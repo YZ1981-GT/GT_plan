@@ -339,6 +339,30 @@ jobs:
             echo "::warning::check_coverage_ledger.py 尚未创建，跳过"
           fi
 
+  acnr-consumer-coverage:
+    # ACNR Req-11: Consumer Coverage 真实扫描器
+    # 扫描 backend/app/ 下 address_registry. 直接调用，阻断未登记的新增消费者
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check ACNR consumer coverage (strict mode)
+        run: python backend/scripts/check/check_acnr_consumer_coverage.py --strict
+
+  acnr-snapshot-count:
+    # ACNR Req-16.4: 快照数量守卫
+    # 校验快照目录总数 ≤ keep_recent + referenced_count，防止清理逻辑失效导致膨胀
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check ACNR snapshot count (strict mode)
+        run: python backend/scripts/check/check_acnr_snapshot_count.py --strict
+
   render-smoke:
     # P0-3: Playwright render 冒烟测试（BLOCKING 模式）
     # 验证底稿渲染无 console error + 关键选择器存在
@@ -381,6 +405,18 @@ jobs:
       - name: Run file size guard (report mode)
         run: |
           python backend/scripts/check/check_file_size_guard.py --check || true
+
+  formula-runtime-completion:
+    # Formula Runtime Convergence: 完成度真实性守卫 (Task 18)
+    # 检查叶子任务全部 [x]、PG/Playwright 证据存在、禁止 skip/吞错、single-kernel drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check formula runtime completion (strict)
+        run: python backend/scripts/check/check_formula_runtime_completion.py --strict
 
   hotspot-baseline-check:
     # P2-1.3: 新增裸组件/重复能力/超大文件检查

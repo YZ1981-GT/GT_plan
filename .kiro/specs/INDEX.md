@@ -1,6 +1,6 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-07-14
+**最后更新**：2026-07-16
 **当前分支**：`work/2026-05-30-wp-specs`
 **统计基线**：2026-06-29 的总数统计尚待批量重算（原记录：240，active 21 + archived 219）
 **本次完成 Spec**：`workpaper-maintainability-convergence`（底稿 Runtime Boundary、统一持久化、能力覆盖真源与防回归）— Wave 0–7 全部完成
@@ -26,15 +26,17 @@
 
 ---
 
-## 一、Active Specs（21个）
+## 一、Active Specs（23个）
 
-### 全局治理（3，未启动）
+### 全局治理（4，未启动 + 1 已完成）
 
-| Spec | 说明 |
-|------|------|
-| `display-format-single-source` | P0金额/时间/百分比格式化收口displayPrefs+CI守卫 |
-| `cycle-palette-single-source` | P0循环色板单一真源cyclePalette.ts+--gt-cycle-* |
-| `stale-propagation-cleanup-doc` | P2删死代码+分层文档 |
+| Spec | 说明 | 状态 |
+|------|------|------|
+| `acnr-runtime-convergence` | ACNR运行时闭环修复(公共resolve/L2-L3生命周期/权限/版本锁定/治理真守卫) Phase1+2共20需求22P25任务 | ✅ 完成 (Phase1+2全量: 后端468+前端41=509测试全绿, CI守卫pass, 2026-07-16) |
+| `formula-runtime-convergence` | 公式运行时真实写入/回滚/并发/生产入口收敛，14需求16P18任务，最大并行6子代理 | ✅ 完成 (18/18任务, CI守卫pass) |
+| `display-format-single-source` | P0金额/时间/百分比格式化收口displayPrefs+CI守卫 | 未启动 |
+| `cycle-palette-single-source` | P0循环色板单一真源cyclePalette.ts+--gt-cycle-* | 未启动 |
+| `stale-propagation-cleanup-doc` | P2删死代码+分层文档 | 未启动 |
 
 ### D1应收票据拆分（6，三件套齐全待执行）
 

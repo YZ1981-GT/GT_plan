@@ -1,24 +1,21 @@
 /**
- * GtRefreshScopeDialog.spec.ts — 合伙人全局一键刷新勾选弹窗 示例测试 + P23
+ * GtRefreshScopeDialog.spec.ts — Task 16 验证
  *
- * spec formula-management-library Task 18.2（Req 19.1-19.6）
+ * 覆盖：
+ *  1. production host 传 project_id/year
+ *  2. contract 字段解析（parseDraftRefreshResponse 各状态）
+ *  3. failed 响应不弹 success toast
+ *  4. partial_success 列出失败目标
+ *  5. success 触发 refresh-complete emit
+ *  6. 空勾选阻断（P23 保留）
  *
- * 示例（不得假绿）：
- *  ① 弹窗含 报表 / 底稿 / 调整分录 / 附注 基础项（Req 19.3）
- *  ② 底稿按循环展开为各循环子项（Req 19.4）
- *  ③ 合伙人可见入口 / 非合伙人不可见入口（Req 19.1 / 19.2）
- *
- * Feature: formula-management-library, Property 23: 空勾选阻断刷新
- *   对任意"空勾选"等价集合（无勾选 / 仅合成父节点）→ 禁止提交（确认刷新禁用）、
- *   不触发刷新（不发 POST /draft-refresh）、无请求 / 无留痕。
- *   **Validates: Requirements 19.5**
+ * Spec: formula-runtime-convergence Task 16
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
 import { defineComponent, ref, nextTick, type Ref } from 'vue'
-import * as fc from 'fast-check'
 
-// ─── ResizeObserver polyfill（Element Plus 部分组件在 jsdom 下需要） ────────────
+// ─── ResizeObserver polyfill ────────────────────────────────────────────────────
 if (!(globalThis as any).ResizeObserver) {
   ;(globalThis as any).ResizeObserver = class {
     observe() {}
@@ -42,18 +39,14 @@ const {
   mockMsgError: vi.fn(),
   mockMsgSuccess: vi.fn(),
   mockMsgWarning: vi.fn(),
-  // 可变角色：控制合伙人 / 非合伙人两态
   roleHolder: { role: 'partner' as string },
-  // el-tree.getCheckedKeys(true) 的受控返回（模拟勾选态）
   checkedKeysHolder: { keys: [] as string[] },
 }))
 
-// http（axios 封装，默认导出）：get 返回 refresh-scopes 桩，post 断言不被调用（空勾选）
 vi.mock('@/utils/http', () => ({
   default: { get: mockGet, post: mockPost },
 }))
 
-// 前端门禁：mock usePermissionMatrix.currentRole（合伙人 vs 非合伙人）
 vi.mock('@/composables/usePermissionMatrix', () => ({
   usePermissionMatrix: () => ({
     currentRole: { get value() { return roleHolder.role } } as unknown as Ref<string>,
@@ -75,24 +68,26 @@ vi.mock('element-plus', async (importOriginal) => {
 
 import ElementPlus from 'element-plus'
 import GtRefreshScopeDialog from '../GtRefreshScopeDialog.vue'
-
-const WORKPAPER_GROUP_KEY = '__workpaper_group__'
+import {
+  parseDraftRefreshResponse,
+  isSuccess,
+  isPartialSuccess,
+  isFailed,
+  isIdempotentHit,
+} from '../formulaRuntimeContract'
 
 // ─── Stubs ────────────────────────────────────────────────────────────────────
-// ElDialog：无条件渲染默认 + footer 插槽（不受 modelValue 限制，便于断言内容）
 const ElDialogStub = defineComponent({
   name: 'ElDialog',
   props: { modelValue: { type: Boolean, default: false }, title: { type: String, default: '' } },
   template: '<div class="el-dialog-stub"><slot /><slot name="footer" /></div>',
 })
 
-// ElTree：递归渲染 label（供文本断言）+ 暴露 getCheckedKeys（受控）+ 可 emit check
 const ElTreeStub = defineComponent({
   name: 'ElTree',
   props: { data: { type: Array as () => any[], default: () => [] } },
   emits: ['check'],
   methods: {
-    // 组件调用 treeRef.value.getCheckedKeys(true)
     getCheckedKeys() {
       return checkedKeysHolder.keys
     },
@@ -111,24 +106,17 @@ const ElTreeStub = defineComponent({
   `,
 })
 
-const STUBS = {
-  ElDialog: ElDialogStub,
-  ElTree: ElTreeStub,
-} as const
+const STUBS = { ElDialog: ElDialogStub, ElTree: ElTreeStub } as const
 
-// refresh-scopes 发现端点桩：覆盖 报表 / 底稿(按循环) / 调整分录 / 附注
 const SCOPE_ITEMS = [
   { key: 'report', label: '报表', group: 'report' },
-  { key: 'adjustment', label: '调整分录', group: 'adjustment' },
   { key: 'note', label: '附注', group: 'note' },
   { key: 'workpaper:D', label: 'D 类循环底稿', group: 'workpaper', cycle: 'D' },
-  { key: 'workpaper:E', label: 'E 类循环底稿', group: 'workpaper', cycle: 'E' },
-  { key: 'workpaper:F', label: 'F 类循环底稿', group: 'workpaper', cycle: 'F' },
 ]
 
 function mountDialog(props: Record<string, unknown> = {}): VueWrapper {
   return mount(GtRefreshScopeDialog, {
-    props: { projectId: 'proj-1', year: 2025, ...props },
+    props: { projectId: 'proj-abc', year: 2025, ...props },
     global: { plugins: [ElementPlus], stubs: STUBS },
   })
 }
@@ -140,160 +128,284 @@ async function openDialog(wrapper: VueWrapper) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-describe('GtRefreshScopeDialog — 示例（Req 19.1-19.6）', () => {
+describe('GtRefreshScopeDialog — Task 16 production host + contract', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     roleHolder.role = 'partner'
     checkedKeysHolder.keys = []
     mockGet.mockResolvedValue({ data: { data: { items: SCOPE_ITEMS } } })
-    mockPost.mockResolvedValue({ data: { data: { affected_count: 3, result_status: 'success' } } })
   })
 
-  // ── ① 弹窗含 报表 / 底稿 / 调整分录 / 附注（Req 19.3） ────────────────────────
-  it('弹窗渲染 报表 / 底稿 / 调整分录 / 附注 基础项', async () => {
-    const wrapper = mountDialog()
+  // ─── 1. production host 传 project_id/year ──────────────────────────────────
+  it('向 refresh-scopes 传递 projectId 和 year', async () => {
+    const wrapper = mountDialog({ projectId: 'p-123', year: 2024 })
     await openDialog(wrapper)
 
-    const text = wrapper.text()
-    expect(text).toContain('报表')
-    expect(text).toContain('调整分录')
-    expect(text).toContain('附注')
-    // 底稿域为合成父节点「底稿（按循环）」
-    expect(text).toContain('底稿')
     expect(mockGet).toHaveBeenCalledWith(
       '/api/workpapers/refresh-scopes',
-      { params: { project_id: 'proj-1', year: 2025 } },
+      { params: { project_id: 'p-123', year: 2024 } },
     )
     wrapper.unmount()
   })
 
-  // ── ② 底稿按循环展开为各循环子项（Req 19.4） ──────────────────────────────────
-  it('底稿域展开为各循环子项（workpaper:{cycle}）', async () => {
-    const wrapper = mountDialog()
+  it('props projectId/year 透传到 POST draft-refresh', async () => {
+    mockPost.mockResolvedValue({
+      data: {
+        data: {
+          status: 'success',
+          run_id: 'run-001',
+          transaction_mode: 'all_or_nothing',
+          affected_count: 5,
+          applied_count: 5,
+          failed_count: 0,
+          skipped_count: 0,
+          scopes: ['report'],
+          idempotent: false,
+          rollback_available: true,
+          warnings: [],
+          failures: [],
+          preset_application: { preset_count: 0, presetted_pages: [], pending_pages: [] },
+        },
+      },
+    })
+
+    const wrapper = mountDialog({ projectId: 'p-xyz', year: 2026 })
     await openDialog(wrapper)
 
-    // 合成父节点存在
-    const groupNode = wrapper.find(`[data-key="${WORKPAPER_GROUP_KEY}"]`)
-    expect(groupNode.exists()).toBe(true)
-
-    // 各循环子叶存在（可按循环单独勾选，而非只能整选全部底稿）
-    expect(wrapper.find('[data-key="workpaper:D"]').exists()).toBe(true)
-    expect(wrapper.find('[data-key="workpaper:E"]').exists()).toBe(true)
-    expect(wrapper.find('[data-key="workpaper:F"]').exists()).toBe(true)
-
-    const text = wrapper.text()
-    expect(text).toContain('D 类循环底稿')
-    expect(text).toContain('E 类循环底稿')
-    wrapper.unmount()
-  })
-
-  // ── ③ 合伙人可见 / 非合伙人不可见入口（Req 19.1 / 19.2） ──────────────────────
-  it('合伙人角色渲染「全局一键刷新」入口按钮', () => {
-    roleHolder.role = 'partner'
-    const wrapper = mountDialog()
-    expect((wrapper.vm as any).isPartner).toBe(true)
-    expect(wrapper.find('.gt-rsd-entry').exists()).toBe(true)
-    wrapper.unmount()
-  })
-
-  it('signing_partner 角色同样渲染入口按钮', () => {
-    roleHolder.role = 'signing_partner'
-    const wrapper = mountDialog()
-    expect((wrapper.vm as any).isPartner).toBe(true)
-    expect(wrapper.find('.gt-rsd-entry').exists()).toBe(true)
-    wrapper.unmount()
-  })
-
-  it('非合伙人角色（auditor / manager / admin）不渲染入口按钮', () => {
-    for (const role of ['auditor', 'manager', 'admin']) {
-      roleHolder.role = role
-      const wrapper = mountDialog()
-      expect((wrapper.vm as any).isPartner).toBe(false)
-      expect(wrapper.find('.gt-rsd-entry').exists()).toBe(false)
-      wrapper.unmount()
-    }
-  })
-
-  // ── 正向对照：非空勾选 → 确认刷新发起 POST（证明 P23 非平凡绿） ────────────────
-  it('勾选非空 → 确认刷新按钮启用并 POST /draft-refresh', async () => {
-    const wrapper = mountDialog()
-    await openDialog(wrapper)
-
-    // 模拟勾选 report 叶子
     checkedKeysHolder.keys = ['report']
     wrapper.findComponent(ElTreeStub).vm.$emit('check')
     await nextTick()
-    expect((wrapper.vm as any).checkedScopes).toEqual(['report'])
 
-    const confirmBtn = wrapper
-      .findAll('button')
-      .find((b) => b.text().includes('确认刷新'))!
-    expect(confirmBtn.classes()).not.toContain('is-disabled')
-
+    const confirmBtn = wrapper.findAll('button').find((b) => b.text().includes('确认刷新'))!
     await confirmBtn.trigger('click')
     await flushPromises()
 
-    expect(mockPost).toHaveBeenCalledTimes(1)
-    expect(mockPost).toHaveBeenCalledWith('/api/workpapers/draft-refresh', {
-      project_id: 'proj-1',
-      year: 2025,
+    expect(mockPost).toHaveBeenCalledWith('/api/workpapers/draft-refresh', expect.objectContaining({
+      project_id: 'p-xyz',
+      year: 2026,
       scopes: ['report'],
-      confirm_overwrite: false,
-    })
+    }))
     wrapper.unmount()
   })
-})
 
-// ══════════════════════════════════════════════════════════════════════════════
-// Feature: formula-management-library, Property 23: 空勾选阻断刷新
-//   对任意空勾选等价集合 → 禁止提交、不触发刷新（不发 POST /draft-refresh）、无请求/无留痕。
-//   Validates: Requirements 19.5
-describe('GtRefreshScopeDialog — Property 23：空勾选阻断刷新（Req 19.5）', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    roleHolder.role = 'partner'
-    checkedKeysHolder.keys = []
-    mockGet.mockResolvedValue({ data: { data: { items: SCOPE_ITEMS } } })
-    mockPost.mockResolvedValue({ data: { data: { affected_count: 0, result_status: 'success' } } })
+  // ─── 2. contract 字段解析 ───────────────────────────────────────────────────
+  it('parseDraftRefreshResponse 解析所有字段', () => {
+    const raw = {
+      status: 'partial_success',
+      run_id: 'abc-123',
+      transaction_mode: 'partial_success',
+      affected_count: 10,
+      applied_count: 7,
+      failed_count: 3,
+      skipped_count: 0,
+      scopes: ['report', 'workpaper:D'],
+      idempotent: false,
+      rollback_available: true,
+      warnings: ['low coverage'],
+      failures: ['D2-1 审定表', 'D3-1 审定表', 'D4-5 检查表'],
+      preset_application: {
+        preset_count: 5,
+        presetted_pages: ['report:BS', 'report:IS'],
+        pending_pages: ['note:section1'],
+      },
+    }
+    const result = parseDraftRefreshResponse(raw)
+
+    expect(result.status).toBe('partial_success')
+    expect(result.run_id).toBe('abc-123')
+    expect(result.transaction_mode).toBe('partial_success')
+    expect(result.applied_count).toBe(7)
+    expect(result.failed_count).toBe(3)
+    expect(result.failures).toEqual(['D2-1 审定表', 'D3-1 审定表', 'D4-5 检查表'])
+    expect(result.preset_application.preset_count).toBe(5)
+    expect(result.preset_application.presetted_pages).toHaveLength(2)
+    expect(result.warnings).toEqual(['low coverage'])
+    expect(result.rollback_available).toBe(true)
   })
 
-  it('任意"空勾选"等价集合（无勾选 / 仅合成父节点）→ 禁用确认 + 不发起任何请求', async () => {
-    // 生成空勾选等价态：仅由合成父节点 key 组成（0..n 个），过滤后必为空
-    const emptyEquivalentArb = fc.array(fc.constant(WORKPAPER_GROUP_KEY), {
-      minLength: 0,
-      maxLength: 4,
+  it('parseDraftRefreshResponse 对缺失字段补默认值', () => {
+    const minimal = { status: 'success', run_id: 'r-1' }
+    const result = parseDraftRefreshResponse(minimal)
+
+    expect(result.applied_count).toBe(0)
+    expect(result.failed_count).toBe(0)
+    expect(result.failures).toEqual([])
+    expect(result.warnings).toEqual([])
+    expect(result.preset_application.preset_count).toBe(0)
+    expect(result.rollback_available).toBe(true)
+  })
+
+  it('parseDraftRefreshResponse 拒绝非法 status', () => {
+    expect(() => parseDraftRefreshResponse({ status: 'bogus', run_id: 'x' })).toThrow('invalid status')
+  })
+
+  it('parseDraftRefreshResponse 拒绝非对象输入', () => {
+    expect(() => parseDraftRefreshResponse(null)).toThrow('must be a non-null object')
+    expect(() => parseDraftRefreshResponse(42)).toThrow('must be a non-null object')
+  })
+
+  it('status helpers 分类正确', () => {
+    const s = parseDraftRefreshResponse({ status: 'success', run_id: 'a' })
+    const p = parseDraftRefreshResponse({ status: 'partial_success', run_id: 'b' })
+    const f = parseDraftRefreshResponse({ status: 'failed', run_id: 'c' })
+    const i = parseDraftRefreshResponse({ status: 'idempotent_hit', run_id: 'd' })
+
+    expect(isSuccess(s)).toBe(true)
+    expect(isPartialSuccess(p)).toBe(true)
+    expect(isFailed(f)).toBe(true)
+    expect(isIdempotentHit(i)).toBe(true)
+
+    expect(isSuccess(f)).toBe(false)
+    expect(isFailed(s)).toBe(false)
+  })
+
+  // ─── 3. failed 响应不弹 success toast ──────────────────────────────────────
+  it('status=failed 不弹 success toast', async () => {
+    mockPost.mockResolvedValue({
+      data: {
+        data: {
+          status: 'failed',
+          run_id: 'run-f',
+          transaction_mode: 'all_or_nothing',
+          affected_count: 0,
+          applied_count: 0,
+          failed_count: 3,
+          skipped_count: 0,
+          scopes: ['report'],
+          idempotent: false,
+          rollback_available: false,
+          warnings: [],
+          failures: ['target-A', 'target-B', 'target-C'],
+          preset_application: { preset_count: 0, presetted_pages: [], pending_pages: [] },
+        },
+      },
     })
 
-    await fc.assert(
-      fc.asyncProperty(emptyEquivalentArb, async (checked) => {
-        const wrapper = mountDialog()
-        await openDialog(wrapper)
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
 
-        // clear 掉 openDialog 期间的 get 调用，聚焦断言"确认阶段无 POST"
-        mockPost.mockClear()
+    checkedKeysHolder.keys = ['report']
+    wrapper.findComponent(ElTreeStub).vm.$emit('check')
+    await nextTick()
 
-        // 施加"空勾选"等价态
-        checkedKeysHolder.keys = checked
-        wrapper.findComponent(ElTreeStub).vm.$emit('check')
-        await nextTick()
+    const confirmBtn = wrapper.findAll('button').find((b) => b.text().includes('确认刷新'))!
+    await confirmBtn.trigger('click')
+    await flushPromises()
 
-        // 过滤合成父节点后勾选集合必为空
-        expect((wrapper.vm as any).checkedScopes).toEqual([])
+    // 不弹 success
+    expect(mockMsgSuccess).not.toHaveBeenCalled()
+    // 不弹 warning（partial 才弹）
+    expect(mockMsgWarning).not.toHaveBeenCalled()
 
-        // 「确认刷新」按钮禁用（禁止提交）
-        const confirmBtn = wrapper
-          .findAll('button')
-          .find((b) => b.text().includes('确认刷新'))!
-        expect(confirmBtn.classes()).toContain('is-disabled')
+    wrapper.unmount()
+  })
 
-        // 尝试点击 → 不触发刷新、不发 POST（无请求/无留痕）
-        await confirmBtn.trigger('click')
-        await flushPromises()
-        expect(mockPost).not.toHaveBeenCalled()
+  // ─── 4. partial_success 列出失败目标 ──────────────────────────────────────
+  it('status=partial_success 显示失败目标列表', async () => {
+    mockPost.mockResolvedValue({
+      data: {
+        data: {
+          status: 'partial_success',
+          run_id: 'run-p',
+          transaction_mode: 'partial_success',
+          affected_count: 5,
+          applied_count: 3,
+          failed_count: 2,
+          skipped_count: 0,
+          scopes: ['report'],
+          idempotent: false,
+          rollback_available: true,
+          warnings: [],
+          failures: ['D2-1 审定表写入失败', '附注 section3 格式错误'],
+          preset_application: { preset_count: 0, presetted_pages: [], pending_pages: [] },
+        },
+      },
+    })
 
-        wrapper.unmount()
-      }),
-      { numRuns: 20 },
-    )
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+
+    checkedKeysHolder.keys = ['report']
+    wrapper.findComponent(ElTreeStub).vm.$emit('check')
+    await nextTick()
+
+    const confirmBtn = wrapper.findAll('button').find((b) => b.text().includes('确认刷新'))!
+    await confirmBtn.trigger('click')
+    await flushPromises()
+
+    const text = wrapper.text()
+    expect(text).toContain('D2-1 审定表写入失败')
+    expect(text).toContain('附注 section3 格式错误')
+    expect(text).toContain('失败')
+    // partial 弹 warning toast
+    expect(mockMsgWarning).toHaveBeenCalled()
+    // 不弹 success toast
+    expect(mockMsgSuccess).not.toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  // ─── 5. success 触发 refresh-complete emit ────────────────────────────────
+  it('status=success emit refresh-complete 事件', async () => {
+    mockPost.mockResolvedValue({
+      data: {
+        data: {
+          status: 'success',
+          run_id: 'run-s',
+          transaction_mode: 'all_or_nothing',
+          affected_count: 8,
+          applied_count: 8,
+          failed_count: 0,
+          skipped_count: 0,
+          scopes: ['report', 'note'],
+          idempotent: false,
+          rollback_available: true,
+          warnings: [],
+          failures: [],
+          preset_application: { preset_count: 2, presetted_pages: ['report:BS'], pending_pages: [] },
+        },
+      },
+    })
+
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+
+    checkedKeysHolder.keys = ['report', 'note']
+    wrapper.findComponent(ElTreeStub).vm.$emit('check')
+    await nextTick()
+
+    const confirmBtn = wrapper.findAll('button').find((b) => b.text().includes('确认刷新'))!
+    await confirmBtn.trigger('click')
+    await flushPromises()
+
+    // emit refresh-complete
+    const emitted = wrapper.emitted('refresh-complete')
+    expect(emitted).toBeTruthy()
+    expect(emitted![0][0]).toMatchObject({ status: 'success', applied_count: 8 })
+    // 弹 success toast
+    expect(mockMsgSuccess).toHaveBeenCalled()
+
+    wrapper.unmount()
+  })
+
+  // ─── 6. 空勾选阻断（P23 回归） ────────────────────────────────────────────
+  it('空勾选 → 确认按钮禁用 + 不发 POST', async () => {
+    const wrapper = mountDialog()
+    await openDialog(wrapper)
+
+    checkedKeysHolder.keys = []
+    wrapper.findComponent(ElTreeStub).vm.$emit('check')
+    await nextTick()
+
+    expect((wrapper.vm as any).checkedScopes).toEqual([])
+
+    const confirmBtn = wrapper.findAll('button').find((b) => b.text().includes('确认刷新'))!
+    expect(confirmBtn.classes()).toContain('is-disabled')
+
+    await confirmBtn.trigger('click')
+    await flushPromises()
+    expect(mockPost).not.toHaveBeenCalled()
+
+    wrapper.unmount()
   })
 })

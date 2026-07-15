@@ -19,6 +19,10 @@ export {
 
 export {
   useAcnr,
+  getCacheEpoch,
+  invalidateModuleCache,
+  isSSEDegraded,
+  MAX_RESOLVE_CACHE_SIZE,
   type AcnrSheetEntry,
   type AcnrCellEntry,
   type AcnrResolveResult,

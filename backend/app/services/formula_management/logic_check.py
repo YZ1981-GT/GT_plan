@@ -1,22 +1,22 @@
-"""logic_check 收编 useReportCrossCheck 7 条硬编码勾稽（Task 4.1 / Req 6.4）。
+"""logic_check 收编 7 条跨表勾稽为真实可失败语义（Req 4 / P7）。
 
-本模块把前端 ``useReportCrossCheck.ts`` 的 ``computeCrossCheckResults`` 中 7 条
-**硬编码不可编辑**的报表勾稽（资产=负债+权益、利润总额−所得税=净利润、有效
-税率≈25% 等）落库为 7 条 **可编辑的 ``logic_check`` 公式**（种子数据）：
+本模块实现 7 条跨表勾稽规则，其中 #2/#5/#7 已修正为使用**独立来源/真实条件**，
+消除旧版自减自比和自适应容差导致的恒真问题：
 
-- 表达式引用经 ACNR **REPORT 域** row_code（``ROW('...')`` 形态，经
-  ``full_resolve`` 归属 report 域，见 ``resolver._detect_non_wp_domain``）。
-- 问题描述（``issue_description``）**沿用原 ``description``**（勾稽不通过时即
-  作为 Issue_List 的问题项文案）。
-- 语义**保持不变**：每条勾稽的 passed 判定逐条移植自前端 ``check()``——
-  ``tolerance > 0`` 时 ``|round(diff, 2)| <= tolerance``，否则 ``|round(diff, 2)| < 0.01``。
-  只是从"硬编码不可编辑"变为"可编辑 logic_check 公式"。
+- **#2** 比较"营业收入减营业成本"的计算结果与独立毛利报表行的值；
+  若平台没有独立毛利行，则降为"营业收入、营业成本完整性/方向"真实检查
+  （两者均 >= 0，使用嵌套 IF 替代 AND），禁止自减自比。
+- **#5** 比较所有者权益变动表期末合计与资产负债表权益合计，
+  使用两个不同 REPORT addr_id。
+- **#7** 直接判断货币资金 >= 0，不得把 tolerance 设为 abs(cash)。
+
+每条规则必须有 pass/fail 样例，后端与前端降级模型等价。
 
 执行路径统一走 ``formula_management.engine.execute_formula``（logic_check 分派）：
 条件表达式求值为真（!=0，即勾稽通过）→ 不产 Issue；求值为 0（勾稽不通过）→
 向 Issue_List 追加一条以 ``description`` 为文案的问题项，**绝不修改任何数据值**。
 
-Requirements: 6.4
+Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ _BS_VARIABLES: dict[str, tuple[str, tuple[str, ...]]] = {
     "assets_total": ("assets_total", ("assets_total", "资产总计", "资产合计")),
     # 负债合计
     "liabilities_total": ("liabilities_total", ("liabilities_total", "负债合计", "负债总计")),
-    # 所有者权益合计
+    # 所有者权益合计（资产负债表来源）
     "equity_total": (
         "equity_total",
         ("equity_total", "所有者权益合计", "股东权益合计", "权益合计"),
@@ -63,8 +63,16 @@ _IS_VARIABLES: dict[str, tuple[str, tuple[str, ...]]] = {
     "net_profit": ("IS-019", ("IS-019", "净利润")),
     "revenue": ("IS-001", ("IS-001", "营业收入")),
     "cost": ("IS-002", ("IS-002", "营业成本")),
+    "gross_profit": ("IS-003", ("IS-003", "毛利", "营业毛利", "主营业务毛利")),
     "profit_before_tax": ("IS-017", ("IS-017", "利润总额")),
     "income_tax": ("IS-018", ("IS-018", "所得税费用", "所得税")),
+}
+# 所有者权益变动表来源（独立于 BS 的 equity_total）
+_EQ_VARIABLES: dict[str, tuple[str, tuple[str, ...]]] = {
+    "eq_ending_total": (
+        "EQ-ENDING",
+        ("EQ-ENDING", "期末余额合计", "期末合计", "所有者权益期末合计"),
+    ),
 }
 
 
@@ -72,7 +80,7 @@ _IS_VARIABLES: dict[str, tuple[str, tuple[str, ...]]] = {
 # 7 条勾稽种子（logic_check 公式定义）
 # ─────────────────────────────────────────────────────────────────────────────
 # 每条表达式在勾稽**通过**时求值为 1（!=0），**不通过**时求值为 0；
-# 与前端 check() 的 passed 判定逐条等价（见模块 docstring）。
+# #2/#5/#7 已修正为独立来源/真实条件，不再自减自比或自适应容差。
 # refs：表达式引用的 REPORT 域 row_code（ROW 形态 formula_ref），经 full_resolve 归属 report 域。
 _CROSS_CHECK_SEEDS: list[dict[str, Any]] = [
     {
@@ -87,13 +95,16 @@ _CROSS_CHECK_SEEDS: list[dict[str, Any]] = [
     },
     {
         "id": "report-cross-check-2",
-        "description": "营业收入 − 营业成本 = 毛利",
-        # tol=0: 左右恒等（毛利定义），|round(0, 2)| < 0.01 → 恒通过
+        "description": "营业收入 − 营业成本 = 独立毛利行（或收入/成本完整性检查）",
+        # 修正：比较计算毛利(revenue - cost)与独立毛利报表行(IS-003)；
+        # 若独立毛利行不存在(=0)，降为检查收入>=0且成本>=0的真实业务条件。
+        # 禁止自减自比。使用嵌套 IF 替代 AND（AST 引擎不支持 AND 关键字）。
         "expression": (
-            "ABS(ROUND((ROW('IS-001') - ROW('IS-002')) - "
-            "(ROW('IS-001') - ROW('IS-002')), 2)) < 0.01"
+            "IF(ROW('IS-003') != 0, "
+            "ABS(ROUND((ROW('IS-001') - ROW('IS-002')) - ROW('IS-003'), 2)) <= 1, "
+            "IF(ROW('IS-001') >= 0, IF(ROW('IS-002') >= 0, 1, 0), 0))"
         ),
-        "refs": ["IS-001", "IS-002"],
+        "refs": ["IS-001", "IS-002", "IS-003"],
     },
     {
         "id": "report-cross-check-3",
@@ -116,17 +127,18 @@ _CROSS_CHECK_SEEDS: list[dict[str, Any]] = [
     },
     {
         "id": "report-cross-check-5",
-        "description": "所有者权益变动表期末 = 资产负债表权益",
-        # tol=0: 左右恒等，|round(0, 2)| < 0.01 → 恒通过
-        "expression": "ABS(ROUND(ROW('equity_total') - ROW('equity_total'), 2)) < 0.01",
-        "refs": ["equity_total"],
+        "description": "所有者权益变动表期末合计 = 资产负债表权益合计",
+        # 修正：使用两个不同 REPORT addr_id —— EQ-ENDING(变动表) vs equity_total(BS)。
+        # 不再自比自减。
+        "expression": (
+            "ABS(ROUND(ROW('EQ-ENDING') - ROW('equity_total'), 2)) <= 1"
+        ),
+        "refs": ["EQ-ENDING", "equity_total"],
     },
     {
         "id": "report-cross-check-6",
         "description": "有效税率 ≈ 25%",
         # pbt>0: |round(tax - pbt*0.25, 2)| <= pbt*0.05；否则 |round(tax, 2)| < 0.01
-        # （等价于前端：right = pbt>0 ? pbt*0.25 : 0，tolerance = pbt*0.05，
-        #   tolerance>0 ⟺ pbt>0）
         "expression": (
             "IF(ROW('IS-017') > 0, "
             "ABS(ROUND(ROW('IS-018') - ROW('IS-017') * 0.25, 2)) <= ROW('IS-017') * 0.05, "
@@ -137,13 +149,8 @@ _CROSS_CHECK_SEEDS: list[dict[str, Any]] = [
     {
         "id": "report-cross-check-7",
         "description": "货币资金 ≥ 0（负值异常）",
-        # left=cash, right=0, tolerance=|cash|：cash!=0 时 |round(cash,2)| <= |cash|，
-        # cash==0 时 |round(0,2)| < 0.01（前端此条 tolerance=abs(cash) 恒使其通过）
-        "expression": (
-            "IF(ABS(ROW('BS-001')) > 0, "
-            "ABS(ROUND(ROW('BS-001'), 2)) <= ABS(ROW('BS-001')), "
-            "ABS(ROUND(ROW('BS-001'), 2)) < 0.01)"
-        ),
+        # 修正：直接判断 cash >= 0，不得把 tolerance 设为 abs(cash)。
+        "expression": "ROW('BS-001') >= 0",
         "refs": ["BS-001"],
     },
 ]
@@ -247,20 +254,26 @@ def _resolve_value(report_map: dict[str, Decimal], candidate_keys: tuple[str, ..
 
 
 def build_report_row_cache(
-    bs_rows: Iterable[Any], is_rows: Iterable[Any]
+    bs_rows: Iterable[Any],
+    is_rows: Iterable[Any],
+    eq_rows: Iterable[Any] | None = None,
 ) -> dict[str, Decimal]:
-    """从资产负债表 / 利润表行构建 logic_check 公式的 row_cache。
+    """从资产负债表 / 利润表 / 权益变动表行构建 logic_check 公式的 row_cache。
 
     row_cache 的键即表达式中 ``ROW('...')`` 的 REPORT 域 row_code。
+    eq_rows 用于 #5（权益变动表期末合计 vs BS 权益合计）。
     """
     bs_map = _build_report_map(bs_rows)
     is_map = _build_report_map(is_rows)
+    eq_map = _build_report_map(eq_rows) if eq_rows else {}
 
     row_cache: dict[str, Decimal] = {}
     for _var, (ref_code, candidates) in _BS_VARIABLES.items():
         row_cache[ref_code] = _resolve_value(bs_map, candidates)
     for _var, (ref_code, candidates) in _IS_VARIABLES.items():
         row_cache[ref_code] = _resolve_value(is_map, candidates)
+    for _var, (ref_code, candidates) in _EQ_VARIABLES.items():
+        row_cache[ref_code] = _resolve_value(eq_map, candidates)
     return row_cache
 
 

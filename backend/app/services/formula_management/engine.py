@@ -18,7 +18,15 @@
 约束：禁止在公式引用中拼接 ``wp_code+sheet+cell`` 裸字符串（Req 11.5），
 引用一律以 ``addr_id`` / ``formula_ref`` 形式经 ``resolve_ref`` 解析。
 
-Requirements: 5.1, 5.2, 5.4, 5.5, 6.1, 6.2, 6.6, 7.1, 7.2, 7.5,
+Batch Runtime 入口（Task 12，Req 1,2,5,11｜P1,P6,P14）：
+
+- ``execute_batch`` 接收预加载 ``BatchFormulaContext`` 与公式定义列表，不逐 ref
+  resolve，直接以 addr_id→value 映射驱动求值。
+- auto_calc 产出 ``MutationIntent``（不直接写值），由上层确认 computed time。
+- logic_check / reasonability 只产 issue/hint，不产 mutation。
+- 返回 ``BatchExecutionResult`` 包含 intents、issues、hints、errors。
+
+Requirements: 1.1, 1.2, 2.1, 5.1, 5.2, 5.4, 5.5, 6.1, 6.2, 6.6, 7.1, 7.2, 7.5,
               11.1, 11.2, 11.3, 11.5
 """
 
@@ -28,7 +36,8 @@ import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Literal, Optional
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -397,3 +406,237 @@ def _exec_reasonability(formula: FormulaRecord, ctx: FormulaContext) -> FormulaE
         )
     result.last_computed_at = datetime.now(timezone.utc)
     return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Batch Runtime 入口（Task 12，Req 1,2,5,11｜P1,P6,P14）
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+@dataclass
+class BatchFormulaContext:
+    """预加载值，由 FormulaValueLoader 填充后传入 execute_batch。
+
+    不再由 engine 逐 ref resolve——所有值已按 addr_id 批量预载。
+    """
+
+    values: dict[str, Any]  # addr_id → resolved value (Decimal/str/None)
+    missing: set[str] = field(default_factory=set)  # addr_id that could not be resolved
+    ambiguous: set[str] = field(default_factory=set)  # addr_id with multiple matches
+
+
+@dataclass(frozen=True)
+class CanonicalFormulaTarget:
+    """公式目标身份（batch runtime 内部使用，与 contracts.py 同构）。"""
+
+    domain: Literal["workpaper", "adjudication", "report", "note"]
+    project_id: UUID
+    year: int
+    addr_id: str
+    locator: dict[str, str] = field(default_factory=dict)
+    wp_id: UUID | None = None
+
+
+@dataclass
+class BatchFormulaDefinition:
+    """batch execute 输入的公式定义。"""
+
+    id: str
+    formula_type: str  # auto_calc | logic_check | reasonability
+    expression: str
+    target: CanonicalFormulaTarget | None = None  # auto_calc 写入目标
+    ref_addr_ids: list[str] = field(default_factory=list)  # 引用的 addr_id 列表
+    issue_description: str | None = None
+    hint_text: str | None = None
+    addr_id: str | None = None  # 本公式承载单元的 canonical addr_id
+
+
+@dataclass
+class MutationIntent:
+    """auto_calc 求值结果——写入意图，NOT YET APPLIED。
+
+    上层 coordinator 成功调用 adapter.apply_many 后才确认 computed time。
+    """
+
+    target: CanonicalFormulaTarget
+    computed_value: Any
+    formula_id: str
+    formula_type: str  # auto_calc | logic_check | reasonability
+
+
+@dataclass
+class BatchExecutionResult:
+    """batch formula execution 完整返回。"""
+
+    intents: list[MutationIntent] = field(default_factory=list)
+    issues: list[dict] = field(default_factory=list)
+    hints: list[dict] = field(default_factory=list)
+    errors: list[dict] = field(default_factory=list)
+
+
+def execute_batch(
+    *,
+    formulas: list[BatchFormulaDefinition],
+    context: BatchFormulaContext,
+) -> BatchExecutionResult:
+    """Batch runtime 单一入口（Task 12，Req 1,2,5,11｜P1,P6,P14）。
+
+    接收预加载 BatchFormulaContext 与公式定义列表。不逐 ref resolve（已由
+    FormulaValueLoader 预载）。auto_calc 产出 MutationIntent，不直接写值，
+    不写 last_computed_at——由上层 coordinator 成功 domain apply 后确认。
+
+    - auto_calc：求值成功 → MutationIntent（intent to write）
+    - logic_check：条件不通过 → issue；不产 mutation
+    - reasonability：条件成立 → hint；不产 mutation
+    - 引用在 missing/ambiguous 中 → 记 error，跳过该公式
+
+    Args:
+        formulas: 公式定义列表，含 canonical target 与 ref addr_ids。
+        context: 预加载上下文（addr_id → value 映射）。
+
+    Returns:
+        BatchExecutionResult（intents, issues, hints, errors）。
+    """
+    result = BatchExecutionResult()
+
+    # 构建 L1 内核 FormulaContext（从预载 addr_id→value 映射填充 row_cache）
+    kernel_ctx = FormulaContext(row_cache={})
+    for addr_id, value in context.values.items():
+        if value is not None:
+            try:
+                kernel_ctx.row_cache[addr_id] = Decimal(str(value))
+            except Exception:
+                kernel_ctx.row_cache[addr_id] = Decimal("0")
+
+    for formula in formulas:
+        # 检查引用 addr_id 是否在 missing 或 ambiguous 中
+        bad_refs = []
+        for ref_id in formula.ref_addr_ids:
+            if ref_id in context.missing:
+                bad_refs.append(f"missing:{ref_id}")
+            elif ref_id in context.ambiguous:
+                bad_refs.append(f"ambiguous:{ref_id}")
+
+        if bad_refs:
+            result.errors.append({
+                "formula_id": formula.id,
+                "formula_type": formula.formula_type,
+                "reason": "unresolved_refs",
+                "refs": bad_refs,
+            })
+            continue
+
+        ftype = (formula.formula_type or "auto_calc").strip()
+
+        if ftype == "auto_calc":
+            _batch_exec_auto_calc(formula, kernel_ctx, result)
+        elif ftype == "logic_check":
+            _batch_exec_logic_check(formula, kernel_ctx, result)
+        elif ftype == "reasonability":
+            _batch_exec_reasonability(formula, kernel_ctx, result)
+        else:
+            result.errors.append({
+                "formula_id": formula.id,
+                "formula_type": ftype,
+                "reason": "unknown_formula_type",
+            })
+
+    return result
+
+
+def _batch_exec_auto_calc(
+    formula: BatchFormulaDefinition,
+    ctx: FormulaContext,
+    result: BatchExecutionResult,
+) -> None:
+    """auto_calc batch：求值 → 产出 MutationIntent（不直接写值、不写 computed time）。"""
+    fr = kernel_execute(formula.expression, ctx)
+
+    if not fr.ok:
+        result.errors.append({
+            "formula_id": formula.id,
+            "formula_type": "auto_calc",
+            "reason": "evaluation_failed",
+            "details": fr.errors or [f"公式求值失败: {formula.expression}"],
+        })
+        return
+
+    value = fr.value
+
+    # 回填到 row_cache 供后续公式使用本次计算值
+    if formula.addr_id:
+        ctx.row_cache[formula.addr_id] = value
+    if formula.target and formula.target.addr_id:
+        ctx.row_cache[formula.target.addr_id] = value
+
+    if formula.target is None:
+        result.errors.append({
+            "formula_id": formula.id,
+            "formula_type": "auto_calc",
+            "reason": "no_target",
+            "details": ["auto_calc 缺少 target，无法生成 MutationIntent"],
+        })
+        return
+
+    result.intents.append(MutationIntent(
+        target=formula.target,
+        computed_value=value,
+        formula_id=formula.id,
+        formula_type="auto_calc",
+    ))
+
+
+def _batch_exec_logic_check(
+    formula: BatchFormulaDefinition,
+    ctx: FormulaContext,
+    result: BatchExecutionResult,
+) -> None:
+    """logic_check batch：条件不通过 → issue；无法求值 → issue。不产 mutation。"""
+    fr = kernel_execute(formula.expression, ctx)
+
+    if not fr.ok:
+        detail = f"（{'; '.join(fr.errors)}）" if fr.errors else ""
+        base = formula.issue_description or formula.expression
+        result.issues.append({
+            "formula_id": formula.id,
+            "addr_id": formula.addr_id,
+            "description": f"公式无法求值：{base}{detail}",
+            "passed": False,
+        })
+        return
+
+    passed = fr.value != Decimal("0")
+    if not passed:
+        result.issues.append({
+            "formula_id": formula.id,
+            "addr_id": formula.addr_id,
+            "description": formula.issue_description
+            or f"逻辑判断不通过：{formula.expression}",
+            "passed": False,
+        })
+
+
+def _batch_exec_reasonability(
+    formula: BatchFormulaDefinition,
+    ctx: FormulaContext,
+    result: BatchExecutionResult,
+) -> None:
+    """reasonability batch：条件成立 → hint；无法求值 → 跳过不中断。不产 mutation。"""
+    fr = kernel_execute(formula.expression, ctx)
+
+    if not fr.ok:
+        logger.warning(
+            "batch reasonability 无法求值，跳过 (id=%s expr=%s): %s",
+            formula.id,
+            formula.expression,
+            fr.errors,
+        )
+        return
+
+    triggered = fr.value != Decimal("0")
+    if triggered:
+        result.hints.append({
+            "formula_id": formula.id,
+            "addr_id": formula.addr_id,
+            "hint_text": formula.hint_text or f"合理性提示：{formula.expression}",
+        })

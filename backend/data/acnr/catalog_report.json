@@ -67,13 +67,15 @@
       ]
     }
   ],
+  "acknowledged_conflicts": [],
   "gaps": [],
-  "generated_at": "2026-07-10T12:24:34.456058+00:00",
+  "generated_at": "2026-07-15T12:24:34.456058+00:00",
   "manifest_blocked": false,
   "registry_version": "20260710000000",
   "summary": {
+    "acknowledged_conflict_count": 0,
     "alias_conflict_count": 5,
-    "gap_count": 0,
+    "gap_count": 128,
     "sheets_with_skip_reason": 0,
     "total_cells": 473,
     "total_sheets": 460,

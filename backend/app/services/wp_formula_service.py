@@ -11,6 +11,16 @@
 - list_by_wp：列出某 wp_id 的全部公式。
 - delete：按 formula_id 删除单条。
 
+Ownership 守卫（formula-runtime-convergence Req 10）：
+- save/list/delete 均须传入 project_id 并校验 wp_id/formula_id 归属。
+- 未提供 project_id 拒绝写入与执行操作。
+- 跨项目访问返回授权错误，不泄露目标敏感元数据。
+
+生命周期修正（formula-runtime-convergence Req 5 / P5）：
+- save 只保存定义并设置 lifecycle_state='saved'，绝不写 last_computed_at。
+- 定义更新递增 definition_version（若列可用）。
+- 成功执行时间戳留给 runtime coordinator。
+
 工程铁律（遵循 memory）：
 - service 只 ``flush`` 不 ``commit``（跨 service 编排由 router 统一 commit 保原子）。
 - 全 async（AsyncSession + select/execute async 风格）。
@@ -19,6 +29,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -26,13 +37,13 @@ from datetime import datetime, timezone
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.workpaper_models import WpFormula
+from app.models.workpaper_models import WpFormula, WorkingPaper
 from app.services.acnr.formula_validation import validate_refs_via_acnr
 
 logger = logging.getLogger(__name__)
 
 # 三类型公式（formula-management-library Req 14.5 / 5-7）：
-#   auto_calc     — 求值并回填目标单元（执行后记 last_computed_at）
+#   auto_calc     — 求值并回填目标单元（执行后由 coordinator 记 last_computed_at）
 #   logic_check   — 产出问题清单，绝不改值
 #   reasonability — 产出提醒清单，绝不改值
 _VALID_FORMULA_TYPES = ("auto_calc", "logic_check", "reasonability")
@@ -42,6 +53,29 @@ _VALID_FORMULA_TYPES = ("auto_calc", "logic_check", "reasonability")
 #   custom    — 用户自定义编辑（默认）
 #   reference — 参照另一条已保存公式（复用其 expression，见 reference_resolver）
 _VALID_FORMULA_SOURCES = ("preset", "custom", "reference")
+
+
+# ── Ownership error 工厂 ─────────────────────────────────────────────────────
+
+class OwnershipError(Exception):
+    """跨项目 ownership 校验失败（Req 10.4：不泄露敏感元数据）。"""
+
+    def __init__(self, message: str = "授权错误：实体不属于请求项目"):
+        super().__init__(message)
+        self.message = message
+
+
+def _ownership_issue(reason: str = "ownership_denied") -> list[dict]:
+    """生成 ownership 校验失败的 issue（不含目标敏感元数据，Req 10.4）。"""
+    return [
+        {
+            "ref": None,
+            "uri": None,
+            "status": reason,
+            "reason": reason,
+            "message": "授权错误：实体不属于请求项目",
+        }
+    ]
 
 
 def _as_uuid(value: uuid.UUID | str) -> uuid.UUID:
@@ -70,14 +104,59 @@ def _normalize_refs(refs: list | None) -> list:
     return normalized
 
 
+def _compute_definition_hash(expression: str, formula_type: str, refs: list) -> str:
+    """计算影响执行的定义字段 hash（definition_hash）。
+
+    仅含 expression + formula_type + sorted refs 序列化。
+    """
+    import json
+    payload = json.dumps(
+        {"expression": expression, "formula_type": formula_type, "refs": refs},
+        sort_keys=True,
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
 class WpFormulaService:
-    """自定义底稿公式 CRUD（save / list / delete）。"""
+    """自定义底稿公式 CRUD（save / list / delete）。
+
+    全部操作校验 project ownership（Req 10.1 / 10.4 / 10.6）。
+    """
+
+    # ── Ownership 校验 ────────────────────────────────────────────────────────
+
+    async def _verify_wp_ownership(
+        self, db: AsyncSession, wp_id: uuid.UUID, project_id: uuid.UUID
+    ) -> bool:
+        """校验 wp_id 属于 project_id（Req 10.1）。"""
+        result = await db.execute(
+            sa.select(WorkingPaper.project_id).where(WorkingPaper.id == wp_id)
+        )
+        row = result.scalar_one_or_none()
+        if row is None:
+            return False
+        return row == project_id
+
+    async def _verify_formula_ownership(
+        self, db: AsyncSession, formula_id: uuid.UUID, project_id: uuid.UUID
+    ) -> bool:
+        """校验 formula_id 属于 project_id（Req 10.1）。"""
+        result = await db.execute(
+            sa.select(WpFormula.project_id).where(WpFormula.id == formula_id)
+        )
+        row = result.scalar_one_or_none()
+        if row is None:
+            return False
+        return row == project_id
+
+    # ── Public API ────────────────────────────────────────────────────────────
 
     async def save(
         self,
         db: AsyncSession,
         *,
-        project_id: uuid.UUID | str,
+        project_id: uuid.UUID | str | None = None,
         wp_id: uuid.UUID | str,
         sheet_name: str,
         target_cell: str,
@@ -94,49 +173,38 @@ class WpFormulaService:
         formula_source: str = "custom",
         reference_formula_id: uuid.UUID | str | None = None,
     ) -> tuple[WpFormula | None, list[dict]]:
-        """保存（upsert）一条底稿公式（formula-management-library 三类型契约）。
+        """保存（upsert）一条底稿公式。
 
-        以 (wp_id, sheet_name, target_cell) 为唯一维度：已存在则覆盖更新
-        expression/formula_type/refs/category/description/issue_description/
-        hint_text，不存在则新建。
+        Lifecycle 修正（Req 5 / P5）：
+        - save 只保存定义，绝不写 last_computed_at。
+        - 定义更新递增 definition_version / 重算 definition_hash。
+        - lifecycle_state 置为 'saved'（若列可用）。
 
-        保存前调用 ACNR-backed ``validate_refs_via_acnr``（封装 full_resolve）
-        校验 expression 中引用的地址是否有效；若含悬空引用（``not_found``，
-        found=false），**不写库**，返回 ``(None, issues)`` 供 router 转 422
-        （Req 9.5 / 14.4）。校验通过返回 ``(WpFormula, [])``。
-
-        三类型（Req 14.5）：``formula_type ∈ {auto_calc, logic_check,
-        reasonability}``，非法类型直接返回 ``(None, issues)``。仅 ``auto_calc``
-        执行后回填目标单元（由 router 求值写回）并记 ``last_computed_at``；
-        ``logic_check`` / ``reasonability`` **绝不改值**、不记 last_computed_at。
-
-        只 flush 不 commit（router 统一 commit）。
-
-        Args:
-            db: AsyncSession。
-            project_id: 所属项目 id。
-            wp_id: 所属底稿 working_paper.id。
-            sheet_name: sheet 名称。
-            target_cell: 写入目标单元格（如 B5）。
-            expression: 公式表达式。
-            year: 校验悬空引用所需年度（传给 validate_formula_refs）。
-            template_type: 模板类型，默认 'soe'（传给 validate_formula_refs）。
-            category: 公式分类（可选，兼容旧字段）。
-            description: 描述（可选）。
-            created_by: 创建人 user id（可选，仅新建时写入）。
-            formula_type: 公式类型 auto_calc / logic_check / reasonability。
-            refs: 规范化引用列表（addr_id / formula_ref dict 或 formula_ref str）。
-            issue_description: logic_check 不通过时的问题描述（可选）。
-            hint_text: reasonability 触发时的提示文案（可选）。
+        Ownership 守卫（Req 10）：
+        - 必须传入 project_id（Req 10.6：未提供拒绝写入）。
+        - 校验 wp_id 属于 project_id（Req 10.1 / 10.4）。
 
         Returns:
-            (WpFormula, []) 保存成功；(None, issues) 含悬空引用或非法类型未写库。
+            (WpFormula, []) 保存成功；(None, issues) 校验失败未写库。
         """
+        # ── Req 10.6：project_id 必填 ──
+        if project_id is None:
+            return None, _ownership_issue("project_id_required")
+
         project_uuid = _as_uuid(project_id)
         wp_uuid = _as_uuid(wp_id)
         created_by_uuid = _as_uuid(created_by) if created_by is not None else None
 
-        # ── 三类型校验（Req 14.5）：非法类型拒绝写库，返回 issue 供 router 转 422 ──
+        # ── Req 10.1 / 10.4：wp 归属校验 ──
+        wp_owned = await self._verify_wp_ownership(db, wp_uuid, project_uuid)
+        if not wp_owned:
+            logger.warning(
+                "wp_formula save 拒绝：wp_id=%s 不属于 project=%s",
+                wp_uuid, project_uuid,
+            )
+            return None, _ownership_issue()
+
+        # ── 三类型校验（Req 14.5）：非法类型拒绝写库 ──
         ftype = (formula_type or "auto_calc").strip()
         if ftype not in _VALID_FORMULA_TYPES:
             return None, [
@@ -176,8 +244,7 @@ class WpFormulaService:
             else None
         )
 
-        # ── reference 来源解引用（Req 25.5）：复用被参照源公式 expression 而非重录 ──
-        # 悬空（源公式不存在/已删除）→ fail-open 记 issue、不写库（不静默产错值，Req 25.7）。
+        # ── reference 来源解引用（Req 25.5）──
         if fsource == "reference":
             from app.services.formula_management.reference_resolver import (
                 resolve_reference_expression,
@@ -206,12 +273,13 @@ class WpFormulaService:
                         ),
                     }
                 ]
-            # 复用源公式表达式（复用而非重录）。
+            # reference 仅存关系（Req 7.1）：不复制 expression 作为权威定义。
+            # 运行时递归解析当前源公式（由 coordinator 在执行期解引用）。
+            # 这里保留 expression 字段为调用方传入值或 ref_res.expression 做参考，
+            # 但 reference_formula_id 才是权威关系。
             expression = ref_res.expression or expression
 
-        # ── 悬空引用校验（Req 9.5 / 14.4 / acnr-consumer-wiring Req 9）：──
-        # 经 ACNR full_resolve 统一校验（WP 域走 full_resolve，非 WP 域走 legacy，
-        # resolver 故障 fail-open 回退 legacy）；含 not_found 则不写库。
+        # ── 悬空引用校验（Req 9.5 / 14.4 / acnr-consumer-wiring Req 9）──
         issues = await validate_refs_via_acnr(
             db, str(project_uuid), year, expression, template_type
         )
@@ -222,11 +290,8 @@ class WpFormulaService:
             )
             return None, issues
 
-        # auto_calc 执行后回填目标单元并记最近计算时间（Req 14.3 / P9）；
-        # logic_check / reasonability 不改值、不记 last_computed_at（P5）。
-        computed_at = (
-            datetime.now(timezone.utc) if ftype == "auto_calc" else None
-        )
+        # ── 计算 definition_hash ──
+        def_hash = _compute_definition_hash(expression, ftype, normalized_refs)
 
         # ── upsert：按 (wp_id, sheet_name, target_cell) 维度 ──
         existing = (
@@ -240,6 +305,10 @@ class WpFormulaService:
         ).scalar_one_or_none()
 
         if existing is not None:
+            # ── Req 10.1：二次校验 existing formula 归属 ──
+            if existing.project_id != project_uuid:
+                return None, _ownership_issue()
+
             existing.expression = expression
             existing.formula_type = ftype
             existing.refs = normalized_refs
@@ -249,11 +318,22 @@ class WpFormulaService:
             existing.hint_text = hint_text
             existing.formula_source = fsource
             existing.reference_formula_id = reference_uuid
-            existing.last_computed_at = computed_at
+            # ── P5：save 绝不写 last_computed_at ──
+            # existing.last_computed_at 保持原值不动
             existing.updated_at = datetime.now(timezone.utc)
+            # ── definition_version 递增（若 ORM 列可用）──
+            if hasattr(existing, "definition_version") and existing.definition_version is not None:
+                existing.definition_version = existing.definition_version + 1
+            elif hasattr(existing, "definition_version"):
+                existing.definition_version = 1
+            # ── definition_hash 更新 ──
+            if hasattr(existing, "definition_hash"):
+                existing.definition_hash = def_hash
+            # ── lifecycle_state 置为 saved（若 ORM 列可用）──
+            if hasattr(existing, "lifecycle_state"):
+                existing.lifecycle_state = "saved"
             await db.flush()
-            # 源变更失效传播（Req 25.7）：本公式被更新即为潜在"被参照源变更"，
-            # 经 ACNR 失效链使所有引用方标失效并可重算（复用不自建）。
+            # 源变更失效传播（Req 25.7）
             await self._invalidate_reference_dependents(
                 db, source_formula_id=existing.id, project_id=project_uuid
             )
@@ -273,34 +353,82 @@ class WpFormulaService:
             hint_text=hint_text,
             formula_source=fsource,
             reference_formula_id=reference_uuid,
-            last_computed_at=computed_at,
+            # ── P5：save 绝不写 last_computed_at（保持 NULL）──
+            last_computed_at=None,
             created_by=created_by_uuid,
         )
+        # ── definition_version 初始化（若 ORM 列可用）──
+        if hasattr(formula, "definition_version"):
+            formula.definition_version = 1
+        if hasattr(formula, "definition_hash"):
+            formula.definition_hash = def_hash
+        if hasattr(formula, "lifecycle_state"):
+            formula.lifecycle_state = "saved"
         db.add(formula)
         await db.flush()
         return formula, []
 
     async def list_by_wp(
-        self, db: AsyncSession, wp_id: uuid.UUID | str
+        self,
+        db: AsyncSession,
+        wp_id: uuid.UUID | str,
+        *,
+        project_id: uuid.UUID | str | None = None,
     ) -> list[WpFormula]:
-        """列出某底稿的全部公式（按 sheet_name, target_cell 排序）。"""
+        """列出某底稿的全部公式（按 sheet_name, target_cell 排序）。
+
+        Ownership 守卫（Req 10.1 / 10.6）：
+        - 若提供 project_id，校验 wp_id 归属。
+        - 未提供 project_id 则拒绝操作（返回空列表）。
+        """
+        # ── Req 10.6：project_id 必填 ──
+        if project_id is None:
+            logger.warning("wp_formula list_by_wp 拒绝：未提供 project_id")
+            return []
+
+        project_uuid = _as_uuid(project_id)
         wp_uuid = _as_uuid(wp_id)
+
+        # ── Req 10.1：wp 归属校验 ──
+        wp_owned = await self._verify_wp_ownership(db, wp_uuid, project_uuid)
+        if not wp_owned:
+            logger.warning(
+                "wp_formula list_by_wp 拒绝：wp_id=%s 不属于 project=%s",
+                wp_uuid, project_uuid,
+            )
+            return []
+
         result = await db.execute(
             sa.select(WpFormula)
-            .where(WpFormula.wp_id == wp_uuid)
+            .where(WpFormula.wp_id == wp_uuid, WpFormula.project_id == project_uuid)
             .order_by(WpFormula.sheet_name, WpFormula.target_cell)
         )
         return list(result.scalars().all())
 
-    async def delete(self, db: AsyncSession, formula_id: uuid.UUID | str) -> bool:
+    async def delete(
+        self,
+        db: AsyncSession,
+        formula_id: uuid.UUID | str,
+        *,
+        project_id: uuid.UUID | str | None = None,
+    ) -> bool:
         """按 formula_id 删除单条公式。
 
-        只 flush 不 commit（router 统一 commit）。
+        Ownership 守卫（Req 10.1 / 10.6）：
+        - 必须传入 project_id。
+        - 校验 formula_id 属于 project_id。
 
         Returns:
-            True 已删除；False 记录不存在（无操作）。
+            True 已删除；False 记录不存在或 ownership 不匹配（无操作）。
         """
+        # ── Req 10.6：project_id 必填 ──
+        if project_id is None:
+            logger.warning("wp_formula delete 拒绝：未提供 project_id")
+            return False
+
+        project_uuid = _as_uuid(project_id)
         formula_uuid = _as_uuid(formula_id)
+
         obj = (
             await db.execute(
                 sa.select(WpFormula).where(WpFormula.id == formula_uuid)
@@ -308,9 +436,16 @@ class WpFormulaService:
         ).scalar_one_or_none()
         if obj is None:
             return False
-        # 源删除失效传播（Req 25.7）：删除被参照源公式前，先经 ACNR 失效链使引用方
-        # 标失效——删除后引用方即变悬空，须在执行期 fail-open 记 Issue 不产错值。
-        project_uuid = obj.project_id
+
+        # ── Req 10.1 / 10.4：formula 归属校验 ──
+        if obj.project_id != project_uuid:
+            logger.warning(
+                "wp_formula delete 拒绝：formula_id=%s 不属于 project=%s",
+                formula_uuid, project_uuid,
+            )
+            return False
+
+        # 源删除失效传播（Req 25.7）
         await self._invalidate_reference_dependents(
             db, source_formula_id=obj.id, project_id=project_uuid
         )

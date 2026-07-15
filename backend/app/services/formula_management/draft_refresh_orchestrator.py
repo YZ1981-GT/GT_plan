@@ -57,7 +57,6 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.report_models import DisclosureNote, FinancialReportType
 from app.models.workpaper_models import DraftRefreshAudit, WpIndex
 from app.services.draft_refresh_service import (
     DraftRefreshService,
@@ -70,14 +69,6 @@ from app.services.formula_management.refresh_scope_discovery import (
 )
 
 logger = logging.getLogger(__name__)
-
-# 报表域生成的四张主表（未审报表初稿）。补充表 / 减值表不纳入全局刷新初稿默认集。
-_REPORT_TYPES: list[FinancialReportType] = [
-    FinancialReportType.balance_sheet,
-    FinancialReportType.income_statement,
-    FinancialReportType.cash_flow_statement,
-    FinancialReportType.equity_statement,
-]
 
 # wp_code 循环前缀提取（与 RefreshScopeDiscovery §③ 同口径：re.match(r'([A-N])', wp_code)）。
 _CYCLE_PREFIX_RE = re.compile(r"([A-N])")
@@ -184,128 +175,88 @@ class DraftRefreshOrchestrator:
     ) -> tuple[list[RefreshUnit], list[str]]:
         """把单个 scope 分派到对应生成器（Req 21.1）。
 
-        未识别 scope 返回空 ``([], [])`` —— 不分派、不生成、不写入（Req 21.3）。
+        Task 13: report/workpaper/adjudication/note 四个 scope 全部走
+        FormulaRuntimeCoordinator 产出真实 mutation plan。
+        未识别 scope 返回空 ``([], [])``。
         """
-        if scope == "report":
-            return await self._dispatch_report(project_id=project_id, year=year)
-        if scope == "note":
-            return await self._dispatch_note(project_id=project_id, year=year)
-        if scope == "adjudication" or scope.startswith("workpaper"):
-            return await self._dispatch_workpaper(
+        if scope in ("report", "note", "adjudication") or scope.startswith("workpaper"):
+            return await self._dispatch_via_coordinator(
                 scope, project_id=project_id, year=year
             )
         # 未识别 scope → 空（不写；此分支为二次防御，generate 已按发现集合过滤）
         logger.warning("DraftRefreshOrchestrator 未识别刷新范围 %r，跳过（不生成）", scope)
         return [], []
 
-    async def _dispatch_report(
-        self, *, project_id: UUID, year: int
-    ) -> tuple[list[RefreshUnit], list[str]]:
-        """报表域 → ``ReportEngine`` 从四表库未审数生成未审报表初稿。
-
-        对四张主表逐一调用 ``generate_unadjusted_report``；每行（含 ``row_code``）产一个
-        ``RefreshUnit``（``unit_scope='report:{row_code}'``，``after_value`` 承载该行）。
-        单张报表生成失败不阻断其余（fail-open + warning，Req 16.5 续算精神）。
-        """
-        from app.services.report_engine import ReportEngine
-
-        engine = ReportEngine(self.db)
-        units: list[RefreshUnit] = []
-        for report_type in _REPORT_TYPES:
-            try:
-                rows = await engine.generate_unadjusted_report(
-                    project_id, year, report_type
-                )
-            except Exception as exc:  # noqa: BLE001 — 单表失败不阻断其余报表
-                logger.warning(
-                    "报表域全局刷新：%s 未审报表生成失败，跳过该表（不阻断其余）: %s: %s",
-                    getattr(report_type, "value", report_type),
-                    type(exc).__name__,
-                    exc,
-                )
-                continue
-            for row in rows or []:
-                row_code = row.get("row_code")
-                if not row_code:
-                    continue
-                units.append(
-                    RefreshUnit(
-                        unit_scope=f"report:{row_code}",
-                        after_value=row,
-                    )
-                )
-        # page_key='report:*' 供预设库对报表页套用预设（若有预设条目）。
-        return units, ["report:*"]
-
-    async def _dispatch_note(
-        self, *, project_id: UUID, year: int
-    ) -> tuple[list[RefreshUnit], list[str]]:
-        """附注域 → 逐 ``note_section`` 调 ``execute_note_formulas`` 回填 ``mode=auto`` 单元。
-
-        先查 ``disclosure_notes`` 现存 section（``is_deleted=false``），对每个 section 执行
-        附注公式；每个成功回填的单元（``results[].cell='row:col'``）产一个 ``RefreshUnit``
-        （``unit_scope='note:{section}!{row}:{col}'``）。执行失败的 section fail-open 跳过。
-        """
-        from app.services.note_formula_generator import execute_note_formulas
-
-        sections = await self._note_sections(project_id=project_id, year=year)
-        units: list[RefreshUnit] = []
-        page_keys: list[str] = []
-        for section in sections:
-            try:
-                res = await execute_note_formulas(
-                    self.db, project_id, year, section
-                )
-            except Exception as exc:  # noqa: BLE001 — 单 section 失败不阻断其余
-                logger.warning(
-                    "附注域全局刷新：section=%s 执行失败，跳过（不阻断其余）: %s: %s",
-                    section,
-                    type(exc).__name__,
-                    exc,
-                )
-                continue
-            page_keys.append(f"note:{section}")
-            for item in res.get("results") or []:
-                if item.get("status") != "ok":
-                    continue
-                cell = item.get("cell")  # 形如 'row:col'
-                if not cell:
-                    continue
-                units.append(
-                    RefreshUnit(unit_scope=f"note:{section}!{cell}")
-                )
-        return units, page_keys
-
-    async def _dispatch_workpaper(
+    async def _dispatch_via_coordinator(
         self, scope: str, *, project_id: UUID, year: int
     ) -> tuple[list[RefreshUnit], list[str]]:
-        """审定/底稿域 → 从 ``wp_index`` 派生 ``page_keys`` 驱动预设库生成底稿初稿。
+        """Route scope through FormulaRuntimeCoordinator for real domain mutations.
 
-        ``scope='workpaper:{cycle}'`` → 仅该循环底稿；``scope='adjudication'`` →
-        审定表页面（``wp_code`` 以 ``-1`` 结尾）。产出 ``page_keys``（``workpaper:{wp_code}``），
-        由治理层 ``refresh_with_presets`` 经**预设库**为这些页面生成初稿单元（真实"底稿生成"）。
+        Task 13 (Req 1,3,7,8 | P2,P3,P8,P9): replaces the placeholder
+        page_keys-only path for workpaper/adjudication and keeps the
+        report/note scopes also going through the real mutation pipeline.
 
-        **审定表回写接口不匹配（诚实记 warning，不假装成功）**：
-        ``AdjudicationWritebackService.writeback_batch`` 需一份 ``FormulaRecord`` 列表，
-        且其 ``target_cell`` 语义为 standard_account_code；编排层没有干净的"项目级审定表
-        FormulaRecord 源"（``wp_formula.target_cell`` 是单元坐标而非科目码）——故本层
-        **不直接驱动 ``writeback_batch``**（避免用坐标充当科目码的假回写），审定/底稿域的
-        初稿单元经预设库 ``page_keys`` 路径生成。此处返回 ``units=[]`` + 真实 ``page_keys``。
+        Returns (units derived from mutations, page_keys for preset library).
+        Does NOT commit — consistent with service-only-flush contract.
         """
-        cycle = self._scope_cycle(scope)
-        wp_codes = await self._wp_codes(
-            project_id=project_id, cycle=cycle, adjudication_only=(scope == "adjudication")
+        from app.services.formula_runtime.coordinator import (
+            FormulaRuntimeCoordinator,
+            MutationPlanResult,
         )
-        page_keys = [f"workpaper:{code}" for code in wp_codes]
 
-        logger.info(
-            "审定/底稿域全局刷新 scope=%r：经预设库 page_keys 生成 %d 个页面初稿；"
-            "审定表 writeback_batch 因缺少项目级 FormulaRecord 源（target_cell 语义为"
-            "科目码而非单元坐标）未在编排层直接驱动（Req 21.1 接口不匹配，诚实记录不假装成功）",
-            scope,
-            len(page_keys),
+        coordinator = FormulaRuntimeCoordinator(self.db)
+        plan: MutationPlanResult = await coordinator.generate_mutation_plan(
+            project_id=project_id,
+            year=year,
+            scopes=[scope],
         )
-        return [], page_keys
+
+        # Convert mutations to RefreshUnit for the treatment layer
+        units: list[RefreshUnit] = []
+        for mutation in plan.mutations:
+            unit_scope = f"{mutation.target.domain}:{mutation.target.addr_id}"
+            units.append(
+                RefreshUnit(
+                    unit_scope=unit_scope,
+                    after_value=mutation.after_value,
+                )
+            )
+
+        # Build page_keys based on scope type
+        page_keys: list[str] = []
+        if scope == "report":
+            page_keys.append("report:*")
+        elif scope == "note":
+            # Derive page_keys from mutation targets
+            note_sections: set[str] = set()
+            for m in plan.mutations:
+                section = m.target.locator.get("section", "")
+                if section:
+                    note_sections.add(f"note:{section}")
+            page_keys.extend(sorted(note_sections))
+        elif scope == "adjudication" or scope.startswith("workpaper"):
+            # Derive page_keys from wp_index for preset library
+            cycle = self._scope_cycle(scope)
+            wp_codes = await self._wp_codes(
+                project_id=project_id,
+                cycle=cycle,
+                adjudication_only=(scope == "adjudication"),
+            )
+            page_keys.extend(f"workpaper:{code}" for code in wp_codes)
+
+        # Log scope failures / issues for observability
+        if plan.scope_failures:
+            logger.warning(
+                "FormulaRuntimeCoordinator scope_failures for scope=%r: %d items",
+                scope, len(plan.scope_failures),
+            )
+        if plan.issues:
+            logger.info(
+                "FormulaRuntimeCoordinator issues for scope=%r: %d items",
+                scope, len(plan.issues),
+            )
+
+        return units, page_keys
 
     # ═══════════════════════════════════════════════════════════════════════
     # 内部只读辅助
@@ -353,19 +304,6 @@ class DraftRefreshOrchestrator:
                     continue
             codes.append(code)
         return sorted(set(codes))
-
-    async def _note_sections(self, *, project_id: UUID, year: int) -> list[str]:
-        """读取项目/年度现存附注 ``note_section``（只读，``is_deleted=false``）。"""
-        rows = await self.db.execute(
-            sa.select(DisclosureNote.note_section)
-            .where(
-                DisclosureNote.project_id == project_id,
-                DisclosureNote.year == year,
-                DisclosureNote.is_deleted == sa.false(),
-            )
-            .distinct()
-        )
-        return sorted({str(s) for (s,) in rows.all() if s})
 
     async def _record_scopes_to_audit(
         self, refresh_id: UUID, scopes: list[str]

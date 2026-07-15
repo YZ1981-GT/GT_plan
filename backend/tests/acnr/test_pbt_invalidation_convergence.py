@@ -46,6 +46,7 @@ from app.services.wp_parsed_data_service import touch_wp_registry  # noqa: E402
 # ---------------------------------------------------------------------------
 
 _L3_TARGET = "app.services.acnr.runtime.clear_runtime_entries"
+_L3_WP_TARGET = "app.services.acnr.runtime.clear_runtime_entries_for_wp"
 _L2_TARGET = "app.services.acnr.overlay.clear_project_overlays"
 _REV_TARGET = "app.services.formula_reverse_index.invalidate_reverse_index"
 # Step 4（legacy V1 delegate）是 address_registry 单例上的 async 方法，用 patch.object
@@ -71,6 +72,7 @@ def _run_path_and_collect(coro_factory):
     cleared: set[str] = set()
 
     l3_spy = MagicMock(side_effect=lambda *a, **k: cleared.add(_LAYER_L3))
+    l3_wp_spy = MagicMock(side_effect=lambda *a, **k: cleared.add(_LAYER_L3))
     l2_spy = MagicMock(side_effect=lambda *a, **k: cleared.add(_LAYER_L2))
     rev_spy = MagicMock(side_effect=lambda *a, **k: cleared.add(_LAYER_REV))
     legacy_spy = AsyncMock(side_effect=lambda *a, **k: cleared.add(_LAYER_LEGACY))
@@ -79,7 +81,9 @@ def _run_path_and_collect(coro_factory):
     publish_immediate_spy = AsyncMock()
     broadcast_raw_spy = MagicMock()
 
-    with patch(_L3_TARGET, l3_spy), patch(_L2_TARGET, l2_spy), patch(
+    with patch(_L3_TARGET, l3_spy), patch(_L3_WP_TARGET, l3_wp_spy), patch(
+        _L2_TARGET, l2_spy
+    ), patch(
         _REV_TARGET, rev_spy
     ), patch.object(address_registry, "invalidate_async", legacy_spy), patch.object(
         event_bus, "publish", publish_spy

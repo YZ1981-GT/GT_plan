@@ -21,9 +21,12 @@ Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 6.1, 6.2, 6.3, 6.4, 13.1
 """
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, Optional
 from uuid import UUID
 
@@ -33,6 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.workpaper_models import WpIndex, WorkingPaper
 from app.services.acnr.catalog import (
     get_catalog,
+    CatalogIndex,
     _uri_to_addr_id,
     _formula_ref_to_addr_id,
     _index_ref_to_addr_id,
@@ -47,6 +51,69 @@ from app.services.acnr.overlay import get_project_overlay, ProjectOverlay
 from app.services.acnr.runtime import get_runtime_entries, RuntimeCellEntry
 
 logger = logging.getLogger(__name__)
+
+
+# ─── VersionNotFoundError ─────────────────────────────────────────────────────
+
+
+class VersionNotFoundError(Exception):
+    """请求的 registry_version 不存在对应 catalog 快照。
+
+    Requirements: Req-9.3 — 版本缺失返回明确治理错误。
+    """
+
+    def __init__(self, version: str) -> None:
+        self.version = version
+        super().__init__(
+            f"Catalog snapshot not found for registry_version={version!r}. "
+            f"Requested version does not have an archived snapshot."
+        )
+
+
+# ─── Versioned Catalog Loading (Req-9) ───────────────────────────────────────
+
+_CATALOG_SNAPSHOTS_DIR = Path(__file__).resolve().parents[3] / "data" / "acnr" / "catalog_snapshots"
+
+
+@lru_cache(maxsize=5)
+def load_versioned_catalog(version: str) -> CatalogIndex:
+    """加载指定版本的 catalog 快照（LRU 缓存大小=5）。
+
+    从 data/acnr/catalog_snapshots/{version}.json 读取历史版本 catalog，
+    构建 CatalogIndex 并缓存。
+
+    Requirements:
+        Req-9.1 — full_resolve 版本不同时加载对应版本快照
+        Req-9.2 — load_versioned_catalog(version) 方法实现
+        Req-9.3 — 版本缺失返回明确治理错误（VersionNotFoundError）
+
+    Args:
+        version: registry_version 字符串
+
+    Returns:
+        CatalogIndex — 对应版本的索引
+
+    Raises:
+        VersionNotFoundError — 快照文件不存在
+    """
+    snapshot_path = _CATALOG_SNAPSHOTS_DIR / f"{version}.json"
+
+    if not snapshot_path.exists():
+        raise VersionNotFoundError(version)
+
+    try:
+        data = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as e:
+        raise VersionNotFoundError(version) from e
+
+    catalog_index = CatalogIndex(data)
+    logger.info(
+        "ACNR versioned catalog loaded: version=%s sheets=%d cells=%d",
+        version,
+        len(catalog_index.sheets_by_addr_id),
+        len(catalog_index.cells_by_addr_id),
+    )
+    return catalog_index
 
 
 # ─── Metrics (R5.6 — miss 指标) ──────────────────────────────────────────────
@@ -258,6 +325,7 @@ async def full_resolve(
     index_ref: str | None = None,
     project_id: str | None = None,
     db: AsyncSession | None = None,
+    _instance_memo: dict | None = None,
 ) -> ResolveResult:
     """统一 resolve 决策树入口 — 四库唯一解析方法（R5.1）。
 
@@ -271,40 +339,77 @@ async def full_resolve(
         index_ref: 索引命名空间引用（如 cell:D2-2!E100）
         project_id: 项目 ID（有值时触发 L2 overlay 和 wp_id 附加）
         db: 数据库会话（resolve_instance 需要，project_id 时必传）
+        _instance_memo: 请求级 resolve_instance 缓存（Req-17），
+            key = "project_id:parent_wp_code:sheet_code"，命中则跳过 DB。
+            由 resolve-batch 端点创建并传入各次 full_resolve，
+            单次请求结束后自动丢弃（request-scoped）。
+            disambiguation 结果不缓存。
 
     Returns:
         ResolveResult — 统一响应契约
 
-    Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8
+    Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, Req-12.1, Req-17
     """
+    import time as _time
+    from app.services.acnr.metrics import get_acnr_metrics
+
+    _t0 = _time.perf_counter()
+    _metrics = get_acnr_metrics()
+
     cat = get_catalog()
     overlay = get_project_overlay()
 
-    # ─── R19.5: 版本锁定解析（归档项目按锁定 registry_version 解析）──────
-    # M3 简化实现：
+    # ─── Req-9: 版本锁定解析（归档项目按锁定 registry_version 解析）──────
+    # 完整实现：
     #   - locked_version == current catalog version → 使用当前 catalog（最常见）
-    #   - locked_version != current → 记录警告，仍使用当前 catalog
-    #     （完整版本化 catalog 存储是 M3+ 后续工作，此处只确保基础设施就位）
+    #   - locked_version != current → 加载对应版本快照
+    #   - 快照缺失 → 抛出 VersionNotFoundError（明确治理错误）
     if project_id:
         locked_version = get_project_registry_version(project_id)
         if locked_version:
             current_version = cat.registry_version
             if locked_version != current_version:
-                logger.warning(
-                    "ACNR version-locked resolution: project=%s locked_version=%s "
-                    "current_version=%s — using current catalog (versioned catalog "
-                    "storage not yet implemented)",
-                    project_id,
-                    locked_version,
-                    current_version,
-                )
-                # TODO M3+: load_versioned_catalog(locked_version) 加载历史版本 catalog
-                # 当前仍使用 cat（当前版本），保证解析不中断
+                # Req-9.1: 加载对应版本的 Catalog 快照进行解析
+                try:
+                    cat = load_versioned_catalog(locked_version)
+                except VersionNotFoundError:
+                    # Req-12.5: version mismatch 告警
+                    _metrics.record_version_mismatch(
+                        locked_version,
+                        f"Catalog snapshot missing for version={locked_version}",
+                    )
+                    # Req-12.2: 记录 fallback 到当前版本
+                    _metrics.record_fallback(
+                        f"snapshot fallback: version={locked_version} not found, using current",
+                        domain="wp",
+                    )
+                    # Req-9.3: 版本缺失返回明确治理错误
+                    logger.warning(
+                        "ACNR version-locked resolve fallback: project=%s locked=%s current=%s — using current catalog",
+                        project_id, locked_version, current_version,
+                    )
+                    raise
 
     # ─── Step 7 (前置判断): 非 wp 域检测 → 委托 V1（R5.7）──────────────
     non_wp_domain = _detect_non_wp_domain(uri, formula_ref, index_ref)
     if non_wp_domain:
-        return _delegate_v1(uri, formula_ref, index_ref, non_wp_domain)
+        result = _delegate_v1(uri, formula_ref, index_ref, non_wp_domain)
+        # Req-12.1: 记录 fallback 指标
+        _latency = (_time.perf_counter() - _t0) * 1000
+        _result_str = "fallback" if result.found else "miss"
+        _metrics.record_resolve(
+            domain=non_wp_domain,
+            layer_hit="V1",
+            result=_result_str,
+            latency_ms=_latency,
+        )
+        # Req-12.2: 记录 fallback 事件
+        if result.found:
+            _metrics.record_fallback(
+                f"非wp域委托V1: domain={non_wp_domain}",
+                domain=non_wp_domain,
+            )
+        return result
 
     # ─── Step 1: grammar 规范化 → 推导 addr_id ──────────────────────────
     resolved_addr_id: str | None = None
@@ -322,7 +427,24 @@ async def full_resolve(
         _resolve_metrics["miss"] += 1
         query = uri or formula_ref or addr_id or index_ref or ""
         candidates = _find_candidates(query, max_results=5)
+        # Req-12.1: 记录 miss 指标
+        _latency = (_time.perf_counter() - _t0) * 1000
+        _metrics.record_resolve(
+            domain="unknown",
+            layer_hit=None,
+            result="miss",
+            latency_ms=_latency,
+        )
         return ResolveResult(found=False, candidates=candidates, source_layer=None)
+
+    # ─── Canonical normalization (Req-6): 内部使用 CanonicalAddress 比较 ───
+    # 通过 CanonicalAddress round-trip 确保 addr_id 格式规范
+    from app.services.acnr.canonical import CanonicalAddress as _CA
+    try:
+        _canonical = _CA.from_addr_id(resolved_addr_id)
+        resolved_addr_id = _canonical.addr_id
+    except (ValueError, IndexError):
+        pass  # 非标准格式，保持原值继续
 
     # ─── Step 2: 若带 project_id → 先应用 L2 overlay（R5.2, R5.8）────
     # overlay 修改的是 catalog 的 sheet 条目（sheet_name_aliases 等），
@@ -337,8 +459,16 @@ async def full_resolve(
         result = _build_cell_resolve_result(cell_entry, project_id, overlay)
         # R5.4: 带 project_id 时附 wp_id
         if project_id and db:
-            result = await _attach_wp_id(result, project_id, db)
+            result = await _attach_wp_id(result, project_id, db, _instance_memo)
         _resolve_metrics["hit"] += 1
+        # Req-12.1: 记录 hit 指标
+        _latency = (_time.perf_counter() - _t0) * 1000
+        _metrics.record_resolve(
+            domain="wp",
+            layer_hit="L1_cell",
+            result="found",
+            latency_ms=_latency,
+        )
         return result
 
     # ─── Step 4: L1 SheetCatalogEntry + aliases → cell 级 match ──────────
@@ -350,7 +480,7 @@ async def full_resolve(
             sheet_entry = overlay.apply_to_single(project_id, sheet_entry)
         result = _build_sheet_resolve_result(sheet_entry, project_id, overlay)
         if project_id and db:
-            result = await _attach_wp_id(result, project_id, db)
+            result = await _attach_wp_id(result, project_id, db, _instance_memo)
         _resolve_metrics["hit"] += 1
         return result
 
@@ -371,7 +501,7 @@ async def full_resolve(
             if len(exact) == 1:
                 result = _build_cell_resolve_result(exact[0], project_id, overlay)
                 if project_id and db:
-                    result = await _attach_wp_id(result, project_id, db)
+                    result = await _attach_wp_id(result, project_id, db, _instance_memo)
                 _resolve_metrics["hit"] += 1
                 return result
 
@@ -400,7 +530,7 @@ async def full_resolve(
             if len(semantic) == 1:
                 result = _build_cell_resolve_result(semantic[0], project_id, overlay)
                 if project_id and db:
-                    result = await _attach_wp_id(result, project_id, db)
+                    result = await _attach_wp_id(result, project_id, db, _instance_memo)
                 _resolve_metrics["hit"] += 1
                 return result
             if len(semantic) > 1:
@@ -428,7 +558,7 @@ async def full_resolve(
         if len(code_matches) == 1:
             result = _build_sheet_resolve_result(code_matches[0], project_id, overlay)
             if project_id and db:
-                result = await _attach_wp_id(result, project_id, db)
+                result = await _attach_wp_id(result, project_id, db, _instance_memo)
             _resolve_metrics["hit"] += 1
             return result
         if len(code_matches) > 1:
@@ -474,7 +604,7 @@ async def full_resolve(
             if len(exact) == 1:
                 result = _build_cell_resolve_result(exact[0], project_id, overlay)
                 if project_id and db:
-                    result = await _attach_wp_id(result, project_id, db)
+                    result = await _attach_wp_id(result, project_id, db, _instance_memo)
                 _resolve_metrics["hit"] += 1
                 return result
             # semantic 包含
@@ -482,18 +612,21 @@ async def full_resolve(
             if len(semantic) == 1:
                 result = _build_cell_resolve_result(semantic[0], project_id, overlay)
                 if project_id and db:
-                    result = await _attach_wp_id(result, project_id, db)
+                    result = await _attach_wp_id(result, project_id, db, _instance_memo)
                 _resolve_metrics["hit"] += 1
                 return result
 
         elif len(alias_matches) == 1:
             result = _build_sheet_resolve_result(alias_matches[0], project_id, overlay)
             if project_id and db:
-                result = await _attach_wp_id(result, project_id, db)
+                result = await _attach_wp_id(result, project_id, db, _instance_memo)
             _resolve_metrics["hit"] += 1
             return result
 
     # ─── Step 6: L3 RuntimeCellEntry（project-scoped）────────────────────
+    # Req-19: L3 模糊搜索收紧 — 移除 startswith(wp_code) 宽松条件
+    # 仅保留：精确 addr_id / cell_address 精确 / endswith("/" + cell_address)
+    # 多候选 → ambiguous（与 L1 行为对齐）
     if project_id:
         runtime_entries = get_runtime_entries(project_id)
         if runtime_entries:
@@ -504,22 +637,51 @@ async def full_resolve(
                 _resolve_metrics["hit"] += 1
                 return result
 
-            # 尝试按 cell_address + wp_code 模糊搜索 L3
+            # 收紧的模糊搜索：仅 cell_address 精确 + endswith("/" + cell_address)
+            # 不再使用 startswith(wp_code)，避免 D2 vs D2-2 互相错格
+            l3_candidates: list[RuntimeCellEntry] = []
             for rt_addr_id, rt_entry in runtime_entries.items():
-                # 检查 resolved_addr_id 是否匹配 runtime entry 的子字段
                 if (
                     resolved_addr_id == rt_entry.cell_address
                     or resolved_addr_id.endswith(f"/{rt_entry.cell_address}")
-                    or (rt_entry.wp_code and resolved_addr_id.startswith(rt_entry.wp_code))
                 ):
-                    result = _build_runtime_resolve_result(rt_entry)
-                    _resolve_metrics["hit"] += 1
-                    return result
+                    l3_candidates.append(rt_entry)
+
+            if len(l3_candidates) == 1:
+                result = _build_runtime_resolve_result(l3_candidates[0])
+                _resolve_metrics["hit"] += 1
+                return result
+            elif len(l3_candidates) > 1:
+                # 多候选 → ambiguous（Req-19.3, Req-5.3 残留漏洞修复）
+                _resolve_metrics["ambiguous"] += 1
+                return ResolveResult(
+                    found=False,
+                    error="ambiguous",
+                    candidates=[
+                        {
+                            "addr_id": c.addr_id,
+                            "display_label": c.semantic_label or c.addr_id,
+                            "score": 1.0,
+                        }
+                        for c in l3_candidates
+                    ],
+                    source_layer="L3",
+                )
 
     # ─── Step 8: miss → metrics + 相近项推荐（≤5）（R5.6）─────────────────
     _resolve_metrics["miss"] += 1
     candidates = _find_candidates(resolved_addr_id, max_results=5)
-    return ResolveResult(found=False, candidates=candidates, source_layer=None)
+    _result = ResolveResult(found=False, candidates=candidates, source_layer=None)
+
+    # Req-12.1: 记录 miss 指标
+    _latency = (_time.perf_counter() - _t0) * 1000
+    _metrics.record_resolve(
+        domain="wp",
+        layer_hit=None,
+        result="miss",
+        latency_ms=_latency,
+    )
+    return _result
 
 
 # ─── Resolve Result Builders ──────────────────────────────────────────────────
@@ -592,11 +754,17 @@ async def _attach_wp_id(
     result: ResolveResult,
     project_id: str,
     db: AsyncSession,
+    _instance_memo: dict | None = None,
 ) -> ResolveResult:
     """R5.4: 带 project_id 且 L1 命中 → 通过 resolve_instance 附 wp_id。
 
     解析 addr_id 的 parent_wp_code + sheet_code → 查 WpIndex → 获取 wp_id。
     成功时同时更新 jump_route（模板填充 wp_id）。
+
+    Req-17: 支持请求级缓存（_instance_memo）。
+    - key = f"{project_id}:{parent_wp_code}:{sheet_code}"
+    - 命中则跳过 DB 查询
+    - disambiguation 结果不缓存（每次重新查询以获取最新状态）
     """
     if not result.found or not result.addr_id:
         return result
@@ -609,12 +777,21 @@ async def _attach_wp_id(
     sheet_code = parts[1]
 
     try:
-        instance_result = await resolve_instance(
-            db=db,
-            project_id=UUID(project_id),
-            parent_wp_code=parent_wp_code,
-            sheet_code=sheet_code,
-        )
+        # Req-17: 请求级缓存查询
+        memo_key = f"{project_id}:{parent_wp_code}:{sheet_code}"
+        if _instance_memo is not None and memo_key in _instance_memo:
+            instance_result = _instance_memo[memo_key]
+        else:
+            instance_result = await resolve_instance(
+                db=db,
+                project_id=UUID(project_id),
+                parent_wp_code=parent_wp_code,
+                sheet_code=sheet_code,
+            )
+            # Req-17.4: disambiguation 结果不缓存
+            if _instance_memo is not None and instance_result.error != "disambiguation":
+                _instance_memo[memo_key] = instance_result
+
         if instance_result.found and instance_result.wp_id:
             result.wp_id = str(instance_result.wp_id)
             # 用解析到的 wp_id 填充 jump_route 模板

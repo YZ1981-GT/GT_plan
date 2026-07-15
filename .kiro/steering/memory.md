@@ -55,10 +55,13 @@ inclusion: always
 - **联动是核心价值**：ref_index chip+auto_data_source实时取数；孤立底稿=无价值
 - **🔴 函证模块跨循环共享**：D0的9个confirmation-*组件跨循环复用(E0/F0/G0/H0/K0/L0)，不为每循环独立开发
 - **开发前必先逐sheet读源模板**；**导入导出三级**；**适用性自动判断**
+- **🔴 增强打磨禁止自造披露内容（2026-07-14血泪）**：D5附注上市版增强曾自造"金融资产风险敞口"(信用风险最大敞口/前五名集中度)，实为**臆测**——源模板真实结构=分类表+(1)减值准备情况+(2)期末已质押的应收票据(银行承兑/商业承兑×已质押金额)+(3)期末已背书或贴现但尚未到期的应收票据(×终止确认金额/未终止确认金额,CAS23金融资产转移+证监会2014监管报告终止确认判断)。已纠正(D5-note-listed-pledged/endorsed)。**教训:附注/披露表增强必先看源模板截图或BCD类md,禁止按"常识"造表**。附注序号:上市版分类表主表无编号+(1)减值/(2)质押/(3)背书贴现;国企版分类表"(1)应收款项融资分项目列示"+参考披露(减值/质押/背书贴现,表样参考D1/D2数据取自D5-2)。审定表D5-1表格内去掉"试算平衡表数/差异数"两行(与底部核对行冗余,displayRows过滤trial-balance/difference,保留底部核对)
+- **🔴 el-table row-class-name 双重解构崩溃（2026-07-14,D6-1白屏）**：`Cannot read properties of undefined (reading 'isDeduction')`根因=模板`:row-class-name="({row})=>adjRowClassName(row)"`已解构row传入,但`adjRowClassName({row})`函数签名又解构`.row`→取到undefined→`undefined.isDeduction`崩→整个审定表白屏。修复:函数签名改直接接收`(row)`不二次解构+`if(!row)return ''`防御+getBlockDisplayRows加`.filter(Boolean)`兜底。**同类反模式排查:所有底稿`:row-class-name`/`:span-method`回调若已`({row})=>fn(row)`则fn不能再解构{row}**
+- **🔴 子代理加宽表列⚙设置v-if易漏`<template #default>`（2026-07-14,D6-2编译崩）**：`[plugin:vite:vue] Element is missing end tag`根因=D6TabDetail"期初≤1年"账龄列被加v-if包裹时误删`<template #default="{ row }">`开始标签(保留了`</template>`结束标签→不配平)。修复=补回开始标签。**🔴 get_diagnostics(Volar)查不出SFC template缺标签(子代理当时报diagnostics clean),唯Vite编译/浏览器HMR overlay暴露→列设置类改动后必须看浏览器Vite overlay不能只信get_diagnostics**。已触类旁通排查:D7TabDetail账龄列#default完好/D5TabDetail无账龄列,仅D6中招已修
 - **模板预填优先于AI生成**：有固定骨架的章节用CHAPTER_TEMPLATE+变量替换做预填，AI仅用于复杂章节
 - **🔴 D~N专属组件开发标准模板**：Phase0双源输入(openpyxl脚本读xlsx+底稿模板库md交叉验证)→Phase1三件套→Phase2开发8步(①registry+yaml ②composable分层useXFormulaEngine纯函数 ③主入口sheetName v-if分发defineAsyncComponent lazy ④后端3-4py ⑤注册四件套 ⑥联动TB回写+EventBus+GtIndexChip ⑦UI铁律 ⑧功能方向:联动/美观/溯源/易操作/导入导出/AI/双三模式)
 - **🔴 宽表拆分策略**：>15列宽表必须拆分提升可操作性。方案按场景选择：①区段Tab(明细表32列→3区段Tab切换,行同步) ②借方/贷方独立区块(检查表→两区块el-table) ③固定列+滚动列(凭证基础列固定,证据列横滚) ④左右视觉分组(记账凭证|检查证据)。优先减少横滚,让用户单屏看到关键信息
-- **🟢 宽表列自定义显示(2026-07-12)**：D2-2明细表已加`useD2DetailColumnPrefs`列配置器(⚙列设置popover+预设方案全部/核心/审定账龄+一键隐藏空列+按组/单列checkbox+偏好存D2-detail-column-prefs)。**D2-7凭证检查表矩阵视图已改固定列+列分组(2026-07-12)**:左5列fixed(序号/凭证号/日期/借方/贷方)+右侧5组可折叠(基础信息/科目信息/核对结果/证据附件/检查结论)+⚙列设置popover+空列组自动折叠+max-height 500内滚。后续推广到所有>15列宽表(D3/F1/K1明细)
+- **🟢 宽表列自定义显示(2026-07-12)**：D2-2明细表已加`useD2DetailColumnPrefs`列配置器(⚙列设置popover+预设方案全部/核心/审定账龄+一键隐藏空列+按组/单列checkbox+偏好存D2-detail-column-prefs)。**D2-7凭证检查表矩阵视图已改固定列+列分组(2026-07-12)**:左5列fixed(序号/凭证号/日期/借方/贷方)+右侧5组可折叠(基础信息/科目信息/核对结果/证据附件/检查结论)+⚙列设置popover+空列组自动折叠+max-height 500内滚。后续推广到所有>15列宽表(D3/F1/K1明细)。**L1-2/L1-6/K7-5/K8-8/K9-8已加(2026-07-13)**。**L5-2/L6-2/L7-2/L8-2已加(2026-07-13,commit 9b2a4b7d)**:区段内列checkbox+localStorage持久化+重置默认
 - **通用schema复用**：`{wp_code}-generic.yaml` + pattern matching
 - **OO sheet-name必须与源xlsx tab名完全一致**；**多sheet workbook OO隐藏非目标tab**
 - **D~N循环全sheet HTML组件化**：OnlyOffice仅为降级/偏好切换
@@ -139,7 +142,7 @@ inclusion: always
 | G | ✅ | G1~G14全部完成✅；G0函证完成✅；G5完成✅(含Task11三阶段+ECL) |
 | H | ✅为主 | ref-unwrap全清:H5修14文件(.value)+H1嵌套ref解构(前期未提交)已Playwright验证审定表渲染;H0/H1~H4/H6/H8~H10 完成；**H5完成✅**(40任务/24sheet/10PBT/行业守卫oil_gas+mining/折耗单位产量法/四区块审定表/EventBus 3事件/TB回写1631+1632)；**H7完成✅**(44任务/26sheet/12PBT/行业守卫agriculture+forestry+livestock+fishery/双计量模式cost+fair_value/产量记录H7独有/互转三方向/直线法折旧/TB回写1621) |
 | I | ✅ | I1~I6 全部完成 |
-| J | ✅ | J1/J2/J3 + orchestration 全部完成 |
+| J | ✅ | J1/J2/J3 + orchestration 全部完成；**J1-8凭证检查重建✅**(useK1VoucherCheck/2211贷方负债/三区贷方+借方+期后/自持久化/列设置,commit d2cfdd76)；**J1-9补审计说明+结论✅** |
 | K | ✅为主 | K0~K9 完成；**K10 全部完成**(31任务/10sheet/6PBT/损益6117发生额贷-借/政府补助核对引擎联动K7/抽凭OCR/EventBus TB回写+A13)；**K11 全部完成**；**K12 全部完成**(29任务/9sheet/5PBT/损益6301发生额贷-借/抽凭OCR/EventBus TB回写+A13)；**K13 全部完成**(29任务/9sheet/5PBT/损益6711发生额借-贷/抽凭OCR/税前扣除性/EventBus TB回写+A13) |
 | L | ✅ | L1~L8完成；**L0函证完成✅** |
 | M | ✅ | **M1~M10 全部完成**（含 M6 未分配利润枢纽） |
@@ -261,3 +264,5 @@ inclusion: always
 - spec 状态 → `.kiro/specs/INDEX.md`
 - 领域术语 → glossary.md（inclusion:always）
 - 底稿内容结构权威来源 → `基础数据/致同通用审计程序及底稿模板（2025年修订）/BCD类底稿md/`
+- **✅ 公式管理运行时闭环收敛完成（formula-runtime-convergence，2026-07-16，18/18任务全绿）**：contracts+ValueLoader+4 adapter+engine batch+orchestrator+service事务+router+UI全链路；logic_check #2/#5/#7修正为独立来源/真实条件；reference运行时递归解析+outbox stale；WpFormula save不写computed_at+ownership守卫；V104迁移(outbox表+audit/snapshot/wp_formula扩展)；PG integration 7测试+Playwright E2E 8测试；completion guard挂CI。最高迁移V104。
+- **✅ ACNR运行时收敛 acnr-runtime-convergence Phase1+Phase2全部完成(2026-07-16,25/25任务,509测试全绿)**：Phase1(15任务):公共resolve→full_resolve/Grammar fail-fast/项目授权403+binding校验/Overlay PG持久化V103+read-through/Runtime增量重建+startswith修复/CanonicalAddress四语法收敛/Redis epoch pub-sub/前端SSE失效/图收敛predecessors/版本快照LRU/gap_count真守卫/consumer coverage扫描器/metrics结构化指标+/api/acnr/metrics端点。Phase2(10任务):①Overlay single-flight防惊群(asyncio.Lock per-project) ②Redis pub-sub断连重连(指数退避5/10/20/30s)+epoch轮询兜底(60s对比) ③前端TTL兜底(MAX_AGE=300s)+POST resolve-batch批量API(≤50) ④快照GC生命周期(keep_recent=10+被引用永不删) ⑤_attach_wp_id请求级memo去重N+1(batch创建memo传入) ⑥前端SSE断连自动重建(5次max+TTL-only降级) ⑦L3 Step6 startswith残留彻底收紧(D2/D2-2不互相错格) ⑧非wp域resolve前端LRU缓存(200条+epoch同步清空)。CI守卫3个(catalog-drift+consumer-coverage+snapshot-count)挂governance-checks.yml。最高迁移V103。后端468+前端41=509测试全绿零回归

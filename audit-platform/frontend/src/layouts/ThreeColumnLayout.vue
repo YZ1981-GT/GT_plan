@@ -286,6 +286,13 @@
       @applied="onFormulaApplied"
     />
 
+    <!-- 全局一键刷新弹窗（formula-runtime-convergence Task 16） -->
+    <GtRefreshScopeDialog
+      :project-id="currentProjectId"
+      :year="currentYear"
+      @refresh-complete="onRefreshComplete"
+    />
+
     <!-- 全局自定义查询弹窗 -->
     <CustomQueryDialog
       v-model="showCustomQuery"
@@ -317,6 +324,7 @@ import {
   Search,
 } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
+import GtRefreshScopeDialog from '@/components/formula/GtRefreshScopeDialog.vue'
 import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
 import ShortcutHelpDialog from '@/components/common/ShortcutHelpDialog.vue'
 import { eventBus, type SyncEventPayload } from '@/utils/eventBus'
@@ -828,6 +836,11 @@ function onFormulaSaved() {
 }
 function onFormulaApplied() {
   eventBus.emit('formula-changed', { action: 'applied' })
+}
+
+// 全局刷新成功/部分成功后触发数据重载（formula-runtime-convergence Task 16）
+function onRefreshComplete(_result: unknown) {
+  eventBus.emit('formula-changed', { action: 'refreshed' })
 }
 
 function onSwitchFourCol(payload: { tab?: string }) {

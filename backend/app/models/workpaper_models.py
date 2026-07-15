@@ -822,6 +822,18 @@ class WpFormula(Base):
     formula_type: Mapped[str] = mapped_column(
         String(20), nullable=False, server_default=text("'auto_calc'")
     )
+
+    # ── V104 formula-runtime-convergence 生命周期扩展 ──────────────────
+    # lifecycle_state ∈ {saved, validated, executing, succeeded, failed, stale, rolled_back}
+    lifecycle_state: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'saved'")
+    )
+    # 定义版本：每次保存定义递增
+    definition_version: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False, server_default=text("1")
+    )
+    # 定义 hash：由影响执行的定义字段（expression, formula_type, refs）计算
+    definition_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     last_computed_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True), nullable=True
     )
@@ -924,6 +936,18 @@ class DraftRefreshAudit(Base):
         JSONB, nullable=False, server_default=text("'{}'")
     )
 
+    # ── V104 formula-runtime-convergence 扩展 ──
+    revision_fingerprint: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    transaction_mode: Mapped[str] = mapped_column(
+        String(30), nullable=False, server_default=text("'all_or_nothing'")
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
+    failure_detail: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+
     __table_args__ = (
         Index(
             "idx_draft_audit_project_year",
@@ -957,6 +981,58 @@ class DraftRefreshSnapshot(Base):
         sa.DateTime(timezone=True), server_default=func.now()
     )
 
+    # ── V104 formula-runtime-convergence 扩展 ──
+    domain: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    target_locator: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    after_value: Mapped[dict | list | None] = mapped_column(JSONB, nullable=True)
+    before_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    after_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    restored_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+
     __table_args__ = (
         Index("idx_draft_snapshot_refresh", "refresh_id"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# FormulaRuntimeOutbox 模型（V104 formula-runtime-convergence）
+# ---------------------------------------------------------------------------
+
+
+class FormulaRuntimeOutbox(Base):
+    """公式运行时事务 Outbox — 与业务写入同事务提交，提交后可靠发布 stale/invalidation 事件。
+
+    对应迁移 V104__formula_runtime_outbox.sql 的 formula_runtime_outbox 表。
+    event_key UNIQUE 保证幂等发布。
+    """
+
+    __tablename__ = "formula_runtime_outbox"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    event_key: Mapped[str] = mapped_column(String(128), nullable=False, unique=True)
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("draft_refresh_audit.id"), nullable=False
+    )
+    event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    payload: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'")
+    )
+    attempts: Mapped[int] = mapped_column(
+        sa.Integer, nullable=False, server_default=text("0")
+    )
+    delivered_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now()
+    )
+
+    __table_args__ = (
+        Index("idx_outbox_run_id", "run_id"),
+        Index("idx_outbox_undelivered", "delivered_at", postgresql_where=text("delivered_at IS NULL")),
     )

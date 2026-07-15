@@ -553,36 +553,30 @@ class TestVersionLockedResolution:
 
     @pytest.mark.asyncio
     async def test_archived_project_different_version_logs_warning_and_resolves(self):
-        """归档项目 locked_version != 当前版本 → 记录警告，仍使用当前 catalog。
+        """归档项目 locked_version != 当前版本 → 记录告警并抛出 VersionNotFoundError (Req-9.3)。
 
-        M3 简化实现：版本不匹配时 log warning + 继续解析（不中断）。
+        Req-9.3: 版本缺失返回明确治理错误。
+        Req-12.5: 主动告警 (version_mismatch)。
         """
         from app.services.acnr.immutability import (
             record_project_registry_version,
             clear_all_project_versions,
         )
+        from app.services.acnr.resolver import VersionNotFoundError
 
         project_id = str(uuid4())
         # 锁定版本与当前不同（模拟 catalog 升级后的旧归档项目）
         record_project_registry_version(project_id, "2025.3.0-archived")
 
         try:
-            with patch(
-                "app.services.acnr.resolver.logger"
-            ) as mock_logger:
-                result = await full_resolve(
+            with pytest.raises(VersionNotFoundError) as exc_info:
+                await full_resolve(
                     addr_id="D2/D2-2/E100",
                     project_id=project_id,
                 )
 
-                # 仍然解析成功（使用当前 catalog）
-                assert result.found is True
-                assert result.addr_id == "D2/D2-2/E100"
-
-                # 验证记录了版本不匹配警告
-                mock_logger.warning.assert_called_once()
-                warning_msg = mock_logger.warning.call_args[0][0]
-                assert "version-locked" in warning_msg
+            # Req-9.3: 确认版本信息
+            assert exc_info.value.version == "2025.3.0-archived"
 
         finally:
             clear_all_project_versions()

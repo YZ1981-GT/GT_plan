@@ -56,11 +56,20 @@ async def invalidate(
 
     # ── Step 1: L3 RuntimeIndex 失效 ─────────────────────────────────────
     try:
-        from app.services.acnr.runtime import clear_runtime_entries
+        from app.services.acnr.runtime import (
+            clear_runtime_entries,
+            clear_runtime_entries_for_wp,
+        )
 
-        # M1 阶段采用 project_id 级全量清除
-        # 未来可按 wp_id / extra_sheets 做增量（仅删匹配的 RuntimeCellEntry）
-        clear_runtime_entries(project_id)
+        # Req-5.2: 有 wp_id 时仅清该 wp L3（非 project 全量）
+        if wp_id:
+            removed = clear_runtime_entries_for_wp(project_id, wp_id)
+            logger.debug(
+                "acnr.invalidate L3: cleared %d entries for wp=%s",
+                removed, wp_id,
+            )
+        else:
+            clear_runtime_entries(project_id)
     except Exception as exc:
         logger.warning("acnr.invalidate L3 clear failed: %s", exc)
 
@@ -93,6 +102,19 @@ async def invalidate(
         logger.warning(
             "acnr.invalidate address_registry delegate failed: %s", exc
         )
+
+    # ── Step 5: 递增 project_epoch + pub-sub 通知其他 worker (Req-7) ────
+    try:
+        from app.services.acnr.cache_epoch import increment_epoch
+
+        new_epoch = await increment_epoch(project_id)
+        if new_epoch > 0:
+            logger.debug(
+                "acnr.invalidate epoch: project=%s new_epoch=%d",
+                project_id, new_epoch,
+            )
+    except Exception as exc:
+        logger.warning("acnr.invalidate epoch increment failed: %s", exc)
 
 
 async def invalidate_domain(

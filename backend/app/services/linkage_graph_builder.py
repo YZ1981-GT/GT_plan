@@ -101,6 +101,46 @@ class LinkageGraphBuilder:
 
     # ─── Public API ───────────────────────────────────────────────
 
+    def get_edges_for(self, addr_id: str) -> list[dict[str, Any]]:
+        """返回以 addr_id 为 source 的所有出边（Req-8.1 单一边源）。
+
+        Parameters
+        ----------
+        addr_id : str
+            源端点标识（canonical addr_id 或非 wp 域 URI）。
+
+        Returns
+        -------
+        list[dict]
+            匹配的边列表，每条边包含 source/target/type/severity。
+        """
+        return [e for e in self._edges if e["source"] == addr_id]
+
+    def predecessors(self, addr_id: str) -> list[str]:
+        """返回以 addr_id 为 target 的所有前驱节点（Req-8.1/8.2 反向投影）。
+
+        用于 FormulaReverseIndex 作为派生视图：predecessors(x) == "谁指向 x"。
+
+        Parameters
+        ----------
+        addr_id : str
+            目标端点标识。
+
+        Returns
+        -------
+        list[str]
+            所有指向 addr_id 的 source 端点列表（去重，保序）。
+        """
+        seen: set[str] = set()
+        result: list[str] = []
+        for e in self._edges:
+            if e["target"] == addr_id:
+                src = e["source"]
+                if src not in seen:
+                    seen.add(src)
+                    result.append(src)
+        return result
+
     async def build(self) -> dict[str, Any]:
         """构建统一依赖图（主入口）。
 

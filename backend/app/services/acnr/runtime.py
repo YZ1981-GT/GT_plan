@@ -3,10 +3,16 @@
 register_custom() 在底稿保存后由 parsed_data 提交调用，
 校验 project_id + wp 归属后将自定义格存入 L3 内存索引。
 
+rebuild_runtime_for_wp() 按 wp_id 增量重建 L3（Req-5.1）——
+仅重建该 wp 的条目，不清除同 project 其他 wp 的条目。
+
+resolve_l3() 修复 L3 匹配逻辑（Req-5.3）——
+精确匹配 或 startswith(target+"/")，多候选返回 ambiguous。
+
 RuntimeCellEntry 仅存在于 L2/L3（runtime_only=true），
 不写入全局 L1 种子（R24.2）。
 
-Requirements: 23.3, 24.1, 24.2
+Requirements: 23.3, 24.1, 24.2, Req-5
 """
 from __future__ import annotations
 
@@ -77,6 +83,180 @@ def clear_runtime_entries(project_id: str) -> None:
 def clear_all_runtime_entries() -> None:
     """清除全部 L3 缓存（测试用）。"""
     _l3_store.clear()
+
+
+def clear_runtime_entries_for_wp(project_id: str, wp_id: str) -> int:
+    """清除指定项目中特定 wp_id 的 L3 条目（Req-5.2 增量失效）。
+
+    仅删除 wp_id 匹配的条目，其他 wp 的条目不受影响。
+
+    Returns:
+        被删除的条目数量
+    """
+    project_store = _l3_store.get(project_id)
+    if not project_store:
+        return 0
+
+    keys_to_remove = [
+        k for k, v in project_store.items() if v.wp_id == wp_id
+    ]
+    for k in keys_to_remove:
+        del project_store[k]
+
+    if not project_store:
+        del _l3_store[project_id]
+
+    return len(keys_to_remove)
+
+
+# ─── L3 Matching (Req-5.3) ──────────────────────────────────────────────────
+
+
+def resolve_l3(
+    project_id: str,
+    target: str,
+) -> tuple[str, RuntimeCellEntry | None | list[RuntimeCellEntry]]:
+    """L3 解析：精确匹配 or startswith(target+"/")，多候选 → ambiguous。
+
+    修复原始 startswith(wp_code) 错格风险（Req-5.3）。
+    例如 target="D2" 不应匹配 "D2-2/..." 或 "D20/..."，
+    只应匹配精确 "D2" 或前缀 "D2/"。
+
+    Returns:
+        ("found", entry) — 唯一匹配
+        ("ambiguous", [entries]) — 多候选
+        ("miss", None) — 无匹配
+    """
+    project_store = _l3_store.get(project_id)
+    if not project_store:
+        return ("miss", None)
+
+    # 精确匹配优先
+    exact = project_store.get(target)
+    if exact is not None:
+        return ("found", exact)
+
+    # 前缀匹配：target + "/"（避免 startswith 错格）
+    prefix = target + "/"
+    candidates = [
+        entry for addr_id, entry in project_store.items()
+        if addr_id.startswith(prefix)
+    ]
+
+    if len(candidates) == 0:
+        return ("miss", None)
+    elif len(candidates) == 1:
+        return ("found", candidates[0])
+    else:
+        return ("ambiguous", candidates)
+
+
+# ─── Incremental Rebuild (Req-5.1, Req-5.4) ─────────────────────────────────
+
+
+async def rebuild_runtime_for_wp(
+    db: AsyncSession,
+    project_id: str,
+    wp_id: str,
+    parsed_data: list[dict[str, Any]],
+    *,
+    addr_profile: str = "runtime",
+) -> list[RuntimeCellEntry]:
+    """按 wp_id 增量重建 L3 RuntimeCell（Req-5.1）。
+
+    1. 仅清除该 wp 的旧条目（不影响同 project 其他 wp）
+    2. 从 parsed_data 重新创建 RuntimeCellEntry
+    3. 支持冷启动/缓存失效后的确定性重建（Req-5.4）
+
+    Args:
+        db: 数据库会话（用于归属校验）
+        project_id: 项目 ID
+        wp_id: 底稿 ID
+        parsed_data: 解析后的格数据列表，每项包含:
+            - cell_address: str — 单元格地址
+            - wp_code: str — 底稿编码
+            - semantic_label: str | None — 语义标签（可选）
+        addr_profile: 地址生成方案 ("runtime" | "custom_flat")
+
+    Returns:
+        重建后的 RuntimeCellEntry 列表
+    """
+    # Step 1: 仅清除该 wp 的旧条目
+    removed = clear_runtime_entries_for_wp(project_id, wp_id)
+    if removed > 0:
+        logger.debug(
+            "rebuild_runtime_for_wp: cleared %d old entries for wp=%s",
+            removed, wp_id,
+        )
+
+    # Step 2: 用 parsed_data 重新注册
+    if not parsed_data:
+        return []
+
+    return await register_custom(
+        db, project_id, wp_id, parsed_data, addr_profile=addr_profile
+    )
+
+
+async def rebuild_from_db_parsed_data(
+    db: AsyncSession,
+    project_id: str,
+    wp_id: str,
+) -> list[RuntimeCellEntry]:
+    """冷启动从 DB parsed_data 惰性重建 L3（Req-5.4）。
+
+    当 L3 缓存为空（进程重启/首次访问）时，从数据库加载该 wp 的
+    parsed_data 并确定性重建 RuntimeCellEntry。
+
+    Returns:
+        重建的条目列表（如果 DB 无数据则返回空列表）
+    """
+    # 查询 checklist_responses 中该 wp 的 parsed cells 数据
+    result = await db.execute(
+        sa.text(
+            "SELECT remark FROM checklist_responses "
+            "WHERE wp_id = :wp_id AND item_id LIKE :prefix "
+            "ORDER BY item_id"
+        ),
+        {"wp_id": wp_id, "prefix": "runtime-cells-%"},
+    )
+    rows = result.fetchall()
+
+    if not rows:
+        # 尝试从 working_paper 的 meta 或 parsed_data 中获取
+        result2 = await db.execute(
+            sa.text(
+                "SELECT wi.wp_code "
+                "FROM working_paper wp "
+                "JOIN wp_index wi ON wi.id = wp.wp_index_id "
+                "WHERE wp.id = :wp_id AND wp.project_id = :project_id "
+                "AND wp.is_deleted = false "
+                "LIMIT 1"
+            ),
+            {"wp_id": wp_id, "project_id": project_id},
+        )
+        row = result2.fetchone()
+        if row is None:
+            return []
+        # 无持久化的 runtime cells，返回空
+        return []
+
+    import json
+    parsed_data: list[dict[str, Any]] = []
+    for row in rows:
+        try:
+            data = json.loads(row[0]) if row[0] else []
+            if isinstance(data, list):
+                parsed_data.extend(data)
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+    if not parsed_data:
+        return []
+
+    return await rebuild_runtime_for_wp(
+        db, project_id, wp_id, parsed_data
+    )
 
 
 # ─── Ownership Validation (R24.1) ───────────────────────────────────────────

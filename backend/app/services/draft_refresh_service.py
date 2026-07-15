@@ -16,17 +16,26 @@
 **Task 5.2 preview_overwrites**（团队人工编辑覆盖清单）、
 **Task 5.3 refresh**（幂等编排 + Draft 标记 + 审计留痕）与
 **Task 5.4 rollback**（依据回滚快照恢复刷新前状态 + 审计标 ``rolled_back``）。
+
+**Task 14 (formula-runtime-convergence)** 扩展：
+
+- ``execute_refresh``：snapshot→adapter.apply_many→audit→outbox 同事务；
+  affected_count 仅计成功 apply。
+- ``rollback_refresh``：逆序 restore 业务值并做 after_version CAS，冲突返回 409。
+- ``compute_fingerprint``：确定性 SHA256。
+- Advisory lock + all-or-nothing 默认 + partial-success savepoint。
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -44,6 +53,13 @@ from app.models.workpaper_models import (
     DraftRefreshSnapshot,
 )
 from app.services.dataset_query import get_active_filter
+from app.services.formula_runtime.contracts import (
+    AppliedMutation,
+    DomainMutationAdapter,
+    ExecutionResult,
+    FormulaMutation,
+    RestoredMutation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1272,3 +1288,639 @@ class DraftRefreshService:
             restored_markers=restored_markers,
             removed_markers=removed_markers,
         )
+
+    # ══════════════════════════════════════════════════════════════════════
+    # Task 14: 事务 apply、真实 rollback、fingerprint 与锁
+    # ══════════════════════════════════════════════════════════════════════
+
+    @staticmethod
+    def compute_fingerprint(
+        *,
+        project_id: UUID,
+        year: int,
+        scopes: Sequence[str],
+        transaction_mode: str = "all_or_nothing",
+        four_table_dataset_revision: str = "",
+        formula_definition_revision: str = "",
+        preset_revision: str = "",
+        acnr_registry_version: str = "",
+    ) -> str:
+        """计算 revision fingerprint（确定性 SHA256）。
+
+        ```
+        revision_fingerprint = SHA256(
+          project_id | year | normalized_scopes | transaction_mode |
+          four_table_dataset_revision | formula_definition_revision |
+          preset_revision | acnr_registry_version
+        )
+        ```
+
+        Args:
+            project_id: 项目 ID。
+            year: 年度。
+            scopes: 刷新范围列表（将排序去重后归一化）。
+            transaction_mode: 事务模式。
+            four_table_dataset_revision: 四表数据版本标识。
+            formula_definition_revision: 公式定义 hash 集合。
+            preset_revision: 预设库版本标识。
+            acnr_registry_version: ACNR 注册中心版本。
+
+        Returns:
+            64 位 hex SHA256 指纹。
+        """
+        normalized_scopes = ",".join(sorted({str(s) for s in scopes if s}))
+        payload = "|".join([
+            str(project_id),
+            str(year),
+            normalized_scopes,
+            transaction_mode,
+            four_table_dataset_revision,
+            formula_definition_revision,
+            preset_revision,
+            acnr_registry_version,
+        ])
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    async def _acquire_advisory_lock(
+        db: AsyncSession,
+        project_id: UUID,
+        year: int,
+        fingerprint: str,
+    ) -> None:
+        """获取 pg_advisory_xact_lock，防止并发执行同一 fingerprint。
+
+        锁在事务结束时自动释放。使用 project_id/year/fingerprint 三元组的 hash
+        作为 64-bit lock key。
+        """
+        lock_payload = f"{project_id}|{year}|{fingerprint}"
+        lock_key = int(hashlib.sha256(lock_payload.encode()).hexdigest()[:16], 16) & 0x7FFFFFFFFFFFFFFF
+        await db.execute(sa.text(f"SELECT pg_advisory_xact_lock({lock_key})"))
+
+    async def _check_idempotency(
+        self,
+        db: AsyncSession,
+        *,
+        project_id: UUID,
+        year: int,
+        fingerprint: str,
+    ) -> DraftRefreshAudit | None:
+        """检查相同 fingerprint 的执行状态（幂等/进行中判定）。
+
+        Returns:
+            已完成的审计记录 → 幂等命中；
+            None → 可执行新 run。
+
+        Raises:
+            ValueError: 相同 fingerprint 正在执行（进行中），返回 409 语义。
+        """
+        stmt = (
+            sa.select(DraftRefreshAudit)
+            .where(
+                DraftRefreshAudit.project_id == project_id,
+                DraftRefreshAudit.year == year,
+                DraftRefreshAudit.revision_fingerprint == fingerprint,
+            )
+            .order_by(DraftRefreshAudit.operated_at.desc())
+            .limit(1)
+        )
+        existing = (await db.execute(stmt)).scalars().first()
+        if existing is None:
+            return None
+        if existing.result_status == "success":
+            return existing  # idempotent hit
+        if existing.result_status == "executing":
+            raise ValueError(f"409:in_progress:{existing.id}")
+        # failed/rolled_back → allow re-execution
+        return None
+
+    async def execute_refresh(
+        self,
+        db: AsyncSession,
+        *,
+        project_id: UUID,
+        year: int,
+        scopes: Sequence[str],
+        mutations: Sequence[FormulaMutation],
+        adapters: dict[str, DomainMutationAdapter],
+        transaction_mode: Literal["all_or_nothing", "partial_success"] = "all_or_nothing",
+        idempotency_key: str | None = None,
+        operator: Any | None = None,
+        four_table_dataset_revision: str = "",
+        formula_definition_revision: str = "",
+        preset_revision: str = "",
+        acnr_registry_version: str = "",
+    ) -> ExecutionResult:
+        """事务编排：fingerprint → advisory lock → snapshot → apply → audit → outbox。
+
+        同事务中完成 snapshot→adapter.apply_many→审计→outbox。
+        affected_count 仅计成功 apply 的 mutation 数。
+
+        事务模式：
+        - ``all_or_nothing``（默认）：任一 apply 失败 → 整批回滚。
+        - ``partial_success``：按 scope 建 savepoint，失败 scope 回滚，成功 scope 提交。
+
+        Args:
+            db: 数据库会话（service 只 flush，router commit）。
+            project_id: 项目 ID。
+            year: 年度。
+            scopes: 刷新范围列表。
+            mutations: 待应用的 mutation 列表（由 orchestrator/coordinator 准备）。
+            adapters: domain→adapter 映射。
+            transaction_mode: 事务模式。
+            idempotency_key: 可选幂等键。
+            operator: 操作者。
+            four_table_dataset_revision: 四表数据版本。
+            formula_definition_revision: 公式定义 hash。
+            preset_revision: 预设版本。
+            acnr_registry_version: ACNR 版本。
+
+        Returns:
+            ExecutionResult。
+        """
+        import uuid as uuid_mod
+
+        run_id = uuid_mod.uuid4()
+
+        # ── 1. Fingerprint ──
+        fingerprint = self.compute_fingerprint(
+            project_id=project_id,
+            year=year,
+            scopes=scopes,
+            transaction_mode=transaction_mode,
+            four_table_dataset_revision=four_table_dataset_revision,
+            formula_definition_revision=formula_definition_revision,
+            preset_revision=preset_revision,
+            acnr_registry_version=acnr_registry_version,
+        )
+
+        # ── 2. Advisory lock ──
+        await self._acquire_advisory_lock(db, project_id, year, fingerprint)
+
+        # ── 3. Idempotency check ──
+        try:
+            prior = await self._check_idempotency(
+                db, project_id=project_id, year=year, fingerprint=fingerprint,
+            )
+        except ValueError as exc:
+            # 409 in progress
+            msg = str(exc)
+            parts = msg.split(":")
+            return ExecutionResult(
+                run_id=run_id,
+                status="failed",
+                failures=[{"error": "concurrent_execution", "existing_run_id": parts[2] if len(parts) > 2 else ""}],
+            )
+
+        if prior is not None:
+            return ExecutionResult(
+                run_id=prior.id,
+                status="idempotent_hit",
+                applied_count=prior.affected_count,
+            )
+
+        # ── 4. Create audit record (status=executing) ──
+        operator_id, operator_role = self._operator_fields(operator) if operator else (project_id, "system")
+        scope_key = self._scope_key(scopes)
+
+        audit = DraftRefreshAudit(
+            id=run_id,
+            project_id=project_id,
+            year=year,
+            operator_id=operator_id,
+            operator_role=operator_role,
+            operated_at=datetime.now(timezone.utc),
+            scope=scope_key,
+            tb_snapshot_hash=fingerprint,
+            affected_count=0,
+            result_status="executing",
+            detail={},
+            revision_fingerprint=fingerprint,
+            transaction_mode=transaction_mode,
+            idempotency_key=idempotency_key or fingerprint,
+        )
+        db.add(audit)
+        await db.flush()
+
+        if not mutations:
+            # No mutations → no_effect
+            audit.result_status = "success"
+            audit.affected_count = 0
+            await db.flush()
+            return ExecutionResult(
+                run_id=run_id,
+                status="no_effect",
+                applied_count=0,
+            )
+
+        # ── 5. Group mutations by domain ──
+        mutations_by_domain: dict[str, list[FormulaMutation]] = {}
+        for m in mutations:
+            domain = m.target.domain
+            mutations_by_domain.setdefault(domain, []).append(m)
+
+        # ── 6. Execute by transaction mode ──
+        if transaction_mode == "all_or_nothing":
+            result = await self._execute_all_or_nothing(
+                db, run_id=run_id, mutations_by_domain=mutations_by_domain,
+                adapters=adapters, audit=audit,
+            )
+        else:
+            result = await self._execute_partial_success(
+                db, run_id=run_id, mutations_by_domain=mutations_by_domain,
+                adapters=adapters, audit=audit, scopes=scopes,
+            )
+
+        return result
+
+    async def _execute_all_or_nothing(
+        self,
+        db: AsyncSession,
+        *,
+        run_id: UUID,
+        mutations_by_domain: dict[str, list[FormulaMutation]],
+        adapters: dict[str, DomainMutationAdapter],
+        audit: DraftRefreshAudit,
+    ) -> ExecutionResult:
+        """All-or-nothing：任一失败 → 整批标记 failed（让 router 回滚事务）。"""
+        all_applied: list[AppliedMutation] = []
+        all_failures: list[dict] = []
+
+        for domain, domain_mutations in mutations_by_domain.items():
+            adapter = adapters.get(domain)
+            if adapter is None:
+                # 失败：无对应 adapter
+                all_failures.append({
+                    "domain": domain,
+                    "error": f"no_adapter_for_domain:{domain}",
+                    "mutations_count": len(domain_mutations),
+                })
+                # All-or-nothing: one failure → abort all
+                audit.result_status = "failed"
+                audit.failure_detail = {"failures": all_failures}
+                audit.affected_count = 0
+                await db.flush()
+                return ExecutionResult(
+                    run_id=run_id,
+                    status="failed",
+                    failures=all_failures,
+                    rollback_available=False,
+                )
+
+            # ── Snapshot: save before_values ──
+            for m in domain_mutations:
+                db.add(DraftRefreshSnapshot(
+                    refresh_id=run_id,
+                    unit_scope=f"{m.target.domain}:{m.target.addr_id}",
+                    before_value=m.before_value if m.before_value is not None else {},
+                    domain=m.target.domain,
+                    target_locator=dict(m.target.locator) if m.target.locator else {},
+                    after_value=m.after_value,
+                    before_version=m.expected_version,
+                ))
+
+            # ── Apply ──
+            try:
+                applied = await adapter.apply_many(domain_mutations)
+                all_applied.extend(applied)
+
+                # Update snapshot after_version
+                for am in applied:
+                    scope_key = f"{am.target.domain}:{am.target.addr_id}"
+                    snap_stmt = (
+                        sa.select(DraftRefreshSnapshot)
+                        .where(
+                            DraftRefreshSnapshot.refresh_id == run_id,
+                            DraftRefreshSnapshot.unit_scope == scope_key,
+                        )
+                    )
+                    snap = (await db.execute(snap_stmt)).scalars().first()
+                    if snap is not None:
+                        snap.after_version = am.applied_version
+            except Exception as exc:
+                all_failures.append({
+                    "domain": domain,
+                    "error": f"apply_failed:{type(exc).__name__}:{exc}",
+                    "mutations_count": len(domain_mutations),
+                })
+                # All-or-nothing: abort
+                audit.result_status = "failed"
+                audit.failure_detail = {"failures": all_failures}
+                audit.affected_count = 0
+                await db.flush()
+                return ExecutionResult(
+                    run_id=run_id,
+                    status="failed",
+                    failures=all_failures,
+                    rollback_available=False,
+                )
+
+        # ── All succeeded → audit + outbox ──
+        audit.result_status = "success"
+        audit.affected_count = len(all_applied)
+        await db.flush()
+
+        # ── Outbox event ──
+        await self._write_outbox_event(
+            db, run_id=run_id, event_type="refresh_completed",
+            payload={
+                "applied_count": len(all_applied),
+                "domains": list(mutations_by_domain.keys()),
+            },
+        )
+
+        return ExecutionResult(
+            run_id=run_id,
+            status="success",
+            applied_count=len(all_applied),
+            applied=all_applied,
+            rollback_available=True,
+        )
+
+    async def _execute_partial_success(
+        self,
+        db: AsyncSession,
+        *,
+        run_id: UUID,
+        mutations_by_domain: dict[str, list[FormulaMutation]],
+        adapters: dict[str, DomainMutationAdapter],
+        audit: DraftRefreshAudit,
+        scopes: Sequence[str],
+    ) -> ExecutionResult:
+        """Partial-success：按 domain 建 savepoint，失败 scope 回滚，成功提交。"""
+        all_applied: list[AppliedMutation] = []
+        all_failures: list[dict] = []
+
+        for domain, domain_mutations in mutations_by_domain.items():
+            adapter = adapters.get(domain)
+            if adapter is None:
+                all_failures.append({
+                    "domain": domain,
+                    "error": f"no_adapter_for_domain:{domain}",
+                    "status": "failed",
+                })
+                continue
+
+            # ── Per-scope savepoint ──
+            try:
+                async with db.begin_nested():
+                    # Snapshot
+                    for m in domain_mutations:
+                        db.add(DraftRefreshSnapshot(
+                            refresh_id=run_id,
+                            unit_scope=f"{m.target.domain}:{m.target.addr_id}",
+                            before_value=m.before_value if m.before_value is not None else {},
+                            domain=m.target.domain,
+                            target_locator=dict(m.target.locator) if m.target.locator else {},
+                            after_value=m.after_value,
+                            before_version=m.expected_version,
+                        ))
+
+                    # Apply
+                    applied = await adapter.apply_many(domain_mutations)
+                    all_applied.extend(applied)
+
+                    # Update snapshot after_version
+                    for am in applied:
+                        scope_key = f"{am.target.domain}:{am.target.addr_id}"
+                        snap_stmt = (
+                            sa.select(DraftRefreshSnapshot)
+                            .where(
+                                DraftRefreshSnapshot.refresh_id == run_id,
+                                DraftRefreshSnapshot.unit_scope == scope_key,
+                            )
+                        )
+                        snap = (await db.execute(snap_stmt)).scalars().first()
+                        if snap is not None:
+                            snap.after_version = am.applied_version
+            except Exception as exc:
+                # Savepoint rolled back, continue with other domains
+                all_failures.append({
+                    "domain": domain,
+                    "error": f"apply_failed:{type(exc).__name__}:{exc}",
+                    "status": "failed",
+                })
+                continue
+
+        # ── Final audit ──
+        if all_applied and all_failures:
+            status = "partial_success"
+        elif all_applied:
+            status = "success"
+        else:
+            status = "failed"
+
+        audit.result_status = status
+        audit.affected_count = len(all_applied)
+        audit.failure_detail = {"failures": all_failures} if all_failures else None
+        await db.flush()
+
+        # Outbox
+        await self._write_outbox_event(
+            db, run_id=run_id, event_type="refresh_completed",
+            payload={
+                "status": status,
+                "applied_count": len(all_applied),
+                "failed_count": len(all_failures),
+                "domains": list(mutations_by_domain.keys()),
+            },
+        )
+
+        return ExecutionResult(
+            run_id=run_id,
+            status=status,
+            applied_count=len(all_applied),
+            failed_count=len(all_failures),
+            applied=all_applied,
+            failures=all_failures,
+            rollback_available=bool(all_applied),
+        )
+
+    async def rollback_refresh(
+        self,
+        db: AsyncSession,
+        *,
+        run_id: UUID,
+        adapters: dict[str, DomainMutationAdapter],
+        operator: Any | None = None,
+    ) -> ExecutionResult | dict:
+        """真实业务值回滚：逆序恢复并做 after_version CAS。
+
+        加载 run_id 对应的 snapshots（逆序），调用 adapter.restore_many 恢复业务值。
+        如果任一目标的当前版本不等于 snapshot 的 after_version（CAS 失败），
+        返回结构化 409 冲突响应。
+
+        Args:
+            db: 数据库会话。
+            run_id: 待回滚的执行批次。
+            adapters: domain→adapter 映射。
+            operator: 操作者。
+
+        Returns:
+            成功返回 ExecutionResult(status='rolled_back')。
+            CAS 冲突返回 dict 含 409 冲突明细。
+        """
+        # ① 定位执行批次
+        audit = (
+            await db.execute(
+                sa.select(DraftRefreshAudit).where(DraftRefreshAudit.id == run_id)
+            )
+        ).scalar_one_or_none()
+
+        if audit is None:
+            return ExecutionResult(run_id=run_id, status="failed", failures=[{"error": "not_found"}])
+
+        if audit.result_status == "rolled_back":
+            return ExecutionResult(run_id=run_id, status="idempotent_hit", applied_count=0)
+
+        # ② 加载 snapshots（逆序）
+        snapshots = (
+            await db.execute(
+                sa.select(DraftRefreshSnapshot)
+                .where(DraftRefreshSnapshot.refresh_id == run_id)
+                .order_by(DraftRefreshSnapshot.id.desc())
+            )
+        ).scalars().all()
+
+        if not snapshots:
+            audit.result_status = "rolled_back"
+            await db.flush()
+            return ExecutionResult(run_id=run_id, status="rolled_back", applied_count=0)
+
+        # ③ Group by domain and restore
+        snapshots_by_domain: dict[str, list[DraftRefreshSnapshot]] = {}
+        for snap in snapshots:
+            d = snap.domain or "unknown"
+            snapshots_by_domain.setdefault(d, []).append(snap)
+
+        all_restored: list[RestoredMutation] = []
+        conflicts: list[dict] = []
+
+        for domain, domain_snapshots in snapshots_by_domain.items():
+            adapter = adapters.get(domain)
+            if adapter is None:
+                conflicts.append({
+                    "domain": domain,
+                    "error": "no_adapter",
+                    "targets": [s.unit_scope for s in domain_snapshots],
+                })
+                continue
+
+            # Build restore mutations (reverse: after→before)
+            restore_mutations: list[FormulaMutation] = []
+            for snap in domain_snapshots:
+                # Build a CanonicalFormulaTarget-like object for restore
+                from app.services.formula_runtime.contracts import CanonicalFormulaTarget
+                target = CanonicalFormulaTarget(
+                    domain=snap.domain or "unknown",
+                    project_id=audit.project_id,
+                    year=audit.year,
+                    addr_id=snap.unit_scope.split(":", 1)[-1] if ":" in snap.unit_scope else snap.unit_scope,
+                    locator=snap.target_locator or {},
+                )
+                restore_mutations.append(FormulaMutation(
+                    target=target,
+                    before_value=snap.after_value,  # current state is what was applied
+                    after_value=snap.before_value,  # restore to before
+                    expected_version=snap.after_version,  # CAS: current must == after_version
+                ))
+
+            # Call adapter restore_many
+            try:
+                restored = await adapter.restore_many(restore_mutations)
+            except Exception as exc:
+                conflicts.append({
+                    "domain": domain,
+                    "error": f"restore_failed:{type(exc).__name__}:{exc}",
+                    "targets": [s.unit_scope for s in domain_snapshots],
+                })
+                continue
+
+            for rm in restored:
+                if rm.conflict:
+                    conflicts.append({
+                        "domain": domain,
+                        "target": f"{rm.target.domain}:{rm.target.addr_id}",
+                        "expected_version": restore_mutations[0].expected_version if restore_mutations else None,
+                        "conflict_detail": rm.conflict_detail,
+                    })
+                else:
+                    all_restored.append(rm)
+                    # Mark snapshot as restored
+                    for snap in domain_snapshots:
+                        addr = snap.unit_scope.split(":", 1)[-1] if ":" in snap.unit_scope else snap.unit_scope
+                        if addr == rm.target.addr_id:
+                            snap.restored_at = datetime.now(timezone.utc)
+                            break
+
+        # ④ If conflicts → return 409 structured response
+        if conflicts:
+            return {
+                "status": 409,
+                "error": "version_conflict",
+                "run_id": str(run_id),
+                "conflicts": conflicts,
+                "restored_count": len(all_restored),
+            }
+
+        # ⑤ Success → update audit + outbox
+        audit.result_status = "rolled_back"
+        operator_id, operator_role = self._operator_fields(operator) if operator else (audit.operator_id, "system")
+        audit.detail = {
+            **(audit.detail or {}),
+            "rollback": {
+                "operator_id": str(operator_id),
+                "operator_role": operator_role,
+                "rolled_back_at": datetime.now(timezone.utc).isoformat(),
+                "restored_count": len(all_restored),
+            },
+        }
+        await db.flush()
+
+        # Outbox
+        await self._write_outbox_event(
+            db, run_id=run_id, event_type="refresh_rolled_back",
+            payload={"restored_count": len(all_restored)},
+        )
+
+        return ExecutionResult(
+            run_id=run_id,
+            status="rolled_back",
+            applied_count=len(all_restored),
+            rollback_available=False,
+        )
+
+    @staticmethod
+    async def _write_outbox_event(
+        db: AsyncSession,
+        *,
+        run_id: UUID,
+        event_type: str,
+        payload: dict,
+    ) -> None:
+        """写入 formula_runtime_outbox 事件（同事务）。
+
+        使用 raw SQL 因 ORM model 尚未定义。event_key 保证幂等。
+        """
+        import uuid as uuid_mod
+
+        event_key = f"{run_id}:{event_type}"
+        stmt = sa.text("""
+            INSERT INTO formula_runtime_outbox (id, event_key, run_id, event_type, payload, attempts)
+            VALUES (:id, :event_key, :run_id, :event_type, :payload::jsonb, 0)
+            ON CONFLICT (event_key) DO NOTHING
+        """)
+        try:
+            await db.execute(stmt, {
+                "id": str(uuid_mod.uuid4()),
+                "event_key": event_key,
+                "run_id": str(run_id),
+                "event_type": event_type,
+                "payload": json.dumps(payload),
+            })
+        except Exception as exc:  # noqa: BLE001
+            # Outbox 写入失败不阻断主事务（降级日志记录）
+            logger.warning(
+                "formula_runtime_outbox write failed (degraded): %s: %s",
+                type(exc).__name__, exc,
+            )

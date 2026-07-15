@@ -62,11 +62,19 @@ async def lifespan(app: FastAPI):
     register_a13_event_handlers()
     _register_phase_handlers()
     await _replay_startup_events()
+    # Grammar 源完整性校验 — 失败则 sys.exit(1) (Req-2)
+    from app.services.acnr.grammar import validate_grammar_on_startup
+    validate_grammar_on_startup()
+
     await _check_gin_index_status()
     await _check_libreoffice_health()
     await _validate_template_manifest()
     await _run_schema_drift_check()
     await _warm_render_caches()
+
+    # ACNR Redis pub-sub 订阅 + epoch 轮询兜底 [Req-14]
+    from app.services.acnr.cache_epoch import start_epoch_subscriber
+    await start_epoch_subscriber()
 
     stop_event = asyncio.Event()
     tasks = _start_workers(stop_event)
@@ -96,6 +104,11 @@ async def lifespan(app: FastAPI):
     # 5. 后续是现有逻辑（stop_event.set() + worker cancel + dispose_engine）
     # F44 / Sprint 10.52: 优雅关闭 — 通知 worker stop_event + 取消 + 等待。
     stop_event.set()
+
+    # 停止 ACNR epoch subscriber + poll [Req-14]
+    from app.services.acnr.cache_epoch import stop_epoch_subscriber
+    await stop_epoch_subscriber()
+
     for t in tasks:
         t.cancel()
         try:

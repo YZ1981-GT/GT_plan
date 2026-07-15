@@ -54,7 +54,10 @@ _RE_ROW = re.compile(r"ROW\('([^']+)'\)")
 
 
 def _wp_edge_to_addr_id(wp_code: str, sheet: str, cell_or_label: str) -> str:
-    """将 WP 类边端点转换为 addr_id 格式（R14.3）。
+    """将 WP 类边端点转换为 canonical addr_id 格式（R14.3, Req-6）。
+
+    内部使用 CanonicalAddress 值对象进行规范化（Req-6.4），
+    保证 FormulaReverseIndex 的边端点全部使用 canonical addr_id。
 
     使用 ACNR catalog 解析 sheet_name → sheet_code，保证重命名 sheet 时
     addr_id（基于 sheet_code）不变。
@@ -71,11 +74,12 @@ def _wp_edge_to_addr_id(wp_code: str, sheet: str, cell_or_label: str) -> str:
     Returns
     -------
     str
-        addr_id 格式，如 'D2/D2-2/E100'。
-        如果 catalog 无法解析则 fallback 为 '{wp_code}/{sheet}/{cell}'。
+        canonical addr_id 格式，如 'D2/D2-2/E100'。
+        如果 catalog 无法解析则 fallback 为 CanonicalAddress 直接构造的 addr_id。
     """
     try:
         from app.services.acnr.catalog import _formula_ref_to_addr_id
+        from app.services.acnr.canonical import CanonicalAddress
     except ImportError:
         # ACNR 未安装时 fallback
         if cell_or_label:
@@ -90,17 +94,24 @@ def _wp_edge_to_addr_id(wp_code: str, sheet: str, cell_or_label: str) -> str:
 
     addr_id = _formula_ref_to_addr_id(formula_ref)
     if addr_id:
-        return addr_id
+        # 通过 CanonicalAddress round-trip 确保格式规范（Req-6.4）
+        ca = CanonicalAddress.from_addr_id(addr_id)
+        return ca.addr_id
 
-    # Fallback: 直接拼 addr_id 格式
-    if cell_or_label:
-        return f"{wp_code}/{sheet}/{cell_or_label}"
-    return f"{wp_code}/{sheet}"
+    # Fallback: 用 CanonicalAddress 直接构造 canonical addr_id
+    ca = CanonicalAddress(
+        domain="wp",
+        parent=wp_code,
+        sheet=sheet,
+        coordinate=cell_or_label,
+    )
+    return ca.addr_id
 
 
 def _legacy_uri_to_addr_id(uri: str) -> str:
-    """将旧格式 URI（WP:D2:明细表D2-2:E100）转为 addr_id 格式。
+    """将旧格式 URI（WP:D2:明细表D2-2:E100）转为 canonical addr_id 格式。
 
+    内部使用 CanonicalAddress 值对象确保规范化（Req-6.4）。
     非 WP 域保持原格式不变（TB/REPORT/NOTE/ADJ 等）。
     """
     parts = uri.split(":", 3)
@@ -158,6 +169,38 @@ class FormulaReverseIndex:
         self._built = True
         logger.info(
             "FormulaReverseIndex built: %d source URIs indexed",
+            len(self._index),
+        )
+        return dict(self._index)
+
+    def build_from_graph(self, graph_builder: "Any") -> dict[str, list[str]]:
+        """从 LinkageGraphBuilder 的边构建反向索引（Req-8.2 派生视图）。
+
+        以 LinkageGraphBuilder 为单一真源，读取其已构建的边数据，
+        不独立扫描数据源。等价于对 graph 中每条边 (source→target)
+        构建 target→[source] 的反向映射。
+
+        Parameters
+        ----------
+        graph_builder : LinkageGraphBuilder
+            已 build() 完成的图构建器实例。
+
+        Returns
+        -------
+        dict[str, list[str]]
+            反向索引：target_addr_id → list of source_addr_ids
+        """
+        self._index.clear()
+
+        for edge in graph_builder._edges:
+            source = edge.get("source", "")
+            target = edge.get("target", "")
+            if source and target:
+                self._index[target].append(source)
+
+        self._built = True
+        logger.info(
+            "FormulaReverseIndex built from graph: %d target URIs indexed",
             len(self._index),
         )
         return dict(self._index)

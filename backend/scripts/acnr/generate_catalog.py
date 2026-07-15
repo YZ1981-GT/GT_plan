@@ -307,22 +307,42 @@ def generate_catalog(
                 "reason": "sheet_code not found in classification catalog",
             })
 
+    # --- acknowledged_conflicts 机制 (Req-10.4) ---
+    # 有 reason 字段的已知例外从 gap_count 扣除
+    acknowledged_conflicts: list[dict[str, Any]] = []
+    effective_alias_conflicts: list[dict[str, Any]] = []
+    for conflict in alias_conflicts:
+        if conflict.get("reason") and conflict.get("action") == "acknowledged":
+            acknowledged_conflicts.append(conflict)
+        else:
+            effective_alias_conflicts.append(conflict)
+
+    # --- gap_count 真实计算 (Req-10.1) ---
+    # gap_count = alias_conflicts(未确认) + unregistered_aliases + gaps + skip_reason
+    skip_reason_count = sum(1 for s in sheets if s.skip_reason)
+    gap_count = (
+        len(effective_alias_conflicts)
+        + len(unregistered_aliases)
+        + len(gaps)
+        + skip_reason_count
+    )
+
     report_data: dict[str, Any] = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "registry_version": registry_version,
         "manifest_blocked": manifest_blocked,
         "alias_conflicts": alias_conflicts,
+        "acknowledged_conflicts": acknowledged_conflicts,
         "gaps": gaps,
         "unregistered_aliases": unregistered_aliases,
         "summary": {
             "total_sheets": len(sheets),
             "total_cells": len(cells),
             "alias_conflict_count": len(alias_conflicts),
-            "gap_count": len(gaps),
+            "gap_count": gap_count,
             "unregistered_alias_count": len(unregistered_aliases),
-            "sheets_with_skip_reason": sum(
-                1 for s in sheets if s.skip_reason
-            ),
+            "sheets_with_skip_reason": skip_reason_count,
+            "acknowledged_conflict_count": len(acknowledged_conflicts),
         },
     }
 
@@ -415,6 +435,35 @@ def _deterministic_json(data: Any) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _archive_catalog_snapshot(catalog_data: dict[str, Any]) -> Path | None:
+    """归档当前版本 catalog 为不可变快照（append-only）。
+
+    在写入新版本之前，将当前 catalog 按 registry_version 归档到
+    data/acnr/catalog_snapshots/{version}.json。
+
+    Requirements: Req-9.4 — Catalog 新版本发布时自动归档当前版本为不可变快照。
+
+    Returns:
+        归档文件路径，若已存在则返回 None（append-only 不覆盖）。
+    """
+    snapshots_dir = _ACNR_DATA_DIR / "catalog_snapshots"
+    snapshots_dir.mkdir(parents=True, exist_ok=True)
+
+    version = catalog_data.get("registry_version", "")
+    if not version:
+        return None
+
+    snapshot_path = snapshots_dir / f"{version}.json"
+
+    # append-only：已存在的快照不覆盖
+    if snapshot_path.exists():
+        return None
+
+    snapshot_json = _deterministic_json(catalog_data)
+    snapshot_path.write_text(snapshot_json, encoding="utf-8")
+    return snapshot_path
+
+
 def write_catalog(
     catalog_data: dict[str, Any],
     report_data: dict[str, Any],
@@ -430,6 +479,17 @@ def write_catalog(
     (catalog_path, report_path)
     """
     out = output_dir or _ACNR_DATA_DIR
+
+    # ─── Req-9.4: 归档当前版本快照（在写入新版本之前）───────────────────
+    existing_catalog_path = out / "global_catalog.json"
+    if existing_catalog_path.exists():
+        try:
+            existing_data = json.loads(existing_catalog_path.read_text(encoding="utf-8"))
+            snapshot_path = _archive_catalog_snapshot(existing_data)
+            if snapshot_path:
+                print(f"  Snapshot archived: {snapshot_path}")
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"  WARNING: Failed to archive snapshot: {e}", file=sys.stderr)
 
     # 主 catalog
     catalog_path = out / "global_catalog.json"
@@ -547,6 +607,18 @@ def main() -> int:
         write_shards=not args.no_shards,
         cycle=args.cycle,
     )
+
+    # ─── Req-16: 生成新版本后自动清理过期快照 ─────────────────────────────
+    try:
+        from app.services.acnr.catalog_snapshot_gc import cleanup_stale_snapshots
+
+        gc_result = cleanup_stale_snapshots(keep_recent=10, referenced_versions=set())
+        if gc_result["deleted"]:
+            print(f"  Snapshot GC: deleted {len(gc_result['deleted'])} stale snapshot(s)")
+        else:
+            print(f"  Snapshot GC: no stale snapshots to clean")
+    except Exception as e:
+        print(f"  WARNING: Snapshot GC failed (non-fatal): {e}", file=sys.stderr)
 
     # 输出摘要
     summary = report_data.get("summary", {})

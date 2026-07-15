@@ -405,6 +405,138 @@ class CrossSheetResolver:
 
         return True
 
+    # ─── Async hot path (Req-8.4) ──────────────────────────────────────────
+
+    async def full_resolve_async(
+        self,
+        parsed_data: dict | None,
+        sheet_name: str,
+        cell_ref: str,
+        max_depth: int = 3,
+    ) -> RefChainResponse:
+        """Async 热路径 BFS：在 async 上下文中用 await full_resolve 替代 _sync_resolve() None 降级。
+
+        Req-8.4: CrossSheetResolver._sync_resolve() 在 async 热路径检测到 event loop 时
+        SHALL 使用 async orchestrator 预解析。本方法是 async 版 resolve()，在已有
+        event loop 的场景下直接 await full_resolve，不降级到 snapshot fallback。
+
+        Parameters
+        ----------
+        parsed_data : dict | None
+            底稿 parsed_data (含 univer_snapshot)
+        sheet_name : str
+            起始 sheet 名
+        cell_ref : str
+            起始 cell 引用 (e.g. "A2")
+        max_depth : int
+            最大递归深度 (默认 3)
+
+        Returns
+        -------
+        RefChainResponse
+            与同步 resolve() 相同结构的响应，但 ACNR 解析不降级。
+        """
+        max_depth = min(max_depth, 3)
+
+        try:
+            from app.services.acnr.resolver import full_resolve
+        except Exception as exc:
+            logger.warning("ACNR resolver import failed in async path: %s", exc)
+            # Fallback to sync resolve (which will itself degrade to snapshot)
+            return self.resolve(parsed_data, sheet_name, cell_ref, max_depth)
+
+        queue: deque[tuple[str, str, int]] = deque()
+        queue.append((sheet_name, cell_ref.upper(), 0))
+        visited: set[str] = set()
+        chain: list[RefChainNode] = []
+        has_cycle = False
+        truncated_at_depth: int | None = None
+
+        while queue:
+            cur_sheet, cur_cell, depth = queue.popleft()
+
+            # ── Async ACNR full_resolve (Req-8.4) ────────────────────────
+            acnr_result: "ResolveResult | None" = None
+            resolve_missed = True
+            try:
+                if self._parent_wp_code:
+                    formula_ref = (
+                        f"WP('{self._parent_wp_code}','{cur_sheet}','{cur_cell}')"
+                    )
+                    acnr_result = await full_resolve(
+                        formula_ref=formula_ref,
+                        project_id=self._project_id,
+                    )
+                else:
+                    acnr_result = await full_resolve(
+                        uri=f"wp://{cur_sheet}/{cur_cell}",
+                        project_id=self._project_id,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Async ACNR full_resolve failed for %s!%s: %s",
+                    cur_sheet,
+                    cur_cell,
+                    exc,
+                )
+
+            if acnr_result and acnr_result.found and acnr_result.addr_id:
+                uri = acnr_result.addr_id
+                resolve_missed = False
+            else:
+                uri = f"{cur_sheet}!{cur_cell}"
+
+            # Cycle detection
+            if uri in visited:
+                chain.append(
+                    RefChainNode(
+                        depth=depth,
+                        uri=uri,
+                        cycle=True,
+                        resolve_missed=resolve_missed,
+                    )
+                )
+                has_cycle = True
+                continue
+
+            visited.add(uri)
+
+            # Extract cell value and formula
+            value, formula = _extract_cell_from_snapshot(
+                parsed_data, cur_sheet, cur_cell
+            )
+
+            # Check if target is missing
+            missing = self._is_missing(parsed_data, cur_sheet, cur_cell)
+
+            node = RefChainNode(
+                depth=depth,
+                uri=uri,
+                value=value,
+                formula=formula,
+                missing=missing,
+                resolve_missed=resolve_missed,
+            )
+            chain.append(node)
+
+            # Depth termination
+            if depth >= max_depth:
+                node.truncated = True
+                if truncated_at_depth is None:
+                    truncated_at_depth = depth
+                continue
+
+            # Parse cross-sheet references from formula
+            refs = parse_cross_sheet_refs(formula)
+            for ref_sheet, ref_cell in refs:
+                queue.append((ref_sheet, ref_cell, depth + 1))
+
+        return RefChainResponse(
+            chain=chain,
+            has_cycle=has_cycle,
+            truncated_at_depth=truncated_at_depth,
+        )
+
 
 # Module-level singleton
 cross_sheet_resolver = CrossSheetResolver()

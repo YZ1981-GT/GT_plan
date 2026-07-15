@@ -12,19 +12,100 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Optional
 
 # ─── Load grammar_v1.json ────────────────────────────────────────────────────
 
+# grammar.py 位于 backend/app/services/acnr/grammar.py
+# parents[0] = backend/app/services/acnr/
+# parents[1] = backend/app/services/
+# parents[2] = backend/app/
+# parents[3] = backend/
+# 目标: backend/data/acnr/grammar_v1.json
 _GRAMMAR_FILE = (
-    Path(__file__).resolve().parents[4] / "data" / "acnr" / "grammar_v1.json"
+    Path(__file__).resolve().parents[3] / "data" / "acnr" / "grammar_v1.json"
 )
 
 _grammar: dict = {}
 if _GRAMMAR_FILE.exists():
     with open(_GRAMMAR_FILE, encoding="utf-8") as f:
         _grammar = json.load(f)
+
+
+# ─── Grammar Validation (Req-2) ─────────────────────────────────────────────
+
+def _validate_grammar(data: dict) -> list[str]:
+    """校验 grammar_v1.json 内容完整性，返回缺失项清单。
+
+    校验项 (Req-2.3):
+    - 至少 5 个域定义 (uri_profiles)
+    - 至少 11 个命名空间映射 (index_namespaces)
+    - STANDARD_WP_CODE_RE 常量存在
+    - registry_version (即顶层 version) 非空
+    """
+    missing: list[str] = []
+
+    # 1. registry_version 非空
+    version = data.get("version")
+    if not version:
+        missing.append("registry_version (顶层 'version' 字段缺失或为空)")
+
+    # 2. 至少 5 个域定义
+    uri_profiles = data.get("uri_profiles", {})
+    if len(uri_profiles) < 5:
+        missing.append(
+            f"uri_profiles 域定义不足: 需要 ≥5, 实际 {len(uri_profiles)}"
+        )
+
+    # 3. 至少 11 个命名空间映射
+    index_ns = data.get("index_namespaces", {})
+    if len(index_ns) < 11:
+        missing.append(
+            f"index_namespaces 命名空间不足: 需要 ≥11, 实际 {len(index_ns)}"
+        )
+
+    # 4. STANDARD_WP_CODE_RE 常量存在
+    constants = data.get("constants", {})
+    if not constants.get("STANDARD_WP_CODE_RE"):
+        missing.append("constants.STANDARD_WP_CODE_RE 缺失或为空")
+
+    return missing
+
+
+def validate_grammar_on_startup() -> None:
+    """启动时校验 grammar_v1.json 完整性。
+
+    由 lifespan 调用。文件不存在/JSON 解析失败/校验项缺失 → sys.exit(1)。
+    (Req-2.1, Req-2.2, Req-2.4)
+    """
+    if not _GRAMMAR_FILE.exists():
+        print(
+            f"[FATAL] grammar_v1.json 不存在: {_GRAMMAR_FILE}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    try:
+        with open(_GRAMMAR_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+    except (json.JSONDecodeError, OSError) as exc:
+        print(
+            f"[FATAL] grammar_v1.json 加载失败: {exc}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    missing = _validate_grammar(data)
+    if missing:
+        print(
+            "[FATAL] grammar_v1.json 校验失败，缺失项:",
+            file=sys.stderr,
+        )
+        for item in missing:
+            print(f"  - {item}", file=sys.stderr)
+        sys.exit(1)
 
 
 # ─── Constants (R12.1, R12.2) ────────────────────────────────────────────────

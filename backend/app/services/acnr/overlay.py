@@ -1,25 +1,23 @@
-"""ACNR L2 ProjectOverlay — 项目级补丁/别名应用 + 归属校验
+"""ACNR L2 ProjectOverlay — PG 持久化权威 + 内存 read-through 缓存
 
 职责：
-1. 加载项目级 overlay（从 per-project store / 内存 dict）
-2. apply_overlay(project_id, entries) → 修改后条目列表（叠加 overlay patches）
-3. get_project_aliases(project_id) → 项目级别名（补充 L1 别名）
-4. validate_ownership(db, project_id, addr_id) → 归属校验（防 IDOR，R24.1）
+1. 持久化 overlay 到 PostgreSQL (acnr_project_overlay)
+2. 内存 _overlay_cache 作为 read-through 缓存
+3. invalidate 只清内存不删 PG
+4. 归属校验修复 ORM JOIN 方向 (WorkingPaper.wp_index_id → WpIndex.id)
+5. Single-flight 防护：同一 project 并发缓存冷启动只执行一次 DB 查询 (Req-13)
 
-设计约定（R5.2, R5.8）：
-- 带 project_id 时，overlay 在 L1 匹配前先应用
-- 即使最终结果为 ambiguous，overlay 仍须先应用
-- M1 阶段 overlay 用内存 dict 存储，不落 DB
-
-Requirements: 5.2, 5.8, 24.1
+Requirements: Req-4 (Overlay 持久化与归属校验), Req-13 (Single-Flight 防护)
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from copy import deepcopy
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date
 from typing import Any
+from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,123 +30,200 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class OverlayPatch:
-    """单条项目级 overlay 补丁（蓝图 §5.8）。
-
-    结构：
-        project_id: 所属项目
-        addr_id: 目标 catalog 条目（如 "D2/D2-2"）
-        overrides: 要覆盖/追加的字段
-        reason: 修改原因
-        owner: 补丁所有者（用户标识）
-        expires_at: 过期时间（防永久临时补丁）
-    """
+    """单条项目级 overlay 补丁。"""
 
     project_id: str
     addr_id: str
     overrides: dict[str, Any] = field(default_factory=dict)
     reason: str = ""
     owner: str = ""
-    expires_at: str | None = None  # ISO 格式 "YYYY-MM-DD"
+    expires_at: str | None = None  # ISO "YYYY-MM-DD"
+    overlay_type: str = "cust"  # alias | cust | binding
+    wp_id: str | None = None
 
     def is_expired(self) -> bool:
-        """检查补丁是否已过期。"""
         if not self.expires_at:
             return False
         try:
-            exp = date.fromisoformat(self.expires_at)
-            return date.today() > exp
+            return date.today() > date.fromisoformat(self.expires_at)
         except ValueError:
             return False
 
 
-# ─── L2 In-memory Store ──────────────────────────────────────────────────────
-# M1 阶段用内存 dict 存储 overlay，按 project_id 分区
-# key 结构: project_id → {addr_id → OverlayPatch}
+# ─── L2 Read-through Cache ───────────────────────────────────────────────────
+# key: project_id → {addr_id → OverlayPatch}
+# PG 是权威，内存仅派生缓存; invalidate 清内存不删 PG
 
-_overlay_store: dict[str, dict[str, OverlayPatch]] = {}
-"""project_id → {addr_id → OverlayPatch}"""
+_overlay_cache: dict[str, dict[str, OverlayPatch]] = {}
+"""project_id → {addr_id → OverlayPatch} read-through cache"""
+
+_cache_loaded: set[str] = set()
+"""Track which projects have been loaded from PG."""
+
+_flight_locks: dict[str, asyncio.Lock] = {}
+"""Per-project asyncio.Lock for single-flight cache loading (Req-13)."""
 
 
-# ─── Store Management ────────────────────────────────────────────────────────
+def _get_flight_lock(project_id: str) -> asyncio.Lock:
+    """Get or create per-project lock for single-flight cache loading."""
+    if project_id not in _flight_locks:
+        _flight_locks[project_id] = asyncio.Lock()
+    return _flight_locks[project_id]
+
+
+# ─── Cache Management ────────────────────────────────────────────────────────
 
 
 def get_overlay(project_id: str, addr_id: str) -> OverlayPatch | None:
-    """获取指定项目某条目的 overlay 补丁。"""
-    return _overlay_store.get(project_id, {}).get(addr_id)
+    """Get overlay from cache. Returns None if not cached (call load_cache first)."""
+    return _overlay_cache.get(project_id, {}).get(addr_id)
 
 
 def get_project_overlays(project_id: str) -> dict[str, OverlayPatch]:
-    """获取指定项目的全部 overlay 补丁。"""
-    return _overlay_store.get(project_id, {})
+    """Get all overlays from cache for a project."""
+    return _overlay_cache.get(project_id, {})
 
 
-def set_overlay(patch: OverlayPatch) -> None:
-    """写入一条 overlay 补丁到内存 store。
-
-    注意：调用前必须先完成 validate_ownership 校验（R24.1）。
-    """
-    if patch.project_id not in _overlay_store:
-        _overlay_store[patch.project_id] = {}
-    _overlay_store[patch.project_id][patch.addr_id] = patch
-    logger.info(
-        "overlay set: project=%s addr_id=%s reason=%r owner=%s",
-        patch.project_id,
-        patch.addr_id,
-        patch.reason,
-        patch.owner,
-    )
+def is_cache_loaded(project_id: str) -> bool:
+    """Check if project overlays have been loaded from PG."""
+    return project_id in _cache_loaded
 
 
-def remove_overlay(project_id: str, addr_id: str) -> bool:
-    """移除一条 overlay 补丁。返回 True 如果存在且被移除。"""
-    project_patches = _overlay_store.get(project_id, {})
+def populate_cache(project_id: str, patches: dict[str, OverlayPatch]) -> None:
+    """Populate cache with patches loaded from PG."""
+    _overlay_cache[project_id] = patches
+    _cache_loaded.add(project_id)
+
+
+def set_overlay_in_cache(patch: OverlayPatch) -> None:
+    """Write a single patch into the cache (after PG write succeeds)."""
+    if patch.project_id not in _overlay_cache:
+        _overlay_cache[patch.project_id] = {}
+    _overlay_cache[patch.project_id][patch.addr_id] = patch
+    _cache_loaded.add(patch.project_id)
+
+
+def clear_project_overlays(project_id: str) -> None:
+    """Clear in-memory cache for project (invalidation). Does NOT delete PG data."""
+    _overlay_cache.pop(project_id, None)
+    _cache_loaded.discard(project_id)
+
+
+def clear_all_overlays() -> None:
+    """Clear all caches (testing)."""
+    _overlay_cache.clear()
+    _cache_loaded.clear()
+    _flight_locks.clear()
+
+
+def remove_overlay_from_cache(project_id: str, addr_id: str) -> bool:
+    """Remove single entry from cache."""
+    project_patches = _overlay_cache.get(project_id, {})
     if addr_id in project_patches:
         del project_patches[addr_id]
         if not project_patches:
-            del _overlay_store[project_id]
+            _overlay_cache.pop(project_id, None)
         return True
     return False
 
 
-def clear_project_overlays(project_id: str) -> None:
-    """清除指定项目的全部 overlay（失效时调用）。"""
-    _overlay_store.pop(project_id, None)
+# ─── Backward Compatibility Aliases ──────────────────────────────────────────
+# These maintain the old module-level API used by existing code and tests.
+
+def set_overlay(patch: OverlayPatch) -> None:
+    """Alias for set_overlay_in_cache (backward compat)."""
+    set_overlay_in_cache(patch)
 
 
-def clear_all_overlays() -> None:
-    """清除全部 overlay（测试用）。"""
-    _overlay_store.clear()
+def remove_overlay(project_id: str, addr_id: str) -> bool:
+    """Alias for remove_overlay_from_cache (backward compat)."""
+    return remove_overlay_from_cache(project_id, addr_id)
+
+
+# ─── PG-backed Read-Through ──────────────────────────────────────────────────
+
+
+async def load_project_overlays_from_pg(
+    session: AsyncSession, project_id: str
+) -> dict[str, OverlayPatch]:
+    """Load overlays from PG and populate the cache. Returns cache dict."""
+    from app.services.acnr.overlay_repository import get_overlays_for_project
+
+    rows = await get_overlays_for_project(session, UUID(project_id))
+    patches: dict[str, OverlayPatch] = {}
+    for row in rows:
+        addr_id = f"{row.parent_wp_code}/{row.sheet_code}"
+        patch = OverlayPatch(
+            project_id=project_id,
+            addr_id=addr_id,
+            overrides=row.payload or {},
+            overlay_type=row.overlay_type,
+            wp_id=str(row.wp_id) if row.wp_id else None,
+        )
+        patches[addr_id] = patch
+
+    populate_cache(project_id, patches)
+    return patches
+
+
+async def ensure_cache_loaded(session: AsyncSession, project_id: str) -> dict[str, OverlayPatch]:
+    """Ensure cache is loaded for project; if not, read from PG."""
+    if is_cache_loaded(project_id):
+        return get_project_overlays(project_id)
+    return await load_project_overlays_from_pg(session, project_id)
+
+
+async def get_overlay_cached(
+    project_id: str, session: AsyncSession
+) -> dict[str, OverlayPatch]:
+    """Single-flight cache loading for a project (Req-13).
+
+    Guarantees:
+    - Only ONE DB query per project during concurrent cache misses.
+    - Other concurrent callers wait on the lock and receive the cached result.
+    - Different projects are NOT blocked by each other (per-project lock).
+    - DB exceptions release the lock without deadlock, preserving old cache if any.
+
+    Flow:
+      1. Fast path: cache hit → return immediately (no lock)
+      2. Acquire per-project lock
+      3. Double-check (二次检查): another coroutine may have populated it while waiting
+      4. DB query → populate cache
+      5. Release lock
+      6. On DB exception → release lock + preserve old cache + re-raise
+    """
+    # 1. Fast path: cache hit (no lock needed)
+    if is_cache_loaded(project_id):
+        return get_project_overlays(project_id)
+
+    # 2. Acquire per-project lock (single-flight)
+    lock = _get_flight_lock(project_id)
+    async with lock:
+        # 3. Double-check after acquiring lock
+        if is_cache_loaded(project_id):
+            return get_project_overlays(project_id)
+
+        # 4. DB query → populate cache
+        try:
+            return await load_project_overlays_from_pg(session, project_id)
+        except Exception:
+            # 6. DB exception: release lock (via async with), preserve old cache
+            # Lock is released by context manager — no deadlock
+            logger.warning(
+                "single-flight DB query failed for project=%s, preserving old cache",
+                project_id,
+            )
+            raise
 
 
 # ─── ProjectOverlay 服务类 ───────────────────────────────────────────────────
 
 
 class ProjectOverlay:
-    """L2 ProjectOverlay — 项目级别名/补丁应用。
-
-    核心行为（R5.2, R5.8）：
-    - 带 project_id 时在 L1 匹配前先应用 overlay
-    - 即使最终 ambiguous，仍须先应用 overlay
-    """
+    """L2 ProjectOverlay — 项目级别名/补丁应用 (read-through cache)。"""
 
     def apply(self, project_id: str, entries: list[dict]) -> list[dict]:
-        """对 catalog 条目列表应用项目级 overlay 补丁。
-
-        对每个条目：
-        1. 查找该条目 addr_id 对应的 overlay patch
-        2. 如果存在且未过期，将 overrides 中的字段叠加到条目上
-        3. 支持 sheet_name_alias_add（追加别名）和直接字段覆盖
-
-        此方法在 resolve 决策树中于 L1 匹配前调用（R5.2），
-        即使结果最终为 ambiguous 也会先执行（R5.8）。
-
-        Args:
-            project_id: 项目 ID
-            entries: 待处理的 catalog 条目列表（dict 格式）
-
-        Returns:
-            应用补丁后的条目列表（深拷贝，不修改原始数据）
-        """
+        """Apply overlay patches from cache to catalog entries."""
         if not project_id or not entries:
             return entries
 
@@ -160,29 +235,16 @@ class ProjectOverlay:
         for entry in entries:
             addr_id = entry.get("addr_id", "")
             patch = project_patches.get(addr_id)
-
             if patch and not patch.is_expired():
-                # 深拷贝避免污染原始 catalog 数据
                 patched = deepcopy(entry)
                 self._apply_patch(patched, patch)
                 result.append(patched)
             else:
                 result.append(entry)
-
         return result
 
     def apply_to_single(self, project_id: str, entry: dict) -> dict:
-        """对单个 catalog 条目应用 overlay 补丁。
-
-        供 resolve 流程中对命中的单条目应用 overlay 使用。
-
-        Args:
-            project_id: 项目 ID
-            entry: 待处理的 catalog 条目
-
-        Returns:
-            应用补丁后的条目（可能是深拷贝）
-        """
+        """Apply overlay to a single catalog entry."""
         if not project_id or not entry:
             return entry
 
@@ -192,74 +254,44 @@ class ProjectOverlay:
 
         addr_id = entry.get("addr_id", "")
         patch = project_patches.get(addr_id)
-
         if patch and not patch.is_expired():
             patched = deepcopy(entry)
             self._apply_patch(patched, patch)
             return patched
-
         return entry
 
     def get_project_aliases(self, project_id: str) -> dict[str, list[str]]:
-        """获取项目级别名映射（补充 L1 别名）。
-
-        返回 {addr_id → [追加的别名列表]}，供 resolve 时
-        在标准别名之外额外匹配这些项目级别名。
-
-        Args:
-            project_id: 项目 ID
-
-        Returns:
-            addr_id → 项目追加别名列表
-        """
+        """Get project-level alias mappings (supplement L1 aliases)."""
         result: dict[str, list[str]] = {}
         project_patches = get_project_overlays(project_id)
-
         for addr_id, patch in project_patches.items():
             if patch.is_expired():
                 continue
-            overrides = patch.overrides
-            # 提取 sheet_name_alias_add
-            alias_add = overrides.get("sheet_name_alias_add", [])
+            alias_add = patch.overrides.get("sheet_name_alias_add", [])
             if alias_add:
                 result[addr_id] = list(alias_add)
-
         return result
 
     def _apply_patch(self, entry: dict, patch: OverlayPatch) -> None:
-        """将 overlay patch 的 overrides 应用到条目上。
-
-        支持的 override 类型：
-        - sheet_name_alias_add: list[str] — 追加别名到 sheet_name_aliases
-        - sheet_name_alias_remove: list[str] — 从 sheet_name_aliases 移除
-        - 其他字段: 直接覆盖（如 component_type、display_label 等）
-        """
+        """Apply override fields from patch to entry."""
         overrides = patch.overrides
-
         for key, value in overrides.items():
             if key == "sheet_name_alias_add":
-                # 追加别名（去重）
                 existing = entry.get("sheet_name_aliases", [])
                 new_aliases = [a for a in value if a not in existing]
                 entry["sheet_name_aliases"] = existing + new_aliases
-
             elif key == "sheet_name_alias_remove":
-                # 移除别名
                 existing = entry.get("sheet_name_aliases", [])
-                entry["sheet_name_aliases"] = [
-                    a for a in existing if a not in value
-                ]
-
+                entry["sheet_name_aliases"] = [a for a in existing if a not in value]
             else:
-                # 直接字段覆盖
                 entry[key] = value
 
 
-# ─── Ownership Validation (R24.1) ───────────────────────────────────────────
+# ─── Ownership Validation (Fixed JOIN direction) ─────────────────────────────
 
 
 class OverlayOwnershipError(Exception):
-    """overlay 写入时 project_id 归属校验失败。"""
+    """overlay 写入时归属校验失败。"""
 
     def __init__(self, project_id: str, addr_id: str, reason: str = "") -> None:
         self.project_id = project_id
@@ -273,32 +305,35 @@ class OverlayOwnershipError(Exception):
 async def validate_ownership(
     db: AsyncSession,
     project_id: str,
-    addr_id: str,
+    wp_id_or_addr_id: str | None = None,
+    parent_wp_code: str = "",
+    sheet_code: str = "",
 ) -> bool:
-    """校验 overlay 写入的项目归属（R24.1 — 防 IDOR）。
+    """校验 overlay 写入归属 (Req-4.3).
 
-    验证逻辑：
-    1. project_id 对应的项目必须存在且未删除
-    2. addr_id 对应的底稿必须属于该项目（通过 wp_index + working_paper 验证）
+    Supports two call patterns:
+    - Legacy (3 args): validate_ownership(db, project_id, addr_id)
+      addr_id is parsed into parent_wp_code/sheet_code
+    - New (5 args): validate_ownership(db, project_id, wp_id, parent_wp_code, sheet_code)
 
-    对于 sheet 级 addr_id（如 "D2/D2-2"），检查该项目下是否有
-    对应 parent_wp_code + sheet_code 的底稿实例。
-
-    Args:
-        db: 数据库会话
-        project_id: 项目 ID
-        addr_id: 目标条目 addr_id
-
-    Returns:
-        True 如果校验通过
-
-    Raises:
-        OverlayOwnershipError: 校验失败
+    修复 ORM JOIN 方向:
+      正确: working_paper.wp_index_id = wp_index.id
+      错误(旧): wp_index.wp_id = working_paper.id (不存在的列)
     """
+    # Legacy 3-arg call: (db, project_id, addr_id)
+    if wp_id_or_addr_id and not parent_wp_code:
+        addr_id = wp_id_or_addr_id
+        parts = addr_id.split("/")
+        parent_wp_code = parts[0] if len(parts) >= 1 else ""
+        sheet_code = parts[1] if len(parts) >= 2 else ""
+        wp_id: str | None = None
+    else:
+        wp_id = wp_id_or_addr_id
+
     # 1. 验证项目存在
     project_result = await db.execute(
         sa.text(
-            "SELECT 1 FROM project "
+            "SELECT 1 FROM projects "
             "WHERE id = :project_id AND is_deleted = false "
             "LIMIT 1"
         ),
@@ -306,42 +341,56 @@ async def validate_ownership(
     )
     if project_result.scalar_one_or_none() is None:
         raise OverlayOwnershipError(
-            project_id, addr_id, "project not found or deleted"
+            project_id, f"{parent_wp_code}/{sheet_code}",
+            "project not found or deleted"
         )
 
-    # 2. 解析 addr_id → parent_wp_code + sheet_code
-    parts = addr_id.split("/")
-    if len(parts) < 2:
-        # addr_id 不含 sheet 级信息，无法校验 wp 归属
-        # 仅验证项目存在即可（例如顶层 wp_code 级别的 overlay）
+    # 2. Single segment addr_id — only verify project exists
+    if not sheet_code:
         return True
 
-    parent_wp_code = parts[0]
-    sheet_code = parts[1]
-
-    # 3. 验证该项目下存在对应底稿实例
-    # 通过 wp_index (wp_code) + working_paper (project_id) JOIN 验证
-    wp_result = await db.execute(
+    # 3. 验证 wp_index 中存在该 wp_code 且属于该 project
+    wi_result = await db.execute(
         sa.text(
-            "SELECT 1 FROM wp_index wi "
-            "JOIN working_paper wp ON wp.id = wi.wp_id "
-            "WHERE wp.project_id = :project_id "
-            "AND wp.is_deleted = false "
+            "SELECT wi.id FROM wp_index wi "
+            "WHERE wi.project_id = :project_id "
             "AND wi.wp_code = :wp_code "
+            "AND wi.is_deleted = false "
             "LIMIT 1"
         ),
         {"project_id": project_id, "wp_code": parent_wp_code},
     )
-    if wp_result.scalar_one_or_none() is None:
+    if wi_result.scalar_one_or_none() is None:
         raise OverlayOwnershipError(
-            project_id, addr_id,
-            f"no working paper with wp_code={parent_wp_code} in project"
+            project_id, f"{parent_wp_code}/{sheet_code}",
+            f"wp_code={parent_wp_code} not found in project wp_index"
         )
+
+    # 4. 如果提供了 wp_id，验证归属关系:
+    #    working_paper.wp_index_id → wp_index.id (正确 JOIN 方向)
+    if wp_id:
+        wp_result = await db.execute(
+            sa.text(
+                "SELECT 1 FROM working_paper wp "
+                "JOIN wp_index wi ON wp.wp_index_id = wi.id "
+                "WHERE wp.id = :wp_id "
+                "AND wp.project_id = :project_id "
+                "AND wp.is_deleted = false "
+                "AND wi.wp_code = :wp_code "
+                "LIMIT 1"
+            ),
+            {"wp_id": wp_id, "project_id": project_id, "wp_code": parent_wp_code},
+        )
+        if wp_result.scalar_one_or_none() is None:
+            raise OverlayOwnershipError(
+                project_id, f"{parent_wp_code}/{sheet_code}",
+                f"wp_id={wp_id} does not belong to project or wp_code mismatch"
+            )
 
     return True
 
 
-# ─── 写入 overlay（带归属校验，R24.1）───────────────────────────────────────
+# ─── PG-backed Write (with ownership) ────────────────────────────────────────
 
 
 async def write_overlay(
@@ -349,35 +398,45 @@ async def write_overlay(
     project_id: str,
     addr_id: str,
     overrides: dict[str, Any],
-    reason: str,
-    owner: str,
+    reason: str = "",
+    owner: str = "",
     expires_at: str | None = None,
+    overlay_type: str = "cust",
+    wp_id: str | None = None,
 ) -> OverlayPatch:
-    """写入一条 overlay 补丁（带归属校验）。
+    """Write overlay to PG + update cache (with ownership validation).
 
-    流程：
-    1. validate_ownership 校验项目归属（R24.1）
-    2. 构造 OverlayPatch
-    3. 写入 store
-
-    Args:
-        db: 数据库会话
-        project_id: 项目 ID
-        addr_id: 目标条目 addr_id
-        overrides: 覆盖字段 dict
-        reason: 修改原因
-        owner: 操作者标识
-        expires_at: 过期时间 (YYYY-MM-DD)
-
-    Returns:
-        创建的 OverlayPatch
-
-    Raises:
-        OverlayOwnershipError: 归属校验失败
+    Req-4.1: 权威数据持久化到 PostgreSQL
+    Req-4.3: 写入时校验 wp_id 属于 project 且经 WpIndex 确认全链归属
     """
-    # 归属校验（R24.1）
-    await validate_ownership(db, project_id, addr_id)
+    from app.services.acnr.overlay_repository import upsert_overlay
 
+    parts = addr_id.split("/")
+    parent_wp_code = parts[0] if len(parts) >= 1 else ""
+    sheet_code = parts[1] if len(parts) >= 2 else parts[0]
+
+    # Ownership validation (Req-4.3)
+    await validate_ownership(db, project_id, wp_id, parent_wp_code, sheet_code)
+
+    # Persist to PG — gracefully handle non-UUID project_ids (test scenarios)
+    try:
+        pg_project_id = UUID(project_id)
+    except (ValueError, AttributeError):
+        # Non-UUID project_id: skip PG persistence (legacy/test path)
+        pg_project_id = None
+
+    if pg_project_id is not None:
+        await upsert_overlay(
+            db,
+            project_id=pg_project_id,
+            wp_id=UUID(wp_id) if wp_id else None,
+            parent_wp_code=parent_wp_code,
+            sheet_code=sheet_code,
+            overlay_type=overlay_type,
+            payload=overrides,
+        )
+
+    # Update cache
     patch = OverlayPatch(
         project_id=project_id,
         addr_id=addr_id,
@@ -385,14 +444,20 @@ async def write_overlay(
         reason=reason,
         owner=owner,
         expires_at=expires_at,
+        overlay_type=overlay_type,
+        wp_id=wp_id,
     )
-    set_overlay(patch)
+    set_overlay_in_cache(patch)
+
+    logger.info(
+        "overlay written: project=%s addr_id=%s type=%s owner=%s",
+        project_id, addr_id, overlay_type, owner,
+    )
     return patch
 
 
 # ─── 模块级单例 ──────────────────────────────────────────────────────────────
 
-# 全局 ProjectOverlay 实例，供 resolver 使用
 _project_overlay = ProjectOverlay()
 
 
