@@ -175,6 +175,36 @@ export const procedures = {
   assign: (pid: string) => `/api/projects/${pid}/procedures/assign`,
 } as const
 
+// ─── 程序行任务（procedure-delegation-notification / Task 12，V105 真源） ─────────
+
+export const procedureRowTasks = {
+  // 项目级"我的程序任务"分页查询（纯读）
+  listByProject: (pid: string) => `/api/projects/${pid}/procedure-row-tasks`,
+  // 跨项目"我的程序任务"分页查询（纯读）
+  listMine: () => `/api/my/procedure-row-tasks`,
+  // 单任务详情 + 深链定位 key（纯读）
+  detail: (pid: string, taskId: string) => `/api/projects/${pid}/procedure-row-tasks/${taskId}`,
+  // 单一状态机入口：状态转换（POST，携带 request_id + expected 版本）
+  transition: (pid: string, taskId: string) => `/api/projects/${pid}/procedure-row-tasks/${taskId}/transitions`,
+  // 两层裁剪 / 方案 preview-apply（Task 6，一次性 preview 凭证 + 真实 applied/unchanged/conflict）
+  trimPreview: (pid: string) => `/api/projects/${pid}/procedure-trim/preview`,
+  trimApply: (pid: string) => `/api/projects/${pid}/procedure-trim/apply`,
+  trimSaveScheme: (pid: string) => `/api/projects/${pid}/procedure-trim/schemes`,
+  trimRowNotApplicable: (pid: string, taskId: string) => `/api/projects/${pid}/procedure-trim/rows/${taskId}/not-applicable`,
+  trimRowRestore: (pid: string, taskId: string) => `/api/projects/${pid}/procedure-trim/rows/${taskId}/restore`,
+  // 三粒度委派 preview-apply（Task 8，materialize 前置 + 一次性 preview 凭证）
+  delegationPreview: (pid: string) => `/api/projects/${pid}/procedure-delegations/preview`,
+  delegationApply: (pid: string) => `/api/projects/${pid}/procedure-delegations/apply`,
+  // 显式物化 job（delegation preview 前置；job 失败不产生 preview）
+  materialize: (pid: string) => `/api/projects/${pid}/procedure-row-tasks/materialize`,
+  materializeJob: (pid: string) => `/api/projects/${pid}/procedure-row-tasks/materialize-jobs`,
+  materializeJobStatus: (pid: string, jobId: string) => `/api/projects/${pid}/procedure-row-tasks/materialize-jobs/${jobId}`,
+  // 程序行一级复核（Task 13，ReviewConversation + IssueTicket）
+  conversation: (pid: string, taskId: string) => `/api/projects/${pid}/procedure-row-tasks/${taskId}/conversation`,
+  messages: (pid: string, taskId: string) => `/api/projects/${pid}/procedure-row-tasks/${taskId}/messages`,
+  closeIssue: (pid: string, taskId: string, issueId: string) => `/api/projects/${pid}/procedure-row-tasks/${taskId}/issues/${issueId}/close`,
+} as const
+
 // ─── 复核 ───────────────────────────────────────────────────────────────────
 
 export const reviews = {

@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -56,22 +57,54 @@ async def update_procedure_status(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """更新程序行状态（filled→reviewed→approved 三档晋级）。"""
+    """更新程序行状态（filled→reviewed→approved 三档晋级）。
+
+    procedure-delegation-notification / Task 9（需求 7.3-7.5）：本端点不再对
+    ``WorkingPaper.parsed_data`` 整列 read-modify-write，改为经唯一的
+    ``ProcedureProjectionService.write_path`` 用 ``jsonb_set`` **精确** 到
+    ``procedure_status.{sheet_key}.{row}`` 路径（不同路径并发不丢）。程序行工作流真源是
+    ProcedureRowTask，其状态写入统一走 ``ProcedureTaskTransitionService`` 单一入口；本端点仅
+    维护可被 task overlay 覆盖的兼容投影，**不构成第二套状态机**。task-source 写模式下若该行已有
+    backing task，则拒绝旁路写并引导使用 transition API。
+    """
     if payload.status not in _VALID_STATUS:
         raise HTTPException(400, f"invalid status: {payload.status}")
 
+    from app.core.config import settings
+    from app.models.procedure_models import ProcedureRowTask
     from app.models.workpaper_models import WorkingPaper
+    from app.services.procedure_projection_service import ProcedureProjectionService
 
     wp_uuid = UUID(wp_id)
-    result = await db.execute(select(WorkingPaper).where(WorkingPaper.id == wp_uuid))
-    wp = result.scalar_one_or_none()
+    result = await db.execute(
+        select(WorkingPaper.id, WorkingPaper.project_id).where(WorkingPaper.id == wp_uuid)
+    )
+    wp = result.first()
     if not wp:
         raise HTTPException(404, "workpaper not found")
 
-    parsed: dict[str, Any] = dict(wp.parsed_data or {})
-    procedure_status: dict[str, Any] = dict(parsed.get("procedure_status") or {})
-    sheet_data: dict[str, Any] = dict(procedure_status.get(payload.sheet_key) or {})
-    row_data: dict[str, Any] = dict(sheet_data.get(payload.row) or {})
+    # task-source 写模式：若该 sheet 已有 backing ProcedureRowTask，禁止旁路写（避免第二套状态机）。
+    if getattr(settings, "PROCEDURE_ROW_TASK_WRITE_MODE", "legacy") == "task-source":
+        backed = (
+            await db.execute(
+                sa.select(ProcedureRowTask.id).where(
+                    ProcedureRowTask.wp_id == wp_uuid,
+                    ProcedureRowTask.sheet_key == payload.sheet_key,
+                    ProcedureRowTask.is_deleted == sa.false(),
+                ).limit(1)
+            )
+        ).first()
+        if backed is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="该程序行由 ProcedureRowTask 管理，请使用任务状态转换 API（transitions）",
+            )
+
+    projection = ProcedureProjectionService(db)
+    # 合并式写：只读取单条叶子（非整列 RMW）后合并 payload 字段，再精确 jsonb_set 写回。
+    row_data: dict[str, Any] = await projection.read_path(
+        wp_uuid, payload.sheet_key, payload.row
+    )
 
     now_iso = datetime.now(timezone.utc).isoformat()
     row_data["status"] = payload.status
@@ -95,13 +128,7 @@ async def update_procedure_status(
         row_data["approved_at"] = now_iso
         row_data["approved_by"] = str(current_user.id)
 
-    sheet_data[payload.row] = row_data
-    procedure_status[payload.sheet_key] = sheet_data
-    parsed["procedure_status"] = procedure_status
-    wp.parsed_data = parsed
-    # SQLAlchemy JSONB 需要显式标记为已修改
-    from sqlalchemy.orm.attributes import flag_modified
-    flag_modified(wp, "parsed_data")
+    await projection.write_path(wp_uuid, payload.sheet_key, payload.row, row_data)
     await db.commit()
     # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
 

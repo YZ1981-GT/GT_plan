@@ -29,6 +29,15 @@ export const NOTIFICATION_TYPES = {
   DELIVERABLE_APPROVAL_SUBMITTED: 'deliverable_approval_submitted',
   DELIVERABLE_APPROVAL_DONE: 'deliverable_approval_done',
   DELIVERABLE_APPROVAL_REJECTED: 'deliverable_approval_rejected',
+  // ── procedure-delegation-notification / Task 11：程序行任务（与后端 notification_types.py 同步）──
+  PROCEDURE_TASK_ASSIGNED: 'procedure_task.assigned',
+  PROCEDURE_TASK_REASSIGNED: 'procedure_task.reassigned',
+  PROCEDURE_TASK_SUBMITTED: 'procedure_task.submitted',
+  PROCEDURE_TASK_CHANGES_REQUESTED: 'procedure_task.changes_requested',
+  PROCEDURE_TASK_REVIEWED: 'procedure_task.reviewed',
+  PROCEDURE_TASK_REVIEWER_MISSING: 'procedure_task.reviewer_missing',
+  PROCEDURE_TASK_DELEGATION_BATCH: 'procedure_task.delegation_batch',
+  PROCEDURE_REVIEW_MESSAGE: 'procedure_review_message',
 } as const
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES]
@@ -50,6 +59,15 @@ export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   [NOTIFICATION_TYPES.DELIVERABLE_APPROVAL_SUBMITTED]: '交付物待审批',
   [NOTIFICATION_TYPES.DELIVERABLE_APPROVAL_DONE]: '交付物审批通过',
   [NOTIFICATION_TYPES.DELIVERABLE_APPROVAL_REJECTED]: '交付物审批驳回',
+  // Task 11：程序行任务
+  [NOTIFICATION_TYPES.PROCEDURE_TASK_ASSIGNED]: '程序任务已分配',
+  [NOTIFICATION_TYPES.PROCEDURE_TASK_REASSIGNED]: '程序任务已转派',
+  [NOTIFICATION_TYPES.PROCEDURE_TASK_SUBMITTED]: '程序任务待复核',
+  [NOTIFICATION_TYPES.PROCEDURE_TASK_CHANGES_REQUESTED]: '程序任务被退回',
+  [NOTIFICATION_TYPES.PROCEDURE_TASK_REVIEWED]: '程序任务已复核',
+  [NOTIFICATION_TYPES.PROCEDURE_TASK_REVIEWER_MISSING]: '缺少操作复核人',
+  [NOTIFICATION_TYPES.PROCEDURE_TASK_DELEGATION_BATCH]: '程序任务批量委派',
+  [NOTIFICATION_TYPES.PROCEDURE_REVIEW_MESSAGE]: '程序复核消息',
 }
 
 // ── 跳转规则 ──────────────────────────────────────────────────
@@ -94,6 +112,55 @@ export const NOTIFICATION_JUMP_ROUTES: Record<string, (meta: Record<string, any>
     `/projects/${m.project_id}/deliverable-center`,
   [NOTIFICATION_TYPES.DELIVERABLE_APPROVAL_REJECTED]: (m) =>
     `/projects/${m.project_id}/deliverable-center`,
+
+  // ── Task 11：程序行任务（metadata 驱动跳转，不解析中文 content）──
+  // 有 wp_id → 底稿深链（携带 task_id/sheet_key/definition_key，控制台精确定位程序行）；
+  // 无 wp_id（先委派后生成）→ 我的程序任务页（按批次/项目筛选）。已读/未读点击均可跳转。
+  [NOTIFICATION_TYPES.PROCEDURE_TASK_ASSIGNED]: (m) => procedureTaskRoute(m),
+  [NOTIFICATION_TYPES.PROCEDURE_TASK_REASSIGNED]: (m) => procedureTaskRoute(m),
+  [NOTIFICATION_TYPES.PROCEDURE_TASK_SUBMITTED]: (m) => procedureTaskRoute(m),
+  [NOTIFICATION_TYPES.PROCEDURE_TASK_CHANGES_REQUESTED]: (m) => procedureTaskRoute(m),
+  [NOTIFICATION_TYPES.PROCEDURE_TASK_REVIEWED]: (m) => procedureTaskRoute(m),
+  [NOTIFICATION_TYPES.PROCEDURE_REVIEW_MESSAGE]: (m) => procedureTaskRoute(m),
+  // reviewer_missing / 批量委派摘要 → 我的程序任务页（批量摘要带 batch/project/filter）
+  [NOTIFICATION_TYPES.PROCEDURE_TASK_REVIEWER_MISSING]: (m) => myProceduresRoute(m),
+  [NOTIFICATION_TYPES.PROCEDURE_TASK_DELEGATION_BATCH]: (m) => myProceduresRoute(m),
+}
+
+/** 拼接 query（跳过空值），返回 `?a=b&c=d` 或空串。 */
+function buildQuery(params: Record<string, any>): string {
+  const parts: string[] = []
+  for (const [k, v] of Object.entries(params)) {
+    if (v === undefined || v === null || v === '') continue
+    parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+  }
+  return parts.length ? `?${parts.join('&')}` : ''
+}
+
+/** 我的程序任务页（批量摘要/reviewer_missing 落地，带 batch/project/filter）。 */
+function myProceduresRoute(m: Record<string, any>): string {
+  const filter = m.filter || {}
+  return `/my-procedures${buildQuery({
+    project_id: m.project_id || filter.project_id,
+    batch_id: m.batch_id || filter.delegation_batch_id,
+  })}`
+}
+
+/**
+ * 单个程序行任务跳转：
+ * - 有 wp_id → 底稿深链（GtAProgramConsole 按 sheet_key+definition_key 精确定位）。
+ * - 无 wp_id（先委派后生成）→ 我的程序任务页（“底稿未生成”空态）。
+ */
+function procedureTaskRoute(m: Record<string, any>): string {
+  if (m.wp_id && m.project_id) {
+    return `/projects/${m.project_id}/workpapers${buildQuery({
+      wp: m.wp_id,
+      task_id: m.task_id,
+      sheet_key: m.sheet_key,
+      definition_key: m.definition_key,
+    })}`
+  }
+  return myProceduresRoute(m)
 }
 
 /**

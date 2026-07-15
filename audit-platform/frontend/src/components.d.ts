@@ -1779,6 +1779,7 @@ declare module 'vue' {
     ProcedureDialogLauncher: typeof import('./components/workpaper/ProcedureDialogLauncher.vue')['default']
     ProcedureFlowChart: typeof import('./components/workpaper/ProcedureFlowChart.vue')['default']
     ProcedurePanel: typeof import('./components/workpaper/ProcedurePanel.vue')['default']
+    ProcedureReviewPanel: typeof import('./components/workpaper/ProcedureReviewPanel.vue')['default']
     ProcedureTableRenderer: typeof import('./components/workpaper/ProcedureTableRenderer.vue')['default']
     ProcedureTrimmingPanel: typeof import('./components/workpaper/ProcedureTrimmingPanel.vue')['default']
     ProgramRequirementsSidebar: typeof import('./components/workpaper/ProgramRequirementsSidebar.vue')['default']

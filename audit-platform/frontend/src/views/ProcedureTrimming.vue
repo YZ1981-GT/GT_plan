@@ -3,16 +3,28 @@
     <!-- 顶部工具栏 -->
     <div class="gt-proc-toolbar">
       <div class="gt-proc-toolbar__left">
-        <h2 class="gt-proc-toolbar__title">审计程序裁剪</h2>
+        <h2 class="gt-proc-toolbar__title">底稿粗裁与委派</h2>
         <el-tag size="small" type="info">{{ projectId.slice(0, 8) }}</el-tag>
       </div>
       <div class="gt-proc-toolbar__right">
         <el-button size="small" @click="resetAll">🔄 恢复初始</el-button>
         <el-button size="small" @click="showRefDialog = true">📋 参照其他项目</el-button>
         <el-button size="small" type="warning" @click="onSmartTrim">🤖 一键智能裁剪</el-button>
-        <el-button size="small" type="primary" @click="saveTrim" :loading="saving">💾 保存裁剪</el-button>
+        <el-button size="small" @click="openDelegateWizard">🎯 程序委派向导</el-button>
+        <el-button size="small" type="primary" @click="saveTrim" :loading="saving">💾 保存粗裁</el-button>
       </div>
     </div>
+
+    <!-- 角色术语说明（需求 14.1：区分五类角色，不把高阶复核显示为程序行 reviewer） -->
+    <el-alert type="info" :closable="false" class="gt-proc-role-legend">
+      <template #title>
+        <span style="font-size:12px">
+          <strong>两层裁剪：</strong>本页做 <strong>粗裁</strong>（{{ TERMS.workpaperScope }}是否执行 + 指定{{ TERMS.workpaperLead }}）；
+          进入底稿程序表控制台做 <strong>细裁</strong>（{{ TERMS.procedureApplicability }} + 委派{{ TERMS.procedureAssignee }} / {{ TERMS.operationReviewer }}）。
+          {{ TERMS.highOrderReviewer }} 的高阶复核由底稿/项目层机制负责，不在此显示为程序行复核人。
+        </span>
+      </template>
+    </el-alert>
 
     <!-- 统计卡片（点击联动筛选） -->
     <div class="gt-proc-stats">
@@ -101,12 +113,17 @@
           </template>
         </el-table-column>
         <el-table-column prop="wp_code" label="关联底稿" width="100" resizable />
-        <el-table-column label="委派执行人" width="160" align="center">
+        <el-table-column width="160" align="center">
+          <template #header>
+            <el-tooltip content="粗裁层：底稿主编（WorkingPaper.assigned_to）。程序执行人/操作复核人在底稿程序表控制台按行细裁委派。" placement="top">
+              <span>底稿主编</span>
+            </el-tooltip>
+          </template>
           <template #default="{ row }">
             <el-select
               v-if="row._applicable"
               v-model="row.assigned_to"
-              placeholder="选择执行人"
+              placeholder="选择底稿主编"
               size="small"
               clearable
               filterable
@@ -156,7 +173,7 @@
 
     <!-- 底部提示 -->
     <div class="gt-proc-footer-tip">
-      💡 双层裁剪：此处粗筛底稿是否执行 + 委派执行人；点「程序裁剪 ›」进入底稿程序表控制台对每条审计程序细裁。保存后保留执行的程序即进入待执行底稿库。
+      💡 双层裁剪：此处<strong>粗裁</strong>底稿范围（是否执行）并指定<strong>底稿主编</strong>；点「程序裁剪 ›」进入底稿程序表控制台，对每条审计程序做<strong>细裁</strong>（程序适用性）并委派<strong>程序执行人 / 操作复核人</strong>。保存后保留执行的程序即进入待执行底稿库。
     </div>
 
     <!-- 新增自定义程序弹窗 -->
@@ -261,6 +278,71 @@
         <el-button type="warning" @click="confirmSmartTrim">确认一键裁剪</el-button>
       </template>
     </el-dialog>
+
+    <!-- 程序委派向导（V105 三粒度委派：materialize 前置 job + 服务端 preview + 真实 applied/unchanged/conflict + TTL/409） -->
+    <el-dialog append-to-body v-model="delegateWizard.visible" title="程序委派向导" width="620px">
+      <el-alert type="info" :closable="false" style="margin-bottom:12px">
+        <template #title>
+          <span style="font-size:12px">
+            按当前循环（{{ activeCycle }}）批量委派程序执行人。未生成任务的程序行会先执行可追踪的
+            <strong>物化 job</strong>，job 成功后才产生可消费的服务端预览；应用后展示真实
+            <strong>已应用 / 未变更 / 冲突</strong> 统计。
+          </span>
+        </template>
+      </el-alert>
+
+      <el-form label-width="110px">
+        <el-form-item :label="TERMS.procedureAssignee" required>
+          <el-select v-model="delegateWizard.assigneeId" placeholder="选择程序执行人" filterable clearable style="width:100%">
+            <el-option v-for="m in teamMembers" :key="m.staff_id"
+              :label="m.staff_name + (m.role_label ? ` (${m.role_label})` : '')" :value="m.staff_id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="TERMS.operationReviewer">
+          <el-select v-model="delegateWizard.reviewerId" placeholder="选择操作复核人（可留空，按 reviewer 回退规则）" filterable clearable style="width:100%">
+            <el-option v-for="m in teamMembers" :key="m.staff_id"
+              :label="m.staff_name + (m.role_label ? ` (${m.role_label})` : '')" :value="m.staff_id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="仅未分配">
+          <el-switch v-model="delegateWizard.unassignedOnly" />
+        </el-form-item>
+      </el-form>
+
+      <!-- 物化 job 状态 -->
+      <div v-if="delegateWizard.jobStatus" class="gt-proc-wizard-job">
+        <el-tag size="small" :type="delegateWizard.jobStatus === 'succeeded' ? 'success' : delegateWizard.jobStatus === 'failed' ? 'danger' : 'warning'">
+          物化 job：{{ jobStatusLabel(delegateWizard.jobStatus) }}
+        </el-tag>
+      </div>
+
+      <!-- 服务端预览统计 -->
+      <div v-if="delegateWizard.preview" class="gt-proc-wizard-preview">
+        <el-descriptions :column="2" size="small" border>
+          <el-descriptions-item label="目标数">{{ delegateWizard.preview.target_count ?? delegateWizard.preview.targets ?? '—' }}</el-descriptions-item>
+          <el-descriptions-item label="冲突数">{{ delegateWizard.preview.conflict_count ?? delegateWizard.preview.conflicts ?? 0 }}</el-descriptions-item>
+          <el-descriptions-item label="已分配">{{ delegateWizard.preview.assigned_count ?? '—' }}</el-descriptions-item>
+          <el-descriptions-item label="预览状态">{{ delegateWizard.preview.status || 'ready' }}</el-descriptions-item>
+          <el-descriptions-item v-if="delegateWizard.preview.expires_at" label="预览有效期至" :span="2">{{ delegateWizard.preview.expires_at }}</el-descriptions-item>
+        </el-descriptions>
+        <div class="gt-proc-wizard-tip">预览为一次性凭证：过期 / 篡改 / 目标版本或成员资格变化时应用被拒绝（409），需重新预览。</div>
+      </div>
+
+      <!-- 应用结果统计（真实 applied/unchanged/conflict） -->
+      <div v-if="delegateWizard.applyResult" class="gt-proc-wizard-result">
+        <el-descriptions :column="3" size="small" border>
+          <el-descriptions-item label="已应用">{{ delegateWizard.applyResult.applied ?? delegateWizard.applyResult.changed ?? 0 }}</el-descriptions-item>
+          <el-descriptions-item label="未变更">{{ delegateWizard.applyResult.unchanged ?? 0 }}</el-descriptions-item>
+          <el-descriptions-item label="冲突">{{ delegateWizard.applyResult.conflict ?? delegateWizard.applyResult.conflicts ?? 0 }}</el-descriptions-item>
+        </el-descriptions>
+      </div>
+
+      <template #footer>
+        <el-button @click="delegateWizard.visible = false">关闭</el-button>
+        <el-button v-if="!delegateWizard.previewId" type="primary" :loading="delegateWizard.loading" @click="runDelegatePreview">预览</el-button>
+        <el-button v-else type="primary" :loading="delegateWizard.loading" @click="runDelegateApply">确认委派</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -272,10 +354,22 @@ import {
   getProcedures, updateProcedureTrim, initProcedures,
   addCustomProcedure, applyProcedureScheme, listProjects,
   assignProcedures,
+  previewProcedureDelegation, applyProcedureDelegation,
 } from '@/services/commonApi'
 import { listAssignments } from '@/services/staffApi'
+import { ROLE_TERMS, newRequestId } from '@/components/workpaper/composables/procedureConsoleOverlay'
 import http from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
+
+// 统一中文术语（需求 14.1）
+const TERMS = {
+  workpaperScope: '底稿范围',
+  workpaperLead: ROLE_TERMS.workpaperLead,
+  procedureApplicability: '程序适用性',
+  procedureAssignee: ROLE_TERMS.procedureAssignee,
+  operationReviewer: ROLE_TERMS.operationReviewer,
+  highOrderReviewer: ROLE_TERMS.highOrderReviewer,
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -604,6 +698,90 @@ async function applyRef() {
   } catch (e: any) { handleApiError(e, '应用参照') }
 }
 
+// ── 程序委派向导（V105 三粒度 cycle 委派：preview → apply，真实统计 + TTL/409） ──
+const delegateWizard = ref<{
+  visible: boolean; assigneeId: string; reviewerId: string; unassignedOnly: boolean;
+  loading: boolean; jobStatus: string | null; preview: any | null; previewId: string;
+  reqId: string; applyResult: any | null;
+}>({
+  visible: false, assigneeId: '', reviewerId: '', unassignedOnly: false,
+  loading: false, jobStatus: null, preview: null, previewId: '', reqId: '', applyResult: null,
+})
+
+function jobStatusLabel(s: string): string {
+  const m: Record<string, string> = { pending: '排队中', running: '进行中', succeeded: '成功', failed: '失败' }
+  return m[s] || s
+}
+
+function openDelegateWizard() {
+  delegateWizard.value = {
+    visible: true, assigneeId: '', reviewerId: '', unassignedOnly: false,
+    loading: false, jobStatus: null, preview: null, previewId: '', reqId: '', applyResult: null,
+  }
+}
+
+function wizardBody() {
+  return {
+    selector: { kind: 'cycle' as const, cycle: activeCycle.value },
+    assignee_staff_id: delegateWizard.value.assigneeId,
+    reviewer_staff_id: delegateWizard.value.reviewerId || null,
+    unassigned_only: delegateWizard.value.unassignedOnly,
+  }
+}
+
+async function runDelegatePreview() {
+  if (!delegateWizard.value.assigneeId) {
+    ElMessage.warning('请选择程序执行人')
+    return
+  }
+  delegateWizard.value.loading = true
+  delegateWizard.value.applyResult = null
+  try {
+    const res = await previewProcedureDelegation(projectId.value, wizardBody())
+    delegateWizard.value.preview = res
+    delegateWizard.value.jobStatus = res?.materialize_job?.status ?? res?.job_status ?? null
+    // 物化 job 未完成 → 不产生可消费 preview（需求 2.8）
+    const status = res?.status
+    if (status === 'materialization_pending') {
+      ElMessage.info('部分程序尚未生成任务，已提交物化 job，请稍后重新预览')
+      delegateWizard.value.previewId = ''
+    } else {
+      delegateWizard.value.previewId = res?.preview_id || res?.preview?.id || ''
+      delegateWizard.value.reqId = newRequestId()
+    }
+  } catch (e: any) {
+    handleApiError(e, '委派预览')
+  } finally {
+    delegateWizard.value.loading = false
+  }
+}
+
+async function runDelegateApply() {
+  if (!delegateWizard.value.previewId) return
+  delegateWizard.value.loading = true
+  try {
+    const res = await applyProcedureDelegation(
+      projectId.value, delegateWizard.value.previewId, delegateWizard.value.reqId, wizardBody(),
+    )
+    delegateWizard.value.applyResult = res
+    const applied = res?.applied ?? res?.changed ?? 0
+    ElMessage.success(`委派完成：已应用 ${applied} 项`)
+    // 一次消费后作废 previewId
+    delegateWizard.value.previewId = ''
+    await loadProcedures()
+  } catch (e: any) {
+    if (e?.response?.status === 409) {
+      ElMessage.warning('预览已失效（过期 / 一次消费 / 目标版本或成员变化），请重新预览')
+      delegateWizard.value.previewId = ''
+      delegateWizard.value.preview = null
+    } else {
+      handleApiError(e, '委派应用')
+    }
+  } finally {
+    delegateWizard.value.loading = false
+  }
+}
+
 onMounted(async () => {
   await loadProcedures()
   await loadTeamMembers()
@@ -688,6 +866,15 @@ onMounted(async () => {
 }
 .gt-proc-smart-scope__title { font-size: 13px; font-weight: 600; color: var(--gt-color-text-primary); margin-bottom: 8px; }
 .gt-proc-smart-scope__cycles { margin-top: 8px; padding: 8px 12px; background: var(--gt-color-bg-white); border-radius: 6px; }
+
+/* 角色术语说明 */
+.gt-proc-role-legend { margin-bottom: 12px; }
+
+/* 委派向导 */
+.gt-proc-wizard-job { margin: 10px 0; }
+.gt-proc-wizard-preview { margin-top: 12px; }
+.gt-proc-wizard-result { margin-top: 12px; }
+.gt-proc-wizard-tip { margin-top: 8px; font-size: 12px; color: var(--gt-color-warning, #e6a23c); }
 
 /* 自定义模板上传区 */
 .gt-proc-custom-template-area {

@@ -5,6 +5,7 @@
 import http from '@/utils/http'
 import {
   projects as P_proj, staff as P_staff, procedures as P_proc,
+  procedureRowTasks as P_prt,
   dashboard as P_dash, disclosureNotes as P_dn, users as P_usr,
   system as P_sys, recycleBin as P_rb, knowledge as P_kb,
   admin as P_admin, auth as P_auth, attachments as P_att,
@@ -92,6 +93,221 @@ export async function getProcedures(projectId: string, cycle: string): Promise<a
 
 export async function updateProcedureTrim(projectId: string, cycle: string, items: any[]): Promise<void> {
   await http.put(P_proc.trim(projectId, cycle), { items })
+}
+
+// ── 程序行任务（procedure-delegation-notification / Task 12，V105 真源） ──
+
+export interface ProcedureRowTaskItem {
+  task_id: string
+  project_id: string
+  wp_index_id: string
+  wp_id: string | null
+  definition_key: string
+  sheet_key: string
+  wp_code: string | null
+  sheet_name: string | null
+  program_no: string | null
+  procedure_text: string | null
+  audit_cycle_snapshot: string
+  applicability_status: string
+  workflow_status: string
+  assignee_staff_id: string | null
+  reviewer_staff_id: string | null
+  assignment_version: number
+  lock_version: number
+  due_at: string | null
+  overdue: boolean
+  materialization_required: boolean
+  my_role: 'assignee' | 'reviewer' | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface ProcedureRowTaskPage {
+  items: ProcedureRowTaskItem[]
+  pagination: { page: number; page_size: number; total: number; total_pages: number }
+}
+
+export interface ProcedureRowTaskQuery {
+  projectId?: string
+  cycle?: string
+  wpIndexId?: string
+  workflowStatus?: string
+  role?: 'assignee' | 'reviewer'
+  overdueOnly?: boolean
+  page?: number
+  pageSize?: number
+}
+
+function _rowTaskParams(q: ProcedureRowTaskQuery): Record<string, any> {
+  const params: Record<string, any> = {}
+  if (q.cycle) params.cycle = q.cycle
+  if (q.wpIndexId) params.wp_index_id = q.wpIndexId
+  if (q.workflowStatus) params.workflow_status = q.workflowStatus
+  if (q.role) params.role = q.role
+  if (q.overdueOnly) params.overdue_only = true
+  if (q.page) params.page = q.page
+  if (q.pageSize) params.page_size = q.pageSize
+  return params
+}
+
+/** 跨项目"我的程序任务"分页查询（V105 任务真源，纯读）。 */
+export async function listMyProcedureRowTasks(q: ProcedureRowTaskQuery = {}): Promise<ProcedureRowTaskPage> {
+  const params = _rowTaskParams(q)
+  if (q.projectId) params.project_id = q.projectId
+  const { data } = await http.get(P_prt.listMine(), { params, validateStatus: () => true })
+  return (data?.data ?? data) as ProcedureRowTaskPage
+}
+
+/** 项目级"我的程序任务"分页查询（纯读）。 */
+export async function listProjectProcedureRowTasks(projectId: string, q: ProcedureRowTaskQuery = {}): Promise<ProcedureRowTaskPage> {
+  const { data } = await http.get(P_prt.listByProject(projectId), {
+    params: _rowTaskParams(q), validateStatus: () => true,
+  })
+  return (data?.data ?? data) as ProcedureRowTaskPage
+}
+
+/** 单任务详情 + 深链定位 key（纯读）。 */
+export async function getProcedureRowTaskDetail(projectId: string, taskId: string): Promise<ProcedureRowTaskItem> {
+  const { data } = await http.get(P_prt.detail(projectId, taskId))
+  return (data?.data ?? data) as ProcedureRowTaskItem
+}
+
+export interface ProcedureRowTaskTransition {
+  action: 'acknowledge' | 'start' | 'submit' | 'request_changes' | 'review' | 'assign' | 'reassign' | 'cancel' | 'reopen'
+  request_id?: string
+  expected_lock_version?: number
+  expected_assignment_version?: number
+  reason?: string
+  execution_summary?: string
+  evidence_snapshot?: any[]
+  open_issue_count?: number
+}
+
+/**
+ * 程序行任务状态转换（单一状态机入口）。
+ * payload 必须携带 request_id + expected 版本（乐观锁 / assignment_version），
+ * 绝不再走 updateProcedureTrim 提交 execution_status（旧 bug 已修）。
+ */
+export async function transitionProcedureRowTask(
+  projectId: string, taskId: string, body: ProcedureRowTaskTransition,
+): Promise<any> {
+  const { data } = await http.post(P_prt.transition(projectId, taskId), body)
+  return data?.data ?? data
+}
+
+// ── 两层裁剪 / 方案 preview-apply（Task 6，一次性 preview 凭证 + 真实统计） ──
+
+export interface TrimSchemeEntry {
+  kind: 'scope' | 'row'
+  cycle?: string
+  wp_index_code?: string
+  target_status?: string
+  template_code?: string
+  sheet_key?: string
+  definition_key?: string
+  target_applicability?: string
+}
+
+/** 裁剪方案预览：解析计划 + 创建一次性 preview 凭证（返回 preview_id/token、目标统计、TTL）。 */
+export async function previewProcedureTrim(
+  projectId: string, entries: TrimSchemeEntry[], schemeId?: string,
+): Promise<any> {
+  const { data } = await http.post(P_prt.trimPreview(projectId), {
+    entries, scheme_id: schemeId ?? null,
+  })
+  return data?.data ?? data
+}
+
+/** 裁剪方案应用：消费 preview，返回真实 applied/unchanged/conflict；篡改/过期/版本变化 → 409。 */
+export async function applyProcedureTrim(
+  projectId: string, previewId: string, requestId: string, entries: TrimSchemeEntry[], schemeId?: string,
+): Promise<any> {
+  const { data } = await http.post(P_prt.trimApply(projectId), {
+    preview_id: previewId, request_id: requestId, entries, scheme_id: schemeId ?? null,
+  })
+  return data?.data ?? data
+}
+
+// ── 三粒度委派 preview-apply（Task 8，materialize 前置 + 一次性 preview 凭证） ──
+
+export interface DelegationSelector {
+  kind: 'cycle' | 'workpaper' | 'row'
+  cycle?: string
+  wp_index_ids?: string[]
+  task_ids?: string[]
+}
+
+export interface DelegationPreviewBody {
+  selector: DelegationSelector
+  assignee_staff_id: string
+  reviewer_staff_id?: string | null
+  unassigned_only?: boolean
+  conflict_policy?: string
+  reason?: string
+  best_effort?: boolean
+  due_at?: string | null
+}
+
+/** 委派预览：materialize 前置 job + 目标/冲突分类 + 一次性 preview 凭证（status=ready/materialization_pending）。 */
+export async function previewProcedureDelegation(
+  projectId: string, body: DelegationPreviewBody,
+): Promise<any> {
+  const { data } = await http.post(P_prt.delegationPreview(projectId), body)
+  return data?.data ?? data
+}
+
+/** 委派应用：消费 preview，真实 assign/reassign；默认整批原子（冲突 409），best_effort 逐任务结果。 */
+export async function applyProcedureDelegation(
+  projectId: string, previewId: string, requestId: string, body: DelegationPreviewBody,
+): Promise<any> {
+  const { data } = await http.post(P_prt.delegationApply(projectId), {
+    ...body, preview_id: previewId, request_id: requestId,
+  })
+  return data?.data ?? data
+}
+
+/** 查询 materialize job 状态（delegation preview 前置 job）。 */
+export async function getProcedureMaterializeJob(projectId: string, jobId: string): Promise<any> {
+  const { data } = await http.get(P_prt.materializeJobStatus(projectId, jobId), { validateStatus: () => true })
+  return data?.data ?? data
+}
+
+// ── 程序行一级复核（Task 13，ReviewConversation + IssueTicket） ──
+
+export interface ProcedureConversationView {
+  task_id: string
+  cell_ref: string
+  conversation: any | null
+  messages: any[]
+  open_issue_count: number
+  issues: any[]
+  access?: string
+  readonly?: boolean
+}
+
+/** 只读复核视图（对话 + 消息稳定排序 + 未解决 IssueTicket 数 + 问题单列表 + 访问级别）。 */
+export async function getProcedureConversation(
+  projectId: string, taskId: string,
+): Promise<ProcedureConversationView> {
+  const { data } = await http.get(P_prt.conversation(projectId, taskId), { validateStatus: () => true })
+  return (data?.data ?? data) as ProcedureConversationView
+}
+
+/** 追加程序行复核消息（仅当前参与者可写；历史只读参与者 403）。 */
+export async function postProcedureMessage(
+  projectId: string, taskId: string, content: string,
+): Promise<any> {
+  const { data } = await http.post(P_prt.messages(projectId, taskId), { content })
+  return data?.data ?? data
+}
+
+/** 关闭程序行 review_comment IssueTicket（review 前置门槛的解除动作）。 */
+export async function closeProcedureIssue(
+  projectId: string, taskId: string, issueId: string,
+): Promise<any> {
+  const { data } = await http.post(P_prt.closeIssue(projectId, taskId, issueId), {})
+  return data?.data ?? data
 }
 
 /** 聚合端点：一次获取当前用户所有被委派的程序（避免逐循环请求） */

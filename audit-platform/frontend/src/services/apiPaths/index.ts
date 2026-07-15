@@ -22,7 +22,7 @@ export {
 
 export {
   workpapers, wpReviews, wpMapping, wpAI, wpFineRules, wpManuals,
-  wpDependencies, workpaperSummary, templates, procedures, reviews,
+  wpDependencies, workpaperSummary, templates, procedures, procedureRowTasks, reviews,
   templateLibrary, templateLibraryMgmt, customTemplates, sharedConfig,
   excelHtml, jobs,
 } from './workpaper'

@@ -269,6 +269,19 @@ class Notification(Base):
     read_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
+    # --- V105 聚合通知扩展（procedure-delegation-notification / Task 2）---
+    # additive-only：event_id+recipient_user_id 去重、dedup_key、metadata 驱动跳转（不解析中文 content）。
+    # 唯一去重索引 uq_notifications_event_recipient 由 V105 迁移拥有。
+    event_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    recipient_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    dedup_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # 属性名避开 DeclarativeBase.metadata 保留字，DB 列名仍为 "metadata"
+    notification_metadata: Mapped[dict | None] = mapped_column(
+        "metadata", JSONB, nullable=True
+    )
+
     __table_args__ = (
         Index("idx_notifications_recipient_read", "recipient_id", "is_read"),
     )

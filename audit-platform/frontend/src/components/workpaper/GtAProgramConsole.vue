@@ -144,6 +144,7 @@
       row-key="id"
       empty-text="暂无审计程序，请点击上方「+ 新增程序」添加"
       :expand-row-keys="expandedRowKeys"
+      :row-class-name="tableRowClassName"
       @expand-change="handleExpandChange"
       @selection-change="handleSelectionChange"
       class="gt-a-program-console__table gt-tb-font-md"
@@ -322,8 +323,45 @@
         </template>
       </el-table-column>
 
-      <!-- 状态 -->
-      <el-table-column label="状态" width="120" align="center">
+      <!-- 程序任务（task overlay 委派/执行态：仅 PROCEDURE_ROW_TASKS_ENABLED 注入 overlay 时显示） -->
+      <el-table-column v-if="taskOverlayActive" label="程序任务" min-width="220" align="center">
+        <template #default="{ row }">
+          <!-- 未物化：只展示不可写 -->
+          <div v-if="rowIsUnmaterialized(row)" class="gt-a-program-console__task-cell">
+            <el-tag size="small" type="info" effect="plain">未生成任务（只展示）</el-tag>
+          </div>
+          <div v-else class="gt-a-program-console__task-cell">
+            <div class="gt-a-program-console__task-status">
+              <el-tag size="small" :type="rowWorkflowTagType(row)">{{ rowWorkflowLabel(row) }}</el-tag>
+              <span v-if="row.assignee_staff_id" class="gt-a-program-console__task-who">
+                执行：{{ staffName(row.assignee_staff_id) }}
+              </span>
+            </div>
+            <div class="gt-a-program-console__task-actions">
+              <el-button
+                v-for="act in rowMemberActions(row)"
+                :key="act.key"
+                size="small" link :type="act.type || 'primary'"
+                :loading="taskActing"
+                @click="runTaskAction(row, act.key)"
+              >{{ act.label }}</el-button>
+              <el-button
+                v-if="!readonly && row.task_id"
+                size="small" link
+                @click="openDelegate(row)"
+              >委派</el-button>
+              <el-button
+                v-if="row.task_id"
+                size="small" link type="info"
+                @click="openReviewPanel(row)"
+              >复核对话</el-button>
+            </div>
+          </div>
+        </template>
+      </el-table-column>
+
+      <!-- 状态（legacy：无 task overlay 时保留原有下拉编辑） -->
+      <el-table-column v-if="!taskOverlayActive" label="状态" width="120" align="center">
         <template #default="{ row }">
           <el-dropdown
             v-if="!readonly"
@@ -503,13 +541,77 @@
       :project-info="projectInfo"
       @save="onPopupSave"
     />
+
+    <!-- ─── 程序任务：提交复核对话框（Task 14；执行说明 + 证据引用非空校验，需求 6.7） ─── -->
+    <el-dialog v-model="submitTaskDialog.visible" title="提交复核" width="520px">
+      <el-form label-width="90px">
+        <el-form-item label="执行说明" required>
+          <el-input v-model="submitTaskDialog.summary" type="textarea" :autosize="{ minRows: 4 }"
+            placeholder="请说明本程序的执行过程与结论" />
+        </el-form-item>
+        <el-form-item label="证据引用" required>
+          <el-input v-model="submitTaskDialog.evidence"
+            placeholder="填写底稿/附件索引，多个用逗号分隔，如 D2-1, 附件3" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="submitTaskDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="taskActing" @click="confirmTaskSubmit">提交</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ─── 管理者行级委派对话框（Task 14；服务端 preview → 真实 applied/unchanged/conflict + TTL） ─── -->
+    <el-dialog v-model="delegateDialog.visible" title="程序行委派" width="560px">
+      <el-form label-width="100px">
+        <el-form-item :label="ROLE_TERMS.procedureAssignee" required>
+          <el-select v-model="delegateDialog.assigneeId" placeholder="选择程序执行人" filterable clearable style="width:100%">
+            <el-option v-for="m in teamMembers" :key="m.staff_id"
+              :label="m.staff_name + (m.role_label ? ` (${m.role_label})` : '')" :value="m.staff_id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="ROLE_TERMS.operationReviewer">
+          <el-select v-model="delegateDialog.reviewerId" placeholder="选择操作复核人（可留空自动回退）" filterable clearable style="width:100%">
+            <el-option v-for="m in teamMembers" :key="m.staff_id"
+              :label="m.staff_name + (m.role_label ? ` (${m.role_label})` : '')" :value="m.staff_id" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+
+      <!-- 服务端预览统计（真实 target/conflict；不伪造） -->
+      <div v-if="delegateDialog.previewStats" class="gt-a-program-console__preview">
+        <el-descriptions :column="2" size="small" border>
+          <el-descriptions-item label="目标数">{{ delegateDialog.previewStats.target_count ?? delegateDialog.previewStats.targets ?? '—' }}</el-descriptions-item>
+          <el-descriptions-item label="冲突数">{{ delegateDialog.previewStats.conflict_count ?? delegateDialog.previewStats.conflicts ?? 0 }}</el-descriptions-item>
+          <el-descriptions-item label="已分配">{{ delegateDialog.previewStats.assigned_count ?? '—' }}</el-descriptions-item>
+          <el-descriptions-item label="预览状态">{{ delegateDialog.previewStats.status || 'ready' }}</el-descriptions-item>
+          <el-descriptions-item v-if="delegateDialog.ttl" label="有效期至" :span="2">{{ delegateDialog.ttl }}</el-descriptions-item>
+        </el-descriptions>
+        <div class="gt-a-program-console__preview-tip">预览为一次性凭证：过期/篡改/目标版本变化时应用将被拒绝（409），需重新预览。</div>
+      </div>
+
+      <template #footer>
+        <el-button @click="delegateDialog.visible = false">取消</el-button>
+        <el-button v-if="!delegateDialog.previewId" type="primary" :loading="delegateDialog.loading" @click="runDelegatePreview">预览</el-button>
+        <el-button v-else type="primary" :loading="delegateDialog.loading" @click="runDelegateApply">确认委派</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ─── 程序行一级复核抽屉（Task 14；复用 ProcedureReviewPanel） ─── -->
+    <el-drawer v-model="reviewDrawer.visible" title="程序行一级复核" size="440px" :destroy-on-close="true">
+      <ProcedureReviewPanel
+        v-if="reviewDrawerTaskId"
+        :project-id="projectId"
+        :task-id="reviewDrawerTaskId"
+        :name-map="staffNameMap"
+      />
+    </el-drawer>
     </template><!-- end: inner v-else (program table) -->
     </template><!-- end: outer v-else (not isNotApplicable) -->
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowDown } from '@element-plus/icons-vue'
 import GtAProgramLinkedChips from '@/components/workpaper/GtAProgramLinkedChips.vue'
@@ -525,6 +627,29 @@ import { useAProgramPopups } from '@/composables/useAProgramPopups'
 import { normalizeAProgramRows } from '@/components/workpaper/composables/parseProgramSubSteps'
 import { INLINE_POPUP_WP_CODES } from '@/components/workpaper/wpPopupDocxConfigs'
 import { isReviewRoleRef } from '@/components/workpaper/reviewWpResolve'
+// procedure-delegation-notification / Task 14：task overlay 委派/执行/一级复核
+import ProcedureReviewPanel from '@/components/workpaper/ProcedureReviewPanel.vue'
+import {
+  hasTaskOverlay,
+  isUnmaterialized,
+  resolveDeepLink,
+  memberActions,
+  workflowLabel,
+  workflowTagType,
+  newRequestId,
+  ROLE_TERMS,
+  type OverlayRow,
+  type ProcedureActionKey,
+} from '@/components/workpaper/composables/procedureConsoleOverlay'
+import {
+  listProjectProcedureRowTasks,
+  transitionProcedureRowTask,
+  previewProcedureDelegation,
+  applyProcedureDelegation,
+  type ProcedureRowTaskItem,
+} from '@/services/commonApi'
+import { listAssignments } from '@/services/staffApi'
+import { ElMessage as _ElMsg, ElMessageBox as _ElBox } from 'element-plus'
 
 // ─── Types ───
 interface ProgramAssertions {
@@ -1133,6 +1258,333 @@ function debounceSave() {
     emit('save', data)
   }, 1500)
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// procedure-delegation-notification / Task 14：task overlay 委派/执行/一级复核 + 深链
+//
+// render-config 在 PROCEDURE_ROW_TASKS_ENABLED=True 时为程序行注入 task overlay 字段
+// （task_id / materialization_required / workflow_status / applicability_status /
+//  assignee_staff_id / reviewer_staff_id / assignment_version / lock_version / due_at /
+//  definition_key）。关闭时无这些字段 → taskOverlayActive=false，控制台回退既有展示。
+// 未物化行只展示不可写；已物化行由成员按状态动作（transition 单一入口）。
+// ══════════════════════════════════════════════════════════════════════════
+
+/** 是否进入 task overlay 委派/执行态。 */
+const taskOverlayActive = computed(() => hasTaskOverlay(programs.value as unknown as OverlayRow[]))
+
+// task_id → 我的角色 & 最新版本（复用 Task 12 项目级查询，backend 计算 my_role）。
+const taskRoleMap = ref<Record<string, ProcedureRowTaskItem>>({})
+// staff_id/user_id → 显示名（发送人/执行人展示）。
+const staffNameMap = ref<Record<string, string>>({})
+
+async function loadTaskRoles() {
+  if (!taskOverlayActive.value || !projectId.value) return
+  try {
+    const res = await listProjectProcedureRowTasks(projectId.value, { pageSize: 200 })
+    const map: Record<string, ProcedureRowTaskItem> = {}
+    for (const t of res?.items || []) map[t.task_id] = t
+    taskRoleMap.value = map
+  } catch { /* 静默：overlay 增强失败不阻塞渲染 */ }
+}
+
+async function loadStaffNames() {
+  if (!projectId.value) return
+  try {
+    const list = await listAssignments(projectId.value)
+    const map: Record<string, string> = {}
+    for (const a of (Array.isArray(list) ? list : [])) {
+      if (a.staff_id) map[a.staff_id] = a.staff_name || a.staff_id.slice(0, 8)
+      if (a.user_id) map[a.user_id] = a.staff_name || a.user_id.slice(0, 8)
+    }
+    staffNameMap.value = map
+  } catch { /* 静默 */ }
+}
+
+/** 合并 overlay 行与 my_role（供动作派生）。 */
+function overlayRow(row: ProgramRow): OverlayRow & { my_role?: 'assignee' | 'reviewer' | null } {
+  const o = row as unknown as OverlayRow
+  const t = o.task_id ? taskRoleMap.value[o.task_id] : undefined
+  return { ...o, my_role: t?.my_role ?? null }
+}
+
+function rowIsUnmaterialized(row: ProgramRow): boolean {
+  return isUnmaterialized(row as unknown as OverlayRow)
+}
+
+function rowMemberActions(row: ProgramRow) {
+  return memberActions(overlayRow(row))
+}
+
+function rowWorkflowLabel(row: ProgramRow): string {
+  return workflowLabel((row as unknown as OverlayRow).workflow_status)
+}
+
+function rowWorkflowTagType(row: ProgramRow) {
+  return workflowTagType((row as unknown as OverlayRow).workflow_status)
+}
+
+function staffName(id: string | null | undefined): string {
+  if (!id) return '—'
+  return staffNameMap.value[id] || id.slice(0, 8)
+}
+
+// ── 成员状态动作（ack/start/submit/review/request_changes）→ transition 单一入口 ──
+const submitTaskDialog = ref<{ visible: boolean; row: ProgramRow | null; summary: string; evidence: string }>({
+  visible: false, row: null, summary: '', evidence: '',
+})
+const taskActing = ref(false)
+
+async function runTaskAction(row: ProgramRow, action: ProcedureActionKey) {
+  const o = row as unknown as OverlayRow
+  if (!o.task_id) return
+  if (action === 'submit') {
+    submitTaskDialog.value = { visible: true, row, summary: '', evidence: '' }
+    return
+  }
+  if (action === 'request_changes') {
+    try {
+      const { value } = await _ElBox.prompt('请填写退回原因', '退回修改', {
+        inputType: 'textarea',
+        inputValidator: (v: string) => (!!v && v.trim().length >= 1) || '退回原因必填',
+      })
+      await doTaskTransition(row, 'request_changes', { reason: value.trim() })
+    } catch { /* 取消 */ }
+    return
+  }
+  if (action === 'review') {
+    try {
+      await _ElBox.confirm('确认本程序一级复核通过？（不影响业务合伙人/QC/EQCR 高阶复核）', '复核通过', { type: 'success' })
+      await doTaskTransition(row, 'review')
+    } catch { /* 取消 */ }
+    return
+  }
+  await doTaskTransition(row, action)
+}
+
+async function confirmTaskSubmit() {
+  const row = submitTaskDialog.value.row
+  if (!row) return
+  const summary = submitTaskDialog.value.summary.trim()
+  const evidence = submitTaskDialog.value.evidence.split(',').map(s => s.trim()).filter(Boolean)
+  if (!summary) { _ElMsg.warning('执行说明必填'); return }
+  if (!evidence.length) { _ElMsg.warning('证据引用必填'); return }
+  const ok = await doTaskTransition(row, 'submit', { execution_summary: summary, evidence_snapshot: evidence })
+  if (ok) submitTaskDialog.value.visible = false
+}
+
+async function doTaskTransition(row: ProgramRow, action: string, extra: Record<string, any> = {}): Promise<boolean> {
+  const o = row as unknown as OverlayRow
+  if (!o.task_id) return false
+  taskActing.value = true
+  try {
+    const body: any = {
+      action,
+      request_id: newRequestId(),
+      expected_lock_version: o.lock_version,
+      ...extra,
+    }
+    if (action === 'acknowledge') body.expected_assignment_version = o.assignment_version
+    await transitionProcedureRowTask(projectId.value, o.task_id, body)
+    _ElMsg.success('操作成功')
+    await refreshOverlayFromServer()
+    return true
+  } catch (e: any) {
+    if (e?.response?.status === 409) {
+      _ElMsg.warning('任务状态已变化，请刷新后重试')
+      await refreshOverlayFromServer()
+    } else {
+      _ElMsg.error(e?.response?.data?.message || e?.message || '操作失败')
+    }
+    return false
+  } finally {
+    taskActing.value = false
+  }
+}
+
+/** 转换后重新拉取 render-config overlay + my_role（保持真源一致）。 */
+async function refreshOverlayFromServer() {
+  await loadTaskRoles()
+  try {
+    const res = await api.get<any>(
+      `/api/workpapers/${props.wpId}/render-config?force_component_type=a-program-console`,
+      { _silent: true } as any,
+    )
+    const data = res?.sheets?.find((s: any) => s.sheet_name === props.sheetName)?.html_data
+      ?? res?.sheets?.[0]?.html_data
+    if (data?.programs?.length) {
+      const fresh = data.programs
+      // 仅回填 overlay 字段，保留本地展示行序/子步骤
+      const byNo: Record<string, any> = {}
+      for (const p of fresh) byNo[String(p.program_no ?? '')] = p
+      for (const p of programs.value) {
+        const src = byNo[String(p.program_no ?? '')]
+        if (!src) continue
+        const anyP = p as any
+        for (const k of ['task_id', 'materialization_required', 'workflow_status', 'applicability_status',
+          'assignee_staff_id', 'reviewer_staff_id', 'assignment_version', 'lock_version', 'due_at', 'definition_key']) {
+          if (k in src) anyP[k] = src[k]
+        }
+      }
+    }
+  } catch { /* 静默 */ }
+}
+
+// ── 管理者行级委派（materialized 行；未物化行只展示不可写）──
+const delegateDialog = ref<{
+  visible: boolean; row: ProgramRow | null; assigneeId: string; reviewerId: string;
+  previewStats: any | null; previewId: string; reqId: string; ttl: string | null; loading: boolean;
+}>({
+  visible: false, row: null, assigneeId: '', reviewerId: '', previewStats: null, previewId: '', reqId: '', ttl: null, loading: false,
+})
+const teamMembers = ref<{ staff_id: string; staff_name: string; role_label?: string }[]>([])
+
+async function loadTeamMembers() {
+  if (!projectId.value) return
+  try {
+    const list = await listAssignments(projectId.value)
+    const ROLE_LABELS: Record<string, string> = {
+      partner: '合伙人', signing_partner: '签字合伙人', manager: '项目经理',
+      auditor: '审计员', reviewer: '复核', eqcr: 'EQCR',
+    }
+    teamMembers.value = (Array.isArray(list) ? list : [])
+      .filter((a: any) => a.staff_id)
+      .map((a: any) => ({ staff_id: a.staff_id, staff_name: a.staff_name || a.staff_id.slice(0, 8), role_label: ROLE_LABELS[a.role] || a.role || '' }))
+  } catch { teamMembers.value = [] }
+}
+
+function openDelegate(row: ProgramRow) {
+  const o = row as unknown as OverlayRow
+  delegateDialog.value = {
+    visible: true, row, assigneeId: o.assignee_staff_id || '', reviewerId: o.reviewer_staff_id || '',
+    previewStats: null, previewId: '', reqId: '', ttl: null, loading: false,
+  }
+  if (!teamMembers.value.length) loadTeamMembers()
+}
+
+async function runDelegatePreview() {
+  const row = delegateDialog.value.row
+  const o = row ? (row as unknown as OverlayRow) : null
+  if (!o?.task_id || !delegateDialog.value.assigneeId) {
+    _ElMsg.warning('请选择程序执行人')
+    return
+  }
+  delegateDialog.value.loading = true
+  try {
+    const body = {
+      selector: { kind: 'row' as const, task_ids: [o.task_id] },
+      assignee_staff_id: delegateDialog.value.assigneeId,
+      reviewer_staff_id: delegateDialog.value.reviewerId || null,
+    }
+    const res = await previewProcedureDelegation(projectId.value, body)
+    delegateDialog.value.previewStats = res
+    delegateDialog.value.previewId = res?.preview_id || res?.preview?.id || ''
+    delegateDialog.value.reqId = newRequestId()
+    delegateDialog.value.ttl = res?.expires_at || res?.preview?.expires_at || null
+  } catch (e: any) {
+    _ElMsg.error(e?.response?.data?.message || '预览失败')
+  } finally {
+    delegateDialog.value.loading = false
+  }
+}
+
+async function runDelegateApply() {
+  const row = delegateDialog.value.row
+  const o = row ? (row as unknown as OverlayRow) : null
+  if (!o?.task_id || !delegateDialog.value.previewId) return
+  delegateDialog.value.loading = true
+  try {
+    const body = {
+      selector: { kind: 'row' as const, task_ids: [o.task_id] },
+      assignee_staff_id: delegateDialog.value.assigneeId,
+      reviewer_staff_id: delegateDialog.value.reviewerId || null,
+    }
+    const res = await applyProcedureDelegation(projectId.value, delegateDialog.value.previewId, delegateDialog.value.reqId, body)
+    const applied = res?.applied ?? res?.changed ?? 0
+    _ElMsg.success(`委派完成：应用 ${applied} 项`)
+    delegateDialog.value.visible = false
+    await refreshOverlayFromServer()
+  } catch (e: any) {
+    if (e?.response?.status === 409) {
+      _ElMsg.warning('预览已失效（过期/一次消费/目标版本变化），请重新预览')
+      delegateDialog.value.previewId = ''
+      delegateDialog.value.previewStats = null
+    } else {
+      _ElMsg.error(e?.response?.data?.message || '委派失败')
+    }
+  } finally {
+    delegateDialog.value.loading = false
+  }
+}
+
+// ── 一级复核面板抽屉 ──
+const reviewDrawer = ref<{ visible: boolean; row: ProgramRow | null }>({ visible: false, row: null })
+function openReviewPanel(row: ProgramRow) {
+  reviewDrawer.value = { visible: true, row }
+}
+const reviewDrawerTaskId = computed(() => {
+  const r = reviewDrawer.value.row as unknown as OverlayRow | null
+  return r?.task_id || ''
+})
+
+// ── 深链：清筛选 → 展开 → 滚动 → 高亮；失配提示“模板已变化”（需求 9.6）──
+const deepLinkDefinitionKey = ref<string>('')
+const highlightRowId = ref<string>('')
+
+function readDeepLinkQuery() {
+  deepLinkDefinitionKey.value = (route.query.definition_key as string) || ''
+}
+
+function tableRowClassName({ row }: { row: ProgramRow }): string {
+  return highlightRowId.value && row.id === highlightRowId.value ? 'gt-proc-deeplink-hl' : ''
+}
+
+async function applyDeepLink() {
+  const defKey = deepLinkDefinitionKey.value
+  if (!defKey || !programs.value.length) return
+  const resolution = resolveDeepLink(
+    programs.value as unknown as OverlayRow[],
+    (route.query.sheet_key as string) || null,
+    defKey,
+  )
+  if (resolution.templateChanged) {
+    _ElMsg.warning('未能定位到目标程序行：模板可能已变化（不按序号猜测）')
+    return
+  }
+  if (!resolution.matched || !resolution.row) return
+  const targetId = (resolution.row as any).id
+  // 清筛选
+  activeCategory.value = ''
+  await nextTick()
+  // 展开
+  if (hasExpandContent.value && !expandedRowKeys.value.includes(targetId)) {
+    expandedRowKeys.value = [...expandedRowKeys.value, targetId]
+  }
+  // 高亮
+  highlightRowId.value = targetId
+  await nextTick()
+  // 滚动
+  const el = tableRef.value?.$el?.querySelector(`[data-row-key="${targetId}"]`)
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  // 高亮 4s 后淡出
+  setTimeout(() => { if (highlightRowId.value === targetId) highlightRowId.value = '' }, 4000)
+}
+
+// 初始化 + 数据变化后重跑 overlay 加载与深链
+onMounted(async () => {
+  readDeepLinkQuery()
+  await loadTaskRoles()
+  await loadStaffNames()
+  await nextTick()
+  await applyDeepLink()
+})
+
+watch(programs, async () => {
+  if (taskOverlayActive.value && !Object.keys(taskRoleMap.value).length) {
+    await loadTaskRoles()
+  }
+  await nextTick()
+  await applyDeepLink()
+}, { deep: false })
 </script>
 
 <style scoped>
@@ -1312,5 +1764,48 @@ function debounceSave() {
 .gt-a-program-console__history-reason {
   color: var(--el-text-color-secondary);
   font-size: 12px;
+}
+
+/* ── Task 14: task overlay 委派/执行 + 深链高亮 ── */
+.gt-a-program-console__task-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+.gt-a-program-console__task-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.gt-a-program-console__task-who {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.gt-a-program-console__task-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.gt-a-program-console__preview {
+  margin-top: 12px;
+}
+.gt-a-program-console__preview-tip {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--el-color-warning);
+}
+/* 深链目标行高亮（清筛选→展开→滚动→高亮） */
+.gt-a-program-console__table :deep(.gt-proc-deeplink-hl > td) {
+  background-color: #fff7e6 !important;
+  animation: gt-proc-deeplink-flash 1.2s ease-in-out 0s 2;
+}
+@keyframes gt-proc-deeplink-flash {
+  0%, 100% { background-color: #fff7e6; }
+  50% { background-color: #ffe7ba; }
 }
 </style>

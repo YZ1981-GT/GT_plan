@@ -197,6 +197,14 @@ class Settings(BaseSettings):
     # 报告正文 preview 会话 TTL（小时）
     FILL_PREVIEW_TTL_HOURS: int = 24
 
+    # --- procedure-delegation-notification ---
+    # expand → dual-read → backfill → cutover → contract 分阶段部署开关（完整行为矩阵见 Task 15）。
+    # expand 阶段默认全部 off/legacy：render-config 只读 overlay 且 task overlay 不改既有读语义。
+    # PROCEDURE_ROW_TASKS_ENABLED=True 才在 render-config 上叠加 task overlay（纯读，缺 task 标 materialization_required）。
+    PROCEDURE_ROW_TASKS_ENABLED: bool = False
+    PROCEDURE_ROW_TASK_WRITE_MODE: str = "legacy"  # legacy | dual | task-source
+    PROCEDURE_TASK_DISPATCHER_ENABLED: bool = False
+
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 
     @property

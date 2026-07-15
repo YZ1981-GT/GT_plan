@@ -366,6 +366,7 @@ def _start_workers(stop_event):
         audit_log_writer_worker, budget_alert_worker, dataset_purge_worker,
         staged_orphan_cleaner, export_cleanup_worker,
         time_machine_cleanup_worker,
+        procedure_dispatcher_worker,
     )
     tasks = [
         asyncio.create_task(sla_worker.run(stop_event)),
@@ -377,6 +378,9 @@ def _start_workers(stop_event):
         asyncio.create_task(staged_orphan_cleaner.run(stop_event)),
         asyncio.create_task(export_cleanup_worker.run(stop_event)),
         asyncio.create_task(time_machine_cleanup_worker.run(stop_event)),
+        # procedure-delegation-notification / Task 10：有序 outbox dispatcher。
+        # 受 PROCEDURE_TASK_DISPATCHER_ENABLED 控制（expand 阶段默认 false → worker 直接退出）。
+        asyncio.create_task(procedure_dispatcher_worker.run(stop_event)),
     ]
     # 进程内 ImportJob runner 主循环：写 import_worker 心跳 + 拉 queued 任务
     # 仅当 LEDGER_IMPORT_IN_PROCESS_RUNNER_ENABLED=True 启动（生产模式下应关闭，

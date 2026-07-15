@@ -42,6 +42,14 @@ class TestWorkflowSyntax:
         assert "scale-snapshot-check" in jobs
         assert "sql-column-contract" in jobs
         assert "hotspot-baseline-check" in jobs
+        assert "procedure-delegation-architecture" in jobs
+        procedure_job = jobs["procedure-delegation-architecture"]
+        assert procedure_job["runs-on"] == "ubuntu-latest"
+        assert procedure_job["env"]["PYTHONUTF8"] == "1"
+        steps_text = json.dumps(procedure_job["steps"], ensure_ascii=False)
+        assert 'python-version": "3.12"' in steps_text
+        assert "check_procedure_delegation_architecture.py --strict" in steps_text
+        assert "test_check_procedure_delegation_architecture.py" in steps_text
 
     def test_enforce_date_configured(self):
         """强制执行日期已配置且为未来日期（warning 期内）。"""

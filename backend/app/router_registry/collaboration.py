@@ -69,9 +69,30 @@ def register_collaboration_routers(app: FastAPI) -> None:
     from app.routers.forum import router as forum_router
     from app.routers.independence import router as independence_router
 
+    # procedure-delegation-notification / Task 4：程序行任务显式物化 API
+    from app.routers.procedure_row_tasks import router as procedure_row_tasks_router
+    # procedure-delegation-notification / Task 5：模板 reconcile preview/apply API
+    from app.routers.procedure_reconcile import router as procedure_reconcile_router
+    # procedure-delegation-notification / Task 6：两层裁剪与方案 preview/apply API
+    from app.routers.procedure_trim import router as procedure_trim_router
+    # procedure-delegation-notification / Task 8：三粒度委派 preview/apply API
+    from app.routers.procedure_delegations import router as procedure_delegations_router
+    # procedure-delegation-notification / Task 12：程序行任务查询 API（项目级 + 跨项目 + 详情，纯读）
+    from app.routers.procedure_task_query import (
+        project_query_router as procedure_task_query_router,
+        my_query_router as procedure_my_tasks_router,
+    )
+    # procedure-delegation-notification / Task 13：程序行一级复核 API（对话 / 消息 / 关闭问题单）
+    from app.routers.procedure_review import router as procedure_review_router
+    # procedure-delegation-notification / Task 10：投递 dead-letter 列表/指标/replay API
+    from app.routers.procedure_delivery import router as procedure_delivery_router
+
     for r in [staff_router, assign_router, wh_router, wh_list_router, dash_router,
               pmd_router, qcd_router, pd_router, rc2_router, proc_router,
-              se_router, forum_router, independence_router]:
+              se_router, forum_router, independence_router, procedure_row_tasks_router,
+              procedure_reconcile_router, procedure_trim_router, procedure_delegations_router,
+              procedure_task_query_router, procedure_my_tasks_router,
+              procedure_delivery_router, procedure_review_router]:
         app.include_router(r, tags=["团队与看板"])
 
     # 角色AI辅助

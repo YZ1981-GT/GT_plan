@@ -256,6 +256,30 @@ jobs:
       - name: Version Trail Integration Guard
         run: python backend/scripts/check/check_wp_version_trail.py --strict
 
+  procedure-delegation-architecture:
+    # procedure-delegation-notification Wave1 Task1: exact architecture debt guard.
+    # The scanner is stdlib-only; its self-tests cover Python AST, Vue/TS structure,
+    # exact baseline matching, Windows paths/UTF-8, and the reserved V105 migration.
+    runs-on: ubuntu-latest
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run procedure delegation architecture guard (strict)
+        run: python backend/scripts/check/check_procedure_delegation_architecture.py --strict
+      - name: Install governance self-test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run procedure delegation architecture self-tests
+        run: python -m pytest backend/tests/scripts/test_check_procedure_delegation_architecture.py -q
+      # Task 15 CI guard: 前后端通知类型同步（新增通知类型必须同步 backend + 前端字典）。
+      # 这是架构守卫 5 条规则之一（GET 禁写 / TransitionService 单入口 / ProcedureInstance
+      # 粒度 / parsed_data 精确写 由 --strict 覆盖；通知类型同步走此契约测试）。
+      - name: Run procedure notification type sync guard
+        run: python -m pytest backend/tests/procedure_delegation/test_notification_type_sync.py -q
+
   displayprefs-contract-check:
     # P0-3: DisplayPrefs 契约守卫（STRICT 模式）
     # 拦截反模式 A（inject 硬编码闭包）和 B（font-size 字面量硬编码）

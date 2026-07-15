@@ -211,4 +211,35 @@ async def render(ctx: RenderContext) -> dict | None:
         business_category=ctx.business_category,
     )
 
+    # procedure-delegation-notification / Task 4：叠加 task overlay（纯读，缺 task 标
+    # materialization_required）。默认关闭（expand 阶段不改既有读语义），只有
+    # PROCEDURE_ROW_TASKS_ENABLED=True 才注入；只读、失败降级、不阻塞渲染。
+    await _apply_task_overlay(ctx, sheet_html_data)
+
     return sheet_html_data
+
+
+async def _apply_task_overlay(ctx: RenderContext, sheet_html_data: dict) -> None:
+    """纯读：把 ProcedureRowTask overlay 合并到 program 行（Design D3 / 需求 2.7）。
+
+    绝不触发 upsert/materialize/任何写库；异常吞掉，渲染不受影响。
+    """
+    from app.core.config import settings
+
+    if not getattr(settings, "PROCEDURE_ROW_TASKS_ENABLED", False):
+        return
+    programs = sheet_html_data.get("programs") if isinstance(sheet_html_data, dict) else None
+    if not programs or ctx.db is None or ctx.project_id is None:
+        return
+    wp_index_id = getattr(getattr(ctx, "working_paper", None), "wp_index_id", None)
+    if wp_index_id is None:
+        return
+    try:
+        from app.services.procedure_task_materialization_service import (
+            ProcedureTaskMaterializationService,
+        )
+
+        svc = ProcedureTaskMaterializationService(ctx.db)
+        await svc.overlay_program_rows(ctx.project_id, wp_index_id, programs)
+    except Exception as e:  # noqa: BLE001 — overlay 只读增强，失败不阻塞渲染
+        logger.debug("program task overlay 跳过 wp_code=%s: %s", ctx.wp_code, e)

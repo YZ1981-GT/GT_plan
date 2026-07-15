@@ -38,6 +38,31 @@ DELIVERABLE_APPROVAL_SUBMITTED = "deliverable_approval_submitted"
 DELIVERABLE_APPROVAL_DONE = "deliverable_approval_done"
 DELIVERABLE_APPROVAL_REJECTED = "deliverable_approval_rejected"
 
+# ── procedure-delegation-notification / Task 11：程序行任务通知（前后端同步）──
+# 跳转严格由 notification.metadata 驱动（不解析中文 content，Req 10.8）；前端
+# notificationTypes.ts 的 PROCEDURE_TASK_* 常量与本文件一一对应。
+PROCEDURE_TASK_ASSIGNED = "procedure_task.assigned"
+PROCEDURE_TASK_REASSIGNED = "procedure_task.reassigned"
+PROCEDURE_TASK_SUBMITTED = "procedure_task.submitted"
+PROCEDURE_TASK_CHANGES_REQUESTED = "procedure_task.changes_requested"
+PROCEDURE_TASK_REVIEWED = "procedure_task.reviewed"
+PROCEDURE_TASK_REVIEWER_MISSING = "procedure_task.reviewer_missing"
+PROCEDURE_TASK_DELEGATION_BATCH = "procedure_task.delegation_batch"
+# 程序行复核对话消息（comment/reply 共用一种消息类型，Req 8.7）
+PROCEDURE_REVIEW_MESSAGE = "procedure_review_message"
+
+# 程序行任务通知类型集合（供前后端同步契约测试校验一致性）。
+PROCEDURE_TASK_NOTIFICATION_TYPES = [
+    PROCEDURE_TASK_ASSIGNED,
+    PROCEDURE_TASK_REASSIGNED,
+    PROCEDURE_TASK_SUBMITTED,
+    PROCEDURE_TASK_CHANGES_REQUESTED,
+    PROCEDURE_TASK_REVIEWED,
+    PROCEDURE_TASK_REVIEWER_MISSING,
+    PROCEDURE_TASK_DELEGATION_BATCH,
+    PROCEDURE_REVIEW_MESSAGE,
+]
+
 # ── 通知元数据字典 ──────────────────────────────────────────────
 # 每个类型对应 title_template / content_template / jump_route
 # title_template 和 content_template 支持 Python str.format() 占位符
@@ -149,6 +174,15 @@ ALL_NOTIFICATION_TYPES = [
     DELIVERABLE_APPROVAL_SUBMITTED,
     DELIVERABLE_APPROVAL_DONE,
     DELIVERABLE_APPROVAL_REJECTED,
+    # procedure-delegation-notification / Task 11
+    PROCEDURE_TASK_ASSIGNED,
+    PROCEDURE_TASK_REASSIGNED,
+    PROCEDURE_TASK_SUBMITTED,
+    PROCEDURE_TASK_CHANGES_REQUESTED,
+    PROCEDURE_TASK_REVIEWED,
+    PROCEDURE_TASK_REVIEWER_MISSING,
+    PROCEDURE_TASK_DELEGATION_BATCH,
+    PROCEDURE_REVIEW_MESSAGE,
 ]
 
 

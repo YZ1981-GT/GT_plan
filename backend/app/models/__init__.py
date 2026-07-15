@@ -124,6 +124,14 @@ from app.models.wp_export_models import (  # noqa: F401
     WpExportSnapshot,
     WpVersionArchive,
 )
+from app.models.procedure_models import (  # noqa: F401
+    ProcedureInstance,
+    ProcedureOperationPreview,
+    ProcedureRowDefinition,
+    ProcedureRowTask,
+    ProcedureRowTaskHistory,
+    ProcedureTrimScheme,
+)
 
 __all__ = [
     # --- base ---
@@ -258,4 +266,11 @@ __all__ = [
     # --- 底稿导出快照与版本归档 (V071) ---
     "WpExportSnapshot",
     "WpVersionArchive",
+    # --- 审计程序裁剪/委派 (Phase9) + V105 程序行任务模型 ---
+    "ProcedureInstance",
+    "ProcedureTrimScheme",
+    "ProcedureRowDefinition",
+    "ProcedureRowTask",
+    "ProcedureRowTaskHistory",
+    "ProcedureOperationPreview",
 ]

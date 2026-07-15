@@ -41,6 +41,7 @@ class WorkpaperGenerationService:
             )
         ).scalar_one_or_none()
         if existing is not None:
+            await _maybe_bind_procedure_row_tasks(db, project_id, wp_index_id, existing.id)
             return existing
 
         wp_index = (
@@ -95,7 +96,34 @@ class WorkpaperGenerationService:
             wp_index_id,
             wp_index.wp_code,
         )
+        await _maybe_bind_procedure_row_tasks(db, project_id, wp_index_id, wp.id)
         return wp
+
+
+async def _maybe_bind_procedure_row_tasks(
+    db: AsyncSession,
+    project_id: uuid.UUID,
+    wp_index_id: uuid.UUID,
+    wp_id: uuid.UUID,
+) -> None:
+    """procedure-delegation-notification / Task 4：底稿生成事务内原子绑定待绑定程序行任务。
+
+    默认关闭（expand 阶段 PROCEDURE_ROW_TASKS_ENABLED=False，行为不变）。开启后在同一事务中
+    把 `wp_id IS NULL` 的 active task 一次绑定到本 wp（幂等、不换 task_id）。失败降级不阻塞生成。
+    """
+    from app.core.config import settings
+
+    if not getattr(settings, "PROCEDURE_ROW_TASKS_ENABLED", False):
+        return
+    try:
+        from app.services.procedure_task_materialization_service import (
+            ProcedureTaskMaterializationService,
+        )
+
+        svc = ProcedureTaskMaterializationService(db)
+        await svc.bind_working_paper(project_id, wp_index_id, wp_id)
+    except Exception as e:  # noqa: BLE001 — 绑定失败不阻塞底稿生成
+        logger.warning("procedure_row_task 绑定跳过 wp_index=%s: %s", wp_index_id, e)
 
 
 workpaper_generation_service = WorkpaperGenerationService()

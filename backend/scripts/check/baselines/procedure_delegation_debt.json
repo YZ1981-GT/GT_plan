@@ -1,0 +1,97 @@
+{
+  "metadata": {"debt_ceiling": 13},
+  "entries": [
+    {
+      "path": "audit-platform/frontend/src/services/commonApi.ts",
+      "symbol": "getMyProcedureTasks",
+      "rule": "procedure-instance-id-as-row-task",
+      "fingerprint": "sha256:e921876b0882d607096acc6da1f3af3ac2b749fa5871cff8c0e7de97ecea4be0",
+      "reason": "Legacy frontend aggregation exposes workpaper-scope ProcedureInstance DTOs as personal tasks until row-task APIs replace it."
+    },
+    {
+      "path": "backend/app/routers/procedures.py",
+      "symbol": "update_execution_status",
+      "rule": "procedure-state-transition-bypass",
+      "fingerprint": "sha256:691587363f5ebd47feee50d9150e3a7b5c83e16c4e35be46dfb4fc66e6041556",
+      "reason": "Legacy endpoint mutates ProcedureInstance.execution_status directly and will be retired behind the transition service."
+    },
+    {
+      "path": "backend/app/routers/wp_relation_router.py",
+      "symbol": "sync_procedure_status",
+      "rule": "procedure-state-transition-bypass",
+      "fingerprint": "sha256:e268d76a7f8bb5944804d2b42c380f101129b00e06f7117a8d837b280f24d081",
+      "reason": "Legacy workpaper-status synchronization writes ProcedureInstance.execution_status directly."
+    },
+    {
+      "path": "backend/app/routers/wp_review_router.py",
+      "symbol": "submit_review",
+      "rule": "procedure-state-transition-bypass",
+      "fingerprint": "sha256:3cc3c3b42c132af68349cb4a057e5eb815e12e7a19e823f67e30e037a54b8443",
+      "reason": "Legacy review submission directly marks the related ProcedureInstance completed."
+    },
+    {
+      "path": "backend/app/services/procedure_service.py",
+      "symbol": "ProcedureService.get_my_tasks",
+      "rule": "procedure-instance-id-as-row-task",
+      "fingerprint": "sha256:50ef02451728bcfa731d9127bb79f6c8c533cd3e0e9bd9020f52e7df8cf7c95f",
+      "reason": "Legacy service returns workpaper-scope ProcedureInstance records as personal tasks pending row-task materialization."
+    },
+    {
+      "path": "backend/app/services/procedure_service.py",
+      "symbol": "ProcedureService.save_trim",
+      "rule": "procedure-state-transition-bypass",
+      "fingerprint": "sha256:c87be688b59748912944c3d0155de879c67f9d5c98bed77e6190757c05cee6c7",
+      "reason": "Legacy scope trimming updates ProcedureInstance.status directly outside the future transition service."
+    }
+,
+    {
+      "path": "backend/app/services/procedure_trim_engine.py",
+      "symbol": "ProcedureTrimEngine.revert",
+      "rule": "parsed-data-procedure-state-rmw",
+      "fingerprint": "sha256:1941789c3d52256e744fd9c8e54cb69ab5c97a9fa493958742056c57eb549393",
+      "reason": "Legacy trim revert performs whole-column procedure_status and trimming_metadata RMW in parsed_data."
+    },
+    {
+      "path": "backend/app/services/procedure_trim_engine.py",
+      "symbol": "ProcedureTrimEngine.revert",
+      "rule": "procedure-state-transition-bypass",
+      "fingerprint": "sha256:1941789c3d52256e744fd9c8e54cb69ab5c97a9fa493958742056c57eb549393",
+      "reason": "Legacy trim revert changes row status without the future row-task transition service."
+    },
+    {
+      "path": "backend/app/services/procedure_trim_engine.py",
+      "symbol": "ProcedureTrimEngine.trim",
+      "rule": "parsed-data-procedure-state-rmw",
+      "fingerprint": "sha256:50449647f42b7783eff2fcba568024a7b5e6a1a1fa0d42c06da6d102be946ee9",
+      "reason": "Legacy trim applies whole-column procedure_status and trimming_metadata RMW in parsed_data."
+    },
+    {
+      "path": "backend/app/services/procedure_trim_engine.py",
+      "symbol": "ProcedureTrimEngine.trim",
+      "rule": "procedure-state-transition-bypass",
+      "fingerprint": "sha256:50449647f42b7783eff2fcba568024a7b5e6a1a1fa0d42c06da6d102be946ee9",
+      "reason": "Legacy trim changes row status without the future row-task transition service."
+    },
+    {
+      "path": "audit-platform/frontend/src/components/collaboration/NotificationCenter.vue",
+      "symbol": "component:NotificationCenter",
+      "rule": "parallel-my-procedure-tasks-page-route",
+      "fingerprint": "sha256:24425ad1a1ee39bf5cb8c6601d13111d04e22f878f4b5f0fa1c40329884c9e61",
+      "reason": "NotificationCenter adds a '程序任务' notification category tab and routes batch summaries to the canonical MyProcedureTasks.vue via metadata (Task 11 / design F4); it is not a parallel task page, so the coarse heuristic match is acknowledged debt."
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/GtAProgramConsole.vue",
+      "symbol": "component:GtAProgramConsole",
+      "rule": "parallel-my-procedure-tasks-page-route",
+      "fingerprint": "sha256:2ab37b9e326d59ffb0bcfeb3edf94cbd95fae450c46398fd19e6f96c3d8197ff",
+      "reason": "GtAProgramConsole renders an in-place '程序任务' task-overlay column and submit dialog (Task 14); it is the canonical program console, not a parallel MyProcedureTasks page, so the coarse heuristic match is acknowledged debt."
+    },
+    {
+      "path": "backend/app/services/procedure_backfill_runner.py",
+      "symbol": "ProcedureBackfillRunner._map_status_for_wp",
+      "rule": "procedure-state-transition-bypass",
+      "fingerprint": "sha256:2759aa4453f84ccea07567ce1e669ffe30424a605f6e35709e638b44845170ce",
+      "reason": "Backfill (Task 15 / Req 2.6 / design D3) is a sanctioned bulk-migration write path that conservatively seeds historical terminal workflow/applicability states via map_legacy_status; it cannot drive tasks through the live actor/version transition chain, so this direct state write is acknowledged, guarded debt (idempotent, only touches migration_confidence IS NULL default tasks)."
+    }
+  ]
+}
