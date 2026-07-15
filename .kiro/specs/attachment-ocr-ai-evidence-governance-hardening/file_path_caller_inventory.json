@@ -1,0 +1,256 @@
+{
+  "schema_version": "1.0",
+  "spec": "attachment-ocr-ai-evidence-governance-hardening",
+  "task": "1.2",
+  "requirements": ["R1", "R14"],
+  "generated_by": "spec-task-execution (Wave 0 freeze)",
+  "purpose": "冻结所有 file_path 读写/下载/预览/导出/归档调用方清单。CI 阻止新增未登记调用。切换前评审此清单；每个调用方必须在 M2 前委托 EvidenceGovernanceFacade / SecureAttachmentGateway，file_path 响应值收敛为 opaque locator，边界/权限失败在任何 open/stat/read 前拒绝。",
+  "frozen_contracts": {
+    "C1_scope_first": "scope/capability 校验先于目标名称、路径、stat/open/read；不存在与无权访问使用同一脱敏错误 SCOPE_NOT_FOUND_OR_FORBIDDEN。",
+    "C2_boundary_before_io": "本地读取只能经 StorageBoundaryResolver；规范化真实路径不在 Storage_Boundary 内时，字节读取器(open/stat/read)调用次数必须为 0。",
+    "C3_opaque_locator": "兼容响应中的 file_path 只能返回 opaque locator / 脱敏 locator / 受控下载 URL，禁止返回绝对路径、storage key 或 token。",
+    "C4_legacy_id_resolution": "旧 attachment ID 先经 LegacyAttachmentResolver(alias 优先)解析为确定根+版本，不得静默解释为当前版本。",
+    "C5_no_anonymous": "附件读写/关联使用当前用户或明确 Service_Identity，禁止匿名新记录。"
+  },
+  "io_type_legend": {
+    "write-locator": "写入或持久化 file_path 定位符",
+    "write-bytes": "把字节写入存储根",
+    "read-bytes": "从 file_path/本地路径读取字节(open/stat/read)",
+    "download": "对外流式下载附件/底稿字节",
+    "preview": "对外预览(含转 PDF)读取字节",
+    "expose-locator": "在 API 响应中返回 file_path 值",
+    "export": "导出 xlsx/docx/模板字节",
+    "archive": "归档/冷存储/云推送打包字节",
+    "associate": "无 FK 裸写入跨模块关联",
+    "consume-locator": "前端消费 file_path 字段或 download/preview URL"
+  },
+  "migration_phase_legend": {
+    "M0": "additive/dark-read，新表与约束，不切写",
+    "M1": "backfill 可证明字段",
+    "M2": "dual-write，旧入口委托 facade，file_path 收敛 opaque locator，P0 规则 hard-block",
+    "M3": "source-of-truth cutover",
+    "M4": "retirement"
+  },
+  "callers": [
+    {
+      "id": "BE-ATT-01",
+      "owner": "attachment-service",
+      "call_path": "backend/app/services/attachment_service.py::AttachmentService.create_attachment",
+      "io_type": "write-locator",
+      "detail": "接受 data['file_path'] 并落库 Attachment.file_path；paperless 走 paperless:// URI，local 走绝对/相对本地路径。",
+      "target_adapter": "SecureAttachmentGateway (storage_key + staged/finalize)",
+      "migration_phase": "M2",
+      "verification_evidence": "backend/tests/test_evidence_file_path_boundary_contract.py::test_opaque_locator_never_absolute_path",
+      "due_date": "wave-2 (task 3.5)"
+    },
+    {
+      "id": "BE-ATT-02",
+      "owner": "attachment-service",
+      "call_path": "backend/app/services/attachment_service.py::AttachmentService.upload_attachment_file / _write_local_file / _write_temp_file",
+      "io_type": "write-bytes",
+      "detail": "把上传内容写入 local_storage_root/{project_id}/{type}/ 并返回 as_posix() 绝对路径作为 file_path。无流式/背压/隔离区/内容嗅探先行。",
+      "target_adapter": "SecureAttachmentGateway (chunked stream + quarantine + magic MIME)",
+      "migration_phase": "M2",
+      "verification_evidence": "task 3.3 (wave 2) streaming/finalize；本任务仅冻结契约",
+      "due_date": "wave-2 (task 3.3)"
+    },
+    {
+      "id": "BE-ATT-03",
+      "owner": "attachment-service",
+      "call_path": "backend/app/services/attachment_service.py::AttachmentService._to_dict",
+      "io_type": "expose-locator",
+      "detail": "所有 list/get/search/wp-attachments 响应经 _to_dict 返回原始 file_path(可能是绝对本地路径)。R14 opaque locator 违规点。",
+      "target_adapter": "LocatorProjection (opaque locator / 受控下载 URL)",
+      "migration_phase": "M2",
+      "verification_evidence": "backend/tests/test_evidence_file_path_boundary_contract.py::test_opaque_locator_never_absolute_path",
+      "due_date": "wave-2 (task 3.5)"
+    },
+    {
+      "id": "BE-ATT-04",
+      "owner": "attachments-router",
+      "call_path": "backend/app/routers/attachments.py::create_attachment (AttachmentCreate.file_path)",
+      "io_type": "write-locator",
+      "detail": "POST /api/projects/{id}/attachments 接受客户端提供的 file_path。客户端提供路径不可信。",
+      "target_adapter": "EvidenceGovernanceFacade (拒绝客户端 path，服务端解析 storage_key)",
+      "migration_phase": "M2",
+      "verification_evidence": "task 3.5 (wave 2)",
+      "due_date": "wave-2 (task 3.5)"
+    },
+    {
+      "id": "BE-ATT-05",
+      "owner": "attachments-router",
+      "call_path": "backend/app/routers/attachments.py::download_attachment",
+      "io_type": "download",
+      "detail": "GET /api/attachments/{id}/download。Path(file_path) + open(local_path,'rb')，回退 Path('storage')/file_path.lstrip('/')。scope 校验(_ensure_project_access)先于读取，但无 Storage_Boundary 规范化/containment 检查。",
+      "target_adapter": "StorageBoundaryResolver + StreamingResponse",
+      "migration_phase": "M2",
+      "verification_evidence": "backend/tests/test_evidence_file_path_boundary_contract.py::test_boundary_failure_zero_byte_io / test_scope_first_before_byte_io",
+      "due_date": "wave-2 (task 3.4)"
+    },
+    {
+      "id": "BE-ATT-06",
+      "owner": "attachments-router",
+      "call_path": "backend/app/routers/attachments.py::preview_attachment",
+      "io_type": "preview",
+      "detail": "GET /api/attachments/{id}/preview。open(local_path,'rb') 直读，同 download 无 boundary containment。",
+      "target_adapter": "StorageBoundaryResolver + StreamingResponse",
+      "migration_phase": "M2",
+      "verification_evidence": "backend/tests/test_evidence_file_path_boundary_contract.py::test_boundary_failure_zero_byte_io",
+      "due_date": "wave-2 (task 3.4)"
+    },
+    {
+      "id": "BE-ATT-07",
+      "owner": "office-preview-router",
+      "call_path": "backend/app/routers/office_preview.py::preview_office_as_pdf / _resolve_local_path",
+      "io_type": "preview",
+      "detail": "GET /api/attachments/{id}/preview-pdf。_resolve_local_path 用 Path(file_path).exists() + Path('storage')/file_path.lstrip('/')，无边界 containment；LibreOffice 转 PDF 读取 src_path。scope 校验先行但边界缺失。",
+      "target_adapter": "StorageBoundaryResolver",
+      "migration_phase": "M2",
+      "verification_evidence": "backend/tests/test_evidence_file_path_boundary_contract.py::test_boundary_failure_zero_byte_io",
+      "due_date": "wave-2 (task 3.4)"
+    },
+    {
+      "id": "BE-ATT-08",
+      "owner": "attachments-router",
+      "call_path": "backend/app/routers/attachments.py::retry_ocr",
+      "io_type": "read-bytes",
+      "detail": "POST /api/attachments/{id}/retry-ocr。无 ocr.retry capability 门禁(仅 get_current_user)；不满足 R5 重试授权(在本 spec 由 task 5.2 治理)。",
+      "target_adapter": "OCRGovernanceOrchestrator (ocr.retry capability)",
+      "migration_phase": "M2",
+      "verification_evidence": "task 5.2 (wave 4)",
+      "due_date": "wave-4 (task 5.2)"
+    },
+    {
+      "id": "BE-ATT-09",
+      "owner": "attachment-service",
+      "call_path": "backend/app/services/attachment_service.py::AttachmentService.associate_with_wp",
+      "io_type": "associate",
+      "detail": "AttachmentWorkingPaper 裸写入，无同 project/year 双端校验、无双端权限校验、created_by 可为 None。",
+      "target_adapter": "EvidenceRefService typed adapter (create-time command guard)",
+      "migration_phase": "M2",
+      "verification_evidence": "task 4.2 (wave 3)",
+      "due_date": "wave-3 (task 4.2)"
+    },
+    {
+      "id": "BE-ATT-10",
+      "owner": "attachment-lineage-router",
+      "call_path": "backend/app/routers/attachment_lineage.py / backend/app/models/attachment_lineage_model.py",
+      "io_type": "consume-locator",
+      "detail": "附件血缘/影响。需并入 UnifiedGraph 与 EvidenceDependency，按旧 ID 查询须经 LegacyAttachmentResolver。",
+      "target_adapter": "EvidenceDependencyService / LegacyAttachmentResolver",
+      "migration_phase": "M2",
+      "verification_evidence": "task 4.3 (wave 3)",
+      "due_date": "wave-3 (task 4.3)"
+    },
+    {
+      "id": "BE-WP-01",
+      "owner": "wp-download-service",
+      "call_path": "backend/app/services/wp_download_service.py (STORAGE_ROOT=Path('storage'))",
+      "io_type": "download",
+      "detail": "底稿文件下载，从 WorkingPaper.file_path 读取。属受控 STORAGE_ROOT 但仍须边界 containment 与 scope-first。",
+      "target_adapter": "StorageBoundaryResolver",
+      "migration_phase": "M2",
+      "verification_evidence": "task 3.4 (wave 2) 边界契约推广",
+      "due_date": "wave-2 (task 3.4)"
+    },
+    {
+      "id": "BE-WP-02",
+      "owner": "wp-xlsx-export-router",
+      "call_path": "backend/app/routers/wp_xlsx_export.py::export_workpaper_xlsx",
+      "io_type": "export",
+      "detail": "导出底稿 xlsx StreamingResponse。读取 WorkingPaper.file_path/模板并填值。",
+      "target_adapter": "StorageBoundaryResolver + delivery flatten",
+      "migration_phase": "M3",
+      "verification_evidence": "task 8.x (wave 7) export/archive gate",
+      "due_date": "wave-7 (task 8.1)"
+    },
+    {
+      "id": "BE-WP-03",
+      "owner": "wp-template-download-router",
+      "call_path": "backend/app/routers/wp_template_download.py::download_template_by_code / download_all_templates / preview_template_as_pdf / download_template_prefilled",
+      "io_type": "download",
+      "detail": "模板 FileResponse/ZIP/preview-pdf。读取 wp_templates 下模板文件；受控模板根，仍须边界与脱敏。",
+      "target_adapter": "StorageBoundaryResolver",
+      "migration_phase": "M2",
+      "verification_evidence": "task 3.4 (wave 2)",
+      "due_date": "wave-2 (task 3.4)"
+    },
+    {
+      "id": "BE-WP-04",
+      "owner": "wp-render-config-router",
+      "call_path": "backend/app/routers/wp_render_config.py::export_template (FileResponse tpl_path)",
+      "io_type": "export",
+      "detail": "GET 导出底稿原始 xlsx 模板 FileResponse(path=tpl_path)。tpl_path 来自模板解析，须边界 containment。",
+      "target_adapter": "StorageBoundaryResolver",
+      "migration_phase": "M2",
+      "verification_evidence": "task 3.4 (wave 2)",
+      "due_date": "wave-2 (task 3.4)"
+    },
+    {
+      "id": "BE-ARC-01",
+      "owner": "wp-storage-service",
+      "call_path": "backend/app/services/wp_storage_service.py::WpStorageService.archive_project / snapshot_version",
+      "io_type": "archive",
+      "detail": "项目底稿归档为 tar.gz 移到 archives；快照复制 wp.file_path。归档须经 ArchiveManifest 两阶段 watermark + FormalOutputGate。",
+      "target_adapter": "ArchiveManifestService / ArchiveOrchestrator",
+      "migration_phase": "M3",
+      "verification_evidence": "task 7.1/7.2 (wave 6)",
+      "due_date": "wave-6 (task 7.1)"
+    },
+    {
+      "id": "BE-ARC-02",
+      "owner": "cloud-storage-service",
+      "call_path": "backend/app/services/cloud_storage_service.py (STORAGE_ROOT/projects push + cleanup)",
+      "io_type": "archive",
+      "detail": "归档推送到云端并可选清理本地。清理须受 Legal_Hold / Retention 保护(零效果禁止)。",
+      "target_adapter": "RetentionLegalHoldService",
+      "migration_phase": "M3",
+      "verification_evidence": "task 7.3 (wave 6)",
+      "due_date": "wave-6 (task 7.3)"
+    },
+    {
+      "id": "BE-ARC-03",
+      "owner": "deliverable-service",
+      "call_path": "backend/app/services/deliverable_service.py / template_fill_service.py (STORAGE_ROOT/deliverables)",
+      "io_type": "export",
+      "detail": "交付件生成/固化写入 deliverables 目录。FormalOutput finalize gate 前须通过 stale/manifest 校验。",
+      "target_adapter": "FormalOutputGate + deliverable center adapter",
+      "migration_phase": "M3",
+      "verification_evidence": "task 6.3 / 7.1 (wave 5/6)",
+      "due_date": "wave-6 (task 7.1)"
+    },
+    {
+      "id": "FE-01",
+      "owner": "frontend-apiPaths",
+      "call_path": "audit-platform/frontend/src/services/apiPaths/attachment.ts::download/preview/previewPdf",
+      "io_type": "consume-locator",
+      "detail": "前端下载/预览 URL 构造。切换后仍使用同一 URL，但后端返回 opaque locator/受控 URL。",
+      "target_adapter": "受控下载 URL (无变化，后端收敛)",
+      "migration_phase": "M2",
+      "verification_evidence": "frontend Vitest AttachmentPreviewOfficeIframe.spec.ts (existing)",
+      "due_date": "wave-2 (task 3.5)"
+    },
+    {
+      "id": "FE-02",
+      "owner": "frontend-workpaper-api",
+      "call_path": "audit-platform/frontend/src/services/workpaperApi.ts (file_path:string|null) / composables/useWpDetailGuard.ts",
+      "io_type": "consume-locator",
+      "detail": "前端读取 WorkingPaper.file_path 判定 no_file/ready 状态；不得依赖绝对路径语义，只判 truthy/opaque。",
+      "target_adapter": "opaque locator 兼容(仅判存在性)",
+      "migration_phase": "M2",
+      "verification_evidence": "frontend __tests__/useWpDetailGuard.spec.ts (existing)",
+      "due_date": "wave-2 (task 3.5)"
+    },
+    {
+      "id": "FE-03",
+      "owner": "frontend-attachment-viewers",
+      "call_path": "audit-platform/frontend/src/components/extension/AttachmentPreview.vue / components/common/AttachmentPreviewDrawer.vue / attachment/AttachmentActionBar.vue",
+      "io_type": "consume-locator",
+      "detail": "附件预览/下载 viewer，依赖 preview_url/download_url，不直接消费绝对 file_path。",
+      "target_adapter": "受控下载 URL",
+      "migration_phase": "M2",
+      "verification_evidence": "task 4.4 (wave 3)",
+      "due_date": "wave-3 (task 4.4)"
+    }
+  ]
+}

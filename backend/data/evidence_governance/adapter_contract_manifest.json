@@ -1,0 +1,149 @@
+{
+  "feature": "attachment-ocr-ai-evidence-governance-hardening",
+  "task": "1.5",
+  "frozen_at_wave": 0,
+  "description": "八项既有引擎 adapter contract 冻结 + 禁止分叉清单。治理层只允许通过 canonical import 委托这些引擎，禁止复制、分叉或影子实现。",
+  "governance_scan_roots": [
+    "backend/app/services/evidence_governance",
+    "backend/app/routers/evidence_governance"
+  ],
+  "engines": [
+    {
+      "name": "AttachmentService",
+      "role": "附件存储与版本 (Paperless/local)；治理层只包装安全接收、版本和 locator。",
+      "module": "app.services.attachment_service",
+      "symbol": "AttachmentService",
+      "kind": "class",
+      "required_methods": [
+        {"name": "create_attachment", "params": ["project_id", "data", "created_by"]},
+        {"name": "upload_attachment_file", "params": ["project_id", "file_name", "content", "created_by"]},
+        {"name": "get_attachment", "params": ["attachment_id"]},
+        {"name": "list_attachments", "params": ["project_id"]},
+        {"name": "associate_with_wp", "params": ["attachment_id", "wp_id"]},
+        {"name": "update_ocr_status", "params": ["attachment_id", "status"]},
+        {"name": "list_versions", "params": []},
+        {"name": "rollback_to_version", "params": []}
+      ],
+      "fork_markers": ["_paperless_uri", "_resolve_version_chain", "_write_local_file", "upload_to_paperless"]
+    },
+    {
+      "name": "UnifiedOCRService",
+      "role": "OCR 引擎选择、调用与降级；治理层只负责任务、结果、确认和写回编排。",
+      "module": "app.services.unified_ocr_service",
+      "symbol": "UnifiedOCRService",
+      "kind": "class",
+      "required_methods": [
+        {"name": "recognize", "params": ["image_path", "mode"]},
+        {"name": "health_check", "params": []}
+      ],
+      "fork_markers": ["_http_recognize", "_in_process_recognize", "_paddle_recognize", "_tesseract_recognize", "_select_engine"]
+    },
+    {
+      "name": "KnowledgeIndexService",
+      "role": "语义/BM25/ILIKE 检索；治理层只补可定位元数据、权限交集与 CitationSnapshot。",
+      "module": "app.services.knowledge_index_service",
+      "symbol": "KnowledgeIndexService",
+      "kind": "class",
+      "required_methods": [
+        {"name": "build_index", "params": ["project_id"]},
+        {"name": "semantic_search", "params": []},
+        {"name": "mark_index_stale", "params": ["source_id"]},
+        {"name": "clear_index_stale", "params": ["source_id"]},
+        {"name": "is_source_stale", "params": ["source_id"]},
+        {"name": "get_index_status", "params": ["project_id"]}
+      ],
+      "fork_markers": ["_vector_search", "_bm25_fallback", "_bm25_retrieve", "_cosine_similarity", "_chunk_text"]
+    },
+    {
+      "name": "AiContentLogService",
+      "role": "AI 内容生命周期；治理层扩展证据、哈希、服务状态和统一门禁，不复制生命周期。",
+      "module": "app.services.ai_content_log_service",
+      "symbol": "__module__",
+      "kind": "module",
+      "required_functions": [
+        {"name": "create", "params": ["db", "project_id", "user_id", "instance_type", "instance_id", "model", "content_hash", "generated_content"]},
+        {"name": "confirm", "params": []},
+        {"name": "revise", "params": []},
+        {"name": "reject", "params": []},
+        {"name": "list_pending_by_project", "params": []},
+        {"name": "count_pending_by_project", "params": []}
+      ],
+      "fork_markers": ["_write_lifecycle_audit", "_load_pending_or_raise"]
+    },
+    {
+      "name": "AiContentLog",
+      "role": "AI 内容日志 ORM 模型；治理层扩展列不重建表。",
+      "module": "app.models.v3_refinement_models",
+      "symbol": "AiContentLog",
+      "kind": "orm_model",
+      "table_name": "ai_content_log",
+      "required_columns": ["id", "project_id", "user_id", "content_hash", "model", "generated_content", "confirm_action", "confirmed_by", "confirmed_at"]
+    },
+    {
+      "name": "ACNR.resolver",
+      "role": "ACNR 统一 resolve 决策树；治理层通过 full_resolve/resolve_instance 求地址，不重实现解析。",
+      "module": "app.services.acnr.resolver",
+      "symbol": "__module__",
+      "kind": "module",
+      "required_functions": [
+        {"name": "full_resolve", "params": ["uri", "formula_ref", "addr_id", "index_ref", "project_id", "db"]},
+        {"name": "resolve_instance", "params": []}
+      ],
+      "fork_markers": ["_detect_non_wp_domain", "_build_cell_resolve_result", "_build_jump_route"]
+    },
+    {
+      "name": "ACNR.events",
+      "role": "ACNR 统一缓存失效钩子；治理层通过 invalidate/invalidate_domain 触发失效，不复制失效链。",
+      "module": "app.services.acnr.events",
+      "symbol": "__module__",
+      "kind": "module",
+      "required_functions": [
+        {"name": "invalidate", "params": ["project_id"]},
+        {"name": "invalidate_domain", "params": ["project_id", "domain"]}
+      ],
+      "fork_markers": []
+    },
+    {
+      "name": "StalePropagationEngine",
+      "role": "已有 stale BFS 写入；治理层提供持久动态边并统一求闭包，复用 on_change。",
+      "module": "app.services.stale_propagation_engine",
+      "symbol": "StalePropagationEngine",
+      "kind": "class",
+      "required_methods": [
+        {"name": "on_change", "params": ["source_uri", "project_id", "year"]},
+        {"name": "reload_graph", "params": []}
+      ],
+      "required_attributes": ["is_degraded", "graph_size"],
+      "fork_markers": ["_bfs", "_load_graph", "_mark_stale_by_uri", "_build_addr_id_index"]
+    },
+    {
+      "name": "DeliverableService",
+      "role": "交付件版本与固化 (deliverable center)；治理层只做 FormalOutput preflight/finalize gate。",
+      "module": "app.services.deliverable_service",
+      "symbol": "DeliverableService",
+      "kind": "class",
+      "required_methods": [
+        {"name": "export_or_new_deliverable", "params": []},
+        {"name": "render_and_store", "params": []},
+        {"name": "get_version_chain", "params": ["task_id"]},
+        {"name": "confirm_deliverable", "params": []},
+        {"name": "sign", "params": []},
+        {"name": "archive_project_deliverables", "params": []}
+      ],
+      "fork_markers": ["_latest_version", "_assert_eqcr_passed", "_deliverable_dir"]
+    },
+    {
+      "name": "ArchiveOrchestrator",
+      "role": "归档工作流、存储与断点；治理层只增加证据图快照、manifest 和离线验证。",
+      "module": "app.services.archive_orchestrator",
+      "symbol": "ArchiveOrchestrator",
+      "kind": "class",
+      "required_methods": [
+        {"name": "orchestrate", "params": ["project_id", "scope"]},
+        {"name": "retry", "params": []},
+        {"name": "get_job", "params": ["job_id"]}
+      ],
+      "fork_markers": ["_step_gate", "_step_wp_storage", "_step_push_to_cloud", "_build_steps", "_persist_integrity_hashes"]
+    }
+  ]
+}

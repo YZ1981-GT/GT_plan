@@ -15,164 +15,15 @@ import type { useF2CrossSheet } from './useF2CrossSheet'
 
 type CrossSheet = ReturnType<typeof useF2CrossSheet>
 
-// ─── F2-18 总体分析 ───────────────────────────────────────────────────────
-
-const OVERALL_KEY = 'F2-18-conclusion'
-const TURNOVER_KEY = 'F2-18-turnover'
-
-export interface F2StructureRow {
-  label: string
-  sheetCode: string
-  currentAmt: number
-  priorAmt: number
-  sharePct: number
-  shareChange: number
-  isHighlight: boolean
-}
-
-export interface F2AnomalyItem {
-  id: string
-  type: string
-  message: string
-  severity: 'warning' | 'danger'
-}
-
-export function useF2OverallAnalysis(options: {
-  allResponses: Ref<Map<string, ChecklistResponse>>
-  crossSheet: CrossSheet
-  isReadonly?: Ref<boolean>
-}) {
-  const { allResponses, crossSheet, isReadonly } = options
-  const readonly = isReadonly ?? ref(false)
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null
-
-  const analysisConclusion = ref('')
-  const turnoverRate = ref(0)
-  const turnoverDays = ref(0)
-  const cogsAmount = ref(0)
-
-  watch(() => allResponses.value.get(OVERALL_KEY)?.remark, (v) => { analysisConclusion.value = v || '' }, { immediate: true })
-  watch(() => allResponses.value.get(TURNOVER_KEY)?.remark, (v) => {
-    if (!v) return
-    try {
-      const d = JSON.parse(v)
-      turnoverRate.value = parseNum(d.turnoverRate)
-      turnoverDays.value = parseNum(d.turnoverDays)
-      cogsAmount.value = parseNum(d.cogsAmount)
-    } catch { /* ignore */ }
-  }, { immediate: true })
-
-  const structureRows: ComputedRef<F2StructureRow[]> = computed(() => {
-    const summaries = crossSheet.categorySummaries.value
-    const total = crossSheet.detailGrandTotal.value || 1
-    return summaries.map((s) => {
-      const prior = s.openingAmt
-      const current = s.closingAmt
-      const sharePct = total ? (current / total) * 100 : 0
-      const priorTotal = crossSheet.detailOpeningTotal.value || 1
-      const priorShare = priorTotal ? (prior / priorTotal) * 100 : 0
-      const shareChange = sharePct - priorShare
-      return {
-        label: s.label,
-        sheetCode: s.sheetCode,
-        currentAmt: current,
-        priorAmt: prior,
-        sharePct,
-        shareChange,
-        isHighlight: Math.abs(shareChange) > 5,
-      }
-    })
-  })
-
-  const computedTurnoverRate = computed(() => {
-    const avg = (crossSheet.detailGrandTotal.value + crossSheet.detailOpeningTotal.value) / 2
-    if (!avg || !cogsAmount.value) return turnoverRate.value
-    return cogsAmount.value / avg
-  })
-
-  const computedTurnoverDays = computed(() => {
-    const rate = computedTurnoverRate.value
-    return rate ? 365 / rate : turnoverDays.value
-  })
-
-  const anomalies: ComputedRef<F2AnomalyItem[]> = computed(() => {
-    const items: F2AnomalyItem[] = []
-    if (computedTurnoverRate.value > 0 && turnoverRate.value > 0) {
-      const drop = (turnoverRate.value - computedTurnoverRate.value) / turnoverRate.value
-      if (drop > 0.2) {
-        items.push({
-          id: 'turnover-drop',
-          type: '周转下降',
-          message: `存货周转率下降 ${(drop * 100).toFixed(1)}%`,
-          severity: 'warning',
-        })
-      }
-    }
-    for (const row of structureRows.value) {
-      if (row.isHighlight) {
-        items.push({
-          id: `share-${row.sheetCode}`,
-          type: '结构变动',
-          message: `${row.label}占比变动 ${row.shareChange.toFixed(1)}%`,
-          severity: 'warning',
-        })
-      }
-    }
-    return items
-  })
-
-  function flushSave(): void {
-    const items = [
-      allResponses.value.get(OVERALL_KEY),
-      allResponses.value.get(TURNOVER_KEY),
-    ].filter(Boolean)
-    if (items.length) window.dispatchEvent(new CustomEvent('f2:save-items', { detail: { items } }))
-  }
-
-  function debounceSave(): void {
-    if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 2000)
-  }
-
-  function updateTurnoverInputs(patch: { cogsAmount?: number; turnoverRate?: number; turnoverDays?: number }): void {
-    if (readonly.value) return
-    if (patch.cogsAmount !== undefined) cogsAmount.value = patch.cogsAmount
-    if (patch.turnoverRate !== undefined) turnoverRate.value = patch.turnoverRate
-    if (patch.turnoverDays !== undefined) turnoverDays.value = patch.turnoverDays
-    allResponses.value.set(TURNOVER_KEY, {
-      item_id: TURNOVER_KEY,
-      conclusion: null,
-      remark: JSON.stringify({
-        cogsAmount: cogsAmount.value,
-        turnoverRate: turnoverRate.value,
-        turnoverDays: turnoverDays.value,
-      }),
-    })
-    debounceSave()
-  }
-
-  watch(analysisConclusion, (val) => {
-    if (readonly.value) return
-    allResponses.value.set(OVERALL_KEY, { item_id: OVERALL_KEY, conclusion: null, remark: val })
-    debounceSave()
-  })
-
-  onBeforeUnmount(() => {
-    if (debounceTimer) { clearTimeout(debounceTimer); flushSave() }
-  })
-
-  return {
-    structureRows,
-    anomalies,
-    analysisConclusion,
-    cogsAmount,
-    turnoverRate,
-    turnoverDays,
-    computedTurnoverRate,
-    computedTurnoverDays,
-    updateTurnoverInputs,
-  }
-}
+// ─── F2-18 总体分析（实现见 useF2OverallAnalysis.ts）──────────────────────
+export {
+  useF2OverallAnalysis,
+  F2_INDICATOR_DEFS,
+  type F2CompositionRow,
+  type F2StructureRow,
+  type F2OverallPack,
+  type F2AnomalyItem,
+} from './useF2OverallAnalysis'
 
 // ─── F2-19 产销量变动 ───────────────────────────────────────────────────────
 
@@ -407,4 +258,3 @@ export function useF2CostComparison(options: {
   return { activeSegment, enrichedRows, anomalyCount, conclusion, addRow, removeRow, updateCell }
 }
 
-export default useF2OverallAnalysis

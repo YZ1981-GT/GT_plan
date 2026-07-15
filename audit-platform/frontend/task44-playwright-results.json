@@ -1,0 +1,199 @@
+{
+  "config": {
+    "configFile": "D:\\GT_plan\\audit-platform\\frontend\\playwright.config.ts",
+    "rootDir": "D:/GT_plan/audit-platform/frontend/e2e",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": "D:\\GT_plan\\audit-platform\\frontend\\e2e\\global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "D:/GT_plan/audit-platform/frontend/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "D:/GT_plan/audit-platform/frontend/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 16,
+    "webServer": {
+      "command": "npm run dev",
+      "url": "http://localhost:3030",
+      "reuseExistingServer": true
+    }
+  },
+  "suites": [
+    {
+      "title": "workpaper-maintainability-pilots-roundtrip.spec.ts",
+      "file": "workpaper-maintainability-pilots-roundtrip.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Task 4.4 — D2/K5/J2 pilot Round_Trip",
+          "file": "workpaper-maintainability-pilots-roundtrip.spec.ts",
+          "line": 176,
+          "column": 6,
+          "specs": [
+            {
+              "title": "D2: fresh navigation → PUT → GET/DB → fresh navigation UI",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6703,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "ROUND_TRIP_METRICS D2 {\"renderConfigGet\":2,\"checklistGet\":0,\"checklistPut\":2,\"aiPost\":0}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-14T12:03:32.733Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3acf2e06c0965676a123-9a355ef2c1dcba0bc381",
+              "file": "workpaper-maintainability-pilots-roundtrip.spec.ts",
+              "line": 180,
+              "column": 5
+            },
+            {
+              "title": "K5: fresh navigation → PUT → GET/DB → fresh navigation UI",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4974,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "ROUND_TRIP_METRICS K5 {\"renderConfigGet\":2,\"checklistGet\":0,\"checklistPut\":4,\"aiPost\":0}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-14T12:03:39.580Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3acf2e06c0965676a123-c61763759910053e49e9",
+              "file": "workpaper-maintainability-pilots-roundtrip.spec.ts",
+              "line": 180,
+              "column": 5
+            },
+            {
+              "title": "J2: fresh navigation → PUT → GET/DB → fresh navigation UI",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 240000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 8059,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "ROUND_TRIP_METRICS J2 {\"renderConfigGet\":2,\"checklistGet\":2,\"checklistPut\":7,\"aiPost\":1}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-14T12:03:44.560Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "3acf2e06c0965676a123-738c7f0ead779b5b8b28",
+              "file": "workpaper-maintainability-pilots-roundtrip.spec.ts",
+              "line": 180,
+              "column": 5
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-14T12:03:32.334Z",
+    "duration": 20404.168999999998,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}
