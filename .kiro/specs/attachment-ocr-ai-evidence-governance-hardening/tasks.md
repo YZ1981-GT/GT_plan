@@ -81,9 +81,9 @@
     - _Requirements: R9, R10, R12_
 
 - [ ] 7. Wave 6 — Archive、离线验签、Legal Hold 与审计告警
-  - [ ] 7.1 实现 ArchiveManifest 两阶段 watermark 与版本化 sealed 包；只有验证失败并阻断归档时生成完整 blocking difference report，成功归档不得生成阻断报告。
+  - [x] 7.1 实现 ArchiveManifest 两阶段 watermark 与版本化 sealed 包；只有验证失败并阻断归档时生成完整 blocking difference report，成功归档不得生成阻断报告。
     - _Requirements: R11, R15_
-  - [ ] 7.2 通过 adapter 接入 deliverable center/ArchiveOrchestrator，并实现不连接业务库的离线 manifest 成员/hash/签名验签器及机器可读差异。
+  - [x] 7.2 通过 adapter 接入 deliverable center/ArchiveOrchestrator，并实现不连接业务库的离线 manifest 成员/hash/签名验签器及机器可读差异。
     - _Requirements: R11_
   - [ ] 7.3 实现 Legal Hold 统一图闭包与新增边监听；删除、清理、覆盖对任何角色/管理员/紧急授权均零效果，只有 hold 解除且 retention 届满后才可授权 purge。
     - _Requirements: R2, R12, R13_

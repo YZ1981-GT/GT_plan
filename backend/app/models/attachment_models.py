@@ -7,8 +7,8 @@ import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
-from sqlalchemy import ForeignKey, Index, String, Text, func, text
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy import CheckConstraint, ForeignKey, Index, String, Text, UniqueConstraint, func, text
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -42,6 +42,33 @@ class Attachment(Base):
     previous_version_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), nullable=True
     )
+    # V106 evidence-governance additive 扩展（legacy 列保留；治理列见 design §4.2）
+    audit_year: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    original_file_name: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    source_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    obtained_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
+    provider: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    is_key_evidence: Mapped[bool] = mapped_column(
+        server_default=text("false"), nullable=False
+    )
+    metadata_status: Mapped[str] = mapped_column(
+        String(20), server_default=text("'incomplete'"), nullable=False
+    )
+    metadata_missing: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    state: Mapped[str] = mapped_column(
+        String(20), server_default=text("'available'"), nullable=False
+    )
+    current_version_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    actor_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    actor_service_identity_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("service_identities.id", ondelete="RESTRICT"), nullable=True
+    )
+    original_creator_unknown: Mapped[bool] = mapped_column(
+        server_default=text("false"), nullable=False
+    )
 
     __table_args__ = (
         Index("idx_attachments_project", "project_id"),
@@ -49,6 +76,17 @@ class Attachment(Base):
         Index("idx_attachments_paperless", "paperless_document_id"),
         Index("idx_attachments_type_ref", "attachment_type", "reference_type", "reference_id"),
         Index("idx_attachments_storage_type", "storage_type"),
+        UniqueConstraint("id", "project_id", "audit_year", name="uq_attachments_scope"),
+        CheckConstraint(
+            "state IN ('pending','available','inactive','tombstoned')",
+            name="chk_attachments_state",
+        ),
+        CheckConstraint(
+            "actor_type IS NULL "
+            "OR (actor_type = 'user' AND actor_user_id IS NOT NULL AND actor_service_identity_id IS NULL) "
+            "OR (actor_type = 'service' AND actor_user_id IS NULL AND actor_service_identity_id IS NOT NULL)",
+            name="chk_attachments_actor_xor",
+        ),
     )
 
 

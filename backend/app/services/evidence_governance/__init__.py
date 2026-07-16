@@ -112,6 +112,23 @@ from .ai_evidence_gate import (
     GateCheckStatus,
     compute_coverage_gap,
 )
+from .archive_adapter import (
+    ArchiveJobResult,
+    ArchiveOrchestratorAdapter,
+    DeliverableArchiveResult,
+    DeliverableServiceAdapter,
+    DeliverableVersion,
+    InMemoryArchiveOrchestratorAdapter,
+    InMemoryDeliverableServiceAdapter,
+)
+from .offline_manifest_verifier import (
+    DifferenceType,
+    OfflineManifestVerifier,
+    OfflineVerificationResult,
+    VerificationDifference,
+    VerificationStatus,
+    serialize_sealed_package,
+)
 
 __all__ = [
     # modules
@@ -201,4 +218,19 @@ __all__ = [
     "GateCheckStatus",
     "AI_ENTRY_REGISTRY",
     "compute_coverage_gap",
+    # archive adapter (Task 7.2)
+    "ArchiveOrchestratorAdapter",
+    "DeliverableServiceAdapter",
+    "ArchiveJobResult",
+    "DeliverableVersion",
+    "DeliverableArchiveResult",
+    "InMemoryArchiveOrchestratorAdapter",
+    "InMemoryDeliverableServiceAdapter",
+    # offline manifest verifier (Task 7.2)
+    "OfflineManifestVerifier",
+    "OfflineVerificationResult",
+    "VerificationDifference",
+    "VerificationStatus",
+    "DifferenceType",
+    "serialize_sealed_package",
 ]

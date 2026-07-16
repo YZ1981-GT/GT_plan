@@ -73,7 +73,10 @@ async def lifespan(app: FastAPI):
     await _warm_render_caches()
 
     # ACNR Redis pub-sub 订阅 + epoch 轮询兜底 [Req-14]
-    from app.services.acnr.cache_epoch import start_epoch_subscriber
+    from app.core.redis import get_redis
+    from app.services.acnr.cache_epoch import set_redis_client, start_epoch_subscriber
+
+    set_redis_client(await get_redis())
     await start_epoch_subscriber()
 
     stop_event = asyncio.Event()

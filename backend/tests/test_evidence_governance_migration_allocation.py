@@ -41,7 +41,7 @@ MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
 class TestNormalize:
     @pytest.mark.parametrize("raw,expected", [
         ("102", 102), ("V102", 102), (102, 102),
-        ("V105__evidence_governance_role_eqcr_enum.sql", 105),
+        ("V109__evidence_governance_role_eqcr_enum.sql", 109),
         ("v007", 7),
     ])
     def test_normalize(self, raw, expected):
@@ -129,7 +129,7 @@ class TestRealMigrationsDir:
     def test_dir_highest_is_at_least_105(self):
         filenames = [p.name for p in MIGRATIONS_DIR.glob("V*.sql")]
         by = parse_dir_versions(filenames)
-        assert max(by) >= 105  # V105 eqcr enum 已由 Task 1.1 加入
+        assert max(by) >= 109  # V109 eqcr enum
 
     def test_next_available_from_dir_when_fully_applied(self):
         """把整个目录视为已应用 —— 下一可用 = 目录最高 + 1（allocation 契约演示）。"""
@@ -193,8 +193,8 @@ class TestLint:
         assert lint_migration_sql(sql, require_fk_restrict=False) == []
 
     def test_real_v105_enum_only_additive(self):
-        """V105 是 enum-only（ADD VALUE IF NOT EXISTS），无 FK/表；additive 通过。"""
-        sql = (MIGRATIONS_DIR / "V105__evidence_governance_role_eqcr_enum.sql").read_text(
+        """V109 是 enum-only（ADD VALUE IF NOT EXISTS），无 FK/表；additive 通过。"""
+        sql = (MIGRATIONS_DIR / "V109__evidence_governance_role_eqcr_enum.sql").read_text(
             encoding="utf-8"
         )
         assert lint_migration_sql(sql, require_fk_restrict=False) == []

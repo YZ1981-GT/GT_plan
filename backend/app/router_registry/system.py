@@ -299,3 +299,11 @@ def register_system_routers(app: FastAPI) -> None:
     # ═══ §134. 底稿编制指导面板 ═══
     from app.routers.wp_guidance_chat import router as wp_guidance_chat_router
     app.include_router(wp_guidance_chat_router, tags=["底稿编制指导"])
+
+    # ═══ §135. evidence-governance: Facade + Ref + OCR ═══
+    from app.routers.evidence_governance import router as evidence_governance_router
+    from app.routers.evidence_ref_router import router as evidence_ref_router
+    from app.routers.ocr_governance_router import router as ocr_governance_router
+
+    for r in (evidence_governance_router, evidence_ref_router, ocr_governance_router):
+        app.include_router(r)

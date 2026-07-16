@@ -8,7 +8,7 @@
  * D 主要产品大类周转（三期）
  * 各段审计说明/异常原因 + 总体审计结论
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
 import {
   parseNum,
   calcSubtotal,
@@ -327,6 +327,7 @@ export function useF2OverallAnalysis(options: {
   let hydrating = false
 
   const pack = ref<F2OverallPack>(defaultPack())
+  let writing = false
 
   function hydrate(): void {
     hydrating = true
@@ -353,33 +354,45 @@ export function useF2OverallAnalysis(options: {
     }
 
     pack.value = stored
+    applyDetailAmounts(false)
     hydrating = false
-    syncCompositionFromDetail()
   }
 
   /** Pull amt0/amt1 from F2-3~13 when not overridden */
-  function syncCompositionFromDetail(): void {
-    if (readonly.value) return
+  function applyDetailAmounts(doPersist: boolean): boolean {
+    if (readonly.value) return false
     const summaries = crossSheet.categorySummaries.value
     const byKey = new Map(summaries.map((s) => [s.rowKey, s]))
     let changed = false
-    for (const row of pack.value.composition) {
+    for (let i = 0; i < pack.value.composition.length; i++) {
+      const row = pack.value.composition[i]
       if (row.override) continue
       const s = byKey.get(row.key)
       if (!s) continue
       if (row.amt0 !== s.closingAmt || row.amt1 !== s.openingAmt) {
-        row.amt0 = s.closingAmt
-        row.amt1 = s.openingAmt
+        pack.value.composition[i] = {
+          ...row,
+          amt0: s.closingAmt,
+          amt1: s.openingAmt,
+        }
         changed = true
       }
     }
-    // Auto-fill inv balances / avg from composition totals when zero
     const t0 = calcSubtotal(pack.value.composition.map((r) => r.amt0))
     const t1 = calcSubtotal(pack.value.composition.map((r) => r.amt1))
     const t2 = calcSubtotal(pack.value.composition.map((r) => r.amt2))
-    if (!pack.value.inputs.invBal0 && t0) pack.value.inputs.invBal0 = t0
-    if (!pack.value.inputs.invBal1 && t1) pack.value.inputs.invBal1 = t1
-    if (!pack.value.inputs.invBal2 && t2) pack.value.inputs.invBal2 = t2
+    if (!pack.value.inputs.invBal0 && t0) {
+      pack.value.inputs.invBal0 = t0
+      changed = true
+    }
+    if (!pack.value.inputs.invBal1 && t1) {
+      pack.value.inputs.invBal1 = t1
+      changed = true
+    }
+    if (!pack.value.inputs.invBal2 && t2) {
+      pack.value.inputs.invBal2 = t2
+      changed = true
+    }
     if (!pack.value.inputs.invAvg0 && (t0 || t1)) {
       pack.value.inputs.invAvg0 = (t0 + t1) / 2
       changed = true
@@ -388,19 +401,27 @@ export function useF2OverallAnalysis(options: {
       pack.value.inputs.invAvg1 = (t1 + t2) / 2
       changed = true
     }
-    if (changed) persist()
+    if (changed && doPersist) persist()
+    return changed
+  }
+
+  function syncCompositionFromDetail(): void {
+    applyDetailAmounts(true)
   }
 
   watch(
     () => allResponses.value.get(STORAGE_KEY)?.remark,
-    () => hydrate(),
+    () => {
+      if (writing || hydrating) return
+      hydrate()
+    },
     { immediate: true },
   )
 
   watch(
     () => crossSheet.categorySummaries.value,
     () => {
-      if (!hydrating) syncCompositionFromDetail()
+      if (!hydrating && !writing) applyDetailAmounts(true)
     },
     { deep: true },
   )
@@ -558,17 +579,19 @@ export function useF2OverallAnalysis(options: {
 
   function persist(): void {
     if (hydrating || readonly.value) return
+    writing = true
+    const json = JSON.stringify(pack.value)
     allResponses.value.set(STORAGE_KEY, {
       item_id: STORAGE_KEY,
       conclusion: null,
-      remark: JSON.stringify(pack.value),
+      remark: json,
     })
-    // also mirror conclusion for older readers
     allResponses.value.set(LEGACY_CONCLUSION_KEY, {
       item_id: LEGACY_CONCLUSION_KEY,
       conclusion: null,
       remark: pack.value.auditConclusion,
     })
+    writing = false
     debounceSave()
   }
 

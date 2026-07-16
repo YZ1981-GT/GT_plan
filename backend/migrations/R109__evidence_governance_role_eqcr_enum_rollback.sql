@@ -1,4 +1,4 @@
--- R105: 回滚 V105（补入 EQCR 角色 enum 值）
+-- R109: 回滚 V109（补入 EQCR 角色 enum 值）
 -- PostgreSQL 不支持从 enum 类型移除已加入的值（无 DROP VALUE）。
 -- 该迁移为 additive 且 IF NOT EXISTS 幂等，enum 中多出的 'eqcr' 值不影响既有数据/查询，
 -- 故回滚为**有意的 no-op**：不删除 enum 值，避免破坏依赖该值的行/约束。

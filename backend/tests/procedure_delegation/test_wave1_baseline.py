@@ -92,10 +92,9 @@ class TestProcedureInstanceGrain:
 # 2. 迁移基线：最高 V104，V105 仅预留、尚未创建
 # ---------------------------------------------------------------------------
 class TestMigrationHead:
-    """Task 2 已落地 V105 feature 迁移，迁移头推进到 105；
+    """Task 2 已落地 V105 feature 迁移；后续其他特性可继续追加更高版本号迁移。
 
-    Wave 1 时期的 "head==104 / V105 不存在" 断言已被本任务合法取代（非静默破坏）——
-    这里锁定 Task 2 之后的新事实：canonical V105 存在、无非法 V105 变体、常量与守卫一致。
+    这里锁定：canonical V105 存在、无非法 V105 变体、常量与守卫一致。
     """
 
     @staticmethod
@@ -107,10 +106,11 @@ class TestMigrationHead:
                 versions.append(int(m.group(1)))
         return sorted(versions)
 
-    def test_migration_head_is_105(self):
+    def test_migration_head_is_at_least_105(self):
         versions = self._versions()
         assert versions, f"未发现 V*.sql 迁移: {MIGRATIONS_DIR}"
-        assert max(versions) == 105, f"Task 2 后最高迁移应为 V105，实际 V{max(versions)}"
+        assert max(versions) >= 105, f"Task 2 后迁移头应至少为 V105，实际 V{max(versions)}"
+        assert 105 in versions, "canonical V105 迁移必须存在"
 
     def test_canonical_v105_file_exists_and_no_variant(self):
         v105 = sorted(p.name for p in MIGRATIONS_DIR.glob("V105__*.sql"))
@@ -123,7 +123,7 @@ class TestMigrationHead:
         assert guard.CANONICAL_V105_FILENAME == "V105__procedure_row_tasks.sql"
         assert guard.NEXT_MIGRATION_FILENAME == "V105__procedure_row_tasks.sql"
         assert guard.CURRENT_MIGRATION_VERSION == 105
-        assert guard.CURRENT_MIGRATION_VERSION == max(self._versions())
+        assert 105 in self._versions()
 
 
 # ---------------------------------------------------------------------------

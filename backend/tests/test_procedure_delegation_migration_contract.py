@@ -1,8 +1,8 @@
 """Migration reservation contract for procedure delegation.
 
-Task 2 landed the canonical V105 feature migration; the migration head advances
-to 105. This contract now locks the post-Task-2 truth: V105 exists as the single
-canonical file and matches the architecture guard's constants.
+Task 2 landed the canonical V105 feature migration. Later features may add
+higher-numbered migrations (e.g. evidence-governance V106–V109); this contract
+locks that V105 remains the single canonical procedure_row_tasks file.
 """
 from __future__ import annotations
 
@@ -30,12 +30,13 @@ def _versioned_migrations() -> list[tuple[int, Path]]:
     return sorted(found)
 
 
-def test_v105_is_highest_and_only_canonical_variant_exists():
+def test_v105_is_canonical_and_only_variant_exists():
     migrations = _versioned_migrations()
     assert migrations, "expected existing versioned migrations"
-    assert migrations[-1][0] == CURRENT_MIGRATION_VERSION
+    v105_entries = [m for m in migrations if m[0] == CURRENT_MIGRATION_VERSION]
+    assert len(v105_entries) == 1, f"expected exactly one V{CURRENT_MIGRATION_VERSION:03d} migration"
+    assert v105_entries[0][1].name == CANONICAL_V105_FILENAME
     assert CURRENT_MIGRATION_VERSION == 105
-    assert migrations[-1][1].name == CANONICAL_V105_FILENAME
 
     # canonical V105 present and no duplicate/misnamed variant (runner dedup safety)
     v105 = sorted(p.name for p in MIGRATION_DIR.glob("V105*.sql"))

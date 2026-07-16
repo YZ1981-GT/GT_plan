@@ -1129,3 +1129,53 @@ class EvidenceQualitySnapshot(Base):
         CheckConstraint(_STRICT_ACTOR_XOR_SQL, name="chk_quality_snapshot_actor_xor"),
         Index("idx_quality_snapshot_scope", "project_id", "audit_year"),
     )
+
+
+# =============================================================================
+# Task 7.4 (Wave 6) — EvidenceTombstone 不可变墓碑
+# Requirements: R12, R13
+# Design: §5.5 Hold 解除后清理保留不可变墓碑；§7.1 审计保留
+# Properties: P26 (hold 零效果), P27 (保留期边界)
+#
+# 当对象在 hold 解除 + retention 到期后被清理(purge)时，创建不可变墓碑记录。
+# 墓碑永不可删除(数据库 immutable 触发器阻止 UPDATE/DELETE)。
+# =============================================================================
+
+
+class EvidenceTombstone(Base):
+    """不可变墓碑 —— 对象被清理后保留的永久审计痕迹。
+
+    - 墓碑一旦创建即不可变（DB 层 immutable 触发器阻止 UPDATE/DELETE）。
+    - 不记录原始内容/凭据，仅保留标识性元数据。
+    - ``purge_reason`` 记录合规清理原因代码。
+    """
+
+    __tablename__ = "evidence_tombstones"
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    original_object_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    original_object_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False
+    )
+    audit_year: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    purge_reason: Mapped[str] = mapped_column(String(100), nullable=False)
+    purged_by_user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    purged_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    metadata_redacted: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    retention_policy_version: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    legal_hold_release_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "purge_reason IN ('retention_expired','manual_purge','compliance_erasure')",
+            name="chk_tombstone_purge_reason",
+        ),
+        Index("idx_tombstone_scope", "project_id", "audit_year"),
+        Index("idx_tombstone_object", "original_object_type", "original_object_id"),
+        Index("idx_tombstone_purged_at", "purged_at"),
+    )

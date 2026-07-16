@@ -48,6 +48,26 @@ async def test_f2_ai_generate_adj_note():
 
 
 @pytest.mark.asyncio
+async def test_f2_ai_generate_f2_18_note_a():
+    with patch("app.routers.wp_render_strategies._f2_inventory_main_ai.chat_completion", new_callable=AsyncMock) as mock_llm:
+        mock_llm.return_value = "原材料占比上升，库存商品占比下降，结构变动需结合产销进一步分析。"
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/api/workpapers/test-wp-id/f2/ai-generate",
+                json={
+                    "section": "f2-18-note-a",
+                    "existingContent": "",
+                    "relatedContext": {"abnormalCount": 1},
+                },
+            )
+        assert response.status_code == 200
+        data = response.json()
+        payload = data.get("data", data)
+        assert len(payload["content"]) > 0
+
+
+@pytest.mark.asyncio
 async def test_f2_ai_generate_rejects_unknown_section():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

@@ -43,6 +43,37 @@ _SUPPORTED_SECTIONS = {
     "policy-evaluation",
     "production-sales-conclusion",
     "cost-comparison-conclusion",
+    "summary-note",
+    "summary-conclusion",
+    "detail-valuation",
+    "detail-change",
+    "detail-long-aging",
+    "detail-impairment",
+    "detail-conclusion",
+    "listed-note-category",
+    "listed-note-nrv",
+    "listed-note-provision",
+    "listed-note-borrow",
+    "listed-note-re",
+    "soe-note-category",
+    "soe-note-borrow",
+    "soe-note-amort",
+    "f2-14-note",
+    "f2-14-conclusion",
+    "f2-14-summary",
+    "f2-16-note",
+    "f2-16-conclusion",
+    "f2-16-process",
+    "f2-18-note-a",
+    "f2-18-note-b",
+    "f2-18-note-c",
+    "f2-18-note-d",
+    "f2-18-abnormal",
+    "f2-18-conclusion",
+    "f2-19-note",
+    "f2-19-conclusion",
+    "f2-20-note",
+    "f2-20-conclusion",
 }
 
 _SYSTEM_PROMPT = """你是一位资深注册会计师（CPA），正在协助编制审计底稿 F2《存货》。
@@ -53,11 +84,89 @@ _SYSTEM_PROMPT = """你是一位资深注册会计师（CPA），正在协助编
 _SECTION_PROMPTS: dict[str, str] = {
     "adj-note": "请生成F2-1存货审定表的审计说明，涵盖存货总体状况、主要审计程序及发现。",
     "adj-conclusion": "请生成F2-1存货审定表的审计结论，评价存货账面价值是否公允反映。",
-    "analysis-conclusion": "请生成F2-18存货总体分析的审计结论，涵盖结构、周转、趋势及异常识别。",
+    "summary-note": "请生成F2-2存货明细汇总表的审计说明。",
+    "summary-conclusion": "请生成F2-2存货明细汇总表的审计结论，可采用A/B/C模板。",
+    "detail-valuation": "请撰写该类存货明细表审计说明第1问：计价方法。",
+    "detail-change": "请撰写该类存货明细表审计说明第2问：本期发生重大变动的原因。",
+    "detail-long-aging": "请撰写该类存货明细表审计说明第3问：库龄较长的原因。",
+    "detail-impairment": "请撰写该类存货明细表审计说明第4问：计提跌价准备的主要项目及原因。",
+    "detail-conclusion": "请生成该类存货明细表的审计结论，可采用A/B/C模板。",
     "cutoff-conclusion": "请生成F2-29~32截止测试的总体审计结论。",
-    "policy-evaluation": "请生成F2-16会计政策的审计评价结论。",
-    "production-sales-conclusion": "请生成F2-19产销量变动分析结论，关注产销率及库存平衡。",
-    "cost-comparison-conclusion": "请生成F2-20产品成本比较分析结论，关注异常变动。",
+    "listed-note-category": "请撰写存货附注「分类说明」披露文字。",
+    "listed-note-nrv": "请撰写上市附注披露：可变现净值确定依据及转回/转销原因。",
+    "listed-note-provision": "请撰写上市附注披露：存货跌价准备计提的具体依据。",
+    "listed-note-borrow": "请撰写存货期末余额中含有借款费用资本化金额的说明。",
+    "listed-note-re": "请撰写房地产开发企业对外披露补充说明。",
+    "soe-note-category": "请撰写国有企业存货附注「分类说明」。",
+    "soe-note-borrow": "请撰写国企口径存货借款费用资本化说明。",
+    "soe-note-amort": "请撰写合同履约成本本期摊销金额及说明。",
+    "f2-14-note": (
+        "请生成F2-14存货调整分录汇总的审计说明：概述AJE/RJE编制依据、"
+        "主要调整事项及对F2-1审定数的影响；说明借贷是否平衡。"
+    ),
+    "f2-14-conclusion": (
+        "请生成F2-14调整分录的审计结论，优先采用A/B/C模板，"
+        "结合分录平衡性与对审定表回写结果给出明确表述。"
+    ),
+    "f2-14-summary": (
+        "请为单笔存货调整分录撰写「调整事项说明」，表述简洁适合表格单元格。"
+    ),
+    "f2-16-note": (
+        "请生成F2-16存货会计政策、核算流程检查表的审计说明："
+        "概述政策符合准则/一贯采用的核查情况、成本核算流程了解结果。"
+    ),
+    "f2-16-conclusion": (
+        "请生成F2-16审计结论（政策评价结论），优先A/B/C模板，"
+        "结合政策合规性、一贯性及成本核算流程合理性。"
+    ),
+    "f2-16-process": (
+        "请撰写F2-16「存货成本核算」某一分项叙述，依据 fieldLabel 指向的具体环节。"
+    ),
+    "policy-evaluation": (
+        "请生成F2-16存货会计政策评价结论，评价发出计价、可变现净值、跌价准备、盘存制度等"
+        "是否符合企业会计准则第1号且前后一贯；可采用A/B/C结论模板。"
+    ),
+    "analysis-conclusion": (
+        "请生成F2-18存货总体分析的审计结论，涵盖构成、周转指标、同行业比较与产品大类周转，"
+        "识别异常波动及减值迹象；可采用A/B/C结论模板。"
+    ),
+    "f2-18-note-a": (
+        "请撰写F2-18「存货构成分析」审计说明：概括三期结构变化、重大占比变动及关注点。"
+    ),
+    "f2-18-note-b": (
+        "请撰写F2-18「存货指标三期对比」审计说明：评价周转率/天数、跌价占比、存货占流动资产等变动。"
+    ),
+    "f2-18-note-c": (
+        "请撰写F2-18「同行业对比」审计说明：对照行业平均与对标公司偏差，评价是否异常。"
+    ),
+    "f2-18-note-d": (
+        "请撰写F2-18「主要产品大类周转」审计说明：指出周转显著放缓或加快的产品类别。"
+    ),
+    "f2-18-abnormal": (
+        "请根据底稿中已标记异常的构成/指标项，撰写「异常原因」说明，条理清晰、可复核。"
+    ),
+    "f2-18-conclusion": (
+        "请生成F2-18总体分析结论（分析结论/审计结论），优先A/B/C模板，"
+        "结合构成、指标、行业与产品周转异常标记给出明确结论。"
+    ),
+    "production-sales-conclusion": (
+        "请生成F2-19产销量变动分析审计结论，关注产销匹配、购耗产出比异常及是否需延伸至F2-64；可采用A/B/C模板。"
+    ),
+    "f2-19-note": (
+        "请撰写F2-19审计说明中某一分项（产量波动/同比变动/购耗勾稽/进一步索引等），专业简洁。"
+    ),
+    "f2-19-conclusion": (
+        "请生成F2-19存货产销量变动分析的审计结论，优先A/B/C模板。"
+    ),
+    "cost-comparison-conclusion": (
+        "请生成F2-20产品单位成本比较审计结论，关注材料/人工/制造费用波动及异常产品；可采用A/B/C模板。"
+    ),
+    "f2-20-note": (
+        "请撰写F2-20审计说明：解释单位成本异常波动原因，并可提示交叉索引F2-64/F2-61等底稿。"
+    ),
+    "f2-20-conclusion": (
+        "请生成F2-20产成品单位成本年度比较的审计结论，优先A/B/C模板。"
+    ),
 }
 
 
