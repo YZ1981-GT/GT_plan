@@ -21,6 +21,7 @@ class UserRole(str, enum.Enum):
     manager = "manager"
     auditor = "auditor"
     qc = "qc"
+    eqcr = "eqcr"  # EQCR 技术复核人（DB userrole 枚举已含此值，此处对齐消除 schema 漂移）
     readonly = "readonly"
 
 

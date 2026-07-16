@@ -14,6 +14,8 @@ inclusion: always
 - **触类旁通**；**改动前先 spec 三件套**（>500行/3+组件/跨前后端）；**改动后必 Playwright 实测**
 - **UI 全中文化**；**报表金额默认"元"**；**中文场景全链路不能崩**
 - **底稿表格UI统一规范**：表格字体13px；AI+复核按钮右对齐在section标题同行；公式列虚线下划线+cursor:help+tooltip来源；列宽min-width自适应；审计说明/结论el-card包裹；编制提示details折叠底部
+- **🔴 GtPageHeader操作按钮铁律**：`GtPageHeader`根容器是`flex-direction:column`默认`align-items:stretch`→放进`#actions`插槽的裸按钮会被拉伸成整条(丑)。正确做法=放进**默认插槽**(标题所在row1 flex行)用`margin-left:auto`推右+白底主色字(`background:rgba(255,255,255,.95);color:var(--el-color-primary)`)适配紫色横幅。列表页表格禁用`border stripe`(像Excel格子丑)→改无边框+外包`el-card shadow="never"`(body padding:0贴边);建项/管理类简单列表页UI打磨范式=筛选栏(搜索+下拉筛选+右侧计数)+头像列(首字母avatar)+角色彩色tag。UserManagement.vue已落地
+- **🔴 Vue模板属性禁用中文引号/特殊Unicode**：`content="...如"XX公司""`的中文引号U+201C/U+201D会触发`[plugin:vite:vue]Attribute name cannot contain U+0022/U+0027/U+003C`编译崩溃→属性值内改纯文本(去掉中文引号)。get_diagnostics查不出,唯Vite编译overlay暴露
 - **🔴 底稿导入导出统一规范**：el-dropdown"导入导出▾"(导出模板/导出数据/导入数据)，复用`useXImportExport`composable(后端三端点)。多区块分sheet导出。动态行表格才需要导入导出
 - **🔴 D~N底稿跨模块联动标准（6大集成）**：①版本链(useVersionTrail主入口集成+autoSnapshot) ②抽凭引擎(检查表GtVoucherSamplingEngine dialog→样本填入) ③截止自动提取(useCutoffAutoSampling→序时账±5天) ④附注EventBus(subscribe substantive:adjudicated刷新+publish disclosure:note-text-updated) ⑤行级OCR(📎列POST contract-ocr→ElMessageBox确认→merge) ⑥复核对话(主入口provide openReviewDialog→子组件inject→section标题栏右侧按钮)
 - **不要考虑轻量**：要考虑针对性、联动性、美观性、实操性、易懂性；审计UI要有逻辑追溯能力
@@ -123,7 +125,8 @@ inclusion: always
 - **Active spec = 0**（全部归档至 `_archive/05-business-features/`）
 
 ### git
-- 分支 `work/2026-05-30-wp-specs`；最高迁移 **V102**（V100 formula-lib / V101 advanced-query模板共享 / V102 advanced_query_writeback addr_id；以 `migration_status` 为准）
+- 分支 `work/2026-05-30-wp-specs`；最高迁移 **V111**（V103 acnr-overlay/V104 formula-runtime-outbox/V105 procedure_row_tasks/V106-V109 evidence治理/V110 修V105/**V111 补建evidence_tombstones**；以 `migration_status` 为准）
+- **🔴 evidence_tombstones 漂移修复(V111,2026-07-16)**：ORM `EvidenceTombstone` 表在 V108 那批 evidence 治理迁移漏建→启动报 orm_extra(critical/health=degraded)。V111 补建(13列对齐ORM+chk_tombstone_purge_reason+3索引+复用evgov_forbid_update()+新增evgov_forbid_delete()双触发器保不可变)。**漂移扫描只在lifespan启动跑一次,只加.sql不触发--reload→需重启后端才清degraded**。schema drift检测器`_types_compatible`把TIMESTAMP↔TIMESTAMPTZ/CHAR↔UUID/VARCHAR↔enum视为兼容,补建表用TIMESTAMPTZ不引入type_mismatch。应用迁移用`python -m app.core.migration_runner`(cwd=backend,默认run_pending)
 - 本次push：**K5-K13审计目标认定全部完成**(push `36a222c5..aecca5be`，17 commit rebase 到 origin D2修复 `36a222c5` 上无冲突)：K5预计负债CAS13/K6持有待售CAS42/K7递延收益CAS16/K8销售费用/K9管理费用/K10其他收益/K11资产减值/K12营业外收入/K13营业外支出 逐 sheet 补认定 alert。**K1-K13认定全部pass**。待续 M1-M10+N1-N5 + K8-2/K8-4 stub。
 - 上一轮push：**D2模块全面优化打磨**两笔commit(`ea6282db`+`dcd55c92`，29文件+2319/-228)：①provide/inject替代window event(全部D2 composable迁移完成) ②D2-2列设置+virtualColumns联动 ③D2-3源模板对齐(其他增加/减少+自定义组合+列设置) ④D2-5分析修复(5年段6段/前十名动态行/各区段导入导出/AI审计过程/账龄联动) ⑤D2-8政策检查(账龄联动+D2-10交叉+审计说明结论) ⑥D2-9/10 ECL(迁徙率联动+D2-3合计) ⑦D2-12/13 inject+删重复按钮 ⑧D2-7 spec三件套(12需求/5composable/17属性/20任务/8波)
 - origin `282f8d80`(我方)：formula-management-library 实现 Req1-32 全链路(P0/P1缺口)+spec三件套修订(components/formula/*+template-library/*+draft_refresh 等)

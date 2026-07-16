@@ -24,8 +24,17 @@
             <el-input v-model="form.company_code" placeholder="统一社会信用代码" maxlength="18" />
           </el-form-item>
 
-          <el-form-item label="项目简称" prop="short_name">
-            <el-input v-model="form.short_name" placeholder="请输入项目简称" maxlength="100" />
+          <el-form-item prop="short_name">
+            <template #label>
+              <el-tooltip
+                content="该简称将用于审计报告正文中替代被审计单位全称，如 XX公司"
+                placement="top"
+                :show-after="300"
+              >
+                <span style="cursor: help; border-bottom: 1px dashed var(--el-text-color-secondary)">项目简称</span>
+              </el-tooltip>
+            </template>
+            <el-input v-model="form.short_name" placeholder="请输入项目简称，如 XX公司" maxlength="100" />
           </el-form-item>
 
           <el-form-item label="审计年度" prop="audit_year">
