@@ -1,19 +1,16 @@
 <script setup lang="ts">
-/** F2TabOverallAnalysis — F2-18 总体分析 | Task 17.2 */
-import { ref, computed, toRef, onMounted, type Ref } from 'vue'
-import { use } from 'echarts/core'
-import { PieChart, BarChart, LineChart } from 'echarts/charts'
-import { TooltipComponent, GridComponent, LegendComponent } from 'echarts/components'
-import { CanvasRenderer } from 'echarts/renderers'
-import VChart from 'vue-echarts'
-import { useF2OverallAnalysis } from '../../composables/useF2Analysis'
+/**
+ * F2TabOverallAnalysis — F2-18 存货总体分析表
+ * A 构成 / B 指标三期 / C 同行业 / D 产品大类周转 + 分段说明 + 结论
+ */
+import { toRef, type Ref } from 'vue'
+import { useF2OverallAnalysis } from '../../composables/useF2OverallAnalysis'
 import { useF2AiGenerate } from '../../composables/useF2AiGenerate'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
 import type { useF2CrossSheet } from '../../composables/useF2CrossSheet'
 import F2ReviewChip from '../shared/F2ReviewChip.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
-
-use([PieChart, BarChart, LineChart, TooltipComponent, GridComponent, LegendComponent, CanvasRenderer])
+import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 
 const props = defineProps<{
   wpId: string
@@ -23,243 +20,568 @@ const props = defineProps<{
   crossSheet: ReturnType<typeof useF2CrossSheet>
 }>()
 
-// ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────────
-const NOTE_KEY = 'F2-overall-analysis-audit-note'
-const CONCLUSION_KEY = 'F2-overall-analysis-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-
-function persistAudit(key: string, val: string): void {
-  const item = { item_id: key, conclusion: null, remark: val }
-  props.allResponses.set(key, item)
-  window.dispatchEvent(new CustomEvent('f2:save-items', { detail: { items: [item] } }))
-}
-function saveAuditNote(val: string): void {
-  if (props.isReadonly) return
-  auditNote.value = val
-  persistAudit(NOTE_KEY, val)
-}
-function saveAuditConclusion(val: string): void {
-  if (props.isReadonly) return
-  auditConclusion.value = val
-  persistAudit(CONCLUSION_KEY, val)
-}
-onMounted(() => {
-  const n = props.allResponses.get(NOTE_KEY)
-  if (n?.remark) auditNote.value = n.remark
-  const c = props.allResponses.get(CONCLUSION_KEY)
-  if (c?.remark) auditConclusion.value = c.remark
-})
-
-function fmt(v: number): string {
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-function fmtPct(v: number): string {
-  return `${v.toFixed(1)}%`
-}
-
-const {
-  structureRows, anomalies, analysisConclusion,
-  cogsAmount, computedTurnoverRate, computedTurnoverDays, updateTurnoverInputs,
-} = useF2OverallAnalysis({
+const oa = useF2OverallAnalysis({
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>,
   crossSheet: props.crossSheet,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
 
-const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2AiGenerate(toRef(props, 'wpId') as Ref<string>)
+const {
+  yearLabels,
+  compositionRows,
+  compositionTotals,
+  indicatorRows,
+  industryRows,
+  productRows,
+  abnormalCount,
+  notesA,
+  notesB,
+  notesC,
+  notesD,
+  analysisConclusion,
+  updateYearLabel,
+  updateComposition,
+  updateInput,
+  updateAbnormalB,
+  updateIndustryPeer,
+  updateIndustryAbnormal,
+  updateNotes,
+  addProductRow,
+  removeProductRow,
+  updateProduct,
+  syncCompositionFromDetail,
+  aiContext,
+  pack,
+} = oa
 
-async function generateAnalysisConclusion() {
-  const text = await generateAndConfirm(
-    'analysis-conclusion',
-    analysisConclusion.value,
-    {
-      anomalyCount: anomalies.value.length,
-      turnoverRate: computedTurnoverRate.value,
-      turnoverDays: computedTurnoverDays.value,
-    },
-    'AI 生成 · 总体分析结论',
-  )
-  if (text) analysisConclusion.value = text
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2AiGenerate(
+  toRef(props, 'wpId') as Ref<string>,
+)
+
+const YES_NO = [
+  { label: '是', value: '是' },
+  { label: '否', value: '否' },
+  { label: '—', value: '' },
+]
+
+function fmt(v: number): string {
+  if (!v) return '-'
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-const pieOption = computed(() => ({
-  tooltip: { trigger: 'item' as const },
-  series: [{
-    type: 'pie' as const,
-    radius: '58%',
-    data: structureRows.value
-      .filter((r) => r.currentAmt > 0)
-      .map((r) => ({ name: r.label, value: r.currentAmt })),
-  }],
-}))
+function fmtPct(v: number | null | undefined): string {
+  if (v == null || Number.isNaN(v)) return '-'
+  return `${v.toFixed(2)}%`
+}
 
-const turnoverBarOption = computed(() => ({
-  tooltip: { trigger: 'axis' as const },
-  grid: { left: 40, right: 16, top: 24, bottom: 28 },
-  xAxis: { type: 'category' as const, data: ['周转率(次)', '周转天数(天)'] },
-  yAxis: { type: 'value' as const },
-  series: [{
-    type: 'bar' as const,
-    data: [Number(computedTurnoverRate.value.toFixed(2)), Number(computedTurnoverDays.value.toFixed(0))],
-    itemStyle: { color: '#409eff' },
-  }],
-}))
+function fmtInd(v: number, unit: string): string {
+  if (!v && v !== 0) return '-'
+  if (unit === '%') return `${v.toFixed(2)}%`
+  if (unit === '天') return v.toFixed(1)
+  return v.toFixed(2)
+}
 
-const trendLineOption = computed(() => ({
-  tooltip: { trigger: 'axis' as const },
-  legend: { data: ['本期', '上期'], bottom: 0 },
-  grid: { left: 48, right: 16, top: 28, bottom: 36 },
-  xAxis: {
-    type: 'category' as const,
-    data: structureRows.value.map((r) => r.label),
-    axisLabel: { rotate: 30, fontSize: 11 },
-  },
-  yAxis: { type: 'value' as const },
-  series: [
-    {
-      name: '本期',
-      type: 'line' as const,
-      data: structureRows.value.map((r) => r.currentAmt),
-      smooth: true,
-      itemStyle: { color: '#409eff' },
-    },
-    {
-      name: '上期',
-      type: 'line' as const,
-      data: structureRows.value.map((r) => r.priorAmt),
-      smooth: true,
-      itemStyle: { color: '#909399' },
-    },
-  ],
-}))
+async function genSection(
+  section: 'f2-18-note-a' | 'f2-18-note-b' | 'f2-18-note-c' | 'f2-18-note-d' | 'f2-18-abnormal' | 'f2-18-conclusion' | 'analysis-conclusion',
+  existing: string,
+  title: string,
+  apply: (text: string) => void,
+) {
+  const text = await generateAndConfirm(section, existing, aiContext(), title)
+  if (text) apply(text)
+}
+
+function saveConclusion(v: string) {
+  analysisConclusion.value = v
+}
+
+function inputVal(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impairment' | 'caAvg' | 'writeOff'): number {
+  const key = `${field}${yearIdx}` as keyof typeof pack.value.inputs
+  return pack.value.inputs[key]
+}
+
+function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impairment' | 'caAvg' | 'writeOff', v: number) {
+  updateInput(`${field}${yearIdx}` as any, v)
+}
 </script>
 
 <template>
   <div class="f2-overall-analysis">
-    <!-- 编制提示 -->
     <details class="guidance-details">
-      <summary>📋 编制提示</summary>
+      <summary>编制提示</summary>
       <div class="guidance-content">
-        <p>1. 从结构、周转、趋势、异常四个维度对存货整体进行分析，结构数据自动从 F2-3~F2-13 取数。</p>
-        <p>2. 存货周转率 = 营业成本 ÷ 平均存货；周转天数 = 365 ÷ 周转率，用于评价存货流动性。</p>
-        <p>3. 依《企业会计准则第 1 号——存货》，关注占比与周转异常，识别积压、滞销及减值迹象。</p>
-        <p>4. 各区块异常应结合产销率、成本变动综合判断，为跌价准备计提提供依据。</p>
+        <p>1. A 构成：优先从 F2-3~F2-13 回写本期/上期金额；结构比自动计算；人工可覆盖并勾选是否异常。</p>
+        <p>2. B 指标：录入营业成本、平均存货、跌价、流动资产、核销等，系统计算周转率/天数及比例与变动率。</p>
+        <p>3. C 同行业：填行业平均与对标公司，看偏差；跌价风险高时可拆分至原材料/库存商品等再比。</p>
+        <p>4. D 产品大类：按主要产品录入平均存货与营业成本，计算周转率及变动；各段填写审计说明与异常原因后给总体结论。</p>
       </div>
     </details>
 
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
       show-icon
       class="objective-alert"
-      title="审计目标：从结构、周转、趋势维度分析存货整体的合理性，识别异常波动及减值迹象。"
+      title="审计目标：分析存货构成、周转与占比是否合理；与历史及同行业比较识别异常，为减值与深挖程序提供依据。"
     />
 
-    <!-- 工具栏 -->
     <div class="tab-toolbar">
-      <div class="toolbar-left" />
+      <div class="toolbar-left">
+        <el-tag v-if="abnormalCount > 0" size="small" type="danger">异常标记 {{ abnormalCount }} 项</el-tag>
+        <el-button size="small" :disabled="isReadonly" @click="syncCompositionFromDetail">同步明细金额</el-button>
+        <F2ReviewChip section-id="F2-18-analysis" />
+      </div>
       <div class="toolbar-right">
+        <CycleImportExportDropdown
+          :wp-id="wpId"
+          api-prefix="f2"
+          sheet="F2-18"
+          :disabled="isReadonly"
+        />
         <span class="chip-wrap"><GtIndexChip value="wp:F2-1" :context-project-id="projectId" /></span>
-        <el-tag size="small" type="info">共 {{ structureRows.length }} 类</el-tag>
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-18" :context-project-id="projectId" :validate="false" /></span>
       </div>
     </div>
 
+    <div class="year-labels">
+      <span>期间标签：</span>
+      <el-input
+        v-for="(lab, idx) in yearLabels"
+        :key="idx"
+        size="small"
+        style="width: 120px"
+        :model-value="lab"
+        :disabled="isReadonly"
+        @change="(v: string) => updateYearLabel(idx as 0 | 1 | 2, v)"
+      />
+    </div>
+
+    <!-- A 构成 -->
     <el-card shadow="never" class="block-card">
-      <template #header><span class="block-title">一、结构分析</span></template>
-      <div class="chart-row">
-        <v-chart v-if="structureRows.some(r => r.currentAmt > 0)" :option="pieOption" autoresize class="pie-chart" />
-        <el-table :data="structureRows" border size="small" class="structure-table">
-        <el-table-column prop="label" label="存货类别" width="140" />
-        <el-table-column label="本期金额" width="120" align="right"><template #default="{ row }">{{ fmt(row.currentAmt) }}</template></el-table-column>
-        <el-table-column label="上期金额" width="120" align="right"><template #default="{ row }">{{ fmt(row.priorAmt) }}</template></el-table-column>
-        <el-table-column label="占比" width="80" align="right" class-name="auto-calc-col"><template #default="{ row }">{{ fmtPct(row.sharePct) }}</template></el-table-column>
-        <el-table-column label="占比变动" width="90" align="right" class-name="auto-calc-col">
+      <template #header><span class="block-title">一、存货构成分析（三期对比）</span></template>
+      <el-table :data="compositionRows" border size="small">
+        <el-table-column prop="label" label="存货项目" width="160" fixed />
+        <el-table-column :label="yearLabels[0]" align="center">
+          <el-table-column label="金额" min-width="120" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.amt0"
+                :controls="false"
+                size="small"
+                style="width: 100%"
+                @change="(v: number) => updateComposition(row.key, 'amt0', v ?? 0)"
+              />
+              <span v-else>{{ fmt(row.amt0) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="结构比" width="90" align="right" class-name="auto-calc-col">
+            <template #default="{ row }">{{ fmtPct(row.share0) }}</template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column :label="yearLabels[1]" align="center">
+          <el-table-column label="金额" min-width="120" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.amt1"
+                :controls="false"
+                size="small"
+                style="width: 100%"
+                @change="(v: number) => updateComposition(row.key, 'amt1', v ?? 0)"
+              />
+              <span v-else>{{ fmt(row.amt1) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="结构比" width="90" align="right" class-name="auto-calc-col">
+            <template #default="{ row }">{{ fmtPct(row.share1) }}</template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column :label="yearLabels[2]" align="center">
+          <el-table-column label="金额" min-width="120" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.amt2"
+                :controls="false"
+                size="small"
+                style="width: 100%"
+                @change="(v: number) => updateComposition(row.key, 'amt2', v ?? 0)"
+              />
+              <span v-else>{{ fmt(row.amt2) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="结构比" width="90" align="right" class-name="auto-calc-col">
+            <template #default="{ row }">{{ fmtPct(row.share2) }}</template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="是否异常" width="100" align="center">
           <template #default="{ row }">
-            <span :class="{ highlight: row.isHighlight }">{{ fmtPct(row.shareChange) }}</span>
+            <el-select
+              v-if="!isReadonly"
+              :model-value="row.abnormal"
+              size="small"
+              @change="(v: string) => updateComposition(row.key, 'abnormal', v)"
+            >
+              <el-option v-for="o in YES_NO" :key="o.value" :label="o.label" :value="o.value" />
+            </el-select>
+            <span v-else>{{ row.abnormal || '—' }}</span>
           </template>
         </el-table-column>
       </el-table>
+      <div class="total-bar">
+        合计：{{ yearLabels[0] }} {{ fmt(compositionTotals.amt0) }}
+        | {{ yearLabels[1] }} {{ fmt(compositionTotals.amt1) }}
+        | {{ yearLabels[2] }} {{ fmt(compositionTotals.amt2) }}
       </div>
-    </el-card>
-
-    <el-card shadow="never" class="block-card">
-      <template #header><span class="block-title">二、周转分析</span></template>
-      <div class="turnover-block">
-        <div class="turnover-inputs">
-        <span>营业成本：
-          <el-input-number :model-value="cogsAmount" size="small" :controls="false" :disabled="isReadonly"
-            @change="(v: number) => updateTurnoverInputs({ cogsAmount: v ?? 0 })" />
-        </span>
-        <span>周转率：{{ computedTurnoverRate.toFixed(2) }}</span>
-        <span>周转天数：{{ computedTurnoverDays.toFixed(0) }} 天</span>
+      <div class="section-notes">
+        <div class="note-head">
+          <span>审计说明</span>
+          <el-button
+            size="small"
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="genSection('f2-18-note-a', notesA.note, 'AI · A构成说明', (t) => updateNotes('notesA', 'note', t))"
+          >AI辅助</el-button>
         </div>
-        <v-chart :option="turnoverBarOption" autoresize class="bar-chart" />
+        <el-input
+          type="textarea"
+          :model-value="notesA.note"
+          :disabled="isReadonly"
+          :autosize="{ minRows: 3 }"
+          placeholder="概述构成分析程序与结果…"
+          @change="(v: string) => updateNotes('notesA', 'note', v)"
+        />
+        <div class="note-head" style="margin-top:8px">
+          <span>异常原因</span>
+          <el-button
+            size="small"
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="genSection('f2-18-abnormal', notesA.abnormalReason, 'AI · A异常原因', (t) => updateNotes('notesA', 'abnormalReason', t))"
+          >AI辅助</el-button>
+        </div>
+        <el-input
+          type="textarea"
+          :model-value="notesA.abnormalReason"
+          :disabled="isReadonly"
+          :autosize="{ minRows: 2 }"
+          placeholder="对标为异常的项目说明原因…"
+          @change="(v: string) => updateNotes('notesA', 'abnormalReason', v)"
+        />
       </div>
     </el-card>
 
+    <!-- B 指标三期 -->
     <el-card shadow="never" class="block-card">
-      <template #header><span class="block-title">三、趋势分析</span></template>
-      <v-chart
-        v-if="structureRows.some(r => r.currentAmt > 0 || r.priorAmt > 0)"
-        :option="trendLineOption"
-        autoresize
-        class="trend-chart"
+      <template #header><span class="block-title">二、存货指标分析（三期数据对比）</span></template>
+      <el-collapse>
+        <el-collapse-item title="指标计算输入（营业成本/平均存货/跌价/流动资产/核销）" name="inputs">
+          <div class="input-grid">
+            <template v-for="(yl, yi) in yearLabels" :key="yl">
+              <div class="input-year">
+                <strong>{{ yl }}</strong>
+                <label>营业成本
+                  <el-input-number :model-value="inputVal(yi, 'cogs')" :controls="false" size="small" :disabled="isReadonly"
+                    @change="(v: number) => setInput(yi, 'cogs', v ?? 0)" />
+                </label>
+                <label>平均存货
+                  <el-input-number :model-value="inputVal(yi, 'invAvg')" :controls="false" size="small" :disabled="isReadonly"
+                    @change="(v: number) => setInput(yi, 'invAvg', v ?? 0)" />
+                </label>
+                <label>存货余额
+                  <el-input-number :model-value="inputVal(yi, 'invBal')" :controls="false" size="small" :disabled="isReadonly"
+                    @change="(v: number) => setInput(yi, 'invBal', v ?? 0)" />
+                </label>
+                <label>跌价准备
+                  <el-input-number :model-value="inputVal(yi, 'impairment')" :controls="false" size="small" :disabled="isReadonly"
+                    @change="(v: number) => setInput(yi, 'impairment', v ?? 0)" />
+                </label>
+                <label>平均流动资产
+                  <el-input-number :model-value="inputVal(yi, 'caAvg')" :controls="false" size="small" :disabled="isReadonly"
+                    @change="(v: number) => setInput(yi, 'caAvg', v ?? 0)" />
+                </label>
+                <label>核销净额
+                  <el-input-number :model-value="inputVal(yi, 'writeOff')" :controls="false" size="small" :disabled="isReadonly"
+                    @change="(v: number) => setInput(yi, 'writeOff', v ?? 0)" />
+                </label>
+              </div>
+            </template>
+          </div>
+        </el-collapse-item>
+      </el-collapse>
+
+      <el-table :data="indicatorRows" border size="small" style="margin-top:8px">
+        <el-table-column prop="label" label="指标" min-width="220" />
+        <el-table-column :label="yearLabels[0]" align="center">
+          <el-table-column label="指标值" width="100" align="right" class-name="auto-calc-col">
+            <template #default="{ row }">{{ fmtInd(row.v0, row.unit) }}</template>
+          </el-table-column>
+          <el-table-column label="变动率" width="90" align="right" class-name="auto-calc-col">
+            <template #default="{ row }">{{ fmtPct(row.change01) }}</template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column :label="yearLabels[1]" align="center">
+          <el-table-column label="指标值" width="100" align="right" class-name="auto-calc-col">
+            <template #default="{ row }">{{ fmtInd(row.v1, row.unit) }}</template>
+          </el-table-column>
+          <el-table-column label="变动率" width="90" align="right" class-name="auto-calc-col">
+            <template #default="{ row }">{{ fmtPct(row.change12) }}</template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column :label="yearLabels[2]" align="center">
+          <el-table-column label="指标值" width="100" align="right" class-name="auto-calc-col">
+            <template #default="{ row }">{{ fmtInd(row.v2, row.unit) }}</template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="是否异常" width="100" align="center">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              :model-value="row.abnormal"
+              size="small"
+              @change="(v: string) => updateAbnormalB(row.key, v)"
+            >
+              <el-option v-for="o in YES_NO" :key="o.value" :label="o.label" :value="o.value" />
+            </el-select>
+            <span v-else>{{ row.abnormal || '—' }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div class="section-notes">
+        <div class="note-head">
+          <span>审计说明</span>
+          <el-button size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading"
+            @click="genSection('f2-18-note-b', notesB.note, 'AI · B指标说明', (t) => updateNotes('notesB', 'note', t))">AI辅助</el-button>
+        </div>
+        <el-input type="textarea" :model-value="notesB.note" :disabled="isReadonly" :autosize="{ minRows: 3 }"
+          @change="(v: string) => updateNotes('notesB', 'note', v)" />
+        <div class="note-head" style="margin-top:8px"><span>异常原因</span></div>
+        <el-input type="textarea" :model-value="notesB.abnormalReason" :disabled="isReadonly" :autosize="{ minRows: 2 }"
+          @change="(v: string) => updateNotes('notesB', 'abnormalReason', v)" />
+      </div>
+    </el-card>
+
+    <!-- C 同行业 -->
+    <el-card shadow="never" class="block-card">
+      <template #header>
+        <div class="card-header-flex">
+          <span class="block-title">三、存货指标分析（与同行业数据对比）</span>
+        </div>
+      </template>
+      <el-alert
+        type="info"
+        :closable="false"
+        show-icon
+        class="hint-alert"
+        title="对于存货跌价准备错报风险较高的项目，可进一步拆分原材料、库存商品等分别与行业数据比较。"
       />
-      <el-empty v-else description="暂无趋势数据" :image-size="60" />
+      <div class="peer-names">
+        <label>行业平均名称 <el-input size="small" style="width:140px" :model-value="pack.industry.avg.name" :disabled="isReadonly"
+          @change="(v: string) => updateIndustryPeer('avg', 'name', v)" /></label>
+        <label>公司A <el-input size="small" style="width:120px" :model-value="pack.industry.companyA.name" :disabled="isReadonly"
+          @change="(v: string) => updateIndustryPeer('companyA', 'name', v)" /></label>
+        <label>公司B <el-input size="small" style="width:120px" :model-value="pack.industry.companyB.name" :disabled="isReadonly"
+          @change="(v: string) => updateIndustryPeer('companyB', 'name', v)" /></label>
+        <label>公司C <el-input size="small" style="width:120px" :model-value="pack.industry.companyC.name" :disabled="isReadonly"
+          @change="(v: string) => updateIndustryPeer('companyC', 'name', v)" /></label>
+      </div>
+      <el-table :data="industryRows" border size="small">
+        <el-table-column prop="label" label="指标" min-width="200" />
+        <el-table-column :label="yearLabels[0]" align="center">
+          <el-table-column label="指标值" width="90" align="right" class-name="auto-calc-col">
+            <template #default="{ row }">{{ fmtInd(row.client, row.unit) }}</template>
+          </el-table-column>
+          <el-table-column label="偏差" width="90" align="right" class-name="auto-calc-col">
+            <template #default="{ row }">{{ fmtPct(row.deviation) }}</template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="行业平均" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.industry" :controls="false" size="small" style="width:100%"
+              @change="(v: number) => updateIndustryPeer('avg', row.key, v ?? 0)" />
+            <span v-else>{{ fmtInd(row.industry, row.unit) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="pack.industry.companyA.name || '公司A'" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.companyA" :controls="false" size="small" style="width:100%"
+              @change="(v: number) => updateIndustryPeer('companyA', row.key, v ?? 0)" />
+            <span v-else>{{ fmtInd(row.companyA, row.unit) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="pack.industry.companyB.name || '公司B'" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.companyB" :controls="false" size="small" style="width:100%"
+              @change="(v: number) => updateIndustryPeer('companyB', row.key, v ?? 0)" />
+            <span v-else>{{ fmtInd(row.companyB, row.unit) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="pack.industry.companyC.name || '公司C'" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.companyC" :controls="false" size="small" style="width:100%"
+              @change="(v: number) => updateIndustryPeer('companyC', row.key, v ?? 0)" />
+            <span v-else>{{ fmtInd(row.companyC, row.unit) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="是否异常" width="100" align="center">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" :model-value="row.abnormal" size="small"
+              @change="(v: string) => updateIndustryAbnormal(row.key, v)">
+              <el-option v-for="o in YES_NO" :key="o.value" :label="o.label" :value="o.value" />
+            </el-select>
+            <span v-else>{{ row.abnormal || '—' }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="section-notes">
+        <div class="note-head">
+          <span>审计说明</span>
+          <el-button size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading"
+            @click="genSection('f2-18-note-c', notesC.note, 'AI · C行业说明', (t) => updateNotes('notesC', 'note', t))">AI辅助</el-button>
+        </div>
+        <el-input type="textarea" :model-value="notesC.note" :disabled="isReadonly" :autosize="{ minRows: 3 }"
+          @change="(v: string) => updateNotes('notesC', 'note', v)" />
+        <div class="note-head" style="margin-top:8px"><span>异常原因</span></div>
+        <el-input type="textarea" :model-value="notesC.abnormalReason" :disabled="isReadonly" :autosize="{ minRows: 2 }"
+          @change="(v: string) => updateNotes('notesC', 'abnormalReason', v)" />
+      </div>
     </el-card>
 
+    <!-- D 产品大类 -->
     <el-card shadow="never" class="block-card">
-      <template #header><span class="block-title">四、异常识别</span></template>
-      <el-empty v-if="!anomalies.length" description="暂无异常标记" :image-size="60" />
-      <el-alert v-for="a in anomalies" :key="a.id" :title="a.message" :type="a.severity === 'danger' ? 'error' : 'warning'" :closable="false" show-icon class="anomaly-item" />
+      <template #header>
+        <div class="card-header-flex">
+          <span class="block-title">四、主要产品大类存货周转（三期对比）</span>
+          <el-button size="small" type="primary" :disabled="isReadonly" @click="addProductRow">+ 新增产品</el-button>
+        </div>
+      </template>
+      <el-table :data="productRows" border size="small">
+        <el-table-column label="产品名称" min-width="120">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.productName" size="small"
+              @change="(v: string) => updateProduct(row.rowId, 'productName', v)" />
+            <span v-else>{{ row.productName }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="yearLabels[0]" align="center">
+          <el-table-column label="平均存货" width="110" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="!isReadonly" :model-value="row.avgInv0" :controls="false" size="small" style="width:100%"
+                @change="(v: number) => updateProduct(row.rowId, 'avgInv0', v ?? 0)" />
+              <span v-else>{{ fmt(row.avgInv0) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="营业成本" width="110" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="!isReadonly" :model-value="row.cogs0" :controls="false" size="small" style="width:100%"
+                @change="(v: number) => updateProduct(row.rowId, 'cogs0', v ?? 0)" />
+              <span v-else>{{ fmt(row.cogs0) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="周转率" width="80" align="right" class-name="auto-calc-col">
+            <template #default="{ row }">{{ row.turnover0 ? row.turnover0.toFixed(2) : '-' }}</template>
+          </el-table-column>
+          <el-table-column label="变动率" width="80" align="right" class-name="auto-calc-col">
+            <template #default="{ row }">{{ fmtPct(row.change01) }}</template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column :label="yearLabels[1]" align="center">
+          <el-table-column label="平均存货" width="100" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="!isReadonly" :model-value="row.avgInv1" :controls="false" size="small" style="width:100%"
+                @change="(v: number) => updateProduct(row.rowId, 'avgInv1', v ?? 0)" />
+              <span v-else>{{ fmt(row.avgInv1) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="营业成本" width="100" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="!isReadonly" :model-value="row.cogs1" :controls="false" size="small" style="width:100%"
+                @change="(v: number) => updateProduct(row.rowId, 'cogs1', v ?? 0)" />
+              <span v-else>{{ fmt(row.cogs1) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="周转率" width="80" align="right" class-name="auto-calc-col">
+            <template #default="{ row }">{{ row.turnover1 ? row.turnover1.toFixed(2) : '-' }}</template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column :label="yearLabels[2] + '周转率'" width="100" align="right" class-name="auto-calc-col">
+          <template #default="{ row }">
+            <div v-if="!isReadonly" class="mini-inputs">
+              <el-input-number :model-value="row.avgInv2" :controls="false" size="small" placeholder="均存"
+                @change="(v: number) => updateProduct(row.rowId, 'avgInv2', v ?? 0)" />
+              <el-input-number :model-value="row.cogs2" :controls="false" size="small" placeholder="成本"
+                @change="(v: number) => updateProduct(row.rowId, 'cogs2', v ?? 0)" />
+            </div>
+            <span>{{ row.turnover2 ? row.turnover2.toFixed(2) : '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="是否异常" width="100" align="center">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" :model-value="row.abnormal" size="small"
+              @change="(v: string) => updateProduct(row.rowId, 'abnormal', v)">
+              <el-option v-for="o in YES_NO" :key="o.value" :label="o.label" :value="o.value" />
+            </el-select>
+            <span v-else>{{ row.abnormal || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="60" align="center">
+          <template #default="{ row }">
+            <el-button link type="danger" size="small" :disabled="isReadonly" @click="removeProductRow(row.rowId)">删</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="section-notes">
+        <div class="note-head">
+          <span>审计说明</span>
+          <el-button size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading"
+            @click="genSection('f2-18-note-d', notesD.note, 'AI · D周转说明', (t) => updateNotes('notesD', 'note', t))">AI辅助</el-button>
+        </div>
+        <el-input type="textarea" :model-value="notesD.note" :disabled="isReadonly" :autosize="{ minRows: 3 }"
+          @change="(v: string) => updateNotes('notesD', 'note', v)" />
+        <div class="note-head" style="margin-top:8px"><span>异常原因</span></div>
+        <el-input type="textarea" :model-value="notesD.abnormalReason" :disabled="isReadonly" :autosize="{ minRows: 2 }"
+          @change="(v: string) => updateNotes('notesD', 'abnormalReason', v)" />
+      </div>
     </el-card>
 
-    <el-card class="opinion-card" shadow="never">
+    <!-- 总体结论 -->
+    <el-card class="opinion-card audit-note-card" shadow="never">
       <template #header>
         <div class="opinion-header">
-          <span class="opinion-title">分析结论</span>
+          <span class="opinion-title">分析结论（四、审计结论）</span>
           <div class="opinion-actions">
-            <el-button size="small" type="primary" plain :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="generateAnalysisConclusion">🤖 AI辅助</el-button>
+            <el-button
+              size="small"
+              type="primary"
+              plain
+              :disabled="isReadonly || !aiAvailable"
+              :loading="aiLoading"
+              @click="genSection('f2-18-conclusion', analysisConclusion, 'AI 生成 · 总体分析结论', saveConclusion)"
+            >AI辅助</el-button>
             <F2ReviewChip section-id="F2-18-conclusion" />
           </div>
         </div>
       </template>
-      <el-input v-model="analysisConclusion" type="textarea" :autosize="{ minRows: 4, maxRows: 10 }" :disabled="isReadonly" placeholder="总体分析结论..." />
-    </el-card>
-
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
       <el-input
         type="textarea"
-        :model-value="auditNote"
+        :model-value="analysisConclusion"
         :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：概述存货结构、周转、趋势及异常识别的分析程序、测试情况与结果，以及减值迹象的核查与拟调整/未调整事项及其影响。"
-        @change="saveAuditNote"
-      />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
-      <el-input
-        type="textarea"
-        :model-value="auditConclusion"
-        :disabled="isReadonly"
-        :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
-        @change="saveAuditConclusion"
+        :autosize="{ minRows: 4, maxRows: 12 }"
+        placeholder="A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
+        @change="saveConclusion"
       />
     </el-card>
   </div>
 </template>
 
 <style scoped>
-.f2-overall-analysis { padding: 12px; font-size: var(--wp-font-size, 13px); }
-.f2-overall-analysis :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
+.f2-overall-analysis { padding: 12px; font-size: 13px; font-size: var(--wp-font-size, 13px); }
+.f2-overall-analysis :deep(.el-table) {
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
+}
 .f2-overall-analysis :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
 .guidance-details {
   margin-bottom: 12px;
@@ -269,18 +591,35 @@ const trendLineOption = computed(() => ({
   padding: 8px 12px;
 }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
+.guidance-content { margin-top: 8px; color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .objective-alert { margin-bottom: 12px; }
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.hint-alert { margin-bottom: 8px; }
+.tab-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px; gap: 8px; flex-wrap: wrap;
+}
+.toolbar-left, .toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .chip-wrap { display: inline-flex; align-items: center; }
+.year-labels { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
 .block-card { margin-bottom: 12px; }
 .block-title { font-weight: 600; }
-.highlight { color: #e6a23c; font-weight: 600; }
-.turnover-inputs { display: flex; gap: 24px; flex-wrap: wrap; align-items: center; }
-.anomaly-item { margin-bottom: 8px; }
+.card-header-flex { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.total-bar { margin-top: 8px; text-align: right; font-weight: 600; color: #606266; }
+.section-notes { margin-top: 12px; }
+.note-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 6px; font-weight: 500;
+}
+.input-grid { display: flex; gap: 16px; flex-wrap: wrap; }
+.input-year {
+  display: flex; flex-direction: column; gap: 6px; min-width: 200px;
+  padding: 8px; background: #fafafa; border-radius: 4px;
+}
+.input-year label { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; }
+.peer-names { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; align-items: center; }
+.peer-names label { display: flex; align-items: center; gap: 4px; font-size: 12px; }
+.mini-inputs { display: flex; flex-direction: column; gap: 2px; margin-bottom: 4px; }
 :deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .opinion-card { margin-top: 16px; border-radius: 8px; }
 .opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
@@ -288,11 +627,4 @@ const trendLineOption = computed(() => ({
 .opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
 .opinion-actions { display: flex; gap: 6px; align-items: center; }
 .audit-note-card { margin-top: 16px; }
-.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
-.chart-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
-.pie-chart { width: 280px; height: 220px; flex-shrink: 0; }
-.structure-table { flex: 1; min-width: 320px; }
-.turnover-block { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
-.bar-chart { width: 280px; height: 180px; }
-.trend-chart { width: 100%; min-width: 320px; height: 240px; }
 </style>
