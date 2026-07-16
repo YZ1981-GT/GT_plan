@@ -58,7 +58,7 @@ async def render(ctx: RenderContext) -> dict | None:
     try:
         proj_result = await db.execute(
             sa.text(
-                "SELECT client_name, audit_year, applicable_standards "
+                "SELECT client_name, audit_year, applicable_standard_v2 AS applicable_standards "
                 "FROM projects WHERE id = :pid"
             ),
             {"pid": str(ctx.project_id)},
@@ -67,7 +67,11 @@ async def render(ctx: RenderContext) -> dict | None:
         if proj_row:
             project_context["client_name"] = proj_row.client_name or ""
             project_context["audit_year"] = str(proj_row.audit_year or "")
-            project_context["applicable_standards"] = proj_row.applicable_standards or ""
+            raw_std = proj_row.applicable_standards
+            if isinstance(raw_std, dict):
+                project_context["applicable_standards"] = raw_std.get("type", "")
+            else:
+                project_context["applicable_standards"] = raw_std or ""
     except Exception as e:  # noqa: BLE001
         logger.warning("F2 render: project context 失败: %s", e)
 
