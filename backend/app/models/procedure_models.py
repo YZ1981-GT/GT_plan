@@ -170,6 +170,48 @@ class ProcedureRowTaskHistory(Base):
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
 
+# ---------------------------------------------------------------------------
+# V109 cutover-hardening 模型（procedure-delegation-notification / Task 2）
+#
+# procedure_template_revisions: 运行时 current-revision 唯一选择器。
+# procedure_row_definition_revisions: revision 成员关系。
+# 索引（identity unique / partial unique WHERE is_current=true / resolve）由 V109 迁移拥有。
+# ---------------------------------------------------------------------------
+
+
+class ProcedureTemplateRevision(Base):
+    """Current-revision registry；每个 template_code 最多一个 active current。"""
+
+    __tablename__ = "procedure_template_revisions"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    template_code: Mapped[str] = mapped_column(String(80), nullable=False)
+    revision_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(24), nullable=False, server_default=text("'registered'"))
+    is_current: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, server_default=text("false"))
+    supersedes_revision_hash: Mapped[str | None] = mapped_column(CHAR(64), nullable=True)
+    activated_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    activated_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    reconcile_detail: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default=text("'{}'"))
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+
+
+class ProcedureRowDefinitionRevision(Base):
+    """Revision membership: 哪些 definition_key 属于 (template_code, revision_hash)。"""
+
+    __tablename__ = "procedure_row_definition_revisions"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    template_code: Mapped[str] = mapped_column(String(80), nullable=False)
+    revision_hash: Mapped[str] = mapped_column(CHAR(64), nullable=False)
+    sheet_key: Mapped[str] = mapped_column(String(160), nullable=False)
+    definition_key: Mapped[str] = mapped_column(
+        String(200), ForeignKey("procedure_row_definitions.definition_key"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+
 class ProcedureOperationPreview(Base):
     """敏感操作 server-side 一次性预览凭证（裁剪/委派/转派）。"""
 

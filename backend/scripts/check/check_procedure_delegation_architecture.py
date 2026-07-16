@@ -27,10 +27,11 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_BASELINE = REPO_ROOT / "backend/scripts/check/baselines/procedure_delegation_debt.json"
 # Task 2 landed the feature migration. V105 is now the canonical, allowed migration; the
 # guard only rejects *non-canonical* V105 variants (duplicate / wrong-name). Current head
-# advances to 105.
+# advances to 112 (V112 = cutover-hardening: procedure_template_revisions + append-only).
 CANONICAL_V105_FILENAME = "V105__procedure_row_tasks.sql"
-NEXT_MIGRATION_FILENAME = CANONICAL_V105_FILENAME
-CURRENT_MIGRATION_VERSION = 105
+CANONICAL_V112_FILENAME = "V112__procedure_current_revision_registry.sql"
+NEXT_MIGRATION_FILENAME = CANONICAL_V112_FILENAME
+CURRENT_MIGRATION_VERSION = 112
 
 RULE_INSTANCE_ID_AS_ROW_TASK = "procedure-instance-id-as-row-task"
 RULE_GET_RENDER_DOMAIN_WRITE = "get-render-procedure-domain-write"

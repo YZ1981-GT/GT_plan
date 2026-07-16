@@ -4,7 +4,9 @@
 
 本设计把程序行拆成两层真源：模板级 `ProcedureRowDefinition` 负责跨项目稳定身份与 revision；项目级 `ProcedureRowTask` 负责适用性、委派、执行与操作复核。现有 `ProcedureInstance` 仅保留为 WorkpaperScopeInstance 粗裁兼容层，`WorkingPaper.parsed_data.procedure_status` 仅保留为可重建投影。
 
-核心约束是“读路径绝不物化”：GET、render-config、列表和深链只读取 definition/task 并生成 overlay；只有显式 POST materialize、项目初始化、delegation preview 前置 materialize job、reconcile apply、backfill 可以写。任务以 `project_id + wp_index_id` 锚定，允许 `wp_id=NULL` 先委派后生成；底稿生成时只原子绑定既有 task，不换 task_id。
+第四轮代码复盘确认 V105、Definition/RowTask、materialize、delegation/transition、outbox、ReviewConversation 和 MyProcedureTasks 主体已存在，但尚未达到 cutover：当前 overlay 仍按 `program_no` first-match，revision 缺省会混入历史定义，bind 冲突会部分成功，transition/history 的并发与旧值审计不够严格，裁剪页仍走 legacy API，SSE 仍是进程内 fan-out，且完成标记缺少可复核证据。本设计因此新增 V106 cutover-hardening 层，禁止修改已可能执行的 V105。
+
+核心约束是“读路径绝不物化”：GET、render-config、列表和深链只读取 current revision definition/task 并生成精确 overlay；只有显式 POST materialize、项目初始化、delegation preview 前置 materialize job、reconcile apply、backfill 可以写。任务以 `project_id + wp_index_id` 锚定，允许 `wp_id=NULL` 先委派后生成；底稿生成时只原子绑定既有 task，不换 task_id，任一异 wp 冲突均整批失败。
 
 目标链路：
 
@@ -63,7 +65,31 @@ TransitionService 先更新 task/history/outbox，再以 `jsonb_set` 更新单�
 
 ### D8. 有序 outbox 与聚合通知分离
 
-每个 task 的领域变化都有独立 history/outbox event；同 aggregate 按 version 顺序。批量委派不把 N 个审计事件压成一个，但 NotificationProjection 按 `delegation_batch_id + recipient_user_id` 聚合用户通知，避免通知风暴。SSE 是 at-least-once，前端只按 event_id 去重后重新拉取。
+每个 task 的领域变化都有独立 history/outbox event；同 aggregate 按 version 顺序。批量委派不把 N 个审计事件压成一个，但 NotificationProjection 按 `delegation_batch_id + recipient_user_id` 聚合用户通知，避免通知风暴。持久化 outbox/Notification 承担 at-least-once；SSE 只承担跨进程可重复 wake-up，前端收到后重新查询真源。
+
+### D9. current revision registry 是运行时唯一选择器
+
+V106 新增 `procedure_template_revisions`：`(template_code, revision_hash)` 唯一，active current 使用 partial unique 保证每个 template_code 最多一个。import 只登记 revision；只有显式 activate/reconcile apply 能切 current。materialize/overlay 未指定 revision 时必须从 registry 解析，零 current、多 current、reconcile_pending 都 fail-closed。禁止用 created_at/max hash/“最近导入”猜 current。
+
+### D10. ProgramRow 身份贯穿导入、渲染与深链
+
+DefinitionImporter 输出的 `sheet_key + definition_key + definition_revision_hash` 必须进入程序行 schema/JSON/parsed snapshot。render overlay 使用三元组精确 join；重复 program_no、跨 sheet 同号、program_no 为空均不影响身份。`program_no` 只做展示和 legacy reconcile alias，运行时不得 `setdefault`/first-match/fallback。旧行缺 definition_key 时显示“待模板对账”，不得静默绑定任务。
+
+### D11. bind 与 compatibility projection 是同一原子操作
+
+`bind_working_paper` 先锁定同 project/wp_index 的全部 active task并校验：若任一 task 已绑定其他 wp，整批 409、零更新；全部合法才批量绑定。随后在同一事务按 task 真源重建目标 wp 的 compatibility projection。所有 WorkingPaper 创建/复制/导入入口必须经统一 factory/hook 调 bind，CI inventory guard 对入口清单做漂移检测。
+
+### D12. TransitionService 自有 CAS 与 history snapshot
+
+所有外部 mutation 请求必须携带 expected lock_version，assignment 相关动作再携带 expected assignment_version。TransitionService 自身通过原子 `UPDATE ... WHERE lock_version=:expected RETURNING` 或 service-owned `SELECT FOR UPDATE` 保证 CAS，不依赖 router 预锁。mutation 前捕获 immutable old snapshot，mutation 后形成 new snapshot；history writer 使用 `_UNSET` sentinel 区分未传与真实 NULL，确保首次 assign、转派、reopen 清人和 reviewer 变化审计准确。
+
+### D13. durable projection 与跨 worker wake-up 分层
+
+领域事务只写 outbox。dispatcher 先提交去重 Notification，再经 Redis Pub/Sub（或等价共享 broker）发布 event_id；每个 API worker 将 wake-up fan-out 到本进程 SSE。SSE 允许重复或断线丢失，客户端重连后以 last-seen cursor 从持久化 Notification/任务 API catch-up。前端按 event_id 去重并在 200–500ms 合并刷新。dead-letter 是 aggregate barrier：未 replay 或审计 waive 前，后续 version 不得领取。dispatcher loop 在 lifespan 显式 start/stop并暴露 heartbeat/lag/barrier metrics。
+
+### D14. legacy cutover 与证据驱动完成
+
+`ProcedureTrimming.vue` 和所有用户可达路径必须切到新 preview/apply/transition；legacy router 在 dual 阶段只可做受控 adapter，task_source 阶段拒写。write mode 枚举固定为 `legacy|dual|task_source|paused`。任务完成不仅要求测试 pass，还必须写入 evidence manifest：命令、环境、时间、结果、关键截图/网络/DB/EXPLAIN 和失败修复记录；没有证据不得标绿。
 ## Data Models
 
 ### V105 Expand Overview
@@ -143,6 +169,32 @@ WHERE is_deleted = false DO UPDATE ...
 Delivery outbox 在现有 task_events 基础上扩展：`aggregate_type, aggregate_id, aggregate_version, event_type, idempotency_key, delegation_batch_id, payload, available_at, lease_expires_at, claimed_by, processed_at, retry_count, dead_letter_at, last_error`。唯一 `idempotency_key`；claim partial index 面向 `processed_at IS NULL AND dead_letter_at IS NULL`，以 available_at/lease_expires_at/aggregate/version 排序。
 
 Notification 增 `event_id, recipient_user_id, dedup_key, metadata`；唯一 dedup 至少等价于 `(event_id, recipient_user_id)`。批量摘要的 event_id 使用聚合投影事件，metadata 保留 underlying task event ids 与 batch id。
+### V106 Cutover-Hardening Overview
+
+V105 已存在且可能已在环境中执行，禁止回改。V106 仅 additive：
+
+- 新增 `procedure_template_revisions(id, template_code, revision_hash, status, is_current, supersedes_revision_hash, activated_at, activated_by, reconcile_detail, created_at)`；建立 `(template_code, revision_hash)` unique 与 `WHERE is_current=true` 的 template_code partial unique。
+- 为 current revision 查询、dead-letter aggregate barrier、dispatcher heartbeat/lag 提供必要索引或状态表；具体对象由迁移前 schema diff 决定，禁止重复造表。
+- history append-only 采用数据库权限/trigger 或等价 DB 约束禁止 UPDATE/DELETE；应用层仍保留静态守卫。
+- pg_catalog 契约校验 constraint/index predicate/include/FK/type 与现有对象定义；对象同名但定义不一致时启动 fail-fast。
+- 数据迁移先从每个 template_code 的可证明唯一 revision 建 current；存在多 revision/歧义时标记 reconcile_pending，不自动选最新。
+
+### Overlay and Binding Contract
+
+```text
+ProgramRow(sheet_key, definition_key, definition_revision_hash)
+  → current revision validation
+  → task lookup(project, wp_index, sheet_key, definition_key, revision snapshot)
+  → exact overlay (no program_no fallback)
+
+WorkingPaper creation transaction
+  → lock anchor tasks
+  → reject any foreign wp binding
+  → bind all pending tasks
+  → rebuild compatibility projection
+  → commit once
+```
+
 ## Backend Components
 
 ### C1. ProcedureDefinitionImporter
@@ -155,11 +207,11 @@ Notification 增 `event_id, recipient_user_id, dedup_key, metadata`；唯一 ded
 ### C2. ProcedureTaskMaterializationService
 
 ```python
-materialize(project_id, wp_index_ids, definition_revision, actor, request_id)
+materialize(project_id, wp_index_ids, target_revision, actor, request_id)
 bind_working_paper(project_id, wp_index_id, wp_id, request_id)
 ```
 
-materialize 批量查询 definitions，使用 active partial unique upsert；已存在任务只允许补充安全快照，不改 assignment/workflow。bind 在底稿生成事务中锁定 wp_index 与 active tasks，验证 wp 属于同 project/wp_index 后一次更新 nullable wp_id。项目初始化和 backfill 直接复用该服务；delegation preview 通过 materialize job 调用。
+`target_revision` 由调用者显式给出或经 current revision registry 唯一解析，不能为“全部 revision”。materialize 先一次性加载目标 wp_index→wp_code 映射，再以集合查询取得全部 `(wp_code,target_revision)` definitions，使用 active partial unique upsert；已存在任务只允许补充安全快照，不改 assignment/workflow。bind 在底稿生成事务中锁定 wp_index 与 active tasks，验证 wp 属于同 project/wp_index；发现任一异 wp binding 即整体 409，全部合法才一次更新 nullable wp_id 并重建 compatibility projection。项目初始化和 backfill 直接复用该服务；delegation preview 通过 materialize job 调用。
 
 ### C3. ProcedureReconcileService
 
@@ -199,7 +251,7 @@ participant guard 从 task 反查 project/wp_index/wp；动作授权比较归一
 | cancel | 任意未终态 | cancelled | Delegator/trim | 原因必填 |
 | reopen | cancelled | unassigned | Delegator | 不保留 ack；后续重新 assign |
 
-`assign` 不接受 cancelled；`start` 不接受 bare assigned，确保每次 assignment 都 ack。reviewer 缺失时 submitted 可保留，但 review 被阻止并产生 reviewer_missing event。所有成功转换：task update + history + outbox + 精确 projection 同事务。
+`assign` 不接受 cancelled；`start` 不接受 bare assigned，确保每次 assignment 都 ack。reviewer 缺失时 submitted 可保留，但 review 被阻止并产生 reviewer_missing outbox event。所有外部动作强制 expected lock_version，assignment 动作再强制 expected assignment_version；CAS 由 service 内部原子写/行锁保证。动作前先冻结 old snapshot，动作后生成 new snapshot，history 以 sentinel 区分未提供与真实 NULL。所有成功转换：task update + history + outbox + 精确 projection 同事务。
 
 ### C8. ProcedureProjectionService
 
@@ -214,9 +266,9 @@ reviewer resolver 严格按 explicit staff → WorkingPaper.reviewer/WpIndex.rev
 
 ### C10. ProcedureDeliveryDispatcher
 
-claim 条件为未 processed、未 dead-letter、available_at 到期、lease 为空或过期。领取后设置 lease_expires_at/claimed_by；同 aggregate 只领取最小未处理 version。NotificationProjection 先在独立事务插入去重通知并 commit，再广播含 event_id 的 SSE，最后标 processed。SSE 失败可重试，Notification dedup 阻止重复。
+claim 条件为未 processed、未 dead-letter、available_at 到期、lease 为空或过期，并且同 aggregate 的所有更小 version 已 processed；dead-letter 前序仍构成 barrier。领取后设置 lease_expires_at/claimed_by。NotificationProjection 先在独立事务插入去重通知并 commit，再通过 Redis Pub/Sub 发布含 event_id 的跨 worker wake-up；每 worker 只负责本地 SSE fan-out，最后标 processed。wake-up 失败可重试，Notification dedup 阻止重复；客户端以持久化 API catch-up，不要求 SSE 自身承担可靠队列语义。
 
-批量委派聚合器以 batch+recipient 收集 task events，产生一条摘要 Notification；history/outbox 仍逐任务。dispatcher 开关关闭时不 claim，已有 rows 保留。
+批量委派聚合器以 batch+recipient 收集 task events，产生一条摘要 Notification；history/outbox 仍逐任务。assign/reassign/submit/changes_requested/review/reviewer_missing/comment/reply 均走该路径，不允许 review service 直写通知。dispatcher 由 lifespan 管理 start/stop，开关关闭时不 claim，已有 rows 保留；健康指标包含 heartbeat、backlog、oldest age、lease、dead-letter barrier 和跨 worker publish 失败。
 
 ### C11. ProcedureTaskQueryService
 
@@ -254,7 +306,7 @@ POST /api/projects/{pid}/procedure-delivery/{event_id}/replay
 
 ### F1. MyProcedureTasks.vue 原位重构
 
-不创建新任务页。现有页面增加“我执行的/我复核的”筛选、项目/循环/状态/逾期筛选、assignment_version 状态动作、nullable wp 空态、聚合通知入口。建立回归测试锁定旧 bug：不得再以 `updateProcedureTrim` 提交 execution_status；状态动作必须调用 transition API 且 payload 包含 expected versions。
+不创建新任务页。现有页面增加“我执行的/我复核的”筛选、项目/循环/wp_index/状态/截止日期/逾期筛选，显示程序执行人和操作复核人。逾期总数由服务端总量返回，不用当前页推算。nullable wp 行提供刷新与提醒，结构化展示 reviewer_missing、IssueTicket 未关闭、版本冲突、preview 过期等 409 reason code；动作按钮按 request_id 防重复。建立回归测试锁定旧 bug：不得再以 `updateProcedureTrim` 提交 execution_status；状态动作必须调用 transition API 且 payload 包含 expected versions。SSE wake-up 在 200–500ms 窗口合并刷新。
 
 ### F2. GtAProgramConsole overlay 与深链
 
@@ -290,17 +342,18 @@ backfill 保存原始来源、值、映射规则和 conflict；不因为 legacy 
 
 | 阶段 | TASKS_ENABLED | WRITE_MODE | DISPATCHER | 行为 |
 |---|---|---|---|---|
-| expand | false | legacy | false | 仅 V105 结构/兼容代码 |
+| expand | false | legacy | false | 仅 V105/V106 additive 结构与兼容代码 |
 | dual-read | true | legacy/dual | false | 读比较、可选双写、记录差异 |
 | backfill | true | dual | false | 可恢复导入、投影核对 |
-| cutover | true | task-source | true | task 真源、dispatcher 领取 |
-| contract | true | task-source | true | 删除旧代码入口，保留物理列表 |
+| cutover | true | task_source | true | task 真源、dispatcher 领取 |
+| contract | true | task_source | true | 删除旧代码入口，保留物理列表 |
+| emergency rollback | true | paused | false | 禁止新领域写，读退回 dual/legacy fallback，保留全部新数据 |
 
-开关名固定为 `PROCEDURE_ROW_TASKS_ENABLED`、`PROCEDURE_ROW_TASK_WRITE_MODE`、`PROCEDURE_TASK_DISPATCHER_ENABLED`。阶段推进 guard 检查 schema、coverage/conflict、projection diff、backlog 和回滚演练。
+开关名固定为 `PROCEDURE_ROW_TASKS_ENABLED`、`PROCEDURE_ROW_TASK_WRITE_MODE`、`PROCEDURE_TASK_DISPATCHER_ENABLED`。WRITE_MODE 只允许 `legacy|dual|task_source|paused`，禁止另造同义值。阶段推进 guard 检查 schema、current revision、coverage/conflict、projection diff、legacy write inventory、backlog 和回滚演练。
 
-生产回滚：先把 WRITE_MODE 停到 no-new-task-writes/legacy-safe 模式，再关闭 dispatcher，保持 outbox/新表/列不动，读取退回 dual-read/legacy fallback。不得执行 V105 destructive down。恢复后 dispatcher 从未 processed event 继续。
+生产回滚：先把 WRITE_MODE 切到 `paused`，再关闭 dispatcher，保持 outbox/新表/列不动，读取退回 dual-read/legacy fallback。不得执行 V105/V106 destructive down。恢复后先校验 aggregate barrier，再由 dispatcher 从未 processed event 继续。
 
-V105 migration 使用 information_schema 与 pg catalog 做幂等保护，并由契约测试精确校验类型、FK、nullable、index columns/include、partial predicate；仅 `IF NOT EXISTS` 不足以接受错误旧结构。
+V105 migration 视为已存在不可修改；V106 使用 information_schema 与 pg catalog 做幂等保护，并由契约测试精确校验类型、FK、nullable、index columns/include、partial predicate；仅 `IF NOT EXISTS` 不足以接受错误旧结构。
 ## Correctness Properties
 
 以下属性由 Hypothesis/fast-check/PG integration 验证；PBT 默认使用项目 fast profile。数据库约束、索引谓词和事务语义必须在 PostgreSQL 验证，不以 sqlite 替代。
@@ -418,12 +471,12 @@ assignment 每次有效改变恰好递增一次并清 ack；同 assignment_versi
 **Validates: Requirements 9.5, 9.6, 9.8**
 
 ### Property 29: aggregate version 有序投递
-任意乱序 available 的同 aggregate events，processed aggregate_version 严格单调；前一版本失败时后一版本不越序。
+任意乱序 available 的同 aggregate events，processed aggregate_version 严格单调；前一版本失败或 dead-letter 未处置时后一版本不越序。
 **Validates: Requirements 10.1, 10.2, 10.3**
 
-### Property 30: Notification 与 SSE 幂等收敛
-任意 dispatcher/SSE 重试次数下，每个 event+recipient 最多一条 Notification；重复 event_id 的 SSE 不造成重复状态动作，最终 API 状态一致。
-**Validates: Requirements 10.4, 10.5, 10.6, 10.9**
+### Property 30: Notification 与 wake-up 幂等收敛
+任意 dispatcher/跨 worker wake-up 重试次数下，每个 event+recipient 最多一条 Notification；重复 event_id 不造成重复状态动作，SSE 断线后通过持久化 API catch-up 最终一致。
+**Validates: Requirements 10.4-10.7, 10.11-10.12**
 
 ### Property 31: 批量通知聚合不损失审计
 N 个 task 委派始终产生 N 组 task history/outbox；每个 recipient/batch 最多一条摘要通知，摘要计数等于其相关任务数。
@@ -438,8 +491,40 @@ N 个 task 委派始终产生 N 组 task history/outbox；每个 recipient/batch
 **Validates: Requirements 12.5**
 
 ### Property 34: 部署阶段单调与回滚保留
-任意阶段跳跃在 guard 未满足时被拒绝；生产回滚关闭写/dispatcher 后 V105 表列、task、history、outbox 均保留。
-**Validates: Requirements 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7, 13.8**
+任意阶段跳跃在 guard 未满足时被拒绝；生产回滚切到 paused 并关闭 dispatcher 后，V105/V106 表列、task、history、outbox 均保留。
+**Validates: Requirements 13.1-13.8, 15.10-15.11**
+
+### Property 35: current revision 唯一且 fail-closed
+任意 template_code 最多一个 active current revision；零 current、多 current 或 reconcile_pending 时 materialize/overlay 均拒绝，不混合历史 definition。
+**Validates: Requirements 15.1-15.2**
+
+### Property 36: ProgramRow 精确身份不受程序号影响
+任意跨 sheet 重号、同 sheet 历史重号或空 program_no 集合，overlay/deep-link 仅由 sheet_key+definition_key+revision 决定；改变 program_no 不改变命中。
+**Validates: Requirements 15.3**
+
+### Property 37: bind 冲突全批零写
+任意锚点只要存在一个异 wp binding，所有 pending task 与 compatibility projection 均不变化；全部合法时绑定和投影同事务成功。
+**Validates: Requirements 15.5**
+
+### Property 38: service-owned CAS 与 history 快照准确
+任意同 expected version 并发 mutation 最多一个成功；history 的 old/new staff/status 与 mutation 前后快照一致，真实 NULL 不被默认值覆盖。
+**Validates: Requirements 15.6-15.7**
+
+### Property 39: 跨 worker wake-up 最终收敛
+任意 worker 发布、断线、重复与重连序列下，在线 worker 可收到共享 broker wake-up；漏失 wake-up 的客户端通过 cursor catch-up 后任务/未读数与数据库一致。
+**Validates: Requirements 10.5-10.7, 15.12**
+
+### Property 40: dead-letter aggregate barrier
+任意 aggregate 的 version k dead-letter 后，所有 version>k 均不可 claim；只有审计 replay 或 waive 后才恢复有序处理。
+**Validates: Requirements 10.3, 10.11**
+
+### Property 41: legacy write freeze 完整
+任意用户可达裁剪、方案、委派和状态动作在 task_source 模式均不调用 legacy 写端点；paused 模式所有新领域写均拒绝且数据不变。
+**Validates: Requirements 15.8-15.10**
+
+### Property 42: 验收证据与完成状态一致
+任意标记完成的整改任务均存在可解析 evidence manifest 条目，包含命令、环境、结果和要求的截图/网络/DB/EXPLAIN 证据；缺任一必需证据时 guard 失败。
+**Validates: Requirements 14.7-14.8, 15.12**
 
 ## Error Handling
 
@@ -471,8 +556,9 @@ N 个 task 委派始终产生 N 组 task history/outbox；每个 recipient/batch
 | Req7 | D7, C8 | P22-P24 |
 | Req8 | C9, F5 | P25-P26 |
 | Req9 | C11, F1-F2 | P27-P28 |
-| Req10 | D8, C10, F4 | P29-P31 |
+| Req10 | D8/D13, C10, F4 | P29-P31/P39-P40 |
 | Req11 | C5 | P32 |
-| Req12 | V105 models/indexes | P4/P21/P33 + schema contracts |
-| Req13 | Deployment and Rollback | P34 |
-| Req14 | F1-F5, performance/E2E | example/performance/Playwright acceptance |
+| Req12 | V105/V106 models/indexes | P4/P21/P33/P35/P38 + schema contracts |
+| Req13 | Deployment and Rollback, D14 | P34/P41 |
+| Req14 | F1-F5, performance/E2E, D14 | P42 + example/performance/Playwright acceptance |
+| Req15 | D9-D14, V106, C2/C7/C10 | P35-P42 |

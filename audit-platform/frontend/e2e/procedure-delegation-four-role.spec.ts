@@ -23,13 +23,14 @@ const API_BASE = 'http://localhost:9980/api'
 const UI_BASE = 'http://localhost:3030'
 
 // 四角色凭据（系统中真实角色账号，admin 角色为全局管理员）
+// Task 17：由 backend/scripts/e2e/procedure_e2e_live.py seed 出的四角色真实账号
+// （现场经理 / 审计助理 / 操作复核人 / 无 assignment 合伙人），密码统一 e2e123456。
 const ROLES = {
   admin: { username: 'admin', password: 'admin123' },
-  // 以下角色使用同一 admin 账号模拟（真实环境需要独立用户）
-  // 如果有独立的 manager/assistant/reviewer 账号可替换
-  manager: { username: 'admin', password: 'admin123' },
-  assistant: { username: 'admin', password: 'admin123' },
-  reviewer: { username: 'admin', password: 'admin123' },
+  manager: { username: 'e2e_manager', password: 'e2e123456' },
+  assistant: { username: 'e2e_assistant', password: 'e2e123456' },
+  reviewer: { username: 'e2e_reviewer', password: 'e2e123456' },
+  partner_na: { username: 'e2e_partner_na', password: 'e2e123456' },
 }
 
 // ─── 工具函数 ────────────────────────────────────────────────────────────────
@@ -644,6 +645,58 @@ test.describe('证据保存: 截图与网络', () => {
     await page.waitForLoadState('networkidle', { timeout: 20000 })
     await page.screenshot({ path: 'test-results/evidence-admin-roundtrip.png' })
 
+    expect(errors.length).toBe(0)
+  })
+})
+
+// ─── 测试组 13: 四角色真实账号 fresh-navigation（cutover 阶段 + 真实 seed 数据）───────
+// 前置：backend 以 cutover 三开关运行 + 已跑 procedure_e2e_live.py（seed 账号 + 物化 + 委派）
+test.describe('四角色真实账号 fresh-navigation', () => {
+  for (const roleKey of ['manager', 'assistant', 'reviewer'] as const) {
+    test(`${roleKey} fresh-navigation MyProcedureTasks 0 console error`, async ({ page }) => {
+      const errors = collectConsoleErrors(page)
+      await uiLogin(page, ROLES[roleKey].username, ROLES[roleKey].password)
+      await page.goto(`${UI_BASE}/my-procedures`)
+      await page.waitForLoadState('networkidle', { timeout: 30000 })
+      // 页面不白屏 + 存在任务容器/空态
+      const hasContent = await page
+        .locator('.el-table, .el-empty, [class*="procedure"], [class*="task"]')
+        .first()
+        .isVisible({ timeout: 10000 })
+        .catch(() => false)
+      await page.screenshot({ path: `test-results/four-role-${roleKey}-my-procedures.png`, fullPage: true })
+      expect(hasContent).toBeTruthy()
+      expect(errors.length).toBe(0)
+    })
+  }
+
+  test('partner(无assignment) fresh-navigation：页面可达 + 委派 API 403', async ({ page, request }) => {
+    const errors = collectConsoleErrors(page)
+    await uiLogin(page, ROLES.partner_na.username, ROLES.partner_na.password)
+    await page.goto(`${UI_BASE}/my-procedures`)
+    await page.waitForLoadState('networkidle', { timeout: 30000 })
+    await page.screenshot({ path: 'test-results/four-role-partner-noassign.png', fullPage: true })
+    // API 层：无 assignment 合伙人对项目 delegation preview 必须 403（fail-closed）
+    const token = await apiLogin(request, ROLES.partner_na.username, ROLES.partner_na.password)
+    const pid = '5e193c68-f53c-4e95-8d03-5d9c996c402d'
+    const resp = await request.post(
+      `${API_BASE}/projects/${pid}/procedure-delegations/preview`,
+      { headers: authHeaders(token), data: { selector: { kind: 'cycle', cycle: 'A' }, assignee_staff_id: '00000000-0000-0000-0000-000000000001' } }
+    )
+    expect(resp.status()).toBe(403)
+    expect(errors.length).toBe(0)
+  })
+
+  test('刷新 round-trip：assistant my-procedures → dashboard → 返回 0 console error', async ({ page }) => {
+    const errors = collectConsoleErrors(page)
+    await uiLogin(page, ROLES.assistant.username, ROLES.assistant.password)
+    await page.goto(`${UI_BASE}/my-procedures`)
+    await page.waitForLoadState('networkidle', { timeout: 30000 })
+    await page.goto(`${UI_BASE}/dashboard`)
+    await page.waitForLoadState('networkidle', { timeout: 20000 })
+    await page.goto(`${UI_BASE}/my-procedures`)
+    await page.waitForLoadState('networkidle', { timeout: 20000 })
+    await page.screenshot({ path: 'test-results/four-role-assistant-roundtrip.png' })
     expect(errors.length).toBe(0)
   })
 })

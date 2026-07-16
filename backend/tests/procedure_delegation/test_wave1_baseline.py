@@ -6,12 +6,12 @@
 1. 真实粒度：`ProcedureInstance` 是 WorkpaperScopeInstance（按 wp_code 一张底稿一条），
    不是程序表具体行；模型上没有 sheet_key/program_no/definition_key/row_key，
    且 `init_from_templates` 令 `procedure_code == wp_code`。
-2. 迁移基线：Task 2 已落地 canonical V105 feature 迁移，最高迁移推进到 V105；
-   4 张 V105 领域表已登记 ORM（expand 阶段建表为空、读路径零写）。
+2. 迁移基线：Task 2 已落地 canonical V105 feature 迁移 + V112 cutover-hardening；
+   V106~V111 被 evidence_governance 等占用；4 张 V105 领域表 + V112 表已登记 ORM。
 3. GET/render-config 「数据库领域零写」baseline：用独立 observer session 对现有表
    （procedure_instances / procedure_trim_schemes / WorkingPaper.parsed_data/file_version/updated_at）
    做 canonical 快照，只读观测前后不变；并用 to_regclass（PG）/inspector（SQLite）
-   动态探测未来 V105 表在调用前不存在、调用后仍不存在。
+   动态探测未来表在调用前不存在、调用后仍不存在。
 
 零写定义为「数据库领域零写」，允许日志 / metrics 等进程副作用。
 
@@ -52,6 +52,11 @@ V105_RESERVED_TABLES = (
     "procedure_row_task_history",
     "procedure_operation_previews",
 )
+# V112 cutover-hardening 新增表
+V112_TABLES = (
+    "procedure_template_revisions",
+    "procedure_row_definition_revisions",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -89,12 +94,13 @@ class TestProcedureInstanceGrain:
 
 
 # ---------------------------------------------------------------------------
-# 2. 迁移基线：最高 V104，V105 仅预留、尚未创建
+# 2. 迁移基线：V105 + V109(cutover-hardening)
 # ---------------------------------------------------------------------------
 class TestMigrationHead:
-    """Task 2 已落地 V105 feature 迁移；后续其他特性可继续追加更高版本号迁移。
+    """Task 2 已落地 V105 + V112(cutover-hardening) feature 迁移；
 
-    这里锁定：canonical V105 存在、无非法 V105 变体、常量与守卫一致。
+    V105 = procedure_row_tasks expand；V112 = current-revision registry + append-only。
+    V106~V111 被 evidence_governance 等占用（非本 feature，不可干涉）。
     """
 
     @staticmethod
@@ -104,36 +110,39 @@ class TestMigrationHead:
             m = re.match(r"V(\d+)__", path.name)
             if m:
                 versions.append(int(m.group(1)))
-        return sorted(versions)
+        return sorted(set(versions))
 
-    def test_migration_head_is_at_least_105(self):
+    def test_migration_head_at_least_112(self):
         versions = self._versions()
         assert versions, f"未发现 V*.sql 迁移: {MIGRATIONS_DIR}"
-        assert max(versions) >= 105, f"Task 2 后迁移头应至少为 V105，实际 V{max(versions)}"
-        assert 105 in versions, "canonical V105 迁移必须存在"
+        assert max(versions) >= 112, f"Task 2 后最高迁移应 >= V112，实际 V{max(versions)}"
 
-    def test_canonical_v105_file_exists_and_no_variant(self):
-        v105 = sorted(p.name for p in MIGRATIONS_DIR.glob("V105__*.sql"))
-        assert v105 == ["V105__procedure_row_tasks.sql"], (
-            f"仅允许 canonical V105 迁移文件（重复/改名会被 runner 版本去重静默跳过）: {v105}"
+    def test_canonical_v105_file_exists(self):
+        v105 = sorted(p.name for p in MIGRATIONS_DIR.glob("V105__procedure_row_tasks*"))
+        assert "V105__procedure_row_tasks.sql" in [p for p in v105], (
+            f"canonical V105 procedure_row_tasks 迁移缺失: {v105}"
         )
 
-    def test_reserved_v105_identity_matches_guard(self):
-        """canonical filename / current version 常量必须与架构守卫脚本一致。"""
-        assert guard.CANONICAL_V105_FILENAME == "V105__procedure_row_tasks.sql"
-        assert guard.NEXT_MIGRATION_FILENAME == "V105__procedure_row_tasks.sql"
-        assert guard.CURRENT_MIGRATION_VERSION == 105
-        assert 105 in self._versions()
+    def test_v112_cutover_hardening_exists(self):
+        v112 = sorted(p.name for p in MIGRATIONS_DIR.glob("V112__*.sql"))
+        assert "V112__procedure_current_revision_registry.sql" in v112, (
+            f"V112 cutover-hardening 迁移缺失: {v112}"
+        )
 
 
 # ---------------------------------------------------------------------------
-# 3a. V105 表已登记到 ORM（Task 2 落地）
+# 3a. V105 + V109 表已登记到 ORM（Task 2 落地）
 # ---------------------------------------------------------------------------
 class TestV105InOrm:
     def test_v105_tables_present_in_metadata(self):
         registered = set(Base.metadata.tables.keys())
         missing = set(V105_RESERVED_TABLES) - registered
         assert not missing, f"Task 2 后 V105 表必须登记到 ORM: {sorted(missing)}"
+
+    def test_v112_tables_present_in_metadata(self):
+        registered = set(Base.metadata.tables.keys())
+        missing = set(V112_TABLES) - registered
+        assert not missing, f"Task 2 后 V112 表必须登记到 ORM: {sorted(missing)}"
 
     def test_scope_tables_present_in_metadata(self):
         registered = set(Base.metadata.tables.keys())

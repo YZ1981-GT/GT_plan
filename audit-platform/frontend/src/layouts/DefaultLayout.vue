@@ -274,6 +274,8 @@ const FULLWIDTH_PATHS = [
   '/knowledge', '/consolidation', '/attachments', '/confirmation',
   '/archive', '/work-hours',
   '/template-library', '/custom-query',
+  // procedure-delegation-notification / Task 12：跨项目"我的程序任务"全宽独立页
+  '/my-procedures',
 ]
 const FULLWIDTH_PREFIXES = ['/extension/', '/settings', '/dashboard/', '/eqcr/']
 

@@ -8,7 +8,9 @@
 
 ## Scope
 
-本 feature 必须完成模板定义真源、V105 expand 模型、显式物化、原子底稿绑定、模板对账、两层裁剪、项目权限、委派预览与一次消费、状态机、兼容投影、旧状态保守迁移、一级复核、IssueTicket 闭环、事务 outbox、聚合通知、任务查询、现有页面重构、分阶段部署和四角色实测。所有任务均为必做，不设置 optional。
+本 feature 必须完成模板定义真源、V105 expand 模型、V106 cutover-hardening 修正迁移、显式物化、原子底稿绑定、模板对账、两层裁剪、项目权限、委派预览与一次消费、状态机、兼容投影、旧状态保守迁移、一级复核、IssueTicket 闭环、事务 outbox、跨进程通知收敛、任务查询、现有页面重构、分阶段部署和四角色实测。所有任务均为必做，不设置 optional。
+
+第四轮代码复盘（2026-07-16）确认：V105 与主要领域服务已经存在，但当前仍有按 `program_no` 猜测 overlay、历史 revision 混合物化、绑定冲突部分成功、非原子乐观锁、history 旧值失真、legacy 裁剪页未切换、进程内 SSE 无法跨 worker 收敛、dead-letter 后续越序及验收证据不足等 cutover 阻断项。因此本 feature 当前状态是“主体已实现、收敛整改中”，不得按 100% 完成发布。
 
 ## Glossary
 
@@ -159,21 +161,24 @@
 7. THE System SHALL 记录现有真实 bug 作为回归基线：当前 UI 修改 `execution_status` 却调用 `updateProcedureTrim`，且 payload 不含 `execution_status`；重构后状态动作必须调用 TransitionService 契约。
 8. 任务详情和深链 SHALL 校验 task→project→wp_index→wp 绑定；未授权请求返回 403/404 且不泄露程序文本。
 
-### Requirement 10: 有序 Outbox、聚合通知与 at-least-once SSE
+### Requirement 10: 有序 Outbox、跨进程通知收敛与可恢复唤醒
 
-**User Story:** 作为任务参与者，我希望通知可靠、顺序正确且批量操作不会造成通知风暴。
+**User Story:** 作为任务参与者，我希望领域通知可靠、有序且跨 worker 可见，批量操作不会造成通知或刷新风暴；短暂断线后仍能通过持久化游标恢复。
 
 #### Acceptance Criteria
 
 1. EACH domain mutation SHALL 在同一事务写 Delivery_Outbox，字段至少包含 `aggregate_type, aggregate_id, aggregate_version, event_type, idempotency_key, available_at, lease_expires_at, claimed_by, processed_at, payload`。
 2. THE dispatcher SHALL 使用 claim lease 与并发安全领取；过期 lease 可回收，失败按 available_at 退避，超限进入 dead-letter。
-3. EVENTS of the same aggregate SHALL 按 aggregate_version 顺序处理；前一版本未 processed 时后续版本不得越序投递。
+3. EVENTS of the same aggregate SHALL 按 aggregate_version 顺序处理；前一版本未 processed（包括 dead-letter 未处置）时后续版本不得越序投递。dead-letter 只有经有审计记录的 replay 或 waive/skip 决议后才能解除 aggregate barrier。
 4. Notification dedup SHALL 至少覆盖 `event_id + recipient_user_id`；重试不得生成重复通知。
-5. THE dispatcher SHALL 先提交 Notification，再发送 SSE；SSE delivery SHALL 明确为 at-least-once，payload 必须包含 event_id。
-6. THE Frontend SHALL 以 event_id 幂等处理 SSE，并通过重新拉取任务/未读数收敛，不把 SSE payload 当状态真源。
-7. 批量委派 SHALL 为每个 task 记录独立 history/outbox audit event，但用户通知 SHALL 按 `delegation_batch_id + recipient_user_id` 聚合为摘要。
-8. THE aggregate notification metadata SHALL 包含 event_id/batch_id、project、任务计数、可跳转 task 列表或任务筛选条件；不得从中文 content 解析路由。
-9. Notification/SSE 失败 SHALL NOT 回滚已提交领域事务；event 保持可重试并提供 backlog、oldest age、lease、失败和延迟指标。
+5. THE dispatcher SHALL 先提交 Notification，再发布跨进程 wake-up。持久化 Notification/outbox 投影采用 at-least-once；SSE 仅作为可重复、可丢失的失效唤醒信号，不得被描述为状态真源或独立可靠队列。
+6. THE cross-worker wake-up SHALL 经 Redis Pub/Sub（或等价共享 broker）广播；每个 API worker 只向本进程 SSE 连接 fan-out。客户端重连 SHALL 携带游标/最后已见 event_id，并从持久化 Notification/任务 API catch-up 后再恢复实时监听。
+7. THE Frontend SHALL 以 event_id 幂等处理 wake-up，并在 200–500ms 窗口内合并任务列表/未读数刷新；单批 N 个底层事件不得触发 N 次全量请求。
+8. 批量委派 SHALL 为每个 task 记录独立 history/outbox audit event，但用户通知 SHALL 按 `delegation_batch_id + recipient_user_id` 聚合为摘要。
+9. THE aggregate notification metadata SHALL 包含 event_id/batch_id、project、任务计数、可跳转 task 列表或任务筛选条件；不得从中文 content 解析路由。
+10. assign/reassign/submit/changes_requested/review/reviewer_missing/comment/reply SHALL 全部通过同一 outbox→Notification→wake-up 路径；禁止在领域服务或 review service 中直接写 Notification/SSE 形成旁路。
+11. Notification/wake-up 失败 SHALL NOT 回滚已提交领域事务；event 保持可重试并提供 backlog、oldest age、lease、失败、dead-letter barrier、dispatcher heartbeat 和延迟指标。
+12. THE dispatcher SHALL 在应用 lifespan 中显式 start/stop，多个 worker 可依赖 lease/`SKIP LOCKED` 安全并行；健康端点必须区分“开关关闭、循环未运行、积压、阻塞、正常”。
 ### Requirement 11: 项目权限与 fail-closed 授权
 
 **User Story:** 作为项目负责人，我希望只有当前项目中的授权人员能裁剪、委派和处理任务。
@@ -228,4 +233,25 @@
 3. `MyProcedureTasks.vue` SHALL 提供执行任务与复核任务筛选、ack/start/submit/review 动作、逾期提示和深链，不复制现有任务中心能力。
 4. UNDER 6000 concurrent users target，常规任务分页查询 p95 SHALL ≤2 秒，单任务转换 p95 SHALL ≤1 秒；5000 行 delegation preview（不含异步 materialize 等待）SHALL ≤3 秒。
 5. THE System SHALL 记录 materialize、reconcile、preview、delegation、transition、projection、dispatcher 的结构化指标与 trace_id，且日志不得包含附件正文或敏感凭证明细。
-6. THE acceptance suite SHALL 包含 admin/现场经理/审计助理/操作复核人四角色 fresh-navigation Playwright，覆盖先委派后生成、原子 wp 绑定、退回再提交、review、聚合通知、SSE 重复、越权、刷新 round-trip 和 0 console error。
+6. THE acceptance suite SHALL 包含 admin/现场经理/审计助理/操作复核人四角色 fresh-navigation Playwright，覆盖先委派后生成、原子 wp 绑定、退回再提交、review、聚合通知、重复 wake-up、越权、刷新 round-trip 和 0 console error。
+7. EACH 验收任务 SHALL 在 spec evidence manifest 中记录命令、时间、环境、结果、关键截图/网络/数据库证据和失败修复记录；无可复核证据不得标记完成。
+8. THE deep-link acceptance SHALL 验证真实 `GtAProgramConsole` 清筛选、展开、滚动与高亮行为，不得只断言 URL/query payload。
+
+### Requirement 15: 第四轮 cutover 收敛与 V106 修正
+
+**User Story:** 作为发布负责人，我希望主体实现与真实用户路径、模板身份、并发和投递语义完全一致，避免“新域模型已存在但旧路径仍在写”的半迁移状态进入生产。
+
+#### Acceptance Criteria
+
+1. THE System SHALL 新增 `procedure_template_revisions`（或等价单一 current-revision registry），以 `template_code + revision_hash` 登记 revision，并保证每个 template_code 最多一个 active current revision；切换 current 必须事务化、可审计且只能来自显式 import/reconcile apply。
+2. WHEN materialize/overlay 未显式给出 revision，THE System SHALL 只使用 registry 指向的 current revision；缺 current、多 current 或待 reconcile 时 fail-closed，不得读取全部历史 revision。
+3. EACH rendered ProgramRow SHALL 携带 `sheet_key + definition_key + definition_revision_hash`；overlay/deep-link SHALL 只按该三元组精确连接。`program_no` 仅用于展示或显式 legacy reconcile，不得用于 `setdefault`、first-match 或静默 fallback。
+4. THE materialize implementation SHALL 以 set-based 查询一次取得目标 wp_code/revision definitions，禁止按每个 wp_index 循环查询；5000 行场景必须提交真实 PostgreSQL query-count/EXPLAIN 证据。
+5. WHEN bind_working_paper 发现同一 project/wp_index 下任一 active task 已绑定其他 wp，THE System SHALL 整批 409 且零写；不得先绑定 pending 再仅返回 conflict 计数。成功绑定 SHALL 在同一事务重建该 wp 的 Compatibility_Projection。
+6. ALL externally callable mutations SHALL 强制要求 expected lock_version；assignment mutation 还要求 expected assignment_version。CAS SHALL 在 TransitionService 内以 `UPDATE ... WHERE lock_version=:expected RETURNING` 或 service-owned `SELECT FOR UPDATE` 保证，不得依赖 router 调用习惯。
+7. THE history writer SHALL 在 mutation 前捕获 old/new snapshot，并用 sentinel 区分“未提供”与“真实 NULL”；首次 assign、转派、reopen 清人、reviewer 变化的 old/new 值必须可验证准确。
+8. THE existing `ProcedureTrimming.vue`、`commonApi` 与 legacy routers SHALL 完成调用清单和切换：用户可达裁剪/方案/委派路径只调用新 preview/apply/transition 契约；legacy 写端点在 dual 阶段仅作受控 adapter，cutover 后拒写，不得维持第二状态机。
+9. THE WorkingPaper creation inventory SHALL 覆盖全部生成/复制/导入入口；每个入口必须在同一事务调用 bind_working_paper，CI coverage guard 防止新增入口漏绑。
+10. `PROCEDURE_ROW_TASK_WRITE_MODE` SHALL 仅允许 `legacy | dual | task_source | paused`。合法迁移为 legacy→dual→task_source，紧急回滚可由 dual/task_source→paused；paused 禁止新领域写并使用 dual-read/legacy fallback，不引入文档外的 `no-new-task-writes/legacy-safe` 隐式值。
+11. THE V106 migration SHALL 以 additive 方式补 revision registry、所需约束/索引/审计字段和 history append-only 防护；不得修改已可能执行的 V105 文件。V106 启动契约必须通过 pg_catalog 校验对象定义而非只看对象名。
+12. BEFORE cutover，THE System SHALL 关闭所有本 requirement 的 blocker，并完成：跨 sheet 重号、旧 revision、绑定冲突、同版本并发、history NULL、跨 worker wake-up、dead-letter barrier、legacy write freeze、真实控制台深链和四角色 round-trip 的实证验收。
