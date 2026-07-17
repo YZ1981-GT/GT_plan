@@ -61,7 +61,7 @@
   - 某 lane 因环境阻塞（服务起不来）→ 降级为 API/gate + PostgreSQL 级证明并如实记该 criterion GAP，不标 passed 冒充浏览器验收。追加 Closeout Evidence run。
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9_
 
-- [-] 7. PR 提交与依赖 spec 交互验证（R6）
+- [x] 7. PR 提交与依赖 spec 交互验证（R6）
   - 推送新分支（`-u` 远程跟踪），`gh pr create` 走 PR 不直推 main/master；仅 stage 本次交付文件；疑似 secret 文件提交前标记。PR 描述含变更摘要/测试/阻塞项。
   - 跑 `procedure-delegation-notification` 相关套件，以基线快照区分其既有 `service_identities` create_all 失败与本次新增回归；确认两 spec 互不引入新回归。
   - 追加 Closeout Evidence run 记录 PR 标识、分支名与 Interaction_Validation 结果。

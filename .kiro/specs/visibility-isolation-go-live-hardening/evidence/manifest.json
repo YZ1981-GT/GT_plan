@@ -259,6 +259,41 @@
         }
       ],
       "notes": "R5 browser lane EXECUTED and PASSED (not GAP): backend 9980 + frontend 3030 healthy; 8 Acceptance_Role each with a fresh browser context + fresh navigation; deep-link render-config allow=200/deny=404; scope-internal-not-delegated AND scope-external-delegated both denied (404); deny shows '资源不存在或不可访问' placeholder with NO workpaper name flash; console error=0 for every role; revocation refresh converged in ~23ms (<=1s). Authoritative deterministic proof of the 8-role authorization matrix (5.2-5.4/5.8/5.9), list visibility, and revocation (5.5) at gate level via real app services + real PostgreSQL audit_platform (test_task6_role_acceptance.py, 4 passed). Deterministic artifacts strip timestamps/host/wp_id/timing for stable hash-pin. Playwright harness audit-platform/frontend/e2e/task6-role-acceptance.spec.ts (10 passed); committed seed backend/scripts/e2e/task6_role_acceptance_seed.py."
+    },
+    {
+      "run_id": "7. PR 提交与依赖 spec 交互验证（R6）-0008-2026-07-17T13:27:24.803169+00:00",
+      "seq": 8,
+      "task_id": "7. PR 提交与依赖 spec 交互验证（R6）",
+      "test_ids": [
+        "backend/tests/procedure_delegation (procedure-delegation-notification suite)"
+      ],
+      "criterion_ids": [
+        "6.1",
+        "6.2",
+        "6.3",
+        "6.4",
+        "6.5",
+        "6.6",
+        "6.7",
+        "6.8"
+      ],
+      "status": "passed",
+      "command": "git checkout -b pr/visibility-isolation-go-live-hardening ; git add <delivery paths> ; git commit ; git fetch origin ; git push -u origin pr/visibility-isolation-go-live-hardening ; python -m pytest tests/procedure_delegation -rfE --tb=no -q  (working tree vs clean HEAD worktree, compared failing-node sets)",
+      "started_at": "2026-07-17T13:27:24.803169+00:00",
+      "finished_at": "2026-07-17T13:27:24.803169+00:00",
+      "artifacts": [
+        {
+          "path": "evidence/artifacts/task7/task7_pr_and_interaction_summary.json",
+          "sha256": "dea2f316460120f32ec56d22123243331820aa8fe694bf06565e1e306b61673a",
+          "size": 12357
+        },
+        {
+          "path": "evidence/artifacts/task7/pr_body.md",
+          "sha256": "f46683900d1a4e8e9da892f909b534c0d3fceb70b6e6be4810f37ae6ca61c7ad",
+          "size": 2200
+        }
+      ],
+      "notes": "Task 7 PR 提交与依赖 spec 交互验证（R6 / 组件 H6 CommitAndInteraction）。GIT: 从 work/2026-05-30-wp-specs HEAD 建新分支 pr/visibility-isolation-go-live-hardening（不直推 main/master），仅 stage 本次交付（221 文件：wp_visibility 服务 + app/security + 已接门 routers/router_registry + V113/R113 迁移 + invalidation worker + 两个可见性 spec 文档与证据 + 可见性测试 + 前端可见性 + 配置编辑），显式排除依赖 spec procedure-delegation-notification（tasks.md + test_p35_current_revision_pbt.py）与 scratch/temp/test-results。提交前 secret 扫描：无 .env/私钥/真实 token；4 处 pattern 命中均为测试文件内合成 fixture 字面量（JWT 签名不匹配用例），非真实凭据。commit 6ac477b120ffbdab95e10d39fb6d99c351c22b11；git fetch 后 git push -u origin 设置远程跟踪成功。PR: gh v2.87.3 已装但未认证（无登录 host，GH_TOKEN/GITHUB_TOKEN 未设），未运行交互式 gh auth login → PR 创建被环境阻断，不伪造 PR 号（诚实 GAP）；已记录精确 gh pr create 命令 + compare URL + pr_body.md 于 artifact。DEPENDENCY INTERACTION（R6.5-6.7）：对 backend/tests/procedure_delegation（procedure-delegation-notification 套件）分别在(a)本交付工作树与(b)干净 HEAD git worktree（detached 69a52b56）跑并比较失败节点集。两侧均 55 failed + 2 errors，失败节点集完全相同（identical=True）；本交付引入 NEW 回归=0。全部失败根因为既有 service_identities create_all 失败：NoReferencedTableError FK 'attachments.actor_service_identity_id' -> 'service_identities'（evidence_governance FK 目标未在这些测试 metadata 注册），与可见性交付无关。工作树比 HEAD 多 5 个 PASSING 收集用例=依赖 spec 未跟踪的 test_p35_current_revision_pbt.py（未纳入本交付 stage）。结论：Parent_Spec 实现与 Dependency_Spec 共存互不引入新回归，既有 service_identities 失败与本交付区分记录。🔴 诚实 GAP：PR 未实际开启（环境未认证）——分支+push+精确 PR 命令+compare URL 已真实记录，未伪造 PR 号。迁移 head 保持 V113。"
     }
   ]
 }
