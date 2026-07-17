@@ -1,0 +1,31 @@
+{
+  "artifact_kind": "deterministic_explain_summary",
+  "determinism_note": "Planner cost/estimated-rows/width and EXPLAIN ANALYZE timing/buffers/actual-rows/loops/timestamps are stripped. Only query-construction and implementation invariants are retained so CI reproduces identical bytes. Raw EXPLAIN (ANALYZE, BUFFERS) output is preserved in explain_plans.txt (not hash-pinned because its bytes are volatile).",
+  "gate_query_count": {
+    "constant": true,
+    "n3": 6,
+    "n30": 6
+  },
+  "grants_query_count": {
+    "constant": true,
+    "le_2": true,
+    "n3": 1,
+    "n30": 1
+  },
+  "grants_union": {
+    "branch_count": 5,
+    "branches": [
+      "lead",
+      "assignee",
+      "reviewer",
+      "lead_history",
+      "row_history"
+    ],
+    "has_correlated_subplan": false,
+    "top_node_family": "Append",
+    "union_all": true
+  },
+  "spec": "procedure-delegation-visibility-isolation",
+  "task": "15",
+  "verified_backend": "PostgreSQL"
+}

@@ -186,9 +186,19 @@ async def batch_export_zip(
     import zipfile
     from pathlib import Path
 
+    from app.services.wp_visibility.entry_integration import make_bulk_visible_filter
+
+    # Wp_Bound_Gate（Task 4 / R3）：打包底稿正文前用可见集过滤 wp_ids；
+    # 不可见/跨项目/未委派/scope 外底稿静默剔除，manifest 只由可见集构建。
+    _visible = make_bulk_visible_filter(
+        db, current_user, entrypoint="workpaper.detail", action="read_detail",
+        method="GET", entry_family="export",
+    )
+    visible_wp_ids = [wid for wid in data.wp_ids if await _visible(wid, None)]
+
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for wp_id_str in data.wp_ids:
+        for wp_id_str in visible_wp_ids:
             wp_id = UUID(wp_id_str)
             result = await db.execute(
                 sa.select(WorkingPaper, WpIndex)

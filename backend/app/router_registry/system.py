@@ -266,6 +266,10 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.workpaper_remind import router as workpaper_remind_router
 
     # 自带完整 /api 前缀的 router（直接注册，不加额外前缀）
+    # Task 16 CROSS-CUTTING-WP-GATE：含 {wp_id} 的 router（workpaper_remind/batch_assign_enhanced）
+    # 经 include_router_with_wp_gate 附加 dedicated_wp_gate（对无 wp_id 路由安全 no-op）。
+    from app.routers._wp_gate import include_router_with_wp_gate as _inc_wp_gate
+
     for r in [
         archive_router,              # /api/projects/{project_id}/archive/*
         batch_assign_enhanced_router,  # /api/workpapers/batch-assign-enhanced
@@ -275,7 +279,7 @@ def register_system_routers(app: FastAPI) -> None:
         workhour_approve_router,     # /api/workhours/batch-approve
         workpaper_remind_router,     # /api/projects/{project_id}/workpapers/*
     ]:
-        app.include_router(r)
+        _inc_wp_gate(app, r)
 
     # rotation_router 内部 prefix="/rotation"，需补 /api 前缀 → /api/rotation/*
     app.include_router(rotation_router, prefix="/api")
@@ -298,7 +302,7 @@ def register_system_routers(app: FastAPI) -> None:
 
     # ═══ §134. 底稿编制指导面板 ═══
     from app.routers.wp_guidance_chat import router as wp_guidance_chat_router
-    app.include_router(wp_guidance_chat_router, tags=["底稿编制指导"])
+    _inc_wp_gate(app, wp_guidance_chat_router, tags=["底稿编制指导"])
 
     # ═══ §135. evidence-governance: Facade + Ref + OCR ═══
     from app.routers.evidence_governance import router as evidence_governance_router

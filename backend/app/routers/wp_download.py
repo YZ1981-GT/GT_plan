@@ -37,12 +37,22 @@ async def download_pack(
         "workpaper_batch_download: user=%s project=%s count=%d",
         str(current_user.id), str(project_id), len(body.wp_ids),
     )
+    # Wp_Bound_Gate（Task 4 / R3）：打包底稿正文前用可见集过滤 wp_ids
+    # （make_bulk_visible_filter）；不可见/跨项目/未委派/scope 外底稿静默剔除，
+    # 不泄露存在性，绝不进入 ZIP（manifest 只由可见集构建）。
+    from app.services.wp_visibility.entry_integration import make_bulk_visible_filter
+
+    _visible = make_bulk_visible_filter(
+        db, current_user, entrypoint="workpaper.detail", action="read_detail",
+        method="GET", entry_family="download",
+    )
+    visible_wp_ids = [wid for wid in body.wp_ids if await _visible(wid, None)]
     svc = WpDownloadService()
     try:
         buf = await svc.download_pack(
             db=db,
             project_id=project_id,
-            wp_ids=body.wp_ids,
+            wp_ids=visible_wp_ids,
             include_prefill=body.include_prefill,
         )
         return StreamingResponse(

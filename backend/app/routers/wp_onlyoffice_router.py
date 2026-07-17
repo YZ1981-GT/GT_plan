@@ -28,6 +28,12 @@ from app.core.database import get_db
 from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.models.workpaper_models import WpIndex, WorkingPaper
+from app.services.wp_visibility import editor_security as _editor_security
+from app.services.wp_visibility.denial import (
+    EXTERNAL_NOT_FOUND_DETAIL,
+    ExternalNotFound,
+    RateLimited,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +41,69 @@ router = APIRouter(
     prefix="/api/workpapers",
     tags=["working-papers"],
 )
+
+
+# ---------------------------------------------------------------------------
+# Task 11 · 组件 C11 EditorSecurity — 统一门接入 + 全 claim 令牌
+#
+# 编辑器入口（config / file-read / callback / convert）与 WOPI 入口统一经
+# resolve_wp_binding_and_access 判定授权；令牌用 editor_security 全量校验
+# （签名/过期/jti/非空/逐 claim 绑定）。
+#
+# 部署分阶段（settings.ONLYOFFICE_JWT_ENFORCE，默认 False）：
+#   - enforce=True：门拒绝 → 对外统一 404（External_Not_Found），令牌 secret 缺失亦 fail-closed。
+#   - enforce=False（dev，JWT disabled）：门拒绝仅记录告警并放行，供开发编辑；
+#     令牌校验机制本身恒 fail-closed（editor_security），仅"是否阻断请求"受 enforce 控制。
+# 校验机制（editor_security / gate signed_token 全量校验）与部署 enforce 解耦。
+# ---------------------------------------------------------------------------
+
+
+async def _gate_editor(
+    db: AsyncSession,
+    current_user: User,
+    *,
+    wp_id: UUID,
+    project_id: UUID | None,
+    entrypoint: str,
+    action: str,
+    method: str,
+    sheet_name: str | None = None,
+    signed_token: str | None = None,
+    requested_version: str | None = None,
+):
+    """对编辑器入口调用统一门（Req 8.8/8.9）。
+
+    返回 WpAccessContext（allow）或 None（enforce 关闭且门拒绝，dev 放行）。
+    RateLimited 恒抛 429；enforce 开启时门拒绝抛 404（External_Not_Found 固定 body）。
+    """
+    from app.services.wp_visibility.wp_bound_gate import (
+        BindingAdapters,
+        resolve_wp_binding_and_access,
+    )
+
+    req = BindingAdapters().wp(
+        entrypoint=entrypoint,
+        action=action,
+        method=method,
+        wp_id=wp_id,
+        project_id=project_id,
+        entry_family="onlyoffice_wopi",
+        requested_sheet_key=sheet_name,
+        requested_version=requested_version,
+        signed_token=signed_token,
+    )
+    try:
+        return await resolve_wp_binding_and_access(db, current_user, req)
+    except RateLimited:
+        raise  # 资源无关 429 恒生效
+    except ExternalNotFound:
+        if settings.ONLYOFFICE_JWT_ENFORCE:
+            raise HTTPException(status_code=404, detail=EXTERNAL_NOT_FOUND_DETAIL)
+        logger.warning(
+            "editor gate deny (enforce off, dev passthrough) entrypoint=%s wp_id=%s action=%s",
+            entrypoint, wp_id, action,
+        )
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -434,6 +503,13 @@ async def get_sheet_onlyoffice_config(
     wp, wp_code = await _load_wp_or_404(db, wp_id)
     project_id = wp.project_id
 
+    # 1.5 统一门授权（Req 8.8/8.9）：editor.config 读入口。
+    gate_ctx = await _gate_editor(
+        db, current_user, wp_id=wp_id, project_id=project_id,
+        entrypoint="editor.config", action="editor_config", method="GET",
+        sheet_name=sheet_name,
+    )
+
     # 2. OnlyOffice 可用性检查
     if not settings.ONLYOFFICE_URL:
         raise HTTPException(status_code=503, detail="OnlyOffice 未配置")
@@ -464,9 +540,22 @@ async def get_sheet_onlyoffice_config(
     # 4. 生成 doc_key
     doc_key = _generate_doc_key(file_path, _sheet_wp_code)
 
-    # 5. 构建 URL（download_url 嵌短时效签名 token，确保 WOPI 鉴权不依赖容器 outbox JWT）
+    # 5. 构建 URL（download_url 嵌全 claim 有限时效签名 token，Req 10.1/10.10）
     base_url = settings.ONLYOFFICE_CALLBACK_BASE or str(request.base_url).rstrip("/")
-    wopi_token = _sign_wopi_token(wp_id, _sheet_wp_code)
+    # 全 claim 编辑器令牌（secret 配置时）；无 secret（dev JWT disabled）回退旧短 token。
+    if settings.ONLYOFFICE_JWT_SECRET:
+        wopi_token = _editor_security.sign_editor_token(
+            secret=settings.ONLYOFFICE_JWT_SECRET,
+            sub=str(current_user.id),
+            project_id=str(project_id),
+            wp_id=str(wp_id),
+            sheet_name=sheet_name,
+            wp_code=_sheet_wp_code,
+            version=str(wp.file_version),
+            action="editor_read",
+        )
+    else:
+        wopi_token = _sign_wopi_token(wp_id, _sheet_wp_code)
     download_url = (
         f"{base_url}/api/workpapers/{wp_id}/sheets/{sheet_name}/wopi/contents"
     )
@@ -484,6 +573,10 @@ async def get_sheet_onlyoffice_config(
         WpFileStatus.review_passed,
         WpFileStatus.archived,
     ):
+        mode = "view"
+    # UserCanWrite = gate allow ∩ file state ∩ lock：History_Only / 只读授权 → view（Req 10.8/Design C11）。
+    # gate_ctx 为 None 表示 enforce 关闭且门拒绝（dev 放行），不额外收紧。
+    if gate_ctx is not None and getattr(gate_ctx, "readonly", False):
         mode = "view"
 
     # 6.5 席位接入：仅 edit 模式占席位；view（只读）不占
@@ -603,6 +696,16 @@ async def get_sheet_wopi_contents(
         if find_template_file_any(_candidate):
             _sheet_wp_code = _candidate
 
+    # 全 claim 令牌逐项绑定校验（Req 10.4/10.5）：拦截跨资源重放（为其它 wp/sheet 签发的令牌）。
+    ok, reason = _validate_editor_download_token(
+        request, wp_id=wp_id, project_id=project_id, sheet_name=sheet_name,
+        wp_code=_sheet_wp_code, version=str(wp.file_version), action="editor_read",
+    )
+    if not ok:
+        logger.warning("WOPI GetFile 令牌绑定校验失败 wp_id=%s reason=%s", wp_id, reason)
+        if settings.ONLYOFFICE_JWT_ENFORCE:
+            raise HTTPException(status_code=404, detail=EXTERNAL_NOT_FOUND_DETAIL)
+
     template_path = find_template_file_any(_sheet_wp_code)
     try:
         file_path = _resolve_wp_file(project_id, _sheet_wp_code, template_path, visible_sheet=sheet_name)
@@ -666,6 +769,43 @@ def _verify_wopi_jwt(request: Request) -> bool:
     except JWTError as exc:
         logger.warning("WOPI GetFile JWT 校验失败: %s", exc)
         return False
+
+
+def _validate_editor_download_token(
+    request: Request,
+    *,
+    wp_id: UUID,
+    project_id: UUID,
+    sheet_name: str,
+    wp_code: str,
+    version: str,
+    action: str,
+    require_write: bool = False,
+) -> tuple[bool, str | None]:
+    """WOPI GetFile / PutFile 全 claim 令牌校验（Req 10.1–10.5/10.8）。
+
+    仅在配置了 secret 时启用（dev JWT disabled → (True, None) 放行，与 _verify_wopi_jwt 一致）。
+    从 ``?token=`` / Authorization 提取原始令牌，逐 claim 绑定到服务端解析资源。
+    返回 (ok, reason)。
+    """
+    secret = settings.ONLYOFFICE_JWT_SECRET
+    if not secret:
+        return True, None  # dev：JWT disabled 放行（机制本身 fail-closed，见 editor_security）
+    token = request.headers.get("Authorization") or request.query_params.get("token")
+    result = _editor_security.validate_editor_token(
+        token,
+        secret=secret,
+        expected={
+            "project_id": str(project_id),
+            "wp_id": str(wp_id),
+            "sheet_name": str(sheet_name),
+            "wp_code": str(wp_code),
+            "version": str(version),
+            "action": str(action),
+        },
+        require_write=require_write,
+    )
+    return result.ok, result.reason
 
 
 def _verify_callback_jwt(request: Request) -> bool:
@@ -754,6 +894,49 @@ async def post_sheet_onlyoffice_callback(
         # 查询底稿 + 项目软删守卫
         wp, wp_code = await _load_wp_or_404(db, wp_id)
         project_id = wp.project_id
+
+        # 落盘前重校验（Req 10.6/10.7/10.8）：Current_Version + action + 文件状态 + 撤权/epoch。
+        # 归档/复核通过 → 只读，拒绝回调写入（不覆盖磁盘）。
+        from app.models.workpaper_models import WpFileStatus as _WpFileStatus
+
+        file_state_writable = wp.status not in (
+            _WpFileStatus.review_passed,
+            _WpFileStatus.archived,
+        )
+        gate_allow_write = file_state_writable
+        # enforce 开启且能定位 actor 时，重跑门检测已撤权会话 / 越权（editor_write）。
+        if settings.ONLYOFFICE_JWT_ENFORCE and user_id:
+            try:
+                actor = (
+                    await db.execute(sa.select(User).where(User.id == UUID(user_id)))
+                ).scalar_one_or_none()
+                if actor is not None:
+                    ctx = await _gate_editor(
+                        db, actor, wp_id=wp_id, project_id=project_id,
+                        entrypoint="editor.file_write", action="editor_write",
+                        method="POST", sheet_name=sheet_name,
+                    )
+                    gate_allow_write = ctx is not None and not getattr(
+                        ctx, "readonly", False
+                    )
+                else:
+                    gate_allow_write = False
+            except (ValueError, ExternalNotFound):
+                gate_allow_write = False
+        ok_cb, cb_reason = _editor_security.verify_callback_preconditions(
+            claim_action="callback",
+            server_action="callback",
+            claim_version=None,
+            current_version=str(wp.file_version),
+            gate_allow_write=gate_allow_write,
+            epoch_valid=True,
+        )
+        if not ok_cb:
+            logger.warning(
+                "OnlyOffice callback 落盘前重校验拒绝 wp_id=%s sheet=%s reason=%s",
+                wp_id, sheet_name, cb_reason,
+            )
+            return {"error": 1}
 
         # 🔴 与 config / WOPI 端点一致：聚合包内独立 source sheet（如 D4-5）
         # 保存回其独立文件而非父 wp_code（D4），否则用户编辑丢失。

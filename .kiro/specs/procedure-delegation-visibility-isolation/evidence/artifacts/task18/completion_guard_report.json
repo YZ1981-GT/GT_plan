@@ -1,0 +1,152 @@
+{
+  "coverage_guard": {
+    "clean": true,
+    "findings": {},
+    "findings_total": 0
+  },
+  "criteria": {
+    "all_latest_passed": true,
+    "non_passed": [],
+    "total": 226
+  },
+  "guard": "completion_guard",
+  "latest_artifacts_verified": {
+    "checked": 26,
+    "clean": true
+  },
+  "note": "Task 18 = 本 Completion Guard 运行；其证据即本 run。历史 superseded run （如 Task 14 seq-24、Task 15 seq-26/27）按 append-only 保留，其漂移 artifact 不阻断完成（latest-run-per-task 语义），从不改写已记录哈希。",
+  "required_leaf_tasks": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18"
+  ],
+  "semantics": "latest-run-per-task and latest-run-per-criterion",
+  "spec": "procedure-delegation-visibility-isolation",
+  "task18_criteria": [
+    "15.1",
+    "15.2",
+    "15.3",
+    "15.4",
+    "15.5",
+    "15.6",
+    "15.7",
+    "15.8",
+    "15.9",
+    "15.10",
+    "15.11",
+    "15.12",
+    "16.21",
+    "16.22",
+    "16.23",
+    "16.24"
+  ],
+  "task_latest": {
+    "1": {
+      "artifacts": 3,
+      "seq": 1,
+      "status": "passed"
+    },
+    "10": {
+      "artifacts": 0,
+      "seq": 15,
+      "status": "passed"
+    },
+    "11": {
+      "artifacts": 0,
+      "seq": 14,
+      "status": "passed"
+    },
+    "12": {
+      "artifacts": 0,
+      "seq": 22,
+      "status": "passed"
+    },
+    "13": {
+      "artifacts": 0,
+      "seq": 23,
+      "status": "passed"
+    },
+    "14": {
+      "artifacts": 2,
+      "seq": 29,
+      "status": "passed"
+    },
+    "15": {
+      "artifacts": 1,
+      "seq": 31,
+      "status": "passed"
+    },
+    "16": {
+      "artifacts": 3,
+      "seq": 28,
+      "status": "passed"
+    },
+    "17": {
+      "artifacts": 11,
+      "seq": 30,
+      "status": "passed"
+    },
+    "18": {
+      "artifacts": 0,
+      "seq": null,
+      "status": "pending_close"
+    },
+    "2": {
+      "artifacts": 4,
+      "seq": 2,
+      "status": "passed"
+    },
+    "3": {
+      "artifacts": 1,
+      "seq": 3,
+      "status": "passed"
+    },
+    "4": {
+      "artifacts": 0,
+      "seq": 5,
+      "status": "passed"
+    },
+    "5": {
+      "artifacts": 0,
+      "seq": 7,
+      "status": "passed"
+    },
+    "6": {
+      "artifacts": 0,
+      "seq": 11,
+      "status": "passed"
+    },
+    "7": {
+      "artifacts": 1,
+      "seq": 12,
+      "status": "passed"
+    },
+    "8": {
+      "artifacts": 0,
+      "seq": 9,
+      "status": "passed"
+    },
+    "9": {
+      "artifacts": 0,
+      "seq": 21,
+      "status": "passed"
+    }
+  },
+  "total_runs": 31,
+  "verdict": "pass"
+}

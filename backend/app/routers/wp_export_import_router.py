@@ -165,11 +165,23 @@ async def batch_export_enhanced(
             detail=f"指定循环 {body.audit_cycles} 下无可导出底稿",
         )
 
+    # Wp_Bound_Gate（Task 4 / R3）：打包底稿正文前用可见集过滤（make_bulk_visible_filter）；
+    # 不可见/跨项目/未委派/scope 外底稿静默剔除，manifest 只由可见集构建。
+    from app.services.wp_visibility.entry_integration import make_bulk_visible_filter
+
+    _visible = make_bulk_visible_filter(
+        db, current_user, entrypoint="workpaper.detail", action="read_detail",
+        method="GET", entry_family="export",
+    )
+
     # 逐底稿导出（失败跳过）
     workpapers_data: list[dict] = []
     for wp, idx in rows:
         # 状态过滤
         if body.status_filter and wp.status not in body.status_filter:
+            continue
+        # 可见集过滤（不可见底稿不进入交付 ZIP）
+        if not await _visible(wp.id, None):
             continue
 
         wp_entry: dict = {
@@ -339,9 +351,17 @@ async def import_enhanced(
     冲突时返回 409 + conflict 详情。
     """
     from app.services.wp_export.import_engine import WpImportEngine
+    from app.services.wp_visibility.entry_integration import make_bulk_preflight
 
     content = await file.read()
     filename = file.filename or "unknown.xlsx"
+
+    # Wp_Bound_Gate（Task 4 / R3）：写入底稿正文前逐资源 preflight（make_bulk_preflight）；
+    # 目标底稿不可见/跨项目/未委派 → 抛 ExternalNotFound(404)，请求原子失败于任何副作用前。
+    preflight = make_bulk_preflight(
+        db, current_user, entrypoint="workpaper.import", action="import_data",
+        method="POST", entry_family="import",
+    )
 
     engine = WpImportEngine()
     resolution = ConflictResolution.FORCE_OVERWRITE if force_overwrite else None
@@ -354,6 +374,7 @@ async def import_enhanced(
             filename=filename,
             resolution=resolution,
             user_id=current_user.id,
+            preflight=preflight,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -391,6 +412,7 @@ async def import_resolve(
     import base64
 
     from app.services.wp_export.import_engine import WpImportEngine
+    from app.services.wp_visibility.entry_integration import make_bulk_preflight
 
     if body.resolution == ConflictResolution.CANCEL:
         return {
@@ -409,6 +431,15 @@ async def import_resolve(
     file_content = base64.b64decode(body.file_content_b64)
     filename = body.filename or "import.xlsx"
 
+    # Wp_Bound_Gate（Task 4 / R3）：写入冲突解决结果到底稿正文前逐资源 preflight
+    # （make_bulk_preflight）；目标底稿不可见/跨项目/未委派 → 抛 ExternalNotFound(404)，
+    # 请求原子失败于任何副作用前。body.wp_id 亦先行 preflight（显式声明的目标）。
+    preflight = make_bulk_preflight(
+        db, current_user, entrypoint="workpaper.import", action="import_data",
+        method="POST", entry_family="import",
+    )
+    await preflight(body.wp_id, None)
+
     engine = WpImportEngine()
     try:
         result = await engine.import_file(
@@ -418,6 +449,7 @@ async def import_resolve(
             filename=filename,
             resolution=body.resolution,
             user_id=current_user.id,
+            preflight=preflight,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -436,6 +468,18 @@ async def get_version_history(
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """查询底稿版本归档历史（WpVersionArchive 列表）"""
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：读取版本归档历史之前完成授权判定（Req 8.15）。read_versions 只读族；
+    # 该 route 与 version_trail 同路径（重复注册，本 handler 实际生效），故在此接入 gate。
+    # 同项目未委派统一 External_Not_Found（404）；跨项目由既有 require_project_access 先行拦截。
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.version_list", action="read_versions", method="GET",
+        wp_id=wp_id, project_id=project_id, entry_family="version",
+        route_name="/api/projects/{project_id}/workpapers/{wp_id}/versions",
+    )
+
     result = await db.execute(
         sa.select(WpVersionArchive)
         .where(

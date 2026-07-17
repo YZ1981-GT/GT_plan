@@ -1,0 +1,6 @@
+SchemaDriftDetector.scan() result after V113 apply:
+  TOTAL drift items (whole schema, allowlist-filtered): 0
+  V113-scope drift items: 0
+  critical orm_extra (any table): 0
+
+schema drift = 0 confirmed (no orm_extra / db_extra / type_mismatch / enum_mismatch).

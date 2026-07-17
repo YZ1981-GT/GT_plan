@@ -1,10 +1,10 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-07-16
+**最后更新**：2026-07-17
 **当前分支**：`work/2026-05-30-wp-specs`
 **统计基线**：2026-06-29 的总数统计尚待批量重算（原记录：240，active 21 + archived 219）
-**本次完成 Spec**：`workpaper-maintainability-convergence`（底稿 Runtime Boundary、统一持久化、能力覆盖真源与防回归）— Wave 0–7 全部完成
-**最高迁移**：以 `migration_status` 实测为准
+**本次完成 Spec**：`procedure-delegation-visibility-isolation`（服务端强制的底稿/页面可见性隔离 + 两层委派分层联动 + Completion Guard 关闭）— Task 1–18 全部完成，最终 Completion Guard 通过
+**最高迁移**：**V113**（`V113__wp_visibility_delegation_history_audit_epoch.sql`；以 `migration_status` 实测为准）
 **测试总数**：~17500+（含 PBT 40+ properties，旧统计）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -32,6 +32,7 @@
 
 | Spec | 说明 | 状态 |
 |------|------|------|
+| `procedure-delegation-visibility-isolation` | 服务端强制 fail-closed 底稿/页面可见性隔离(wp_index_id+sheet_key)+统一 Wp_Bound_Gate/Action_Matrix+不可枚举 404+两层委派分层联动(WorkingPaper.assigned_to↔ProcedureInstance/ProcedureRowTask)+persistent policy epoch+6000并发限流+Completion Guard 16需求20P18任务 | ✅ 完成 (Task 1–18 全部完成, 最终 Completion Guard 通过: latest-run-per-task 全 passed + 覆盖/漂移守卫 0 unmigrated 双向相等 + correctness≥100样例, 迁移V113/perf-6000-visibility-v1/rate-6000-visibility-v1, 2026-07-17) |
 | `acnr-runtime-convergence` | ACNR运行时闭环修复(公共resolve/L2-L3生命周期/权限/版本锁定/治理真守卫) Phase1+2共20需求22P25任务 | ✅ 完成 (Phase1+2全量: 后端468+前端41=509测试全绿, CI守卫pass, 2026-07-16) |
 | `formula-runtime-convergence` | 公式运行时真实写入/回滚/并发/生产入口收敛，14需求16P18任务，最大并行6子代理 | ✅ 完成 (18/18任务, CI守卫pass) |
 | `display-format-single-source` | P0金额/时间/百分比格式化收口displayPrefs+CI守卫 | 未启动 |

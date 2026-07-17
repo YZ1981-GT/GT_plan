@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="33" failures="0" errors="0" time="0.2824178">
+    <testsuite name="src/composables/__tests__/useVisibilityWorkpaperList.spec.ts" timestamp="2026-07-16T20:00:07.993Z" hostname="DESKTOP-FURNVS2" tests="11" failures="0" errors="0" skipped="0" time="0.0212587">
+        <testcase classname="src/composables/__tests__/useVisibilityWorkpaperList.spec.ts" name="useVisibilityWorkpaperList — 分页 envelope 消费 &gt; consumes {items,total,stats,page,page_size} envelope from server" time="0.003692">
+        </testcase>
+        <testcase classname="src/composables/__tests__/useVisibilityWorkpaperList.spec.ts" name="useVisibilityWorkpaperList — 分页 envelope 消费 &gt; forwards page/page_size/sort/filters to the server fetcher (no client-side full filtering)" time="0.0010464">
+        </testcase>
+        <testcase classname="src/composables/__tests__/useVisibilityWorkpaperList.spec.ts" name="useVisibilityWorkpaperList — 分页 envelope 消费 &gt; empty projectId does not call fetcher and clears cache" time="0.0006816">
+        </testcase>
+        <testcase classname="src/composables/__tests__/useVisibilityWorkpaperList.spec.ts" name="useVisibilityWorkpaperList — 状态拆分（index/file） &gt; exposes index_status and file_status separately on items and stats" time="0.0003951">
+        </testcase>
+        <testcase classname="src/composables/__tests__/useVisibilityWorkpaperList.spec.ts" name="useVisibilityWorkpaperList — 安全占位（External_Not_Found） &gt; 404 sets unified placeholder and clears cached items/names (no flash)" time="0.0009056">
+        </testcase>
+        <testcase classname="src/composables/__tests__/useVisibilityWorkpaperList.spec.ts" name="useVisibilityWorkpaperList — 安全占位（External_Not_Found） &gt; non-404 errors are re-thrown (handled by caller) and still clear cache" time="0.0007653">
+        </testcase>
+        <testcase classname="src/composables/__tests__/useVisibilityWorkpaperList.spec.ts" name="useVisibilityWorkpaperList — nullable wp 禁用文件动作 &gt; canOpen is false for wp_generated=false (底稿尚未生成)" time="0.0002549">
+        </testcase>
+        <testcase classname="src/composables/__tests__/useVisibilityWorkpaperList.spec.ts" name="useVisibilityWorkpaperList — nullable wp 禁用文件动作 &gt; canOpen is true only when wp_generated=true and wp_id present" time="0.0001736">
+        </testcase>
+        <testcase classname="src/composables/__tests__/useVisibilityWorkpaperList.spec.ts" name="useVisibilityWorkpaperList — visibility_mode 仅 UX 不授权 &gt; visibility_mode is forwarded only as a UX param and never gates the request" time="0.0005037">
+        </testcase>
+        <testcase classname="src/composables/__tests__/useVisibilityWorkpaperList.spec.ts" name="useVisibilityWorkpaperList — fast-check 属性 &gt; property: whatever server returns is exactly what the composable exposes (no client filtering)" time="0.0099074">
+        </testcase>
+        <testcase classname="src/composables/__tests__/useVisibilityWorkpaperList.spec.ts" name="useVisibilityWorkpaperList — fast-check 属性 &gt; property: rejection always yields the same placeholder and empty cache (unenumerable)" time="0.0014054">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/services/__tests__/workpaperVisibilityApi.spec.ts" timestamp="2026-07-16T20:00:07.998Z" hostname="DESKTOP-FURNVS2" tests="8" failures="0" errors="0" skipped="0" time="0.0090666">
+        <testcase classname="src/services/__tests__/workpaperVisibilityApi.spec.ts" name="listWorkpapersPaged — 分页 envelope &gt; returns full envelope and forwards page/page_size" time="0.0029755">
+        </testcase>
+        <testcase classname="src/services/__tests__/workpaperVisibilityApi.spec.ts" name="listWorkpapersPaged — 分页 envelope &gt; normalizes missing fields to a stable envelope" time="0.0004817">
+        </testcase>
+        <testcase classname="src/services/__tests__/workpaperVisibilityApi.spec.ts" name="listMyLeadWorkpapers — 独立主编视图端点 &gt; hits the my-lead-workpapers endpoint (not the tasks endpoint)" time="0.0003415">
+        </testcase>
+        <testcase classname="src/services/__tests__/workpaperVisibilityApi.spec.ts" name="legacy listWorkpapers — envelope 兼容 + 全量分页 + nullable 过滤 &gt; extracts items from a single-page envelope and maps id from wp_id" time="0.0004383">
+        </testcase>
+        <testcase classname="src/services/__tests__/workpaperVisibilityApi.spec.ts" name="legacy listWorkpapers — envelope 兼容 + 全量分页 + nullable 过滤 &gt; filters out nullable wp (wp_generated=false) for legacy consumers" time="0.0002536">
+        </testcase>
+        <testcase classname="src/services/__tests__/workpaperVisibilityApi.spec.ts" name="legacy listWorkpapers — envelope 兼容 + 全量分页 + nullable 过滤 &gt; paginates through all pages until total is covered" time="0.0005563">
+        </testcase>
+        <testcase classname="src/services/__tests__/workpaperVisibilityApi.spec.ts" name="legacy listWorkpapers — envelope 兼容 + 全量分页 + nullable 过滤 &gt; maps legacy `status` query param to index_status (Req 12.6)" time="0.000263">
+        </testcase>
+        <testcase classname="src/services/__tests__/workpaperVisibilityApi.spec.ts" name="legacy listWorkpapers — envelope 兼容 + 全量分页 + nullable 过滤 &gt; supports a plain legacy array response (un-upgraded backend)" time="0.00016">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/utils/__tests__/visibilityAccess.spec.ts" timestamp="2026-07-16T20:00:07.999Z" hostname="DESKTOP-FURNVS2" tests="4" failures="0" errors="0" skipped="0" time="0.006352">
+        <testcase classname="src/utils/__tests__/visibilityAccess.spec.ts" name="visibilityAccess &gt; unified placeholder message is fixed and reveals no internal reason" time="0.0017158">
+        </testcase>
+        <testcase classname="src/utils/__tests__/visibilityAccess.spec.ts" name="visibilityAccess &gt; isExternalNotFound only matches HTTP 404" time="0.0006042">
+        </testcase>
+        <testcase classname="src/utils/__tests__/visibilityAccess.spec.ts" name="visibilityAccess &gt; buildDeepLinkQuery drops empty locators (only locates)" time="0.0009899">
+        </testcase>
+        <testcase classname="src/utils/__tests__/visibilityAccess.spec.ts" name="visibilityAccess &gt; handleDeepLinkRejection clears cache and returns the unified placeholder" time="0.0013538">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/views/__tests__/MyLeadWorkpapers.spec.ts" timestamp="2026-07-16T20:00:08.001Z" hostname="DESKTOP-FURNVS2" tests="4" failures="0" errors="0" skipped="0" time="0.1094265">
+        <testcase classname="src/views/__tests__/MyLeadWorkpapers.spec.ts" name="MyLeadWorkpapers (Task 12) &gt; loads from the my-lead-workpapers endpoint (independent lead identity)" time="0.0588296">
+            <system-err>
+[Vue warn]: Failed to resolve directive: loading 
+  at &lt;MyLeadWorkpapers projectId=&quot;p1&quot; ref=&quot;VTU_COMPONENT&quot; &gt; 
+  at &lt;VTUROOT&gt;
+
+[Vue warn]: Failed to resolve directive: loading 
+  at &lt;MyLeadWorkpapers projectId=&quot;p1&quot; ref=&quot;VTU_COMPONENT&quot; &gt; 
+  at &lt;VTUROOT&gt;
+
+[Vue warn]: Failed to resolve directive: loading 
+  at &lt;MyLeadWorkpapers projectId=&quot;p1&quot; ref=&quot;VTU_COMPONENT&quot; &gt; 
+  at &lt;VTUROOT&gt;
+
+            </system-err>
+        </testcase>
+        <testcase classname="src/views/__tests__/MyLeadWorkpapers.spec.ts" name="MyLeadWorkpapers (Task 12) &gt; nullable wp shows 底稿尚未生成 and does not render open/download buttons" time="0.0244055">
+            <system-err>
+[Vue warn]: Failed to resolve directive: loading 
+  at &lt;MyLeadWorkpapers projectId=&quot;p1&quot; ref=&quot;VTU_COMPONENT&quot; &gt; 
+  at &lt;VTUROOT&gt;
+
+[Vue warn]: Failed to resolve directive: loading 
+  at &lt;MyLeadWorkpapers projectId=&quot;p1&quot; ref=&quot;VTU_COMPONENT&quot; &gt; 
+  at &lt;VTUROOT&gt;
+
+[Vue warn]: Failed to resolve directive: loading 
+  at &lt;MyLeadWorkpapers projectId=&quot;p1&quot; ref=&quot;VTU_COMPONENT&quot; &gt; 
+  at &lt;VTUROOT&gt;
+
+            </system-err>
+        </testcase>
+        <testcase classname="src/views/__tests__/MyLeadWorkpapers.spec.ts" name="MyLeadWorkpapers (Task 12) &gt; generated wp exposes open + download and deep-links to editor" time="0.0158666">
+            <system-err>
+[Vue warn]: Failed to resolve directive: loading 
+  at &lt;MyLeadWorkpapers projectId=&quot;p1&quot; ref=&quot;VTU_COMPONENT&quot; &gt; 
+  at &lt;VTUROOT&gt;
+
+[Vue warn]: Failed to resolve directive: loading 
+  at &lt;MyLeadWorkpapers projectId=&quot;p1&quot; ref=&quot;VTU_COMPONENT&quot; &gt; 
+  at &lt;VTUROOT&gt;
+
+[Vue warn]: Failed to resolve directive: loading 
+  at &lt;MyLeadWorkpapers projectId=&quot;p1&quot; ref=&quot;VTU_COMPONENT&quot; &gt; 
+  at &lt;VTUROOT&gt;
+
+            </system-err>
+        </testcase>
+        <testcase classname="src/views/__tests__/MyLeadWorkpapers.spec.ts" name="MyLeadWorkpapers (Task 12) &gt; 404 shows unified placeholder and never flashes cached names" time="0.0083172">
+            <system-err>
+[Vue warn]: Failed to resolve directive: loading 
+  at &lt;MyLeadWorkpapers projectId=&quot;p1&quot; ref=&quot;VTU_COMPONENT&quot; &gt; 
+  at &lt;VTUROOT&gt;
+
+[Vue warn]: Failed to resolve directive: loading 
+  at &lt;MyLeadWorkpapers projectId=&quot;p1&quot; ref=&quot;VTU_COMPONENT&quot; &gt; 
+  at &lt;VTUROOT&gt;
+
+[Vue warn]: Failed to resolve directive: loading 
+  at &lt;MyLeadWorkpapers projectId=&quot;p1&quot; ref=&quot;VTU_COMPONENT&quot; &gt; 
+  at &lt;VTUROOT&gt;
+
+            </system-err>
+        </testcase>
+    </testsuite>
+    <testsuite name="src/views/__tests__/MyProcedureTasks.characterization.spec.ts" timestamp="2026-07-16T20:00:08.004Z" hostname="DESKTOP-FURNVS2" tests="6" failures="0" errors="0" skipped="0" time="0.136314">
+        <testcase classname="src/views/__tests__/MyProcedureTasks.characterization.spec.ts" name="MyProcedureTasks payload regression (Task 12) &gt; loads tasks from listMyProcedureRowTasks (V105 truth source), not the legacy aggregate" time="0.0508829">
+        </testcase>
+        <testcase classname="src/views/__tests__/MyProcedureTasks.characterization.spec.ts" name="MyProcedureTasks payload regression (Task 12) &gt; acknowledge action calls transition API with request_id + expected lock &amp; assignment versions" time="0.026963">
+        </testcase>
+        <testcase classname="src/views/__tests__/MyProcedureTasks.characterization.spec.ts" name="MyProcedureTasks payload regression (Task 12) &gt; start action carries expected_lock_version and never touches updateProcedureTrim" time="0.0134557">
+        </testcase>
+        <testcase classname="src/views/__tests__/MyProcedureTasks.characterization.spec.ts" name="MyProcedureTasks payload regression (Task 12) &gt; reviewer submitted task exposes review/request_changes calling transition API" time="0.0127104">
+        </testcase>
+        <testcase classname="src/views/__tests__/MyProcedureTasks.characterization.spec.ts" name="MyProcedureTasks payload regression (Task 12) &gt; nullable wp task does not build an editor deep link (shows empty state)" time="0.0167292">
+        </testcase>
+        <testcase classname="src/views/__tests__/MyProcedureTasks.characterization.spec.ts" name="MyProcedureTasks payload regression (Task 12) &gt; valid wp deep link carries task_id + sheet_key + definition_key" time="0.013716">
+        </testcase>
+    </testsuite>
+</testsuites>

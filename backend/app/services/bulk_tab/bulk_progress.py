@@ -42,6 +42,8 @@ class BulkTaskProgress:
     result_filename: Optional[str] = None
     # 异步导入结果：ImportReport.to_dict()（供 GET /import/{task_id}/result）
     result: Optional[dict[str, Any]] = None
+    # 生成阶段记录的可见底稿 wp_id 集合（供下载端 re-gate；Task 4 / R3 · Req 8.16）
+    wp_ids: list[str] = field(default_factory=list)
 
 
 class BulkProgressService:
@@ -98,6 +100,12 @@ class BulkProgressService:
         task = self._tasks.get(task_id)
         if task:
             task.result = result
+
+    def set_wp_ids(self, task_id: str, wp_ids: list[str]) -> None:
+        """记录本次异步导出的可见底稿 wp_id 集合（供下载端 re-gate；Task 4 / R3）。"""
+        task = self._tasks.get(task_id)
+        if task:
+            task.wp_ids = [str(w) for w in wp_ids if w]
 
     # ------------------------------------------------------------------
     # 进度更新（由 BulkExport/Import Service 的 progress 回调调用）

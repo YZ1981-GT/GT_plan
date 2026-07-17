@@ -482,6 +482,18 @@ async def get_render_config(
     """获取底稿渲染 schema + 项目数据 + 跨底稿引用（dispatch 模式）。"""
     import time as _time
     from app.services.wp_metrics import wp_metrics
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：读取任何渲染业务内容之前完成授权判定（Req 8.1/8.5）。
+    # 底稿级读授权（委派/scope/跨项目/版本/角色）；无 project_id → gate 从 wp_id 反查。
+    # 说明：per-sheet 页面隔离（Req 5.8/5.9）由 gate 服务对 row-only 身份统一处理，
+    # 但整册渲染的逐 sheet 裁剪依赖 ProcedureRowTask sheet 目录覆盖，未在此路由强制传 sheet。
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.render_config", action="read_render", method="GET",
+        wp_id=wp_id, entry_family="render_config",
+        route_name="/api/workpapers/{wp_id}/render-config",
+    )
 
     _t0 = _time.perf_counter()
     # 判断冷/热：模板 sheet 顺序缓存是否已存在条目
@@ -494,12 +506,10 @@ async def get_render_config(
         _elapsed = (_time.perf_counter() - _t0) * 1000
         wp_metrics.observe_render_config(_ct, _elapsed, cold=_cold)
         return result
-    except Exception as _fatal:
-        # 临时：把完整堆栈写到文件方便排查 500
-        import traceback
-        with open("_render_config_500.log", "a", encoding="utf-8") as _f:
-            _f.write(f"\n{'='*60}\nwp_id={wp_id}\n")
-            traceback.print_exc(file=_f)
+    except Exception:
+        # 只记 request/entrypoint/reason 摘要，禁止把完整 traceback / 正文写临时文件
+        # （procedure-delegation-visibility-isolation 设计 "Error Handling"：删除 _render_config_500.log）。
+        logger.exception("render-config 失败 wp_id=%s sheet=%s", wp_id, sheet_name)
         raise
 
 

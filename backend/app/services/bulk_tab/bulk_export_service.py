@@ -196,6 +196,7 @@ async def export(
     platform_version: str = "",
     audit_year: int = 0,
     progress: Any | None = None,
+    visible_filter: Any | None = None,
 ) -> io.BytesIO:
     """批量导出底稿为 ZIP。
 
@@ -243,6 +244,20 @@ async def export(
 
     # ─── Step 3: Export each tab ──────────────────────────────────────
     exportable_entries = manifest.exportable()
+
+    # Task 10 · 可见集过滤（Req 8.6/8.14/9）：manifest 只由 gate 可见集构建。不可见底稿在 export_tab
+    # （读正文）之前被剔除，其 sha256 保持空 → Step 4 从 manifest.files 移除，不泄露存在性。
+    if visible_filter is not None:
+        _visible: list[ManifestFileEntry] = []
+        for _e in exportable_entries:
+            try:
+                _ok = await visible_filter(_e.wp_id, _e.sheet_code)
+            except Exception:  # noqa: BLE001 — 过滤异常 fail-closed（不导出该条目）
+                _ok = False
+            if _ok:
+                _visible.append(_e)
+        exportable_entries = _visible
+
     exported_count = 0
     skipped_count = 0
 

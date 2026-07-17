@@ -23,6 +23,16 @@ async def list_versions(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：读取底稿版本列表之前完成授权判定（Req 8.15 / version 入口族）。
+    # 无 project_id 路由参数 → gate 从 wp_id 反查 project（Binding_Minimum）。
+    await enforce_wp_gate(
+        db, user,
+        entrypoint="workpaper.version_list", action="read_versions", method="GET",
+        wp_id=wp_id, entry_family="version",
+        route_name="/api/workpapers/{wp_id}/versions",
+    )
     svc = WpStorageService(db)
     return await svc.list_versions(wp_id)
 

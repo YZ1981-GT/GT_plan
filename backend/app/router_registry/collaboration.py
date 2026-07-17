@@ -125,11 +125,14 @@ def register_collaboration_routers(app: FastAPI) -> None:
               export_integrity_router]:
         app.include_router(r, prefix="/api", tags=["取证与版本链"])
 
+    # Task 16 CROSS-CUTTING-WP-GATE：含 {wp_id} 的横切 router 统一附加 dedicated_wp_gate（安全 no-op）。
+    from app.routers._wp_gate import include_router_with_wp_gate as _inc_wp_gate
+
     # ═══ §12. 协作管理（PBC 清单 / 函证管理） ═══
     from app.routers.pbc import router as pbc_router
     from app.routers.confirmations import router as confirmations_router
 
-    app.include_router(pbc_router, prefix="/api", tags=["PBC清单"])
+    _inc_wp_gate(app, pbc_router, prefix="/api", tags=["PBC清单"])
     app.include_router(confirmations_router, prefix="/api", tags=["函证管理"])
 
     # ═══ §12a. 分发记录（cross-workpaper-dispatch-persistence） ═══
@@ -152,7 +155,7 @@ def register_collaboration_routers(app: FastAPI) -> None:
     from app.routers.penetrate_by_amount import router as pba_router
 
     for r in [wpreq_router, wppy_router, wphp_router, ocrf_router, pba_router]:
-        app.include_router(r, tags=["审计助理(R4)"])
+        _inc_wp_gate(app, r, tags=["审计助理(R4)"])
 
     # ═══ §14. Round 5：EQCR 工作台 ═══
     from app.routers.eqcr import router as eqcr_router
@@ -347,7 +350,7 @@ def register_collaboration_routers(app: FastAPI) -> None:
 
     # ═══ §125. 复核对话 ═══
     from app.routers.review_dialog import router as review_dialog_router
-    app.include_router(review_dialog_router, tags=["review-dialog"])
+    _inc_wp_gate(app, review_dialog_router, tags=["review-dialog"])
 
     # ═══ §130. 底稿版本链（workpaper-version-trail） ═══
     from app.routers.version_trail import router as version_trail_router

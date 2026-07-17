@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -460,8 +460,17 @@ async def assign_procedures(
     project_id: UUID, data: AssignRequest,
     db: AsyncSession = Depends(get_db), user=Depends(get_current_user),
 ):
+    from app.services.wp_visibility.delegation_transaction import DelegationError
+
     svc = ProcedureService(db)
-    count = await svc.assign_procedures(project_id, data.assignments)
+    try:
+        count = await svc.assign_procedures(
+            project_id, data.assignments, actor_user_id=getattr(user, "id", None)
+        )
+    except DelegationError as exc:
+        # fail-closed：委派/映射/scope 校验失败 → 回滚整批并返回 400（不 commit）
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=f"委派校验失败：{exc.reason.value}") from exc
     await db.commit()
     return {"assigned": count}
 

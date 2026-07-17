@@ -442,6 +442,79 @@ jobs:
       - name: Check formula runtime completion (strict)
         run: python backend/scripts/check/check_formula_runtime_completion.py --strict
 
+  wp-visibility-coverage-guard:
+    # procedure-delegation-visibility-isolation Task 16: Route/worker Coverage
+    # Ledger 漂移守卫 + CI 集成。生产 HTTP route+method 与 callback/worker/retry/
+    # dead-letter callable 与 ledger 双向相等；AST 派生 gate（抗伪注释）；每条 gated
+    # 条目 matrix 已登记 + 稳定 test id；任一 unmigrated wp-bound / 假绿 / 缺 gate/matrix
+    # / 新增未登记入口 / 未 re-gate 的非 HTTP callable 均阻断 CI（Req 13.1–13.15, 16.17）。
+    # 同时跑 correctness PBT、PostgreSQL 集成、token 测试、evidence precheck。
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: audit_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
+      - name: Run migrations (PG schema for integration tests)
+        run: python -c "import asyncio; from app.core.migration_runner import MigrationRunner; asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending())"
+        working-directory: backend
+      - name: Coverage/drift guard (bidirectional HTTP + worker ⇔ ledger, no fake-pass + native_authz audited)
+        run: python -m app.security.coverage_guard
+        working-directory: backend
+      - name: Scanner/guard self-tests (dynamic/indirect/wrapper routes + fake-comment decoys)
+        run: python -m pytest tests/procedure_delegation_visibility/test_task16_coverage_guard.py -q
+        working-directory: backend
+      - name: Native_Authz audit (go-live hardening Task 4 · 72 entries classified, no silent pass)
+        # visibility-isolation-go-live-hardening R3: every native_authz entry must be
+        # gated (leak_risk wired) OR classified justified_allowlist/leak_risk_deferred.
+        # Unaudited leftover blocks CI (fail-closed). coverage_guard (above) additionally
+        # enforces native_authz_unaudited drift-blocking.
+        run: python -m app.security.native_authz_audit
+        working-directory: backend
+      - name: Native_Authz audit tests (classification + drift guard + real-PG newly-gated isolation)
+        run: python -m pytest tests/visibility_go_live_hardening/test_task4_native_authz_audit.py -q
+        working-directory: backend
+      - name: Evidence Manifest precheck (append-only, SHA-256/size, path safety)
+        run: python -m app.security.evidence_manifest
+        working-directory: backend
+      - name: Token / editor-security tests
+        run: python -m pytest tests/procedure_delegation_visibility/test_editor_security.py -q
+        working-directory: backend
+      - name: PostgreSQL full-entry integration + EXPLAIN
+        run: |
+          python -m pytest \
+            tests/procedure_delegation_visibility/test_task15_full_entry_integration.py \
+            tests/procedure_delegation_visibility/test_task15_integration_explain.py -q
+        working-directory: backend
+      - name: Correctness PBT (design P1–P20, >=100 valid examples each)
+        env:
+          HYPOTHESIS_PROFILE: correctness
+        run: |
+          python -m pytest \
+            tests/procedure_delegation_visibility/test_task14_property_gaps.py \
+            tests/procedure_delegation_visibility/test_task14_pbt_profiles.py -q
+        working-directory: backend
+
   hotspot-baseline-check:
     # P2-1.3: 新增裸组件/重复能力/超大文件检查
     # 对比 baseline，只有新增超标文件才触发（历史债务不阻塞）

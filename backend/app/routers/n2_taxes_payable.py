@@ -326,7 +326,23 @@ async def n2_tb_writeback(
 
     Requirements: 3.4
     """
+    from uuid import UUID as _UUID
+
     from app.models.audit_platform_models import TrialBalance
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：审定数回写 trial_balance（写副作用，PUT）之前完成授权判定
+    # （Req 8.5 / trial-balance writeback）。tb_writeback 仅 lead/admin/supervisor_scope；越权/不存在统一 404。
+    try:
+        _wpid = _UUID(str(wp_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail="资源不存在或不可访问")
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.tb_writeback", action="tb_writeback", method="PUT",
+        wp_id=_wpid, entry_family="save",
+        route_name="/api/n2-taxes-payable/{wp_id}/tb-writeback",
+    )
 
     # 从 wp_id 获取 project_id
     wp_result = await db.execute(

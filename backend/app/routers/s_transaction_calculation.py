@@ -135,6 +135,21 @@ async def s_transaction_tb_writeback(
 
     Requirements: 9.1, 9.3
     """
+    from uuid import UUID as _UUID
+
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：审定数回写 trial_balance（写副作用）之前完成授权判定（Req 8.5 / tb writeback）。
+    try:
+        _wpid = _UUID(str(wp_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail="资源不存在或不可访问")
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.tb_writeback", action="tb_writeback", method="POST",
+        wp_id=_wpid, entry_family="save",
+        route_name="/api/s-transaction/{wp_id}/tb-writeback",
+    )
     # 从 wp_id 获取 project_id + year
     wp_result = await db.execute(
         sa.text(
@@ -220,6 +235,21 @@ async def s_transaction_tb_writeback_batch(
 
     Requirements: 9.1, 9.3
     """
+    from uuid import UUID as _UUID
+
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：批量审定回写（写副作用）之前完成授权判定（Req 8.5 / tb writeback）。
+    try:
+        _wpid = _UUID(str(wp_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail="资源不存在或不可访问")
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.tb_writeback", action="tb_writeback", method="POST",
+        wp_id=_wpid, entry_family="save",
+        route_name="/api/s-transaction/{wp_id}/tb-writeback-batch",
+    )
     # 从 wp_id 获取 project_id + year
     wp_result = await db.execute(
         sa.text(

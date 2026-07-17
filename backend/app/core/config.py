@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 查找 .env 文件：优先 backend/.env，其次项目根目录 .env
@@ -39,6 +39,22 @@ class Settings(BaseSettings):
     ONLYOFFICE_JWT_SECRET: str = ""
     ONLYOFFICE_CALLBACK_BASE: str = ""
     ONLYOFFICE_MAX_SESSIONS: int = 10  # 最大并发编辑人数
+    # procedure-delegation-visibility-isolation Task 11（组件 C11 EditorSecurity）：
+    # 冻结的有限 JWT 时效（秒）。此值在验收开始前冻结并写入 Evidence_Manifest（Req 10.10/10.11）。
+    # config 标识符 = "ONLYOFFICE_JWT_LIFETIME_SECONDS"。有限正值，绝不为 0 / 负 / 无限。
+    ONLYOFFICE_JWT_LIFETIME_SECONDS: int = Field(default=900, ge=1)
+    # 编辑器签名令牌强制校验开关。True = 对 config/file-read/callback/PutFile 等安全关键入口
+    # 强制全量签名令牌校验（secret 缺失 / JWT disabled / 签名 / 过期 / 空值 / 不一致 fail-closed，
+    # 即使 dev JWT_ENABLED=false 也拒绝写/回调路径，Req 10.9）。False（dev 默认）= 记录告警但放行，
+    # 供 JWT disabled 的开发环境编辑；上线前置 True。校验机制本身恒 fail-closed（editor_security）。
+    #
+    # visibility-isolation-go-live-hardening Task 2 / R1（组件 H1 EnforcementEnabler）：
+    # 此开关改为「环境求值」（见下方 _derive_onlyoffice_jwt_enforce 校验器）——
+    # 未显式设置时按 APP_ENV 求值：prod/production/staging → True；dev（JWT disabled）保持 False。
+    # 默认值本身不硬翻转为 True，避免破坏本地开发编辑。显式设置（env / .env 给出
+    # ONLYOFFICE_JWT_ENFORCE=true|false）则完全尊重原值 —— 这就是不需代码回滚的 Rollback_Path：
+    # 生产置 ONLYOFFICE_JWT_ENFORCE=false 即恢复启用前行为。
+    ONLYOFFICE_JWT_ENFORCE: bool = False
     WOPI_BASE_URL: str = "http://backend:8000/wopi"
     # 文件存储
     STORAGE_ROOT: str = "./storage"
@@ -205,7 +221,32 @@ class Settings(BaseSettings):
     PROCEDURE_ROW_TASK_WRITE_MODE: str = "legacy"  # legacy | dual | task-source
     PROCEDURE_TASK_DISPATCHER_ENABLED: bool = False
 
+    # --- visibility-isolation-go-live-hardening Task 3 / R2（组件 H2 DispatcherLifecycle）---
+    # epoch 失效 Redis dispatcher（publisher fan-out + subscriber psubscribe）挂载开关。
+    # 默认 True：应用启动即挂载失效派发器 → 撤权走 Redis 快路径 ≤1s 收敛。
+    # 置 False 即回退（不挂载 dispatcher），撤权仍由 PersistentEpochCache 的 ≤1s DB epoch
+    # 安全网兜底 fail-closed（绝不 stale-allow），是纯配置、不需代码回滚的 Rollback_Path。
+    VISIBILITY_INVALIDATION_DISPATCHER_ENABLED: bool = True
+
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
+
+    @model_validator(mode="after")
+    def _derive_onlyoffice_jwt_enforce(self) -> "Settings":
+        """R1 组件 H1 EnforcementEnabler：环境求值 ONLYOFFICE_JWT_ENFORCE。
+
+        仅当该开关**未被显式设置**（env / .env / 构造入参均未给出 ``ONLYOFFICE_JWT_ENFORCE``）时，
+        按运行环境标识 ``APP_ENV`` 派生：prod/production/staging → True；其余（dev，JWT disabled）
+        保持 False，本地开发编辑不受影响。
+
+        若显式设置（如 ``ONLYOFFICE_JWT_ENFORCE=false``），``model_fields_set`` 会包含该字段名，
+        此处跳过派生并完全尊重显式值 —— 这就是**纯配置、不需代码回滚**的 Rollback_Path：
+        生产环境置 ``ONLYOFFICE_JWT_ENFORCE=false`` 即恢复启用前行为。
+        """
+        if "ONLYOFFICE_JWT_ENFORCE" not in self.model_fields_set:
+            env = (self.APP_ENV or "").strip().lower()
+            if env in ("prod", "production", "staging"):
+                self.ONLYOFFICE_JWT_ENFORCE = True
+        return self
 
     @property
     def is_jwt_key_secure(self) -> bool:

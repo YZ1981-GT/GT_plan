@@ -31,6 +31,10 @@ from app.deps import get_current_user, require_project_access
 from app.models.base import ProjectStatus
 from app.models.core import Project, ProjectUser, User
 from app.services.bulk_tab.bulk_progress import bulk_progress_service
+from app.services.wp_visibility.entry_integration import (
+    make_bulk_preflight,
+    make_bulk_visible_filter,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -329,6 +333,8 @@ async def bulk_export_templates(
         exported_by=current_user.username,
         platform_version=platform_version,
         audit_year=audit_year,
+        # Task 10 · manifest 只由可见集构建（Req 8.6/9）
+        visible_filter=make_bulk_visible_filter(db, current_user),
     )
     zip_buffer.seek(0)
 
@@ -380,6 +386,8 @@ async def bulk_export_data(
         exported_by=current_user.username,
         platform_version=platform_version,
         audit_year=audit_year,
+        # Task 10 · manifest 只由可见集构建（Req 8.6/9）
+        visible_filter=make_bulk_visible_filter(db, current_user),
     )
     zip_buffer.seek(0)
 
@@ -477,11 +485,30 @@ async def bulk_export_download(
     project_id: UUID,
     task_id: str,
     current_user: User = Depends(require_project_access("readonly")),
+    db: AsyncSession = Depends(get_db),
 ) -> FileResponse:
-    """下载已完成的异步导出 ZIP（Req 6.1）。"""
+    """下载已完成的异步导出 ZIP（Req 6.1）。
+
+    Wp_Bound_Gate（Task 4 / R3）：manifest 已在生成阶段（bulk_async_runner）仅由可见集构建；
+    下载端 ① 校验 task 归属发起人（仅发起人可下载其导出）；② 对生成时记录的可见底稿集合在
+    下载时 re-gate（Req 8.16）——排队/生成后被撤权、任一 wp 变不可见 → 统一 404，不泄露存在性。
+    """
+    from app.services.wp_visibility.denial import EXTERNAL_NOT_FOUND_DETAIL
+
     task = bulk_progress_service.get_task(task_id)
     if not task or task.project_id != str(project_id):
         raise HTTPException(status_code=404, detail="任务不存在或已过期")
+    # ① 归属发起人（防止下载他人导出）→ 统一 404
+    if task.user_id != str(current_user.id):
+        raise HTTPException(status_code=404, detail=EXTERNAL_NOT_FOUND_DETAIL)
+    # ② 下载时 re-gate 生成阶段记录的可见 wp 集合（撤权即拒绝）
+    _visible = make_bulk_visible_filter(
+        db, current_user, entrypoint="workpaper.detail", action="read_detail",
+        method="GET", entry_family="bulk",
+    )
+    for _wid in (task.wp_ids or []):
+        if not await _visible(_wid, None):
+            raise HTTPException(status_code=404, detail=EXTERNAL_NOT_FOUND_DETAIL)
     if task.status != "complete" or not task.result_path:
         raise HTTPException(status_code=409, detail="导出尚未完成")
 
@@ -555,12 +582,17 @@ async def bulk_import(
 
     project_id_str = str(project_id)
 
+    # Task 10 · 逐资源 gate preflight（Req 8.13/8.14/9）：写入前对每个目标底稿过 gate，
+    # 显式任一被拒 → 整请求 404（原子，副作用前）。
+    preflight = make_bulk_preflight(db, current_user)
+
     if dry_run:
         report = await bulk_import_service.dry_run(
             db=db,
             project_id=project_id_str,
             zip_bytes=zip_bytes,
             strategy=strategy,
+            preflight=preflight,
         )
     else:
         report = await bulk_import_service.run(
@@ -569,6 +601,7 @@ async def bulk_import(
             zip_bytes=zip_bytes,
             strategy=strategy,
             user=current_user,
+            preflight=preflight,
         )
         # 正式导入成功后 commit（service 只 flush 不 commit）
         await db.commit()
@@ -698,6 +731,16 @@ async def bulk_import_rollback(
 
     if not snapshots:
         raise HTTPException(status_code=400, detail="无有效的快照记录")
+
+    # Wp_Bound_Gate（Task 4 / R3）：按快照还原底稿正文前逐资源 preflight（make_bulk_preflight）；
+    # 任一目标底稿不可见/跨项目/未委派 → 抛 ExternalNotFound(404)，整请求原子失败于回滚副作用前
+    # （仅回滚可见+可写底稿；排队期间被撤权即拒绝，不 fail-soft 跳过）。
+    preflight = make_bulk_preflight(
+        db, current_user, entrypoint="workpaper.import", action="import_data",
+        method="POST", entry_family="bulk",
+    )
+    for _snap in snapshots:
+        await preflight(_snap.wp_id, None)
 
     # 执行回滚
     user_id = current_user.id

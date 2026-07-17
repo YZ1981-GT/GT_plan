@@ -98,8 +98,13 @@ class WOPIHostService:
         db: AsyncSession,
         file_id: UUID,
         user_id: UUID | None = None,
+        gate_allow: bool = True,
     ) -> dict:
-        """WOPI CheckFileInfo: 返回文件元数据（含真实文件大小）。"""
+        """WOPI CheckFileInfo: 返回文件元数据（含真实文件大小）。
+
+        ``UserCanWrite = gate allow ∩ file state ∩ lock``（procedure-delegation-visibility-isolation
+        Task 11 / Req 10 / Design C11）：``gate_allow`` 为统一门写授权结果，与文件状态、锁合取。
+        """
         from pathlib import Path
 
         result = await db.execute(
@@ -146,6 +151,12 @@ class WOPIHostService:
             if lock_holder and user_id and lock_holder.get("user_id") != str(user_id):
                 can_write = False
                 readonly_reason = "其他用户正在编辑"
+
+        # UserCanWrite = gate allow ∩ file state ∩ lock（Task 11 / Design C11）。
+        # 上面 can_write 已含 file state ∩ lock；此处再合取门写授权 gate_allow。
+        if can_write and not gate_allow:
+            can_write = False
+            readonly_reason = "无底稿写权限"
 
         info["UserCanWrite"] = can_write
         if not can_write:

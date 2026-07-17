@@ -373,6 +373,8 @@ async def dry_run(
     project_id: str,
     zip_bytes: bytes,
     strategy: ConflictStrategy = "overwrite",
+    *,
+    preflight: Callable[[str, str | None], Any] | None = None,
 ) -> ImportReport:
     """校验 manifest / 文件完整性 / 工作流状态门禁；不写库（Req 2.3）。
 
@@ -444,6 +446,14 @@ async def dry_run(
     zip_file_list = reader.list_files()
     plan = align(manifest_files, topo_sheets, zip_file_list)
 
+    # ④.5 Task 10 逐资源 gate preflight（Req 8.13/8.14/9）：显式任一资源被拒 → 抛
+    # ExternalNotFound（404），整请求失败且不泄露存在性；dry_run 亦不得据存在性推断。
+    if preflight is not None:
+        for item in plan.items:
+            if item.missing or not item.wp_id:
+                continue
+            await preflight(item.wp_id, item.sheet_code)
+
     # ⑤ 查询底稿状态 + WorkflowGate 分类
     wp_ids = [item.wp_id for item in plan.items if item.wp_id]
     statuses = await _get_wp_statuses(db, wp_ids)
@@ -496,6 +506,7 @@ async def run(
     *,
     atomicity: AtomicityMode = AtomicityMode.PER_SHEET,
     progress: Any | None = None,
+    preflight: Callable[[str, str | None], Any] | None = None,
 ) -> ImportReport:
     """正式批量导入：align → 门禁 → 快照 → 逐 sheet import → 报告 → 审计日志。
 
@@ -561,6 +572,15 @@ async def run(
     # ④ align — 对齐 manifest 与 ZIP（Req 2.8 / 2.9）
     zip_file_list = reader.list_files()
     plan = align(manifest_files, topo_sheets, zip_file_list)
+
+    # ④.5 Task 10 逐资源 gate preflight（Req 8.13/8.14/8.16/9）：在任何副作用（快照/写入）之前
+    # 逐资源过 gate；显式任一资源被拒 → 抛 ExternalNotFound（404）→ 整请求失败（原子），
+    # 不 fail-soft 跳过、不泄露存在性。worker re-gate 复用此路径（撤权后排队任务被拒）。
+    if preflight is not None:
+        for item in plan.items:
+            if item.missing or not item.wp_id:
+                continue
+            await preflight(item.wp_id, item.sheet_code)
 
     # ⑤ 查询底稿状态 + WorkflowGate 分类（Req 9.1）
     wp_ids = [item.wp_id for item in plan.items if item.wp_id]

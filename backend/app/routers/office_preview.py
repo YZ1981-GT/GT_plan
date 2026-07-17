@@ -207,6 +207,16 @@ async def preview_office_as_pdf(
         raise HTTPException(status_code=404, detail="附件不存在")
 
     await _ensure_project_access(db, current_user, UUID(att["project_id"]), "readonly")
+    # Wp_Bound_Gate 附件可见性隔离（Task 4 / R3 leak_risk → gated，additive；项目级授权之上再收紧）：
+    # 附件绑定底稿时要求当前用户对至少一个关联底稿可见，全部不可见 → 404；未绑定 → 放行。
+    from app.services.wp_visibility.entry_integration import (
+        enforce_attachment_wp_visibility,
+    )
+
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_read", method="GET", entrypoint="attachment.read",
+    )
 
     file_name = att.get("file_name") or ""
     file_path = att.get("file_path") or ""

@@ -1,0 +1,5 @@
+Task 1 self-tests
+command: python -m pytest tests/security/test_task1_baseline_and_evidence.py
+result: 15 passed
+scope: entry-coverage ledger invariants, scanner classifiers, baseline contracts, evidence append-only+sha256/size+path-safety
+recorded_at: 2026-07-16T17:07:58.330683+00:00

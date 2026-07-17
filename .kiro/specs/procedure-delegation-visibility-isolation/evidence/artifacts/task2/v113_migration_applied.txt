@@ -1,0 +1,14 @@
+V113 migration applied to dev PostgreSQL (audit_platform).
+schema_version head: 113  (V113__wp_visibility_delegation_history_audit_epoch.sql)
+
+New tables (to_regclass):
+  workpaper_delegation_history -> workpaper_delegation_history
+  wp_access_security_outbox -> wp_access_security_outbox
+  wp_visibility_policy_epoch -> wp_visibility_policy_epoch
+  wp_visibility_invalidation_outbox -> wp_visibility_invalidation_outbox
+
+Append-only / monotonic triggers:
+  trg_wp_access_security_outbox_append_only on wp_access_security_outbox
+  trg_wp_deleg_history_append_only on workpaper_delegation_history
+  trg_wp_visibility_invalidation_outbox_append_only on wp_visibility_invalidation_outbox
+  trg_wp_visibility_policy_epoch_monotonic on wp_visibility_policy_epoch

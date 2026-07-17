@@ -1,13 +1,42 @@
 <template>
   <div class="gt-my-proc gt-fade-in">
-    <GtPageHeader title="我的程序任务" variant="banner" icon="📋" :show-back="false">
+    <GtPageHeader title="我的工作" variant="banner" icon="📋" :show-back="false">
       <template #subtitle>
-        <span v-if="page.pagination.total">
+        <span v-if="mainView === 'tasks' && page.pagination.total">
           共 {{ page.pagination.total }} 项 · {{ overdueCount }} 逾期
         </span>
       </template>
     </GtPageHeader>
 
+    <!-- 两个独立身份视图分区（Req 11.10–11.13）：
+         「我的程序任务」= 程序行执行人/操作复核人；「我的主编底稿」= 底稿主编。两者互不合成。 -->
+    <div class="gt-proc-viewswitch">
+      <el-radio-group v-model="mainView" size="default">
+        <el-radio-button label="tasks">我的程序任务</el-radio-button>
+        <el-radio-button label="lead">我的主编底稿</el-radio-button>
+      </el-radio-group>
+      <el-tooltip
+        content="程序任务 = 你作为程序执行人/操作复核人的行任务；主编底稿 = 你作为底稿主编负责的整张底稿。两者是不同委派层，分开展示。"
+        placement="top"
+      >
+        <span class="gt-proc-viewswitch__hint">ⓘ 两层委派分区</span>
+      </el-tooltip>
+    </div>
+
+    <!-- ── 我的主编底稿（MyLeadWorkpapers 独立身份视图）── -->
+    <div v-if="mainView === 'lead'" class="gt-proc-lead">
+      <div class="gt-proc-lead__proj">
+        <span class="gt-proc-lead__proj-label">项目</span>
+        <el-select v-model="leadProjectId" placeholder="选择项目" filterable size="small" style="width: 260px">
+          <el-option v-for="p in projectList" :key="p.id" :label="p.name" :value="p.id" />
+        </el-select>
+      </div>
+      <MyLeadWorkpapers v-if="leadProjectId" :project-id="leadProjectId" />
+      <GtEmpty v-else preset="no-data" title="请选择项目" description="选择项目后查看你主编的底稿" />
+    </div>
+
+    <!-- ── 我的程序任务（Row_Assignee / Operation_Reviewer）── -->
+    <template v-else>
     <!-- 我执行的 / 我复核的 -->
     <div class="gt-proc-toolbar">
       <el-radio-group v-model="role" size="default" @change="onRoleChange">
@@ -56,7 +85,7 @@
               打开底稿
             </el-button>
             <el-tooltip v-else content="程序已委派，底稿尚未生成，生成后可执行" placement="top">
-              <el-tag size="small" type="info" effect="plain">底稿未生成</el-tag>
+              <el-tag size="small" type="info" effect="plain">底稿尚未生成</el-tag>
             </el-tooltip>
           </template>
         </el-table-column>
@@ -111,6 +140,7 @@
         <el-button type="primary" :loading="acting" @click="confirmSubmit">提交</el-button>
       </template>
     </el-dialog>
+    </template>
   </div>
 </template>
 
@@ -122,6 +152,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh as RefreshIcon } from '@element-plus/icons-vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtEmpty from '@/components/common/GtEmpty.vue'
+import MyLeadWorkpapers from '@/views/MyLeadWorkpapers.vue'
 import {
   listMyProcedureRowTasks,
   transitionProcedureRowTask,
@@ -131,12 +162,18 @@ import {
   type ProcedureRowTaskTransition,
 } from '@/services/commonApi'
 import { handleApiError } from '@/utils/errorHandler'
+import { isExternalNotFound, EXTERNAL_NOT_FOUND_MESSAGE } from '@/utils/visibilityAccess'
 
 const router = useRouter()
 const loading = ref(false)
 const acting = ref(false)
 const role = ref<'assignee' | 'reviewer'>('assignee')
 const projectNames = ref<Record<string, string>>({})
+
+// 两个独立身份视图分区（Req 11.10–11.13）
+const mainView = ref<'tasks' | 'lead'>('tasks')
+const leadProjectId = ref('')
+const projectList = ref<{ id: string; name: string }[]>([])
 
 const page = reactive<ProcedureRowTaskPage>({
   items: [],
@@ -292,6 +329,10 @@ async function doTransition(row: ProcedureRowTaskItem, body: ProcedureRowTaskTra
     if (e?.response?.status === 409) {
       ElMessage.warning('任务状态已变化，请刷新后重试')
       await loadTasks()
+    } else if (isExternalNotFound(e)) {
+      // 任务不再可见/不存在（撤权、跨项目、越权）：统一占位文案 + 刷新清理陈旧行（Req 12.7）
+      ElMessage.warning(EXTERNAL_NOT_FOUND_MESSAGE)
+      await loadTasks()
     } else {
       handleApiError(e, '操作')
     }
@@ -343,10 +384,17 @@ async function loadProjectNames() {
   try {
     const projects = await listProjects()
     const map: Record<string, string> = {}
+    const opts: { id: string; name: string }[] = []
     for (const p of projects) {
-      map[p.id || p.project_id] = p.project_name || p.client_name || p.name || ''
+      const pid = p.id || p.project_id
+      const name = p.project_name || p.client_name || p.name || ''
+      map[pid] = name
+      if (pid) opts.push({ id: pid, name: name || `项目 ${String(pid).slice(0, 8)}` })
     }
     projectNames.value = map
+    projectList.value = opts
+    // 主编底稿视图默认选中第一个项目
+    if (!leadProjectId.value && opts.length) leadProjectId.value = opts[0].id
   } catch { /* 项目名映射失败不阻断任务列表 */ }
 }
 
@@ -371,6 +419,19 @@ onUnmounted(() => {
   flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
 }
 .gt-proc-filters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.gt-proc-viewswitch {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+}
+.gt-proc-viewswitch__hint {
+  font-size: 12px; color: var(--gt-color-text-tertiary); cursor: help;
+}
+.gt-proc-lead { margin-top: 4px; }
+.gt-proc-lead__proj {
+  display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+}
+.gt-proc-lead__proj-label {
+  font-size: 13px; color: var(--gt-color-text-secondary);
+}
 .gt-proc-group-title {
   font-size: var(--gt-font-size-base); color: var(--gt-color-primary); margin-bottom: 8px;
 }

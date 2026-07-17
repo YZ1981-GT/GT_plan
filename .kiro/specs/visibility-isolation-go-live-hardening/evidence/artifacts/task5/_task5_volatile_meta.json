@@ -1,0 +1,21 @@
+{
+  "capacity_report_hash": "98f153bba7f38c5f588eaf5b2c500a4e4835482af4a7abd48fd537542cb2e657",
+  "measured": {
+    "achieved_inflight_concurrency": 64,
+    "deny_probes_observed": 858,
+    "derived_thresholds": {
+      "per_family": 54,
+      "per_project": 584,
+      "per_user": 10
+    },
+    "error_allow": 0,
+    "error_rate": 0.0,
+    "gate_p95_seconds": 0.198073,
+    "list_p95_seconds": 0.278316,
+    "max_query_count": 0,
+    "throughput_rps": 291.81,
+    "total_requests": 6000
+  },
+  "performance_profile_version": "perf-6000-golive-v1",
+  "rate_limit_profile_version": "rate-6000-golive-v1"
+}
