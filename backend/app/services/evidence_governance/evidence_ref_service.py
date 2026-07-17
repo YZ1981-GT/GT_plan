@@ -250,7 +250,11 @@ class EvidenceRefService:
                     "audit_year": request.audit_year,
                     "source_type": request.source_type,
                     "source_id": request.source_id,
-                    "source_version": request.source_version,
+                    # evidence_refs.source_version/target_version are VARCHAR columns;
+                    # adapters resolve integer version_no. Bind as text (native ints are
+                    # kept for the version-match comparison above). SQLite accepted ints
+                    # silently; real PG16 rejects int→varchar, so stringify here.
+                    "source_version": _ver_str(request.source_version),
                     "evidence_type": request.evidence_type,
                     "evidence_id": request.evidence_id,
                     "attachment_version_id": (
@@ -258,7 +262,7 @@ class EvidenceRefService:
                         if request.attachment_version_id
                         else None
                     ),
-                    "target_version": (
+                    "target_version": _ver_str(
                         request.target_version
                         if request.target_version is not None
                         else (target_resolved.target_version if target_resolved else None)
@@ -298,7 +302,7 @@ class EvidenceRefService:
                         source_type, source_id,
                         target_type, target_id,
                         source_version, target_version,
-                        edge_hash, status,
+                        relation, edge_hash, status,
                         evidence_ref_id,
                         actor_type, actor_user_id, actor_service_identity_id,
                         created_at
@@ -307,7 +311,7 @@ class EvidenceRefService:
                         :source_type, :source_id,
                         :target_type, :target_id,
                         :source_version, :target_version,
-                        :edge_hash, 'active',
+                        :relation, :edge_hash, 'active',
                         :evidence_ref_id,
                         :actor_type, :actor_user_id, :actor_service_identity_id,
                         NOW()
@@ -321,12 +325,17 @@ class EvidenceRefService:
                     "source_id": request.source_id,
                     "target_type": request.evidence_type,
                     "target_id": request.evidence_id,
-                    "source_version": request.source_version,
-                    "target_version": (
+                    # evidence_dependencies.source_version/target_version are VARCHAR.
+                    "source_version": _ver_str(request.source_version),
+                    "target_version": _ver_str(
                         request.target_version
                         if request.target_version is not None
                         else (target_resolved.target_version if target_resolved else None)
                     ),
+                    # evidence_dependencies.relation is NOT NULL (String(50)); this edge
+                    # is derived from an EvidenceRef binding (design §4.4). SQLite did not
+                    # enforce NOT NULL, hiding the missing value (false-green).
+                    "relation": "evidence_ref",
                     "edge_hash": edge_hash,
                     "evidence_ref_id": str(ref_id),
                     "actor_type": actor.actor_type.value,
@@ -397,6 +406,16 @@ class EvidenceRefService:
 # ─────────────────────────────────────────────────────────────────────────────
 # Private helpers
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+def _ver_str(value: object | None) -> str | None:
+    """Coerce a version value to text for the VARCHAR ``*_version`` columns.
+
+    Adapters resolve integer ``version_no``; the DB columns are ``character varying``.
+    Real PG16 rejects an int bound to a varchar column (SQLite silently coerced it,
+    which produced the false-green). ``None`` stays ``None``.
+    """
+    return None if value is None else str(value)
 
 
 def _compute_intent_hash(

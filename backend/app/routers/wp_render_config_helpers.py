@@ -27,7 +27,7 @@ from app.services.wp_classification_service import ClassificationResult
 _CONFIRMATION_FORMAT_MAP: dict[str, str] = {
     "confirmation-summary": "confirmation-v1",
     "confirmation-entity-verify": "entity-verify-v1",
-    "confirmation-followup": "followup-v1",
+    "confirmation-followup": "confirmation-followup-v1",
     "confirmation-diff-reconcile": "diff-reconcile-v1",
     "confirmation-diff-checklist": "diff-checklist-v1",
     "confirmation-alternative-d05": "alternative-d05-v1",
@@ -40,7 +40,7 @@ _CONFIRMATION_FORMAT_MAP: dict[str, str] = {
     "confirmation-alternative-k05": "alternative-k05-v1",
     "confirmation-alternative-k06": "alternative-k06-v1",
     "confirmation-reliability": "reliability-v1",
-    "confirmation-fraud-risk": "fraud-risk-v1",
+    "confirmation-fraud-risk": "fraud-risk-d08-v1",
 }
 
 

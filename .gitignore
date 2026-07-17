@@ -142,3 +142,7 @@ backend/app/_build_version.json
 
 # MCP 本地密钥（复制 mcp.env.example → mcp.env）
 .cursor/mcp.env
+
+# Evidence-governance quarantine store (must never be committed — may hold rejected/malicious upload bytes)
+quarantine_store/
+backend/quarantine_store/

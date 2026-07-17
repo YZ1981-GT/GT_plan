@@ -302,8 +302,33 @@ def register_system_routers(app: FastAPI) -> None:
 
     # ═══ §135. evidence-governance: Facade + Ref + OCR ═══
     from app.routers.evidence_governance import router as evidence_governance_router
+    from app.routers.evidence_governance import (
+        attachments_router as evidence_governance_attachments_router,
+    )
+    from app.routers.evidence_governance import (
+        observability_router as evidence_governance_observability_router,
+    )
     from app.routers.evidence_ref_router import router as evidence_ref_router
     from app.routers.ocr_governance_router import router as ocr_governance_router
 
-    for r in (evidence_governance_router, evidence_ref_router, ocr_governance_router):
+    # Wave 9 HTTP 接线：AI 门禁 / Citation / Review / Archive / Legal Hold thin routers
+    # （委托既有 evidence_governance 服务；UAT-09/10/11/12/13 经网络契约可达）。
+    from app.routers.ai_evidence_gate_router import router as ai_evidence_gate_router
+    from app.routers.citation_router import router as citation_router
+    from app.routers.review_evidence_router import router as review_evidence_router
+    from app.routers.archive_manifest_router import router as archive_manifest_router
+    from app.routers.legal_hold_router import router as legal_hold_router
+
+    for r in (
+        evidence_governance_router,
+        evidence_governance_observability_router,
+        evidence_governance_attachments_router,
+        evidence_ref_router,
+        ocr_governance_router,
+        ai_evidence_gate_router,
+        citation_router,
+        review_evidence_router,
+        archive_manifest_router,
+        legal_hold_router,
+    ):
         app.include_router(r)

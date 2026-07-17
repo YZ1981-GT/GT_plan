@@ -238,7 +238,7 @@ export function useFraudRiskData(props: UseFraudRiskDataProps): UseFraudRiskData
 
   function buildPayload(): FraudRiskPayload {
     return {
-      _format: 'fraud-risk-v1',
+      _format: 'fraud-risk-d08-v1',
       items: items.value.map((item) => ({ ...item })),
       summary: { ...summary.value },
       conclusion: { ...conclusion.value },

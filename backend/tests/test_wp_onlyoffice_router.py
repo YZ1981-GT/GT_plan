@@ -197,6 +197,26 @@ class TestHelpers:
         assert result1 == result2
         assert result1.name == "D0.xlsx"
 
+    def test_resolve_wp_file_replaces_xlsx_when_template_is_docx(self, tmp_path, monkeypatch):
+        """F2-22 等从包内 xlsx 改挂 Word 模板时，丢弃旧 xlsx 缓存并复制 docx。"""
+        import zipfile
+
+        monkeypatch.setattr(app_settings, "STORAGE_ROOT", str(tmp_path))
+        pid = uuid.UUID("55555555-5555-5555-5555-555555555555")
+        storage_dir = tmp_path / "projects" / str(pid) / "workpapers" / "onlyoffice"
+        storage_dir.mkdir(parents=True)
+        (storage_dir / "F2-22.xlsx").write_bytes(b"old pack sheet")
+
+        template = tmp_path / "F2-22.docx"
+        with zipfile.ZipFile(template, "w") as zf:
+            zf.writestr("word/document.xml", "<w:document/>")
+            zf.writestr("[Content_Types].xml", "<Types/>")
+
+        result = _resolve_wp_file(pid, "F2-22", template)
+        assert result.name == "F2-22.docx"
+        assert result.read_bytes() == template.read_bytes()
+        assert not (storage_dir / "F2-22.xlsx").exists()
+
 
 # ---------------------------------------------------------------------------
 # Integration tests: endpoints

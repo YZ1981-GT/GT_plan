@@ -25,6 +25,7 @@ from app.core.tracing import setup_tracing
 from app.core.logging_config import setup_logging
 from app.middleware.audit_log import AuditLogMiddleware
 from app.middleware.error_handler import (
+    evidence_governance_error_handler,
     generic_exception_handler,
     http_exception_handler,
     validation_exception_handler,
@@ -56,6 +57,15 @@ async def lifespan(app: FastAPI):
     from app.core.runtime_state import migration_state
     migration_state.mark_complete()
 
+    # ACNR Redis 客户端注入 — 必须在事件回放/缓存预热之前，
+    # 否则 increment_epoch 在启动期看到未注入的客户端而误报降级 [Req-14]
+    from app.core.redis import get_redis
+    from app.services.acnr.cache_epoch import set_redis_client, start_epoch_subscriber
+    _acnr_redis = await get_redis()
+    if _acnr_redis is not None:
+        set_redis_client(_acnr_redis)
+    # ping 失败时不注入 None：保留懒解析，Redis 恢复后可自动接管
+
     register_event_handlers()
     # A13 错报评价自动聚合 EventBus handler
     from app.services.a13_event_handler import register_a13_event_handlers
@@ -71,12 +81,9 @@ async def lifespan(app: FastAPI):
     await _validate_template_manifest()
     await _run_schema_drift_check()
     await _warm_render_caches()
+    _check_attachment_security_gates()
 
     # ACNR Redis pub-sub 订阅 + epoch 轮询兜底 [Req-14]
-    from app.core.redis import get_redis
-    from app.services.acnr.cache_epoch import set_redis_client, start_epoch_subscriber
-
-    set_redis_client(await get_redis())
     await start_epoch_subscriber()
 
     stop_event = asyncio.Event()
@@ -121,6 +128,23 @@ async def lifespan(app: FastAPI):
 
     from app.core.database import dispose_engine
     await dispose_engine()
+
+
+def _check_attachment_security_gates() -> None:
+    """启动守卫：确认证据治理上传的三道内容门（媒体类型允许清单 / 恶意内容 / 可读性）
+    在 production 已真实接线（R1.2/R1.3/R2/R15）。
+
+    - ``ATTACHMENT_SECURITY_GATES_REQUIRED=true`` 且缺门 → 抛错阻断启动（fail-closed）。
+    - production 缺门（未强制）→ loud WARNING + 治理指标 alert 暴露。
+    - 非 production（dev/test/staging，合法注入 fake / 关门运行）→ 不阻断。
+
+    守卫只看 ``APP_ENV`` / 配置开关，不做 pytest 检测 hack。
+    """
+    from app.services.evidence_governance.attachment_security_gates import (
+        check_attachment_security_gates_startup,
+    )
+
+    check_attachment_security_gates_startup()
 
 
 async def _warm_render_caches() -> None:
@@ -430,8 +454,15 @@ async def metrics_endpoint():
 
 
 # --- 异常处理器 ---
+from app.services.evidence_governance.frozen_contracts import (
+    EvidenceGovernanceError as _EvidenceGovernanceError,
+)
+
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
+# 证据治理稳定错误 → 脱敏 4xx/5xx（design §7.2）。必须先于泛型 Exception 处理器注册，
+# 否则 SCOPE_NOT_FOUND_OR_FORBIDDEN 等会被 generic_exception_handler 误报为 500。
+app.add_exception_handler(_EvidenceGovernanceError, evidence_governance_error_handler)
 app.add_exception_handler(Exception, generic_exception_handler)
 
 # --- 中间件（LIFO：最后添加的最先执行=洋葱最外层） ---

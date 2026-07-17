@@ -37,8 +37,12 @@
       </template>
 
       <template v-else>
+        <F2ContractCostTestExample
+          v-if="isContractCostExampleSheet"
+        />
+
         <F2TabContractProcedure
-          v-if="currentSheet === 'F2-55A'"
+          v-else-if="currentSheet === 'F2-55A'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :is-readonly="isReadonly"
@@ -192,6 +196,7 @@ import { useF2SpecialFormData, type ChecklistResponse } from './composables/useF
 import { useF2SpecialDualMode } from './composables/useF2SpecialDualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useF2SpeExternalAdjudicated } from './composables/useF2SpeExternalAdjudicated'
+import { isContractCostTestExampleSheet } from './f2-special/contract/f2ContractCostTestExampleData'
 
 // defineAsyncComponent lazy loading — 首屏仅加载当前 sheet 组件（对齐D4标准）
 const F2TabContractProcedure = defineAsyncComponent(() => import('./f2-special/contract/F2TabContractProcedure.vue'))
@@ -212,6 +217,9 @@ const F2TabSupplierChecklist = defineAsyncComponent(() => import('./f2-special/i
 const F2TabInterviewSummary = defineAsyncComponent(() => import('./f2-special/ipo/F2TabInterviewSummary.vue'))
 const F2TabSupplierInfoCheck = defineAsyncComponent(() => import('./f2-special/ipo/F2TabSupplierInfoCheck.vue'))
 const F2TabInterviewDetail = defineAsyncComponent(() => import('./f2-special/ipo/F2TabInterviewDetail.vue'))
+const F2ContractCostTestExample = defineAsyncComponent(
+  () => import('./f2-special/contract/F2ContractCostTestExample.vue'),
+)
 
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -266,6 +274,10 @@ const currentSheet = computed(() => {
   return m ? m[1] : ''
 })
 
+const isContractCostExampleSheet = computed(() =>
+  isContractCostTestExampleSheet(props.sheetName),
+)
+
 const auditYear = computed(() => {
   const d = formData.projectContext.value?.audit_period_end
     || formData.projectContext.value?.bs_date || ''
@@ -289,6 +301,7 @@ const isHtmlSheet = computed(() => {
 const showHtmlToolbar = computed(() => isHtmlSheet.value)
 
 const useGridFallback = computed(() => {
+  if (isContractCostExampleSheet.value) return false
   const code = currentSheet.value
   return code && !isHtmlSheet.value && !showIpoBlocked.value
 })

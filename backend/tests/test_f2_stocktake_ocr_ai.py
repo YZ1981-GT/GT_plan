@@ -80,6 +80,36 @@ async def test_f2_st_ai_generate_plan():
 
 
 @pytest.mark.asyncio
+async def test_f2_st_ai_generate_questionnaire_field():
+    with patch(
+        "app.routers.wp_render_strategies._f2_stocktake_ai.chat_completion",
+        new_callable=AsyncMock,
+    ) as mock_llm:
+        mock_llm.return_value = "本项目未聘请外部专家；盘点以项目组自行观察与抽盘为主。"
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/api/workpapers/test-wp/f2-st/ai-generate",
+                json={
+                    "section": "stocktake-questionnaire-field",
+                    "existingContent": "",
+                    "relatedContext": {
+                        "questionId": "q3",
+                        "questionNo": "3",
+                        "questionLabel": "是否有专家参与？如何安排？",
+                        "locations": "主仓/原材料",
+                    },
+                },
+            )
+        assert response.status_code == 200
+        data = response.json().get("data", response.json())
+        assert "专家" in data["content"]
+        msgs = mock_llm.await_args.kwargs["messages"]
+        assert "当前题目" in msgs[-1]["content"]
+        assert "是否有专家参与" in msgs[-1]["content"]
+
+
+@pytest.mark.asyncio
 async def test_f2_st_ocr_rejects_invalid_sheet():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

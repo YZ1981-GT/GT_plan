@@ -2,48 +2,14 @@
  * ConfirmationKit.ts — 共享 UI 工具集
  *
  * 提供函证模块统一的：
- * - 状态徽章配色（绿#完成 / 橙#关注 / 红#异常）
  * - 金额格式化（右对齐 / 千分位 / 2 位小数 / 元）
  * - 网格美化调色板（与 GtGridSheet 网格美化对齐）
  * - 自动取数蓝色标识
  *
  * Sprint 3 Task 3.1
+ * 注：原 12 态状态徽章（STATUS_BADGE_MAP/getStatusBadge）随孤儿的 useConfirmationStatus
+ * 一并删除（2026-07-17 G3）——真实 UI 用 match_status 3 态 / Hub 5 态，无 12 态消费者。
  */
-import type { ConfirmationStatus } from './useConfirmationStatus'
-
-// ─── 状态颜色体系 ────────────────────────────────────────────────────────────
-
-export type StatusColorLevel = 'success' | 'warning' | 'danger' | 'info' | 'primary'
-
-export interface StatusBadgeConfig {
-  label: string
-  color: string
-  bgColor: string
-  level: StatusColorLevel
-}
-
-/** 12 态状态徽章配色映射 */
-export const STATUS_BADGE_MAP: Record<ConfirmationStatus, StatusBadgeConfig> = {
-  '未核实': { label: '未核实', color: '#909399', bgColor: '#f4f4f5', level: 'info' },
-  '已核实': { label: '已核实', color: '#409EFF', bgColor: '#ecf5ff', level: 'primary' },
-  '已发函': { label: '已发函', color: '#409EFF', bgColor: '#ecf5ff', level: 'primary' },
-  '跟函中': { label: '跟函中', color: '#E6A23C', bgColor: '#fdf6ec', level: 'warning' },
-  '已回函': { label: '已回函', color: '#67C23A', bgColor: '#f0f9eb', level: 'success' },
-  '未回函': { label: '未回函', color: '#F56C6C', bgColor: '#fef0f0', level: 'danger' },
-  '待验证': { label: '待验证', color: '#E6A23C', bgColor: '#fdf6ec', level: 'warning' },
-  '相符': { label: '相符', color: '#67C23A', bgColor: '#f0f9eb', level: 'success' },
-  '有差异': { label: '有差异', color: '#F56C6C', bgColor: '#fef0f0', level: 'danger' },
-  '替代中': { label: '替代中', color: '#E6A23C', bgColor: '#fdf6ec', level: 'warning' },
-  '完成': { label: '完成', color: '#67C23A', bgColor: '#f0f9eb', level: 'success' },
-  '舞弊迹象': { label: '舞弊迹象', color: '#F56C6C', bgColor: '#fef0f0', level: 'danger' },
-}
-
-/**
- * 获取状态徽章配置
- */
-export function getStatusBadge(status: ConfirmationStatus): StatusBadgeConfig {
-  return STATUS_BADGE_MAP[status] ?? STATUS_BADGE_MAP['未核实']
-}
 
 // ─── 金额格式化 ──────────────────────────────────────────────────────────────
 

@@ -5055,6 +5055,200 @@
         }
       ]
     },
+    "F2-21A": {
+      "name": "存货监盘程序表",
+      "items": [
+        {
+          "seq": 1,
+          "content": "（一）了解存货的形态、存放地点等，并确定是否实施监盘\n（1）了解存货形态、存放地点、保管责任人及数量规模，识别难以盘点、异地存放、第三方保管等特殊情形；\n（2）结合风险评估结果，初步确定是否实施监盘以及监盘方式、时间和范围；\n（3）如拟不实施监盘，评价替代程序能否获取充分、适当的审计证据，并形成裁剪记录。",
+          "ref_index": "",
+          "category": "常规★",
+          "phase": "planning",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 2,
+          "content": "（二）评价被审计单位存货盘点内部控制、程序和指令，完成盘点计划问卷\n（1）评价盘点日选择的合理性（是否接近资产负债表日、是否覆盖主要存放地点）；\n（2）获取仓库/存放地点清单，核对与账面存货存放信息是否一致；\n（3）与管理层讨论盘点计划，评价盘点程序和指令是否恰当；\n（4）评价以前年度监盘发现问题的整改情况；\n（5）完成存货盘点计划问卷。",
+          "ref_index": "F2-21",
+          "category": "常规★",
+          "phase": "planning",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 3,
+          "content": "（三）编制存货监盘计划\n1. 根据风险评估结果，确定拟监盘的存放地点及监盘范围。",
+          "ref_index": "F2-22",
+          "category": "常规★",
+          "phase": "planning",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 4,
+          "content": "2. 与管理层沟通监盘时间、范围、人员安排及需配合事项。",
+          "ref_index": "F2-22",
+          "category": "常规★",
+          "phase": "planning",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 5,
+          "content": "3. 确定抽盘样本选取方法（从盘点记录追至实物、从实物追至盘点记录）及样本量。",
+          "ref_index": "F2-22",
+          "category": "常规★",
+          "phase": "planning",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 6,
+          "content": "4. 明确重点关注事项（残次冷背、权属争议、第三方保管、在途/发出商品等）。",
+          "ref_index": "F2-22",
+          "category": "常规★",
+          "phase": "planning",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 7,
+          "content": "5. 编制存货监盘计划，明确监盘人员分工、底稿索引及复核安排。",
+          "ref_index": "F2-22",
+          "category": "常规★",
+          "phase": "planning",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 8,
+          "content": "（四）观察管理层制定的盘点程序的执行情况，并检查存货状况\n1. 观察盘点程序执行：\n（1）观察盘点人员是否按指令执行；\n（2）检查存货是否分类摆放、标识清晰；\n（3）关注是否存在过时、毁损、陈旧存货；\n（4）观察盘点过程中收发货是否已恰当停止或另行控制；\n（5）记录观察到的异常情况并与管理层沟通。",
+          "ref_index": "F2-22",
+          "category": "常规★",
+          "phase": "execution",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 9,
+          "content": "2. 根据被审计单位实际情况裁剪并执行进一步观察程序：\n（1）检查盘点标签/盘点表编号连续性和控制；\n（2）观察是否存在重复盘点或遗漏盘点；\n（3）关注寄售、代管、抵押、质押存货的识别与排除；\n（4）检查包装完好但难以直接盘点的存货（如密封容器）的处理方式；\n（5）观察盘点结果汇总与差异处理流程；\n（6）获取截止日前后收发货资料用于截止测试；\n（7）记录管理层盘点调整及原因；\n（8）评价盘点结果是否可靠。",
+          "ref_index": "F2-22",
+          "category": "常规★",
+          "phase": "execution",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 10,
+          "content": "针对 IPO/上市/新三板/重组/舞弊应对等特殊情形，扩大监盘覆盖面、增加突击性或提高抽盘比例，并强化对异常存放地点、第三方仓库及管理层操纵迹象的关注。",
+          "ref_index": "F2-22",
+          "category": "IPO/上市/新三板/重组/舞弊应对",
+          "phase": "execution",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 11,
+          "content": "（五）根据监盘计划执行抽盘，核对盘点结果并编制监盘小结\n1. 核对存货账面余额与仓储台账（或ERP业务数据）是否一致，调查重大差异。",
+          "ref_index": "F2-24",
+          "category": "常规★",
+          "phase": "execution",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 12,
+          "content": "2. 执行双向抽盘：从盘点记录选取项目追查至实物（存在），从实物选取项目追查至盘点记录（完整性）。",
+          "ref_index": "F2-25",
+          "category": "常规★",
+          "phase": "execution",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 13,
+          "content": "3. 将抽盘结果与账面记录核对，调查差异原因并评价对财务报表的影响。",
+          "ref_index": "F2-25",
+          "category": "常规★",
+          "phase": "execution",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 14,
+          "content": "4. 对密封容器、堆放大宗物资等难以直接计量的存货，评价计量方法并执行复核或重新计量（如适用）。",
+          "ref_index": "F2-25",
+          "category": "备选",
+          "phase": "execution",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 15,
+          "content": "5. 获取并检查盘点日前后收发货资料，执行存货收发截止测试。",
+          "ref_index": "F2-26",
+          "category": "常规★",
+          "phase": "execution",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 16,
+          "content": "6. 对第三方保管/异地存放存货，评价是否实施函证、现场监盘或其他替代程序。",
+          "ref_index": "F2-23",
+          "category": "备选",
+          "phase": "execution",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 17,
+          "content": "7. 评价存货盘点结果，汇总抽盘差异及未解决事项。",
+          "ref_index": "F2-23/F2-25",
+          "category": "常规★",
+          "phase": "execution",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 18,
+          "content": "8. 编制存货监盘小结，形成监盘结论。",
+          "ref_index": "F2-23",
+          "category": "常规★",
+          "phase": "execution",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 19,
+          "content": "（六）其他考虑\n1. 评价监盘范围是否充分覆盖重大存货存放地点及高风险类别。",
+          "ref_index": "",
+          "category": "常规★",
+          "phase": "completion",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 20,
+          "content": "2. 如存在未能实施监盘的情形，评价替代程序的充分性并在底稿中记录理由。",
+          "ref_index": "",
+          "category": "常规★",
+          "phase": "completion",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        },
+        {
+          "seq": 21,
+          "content": "3. 将监盘发现与存货跌价、截止、收入成本循环等程序联动，评估对财务报表认定的影响。",
+          "ref_index": "F2A",
+          "category": "常规★",
+          "phase": "completion",
+          "auto_data_source": null,
+          "applicable_default": "yes"
+        }
+      ]
+    },
     "F3A": {
       "name": "应付票据实质性程序表",
       "items": [

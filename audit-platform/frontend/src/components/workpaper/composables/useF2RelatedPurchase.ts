@@ -1,35 +1,33 @@
 /**
- * useF2RelatedPurchase — F2-52 关联采购公允性分析
+ * useF2RelatedPurchase — F2-52 存货关联采购分析表
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
-import { parseNum, calcSubtotal, calcFairnessDeviation } from './useF2InvValFormulaEngine'
 import { readValRowJson, type ChecklistResponse } from './useF2ValuationFormData'
+import {
+  defaultRelatedPurchaseSheet,
+  enrichRelatedPurchases,
+  calcRelatedPurchaseTotals,
+  migrateRelatedPurchaseSheet,
+  emptyRelatedPurchaseItem,
+  type RelatedPurchaseSheet,
+  type RelatedPurchaseItem,
+  type RelatedPurchaseAuditNotes,
+} from './useF2RelatedPurchaseFormulas'
 
-export interface RelatedPurchaseRow {
-  rowId: string
-  relatedParty: string
-  itemName: string
-  relatedPrice: number
-  comparablePrice: number
-  quantity: number
-  amount: number
-  fairnessEval: string
-  remark: string
+/** @deprecated 兼容旧引用 */
+export type RelatedPurchaseRow = RelatedPurchaseItem & {
+  rowId?: string
+  relatedParty?: string
+  itemName?: string
+  relatedPrice?: number
+  comparablePrice?: number
+  quantity?: number
+  amount?: number
+  fairnessEval?: string
 }
 
 const ROWS_KEY = 'F2-52-rows'
 const NOTE_KEY = 'F2-52-note'
-
-function genId(): string {
-  return `f2rp-${Date.now().toString(36)}`
-}
-
-function enrichRow(r: RelatedPurchaseRow) {
-  const deviation = calcFairnessDeviation(r.relatedPrice, r.comparablePrice)
-  const amount = r.relatedPrice * r.quantity
-  const isHighDeviation = typeof deviation === 'number' && Math.abs(deviation) > 10
-  return { ...r, deviation, amount, isHighDeviation }
-}
 
 export function useF2RelatedPurchase(options: {
   allResponses: Ref<Map<string, ChecklistResponse>>
@@ -39,55 +37,112 @@ export function useF2RelatedPurchase(options: {
   const readonly = isReadonly ?? ref(false)
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-  const rows = ref<RelatedPurchaseRow[]>([{
-    rowId: genId(), relatedParty: '', itemName: '', relatedPrice: 0,
-    comparablePrice: 0, quantity: 0, amount: 0, fairnessEval: '', remark: '',
-  }])
+  const sheet = ref<RelatedPurchaseSheet>(defaultRelatedPurchaseSheet())
   const auditNote = ref('')
 
-  watch(() => allResponses.value.get(ROWS_KEY)?.remark, (v) => {
-    if (!v) return
-    try {
-      const parsed = JSON.parse(v)
-      if (Array.isArray(parsed) && parsed.length) rows.value = parsed
-    } catch { /* ignore */ }
-  }, { immediate: true })
+  function load(): void {
+    const raw = readValRowJson(allResponses.value.get(ROWS_KEY))
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw)
+        const migrated = migrateRelatedPurchaseSheet(parsed)
+        if (migrated) sheet.value = migrated
+      } catch { /* ignore */ }
+    }
+    auditNote.value = allResponses.value.get(NOTE_KEY)?.remark || ''
+  }
 
+  watch(() => allResponses.value.get(ROWS_KEY)?.remark, load, { immediate: true })
   watch(() => allResponses.value.get(NOTE_KEY)?.remark, (v) => { auditNote.value = v || '' }, { immediate: true })
 
-  const enrichedRows = computed(() => rows.value.map(enrichRow))
-  const highDeviationCount = computed(() => enrichedRows.value.filter((r) => r.isHighDeviation).length)
-  const totalAmount = computed(() => calcSubtotal(enrichedRows.value.map((r) => r.amount)))
+  const enrichedProducts = computed(() => enrichRelatedPurchases(sheet.value.products))
+  const enrichedRows = enrichedProducts
+
+  const columnTotals = computed(() => calcRelatedPurchaseTotals(enrichedProducts.value))
+
+  const highDeviationCount = computed(() =>
+    enrichedProducts.value.filter((r) => r.isHighVariance).length,
+  )
+
+  const totalAmount = computed(() => columnTotals.value.relatedAmount)
+
+  function flushSave(): void {
+    const items = [
+      allResponses.value.get(ROWS_KEY),
+      allResponses.value.get(NOTE_KEY),
+    ].filter(Boolean)
+    if (items.length) window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items } }))
+  }
 
   function persist(): void {
-    allResponses.value.set(ROWS_KEY, { item_id: ROWS_KEY, conclusion: null, remark: JSON.stringify(rows.value) })
+    if (readonly.value) return
+    allResponses.value.set(ROWS_KEY, {
+      item_id: ROWS_KEY,
+      conclusion: null,
+      remark: JSON.stringify(sheet.value),
+    })
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => {
       debounceTimer = null
-      const items = [allResponses.value.get(ROWS_KEY), allResponses.value.get(NOTE_KEY)].filter(Boolean)
-      if (items.length) window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items } }))
+      flushSave()
     }, 2000)
   }
 
-  function addRow(): void {
+  function updateAuditNotes(patch: Partial<RelatedPurchaseAuditNotes>): void {
     if (readonly.value) return
-    rows.value = [...rows.value, {
-      rowId: genId(), relatedParty: '', itemName: '', relatedPrice: 0,
-      comparablePrice: 0, quantity: 0, amount: 0, fairnessEval: '', remark: '',
-    }]
+    sheet.value = {
+      ...sheet.value,
+      auditNotes: { ...sheet.value.auditNotes, ...patch },
+    }
     persist()
   }
 
-  function removeRow(rowId: string): void {
-    if (readonly.value || rows.value.length <= 1) return
-    rows.value = rows.value.filter((r) => r.rowId !== rowId)
+  function updateProduct(id: string, patch: Partial<RelatedPurchaseItem>): void {
+    if (readonly.value) return
+    sheet.value = {
+      ...sheet.value,
+      products: sheet.value.products.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    }
     persist()
   }
 
   function updateRow(rowId: string, patch: Partial<RelatedPurchaseRow>): void {
+    const mapped: Partial<RelatedPurchaseItem> = { ...patch }
+    if (patch.rowId) mapped.id = patch.rowId
+    if (patch.relatedParty) mapped.relatedPartyName = patch.relatedParty
+    if (patch.itemName) mapped.itemNameSpec = patch.itemName
+    if (patch.comparablePrice != null) mapped.nonRelatedAvgPrice = patch.comparablePrice
+    if (patch.quantity != null) mapped.relatedQty = patch.quantity
+    if (patch.relatedPrice != null && patch.quantity != null) {
+      mapped.relatedAmount = patch.relatedPrice * patch.quantity
+    }
+    updateProduct(rowId, mapped)
+  }
+
+  function addProduct(): void {
     if (readonly.value) return
-    rows.value = rows.value.map((r) => (r.rowId === rowId ? { ...r, ...patch } : r))
+    sheet.value = {
+      ...sheet.value,
+      products: [...sheet.value.products, emptyRelatedPurchaseItem()],
+    }
     persist()
+  }
+
+  function addRow(): void {
+    addProduct()
+  }
+
+  function removeProduct(id: string): void {
+    if (readonly.value || sheet.value.products.length <= 1) return
+    sheet.value = {
+      ...sheet.value,
+      products: sheet.value.products.filter((p) => p.id !== id),
+    }
+    persist()
+  }
+
+  function removeRow(rowId: string): void {
+    removeProduct(rowId)
   }
 
   watch(auditNote, (val) => {
@@ -96,9 +151,29 @@ export function useF2RelatedPurchase(options: {
     persist()
   })
 
-  onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); persist() } })
+  onBeforeUnmount(() => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      flushSave()
+    }
+  })
 
-  return { enrichedRows, highDeviationCount, totalAmount, auditNote, addRow, removeRow, updateRow }
+  return {
+    sheet,
+    enrichedProducts,
+    enrichedRows,
+    columnTotals,
+    highDeviationCount,
+    totalAmount,
+    auditNote,
+    updateAuditNotes,
+    updateProduct,
+    updateRow,
+    addProduct,
+    addRow,
+    removeProduct,
+    removeRow,
+  }
 }
 
 export default useF2RelatedPurchase

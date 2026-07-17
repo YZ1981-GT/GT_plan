@@ -33,24 +33,37 @@ _SHEET_SCHEMAS: dict[str, dict[str, str]] = {
     },
     "F2-25": {
         "itemName": "品名",
+        "itemCode": "存货编码",
         "spec": "规格",
         "unit": "单位",
+        "unitPrice": "单价(数字)",
         "bookQty": "账面数量(数字)",
+        "bookAmount": "账面金额(数字)",
+        "clientCountQty": "企业盘点数量(数字)",
         "sampleQty": "抽盘/实盘数量(数字)",
+        "qualityStatus": "品质状况(正常/毁损/呆滞/过期等)",
         "varianceReason": "差异原因",
     },
     "F2-26": {
+        "category": "存货类别",
+        "itemCode": "存货编码",
         "itemName": "品名",
-        "countDayQty": "盘点日数量(数字)",
-        "inboundQty": "盘点日后入库(数字)",
-        "outboundQty": "盘点日后出库(数字)",
-        "bookQty": "账面结存(数字)",
+        "spec": "规格",
+        "unit": "单位",
+        "unitPrice": "单价(数字)",
+        "warehouse": "仓库",
+        "countDayQty": "盘点日实存数量(数字)",
+        "inboundQty": "期间入库数量(数字)",
+        "outboundQty": "期间发出数量(数字)",
+        "bookQty": "资产负债表日账面数量(数字)",
+        "varianceReason": "差异原因",
+        "needAdjust": "是否调整(是/否)",
     },
 }
 
 _NUM_KEYS = {
-    "bookQty", "bookAmount", "erpQty", "erpAmount", "sampleQty",
-    "countDayQty", "inboundQty", "outboundQty", "bookQty",
+    "bookQty", "bookAmount", "erpQty", "erpAmount", "sampleQty", "unitPrice",
+    "countDayQty", "inboundQty", "outboundQty", "clientCountQty",
 }
 
 

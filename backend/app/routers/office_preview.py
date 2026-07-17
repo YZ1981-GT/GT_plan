@@ -208,8 +208,12 @@ async def preview_office_as_pdf(
 
     await _ensure_project_access(db, current_user, UUID(att["project_id"]), "readonly")
 
+    # C3：att["file_path"] 已投影为 opaque locator，转 PDF 预览的本地读取须取真实路径。
+    raw = await svc.get_raw_storage(attachment_id)
+    if not raw:
+        raise HTTPException(status_code=404, detail="附件不存在")
     file_name = att.get("file_name") or ""
-    file_path = att.get("file_path") or ""
+    file_path = raw.get("file_path") or ""
     ext = Path(file_name).suffix.lower()
 
     if ext not in OFFICE_EXTENSIONS:

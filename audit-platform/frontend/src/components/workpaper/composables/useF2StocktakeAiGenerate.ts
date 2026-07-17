@@ -5,11 +5,17 @@ import http from '@/utils/http'
 
 export type F2StAiSection =
   | 'stocktake-questionnaire'
+  | 'stocktake-questionnaire-field'
   | 'stocktake-plan'
+  | 'stocktake-plan-field'
   | 'stocktake-summary'
+  | 'stocktake-summary-field'
   | 'stocktake-reconcile'
+  | 'stocktake-reconcile-field'
   | 'stocktake-sample'
+  | 'stocktake-sample-field'
   | 'stocktake-rollforward'
+  | 'stocktake-rollforward-field'
 
 export interface StocktakeDiffItem {
   itemName: string
@@ -59,12 +65,18 @@ export function useF2StocktakeAiGenerate(options: {
         ElMessage.warning('AI 未生成内容')
         return null
       }
-      const preview = text.length > 400 ? `${text.slice(0, 400)}…` : text
-      await ElMessageBox.confirm(preview, title, {
+      const preview = text.length > 600 ? `${text.slice(0, 600)}…` : text
+      const confirmHint =
+        section === 'stocktake-plan'
+          ? `${preview}\n\n（确认后将写入结论框）`
+          : section.endsWith('-field')
+            ? `${preview}\n\n（确认后写入当前文本框，可再编辑）`
+            : preview
+      await ElMessageBox.confirm(confirmHint, title, {
         confirmButtonText: '填入',
         cancelButtonText: '取消',
         type: 'info',
-        customStyle: { maxWidth: '600px' },
+        customStyle: { maxWidth: '640px', whiteSpace: 'pre-wrap' },
       })
       return text
     } catch (err: any) {

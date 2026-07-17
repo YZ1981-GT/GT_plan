@@ -46,7 +46,7 @@
           <li v-for="s in md.entityList.value" :key="s.id"
             :class="{ active: md.currentId.value === s.id }"
             @click="md.selectEntity(s.id)">
-            {{ (s as { supplierName?: string }).supplierName || '未命名' }}
+            {{ supplierLabel(s) }}
           </li>
         </ul>
       </aside>
@@ -126,6 +126,10 @@ const md = useF2MasterDetail({
 })
 
 const cur = computed(() => md.currentSupplier.value)
+
+function supplierLabel(s: unknown): string {
+  return (s as { supplierName?: string }).supplierName || '未命名'
+}
 
 const basicFields = [
   { key: 'supplierName', label: '供应商名称' },

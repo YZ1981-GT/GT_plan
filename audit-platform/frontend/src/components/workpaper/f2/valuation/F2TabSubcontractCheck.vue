@@ -1,133 +1,367 @@
 <template>
-  <div class="f2-val-sheet">
-    <!-- 编制提示 -->
-    <details class="guidance-details">
-      <summary>📋 编制提示</summary>
-      <div class="guidance-content">
-        <p>1. 本表抽取样本核查委外加工业务，逐笔核对委托方、单号、品名、金额、账龄与凭证。</p>
-        <p>2. 覆盖率＝已查金额 / 账面总额，覆盖率偏低时自动橙色提示，应扩大样本或说明抽样理由。</p>
-        <p>3. 关注委外加工物资的发出、收回与加工费归集是否完整，账龄异常（长期挂账）须重点核查。</p>
-        <p>4. 依《企业会计准则第 1 号——存货》，加工成本应准确计入委托加工物资成本，防止跨期或漏记。</p>
+  <div class="f2-inspect">
+    <header class="ic-hero">
+      <div>
+        <div class="ic-kicker">{{ sc.sheetCode }} · 委托加工物资</div>
+        <h2 class="ic-title">{{ sc.title }}</h2>
+        <p class="ic-sub">从余额倒轧 → 供应商加工规模 → 发出/收回材料流，核查委托加工真实、完整与计价。</p>
       </div>
-    </details>
-
-    <!-- 审计目标 -->
-    <el-alert
-      type="info"
-      :closable="false"
-      show-icon
-      class="objective-alert"
-      title="审计目标：验证委外加工物资发出、收回及加工费归集的真实性与完整性，确认委托加工物资成本计价准确。"
-    />
-
-    <header class="sheet-header">
-      <div><h3>{{ ic.title }}</h3><span class="code">{{ ic.sheetCode }}</span></div>
-      <span :class="['coverage', { warn: ic.isCoverageLow.value }]">覆盖率 {{ ic.coverageRatio.value.toFixed(1) }}%</span>
-    </header>
-    <div class="meta-bar">
-      <span>账面总额<el-input-number :model-value="ic.bookTotal.value" size="small" :controls="false" :disabled="isReadonly" @change="(v: number) => ic.updateBookTotal(v ?? 0)" /></span>
-      <span>已查 {{ ic.checkedTotal.value.toLocaleString() }}</span>
-    </div>
-
-    <!-- 工具栏 -->
-    <div class="tab-toolbar">
-      <div class="toolbar-left">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="ic.addRow()">+ 新增</el-button>
-      </div>
-      <div class="toolbar-right">
+      <div class="ic-actions">
+        <GtIndexChip value="wp:F2-35" :context-project-id="projectId" />
+        <GtIndexChip value="wp:F2-7" :context-project-id="projectId" />
         <F2SheetToolbar
           :wp-id="wpId"
           api-prefix="f2-val"
           sheet="F2-35"
           :disabled="isReadonly"
-          ai-section="inspection-conclusion"
-          :existing-content="ic.auditNote.value"
-          :related-context="{ coverageRatio: ic.coverageRatio.value }"
-          ai-title="AI 生成 · 委外加工检查结论"
           review-section="F2-35-conclusion"
-          @ai-filled="(t: string) => { ic.auditNote.value = t }"
         />
-        <span class="chip-wrap"><GtIndexChip value="wp:F2-1" /></span>
-        <el-tag size="small" type="info">共 {{ ic.rows.value.length }} 行</el-tag>
+        <el-tag v-if="sc.unrecoveredCount.value" size="small" type="danger">
+          未全额收回 {{ sc.unrecoveredCount.value }}
+        </el-tag>
+        <el-tag v-if="valuationCount" size="small" type="warning">
+          计价差异 {{ valuationCount }}
+        </el-tag>
       </div>
-    </div>
-    <el-table :data="ic.rows.value" border size="small" max-height="440">
-      <el-table-column prop="seq" label="序号" width="50" />
-      <el-table-column label="委托方" width="130">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.party" size="small" @change="(v: string) => ic.updateRow(row.id, { party: v })" />
-          <span v-else>{{ row.party }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="单号" width="110">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.docNo" size="small" @change="(v: string) => ic.updateRow(row.id, { docNo: v })" />
-          <span v-else>{{ row.docNo }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="品名" width="120">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.itemName" size="small" @change="(v: string) => ic.updateRow(row.id, { itemName: v })" />
-          <span v-else>{{ row.itemName }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="金额" width="100">
-        <template #default="{ row }">
-          <el-input-number :model-value="row.amount" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v: number) => ic.updateRow(row.id, { amount: v ?? 0 })" />
-        </template>
-      </el-table-column>
-      <el-table-column label="账龄(天)" width="85">
-        <template #default="{ row }">
-          <el-input-number :model-value="row.daysOutstanding ?? 0" size="small" :controls="false" :disabled="isReadonly"
-            class="compact-num" @change="(v: number) => ic.updateRow(row.id, { daysOutstanding: v ?? 0 })" />
-        </template>
-      </el-table-column>
-      <el-table-column label="凭证号" width="95">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small" @change="(v: string) => ic.updateRow(row.id, { voucherNo: v })" />
-          <span v-else>{{ row.voucherNo }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="" width="48">
-        <template #default="{ row }">
-          <el-button link type="danger" size="small" :disabled="isReadonly" @click="ic.removeRow(row.id)">删</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    <!-- 审计说明 -->
-    <el-card class="opinion-card" shadow="never">
-      <template #header>
-        <div class="opinion-header"><span class="opinion-title">审计说明</span></div>
-      </template>
-      <el-input v-model="ic.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" :disabled="isReadonly" placeholder="填写审计说明：概述委外加工物资发出、收回及加工费归集核查程序、样本覆盖率与核对结果，以及异常事项处理。" />
-    </el-card>
+    </header>
 
-    <!-- 审计结论 -->
-    <el-card class="opinion-card" shadow="never">
-      <template #header>
-        <div class="opinion-header"><span class="opinion-title">审计结论</span></div>
-      </template>
-      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" :disabled="isReadonly"
-        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。" @change="saveAuditConclusion" />
-    </el-card>
+    <details class="ic-guide guidance-details">
+      <summary>编制提示</summary>
+      <ol>
+        <li>获取委外明细，检查合同、发料凭证、加工费结算凭证；必要时向加工方函证加工费与期末结存。</li>
+        <li>表一核对期初期末倒轧；表二关注主要供应商加工规模与结算单据；表三跟踪发出未收回风险。</li>
+        <li>可与 F2-7 委托加工物资明细表金额勾稽。</li>
+      </ol>
+    </details>
+
+    <section class="ic-card">
+      <header class="ic-card-head"><h3>一、审计目标</h3></header>
+      <ul class="ic-list">
+        <li>资产负债表中记录的存货是存在的，并计入了正确的会计科目</li>
+        <li>所有应记录的存货均已记录，且相关信息已得到恰当披露</li>
+        <li>被审计单位拥有或控制资产负债表中记录的存货</li>
+        <li>存货以恰当金额列示，相关调整已记录，相关信息已得到恰当披露</li>
+      </ul>
+    </section>
+
+    <section class="ic-card">
+      <header class="ic-card-head"><h3>二、样本选取标准与规模</h3></header>
+      <div class="ic-meta-grid">
+        <div class="ic-field"><label>被审计单位</label>
+          <el-input :model-value="sc.meta.value.entityName" :disabled="isReadonly" @update:model-value="(v: string) => sc.updateMeta({ entityName: v })" />
+        </div>
+        <div class="ic-field"><label>截止日</label>
+          <el-input :model-value="sc.meta.value.cutoffDate" :disabled="isReadonly" @update:model-value="(v: string) => sc.updateMeta({ cutoffDate: v })" />
+        </div>
+        <div class="ic-field span2"><label>样本说明</label>
+          <el-input :model-value="sc.meta.value.sampleNote" type="textarea" :rows="2" :disabled="isReadonly" @update:model-value="(v: string) => sc.updateMeta({ sampleNote: v })" />
+        </div>
+      </div>
+    </section>
+
+    <section class="ic-card">
+      <header class="ic-card-head">
+        <div>
+          <h3>三、审计过程</h3>
+          <p>1. 取得委外明细并检查合同/发料/加工费结算；2. 必要时向加工方函证；3. 填写下方三表</p>
+        </div>
+      </header>
+      <div class="ic-meta-grid" style="padding-top: 0">
+        <div class="ic-field span2"><label>过程补充</label>
+          <el-input :model-value="sc.meta.value.processNote" type="textarea" :rows="2" :disabled="isReadonly" @update:model-value="(v: string) => sc.updateMeta({ processNote: v })" />
+        </div>
+      </div>
+    </section>
+
+    <!-- 表一 -->
+    <section class="ic-card">
+      <header class="ic-card-head">
+        <div>
+          <h3>（一）委托加工物资基本情况</h3>
+          <p>期末＝期初＋本期增加－本期减少 · 合计期末 {{ sc.closingTotal.value.toLocaleString() }}</p>
+        </div>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="sc.addBasic()">+ 行</el-button>
+      </header>
+      <div class="ic-table-wrap">
+        <el-table :data="sc.basicRows.value" border size="small">
+          <el-table-column prop="seq" label="序号" width="50" />
+          <el-table-column label="年度" width="90">
+            <template #default="{ row }">
+              <el-input :model-value="row.year" size="small" :disabled="isReadonly" @change="(v: string) => sc.updateBasic(row.id, { year: v })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="期初余额" width="110">
+            <template #default="{ row }">
+              <el-input-number :model-value="row.opening" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateBasic(row.id, { opening: v ?? 0 })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="本期增加" width="110">
+            <template #default="{ row }">
+              <el-input-number :model-value="row.increase" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateBasic(row.id, { increase: v ?? 0 })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="本期减少" width="110">
+            <template #default="{ row }">
+              <el-input-number :model-value="row.decrease" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateBasic(row.id, { decrease: v ?? 0 })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="期末余额" width="110">
+            <template #default="{ row }"><span class="formula">{{ row.closing.toLocaleString() }}</span></template>
+          </el-table-column>
+          <el-table-column label="其中加工费发生" width="120">
+            <template #default="{ row }">
+              <el-input-number :model-value="row.processingFee" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateBasic(row.id, { processingFee: v ?? 0 })" />
+            </template>
+          </el-table-column>
+          <el-table-column width="44">
+            <template #default="{ row }">
+              <el-button link type="danger" size="small" :disabled="isReadonly" @click="sc.removeBasic(row.id)">删</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </section>
+
+    <!-- 表二 -->
+    <section class="ic-card">
+      <header class="ic-card-head">
+        <div>
+          <h3>（二）主要委外供应商情况 1</h3>
+          <p>加工入库与加工费 · 加工费合计 {{ sc.feeTotal.value.toLocaleString() }}</p>
+        </div>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="sc.addSupplier1()">+ 行</el-button>
+      </header>
+      <div class="ic-table-wrap">
+        <el-table :data="sc.supplier1Rows.value" border size="small" max-height="320">
+          <el-table-column prop="seq" label="序号" width="50" />
+          <el-table-column label="年度" width="80">
+            <template #default="{ row }">
+              <el-input :model-value="row.year" size="small" :disabled="isReadonly" @change="(v: string) => sc.updateSupplier1(row.id, { year: v })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="供应商名称" min-width="120">
+            <template #default="{ row }">
+              <el-input :model-value="row.supplier" size="small" :disabled="isReadonly" @change="(v: string) => sc.updateSupplier1(row.id, { supplier: v })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="主要加工工序" min-width="110">
+            <template #default="{ row }">
+              <el-input :model-value="row.processStep" size="small" :disabled="isReadonly" @change="(v: string) => sc.updateSupplier1(row.id, { processStep: v })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="入库数量" width="90">
+            <template #default="{ row }">
+              <el-input-number :model-value="row.inboundQty" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateSupplier1(row.id, { inboundQty: v ?? 0 })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="入库金额" width="100">
+            <template #default="{ row }">
+              <el-input-number :model-value="row.inboundAmount" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateSupplier1(row.id, { inboundAmount: v ?? 0 })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="加工费金额" width="100">
+            <template #default="{ row }">
+              <el-input-number :model-value="row.feeAmount" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateSupplier1(row.id, { feeAmount: v ?? 0 })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="加工费结算单据" min-width="110">
+            <template #default="{ row }">
+              <el-input :model-value="row.settlementDocs" size="small" :disabled="isReadonly" @change="(v: string) => sc.updateSupplier1(row.id, { settlementDocs: v })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="凭证编号" width="96">
+            <template #default="{ row }">
+              <el-input :model-value="row.voucherNo" size="small" :disabled="isReadonly" @change="(v: string) => sc.updateSupplier1(row.id, { voucherNo: v })" />
+            </template>
+          </el-table-column>
+          <el-table-column width="44">
+            <template #default="{ row }">
+              <el-button link type="danger" size="small" :disabled="isReadonly" @click="sc.removeSupplier1(row.id)">删</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </section>
+
+    <!-- 表三 -->
+    <section class="ic-card">
+      <header class="ic-card-head">
+        <div>
+          <h3>（三）主要委外供应商情况 2</h3>
+          <p>发出/收回材料成本 · 未收回须说明原因并评估是否函证</p>
+        </div>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="sc.addSupplier2()">+ 行</el-button>
+      </header>
+      <div class="ic-table-wrap">
+        <el-table
+          :data="sc.supplier2Rows.value"
+          border
+          size="small"
+          max-height="360"
+          :row-class-name="supplier2RowClassName"
+        >
+          <el-table-column prop="seq" label="序号" width="50" />
+          <el-table-column label="加工单位名称" min-width="120">
+            <template #default="{ row }">
+              <el-input :model-value="row.processor" size="small" :disabled="isReadonly" @change="(v: string) => sc.updateSupplier2(row.id, { processor: v })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="合同或协议号" width="120">
+            <template #default="{ row }">
+              <el-input :model-value="row.contractNo" size="small" :disabled="isReadonly" @change="(v: string) => sc.updateSupplier2(row.id, { contractNo: v })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="发出时间" width="110">
+            <template #default="{ row }">
+              <el-input :model-value="row.issueDate" size="small" :disabled="isReadonly" @change="(v: string) => sc.updateSupplier2(row.id, { issueDate: v })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="发出材料成本" width="110">
+            <template #default="{ row }">
+              <el-input-number :model-value="row.issueCost" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateSupplier2(row.id, { issueCost: v ?? 0 })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="加工费" width="96">
+            <template #default="{ row }">
+              <el-input-number :model-value="row.fee" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateSupplier2(row.id, { fee: v ?? 0 })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="收回材料成本" width="110">
+            <template #default="{ row }">
+              <el-input-number :model-value="row.recoverCost" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateSupplier2(row.id, { recoverCost: v ?? 0 })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="应收回(发出+加工费)" width="120">
+            <template #default="{ row }">
+              <span class="formula">{{ recoverCheck(row).expected.toLocaleString() }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="计价勾稽" width="150">
+            <template #default="{ row }">
+              <el-tooltip :content="recoverCheck(row).detail" placement="top" :show-after="200">
+                <span :class="'recover-st recover-' + recoverCheck(row).status">
+                  {{ RECOVER_ICON[recoverCheck(row).status] }}
+                  {{ recoverCheck(row).status === 'ok' ? '一致'
+                    : recoverCheck(row).status === 'unrecovered' ? '未全额收回'
+                    : recoverCheck(row).status === 'valuation' ? '计价差异' : '待填' }}
+                </span>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <el-table-column label="未收回原因及是否需函证" min-width="160">
+            <template #default="{ row }">
+              <el-input :model-value="row.unrecoveredNote" size="small" :disabled="isReadonly" @change="(v: string) => sc.updateSupplier2(row.id, { unrecoveredNote: v })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="索引号" width="80">
+            <template #default="{ row }">
+              <el-input :model-value="row.indexRef" size="small" :disabled="isReadonly" @change="(v: string) => sc.updateSupplier2(row.id, { indexRef: v })" />
+            </template>
+          </el-table-column>
+          <el-table-column label="备注" min-width="90">
+            <template #default="{ row }">
+              <el-input :model-value="row.remark" size="small" :disabled="isReadonly" @change="(v: string) => sc.updateSupplier2(row.id, { remark: v })" />
+            </template>
+          </el-table-column>
+          <el-table-column width="44">
+            <template #default="{ row }">
+              <el-button link type="danger" size="small" :disabled="isReadonly" @click="sc.removeSupplier2(row.id)">删</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </section>
+
+    <section class="ic-card">
+      <header class="ic-card-head">
+        <h3>四、审计说明</h3>
+        <el-tooltip :content="aiTip" placement="top">
+          <el-button size="small" type="primary" plain :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="genNote">🤖 AI辅助说明</el-button>
+        </el-tooltip>
+      </header>
+      <el-input v-model="sc.auditNote.value" class="ic-note" type="textarea" :rows="3" :disabled="isReadonly" placeholder="概述核查程序、函证情况、未收回风险与处理…" />
+    </section>
+
+    <section class="ic-card conclusion-card">
+      <header class="ic-card-head">
+        <h3>五、审计结论</h3>
+        <el-tooltip :content="aiTip" placement="top">
+          <el-button size="small" type="primary" plain :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="genConclusion">🤖 AI辅助结论</el-button>
+        </el-tooltip>
+      </header>
+      <el-input
+        :model-value="auditConclusion"
+        type="textarea"
+        :rows="3"
+        :disabled="isReadonly"
+        placeholder="A / B / C 结论模板"
+        @change="saveAuditConclusion"
+      />
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, toRef } from 'vue'
-import { useF2SubcontractCheck } from '../../composables/useF2InspectionCheck'
+import { ref, computed, onMounted, toRef, type Ref } from 'vue'
+import { useF2SubcontractSheet } from '../../composables/useF2SubcontractCheck'
+import { useF2ValuationAiGenerate } from '../../composables/useF2ValuationAiGenerate'
+import {
+  evaluateSubcontractRecover,
+  type SubcontractSupplier2Row,
+} from '../../composables/useF2InspectionCheckFormulas'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
 
 const props = defineProps<{
   wpId?: string
+  projectId?: string
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()
-const ic = useF2SubcontractCheck({ allResponses: toRef(props, 'allResponses'), isReadonly: toRef(props, 'isReadonly') })
 
-// ─── 审计结论（独立持久化，F2 计价组事件；检查说明沿用 composable auditNote） ──
+const sc = useF2SubcontractSheet({
+  allResponses: toRef(props, 'allResponses'),
+  isReadonly: toRef(props, 'isReadonly'),
+})
+
+// ─── 表三计价勾稽（收回 ≈ 发出 + 加工费）─────────────────────────────────────
+function recoverCheck(row: SubcontractSupplier2Row) {
+  return evaluateSubcontractRecover(row)
+}
+const valuationCount = computed(
+  () => sc.supplier2Rows.value.filter((r) => recoverCheck(r).status === 'valuation').length,
+)
+const RECOVER_ICON: Record<string, string> = { ok: '✓', unrecovered: '!', valuation: '✗', pending: '…' }
+
+function supplier2RowClassName({ row }: { row: SubcontractSupplier2Row }): string {
+  const s = recoverCheck(row).status
+  return s === 'unrecovered' ? 'error-row' : s === 'valuation' ? 'warn-row' : ''
+}
+
+// ─── AI 辅助（与 D4/F2-33 gold 标准一致）─────────────────────────────────────
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2ValuationAiGenerate(
+  toRef(() => props.wpId || '') as Ref<string>,
+)
+const aiTip = computed(() => (aiAvailable.value ? 'AI 辅助生成' : 'AI 服务暂不可用'))
+function aiCtx(): Record<string, unknown> {
+  return {
+    sheet: 'F2-35',
+    unrecoveredCount: sc.unrecoveredCount.value,
+    valuationCount: valuationCount.value,
+    feeTotal: sc.feeTotal.value,
+    closingTotal: sc.closingTotal.value,
+  }
+}
+async function genNote(): Promise<void> {
+  const t = await generateAndConfirm('inspection-audit-note', sc.auditNote.value, aiCtx(), 'AI 生成 · 委托加工核查说明')
+  if (t) sc.auditNote.value = t
+}
+async function genConclusion(): Promise<void> {
+  const t = await generateAndConfirm('inspection-conclusion', auditConclusion.value, aiCtx(), 'AI 生成 · 委托加工核查结论')
+  if (t) saveAuditConclusion(t)
+}
+
 const CONCLUSION_KEY = 'F2-35-audit-conclusion'
 const auditConclusion = ref('')
 function saveAuditConclusion(val: string): void {
@@ -143,27 +377,22 @@ onMounted(() => {
 })
 </script>
 
-<style scoped src="./f2ValSheetStyles.css"></style>
+<style scoped src="./f2InspectSheetStyles.css"></style>
 <style scoped>
-.f2-val-sheet :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
-.f2-val-sheet :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
-/* 编制提示（蓝色） */
-.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
-.guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
-.meta-bar { display: flex; gap: 16px; align-items: center; margin-bottom: 10px; flex-wrap: wrap; }
-.coverage { font-weight: 600; }
-.coverage.warn { color: #e6a23c; }
-/* 工具栏 */
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; }
-.chip-wrap { display: inline-flex; align-items: center; }
-/* 审计意见卡片 */
-.opinion-card { margin-top: 14px; border-radius: 8px; }
-.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.opinion-header { display: flex; align-items: center; justify-content: space-between; }
-.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+.formula {
+  text-decoration: underline dotted #909399;
+  cursor: help;
+}
+.ic-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+:deep(.warn-row) td { background: #fdf6ec; }
+.recover-st { font-size: 12px; white-space: nowrap; }
+.recover-ok { color: var(--el-color-success); }
+.recover-unrecovered { color: var(--el-color-danger); font-weight: 600; }
+.recover-valuation { color: var(--el-color-warning); font-weight: 600; }
+.recover-pending { color: var(--el-text-color-placeholder); }
 </style>

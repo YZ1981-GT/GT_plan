@@ -71,8 +71,12 @@ export function useFollowupData(props: UseFollowupDataProps): UseFollowupDataRet
 
   // ─── 初始化 ─────────────────────────────────────────────────────────────────
 
+  // 仅接受本表格式；'followup-v1' 为历史 buildPayload 误写的旧别名（向后兼容不丢旧数据），
+  // canonical 见 followupTypes.FollowupPayload._format。其它 sheet 的格式（如 entity-verify-v1）拒绝。
+  const ACCEPTED_FORMATS = new Set(['confirmation-followup-v1', 'followup-v1'])
+
   function initFromHtmlData(data: any) {
-    if (!data || !data._format) {
+    if (!data || !ACCEPTED_FORMATS.has(data._format)) {
       rows.value = []
       return
     }
@@ -180,7 +184,7 @@ export function useFollowupData(props: UseFollowupDataProps): UseFollowupDataRet
 
   function buildPayload(): FollowupPayload {
     return {
-      _format: 'followup-v1',
+      _format: 'confirmation-followup-v1',
       rows: rows.value,
       progress_summary: progressMetrics.value,
     }

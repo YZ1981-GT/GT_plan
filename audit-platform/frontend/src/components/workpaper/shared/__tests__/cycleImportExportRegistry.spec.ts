@@ -5,10 +5,10 @@ import { describe, it, expect } from 'vitest'
 import { CYCLE_IMPORT_EXPORT } from '../cycleImportExportRegistry'
 
 describe('cycleImportExportRegistry f2-st', () => {
-  it('f2-st 仅包含 F2-24/25/26（F2-21 文本问卷无 Excel round-trip）', () => {
+  it('f2-st 包含 F2-24/25/26 及双表变体', () => {
     const entry = CYCLE_IMPORT_EXPORT['f2-st']
     expect(entry.apiPrefix).toBe('f2-st')
-    expect([...entry.sheets]).toEqual(['F2-24', 'F2-25', 'F2-26'])
+    expect([...entry.sheets]).toEqual(['F2-24', 'F2-24-count', 'F2-25', 'F2-25-floor', 'F2-26', 'F2-26-after'])
   })
 
   it('f2-st 不包含 F2-21', () => {

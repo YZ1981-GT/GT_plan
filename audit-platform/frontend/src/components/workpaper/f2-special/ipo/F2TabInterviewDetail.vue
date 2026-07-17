@@ -44,7 +44,7 @@
           <li v-for="i in md.entityList.value" :key="i.id"
             :class="{ active: md.currentId.value === i.id }"
             @click="md.selectEntity(i.id)">
-            {{ (i as { supplierName?: string }).supplierName }} / {{ (i as { interviewDate?: string }).interviewDate }}
+            {{ entityLabel(i) }}
           </li>
         </ul>
       </aside>
@@ -136,6 +136,11 @@ const md = useF2MasterDetail({
 })
 
 const cur = computed(() => md.currentInterview.value)
+
+function entityLabel(i: unknown): string {
+  const e = i as { supplierName?: string; interviewDate?: string }
+  return `${e.supplierName ?? ''} / ${e.interviewDate ?? ''}`
+}
 
 // ─── 审计结论（逐 sheet 打磨补齐，持久化走 f2-spe:save-items）──────────────────
 const CONCLUSION_KEY = 'F2-72-audit-conclusion'

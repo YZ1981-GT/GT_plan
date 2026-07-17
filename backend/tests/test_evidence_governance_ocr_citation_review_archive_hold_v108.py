@@ -42,6 +42,11 @@ from app.services.evidence_governance.migration_allocation import (
 
 MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
 V108_PATH = MIGRATIONS_DIR / "V108__evidence_governance_ocr_citation_review_archive_hold.sql"
+# V110 additively 补齐 V108 建表时漏掉的 ocr_jobs.next_retry_at 列（R15.4 有界指数退避）。
+# 按本仓「已应用迁移不可事后编辑、缺列靠 additive repair 迁移补跑」铁律，该列由 V110 补齐
+# 而非改 V108，故 ORM↔迁移列 parity 的语料库须纳入这条 additive 完成迁移（与 Wave-1 capstone
+# test_every_orm_column_present_in_wave1_migrations 的 _all_wave1_sql 同源）。
+V110_PATH = MIGRATIONS_DIR / "V110__repair_procedure_row_tasks_missed_by_v105_conflict.sql"
 
 NEW_TABLES = (
     "evidence_audit_command_roots",
@@ -130,12 +135,24 @@ class TestMigrationFileConventions:
         violations = lint_migration_sql(V108_PATH.read_text(encoding="utf-8"))
         assert violations == [], f"V108 违反迁移约定：{violations}"
 
-    def test_v108_no_duplicate_and_is_highest(self):
+    def test_v108_no_duplicate_and_well_formed(self):
+        """V108 无重复且自洽（highest-migration 断言已动态化）。
+
+        原断言 ``max(by) == 108``（V108 为当前最高迁移号）是陈旧簿记假设——后续无关 feature
+        已将迁移链推进到更高号（V109..V112：procedure-delegation / evidence tombstones /
+        ai_content_governance 等）。硬编码最高号会随每个新 feature 添加迁移而误报失败。
+
+        改为动态自洽守卫，保留真正的不变量：
+          - 全局无重复版本号（同号冲突会被 MigrationRunner 静默跳过靠后者，是真实隐患）；
+          - V108 在目录中恰好由一个文件承载（自身无重复）；
+          - V108 处于已知迁移链内（号 ≤ 当前最高号）——不再要求它是最高号。
+        """
         by = parse_dir_versions([p.name for p in MIGRATIONS_DIR.glob("V*.sql")])
         dupes = {v: names for v, names in by.items() if len(names) > 1}
         assert dupes == {}, f"重复版本号：{dupes}"
         assert 108 in by, "V108 未在目录中"
-        assert max(by) == 108, f"V108 应为当前最高号，实际最高={max(by)}"
+        assert len(by[108]) == 1, f"V108 版本号存在重复文件：{by[108]}"
+        assert max(by) >= 108, f"迁移链最高号 {max(by)} 低于 V108（不可能）"
 
     def test_v108_additive_no_destructive(self):
         sql = _strip_comments(V108_PATH.read_text(encoding="utf-8")).upper()
@@ -255,10 +272,17 @@ class TestOrmMigrationParity:
             assert model.__tablename__ == tname
 
     def test_orm_columns_present_in_migration(self):
-        sql = V108_PATH.read_text(encoding="utf-8")
+        # 语料库 = V108 建表 DDL + V110 additive 补齐（ocr_jobs.next_retry_at）。
+        # next_retry_at 是 ORM/OcrRetryService 有界指数退避（R15.4）真实列，V108 建表时漏列，
+        # 按「已应用迁移不可事后编辑、缺列靠 additive repair 迁移补齐」铁律由 V110 additively 补齐
+        # （见 V110_PATH 注释）。parity 守卫不因此弱化：每个 ORM 列仍必须出现在本 spec 的治理迁移
+        # 链（V108 + 其 additive 修复迁移）中——列在磁盘迁移 SQL 与 DB 中都真实存在，非 fake-green。
+        sql = V108_PATH.read_text(encoding="utf-8") + "\n" + V110_PATH.read_text(encoding="utf-8")
         for tname, model in self._orm_models().items():
             for col in model.__table__.columns:
-                assert col.name in sql, f"ORM 列 {tname}.{col.name} 未出现在 V108"
+                assert col.name in sql, (
+                    f"ORM 列 {tname}.{col.name} 未出现在 V108 及其 additive 修复迁移 V110"
+                )
 
     def test_ai_content_log_orm_has_extension_columns(self):
         import app.models  # noqa: F401

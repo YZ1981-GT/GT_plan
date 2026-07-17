@@ -71,7 +71,8 @@ if !READY!==0 (
 
 :: ─── [4/5] start frontend ────────────────────────────────────
 echo [4/5] Starting frontend on :%FRONTEND_PORT% ...
-start "%FRONTEND_TITLE%" /min cmd /k "title %FRONTEND_TITLE% && cd /d "%FRONTEND_DIR%" && set VITE_API_BASE_URL=http://localhost:%BACKEND_PORT% && set VITE_DEV_PORT=%FRONTEND_PORT% && npm run dev"
+:: 用 127.0.0.1 而非 localhost：后端仅监听 IPv4，localhost 会先试 IPv6 ::1 → 每请求 +2s
+start "%FRONTEND_TITLE%" /min cmd /k "title %FRONTEND_TITLE% && cd /d "%FRONTEND_DIR%" && set VITE_API_BASE_URL=http://127.0.0.1:%BACKEND_PORT% && set VITE_DEV_PORT=%FRONTEND_PORT% && npm run dev"
 
 :: ─── [5/5] wait for frontend ─────────────────────────────────
 echo [5/5] Waiting for frontend (max 15s)...

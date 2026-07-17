@@ -7,7 +7,8 @@
       <p>1. 本程序表按 CAS14 号列示合同履约成本的实质性审计程序，逐条执行并记录结论、索引。</p>
       <p>2. 关注合同履约成本的资本化条件（直接相关、增加未来资源、预期收回）与摊销、减值处理。</p>
       <p>3. 检查凭证真实性、计量准确性与期间归属，结合抽凭（F2-56）与减值测算（F2-57）交叉复核。</p>
-      <p>4. 程序执行结论应回填底稿目录（F2-1）并向报表层（A1-13）传递。</p>
+      <p>4. 资本化判断与摊销测试编制方法可展开下方「编制参考示例」对照源模板执行。</p>
+      <p>5. 程序执行结论应回填底稿目录（F2-1）并向报表层（A1-13）传递。</p>
     </div>
   </details>
 
@@ -15,6 +16,8 @@
   <el-alert type="info" :closable="false" show-icon class="objective-alert">
     <template #title>审计目标：确认合同履约成本的确认、计量、摊销及减值符合 CAS14 号要求，期末余额真实、完整、准确。</template>
   </el-alert>
+
+  <F2ContractCostTestExampleRef />
 
   <!-- 交叉索引 -->
   <div class="procedure-header">
@@ -60,6 +63,7 @@ import http from '@/utils/http'
 
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtAProgramConsole from '../../GtAProgramConsole.vue'
+import F2ContractCostTestExampleRef from './F2ContractCostTestExampleRef.vue'
 
 const props = defineProps<{
   htmlData?: any

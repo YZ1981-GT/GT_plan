@@ -1,8 +1,17 @@
 /**
  * useF2StocktakeSheet — F2 监盘通用行/字段持久化
  */
-import { ref, watch, onBeforeUnmount, type Ref } from 'vue'
+import { ref, watch, onBeforeUnmount, onScopeDispose, type Ref } from 'vue'
 import type { ChecklistResponse } from './useF2StocktakeFormData'
+
+/** 已挂载的字段编辑器 flush 回调（切 OnlyOffice 前统一刷盘） */
+const _fieldFlushers = new Set<() => Promise<void>>()
+
+/** 立即落库所有挂载中的监盘字段编辑器（取消 2s debounce） */
+export async function flushAllF2StocktakeFields(): Promise<void> {
+  if (!_fieldFlushers.size) return
+  await Promise.all([..._fieldFlushers].map((fn) => fn()))
+}
 
 function genId(): string {
   return `st-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
@@ -79,10 +88,35 @@ export function useF2StocktakeRows<T extends { id: string }>(opts: {
     const items = [
       opts.allResponses.value.get(opts.rowsKey),
       opts.allResponses.value.get(opts.noteKey),
-    ].filter(Boolean)
-    if (items.length) {
-      window.dispatchEvent(new CustomEvent('f2-stocktake:save-items', { detail: { items } }))
+    ].filter(Boolean) as ChecklistResponse[]
+    if (!items.length) return
+    window.dispatchEvent(new CustomEvent('f2-stocktake:save-items', { detail: { items } }))
+  }
+
+  async function flushNow(): Promise<void> {
+    opts.allResponses.value.set(opts.rowsKey, {
+      item_id: opts.rowsKey, conclusion: null, remark: JSON.stringify(rows.value),
+    })
+    opts.allResponses.value.set(opts.noteKey, {
+      item_id: opts.noteKey, conclusion: null, remark: auditNote.value,
+    })
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
     }
+    await new Promise<void>((resolve) => {
+      let settled = false
+      const done = () => { if (!settled) { settled = true; resolve() } }
+      const items = [
+        opts.allResponses.value.get(opts.rowsKey),
+        opts.allResponses.value.get(opts.noteKey),
+      ].filter(Boolean) as ChecklistResponse[]
+      if (!items.length) { resolve(); return }
+      window.dispatchEvent(
+        new CustomEvent('f2-stocktake:save-items', { detail: { items, done } }),
+      )
+      setTimeout(done, 8000)
+    })
   }
 
   function persist(): void {
@@ -120,7 +154,10 @@ export function useF2StocktakeRows<T extends { id: string }>(opts: {
 
   onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
 
-  return { rows, auditNote, updateRow, addRow, removeRow, genId }
+  _fieldFlushers.add(flushNow)
+  onScopeDispose(() => { _fieldFlushers.delete(flushNow) })
+
+  return { rows, auditNote, updateRow, addRow, removeRow, genId, flushNow }
 }
 
 export function useF2StocktakeFields(opts: {
@@ -162,14 +199,25 @@ export function useF2StocktakeFields(opts: {
     () => { if (opts.fieldsKey === 'F2-21-fields') load() },
   )
 
-  function flushSave(): void {
+  function flushSave(): Promise<void> {
     const items = [
       opts.allResponses.value.get(opts.fieldsKey),
       opts.allResponses.value.get(opts.noteKey),
-    ].filter(Boolean)
-    if (items.length) {
-      window.dispatchEvent(new CustomEvent('f2-stocktake:save-items', { detail: { items } }))
-    }
+    ].filter(Boolean) as ChecklistResponse[]
+    if (!items.length) return Promise.resolve()
+    return new Promise((resolve) => {
+      let settled = false
+      const done = () => {
+        if (settled) return
+        settled = true
+        resolve()
+      }
+      window.dispatchEvent(
+        new CustomEvent('f2-stocktake:save-items', { detail: { items, done } }),
+      )
+      // 防止监听方未调用 done 时一直挂起
+      setTimeout(done, 8000)
+    })
   }
 
   function persistFields(): void {
@@ -177,7 +225,22 @@ export function useF2StocktakeFields(opts: {
       item_id: opts.fieldsKey, conclusion: null, remark: JSON.stringify(fields.value),
     })
     if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 2000)
+    debounceTimer = setTimeout(() => { debounceTimer = null; void flushSave() }, 2000)
+  }
+
+  /** 立即刷盘（切到在线编辑前必须调用，否则 2s debounce 未到会同步旧数据） */
+  async function flushNow(): Promise<void> {
+    opts.allResponses.value.set(opts.fieldsKey, {
+      item_id: opts.fieldsKey, conclusion: null, remark: JSON.stringify(fields.value),
+    })
+    opts.allResponses.value.set(opts.noteKey, {
+      item_id: opts.noteKey, conclusion: null, remark: auditNote.value,
+    })
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
+    }
+    await flushSave()
   }
 
   function updateField(id: string, val: string): void {
@@ -186,16 +249,36 @@ export function useF2StocktakeFields(opts: {
     persistFields()
   }
 
+  /** 批量回写（AI 填入等），保留未覆盖字段，可继续二次编辑 */
+  function applyFields(patch: Record<string, string>, optsApply?: { overwriteEmptyOnly?: boolean }): void {
+    if (readonly.value) return
+    const next = { ...fields.value }
+    for (const [id, val] of Object.entries(patch)) {
+      if (!opts.fieldIds.includes(id)) continue
+      const text = (val ?? '').trim()
+      if (!text) continue
+      if (optsApply?.overwriteEmptyOnly && (next[id] || '').trim()) continue
+      next[id] = text
+    }
+    fields.value = next
+    persistFields()
+    // AI 填入立即落库，不等 debounce
+    void flushNow()
+  }
+
   watch(auditNote, (val) => {
     if (readonly.value) return
     opts.allResponses.value.set(opts.noteKey, { item_id: opts.noteKey, conclusion: null, remark: val })
     if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 2000)
+    debounceTimer = setTimeout(() => { debounceTimer = null; void flushSave() }, 2000)
   })
 
-  onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
+  onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); void flushSave() } })
 
-  return { fields, auditNote, updateField }
+  _fieldFlushers.add(flushNow)
+  onScopeDispose(() => { _fieldFlushers.delete(flushNow) })
+
+  return { fields, auditNote, updateField, applyFields, flushNow }
 }
 
 export default useF2StocktakeRows

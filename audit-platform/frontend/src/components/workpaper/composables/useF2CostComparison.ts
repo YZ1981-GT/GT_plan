@@ -1,14 +1,23 @@
 /**
  * useF2CostComparison — F2-20 产成品单位成本年度比较分析表
  *
- * 对齐 xlsx：本年/上年单位成本（材料/人工/制造/合计）+ 波动比例 + 是否异常 + 索引
- * + 审计说明 / 审计结论
+ * 功能参照 F2-18：
+ * - 可编辑期间标签（本年/上年）
+ * - 可配置异常阈值
+ * - 表内合计/波动自动计算 + 是否异常（人工覆盖 / 阈值自动）
+ * - 分段「审计说明 + 异常原因」+ 总体审计结论
+ * - pack v2 持久化 + legacy 迁移
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
 import { parseNum, calcChangeRate, isChangeRateExceeding } from './useF2InvMaiFormulaEngine'
 import type { ChecklistResponse } from './useF2FormData'
 
 export type F2YesNo = '是' | '否' | ''
+
+export interface F2SectionNotes {
+  note: string
+  abnormalReason: string
+}
 
 export interface F2CostRow {
   rowId: string
@@ -21,7 +30,7 @@ export interface F2CostRow {
   priorMaterial: number
   priorLabor: number
   priorOverhead: number
-  /** 是否存在异常波动（可人工覆盖；空则按阈值自动提示） */
+  /** 是否存在异常波动（空=按阈值自动） */
   abnormal: F2YesNo
   indexRef: string
   /** legacy */
@@ -32,8 +41,9 @@ export interface F2CostRow {
 
 export interface F2CostPack {
   version: 2
+  yearLabels: [string, string]
   rows: F2CostRow[]
-  auditNote: string
+  notes: F2SectionNotes
   auditConclusion: string
   /** 波动异常阈值（默认 20%） */
   anomalyThreshold: number
@@ -47,6 +57,10 @@ const LEGACY_AUDIT_CONCLUSION_KEY = 'F2-cost-comparison-audit-conclusion'
 
 function rid(): string {
   return `f2c-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
+}
+
+function emptyNotes(): F2SectionNotes {
+  return { note: '', abnormalReason: '' }
 }
 
 function emptyRow(): F2CostRow {
@@ -67,8 +81,9 @@ function emptyRow(): F2CostRow {
 function defaultPack(): F2CostPack {
   return {
     version: 2,
+    yearLabels: ['本年', '上年'],
     rows: [emptyRow()],
-    auditNote: '',
+    notes: emptyNotes(),
     auditConclusion: '',
     anomalyThreshold: 0.2,
   }
@@ -85,27 +100,42 @@ function normalizeYesNo(v: unknown): F2YesNo {
   return ''
 }
 
+function normalizeNotes(raw: unknown, fallbackNote = ''): F2SectionNotes {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const o = raw as Record<string, unknown>
+    return {
+      note: o.note != null ? String(o.note) : fallbackNote,
+      abnormalReason: o.abnormalReason != null ? String(o.abnormalReason) : '',
+    }
+  }
+  return { note: fallbackNote, abnormalReason: '' }
+}
+
+function mapRow(r: any): F2CostRow {
+  return {
+    rowId: r.rowId || rid(),
+    productName: String(r.productName || ''),
+    currentMaterial: parseNum(r.currentMaterial),
+    currentLabor: parseNum(r.currentLabor),
+    currentOverhead: parseNum(r.currentOverhead),
+    priorMaterial: parseNum(r.priorMaterial),
+    priorLabor: parseNum(r.priorLabor),
+    priorOverhead: parseNum(r.priorOverhead),
+    abnormal: normalizeYesNo(r.abnormal) || (r.anomalyNote ? '是' : ''),
+    indexRef: String(r.indexRef || ''),
+    anomalyNote: r.anomalyNote != null ? String(r.anomalyNote) : '',
+  }
+}
+
 function migrateLegacy(rowsJson: string | null | undefined, conclusion: string, note: string): F2CostPack {
   const pack = defaultPack()
   pack.auditConclusion = conclusion || ''
-  pack.auditNote = note || ''
+  pack.notes = { note: note || '', abnormalReason: '' }
   if (!rowsJson) return pack
   try {
     const arr = JSON.parse(rowsJson)
     if (!Array.isArray(arr) || !arr.length) return pack
-    pack.rows = arr.map((r: any) => ({
-      rowId: r.rowId || rid(),
-      productName: String(r.productName || ''),
-      currentMaterial: parseNum(r.currentMaterial),
-      currentLabor: parseNum(r.currentLabor),
-      currentOverhead: parseNum(r.currentOverhead),
-      priorMaterial: parseNum(r.priorMaterial),
-      priorLabor: parseNum(r.priorLabor),
-      priorOverhead: parseNum(r.priorOverhead),
-      abnormal: normalizeYesNo(r.abnormal) || (r.anomalyNote ? '是' : ''),
-      indexRef: String(r.indexRef || ''),
-      anomalyNote: r.anomalyNote != null ? String(r.anomalyNote) : '',
-    }))
+    pack.rows = arr.map(mapRow)
   } catch { /* ignore */ }
   return pack
 }
@@ -116,23 +146,19 @@ function parsePack(jsonStr: string | null | undefined): F2CostPack | null {
     const parsed = JSON.parse(jsonStr)
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
     const base = defaultPack()
-    if (Array.isArray(parsed.rows) && parsed.rows.length) {
-      base.rows = parsed.rows.map((r: any) => ({
-        rowId: r.rowId || rid(),
-        productName: String(r.productName || ''),
-        currentMaterial: parseNum(r.currentMaterial),
-        currentLabor: parseNum(r.currentLabor),
-        currentOverhead: parseNum(r.currentOverhead),
-        priorMaterial: parseNum(r.priorMaterial),
-        priorLabor: parseNum(r.priorLabor),
-        priorOverhead: parseNum(r.priorOverhead),
-        abnormal: normalizeYesNo(r.abnormal),
-        indexRef: String(r.indexRef || ''),
-      }))
+    if (Array.isArray(parsed.yearLabels) && parsed.yearLabels.length >= 2) {
+      base.yearLabels = [String(parsed.yearLabels[0] || '本年'), String(parsed.yearLabels[1] || '上年')]
     }
-    base.auditNote = parsed.auditNote != null ? String(parsed.auditNote) : ''
+    if (Array.isArray(parsed.rows) && parsed.rows.length) {
+      base.rows = parsed.rows.map(mapRow)
+    }
+    const flatNote = parsed.auditNote != null ? String(parsed.auditNote) : ''
+    base.notes = normalizeNotes(parsed.notes, flatNote)
     base.auditConclusion = parsed.auditConclusion != null ? String(parsed.auditConclusion) : ''
-    if (parsed.anomalyThreshold != null) base.anomalyThreshold = parseNum(parsed.anomalyThreshold) || 0.2
+    if (parsed.anomalyThreshold != null) {
+      const t = parseNum(parsed.anomalyThreshold)
+      base.anomalyThreshold = t > 0 ? t : 0.2
+    }
     return base
   } catch {
     return null
@@ -150,7 +176,6 @@ export function useF2CostComparison(options: {
   let writing = false
 
   const pack = ref<F2CostPack>(defaultPack())
-  const activeSegment = ref<'current' | 'variance'>('current')
 
   function hydrate(): void {
     hydrating = true
@@ -175,8 +200,11 @@ export function useF2CostComparison(options: {
     { immediate: true },
   )
 
+  const yearLabels = computed(() => pack.value.yearLabels)
+
   const enrichedRows = computed(() => {
     const thr = pack.value.anomalyThreshold
+    const thrPct = thr * 100
     return pack.value.rows.map((r) => {
       const currentTotal = r.currentMaterial + r.currentLabor + r.currentOverhead
       const priorTotal = r.priorMaterial + r.priorLabor + r.priorOverhead
@@ -200,19 +228,56 @@ export function useF2CostComparison(options: {
         varianceRate: totalRate == null ? ('' as const) : totalRate / 100,
         isAnomaly,
         autoAnomaly,
+        thrPct,
+        matHot: matRate != null && Math.abs(matRate) > thrPct,
+        laborHot: laborRate != null && Math.abs(laborRate) > thrPct,
+        ohHot: ohRate != null && Math.abs(ohRate) > thrPct,
       }
     })
   })
 
+  const totals = computed(() => {
+    const rows = enrichedRows.value
+    return {
+      currentMaterial: rows.reduce((s, r) => s + r.currentMaterial, 0),
+      currentLabor: rows.reduce((s, r) => s + r.currentLabor, 0),
+      currentOverhead: rows.reduce((s, r) => s + r.currentOverhead, 0),
+      currentTotal: rows.reduce((s, r) => s + r.currentTotal, 0),
+      priorMaterial: rows.reduce((s, r) => s + r.priorMaterial, 0),
+      priorLabor: rows.reduce((s, r) => s + r.priorLabor, 0),
+      priorOverhead: rows.reduce((s, r) => s + r.priorOverhead, 0),
+      priorTotal: rows.reduce((s, r) => s + r.priorTotal, 0),
+    }
+  })
+
   const anomalyCount = computed(() => enrichedRows.value.filter((r) => r.isAnomaly).length)
+
+  const notes = computed({
+    get: () => pack.value.notes,
+    set: (v: F2SectionNotes) => {
+      if (readonly.value) return
+      pack.value.notes = { note: v.note || '', abnormalReason: v.abnormalReason || '' }
+      persist()
+    },
+  })
+
+  /** 兼容旧 API：审计说明正文 */
+  const auditNote = computed({
+    get: () => pack.value.notes.note,
+    set: (v: string) => {
+      if (readonly.value) return
+      pack.value.notes = { ...pack.value.notes, note: v }
+      persist()
+    },
+  })
 
   const conclusion = computed({
     get: () => pack.value.auditConclusion,
-    set: (v: string) => { if (!readonly.value) { pack.value.auditConclusion = v; persist() } },
-  })
-  const auditNote = computed({
-    get: () => pack.value.auditNote,
-    set: (v: string) => { if (!readonly.value) { pack.value.auditNote = v; persist() } },
+    set: (v: string) => {
+      if (readonly.value) return
+      pack.value.auditConclusion = v
+      persist()
+    },
   })
 
   function flushSave(): void {
@@ -243,6 +308,27 @@ export function useF2CostComparison(options: {
     debounceSave()
   }
 
+  function updateYearLabel(idx: 0 | 1, value: string): void {
+    if (readonly.value) return
+    const next = [...pack.value.yearLabels] as [string, string]
+    next[idx] = value || (idx === 0 ? '本年' : '上年')
+    pack.value.yearLabels = next
+    persist()
+  }
+
+  function updateThreshold(value: number): void {
+    if (readonly.value) return
+    const t = parseNum(value)
+    pack.value.anomalyThreshold = t > 0 ? t : 0.2
+    persist()
+  }
+
+  function updateNotes(field: keyof F2SectionNotes, value: string): void {
+    if (readonly.value) return
+    pack.value.notes = { ...pack.value.notes, [field]: value }
+    persist()
+  }
+
   function addRow(): void {
     if (readonly.value) return
     pack.value.rows.push(emptyRow())
@@ -261,11 +347,11 @@ export function useF2CostComparison(options: {
     if (idx === -1) return
     const row = { ...pack.value.rows[idx] }
     if (field === 'productName' || field === 'indexRef' || field === 'anomalyNote') {
-      (row as any)[field] = String(value ?? '')
+      ;(row as any)[field] = String(value ?? '')
     } else if (field === 'abnormal') {
       row.abnormal = normalizeYesNo(value)
     } else {
-      (row as any)[field] = parseNum(value)
+      ;(row as any)[field] = parseNum(value)
     }
     pack.value.rows.splice(idx, 1, row)
     persist()
@@ -273,16 +359,37 @@ export function useF2CostComparison(options: {
 
   function aiContext(): Record<string, unknown> {
     return {
+      yearLabels: pack.value.yearLabels,
+      threshold: pack.value.anomalyThreshold,
+      thresholdPct: pack.value.anomalyThreshold * 100,
       rows: enrichedRows.value.map((r) => ({
         productName: r.productName,
-        currentTotal: r.currentTotal,
-        priorTotal: r.priorTotal,
-        totalRate: r.totalRate,
+        current: {
+          material: r.currentMaterial,
+          labor: r.currentLabor,
+          overhead: r.currentOverhead,
+          total: r.currentTotal,
+        },
+        prior: {
+          material: r.priorMaterial,
+          labor: r.priorLabor,
+          overhead: r.priorOverhead,
+          total: r.priorTotal,
+        },
+        rates: {
+          material: r.matRate,
+          labor: r.laborRate,
+          overhead: r.ohRate,
+          total: r.totalRate,
+        },
         isAnomaly: r.isAnomaly,
+        autoAnomaly: r.autoAnomaly,
+        abnormal: r.abnormal,
         indexRef: r.indexRef,
       })),
       anomalyCount: anomalyCount.value,
-      threshold: pack.value.anomalyThreshold,
+      notes: pack.value.notes,
+      totals: totals.value,
     }
   }
 
@@ -292,11 +399,16 @@ export function useF2CostComparison(options: {
 
   return {
     pack,
+    yearLabels,
     enrichedRows,
+    totals,
     anomalyCount,
-    conclusion,
+    notes,
     auditNote,
-    activeSegment,
+    conclusion,
+    updateYearLabel,
+    updateThreshold,
+    updateNotes,
     addRow,
     removeRow,
     updateCell,

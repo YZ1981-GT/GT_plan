@@ -3,13 +3,26 @@
     <div v-if="isLoading" class="loading"><el-skeleton :rows="6" animated /></div>
     <template v-else>
       <div class="toolbar">
-        <el-segmented v-model="dualMode.currentMode.value" :options="dualMode.modeOptions" size="small" @change="dualMode.onModeChange" />
+        <el-segmented
+          :model-value="dualMode.currentMode.value"
+          :options="dualMode.modeOptions"
+          size="small"
+          :disabled="dualMode.syncing.value"
+          @change="dualMode.onModeChange"
+        />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
-        <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="dualMode.syncing.value" size="small" type="info">同步中…</el-tag>
+        <el-tag v-else-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag
+          v-else-if="dualMode.currentMode.value === 'onlyoffice' && !dualMode.supportsBidirectionalSync()"
+          size="small"
+          type="warning"
+        >仅预览·无回写</el-tag>
       </div>
 
       <GtOnlyOfficeSheet
         v-if="dualMode.currentMode.value === 'onlyoffice'"
+        :key="`oo-${activeTab}-${dualMode.ooRemountKey.value}`"
         :wp-id="props.wpId"
         :project-id="projectId"
         :sheet-name="props.sheetName || activeTab"
@@ -20,6 +33,7 @@
       <template v-else-if="singleSheetMode">
         <component
           :is="tabComponent(activeTab)"
+          :key="activeTab"
           :wp-id="props.wpId"
           :project-id="projectId"
           :all-responses="allResponses"
@@ -29,13 +43,11 @@
 
       <el-tabs v-else v-model="activeTab" class="stocktake-tabs">
         <el-tab-pane label="监盘程序表" name="program" lazy>
-          <GtAProgramConsole
+          <F2TabStocktakeProcedure
             v-if="activeTab === 'program'"
             :wp-id="props.wpId"
-            sheet-name="F2-21A"
-            :schema="{ columns: [], rows: [] }"
-            :html-data="{ programs: [], schema: { columns: [], rows: [] } }"
-            :readonly="isReadonly"
+            :project-id="projectId"
+            :is-readonly="isReadonly"
           />
         </el-tab-pane>
         <el-tab-pane v-for="t in dataTabs" :key="t.id" :label="t.label" :name="t.id" lazy>
@@ -58,18 +70,19 @@
 /**
  * GtF2StocktakeBundle — F2 存货监盘 HTML 入口 (F2-21A + F2-21~26)
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent, type Component } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, provide, inject, toRef, defineAsyncComponent, type Component } from 'vue'
 import { useRoute } from 'vue-router'
 import { useF2StocktakeFormData, type ChecklistResponse } from './composables/useF2StocktakeFormData'
 import { useF2StocktakeDualMode } from './composables/useF2StocktakeDualMode'
+import { flushAllF2StocktakeFields } from './composables/useF2StocktakeSheet'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import F2TabStocktakeProcedure from './f2/stocktake/F2TabStocktakeProcedure.vue'
 import F2TabStocktakeQuestionnaire from './f2/stocktake/F2TabStocktakeQuestionnaire.vue'
 import F2TabStocktakePlan from './f2/stocktake/F2TabStocktakePlan.vue'
 import F2TabStocktakeSummary from './f2/stocktake/F2TabStocktakeSummary.vue'
 import F2TabStocktakeReconcile from './f2/stocktake/F2TabStocktakeReconcile.vue'
 import F2TabStocktakeSampleResult from './f2/stocktake/F2TabStocktakeSampleResult.vue'
 import F2TabStocktakeRollforward from './f2/stocktake/F2TabStocktakeRollforward.vue'
-import GtAProgramConsole from './GtAProgramConsole.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 
@@ -93,8 +106,20 @@ const formData = useF2StocktakeFormData({
 
 const allResponses = computed(() => formData.allResponses.value)
 
+const currentSheet = computed(() => {
+  const name = props.sheetName || props.wpCode || ''
+  const m = name.match(/(F2-21A|F2-2[1-6])/)
+  return m ? m[1] : 'F2-21A'
+})
+
 const dualMode = useF2StocktakeDualMode({
   wpId: toRef(props, 'wpId'),
+  projectId,
+  sheetCode: currentSheet,
+  flushPending: async () => {
+    // 字段编辑 2s debounce；切 OO 前必须立即落库，否则 plan-sync 读到旧数据
+    await flushAllF2StocktakeFields()
+  },
   reloadAll: () => formData.loadAll(),
 })
 
@@ -118,15 +143,18 @@ const dataTabs = [
   { id: 'F2-26', label: '倒轧表' },
 ]
 
-const currentSheet = computed(() => {
-  const name = props.sheetName || props.wpCode || ''
-  const m = name.match(/(F2-21A|F2-2[1-6])/)
-  return m ? m[1] : 'F2-21A'
-})
-
 const singleSheetMode = computed(() => /^F2-2[1-6]$/.test(currentSheet.value))
 
 const activeTab = ref(singleSheetMode.value ? currentSheet.value : 'program')
+
+/** 父级 sheet 页签切换时（F2-21↔F2-22↔F2-23…）组件会复用，必须同步 activeTab */
+watch(currentSheet, (code) => {
+  if (/^F2-2[1-6]$/.test(code)) {
+    activeTab.value = code
+  } else if (code === 'F2-21A') {
+    activeTab.value = 'program'
+  }
+})
 
 function tabComponent(id: string): Component {
   const map: Record<string, Component> = {
@@ -141,10 +169,15 @@ function tabComponent(id: string): Component {
 }
 
 async function handleSave(e: Event): Promise<void> {
-  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
-  if (Array.isArray(items) && items.length) {
-    await formData.saveItemsFromEvent(items)
-    scheduleAutoSnapshot()
+  const detail = (e as CustomEvent<{ items: ChecklistResponse[]; done?: () => void }>).detail
+  const items = detail?.items
+  try {
+    if (Array.isArray(items) && items.length) {
+      await formData.saveItemsFromEvent(items)
+      scheduleAutoSnapshot()
+    }
+  } finally {
+    detail?.done?.()
   }
 }
 

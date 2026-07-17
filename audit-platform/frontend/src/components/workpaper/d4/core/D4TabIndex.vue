@@ -157,6 +157,10 @@ function navigateToSheet(row: IndexRow) {
   if (!row.applicable || !jumpToSection) return
   jumpToSection(resolveD4SheetLabel(row.code, props.availableSheets))
 }
+
+function indexRowClassName({ row }: { row: IndexRow }): string {
+  return row.applicable ? '' : 'inapplicable-row'
+}
 </script>
 
 <template>
@@ -175,7 +179,7 @@ function navigateToSheet(row: IndexRow) {
       :data="displayRows"
       border
       size="small"
-      :row-class-name="({ row }: { row: IndexRow }) => row.applicable ? '' : 'inapplicable-row'"
+      :row-class-name="indexRowClassName"
       style="width: 100%"
     >
       <el-table-column prop="seq" label="序号" width="60" align="center" />

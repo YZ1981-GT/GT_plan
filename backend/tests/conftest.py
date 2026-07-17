@@ -96,14 +96,72 @@ TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 test_engine = create_async_engine(TEST_DATABASE_URL, echo=False)
 
 
+# ---------------------------------------------------------------------------
+# Evidence-governance aggregation marker (Task 8.3)
+#
+# Spec: attachment-ocr-ai-evidence-governance-hardening
+# Single aggregation entrypoint for the whole evidence-governance backend suite:
+#     python -m pytest -m evidence_governance
+# Membership is decided by:
+#   1) path — files under tests/evidence_governance/, tests/test_evidence_governance_*.py,
+#      or tests/attachment_ocr_ai_evidence_governance_hardening/ (the named wave locations); OR
+#   2) content — any test file that embeds the spec slug
+#      "attachment-ocr-ai-evidence-governance-hardening" in its header (wave 3/4/5
+#      ref/OCR/AI files such as test_evidence_ref_*, test_ocr_governance_*,
+#      test_ocr_retry_service_task5_2, test_ai_evidence_gate, etc.).
+# This auto-discovers spec files (including future ones) without hardcoding a
+# fragile list, and never fake-greens: it only tags existing tests.
+# ---------------------------------------------------------------------------
+
+_EVIDENCE_GOVERNANCE_SLUG = "attachment-ocr-ai-evidence-governance-hardening"
+_evidence_membership_cache: dict[str, bool] = {}
+
+
+def _is_evidence_governance_file(path_str: str) -> bool:
+    """Return True if the test file belongs to the evidence-governance spec."""
+    cached = _evidence_membership_cache.get(path_str)
+    if cached is not None:
+        return cached
+    norm = path_str.replace("\\", "/")
+    result = False
+    # 1) named wave locations by path
+    if (
+        "/tests/evidence_governance/" in norm
+        or "/tests/attachment_ocr_ai_evidence_governance_hardening/" in norm
+    ):
+        result = True
+    else:
+        base = norm.rsplit("/", 1)[-1]
+        if base.startswith("test_evidence_governance_"):
+            result = True
+        else:
+            # 2) related wave files by embedded spec slug
+            try:
+                from pathlib import Path as _P
+
+                head = _P(path_str).read_text(encoding="utf-8", errors="ignore")[:4000]
+                result = _EVIDENCE_GOVERNANCE_SLUG in head
+            except Exception:
+                result = False
+    _evidence_membership_cache[path_str] = result
+    return result
+
+
 def pytest_collection_modifyitems(config, items):
-    """Skip pg_only tests when DATABASE_URL is not PostgreSQL."""
+    """Skip pg_only tests when DATABASE_URL is not PostgreSQL, and tag the
+    evidence-governance aggregation suite (Task 8.3)."""
     db_url = os.getenv("DATABASE_URL", "sqlite")
-    if "postgresql" not in db_url:
-        skip_pg = pytest.mark.skip(reason="requires PostgreSQL")
-        for item in items:
-            if "pg_only" in item.keywords:
-                item.add_marker(skip_pg)
+    skip_pg = pytest.mark.skip(reason="requires PostgreSQL")
+    tag_pg = "postgresql" not in db_url
+    for item in items:
+        if tag_pg and "pg_only" in item.keywords:
+            item.add_marker(skip_pg)
+        try:
+            fspath = str(getattr(item, "fspath", "") or "")
+            if fspath and _is_evidence_governance_file(fspath):
+                item.add_marker(pytest.mark.evidence_governance)
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------

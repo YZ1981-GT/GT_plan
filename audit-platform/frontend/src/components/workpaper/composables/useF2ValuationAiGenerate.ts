@@ -7,11 +7,20 @@ import http from '@/utils/http'
 
 export type F2ValAiSection =
   | 'valuation-conclusion'
+  | 'valuation-note'
   | 'impairment-evaluation'
   | 'reversal-evaluation'
   | 'fairness-evaluation'
   | 'cost-analysis'
   | 'labor-analysis'
+  | 'allocation-note'
+  | 'allocation-conclusion'
+  | 'impairment-note'
+  | 'impairment-conclusion'
+  | 'obsolete-note'
+  | 'obsolete-conclusion'
+  | 'inspection-sampling-note'
+  | 'inspection-audit-note'
   | 'inspection-conclusion'
 
 export function useF2ValuationAiGenerate(wpId: Ref<string>) {

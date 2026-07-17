@@ -7,7 +7,9 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const apiTarget = env.VITE_API_BASE_URL || 'http://localhost:9980'
+  // 用 127.0.0.1 而非 localhost：后端 uvicorn 仅监听 IPv4（0.0.0.0），
+  // Windows 上 localhost 先解析 ::1 → 连接失败回退，每个代理请求固定 +2s
+  const apiTarget = env.VITE_API_BASE_URL || 'http://127.0.0.1:9980'
   const devPort = parseInt(env.VITE_DEV_PORT || '3030', 10)
 
   return {

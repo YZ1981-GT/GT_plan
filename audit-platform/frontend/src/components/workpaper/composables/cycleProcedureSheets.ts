@@ -139,6 +139,11 @@ export const FH_CYCLE_PROCEDURE_SHEETS: Record<string, CycleProcedureSheetConfig
     sheetLabel: '存货实质性程序表F2A',
     reviewSectionId: 'F2A-procedure',
   },
+  'F2-21A': {
+    sheetCode: 'F2-21A',
+    sheetLabel: '存货监盘程序表F2-21A',
+    reviewSectionId: 'F2-21A-procedure',
+  },
   F3A: {
     sheetCode: 'F3A',
     sheetLabel: '应付票据实质性程序表F3A',

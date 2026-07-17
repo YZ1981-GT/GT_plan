@@ -40,6 +40,9 @@ _SUPPORTED_SECTIONS = {
     "adj-conclusion",
     "analysis-conclusion",
     "cutoff-conclusion",
+    "cutoff-process-note",
+    "cutoff-audit-note",
+    "cutoff-standard-conclusion",
     "policy-evaluation",
     "production-sales-conclusion",
     "cost-comparison-conclusion",
@@ -73,6 +76,7 @@ _SUPPORTED_SECTIONS = {
     "f2-19-note",
     "f2-19-conclusion",
     "f2-20-note",
+    "f2-20-abnormal",
     "f2-20-conclusion",
 }
 
@@ -91,7 +95,26 @@ _SECTION_PROMPTS: dict[str, str] = {
     "detail-long-aging": "请撰写该类存货明细表审计说明第3问：库龄较长的原因。",
     "detail-impairment": "请撰写该类存货明细表审计说明第4问：计提跌价准备的主要项目及原因。",
     "detail-conclusion": "请生成该类存货明细表的审计结论，可采用A/B/C模板。",
-    "cutoff-conclusion": "请生成F2-29~32截止测试的总体审计结论。",
+    "cutoff-conclusion": (
+        "请生成F2-29~32存货截止测试审计结论。结合追查方向（账→单存在/发生，或单→账完整性）、"
+        "截止日前后抽样天数、跨期笔数与金额、差异样本摘要，评价期间归属是否恰当；"
+        "优先采用A/B/C结论模板，指出拟调整或需扩大测试的事项。"
+    ),
+    "cutoff-process-note": (
+        "请生成F2-29~32存货截止测试的过程补充说明。结合底稿类型、追查方向、抽样窗口、"
+        "金额门槛、样本分类及监盘/收入截止勾稽情况，简洁说明样本选取和核查过程；"
+        "不得虚构未提供的凭证编号或核查结果。"
+    ),
+    "cutoff-audit-note": (
+        "请生成F2-29~32存货截止测试审计说明。概述抽样范围、账证/单账勾稽、"
+        "截止日前后期间归属核实、异常样本及拟调整或扩大测试情况；"
+        "如上下文没有异常，应使用审慎的未见异常表述。"
+    ),
+    "cutoff-standard-conclusion": (
+        "请生成F2-29~32存货截止测试标准审计结论，仅采用A/B/C之一开头并给出简洁依据："
+        "A表示未见异常；B表示除已识别并拟调整事项外其余未见异常；"
+        "C表示存在重大未调整错报或范围受限，无法确认截止准确性。"
+    ),
     "listed-note-category": "请撰写存货附注「分类说明」披露文字。",
     "listed-note-nrv": "请撰写上市附注披露：可变现净值确定依据及转回/转销原因。",
     "listed-note-provision": "请撰写上市附注披露：存货跌价准备计提的具体依据。",
@@ -162,10 +185,16 @@ _SECTION_PROMPTS: dict[str, str] = {
         "请生成F2-20产品单位成本比较审计结论，关注材料/人工/制造费用波动及异常产品；可采用A/B/C模板。"
     ),
     "f2-20-note": (
-        "请撰写F2-20审计说明：解释单位成本异常波动原因，并可提示交叉索引F2-64/F2-61等底稿。"
+        "请撰写F2-20「审计说明」：概述单位成本比较程序、关注产品与交叉索引情况，"
+        "不展开逐项异常原因（异常原因另有字段）。"
+    ),
+    "f2-20-abnormal": (
+        "请根据底稿中已标记异常（或合计波动超阈值）的产品，撰写「异常原因」说明："
+        "区分材料/人工/制造费用哪一块驱动，并可提示交叉索引F2-64/F2-61等，条理清晰、可复核。"
     ),
     "f2-20-conclusion": (
-        "请生成F2-20产成品单位成本年度比较的审计结论，优先A/B/C模板。"
+        "请生成F2-20产成品单位成本年度比较的审计结论，优先A/B/C模板，"
+        "结合异常产品数量与追查情况给出明确表述。"
     ),
 }
 

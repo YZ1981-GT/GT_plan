@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { ref } from 'vue'
 import { useF2PurchaseInboundCheck, useF2MaterialUsageCheck } from '../useF2InspectionCheck'
+import { assessPurchaseAbnormal, assessMaterialAbnormal, calcSubClosing } from '../useF2InspectionCheckFormulas'
 import type { ChecklistResponse } from '../useF2ValuationFormData'
 import type { SampledVoucher } from '../useSamplingAlgorithms'
 
@@ -58,5 +59,29 @@ describe('useF2InspectionCheck fillFromSampling', () => {
     ic.fillFromSampling([makeVoucher()], 'replace')
     ic.fillFromSampling([makeVoucher(), makeVoucher({ voucherNo: '记-002' })], 'merge')
     expect(ic.rows.value.length).toBe(2)
+  })
+})
+
+describe('inspection abnormal assess', () => {
+  it('flags qty mismatch on purchase', () => {
+    expect(assessPurchaseAbnormal({
+      id: '1', seq: 1, party: '', invCategory: '', voucherNo: 'V1', businessContent: '',
+      itemName: '', unit: '', qty: 10, amount: 100, counterpartAccount: '', counterpartDetail: '',
+      recvDateNo: 'RK1', recvQty: 8, inspectDateNo: '', logisticsDateNo: '', logisticsProvider: '',
+      invoiceQty: 0, invoiceDateNo: '', invoiceParty: '', invoiceAmount: 0, indexRef: '',
+      isAbnormal: false, abnormalOverride: null, remark: '',
+    })).toBe(true)
+  })
+
+  it('flags missing doc on material usage', () => {
+    expect(assessMaterialAbnormal({
+      id: '1', seq: 1, party: '', voucherNo: 'V1', businessContent: '', itemName: '',
+      unit: '', qty: 5, amount: 50, counterpartAccount: '', counterpartDetail: '',
+      docDateNo: '', docQty: 0, indexRef: '', isAbnormal: false, abnormalOverride: null, remark: '',
+    })).toBe(true)
+  })
+
+  it('subcontract closing formula', () => {
+    expect(calcSubClosing({ opening: 100, increase: 40, decrease: 30 })).toBe(110)
   })
 })

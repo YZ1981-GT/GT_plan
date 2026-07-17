@@ -172,6 +172,7 @@ class ProcedureTableService:
                 "content": item["content"],
                 "ref_index": item.get("ref_index", ""),
                 "phase": item.get("phase"),
+                "category": item.get("category") or item.get("program_category") or "",
                 **merged,
             })
 

@@ -120,9 +120,9 @@ export function calcDaysBetween(dateA: string, dateB: string): number {
 /**
  * 截止正确判定（纯函数）
  *
- * 入库日期和记账日期都在期末日期当日或之前 → 截止正确(true)
- * 任一日期在期末之后 → 截止不正确(false)
- * 无效日期输入 → false
+ * 单据日与记账日落在截止日同侧（均 ≤ 截止日，或均 > 截止日）→ 截止正确
+ * 分落两侧 → 跨期，不正确
+ * 无效日期 → false
  */
 export function isCutoffCorrect(docDate: string, bookDate: string, periodEnd: string): boolean {
   return cached(`cut:${docDate}:${bookDate}:${periodEnd}`, () => {
@@ -130,6 +130,14 @@ export function isCutoffCorrect(docDate: string, bookDate: string, periodEnd: st
     const book = new Date(bookDate + 'T00:00:00')
     const end = new Date(periodEnd + 'T00:00:00')
     if (isNaN(doc.getTime()) || isNaN(book.getTime()) || isNaN(end.getTime())) return false
-    return doc.getTime() <= end.getTime() && book.getTime() <= end.getTime()
+    const docBeforeOrOn = doc.getTime() <= end.getTime()
+    const bookBeforeOrOn = book.getTime() <= end.getTime()
+    return docBeforeOrOn === bookBeforeOrOn
   })
+}
+
+/** 是否跨期（单据日与记账日分落截止日两侧） */
+export function isCutoffCrossPeriod(docDate: string, bookDate: string, periodEnd: string): boolean {
+  if (!docDate || !bookDate || !periodEnd) return false
+  return !isCutoffCorrect(docDate, bookDate, periodEnd)
 }

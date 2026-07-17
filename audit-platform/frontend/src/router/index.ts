@@ -230,6 +230,14 @@ const router = createRouter({
           component: () => import('@/views/AttachmentManagement.vue'),
         },
         {
+          // 附件·OCR·AI·证据链治理中心
+          // [attachment-ocr-ai-evidence-governance-hardening Wave 9 UI 接线]
+          path: 'projects/:projectId/evidence-governance',
+          name: 'EvidenceGovernanceCenter',
+          component: () => import('@/views/EvidenceGovernanceCenter.vue'),
+          meta: { permission: 'project:view' },
+        },
+        {
           path: 'projects/:projectId/consolidation',
           name: 'Consolidation',
           component: () => import('@/views/ConsolidationIndex.vue'),

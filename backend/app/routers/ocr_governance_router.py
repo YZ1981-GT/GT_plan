@@ -385,11 +385,13 @@ async def get_job_timeline(
             "job not found",
         )
 
-    # Fetch transitions ordered by creation time
+    # Fetch transitions ordered by occurrence time.
+    # NOTE: OcrJobTransition 的时间戳列是 ``at``（append-only 迁移发生时刻），
+    # 不是 ``created_at``；用错列名会 AttributeError → 500。
     stmt = (
         sa.select(OcrJobTransition)
         .where(OcrJobTransition.ocr_job_id == jid)
-        .order_by(OcrJobTransition.created_at.asc())
+        .order_by(OcrJobTransition.at.asc())
         .limit(limit)
     )
     result = await db.execute(stmt)
@@ -402,10 +404,11 @@ async def get_job_timeline(
                 "id": str(t.id),
                 "from_state": t.from_state,
                 "to_state": t.to_state,
+                "progress": t.progress,
                 "actor_type": t.actor_type,
                 "error_code": t.error_code,
                 "error_message": t.error_message,
-                "created_at": _isoformat(t.created_at),
+                "at": _isoformat(t.at),
             }
             for t in transitions
         ],
@@ -648,14 +651,26 @@ async def execute_writeback(
 
     async def _business(txn: CommandTxn) -> Any:
         svc = OCRWritebackService(txn.db)
+        # NOTE: OCRWritebackService.execute_writeback signature is keyword-only and
+        # requires ``project_id``; it takes ``target_version_at_start`` (not
+        # ``target_version``) and derives its own writeback idempotency key from
+        # (job,result,target,mapping) — it does NOT accept an ``idempotency_key`` kwarg
+        # (the command-level Idempotency-Key is enforced by the facade command-root).
+        # Passing the old ``target_version=/idempotency_key=`` kwargs + omitting
+        # ``project_id`` raised TypeError → HTTP 500 for any real writeback. Bind the
+        # correct params here.
         wb_result = await svc.execute_writeback(
             job_id=jid,
             result_id=rid,
             target_type=body.target_type,
             target_id=body.target_id,
-            target_version=body.target_version,
             actor=txn.actor,
-            idempotency_key=idempotency_key,
+            project_id=txn.project_id,
+            audit_year=txn.audit_year or year,
+            target_version_at_start=(
+                str(body.target_version) if body.target_version is not None else None
+            ),
+            command_root_id=txn.command_root_id,
         )
         return wb_result
 

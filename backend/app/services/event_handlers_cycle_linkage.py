@@ -502,6 +502,33 @@ async def _on_d_audit_determination_saved(payload: EventPayload) -> None:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
+async def _on_confirmation_received(payload: EventPayload) -> None:
+    """CONFIRMATION_RECEIVED（函证回函）→ 沿 cross_wp_references 把下游底稿标 stale。
+
+    payload.extra.wp_code = 源函证底稿编码（D0/F0/G0…）。复用 propagate_wp_stale
+    （stale_engine.on_change，source_uri=WP:{wp_code}::data），按依赖图向下游
+    （D2/F2/G7…）传播 stale。此前 apply_confirmation_result 发的事件无人消费——
+    本 handler 补齐消费侧，闭合"回函 → 下游 stale"链路。
+    """
+    extra = payload.extra or {}
+    wp_code = extra.get("wp_code")
+    if not wp_code:
+        return
+    try:
+        from app.services.workpaper_trace_stale_integration import propagate_wp_stale
+
+        affected = await propagate_wp_stale(wp_code, payload.project_id, payload.year or 0)
+        logger.info(
+            "[confirmation→stale] wp_code=%s project=%s → %d 下游标记 stale",
+            wp_code, payload.project_id, len(affected),
+        )
+    except Exception:
+        logger.warning(
+            "[confirmation→stale] propagate failed for wp_code=%s project=%s",
+            wp_code, payload.project_id, exc_info=True,
+        )
+
+
 def register_cycle_linkage_handlers() -> None:
     """注册所有循环联动 handlers 到全局 EventBus。
 
@@ -512,4 +539,6 @@ def register_cycle_linkage_handlers() -> None:
     event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_c22_itgc_saved)
     event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_f_workpaper_conclusion_saved)
     event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_d_audit_determination_saved)
-    logger.debug("Cycle linkage handlers registered (C/F/D~N)")
+    # 函证回函 → 下游 stale 传播（D0/F0/G0…）
+    event_bus.subscribe(EventType.CONFIRMATION_RECEIVED, _on_confirmation_received)
+    logger.debug("Cycle linkage handlers registered (C/F/D~N + confirmation)")

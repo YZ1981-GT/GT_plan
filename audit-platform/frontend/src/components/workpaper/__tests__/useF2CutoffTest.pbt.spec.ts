@@ -75,13 +75,12 @@ describe('Feature: f2-inventory-main, Property 12: 截止判定幂等', () => {
     )
   })
 
-  it('入库日期和记账日期均≤期末 → 截止正确', () => {
+  it('入库日期和记账日期均≤期末 → 截止正确（同侧）', () => {
     fc.assert(
       fc.property(
         arbDateStr,
         arbDateStr,
         (docDate, bookDate) => {
-          // 取两个日期中较大的作为期末，确保条件成立
           const later = docDate >= bookDate ? docDate : bookDate
           const result = isCutoffCorrect(docDate, bookDate, later)
           expect(result).toBe(true)
@@ -91,13 +90,12 @@ describe('Feature: f2-inventory-main, Property 12: 截止判定幂等', () => {
     )
   })
 
-  it('入库日期>期末 → 截止不正确', () => {
+  it('单据与记账分落截止日两侧 → 跨期不正确', () => {
     fc.assert(
       fc.property(
         arbDateStr,
         arbDateStr,
         (bookDate, periodEnd) => {
-          // 构造 docDate > periodEnd
           const endDate = new Date(periodEnd + 'T00:00:00')
           const docDateObj = new Date(endDate)
           docDateObj.setDate(docDateObj.getDate() + 1)
@@ -111,13 +109,12 @@ describe('Feature: f2-inventory-main, Property 12: 截止判定幂等', () => {
     )
   })
 
-  it('记账日期>期末 → 截止不正确', () => {
+  it('记账在截止日后、单据在截止日前 → 跨期不正确', () => {
     fc.assert(
       fc.property(
         arbDateStr,
         arbDateStr,
         (docDate, periodEnd) => {
-          // 构造 bookDate > periodEnd
           const endDate = new Date(periodEnd + 'T00:00:00')
           const bookDateObj = new Date(endDate)
           bookDateObj.setDate(bookDateObj.getDate() + 1)
@@ -128,6 +125,21 @@ describe('Feature: f2-inventory-main, Property 12: 截止判定幂等', () => {
         },
       ),
       { numRuns: 100 },
+    )
+  })
+
+  it('单据与记账均在截止日后 → 同侧正确', () => {
+    fc.assert(
+      fc.property(
+        arbDateStr,
+        (periodEnd) => {
+          const endDate = new Date(periodEnd + 'T00:00:00')
+          const a = new Date(endDate); a.setDate(a.getDate() + 1)
+          const b = new Date(endDate); b.setDate(b.getDate() + 3)
+          expect(isCutoffCorrect(formatDate(a), formatDate(b), periodEnd)).toBe(true)
+        },
+      ),
+      { numRuns: 50 },
     )
   })
 

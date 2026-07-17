@@ -7,7 +7,26 @@
       size="small"
       class="variant-bar"
     />
-    <el-dropdown trigger="click" size="small">
+    <template v-if="expanded">
+      <el-button size="small" :disabled="disabled" @click="exportTemplate(activeSheet)">
+        下载模板
+      </el-button>
+      <el-button size="small" :disabled="disabled" @click="exportData(activeSheet)">
+        导出 Excel
+      </el-button>
+      <el-upload
+        :show-file-list="false"
+        accept=".xlsx"
+        :auto-upload="false"
+        :disabled="disabled || importing"
+        @change="onImportChange"
+      >
+        <el-button size="small" type="primary" plain :loading="importing" :disabled="disabled">
+          导入 Excel
+        </el-button>
+      </el-upload>
+    </template>
+    <el-dropdown v-else trigger="click" size="small">
       <el-button size="small" :disabled="disabled">
         导入导出 ▾
       </el-button>
@@ -41,6 +60,7 @@ const props = defineProps<{
   apiPrefix: string
   sheet: string
   disabled?: boolean
+  expanded?: boolean
   variants?: readonly { label: string; sheet: string }[]
 }>()
 

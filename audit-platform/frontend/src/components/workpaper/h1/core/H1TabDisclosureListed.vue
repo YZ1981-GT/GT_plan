@@ -109,8 +109,9 @@
  * - subscribe 'substantive:adjudicated' 刷新附注取数
  * - publish 'disclosure:note-text-updated' 通知外部
  */
-import { ref, computed, inject, toRef, onMounted, onUnmounted } from 'vue'
+import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
+import { eventBus } from '@/utils/eventBus'
 import { useH1Disclosure, LISTED_SECTIONS } from '../../composables/useH1Disclosure'
 
 const props = defineProps<{
@@ -127,7 +128,11 @@ const disclosureNote = ref('')
 const auditConclusionText = ref('')
 const NOTE_KEY = 'H1-note-listed-audit-note'
 const CONCLUSION_KEY = 'H1-note-listed-audit-conclusion'
-function saveDisclosureNote() { saveResponse(NOTE_KEY, disclosureNote.value) }
+function saveDisclosureNote() {
+  saveResponse(NOTE_KEY, disclosureNote.value)
+  // P1: 真正发布附注文本更新事件（原 onPublishEvent 仅 console.log）
+  eventBus.emit('disclosure:note-text-updated', { wpCode: 'H1', section: 'listed', timestamp: Date.now() })
+}
 function saveAuditConclusion() { saveResponse(CONCLUSION_KEY, auditConclusionText.value) }
 
 const sections = LISTED_SECTIONS
@@ -139,34 +144,21 @@ const disclosure = useH1Disclosure(
   {
     variant: ref('listed') as any,
     onPublishEvent(event: string, payload: any) {
-      // 6.6 — publish 'disclosure:note-text-updated' 通知外部
-      console.log('[H1-DiscListed] publish', event, payload)
+      // P1: 真正走 eventBus（经 crossWpEventBridge 桥接到 window），不再 console.log 空转
+      eventBus.emit(event as any, payload)
     },
   },
 )
 
 const { costMatrixRows: overviewRows, sectionRows: dynamicRowsMap, addDynamicRow: _addDynamic } = disclosure
 
-// ─── 6.6 EventBus: subscribe 'substantive:adjudicated' 刷新附注取数 ─────────
-let eventSource: EventSource | null = null
-
-function subscribeAdjudicated() {
-  // SSE-based EventBus subscription for cross-sheet refresh
-  try {
-    eventSource = new EventSource(`/api/projects/${props.projectId}/events?topic=substantive:adjudicated`)
-    eventSource.onmessage = () => {
-      // 刷新跨sheet取数 — trigger re-load from allResponses
-      console.log('[H1-DiscListed] received substantive:adjudicated, refreshing disclosure data')
-    }
-  } catch { /* SSE not available, degrade silently */ }
-}
-
+// ─── 附注取数刷新：跨 sheet 数据由主入口 GtH1FixedAssets 订阅 substantive:adjudicated
+//     统一刷新 allResponses（本 tab 的 overviewRows 为 computed，随 props.allResponses 重算）。
+//     此处不再自建失效的 SSE 订阅（原 EventSource 订阅客户端事件 + handler 仅 console.log，双重空操作）。
 onMounted(() => {
-  subscribeAdjudicated()
   const n = props.allResponses.get(NOTE_KEY); if (n?.remark) disclosureNote.value = n.remark
   const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusionText.value = c.remark
 })
-onUnmounted(() => { eventSource?.close() })
 
 function getDynamicRows(key: string) {
   return dynamicRowsMap.value?.[key] ?? []

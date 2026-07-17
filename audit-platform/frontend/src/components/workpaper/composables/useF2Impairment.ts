@@ -2,60 +2,33 @@
  * useF2Impairment — F2-57 合同履约成本减值准备测算
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import {
-  calcCompletionRate,
-  calcRemainingCost,
-  calcRecoverableAmount,
-  calcImpairment,
-  calcSubtotal,
-} from './useF2SpecialFormulaEngine'
 import { readSpeRowJson, type ChecklistResponse } from './useF2SpecialFormData'
 import {
   debouncedPublishF2SpeDisclosureNote,
   publishF2SpeSubstantiveAdjudicated,
 } from './useF2SpeEventBus'
+import {
+  defaultContractCostImpairmentSheet,
+  enrichImpairmentProjects,
+  calcImpairmentTotals,
+  calcImpairmentAmountTotal,
+  migrateContractCostImpairmentSheet,
+  emptyImpairmentProject,
+  type ContractCostImpairmentSheet,
+  type ContractCostImpairmentProject,
+  type ContractCostImpairmentTotals,
+} from './useF2ContractCostImpairmentFormulas'
 
-export interface ImpairmentRow {
-  id: string
-  projectCode: string
-  projectName: string
-  estimatedTotalRevenue: number
-  recognizedRevenue: number
-  estimatedTotalCost: number
-  incurredCost: number
-  bookValue: number
-  managementProvision: number
-  remark: string
-}
+export type {
+  ContractCostImpairmentProject,
+  EnrichedContractCostImpairment,
+} from './useF2ContractCostImpairmentFormulas'
+
+/** @deprecated 兼容旧引用 */
+export type ImpairmentRow = ContractCostImpairmentProject
 
 const ROWS_KEY = 'F2-57-rows'
 const NOTE_KEY = 'F2-57-note'
-
-function emptyRow(id: string): ImpairmentRow {
-  return {
-    id, projectCode: '', projectName: '',
-    estimatedTotalRevenue: 0, recognizedRevenue: 0,
-    estimatedTotalCost: 0, incurredCost: 0,
-    bookValue: 0, managementProvision: 0, remark: '',
-  }
-}
-
-function enrichRow(r: ImpairmentRow) {
-  const completionRate = calcCompletionRate(r.recognizedRevenue, r.estimatedTotalRevenue)
-  const rateNum = typeof completionRate === 'number' ? completionRate : 0
-  const remainingCost = calcRemainingCost(r.estimatedTotalCost, r.incurredCost)
-  const recoverableAmount = calcRecoverableAmount(
-    r.recognizedRevenue, r.estimatedTotalRevenue, r.estimatedTotalCost,
-  )
-  const impairmentAmount = calcImpairment(r.bookValue, recoverableAmount)
-  const difference = impairmentAmount - r.managementProvision
-  const hasDifference = Math.abs(difference) > 0.01
-  return {
-    ...r, completionRate, rateNum, remainingCost, recoverableAmount,
-    impairmentAmount, difference, hasDifference,
-  }
-}
 
 export function useF2Impairment(opts: {
   allResponses: Ref<Map<string, ChecklistResponse>>
@@ -64,15 +37,17 @@ export function useF2Impairment(opts: {
   const readonly = opts.isReadonly ?? ref(false)
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   let adjudicatedTimer: ReturnType<typeof setTimeout> | null = null
-  const rows = ref<ImpairmentRow[]>([enrichRow(emptyRow('1'))])
+
+  const sheet = ref<ContractCostImpairmentSheet>(defaultContractCostImpairmentSheet())
   const auditNote = ref('')
 
   function load(): void {
     const raw = readSpeRowJson(opts.allResponses.value.get(ROWS_KEY))
     if (raw) {
       try {
-        const parsed = JSON.parse(raw) as ImpairmentRow[]
-        if (parsed.length) rows.value = parsed.map(enrichRow)
+        const parsed = JSON.parse(raw)
+        const migrated = migrateContractCostImpairmentSheet(parsed)
+        if (migrated) sheet.value = migrated
       } catch { /* ignore */ }
     }
     auditNote.value = opts.allResponses.value.get(NOTE_KEY)?.remark || ''
@@ -80,46 +55,80 @@ export function useF2Impairment(opts: {
 
   watch(() => opts.allResponses.value.get(ROWS_KEY)?.remark, load, { immediate: true })
 
-  const enrichedRows = computed(() => rows.value.map(enrichRow))
-  const impairmentTotal = computed(() =>
-    calcSubtotal(enrichedRows.value.map((r) => r.impairmentAmount)),
+  const enrichedProjects = computed(() => enrichImpairmentProjects(sheet.value.projects))
+  const enrichedRows = enrichedProjects
+
+  const columnTotals = computed<ContractCostImpairmentTotals>(() =>
+    calcImpairmentTotals(enrichedProjects.value),
   )
-  const diffCount = computed(() => enrichedRows.value.filter((r) => r.hasDifference).length)
+
+  const impairmentTotal = computed(() => calcImpairmentAmountTotal(enrichedProjects.value))
+  const diffCount = computed(() => enrichedProjects.value.filter((r) => r.hasDifference).length)
+  const impairedCount = computed(() =>
+    enrichedProjects.value.filter((r) => r.isImpaired === '是').length,
+  )
 
   function flushSave(): void {
-    const items = [opts.allResponses.value.get(ROWS_KEY), opts.allResponses.value.get(NOTE_KEY)].filter(Boolean)
-    if (items.length) window.dispatchEvent(new CustomEvent('f2-spe:save-items', { detail: { items } }))
+    const items = [
+      opts.allResponses.value.get(ROWS_KEY),
+      opts.allResponses.value.get(NOTE_KEY),
+    ].filter(Boolean)
+    if (items.length) {
+      window.dispatchEvent(new CustomEvent('f2-spe:save-items', { detail: { items } }))
+    }
   }
 
   function persist(): void {
+    if (readonly.value) return
     opts.allResponses.value.set(ROWS_KEY, {
-      item_id: ROWS_KEY, conclusion: null, remark: JSON.stringify(rows.value),
+      item_id: ROWS_KEY,
+      conclusion: null,
+      remark: JSON.stringify(sheet.value),
     })
     if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 2000)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      flushSave()
+    }, 2000)
   }
 
-  function updateRow(id: string, patch: Partial<ImpairmentRow>): void {
+  function updateProject(id: string, patch: Partial<ContractCostImpairmentProject>): void {
     if (readonly.value) return
-    rows.value = rows.value.map((r) => (r.id === id ? enrichRow({ ...r, ...patch }) : r))
+    sheet.value = {
+      ...sheet.value,
+      projects: sheet.value.projects.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    }
     persist()
   }
 
-  async function addRow(): Promise<void> {
+  function updateRow(id: string, patch: Partial<ContractCostImpairmentProject>): void {
+    updateProject(id, patch)
+  }
+
+  function addProject(): void {
     if (readonly.value) return
-    try {
-      const { value } = await ElMessageBox.prompt('请输入项目名称', '新增减值测算', {
-        confirmButtonText: '确定', cancelButtonText: '取消',
-      })
-      rows.value = [...rows.value, enrichRow({ ...emptyRow(String(Date.now())), projectName: value })]
-      persist()
-    } catch { /* cancelled */ }
+    sheet.value = {
+      ...sheet.value,
+      projects: [...sheet.value.projects, emptyImpairmentProject()],
+    }
+    persist()
+  }
+
+  function addRow(): void {
+    addProject()
+  }
+
+  function removeProject(id: string): void {
+    if (readonly.value || sheet.value.projects.length <= 1) return
+    sheet.value = {
+      ...sheet.value,
+      projects: sheet.value.projects.filter((p) => p.id !== id),
+    }
+    persist()
   }
 
   function removeRow(id: string): void {
-    if (readonly.value || rows.value.length <= 1) return
-    rows.value = rows.value.filter((r) => r.id !== id)
-    persist()
+    removeProject(id)
   }
 
   watch(auditNote, (val) => {
@@ -127,7 +136,10 @@ export function useF2Impairment(opts: {
     opts.allResponses.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
     debouncedPublishF2SpeDisclosureNote('impairment', val)
     if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 2000)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      flushSave()
+    }, 2000)
   })
 
   watch(
@@ -147,11 +159,29 @@ export function useF2Impairment(opts: {
   )
 
   onBeforeUnmount(() => {
-    if (debounceTimer) { clearTimeout(debounceTimer); flushSave() }
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      flushSave()
+    }
     if (adjudicatedTimer) clearTimeout(adjudicatedTimer)
   })
 
-  return { enrichedRows, impairmentTotal, diffCount, auditNote, updateRow, addRow, removeRow }
+  return {
+    sheet,
+    enrichedProjects,
+    enrichedRows,
+    columnTotals,
+    impairmentTotal,
+    diffCount,
+    impairedCount,
+    auditNote,
+    updateProject,
+    updateRow,
+    addProject,
+    addRow,
+    removeProject,
+    removeRow,
+  }
 }
 
 export default useF2Impairment

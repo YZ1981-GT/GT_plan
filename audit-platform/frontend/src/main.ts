@@ -21,6 +21,12 @@ import { queryClient } from './utils/queryClient'
 import { vPermission } from './directives/permission'
 import { registerServiceWorker } from './composables/useOfflineCache'
 import vTabWheel from './directives/vTabWheel'
+import { installCrossWpEventBridge } from './utils/crossWpEventBridge'
+
+// 跨底稿事件传输桥（P0）：统一 window CustomEvent ⇄ mitt eventBus，
+// 归一 substantive:adjudicated / disclosure:note-text-updated payload。
+// 必须在任何组件挂载前安装，确保所有生产者/消费者互通。
+installCrossWpEventBridge()
 
 const app = createApp(App)
 

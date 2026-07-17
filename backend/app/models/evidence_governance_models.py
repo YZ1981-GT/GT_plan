@@ -769,6 +769,76 @@ class CitationSnapshot(Base):
     )
 
 
+class AiContentGovernance(Base):
+    """AiContentGovernance（design §4.6 / AIEvidenceGate；R8/P17/P18/P19）—— AI 全入口内容治理。
+
+    可变生命周期表（draft→confirmed/revised/rejected→stale）：记录 prompt hash / model /
+    service status / output hash / 上下文 EvidenceRefs / CitationSnapshot 链接 / actor / stale。
+    修订链靠 ``previous_version_id`` 自引用保留历史。与既有 ``ai_content_log`` 互补而非替代
+    （design §1.2）。迁移 V112 与本 ORM 严格对齐（SchemaDriftDetector 零漂移）。
+    """
+
+    __tablename__ = "ai_content_governance"
+
+    id: Mapped[uuid.UUID] = mapped_column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False
+    )
+    audit_year: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    wp_id: Mapped[uuid.UUID | None] = mapped_column(PG_UUID(as_uuid=True), nullable=True)
+    entry_point: Mapped[str] = mapped_column(String(80), nullable=False)
+    prompt_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    model_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    service_status: Mapped[str] = mapped_column(
+        String(20), server_default=text("'available'"), nullable=False
+    )
+    output_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    output_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    target_cell: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    evidence_refs: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    citation_snapshots: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    lifecycle_status: Mapped[str] = mapped_column(
+        String(20), server_default=text("'draft'"), nullable=False
+    )
+    content_version: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("1"), nullable=False
+    )
+    previous_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ai_content_governance.id", ondelete="RESTRICT"), nullable=True
+    )
+    reject_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    confirmed_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    confirmed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    actor_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    actor_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=True
+    )
+    actor_service_identity_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("service_identities.id", ondelete="RESTRICT"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "service_status IN ('available','degraded','unavailable')",
+            name="chk_ai_content_gov_service_status",
+        ),
+        CheckConstraint(
+            "lifecycle_status IN ('draft','confirmed','revised','rejected','stale')",
+            name="chk_ai_content_gov_lifecycle",
+        ),
+        CheckConstraint(_STRICT_ACTOR_XOR_SQL, name="chk_ai_content_gov_actor_xor"),
+        Index("idx_ai_content_gov_scope", "project_id", "audit_year"),
+        Index("idx_ai_content_gov_lifecycle", "project_id", "lifecycle_status"),
+        Index("idx_ai_content_gov_wp", "wp_id"),
+        Index("idx_ai_content_gov_entry", "entry_point"),
+        Index("idx_ai_content_gov_prev", "previous_version_id"),
+    )
+
+
 class ReviewEvidenceSnapshot(Base):
     """ReviewEvidenceSnapshot（design §4.6；R10/P22）—— 冻结提出/关闭时 ref/version/hash/locator。"""
 

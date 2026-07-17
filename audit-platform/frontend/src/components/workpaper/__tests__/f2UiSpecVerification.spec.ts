@@ -133,10 +133,10 @@ describe('F2 UI Specification Verification', () => {
       expect(content).toMatch(/<el-card[^>]*class="audit-note-card"/)
     })
 
-    it('F2CutoffSheet wraps conclusion in el-card', () => {
+    it('F2CutoffSheet wraps conclusion in section card', () => {
       const content = readVueFile('inspection/F2CutoffSheet.vue')
-      expect(content).toContain('conclusion-card')
-      expect(content).toMatch(/<el-card[^>]*class="conclusion-card"/)
+      expect(content).toContain('ct-card-conclusion')
+      expect(content).toContain('审计结论')
     })
 
     it('F2TabOverallAnalysis conclusion section uses el-card', () => {

@@ -45,6 +45,11 @@ class ConfirmationUpdate(BaseModel):
 
 class TransitionRequest(BaseModel):
     target_status: str = Field(..., description="目标状态")
+    # 可选：终态（returned/matched/discrepancy）时用于发布 CONFIRMATION_RECEIVED
+    # → 下游 stale 传播。调用方（如前端 syncHub）传入源函证底稿循环码与年度以精确路由。
+    wp_code: str | None = Field(None, description="源函证底稿循环码 D0/F0/G0…（用于下游 stale 路由）")
+    year: int | None = Field(None, description="审计年度（stale 传播按年度）")
+    reply_amount: float | None = Field(None, description="回函金额（可选）")
 
 
 # ─── Endpoints ─────────────────────────────────────────────────────────────
@@ -149,5 +154,37 @@ async def transition_confirmation(
         if "不存在" in msg:
             raise HTTPException(status_code=404, detail=msg)
         raise HTTPException(status_code=400, detail=msg)
+
+    # 回函终态 → 发布 CONFIRMATION_RECEIVED，触发下游 stale 传播。
+    # 源循环码优先用调用方显式传入的 wp_code（如前端 syncHub）；缺省时（G1：函证中心
+    # 台账手动推进）从函证记录的 wp_id 反查 wp_code + 年度作兜底，使手动登记回函 / 确认
+    # 相符不符也能传播下游 stale。仍反查不到 wp_code（无关联底稿）时不臆测源底稿。
+    if body.target_status in ("returned", "matched", "discrepancy"):
+        wp_code = body.wp_code
+        year = body.year
+        if not wp_code:
+            try:
+                derived_code, derived_year = (
+                    await confirmation_service.derive_source_wp_code_and_year(db, cid)
+                )
+                wp_code = wp_code or derived_code
+                if year is None:
+                    year = derived_year
+            except Exception:
+                pass  # 反查失败不阻断
+        if wp_code:
+            try:
+                await confirmation_service.apply_confirmation_result(
+                    project_id=uuid.UUID(project_id),
+                    year=year or 0,
+                    confirmation_id=cid,
+                    reply_status=body.target_status,
+                    reply_amount=body.reply_amount,
+                    wp_code=wp_code,
+                    db=None,  # 状态已由 transition_status 更新，此处仅发事件
+                )
+            except Exception:
+                pass  # 事件发布失败不阻断状态推进
+
     await db.commit()
     return result

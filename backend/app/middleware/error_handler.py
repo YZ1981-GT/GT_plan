@@ -41,6 +41,26 @@ async def validation_exception_handler(
     )
 
 
+async def evidence_governance_error_handler(request: Request, exc):
+    """把 ``EvidenceGovernanceError`` 映射为脱敏 HTTP 响应（design §7.2）。
+
+    没有该处理器时，治理层从 router 抛出的稳定错误会落到 ``generic_exception_handler``
+    并统一返回 500 —— 这会把 R4.2 / design §7.2 要求的 clean 4xx
+    ``SCOPE_NOT_FOUND_OR_FORBIDDEN`` 误报成 500。此处按 ``error_code`` 的主 HTTP 状态
+    返回 ``code/error_code/message/retryable``，message 已是脱敏通用提示，不含目标名称、
+    项目、客户或路径。
+    """
+    return JSONResponse(
+        status_code=exc.http_status,
+        content={
+            "code": exc.http_status,
+            "error_code": exc.error_code.value,
+            "message": str(exc),
+            "retryable": bool(getattr(exc, "retryable", False)),
+        },
+    )
+
+
 async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """处理未捕获异常，返回 500 通用消息，堆栈记录到日志文件。"""
     logger.error(

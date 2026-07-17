@@ -3,18 +3,14 @@
  *
  * 覆盖：
  * - 金额格式化（千分位/小数/零值/负数）
- * - 状态徽章映射
  * - 数据来源标识
  */
 import { describe, it, expect } from 'vitest'
 import {
   formatAmount,
-  getStatusBadge,
   getSourceIndicator,
-  STATUS_BADGE_MAP,
   GRID_PALETTE,
 } from '../ConfirmationKit'
-import { CONFIRMATION_STATUSES } from '../useConfirmationStatus'
 
 describe('ConfirmationKit — 共享 UI 工具', () => {
   // ─── 金额格式化 ────────────────────────────────────────────────────────────
@@ -66,40 +62,6 @@ describe('ConfirmationKit — 共享 UI 工具', () => {
 
     it('无分隔符', () => {
       expect(formatAmount(1234567, { separator: false })).toBe('1234567.00')
-    })
-  })
-
-  // ─── 状态徽章 ──────────────────────────────────────────────────────────────
-
-  describe('getStatusBadge()', () => {
-    it('12 个状态全有配置', () => {
-      for (const status of CONFIRMATION_STATUSES) {
-        const badge = getStatusBadge(status)
-        expect(badge.label).toBeTruthy()
-        expect(badge.color).toMatch(/^#/)
-        expect(badge.bgColor).toMatch(/^#/)
-      }
-    })
-
-    it('完成状态为绿色 success', () => {
-      const badge = getStatusBadge('完成')
-      expect(badge.level).toBe('success')
-      expect(badge.color).toBe('#67C23A')
-    })
-
-    it('未回函为红色 danger', () => {
-      const badge = getStatusBadge('未回函')
-      expect(badge.level).toBe('danger')
-    })
-
-    it('跟函中为橙色 warning', () => {
-      const badge = getStatusBadge('跟函中')
-      expect(badge.level).toBe('warning')
-    })
-
-    it('未知状态回退到未核实', () => {
-      const badge = getStatusBadge('不存在的状态' as any)
-      expect(badge.label).toBe('未核实')
     })
   })
 

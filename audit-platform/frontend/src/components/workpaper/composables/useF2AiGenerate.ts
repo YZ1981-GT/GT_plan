@@ -18,6 +18,9 @@ export type F2AiSection =
   | 'detail-conclusion'
   | 'analysis-conclusion'
   | 'cutoff-conclusion'
+  | 'cutoff-process-note'
+  | 'cutoff-audit-note'
+  | 'cutoff-standard-conclusion'
   | 'policy-evaluation'
   | 'production-sales-conclusion'
   | 'cost-comparison-conclusion'
@@ -36,6 +39,7 @@ export type F2AiSection =
   | 'f2-19-note'
   | 'f2-19-conclusion'
   | 'f2-20-note'
+  | 'f2-20-abnormal'
   | 'f2-20-conclusion'
 
 export function useF2AiGenerate(wpId: Ref<string>) {

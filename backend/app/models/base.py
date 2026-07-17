@@ -54,6 +54,9 @@ class ProjectUserRole(str, enum.Enum):
     manager = "manager"
     auditor = "auditor"
     qc = "qc"
+    eqcr = "eqcr"  # EQCR 技术复核人：Wave 0 冻结角色契约将 eqcr 定为独立合法项目角色
+    # （design §2.1 / role_capability_contract.PROJECT_ROLE_SET）。PG enum `projectuserrole`
+    # 已含此值（迁移 V109），此处对齐消除 ORM↔DB enum_mismatch 漂移。
     readonly = "readonly"
 
 

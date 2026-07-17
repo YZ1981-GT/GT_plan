@@ -95,10 +95,10 @@
  * 多子节卡片+计量模式说明+动态行+合计
  * EventBus: subscribe 'substantive:adjudicated' 刷新 / publish 'disclosure:note-text-updated'
  */
-import { ref, reactive, computed, inject, toRef, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, inject, toRef, onMounted } from 'vue'
 import { useH3Disclosure } from '../../composables/useH3Disclosure'
 import { useH3FormData } from '../../composables/useH3FormData'
-import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{
   wpId: string
@@ -154,44 +154,18 @@ function saveAuditConclusion(val: string) {
   void saveImmediate(CONCLUSION_KEY, val)
 }
 
-// ─── EventBus: subscribe 'substantive:adjudicated' → 刷新附注数据 ──────────
-let eventSource: EventSource | null = null
+// ─── 附注取数刷新 ────────────────────────────────────────────────────────────
+// 跨 sheet 数据刷新由主入口 GtH3InvestmentProperty 订阅 substantive:adjudicated 统一处理
+// （刷新 allResponses → 本 tab computed 自动重算）。此处不再自建失效的 SSE 订阅
+// （原 EventSource 订阅客户端事件 + refreshDisclosureData 空操作 = 双重空转）。
 
-function setupEventBusSubscription() {
-  try {
-    eventSource = new EventSource(`/api/projects/${props.projectId}/events/stream`)
-    eventSource.addEventListener('substantive:adjudicated', (event: MessageEvent) => {
-      try {
-        const data = JSON.parse(event.data)
-        // 审定表审定完成 → 刷新附注自动取数
-        if (data.wp_code?.startsWith('H3')) {
-          refreshDisclosureData()
-        }
-      } catch { /* ignore parse errors */ }
-    })
-  } catch { /* SSE not available, silent */ }
-}
-
-function refreshDisclosureData() {
-  // 重新从 allResponses 读取最新的审定数据以刷新附注
-  // 通过触发 useH3Disclosure 的响应式链自动完成
-}
-
-onMounted(() => {
-  setupEventBusSubscription()
-})
-
-onUnmounted(() => {
-  eventSource?.close()
-  eventSource = null
-})
-
-// ─── EventBus: publish 'disclosure:note-text-updated' ────────────────────────
-function publishNoteTextUpdated(sectionKey: string, text: string) {
-  http.post(`/api/projects/${props.projectId}/events/publish`, {
-    event_type: 'disclosure:note-text-updated',
-    payload: { wp_id: props.wpId, section: sectionKey, text, variant: 'listed' },
-  }).catch(() => { /* best effort */ })
+// ─── EventBus: publish 'disclosure:note-text-updated'（走客户端总线，经桥同步到 window）──
+function publishNoteTextUpdated(sectionKey: string, _text: string) {
+  eventBus.emit('disclosure:note-text-updated', {
+    wpCode: 'H3',
+    section: sectionKey,
+    timestamp: Date.now(),
+  })
 }
 
 interface NoteSection {

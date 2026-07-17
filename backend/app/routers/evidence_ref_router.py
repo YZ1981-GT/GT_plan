@@ -218,7 +218,8 @@ async def list_evidence_refs(
             audit_year=year,
             evidence_type=evidence_type or "",
             evidence_id=evidence_id,
-            status_filter=status,
+            actor=actor,
+            status=status or "active",
             cursor=cursor,
             limit=limit,
         )
@@ -226,9 +227,10 @@ async def list_evidence_refs(
         page = await query_svc.query_refs_from_source(
             project_id=pid,
             audit_year=year,
-            source_type=source_type,
-            source_id=source_id,
-            status_filter=status,
+            source_type=source_type or "",
+            source_id=source_id or "",
+            actor=actor,
+            status=status or "active",
             cursor=cursor,
             limit=limit,
         )
@@ -340,15 +342,17 @@ async def query_impact(
     )
 
     query_svc = EvidenceRefQueryService(db)
+    # NOTE: service signature is query_impact(*, target_type, target_id, project_id,
+    # audit_year, actor, max_depth). The impact traversal walks edges where the given
+    # node is the *source* (source changes → targets become stale), so the requested
+    # source_type/source_id map to the service's target_type/target_id parameters.
     result = await query_svc.query_impact(
+        target_type=source_type,
+        target_id=source_id,
         project_id=pid,
         audit_year=year,
-        source_type=source_type,
-        source_id=source_id,
         actor=actor,
-        actor_role=role,
         max_depth=max_depth,
-        max_nodes=limit,
     )
 
     return {
@@ -386,6 +390,20 @@ async def create_evidence_ref(
     actor = ActorContext.for_user(current_user.id)
     role = await _get_user_role(db, current_user, pid)
 
+    # 边界先于业务：source_id / evidence_id 必须是合法 UUID（全部 10 个 typed adapter
+    # 都以 UUID 主键解析证据目标；见 typed_adapters.py）。非 UUID 无法标识任何真实对象，
+    # 且直接绑定到 UUID 列会触发 asyncpg DataError → 事务中止 → HTTP 500。按 design §7.2，
+    # 否决必须是脱敏的干净 4xx，绝不能是 500。因此在任何 DB 读之前就以
+    # SCOPE_NOT_FOUND_OR_FORBIDDEN 拒绝畸形 id（与安全读取端点 _parse_uuid 同一边界模式）。
+    for _field_val in (body.source_id, body.evidence_id):
+        try:
+            uuid.UUID(str(_field_val))
+        except (ValueError, AttributeError, TypeError):
+            raise EvidenceGovernanceError(
+                EvidenceErrorCode.SCOPE_NOT_FOUND_OR_FORBIDDEN,
+                "scope not found or forbidden",
+            )
+
     # 元数据完整门禁（R2.1: 不完整时禁止新建正式 EvidenceRef）
     if body.attachment_version_id:
         # 查找关联附件 ID
@@ -406,56 +424,47 @@ async def create_evidence_ref(
 
     idem_key = idempotency_key or f"ref:{body.source_type}:{body.source_id}:{body.evidence_type}:{body.evidence_id}"
 
-    facade = EvidenceGovernanceFacade(db)
+    # EvidenceRefService.create_ref() itself runs the command through the facade
+    # (scope + capability + short transaction + command-root + outbox). The router
+    # therefore delegates directly and does NOT double-wrap in a second facade command.
+    # CreateEvidenceRefRequest has NO `actor` field — actor is a keyword-only arg on
+    # create_ref (create_ref(*, request, actor, actor_role, idempotency_key=None, ...)).
+    req = CreateEvidenceRefRequest(
+        project_id=pid,
+        audit_year=year,
+        source_type=body.source_type,
+        source_id=body.source_id,
+        source_version=body.source_version,
+        evidence_type=body.evidence_type,
+        evidence_id=body.evidence_id,
+        attachment_version_id=(
+            uuid.UUID(body.attachment_version_id)
+            if body.attachment_version_id
+            else None
+        ),
+        target_version=body.target_version,
+        target_hash=body.target_hash,
+        label=body.label,
+        context=body.context,
+    )
 
-    async def _business(txn: CommandTxn) -> Any:
-        svc = EvidenceRefService(txn.db)
-        req = CreateEvidenceRefRequest(
-            project_id=txn.project_id,
-            audit_year=txn.audit_year or year,
-            source_type=body.source_type,
-            source_id=body.source_id,
-            source_version=body.source_version,
-            evidence_type=body.evidence_type,
-            evidence_id=body.evidence_id,
-            attachment_version_id=(
-                uuid.UUID(body.attachment_version_id)
-                if body.attachment_version_id
-                else None
-            ),
-            target_version=body.target_version,
-            target_hash=body.target_hash,
-            label=body.label,
-            context=body.context,
-            actor=txn.actor,
-        )
-        result = await svc.create_ref(req)
-        return result
+    svc = EvidenceRefService(db)
+    cmd_result = await svc.create_ref(
+        request=req,
+        actor=actor,
+        actor_role=role,
+        idempotency_key=idem_key,
+    )
 
-    try:
-        cmd_result = await facade.execute(
-            CommandRequest(
-                command_type="evidence_ref.create",
-                idempotency_key=idem_key,
-                actor=actor,
-                actor_role=role,
-                project_id=pid,
-                audit_year=year,
-                capability="evidence_ref.create",
-            ),
-            _business,
-        )
-    except EvidenceGovernanceError:
-        raise
-
-    result = cmd_result.result
     if cmd_result.replayed:
         return {"replayed": True, "command_root_id": str(cmd_result.command_root_id)}
 
+    result = cmd_result.result  # EvidenceRefResult(ref_id, intent_hash, idempotent_hit, dependency_id)
     return {
         "id": str(result.ref_id),
-        "status": result.status,
-        "created": result.created,
+        "intent_hash": result.intent_hash,
+        "idempotent_hit": result.idempotent_hit,
+        "dependency_id": str(result.dependency_id) if result.dependency_id else None,
         "command_root_id": str(cmd_result.command_root_id),
     }
 
@@ -498,6 +507,18 @@ async def deactivate_evidence_ref(
             audit_year=txn.audit_year or year,
             reason=body.reason,
             actor=txn.actor,
+        )
+        # 停用后经统一 outbox（facade 事务）触发下游 stale 传播 / 影响评估。
+        # 由 facade 填充 project_id/event_id/actor_type/command_root_id（NOT NULL 列），
+        # 保持单一权威 outbox 机制（服务层不再直接写 evidence_outbox）。
+        await txn.enqueue_outbox(
+            event_type="evidence_ref.deactivated",
+            payload={
+                "ref_id": str(rid),
+                "previous_status": result.previous_status,
+                "new_status": result.new_status,
+                "reason": result.reason,
+            },
         )
         return result
 

@@ -49,12 +49,15 @@ export function useF2SpecialContractOcr(wpId: Ref<string>) {
 
       const patch: Partial<ContractCostCheckRow> = {}
       if (fields.projectName) patch.projectName = String(fields.projectName)
-      if (fields.contractNo) patch.contractNo = String(fields.contractNo)
-      if (fields.contractDate) patch.voucherDate = String(fields.contractDate)
+      const datePart = fields.contractDate ? String(fields.contractDate) : ''
+      const noPart = fields.contractNo ? String(fields.contractNo) : ''
+      if (datePart || noPart) {
+        patch.contractDateNo = [datePart, noPart].filter(Boolean).join(' / ')
+      }
       if (fields.invoiceNo) patch.voucherNo = String(fields.invoiceNo)
       const amt = typeof fields.amount === 'number' ? fields.amount : parseFloat(String(fields.amount || '0'))
-      if (amt > 0) patch.amount = amt
-      if (fields.supplier) patch.remark = `供应商 ${fields.supplier}`
+      if (amt > 0) patch.voucherAmount = amt
+      if (fields.supplier) patch.logisticsProvider = String(fields.supplier)
 
       updateRow(rowId, patch)
       ElMessage.success('OCR 结果已填入')

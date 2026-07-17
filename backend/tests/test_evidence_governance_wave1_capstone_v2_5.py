@@ -40,6 +40,11 @@ MIGRATIONS_DIR = Path(__file__).resolve().parent.parent / "migrations"
 V106 = MIGRATIONS_DIR / "V106__evidence_governance_attachment_versions.sql"
 V107 = MIGRATIONS_DIR / "V107__evidence_governance_legacy_alias_evidence_ref.sql"
 V108 = MIGRATIONS_DIR / "V108__evidence_governance_ocr_citation_review_archive_hold.sql"
+# V110 additively 补齐 Wave 1 ocr_jobs 表的 next_retry_at 列（R15.4 有界指数退避；
+# V108 建表时漏列）。按本仓「已应用迁移不可事后编辑、缺列靠 additive repair 迁移补跑」
+# 铁律（正是 MigrationRunner.detect_checksum_drift 守卫的对象），该列由 V110 补齐而非改 V108，
+# 故 Wave 1 DDL parity 语料库须纳入这条 additive 完成迁移。
+V110 = MIGRATIONS_DIR / "V110__repair_procedure_row_tasks_missed_by_v105_conflict.sql"
 
 # 全部 27 张 Wave 1 治理表（+ attachments 是既有表的 additive 扩展，另测）。
 GOVERNANCE_TABLES: tuple[str, ...] = (
@@ -119,7 +124,10 @@ HUMAN_ONLY_NOT_NULL_FKS: tuple[tuple[str, str], ...] = (
 
 
 def _all_wave1_sql() -> str:
-    return "\n".join(p.read_text(encoding="utf-8") for p in (V106, V107, V108))
+    # V106/V107/V108 建表 + V110 additive 补齐（ocr_jobs.next_retry_at）——
+    # 见 V110 常量注释：缺列靠 additive repair 迁移补齐（不改已应用迁移），
+    # 故 Wave 1 表的完整 DDL 语料库须含 V110。
+    return "\n".join(p.read_text(encoding="utf-8") for p in (V106, V107, V108, V110))
 
 
 def _governance_orm_models() -> dict[str, type]:

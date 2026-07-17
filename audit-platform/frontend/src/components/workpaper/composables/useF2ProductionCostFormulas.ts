@@ -8,6 +8,9 @@ import {
   calcChangeAmount,
 } from './useF2InvValFormulaEngine'
 import { readValRowJson, type ChecklistResponse } from './useF2ValuationFormData'
+import { readF2_41SourceTotals } from './useF2ProductionCostMatrixFormulas'
+import { readF2_42LaborTotal } from './useF2DirectLaborMatrixFormulas'
+import { readF2_43OverheadTotal } from './useF2OverheadMatrixFormulas'
 
 export interface ProductionCostRow {
   rowId: string
@@ -129,12 +132,14 @@ export function sumOverheadActual(rows: OverheadRow[]): number {
 }
 
 export function readSourceTotals(allResponses: Map<string, ChecklistResponse>) {
-  const pRows = parseRows<ProductionCostRow>(readValRowJson(allResponses.get('F2-41-rows')), () => [])
+  const f41 = readF2_41SourceTotals(allResponses)
+  const f42Labor = readF2_42LaborTotal(allResponses)
+  const f43Overhead = readF2_43OverheadTotal(allResponses)
   const lRows = parseRows<DirectLaborRow>(readValRowJson(allResponses.get('F2-42-rows')), () => [])
   const oRows = parseRows<OverheadRow>(readValRowJson(allResponses.get('F2-43-rows')), () => [])
   return {
-    material: sumProductionClosing(pRows),
-    labor: sumLaborActual(lRows),
-    overhead: sumOverheadActual(oRows),
+    material: f41.material,
+    labor: f42Labor || sumLaborActual(lRows),
+    overhead: f43Overhead || sumOverheadActual(oRows) || f41.overhead,
   }
 }

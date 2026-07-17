@@ -71,7 +71,9 @@ export function useReliabilityData(props: UseReliabilityDataProps): UseReliabili
   // ─── 从 htmlData 初始化 ────────────────────────────────────────────────────
 
   function initFromHtmlData(data: any) {
-    if (!data || !data._format) {
+    // 仅接受本表 canonical 格式（见 reliabilityTypes.ReliabilityPayload._format）；
+    // 其它格式（如其它 sheet 的 old-format）拒绝，避免误载入非本表数据。
+    if (!data || data._format !== 'reliability-v1') {
       rows.value = []
       auditNote.value = {}
       conclusion.value = {}

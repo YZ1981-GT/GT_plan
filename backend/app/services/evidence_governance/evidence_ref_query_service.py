@@ -10,7 +10,7 @@ Implements:
      - query_refs_from_source: find all refs originating from a source
      - query_refs_to_evidence: find all refs targeting this evidence
   3. Deactivation flow:
-     - deactivate_ref: sets status='deactivated', preserves history, triggers outbox
+     - deactivate_ref: sets status='inactive', preserves history, triggers outbox
   4. Active EvidenceDependency queries:
      - query_dependencies: direct edges from source
   5. Impact API (direct + transitive):
@@ -395,12 +395,15 @@ class EvidenceRefQueryService:
             )
 
         current_status = row["status"]
-        if current_status == "deactivated":
+        # DB check constraint (chk_evidence_ref_status) allows only 'active'|'inactive';
+        # the deactivated terminal state is stored as 'inactive'. (Using 'deactivated'
+        # was a SQLite false-green — real PG16 rejects it with a CheckViolationError.)
+        if current_status == "inactive":
             # Already deactivated — idempotent return
             return DeactivateRefResult(
                 ref_id=ref_id,
-                previous_status="deactivated",
-                new_status="deactivated",
+                previous_status="inactive",
+                new_status="inactive",
                 reason=reason,
             )
 
@@ -410,66 +413,49 @@ class EvidenceRefQueryService:
                 f"cannot deactivate ref in status '{current_status}'",
             )
 
-        # Deactivate the ref (preserve history — update, NOT delete)
+        # Deactivate the ref (preserve history — update, NOT delete).
+        # NOTE: evidence_refs schema (V10x) has ``status`` + ``deactivation_reason`` +
+        # ``updated_at`` only — there is no ``deactivated_at``/``deactivated_by_user_id``
+        # column. The deactivating actor is captured on the command-root/outbox audit
+        # trail (facade), not on the ref row. status='inactive' matches the CHECK
+        # constraint. Align SQL to the real columns/values to avoid Undefined/CheckViolation
+        # → 500 on this mounted governance route.
         await self._db.execute(
             sa.text("""
                 UPDATE evidence_refs
-                SET status = 'deactivated',
-                    deactivated_reason = :reason,
-                    deactivated_at = NOW(),
-                    deactivated_by_user_id = :uid
+                SET status = 'inactive',
+                    deactivation_reason = :reason,
+                    updated_at = NOW()
                 WHERE id = :rid
             """),
             {
                 "rid": str(ref_id),
                 "reason": reason.strip(),
-                "uid": str(actor.actor_user_id) if actor.actor_user_id else None,
             },
         )
 
-        # Update associated EvidenceDependency edge status
+        # Update associated EvidenceDependency edge status (constraint: 'active'|'inactive')
         await self._db.execute(
             sa.text("""
                 UPDATE evidence_dependencies
-                SET status = 'deactivated'
+                SET status = 'inactive'
                 WHERE evidence_ref_id = :rid
                   AND status = 'active'
             """),
             {"rid": str(ref_id)},
         )
 
-        # Enqueue outbox event for impact assessment / stale propagation
-        outbox_id = uuid.uuid4()
-        await self._db.execute(
-            sa.text("""
-                INSERT INTO evidence_outbox (
-                    id, event_type, payload, status, created_at
-                ) VALUES (
-                    :id, :event_type, :payload::jsonb, 'pending', NOW()
-                )
-            """),
-            {
-                "id": str(outbox_id),
-                "event_type": "evidence_ref.deactivated",
-                "payload": _json_dumps({
-                    "ref_id": str(ref_id),
-                    "project_id": str(project_id),
-                    "audit_year": audit_year,
-                    "source_type": row["source_type"],
-                    "source_id": row["source_id"],
-                    "evidence_type": row["evidence_type"],
-                    "evidence_id": row["evidence_id"],
-                    "reason": reason.strip(),
-                }),
-            },
-        )
-
+        # NOTE: the impact-assessment / stale-propagation outbox event is enqueued by
+        # the caller via the facade transaction (``CommandTxn.enqueue_outbox``), which
+        # fills all NOT-NULL columns (project_id / event_id / actor_type / command_root_id)
+        # and keeps a single authoritative outbox mechanism. This service no longer writes
+        # ``evidence_outbox`` directly (the direct INSERT omitted required columns → 500).
         await self._db.flush()
 
         return DeactivateRefResult(
             ref_id=ref_id,
             previous_status=current_status,
-            new_status="deactivated",
+            new_status="inactive",
             reason=reason.strip(),
         )
 
@@ -687,7 +673,7 @@ class EvidenceRefQueryService:
             FROM evidence_refs
             WHERE project_id = :pid
               AND audit_year = :yr
-              AND status = 'deactivated'
+              AND status = 'inactive'
               {cursor_cond}
             ORDER BY created_at ASC, id ASC
             LIMIT :lim

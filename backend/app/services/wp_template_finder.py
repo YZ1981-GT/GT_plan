@@ -22,6 +22,13 @@ INDEX_FILE = TEMPLATES_DIR / "_index.json"
 # 缓存模板索引
 _index_cache: list[dict] | None = None
 
+# Sheet 级独立模板：优先于「F2-21至F2-26」等包内近空 sheet。
+# F2-22/F2-23 在线编辑应对齐通用底稿 G2-6-2 / G2-6-1（Word）。
+_EXPLICIT_TEMPLATE_RELPATHS: dict[str, str] = {
+    "F2-22": "F/F2-22 存货监盘计划.docx",
+    "F2-23": "F/F2-23 存货监盘小结.docx",
+}
+
 
 # ---------------------------------------------------------------------------
 # F2 / F3 多文件 sheet 合并去重工具（spec workpaper-d-sales-cycle, ADR D2 + D3）
@@ -237,6 +244,12 @@ def find_template_file_any(wp_code: str) -> Path | None:
     PRE-1: 子码 docx（索引挂父 wp_code）按文件名前缀 fallback；
     子码（A9-1 等）**禁止**回退到父程序表 xlsx。
     """
+    explicit = _EXPLICIT_TEMPLATE_RELPATHS.get(wp_code)
+    if explicit:
+        path = TEMPLATES_DIR / explicit
+        if path.exists():
+            return path
+
     is_sub_code = bool(re.match(r"^A\d+-\d+", wp_code))
 
     if is_sub_code:

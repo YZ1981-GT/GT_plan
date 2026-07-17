@@ -20,34 +20,16 @@ export {
   type ConfirmationDictKey,
 } from './confirmationDicts'
 
-// 状态机
-export {
-  CONFIRMATION_STATUSES,
-  TRANSITION_TABLE,
-  canTransition,
-  transition,
-  availableEvents,
-  useConfirmationStatus,
-  type ConfirmationStatus,
-  type StatusEvent,
-  type Transition,
-  type StatusRecord,
-  type StatusDistribution,
-  type UseConfirmationStatusOptions,
-} from './useConfirmationStatus'
-
 // 共享 UI Kit
+// 注：原 12 态状态机（useConfirmationStatus）+ 状态徽章（STATUS_BADGE_MAP/getStatusBadge）
+// 已于 2026-07-17（G3）删除——零运行时消费者，真实 UI 用 match_status 3 态 / Hub 5 态。
 export {
-  STATUS_BADGE_MAP,
-  getStatusBadge,
   formatAmount,
   GRID_PALETTE,
   SOURCE_INDICATOR_MAP,
   getSourceIndicator,
   WARN_LEVEL_COLORS,
   COVERAGE_THRESHOLDS,
-  type StatusBadgeConfig,
-  type StatusColorLevel,
   type AmountFormatOptions,
   type DataSource,
   type SourceIndicatorConfig,

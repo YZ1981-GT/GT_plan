@@ -48,10 +48,10 @@ _F2_SHEET_CONFIGS: dict[str, dict[str, Any]] = {
     "F2-14": {"kind": "adjustment", "title": "调整分录 F2-14"},
     "F2-19": {"kind": "production_sales", "title": "产销量变动 F2-19"},
     "F2-20": {"kind": "cost_comparison", "title": "成本比较 F2-20"},
-    "F2-29": {"kind": "cutoff", "title": "截止测试-入库(正向) F2-29"},
-    "F2-30": {"kind": "cutoff", "title": "截止测试-入库(反向) F2-30"},
-    "F2-31": {"kind": "cutoff", "title": "截止测试-出库(正向) F2-31"},
-    "F2-32": {"kind": "cutoff", "title": "截止测试-出库(反向) F2-32"},
+    "F2-29": {"kind": "cutoff", "title": "存货(原材料/产成品)截止-入库(账→单) F2-29"},
+    "F2-30": {"kind": "cutoff", "title": "存货(原材料/产成品)截止-入库(单→账) F2-30"},
+    "F2-31": {"kind": "cutoff", "title": "存货(原材料/产成品)截止-出库(账→单) F2-31"},
+    "F2-32": {"kind": "cutoff", "title": "存货(原材料/产成品)截止-出库(单→账) F2-32"},
 }
 
 _SUPPORTED_SHEETS = set(_F2_SHEET_CONFIGS.keys())
@@ -78,7 +78,25 @@ def _headers(sheet: str) -> list[str]:
     if kind == "cost_comparison":
         return ["产品名称", "产量", "材料", "人工", "制造费用", "上期合计", "异常说明"]
     if kind == "cutoff":
-        return ["供应商/部门", "单号", "单据日期", "品名", "数量", "金额", "凭证号", "记账日期", "截止正确", "备注"]
+        return [
+            "存货类别",
+            "供应商/部门",
+            "凭证日期",
+            "凭证号",
+            "业务内容",
+            "品名",
+            "金额",
+            "单据号",
+            "单据日期",
+            "单据金额",
+            "质检编号",
+            "质检日期",
+            "其他单号",
+            "其他日期",
+            "是否跨期",
+            "截止正确",
+            "备注",
+        ]
     headers = ["品名"]
     if cfg["has_quantity"]:
         headers.extend(["期初数量", "期初金额", "增加数量", "增加金额", "减少数量", "减少金额"])
@@ -100,7 +118,25 @@ def _field_keys(sheet: str) -> list[str]:
     if kind == "cost_comparison":
         return ["productName", "currentQty", "currentMaterial", "currentLabor", "currentOverhead", "priorTotal", "anomalyNote"]
     if kind == "cutoff":
-        return ["party", "docNo", "docDate", "itemName", "quantity", "amount", "voucherNo", "bookDate", "isCorrect", "remark"]
+        return [
+            "invCategory",
+            "party",
+            "bookDate",
+            "voucherNo",
+            "businessContent",
+            "itemName",
+            "amount",
+            "docNo",
+            "docDate",
+            "docAmount",
+            "inspectNo",
+            "inspectDate",
+            "otherDocNo",
+            "otherDocDate",
+            "isCrossPeriod",
+            "isCorrect",
+            "remark",
+        ]
     keys = ["itemName"]
     if cfg["has_quantity"]:
         keys.extend(["openingQty", "openingAmt", "increaseQty", "increaseAmt", "decreaseQty", "decreaseAmt"])
@@ -190,20 +226,38 @@ def _parse_f2_row(sheet: str, row: tuple, headers: list[str]) -> dict:
     if kind == "cutoff":
         correct_raw = safe_str(col_val(row, headers, "截止正确")).lower()
         is_correct = correct_raw in ("是", "true", "1", "yes", "y")
+        cross_raw = safe_str(col_val(row, headers, "是否跨期")).lower()
+        is_cross = cross_raw in ("是", "true", "1", "yes", "y") if cross_raw else not is_correct
+        cat_raw = safe_str(col_val(row, headers, "存货类别"))
+        if cat_raw in ("原材料", "raw"):
+            inv_category = "raw"
+        elif cat_raw in ("产成品", "库存商品", "finished"):
+            inv_category = "finished"
+        else:
+            inv_category = ""
         return {
             "id": str(uuid4()),
             "seq": 0,
+            "invCategory": inv_category,
             "party": safe_str(col_val(row, headers, "供应商/部门")),
-            "docNo": safe_str(col_val(row, headers, "单号")),
-            "docDate": safe_str(col_val(row, headers, "单据日期")),
-            "itemName": safe_str(col_val(row, headers, "品名")),
-            "quantity": safe_float(col_val(row, headers, "数量")),
-            "amount": safe_float(col_val(row, headers, "金额")),
+            "bookDate": safe_str(col_val(row, headers, "凭证日期"))
+            or safe_str(col_val(row, headers, "记账日期")),
             "voucherNo": safe_str(col_val(row, headers, "凭证号")),
-            "bookDate": safe_str(col_val(row, headers, "记账日期")),
+            "businessContent": safe_str(col_val(row, headers, "业务内容")),
+            "itemName": safe_str(col_val(row, headers, "品名")),
+            "amount": safe_float(col_val(row, headers, "金额")),
+            "quantity": safe_float(col_val(row, headers, "数量")),
+            "docNo": safe_str(col_val(row, headers, "单据号"))
+            or safe_str(col_val(row, headers, "单号")),
+            "docDate": safe_str(col_val(row, headers, "单据日期")),
+            "docAmount": safe_float(col_val(row, headers, "单据金额")),
+            "inspectNo": safe_str(col_val(row, headers, "质检编号")),
+            "inspectDate": safe_str(col_val(row, headers, "质检日期")),
+            "otherDocNo": safe_str(col_val(row, headers, "其他单号")),
+            "otherDocDate": safe_str(col_val(row, headers, "其他日期")),
             "isCorrect": is_correct,
             "remark": safe_str(col_val(row, headers, "备注")),
-            "isCrossPeriod": not is_correct,
+            "isCrossPeriod": is_cross,
             "correctPeriod": "",
             "bookedPeriod": "",
             "suggestion": "",

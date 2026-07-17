@@ -49,12 +49,25 @@ export function useF2PurchaseOcr(wpId: Ref<string>) {
       )
 
       const patch: Partial<InspectionCheckRow> = { sampleSource: 'OCR识别' }
-      if (fields.supplier) patch.party = String(fields.supplier)
-      if (fields.purchaseOrderNo) patch.docNo = String(fields.purchaseOrderNo)
+      if (fields.supplier) {
+        patch.party = String(fields.supplier)
+        if ('invoiceParty' in ({} as InspectionCheckRow) || true) {
+          ;(patch as Record<string, unknown>).invoiceParty = String(fields.supplier)
+        }
+      }
+      if (fields.purchaseOrderNo) {
+        ;(patch as Record<string, unknown>).recvDateNo = String(fields.purchaseOrderNo)
+        patch.docNo = String(fields.purchaseOrderNo)
+      }
       if (fields.itemName) patch.itemName = String(fields.itemName)
-      if (fields.invoiceNo) patch.voucherNo = String(fields.invoiceNo)
+      if (fields.invoiceNo) {
+        ;(patch as Record<string, unknown>).invoiceDateNo = String(fields.invoiceNo)
+      }
       const amt = typeof fields.amount === 'number' ? fields.amount : parseFloat(String(fields.amount || '0'))
-      if (amt > 0) patch.amount = amt
+      if (amt > 0) {
+        patch.amount = amt
+        ;(patch as Record<string, unknown>).invoiceAmount = amt
+      }
       if (fields.orderDate) patch.remark = `单据日期 ${fields.orderDate}`
 
       updateRow(rowId, patch)

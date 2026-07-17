@@ -155,12 +155,14 @@ class ProjectYearScopeGuard:
             raise self._denied()
 
         if requested_project_id is not None and requested_project_id != scope.project_id:
+            self._record_cross_scope_denied(scope.project_id, scope.audit_year)
             raise self._denied()
         if (
             requested_year is not None
             and scope.audit_year is not None
             and requested_year != scope.audit_year
         ):
+            self._record_cross_scope_denied(scope.project_id, scope.audit_year)
             raise self._denied()
 
         await self.authorize_scope(
@@ -207,3 +209,23 @@ class ProjectYearScopeGuard:
             EvidenceErrorCode.SCOPE_NOT_FOUND_OR_FORBIDDEN,
             "scope not found or forbidden",
         )
+
+    @staticmethod
+    def _record_cross_scope_denied(
+        project_id: uuid.UUID, audit_year: int | None
+    ) -> None:
+        """跨 project/year 声明与权威 scope 不一致时记录低基数指标 + 峰值检测告警
+        （design §9.3；R12.2/R12.3）。防御式：任何指标错误都不得影响 scope 拒绝语义。
+        """
+        try:
+            from app.services.evidence_governance.observability import (
+                get_evidence_metrics,
+            )
+
+            get_evidence_metrics().record_cross_scope_denied(
+                domain="boundary",
+                project_id=str(project_id),
+                audit_year=audit_year,
+            )
+        except Exception:  # pragma: no cover - 指标永不阻断授权
+            pass

@@ -68,6 +68,26 @@ async def test_f2_ai_generate_f2_18_note_a():
 
 
 @pytest.mark.asyncio
+async def test_f2_ai_generate_f2_20_abnormal():
+    with patch("app.routers.wp_render_strategies._f2_inventory_main_ai.chat_completion", new_callable=AsyncMock) as mock_llm:
+        mock_llm.return_value = "产品A材料成本上涨约30%，进一步分析见F2-61。"
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/api/workpapers/test-wp-id/f2/ai-generate",
+                json={
+                    "section": "f2-20-abnormal",
+                    "existingContent": "",
+                    "relatedContext": {"anomalyCount": 1},
+                },
+            )
+        assert response.status_code == 200
+        data = response.json()
+        payload = data.get("data", data)
+        assert "F2-61" in payload["content"] or len(payload["content"]) > 0
+
+
+@pytest.mark.asyncio
 async def test_f2_ai_generate_rejects_unknown_section():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:

@@ -234,8 +234,10 @@ async function executeTransition(row: ConfirmationItem, target: string) {
     await api.post(`/api/projects/${projectId.value}/confirmations/${row.id}/transition`, {
       target_status: target,
     })
-    // 回函登记成功 emit eventBus
-    if (target === 'returned') {
+    // 回函终态（已回函/相符/差异）→ emit eventBus，统一驱动下游刷新（摘要卡/底稿）。
+    // 后端 transition 端点会从记录 wp_id 反查 wp_code 触发 CONFIRMATION_RECEIVED 下游 stale，
+    // 前端此事件仅负责客户端刷新，两条链触发点在终态对齐（G1/G2）。
+    if (target === 'returned' || target === 'matched' || target === 'discrepancy') {
       eventBus.emit('confirmation:received', {
         projectId: projectId.value,
         confirmationId: row.id,

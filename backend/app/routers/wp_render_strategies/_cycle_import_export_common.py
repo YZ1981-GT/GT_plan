@@ -93,6 +93,10 @@ def is_numeric_field_key(key: str) -> bool:
         "usefulLife", "salvageRate", "entryAmount", "originalCost",
         "amortTotal", "adminExpense", "salesExpense", "mfgExpense", "rdExpense", "otherExpense",
         "allocTotal", "allocRatio",
+        # F2-43/F2-44 分配基数
+        "allocationBase",
+        # F2-47/F2-48 数量与库龄四档
+        "qty", "within1y", "y1to2", "y2to3", "over3y",
     }
 
 

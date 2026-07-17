@@ -140,8 +140,47 @@ async def get_command_status(
     }
 
 
+# ---------------------------------------------------------------------------
+# 全局可观测性（Task 7.4, Wave 6；design §9.3）
+#   进程级低基数指标聚合 + 近期告警；admin/manager 只读。指标为进程内聚合，
+#   非项目 scope，故独立于项目 scope 根，走全局 /api/evidence-governance 前缀。
+# ---------------------------------------------------------------------------
+
+observability_router = APIRouter(prefix="/api/evidence-governance", tags=["证据治理可观测性"])
+
+
+@observability_router.get("/metrics")
+async def get_evidence_governance_metrics(
+    current_user: User = Depends(get_current_user),
+) -> dict:
+    """返回治理低基数指标 + 近期告警聚合（design §9.3）。
+
+    覆盖 upload/boundary/ref/OCR queue+failure/AI coverage/citation/stale
+    age+closure/review reopen/formal gate/archive hash/hold/outbox lag/PG pool
+    wait/backpressure。告警关联 command-root/transition/trace，metadata 已脱敏。
+    """
+    from app.services.evidence_governance.observability import get_evidence_metrics
+
+    role = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
+    if role not in ("admin", "manager", "partner"):
+        from app.services.evidence_governance.frozen_contracts import EvidenceErrorCode
+
+        raise raise_http(
+            EvidenceGovernanceError(EvidenceErrorCode.SCOPE_NOT_FOUND_OR_FORBIDDEN)
+        )
+    return get_evidence_metrics().get_aggregated_metrics()
+
+
+# 安全上传 + 安全读取端点（Task 3.2/3.3/3.4 的 HTTP 接线）。放在包末尾导入，避免与
+# 本模块的依赖/异常辅助形成循环导入；由 router_registry/system.py §135 挂载。
+from app.routers.evidence_governance.attachments_router import (  # noqa: E402
+    router as attachments_router,
+)
+
 __all__ = [
     "router",
+    "observability_router",
+    "attachments_router",
     "get_evidence_facade",
     "resolve_user_actor",
     "raise_http",

@@ -1,37 +1,39 @@
 <template>
-  <div class="f2-val-sheet">
+  <div class="f2-val-sheet f2-labor">
     <header class="sheet-header">
       <div><h3>直接人工分析表</h3><span class="code">F2-42</span></div>
       <div class="stat-row">
-        <span class="stat">计算合计 {{ lb.laborGrandTotal.value.toLocaleString() }}</span>
-        <el-tag v-if="lb.varianceCount.value" type="warning" size="small">{{ lb.varianceCount.value }} 行差异>5%</el-tag>
+        <span class="stat">人工合计 {{ fmt(lb.laborGrandTotal.value) }}</span>
+        <el-tag v-if="lb.varianceCount.value" type="warning" size="small">
+          单位成本异常 {{ lb.varianceCount.value }} 项
+        </el-tag>
       </div>
     </header>
 
-    <!-- 编制提示 -->
-    <details class="guidance-details">
-      <summary>📋 编制提示</summary>
-      <div class="guidance-content">
-        <p>1. 直接人工按部门/工种分析人数、工时、工资率与人工费用的匹配性，验证人工成本归集与分配的合理性（CAS 1 号存货加工成本）。</p>
-        <p>2. 灰色底纹列为自动计算列（计算人工费、占比），据工时×工资率自动测算，不可手工编辑。</p>
-        <p>3. 计算人工费与实际人工费差异率超过 5% 的行自动标橙，须核查工时统计、工资率取数或人工费归集是否存在异常。</p>
-        <p>4. 关注人工费用是否跨期、是否将非生产人员薪酬错误计入直接人工，影响存货成本计价。</p>
-      </div>
-    </details>
+    <el-alert type="info" :closable="false" show-icon class="objective-alert" title="一、测试目标" />
+    <el-input
+      :model-value="objectiveText"
+      type="textarea"
+      :autosize="{ minRows: 2, maxRows: 4 }"
+      :disabled="isReadonly"
+      class="section-text"
+      @update:model-value="(v: string) => { objectiveText = v }"
+    />
 
-    <!-- 审计目标 -->
-    <el-alert
-      type="info"
-      :closable="false"
-      title="审计目标：验证直接人工成本归集与分配的合理性，通过工时、工资率重新计算复核人工费用，识别异常波动，为存货加工成本准确性提供分析证据。"
-      class="objective-alert"
+    <div class="section-label">二、审计程序</div>
+    <el-input
+      :model-value="lb.auditProcedure.value"
+      type="textarea"
+      :autosize="{ minRows: 2, maxRows: 4 }"
+      :disabled="isReadonly"
+      class="section-text"
+      :placeholder="defaultProcedure"
+      @update:model-value="(v: string) => lb.setProcedure(v)"
     />
 
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="lb.addRow()">+ 新增</el-button>
-      </div>
-      <div class="toolbar-right">
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="lb.addLine()">+ 产品</el-button>
         <F2SheetToolbar
           :wp-id="wpId"
           api-prefix="f2-val"
@@ -44,102 +46,125 @@
           review-section="F2-42-conclusion"
           @ai-filled="(t: string) => { lb.auditNote.value = t }"
         />
-        <span class="chip-wrap"><GtIndexChip value="wp:F2-1" /></span>
-        <el-tag size="small" type="info">共 {{ lb.enrichedRows.value.length }} 行</el-tag>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-42" /></span>
+        <el-tag size="small" type="info">{{ lb.enrichedLines.value.length }} 个产品</el-tag>
       </div>
     </div>
 
-    <el-table
-      :data="lb.enrichedRows.value" border size="small" max-height="460"
-      :row-class-name="({ row }) => (typeof row.varianceRate === 'number' && Math.abs(row.varianceRate) > 0.05) ? 'warn-row' : ''"
-    >
-      <el-table-column label="部门/产品" width="120">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.department" size="small"
-            @change="(v: string) => lb.updateRow(row.rowId, { department: v })" />
-          <span v-else>{{ row.department }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="工种" width="90">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.jobType" size="small"
-            @change="(v: string) => lb.updateRow(row.rowId, { jobType: v })" />
-          <span v-else>{{ row.jobType }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="人数" width="80">
-        <template #default="{ row }">
-          <el-input-number :model-value="row.headcount" size="small" :controls="false" :disabled="isReadonly"
-            class="compact-num" @change="(v: number) => lb.updateRow(row.rowId, { headcount: v ?? 0 })" />
-        </template>
-      </el-table-column>
-      <el-table-column label="工时" width="80">
-        <template #default="{ row }">
-          <el-input-number :model-value="row.hours" size="small" :controls="false" :disabled="isReadonly"
-            class="compact-num" @change="(v: number) => lb.updateRow(row.rowId, { hours: v ?? 0 })" />
-        </template>
-      </el-table-column>
-      <el-table-column label="工资率" width="85">
-        <template #default="{ row }">
-          <el-input-number :model-value="row.wageRate" size="small" :controls="false" :disabled="isReadonly"
-            class="compact-num" @change="(v: number) => lb.updateRow(row.rowId, { wageRate: v ?? 0 })" />
-        </template>
-      </el-table-column>
-      <el-table-column label="计算人工费" width="105" align="right" class-name="auto-calc-col">
-        <template #default="{ row }"><span class="formula" title="工时 × 工资率">{{ row.calculatedLabor.toLocaleString() }}</span></template>
-      </el-table-column>
-      <el-table-column label="实际人工费" width="105">
-        <template #default="{ row }">
-          <el-input-number :model-value="row.actualLabor" size="small" :controls="false" :disabled="isReadonly"
-            class="compact-num" @change="(v: number) => lb.updateRow(row.rowId, { actualLabor: v ?? 0 })" />
-        </template>
-      </el-table-column>
-      <el-table-column label="占比%" width="75" align="right" class-name="auto-calc-col">
-        <template #default="{ row }"><span class="formula" title="本行实际人工费 ÷ 人工费合计 × 100%">{{ row.sharePct.toFixed(1) }}</span></template>
-      </el-table-column>
-      <el-table-column label="" width="48">
-        <template #default="{ row }">
-          <el-button link type="danger" size="small" :disabled="isReadonly" @click="lb.removeRow(row.rowId)">删</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <!-- 表1：各月发生的直接人工 -->
+    <div class="table-title">各月发生的直接人工</div>
+    <LaborMatrixTable
+      :lines="lb.enrichedLines.value"
+      :month-labels="monthLabels"
+      :is-readonly="isReadonly"
+      summary-label="合计"
+      value-kind="labor"
+      prior-field="laborPriorYear"
+      change-rate-field="laborChangeRate"
+      total-field="laborTotal"
+      @update-name="(id, v) => lb.updateLine(id, { productName: v })"
+      @update-month="(id, m, v) => lb.updateLaborMonth(id, m, v)"
+      @update-prior="(id, v) => lb.updateLine(id, { laborPriorYear: v })"
+      @update-reason="(id, v) => lb.updateLine(id, { changeReason: v })"
+      @remove="(id) => lb.removeLine(id)"
+    />
 
-    <el-card class="opinion-card" shadow="never">
-      <template #header>
-        <div class="opinion-header"><span class="opinion-title">审计说明</span></div>
-      </template>
-      <el-input v-model="lb.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="直接人工分析审计说明..." />
+    <!-- 表2：各月产量/工时 -->
+    <div class="table-title">各月产量/工时</div>
+    <LaborMatrixTable
+      :lines="lb.enrichedLines.value"
+      :month-labels="monthLabels"
+      :is-readonly="isReadonly"
+      summary-label="合计"
+      value-kind="output"
+      prior-field="outputPriorYear"
+      change-rate-field="outputChangeRate"
+      total-field="outputTotal"
+      @update-name="(id, v) => lb.updateLine(id, { productName: v })"
+      @update-month="(id, m, v) => lb.updateOutputMonth(id, m, v)"
+      @update-prior="(id, v) => lb.updateLine(id, { outputPriorYear: v })"
+      @remove="(id) => lb.removeLine(id)"
+    />
+
+    <!-- 表3：单位人工成本（自动） -->
+    <div class="table-title">单位人工成本 <span class="formula-hint">= 直接人工 ÷ 产量/工时</span></div>
+    <LaborMatrixTable
+      :lines="lb.enrichedLines.value"
+      :month-labels="monthLabels"
+      :is-readonly="true"
+      summary-label="平均值"
+      value-kind="unit"
+      prior-field="unitPriorYear"
+      change-rate-field="unitChangeRate"
+      total-field="unitAverage"
+      highlight-variance
+      @update-prior="(id, v) => lb.updateLine(id, { unitPriorYear: v })"
+    />
+
+    <el-card shadow="never" class="conclusion-card">
+      <template #header><span class="conclusion-header">三、审计说明</span></template>
+      <el-input
+        v-model="lb.auditNote.value"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="直接人工分析审计说明..."
+      />
     </el-card>
 
-    <el-card class="opinion-card" shadow="never">
-      <template #header>
-        <div class="opinion-header"><span class="opinion-title">审计结论</span></div>
-      </template>
-      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。" @change="saveAuditConclusion" />
+    <el-card shadow="never" class="conclusion-card">
+      <template #header><span class="conclusion-header">四、审计结论</span></template>
+      <el-input
+        :model-value="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 2, maxRows: 6 }"
+        :disabled="isReadonly"
+        placeholder="填写审计结论。"
+        @update:model-value="saveAuditConclusion"
+      />
     </el-card>
+
+    <div class="tips-box">
+      <div class="tips-title">提示</div>
+      <ol>
+        <li v-for="(tip, i) in tips" :key="i">{{ tip }}</li>
+      </ol>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, toRef } from 'vue'
 import { useF2DirectLaborAnalysis } from '../../composables/useF2DirectLaborAnalysis'
+import {
+  LABOR_MONTH_LABELS,
+  F2_42_DEFAULT_OBJECTIVE,
+  F2_42_PROCEDURE,
+  F2_42_TIPS,
+} from '../../composables/useF2DirectLaborMatrixFormulas'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
+import LaborMatrixTable from './F2LaborMatrixTable.vue'
 
 const props = defineProps<{
   wpId?: string
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()
+
 const lb = useF2DirectLaborAnalysis({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-// ─── 审计结论（独立持久化，F2 计价组事件） ───────────────────────────────
+const tips = F2_42_TIPS
+const defaultProcedure = F2_42_PROCEDURE
+const objectiveText = ref(F2_42_DEFAULT_OBJECTIVE)
+const monthLabels = LABOR_MONTH_LABELS
+
 const CONCLUSION_KEY = 'F2-42-audit-conclusion'
 const auditConclusion = ref('')
 function saveAuditConclusion(val: string): void {
@@ -153,6 +178,36 @@ onMounted(() => {
   const c = props.allResponses.get(CONCLUSION_KEY)
   if (c?.remark) auditConclusion.value = c.remark
 })
+
+function fmt(v: number): string {
+  if (!v) return '0'
+  return v.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+}
 </script>
 
 <style scoped src="./f2ValSheetStyles.css"></style>
+<style scoped>
+.f2-labor { --gt-purple: #4b2d77; --gt-purple-soft: #f3eef8; }
+.section-label { margin: 14px 0 8px; font-size: 14px; font-weight: 600; }
+.section-text { margin-bottom: 10px; }
+.table-title {
+  margin: 16px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gt-purple);
+}
+.formula-hint { font-weight: 400; color: #909399; font-size: 12px; }
+.conclusion-card { margin-top: 14px; }
+.conclusion-header { font-weight: 600; font-size: 14px; }
+.tips-box {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #ecf5ff;
+  border-left: 3px solid #409eff;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.tips-title { font-weight: 600; color: #409eff; margin-bottom: 6px; }
+.tips-box ol { margin: 0; padding-left: 1.4em; }
+</style>

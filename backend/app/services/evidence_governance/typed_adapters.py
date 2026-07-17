@@ -158,6 +158,55 @@ _GLOBAL_VISIBILITY_ROLES: frozenset[str] = frozenset({"admin", "partner"})
 _EDIT_ROLES: frozenset[str] = frozenset({"admin", "partner", "manager", "auditor"})
 
 
+def _as_uuid(value: str | None) -> str | None:
+    """Validate & normalize a UUID string for binding to UUID-typed columns.
+
+    Every adapter binds ``target_id`` (or a parsed part of it) to a ``uuid`` column
+    (``WHERE id = :tid``). asyncpg rejects a non-UUID string with ``DataError:
+    invalid input for query argument`` which propagates as HTTP 500. A non-UUID
+    ``target_id`` is not a server error — it simply resolves to "not found".
+
+    Returns the canonical UUID string when ``value`` is a valid UUID, otherwise
+    ``None`` so callers can short-circuit to None/False (clean desensitized 404)
+    BEFORE running any UUID-keyed SQL. Does NOT swallow DB errors — it only screens
+    the id shape; genuine DB failures still surface.
+    """
+    if not value:
+        return None
+    try:
+        return str(uuid.UUID(str(value)))
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
+# Composite workpaper_cell target separator: "{wp_id}::{item_id}".
+_CELL_COMPOSITE_SEP = "::"
+
+
+def _parse_cell_target(target_id: str) -> tuple[str, str] | tuple[str, None] | None:
+    """Parse a workpaper_cell target_id into a query strategy.
+
+    A workpaper_cell target may be:
+      * ``"{wp_id}::{item_id}"`` composite → returns ``(wp_uuid, item_id)`` where
+        ``wp_uuid`` is the validated wp_id UUID and ``item_id`` is free text.
+      * a bare ``checklist_responses.id`` UUID → returns ``(cr_uuid, None)``.
+      * anything else (non-UUID, non-composite, or composite with non-UUID wp_id)
+        → returns ``None`` ("not found").
+    """
+    if not target_id:
+        return None
+    if _CELL_COMPOSITE_SEP in target_id:
+        wp_part, _, item_part = target_id.partition(_CELL_COMPOSITE_SEP)
+        wp_uuid = _as_uuid(wp_part)
+        if wp_uuid is None or not item_part:
+            return None
+        return (wp_uuid, item_part)
+    bare = _as_uuid(target_id)
+    if bare is None:
+        return None
+    return (bare, None)
+
+
 async def _row_exists_in_scope(
     db: AsyncSession,
     *,
@@ -170,14 +219,20 @@ async def _row_exists_in_scope(
     year_col: str = "audit_year",
     extra_predicate: str | None = None,
 ) -> bool:
-    """Check if a row exists in the given table with matching scope."""
+    """Check if a row exists in the given table with matching scope.
+
+    ``id_col`` is a uuid-typed column; a non-UUID ``target_id`` is "not found".
+    """
+    tid = _as_uuid(target_id)
+    if tid is None:
+        return False
     where = f"{id_col} = :tid AND {project_col} = :pid AND {year_col} = :yr"
     if extra_predicate:
         where += f" AND {extra_predicate}"
     stmt = sa.text(f"SELECT 1 FROM {table} WHERE {where} LIMIT 1")
     row = (
         await db.execute(
-            stmt, {"tid": target_id, "pid": str(project_id), "yr": audit_year}
+            stmt, {"tid": tid, "pid": str(project_id), "yr": audit_year}
         )
     ).first()
     return row is not None
@@ -200,12 +255,62 @@ async def _is_project_member(
     return row is not None
 
 
+async def _resolve_system_role(
+    db: AsyncSession, user_id: uuid.UUID | None
+) -> str | None:
+    """Resolve the actor's authoritative system role from ``users.role`` (DB is truth).
+
+    Returns the lowercase role string (e.g. ``"admin"``) or ``None`` when the user is
+    unknown / the users table is unavailable (test envs). Defensive: never raises —
+    an unresolved role simply falls through to the project-membership check.
+    """
+    if user_id is None:
+        return None
+    try:
+        row = (
+            await db.execute(
+                sa.text("SELECT role FROM users WHERE id = :uid LIMIT 1"),
+                {"uid": str(user_id)},
+            )
+        ).first()
+    except Exception:  # pragma: no cover - users table absent in some unit envs
+        return None
+    if row is None:
+        return None
+    val = row[0]
+    return val.value if hasattr(val, "value") else str(val)
+
+
 async def _actor_can_access_project(
-    db: AsyncSession, actor: ActorContext, project_id: uuid.UUID
+    db: AsyncSession,
+    actor: ActorContext,
+    project_id: uuid.UUID,
+    *,
+    actor_role: str | None = None,
 ) -> bool:
-    """Check project access for actor (service actors have task-scope access)."""
+    """Check project access for actor.
+
+    Alignment with ``ProjectYearScopeGuard`` (design §3.1): admin/partner have global
+    project visibility; every other human role must be a (non-soft-deleted) project
+    member. Previously this helper only checked ``project_users`` membership, which
+    diverged from the scope guard — since ``project_users`` is empty platform-wide and
+    the platform runs on admin/partner global visibility, a valid same-scope EvidenceRef
+    create by admin/partner was wrongly denied (404) even though the scope guard admitted
+    the very same actor. This does NOT weaken cross-project denial: target belonging is
+    still enforced by each adapter's ``resolve`` (project_id filter), so a foreign-scope
+    target resolves to None → SCOPE_NOT_FOUND_OR_FORBIDDEN regardless of the caller's role.
+
+    ``actor_role`` (when threaded by a caller) is used directly for exact parity; when not
+    provided the authoritative system role is resolved from ``users.role`` (never trusted
+    from the client). Service identities keep task-scope access (unchanged).
+    """
     if actor.is_service:
         # Service identities have task-scope access — assume authorized
+        return True
+    role = actor_role
+    if role is None:
+        role = await _resolve_system_role(db, actor.actor_user_id)
+    if role in _GLOBAL_VISIBILITY_ROLES:
         return True
     return await _is_project_member(db, project_id, actor.actor_user_id)
 
@@ -213,9 +318,16 @@ async def _actor_can_access_project(
 async def _lock_row(
     db: AsyncSession, table: str, id_col: str, target_id: str
 ) -> bool:
-    """Acquire SELECT ... FOR UPDATE lock on a single row."""
+    """Acquire SELECT ... FOR UPDATE lock on a single row.
+
+    ``id_col`` is uuid-typed in every current caller; a non-UUID ``target_id``
+    resolves to "not found" (False) rather than raising asyncpg DataError.
+    """
+    tid = _as_uuid(target_id)
+    if tid is None:
+        return False
     stmt = sa.text(f"SELECT 1 FROM {table} WHERE {id_col} = :tid FOR UPDATE")
-    row = (await db.execute(stmt, {"tid": target_id})).first()
+    row = (await db.execute(stmt, {"tid": tid})).first()
     return row is not None
 
 
@@ -237,19 +349,36 @@ class WorkpaperCellAdapter:
         audit_year: int,
         db: AsyncSession,
     ) -> ResolvedTarget | None:
-        # target_id = "{wp_id}::{item_id}" or just checklist_responses row id
-        stmt = sa.text(
-            "SELECT cr.id, cr.wp_id, cr.item_id, cr.project_id, wp.audit_year "
-            "FROM checklist_responses cr "
-            "JOIN working_paper wp ON wp.id = cr.wp_id "
-            "WHERE cr.id = :tid AND cr.project_id = :pid AND wp.audit_year = :yr "
-            "LIMIT 1"
-        )
-        row = (
-            await db.execute(
-                stmt, {"tid": target_id, "pid": str(project_id), "yr": audit_year}
+        # target_id = "{wp_id}::{item_id}" (composite) or a bare checklist_responses
+        # row id (uuid). A non-UUID / non-composite string matches nothing → None.
+        # NOTE: working_paper has NO audit_year column — year is derived from
+        # projects.audit_year via checklist_responses.project_id.
+        parsed = _parse_cell_target(target_id)
+        if parsed is None:
+            return None
+        first, item_id = parsed
+        if item_id is None:
+            # bare checklist_responses.id (uuid)
+            stmt = sa.text(
+                "SELECT cr.id, cr.wp_id, cr.item_id, cr.project_id, p.audit_year "
+                "FROM checklist_responses cr "
+                "JOIN projects p ON p.id = cr.project_id "
+                "WHERE cr.id = :tid AND cr.project_id = :pid AND p.audit_year = :yr "
+                "LIMIT 1"
             )
-        ).mappings().first()
+            params = {"tid": first, "pid": str(project_id), "yr": audit_year}
+        else:
+            # composite "{wp_id}::{item_id}": query by wp_id + item_id
+            stmt = sa.text(
+                "SELECT cr.id, cr.wp_id, cr.item_id, cr.project_id, p.audit_year "
+                "FROM checklist_responses cr "
+                "JOIN projects p ON p.id = cr.project_id "
+                "WHERE cr.wp_id = :wid AND cr.item_id = :iid "
+                "AND cr.project_id = :pid AND p.audit_year = :yr "
+                "LIMIT 1"
+            )
+            params = {"wid": first, "iid": item_id, "pid": str(project_id), "yr": audit_year}
+        row = (await db.execute(stmt, params)).mappings().first()
         if row is None:
             return None
         return ResolvedTarget(
@@ -269,15 +398,7 @@ class WorkpaperCellAdapter:
     ) -> bool:
         if not await _actor_can_access_project(db, actor, project_id):
             return False
-        stmt = sa.text(
-            "SELECT 1 FROM checklist_responses cr "
-            "JOIN working_paper wp ON wp.id = cr.wp_id "
-            "WHERE cr.id = :tid AND cr.project_id = :pid LIMIT 1"
-        )
-        row = (
-            await db.execute(stmt, {"tid": target_id, "pid": str(project_id)})
-        ).first()
-        return row is not None
+        return await self._cell_exists_in_project(target_id, project_id=project_id, db=db)
 
     async def can_edit(
         self,
@@ -291,14 +412,35 @@ class WorkpaperCellAdapter:
             return False  # Service cannot edit user-facing content
         if not await _actor_can_access_project(db, actor, project_id):
             return False
-        stmt = sa.text(
-            "SELECT 1 FROM checklist_responses cr "
-            "JOIN working_paper wp ON wp.id = cr.wp_id "
-            "WHERE cr.id = :tid AND cr.project_id = :pid LIMIT 1"
-        )
-        row = (
-            await db.execute(stmt, {"tid": target_id, "pid": str(project_id)})
-        ).first()
+        return await self._cell_exists_in_project(target_id, project_id=project_id, db=db)
+
+    @staticmethod
+    async def _cell_exists_in_project(
+        target_id: str, *, project_id: uuid.UUID, db: AsyncSession
+    ) -> bool:
+        """Existence + project-scope check for a bare-uuid or composite cell target.
+
+        Non-UUID / non-composite target_id → False (not a DB error).
+        """
+        parsed = _parse_cell_target(target_id)
+        if parsed is None:
+            return False
+        first, item_id = parsed
+        if item_id is None:
+            stmt = sa.text(
+                "SELECT 1 FROM checklist_responses cr "
+                "JOIN working_paper wp ON wp.id = cr.wp_id "
+                "WHERE cr.id = :tid AND cr.project_id = :pid LIMIT 1"
+            )
+            params = {"tid": first, "pid": str(project_id)}
+        else:
+            stmt = sa.text(
+                "SELECT 1 FROM checklist_responses cr "
+                "JOIN working_paper wp ON wp.id = cr.wp_id "
+                "WHERE cr.wp_id = :wid AND cr.item_id = :iid AND cr.project_id = :pid LIMIT 1"
+            )
+            params = {"wid": first, "iid": item_id, "pid": str(project_id)}
+        row = (await db.execute(stmt, params)).first()
         return row is not None
 
     async def locate(
@@ -308,11 +450,23 @@ class WorkpaperCellAdapter:
         version: int | None = None,
         db: AsyncSession,
     ) -> LocatorInfo | None:
-        stmt = sa.text(
-            "SELECT cr.wp_id, cr.item_id FROM checklist_responses cr "
-            "WHERE cr.id = :tid LIMIT 1"
-        )
-        row = (await db.execute(stmt, {"tid": target_id})).mappings().first()
+        parsed = _parse_cell_target(target_id)
+        if parsed is None:
+            return None
+        first, item_id = parsed
+        if item_id is None:
+            stmt = sa.text(
+                "SELECT cr.wp_id, cr.item_id FROM checklist_responses cr "
+                "WHERE cr.id = :tid LIMIT 1"
+            )
+            params = {"tid": first}
+        else:
+            stmt = sa.text(
+                "SELECT cr.wp_id, cr.item_id FROM checklist_responses cr "
+                "WHERE cr.wp_id = :wid AND cr.item_id = :iid LIMIT 1"
+            )
+            params = {"wid": first, "iid": item_id}
+        row = (await db.execute(stmt, params)).mappings().first()
         if row is None:
             return None
         return LocatorInfo(
@@ -323,7 +477,19 @@ class WorkpaperCellAdapter:
         )
 
     async def lock_for_update(self, target_id: str, *, db: AsyncSession) -> bool:
-        return await _lock_row(db, "checklist_responses", "id", target_id)
+        parsed = _parse_cell_target(target_id)
+        if parsed is None:
+            return False
+        first, item_id = parsed
+        if item_id is None:
+            return await _lock_row(db, "checklist_responses", "id", target_id)
+        # composite: lock the row identified by wp_id + item_id
+        stmt = sa.text(
+            "SELECT 1 FROM checklist_responses "
+            "WHERE wp_id = :wid AND item_id = :iid FOR UPDATE"
+        )
+        row = (await db.execute(stmt, {"wid": first, "iid": item_id})).first()
+        return row is not None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -339,13 +505,16 @@ class SamplingItemAdapter:
     async def resolve(
         self, target_id: str, *, project_id: uuid.UUID, audit_year: int, db: AsyncSession
     ) -> ResolvedTarget | None:
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
-            "SELECT vs.id, vs.project_id, vs.year AS audit_year "
-            "FROM voucher_samples vs "
-            "WHERE vs.id = :tid AND vs.project_id = :pid AND vs.year = :yr LIMIT 1"
+            "SELECT sv.id, sv.project_id, sv.year AS audit_year "
+            "FROM sampled_vouchers sv "
+            "WHERE sv.id = :tid AND sv.project_id = :pid AND sv.year = :yr LIMIT 1"
         )
         row = (
-            await db.execute(stmt, {"tid": target_id, "pid": str(project_id), "yr": audit_year})
+            await db.execute(stmt, {"tid": tid, "pid": str(project_id), "yr": audit_year})
         ).mappings().first()
         if row is None:
             return None
@@ -360,10 +529,13 @@ class SamplingItemAdapter:
     ) -> bool:
         if not await _actor_can_access_project(db, actor, project_id):
             return False
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return False
         stmt = sa.text(
-            "SELECT 1 FROM voucher_samples WHERE id = :tid AND project_id = :pid LIMIT 1"
+            "SELECT 1 FROM sampled_vouchers WHERE id = :tid AND project_id = :pid LIMIT 1"
         )
-        return (await db.execute(stmt, {"tid": target_id, "pid": str(project_id)})).first() is not None
+        return (await db.execute(stmt, {"tid": tid, "pid": str(project_id)})).first() is not None
 
     async def can_edit(
         self, target_id: str, *, actor: ActorContext, project_id: uuid.UUID, db: AsyncSession
@@ -375,21 +547,24 @@ class SamplingItemAdapter:
     async def locate(
         self, target_id: str, *, version: int | None = None, db: AsyncSession
     ) -> LocatorInfo | None:
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
-            "SELECT id, wp_id FROM voucher_samples WHERE id = :tid LIMIT 1"
+            "SELECT id, working_paper_id FROM sampled_vouchers WHERE id = :tid LIMIT 1"
         )
-        row = (await db.execute(stmt, {"tid": target_id})).mappings().first()
+        row = (await db.execute(stmt, {"tid": tid})).mappings().first()
         if row is None:
             return None
         return LocatorInfo(
             target_id=target_id,
             evidence_type=self.evidence_type,
-            route=f"/workpapers/{row['wp_id']}" if row.get("wp_id") else None,
+            route=f"/workpapers/{row['working_paper_id']}" if row.get("working_paper_id") else None,
             locator=f"sample:{target_id}",
         )
 
     async def lock_for_update(self, target_id: str, *, db: AsyncSession) -> bool:
-        return await _lock_row(db, "voucher_samples", "id", target_id)
+        return await _lock_row(db, "sampled_vouchers", "id", target_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -405,13 +580,16 @@ class VoucherAdapter:
     async def resolve(
         self, target_id: str, *, project_id: uuid.UUID, audit_year: int, db: AsyncSession
     ) -> ResolvedTarget | None:
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
             "SELECT id, project_id, year AS audit_year, voucher_no "
             "FROM tb_ledger "
             "WHERE id = :tid AND project_id = :pid AND year = :yr LIMIT 1"
         )
         row = (
-            await db.execute(stmt, {"tid": target_id, "pid": str(project_id), "yr": audit_year})
+            await db.execute(stmt, {"tid": tid, "pid": str(project_id), "yr": audit_year})
         ).mappings().first()
         if row is None:
             return None
@@ -427,8 +605,11 @@ class VoucherAdapter:
     ) -> bool:
         if not await _actor_can_access_project(db, actor, project_id):
             return False
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return False
         stmt = sa.text("SELECT 1 FROM tb_ledger WHERE id = :tid AND project_id = :pid LIMIT 1")
-        return (await db.execute(stmt, {"tid": target_id, "pid": str(project_id)})).first() is not None
+        return (await db.execute(stmt, {"tid": tid, "pid": str(project_id)})).first() is not None
 
     async def can_edit(
         self, target_id: str, *, actor: ActorContext, project_id: uuid.UUID, db: AsyncSession
@@ -441,10 +622,13 @@ class VoucherAdapter:
     async def locate(
         self, target_id: str, *, version: int | None = None, db: AsyncSession
     ) -> LocatorInfo | None:
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
-            "SELECT id, voucher_no, accounting_date FROM tb_ledger WHERE id = :tid LIMIT 1"
+            "SELECT id, voucher_no, voucher_date FROM tb_ledger WHERE id = :tid LIMIT 1"
         )
-        row = (await db.execute(stmt, {"tid": target_id})).mappings().first()
+        row = (await db.execute(stmt, {"tid": tid})).mappings().first()
         if row is None:
             return None
         return LocatorInfo(
@@ -470,13 +654,18 @@ class ConfirmationAdapter:
     async def resolve(
         self, target_id: str, *, project_id: uuid.UUID, audit_year: int, db: AsyncSession
     ) -> ResolvedTarget | None:
+        # confirmations has NO year column — scope by projects.audit_year.
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
-            "SELECT c.id, c.project_id, c.year AS audit_year "
+            "SELECT c.id, c.project_id, p.audit_year "
             "FROM confirmations c "
-            "WHERE c.id = :tid AND c.project_id = :pid AND c.year = :yr LIMIT 1"
+            "JOIN projects p ON p.id = c.project_id "
+            "WHERE c.id = :tid AND c.project_id = :pid AND p.audit_year = :yr LIMIT 1"
         )
         row = (
-            await db.execute(stmt, {"tid": target_id, "pid": str(project_id), "yr": audit_year})
+            await db.execute(stmt, {"tid": tid, "pid": str(project_id), "yr": audit_year})
         ).mappings().first()
         if row is None:
             return None
@@ -491,8 +680,11 @@ class ConfirmationAdapter:
     ) -> bool:
         if not await _actor_can_access_project(db, actor, project_id):
             return False
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return False
         stmt = sa.text("SELECT 1 FROM confirmations WHERE id = :tid AND project_id = :pid LIMIT 1")
-        return (await db.execute(stmt, {"tid": target_id, "pid": str(project_id)})).first() is not None
+        return (await db.execute(stmt, {"tid": tid, "pid": str(project_id)})).first() is not None
 
     async def can_edit(
         self, target_id: str, *, actor: ActorContext, project_id: uuid.UUID, db: AsyncSession
@@ -504,17 +696,20 @@ class ConfirmationAdapter:
     async def locate(
         self, target_id: str, *, version: int | None = None, db: AsyncSession
     ) -> LocatorInfo | None:
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
-            "SELECT id, entity_name, wp_code FROM confirmations WHERE id = :tid LIMIT 1"
+            "SELECT id, counterparty, wp_id FROM confirmations WHERE id = :tid LIMIT 1"
         )
-        row = (await db.execute(stmt, {"tid": target_id})).mappings().first()
+        row = (await db.execute(stmt, {"tid": tid})).mappings().first()
         if row is None:
             return None
         return LocatorInfo(
             target_id=target_id,
             evidence_type=self.evidence_type,
             route=f"/confirmations/{target_id}",
-            locator=f"confirmation:{row.get('entity_name', '')}",
+            locator=f"confirmation:{row.get('counterparty', '')}",
         )
 
     async def lock_for_update(self, target_id: str, *, db: AsyncSession) -> bool:
@@ -534,16 +729,21 @@ class ReviewOpinionAdapter:
     async def resolve(
         self, target_id: str, *, project_id: uuid.UUID, audit_year: int, db: AsyncSession
     ) -> ResolvedTarget | None:
-        # Try review_records first (primary review opinion model)
+        # review_records has NO project_id and working_paper has NO audit_year:
+        # scope is derived via working_paper.project_id → projects.audit_year.
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
-            "SELECT rr.id, rr.project_id, wp.audit_year "
+            "SELECT rr.id, wp.project_id, p.audit_year "
             "FROM review_records rr "
             "JOIN working_paper wp ON wp.id = rr.working_paper_id "
-            "WHERE rr.id = :tid AND rr.project_id = :pid AND wp.audit_year = :yr "
+            "JOIN projects p ON p.id = wp.project_id "
+            "WHERE rr.id = :tid AND wp.project_id = :pid AND p.audit_year = :yr "
             "LIMIT 1"
         )
         row = (
-            await db.execute(stmt, {"tid": target_id, "pid": str(project_id), "yr": audit_year})
+            await db.execute(stmt, {"tid": tid, "pid": str(project_id), "yr": audit_year})
         ).mappings().first()
         if row is None:
             return None
@@ -558,10 +758,16 @@ class ReviewOpinionAdapter:
     ) -> bool:
         if not await _actor_can_access_project(db, actor, project_id):
             return False
+        # review_records has NO project_id — join working_paper for scope.
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return False
         stmt = sa.text(
-            "SELECT 1 FROM review_records WHERE id = :tid AND project_id = :pid LIMIT 1"
+            "SELECT 1 FROM review_records rr "
+            "JOIN working_paper wp ON wp.id = rr.working_paper_id "
+            "WHERE rr.id = :tid AND wp.project_id = :pid LIMIT 1"
         )
-        return (await db.execute(stmt, {"tid": target_id, "pid": str(project_id)})).first() is not None
+        return (await db.execute(stmt, {"tid": tid, "pid": str(project_id)})).first() is not None
 
     async def can_edit(
         self, target_id: str, *, actor: ActorContext, project_id: uuid.UUID, db: AsyncSession
@@ -574,18 +780,22 @@ class ReviewOpinionAdapter:
     async def locate(
         self, target_id: str, *, version: int | None = None, db: AsyncSession
     ) -> LocatorInfo | None:
+        # review_records has NO section column — use cell_reference for the label.
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
-            "SELECT id, working_paper_id, section FROM review_records "
+            "SELECT id, working_paper_id, cell_reference FROM review_records "
             "WHERE id = :tid LIMIT 1"
         )
-        row = (await db.execute(stmt, {"tid": target_id})).mappings().first()
+        row = (await db.execute(stmt, {"tid": tid})).mappings().first()
         if row is None:
             return None
         return LocatorInfo(
             target_id=target_id,
             evidence_type=self.evidence_type,
             route=f"/workpapers/{row['working_paper_id']}",
-            locator=f"review:{row.get('section', '')}",
+            locator=f"review:{row.get('cell_reference', '')}",
         )
 
     async def lock_for_update(self, target_id: str, *, db: AsyncSession) -> bool:
@@ -605,13 +815,16 @@ class DisclosureNoteAdapter:
     async def resolve(
         self, target_id: str, *, project_id: uuid.UUID, audit_year: int, db: AsyncSession
     ) -> ResolvedTarget | None:
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
             "SELECT dn.id, dn.project_id, dn.year AS audit_year "
             "FROM disclosure_notes dn "
             "WHERE dn.id = :tid AND dn.project_id = :pid AND dn.year = :yr LIMIT 1"
         )
         row = (
-            await db.execute(stmt, {"tid": target_id, "pid": str(project_id), "yr": audit_year})
+            await db.execute(stmt, {"tid": tid, "pid": str(project_id), "yr": audit_year})
         ).mappings().first()
         if row is None:
             return None
@@ -626,10 +839,13 @@ class DisclosureNoteAdapter:
     ) -> bool:
         if not await _actor_can_access_project(db, actor, project_id):
             return False
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return False
         stmt = sa.text(
             "SELECT 1 FROM disclosure_notes WHERE id = :tid AND project_id = :pid LIMIT 1"
         )
-        return (await db.execute(stmt, {"tid": target_id, "pid": str(project_id)})).first() is not None
+        return (await db.execute(stmt, {"tid": tid, "pid": str(project_id)})).first() is not None
 
     async def can_edit(
         self, target_id: str, *, actor: ActorContext, project_id: uuid.UUID, db: AsyncSession
@@ -641,17 +857,20 @@ class DisclosureNoteAdapter:
     async def locate(
         self, target_id: str, *, version: int | None = None, db: AsyncSession
     ) -> LocatorInfo | None:
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
-            "SELECT id, section_id, title FROM disclosure_notes WHERE id = :tid LIMIT 1"
+            "SELECT id, section_id, section_title FROM disclosure_notes WHERE id = :tid LIMIT 1"
         )
-        row = (await db.execute(stmt, {"tid": target_id})).mappings().first()
+        row = (await db.execute(stmt, {"tid": tid})).mappings().first()
         if row is None:
             return None
         return LocatorInfo(
             target_id=target_id,
             evidence_type=self.evidence_type,
             route=f"/notes/{target_id}",
-            locator=f"note:{row.get('section_id', row.get('title', ''))}",
+            locator=f"note:{row.get('section_id', row.get('section_title', ''))}",
         )
 
     async def lock_for_update(self, target_id: str, *, db: AsyncSession) -> bool:
@@ -664,20 +883,24 @@ class DisclosureNoteAdapter:
 
 
 class ReportAdapter:
-    """Adapter for audit reports (report_configs / report paragraphs)."""
+    """Adapter for audit reports (audit_report — project+year scoped report)."""
 
     evidence_type = "report"
 
     async def resolve(
         self, target_id: str, *, project_id: uuid.UUID, audit_year: int, db: AsyncSession
     ) -> ResolvedTarget | None:
+        # "report" evidence = the audit report (audit_report), project+year scoped.
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
             "SELECT rc.id, rc.project_id, rc.year AS audit_year "
-            "FROM report_configs rc "
+            "FROM audit_report rc "
             "WHERE rc.id = :tid AND rc.project_id = :pid AND rc.year = :yr LIMIT 1"
         )
         row = (
-            await db.execute(stmt, {"tid": target_id, "pid": str(project_id), "yr": audit_year})
+            await db.execute(stmt, {"tid": tid, "pid": str(project_id), "yr": audit_year})
         ).mappings().first()
         if row is None:
             return None
@@ -692,10 +915,13 @@ class ReportAdapter:
     ) -> bool:
         if not await _actor_can_access_project(db, actor, project_id):
             return False
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return False
         stmt = sa.text(
-            "SELECT 1 FROM report_configs WHERE id = :tid AND project_id = :pid LIMIT 1"
+            "SELECT 1 FROM audit_report WHERE id = :tid AND project_id = :pid LIMIT 1"
         )
-        return (await db.execute(stmt, {"tid": target_id, "pid": str(project_id)})).first() is not None
+        return (await db.execute(stmt, {"tid": tid, "pid": str(project_id)})).first() is not None
 
     async def can_edit(
         self, target_id: str, *, actor: ActorContext, project_id: uuid.UUID, db: AsyncSession
@@ -707,21 +933,24 @@ class ReportAdapter:
     async def locate(
         self, target_id: str, *, version: int | None = None, db: AsyncSession
     ) -> LocatorInfo | None:
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
-            "SELECT id, report_type FROM report_configs WHERE id = :tid LIMIT 1"
+            "SELECT id, opinion_type FROM audit_report WHERE id = :tid LIMIT 1"
         )
-        row = (await db.execute(stmt, {"tid": target_id})).mappings().first()
+        row = (await db.execute(stmt, {"tid": tid})).mappings().first()
         if row is None:
             return None
         return LocatorInfo(
             target_id=target_id,
             evidence_type=self.evidence_type,
             route=f"/reports/{target_id}",
-            locator=f"report:{row.get('report_type', '')}",
+            locator=f"report:{row.get('opinion_type', '')}",
         )
 
     async def lock_for_update(self, target_id: str, *, db: AsyncSession) -> bool:
-        return await _lock_row(db, "report_configs", "id", target_id)
+        return await _lock_row(db, "audit_report", "id", target_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -730,20 +959,25 @@ class ReportAdapter:
 
 
 class AiContentAdapter:
-    """Adapter for AI content (ai_content_logs)."""
+    """Adapter for AI content (ai_content_log — AI output provenance log)."""
 
     evidence_type = "ai_content"
 
     async def resolve(
         self, target_id: str, *, project_id: uuid.UUID, audit_year: int, db: AsyncSession
     ) -> ResolvedTarget | None:
+        # ai_content_log has NO year/status columns — scope via projects.audit_year.
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
-            "SELECT acl.id, acl.project_id, acl.year AS audit_year, acl.status "
-            "FROM ai_content_logs acl "
-            "WHERE acl.id = :tid AND acl.project_id = :pid AND acl.year = :yr LIMIT 1"
+            "SELECT acl.id, acl.project_id, p.audit_year "
+            "FROM ai_content_log acl "
+            "JOIN projects p ON p.id = acl.project_id "
+            "WHERE acl.id = :tid AND acl.project_id = :pid AND p.audit_year = :yr LIMIT 1"
         )
         row = (
-            await db.execute(stmt, {"tid": target_id, "pid": str(project_id), "yr": audit_year})
+            await db.execute(stmt, {"tid": tid, "pid": str(project_id), "yr": audit_year})
         ).mappings().first()
         if row is None:
             return None
@@ -758,10 +992,13 @@ class AiContentAdapter:
     ) -> bool:
         if not await _actor_can_access_project(db, actor, project_id):
             return False
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return False
         stmt = sa.text(
-            "SELECT 1 FROM ai_content_logs WHERE id = :tid AND project_id = :pid LIMIT 1"
+            "SELECT 1 FROM ai_content_log WHERE id = :tid AND project_id = :pid LIMIT 1"
         )
-        return (await db.execute(stmt, {"tid": target_id, "pid": str(project_id)})).first() is not None
+        return (await db.execute(stmt, {"tid": tid, "pid": str(project_id)})).first() is not None
 
     async def can_edit(
         self, target_id: str, *, actor: ActorContext, project_id: uuid.UUID, db: AsyncSession
@@ -774,20 +1011,23 @@ class AiContentAdapter:
     async def locate(
         self, target_id: str, *, version: int | None = None, db: AsyncSession
     ) -> LocatorInfo | None:
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
-            "SELECT id, entry_point, status FROM ai_content_logs WHERE id = :tid LIMIT 1"
+            "SELECT id, target_cell FROM ai_content_log WHERE id = :tid LIMIT 1"
         )
-        row = (await db.execute(stmt, {"tid": target_id})).mappings().first()
+        row = (await db.execute(stmt, {"tid": tid})).mappings().first()
         if row is None:
             return None
         return LocatorInfo(
             target_id=target_id,
             evidence_type=self.evidence_type,
-            locator=f"ai:{row.get('entry_point', '')}",
+            locator=f"ai:{row.get('target_cell', '')}",
         )
 
     async def lock_for_update(self, target_id: str, *, db: AsyncSession) -> bool:
-        return await _lock_row(db, "ai_content_logs", "id", target_id)
+        return await _lock_row(db, "ai_content_log", "id", target_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -796,20 +1036,24 @@ class AiContentAdapter:
 
 
 class DeliverableAdapter:
-    """Adapter for deliverables (deliverable versions)."""
+    """Adapter for deliverables (deliverable_section_state — section versions)."""
 
     evidence_type = "deliverable"
 
     async def resolve(
         self, target_id: str, *, project_id: uuid.UUID, audit_year: int, db: AsyncSession
     ) -> ResolvedTarget | None:
+        # "deliverable" evidence = deliverable_section_state (version_no, not version).
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
-            "SELECT d.id, d.project_id, d.year AS audit_year, d.version "
-            "FROM deliverables d "
+            "SELECT d.id, d.project_id, d.year AS audit_year, d.version_no "
+            "FROM deliverable_section_state d "
             "WHERE d.id = :tid AND d.project_id = :pid AND d.year = :yr LIMIT 1"
         )
         row = (
-            await db.execute(stmt, {"tid": target_id, "pid": str(project_id), "yr": audit_year})
+            await db.execute(stmt, {"tid": tid, "pid": str(project_id), "yr": audit_year})
         ).mappings().first()
         if row is None:
             return None
@@ -817,7 +1061,7 @@ class DeliverableAdapter:
             target_id=target_id,
             project_id=uuid.UUID(str(row["project_id"])),
             audit_year=row["audit_year"],
-            target_version=row.get("version"),
+            target_version=row.get("version_no"),
         )
 
     async def can_read(
@@ -825,10 +1069,13 @@ class DeliverableAdapter:
     ) -> bool:
         if not await _actor_can_access_project(db, actor, project_id):
             return False
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return False
         stmt = sa.text(
-            "SELECT 1 FROM deliverables WHERE id = :tid AND project_id = :pid LIMIT 1"
+            "SELECT 1 FROM deliverable_section_state WHERE id = :tid AND project_id = :pid LIMIT 1"
         )
-        return (await db.execute(stmt, {"tid": target_id, "pid": str(project_id)})).first() is not None
+        return (await db.execute(stmt, {"tid": tid, "pid": str(project_id)})).first() is not None
 
     async def can_edit(
         self, target_id: str, *, actor: ActorContext, project_id: uuid.UUID, db: AsyncSession
@@ -840,22 +1087,25 @@ class DeliverableAdapter:
     async def locate(
         self, target_id: str, *, version: int | None = None, db: AsyncSession
     ) -> LocatorInfo | None:
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
-            "SELECT id, title, version FROM deliverables WHERE id = :tid LIMIT 1"
+            "SELECT id, section_code, version_no FROM deliverable_section_state WHERE id = :tid LIMIT 1"
         )
-        row = (await db.execute(stmt, {"tid": target_id})).mappings().first()
+        row = (await db.execute(stmt, {"tid": tid})).mappings().first()
         if row is None:
             return None
         return LocatorInfo(
             target_id=target_id,
             evidence_type=self.evidence_type,
-            version=row.get("version"),
+            version=row.get("version_no"),
             route=f"/deliverables/{target_id}",
-            locator=f"deliverable:{row.get('title', '')}",
+            locator=f"deliverable:{row.get('section_code', '')}",
         )
 
     async def lock_for_update(self, target_id: str, *, db: AsyncSession) -> bool:
-        return await _lock_row(db, "deliverables", "id", target_id)
+        return await _lock_row(db, "deliverable_section_state", "id", target_id)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -871,13 +1121,16 @@ class AttachmentVersionAdapter:
     async def resolve(
         self, target_id: str, *, project_id: uuid.UUID, audit_year: int, db: AsyncSession
     ) -> ResolvedTarget | None:
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
             "SELECT av.id, av.project_id, av.audit_year, av.version_no, av.content_hash "
             "FROM attachment_versions av "
             "WHERE av.id = :tid AND av.project_id = :pid AND av.audit_year = :yr LIMIT 1"
         )
         row = (
-            await db.execute(stmt, {"tid": target_id, "pid": str(project_id), "yr": audit_year})
+            await db.execute(stmt, {"tid": tid, "pid": str(project_id), "yr": audit_year})
         ).mappings().first()
         if row is None:
             return None
@@ -894,11 +1147,14 @@ class AttachmentVersionAdapter:
     ) -> bool:
         if not await _actor_can_access_project(db, actor, project_id):
             return False
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return False
         stmt = sa.text(
             "SELECT 1 FROM attachment_versions "
             "WHERE id = :tid AND project_id = :pid LIMIT 1"
         )
-        return (await db.execute(stmt, {"tid": target_id, "pid": str(project_id)})).first() is not None
+        return (await db.execute(stmt, {"tid": tid, "pid": str(project_id)})).first() is not None
 
     async def can_edit(
         self, target_id: str, *, actor: ActorContext, project_id: uuid.UUID, db: AsyncSession
@@ -909,12 +1165,15 @@ class AttachmentVersionAdapter:
             return False
         if not await _actor_can_access_project(db, actor, project_id):
             return False
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return False
         # Check version availability (only staged/available can be part of replacement flow)
         stmt = sa.text(
             "SELECT availability FROM attachment_versions "
             "WHERE id = :tid AND project_id = :pid LIMIT 1"
         )
-        row = (await db.execute(stmt, {"tid": target_id, "pid": str(project_id)})).mappings().first()
+        row = (await db.execute(stmt, {"tid": tid, "pid": str(project_id)})).mappings().first()
         if row is None:
             return False
         return row.get("availability") in ("staged", "available")
@@ -922,11 +1181,14 @@ class AttachmentVersionAdapter:
     async def locate(
         self, target_id: str, *, version: int | None = None, db: AsyncSession
     ) -> LocatorInfo | None:
+        tid = _as_uuid(target_id)
+        if tid is None:
+            return None
         stmt = sa.text(
             "SELECT av.id, av.attachment_id, av.version_no, av.media_type "
             "FROM attachment_versions av WHERE av.id = :tid LIMIT 1"
         )
-        row = (await db.execute(stmt, {"tid": target_id})).mappings().first()
+        row = (await db.execute(stmt, {"tid": tid})).mappings().first()
         if row is None:
             return None
         return LocatorInfo(

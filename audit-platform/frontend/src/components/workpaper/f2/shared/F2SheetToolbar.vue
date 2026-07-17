@@ -4,8 +4,9 @@
     <CycleImportExportDropdown
       v-if="wpId && showImportExport"
       :wp-id="wpId"
-      :api-prefix="apiPrefix"
-      :sheet="sheet"
+      :api-prefix="importExport.apiPrefix"
+      :sheet="importExport.sheet"
+      :variants="importExport.variants"
       :disabled="disabled"
       @imported="onImported"
     />
@@ -32,6 +33,7 @@ import { useF2AiGenerate, type F2AiSection } from '../../composables/useF2AiGene
 import { useF2ValuationAiGenerate, type F2ValAiSection } from '../../composables/useF2ValuationAiGenerate'
 import { useF2SpecialAiGenerate, type F2SpeAiSection } from '../../composables/useF2SpecialAiGenerate'
 import { useF2StocktakeAiGenerate, type F2StAiSection } from '../../composables/useF2StocktakeAiGenerate'
+import { resolveImportExportSheet } from '../../shared/cycleImportExportRegistry'
 
 const props = withDefaults(defineProps<{
   wpId?: string
@@ -50,6 +52,12 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{ aiFilled: [text: string]; imported: [] }>()
+
+const importExport = computed(() => {
+  const resolved = resolveImportExportSheet(props.apiPrefix, props.sheet)
+  if (resolved) return resolved
+  return { apiPrefix: props.apiPrefix, sheet: props.sheet, variants: undefined }
+})
 
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 

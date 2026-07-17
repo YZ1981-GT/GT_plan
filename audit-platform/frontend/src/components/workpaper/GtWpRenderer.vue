@@ -136,6 +136,7 @@
         v-if="rendererEntry"
         ref="activeComponentRef"
         :is="rendererEntry.component"
+        :key="htmlRendererKey"
         :wp-id="wpId"
         :sheet-name="activeSheetName"
         :schema="activeSheetSchema"
@@ -529,6 +530,20 @@ const rendererEntry = computed(() =>
     ? undefined
     : getRendererEntry(effectiveRendererComponentType.value),
 )
+
+/**
+ * HTML 渲染器 key：同 componentType 下切换 sheet（如 F2-21→F2-22 同属 f2-stocktake-bundle）
+ * 必须强制重建，否则内部 activeTab 等状态会卡住，表现为「点页签没反应」。
+ */
+const htmlRendererKey = computed(() => {
+  const ct = effectiveRendererComponentType.value
+  // 同 componentType 多 sheet（监盘 F2-21↔22↔23）需带 sheet，避免内部状态卡住
+  if (ct === 'f2-stocktake-bundle') {
+    return `${ct}::${activeSheetName.value}`
+  }
+  // 其余 HTML 组件按类型复用即可，减少无谓重建与重复请求
+  return ct
+})
 
 /** D 子模式需要 form-type prop；custom 需要项目上下文 */
 const extraComponentProps = computed<Record<string, unknown>>(() => {

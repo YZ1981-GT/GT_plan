@@ -132,6 +132,26 @@ class FailureRecord:
     error_message: str
 
 
+@dataclass
+class ChecksumDrift:
+    """已应用迁移的 checksum 漂移记录（Task 2.3 finding）。
+
+    「已应用迁移文件被事后编辑」时，schema_version 里记录的 ``checksum``
+    与磁盘上当前文件重新计算的 SHA-256 不再一致——迁移不会重跑，改动静默丢失。
+    ``detect_checksum_drift`` 纯检测（不重跑、不修改），返回此记录列表供守卫报警。
+
+    - version           : 版本号（如 "106"）
+    - filename          : schema_version 记录的迁移文件名
+    - stored_checksum   : schema_version 中存储的（应用时）checksum
+    - current_checksum  : 当前磁盘文件重新计算的 checksum（文件缺失时为 None）
+    """
+
+    version: str
+    filename: str
+    stored_checksum: str
+    current_checksum: str | None
+
+
 @dataclass(eq=False)
 class RunPendingResult:
     """run_pending 的返回值（resilient 模式）。
@@ -427,6 +447,50 @@ class MigrationRunner:
                 text("SELECT MAX(version) FROM schema_version")
             )
             return result.scalar()
+
+    async def detect_checksum_drift(self) -> list[ChecksumDrift]:
+        """检测「已应用迁移文件被事后编辑」的 checksum 漂移（纯检测，不重跑）。
+
+        对比 schema_version 表中每条已应用迁移记录的存储 checksum 与磁盘上当前
+        对应文件重新计算出的 SHA-256：
+        - 两者一致          → 无漂移；
+        - 两者不同          → 报漂移（文件应用后被编辑，改动静默丢失）；
+        - 磁盘文件已缺失    → 报漂移（current_checksum=None）；
+        - schema_version 记录的文件在磁盘上无同版本迁移 → 跳过（可能是回滚日志行或
+          手工插入的非文件行），不误报。
+
+        Returns
+        -------
+        list[ChecksumDrift]
+            所有漂移记录（版本号数值升序）。无漂移返回空列表。
+        """
+        await self.ensure_schema_version_table()
+
+        # 磁盘上当前迁移文件：version -> MigrationFile（含最新 checksum）
+        disk_by_version = {m.version: m for m in self.scan_migrations()}
+
+        async with self._engine.begin() as conn:
+            rows = await conn.execute(
+                text("SELECT version, filename, checksum FROM schema_version")
+            )
+            stored = rows.fetchall()
+
+        drifts: list[ChecksumDrift] = []
+        for version, filename, stored_checksum in stored:
+            disk = disk_by_version.get(version)
+            if disk is None:
+                # 磁盘上无该版本迁移文件：可能是回滚日志/手工行，不作为漂移误报。
+                continue
+            if disk.checksum != stored_checksum:
+                drifts.append(ChecksumDrift(
+                    version=version,
+                    filename=filename,
+                    stored_checksum=stored_checksum,
+                    current_checksum=disk.checksum,
+                ))
+
+        drifts.sort(key=lambda d: int(d.version))
+        return drifts
 
     # ------------------------------------------------------------------
     # 回滚 API

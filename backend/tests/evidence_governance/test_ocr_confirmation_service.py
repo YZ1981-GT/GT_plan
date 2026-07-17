@@ -85,9 +85,12 @@ async def db_session():
     async with engine.begin() as conn:
         # SQLite does not support partial unique indexes — remove the problematic
         # partial-unique before creating tables (the real PG constraint is
-        # tested in PG integration tests).
-        _patch_partial_unique_for_sqlite()
+        # tested in PG integration tests). Restore the canonical index right after
+        # create_all so the shared ORM metadata is not permanently mutated for
+        # later ORM-parity assertions in the aggregated suite.
+        _removed = _patch_partial_unique_for_sqlite()
         await conn.run_sync(Base.metadata.create_all)
+        _restore_partial_unique(_removed)
 
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
@@ -106,6 +109,7 @@ def _patch_partial_unique_for_sqlite():
     unique flag for SQLite testing so append-only revisions work.
     """
     table = OcrConfirmation.__table__
+    removed: list[tuple] = []
     for idx in list(table.indexes):
         if idx.name == "uq_ocr_confirmation_current" and idx.unique:
             # Replace with a non-unique index for SQLite
@@ -117,7 +121,18 @@ def _patch_partial_unique_for_sqlite():
                 unique=False,
             )
             table.indexes.add(new_idx)
+            removed.append((table, new_idx, idx))
             break
+    return removed
+
+
+def _restore_partial_unique(removed: list[tuple]) -> None:
+    """Restore the canonical (unique/partial) indexes that were swapped out for
+    SQLite so the shared ORM metadata is left unmodified for the rest of the
+    aggregated test session."""
+    for table, temp_idx, original_idx in removed:
+        table.indexes.discard(temp_idx)
+        table.indexes.add(original_idx)
 
 
 @pytest.fixture

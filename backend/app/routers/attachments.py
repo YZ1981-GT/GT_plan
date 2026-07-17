@@ -366,7 +366,11 @@ async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(ge
         raise HTTPException(status_code=404, detail="附件不存在")
     await _ensure_project_access(db, current_user, UUID(att["project_id"]), "readonly")
 
-    file_path = att.get("file_path", "")
+    # C3：att["file_path"] 已投影为 opaque locator，内部字节读取须取真实路径。
+    raw = await svc.get_raw_storage(attachment_id)
+    if not raw:
+        raise HTTPException(status_code=404, detail="附件不存在")
+    file_path = raw.get("file_path", "")
     file_name = att.get("file_name", "attachment")
     # 中文文件名需 RFC5987 编码（HTTP 头按 latin-1，直接放中文会 UnicodeEncodeError）
     from urllib.parse import quote as _quote
@@ -426,7 +430,11 @@ async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get
         raise HTTPException(status_code=404, detail="附件不存在")
     await _ensure_project_access(db, current_user, UUID(att["project_id"]), "readonly")
 
-    file_path = att.get("file_path", "")
+    # C3：att["file_path"] 已投影为 opaque locator，内部预览读取须取真实路径。
+    raw = await svc.get_raw_storage(attachment_id)
+    if not raw:
+        raise HTTPException(status_code=404, detail="附件不存在")
+    file_path = raw.get("file_path", "")
     file_name = att.get("file_name", "")
     file_type = att.get("file_type", "")
 

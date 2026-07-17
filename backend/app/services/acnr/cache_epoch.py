@@ -23,17 +23,35 @@ logger = logging.getLogger(__name__)
 
 # ─── Redis 连接获取 ─────────────────────────────────────────────────────────
 
-_redis_client: Any = None
+_UNSET = object()  # 哨兵：区分「尚未注入」与「显式注入 None（禁用）」
+
+_redis_client: Any = _UNSET
 
 
 def set_redis_client(client: Any) -> None:
-    """注入 Redis 客户端（lifespan 启动时调用）。"""
+    """注入 Redis 客户端（lifespan 启动时调用）。
+
+    显式传入 None 表示禁用（测试模拟 Redis 不可用时使用），
+    此后 get_redis_client() 不再懒解析。
+    """
     global _redis_client
     _redis_client = client
 
 
 def get_redis_client() -> Any:
-    """获取当前 Redis 客户端（可能为 None）。"""
+    """获取当前 Redis 客户端。
+
+    lifespan 注入前若已有调用（如启动期事件回放），懒解析：
+    从 app.core.redis 取连接池客户端（惰性连接，不 ping）。
+    若 Redis 实际不可用，后续命令抛异常走既有 fallback 分支。
+    """
+    global _redis_client
+    if _redis_client is _UNSET:
+        try:
+            from app.core.redis import _get_client
+            _redis_client = _get_client()
+        except Exception:
+            return None
     return _redis_client
 
 

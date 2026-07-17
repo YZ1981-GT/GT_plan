@@ -1,37 +1,37 @@
 <template>
-  <div class="f2-reversal">
-    <h3 class="title">跌价转回 F2-49</h3>
+  <div class="f2-val-sheet f2-reversal">
+    <header class="sheet-header">
+      <div>
+        <h3>存货跌价准备转回核对表</h3>
+        <span class="code">F2-49</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat">转回合计 {{ fmt(rev.columnTotals.value.reversalTotal) }}</span>
+        <span class="stat sub">期初跌价 {{ fmt(rev.columnTotals.value.priorProvision) }}</span>
+        <el-tag v-if="rev.summary.value.reverseCount" type="success" size="small">
+          转回 {{ rev.summary.value.reverseCount }} 项
+        </el-tag>
+        <el-tag v-if="rev.summary.value.verifyFailCount" type="danger" size="small">
+          核对差异 {{ rev.summary.value.verifyFailCount }} 项
+        </el-tag>
+      </div>
+    </header>
 
-    <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>1. 以前减记存货价值的影响因素已消失的，减记金额应予恢复，并在原已计提跌价准备金额内转回（CAS 1 号存货，转回不得超过原计提数）。</p>
-        <p>2. 灰色底纹列为自动计算列（当前 NRV、现需计提、转回金额），据售价/完工成本/销售费用自动测算，不可手工编辑。</p>
-        <p>3. 存在转回金额但缺"转回依据"的行自动标橙，须落实价值恢复的客观证据（价格回升、订单恢复等），防止无依据转回操纵利润。</p>
-        <p>4. 切换分段可分别查看期初已计提与当前 NRV/转回测算；转回后账面价值不得超过成本。</p>
+        <p>1. 转回金额 = 上期末已计提跌价 × (本年发出数量 ÷ 期初结存数量)，在原计提金额内转回。</p>
+        <p>2. 按生产领用、销售、研发领用等发出结构，将转回金额分摊至营业成本、研发费用等科目。</p>
+        <p>3. 转回金额核对 = 跌价转回合计 − 各科目转回之和；发出明细合计应与本年发出数量勾稽。</p>
+        <p>4. 未勾选"单独计提跌价"的存货不参与本表转回测算。</p>
       </div>
     </details>
 
-    <!-- 审计目标 -->
-    <el-alert
-      type="info"
-      :closable="false"
-      title="审计目标：验证存货跌价准备转回的条件是否满足（减值因素消失且有客观证据），确认转回金额未超过原计提数，防止通过不当转回高估存货与利润。"
-      class="objective-alert"
-    />
+    <el-alert type="info" :closable="false" :title="objectiveText" class="objective-alert" />
 
-    <div class="summary">
-      <el-tag size="small" type="success">可转回笔数: {{ rev.summary.value.reverseCount }}</el-tag>
-      <el-tag size="small" type="info">转回合计: {{ rev.summary.value.reverseTotal.toLocaleString() }}</el-tag>
-      <el-tag v-if="rev.summary.value.missingRationale > 0" size="small" type="warning">
-        {{ rev.summary.value.missingRationale }} 笔缺转回依据
-      </el-tag>
-    </div>
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="rev.addRow()">+ 新增行</el-button>
-        <el-segmented v-model="rev.activeSegment.value" :options="segments" size="small" />
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="rev.addProduct()">+ 存货</el-button>
       </div>
       <div class="toolbar-right">
         <F2SheetToolbar
@@ -46,102 +46,227 @@
           review-section="F2-49-conclusion"
           @ai-filled="(t: string) => { rev.auditNote.value = t }"
         />
-        <span class="chip-wrap"><GtIndexChip value="wp:F2-1" /></span>
-        <el-tag size="small" type="info">共 {{ rev.enrichedRows.value.length }} 行</el-tag>
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-49" /></span>
+        <el-tag size="small" type="info">{{ rev.enrichedProducts.value.length }} 行</el-tag>
       </div>
     </div>
-    <el-table :data="rev.enrichedRows.value" border size="small" max-height="480"
-      :row-class-name="({ row }) => row.needsRationale ? 'warn-row' : ''">
-      <el-table-column label="品名" width="120" fixed>
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.itemName" size="small"
-            @change="(v: string) => rev.updateRow(row.rowId, { itemName: v })" />
-          <span v-else>{{ row.itemName }}</span>
-        </template>
-      </el-table-column>
 
-      <template v-if="rev.activeSegment.value === 'prior'">
-        <el-table-column label="账面成本" width="100">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.bookCost" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => rev.updateRow(row.rowId, { bookCost: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="已计提跌价" width="110">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.priorProvision" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => rev.updateRow(row.rowId, { priorProvision: v ?? 0 })" />
-          </template>
-        </el-table-column>
-      </template>
+    <div class="table-scroll">
+      <table class="matrix-table">
+        <thead>
+          <tr>
+            <th rowspan="2" class="col-cat">存货类别</th>
+            <th rowspan="2" class="col-code">编码</th>
+            <th rowspan="2" class="col-name">名称</th>
+            <th rowspan="2" class="col-spec">规格</th>
+            <th rowspan="2" class="col-unit">单位</th>
+            <th colspan="3" class="grp-open">期初</th>
+            <th colspan="4" class="grp-aging col-aging-h">库龄</th>
+            <th rowspan="2" class="col-flag">单独计提</th>
+            <th rowspan="2">上期末跌价</th>
+            <th colspan="5" class="grp-issue">本年发出数量</th>
+            <th rowspan="2" class="col-rev">转回合计</th>
+            <th colspan="3" class="grp-acct">转回科目</th>
+            <th rowspan="2" class="col-verify">核对</th>
+            <th rowspan="2" class="col-act" />
+          </tr>
+          <tr>
+            <th class="sub">数量</th>
+            <th class="sub">单价</th>
+            <th class="sub open-amt">金额</th>
+            <th class="sub aging">1年内</th>
+            <th class="sub aging">1-2年</th>
+            <th class="sub aging">2-3年</th>
+            <th class="sub aging">3年以上</th>
+            <th class="sub">合计</th>
+            <th class="sub">生产领用</th>
+            <th class="sub">销售</th>
+            <th class="sub">研发领用</th>
+            <th class="sub">其他</th>
+            <th class="sub">营业成本</th>
+            <th class="sub">研发费用</th>
+            <th class="sub">其他</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="row in rev.enrichedProducts.value"
+            :key="row.id"
+            :class="{
+              'row-warn': row.highlight,
+              'row-aging': row.agingMismatch || row.issuanceMismatch,
+            }"
+          >
+            <td class="col-cat">
+              <el-input v-if="!isReadonly" :model-value="row.category" size="small"
+                @update:model-value="(v: string) => rev.updateProduct(row.id, { category: v })" />
+              <span v-else>{{ row.category || '—' }}</span>
+            </td>
+            <td>
+              <el-input v-if="!isReadonly" :model-value="row.itemCode" size="small"
+                @update:model-value="(v: string) => rev.updateProduct(row.id, { itemCode: v })" />
+              <span v-else>{{ row.itemCode || '—' }}</span>
+            </td>
+            <td class="col-name">
+              <el-input v-if="!isReadonly" :model-value="row.itemName" size="small"
+                @update:model-value="(v: string) => rev.updateProduct(row.id, { itemName: v })" />
+              <span v-else>{{ row.itemName || '—' }}</span>
+            </td>
+            <td>
+              <el-input v-if="!isReadonly" :model-value="row.specification" size="small"
+                @update:model-value="(v: string) => rev.updateProduct(row.id, { specification: v })" />
+              <span v-else>{{ row.specification || '—' }}</span>
+            </td>
+            <td>
+              <el-input v-if="!isReadonly" :model-value="row.unit" size="small"
+                @update:model-value="(v: string) => rev.updateProduct(row.id, { unit: v })" />
+              <span v-else>{{ row.unit || '—' }}</span>
+            </td>
+            <td>
+              <el-input-number v-if="!isReadonly" :model-value="row.openingQty" size="small" :controls="false"
+                class="compact-num" @change="(v: number | undefined) => rev.updateProduct(row.id, { openingQty: v ?? 0 })" />
+              <span v-else class="auto">{{ fmtQty(row.openingQty) }}</span>
+            </td>
+            <td>
+              <el-input-number v-if="!isReadonly" :model-value="row.openingUnitPrice" size="small" :controls="false"
+                :precision="4" class="compact-num"
+                @change="(v: number | undefined) => rev.updateProduct(row.id, { openingUnitPrice: v ?? 0 })" />
+              <span v-else class="auto">{{ fmtUnit(row.openingUnitPrice) }}</span>
+            </td>
+            <td class="auto calc open-amt">{{ fmt(row.openingAmount) }}</td>
+            <td class="aging-cell">
+              <el-input-number v-if="!isReadonly" :model-value="row.aging.within1y" size="small" :controls="false"
+                class="compact-num" @change="(v: number | undefined) => rev.updateAging(row.id, { within1y: v ?? 0 })" />
+              <span v-else class="auto">{{ fmtQty(row.aging.within1y) }}</span>
+            </td>
+            <td class="aging-cell">
+              <el-input-number v-if="!isReadonly" :model-value="row.aging.y1to2" size="small" :controls="false"
+                class="compact-num" @change="(v: number | undefined) => rev.updateAging(row.id, { y1to2: v ?? 0 })" />
+              <span v-else class="auto">{{ fmtQty(row.aging.y1to2) }}</span>
+            </td>
+            <td class="aging-cell">
+              <el-input-number v-if="!isReadonly" :model-value="row.aging.y2to3" size="small" :controls="false"
+                class="compact-num" @change="(v: number | undefined) => rev.updateAging(row.id, { y2to3: v ?? 0 })" />
+              <span v-else class="auto">{{ fmtQty(row.aging.y2to3) }}</span>
+            </td>
+            <td class="aging-cell">
+              <el-input-number v-if="!isReadonly" :model-value="row.aging.over3y" size="small" :controls="false"
+                class="compact-num" @change="(v: number | undefined) => rev.updateAging(row.id, { over3y: v ?? 0 })" />
+              <span v-else class="auto">{{ fmtQty(row.aging.over3y) }}</span>
+            </td>
+            <td class="col-flag">
+              <el-checkbox v-if="!isReadonly" :model-value="row.separateProvision"
+                @change="(v: boolean) => rev.updateProduct(row.id, { separateProvision: !!v })" />
+              <span v-else>{{ row.separateProvision ? '是' : '否' }}</span>
+            </td>
+            <td>
+              <el-input-number v-if="!isReadonly" :model-value="row.priorProvision" size="small" :controls="false"
+                class="compact-num wide"
+                @change="(v: number | undefined) => rev.updateProduct(row.id, { priorProvision: v ?? 0 })" />
+              <span v-else class="auto">{{ fmt(row.priorProvision) }}</span>
+            </td>
+            <td>
+              <el-input-number v-if="!isReadonly" :model-value="row.issuance.total" size="small" :controls="false"
+                class="compact-num" @change="(v: number | undefined) => rev.updateIssuance(row.id, { total: v ?? 0 })" />
+              <span v-else class="auto">{{ fmtQty(row.issuance.total) }}</span>
+            </td>
+            <td>
+              <el-input-number v-if="!isReadonly" :model-value="row.issuance.production" size="small" :controls="false"
+                class="compact-num" @change="(v: number | undefined) => rev.updateIssuance(row.id, { production: v ?? 0 })" />
+              <span v-else class="auto">{{ fmtQty(row.issuance.production) }}</span>
+            </td>
+            <td>
+              <el-input-number v-if="!isReadonly" :model-value="row.issuance.sales" size="small" :controls="false"
+                class="compact-num" @change="(v: number | undefined) => rev.updateIssuance(row.id, { sales: v ?? 0 })" />
+              <span v-else class="auto">{{ fmtQty(row.issuance.sales) }}</span>
+            </td>
+            <td>
+              <el-input-number v-if="!isReadonly" :model-value="row.issuance.rnd" size="small" :controls="false"
+                class="compact-num" @change="(v: number | undefined) => rev.updateIssuance(row.id, { rnd: v ?? 0 })" />
+              <span v-else class="auto">{{ fmtQty(row.issuance.rnd) }}</span>
+            </td>
+            <td>
+              <el-input-number v-if="!isReadonly" :model-value="row.issuance.other" size="small" :controls="false"
+                class="compact-num" @change="(v: number | undefined) => rev.updateIssuance(row.id, { other: v ?? 0 })" />
+              <span v-else class="auto">{{ fmtQty(row.issuance.other) }}</span>
+            </td>
+            <td class="auto calc col-rev rev-amt">{{ fmt(row.reversalTotal) }}</td>
+            <td>
+              <el-input-number v-if="!isReadonly" :model-value="row.accountSplit.costOfSales" size="small" :controls="false"
+                class="compact-num" placeholder="自动"
+                @change="(v: number | undefined) => rev.updateAccountSplit(row.id, { costOfSales: v ?? 0 })" />
+              <span v-else class="auto">{{ fmt(row.effectiveCostOfSales) }}</span>
+            </td>
+            <td>
+              <el-input-number v-if="!isReadonly" :model-value="row.accountSplit.rndExpense" size="small" :controls="false"
+                class="compact-num" placeholder="自动"
+                @change="(v: number | undefined) => rev.updateAccountSplit(row.id, { rndExpense: v ?? 0 })" />
+              <span v-else class="auto">{{ fmt(row.effectiveRndExpense) }}</span>
+            </td>
+            <td>
+              <el-input-number v-if="!isReadonly" :model-value="row.accountSplit.other" size="small" :controls="false"
+                class="compact-num" placeholder="自动"
+                @change="(v: number | undefined) => rev.updateAccountSplit(row.id, { other: v ?? 0 })" />
+              <span v-else class="auto">{{ fmt(row.effectiveOther) }}</span>
+            </td>
+            <td class="col-verify" :class="row.verifyOk ? 'verify-ok' : 'verify-fail'">
+              {{ row.reversalTotal ? (row.verifyOk ? 'OK' : fmt(row.verificationDiff)) : '—' }}
+            </td>
+            <td class="col-act">
+              <el-button v-if="!isReadonly" link type="danger" size="small" @click="rev.removeProduct(row.id)">删</el-button>
+            </td>
+          </tr>
+          <tr class="row-total">
+            <td colspan="5" class="col-name">合计</td>
+            <td class="auto">{{ fmtQty(rev.columnTotals.value.openingQty) }}</td>
+            <td />
+            <td class="auto calc">{{ fmt(rev.columnTotals.value.openingAmount) }}</td>
+            <td colspan="4" />
+            <td />
+            <td class="auto">{{ fmt(rev.columnTotals.value.priorProvision) }}</td>
+            <td class="auto">{{ fmtQty(rev.columnTotals.value.issuanceTotal) }}</td>
+            <td colspan="3" />
+            <td />
+            <td class="auto calc rev-amt">{{ fmt(rev.columnTotals.value.reversalTotal) }}</td>
+            <td class="auto">{{ fmt(rev.columnTotals.value.costOfSales) }}</td>
+            <td class="auto">{{ fmt(rev.columnTotals.value.rndExpense) }}</td>
+            <td class="auto">{{ fmt(rev.columnTotals.value.other) }}</td>
+            <td />
+            <td />
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
-      <template v-else>
-        <el-table-column label="售价" width="90">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.sellingPrice" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => rev.updateRow(row.rowId, { sellingPrice: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="完工成本" width="90">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.completionCost" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => rev.updateRow(row.rowId, { completionCost: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="销售费用" width="90">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.sellingExpense" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => rev.updateRow(row.rowId, { sellingExpense: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="当前NRV" width="100" align="right" class-name="auto-calc-col">
-          <template #default="{ row }"><span class="formula" title="售价 − 完工成本 − 销售费用">{{ row.currentNrv.toLocaleString() }}</span></template>
-        </el-table-column>
-        <el-table-column label="现需计提" width="100" align="right" class-name="auto-calc-col">
-          <template #default="{ row }"><span class="formula" title="账面成本 − 当前NRV（不小于0）">{{ row.currentRequired.toLocaleString() }}</span></template>
-        </el-table-column>
-        <el-table-column label="转回金额" width="100" align="right" class-name="auto-calc-col">
-          <template #default="{ row }">
-            <span v-if="row.shouldReverse" class="formula reverse" title="已计提跌价 − 现需计提（限原计提数内）">{{ row.reversalAmount.toLocaleString() }}</span>
-            <span v-else>—</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="转回依据" min-width="140">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.rationale" size="small"
-              @change="(v: string) => rev.updateRow(row.rowId, { rationale: v })" />
-            <span v-else>{{ row.rationale }}</span>
-          </template>
-        </el-table-column>
-      </template>
-
-      <el-table-column label="操作" width="55">
-        <template #default="{ row }">
-          <el-button link type="danger" size="small" :disabled="isReadonly" @click="rev.removeRow(row.rowId)">删</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
     <el-card class="opinion-card" shadow="never">
-      <template #header>
-        <div class="opinion-header"><span class="opinion-title">审计说明</span></div>
-      </template>
+      <template #header><span class="opinion-title">1、审计说明</span></template>
       <el-input v-model="rev.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="跌价准备转回评价审计说明..." />
+        placeholder="说明跌价转回的测算依据、发出核对及科目分摊..." />
     </el-card>
 
     <el-card class="opinion-card" shadow="never">
-      <template #header>
-        <div class="opinion-header"><span class="opinion-title">审计结论</span></div>
-      </template>
+      <template #header><span class="opinion-title">2、审计结论</span></template>
       <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。" @change="saveAuditConclusion" />
+        placeholder="A、未见异常。B、除上述应调整事项外，其余未见异常。C、不可确认。"
+        @update:model-value="saveAuditConclusion" />
     </el-card>
+
+    <div class="tips-box">
+      <div class="tips-title">提示</div>
+      <ol>
+        <li v-for="(tip, i) in tips" :key="i">{{ tip }}</li>
+      </ol>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, toRef } from 'vue'
 import { useF2ImpairmentReversal } from '../../composables/useF2ImpairmentReversal'
+import {
+  F2_49_DEFAULT_OBJECTIVE,
+  F2_49_TIPS,
+} from '../../composables/useF2ImpairmentReversalFormulas'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
@@ -152,17 +277,14 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const segments = [
-  { label: '期初跌价', value: 'prior' },
-  { label: '当前NRV/转回', value: 'current' },
-]
-
 const rev = useF2ImpairmentReversal({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-// ─── 审计结论（独立持久化，F2 计价组事件） ───────────────────────────────
+const objectiveText = F2_49_DEFAULT_OBJECTIVE
+const tips = F2_49_TIPS
+
 const CONCLUSION_KEY = 'F2-49-audit-conclusion'
 const auditConclusion = ref('')
 function saveAuditConclusion(val: string): void {
@@ -176,35 +298,82 @@ onMounted(() => {
   const c = props.allResponses.get(CONCLUSION_KEY)
   if (c?.remark) auditConclusion.value = c.remark
 })
+
+function fmt(v: number): string {
+  if (!Number.isFinite(v) || v === 0) return '—'
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function fmtQty(v: number): string {
+  if (!Number.isFinite(v) || v === 0) return '—'
+  return v.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+}
+function fmtUnit(v: number): string {
+  if (!Number.isFinite(v) || v === 0) return '—'
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+}
 </script>
 
+<style scoped src="./f2ValSheetStyles.css"></style>
 <style scoped>
-.f2-reversal { padding: 12px; font-size: var(--wp-font-size, 13px); }
-.f2-reversal :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
-.f2-reversal :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
-.title { margin: 0 0 8px; }
-.summary { margin-bottom: 8px; display: flex; gap: 8px; flex-wrap: wrap; }
-.formula { text-decoration: underline dotted #909399; cursor: help; }
-.reverse { color: #67c23a; }
-:deep(.warn-row) { background: #fdf6ec; }
-:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
+.f2-reversal { --gt-purple: #4b2d77; --gt-purple-soft: #f3eef8; --gt-aging: #f3eef8; }
 
-/* 编制提示 */
-.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; font-size: var(--wp-font-size, 13px); }
-.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
-.guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
+.table-scroll { overflow-x: auto; margin-bottom: 12px; }
+.matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  min-width: 2400px;
+}
+.matrix-table th,
+.matrix-table td {
+  border: 1px solid #d4c8e0;
+  padding: 2px 3px;
+  text-align: center;
+  vertical-align: middle;
+}
+.matrix-table thead th {
+  background: var(--gt-purple-soft);
+  color: #3d2a55;
+  font-weight: 600;
+}
+.matrix-table th.sub { font-weight: 500; font-size: 10px; }
+.grp-open { background: #ede8f4 !important; }
+.grp-aging, .col-aging-h { color: #c45656; }
+.grp-issue { background: #eef5fc !important; }
+.grp-acct { background: #f0f9eb !important; }
+.matrix-table th.sub.aging { color: #c45656; }
+.col-cat { min-width: 68px; }
+.col-code { min-width: 64px; }
+.col-name { min-width: 80px; text-align: left !important; padding-left: 4px !important; background: #faf8fc; }
+.col-spec { min-width: 64px; }
+.col-unit { width: 44px; }
+.col-flag { width: 56px; }
+.col-rev { min-width: 80px; }
+.col-verify { min-width: 56px; font-weight: 600; }
+.col-act { width: 36px; }
+.open-amt, .aging-cell { background: var(--gt-aging) !important; }
+.rev-amt { color: #67c23a; font-weight: 600; }
+.row-total td { background: #f0ebf5; font-weight: 600; }
+.row-warn td { background: #fdf6ec; }
+.row-aging td { box-shadow: inset 0 0 0 1px #f56c6c; }
+.auto { display: block; text-align: right; padding-right: 3px; white-space: nowrap; color: #606266; }
+.calc { font-weight: 500; color: #4b2d77; }
+.verify-ok { color: #67c23a; }
+.verify-fail { color: #f56c6c; }
 
-/* 工具栏 */
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.chip-wrap { display: inline-flex; align-items: center; }
+.tips-box {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #ecf5ff;
+  border-left: 3px solid #409eff;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.tips-title { font-weight: 600; color: #409eff; margin-bottom: 6px; }
+.tips-box ol { margin: 0; padding-left: 1.4em; }
 
-/* 审计意见卡片 */
-.opinion-card { margin-top: 16px; border-radius: 8px; }
-.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.opinion-header { display: flex; align-items: center; justify-content: space-between; }
-.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+:deep(.compact-num) { width: 60px; }
+:deep(.compact-num.wide) { width: 76px; }
+:deep(.compact-num .el-input__inner) { text-align: right; padding: 0 2px; font-size: 10px; }
 </style>

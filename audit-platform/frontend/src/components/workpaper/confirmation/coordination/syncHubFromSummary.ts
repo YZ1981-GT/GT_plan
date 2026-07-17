@@ -92,9 +92,13 @@ export async function syncHubFromSummary(options: {
   projectId: string
   wpId?: string
   sourceWpCode?: string
+  /** 源函证底稿循环码 D0/F0/G0…（transition 到终态时触发 CONFIRMATION_RECEIVED 下游 stale 路由） */
+  wpCode?: string
+  /** 审计年度（stale 传播按年度） */
+  year?: number
   rows: ConfirmationRow[]
 }): Promise<SyncHubResult> {
-  const { projectId, wpId, rows } = options
+  const { projectId, wpId, wpCode, year, rows } = options
   const result: SyncHubResult = {
     created: 0,
     updated: 0,
@@ -194,7 +198,7 @@ export async function syncHubFromSummary(options: {
           try {
             const next = await api.post<HubConfirmationItem>(
               `/api/projects/${projectId}/confirmations/${hub.id}/transition`,
-              { target_status: step },
+              { target_status: step, wp_code: wpCode, year },
               { _silent: true } as any,
             )
             hub = (next as any) || { ...hub, status: step }

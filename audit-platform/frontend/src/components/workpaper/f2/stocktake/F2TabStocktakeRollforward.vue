@@ -1,179 +1,290 @@
 <template>
-  <div class="f2-st-26">
-    <h3 class="title">盘点倒轧表 F2-26</h3>
-
-    <!-- 编制提示 -->
-    <details class="guidance-details">
-      <summary>📋 编制提示</summary>
-      <div class="guidance-content">
-        <p>1. 本表将盘点日实盘数量倒轧至资产负债表日，验证时点差异，适用于监盘日≠期末日的情形（CAS 1311 存货监盘）。</p>
-        <p>2. 理论结存 = 盘点日数量 + 盘点日至期末入库 − 盘点日至期末出库；差异 = 账面结存 − 理论结存。</p>
-        <p>3. 存在差异的行自动红色高亮，应追溯盘点日至期末的出入库单据核实。</p>
-        <p>4. 可通过 📎 上传出入库单据，由 OCR 识别数量自动填入对应行。</p>
+  <div class="f2-roll">
+    <header class="rf-hero">
+      <div class="rf-hero-main">
+        <div class="rf-kicker">F2-26 · 时点调节</div>
+        <h2 class="rf-title">存货盘点倒轧表</h2>
+        <p class="rf-objective">
+          将监盘日实存数量调节至资产负债表日，与截止日账面比对；
+          盘点日晚于截止日用「日后倒推」，早于截止日用「日前顺推」。
+        </p>
       </div>
+      <div class="rf-hero-actions">
+        <GtIndexChip value="wp:F2-26" :context-project-id="projectId" />
+        <F2SheetToolbar
+          v-if="wpId"
+          :wp-id="wpId"
+          :project-id="projectId"
+          api-prefix="f2-st"
+          sheet="F2-26"
+          :disabled="isReadonly"
+          :show-import-export="true"
+          ai-section="stocktake-rollforward"
+          :existing-content="auditConclusion"
+          :related-context="{
+            afterVariance: afterVarianceCount,
+            beforeVariance: beforeVarianceCount,
+            suggestedMode,
+            afterVarianceSummary: aiContext.afterVarianceSummary,
+            beforeVarianceSummary: aiContext.beforeVarianceSummary,
+          }"
+          ai-title="AI 生成 · 审计结论"
+          review-section="F2-26-conclusion"
+          @ai-filled="(t: string) => saveAuditConclusion(t)"
+        />
+      </div>
+    </header>
+
+    <details class="rf-guide">
+      <summary>编制提示</summary>
+      <ol>
+        <li>仅当监盘日 ≠ 资产负债表日时填本表；相同时可在说明中注明「不适用」。</li>
+        <li>（一）日后盘点：D = A + 发出 − 入库（从盘点日倒推至截止日）。</li>
+        <li>（二）日前盘点：D = A + 入库 − 发出（从盘点日顺推至截止日）。</li>
+        <li>数量差异 F = D − E；金额差异 G ≈ F × 单价。有差异须填原因并判断是否调整。</li>
+        <li>期间收发应抽查入库单/出库单，可作附件或 OCR 填入。</li>
+      </ol>
     </details>
 
-    <!-- 审计目标 -->
-    <el-alert
-      type="info"
-      :closable="false"
-      title="审计目标：验证监盘日实盘数量倒轧至期末的准确性，确认期末账面结存与理论结存一致，支持存货存在性认定。"
-      class="objective-alert"
+    <div v-if="suggestedMode" class="rf-mode-hint" :class="suggestedMode">
+      <template v-if="suggestedMode === 'after'">
+        根据日期：盘点日晚于截止日 → 建议填写<strong>第一节（日后倒推）</strong>
+      </template>
+      <template v-else>
+        根据日期：盘点日早于截止日 → 建议填写<strong>第二节（日前顺推）</strong>
+      </template>
+    </div>
+    <div v-else-if="datesEqual" class="rf-mode-hint same">
+      盘点日与截止日相同，本表通常不适用；若仍有调节事项请在审计说明中说明。
+    </div>
+
+    <F2StocktakeSheetAttachments
+      v-if="wpId"
+      :project-id="projectId"
+      :wp-id="wpId"
+      sheet-code="F2-26"
     />
 
-    <F2StocktakeSheetAttachments :project-id="projectId" :wp-id="wpId" sheet-code="F2-26" />
-    <F2StocktakeSectionForm
-      sheet-code="F2-26"
-      fields-key="F2-26-fields"
-      note-key="F2-26-narrative-note"
-      :field-defs="F2_26_NARRATIVE_FIELDS"
-      :wp-id="wpId"
-      :project-id="projectId"
-      :all-responses="allResponses"
-      :is-readonly="isReadonly"
-      :show-audit-note="false"
-      :show-attachments="false"
-      compact
-    />
-    <div class="table-block">
-      <div class="tab-toolbar">
-        <div class="toolbar-left">
-          <el-button size="small" type="primary" :disabled="isReadonly" @click="sheet.addRow()">+ 新增明细行</el-button>
-          <span class="hint">倒轧明细表（公式：理论结存 = 盘点日 + 入库 − 出库）</span>
+    <section v-for="group in F2_26_LAYOUT" :key="group.id" class="rf-card">
+      <header class="rf-card-head">
+        <div>
+          <h3>{{ group.title }}</h3>
+          <p v-if="group.subtitle">{{ group.subtitle }}</p>
         </div>
-        <div class="toolbar-right">
-          <F2SheetToolbar
-            v-if="wpId"
-            :wp-id="wpId"
-            :project-id="projectId"
-            api-prefix="f2-st"
-            sheet="F2-26"
+        <el-button
+          v-if="group.id === 'meta' && wpId && !isReadonly"
+          size="small"
+          plain
+          @click="seedFromPlan"
+        >从计划/小结带入</el-button>
+      </header>
+      <div
+        class="rf-card-grid"
+        :style="{ gridTemplateColumns: `repeat(${group.cols}, minmax(0, 1fr))` }"
+      >
+        <div
+          v-for="fid in group.fieldIds"
+          :key="fid"
+          class="rf-field"
+          :class="{ span2: group.cols === 1 || fid === 'method' }"
+        >
+          <div class="rf-field-label">
+            <span>{{ fieldMap[fid]?.label || fid }}</span>
+            <button
+              v-if="wpId && !isReadonly && !fieldMap[fid]?.date"
+              type="button"
+              class="ai-chip"
+              :disabled="!aiAvailable || aiLoadingId === fid"
+              :title="`AI 起草「${fieldMap[fid]?.label || fid}」`"
+              :aria-label="`AI 起草${fieldMap[fid]?.label || fid}`"
+              @click="aiFillField(fid, fieldMap[fid]?.label || fid)"
+            >
+              {{ aiLoadingId === fid ? '…' : 'AI' }}
+            </button>
+          </div>
+          <el-date-picker
+            v-if="fieldMap[fid]?.date"
+            :model-value="toPickerDate(meta.fields.value[fid])"
+            type="date"
+            value-format="YYYY-MM-DD"
+            format="YYYY年MM月DD日"
+            :placeholder="fieldMap[fid]?.hint || '选择日期'"
             :disabled="isReadonly"
-            :show-import-export="true"
-            ai-section="stocktake-rollforward"
-            :existing-content="sheet.auditNote.value"
-            :related-context="{ varianceRows: varianceCount }"
-            ai-title="AI 生成 · 倒轧结论"
-            review-section="F2-26-conclusion"
-            @ai-filled="(t: string) => { sheet.auditNote.value = t }"
+            style="width: 100%"
+            @update:model-value="(v: string | null) => meta.updateField(fid, v || '')"
           />
-          <span class="chip-wrap"><GtIndexChip value="wp:F2-26" :context-project-id="projectId" /></span>
-          <el-tag size="small" type="info">共 {{ sheet.rows.value.length }} 行</el-tag>
+          <el-input
+            v-else-if="fieldMap[fid]?.multiline"
+            :model-value="meta.fields.value[fid] || ''"
+            type="textarea"
+            :rows="fieldMap[fid]?.rows || 2"
+            :placeholder="fieldMap[fid]?.hint || ''"
+            :disabled="isReadonly"
+            resize="vertical"
+            @update:model-value="(v: string) => meta.updateField(fid, v)"
+          />
+          <el-input
+            v-else
+            :model-value="meta.fields.value[fid] || ''"
+            :placeholder="fieldMap[fid]?.hint || ''"
+            :disabled="isReadonly"
+            @update:model-value="(v: string) => meta.updateField(fid, v)"
+          />
         </div>
       </div>
-      <el-table :data="enriched" border size="small" max-height="420"
-        :row-class-name="({ row }) => row.hasVariance ? 'warn-row' : ''">
-        <el-table-column label="品名" min-width="110">
-          <template #default="{ row }">
-            <el-input :model-value="row.itemName" size="small" :disabled="isReadonly"
-              @update:model-value="(v: string) => sheet.updateRow(row.id, { itemName: v })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="盘点日数量" width="100">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.countDayQty" size="small" :controls="false" :disabled="isReadonly"
-              @update:model-value="(v: number) => sheet.updateRow(row.id, { countDayQty: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="入库" width="90">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.inboundQty" size="small" :controls="false" :disabled="isReadonly"
-              @update:model-value="(v: number) => sheet.updateRow(row.id, { inboundQty: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="出库" width="90">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.outboundQty" size="small" :controls="false" :disabled="isReadonly"
-              @update:model-value="(v: number) => sheet.updateRow(row.id, { outboundQty: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="理论结存" width="95" align="right" class-name="auto-calc-col">
-          <template #default="{ row }">
-            <el-tooltip content="公式：盘点日数量 + 入库 − 出库" placement="top">
-              <span class="formula-cell">{{ row.theoreticalQty.toLocaleString() }}</span>
-            </el-tooltip>
-          </template>
-        </el-table-column>
-        <el-table-column label="账面结存" width="95">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.bookQty" size="small" :controls="false" :disabled="isReadonly"
-              @update:model-value="(v: number) => sheet.updateRow(row.id, { bookQty: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="差异" width="80" align="right" class-name="auto-calc-col">
-          <template #default="{ row }">
-            <el-tooltip content="公式：账面结存 − 理论结存" placement="top">
-              <span class="formula-cell" :class="{ 'diff-warn': row.hasVariance }">{{ row.variance.toLocaleString() }}</span>
-            </el-tooltip>
-          </template>
-        </el-table-column>
-        <el-table-column label="备注" min-width="90">
-          <template #default="{ row }">
-            <el-input :model-value="row.remark" size="small" :disabled="isReadonly"
-              @update:model-value="(v: string) => sheet.updateRow(row.id, { remark: v })" />
-          </template>
-        </el-table-column>
-        <el-table-column width="50">
-          <template #default="{ row }">
-            <el-button v-if="!isReadonly" link type="danger" size="small" @click="sheet.removeRow(row.id)">删</el-button>
-          </template>
-        </el-table-column>
-        <el-table-column v-if="wpId && !isReadonly" label="OCR" width="50" align="center">
-          <template #default="{ row }">
-            <el-upload :show-file-list="false" :auto-upload="false" accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls"
-              :disabled="ocrLoadingId === row.id"
-              @change="(f: any) => onOcr(row.id, f?.raw)">
-              <el-button link size="small" :loading="ocrLoadingId === row.id">📎</el-button>
-            </el-upload>
-          </template>
-        </el-table-column>
-      </el-table>
-    </div>
+    </section>
 
-    <!-- 核对行 -->
-    <div class="tb-check-row">
-      <span class="tb-label">理论结存与账面结存倒轧核对：</span>
-      <el-tag v-if="varianceCount > 0" type="danger" size="small">{{ varianceCount }} 个品名存在差异</el-tag>
-      <el-tag v-else type="success" size="small">倒轧核对一致</el-tag>
-    </div>
-
-    <!-- 审计意见区（卡片式） -->
-    <el-card class="opinion-card" shadow="never">
-      <template #header>
-        <div class="opinion-header">
-          <span class="opinion-title">倒轧结论</span>
-          <div class="opinion-chips">
-            <GtIndexChip value="wp:F2-26" :context-project-id="projectId" />
-          </div>
+    <section class="rf-card" :class="{ recommended: suggestedMode === 'after' }">
+      <header class="rf-card-head">
+        <div>
+          <h3>一、资产负债表日后盘点倒轧（倒推）</h3>
+          <p>D = A + 发出 − 入库 · 盘点日晚于截止日时填写</p>
         </div>
-      </template>
-      <el-input v-model="sheet.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="盘点倒轧说明（时点差异、出入库核实、差异结论等）..." />
-    </el-card>
+        <div class="rf-card-actions">
+          <el-tag v-if="afterVarianceCount > 0" size="small" type="danger">{{ afterVarianceCount }} 行差异</el-tag>
+          <el-tag v-else-if="afterSheet.rows.value.length" size="small" type="success">核对一致</el-tag>
+          <el-button size="small" :disabled="isReadonly" @click="pullBookRows('after', 'F2-24')">从 F2-24 带入</el-button>
+          <el-button size="small" :disabled="isReadonly" @click="pullBookRows('after', 'F2-25')">从 F2-25 带入</el-button>
+          <el-button size="small" type="primary" :disabled="isReadonly" @click="afterSheet.addRow()">+ 明细行</el-button>
+        </div>
+      </header>
+      <div class="rf-card-body">
+        <el-empty
+          v-if="!afterSheet.rows.value.length"
+          description="暂无明细；可新增或从 F2-24/25 带入账面品名"
+          :image-size="64"
+        />
+        <F2RollTable
+          v-else
+          mode="after"
+          :rows="afterEnriched"
+          :is-readonly="isReadonly"
+          :wp-id="wpId"
+          :ocr-loading-id="ocrLoadingId"
+          @update="(id, patch) => afterSheet.updateRow(id, patch)"
+          @remove="(id) => afterSheet.removeRow(id)"
+          @ocr="(id, file) => onOcr(id, file, afterSheet)"
+        />
+      </div>
+    </section>
 
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
+    <section class="rf-card" :class="{ recommended: suggestedMode === 'before' }">
+      <header class="rf-card-head">
+        <div>
+          <h3>二、资产负债表日前盘点倒轧（顺推）</h3>
+          <p>D = A + 入库 − 发出 · 盘点日早于截止日时填写</p>
+        </div>
+        <div class="rf-card-actions">
+          <el-tag v-if="beforeVarianceCount > 0" size="small" type="danger">{{ beforeVarianceCount }} 行差异</el-tag>
+          <el-tag v-else-if="beforeSheet.rows.value.length" size="small" type="success">核对一致</el-tag>
+          <el-button size="small" :disabled="isReadonly" @click="pullBookRows('before', 'F2-24')">从 F2-24 带入</el-button>
+          <el-button size="small" :disabled="isReadonly" @click="pullBookRows('before', 'F2-25')">从 F2-25 带入</el-button>
+          <el-button size="small" type="primary" :disabled="isReadonly" @click="beforeSheet.addRow()">+ 明细行</el-button>
+        </div>
+      </header>
+      <div class="rf-card-body">
+        <el-empty
+          v-if="!beforeSheet.rows.value.length"
+          description="暂无明细；可新增或从 F2-24/25 带入账面品名"
+          :image-size="64"
+        />
+        <F2RollTable
+          v-else
+          mode="before"
+          :rows="beforeEnriched"
+          :is-readonly="isReadonly"
+          :wp-id="wpId"
+          :ocr-loading-id="ocrLoadingId"
+          @update="(id, patch) => beforeSheet.updateRow(id, patch)"
+          @remove="(id) => beforeSheet.removeRow(id)"
+          @ocr="(id, file) => onOcr(id, file, beforeSheet)"
+        />
+      </div>
+    </section>
+
+    <section class="rf-card rf-card-conclusion">
+      <header class="rf-card-head">
+        <div>
+          <h3>三、审计说明</h3>
+          <p>调节方向、收发核实、差异处理</p>
+        </div>
+        <button
+          v-if="wpId && !isReadonly"
+          type="button"
+          class="ai-chip"
+          :disabled="!aiAvailable || aiLoadingId === '__note__'"
+          title="AI 起草审计说明"
+          aria-label="AI 起草审计说明"
+          @click="aiFillNote"
+        >
+          {{ aiLoadingId === '__note__' ? '…' : 'AI' }}
+        </button>
+      </header>
       <el-input
+        v-model="beforeSheet.auditNote.value"
         type="textarea"
-        :model-value="auditConclusion"
+        :rows="4"
         :disabled="isReadonly"
-        :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
+        placeholder="填写审计说明…"
+        resize="vertical"
+      />
+    </section>
+
+    <section class="rf-card rf-card-conclusion">
+      <header class="rf-card-head">
+        <div>
+          <h3>四、审计结论</h3>
+          <p>A 未见异常 · B 除重大不符应调整外其余未见异常 · C 重大未调整或范围受限不可确认</p>
+        </div>
+        <button
+          v-if="wpId && !isReadonly"
+          type="button"
+          class="ai-chip"
+          :disabled="!aiAvailable || aiLoadingId === '__conclusion__'"
+          title="AI 起草审计结论"
+          aria-label="AI 起草审计结论"
+          @click="aiFillConclusion"
+        >
+          {{ aiLoadingId === '__conclusion__' ? '…' : 'AI' }}
+        </button>
+      </header>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :rows="3"
+        :disabled="isReadonly"
+        placeholder="填写审计结论…"
+        resize="vertical"
         @change="saveAuditConclusion"
       />
-    </el-card>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef, onMounted, type Ref } from 'vue'
-import { useF2StocktakeRows } from '../../composables/useF2StocktakeSheet'
+import { computed, onMounted, ref, toRef, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { useF2StocktakeFields, useF2StocktakeRows } from '../../composables/useF2StocktakeSheet'
 import { useF2StocktakeOcr } from '../../composables/useF2StocktakeOcr'
+import { useF2StocktakeAiGenerate } from '../../composables/useF2StocktakeAiGenerate'
+import {
+  applyMetaSeedToFields,
+  formatVarianceSummary,
+  parseJsonRows,
+  readStocktakeMetaSeed,
+} from '../../composables/useF2StocktakeCrossSheet'
 import type { ChecklistResponse } from '../../composables/useF2StocktakeFormData'
-import { F2_26_NARRATIVE_FIELDS, type StocktakeRollforwardRow } from './f2StocktakeConfigs'
+import {
+  F2_26_FIELDS,
+  F2_26_LAYOUT,
+  type StocktakeReconcileRow,
+  type StocktakeRollMode,
+  type StocktakeRollforwardRow,
+  type StocktakeSampleRow,
+  type StocktakeSectionField,
+} from './f2StocktakeConfigs'
+import F2RollTable, { type F2RollEnrichedRow } from './F2RollTable.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
-import F2StocktakeSectionForm from './F2StocktakeSectionForm.vue'
 import F2StocktakeSheetAttachments from './F2StocktakeSheetAttachments.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -184,33 +295,128 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const sheet = useF2StocktakeRows<StocktakeRollforwardRow>({
+const fieldIds = F2_26_FIELDS.filter((f) => !f.isSection).map((f) => f.id)
+const fieldMap = Object.fromEntries(
+  F2_26_FIELDS.filter((f) => !f.isSection).map((f) => [f.id, f]),
+) as Record<string, StocktakeSectionField>
+
+const meta = useF2StocktakeFields({
+  fieldsKey: 'F2-26-fields',
+  noteKey: 'F2-26-fields-note',
+  fieldIds,
+  allResponses: toRef(props, 'allResponses'),
+  isReadonly: toRef(props, 'isReadonly'),
+})
+
+function emptyRow(): StocktakeRollforwardRow {
+  return {
+    id: `st-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    category: '',
+    itemCode: '',
+    itemName: '',
+    spec: '',
+    unit: '',
+    unitPrice: 0,
+    warehouse: '',
+    countDayQty: 0,
+    inboundQty: 0,
+    outboundQty: 0,
+    bookQty: 0,
+    varianceReason: '',
+    needAdjust: '',
+    remark: '',
+  }
+}
+
+/** 日前顺推（与旧版 F2-26-rows 公式一致，保留兼容） */
+const beforeSheet = useF2StocktakeRows<StocktakeRollforwardRow>({
   rowsKey: 'F2-26-rows',
   noteKey: 'F2-26-note',
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
-  emptyRow: () => ({
-    id: `st-${Date.now()}`, itemName: '', countDayQty: 0, inboundQty: 0, outboundQty: 0, theoreticalQty: 0, bookQty: 0, remark: '',
-  }),
+  emptyRow,
 })
 
-const enriched = computed(() => sheet.rows.value.map((r) => {
-  const theoreticalQty = r.countDayQty + r.inboundQty - r.outboundQty
-  const variance = r.bookQty - theoreticalQty
-  return { ...r, theoreticalQty, variance, hasVariance: Math.abs(variance) > 0.001 }
-}))
+/** 日后倒推 */
+const afterSheet = useF2StocktakeRows<StocktakeRollforwardRow>({
+  rowsKey: 'F2-26-after-rows',
+  noteKey: 'F2-26-after-note',
+  allResponses: toRef(props, 'allResponses'),
+  isReadonly: toRef(props, 'isReadonly'),
+  emptyRow,
+})
 
-const varianceCount = computed(() => enriched.value.filter((r) => r.hasVariance).length)
-
-const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
-const { ocrLoadingId, uploadAndMerge } = useF2StocktakeOcr(wpIdRef)
-
-function onOcr(rowId: string, file?: File) {
-  if (!file) return
-  void uploadAndMerge('F2-26', rowId, file, (id, patch) => sheet.updateRow(id, patch))
+function enrich(rows: StocktakeRollforwardRow[], mode: StocktakeRollMode): F2RollEnrichedRow[] {
+  return rows.map((r) => {
+    const calcBsQty =
+      mode === 'after'
+        ? r.countDayQty + r.outboundQty - r.inboundQty
+        : r.countDayQty + r.inboundQty - r.outboundQty
+    const qtyDiff = calcBsQty - r.bookQty
+    const amtDiff = qtyDiff * (r.unitPrice || 0)
+    return {
+      ...r,
+      category: r.category || '',
+      itemCode: r.itemCode || '',
+      spec: r.spec || '',
+      unit: r.unit || '',
+      unitPrice: r.unitPrice || 0,
+      warehouse: r.warehouse || '',
+      varianceReason: r.varianceReason || '',
+      needAdjust: r.needAdjust || '',
+      calcBsQty,
+      qtyDiff,
+      amtDiff,
+      hasVariance: Math.abs(qtyDiff) > 0.001,
+    }
+  })
 }
 
-// ─── 审计结论（标准打磨项，独立持久化） ───────────────────────────────────────
+const afterEnriched = computed(() => enrich(afterSheet.rows.value, 'after'))
+const beforeEnriched = computed(() => enrich(beforeSheet.rows.value, 'before'))
+const afterVarianceCount = computed(() => afterEnriched.value.filter((r) => r.hasVariance).length)
+const beforeVarianceCount = computed(() => beforeEnriched.value.filter((r) => r.hasVariance).length)
+
+function toPickerDate(raw: string | undefined): string {
+  const s = (raw || '').trim()
+  if (!s) return ''
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+  const m = s.match(/(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日?/)
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`
+  return ''
+}
+
+const suggestedMode = computed<StocktakeRollMode | ''>(() => {
+  const bs = toPickerDate(meta.fields.value.bsDate)
+  const ct = toPickerDate(meta.fields.value.countDate)
+  if (!bs || !ct || bs === ct) return ''
+  return ct > bs ? 'after' : 'before'
+})
+
+const datesEqual = computed(() => {
+  const bs = toPickerDate(meta.fields.value.bsDate)
+  const ct = toPickerDate(meta.fields.value.countDate)
+  return !!(bs && ct && bs === ct)
+})
+
+const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
+const projectIdRef = toRef(() => props.projectId || '') as Ref<string>
+const { ocrLoadingId, uploadAndMerge } = useF2StocktakeOcr(wpIdRef)
+const { aiAvailable, generateAndConfirm } = useF2StocktakeAiGenerate({
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+})
+const aiLoadingId = ref('')
+
+function onOcr(
+  rowId: string,
+  file: File | undefined,
+  sheet: ReturnType<typeof useF2StocktakeRows<StocktakeRollforwardRow>>,
+) {
+  if (!file) return
+  void uploadAndMerge('F2-26', rowId, file, (id, patch) => sheet.updateRow(id, patch as Partial<StocktakeRollforwardRow>))
+}
+
 const CONCLUSION_KEY = 'F2-26-audit-conclusion'
 const auditConclusion = ref('')
 function saveAuditConclusion(val: string): void {
@@ -220,52 +426,414 @@ function saveAuditConclusion(val: string): void {
   props.allResponses.set(CONCLUSION_KEY, item)
   window.dispatchEvent(new CustomEvent('f2-stocktake:save-items', { detail: { items: [item] } }))
 }
+
 onMounted(() => {
   const c = props.allResponses.get(CONCLUSION_KEY)
   if (c?.remark) auditConclusion.value = c.remark
+  const legacy = props.allResponses.get('F2-26-fields')
+  if (legacy?.remark) {
+    try {
+      const parsed = JSON.parse(legacy.remark) as Record<string, string>
+      const patch: Record<string, string> = {}
+      if (parsed.countDate && !meta.fields.value.countDate) patch.countDate = parsed.countDate
+      if (parsed.bsDate && !meta.fields.value.bsDate) patch.bsDate = parsed.bsDate
+      if (parsed.method && !meta.fields.value.method) patch.method = parsed.method
+      if (Object.keys(patch).length) meta.applyFields(patch, { overwriteEmptyOnly: true })
+    } catch { /* ignore */ }
+  }
+  seedFromPlan({ silent: true })
 })
+
+function seedFromPlan(opts?: { silent?: boolean }): void {
+  if (props.isReadonly) return
+  const seed = readStocktakeMetaSeed(props.allResponses)
+  const patch = applyMetaSeedToFields(seed, meta.fields.value, {
+    entityName: 'entityName',
+    bsDate: 'bsDate',
+    countDate: 'countDate',
+  })
+  if (!Object.keys(patch).length) {
+    if (!opts?.silent) {
+      ElMessage.info(seed.source ? '文首字段已有内容，未覆盖' : '计划/小结中暂无可带入的文首信息')
+    }
+    return
+  }
+  meta.applyFields(patch, { overwriteEmptyOnly: true })
+  if (!opts?.silent) ElMessage.success(`已从 ${seed.source || '上游'} 带入文首信息`)
+}
+
+function pullBookRows(target: StocktakeRollMode, source: 'F2-24' | 'F2-25'): void {
+  if (props.isReadonly) return
+  const sheet = target === 'after' ? afterSheet : beforeSheet
+  let mapped: StocktakeRollforwardRow[] = []
+
+  if (source === 'F2-24') {
+    const primary = parseJsonRows<StocktakeReconcileRow>(props.allResponses, 'F2-24-rows')
+    const countRows = parseJsonRows<StocktakeReconcileRow>(props.allResponses, 'F2-24-count-rows')
+    const src = target === 'after' && countRows.length ? countRows : (primary.length ? primary : countRows)
+    mapped = src
+      .filter((r) => (r.itemName || '').trim())
+      .map((r, i) => {
+        const bookQty = Number(r.bookQty) || 0
+        const bookAmount = Number(r.bookAmount) || 0
+        return {
+          ...emptyRow(),
+          id: `st-${Date.now().toString(36)}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+          itemName: r.itemName || '',
+          spec: r.spec || '',
+          bookQty,
+          unitPrice: bookQty ? bookAmount / bookQty : 0,
+          remark: r.remark || '',
+        }
+      })
+  } else {
+    const exist = parseJsonRows<StocktakeSampleRow>(props.allResponses, 'F2-25-rows')
+    const floor = parseJsonRows<StocktakeSampleRow>(props.allResponses, 'F2-25-floor-rows')
+    const src = exist.length ? exist : floor
+    mapped = src
+      .filter((r) => (r.itemName || '').trim())
+      .map((r, i) => ({
+        ...emptyRow(),
+        id: `st-${Date.now().toString(36)}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+        itemCode: r.itemCode || '',
+        itemName: r.itemName || '',
+        spec: r.spec || '',
+        unit: r.unit || '',
+        unitPrice: Number(r.unitPrice) || 0,
+        bookQty: Number(r.bookQty) || 0,
+        countDayQty: Number(r.sampleQty) || Number(r.clientCountQty) || 0,
+        remark: r.remark || '',
+      }))
+  }
+
+  if (!mapped.length) {
+    ElMessage.warning(`${source} 暂无可带入的明细行`)
+    return
+  }
+
+  const existingNames = new Set(
+    sheet.rows.value.map((r) => (r.itemName || '').trim()).filter(Boolean),
+  )
+  const toAdd = mapped.filter((r) => !existingNames.has((r.itemName || '').trim()))
+  if (!toAdd.length) {
+    ElMessage.info('品名已存在，未重复带入')
+    return
+  }
+  sheet.rows.value = [...sheet.rows.value, ...toAdd]
+  void sheet.flushNow()
+  ElMessage.success(`已从 ${source} 带入 ${toAdd.length} 行（请补全期间收发数量）`)
+}
+
+const aiContext = computed(() => {
+  const filled = Object.fromEntries(
+    Object.entries(meta.fields.value).filter(([, v]) => v),
+  )
+  const afterVar = afterEnriched.value.filter((r) => r.hasVariance)
+  const beforeVar = beforeEnriched.value.filter((r) => r.hasVariance)
+  return {
+    sheet: 'F2-26',
+    suggestedMode: suggestedMode.value,
+    afterVariance: afterVarianceCount.value,
+    beforeVariance: beforeVarianceCount.value,
+    afterRows: afterEnriched.value.length,
+    beforeRows: beforeEnriched.value.length,
+    afterVarianceSummary: formatVarianceSummary(
+      afterVar.map((r) => ({
+        itemName: r.itemName,
+        qtyDiff: r.qtyDiff,
+        amtDiff: r.amtDiff,
+        calcBsQty: r.calcBsQty,
+        bookQty: r.bookQty,
+        varianceReason: r.varianceReason,
+        hasVariance: true,
+      })),
+      { label: '日后倒推差异' },
+    ),
+    beforeVarianceSummary: formatVarianceSummary(
+      beforeVar.map((r) => ({
+        itemName: r.itemName,
+        qtyDiff: r.qtyDiff,
+        amtDiff: r.amtDiff,
+        calcBsQty: r.calcBsQty,
+        bookQty: r.bookQty,
+        varianceReason: r.varianceReason,
+        hasVariance: true,
+      })),
+      { label: '日前顺推差异' },
+    ),
+    ...filled,
+  }
+})
+
+async function aiFillField(fieldId: string, fieldLabel: string): Promise<void> {
+  if (props.isReadonly || !props.wpId) return
+  aiLoadingId.value = fieldId
+  try {
+    const text = await generateAndConfirm(
+      'stocktake-rollforward-field',
+      meta.fields.value[fieldId] || '',
+      { ...aiContext.value, fieldId, fieldLabel },
+      `AI · ${fieldLabel}`,
+    )
+    if (text) {
+      meta.updateField(fieldId, text)
+      ElMessage.success('已填入，可继续编辑')
+    }
+  } finally {
+    aiLoadingId.value = ''
+  }
+}
+
+async function aiFillNote(): Promise<void> {
+  if (props.isReadonly || !props.wpId) return
+  aiLoadingId.value = '__note__'
+  try {
+    const text = await generateAndConfirm(
+      'stocktake-rollforward-field',
+      beforeSheet.auditNote.value || '',
+      { ...aiContext.value, fieldId: 'auditNote', fieldLabel: '审计说明' },
+      'AI · 审计说明',
+    )
+    if (text) {
+      beforeSheet.auditNote.value = text
+      ElMessage.success('已填入，可继续编辑')
+    }
+  } finally {
+    aiLoadingId.value = ''
+  }
+}
+
+async function aiFillConclusion(): Promise<void> {
+  if (props.isReadonly || !props.wpId) return
+  aiLoadingId.value = '__conclusion__'
+  try {
+    const text = await generateAndConfirm(
+      'stocktake-rollforward',
+      auditConclusion.value || '',
+      { ...aiContext.value, fieldId: 'conclusion', fieldLabel: '审计结论' },
+      'AI · 审计结论',
+    )
+    if (text) {
+      saveAuditConclusion(text)
+      ElMessage.success('已填入，可继续编辑')
+    }
+  } finally {
+    aiLoadingId.value = ''
+  }
+}
 </script>
 
 <style scoped>
-.f2-st-26 { padding: 12px; font-size: var(--wp-font-size, 13px); }
-.f2-st-26 :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
-.f2-st-26 :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
-.title { margin: 0 0 8px; }
+.f2-roll {
+  --rf-border: #e8eaef;
+  --rf-muted: #6b7280;
+  --rf-ink: #1f2937;
+  --rf-accent: var(--gt-color-primary, #4b2d77);
+  --rf-accent-light: var(--gt-color-primary-light, #A06DFF);
+  --rf-surface: var(--gt-color-primary-bg, #f4f0fa);
+  padding: 8px 12px 20px;
+  font-size: var(--wp-font-size, 13px);
+  color: var(--rf-ink);
+  max-width: 1280px;
+}
+.f2-roll :deep(.el-table) {
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
+}
+.f2-roll :deep(.el-table .cell) {
+  font-size: var(--wp-font-size, 13px) !important;
+}
 
-/* 编制提示 */
-.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
-.guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
+.rf-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  border: 1px solid var(--rf-border);
+  border-radius: 10px;
+  background: linear-gradient(135deg, #faf9ff 0%, #fff 55%);
+}
+.rf-kicker {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rf-accent);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.rf-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.3;
+  color: var(--rf-ink);
+}
+.rf-objective {
+  margin: 6px 0 0;
+  color: var(--rf-muted);
+  line-height: 1.5;
+  max-width: 56em;
+}
+.rf-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
 
-.table-block { margin-top: 8px; border-top: 1px solid #ebeef5; padding-top: 12px; }
+.rf-guide {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--gt-color-primary-lighter, #c4a8e8);
+  background: var(--rf-surface);
+}
+.rf-guide summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #374151;
+  list-style: none;
+}
+.rf-guide summary::-webkit-details-marker { display: none; }
+.rf-guide ol {
+  margin: 8px 0 4px;
+  padding-left: 1.2em;
+  color: var(--rf-muted);
+  line-height: 1.55;
+}
 
-/* 工具栏 */
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.chip-wrap { display: inline-flex; align-items: center; }
-.hint { font-size: 12px; color: #909399; }
+.rf-mode-hint {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  border: 1px solid var(--gt-color-primary-lighter, #c4a8e8);
+  background: var(--rf-surface);
+  color: var(--rf-accent);
+}
+.rf-mode-hint.after {
+  border-color: var(--gt-color-wheat, #FFC23D);
+  background: var(--gt-color-wheat-light, #fff8e6);
+  color: #8a6a12;
+}
+.rf-mode-hint.before {
+  border-color: var(--gt-color-primary-lighter, #c4a8e8);
+  background: var(--rf-surface);
+  color: var(--rf-accent);
+}
+.rf-mode-hint.same {
+  border-color: #e5e7eb;
+  background: #f9fafb;
+  color: #6b7280;
+}
 
-/* 表格 */
-.formula-cell { border-bottom: 1px dashed #c0c4cc; cursor: help; }
-.formula-cell.diff-warn { color: #f56c6c; font-weight: 600; }
-:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
-:deep(.warn-row) { background: #fef0f0; }
+.rf-card {
+  margin-bottom: 12px;
+  border: 1px solid var(--rf-border);
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+.rf-card.recommended {
+  border-color: var(--gt-color-primary-lighter, #c4a8e8);
+  box-shadow: 0 0 0 1px rgba(75, 45, 119, 0.12);
+}
+.rf-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--rf-border);
+  background: var(--rf-surface);
+}
+.rf-card-head h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--rf-accent);
+}
+.rf-card-head p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--rf-muted);
+}
+.rf-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.rf-card-grid {
+  display: grid;
+  gap: 12px 14px;
+  padding: 12px 14px 14px;
+}
+.rf-card-body {
+  padding: 12px 14px 14px;
+}
+.rf-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.rf-field.span2 { grid-column: 1 / -1; }
+.rf-field-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 550;
+  color: #374151;
+}
+.rf-field :deep(.el-textarea__inner),
+.rf-field :deep(.el-input__wrapper),
+.rf-field :deep(.el-date-editor.el-input__wrapper) {
+  box-shadow: 0 0 0 1px #e5e7eb inset;
+}
+.rf-field :deep(.el-textarea__inner:focus),
+.rf-field :deep(.el-input__wrapper.is-focus),
+.rf-field :deep(.el-date-editor.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px var(--rf-accent) inset !important;
+}
+.rf-field :deep(.el-date-editor) { width: 100%; }
 
-/* 核对行 */
-.tb-check-row { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; margin: 12px 0; font-size: var(--wp-font-size, 13px); }
-.tb-label { color: #909399; }
+.ai-chip {
+  border: 1px solid var(--gt-color-primary-lighter, #c4a8e8);
+  background: var(--rf-surface);
+  color: var(--rf-accent);
+  border-radius: 999px;
+  padding: 0 8px;
+  height: 22px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  line-height: 20px;
+  flex-shrink: 0;
+}
+.ai-chip:hover:not(:disabled) {
+  background: #ebe4f5;
+  border-color: var(--rf-accent-light);
+}
+.ai-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 
-/* 审计意见卡片 */
-.opinion-card { margin-top: 16px; border-radius: 8px; }
-.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.opinion-header { display: flex; align-items: center; justify-content: space-between; }
-.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
-.opinion-chips { display: flex; gap: 6px; }
+:deep(.auto-calc-col) { background-color: #f8f7fc !important; }
+:deep(.warn-row) { background: var(--gt-color-coral-light, #fff0ef); }
 
-/* 审计说明 / 审计结论卡片 */
-.audit-note-card { margin-top: 16px; }
-.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
+.rf-card-conclusion .rf-card-head { background: var(--rf-surface); }
+.rf-card-conclusion :deep(.el-textarea) {
+  padding: 0 14px 14px;
+  display: block;
+}
 </style>

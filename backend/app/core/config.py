@@ -45,6 +45,14 @@ class Settings(BaseSettings):
     ATTACHMENT_PRIMARY_STORAGE: str = "paperless"
     ATTACHMENT_FALLBACK_TO_LOCAL: bool = True
     ATTACHMENT_LOCAL_STORAGE_ROOT: str = "./storage/attachments"
+    # 证据治理 —— 上传隔离/暂存区（durable quarantine，evidence-governance-hardening R1.2/§4.0/§5.1）
+    # 必须位于任何 Storage_Boundary root（STORAGE_ROOT / ATTACHMENT_LOCAL_STORAGE_ROOT）之外，
+    # 隔离内容绝不可经下载/预览/EvidenceRef/OCR/AI/FormalOutput/archive 任何边界路径读取。
+    ATTACHMENT_QUARANTINE_ROOT: str = "./quarantine_store"
+    # 是否使用持久（磁盘）隔离区。生产默认 True，保证 202 异步 finalize / 进程重启后 staged 内容仍在。
+    ATTACHMENT_QUARANTINE_DURABLE: bool = True
+    # 未 finalize 的 staged/quarantined 内容存活上限（秒）；超过由 reaper 加密擦除 + 标记 purged。
+    ATTACHMENT_QUARANTINE_TTL_SECONDS: int = 86400  # 24h
     PAPERLESS_URL: str = ""
     PAPERLESS_TOKEN: str = ""
     PAPERLESS_TIMEOUT: int = 30
@@ -135,6 +143,32 @@ class Settings(BaseSettings):
     CLAMAV_ENABLED: bool = False
     CLAMAV_HOST: str = "localhost"
     CLAMAV_PORT: int = 3310
+
+    # --- 证据治理附件安全门（attachment-ocr-ai-evidence-governance-hardening R1.2/R1.3/R2/R15）---
+    # SecureAttachmentGateway 的三道内容门：声明媒体类型允许清单 / 恶意内容扫描 / 可读性检查。
+    # 生产接线必须真实注入（不能保持 None 默认——None 会令门以 default=True 放行）。
+    #
+    # 声明媒体类型正向允许清单（逗号分隔）。上传声明的媒体类型不在此集合则拒绝
+    # （MEDIA_TYPE_MISMATCH / declared_type_not_allowed）。默认覆盖审计底稿常见证据类型
+    # （pdf/png/jpeg/gif/bmp/tiff/xlsx/docx/pptx/xls/doc/csv/txt/zip）。留空字符串=禁用允许清单
+    # （不推荐；等同无正向白名单）。
+    ATTACHMENT_ALLOWED_MEDIA_TYPES: str = (
+        "application/pdf,"
+        "image/png,image/jpeg,image/gif,image/bmp,image/tiff,"
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,"
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document,"
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation,"
+        "application/vnd.ms-excel,application/msword,application/vnd.ms-powerpoint,"
+        "text/csv,text/plain,application/zip"
+    )
+    # 最小签名式恶意内容检查（拒绝可执行/脚本 magic：PE MZ / ELF / Mach-O / shebang / EICAR）。
+    # 这是真实的最小实现（非 lambda:True 桩）；与 CLAMAV_ENABLED 组合成完整恶意内容门。
+    ATTACHMENT_SIGNATURE_SCAN_ENABLED: bool = True
+    # 可读性检查（非空 + 按识别类型的廉价可解析性校验）。
+    ATTACHMENT_READABILITY_CHECK_ENABLED: bool = True
+    # fail-closed 启动守卫：为 True 时若三道门未真实接线则启动直接报错；
+    # 为 False（默认）时仅在 production 环境下打 loud WARNING 并在治理指标中暴露。
+    ATTACHMENT_SECURITY_GATES_REQUIRED: bool = False
 
     # I-F4 商誉减值 / 后续 LLM 接入开关（默认 False = stub 实现）
     # 当 wp_ai_service 升级真实接入 LLM 后改为 True，前端 is_llm_stub 字段自动反映

@@ -51,4 +51,4 @@ async def test_f2_st_export_template_f2_24():
 async def test_f2_st_supported_sheets():
     from app.routers.wp_render_strategies._f2_stocktake_import_export import _SUPPORTED
 
-    assert _SUPPORTED == {"F2-24", "F2-25", "F2-26"}
+    assert _SUPPORTED == {"F2-24", "F2-24-count", "F2-25", "F2-25-floor", "F2-26", "F2-26-after"}

@@ -1,17 +1,15 @@
 <template>
   <div class="f2-questionnaire-wrapper">
-    <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>1. 本问卷评价被审计单位盘点计划的健全性，覆盖盘点组织、程序、截止控制与差异处理（CAS 1311 存货监盘）。</p>
-        <p>2. 逐项记录盘点安排（时间 / 地点 / 人员）、存货标识与移动控制、以及盘点表汇总与复核机制。</p>
-        <p>3. 问卷结论应评价盘点计划是否足以保证盘点结果的准确与完整。</p>
-        <p>4. 检测到旧版 OO 地点表数据时，可一键写入结构化字段。</p>
+        <p>1. 本问卷评价被审计单位盘点计划的健全性，覆盖盘点组织、程序、截止控制与差异处理（CAS 1311）。</p>
+        <p>2. 点击「填写盘点计划问卷」按 Excel 1~22 题结构填报；叙述题旁可使用 AI 辅助起草。</p>
+        <p>3. 第 22 题总体评价驱动后续监盘计划（F2-22）与程序裁剪（F2-21A）。</p>
+        <p>4. 检测到旧版 OO 地点表或扁平字段时，打开问卷将自动迁移为结构化数据。</p>
       </div>
     </details>
 
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
@@ -19,73 +17,105 @@
       class="objective-alert"
     />
 
-    <!-- 工具栏 -->
     <div class="tab-toolbar">
-      <div class="toolbar-left"><span class="hint">盘点计划问卷 F2-21</span></div>
+      <div class="toolbar-left">
+        <span class="hint">盘点计划问卷 F2-21</span>
+        <el-tag size="small" :type="progress.filled === progress.total ? 'success' : 'warning'" effect="plain">
+          问卷进度 {{ progress.filled }}/{{ progress.total }}
+        </el-tag>
+      </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:F2-21" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-21A" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-22" :context-project-id="projectId" /></span>
+        <el-button type="primary" size="small" @click="dialogOpen = true">
+          {{ isReadonly ? '查看问卷' : '填写盘点计划问卷' }}
+        </el-button>
       </div>
     </div>
 
-    <div v-if="showMigrationBtn" class="migration-banner">
-      <el-alert type="info" :closable="false" show-icon>
-        <template #title>
-          检测到旧版 OO 地点表数据，可一键写入结构化字段
-        </template>
-        <el-button size="small" type="primary" @click="doMigrateWrite">一键写入</el-button>
-      </el-alert>
-    </div>
-    <F2StocktakeSectionForm
-      title="盘点计划问卷 F2-21"
-      sheet-code="F2-21"
-      fields-key="F2-21-fields"
-      note-key="F2-21-note"
-      :field-defs="F2_21_FIELDS"
-      :wp-id="wpId"
-      :project-id="projectId"
-      :all-responses="allResponses"
-      :is-readonly="isReadonly"
-      ai-section="stocktake-questionnaire"
-      ai-title="AI 生成 · 盘点问卷结论"
-      audit-note-label="问卷结论"
-    />
-
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input
-        type="textarea"
-        :model-value="auditNote"
-        :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：概述对盘点计划问卷的评价程序、盘点组织与截止控制的核查情况及结果。"
-        @change="saveAuditNote"
-      />
+    <el-card shadow="never" class="summary-card">
+      <template #header>
+        <div class="card-header">
+          <span>问卷摘要</span>
+          <el-button text type="primary" size="small" @click="dialogOpen = true">打开问卷</el-button>
+        </div>
+      </template>
+      <div class="summary-grid">
+        <div class="summary-item">
+          <div class="label">盘点地点（Q1）</div>
+          <div class="value">{{ locationSummary }}</div>
+        </div>
+        <div class="summary-item">
+          <div class="label">盘点人员（Q2）</div>
+          <div class="value">{{ personnelSummary }}</div>
+        </div>
+        <div class="summary-item">
+          <div class="label">计划是否适当（Q22.1）</div>
+          <div class="value">
+            <el-tag v-if="q22Label" size="small" :type="q22TagType" effect="plain">{{ q22Label }}</el-tag>
+            <span v-else class="muted">未评价</span>
+          </div>
+        </div>
+        <div class="summary-item full">
+          <div class="label">缺陷与建议（Q22.2）</div>
+          <div class="value pre">{{ data.answers.q22_2 || '—' }}</div>
+        </div>
+      </div>
     </el-card>
 
-    <!-- 审计结论 -->
     <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <template #header>
+        <div class="card-header">
+          <span>问卷结论</span>
+          <el-button
+            v-if="wpId"
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="aiFillConclusion"
+          >
+            🤖 AI辅助
+          </el-button>
+        </div>
+      </template>
       <el-input
+        v-model="auditNote"
         type="textarea"
-        :model-value="auditConclusion"
         :disabled="isReadonly"
         :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
-        @change="saveAuditConclusion"
+        placeholder="概括对本问卷的总体结论，可索引至 F2-21A / F2-22。"
       />
     </el-card>
+
+    <F2StocktakeQuestionnaireDialog
+      v-model="dialogOpen"
+      :data="data"
+      :is-readonly="isReadonly"
+      :wp-id="wpId"
+      :project-id="projectId"
+      @update:answer="updateAnswer"
+      @update:location="updateLocation"
+      @add:location="addLocation"
+      @remove:location="removeLocation"
+      @update:personnel="updatePersonnel"
+      @add:personnel="addPersonnel"
+      @remove:personnel="removePersonnel"
+      @save="saveNow"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import F2StocktakeSectionForm from './F2StocktakeSectionForm.vue'
+import { ref, computed, toRef, shallowRef, watch } from 'vue'
 import GtIndexChip from '../../GtIndexChip.vue'
-import { F2_21_FIELDS } from './f2StocktakeConfigs'
-import { migrateF21RowsToFields } from '../../composables/useF2StocktakeSheet'
+import F2StocktakeQuestionnaireDialog from './F2StocktakeQuestionnaireDialog.vue'
+import { useF2StocktakeQuestionnaire } from '../../composables/useF2StocktakeQuestionnaire'
+import { useF2StocktakeAiGenerate } from '../../composables/useF2StocktakeAiGenerate'
+import { F21_EVAL_Q22_1_OPTIONS } from './f2StocktakeQuestionnaire'
 import type { ChecklistResponse } from '../../composables/useF2StocktakeFormData'
-import { ElMessage } from 'element-plus'
 
 const props = defineProps<{
   wpId?: string
@@ -94,100 +124,106 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-// ─── 审计说明 / 审计结论（标准打磨项，独立持久化） ─────────────────────────────
-const NOTE_KEY = 'F2-21-audit-note'
-const CONCLUSION_KEY = 'F2-21-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-function persistAudit(key: string, val: string): void {
-  const item: ChecklistResponse = { item_id: key, conclusion: null, remark: val }
-  props.allResponses.set(key, item)
-  window.dispatchEvent(new CustomEvent('f2-stocktake:save-items', { detail: { items: [item] } }))
-}
-function saveAuditNote(val: string): void {
-  if (props.isReadonly) return
-  auditNote.value = val
-  persistAudit(NOTE_KEY, val)
-}
-function saveAuditConclusion(val: string): void {
-  if (props.isReadonly) return
-  auditConclusion.value = val
-  persistAudit(CONCLUSION_KEY, val)
-}
-onMounted(() => {
-  const n = props.allResponses.get(NOTE_KEY)
-  if (n?.remark) auditNote.value = n.remark
-  const c = props.allResponses.get(CONCLUSION_KEY)
-  if (c?.remark) auditConclusion.value = c.remark
+const dialogOpen = ref(false)
+const responsesMap = shallowRef(props.allResponses)
+watch(() => props.allResponses, (v) => { responsesMap.value = v })
+
+const {
+  data,
+  auditNote,
+  saveNow,
+  updateAnswer,
+  updateLocation,
+  addLocation,
+  removeLocation,
+  updatePersonnel,
+  addPersonnel,
+  removePersonnel,
+  progress: progressFn,
+} = useF2StocktakeQuestionnaire({
+  allResponses: responsesMap,
+  isReadonly: toRef(props, 'isReadonly'),
 })
 
-/**
- * 首次迁移条件：
- * 1. checklist_responses 中 F2-21-fields 为空或所有字段为空串
- * 2. F2-21-rows 有旧版 OO 数据
- * 3. migrateF21RowsToFields 能产出有效 patch
- */
-const showMigrationBtn = computed(() => {
-  if (props.isReadonly) return false
-  const fieldsRaw = props.allResponses.get('F2-21-fields')?.remark
-  let existingFields: Record<string, string> | null = null
-  if (fieldsRaw) {
-    try {
-      existingFields = JSON.parse(fieldsRaw)
-    } catch { /* ignore */ }
-  }
-  // 如果已有非空字段值，不显示
-  if (existingFields && Object.values(existingFields).some((v) => String(v || '').trim())) {
-    return false
-  }
-  const rowsRaw = props.allResponses.get('F2-21-rows')?.remark
-  if (!rowsRaw) return false
-  const patch = migrateF21RowsToFields(rowsRaw, existingFields)
-  return patch !== null && Object.keys(patch).length > 0
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2StocktakeAiGenerate({
+  wpId: toRef(() => props.wpId || '') as any,
+  projectId: toRef(() => props.projectId || '') as any,
 })
 
-function doMigrateWrite() {
-  const fieldsRaw = props.allResponses.get('F2-21-fields')?.remark
-  let existingFields: Record<string, string> = {}
-  if (fieldsRaw) {
-    try { existingFields = JSON.parse(fieldsRaw) } catch { /* ignore */ }
-  }
-  const rowsRaw = props.allResponses.get('F2-21-rows')?.remark
-  const patch = migrateF21RowsToFields(rowsRaw, null)
-  if (!patch) { ElMessage.warning('无可迁移数据'); return }
+const progress = computed(() => progressFn())
 
-  const merged = { ...existingFields, ...patch }
-  const updated: ChecklistResponse = {
-    item_id: 'F2-21-fields',
-    conclusion: null,
-    remark: JSON.stringify(merged),
-  }
-  props.allResponses.set('F2-21-fields', updated)
-  window.dispatchEvent(new CustomEvent('f2-stocktake:save-items', { detail: { items: [updated] } }))
-  ElMessage.success('旧版数据已写入结构化字段')
+const locationSummary = computed(() => {
+  const rows = data.value.locations.filter((r) => r.location.trim() || r.inventoryType.trim())
+  if (!rows.length) return '未填写'
+  return rows.map((r) => {
+    const parts = [r.location, r.inventoryType, r.sharePct ? `${r.sharePct}%` : '', r.countTime].filter(Boolean)
+    return parts.join(' · ')
+  }).join('；')
+})
+
+const personnelSummary = computed(() => {
+  const rows = data.value.personnel.filter((r) => r.name.trim())
+  if (!rows.length) return '未填写'
+  return rows.map((r) => [r.name, r.role, r.location].filter(Boolean).join('/')).join('；')
+})
+
+const q22Label = computed(() => {
+  const v = data.value.answers.q22_1
+  return F21_EVAL_Q22_1_OPTIONS.find((o) => o.value === v)?.label || ''
+})
+
+const q22TagType = computed(() => {
+  const v = data.value.answers.q22_1
+  if (v === 'yes') return 'success'
+  if (v === 'partial') return 'warning'
+  if (v === 'no') return 'danger'
+  return 'info'
+})
+
+async function aiFillConclusion() {
+  if (props.isReadonly || !props.wpId) return
+  const text = await generateAndConfirm(
+    'stocktake-questionnaire',
+    auditNote.value || '',
+    {
+      sheet: 'F2-21',
+      locations: locationSummary.value === '未填写' ? undefined : locationSummary.value,
+      personnel: personnelSummary.value === '未填写' ? undefined : personnelSummary.value,
+      q22_1: q22Label.value || undefined,
+      q22_2: data.value.answers.q22_2 || undefined,
+      filledAnswers: Object.fromEntries(
+        Object.entries(data.value.answers).filter(([, v]) => String(v || '').trim()),
+      ),
+    },
+    'AI 生成 · 盘点问卷结论',
+  )
+  if (text) auditNote.value = text
 }
 </script>
 
 <style scoped>
 .f2-questionnaire-wrapper { font-size: var(--wp-font-size, 13px); padding: 12px; }
-.migration-banner { margin-bottom: 12px; }
-.migration-banner .el-button { margin-top: 6px; }
 .objective-alert { margin-bottom: 12px; }
-
-/* 工具栏 */
+.guidance-details { margin-bottom: 12px; font-size: 12px; }
+.guidance-content { padding: 8px 0; color: var(--el-text-color-secondary); line-height: 1.6; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.chip-wrap { display: inline-flex; align-items: center; }
-.hint { font-size: 12px; color: #909399; }
+.toolbar-left, .toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.hint { font-weight: 600; }
+.chip-wrap { display: inline-flex; }
+.summary-card, .audit-note-card { margin-bottom: 12px; }
+.card-header { display: flex; justify-content: space-between; align-items: center; }
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+.summary-item.full { grid-column: 1 / -1; }
+.summary-item .label { font-size: 12px; color: var(--el-text-color-secondary); margin-bottom: 4px; }
+.summary-item .value { font-size: 13px; line-height: 1.45; }
+.summary-item .value.pre { white-space: pre-wrap; }
+.muted { color: var(--el-text-color-placeholder); }
 
-/* 审计说明 / 审计结论卡片 */
-.audit-note-card { margin-top: 16px; }
-.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
-
-/* 编制提示 */
-.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
-.guidance-content p { margin: 2px 0; }
+@media (max-width: 900px) {
+  .summary-grid { grid-template-columns: 1fr; }
+}
 </style>

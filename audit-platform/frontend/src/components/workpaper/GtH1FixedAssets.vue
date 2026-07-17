@@ -292,6 +292,7 @@
  */
 import { ref, computed, onMounted, onUnmounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
@@ -463,9 +464,21 @@ provide('h1OpenVersionHistory', openVersionHistory)
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 let c6EventSource: EventSource | null = null
 
+// 审定数变更 / 试算表更新 → 刷新 allResponses（各子 tab 含附注据此重算跨 sheet 取数）。
+// 经 crossWpEventBridge 统一，无论源底稿走 window 还是 eventBus 都能命中。
+let _refreshTimer: ReturnType<typeof setTimeout> | null = null
+function _handleAdjudicatedRefresh(): void {
+  if (_refreshTimer) clearTimeout(_refreshTimer)
+  _refreshTimer = setTimeout(() => { void selfLoad() }, 400)
+}
+
 onMounted(() => {
   void selfLoad()
   // 版本追踪：已集成 useVersionTrail — createSnapshot 由保存流程触发
+
+  // 附注/取数联动：审定数变更或 TB 更新时刷新（P1 — 修 H1 附注刷新 double no-op）
+  eventBus.on('substantive:adjudicated', _handleAdjudicatedRefresh)
+  eventBus.on('trial-balance:updated', _handleAdjudicatedRefresh)
 
   // 6.9 — subscribe 'control:c6-completed' → 更新 H1A 前置状态
   subscribeC6Completed()
@@ -490,7 +503,12 @@ function subscribeC6Completed() {
   } catch { /* SSE not available */ }
 }
 
-onUnmounted(() => { c6EventSource?.close() })
+onUnmounted(() => {
+  c6EventSource?.close()
+  if (_refreshTimer) clearTimeout(_refreshTimer)
+  eventBus.off('substantive:adjudicated', _handleAdjudicatedRefresh)
+  eventBus.off('trial-balance:updated', _handleAdjudicatedRefresh)
+})
 </script>
 
 <style scoped>

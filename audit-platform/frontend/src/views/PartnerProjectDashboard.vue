@@ -17,6 +17,9 @@
         <el-button @click="goLinkagePanorama" :icon="ConnectionIcon" size="default">
           联动全景图
         </el-button>
+        <el-button @click="goEvidenceGovernance" :icon="FolderChecked" size="default">
+          证据链治理
+        </el-button>
         <el-button :loading="loading" @click="refresh" :icon="RefreshIcon" size="default">
           刷新
         </el-button>
@@ -136,7 +139,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Refresh as RefreshIcon, Connection as ConnectionIcon } from '@element-plus/icons-vue'
+import { Refresh as RefreshIcon, Connection as ConnectionIcon, FolderChecked } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useDashboardData } from '@/composables/useDashboardData'
 import QuickEntryPanel from '@/components/dashboard/QuickEntryPanel.vue'
@@ -208,6 +211,13 @@ function formatTime(isoStr: string): string {
 function goLinkagePanorama() {
   router.push({
     name: 'LinkagePanorama',
+    params: { projectId: route.params.projectId as string },
+  })
+}
+
+function goEvidenceGovernance() {
+  router.push({
+    name: 'EvidenceGovernanceCenter',
     params: { projectId: route.params.projectId as string },
   })
 }

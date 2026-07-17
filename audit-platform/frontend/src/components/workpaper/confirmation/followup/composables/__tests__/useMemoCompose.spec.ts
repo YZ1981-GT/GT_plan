@@ -61,12 +61,13 @@ describe('useMemoCompose', () => {
 
       const { text, missingFields } = compose(row)
 
-      expect(missingFields).toContain('entity_address')
-      expect(missingFields).toContain('confirm_contact')
-      expect(missingFields).toContain('confirm_identity_verified')
-      expect(missingFields).toContain('confirm_location')
-      expect(text).toContain('〔entity_address〕')
-      expect(text).toContain('〔confirm_contact〕')
+      // missingFields 与占位符均为中文标签（供 FollowupMemoPreview 直接展示给审计师）
+      expect(missingFields).toContain('单位地址')
+      expect(missingFields).toContain('确认联系人')
+      expect(missingFields).toContain('身份确认情况')
+      expect(missingFields).toContain('确认地点')
+      expect(text).toContain('〔单位地址〕')
+      expect(text).toContain('〔确认联系人〕')
     })
   })
 
@@ -100,12 +101,12 @@ describe('useMemoCompose', () => {
       const row = makeRow({ scenario: 'later_follow', entity_name: '测试' })
       const { text, missingFields } = compose(row)
 
-      expect(missingFields).toContain('leave_date')
-      expect(missingFields).toContain('leave_contact')
-      expect(missingFields).toContain('follow_call_date')
-      expect(missingFields).toContain('follow_call_phone')
-      expect(missingFields).toContain('follow_call_result')
-      expect(text).toContain('〔leave_date〕')
+      expect(missingFields).toContain('留函日期')
+      expect(missingFields).toContain('留函联系人')
+      expect(missingFields).toContain('跟踪致电日期')
+      expect(missingFields).toContain('跟踪电话')
+      expect(missingFields).toContain('跟踪结果')
+      expect(text).toContain('〔留函日期〕')
     })
   })
 

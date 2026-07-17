@@ -70,7 +70,7 @@ async def _generate_a_program_data(
                         "id": f"row-{it.get('seq')}",
                         "program_no": it.get("seq"),
                         "program_desc": parent_desc,
-                        "program_category": "",
+                        "program_category": it.get("category") or it.get("program_category") or "",
                         "assertions": {},
                         "linked_workpapers": it.get("ref_index", "") or "",
                         "status": status,

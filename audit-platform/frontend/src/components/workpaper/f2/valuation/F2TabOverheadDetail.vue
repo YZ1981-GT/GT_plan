@@ -1,38 +1,33 @@
 <template>
-  <div class="f2-val-sheet">
+  <div class="f2-val-sheet f2-overhead">
     <header class="sheet-header">
       <div><h3>制造费用明细表</h3><span class="code">F2-43</span></div>
       <div class="stat-row">
-        <span class="stat sub">预算 {{ oh.totals.value.budget.toLocaleString() }}</span>
-        <span class="stat sub">实际 {{ oh.totals.value.actual.toLocaleString() }}</span>
-        <span class="stat">分配 {{ oh.totals.value.allocated.toLocaleString() }}</span>
-        <el-tag v-if="oh.mismatchCount.value" type="danger" size="small">{{ oh.mismatchCount.value }} 行分配不符</el-tag>
+        <span class="stat">年度合计 {{ fmt(oh.annualTotal.value) }}</span>
+        <el-tag v-if="oh.highVarianceCount.value" type="warning" size="small">
+          变动超20% {{ oh.highVarianceCount.value }} 项
+        </el-tag>
       </div>
     </header>
 
-    <!-- 编制提示 -->
-    <details class="guidance-details">
-      <summary>📋 编制提示</summary>
-      <div class="guidance-content">
-        <p>1. 制造费用按费用项目归集预算、实际与分配额，验证费用归集完整性与分配方法的合理性、一贯性（CAS 1 号存货加工成本）。</p>
-        <p>2. 灰色底纹列为自动计算列（变动率），据实际与预算自动测算，不可手工编辑。</p>
-        <p>3. 分配额与预算/实际不符的行自动标红，须核查分配基准是否恰当、是否存在费用跨期或错误归集。</p>
-        <p>4. 关注将期间费用错误计入制造费用、或制造费用未按受益对象合理分配导致存货成本失真的情形。</p>
-      </div>
-    </details>
+    <div class="section-label">一、审计目标</div>
+    <ol class="objectives">
+      <li v-for="(obj, i) in objectives" :key="i">{{ obj }}</li>
+    </ol>
 
-    <!-- 审计目标 -->
-    <el-alert
-      type="info"
-      :closable="false"
-      title="审计目标：验证制造费用归集的完整性与分配方法的合理性、一贯性，通过预算与实际对比识别异常波动，确认制造费用计入存货成本的准确性。"
-      class="objective-alert"
+    <div class="section-label">二、审计程序</div>
+    <el-input
+      :model-value="oh.auditProcedure.value"
+      type="textarea"
+      :autosize="{ minRows: 2, maxRows: 4 }"
+      :disabled="isReadonly"
+      class="section-text"
+      :placeholder="defaultProcedure"
+      @update:model-value="(v: string) => oh.setProcedure(v)"
     />
 
     <div class="tab-toolbar">
-      <div class="toolbar-left">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="oh.addRow()">+ 新增费用项</el-button>
-      </div>
+      <div class="toolbar-left" />
       <div class="toolbar-right">
         <F2SheetToolbar
           :wp-id="wpId"
@@ -44,76 +39,118 @@
           review-section="F2-43-conclusion"
           @ai-filled="(t: string) => { oh.auditNote.value = t }"
         />
-        <span class="chip-wrap"><GtIndexChip value="wp:F2-1" /></span>
-        <el-tag size="small" type="info">共 {{ oh.enrichedRows.value.length }} 行</el-tag>
+        <span class="chip-wrap"><GtIndexChip value="wp:F2-43" /></span>
       </div>
     </div>
 
-    <el-table
-      :data="oh.enrichedRows.value" border size="small" max-height="460"
-      :row-class-name="({ row }) => row.allocMismatch ? 'error-row' : ''"
-    >
-      <el-table-column label="费用项目" width="140">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.costItem" size="small"
-            @change="(v: string) => oh.updateRow(row.rowId, { costItem: v })" />
-          <span v-else>{{ row.costItem }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="预算" width="100">
-        <template #default="{ row }">
-          <el-input-number :model-value="row.budgetAmt" size="small" :controls="false" :disabled="isReadonly"
-            class="compact-num" @change="(v: number) => oh.updateRow(row.rowId, { budgetAmt: v ?? 0 })" />
-        </template>
-      </el-table-column>
-      <el-table-column label="实际" width="100">
-        <template #default="{ row }">
-          <el-input-number :model-value="row.actualAmt" size="small" :controls="false" :disabled="isReadonly"
-            class="compact-num" @change="(v: number) => oh.updateRow(row.rowId, { actualAmt: v ?? 0 })" />
-        </template>
-      </el-table-column>
-      <el-table-column label="分配额" width="100">
-        <template #default="{ row }">
-          <el-input-number :model-value="row.allocatedAmt" size="small" :controls="false" :disabled="isReadonly"
-            class="compact-num" @change="(v: number) => oh.updateRow(row.rowId, { allocatedAmt: v ?? 0 })" />
-        </template>
-      </el-table-column>
-      <el-table-column label="变动率" width="85" align="right" class-name="auto-calc-col">
-        <template #default="{ row }">
-          <span v-if="row.varianceRate !== '' && row.varianceRate !== 'N/A'" class="formula" title="(实际 − 预算) ÷ 预算 × 100%">
-            {{ (Number(row.varianceRate) * 100).toFixed(1) }}%
-          </span>
-          <span v-else>—</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="" width="48">
-        <template #default="{ row }">
-          <el-button link type="danger" size="small" :disabled="isReadonly" @click="oh.removeRow(row.rowId)">删</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div class="table-scroll">
+      <table class="matrix-table">
+        <thead>
+          <tr>
+            <th rowspan="2" class="col-item">项目</th>
+            <th colspan="12">月份</th>
+            <th rowspan="2" class="col-total">合计</th>
+            <th rowspan="2" class="col-prior">上年度</th>
+            <th rowspan="2" class="col-rate">变动率</th>
+            <th rowspan="2" class="col-reason">变动原因</th>
+          </tr>
+          <tr>
+            <th v-for="m in monthLabels" :key="m.key">{{ m.label }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="row in oh.enriched.value.rows"
+            :key="row.key"
+            :class="{
+              'row-total': row.kind === 'total',
+              'row-warn': row.kind === 'item' && isHighVariance(row),
+            }"
+          >
+            <td class="col-item" :class="{ indent: row.key === 'other' }">{{ row.label }}</td>
+            <td v-for="mk in monthKeys" :key="mk">
+              <el-input-number
+                v-if="row.kind === 'item' && !isReadonly"
+                :model-value="row.months[mk]"
+                size="small"
+                :controls="false"
+                class="compact-num"
+                @change="(v: number | undefined) => oh.updateMonth(row.key as OverheadItemKey, mk, v ?? 0)"
+              />
+              <span v-else class="auto">{{ fmt(row.months[mk]) }}</span>
+            </td>
+            <td class="auto col-total">{{ fmt(row.total) }}</td>
+            <td>
+              <el-input-number
+                v-if="row.kind === 'item' && !isReadonly"
+                :model-value="row.priorYear"
+                size="small"
+                :controls="false"
+                class="compact-num"
+                @change="(v: number | undefined) => oh.updateRowMeta(row.key as OverheadItemKey, { priorYear: v ?? 0 })"
+              />
+              <span v-else class="auto">{{ fmt(row.priorYear) }}</span>
+            </td>
+            <td class="auto col-rate" :class="{ 'var-warn': isHighVariance(row) }">
+              {{ fmtRate(row.changeRate) }}
+            </td>
+            <td>
+              <el-input
+                v-if="row.kind === 'item' && !isReadonly"
+                :model-value="row.changeReason"
+                size="small"
+                @update:model-value="(v: string) => oh.updateRowMeta(row.key as OverheadItemKey, { changeReason: v })"
+              />
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
-    <el-card class="opinion-card" shadow="never">
-      <template #header>
-        <div class="opinion-header"><span class="opinion-title">审计说明</span></div>
-      </template>
-      <el-input v-model="oh.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="制造费用明细审计说明..." />
+    <el-card shadow="never" class="conclusion-card">
+      <template #header><span class="conclusion-header">三、审计说明</span></template>
+      <el-input
+        v-model="oh.auditNote.value"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="制造费用明细审计说明..."
+      />
     </el-card>
 
-    <el-card class="opinion-card" shadow="never">
-      <template #header>
-        <div class="opinion-header"><span class="opinion-title">审计结论</span></div>
-      </template>
-      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。" @change="saveAuditConclusion" />
+    <el-card shadow="never" class="conclusion-card">
+      <template #header><span class="conclusion-header">四、审计结论</span></template>
+      <el-input
+        :model-value="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 2, maxRows: 6 }"
+        :disabled="isReadonly"
+        placeholder="填写审计结论。"
+        @update:model-value="saveAuditConclusion"
+      />
     </el-card>
+
+    <div class="tips-box">
+      <div class="tips-title">提示</div>
+      <ol>
+        <li v-for="(tip, i) in tips" :key="i">{{ tip }}</li>
+      </ol>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, toRef } from 'vue'
 import { useF2OverheadDetail } from '../../composables/useF2OverheadDetail'
+import {
+  OVERHEAD_MONTH_KEYS,
+  OVERHEAD_MONTH_LABELS,
+  F2_43_OBJECTIVES,
+  F2_43_PROCEDURE,
+  F2_43_TIPS,
+  type OverheadItemKey,
+  type OverheadMatrixRow,
+} from '../../composables/useF2OverheadMatrixFormulas'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
@@ -123,12 +160,18 @@ const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()
+
 const oh = useF2OverheadDetail({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-// ─── 审计结论（独立持久化，F2 计价组事件） ───────────────────────────────
+const objectives = F2_43_OBJECTIVES
+const tips = F2_43_TIPS
+const defaultProcedure = F2_43_PROCEDURE
+const monthKeys = OVERHEAD_MONTH_KEYS
+const monthLabels = OVERHEAD_MONTH_LABELS
+
 const CONCLUSION_KEY = 'F2-43-audit-conclusion'
 const auditConclusion = ref('')
 function saveAuditConclusion(val: string): void {
@@ -142,6 +185,72 @@ onMounted(() => {
   const c = props.allResponses.get(CONCLUSION_KEY)
   if (c?.remark) auditConclusion.value = c.remark
 })
+
+function isHighVariance(row: OverheadMatrixRow): boolean {
+  return row.kind === 'item' && typeof row.changeRate === 'number' && Math.abs(row.changeRate) > 0.2
+}
+
+function fmt(v: number): string {
+  if (v === 0 || !Number.isFinite(v)) return '—'
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function fmtRate(r: number | '' | 'N/A'): string {
+  if (r === '' || r === 'N/A') return '—'
+  return `${(r * 100).toFixed(2)}%`
+}
 </script>
 
 <style scoped src="./f2ValSheetStyles.css"></style>
+<style scoped>
+.f2-overhead { --gt-purple: #4b2d77; --gt-purple-soft: #f3eef8; }
+.section-label { margin: 14px 0 8px; font-size: 14px; font-weight: 600; color: #303133; }
+.section-text { margin-bottom: 10px; }
+.objectives { margin: 0 0 12px; padding-left: 1.4em; font-size: 13px; line-height: 1.7; color: #606266; }
+
+.table-scroll { overflow-x: auto; margin-bottom: 12px; }
+.matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 1280px;
+}
+.matrix-table th,
+.matrix-table td {
+  border: 1px solid #d4c8e0;
+  padding: 2px 3px;
+  text-align: center;
+  vertical-align: middle;
+}
+.matrix-table thead th {
+  background: var(--gt-purple-soft);
+  color: #3d2a55;
+  font-weight: 600;
+}
+.col-item { width: 110px; text-align: left !important; padding-left: 8px !important; background: #faf8fc; }
+.col-total { background: #f0ebf5 !important; min-width: 80px; }
+.col-prior { min-width: 80px; }
+.col-rate { min-width: 64px; }
+.col-reason { min-width: 100px; }
+.row-total td { background: #f0ebf5; font-weight: 600; }
+.row-warn td { background: #fdf6ec; }
+.auto { display: block; text-align: right; padding-right: 4px; white-space: nowrap; color: #606266; }
+.var-warn { color: #f56c6c !important; font-weight: 600; }
+
+.conclusion-card { margin-top: 14px; }
+.conclusion-header { font-weight: 600; font-size: 14px; }
+.tips-box {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #ecf5ff;
+  border-left: 3px solid #409eff;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.tips-title { font-weight: 600; color: #409eff; margin-bottom: 6px; }
+.tips-box ol { margin: 0; padding-left: 1.4em; }
+
+:deep(.compact-num) { width: 68px; }
+:deep(.compact-num .el-input__inner) { text-align: right; padding: 0 3px; font-size: 11px; }
+</style>

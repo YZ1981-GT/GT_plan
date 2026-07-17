@@ -43,7 +43,7 @@ export const CYCLE_IMPORT_EXPORT: Record<string, CycleImportExportEntry> = {
   },
   'f2-st': {
     apiPrefix: 'f2-st',
-    sheets: ['F2-24', 'F2-25', 'F2-26'],
+    sheets: ['F2-24', 'F2-24-count', 'F2-25', 'F2-25-floor', 'F2-26', 'F2-26-after'],
   },
   f3: {
     apiPrefix: 'f3',
@@ -73,6 +73,29 @@ export const CYCLE_IMPORT_EXPORT: Record<string, CycleImportExportEntry> = {
 }
 
 export const COMPOUND_IMPORT_EXPORT: Record<string, CompoundImportExportGroup[]> = {
+  'f2-st': [
+    {
+      baseSheet: 'F2-24',
+      variants: [
+        { label: '截止日核对', sheet: 'F2-24' },
+        { label: '盘点日核对', sheet: 'F2-24-count' },
+      ],
+    },
+    {
+      baseSheet: 'F2-25',
+      variants: [
+        { label: '记录→实物', sheet: 'F2-25' },
+        { label: '实物→记录', sheet: 'F2-25-floor' },
+      ],
+    },
+    {
+      baseSheet: 'F2-26',
+      variants: [
+        { label: '日后倒推', sheet: 'F2-26-after' },
+        { label: '日前顺推', sheet: 'F2-26' },
+      ],
+    },
+  ],
   f4: [
     {
       baseSheet: 'F4-7',
@@ -113,12 +136,12 @@ export function resolveImportExportSheet(
 ): { apiPrefix: string; sheet: string; variants?: CompoundImportExportGroup['variants'] } | null {
   const entry = CYCLE_IMPORT_EXPORT[cycleKey]
   if (!entry) return null
-  if (entry.sheets.includes(sheetCode)) {
-    return { apiPrefix: entry.apiPrefix, sheet: sheetCode }
-  }
   const group = (COMPOUND_IMPORT_EXPORT[cycleKey] ?? []).find((g) => g.baseSheet === sheetCode)
   if (group) {
     return { apiPrefix: entry.apiPrefix, sheet: group.variants[0].sheet, variants: group.variants }
+  }
+  if (entry.sheets.includes(sheetCode)) {
+    return { apiPrefix: entry.apiPrefix, sheet: sheetCode }
   }
   return null
 }

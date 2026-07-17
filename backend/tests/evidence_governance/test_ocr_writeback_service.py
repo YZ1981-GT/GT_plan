@@ -80,7 +80,13 @@ except Exception:
 
 
 def _patch_partial_unique_for_sqlite():
-    """Remove postgresql_where from partial unique indexes for SQLite."""
+    """Remove postgresql_where from partial unique indexes for SQLite.
+
+    Returns the list of swapped indexes so callers can restore the canonical
+    (unique/partial) indexes after create_all — leaving the shared ORM metadata
+    unmodified for the rest of the aggregated test session.
+    """
+    removed: list[tuple] = []
     for model in [OcrConfirmation, OcrWriteback, OcrWritebackStaging]:
         table = model.__table__
         for idx in list(table.indexes):
@@ -92,6 +98,15 @@ def _patch_partial_unique_for_sqlite():
                     unique=False,
                 )
                 table.indexes.add(new_idx)
+                removed.append((table, new_idx, idx))
+    return removed
+
+
+def _restore_partial_unique(removed: list[tuple]) -> None:
+    """Restore the canonical (unique/partial) indexes swapped out for SQLite."""
+    for table, temp_idx, original_idx in removed:
+        table.indexes.discard(temp_idx)
+        table.indexes.add(original_idx)
 
 
 @pytest_asyncio.fixture
@@ -110,8 +125,9 @@ async def db_session():
         cursor.close()
 
     async with engine.begin() as conn:
-        _patch_partial_unique_for_sqlite()
+        _removed = _patch_partial_unique_for_sqlite()
         await conn.run_sync(Base.metadata.create_all)
+        _restore_partial_unique(_removed)
 
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

@@ -1,14 +1,30 @@
 /**
  * useAlternativeH05Data — H0-5 固定资产循环替代程序数据 composable
  *
- * Master-Detail（公司→4 区块检查表）
- * - loadAll / persistAll（_format: alternative-h05-v1）
- * - importFromSummary（H0-1 未回函，对标 D0-1→D0-5）
- * - 四区块 CRUD + 合计 + 检查比例
+ * confirmation-alternative-factory-convergence Task 9（H05 迁移）：
+ * 本 composable 已迁移为 Shared_Core 工厂 `createAlternativeConfirmationData` 的
+ * 薄适配器——构造 H05 的 AltConfig + 调工厂 + 旁挂 H05 附加能力
+ * （loading / importFromSummary / loadAll / persistAll）。
  *
- * Requirements: 2, 3
+ * 零回归约束：导出名 `useAlternativeH05Data`、props 签名 `{wpId, projectId, htmlData,
+ * readonly}`、返回对象形状与类型（`UseAlternativeH05DataReturn`，buildPayload 返回
+ * `AlternativeH05Payload`）逐字不变；H05 现有 characterization spec 不改任何断言必须全绿。
+ *
+ * H05 差异（经 AltConfig 声明）：
+ * - format = 'alternative-h05-v1'
+ * - getSumFields = getSumFieldsH05
+ * - defaultBalance = () => ({ item_name: '固定资产' })
+ * - baseAmount = parseNum(c.balance?.closing_balance ?? c.balance?.ending_balance ?? 0)（期末余额）
+ * - ratios：block2 ownership（contract_amount ?? invoice_amount ?? payment_amount）→ ownership_check_ratio；
+ *           block1 acceptance（voucher_amount）→ post_acceptance_ratio
+ * - metricRatioKeys：metrics.receipt_ratio←acceptance、shipment_ratio←ownership
+ * - calcTotal/calcRatio/parseNum 注入 useH0FormulaEngine 的
+ *   calcBlockTotal/calcCheckRatio/parseNum（保证与原实现逐字等价，含 Infinity→0 语义）
+ *
+ * H05 附加能力（适配器旁挂，不进工厂）：
+ * - loading ref、importFromSummary（H0-1 未回函带入，逐字保留原实现）、loadAll、persistAll
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, type Ref, type ComputedRef } from 'vue'
 import type {
   AlternativeCompany,
   AlternativeD05Metrics,
@@ -17,16 +33,9 @@ import type {
 } from '../../alternativeD05/alternativeD05Types'
 import type { AlternativeH05Payload, H01UnrepliedEntity } from '../alternativeH05Types'
 import { getSumFieldsH05 } from '../blockColumnConfigsH05'
-import { calcCheckRatio as calcRatio, calcBlockTotal as calcTotal, parseNum } from './useH0FormulaEngine'
+import { calcCheckRatio, calcBlockTotal, parseNum } from './useH0FormulaEngine'
+import { createAlternativeConfirmationData } from '../../coordination/createAlternativeConfirmationData'
 import http from '@/utils/http'
-
-function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
-}
-
-function precise(n: number): number {
-  return Math.round(n * 100) / 100
-}
 
 export interface UseAlternativeH05DataProps {
   wpId: string
@@ -59,135 +68,47 @@ export interface UseAlternativeH05DataReturn {
 }
 
 export function useAlternativeH05Data(props: UseAlternativeH05DataProps): UseAlternativeH05DataReturn {
-  const companies = ref<AlternativeCompany[]>([])
-  const isDirty = ref(false)
-  const selectedCompanyId = ref<string | null>(null)
+  const core = createAlternativeConfirmationData({
+    format: 'alternative-h05-v1',
+    getSumFields: getSumFieldsH05,
+    // H05 默认 balance 带 item_name='固定资产'
+    defaultBalance: () => ({ item_name: '固定资产' }),
+    // 比例分母基数：期末余额（closing_balance 缺失回退 ending_balance，再缺失/0 → emptyBase='null'）
+    baseAmount: (c: AlternativeCompany) =>
+      parseNum(c.balance?.closing_balance ?? c.balance?.ending_balance ?? 0),
+    ratios: [
+      { key: 'ownership', block: 'block2', fields: ['contract_amount', 'invoice_amount', 'payment_amount'], payloadKey: 'ownership_check_ratio' },
+      { key: 'acceptance', block: 'block1', fields: ['voucher_amount'], payloadKey: 'post_acceptance_ratio' },
+    ],
+    emptyBase: 'null',
+    // metrics receipt_ratio←acceptance、shipment_ratio←ownership
+    metricRatioKeys: { receipt: 'acceptance', shipment: 'ownership' },
+    // 注入 useH0FormulaEngine 纯函数，保证与原实现逐字等价
+    calcTotal: calcBlockTotal,
+    calcRatio: calcCheckRatio,
+    parseNum,
+    htmlData: props.htmlData,
+  })
+
+  // ─── H05 附加能力（旁挂，不进工厂） ───────────────────────────────────────
+
   const loading = ref(false)
 
-  // ─── Load / Persist ───────────────────────────────────────────────────────
-
   function loadAll() {
-    initFromHtmlData(props.htmlData())
-  }
-
-  function initFromHtmlData(data: any) {
-    if (!data || data._format !== 'alternative-h05-v1') {
-      companies.value = []
-      return
-    }
-    companies.value = Array.isArray(data.companies) ? data.companies.map(ensureCompanyId) : []
-    isDirty.value = false
+    core._initFromHtmlData(props.htmlData())
   }
 
   function persistAll(): AlternativeH05Payload {
-    return buildPayload()
-  }
-
-  function buildPayload(): AlternativeH05Payload {
-    return {
-      _format: 'alternative-h05-v1',
-      companies: companies.value.map((company) => ({
-        ...company,
-        balance: {
-          ...company.balance,
-          ownership_check_ratio: getCheckRatio(company, 'ownership'),
-          post_acceptance_ratio: getCheckRatio(company, 'acceptance'),
-        },
-      })),
-    }
-  }
-
-  // ─── ID helpers ───────────────────────────────────────────────────────────
-
-  function ensureCompanyId(company: AlternativeCompany): AlternativeCompany {
-    return {
-      ...company,
-      _company_id: company._company_id || generateId(),
-      block1_rows: (company.block1_rows || []).map(ensureRowId),
-      block2_rows: (company.block2_rows || []).map(ensureRowId),
-      block3_rows: (company.block3_rows || []).map(ensureRowId),
-      block4_rows: (company.block4_rows || []).map(ensureRowId),
-    }
-  }
-
-  function ensureRowId(row: CheckRow): CheckRow {
-    if (!row._row_id) return { ...row, _row_id: generateId() }
-    return row
-  }
-
-  // ─── Init ─────────────────────────────────────────────────────────────────
-
-  loadAll()
-  watch(() => props.htmlData(), () => { loadAll() }, { deep: true })
-
-  // ─── Company CRUD ─────────────────────────────────────────────────────────
-
-  function addCompany(partial?: Partial<AlternativeCompany>): AlternativeCompany {
-    const maxSeq = companies.value.reduce((max, c) => Math.max(max, c.seq ?? 0), 0)
-    const newCompany: AlternativeCompany = {
-      _company_id: generateId(),
-      seq: maxSeq + 1,
-      entity_name: '',
-      _source: 'manual',
-      sampling: {},
-      balance: { item_name: '固定资产' },
-      block1_rows: [],
-      block2_rows: [],
-      block3_rows: [],
-      block4_rows: [],
-      conclusion: {},
-      ...partial,
-    }
-    companies.value.push(newCompany)
-    isDirty.value = true
-    return newCompany
-  }
-
-  function deleteCompany(companyId: string) {
-    companies.value = companies.value.filter((c) => c._company_id !== companyId)
-    if (selectedCompanyId.value === companyId) {
-      selectedCompanyId.value = companies.value[0]?._company_id ?? null
-    }
-    isDirty.value = true
-  }
-
-  function updateCompany(companyId: string, field: string, value: any) {
-    const company = companies.value.find((c) => c._company_id === companyId)
-    if (!company) return
-    ;(company as any)[field] = value
-    isDirty.value = true
-  }
-
-  /**
-   * 批量导入公司（通用，按 confirm_index 去重）
-   */
-  function importCompanies(items: Partial<AlternativeCompany>[]) {
-    const existingIndexes = new Set(companies.value.map((c) => c.confirm_index).filter(Boolean))
-    const deduped = items.filter((item) => !item.confirm_index || !existingIndexes.has(item.confirm_index))
-    const maxSeq = companies.value.reduce((max, c) => Math.max(max, c.seq ?? 0), 0)
-    deduped.forEach((item, i) => {
-      companies.value.push({
-        _company_id: generateId(),
-        seq: maxSeq + i + 1,
-        entity_name: item.entity_name || '',
-        confirm_index: item.confirm_index,
-        _source: item._source || 'auto',
-        sampling: item.sampling || {},
-        balance: { item_name: '固定资产', ...(item.balance || {}) },
-        block1_rows: [],
-        block2_rows: [],
-        block3_rows: [],
-        block4_rows: [],
-        conclusion: {},
-      })
-    })
-    isDirty.value = true
+    return core.buildPayload() as AlternativeH05Payload
   }
 
   /**
    * 从 H0-1 函证汇总表带入未回函公司（对标 D0-1→D0-5 模式）
    * 调用后端 API 获取 H0-1 未回函列表，按 confirm_index 去重后插入
    * @returns 新增公司数量
+   *
+   * 逐字保留原实现：直接 push 带 closing_balance 的公司（core.importCompanies
+   * 不带 closing_balance 语义，故此处保留原内联 push + core._generateId 以零回归）。
    */
   async function importFromSummary(): Promise<number> {
     loading.value = true
@@ -200,17 +121,17 @@ export function useAlternativeH05Data(props: UseAlternativeH05DataProps): UseAlt
       if (!entities.length) return 0
 
       const existingIndexes = new Set(
-        companies.value.map((c) => c.confirm_index).filter(Boolean),
+        core.companies.value.map((c) => c.confirm_index).filter(Boolean),
       )
       const newItems = entities.filter(
         (e) => !e.confirm_index || !existingIndexes.has(e.confirm_index),
       )
       if (!newItems.length) return 0
 
-      const maxSeq = companies.value.reduce((max, c) => Math.max(max, c.seq ?? 0), 0)
+      const maxSeq = core.companies.value.reduce((max, c) => Math.max(max, c.seq ?? 0), 0)
       newItems.forEach((item, i) => {
-        companies.value.push({
-          _company_id: generateId(),
+        core.companies.value.push({
+          _company_id: core._generateId(),
           seq: maxSeq + i + 1,
           entity_name: item.entity_name || '',
           confirm_index: item.confirm_index,
@@ -227,151 +148,22 @@ export function useAlternativeH05Data(props: UseAlternativeH05DataProps): UseAlt
           conclusion: {},
         })
       })
-      isDirty.value = true
+      core.isDirty.value = true
       return newItems.length
     } finally {
       loading.value = false
     }
   }
 
-  // ─── Block Row CRUD ───────────────────────────────────────────────────────
-
-  function getBlockRows(company: AlternativeCompany, blockType: BlockType): CheckRow[] {
-    const key = `${blockType}_rows` as keyof AlternativeCompany
-    return (company[key] as CheckRow[]) || []
-  }
-
-  function setBlockRows(company: AlternativeCompany, blockType: BlockType, rows: CheckRow[]) {
-    const key = `${blockType}_rows` as keyof AlternativeCompany
-    ;(company as any)[key] = rows
-  }
-
-  function addBlockRow(companyId: string, blockType: BlockType): CheckRow | undefined {
-    const company = companies.value.find((c) => c._company_id === companyId)
-    if (!company) return undefined
-    const rows = getBlockRows(company, blockType)
-    const maxSeq = rows.reduce((max, r) => Math.max(max, r.seq ?? 0), 0)
-    const newRow: CheckRow = { _row_id: generateId(), seq: maxSeq + 1, _source: 'manual', is_abnormal: '否' }
-    rows.push(newRow)
-    setBlockRows(company, blockType, rows)
-    isDirty.value = true
-    return newRow
-  }
-
-  function deleteBlockRow(companyId: string, blockType: BlockType, rowId: string) {
-    const company = companies.value.find((c) => c._company_id === companyId)
-    if (!company) return
-    setBlockRows(company, blockType, getBlockRows(company, blockType).filter((r) => r._row_id !== rowId))
-    isDirty.value = true
-  }
-
-  function updateBlockField(companyId: string, blockType: BlockType, rowId: string, field: string, value: any) {
-    const company = companies.value.find((c) => c._company_id === companyId)
-    if (!company) return
-    const row = getBlockRows(company, blockType).find((r) => r._row_id === rowId)
-    if (!row) return
-    row[field] = value
-    isDirty.value = true
-  }
-
-  // ─── Computed: totals & ratios ────────────────────────────────────────────
-
-  function getBlockTotal(company: AlternativeCompany, blockType: BlockType): Record<string, number> {
-    const rows = getBlockRows(company, blockType)
-    const fields = getSumFieldsH05(blockType)
-    const totals: Record<string, number> = {}
-    for (const field of fields) {
-      const amounts = rows.map((r) => parseNum(r[field]))
-      totals[field] = precise(calcTotal(amounts))
-    }
-    return totals
-  }
-
-  function getClosingBalance(company: AlternativeCompany): number {
-    return parseNum(company.balance?.closing_balance ?? company.balance?.ending_balance ?? 0)
-  }
-
-  /**
-   * 检查比例计算
-   * - ownership: 区块②余额支持性证据合计 / 期末余额
-   * - acceptance: 区块①期后验收合计 / 期末余额
-   */
-  function getCheckRatio(company: AlternativeCompany, type: 'ownership' | 'acceptance'): number | null {
-    const closing = getClosingBalance(company)
-    if (!closing) return null
-    if (type === 'ownership') {
-      const totals = getBlockTotal(company, 'block2')
-      const sum = totals.contract_amount ?? totals.invoice_amount ?? totals.payment_amount ?? 0
-      return precise(calcRatio(sum, closing) * 100)
-    }
-    // acceptance: block1 voucher_amount
-    const totals = getBlockTotal(company, 'block1')
-    const sum = totals.voucher_amount ?? 0
-    return precise(calcRatio(sum, closing) * 100)
-  }
-
-  function getCompletionStatus(company: AlternativeCompany) {
-    const blocks: BlockType[] = ['block1', 'block2', 'block3', 'block4']
-    let completed = 0
-    for (const bt of blocks) {
-      if (getBlockRows(company, bt).length > 0) completed++
-    }
-    return { completed, total: 4, rate: Math.round((completed / 4) * 100) }
-  }
-
-  function hasAbnormal(company: AlternativeCompany): boolean {
-    for (const bt of ['block1', 'block2', 'block3', 'block4'] as BlockType[]) {
-      if (getBlockRows(company, bt).some((r) => r.is_abnormal === '是')) return true
-    }
-    return false
-  }
-
-  // ─── Metrics ──────────────────────────────────────────────────────────────
-
-  const metrics = computed<AlternativeD05Metrics>(() => {
-    let completedCount = 0
-    let abnormalCount = 0
-    const ratioDistribution: AlternativeD05Metrics['ratio_distribution'] = []
-    for (const company of companies.value) {
-      const status = getCompletionStatus(company)
-      if (status.completed === 4) completedCount++
-      if (hasAbnormal(company)) abnormalCount++
-      ratioDistribution.push({
-        entity_name: company.entity_name || '未命名',
-        receipt_ratio: getCheckRatio(company, 'acceptance'),
-        shipment_ratio: getCheckRatio(company, 'ownership'),
-      })
-    }
-    const total = companies.value.length
-    return {
-      total_companies: total,
-      completed_companies: completedCount,
-      abnormal_companies: abnormalCount,
-      ratio_distribution: ratioDistribution,
-      completion_rate: total > 0 ? Math.round((completedCount / total) * 100) : 0,
-    }
-  })
-
   return {
-    companies,
-    isDirty,
-    selectedCompanyId,
+    ...core,
     loading,
-    addCompany,
-    deleteCompany,
-    updateCompany,
-    importCompanies,
+    // getCheckRatio 是 H05 对通用 getRatio 的命名别名（type 'ownership'|'acceptance'）
+    getCheckRatio: (c: AlternativeCompany, type: 'ownership' | 'acceptance') => core.getRatio(c, type),
     importFromSummary,
-    addBlockRow,
-    deleteBlockRow,
-    updateBlockField,
-    getBlockTotal,
-    getCheckRatio,
-    getCompletionStatus,
-    hasAbnormal,
-    metrics,
     loadAll,
     persistAll,
-    buildPayload,
+    // 工厂 buildPayload 返回 {_format:string,...}，收窄为 AlternativeH05Payload
+    buildPayload: () => core.buildPayload() as AlternativeH05Payload,
   }
 }

@@ -1,47 +1,84 @@
 <template>
-  <div class="f2-contract-check">
-    <!-- 编制提示 -->
+  <div class="f2-val-sheet f2-contract-check">
+    <header class="sheet-header">
+      <div>
+        <h3>合同履约成本检查表</h3>
+        <span class="code">F2-56</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat">测试金额 {{ fmt(chk.stats.value.testedAmount) }}</span>
+        <span class="stat sub">不正确 {{ fmt(chk.stats.value.incorrectAmount) }}</span>
+        <span class="stat sub">差错率 {{ fmtPct(chk.stats.value.errorRate) }}</span>
+        <span class="stat-text" :class="{ warn: chk.isCoverageLow.value }">
+          覆盖率 {{ chk.coverageRatio.value.toFixed(1) }}%
+        </span>
+        <el-tag v-if="chk.issueCount.value" type="danger" size="small">
+          异常 {{ chk.issueCount.value }} 笔
+        </el-tag>
+      </div>
+    </header>
+
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>1. 合同履约成本按 CAS14 号确认，须同时满足：与合同（或预期取得的合同）直接相关、增加未来用于履约的资源、预期能够收回。</p>
-        <p>2. 按重要性与可容忍错报确定样本量，抽取凭证检查其真实性、计量准确性与期间归属。</p>
-        <p>3. 关注是否将不符合资本化条件的支出（如管理费用、非正常消耗）错误计入合同履约成本。</p>
-        <p>4. 覆盖率偏低（低于阈值标红）时应扩大样本量或补充分析性程序，并在审计说明中记录。</p>
+        <p v-for="(tip, i) in tips" :key="i">{{ i + 1 }}. {{ tip }}</p>
       </div>
     </details>
 
-    <!-- 审计目标 -->
-    <el-alert type="info" :closable="false" show-icon class="objective-alert">
-      <template #title>审计目标：检查合同履约成本的真实性、完整性与计量准确性，确认其符合资本化条件且期间归属正确。</template>
-    </el-alert>
+    <F2ContractCostTestExampleRef />
 
-    <el-card shadow="never" class="params-card">
-      <template #header>抽样参数</template>
+    <div class="section-block">
+      <div class="section-label">一、审计目标</div>
+      <ol class="objective-list">
+        <li v-for="(obj, i) in objectives" :key="i">{{ obj }}</li>
+      </ol>
+    </div>
+
+    <div class="section-block">
+      <div class="section-label">二、样本选取标准与范围</div>
       <div class="params-grid">
+        <label class="wide">样本总体
+          <el-input v-if="!isReadonly" :model-value="chk.params.value.populationDesc" size="small"
+            @update:model-value="(v: string) => chk.updateParams({ populationDesc: v })" />
+          <span v-else>{{ chk.params.value.populationDesc }}</span>
+        </label>
+        <label class="wide">选取方法
+          <el-input v-if="!isReadonly" :model-value="chk.params.value.method" size="small"
+            @update:model-value="(v: string) => chk.updateParams({ method: v })" />
+          <span v-else>{{ chk.params.value.method }}</span>
+        </label>
+        <label class="full">选取过程
+          <el-input v-if="!isReadonly" :model-value="chk.params.value.process" type="textarea" :rows="2"
+            @update:model-value="(v: string) => chk.updateParams({ process: v })" />
+          <span v-else>{{ chk.params.value.process || '—' }}</span>
+        </label>
         <label>总体金额
           <el-input-number :model-value="chk.params.value.populationAmount" size="small" :controls="false"
-            :disabled="isReadonly" @change="(v: number) => chk.updateParams({ populationAmount: v ?? 0 })" />
+            :disabled="isReadonly" class="compact-num wide"
+            @change="(v: number | undefined) => chk.updateParams({ populationAmount: v ?? 0 })" />
         </label>
         <label>重要性
           <el-input-number :model-value="chk.params.value.materiality" size="small" :controls="false"
-            :disabled="isReadonly" @change="(v: number) => chk.updateParams({ materiality: v ?? 0 })" />
+            :disabled="isReadonly" class="compact-num wide"
+            @change="(v: number | undefined) => chk.updateParams({ materiality: v ?? 0 })" />
         </label>
         <label>可容忍错报
           <el-input-number :model-value="chk.params.value.tolerableMisstatement" size="small" :controls="false"
-            :disabled="isReadonly" @change="(v: number) => chk.updateParams({ tolerableMisstatement: v ?? 0 })" />
+            :disabled="isReadonly" class="compact-num wide"
+            @change="(v: number | undefined) => chk.updateParams({ tolerableMisstatement: v ?? 0 })" />
+        </label>
+        <label>预期错报
+          <el-input-number :model-value="chk.params.value.expectedMisstatement" size="small" :controls="false"
+            :disabled="isReadonly" class="compact-num wide"
+            @change="(v: number | undefined) => chk.updateParams({ expectedMisstatement: v ?? 0 })" />
         </label>
         <label>样本量
           <el-input-number :model-value="chk.params.value.sampleSize" size="small" :controls="false"
-            :disabled="isReadonly" @change="(v: number) => chk.updateParams({ sampleSize: v ?? 0 })" />
-        </label>
-        <label>抽样方法
-          <el-input v-if="!isReadonly" :model-value="chk.params.value.method" size="small"
-            @change="(v: string) => chk.updateParams({ method: v })" />
-          <span v-else>{{ chk.params.value.method }}</span>
+            :disabled="isReadonly" class="compact-num"
+            @change="(v: number | undefined) => chk.updateParams({ sampleSize: v ?? 0 })" />
         </label>
       </div>
-    </el-card>
+    </div>
 
     <el-collapse v-if="wpId && projectId && !isReadonly" class="sampling-collapse">
       <el-collapse-item title="⚡ 自动抽凭（科目 1410 合同履约成本）" name="sampling">
@@ -57,13 +94,9 @@
       </el-collapse-item>
     </el-collapse>
 
-    <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="chk.addRow()">+ 新增样本</el-button>
-        <span class="stat-text">检查合计: {{ chk.checkedTotal.value.toLocaleString() }}</span>
-        <span class="stat-text" :class="{ warn: chk.isCoverageLow.value }">覆盖率 {{ chk.coverageRatio.value.toFixed(1) }}%</span>
-        <el-tag v-if="chk.issueCount.value > 0" type="danger" size="small">{{ chk.issueCount.value }} 笔异常</el-tag>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="chk.addSample()">+ 新增样本</el-button>
       </div>
       <div class="toolbar-right">
         <F2SheetToolbar
@@ -77,85 +110,248 @@
           @ai-filled="(t: string) => { chk.auditNote.value = t }"
         />
         <GtIndexChip value="wp:F2-56" :context-project-id="projectId" />
-        <el-tag size="small" type="info">共 {{ chk.enrichedRows.value.length }} 行</el-tag>
+        <el-tag size="small" type="info">{{ chk.enrichedSamples.value.length }} 行</el-tag>
       </div>
     </div>
 
-    <el-table :data="chk.enrichedRows.value" border size="small" max-height="440"
-      :row-class-name="({ row }) => row.hasIssue ? 'error-row' : ''">
-      <el-table-column label="项目" width="120" fixed>
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.projectName" size="small"
-            @change="(v: string) => chk.updateRow(row.id, { projectName: v })" />
-          <span v-else>{{ row.projectName }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="凭证日期" width="110">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.voucherDate" size="small"
-            @change="(v: string) => chk.updateRow(row.id, { voucherDate: v })" />
-          <span v-else>{{ row.voucherDate }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="凭证号" width="100">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small"
-            @change="(v: string) => chk.updateRow(row.id, { voucherNo: v })" />
-          <span v-else>{{ row.voucherNo }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="金额" width="100">
-        <template #default="{ row }">
-          <el-input-number :model-value="row.amount" size="small" :controls="false" :disabled="isReadonly"
-            @change="(v: number) => chk.updateRow(row.id, { amount: v ?? 0 })" />
-        </template>
-      </el-table-column>
-      <el-table-column label="是否正确" width="90">
-        <template #default="{ row }">
-          <el-select v-if="!isReadonly" :model-value="row.isCorrect" size="small"
-            @change="(v: '是'|'否') => chk.updateRow(row.id, { isCorrect: v })">
-            <el-option label="是" value="是" /><el-option label="否" value="否" />
-          </el-select>
-          <span v-else>{{ row.isCorrect }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column v-if="wpId && !isReadonly" label="📎" width="45" align="center">
-        <template #default="{ row }">
-          <el-upload :show-file-list="false" :auto-upload="false" accept=".pdf,.png,.jpg,.jpeg"
-            :disabled="ocrLoadingId === row.id"
-            @change="(f: any) => handleOcr(row.id, f?.raw)">
-            <el-button link size="small" :loading="ocrLoadingId === row.id">📎</el-button>
-          </el-upload>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="55">
-        <template #default="{ row }">
-          <el-button link type="danger" size="small" :disabled="isReadonly" @click="chk.removeRow(row.id)">删</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div class="section-block">
+      <div class="section-label">三、测试表</div>
+      <div class="test-checks">
+        <span class="test-checks-title">测试内容说明：</span>
+        <span v-for="(c, i) in testChecks" :key="i" class="test-check-item">{{ c }}</span>
+      </div>
 
-    <!-- 审计说明 -->
+      <div class="table-scroll">
+        <table class="matrix-table">
+          <thead>
+            <tr>
+              <th rowspan="2" class="sticky col-project">项目名称</th>
+              <th rowspan="2" class="sticky col-account">合同履约成本<br>科目/明细</th>
+              <th colspan="5" class="grp grp-voucher">记账凭证</th>
+              <th colspan="2" class="grp grp-contract">合同/协议</th>
+              <th colspan="2" class="grp grp-receipt">到货验收单</th>
+              <th colspan="4" class="grp grp-logistics">物流单/运输单</th>
+              <th colspan="4" class="grp grp-alloc">费用分配表/计算表</th>
+              <th rowspan="2" class="col-idx">索引号</th>
+              <th rowspan="2" class="col-flag">是否<br>异常</th>
+              <th rowspan="2" class="col-issue">异常说明</th>
+              <th v-if="wpId && !isReadonly" rowspan="2" class="col-ocr">📎</th>
+              <th rowspan="2" class="col-act" />
+            </tr>
+            <tr>
+              <th class="sub">凭证号</th>
+              <th class="sub">业务内容</th>
+              <th class="sub">对方科目</th>
+              <th class="sub">对方项目</th>
+              <th class="sub">金额</th>
+              <th class="sub">日期/编号</th>
+              <th class="sub">主要条款</th>
+              <th class="sub">产品名称</th>
+              <th class="sub">金额</th>
+              <th class="sub">数量</th>
+              <th class="sub">日期/编号</th>
+              <th class="sub">产品名称</th>
+              <th class="sub">物流商</th>
+              <th class="sub">数量</th>
+              <th class="sub">月份</th>
+              <th class="sub">金额</th>
+              <th class="sub">分配依据</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="row in chk.enrichedSamples.value"
+              :key="row.id"
+              :class="{ 'row-warn': row.hasIssue }"
+            >
+              <td class="sticky col-project">
+                <el-input v-if="!isReadonly" :model-value="row.projectName" size="small"
+                  @update:model-value="(v: string) => chk.updateSample(row.id, { projectName: v })" />
+                <span v-else>{{ row.projectName || '—' }}</span>
+              </td>
+              <td class="sticky col-account">
+                <el-input v-if="!isReadonly" :model-value="row.accountDetail" size="small"
+                  @update:model-value="(v: string) => chk.updateSample(row.id, { accountDetail: v })" />
+                <span v-else>{{ row.accountDetail || '—' }}</span>
+              </td>
+
+              <td>
+                <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small"
+                  @update:model-value="(v: string) => chk.updateSample(row.id, { voucherNo: v })" />
+                <span v-else>{{ row.voucherNo || '—' }}</span>
+              </td>
+              <td>
+                <el-input v-if="!isReadonly" :model-value="row.businessContent" size="small"
+                  @update:model-value="(v: string) => chk.updateSample(row.id, { businessContent: v })" />
+                <span v-else class="text-left">{{ row.businessContent || '—' }}</span>
+              </td>
+              <td>
+                <el-input v-if="!isReadonly" :model-value="row.offsetAccount" size="small"
+                  @update:model-value="(v: string) => chk.updateSample(row.id, { offsetAccount: v })" />
+                <span v-else>{{ row.offsetAccount || '—' }}</span>
+              </td>
+              <td>
+                <el-input v-if="!isReadonly" :model-value="row.offsetProject" size="small"
+                  @update:model-value="(v: string) => chk.updateSample(row.id, { offsetProject: v })" />
+                <span v-else>{{ row.offsetProject || '—' }}</span>
+              </td>
+              <td>
+                <el-input-number v-if="!isReadonly" :model-value="row.voucherAmount" size="small" :controls="false"
+                  class="compact-num wide"
+                  @change="(v: number | undefined) => chk.updateSample(row.id, { voucherAmount: v ?? 0 })" />
+                <span v-else class="auto">{{ fmt(row.voucherAmount) }}</span>
+              </td>
+
+              <td>
+                <el-input v-if="!isReadonly" :model-value="row.contractDateNo" size="small"
+                  @update:model-value="(v: string) => chk.updateSample(row.id, { contractDateNo: v })" />
+                <span v-else>{{ row.contractDateNo || '—' }}</span>
+              </td>
+              <td>
+                <el-input v-if="!isReadonly" :model-value="row.contractTerms" size="small"
+                  @update:model-value="(v: string) => chk.updateSample(row.id, { contractTerms: v })" />
+                <span v-else class="text-left">{{ row.contractTerms || '—' }}</span>
+              </td>
+
+              <td>
+                <el-input v-if="!isReadonly" :model-value="row.receiptProductName" size="small"
+                  @update:model-value="(v: string) => chk.updateSample(row.id, { receiptProductName: v })" />
+                <span v-else>{{ row.receiptProductName || '—' }}</span>
+              </td>
+              <td>
+                <el-input-number v-if="!isReadonly" :model-value="row.receiptAmount" size="small" :controls="false"
+                  class="compact-num wide"
+                  @change="(v: number | undefined) => chk.updateSample(row.id, { receiptAmount: v ?? 0 })" />
+                <span v-else class="auto">{{ fmt(row.receiptAmount) }}</span>
+              </td>
+
+              <td>
+                <el-input-number v-if="!isReadonly" :model-value="row.logisticsQty" size="small" :controls="false"
+                  class="compact-num"
+                  @change="(v: number | undefined) => chk.updateSample(row.id, { logisticsQty: v ?? 0 })" />
+                <span v-else class="auto">{{ row.logisticsQty || '—' }}</span>
+              </td>
+              <td>
+                <el-input v-if="!isReadonly" :model-value="row.logisticsDateNo" size="small"
+                  @update:model-value="(v: string) => chk.updateSample(row.id, { logisticsDateNo: v })" />
+                <span v-else>{{ row.logisticsDateNo || '—' }}</span>
+              </td>
+              <td>
+                <el-input v-if="!isReadonly" :model-value="row.logisticsProductName" size="small"
+                  @update:model-value="(v: string) => chk.updateSample(row.id, { logisticsProductName: v })" />
+                <span v-else>{{ row.logisticsProductName || '—' }}</span>
+              </td>
+              <td>
+                <el-input v-if="!isReadonly" :model-value="row.logisticsProvider" size="small"
+                  @update:model-value="(v: string) => chk.updateSample(row.id, { logisticsProvider: v })" />
+                <span v-else>{{ row.logisticsProvider || '—' }}</span>
+              </td>
+
+              <td>
+                <el-input-number v-if="!isReadonly" :model-value="row.allocQty" size="small" :controls="false"
+                  class="compact-num"
+                  @change="(v: number | undefined) => chk.updateSample(row.id, { allocQty: v ?? 0 })" />
+                <span v-else class="auto">{{ row.allocQty || '—' }}</span>
+              </td>
+              <td>
+                <el-input v-if="!isReadonly" :model-value="row.allocMonth" size="small"
+                  @update:model-value="(v: string) => chk.updateSample(row.id, { allocMonth: v })" />
+                <span v-else>{{ row.allocMonth || '—' }}</span>
+              </td>
+              <td>
+                <el-input-number v-if="!isReadonly" :model-value="row.allocAmount" size="small" :controls="false"
+                  class="compact-num wide"
+                  @change="(v: number | undefined) => chk.updateSample(row.id, { allocAmount: v ?? 0 })" />
+                <span v-else class="auto">{{ fmt(row.allocAmount) }}</span>
+              </td>
+              <td>
+                <el-input v-if="!isReadonly" :model-value="row.allocBasis" size="small"
+                  @update:model-value="(v: string) => chk.updateSample(row.id, { allocBasis: v })" />
+                <span v-else class="text-left">{{ row.allocBasis || '—' }}</span>
+              </td>
+
+              <td>
+                <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small"
+                  @update:model-value="(v: string) => chk.updateSample(row.id, { indexRef: v })" />
+                <span v-else>{{ row.indexRef || '—' }}</span>
+              </td>
+              <td class="col-flag">
+                <el-select v-if="!isReadonly" :model-value="row.isAbnormal || undefined" size="small" clearable
+                  @update:model-value="(v: string) => chk.updateSample(row.id, { isAbnormal: (v as '是'|'否'|'') || '' })">
+                  <el-option label="是" value="是" /><el-option label="否" value="否" />
+                </el-select>
+                <span v-else :class="{ 'abn-yes': row.isAbnormal === '是' }">{{ row.isAbnormal || '—' }}</span>
+              </td>
+              <td class="col-issue">
+                <el-input v-if="!isReadonly" :model-value="row.issueDesc" size="small"
+                  @update:model-value="(v: string) => chk.updateSample(row.id, { issueDesc: v })" />
+                <span v-else class="text-left">{{ row.issueDesc || '—' }}</span>
+              </td>
+              <td v-if="wpId && !isReadonly" class="col-ocr">
+                <el-upload :show-file-list="false" :auto-upload="false" accept=".pdf,.png,.jpg,.jpeg"
+                  :disabled="ocrLoadingId === row.id"
+                  @change="(f: any) => handleOcr(row.id, f?.raw)">
+                  <el-button link size="small" :loading="ocrLoadingId === row.id">📎</el-button>
+                </el-upload>
+              </td>
+              <td class="col-act">
+                <el-button v-if="!isReadonly" link type="danger" size="small" @click="chk.removeSample(row.id)">删</el-button>
+              </td>
+            </tr>
+
+            <tr class="row-total">
+              <td colspan="2" class="sticky col-project">合计（测试金额）</td>
+              <td colspan="4" />
+              <td class="auto calc">{{ fmt(chk.stats.value.testedAmount) }}</td>
+              <td colspan="14" />
+              <td class="auto calc abn-yes">{{ fmt(chk.stats.value.incorrectAmount) }}</td>
+              <td :colspan="wpId && !isReadonly ? 3 : 2" />
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-label">四、统计说明</div>
+      <table class="stat-table">
+        <thead>
+          <tr>
+            <th>测试金额</th>
+            <th>不正确金额</th>
+            <th>差错率</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="auto calc">{{ fmt(chk.stats.value.testedAmount) }}</td>
+            <td class="auto calc abn-yes">{{ fmt(chk.stats.value.incorrectAmount) }}</td>
+            <td class="auto calc">{{ fmtPct(chk.stats.value.errorRate) }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <el-input
+        class="stat-note"
+        :model-value="chk.sheet.value.statNote"
+        type="textarea"
+        :autosize="{ minRows: 2, maxRows: 5 }"
+        placeholder="补充统计说明、扩大样本理由等…"
+        :disabled="isReadonly"
+        @update:model-value="(v: string) => chk.setStatNote(v)"
+      />
+    </div>
+
     <el-card class="opinion-card" shadow="never">
-      <template #header>
-        <div class="opinion-header">
-          <span class="opinion-title">审计说明</span>
-        </div>
-      </template>
+      <template #header><span class="opinion-title">五、审计说明</span></template>
       <el-input v-model="chk.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请说明合同履约成本抽样检查结果、异常笔数及处理情况……" :disabled="isReadonly" />
+        placeholder="说明抽样检查结果、证据勾稽情况及异常处理…" :disabled="isReadonly" />
     </el-card>
 
-    <!-- 审计结论 -->
     <el-card class="opinion-card" shadow="never">
-      <template #header>
-        <div class="opinion-header">
-          <span class="opinion-title">审计结论</span>
-        </div>
-      </template>
+      <template #header><span class="opinion-title">六、审计结论</span></template>
       <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
-        :disabled="isReadonly" @change="saveAuditConclusion" />
+        placeholder="A、未见异常。B、除上述应调整事项外，其余未见异常。C、不可确认。"
+        :disabled="isReadonly" @update:model-value="saveAuditConclusion" />
     </el-card>
   </div>
 </template>
@@ -164,11 +360,17 @@
 import { computed, onMounted, ref, toRef, type Ref } from 'vue'
 import { useF2ContractCostCheck } from '../../composables/useF2ContractCostCheck'
 import { useF2SpecialContractOcr } from '../../composables/useF2SpecialContractOcr'
+import {
+  F2_56_OBJECTIVES,
+  F2_56_TEST_CHECKS,
+  F2_56_TIPS,
+} from '../../composables/useF2ContractCostCheckFormulas'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import type { SampledVoucher, FillMode } from '../../composables/useSamplingAlgorithms'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import F2ContractCostTestExampleRef from './F2ContractCostTestExampleRef.vue'
 
 const props = defineProps<{
   wpId?: string
@@ -183,7 +385,10 @@ const chk = useF2ContractCostCheck({
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-// 审计结论（本表独立持久化，item_id 沿用 F2 特殊组 sheet-code 前缀，经 f2-spe:save-items 落库）
+const objectives = F2_56_OBJECTIVES
+const testChecks = F2_56_TEST_CHECKS
+const tips = F2_56_TIPS
+
 const CONCLUSION_KEY = 'F2-56-conclusion'
 const auditConclusion = ref('')
 function saveAuditConclusion(val: string): void {
@@ -212,29 +417,121 @@ function handleOcr(rowId: string, file?: File) {
   if (!file || !props.wpId) return
   void uploadAndMerge(rowId, file, (id, patch) => chk.updateRow(id, patch))
 }
+
+function fmt(v: number): string {
+  if (!Number.isFinite(v) || v === 0) return '—'
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function fmtPct(v: number): string {
+  if (!Number.isFinite(v) || v === 0) return '—'
+  return `${(v * 100).toFixed(2)}%`
+}
 </script>
 
+<style scoped src="../../f2/valuation/f2ValSheetStyles.css"></style>
 <style scoped>
-.f2-contract-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
-.f2-contract-check :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
-.f2-contract-check :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
-.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
-.guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
-.params-card { margin-bottom: 12px; }
-.params-grid { display: flex; flex-wrap: wrap; gap: 12px; }
-.params-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.stat-text { font-size: 12px; color: #606266; }
+.f2-contract-check { --gt-purple: #4b2d77; --gt-purple-soft: #f3eef8; }
+.section-block { margin-bottom: 14px; }
+.section-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gt-purple);
+  margin-bottom: 8px;
+  padding-left: 8px;
+  border-left: 3px solid var(--gt-purple);
+}
+.objective-list { margin: 0; padding-left: 1.4em; font-size: 13px; line-height: 1.7; color: #303133; }
+.params-grid { display: flex; flex-wrap: wrap; gap: 10px 14px; }
+.params-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: #606266; }
+.params-grid label.wide { min-width: 160px; }
+.params-grid label.full { flex: 1 1 100%; }
 .sampling-collapse { margin-bottom: 10px; }
 .warn { color: #e6a23c; font-weight: 600; }
-:deep(.error-row) { background: #fef0f0; }
-.opinion-card { margin-top: 16px; border-radius: 8px; }
-.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.opinion-header { display: flex; align-items: center; justify-content: space-between; }
-.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+.stat-text { font-size: 12px; color: #606266; }
+
+.test-checks {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  background: #fef0f0;
+  border-radius: 4px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+.test-checks-title { color: #c45656; font-weight: 600; margin-right: 6px; }
+.test-check-item { color: #c45656; margin-right: 10px; }
+
+.table-scroll { overflow-x: auto; margin-bottom: 12px; }
+.matrix-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 10px;
+  min-width: 2800px;
+}
+.matrix-table th,
+.matrix-table td {
+  border: 1px solid #d4c8e0;
+  padding: 2px 2px;
+  text-align: center;
+  vertical-align: middle;
+  background: #fff;
+}
+.matrix-table thead th {
+  background: var(--gt-purple-soft);
+  color: #3d2a55;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.matrix-table th.sub { font-weight: 500; font-size: 9px; white-space: nowrap; }
+.grp-voucher { background: #f8f6fa !important; }
+.grp-contract { background: #eef5fc !important; }
+.grp-receipt { background: #fdf6ec !important; }
+.grp-logistics { background: #f0f9eb !important; }
+.grp-alloc { background: #fef0f0 !important; }
+
+.sticky { position: sticky; z-index: 3; background: #faf8fc !important; }
+.matrix-table thead th.sticky { background: var(--gt-purple) !important; color: #fff; z-index: 4; }
+.col-project { left: 0; min-width: 88px; text-align: left !important; padding-left: 4px !important; }
+.col-account {
+  left: 88px;
+  min-width: 96px;
+  box-shadow: 2px 0 4px rgba(75, 45, 119, 0.08);
+  text-align: left !important;
+  padding-left: 4px !important;
+}
+.col-idx { min-width: 56px; }
+.col-flag { min-width: 52px; }
+.col-issue { min-width: 80px; }
+.col-ocr { width: 36px; }
+.col-act { width: 36px; position: sticky; right: 0; z-index: 3; background: #fff !important; }
+
+.row-total td { background: #f0ebf5 !important; font-weight: 600; }
+.row-warn td { background: #fdf6ec !important; }
+.auto { text-align: right; padding-right: 2px; white-space: nowrap; color: #606266; }
+span.auto { display: block; }
+.calc { color: #4b2d77; font-weight: 500; }
+.text-left { display: block; text-align: left; padding-left: 2px; font-size: 10px; }
+.abn-yes { color: #c45656; font-weight: 600; }
+
+.stat-table {
+  width: 360px;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.stat-table th,
+.stat-table td {
+  border: 1px solid #d4c8e0;
+  padding: 6px 10px;
+  text-align: center;
+}
+.stat-table th { background: var(--gt-purple-soft); color: #3d2a55; }
+.stat-note { margin-top: 4px; }
+
+:deep(.compact-num) { width: 62px; }
+:deep(.compact-num.wide) { width: 80px; }
+:deep(.compact-num .el-input__inner) { text-align: right; padding: 0 2px; font-size: 10px; }
 </style>

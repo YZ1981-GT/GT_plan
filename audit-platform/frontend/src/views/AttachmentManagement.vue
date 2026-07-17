@@ -35,6 +35,11 @@
           <el-tooltip content="上传整个文件夹（含子目录）" placement="bottom">
             <el-button @click="triggerFolderUpload"><el-icon><FolderOpened /></el-icon> 上传文件夹</el-button>
           </el-tooltip>
+          <el-tooltip content="附件·OCR·AI·证据链治理中心" placement="bottom">
+            <el-button @click="router.push({ name: 'EvidenceGovernanceCenter', params: { projectId } })">
+              <el-icon><FolderChecked /></el-icon> 证据链治理
+            </el-button>
+          </el-tooltip>
           <!-- 隐藏的文件夹选择 input -->
           <input
             ref="folderInputRef"
@@ -196,7 +201,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import { Search, Upload, Document, View, Link, Download, RefreshRight, Right, Check, FolderOpened } from '@element-plus/icons-vue'
+import { Search, Upload, Document, View, Link, Download, RefreshRight, Right, Check, FolderOpened, FolderChecked } from '@element-plus/icons-vue'
 import AttachmentPreview from '@/components/extension/AttachmentPreview.vue'
 import OcrConfirmDialog from '@/components/attachment/OcrConfirmDialog.vue'
 import type { OcrConfirmPayload } from '@/components/attachment/OcrConfirmDialog.vue'

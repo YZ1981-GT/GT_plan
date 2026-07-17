@@ -65,27 +65,31 @@ describe('Task 13.2: 性能优化验证', () => {
     })
   })
 
-  describe('F2-55(37列) 6区段Tab切换', () => {
+  describe('F2-55(37列) 宽表横向滚动 + 固定列', () => {
     const src = readSource('f2-special/contract/F2TabContractCostDetail.vue')
 
-    it('定义6个区段选项', () => {
-      expect(src).toContain("'basic'")
-      expect(src).toContain("'opening'")
-      expect(src).toContain("'increase'")
-      expect(src).toContain("'decrease'")
-      expect(src).toContain("'end'")
-      expect(src).toContain("'audit'")
+    it('使用 matrix-table 宽表布局', () => {
+      expect(src).toContain('matrix-table')
+      expect(src).toContain('table-scroll')
     })
 
-    it('使用 el-segmented 实现区段切换', () => {
-      expect(src).toContain('el-segmented')
-      expect(src).toContain('activeSegment')
+    it('包含期初/增加/减少/期末/审计调整/审定列组', () => {
+      expect(src).toContain('账面期初余额')
+      expect(src).toContain('账面本期增加')
+      expect(src).toContain('账面本期减少')
+      expect(src).toContain('账面期末余额')
+      expect(src).toContain('审计调整')
+      expect(src).toContain('期末审定余额')
     })
 
-    it('区段列通过 v-if/v-else-if 按需渲染（非全量DOM）', () => {
-      const segmentSwitches = (src.match(/v-else-if="cc\.activeSegment/g) || []).length
-      // 应有至少4个 v-else-if 判断 (opening/increase/decrease/end/audit)
-      expect(segmentSwitches).toBeGreaterThanOrEqual(4)
+    it('项目信息列 sticky 固定', () => {
+      expect(src).toContain('sticky')
+      expect(src).toContain('col-name')
+    })
+
+    it('配置横向滚动最小宽度', () => {
+      expect(src).toContain('min-width: 3400px')
+      expect(src).toContain('overflow-x: auto')
     })
   })
 
@@ -212,11 +216,9 @@ describe('Task 13.3: UI规范验证', () => {
   })
 
   describe('min-width 自适应列宽', () => {
-    it('F2TabContractCostDetail 使用 width 定义保证最小列宽', () => {
+    it('F2TabContractCostDetail 使用 min-width 保证宽表列宽', () => {
       const src = readSource('f2-special/contract/F2TabContractCostDetail.vue')
-      // el-table-column 都指定了 width，确保最小可读宽度
-      const widthMatches = src.match(/width="\d+"/g) || []
-      expect(widthMatches.length).toBeGreaterThanOrEqual(6)
+      expect(src).toContain('min-width')
     })
 
     it('F2TabUnitConsumption 使用 min-width 自适应列', () => {

@@ -80,64 +80,64 @@
   - [x] 6.5 实现 ReviewEvidenceSnapshot/关闭门禁/自动重开及 QC/EQCR/partner 阻断，完成版本/hash/OCR-AI确认/stale path/locator UI 和相关 unit/integration/Vitest。
     - _Requirements: R9, R10, R12_
 
-- [ ] 7. Wave 6 — Archive、离线验签、Legal Hold 与审计告警
+- [x] 7. Wave 6 — Archive、离线验签、Legal Hold 与审计告警
   - [x] 7.1 实现 ArchiveManifest 两阶段 watermark 与版本化 sealed 包；只有验证失败并阻断归档时生成完整 blocking difference report，成功归档不得生成阻断报告。
     - _Requirements: R11, R15_
   - [x] 7.2 通过 adapter 接入 deliverable center/ArchiveOrchestrator，并实现不连接业务库的离线 manifest 成员/hash/签名验签器及机器可读差异。
     - _Requirements: R11_
-  - [ ] 7.3 实现 Legal Hold 统一图闭包与新增边监听；删除、清理、覆盖对任何角色/管理员/紧急授权均零效果，只有 hold 解除且 retention 届满后才可授权 purge。
+  - [x] 7.3 实现 Legal Hold 统一图闭包与新增边监听；删除、清理、覆盖对任何角色/管理员/紧急授权均零效果，只有 hold 解除且 retention 届满后才可授权 purge。
     - _Requirements: R2, R12, R13_
-  - [ ] 7.4 实现不可变墓碑、审计保留、低基数指标、trace 与告警，覆盖 upload/ref/OCR/AI/citation/stale/review/archive/hold/outbox 且不记录原文或凭据。
+  - [x] 7.4 实现不可变墓碑、审计保留、低基数指标、trace 与告警，覆盖 upload/ref/OCR/AI/citation/stale/review/archive/hold/outbox 且不记录原文或凭据。
     - _Requirements: R12, R13, R15, R16_
-  - [ ] 7.5 完成 archive/hold 后端 unit/integration/contract 与 UI/Vitest，验证失败报告、成功无阻断报告、sealed 防覆盖、hold 无绕过及 purge 四条件。
+  - [x] 7.5 完成 archive/hold 后端 unit/integration/contract 与 UI/Vitest，验证失败报告、成功无阻断报告、sealed 防覆盖、hold 无绕过及 purge 四条件。
     - _Requirements: R11, R12, R13_
 
-- [ ] 8. Wave 7 — M0–M4、质量快照、真实 PG 与容量基础验证
-  - [ ] 8.1 执行 M0 dark-read、M1 checkpoint backfill、M2 dual-write、M3 cutover、M4 retirement；未知 creator 用 migration identity，只补可证明字段，重跑幂等且 legacy 列保留。
+- [x] 8. Wave 7 — M0–M4、质量快照、真实 PG 与容量基础验证
+  - [x] 8.1 执行 M0 dark-read、M1 checkpoint backfill、M2 dual-write、M3 cutover、M4 retirement；未知 creator 用 migration identity，只补可证明字段，重跑幂等且 legacy 列保留。
     - _Requirements: R14, R16_
-  - [ ] 8.2 建立 6000 VU 容量与 chaos 场景：30 分钟稳态+10 分钟突发、70/20/7/3 流量、PgBouncer/PG 配额、独立队列背压和 storage/OCR/retrieval/AI 故障。
+  - [x] 8.2 建立 6000 VU 容量与 chaos 场景：30 分钟稳态+10 分钟突发、70/20/7/3 流量、PgBouncer/PG 配额、独立队列背压和 storage/OCR/retrieval/AI 故障。
     - _Requirements: R12, R15_
-  - [ ] 8.3 汇总后端 unit/integration/API/component 测试，覆盖 scope、事务、幂等、worker crash/dead-letter、watermark 竞争、迁移中断与 fail-closed。
+  - [x] 8.3 汇总后端 unit/integration/API/component 测试，覆盖 scope、事务、幂等、worker crash/dead-letter、watermark 竞争、迁移中断与 fail-closed。
     - _Requirements: R1, R3, R5, R6, R8, R9, R11, R12, R14, R15_
-  - [ ] 8.4 汇总前端 Vitest/component 与静态守卫，覆盖 capability 仅展示、上传/OCR/证据/stale/review/archive/hold 状态、AI coverage 和大列表错误恢复。
+  - [x] 8.4 汇总前端 Vitest/component 与静态守卫，覆盖 capability 仅展示、上传/OCR/证据/stale/review/archive/hold 状态、AI coverage 和大列表错误恢复。
     - _Requirements: R1, R4, R5, R6, R7, R8, R9, R10, R11, R13, R15_
-  - [ ] 8.5 运行真实 PG16 约束/并发/trigger/rollback/SKIP LOCKED、八引擎 adapter contract、迁移/ORM drift、离线验签和容量机器报告；SQLite/Playwright 不替代这些证据。
+  - [x] 8.5 运行真实 PG16 约束/并发/trigger/rollback/SKIP LOCKED、八引擎 adapter contract、迁移/ORM drift、离线验签和容量机器报告；SQLite/Playwright 不替代这些证据。
     - _Requirements: R1, R2, R3, R5, R6, R7, R8, R9, R11, R12, R13, R14, R15_
 
-- [ ] 9. Wave 8 — 六领域合并 PBT（逐项覆盖 P1–P30）
-  - [ ] 9.1 安全/附件引用属性组：逐项实现 P1 项目隔离、P2 存储边界、P3 actor 完备、P4 版本不可变、P5 哈希绑定、P6 Ref 完整性、P7 Ref 幂等、P8 双向一致，并保留失败 counterexample。
+- [x] 9. Wave 8 — 六领域合并 PBT（逐项覆盖 P1–P30）
+  - [x] 9.1 安全/附件引用属性组：逐项实现 P1 项目隔离、P2 存储边界、P3 actor 完备、P4 版本不可变、P5 哈希绑定、P6 Ref 完整性、P7 Ref 幂等、P8 双向一致，并保留失败 counterexample。
     - _Requirements: R1, R2, R3, R4, R11, R14_
-  - [ ] 9.2 OCR 属性组：逐项实现 P9 状态机封闭、P10 重试授权、P11 原始结果不可变、P12 未确认不可写回、P13 写回原子性、P14 写回幂等性。
+  - [x] 9.2 OCR 属性组：逐项实现 P9 状态机封闭、P10 重试授权、P11 原始结果不可变、P12 未确认不可写回、P13 写回原子性、P14 写回幂等性。
     - _Requirements: R5, R6_
-  - [ ] 9.3 RAG-AI 属性组：逐项实现 P15 引用可定位、P16 权限不扩张、P17 AI 状态门禁、P18 入口覆盖、P19 已确认内容变更失效。
+  - [x] 9.3 RAG-AI 属性组：逐项实现 P15 引用可定位、P16 权限不扩张、P17 AI 状态门禁、P18 入口覆盖、P19 已确认内容变更失效。
     - _Requirements: R7, R8, R9_
-  - [ ] 9.4 stale-review 属性组：逐项实现 P20 统一图精确闭包、P21 Blocking Review 关闭门禁、P22 证据失效自动重开与 QC/EQCR 阻断。
+  - [x] 9.4 stale-review 属性组：逐项实现 P20 统一图精确闭包、P21 Blocking Review 关闭门禁、P22 证据失效自动重开与 QC/EQCR 阻断。
     - _Requirements: R9, R10_
-  - [ ] 9.5 archive-hold 属性组：逐项实现 P23 manifest 精确完备、P24 防覆盖、P25 command-root 唯一/transition 多条、P26 hold 三类操作无绕过、P27 hold 解除+retention 到期清理边界。
+  - [x] 9.5 archive-hold 属性组：逐项实现 P23 manifest 精确完备、P24 防覆盖、P25 command-root 唯一/transition 多条、P26 hold 三类操作无绕过、P27 hold 解除+retention 到期清理边界。
     - _Requirements: R11, R12, R13_
-  - [ ] 9.6 migration-quality 属性组：逐项实现 P28 迁移幂等守恒、P29 降级安全、P30 固定快照质量指标可复算；P30 独立于 UAT-15。
+  - [x] 9.6 migration-quality 属性组：逐项实现 P28 迁移幂等守恒、P29 降级安全、P30 固定快照质量指标可复算；P30 独立于 UAT-15。
     - _Requirements: R14, R15, R16_
 
-- [ ] 10. Wave 9 — 五领域 Playwright UAT suite（逐项覆盖 UAT-01～15）
-  - [ ] 10.1 安全接收 suite：逐项运行 UAT-01 上传先审计/无可用恶意文件、UAT-02 越界读取否决、UAT-03 跨项目关联否决；02/03 一票否决。
+- [x] 10. Wave 9 — 五领域 Playwright UAT suite（逐项覆盖 UAT-01～15）
+  - [x] 10.1 安全接收 suite：逐项运行 UAT-01 上传先审计/无可用恶意文件、UAT-02 越界读取否决、UAT-03 跨项目关联否决；02/03 一票否决。
     - _Requirements: R1, R3, R4, R12_
-  - [ ] 10.2 附件与引用 suite：逐项运行 UAT-04 版本/影响/stale、UAT-05 EvidenceRef 重启持久与双向查询。
+  - [x] 10.2 附件与引用 suite：逐项运行 UAT-04 版本/影响/stale、UAT-05 EvidenceRef 重启持久与双向查询。
     - _Requirements: R2, R3, R4, R9_
-  - [ ] 10.3 OCR 与 RAG suite：逐项运行 UAT-06 Job 重启恢复、UAT-07 人工确认/原子写回、UAT-08 重试权限否决、UAT-09 精确引用/失效；08 一票否决。
+  - [x] 10.3 OCR 与 RAG suite：逐项运行 UAT-06 Job 重启恢复、UAT-07 人工确认/原子写回、UAT-08 重试权限否决、UAT-09 精确引用/失效；08 一票否决。
     - _Requirements: R5, R6, R7, R9_
-  - [ ] 10.4 AI、复核、归档与 Hold suite：逐项运行 UAT-10 AI 全入口门禁、UAT-11 QC/EQCR 再复核、UAT-12 失败才有 blocking report/成功离线验签、UAT-13 删除清理覆盖无绕过；13 一票否决。
+  - [x] 10.4 AI、复核、归档与 Hold suite：逐项运行 UAT-10 AI 全入口门禁、UAT-11 QC/EQCR 再复核、UAT-12 失败才有 blocking report/成功离线验签、UAT-13 删除清理覆盖无绕过；13 一票否决。
     - _Requirements: R8, R9, R10, R11, R13_
-  - [ ] 10.5 迁移与容量 suite：逐项运行 UAT-14 中断重跑/legacy alias/opaque locator、UAT-15 用户可见背压降级并关联 6000 VU chaos 报告；15 一票否决且不承接 P30。
+  - [x] 10.5 迁移与容量 suite：逐项运行 UAT-14 中断重跑/legacy alias/opaque locator、UAT-15 用户可见背压降级并关联 6000 VU chaos 报告；15 一票否决且不承接 P30。
     - _Requirements: R14, R15_
 
 - [ ] 11. Wave 10 — 可执行最终发布门
-  - [ ] 11.1 运行三件套追溯与完成守卫，确认 R1–R16、P1–P30、UAT-01～15、55 叶子任务、11 waves、dependency graph 无 missing/extra/duplicate，且无 optional/ask-user checkpoint。
+  - [x] 11.1 运行三件套追溯与完成守卫，确认 R1–R16、P1–P30、UAT-01～15、55 叶子任务、11 waves、dependency graph 无 missing/extra/duplicate，且无 optional/ask-user checkpoint。
     - _Requirements: R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16_
-  - [ ] 11.2 在预生产执行 migration health gate 与完整回滚演练：阻止失败迁移/无锁降级切 flag，验证停止新写、drain worker、暂停 backfill、兼容读回退且不删除治理对象。
+  - [x] 11.2 在预生产执行 migration health gate 与完整回滚演练：阻止失败迁移/无锁降级切 flag，验证停止新写、drain worker、暂停 backfill、兼容读回退且不删除治理对象。
     - _Requirements: R11, R12, R13, R14, R15_
-  - [ ] 11.3 在历史增强启用前对固定不可变 snapshot 单独运行 P30，确认原始字节与业务结论不变，不以在线容量数据替代。
+  - [x] 11.3 在历史增强启用前对固定不可变 snapshot 单独运行 P30，确认原始字节与业务结论不变，不以在线容量数据替代。
     - _Requirements: R16_
-  - [ ] 11.4 执行最终发布门脚本并生成机器可读 release evidence：R1–R15、P1–P29、UAT-01～15、PG16、adapter contracts、AI coverage、offline manifest 验签、6000 VU、health/rollback 全绿后才更新实施状态并发起归档评审；否则保持待执行且阻断发布。
+  - [-] 11.4 执行最终发布门脚本并生成机器可读 release evidence：R1–R15、P1–P29、UAT-01～15、PG16、adapter contracts、AI coverage、offline manifest 验签、6000 VU、health/rollback 全绿后才更新实施状态并发起归档评审；否则保持待执行且阻断发布。
     - _Requirements: R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, R13, R14, R15, R16_
 
 ## Task Dependency Graph

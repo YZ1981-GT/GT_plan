@@ -10,7 +10,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import select, delete as sa_delete
+import re
+
+from sqlalchemy import select, delete as sa_delete, text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.confirmation_models import Confirmation
@@ -205,3 +207,152 @@ async def transition_status(
     await db.flush()
     await db.refresh(record)
     return _to_dict(record)
+
+
+# ─── 回函结果应用 + 下游 stale 传播事件（P0 恢复）────────────────────────────
+#
+# 历史上 workpaper-d-sales-cycle 任务 2.11 / workpaper-f-purchase-inventory 任务 2.20
+# 要求"函证回函 → emit EventType.CONFIRMATION_RECEIVED → 沿 cross_wp_references
+# 中 source_wp={D0,F0,G0} 的条目向下游（D2/F2/G7…）传播 stale"。该函数一度缺失
+# （3 个回调测试 ImportError 红）。此处按测试契约重建并通用化。
+
+
+async def apply_confirmation_result(
+    *,
+    project_id: uuid.UUID,
+    year: int,
+    confirmation_id: uuid.UUID,
+    reply_status: str = "",
+    reply_amount: float | None = None,
+    wp_code: str = "D0",
+    db: AsyncSession | None = None,
+) -> dict:
+    """应用函证回函结果并发布 CONFIRMATION_RECEIVED 事件（下游 stale 传播入口）。
+
+    通用化支持各循环函证底稿：默认 ``wp_code="D0"`` 向下兼容销售循环，亦支持
+    ``F0``（采购/存货）、``G0``（投资）等——``extra.wp_code`` 供 stale_engine
+    按 ``cross_wp_references`` 的 ``source_wp`` 路由把下游底稿（D2/F2/G7…）标 stale。
+
+    - ``db`` 为 None 时只发事件（供纯事件场景/测试）；提供时尽力回写函证记录
+      （confirmed_amount / diff / 终态 status），失败不阻断事件发布。
+    - 事件经 ``event_bus.publish_immediate`` 立即派发（不 debounce）。
+
+    Returns: ``{applied, wp_code, confirmation_id, reply_status, reply_amount}``。
+    """
+    from app.services.event_bus import event_bus
+    from app.models.audit_platform_schemas import EventPayload, EventType
+
+    # 1) 尽力回写函证记录（仅当传入 db 且记录存在）
+    if db is not None:
+        try:
+            stmt = select(Confirmation).where(Confirmation.id == confirmation_id)
+            record = (await db.execute(stmt)).scalar_one_or_none()
+            if record is not None:
+                if reply_amount is not None:
+                    record.confirmed_amount = reply_amount
+                    if record.book_amount is not None:
+                        record.diff_amount = float(record.book_amount) - float(reply_amount)
+                status = (reply_status or "").lower()
+                if "disc" in status or "diff" in status or "不符" in reply_status:
+                    record.status = "discrepancy"
+                elif "match" in status or "相符" in reply_status:
+                    record.status = "matched"
+                elif status in ("returned", "已回函"):
+                    record.status = "returned"
+                record.updated_at = datetime.now(timezone.utc)
+                await db.flush()
+        except Exception:  # noqa: BLE001 — 回写失败不阻断事件发布
+            pass
+
+    # 2) 发布 CONFIRMATION_RECEIVED（下游 stale 传播真源）
+    payload = EventPayload(
+        event_type=EventType.CONFIRMATION_RECEIVED,
+        project_id=project_id,
+        year=year,
+        extra={
+            "wp_code": wp_code,
+            "confirmation_id": str(confirmation_id),
+            "reply_status": reply_status,
+            "reply_amount": reply_amount,
+        },
+    )
+    await event_bus.publish_immediate(payload)
+
+    return {
+        "applied": True,
+        "wp_code": wp_code,
+        "confirmation_id": str(confirmation_id),
+        "reply_status": reply_status,
+        "reply_amount": reply_amount,
+    }
+
+
+# ─── 源底稿循环码 / 年度反查（G1：Hub 手动回函 stale 兜底）────────────────────
+#
+# 函证中心台账（ConfirmationHub）手动推进 transition 时通常不带 wp_code——
+# 若函证记录关联了 wp_id（源函证底稿，如 D0/F0/G0…），可经 working_paper→wp_index
+# 反查出 wp_code，并从 projects.audit_year 取年度，作为 CONFIRMATION_RECEIVED
+# 下游 stale 传播的兜底路由源。无 wp_id 时返回 (None, None)，调用方据此不臆测源底稿。
+
+
+def _normalize_source_wp_code(wp_code: str | None) -> str | None:
+    """把 sheet 级函证底稿编码归一为循环级源码（D0-1 → D0）。
+
+    stale 传播图以循环级 wp_code（D0/F0/G0…）为键，故剥离尾部 ``-N`` sheet 后缀，
+    与前端 ``syncHubFromSummary`` 的 ``wpCode.split('-')[0]`` 口径一致。
+    """
+    if not wp_code:
+        return None
+    return re.sub(r"-\d+$", "", wp_code.strip()) or None
+
+
+async def derive_source_wp_code_and_year(
+    db: AsyncSession,
+    confirmation_id: uuid.UUID,
+) -> tuple[str | None, int | None]:
+    """从函证记录的 wp_id 反查 (源循环 wp_code, 审计年度)。
+
+    - 记录不存在 / 无 wp_id → ``(None, None)``（调用方不触发 stale）。
+    - 反查失败不抛异常（尽力而为），返回已取到的部分。
+    """
+    stmt = select(Confirmation.wp_id, Confirmation.project_id).where(
+        Confirmation.id == confirmation_id
+    )
+    row = (await db.execute(stmt)).first()
+    if row is None:
+        return None, None
+    wp_id, project_id = row[0], row[1]
+
+    # 无关联底稿 → 不臆测源循环码；year 仅在有 wp_code（会传播 stale）时才需要，
+    # 故此处直接短路，避免多余的 projects 查询。
+    if wp_id is None:
+        return None, None
+
+    wc_row = (
+        await db.execute(
+            sa_text(
+                "SELECT wi.wp_code "
+                "FROM working_paper wp "
+                "JOIN wp_index wi ON wi.id = wp.wp_index_id "
+                "WHERE wp.id = :wp_id AND wp.is_deleted = false "
+                "LIMIT 1"
+            ),
+            {"wp_id": str(wp_id)},
+        )
+    ).first()
+    wp_code = _normalize_source_wp_code(wc_row[0]) if wc_row is not None else None
+    if not wp_code:
+        return None, None
+
+    year: int | None = None
+    if project_id is not None:
+        yr_row = (
+            await db.execute(
+                sa_text("SELECT audit_year FROM projects WHERE id = :pid LIMIT 1"),
+                {"pid": str(project_id)},
+            )
+        ).first()
+        if yr_row is not None and yr_row[0] is not None:
+            year = int(yr_row[0])
+
+    return wp_code, year

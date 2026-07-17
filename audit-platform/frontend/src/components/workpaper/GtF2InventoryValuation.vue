@@ -71,6 +71,7 @@
         <F2TabSubcontractCheck
           v-else-if="currentSheet === 'F2-35'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -159,6 +160,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import { useF2ValuationFormData, type ChecklistResponse } from './composables/useF2ValuationFormData'
 import { useF2ValuationDualMode } from './composables/useF2ValuationDualMode'
+import { useF2ReviewDialogProvide } from './composables/useF2ReviewDialogProvide'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 // defineAsyncComponent lazy加载所有子组件（性能优化：13个sheet按需加载）
 const F2TabValuationAvg = defineAsyncComponent(() => import('./f2/valuation/F2TabValuationAvg.vue'))

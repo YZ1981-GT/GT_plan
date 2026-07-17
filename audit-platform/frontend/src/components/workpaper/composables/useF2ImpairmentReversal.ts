@@ -1,48 +1,26 @@
 /**
- * useF2ImpairmentReversal — F2-49 跌价转回
+ * useF2ImpairmentReversal — F2-49 存货跌价准备转回核对表
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
-import {
-  parseNum,
-  calcSubtotal,
-  calcNRV,
-  calcImpairmentProvision,
-  calcReversalAmount,
-} from './useF2InvValFormulaEngine'
 import { readValRowJson, type ChecklistResponse } from './useF2ValuationFormData'
+import {
+  defaultReversalSheet,
+  enrichReversalItems,
+  calcReversalTotals,
+  migrateReversalSheet,
+  emptyReversalItem,
+  type ImpairmentReversalSheet,
+  type ImpairmentReversalItem,
+  type IssuanceBreakdown,
+  type ReversalAccountSplit,
+  type ImpairmentAging,
+} from './useF2ImpairmentReversalFormulas'
 
-export interface ImpairmentReversalRow {
-  rowId: string
-  itemName: string
-  bookCost: number
-  priorProvision: number
-  sellingPrice: number
-  completionCost: number
-  sellingExpense: number
-  currentNrv: number
-  currentRequired: number
-  shouldReverse: boolean
-  reversalAmount: number
-  reversalCap: number
-  rationale: string
-}
+/** @deprecated 兼容旧引用 */
+export type ImpairmentReversalRow = ImpairmentReversalItem & { rowId?: string }
 
 const ROWS_KEY = 'F2-49-rows'
 const NOTE_KEY = 'F2-49-note'
-
-function genId(): string {
-  return `f2rev-${Date.now().toString(36)}`
-}
-
-function enrichRow(r: ImpairmentReversalRow) {
-  const currentNrv = calcNRV(r.sellingPrice, r.completionCost, r.sellingExpense, 0)
-  const currentRequired = calcImpairmentProvision(r.bookCost, currentNrv)
-  const shouldReverse = r.priorProvision > currentRequired
-  const reversalCap = r.priorProvision
-  const reversalAmount = calcReversalAmount(r.priorProvision, currentRequired, reversalCap)
-  const needsRationale = shouldReverse && !r.rationale.trim()
-  return { ...r, currentNrv, currentRequired, shouldReverse, reversalAmount, reversalCap, needsRationale }
-}
 
 export function useF2ImpairmentReversal(options: {
   allResponses: Ref<Map<string, ChecklistResponse>>
@@ -51,73 +29,123 @@ export function useF2ImpairmentReversal(options: {
   const { allResponses, isReadonly } = options
   const readonly = isReadonly ?? ref(false)
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
-  const activeSegment = ref<'prior' | 'current'>('prior')
 
-  const rows = ref<ImpairmentReversalRow[]>([{
-    rowId: genId(), itemName: '', bookCost: 0, priorProvision: 0,
-    sellingPrice: 0, completionCost: 0, sellingExpense: 0,
-    currentNrv: 0, currentRequired: 0, shouldReverse: false,
-    reversalAmount: 0, reversalCap: 0, rationale: '',
-  }])
+  const sheet = ref<ImpairmentReversalSheet>(defaultReversalSheet())
   const auditNote = ref('')
 
-  watch(() => allResponses.value.get(ROWS_KEY)?.remark, (v) => {
-    if (!v) return
-    try {
-      const parsed = JSON.parse(v)
-      if (Array.isArray(parsed) && parsed.length) rows.value = parsed
-    } catch { /* ignore */ }
-  }, { immediate: true })
+  function load(): void {
+    const raw = readValRowJson(allResponses.value.get(ROWS_KEY))
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw)
+        const migrated = migrateReversalSheet(parsed)
+        if (migrated) sheet.value = migrated
+      } catch { /* ignore */ }
+    }
+    auditNote.value = allResponses.value.get(NOTE_KEY)?.remark || ''
+  }
 
+  watch(() => allResponses.value.get(ROWS_KEY)?.remark, load, { immediate: true })
   watch(() => allResponses.value.get(NOTE_KEY)?.remark, (v) => { auditNote.value = v || '' }, { immediate: true })
 
-  const enrichedRows = computed(() => rows.value.map(enrichRow))
+  const enrichedProducts = computed(() => enrichReversalItems(sheet.value.products))
+  const enrichedRows = enrichedProducts
+
+  const columnTotals = computed(() => calcReversalTotals(enrichedProducts.value))
 
   const summary = computed(() => ({
-    reverseCount: enrichedRows.value.filter((r) => r.shouldReverse).length,
-    reverseTotal: calcSubtotal(enrichedRows.value.map((r) => r.reversalAmount)),
-    missingRationale: enrichedRows.value.filter((r) => r.needsRationale).length,
+    reverseCount: enrichedProducts.value.filter((r) => r.reversalTotal > 0).length,
+    reverseTotal: columnTotals.value.reversalTotal,
+    verifyFailCount: enrichedProducts.value.filter((r) => !r.verifyOk && r.reversalTotal > 0).length,
+    issuanceMismatchCount: enrichedProducts.value.filter((r) => r.issuanceMismatch).length,
+    agingMismatchCount: enrichedProducts.value.filter((r) => r.agingMismatch).length,
+    missingRationale: 0,
   }))
 
+  function flushSave(): void {
+    const items = [
+      allResponses.value.get(ROWS_KEY),
+      allResponses.value.get(NOTE_KEY),
+    ].filter(Boolean)
+    if (items.length) window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items } }))
+  }
+
   function persist(): void {
-    allResponses.value.set(ROWS_KEY, { item_id: ROWS_KEY, conclusion: null, remark: JSON.stringify(rows.value) })
+    if (readonly.value) return
+    allResponses.value.set(ROWS_KEY, {
+      item_id: ROWS_KEY,
+      conclusion: null,
+      remark: JSON.stringify(sheet.value),
+    })
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => {
       debounceTimer = null
-      const items = [allResponses.value.get(ROWS_KEY), allResponses.value.get(NOTE_KEY)].filter(Boolean)
-      if (items.length) window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items } }))
+      flushSave()
     }, 2000)
   }
 
-  function addRow(): void {
+  function updateProduct(id: string, patch: Partial<ImpairmentReversalItem>): void {
     if (readonly.value) return
-    rows.value = [...rows.value, {
-      rowId: genId(), itemName: '', bookCost: 0, priorProvision: 0,
-      sellingPrice: 0, completionCost: 0, sellingExpense: 0,
-      currentNrv: 0, currentRequired: 0, shouldReverse: false,
-      reversalAmount: 0, reversalCap: 0, rationale: '',
-    }]
-    persist()
-  }
-
-  function removeRow(rowId: string): void {
-    if (readonly.value || rows.value.length <= 1) return
-    rows.value = rows.value.filter((r) => r.rowId !== rowId)
+    sheet.value = {
+      ...sheet.value,
+      products: sheet.value.products.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    }
     persist()
   }
 
   function updateRow(rowId: string, patch: Partial<ImpairmentReversalRow>): void {
+    const mapped: Partial<ImpairmentReversalItem> = { ...patch }
+    if (patch.rowId) mapped.id = patch.rowId
+    if (patch.bookCost != null && patch.openingQty == null) {
+      const row = sheet.value.products.find((p) => p.id === rowId)
+      const qty = row?.openingQty || 1
+      mapped.openingUnitPrice = patch.bookCost / qty
+    }
+    updateProduct(rowId, mapped)
+  }
+
+  function updateAging(id: string, patch: Partial<ImpairmentAging>): void {
+    const row = sheet.value.products.find((p) => p.id === id)
+    if (!row || readonly.value) return
+    updateProduct(id, { aging: { ...row.aging, ...patch } })
+  }
+
+  function updateIssuance(id: string, patch: Partial<IssuanceBreakdown>): void {
+    const row = sheet.value.products.find((p) => p.id === id)
+    if (!row || readonly.value) return
+    updateProduct(id, { issuance: { ...row.issuance, ...patch } })
+  }
+
+  function updateAccountSplit(id: string, patch: Partial<ReversalAccountSplit>): void {
+    const row = sheet.value.products.find((p) => p.id === id)
+    if (!row || readonly.value) return
+    updateProduct(id, { accountSplit: { ...row.accountSplit, ...patch } })
+  }
+
+  function addProduct(): void {
     if (readonly.value) return
-    rows.value = rows.value.map((r) => {
-      if (r.rowId !== rowId) return r
-      const next = { ...r, ...patch }
-      if (typeof patch.bookCost === 'number' || typeof patch.priorProvision === 'number') {
-        next.bookCost = parseNum(next.bookCost)
-        next.priorProvision = parseNum(next.priorProvision)
-      }
-      return next
-    })
+    sheet.value = {
+      ...sheet.value,
+      products: [...sheet.value.products, emptyReversalItem()],
+    }
     persist()
+  }
+
+  function addRow(): void {
+    addProduct()
+  }
+
+  function removeProduct(id: string): void {
+    if (readonly.value || sheet.value.products.length <= 1) return
+    sheet.value = {
+      ...sheet.value,
+      products: sheet.value.products.filter((p) => p.id !== id),
+    }
+    persist()
+  }
+
+  function removeRow(rowId: string): void {
+    removeProduct(rowId)
   }
 
   watch(auditNote, (val) => {
@@ -126,9 +154,30 @@ export function useF2ImpairmentReversal(options: {
     persist()
   })
 
-  onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); persist() } })
+  onBeforeUnmount(() => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      flushSave()
+    }
+  })
 
-  return { activeSegment, enrichedRows, summary, auditNote, addRow, removeRow, updateRow }
+  return {
+    sheet,
+    enrichedProducts,
+    enrichedRows,
+    columnTotals,
+    summary,
+    auditNote,
+    updateProduct,
+    updateRow,
+    updateAging,
+    updateIssuance,
+    updateAccountSplit,
+    addProduct,
+    addRow,
+    removeProduct,
+    removeRow,
+  }
 }
 
 export default useF2ImpairmentReversal

@@ -116,10 +116,10 @@
  * - 使用列需区分费用化/资本化
  * - 需披露计提依据（政策文件/行业标准）
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onMounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
-import { eventBus } from '@/utils/eventBus'
 import { useM7FormData } from '../../composables/useM7FormData'
+import { useNoteAutoFill } from '../../composables/useNoteAutoFill'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 
@@ -162,21 +162,27 @@ function parseNum(v: any): number {
   return Number.isFinite(n) ? n : 0
 }
 
-// ─── 从 M7-1 审定数据刷新附注 ───────────────────────────────────────────────
-function refreshFromAdjudication(): void {
-  const safetyAudited = parseNum(formData.allResponses.value.get('M7-1-safety-subtotal')?.remark)
-  const maintenanceAudited = parseNum(formData.allResponses.value.get('M7-1-maintenance-subtotal')?.remark)
-  const otherAudited = parseNum(formData.allResponses.value.get('M7-1-other-subtotal')?.remark)
-  const totalAudited = parseNum(formData.allResponses.value.get('M7-1-total-audited')?.remark)
-
-  if (totalAudited !== 0 || safetyAudited !== 0) {
-    disclosureRows.value[0].endBalance = safetyAudited
-    disclosureRows.value[1].endBalance = maintenanceAudited
-    disclosureRows.value[2].endBalance = otherAudited
-    disclosureRows.value[3].endBalance = totalAudited
-    lastRefreshTime.value = new Date().toLocaleTimeString('zh-CN')
-  }
-}
+// ─── 从 M7-1 审定数据刷新附注（P2：统一 useNoteAutoFill SDK）────────────────
+const autoFill = useNoteAutoFill({
+  allResponses: computed(() => formData.allResponses.value) as any,
+  sources: {
+    safety: 'M7-1-safety-subtotal',
+    maintenance: 'M7-1-maintenance-subtotal',
+    other: 'M7-1-other-subtotal',
+    total: 'M7-1-total-audited',
+  },
+  accountCodes: ['4201'],
+  reload: () => formData.loadData(),
+  onRefresh: (v) => {
+    if ((v.total ?? 0) !== 0 || (v.safety ?? 0) !== 0) {
+      disclosureRows.value[0].endBalance = v.safety ?? 0
+      disclosureRows.value[1].endBalance = v.maintenance ?? 0
+      disclosureRows.value[2].endBalance = v.other ?? 0
+      disclosureRows.value[3].endBalance = v.total ?? 0
+      lastRefreshTime.value = autoFill.lastRefreshAt.value
+    }
+  },
+})
 
 // ─── 保存 ────────────────────────────────────────────────────────────────────
 function handlePolicyChange(index: number): void {
@@ -192,16 +198,8 @@ function saveDisclosureNote(): void {
 function handleAI(_section: string): void { /* AI辅助钩子 */ }
 function handleReview(): void { openReviewDialog?.('M7-disclosure-soe', '附注披露-国有企业') }
 
-// ─── EventBus: subscribe 'substantive:adjudicated' → 刷新附注 ────────────────
-function onAdjudicated(payload: any): void {
-  if (payload?.wpCode === 'M7' && payload?.accountCode === '4201') {
-    formData.loadData().then(() => {
-      refreshFromAdjudication()
-    })
-  }
-}
-
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
+// 审定事件订阅由 useNoteAutoFill 统一处理（含卸载清理），此处仅负责首屏加载与文本/依据恢复。
 onMounted(async () => {
   await formData.loadData()
 
@@ -215,15 +213,8 @@ onMounted(async () => {
     if (resp?.remark) row.policyBasis = resp.remark
   })
 
-  // 从审定数据刷新
-  refreshFromAdjudication()
-
-  // EventBus subscribe
-  eventBus.on('substantive:adjudicated', onAdjudicated)
-})
-
-onUnmounted(() => {
-  eventBus.off('substantive:adjudicated', onAdjudicated)
+  // 数据加载后从审定数据取数刷新
+  autoFill.pull()
 })
 </script>
 

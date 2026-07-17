@@ -44,6 +44,27 @@ from app.services.evidence_governance.typed_adapters import (
 )
 
 
+def _as_uuid(value: Any) -> str | None:
+    """Validate & normalize a UUID for binding to UUID-typed columns.
+
+    ``citation_snapshots.id`` / ``project_id`` (and ``evidence_refs`` keys) are
+    uuid-typed. asyncpg rejects a non-UUID string with ``DataError: invalid input
+    for query argument`` which would propagate as HTTP 500. A malformed id is not a
+    server error — it simply resolves to "not found".
+
+    Returns the canonical UUID string for a valid UUID, otherwise ``None`` so callers
+    short-circuit to a clean desensitized "not found" BEFORE running UUID-keyed SQL.
+    Mirrors ``typed_adapters._as_uuid``. Only screens id shape; genuine DB errors
+    still surface.
+    """
+    if not value:
+        return None
+    try:
+        return str(uuid.UUID(str(value)))
+    except (ValueError, AttributeError, TypeError):
+        return None
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Data types
 # ─────────────────────────────────────────────────────────────────────────────
@@ -252,8 +273,9 @@ class CitationSnapshotService:
                 reason="citation_not_found",
             )
 
-        source_type = row["source_type"] if "source_type" in row else None
-        source_id = row["source_id"] if "source_id" in row else None
+        # ``citation_snapshots`` binds the source via ``evidence_ref_id`` (there are no
+        # ``source_type``/``source_id`` columns on the immutable snapshot); re-auth and
+        # version/hash checks all resolve through the linked EvidenceRef.
         evidence_ref_id = row["evidence_ref_id"]
 
         # Check 1: Actor still has read permission (re-authenticate)
@@ -286,9 +308,11 @@ class CitationSnapshotService:
             status = CitationStatus.ACTIVE
             reason = None
 
-        # If status changed from what's stored, update DB
-        stored_status = row.get("status", "active")
-        if status.value != stored_status and status != CitationStatus.ACTIVE:
+        # Status is DERIVED at read time (R7.3 / design §4.6 "不可变且打开时重新鉴权"):
+        # the snapshot is immutable and has no ``status`` column, so stale/invalid is
+        # computed from re-auth + EvidenceRef active + version/hash match — never
+        # persisted back to the snapshot.
+        if status != CitationStatus.ACTIVE:
             await self._mark_citation_status(citation_id, status)
 
         return CitationLocateResult(
@@ -495,16 +519,32 @@ class CitationSnapshotService:
     async def _load_citation(
         self, citation_id: uuid.UUID, project_id: uuid.UUID
     ) -> dict[str, Any] | None:
-        """Load a citation snapshot from DB with scope check."""
+        """Load a citation snapshot from DB with scope check.
+
+        NOTE: ``citation_snapshots`` is an IMMUTABLE snapshot (migration V108 / ORM
+        ``CitationSnapshot``). It has NO ``status`` column — locatability/validity is
+        derived dynamically at read time from the immutable snapshot fields
+        (version/hash/page/region) + the linked EvidenceRef being active
+        (see ``locate_citation``). Only real columns are selected here.
+
+        Non-UUID ids are screened to a clean None ("not found") BEFORE running any
+        UUID-keyed SQL, mirroring the typed-adapter hardening (``_as_uuid``): a
+        malformed id is not a server error and must never surface as
+        asyncpg DataError/ProgrammingError (HTTP 500).
+        """
+        cid = _as_uuid(citation_id)
+        pid = _as_uuid(project_id)
+        if cid is None or pid is None:
+            return None
         stmt = sa.text(
             "SELECT id, ai_content_log_id, evidence_ref_id, project_id, audit_year, "
             "target_version, target_hash, page, region, excerpt_hash, "
-            "index_version, locator_version, status, created_at "
+            "index_version, locator_version, created_at "
             "FROM citation_snapshots "
             "WHERE id = :cid AND project_id = :pid LIMIT 1"
         )
         row = (
-            await self._db.execute(stmt, {"cid": str(citation_id), "pid": str(project_id)})
+            await self._db.execute(stmt, {"cid": cid, "pid": pid})
         ).mappings().first()
         if row is None:
             return None
@@ -581,20 +621,16 @@ class CitationSnapshotService:
     async def _mark_citation_status(
         self, citation_id: uuid.UUID, status: CitationStatus
     ) -> None:
-        """Update citation status in DB (stale/invalid detection during locate).
+        """No-op: citation status is DERIVED, never persisted.
 
-        Note: The citation_snapshots table has an immutable trigger that forbids UPDATE.
-        Status tracking is handled via a separate status column that the trigger allows
-        or via a separate tracking mechanism. For now, we record this as a best-effort
-        status note — the immutable trigger on citation_snapshots forbids direct UPDATE.
-
-        In practice, stale/invalid status is computed at read time (locate/validate)
-        rather than persisted, since the snapshot itself is immutable.
+        ``citation_snapshots`` is immutable (migration V108 / ORM ``CitationSnapshot``):
+        it has NO ``status`` column and an immutable trigger forbids UPDATE. Stale/invalid
+        is computed at read time (locate/validate) from re-auth + EvidenceRef active +
+        version/hash match, per design §4.6 "不可变且打开时重新鉴权". Kept as a seam so
+        callers can signal a derived status transition without mutating the snapshot.
         """
-        # The immutable trigger prevents UPDATE on citation_snapshots.
-        # Status is determined dynamically at locate/validate time.
-        # This is intentional per design §4.6: "不可变且打开时重新鉴权"
-        pass
+        # Intentionally does nothing — the snapshot is immutable and status is dynamic.
+        return None
 
     # ─────────────────────────────────────────────────────────────────────────
     # Private: Create snapshot
@@ -638,7 +674,7 @@ class CitationSnapshotService:
             "index_version, locator_version, "
             "actor_type, actor_user_id, actor_service_identity_id) "
             "VALUES (:id, :ai_log, :ref_id, :pid, :yr, "
-            ":tver, :thash, :page, :region::jsonb, :ehash, "
+            ":tver, :thash, :page, CAST(:region AS JSONB), :ehash, "
             ":iver, :lver, "
             ":atype, :auid, :asid) "
             "RETURNING id, created_at"

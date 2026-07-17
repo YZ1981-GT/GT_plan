@@ -49,6 +49,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.attachment_models import Attachment
 from app.models.evidence_governance_models import AttachmentVersion, QuarantineHandle, UploadAttempt
+from app.services.attachment_locator import (
+    project_attachment_locator as _project_attachment_locator,
+)
 from app.services.evidence_governance.facade import (
     CommandRequest,
     CommandTxn,
@@ -323,6 +326,102 @@ class InMemoryQuarantineStore:
         return key in self._blobs
 
 
+class DurableQuarantineStore:
+    """持久（磁盘）隔离/暂存缓冲（生产默认实现）。
+
+    与 :class:`InMemoryQuarantineStore` **接口完全一致**（``begin/write/size/read/
+    buffered_bytes/purge/exists``），可直接注入 :class:`SecureAttachmentGateway`。字节写在
+    **不可经下载/预览/EvidenceRef/OCR/AI/FormalOutput/archive 任何边界路径访问** 的非
+    servable 根目录（``settings.ATTACHMENT_QUARANTINE_ROOT``），该根 **不在** 任何
+    ``StorageBoundaryResolver`` 会解析的 Storage_Boundary root 内，故隔离内容对任何读取链
+    不可达（design §4.0；R1.2）。
+
+    崩溃安全：内容落盘后即使 API 进程重启或 finalize worker 是独立进程，同一 ``key`` 仍可由
+    **新构造的** store 实例读取并 finalize（202 异步路径）。``purge(crypto_erase=True)`` 先把
+    文件字节整体覆写为 0 再 unlink——拒绝/reaper 清理后内容绝不成为可访问文件。
+
+    key（形如 ``quarantine://{uuid}``）经 SHA-256 稳定映射为根下单一 basename——跨进程/重启
+    确定一致，且绝不把 opaque key 里的 scheme/uuid 直接当路径拼接（无 traversal 面）。
+    ``buffered_bytes()`` 走进程内运行计数器（构造时按目录内现存文件大小初始化），供背压廉价读取。
+    """
+
+    def __init__(self, root: str | Path) -> None:
+        self._root = Path(os.path.normpath(str(root))).absolute()
+        self._root.mkdir(parents=True, exist_ok=True)
+        # 运行计数器：构造时按磁盘现存文件大小初始化（重启后背压读数仍正确）。
+        self._buffered = 0
+        try:
+            for child in self._root.iterdir():
+                if child.is_file():
+                    self._buffered += child.stat().st_size
+        except OSError:
+            self._buffered = 0
+
+    def _path(self, key: str) -> Path:
+        digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
+        return self._root / digest
+
+    def begin(self, key: str) -> None:
+        path = self._path(key)
+        if not path.exists():
+            # 创建空文件（setdefault 语义：已存在则不清空）。
+            path.touch()
+
+    def write(self, key: str, chunk: bytes) -> None:
+        if not chunk:
+            return
+        path = self._path(key)
+        with open(path, "ab") as fh:
+            fh.write(chunk)
+        self._buffered += len(chunk)
+
+    def size(self, key: str) -> int:
+        path = self._path(key)
+        try:
+            return path.stat().st_size
+        except OSError:
+            return 0
+
+    def read(self, key: str) -> bytes:
+        path = self._path(key)
+        if not path.exists():
+            raise KeyError(key)
+        with open(path, "rb") as fh:
+            return fh.read()
+
+    def buffered_bytes(self) -> int:
+        return max(0, self._buffered)
+
+    def purge(self, key: str, *, crypto_erase: bool = True) -> None:
+        """删除或加密擦除隔离内容——拒绝/reaper 清理后内容不得成为可访问文件（R1.2/§4.0）。
+
+        ``crypto_erase=True`` 时先把整个文件字节覆写为 0（flush+fsync 落盘）再 unlink，
+        使残留扇区不含明文。
+        """
+        path = self._path(key)
+        try:
+            size = path.stat().st_size
+        except OSError:
+            return  # 不存在 → 幂等 no-op
+        if crypto_erase and size > 0:
+            try:
+                with open(path, "r+b") as fh:
+                    fh.seek(0)
+                    fh.write(b"\x00" * size)
+                    fh.flush()
+                    os.fsync(fh.fileno())
+            except OSError:
+                pass
+        try:
+            path.unlink()
+        except OSError:
+            pass
+        self._buffered = max(0, self._buffered - size)
+
+    def exists(self, key: str) -> bool:
+        return self._path(key).exists()
+
+
 #: storage_finalizer 契约：把隔离内容委托给 AttachmentService 存储，返回永久 locator。
 StorageFinalizer = Callable[..., "Awaitable[dict[str, str]]"]
 
@@ -519,10 +618,12 @@ class StorageBoundaryResolver:
         return ReadPlan(kind="local", safe_path=str(safe))
 
     def project_read_locator(self, attachment_id: uuid.UUID | str, storage_key: str | None = None) -> str:
-        """C3：对外 opaque locator —— paperless scheme 或受控下载 URL，绝不返回绝对路径。"""
-        if storage_key and storage_key.startswith(_PAPERLESS_SCHEME):
-            return storage_key
-        return f"/api/attachments/{attachment_id}/download"
+        """C3：对外 opaque locator —— paperless scheme 或受控下载 URL，绝不返回绝对路径。
+
+        投影语义收敛到共享单一真源 ``project_attachment_locator``（legacy
+        ``AttachmentService._to_dict`` 亦委托同一函数），禁止分叉。
+        """
+        return _project_attachment_locator(attachment_id, storage_key=storage_key)
 
 
 def _effective_storage(version: "AttachmentVersion", attachment: "Attachment") -> tuple[str | None, str | None]:

@@ -727,3 +727,45 @@ async def upsert_note_formulas(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=f"公式保存失败: {str(e)}")
+
+
+# ---------------------------------------------------------------------------
+# 附注 ↔ 底稿/试算表 联动（P1 落地：WpNoteLinkageService 一致性校验 + 一键取数预览）
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{project_id}/{year}/note-linkage/consistency")
+async def note_linkage_consistency(
+    project_id: UUID,
+    year: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """校验附注合计与试算表审定数一致性（按 account_name 匹配）。
+
+    仅比较"存在可比 TB 审定数 + 附注有数值合计"的节；其余如实计入 skipped。
+    返回 ``{consistent, checked_sections, skipped_sections, inconsistencies:[...]}``。
+    """
+    from app.services.wp_note_linkage_service import WpNoteLinkageService
+
+    svc = WpNoteLinkageService(db)
+    return await svc.check_consistency(project_id=project_id, year=year)
+
+
+@router.get("/{project_id}/{year}/note-linkage/one-click-preview")
+async def note_linkage_one_click_preview(
+    project_id: UUID,
+    year: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """一键取数预览（只读）：列出每节可从试算表带入的审定数。
+
+    不改写 disclosure_notes（各节 table_data 结构各异，改写风险高）；返回预览供前端
+    逐节确认后应用。返回 ``{available_sections, sections:[{note_section, account_name,
+    tb_audited_amount, current_note_amount}]}``。
+    """
+    from app.services.wp_note_linkage_service import WpNoteLinkageService
+
+    svc = WpNoteLinkageService(db)
+    return await svc.one_click_fetch(project_id=project_id, year=year)

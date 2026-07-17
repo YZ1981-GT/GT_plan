@@ -85,7 +85,7 @@
 
       <!-- 工具栏：类别筛选 + 批量操作 -->
       <div class="gt-a-program-console__toolbar">
-        <div v-if="!hideCategories && !cycleSheetMode" class="gt-a-program-console__filters">
+        <div v-if="!hideCategories && hasCategory" class="gt-a-program-console__filters">
           <el-radio-group v-model="activeCategory" size="small">
             <el-radio-button label="">全部</el-radio-button>
             <el-radio-button
@@ -999,10 +999,9 @@ const gridFallback = computed(() => {
   return props.htmlData?.grid_fallback ?? null
 })
 
-/** 当任意程序行有非空类别时显示类别列（循环 *A 程序表强制隐藏，对齐 D4A） */
+/** 当任意程序行有非空类别时显示类别列（有分类数据则显示，便于 F2-21A 等按常规★/备选筛选与裁剪） */
 const hasCategory = computed(() =>
-  !props.cycleSheetMode
-  && programs.value.some(p => p.program_category && p.program_category.trim() !== '')
+  programs.value.some(p => p.program_category && p.program_category.trim() !== '')
 )
 
 // ─── Methods ───
@@ -1016,9 +1015,12 @@ function categoryTagType(category: string): 'primary' | 'success' | 'warning' | 
   switch (category) {
     case '常规★': return 'primary'
     case 'IPO 加项': return 'warning'
-    case '备选程序': return 'info'
+    case '备选程序':
+    case '备选': return 'info'
     case '舞弊应对': return 'danger'
-    default: return 'info'
+    default:
+      if (category.includes('IPO') || category.includes('舞弊')) return 'warning'
+      return 'info'
   }
 }
 

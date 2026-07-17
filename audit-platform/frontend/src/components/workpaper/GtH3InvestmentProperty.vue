@@ -303,8 +303,9 @@
  * Spec: .kiro/specs/h3-investment-property/ Task 6.1
  * Requirements: 1.1, 1.2, 1.6, 1.7, 1.8, 1.9, 1.11, 16.1-16.2, 16.8, 16.10
  */
-import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
 import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useH3DualMode } from './composables/useH3DualMode'
 import { useH3FormData } from './composables/useH3FormData'
@@ -490,8 +491,24 @@ watch(measurementModel, () => {
 })
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
+// 审定数变更 / TB 更新 → 刷新 allResponses（各子 tab 含附注据此重算跨 sheet 取数）。
+// 经 crossWpEventBridge 统一 window/eventBus 传输（P1 — 修 H3 附注刷新 double no-op）。
+let _refreshTimer: ReturnType<typeof setTimeout> | null = null
+function _handleAdjudicatedRefresh(): void {
+  if (_refreshTimer) clearTimeout(_refreshTimer)
+  _refreshTimer = setTimeout(() => { void selfLoad() }, 400)
+}
+
 onMounted(() => {
   void selfLoad()
+  eventBus.on('substantive:adjudicated', _handleAdjudicatedRefresh)
+  eventBus.on('trial-balance:updated', _handleAdjudicatedRefresh)
+})
+
+onUnmounted(() => {
+  if (_refreshTimer) clearTimeout(_refreshTimer)
+  eventBus.off('substantive:adjudicated', _handleAdjudicatedRefresh)
+  eventBus.off('trial-balance:updated', _handleAdjudicatedRefresh)
 })
 </script>
 

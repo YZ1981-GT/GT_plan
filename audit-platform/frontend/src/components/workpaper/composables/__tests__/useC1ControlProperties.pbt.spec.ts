@@ -1,18 +1,18 @@
 /**
- * C1 企业层面控制测试 �?前端属性测试（fast-check�?
+ * C1 企业层面控制测试 — 前端属性测试（fast-check）
  *
  * Feature: c1-entity-level-control
- * Task 5.1 产出物。覆盖设计文�?Correctness Properties�?
- *   - Property 1: 组件注册完整�?       (Requirements 1.1, 1.2, 1.3)
- *   - Property 2: 九段分组完整�?       (Requirements 2.1)
- *   - Property 3: 适用性进度排除不适用�?(Requirements 3.2, 3.3)
- *   - Property 6: readonly 禁编�?       (Requirements 8.1)
+ * Task 5.1 产出物。覆盖设计文档 Correctness Properties：
+ *   - Property 1: 组件注册完整性       (Requirements 1.1, 1.2, 1.3)
+ *   - Property 2: 九段分组完整性       (Requirements 2.1)
+ *   - Property 3: 适用性进度排除不适用项 (Requirements 3.2, 3.3)
+ *   - Property 6: readonly 禁编辑       (Requirements 8.1)
  *
- * Property 4「样本借贷勾稽正确性�?Requirements 4.4) 已在
- * `useC1SampleEngine.test.ts` 中以 �?00 runs 覆盖，本文件不重复实现，
- * 仅在下方引用其核心函数做一次一致性回归引用（不构成重复的 property 断言）�?
+ * Property 4「样本借贷勾稽正确性」(Requirements 4.4) 已在
+ * `useC1SampleEngine.test.ts` 中以 100 runs 覆盖，本文件不重复实现，
+ * 仅在下方引用其核心函数做一次一致性回归引用（不构成重复的 property 断言）。
  *
- * 每个 property �?00 runs。Tag 见各 describe 块标题�?
+ * 每个 property 25 runs。Tag 见各 describe 块标题。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, effectScope, type EffectScope } from 'vue'
@@ -44,10 +44,10 @@ import { calcSampleBalance } from '../useC1SampleEngine'
 
 const C1_COMPONENT_TYPE = 'c1-entity-level-control'
 
-// ─── Property 1: 组件注册完整�?──────────────────────────────────────────────
+// ─── Property 1: 组件注册完整性 ──────────────────────────────────────────────
 
-describe('Feature: c1-entity-level-control, Property 1: 组件注册完整�?, () => {
-  // 一次性读取后端注册来源（overrides + VALID_COMPONENT_TYPES�?
+describe('Feature: c1-entity-level-control, Property 1: 组件注册完整性', () => {
+  // 一次性读取后端注册来源（overrides + VALID_COMPONENT_TYPES）
   const overridesPath = path.resolve(
     __dirname,
     '../../../../../../../backend/app/data/wp_code_overrides.json',
@@ -59,12 +59,12 @@ describe('Feature: c1-entity-level-control, Property 1: 组件注册完整�?, 
   const overrides: Record<string, string> = JSON.parse(fs.readFileSync(overridesPath, 'utf-8'))
   const serviceSrc: string = fs.readFileSync(servicePath, 'utf-8')
 
-  it('C1 �?c1-entity-level-control 且三处注册齐全（overrides + registry + VALID_COMPONENT_TYPES�?, () => {
-    // C1 主底稿在 overrides 中映射到专属 componentType（子 sheet 由主组件内部分发，不单列�?
+  it('C1 → c1-entity-level-control 且三处注册齐全（overrides + registry + VALID_COMPONENT_TYPES）', () => {
+    // C1 主底稿在 overrides 中映射到专属 componentType（子 sheet 由主组件内部分发，不单列）
     fc.assert(
       fc.property(fc.constantFrom('C1'), (code) => {
         expect(overrides[code]).toBe(C1_COMPONENT_TYPE)
-        // 前端渲染注册表登�?
+        // 前端渲染注册表登记
         expect(HTML_RENDERER_REGISTRY.has(C1_COMPONENT_TYPE)).toBe(true)
         expect(isHtmlComponentType(C1_COMPONENT_TYPE)).toBe(true)
         const entry = getRendererEntry(C1_COMPONENT_TYPE)
@@ -77,11 +77,11 @@ describe('Feature: c1-entity-level-control, Property 1: 组件注册完整�?, 
     )
   })
 
-  it('注册一致性：任意 componentType 字符�?isHtmlComponentType �?注册表存�?, () => {
+  it('注册一致性：任意 componentType 字符串，isHtmlComponentType 与注册表存在性一致', () => {
     const registered = [...HTML_RENDERER_REGISTRY.keys()]
     const junk = fc.oneof(
       fc.constantFrom(C1_COMPONENT_TYPE, ...registered),
-      fc.string(), // 随机噪声（几乎必为未注册�?
+      fc.string(), // 随机噪声（几乎必为未注册）
       fc.constantFrom('c1', 'C1', 'entity-level-control', 'c1-entity', 'skip', 'unknown'),
     )
     fc.assert(
@@ -93,24 +93,24 @@ describe('Feature: c1-entity-level-control, Property 1: 组件注册完整�?, 
   })
 })
 
-// ─── Property 2: 九段分组完整�?──────────────────────────────────────────────
+// ─── Property 2: 九段分组完整性 ──────────────────────────────────────────────
 
-describe('Feature: c1-entity-level-control, Property 2: 九段分组完整�?, () => {
+describe('Feature: c1-entity-level-control, Property 2: 九段分组完整性', () => {
   interface RowStep { id: number; row: number }
 
-  // 覆盖全表行区间及越界行（1..5 表头�?136 尾部�?
+  // 覆盖全表行区间及越界行（1..5 表头；136 尾部）
   const rowStepArb: fc.Arbitrary<RowStep> = fc.record({
     id: fc.nat(),
     row: fc.integer({ min: 0, max: C1_PROGRAM_ROW_MAX + 20 }),
   })
 
-  it('按行分组：无遗漏无重复（Σ分组�?+ ungrouped == 总数�?, () => {
+  it('按行分组：无遗漏无重复（Σ分组数 + ungrouped == 总数）', () => {
     fc.assert(
       fc.property(fc.array(rowStepArb, { maxLength: 300 }), (steps) => {
         const grouped = groupStepsByRow(steps)
-        // 无遗漏：分组总数 + 未分�?== 输入总数
+        // 无遗漏：分组总数 + 未分组 == 输入总数
         expect(totalGrouped(grouped) + grouped.ungrouped.length).toBe(steps.length)
-        // 无重复：每个步骤 id 至多出现一次（跨九�?+ ungrouped�?
+        // 无重复：每个步骤 id 至多出现一次（跨九段 + ungrouped）
         const seen = new Set<number>()
         let count = 0
         for (const slug of C1_SECTION_SLUGS) {
@@ -126,7 +126,7 @@ describe('Feature: c1-entity-level-control, Property 2: 九段分组完整�?, 
     )
   })
 
-  it('落在九段行区间内的步骤必被唯一归段，且归段�?assignSectionByRow 一�?, () => {
+  it('落在九段行区间内的步骤必被唯一归段，且归段与 assignSectionByRow 一致', () => {
     const inRangeStep: fc.Arbitrary<RowStep> = fc.record({
       id: fc.nat(),
       row: fc.integer({ min: C1_PROGRAM_ROW_MIN, max: C1_PROGRAM_ROW_MAX }),
@@ -137,7 +137,7 @@ describe('Feature: c1-entity-level-control, Property 2: 九段分组完整�?, 
         // 区间内步骤无一落入 ungrouped
         expect(grouped.ungrouped.length).toBe(0)
         expect(totalGrouped(grouped)).toBe(steps.length)
-        // 每段内所有步�?assignSectionByRow 都等于该�?slug
+        // 每段内所有步骤 assignSectionByRow 都等于该段 slug
         for (const slug of C1_SECTION_SLUGS) {
           for (const s of grouped.groups[slug]) {
             expect(assignSectionByRow(s.row)).toBe(slug)
@@ -148,7 +148,7 @@ describe('Feature: c1-entity-level-control, Property 2: 九段分组完整�?, 
     )
   })
 
-  it('�?slug 分组：合�?slug 唯一归段，非�?slug �?ungrouped', () => {
+  it('按 slug 分组：合法 slug 唯一归段，非法 slug 进 ungrouped', () => {
     const slugStep = fc.record({
       id: fc.nat(),
       section: fc.oneof(
@@ -161,7 +161,7 @@ describe('Feature: c1-entity-level-control, Property 2: 九段分组完整�?, 
       fc.property(fc.array(slugStep, { maxLength: 200 }), (steps) => {
         const grouped = groupStepsBySlug(steps)
         expect(totalGrouped(grouped) + grouped.ungrouped.length).toBe(steps.length)
-        // 合法 slug 步骤�?== 各段计数之和
+        // 合法 slug 步骤数 == 各段计数之和
         const legal = steps.filter((s) =>
           (C1_SECTION_SLUGS as readonly string[]).includes(s.section),
         ).length
@@ -172,7 +172,7 @@ describe('Feature: c1-entity-level-control, Property 2: 九段分组完整�?, 
   })
 
   it('九段行区间连续无缝无重叠（分组完整性前提）', () => {
-    // 逐行遍历整表：每一行至多命中一个段；区间内恰好命中一�?
+    // 逐行遍历整表：每一行至多命中一个段；区间内恰好命中一段
     fc.assert(
       fc.property(fc.integer({ min: C1_PROGRAM_ROW_MIN, max: C1_PROGRAM_ROW_MAX }), (row) => {
         const hits = C1_SECTION_DEFS.filter((d) => row >= d.startRow && row <= d.endRow)
@@ -184,10 +184,10 @@ describe('Feature: c1-entity-level-control, Property 2: 九段分组完整�?, 
   })
 })
 
-// ─── Property 3: 适用性进度排除不适用�?──────────────────────────────────────
+// ─── Property 3: 适用性进度排除不适用项 ──────────────────────────────────────
 
-describe('Feature: c1-entity-level-control, Property 3: 适用性进度排除不适用�?, () => {
-  it('不适用步骤必有非空理由方可保存（canPersistApplicability�?, () => {
+describe('Feature: c1-entity-level-control, Property 3: 适用性进度排除不适用项', () => {
+  it('不适用步骤必有非空理由方可保存（canPersistApplicability）', () => {
     fc.assert(
       fc.property(
         fc.boolean(),
@@ -198,7 +198,7 @@ describe('Feature: c1-entity-level-control, Property 3: 适用性进度排除不
             // 适用：始终可保存，无需理由
             expect(ok).toBe(true)
           } else {
-            // 不适用：当且仅当理�?trim 后非�?
+            // 不适用：当且仅当理由 trim 后非空
             const hasReason = !!(reason && String(reason).trim())
             expect(ok).toBe(hasReason)
           }
@@ -208,9 +208,9 @@ describe('Feature: c1-entity-level-control, Property 3: 适用性进度排除不
     )
   })
 
-  it('段完成进度分�?== 适用步骤数（排除 conclusion=N 的不适用步骤�?, () => {
+  it('段完成进度分母 == 适用步骤数（排除 conclusion=N 的不适用步骤）', () => {
     const slug: C1SectionSlug = 'ce'
-    // 生成若干步骤，各�?applicable(Y/N) + 可�?result �?
+    // 生成若干步骤，各带 applicable(Y/N) + 可选 result 值
     const stepArb = fc.record({
       step: fc.integer({ min: 1, max: 30 }),
       applicable: fc.boolean(),
@@ -218,7 +218,7 @@ describe('Feature: c1-entity-level-control, Property 3: 适用性进度排除不
     })
     fc.assert(
       fc.property(fc.array(stepArb, { maxLength: 40 }), (rawSteps) => {
-        // 去重步骤号（同号后者覆盖），构�?responses
+        // 去重步骤号（同号后者覆盖），构造 responses
         const byStep = new Map<number, { applicable: boolean; hasResult: boolean }>()
         for (const s of rawSteps) byStep.set(s.step, { applicable: s.applicable, hasResult: s.hasResult })
 
@@ -233,19 +233,19 @@ describe('Feature: c1-entity-level-control, Property 3: 适用性进度排除不
             responses.push({
               item_id: `C1-${slug}-${step}-result`,
               conclusion: null,
-              remark: '已执行测�?,
+              remark: '已执行测试',
             })
           }
         }
 
         const detail = sectionProgressDetail(responses, slug, true)
 
-        // 期望分母：适用（applicable=true）且出现�?applicable/result 字段的步骤数
+        // 期望分母：适用（applicable=true）且出现在 applicable/result 字段的步骤数
         const applicableSteps = [...byStep.values()].filter((v) => v.applicable).length
         expect(detail.denominator).toBe(applicableSteps)
-        // 分子不超过分母；不适用步骤即使�?result 也不计入
+        // 分子不超过分母；不适用步骤即使有 result 也不计入
         expect(detail.completed).toBeLessThanOrEqual(detail.denominator)
-        // percent �?0..100 且与分子分母一�?
+        // percent 在 0..100 且与分子分母一致
         const expectedPct = detail.denominator === 0
           ? 0
           : Math.round((detail.completed / detail.denominator) * 100)
@@ -255,7 +255,7 @@ describe('Feature: c1-entity-level-control, Property 3: 适用性进度排除不
     )
   })
 
-  it('整段不适用时进度视为已裁剪（denominator=0, percent=100�?, () => {
+  it('整段不适用时进度视为已裁剪（denominator=0, percent=100）', () => {
     const responsesArb = fc.array(
       fc.record({
         item_id: fc.constant('C1-bu-1-applicable'),
@@ -275,10 +275,10 @@ describe('Feature: c1-entity-level-control, Property 3: 适用性进度排除不
   })
 })
 
-// ─── Property 4: 引用回归（不重复断言，权威实现见 useC1SampleEngine.test.ts�?──
+// ─── Property 4: 引用回归（不重复断言，权威实现见 useC1SampleEngine.test.ts）──
 
 describe('Feature: c1-entity-level-control, Property 4 (reference): 样本借贷勾稽', () => {
-  it('引用 calcSampleBalance 做一次冒烟回归（完整 property �?useC1SampleEngine.test.ts�?, () => {
+  it('引用 calcSampleBalance 做一次冒烟回归（完整 property 见 useC1SampleEngine.test.ts）', () => {
     const r = calcSampleBalance([
       { date: '', account: '', ref: '', desc: '', debit: 100, credit: 0 },
       { date: '', account: '', ref: '', desc: '', debit: 0, credit: 100 },
@@ -287,7 +287,7 @@ describe('Feature: c1-entity-level-control, Property 4 (reference): 样本借贷
   })
 })
 
-// ─── Property 6: readonly 禁编�?─────────────────────────────────────────────
+// ─── Property 6: readonly 禁编辑 ─────────────────────────────────────────────
 
 const mockGet = vi.fn()
 const mockPut = vi.fn()
@@ -303,7 +303,7 @@ vi.mock('element-plus', () => ({
   ElMessage: { warning: vi.fn(), error: vi.fn(), success: vi.fn() },
 }))
 
-// 动�?import 需�?mock 声明�?
+// 动态 import 需在 mock 声明后
 import { useC1ControlData } from '../useC1ControlData'
 
 type EditOp =
@@ -312,7 +312,7 @@ type EditOp =
   | { kind: 'wpRef'; itemId: string; value: string }
   | { kind: 'applicable'; itemId: string; applicable: boolean; reason: string }
 
-describe('Feature: c1-entity-level-control, Property 6: readonly 禁编�?, () => {
+describe('Feature: c1-entity-level-control, Property 6: readonly 禁编辑', () => {
   beforeEach(() => {
     mockGet.mockReset()
     mockPut.mockReset()
@@ -331,7 +331,7 @@ describe('Feature: c1-entity-level-control, Property 6: readonly 禁编�?, () 
     }),
   )
 
-  it('readonly=true 下任意编辑序列都不发起保存，本地状态不�?, async () => {
+  it('readonly=true 下任意编辑序列都不发起保存，本地状态不变', async () => {
     await fc.assert(
       fc.asyncProperty(fc.array(opArb, { maxLength: 30 }), async (ops) => {
         mockPut.mockClear()
@@ -361,16 +361,16 @@ describe('Feature: c1-entity-level-control, Property 6: readonly 禁编�?, () 
         handle.flushPendingSave()
         await flushPromises()
 
-        // 禁编辑：无任�?PUT
+        // 禁编辑：无任何 PUT
         expect(mockPut).not.toHaveBeenCalled()
-        // 本地 responses 不被写入（方法在 readonly 时提前返回，�?applyPatch�?
+        // 本地 responses 不被写入（方法在 readonly 时提前返回，不 applyPatch）
         expect(handle.responses.value.size).toBe(0)
-        // setApplicable �?readonly 下一律返�?false
+        // setApplicable 在 readonly 下一律返回 false
         expect(applicableResults.every((r) => r === false)).toBe(true)
 
         scope.stop()
         await flushPromises()
-        // 卸载 flush 也不应触发保�?
+        // 卸载 flush 也不应触发保存
         expect(mockPut).not.toHaveBeenCalled()
       }),
       { numRuns: 25 },

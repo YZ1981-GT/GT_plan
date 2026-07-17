@@ -94,8 +94,10 @@ def _resolve_wp_file(
     同一 wp_code 的多个 sheet 共享此文件。
     首次从模板整本复制一次，后续复用。
 
-    visible_sheet: 若提供，首次复制后用 openpyxl 隐藏非目标 sheet
-                   （解决多sheet workbook在OO中显示无关tab的问题）。
+    visible_sheet: 若提供，用 openpyxl 隐藏非目标 sheet 并置其为活动 sheet
+                   （解决多sheet workbook在OO中显示无关tab/打开到错误sheet的问题）。
+                   对已存在的缓存文件同样生效（幂等，可见性无变化时不落盘，
+                   避免无谓刷新 doc_key）。
     """
     storage_dir = _onlyoffice_storage_dir(project_id)
 
@@ -106,15 +108,32 @@ def _resolve_wp_file(
     file_name = f"{wp_code}{ext}"           # single file per wp_code, 保留原始扩展名
     target = storage_dir / file_name
 
+    # 曾错误地把 xlsx 缓存 rename 成 .docx：内容仍是 workbook，需丢弃重拷
+    if target.exists() and ext in (".docx", ".doc") and _oo_file_is_xlsx_zip(target):
+        try:
+            target.unlink()
+            logger.info("已清除伪 docx（实为 xlsx）OO 缓存: %s", target.name)
+        except OSError as exc:
+            logger.warning("无法删除伪 docx OO 缓存 %s: %s", target, exc)
+
     if target.exists():
+        # 共享缓存文件按当前请求的目标 sheet 重设可见性/活动 sheet
+        # （否则首次复制时锁定的 sheet 永久生效，切换 sheet 后 OO 打开错误页）。
+        if visible_sheet and ext in (".xlsx", ".xlsm"):
+            _hide_non_target_sheets(target, visible_sheet)
         return target
 
-    # 兼容旧格式：检查是否存在旧的 .xlsx 命名（从 .xlsx 硬编码时代遗留）
+    # 兼容旧格式：曾按 .xlsx 缓存，现模板为 docx/doc 时不可 rename（内容仍是 xlsx）
     legacy_target = storage_dir / f"{wp_code}.xlsx"
     if legacy_target.exists() and ext != ".xlsx":
-        # 旧文件存在但扩展名不对 → 重命名为正确扩展名
-        legacy_target.rename(target)
-        return target
+        try:
+            legacy_target.unlink()
+            logger.info(
+                "已清除过时 OO xlsx 缓存以便改挂 %s 模板: %s",
+                ext, legacy_target.name,
+            )
+        except OSError as exc:
+            logger.warning("无法删除过时 OO xlsx 缓存 %s: %s", legacy_target, exc)
 
     if template_path and template_path.exists():
         storage_dir.mkdir(parents=True, exist_ok=True)
@@ -128,11 +147,28 @@ def _resolve_wp_file(
     raise FileNotFoundError(f"OnlyOffice 文件不存在且无模板可复制: {file_name}")
 
 
+def _oo_file_is_xlsx_zip(path: Path) -> bool:
+    """True if path is an OOXML workbook (xl/) rather than a Word document (word/)."""
+    try:
+        import zipfile
+
+        with zipfile.ZipFile(path) as zf:
+            names = zf.namelist()
+        has_xl = any(n.startswith("xl/") for n in names)
+        has_word = any(n.startswith("word/") for n in names)
+        return has_xl and not has_word
+    except Exception:
+        return False
+
+
 def _hide_non_target_sheets(file_path: Path, target_sheet: str) -> None:
     """用 openpyxl 将非目标 sheet 设为 hidden，让 OO 只显示目标 tab。
 
     匹配逻辑：target_sheet 可能是完整名或末尾含编码，用 endswith 或 contains 匹配。
     至少保留一个可见 sheet（否则 xlsx 无效）。
+
+    幂等：目标 sheet 已是唯一可见且为活动 sheet 时不落盘（避免 mtime 变化
+    导致 doc_key 刷新、打断进行中的 OO 编辑会话）。
     """
     try:
         import openpyxl
@@ -157,6 +193,16 @@ def _hide_non_target_sheets(file_path: Path, target_sheet: str) -> None:
             wb.close()
             return
 
+        # 幂等短路：目标已可见 + 活动，且其余全部隐藏 → 无需改写文件
+        already_ok = (
+            target_ws.sheet_state == 'visible'
+            and wb.active == target_ws
+            and all(ws.sheet_state == 'hidden' for ws in wb.worksheets if ws is not target_ws)
+        )
+        if already_ok:
+            wb.close()
+            return
+
         # 设置目标为活动 sheet，其余隐藏
         for ws in wb.worksheets:
             if ws == target_ws:
@@ -168,6 +214,25 @@ def _hide_non_target_sheets(file_path: Path, target_sheet: str) -> None:
         wb.close()
     except Exception as e:
         logger.warning("_hide_non_target_sheets failed for %s: %s", file_path.name, e)
+
+
+def _ensure_all_sheets_visible(file_path: Path) -> None:
+    """「完整Excel」页签：把共享工作簿的全部 sheet 恢复可见（幂等，无变化不落盘）。
+
+    共享文件曾被 _hide_non_target_sheets 隐藏为单 sheet，整册编辑前需恢复。
+    """
+    try:
+        import openpyxl
+        wb = openpyxl.load_workbook(str(file_path))
+        if all(ws.sheet_state == 'visible' for ws in wb.worksheets):
+            wb.close()
+            return
+        for ws in wb.worksheets:
+            ws.sheet_state = 'visible'
+        wb.save(str(file_path))
+        wb.close()
+    except Exception as e:
+        logger.warning("_ensure_all_sheets_visible failed for %s: %s", file_path.name, e)
 
 
 def _generate_doc_key(file_path: Path, wp_code: str) -> str:
@@ -444,8 +509,8 @@ async def get_sheet_onlyoffice_config(
     # 聚合包内的独立 source_wp_code sheet（如 D4-5）：尝试用 sheet 级编码找独立模板
     _sheet_wp_code = wp_code
     # 从 sheet_name 提取可能的独立 wp_code（尾部匹配 or 头部匹配）
-    # 尾部匹配：如 "营业收入会计政策检查D4-5"
-    _m = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*$", sheet_name)
+    # 尾部匹配：如 "营业收入会计政策检查D4-5"、"存货采购入库检查表F2-33-新增"（忽略修订尾缀）
+    _m = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)(?:-新增)?\s*$", sheet_name)
     # 头部匹配：如 "C14-2评价控制偏差" / "C14-2 xxx"
     if not _m:
         _m = re.match(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*", sheet_name)
@@ -457,9 +522,16 @@ async def get_sheet_onlyoffice_config(
 
     template_path = find_template_file_any(_sheet_wp_code)
     try:
-        file_path = _resolve_wp_file(project_id, _sheet_wp_code, template_path, visible_sheet=sheet_name)
+        file_path = _resolve_wp_file(
+            project_id, _sheet_wp_code, template_path,
+            visible_sheet=None if whole_workbook else sheet_name,
+        )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+
+    # 完整Excel 页签：恢复全部 sheet 可见（共享文件可能被单 sheet 模式隐藏过）
+    if whole_workbook and file_path.suffix.lower() in (".xlsx", ".xlsm"):
+        _ensure_all_sheets_visible(file_path)
 
     # 4. 生成 doc_key
     doc_key = _generate_doc_key(file_path, _sheet_wp_code)
@@ -469,9 +541,10 @@ async def get_sheet_onlyoffice_config(
     wopi_token = _sign_wopi_token(wp_id, _sheet_wp_code)
     download_url = (
         f"{base_url}/api/workpapers/{wp_id}/sheets/{sheet_name}/wopi/contents"
+        f"?whole={'1' if whole_workbook else '0'}"
     )
     if wopi_token:
-        download_url += f"?token={wopi_token}"
+        download_url += f"&token={wopi_token}"
     callback_url = (
         f"{base_url}/api/workpapers/{wp_id}/sheets/{sheet_name}/onlyoffice-callback"
     )
@@ -572,6 +645,7 @@ async def get_sheet_wopi_contents(
     wp_id: UUID,
     sheet_name: str,
     request: Request,
+    whole: str = "0",
     db: AsyncSession = Depends(get_db),
 ):
     """WOPI GetFile — JWT 鉴权后返回 xlsx 内容。
@@ -594,8 +668,8 @@ async def get_sheet_wopi_contents(
     # 聚合包内独立 source sheet（如 D4-5）应服务其独立文件，而非父 wp_code（D4）
     # 对应的任意 D4 模板（否则 OO 下载到 D4-12 合同检查表却标题显示 D4-5）。
     _sheet_wp_code = wp_code
-    # 从 sheet_name 提取可能的独立 wp_code（尾部匹配 or 头部匹配）
-    _m = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*$", sheet_name)
+    # 从 sheet_name 提取可能的独立 wp_code（尾部匹配 or 头部匹配，忽略「-新增」修订尾缀）
+    _m = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)(?:-新增)?\s*$", sheet_name)
     if not _m:
         _m = re.match(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*", sheet_name)
     if _m and _m.group(1) != wp_code:
@@ -604,10 +678,17 @@ async def get_sheet_wopi_contents(
             _sheet_wp_code = _candidate
 
     template_path = find_template_file_any(_sheet_wp_code)
+    _is_whole = whole == "1"
     try:
-        file_path = _resolve_wp_file(project_id, _sheet_wp_code, template_path, visible_sheet=sheet_name)
+        file_path = _resolve_wp_file(
+            project_id, _sheet_wp_code, template_path,
+            visible_sheet=None if _is_whole else sheet_name,
+        )
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+
+    if _is_whole and file_path.suffix.lower() in (".xlsx", ".xlsm"):
+        _ensure_all_sheets_visible(file_path)
 
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="文件不存在")
@@ -760,7 +841,7 @@ async def post_sheet_onlyoffice_callback(
         from app.services.wp_template_finder import find_template_file_any as _find_tpl
 
         _save_wp_code = wp_code
-        _m_save = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*$", sheet_name)
+        _m_save = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)(?:-新增)?\s*$", sheet_name)
         if _m_save and _m_save.group(1) != wp_code:
             _cand = _m_save.group(1)
             if _find_tpl(_cand):
@@ -786,14 +867,23 @@ async def post_sheet_onlyoffice_callback(
 
         component_type = _WP_CODE_OVERRIDE.get(wp_code)
         is_word_template = component_type == "word-template"
+        _tpl_for_ext = _find_tpl(_save_wp_code)
+        _save_ext = (
+            _tpl_for_ext.suffix.lower()
+            if _tpl_for_ext and _tpl_for_ext.suffix
+            else ".xlsx"
+        )
+        # 已有 docx 缓存时优先按 docx 写回（F2-22 等从 xlsx 改挂 Word 的场景）
+        _oo_dir = _onlyoffice_storage_dir(project_id)
+        if (_oo_dir / f"{_save_wp_code}.docx").exists():
+            _save_ext = ".docx"
 
         if is_word_template:
             # word-template: 保存到 storage/{project_id}/workpapers/{wp_code}.docx
             target = Path(f"storage/{project_id}/workpapers/{wp_code}.docx")
         else:
-            # xlsx: 保存到原有 OnlyOffice 存储目录（用 sheet 级 wp_code）
-            storage_dir = _onlyoffice_storage_dir(project_id)
-            target = storage_dir / f"{_save_wp_code}.xlsx"
+            # 按模板实际扩展名落盘（F2-22 为 docx，不得硬编码 xlsx）
+            target = _oo_dir / f"{_save_wp_code}{_save_ext}"
 
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
@@ -812,6 +902,74 @@ async def post_sheet_onlyoffice_callback(
                 exc,
             )
             return {"error": 1}
+
+        # ─── F2-22 监盘计划 / F2-23 监盘小结：docx → fields JSON 回写 ───
+        if (
+            _save_wp_code in ("F2-22", "F2-23")
+            and target.suffix.lower() == ".docx"
+        ):
+            try:
+                import json as _json
+
+                if _save_wp_code == "F2-23":
+                    from app.services.f2_stocktake_summary_sync import (
+                        FIELDS_ITEM_ID,
+                        extract_fields_from_docx,
+                        merge_extracted_into_existing,
+                        parse_fields_json,
+                    )
+                else:
+                    from app.services.f2_stocktake_plan_sync import (
+                        FIELDS_ITEM_ID,
+                        extract_fields_from_docx,
+                        merge_extracted_into_existing,
+                        parse_fields_json,
+                    )
+
+                existing_row = (
+                    await db.execute(
+                        sa.text(
+                            "SELECT remark FROM checklist_responses "
+                            "WHERE wp_id = :wid AND item_id = :iid LIMIT 1"
+                        ),
+                        {"wid": str(wp_id), "iid": FIELDS_ITEM_ID},
+                    )
+                ).first()
+                existing = parse_fields_json(
+                    existing_row.remark if existing_row else None
+                )
+                extracted = extract_fields_from_docx(target)
+                merged = merge_extracted_into_existing(existing, extracted)
+                await db.execute(
+                    sa.text(
+                        "INSERT INTO checklist_responses "
+                        "(project_id, wp_id, item_id, conclusion, remark) "
+                        "VALUES (:pid, :wid, :iid, NULL, :remark) "
+                        "ON CONFLICT (wp_id, item_id) "
+                        "DO UPDATE SET remark = EXCLUDED.remark, "
+                        "project_id = COALESCE(checklist_responses.project_id, EXCLUDED.project_id)"
+                    ),
+                    {
+                        "pid": str(project_id),
+                        "wid": str(wp_id),
+                        "iid": FIELDS_ITEM_ID,
+                        "remark": _json.dumps(merged, ensure_ascii=False),
+                    },
+                )
+                await db.commit()
+                logger.info(
+                    "OnlyOffice callback: %s 字段已回写 wp_id=%s keys=%s",
+                    _save_wp_code,
+                    wp_id,
+                    list(extracted.keys()),
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "OnlyOffice callback: %s 回写失败 wp_id=%s: %s",
+                    _save_wp_code,
+                    wp_id,
+                    exc,
+                )
 
         # ─── word-template: 从保存的 docx 提取占位符值并回写 checklist_responses ───
         if is_word_template:
@@ -834,8 +992,9 @@ async def post_sheet_onlyoffice_callback(
                                     "INSERT INTO checklist_responses "
                                     "(project_id, wp_id, item_id, conclusion, remark) "
                                     "VALUES (:pid, :wid, :iid, :val, '') "
-                                    "ON CONFLICT (project_id, wp_id, item_id) "
-                                    "DO UPDATE SET conclusion = :val"
+                                    "ON CONFLICT (wp_id, item_id) "
+                                    "DO UPDATE SET conclusion = EXCLUDED.conclusion, "
+                                    "project_id = COALESCE(checklist_responses.project_id, EXCLUDED.project_id)"
                                 ),
                                 {
                                     "pid": str(project_id),
@@ -1056,8 +1215,9 @@ async def import_structured_docx(
                     "INSERT INTO checklist_responses "
                     "(project_id, wp_id, item_id, conclusion, remark) "
                     "VALUES (:pid, :wid, :iid, :val, '') "
-                    "ON CONFLICT (project_id, wp_id, item_id) "
-                    "DO UPDATE SET conclusion = :val"
+                    "ON CONFLICT (wp_id, item_id) "
+                    "DO UPDATE SET conclusion = EXCLUDED.conclusion, "
+                    "project_id = COALESCE(checklist_responses.project_id, EXCLUDED.project_id)"
                 ),
                 {
                     "pid": str(wp.project_id),

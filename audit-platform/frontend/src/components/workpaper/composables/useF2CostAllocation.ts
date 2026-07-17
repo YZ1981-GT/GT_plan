@@ -1,26 +1,24 @@
 /**
- * useF2CostAllocation — F2-44 生产成本分配（联动 F2-41/42/43 来源合计）
+ * useF2CostAllocation — F2-44 生产成本分配
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
-import { calcSubtotal } from './useF2InvValFormulaEngine'
 import { readValRowJson, type ChecklistResponse } from './useF2ValuationFormData'
+import { readSourceTotals } from './useF2ProductionCostFormulas'
 import {
-  newRowId,
-  enrichAllocationRow,
-  parseRows,
-  readSourceTotals,
-  type AllocationRow,
-} from './useF2ProductionCostFormulas'
+  defaultAllocationSheet,
+  effectivePool,
+  poolGrandTotal,
+  enrichAllocationProducts,
+  calcAllocationTotals,
+  migrateAllocationSheet,
+  emptyAllocationProduct,
+  type CostAllocationSheet,
+  type CostAllocationProduct,
+  type CostAllocationPool,
+} from './useF2CostAllocationFormulas'
 
 const ROWS_KEY = 'F2-44-rows'
 const NOTE_KEY = 'F2-44-note'
-
-function emptyRow(): AllocationRow {
-  return {
-    rowId: newRowId(), productName: '',
-    allocationBase: 0, materialAlloc: 0, laborAlloc: 0, overheadAlloc: 0, remark: '',
-  }
-}
 
 export function useF2CostAllocation(opts: {
   allResponses: Ref<Map<string, ChecklistResponse>>
@@ -29,12 +27,18 @@ export function useF2CostAllocation(opts: {
   const readonly = opts.isReadonly ?? ref(false)
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-  const rows = ref<AllocationRow[]>([emptyRow()])
+  const sheet = ref<CostAllocationSheet>(defaultAllocationSheet())
   const auditNote = ref('')
 
   function load(): void {
     const raw = readValRowJson(opts.allResponses.value.get(ROWS_KEY))
-    rows.value = parseRows(raw, () => rows.value)
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw)
+        const migrated = migrateAllocationSheet(parsed)
+        if (migrated) sheet.value = migrated
+      } catch { /* ignore */ }
+    }
     auditNote.value = opts.allResponses.value.get(NOTE_KEY)?.remark || ''
   }
 
@@ -48,19 +52,32 @@ export function useF2CostAllocation(opts: {
     return readSourceTotals(map)
   })
 
-  const baseTotal = computed(() => calcSubtotal(rows.value.map((r) => r.allocationBase)))
-
-  const enrichedRows = computed(() =>
-    rows.value.map((r) => enrichAllocationRow(r, baseTotal.value, sourceTotals.value)),
+  const activePool = computed(() =>
+    effectivePool(sheet.value.pool, {
+      material: sourceTotals.value.material,
+      labor: sourceTotals.value.labor,
+      overhead: sourceTotals.value.overhead,
+    }),
   )
 
-  const allocationMismatch = computed(() =>
-    enrichedRows.value.some((r) => Math.abs(r.variance) > 0.01),
+  const enrichedProducts = computed(() =>
+    enrichAllocationProducts(sheet.value.products, activePool.value),
   )
 
-  const allocGrandTotal = computed(() =>
-    calcSubtotal(enrichedRows.value.map((r) => r.totalAlloc)),
+  const columnTotals = computed(() => calcAllocationTotals(enrichedProducts.value))
+
+  const poolTotal = computed(() => poolGrandTotal(activePool.value))
+
+  const verifyFailCount = computed(() =>
+    enrichedProducts.value.filter((r) => !r.verifyOk && r.verify !== '—').length,
   )
+
+  const allocGrandTotal = computed(() => columnTotals.value.totalAlloc)
+
+  const allocationMismatch = computed(() => {
+    const diff = Math.abs(allocGrandTotal.value - poolTotal.value)
+    return diff > 0.01 && poolTotal.value > 0
+  })
 
   function flushSave(): void {
     const items = [
@@ -71,28 +88,55 @@ export function useF2CostAllocation(opts: {
   }
 
   function persist(): void {
+    if (readonly.value) return
     opts.allResponses.value.set(ROWS_KEY, {
-      item_id: ROWS_KEY, conclusion: null, remark: JSON.stringify(rows.value),
+      item_id: ROWS_KEY,
+      conclusion: null,
+      remark: JSON.stringify(sheet.value),
     })
     if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 2000)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      flushSave()
+    }, 2000)
   }
 
-  function updateRow(rowId: string, patch: Partial<AllocationRow>): void {
+  function updateSheet(patch: Partial<CostAllocationSheet>): void {
     if (readonly.value) return
-    rows.value = rows.value.map((r) => (r.rowId === rowId ? { ...r, ...patch } : r))
+    sheet.value = { ...sheet.value, ...patch }
     persist()
   }
 
-  function addRow(): void {
+  function updatePool(patch: Partial<CostAllocationPool>): void {
     if (readonly.value) return
-    rows.value = [...rows.value, emptyRow()]
+    sheet.value = { ...sheet.value, pool: { ...sheet.value.pool, ...patch } }
     persist()
   }
 
-  function removeRow(rowId: string): void {
-    if (readonly.value || rows.value.length <= 1) return
-    rows.value = rows.value.filter((r) => r.rowId !== rowId)
+  function updateProduct(id: string, patch: Partial<CostAllocationProduct>): void {
+    if (readonly.value) return
+    sheet.value = {
+      ...sheet.value,
+      products: sheet.value.products.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    }
+    persist()
+  }
+
+  function addProduct(): void {
+    if (readonly.value) return
+    sheet.value = {
+      ...sheet.value,
+      products: [...sheet.value.products, emptyAllocationProduct()],
+    }
+    persist()
+  }
+
+  function removeProduct(id: string): void {
+    if (readonly.value || sheet.value.products.length <= 1) return
+    sheet.value = {
+      ...sheet.value,
+      products: sheet.value.products.filter((p) => p.id !== id),
+    }
     persist()
   }
 
@@ -100,20 +144,35 @@ export function useF2CostAllocation(opts: {
     if (readonly.value) return
     opts.allResponses.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
     if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 2000)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      flushSave()
+    }, 2000)
   })
 
-  onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
+  onBeforeUnmount(() => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      flushSave()
+    }
+  })
 
   return {
-    enrichedRows,
+    sheet,
+    activePool,
     sourceTotals,
+    enrichedProducts,
+    columnTotals,
+    poolTotal,
     allocGrandTotal,
     allocationMismatch,
+    verifyFailCount,
     auditNote,
-    updateRow,
-    addRow,
-    removeRow,
+    updateSheet,
+    updatePool,
+    updateProduct,
+    addProduct,
+    removeProduct,
   }
 }
 

@@ -1,27 +1,35 @@
 <template>
-  <div class="f2-loss-contract">
-    <!-- 编制提示 -->
+  <div class="f2-val-sheet f2-loss-contract">
+    <header class="sheet-header">
+      <div>
+        <h3>亏损合同预计损失测算表</h3>
+        <span class="code">F2-58</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat">预计损失合计 {{ fmt(loss.columnTotals.value.contractEstimatedLoss) }}</span>
+        <span class="stat sub">本期应确认 {{ fmt(loss.columnTotals.value.currentPeriodLoss) }}</span>
+        <span class="stat sub">差异 {{ fmtSigned(loss.columnTotals.value.difference) }}</span>
+        <el-tag v-if="loss.lossCount.value" type="danger" size="small">
+          亏损合同 {{ loss.lossCount.value }} 项
+        </el-tag>
+        <el-tag v-if="loss.adjustCount.value" type="warning" size="small">
+          差异 {{ loss.adjustCount.value }} 项
+        </el-tag>
+      </div>
+    </header>
+
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>1. 合同预计总成本超过预计总收入时构成亏损合同，应按 CAS13 号计提预计负债。</p>
-        <p>2. 灰底列为自动测算列（是否亏损、完工进度、应确认损失、本期应计提、差异），不可手动编辑。</p>
-        <p>3. 应确认损失 = 预计总成本 − 预计总收入；本期应计提为扣除已计提部分后的增量。</p>
-        <p>4. 与管理层计提比较，差异标红行须在审计说明中说明并考虑调整分录。</p>
+        <p v-for="(tip, i) in tips" :key="i">{{ i + 1 }}. {{ tip }}</p>
       </div>
     </details>
 
-    <!-- 审计目标 -->
-    <el-alert type="info" :closable="false" show-icon class="objective-alert">
-      <template #title>审计目标：识别亏损合同并复核预计损失计提的完整性与准确性，确认预计负债恰当反映。</template>
-    </el-alert>
+    <el-alert type="info" :closable="false" :title="objectiveText" class="objective-alert" />
 
-    <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="loss.addRow()">+ 新增项目</el-button>
-        <el-tag size="small" type="warning">亏损合同: {{ loss.lossCount.value }}</el-tag>
-        <el-tag v-if="loss.adjustCount.value > 0" size="small" type="danger">需调整 {{ loss.adjustCount.value }} 笔</el-tag>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="loss.addProject()">+ 项目</el-button>
       </div>
       <div class="toolbar-right">
         <F2SheetToolbar
@@ -31,109 +39,147 @@
           :disabled="isReadonly"
           ai-section="loss-analysis"
           :existing-content="loss.auditNote.value"
+          :related-context="{
+            lossCount: loss.lossCount.value,
+            adjustCount: loss.adjustCount.value,
+          }"
           review-section="F2-58-loss"
           @ai-filled="(t: string) => { loss.auditNote.value = t }"
         />
         <GtIndexChip value="wp:F2-58" />
-        <el-tag size="small" type="info">共 {{ loss.enrichedRows.value.length }} 行</el-tag>
+        <el-tag size="small" type="info">{{ loss.enrichedProjects.value.length }} 个项目</el-tag>
       </div>
     </div>
 
-    <el-table :data="loss.enrichedRows.value" border size="small" max-height="480"
-      :row-class-name="({ row }) => row.isLoss ? 'warn-row' : row.needsAdjust ? 'error-row' : ''">
-      <el-table-column label="项目" width="120" fixed>
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.projectName" size="small"
-            @change="(v: string) => loss.updateRow(row.id, { projectName: v })" />
-          <span v-else>{{ row.projectName }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="预计总收入" width="110">
-        <template #default="{ row }">
-          <el-input-number :model-value="row.estimatedTotalRevenue" size="small" :controls="false" :disabled="isReadonly"
-            @change="(v: number) => loss.updateRow(row.id, { estimatedTotalRevenue: v ?? 0 })" />
-        </template>
-      </el-table-column>
-      <el-table-column label="预计总成本" width="110">
-        <template #default="{ row }">
-          <el-input-number :model-value="row.estimatedTotalCost" size="small" :controls="false" :disabled="isReadonly"
-            @change="(v: number) => loss.updateRow(row.id, { estimatedTotalCost: v ?? 0 })" />
-        </template>
-      </el-table-column>
-      <el-table-column label="是否亏损" width="80" class-name="auto-calc-col">
-        <template #default="{ row }">
-          <el-tag :type="row.isLoss ? 'danger' : 'success'" size="small">{{ row.isLoss ? '是' : '否' }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="完工进度" width="90" align="right" class-name="auto-calc-col">
-        <template #default="{ row }">
-          <el-tooltip content="完工进度 = 已发生成本 / 预计总成本" placement="top">
-            <span class="formula" v-if="typeof row.completionRate === 'number'">{{ (row.rateNum * 100).toFixed(1) }}%</span>
-            <span v-else>N/A</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-      <el-table-column label="应确认损失" width="110" align="right" class-name="auto-calc-col">
-        <template #default="{ row }">
-          <el-tooltip content="应确认损失 = 预计总成本 − 预计总收入（＞0 时为亏损）" placement="top">
-            <span class="formula">{{ row.expectedLoss.toLocaleString() }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-      <el-table-column label="本期应计提" width="110" align="right" class-name="auto-calc-col">
-        <template #default="{ row }">
-          <el-tooltip content="本期应计提 = 应确认损失 − 已计提部分" placement="top">
-            <span class="formula">{{ row.currentProvision.toLocaleString() }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-      <el-table-column label="管理层计提" width="110">
-        <template #default="{ row }">
-          <el-input-number :model-value="row.managementProvision" size="small" :controls="false" :disabled="isReadonly"
-            @change="(v: number) => loss.updateRow(row.id, { managementProvision: v ?? 0 })" />
-        </template>
-      </el-table-column>
-      <el-table-column label="差异" width="90" align="right" class-name="auto-calc-col">
-        <template #default="{ row }">
-          <el-tooltip content="差异 = 本期应计提 − 管理层计提" placement="top">
-            <span class="formula">{{ row.difference.toLocaleString() }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="55">
-        <template #default="{ row }">
-          <el-button link type="danger" size="small" :disabled="isReadonly" @click="loss.removeRow(row.id)">删</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    <!-- 审计说明 -->
+    <div class="table-scroll">
+      <table class="matrix-table">
+        <thead>
+          <tr>
+            <th rowspan="2" class="sticky col-code">项目编码</th>
+            <th rowspan="2" class="sticky col-name">项目名称</th>
+            <th rowspan="2">①<br>完工进度</th>
+            <th rowspan="2">②<br>预计总收入</th>
+            <th rowspan="2">③<br>预计总成本</th>
+            <th rowspan="2" class="calc-col">④=③−②<br>合同预计损失</th>
+            <th rowspan="2" class="calc-col">⑤<br>已在损益<br>反映亏损</th>
+            <th rowspan="2" class="calc-col">⑥=④−⑤<br>本期应确认</th>
+            <th rowspan="2">⑦<br>账面已确认</th>
+            <th rowspan="2" class="calc-col">⑧=⑥−⑦<br>差异</th>
+            <th rowspan="2" class="col-remark">备注</th>
+            <th rowspan="2" class="col-act" />
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="row in loss.enrichedProjects.value"
+            :key="row.id"
+            :class="{ 'row-warn': row.isLoss === '是', 'row-error': row.hasDifference }"
+          >
+            <td class="sticky col-code">
+              <el-input v-if="!isReadonly" :model-value="row.projectCode" size="small"
+                @update:model-value="(v: string) => loss.updateProject(row.id, { projectCode: v })" />
+              <span v-else>{{ row.projectCode || '—' }}</span>
+            </td>
+            <td class="sticky col-name">
+              <el-input v-if="!isReadonly" :model-value="row.projectName" size="small"
+                @update:model-value="(v: string) => loss.updateProject(row.id, { projectName: v })" />
+              <span v-else>{{ row.projectName || '—' }}</span>
+            </td>
+            <td>
+              <el-input-number v-if="!isReadonly" :model-value="row.effectiveCompletionRate * 100"
+                size="small" :controls="false" :precision="1" class="compact-num"
+                @change="(v: number | undefined) => loss.updateProject(row.id, {
+                  completionRate: (v ?? 0) / 100,
+                  recognizedRevenue: 0,
+                })" />
+              <span v-else class="auto">{{ fmtPct(row.effectiveCompletionRate) }}</span>
+            </td>
+            <td>
+              <el-input-number v-if="!isReadonly" :model-value="row.estimatedTotalRevenue" size="small"
+                :controls="false" class="compact-num wide"
+                @change="(v: number | undefined) => loss.updateProject(row.id, { estimatedTotalRevenue: v ?? 0 })" />
+              <span v-else class="auto">{{ fmt(row.estimatedTotalRevenue) }}</span>
+            </td>
+            <td>
+              <el-input-number v-if="!isReadonly" :model-value="row.estimatedTotalCost" size="small"
+                :controls="false" class="compact-num wide"
+                @change="(v: number | undefined) => loss.updateProject(row.id, { estimatedTotalCost: v ?? 0 })" />
+              <span v-else class="auto">{{ fmt(row.estimatedTotalCost) }}</span>
+            </td>
+            <td class="auto calc calc-col" :class="{ 'loss-yes': row.isLoss === '是' }">
+              {{ fmt(row.contractEstimatedLoss) }}
+            </td>
+            <td>
+              <el-input-number v-if="!isReadonly" :model-value="row.priorRecognizedLoss" size="small"
+                :controls="false" class="compact-num wide"
+                :placeholder="fmt(row.contractEstimatedLoss * row.effectiveCompletionRate)"
+                @change="(v: number | undefined) => loss.updateProject(row.id, { priorRecognizedLoss: v ?? 0 })" />
+              <span v-else class="auto calc">{{ fmt(row.recognizedLossInPl) }}</span>
+            </td>
+            <td class="auto calc calc-col">{{ fmt(row.currentPeriodLoss) }}</td>
+            <td>
+              <el-input-number v-if="!isReadonly" :model-value="row.bookRecognizedLoss" size="small"
+                :controls="false" class="compact-num wide"
+                @change="(v: number | undefined) => loss.updateProject(row.id, { bookRecognizedLoss: v ?? 0 })" />
+              <span v-else class="auto">{{ fmt(row.bookRecognizedLoss) }}</span>
+            </td>
+            <td class="auto calc calc-col" :class="{ 'diff-warn': row.hasDifference }">
+              {{ fmtSigned(row.difference) }}
+            </td>
+            <td class="col-remark">
+              <el-input v-if="!isReadonly" :model-value="row.remark" size="small"
+                @update:model-value="(v: string) => loss.updateProject(row.id, { remark: v })" />
+              <span v-else class="remark-text">{{ row.remark || '—' }}</span>
+            </td>
+            <td class="col-act">
+              <el-button v-if="!isReadonly" link type="danger" size="small" @click="loss.removeProject(row.id)">删</el-button>
+            </td>
+          </tr>
+
+          <tr class="row-total">
+            <td colspan="2" class="sticky col-name">合计</td>
+            <td />
+            <td class="auto">{{ fmt(loss.columnTotals.value.estimatedTotalRevenue) }}</td>
+            <td class="auto">{{ fmt(loss.columnTotals.value.estimatedTotalCost) }}</td>
+            <td class="auto calc">{{ fmt(loss.columnTotals.value.contractEstimatedLoss) }}</td>
+            <td class="auto calc">{{ fmt(loss.columnTotals.value.recognizedLossInPl) }}</td>
+            <td class="auto calc">{{ fmt(loss.columnTotals.value.currentPeriodLoss) }}</td>
+            <td class="auto">{{ fmt(loss.columnTotals.value.bookRecognizedLoss) }}</td>
+            <td class="auto calc" :class="{ 'diff-warn': Math.abs(loss.columnTotals.value.difference) > 0.01 }">
+              {{ fmtSigned(loss.columnTotals.value.difference) }}
+            </td>
+            <td colspan="2" />
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
     <el-card class="opinion-card" shadow="never">
-      <template #header>
-        <div class="opinion-header">
-          <span class="opinion-title">审计说明</span>
-        </div>
-      </template>
+      <template #header><span class="opinion-title">1、审计说明</span></template>
       <el-input v-model="loss.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请说明亏损合同的识别、预计损失测算及管理层计提充分性判断……" :disabled="isReadonly" />
+        placeholder="说明亏损合同识别、预计损失测算及差异处理…" :disabled="isReadonly" />
     </el-card>
 
-    <!-- 审计结论 -->
     <el-card class="opinion-card" shadow="never">
-      <template #header>
-        <div class="opinion-header">
-          <span class="opinion-title">审计结论</span>
-        </div>
-      </template>
+      <template #header><span class="opinion-title">2、审计结论</span></template>
       <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
-        :disabled="isReadonly" @change="saveAuditConclusion" />
+        placeholder="A、未见异常。B、除上述应调整事项外，其余未见异常。C、不可确认。"
+        :disabled="isReadonly" @update:model-value="saveAuditConclusion" />
     </el-card>
+
+    <div class="tips-box">
+      <div class="tips-title">提示</div>
+      <ol>
+        <li v-for="(tip, i) in tips" :key="i">{{ tip }}</li>
+      </ol>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref, toRef } from 'vue'
 import { useF2LossContract } from '../../composables/useF2LossContract'
+import { F2_58_OBJECTIVE, F2_58_TIPS } from '../../composables/useF2LossContractFormulas'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -149,7 +195,9 @@ const loss = useF2LossContract({
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-// 审计结论（本表独立持久化，item_id 沿用 F2 特殊组 sheet-code 前缀，经 f2-spe:save-items 落库）
+const objectiveText = F2_58_OBJECTIVE
+const tips = F2_58_TIPS
+
 const CONCLUSION_KEY = 'F2-58-conclusion'
 const auditConclusion = ref('')
 function saveAuditConclusion(val: string): void {
@@ -163,26 +211,93 @@ onMounted(() => {
   const c = props.allResponses.get(CONCLUSION_KEY)
   if (c?.remark) auditConclusion.value = c.remark
 })
+
+function fmt(v: number): string {
+  if (!Number.isFinite(v) || v === 0) return '—'
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function fmtSigned(v: number): string {
+  if (!Number.isFinite(v) || v === 0) return '—'
+  const s = v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return v > 0 ? s : `(${s.replace('-', '')})`
+}
+
+function fmtPct(v: number): string {
+  if (!Number.isFinite(v) || v === 0) return '—'
+  return `${(v * 100).toFixed(1)}%`
+}
 </script>
 
+<style scoped src="../../f2/valuation/f2ValSheetStyles.css"></style>
 <style scoped>
-.f2-loss-contract { padding: 12px; font-size: var(--wp-font-size, 13px); }
-.f2-loss-contract :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
-.f2-loss-contract :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
-.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
-.guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.formula { text-decoration: underline dotted #909399; cursor: help; }
-:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
-:deep(.warn-row) { background: #fdf6ec; }
-:deep(.error-row) { background: #fef0f0; }
-.opinion-card { margin-top: 16px; border-radius: 8px; }
-.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.opinion-header { display: flex; align-items: center; justify-content: space-between; }
-.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+.f2-loss-contract { --gt-purple: #4b2d77; --gt-purple-soft: #f3eef8; }
+
+.table-scroll { overflow-x: auto; margin-bottom: 12px; }
+.matrix-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 11px;
+  min-width: 1180px;
+}
+.matrix-table th,
+.matrix-table td {
+  border: 1px solid #d4c8e0;
+  padding: 4px 4px;
+  text-align: center;
+  vertical-align: middle;
+  background: #fff;
+}
+.matrix-table thead th {
+  background: var(--gt-purple);
+  color: #fff;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  white-space: nowrap;
+  font-size: 10px;
+  line-height: 1.3;
+}
+.matrix-table th.calc-col { background: #6b4d8f; }
+
+.sticky { position: sticky; z-index: 3; background: #faf8fc !important; }
+.matrix-table thead th.sticky { background: var(--gt-purple) !important; color: #fff; z-index: 4; }
+.col-code { left: 0; min-width: 72px; }
+.col-name {
+  left: 72px;
+  min-width: 100px;
+  text-align: left !important;
+  padding-left: 4px !important;
+  box-shadow: 2px 0 4px rgba(75, 45, 119, 0.08);
+}
+.col-remark { min-width: 80px; }
+.col-act { width: 36px; position: sticky; right: 0; z-index: 3; background: #fff !important; }
+
+.row-total td { background: #f0ebf5 !important; font-weight: 600; }
+.row-warn td { background: #fdf6ec !important; }
+.row-error td { background: #fef0f0 !important; }
+.auto { text-align: right; padding-right: 2px; white-space: nowrap; color: #606266; }
+span.auto { display: block; }
+.calc { color: #4b2d77; font-weight: 500; background: #faf8fc !important; }
+.loss-yes { color: #c45656; font-weight: 600; }
+.diff-warn { color: #c45656; font-weight: 600; }
+.remark-text { font-size: 10px; color: #909399; }
+
+.tips-box {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #ecf5ff;
+  border-left: 3px solid #409eff;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.tips-title { font-weight: 600; color: #409eff; margin-bottom: 6px; }
+.tips-box ol { margin: 0; padding-left: 1.4em; }
+
+:deep(.compact-num) { width: 72px; }
+:deep(.compact-num.wide) { width: 96px; }
+:deep(.compact-num .el-input__inner) { text-align: right; padding: 0 4px; font-size: 11px; }
 </style>

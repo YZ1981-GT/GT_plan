@@ -56,10 +56,19 @@
         <!-- 科目 Tab + 视图切换 -->
         <div class="gt-confirmation-summary__toolbar">
           <ConfirmationTabs :tabs="data.accountTabs.value" :active-tab="data.activeTab.value" @update:active-tab="data.activeTab.value = $event" />
-          <el-radio-group v-model="viewMode.viewMode.value" size="small">
-            <el-radio-button value="list">列表视图</el-radio-button>
-            <el-radio-button value="grid">完整表格</el-radio-button>
-          </el-radio-group>
+          <div class="gt-confirmation-summary__toolbar-right">
+            <el-button
+              v-if="!readonly"
+              size="small"
+              :loading="syncing"
+              title="将已发函/已回函的行同步到项目函证中心台账（供工作包摘要/覆盖率消费）"
+              @click="handleSyncHub"
+            >同步到函证中心</el-button>
+            <el-radio-group v-model="viewMode.viewMode.value" size="small">
+              <el-radio-button value="list">列表视图</el-radio-button>
+              <el-radio-button value="grid">完整表格</el-radio-button>
+            </el-radio-group>
+          </div>
         </div>
 
         <!-- 列表视图 -->
@@ -168,6 +177,7 @@ import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { useConfirmationData } from './composables/useConfirmationData'
 import { useViewMode } from './composables/useViewMode'
+import { syncHubFromSummary } from './coordination/syncHubFromSummary'
 import type { ConfirmationRow } from './confirmationTypes'
 
 import ConfirmationDashboard from './ConfirmationDashboard.vue'
@@ -215,6 +225,8 @@ const viewMode = useViewMode()
 const selectedIds = ref<string[]>([])
 const currentRow = ref<ConfirmationRow | null>(null)
 const contextMenu = ref({ visible: false, x: 0, y: 0 })
+// 同步到函证中心（P0-2：编制真源 confirmation-v1 → 后端 Confirmation 台账/工作包摘要真源）
+const syncing = ref(false)
 // 用户是否已操作过（新增/删除），用于区分首次空态 vs 删光后空态
 const hasInteracted = ref(false)
 
@@ -400,6 +412,39 @@ function handleDelete() {
   selectedIds.value = []
 }
 
+/**
+ * 同步到函证中心：把本汇总表「已进入函证程序」的行 upsert 到后端 Confirmation 台账，
+ * 并按状态机推进（终态触发 CONFIRMATION_RECEIVED → 下游 D2/F2/G7… stale）。
+ * 这是 confirmation-v1 编制真源 → 后端摘要真源的桥（此前 syncHubFromSummary 为死代码未接线）。
+ */
+async function handleSyncHub() {
+  if (!props.projectId) { ElMessage.warning('缺少项目上下文，无法同步'); return }
+  syncing.value = true
+  try {
+    const cycleCode = (props.wpCode || '').split('-')[0] || undefined
+    const res = await syncHubFromSummary({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      sourceWpCode: props.wpCode,
+      wpCode: cycleCode,
+      year: props.year ? Number(props.year) : undefined,
+      rows: data.rows.value,
+    })
+    const summary = `新增 ${res.created} · 更新 ${res.updated} · 状态推进 ${res.transitioned}`
+    if (res.errors.length) {
+      ElMessage.warning(`同步完成（部分失败）：${summary}；${res.errors[0]}`)
+    } else if (res.created + res.updated + res.transitioned === 0) {
+      ElMessage.info('暂无「已发函/已回函」的行需要同步')
+    } else {
+      ElMessage.success(`已同步到函证中心：${summary}`)
+    }
+  } catch (e: any) {
+    ElMessage.error('同步失败：' + (e?.message || '未知错误'))
+  } finally {
+    syncing.value = false
+  }
+}
+
 function handleSave() {
   const payload = data.buildPayload()
   emit('save', payload)
@@ -524,6 +569,12 @@ defineExpose({
   justify-content: space-between;
   margin: 8px 0;
   flex-wrap: wrap;
+  gap: 8px;
+}
+
+.gt-confirmation-summary__toolbar-right {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 

@@ -15,7 +15,8 @@ export function useCycleProcedureConsole(options: {
 
   async function selfLoad(): Promise<void> {
     const htmlData = toValue(options.htmlData)
-    if (htmlData?.programs || htmlData?.schema) {
+    // 空 programs 不能短路：否则 F2-21A 等灵魂表会卡在「暂无内容」
+    if (htmlData?.programs?.length || (htmlData?.schema && htmlData.programs === undefined)) {
       programData.value = htmlData
       isLoading.value = false
       return

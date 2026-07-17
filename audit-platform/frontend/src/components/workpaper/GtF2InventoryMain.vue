@@ -30,6 +30,62 @@
           :is-readonly="isReadonly"
         />
 
+        <F2TabStocktakeProcedure
+          v-else-if="currentSheet === 'F2-21A'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="isReadonly"
+          :html-data="props.htmlData"
+        />
+
+        <F2TabStocktakeQuestionnaire
+          v-else-if="currentSheet === 'F2-21'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
+        <F2TabStocktakePlan
+          v-else-if="currentSheet === 'F2-22'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
+        <F2TabStocktakeSummary
+          v-else-if="currentSheet === 'F2-23'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
+        <F2TabStocktakeReconcile
+          v-else-if="currentSheet === 'F2-24'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
+        <F2TabStocktakeSampleResult
+          v-else-if="currentSheet === 'F2-25'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
+        <F2TabStocktakeRollforward
+          v-else-if="currentSheet === 'F2-26'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
         <F2TabAdjudication
           v-else-if="currentSheet === 'F2-1'"
           :wp-id="props.wpId"
@@ -167,6 +223,13 @@ import { getF2CutoffConfig } from './f2/inspection/f2CutoffSheetConfigs'
 
 // defineAsyncComponent lazy loading — 首屏仅加载当前 sheet 组件（Req 20.7）
 const F2TabProcedure = defineAsyncComponent(() => import('./f2/core/F2TabProcedure.vue'))
+const F2TabStocktakeProcedure = defineAsyncComponent(() => import('./f2/stocktake/F2TabStocktakeProcedure.vue'))
+const F2TabStocktakeQuestionnaire = defineAsyncComponent(() => import('./f2/stocktake/F2TabStocktakeQuestionnaire.vue'))
+const F2TabStocktakePlan = defineAsyncComponent(() => import('./f2/stocktake/F2TabStocktakePlan.vue'))
+const F2TabStocktakeSummary = defineAsyncComponent(() => import('./f2/stocktake/F2TabStocktakeSummary.vue'))
+const F2TabStocktakeReconcile = defineAsyncComponent(() => import('./f2/stocktake/F2TabStocktakeReconcile.vue'))
+const F2TabStocktakeSampleResult = defineAsyncComponent(() => import('./f2/stocktake/F2TabStocktakeSampleResult.vue'))
+const F2TabStocktakeRollforward = defineAsyncComponent(() => import('./f2/stocktake/F2TabStocktakeRollforward.vue'))
 const F2TabAdjudication = defineAsyncComponent(() => import('./f2/core/F2TabAdjudication.vue'))
 const F2TabDetailSummary = defineAsyncComponent(() => import('./f2/core/F2TabDetailSummary.vue'))
 const F2TabAdjustment = defineAsyncComponent(() => import('./f2/core/F2TabAdjustment.vue'))
@@ -251,6 +314,7 @@ const useGridFallback = computed(() => {
   const code = currentSheet.value
   const htmlSheets = new Set([
     'F2-1', 'F2-2', 'F2-14', 'F2-16', 'F2-18', 'F2-19', 'F2-20', 'F2A',
+    'F2-21A', 'F2-21', 'F2-22', 'F2-23', 'F2-24', 'F2-25', 'F2-26',
   ])
   return code && !htmlSheets.has(code) && !code.startsWith('附注')
     && !detailConfig.value && !cutoffConfig.value
@@ -289,12 +353,14 @@ async function selfLoad(): Promise<void> {
 
 onMounted(() => {
   window.addEventListener('f2:save-items', handleF2SaveItems)
+  window.addEventListener('f2-stocktake:save-items', handleF2SaveItems)
   window.addEventListener('f2:writeback-trial-balance', handleF2Writeback)
   void selfLoad()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('f2:save-items', handleF2SaveItems)
+  window.removeEventListener('f2-stocktake:save-items', handleF2SaveItems)
   window.removeEventListener('f2:writeback-trial-balance', handleF2Writeback)
 })
 </script>

@@ -350,13 +350,19 @@ class AttachmentVersionManager:
     async def _check_legal_hold(
         self, attachment_id: uuid.UUID, project_id: uuid.UUID | None
     ) -> bool:
-        """Check if attachment is under active Legal Hold (R13 / P26)."""
-        # Query legal_hold_scopes for this attachment.
+        """Check if attachment is under active Legal Hold (R13 / P26).
+
+        Uses the canonical legal_hold_scopes schema (node_type/node_id/is_active)
+        and legal_holds.state — the authoritative columns shared with
+        RetentionLegalHoldService (design §4.6). Matches either an attachment
+        node or an attachment_version node in the frozen hold closure.
+        """
         query = sa.text(
             "SELECT 1 FROM legal_hold_scopes lhs "
             "JOIN legal_holds lh ON lh.id = lhs.legal_hold_id "
-            "WHERE lhs.target_type = 'attachment' AND lhs.target_id = :aid "
-            "AND lh.status = 'active' LIMIT 1"
+            "WHERE lhs.node_type IN ('attachment', 'attachment_version') "
+            "AND lhs.node_id = :aid AND lhs.is_active = true "
+            "AND lh.state = 'active' LIMIT 1"
         )
         try:
             r = (await self._db.execute(query, {"aid": str(attachment_id)})).scalar()

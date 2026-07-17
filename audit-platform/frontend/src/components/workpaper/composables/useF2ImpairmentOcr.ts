@@ -61,10 +61,11 @@ export function useF2ImpairmentOcr(wpId: Ref<string>) {
       const unitCost = parseNum(fields.unitCost)
       if (qty > 0) patch.qty = qty
       if (unitCost > 0) patch.unitCost = unitCost
-      if (fields.sellingPrice != null) patch.sellingPrice = parseNum(fields.sellingPrice)
+      if (fields.sellingPrice != null) patch.pricePreContract = parseNum(fields.sellingPrice)
       if (fields.completionCost != null) patch.completionCost = parseNum(fields.completionCost)
       if (fields.sellingExpense != null) patch.sellingExpense = parseNum(fields.sellingExpense)
-      if (fields.tax != null) patch.tax = parseNum(fields.tax)
+      if (fields.tax != null) patch.relatedTax = parseNum(fields.tax)
+      if (qty > 0 && unitCost > 0) patch.bookCost = qty * unitCost
 
       updateRow(rowId, patch)
       ElMessage.success('OCR 结果已填入')

@@ -1,23 +1,39 @@
 /**
  * useAlternativeL05Data — L0-5 债务循环替代程序 composable
  *
+ * confirmation-alternative-factory-convergence Task 11（L05 迁移）：
+ * 本 composable 已迁移为 Shared_Core 工厂 `createAlternativeConfirmationData` 的
+ * 薄适配器——构造 L05 的 AltConfig + 调工厂 + 组装原返回签名，并旁挂 L05 独有面
+ * （命名比例别名、balanceSummary、loading/importFromSummary/loadAll/persistAll）。
+ *
+ * 零回归约束：命名导出 `useAlternativeL05Data` + default export + `FORMAT_VERSION` 导出、
+ * props 签名 `{wpId, projectId, htmlData, readonly}`、返回类型 `UseAlternativeL05DataReturn`、
+ * buildPayload 返回 `AlternativeL05Payload` 逐字不变；L05 characterization spec 不改断言必须全绿。
+ *
+ * L05 差异（经 AltConfig 声明）：
+ * - _format: alternative-l05-v1；默认 balance.item_name = '长期应付款/借款'
+ * - baseAmount = c.balance?.closing_balance（期末余额）
+ * - 🔴 emptyBase='zero'（空基数返回 0 而非 null，与 D/F/H/K 相反）
+ * - 两比例算法不同源：repayment 用 FormulaEngine 的 calcRepaymentRatio（per-rule 注入，
+ *   语义 = balance===0?0:num/den，空基数已由 emptyBase='zero' 兜底故等价 num/den）；
+ *   mortgage 用默认 num/den
+ * - calcTotal 注入 FormulaEngine 的 calcBlockTotal
+ * - metricRatioKeys: receipt←repayment、shipment←mortgage
+ *
  * Master-Detail 结构：公司列表 → 选中公司 → 4 区块检查表
  * 4 区块：①期后付款/还款检查 ②期末余额支持性证据(借款合同/银行对账单)
  *         ③本期借款检查 ④抵质押/担保证据
- *
- * 数据流：loadAll(htmlData) → companies → buildPayload → persistAll
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import type {
   AlternativeCompany,
   BlockType,
   CheckRow,
-  SamplingConfig,
   BalanceSummary,
-  AuditConclusion,
   AlternativeD05Metrics,
 } from '../../alternativeD05/alternativeD05Types'
 import { calcBlockTotal, calcRepaymentRatio } from './useL0FormulaEngine'
+import { createAlternativeConfirmationData } from '../../coordination/createAlternativeConfirmationData'
 import http from '@/utils/http'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -90,118 +106,94 @@ const SUM_FIELDS: Record<BlockType, string[]> = {
   block4: ['voucher_amount', 'mortgage_amount', 'guarantee_amount'],
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-
-function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+/** 对齐原 getBlockTotal 的 fallback：SUM_FIELDS[blockType] || ['voucher_amount'] */
+function getSumFields(blockType: string): string[] {
+  return SUM_FIELDS[blockType as BlockType] || ['voucher_amount']
 }
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function precise(n: number): number {
   return Math.round(n * 100) / 100
 }
 
-// ─── Composable ─────────────────────────────────────────────────────────────
+// ─── Composable 主体（工厂适配器） ───────────────────────────────────────────
 
 export function useAlternativeL05Data(props: UseAlternativeL05DataProps): UseAlternativeL05DataReturn {
-  const companies = ref<AlternativeCompany[]>([])
-  const isDirty = ref(false)
-  const selectedCompanyId = ref<string | null>(null)
   const loading = ref(false)
 
-  // ─── Init / Load ─────────────────────────────────────────────────────────
+  const core = createAlternativeConfirmationData({
+    format: FORMAT_VERSION,
+    getSumFields,
+    // L05 默认 balance 带负债科目名
+    defaultBalance: () => ({ item_name: '长期应付款/借款' }),
+    // 比例分母基数：期末余额（缺失/0 → emptyBase='zero' 交给工厂处理）
+    baseAmount: (c: AlternativeCompany) => Number(c.balance?.closing_balance ?? 0),
+    // 🔴 L05 空基数返回 0（与 D/F/H/K 相反）
+    emptyBase: 'zero',
+    ratios: [
+      // repayment：block1 分子优先 repayment_principal → 回退 voucher_amount；per-rule 注入 calcRepaymentRatio（原样保险）
+      {
+        key: 'repayment',
+        block: 'block1',
+        fields: ['repayment_principal', 'voucher_amount'],
+        payloadKey: 'receipt_check_ratio',
+        calcRatio: calcRepaymentRatio,
+      },
+      // mortgage：block4 分子优先 mortgage_amount → 回退 voucher_amount；默认 num/den
+      {
+        key: 'mortgage',
+        block: 'block4',
+        fields: ['mortgage_amount', 'voucher_amount'],
+        payloadKey: 'shipment_check_ratio',
+      },
+    ],
+    metricRatioKeys: { receipt: 'repayment', shipment: 'mortgage' },
+    calcTotal: calcBlockTotal,
+    htmlData: props.htmlData,
+  })
 
-  function initFromHtmlData(data: any) {
-    if (!data || data._format !== FORMAT_VERSION) {
-      companies.value = []
-      return
+  // ─── 命名比例别名（L05 对通用 getRatio 的命名别名，emptyBase='zero' 保证非 null）──
+
+  const getRepaymentRatio = (c: AlternativeCompany): number => core.getRatio(c, 'repayment') as number
+  const getMortgageRatio = (c: AlternativeCompany): number => core.getRatio(c, 'mortgage') as number
+
+  // ─── getBlockRows / getClosingBalance 导出（旁挂，逐字保留）────────────────
+
+  const getBlockRows = core._getBlockRows
+  const getClosingBalance = (c: AlternativeCompany): number => Number(c.balance?.closing_balance ?? 0)
+
+  // ─── balanceSummary（L05 独有，逐字保留）──────────────────────────────────
+
+  const balanceSummary = computed<AlternativeL05Summary>(() => {
+    let opening = 0, debit = 0, credit = 0, closing = 0, currentLoan = 0
+    for (const c of core.companies.value) {
+      opening += Number(c.balance?.opening_balance ?? 0)
+      debit += Number(c.balance?.debit_amount ?? 0)
+      credit += Number(c.balance?.credit_amount ?? 0)
+      closing += getClosingBalance(c)
+      const block3Total = core.getBlockTotal(c, 'block3')
+      currentLoan += block3Total.voucher_amount ?? 0
     }
-    companies.value = Array.isArray(data.companies) ? data.companies.map(ensureCompanyId) : []
-    isDirty.value = false
-  }
-
-  function ensureCompanyId(company: AlternativeCompany): AlternativeCompany {
+    const avgRepayment = core.companies.value.length > 0
+      ? core.companies.value.reduce((s, c) => s + getRepaymentRatio(c), 0) / core.companies.value.length
+      : 0
+    const avgMortgage = core.companies.value.length > 0
+      ? core.companies.value.reduce((s, c) => s + getMortgageRatio(c), 0) / core.companies.value.length
+      : 0
     return {
-      ...company,
-      _company_id: company._company_id || generateId(),
-      block1_rows: (company.block1_rows || []).map(ensureRowId),
-      block2_rows: (company.block2_rows || []).map(ensureRowId),
-      block3_rows: (company.block3_rows || []).map(ensureRowId),
-      block4_rows: (company.block4_rows || []).map(ensureRowId),
+      investmentType: '长期应付款/借款',
+      openingBalance: precise(opening),
+      debitAmount: precise(debit),
+      creditAmount: precise(credit),
+      closingBalance: precise(closing),
+      currentLoan: precise(currentLoan),
+      repaymentCheckRatio: precise(avgRepayment),
+      mortgageCheckRatio: precise(avgMortgage),
     }
-  }
+  })
 
-  function ensureRowId(row: CheckRow): CheckRow {
-    if (!row._row_id) return { ...row, _row_id: generateId() }
-    return row
-  }
-
-  function loadAll() {
-    initFromHtmlData(props.htmlData())
-  }
-
-  loadAll()
-  watch(() => props.htmlData(), (newData) => { initFromHtmlData(newData) }, { deep: true })
-
-  // ─── Company CRUD ────────────────────────────────────────────────────────
-
-  function addCompany(partial?: Partial<AlternativeCompany>): AlternativeCompany {
-    const maxSeq = companies.value.reduce((max, c) => Math.max(max, c.seq ?? 0), 0)
-    const newCompany: AlternativeCompany = {
-      _company_id: generateId(),
-      seq: maxSeq + 1,
-      entity_name: '',
-      _source: 'manual',
-      sampling: {} as SamplingConfig,
-      balance: { item_name: '长期应付款/借款' } as BalanceSummary,
-      block1_rows: [],
-      block2_rows: [],
-      block3_rows: [],
-      block4_rows: [],
-      conclusion: {} as AuditConclusion,
-      ...partial,
-    }
-    companies.value.push(newCompany)
-    isDirty.value = true
-    return newCompany
-  }
-
-  function deleteCompany(companyId: string) {
-    companies.value = companies.value.filter((c) => c._company_id !== companyId)
-    if (selectedCompanyId.value === companyId) {
-      selectedCompanyId.value = companies.value[0]?._company_id ?? null
-    }
-    isDirty.value = true
-  }
-
-  function updateCompany(companyId: string, field: string, value: any) {
-    const company = companies.value.find((c) => c._company_id === companyId)
-    if (!company) return
-    ;(company as any)[field] = value
-    isDirty.value = true
-  }
-
-  function importCompanies(items: Partial<AlternativeCompany>[]) {
-    const existingIndexes = new Set(companies.value.map((c) => c.confirm_index).filter(Boolean))
-    const deduped = items.filter((item) => !item.confirm_index || !existingIndexes.has(item.confirm_index))
-    const maxSeq = companies.value.reduce((max, c) => Math.max(max, c.seq ?? 0), 0)
-    deduped.forEach((item, i) => {
-      companies.value.push({
-        _company_id: generateId(),
-        seq: maxSeq + i + 1,
-        entity_name: item.entity_name || '',
-        confirm_index: item.confirm_index,
-        _source: item._source || 'auto',
-        sampling: item.sampling || ({} as SamplingConfig),
-        balance: { item_name: '长期应付款/借款', ...(item.balance || {}) } as BalanceSummary,
-        block1_rows: [],
-        block2_rows: [],
-        block3_rows: [],
-        block4_rows: [],
-        conclusion: {} as AuditConclusion,
-      })
-    })
-    isDirty.value = true
-  }
+  // ─── importFromSummary（旁挂，逐字保留；内部调 core.importCompanies）───────
 
   async function importFromSummary(): Promise<number> {
     loading.value = true
@@ -211,7 +203,7 @@ export function useAlternativeL05Data(props: UseAlternativeL05DataProps): UseAlt
       })
       const entities: L01UnrepliedEntity[] = res.data?.data ?? res.data ?? []
       if (!entities.length) return 0
-      importCompanies(
+      core.importCompanies(
         entities.map((e) => ({
           entity_name: e.entity_name,
           confirm_index: e.confirm_index,
@@ -227,191 +219,42 @@ export function useAlternativeL05Data(props: UseAlternativeL05DataProps): UseAlt
     }
   }
 
-  // ─── Block CRUD ──────────────────────────────────────────────────────────
+  // ─── loadAll / persistAll（旁挂，逐字保留）────────────────────────────────
 
-  function getBlockRows(company: AlternativeCompany, blockType: BlockType): CheckRow[] {
-    const key = `${blockType}_rows` as keyof AlternativeCompany
-    return (company[key] as CheckRow[]) || []
-  }
-
-  function setBlockRows(company: AlternativeCompany, blockType: BlockType, rows: CheckRow[]) {
-    const key = `${blockType}_rows` as keyof AlternativeCompany
-    ;(company as any)[key] = rows
-  }
-
-  function addBlockRow(companyId: string, blockType: BlockType): CheckRow | undefined {
-    const company = companies.value.find((c) => c._company_id === companyId)
-    if (!company) return undefined
-    const rows = getBlockRows(company, blockType)
-    const maxSeq = rows.reduce((max, r) => Math.max(max, r.seq ?? 0), 0)
-    const newRow: CheckRow = { _row_id: generateId(), seq: maxSeq + 1, _source: 'manual', is_abnormal: '否' }
-    rows.push(newRow)
-    setBlockRows(company, blockType, rows)
-    isDirty.value = true
-    return newRow
-  }
-
-  function deleteBlockRow(companyId: string, blockType: BlockType, rowId: string) {
-    const company = companies.value.find((c) => c._company_id === companyId)
-    if (!company) return
-    setBlockRows(company, blockType, getBlockRows(company, blockType).filter((r) => r._row_id !== rowId))
-    isDirty.value = true
-  }
-
-  function updateBlockField(companyId: string, blockType: BlockType, rowId: string, field: string, value: any) {
-    const company = companies.value.find((c) => c._company_id === companyId)
-    if (!company) return
-    const row = getBlockRows(company, blockType).find((r) => r._row_id === rowId)
-    if (!row) return
-    row[field] = value
-    isDirty.value = true
-  }
-
-  // ─── Computed / Calculations ─────────────────────────────────────────────
-
-  function getBlockTotal(company: AlternativeCompany, blockType: BlockType): Record<string, number> {
-    const rows = getBlockRows(company, blockType)
-    const fields = SUM_FIELDS[blockType] || ['voucher_amount']
-    const totals: Record<string, number> = {}
-    for (const field of fields) {
-      const amounts = rows.map((r) => Number(r[field])).filter((n) => !isNaN(n))
-      totals[field] = precise(calcBlockTotal(amounts))
-    }
-    return totals
-  }
-
-  function getClosingBalance(company: AlternativeCompany): number {
-    return Number(company.balance?.closing_balance ?? 0)
-  }
-
-  function getRepaymentRatio(company: AlternativeCompany): number {
-    const block1Total = getBlockTotal(company, 'block1')
-    const repaid = block1Total.repayment_principal ?? block1Total.voucher_amount ?? 0
-    const balance = getClosingBalance(company)
-    return precise(calcRepaymentRatio(repaid, balance) * 100)
-  }
-
-  function getMortgageRatio(company: AlternativeCompany): number {
-    const block4Total = getBlockTotal(company, 'block4')
-    const mortgageAmt = block4Total.mortgage_amount ?? block4Total.voucher_amount ?? 0
-    const balance = getClosingBalance(company)
-    return balance > 0 ? precise((mortgageAmt / balance) * 100) : 0
-  }
-
-  function getCompletionStatus(company: AlternativeCompany) {
-    const blocks: BlockType[] = ['block1', 'block2', 'block3', 'block4']
-    let completed = 0
-    for (const bt of blocks) {
-      if (getBlockRows(company, bt).length > 0) completed++
-    }
-    return { completed, total: 4, rate: Math.round((completed / 4) * 100) }
-  }
-
-  function hasAbnormal(company: AlternativeCompany): boolean {
-    for (const bt of ['block1', 'block2', 'block3', 'block4'] as BlockType[]) {
-      if (getBlockRows(company, bt).some((r) => r.is_abnormal === '是')) return true
-    }
-    return false
-  }
-
-  const metrics = computed<AlternativeD05Metrics>(() => {
-    let completedCount = 0
-    let abnormalCount = 0
-    const ratioDistribution: AlternativeD05Metrics['ratio_distribution'] = []
-    for (const company of companies.value) {
-      const status = getCompletionStatus(company)
-      if (status.completed === 4) completedCount++
-      if (hasAbnormal(company)) abnormalCount++
-      ratioDistribution.push({
-        entity_name: company.entity_name || '未命名',
-        receipt_ratio: getRepaymentRatio(company),
-        shipment_ratio: getMortgageRatio(company),
-      })
-    }
-    const total = companies.value.length
-    return {
-      total_companies: total,
-      completed_companies: completedCount,
-      abnormal_companies: abnormalCount,
-      ratio_distribution: ratioDistribution,
-      completion_rate: total > 0 ? Math.round((completedCount / total) * 100) : 0,
-    }
-  })
-
-  const balanceSummary = computed<AlternativeL05Summary>(() => {
-    let opening = 0, debit = 0, credit = 0, closing = 0, currentLoan = 0
-    for (const c of companies.value) {
-      opening += Number(c.balance?.opening_balance ?? 0)
-      debit += Number(c.balance?.debit_amount ?? 0)
-      credit += Number(c.balance?.credit_amount ?? 0)
-      closing += getClosingBalance(c)
-      const block3Total = getBlockTotal(c, 'block3')
-      currentLoan += block3Total.voucher_amount ?? 0
-    }
-    const avgRepayment = companies.value.length > 0
-      ? companies.value.reduce((s, c) => s + getRepaymentRatio(c), 0) / companies.value.length
-      : 0
-    const avgMortgage = companies.value.length > 0
-      ? companies.value.reduce((s, c) => s + getMortgageRatio(c), 0) / companies.value.length
-      : 0
-    return {
-      investmentType: '长期应付款/借款',
-      openingBalance: precise(opening),
-      debitAmount: precise(debit),
-      creditAmount: precise(credit),
-      closingBalance: precise(closing),
-      currentLoan: precise(currentLoan),
-      repaymentCheckRatio: precise(avgRepayment),
-      mortgageCheckRatio: precise(avgMortgage),
-    }
-  })
-
-  // ─── Persist ─────────────────────────────────────────────────────────────
-
-  function buildPayload(): AlternativeL05Payload {
-    return {
-      _format: FORMAT_VERSION,
-      companies: companies.value.map((company) => ({
-        ...company,
-        balance: {
-          ...company.balance,
-          receipt_check_ratio: getRepaymentRatio(company),
-          shipment_check_ratio: getMortgageRatio(company),
-        },
-      })),
-    }
+  function loadAll() {
+    core._initFromHtmlData(props.htmlData())
   }
 
   function persistAll(): AlternativeL05Payload {
-    isDirty.value = false
-    return buildPayload()
+    core.isDirty.value = false
+    return core.buildPayload() as AlternativeL05Payload
   }
 
   return {
-    companies,
-    isDirty,
-    selectedCompanyId,
+    companies: core.companies,
+    isDirty: core.isDirty,
+    selectedCompanyId: core.selectedCompanyId,
     loading,
-    addCompany,
-    deleteCompany,
-    updateCompany,
-    importCompanies,
+    addCompany: core.addCompany,
+    deleteCompany: core.deleteCompany,
+    updateCompany: core.updateCompany,
+    importCompanies: core.importCompanies,
     importFromSummary,
-    addBlockRow,
-    deleteBlockRow,
-    updateBlockField,
+    addBlockRow: core.addBlockRow,
+    deleteBlockRow: core.deleteBlockRow,
+    updateBlockField: core.updateBlockField,
     getBlockRows,
-    getBlockTotal,
+    getBlockTotal: core.getBlockTotal,
     getClosingBalance,
     getRepaymentRatio,
     getMortgageRatio,
-    getCompletionStatus,
-    hasAbnormal,
-    metrics,
+    getCompletionStatus: core.getCompletionStatus,
+    hasAbnormal: core.hasAbnormal,
+    metrics: core.metrics,
     balanceSummary,
     loadAll,
     persistAll,
-    buildPayload,
+    buildPayload: () => core.buildPayload() as AlternativeL05Payload,
   }
 }
 

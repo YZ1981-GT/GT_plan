@@ -120,7 +120,8 @@ def _get_template_sheet_order(tpl_path: str) -> dict[str, int]:
 # sheet 名尾部的 sheet 级编码提取（如「合同负债及销售替代程序D0-5」→「D0-5」、
 # 「审定表D2-1」→「D2-1」、「应收票据审计程序表D1A」→「D1A」）。
 # 用于多 sheet 底稿按 sheet 级编码查 _WP_CODE_OVERRIDE（协作者 confirmation-* 精细组件）。
-_SHEET_CODE_RE = re.compile(r"([A-Z]\d+[A-Z]?(?:-\d+[a-z]?)*)\s*$")
+# 「-新增」尾缀为模板修订版标记（如「存货采购入库检查表F2-33-新增」），提取编码时忽略。
+_SHEET_CODE_RE = re.compile(r"([A-Z]\d+(?:-\d+)*[A-Z]?)(?:-新增)?\s*$")
 
 # ─── 整册专属组件（多 sheet 但整册路由到同一 componentType，靠 sheetName v-if 分发） ──
 # 这类底稿本身没有 account_package_registry 条目（非科目工作包），但设计上要求

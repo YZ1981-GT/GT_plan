@@ -93,3 +93,21 @@ def test_f2_2_does_not_resolve_to_f2_29_check_pack() -> None:
     assert "检查" not in path.name
     assert finder._wp_code_filename_prefix_ok("F2-29至F2-35 检查.xlsx", "F2-2") is False
     assert finder._wp_code_filename_prefix_ok("F2-21至F2-26 盘点.xlsx", "F2-2") is False
+
+
+def test_f2_22_onlyoffice_prefers_g2_6_2_docx() -> None:
+    """F2-22 在线编辑挂载 G2-6-2 存货监盘计划（Word），而非盘点包内近空 sheet。"""
+    path = finder.find_template_file_any("F2-22")
+    assert path is not None
+    assert path.suffix.lower() == ".docx"
+    assert path.name.startswith("F2-22")
+    assert "监盘计划" in path.name
+
+
+def test_f2_23_onlyoffice_prefers_g2_6_1_docx() -> None:
+    """F2-23 在线编辑挂载 G2-6-1 存货监盘小结（Word）。"""
+    path = finder.find_template_file_any("F2-23")
+    assert path is not None
+    assert path.suffix.lower() == ".docx"
+    assert path.name.startswith("F2-23")
+    assert "监盘小结" in path.name
