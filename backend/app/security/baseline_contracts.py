@@ -38,11 +38,11 @@ FORBIDDEN_TABLE_NAMES: tuple[str, ...] = ("working_papers",)
 
 # Pre-feature migration head frozen at Task 1 baseline snapshot.
 MIGRATION_HEAD = "V112"
-# This feature's own migration, applied by Task 2. The live head is now V113
-# (``V113__wp_visibility_delegation_history_audit_epoch.sql``). Recorded here so
+# This feature's own migration, applied by Task 2. The live head is now V115
+# (``V115__wp_visibility_delegation_history_audit_epoch.sql``). Recorded here so
 # the drift check reflects the feature-applied head without weakening the
 # anti-fake-pass intent (which is enforced by the ledger gate/matrix/test_ids).
-FEATURE_APPLIED_MIGRATION = "V113"
+FEATURE_APPLIED_MIGRATION = "V115"
 
 # ---------------------------------------------------------------------------
 # Known security gaps at baseline (recorded as gaps, never as passing).
@@ -70,8 +70,9 @@ def get_baseline() -> dict[str, Any]:
         "migration_head": MIGRATION_HEAD,
         "feature_applied_migration": FEATURE_APPLIED_MIGRATION,
         "migration_note": (
-            "V112 = pre-feature baseline snapshot; Task 2 applied this feature's own "
-            "migration V113 (wp_visibility_delegation_history_audit_epoch). Live head is V113."
+            "V112 = pre-feature baseline snapshot; Task 2 migration was renumbered "
+            "to V115 (wp_visibility_delegation_history_audit_epoch) after resolving "
+            "the V113 collision. Live feature migration is V115."
         ),
         "tables": dict(TABLE_CONTRACTS),
         "forbidden_table_names": list(FORBIDDEN_TABLE_NAMES),

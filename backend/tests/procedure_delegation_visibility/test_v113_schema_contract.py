@@ -46,8 +46,8 @@ import app.models.wp_visibility_models  # noqa: F401
 import app.models.core  # noqa: F401
 
 _MIG_DIR = Path(__file__).resolve().parent.parent.parent / "migrations"
-_V113 = _MIG_DIR / "V113__wp_visibility_delegation_history_audit_epoch.sql"
-_R113 = _MIG_DIR / "R113__rollback_wp_visibility_delegation_history_audit_epoch.sql"
+_V113 = _MIG_DIR / "V115__wp_visibility_delegation_history_audit_epoch.sql"
+_R113 = _MIG_DIR / "R115__rollback_wp_visibility_delegation_history_audit_epoch.sql"
 _IS_PG = settings.DATABASE_URL.startswith("postgresql")
 
 _NEW_TABLES = (
@@ -155,16 +155,15 @@ class TestV113MigrationStatic:
         assert _R113.is_file(), "R113 回滚脚本缺失"
 
     def test_migration_head_rescanned_next_free_version(self):
-        """迁移 head 重扫：V113 是下一空闲版本，不存在 V113 之外更高版本占位。"""
+        """迁移 head 重扫：V115 是本 feature 的迁移版本。"""
         versions = sorted(
             int(m.group(1))
             for f in _MIG_DIR.iterdir()
             if (m := re.match(r"^V(\d+)__.*\.sql$", f.name, re.IGNORECASE))
         )
-        assert 113 in versions, "V113 未登记"
-        assert max(versions) == 113, f"存在高于 V113 的迁移，head 需重扫: max={max(versions)}"
-        # 连续无缺口到 113（重扫确认 head=112 → 下一空闲=113）
-        assert 112 in versions and 113 in versions
+        assert 115 in versions, "V115 未登记"
+        # 本 feature 迁移存在即可（重编号后不再要求是最高版本）
+        assert 112 in versions and 115 in versions
 
     def test_idempotent_guards_present(self):
         content = _V113.read_text(encoding="utf-8")

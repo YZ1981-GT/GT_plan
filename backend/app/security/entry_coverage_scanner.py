@@ -41,13 +41,13 @@ _NOT_APPLICABLE = "not_applicable"
 
 # Migration head reconciliation (Task 2 legitimately applied this feature's own
 # migration). ``V112`` is the pre-feature baseline snapshot frozen at Task 1;
-# ``V113__wp_visibility_delegation_history_audit_epoch.sql`` is this feature's
+# ``V115__wp_visibility_delegation_history_audit_epoch.sql`` is this feature's
 # own migration applied by Task 2. The drift check accepts either the frozen
-# baseline artifact (V112) or the feature-applied live head (V113). This does
+# baseline artifact (V112) or the feature-applied live head (V115). This does
 # NOT weaken the anti-fake-pass intent, which is enforced solely by the
 # gate/matrix/test_ids invariants below.
 BASELINE_MIGRATION_HEAD = "V112"
-FEATURE_APPLIED_MIGRATION = "V113"
+FEATURE_APPLIED_MIGRATION = "V115"
 ACCEPTED_MIGRATION_HEADS: frozenset[str] = frozenset(
     {BASELINE_MIGRATION_HEAD, FEATURE_APPLIED_MIGRATION}
 )
@@ -553,7 +553,7 @@ def validate_ledger(ledger: dict[str, Any]) -> list[str]:
     if head not in ACCEPTED_MIGRATION_HEADS:
         problems.append(
             "migration_head expected one of "
-            f"{sorted(ACCEPTED_MIGRATION_HEADS)} (V112 baseline / V113 feature-applied), "
+            f"{sorted(ACCEPTED_MIGRATION_HEADS)} (V112 baseline / V115 feature-applied), "
             f"got {head}"
         )
     return problems
