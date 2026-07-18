@@ -2,9 +2,9 @@
 
 POST /api/workpapers/{wp_id}/g1/ai/{section}
 
-sections: adjudication-summary / fair-value-conclusion / sppi-analysis /
-          business-model-conclusion / counting-conclusion / voucher-check-conclusion /
-          derivative-conclusion / overall-opinion
+sections: adjudication-*/detail-*/adjustment-*/inventory-*/income-*/fair-value-*/
+          level3-*/business-model-*/classification-*/sppi-*/counting-*/recon-*/
+          voucher-*/derivative-*/disclosure-*-note / overall-opinion
 """
 
 from __future__ import annotations
@@ -51,13 +51,38 @@ SPPI合同现金流量特征测试、业务模式分析（CAS22分类：FVTPL/FV
 输出要求：中文、审计专业用语、直接输出正文、简洁适合底稿。"""
 
 _SECTION_PROMPTS: dict[str, str] = {
+    "adjudication-note": "请生成G1-1审定表审计说明：评价各投资品种本期/上期审定、AJE/RJE影响及与试算表/明细表勾稽情况。",
     "adjudication-summary": "请生成G1-1审定表的审定汇总说明，评价交易性金融资产按投资品种（股票/基金/债券/衍生/其他）的成本、公允价值变动、处置损益审定结果，以及与试算表的勾稽差异。",
+    "adjudication-conclusion": "请生成G1-1审定表审计结论（A/B/C），评价科目1501列报是否公允。",
+    "detail-note": "请生成G1-2明细表审计说明：覆盖明细核对程序、各品种成本/公允价值/收益核实、公允层级及与审定表勾稽。",
+    "detail-conclusion": "请生成G1-2明细表审计结论（A/B/C），简述明细完整性、公允计量及与G1-1勾稽依据。",
+    "adjustment-note": "请生成G1-3调整分录审计说明：说明AJE/RJE编制依据、借贷平衡核对及对科目1501/损益的影响。",
+    "adjustment-conclusion": "请生成G1-3调整分录审计结论（A/B/C）：评价调整是否恰当、借贷是否平衡、是否正确回写审定表。",
+    "inventory-note": "请生成G1-4结存表审计说明：评价数量/成本/公允结存勾稽及异常结存项目。",
+    "inventory-conclusion": "请生成G1-4结存表审计结论（A/B/C）。",
+    "income-note": "请生成G1-5收益测算表审计说明：评价股利/利息及处置损益测算过程与异常差异。",
+    "income-conclusion": "请生成G1-5收益测算表审计结论（A/B/C）。",
+    "fair-value-note": "请生成G1-6公允价值测试审计说明：评价Level1-3划分、报价/估值来源及差异超阈值项。",
     "fair-value-conclusion": "请生成G1-6公允价值测试的审计结论，评价Level1-3公允价值计量层级划分的适当性、报价来源/估值方法的可靠性及差异超阈值项的合理性。",
-    "sppi-analysis": "请生成G1-10合同现金流量特征（SPPI）测试的审计说明，分析合同条款是否仅为对本金和利息的支付、提前还款/展期条款及非标准特征对分类的影响。",
+    "level3-note": "请生成G1-7第三层次调节表审计说明：评价期初至期末变动、转入转出及本期公允变动的合理性。",
+    "level3-conclusion": "请生成G1-7第三层次调节表审计结论（A/B/C）。",
+    "business-model-note": "请生成G1-8业务模式分析审计说明：评价持有目的、交易频率、KPI与CAS22分类判定依据。",
     "business-model-conclusion": "请生成G1-8业务模式分析的审计结论，评价管理层持有目的、交易频率、KPI考核关联及CAS22分类判定（持有至收取/出售/兼有）的合理性。",
+    "classification-note": "请生成G1-9分类适当性检查审计说明：评价SPPI与业务模式检查结果及不合规项应对。",
+    "classification-conclusion": "请生成G1-9分类适当性检查审计结论（A/B/C）。",
+    "sppi-note": "请生成G1-10合同现金流量特征（SPPI）测试审计说明：分析本金利息支付特征及非标准条款影响。",
+    "sppi-analysis": "请生成G1-10合同现金流量特征（SPPI）测试的审计说明，分析合同条款是否仅为对本金和利息的支付、提前还款/展期条款及非标准特征对分类的影响。",
+    "sppi-conclusion": "请生成G1-10 SPPI测试审计结论（A/B/C）。",
+    "counting-note": "请生成G1-11有价证券监盘审计说明：评价监盘范围、差异及存在性程序结果。",
     "counting-conclusion": "请生成G1-11监盘与G1-12盘点倒轧的审计结论，评价证券存在性、监盘差异及盘点日至报表日的倒轧勾稽关系。",
+    "recon-note": "请生成G1-12盘点倒轧审计说明：评价盘点日至报表日增减变动与推算余额勾稽。",
+    "recon-conclusion": "请生成G1-12盘点倒轧审计结论（A/B/C）。",
+    "voucher-note": "请生成G1-13凭证检查表审计说明：覆盖抽凭范围/方法、合同结算单报价授权账务核对及异常事项。",
     "voucher-check-conclusion": "请生成G1-13凭证检查表的审计结论，评价抽查凭证的合同/结算单/报价/授权审批/账务处理核对结果及交易真实性。",
+    "derivative-note": "请生成G1-14衍生工具核查审计说明：评价存在性、名义金额、对手方、保证金及会计处理适当性。",
     "derivative-conclusion": "请生成G1-14衍生金融工具核查的审计评价，评估衍生工具（期权/期货/互换/远期）名义金额、保证金、套期认定及会计处理的合规性。",
+    "disclosure-listed-note": "请生成G1上市公司附注披露说明：评价披露项目完整性、金额与审定表勾稽及列报格式合规性。",
+    "disclosure-soe-note": "请生成G1国有企业附注披露说明：评价披露项目完整性、金额与审定表勾稽及列报格式合规性。",
     "overall-opinion": "请生成G1交易性金融资产的整体审计意见，综合公允价值计量、分类适当性、存在性、真实性各方面，形成对科目1501列报与披露的总体结论。",
 }
 

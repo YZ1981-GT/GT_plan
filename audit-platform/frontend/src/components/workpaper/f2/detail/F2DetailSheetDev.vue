@@ -436,7 +436,17 @@
     <section class="notes-panel">
       <h4>审计说明</h4>
       <div v-for="f in noteFields" :key="f.key" class="note-block">
-        <div class="note-label">{{ f.label }}</div>
+        <div class="note-label">
+          <span>{{ f.label }}</span>
+          <el-button
+            size="small"
+            text
+            type="primary"
+            :disabled="isReadonly || !aiAvailable || aiBusyKey === f.key"
+            :loading="aiBusyKey === f.key"
+            @click="generateNote(f)"
+          >AI</el-button>
+        </div>
         <el-input
           type="textarea"
           :rows="2"
@@ -449,7 +459,17 @@
     </section>
 
     <section class="notes-panel conclusion">
-      <div class="note-label">审计结论</div>
+      <div class="note-label">
+        <span>审计结论</span>
+        <el-button
+          size="small"
+          text
+          type="primary"
+          :disabled="isReadonly || !aiAvailable || aiBusyKey === 'conclusion'"
+          :loading="aiBusyKey === 'conclusion'"
+          @click="generateConclusion"
+        >AI</el-button>
+      </div>
       <el-input
         type="textarea"
         :rows="3"
@@ -463,8 +483,9 @@
 </template>
 
 <script setup lang="ts">
-import { inject, toRef } from 'vue'
+import { inject, ref, toRef, type Ref } from 'vue'
 import { useF2DevProductSheet, DEV_PRODUCT_QUALITY } from '../../composables/useF2DevProductSheet'
+import { useF2AiGenerate, type F2AiSection } from '../../composables/useF2AiGenerate'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
@@ -483,12 +504,88 @@ const dev = useF2DevProductSheet({
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-const noteFields = [
-  { key: 'status', packKey: 'statusNote' as const, label: '1. 开发产品现状说明：', placeholder: '开发产品现状说明：' },
-  { key: 'change', packKey: 'significantChange' as const, label: '2. 本期重大变动原因：', placeholder: '本期重大变动原因：' },
-  { key: 'diff', packKey: 'bookAuditDiff' as const, label: '3. 账面与审定差异说明：', placeholder: '账面与审定差异说明：' },
-  { key: 'imp', packKey: 'impairmentReason' as const, label: '4. 计提跌价准备的主要项目及原因：', placeholder: '计提跌价准备的主要项目及原因：' },
+const { aiAvailable, generateAndConfirm } = useF2AiGenerate(toRef(props, 'wpId') as Ref<string>)
+const aiBusyKey = ref<string | null>(null)
+
+type NotePackKey = 'statusNote' | 'significantChange' | 'bookAuditDiff' | 'impairmentReason'
+
+const noteFields: Array<{
+  key: string
+  packKey: NotePackKey
+  section: F2AiSection
+  label: string
+  placeholder: string
+}> = [
+  {
+    key: 'status',
+    packKey: 'statusNote',
+    section: 'detail-valuation',
+    label: '1. 开发产品现状说明：',
+    placeholder: '开发产品现状说明：',
+  },
+  {
+    key: 'change',
+    packKey: 'significantChange',
+    section: 'detail-change',
+    label: '2. 本期重大变动原因：',
+    placeholder: '本期重大变动原因：',
+  },
+  {
+    key: 'diff',
+    packKey: 'bookAuditDiff',
+    section: 'detail-long-aging',
+    label: '3. 账面与审定差异说明：',
+    placeholder: '账面与审定差异说明：',
+  },
+  {
+    key: 'imp',
+    packKey: 'impairmentReason',
+    section: 'detail-impairment',
+    label: '4. 计提跌价准备的主要项目及原因：',
+    placeholder: '计提跌价准备的主要项目及原因：',
+  },
 ]
+
+async function generateNote(f: (typeof noteFields)[number]) {
+  aiBusyKey.value = f.key
+  try {
+    const text = await generateAndConfirm(
+      f.section,
+      dev.notePack.value[f.packKey],
+      {
+        sheetCode: 'F2-10',
+        sheetName: '开发产品',
+        noteHint: f.label,
+        closeAmt: dev.totals.value.closeAmt,
+        netCloseBookAmt: dev.totals.value.netCloseBookAmt,
+      },
+      `AI 生成 · F2-10 ${f.label}`,
+    )
+    if (text) dev.persistNotePack({ [f.packKey]: text })
+  } finally {
+    aiBusyKey.value = null
+  }
+}
+
+async function generateConclusion() {
+  aiBusyKey.value = 'conclusion'
+  try {
+    const text = await generateAndConfirm(
+      'detail-conclusion',
+      dev.auditConclusion.value,
+      {
+        sheetCode: 'F2-10',
+        sheetName: '开发产品',
+        closeAmt: dev.totals.value.closeAmt,
+        netCloseBookAmt: dev.totals.value.netCloseBookAmt,
+      },
+      'AI · F2-10 审计结论',
+    )
+    if (text) dev.persistConclusion(text)
+  } finally {
+    aiBusyKey.value = null
+  }
+}
 
 function fmtAmt(v: number): string {
   if (!v) return '-'
@@ -516,7 +613,7 @@ async function onImported() { await reloadWorkpaperData?.() }
 .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .search { width: 180px; }
 .chip { display: inline-flex; }
-.main-table :deep(.auto-calc-col) { background: #f5f7fa; }
+.main-table :deep(.auto-calc-col) { background: #faf8fc; }
 .formula { color: #606266; font-variant-numeric: tabular-nums; }
 .summary-panel { margin-top: 12px; border: 1px solid #ebeef5; border-radius: 6px; padding: 8px 12px; }
 .summary-row { display: flex; align-items: center; gap: 12px; padding: 4px 0; }
@@ -527,6 +624,14 @@ async function onImported() { await reloadWorkpaperData?.() }
 .notes-panel { margin-top: 14px; }
 .notes-panel h4 { margin: 0 0 8px; font-size: 14px; }
 .note-block { margin-bottom: 8px; }
-.note-label { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 13px; color: #606266; }
+.note-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: #606266;
+  font-weight: 500;
+}
 .conclusion { border-top: 1px dashed #e4e7ed; padding-top: 10px; }
 </style>

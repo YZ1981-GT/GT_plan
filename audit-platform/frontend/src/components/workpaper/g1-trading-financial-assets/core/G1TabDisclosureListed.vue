@@ -4,7 +4,6 @@
       <h3 class="sheet-title">交易性金融资产附注披露（上市）</h3>
       <div class="head-actions">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="dis.addRow()">新增行</el-button>
-        <el-button size="small" :disabled="isReadonly" @click="fillAiDraft">🤖AI辅助</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-1" /></span>
         <el-tag size="small" type="info">共 {{ dis.rows.value.length }} 行</el-tag>
         <el-button size="small" @click="openReviewDialog('G1-note-listed')">💬复核</el-button>
@@ -85,14 +84,20 @@
       期末数 {{ dis.subtotal.value.endAmount.toLocaleString() }} · 上期数 {{ dis.subtotal.value.priorAmount.toLocaleString() }}
     </div>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>附注说明</template>
-      <el-input v-model="dis.noteText.value" type="textarea" :autosize="{ minRows: 3, maxRows: 10 }" :disabled="isReadonly"
-        placeholder="交易性金融资产附注披露说明（上市公司格式）..." />
-    </el-card>
+    <G1AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      :note="dis.noteText.value"
+      @update:note="(v: string) => { dis.noteText.value = v }"
+      :show-conclusion="false"
+      note-title="附注说明"
+      note-ai-section="disclosure-listed-note"
+      note-placeholder="交易性金融资产附注披露说明（上市公司格式）..."
+      note-hint="评价披露完整性、金额与审定表勾稽及列报格式。"
+      :note-min-rows="3"
+      :related-context="{ 期末合计: dis.subtotal.value.endAmount, 上期合计: dis.subtotal.value.priorAmount, 行数: dis.rows.value.length }"
+    />
 
-    
-    
     <details class="prep-hint">
       <summary>编制提示</summary>
       <ul>
@@ -110,12 +115,16 @@ import { useG1Disclosure } from '../../composables/useG1Disclosure'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import type { VirtualColumn } from '@/composables/useVirtualTable'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G1AuditTextCards from '../G1AuditTextCards.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  wpId?: string
 }>()
+
+const wpId = computed(() => props.wpId ?? '')
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -162,16 +171,6 @@ const virtualColumns = computed<VirtualColumn[]>(() => [
     cellRenderer: ({ cellData }) => h('span', {}, cellData == null || cellData === '' ? '-' : String(cellData)),
   },
 ])
-
-function fillAiDraft() {
-  if (props.isReadonly) return
-  const total = dis.subtotal.value.endAmount
-  const draft =
-    `本公司交易性金融资产（科目1501）期末余额为 ${total.toLocaleString()} 元，` +
-    `以公允价值计量且其变动计入当期损益。按公允价值层级划分，Level 1 为活跃市场报价，` +
-    `Level 2 为可观察输入估值，Level 3 为不可观察输入估值。公允价值变动损益已计入当期投资收益。`
-  dis.noteText.value = dis.noteText.value ? `${dis.noteText.value}\n${draft}` : draft
-}
 </script>
 
 <style scoped>

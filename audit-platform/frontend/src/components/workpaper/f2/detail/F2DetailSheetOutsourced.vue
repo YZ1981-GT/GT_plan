@@ -12,7 +12,7 @@
       <summary>编制提示</summary>
       <div class="guidance-body">
         <p>1. 按加工单位/合同列示发出加工物资：数量、单价、金额，并登记加工费、运杂费、计入成本的税金。</p>
-        <p>2. 灰色列为自动计算：金额 = 数量 × 单价；加工物资成本 = 金额 + 加工费 + 运杂费 + 税金；库龄合计须等于加工物资成本。</p>
+        <p>2. 紫色列为自动计算：金额 = 数量 × 单价；加工物资成本 = 金额 + 加工费 + 运杂费 + 税金；库龄合计须等于加工物资成本。</p>
         <p>3. 页尾合计 − 跌价准备 = 存货净额；可用「成本 / 库龄 / 完整」切换视图。</p>
       </div>
     </details>
@@ -458,43 +458,52 @@ function cancelCustomAging() {
 
 <style scoped>
 .f2-outsourced {
-  --f2-ink: #1f2a37;
-  --f2-muted: #6b7280;
-  --f2-line: #e5e7eb;
-  --f2-primary: #0f766e;
-  --f2-soft: #f0fdfa;
+  --f2-ink: #2c2140;
+  --f2-muted: #7a6f8a;
+  --f2-line: #ebe4f2;
+  --f2-primary: #6b3fa0;
+  --f2-soft: #f8f5fc;
   padding: 12px 14px 28px;
   color: var(--f2-ink);
   font-size: var(--wp-font-size, 13px);
 }
+.f2-outsourced :deep(.el-table) {
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
+}
+.f2-outsourced :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
 .hero {
   margin-bottom: 12px;
   padding: 14px 16px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, #f0fdfa 0%, #ecfeff 55%, #f8fafc 100%);
+  border-radius: 12px;
+  background: linear-gradient(135deg, #faf7fd 0%, #f3eef8 55%, #eef6f4 100%);
   border: 1px solid var(--f2-line);
 }
 .hero-main { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.hero-title { margin: 0; font-size: 17px; font-weight: 650; }
+.hero-title { margin: 0; font-size: 18px; font-weight: 650; letter-spacing: 0.02em; }
 .hero-sub { margin: 6px 0 0; color: var(--f2-muted); font-size: 13px; }
 .guidance {
   margin-bottom: 10px;
-  border-left: 3px solid var(--f2-primary);
-  background: #ccfbf1;
-  border-radius: 4px;
+  border: 1px solid var(--f2-line);
+  border-radius: 10px;
   padding: 8px 12px;
+  background: #fff;
 }
-.guidance summary { cursor: pointer; font-weight: 500; color: var(--f2-primary); }
-.guidance-body { margin-top: 8px; color: #4b5563; line-height: 1.6; }
-.guidance-body p { margin: 2px 0; }
+.guidance summary { cursor: pointer; font-weight: 600; color: var(--f2-primary); }
+.guidance-body { margin-top: 8px; color: #564866; line-height: 1.55; }
+.guidance-body p { margin: 0 0 4px; }
 .obj-alert { margin-bottom: 12px; }
 .toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin: 10px 0 14px;
+  padding: 10px 12px;
   flex-wrap: wrap;
   gap: 8px;
+  background: #fff;
+  border: 1px solid var(--f2-line);
+  border-radius: 10px;
 }
 .toolbar-left, .toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .search { width: 220px; }
@@ -503,16 +512,16 @@ function cancelCustomAging() {
 .tiny { font-size: 12px; margin-left: 8px; }
 .chip { display: inline-flex; }
 .main-table { width: 100%; margin-bottom: 12px; }
-.formula { border-bottom: 1px dashed #c0c4cc; }
-.bad { color: #e6a23c; font-weight: 600; }
-:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
+.formula { border-bottom: 1px dashed #c0c4cc; cursor: help; }
+.bad { color: #c45656; font-weight: 600; }
+:deep(.auto-calc-col) { background-color: #faf8fc !important; }
 :deep(.warn-row) { background: #fef6e8; }
 .summary-panel {
   margin: 12px 0 16px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 1px solid var(--f2-line);
-  border-radius: 8px;
-  background: var(--f2-soft);
+  border-radius: 12px;
+  background: linear-gradient(135deg, #faf8fc, #f5f7fa);
 }
 .summary-row {
   display: flex;
@@ -520,7 +529,7 @@ function cancelCustomAging() {
   gap: 12px;
   padding: 6px 0;
 }
-.summary-row .lab { min-width: 180px; color: #374151; }
+.summary-row .lab { min-width: 180px; color: #4a3b5c; font-weight: 600; }
 .summary-row .val { font-weight: 600; font-variant-numeric: tabular-nums; }
 .summary-row.net {
   border-top: 1px dashed var(--f2-line);
@@ -528,16 +537,22 @@ function cancelCustomAging() {
   padding-top: 10px;
 }
 .summary-row.net .val { color: var(--f2-primary); font-size: 15px; }
-.notes-panel { margin-top: 16px; }
-.notes-panel h4 { margin: 0 0 10px; font-size: 14px; }
+.notes-panel {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--f2-line);
+  background: #fff;
+}
+.notes-panel h4 { margin: 0 0 10px; font-size: 14px; color: #4a3b5c; }
 .note-block { margin-bottom: 10px; }
 .note-label {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 4px;
-  font-weight: 500;
-  color: #374151;
+  font-weight: 600;
+  color: #4a3b5c;
 }
 .conclusion { margin-top: 14px; }
 </style>

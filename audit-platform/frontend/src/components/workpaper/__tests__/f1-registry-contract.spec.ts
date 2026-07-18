@@ -4,7 +4,7 @@
  * 验证：
  * 1. htmlRendererRegistry 中 'f1-prepayment' 已注册且配置正确
  * 2. VALID_COMPONENT_TYPES 契约（后端 pytest 验证，此处验证前端侧）
- * 3. wp_code_overrides 契约：F1/F1-1~F1-7 共 8 个映射
+ * 3. wp_code_overrides 契约：F1/F1-1~F1-7/F1-note-* 共 10 个映射
  *
  * **Validates: Requirements 1.5, 1.6, 1.7**
  */
@@ -56,7 +56,10 @@ describe('F1 预付账款 — wp_code_overrides 契约', () => {
     overrides = {}
   }
 
-  const expectedMappings = ['F1', 'F1-1', 'F1-2', 'F1-3', 'F1-4', 'F1-5', 'F1-6', 'F1-7']
+  const expectedMappings = [
+    'F1', 'F1-1', 'F1-2', 'F1-3', 'F1-4', 'F1-5', 'F1-6', 'F1-7',
+    'F1-note-listed', 'F1-note-soe',
+  ]
 
   it('wp_code_overrides.json 可读取', () => {
     expect(Object.keys(overrides).length).toBeGreaterThan(0)

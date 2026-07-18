@@ -117,7 +117,7 @@ export function useWorkpaperImportExport(options: UseWorkpaperImportExportOption
 }
 
 /** F1 预付账款 */
-export type F1ImportableSheet = 'F1-2' | 'F1-5' | 'F1-6' | 'F1-7' | 'F1-7-post'
+export type F1ImportableSheet = 'F1-2' | 'F1-5' | 'F1-6' | 'F1-7' | 'F1-7-credit' | 'F1-7-post'
 export type F1ImportSheet = F1ImportableSheet
 
 export function useF1ImportExport(opts: { wpId: Ref<string>; projectId?: Ref<string> }) {

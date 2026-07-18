@@ -1,86 +1,120 @@
 <template>
-<div class="d3-comprehensive-check">
-  <!-- 编制提示 -->
+<div class="f1-comprehensive-check">
   <details class="guidance-details">
     <summary>📋 编制提示</summary>
     <div class="guidance-content">
-      <p>1. 本表对预付账款（科目1123）本期增减变动与期后结转进行抽样检查，验证真实性与截止恰当性。</p>
-      <p>2. 抽样应结合重要性与风险确定样本量，大额、长账龄、关联方预付款应作为特定样本必选。</p>
-      <p>3. 逐笔核对凭证、合同、原始单据，异常项在"异常"列标注并回写审计说明。</p>
-      <p>4. 期后结转贷方合计应与 F1-2 期后结转（Z列）勾稽一致，差异须查明原因。</p>
+      <p>1. 本表对预付账款（科目1123）本期增减与期后结转抽样检查，验证真实性与截止恰当性。</p>
+      <p>2. 借方核对：记账凭证 ↔ 付款审批单 ↔ 银行回单 ↔ 合同/订单；贷方/期后核对：记账凭证 ↔ 入库/验收 ↔ 发票。</p>
+      <p>3. 大额、长账龄、关联方预付应作为特定样本必选；检查比例偏低（&lt;30%）须扩大样本或在说明中解释。</p>
+      <p>4. 期后贷方合计应与 F1-2 期后结转（Z列）勾稽；账面金额可从 F1-2 回填后计算覆盖率。</p>
     </div>
   </details>
 
-  <!-- 审计目标 -->
-  <el-alert
-    type="info"
-    :closable="false"
-    title="审计目标：验证预付账款本期增减变动的真实性与准确性，检查期后结转情况，评估长期挂账款项的可收回性与截止恰当性。"
-    class="objective-alert"
-  />
+  <!-- 一、审计目标 -->
+  <el-alert type="info" :closable="false" class="objective-alert" show-icon>
+    <template #title>
+      <div class="objective-title">一、审计目标</div>
+      <ul class="objective-list">
+        <li>验证预付账款本期增减变动的真实性与准确性</li>
+        <li>检查期后结转情况，确认截止恰当</li>
+        <li>评估长期挂账款项的可收回性及披露是否充分</li>
+      </ul>
+    </template>
+  </el-alert>
 
-  <!-- 抽样参数区 -->
-  <div class="sampling-params-card">
-    <h4 class="card-title">抽样参数</h4>
+  <!-- 二、样本选取 -->
+  <el-card class="sampling-card" shadow="never">
+    <template #header>
+      <div class="card-header">
+        <span>二、样本选取标准与规模</span>
+        <GtIndexChip value="wp:F1-2" :context-project-id="projectId" />
+      </div>
+    </template>
     <div class="params-grid">
-      <div class="param-item">
+      <div class="param-item span-2">
         <span class="param-label">测试总体</span>
-        <el-input v-model="samplingParams.testPopulation" size="small" :disabled="isReadonly"
-          @change="(val: string) => updateSamplingParams('testPopulation', val)" />
+        <el-input
+          :model-value="samplingParams.testName"
+          size="small"
+          :disabled="isReadonly"
+          placeholder="如：预付账款本期借方/贷方发生额"
+          @change="(v: string) => updateSamplingParams('testName', v)"
+        />
       </div>
-      <div class="param-item">
+      <div class="param-item span-2">
         <span class="param-label">特定样本</span>
-        <el-input v-model="samplingParams.specificSamples" size="small" :disabled="isReadonly"
-          @change="(val: string) => updateSamplingParams('specificSamples', val)" />
+        <el-input
+          :model-value="samplingParams.specificSamples"
+          size="small"
+          :disabled="isReadonly"
+          placeholder="大额、关联方、长账龄等必选样本说明"
+          @change="(v: string) => updateSamplingParams('specificSamples', v)"
+        />
       </div>
       <div class="param-item">
-        <span class="param-label">抽样总体</span>
-        <el-input v-model="samplingParams.samplingPopulation" size="small" :disabled="isReadonly"
-          @change="(val: string) => updateSamplingParams('samplingPopulation', val)" />
+        <span class="param-label">抽样总体笔数</span>
+        <el-input
+          :model-value="samplingParams.samplingPopulationCount"
+          size="small"
+          :disabled="isReadonly"
+          @change="(v: any) => updateSamplingParams('samplingPopulationCount', Number(v) || 0)"
+        />
+      </div>
+      <div class="param-item">
+        <span class="param-label">抽样总体金额</span>
+        <el-input
+          :model-value="samplingParams.samplingPopulationAmount"
+          size="small"
+          :disabled="isReadonly"
+          @change="(v: any) => updateSamplingParams('samplingPopulationAmount', Number(v) || 0)"
+        />
+      </div>
+      <div class="param-item">
+        <span class="param-label">目标样本量</span>
+        <el-input
+          :model-value="samplingParams.targetSampleSize"
+          size="small"
+          :disabled="isReadonly"
+          @change="(v: any) => updateSamplingParams('targetSampleSize', Number(v) || 0)"
+        />
       </div>
       <div class="param-item">
         <span class="param-label">抽样方法</span>
-        <el-input v-model="samplingParams.samplingMethod" size="small" :disabled="isReadonly"
-          @change="(val: string) => updateSamplingParams('samplingMethod', val)" />
+        <el-select
+          :model-value="samplingParams.samplingMethod"
+          size="small"
+          :disabled="isReadonly"
+          style="width: 100%"
+          @change="(v: string) => updateSamplingParams('samplingMethod', v)"
+        >
+          <el-option v-for="opt in F1_SAMPLING_METHOD_OPTIONS" :key="opt" :label="opt" :value="opt" />
+        </el-select>
+      </div>
+      <div class="param-item span-2">
+        <span class="param-label">抽样过程</span>
+        <el-input
+          :model-value="samplingParams.samplingProcess"
+          size="small"
+          :disabled="isReadonly"
+          type="textarea"
+          :autosize="{ minRows: 2, maxRows: 4 }"
+          placeholder="描述抽样工具、随机起点、间隔或货币单元过程索引…"
+          @change="(v: string) => updateSamplingParams('samplingProcess', v)"
+        />
       </div>
     </div>
-    <!-- 进度条 -->
-    <div class="sampling-progress">
-      <span>抽样进度：{{ samplingParams.currentSampleSize }} / {{ samplingParams.targetSampleSize }}</span>
-      <el-progress
-        :percentage="progressPct"
-        :stroke-width="8"
-        :color="progressPct >= 100 ? '#67c23a' : '#409eff'"
-        style="flex: 1; margin-left: 12px"
-      />
-    </div>
-  </div>
+  </el-card>
 
-  <!-- 汇总 + 导入导出 -->
   <div class="tab-toolbar">
     <div class="toolbar-left">
-      <el-tag type="info">已检查：{{ totalChecked }}</el-tag>
-      <el-tag :type="anomalyCount > 0 ? 'danger' : 'success'">异常：{{ anomalyCount }}</el-tag>
-      <el-tag :type="anomalyRate > 10 ? 'danger' : 'info'">异常率：{{ anomalyRate.toFixed(1) }}%</el-tag>
-      <el-tag size="small" type="warning" effect="plain">抽凭引擎</el-tag>
+      <el-tag type="info" size="small">已检查 {{ totalChecked }}</el-tag>
+      <el-tag :type="anomalyCount > 0 ? 'danger' : 'success'" size="small">异常 {{ anomalyCount }}</el-tag>
+      <el-tag :type="anomalyRate > 10 ? 'danger' : 'info'" size="small">异常率 {{ anomalyRate.toFixed(1) }}%</el-tag>
+      <el-button size="small" :disabled="isReadonly" @click="doFillBookFromDetail">从 F1-2 回填账面</el-button>
     </div>
     <div class="toolbar-right">
       <span class="chip-wrap"><GtIndexChip value="wp:F1-1" :context-project-id="projectId" /></span>
-      <el-dropdown size="small" trigger="click" :disabled="isReadonly">
-        <el-button size="small">导入导出 ▾</el-button>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item @click="exportTemplate('F1-7')">导出模板</el-dropdown-item>
-            <el-dropdown-item @click="exportData('F1-7')">导出数据</el-dropdown-item>
-            <el-dropdown-item>
-              <el-upload :show-file-list="false" accept=".xlsx" :disabled="isReadonly || importing"
-                :before-upload="(file: any) => handleImport(file, 'F1-7')">
-                <span>导入数据</span>
-              </el-upload>
-            </el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
+      <span class="chip-wrap"><GtIndexChip value="wp:F1-2" :context-project-id="projectId" /></span>
     </div>
   </div>
 
@@ -91,114 +125,243 @@
     label="综合检查附件"
   />
 
-  <!-- (1) 本期增减变动 -->
+  <!-- (1) 本期借方 -->
   <div class="vc-section">
     <div class="section-header">
-      <h4>(1) 本期增减变动检查</h4>
-      <el-button size="small" :disabled="isReadonly" @click="addSample('current')">+ 添加样本</el-button>
+      <h4>(1) 本期借方发生额核查</h4>
+      <div class="section-header-actions">
+        <el-dropdown size="small" trigger="click" :disabled="isReadonly">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="exportTemplate('F1-7')">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="exportData('F1-7')">导出数据</el-dropdown-item>
+              <el-dropdown-item>
+                <el-upload
+                  :show-file-list="false"
+                  accept=".xlsx"
+                  :disabled="isReadonly || importing"
+                  :before-upload="(file: any) => handleImport(file, 'F1-7')"
+                >
+                  <span>导入数据</span>
+                </el-upload>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="addSample('debit')">+ 添加样本</el-button>
+      </div>
     </div>
-    <el-table :data="currentChangeRows" size="small" border stripe :height="currentChangeRows.length > 15 ? '400px' : undefined">
-      <el-table-column type="index" label="#" width="40" />
-      <el-table-column label="客户名称" width="120">
+    <el-table
+      :data="debitTableData"
+      size="small"
+      border
+      stripe
+      :height="debitRows.length > 12 ? '400px' : undefined"
+      :row-class-name="rowClassName"
+    >
+      <el-table-column label="供应商名称" width="120" fixed>
         <template #default="{ row }">
-          <el-input v-model="row.customerName" size="small" :disabled="isReadonly"
-            @change="(val: string) => updateCell('current', row.rowId, 'customerName', val)" />
+          <span v-if="row.rowId === '__subtotal__'" class="subtotal-label">合计</span>
+          <el-input
+            v-else
+            :model-value="row.supplierName"
+            size="small"
+            :disabled="isReadonly"
+            @change="(v: string) => updateCell('debit', row.rowId, 'supplierName', v)"
+          />
         </template>
       </el-table-column>
       <el-table-column label="日期" width="100">
         <template #default="{ row }">
-          <el-input v-model="row.date" size="small" :disabled="isReadonly" placeholder="YYYY-MM-DD"
-            @change="(val: string) => updateCell('current', row.rowId, 'date', val)" />
+          <el-input
+            v-if="row.rowId !== '__subtotal__'"
+            :model-value="row.date"
+            size="small"
+            :disabled="isReadonly"
+            placeholder="YYYY-MM-DD"
+            @change="(v: string) => updateCell('debit', row.rowId, 'date', v)"
+          />
         </template>
       </el-table-column>
-      <el-table-column label="凭证号" width="90">
+      <el-table-column label="凭证编号" width="90">
         <template #default="{ row }">
-          <el-input v-model="row.voucherNo" size="small" :disabled="isReadonly"
-            @change="(val: string) => updateCell('current', row.rowId, 'voucherNo', val)" />
+          <el-input
+            v-if="row.rowId !== '__subtotal__'"
+            :model-value="row.voucherNo"
+            size="small"
+            :disabled="isReadonly"
+            @change="(v: string) => updateCell('debit', row.rowId, 'voucherNo', v)"
+          />
         </template>
       </el-table-column>
-      <el-table-column label="业务内容" width="130">
+      <el-table-column label="记账凭证" align="center">
+        <el-table-column label="业务内容" width="120">
+          <template #default="{ row }">
+            <el-input
+              v-if="row.rowId !== '__subtotal__'"
+              :model-value="row.businessContent"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: string) => updateCell('debit', row.rowId, 'businessContent', v)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="对方科目" width="90">
+          <template #default="{ row }">
+            <el-input
+              v-if="row.rowId !== '__subtotal__'"
+              :model-value="row.counterAccount"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: string) => updateCell('debit', row.rowId, 'counterAccount', v)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="对方明细" width="100">
+          <template #default="{ row }">
+            <el-input
+              v-if="row.rowId !== '__subtotal__'"
+              :model-value="row.counterDetailAccount"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: string) => updateCell('debit', row.rowId, 'counterDetailAccount', v)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="借方金额" width="100" align="right">
+          <template #default="{ row }">
+            <span v-if="row.rowId === '__subtotal__'" class="amt subtotal-val">{{ fmtAmount(debitChecked) }}</span>
+            <el-input
+              v-else
+              :model-value="row.debitAmount"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: any) => updateCell('debit', row.rowId, 'debitAmount', v)"
+            />
+          </template>
+        </el-table-column>
+      </el-table-column>
+      <el-table-column label="付款审批单" align="center">
+        <el-table-column label="日期/编号" width="100">
+          <template #default="{ row }">
+            <el-input
+              v-if="row.rowId !== '__subtotal__'"
+              :model-value="row.approvalDateNo"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: string) => updateCell('debit', row.rowId, 'approvalDateNo', v)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="是否审批" width="80">
+          <template #default="{ row }">
+            <el-input
+              v-if="row.rowId !== '__subtotal__'"
+              :model-value="row.approvalOk"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: string) => updateCell('debit', row.rowId, 'approvalOk', v)"
+            />
+          </template>
+        </el-table-column>
+      </el-table-column>
+      <el-table-column label="银行回单" align="center">
+        <el-table-column label="付款方" width="90">
+          <template #default="{ row }">
+            <el-input
+              v-if="row.rowId !== '__subtotal__'"
+              :model-value="row.bankPayment"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: string) => updateCell('debit', row.rowId, 'bankPayment', v)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="收款方" width="90">
+          <template #default="{ row }">
+            <el-input
+              v-if="row.rowId !== '__subtotal__'"
+              :model-value="row.bankPayee"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: string) => updateCell('debit', row.rowId, 'bankPayee', v)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="金额" width="90" align="right">
+          <template #default="{ row }">
+            <el-input
+              v-if="row.rowId !== '__subtotal__'"
+              :model-value="row.bankAmount"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: any) => updateCell('debit', row.rowId, 'bankAmount', v)"
+            />
+          </template>
+        </el-table-column>
+      </el-table-column>
+      <el-table-column label="合同/订单" align="center">
+        <el-table-column label="名称" width="100">
+          <template #default="{ row }">
+            <el-input
+              v-if="row.rowId !== '__subtotal__'"
+              :model-value="row.contractName"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: string) => updateCell('debit', row.rowId, 'contractName', v)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="合同金额" width="90" align="right">
+          <template #default="{ row }">
+            <el-input
+              v-if="row.rowId !== '__subtotal__'"
+              :model-value="row.contractAmount"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: any) => updateCell('debit', row.rowId, 'contractAmount', v)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="签收单据" width="90">
+          <template #default="{ row }">
+            <el-input
+              v-if="row.rowId !== '__subtotal__'"
+              :model-value="row.receiptDoc"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: string) => updateCell('debit', row.rowId, 'receiptDoc', v)"
+            />
+          </template>
+        </el-table-column>
+      </el-table-column>
+      <el-table-column label="索引号" width="70">
         <template #default="{ row }">
-          <el-input v-model="row.businessContent" size="small" :disabled="isReadonly"
-            @change="(val: string) => updateCell('current', row.rowId, 'businessContent', val)" />
+          <el-input
+            v-if="row.rowId !== '__subtotal__'"
+            :model-value="row.indexRef"
+            size="small"
+            :disabled="isReadonly"
+            @change="(v: string) => updateCell('debit', row.rowId, 'indexRef', v)"
+          />
         </template>
       </el-table-column>
-      <el-table-column label="对方科目" width="100">
+      <el-table-column label="是否异常" width="90">
         <template #default="{ row }">
-          <el-input v-model="row.counterAccount" size="small" :disabled="isReadonly"
-            @change="(val: string) => updateCell('current', row.rowId, 'counterAccount', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="对方明细" width="100">
-        <template #default="{ row }">
-          <el-input v-model="row.counterDetailAccount" size="small" :disabled="isReadonly"
-            @change="(val: string) => updateCell('current', row.rowId, 'counterDetailAccount', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="借方" width="100" align="right">
-        <template #default="{ row }">
-          <el-input v-model.number="row.debitAmount" size="small" :disabled="isReadonly"
-            @change="(val: any) => updateCell('current', row.rowId, 'debitAmount', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="贷方" width="100" align="right">
-        <template #default="{ row }">
-          <el-input v-model.number="row.creditAmount" size="small" :disabled="isReadonly"
-            @change="(val: any) => updateCell('current', row.rowId, 'creditAmount', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="原始凭证" width="100">
-        <template #default="{ row }">
-          <el-input v-model="row.supportingDoc" size="small" :disabled="isReadonly"
-            @change="(val: string) => updateCell('current', row.rowId, 'supportingDoc', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="核1" width="40" align="center">
-        <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[0]" :disabled="isReadonly"
-            @change="(val: any) => updateCell('current', row.rowId, 'checkItems.0', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="核2" width="40" align="center">
-        <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[1]" :disabled="isReadonly"
-            @change="(val: any) => updateCell('current', row.rowId, 'checkItems.1', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="核3" width="40" align="center">
-        <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[2]" :disabled="isReadonly"
-            @change="(val: any) => updateCell('current', row.rowId, 'checkItems.2', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="核4" width="40" align="center">
-        <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[3]" :disabled="isReadonly"
-            @change="(val: any) => updateCell('current', row.rowId, 'checkItems.3', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="核5" width="40" align="center">
-        <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[4]" :disabled="isReadonly"
-            @change="(val: any) => updateCell('current', row.rowId, 'checkItems.4', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="索引" width="70">
-        <template #default="{ row }">
-          <el-input v-model="row.indexRef" size="small" :disabled="isReadonly"
-            @change="(val: string) => updateCell('current', row.rowId, 'indexRef', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="异常" width="80">
-        <template #default="{ row }">
-          <el-input v-model="row.isAbnormal" size="small" :disabled="isReadonly"
+          <el-input
+            v-if="row.rowId !== '__subtotal__'"
+            :model-value="row.isAbnormal"
+            size="small"
+            :disabled="isReadonly"
             :class="{ 'abnormal-cell': row.isAbnormal }"
-            @change="(val: string) => updateCell('current', row.rowId, 'isAbnormal', val)" />
+            @change="(v: string) => updateCell('debit', row.rowId, 'isAbnormal', v)"
+          />
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="50" v-if="!isReadonly">
+      <el-table-column v-if="!isReadonly" label="操作" width="50" fixed="right">
         <template #default="{ row }">
-          <el-popconfirm title="删除？" @confirm="removeSample('current', row.rowId)">
+          <el-popconfirm v-if="row.rowId !== '__subtotal__'" title="删除？" @confirm="removeSample('debit', row.rowId)">
             <template #reference><el-button size="small" type="danger" link>删</el-button></template>
           </el-popconfirm>
         </template>
@@ -206,10 +369,46 @@
     </el-table>
   </div>
 
-  <!-- (2) 期后结转检查 -->
+  <!-- (2) 本期贷方 -->
   <div class="vc-section">
     <div class="section-header">
-      <h4>(2) 期后结转检查</h4>
+      <h4>(2) 本期贷方发生额核查</h4>
+      <div class="section-header-actions">
+        <el-dropdown size="small" trigger="click" :disabled="isReadonly">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="exportTemplate('F1-7-credit')">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="exportData('F1-7-credit')">导出数据</el-dropdown-item>
+              <el-dropdown-item>
+                <el-upload
+                  :show-file-list="false"
+                  accept=".xlsx"
+                  :disabled="isReadonly || importing"
+                  :before-upload="(file: any) => handleImport(file, 'F1-7-credit')"
+                >
+                  <span>导入数据</span>
+                </el-upload>
+              </el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="addSample('credit')">+ 添加样本</el-button>
+      </div>
+    </div>
+    <F1CreditCheckTable
+      :rows="creditRows"
+      :checked-total="creditChecked"
+      :is-readonly="isReadonly"
+      @update="(rowId, field, value) => updateCell('credit', rowId, field, value)"
+      @remove="(rowId) => removeSample('credit', rowId)"
+    />
+  </div>
+
+  <!-- (3) 期后贷方 -->
+  <div class="vc-section">
+    <div class="section-header">
+      <h4>(3) 期后贷方发生额核查</h4>
       <div class="section-header-actions">
         <el-dropdown size="small" trigger="click" :disabled="isReadonly">
           <el-button size="small">导入导出 ▾</el-button>
@@ -218,168 +417,125 @@
               <el-dropdown-item @click="exportTemplate('F1-7-post')">导出模板</el-dropdown-item>
               <el-dropdown-item @click="exportData('F1-7-post')">导出数据</el-dropdown-item>
               <el-dropdown-item>
-                <el-upload :show-file-list="false" accept=".xlsx" :disabled="isReadonly || importing"
-                  :before-upload="(file: any) => handleImport(file, 'F1-7-post')">
+                <el-upload
+                  :show-file-list="false"
+                  accept=".xlsx"
+                  :disabled="isReadonly || importing"
+                  :before-upload="(file: any) => handleImport(file, 'F1-7-post')"
+                >
                   <span>导入数据</span>
                 </el-upload>
               </el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" :disabled="isReadonly" @click="addSample('postPeriod')">+ 添加样本</el-button>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="addSample('postPeriod')">+ 添加样本</el-button>
       </div>
     </div>
-    <el-table :data="postPeriodRows" size="small" border stripe :height="postPeriodRows.length > 15 ? '400px' : undefined">
-      <el-table-column type="index" label="#" width="40" />
-      <el-table-column label="客户名称" width="120">
-        <template #default="{ row }">
-          <el-input v-model="row.customerName" size="small" :disabled="isReadonly"
-            @change="(val: string) => updateCell('postPeriod', row.rowId, 'customerName', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="日期" width="100">
-        <template #default="{ row }">
-          <el-input v-model="row.date" size="small" :disabled="isReadonly" placeholder="YYYY-MM-DD"
-            @change="(val: string) => updateCell('postPeriod', row.rowId, 'date', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="凭证号" width="90">
-        <template #default="{ row }">
-          <el-input v-model="row.voucherNo" size="small" :disabled="isReadonly"
-            @change="(val: string) => updateCell('postPeriod', row.rowId, 'voucherNo', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="业务内容" width="130">
-        <template #default="{ row }">
-          <el-input v-model="row.businessContent" size="small" :disabled="isReadonly"
-            @change="(val: string) => updateCell('postPeriod', row.rowId, 'businessContent', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="对方科目" width="100">
-        <template #default="{ row }">
-          <el-input v-model="row.counterAccount" size="small" :disabled="isReadonly"
-            @change="(val: string) => updateCell('postPeriod', row.rowId, 'counterAccount', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="对方明细" width="100">
-        <template #default="{ row }">
-          <el-input v-model="row.counterDetailAccount" size="small" :disabled="isReadonly"
-            @change="(val: string) => updateCell('postPeriod', row.rowId, 'counterDetailAccount', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="贷方" width="100" align="right">
-        <template #default="{ row }">
-          <el-input v-model.number="row.creditAmount" size="small" :disabled="isReadonly"
-            @change="(val: any) => updateCell('postPeriod', row.rowId, 'creditAmount', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="原始凭证" width="100">
-        <template #default="{ row }">
-          <el-input v-model="row.supportingDoc" size="small" :disabled="isReadonly"
-            @change="(val: string) => updateCell('postPeriod', row.rowId, 'supportingDoc', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="核1" width="40" align="center">
-        <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[0]" :disabled="isReadonly"
-            @change="(val: any) => updateCell('postPeriod', row.rowId, 'checkItems.0', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="核2" width="40" align="center">
-        <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[1]" :disabled="isReadonly"
-            @change="(val: any) => updateCell('postPeriod', row.rowId, 'checkItems.1', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="核3" width="40" align="center">
-        <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[2]" :disabled="isReadonly"
-            @change="(val: any) => updateCell('postPeriod', row.rowId, 'checkItems.2', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="核4" width="40" align="center">
-        <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[3]" :disabled="isReadonly"
-            @change="(val: any) => updateCell('postPeriod', row.rowId, 'checkItems.3', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="核5" width="40" align="center">
-        <template #default="{ row }">
-          <el-checkbox v-model="row.checkItems[4]" :disabled="isReadonly"
-            @change="(val: any) => updateCell('postPeriod', row.rowId, 'checkItems.4', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="索引" width="70">
-        <template #default="{ row }">
-          <el-input v-model="row.indexRef" size="small" :disabled="isReadonly"
-            @change="(val: string) => updateCell('postPeriod', row.rowId, 'indexRef', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="异常" width="80">
-        <template #default="{ row }">
-          <el-input v-model="row.isAbnormal" size="small" :disabled="isReadonly"
-            :class="{ 'abnormal-cell': row.isAbnormal }"
-            @change="(val: string) => updateCell('postPeriod', row.rowId, 'isAbnormal', val)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="50" v-if="!isReadonly">
-        <template #default="{ row }">
-          <el-popconfirm title="删除？" @confirm="removeSample('postPeriod', row.rowId)">
-            <template #reference><el-button size="small" type="danger" link>删</el-button></template>
-          </el-popconfirm>
-        </template>
-      </el-table-column>
-    </el-table>
+    <F1CreditCheckTable
+      :rows="postPeriodRows"
+      :checked-total="postChecked"
+      :is-readonly="isReadonly"
+      @update="(rowId, field, value) => updateCell('postPeriod', rowId, field, value)"
+      @remove="(rowId) => removeSample('postPeriod', rowId)"
+    />
   </div>
 
-  <!-- F1-2 Z列合计交叉验证 -->
   <el-alert
     v-if="postPeriodCrossValidation"
     :title="postPeriodCrossValidation"
     type="warning"
     :closable="false"
     show-icon
-    style="margin: 12px 0"
+    class="cross-alert"
   />
 
-  <!-- 审计说明 -->
-  <el-card shadow="never" class="audit-note-card">
-    <template #header><div class="card-header"><span>审计说明</span></div></template>
-    <el-input
-      type="textarea"
-      :model-value="auditNote"
-      :disabled="isReadonly"
-      :autosize="{ minRows: 5 }"
-      placeholder="填写审计说明：概述抽样测试情况、本期增减与期后结转检查结果、发现的异常事项及其影响。"
-      @change="saveAuditNote"
+  <!-- 四、检查比例 -->
+  <el-card class="opinion-card" shadow="never">
+    <template #header>
+      <div class="opinion-header">
+        <span class="opinion-title">四、检查比例</span>
+        <span class="ratio-hint">账面金额可编辑；核实金额自动汇总；比例 &lt;30% 将提示扩大样本</span>
+      </div>
+    </template>
+
+    <el-table :data="coverageRows" border size="small" class="coverage-table">
+      <el-table-column prop="direction" label="方向" width="120" />
+      <el-table-column label="账面金额" align="right" min-width="140">
+        <template #default="{ row, $index }">
+          <el-input
+            :model-value="row.bookAmount"
+            size="small"
+            :disabled="isReadonly"
+            @change="(v: any) => onBookAmountChange($index, v)"
+          />
+        </template>
+      </el-table-column>
+      <el-table-column label="核实金额" align="right" min-width="120">
+        <template #default="{ row }">
+          <span class="amt auto">{{ fmtAmount(row.checkedAmount) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="检查比例" align="right" width="120">
+        <template #default="{ row }">
+          <span :class="ratioClass(row.ratio)">{{ formatRatio(row.ratio) }}</span>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <el-alert
+      v-if="lowCoverageWarning"
+      :title="lowCoverageWarning"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="cross-alert"
     />
+
+    <div class="opinion-section">
+      <div class="opinion-section-header">
+        <span class="opinion-section-label">审计说明</span>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :disabled="isReadonly || !aiAvailable || aiLoading"
+          :loading="aiLoading"
+          @click="generateNote"
+        >🤖AI</el-button>
+      </div>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="说明样本选取、借/贷/期后勾稽结果、检查比例偏低原因及扩大测试情况…"
+      />
+    </div>
   </el-card>
 
-  <!-- 审计结论 -->
-  <el-card shadow="never" class="audit-note-card">
+  <!-- 五、审计结论 -->
+  <el-card class="opinion-card" shadow="never">
     <template #header>
-      <div class="card-header">
-        <span>审计结论</span>
+      <div class="opinion-header">
+        <span class="opinion-title">五、审计结论</span>
         <div class="opinion-actions">
           <el-button
             size="small"
-            type="primary"
-            plain
-            :disabled="isReadonly || !aiAvailable"
+            :disabled="isReadonly || !aiAvailable || aiLoading"
             :loading="aiLoading"
-            @click="generateComprehensiveConclusion"
-          >AI 生成结论</el-button>
+            @click="generateConclusion"
+          >🤖AI</el-button>
           <el-button v-if="openReviewDialog" size="small" @click="openReview">复核</el-button>
         </div>
       </div>
     </template>
     <el-input
+      v-model="conclusion"
       type="textarea"
-      :model-value="auditConclusion"
+      :autosize="{ minRows: 2, maxRows: 6 }"
       :disabled="isReadonly"
-      :autosize="{ minRows: 3 }"
       placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。"
-      @change="saveAuditConclusion"
     />
   </el-card>
 </div>
@@ -387,18 +543,27 @@
 
 <script setup lang="ts">
 /**
- * F1TabComprehensiveCheck.vue — F1-7 综合检查表
- * 抽样参数 + (1)本期增减 + (2)期后结转 + 汇总 + 跨期标记
+ * F1TabComprehensiveCheck.vue — F1-7 预付账款检查表（对齐 Excel）
+ * 一目标 / 二抽样 / 三(1)借方(2)贷方(3)期后 / 四检查比例 / 五结论
  */
-import { computed, inject, onMounted, ref, toRef, type Ref } from 'vue'
-import { useF1VoucherCheck } from '../composables/useF1ComprehensiveCheck'
+import { computed, inject, toRef, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import {
+  useF1VoucherCheck,
+  F1_SAMPLING_METHOD_OPTIONS,
+  createEmptyDebitRow,
+  type F1DebitCheckRow,
+} from '../composables/useF1ComprehensiveCheck'
 import { useF1AiGenerate } from '../composables/useF1AiGenerate'
 import { useF1ImportExport, type F1ImportSheet } from '../composables/useWorkpaperImportExport'
+import { useF1CrossSheet } from '../composables/useF1CrossSheet'
+import { parseNum } from '../composables/useF1FormulaEngine'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
-// @ts-ignore - GtIndexChip may not have type declarations
+// @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
 import F1SheetAttachments from './F1SheetAttachments.vue'
+import F1CreditCheckTable from './F1CreditCheckTable.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -411,13 +576,20 @@ const props = defineProps<{
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 const wpIdRef = toRef(props, 'wpId') as Ref<string>
-
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 
 const {
   samplingParams,
-  currentChangeRows,
+  debitRows,
+  creditRows,
   postPeriodRows,
+  auditNote,
+  conclusion,
+  coverageRows,
+  debitChecked,
+  creditChecked,
+  postChecked,
   totalChecked,
   anomalyCount,
   anomalyRate,
@@ -425,6 +597,7 @@ const {
   removeSample,
   updateCell,
   updateSamplingParams,
+  fillBookFromDetail,
 } = useF1VoucherCheck({
   allResponses: allResponsesRef,
   wpId: wpIdRef,
@@ -435,127 +608,197 @@ const {
 })
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(wpIdRef)
-
-// ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────────
-const NOTE_KEY = 'F1-vc-audit-note'
-const CONCLUSION_KEY = 'F1-vc-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-
-function saveAuditNote(val: string): void {
-  if (props.isReadonly) return
-  auditNote.value = val
-  allResponsesRef.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
-  void props.saveImmediate(NOTE_KEY, { conclusion: null, remark: val })
-}
-
-function saveAuditConclusion(val: string): void {
-  if (props.isReadonly) return
-  auditConclusion.value = val
-  allResponsesRef.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
-  void props.saveImmediate(CONCLUSION_KEY, { conclusion: null, remark: val })
-}
-
-onMounted(() => {
-  const n = allResponsesRef.value.get(NOTE_KEY)
-  if (n?.remark) auditNote.value = n.remark
-  const c = allResponsesRef.value.get(CONCLUSION_KEY)
-  if (c?.remark) auditConclusion.value = c.remark
-})
-
-const progressPct = computed(() => {
-  if (!samplingParams.value.targetSampleSize) return 0
-  return Math.min(100, Math.round((samplingParams.value.currentSampleSize / samplingParams.value.targetSampleSize) * 100))
-})
-
-// ─── F1-2 Z列合计交叉验证 ───────────────────────────────────────────────────
-import { useF1CrossSheet } from '../composables/useF1CrossSheet'
-import { parseNum } from '../composables/useF1FormulaEngine'
-
+const { exportTemplate, exportData, importData, importing } = useF1ImportExport({ wpId: wpIdRef })
 const crossSheet = useF1CrossSheet({ allResponses: allResponsesRef })
 
-/** F1-2 Z列（期后结转）合计 vs F1-7 (2)期后结转贷方合计 交叉验证 */
-const postPeriodCrossValidation = computed(() => {
-  const d37Total = crossSheet.postPeriodSettlementSync.value.total
-  if (d37Total === 0) return ''
+const BOOK_FIELDS = ['bookDebit', 'bookCredit', 'bookEndBalance'] as const
 
-  // 从 F1-2 明细行聚合 Z列合计
+const debitTableData = computed(() => {
+  const sub: F1DebitCheckRow = {
+    ...createEmptyDebitRow(),
+    rowId: '__subtotal__',
+    supplierName: '合计',
+  }
+  return [...debitRows.value, sub]
+})
+
+function rowClassName({ row }: { row: { rowId: string } }) {
+  return row.rowId === '__subtotal__' ? 'subtotal-row' : ''
+}
+
+function onBookAmountChange(index: number, value: any) {
+  const field = BOOK_FIELDS[index]
+  if (!field) return
+  updateSamplingParams(field, Number(value) || 0)
+}
+
+function doFillBookFromDetail() {
+  if (props.isReadonly) return
   const detResp = allResponsesRef.value.get('F1-det-rows')
-  let d32ZTotal = 0
+  let debit = 0
+  let credit = 0
+  let endAudited = 0
+  if (detResp?.remark) {
+    try {
+      const rows = JSON.parse(detResp.remark) as Array<{
+        debit?: number
+        credit?: number
+        endAudited?: number
+      }>
+      for (const r of rows) {
+        debit += parseNum(r.debit)
+        credit += parseNum(r.credit)
+        endAudited += parseNum(r.endAudited)
+      }
+    } catch { /* ignore */ }
+  }
+  if (debit === 0 && credit === 0 && endAudited === 0) {
+    ElMessage.warning('F1-2 明细暂无数据，请先编制明细表')
+    return
+  }
+  fillBookFromDetail({ debit, credit, endAudited })
+  ElMessage.success('已从 F1-2 回填账面金额')
+}
+
+/** F1-2 Z列合计 vs F1-7 期后贷方合计 */
+const postPeriodCrossValidation = computed(() => {
+  const f17Total = crossSheet.postPeriodSettlementSync.value.total
+  if (f17Total === 0 && postChecked.value === 0) return ''
+
+  const detResp = allResponsesRef.value.get('F1-det-rows')
+  let f12ZTotal = 0
   if (detResp?.remark) {
     try {
       const rows = JSON.parse(detResp.remark) as Array<{ postPeriodSettlement?: number }>
-      d32ZTotal = rows.reduce((sum, r) => sum + parseNum(r.postPeriodSettlement), 0)
+      f12ZTotal = rows.reduce((sum, r) => sum + parseNum(r.postPeriodSettlement), 0)
     } catch { /* ignore */ }
   }
 
-  const diff = Math.abs(d32ZTotal - d37Total)
+  const checked = postChecked.value || f17Total
+  const diff = Math.abs(f12ZTotal - checked)
   if (diff < 0.01) return ''
-  return `F1-2期后结转（Z列）合计 ${d32ZTotal.toLocaleString()} 元 ≠ F1-7期后结转贷方合计 ${d37Total.toLocaleString()} 元，差额 ${diff.toLocaleString()} 元`
+  return `F1-2期后结转（Z列）合计 ${f12ZTotal.toLocaleString()} 元 ≠ F1-7期后贷方合计 ${checked.toLocaleString()} 元，差额 ${diff.toLocaleString()} 元`
 })
 
-function openReview() {
-  openReviewDialog?.('F1-vc-review')
+const lowCoverageWarning = computed(() => {
+  const low = coverageRows.value.filter(r => r.ratio != null && r.ratio < 30 && r.bookAmount > 0)
+  if (!low.length) return ''
+  return `以下方向检查比例低于 30%，请扩大样本量或在审计说明中解释：${low.map(r => `${r.direction}(${r.ratio}%)`).join('、')}`
+})
+
+function aiContext() {
+  return {
+    sheet: 'F1-7',
+    samplingParams: { ...samplingParams.value },
+    coverageRows: coverageRows.value,
+    totalChecked: totalChecked.value,
+    anomalyCount: anomalyCount.value,
+    anomalyRate: anomalyRate.value,
+    debitChecked: debitChecked.value,
+    creditChecked: creditChecked.value,
+    postChecked: postChecked.value,
+  }
 }
 
-async function generateComprehensiveConclusion() {
+async function generateNote() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'comprehensive-note',
+    auditNote.value,
+    aiContext(),
+    'AI 生成 · F1-7 审计说明',
+  )
+  if (text) auditNote.value = text
+}
+
+async function generateConclusion() {
   if (props.isReadonly) return
   const text = await generateAndConfirm(
     'comprehensive-conclusion',
-    auditConclusion.value,
-    {
-      sheet: 'F1-7',
-      totalChecked: totalChecked.value,
-      anomalyCount: anomalyCount.value,
-      anomalyRate: anomalyRate.value,
-    },
+    conclusion.value,
+    aiContext(),
     'AI 生成 · F1-7 审计结论',
   )
-  if (text) saveAuditConclusion(text)
+  if (text) conclusion.value = text
 }
 
-const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
-const { exportTemplate, exportData, importData, importing } = useF1ImportExport({ wpId: wpIdRef })
+function openReview() {
+  openReviewDialog?.('F1-vc-conclusion')
+}
 
 async function handleImport(file: File, sheet: F1ImportSheet): Promise<boolean> {
   const result = await importData(sheet, file)
   if (result) await reloadWorkpaperData?.()
   return false
 }
+
+function fmtAmount(val: number | null | undefined): string {
+  if (val == null || val === 0) return '-'
+  if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { maximumFractionDigits: 2 })})`
+  return val.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+}
+
+function formatRatio(ratio: number | null): string {
+  if (ratio == null) return '—'
+  return `${ratio.toFixed(2)}%`
+}
+
+function ratioClass(ratio: number | null): string {
+  if (ratio == null) return ''
+  return ratio > 0 && ratio < 30 ? 'ratio-low' : ''
+}
 </script>
 
 <style scoped>
-.d3-comprehensive-check { padding: 16px; }
-.d3-comprehensive-check :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
-.d3-comprehensive-check :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
+.f1-comprehensive-check { padding: 16px; }
+.f1-comprehensive-check :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
+.f1-comprehensive-check :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
 
-/* 编制提示 */
 .guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
 
-/* 工具栏 */
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.objective-alert { margin-bottom: 12px; }
+.objective-title { font-weight: 600; margin-bottom: 4px; }
+.objective-list { margin: 4px 0 0; padding-left: 1.2em; line-height: 1.6; }
+
+.sampling-card { margin-bottom: 12px; border-radius: 8px; }
+.sampling-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.card-header { display: flex; align-items: center; justify-content: space-between; font-weight: 600; font-size: 14px; }
+
+.params-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.param-item { display: flex; align-items: flex-start; gap: 8px; }
+.param-item.span-2 { grid-column: 1 / -1; }
+.param-label { font-size: 12px; color: #909399; white-space: nowrap; min-width: 88px; padding-top: 5px; }
+
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left, .toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .chip-wrap { display: inline-flex; align-items: center; }
 
-/* 审计说明/结论卡片 */
-.audit-note-card { margin-top: 16px; }
-.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
-.opinion-actions { display: flex; gap: 6px; align-items: center; }
-
-.sampling-params-card { padding: 16px; background: #fff; border: 1px solid #ebeef5; border-radius: 6px; margin-bottom: 16px; }
-.card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
-.params-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
-.param-item { display: flex; align-items: center; gap: 8px; }
-.param-label { font-size: 12px; color: #909399; white-space: nowrap; min-width: 60px; }
-.sampling-progress { display: flex; align-items: center; font-size: 12px; color: #606266; }
 .vc-section { margin-bottom: 20px; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
-.section-header h4 { font-size: 14px; font-weight: 600; }
+.section-header h4 { font-size: 14px; font-weight: 600; margin: 0; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }
+
+.subtotal-label { font-weight: 700; }
+.subtotal-val { font-weight: 700; }
+.amt { text-align: right; display: inline-block; width: 100%; }
+.auto { color: #909399; }
 .abnormal-cell :deep(.el-input__inner) { color: #f56c6c; font-weight: 600; }
+:deep(.subtotal-row) { background-color: #fafafa !important; font-weight: 600; }
+
+.cross-alert { margin: 12px 0; }
+.coverage-table { max-width: 720px; margin-bottom: 12px; }
+.ratio-hint { font-size: 12px; color: #909399; font-weight: 400; }
+.ratio-low { color: #e6a23c; font-weight: 600; }
+
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.opinion-title { font-size: 14px; font-weight: 600; }
+.opinion-section { margin-top: 16px; }
+.opinion-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
+.opinion-section-label { font-size: 14px; font-weight: 500; }
+.opinion-actions { display: flex; gap: 6px; }
 </style>

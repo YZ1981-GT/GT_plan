@@ -41,13 +41,6 @@
       </div>
     </div>
 
-    <F1SheetAttachments
-      :project-id="projectId"
-      :wp-id="wpId"
-      sheet-code="F1-soe"
-      label="国企附注附件"
-    />
-
     <!-- (1) 账龄列示 -->
     <div class="disclosure-card">
       <h4 class="card-title">
@@ -57,7 +50,7 @@
         </el-tooltip>
         <GtIndexChip value="wp:F1-1" :context-project-id="projectId" />
       </h4>
-      <el-table :data="[...agingRows, agingTotal]" size="small" border stripe>
+      <el-table :data="agingTableData" size="small" border stripe>
         <el-table-column prop="label" label="账龄" width="140">
           <template #default="{ row }">
             <span :class="{ 'subtotal-label': row.rowId === '__subtotal__' }">{{ row.label }}</span>
@@ -143,7 +136,7 @@
         <el-button size="small" :disabled="isReadonly" @click="addOver1Row()">+ 添加</el-button>
         <GtIndexChip value="wp:F1-2" :context-project-id="projectId" />
       </h4>
-      <el-table :data="[...over1YearRows, over1TotalRow]" size="small" border stripe>
+      <el-table :data="over1TableData" size="small" border stripe>
         <el-table-column label="债权单位" min-width="120">
           <template #default="{ row }">
             <template v-if="row.rowId === '__total__'">
@@ -247,7 +240,7 @@
         (3) 按欠款方归集的期末余额前五名的预付款项情况
         <GtIndexChip value="wp:F1-2" :context-project-id="projectId" />
       </h4>
-      <el-table :data="[...top5Rows, top5TotalRow]" size="small" border stripe>
+      <el-table :data="top5TableData" size="small" border stripe>
         <el-table-column label="债务人名称" min-width="160">
           <template #default="{ row }">
             <span :class="{ 'subtotal-label': row.rowId === '__total__' }">
@@ -314,7 +307,6 @@ import { F1_NOTE_SECTION } from '../composables/f1NoteSectionMap'
 import type { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 import GtIndexChip from '../GtIndexChip.vue'
-import F1SheetAttachments from './F1SheetAttachments.vue'
 import F1DisclosureUsageGuide from './F1DisclosureUsageGuide.vue'
 
 const props = withDefaults(defineProps<{
@@ -380,6 +372,11 @@ const top5TotalRow = computed(() => ({
   proportionPct: top5Total.value.proportionPct,
   badDebt: top5Total.value.badDebt,
 }))
+
+/** 避免模板 spread 在 Ref 未就绪时抛出 “X is not iterable” */
+const agingTableData = computed(() => [...(agingRows.value ?? []), agingTotal.value])
+const over1TableData = computed(() => [...(over1YearRows.value ?? []), over1TotalRow.value])
+const top5TableData = computed(() => [...(top5Rows.value ?? []), top5TotalRow.value])
 
 async function syncToDisclosureNotes() {
   const payload = buildF1SyncPayload(

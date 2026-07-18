@@ -15,7 +15,7 @@ export interface CompoundImportExportGroup {
 export const CYCLE_IMPORT_EXPORT: Record<string, CycleImportExportEntry> = {
   f1: {
     apiPrefix: 'f1',
-    sheets: ['F1-2', 'F1-5', 'F1-6', 'F1-7', 'F1-7-post'],
+    sheets: ['F1-2', 'F1-5', 'F1-6', 'F1-7', 'F1-7-credit', 'F1-7-post'],
   },
   f2: {
     apiPrefix: 'f2',

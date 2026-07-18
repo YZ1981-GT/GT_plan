@@ -84,7 +84,8 @@ export interface F1AdjustmentRowRaw {
 /** F1-7 期后结转行原始 JSON 结构 */
 export interface D3PostPeriodRowRaw {
   rowId: string
-  customerName: string
+  customerName?: string
+  supplierName?: string
   creditAmount?: number
 }
 
@@ -326,7 +327,7 @@ export function useF1CrossSheet(options: UseD3CrossSheetOptions) {
     let total = 0
 
     for (const row of rows) {
-      const name = row.customerName || ''
+      const name = row.supplierName || row.customerName || ''
       const amount = parseNum(row.creditAmount)
       if (name) {
         byCustomer[name] = (byCustomer[name] || 0) + amount

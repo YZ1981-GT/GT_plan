@@ -37,6 +37,7 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :wp-id="props.wpId"
       />
 
       <G1TabFairValueTest
@@ -44,6 +45,8 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :wp-id="props.wpId"
+        @imported="onSheetImported"
       />
 
       <G1TabDetail
@@ -51,6 +54,8 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :wp-id="props.wpId"
+        @imported="onSheetImported"
       />
 
       <G1TabAdjustment
@@ -58,6 +63,8 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :wp-id="props.wpId"
+        @imported="onSheetImported"
       />
 
       <G1TabDisclosureListed
@@ -65,6 +72,7 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :wp-id="props.wpId"
       />
 
       <G1TabDisclosureSOE
@@ -72,6 +80,7 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :wp-id="props.wpId"
       />
 
       <G1TabLevel3Reconciliation
@@ -79,6 +88,8 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :wp-id="props.wpId"
+        @imported="onSheetImported"
       />
 
       <G1TabBusinessModel
@@ -86,6 +97,7 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :wp-id="props.wpId"
       />
 
       <G1TabClassification
@@ -93,6 +105,7 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :wp-id="props.wpId"
       />
 
       <G1TabContractCashflow
@@ -100,6 +113,7 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :wp-id="props.wpId"
       />
 
       <G1TabInventory
@@ -107,6 +121,8 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :wp-id="props.wpId"
+        @imported="onSheetImported"
       />
 
       <G1TabIncomeCalc
@@ -114,6 +130,8 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :wp-id="props.wpId"
+        @imported="onSheetImported"
       />
 
       <G1TabSecuritiesCount
@@ -121,6 +139,8 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :wp-id="props.wpId"
+        @imported="onSheetImported"
       />
 
       <G1TabCountReconciliation
@@ -128,6 +148,8 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :wp-id="props.wpId"
+        @imported="onSheetImported"
       />
 
       <G1TabVoucherCheck
@@ -137,6 +159,7 @@
         :debounced-save="formData.debouncedSave"
         :wp-id="props.wpId"
         :project-id="props.projectId"
+        @imported="onSheetImported"
       />
 
       <G1TabDerivativeCheck
@@ -144,6 +167,8 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :wp-id="props.wpId"
+        @imported="onSheetImported"
       />
 
       <GtGridSheet
@@ -224,10 +249,12 @@ const formData = useG1TraFinFormData({
 
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''
-  if (/附注披露\s*\(\s*上市\s*\)/.test(name) || name.includes('附注披露(上市)')) return '附注上市'
-  if (/附注披露\s*\(\s*国企\s*\)/.test(name) || name.includes('附注披露(国企)')) return '附注国企'
-  const m = name.match(/(G1A|G1-\d+)/)
-  return m ? m[1] : ''
+  // 模板名多为「附注披露信息（上市公司）/（国企）」；兼容半角括号与缩写
+  if (/G1-note-listed|附注披露.*上市|附注.*上市/.test(name)) return '附注上市'
+  if (/G1-note-soe|附注披露.*国企|附注.*国企/.test(name)) return '附注国企'
+  if (/附注/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
+  const m = name.match(/(G1A|G1-\d+)/i)
+  return m ? m[1].toUpperCase().replace(/^G1A$/i, 'G1A') : ''
 })
 
 const MIGRATED_SHEETS = new Set([
@@ -240,8 +267,11 @@ const isHtmlSheet = computed(() => {
   return code === 'G1A' || MIGRATED_SHEETS.has(code) || code.startsWith('附注')
 })
 
+const sheetNameRef = computed(() => props.sheetName || '')
+
 const dualMode = useG1DualMode({
   wpId: wpIdRef,
+  sheetName: sheetNameRef,
   reloadAll: () => formData.loadAll(),
 })
 
@@ -253,6 +283,10 @@ const useGridFallback = computed(() => {
 async function selfLoad() {
   await formData.loadAll()
   isLoading.value = false
+}
+
+function onSheetImported() {
+  void formData.loadAll()
 }
 
 onMounted(() => { void selfLoad() })

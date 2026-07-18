@@ -13,7 +13,8 @@ Body: { section: string, existingContent: string, relatedContext: object }
 - longterm-conclusion: F1-5 审计结论
 - related-party-note: F1-6 关联方审计说明
 - related-party-conclusion: F1-6 关联方审计结论
-- comprehensive-conclusion: 综合检查结论
+- comprehensive-note: F1-7 审计说明（抽样与三表核查）
+- comprehensive-conclusion: F1-7 审计结论
 - detail-prior-linkage: 明细表期初与上年报核对
 - detail-fluctuation: 明细表重大变动原因
 - detail-over1year: 明细表超1年预付款说明
@@ -73,6 +74,7 @@ _SUPPORTED_SECTIONS = {
     "longterm-conclusion",
     "related-party-note",
     "related-party-conclusion",
+    "comprehensive-note",
     "comprehensive-conclusion",
     "detail-prior-linkage",
     "detail-fluctuation",
@@ -106,7 +108,8 @@ _SECTION_PROMPTS: dict[str, str] = {
     "longterm-conclusion": "请生成F1-5审计结论（A未见异常 / B除重大调整外未见异常 / C存在重大未调整或范围受限），并简要陈述依据。",
     "related-party-note": "请生成F1-6关联方预付账款审计说明，评价交易真实性、商业实质、定价公允性、是否存在资金占用及披露充分性。",
     "related-party-conclusion": "请生成F1-6关联方及交易检查审计结论（A未见异常 / B除重大调整外未见异常 / C存在重大未调整或范围受限），并简要陈述依据。",
-    "comprehensive-conclusion": "请基于综合检查(F1-7)的抽凭结果和异常发现，生成综合检查审计结论。",
+    "comprehensive-note": "请生成F1-7预付账款检查表审计说明，结合抽样方法、借方（审批/回单/合同）、贷方与期后（入库/发票）核查结果及检查比例进行评价。",
+    "comprehensive-conclusion": "请生成F1-7预付账款检查审计结论（A未见异常 / B除重大调整外未见异常 / C存在重大未调整或范围受限），并简要陈述依据。",
     "detail-prior-linkage": "请生成F1-2明细表审计说明(1)：期初审定余额与上年审计报告/附注披露的勾稽核对说明，如有差异说明原因。",
     "detail-fluctuation": "请生成F1-2明细表审计说明(2)：预付账款本期重大增减变动原因分析（结合主要供应商、款项性质、项目进度）。",
     "detail-over1year": "请生成F1-2明细表审计说明(3)：账龄超过1年的预付款款项性质、未结转/未收回原因及后续处理计划。",

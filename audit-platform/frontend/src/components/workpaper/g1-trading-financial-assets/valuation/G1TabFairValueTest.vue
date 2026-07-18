@@ -3,6 +3,13 @@
     <div class="section-head">
       <h3 class="sheet-title">G1-6 公允价值测试表</h3>
       <div class="head-actions tab-toolbar">
+        <G1ImportExportDropdown
+          v-if="wpId"
+          :wp-id="wpId"
+          sheet="G1-6"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow()">新增证券</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-2" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 项</el-tag>
@@ -96,17 +103,18 @@
         @change="updateRow(row.id, { remark: row.remark })" />
     </div>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：（1）公允价值层级划分依据及估值方法/关键输入的核实情况；（2）与账面值差异的说明及处理。" />
-    </el-card>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计结论</template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="对公允价值计量层级划分与估值合理性的复核结论..." />
-    </el-card>
+    <G1AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="auditConclusion"
+      note-ai-section="fair-value-note"
+      conclusion-ai-section="fair-value-conclusion"
+      note-placeholder="填写审计说明：Level1-3划分、报价/估值来源及差异超阈值项。"
+      note-hint="覆盖公允层级划分与估值来源可靠性。"
+    />
+
 
     <details class="prep-hint">
       <summary>📋 编制提示</summary>
@@ -121,16 +129,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, inject, watch } from 'vue'
+import {ref, toRef, inject, watch , computed} from 'vue'
 import { useG1FairValueTest } from '../../composables/useG1FairValueTest'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G1AuditTextCards from '../G1AuditTextCards.vue'
+import G1ImportExportDropdown from '../G1ImportExportDropdown.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  wpId?: string
 }>()
+
+const wpId = computed(() => props.wpId ?? '')
+
+const emit = defineEmits<{ imported: [] }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -152,11 +167,12 @@ watch(auditNote, (v) => {
 
 <style scoped>
 .g1-fv-test { padding: 12px; font-size: var(--wp-font-size, 13px); }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
+.section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.sheet-title { margin: 0; font-size: 16px; font-weight: 600; color: #1f2a37; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 .objective-alert { margin-bottom: 12px; }
+.stats-bar { margin-bottom: 10px; padding: 8px 12px; background: #f8f9fb; border: 1px solid #ebeef5; border-radius: 6px; font-size: 12px; color: #606266; }
 .toolbar { display: flex; gap: 16px; align-items: center; margin-bottom: 12px; }
 .stats { color: #606266; font-size: 12px; }
 .fv-card { border: 1px solid #ebeef5; border-radius: 4px; padding: 12px; margin-bottom: 12px; }

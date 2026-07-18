@@ -1,31 +1,47 @@
 /**
- * useF1AiGenerate — F1 预付账款 AI 辅助生成（POST /f1/ai-generate）
+ * useG1AiGenerate — G1 交易性金融资产 AI 辅助生成
+ * POST /api/workpapers/{wpId}/g1/ai/{section}
  */
 import { onMounted, ref, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 
-export type F1AiSection =
-  | 'adj-change-analysis'
-  | 'adj-conclusion'
-  | 'analysis-note'
-  | 'analysis-balance-note'
-  | 'analysis-debit-note'
-  | 'analysis-credit-note'
-  | 'analysis-supplier-note'
-  | 'analysis-conclusion'
-  | 'longterm-reason'
-  | 'longterm-conclusion'
-  | 'related-party-note'
-  | 'related-party-conclusion'
-  | 'comprehensive-note'
-  | 'comprehensive-conclusion'
-  | 'detail-prior-linkage'
-  | 'detail-fluctuation'
-  | 'detail-over1year'
+export type G1AiSection =
+  | 'adjudication-note'
+  | 'adjudication-summary'
+  | 'adjudication-conclusion'
+  | 'detail-note'
   | 'detail-conclusion'
+  | 'adjustment-note'
+  | 'adjustment-conclusion'
+  | 'inventory-note'
+  | 'inventory-conclusion'
+  | 'income-note'
+  | 'income-conclusion'
+  | 'fair-value-note'
+  | 'fair-value-conclusion'
+  | 'level3-note'
+  | 'level3-conclusion'
+  | 'business-model-note'
+  | 'business-model-conclusion'
+  | 'classification-note'
+  | 'classification-conclusion'
+  | 'sppi-note'
+  | 'sppi-analysis'
+  | 'sppi-conclusion'
+  | 'counting-note'
+  | 'counting-conclusion'
+  | 'recon-note'
+  | 'recon-conclusion'
+  | 'voucher-note'
+  | 'voucher-check-conclusion'
+  | 'derivative-note'
+  | 'derivative-conclusion'
+  | 'disclosure-listed-note'
+  | 'disclosure-soe-note'
+  | 'overall-opinion'
 
-export function useF1AiGenerate(wpId: Ref<string>) {
+export function useG1AiGenerate(wpId: Ref<string>) {
   const aiAvailable = ref(false)
   const loading = ref(false)
 
@@ -40,11 +56,15 @@ export function useF1AiGenerate(wpId: Ref<string>) {
   }
 
   async function generateAndConfirm(
-    section: F1AiSection,
+    section: G1AiSection,
     existingContent: string,
     relatedContext: Record<string, unknown>,
     title: string,
   ): Promise<string | null> {
+    if (!wpId.value) {
+      ElMessage.warning('底稿未就绪')
+      return null
+    }
     if (!aiAvailable.value) {
       ElMessage.warning('AI 服务暂不可用')
       return null
@@ -52,8 +72,8 @@ export function useF1AiGenerate(wpId: Ref<string>) {
     loading.value = true
     try {
       const response = await http.post(
-        `/api/workpapers/${wpId.value}/f1/ai-generate`,
-        { section, existingContent, relatedContext },
+        `/api/workpapers/${wpId.value}/g1/ai/${section}`,
+        { existingContent, relatedContext },
         { _silent: true } as any,
       )
       const content = response.data?.data?.content ?? response.data?.content ?? ''
@@ -84,4 +104,4 @@ export function useF1AiGenerate(wpId: Ref<string>) {
   return { aiAvailable, loading, generateAndConfirm, checkAiHealth }
 }
 
-export default useF1AiGenerate
+export default useG1AiGenerate

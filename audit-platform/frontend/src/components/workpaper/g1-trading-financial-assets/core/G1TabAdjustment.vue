@@ -3,6 +3,13 @@
     <div class="section-head">
       <h3 class="sheet-title">G1-3 交易性金融资产调整分录</h3>
       <div class="head-actions">
+        <G1ImportExportDropdown
+          v-if="wpId"
+          :wp-id="wpId"
+          sheet="G1-3"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">新增分录</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-1" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
@@ -94,17 +101,18 @@
       <span v-else class="balance-flag">✗ 借贷不平衡，差额：{{ balanceDiff.toLocaleString() }}</span>
     </div>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：（1）调整分录的编制依据及事项说明；（2）AJE/RJE 对科目1501及相关损益的影响。" />
-    </el-card>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计结论</template>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
-        placeholder="对调整分录的复核结论..." />
-    </el-card>
+    <G1AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="conclusion"
+      note-ai-section="adjustment-note"
+      conclusion-ai-section="adjustment-conclusion"
+      note-placeholder="填写审计说明：（1）调整分录的编制依据及事项说明；（2）AJE/RJE 对科目1501及相关损益的影响。"
+      note-hint="覆盖调整依据、借贷平衡与回写影响。"
+    />
+
 
     <details class="prep-hint">
       <summary>📋 编制提示</summary>
@@ -122,12 +130,19 @@ import { ref, computed, inject, watch } from 'vue'
 import { isDebitCreditBalanced, parseNum } from '../../composables/useG1TraFinFormulaEngine'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G1AuditTextCards from '../G1AuditTextCards.vue'
+import G1ImportExportDropdown from '../G1ImportExportDropdown.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  wpId?: string
 }>()
+
+const wpId = computed(() => props.wpId ?? '')
+
+const emit = defineEmits<{ imported: [] }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -224,11 +239,12 @@ watch(conclusion, (v) => {
 .g1-adjustment { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .g1-adjustment :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
 .g1-adjustment :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px); }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
+.section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.sheet-title { margin: 0; font-size: 16px; font-weight: 600; color: #1f2a37; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 .objective-alert { margin-bottom: 12px; }
+.stats-bar { margin-bottom: 10px; padding: 8px 12px; background: #f8f9fb; border: 1px solid #ebeef5; border-radius: 6px; font-size: 12px; color: #606266; }
 .balance-bar { display: flex; gap: 24px; align-items: center; margin: 14px 0; padding: 8px 12px; border-radius: 4px; }
 .balance-ok { background: #f0f9eb; color: #67c23a; }
 .balance-bad { background: #fef0f0; color: #f56c6c; }

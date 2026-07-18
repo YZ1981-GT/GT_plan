@@ -7,7 +7,8 @@
       <p>1. 本表按债权人（对方单位）逐户列示预付账款（科目1123）明细，填列期初/发生额/期末及三期账龄。</p>
       <p>2. 灰色底纹列为自动计算列（期初审定H / 期末余额O / 期末未审Q / 期末审定X），不可手工编辑。</p>
       <p>3. 期末余额 O = 期初审定 H + 借方发生 M − 贷方发生 N（借方科目）；账龄各段之和须等于对应余额（见账龄逻辑校验行）。</p>
-      <p>4. 账龄超过1年的长期挂账应转入 F1-5 检查，关联方预付款需在 F1-6 单独列示并关注商业实质。</p>
+      <p>4. 账龄段支持「3年段 / 5年段」枚举切换（与 F1-1 审定表口径一致）；可用行内「账龄分配」按枚举档位将余额整笔填入。</p>
+      <p>5. 账龄超过1年的长期挂账应转入 F1-5 检查，关联方预付款需在 F1-6 单独列示并关注商业实质。</p>
     </div>
   </details>
 
@@ -25,6 +26,17 @@
       <el-input v-model="searchQuery" size="small" placeholder="搜索债权人名称..." clearable style="width: 220px" />
       <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加行</el-button>
       <el-button size="small" :disabled="isReadonly" @click="importFromAuxBalance">从余额表导入</el-button>
+      <span class="muted">账龄口径</span>
+      <el-select
+        :model-value="agingPreset"
+        size="small"
+        style="width: 110px"
+        :disabled="isReadonly"
+        @change="(v: string) => setAgingPreset(v as 'THREE_YEAR' | 'FIVE_YEAR')"
+      >
+        <el-option label="3年段" value="THREE_YEAR" />
+        <el-option label="5年段" value="FIVE_YEAR" />
+      </el-select>
     </div>
     <div class="toolbar-right">
       <el-dropdown size="small" trigger="click" :disabled="isReadonly">
@@ -280,11 +292,42 @@
       </template>
     </el-table-column>
     <!-- 操作列 -->
-    <el-table-column label="操作" width="60" fixed="right" v-if="!isReadonly">
+    <el-table-column label="操作" width="150" fixed="right" v-if="!isReadonly">
       <template #default="{ row }">
-        <el-popconfirm v-if="isDataRow(row)" title="确认删除此行？" @confirm="removeRow(row.rowId)">
-          <template #reference><el-button size="small" type="danger" link>删除</el-button></template>
-        </el-popconfirm>
+        <template v-if="isDataRow(row)">
+          <el-dropdown
+            size="small"
+            trigger="click"
+            @command="(cmd: string) => handleAgingCommand(row.rowId, cmd)"
+          >
+            <el-button link type="primary" size="small">账龄分配▾</el-button>
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item disabled>按期初审定分配</el-dropdown-item>
+                <el-dropdown-item
+                  v-for="band in bands"
+                  :key="`p-${band.key}`"
+                  :command="`prior:${band.key}`"
+                >{{ band.label }}</el-dropdown-item>
+                <el-dropdown-item divided disabled>按期末未审分配</el-dropdown-item>
+                <el-dropdown-item
+                  v-for="band in bands"
+                  :key="`c-${band.key}`"
+                  :command="`current:${band.key}`"
+                >{{ band.label }}</el-dropdown-item>
+                <el-dropdown-item divided disabled>按期末审定分配</el-dropdown-item>
+                <el-dropdown-item
+                  v-for="band in bands"
+                  :key="`a-${band.key}`"
+                  :command="`audited:${band.key}`"
+                >{{ band.label }}</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
+          <el-popconfirm title="确认删除此行？" @confirm="removeRow(row.rowId)">
+            <template #reference><el-button size="small" type="danger" link>删除</el-button></template>
+          </el-popconfirm>
+        </template>
       </template>
     </el-table-column>
   </el-table>
@@ -432,6 +475,9 @@ const {
   agingCheckRow,
   searchQuery,
   bands,
+  agingPreset,
+  setAgingPreset,
+  allocateAging,
   addRow,
   removeRow,
   updateCell,
@@ -445,6 +491,13 @@ const {
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
   relatedParties,
 })
+
+function handleAgingCommand(rowId: string, command: string): void {
+  const [stage, key] = command.split(':')
+  if ((stage === 'prior' || stage === 'current' || stage === 'audited') && key) {
+    allocateAging(rowId, stage, key)
+  }
+}
 
 const crossSheet = useF1CrossSheet({ allResponses: allResponsesRef })
 
@@ -583,6 +636,7 @@ async function handleImport(file: File, sheet: F1ImportSheet): Promise<boolean> 
 
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.muted { font-size: 12px; color: #909399; white-space: nowrap; }
 .toolbar-right { display: flex; gap: 6px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 

@@ -3,6 +3,13 @@
     <div class="section-head">
       <h3 class="sheet-title">G1-13 交易性金融资产检查表（凭证核对）</h3>
       <div class="head-actions tab-toolbar">
+        <G1ImportExportDropdown
+          v-if="wpId"
+          :wp-id="wpId"
+          sheet="G1-13"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="vc.addRow()">新增检查行</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-1" /></span>
         <el-tag size="small" type="info">共 {{ vc.rows.value.length }} 笔</el-tag>
@@ -94,17 +101,19 @@
       </el-table-column>
     </el-table>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：（1）抽凭范围、方法及逐笔核对结果；（2）合同/结算单/报价/授权/账务处理核对的异常事项。" />
-    </el-card>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计结论</template>
-      <el-input v-model="vc.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
-        :disabled="isReadonly" placeholder="对凭证核对检查的复核结论..." />
-    </el-card>
+    <G1AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      :conclusion="vc.auditConclusion.value"
+      @update:conclusion="(v: string) => { vc.auditConclusion.value = v }"
+      note-ai-section="voucher-note"
+      conclusion-ai-section="voucher-check-conclusion"
+      note-placeholder="填写审计说明：（1）抽凭范围、方法及逐笔核对结果；（2）合同/结算单/报价/授权/账务处理核对的异常事项。"
+      note-hint="覆盖抽凭范围、样本核对与异常事项处理。"
+    />
+
 
     <details class="prep-hint">
       <summary>📋 编制提示</summary>
@@ -124,6 +133,8 @@ import http from '@/utils/http'
 import { useG1VoucherCheck } from '../../composables/useG1VoucherCheck'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G1AuditTextCards from '../G1AuditTextCards.vue'
+import G1ImportExportDropdown from '../G1ImportExportDropdown.vue'
 import type { SampledVoucher, FillMode, Phase } from '../../composables/useSamplingAlgorithms'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
@@ -135,6 +146,10 @@ const props = defineProps<{
   projectId?: string
   bsDate?: string
 }>()
+
+const wpId = computed(() => props.wpId ?? '')
+
+const emit = defineEmits<{ imported: [] }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -217,11 +232,12 @@ async function handleRowOcr(rowId: string, file: File): Promise<boolean> {
 .g1-voucher-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .g1-voucher-check :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
 .g1-voucher-check :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px); }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
+.section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.sheet-title { margin: 0; font-size: 16px; font-weight: 600; color: #1f2a37; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 .objective-alert { margin-bottom: 12px; }
+.stats-bar { margin-bottom: 10px; padding: 8px 12px; background: #f8f9fb; border: 1px solid #ebeef5; border-radius: 6px; font-size: 12px; color: #606266; }
 .stats-bar { margin-bottom: 10px; font-size: 12px; color: #606266; }
 .stats-bar .warn { color: #f56c6c; }
 .sampling-collapse { margin-bottom: 12px; }

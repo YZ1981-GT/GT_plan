@@ -25,8 +25,9 @@ import {
 } from './useF1FormulaEngine'
 import { api } from '@/services/apiProxy'
 import type { ChecklistResponse } from './useF1FormData'
-import { useAgingConfig, type AgingSegment } from '@/composables/useAgingConfig'
+import { useAgingConfig, PRESET_SEGMENTS, type AgingSegment, type AgingPreset } from '@/composables/useAgingConfig'
 import { migrateD3F1Keys, remapRowAgingData, type AgingData } from '@/composables/useAgingMigration'
+import { ADJUDICATION_LABEL_BY_SEGMENT_KEY } from './agingPresets'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -70,6 +71,8 @@ export interface UseD3DetailOptions {
 
 const ITEM_ID_ROWS = 'F1-det-rows'
 const ITEM_ID_TB_AMOUNT = 'F1-adj-trial-balance-amount'
+/** 明细表账龄口径覆盖（THREE_YEAR / FIVE_YEAR）；空则跟随项目 aging 配置 */
+const ITEM_ID_AGING_PRESET = 'F1-det-aging-preset'
 const AGING_TOLERANCE = 0.01
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -246,7 +249,46 @@ export function useF1Detail(options: UseD3DetailOptions) {
 
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
 
-  const { segments, bands } = useAgingConfig(projectId, 'F1')
+  const { segments: projectSegments, preset: projectPreset } = useAgingConfig(projectId, 'F1')
+
+  /** 表级账龄枚举覆盖；空字符串表示跟随项目配置 */
+  const sheetAgingPreset = ref<'' | 'THREE_YEAR' | 'FIVE_YEAR'>('')
+
+  watch(
+    () => allResponses.value.get(ITEM_ID_AGING_PRESET)?.remark,
+    (v) => {
+      const raw = String(v || '').trim().toUpperCase()
+      sheetAgingPreset.value = raw === 'THREE_YEAR' || raw === 'FIVE_YEAR' ? raw : ''
+    },
+    { immediate: true },
+  )
+
+  const agingPreset: ComputedRef<AgingPreset> = computed(() => {
+    if (sheetAgingPreset.value) return sheetAgingPreset.value
+    const p = projectPreset.value
+    if (p === 'THREE_YEAR' || p === 'FIVE_YEAR') return p
+    return 'THREE_YEAR'
+  })
+
+  /** 有效账龄段：表级枚举优先，否则项目配置，兜底 3 年段 */
+  const segments: ComputedRef<AgingSegment[]> = computed(() => {
+    if (sheetAgingPreset.value) {
+      return PRESET_SEGMENTS[sheetAgingPreset.value] || PRESET_SEGMENTS.THREE_YEAR
+    }
+    if (projectSegments.value.length) return projectSegments.value
+    return PRESET_SEGMENTS[agingPreset.value] || PRESET_SEGMENTS.THREE_YEAR
+  })
+
+  /** 列定义：使用审定表同口径枚举标签（含N年） */
+  const bands = computed(() =>
+    segments.value.map((seg) => ({
+      key: seg.key,
+      label: ADJUDICATION_LABEL_BY_SEGMENT_KEY[seg.key] || seg.label,
+      priorField: `agingPrior.${seg.key}`,
+      currentField: `agingCurrent.${seg.key}`,
+      auditedField: `agingAudited.${seg.key}`,
+    })),
+  )
 
   const rows = ref<DetailRow[]>([])
   const searchQuery = ref<string>('')
@@ -254,8 +296,9 @@ export function useF1Detail(options: UseD3DetailOptions) {
   watch(
     [() => allResponses.value.get(ITEM_ID_ROWS)?.remark, segments],
     ([jsonStr]) => {
-      if (!segments.value.length) return
-      const parsed = safeParseRows(jsonStr as string | undefined, segments.value)
+      const segs = segments.value
+      if (!segs.length) return
+      const parsed = safeParseRows(jsonStr as string | undefined, segs)
       rows.value = parsed.map(recalcRowFormulas)
     },
     { immediate: true },
@@ -466,6 +509,52 @@ export function useF1Detail(options: UseD3DetailOptions) {
     persistRows()
   }
 
+  /**
+   * 切换账龄枚举口径（3年段 / 5年段）。
+   * 写入表级覆盖并 remap 已有行的账龄字段。
+   */
+  function setAgingPreset(preset: 'THREE_YEAR' | 'FIVE_YEAR'): void {
+    if (isReadonly.value) return
+    sheetAgingPreset.value = preset
+    debouncedSave(ITEM_ID_AGING_PRESET, { remark: preset })
+    const segs = PRESET_SEGMENTS[preset] || PRESET_SEGMENTS.THREE_YEAR
+    rows.value = rows.value.map(row =>
+      recalcRowFormulas(remapRowAgingData(row, segs, true) as DetailRow),
+    )
+    persistRows()
+  }
+
+  /**
+   * 按枚举档位快捷分配：将对应余额整笔填入指定账龄段，其余段清零。
+   * stage: prior=期初审定 / current=期末未审 / audited=期末审定
+   */
+  function allocateAging(
+    rowId: string,
+    stage: 'prior' | 'current' | 'audited',
+    segmentKey: string,
+  ): void {
+    if (isReadonly.value) return
+    const idx = rows.value.findIndex(r => r.rowId === rowId)
+    if (idx === -1) return
+    const row = recalcRowFormulas({ ...rows.value[idx] })
+    const segs = segments.value
+    const empty = emptyAging(segs)
+    if (stage === 'prior') {
+      empty[segmentKey] = row.priorAudited
+      row.agingPrior = empty
+    } else if (stage === 'current') {
+      empty[segmentKey] = row.endUnadjusted
+      row.agingCurrent = empty
+    } else {
+      empty[segmentKey] = row.endAudited
+      row.agingAudited = empty
+    }
+    const newRows = [...rows.value]
+    newRows[idx] = row
+    rows.value = newRows
+    persistRows()
+  }
+
   const confirmationHandler = (e: Event) => {
     const detail = (e as CustomEvent).detail
     if (detail?.customerName) onConfirmationCompleted(detail)
@@ -474,6 +563,8 @@ export function useF1Detail(options: UseD3DetailOptions) {
   eventListeners.push({ event: 'confirmation:completed', handler: confirmationHandler })
 
   const agingConfigHandler = () => {
+    // 表级覆盖存在时不跟随项目全局变更
+    if (sheetAgingPreset.value) return
     if (!segments.value.length) return
     rows.value = rows.value.map(row =>
       remapRowAgingData(row, segments.value, true) as DetailRow,
@@ -499,6 +590,9 @@ export function useF1Detail(options: UseD3DetailOptions) {
     searchQuery,
     segments,
     bands,
+    agingPreset,
+    setAgingPreset,
+    allocateAging,
     addRow,
     removeRow,
     updateCell,

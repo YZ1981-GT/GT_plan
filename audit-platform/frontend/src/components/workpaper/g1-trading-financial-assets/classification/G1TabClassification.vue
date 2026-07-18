@@ -100,17 +100,19 @@
       </el-table-column>
     </el-table>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：（1）执行的分类适当性程序及结果；（2）SPPI 测试与业务模式判定的关键判断、拟调整/未调整事项及其影响。" />
-    </el-card>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计结论</template>
-      <el-input v-model="cls.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
-        :disabled="isReadonly" placeholder="对金融工具分类适当性的复核结论..." />
-    </el-card>
+    <G1AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      :conclusion="cls.auditConclusion.value"
+      @update:conclusion="(v: string) => { cls.auditConclusion.value = v }"
+      note-ai-section="classification-note"
+      conclusion-ai-section="classification-conclusion"
+      note-placeholder="填写审计说明：分类适当性检查结果及不合规项应对。"
+      note-hint="覆盖 SPPI/业务模式检查与不合规应对。"
+    />
+
 
     <details class="prep-hint">
       <summary>📋 编制提示</summary>
@@ -124,16 +126,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, inject, watch } from 'vue'
+import {ref, toRef, inject, watch , computed} from 'vue'
 import { useG1Classification } from '../../composables/useG1Classification'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G1AuditTextCards from '../G1AuditTextCards.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  wpId?: string
 }>()
+
+const wpId = computed(() => props.wpId ?? '')
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -160,11 +166,12 @@ const segmentOptions = [
 .g1-classification { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .g1-classification :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
 .g1-classification :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px); }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
+.section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.sheet-title { margin: 0; font-size: 16px; font-weight: 600; color: #1f2a37; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 .objective-alert { margin-bottom: 12px; }
+.stats-bar { margin-bottom: 10px; padding: 8px 12px; background: #f8f9fb; border: 1px solid #ebeef5; border-radius: 6px; font-size: 12px; color: #606266; }
 .stats-bar { margin-bottom: 10px; font-size: 12px; color: #606266; }
 .stats-bar .warn { color: #f56c6c; }
 .segment-bar { margin-bottom: 12px; }

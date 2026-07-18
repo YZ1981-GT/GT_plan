@@ -8,11 +8,11 @@
       class="variant-bar"
     />
     <template v-if="expanded">
-      <el-button size="small" :disabled="disabled" @click="exportTemplate(activeSheet)">
-        下载模板
+        <el-button size="small" :disabled="disabled" @click="exportTemplate(activeSheet)">
+        导出模板
       </el-button>
       <el-button size="small" :disabled="disabled" @click="exportData(activeSheet)">
-        导出 Excel
+        导出数据
       </el-button>
       <el-upload
         :show-file-list="false"
@@ -22,7 +22,7 @@
         @change="onImportChange"
       >
         <el-button size="small" type="primary" plain :loading="importing" :disabled="disabled">
-          导入 Excel
+          导入
         </el-button>
       </el-upload>
     </template>

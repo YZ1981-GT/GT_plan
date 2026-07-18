@@ -3,8 +3,14 @@
     <div class="section-head">
       <h3 class="sheet-title">G1-5 投资收益测算表</h3>
       <div class="head-actions tab-toolbar">
+        <G1ImportExportDropdown
+          v-if="wpId"
+          :wp-id="wpId"
+          sheet="G1-5"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="calc.addRow()">新增测算行</el-button>
-        <el-button size="small" :disabled="isReadonly" @click="fillAiDraft">🤖AI辅助</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-2" /></span>
         <el-tag size="small" type="info">共 {{ calc.rows.value.length }} 行</el-tag>
         <el-button size="small" @click="openReviewDialog('G1-5-conclusion')">💬复核</el-button>
@@ -76,17 +82,19 @@
       </div>
     </div>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：（1）投资收益与处置损益的测算过程及与账面确认金额的核对结果；（2）应收实收差异及处置损益异常事项。" />
-    </el-card>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计结论</template>
-      <el-input v-model="calc.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
-        :disabled="isReadonly" placeholder="对投资收益/处置损益测算的复核结论..." />
-    </el-card>
+    <G1AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      :conclusion="calc.auditConclusion.value"
+      @update:conclusion="(v: string) => { calc.auditConclusion.value = v }"
+      note-ai-section="income-note"
+      conclusion-ai-section="income-conclusion"
+      note-placeholder="填写审计说明：股利/利息及处置损益测算过程与异常差异。"
+      note-hint="覆盖收益测算过程与异常差异。"
+    />
+
 
     <details class="prep-hint">
       <summary>📋 编制提示</summary>
@@ -104,12 +112,19 @@ import { ref, toRef, computed, inject, watch } from 'vue'
 import { useG1IncomeCalc, type G1IncomeCalcRow } from '../../composables/useG1IncomeCalc'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G1AuditTextCards from '../G1AuditTextCards.vue'
+import G1ImportExportDropdown from '../G1ImportExportDropdown.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  wpId?: string
 }>()
+
+const wpId = computed(() => props.wpId ?? '')
+
+const emit = defineEmits<{ imported: [] }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -149,28 +164,18 @@ function formulaHint(prop: keyof G1IncomeCalcRow): string {
 function fmtNum(v: unknown): string {
   return typeof v === 'number' ? v.toLocaleString() : String(v ?? '')
 }
-
-function fillAiDraft() {
-  if (props.isReadonly) return
-  const t = calc.grandTotal.value
-  const draft =
-    `经测算，本期投资收益应收金额合计 ${t.receivableAmount.toLocaleString()} 元，` +
-    `实收 ${t.receivedAmount.toLocaleString()} 元，差异 ${t.incomeDiff.toLocaleString()} 元；` +
-    `处置损益合计 ${t.realizedGain.toLocaleString()} 元，扣除手续费后净损益 ${t.netGain.toLocaleString()} 元。` +
-    `测算结果与企业账面确认金额核对一致，投资收益确认恰当。`
-  calc.auditConclusion.value = calc.auditConclusion.value ? `${calc.auditConclusion.value}\n${draft}` : draft
-}
 </script>
 
 <style scoped>
 .g1-income-calc { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .g1-income-calc :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
 .g1-income-calc :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px); }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
+.section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.sheet-title { margin: 0; font-size: 16px; font-weight: 600; color: #1f2a37; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 .objective-alert { margin-bottom: 12px; }
+.stats-bar { margin-bottom: 10px; padding: 8px 12px; background: #f8f9fb; border: 1px solid #ebeef5; border-radius: 6px; font-size: 12px; color: #606266; }
 .segment-bar { margin-bottom: 12px; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
 :deep(.auto-calc-col) { background-color: #f5f7fa; }

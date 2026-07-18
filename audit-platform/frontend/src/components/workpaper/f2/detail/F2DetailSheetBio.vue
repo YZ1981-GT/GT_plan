@@ -371,6 +371,17 @@
 
     <section class="notes-panel">
       <h4>审计说明</h4>
+      <div class="note-label">
+        <span>审计说明</span>
+        <el-button
+          size="small"
+          text
+          type="primary"
+          :disabled="isReadonly || !aiAvailable || aiBusyKey === 'note'"
+          :loading="aiBusyKey === 'note'"
+          @click="generateNote"
+        >AI</el-button>
+      </div>
       <el-input
         type="textarea"
         :rows="4"
@@ -382,7 +393,17 @@
     </section>
 
     <section class="notes-panel conclusion">
-      <div class="note-label">审计结论</div>
+      <div class="note-label">
+        <span>审计结论</span>
+        <el-button
+          size="small"
+          text
+          type="primary"
+          :disabled="isReadonly || !aiAvailable || aiBusyKey === 'conclusion'"
+          :loading="aiBusyKey === 'conclusion'"
+          @click="generateConclusion"
+        >AI</el-button>
+      </div>
       <el-input
         type="textarea"
         :rows="3"
@@ -396,8 +417,9 @@
 </template>
 
 <script setup lang="ts">
-import { inject, toRef } from 'vue'
+import { inject, ref, toRef, type Ref } from 'vue'
 import { useF2BioAssetSheet, BIO_ASSET_STATUS } from '../../composables/useF2BioAssetSheet'
+import { useF2AiGenerate } from '../../composables/useF2AiGenerate'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
@@ -415,6 +437,52 @@ const sheet = useF2BioAssetSheet({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
 })
+
+const { aiAvailable, generateAndConfirm } = useF2AiGenerate(toRef(props, 'wpId') as Ref<string>)
+const aiBusyKey = ref<string | null>(null)
+
+async function generateNote() {
+  aiBusyKey.value = 'note'
+  try {
+    const text = await generateAndConfirm(
+      'detail-change',
+      sheet.notePack.value.auditNote,
+      {
+        sheetCode: 'F2-13',
+        sheetName: '消耗性生物资产',
+        noteHint: '审计说明',
+        closeAmt: sheet.totals.value.closeAmt,
+        netCloseAmt: sheet.totals.value.netCloseAmt,
+        agingOk: sheet.totals.value.agingOk,
+      },
+      'AI 生成 · F2-13 审计说明',
+    )
+    if (text) sheet.persistNotePack({ auditNote: text })
+  } finally {
+    aiBusyKey.value = null
+  }
+}
+
+async function generateConclusion() {
+  aiBusyKey.value = 'conclusion'
+  try {
+    const text = await generateAndConfirm(
+      'detail-conclusion',
+      sheet.auditConclusion.value,
+      {
+        sheetCode: 'F2-13',
+        sheetName: '消耗性生物资产',
+        closeAmt: sheet.totals.value.closeAmt,
+        netCloseAmt: sheet.totals.value.netCloseAmt,
+        agingOk: sheet.totals.value.agingOk,
+      },
+      'AI · F2-13 审计结论',
+    )
+    if (text) sheet.persistConclusion(text)
+  } finally {
+    aiBusyKey.value = null
+  }
+}
 
 function fmtAmt(v: number): string {
   if (!v) return '-'
@@ -444,7 +512,7 @@ async function onImported() { await reloadWorkpaperData?.() }
 .aging-sel { width: 100px; }
 .chip { display: inline-flex; }
 .muted { color: #909399; font-size: 12px; }
-.main-table :deep(.auto-calc-col) { background: #f5f7fa; }
+.main-table :deep(.auto-calc-col) { background: #faf8fc; }
 .formula { color: #606266; font-variant-numeric: tabular-nums; }
 .bad { color: #e6a23c; font-weight: 600; }
 .summary-panel { margin-top: 12px; border: 1px solid #ebeef5; border-radius: 6px; padding: 8px 12px; }
@@ -455,6 +523,14 @@ async function onImported() { await reloadWorkpaperData?.() }
 .muted.tiny { color: #909399; font-size: 12px; }
 .notes-panel { margin-top: 14px; }
 .notes-panel h4 { margin: 0 0 8px; font-size: 14px; }
-.note-label { margin-bottom: 4px; font-size: 13px; color: #606266; }
+.note-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: #606266;
+  font-weight: 500;
+}
 .conclusion { border-top: 1px dashed #e4e7ed; padding-top: 10px; margin-top: 10px; }
 </style>

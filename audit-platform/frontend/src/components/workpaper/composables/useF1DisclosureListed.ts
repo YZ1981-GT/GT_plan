@@ -89,12 +89,13 @@ function fmtPctPlain(v: number): string {
  * 将任意账龄聚合折叠为披露四档（1年以内 / 1至2 / 2至3 / 3年以上）
  */
 export function collapseAgingForListedDisclosure(
-  agingAgg: Record<string, number>,
+  agingAgg: Record<string, number> | null | undefined,
   segments: AgingSegment[] = PRESET_SEGMENTS.THREE_YEAR,
 ): Array<{ key: string; label: string; endAmount: number; priorAmount: number }> {
+  const src = agingAgg ?? {}
   const keys = segments.map((s) => s.key)
-  const get = (k: string) => parseNum(agingAgg[k])
-  const getPrior = (k: string) => parseNum(agingAgg[`prior_${k}`])
+  const get = (k: string) => parseNum(src[k])
+  const getPrior = (k: string) => parseNum(src[`prior_${k}`])
 
   const within1 = keys.includes('within1') ? 'within1' : keys[0]
   const y1to2 = keys.find((k) => k === 'y1to2') || keys[1]
@@ -133,7 +134,8 @@ export function useF1DisclosureListed(options: UseF1DisclosureListedOptions) {
   )
 
   const agingRows: ComputedRef<F1AgingDisclosureRow[]> = computed(() => {
-    const buckets = collapseAgingForListedDisclosure(crossSheet.agingAggregation.value)
+    const agg = crossSheet.agingAggregation?.value ?? {}
+    const buckets = collapseAgingForListedDisclosure(agg)
     const endTotal = calcSubtotal(buckets.map((b) => b.endAmount))
     const priorTotal = calcSubtotal(buckets.map((b) => b.priorAmount))
     return buckets.map((b) => ({
@@ -198,7 +200,8 @@ export function useF1DisclosureListed(options: UseF1DisclosureListedOptions) {
 
   const over1YearRows: ComputedRef<F1Over1YearRow[]> = computed(() => {
     const total = agingTotal.value.endAmount
-    const cs = crossSheet.longTermRows.value.map((r) => {
+    const ltRows = crossSheet.longTermRows?.value ?? []
+    const cs = ltRows.map((r) => {
       const name = r.customerName || ''
       return {
         rowId: `cs-lt-${name}`,
@@ -425,6 +428,9 @@ export function useF1DisclosureListed(options: UseF1DisclosureListedOptions) {
     agingRows,
     agingTotal,
     agingNet,
+    /** 兼容旧模板解构名（重构前 D3 风格 section1Rows） */
+    section1Rows: agingRows,
+    section1Subtotal: agingTotal,
     impairmentProvision,
     persistImpairment,
     over1YearRows,

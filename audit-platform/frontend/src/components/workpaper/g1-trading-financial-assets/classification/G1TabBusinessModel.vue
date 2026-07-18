@@ -65,17 +65,18 @@
       </el-table-column>
     </el-table>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：（1）执行的业务模式判定程序及结果；（2）持有目的、交易频率、管理层意图的核实情况及关键判断。" />
-    </el-card>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计结论</template>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
-        :disabled="isReadonly" placeholder="对业务模式分析的整体复核结论..." />
-    </el-card>
+    <G1AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="conclusion"
+      note-ai-section="business-model-note"
+      conclusion-ai-section="business-model-conclusion"
+      note-placeholder="填写审计说明：持有目的、交易频率、KPI与CAS22分类判定依据。"
+      note-hint="覆盖业务模式判定依据。"
+    />
+
 
     <details class="prep-hint">
       <summary>📋 编制提示</summary>
@@ -88,16 +89,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, inject } from 'vue'
+import { computed, ref, watch, inject } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G1AuditTextCards from '../G1AuditTextCards.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  wpId?: string
 }>()
+
+const wpId = computed(() => props.wpId ?? '')
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -206,11 +211,12 @@ watch(conclusion, (v) => {
 .g1-biz-model { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .g1-biz-model :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
 .g1-biz-model :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px); }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
+.section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.sheet-title { margin: 0; font-size: 16px; font-weight: 600; color: #1f2a37; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 .objective-alert { margin-bottom: 12px; }
+.stats-bar { margin-bottom: 10px; padding: 8px 12px; background: #f8f9fb; border: 1px solid #ebeef5; border-radius: 6px; font-size: 12px; color: #606266; }
 .methodology { margin-bottom: 12px; padding: 8px 12px; background: #fdf6ec; border-left: 3px solid #e6a23c; font-size: 12px; color: #8a6d3b; border-radius: 2px; }
 .conclusion-card { margin-top: 12px; }
 .prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }

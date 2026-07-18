@@ -3,6 +3,13 @@
     <div class="section-head">
       <h3 class="sheet-title">G1-12 证券盘点倒轧表</h3>
       <div class="head-actions tab-toolbar">
+        <G1ImportExportDropdown
+          v-if="wpId"
+          :wp-id="wpId"
+          sheet="G1-12"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="recon.addRow()">新增倒轧行</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-11" /></span>
         <el-tag size="small" type="info">共 {{ recon.rows.value.length }} 行</el-tag>
@@ -77,17 +84,19 @@
       </div>
     </div>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：（1）监盘日至报表日倒轧计算过程及依据；（2）倒轧差异的查明与处理情况。" />
-    </el-card>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计结论</template>
-      <el-input v-model="recon.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
-        :disabled="isReadonly" placeholder="对证券盘点倒轧的复核结论..." />
-    </el-card>
+    <G1AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      :conclusion="recon.auditConclusion.value"
+      @update:conclusion="(v: string) => { recon.auditConclusion.value = v }"
+      note-ai-section="recon-note"
+      conclusion-ai-section="recon-conclusion"
+      note-placeholder="填写审计说明：（1）盘点日至报表日增减变动核对；（2）倒轧推算与账面勾稽结果。"
+      note-hint="覆盖倒轧推算、增减变动与账面勾稽。"
+    />
+
 
     <details class="prep-hint">
       <summary>📋 编制提示</summary>
@@ -108,12 +117,19 @@ import {
 } from '../../composables/useG1CountReconciliation'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G1AuditTextCards from '../G1AuditTextCards.vue'
+import G1ImportExportDropdown from '../G1ImportExportDropdown.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  wpId?: string
 }>()
+
+const wpId = computed(() => props.wpId ?? '')
+
+const emit = defineEmits<{ imported: [] }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -167,11 +183,12 @@ function fmtNum(v: unknown): string {
 .g1-count-recon { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .g1-count-recon :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
 .g1-count-recon :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px); }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
+.section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.sheet-title { margin: 0; font-size: 16px; font-weight: 600; color: #1f2a37; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 .objective-alert { margin-bottom: 12px; }
+.stats-bar { margin-bottom: 10px; padding: 8px 12px; background: #f8f9fb; border: 1px solid #ebeef5; border-radius: 6px; font-size: 12px; color: #606266; }
 .stats-bar { margin-bottom: 10px; font-size: 12px; color: #606266; }
 .stats-bar .warn { color: #e6a23c; }
 .segment-bar { margin-bottom: 12px; }

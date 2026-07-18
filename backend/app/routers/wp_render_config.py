@@ -701,6 +701,10 @@ async def _get_render_config_impl(
             # fallback: 按完整 sheet_name 查找（如「函证差异检查表（示例）」无尾部编码）
             if not _sheet_ovr:
                 _sheet_ovr = _WP_CODE_OVERRIDE.get(cls.sheet_name)
+            # G/F 等循环附注页无尾部编码：用「{wp_code}-{sheet_name}」命中
+            # （如 G1-附注披露信息（上市公司）），避免被下方 G- class_code 强制改写为 OnlyOffice
+            if not _sheet_ovr and wp_code:
+                _sheet_ovr = _WP_CODE_OVERRIDE.get(f"{wp_code}-{cls.sheet_name}")
         try:
             if _is_multi_sheet:
                 if _sheet_ovr:
@@ -743,9 +747,15 @@ async def _get_render_config_impl(
 
         # 聚合工作包或独立底稿中 G- 前缀 class_code 强制走 OnlyOffice 编辑（不走 univer grid）
         # G-OnlyOffice = 聚合 grid_table；G-替代程序 = 独立底稿替代程序检查表等
-        # 但如果 sheet 已有 _sheet_ovr（专属组件 override），不强制走 OO
+        # 例外：sheet 级 override 已命中，或整册 wp_code override 已路由到专属 HTML 组件
+        # （如 G1 附注披露 → g1-trading-financial-assets，由前端双模式切换 OO）
         _cls_code = getattr(cls, "class_code", "") or ""
-        if _is_multi_sheet and _cls_code.startswith("G-") and not _sheet_ovr:
+        if (
+            _is_multi_sheet
+            and _cls_code.startswith("G-")
+            and not _sheet_ovr
+            and not (ovr and component_type == ovr)
+        ):
             component_type = "onlyoffice-sheet"
             sheet_html_data = {"onlyoffice": True, "sheet_name": cls.sheet_name}
             sheets.append({"sheet_name": cls.sheet_name, "componentType": component_type,

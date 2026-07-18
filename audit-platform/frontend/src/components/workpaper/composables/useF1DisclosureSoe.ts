@@ -100,7 +100,8 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
   )
 
   const agingRows: ComputedRef<F1SoeAgingRow[]> = computed(() => {
-    const buckets = collapseAgingForListedDisclosure(crossSheet.agingAggregation.value)
+    const agg = crossSheet.agingAggregation?.value ?? {}
+    const buckets = collapseAgingForListedDisclosure(agg)
     const endTotal = calcSubtotal(buckets.map((b) => b.endAmount))
     const priorTotal = calcSubtotal(buckets.map((b) => b.priorAmount))
     return buckets.map((b) => {
@@ -174,7 +175,8 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
   )
 
   const over1YearRows: ComputedRef<F1SoeOver1Row[]> = computed(() => {
-    const cs = crossSheet.longTermRows.value.map((r) => {
+    const ltRows = crossSheet.longTermRows?.value ?? []
+    const cs = ltRows.map((r) => {
       const name = r.customerName || ''
       const meta = over1MetaMap.value[name] || {}
       return {
@@ -378,6 +380,9 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
     isApplicable,
     agingRows,
     agingTotal,
+    /** 兼容旧模板解构名（重构前 D3 风格 section1Rows） */
+    section1Rows: agingRows,
+    section1Subtotal: agingTotal,
     updateAgingBadDebt,
     over1YearRows,
     over1YearTotal,

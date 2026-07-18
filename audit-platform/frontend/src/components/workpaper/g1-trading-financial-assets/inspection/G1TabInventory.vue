@@ -3,6 +3,13 @@
     <div class="section-head">
       <h3 class="sheet-title">G1-4 证券结存表</h3>
       <div class="head-actions tab-toolbar">
+        <G1ImportExportDropdown
+          v-if="wpId"
+          :wp-id="wpId"
+          sheet="G1-4"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="inv.addRow()">新增证券</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-2" /></span>
         <el-tag size="small" type="info">共 {{ inv.rows.value.length }} 行</el-tag>
@@ -74,17 +81,19 @@
       </div>
     </div>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：（1）各证券期末数量、成本、公允价值结存的核实情况；（2）未实现损益计算及品种分组小计的核对结果。" />
-    </el-card>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计结论</template>
-      <el-input v-model="inv.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
-        :disabled="isReadonly" placeholder="对证券结存的复核结论..." />
-    </el-card>
+    <G1AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      :conclusion="inv.auditConclusion.value"
+      @update:conclusion="(v: string) => { inv.auditConclusion.value = v }"
+      note-ai-section="inventory-note"
+      conclusion-ai-section="inventory-conclusion"
+      note-placeholder="填写审计说明：结存数量/成本/公允价值勾稽及异常结存项目。"
+      note-hint="覆盖结存勾稽与异常项目。"
+    />
+
 
     <details class="prep-hint">
       <summary>📋 编制提示</summary>
@@ -102,12 +111,19 @@ import { ref, toRef, computed, inject, watch } from 'vue'
 import { useG1Inventory, type G1InventoryRow } from '../../composables/useG1Inventory'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G1AuditTextCards from '../G1AuditTextCards.vue'
+import G1ImportExportDropdown from '../G1ImportExportDropdown.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  wpId?: string
 }>()
+
+const wpId = computed(() => props.wpId ?? '')
+
+const emit = defineEmits<{ imported: [] }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -152,11 +168,12 @@ function fmtNum(v: unknown): string {
 .g1-inventory { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .g1-inventory :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
 .g1-inventory :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px); }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
+.section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.sheet-title { margin: 0; font-size: 16px; font-weight: 600; color: #1f2a37; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 .objective-alert { margin-bottom: 12px; }
+.stats-bar { margin-bottom: 10px; padding: 8px 12px; background: #f8f9fb; border: 1px solid #ebeef5; border-radius: 6px; font-size: 12px; color: #606266; }
 .segment-bar { margin-bottom: 12px; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
 :deep(.auto-calc-col) { background-color: #f5f7fa; }

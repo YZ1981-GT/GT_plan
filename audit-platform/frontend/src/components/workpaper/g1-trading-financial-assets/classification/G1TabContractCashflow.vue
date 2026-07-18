@@ -88,17 +88,18 @@
       </el-table-column>
     </el-table>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：（1）执行的合同现金流量特征（SPPI）测试程序及结果；（2）逐项条款分析的关键判断及例外情形。" />
-    </el-card>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计结论</template>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
-        :disabled="isReadonly" placeholder="对合同现金流量特征分析的整体复核结论..." />
-    </el-card>
+    <G1AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="conclusion"
+      note-ai-section="sppi-note"
+      conclusion-ai-section="sppi-conclusion"
+      note-placeholder="填写审计说明：合同现金流量特征（SPPI）测试过程与非标准条款影响。"
+      note-hint="覆盖 SPPI 测试过程与分类影响。"
+    />
+
 
     <details class="prep-hint">
       <summary>📋 编制提示</summary>
@@ -115,6 +116,7 @@
 import { ref, computed, watch, inject, h } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G1AuditTextCards from '../G1AuditTextCards.vue'
 import { useWorkpaperBrowseMode } from '../../composables/useWorkpaperBrowseMode'
 import { virtualTextCol } from '../../composables/virtualColumnHelpers'
 import type { VirtualColumn } from '@/composables/useVirtualTable'
@@ -124,7 +126,10 @@ const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  wpId?: string
 }>()
+
+const wpId = computed(() => props.wpId ?? '')
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -253,11 +258,12 @@ watch(conclusion, (v) => {
 .g1-contract-cf { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .g1-contract-cf :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
 .g1-contract-cf :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px); }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
+.section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.sheet-title { margin: 0; font-size: 16px; font-weight: 600; color: #1f2a37; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 .objective-alert { margin-bottom: 12px; }
+.stats-bar { margin-bottom: 10px; padding: 8px 12px; background: #f8f9fb; border: 1px solid #ebeef5; border-radius: 6px; font-size: 12px; color: #606266; }
 .methodology { margin-bottom: 12px; padding: 8px 12px; background: #fdf6ec; border-left: 3px solid #e6a23c; font-size: 12px; color: #8a6d3b; border-radius: 2px; }
 .virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .virtual-hint { flex: 1; min-width: 200px; margin: 0; }

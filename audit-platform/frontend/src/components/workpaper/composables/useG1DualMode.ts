@@ -88,7 +88,13 @@ export function useG1DualMode(options: UseG1DualModeOptions) {
 
   onMounted(() => {
     loadPersistedMode()
-    void checkOOHealth()
+    void checkOOHealth().then((healthy) => {
+      // OO 不可用时强制回结构化视图，避免「下载失败」死页
+      if (!healthy && currentMode.value === 'onlyoffice') {
+        currentMode.value = 'html'
+        persistMode('html')
+      }
+    })
   })
 
   return {

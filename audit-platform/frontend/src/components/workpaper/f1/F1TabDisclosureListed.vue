@@ -41,13 +41,6 @@
       </div>
     </div>
 
-    <F1SheetAttachments
-      :project-id="projectId"
-      :wp-id="wpId"
-      sheet-code="F1-listed"
-      label="上市附注附件"
-    />
-
     <!-- (1) 账龄分析 -->
     <div class="disclosure-card">
       <h4 class="card-title">
@@ -57,31 +50,31 @@
         </el-tooltip>
         <GtIndexChip value="wp:F1-1" :context-project-id="projectId" />
       </h4>
-      <el-table :data="[...agingRows, agingTotal]" size="small" border stripe>
-        <el-table-column prop="label" label="账龄" width="120">
+      <el-table :data="agingTableData" size="small" border stripe class="disclosure-table" style="width:100%">
+        <el-table-column prop="label" label="账龄" min-width="120">
           <template #default="{ row }">
             <span :class="{ 'subtotal-label': row.rowId === '__subtotal__' }">{{ row.label }}</span>
           </template>
         </el-table-column>
         <el-table-column label="期末数" align="center">
-          <el-table-column label="金额" width="130" align="right">
+          <el-table-column label="金额" min-width="130" align="right">
             <template #default="{ row }">
               <span class="cross-sheet-cell">{{ fmtAmount(row.endAmount) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="比例%" width="100" align="right">
+          <el-table-column label="比例%" min-width="100" align="right">
             <template #default="{ row }">
               <span class="cross-sheet-cell">{{ fmtPct(row.endPct) }}</span>
             </template>
           </el-table-column>
         </el-table-column>
         <el-table-column label="上年年末数" align="center">
-          <el-table-column label="金额" width="130" align="right">
+          <el-table-column label="金额" min-width="130" align="right">
             <template #default="{ row }">
               <span class="cross-sheet-cell">{{ fmtAmount(row.priorAmount) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="比例%" width="100" align="right">
+          <el-table-column label="比例%" min-width="100" align="right">
             <template #default="{ row }">
               <span class="cross-sheet-cell">{{ fmtPct(row.priorPct) }}</span>
             </template>
@@ -118,7 +111,7 @@
         <el-button size="small" :disabled="isReadonly" @click="addOver1Row()">+ 添加</el-button>
         <GtIndexChip value="wp:F1-2" :context-project-id="projectId" />
       </h4>
-      <el-table :data="[...over1YearRows, over1TotalRow]" size="small" border stripe>
+      <el-table :data="over1TableData" size="small" border stripe class="disclosure-table" style="width:100%">
         <el-table-column label="债务人名称" min-width="160">
           <template #default="{ row }">
             <template v-if="row.rowId === '__total__'">
@@ -137,7 +130,7 @@
             </template>
           </template>
         </el-table-column>
-        <el-table-column label="期末余额" width="130" align="right">
+        <el-table-column label="期末余额" min-width="130" align="right">
           <template #default="{ row }">
             <template v-if="row.rowId === '__total__' || row.fromCrossSheet">
               <span :class="{ 'cross-sheet-cell': row.fromCrossSheet, 'subtotal-val': row.rowId === '__total__' }">
@@ -150,12 +143,13 @@
                 size="small"
                 :controls="false"
                 :disabled="isReadonly"
+                style="width:100%"
                 @change="(v: number | undefined) => updateOver1Field(row.rowId, 'endBalance', v ?? 0)"
               />
             </template>
           </template>
         </el-table-column>
-        <el-table-column label="占预付款项合计的比例(%)" width="160" align="right">
+        <el-table-column label="占预付款项合计的比例(%)" min-width="160" align="right">
           <template #default="{ row }">
             <span>{{ fmtPct(row.proportionPct) }}</span>
           </template>
@@ -171,7 +165,7 @@
             />
           </template>
         </el-table-column>
-        <el-table-column v-if="!isReadonly" label="操作" width="56">
+        <el-table-column v-if="!isReadonly" label="操作" min-width="64" width="64">
           <template #default="{ row }">
             <el-popconfirm
               v-if="!row.fromCrossSheet && row.rowId !== '__total__'"
@@ -215,7 +209,7 @@
       <p class="hint">留空则使用自动汇总：{{ top5SummaryAuto }}</p>
 
       <p class="sub-label">分别披露格式</p>
-      <el-table :data="[...top5Rows, top5TotalRow]" size="small" border stripe>
+      <el-table :data="top5TableData" size="small" border stripe class="disclosure-table" style="width:100%">
         <el-table-column label="单位名称" min-width="180">
           <template #default="{ row }">
             <span :class="{ 'subtotal-label': row.rowId === '__total__' }">
@@ -223,14 +217,14 @@
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="预付款项期末余额" width="150" align="right">
+        <el-table-column label="预付款项期末余额" min-width="150" align="right">
           <template #default="{ row }">
             <span class="cross-sheet-cell" :class="{ 'subtotal-val': row.rowId === '__total__' }">
               {{ fmtAmount(row.endBalance) }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="占预付款项期末余额合计数的比例%" width="200" align="right">
+        <el-table-column label="占预付款项期末余额合计数的比例%" min-width="200" align="right">
           <template #default="{ row }">
             <span class="cross-sheet-cell">{{ fmtPct(row.proportionPct) }}</span>
           </template>
@@ -266,7 +260,6 @@ import { F1_NOTE_SECTION } from '../composables/f1NoteSectionMap'
 import type { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 import GtIndexChip from '../GtIndexChip.vue'
-import F1SheetAttachments from './F1SheetAttachments.vue'
 import F1DisclosureUsageGuide from './F1DisclosureUsageGuide.vue'
 
 const props = withDefaults(defineProps<{
@@ -337,6 +330,11 @@ const top5TotalRow = computed(() => ({
   proportionPct: top5Total.value.proportionPct,
 }))
 
+/** 避免模板 spread 在 Ref 未就绪时抛出 “X is not iterable” */
+const agingTableData = computed(() => [...(agingRows.value ?? []), agingTotal.value])
+const over1TableData = computed(() => [...(over1YearRows.value ?? []), over1TotalRow.value])
+const top5TableData = computed(() => [...(top5Rows.value ?? []), top5TotalRow.value])
+
 async function syncToDisclosureNotes() {
   const payload = buildF1SyncPayload(
     'listed',
@@ -376,10 +374,22 @@ function fmtPct(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.f1-disclosure-listed { padding: 16px; }
+.f1-disclosure-listed {
+  padding: 16px;
+  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
+}
 .f1-disclosure-listed :deep(.el-table) {
-  --el-table-font-size: var(--wp-font-size, 13px);
-  font-size: var(--wp-font-size, 13px);
+  --el-table-font-size: 13px;
+  font-size: 13px;
+  width: 100% !important;
+}
+.f1-disclosure-listed :deep(.el-table .cell) {
+  font-size: 13px !important;
+}
+.f1-disclosure-listed :deep(.disclosure-table) {
+  width: 100%;
 }
 .guidance-details {
   margin-bottom: 12px;
@@ -408,6 +418,8 @@ function fmtPct(val: number | null | undefined): string {
   background: #fff;
   border: 1px solid #ebeef5;
   border-radius: 6px;
+  width: 100%;
+  box-sizing: border-box;
 }
 .card-title {
   font-size: 14px;

@@ -409,7 +409,17 @@
     <section class="notes-panel">
       <h4>审计说明</h4>
       <div v-for="f in noteFields" :key="f.key" class="note-block">
-        <div class="note-label">{{ f.label }}</div>
+        <div class="note-label">
+          <span>{{ f.label }}</span>
+          <el-button
+            size="small"
+            text
+            type="primary"
+            :disabled="isReadonly || !aiAvailable || aiBusyKey === f.key"
+            :loading="aiBusyKey === f.key"
+            @click="generateNote(f)"
+          >AI</el-button>
+        </div>
         <el-input
           type="textarea"
           :rows="2"
@@ -422,7 +432,17 @@
     </section>
 
     <section class="notes-panel conclusion">
-      <div class="note-label">审计结论</div>
+      <div class="note-label">
+        <span>审计结论</span>
+        <el-button
+          size="small"
+          text
+          type="primary"
+          :disabled="isReadonly || !aiAvailable || aiBusyKey === 'conclusion'"
+          :loading="aiBusyKey === 'conclusion'"
+          @click="generateConclusion"
+        >AI</el-button>
+      </div>
       <el-input
         type="textarea"
         :rows="3"
@@ -436,8 +456,9 @@
 </template>
 
 <script setup lang="ts">
-import { inject, toRef } from 'vue'
+import { inject, ref, toRef, type Ref } from 'vue'
 import { useF2DevCostSheet, DEV_COST_QUALITY } from '../../composables/useF2DevCostSheet'
+import { useF2AiGenerate, type F2AiSection } from '../../composables/useF2AiGenerate'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
@@ -456,12 +477,90 @@ const sheet = useF2DevCostSheet({
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-const noteFields = [
-  { key: 'method', packKey: 'costMethod' as const, label: '1. 成本计算方法说明：', placeholder: '成本计算方法说明：' },
-  { key: 'change', packKey: 'significantChange' as const, label: '2. 本期重大变动原因：', placeholder: '开发成本本期发生重大变动的原因：' },
-  { key: 'long', packKey: 'longTermReason' as const, label: '3. 长期开发成本（一年以上）说明：', placeholder: '长期开发成本（一年以上）说明：' },
-  { key: 'int', packKey: 'capitalizedInterest' as const, label: '4. 资本化利息来源及真实性：', placeholder: '资本化利息的主要来源及真实性：' },
+const { aiAvailable, generateAndConfirm } = useF2AiGenerate(toRef(props, 'wpId') as Ref<string>)
+const aiBusyKey = ref<string | null>(null)
+
+type NotePackKey = 'costMethod' | 'significantChange' | 'longTermReason' | 'capitalizedInterest'
+
+const noteFields: Array<{
+  key: string
+  packKey: NotePackKey
+  section: F2AiSection
+  label: string
+  placeholder: string
+  noteHint?: string
+}> = [
+  {
+    key: 'method',
+    packKey: 'costMethod',
+    section: 'detail-valuation',
+    label: '1. 成本计算方法说明：',
+    placeholder: '成本计算方法说明：',
+  },
+  {
+    key: 'change',
+    packKey: 'significantChange',
+    section: 'detail-change',
+    label: '2. 本期重大变动原因：',
+    placeholder: '开发成本本期发生重大变动的原因：',
+  },
+  {
+    key: 'long',
+    packKey: 'longTermReason',
+    section: 'detail-long-aging',
+    label: '3. 长期开发成本（一年以上）说明：',
+    placeholder: '长期开发成本（一年以上）说明：',
+  },
+  {
+    key: 'int',
+    packKey: 'capitalizedInterest',
+    section: 'detail-change',
+    label: '4. 资本化利息来源及真实性：',
+    placeholder: '资本化利息的主要来源及真实性：',
+    noteHint: '资本化利息来源及真实性',
+  },
 ]
+
+async function generateNote(f: (typeof noteFields)[number]) {
+  aiBusyKey.value = f.key
+  try {
+    const text = await generateAndConfirm(
+      f.section,
+      sheet.notePack.value[f.packKey],
+      {
+        sheetCode: 'F2-11',
+        sheetName: '开发成本',
+        noteHint: f.noteHint ?? f.label,
+        unaudClose: sheet.totals.value.unaudClose,
+        netUnaudClose: sheet.totals.value.netUnaudClose,
+      },
+      `AI 生成 · F2-11 ${f.label}`,
+    )
+    if (text) sheet.persistNotePack({ [f.packKey]: text })
+  } finally {
+    aiBusyKey.value = null
+  }
+}
+
+async function generateConclusion() {
+  aiBusyKey.value = 'conclusion'
+  try {
+    const text = await generateAndConfirm(
+      'detail-conclusion',
+      sheet.auditConclusion.value,
+      {
+        sheetCode: 'F2-11',
+        sheetName: '开发成本',
+        unaudClose: sheet.totals.value.unaudClose,
+        netUnaudClose: sheet.totals.value.netUnaudClose,
+      },
+      'AI · F2-11 审计结论',
+    )
+    if (text) sheet.persistConclusion(text)
+  } finally {
+    aiBusyKey.value = null
+  }
+}
 
 function fmtAmt(v: number): string {
   if (!v) return '-'
@@ -485,7 +584,7 @@ async function onImported() { await reloadWorkpaperData?.() }
 .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .search { width: 180px; }
 .chip { display: inline-flex; }
-.main-table :deep(.auto-calc-col) { background: #f5f7fa; }
+.main-table :deep(.auto-calc-col) { background: #faf8fc; }
 .formula { color: #606266; font-variant-numeric: tabular-nums; }
 .summary-panel { margin-top: 12px; border: 1px solid #ebeef5; border-radius: 6px; padding: 8px 12px; }
 .summary-row { display: flex; align-items: center; gap: 12px; padding: 4px 0; }
@@ -496,6 +595,14 @@ async function onImported() { await reloadWorkpaperData?.() }
 .notes-panel { margin-top: 14px; }
 .notes-panel h4 { margin: 0 0 8px; font-size: 14px; }
 .note-block { margin-bottom: 8px; }
-.note-label { margin-bottom: 4px; font-size: 13px; color: #606266; }
+.note-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: #606266;
+  font-weight: 500;
+}
 .conclusion { border-top: 1px dashed #e4e7ed; padding-top: 10px; }
 </style>

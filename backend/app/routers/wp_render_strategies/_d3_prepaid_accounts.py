@@ -90,7 +90,8 @@ async def render(ctx: RenderContext) -> dict | None:
     try:
         proj_result = await db.execute(
             sa.text(
-                "SELECT client_name, audit_year, business_category, applicable_standards "
+                "SELECT client_name, audit_year, business_category, "
+                "applicable_standard_v2 AS applicable_standards "
                 "FROM projects WHERE id = :pid"
             ),
             {"pid": str(ctx.project_id)},
@@ -100,12 +101,28 @@ async def render(ctx: RenderContext) -> dict | None:
             project_context["client_name"] = proj_row.client_name or ""
             project_context["audit_year"] = str(proj_row.audit_year or "")
             project_context["business_category"] = proj_row.business_category or ""
-            project_context["applicable_standards"] = proj_row.applicable_standards or ""
+            raw_standards = proj_row.applicable_standards
+            # applicable_standard_v2 可能是 JSONB(dict) 或 string 或 None
+            if isinstance(raw_standards, dict):
+                project_context["applicable_standards"] = (
+                    raw_standards.get("type")
+                    or raw_standards.get("entity_type")
+                    or ""
+                )
+            elif isinstance(raw_standards, str):
+                project_context["applicable_standards"] = raw_standards
+            else:
+                project_context["applicable_standards"] = ""
     except Exception as e:  # noqa: BLE001
         logger.warning("D3 render: project context 查询失败: %s", e)
+        try:
+            await db.rollback()
+        except Exception:
+            pass
 
     # 附注适用性
-    standards = project_context["applicable_standards"].lower()
+    raw_std = project_context["applicable_standards"]
+    standards = raw_std.lower() if isinstance(raw_std, str) else ""
     disclosure_visibility = {
         "listed": "listed" in standards,
         "soe": "soe" in standards,

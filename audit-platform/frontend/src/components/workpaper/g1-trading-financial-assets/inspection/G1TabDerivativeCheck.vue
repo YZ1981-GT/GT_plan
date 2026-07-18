@@ -3,6 +3,13 @@
     <div class="section-head">
       <h3 class="sheet-title">G1-14 衍生金融工具核查表</h3>
       <div class="head-actions tab-toolbar">
+        <G1ImportExportDropdown
+          v-if="wpId"
+          :wp-id="wpId"
+          sheet="G1-14"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="dc.addRow()">新增衍生工具</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-1" /></span>
         <el-tag size="small" type="info">共 {{ dc.rows.value.length }} 行</el-tag>
@@ -79,17 +86,19 @@
       </el-table-column>
     </el-table>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：（1）衍生工具存在性、名义金额、对手方及保证金的核查情况；（2）会计处理适当性的判断依据。" />
-    </el-card>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计结论</template>
-      <el-input v-model="dc.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
-        :disabled="isReadonly" placeholder="对衍生金融工具合规性的复核结论..." />
-    </el-card>
+    <G1AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      :conclusion="dc.auditConclusion.value"
+      @update:conclusion="(v: string) => { dc.auditConclusion.value = v }"
+      note-ai-section="derivative-note"
+      conclusion-ai-section="derivative-conclusion"
+      note-placeholder="填写审计说明：（1）衍生工具存在性、名义金额、对手方及保证金的核查情况；（2）会计处理适当性的判断依据。"
+      note-hint="覆盖存在性、名义金额、对手方、保证金及会计处理。"
+    />
+
 
     <details class="prep-hint">
       <summary>📋 编制提示</summary>
@@ -103,16 +112,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, inject, watch } from 'vue'
+import {ref, toRef, inject, watch , computed} from 'vue'
 import { useG1DerivativeCheck } from '../../composables/useG1DerivativeCheck'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G1AuditTextCards from '../G1AuditTextCards.vue'
+import G1ImportExportDropdown from '../G1ImportExportDropdown.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  wpId?: string
 }>()
+
+const wpId = computed(() => props.wpId ?? '')
+
+const emit = defineEmits<{ imported: [] }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -133,11 +149,12 @@ watch(auditNote, (v) => {
 .g1-derivative-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .g1-derivative-check :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
 .g1-derivative-check :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px); }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
+.section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.sheet-title { margin: 0; font-size: 16px; font-weight: 600; color: #1f2a37; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 .objective-alert { margin-bottom: 12px; }
+.stats-bar { margin-bottom: 10px; padding: 8px 12px; background: #f8f9fb; border: 1px solid #ebeef5; border-radius: 6px; font-size: 12px; color: #606266; }
 .stats-bar { margin-bottom: 10px; font-size: 12px; color: #606266; }
 .stats-bar .warn { color: #f56c6c; }
 .conclusion-card { margin-top: 12px; }

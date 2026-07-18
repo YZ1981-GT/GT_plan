@@ -52,10 +52,12 @@ describe('G1 集成: sheetName 正则分发', () => {
    * 复制 GtG1TradingFinancialAssets.vue 中 currentSheet computed 逻辑为纯函数
    */
   function resolveSheet(name: string): string {
-    if (/附注披露\s*\(\s*上市\s*\)/.test(name) || name.includes('附注披露(上市)')) return '附注上市'
-    if (/附注披露\s*\(\s*国企\s*\)/.test(name) || name.includes('附注披露(国企)')) return '附注国企'
-    const m = name.match(/(G1A|G1-\d+)/)
-    return m ? m[1] : ''
+    // 与 GtG1TradingFinancialAssets.vue currentSheet 保持一致
+    if (/G1-note-listed|附注披露.*上市|附注.*上市/.test(name)) return '附注上市'
+    if (/G1-note-soe|附注披露.*国企|附注.*国企/.test(name)) return '附注国企'
+    if (/附注/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
+    const m = name.match(/(G1A|G1-\d+)/i)
+    return m ? m[1].toUpperCase().replace(/^G1A$/i, 'G1A') : ''
   }
 
   const cases: [string, string][] = [
@@ -77,6 +79,10 @@ describe('G1 集成: sheetName 正则分发', () => {
     ['附注披露(上市)', '附注上市'],
     ['附注披露(国企)', '附注国企'],
     ['附注披露 ( 上市 )', '附注上市'],
+    ['附注披露信息（上市公司）', '附注上市'],
+    ['附注披露信息（国企）', '附注国企'],
+    ['G1-附注披露信息（上市公司）', '附注上市'],
+    ['G1-note-listed', '附注上市'],
   ]
 
   it.each(cases)('sheetName "%s" → currentSheet "%s"', (input, expected) => {

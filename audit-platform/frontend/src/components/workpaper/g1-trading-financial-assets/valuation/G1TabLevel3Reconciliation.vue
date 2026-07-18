@@ -3,6 +3,13 @@
     <div class="section-head">
       <h3 class="sheet-title">G1-7 第三层次公允价值变动调节表</h3>
       <div class="head-actions tab-toolbar">
+        <G1ImportExportDropdown
+          v-if="wpId"
+          :wp-id="wpId"
+          sheet="G1-7"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="l3.addRow()">新增调节行</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-6" /></span>
         <el-tag size="small" type="info">共 {{ l3.rows.value.length }} 行</el-tag>
@@ -69,17 +76,19 @@
       累计变动 {{ fmtNum(l3.grandTotal.value.cumulativeChange) }}
     </div>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：（1）第三层次公允价值期初至期末变动调节的核实情况；（2）估值方法、关键假设及敏感性分析的披露充分性。" />
-    </el-card>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计结论</template>
-      <el-input v-model="l3.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
-        :disabled="isReadonly" placeholder="对第三层次公允价值变动的复核结论..." />
-    </el-card>
+    <G1AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      :conclusion="l3.auditConclusion.value"
+      @update:conclusion="(v: string) => { l3.auditConclusion.value = v }"
+      note-ai-section="level3-note"
+      conclusion-ai-section="level3-conclusion"
+      note-placeholder="填写审计说明：第三层次期初至期末变动、转入转出及本期公允变动。"
+      note-hint="覆盖 Level3 调节勾稽与变动合理性。"
+    />
+
 
     <details class="prep-hint">
       <summary>📋 编制提示</summary>
@@ -92,16 +101,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, inject, watch } from 'vue'
+import {ref, toRef, inject, watch , computed} from 'vue'
 import { useG1Level3 } from '../../composables/useG1Level3'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G1AuditTextCards from '../G1AuditTextCards.vue'
+import G1ImportExportDropdown from '../G1ImportExportDropdown.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  wpId?: string
 }>()
+
+const wpId = computed(() => props.wpId ?? '')
+
+const emit = defineEmits<{ imported: [] }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -128,11 +144,12 @@ function fmtNum(v: unknown): string {
 .g1-level3 { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .g1-level3 :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
 .g1-level3 :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px); }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; }
+.section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.sheet-title { margin: 0; font-size: 16px; font-weight: 600; color: #1f2a37; }
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 .objective-alert { margin-bottom: 12px; }
+.stats-bar { margin-bottom: 10px; padding: 8px 12px; background: #f8f9fb; border: 1px solid #ebeef5; border-radius: 6px; font-size: 12px; color: #606266; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
 .totals { margin-top: 12px; padding-top: 8px; border-top: 1px solid #dcdfe6; font-weight: 600; color: #303133; }
 .total-label { margin-right: 12px; }

@@ -130,27 +130,17 @@
       </span>
     </div>
 
-    <el-card class="opinion-card" shadow="never">
-      <template #header>
-        <div class="opinion-header">
-          <span class="opinion-title">审计说明与结论</span>
-        </div>
-      </template>
-      <div class="opinion-section">
-        <div class="opinion-section-header">
-          <span class="opinion-section-label">1. 审计说明</span>
-        </div>
-        <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
-          placeholder="交易性金融资产审定说明（如公允价值变动来源、处置损益核对、与试算表核对等）..." />
-      </div>
-      <div class="opinion-section">
-        <div class="opinion-section-header">
-          <span class="opinion-section-label">2. 审计结论</span>
-        </div>
-        <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
-          placeholder="审计结论..." />
-      </div>
-    </el-card>
+    <G1AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="conclusion"
+      note-ai-section="adjudication-note"
+      conclusion-ai-section="adjudication-conclusion"
+      note-placeholder="交易性金融资产审定说明（如公允价值变动来源、处置损益核对、与试算表核对等）..."
+      note-hint="评价各投资品种审定、AJE/RJE 及与试算表勾稽。"
+      conclusion-hint="按 A/B/C 口径评价科目 1501 列报是否公允。"
+    />
 
     <details class="prep-hint">
       <summary>📋 编制提示</summary>
@@ -165,16 +155,20 @@
 </template>
 
 <script setup lang="ts">
-import { toRef, inject } from 'vue'
+import { computed, toRef, inject } from 'vue'
 import { useG1Adjudication } from '../../composables/useG1Adjudication'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G1AuditTextCards from '../G1AuditTextCards.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  wpId?: string
 }>()
+
+const wpId = computed(() => props.wpId ?? '')
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
