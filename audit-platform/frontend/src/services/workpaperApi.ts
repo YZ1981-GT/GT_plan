@@ -209,20 +209,182 @@ export async function batchExecuteFormulas(reqs: FormulaRequest[]): Promise<Form
 
 // ─── Working Papers ───
 
+/**
+ * 统一「资源不存在或不可访问」文案（External_Not_Found）。
+ *
+ * Feature: procedure-delegation-visibility-isolation · Task 12 / Req 12.7。
+ * 服务端对不存在、跨项目、越权、未映射页、历史版本等一律返回 HTTP 404 +
+ * ``{"detail":"资源不存在或不可访问"}``；前端只显示此文案，绝不显示内部拒绝原因。
+ */
+export const EXTERNAL_NOT_FOUND_MESSAGE = '资源不存在或不可访问'
+
+/**
+ * 服务端可见性列表项（Task 8 组件 C13 分页 envelope 的单项）。
+ *
+ * 状态拆分（Req 12.4/12.5）：``index_status``（索引/目录层）与 ``file_status``（文件/编制层）
+ * 分别返回，替代含义不明确的 legacy ``status``。``wp_id`` 可空——底稿尚未生成时为 ``null``，
+ * ``wp_generated=false``，前端据此禁用依赖具体底稿资源的读取/写入动作（Req 12.8/12.9）。
+ */
+export interface VisibilityWpItem {
+  wp_index_id: string
+  project_id: string
+  wp_id: string | null
+  wp_code: string
+  wp_name: string
+  audit_cycle: string | null
+  index_status: string | null
+  file_status: string | null
+  review_status: string
+  assigned_to: string | null
+  reviewer: string | null
+  file_version: number | null
+  file_path: string | null
+  source_type: string | null
+  prefill_stale: boolean
+  /** 底稿是否已生成（wp_id 非空）。false → 前端禁用文件动作并显示"底稿尚未生成"。 */
+  wp_generated: boolean
+  created_at: string | null
+  updated_at: string | null
+}
+
+/** 服务端分页 envelope（Req 11.6：仅 ``{items,total,stats,page,page_size}``）。 */
+export interface WpVisibilityStats {
+  by_index_status: Record<string, number>
+  by_file_status: Record<string, number>
+}
+
+export interface WpListEnvelope {
+  items: VisibilityWpItem[]
+  total: number
+  stats: WpVisibilityStats
+  page: number
+  page_size: number
+}
+
+/** nullable wp（底稿尚未生成）在 by_file_status 下的稳定 sentinel key（与后端一致）。 */
+export const FILE_STATUS_NOT_GENERATED = 'not_generated'
+
+const EMPTY_STATS: WpVisibilityStats = { by_index_status: {}, by_file_status: {} }
+
+/** 归一化服务端分页 envelope（防御后端未来字段缺失，保证契约稳定）。 */
+function normalizeEnvelope(data: any, page: number, pageSize: number): WpListEnvelope {
+  const items = Array.isArray(data?.items) ? (data.items as VisibilityWpItem[]) : []
+  const stats = data?.stats && typeof data.stats === 'object'
+    ? {
+        by_index_status: { ...(data.stats.by_index_status || {}) },
+        by_file_status: { ...(data.stats.by_file_status || {}) },
+      }
+    : { ...EMPTY_STATS }
+  return {
+    items,
+    total: Number.isFinite(data?.total) ? Number(data.total) : items.length,
+    stats,
+    page: Number.isFinite(data?.page) ? Number(data.page) : page,
+    page_size: Number.isFinite(data?.page_size) ? Number(data.page_size) : pageSize,
+  }
+}
+
 function normalizeWorkpaper(item: any): WorkpaperDetail {
   return {
     ...item,
+    // 分页 envelope 项用 wp_id 标识具体底稿；legacy 数组项已带 id。
+    id: item?.id ?? item?.wp_id,
     status: item?.status ?? item?.file_status ?? item?.index_status ?? 'not_started',
   }
 }
 
+/** 分页/排序/过滤参数（服务端强制可见性列表；Task 8 组件 C13）。 */
+export interface WpListParams {
+  audit_cycle?: string
+  index_status?: string
+  file_status?: string
+  assigned_to?: string
+  page?: number
+  page_size?: number
+  sort?: string
+  sort_dir?: 'asc' | 'desc'
+  /** 仅 UX，不参与服务端授权（Req 12.1–12.3 / Property 15）。 */
+  visibility_mode?: string
+}
+
+/**
+ * 底稿列表（服务端强制可见性 + 正式分页 + 状态拆分）。
+ *
+ * Feature: procedure-delegation-visibility-isolation · Task 12（消费 Task 8 组件 C13）。
+ * 返回完整 envelope ``{items,total,stats,page,page_size}``（Req 11.6）；``visibility_mode``/
+ * 客户端身份不改变授权（Req 12.1–12.3）。
+ */
+export async function listWorkpapersPaged(
+  projectId: string,
+  params: WpListParams = {},
+): Promise<WpListEnvelope> {
+  const page = params.page ?? 1
+  const pageSize = params.page_size ?? 20
+  const { data } = await http.get(P_wp.list(projectId), {
+    params: { ...params, page, page_size: pageSize },
+  })
+  return normalizeEnvelope(data, page, pageSize)
+}
+
+/**
+ * 我的主编底稿（MyLeadWorkpapers，Req 11.12/11.13）。
+ *
+ * 仅返回当前用户作为 Workpaper_Lead 的底稿，与「我的程序任务」（assignee/reviewer）为两个
+ * 独立身份视图（Req 11.11：程序任务视图不合成主编项）。复用同一分页/去重/stats/排序契约。
+ */
+export async function listMyLeadWorkpapers(
+  projectId: string,
+  params: WpListParams = {},
+): Promise<WpListEnvelope> {
+  const page = params.page ?? 1
+  const pageSize = params.page_size ?? 20
+  const { data } = await http.get(P_wp.myLead(projectId), {
+    params: { ...params, page, page_size: pageSize },
+  })
+  return normalizeEnvelope(data, page, pageSize)
+}
+
+/**
+ * Legacy 底稿列表（返回扁平数组）。
+ *
+ * 服务端已把 ``/working-papers`` 升级为分页 envelope（Task 8），此函数对 envelope 与旧数组
+ * 两种形态都兼容：envelope → 抽取 ``items``；数组 → 直接映射。新代码请改用
+ * ``listWorkpapersPaged`` 消费完整分页/stats。
+ */
 export async function listWorkpapers(
   projectId: string,
   opts?: { audit_cycle?: string; status?: string; assigned_to?: string }
 ): Promise<WorkpaperDetail[]> {
-  const { data } = await http.get(P_wp.list(projectId), { params: opts })
-  const items = data ?? []
-  return Array.isArray(items) ? items.map(normalizeWorkpaper) : []
+  // legacy `status` 查询参数映射到 index_status（Req 12.6：legacy source → target）。
+  const baseParams: Record<string, any> = { ...(opts || {}) }
+  if (baseParams.status != null) {
+    baseParams.index_status = baseParams.status
+    delete baseParams.status
+  }
+  const PAGE_SIZE = 100 // 服务端上限
+  const collected: any[] = []
+  let page = 1
+  // 服务端分页 envelope 上限 100/页：逐页拉取直至覆盖去重全集（保留 legacy「返回全部可见项」语义）。
+  // 旧数组形态（未升级环境）第一次即返回全部，循环自然终止。
+  for (;;) {
+    const { data } = await http.get(P_wp.list(projectId), {
+      params: { ...baseParams, page, page_size: PAGE_SIZE },
+    })
+    if (Array.isArray(data)) {
+      collected.push(...data)
+      break
+    }
+    const items = Array.isArray(data?.items) ? data.items : []
+    collected.push(...items)
+    const total = Number.isFinite(data?.total) ? Number(data.total) : collected.length
+    if (items.length === 0 || collected.length >= total || page > 200) break
+    page += 1
+  }
+  // legacy 消费者（Shell/试算表）期望「已生成的真实底稿」。分页 envelope 会含 nullable wp
+  // （wp_generated=false，底稿尚未生成的可见 wp_index 行）——这些没有具体 WorkingPaper，
+  // 过滤掉以保持 legacy 语义；wp_index 层信息由 getWpIndex 单独提供。
+  const realized = collected.filter((it) => it?.wp_generated !== false)
+  return realized.map(normalizeWorkpaper)
 }
 
 export async function getWorkpaper(projectId: string, wpId: string): Promise<WorkpaperDetail> {

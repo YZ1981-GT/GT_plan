@@ -122,6 +122,20 @@ async def get_row_task_detail(
     - 校验参与关系（delegator/assignee/reviewer/历史只读）；无任何访问 → 404（不泄露）。
     - 返回 nullable wp_id + materialization_required + 深链定位 key（sheet_key+definition_key）。
     """
+    from app.routers._wp_gate import enforce_task_gate
+
+    # Wp_Bound_Gate（task 绑定）：读取程序行任务详情正文之前完成可见性/绑定判定
+    # （Req 8.12 / procedure_task 入口族）。gate 从 task 反查 project + 唯一 wp_index，
+    # row-only 身份只授权映射 sheet；跨项目/out-of-scope/未委派统一 External_Not_Found（404）。
+    # read_task 属只读族，全部参与身份（lead/assignee/reviewer/history）均可命中，作为
+    # 统一门可见性前置；更细粒度的参与者动作授权仍由 procedure_authorization 原生强制。
+    await enforce_task_gate(
+        db, user,
+        entrypoint="procedure.task_read", action="read_task", method="GET",
+        task_id=task_id, project_id=project_id, entry_family="procedure_task",
+        route_name="/api/projects/{project_id}/procedure-row-tasks/{task_id}",
+    )
+
     svc = ProcedureTaskQueryService(db)
     task = await svc.get_detail(project_id, task_id)
     if task is None:

@@ -242,65 +242,110 @@ class ProcedureService:
         await self.db.flush()
         return self._to_dict(pi)
 
-    async def assign_procedures(self, project_id: UUID, assignments: list[dict]) -> int:
-        """批量委派"""
+    async def assign_procedures(
+        self,
+        project_id: UUID,
+        assignments: list[dict],
+        actor_user_id: UUID | None = None,
+    ) -> int:
+        """批量委派（走底稿主编两层原子事务 · procedure-delegation-visibility-isolation Task 7）。
+
+        每个 assignment 经 ``DelegationTransactionService.delegate_lead`` 落地：
+          - 唯一解析 wp_index（由 procedure_instance_id / wp_code 联合解析，fail-closed）；
+          - 严格 staff→user 映射后同事务写 ``working_paper.assigned_to=user_id`` 权威、
+            ``procedure_instances.assigned_to=staff_id`` 投影、统一 delegation history、
+            policy epoch 与 invalidation outbox；
+          - 两层互不覆盖、无 last-write-wins；任一 assignment 校验失败 raise
+            ``DelegationError`` → router 回滚整批（原子）。
+
+        为保持既有行为：自定义程序在委派前先幂等确保 working_paper 存在（standard 程序若
+        底稿尚未生成则由 delegate_lead 只写投影 + history，WP 生成后再回填 assigned_to）。
+        """
         from app.models.workpaper_models import WorkingPaper, WpIndex
         from app.services.workpaper_generation_service import workpaper_generation_service
+        from app.services.wp_visibility.delegation_transaction import (
+            DelegationTransactionService,
+            LeadDelegationRequest,
+        )
 
-        now = datetime.now(timezone.utc)
+        deleg = DelegationTransactionService(self.db)
         updated = 0
         for a in assignments:
             proc_id = a["procedure_id"]
-            await self.db.execute(
-                sa.update(ProcedureInstance)
-                .where(ProcedureInstance.id == proc_id)
-                .values(assigned_to=a["staff_id"], assigned_at=now)
-            )
-            updated += 1
+            staff_raw = a.get("staff_id")
+            request_id = a.get("request_id")
 
             proc = (
                 await self.db.execute(
-                    sa.select(ProcedureInstance).where(ProcedureInstance.id == proc_id)
-                )
-            ).scalar_one_or_none()
-            if not proc or not proc.is_custom or not proc.wp_code:
-                continue
-
-            wp_index = (
-                await self.db.execute(
-                    sa.select(WpIndex).where(
-                        WpIndex.project_id == project_id,
-                        WpIndex.wp_code == proc.wp_code,
-                        WpIndex.is_deleted == False,  # noqa: E712
+                    sa.select(ProcedureInstance).where(
+                        ProcedureInstance.id == proc_id,
+                        ProcedureInstance.project_id == project_id,
+                        ProcedureInstance.is_deleted == False,  # noqa: E712
                     )
                 )
             ).scalar_one_or_none()
-            if wp_index is None:
+            if proc is None:
                 continue
 
-            has_wp = (
-                await self.db.execute(
-                    sa.select(sa.func.count())
-                    .select_from(WorkingPaper)
-                    .where(
-                        WorkingPaper.project_id == project_id,
-                        WorkingPaper.wp_index_id == wp_index.id,
-                        WorkingPaper.is_deleted == False,  # noqa: E712
+            # 自定义程序：委派前幂等确保 working_paper 存在（保持既有行为）。
+            if proc.is_custom and proc.wp_code:
+                wp_index = (
+                    await self.db.execute(
+                        sa.select(WpIndex).where(
+                            WpIndex.project_id == project_id,
+                            WpIndex.wp_code == proc.wp_code,
+                            WpIndex.is_deleted == False,  # noqa: E712
+                        )
                     )
-                )
-            ).scalar()
-            if not has_wp:
-                wp = await workpaper_generation_service.ensure_working_paper(
-                    self.db, project_id, wp_index.id
-                )
-                await self.db.execute(
-                    sa.update(ProcedureInstance)
-                    .where(ProcedureInstance.id == proc_id)
-                    .values(wp_id=wp.id)
-                )
+                ).scalar_one_or_none()
+                if wp_index is not None:
+                    has_wp = (
+                        await self.db.execute(
+                            sa.select(sa.func.count())
+                            .select_from(WorkingPaper)
+                            .where(
+                                WorkingPaper.project_id == project_id,
+                                WorkingPaper.wp_index_id == wp_index.id,
+                                WorkingPaper.is_deleted == False,  # noqa: E712
+                            )
+                        )
+                    ).scalar()
+                    if not has_wp:
+                        wp = await workpaper_generation_service.ensure_working_paper(
+                            self.db, project_id, wp_index.id
+                        )
+                        await self.db.execute(
+                            sa.update(ProcedureInstance)
+                            .where(ProcedureInstance.id == proc_id)
+                            .values(wp_id=wp.id)
+                        )
+
+            staff_uuid = self._coerce_uuid(staff_raw)
+            req = LeadDelegationRequest(
+                project_id=project_id,
+                actor_user_id=actor_user_id or project_id,  # actor 缺省兜底（审计用）
+                staff_id=staff_uuid,
+                clear=(staff_uuid is None),
+                procedure_instance_id=proc.id,
+                wp_code=proc.wp_code,
+                request_id=str(request_id) if request_id else None,
+            )
+            await deleg.delegate_lead(req)
+            updated += 1
 
         await self.db.flush()
         return updated
+
+    @staticmethod
+    def _coerce_uuid(value) -> UUID | None:
+        if value is None or value == "":
+            return None
+        if isinstance(value, UUID):
+            return value
+        try:
+            return UUID(str(value))
+        except (ValueError, TypeError):
+            return None
 
     async def get_trim_scheme(self, project_id: UUID, cycle: str) -> dict | None:
         """获取裁剪方案"""

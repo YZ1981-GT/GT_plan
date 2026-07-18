@@ -1,0 +1,12 @@
+visibility-isolation-go-live-hardening Task 1 self-test summary
+suite: tests/visibility_go_live_hardening/test_task1_evidence_baseline.py
+result: 7 passed, 0 failed, 0 error, 0 skipped
+total: 7
+
+PASS  tests.visibility_go_live_hardening.test_task1_evidence_baseline::test_append_is_append_only_and_precheck_clean
+PASS  tests.visibility_go_live_hardening.test_task1_evidence_baseline::test_baseline_artifact_declares_built_not_live
+PASS  tests.visibility_go_live_hardening.test_task1_evidence_baseline::test_gate_reuses_artifact_integrity_recompute
+PASS  tests.visibility_go_live_hardening.test_task1_evidence_baseline::test_go_live_gate_blocks_while_items_built_not_live
+PASS  tests.visibility_go_live_hardening.test_task1_evidence_baseline::test_precheck_and_writer_reject_unsafe_paths
+PASS  tests.visibility_go_live_hardening.test_task1_evidence_baseline::test_real_manifest_precheck_returns_empty
+PASS  tests.visibility_go_live_hardening.test_task1_evidence_baseline::test_wrapper_is_scoped_to_this_spec_not_parent

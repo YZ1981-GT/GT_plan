@@ -394,6 +394,7 @@ def _start_workers(stop_event):
         staged_orphan_cleaner, export_cleanup_worker,
         time_machine_cleanup_worker,
         procedure_dispatcher_worker,
+        invalidation_dispatcher_worker,
     )
     tasks = [
         asyncio.create_task(sla_worker.run(stop_event)),
@@ -408,6 +409,11 @@ def _start_workers(stop_event):
         # procedure-delegation-notification / Task 10：有序 outbox dispatcher。
         # 受 PROCEDURE_TASK_DISPATCHER_ENABLED 控制（expand 阶段默认 false → worker 直接退出）。
         asyncio.create_task(procedure_dispatcher_worker.run(stop_event)),
+        # visibility-isolation-go-live-hardening Task 3 / R2：epoch 失效 Redis dispatcher。
+        # subscriber（psubscribe 快路径淘汰）+ publisher（提交后 outbox fan-out），
+        # 受 VISIBILITY_INVALIDATION_DISPATCHER_ENABLED 控制（默认 True）。Redis 不可用不阻塞
+        # 启动 → 指数退避重连；重连期间由 PersistentEpochCache 的 ≤1s DB epoch 安全网兜底。
+        asyncio.create_task(invalidation_dispatcher_worker.run(stop_event)),
     ]
     # 进程内 ImportJob runner 主循环：写 import_worker 心跳 + 拉 queued 任务
     # 仅当 LEDGER_IMPORT_IN_PROCESS_RUNNER_ENABLED=True 启动（生产模式下应关闭，

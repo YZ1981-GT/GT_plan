@@ -1,0 +1,236 @@
+{
+  "flags": {
+    "PROCEDURE_ROW_TASKS_ENABLED": true,
+    "PROCEDURE_ROW_TASK_WRITE_MODE": "task-source",
+    "PROCEDURE_TASK_DISPATCHER_ENABLED": true
+  },
+  "seed": {
+    "manager": {
+      "user_id": "30460465-bf8e-435b-9f40-a0187a04d72a",
+      "staff_id": "31c1b792-45b8-4aac-bcd5-833e277a14e3",
+      "username": "e2e_manager",
+      "role": "manager"
+    },
+    "assistant": {
+      "user_id": "a7b216b8-1c65-43d2-9a47-f09d55c0242b",
+      "staff_id": "b4da9c73-fd6d-4f65-86f7-3d6e07b8b7bf",
+      "username": "e2e_assistant",
+      "role": "auditor"
+    },
+    "reviewer": {
+      "user_id": "cb1e8848-600c-4d05-95bf-b2a4933b9f5b",
+      "staff_id": "9af2f2f1-f8b3-4474-a9c8-3821b1f42405",
+      "username": "e2e_reviewer",
+      "role": "auditor"
+    },
+    "partner_na": {
+      "user_id": "66ddf06d-2a18-422c-8376-c0a727e9d203",
+      "staff_id": "3c11e014-1b74-4378-ba85-74f69e473ede",
+      "username": "e2e_partner_na",
+      "role": "partner"
+    }
+  },
+  "summary": {
+    "passed": 38,
+    "total": 38
+  },
+  "results": [
+    {
+      "scenario": "Flags cutover 已启用",
+      "pass": true,
+      "detail": "{'PROCEDURE_ROW_TASKS_ENABLED': True, 'PROCEDURE_ROW_TASK_WRITE_MODE': 'task-source', 'PROCEDURE_TASK_DISPATCHER_ENABLED': True}"
+    },
+    {
+      "scenario": "login admin",
+      "pass": true,
+      "detail": "ok"
+    },
+    {
+      "scenario": "login manager",
+      "pass": true,
+      "detail": "ok"
+    },
+    {
+      "scenario": "login assistant",
+      "pass": true,
+      "detail": "ok"
+    },
+    {
+      "scenario": "login reviewer",
+      "pass": true,
+      "detail": "ok"
+    },
+    {
+      "scenario": "login partner_na",
+      "pass": true,
+      "detail": "ok"
+    },
+    {
+      "scenario": "S1a materialize先委派",
+      "pass": true,
+      "detail": "status=200 created=21 targets=21"
+    },
+    {
+      "scenario": "S1b 物化任务 wp_id 为空(先委派)",
+      "pass": true,
+      "detail": "n=21 first.wp_id=None"
+    },
+    {
+      "scenario": "S10 无assignment合伙人 delegator→403",
+      "pass": true,
+      "detail": "status=403"
+    },
+    {
+      "scenario": "S2a delegation preview",
+      "pass": true,
+      "detail": "status=200 preview_id=8974983b-d654-47f7-a597-b0721c9fa97c targets=None"
+    },
+    {
+      "scenario": "S2b delegation apply",
+      "pass": true,
+      "detail": "status=200 body={'delegation_batch_id': 'f89994c6-27d6-40d9-86d0-4ab6d6a15cf2', 'applied': 1, 'unchanged': 0, 'failed': 0, 'conflict': 0"
+    },
+    {
+      "scenario": "S2c apply 后 task 已分配",
+      "pass": true,
+      "detail": "workflow=assigned assignee_ok=True av=1"
+    },
+    {
+      "scenario": "S2d 重放已消费 preview→409",
+      "pass": true,
+      "detail": "status=409"
+    },
+    {
+      "scenario": "S2e 伪造 preview→409/404",
+      "pass": true,
+      "detail": "status=404"
+    },
+    {
+      "scenario": "S2f 同 request_id 幂等重试无二次领域写",
+      "pass": true,
+      "detail": "status=200 av 1->1"
+    },
+    {
+      "scenario": "S12 底稿生成原子绑定(task_id/assignment/history 不变)",
+      "pass": true,
+      "detail": "wp_id=249ecd05-d7b5-4200-acbe-3fe62d22b217 task_same=True av_same=True hist 1->1"
+    },
+    {
+      "scenario": "S3 同执行人 no-op(assignment_version 不变)",
+      "pass": true,
+      "detail": "av 1->1"
+    },
+    {
+      "scenario": "S4a assistant ack",
+      "pass": true,
+      "detail": "status=200 wf=acknowledged"
+    },
+    {
+      "scenario": "S4b assistant start",
+      "pass": true,
+      "detail": "status=200 wf=in_progress"
+    },
+    {
+      "scenario": "S4c assistant submit",
+      "pass": true,
+      "detail": "status=200 wf=submitted"
+    },
+    {
+      "scenario": "S4d assistant 不能 review→403",
+      "pass": true,
+      "detail": "status=403"
+    },
+    {
+      "scenario": "S4e reviewer review 通过",
+      "pass": true,
+      "detail": "status=200 wf=reviewed"
+    },
+    {
+      "scenario": "S5a reviewer request_changes",
+      "pass": true,
+      "detail": "status=200 wf=changes_requested"
+    },
+    {
+      "scenario": "S5b changes_requested 创建 IssueTicket",
+      "pass": true,
+      "detail": "status=200 open_issues=1 issue_id=c3ee0287-26ea-4b8a-b795-359027bd9ead"
+    },
+    {
+      "scenario": "S5c 未关 issue 时 review→409",
+      "pass": true,
+      "detail": "status=409"
+    },
+    {
+      "scenario": "S5d 关闭 IssueTicket",
+      "pass": true,
+      "detail": "status=200"
+    },
+    {
+      "scenario": "S5e issue 全关后 review 通过",
+      "pass": true,
+      "detail": "status=200 wf=reviewed"
+    },
+    {
+      "scenario": "S6a 转派后 assignment_version 递增+清 ack",
+      "pass": true,
+      "detail": "status=200 av 1->2 ack=None"
+    },
+    {
+      "scenario": "S6b 旧执行人 ack→403",
+      "pass": true,
+      "detail": "status=403"
+    },
+    {
+      "scenario": "S6c 新执行人重新 ack",
+      "pass": true,
+      "detail": "status=200 wf=acknowledged"
+    },
+    {
+      "scenario": "S7a 批量委派 apply",
+      "pass": true,
+      "detail": "status=200 n=5 batch_id=21734022-c580-4870-b222-05126265f820"
+    },
+    {
+      "scenario": "S7b 批量逐任务独立 history",
+      "pass": true,
+      "detail": "history_counts=[1, 1, 1, 1, 1]"
+    },
+    {
+      "scenario": "S7c 每 recipient 聚合为单条通知(5任务→1通知)",
+      "pass": true,
+      "detail": "batch_notifs_for_assistant=1 per_task_history=[1, 1, 1, 1, 1]"
+    },
+    {
+      "scenario": "S7d 聚合通知含可跳转 metadata(不靠中文content)",
+      "pass": true,
+      "detail": "meta={'kind': 'delegation_batch', 'filter': {'project_id': '5e193c68-f53c-4e95-8d03-5d9c996c402d', 'delegation_batch_id': '21734022-c580-4870-b222-05126265f820'}, 'b"
+    },
+    {
+      "scenario": "S11 dispatcher 投递 outbox(processed>0)",
+      "pass": true,
+      "detail": "outbox={'table': 'task_events', 'total': 40, 'processed': 40, 'dead_letter': 0}"
+    },
+    {
+      "scenario": "S8a 跨项目 task 详情→404",
+      "pass": true,
+      "detail": "status=404"
+    },
+    {
+      "scenario": "S8b 跨项目无assignment delegator→403",
+      "pass": true,
+      "detail": "status=403"
+    },
+    {
+      "scenario": "S9 due_at null 不逾期",
+      "pass": true,
+      "detail": "status=200 my_tasks=7 null_due=7 overdue_bad=0"
+    }
+  ],
+  "detail": {
+    "a1_ids": "['6fc86732-8e5a-4f95-bae1-6a87763524cb', 'f36d57df-eafa-4c13-bff6-e73125276479', '59506c87-de2a-4954-9cde-a674330dea88']",
+    "a10_batch": "['1cb83a43-2784-4f6e-adbb-2718e9099523', 'd5b2b945-ad7e-4a95-be0a-5d963dee30c4', '0bbe32f3-ec53-4b21-a4a6-e38f58902bcc', 'ca554e64-35e2-4eff-ae9c-61b01fc47f93', 'e4a36c1b-b7f8-4456-8b51-c6b1d5b82ba2']",
+    "wp_id": "249ecd05-d7b5-4200-acbe-3fe62d22b217",
+    "outbox": "{'table': 'task_events', 'total': 40, 'processed': 40, 'dead_letter': 0}",
+    "assistant_notifs": "[{'type': 'procedure_task.delegation_batch', 'title': '程序任务批量委派', 'event_id': 'batch:f89994c6-27d6-40d9-86d0-4ab6d6a15cf2', 'dedup_key': 'batch:f89994c6-27d6-40d9-86d0-4ab6d6a15cf2:a7b216b8-1c65-43d2-9a47-f09d55c0242b', 'meta': {'kind': 'delegation_batch', 'filter': {'project_id': '5e193c68-f53c-4e95-8d03-5d9c996c402d', 'delegation_batch_id': 'f89994c6-27d6-40d9-86d0-4ab6d6a15cf2'}, 'batch_id': 'f"
+  }
+}

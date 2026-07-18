@@ -12,15 +12,26 @@ try:  # pragma: no cover - 测试环境配置
     from hypothesis import HealthCheck, settings as _hyp_settings
 
     _HYP_MAX_EXAMPLES = int(os.environ.get("HYPOTHESIS_MAX_EXAMPLES", "5"))
+    # Feature: procedure-delegation-visibility-isolation Task 14 —— 同源双 profile 机制。
+    # smoke（=5，本地快速冒烟，不得作为完成证据）与 correctness（≥100 有效样例/property，
+    # CI 正确性验收）收集**同一批**属性函数：property 测试不再硬编码 max_examples，改由
+    # 当前加载 profile 驱动例数（`@settings(deadline=None)` 只固定 deadline，max_examples
+    # 继承活动 profile）。三者共享同一 health-check 抑制集，语义仅差 max_examples。
+    _CORRECTNESS_EXAMPLES = int(os.environ.get("HYPOTHESIS_CORRECTNESS_EXAMPLES", "100"))
+    _SUPPRESS = [
+        HealthCheck.too_slow,
+        HealthCheck.data_too_large,
+        HealthCheck.function_scoped_fixture,
+    ]
     _hyp_settings.register_profile(
-        "fast",
-        max_examples=_HYP_MAX_EXAMPLES,
-        deadline=None,
-        suppress_health_check=[
-            HealthCheck.too_slow,
-            HealthCheck.data_too_large,
-            HealthCheck.function_scoped_fixture,
-        ],
+        "fast", max_examples=_HYP_MAX_EXAMPLES, deadline=None, suppress_health_check=_SUPPRESS,
+    )
+    _hyp_settings.register_profile(
+        "smoke", max_examples=5, deadline=None, suppress_health_check=_SUPPRESS,
+    )
+    _hyp_settings.register_profile(
+        "correctness", max_examples=_CORRECTNESS_EXAMPLES, deadline=None,
+        suppress_health_check=_SUPPRESS,
     )
     _hyp_settings.load_profile(os.environ.get("HYPOTHESIS_PROFILE", "fast"))
 except Exception:  # hypothesis 未安装或版本差异时不阻断测试收集

@@ -6,6 +6,7 @@
 
 export const workpapers = {
   list: (pid: string) => `/api/projects/${pid}/working-papers`,
+  myLead: (pid: string) => `/api/projects/${pid}/my-lead-workpapers`,
   detail: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}`,
   download: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/download`,
   downloadPack: (pid: string) => `/api/projects/${pid}/working-papers/download-pack`,

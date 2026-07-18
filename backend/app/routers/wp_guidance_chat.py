@@ -249,6 +249,21 @@ async def workpaper_ai_generate_text(
     """
     from app.services.llm_client import chat_completion
     from app.core.config import settings
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：AI 上下文构造 / LLM 调用之前完成授权判定（Req 8.11 "AI gate 后构造 context"）。
+    # wp_id 为字符串 → 转 UUID；非法/不存在 → gate 反查失败 → 统一 404。
+    try:
+        _wp_uuid = UUID(str(wp_id))
+    except (ValueError, TypeError):
+        from app.services.wp_visibility.denial import ExternalNotFound
+        raise ExternalNotFound()
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.ai_generate", action="ai_generate", method="POST",
+        wp_id=_wp_uuid, entry_family="ai",
+        route_name="/api/workpapers/{wp_id}/ai/generate-text",
+    )
 
     if not settings.WP_AI_SERVICE_ENABLED:
         raise HTTPException(status_code=503, detail="AI 服务未启用")

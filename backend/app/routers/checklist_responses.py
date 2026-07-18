@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user, require_wp_edit_permission
 from app.models.core import User
+from app.routers._wp_gate import enforce_wp_gate
 from app.services.review_rbac_guard import check_rbac, check_sign_lock, extract_base_level
 
 logger = logging.getLogger(__name__)
@@ -88,6 +89,14 @@ async def get_checklist_responses(
     current_user: User = Depends(get_current_user),
 ):
     """获取指定底稿的所有核对表填写响应（含稳定版本和集合 ETag）。"""
+    # Wp_Bound_Gate：读取任何 checklist 正文之前完成授权判定（Req 8.1/8.5）。
+    # 无 project_id → gate 从 wp_id 反查资源真实 project（Binding_Minimum）。
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.checklist_read", action="read_checklist", method="GET",
+        wp_id=wp_id, entry_family="checklist",
+        route_name="/api/workpapers/{wp_id}/checklist-responses",
+    )
     result = await db.execute(
         text("""
             SELECT id, item_id, conclusion, remark, wp_ref, updated_by, updated_at
@@ -136,6 +145,16 @@ async def batch_save_checklist_responses(
 
     _save_t0 = _time.perf_counter()
     _save_status = "success"
+
+    # Wp_Bound_Gate：产生任何持久化副作用之前完成授权判定（Req 8.1/8.5）。
+    # save_checklist 为内容写；assignee 仅在被委派 sheet 上允许、reviewer 禁止通用 checklist 写、
+    # History_Only 写入统一 404（矩阵与 grant 已保证）。无 project_id → gate 反查。
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.checklist_save", action="save_checklist", method="PUT",
+        wp_id=wp_id, project_id=body.project_id, entry_family="checklist",
+        route_name="/api/workpapers/{wp_id}/checklist-responses",
+    )
 
     context_result = await db.execute(
         text("""

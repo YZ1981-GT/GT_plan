@@ -132,6 +132,12 @@ from app.models.procedure_models import (  # noqa: F401
     ProcedureRowTaskHistory,
     ProcedureTrimScheme,
 )
+from app.models.wp_visibility_models import (  # noqa: F401
+    WorkpaperDelegationHistory,
+    WpAccessSecurityOutbox,
+    WpVisibilityInvalidationOutbox,
+    WpVisibilityPolicyEpoch,
+)
 
 __all__ = [
     # --- base ---
@@ -273,4 +279,9 @@ __all__ = [
     "ProcedureRowTask",
     "ProcedureRowTaskHistory",
     "ProcedureOperationPreview",
+    # --- 底稿可见性隔离 (procedure-delegation-visibility-isolation / V113) ---
+    "WorkpaperDelegationHistory",
+    "WpAccessSecurityOutbox",
+    "WpVisibilityPolicyEpoch",
+    "WpVisibilityInvalidationOutbox",
 ]

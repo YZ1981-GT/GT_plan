@@ -26,6 +26,11 @@ from app.core.database import get_db
 from app.deps import PERMISSION_HIERARCHY, get_current_user, require_project_access
 from app.models.core import ProjectUser, User
 from app.services.attachment_service import AttachmentService
+from app.services.wp_visibility.entry_integration import (
+    enforce_attachment_wp_visibility,
+    gate_attachment_associate,
+    gate_wp,
+)
 
 router = APIRouter(tags=["attachments"])
 
@@ -182,6 +187,11 @@ async def get_attachment(attachment_id: UUID, db: AsyncSession = Depends(get_db)
     if not result:
         raise HTTPException(status_code=404, detail="附件不存在")
     await _ensure_project_access(db, current_user, UUID(result["project_id"]), "readonly")
+    # Task 10 · wp-link 隔离层（Req 8.7/9.3）
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_read", method="GET", entrypoint="attachment.read",
+    )
     return result
 
 
@@ -191,30 +201,31 @@ async def associate_with_wp(
     current_user: User = Depends(get_current_user),
 ):
     svc = _svc(db)
-    att = await svc.get_attachment(attachment_id)
-    if not att:
-        raise HTTPException(status_code=404, detail="附件不存在")
-    await _ensure_project_access(db, current_user, UUID(att["project_id"]), "edit")
-    result = await svc.associate_with_wp(attachment_id, body.wp_id, body.association_type, body.notes)
+    # Task 10 · 多资源 gate（Req 8.7/8.13/9.1-9.3）：附件项目 + 目标底稿同项目 + 源附件权限
+    # + 目标 sheet 写权限，全部通过或整请求失败（副作用前）；不可见统一 404。
+    await gate_attachment_associate(
+        db,
+        current_user,
+        attachment_id=attachment_id,
+        target_wp_id=body.wp_id,
+    )
+    result = await svc.associate_with_wp(
+        attachment_id, body.wp_id, body.association_type, body.notes,
+        created_by=current_user.id,
+    )
     await db.commit()
     return result
 
 
 @router.get("/api/working-papers/{wp_id}/attachments")
 async def get_wp_attachments(wp_id: UUID, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
-    from app.models.workpaper_models import WorkingPaper
-
     svc = _svc(db)
-    wp_result = await db.execute(
-        sa.select(WorkingPaper.project_id).where(
-            WorkingPaper.id == wp_id,
-            WorkingPaper.is_deleted == sa.false(),
-        )
+    # Task 10 · 底稿绑定入口（Req 8.7）：列出底稿关联附件 = 读该底稿，走统一门；不可见统一 404。
+    await gate_wp(
+        db, current_user,
+        entrypoint="attachment.read", action="attach_read", method="GET",
+        wp_id=wp_id, entry_family="attachment",
     )
-    project_id = wp_result.scalar_one_or_none()
-    if project_id is None:
-        raise HTTPException(status_code=404, detail="底稿不存在")
-    await _ensure_project_access(db, current_user, project_id, "readonly")
     return await svc.get_wp_attachments(wp_id)
 
 
@@ -233,6 +244,11 @@ async def update_ocr_status(
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
     await _ensure_project_access(db, current_user, UUID(att["project_id"]), "edit")
+    # Task 10 · wp-link 隔离层（OCR 写；Req 8.7）：以可见性探针校验关联底稿可见。
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_read", method="GET", entrypoint="attachment.read",
+    )
     result = await svc.update_ocr_status(attachment_id, body.status, body.ocr_text)
     if not result:
         raise HTTPException(status_code=404, detail="附件不存在")
@@ -330,6 +346,10 @@ async def classify_document(attachment_id: UUID, db: AsyncSession = Depends(get_
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
     await _ensure_project_access(db, current_user, UUID(att["project_id"]), "readonly")
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_read", method="GET", entrypoint="attachment.read",
+    )
     try:
         return await svc.classify_document(attachment_id)
     except ValueError as e:
@@ -343,6 +363,10 @@ async def extract_confirmation_reply(attachment_id: UUID, db: AsyncSession = Dep
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
     await _ensure_project_access(db, current_user, UUID(att["project_id"]), "readonly")
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_read", method="GET", entrypoint="attachment.read",
+    )
     try:
         return await svc.extract_confirmation_reply(attachment_id)
     except ValueError as e:
@@ -365,6 +389,11 @@ async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(ge
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
     await _ensure_project_access(db, current_user, UUID(att["project_id"]), "readonly")
+    # Task 10 · wp-link 隔离层（Req 8.7/9.3）：附件若关联底稿，要求至少一关联底稿可见。
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_download", method="GET", entrypoint="attachment.download",
+    )
 
     # C3：att["file_path"] 已投影为 opaque locator，内部字节读取须取真实路径。
     raw = await svc.get_raw_storage(attachment_id)
@@ -429,6 +458,11 @@ async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get
     if not att:
         raise HTTPException(status_code=404, detail="附件不存在")
     await _ensure_project_access(db, current_user, UUID(att["project_id"]), "readonly")
+    # Task 10 · wp-link 隔离层（Req 8.7/9.3）
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_read", method="GET", entrypoint="attachment.read",
+    )
 
     # C3：att["file_path"] 已投影为 opaque locator，内部预览读取须取真实路径。
     raw = await svc.get_raw_storage(attachment_id)
@@ -528,6 +562,12 @@ async def retry_ocr(
     att = await svc.get_attachment(attachment_id)
     if not att:
         raise HTTPException(404, "附件不存在")
+    # Task 10 · 补齐项目级授权 + wp-link 隔离层（原实现缺项目授权，Req 8.7）。
+    await _ensure_project_access(db, current_user, UUID(att["project_id"]), "edit")
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_read", method="GET", entrypoint="attachment.read",
+    )
 
     # 更新 OCR 状态为 pending
     from app.models.phase10_models import Attachment as AttachmentModel

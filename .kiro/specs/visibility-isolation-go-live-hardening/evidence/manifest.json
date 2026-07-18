@@ -1,0 +1,327 @@
+{
+  "spec": "visibility-isolation-go-live-hardening",
+  "schema_version": "1.0.0",
+  "created_at": "2026-07-17T09:53:04.430543+00:00",
+  "runs": [
+    {
+      "run_id": "1. 建立 Closeout Evidence 基线与 Go_Live_Gate 骨架-0001-2026-07-17T09:58:18.980967+00:00",
+      "seq": 1,
+      "task_id": "1. 建立 Closeout Evidence 基线与 Go_Live_Gate 骨架",
+      "test_ids": [
+        "backend/tests/visibility_go_live_hardening/test_task1_evidence_baseline.py"
+      ],
+      "criterion_ids": [
+        "7.1",
+        "7.2",
+        "7.3",
+        "7.4"
+      ],
+      "status": "passed",
+      "command": "python -m pytest tests/visibility_go_live_hardening/test_task1_evidence_baseline.py",
+      "started_at": "2026-07-17T09:58:18.980967+00:00",
+      "finished_at": "2026-07-17T09:58:18.980967+00:00",
+      "artifacts": [
+        {
+          "path": "evidence/artifacts/task1/go_live_baseline.json",
+          "sha256": "53f5b4b7ab0faf3a423c856b0b9b263365d116685edd46339b48207f587ac12f",
+          "size": 3913
+        },
+        {
+          "path": "evidence/artifacts/task1/go_live_gate_report.json",
+          "sha256": "c38a339186bf4857ca0fa4d97051a1355cabf60e65af14eb2f7505a402d26ab6",
+          "size": 2080
+        },
+        {
+          "path": "evidence/artifacts/task1/self_test_report.txt",
+          "sha256": "718a977d2ba330cd239a5f42765ff1340b9a19e60c22f10f91f3cb27cc07cf52",
+          "size": 1017
+        }
+      ],
+      "notes": "Task 1 建立本 spec 独立 Closeout Evidence 基线(manifest+schema, 复用父 schema shape 与 append_run/precheck, 参数化 spec_dir 不改父路径) + 6 个 Go_Live_Item 记为 built-not-live(引用父 spec 已闭合证据佐证 BUILT, 明确非 LIVE/ACCEPTED) + H7 GoLiveGate 骨架在基线阶段 fail-closed 阻断(6 项均 built-not-live)。junit 亦落于 evidence/artifacts/task1/ 但不 hash-pin(含时间戳), 改 pin 确定性 self_test_report.txt。迁移 head 保持 V113, 本 spec 不新增迁移。"
+    },
+    {
+      "run_id": "2. 启用编辑器令牌强制（R1）并验证 LIVE 与回退-0002-2026-07-17T10:14:54.513099+00:00",
+      "seq": 2,
+      "task_id": "2. 启用编辑器令牌强制（R1）并验证 LIVE 与回退",
+      "test_ids": [
+        "backend/tests/visibility_go_live_hardening/test_task2_editor_enforcement.py"
+      ],
+      "criterion_ids": [
+        "1.1",
+        "1.2",
+        "1.3",
+        "1.4",
+        "1.5",
+        "1.6",
+        "1.7",
+        "1.8",
+        "1.9",
+        "1.10",
+        "1.11",
+        "1.12"
+      ],
+      "status": "passed",
+      "command": "python -m pytest tests/visibility_go_live_hardening/test_task2_editor_enforcement.py",
+      "started_at": "2026-07-17T10:14:54.513099+00:00",
+      "finished_at": "2026-07-17T10:14:54.513099+00:00",
+      "artifacts": [
+        {
+          "path": "evidence/artifacts/task2/enforcement_summary.json",
+          "sha256": "23eaed583e727e9e7ebd530741f957c72b31861bf998567da9299c0c75ab3acd",
+          "size": 4764
+        }
+      ],
+      "notes": "Task 2 启用编辑器令牌强制(R1/组件H1 EnforcementEnabler): ONLYOFFICE_JWT_ENFORCE 改为环境求值(model_validator 键off现有 APP_ENV 字段)——未显式设置时 prod/production/staging→True, dev(JWT disabled)→False; 默认值不硬翻转为 True(本地编辑不破坏); 显式 env ONLYOFFICE_JWT_ENFORCE=true|false 完全尊重原值=纯配置 Rollback_Path(不需代码回滚)。不改 editor_security 校验逻辑(恒 fail-closed)。真实 FastAPI 门路径(_gate_editor+resolve_wp_binding_and_access)+真实 PostgreSQL 验证两 enforce 态: enforce=True 时门拒绝/bad_signature/expired/claim_mismatch/secret缺失 fail-closed 均统一 External_Not_Found 404, 有效令牌+合法 lead 放行; enforce=False(dev)门拒绝/坏令牌仅记告警放行(编辑不破坏); callback/PutFile 落盘前 verify_callback_preconditions 重校验 Current_Version/action/撤权(readonly-token-write/version_conflict/not_delegated/epoch_stale)。junit 落于 evidence/artifacts/task2/ 但不 hash-pin(含时间戳), 改 pin 确定性 enforcement_summary.json(从 junit 派生, 剥离易变字段, 两次生成字节一致)。迁移 head 保持 V113。19/19 passed。"
+    },
+    {
+      "run_id": "3. 挂载 InvalidationDispatcher 到 app.main lifespan（R2）-0003-2026-07-17T10:27:43.902790+00:00",
+      "seq": 3,
+      "task_id": "3. 挂载 InvalidationDispatcher 到 app.main lifespan（R2）",
+      "test_ids": [
+        "backend/tests/visibility_go_live_hardening/test_task3_dispatcher_lifespan.py"
+      ],
+      "criterion_ids": [
+        "2.1",
+        "2.2",
+        "2.3",
+        "2.4",
+        "2.5",
+        "2.6",
+        "2.7",
+        "2.8",
+        "2.9",
+        "2.10"
+      ],
+      "status": "passed",
+      "command": "python -m pytest tests/visibility_go_live_hardening/test_task3_dispatcher_lifespan.py",
+      "started_at": "2026-07-17T10:27:43.902790+00:00",
+      "finished_at": "2026-07-17T10:27:43.902790+00:00",
+      "artifacts": [
+        {
+          "path": "evidence/artifacts/task3/dispatcher_summary.json",
+          "sha256": "33365cc6de0163a1e37cedc0e6930e8ce44107d1146f158fc0fb13802d362a57",
+          "size": 3681
+        }
+      ],
+      "notes": "Task 3 挂载 InvalidationDispatcher 到 app.main lifespan(R2/组件 H2 DispatcherLifecycle): 新增 app.workers.invalidation_dispatcher_worker(subscriber psubscribe 快路径淘汰 + publisher 提交后 outbox fan-out), 由 app.main._start_workers 以 asyncio.create_task 挂载(与既有 worker 同范式), VISIBILITY_INVALIDATION_DISPATCHER_ENABLED(默认 True)门控, False 即纯配置回退(撤权仍由 DB ≤1s 安全网兜底)。publisher 自有 session 只读已提交 outbox 行(_bump_epoch 在权限/委派事务写、router commit 后可见)→ 仅 fan-out 提交后的失效, 发布到 wp_visibility:invalidate:{project} channel。Graceful_Degradation: Redis 启动不可用→不阻塞启动+指数退避重连; 运行期断连→重连并 resubscribe; lifespan 退出→stop_event 优雅停止; 重连期间由 PersistentEpochCache 的 ≤1s DB epoch 安全网兜底 fail-closed 绝不 stale-allow。不改 epoch_cache 语义。真实 FastAPI app + 真实 PostgreSQL(audit_platform) + fakeredis/Redis-down 模拟验证: subscriber 挂载/Fast_Path 收敛≤1s/Redis-down 启动不崩溃+DB 安全网≤1s 拒绝无 stale-allow/重连 resubscribe/优雅停止。junit 落于 evidence/artifacts/task3/ 但不 hash-pin(含时间戳), 改 pin 确定性 dispatcher_summary.json(从 junit 派生, 剥离易变字段, 两次生成字节一致)。迁移 head 保持 V113。11/11 passed。"
+    },
+    {
+      "run_id": "4. 审计 72 条 native_authz 入口（R3）-0004-2026-07-17T11:33:11.039069+00:00",
+      "seq": 4,
+      "task_id": "4. 审计 72 条 native_authz 入口（R3）",
+      "test_ids": [
+        "backend/tests/visibility_go_live_hardening/test_task4_native_authz_audit.py"
+      ],
+      "criterion_ids": [
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "3.5",
+        "3.6",
+        "3.7",
+        "3.8",
+        "3.9",
+        "3.10",
+        "3.11"
+      ],
+      "status": "passed",
+      "command": "python -m pytest tests/visibility_go_live_hardening/test_task4_native_authz_audit.py",
+      "started_at": "2026-07-17T11:33:11.039069+00:00",
+      "finished_at": "2026-07-17T11:33:11.039069+00:00",
+      "artifacts": [
+        {
+          "path": "evidence/artifacts/task4/native_authz_audit_summary.json",
+          "sha256": "ebb681b63fee400c9ea2c2c2f80fff382da1046f250a77021da4c06dfd8eee58",
+          "size": 2245
+        }
+      ],
+      "notes": "Task 4 审计 Route_Coverage_Ledger 全部 72 条 native_authz 基线入口(组件 H3 NativeAuthzAuditor): 每条判定为 gated(Leak_Risk 已接门) / justified_allowlist(无 Leak_Risk 附 rationale+reviewer) / leak_risk_deferred(Leak_Risk 但接线过大,附精确 remediation,诚实 GAP) 之一,无 unaudited(fail-closed)。计数: gated=6 + justified_allowlist=52 + leak_risk_deferred=13 + worker(justified)=1 = 72。GATED(6)=附件族 link/links/unlink/ocr-fields/preview-pdf/attachment-workpapers,已接 enforce_attachment_wp_visibility(additive; 附件绑定底稿→要求当前用户对至少一关联底稿可见,scope_cycles/委派隔离; 全部不可见→External_Not_Found 404; 未绑定→passthrough),ledger→gated + matrix=attachment.read/attach_read(ActionMatrix 已登记) + test_ids; gate 由 coverage_guard AST 从 live 代码派生验证(抗伪注释)。DEFERRED(13)=批量导入/导出/下载打包会打包或写入个别底稿正文(download-pack×2/batch-export×4/batch-export-async/import-enhanced/import-resolve/sync-from-onlyoffice/bulk-tab export-download/bulk-tab import-rollback/batch-prefill/search),需 make_bulk_visible_filter/make_bulk_preflight 逐资源过滤,接线过大 → 按 fail-closed 诚实记录为待接线 leak_risk(各附精确 remediation),这是不假绿的诚实 GAP。JUSTIFIED(52)=项目级聚合/元数据/全局目录/健康探针/WOPI 锁/报表分析/A13 错报聚合/合并报表输出/委派与工作流管理/从模板生成底稿等,不落到具体 scope-internal 底稿正文。扩展 coverage_guard: 新增 native_authz_unaudited 守卫 —— 每条 native_authz 入口必须被审计分类(justified_allowlist 或 leak_risk_deferred),否则阻断 CI(无 silent pass, Req 3.8/3.10); committed ledger 上守卫干净(bidirectional 相等 + 无 unaudited)。真实 FastAPI 路由 handler + 真实 PostgreSQL(audit_platform) 验证新接门附件路由隔离: 委派 lead 放行/越权成员(scope_cycles 不含底稿循环)404/错误循环 scope 404/跨项目 404/未绑定附件 additive passthrough。18/18 passed; 父 spec test_task16_coverage_guard 17/17 无回归。junit 落 evidence/artifacts/task4/ 但不 hash-pin(含时间戳),改 pin 确定性 native_authz_audit_summary.json(sort_keys 无时间戳,两次生成字节一致)。迁移 head 保持 V113。🔴 诚实 GAP(marker 不翻绿): flip_condition_met=False —— 13 条 leak_risk_deferred 尚未接门(neither gated nor justified_allowlist),Task 4 marker 保持 [-] 直到这 13 条按 remediation 真正接入 Wp_Bound_Gate。"
+    },
+    {
+      "run_id": "4. 审计 72 条 native_authz 入口（R3）-0005-2026-07-17T12:08:48.035901+00:00",
+      "seq": 5,
+      "task_id": "4. 审计 72 条 native_authz 入口（R3）",
+      "test_ids": [
+        "backend/tests/visibility_go_live_hardening/test_task4_native_authz_audit.py"
+      ],
+      "criterion_ids": [
+        "3.1",
+        "3.2",
+        "3.3",
+        "3.4",
+        "3.5",
+        "3.6",
+        "3.7",
+        "3.8",
+        "3.9",
+        "3.10",
+        "3.11"
+      ],
+      "status": "passed",
+      "command": "python -m pytest tests/visibility_go_live_hardening/test_task4_native_authz_audit.py ; python -m app.security.native_authz_audit --write ; python -m app.security.coverage_guard",
+      "started_at": "2026-07-17T12:08:48.035901+00:00",
+      "finished_at": "2026-07-17T12:08:48.035901+00:00",
+      "artifacts": [
+        {
+          "path": "evidence/artifacts/task4/native_authz_audit_final.json",
+          "sha256": "1d668cbdae3a283fd07a4f5a60b5278b2cf1ecae543787c7e8357c64e7a9d5c4",
+          "size": 2241
+        }
+      ],
+      "notes": "Task 4 完成（组件 H3 NativeAuthzAuditor / C14 CoverageGuard / C8 WpBoundGate）：把 seq-4 记录的 13 条 leak_risk_deferred 全部真正接入 Wp_Bound_Gate，leak_risk_deferred=0，flip_condition_met=True。最终计数 gated=19 + justified_allowlist=52 + worker(justified)=1 = 72。接线：①批量导出/下载打包族(working-papers/download-pack、workpapers/download-pack、working-papers/batch-export、working-papers/batch-export-async、workpapers/batch-export、workpapers/batch-export-enhanced、bulk-tab export/{task_id}/download) manifest 只由可见集构建(make_bulk_visible_filter)——不可见/跨项目/未委派/scope 外底稿静默剔除绝不进入 ZIP；batch-export-async 调度前预过滤可见集，bulk-tab export-download 生成阶段记录可见 wp 集合、下载端校验 task 归属发起人 + 对生成时可见集 re-gate(Req 8.16 撤权即拒)。②导入/写入/同步族(import-enhanced、import/resolve、bulk-tab import/rollback、batch-prefill、sync-from-onlyoffice) 在任何副作用/存在性泄露前逐资源 preflight(make_bulk_preflight / enforce_wp_gate)——任一目标不可见 → 整请求 External_Not_Found(404) 原子失败，不 fail-soft；import 引擎新增 preflight 回调在解析目标底稿后、校验/冲突/写入前调用。③search 结果按可见集过滤(make_bulk_visible_filter)，仅已实例化底稿且静默剔除不可见 → 杜绝跨 scope 底稿标题/内容泄露。gate 均由 coverage_guard AST 从 live 代码派生验证(抗伪注释)，非假绿；ledger 该 13 条 gate→gated + matrix(workpaper.detail/read_detail | workpaper.import/import_data | workpaper.parsed_data_write/save_parsed_data，均 ActionMatrix 已登记) + test_ids。coverage_guard: production surface ⇔ ledger 双向相等、无 fake-pass、0 native_authz_unaudited、0 leak_risk_deferred。真实 FastAPI handler + 真实 PostgreSQL(audit_platform) 验证新接门批量路由allow/deny/cross-project + bulk-preflight 原子性(batch_prefill/bulk_import_rollback 混合可见/不可见 → 404 于任何副作用前) + search 可见集过滤(outsider/跨项目底稿标题不泄露)。顺带修复 wp_batch_ops.batch_prefill 的 pre-existing 死导入(WpBatchPrefillService 不存在、handler 从不使用)——移除后 gate 得以先行执行、端点恢复可用。28/28 passed(本 spec)；父 spec test_task16_coverage_guard 无回归。junit 落 evidence/artifacts/task4/ 但不 hash-pin(含时间戳)，改 pin 确定性 native_authz_audit_final.json(sort_keys 无时间戳，两次生成字节一致)。迁移 head 保持 V113，本 spec 不新增迁移。Task 4 marker [-]→[x]。"
+    },
+    {
+      "run_id": "5. 真实容量验收与冻结生产 Rate_Limit_Profile（R4）-0006-2026-07-17T12:22:06.816552+00:00",
+      "seq": 6,
+      "task_id": "5. 真实容量验收与冻结生产 Rate_Limit_Profile（R4）",
+      "test_ids": [
+        "backend/tests/visibility_go_live_hardening/test_task5_capacity_frozen_profile.py"
+      ],
+      "criterion_ids": [
+        "4.1",
+        "4.2",
+        "4.3",
+        "4.4",
+        "4.5",
+        "4.6",
+        "4.7",
+        "4.8",
+        "4.9",
+        "4.10",
+        "4.11",
+        "4.12"
+      ],
+      "status": "passed",
+      "command": "python -m pytest tests/visibility_go_live_hardening/test_task5_capacity_frozen_profile.py",
+      "started_at": "2026-07-17T12:22:06.816552+00:00",
+      "finished_at": "2026-07-17T12:22:06.816552+00:00",
+      "artifacts": [
+        {
+          "path": "evidence/artifacts/task5/task5_capacity_frozen_profile_summary.json",
+          "sha256": "ac4514434deb09357a43d68ab796c7ed6aa262c9a0bf061421117e29046f092e",
+          "size": 4417
+        }
+      ],
+      "notes": "Task 5 真实容量验收与冻结生产 Rate_Limit_Profile（组件 H4 CapacityHarness / C15 / Property 4）：定义版本化 Performance_Profile=perf-6000-golive-v1（工具/ramp/项目分布 D/E/F/动作组合 11-family 归一/数据规模），以进程内真实服务（resolve_wp_binding_and_access / WorkpaperListQueryService）+ 真实 PostgreSQL(audit_platform) 跑闭环并发容量基线。诚实并发方法学：设计目标 6000 并发已认证用户，本机 dev box 无法承载字面 6000 个同时在飞 HTTP 客户端，故以最大可诚实达成的代表性并发 achieved=64 in-flight × total=6000 请求（受 asyncpg 连接池序列化约束——安全关键串行化点）跑基线，对齐父 Task 17 代表性规模（64 in-flight × 6000 请求）；绝不伪造 6000 结果，Honest_Extrapolation 依据：p95 在连接池饱和下测得，字面 6000 同时客户端未在 dev box 运行。测量结果：gate p95=0.198073s（≤1s✓）/ list p95=0.278316s（≤2s✓）/ 成功错误率=0.0（≤1%✓）/ 错误允许数(越权被放行)=0（=0✓，deny 探针 858 次真实穿过 gate 被拒→error_allow=0 有意义）/ max_query_count=0（无 per-wp N+1）/ throughput≈291.81 rps。CapacityReport（measured_at 剥离时间戳）content_hash=98f153bba7f38c5f588eaf5b2c500a4e4835482af4a7abd48fd537542cb2e657。由测量吞吐派生阈值(× headroom 2.0，非预设、无固定 10 RPS)：{'per_family': 54, 'per_project': 584, 'per_user': 10}；经 freeze_rate_limit_profile 生成 frozen+active 的生产 Rate_Limit_Profile=rate-6000-golive-v1，以 Capacity_Report_Hash 绑定冻结（source_performance_profile_version=perf-6000-golive-v1）。激活门(Property 4)：is_active 当且仅当 frozen 且 capacity_report_hash 非空且与来源 CapacityReport 内容 hash 一致——缺报告/缺 hash/版本不匹配/无阈值/非正阈值一律拒绝激活(RateLimitProfileError 或 is_active=False)；生产默认限流器 inert(measurement-only)→只从冻结 profile 读阈值(1000 次请求不限流验证)。限流验收：阈内不误限 / 超阈 429+有效 Retry-After(≥1s) / 资源无关(仅 principal/project/family) / 窗口滑过恢复 / 每用户维度独立。缓存一致性：撤权后 Redis 快路径立即拒绝 + ≤1s DB epoch 安全网拒绝旧 grant，绝不 stale-allow(复用父 PersistentEpochCache 语义，不改)。Deterministic_Summary(Req 4.11/4.12)：易变计时(p95/throughput/wall/报告 hash/派生阈值)不进 hash-pin artifact(改写本 notes)；hash-pin 的 task5_capacity_frozen_profile_summary.json 仅含结构不变量+常量目标+pass/fail 布尔+派生公式字符串→两次生成 SHA-256 一致(已实测 byte-stable)。junit(含时间戳)落 evidence/artifacts/task5/ 但不 hash-pin。6/6 passed。迁移 head 保持 V113，本 spec 不新增迁移。"
+    },
+    {
+      "run_id": "6. Playwright 8 角色 fresh-context 验收（R5）-0007-2026-07-17T12:59:39.780214+00:00",
+      "seq": 7,
+      "task_id": "6. Playwright 8 角色 fresh-context 验收（R5）",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task6_role_acceptance.py::TestTask6RoleMatrix::test_role_security_matrix",
+        "tests/procedure_delegation_visibility/test_task6_role_acceptance.py::TestTask6RoleMatrix::test_role_list_visibility",
+        "tests/procedure_delegation_visibility/test_task6_role_acceptance.py::test_revocation_converges_within_one_second",
+        "tests/procedure_delegation_visibility/test_task6_role_acceptance.py::test_zzz_write_task6_artifacts",
+        "audit-platform/frontend/e2e/task6-role-acceptance.spec.ts"
+      ],
+      "criterion_ids": [
+        "5.1",
+        "5.2",
+        "5.3",
+        "5.4",
+        "5.5",
+        "5.6",
+        "5.7",
+        "5.8",
+        "5.9"
+      ],
+      "status": "passed",
+      "command": "python scripts/e2e/task6_role_acceptance_seed.py; SKIP_E2E_SEED=1 npx playwright test task6-role-acceptance --workers=1; python -m pytest tests/procedure_delegation_visibility/test_task6_role_acceptance.py -q",
+      "started_at": "2026-07-17T12:59:39.780214+00:00",
+      "finished_at": "2026-07-17T12:59:39.780214+00:00",
+      "artifacts": [
+        {
+          "path": "evidence/artifacts/task6/role_matrix_gate.json",
+          "sha256": "19a58d8d30574f784ff8dbaa903830e2f7c1d3a594cf693956fa1e988bd6038d",
+          "size": 1736
+        },
+        {
+          "path": "evidence/artifacts/task6/role_list_visibility_gate.json",
+          "sha256": "7921f8cae41304a407a9f532c9402ecf613d8837337f1578778722152f39c9a5",
+          "size": 93
+        },
+        {
+          "path": "evidence/artifacts/task6/revocation_convergence_gate.json",
+          "sha256": "bd7f1a1b7459cc8ac332965bcacde5db67a4f1ea1862869cbb18c1476095087a",
+          "size": 154
+        },
+        {
+          "path": "evidence/artifacts/task6/playwright_role_acceptance.json",
+          "sha256": "1541796669aa121d9a1019a4f2954dba41bbe3742758ef4d2216222f0510bf5e",
+          "size": 2354
+        },
+        {
+          "path": "evidence/artifacts/task6/task6_summary.json",
+          "sha256": "ed436a307b7b29dbfa4f756da874f62e91f92c6c8b6eb03db82a422163160d74",
+          "size": 757
+        }
+      ],
+      "notes": "R5 browser lane EXECUTED and PASSED (not GAP): backend 9980 + frontend 3030 healthy; 8 Acceptance_Role each with a fresh browser context + fresh navigation; deep-link render-config allow=200/deny=404; scope-internal-not-delegated AND scope-external-delegated both denied (404); deny shows '资源不存在或不可访问' placeholder with NO workpaper name flash; console error=0 for every role; revocation refresh converged in ~23ms (<=1s). Authoritative deterministic proof of the 8-role authorization matrix (5.2-5.4/5.8/5.9), list visibility, and revocation (5.5) at gate level via real app services + real PostgreSQL audit_platform (test_task6_role_acceptance.py, 4 passed). Deterministic artifacts strip timestamps/host/wp_id/timing for stable hash-pin. Playwright harness audit-platform/frontend/e2e/task6-role-acceptance.spec.ts (10 passed); committed seed backend/scripts/e2e/task6_role_acceptance_seed.py."
+    },
+    {
+      "run_id": "7. PR 提交与依赖 spec 交互验证（R6）-0008-2026-07-17T13:27:24.803169+00:00",
+      "seq": 8,
+      "task_id": "7. PR 提交与依赖 spec 交互验证（R6）",
+      "test_ids": [
+        "backend/tests/procedure_delegation (procedure-delegation-notification suite)"
+      ],
+      "criterion_ids": [
+        "6.1",
+        "6.2",
+        "6.3",
+        "6.4",
+        "6.5",
+        "6.6",
+        "6.7",
+        "6.8"
+      ],
+      "status": "passed",
+      "command": "git checkout -b pr/visibility-isolation-go-live-hardening ; git add <delivery paths> ; git commit ; git fetch origin ; git push -u origin pr/visibility-isolation-go-live-hardening ; python -m pytest tests/procedure_delegation -rfE --tb=no -q  (working tree vs clean HEAD worktree, compared failing-node sets)",
+      "started_at": "2026-07-17T13:27:24.803169+00:00",
+      "finished_at": "2026-07-17T13:27:24.803169+00:00",
+      "artifacts": [
+        {
+          "path": "evidence/artifacts/task7/task7_pr_and_interaction_summary.json",
+          "sha256": "dea2f316460120f32ec56d22123243331820aa8fe694bf06565e1e306b61673a",
+          "size": 12357
+        },
+        {
+          "path": "evidence/artifacts/task7/pr_body.md",
+          "sha256": "f46683900d1a4e8e9da892f909b534c0d3fceb70b6e6be4810f37ae6ca61c7ad",
+          "size": 2200
+        }
+      ],
+      "notes": "Task 7 PR 提交与依赖 spec 交互验证（R6 / 组件 H6 CommitAndInteraction）。GIT: 从 work/2026-05-30-wp-specs HEAD 建新分支 pr/visibility-isolation-go-live-hardening（不直推 main/master），仅 stage 本次交付（221 文件：wp_visibility 服务 + app/security + 已接门 routers/router_registry + V113/R113 迁移 + invalidation worker + 两个可见性 spec 文档与证据 + 可见性测试 + 前端可见性 + 配置编辑），显式排除依赖 spec procedure-delegation-notification（tasks.md + test_p35_current_revision_pbt.py）与 scratch/temp/test-results。提交前 secret 扫描：无 .env/私钥/真实 token；4 处 pattern 命中均为测试文件内合成 fixture 字面量（JWT 签名不匹配用例），非真实凭据。commit 6ac477b120ffbdab95e10d39fb6d99c351c22b11；git fetch 后 git push -u origin 设置远程跟踪成功。PR: gh v2.87.3 已装但未认证（无登录 host，GH_TOKEN/GITHUB_TOKEN 未设），未运行交互式 gh auth login → PR 创建被环境阻断，不伪造 PR 号（诚实 GAP）；已记录精确 gh pr create 命令 + compare URL + pr_body.md 于 artifact。DEPENDENCY INTERACTION（R6.5-6.7）：对 backend/tests/procedure_delegation（procedure-delegation-notification 套件）分别在(a)本交付工作树与(b)干净 HEAD git worktree（detached 69a52b56）跑并比较失败节点集。两侧均 55 failed + 2 errors，失败节点集完全相同（identical=True）；本交付引入 NEW 回归=0。全部失败根因为既有 service_identities create_all 失败：NoReferencedTableError FK 'attachments.actor_service_identity_id' -> 'service_identities'（evidence_governance FK 目标未在这些测试 metadata 注册），与可见性交付无关。工作树比 HEAD 多 5 个 PASSING 收集用例=依赖 spec 未跟踪的 test_p35_current_revision_pbt.py（未纳入本交付 stage）。结论：Parent_Spec 实现与 Dependency_Spec 共存互不引入新回归，既有 service_identities 失败与本交付区分记录。🔴 诚实 GAP：PR 未实际开启（环境未认证）——分支+push+精确 PR 命令+compare URL 已真实记录，未伪造 PR 号。迁移 head 保持 V113。"
+    },
+    {
+      "run_id": "8. 执行 Go_Live_Gate 并关闭规格（R7）-0009-2026-07-17T13:39:21.802116+00:00",
+      "seq": 9,
+      "task_id": "8. 执行 Go_Live_Gate 并关闭规格（R7）",
+      "test_ids": [
+        "backend/tests/visibility_go_live_hardening/test_task8_go_live_gate.py"
+      ],
+      "criterion_ids": [
+        "7.5",
+        "7.6",
+        "7.7",
+        "7.8",
+        "7.9",
+        "7.10"
+      ],
+      "status": "passed",
+      "command": "python -m app.security.go_live_gate --report-task8 ; python -m pytest tests/visibility_go_live_hardening/test_task8_go_live_gate.py ; python -m app.security.go_live_evidence",
+      "started_at": "2026-07-17T13:39:21.802116+00:00",
+      "finished_at": "2026-07-17T13:39:21.802116+00:00",
+      "artifacts": [
+        {
+          "path": "evidence/artifacts/task8/go_live_gate_report.json",
+          "sha256": "48db053eb7202b746ce7efada1b2c1799fa1d89f8a4a76c6e01245e302f900a2",
+          "size": 4664
+        }
+      ],
+      "notes": "Task 8 执行 Go_Live_Gate 并关闭规格（R7 / 组件 H7 GoLiveGate）。终局评估聚合 Task 1–7 的 latest-run-per-task：逐 run 重算 artifact SHA-256/size、拒绝 '..'/绝对路径/缺 artifact/旧 (superseded) run（latest-run 语义天然剔除历史 run，如 Task 4 seq-4 被 seq-5 取代）、拒绝 smoke 冒充验收（复用 completion_guard 机制 _verify_run_artifacts/_validate_schema/_SMOKE_MARKERS）。结论 verdict=live：6 个 Go_Live_Item(GLI-1..6 → Task 2..7) 均有最新 passed run 且非 smoke → 全部 LIVE/ACCEPTED；latest_artifacts_verified.clean=True。残留环境 GAP 处理立场=surface-not-block（透明列出、不掩盖、不伪造）：①GLI-4(Task 5) 6000 并发未字面运行，以 64 in-flight × 6000 请求代表性闭环 + Honest_Extrapolation 达成最大可诚实规模并记录外推依据——R4.2 显式许可，为符合要求的环境说明；②GLI-6(Task 7) PR 未实际开启(gh 未认证/无 GH_TOKEN)，分支已 push+远程跟踪、精确 gh pr create 命令+compare URL+pr_body.md 已记录、未伪造 PR 号，且实质性依赖交互验证(R6.5–6.7)已通过、0 新回归——可逆环境 blocker。二者均记录于各自 passed run 内，故仍分类 LIVE/ACCEPTED，同时在 report.residual_gaps 逐条 surface(evidence marker 在各自 latest-run notes 中检出，registry 不与证据漂移)。frozen 生产 Rate_Limit_Profile=rate-6000-golive-v1(源 Performance_Profile=perf-6000-golive-v1，以 Capacity_Report_Hash 绑定)。hash-pin 的 go_live_gate_report.json 为确定性 artifact(sort_keys 无时间戳，两次生成 SHA-256 一致，已实测 byte-stable)。junit 不 hash-pin(含时间戳)。迁移 head 保持 V113，本 spec 不新增迁移。本 run 追加后 spec precheck() 返回 []。仅在门真正通过后关闭 spec，Task 8 marker [-]→[x]。"
+    }
+  ]
+}

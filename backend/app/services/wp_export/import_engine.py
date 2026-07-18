@@ -102,6 +102,7 @@ class WpImportEngine:
         filename: str,
         resolution: ConflictResolution | None = None,
         user_id: UUID | None = None,
+        preflight: Any = None,
     ) -> ImportResult:
         """完整导入流程：提取元数据→校验→冲突检测→上传→归档。
 
@@ -112,6 +113,9 @@ class WpImportEngine:
             filename: 文件名（含扩展名）
             resolution: 冲突处理选项（首次导入为 None）
             user_id: 操作人 ID
+            preflight: 可选 ``async (wp_id, sheet_key) -> None`` 可见性 preflight 回调
+                （make_bulk_preflight）。解析出目标底稿后、任何副作用/存在性泄露前调用；
+                目标不可见 → 抛 ExternalNotFound(404)（Task 4 / R3）。
 
         Returns:
             ImportResult
@@ -150,6 +154,14 @@ class WpImportEngine:
                 "导入文件缺少必要元数据(wp_code/project_id)，无法匹配目标底稿。"
                 "请使用系统导出的文件进行导入。"
             )
+
+        # ─── Step 2.5: Wp_Bound_Gate 可见性 preflight（Task 4 / R3）──────
+        # 解析目标底稿后、在校验/冲突检测（存在性泄露）与写入（副作用）之前逐资源过 gate；
+        # 目标不可见/跨项目/未委派 → preflight 抛 ExternalNotFound(404)，请求原子失败。
+        if preflight is not None:
+            _pf_wp_id = await self._find_wp_id(db, project_id, metadata.wp_code)
+            if _pf_wp_id is not None:
+                await preflight(_pf_wp_id, None)
 
         # ─── Step 3: FormatValidator 校验（含 render_schema 结构校验）────
         render_schema = None

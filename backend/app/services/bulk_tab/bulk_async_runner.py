@@ -85,6 +85,7 @@ def schedule_export(
             platform_version=platform_version,
             audit_year=audit_year,
             filename=filename,
+            user_id=str(user_id),
         )
     )
     return task.task_id
@@ -101,13 +102,32 @@ async def _run_export(
     platform_version: str,
     audit_year: int,
     filename: str,
+    user_id: str | None = None,
 ) -> None:
-    """后台 worker：用自有 session 跑 bulk_export_service.export，进度经 SSE 推。"""
+    """后台 worker：用自有 session 跑 bulk_export_service.export，进度经 SSE 推。
+
+    Task 10（Req 8.16 / 16.17）：worker 在 **实际执行时** 用自有 session 重新 gate（re-gate），
+    manifest 仅由此刻可见集构建；排队期间被撤权则不可见底稿不进入导出。
+    """
+    from sqlalchemy import select
+
     from app.services.bulk_tab import bulk_export_service
     from app.services.bulk_tab.manifest_builder import build_manifest
+    from app.services.wp_visibility.entry_integration import make_bulk_visible_filter
 
     try:
         async with async_session_factory() as db:
+            # worker 自有 session：重载 User 以在执行时 re-gate（请求 session 已关闭）
+            _user = None
+            if user_id:
+                _user = (
+                    await db.execute(select(User).where(User.id == UUID(user_id)))
+                ).scalar_one_or_none()
+            visible_filter = (
+                make_bulk_visible_filter(db, _user, entry_kind="worker")
+                if _user is not None
+                else None
+            )
             # 预建 manifest 以获知 total（ACNR 内存目录读取，代价低）
             try:
                 manifest = await build_manifest(
@@ -120,6 +140,18 @@ async def _run_export(
                     audit_year=audit_year,
                 )
                 bulk_progress_service.set_total(task_id, len(manifest.exportable()))
+                # Task 4（R3 · Req 8.16）：记录本次导出的可见底稿 wp_id 集合，供下载端 re-gate。
+                # manifest 只由可见集构建（bulk_export_service.export 应用 visible_filter）；此处
+                # 以同一 visible_filter 复核，得到实际进入 ZIP 的可见 wp 集合。
+                _exportable = manifest.exportable()
+                if visible_filter is not None:
+                    _visible_ids = [
+                        f.wp_id for f in _exportable
+                        if f.wp_id and await visible_filter(f.wp_id, None)
+                    ]
+                else:
+                    _visible_ids = [f.wp_id for f in _exportable if f.wp_id]
+                bulk_progress_service.set_wp_ids(task_id, _visible_ids)
             except Exception:
                 # total 仅用于进度显示，失败不阻断导出
                 logger.debug("bulk async export: manifest 预建计数失败", exc_info=True)
@@ -135,6 +167,7 @@ async def _run_export(
                 platform_version=platform_version,
                 audit_year=audit_year,
                 progress=progress,
+                visible_filter=visible_filter,
             )
 
         # 写盘（会话已关闭，纯 IO）
@@ -226,6 +259,11 @@ async def _run_import(
                 return
 
             progress = bulk_progress_service.make_progress_callback(task_id)
+            # Task 10（Req 8.16 / 16.17）：worker 执行时 re-gate 每个目标底稿；排队期间被撤权 →
+            # preflight 抛 ExternalNotFound（副作用前）→ 本 worker 捕获 → 任务失败（排队任务被拒）。
+            from app.services.wp_visibility.entry_integration import make_bulk_preflight
+
+            preflight = make_bulk_preflight(db, user, entry_kind="worker")
             report = await bulk_import_service.run(
                 db=db,
                 project_id=str(project_id),
@@ -234,6 +272,7 @@ async def _run_import(
                 user=user,
                 atomicity=atomicity,
                 progress=progress,
+                preflight=preflight,
             )
             # service 只 flush 不 commit → worker 负责 commit
             await db.commit()

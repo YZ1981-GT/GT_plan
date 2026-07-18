@@ -1,0 +1,29 @@
+EXPLAIN (ANALYZE, BUFFERS) — delegation-history reverse-set query shape
+(History_Set: wp_index/sheet for a user in project, intersected with scope_cycles)
+workpaper_delegation_history row count = 0
+
+Unique  (cost=13.75..13.76 rows=1 width=354) (actual time=0.061..0.062 rows=0 loops=1)
+  Buffers: shared hit=7 dirtied=1
+  ->  Sort  (cost=13.75..13.75 rows=1 width=354) (actual time=0.061..0.061 rows=0 loops=1)
+        Sort Key: h.wp_index_id, h.sheet_key
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=7 dirtied=1
+        ->  Nested Loop  (cost=0.28..13.74 rows=1 width=354) (actual time=0.016..0.016 rows=0 loops=1)
+              Buffers: shared hit=1 dirtied=1
+              ->  Seq Scan on workpaper_delegation_history h  (cost=0.00..11.20 rows=1 width=354) (actual time=0.015..0.015 rows=0 loops=1)
+                    Filter: ((new_user_id = 'ae9e0523-627f-44c1-b20a-99854439f6f3'::uuid) AND (project_id = '00000000-0000-0000-0000-000000000099'::uuid))
+                    Buffers: shared hit=1 dirtied=1
+              ->  Index Scan using wp_index_pkey on wp_index wi  (cost=0.28..2.50 rows=1 width=16) (never executed)
+                    Index Cond: (id = h.wp_index_id)
+                    Filter: ((audit_cycle)::text = ANY ('{D,E,F}'::text[]))
+Planning:
+  Buffers: shared hit=165 dirtied=1
+Planning Time: 0.980 ms
+Execution Time: 0.119 ms
+
+CONCLUSION: On the (empty/low-cardinality) history table the planner chooses a
+Seq Scan; the wp_index join uses the existing wp_index_pkey. A support index on
+(new_user_id, project_id) would NOT be chosen at this cardinality. Per the spec
+empiricism rule, NO V-index was added in V113. Visibility support indexes are
+deferred to Task 5/15 (index only after EXPLAIN proves plan improvement with
+representative data).

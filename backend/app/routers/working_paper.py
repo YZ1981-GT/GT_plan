@@ -24,7 +24,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import sqlalchemy as sa
 
 from app.core.database import get_db
-from app.core.field_selection import parse_fields, DEFAULT_SUMMARY_FIELDS, BLOCKED_FIELDS
 from app.deps import require_project_access, check_consol_lock
 from app.models.core import User
 from app.models.phase10_schemas import DownloadPackRequest
@@ -99,54 +98,98 @@ router = APIRouter(
 async def list_workpapers(
     project_id: UUID,
     audit_cycle: str | None = None,
-    status: str | None = None,
+    index_status: str | None = Query(None, description="索引层状态过滤（WpIndex.status）"),
+    file_status: str | None = Query(None, description="文件/编制层状态过滤（WorkingPaper.status）"),
     assigned_to: UUID | None = None,
-    fields: str | None = Query(None, description="逗号分隔的字段名，如 id,wp_code,status"),
+    page: int = Query(1, description="页码（正整数）；非法值在底稿查询前返回 422"),
+    page_size: int = Query(20, description="每页大小（1..100）；非法值在底稿查询前返回 422"),
+    sort: str = Query("wp_code", description="排序字段（已登记：wp_code/audit_cycle/index_status/file_status/created_at/updated_at）"),
+    sort_dir: str = Query("asc", description="排序方向 asc/desc"),
+    visibility_mode: str | None = Query(None, description="展示模式（仅 UX，不参与授权）"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """底稿列表（支持筛选，需项目成员权限）。自动按用户 scope_cycles 过滤。"""
-    # 获取用户的循环范围限制
-    scope_cycles = None
-    if current_user.role.value not in ("admin", "partner"):
-        from app.models.core import ProjectUser
-        pu = (await db.execute(
-            sa.select(ProjectUser.scope_cycles).where(
-                ProjectUser.project_id == project_id,
-                ProjectUser.user_id == current_user.id,
-                ProjectUser.is_deleted == False,
-            )
-        )).scalar()
-        if pu and isinstance(pu, str) and pu.strip():
-            scope_cycles = [c.strip() for c in pu.split(",") if c.strip()]
+    """底稿列表（服务端强制可见性 + 正式分页 / 状态拆分）。
 
-    svc = WorkingPaperService()
-    items = await svc.list_workpapers(
-        db=db,
-        project_id=project_id,
-        audit_cycle=audit_cycle,
-        status=status,
-        assigned_to=assigned_to,
-        scope_cycles=scope_cycles,
+    Feature: procedure-delegation-visibility-isolation · Task 8（组件 C13）。
+    - 授权只来自服务端角色分类 + scope + grants（``visibility_mode`` / 客户端身份不改变授权，
+      Req 12.1–12.3 / Property 15）。
+    - 固定 SQL 顺序：参数校验 → grants → 业务过滤 → 去重 → total/stats → 稳定排序 → 分页。
+    - 响应仅 ``{items,total,stats,page,page_size}``（Req 11.6）；拆 ``index_status``/``file_status``。
+    - 非法 page/page_size/sort 在底稿查询前返回 HTTP 422（Req 11.7）。
+    """
+    from app.services.wp_visibility import (
+        InvalidListParams,
+        VisibilityRoleClassifier,
+        WorkpaperListFilters,
+        WorkpaperListQueryService,
     )
 
-    # 字段选择：过滤返回字段
-    requested_fields = parse_fields(fields)
-    if requested_fields is not None:
-        # 移除屏蔽字段
-        allowed = requested_fields - BLOCKED_FIELDS
-        # 确保至少包含 id
-        allowed.add("id")
-        items = [
-            {k: v for k, v in item.items() if k in allowed}
-            for item in items
-        ]
-    else:
-        # 默认行为：使用默认摘要字段集排除大字段
-        # 保持向后兼容 — 现有返回字段不含 parsed_data，无需额外过滤
-        pass
+    context = await VisibilityRoleClassifier(db).classify(current_user, project_id)
+    svc = WorkpaperListQueryService(db)
+    try:
+        return await svc.list_workpapers(
+            context,
+            page=page,
+            page_size=page_size,
+            sort=sort,
+            sort_dir=sort_dir,
+            filters=WorkpaperListFilters(
+                audit_cycle=audit_cycle,
+                index_status=index_status,
+                file_status=file_status,
+                assigned_to=assigned_to,
+            ),
+        )
+    except InvalidListParams as exc:
+        # 非法分页/排序：在任何底稿数据查询之前返回 422（Req 11.7）
+        raise HTTPException(status_code=422, detail=str(exc))
 
-    return items
+
+@router.get("/my-lead-workpapers")
+async def list_my_lead_workpapers(
+    project_id: UUID,
+    audit_cycle: str | None = None,
+    index_status: str | None = Query(None),
+    file_status: str | None = Query(None),
+    page: int = Query(1),
+    page_size: int = Query(20),
+    sort: str = Query("wp_code"),
+    sort_dir: str = Query("asc"),
+    visibility_mode: str | None = Query(None, description="展示模式（仅 UX，不参与授权）"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """我的主编底稿（MyLeadWorkpapers，组件 C13 / Req 11.12–11.13）。
+
+    仅返回当前用户作为 Workpaper_Lead（authoritative ``WorkingPaper.assigned_to``）的底稿；
+    与"我的程序任务"（assignee/reviewer）为两个独立身份视图，复用同一分页/去重/stats/排序契约。
+    响应仅 ``{items,total,stats,page,page_size}``；非法 page/page_size/sort → 422（先于底稿查询）。
+    """
+    from app.services.wp_visibility import (
+        InvalidListParams,
+        VisibilityRoleClassifier,
+        WorkpaperListFilters,
+        WorkpaperListQueryService,
+    )
+
+    context = await VisibilityRoleClassifier(db).classify(current_user, project_id)
+    svc = WorkpaperListQueryService(db)
+    try:
+        return await svc.list_lead_workpapers(
+            context,
+            page=page,
+            page_size=page_size,
+            sort=sort,
+            sort_dir=sort_dir,
+            filters=WorkpaperListFilters(
+                audit_cycle=audit_cycle,
+                index_status=index_status,
+                file_status=file_status,
+            ),
+        )
+    except InvalidListParams as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.post("/working-papers/download-pack")
@@ -156,12 +199,22 @@ async def download_workpaper_pack(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
+    # Wp_Bound_Gate（Task 4 / R3）：打包底稿正文前用可见集过滤 wp_ids
+    # （make_bulk_visible_filter）；不可见/跨项目/未委派/scope 外底稿静默剔除，
+    # 不泄露存在性，绝不进入 ZIP（manifest 只由可见集构建）。
+    from app.services.wp_visibility.entry_integration import make_bulk_visible_filter
+
+    _visible = make_bulk_visible_filter(
+        db, current_user, entrypoint="workpaper.detail", action="read_detail",
+        method="GET", entry_family="download",
+    )
+    visible_wp_ids = [wid for wid in body.wp_ids if await _visible(wid, None)]
     svc = WpDownloadService()
     try:
         buf = await svc.download_pack(
             db=db,
             project_id=project_id,
-            wp_ids=body.wp_ids,
+            wp_ids=visible_wp_ids,
             include_prefill=body.include_prefill,
         )
         return StreamingResponse(
@@ -181,6 +234,17 @@ async def get_workpaper(
     current_user: User = Depends(require_project_access("readonly")),
 ):
     """底稿详情（需项目成员权限）"""
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：读取底稿详情正文之前完成授权判定（Req 8.1/8.5）。read_detail 只读族；
+    # 不可见/跨项目/越权/不存在统一 External_Not_Found（404）。无 project_id 时 gate 从 wp_id 反查。
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.detail", action="read_detail", method="GET",
+        wp_id=wp_id, project_id=project_id, entry_family="detail",
+        route_name="/api/projects/{project_id}/working-papers/{wp_id}",
+    )
+
     svc = WorkingPaperService()
     detail = await svc.get_workpaper(db=db, wp_id=wp_id, project_id=project_id)
     if detail is None:
@@ -354,6 +418,16 @@ async def update_parsed_data(
     不覆盖 univer_snapshot 等其他键。
     """
     from sqlalchemy.orm.attributes import flag_modified
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：写 parsed_data 前完成授权判定（Req 8.1/8.5）。save_parsed_data 内容写；
+    # reviewer/History_Only 被拒（矩阵与 grant 保证）。
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.parsed_data_write", action="save_parsed_data", method="PUT",
+        wp_id=wp_id, project_id=project_id, entry_family="save",
+        route_name="/api/projects/{project_id}/working-papers/{wp_id}/parsed-data",
+    )
 
     wp = (await db.execute(
         sa.select(WorkingPaper).where(WorkingPaper.id == wp_id, WorkingPaper.is_deleted == False)
@@ -384,6 +458,30 @@ async def update_status(
     编制状态流转由 WorkingPaperService.update_status 严格校验。
     提交复核请使用 POST /submit-review 专用端点（含4项门禁）。
     """
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：file_status 迁移（写副作用）之前完成授权判定
+    # （Req 8.5 / status 入口族 / Part A 已把矩阵状态对齐真实 WpFileStatus）。
+    # source_state = 当前 file_status，target_state = 请求状态；仅 lead/admin/supervisor_scope
+    # 的完整允许项覆盖真实迁移，assignee/reviewer/History_Only 被拒；越权/不存在统一 404。
+    _cur = (
+        await db.execute(
+            sa.select(WorkingPaper.status).where(
+                WorkingPaper.id == wp_id,
+                WorkingPaper.project_id == project_id,
+                WorkingPaper.is_deleted == sa.false(),
+            )
+        )
+    ).scalar_one_or_none()
+    _src = (_cur.value if hasattr(_cur, "value") else str(_cur)) if _cur is not None else "none"
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.status_transition", action="status_transition",
+        method="POST", wp_id=wp_id, project_id=project_id, entry_family="status",
+        route_name="/api/projects/{project_id}/working-papers/{wp_id}/status",
+        source_state=_src, target_state=str(data.status),
+    )
+
     svc = WorkingPaperService()
     try:
         result = await svc.update_status(db=db, wp_id=wp_id, new_status=data.status, project_id=project_id)

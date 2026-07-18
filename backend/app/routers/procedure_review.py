@@ -74,6 +74,18 @@ async def get_procedure_conversation(
     user=Depends(get_current_user),
 ):
     """只读复核视图（对话 + 消息 + 未解决问题单）。严格只读。"""
+    from app.routers._wp_gate import enforce_task_gate
+
+    # Wp_Bound_Gate（task 绑定）：读取程序行复核对话正文之前完成可见性/绑定判定
+    # （Req 8.10/8.12 / procedure_task 入口族）。read_task 只读族对全部参与身份可命中，
+    # 作为统一门可见性前置；细粒度会话读写授权仍由 resolve_conversation_access 原生强制。
+    await enforce_task_gate(
+        db, user,
+        entrypoint="procedure.task_read", action="read_task", method="GET",
+        task_id=task_id, project_id=pid, entry_family="procedure_task",
+        route_name="/api/projects/{pid}/procedure-row-tasks/{task_id}/conversation",
+    )
+
     task = await _load_task(db, pid, task_id)
     resolution = await resolve_conversation_access(db, task_id, user)
     if resolution.access == ParticipantAccess.none:

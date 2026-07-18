@@ -78,6 +78,18 @@ async def create_version(
     current_user: User = Depends(get_current_user),
 ) -> SnapshotMeta:
     """创建版本快照。"""
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：创建整稿快照（写副作用）之前完成授权判定（Req 8.15 / snapshot）。
+    # version_snapshot 仅 lead/admin/supervisor_scope 登记（assignee/reviewer/History_Only 被拒）；
+    # 越权/不存在统一 External_Not_Found（404）。
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="version.snapshot", action="version_snapshot", method="POST",
+        wp_id=wp_id, project_id=pid, entry_family="snapshot",
+        route_name="/api/projects/{pid}/workpapers/{wp_id}/versions",
+    )
+
     await _validate_workpaper_belongs_to_project(db, pid, wp_id)
 
     result = await VersionTrailService.create_snapshot(
@@ -106,6 +118,17 @@ async def list_versions(
     current_user: User = Depends(get_current_user),
 ) -> dict:
     """分页获取快照列表（按 created_at DESC）。"""
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：读取版本列表之前完成授权判定（Req 8.15）。read_versions 只读族；
+    # History_Only 仅当前版本可读、越权/不存在统一 404（gate 服务统一处理）。
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.version_list", action="read_versions", method="GET",
+        wp_id=wp_id, project_id=pid, entry_family="version",
+        route_name="/api/projects/{pid}/workpapers/{wp_id}/versions",
+    )
+
     await _validate_workpaper_belongs_to_project(db, pid, wp_id)
 
     items, total = await VersionTrailService.list_snapshots(
@@ -130,6 +153,17 @@ async def get_version_detail(
     current_user: User = Depends(get_current_user),
 ) -> SnapshotDetail:
     """获取快照详情（含 data_json）。"""
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：读取快照详情正文之前完成授权判定（Req 8.15）。
+    # 历史版本对 History_Only 用户的隔离由 gate 服务统一处理；越权/不存在统一 404。
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.version_list", action="read_versions", method="GET",
+        wp_id=wp_id, project_id=pid, entry_family="version",
+        route_name="/api/projects/{pid}/workpapers/{wp_id}/versions/{vid}",
+    )
+
     await _validate_workpaper_belongs_to_project(db, pid, wp_id)
 
     return await VersionTrailService.get_snapshot_detail(
@@ -151,6 +185,17 @@ async def compare_versions(
     current_user: User = Depends(get_current_user),
 ) -> DiffResult:
     """计算两个快照间的 field-level diff。"""
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：读取两版本快照正文做 diff 之前完成授权判定（Req 8.15 / snapshot）。
+    # compare 是读动作，用 read_versions 只读族；越权/不存在统一 404。
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.version_list", action="read_versions", method="GET",
+        wp_id=wp_id, project_id=pid, entry_family="snapshot",
+        route_name="/api/projects/{pid}/workpapers/{wp_id}/versions/compare",
+    )
+
     await _validate_workpaper_belongs_to_project(db, pid, wp_id)
 
     return await VersionTrailService.compute_diff(
@@ -173,6 +218,18 @@ async def rollback_version(
     current_user: User = Depends(get_current_user),
 ) -> SnapshotMeta:
     """回滚到指定快照（仅现场经理及以上）。"""
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：回滚（写动作）产生副作用之前完成授权判定（Req 8.15）。version_restore
+    # 仅 lead/admin/supervisor_scope 在矩阵登记（assignee/reviewer/History_Only 被拒）；
+    # 越权/不存在统一 External_Not_Found（404）。层叠在既有角色门禁之上，不改其语义。
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="version.restore", action="version_restore", method="POST",
+        wp_id=wp_id, project_id=pid, entry_family="version",
+        route_name="/api/projects/{pid}/workpapers/{wp_id}/versions/{vid}/rollback",
+    )
+
     # 权限校验：审计助理不允许回滚
     role_value = current_user.role.value if hasattr(current_user.role, "value") else str(current_user.role)
     if role_value not in _ROLLBACK_ALLOWED_ROLES:

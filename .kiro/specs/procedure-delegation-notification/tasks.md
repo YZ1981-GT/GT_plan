@@ -38,7 +38,7 @@
   - 确认 migration status 最高 V104，预留 V105 文件名与 ORM/DDL 契约入口。
   - _需求：2.5, 7.3-7.5, 9.4, 9.7, 13.9_
 
-- [ ] 2. 实现 V105 expand 数据模型与 V106 cutover-hardening
+- [x] 2. 实现 V105 expand 数据模型与 V106 cutover-hardening
   - 保留已落地 V105，不得回改；新增 V106 additive migration 与 ORM：`procedure_template_revisions` current registry、必要 barrier/heartbeat 索引或状态、history append-only 防护。
   - V106 回填只在某 template_code 存在可证明唯一 revision 时设 current；多 revision/歧义标 reconcile_pending，不按时间猜测。
   - 新建/核验 `procedure_row_definitions`、`procedure_row_tasks`、`procedure_row_task_history`、`procedure_operation_previews` 与现有字段/FK/nullability。
@@ -48,13 +48,13 @@
   - 新增 V106 迁移契约与 P35 数据库属性测试。
   - _需求：1.1-1.2, 2.1-2.2, 4.2, 10.1, 12.1-12.7, 13.3, 15.1-15.2, 15.11_
 
-- [ ] 3. 实现 ProcedureRowDefinition 导入、current revision 与稳定行身份
+- [x] 3. 实现 ProcedureRowDefinition 导入、current revision 与稳定行身份
   - 保留 DefinitionImporter 的 JSON/xlsx 规范化、SHA-256 revision、definition_key 与 legacy aliases；补 current revision registry 登记/显式激活，导入本身不得隐式切 current。
   - 把 `sheet_key + definition_key + definition_revision_hash` 写入标准 ProgramRow schema/模板快照/render 输入，禁止数组序号成为长期身份。
   - current 缺失、多值或 reconcile_pending 时 fail-closed；不得以最新 created_at/hash/导入顺序猜测。
   - 编写 PBT P1-P3/P35-P36：跨项目稳定、mtime 不敏感、语义变化、历史 revision 隔离、跨 sheet 重号、空 program_no。
   - _需求：1.1-1.7, 15.1-15.3_
-- [ ] 4. 收敛显式 materialize、精确 overlay 与底稿原子绑定
+- [x] 4. 收敛显式 materialize、精确 overlay 与底稿原子绑定
   - materialize 未显式给 revision 时只从 current registry 唯一解析；一次性集合查询全部目标 wp_index/wp_code/revision definitions，消除 per-wp_index N+1。
   - ProgramRow overlay 只按 `sheet_key+definition_key+definition_revision_hash`；删除按 program_no 的 `setdefault`/first-match，旧行缺 key 仅显示待对账。
   - bind 锁定全部 anchor tasks 后先校验；任一 task 已绑定异 wp 则整批 409/零写，全部合法才批量绑定并在同事务 rebuild projection。
@@ -99,14 +99,14 @@
   - 编写 PBT P11-P15：selector 等价、篡改/重放/越权/过期 409、一次消费、批量原子、owner 隔离。
   - _需求：4.1-4.10, 6.4, 10.7_
 
-- [ ] 9. 收敛状态机 CAS、任务真源、精确投影与审计快照
+- [x] 9. 收敛状态机 CAS、任务真源、精确投影与审计快照
   - 保留 TransitionService 转换表；所有外部 mutation 强制 expected lock_version，assignment mutation 再强制 expected assignment_version。
   - CAS 由 service 内原子 UPDATE RETURNING 或 service-owned FOR UPDATE 保证，不依赖 router；cancel/reopen/trim/scope mutation 同样覆盖。
   - mutation 前冻结 old snapshot、后生成 new snapshot；history writer 用 sentinel 区分未提供与真实 NULL，修首次 assign/reopen/reviewer 变化审计。
   - task/history/outbox/projection 同事务；parsed_data 仅 jsonb_set 精确路径，旧写入口只作 TransitionService adapter。
   - 编写 PBT P19-P24/P33/P38 与真实 PG 并发测试，覆盖首次 assign、换人、清人、同版本竞态、失败零副作用。
   - _需求：6.1-6.9, 7.1-7.9, 12.5-12.6, 15.6-15.7_
-- [ ] 10. 收敛 ordered outbox、aggregate barrier 与跨 worker dispatcher
+- [x] 10. 收敛 ordered outbox、aggregate barrier 与跨 worker dispatcher
   - 保留 claim lease/退避/replay/Notification dedup；修 dead-letter 前序仍阻塞后续 version，新增审计 waive/skip 决议。
   - dispatcher 在应用 lifespan 显式 start/stop，多 worker 依赖 lease/SKIP LOCKED；暴露 heartbeat/backlog/oldest/barrier/跨进程 publish 指标与健康状态。
   - Notification commit 后通过 Redis Pub/Sub（或共享 broker）发布 event_id，各 worker 本地 SSE fan-out；SSE 只作 wake-up，客户端持久化 API catch-up。
@@ -114,14 +114,14 @@
   - 编写 PBT P29-P30/P39-P40 与双 worker、断线重连、dead-letter barrier、lease 超时、Notification 成功/wake-up 失败/replay 集成测试。
   - _需求：10.1-10.12, 13.2, 13.8, 15.12_
 
-- [ ] 11. 收敛通知聚合、metadata 与前端刷新
+- [x] 11. 收敛通知聚合、metadata 与前端刷新
   - Notification dedup/批量摘要/metadata 深链继续复用；assign/reassign/submit/changes_requested/review/reviewer_missing/comment/reply 类型全部走 outbox。
   - 前端按 event_id LRU 幂等，并以 200–500ms debounce 合并任务与未读数刷新；N 个任务事件不得触发 N 次全量请求。
   - 支持 reconnect cursor/last event id 后从持久化 API catch-up；已读通知仍可跳转。
   - 编写 PBT P30-P31/P39 与 N task/M recipient、重复/漏失 wake-up、跨 worker、刷新次数上限组件测试。
   - _需求：5.6, 8.7, 10.4-10.12, 14.2-14.3_
 
-- [ ] 12. 收敛任务查询 API 与 MyProcedureTasks.vue
+- [x] 12. 收敛任务查询 API 与 MyProcedureTasks.vue
   - 查询补 project/wp_index/due range、服务端 overdue total、assignee/reviewer 展示与 materialization 状态，保持 active staff covering index。
   - UI 补项目/底稿/截止筛选、参与者列、底稿未生成的刷新/提醒、review conversation/IssueTicket 入口。
   - 409 按 reason code 展示可操作信息（版本冲突、reviewer_missing、issue 未关闭、preview 过期），按钮按 request_id 防重复。
@@ -130,20 +130,20 @@
   - 编写 PBT P27-P28/P39、API schema/filter/pagination/空态/权限与前端 payload/刷新次数回归测试。
   - _需求：9.1-9.8, 12.3, 14.3-14.4, 15.3_
 
-- [ ] 13. 收敛操作复核、IssueTicket、历史参与者与通知路径
+- [x] 13. 收敛操作复核、IssueTicket、历史参与者与通知路径
   - 保留 reviewer resolver、ReviewConversation 与 IssueTicket 门槛；确认 GET conversation 严格零写。
   - comment/reply/reviewer_missing/changes_requested/review 全部同事务写 outbox，删除直接 Notification/SSE 旁路。
   - reviewer 转派后历史参与者可读参与期间记录但无当前动作权限；高阶复核不受影响。
   - 编写 PBT P17-P18/P25-P26 与通知重试、GET 零写、多轮返修集成测试。
   - _需求：5.4-5.8, 8.1-8.8, 10.10_
 
-- [ ] 14. 完成 legacy 裁剪页 cutover、精确控制台深链与一级复核 UI
+- [x] 14. 完成 legacy 裁剪页 cutover、精确控制台深链与一级复核 UI
   - 将 `ProcedureTrimming.vue/commonApi` 的保存裁剪、方案应用和委派切到新 materialize→preview→apply/transition 契约；显示 job、TTL、真实 changed/unchanged/conflict 与结构化 409。
   - GtAProgramConsole 使用三元组 task overlay；未物化只展示。深链必须真实清筛选、展开、滚动、高亮，失配提示模板变化，不按 program_no 猜测。
   - 接入 ProcedureReviewPanel、IssueTicket 未解决数和历史只读标识；高阶复核独立显示。
   - 运行 vitest/fast-check/Vite transform，并用 Playwright fresh navigation 验证真实控制台行为，不只断言 URL。
   - _需求：3.7, 5.7-5.8, 8.1-8.8, 9.5-9.7, 14.1-14.3, 14.8, 15.3, 15.8_
-- [ ] 15. 完成 V106 backfill、write freeze、cutover 与非破坏回滚
+- [x] 15. 完成 V106 backfill、write freeze、cutover 与非破坏回滚
   - 保留可恢复 backfill 与 dual-read diff；新增 current revision 回填/歧义报告、WorkingPaper 创建入口 bind inventory。
   - 统一 WRITE_MODE 为 `legacy|dual|task_source|paused` 并实现合法迁移；删除/拒绝未声明的同义模式。
   - 建 legacy endpoint/page 调用清单与 guard；task_source 下用户可达路径不得写 legacy，paused 下所有新领域写零副作用拒绝。
@@ -152,7 +152,7 @@
   - 编写 PBT P34/P41 与中断恢复、模式矩阵、入口 drift、回滚数据保留测试。
   - _需求：7.6-7.9, 13.1-13.9, 15.8-15.12_
 
-- [ ] 16. 完成 CI、自动化、性能验证与 evidence manifest
+- [x] 16. 完成 CI、自动化、性能验证与 evidence manifest
   - 运行 V105/V106 migration、ORM/schema drift、pg_catalog/current revision/partial index/append-only 契约测试。
   - 运行后端 targeted unit/PBT P1-P42、PostgreSQL 并发/事务/dispatcher；前端 vitest/fast-check/Vite transform 与 GET 零写守卫。
   - 压测 5000 task preview≤3s、materialize query-count/EXPLAIN、任务查询 p95≤2s、transition p95≤1s、跨 worker wake-up 与 debounce 刷新上限。
@@ -161,7 +161,7 @@
   - 任一失败必须修复后重跑，不得跳过、降断言或假绿。
   - _需求：1-15 全部自动化验收，14.7, 15.12_
 
-- [ ] 17. 完成四角色 Playwright 全链路实测与最终复盘
+- [x] 17. 完成四角色 Playwright 全链路实测与最终复盘
   - 使用 admin、现场经理、审计助理、操作复核人 fresh navigation；验证项目权限与跨项目 IDOR。
   - 验证先委派后生成、bind 冲突零写/成功原子投影、revision 精确身份、同版本并发、返修/IssueTicket/review。
   - 验证 legacy 裁剪页已切新契约、task_source write freeze、paused rollback、跨 worker wake-up/重连 catch-up/dead-letter barrier。

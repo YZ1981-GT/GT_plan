@@ -131,6 +131,23 @@ async def s_estimate_tb_writeback(
 
     Requirements: 7.1, 7.4
     """
+    from uuid import UUID as _UUID
+
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：审定数回写 trial_balance（写副作用）之前完成授权判定
+    # （Req 8.5 / trial-balance writeback）。tb_writeback 仅 lead/admin/supervisor_scope；
+    # gate 从 wp_id 反查 project；越权/不存在统一 404。
+    try:
+        _wpid = _UUID(str(wp_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail="资源不存在或不可访问")
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.tb_writeback", action="tb_writeback", method="POST",
+        wp_id=_wpid, entry_family="save",
+        route_name="/api/s-estimate/{wp_id}/tb-writeback",
+    )
     # 从 wp_id 获取 project_id + year
     wp_result = await db.execute(
         sa.text(
@@ -215,6 +232,21 @@ async def s_estimate_tb_writeback_batch(
 
     Requirements: 7.1, 7.4
     """
+    from uuid import UUID as _UUID
+
+    from app.routers._wp_gate import enforce_wp_gate
+
+    # Wp_Bound_Gate：批量审定回写（写副作用）之前完成授权判定（Req 8.5 / tb writeback）。
+    try:
+        _wpid = _UUID(str(wp_id))
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=404, detail="资源不存在或不可访问")
+    await enforce_wp_gate(
+        db, current_user,
+        entrypoint="workpaper.tb_writeback", action="tb_writeback", method="POST",
+        wp_id=_wpid, entry_family="save",
+        route_name="/api/s-estimate/{wp_id}/tb-writeback-batch",
+    )
     # 从 wp_id 获取 project_id + year
     wp_result = await db.execute(
         sa.text(

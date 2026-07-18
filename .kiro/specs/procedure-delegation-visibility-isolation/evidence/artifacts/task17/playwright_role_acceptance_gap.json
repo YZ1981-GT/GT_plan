@@ -1,0 +1,30 @@
+{
+  "exact_playwright_plan": {
+    "assertions": "identical to TestRoleMatrixApiLevel (both scope-internal-not-delegated AND scope-external-delegated denied) plus UI-only: no name/body flash, console error=0.",
+    "per_role_new_context": [
+      "Admin",
+      "Supervisor",
+      "Workpaper_Lead",
+      "Row_Assignee",
+      "Operation_Reviewer",
+      "History Lead",
+      "History Row",
+      "plain Restricted"
+    ],
+    "preconditions": "start-dev.bat (backend 9980 + frontend 3030) healthy; seed one project with the 8-role fixture used in TestRoleMatrixApiLevel._seed.",
+    "steps_each_role": [
+      "browser.newContext() + fresh navigation (no shared storage/session)",
+      "login as the role principal",
+      "assert workpaper list shows ONLY visible set (no name/body flash of hidden wp)",
+      "open delegated wp tab/URL → allowed; open scope-internal-not-delegated wp URL → '资源不存在或不可访问' placeholder, no cached name/body flash",
+      "open scope-external-delegated wp URL → denied placeholder",
+      "attempt write/review/attachment/AI/version/OO-WOPI per role matrix → allow/deny per gate",
+      "revoke delegation in another context → within 1s the role's next action denied (poll)",
+      "queued OnlyOffice callback / bulk worker re-gate after revocation → denied",
+      "assert console error count == 0 for every navigation"
+    ]
+  },
+  "reason": "dev backend on port 9980 is NOT running; starting a heavy dev server as a blocking/background process for load acceptance is not safe/permitted in this run. Frontend 3030 is up but cannot serve without the backend.",
+  "status": "GAP_deferred",
+  "substitute": "role security matrix verified at API/gate integration level against the real app services (resolve_wp_binding_and_access / WorkpaperListQueryService) + real PostgreSQL (audit_platform) — see role_matrix.json."
+}

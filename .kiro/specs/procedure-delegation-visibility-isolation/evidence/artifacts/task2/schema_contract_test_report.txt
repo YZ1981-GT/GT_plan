@@ -1,0 +1,38 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-8.4.2, pluggy-1.6.0 -- D:\GT_plan\.venv\Scripts\python.exe
+hypothesis profile 'fast' -> deadline=None, max_examples=5, suppress_health_check=(HealthCheck.too_slow, HealthCheck.data_too_large, HealthCheck.function_scoped_fixture)
+rootdir: D:\GT_plan\backend
+configfile: pytest.ini
+plugins: anyio-4.13.0, hypothesis-6.152.4, asyncio-1.3.0, cov-7.1.0, subtests-0.14.2, schemathesis-3.39.16
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 21 items
+
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113MigrationStatic::test_migration_and_rollback_files_exist PASSED [  4%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113MigrationStatic::test_migration_head_rescanned_next_free_version PASSED [  9%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113MigrationStatic::test_idempotent_guards_present PASSED [ 14%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113MigrationStatic::test_append_only_triggers_declared PASSED [ 19%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113MigrationStatic::test_reason_enum_check_has_all_values_incl_rate_limited PASSED [ 23%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113MigrationStatic::test_invalidation_change_type_check PASSED [ 28%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113MigrationStatic::test_no_sensitive_columns_declared PASSED [ 33%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113MigrationStatic::test_orm_models_registered PASSED [ 38%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113MigrationStatic::test_append_only_orm_has_no_updated_at PASSED [ 42%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113MigrationStatic::test_epoch_column_is_bigint PASSED [ 47%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113MigrationStatic::test_rollback_only_drops_v113_objects PASSED [ 52%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113PgContract::test_apply_is_idempotent_and_tables_exist PASSED [ 57%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113PgContract::test_history_columns_and_fk PASSED [ 61%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113PgContract::test_security_outbox_columns_and_reason_check PASSED [ 66%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113PgContract::test_reason_check_rejects_unknown_and_accepts_rate_limited PASSED [ 71%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113PgContract::test_epoch_and_invalidation_columns PASSED [ 76%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113PgContract::test_append_only_triggers_block_update_and_delete PASSED [ 80%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113PgContract::test_outbox_tables_are_append_only PASSED [ 85%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113PgContract::test_policy_epoch_monotonic_and_atomic_increment PASSED [ 90%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113PgContract::test_rollback_r113_transactional PASSED [ 95%]
+tests/procedure_delegation_visibility/test_v113_schema_contract.py::TestV113PgContract::test_orm_db_zero_drift_for_task2_scope PASSED [100%]
+
+============================== warnings summary ===============================
+..\.venv\Lib\site-packages\schemathesis\generation\coverage.py:305
+  D:\GT_plan\.venv\Lib\site-packages\schemathesis\generation\coverage.py:305: DeprecationWarning: jsonschema.exceptions.RefResolutionError is deprecated as of version 4.18.0. If you wish to catch potential reference resolution errors, directly catch referencing.exceptions.Unresolvable.
+    ref_error: type[Exception] = jsonschema.RefResolutionError,
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 21 passed, 1 warning in 1.44s ========================
