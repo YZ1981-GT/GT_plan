@@ -61,7 +61,7 @@
       <el-checkbox
         :model-value="ca.sheet.value.pool.linkSource"
         :disabled="isReadonly"
-        @change="(v: boolean) => ca.updatePool({ linkSource: v })"
+        @change="(v) => ca.updatePool({ linkSource: !!v })"
       >
         联动来源底稿
       </el-checkbox>
@@ -254,7 +254,8 @@
                 link
                 type="danger"
                 size="small"
-                @click="ca.removeProduct(row.id)"
+                :disabled="ca.enrichedProducts.value.length <= 1 && isBlankAllocationProduct(row)"
+                @click.stop="ca.removeProduct(row.id)"
               >删</el-button>
             </td>
           </tr>
@@ -332,7 +333,7 @@
 import { ref, onMounted, toRef, type Ref } from 'vue'
 import { useF2CostAllocation } from '../../composables/useF2CostAllocation'
 import { useF2ValuationAiGenerate, type F2ValAiSection } from '../../composables/useF2ValuationAiGenerate'
-import { F2_44_DEFAULT_OBJECTIVE } from '../../composables/useF2CostAllocationFormulas'
+import { F2_44_DEFAULT_OBJECTIVE, isBlankAllocationProduct } from '../../composables/useF2CostAllocationFormulas'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'

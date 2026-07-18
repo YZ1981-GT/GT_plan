@@ -54,20 +54,6 @@
       </div>
     </el-card>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><span class="card-title">审计说明</span></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly"
-        :autosize="{ minRows: 5 }" placeholder="请输入审计说明..." @change="saveAuditNote" />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-conclusion-card">
-      <template #header><span class="card-title">审计结论</span></template>
-      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly"
-        :autosize="{ minRows: 3 }" placeholder="请输入审计结论..." @change="saveAuditConclusion" />
-    </el-card>
-
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -87,7 +73,7 @@
  * 48行7列，OO渲染wrapper
  * Spec: Task 4.10 | Requirements: 1.2
  */
-import { ref, watch, defineAsyncComponent } from 'vue'
+import { ref, defineAsyncComponent } from 'vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() =>
@@ -109,36 +95,12 @@ const emit = defineEmits<{
 
 const showOO = ref(true)
 
-// ── 审计说明 / 审计结论（持久化 checklist_responses，conclusion:null）──
-const AUDIT_NOTE_KEY = 'H8-disclosure-listed-audit-note'
-const AUDIT_CONCLUSION_KEY = 'H8-disclosure-listed-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-function _hydrateAudit() {
-  const n = props.allResponses.get(AUDIT_NOTE_KEY)
-  if (n?.remark != null) auditNote.value = n.remark
-  const c = props.allResponses.get(AUDIT_CONCLUSION_KEY)
-  if (c?.remark != null) auditConclusion.value = c.remark
-}
-_hydrateAudit()
-watch(() => props.allResponses, _hydrateAudit)
-function saveAuditNote(val: string) {
-  if (props.isReadonly) return
-  auditNote.value = val
-  emit('save', AUDIT_NOTE_KEY, val)
-}
-function saveAuditConclusion(val: string) {
-  if (props.isReadonly) return
-  auditConclusion.value = val
-  emit('save', AUDIT_CONCLUSION_KEY, val)
-}
 </script>
 
 <style scoped>
 .h8-tab-disclosure-listed { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .objective-alert { margin-bottom: 12px; }
-.audit-note-card, .audit-conclusion-card { margin-bottom: 16px; }
 .card-title { font-weight: 600; }
 
 .h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="f2-roll">
     <header class="rf-hero">
       <div class="rf-hero-main">
@@ -65,7 +65,18 @@
       sheet-code="F2-26"
     />
 
-    <section v-for="group in F2_26_LAYOUT" :key="group.id" class="rf-card">
+    <nav class="st-sec-nav" aria-label="分区导航">
+      <button
+        v-for="item in rfNav"
+        :key="item.id"
+        type="button"
+        class="st-sec-btn"
+        :class="{ active: activeId === item.id }"
+        @click="scrollTo(item.id)"
+      >{{ item.label }}</button>
+    </nav>
+
+    <section v-for="group in F2_26_LAYOUT" :id="`st-${group.id}`" :key="group.id" class="rf-card">
       <header class="rf-card-head">
         <div>
           <h3>{{ group.title }}</h3>
@@ -75,7 +86,7 @@
           v-if="group.id === 'meta' && wpId && !isReadonly"
           size="small"
           plain
-          @click="seedFromPlan"
+          @click="() => seedFromPlan()"
         >从计划/小结带入</el-button>
       </header>
       <div
@@ -134,7 +145,7 @@
       </div>
     </section>
 
-    <section class="rf-card" :class="{ recommended: suggestedMode === 'after' }">
+    <section id="st-after" class="rf-card" :class="{ recommended: suggestedMode === 'after' }">
       <header class="rf-card-head">
         <div>
           <h3>一、资产负债表日后盘点倒轧（倒推）</h3>
@@ -168,7 +179,7 @@
       </div>
     </section>
 
-    <section class="rf-card" :class="{ recommended: suggestedMode === 'before' }">
+    <section id="st-before" class="rf-card" :class="{ recommended: suggestedMode === 'before' }">
       <header class="rf-card-head">
         <div>
           <h3>二、资产负债表日前盘点倒轧（顺推）</h3>
@@ -202,7 +213,7 @@
       </div>
     </section>
 
-    <section class="rf-card rf-card-conclusion">
+    <section id="st-note" class="rf-card rf-card-conclusion">
       <header class="rf-card-head">
         <div>
           <h3>三、审计说明</h3>
@@ -230,7 +241,7 @@
       />
     </section>
 
-    <section class="rf-card rf-card-conclusion">
+    <section id="st-conclusion" class="rf-card rf-card-conclusion">
       <header class="rf-card-head">
         <div>
           <h3>四、审计结论</h3>
@@ -267,6 +278,7 @@ import { ElMessage } from 'element-plus'
 import { useF2StocktakeFields, useF2StocktakeRows } from '../../composables/useF2StocktakeSheet'
 import { useF2StocktakeOcr } from '../../composables/useF2StocktakeOcr'
 import { useF2StocktakeAiGenerate } from '../../composables/useF2StocktakeAiGenerate'
+import { useStickySectionNav } from '../../composables/useStickySectionNav'
 import {
   applyMetaSeedToFields,
   formatVarianceSummary,
@@ -287,6 +299,22 @@ import F2RollTable, { type F2RollEnrichedRow } from './F2RollTable.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
 import F2StocktakeSheetAttachments from './F2StocktakeSheetAttachments.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+
+function shortNavLabel(title: string): string {
+  return title
+    .replace(/^[\d一二三四五六七八九十～\-·\s]+/, '')
+    .replace(/^[·\s]+/, '')
+    .slice(0, 8) || title
+}
+
+const rfNav = [
+  ...F2_26_LAYOUT.map((g) => ({ id: `st-${g.id}`, label: shortNavLabel(g.title) })),
+  { id: 'st-after', label: '日后倒推' },
+  { id: 'st-before', label: '日前顺推' },
+  { id: 'st-note', label: '审计说明' },
+  { id: 'st-conclusion', label: '审计结论' },
+]
+const { activeId, scrollTo } = useStickySectionNav(rfNav)
 
 const props = defineProps<{
   wpId?: string
@@ -628,7 +656,7 @@ async function aiFillConclusion(): Promise<void> {
   --rf-border: #e8eaef;
   --rf-muted: #6b7280;
   --rf-ink: #1f2937;
-  --rf-accent: var(--gt-color-primary, #4b2d77);
+  --rf-accent: var(--gt-color-primary, #334155);
   --rf-accent-light: var(--gt-color-primary-light, #A06DFF);
   --rf-surface: var(--gt-color-primary-bg, #f4f0fa);
   padding: 8px 12px 20px;
@@ -653,7 +681,7 @@ async function aiFillConclusion(): Promise<void> {
   margin-bottom: 12px;
   border: 1px solid var(--rf-border);
   border-radius: 10px;
-  background: linear-gradient(135deg, #faf9ff 0%, #fff 55%);
+  background: linear-gradient(135deg, #f8fafc 0%, #fff 55%);
 }
 .rf-kicker {
   font-size: 11px;
@@ -820,7 +848,7 @@ async function aiFillConclusion(): Promise<void> {
   flex-shrink: 0;
 }
 .ai-chip:hover:not(:disabled) {
-  background: #ebe4f5;
+  background: #f1f5f9;
   border-color: var(--rf-accent-light);
 }
 .ai-chip:disabled {
@@ -837,3 +865,5 @@ async function aiFillConclusion(): Promise<void> {
   display: block;
 }
 </style>
+
+<style src="./f2StocktakeSoftNav.css"></style>

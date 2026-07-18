@@ -13,6 +13,8 @@ export interface ChecklistResponse {
 
 export interface ProjectContext {
   business_category?: string
+  project_type?: string
+  template_type?: string
   applicable_standards?: string[]
   [key: string]: any
 }
@@ -40,9 +42,14 @@ export function useF2SpecialFormData(options: { wpId: Ref<string>; projectId: Re
   const sheetCache = ref<Record<string, any>>({})
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
-  const isIpoProject = computed(() =>
-    IPO_CATEGORIES.includes(projectContext.value.business_category as typeof IPO_CATEGORIES[number]),
-  )
+  // IPO 专项适用性：项目详情接口实际返回 project_type（annual/ipo/…）与
+  // template_type（listed/soe），business_category 仅作历史兼容兜底。
+  const isIpoProject = computed(() => {
+    const ctx = projectContext.value
+    if (ctx.project_type === 'ipo') return true
+    if (ctx.template_type === 'listed') return true
+    return IPO_CATEGORIES.includes(ctx.business_category as typeof IPO_CATEGORIES[number])
+  })
 
   async function loadResponses(): Promise<void> {
     if (!wpId.value) return
@@ -68,8 +75,9 @@ export function useF2SpecialFormData(options: { wpId: Ref<string>; projectId: Re
   async function loadProjectContext(): Promise<void> {
     if (!projectId.value) return
     try {
-      const data = await api.get(`/api/projects/${projectId.value}`)
-      projectContext.value = data || {}
+      const res = await api.get(`/api/projects/${projectId.value}`)
+      // 项目详情响应为 {code, data, message} 信封，需解包后才能读到 project_type 等字段
+      projectContext.value = res?.data ?? res ?? {}
     } catch { /* skip */ }
   }
 

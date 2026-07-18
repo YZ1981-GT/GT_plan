@@ -1,182 +1,357 @@
 <template>
-<div class="d3-disclosure-soe">
+<div class="f1-disclosure-soe">
   <template v-if="!isApplicable">
     <el-alert type="info" title="当前项目不适用国企附注披露格式" :closable="false" show-icon />
   </template>
   <template v-else>
-    <!-- 编制提示 -->
     <details class="guidance-details">
-      <summary>📋 编制提示</summary>
+      <summary>编制提示</summary>
       <div class="guidance-content">
-        <p>1. 国有企业应按《企业财务报告条例》和国资委监管要求，分别披露预付账款（科目1123）按账龄分类和超1年重要预收情况。</p>
-        <p>2. 账龄分类简化为"1年以内"和"1年以上"两档。</p>
-        <p>3. 账龄超过1年的重要预付账款应逐户披露，说明未结转原因。</p>
-        <p>4. 跨sheet取数（浅蓝色背景）自动从 F1-1 审定表按账龄分类区块同步。</p>
+        <p>1. （1）按账龄列示：期末/期初账面余额（金额+比例）及坏账准备，自 F1-2 审定账龄聚合。</p>
+        <p>2. （2）账龄超过1年的重要预付款项：债权单位可填；债务单位/余额/账龄自 F1-2 带入，补未结算原因。</p>
+        <p>3. （3）前五名：按期末余额降序；坏账准备可手工录入。</p>
+        <p>4. 「同步到附注」推送至附注模块「{{ noteSectionId }} 预付款项」。</p>
       </div>
     </details>
 
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：按国有企业财务报告及国资监管要求，完整、准确披露预付账款（科目1123）按账龄分类及超1年重要预付款情况，确保附注披露与 F1-1 审定表勾稽一致。"
+      show-icon
       class="objective-alert"
+      title="审计目标：按国有企业财务报告及国资监管要求披露预付款项账龄、超1年大额及前五名，与 F1-1/F1-2 勾稽并同步附注。"
     />
 
-    <!-- 子节一：按账龄分类 -->
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="isSyncing"
+          :disabled="isReadonly"
+          @click="syncToDisclosureNotes"
+        >同步到附注</el-button>
+        <el-button size="small" text type="primary" @click="showGuide = true">使用手册</el-button>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:F1-1" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:F1-2" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip :value="`Note:${noteSectionId}`" :context-project-id="projectId" /></span>
+      </div>
+    </div>
+
+    <F1SheetAttachments
+      :project-id="projectId"
+      :wp-id="wpId"
+      sheet-code="F1-soe"
+      label="国企附注附件"
+    />
+
+    <!-- (1) 账龄列示 -->
     <div class="disclosure-card">
       <h4 class="card-title">
-        (1) 预付账款按账龄分类
-        <el-tooltip content="数据来源：F1-1审定表按账龄分类区块" placement="top">
+        (1) 预付款项按账龄列示
+        <el-tooltip content="账面余额自 F1-2 审定账龄聚合；坏账准备可手工录入" placement="top">
           <el-tag size="small" type="info">跨sheet取数</el-tag>
         </el-tooltip>
+        <GtIndexChip value="wp:F1-1" :context-project-id="projectId" />
       </h4>
-      <el-table :data="[...section1Rows, section1Subtotal]" size="small" border stripe>
-        <el-table-column prop="label" label="账龄" width="160">
+      <el-table :data="[...agingRows, agingTotal]" size="small" border stripe>
+        <el-table-column prop="label" label="账龄" width="140">
           <template #default="{ row }">
             <span :class="{ 'subtotal-label': row.rowId === '__subtotal__' }">{{ row.label }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末金额" width="130" align="right">
-          <template #default="{ row }">
-            <span :class="{ 'cross-sheet-cell': row.rowId?.startsWith('cs-') }">
-              {{ fmtAmount(row.endAmount) }}
-            </span>
-          </template>
+        <el-table-column label="期末数" align="center">
+          <el-table-column label="账面余额" align="center">
+            <el-table-column label="金额" width="120" align="right">
+              <template #default="{ row }">
+                <span class="cross-sheet-cell">{{ fmtAmount(row.endAmount) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="比例%" width="90" align="right">
+              <template #default="{ row }">
+                <span class="cross-sheet-cell">{{ fmtPct(row.endPct) }}</span>
+              </template>
+            </el-table-column>
+          </el-table-column>
+          <el-table-column label="坏账准备" width="110" align="right">
+            <template #default="{ row }">
+              <template v-if="row.rowId === '__subtotal__'">
+                <span class="subtotal-val">{{ fmtAmount(row.endBadDebt) }}</span>
+              </template>
+              <template v-else>
+                <el-input-number
+                  :model-value="row.endBadDebt"
+                  size="small"
+                  :controls="false"
+                  :disabled="isReadonly"
+                  @change="(v: number | undefined) => updateAgingBadDebt(row.key, 'end', v ?? 0)"
+                />
+              </template>
+            </template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column label="期初金额" width="130" align="right">
-          <template #default="{ row }">
-            <span :class="{ 'cross-sheet-cell': row.rowId?.startsWith('cs-') }">
-              {{ fmtAmount(row.priorAmount) }}
-            </span>
-          </template>
+        <el-table-column label="期初数" align="center">
+          <el-table-column label="账面余额" align="center">
+            <el-table-column label="金额" width="120" align="right">
+              <template #default="{ row }">
+                <span class="cross-sheet-cell">{{ fmtAmount(row.priorAmount) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="比例%" width="90" align="right">
+              <template #default="{ row }">
+                <span class="cross-sheet-cell">{{ fmtPct(row.priorPct) }}</span>
+              </template>
+            </el-table-column>
+          </el-table-column>
+          <el-table-column label="坏账准备" width="110" align="right">
+            <template #default="{ row }">
+              <template v-if="row.rowId === '__subtotal__'">
+                <span class="subtotal-val">{{ fmtAmount(row.priorBadDebt) }}</span>
+              </template>
+              <template v-else>
+                <el-input-number
+                  :model-value="row.priorBadDebt"
+                  size="small"
+                  :controls="false"
+                  :disabled="isReadonly"
+                  @change="(v: number | undefined) => updateAgingBadDebt(row.key, 'prior', v ?? 0)"
+                />
+              </template>
+            </template>
+          </el-table-column>
         </el-table-column>
       </el-table>
+      <div class="note-area">
+        <span class="note-prefix">说明：</span>
+        <el-input
+          v-model="note1"
+          type="textarea"
+          :autosize="{ minRows: 2, maxRows: 6 }"
+          :disabled="isReadonly"
+          placeholder="账龄列示说明..."
+        />
+      </div>
     </div>
 
-    <!-- 子节二：超1年重要预收 -->
+    <!-- (2) 超1年 -->
     <div class="disclosure-card">
       <h4 class="card-title">
-        (2) 账龄超过1年的重要预付账款
-        <el-button size="small" :disabled="isReadonly" @click="addRow">+ 添加</el-button>
+        (2) 账龄超过1年的重要预付款项
+        <el-button size="small" :disabled="isReadonly" @click="addOver1Row()">+ 添加</el-button>
+        <GtIndexChip value="wp:F1-2" :context-project-id="projectId" />
       </h4>
-      <el-table :data="[...section2Rows, section2Subtotal]" size="small" border stripe>
-        <el-table-column prop="label" label="对方单位" width="160">
+      <el-table :data="[...over1YearRows, over1TotalRow]" size="small" border stripe>
+        <el-table-column label="债权单位" min-width="120">
           <template #default="{ row }">
-            <template v-if="row.rowId === '__subtotal__'">
+            <template v-if="row.rowId === '__total__'">
               <span class="subtotal-label">合计</span>
             </template>
-            <template v-else-if="row.rowId?.startsWith('cs-')">
-              <span class="cross-sheet-cell">{{ row.label }}</span>
+            <template v-else>
+              <el-input
+                :model-value="row.creditorUnit"
+                size="small"
+                :disabled="isReadonly"
+                @change="(v: string) => updateOver1Field(row.rowId, 'creditorUnit', v)"
+              />
+            </template>
+          </template>
+        </el-table-column>
+        <el-table-column label="债务单位" min-width="140">
+          <template #default="{ row }">
+            <template v-if="row.rowId === '__total__'" />
+            <template v-else-if="row.fromCrossSheet">
+              <span class="cross-sheet-cell">{{ row.debtorUnit }}</span>
             </template>
             <template v-else>
-              <el-input v-model="row.label" size="small" :disabled="isReadonly"
-                @change="(val: string) => updateCell(row.rowId, 'label', val)" />
+              <el-input
+                :model-value="row.debtorUnit"
+                size="small"
+                :disabled="isReadonly"
+                @change="(v: string) => updateOver1Field(row.rowId, 'debtorUnit', v)"
+              />
             </template>
           </template>
         </el-table-column>
-        <el-table-column label="期末金额" width="130" align="right">
+        <el-table-column label="期末余额" width="120" align="right">
           <template #default="{ row }">
-            <template v-if="row.rowId === '__subtotal__' || row.rowId?.startsWith('cs-')">
-              <span :class="{ 'cross-sheet-cell': row.rowId?.startsWith('cs-') }">{{ fmtAmount(row.endAmount) }}</span>
+            <template v-if="row.rowId === '__total__' || row.fromCrossSheet">
+              <span :class="{ 'cross-sheet-cell': row.fromCrossSheet, 'subtotal-val': row.rowId === '__total__' }">
+                {{ fmtAmount(row.endBalance) }}
+              </span>
             </template>
             <template v-else>
-              <el-input v-model.number="row.endAmount" size="small" :disabled="isReadonly"
-                @change="(val: any) => updateCell(row.rowId, 'endAmount', val)" />
+              <el-input-number
+                :model-value="row.endBalance"
+                size="small"
+                :controls="false"
+                :disabled="isReadonly"
+                @change="(v: number | undefined) => updateOver1Field(row.rowId, 'endBalance', v ?? 0)"
+              />
             </template>
           </template>
         </el-table-column>
-        <el-table-column label="期初金额" width="130" align="right">
+        <el-table-column label="账龄" width="120">
           <template #default="{ row }">
-            <template v-if="row.rowId === '__subtotal__' || row.rowId?.startsWith('cs-')">
-              <span>{{ fmtAmount(row.priorAmount) }}</span>
-            </template>
-            <template v-else>
-              <el-input v-model.number="row.priorAmount" size="small" :disabled="isReadonly"
-                @change="(val: any) => updateCell(row.rowId, 'priorAmount', val)" />
-            </template>
+            <el-input
+              v-if="row.rowId !== '__total__'"
+              :model-value="row.agingLabel"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: string) => updateOver1Field(row.rowId, 'agingLabel', v)"
+            />
           </template>
         </el-table-column>
-        <el-table-column label="原因" min-width="140">
+        <el-table-column label="未结算的原因" min-width="160">
           <template #default="{ row }">
-            <template v-if="!row.rowId?.startsWith('cs-') && row.rowId !== '__subtotal__'">
-              <el-input v-model="row.reason" size="small" :disabled="isReadonly"
-                @change="(val: string) => updateCell(row.rowId, 'reason', val)" />
-            </template>
-            <span v-else>{{ row.reason || '' }}</span>
+            <el-input
+              v-if="row.rowId !== '__total__'"
+              :model-value="row.reason"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: string) => updateOver1Field(row.rowId, 'reason', v)"
+            />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="50" v-if="!isReadonly">
+        <el-table-column v-if="!isReadonly" label="操作" width="56">
           <template #default="{ row }">
-            <el-popconfirm v-if="!row.rowId?.startsWith('cs-') && row.rowId !== '__subtotal__'" title="删除？" @confirm="removeRow(row.rowId)">
-              <template #reference><el-button size="small" type="danger" link>删</el-button></template>
+            <el-popconfirm
+              v-if="!row.fromCrossSheet && row.rowId !== '__total__'"
+              title="删除？"
+              @confirm="removeOver1Row(row.rowId)"
+            >
+              <template #reference>
+                <el-button size="small" type="danger" link>删</el-button>
+              </template>
             </el-popconfirm>
           </template>
         </el-table-column>
       </el-table>
+      <div class="note-area">
+        <span class="note-prefix">说明：</span>
+        <el-input
+          v-model="note2"
+          type="textarea"
+          :autosize="{ minRows: 2, maxRows: 6 }"
+          :disabled="isReadonly"
+          placeholder="超1年重要预付款项说明..."
+        />
+      </div>
     </div>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input
-        type="textarea"
-        :model-value="auditNote"
-        :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：概述附注披露账龄分类的数据来源与勾稽核对情况、披露完整性与准确性的复核结论。"
-        @change="saveAuditNote"
-      />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
-      <el-input
-        type="textarea"
-        :model-value="auditConclusion"
-        :disabled="isReadonly"
-        :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：预付账款附注披露是否符合国有企业财务报告要求，与审定表是否勾稽一致。"
-        @change="saveAuditConclusion"
-      />
-    </el-card>
+    <!-- (3) 前五名 -->
+    <div class="disclosure-card">
+      <h4 class="card-title">
+        (3) 按欠款方归集的期末余额前五名的预付款项情况
+        <GtIndexChip value="wp:F1-2" :context-project-id="projectId" />
+      </h4>
+      <el-table :data="[...top5Rows, top5TotalRow]" size="small" border stripe>
+        <el-table-column label="债务人名称" min-width="160">
+          <template #default="{ row }">
+            <span :class="{ 'subtotal-label': row.rowId === '__total__' }">
+              {{ row.rowId === '__total__' ? '合计' : row.debtorName }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账面余额" width="130" align="right">
+          <template #default="{ row }">
+            <span class="cross-sheet-cell" :class="{ 'subtotal-val': row.rowId === '__total__' }">
+              {{ fmtAmount(row.endBalance) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="占预付款项合计的比例(%)" width="170" align="right">
+          <template #default="{ row }">
+            <span class="cross-sheet-cell">{{ fmtPct(row.proportionPct) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="坏账准备" width="110" align="right">
+          <template #default="{ row }">
+            <template v-if="row.rowId === '__total__'">
+              <span class="subtotal-val">{{ fmtAmount(row.badDebt) }}</span>
+            </template>
+            <template v-else>
+              <el-input-number
+                :model-value="row.badDebt"
+                size="small"
+                :controls="false"
+                :disabled="isReadonly"
+                @change="(v: number | undefined) => updateTop5BadDebt(row.debtorName, v ?? 0)"
+              />
+            </template>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="note-area">
+        <span class="note-prefix">说明：</span>
+        <el-input
+          v-model="note3"
+          type="textarea"
+          :autosize="{ minRows: 2, maxRows: 6 }"
+          :disabled="isReadonly"
+          placeholder="前五名披露说明..."
+        />
+      </div>
+    </div>
   </template>
+
+  <F1DisclosureUsageGuide v-model="showGuide" variant="soe" />
 </div>
 </template>
 
 <script setup lang="ts">
-/**
- * F1TabDisclosureSoe.vue — 附注披露（国企）
- * 2子节卡片 + 跨sheet取数 + 动态行 + 合计 + applicable_standards判断
- */
-import { computed, onMounted, ref, toRef, type Ref } from 'vue'
+import { computed, ref, toRef, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { api } from '@/services/apiProxy'
 import { useF1DisclosureSoe } from '../composables/useF1DisclosureSoe'
+import {
+  buildF1SoeSubTableData,
+  buildF1SyncPayload,
+} from '../composables/f1DisclosureSyncPayload'
+import { F1_NOTE_SECTION } from '../composables/f1NoteSectionMap'
 import type { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import type { ChecklistResponse } from '../composables/useF1FormData'
+import GtIndexChip from '../GtIndexChip.vue'
+import F1SheetAttachments from './F1SheetAttachments.vue'
+import F1DisclosureUsageGuide from './F1DisclosureUsageGuide.vue'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   allResponses: Map<string, ChecklistResponse>
   wpId: string
   projectId: string
   isReadonly: boolean
   crossSheet: ReturnType<typeof useF1CrossSheet>
-  applicableStandards: string[]
+  applicableStandards?: string[]
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
-}>()
+}>(), {
+  applicableStandards: () => [],
+})
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
+const noteSectionId = F1_NOTE_SECTION.soe
+const showGuide = ref(false)
+const isSyncing = ref(false)
 
 const {
   isApplicable,
-  section1Rows,
-  section1Subtotal,
-  section2Rows,
-  section2Subtotal,
-  addRow,
-  removeRow,
-  updateCell,
+  agingRows,
+  agingTotal,
+  updateAgingBadDebt,
+  over1YearRows,
+  over1YearTotal,
+  addOver1Row,
+  removeOver1Row,
+  updateOver1Field,
+  top5Rows,
+  top5Total,
+  updateTop5BadDebt,
+  note1,
+  note2,
+  note3,
+  getSyncSnapshot,
 } = useF1DisclosureSoe({
   allResponses: allResponsesRef,
   wpId: toRef(props, 'wpId') as Ref<string>,
@@ -188,58 +363,107 @@ const {
   applicableStandards: toRef(props, 'applicableStandards') as unknown as Ref<string[]>,
 })
 
-// ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────────
-const NOTE_KEY = 'F1-disclosure-soe-audit-note'
-const CONCLUSION_KEY = 'F1-disclosure-soe-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
+const over1TotalRow = computed(() => ({
+  rowId: '__total__',
+  creditorUnit: '',
+  debtorUnit: '',
+  endBalance: over1YearTotal.value.endBalance,
+  agingLabel: '',
+  reason: '',
+  fromCrossSheet: false,
+}))
 
-function saveAuditNote(val: string): void {
-  if (props.isReadonly) return
-  auditNote.value = val
-  allResponsesRef.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
-  void props.saveImmediate(NOTE_KEY, { conclusion: null, remark: val })
+const top5TotalRow = computed(() => ({
+  rowId: '__total__',
+  debtorName: '合计',
+  endBalance: top5Total.value.endBalance,
+  proportionPct: top5Total.value.proportionPct,
+  badDebt: top5Total.value.badDebt,
+}))
+
+async function syncToDisclosureNotes() {
+  const payload = buildF1SyncPayload(
+    'soe',
+    props.wpId,
+    props.applicableStandards,
+    buildF1SoeSubTableData(getSyncSnapshot()),
+  )
+  if (!payload) {
+    ElMessage.warning('当前项目准则不适用国企附注同步')
+    return
+  }
+  isSyncing.value = true
+  try {
+    const result: any = await api.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      payload,
+    )
+    const data = result?.data ?? result
+    ElMessage.success(`已同步 ${Number(data?.rows_synced ?? 0)} 行到附注模块「${noteSectionId} 预付款项」`)
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
 }
-
-function saveAuditConclusion(val: string): void {
-  if (props.isReadonly) return
-  auditConclusion.value = val
-  allResponsesRef.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
-  void props.saveImmediate(CONCLUSION_KEY, { conclusion: null, remark: val })
-}
-
-onMounted(() => {
-  const n = allResponsesRef.value.get(NOTE_KEY)
-  if (n?.remark) auditNote.value = n.remark
-  const c = allResponsesRef.value.get(CONCLUSION_KEY)
-  if (c?.remark) auditConclusion.value = c.remark
-})
 
 function fmtAmount(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
   if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { maximumFractionDigits: 2 })})`
   return val.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 }
+
+function fmtPct(val: number | null | undefined): string {
+  if (val == null || !isFinite(val) || val === 0) return '-'
+  return `${val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+}
 </script>
 
 <style scoped>
-.d3-disclosure-soe { padding: 16px; }
-.d3-disclosure-soe :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
-.d3-disclosure-soe :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
-
-/* 编制提示 */
-.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
+.f1-disclosure-soe { padding: 16px; }
+.f1-disclosure-soe :deep(.el-table) {
+  --el-table-font-size: var(--wp-font-size, 13px);
+  font-size: var(--wp-font-size, 13px);
+}
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
+.guidance-content { margin-top: 8px; font-size: 13px; color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .objective-alert { margin-bottom: 12px; }
-
-/* 审计说明/结论卡片 */
-.audit-note-card { margin-top: 16px; }
-.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
-
-.disclosure-card { margin-bottom: 20px; padding: 16px; background: #fff; border: 1px solid #ebeef5; border-radius: 6px; }
-.card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-.subtotal-label { font-weight: 700; }
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; }
+.disclosure-card {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+}
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.subtotal-label, .subtotal-val { font-weight: 700; }
 .cross-sheet-cell { background: #ecf5ff; padding: 2px 6px; border-radius: 2px; }
+.note-area { margin-top: 12px; display: flex; align-items: flex-start; gap: 8px; }
+.note-prefix { font-size: 13px; color: #606266; white-space: nowrap; padding-top: 6px; }
 </style>

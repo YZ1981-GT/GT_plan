@@ -1,43 +1,44 @@
 /**
- * useF1DisclosureListed — 附注披露信息（上市公司）核心逻辑 composable
- *
- * Spec: .kiro/specs/f1-prepayment/
- * Task: 14.1
- *
- * 职责：
- * - 3子节（按性质/超1年/重大变动）
- * - 从crossSheet取数（natureAggregation + longTermRows）
- * - 动态行 + 合计
- * - 说明textarea + EventBus双向回写
- * - applicable_standards 适用性判断
- *
- * Requirements: 12.1-12.8, 14.1-14.6
+ * useF1DisclosureListed — 预付账款附注披露（上市公司）
+ * 对齐 Excel：账龄分析(+比例) / 超1年重要 / 前五名(汇总+分别) + 同步附注五、7
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
-import { parseNum, calcSubtotal } from './useF1FormulaEngine'
+import { parseNum, calcSubtotal, calcPercentage } from './useF1FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import type { useF1CrossSheet } from './useF1CrossSheet'
+import { computeTop5 } from './useF1Analysis'
+import { PRESET_SEGMENTS, type AgingSegment } from '@/composables/useAgingConfig'
+import { isF1DisclosureApplicable } from './f1NoteSectionMap'
+import type { F1ListedSyncSnapshot } from './f1DisclosureSyncPayload'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-export interface DisclosureRow {
+export interface F1AgingDisclosureRow {
   rowId: string
+  key: string
   label: string
   endAmount: number
+  endPct: number
   priorAmount: number
-  reason?: string
+  priorPct: number
 }
 
-export interface DisclosureSection {
-  sectionKey: string
-  sectionLabel: string
-  rows: DisclosureRow[]
-  subtotalRow: DisclosureRow
-  note: string
-  isFromCrossSheet: boolean
+export interface F1Over1YearRow {
+  rowId: string
+  debtorName: string
+  endBalance: number
+  proportionPct: number
+  impairment: number
+  reason: string
+  fromCrossSheet: boolean
 }
 
-export interface UseD3DisclosureListedOptions {
+export interface F1Top5Row {
+  rowId: string
+  entityName: string
+  endBalance: number
+  proportionPct: number
+}
+
+export interface UseF1DisclosureListedOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
   wpId: Ref<string>
   projectId: Ref<string>
@@ -48,112 +49,230 @@ export interface UseD3DisclosureListedOptions {
   applicableStandards: Ref<string[]>
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
 const PREFIX = 'F1-note-listed-'
-const ITEM_SECTION2_ROWS = `${PREFIX}section2-rows`
-const ITEM_SECTION3_ROWS = `${PREFIX}section3-rows`
+const ITEM_OVER1_ROWS = `${PREFIX}over1-rows`
+const ITEM_OVER1_REASON_MAP = `${PREFIX}over1-reasons`
+const ITEM_IMPAIRMENT = `${PREFIX}impairment-provision`
+const ITEM_TOP5_SUMMARY = `${PREFIX}top5-summary`
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function generateRowId(): string {
-  return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+/** 附注模板账龄标签（1至2年）；与 PRESET 的 1-2年 对齐 */
+const NOTE_AGING_LABEL: Record<string, string> = {
+  within1: '1年以内',
+  y1to2: '1至2年',
+  y2to3: '2至3年',
+  over3: '3年以上',
 }
 
-function safeParseRows(jsonStr: string | null | undefined): DisclosureRow[] {
-  if (!jsonStr) return []
+function generateRowId(): string {
+  return `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function safeParseJson<T>(jsonStr: string | null | undefined, fallback: T): T {
+  if (!jsonStr) return fallback
   try {
     const parsed = JSON.parse(jsonStr)
-    return Array.isArray(parsed) ? parsed : []
+    return (parsed ?? fallback) as T
   } catch {
-    return []
+    return fallback
   }
 }
 
-function createEmptyRow(): DisclosureRow {
-  return { rowId: generateRowId(), label: '', endAmount: 0, priorAmount: 0, reason: '' }
+function fmtMoneyPlain(v: number): string {
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-// ─── Composable ──────────────────────────────────────────────────────────────
+function fmtPctPlain(v: number): string {
+  return `${v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+}
 
-export function useF1DisclosureListed(options: UseD3DisclosureListedOptions) {
+/**
+ * 将任意账龄聚合折叠为披露四档（1年以内 / 1至2 / 2至3 / 3年以上）
+ */
+export function collapseAgingForListedDisclosure(
+  agingAgg: Record<string, number>,
+  segments: AgingSegment[] = PRESET_SEGMENTS.THREE_YEAR,
+): Array<{ key: string; label: string; endAmount: number; priorAmount: number }> {
+  const keys = segments.map((s) => s.key)
+  const get = (k: string) => parseNum(agingAgg[k])
+  const getPrior = (k: string) => parseNum(agingAgg[`prior_${k}`])
+
+  const within1 = keys.includes('within1') ? 'within1' : keys[0]
+  const y1to2 = keys.find((k) => k === 'y1to2') || keys[1]
+  const y2to3 = keys.find((k) => k === 'y2to3') || keys[2]
+  const restKeys = keys.filter((k) => k !== within1 && k !== y1to2 && k !== y2to3)
+
+  const buckets = [
+    { key: 'within1', label: NOTE_AGING_LABEL.within1, endAmount: get(within1), priorAmount: getPrior(within1) },
+    { key: 'y1to2', label: NOTE_AGING_LABEL.y1to2, endAmount: get(y1to2), priorAmount: getPrior(y1to2) },
+    { key: 'y2to3', label: NOTE_AGING_LABEL.y2to3, endAmount: get(y2to3), priorAmount: getPrior(y2to3) },
+    {
+      key: 'over3',
+      label: NOTE_AGING_LABEL.over3,
+      endAmount: calcSubtotal(restKeys.map(get)),
+      priorAmount: calcSubtotal(restKeys.map(getPrior)),
+    },
+  ]
+  return buckets
+}
+
+export function useF1DisclosureListed(options: UseF1DisclosureListedOptions) {
   const { allResponses, debouncedSave, crossSheet, isReadonly, applicableStandards } = options
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
 
-  // ─── Applicable check ────────────────────────────────────────────────
+  const isApplicable: ComputedRef<boolean> = computed(() =>
+    isF1DisclosureApplicable('listed', applicableStandards.value),
+  )
 
-  const isApplicable: ComputedRef<boolean> = computed(() => {
-    return applicableStandards.value.some(s =>
-      s === 'listed_standalone' || s === 'listed_consolidated',
-    )
-  })
+  // ─── (1) 账龄分析 ───────────────────────────────────────────────────
 
-  // ─── Section 1: 按性质分类（from crossSheet）────────────────────────
-
-  const section1Rows: ComputedRef<DisclosureRow[]> = computed(() => {
-    const natureAgg = crossSheet.natureAggregation.value
-    return Object.entries(natureAgg).map(([label, { current, prior }]) => ({
-      rowId: `cs-nature-${label}`,
-      label,
-      endAmount: current,
-      priorAmount: prior,
-    }))
-  })
-
-  const section1Subtotal: ComputedRef<DisclosureRow> = computed(() => ({
-    rowId: '__subtotal__',
-    label: '合计',
-    endAmount: calcSubtotal(section1Rows.value.map(r => r.endAmount)),
-    priorAmount: calcSubtotal(section1Rows.value.map(r => r.priorAmount)),
-  }))
-
-  // ─── Section 2: 超1年重要预收（from crossSheet + dynamic rows）────
-
-  const section2DynamicRows = ref<DisclosureRow[]>([])
-
+  const impairmentProvision = ref(0)
   watch(
-    () => allResponses.value.get(ITEM_SECTION2_ROWS)?.remark,
-    (jsonStr) => { section2DynamicRows.value = safeParseRows(jsonStr) },
+    () => allResponses.value.get(ITEM_IMPAIRMENT)?.remark,
+    (v) => { impairmentProvision.value = parseNum(v) },
     { immediate: true },
   )
 
-  const section2Rows: ComputedRef<DisclosureRow[]> = computed(() => {
-    // From crossSheet longTermRows
-    const ltRows = crossSheet.longTermRows.value.map(r => ({
-      rowId: `cs-lt-${r.customerName}`,
-      label: r.customerName,
-      endAmount: r.endAudited,
-      priorAmount: 0,
-      reason: r.agingDescription,
+  const agingRows: ComputedRef<F1AgingDisclosureRow[]> = computed(() => {
+    const buckets = collapseAgingForListedDisclosure(crossSheet.agingAggregation.value)
+    const endTotal = calcSubtotal(buckets.map((b) => b.endAmount))
+    const priorTotal = calcSubtotal(buckets.map((b) => b.priorAmount))
+    return buckets.map((b) => ({
+      rowId: `aging-${b.key}`,
+      key: b.key,
+      label: b.label,
+      endAmount: b.endAmount,
+      endPct: calcPercentage(b.endAmount, endTotal),
+      priorAmount: b.priorAmount,
+      priorPct: calcPercentage(b.priorAmount, priorTotal),
     }))
-    return [...ltRows, ...section2DynamicRows.value]
   })
 
-  const section2Subtotal: ComputedRef<DisclosureRow> = computed(() => ({
-    rowId: '__subtotal__',
-    label: '合计',
-    endAmount: calcSubtotal(section2Rows.value.map(r => r.endAmount)),
-    priorAmount: calcSubtotal(section2Rows.value.map(r => r.priorAmount)),
+  const agingTotal: ComputedRef<F1AgingDisclosureRow> = computed(() => {
+    const endAmount = calcSubtotal(agingRows.value.map((r) => r.endAmount))
+    const priorAmount = calcSubtotal(agingRows.value.map((r) => r.priorAmount))
+    return {
+      rowId: '__subtotal__',
+      key: 'total',
+      label: '合计',
+      endAmount,
+      endPct: endAmount ? 100 : 0,
+      priorAmount,
+      priorPct: priorAmount ? 100 : 0,
+    }
+  })
+
+  const agingNet = computed(() => ({
+    rowId: '__net__',
+    label: '合计（减减值后）',
+    endAmount: agingTotal.value.endAmount - impairmentProvision.value,
+    priorAmount: agingTotal.value.priorAmount,
   }))
 
-  // ─── Section 3: 重大变动（dynamic rows only）──────────────────────
+  // ─── (2) 超1年重要 ─────────────────────────────────────────────────
 
-  const section3Rows = ref<DisclosureRow[]>([])
+  const over1DynamicRows = ref<F1Over1YearRow[]>([])
+  const over1ReasonMap = ref<Record<string, string>>({})
 
   watch(
-    () => allResponses.value.get(ITEM_SECTION3_ROWS)?.remark,
-    (jsonStr) => { section3Rows.value = safeParseRows(jsonStr) },
+    () => allResponses.value.get(ITEM_OVER1_ROWS)?.remark,
+    (json) => {
+      const rows = safeParseJson<Partial<F1Over1YearRow>[]>(json, [])
+      over1DynamicRows.value = rows.map((r) => ({
+        rowId: r.rowId || generateRowId(),
+        debtorName: r.debtorName || '',
+        endBalance: parseNum(r.endBalance),
+        proportionPct: 0,
+        impairment: parseNum(r.impairment),
+        reason: r.reason || '',
+        fromCrossSheet: false,
+      }))
+    },
     { immediate: true },
   )
 
-  const section3Subtotal: ComputedRef<DisclosureRow> = computed(() => ({
-    rowId: '__subtotal__',
-    label: '合计',
-    endAmount: calcSubtotal(section3Rows.value.map(r => r.endAmount)),
-    priorAmount: calcSubtotal(section3Rows.value.map(r => r.priorAmount)),
-  }))
+  watch(
+    () => allResponses.value.get(ITEM_OVER1_REASON_MAP)?.remark,
+    (json) => { over1ReasonMap.value = safeParseJson(json, {}) },
+    { immediate: true },
+  )
 
-  // ─── Notes (per section) ─────────────────────────────────────────────
+  const over1YearRows: ComputedRef<F1Over1YearRow[]> = computed(() => {
+    const total = agingTotal.value.endAmount
+    const cs = crossSheet.longTermRows.value.map((r) => {
+      const name = r.customerName || ''
+      return {
+        rowId: `cs-lt-${name}`,
+        debtorName: name,
+        endBalance: parseNum(r.endAudited),
+        proportionPct: calcPercentage(r.endAudited, total),
+        impairment: 0,
+        reason: over1ReasonMap.value[name] || r.agingDescription || '',
+        fromCrossSheet: true,
+      }
+    })
+    const dyn = over1DynamicRows.value.map((r) => ({
+      ...r,
+      proportionPct: calcPercentage(r.endBalance, total),
+    }))
+    return [...cs, ...dyn]
+  })
+
+  const over1YearTotal = computed(() => {
+    const endBalance = calcSubtotal(over1YearRows.value.map((r) => r.endBalance))
+    const impairment = calcSubtotal(over1YearRows.value.map((r) => r.impairment))
+    return {
+      endBalance,
+      proportionPct: calcPercentage(endBalance, agingTotal.value.endAmount),
+      impairment,
+    }
+  })
+
+  // ─── (3) 前五名 ────────────────────────────────────────────────────
+
+  const top5SummaryOverride = ref('')
+  watch(
+    () => allResponses.value.get(ITEM_TOP5_SUMMARY)?.remark,
+    (v) => { top5SummaryOverride.value = v || '' },
+    { immediate: true },
+  )
+
+  const top5Rows: ComputedRef<F1Top5Row[]> = computed(() => {
+    const detResp = allResponses.value.get('F1-det-rows')?.remark
+    const raw = safeParseJson<Array<{ customerName?: string; endAudited?: number; priorAudited?: number }>>(detResp, [])
+    const rows = raw.map((r) => ({
+      customerName: r.customerName || '',
+      endAudited: parseNum(r.endAudited),
+      priorAudited: parseNum(r.priorAudited),
+    }))
+    const { top5 } = computeTop5(rows)
+    const total = agingTotal.value.endAmount || calcSubtotal(rows.map((r) => r.endAudited))
+    return top5.map((r, i) => ({
+      rowId: `top5-${i}`,
+      entityName: r.customerName,
+      endBalance: r.endAudited,
+      proportionPct: calcPercentage(r.endAudited, total),
+    }))
+  })
+
+  const top5Total = computed(() => {
+    const endBalance = calcSubtotal(top5Rows.value.map((r) => r.endBalance))
+    return {
+      endBalance,
+      proportionPct: calcPercentage(endBalance, agingTotal.value.endAmount || endBalance),
+    }
+  })
+
+  const top5SummaryAuto = computed(() => {
+    const t = top5Total.value
+    if (!t.endBalance) {
+      return '本期按预付对象归集的期末余额前五名预付款项汇总金额——元，占预付款项期末余额合计数的比例——%。'
+    }
+    return `本期按预付对象归集的期末余额前五名预付款项汇总金额${fmtMoneyPlain(t.endBalance)}元，占预付款项期末余额合计数的比例${fmtPctPlain(t.proportionPct)}。`
+  })
+
+  const top5SummaryText = computed(() => top5SummaryOverride.value || top5SummaryAuto.value)
+
+  // ─── Notes ───────────────────────────────────────────────────────────
 
   const note1 = ref('')
   const note2 = ref('')
@@ -167,15 +286,12 @@ export function useF1DisclosureListed(options: UseD3DisclosureListedOptions) {
   watch(() => note2.value, (val) => { debouncedSave(`${PREFIX}note-2`, { remark: val }) })
   watch(() => note3.value, (val) => {
     debouncedSave(`${PREFIX}note-3`, { remark: val })
-    // EventBus双向回写附注模块
     try {
       window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
         detail: { wpCode: 'F1', section: 'listed-3', text: val },
       }))
     } catch { /* silent */ }
   })
-
-  // ─── EventBus: 监听附注模块更新 ─────────────────────────────────────
 
   const noteUpdateHandler = (e: Event) => {
     const detail = (e as CustomEvent).detail
@@ -189,57 +305,114 @@ export function useF1DisclosureListed(options: UseD3DisclosureListedOptions) {
   window.addEventListener('note:section-updated', noteUpdateHandler)
   eventListeners.push({ event: 'note:section-updated', handler: noteUpdateHandler })
 
-  // ─── Row operations (section 2 & 3) ──────────────────────────────────
+  // ─── Mutations ───────────────────────────────────────────────────────
 
-  function addRow(section: 2 | 3): void {
+  function persistImpairment(val: number) {
     if (isReadonly.value) return
-    const row = createEmptyRow()
-    if (section === 2) {
-      section2DynamicRows.value = [...section2DynamicRows.value, row]
-      debouncedSave(ITEM_SECTION2_ROWS, { remark: JSON.stringify(section2DynamicRows.value) })
-    } else {
-      section3Rows.value = [...section3Rows.value, row]
-      debouncedSave(ITEM_SECTION3_ROWS, { remark: JSON.stringify(section3Rows.value) })
-    }
+    impairmentProvision.value = parseNum(val)
+    debouncedSave(ITEM_IMPAIRMENT, { remark: String(impairmentProvision.value) })
   }
 
-  function removeRow(section: 2 | 3, rowId: string): void {
+  function updateOver1Reason(rowId: string, reason: string) {
     if (isReadonly.value) return
-    if (section === 2) {
-      section2DynamicRows.value = section2DynamicRows.value.filter(r => r.rowId !== rowId)
-      debouncedSave(ITEM_SECTION2_ROWS, { remark: JSON.stringify(section2DynamicRows.value) })
-    } else {
-      section3Rows.value = section3Rows.value.filter(r => r.rowId !== rowId)
-      debouncedSave(ITEM_SECTION3_ROWS, { remark: JSON.stringify(section3Rows.value) })
+    const row = over1YearRows.value.find((r) => r.rowId === rowId)
+    if (!row) return
+    if (row.fromCrossSheet) {
+      over1ReasonMap.value = { ...over1ReasonMap.value, [row.debtorName]: reason }
+      debouncedSave(ITEM_OVER1_REASON_MAP, { remark: JSON.stringify(over1ReasonMap.value) })
+      return
     }
+    over1DynamicRows.value = over1DynamicRows.value.map((r) =>
+      r.rowId === rowId ? { ...r, reason } : r,
+    )
+    debouncedSave(ITEM_OVER1_ROWS, { remark: JSON.stringify(over1DynamicRows.value) })
   }
 
-  function updateCell(section: 2 | 3, rowId: string, field: string, value: any): void {
+  function updateOver1Field(rowId: string, field: 'debtorName' | 'endBalance' | 'impairment', value: string | number) {
     if (isReadonly.value) return
-    const rows = section === 2 ? section2DynamicRows.value : section3Rows.value
-    const idx = rows.findIndex(r => r.rowId === rowId)
-    if (idx === -1) return
-
-    const row = { ...rows[idx] }
-    if (field === 'endAmount' || field === 'priorAmount') {
-      ;(row as any)[field] = parseNum(value)
-    } else {
-      ;(row as any)[field] = value
-    }
-
-    const newRows = [...rows]
-    newRows[idx] = row
-
-    if (section === 2) {
-      section2DynamicRows.value = newRows
-      debouncedSave(ITEM_SECTION2_ROWS, { remark: JSON.stringify(newRows) })
-    } else {
-      section3Rows.value = newRows
-      debouncedSave(ITEM_SECTION3_ROWS, { remark: JSON.stringify(newRows) })
-    }
+    const row = over1YearRows.value.find((r) => r.rowId === rowId)
+    if (!row || row.fromCrossSheet) return
+    over1DynamicRows.value = over1DynamicRows.value.map((r) => {
+      if (r.rowId !== rowId) return r
+      if (field === 'endBalance' || field === 'impairment') {
+        return { ...r, [field]: parseNum(value) }
+      }
+      return { ...r, debtorName: String(value) }
+    })
+    debouncedSave(ITEM_OVER1_ROWS, { remark: JSON.stringify(over1DynamicRows.value) })
   }
 
-  // ─── Lifecycle ───────────────────────────────────────────────────────
+  function addOver1Row() {
+    if (isReadonly.value) return
+    over1DynamicRows.value = [
+      ...over1DynamicRows.value,
+      {
+        rowId: generateRowId(),
+        debtorName: '',
+        endBalance: 0,
+        proportionPct: 0,
+        impairment: 0,
+        reason: '',
+        fromCrossSheet: false,
+      },
+    ]
+    debouncedSave(ITEM_OVER1_ROWS, { remark: JSON.stringify(over1DynamicRows.value) })
+  }
+
+  function removeOver1Row(rowId: string) {
+    if (isReadonly.value) return
+    over1DynamicRows.value = over1DynamicRows.value.filter((r) => r.rowId !== rowId)
+    debouncedSave(ITEM_OVER1_ROWS, { remark: JSON.stringify(over1DynamicRows.value) })
+  }
+
+  function persistTop5Summary(val: string) {
+    if (isReadonly.value) return
+    top5SummaryOverride.value = val
+    debouncedSave(ITEM_TOP5_SUMMARY, { remark: val })
+  }
+
+  function getSyncSnapshot(): F1ListedSyncSnapshot {
+    return {
+      agingRows: agingRows.value.map((r) => ({
+        label: r.label,
+        endAmount: r.endAmount,
+        endPct: r.endPct,
+        priorAmount: r.priorAmount,
+        priorPct: r.priorPct,
+      })),
+      agingTotal: {
+        label: agingTotal.value.label,
+        endAmount: agingTotal.value.endAmount,
+        endPct: agingTotal.value.endPct,
+        priorAmount: agingTotal.value.priorAmount,
+        priorPct: agingTotal.value.priorPct,
+      },
+      impairmentProvision: impairmentProvision.value,
+      agingNet: {
+        label: '合计',
+        endAmount: agingNet.value.endAmount,
+        priorAmount: agingNet.value.priorAmount,
+      },
+      over1YearRows: over1YearRows.value.map((r) => ({
+        debtorName: r.debtorName,
+        endBalance: r.endBalance,
+        proportionPct: r.proportionPct,
+        impairment: r.impairment,
+        reason: r.reason,
+      })),
+      over1YearTotal: over1YearTotal.value,
+      top5Rows: top5Rows.value.map((r) => ({
+        entityName: r.entityName,
+        endBalance: r.endBalance,
+        proportionPct: r.proportionPct,
+      })),
+      top5Total: top5Total.value,
+      top5SummaryText: top5SummaryText.value,
+      noteAging: note1.value,
+      noteOver1Year: note2.value,
+      noteTop5: note3.value,
+    }
+  }
 
   onBeforeUnmount(() => {
     for (const { event, handler } of eventListeners) {
@@ -247,26 +420,28 @@ export function useF1DisclosureListed(options: UseD3DisclosureListedOptions) {
     }
   })
 
-  // ─── Return ──────────────────────────────────────────────────────────
-
   return {
     isApplicable,
-    // Section 1
-    section1Rows,
-    section1Subtotal,
+    agingRows,
+    agingTotal,
+    agingNet,
+    impairmentProvision,
+    persistImpairment,
+    over1YearRows,
+    over1YearTotal,
+    addOver1Row,
+    removeOver1Row,
+    updateOver1Reason,
+    updateOver1Field,
+    top5Rows,
+    top5Total,
+    top5SummaryText,
+    top5SummaryAuto,
+    persistTop5Summary,
     note1,
-    // Section 2
-    section2Rows,
-    section2Subtotal,
     note2,
-    // Section 3
-    section3Rows,
-    section3Subtotal,
     note3,
-    // Operations
-    addRow,
-    removeRow,
-    updateCell,
+    getSyncSnapshot,
   }
 }
 

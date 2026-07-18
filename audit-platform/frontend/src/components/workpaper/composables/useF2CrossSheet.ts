@@ -10,6 +10,10 @@ import { readRowJson, type ChecklistResponse, type ProjectContext } from './useF
 import { F2_DETAIL_SHEET_CONFIGS } from '../f2/detail/f2DetailSheetConfigs'
 import { F2_CATEGORIES } from './useF2Adjudication'
 import type { F2DetailRow } from './useF2DetailSheet'
+import { sumDevProductMovement } from './useF2DevProductSheet'
+import { sumDevCostMovement } from './useF2DevCostSheet'
+import { sumContractPerfMovement } from './useF2ContractPerfSheet'
+import { sumBioAssetMovement } from './useF2BioAssetSheet'
 
 import type { F2AdjustmentRow } from './useF2Adjustment'
 
@@ -97,6 +101,46 @@ function safeParseRows<T>(jsonStr: string | null | undefined): T[] {
 }
 
 function loadDetailTotals(map: Map<string, ChecklistResponse>, sheetCode: string) {
+  if (sheetCode === 'F2-10') {
+    const raw = readRowJson(map.get('F2-10-rows'))
+    const mv = sumDevProductMovement(safeParseRows(raw))
+    return {
+      openingAmt: mv.opening,
+      increaseAmt: mv.increase,
+      decreaseAmt: mv.decrease,
+      closingAmt: mv.closing,
+    }
+  }
+  if (sheetCode === 'F2-11') {
+    const raw = readRowJson(map.get('F2-11-rows'))
+    const mv = sumDevCostMovement(safeParseRows(raw))
+    return {
+      openingAmt: mv.opening,
+      increaseAmt: mv.increase,
+      decreaseAmt: mv.decrease,
+      closingAmt: mv.closing,
+    }
+  }
+  if (sheetCode === 'F2-12') {
+    const raw = readRowJson(map.get('F2-12-rows'))
+    const mv = sumContractPerfMovement(safeParseRows(raw))
+    return {
+      openingAmt: mv.opening,
+      increaseAmt: mv.increase,
+      decreaseAmt: mv.decrease,
+      closingAmt: mv.closing,
+    }
+  }
+  if (sheetCode === 'F2-13') {
+    const raw = readRowJson(map.get('F2-13-rows'))
+    const mv = sumBioAssetMovement(safeParseRows(raw))
+    return {
+      openingAmt: mv.opening,
+      increaseAmt: mv.increase,
+      decreaseAmt: mv.decrease,
+      closingAmt: mv.closing,
+    }
+  }
   const raw = readRowJson(map.get(`${sheetCode}-rows`))
   const rows = safeParseRows<F2DetailRow>(raw)
   return {

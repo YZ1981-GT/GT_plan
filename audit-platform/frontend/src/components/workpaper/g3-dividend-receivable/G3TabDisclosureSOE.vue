@@ -91,32 +91,6 @@
       />
     </el-card>
 
-    <!-- 审计说明 -->
-    <el-card class="audit-note-card" shadow="never">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input
-        v-model="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 5 }"
-        :disabled="isReadonly"
-        placeholder="填写审计说明：概述国企应收股利披露的复核程序、与审定数勾稽核对结果、列报是否符合准则要求。"
-        @change="persistNote"
-      />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card class="audit-note-card" shadow="never">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
-      <el-input
-        v-model="auditConclusion"
-        type="textarea"
-        :autosize="{ minRows: 3 }"
-        :disabled="isReadonly"
-        placeholder="填写审计结论：附注披露完整、准确且与审定数一致，或说明需修改/补充事项。"
-        @change="persistConclusion"
-      />
-    </el-card>
-
     <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>📋 编制提示（CAS 依据）</summary>
@@ -160,20 +134,6 @@ const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog',
 // ─── Storage Keys ───
 const TEXT_KEY = 'G3-disclosure-soe-text'
 const TABLE_KEY = 'G3-disclosure-soe-table'
-
-// ─── 审计说明 / 审计结论（conclusion=null，文本存 remark，走白名单豁免路径） ───
-const NOTE_KEY = 'G3-disclosure-soe-audit-note'
-const CONCLUSION_KEY = 'G3-disclosure-soe-audit-conclusion'
-const auditNote = ref(props.allResponses.get(NOTE_KEY)?.remark ?? '')
-const auditConclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.remark ?? '')
-function persistNote() {
-  if (props.isReadonly) return
-  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: auditNote.value })
-}
-function persistConclusion() {
-  if (props.isReadonly) return
-  props.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: auditConclusion.value })
-}
 
 // ─── Note Text ───
 const noteText = ref('')
@@ -364,10 +324,8 @@ function fmtNum(v: unknown): string {
 }
 
 /* 审计说明 / 审计结论卡片 */
-.audit-note-card {
   margin-top: 12px;
 }
-.audit-note-card .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;

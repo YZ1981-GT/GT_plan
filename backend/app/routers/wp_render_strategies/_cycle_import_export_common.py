@@ -47,16 +47,27 @@ def is_numeric_field_key(key: str) -> bool:
         return True
     return key in {
         "faceValue", "termDays", "overdueDays", "concentration", "debitAmount", "creditAmount",
+        "debitMovement", "creditMovement",
         "debit", "credit", "increase", "decrease", "interest", "accruedInterest", "bookInterest",
         "variance", "openingQty", "openingAmt", "increaseQty", "increaseAmt", "decreaseQty",
         "decreaseAmt", "agingLt1", "aging1to2", "aging2to3", "agingGt3", "expectedDays",
         "payableInterest", "openingAdjusted", "closingBalance", "agingTotal", "postPaymentAmt",
+        "postPaymentAmount", "averagePaymentDays", "contractUnitPrice",
+        "estimatedAmount", "voucherAmount", "reportPeriodAmount",
         "auditedBalance", "auditedAgingLt1", "auditedAging1to2", "auditedAging2to3", "auditedAgingGt3",
         "h1Total", "h1Share", "h1Avg", "h2Total", "yearTotal", "priorTotal", "changeAmt", "changeRate",
         "volCoef", "currentAmt", "priorAmt", "changeAmount", "changeRatePct", "expectedDiff",
         "hangDays", "hangAmount", "qtySold", "qtyCost", "qtyDiff", "qtyDiffRate", "openingStock",
         "production", "purchase", "availableQty", "closingStock", "theoreticalQty", "theoreticalDiff",
         "amount", "adjustAmount", "noteAmount", "discountAmount", "openingBalance", "sharePct",
+        "currentIssued", "currentAccepted", "closingUnadjusted", "closingAdjusted",
+        "depositRate", "depositAmount",
+        # F4-2 应付账款明细（源表A:AA）
+        "openingUnadjusted", "openingAje", "openingRje", "currentDebit", "currentCredit",
+        "entityReclassification", "unadjustedAgingLt1", "unadjustedAging1to2",
+        "unadjustedAging2to3", "unadjustedAgingGt3", "closingAje", "closingRje",
+        "auditedAgingLt1", "auditedAging1to2", "auditedAging2to3", "auditedAgingGt3",
+        "subsequentPayment",
         "currentRevenue", "currentCost", "currentGross", "currentMargin", "priorRevenue", "priorCost",
         "priorGross", "priorMargin", "revenueChange", "revenueChangeRate", "costChange", "costChangeRate",
         "marginChange", "relatedRevenue", "costRate",
@@ -249,8 +260,9 @@ AGING_PERIOD_LABELS: dict[str, str] = {
     "audited": "期末审定",
 }
 
-# 三期科目（含期末未审 current）：D2/K1/K3/G5；两期科目（仅期初/期末审定）：D3/F1
-_THREE_PERIOD_SUBJECTS = frozenset({"D2", "K1", "K3", "G5"})
+# 三期科目（含期末未审 current）：D2/K1/K3/G5/F1；两期科目（仅期初/期末审定）：D3
+_THREE_PERIOD_SUBJECTS = frozenset({"D2", "K1", "K3", "G5", "F1"})
+
 
 # 期间 key → DetailRow 中嵌套 aging 数据字段名
 _AGING_PERIOD_FIELD: dict[str, str] = {
@@ -263,8 +275,8 @@ _AGING_PERIOD_FIELD: dict[str, str] = {
 def subject_aging_periods(subject: str) -> list[str]:
     """返回科目对应的账龄期间列表（有序）。
 
-    - 三期科目（D2/K1/K3/G5）：[prior, current, audited]
-    - 两期科目（D3/F1）：[prior, audited]
+    - 三期科目（D2/K1/K3/G5/F1）：[prior, current, audited]
+    - 两期科目（D3）：[prior, audited]
     """
     if subject in _THREE_PERIOD_SUBJECTS:
         return ["prior", "current", "audited"]

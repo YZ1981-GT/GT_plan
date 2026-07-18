@@ -17,7 +17,7 @@ import {
 
 // ─── Generators ──────────────────────────────────────────────────────────────
 
-const NATURE_VALUES = ['预付货款', '预付服务费', '预付租金', '其他'] as const
+const NATURE_VALUES = ['货款', '工程款', '设备款', '服务费', '其他'] as const
 
 const detailRowArb: fc.Arbitrary<DetailRowForFormula> = fc.record({
   nature: fc.constantFrom(...NATURE_VALUES),

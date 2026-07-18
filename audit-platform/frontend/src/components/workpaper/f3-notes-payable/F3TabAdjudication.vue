@@ -8,7 +8,9 @@ import { computed, inject, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useF3Adjudication } from '../composables/useF3Adjudication'
 import type { F3AdjudicationRow } from '../composables/useF3Adjudication'
+import { useF3AiGenerate, type F3AiSection } from '../composables/useF3AiGenerate'
 import GtIndexChip from '../GtIndexChip.vue'
+import F3SheetAttachments from './F3SheetAttachments.vue'
 
 const props = defineProps<{
   wpId: string
@@ -45,6 +47,47 @@ const {
 })
 
 const hasDifference = computed(() => Math.abs(differenceRow.value) > 0.005)
+const {
+  aiAvailable,
+  loading: aiLoading,
+  generateAndConfirm,
+} = useF3AiGenerate(toRef(props, 'wpId') as Ref<string>)
+
+function adjudicationAiContext(): Record<string, unknown> {
+  return {
+    accountCode: '2201',
+    accountName: '应付票据',
+    detailCrossValidation: detailCrossValidation.value || '未发现明细表核对提示',
+    trialBalanceClosing: trialBalanceRow.value,
+    adjudicatedClosing: subtotalRow.value.closingAdjusted,
+    difference: differenceRow.value,
+    hasDifference: hasDifference.value,
+    categories: dataRows.value.map((row) => ({
+      category: row.label,
+      openingUnadjusted: row.openingUnadjusted,
+      openingAdjusted: row.openingAdjusted,
+      closingUnadjusted: row.closingUnadjusted,
+      closingAje: row.closingAje,
+      closingRje: row.closingRje,
+      closingAdjusted: row.closingAdjusted,
+      indexRef: row.indexRef,
+    })),
+  }
+}
+
+async function generateAiText(section: F3AiSection): Promise<void> {
+  if (props.isReadonly) return
+  const isNote = section === 'adjudication-note'
+  const text = await generateAndConfirm(
+    section,
+    isNote ? auditNote.value : auditConclusion.value,
+    adjudicationAiContext(),
+    isNote ? 'AI 生成 · 应付票据审计说明' : 'AI 生成 · 应付票据审计结论',
+  )
+  if (!text) return
+  if (isNote) auditNote.value = text
+  else auditConclusion.value = text
+}
 
 const footerRows = computed(() => [
   subtotalRow.value,
@@ -142,6 +185,13 @@ function confirmAdjudication() {
         <el-tag size="small" type="info">共 {{ dataRows.length }} 行</el-tag>
       </div>
     </div>
+
+    <F3SheetAttachments
+      :project-id="projectId"
+      :wp-id="wpId"
+      sheet-code="F3-1"
+      label="审定表附件"
+    />
 
     <el-table
       :data="[...dataRows, ...footerRows]"
@@ -274,6 +324,14 @@ function confirmAdjudication() {
         <div class="opinion-section-header">
           <span class="opinion-section-label">1. 审计说明</span>
           <div class="opinion-actions">
+            <el-button
+              size="small"
+              type="primary"
+              plain
+              :disabled="isReadonly || !aiAvailable"
+              :loading="aiLoading"
+              @click="generateAiText('adjudication-note')"
+            >🤖 AI 填写审计说明</el-button>
             <el-button size="small" @click="openReviewDialog?.('F3-1-note')">💬</el-button>
           </div>
         </div>
@@ -289,7 +347,17 @@ function confirmAdjudication() {
       <div class="opinion-section">
         <div class="opinion-section-header">
           <span class="opinion-section-label">2. 审计结论</span>
-          <el-button size="small" @click="openReviewDialog?.('F3-1-conclusion')">💬</el-button>
+          <div class="opinion-actions">
+            <el-button
+              size="small"
+              type="primary"
+              plain
+              :disabled="isReadonly || !aiAvailable"
+              :loading="aiLoading"
+              @click="generateAiText('adjudication-conclusion')"
+            >🤖 AI 生成审计结论</el-button>
+            <el-button size="small" @click="openReviewDialog?.('F3-1-conclusion')">💬</el-button>
+          </div>
         </div>
         <el-input
           v-model="auditConclusion"

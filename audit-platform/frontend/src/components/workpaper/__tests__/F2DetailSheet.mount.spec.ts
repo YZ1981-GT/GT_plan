@@ -104,7 +104,104 @@ describe('F2DetailSheet mount', () => {
     })
     await flushPromises()
     await nextTick()
-    expect(wrapper.text()).toContain('材料采购')
+    expect(wrapper.text()).toContain('材料采购/在途物资')
     expect(wrapper.text()).toContain('F2-4')
+  })
+
+  it('renders F2-6 semi-finished without crash', async () => {
+    const wrapper = mount(F2DetailSheet, {
+      props: {
+        config: F2_DETAIL_SHEET_CONFIGS['F2-6'],
+        wpId: 'wp-1',
+        projectId: 'p1',
+        allResponses: new Map(),
+        isReadonly: false,
+      },
+      global: {
+        stubs: {
+          'el-table-v2': true,
+          'el-radio-group': true,
+          'el-radio-button': true,
+          'el-popover': true,
+          'el-dialog': true,
+          'el-card': true,
+          'el-alert': true,
+          'el-tag': true,
+          'el-button': true,
+          'el-input': true,
+          'el-input-number': true,
+          'el-select': true,
+          'el-option': true,
+          'el-checkbox': true,
+          'el-divider': true,
+          'el-tooltip': true,
+          'el-table': true,
+          'el-table-column': true,
+        },
+      },
+    })
+    await flushPromises()
+    await nextTick()
+    expect(wrapper.text()).toContain('自制半成品')
+    expect(wrapper.text()).toContain('F2-6')
+  })
+
+  const stubs = {
+    'el-table-v2': true,
+    'el-radio-group': true,
+    'el-radio-button': true,
+    'el-popover': true,
+    'el-dialog': true,
+    'el-card': true,
+    'el-alert': true,
+    'el-tag': true,
+    'el-button': true,
+    'el-input': true,
+    'el-input-number': true,
+    'el-select': true,
+    'el-option': true,
+    'el-checkbox': true,
+    'el-divider': true,
+    'el-tooltip': true,
+    'el-table': true,
+    'el-table-column': true,
+  }
+
+  it('renders F2-8 finished goods with sales ledger recon', async () => {
+    const wrapper = mount(F2DetailSheet, {
+      props: {
+        config: F2_DETAIL_SHEET_CONFIGS['F2-8'],
+        wpId: 'wp-1',
+        projectId: 'p1',
+        allResponses: new Map(),
+        isReadonly: false,
+      },
+      global: { stubs },
+    })
+    await flushPromises()
+    await nextTick()
+    expect(wrapper.text()).toContain('库存商品')
+    expect(wrapper.text()).toContain('F2-8')
+    expect(wrapper.text()).toContain('销售出库数量')
+    expect(wrapper.text()).toContain('差异')
+  })
+
+  it('renders F2-9 dispatched goods with party columns', async () => {
+    const wrapper = mount(F2DetailSheet, {
+      props: {
+        config: F2_DETAIL_SHEET_CONFIGS['F2-9'],
+        wpId: 'wp-1',
+        projectId: 'p1',
+        allResponses: new Map(),
+        isReadonly: false,
+      },
+      global: { stubs },
+    })
+    await flushPromises()
+    await nextTick()
+    expect(wrapper.text()).toContain('发出商品')
+    expect(wrapper.text()).toContain('F2-9')
+    expect(wrapper.text()).toContain('销售出库数量')
+    expect(wrapper.text()).toContain('资产负债表日后销售情况')
   })
 })

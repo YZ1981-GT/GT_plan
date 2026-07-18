@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="f2-reconcile">
     <header class="rec-hero">
       <div class="rec-hero-main">
@@ -51,7 +51,18 @@
       sheet-code="F2-24"
     />
 
-    <section v-for="group in F2_24_LAYOUT" :key="group.id" class="rec-card">
+    <nav class="st-sec-nav" aria-label="分区导航">
+      <button
+        v-for="item in recNav"
+        :key="item.id"
+        type="button"
+        class="st-sec-btn"
+        :class="{ active: activeId === item.id }"
+        @click="scrollTo(item.id)"
+      >{{ item.label }}</button>
+    </nav>
+
+    <section v-for="group in F2_24_LAYOUT" :id="`st-${group.id}`" :key="group.id" class="rec-card">
       <header class="rec-card-head">
         <div>
           <h3>{{ group.title }}</h3>
@@ -61,7 +72,7 @@
           v-if="group.id === 'meta' && wpId && !isReadonly"
           size="small"
           plain
-          @click="seedFromPlan"
+          @click="() => seedFromPlan()"
         >从计划/小结带入</el-button>
       </header>
       <div
@@ -121,7 +132,7 @@
     </section>
 
     <!-- 一、资产负债表日 -->
-    <section class="rec-card">
+    <section id="st-bs" class="rec-card">
       <header class="rec-card-head">
         <div>
           <h3>一、资产负债表日核对记录</h3>
@@ -246,7 +257,7 @@
     </section>
 
     <!-- 二、盘点日 -->
-    <section class="rec-card">
+    <section id="st-count" class="rec-card">
       <header class="rec-card-head">
         <div>
           <h3>二、盘点日核对记录</h3>
@@ -393,7 +404,7 @@
       </div>
     </section>
 
-    <section class="rec-card rec-card-conclusion">
+    <section id="st-note" class="rec-card rec-card-conclusion">
       <header class="rec-card-head">
         <div>
           <h3>三、审计说明</h3>
@@ -421,7 +432,7 @@
       />
     </section>
 
-    <section class="rec-card rec-card-conclusion">
+    <section id="st-conclusion" class="rec-card rec-card-conclusion">
       <header class="rec-card-head">
         <div>
           <h3>四、审计结论</h3>
@@ -458,6 +469,7 @@ import { ElMessage } from 'element-plus'
 import { useF2StocktakeFields, useF2StocktakeRows } from '../../composables/useF2StocktakeSheet'
 import { useF2StocktakeOcr } from '../../composables/useF2StocktakeOcr'
 import { useF2StocktakeAiGenerate } from '../../composables/useF2StocktakeAiGenerate'
+import { useStickySectionNav } from '../../composables/useStickySectionNav'
 import {
   applyMetaSeedToFields,
   formatVarianceSummary,
@@ -474,6 +486,22 @@ import {
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
 import F2StocktakeSheetAttachments from './F2StocktakeSheetAttachments.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+
+function shortNavLabel(title: string): string {
+  return title
+    .replace(/^[\d一二三四五六七八九十～\-·\s]+/, '')
+    .replace(/^[·\s]+/, '')
+    .slice(0, 8) || title
+}
+
+const recNav = [
+  ...F2_24_LAYOUT.map((g) => ({ id: `st-${g.id}`, label: shortNavLabel(g.title) })),
+  { id: 'st-bs', label: '截止日核对' },
+  { id: 'st-count', label: '盘点日核对' },
+  { id: 'st-note', label: '审计说明' },
+  { id: 'st-conclusion', label: '审计结论' },
+]
+const { activeId, scrollTo } = useStickySectionNav(recNav)
 
 const props = defineProps<{
   wpId?: string
@@ -714,7 +742,7 @@ async function aiFillConclusion(): Promise<void> {
   --rec-border: #e8eaef;
   --rec-muted: #6b7280;
   --rec-ink: #1f2937;
-  --rec-accent: var(--gt-color-primary, #4b2d77);
+  --rec-accent: var(--gt-color-primary, #334155);
   --rec-surface: var(--gt-color-primary-bg, #f4f0fa);
   padding: 8px 12px 20px;
   font-size: var(--wp-font-size, 13px);
@@ -738,7 +766,7 @@ async function aiFillConclusion(): Promise<void> {
   margin-bottom: 12px;
   border: 1px solid var(--rec-border);
   border-radius: 10px;
-  background: linear-gradient(135deg, #faf9ff 0%, #fff 55%);
+  background: linear-gradient(135deg, #f8fafc 0%, #fff 55%);
 }
 .rec-kicker {
   font-size: 11px;
@@ -877,7 +905,7 @@ async function aiFillConclusion(): Promise<void> {
   flex-shrink: 0;
 }
 .ai-chip:hover:not(:disabled) {
-  background: #ebe4f5;
+  background: #f1f5f9;
 }
 .ai-chip:disabled {
   opacity: 0.55;
@@ -915,3 +943,5 @@ async function aiFillConclusion(): Promise<void> {
   .rec-field.span2 { grid-column: auto; }
 }
 </style>
+
+<style src="./f2StocktakeSoftNav.css"></style>

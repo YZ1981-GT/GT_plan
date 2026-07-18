@@ -97,6 +97,23 @@ async def _generate_a_program_data(
             logger.warning("A-程序表提取失败 %s/%s: %s", file_path, sheet_name, e)
             programs = []
 
+    # ─── 兜底 2：按 sheet 级编码重新解析模板文件后再提取 ─────────────────
+    # 多文件科目（如 F2）的父码模板可能不含该程序表 sheet（F2-55A 位于
+    # "F2-55至F2-58 合同履约成本.xlsx"），用 sheet 编码定位真正来源文件。
+    if not any(p.get("program_desc", "").strip() for p in programs) and wp_code:
+        try:
+            from app.services.wp_template_finder import find_template_file_any
+
+            alt_path = find_template_file_any(wp_code)
+            if alt_path and str(alt_path) != (file_path or ""):
+                alt_programs = extract_program_rows(str(alt_path), sheet_name)
+                alt_programs = [enrich_program_row(p) for p in alt_programs]
+                if any(p.get("program_desc", "").strip() for p in alt_programs):
+                    programs = alt_programs
+                    file_path = str(alt_path)
+        except Exception as e:  # noqa: BLE001 — 降级不阻塞渲染
+            logger.warning("A-程序表按编码重解析失败 %s/%s: %s", wp_code, sheet_name, e)
+
     # 有效性检测：如果 extract_program_rows 提取的行全是空描述（无实质内容），
     # 说明该 sheet 不是程序表结构（如 D0-5/D0-6 替代程序检查表），清空让 grid_fallback 接管。
     if programs and not any(p.get("program_desc", "").strip() for p in programs):

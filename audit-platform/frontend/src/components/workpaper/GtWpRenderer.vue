@@ -537,8 +537,8 @@ const rendererEntry = computed(() =>
  */
 const htmlRendererKey = computed(() => {
   const ct = effectiveRendererComponentType.value
-  // 同 componentType 多 sheet（监盘 F2-21↔22↔23）需带 sheet，避免内部状态卡住
-  if (ct === 'f2-stocktake-bundle') {
+  // 同 componentType 多 sheet 需带 sheet，避免内部状态卡住 / 双层 tabs 错位
+  if (ct === 'f2-stocktake-bundle' || ct === 'f1-prepayment') {
     return `${ct}::${activeSheetName.value}`
   }
   // 其余 HTML 组件按类型复用即可，减少无谓重建与重复请求

@@ -54,6 +54,15 @@ export interface EnrichedContractCostCheck extends ContractCostCheckSample {
   hasIssue: boolean
 }
 
+export type ContractCostCheckStatus = 'ok' | 'missing' | 'mismatch'
+
+export interface ContractCostEvidenceCheck {
+  key: string
+  label: string
+  status: ContractCostCheckStatus
+  detail: string
+}
+
 export interface ContractCostCheckStats {
   testedAmount: number
   incorrectAmount: number
@@ -129,9 +138,71 @@ export function emptyCheckSample(): ContractCostCheckSample {
 export function defaultContractCostCheckSheet(): ContractCostCheckSheet {
   return {
     sampling: emptySampling(),
-    samples: Array.from({ length: 8 }, () => emptyCheckSample()),
+    samples: [emptyCheckSample()],
     statNote: '',
   }
+}
+
+export function isBlankContractCostCheckSample(row: ContractCostCheckSample): boolean {
+  return (Object.entries(row) as Array<[keyof ContractCostCheckSample, unknown]>)
+    .every(([key, value]) => key === 'id' || value === '' || value === 0 || value == null)
+}
+
+export function pruneBlankContractCostCheckSamples(
+  rows: ContractCostCheckSample[],
+): ContractCostCheckSample[] {
+  const filled = rows.filter((row) => !isBlankContractCostCheckSample(row))
+  return filled.length ? filled : [emptyCheckSample()]
+}
+
+export function evaluateContractCostEvidence(
+  row: ContractCostCheckSample,
+): ContractCostEvidenceCheck[] {
+  const present = (value: unknown) => String(value ?? '').trim().length > 0
+  const amountMatches = (other: number) =>
+    !row.voucherAmount || !other || Math.abs(row.voucherAmount - other) <= 0.01
+  return [
+    {
+      key: 'voucher',
+      label: '记账凭证',
+      status: present(row.voucherNo) && present(row.businessContent) && !!row.voucherAmount
+        ? 'ok' : 'missing',
+      detail: present(row.voucherNo) ? row.voucherNo : '凭证号、业务内容或金额待补充',
+    },
+    {
+      key: 'contract',
+      label: '合同/协议',
+      status: present(row.contractDateNo) && present(row.contractTerms) ? 'ok' : 'missing',
+      detail: present(row.contractDateNo) ? row.contractDateNo : '合同日期/编号或主要条款待补充',
+    },
+    {
+      key: 'receipt',
+      label: '到货验收',
+      status: !present(row.receiptProductName) || !row.receiptAmount
+        ? 'missing'
+        : amountMatches(row.receiptAmount) ? 'ok' : 'mismatch',
+      detail: !row.receiptAmount
+        ? '验收产品或金额待补充'
+        : amountMatches(row.receiptAmount) ? '与凭证金额勾稽' : '验收金额与凭证金额不一致',
+    },
+    {
+      key: 'logistics',
+      label: '物流运输',
+      status: present(row.logisticsDateNo) && present(row.logisticsProductName)
+        ? 'ok' : 'missing',
+      detail: present(row.logisticsDateNo) ? row.logisticsDateNo : '物流日期/编号或产品名称待补充',
+    },
+    {
+      key: 'allocation',
+      label: '费用分配',
+      status: !row.allocAmount || !present(row.allocBasis)
+        ? 'missing'
+        : amountMatches(row.allocAmount) ? 'ok' : 'mismatch',
+      detail: !row.allocAmount
+        ? '分配金额或依据待补充'
+        : amountMatches(row.allocAmount) ? '与凭证金额勾稽' : '分配金额与凭证金额不一致',
+    },
+  ]
 }
 
 export function enrichCheckSample(row: ContractCostCheckSample): EnrichedContractCostCheck {
@@ -181,14 +252,17 @@ export function migrateContractCostCheckSheet(
       ...sheet,
       ...s,
       sampling: { ...sheet.sampling, ...s.sampling },
-      samples: s.samples?.length ? s.samples : sheet.samples,
+      samples: pruneBlankContractCostCheckSamples(
+        s.samples?.length ? s.samples : sheet.samples,
+      ),
     }
   }
 
   if (Array.isArray(legacy) && legacy.length) {
     const first = legacy[0] as Record<string, unknown>
     if ('voucherNo' in first || 'projectName' in first) {
-      sheet.samples = (legacy as Array<Record<string, unknown>>).map((r) => ({
+      sheet.samples = pruneBlankContractCostCheckSamples(
+        (legacy as Array<Record<string, unknown>>).map((r) => ({
         ...emptyCheckSample(),
         id: String(r.id || newContractCostCheckId()),
         projectName: String(r.projectName || ''),
@@ -214,7 +288,8 @@ export function migrateContractCostCheckSheet(
         isAbnormal: (r.isAbnormal as YesNo) ||
           (r.isCorrect === '否' ? '是' : r.isCorrect === '是' ? '否' : ''),
         issueDesc: String(r.issueDesc || ''),
-      }))
+        })),
+      )
       return sheet
     }
   }

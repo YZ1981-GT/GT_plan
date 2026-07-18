@@ -94,8 +94,8 @@ export function emptyOpeningLine(): ValuationDateLine {
   }
 }
 
-/** 源模板每个测试项目约 12 笔空白发生行 */
-const DEFAULT_TXN_ROW_COUNT = 12
+/** 默认每个测试项目仅预留 1 笔空白发生行；需要时由「+ 增行」添加 */
+const DEFAULT_TXN_ROW_COUNT = 1
 
 export function emptyDateProject(seq: number, itemName = ''): ValuationDateProject {
   return {
@@ -110,9 +110,9 @@ export function emptyDateProject(seq: number, itemName = ''): ValuationDateProje
   }
 }
 
-/** F2-39 源模板列示 3 个测试项目 */
+/** 默认 1 个测试项目；需要时由「+ 项目」添加 */
 export function defaultThreeDateProjects(): ValuationDateProject[] {
-  return [1, 2, 3].map((n) => emptyDateProject(n, ''))
+  return [emptyDateProject(1, '')]
 }
 
 function n(v: number): number {
@@ -333,6 +333,28 @@ export const F2_39_TIPS = [
   '存货成本结转时，已计提的存货跌价准备应当同时结转，计入当期损益。',
 ] as const
 
+function isBlankTxnLine(line: ValuationDateLine): boolean {
+  return !(
+    line.dateLabel.trim()
+    || n(line.prodQty)
+    || n(line.prodPrice)
+    || n(line.prodAmt)
+    || n(line.saleQty)
+    || n(line.salePrice)
+    || n(line.saleAmt)
+  )
+}
+
+/** 保留年初行 + 已填发生行，末尾最多留 1 行空白发生行 */
+export function pruneDateProjectBlankTxns(proj: ValuationDateProject): ValuationDateProject {
+  const opening = proj.lines[0] || emptyOpeningLine()
+  const filledTxns = proj.lines.slice(1).filter((l) => !isBlankTxnLine(l))
+  return {
+    ...proj,
+    lines: [opening, ...filledTxns, emptyTxnLine()],
+  }
+}
+
 /** 迁移：旧月度结构 / 扁平行 → 日期结构 */
 export function migrateToDateProjects(
   legacy: Array<Record<string, unknown>>,
@@ -342,15 +364,12 @@ export function migrateToDateProjects(
   const first = legacy[0] as Record<string, unknown>
   if (first && Array.isArray(first.lines)) {
     const projects = legacy as unknown as ValuationDateProject[]
-    while (projects.length < 3) {
-      projects.push(emptyDateProject(projects.length + 1))
-    }
-    return projects.slice(0, 12)
+    return projects.length ? projects.slice(0, 12).map(pruneDateProjectBlankTxns) : [emptyDateProject(1)]
   }
 
   // 月度结构（误存为 F2-39）
   if (first && Array.isArray(first.months)) {
-    return (legacy as Array<{ seq?: number; itemName?: string; remark?: string; months: Array<Record<string, unknown>> }>)
+    const migrated = (legacy as Array<{ seq?: number; itemName?: string; remark?: string; months: Array<Record<string, unknown>> }>)
       .slice(0, 8)
       .map((p, i) => {
         const proj = emptyDateProject(i + 1, String(p.itemName || ''))
@@ -374,14 +393,9 @@ export function migrateToDateProjects(
           if (ti + 1 >= proj.lines.length) proj.lines.push(line)
           else proj.lines[ti + 1] = line
         })
-        return proj
+        return pruneDateProjectBlankTxns(proj)
       })
-      .concat(
-        Array.from({ length: Math.max(0, 3 - legacy.length) }, (_, i) =>
-          emptyDateProject(legacy.length + i + 1),
-        ),
-      )
-      .slice(0, 12)
+    return migrated.length ? migrated.slice(0, 12) : [emptyDateProject(1)]
   }
 
   // 旧扁平行
@@ -395,8 +409,7 @@ export function migrateToDateProjects(
     txn.prodAmt = Number(r.inboundAmt || 0)
     txn.saleQty = Number(r.issueQty || 0)
     txn.saleAmt = Number(r.bookIssueAmt || 0)
-    return p
+    return pruneDateProjectBlankTxns(p)
   })
-  while (projects.length < 3) projects.push(emptyDateProject(projects.length + 1))
-  return projects
+  return projects.length ? projects : [emptyDateProject(1)]
 }

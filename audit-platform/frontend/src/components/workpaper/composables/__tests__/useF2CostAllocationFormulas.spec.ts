@@ -10,10 +10,25 @@ import {
 } from '../useF2CostAllocationFormulas'
 
 describe('useF2CostAllocationFormulas', () => {
-  it('default sheet has 12 product rows', () => {
+  it('default sheet has 1 product row', () => {
     const s = defaultAllocationSheet()
-    expect(s.products).toHaveLength(12)
+    expect(s.products).toHaveLength(1)
     expect(s.pool.linkSource).toBe(true)
+  })
+
+  it('prunes blank product rows on migrate', () => {
+    const migrated = migrateAllocationSheet({
+      sampleMonth: '3月',
+      workshop: '一车间',
+      pool: { material: 1, labor: 0, overhead: 0, other: 0, linkSource: false },
+      products: [
+        { ...emptyAllocationProduct(), productName: 'A', outputQty: 1, allocationBase: 1 },
+        emptyAllocationProduct(),
+        emptyAllocationProduct(),
+      ],
+    })
+    expect(migrated!.products).toHaveLength(1)
+    expect(migrated!.products[0].productName).toBe('A')
   })
 
   it('allocates by allocation base ratio', () => {

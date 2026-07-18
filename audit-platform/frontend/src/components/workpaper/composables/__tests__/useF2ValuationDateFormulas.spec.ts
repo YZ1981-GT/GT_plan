@@ -11,9 +11,10 @@ import {
 } from '../useF2ValuationDateFormulas'
 
 describe('useF2ValuationDateFormulas', () => {
-  it('默认 3 个测试项目', () => {
+  it('默认 1 个测试项目', () => {
     const projects = defaultThreeDateProjects()
-    expect(projects).toHaveLength(3)
+    expect(projects).toHaveLength(1)
+    expect(projects[0].lines).toHaveLength(2)
     expect(projects[0].lines[0].dateLabel).toBe('年初数')
   })
 
@@ -57,7 +58,7 @@ describe('useF2ValuationDateFormulas', () => {
       ],
     }]
     const migrated = migrateToDateProjects(monthly)
-    expect(migrated).toHaveLength(3)
+    expect(migrated).toHaveLength(1)
     expect(migrated![0].itemName).toBe('乙')
     expect(migrated![0].lines[1].dateLabel).toBe('1月')
   })

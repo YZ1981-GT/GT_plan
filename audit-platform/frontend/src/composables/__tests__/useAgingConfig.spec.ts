@@ -50,11 +50,11 @@ describe('useAgingConfig — segmentsToBands', () => {
     }
   })
 
-  it('应为 2-period subject (F1) 生成 currentField 为空字符串', () => {
+  it('应为 3-period subject (F1) 生成 currentField（期末未审账龄）', () => {
     const bands = segmentsToBands(fiveYearSegments, 'F1')
     expect(bands).toHaveLength(6)
     for (const band of bands) {
-      expect(band.currentField).toBe('')
+      expect(band.currentField).toBe(`agingCurrent.${band.key}`)
     }
   })
 
@@ -118,10 +118,11 @@ describe('useAgingConfig — createEmptyAgingData', () => {
     expect(Object.keys(data.agingPrior!)).toHaveLength(4)
   })
 
-  it('F1 作为 2-period 无 agingCurrent', () => {
+  it('F1 作为 3-period 含 agingCurrent（对齐 Excel 期末未审账龄）', () => {
     const data = createEmptyAgingData(fiveYearSegments, 'F1')
-    expect(data.agingCurrent).toBeUndefined()
+    expect(data.agingCurrent).toBeDefined()
     expect(Object.keys(data.agingPrior!)).toHaveLength(6)
+    expect(Object.keys(data.agingCurrent!)).toHaveLength(6)
   })
 
   it('空 segments 生成空对象', () => {

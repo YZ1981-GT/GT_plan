@@ -31,11 +31,19 @@
           :disabled="isReadonly" @imported="$emit('imported')" />
       </div>
       <div class="toolbar-right">
-        <el-button size="small" @click="openReview">💬 复核</el-button>
-        <span class="chip-wrap"><GtIndexChip value="wp:F5-1" /></span>
+        <el-button v-if="openReviewDialog" size="small" @click="openReview">复核</el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:F5-1" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
+
+    <F5SheetAttachments
+      v-if="projectId"
+      :project-id="projectId"
+      :wp-id="wpId"
+      sheet-code="F5-4"
+      label="调整分录附件"
+    />
 
     <el-table :data="rows" border size="small" style="width:100%;font-size:13px" max-height="480">
       <el-table-column prop="seq" label="序号" width="56" />
@@ -114,6 +122,14 @@
       <template #header>
         <div class="opinion-header">
           <span class="opinion-title">审计说明</span>
+          <el-button
+            v-if="!isReadonly && aiAvailable"
+            size="small"
+            type="primary"
+            plain
+            :loading="aiLoading"
+            @click="runAdjAi('adjustment-entry-note')"
+          >AI 填写说明</el-button>
         </div>
       </template>
       <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5, maxRows: 8 }" :disabled="isReadonly"
@@ -125,6 +141,14 @@
       <template #header>
         <div class="opinion-header">
           <span class="opinion-title">审计结论</span>
+          <el-button
+            v-if="!isReadonly && aiAvailable"
+            size="small"
+            type="primary"
+            plain
+            :loading="aiLoading"
+            @click="runAdjAi('adjustment-entry-conclusion')"
+          >AI 填写结论</el-button>
         </div>
       </template>
       <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" :disabled="isReadonly"
@@ -137,18 +161,26 @@
 /** F5TabAdjustment — F5-4 调整分录（借贷平衡校验 + 动态行 + 导入导出） */
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
 import { parseNum, calcSubtotal, isDebitCreditBalanced } from '../composables/useF5CosOfFormulaEngine'
+import { useF5AiGenerate } from '../composables/useF5AiGenerate'
 import { resolveImportExportSheet, isImportExportSheet } from '../shared/cycleImportExportRegistry'
 import CycleImportExportDropdown from '../shared/CycleImportExportDropdown.vue'
+import F5SheetAttachments from './F5SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
 defineEmits<{ imported: [] }>()
-const props = defineProps<{ allResponses: Map<string, ChecklistResponse>; wpId: string; isReadonly: boolean }>()
+const props = defineProps<{
+  allResponses: Map<string, ChecklistResponse>
+  wpId: string
+  projectId?: string
+  isReadonly: boolean
+}>()
 
-// 父组件模板绑定会自动解包 computed → 子组件收到纯 Map；重新包成 ref 供内部逻辑使用
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
 
-const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF5AiGenerate(wpIdRef)
 const STORAGE_KEY = 'F5-4-rows'
 const NOTE_KEY = 'F5-4-audit-note'
 const CONCLUSION_KEY = 'F5-4-audit-conclusion'
@@ -163,6 +195,31 @@ function saveNote() {
 function saveConclusion() {
   allResponsesRef.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: auditConclusion.value })
   window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items: [{ item_id: CONCLUSION_KEY, conclusion: null, remark: auditConclusion.value }] } }))
+}
+
+async function runAdjAi(section: 'adjustment-entry-note' | 'adjustment-entry-conclusion'): Promise<void> {
+  if (props.isReadonly) return
+  const isNote = section === 'adjustment-entry-note'
+  const text = await generateAndConfirm(
+    section,
+    isNote ? auditNote.value : auditConclusion.value,
+    {
+      sheet: 'F5-4',
+      rowCount: rows.value.length,
+      debitTotal: totalDebit.value,
+      creditTotal: totalCredit.value,
+      isBalanced: isBalanced.value,
+    },
+    isNote ? 'AI · 审计说明' : 'AI · 审计结论',
+  )
+  if (!text) return
+  if (isNote) {
+    auditNote.value = text
+    saveNote()
+  } else {
+    auditConclusion.value = text
+    saveConclusion()
+  }
 }
 
 interface AdjRow {
@@ -235,7 +292,7 @@ function persist() {
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); persist() } })
 
 function fmt(v: number | null | undefined): string { return v == null || v === 0 ? '-' : v.toLocaleString('zh-CN', { maximumFractionDigits: 2 }) }
-function openReview() { openReviewDialog('F5-4-adjustment') }
+function openReview() { openReviewDialog?.('F5-4-adjustment') }
 </script>
 
 <style scoped>

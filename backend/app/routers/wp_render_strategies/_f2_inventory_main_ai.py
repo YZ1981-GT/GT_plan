@@ -48,6 +48,9 @@ _SUPPORTED_SECTIONS = {
     "cost-comparison-conclusion",
     "summary-note",
     "summary-conclusion",
+    "summary-objective",
+    "summary-process",
+    "summary-change-reason",
     "detail-valuation",
     "detail-change",
     "detail-long-aging",
@@ -88,8 +91,26 @@ _SYSTEM_PROMPT = """你是一位资深注册会计师（CPA），正在协助编
 _SECTION_PROMPTS: dict[str, str] = {
     "adj-note": "请生成F2-1存货审定表的审计说明，涵盖存货总体状况、主要审计程序及发现。",
     "adj-conclusion": "请生成F2-1存货审定表的审计结论，评价存货账面价值是否公允反映。",
-    "summary-note": "请生成F2-2存货明细汇总表的审计说明。",
-    "summary-conclusion": "请生成F2-2存货明细汇总表的审计结论，可采用A/B/C模板。",
+    "summary-note": (
+        "请生成F2-2存货明细汇总表的审计说明。结合各类别原值/跌价/账面价值未审与审定差异、"
+        "跨表明细勾稽及重大调整，概述测试情况与拟调整影响；不得虚构未提供的金额。"
+    ),
+    "summary-conclusion": (
+        "请生成F2-2存货明细汇总表的审计结论，仅采用A/B/C之一开头："
+        "A未见异常；B除已识别拟调整事项外其余未见异常；C存在重大未调整或范围受限不可确认。"
+    ),
+    "summary-objective": (
+        "请生成F2-2存货明细汇总表「一、审计目标」条目，通常涵盖存在、权利与义务、完整性、计价与分摊等，"
+        "用编号列表，简洁适合底稿页眉区。"
+    ),
+    "summary-process": (
+        "请生成F2-2存货明细汇总表「二、审计过程」条目，说明取得明细并与总账核对、抽查收发存、"
+        "截止测试、库龄与跌价分析等程序，用编号列表，不得虚构已执行但未提供的程序结果。"
+    ),
+    "summary-change-reason": (
+        "请基于上下文中各类别审定变动率，生成存货账面价值「变动原因分析」提示要点（按类别），"
+        "便于审计人员粘贴到对应行；变动不显著的可写「变动不重大」。"
+    ),
     "detail-valuation": "请撰写该类存货明细表审计说明第1问：计价方法。",
     "detail-change": "请撰写该类存货明细表审计说明第2问：本期发生重大变动的原因。",
     "detail-long-aging": "请撰写该类存货明细表审计说明第3问：库龄较长的原因。",

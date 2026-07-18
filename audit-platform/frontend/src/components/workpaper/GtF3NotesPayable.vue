@@ -299,8 +299,6 @@ import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 
 
-const GtAProgramConsole = defineAsyncComponent(() => import('./GtAProgramConsole.vue'))
-
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 
 

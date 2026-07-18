@@ -41,6 +41,10 @@
           v-if="isContractCostExampleSheet"
         />
 
+        <F2InterviewCheckExample
+          v-else-if="isInterviewExampleSheet"
+        />
+
         <F2TabContractProcedure
           v-else-if="currentSheet === 'F2-55A'"
           :wp-id="props.wpId"
@@ -58,6 +62,7 @@
         <F2TabContractCostDetail
           v-else-if="currentSheet === 'F2-55'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -74,6 +79,7 @@
         <F2TabImpairment
           v-else-if="currentSheet === 'F2-57'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -81,6 +87,7 @@
         <F2TabLossContract
           v-else-if="currentSheet === 'F2-58'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -88,6 +95,7 @@
         <F2TabPurchasePrice
           v-else-if="currentSheet === 'F2-61'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -95,6 +103,7 @@
         <F2TabUnitPrice
           v-else-if="currentSheet === 'F2-62'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -102,6 +111,7 @@
         <F2TabCapacityEnergy
           v-else-if="currentSheet === 'F2-63'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -116,6 +126,7 @@
         <F2TabRelatedPartyInquiry
           v-else-if="currentSheet === 'F2-65'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -123,6 +134,7 @@
         <F2TabRelatedPartyMarket
           v-else-if="currentSheet === 'F2-66'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -130,6 +142,7 @@
         <F2TabUndisclosedParty
           v-else-if="currentSheet === 'F2-67'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -137,6 +150,7 @@
         <F2TabSupplierStructure
           v-else-if="currentSheet === 'F2-68'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -144,6 +158,7 @@
         <F2TabSupplierChecklist
           v-else-if="currentSheet === 'F2-69'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -151,6 +166,7 @@
         <F2TabInterviewSummary
           v-else-if="currentSheet === 'F2-71'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -158,6 +174,7 @@
         <F2TabSupplierInfoCheck
           v-else-if="currentSheet === 'F2-70'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -165,6 +182,7 @@
         <F2TabInterviewDetail
           v-else-if="currentSheet === 'F2-72'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -197,6 +215,7 @@ import { useF2SpecialDualMode } from './composables/useF2SpecialDualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useF2SpeExternalAdjudicated } from './composables/useF2SpeExternalAdjudicated'
 import { isContractCostTestExampleSheet } from './f2-special/contract/f2ContractCostTestExampleData'
+import { isInterviewCheckExampleSheet } from './f2-special/ipo/f2InterviewCheckExampleData'
 
 // defineAsyncComponent lazy loading — 首屏仅加载当前 sheet 组件（对齐D4标准）
 const F2TabContractProcedure = defineAsyncComponent(() => import('./f2-special/contract/F2TabContractProcedure.vue'))
@@ -219,6 +238,9 @@ const F2TabSupplierInfoCheck = defineAsyncComponent(() => import('./f2-special/i
 const F2TabInterviewDetail = defineAsyncComponent(() => import('./f2-special/ipo/F2TabInterviewDetail.vue'))
 const F2ContractCostTestExample = defineAsyncComponent(
   () => import('./f2-special/contract/F2ContractCostTestExample.vue'),
+)
+const F2InterviewCheckExample = defineAsyncComponent(
+  () => import('./f2-special/ipo/F2InterviewCheckExample.vue'),
 )
 
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
@@ -278,6 +300,10 @@ const isContractCostExampleSheet = computed(() =>
   isContractCostTestExampleSheet(props.sheetName),
 )
 
+const isInterviewExampleSheet = computed(() =>
+  isInterviewCheckExampleSheet(props.sheetName),
+)
+
 const auditYear = computed(() => {
   const d = formData.projectContext.value?.audit_period_end
     || formData.projectContext.value?.bs_date || ''
@@ -301,7 +327,7 @@ const isHtmlSheet = computed(() => {
 const showHtmlToolbar = computed(() => isHtmlSheet.value)
 
 const useGridFallback = computed(() => {
-  if (isContractCostExampleSheet.value) return false
+  if (isContractCostExampleSheet.value || isInterviewExampleSheet.value) return false
   const code = currentSheet.value
   return code && !isHtmlSheet.value && !showIpoBlocked.value
 })

@@ -34,6 +34,12 @@
       </div>
     </div>
 
+    <F2StocktakeSheetAttachments
+      :project-id="projectId"
+      :wp-id="wpId"
+      sheet-code="F2-21"
+    />
+
     <el-card shadow="never" class="summary-card">
       <template #header>
         <div class="card-header">
@@ -112,6 +118,7 @@
 import { ref, computed, toRef, shallowRef, watch } from 'vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2StocktakeQuestionnaireDialog from './F2StocktakeQuestionnaireDialog.vue'
+import F2StocktakeSheetAttachments from './F2StocktakeSheetAttachments.vue'
 import { useF2StocktakeQuestionnaire } from '../../composables/useF2StocktakeQuestionnaire'
 import { useF2StocktakeAiGenerate } from '../../composables/useF2StocktakeAiGenerate'
 import { F21_EVAL_Q22_1_OPTIONS } from './f2StocktakeQuestionnaire'

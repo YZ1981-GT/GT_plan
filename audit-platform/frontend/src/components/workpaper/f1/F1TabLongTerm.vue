@@ -1,29 +1,26 @@
 <template>
-<div class="d3-long-term">
-  <!-- 编制提示 -->
+<div class="f1-long-term">
   <details class="guidance-details">
     <summary>📋 编制提示</summary>
     <div class="guidance-content">
-      <p>1. 本表检查账龄超过1年的预付账款（科目1123），逐户列示未结转原因与处理计划。</p>
-      <p>2. 长期挂账应分析款项性质：是否仍具商业实质、能否形成资产或已具备结转/退款条件。</p>
-      <p>3. 无法收回或对方已注销/失联的，应评估减值并考虑转入其他应收款或计提坏账。</p>
-      <p>4. 数据可从 F1-2 明细表按账龄一键导入，结论应与 F1-1 审定表账龄区块勾稽一致。</p>
+      <p>1. 本表检查账龄 1 年及以上的大额预付账款，逐户说明未结转原因、出路及是否减值/重分类。</p>
+      <p>2. 审定余额 = 期末余额 − 计提坏账准备（灰底自动）；「是否转入其他应收」若为是，通常需在 F1-3 做重分类。</p>
+      <p>3. 期后供货或退款可与 F1-7 勾稽；账龄枚举与 F1-1 / 项目账龄配置一致。</p>
+      <p>4. 可从 F1-2 一键导入超 1 年户（同名合并，保留已填说明）。</p>
     </div>
   </details>
 
-  <!-- 审计目标 -->
   <el-alert
     type="info"
     :closable="false"
-    title="审计目标：核查账龄超过1年的预付账款长期挂账原因，评估其可收回性与列报恰当性，识别减值及重分类迹象。"
+    title="审计目标：核查账龄1年及以上大额预付账款的存在与可收回性，评价未结转原因、期后消化及坏账/重分类处理是否恰当。"
     class="objective-alert"
   />
 
-  <!-- 工具栏 -->
   <div class="tab-toolbar">
     <div class="toolbar-left">
       <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加行</el-button>
-      <el-button size="small" :disabled="isReadonly" @click="doImport">从F1-2导入</el-button>
+      <el-button size="small" :disabled="isReadonly" @click="doImport">从 F1-2 导入超1年</el-button>
     </div>
     <div class="toolbar-right">
       <el-dropdown size="small" trigger="click" :disabled="isReadonly">
@@ -41,79 +38,114 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-      <span class="chip-wrap"><GtIndexChip value="wp:F1-1" :context-project-id="projectId" /></span>
+      <span class="chip-wrap"><GtIndexChip value="wp:F1-2" :context-project-id="projectId" /></span>
       <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
     </div>
   </div>
 
-  <!-- 8列表格 -->
-  <el-table :data="tableData" size="small" border stripe>
-    <el-table-column label="对方单位名称" width="160">
+  <F1SheetAttachments
+    :project-id="projectId"
+    :wp-id="wpId"
+    sheet-code="F1-5"
+    label="长期检查附件"
+  />
+
+  <!-- 13 列对齐 Excel -->
+  <el-table :data="tableData" size="small" border stripe :row-class-name="rowClassName">
+    <el-table-column label="债务人名称" width="140" fixed>
       <template #default="{ row }">
         <template v-if="row.rowId === '__subtotal__'">
           <span class="subtotal-label">合计</span>
         </template>
         <template v-else>
-          <el-input v-model="row.customerName" size="small" :disabled="isReadonly"
+          <el-input :model-value="row.customerName" size="small" :disabled="isReadonly"
             @change="(val: string) => updateCell(row.rowId, 'customerName', val)" />
-          <GtIndexChip value="wp:F1-2" :context-project-id="projectId" />
         </template>
       </template>
     </el-table-column>
-    <el-table-column label="期末余额" width="120" align="right">
+    <el-table-column label="期末余额" width="110" align="right">
       <template #default="{ row }">
-        <template v-if="row.rowId === '__subtotal__'">
-          <span class="subtotal-val">{{ fmtAmount(subtotalRow.endBalance) }}</span>
-        </template>
-        <template v-else>
-          <el-input v-model.number="row.endBalance" size="small" :disabled="isReadonly"
-            @change="(val: any) => updateCell(row.rowId, 'endBalance', val)" />
-        </template>
+        <span v-if="row.rowId === '__subtotal__'" class="amt subtotal-val">{{ fmtAmount(subtotalRow.endBalance) }}</span>
+        <el-input v-else :model-value="row.endBalance" size="small" :disabled="isReadonly"
+          @change="(val: any) => updateCell(row.rowId, 'endBalance', val)" />
       </template>
     </el-table-column>
-    <el-table-column label="账龄" width="100">
+    <el-table-column label="账龄" width="120">
       <template #default="{ row }">
-        <el-input v-if="row.rowId !== '__subtotal__'" v-model="row.aging" size="small" :disabled="isReadonly"
-          @change="(val: string) => updateCell(row.rowId, 'aging', val)" />
+        <el-select v-if="row.rowId !== '__subtotal__'" :model-value="row.aging" size="small" :disabled="isReadonly" filterable allow-create
+          @change="(val: string) => updateCell(row.rowId, 'aging', val)">
+          <el-option v-for="opt in agingOptions" :key="opt" :label="opt" :value="opt" />
+        </el-select>
       </template>
     </el-table-column>
     <el-table-column label="经济业务说明" min-width="140">
       <template #default="{ row }">
-        <el-input v-if="row.rowId !== '__subtotal__'" v-model="row.businessDescription" size="small" :disabled="isReadonly"
+        <el-input v-if="row.rowId !== '__subtotal__'" :model-value="row.businessDescription" size="small" :disabled="isReadonly"
           @change="(val: string) => updateCell(row.rowId, 'businessDescription', val)" />
       </template>
     </el-table-column>
-    <el-table-column label="未结转原因" min-width="160">
+    <el-table-column label="未偿还或未结转的原因" min-width="150">
       <template #default="{ row }">
-        <el-input v-if="row.rowId !== '__subtotal__'" v-model="row.reason" size="small" :disabled="isReadonly"
+        <el-input v-if="row.rowId !== '__subtotal__'" :model-value="row.reason" size="small" :disabled="isReadonly"
           @change="(val: string) => updateCell(row.rowId, 'reason', val)" />
       </template>
     </el-table-column>
-    <el-table-column label="结转金额" width="120" align="right">
+    <el-table-column label="计划供货还是退款" width="130">
       <template #default="{ row }">
-        <template v-if="row.rowId === '__subtotal__'">
-          <span class="subtotal-val">{{ fmtAmount(subtotalRow.settlementAmount) }}</span>
-        </template>
-        <template v-else>
-          <el-input v-model.number="row.settlementAmount" size="small" :disabled="isReadonly"
-            @change="(val: any) => updateCell(row.rowId, 'settlementAmount', val)" />
-        </template>
+        <el-input v-if="row.rowId !== '__subtotal__'" :model-value="row.plan" size="small" :disabled="isReadonly"
+          @change="(val: string) => updateCell(row.rowId, 'plan', val)" />
       </template>
     </el-table-column>
-    <el-table-column label="处理计划" width="120">
+    <el-table-column label="是否诉讼" width="90" align="center">
       <template #default="{ row }">
-        <el-input v-if="row.rowId !== '__subtotal__'" v-model="row.plan" size="small" :disabled="isReadonly"
-          @change="(val: string) => updateCell(row.rowId, 'plan', val)" />
+        <el-select v-if="row.rowId !== '__subtotal__'" :model-value="row.isLitigation" size="small" :disabled="isReadonly" clearable
+          @change="(val: string) => updateCell(row.rowId, 'isLitigation', val || '')">
+          <el-option value="Y" label="是" />
+          <el-option value="N" label="否" />
+        </el-select>
+      </template>
+    </el-table-column>
+    <el-table-column label="是否转入其他应收款" width="130" align="center">
+      <template #default="{ row }">
+        <el-select v-if="row.rowId !== '__subtotal__'" :model-value="row.transferToOtherReceivable" size="small" :disabled="isReadonly" clearable
+          @change="(val: string) => updateCell(row.rowId, 'transferToOtherReceivable', val || '')">
+          <el-option value="Y" label="是" />
+          <el-option value="N" label="否" />
+        </el-select>
+      </template>
+    </el-table-column>
+    <el-table-column label="计提坏账准备金额" width="130" align="right">
+      <template #default="{ row }">
+        <span v-if="row.rowId === '__subtotal__'" class="amt subtotal-val">{{ fmtAmount(subtotalRow.badDebtProvision) }}</span>
+        <el-input v-else :model-value="row.badDebtProvision" size="small" :disabled="isReadonly"
+          @change="(val: any) => updateCell(row.rowId, 'badDebtProvision', val)" />
+      </template>
+    </el-table-column>
+    <el-table-column label="审定余额" width="110" align="right" class-name="auto-calc-col">
+      <template #default="{ row }">
+        <span class="amt auto">{{ fmtAmount(row.rowId === '__subtotal__' ? subtotalRow.auditedBalance : row.auditedBalance) }}</span>
+      </template>
+    </el-table-column>
+    <el-table-column label="期后供货或退款金额" width="140" align="right">
+      <template #default="{ row }">
+        <span v-if="row.rowId === '__subtotal__'" class="amt subtotal-val">{{ fmtAmount(subtotalRow.postSettlementAmount) }}</span>
+        <el-input v-else :model-value="row.postSettlementAmount" size="small" :disabled="isReadonly"
+          @change="(val: any) => updateCell(row.rowId, 'postSettlementAmount', val)" />
+      </template>
+    </el-table-column>
+    <el-table-column label="支持性证据" min-width="120">
+      <template #default="{ row }">
+        <el-input v-if="row.rowId !== '__subtotal__'" :model-value="row.supportingEvidence" size="small" :disabled="isReadonly"
+          @change="(val: string) => updateCell(row.rowId, 'supportingEvidence', val)" />
       </template>
     </el-table-column>
     <el-table-column label="备注" width="100">
       <template #default="{ row }">
-        <el-input v-if="row.rowId !== '__subtotal__'" v-model="row.remark" size="small" :disabled="isReadonly"
+        <el-input v-if="row.rowId !== '__subtotal__'" :model-value="row.remark" size="small" :disabled="isReadonly"
           @change="(val: string) => updateCell(row.rowId, 'remark', val)" />
       </template>
     </el-table-column>
-    <!-- 操作 -->
-    <el-table-column label="操作" width="60" v-if="!isReadonly">
+    <el-table-column label="操作" width="60" fixed="right" v-if="!isReadonly">
       <template #default="{ row }">
         <el-popconfirm v-if="row.rowId !== '__subtotal__'" title="确认删除？" @confirm="removeRow(row.rowId)">
           <template #reference><el-button size="small" type="danger" link>删除</el-button></template>
@@ -122,7 +154,6 @@
     </el-table-column>
   </el-table>
 
-  <!-- 审计说明区（卡片式） -->
   <el-card class="opinion-card" shadow="never">
     <template #header>
       <div class="opinion-header">
@@ -130,34 +161,29 @@
         <div class="opinion-chips">
           <GtIndexChip value="wp:F1-1" :context-project-id="projectId" />
           <GtIndexChip value="wp:F1-2" :context-project-id="projectId" />
+          <GtIndexChip value="wp:F1-3" :context-project-id="projectId" />
         </div>
       </div>
     </template>
 
     <div class="opinion-section">
       <div class="opinion-section-header">
-        <span class="opinion-section-label">审计说明</span>
+        <span class="opinion-section-label">1、审计说明</span>
+        <el-button size="small" type="primary" plain :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading"
+          @click="generateNote">🤖AI</el-button>
       </div>
-      <el-input
-        v-model="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        :disabled="isReadonly"
-        placeholder="对超1年预付账款未结转原因的审计说明..."
-      />
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="对超1年大额预付的总体检查情况、主要原因分类、减值与重分类考虑..." />
     </div>
 
     <div class="opinion-section">
       <div class="opinion-section-header">
-        <span class="opinion-section-label">审计结论</span>
+        <span class="opinion-section-label">2、审计结论</span>
+        <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading"
+          @click="generateConclusion">🤖AI</el-button>
       </div>
-      <el-input
-        v-model="conclusion"
-        type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }"
-        :disabled="isReadonly"
-        placeholder="审计结论..."
-      />
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。" />
     </div>
   </el-card>
 </div>
@@ -165,17 +191,19 @@
 
 <script setup lang="ts">
 /**
- * F1TabLongTerm.vue — F1-5 账龄1年以上检查表
- * 8列表 + 从F1-2导入 + AI建议 + GtIndexChip
+ * F1TabLongTerm.vue — F1-5 账龄1年及以上大额预付账款检查表（13列）
  */
 import { computed, inject, toRef, type Ref } from 'vue'
 import { useF1LongTerm } from '../composables/useF1LongTerm'
+import { useF1AiGenerate } from '../composables/useF1AiGenerate'
 import { useF1ImportExport, type F1ImportSheet } from '../composables/useWorkpaperImportExport'
+import { useAgingConfig } from '@/composables/useAgingConfig'
 import type { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
+import F1SheetAttachments from './F1SheetAttachments.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -188,6 +216,16 @@ const props = defineProps<{
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const projectIdRef = toRef(props, 'projectId') as Ref<string>
+
+const { bands } = useAgingConfig(projectIdRef, 'F1')
+
+/** 超1年账龄选项（排除 1年以内） */
+const agingOptions = computed(() => {
+  const labels = bands.value.filter(b => b.key !== 'within1').map(b => b.label)
+  return labels.length ? labels : ['1-2年', '2-3年', '3年以上']
+})
 
 const {
   rows,
@@ -200,22 +238,71 @@ const {
   importFromCrossSheet,
 } = useF1LongTerm({
   allResponses: allResponsesRef,
-  wpId: toRef(props, 'wpId') as Ref<string>,
-  projectId: toRef(props, 'projectId') as Ref<string>,
+  wpId: wpIdRef,
+  projectId: projectIdRef,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
-// Append subtotal row for display
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(wpIdRef)
+
 const tableData = computed(() => [
   ...rows.value,
-  { rowId: '__subtotal__', customerName: '合计', endBalance: 0, aging: '', businessDescription: '', reason: '', settlementAmount: 0, plan: '', remark: '' },
+  {
+    rowId: '__subtotal__',
+    customerName: '合计',
+    endBalance: 0,
+    aging: '',
+    businessDescription: '',
+    reason: '',
+    plan: '',
+    isLitigation: '',
+    transferToOtherReceivable: '',
+    badDebtProvision: 0,
+    auditedBalance: 0,
+    postSettlementAmount: 0,
+    supportingEvidence: '',
+    remark: '',
+  },
 ])
 
+function rowClassName({ row }: { row: any }) {
+  return row.rowId === '__subtotal__' ? 'subtotal-row' : ''
+}
+
 function doImport() {
-  const longTermRows = props.crossSheet.longTermRows.value
-  importFromCrossSheet(longTermRows)
+  importFromCrossSheet(props.crossSheet.longTermRows.value)
+}
+
+function noteContext() {
+  return {
+    sheet: 'F1-5',
+    rowCount: rows.value.length,
+    endBalanceTotal: subtotalRow.value.endBalance,
+    badDebtTotal: subtotalRow.value.badDebtProvision,
+    auditedTotal: subtotalRow.value.auditedBalance,
+    litigationCount: rows.value.filter(r => r.isLitigation === 'Y').length,
+    transferCount: rows.value.filter(r => r.transferToOtherReceivable === 'Y').length,
+    topDebtors: rows.value
+      .slice()
+      .sort((a, b) => b.endBalance - a.endBalance)
+      .slice(0, 5)
+      .map(r => `${r.customerName}:${r.endBalance}/${r.aging}`)
+      .join('; '),
+  }
+}
+
+async function generateNote() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('longterm-reason', auditNote.value, noteContext(), 'F1-5 审计说明')
+  if (text) auditNote.value = text
+}
+
+async function generateConclusion() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('longterm-conclusion', conclusion.value, noteContext(), 'F1-5 审计结论')
+  if (text) conclusion.value = text
 }
 
 function fmtAmount(val: number | null | undefined): string {
@@ -224,9 +311,8 @@ function fmtAmount(val: number | null | undefined): string {
   return val.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 }
 
-// ─── 导入导出（D4 模式） ─────────────────────────────────────────────────────
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
-const { exportTemplate, exportData, importData, importing } = useF1ImportExport({ wpId: toRef(props, 'wpId') as Ref<string> })
+const { exportTemplate, exportData, importData, importing } = useF1ImportExport({ wpId: wpIdRef })
 
 async function handleImport(file: File, sheet: F1ImportSheet): Promise<boolean> {
   const result = await importData(sheet, file)
@@ -236,27 +322,27 @@ async function handleImport(file: File, sheet: F1ImportSheet): Promise<boolean> 
 </script>
 
 <style scoped>
-.d3-long-term { padding: 16px; }
-.d3-long-term :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
-.d3-long-term :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
+.f1-long-term { padding: 16px; }
+.f1-long-term :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
+.f1-long-term :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
 
-/* 编制提示 */
 .guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .objective-alert { margin-bottom: 12px; }
 
-/* 工具栏 */
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.toolbar-left, .toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .chip-wrap { display: inline-flex; align-items: center; }
 
 .subtotal-label { font-weight: 700; }
 .subtotal-val { font-weight: 700; }
+.amt { text-align: right; display: inline-block; width: 100%; }
+.auto { color: #909399; }
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
+:deep(.subtotal-row) { background-color: #fafafa !important; font-weight: 600; }
 
-/* 审计意见卡片 */
 .opinion-card { margin-top: 16px; border-radius: 8px; }
 .opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
 .opinion-header { display: flex; align-items: center; justify-content: space-between; }

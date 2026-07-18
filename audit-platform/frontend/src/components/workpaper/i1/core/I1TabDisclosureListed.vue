@@ -181,32 +181,6 @@
       </div>
     </el-card>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input
-        type="textarea"
-        :model-value="auditNote"
-        :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：披露项取数来源、与审定表/明细表核对情况、使用寿命不确定项及受限资产的披露依据等。"
-        @change="saveAuditNote"
-      />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
-      <el-input
-        type="textarea"
-        :model-value="auditConclusion"
-        :disabled="isReadonly"
-        :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：无形资产附注披露完整、准确，符合 CAS6/CAS8/CAS30 披露要求，未见异常。"
-        @change="saveAuditConclusion"
-      />
-    </el-card>
-
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -236,7 +210,7 @@
  * - AI辅助生成文字描述 (Req 14.3)
  * - EventBus publish 'disclosure:note-text-updated' (Req 14.4)
  */
-import { ref, computed, inject, toRef, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, inject, toRef, onMounted, onUnmounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useI1Disclosure, LISTED_SECTIONS, type I1DisclosureMatrixRow } from '../../composables/useI1Disclosure'
 
@@ -256,34 +230,6 @@ const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => 
 const allResponsesRef = computed(() => props.allResponses)
 
 const sections = LISTED_SECTIONS
-
-// ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────────
-
-const NOTE_KEY = 'I1-disc-listed-audit-note'
-const CONCLUSION_KEY = 'I1-disc-listed-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-
-function saveAuditNote(val: string): void {
-  if (props.isReadonly) return
-  auditNote.value = val
-  emit('save', NOTE_KEY, val)
-}
-
-function saveAuditConclusion(val: string): void {
-  if (props.isReadonly) return
-  auditConclusion.value = val
-  emit('save', CONCLUSION_KEY, val)
-}
-
-function loadAuditText(): void {
-  const n = props.allResponses.get(NOTE_KEY)
-  if (n) auditNote.value = (n.remark ?? n.conclusion ?? '') as string
-  const c = props.allResponses.get(CONCLUSION_KEY)
-  if (c) auditConclusion.value = (c.remark ?? c.conclusion ?? '') as string
-}
-
-watch(() => props.allResponses, loadAuditText, { immediate: true, deep: true })
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -485,10 +431,6 @@ function fmtAmt(val: number | null | undefined): string {
 
 /* 审计目标 alert */
 .objective-alert { margin-bottom: 12px; }
-
-/* 审计说明/结论卡片 */
-.audit-note-card { margin-top: 12px; }
-.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 
 /* 编制提示 */
 .compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }

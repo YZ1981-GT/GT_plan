@@ -156,23 +156,6 @@
       />
     </el-card>
 
-    <!-- Section 4: 审计说明 -->
-    <el-card shadow="never" class="conclusion-card">
-      <template #header>
-        <div class="section-card-header">
-          <span>审计说明与结论</span>
-        </div>
-      </template>
-      <el-input
-        v-model="auditConclusion"
-        :disabled="isReadonly"
-        type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }"
-        placeholder="附注披露完整性和准确性的审计结论"
-        @blur="handleConclusionSave"
-      />
-    </el-card>
-
     <!-- 编制提示 -->
     <details class="k6-details-tip">
       <summary>编制提示</summary>
@@ -201,7 +184,6 @@
  * - 审计说明 + 结论 el-card
  */
 import { ref, computed, onMounted, onBeforeUnmount, inject } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 
 const K6_ACCOUNT_CODE = '1481'
@@ -255,7 +237,6 @@ interface LiabilityDisclosureRow {
 const assetTable = ref<AssetDisclosureRow[]>([])
 const liabilityTable = ref<LiabilityDisclosureRow[]>([])
 const disposalNarrative = ref('')
-const auditConclusion = ref('')
 const hasAutoData = ref(false)
 
 // ─── Init ────────────────────────────────────────────────────────────────────
@@ -349,7 +330,6 @@ function loadSavedData(): void {
   if (savedNarrative?.remark) disposalNarrative.value = savedNarrative.remark
 
   const savedConclusion = props.allResponses.get('K6-disclosure-listed-conclusion')
-  if (savedConclusion?.remark) auditConclusion.value = savedConclusion.remark
 }
 
 function applyAutoFill(): void {
@@ -423,7 +403,6 @@ function handleNarrativeSave(): void {
 }
 
 function handleConclusionSave(): void {
-  emit('save', 'K6-disclosure-listed-conclusion', { remark: auditConclusion.value })
 }
 
 function handleAiGenerate(): void {

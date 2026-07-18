@@ -130,8 +130,31 @@ export function emptyContractCostProject(): ContractCostProject {
 
 export function defaultContractCostSheet(): ContractCostSheet {
   return {
-    products: Array.from({ length: 8 }, () => emptyContractCostProject()),
+    products: [emptyContractCostProject()],
   }
+}
+
+export function isBlankContractCostProject(row: ContractCostProject): boolean {
+  return !(row.projectCode || '').trim()
+    && !(row.projectName || '').trim()
+    && !(row.contractName || '').trim()
+    && Number(row.contractAmount || 0) === 0
+    && CONTRACT_COST_CATEGORIES.every((cat) =>
+      (['opening', 'increase', 'decrease', 'adj'] as const)
+        .every((period) => Number(row[`${period}_${cat.key}`]) === 0),
+    )
+    && !row.matchesLedger
+    && !row.carriedByProgress
+    && (!row.isDirectlyRelated || row.isDirectlyRelated === '是')
+    && (!row.isRecoverable || row.isRecoverable === '是')
+    && !(row.remark || '').trim()
+}
+
+export function pruneBlankContractCostProjects(
+  rows: ContractCostProject[],
+): ContractCostProject[] {
+  const filled = rows.filter((row) => !isBlankContractCostProject(row))
+  return filled.length ? filled : [emptyContractCostProject()]
 }
 
 function quad(
@@ -222,17 +245,19 @@ export function migrateContractCostSheet(legacy: unknown): ContractCostSheet | n
   if (typeof legacy === 'object' && legacy !== null && 'products' in legacy) {
     const sheet = legacy as ContractCostSheet
     return {
-      products: sheet.products?.length ? sheet.products : defaultContractCostSheet().products,
+      products: pruneBlankContractCostProjects(
+        sheet.products?.length ? sheet.products : defaultContractCostSheet().products,
+      ),
     }
   }
 
   if (Array.isArray(legacy) && legacy.length) {
     return {
-      products: (legacy as ContractCostProject[]).map((r) => ({
+      products: pruneBlankContractCostProjects((legacy as ContractCostProject[]).map((r) => ({
         ...emptyContractCostProject(),
         ...r,
         id: r.id || newContractCostId(),
-      })),
+      }))),
     }
   }
 

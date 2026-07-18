@@ -8,8 +8,8 @@ import {
 } from '../useF2StdCostMonthlyFormulas'
 
 describe('useF2StdCostMonthlyFormulas', () => {
-  it('默认 3 个测试项目', () => {
-    expect(defaultThreeStdCostProjects()).toHaveLength(3)
+  it('默认 1 个测试项目', () => {
+    expect(defaultThreeStdCostProjects()).toHaveLength(1)
   })
 
   it('应结存滚动：期初 + 生产 − 发出', () => {
@@ -65,7 +65,7 @@ describe('useF2StdCostMonthlyFormulas', () => {
       ],
     }]
     const migrated = migrateToStdCostProjects(legacy)
-    expect(migrated).toHaveLength(3)
+    expect(migrated).toHaveLength(1)
     expect(migrated![0].itemName).toBe('乙')
   })
 })

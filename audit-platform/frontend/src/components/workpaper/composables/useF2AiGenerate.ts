@@ -11,6 +11,9 @@ export type F2AiSection =
   | 'adj-conclusion'
   | 'summary-note'
   | 'summary-conclusion'
+  | 'summary-objective'
+  | 'summary-process'
+  | 'summary-change-reason'
   | 'detail-valuation'
   | 'detail-change'
   | 'detail-long-aging'
@@ -96,7 +99,15 @@ export function useF2AiGenerate(wpId: Ref<string>) {
     }
   }
 
-  onMounted(() => { void checkAiHealth() })
+  onMounted(() => {
+    // 延后探测，避免与底稿 checklist 首屏请求抢带宽
+    const run = () => { void checkAiHealth() }
+    if (typeof requestIdleCallback === 'function') {
+      requestIdleCallback(run, { timeout: 2500 })
+    } else {
+      setTimeout(run, 800)
+    }
+  })
 
   return { aiAvailable, loading, generateAndConfirm, checkAiHealth }
 }

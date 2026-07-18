@@ -6,7 +6,7 @@
       <details class="guidance-details">
         <summary>📋 编制提示</summary>
         <div class="guidance-content">
-          <p>1. 本表汇总预付账款（科目1123）审定情况，按款项性质与账龄两个区块分别归集。</p>
+          <p>1. 本表汇总预付账款（科目1123）审定情况：一、按性质（货款/工程款/设备款/服务费/其他）；二、按账龄（随项目账龄配置，默认「1年以内(含1年)」…「3年以上」）。</p>
           <p>2. 浅蓝底纹单元格由 F1-2 明细表聚合取数，灰色底纹列为审定数（期初/期末审定）自动计算列。</p>
           <p>3. 账龄超过1年的预付账款须说明未结转原因并与 F1-5 长期检查勾稽一致。</p>
           <p>4. 审定合计应与试算平衡表核对一致，差异须查明并通过 F1-3 调整分录处理。</p>
@@ -27,8 +27,16 @@
         <div class="toolbar-right">
           <span class="chip-wrap"><GtIndexChip value="wp:F1-2" :context-project-id="projectId" /></span>
           <span class="chip-wrap"><GtIndexChip value="wp:F1-5" :context-project-id="projectId" /></span>
+          <el-button v-if="openReviewDialog" size="small" @click="openReview">复核</el-button>
         </div>
       </div>
+
+      <F1SheetAttachments
+        :project-id="projectId"
+        :wp-id="wpId"
+        sheet-code="F1-1"
+        label="审定表附件"
+      />
 
       <!-- 交叉验证警告 -->
       <el-alert
@@ -124,6 +132,9 @@
         <span class="tb-label">与试算平衡表核对（科目1123）：试算平衡表数 {{ fmtAmount(trialBalanceAmount) }}</span>
         <el-tag v-if="trialBalanceDiff !== 0" type="danger" size="small">差异 {{ fmtAmount(trialBalanceDiff) }}</el-tag>
         <el-tag v-else type="success" size="small">核对一致</el-tag>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="confirmAdjudication">
+          发布审定数（回写TB）
+        </el-button>
       </div>
 
       <!-- 审计说明区（卡片式） -->
@@ -157,6 +168,16 @@
         <div class="opinion-section">
           <div class="opinion-section-header">
             <span class="opinion-section-label">(2) 重大变动分析</span>
+            <div class="opinion-actions">
+              <el-button
+                size="small"
+                type="primary"
+                plain
+                :disabled="isReadonly || !aiAvailable"
+                :loading="aiLoading"
+                @click="generateChangeAnalysis"
+              >AI 生成分析</el-button>
+            </div>
           </div>
           <el-input
             v-model="auditNotes.changeAnalysis"
@@ -171,7 +192,15 @@
           <div class="opinion-section-header">
             <span class="opinion-section-label">(3) 审计结论</span>
             <div class="opinion-actions">
-              <el-button size="small" @click="openReview">💬</el-button>
+              <el-button
+                size="small"
+                type="primary"
+                plain
+                :disabled="isReadonly || !aiAvailable"
+                :loading="aiLoading"
+                @click="generateConclusion"
+              >AI 生成结论</el-button>
+              <el-button v-if="openReviewDialog" size="small" @click="openReview">复核</el-button>
             </div>
           </div>
           <el-input
@@ -183,13 +212,13 @@
           />
         </div>
 
-        <!-- CAS14 方法论提示 -->
+        <!-- 编制提示：长期挂账 / 重分类 -->
         <details class="cas14-hint">
-          <summary>📋 CAS14收入准则提示</summary>
+          <summary>📋 编制要点提示</summary>
           <div class="hint-content">
-            根据CAS14《企业会计准则第14号——收入》，预付账款中包含的"合同不成立时已收取的对价"应区分于合同负债。
-            需评估是否满足收入确认条件：(a)合同各方已批准并承诺履行各自义务；(b)合同明确了各方权利；
-            (c)合同有明确的付款条款；(d)合同具有商业实质；(e)对价很可能收回。
+            关注账龄超过1年的预付款项：核实是否仍具商业实质、能否形成资产或已具备结转/退款条件；
+            性质含工程/设备等且预计超过一年结转的，评估是否应重分类至其他非流动资产。
+            性质分类合计须与账龄分类合计勾稽一致，并与试算平衡表核对。
           </div>
         </details>
       </el-card>
@@ -204,13 +233,16 @@
  * 双区块(按性质+按账龄) + 变动率高亮 + 跨sheet取数 + 审计说明/结论
  */
 import { computed, inject, toRef, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { isChangeRateExceeding } from '../composables/useF1FormulaEngine'
 import { useF1Adjudication } from '../composables/useF1Adjudication'
+import { useF1AiGenerate } from '../composables/useF1AiGenerate'
 import type { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
 // @ts-ignore - GtIndexChip may not have type declarations
 import GtIndexChip from '../GtIndexChip.vue'
+import F1SheetAttachments from './F1SheetAttachments.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -223,8 +255,9 @@ const props = defineProps<{
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
 
-const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
 const {
   sections,
@@ -233,15 +266,18 @@ const {
   crossValidationWarning,
   auditNotes,
   updateCell,
+  publishAdjudicated,
 } = useF1Adjudication({
   allResponses: allResponsesRef,
-  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpId: wpIdRef,
   projectId: toRef(props, 'projectId') as Ref<string>,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   crossSheet: props.crossSheet,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
+
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(wpIdRef)
 
 // ─── Formatting helpers ─────────────────────────────────────────────────────
 
@@ -269,11 +305,38 @@ function cellClass(row: any): Record<string, boolean> {
 
 function onCellContextMenu(row: any, _col: any, _cell: any, event: MouseEvent) {
   event.preventDefault()
-  openReviewDialog(`F1-adj-${row.rowKey}`)
+  openReviewDialog?.(`F1-adj-${row.rowKey}`)
 }
 
 function openReview() {
-  openReviewDialog('F1-adj-conclusion')
+  openReviewDialog?.('F1-adj-conclusion')
+}
+
+function confirmAdjudication() {
+  publishAdjudicated()
+  ElMessage.success('已确认审定并发布（回写试算 1123）')
+}
+
+async function generateChangeAnalysis() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'adj-change-analysis',
+    auditNotes.value.changeAnalysis,
+    { sheet: 'F1-1', trialBalanceDiff: trialBalanceDiff.value },
+    'AI 生成 · F1-1 变动分析',
+  )
+  if (text) auditNotes.value.changeAnalysis = text
+}
+
+async function generateConclusion() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'adj-conclusion',
+    auditNotes.value.conclusion,
+    { sheet: 'F1-1', trialBalanceDiff: trialBalanceDiff.value },
+    'AI 生成 · F1-1 审计结论',
+  )
+  if (text) auditNotes.value.conclusion = text
 }
 </script>
 

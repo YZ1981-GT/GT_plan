@@ -2,7 +2,9 @@
 /** F3TabAdjustment — F3-3 调整分录 | Task 6 (比照 D4TabAdjustment) */
 import { ref, watch, toRef, inject, type Ref } from 'vue'
 import { useF3Adjustment } from '../composables/useF3Adjustment'
+import { useF3AiGenerate } from '../composables/useF3AiGenerate'
 import F3ImportExportToolbar from './F3ImportExportToolbar.vue'
+import F3SheetAttachments from './F3SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -26,6 +28,10 @@ const { rows, debitTotal, creditTotal, balanceDiff, isBalanced, addRow, removeRo
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
 
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF3AiGenerate(
+  toRef(props, 'wpId') as Ref<string>,
+)
+
 // ─── 审计说明 / 审计结论（F3 约定：写入 allResponses + f3:save-items 事件持久化） ───
 const NOTE_KEY = 'F3-3-note'
 const CONCLUSION_KEY = 'F3-3-conclusion'
@@ -42,6 +48,26 @@ function saveAuditConclusion(val: string): void { if (props.isReadonly) return; 
 
 watch(() => props.allResponses.get(NOTE_KEY)?.remark, (v) => { if (typeof v === 'string') auditNote.value = v }, { immediate: true })
 watch(() => props.allResponses.get(CONCLUSION_KEY)?.remark, (v) => { if (typeof v === 'string') auditConclusion.value = v }, { immediate: true })
+
+async function runAdjAi(section: 'adjustment-note' | 'adjustment-conclusion'): Promise<void> {
+  if (props.isReadonly) return
+  const isNote = section === 'adjustment-note'
+  const text = await generateAndConfirm(
+    section,
+    isNote ? auditNote.value : auditConclusion.value,
+    {
+      sheet: 'F3-3',
+      rowCount: rows.value.length,
+      debitTotal: debitTotal.value,
+      creditTotal: creditTotal.value,
+      isBalanced: isBalanced.value,
+    },
+    isNote ? 'AI · 审计说明' : 'AI · 审计结论',
+  )
+  if (!text) return
+  if (isNote) saveAuditNote(text)
+  else saveAuditConclusion(text)
+}
 </script>
 
 <template>
@@ -77,6 +103,8 @@ watch(() => props.allResponses.get(CONCLUSION_KEY)?.remark, (v) => { if (typeof 
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
+
+    <F3SheetAttachments :project-id="projectId" :wp-id="wpId" sheet-code="F3-3" label="调整分录附件" />
 
     <!-- 借贷平衡指示 -->
     <div class="balance-indicator" :class="{ unbalanced: !isBalanced }">
@@ -133,7 +161,19 @@ watch(() => props.allResponses.get(CONCLUSION_KEY)?.remark, (v) => { if (typeof 
 
     <!-- 审计说明 -->
     <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <template #header>
+        <div class="card-header">
+          <span>审计说明</span>
+          <el-button
+            v-if="!isReadonly && aiAvailable"
+            size="small"
+            type="primary"
+            plain
+            :loading="aiLoading"
+            @click="runAdjAi('adjustment-note')"
+          >AI 填写说明</el-button>
+        </div>
+      </template>
       <el-input
         type="textarea"
         :model-value="auditNote"
@@ -146,7 +186,19 @@ watch(() => props.allResponses.get(CONCLUSION_KEY)?.remark, (v) => { if (typeof 
 
     <!-- 审计结论 -->
     <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <template #header>
+        <div class="card-header">
+          <span>审计结论</span>
+          <el-button
+            v-if="!isReadonly && aiAvailable"
+            size="small"
+            type="primary"
+            plain
+            :loading="aiLoading"
+            @click="runAdjAi('adjustment-conclusion')"
+          >AI 填写结论</el-button>
+        </div>
+      </template>
       <el-input
         type="textarea"
         :model-value="auditConclusion"

@@ -6,11 +6,29 @@ import {
   calcContractCostTotals,
   migrateContractCostSheet,
   emptyContractCostProject,
+  isBlankContractCostProject,
+  pruneBlankContractCostProjects,
 } from '../useF2ContractCostFormulas'
 
 describe('useF2ContractCostFormulas', () => {
-  it('default sheet has 8 projects', () => {
-    expect(defaultContractCostSheet().products).toHaveLength(8)
+  it('default sheet keeps only one editable project row', () => {
+    expect(defaultContractCostSheet().products).toHaveLength(1)
+    expect(isBlankContractCostProject(defaultContractCostSheet().products[0])).toBe(true)
+  })
+
+  it('prunes reserved blank rows but retains entered projects', () => {
+    const entered = { ...emptyContractCostProject(), projectName: '项目A' }
+    const rows = [emptyContractCostProject(), entered, emptyContractCostProject()]
+    expect(pruneBlankContractCostProjects(rows)).toEqual([entered])
+  })
+
+  it('keeps one blank row when all rows are empty', () => {
+    const rows = pruneBlankContractCostProjects([
+      emptyContractCostProject(),
+      emptyContractCostProject(),
+    ])
+    expect(rows).toHaveLength(1)
+    expect(isBlankContractCostProject(rows[0])).toBe(true)
   })
 
   it('calculates end balance and audited amount', () => {

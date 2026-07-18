@@ -5,7 +5,7 @@
  * Task: 6.1
  *
  * 职责：
- * - 双区块固定行（按性质分类 NATURE_ROWS + 按账龄分类 AGING_ROWS）
+ * - 双区块：按性质分类（货款/工程款/设备款/服务费/其他）+ 按账龄分类（项目 aging 配置驱动）
  * - sections computed（从allResponses加载 + crossSheet聚合填入）
  * - trialBalanceAmount（从TB auto_data取数）+ trialBalanceDiff computed
  * - crossValidationDiff + crossValidationWarning computed
@@ -17,6 +17,12 @@
  * Requirements: 1.1-1.8, 2.1-2.8, 3.1-3.7, 18.1
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { useAgingConfig, PRESET_SEGMENTS } from '@/composables/useAgingConfig'
+import {
+  AGING_ROWS_3YEAR,
+  resolveAdjudicationAgingRows,
+  type AgingRowDef,
+} from './agingPresets'
 import {
   parseNum,
   calcAuditedAmount,
@@ -73,29 +79,25 @@ export interface UseF1AdjudicationOptions {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** 区块一：按性质分类固定行 */
+/** 区块一：按性质分类（对齐 Excel F1-1 / F4 往来款性质枚举） */
 export const NATURE_ROWS = [
-  { rowKey: 'fixed-asset-sales', label: '预收销售固定资产款' },
-  { rowKey: 'land-use-right', label: '预收销售土地使用权款' },
-  { rowKey: 'contract-invalid', label: '合同不成立时已收取的对价' },
+  { rowKey: 'goods', label: '货款' },
+  { rowKey: 'construction', label: '工程款' },
+  { rowKey: 'equipment', label: '设备款' },
+  { rowKey: 'service', label: '服务费' },
   { rowKey: 'other', label: '其他' },
 ] as const
 
-/** 区块二：按账龄分类固定行 */
-export const AGING_ROWS = [
-  { rowKey: 'within-1-year', label: '1年以内' },
-  { rowKey: '1-to-2-years', label: '1至2年' },
-  { rowKey: '2-to-3-years', label: '2至3年' },
-  { rowKey: 'over-3-years', label: '3年以上' },
-] as const
+/** 明细表款项性质下拉（与 NATURE_ROWS.label 一致） */
+export const F1_PAYMENT_NATURE_OPTIONS = NATURE_ROWS.map(r => r.label)
+
+/** 区块二默认账龄行（THREE_YEAR；运行时由 useAgingConfig 覆盖） */
+export const AGING_ROWS: AgingRowDef[] = AGING_ROWS_3YEAR
 
 /** 性质标签→rowKey映射 */
-const NATURE_LABEL_TO_KEY: Record<string, string> = {
-  '预收销售固定资产款': 'fixed-asset-sales',
-  '预收销售土地使用权款': 'land-use-right',
-  '合同不成立时已收取的对价': 'contract-invalid',
-  '其他': 'other',
-}
+const NATURE_LABEL_TO_KEY: Record<string, string> = Object.fromEntries(
+  NATURE_ROWS.map(r => [r.label, r.rowKey]),
+)
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -121,8 +123,8 @@ function buildRow(
   eventAje: number,
   eventRje: number,
 ): AdjudicationRow {
-  // Manual fields (editable)
-  const priorUnadjusted = getResponseNum(allResponses, makeItemId(section, rowKey, 'priorUnadjusted'))
+  const manualPrior = getResponseNum(allResponses, makeItemId(section, rowKey, 'priorUnadjusted'))
+  const priorUnadjusted = crossSheetPrior !== 0 ? crossSheetPrior : manualPrior
   const priorAje = getResponseNum(allResponses, makeItemId(section, rowKey, 'priorAje'))
   const priorRje = getResponseNum(allResponses, makeItemId(section, rowKey, 'priorRje'))
 
@@ -202,6 +204,14 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
   const eventAjeAccum = ref(0)
   const eventRjeAccum = ref(0)
 
+  // 项目级账龄配置（F1 默认 THREE_YEAR；可切换 FIVE_YEAR / CUSTOM）
+  const { segments } = useAgingConfig(projectId, 'F1')
+
+  const agingRowDefs: ComputedRef<AgingRowDef[]> = computed(() => {
+    const segs = segments.value.length ? segments.value : PRESET_SEGMENTS.THREE_YEAR
+    return resolveAdjudicationAgingRows(segs)
+  })
+
   // ─── Sections computed ───────────────────────────────────────────────
 
   const sections: ComputedRef<AdjudicationSection[]> = computed(() => {
@@ -217,29 +227,20 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
 
     const natureSubtotal = buildSubtotalRow(natureRows, '合计')
 
-    // === 区块二：按账龄分类 ===
-    const agingRows: AdjudicationRow[] = AGING_ROWS.map(({ rowKey, label }) => {
-      let crossCurrent = 0
-      let crossPrior = 0
-      switch (rowKey) {
-        case 'within-1-year':
-          crossCurrent = agingAgg.within1
-          crossPrior = agingAgg.prior_within1
-          break
-        case '1-to-2-years':
-          crossCurrent = agingAgg.y1to2
-          crossPrior = agingAgg.prior_y1to2
-          break
-        case '2-to-3-years':
-          crossCurrent = agingAgg.y2to3
-          crossPrior = agingAgg.prior_y2to3
-          break
-        case 'over-3-years':
-          crossCurrent = agingAgg.over3
-          crossPrior = agingAgg.prior_over3
-          break
-      }
-      return buildRow('aging', rowKey, label, responses, crossCurrent, crossPrior, eventAjeAccum.value, eventRjeAccum.value)
+    // === 区块二：按账龄分类（动态段） ===
+    const agingRows: AdjudicationRow[] = agingRowDefs.value.map(({ rowKey, label }) => {
+      const crossCurrent = parseNum(agingAgg[rowKey])
+      const crossPrior = parseNum(agingAgg[`prior_${rowKey}`])
+      return buildRow(
+        'aging',
+        rowKey,
+        label,
+        responses,
+        crossCurrent,
+        crossPrior,
+        eventAjeAccum.value,
+        eventRjeAccum.value,
+      )
     })
 
     const agingSubtotal = buildSubtotalRow(agingRows, '合计')
@@ -348,12 +349,10 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
   function updateCell(rowKey: string, field: string, value: number | string): void {
     if (isReadonly.value) return
 
-    // Determine section from rowKey
     const isNature = NATURE_ROWS.some(r => r.rowKey === rowKey)
     const section = isNature ? 'nature' : 'aging'
     const itemId = makeItemId(section, rowKey, field)
 
-    // Update allResponses and trigger save
     const strValue = typeof value === 'number' ? String(value) : value
     debouncedSave(itemId, { remark: strValue })
   }
@@ -373,6 +372,14 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
     try {
       window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
     } catch { /* silent */ }
+
+    if (projectId.value) {
+      try {
+        window.dispatchEvent(new CustomEvent('f1:writeback-trial-balance', {
+          detail: { projectId: projectId.value, accountCode: '1123', auditedAmount },
+        }))
+      } catch { /* silent */ }
+    }
   }
 
   // ─── onAdjustmentCreated ─────────────────────────────────────────────
@@ -410,6 +417,7 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
   return {
     // 双区块
     sections,
+    agingRowDefs,
     // 试算平衡表数 + 差异
     trialBalanceAmount,
     trialBalanceDiff,
@@ -426,6 +434,7 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
     // Internal (for testing)
     _eventAjeAccum: eventAjeAccum,
     _eventRjeAccum: eventRjeAccum,
+    _NATURE_LABEL_TO_KEY: NATURE_LABEL_TO_KEY,
   }
 }
 

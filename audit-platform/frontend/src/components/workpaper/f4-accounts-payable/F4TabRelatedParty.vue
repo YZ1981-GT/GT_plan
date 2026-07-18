@@ -1,14 +1,16 @@
 <script setup lang="ts">
-/**
- * F4TabRelatedParty — F4-6 关联方检查表
- * Spec: .kiro/specs/f4-accounts-payable/ Task 6.6
- * 集中度>30% 橙色高亮 + 汇总 + 导入导出
- * Requirements: 9.1~9.6
- */
-import { inject, toRef, ref, type Ref } from 'vue'
+/** F4TabRelatedParty — F4-6 应付账款关联方及交易检查表 */
+import { inject, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import axios from 'axios'
-import { useF4RelatedParty } from '../composables/useF4RelatedParty'
+import {
+  F4_RELATED_AGING_OPTIONS,
+  F4_RELATED_PRICING_OPTIONS,
+  F4_RELATED_RELATIONSHIPS,
+  useF4RelatedParty,
+} from '../composables/useF4RelatedParty'
+import { useF4AiGenerate } from '../composables/useF4AiGenerate'
+import F4ImportExportToolbar from './F4ImportExportToolbar.vue'
+import F4SheetAttachments from './F4SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -18,15 +20,23 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
+const reloadWorkpaperData = inject<(() => void) | null>('reloadWorkpaperData', null)
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
 const {
   rows,
   summary,
+  filledCount,
+  pendingSyncCount,
   auditNote,
+  auditConclusion,
+  loadRows,
+  syncFromDetail,
   addRow,
   removeRow,
   updateCell,
+  saveAuditNote,
+  saveAuditConclusion,
   rowClassName,
 } = useF4RelatedParty({
   wpId: toRef(props, 'wpId') as Ref<string>,
@@ -35,68 +45,101 @@ const {
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
 
-const aiLoading = ref(false)
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF4AiGenerate(
+  toRef(props, 'wpId') as Ref<string>,
+)
 
-async function generateAiConclusion() {
-  aiLoading.value = true
-  try {
-    const { data } = await axios.post(`/api/workpapers/${props.wpId}/f4/ai/related-evaluation`)
-    auditNote.value = data?.data?.conclusion || data?.conclusion || ''
-    ElMessage.success('AI结论已生成')
-  } catch { ElMessage.error('AI生成失败') }
-  finally { aiLoading.value = false }
+async function onImported(): Promise<void> {
+  if (reloadWorkpaperData) await reloadWorkpaperData()
+  loadRows()
 }
 
-// ─── 导入导出 ────────────────────────────────────────────────────────────────
-async function handleExportTemplate() {
-  try {
-    const resp = await axios.post(`/api/workpapers/${props.wpId}/f4/export-template?sheet=F4-6`, null, { responseType: 'blob' })
-    const url = URL.createObjectURL(resp.data)
-    const a = document.createElement('a'); a.href = url; a.download = 'F4-6关联方检查模板.xlsx'; a.click()
-    URL.revokeObjectURL(url)
-  } catch { ElMessage.error('导出模板失败') }
+function fmtAmount(value: number): string {
+  if (Math.abs(value) < 0.005) return '-'
+  const formatted = Math.abs(value).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+  return value < 0 ? `(${formatted})` : formatted
 }
 
-async function handleExportData() {
-  try {
-    const resp = await axios.post(`/api/workpapers/${props.wpId}/f4/export-data?sheet=F4-6`, null, { responseType: 'blob' })
-    const url = URL.createObjectURL(resp.data)
-    const a = document.createElement('a'); a.href = url; a.download = 'F4-6关联方检查数据.xlsx'; a.click()
-    URL.revokeObjectURL(url)
-  } catch { ElMessage.error('导出数据失败') }
+function fmtRate(value: number): string {
+  return `${value.toFixed(2)}%`
 }
 
-function handleImportData() {
-  const input = document.createElement('input')
-  input.type = 'file'; input.accept = '.xlsx,.xls'
-  input.onchange = async () => {
-    const file = input.files?.[0]
-    if (!file) return
-    const fd = new FormData(); fd.append('file', file)
-    try {
-      await axios.post(`/api/workpapers/${props.wpId}/f4/import-data?sheet=F4-6`, fd)
-      ElMessage.success('导入成功')
-      window.location.reload()
-    } catch { ElMessage.error('导入失败') }
+function handleSync(): void {
+  const added = syncFromDetail()
+  if (added > 0) ElMessage.success(`已从F4-2同步 ${added} 个关联方`)
+  else ElMessage.info('F4-2中已标识的关联方均已同步')
+}
+
+function aiContext(): Record<string, unknown> {
+  return {
+    sheet: 'F4-6',
+    totals: {
+      openingBalance: summary.value.openingTotal,
+      currentDebit: summary.value.debitTotal,
+      currentCredit: summary.value.creditTotal,
+      closingBalance: summary.value.closingTotal,
+      postPaymentAmount: summary.value.postPaymentTotal,
+      detailClosingBalance: summary.value.sourceClosingTotal,
+      reconciliationDifference: summary.value.reconciliationDifference,
+    },
+    count: summary.value.count,
+    highRiskCount: summary.value.highRiskCount,
+    missingPricingCount: summary.value.missingPricingCount,
+    rows: rows.value
+      .filter((row) => row.partyName || row.closingBalance)
+      .map((row) => ({
+        partyName: row.partyName,
+        relationship: row.relationship,
+        openingBalance: row.openingBalance,
+        currentDebit: row.currentDebit,
+        currentCredit: row.currentCredit,
+        closingBalance: row.closingBalance,
+        aging: row.aging,
+        pricingPolicy: row.pricingPolicy,
+        transactionNature: row.transactionNature,
+        postPaymentAmount: row.postPaymentAmount,
+        indexNo: row.indexNo,
+        reconciliationDifference: row.reconciliationDifference,
+        concentration: row.concentration,
+        riskFlags: row.riskFlags,
+      })),
   }
-  input.click()
 }
 
-function fmtAmount(v: number): string {
-  if (v === 0) return '-'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+async function generateAuditNote(): Promise<void> {
+  const generated = await generateAndConfirm(
+    'related-party-note',
+    auditNote.value,
+    aiContext(),
+    'AI 生成 · F4-6审计说明',
+  )
+  if (generated) saveAuditNote(generated)
+}
+
+async function generateAuditConclusion(): Promise<void> {
+  const generated = await generateAndConfirm(
+    'related-party-conclusion',
+    auditConclusion.value,
+    aiContext(),
+    'AI 生成 · F4-6审计结论',
+  )
+  if (generated) saveAuditConclusion(generated)
 }
 </script>
 
 <template>
   <div class="f4-tab-related-party">
     <details class="guidance-details">
-      <summary>📋 编制提示</summary>
+      <summary>📋 编制思路与联动逻辑</summary>
       <div class="guidance-content">
-        <p>1. 关联方检查表检查关联方应付账款的合理性和定价公允性。</p>
-        <p>2. 期末余额(公式) = 期初余额 + 本期增加 - 本期减少。</p>
-        <p>3. 占比(公式) = 单笔期末余额 / 关联方应付总余额 × 100%。</p>
-        <p>4. 占比>30%的行橙色高亮，表示集中度过高需重点关注。</p>
+        <p>1. 先取得并核对完整关联方清单，关注F4-2中关联方标识为空或错误造成的未识别关联方风险；本表仅自动同步F4-2中已标识为关联方的实际债权人。</p>
+        <p>2. 逐项核对期初余额、本期借方和本期贷方，期末余额自动按“期初余额＋本期贷方－本期借方”计算，并与F4-2审定余额交叉核对。</p>
+        <p>3. 结合合同、订单、发票、验收及付款资料检查交易性质和业务合理性；结合第三方价格、成本加成或协议条款评价定价政策。</p>
+        <p>4. 分析账龄及期后付款，关注长期挂账、借方余额、期后付款超过期末余额、余额集中及异常资金往来。</p>
+        <p>5. 最后核对关联方交易及余额是否在财务报表附注中完整、准确披露；索引号应指向所取得的合同、定价及付款证据。</p>
       </div>
     </details>
 
@@ -105,171 +148,352 @@ function fmtAmount(v: number): string {
       type="info"
       :closable="false"
       show-icon
-      title="审计目标：检查关联方应付账款(2202)的真实性、定价公允性与集中度，评估是否存在通过关联方粉饰负债或利益输送的风险。"
+      title="审计目标：关注关联方应付账款的真实性、合理性、合法性及会计处理是否正确，考虑是否存在未识别关联方，并检查关联交易和余额披露是否正确。"
     />
 
-    <div class="section-toolbar tab-toolbar">
+    <div class="section-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" :disabled="isReadonly" @click="addRow">+ 新增行</el-button>
+        <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleSync">
+          ⇄ 从F4-2同步
+          <el-badge v-if="pendingSyncCount" :value="pendingSyncCount" class="sync-badge" />
+        </el-button>
+        <el-button size="small" :disabled="isReadonly" @click="addRow">+ 手工添加</el-button>
       </div>
       <div class="toolbar-right">
-        <el-dropdown size="small" trigger="click">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-              <el-dropdown-item @click="handleImportData">导入数据</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-        <span class="chip-wrap"><GtIndexChip value="wp:F4-2" :context-project-id="projectId" /></span>
-        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+        <F4ImportExportToolbar
+          :wp-id="wpId"
+          :project-id="projectId"
+          sheet="F4-6"
+          :disabled="isReadonly"
+          @imported="onImported"
+        />
+        <GtIndexChip value="wp:F4-2" :context-project-id="projectId" />
+        <el-tag size="small" type="info">已填 {{ filledCount }} 项</el-tag>
+        <el-tag v-if="summary.highRiskCount" size="small" type="danger">
+          高风险 {{ summary.highRiskCount }} 项
+        </el-tag>
         <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-6-related-party')">复核</el-button>
       </div>
     </div>
 
-    <el-table :data="rows" border size="small" :row-class-name="rowClassName" style="width:100%;font-size:13px">
-      <el-table-column prop="seq" label="序号" width="60" />
-      <el-table-column label="关联方名称" min-width="130">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.partyName" size="small" @change="(v: string) => updateCell(row.rowId, 'partyName', v)" />
-          <span v-else>{{ row.partyName }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="关联关系" min-width="110">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.relationship" size="small" @change="(v: string) => updateCell(row.rowId, 'relationship', v)" />
-          <span v-else>{{ row.relationship }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="款项性质" min-width="100">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.paymentNature" size="small" @change="(v: string) => updateCell(row.rowId, 'paymentNature', v)" />
-          <span v-else>{{ row.paymentNature }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期初余额" min-width="110" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.openingBalance" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'openingBalance', v ?? 0)" />
-          <span v-else>{{ fmtAmount(row.openingBalance) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="本期增加" min-width="110" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.currentIncrease" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'currentIncrease', v ?? 0)" />
-          <span v-else>{{ fmtAmount(row.currentIncrease) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="本期减少" min-width="110" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.currentDecrease" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'currentDecrease', v ?? 0)" />
-          <span v-else>{{ fmtAmount(row.currentDecrease) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期末余额" min-width="110" align="right" class-name="auto-calc-col">
-        <template #default="{ row }">
-          <el-tooltip content="期末 = 期初 + 增加 - 减少" placement="top">
-            <span class="formula-cell">{{ fmtAmount(row.closingBalance) }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-      <el-table-column label="占比(%)" min-width="90" align="right" class-name="auto-calc-col">
-        <template #default="{ row }">
-          <el-tooltip content="占比 = 余额/总额 × 100%" placement="top">
-            <span class="formula-cell" :class="{ 'high-concentration': row.isHighConcentration }">{{ row.concentration.toFixed(2) }}%</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-      <el-table-column label="结算周期" min-width="100">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.settlementCycle" size="small" @change="(v: string) => updateCell(row.rowId, 'settlementCycle', v)" />
-          <span v-else>{{ row.settlementCycle }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="是否超期" min-width="80">
-        <template #default="{ row }">
-          <el-select v-if="!isReadonly" :model-value="row.isOverdue" size="small" @change="(v: string) => updateCell(row.rowId, 'isOverdue', v)">
-            <el-option label="是" value="是" />
-            <el-option label="否" value="否" />
-          </el-select>
-          <span v-else>{{ row.isOverdue }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="定价公允性" min-width="100">
-        <template #default="{ row }">
-          <el-select v-if="!isReadonly" :model-value="row.fairness" size="small" @change="(v: string) => updateCell(row.rowId, 'fairness', v)">
-            <el-option label="公允" value="公允" />
-            <el-option label="基本公允" value="基本公允" />
-            <el-option label="不公允" value="不公允" />
-            <el-option label="未知" value="未知" />
-          </el-select>
-          <span v-else>{{ row.fairness }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="60">
-        <template #default="{ row }">
-          <el-button v-if="!isReadonly" link size="small" type="danger" @click="removeRow(row.rowId)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <F4SheetAttachments :project-id="projectId" :wp-id="wpId" sheet-code="F4-6" label="关联方检查附件" />
 
-    <div class="subtotal-bar">
-      关联方应付总额：{{ fmtAmount(summary.totalClosing) }} ｜超期：{{ summary.overdueCount }}笔 ｜高集中度(>30%)：{{ summary.highConcentrationCount }}笔
+    <div class="table-scroll-wrap">
+      <el-table
+        :data="rows"
+        border
+        size="small"
+        class="related-table"
+        max-height="620"
+        :row-class-name="rowClassName"
+      >
+        <el-table-column type="index" label="序号" width="58" fixed="left" />
+        <el-table-column label="关联方名称" width="175" fixed="left">
+          <template #default="{ row }">
+            <el-tooltip v-if="row.linked" content="关联F4-2债权人">
+              <span class="linked-value">🔗 {{ row.partyName }}</span>
+            </el-tooltip>
+            <el-input
+              v-else-if="!isReadonly"
+              :model-value="row.partyName"
+              size="small"
+              @change="(value: string) => updateCell(row.rowId, 'partyName', value)"
+            />
+            <span v-else>{{ row.partyName }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="关联关系" width="190">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              :model-value="row.relationship"
+              size="small"
+              filterable
+              allow-create
+              clearable
+              placeholder="选择或据实填写"
+              @change="(value: string) => updateCell(row.rowId, 'relationship', value)"
+            >
+              <el-option v-for="option in F4_RELATED_RELATIONSHIPS" :key="option" :label="option" :value="option" />
+            </el-select>
+            <span v-else>{{ row.relationship }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期初余额" width="130" align="right">
+          <template #default="{ row }">
+            <span v-if="row.linked" class="linked-value">{{ fmtAmount(row.openingBalance) }}</span>
+            <el-input-number
+              v-else-if="!isReadonly"
+              :model-value="row.openingBalance"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @change="(value: number | undefined) => updateCell(row.rowId, 'openingBalance', value ?? 0)"
+            />
+            <span v-else>{{ fmtAmount(row.openingBalance) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期借方" width="130" align="right">
+          <template #default="{ row }">
+            <span v-if="row.linked" class="linked-value">{{ fmtAmount(row.currentDebit) }}</span>
+            <el-input-number
+              v-else-if="!isReadonly"
+              :model-value="row.currentDebit"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @change="(value: number | undefined) => updateCell(row.rowId, 'currentDebit', value ?? 0)"
+            />
+            <span v-else>{{ fmtAmount(row.currentDebit) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期贷方" width="130" align="right">
+          <template #default="{ row }">
+            <span v-if="row.linked" class="linked-value">{{ fmtAmount(row.currentCredit) }}</span>
+            <el-input-number
+              v-else-if="!isReadonly"
+              :model-value="row.currentCredit"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @change="(value: number | undefined) => updateCell(row.rowId, 'currentCredit', value ?? 0)"
+            />
+            <span v-else>{{ fmtAmount(row.currentCredit) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末余额" width="135" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <el-tooltip
+              :content="`期初＋贷方－借方；占关联方余额 ${fmtRate(row.concentration)}`"
+              placement="top"
+            >
+              <span class="formula-value">{{ fmtAmount(row.closingBalance) }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column label="账龄" width="155">
+          <template #default="{ row }">
+            <span v-if="row.linked" class="linked-value">{{ row.aging }}</span>
+            <el-select
+              v-else-if="!isReadonly"
+              :model-value="row.aging"
+              size="small"
+              filterable
+              allow-create
+              clearable
+              @change="(value: string) => updateCell(row.rowId, 'aging', value)"
+            >
+              <el-option v-for="option in F4_RELATED_AGING_OPTIONS" :key="option" :label="option" :value="option" />
+            </el-select>
+            <span v-else>{{ row.aging }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="定价政策" width="155">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              :model-value="row.pricingPolicy"
+              size="small"
+              filterable
+              allow-create
+              clearable
+              placeholder="定价依据"
+              @change="(value: string) => updateCell(row.rowId, 'pricingPolicy', value)"
+            >
+              <el-option v-for="option in F4_RELATED_PRICING_OPTIONS" :key="option" :label="option" :value="option" />
+            </el-select>
+            <span v-else>{{ row.pricingPolicy }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="发生原因（款项性质）" min-width="200">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.transactionNature"
+              type="textarea"
+              :autosize="{ minRows: 1, maxRows: 3 }"
+              placeholder="交易背景、款项性质及发生原因"
+              @change="(value: string) => updateCell(row.rowId, 'transactionNature', value)"
+            />
+            <span v-else>{{ row.transactionNature }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期后付款金额" width="140" align="right">
+          <template #default="{ row }">
+            <span v-if="row.linked" class="linked-value">{{ fmtAmount(row.postPaymentAmount) }}</span>
+            <el-input-number
+              v-else-if="!isReadonly"
+              :model-value="row.postPaymentAmount"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @change="(value: number | undefined) => updateCell(row.rowId, 'postPaymentAmount', value ?? 0)"
+            />
+            <span v-else>{{ fmtAmount(row.postPaymentAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="索引号" width="125">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.indexNo"
+              size="small"
+              placeholder="证据索引"
+              @change="(value: string) => updateCell(row.rowId, 'indexNo', value)"
+            />
+            <span v-else>{{ row.indexNo }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="备注" min-width="170">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.remark"
+              type="textarea"
+              :autosize="{ minRows: 1, maxRows: 3 }"
+              @change="(value: string) => updateCell(row.rowId, 'remark', value)"
+            />
+            <span v-else>{{ row.remark }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="风险提示" width="180">
+          <template #default="{ row }">
+            <div class="risk-flags">
+              <el-tag
+                v-for="flag in row.riskFlags"
+                :key="flag"
+                size="small"
+                :type="row.riskLevel === 'danger' ? 'danger' : 'warning'"
+              >{{ flag }}</el-tag>
+              <span v-if="!row.riskFlags.length">—</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="60" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="danger" size="small" :disabled="isReadonly" @click="removeRow(row.rowId)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
     </div>
 
-    <el-card class="opinion-card" shadow="never">
+    <div class="summary-strip">
+      <span>期初 {{ fmtAmount(summary.openingTotal) }}</span>
+      <span>借方 {{ fmtAmount(summary.debitTotal) }}</span>
+      <span>贷方 {{ fmtAmount(summary.creditTotal) }}</span>
+      <span>期末 {{ fmtAmount(summary.closingTotal) }}</span>
+      <span>期后付款 {{ fmtAmount(summary.postPaymentTotal) }}</span>
+      <span :class="{ danger: Math.abs(summary.reconciliationDifference) >= 0.005 }">
+        与F4-2审定数差异 {{ fmtAmount(summary.reconciliationDifference) }}
+      </span>
+    </div>
+
+    <el-card shadow="never" class="text-card">
       <template #header>
-        <div class="opinion-header">
-          <span class="opinion-title">审计说明与结论</span>
-          <div class="opinion-chips">
-            <GtIndexChip value="wp:F4-2" :context-project-id="projectId" />
+        <div class="card-header">
+          <div>
+            <div class="card-title">1、审计说明</div>
+            <div class="card-hint">说明关联方识别、余额勾稽、交易性质、定价依据、账龄、期后付款及披露核对结果。</div>
+          </div>
+          <div class="card-actions">
+            <el-button
+              size="small"
+              type="primary"
+              plain
+              :disabled="isReadonly || !aiAvailable"
+              :loading="aiLoading"
+              @click="generateAuditNote"
+            >🤖 AI生成说明</el-button>
+            <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-6-note')">💬</el-button>
           </div>
         </div>
       </template>
-      <div class="opinion-section">
-        <div class="opinion-section-header">
-          <span class="opinion-section-label">审计结论</span>
-          <div class="opinion-actions">
-            <el-button size="small" type="primary" plain :loading="aiLoading" :disabled="isReadonly" @click="generateAiConclusion">🤖 AI辅助</el-button>
-            <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-6-related-party')">💬</el-button>
+      <el-input
+        :model-value="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5, maxRows: 12 }"
+        :disabled="isReadonly"
+        placeholder="记录关联方清单核对、交易及余额检查、定价测试、期后付款和披露检查过程及发现。"
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <el-card shadow="never" class="text-card">
+      <template #header>
+        <div class="card-header">
+          <div>
+            <div class="card-title">2、审计结论</div>
+            <div class="card-hint">评价关联方识别是否完整、交易是否真实公允、余额是否准确以及披露是否充分。</div>
           </div>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="generateAuditConclusion"
+          >🤖 AI生成结论</el-button>
         </div>
-        <el-input
-          v-model="auditNote"
-          type="textarea"
-          :autosize="{ minRows: 3, maxRows: 8 }"
-          :disabled="isReadonly"
-          placeholder="请输入关联方检查审计结论，或点击AI辅助生成..."
-        />
-      </div>
+      </template>
+      <el-input
+        :model-value="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="综合评价关联方应付账款及交易的真实性、合理性、合法性、会计处理和披露。"
+        @change="saveAuditConclusion"
+      />
     </el-card>
   </div>
 </template>
 
 <style scoped>
-.f4-tab-related-party { font-size: var(--wp-font-size, 13px); }
-.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; font-size: var(--wp-font-size, 13px); }
-.guidance-details .guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
-.guidance-details .guidance-content p { margin: 2px 0; }
+.f4-tab-related-party { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.guidance-details {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-left: 3px solid #315a8a;
+  border-radius: 4px;
+  background: #eef4fa;
+}
+.guidance-details summary { cursor: pointer; color: #315a8a; font-weight: 600; }
+.guidance-content { margin-top: 8px; color: #606266; line-height: 1.65; }
+.guidance-content p { margin: 3px 0; }
 .audit-objective { margin-bottom: 12px; }
-.section-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; }
-.toolbar-right { display: flex; gap: 8px; align-items: center; }
-.chip-wrap { display: inline-flex; align-items: center; }
-.formula-cell { border-bottom: 1px dashed #c0c4cc; cursor: help; }
-.high-concentration { color: #e6a23c; font-weight: 600; }
-:deep(.concentration-warn td) { background: #fef3e6 !important; }
-:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
-.subtotal-bar { margin-top: 8px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; font-weight: 600; font-size: var(--wp-font-size, 13px); }
-.opinion-card { margin-top: 16px; border-radius: 8px; }
-.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.opinion-header { display: flex; align-items: center; justify-content: space-between; }
-.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
-.opinion-chips { display: flex; gap: 6px; }
-.opinion-section { margin-bottom: 0; }
-.opinion-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.opinion-section-label { font-size: 14px; font-weight: 500; color: #303133; }
-.opinion-actions { display: flex; gap: 6px; }
+.section-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.toolbar-left, .toolbar-right { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.sync-badge { margin-left: 4px; }
+.table-scroll-wrap { width: 100%; overflow-x: auto; }
+.related-table { min-width: 1950px; }
+.related-table :deep(.el-input-number), .related-table :deep(.el-select) { width: 100%; }
+.linked-value { color: #7b4ba3; font-weight: 600; }
+.formula-value { border-bottom: 1px dashed #9ca3af; cursor: help; font-weight: 600; }
+:deep(.formula-col) { background: #f4f7fa !important; }
+:deep(.related-risk-warning td) { background: #fdf6ec !important; }
+:deep(.related-risk-danger td) { background: #fef0f0 !important; }
+.risk-flags { display: flex; flex-wrap: wrap; gap: 3px; }
+.summary-strip {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  padding: 9px 12px;
+  border: 1px solid #dcdfe6;
+  border-top: none;
+  background: #f3f5f8;
+  font-weight: 700;
+}
+.summary-strip .danger { color: #d03050; }
+.text-card { margin-top: 16px; border-radius: 8px; }
+.text-card :deep(.el-card__header) { padding: 11px 14px; background: #fafafa; }
+.card-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.card-title { color: #303133; font-weight: 600; }
+.card-hint { margin-top: 3px; color: #909399; font-size: 12px; }
+.card-actions { display: flex; gap: 6px; }
 </style>

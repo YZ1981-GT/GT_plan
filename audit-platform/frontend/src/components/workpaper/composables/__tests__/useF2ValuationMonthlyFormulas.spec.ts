@@ -89,7 +89,7 @@ describe('useF2ValuationMonthlyFormulas', () => {
       },
     ]
     const migrated = migrateLegacyValuationRows(legacy)
-    expect(migrated).toHaveLength(4)
+    expect(migrated).toHaveLength(1)
     expect(migrated![0].itemName).toBe('A')
     expect(migrated![0].months[0].prodQty).toBe(10)
     expect(migrated![0].months[12].saleQty).toBe(3)

@@ -1,19 +1,9 @@
 /**
- * useF1RelatedParty — F1-6 关联关系及交易检查表核心逻辑 composable
+ * useF1RelatedParty — F1-6 预付账款关联方及交易检查表
  *
- * Spec: .kiro/specs/f1-prepayment/
- * Task: 12.1
- *
- * 职责：
- * - 定义 RelatedPartyRow 类型（10列）
- * - rows reactive（从F1-rp-rows加载JSON）
- * - 从crossSheet.relatedPartyRows导入功能
- * - 行内公式（期末=期初+贷方-借方）
- * - subtotalRow computed
- * - addRow/removeRow/updateCell
- * - auditNote/conclusion 双向绑定
- *
- * Requirements: 10.1-10.9
+ * Excel 13 列：关联方|关系|期初|借方|贷方|期末(自动)|坏账|账面价值(自动)|
+ * 账龄|款项性质|期后到货|索引|备注
+ * 期末 = 期初 + 借方 − 贷方（借方科目）
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal, calcRelatedPartyEndBalance } from './useF1FormulaEngine'
@@ -24,16 +14,19 @@ import type { RelatedPartyImportRow } from './useF1CrossSheet'
 
 export interface RelatedPartyRow {
   rowId: string
-  partyName: string          // 关联方名称
-  relationship: string       // 关联关系
-  priorBalance: number       // 期初余额
-  debit: number              // 借方发生
-  credit: number             // 贷方发生
-  endBalance: number         // 期末余额 = 期初 + 贷方 - 借方
-  agingDescription: string   // 发生时间及账龄
-  natureDescription: string  // 发生原因（款项性质）
-  indexRef: string           // 索引号
-  remark: string             // 备注
+  partyName: string           // 关联方名称
+  relationship: string        // 关联关系
+  priorBalance: number        // 期初余额
+  debit: number               // 借方发生额
+  credit: number              // 贷方发生额
+  endBalance: number          // 期末余额 = 期初+借方−贷方
+  badDebt: number             // 减：坏账准备
+  bookValue: number           // 账面价值 = 期末−坏账
+  agingDescription: string    // 发生时间及账龄
+  natureDescription: string   // 发生原因（款项性质）
+  postPeriodDelivery: number  // 期后到货
+  indexRef: string            // 索引号
+  remark: string              // 备注
 }
 
 export interface UseD3RelatedPartyOptions {
@@ -45,48 +38,59 @@ export interface UseD3RelatedPartyOptions {
   isReadonly: Ref<boolean>
 }
 
+/** Excel 模板「关联关系」枚举 */
+export const F1_RELATED_PARTY_RELATIONSHIP_OPTIONS = [
+  '实际控制人',
+  '控股股东',
+  '控股股东、实际控制人的近亲属及关联企业',
+  '持有5%以上股份的法人或其他组织',
+  '联营企业',
+  '合营企业',
+  '董高监等关键管理人员',
+  '其他关联方',
+  // F1-2 明细常用值，导入时兼容
+  '母公司',
+  '子公司',
+] as const
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const ITEM_ID_ROWS = 'F1-rp-rows'
 const ITEM_ID_NOTE = 'F1-rp-note'
 const ITEM_ID_CONCLUSION = 'F1-rp-conclusion'
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Pure helpers ────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
   return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
 }
 
-function safeParseRows(jsonStr: string | null | undefined): RelatedPartyRow[] {
-  if (!jsonStr) return []
-  try {
-    const parsed = JSON.parse(jsonStr)
-    return Array.isArray(parsed) ? parsed.map(normalizeRow) : []
-  } catch {
-    return []
-  }
+export function recalcRelatedPartyRow(row: RelatedPartyRow): RelatedPartyRow {
+  const endBalance = calcRelatedPartyEndBalance(row.priorBalance, row.debit, row.credit)
+  const bookValue = endBalance - parseNum(row.badDebt)
+  return { ...row, endBalance, bookValue }
 }
 
-function normalizeRow(raw: any): RelatedPartyRow {
-  const prior = parseNum(raw.priorBalance)
-  const debit = parseNum(raw.debit)
-  const credit = parseNum(raw.credit)
-  return {
+export function normalizeRelatedPartyRow(raw: any): RelatedPartyRow {
+  return recalcRelatedPartyRow({
     rowId: raw.rowId || generateRowId(),
-    partyName: raw.partyName || '',
+    partyName: raw.partyName || raw.customerName || '',
     relationship: raw.relationship || '',
-    priorBalance: prior,
-    debit,
-    credit,
-    endBalance: calcRelatedPartyEndBalance(prior, credit, debit),
+    priorBalance: parseNum(raw.priorBalance),
+    debit: parseNum(raw.debit),
+    credit: parseNum(raw.credit),
+    endBalance: parseNum(raw.endBalance),
+    badDebt: parseNum(raw.badDebt ?? raw.badDebtProvision),
+    bookValue: parseNum(raw.bookValue),
     agingDescription: raw.agingDescription || '',
-    natureDescription: raw.natureDescription || '',
+    natureDescription: raw.natureDescription || raw.nature || '',
+    postPeriodDelivery: parseNum(raw.postPeriodDelivery ?? raw.postPeriodSettlement),
     indexRef: raw.indexRef || '',
     remark: raw.remark || '',
-  }
+  })
 }
 
-function createEmptyRow(): RelatedPartyRow {
+export function createEmptyRelatedPartyRow(): RelatedPartyRow {
   return {
     rowId: generateRowId(),
     partyName: '',
@@ -95,27 +99,77 @@ function createEmptyRow(): RelatedPartyRow {
     debit: 0,
     credit: 0,
     endBalance: 0,
+    badDebt: 0,
+    bookValue: 0,
     agingDescription: '',
     natureDescription: '',
+    postPeriodDelivery: 0,
     indexRef: '',
     remark: '',
   }
 }
 
-/** 对单行重新计算期末余额公式 */
-function recalcRow(row: RelatedPartyRow): RelatedPartyRow {
-  return {
-    ...row,
-    endBalance: calcRelatedPartyEndBalance(row.priorBalance, row.credit, row.debit),
+function safeParseRows(jsonStr: string | null | undefined): RelatedPartyRow[] {
+  if (!jsonStr) return []
+  try {
+    const parsed = JSON.parse(jsonStr)
+    return Array.isArray(parsed) ? parsed.map(normalizeRelatedPartyRow) : []
+  } catch {
+    return []
   }
+}
+
+/** 从 F1-2 关联方行合并导入（同名更新金额，保留已填说明） */
+export function mergeRelatedPartyFromImport(
+  existing: RelatedPartyRow[],
+  imported: RelatedPartyImportRow[],
+): RelatedPartyRow[] {
+  const map = new Map(existing.map(r => [r.partyName, r]))
+  for (const src of imported) {
+    const name = src.customerName || ''
+    if (!name) continue
+    const prev = map.get(name)
+    if (prev) {
+      map.set(
+        name,
+        recalcRelatedPartyRow({
+          ...prev,
+          relationship: src.relationType || prev.relationship,
+          priorBalance: src.priorAudited,
+          debit: src.debit,
+          credit: src.credit,
+          natureDescription: src.nature || prev.natureDescription,
+          agingDescription: src.agingDescription || prev.agingDescription,
+          postPeriodDelivery:
+            src.postPeriodSettlement != null && src.postPeriodSettlement !== 0
+              ? src.postPeriodSettlement
+              : prev.postPeriodDelivery,
+        }),
+      )
+    } else {
+      map.set(
+        name,
+        recalcRelatedPartyRow({
+          ...createEmptyRelatedPartyRow(),
+          partyName: name,
+          relationship: src.relationType || '',
+          priorBalance: src.priorAudited,
+          debit: src.debit,
+          credit: src.credit,
+          natureDescription: src.nature || '',
+          agingDescription: src.agingDescription || '',
+          postPeriodDelivery: parseNum(src.postPeriodSettlement),
+        }),
+      )
+    }
+  }
+  return Array.from(map.values())
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useF1RelatedParty(options: UseD3RelatedPartyOptions) {
   const { allResponses, debouncedSave, isReadonly } = options
-
-  // ─── Reactive rows ───────────────────────────────────────────────────
 
   const rows = ref<RelatedPartyRow[]>([])
 
@@ -125,57 +179,30 @@ export function useF1RelatedParty(options: UseD3RelatedPartyOptions) {
     { immediate: true },
   )
 
-  // ─── Persist ─────────────────────────────────────────────────────────
-
   function persistRows(): void {
     debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(rows.value) })
   }
 
-  // ─── subtotalRow computed ────────────────────────────────────────────
-
-  const subtotalRow: ComputedRef<{ priorBalance: number; debit: number; credit: number; endBalance: number }> = computed(() => {
-    return {
-      priorBalance: calcSubtotal(rows.value.map(r => r.priorBalance)),
-      debit: calcSubtotal(rows.value.map(r => r.debit)),
-      credit: calcSubtotal(rows.value.map(r => r.credit)),
-      endBalance: calcSubtotal(rows.value.map(r => r.endBalance)),
-    }
-  })
-
-  // ─── Import from crossSheet ──────────────────────────────────────────
+  const subtotalRow = computed(() => ({
+    priorBalance: calcSubtotal(rows.value.map(r => r.priorBalance)),
+    debit: calcSubtotal(rows.value.map(r => r.debit)),
+    credit: calcSubtotal(rows.value.map(r => r.credit)),
+    endBalance: calcSubtotal(rows.value.map(r => r.endBalance)),
+    badDebt: calcSubtotal(rows.value.map(r => r.badDebt)),
+    bookValue: calcSubtotal(rows.value.map(r => r.bookValue)),
+    postPeriodDelivery: calcSubtotal(rows.value.map(r => r.postPeriodDelivery)),
+  }))
 
   function importFromCrossSheet(relatedPartyRows: RelatedPartyImportRow[]): void {
     if (isReadonly.value) return
     if (relatedPartyRows.length === 0) return
-
-    const imported: RelatedPartyRow[] = relatedPartyRows.map(r => {
-      const prior = r.priorAudited
-      const debit = r.debit
-      const credit = r.credit
-      return {
-        rowId: generateRowId(),
-        partyName: r.customerName,
-        relationship: r.relationType,
-        priorBalance: prior,
-        debit,
-        credit,
-        endBalance: calcRelatedPartyEndBalance(prior, credit, debit),
-        agingDescription: '',
-        natureDescription: '',
-        indexRef: '',
-        remark: '',
-      }
-    })
-
-    rows.value = [...rows.value, ...imported]
+    rows.value = mergeRelatedPartyFromImport(rows.value, relatedPartyRows)
     persistRows()
   }
 
-  // ─── addRow / removeRow / updateCell ─────────────────────────────────
-
   function addRow(): void {
     if (isReadonly.value) return
-    rows.value = [...rows.value, createEmptyRow()]
+    rows.value = [...rows.value, createEmptyRelatedPartyRow()]
     persistRows()
   }
 
@@ -185,28 +212,27 @@ export function useF1RelatedParty(options: UseD3RelatedPartyOptions) {
     persistRows()
   }
 
+  const NUMERIC = new Set([
+    'priorBalance', 'debit', 'credit', 'badDebt', 'postPeriodDelivery',
+  ])
+
   function updateCell(rowId: string, field: string, value: any): void {
     if (isReadonly.value) return
     const idx = rows.value.findIndex(r => r.rowId === rowId)
     if (idx === -1) return
 
     const row = { ...rows.value[idx] }
-    if (['priorBalance', 'debit', 'credit'].includes(field)) {
+    if (NUMERIC.has(field)) {
       ;(row as any)[field] = parseNum(value)
     } else {
       ;(row as any)[field] = value
     }
 
-    // Recalculate endBalance formula
-    const recalculated = recalcRow(row)
-
     const newRows = [...rows.value]
-    newRows[idx] = recalculated
+    newRows[idx] = recalcRelatedPartyRow(row)
     rows.value = newRows
     persistRows()
   }
-
-  // ─── Audit Note / Conclusion ─────────────────────────────────────────
 
   const auditNote = ref('')
   const conclusion = ref('')
@@ -216,17 +242,13 @@ export function useF1RelatedParty(options: UseD3RelatedPartyOptions) {
     (val) => { auditNote.value = val || '' },
     { immediate: true },
   )
-
   watch(
     () => allResponses.value.get(ITEM_ID_CONCLUSION)?.remark,
     (val) => { conclusion.value = val || '' },
     { immediate: true },
   )
-
-  watch(() => auditNote.value, (val) => { debouncedSave(ITEM_ID_NOTE, { remark: val }) })
-  watch(() => conclusion.value, (val) => { debouncedSave(ITEM_ID_CONCLUSION, { remark: val }) })
-
-  // ─── Return ──────────────────────────────────────────────────────────
+  watch(() => auditNote.value, (val) => { if (!isReadonly.value) debouncedSave(ITEM_ID_NOTE, { remark: val }) })
+  watch(() => conclusion.value, (val) => { if (!isReadonly.value) debouncedSave(ITEM_ID_CONCLUSION, { remark: val }) })
 
   return {
     rows,

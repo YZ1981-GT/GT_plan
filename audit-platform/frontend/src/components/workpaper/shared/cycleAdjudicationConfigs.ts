@@ -28,8 +28,10 @@ export const CYCLE_ADJUDICATION_CONFIGS: Record<string, CycleAdjudicationConfig>
     accountLabel: '应付账款',
     direction: 'credit',
     rows: [
-      { rowKey: 'goods', label: '应付货款' },
-      { rowKey: 'services', label: '应付劳务款' },
+      { rowKey: 'goods', label: '货款' },
+      { rowKey: 'construction', label: '工程款' },
+      { rowKey: 'equipment', label: '设备款' },
+      { rowKey: 'service', label: '服务费' },
       { rowKey: 'other', label: '其他' },
     ],
   },

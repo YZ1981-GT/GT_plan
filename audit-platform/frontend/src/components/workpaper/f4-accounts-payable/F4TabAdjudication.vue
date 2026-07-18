@@ -1,14 +1,17 @@
 <script setup lang="ts">
-/**
- * F4TabAdjudication — F4-1 审定表（贷方科目 2202 应付账款）
- * Spec: .kiro/specs/f4-accounts-payable/ Task 6.1
- * 两级结构：按性质(货款/工程款/服务费/其他) + 按账龄(1年以内/1-2年/2-3年/3年以上)
- * 交叉校验：按性质小计 === 按账龄小计
- */
+/** F4TabAdjudication — F4-1 应付账款审定表（严格对齐源表双分类结构）。 */
 import { computed, inject, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useF4Adjudication } from '../composables/useF4Adjudication'
-import type { F4AdjudicationRow } from '../composables/useF4Adjudication'
+import {
+  useF4Adjudication,
+  type F4AdjudicationRow,
+  type F4AdjudicationSection,
+  type StoredF4AdjRow,
+} from '../composables/useF4Adjudication'
+import { useF4AiGenerate } from '../composables/useF4AiGenerate'
+import F4AdjudicationTable from './F4AdjudicationTable.vue'
+import F4ImportExportToolbar from './F4ImportExportToolbar.vue'
+import F4SheetAttachments from './F4SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -19,24 +22,22 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
-
-function fmtAmount(v: number): string {
-  if (v === 0) return '-'
-  if (v < 0) return `(${Math.abs(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+const reloadWorkpaperData = inject<(() => void) | null>('reloadWorkpaperData', null)
 
 const {
   natureDataRows,
   natureSubtotalRow,
   agingDataRows,
   agingSubtotalRow,
-  totalRow,
-  trialBalanceAmount,
-  variance,
+  detailAggregation,
+  openingCrossCheckPassed,
+  closingCrossCheckPassed,
   crossCheckPassed,
-  updateNatureCell,
-  updateAgingCell,
+  trialBalance,
+  openingVariance,
+  closingVariance,
+  significantChanges,
+  updateCell,
   updateTrialBalance,
   auditNote,
   auditConclusion,
@@ -48,584 +49,359 @@ const {
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
 
-// ─── 按性质表数据（含小计） ──────────────────────────────────────────────
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF4AiGenerate(
+  toRef(props, 'wpId') as Ref<string>,
+)
+
 const natureTableData = computed(() => [...natureDataRows.value, natureSubtotalRow.value])
-
-// ─── 按账龄表数据（含小计） ──────────────────────────────────────────────
 const agingTableData = computed(() => [...agingDataRows.value, agingSubtotalRow.value])
+const hasOpeningVariance = computed(() => Math.abs(openingVariance.value) >= 0.005)
+const hasClosingVariance = computed(() => Math.abs(closingVariance.value) >= 0.005)
+const totalChangeRate = computed(() => natureSubtotalRow.value.changeRate)
 
-// ─── 差异判断 ────────────────────────────────────────────────────────────
-const hasDifference = computed(() => Math.abs(variance.value) > 0.005)
+function amount(value: number): string {
+  if (Math.abs(value) < 0.005) return '-'
+  const formatted = Math.abs(value).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+  return value < 0 ? `(${formatted})` : formatted
+}
 
-// ─── 汇总行数据（合计/TB数/差异） ───────────────────────────────────────
-const summaryTableData = computed(() => [
-  { key: 'total', label: '合计（按性质小计）', amount: totalRow.value.closingAdjusted },
-  { key: 'tb', label: '试算表数(2202)', amount: trialBalanceAmount.value },
-  { key: 'variance', label: '差异', amount: variance.value },
-])
+function rate(value: number): string {
+  return `${(value * 100).toFixed(2)}%`
+}
 
-// ─── 行样式 ──────────────────────────────────────────────────────────────
-function getNatureRowClassName({ row }: { row: F4AdjudicationRow }): string {
-  if (row.rowKey === 'nature-subtotal') {
-    return crossCheckPassed.value ? 'subtotal-row-bg' : 'subtotal-row-bg cross-check-fail'
+function handleUpdate(
+  section: F4AdjudicationSection,
+  rowKey: string,
+  field: keyof StoredF4AdjRow,
+  value: unknown,
+): void {
+  updateCell(section, rowKey, field, value)
+}
+
+function aiContext() {
+  return {
+    accountCode: '2202',
+    natureRows: natureDataRows.value.map((row) => ({
+      item: row.label,
+      openingAudited: row.openingAdjusted,
+      closingAudited: row.closingAdjusted,
+      changeAmount: row.changeAmount,
+      changeRate: rate(row.changeRate),
+      reasonAnalysis: row.reasonAnalysis,
+    })),
+    agingRows: agingDataRows.value.map((row) => ({
+      aging: row.label,
+      openingAudited: row.openingAdjusted,
+      closingAudited: row.closingAdjusted,
+      changeAmount: row.changeAmount,
+      changeRate: rate(row.changeRate),
+      reasonAnalysis: row.reasonAnalysis,
+    })),
+    total: {
+      openingAudited: natureSubtotalRow.value.openingAdjusted,
+      closingAudited: natureSubtotalRow.value.closingAdjusted,
+      changeAmount: natureSubtotalRow.value.changeAmount,
+      changeRate: rate(natureSubtotalRow.value.changeRate),
+    },
+    reconciliation: {
+      openingNatureVsAgingPassed: openingCrossCheckPassed.value,
+      closingNatureVsAgingPassed: closingCrossCheckPassed.value,
+      openingTrialBalance: trialBalance.value.opening,
+      openingVariance: openingVariance.value,
+      closingTrialBalance: trialBalance.value.closing,
+      closingVariance: closingVariance.value,
+    },
+    significantChanges: significantChanges.value,
+    closingDataSource: detailAggregation.value.hasData ? 'F4-2明细表自动汇总' : 'F4-1手工录入',
   }
-  return ''
 }
 
-function getAgingRowClassName({ row }: { row: F4AdjudicationRow }): string {
-  if (row.rowKey === 'aging-subtotal') {
-    return crossCheckPassed.value ? 'subtotal-row-bg' : 'subtotal-row-bg cross-check-fail'
+async function generateReason(section: F4AdjudicationSection, row: F4AdjudicationRow): Promise<void> {
+  const generated = await generateAndConfirm(
+    'adjudication-reason',
+    row.reasonAnalysis,
+    {
+      classification: section === 'nature' ? '按性质分类' : '按账龄分类',
+      item: row.label,
+      openingAudited: row.openingAdjusted,
+      closingAudited: row.closingAdjusted,
+      changeAmount: row.changeAmount,
+      changeRate: rate(row.changeRate),
+      totalChangeRate: rate(totalChangeRate.value),
+    },
+    `AI 生成 · ${row.label}变动原因`,
+  )
+  if (generated) updateCell(section, row.rowKey, 'reasonAnalysis', generated)
+}
+
+async function generateNote(): Promise<void> {
+  const generated = await generateAndConfirm(
+    'adjudication-note',
+    auditNote.value,
+    aiContext(),
+    'AI 生成 · F4-1审计说明',
+  )
+  if (generated) auditNote.value = generated
+}
+
+async function generateConclusion(): Promise<void> {
+  const generated = await generateAndConfirm(
+    'adjudication-conclusion',
+    auditConclusion.value,
+    aiContext(),
+    'AI 生成 · F4-1审计结论',
+  )
+  if (generated) auditConclusion.value = generated
+}
+
+function confirmAdjudication(): void {
+  if (!crossCheckPassed.value || hasOpeningVariance.value || hasClosingVariance.value) {
+    ElMessage.warning('存在分类口径差异或试算平衡表差异，请核对后再确认')
+    return
   }
-  return ''
-}
-
-function getSummaryRowClassName({ row }: { row: { key: string; amount: number } }): string {
-  if (row.key === 'total') return 'subtotal-row-bg'
-  if (row.key === 'variance' && hasDifference.value) return 'variance-row'
-  return ''
-}
-
-function confirmAdjudication() {
   publishAdjudicated()
-  ElMessage.success('已确认审定并发布 EventBus(substantive:adjudicated)')
+  ElMessage.success('已确认审定并发布应付账款审定数')
 }
 </script>
 
 <template>
   <div class="f4-tab-adjudication">
     <details class="guidance-details">
-      <summary>📋 编制提示</summary>
+      <summary>📋 编制思路与公式逻辑</summary>
       <div class="guidance-content">
-        <p>1. 应付账款为贷方科目(2202)：期末未审 = 期初审定 + 贷方发生 - 借方发生。</p>
-        <p>2. 审定 = 未审 + 账项调整(AJE) + 重分类(RJE)。</p>
-        <p>3. 两级结构：按性质(货款/工程款/服务费/其他) + 按账龄(1年以内/1-2年/2-3年/3年以上)。</p>
-        <p>4. 交叉校验：按性质小计 必须等于 按账龄小计（不等标红）。</p>
-        <p>5. 差异≠0 时标红，确认审定后回写试算表。</p>
+        <p>1. 本表不是发生额滚动表，而是期初与期末两个时点的余额审定桥接：审定数 = 未审数 + 账项调整 + 重分类调整。</p>
+        <p>2. 同一应付账款余额分别按性质和账龄展示。两种分类口径的期初审定合计、期末审定合计必须分别一致。</p>
+        <p>3. 期末数按原Excel公式逻辑从F4-2明细表自动汇总；未录入明细时允许在本表手工录入期末数据。</p>
+        <p>4. 变动额 = 本期审定数 - 上期审定数；变动率 = 变动额 ÷ 上期审定数。变动率绝对值超过30%的项目必须说明主要原因。</p>
+        <p>5. 按账龄的账项调整采用源表逻辑：审定账龄 - 未审账龄 - 重分类调整；无法合理分摊的余额归入“其他/未分类”。</p>
+        <p>6. 期初、期末审定合计分别与试算平衡表2202科目核对，差异应为零。</p>
       </div>
     </details>
 
     <el-alert
-      class="audit-objective"
       type="info"
       :closable="false"
       show-icon
-      title="审计目标：验证应付账款(2202)期末余额的完整性、准确性、计价与列报，确认账龄划分合理，确保未审数经调整后的审定数与试算平衡表核对一致。"
+      class="objective-alert"
+      title="审计目标：确认应付账款期初及期末余额完整、准确，调整和重分类恰当；性质及账龄分类一致；重大变动具有合理解释；审定数与试算平衡表一致。"
     />
 
-    <el-alert v-if="!crossCheckPassed" type="error" :closable="false" class="cross-alert">
-      ⚠️ 交叉校验失败：按性质小计({{ fmtAmount(natureSubtotalRow.closingAdjusted) }}) ≠ 按账龄小计({{ fmtAmount(agingSubtotalRow.closingAdjusted) }})
-    </el-alert>
-    <el-alert v-if="hasDifference" type="error" :closable="false" class="cross-alert">
-      审定合计与试算平衡表差异：{{ fmtAmount(variance) }}元
-    </el-alert>
-
-    <div class="section-toolbar tab-toolbar">
-      <div class="toolbar-left">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="confirmAdjudication">确认审定</el-button>
+    <div class="toolbar">
+      <div>
+        <el-button type="primary" size="small" :disabled="isReadonly" @click="confirmAdjudication">
+          确认审定
+        </el-button>
+        <el-tag v-if="detailAggregation.hasData" type="success" size="small">期末已联动 F4-2</el-tag>
+        <el-tag v-else type="warning" size="small">F4-2无有效明细，期末可手工录入</el-tag>
       </div>
       <div class="toolbar-right">
-        <span class="chip-wrap">
-          <GtIndexChip value="wp:F4-2" :context-project-id="projectId" />
-          <GtIndexChip value="wp:F4-3" :context-project-id="projectId" />
-        </span>
-        <el-button
-          v-if="openReviewDialog"
-          size="small"
-          @click="openReviewDialog('f4-1-adjudication')"
-        >复核</el-button>
+        <GtIndexChip value="wp:F4-1" :context-project-id="projectId" />
+        <GtIndexChip value="wp:F4-2" :context-project-id="projectId" />
+        <GtIndexChip value="wp:F4-3" :context-project-id="projectId" />
+        <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-1-adjudication')">复核</el-button>
       </div>
     </div>
 
-    <!-- ─── 按性质分类表 ──────────────────────────────────────────────── -->
-    <h4 class="table-title">一、按性质分类</h4>
-    <el-table
-      :data="natureTableData"
-      border
-      size="small"
-      :row-class-name="getNatureRowClassName"
-      style="width: 100%; font-size: 13px"
-    >
-      <el-table-column prop="label" label="项目" min-width="120" fixed />
+    <F4SheetAttachments
+      :project-id="projectId"
+      :wp-id="wpId"
+      sheet-code="F4-1"
+      label="审定表附件"
+    />
 
-      <el-table-column label="期初未审" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable && !isReadonly"
-            :model-value="row.openingUnadjusted"
-            :controls="false"
-            size="small"
-            style="width:100%"
-            @change="(v: number) => updateNatureCell(row.rowKey, 'openingUnadjusted', v ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.openingUnadjusted) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期初AJE" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable && !isReadonly"
-            :model-value="row.openingAje"
-            :controls="false"
-            size="small"
-            style="width:100%"
-            @change="(v: number) => updateNatureCell(row.rowKey, 'openingAje', v ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.openingAje) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期初RJE" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable && !isReadonly"
-            :model-value="row.openingRje"
-            :controls="false"
-            size="small"
-            style="width:100%"
-            @change="(v: number) => updateNatureCell(row.rowKey, 'openingRje', v ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.openingRje) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期初审定" min-width="110" align="right">
-        <template #default="{ row }">
-          <el-tooltip content="期初审定 = 期初未审 + AJE + RJE" placement="top">
-            <span class="formula-cell">{{ fmtAmount(row.openingAdjusted) }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-      <el-table-column label="本期贷方" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable && !isReadonly"
-            :model-value="row.periodCredit"
-            :controls="false"
-            size="small"
-            style="width:100%"
-            @change="(v: number) => updateNatureCell(row.rowKey, 'periodCredit', v ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.periodCredit) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="本期借方" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable && !isReadonly"
-            :model-value="row.periodDebit"
-            :controls="false"
-            size="small"
-            style="width:100%"
-            @change="(v: number) => updateNatureCell(row.rowKey, 'periodDebit', v ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.periodDebit) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期末未审" min-width="110" align="right">
-        <template #default="{ row }">
-          <el-tooltip content="期末未审 = 期初审定 + 贷方 - 借方" placement="top">
-            <span class="formula-cell">{{ fmtAmount(row.closingUnadjusted) }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-      <el-table-column label="期末AJE" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable && !isReadonly"
-            :model-value="row.closingAje"
-            :controls="false"
-            size="small"
-            style="width:100%"
-            @change="(v: number) => updateNatureCell(row.rowKey, 'closingAje', v ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.closingAje) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期末RJE" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable && !isReadonly"
-            :model-value="row.closingRje"
-            :controls="false"
-            size="small"
-            style="width:100%"
-            @change="(v: number) => updateNatureCell(row.rowKey, 'closingRje', v ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.closingRje) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期末审定" min-width="110" align="right">
-        <template #default="{ row }">
-          <el-tooltip content="期末审定 = 期末未审 + AJE + RJE" placement="top">
-            <span class="formula-cell audited-cell">{{ fmtAmount(row.closingAdjusted) }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-      <el-table-column label="索引" min-width="90">
-        <template #default="{ row }">
-          <el-input
-            v-if="row.isEditable && !isReadonly"
-            :model-value="row.indexRef"
-            size="small"
-            @change="(v: string) => updateNatureCell(row.rowKey, 'indexRef', v)"
-          />
-          <GtIndexChip v-else-if="row.indexRef" :value="row.indexRef" :context-project-id="projectId" />
-        </template>
-      </el-table-column>
-    </el-table>
+    <el-alert v-if="!crossCheckPassed" type="error" :closable="false" class="warning-alert">
+      分类口径不一致：
+      <span v-if="!openingCrossCheckPassed">
+        期初按性质 {{ amount(natureSubtotalRow.openingAdjusted) }}，按账龄 {{ amount(agingSubtotalRow.openingAdjusted) }}；
+      </span>
+      <span v-if="!closingCrossCheckPassed">
+        期末按性质 {{ amount(natureSubtotalRow.closingAdjusted) }}，按账龄 {{ amount(agingSubtotalRow.closingAdjusted) }}。
+      </span>
+    </el-alert>
 
-    <!-- ─── 按账龄分类表 ──────────────────────────────────────────────── -->
-    <h4 class="table-title">二、按账龄分类</h4>
-    <el-table
-      :data="agingTableData"
-      border
-      size="small"
-      :row-class-name="getAgingRowClassName"
-      style="width: 100%; font-size: 13px"
-    >
-      <el-table-column prop="label" label="项目" min-width="120" fixed />
-
-      <el-table-column label="期初未审" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable && !isReadonly"
-            :model-value="row.openingUnadjusted"
-            :controls="false"
-            size="small"
-            style="width:100%"
-            @change="(v: number) => updateAgingCell(row.rowKey, 'openingUnadjusted', v ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.openingUnadjusted) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期初AJE" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable && !isReadonly"
-            :model-value="row.openingAje"
-            :controls="false"
-            size="small"
-            style="width:100%"
-            @change="(v: number) => updateAgingCell(row.rowKey, 'openingAje', v ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.openingAje) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期初RJE" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable && !isReadonly"
-            :model-value="row.openingRje"
-            :controls="false"
-            size="small"
-            style="width:100%"
-            @change="(v: number) => updateAgingCell(row.rowKey, 'openingRje', v ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.openingRje) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期初审定" min-width="110" align="right">
-        <template #default="{ row }">
-          <el-tooltip content="期初审定 = 期初未审 + AJE + RJE" placement="top">
-            <span class="formula-cell">{{ fmtAmount(row.openingAdjusted) }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-      <el-table-column label="本期贷方" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable && !isReadonly"
-            :model-value="row.periodCredit"
-            :controls="false"
-            size="small"
-            style="width:100%"
-            @change="(v: number) => updateAgingCell(row.rowKey, 'periodCredit', v ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.periodCredit) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="本期借方" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable && !isReadonly"
-            :model-value="row.periodDebit"
-            :controls="false"
-            size="small"
-            style="width:100%"
-            @change="(v: number) => updateAgingCell(row.rowKey, 'periodDebit', v ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.periodDebit) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期末未审" min-width="110" align="right">
-        <template #default="{ row }">
-          <el-tooltip content="期末未审 = 期初审定 + 贷方 - 借方" placement="top">
-            <span class="formula-cell">{{ fmtAmount(row.closingUnadjusted) }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-      <el-table-column label="期末AJE" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable && !isReadonly"
-            :model-value="row.closingAje"
-            :controls="false"
-            size="small"
-            style="width:100%"
-            @change="(v: number) => updateAgingCell(row.rowKey, 'closingAje', v ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.closingAje) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期末RJE" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable && !isReadonly"
-            :model-value="row.closingRje"
-            :controls="false"
-            size="small"
-            style="width:100%"
-            @change="(v: number) => updateAgingCell(row.rowKey, 'closingRje', v ?? 0)"
-          />
-          <span v-else>{{ fmtAmount(row.closingRje) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期末审定" min-width="110" align="right">
-        <template #default="{ row }">
-          <el-tooltip content="期末审定 = 期末未审 + AJE + RJE" placement="top">
-            <span class="formula-cell audited-cell">{{ fmtAmount(row.closingAdjusted) }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-      <el-table-column label="索引" min-width="90">
-        <template #default="{ row }">
-          <el-input
-            v-if="row.isEditable && !isReadonly"
-            :model-value="row.indexRef"
-            size="small"
-            @change="(v: string) => updateAgingCell(row.rowKey, 'indexRef', v)"
-          />
-          <GtIndexChip v-else-if="row.indexRef" :value="row.indexRef" :context-project-id="projectId" />
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- ─── 合计 / 试算表数 / 差异 ────────────────────────────────────── -->
-    <h4 class="table-title">三、汇总</h4>
-    <el-table
-      :data="summaryTableData"
-      border
-      size="small"
-      :row-class-name="getSummaryRowClassName"
-      style="width: 100%; font-size: 13px"
-    >
-      <el-table-column prop="label" label="项目" min-width="140" fixed />
-      <el-table-column label="期末审定" min-width="140" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.key === 'tb' && !isReadonly"
-            :model-value="row.amount"
-            :controls="false"
-            size="small"
-            style="width:100%"
-            @change="(v: number) => updateTrialBalance(v ?? 0)"
-          />
-          <span v-else :class="{ 'formula-cell': row.key !== 'tb' }">{{ fmtAmount(row.amount) }}</span>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- ─── 核对行（与试算平衡表 2202 核对） ──────────────────────────── -->
-    <div class="tb-check-row">
-      <span class="tb-label">与试算平衡表核对（科目2202）：</span>
-      <span>{{ fmtAmount(trialBalanceAmount) }}</span>
-      <el-tag v-if="hasDifference" type="danger" size="small">差异 {{ fmtAmount(variance) }}</el-tag>
-      <el-tag v-else type="success" size="small">核对一致</el-tag>
+    <div class="section-heading">
+      <h4>一、按照性质分类</h4>
+      <F4ImportExportToolbar
+        :wp-id="wpId"
+        :project-id="projectId"
+        sheet="F4-1-nature"
+        :disabled="isReadonly"
+        @imported="reloadWorkpaperData?.()"
+      />
     </div>
+    <F4AdjudicationTable
+      section="nature"
+      :rows="natureTableData"
+      :readonly="isReadonly"
+      :ai-available="aiAvailable"
+      :ai-loading="aiLoading"
+      @update="(rowKey, field, value) => handleUpdate('nature', rowKey, field, value)"
+      @ai-reason="(row) => generateReason('nature', row)"
+    />
 
-    <!-- ─── 审计说明 / 结论 ───────────────────────────────────────────── -->
-    <el-card class="opinion-card" shadow="never">
+    <div class="section-heading">
+      <h4>二、按照账龄分类</h4>
+      <F4ImportExportToolbar
+        :wp-id="wpId"
+        :project-id="projectId"
+        sheet="F4-1-aging"
+        :disabled="isReadonly"
+        @imported="reloadWorkpaperData?.()"
+      />
+    </div>
+    <F4AdjudicationTable
+      section="aging"
+      :rows="agingTableData"
+      :readonly="isReadonly"
+      :ai-available="aiAvailable"
+      :ai-loading="aiLoading"
+      @update="(rowKey, field, value) => handleUpdate('aging', rowKey, field, value)"
+      @ai-reason="(row) => generateReason('aging', row)"
+    />
+
+    <section class="reconciliation">
+      <h4>试算平衡表核对</h4>
+      <div class="reconcile-grid">
+        <div class="reconcile-label">项目</div>
+        <div class="reconcile-label">期初数</div>
+        <div class="reconcile-label">期末数</div>
+
+        <div>审定表合计</div>
+        <div class="number">{{ amount(natureSubtotalRow.openingAdjusted) }}</div>
+        <div class="number">{{ amount(natureSubtotalRow.closingAdjusted) }}</div>
+
+        <div>试算平衡表数（2202）</div>
+        <el-input-number
+          :model-value="trialBalance.opening"
+          :controls="false"
+          size="small"
+          :disabled="isReadonly"
+          @change="(value: number | undefined) => updateTrialBalance('opening', value ?? 0)"
+        />
+        <el-input-number
+          :model-value="trialBalance.closing"
+          :controls="false"
+          size="small"
+          :disabled="isReadonly"
+          @change="(value: number | undefined) => updateTrialBalance('closing', value ?? 0)"
+        />
+
+        <div>差异数</div>
+        <div class="number" :class="{ danger: hasOpeningVariance }">{{ amount(openingVariance) }}</div>
+        <div class="number" :class="{ danger: hasClosingVariance }">{{ amount(closingVariance) }}</div>
+      </div>
+    </section>
+
+    <el-card shadow="never" class="opinion-card">
       <template #header>
-        <div class="opinion-header">
-          <span class="opinion-title">审计说明与结论</span>
-          <div class="opinion-chips">
-            <GtIndexChip value="wp:F4-2" :context-project-id="projectId" />
-            <GtIndexChip value="wp:F4-3" :context-project-id="projectId" />
+        <div class="card-header">
+          <span>三、审计说明</span>
+          <div>
+            <el-button
+              size="small"
+              type="primary"
+              plain
+              :disabled="isReadonly || !aiAvailable"
+              :loading="aiLoading"
+              @click="generateNote"
+            >🤖 AI生成说明</el-button>
+            <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-1-note')">💬</el-button>
           </div>
         </div>
       </template>
+      <div class="change-summary">
+        应付账款期末审定余额较期初
+        <strong>{{ natureSubtotalRow.changeAmount >= 0 ? '增加' : '减少' }}</strong>
+        {{ amount(Math.abs(natureSubtotalRow.changeAmount)) }}，变动率 {{ rate(totalChangeRate) }}。
+        <span v-if="significantChanges.length">
+          超过30%的项目：{{ significantChanges.map((item) => item.label).join('、') }}。
+        </span>
+      </div>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 4, maxRows: 10 }"
+        :disabled="isReadonly"
+        placeholder="说明余额总体变动、超过30%的主要项目及原因、长期账龄构成、分类与试算表勾稽结果。"
+      />
+    </el-card>
 
-      <div class="opinion-section">
-        <div class="opinion-section-header">
-          <span class="opinion-section-label">1. 审计说明</span>
-          <div class="opinion-actions">
+    <el-card shadow="never" class="opinion-card">
+      <template #header>
+        <div class="card-header">
+          <span>四、审计结论</span>
+          <div>
             <el-button
-              v-if="openReviewDialog"
               size="small"
-              @click="openReviewDialog('f4-1-note')"
-            >💬</el-button>
+              type="primary"
+              plain
+              :disabled="isReadonly || !aiAvailable"
+              :loading="aiLoading"
+              @click="generateConclusion"
+            >🤖 AI生成结论</el-button>
+            <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-1-conclusion')">💬</el-button>
           </div>
         </div>
-        <el-input
-          v-model="auditNote"
-          type="textarea"
-          :autosize="{ minRows: 3, maxRows: 8 }"
-          :disabled="isReadonly"
-          placeholder="审计说明（对应付账款余额构成、变动及合理性的分析描述）"
-        />
-      </div>
-
-      <div class="opinion-section">
-        <div class="opinion-section-header">
-          <span class="opinion-section-label">2. 审计结论</span>
-        </div>
-        <el-input
-          v-model="auditConclusion"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 6 }"
-          :disabled="isReadonly"
-          placeholder="审计结论"
-        />
-      </div>
+      </template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="评价应付账款余额、分类、调整重分类及列报是否恰当。"
+      />
     </el-card>
   </div>
 </template>
 
 <style scoped>
-.f4-tab-adjudication {
-  font-size: var(--wp-font-size, 13px);
-}
+.f4-tab-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .guidance-details {
   margin-bottom: 12px;
-  border-left: 3px solid #409eff;
-  background: #ecf5ff;
-  border-radius: 4px;
   padding: 8px 12px;
+  border-left: 3px solid #315a8a;
+  border-radius: 4px;
+  background: #eef4fa;
 }
-.guidance-details summary {
-  cursor: pointer;
-  font-weight: 500;
-  color: #409eff;
-  font-size: var(--wp-font-size, 13px);
+.guidance-details summary { cursor: pointer; color: #315a8a; font-weight: 600; }
+.guidance-content { margin-top: 8px; color: #606266; line-height: 1.65; }
+.guidance-content p { margin: 3px 0; }
+.objective-alert, .warning-alert { margin-bottom: 10px; }
+.toolbar, .toolbar > div, .toolbar-right, .card-header {
+  display: flex;
+  align-items: center;
 }
-.guidance-details .guidance-content {
-  margin-top: 8px;
-  font-size: var(--wp-font-size, 13px);
+.toolbar, .card-header { justify-content: space-between; }
+.toolbar { margin: 10px 0; }
+.toolbar > div, .toolbar-right { gap: 7px; }
+h4 { margin: 16px 0 8px; color: #303133; }
+.section-heading { display: flex; align-items: center; justify-content: space-between; }
+.reconciliation { max-width: 760px; margin-top: 16px; }
+.reconcile-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  border-top: 1px solid #dcdfe6;
+  border-left: 1px solid #dcdfe6;
+}
+.reconcile-grid > * {
+  min-height: 38px;
+  padding: 7px 10px;
+  border-right: 1px solid #dcdfe6;
+  border-bottom: 1px solid #dcdfe6;
+}
+.reconcile-label { background: #f3f5f8; font-weight: 600; text-align: center; }
+.number { text-align: right; }
+.danger { color: #d03050; font-weight: 700; background: #fff1f1; }
+.opinion-card { margin-top: 16px; }
+.card-header { font-weight: 600; }
+.change-summary {
+  margin-bottom: 10px;
+  padding: 9px 12px;
+  border-radius: 4px;
+  background: #f6f8fa;
   color: #606266;
-  line-height: 1.6;
-}
-.guidance-details .guidance-content p {
-  margin: 2px 0;
-}
-.audit-objective {
-  margin-bottom: 12px;
-}
-.cross-alert {
-  margin-bottom: 8px;
-}
-.section-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-.toolbar-left {
-  display: flex;
-  gap: 8px;
-}
-.toolbar-right {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.chip-wrap {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.tb-check-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: #f5f7fa;
-  border-radius: 4px;
-  margin: 12px 0;
-  font-size: var(--wp-font-size, 13px);
-}
-.tb-label {
-  color: #909399;
-}
-.table-title {
-  margin: 16px 0 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
-.table-title:first-of-type {
-  margin-top: 8px;
-}
-.formula-cell {
-  border-bottom: 1px dashed #c0c4cc;
-  cursor: help;
-}
-.audited-cell {
-  font-weight: 600;
-  color: #409eff;
-}
-.subtotal-row-bg :deep(td) {
-  font-weight: 600;
-  background: #fafafa !important;
-}
-.cross-check-fail :deep(td) {
-  background: #fef0f0 !important;
-  color: #f56c6c;
-  font-weight: 700;
-}
-.variance-row :deep(td) {
-  color: #f56c6c;
-  font-weight: 600;
-}
-.opinion-card {
-  margin-top: 16px;
-  border-radius: 8px;
-}
-.opinion-card :deep(.el-card__header) {
-  padding: 12px 16px;
-  background: #fafafa;
-  border-bottom: 1px solid #ebeef5;
-}
-.opinion-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.opinion-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
-.opinion-chips {
-  display: flex;
-  gap: 6px;
-}
-.opinion-section {
-  margin-bottom: 16px;
-}
-.opinion-section:last-child {
-  margin-bottom: 0;
-}
-.opinion-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-.opinion-section-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: #303133;
-}
-.opinion-actions {
-  display: flex;
-  gap: 6px;
 }
 </style>

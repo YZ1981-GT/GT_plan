@@ -1,212 +1,311 @@
-<template>
-  <div class="f2-unit-price">
-    <!-- 编制提示 -->
+﻿<template>
+  <div class="f2-val-sheet f2-unit-price f2-ipo-soft">
+    <header class="sheet-header">
+      <div>
+        <h3>原材料单价分析表</h3>
+        <span class="code">F2-62 · 供应商/材料/规格三维交叉比较</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat">比较组 {{ up.filledGroupCount.value }}</span>
+        <span class="stat sub">第一层采购额 {{ fmt(up.totalPurchaseAmount.value) }}</span>
+        <el-tag v-if="up.abnormalCount.value" type="danger" size="small">
+          异常 {{ up.abnormalCount.value }} 项
+        </el-tag>
+      </div>
+    </header>
+
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>1. 本表分析主要原材料采购单价的历年趋势及与行业均价的偏离度，验证采购价格公允、采购成本真实（CAS 1231 / CAS 1323）。</p>
-        <p>2. 灰色底纹列为自动计算列（采购额/同比变动率/环比变动率/偏离度%），由单价与采购量自动测算，不可手工编辑。</p>
-        <p>3. 偏离度异常的材料行以红色高亮提示，请填写行业均价并撰写分析结论，警惕向关联方高买或转移定价。</p>
-        <p>4. 可通过工具栏"AI 生成"辅助撰写价格分析结论，"💬"发起复核对话，"导入导出"批量维护单价数据。</p>
+        <p>1. 第一层固定同一供应商，比较其不同物料的逐月单价，识别同一交易对手对不同物料的异常定价。</p>
+        <p>2. 第二层固定同一原材料，比较不同供应商的逐月单价，识别供应商间异常价差或利益输送。</p>
+        <p>3. 第三层固定同类原材料，比较不同规格跨年度的数量、金额和采购单价，分析规格及年度价格差异。</p>
+        <p>4. 只填写采购金额和数量，采购单价均由系统自动计算；组内平均价偏离或年度变动超过 ±20% 自动标红。</p>
       </div>
     </details>
 
-    <!-- 审计目标 -->
-    <el-alert
-      type="info"
-      :closable="false"
-      title="审计目标：评价主要原材料采购单价的公允性与变动合理性，识别采购价格异常及关联方转移定价风险。"
-      class="objective-alert"
-    />
+    <el-alert type="info" :closable="false" :title="objectiveText" class="objective-alert" />
 
-    <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="up.addRow()">+ 新增材料</el-button>
-        <el-input v-model="up.searchQuery.value" size="small" placeholder="搜索材料名称/规格" clearable class="search" />
+        <el-button size="small" type="primary" :disabled="isReadonly"
+          @click="up.addMonthlyGroup('supplierGroups')">+ 供应商分析组</el-button>
+        <el-button size="small" type="primary" plain :disabled="isReadonly"
+          @click="up.addMonthlyGroup('materialGroups')">+ 原材料分析组</el-button>
+        <el-button size="small" type="primary" plain :disabled="isReadonly"
+          @click="up.addSpecGroup()">+ 规格分析组</el-button>
       </div>
       <div class="toolbar-right">
-        <el-tag v-if="up.abnormalCount.value > 0" type="danger" size="small">
-          {{ up.abnormalCount.value }} 行偏离度异常
-        </el-tag>
         <F2SheetToolbar
           :wp-id="wpId"
           api-prefix="f2-spe"
           sheet="F2-62"
           :disabled="isReadonly"
-          ai-section="price-analysis"
-          :existing-content="up.auditNote.value"
           review-section="F2-62-price"
-          @ai-filled="(t: string) => { up.auditNote.value = t }"
         />
-        <span class="chip-wrap"><GtIndexChip value="wp:F2-62" /></span>
-        <el-tag size="small" type="info">共 {{ up.filteredRows.value.length }} 行</el-tag>
+        <GtIndexChip value="wp:F2-62" />
       </div>
     </div>
 
-    <div class="table-scroll-wrap">
-      <el-table
-        :data="up.filteredRows.value"
-        border
-        size="small"
-        max-height="480"
-        :row-class-name="({ row }) => row.highlight ? 'warn-row' : ''"
+    <!-- 一、同一供应商/二、同一原材料：月份为行，对比对象为三列一组 -->
+    <section
+      v-for="section in monthlySections"
+      :key="section.key"
+      class="analysis-section"
+    >
+      <div class="major-title">
+        <span>{{ section.order }}、{{ section.title }}</span>
+        <el-button size="small" link type="primary" :disabled="isReadonly"
+          @click="up.addMonthlyGroup(section.key)">新增{{ section.groupLabel }}组</el-button>
+      </div>
+
+      <el-card
+        v-for="(group, groupIndex) in section.groups"
+        :key="group.id"
+        shadow="never"
+        class="group-card"
       >
-        <el-table-column prop="materialName" label="材料名称" width="120" fixed />
-        <el-table-column label="规格" width="90" fixed>
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.spec" size="small"
-              @change="(v: string) => up.updateRow(row.id, { spec: v })" />
-            <span v-else>{{ row.spec }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="单位" width="70" fixed>
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.unit" size="small"
-              @change="(v: string) => up.updateRow(row.id, { unit: v })" />
-            <span v-else>{{ row.unit }}</span>
-          </template>
-        </el-table-column>
+        <template #header>
+          <div class="group-header">
+            <div class="group-name">
+              <span class="group-seq">{{ groupIndex + 1 }}</span>
+              <span>{{ section.groupLabel }}：</span>
+              <el-input
+                v-if="!isReadonly"
+                :model-value="group.name"
+                size="small"
+                class="group-name-input"
+                :placeholder="`填写${section.groupLabel}名称`"
+                @update:model-value="(v: string) => up.updateMonthlyGroup(section.key, group.id, { name: v })"
+              />
+              <strong v-else>{{ group.name || `未填写${section.groupLabel}` }}</strong>
+              <el-tag v-if="group.abnormalCount" size="small" type="danger">
+                {{ group.abnormalCount }} 项异常
+              </el-tag>
+            </div>
+            <div class="group-actions">
+              <el-button size="small" type="primary" plain :disabled="isReadonly"
+                @click="up.addMonthlyItem(section.key, group.id)">+ {{ section.itemLabel }}</el-button>
+              <el-button size="small" type="danger" plain :disabled="isReadonly || section.groups.length <= 1"
+                @click="up.removeMonthlyGroup(section.key, group.id)">删除组</el-button>
+            </div>
+          </div>
+        </template>
 
-        <el-table-column label="T期" align="center">
-          <el-table-column label="单价" width="90">
-            <template #default="{ row }">
-              <el-input-number :model-value="row.priceT" size="small" :controls="false" :disabled="isReadonly"
-                @change="(v: number) => up.updateRow(row.id, { priceT: v ?? 0 })" />
-            </template>
-          </el-table-column>
-          <el-table-column label="采购量" width="90">
-            <template #default="{ row }">
-              <el-input-number :model-value="row.qtyT" size="small" :controls="false" :disabled="isReadonly"
-                @change="(v: number) => up.updateRow(row.id, { qtyT: v ?? 0 })" />
-            </template>
-          </el-table-column>
-          <el-table-column label="采购额" width="100" align="right" class-name="auto-calc-col">
-            <template #default="{ row }">
-              <span class="formula" title="单价×采购量">{{ row.amountT.toLocaleString() }}</span>
-            </template>
-          </el-table-column>
-        </el-table-column>
+        <div class="table-scroll">
+          <table class="compare-table" :style="{ minWidth: `${120 + group.items.length * 260}px` }">
+            <thead>
+              <tr>
+                <th rowspan="2" class="sticky col-month">月份</th>
+                <th v-for="item in group.items" :key="item.id" colspan="3" class="item-header">
+                  <div class="item-header-content">
+                    <el-input
+                      v-if="!isReadonly"
+                      :model-value="item.name"
+                      size="small"
+                      :placeholder="`填写${section.itemLabel}名称`"
+                      @update:model-value="(v: string) => up.updateMonthlyItem(section.key, group.id, item.id, { name: v })"
+                    />
+                    <span v-else>{{ item.name || `未填写${section.itemLabel}` }}</span>
+                    <el-button v-if="!isReadonly && group.items.length > 1" link type="danger" size="small"
+                      @click="up.removeMonthlyItem(section.key, group.id, item.id)">删</el-button>
+                  </div>
+                </th>
+              </tr>
+              <tr>
+                <template v-for="item in group.items" :key="`${item.id}-sub`">
+                  <th>入库金额</th>
+                  <th>入库数量</th>
+                  <th class="calc-head">单价</th>
+                </template>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(_, monthIndex) in monthLabels" :key="monthIndex">
+                <td class="sticky col-month">{{ monthLabels[monthIndex] }}</td>
+                <template v-for="item in group.items" :key="`${item.id}-${monthIndex}`">
+                  <td>
+                    <el-input-number v-if="!isReadonly"
+                      :model-value="item.enrichedMonths[monthIndex].amount"
+                      size="small" :controls="false" class="compact-num"
+                      @change="(v: number | undefined) => up.updateMonth(section.key, group.id, item.id, monthIndex, { amount: v ?? 0 })" />
+                    <span v-else class="num">{{ fmt(item.enrichedMonths[monthIndex].amount) }}</span>
+                  </td>
+                  <td>
+                    <el-input-number v-if="!isReadonly"
+                      :model-value="item.enrichedMonths[monthIndex].qty"
+                      size="small" :controls="false" class="compact-num"
+                      @change="(v: number | undefined) => up.updateMonth(section.key, group.id, item.id, monthIndex, { qty: v ?? 0 })" />
+                    <span v-else class="num">{{ fmt(item.enrichedMonths[monthIndex].qty) }}</span>
+                  </td>
+                  <td class="calc-cell">{{ fmtPrice(item.enrichedMonths[monthIndex].unitPrice) }}</td>
+                </template>
+              </tr>
+              <tr class="row-total">
+                <td class="sticky col-month">合计</td>
+                <template v-for="item in group.items" :key="`${item.id}-total`">
+                  <td class="num">{{ fmt(item.totalAmount) }}</td>
+                  <td class="num">{{ fmt(item.totalQty) }}</td>
+                  <td class="calc-cell" :class="{ 'price-warn': item.isAbnormal }">
+                    {{ fmtPrice(item.avgPrice) }}
+                    <small v-if="item.groupDeviation !== null">
+                      （{{ fmtRate(item.groupDeviation) }}）
+                    </small>
+                  </td>
+                </template>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </el-card>
+    </section>
 
-        <el-table-column label="T-1期" align="center">
-          <el-table-column label="单价" width="90">
-            <template #default="{ row }">
-              <el-input-number :model-value="row.priceT1" size="small" :controls="false" :disabled="isReadonly"
-                @change="(v: number) => up.updateRow(row.id, { priceT1: v ?? 0 })" />
-            </template>
-          </el-table-column>
-          <el-table-column label="采购量" width="90">
-            <template #default="{ row }">
-              <el-input-number :model-value="row.qtyT1" size="small" :controls="false" :disabled="isReadonly"
-                @change="(v: number) => up.updateRow(row.id, { qtyT1: v ?? 0 })" />
-            </template>
-          </el-table-column>
-          <el-table-column label="采购额" width="100" align="right" class-name="auto-calc-col">
-            <template #default="{ row }">
-              <span class="formula" title="单价×采购量">{{ row.amountT1.toLocaleString() }}</span>
-            </template>
-          </el-table-column>
-        </el-table-column>
+    <!-- 三、同类原材料不同规格跨年度分析 -->
+    <section class="analysis-section">
+      <div class="major-title">
+        <span>三、同一类原材料，不同规格材料采购单价分析</span>
+        <el-button size="small" link type="primary" :disabled="isReadonly"
+          @click="up.addSpecGroup()">新增类别组</el-button>
+      </div>
 
-        <el-table-column label="T-2期" align="center">
-          <el-table-column label="单价" width="90">
-            <template #default="{ row }">
-              <el-input-number :model-value="row.priceT2" size="small" :controls="false" :disabled="isReadonly"
-                @change="(v: number) => up.updateRow(row.id, { priceT2: v ?? 0 })" />
-            </template>
-          </el-table-column>
-          <el-table-column label="采购量" width="90">
-            <template #default="{ row }">
-              <el-input-number :model-value="row.qtyT2" size="small" :controls="false" :disabled="isReadonly"
-                @change="(v: number) => up.updateRow(row.id, { qtyT2: v ?? 0 })" />
-            </template>
-          </el-table-column>
-          <el-table-column label="采购额" width="100" align="right" class-name="auto-calc-col">
-            <template #default="{ row }">
-              <span class="formula" title="单价×采购量">{{ row.amountT2.toLocaleString() }}</span>
-            </template>
-          </el-table-column>
-        </el-table-column>
+      <el-card
+        v-for="(group, groupIndex) in up.specGroups.value"
+        :key="group.id"
+        shadow="never"
+        class="group-card"
+      >
+        <template #header>
+          <div class="group-header">
+            <div class="group-name">
+              <span class="group-seq">{{ groupIndex + 1 }}</span>
+              <span>原材料类别：</span>
+              <el-input v-if="!isReadonly" :model-value="group.categoryName" size="small"
+                class="group-name-input" placeholder="如：钢材、铜材"
+                @update:model-value="(v: string) => up.updateSpecGroup(group.id, { categoryName: v })" />
+              <strong v-else>{{ group.categoryName || '未填写类别' }}</strong>
+              <el-tag v-if="group.abnormalCount" size="small" type="danger">
+                {{ group.abnormalCount }} 项异常
+              </el-tag>
+            </div>
+            <div class="group-actions">
+              <el-button size="small" type="primary" plain :disabled="isReadonly"
+                @click="up.addSpecItem(group.id)">+ 规格</el-button>
+              <el-button size="small" type="danger" plain
+                :disabled="isReadonly || up.specGroups.value.length <= 1"
+                @click="up.removeSpecGroup(group.id)">删除组</el-button>
+            </div>
+          </div>
+        </template>
 
-        <el-table-column label="同比变动率" width="95" align="right" class-name="auto-calc-col">
-          <template #default="{ row }">
-            <span class="formula" title="(T期单价-T-1期单价)/T-1期单价×100">{{ up.fmtRate(row.yoyChangeRate) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="环比变动率" width="95" align="right" class-name="auto-calc-col">
-          <template #default="{ row }">
-            <span class="formula" title="(T-1期单价-T-2期单价)/T-2期单价×100">{{ up.fmtRate(row.momChangeRate) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="行业均价" width="95">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.industryAvgPrice" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => up.updateRow(row.id, { industryAvgPrice: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="偏离度%" width="90" align="right" class-name="auto-calc-col">
-          <template #default="{ row }">
-            <span class="formula" :class="{ 'dev-warn': row.isHighDeviation }" title="(T期单价-行业均价)/行业均价×100">{{ row.deviationPct.toFixed(1) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="分析结论" width="120">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.analysisConclusion" size="small"
-              @change="(v: string) => up.updateRow(row.id, { analysisConclusion: v })" />
-            <span v-else>{{ row.analysisConclusion }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="备注" width="100">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.remark" size="small"
-              @change="(v: string) => up.updateRow(row.id, { remark: v })" />
-            <span v-else>{{ row.remark }}</span>
-          </template>
-        </el-table-column>
+        <div class="table-scroll">
+          <table class="compare-table spec-table">
+            <thead>
+              <tr>
+                <th rowspan="2" class="sticky col-spec">规格</th>
+                <th v-for="period in periodLabels" :key="period" colspan="3">{{ period }}</th>
+                <th rowspan="2" class="calc-head">本期较上期</th>
+                <th rowspan="2" class="col-act" />
+              </tr>
+              <tr>
+                <template v-for="period in periodLabels" :key="`${period}-sub`">
+                  <th>数量</th>
+                  <th>金额</th>
+                  <th class="calc-head">采购单价</th>
+                </template>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in group.items" :key="item.id" :class="{ 'row-error': item.isAbnormal }">
+                <td class="sticky col-spec">
+                  <el-input v-if="!isReadonly" :model-value="item.spec" size="small" placeholder="规格型号"
+                    @update:model-value="(v: string) => up.updateSpecItem(group.id, item.id, { spec: v })" />
+                  <span v-else>{{ item.spec || '—' }}</span>
+                </td>
+                <template v-for="(period, periodIndex) in item.periods" :key="`${item.id}-${periodIndex}`">
+                  <td>
+                    <el-input-number v-if="!isReadonly" :model-value="period.qty" size="small"
+                      :controls="false" class="compact-num"
+                      @change="(v: number | undefined) => up.updateSpecPeriod(group.id, item.id, periodIndex, { qty: v ?? 0 })" />
+                    <span v-else class="num">{{ fmt(period.qty) }}</span>
+                  </td>
+                  <td>
+                    <el-input-number v-if="!isReadonly" :model-value="period.amount" size="small"
+                      :controls="false" class="compact-num"
+                      @change="(v: number | undefined) => up.updateSpecPeriod(group.id, item.id, periodIndex, { amount: v ?? 0 })" />
+                    <span v-else class="num">{{ fmt(period.amount) }}</span>
+                  </td>
+                  <td class="calc-cell">{{ fmtPrice(period.unitPrice) }}</td>
+                </template>
+                <td class="calc-cell" :class="{ 'price-warn': item.isAbnormal }">
+                  {{ fmtRate(item.latestChangeRate) }}
+                </td>
+                <td class="col-act">
+                  <el-button v-if="!isReadonly && group.items.length > 1" link type="danger" size="small"
+                    @click="up.removeSpecItem(group.id, item.id)">删</el-button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </el-card>
+    </section>
 
-        <el-table-column label="操作" width="55" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="danger" size="small" :disabled="isReadonly" @click="up.removeRow(row.id)">删</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </div>
-
-    <!-- 审计意见区（卡片式） -->
+    <!-- 四、审计说明 -->
     <el-card class="opinion-card" shadow="never">
       <template #header>
         <div class="opinion-header">
-          <span class="opinion-title">分析结论</span>
+          <span class="opinion-title">四、审计说明</span>
+          <el-button size="small" type="primary" plain
+            :disabled="isReadonly || !aiAvailable" :loading="aiLoading"
+            @click="runAi('unit-price-note')">AI 填写审计说明</el-button>
         </div>
       </template>
-      <el-input v-model="up.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="汇总原材料单价趋势、偏离度分析及审计结论…" />
+      <el-input v-model="up.auditNote.value" type="textarea" :autosize="{ minRows: 4, maxRows: 10 }"
+        placeholder="分别说明三个比较维度的执行范围、异常价格差异、管理层解释及核查结果…"
+        :disabled="isReadonly" />
     </el-card>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="audit-card-header"><span>审计说明</span></div></template>
-      <el-input
-        type="textarea"
-        :model-value="auditNoteText"
-        :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：概述所执行的原材料单价趋势与偏离度核查程序、测试范围与结果，以及发现的异常事项及其处理。"
-        @change="saveAuditNote"
-      />
+    <!-- 五、分析结论 / 审计结论 -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">五、分析结论（审计结论）</span>
+          <el-button size="small" type="primary" plain
+            :disabled="isReadonly || !aiAvailable" :loading="aiLoading"
+            @click="runAi('unit-price-conclusion')">AI 生成分析结论</el-button>
+        </div>
+      </template>
+      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
+        placeholder="A、未见异常。B、除上述应调整事项外，其余未见异常。C、不可确认。"
+        :disabled="isReadonly" @update:model-value="saveAuditConclusion" />
     </el-card>
+
+    <div class="tips-box">
+      <div class="tips-title">提示</div>
+      <p>{{ fraudTip }}</p>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, toRef } from 'vue'
-import { useF2UnitPrice } from '../../composables/useF2UnitPrice'
+import { computed, onMounted, ref, toRef, type Ref } from 'vue'
+import { useF2UnitPrice, type MonthlySection } from '../../composables/useF2UnitPrice'
+import {
+  F2_62_FRAUD_TIP,
+  F2_62_OBJECTIVE,
+  UNIT_PRICE_MONTH_LABELS,
+} from '../../composables/useF2UnitPriceFormulas'
+import {
+  useF2SpecialAiGenerate,
+  type F2SpeAiSection,
+} from '../../composables/useF2SpecialAiGenerate'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId?: string
+  projectId?: string
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()
@@ -216,57 +315,220 @@ const up = useF2UnitPrice({
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-// ─── 审计说明（逐 sheet 打磨补齐，持久化走 f2-spe:save-items）──────────────────
-const NOTE_KEY = 'F2-62-audit-note'
-const auditNoteText = ref('')
-function persistSpeAudit(key: string, val: string): void {
-  const item = { item_id: key, conclusion: null, remark: val }
-  props.allResponses.set(key, item)
+const monthLabels = UNIT_PRICE_MONTH_LABELS
+const periodLabels = ['本期', '上期', '上上期'] as const
+const objectiveText = F2_62_OBJECTIVE
+const fraudTip = F2_62_FRAUD_TIP
+
+const monthlySections = computed(() => [
+  {
+    key: 'supplierGroups' as MonthlySection,
+    order: '一',
+    title: '同一供应商，采购不同物料单价分析',
+    groupLabel: '供应商',
+    itemLabel: '物料',
+    groups: up.supplierGroups.value,
+  },
+  {
+    key: 'materialGroups' as MonthlySection,
+    order: '二',
+    title: '同一原材料，在不同供应商处各月采购单价分析',
+    groupLabel: '原材料',
+    itemLabel: '供应商',
+    groups: up.materialGroups.value,
+  },
+])
+
+const CONCLUSION_KEY = 'F2-62-audit-conclusion'
+const LEGACY_NOTE_KEY = 'F2-62-audit-note'
+const auditConclusion = ref('')
+
+function saveAuditConclusion(value: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = value
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: value }
+  props.allResponses.set(CONCLUSION_KEY, item)
   window.dispatchEvent(new CustomEvent('f2-spe:save-items', { detail: { items: [item] } }))
 }
-function saveAuditNote(val: string): void {
-  if (props.isReadonly) return
-  auditNoteText.value = val
-  persistSpeAudit(NOTE_KEY, val)
-}
+
 onMounted(() => {
-  const n = props.allResponses.get(NOTE_KEY)
-  if (n?.remark) auditNoteText.value = n.remark
+  const conclusion = props.allResponses.get(CONCLUSION_KEY)
+  if (conclusion?.remark) auditConclusion.value = conclusion.remark
+  // 旧页面第二个“审计说明”迁入新版第四部分，避免历史文本丢失。
+  const legacyNote = props.allResponses.get(LEGACY_NOTE_KEY)?.remark
+  if (!up.auditNote.value && legacyNote) up.auditNote.value = legacyNote
 })
+
+const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
+const {
+  aiAvailable,
+  loading: aiLoading,
+  generateAndConfirm,
+} = useF2SpecialAiGenerate(wpIdRef)
+
+function aiContext(): Record<string, unknown> {
+  const monthly = (groups: typeof up.supplierGroups.value) =>
+    groups.slice(0, 10).map((group) => ({
+      groupName: group.name,
+      groupAvgPrice: group.avgPrice,
+      abnormalCount: group.abnormalCount,
+      items: group.items.slice(0, 10).map((item) => ({
+        name: item.name,
+        totalAmount: item.totalAmount,
+        totalQty: item.totalQty,
+        avgPrice: item.avgPrice,
+        groupDeviation: item.groupDeviation,
+      })),
+    }))
+  return {
+    sheet: 'F2-62',
+    comparisonGroupCount: up.filledGroupCount.value,
+    abnormalCount: up.abnormalCount.value,
+    totalPurchaseAmount: up.totalPurchaseAmount.value,
+    supplierDimension: monthly(up.supplierGroups.value),
+    materialDimension: monthly(up.materialGroups.value),
+    specificationDimension: up.specGroups.value.slice(0, 10).map((group) => ({
+      categoryName: group.categoryName,
+      abnormalCount: group.abnormalCount,
+      items: group.items.map((item) => ({
+        spec: item.spec,
+        prices: item.periods.map((period) => ({
+          period: period.label,
+          unitPrice: period.unitPrice,
+        })),
+        latestChangeRate: item.latestChangeRate,
+      })),
+    })),
+  }
+}
+
+async function runAi(section: F2SpeAiSection): Promise<void> {
+  const isNote = section === 'unit-price-note'
+  const existing = isNote ? up.auditNote.value : auditConclusion.value
+  const title = isNote ? 'AI 生成 · 原材料单价审计说明' : 'AI 生成 · 原材料单价分析结论'
+  const text = await generateAndConfirm(section, existing || '', aiContext(), title)
+  if (!text) return
+  if (isNote) up.auditNote.value = text
+  else saveAuditConclusion(text)
+}
+
+function fmt(value: number): string {
+  if (!Number.isFinite(value) || value === 0) return '—'
+  return value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function fmtPrice(value: number | null): string {
+  if (value === null || !Number.isFinite(value) || value === 0) return '—'
+  return value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+}
+
+function fmtRate(value: number | null): string {
+  if (value === null || !Number.isFinite(value)) return '—'
+  return `${(value * 100).toFixed(1)}%`
+}
 </script>
 
+<style scoped src="../../f2/valuation/f2ValSheetStyles.css"></style>
+<style scoped src="./f2IpoSoftStyles.css"></style>
 <style scoped>
-.f2-unit-price { padding: 12px 16px; font-size: var(--wp-font-size, 13px); }
-.f2-unit-price :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
-.f2-unit-price :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
-
-/* 编制提示 */
-.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
-.guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
-
-/* 工具栏 */
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.chip-wrap { display: inline-flex; align-items: center; }
-.search { width: 180px; }
-
-/* 表格 */
-.table-scroll-wrap { overflow-x: auto; }
-.formula { border-bottom: 1px dashed #909399; cursor: help; }
-.dev-warn { color: #f56c6c; font-weight: 600; background: #fef0f0; padding: 0 4px; border-radius: 2px; }
-:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
-:deep(.warn-row) { background: #fef0f0; }
-
-/* 审计意见卡片 */
-.opinion-card { margin-top: 16px; border-radius: 8px; }
-.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.f2-unit-price { --gt-purple: #4b2d77; --gt-purple-soft: #f3eef8; }
 .opinion-header { display: flex; align-items: center; justify-content: space-between; }
-.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
-.audit-note-card { margin-top: 16px; border-radius: 8px; }
-.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.audit-card-header { font-weight: 600; font-size: 14px; color: #303133; }
+
+.analysis-section { margin: 18px 0; }
+.major-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  background: linear-gradient(90deg, #ede5f5, #faf8fc);
+  border-left: 4px solid var(--gt-purple);
+  color: #3f2465;
+  font-size: 14px;
+  font-weight: 700;
+}
+.group-card { margin-bottom: 12px; border-color: #d8cce5; }
+.group-card :deep(.el-card__header) { padding: 8px 12px; background: #faf8fc; }
+.group-card :deep(.el-card__body) { padding: 0; }
+.group-header, .group-name, .group-actions, .item-header-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.group-header { justify-content: space-between; flex-wrap: wrap; }
+.group-seq {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--gt-purple);
+  color: #fff;
+  font-size: 12px;
+}
+.group-name-input { width: 220px; }
+.group-actions { margin-left: auto; }
+.item-header-content { justify-content: center; min-width: 220px; }
+.item-header-content :deep(.el-input) { max-width: 180px; }
+
+.table-scroll { overflow-x: auto; max-width: 100%; }
+.compare-table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 11px;
+}
+.compare-table th,
+.compare-table td {
+  border: 1px solid #d4c8e0;
+  padding: 4px;
+  text-align: center;
+  vertical-align: middle;
+  background: #fff;
+}
+.compare-table thead th {
+  background: var(--gt-purple);
+  color: #fff;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.compare-table thead th.calc-head { background: #6b4d8f; }
+.item-header { background: #55347f !important; min-width: 240px; }
+.sticky { position: sticky; left: 0; z-index: 3; background: #faf8fc !important; }
+.compare-table thead th.sticky { background: var(--gt-purple) !important; z-index: 4; }
+.col-month { width: 70px; min-width: 70px; font-weight: 600; }
+.col-spec { width: 110px; min-width: 110px; text-align: left !important; }
+.col-act { width: 38px; min-width: 38px; }
+.calc-cell {
+  color: #4b2d77;
+  font-weight: 500;
+  background: #faf8fc !important;
+  text-align: right !important;
+  white-space: nowrap;
+}
+.calc-cell small { display: block; color: #909399; font-size: 9px; }
+.num { display: block; text-align: right; white-space: nowrap; }
+.row-total td { background: #f0ebf5 !important; font-weight: 600; }
+.row-error td { background: #fef0f0 !important; }
+.price-warn { color: #c45656 !important; font-weight: 700; background: #fef0f0 !important; }
+.spec-table { min-width: 1100px; }
+
+.tips-box {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: #ecf5ff;
+  border-left: 3px solid #409eff;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.tips-title { font-weight: 600; color: #409eff; margin-bottom: 6px; }
+.tips-box p { margin: 0; }
+
+:deep(.compact-num) { width: 76px; }
+:deep(.compact-num .el-input__inner) { text-align: right; padding: 0 4px; font-size: 11px; }
 </style>

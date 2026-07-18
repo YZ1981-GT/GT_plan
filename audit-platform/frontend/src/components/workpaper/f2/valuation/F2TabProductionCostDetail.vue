@@ -26,11 +26,7 @@
           api-prefix="f2-val"
           sheet="F2-41"
           :disabled="isReadonly"
-          ai-section="cost-analysis"
-          :existing-content="pc.auditNote.value"
-          ai-title="AI 生成 · 生产成本分析结论"
           review-section="F2-41-conclusion"
-          @ai-filled="(t: string) => { pc.auditNote.value = t }"
         />
       </div>
       <div class="toolbar-right">
@@ -132,7 +128,19 @@
     </section>
 
     <el-card shadow="never" class="conclusion-card">
-      <template #header><span class="conclusion-header">三、审计说明</span></template>
+      <template #header>
+        <div class="conclusion-card-header">
+          <span class="conclusion-header">三、审计说明</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="runAi('production-cost-note')"
+          >AI 填写审计说明</el-button>
+        </div>
+      </template>
       <el-input
         v-model="pc.auditNote.value"
         type="textarea"
@@ -143,7 +151,19 @@
     </el-card>
 
     <el-card shadow="never" class="conclusion-card">
-      <template #header><span class="conclusion-header">四、审计结论</span></template>
+      <template #header>
+        <div class="conclusion-card-header">
+          <span class="conclusion-header">四、审计结论</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="runAi('production-cost-conclusion')"
+          >AI 生成结论</el-button>
+        </div>
+      </template>
       <el-input
         :model-value="auditConclusion"
         type="textarea"
@@ -164,8 +184,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, toRef } from 'vue'
+import { ref, onMounted, toRef, type Ref } from 'vue'
 import { useF2ProductionCostDetail } from '../../composables/useF2ProductionCostDetail'
+import { useF2ValuationAiGenerate, type F2ValAiSection } from '../../composables/useF2ValuationAiGenerate'
 import {
   PROD_COST_MONTH_KEYS,
   F2_41_TIPS,
@@ -214,6 +235,37 @@ onMounted(() => {
   const c = props.allResponses.get(CONCLUSION_KEY)
   if (c?.remark) auditConclusion.value = c.remark
 })
+
+const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2ValuationAiGenerate(wpIdRef)
+
+function aiContext(): Record<string, unknown> {
+  return {
+    sheet: 'F2-41',
+    objectCount: pc.enrichedBlocks.value.length,
+    totals: pc.totals.value,
+    costObjects: pc.enrichedBlocks.value.map((block) => ({
+      productName: block.productName,
+      rows: block.rows.map((row) => ({
+        item: row.label,
+        annualTotal: row.total,
+        priorYear: row.priorYear,
+        changeRate: row.changeRate,
+        changeReason: row.changeReason,
+      })),
+    })),
+  }
+}
+
+async function runAi(section: F2ValAiSection): Promise<void> {
+  const isNote = section === 'production-cost-note'
+  const existing = isNote ? pc.auditNote.value : auditConclusion.value
+  const title = isNote ? 'AI 生成 · 生产成本审计说明' : 'AI 生成 · 生产成本审计结论'
+  const text = await generateAndConfirm(section, existing || '', aiContext(), title)
+  if (!text) return
+  if (isNote) pc.auditNote.value = text
+  else saveAuditConclusion(text)
+}
 
 function isComputed(row: ProdCostMatrixRow): boolean {
   return row.kind === 'computed' || row.kind === 'ending'
@@ -295,6 +347,7 @@ function fmtRate(r: number | '' | 'N/A'): string {
 }
 
 .conclusion-card { margin-top: 14px; }
+.conclusion-card-header { display: flex; align-items: center; justify-content: space-between; }
 .conclusion-header { font-weight: 600; font-size: 14px; }
 
 .tips-box {

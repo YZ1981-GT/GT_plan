@@ -10,6 +10,7 @@ import {
   calcCheckStats,
   migrateContractCostCheckSheet,
   emptyCheckSample,
+  pruneBlankContractCostCheckSamples,
   type ContractCostCheckSheet,
   type ContractCostCheckSample,
   type ContractCostCheckSampling,
@@ -48,11 +49,31 @@ export function useF2ContractCostCheck(opts: {
   function load(): void {
     const pRaw = readSpeRowJson(opts.allResponses.value.get(PARAMS_KEY))
     const rRaw = readSpeRowJson(opts.allResponses.value.get(ROWS_KEY))
+    // 自回声守卫：persist() 写回后 watcher 会再次触发 load，
+    // 若内容与内存一致则跳过，避免 migrate 的空行裁剪吃掉刚新增的空样本行。
+    if (rRaw && rRaw === JSON.stringify(sheet.value)) return
     if (rRaw || pRaw) {
       try {
         const parsed = rRaw ? JSON.parse(rRaw) : null
         const migrated = migrateContractCostCheckSheet(parsed, pRaw || undefined)
-        if (migrated) sheet.value = migrated
+        if (migrated) {
+          const beforeCount = Array.isArray(parsed?.samples)
+            ? parsed.samples.length
+            : (Array.isArray(parsed) ? parsed.length : 0)
+          sheet.value = migrated
+          if (!readonly.value && beforeCount > migrated.samples.length) {
+            opts.allResponses.value.set(ROWS_KEY, {
+              item_id: ROWS_KEY,
+              conclusion: null,
+              remark: JSON.stringify(migrated),
+            })
+            if (debounceTimer) clearTimeout(debounceTimer)
+            debounceTimer = setTimeout(() => {
+              debounceTimer = null
+              flushSave()
+            }, 300)
+          }
+        }
       } catch { /* ignore */ }
     }
     auditNote.value = opts.allResponses.value.get(NOTE_KEY)?.remark || ''
@@ -232,22 +253,25 @@ export function useF2ContractCostCheck(opts: {
     if (fillMode === 'replace') {
       sheet.value = { ...sheet.value, samples: mapped }
     } else if (fillMode === 'merge') {
-      const existingNos = new Set(sheet.value.samples.map((r) => r.voucherNo).filter(Boolean))
+      const existing = pruneBlankContractCostCheckSamples(sheet.value.samples)
+        .filter((row) => row.voucherNo || row.projectName)
+      const existingNos = new Set(existing.map((r) => r.voucherNo).filter(Boolean))
       sheet.value = {
         ...sheet.value,
         samples: [
-          ...sheet.value.samples,
+          ...existing,
           ...mapped.filter((r) => !r.voucherNo || !existingNos.has(r.voucherNo)),
         ],
       }
     } else {
-      sheet.value = { ...sheet.value, samples: [...sheet.value.samples, ...mapped] }
+      const existing = sheet.value.samples.filter((row) => row.voucherNo || row.projectName)
+      sheet.value = { ...sheet.value, samples: [...existing, ...mapped] }
     }
     sheet.value = {
       ...sheet.value,
       sampling: {
         ...sheet.value.sampling,
-        sampleSize: sheet.value.samples.length,
+        sampleSize: sheet.value.samples.filter((row) => row.voucherNo || row.projectName).length,
         method: '抽凭引擎',
       },
     }

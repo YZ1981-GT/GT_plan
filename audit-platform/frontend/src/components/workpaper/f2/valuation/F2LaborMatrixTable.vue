@@ -39,7 +39,7 @@
               :controls="false"
               :disabled="isReadonly"
               class="compact-num"
-              @change="(v: number | undefined) => $emit('updateMonth', line.id, m.key, v ?? 0)"
+              @change="(v: number | undefined) => $emit('updateMonth', line.id, m.key as LaborMonthKey, v ?? 0)"
             />
             <span v-else class="auto">{{ fmtCell(monthValue(line, m.key)) }}</span>
           </td>

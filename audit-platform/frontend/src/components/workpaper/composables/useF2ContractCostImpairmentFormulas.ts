@@ -78,8 +78,26 @@ export function emptyImpairmentProject(): ContractCostImpairmentProject {
 
 export function defaultContractCostImpairmentSheet(): ContractCostImpairmentSheet {
   return {
-    projects: Array.from({ length: 8 }, () => emptyImpairmentProject()),
+    projects: [emptyImpairmentProject()],
   }
+}
+
+export function isBlankImpairmentProject(row: ContractCostImpairmentProject): boolean {
+  return !(row.projectCode || '').trim()
+    && !(row.projectName || '').trim()
+    && Number(row.bookBalance || 0) === 0
+    && Number(row.accumulatedProvision || 0) === 0
+    && Number(row.remainingConsideration || 0) === 0
+    && Number(row.estimatedFutureCosts || 0) === 0
+    && Number(row.companyRecordedProvision || 0) === 0
+    && !(row.remark || '').trim()
+}
+
+export function pruneBlankImpairmentProjects(
+  rows: ContractCostImpairmentProject[],
+): ContractCostImpairmentProject[] {
+  const filled = rows.filter((row) => !isBlankImpairmentProject(row))
+  return filled.length ? filled : [emptyImpairmentProject()]
 }
 
 export function calcBookValue(bookBalance: number, accumulatedProvision: number): number {
@@ -174,18 +192,22 @@ export function migrateContractCostImpairmentSheet(legacy: unknown): ContractCos
   if (typeof legacy === 'object' && legacy !== null && 'projects' in legacy) {
     const s = legacy as ContractCostImpairmentSheet
     return {
-      projects: s.projects?.length ? s.projects : sheet.projects,
+      projects: pruneBlankImpairmentProjects(
+        s.projects?.length ? s.projects : sheet.projects,
+      ),
     }
   }
 
   if (Array.isArray(legacy) && legacy.length) {
     const first = legacy[0] as Record<string, unknown>
     if ('bookBalance' in first || 'remainingConsideration' in first) {
-      sheet.projects = (legacy as ContractCostImpairmentProject[]).map((r) => ({
-        ...emptyImpairmentProject(),
-        ...r,
-        id: r.id || newContractCostImpairmentId(),
-      }))
+      sheet.projects = pruneBlankImpairmentProjects(
+        (legacy as ContractCostImpairmentProject[]).map((r) => ({
+          ...emptyImpairmentProject(),
+          ...r,
+          id: r.id || newContractCostImpairmentId(),
+        })),
+      )
       return sheet
     }
 

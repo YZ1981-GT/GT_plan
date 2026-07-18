@@ -1,7 +1,7 @@
 /**
  * useF4ImportExport — F4 应付账款导入导出（比照 useF3ImportExport）
  *
- * 7张动态行表格：F4-2/F4-3/F4-5/F4-6/F4-7(purchase/inbound/invoice)/F4-8(debit/credit)/F4-9(factoring/note/supply)
+ * 7张动态行表格：F4-2/F4-3/F4-5/F4-6/F4-7(五段)/F4-8(debit/credit)/F4-9
  * Spec: .kiro/specs/f4-accounts-payable/ Task 8.2
  */
 import { ref, type Ref } from 'vue'
@@ -9,18 +9,20 @@ import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 
 export type F4ImportableSheet =
+  | 'F4-1-nature'
+  | 'F4-1-aging'
   | 'F4-2'
   | 'F4-3'
   | 'F4-5'
   | 'F4-6'
-  | 'F4-7-purchase'
-  | 'F4-7-inbound'
-  | 'F4-7-invoice'
+  | 'F4-7-payment-window'
+  | 'F4-7-estimated-inbound'
+  | 'F4-7-unprocessed-invoice'
+  | 'F4-7-subsequent-payment'
+  | 'F4-7-subsequent-increase'
   | 'F4-8-debit'
   | 'F4-8-credit'
-  | 'F4-9-factoring'
-  | 'F4-9-note'
-  | 'F4-9-supply'
+  | 'F4-9'
 
 export interface F4ImportResult {
   rowCount: number

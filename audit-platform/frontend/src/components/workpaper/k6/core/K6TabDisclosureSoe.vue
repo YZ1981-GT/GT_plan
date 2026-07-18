@@ -143,23 +143,6 @@
       />
     </el-card>
 
-    <!-- 审计说明+结论 -->
-    <el-card shadow="never" class="conclusion-card">
-      <template #header>
-        <div class="section-card-header">
-          <span>审计说明与结论</span>
-        </div>
-      </template>
-      <el-input
-        v-model="auditConclusion"
-        :disabled="isReadonly"
-        type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }"
-        placeholder="附注披露完整性和准确性审计结论"
-        @blur="handleConclusionSave"
-      />
-    </el-card>
-
     <!-- 编制提示 -->
     <details class="k6-details-tip">
       <summary>编制提示</summary>
@@ -187,7 +170,6 @@
  * - Same pattern as Listed but different dimensions
  */
 import { ref, onMounted, onBeforeUnmount, inject } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 
 const K6_ACCOUNT_CODE = '1481'
@@ -237,7 +219,6 @@ interface LiabSoeRow {
 const assetSummary = ref<AssetSoeRow[]>([])
 const liabilitySummary = ref<LiabSoeRow[]>([])
 const narrativeText = ref('')
-const auditConclusion = ref('')
 const hasAutoData = ref(false)
 
 // ─── Init ────────────────────────────────────────────────────────────────────
@@ -323,7 +304,6 @@ function loadSavedData(): void {
   if (savedNarrative?.remark) narrativeText.value = savedNarrative.remark
 
   const savedConclusion = props.allResponses.get('K6-disclosure-soe-conclusion')
-  if (savedConclusion?.remark) auditConclusion.value = savedConclusion.remark
 }
 
 function applyAutoFill(): void {
@@ -390,7 +370,6 @@ function handleNarrativeSave(): void {
 }
 
 function handleConclusionSave(): void {
-  emit('save', 'K6-disclosure-soe-conclusion', { remark: auditConclusion.value })
 }
 
 function handleAiGenerate(): void {

@@ -183,32 +183,6 @@
       </div>
     </el-card>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><span>审计说明</span></template>
-      <el-input
-        v-model="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 5 }"
-        :disabled="isReadonly"
-        placeholder="记录商誉附注披露的审计说明（各披露项数据来源、与审定表/减值测试底稿的勾稽核对等）..."
-        @change="saveAuditNote"
-      />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><span>审计结论</span></template>
-      <el-input
-        v-model="auditConclusion"
-        type="textarea"
-        :autosize="{ minRows: 3 }"
-        :disabled="isReadonly"
-        placeholder="商誉附注披露的审计结论（如：披露内容完整、准确，符合国有企业报表附注列报要求）..."
-        @change="saveAuditConclusion"
-      />
-    </el-card>
-
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -245,7 +219,7 @@
  * Spec: .kiro/specs/i3-goodwill/
  * Task: 4.10
  */
-import { ref, computed, inject, toRef, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, inject, toRef, onMounted, onUnmounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import {
   useI3Disclosure,
@@ -384,35 +358,6 @@ function handleMatrixEdit(sectionKey: string, rowId: string, field: string, valu
 function handleNoteChange(sectionKey: string) {
   saveSectionNote(sectionKey, sectionNotes.value[sectionKey] ?? '')
 }
-
-// ─── 审计说明 / 审计结论（纯文本，无AI） ─────────────────────────────────────
-
-const NOTE_KEY = 'I3-disc-soe-audit-note'
-const CONCLUSION_KEY = 'I3-disc-soe-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-
-function saveAuditNote(val: string) {
-  if (props.isReadonly) return
-  auditNote.value = val
-  emit('save', NOTE_KEY, val)
-}
-function saveAuditConclusion(val: string) {
-  if (props.isReadonly) return
-  auditConclusion.value = val
-  emit('save', CONCLUSION_KEY, val)
-}
-
-watch(
-  () => props.allResponses,
-  () => {
-    const n = props.allResponses.get(NOTE_KEY)
-    if (n?.remark != null) auditNote.value = n.remark
-    const c = props.allResponses.get(CONCLUSION_KEY)
-    if (c?.remark != null) auditConclusion.value = c.remark
-  },
-  { immediate: true },
-)
 
 // ─── Review dialog ───────────────────────────────────────────────────────────
 

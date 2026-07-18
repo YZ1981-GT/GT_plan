@@ -12,6 +12,7 @@ import {
   calcAllocationTotals,
   migrateAllocationSheet,
   emptyAllocationProduct,
+  isBlankAllocationProduct,
   type CostAllocationSheet,
   type CostAllocationProduct,
   type CostAllocationPool,
@@ -30,13 +31,46 @@ export function useF2CostAllocation(opts: {
   const sheet = ref<CostAllocationSheet>(defaultAllocationSheet())
   const auditNote = ref('')
 
+  function flushSave(): void {
+    const items = [
+      opts.allResponses.value.get(ROWS_KEY),
+      opts.allResponses.value.get(NOTE_KEY),
+    ].filter(Boolean)
+    if (items.length) window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items } }))
+  }
+
+  function debounceSave(): void {
+    if (debounceTimer) clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      flushSave()
+    }, 2000)
+  }
+
   function load(): void {
     const raw = readValRowJson(opts.allResponses.value.get(ROWS_KEY))
+    // 自回声守卫：persist() 写回后 watcher 会再次触发 load，
+    // 若内容与内存一致则跳过，避免 migrate 的空行裁剪吃掉刚新增的空行。
+    if (raw && raw === JSON.stringify(sheet.value)) return
     if (raw) {
       try {
         const parsed = JSON.parse(raw)
         const migrated = migrateAllocationSheet(parsed)
-        if (migrated) sheet.value = migrated
+        if (migrated) {
+          const beforeCount = Array.isArray(parsed?.products)
+            ? parsed.products.length
+            : (Array.isArray(parsed) ? parsed.length : 0)
+          sheet.value = migrated
+          // 裁掉历史预留空行后写回，避免刷新又还原
+          if (!readonly.value && beforeCount > migrated.products.length) {
+            opts.allResponses.value.set(ROWS_KEY, {
+              item_id: ROWS_KEY,
+              conclusion: null,
+              remark: JSON.stringify(migrated),
+            })
+            debounceSave()
+          }
+        }
       } catch { /* ignore */ }
     }
     auditNote.value = opts.allResponses.value.get(NOTE_KEY)?.remark || ''
@@ -79,26 +113,29 @@ export function useF2CostAllocation(opts: {
     return diff > 0.01 && poolTotal.value > 0
   })
 
-  function flushSave(): void {
-    const items = [
-      opts.allResponses.value.get(ROWS_KEY),
-      opts.allResponses.value.get(NOTE_KEY),
-    ].filter(Boolean)
-    if (items.length) window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items } }))
-  }
-
-  function persist(): void {
+  function persist(immediate = false): void {
     if (readonly.value) return
+    const remark = JSON.stringify(sheet.value)
+    const prev = opts.allResponses.value.get(ROWS_KEY)?.remark
+    // 内容未变则跳过，避免输入框失焦/点删除时重复提交相同 PUT（会被 HTTP 去重 abort 并误报保存失败）
+    if (prev === remark) {
+      if (immediate) flushSave()
+      return
+    }
     opts.allResponses.value.set(ROWS_KEY, {
       item_id: ROWS_KEY,
       conclusion: null,
-      remark: JSON.stringify(sheet.value),
+      remark,
     })
-    if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => {
-      debounceTimer = null
+    if (immediate) {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer)
+        debounceTimer = null
+      }
       flushSave()
-    }, 2000)
+    } else {
+      debounceSave()
+    }
   }
 
   function updateSheet(patch: Partial<CostAllocationSheet>): void {
@@ -115,9 +152,19 @@ export function useF2CostAllocation(opts: {
 
   function updateProduct(id: string, patch: Partial<CostAllocationProduct>): void {
     if (readonly.value) return
+    const cur = sheet.value.products.find((p) => p.id === id)
+    if (!cur) return
+    const next = { ...cur, ...patch }
+    if (
+      next.productName === cur.productName
+      && next.outputQty === cur.outputQty
+      && next.bookUnitCost === cur.bookUnitCost
+      && next.allocationBase === cur.allocationBase
+      && next.baseNote === cur.baseNote
+    ) return
     sheet.value = {
       ...sheet.value,
-      products: sheet.value.products.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+      products: sheet.value.products.map((p) => (p.id === id ? next : p)),
     }
     persist()
   }
@@ -132,22 +179,30 @@ export function useF2CostAllocation(opts: {
   }
 
   function removeProduct(id: string): void {
-    if (readonly.value || sheet.value.products.length <= 1) return
+    if (readonly.value) return
+    if (sheet.value.products.length <= 1) {
+      const only = sheet.value.products[0]
+      if (!only || only.id !== id || isBlankAllocationProduct(only)) return
+      sheet.value = {
+        ...sheet.value,
+        products: [emptyAllocationProduct()],
+      }
+      persist(true)
+      return
+    }
     sheet.value = {
       ...sheet.value,
       products: sheet.value.products.filter((p) => p.id !== id),
     }
-    persist()
+    persist(true)
   }
 
   watch(auditNote, (val) => {
     if (readonly.value) return
+    const prev = opts.allResponses.value.get(NOTE_KEY)?.remark || ''
+    if (prev === val) return
     opts.allResponses.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
-    if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => {
-      debounceTimer = null
-      flushSave()
-    }, 2000)
+    debounceSave()
   })
 
   onBeforeUnmount(() => {

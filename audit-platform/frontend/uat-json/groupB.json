@@ -1,0 +1,1213 @@
+{
+  "config": {
+    "configFile": "D:\\GT_plan\\audit-platform\\frontend\\playwright-uat.config.ts",
+    "rootDir": "D:/GT_plan/audit-platform/frontend/e2e-uat",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "D:/GT_plan/audit-platform/frontend/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "D:/GT_plan/audit-platform/frontend/e2e-uat",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 60000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "evidence-governance-ai-review-archive-hold.spec.ts",
+      "file": "evidence-governance-ai-review-archive-hold.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Task 10.4 前置 — 环境与治理网络契约基线",
+          "file": "evidence-governance-ai-review-archive-hold.spec.ts",
+          "line": 141,
+          "column": 6,
+          "specs": [
+            {
+              "title": "登录成功并可读取 openapi",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 600,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:53.361Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a3616d2c7227fd76f8e9-331d548f7b1d72b26450",
+              "file": "evidence-governance-ai-review-archive-hold.spec.ts",
+              "line": 142,
+              "column": 3
+            },
+            {
+              "title": "四个治理域 HTTP 契约均已挂载（AI-gate / Review / Archive / Legal-Hold）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 277,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:53.984Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a3616d2c7227fd76f8e9-f07b8b1b048fd2cb017b",
+              "file": "evidence-governance-ai-review-archive-hold.spec.ts",
+              "line": 148,
+              "column": 3
+            },
+            {
+              "title": "login 页 UI 可达（浏览器可见流程存在）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 405,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:54.270Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a3616d2c7227fd76f8e9-85ef4619ccad356ae635",
+              "file": "evidence-governance-ai-review-archive-hold.spec.ts",
+              "line": 170,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "UAT-10 AI 全入口门禁",
+          "file": "evidence-governance-ai-review-archive-hold.spec.ts",
+          "line": 183,
+          "column": 6,
+          "specs": [
+            {
+              "title": "AI 生成未人工确认 → 资格 blocked(NOT_CONFIRMED)；确认后 eligible；FormalOutput watermark 门禁",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 340,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:54.768Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a3616d2c7227fd76f8e9-f9233936c98eed9e699d",
+              "file": "evidence-governance-ai-review-archive-hold.spec.ts",
+              "line": 184,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "UAT-11 QC/EQCR 再复核",
+          "file": "evidence-governance-ai-review-archive-hold.spec.ts",
+          "line": 284,
+          "column": 6,
+          "specs": [
+            {
+              "title": "绑定非 stale 证据关闭复核 → 停用证据自动重开(re_review_required) + completion-block=true",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 488,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:55.115Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a3616d2c7227fd76f8e9-b74d41ac8fa54b216340",
+              "file": "evidence-governance-ai-review-archive-hold.spec.ts",
+              "line": 285,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "UAT-12 归档完整性（失败才有 blocking report / 成功离线验签）",
+          "file": "evidence-governance-ai-review-archive-hold.spec.ts",
+          "line": 383,
+          "column": 6,
+          "specs": [
+            {
+              "title": "clean 集合归档成功且无 blocking report + 离线验签通过；篡改封存包验签失败并给出差异",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 298,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:55.609Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a3616d2c7227fd76f8e9-312ef38b107e006d5fe4",
+              "file": "evidence-governance-ai-review-archive-hold.spec.ts",
+              "line": 384,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "UAT-13 删除清理覆盖无绕过（一票否决）",
+          "file": "evidence-governance-ai-review-archive-hold.spec.ts",
+          "line": 448,
+          "column": 6,
+          "specs": [
+            {
+              "title": "active hold 下 覆盖=423 LEGAL_HOLD_ACTIVE 零效果 + purge 四条件 allowed=false delta=0",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 630,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:55.913Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a3616d2c7227fd76f8e9-5d97d3028d2477401cde",
+              "file": "evidence-governance-ai-review-archive-hold.spec.ts",
+              "line": 449,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "evidence-governance-attachment-ref-uat.spec.ts",
+      "file": "evidence-governance-attachment-ref-uat.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Task 10.2 前置 — 环境与附件/引用网络契约基线",
+          "file": "evidence-governance-attachment-ref-uat.spec.ts",
+          "line": 229,
+          "column": 6,
+          "specs": [
+            {
+              "title": "登录成功并可读取 openapi",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 262,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:56.575Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4ae9e1625eabb416934e-e30581c32afe99f25d70",
+              "file": "evidence-governance-attachment-ref-uat.spec.ts",
+              "line": 230,
+              "column": 3
+            },
+            {
+              "title": "login 页 UI 可达（浏览器可见流程存在）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 406,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:56.843Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4ae9e1625eabb416934e-aab3027480e5fdb1280e",
+              "file": "evidence-governance-attachment-ref-uat.spec.ts",
+              "line": 236,
+              "column": 3
+            },
+            {
+              "title": "治理 attachments / EvidenceRef / impact 路由均已接入 router（openapi 事实源）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 271,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[10.2] wired evidence paths:\n"
+                        },
+                        {
+                          "text": "    /api/evidence-governance/metrics\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/workpapers/{wp_id}/evidence\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/workpapers/{wp_id}/evidence/batch-link\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/workpapers/{wp_id}/evidence/link\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/workpapers/{wp_id}/evidence/sufficiency\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/workpapers/{wp_id}/evidence/{link_id}\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/ai/formal-output/finalize\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/ai/formal-output/preflight\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/ai/generations\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/ai/generations/{content_id}\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/ai/generations/{content_id}/confirm\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/ai/generations/{content_id}/eligibility\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/ai/generations/{content_id}/reject\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/ai/generations/{content_id}/revise\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/archive/manifests\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/archive/manifests/{manifest_id}\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/archive/preflight\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/archive/verify\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/attachments\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/attachments/versions/{version_id}/content\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/attachments/{attachment_id}/content\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/attachments/{attachment_id}/impact\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/attachments/{attachment_id}/versions\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/citations\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/citations/validate\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/citations/{citation_id}/locate\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/commands/{command_root_id}\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/legal-holds\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/legal-holds/purge-jobs\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/legal-holds/{hold_id}/release\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/legal-holds/{hold_id}/scope\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/ocr/jobs\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/ocr/jobs/{job_id}\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/ocr/jobs/{job_id}/results/{result_id}\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/ocr/jobs/{job_id}/results/{result_id}/confirmations\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/ocr/jobs/{job_id}/results/{result_id}/mapping\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/ocr/jobs/{job_id}/results/{result_id}/writeback\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/ocr/jobs/{job_id}/retry\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/ocr/jobs/{job_id}/timeline\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/refs/impact\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/refs/references\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/refs/references/{ref_id}\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/refs/references/{ref_id}/deactivate\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/reviews/completion-block\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/reviews/{review_id}\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/reviews/{review_id}/close\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/reviews/{review_id}/evidence\n"
+                        },
+                        {
+                          "text": "    /api/projects/{project_id}/years/{year}/evidence/reviews/{review_id}/reopen\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:57.256Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4ae9e1625eabb416934e-d373899efb5d632cc417",
+              "file": "evidence-governance-attachment-ref-uat.spec.ts",
+              "line": 245,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "UAT-04 附件版本/影响/stale",
+          "file": "evidence-governance-attachment-ref-uat.spec.ts",
+          "line": 286,
+          "column": 6,
+          "specs": [
+            {
+              "title": "治理安全上传创建版本 + 按版本安全读取（version_no=1 / hash 绑定 / opaque locator）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 290,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:57.533Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4ae9e1625eabb416934e-ffd56e3b1abaa5049eb0",
+              "file": "evidence-governance-attachment-ref-uat.spec.ts",
+              "line": 288,
+              "column": 3
+            },
+            {
+              "title": "影响范围(impact/UnifiedGraph)查询网络契约可用（200 + {nodes,total_visited,truncated}）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 202,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:57.829Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4ae9e1625eabb416934e-dbd3dbd9574b2c35d622",
+              "file": "evidence-governance-attachment-ref-uat.spec.ts",
+              "line": 317,
+              "column": 3
+            },
+            {
+              "title": "创建 ref → impact 起点返回下游节点与 path（统一图影响路径反映绑定）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 400,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:58.037Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4ae9e1625eabb416934e-1220b7ea583bf3b6a5b1",
+              "file": "evidence-governance-attachment-ref-uat.spec.ts",
+              "line": 344,
+              "column": 3
+            },
+            {
+              "title": "替换附件 → vN+1(version_no=2) / 旧 v1 快照 bytes·hash 不变(immutable) / impact 反映变更（端到端）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 366,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:58.445Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4ae9e1625eabb416934e-57dc6f97a4be9234a27c",
+              "file": "evidence-governance-attachment-ref-uat.spec.ts",
+              "line": 380,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "UAT-05 EvidenceRef 重启持久与双向查询",
+          "file": "evidence-governance-attachment-ref-uat.spec.ts",
+          "line": 447,
+          "column": 6,
+          "specs": [
+            {
+              "title": "admin 同 scope 创建 EvidenceRef → 201 落库（诚实门 B 已解除）+ 畸形入参干净 4xx",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 401,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[10.2 UAT-05] ref created id=758dd0cd-4138-4254-8928-a417f3046247 dep=baaa1281-dabb-4cf4-a4d4-fe4bab821b0d\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:58.817Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4ae9e1625eabb416934e-c1724847fea1772608c9",
+              "file": "evidence-governance-attachment-ref-uat.spec.ts",
+              "line": 448,
+              "column": 3
+            },
+            {
+              "title": "双向查询一致（source 与 evidence 方向均 200 + shape + P8 子集不变量）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 211,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:59.227Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4ae9e1625eabb416934e-55aa7dd95a6c762523da",
+              "file": "evidence-governance-attachment-ref-uat.spec.ts",
+              "line": 491,
+              "column": 3
+            },
+            {
+              "title": "单条引用详情脱敏（不存在→干净 404 SCOPE_NOT_FOUND_OR_FORBIDDEN，绝不 5xx）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 198,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:59.443Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4ae9e1625eabb416934e-8840d7e9e7d80ae2d874",
+              "file": "evidence-governance-attachment-ref-uat.spec.ts",
+              "line": 530,
+              "column": 3
+            },
+            {
+              "title": "新会话(重启代理)再查双向端点契约与持久层稳定一致",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 396,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:59.647Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4ae9e1625eabb416934e-591d2bfe28deb98e5c15",
+              "file": "evidence-governance-attachment-ref-uat.spec.ts",
+              "line": 552,
+              "column": 3
+            },
+            {
+              "title": "创建的 ref 经新会话(重启代理)后 id/version/status 与双向视图不变",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 594,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:39:00.049Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4ae9e1625eabb416934e-5a3b23bcdea29064d658",
+              "file": "evidence-governance-attachment-ref-uat.spec.ts",
+              "line": 586,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "evidence-governance-migration-capacity-uat.spec.ts",
+      "file": "evidence-governance-migration-capacity-uat.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "UAT-14 迁移兼容（R14）",
+          "file": "evidence-governance-migration-capacity-uat.spec.ts",
+          "line": 78,
+          "column": 6,
+          "specs": [
+            {
+              "title": "UAT-14.1 opaque locator — 附件兼容响应 file_path 不返回绝对路径 (C3)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 96,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:39:00.672Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8e9dd712870b1f96f021-ea8de884c5d52c2f89fb",
+              "file": "evidence-governance-migration-capacity-uat.spec.ts",
+              "line": 79,
+              "column": 3
+            },
+            {
+              "title": "UAT-14.2 legacy alias — 旧读取接口经 alias 稳定解析",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "无测试专用 legacy-alias fixture/种子附件，且无浏览器可达的 alias 解析 UI；alias 稳定性由后端 LegacyAttachmentResolver 契约与 PG 集成证明（design §10.2 第 3/4 层）。",
+                      "location": {
+                        "file": "D:\\GT_plan\\audit-platform\\frontend\\e2e-uat\\evidence-governance-migration-capacity-uat.spec.ts",
+                        "line": 125,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:39:00.963Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "无测试专用 legacy-alias fixture/种子附件，且无浏览器可达的 alias 解析 UI；alias 稳定性由后端 LegacyAttachmentResolver 契约与 PG 集成证明（design §10.2 第 3/4 层）。",
+                          "location": {
+                            "file": "D:\\GT_plan\\audit-platform\\frontend\\e2e-uat\\evidence-governance-migration-capacity-uat.spec.ts",
+                            "line": 125,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e9dd712870b1f96f021-315fcab62f53152d3371",
+              "file": "evidence-governance-migration-capacity-uat.spec.ts",
+              "line": 121,
+              "column": 3
+            },
+            {
+              "title": "UAT-14.3 中断重跑 backfill — 无重复对象",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "中断重跑无重复对象 = P28 迁移幂等守恒，由 crash-point PBT + 真实 PG16 证明；未暴露 backfill 对象计数只读 API，Playwright 侧不做该 DB 断言（避免假绿）。",
+                      "location": {
+                        "file": "D:\\GT_plan\\audit-platform\\frontend\\e2e-uat\\evidence-governance-migration-capacity-uat.spec.ts",
+                        "line": 136,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:39:00.969Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "中断重跑无重复对象 = P28 迁移幂等守恒，由 crash-point PBT + 真实 PG16 证明；未暴露 backfill 对象计数只读 API，Playwright 侧不做该 DB 断言（避免假绿）。",
+                          "location": {
+                            "file": "D:\\GT_plan\\audit-platform\\frontend\\e2e-uat\\evidence-governance-migration-capacity-uat.spec.ts",
+                            "line": 136,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "8e9dd712870b1f96f021-9d6ed4f121779183efb8",
+              "file": "evidence-governance-migration-capacity-uat.spec.ts",
+              "line": 132,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "UAT-15 用户可见背压降级 + 6000 VU 关联（R15/P29，一票否决）",
+          "file": "evidence-governance-migration-capacity-uat.spec.ts",
+          "line": 148,
+          "column": 6,
+          "specs": [
+            {
+              "title": "UAT-15.1 用户可见降级/背压状态 — 治理可观测性网络契约可达且结构完整",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 16,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:39:00.977Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8e9dd712870b1f96f021-d6af0ae6198c0cca85a1",
+              "file": "evidence-governance-migration-capacity-uat.spec.ts",
+              "line": 149,
+              "column": 3
+            },
+            {
+              "title": "UAT-15.2 关联 8.2 6000 VU chaos 容量报告契约（不在浏览器内跑 6000 VU）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 7,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:39:00.999Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8e9dd712870b1f96f021-5aaa7fbf47cf5bcde636",
+              "file": "evidence-governance-migration-capacity-uat.spec.ts",
+              "line": 173,
+              "column": 3
+            },
+            {
+              "title": "UAT-15.3 Playwright 边界自证 — 本 suite 不模拟 6000 并发",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 60000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:39:01.011Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "8e9dd712870b1f96f021-b80c64cedbee714475e6",
+              "file": "evidence-governance-migration-capacity-uat.spec.ts",
+              "line": 210,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-16T15:38:52.902Z",
+    "duration": 8215.076000000001,
+    "expected": 23,
+    "skipped": 2,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

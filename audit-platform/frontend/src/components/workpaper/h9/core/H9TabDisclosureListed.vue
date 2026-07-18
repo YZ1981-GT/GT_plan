@@ -79,36 +79,6 @@
       />
     </el-card>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>
-        <div class="section-title"><span>审计说明</span></div>
-      </template>
-      <el-input
-        v-model="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 5 }"
-        :readonly="isReadonly"
-        placeholder="请填写附注披露的审计说明：披露口径、分类依据、与审定表勾稽核对情况等..."
-        @change="saveAuditNote"
-      />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>
-        <div class="section-title"><span>审计结论</span></div>
-      </template>
-      <el-input
-        v-model="auditConclusion"
-        type="textarea"
-        :autosize="{ minRows: 3 }"
-        :readonly="isReadonly"
-        placeholder="请填写附注披露的审计结论..."
-        @change="saveAuditConclusion"
-      />
-    </el-card>
-
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -161,8 +131,6 @@ const defaultRows: DisclosureRow[] = [
 
 const tableRows = ref<DisclosureRow[]>([])
 const interestNote = ref('')
-const auditNote = ref('')
-const auditConclusion = ref('')
 
 // 计算合计行
 const summaryRows = computed(() => {
@@ -192,9 +160,7 @@ function loadFromResponses() {
     tableRows.value = [...defaultRows]
   }
   const noteItem = props.allResponses.get('H9-disc-listed-audit-note')
-  auditNote.value = noteItem?.remark ?? noteItem?.conclusion ?? ''
   const conclusionItem = props.allResponses.get('H9-disc-listed-audit-conclusion')
-  auditConclusion.value = conclusionItem?.remark ?? conclusionItem?.conclusion ?? ''
 }
 
 // --- 保存 ---
@@ -204,14 +170,6 @@ function onDataChange() {
 
 function saveInterestNote() {
   saveAll()
-}
-
-function saveAuditNote() {
-  emit('save', 'H9-disc-listed-audit-note', auditNote.value)
-}
-
-function saveAuditConclusion() {
-  emit('save', 'H9-disc-listed-audit-conclusion', auditConclusion.value)
 }
 
 function saveAll() {
@@ -253,7 +211,6 @@ watch(() => props.allResponses, loadFromResponses, { deep: true })
 .h9-tab-disclosure-listed { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .objective-alert { margin-bottom: 12px; }
-.audit-note-card { margin-bottom: 16px; }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;

@@ -20,8 +20,8 @@ import {
   type AgingSegment,
 } from '../useAgingConfig'
 
-const THREE_PERIOD = ['D2', 'K1', 'K3', 'G5'] as const
-const TWO_PERIOD = ['D3', 'F1'] as const
+const THREE_PERIOD = ['D2', 'K1', 'K3', 'G5', 'F1'] as const
+const TWO_PERIOD = ['D3'] as const
 
 /** Generate N segments (2..10) with unique keys and derived labels. */
 function segmentsArb(min = 2, max = 10): fc.Arbitrary<AgingSegment[]> {
@@ -66,7 +66,7 @@ describe('buildAgingExportHeaders — Property 12: Export header generation from
     )
   })
 
-  it('two-period subjects (D3/F1) produce 2N headers with only prior + audited prefixes', () => {
+  it('two-period subjects (D3) produce 2N headers with only prior + audited prefixes', () => {
     // Feature: aging-config-enhancement, Property 12: Export header generation from bands
     // **Validates: Requirements 8.1**
     fc.assert(

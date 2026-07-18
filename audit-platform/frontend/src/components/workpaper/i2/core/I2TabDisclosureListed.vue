@@ -101,20 +101,11 @@
       <el-button size="small" type="success" @click="handleSave">保存</el-button>
     </div>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><span>审计说明</span></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }" placeholder="记录审计过程、发现的问题及处理..." @change="saveAuditNote" />
-    </el-card>
-    <el-card shadow="never" class="audit-conclusion-card">
-      <template #header><span>审计结论</span></template>
-      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }" placeholder="填写审计结论..." @change="saveAuditConclusion" />
-    </el-card>
-  </div>
+      </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, inject, onMounted } from 'vue'
+import { ref, watch, inject } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 

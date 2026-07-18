@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
  * F2TabOverallAnalysis — F2-18 存货总体分析表
  * A 构成 / B 指标三期 / C 同行业 / D 产品大类周转 + 分段说明 + 结论
@@ -6,11 +6,21 @@
 import { toRef, type Ref } from 'vue'
 import { useF2OverallAnalysis } from '../../composables/useF2OverallAnalysis'
 import { useF2AiGenerate } from '../../composables/useF2AiGenerate'
+import { useStickySectionNav } from '../../composables/useStickySectionNav'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
 import type { useF2CrossSheet } from '../../composables/useF2CrossSheet'
 import F2ReviewChip from '../shared/F2ReviewChip.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
+
+const oaNav = [
+  { id: 'st-oa-a', label: 'A 构成' },
+  { id: 'st-oa-b', label: 'B 指标' },
+  { id: 'st-oa-c', label: 'C 同行业' },
+  { id: 'st-oa-d', label: 'D 周转' },
+  { id: 'st-oa-conclusion', label: '结论' },
+]
+const { activeId, scrollTo } = useStickySectionNav(oaNav)
 
 const props = defineProps<{
   wpId: string
@@ -156,8 +166,19 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
       />
     </div>
 
+    <nav class="st-sec-nav oa-sec-nav" aria-label="分区导航">
+      <button
+        v-for="item in oaNav"
+        :key="item.id"
+        type="button"
+        class="st-sec-btn"
+        :class="{ active: activeId === item.id }"
+        @click="scrollTo(item.id)"
+      >{{ item.label }}</button>
+    </nav>
+
     <!-- A 构成 -->
-    <el-card shadow="never" class="block-card">
+    <el-card id="st-oa-a" shadow="never" class="block-card">
       <template #header><span class="block-title">一、存货构成分析（三期对比）</span></template>
       <el-table :data="compositionRows" border size="small">
         <el-table-column prop="label" label="存货项目" width="160" fixed />
@@ -170,7 +191,7 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
                 :controls="false"
                 size="small"
                 style="width: 100%"
-                @change="(v: number) => updateComposition(row.key, 'amt0', v ?? 0)"
+                @change="(v: number | undefined) => updateComposition(row.key, 'amt0', v ?? 0)"
               />
               <span v-else>{{ fmt(row.amt0) }}</span>
             </template>
@@ -188,7 +209,7 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
                 :controls="false"
                 size="small"
                 style="width: 100%"
-                @change="(v: number) => updateComposition(row.key, 'amt1', v ?? 0)"
+                @change="(v: number | undefined) => updateComposition(row.key, 'amt1', v ?? 0)"
               />
               <span v-else>{{ fmt(row.amt1) }}</span>
             </template>
@@ -206,7 +227,7 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
                 :controls="false"
                 size="small"
                 style="width: 100%"
-                @change="(v: number) => updateComposition(row.key, 'amt2', v ?? 0)"
+                @change="(v: number | undefined) => updateComposition(row.key, 'amt2', v ?? 0)"
               />
               <span v-else>{{ fmt(row.amt2) }}</span>
             </template>
@@ -273,7 +294,7 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
     </el-card>
 
     <!-- B 指标三期 -->
-    <el-card shadow="never" class="block-card">
+    <el-card id="st-oa-b" shadow="never" class="block-card">
       <template #header><span class="block-title">二、存货指标分析（三期数据对比）</span></template>
       <el-collapse>
         <el-collapse-item title="指标计算输入（营业成本/平均存货/跌价/流动资产/核销）" name="inputs">
@@ -283,27 +304,27 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
                 <strong>{{ yl }}</strong>
                 <label>营业成本
                   <el-input-number :model-value="inputVal(yi, 'cogs')" :controls="false" size="small" :disabled="isReadonly"
-                    @change="(v: number) => setInput(yi, 'cogs', v ?? 0)" />
+                    @change="(v: number | undefined) => setInput(yi, 'cogs', v ?? 0)" />
                 </label>
                 <label>平均存货
                   <el-input-number :model-value="inputVal(yi, 'invAvg')" :controls="false" size="small" :disabled="isReadonly"
-                    @change="(v: number) => setInput(yi, 'invAvg', v ?? 0)" />
+                    @change="(v: number | undefined) => setInput(yi, 'invAvg', v ?? 0)" />
                 </label>
                 <label>存货余额
                   <el-input-number :model-value="inputVal(yi, 'invBal')" :controls="false" size="small" :disabled="isReadonly"
-                    @change="(v: number) => setInput(yi, 'invBal', v ?? 0)" />
+                    @change="(v: number | undefined) => setInput(yi, 'invBal', v ?? 0)" />
                 </label>
                 <label>跌价准备
                   <el-input-number :model-value="inputVal(yi, 'impairment')" :controls="false" size="small" :disabled="isReadonly"
-                    @change="(v: number) => setInput(yi, 'impairment', v ?? 0)" />
+                    @change="(v: number | undefined) => setInput(yi, 'impairment', v ?? 0)" />
                 </label>
                 <label>平均流动资产
                   <el-input-number :model-value="inputVal(yi, 'caAvg')" :controls="false" size="small" :disabled="isReadonly"
-                    @change="(v: number) => setInput(yi, 'caAvg', v ?? 0)" />
+                    @change="(v: number | undefined) => setInput(yi, 'caAvg', v ?? 0)" />
                 </label>
                 <label>核销净额
                   <el-input-number :model-value="inputVal(yi, 'writeOff')" :controls="false" size="small" :disabled="isReadonly"
-                    @change="(v: number) => setInput(yi, 'writeOff', v ?? 0)" />
+                    @change="(v: number | undefined) => setInput(yi, 'writeOff', v ?? 0)" />
                 </label>
               </div>
             </template>
@@ -364,7 +385,7 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
     </el-card>
 
     <!-- C 同行业 -->
-    <el-card shadow="never" class="block-card">
+    <el-card id="st-oa-c" shadow="never" class="block-card">
       <template #header>
         <div class="card-header-flex">
           <span class="block-title">三、存货指标分析（与同行业数据对比）</span>
@@ -400,28 +421,28 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
         <el-table-column label="行业平均" width="100" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.industry" :controls="false" size="small" style="width:100%"
-              @change="(v: number) => updateIndustryPeer('avg', row.key, v ?? 0)" />
+              @change="(v: number | undefined) => updateIndustryPeer('avg', row.key, v ?? 0)" />
             <span v-else>{{ fmtInd(row.industry, row.unit) }}</span>
           </template>
         </el-table-column>
         <el-table-column :label="pack.industry.companyA.name || '公司A'" width="100" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.companyA" :controls="false" size="small" style="width:100%"
-              @change="(v: number) => updateIndustryPeer('companyA', row.key, v ?? 0)" />
+              @change="(v: number | undefined) => updateIndustryPeer('companyA', row.key, v ?? 0)" />
             <span v-else>{{ fmtInd(row.companyA, row.unit) }}</span>
           </template>
         </el-table-column>
         <el-table-column :label="pack.industry.companyB.name || '公司B'" width="100" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.companyB" :controls="false" size="small" style="width:100%"
-              @change="(v: number) => updateIndustryPeer('companyB', row.key, v ?? 0)" />
+              @change="(v: number | undefined) => updateIndustryPeer('companyB', row.key, v ?? 0)" />
             <span v-else>{{ fmtInd(row.companyB, row.unit) }}</span>
           </template>
         </el-table-column>
         <el-table-column :label="pack.industry.companyC.name || '公司C'" width="100" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.companyC" :controls="false" size="small" style="width:100%"
-              @change="(v: number) => updateIndustryPeer('companyC', row.key, v ?? 0)" />
+              @change="(v: number | undefined) => updateIndustryPeer('companyC', row.key, v ?? 0)" />
             <span v-else>{{ fmtInd(row.companyC, row.unit) }}</span>
           </template>
         </el-table-column>
@@ -450,7 +471,7 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
     </el-card>
 
     <!-- D 产品大类 -->
-    <el-card shadow="never" class="block-card">
+    <el-card id="st-oa-d" shadow="never" class="block-card">
       <template #header>
         <div class="card-header-flex">
           <span class="block-title">四、主要产品大类存货周转（三期对比）</span>
@@ -469,14 +490,14 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
           <el-table-column label="平均存货" width="110" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.avgInv0" :controls="false" size="small" style="width:100%"
-                @change="(v: number) => updateProduct(row.rowId, 'avgInv0', v ?? 0)" />
+                @change="(v: number | undefined) => updateProduct(row.rowId, 'avgInv0', v ?? 0)" />
               <span v-else>{{ fmt(row.avgInv0) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="营业成本" width="110" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.cogs0" :controls="false" size="small" style="width:100%"
-                @change="(v: number) => updateProduct(row.rowId, 'cogs0', v ?? 0)" />
+                @change="(v: number | undefined) => updateProduct(row.rowId, 'cogs0', v ?? 0)" />
               <span v-else>{{ fmt(row.cogs0) }}</span>
             </template>
           </el-table-column>
@@ -491,14 +512,14 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
           <el-table-column label="平均存货" width="100" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.avgInv1" :controls="false" size="small" style="width:100%"
-                @change="(v: number) => updateProduct(row.rowId, 'avgInv1', v ?? 0)" />
+                @change="(v: number | undefined) => updateProduct(row.rowId, 'avgInv1', v ?? 0)" />
               <span v-else>{{ fmt(row.avgInv1) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="营业成本" width="100" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.cogs1" :controls="false" size="small" style="width:100%"
-                @change="(v: number) => updateProduct(row.rowId, 'cogs1', v ?? 0)" />
+                @change="(v: number | undefined) => updateProduct(row.rowId, 'cogs1', v ?? 0)" />
               <span v-else>{{ fmt(row.cogs1) }}</span>
             </template>
           </el-table-column>
@@ -510,9 +531,9 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
           <template #default="{ row }">
             <div v-if="!isReadonly" class="mini-inputs">
               <el-input-number :model-value="row.avgInv2" :controls="false" size="small" placeholder="均存"
-                @change="(v: number) => updateProduct(row.rowId, 'avgInv2', v ?? 0)" />
+                @change="(v: number | undefined) => updateProduct(row.rowId, 'avgInv2', v ?? 0)" />
               <el-input-number :model-value="row.cogs2" :controls="false" size="small" placeholder="成本"
-                @change="(v: number) => updateProduct(row.rowId, 'cogs2', v ?? 0)" />
+                @change="(v: number | undefined) => updateProduct(row.rowId, 'cogs2', v ?? 0)" />
             </div>
             <span>{{ row.turnover2 ? row.turnover2.toFixed(2) : '-' }}</span>
           </template>
@@ -547,7 +568,7 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
     </el-card>
 
     <!-- 总体结论 -->
-    <el-card class="opinion-card audit-note-card" shadow="never">
+    <el-card id="st-oa-conclusion" class="opinion-card audit-note-card" shadow="never">
       <template #header>
         <div class="opinion-header">
           <span class="opinion-title">分析结论（四、审计结论）</span>
@@ -628,3 +649,5 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
 .opinion-actions { display: flex; gap: 6px; align-items: center; }
 .audit-note-card { margin-top: 16px; }
 </style>
+
+<style src="../stocktake/f2StocktakeSoftNav.css"></style>

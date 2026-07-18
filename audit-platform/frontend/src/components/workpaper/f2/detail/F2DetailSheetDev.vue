@@ -1,296 +1,532 @@
-<template>
+﻿<template>
   <div class="f2-dev-product">
-    <h3 class="sheet-title">开发产品明细表 F2-10</h3>
+    <header class="hero">
+      <div class="hero-main">
+        <h3 class="hero-title">开发产品明细表 F2-10</h3>
+        <el-tag size="small" effect="plain">科目 1408</el-tag>
+      </div>
+      <p class="hero-sub">（一）原值 ·（二）跌价准备 ·（三）净值 · 面积/单位成本/调整审定</p>
+    </header>
 
-    <!-- 编制提示 -->
-    <details class="guidance-details">
-      <summary>📋 编制提示</summary>
-      <div class="guidance-content">
-        <p>1. 本表列示开发产品（科目 1408）成本明细，按基础信息 / 土地 / 建安 / 资本化利息 / 其他+结转分区段（CAS 1301 存货）。</p>
-        <p>2. 灰色底纹列为自动计算列：各成本期末 = 期初 + 增加 − 减少；成本合计为各成本期末之和；存货净值 = 成本合计 − 结转转出。</p>
-        <p>3. 库龄合计 ≠ 存货净值的行标橙提示；长期积压行须关注可变现净值与跌价准备计提。</p>
-        <p>4. 结转转出对应已售面积的成本结转，应与销售成本确认勾稽核对。</p>
+    <details class="guidance">
+      <summary>编制提示</summary>
+      <div class="guidance-body">
+        <p>1. 按项目列示开发产品：总建筑面积、开工/竣工时间；原值含期初结存、期初调整、本期增减、期末结存与期末调整。</p>
+        <p>2. 灰色列为自动计算：期末面积/金额 = 期初 + 增加 − 减少；单位成本 = 金额 ÷ 面积；期初/期末审定 = 账面 + 账项调整 + 重分类调整。</p>
+        <p>3. 跌价准备按同一项目勾稽；净值 = 原值 − 跌价（账面与审定分列）。</p>
+        <p>4. 可用「原值 / 跌价 / 净值」切换视图；重大变动与跌价原因写入审计说明。</p>
       </div>
     </details>
 
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：核实开发产品成本归集（土地 / 建安 / 利息 / 其他）的完整与准确，验证成本结转与净值计价合理性，识别长期积压跌价风险。"
-      class="objective-alert"
+      show-icon
+      class="obj-alert"
+      title="审计目标：核实开发产品原值收发存与调整审定，验证跌价计提充分性，勾稽账面净值与审定净值。"
     />
 
-    <div class="tab-toolbar">
+    <div class="toolbar">
       <div class="toolbar-left">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="dev.addRow()">新增项目</el-button>
-        <span class="account-tag">科目 1408</span>
+        <el-input
+          v-model="dev.searchText.value"
+          size="small"
+          clearable
+          placeholder="搜索项目名称…"
+          class="search"
+        />
+        <el-radio-group v-model="dev.activeView.value" size="small">
+          <el-radio-button value="gross">（一）原值</el-radio-button>
+          <el-radio-button value="impairment">（二）跌价</el-radio-button>
+          <el-radio-button value="net">（三）净值</el-radio-button>
+        </el-radio-group>
       </div>
       <div class="toolbar-right">
-        <el-tag v-if="dev.agingMismatchCount.value > 0" type="warning" size="small">
-          {{ dev.agingMismatchCount.value }} 行库龄≠净值
-        </el-tag>
         <CycleImportExportDropdown
           :wp-id="wpId"
           api-prefix="f2"
           sheet="F2-10"
           :disabled="isReadonly"
+          @imported="onImported"
         />
-        <span class="chip-wrap"><GtIndexChip value="wp:F2-10" /></span>
+        <span class="chip"><GtIndexChip value="wp:F2-10" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ dev.enrichedRows.value.length }} 行</el-tag>
       </div>
     </div>
 
-    <el-segmented v-model="dev.activeSegment.value" :options="segmentOptions" size="small" class="segment-bar" />
+    <el-table :data="dev.filteredRows.value" border size="small" class="main-table" max-height="520">
+      <el-table-column type="index" label="序号" width="56" fixed />
+      <el-table-column label="项目名称" min-width="140" fixed>
+        <template #default="{ row }">
+          <el-input
+            :model-value="row.projectName"
+            size="small"
+            :disabled="isReadonly"
+            @change="(v: string) => dev.updateRow(row.id, { projectName: v })"
+          />
+        </template>
+      </el-table-column>
+      <el-table-column label="总建筑面积(㎡)" width="110">
+        <template #default="{ row }">
+          <el-input-number
+            :model-value="row.totalArea"
+            size="small"
+            :controls="false"
+            :disabled="isReadonly"
+            @change="(v: number | undefined) => dev.updateRow(row.id, { totalArea: v ?? 0 })"
+          />
+        </template>
+      </el-table-column>
+      <el-table-column label="开工时间" width="120">
+        <template #default="{ row }">
+          <el-input
+            :model-value="row.startDate"
+            size="small"
+            placeholder="YYYY-MM-DD"
+            :disabled="isReadonly"
+            @change="(v: string) => dev.updateRow(row.id, { startDate: v })"
+          />
+        </template>
+      </el-table-column>
+      <el-table-column label="竣工时间" width="120">
+        <template #default="{ row }">
+          <el-input
+            :model-value="row.completeDate"
+            size="small"
+            placeholder="YYYY-MM-DD"
+            :disabled="isReadonly"
+            @change="(v: string) => dev.updateRow(row.id, { completeDate: v })"
+          />
+        </template>
+      </el-table-column>
 
-    <el-table :data="dev.enrichedRows.value" border size="small" max-height="480"
-      :row-class-name="({ row }) => row.isLongTerm || row.agingMismatch ? 'warn-row' : ''">
-      <el-table-column prop="projectName" label="项目名称" width="140" fixed />
-
-      <template v-if="dev.activeSegment.value === 'basic'">
-        <el-table-column label="楼栋" width="90">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.buildingNo" size="small"
-              @change="(v: string) => dev.updateRow(row.id, { buildingNo: v })" />
-            <span v-else>{{ row.buildingNo }}</span>
-          </template>
+      <template v-if="dev.activeView.value === 'gross'">
+        <el-table-column label="期初结存(本币)" align="center">
+          <el-table-column label="面积" width="88">
+            <template #default="{ row }">
+              <el-input-number
+                :model-value="row.openArea"
+                size="small"
+                :controls="false"
+                :disabled="isReadonly"
+                @change="(v: number | undefined) => dev.updateRow(row.id, { openArea: v ?? 0 })"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="单位成本" width="88" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtPrice(row.openUnitCost) }}</span></template>
+          </el-table-column>
+          <el-table-column label="金额" width="110">
+            <template #default="{ row }">
+              <el-input-number
+                :model-value="row.openAmt"
+                size="small"
+                :controls="false"
+                :disabled="isReadonly"
+                @change="(v: number | undefined) => dev.updateRow(row.id, { openAmt: v ?? 0 })"
+              />
+            </template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column label="产品类型" width="100">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.productType" size="small"
-              @change="(v: string) => dev.updateRow(row.id, { productType: v })" />
-            <span v-else>{{ row.productType }}</span>
-          </template>
+        <el-table-column label="期初调整" align="center">
+          <el-table-column label="账项调整" width="100">
+            <template #default="{ row }">
+              <el-input-number
+                :model-value="row.openAdjAcct"
+                size="small"
+                :controls="false"
+                :disabled="isReadonly"
+                @change="(v: number | undefined) => dev.updateRow(row.id, { openAdjAcct: v ?? 0 })"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="重分类调整" width="100">
+            <template #default="{ row }">
+              <el-input-number
+                :model-value="row.openAdjReclass"
+                size="small"
+                :controls="false"
+                :disabled="isReadonly"
+                @change="(v: number | undefined) => dev.updateRow(row.id, { openAdjReclass: v ?? 0 })"
+              />
+            </template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column label="可售面积" width="100">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.area" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { area: v ?? 0 })" />
-          </template>
+        <el-table-column label="期初审定" align="center">
+          <el-table-column label="单位成本" width="88" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtPrice(row.openAudUnitCost) }}</span></template>
+          </el-table-column>
+          <el-table-column label="金额" width="110" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtAmt(row.openAudAmt) }}</span></template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column label="已售面积" width="100">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.soldArea" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { soldArea: v ?? 0 })" />
-          </template>
+        <el-table-column label="本期增加" align="center">
+          <el-table-column label="面积" width="88">
+            <template #default="{ row }">
+              <el-input-number
+                :model-value="row.incArea"
+                size="small"
+                :controls="false"
+                :disabled="isReadonly"
+                @change="(v: number | undefined) => dev.updateRow(row.id, { incArea: v ?? 0 })"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="单位成本" width="88" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtPrice(row.incUnitCost) }}</span></template>
+          </el-table-column>
+          <el-table-column label="金额" width="110">
+            <template #default="{ row }">
+              <el-input-number
+                :model-value="row.incAmt"
+                size="small"
+                :controls="false"
+                :disabled="isReadonly"
+                @change="(v: number | undefined) => dev.updateRow(row.id, { incAmt: v ?? 0 })"
+              />
+            </template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column label="套数" width="80">
+        <el-table-column label="本期减少" align="center">
+          <el-table-column label="面积" width="88">
+            <template #default="{ row }">
+              <el-input-number
+                :model-value="row.decArea"
+                size="small"
+                :controls="false"
+                :disabled="isReadonly"
+                @change="(v: number | undefined) => dev.updateRow(row.id, { decArea: v ?? 0 })"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="单位成本" width="88" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtPrice(row.decUnitCost) }}</span></template>
+          </el-table-column>
+          <el-table-column label="金额" width="110">
+            <template #default="{ row }">
+              <el-input-number
+                :model-value="row.decAmt"
+                size="small"
+                :controls="false"
+                :disabled="isReadonly"
+                @change="(v: number | undefined) => dev.updateRow(row.id, { decAmt: v ?? 0 })"
+              />
+            </template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="期末结存(本币)" align="center">
+          <el-table-column label="面积" width="88" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ row.closeArea }}</span></template>
+          </el-table-column>
+          <el-table-column label="单位成本" width="88" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtPrice(row.closeUnitCost) }}</span></template>
+          </el-table-column>
+          <el-table-column label="金额" width="110" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtAmt(row.closeAmt) }}</span></template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="期末调整" align="center">
+          <el-table-column label="账项调整" width="100">
+            <template #default="{ row }">
+              <el-input-number
+                :model-value="row.closeAdjAcct"
+                size="small"
+                :controls="false"
+                :disabled="isReadonly"
+                @change="(v: number | undefined) => dev.updateRow(row.id, { closeAdjAcct: v ?? 0 })"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="重分类调整" width="100">
+            <template #default="{ row }">
+              <el-input-number
+                :model-value="row.closeAdjReclass"
+                size="small"
+                :controls="false"
+                :disabled="isReadonly"
+                @change="(v: number | undefined) => dev.updateRow(row.id, { closeAdjReclass: v ?? 0 })"
+              />
+            </template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="期末审定" align="center">
+          <el-table-column label="单位成本" width="88" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtPrice(row.closeAudUnitCost) }}</span></template>
+          </el-table-column>
+          <el-table-column label="金额" width="110" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtAmt(row.closeAudAmt) }}</span></template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="品质状况" width="100">
           <template #default="{ row }">
-            <el-input-number :model-value="row.units" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { units: v ?? 0 })" />
+            <el-select
+              :model-value="row.qualityStatus"
+              size="small"
+              clearable
+              :disabled="isReadonly"
+              @change="(v: string) => dev.updateRow(row.id, { qualityStatus: v || '' })"
+            >
+              <el-option v-for="o in QUALITY" :key="o" :label="o" :value="o" />
+            </el-select>
           </template>
         </el-table-column>
       </template>
 
-      <template v-else-if="dev.activeSegment.value === 'land'">
-        <el-table-column label="土地-期初" width="100">
+      <template v-else-if="dev.activeView.value === 'impairment'">
+        <el-table-column label="未审数" align="center">
+          <el-table-column label="期初余额" width="100">
+            <template #default="{ row }">
+              <el-input-number
+                :model-value="row.impOpen"
+                size="small"
+                :controls="false"
+                :disabled="isReadonly"
+                @change="(v: number | undefined) => dev.updateRow(row.id, { impOpen: v ?? 0 })"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="本期增加" width="100">
+            <template #default="{ row }">
+              <el-input-number
+                :model-value="row.impInc"
+                size="small"
+                :controls="false"
+                :disabled="isReadonly"
+                @change="(v: number | undefined) => dev.updateRow(row.id, { impInc: v ?? 0 })"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="本期减少" width="100">
+            <template #default="{ row }">
+              <el-input-number
+                :model-value="row.impDec"
+                size="small"
+                :controls="false"
+                :disabled="isReadonly"
+                @change="(v: number | undefined) => dev.updateRow(row.id, { impDec: v ?? 0 })"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="期末余额" width="100" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtAmt(row.impClose) }}</span></template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="期初调整" align="center">
+          <el-table-column label="账项调整" width="100">
+            <template #default="{ row }">
+              <el-input-number
+                :model-value="row.impOpenAdjAcct"
+                size="small"
+                :controls="false"
+                :disabled="isReadonly"
+                @change="(v: number | undefined) => dev.updateRow(row.id, { impOpenAdjAcct: v ?? 0 })"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="重分类调整" width="100">
+            <template #default="{ row }">
+              <el-input-number
+                :model-value="row.impOpenAdjReclass"
+                size="small"
+                :controls="false"
+                :disabled="isReadonly"
+                @change="(v: number | undefined) => dev.updateRow(row.id, { impOpenAdjReclass: v ?? 0 })"
+              />
+            </template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="审定数" align="center">
+          <el-table-column label="期初" width="100" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtAmt(row.impOpenAud) }}</span></template>
+          </el-table-column>
+          <el-table-column label="本期增加" width="100" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtAmt(row.impInc) }}</span></template>
+          </el-table-column>
+          <el-table-column label="本期减少" width="100" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtAmt(row.impDec) }}</span></template>
+          </el-table-column>
+          <el-table-column label="期末" width="100" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtAmt(row.impCloseAud) }}</span></template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="备注" width="120">
           <template #default="{ row }">
-            <el-input-number :model-value="row.landOpen" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { landOpen: v ?? 0 })" />
+            <el-input
+              :model-value="row.impRemark"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: string) => dev.updateRow(row.id, { impRemark: v })"
+            />
           </template>
         </el-table-column>
-        <el-table-column label="土地-增加" width="100">
+        <el-table-column label="索引号" width="100">
           <template #default="{ row }">
-            <el-input-number :model-value="row.landIn" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { landIn: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="土地-减少" width="100">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.landOut" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { landOut: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="土地-期末" width="100" align="right" class-name="auto-calc-col">
-          <template #default="{ row }">
-            <el-tooltip content="公式：土地期初 + 增加 − 减少" placement="top">
-              <span class="formula">{{ row.landClose.toLocaleString() }}</span>
-            </el-tooltip>
-          </template>
-        </el-table-column>
-      </template>
-
-      <template v-else-if="dev.activeSegment.value === 'construction'">
-        <el-table-column label="建安-期初" width="100">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.buildOpen" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { buildOpen: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="建安-增加" width="100">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.buildIn" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { buildIn: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="建安-减少" width="100">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.buildOut" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { buildOut: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="建安-期末" width="100" align="right" class-name="auto-calc-col">
-          <template #default="{ row }">
-            <el-tooltip content="公式：建安期初 + 增加 − 减少" placement="top">
-              <span class="formula">{{ row.buildClose.toLocaleString() }}</span>
-            </el-tooltip>
-          </template>
-        </el-table-column>
-      </template>
-
-      <template v-else-if="dev.activeSegment.value === 'interest'">
-        <el-table-column label="利息-期初" width="100">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.intOpen" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { intOpen: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="利息-增加" width="100">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.intIn" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { intIn: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="利息-减少" width="100">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.intOut" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { intOut: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="利息-期末" width="100" align="right" class-name="auto-calc-col">
-          <template #default="{ row }">
-            <el-tooltip content="公式：利息期初 + 增加 − 减少" placement="top">
-              <span class="formula">{{ row.intClose.toLocaleString() }}</span>
-            </el-tooltip>
+            <el-input
+              :model-value="row.impIndex"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: string) => dev.updateRow(row.id, { impIndex: v })"
+            />
           </template>
         </el-table-column>
       </template>
 
       <template v-else>
-        <el-table-column label="其他-期初" width="100">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.otherOpen" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { otherOpen: v ?? 0 })" />
-          </template>
+        <el-table-column label="期初账面数" align="center">
+          <el-table-column label="面积" width="88" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ row.netOpenBookArea }}</span></template>
+          </el-table-column>
+          <el-table-column label="单位成本" width="88" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtPrice(row.netOpenBookUnit) }}</span></template>
+          </el-table-column>
+          <el-table-column label="金额" width="110" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtAmt(row.netOpenBookAmt) }}</span></template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column label="其他-增加" width="100">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.otherIn" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { otherIn: v ?? 0 })" />
-          </template>
+        <el-table-column label="期末账面数" align="center">
+          <el-table-column label="面积" width="88" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ row.netCloseBookArea }}</span></template>
+          </el-table-column>
+          <el-table-column label="单位成本" width="88" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtPrice(row.netCloseBookUnit) }}</span></template>
+          </el-table-column>
+          <el-table-column label="金额" width="110" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtAmt(row.netCloseBookAmt) }}</span></template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column label="其他-减少" width="100">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.otherOut" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { otherOut: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="其他-期末" width="100" align="right" class-name="auto-calc-col">
-          <template #default="{ row }">
-            <el-tooltip content="公式：其他期初 + 增加 − 减少" placement="top">
-              <span class="formula">{{ row.otherClose.toLocaleString() }}</span>
-            </el-tooltip>
-          </template>
-        </el-table-column>
-        <el-table-column label="结转转出" width="100">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.transferOut" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { transferOut: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="成本合计" width="100" align="right" class-name="auto-calc-col">
-          <template #default="{ row }">
-            <el-tooltip content="公式：土地 + 建安 + 利息 + 其他 期末合计" placement="top">
-              <span class="formula">{{ row.totalClose.toLocaleString() }}</span>
-            </el-tooltip>
-          </template>
-        </el-table-column>
-        <el-table-column label="存货净值" width="100" align="right" class-name="auto-calc-col">
-          <template #default="{ row }">
-            <el-tooltip content="公式：成本合计 − 结转转出" placement="top">
-              <span class="formula">{{ row.netInventory.toLocaleString() }}</span>
-            </el-tooltip>
-          </template>
-        </el-table-column>
-        <el-table-column label="1年以内" width="90">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.agingLt1" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { agingLt1: v ?? 0 })" />
-          </template>
-        </el-table-column>
-        <el-table-column label="3年以上" width="90">
-          <template #default="{ row }">
-            <el-input-number :model-value="row.agingGt3" size="small" :controls="false" :disabled="isReadonly"
-              @change="(v: number) => dev.updateRow(row.id, { agingGt3: v ?? 0 })" />
-          </template>
+        <el-table-column label="期末审定数" align="center">
+          <el-table-column label="面积" width="88" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ row.netCloseAudArea }}</span></template>
+          </el-table-column>
+          <el-table-column label="单位成本" width="88" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtPrice(row.netCloseAudUnit) }}</span></template>
+          </el-table-column>
+          <el-table-column label="金额" width="110" class-name="auto-calc-col">
+            <template #default="{ row }"><span class="formula">{{ fmtAmt(row.netCloseAudAmt) }}</span></template>
+          </el-table-column>
         </el-table-column>
       </template>
 
-      <el-table-column label="操作" width="55" fixed="right">
+      <el-table-column label="" width="56" fixed="right">
         <template #default="{ row }">
-          <el-button v-if="!isReadonly" link type="danger" size="small" @click="dev.removeRow(row.id)">删</el-button>
+          <el-button size="small" text type="danger" :disabled="isReadonly" @click="dev.removeRow(row.id)">删</el-button>
         </template>
       </el-table-column>
     </el-table>
 
-    <div class="totals-row">
-      合计 — 土地: {{ dev.totals.value.landClose.toLocaleString() }}
-      | 建安: {{ dev.totals.value.buildClose.toLocaleString() }}
-      | 利息: {{ dev.totals.value.intClose.toLocaleString() }}
-      | 净值: {{ dev.totals.value.netInventory.toLocaleString() }}
-    </div>
+    <section class="summary-panel">
+      <div class="summary-row">
+        <span class="lab">原值期末合计</span>
+        <span class="val">{{ fmtAmt(dev.totals.value.closeAmt) }}</span>
+        <span class="muted tiny">审定 {{ fmtAmt(dev.totals.value.closeAudAmt) }}</span>
+      </div>
+      <div class="summary-row">
+        <span class="lab">跌价期末合计</span>
+        <span class="val">{{ fmtAmt(dev.totals.value.impClose) }}</span>
+        <span class="muted tiny">审定 {{ fmtAmt(dev.totals.value.impCloseAud) }}</span>
+      </div>
+      <div class="summary-row net">
+        <span class="lab">净值期末（原值−跌价）</span>
+        <span class="val">{{ fmtAmt(dev.totals.value.netCloseBookAmt) }}</span>
+        <span class="muted tiny">审定 {{ fmtAmt(dev.totals.value.netCloseAudAmt) }}</span>
+      </div>
+    </section>
+
+    <section class="notes-panel">
+      <h4>审计说明</h4>
+      <div v-for="f in noteFields" :key="f.key" class="note-block">
+        <div class="note-label">{{ f.label }}</div>
+        <el-input
+          type="textarea"
+          :rows="2"
+          :model-value="dev.notePack.value[f.packKey]"
+          :disabled="isReadonly"
+          :placeholder="f.placeholder"
+          @change="(v: string) => dev.persistNotePack({ [f.packKey]: v })"
+        />
+      </div>
+    </section>
+
+    <section class="notes-panel conclusion">
+      <div class="note-label">审计结论</div>
+      <el-input
+        type="textarea"
+        :rows="3"
+        :model-value="dev.auditConclusion.value"
+        :disabled="isReadonly"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项，不可确认。"
+        @change="(v: string) => dev.persistConclusion(v)"
+      />
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { toRef } from 'vue'
-import { useF2DevProductSheet } from '../../composables/useF2DevProductSheet'
+import { inject, toRef } from 'vue'
+import { useF2DevProductSheet, DEV_PRODUCT_QUALITY } from '../../composables/useF2DevProductSheet'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
 
+const QUALITY = DEV_PRODUCT_QUALITY
+
 const props = defineProps<{
   wpId: string
+  projectId?: string
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()
-
-const segmentOptions = [
-  { label: '基础信息', value: 'basic' },
-  { label: '土地成本', value: 'land' },
-  { label: '建安成本', value: 'construction' },
-  { label: '资本化利息', value: 'interest' },
-  { label: '其他+结转', value: 'other' },
-]
 
 const dev = useF2DevProductSheet({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
 })
+
+const noteFields = [
+  { key: 'status', packKey: 'statusNote' as const, label: '1. 开发产品现状说明：', placeholder: '开发产品现状说明：' },
+  { key: 'change', packKey: 'significantChange' as const, label: '2. 本期重大变动原因：', placeholder: '本期重大变动原因：' },
+  { key: 'diff', packKey: 'bookAuditDiff' as const, label: '3. 账面与审定差异说明：', placeholder: '账面与审定差异说明：' },
+  { key: 'imp', packKey: 'impairmentReason' as const, label: '4. 计提跌价准备的主要项目及原因：', placeholder: '计提跌价准备的主要项目及原因：' },
+]
+
+function fmtAmt(v: number): string {
+  if (!v) return '-'
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function fmtPrice(v: number | ''): string {
+  if (v === '' || v == null) return '-'
+  return Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+}
+
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+async function onImported() { await reloadWorkpaperData?.() }
 </script>
 
 <style scoped>
-.f2-dev-product { padding: 12px; font-size: var(--wp-font-size, 13px); }
-.f2-dev-product :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
-.f2-dev-product :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
-.sheet-title { margin: 0 0 8px; }
-
-/* 编制提示 */
-.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
-.guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
-
-/* 工具栏 */
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.chip-wrap { display: inline-flex; align-items: center; }
-.account-tag { font-size: 12px; color: #909399; }
-.segment-bar { margin-bottom: 8px; }
-.formula { text-decoration: underline dotted #909399; cursor: help; }
-:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
-.totals-row { margin-top: 12px; font-size: 12px; }
-:deep(.warn-row) { background: #fdf6ec; }
+.f2-dev-product { padding: 8px 4px 24px; }
+.hero { margin-bottom: 10px; }
+.hero-main { display: flex; align-items: center; gap: 10px; }
+.hero-title { margin: 0; font-size: 16px; font-weight: 600; }
+.hero-sub { margin: 4px 0 0; color: #909399; font-size: 12px; }
+.guidance { margin-bottom: 10px; font-size: 13px; }
+.guidance-body { padding: 8px 4px; color: #606266; line-height: 1.6; }
+.obj-alert { margin-bottom: 10px; }
+.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.search { width: 180px; }
+.chip { display: inline-flex; }
+.main-table :deep(.auto-calc-col) { background: #f5f7fa; }
+.formula { color: #606266; font-variant-numeric: tabular-nums; }
+.summary-panel { margin-top: 12px; border: 1px solid #ebeef5; border-radius: 6px; padding: 8px 12px; }
+.summary-row { display: flex; align-items: center; gap: 12px; padding: 4px 0; }
+.summary-row.net .lab, .summary-row.net .val { font-weight: 600; }
+.lab { min-width: 160px; color: #606266; }
+.val { font-variant-numeric: tabular-nums; }
+.muted.tiny { color: #909399; font-size: 12px; }
+.notes-panel { margin-top: 14px; }
+.notes-panel h4 { margin: 0 0 8px; font-size: 14px; }
+.note-block { margin-bottom: 8px; }
+.note-label { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 13px; color: #606266; }
+.conclusion { border-top: 1px dashed #e4e7ed; padding-top: 10px; }
 </style>

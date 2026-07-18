@@ -1,0 +1,73 @@
+/**
+ * F2 合同成本 / 宽表底稿浅色矩阵样式（对齐 IPO soft slate）
+ * 用法：根节点加 class="f2-soft-matrix"，并 import 本文件。
+ */
+.f2-soft-matrix {
+  --uc-ink: #1f2937;
+  --uc-muted: #6b7280;
+  --uc-line: #e5e7eb;
+  --uc-soft: #f8fafc;
+  --uc-accent: #334155;
+  --uc-accent-soft: #f1f5f9;
+  --uc-calc: #eff6ff;
+  --uc-calc-ink: #1d4ed8;
+  --gt-purple: #334155;
+  --gt-purple-soft: #f1f5f9;
+  font-size: var(--wp-font-size, 13px);
+}
+
+.f2-soft-matrix .matrix-table thead th,
+.f2-soft-matrix .check-table thead th {
+  background: #f8fafc !important;
+  color: #475569 !important;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.f2-soft-matrix .matrix-table thead th.calc-col,
+.f2-soft-matrix .matrix-table thead th.calc-head,
+.f2-soft-matrix .matrix-table thead th.sticky {
+  background: #eff6ff !important;
+  color: #1e40af !important;
+}
+
+.f2-soft-matrix .matrix-table thead th.sticky.col-name,
+.f2-soft-matrix .matrix-table thead th.col-name.sticky {
+  background: #f8fafc !important;
+  color: #475569 !important;
+}
+
+.f2-soft-matrix .calc-cell,
+.f2-soft-matrix .calc {
+  background: var(--uc-calc) !important;
+  color: var(--uc-calc-ink) !important;
+}
+
+.f2-soft-matrix .row-total td {
+  background: #f1f5f9 !important;
+  font-weight: 700;
+}
+
+.f2-soft-matrix .section-title,
+.f2-soft-matrix .major-title {
+  color: var(--uc-ink);
+  border-left-color: var(--uc-accent) !important;
+  background: linear-gradient(90deg, #f1f5f9, #fff) !important;
+}
+
+.f2-soft-matrix .evidence-panel {
+  border: 1px solid var(--uc-line);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #f8fafc 0%, #fff 48px);
+  padding: 12px 14px;
+  margin-top: 12px;
+}
+.f2-soft-matrix .evidence-panel h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--uc-ink);
+}
+.f2-soft-matrix .evidence-panel p {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--uc-muted);
+}

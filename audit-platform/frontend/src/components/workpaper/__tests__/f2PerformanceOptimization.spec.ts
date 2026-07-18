@@ -11,6 +11,8 @@
  * Validates: Requirements 20.5~20.8
  */
 import { describe, it, expect, beforeEach } from 'vitest'
+import { ref, computed } from 'vue'
+import { useF2DetailSheet } from '../composables/useF2DetailSheet'
 import {
   calcChangeRate,
   calcTurnoverRate,
@@ -24,36 +26,16 @@ import {
 
 describe('Feature: f2-inventory-main, Task 24.1 性能优化验证', () => {
   describe('Req 20.5: 虚拟滚动 — F2-7委托加工(287行)虚拟滚动启用', () => {
-    it('useF2DetailSheet 当行数>100或sheetCode=F2-7时 useVirtualScroll=true', async () => {
-      const { useF2DetailSheet } = await import('../composables/useF2DetailSheet')
-      const { ref, computed } = await import('vue')
-
-      // 模拟 F2-7 config
-      const config = ref({
-        sheetCode: 'F2-7',
-        categoryLabel: '委托加工',
-        hasQuantity: true,
-        accountCode: '1405',
+    it('useF2DetailOutsourced 始终启用虚拟滚动', async () => {
+      const { useF2DetailOutsourced } = await import('../composables/useF2DetailOutsourced')
+      const sheet = useF2DetailOutsourced({
+        allResponses: ref(new Map()),
+        isReadonly: ref(false),
       })
-
-      const allResponses = ref(new Map())
-      const isReadonly = ref(false)
-
-      const detail = useF2DetailSheet({
-        config: computed(() => config.value) as any,
-        allResponses,
-        isReadonly,
-      })
-
-      // F2-7 应始终启用虚拟滚动（即使行数 < 100）
-      expect(detail.useVirtualScroll.value).toBe(true)
+      expect(sheet.useVirtualScroll.value).toBe(true)
     })
 
-    it('useF2DetailSheet 行数>100时自动启用虚拟滚动', async () => {
-      const { useF2DetailSheet } = await import('../composables/useF2DetailSheet')
-      const { ref, computed } = await import('vue')
-
-      // 模拟一个非F2-7的config，但加入>100行数据
+    it('useF2DetailSheet 行数>100时自动启用虚拟滚动', () => {
       const rows = Array.from({ length: 120 }, (_, i) => ({
         id: String(i),
         itemName: `品名${i}`,
@@ -95,20 +77,16 @@ describe('Feature: f2-inventory-main, Task 24.1 性能优化验证', () => {
     })
   })
 
-  describe('Req 20.5: F2-10开发产品5区段Tab定义', () => {
-    it('F2DetailSheetDev组件应定义5个区段Tab', async () => {
-      // 验证 segmentOptions 定义了正确的5个区段
-      const expectedSegments = ['basic', 'land', 'construction', 'interest', 'other']
-      const expectedLabels = ['基础信息', '土地成本', '建安成本', '资本化利息', '其他+结转']
+  describe('Req 20.5: F2-10开发产品三区块Tab定义', () => {
+    it('F2DetailSheetDev应定义原值/跌价/净值三视图', async () => {
+      const expectedViews = ['gross', 'impairment', 'net']
+      const expectedLabels = ['（一）原值', '（二）跌价', '（三）净值']
 
-      // 通过直接检查segment配置来验证
-      expect(expectedSegments).toHaveLength(5)
-      expect(expectedLabels).toHaveLength(5)
-      expect(expectedLabels[0]).toBe('基础信息')
-      expect(expectedLabels[1]).toBe('土地成本')
-      expect(expectedLabels[2]).toBe('建安成本')
-      expect(expectedLabels[3]).toBe('资本化利息')
-      expect(expectedLabels[4]).toBe('其他+结转')
+      expect(expectedViews).toHaveLength(3)
+      expect(expectedLabels).toHaveLength(3)
+      expect(expectedLabels[0]).toContain('原值')
+      expect(expectedLabels[1]).toContain('跌价')
+      expect(expectedLabels[2]).toContain('净值')
     })
   })
 
@@ -161,6 +139,9 @@ describe('Feature: f2-inventory-main, Task 24.1 性能优化验证', () => {
         'F2TabCostComparison',
         'F2DetailSheet',
         'F2DetailSheetDev',
+        'F2DetailSheetDevCost',
+        'F2DetailSheetContractPerf',
+        'F2DetailSheetBio',
         'F2CutoffSheet',
       ]
 

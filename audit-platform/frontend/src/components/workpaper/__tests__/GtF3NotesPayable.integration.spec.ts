@@ -242,58 +242,60 @@ describe('F3 集成: F3-7 抽凭引擎样本借贷方向分配', () => {
 // ---------------------------------------------------------------------------
 // 5. F3-2 三区段Tab行同步（列定义完整性）
 // ---------------------------------------------------------------------------
-describe('F3 集成: F3-2 三区段Tab列定义', () => {
-  it('基础信息区段9列完整', () => {
-    expect(F3_DETAIL_BASIC_COLUMNS).toHaveLength(9)
+describe('F3 集成: F3-2 源表宽表/三区段列定义', () => {
+  it('票据身份区段7列完整', () => {
+    expect(F3_DETAIL_BASIC_COLUMNS).toHaveLength(7)
     const props = F3_DETAIL_BASIC_COLUMNS.map((c) => c.prop)
     expect(props).toContain('seq')
-    expect(props).toContain('issueDate')
-    expect(props).toContain('dueDate')
+    expect(props).toContain('ticketNo')
     expect(props).toContain('noteType')
+    expect(props).toContain('relatedPartyType')
     expect(props).toContain('drawer')
+    expect(props).toContain('acceptor')
     expect(props).toContain('payee')
-    expect(props).toContain('faceValue')
-    expect(props).toContain('currency')
-    expect(props).toContain('purpose')
   })
 
-  it('票据详情区段8列完整', () => {
+  it('票据条款和到期账龄区段8列完整', () => {
     expect(F3_DETAIL_INFO_COLUMNS).toHaveLength(8)
     const props = F3_DETAIL_INFO_COLUMNS.map((c) => c.prop)
+    expect(props).toContain('issueDate')
+    expect(props).toContain('dueDate')
     expect(props).toContain('interestRate')
     expect(props).toContain('termDays')
-    expect(props).toContain('isInterestBearing')
+    expect(props).toContain('maturityBucket')
+    expect(props).toContain('isAccepted')
     expect(props).toContain('isOverdue')
     expect(props).toContain('overdueDays')
-    expect(props).toContain('acceptBank')
-    expect(props).toContain('noteStatus')
+  })
+
+  it('余额与核对区段12列完整', () => {
+    expect(F3_DETAIL_AUDIT_COLUMNS).toHaveLength(12)
+    const props = F3_DETAIL_AUDIT_COLUMNS.map((c) => c.prop)
+    expect(props).toContain('openingBalance')
+    expect(props).toContain('currentIssued')
+    expect(props).toContain('currentAccepted')
+    expect(props).toContain('closingUnadjusted')
+    expect(props).toContain('aje')
+    expect(props).toContain('rje')
+    expect(props).toContain('closingAdjusted')
+    expect(props).toContain('accruedInterest')
+    expect(props).toContain('isConfirmed')
+    expect(props).toContain('depositRate')
+    expect(props).toContain('depositAmount')
     expect(props).toContain('remark')
   })
 
-  it('审定调整区段8列完整', () => {
-    expect(F3_DETAIL_AUDIT_COLUMNS).toHaveLength(8)
-    const props = F3_DETAIL_AUDIT_COLUMNS.map((c) => c.prop)
-    expect(props).toContain('openingBalance')
-    expect(props).toContain('increase')
-    expect(props).toContain('decrease')
-    expect(props).toContain('closingBalance')
-    expect(props).toContain('aje')
-    expect(props).toContain('rje')
-    expect(props).toContain('adjustedBalance')
-    expect(props).toContain('indexRef')
-  })
-
-  it('三区段合计为25列', () => {
+  it('三区段合计为27列', () => {
     const total = F3_DETAIL_BASIC_COLUMNS.length + F3_DETAIL_INFO_COLUMNS.length + F3_DETAIL_AUDIT_COLUMNS.length
-    expect(total).toBe(25)
+    expect(total).toBe(27)
   })
 
   it('公式列标记editable=false', () => {
-    const closingCol = F3_DETAIL_AUDIT_COLUMNS.find((c) => c.prop === 'closingBalance')
+    const closingCol = F3_DETAIL_AUDIT_COLUMNS.find((c) => c.prop === 'closingUnadjusted')
     expect(closingCol?.editable).toBe(false)
     expect(closingCol?.formula).toBeDefined()
 
-    const adjustedCol = F3_DETAIL_AUDIT_COLUMNS.find((c) => c.prop === 'adjustedBalance')
+    const adjustedCol = F3_DETAIL_AUDIT_COLUMNS.find((c) => c.prop === 'closingAdjusted')
     expect(adjustedCol?.editable).toBe(false)
     expect(adjustedCol?.formula).toBeDefined()
 
@@ -304,6 +306,21 @@ describe('F3 集成: F3-2 三区段Tab列定义', () => {
     const termCol = F3_DETAIL_INFO_COLUMNS.find((c) => c.prop === 'termDays')
     expect(termCol?.editable).toBe(false)
     expect(termCol?.formula).toBeDefined()
+  })
+
+  it('UI 支持全字段宽表、分段编辑、列设置、枚举及 AI', () => {
+    const vuePath = path.resolve(
+      __dirname,
+      '../f3-notes-payable/F3TabDetail.vue',
+    )
+    const src = fs.readFileSync(vuePath, 'utf-8')
+    expect(src).toContain('全字段宽表')
+    expect(src).toContain('分段编辑')
+    expect(src).toContain('列设置')
+    expect(src).toContain("col.inputType === 'select'")
+    expect(src).toContain("runAi('detail-note')")
+    expect(src).toContain("runAi('detail-conclusion')")
+    expect(src).toContain('F3ImportExportToolbar')
   })
 })
 
@@ -356,51 +373,72 @@ describe('F3 集成: 导入导出 spec 完整性', () => {
     content = fs.readFileSync(importExportPath, 'utf-8')
   })
 
-  it('包含全部7个sheet spec定义', () => {
-    const expectedSheets = ['F3-2', 'F3-3', 'F3-4', 'F3-5', 'F3-6', 'F3-7-credit', 'F3-7-debit']
+  it('包含全部8个sheet spec定义', () => {
+    const expectedSheets = ['F3-2', 'F3-3', 'F3-4', 'F3-5', 'F3-6', 'F3-7-credit', 'F3-7-debit', 'F3-7-subsequent']
     for (const sheet of expectedSheets) {
       expect(content).toContain(`"${sheet}"`)
     }
   })
 
-  it('F3-2 spec 有25个 headers（明细表全列）', () => {
+  it('F3-2 spec 有27个 headers（源表全列+到期账龄）', () => {
     // 验证 F3-2 headers 行数 / field_keys 行数
     const f3_2_headers_match = content.match(/"F3-2":\s*\{[^}]*?"headers":\s*\[([\s\S]*?)\]/m)
     expect(f3_2_headers_match).not.toBeNull()
     if (f3_2_headers_match) {
       const headerStr = f3_2_headers_match[1]
       const headerCount = (headerStr.match(/"/g) || []).length / 2 // 每个 header 有开/闭引号
-      expect(headerCount).toBe(25)
+      expect(headerCount).toBe(27)
     }
   })
 
-  it('F3-4 spec 有13个 headers（利息测算表）', () => {
+  it('F3-4 spec 有12个 headers（利息测算表，对齐源表）', () => {
     const f3_4_match = content.match(/"F3-4":\s*\{[^}]*?"headers":\s*\[([\s\S]*?)\]/m)
     expect(f3_4_match).not.toBeNull()
     if (f3_4_match) {
       const headerCount = (f3_4_match[1].match(/"/g) || []).length / 2
-      expect(headerCount).toBe(13)
+      expect(headerCount).toBe(12)
+      expect(f3_4_match[1]).toContain('票据类别')
+      expect(f3_4_match[1]).toContain('票据号')
+      expect(f3_4_match[1]).toContain('账面已计利息')
     }
   })
 
-  it('F3-5 spec 有15个 headers（逾期检查表）', () => {
+  it('F3-5 spec 有16个 headers（源表15字段加序号）', () => {
     const f3_5_match = content.match(/"F3-5":\s*\{[^}]*?"headers":\s*\[([\s\S]*?)\]/m)
     expect(f3_5_match).not.toBeNull()
     if (f3_5_match) {
       const headerCount = (f3_5_match[1].match(/"/g) || []).length / 2
-      expect(headerCount).toBe(15)
+      expect(headerCount).toBe(16)
+      expect(f3_5_match[1]).toContain('承兑人')
+      expect(f3_5_match[1]).toContain('收款人')
+      expect(f3_5_match[1]).toContain('期后支付金额')
+      expect(f3_5_match[1]).toContain('抵押物品名称')
     }
   })
 
-  it('F3-7 拆为借方/贷方独立 spec', () => {
+  it('F3-6 spec 有14个 headers（源表13字段加序号）', () => {
+    const f3_6_match = content.match(/"F3-6":\s*\{[^}]*?"headers":\s*\[([\s\S]*?)\]/m)
+    expect(f3_6_match).not.toBeNull()
+    if (f3_6_match) {
+      const headerCount = (f3_6_match[1].match(/"/g) || []).length / 2
+      expect(headerCount).toBe(14)
+      expect(f3_6_match[1]).toContain('借方发生')
+      expect(f3_6_match[1]).toContain('贷方发生')
+      expect(f3_6_match[1]).toContain('期后付款金额')
+    }
+  })
+
+  it('F3-7 拆为借方/贷方/日后三个独立 spec', () => {
     expect(content).toContain('"F3-7-credit"')
     expect(content).toContain('"F3-7-debit"')
-    expect(content).toContain('贷方检查区（增加）')
-    expect(content).toContain('借方检查区（减少）')
+    expect(content).toContain('"F3-7-subsequent"')
+    expect(content).toContain('本期借方金额检查')
+    expect(content).toContain('本期贷方金额检查')
+    expect(content).toContain('资产负债表日后借方检查')
   })
 
   it('每个 spec 都同时定义了 headers 和 field_keys', () => {
-    const expectedSheets = ['F3-2', 'F3-3', 'F3-4', 'F3-5', 'F3-6', 'F3-7-credit', 'F3-7-debit']
+    const expectedSheets = ['F3-2', 'F3-3', 'F3-4', 'F3-5', 'F3-6', 'F3-7-credit', 'F3-7-debit', 'F3-7-subsequent']
     for (const sheet of expectedSheets) {
       // 验证每个spec同时有headers和field_keys
       const sheetIdx = content.indexOf(`"${sheet}"`)

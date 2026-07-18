@@ -4,11 +4,12 @@
  * 提供:
  * - listSheets(cycle?, importExportOnly?) — 调 /api/acnr/entries 构建下拉树
  * - listCells(wpCode, sheet) — 调 /api/acnr/anchors 获取坐标锚点
+ * - resolve(params) — 统一 resolve 入口（index_ref / uri / formula_ref / addr_id）
  * - resolveFormula(formulaRef) — 保存前 resolve 校验（R14.2: 非法引用编译期失败）
  * - resolveUri(uri) — URI 解析
  * - resolveAddr(addrId) — addr_id 解析
  * - resolveIndex(indexRef) — 索引 ns:target 解析
- * - resolveInstance(projectId, parent, sheetCode) — wp_id 解析
+ * - resolveInstance(projectId|params, ...) — wp_id 解析
  *
  * 与 useAddressRegistry 的区别：
  *   useAddressRegistry 是旧 V1 运行时目录（动态 build），面向五域全搜索。
@@ -541,20 +542,25 @@ export function useAcnr() {
   /**
    * 索引 ns:target 解析（R13.3: GtIndexChip 调 resolve 获取 addr_id + jump_route）
    * @param indexRef - 如 cell:D2-2!E100, TB:1001
+   * @param projectId - 可选项目 UUID（触发 L2/L3）
    */
-  async function resolveIndex(indexRef: string): Promise<AcnrResolveResult> {
+  async function resolveIndex(indexRef: string, projectId?: string): Promise<AcnrResolveResult> {
     if (!indexRef || !isValidIndexRef(indexRef)) {
       return { found: false, error: 'invalid_index_ref' }
     }
     // Req-20: resolve 缓存
-    const cacheKey = `resolve:${JSON.stringify({ index_ref: indexRef })}`
+    const cacheKey = `resolve:${JSON.stringify({ index_ref: indexRef, project_id: projectId })}`
     const cached = _resolveCacheGet(cacheKey)
     if (cached) return cached
 
     try {
       const { data } = await http.get(ACNR_PATHS.resolve, {
-        params: { index_ref: indexRef },
-      })
+        params: {
+          index_ref: indexRef,
+          ...(projectId ? { project_id: projectId } : {}),
+        },
+        _silent: true,
+      } as any)
       const result = data as AcnrResolveResult
       _resolveCacheSet(cacheKey, result)
       return result
@@ -564,31 +570,65 @@ export function useAcnr() {
   }
 
   /**
+   * 统一 resolve 入口（GtIndexChip / 公式选址器对象参数形态）
+   */
+  async function resolve(params: {
+    index_ref?: string
+    uri?: string
+    formula_ref?: string
+    addr_id?: string
+    project_id?: string
+  }): Promise<AcnrResolveResult> {
+    if (params.index_ref) return resolveIndex(params.index_ref, params.project_id)
+    if (params.uri) return resolveUri(params.uri)
+    if (params.formula_ref) return resolveFormula(params.formula_ref)
+    if (params.addr_id) return resolveAddr(params.addr_id)
+    return { found: false, error: 'empty_resolve_params' }
+  }
+
+  type ResolveInstanceParams = {
+    project_id: string
+    parent: string
+    sheet_code: string
+    wp_id?: string
+  }
+
+  /**
    * 项目实例解析 — 唯一 wp_id 出口（R6, R13.1）
-   *
-   * @param projectId - 项目 UUID
-   * @param parent - 父底稿码（WP 第一参），如 'D2'
-   * @param sheetCode - Tab 编码，如 'D2-2'
-   * @param wpId - 可选 wp_id（多实例消歧时传入）
+   * 兼容位置参数与 GtIndexChip 对象参数两种调用形态。
    */
   async function resolveInstance(
-    projectId: string,
-    parent: string,
-    sheetCode: string,
+    projectIdOrParams: string | ResolveInstanceParams,
+    parent?: string,
+    sheetCode?: string,
     wpId?: string,
   ): Promise<AcnrInstanceResult> {
-    if (!projectId || !parent || !sheetCode) {
+    const projectId = typeof projectIdOrParams === 'string'
+      ? projectIdOrParams
+      : projectIdOrParams.project_id
+    const parentCode = typeof projectIdOrParams === 'string'
+      ? parent
+      : projectIdOrParams.parent
+    const sheet = typeof projectIdOrParams === 'string'
+      ? sheetCode
+      : projectIdOrParams.sheet_code
+    const instanceWpId = typeof projectIdOrParams === 'string'
+      ? wpId
+      : projectIdOrParams.wp_id
+
+    if (!projectId || !parentCode || !sheet) {
       return { found: false, error: 'missing_params' }
     }
     try {
       const { data } = await http.get(ACNR_PATHS.resolveInstance, {
         params: {
           project_id: projectId,
-          parent,
-          sheet_code: sheetCode,
-          ...(wpId ? { wp_id: wpId } : {}),
+          parent: parentCode,
+          sheet_code: sheet,
+          ...(instanceWpId ? { wp_id: instanceWpId } : {}),
         },
-      })
+        _silent: true,
+      } as any)
       return data as AcnrInstanceResult
     } catch {
       return { found: false, error: 'resolve_instance_failed' }
@@ -705,6 +745,7 @@ export function useAcnr() {
     // API 方法
     listSheets,
     listCells,
+    resolve,
     resolveFormula,
     resolveUri,
     resolveAddr,

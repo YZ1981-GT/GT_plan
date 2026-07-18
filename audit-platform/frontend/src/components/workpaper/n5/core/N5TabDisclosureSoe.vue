@@ -84,18 +84,6 @@
       </div>
     </el-card>
 
-    <!-- ═══ 审计说明+结论 ═══ -->
-    <el-card shadow="never" class="audit-notes-card">
-      <template #header><span class="notes-title">审计说明与结论</span></template>
-      <div class="notes-field">
-        <label class="field-label">附注审核说明</label>
-        <el-input v-model="auditNotes" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" placeholder="请输入..." :disabled="isReadonly" @change="saveNotes" />
-      </div>
-      <div class="notes-field">
-        <label class="field-label">审计结论</label>
-        <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" placeholder="请输入..." :disabled="isReadonly" @change="saveConclusion" />
-      </div>
-    </el-card>
   </div>
 </template>
 
@@ -109,7 +97,7 @@
  */
 import { ref, computed, inject, onMounted, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick, ChatDotSquare } from '@element-plus/icons-vue'
+import { ChatDotSquare } from '@element-plus/icons-vue'
 import { useN5FormData } from '../../composables/useN5FormData'
 import { useN5CrossSheet } from '../../composables/useN5CrossSheet'
 import { eventBus } from '@/utils/eventBus'
@@ -130,8 +118,6 @@ const formData = useN5FormData({ wpId: wpIdRef, projectId: projectIdRef })
 const { adjudicationVsCalc, effectiveTaxRate, profitFromIncomeStatement } = useN5CrossSheet(allResponsesRef, { wpId: wpIdRef, projectId: projectIdRef })
 
 const etr = effectiveTaxRate
-const auditNotes = ref('')
-const auditConclusion = ref('')
 const unrecognizedNote = ref('')
 const taxBenefitNote = ref('')
 const lossCarryNote = ref('')
@@ -181,8 +167,6 @@ const reconciliationRows = computed<ReconRow[]>(() => {
 
 onMounted(async () => {
   await formData.loadData()
-  auditNotes.value = formData.getField('disclosure-soe', 'audit-notes') ?? ''
-  auditConclusion.value = formData.getField('disclosure-soe', 'audit-conclusion') ?? ''
   unrecognizedNote.value = formData.getField('disclosure-soe', 'unrecognized-note') ?? ''
   taxBenefitNote.value = formData.getField('disclosure-soe', 'tax-benefit-note') ?? ''
   lossCarryNote.value = formData.getField('disclosure-soe', 'loss-carry-note') ?? ''
@@ -207,17 +191,6 @@ async function handleSupplementSave() {
   ])
 }
 
-async function saveNotes() { await formData.setField('disclosure-soe', 'audit-notes', auditNotes.value) }
-async function saveConclusion() { await formData.setField('disclosure-soe', 'audit-conclusion', auditConclusion.value) }
-function handleAiAssist() {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: 'n5-disclosure-soe',
-      prompt: '请基于所得税费用底稿数据，给出审计分析建议',
-      context: { wpId: props.wpId },
-    }).catch(() => {})
-  })
-}
 function handleSupplementAi() {
   import('@/utils/http').then(({ default: h }) => {
     h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {

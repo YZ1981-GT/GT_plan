@@ -1,343 +1,569 @@
-<template>
-  <div class="f2-unit-consumption">
-    <!-- 编制提示 -->
-    <details class="guidance-details">
-      <summary>📋 编制提示</summary>
-      <div class="guidance-content">
-        <p>1. 本表分析主要产品的单位材料消耗（单耗）及投入产出比，验证生产成本结转的合理性与营业成本的准确性（CAS 1231 / CAS 1141）。</p>
-        <p>2. 灰色底纹列为自动计算列（差异率%/金额影响/投入产出比/单耗变动率），由标准/实际单耗、单价及投入产出量自动测算，不可手工编辑。</p>
-        <p>3. 单耗差异率超阈值标橙、投入产出失衡标红，请填写合理性说明与审计关注；单耗异常可能提示成本核算错误或存货舞弊。</p>
-        <p>4. 可通过工具栏"AI 生成"辅助撰写单耗分析结论，"💬"发起复核对话，"导入导出"批量维护产品单耗数据。</p>
+﻿<template>
+  <div class="f2-val-sheet f2-unit-consumption f2-ipo-soft">
+    <header class="uc-hero">
+      <div class="uc-hero-text">
+        <div class="uc-title-row">
+          <h3>主要产品生产成本及单耗分析表</h3>
+          <span class="uc-code">F2-64</span>
+        </div>
+        <p class="uc-desc">成本构成 / 成本衔接 / 单位成本 / 原材料单耗</p>
       </div>
-    </details>
-
-    <!-- 审计目标 -->
-    <el-alert
-      type="info"
-      :closable="false"
-      title="审计目标：验证主要产品单位材料消耗与投入产出的合理性，评价生产成本结转的准确性，识别多结转/少结转导致的营业成本错报。"
-      class="objective-alert"
-    />
-
-    <header class="sheet-header">
-      <div class="header-text">
-        <h3>主要产品生产成本及单耗分析</h3>
-        <span class="sheet-code">F2-64</span>
-      </div>
-      <div class="stat-cards">
-        <div class="stat-card">
-          <span class="stat-val">{{ uc.globalSummary.value.productCount }}</span>
-          <span class="stat-label">产品</span>
+      <div class="uc-metrics">
+        <div class="uc-metric">
+          <span class="uc-metric-val">{{ uc.sheet.value.productName || '未填写' }}</span>
+          <span class="uc-metric-label">分析产品</span>
         </div>
-        <div class="stat-card">
-          <span class="stat-val">{{ uc.globalSummary.value.materialCount }}</span>
-          <span class="stat-label">材料行</span>
+        <div class="uc-metric" :class="{ danger: uc.abnormalCount.value > 0 }">
+          <span class="uc-metric-val">{{ uc.abnormalCount.value }}</span>
+          <span class="uc-metric-label">异常项</span>
         </div>
-        <div class="stat-card warn">
-          <span class="stat-val">{{ uc.globalSummary.value.abnormalCount }}</span>
-          <span class="stat-label">异常行</span>
-        </div>
-        <div class="stat-card impact">
-          <span class="stat-val">{{ fmtMoney(uc.globalSummary.value.totalAmountImpact) }}</span>
-          <span class="stat-label">金额影响合计</span>
+        <div class="uc-metric muted">
+          <span class="uc-metric-val">{{ uc.sheet.value.currentYear }}/{{ uc.sheet.value.priorYear }}</span>
+          <span class="uc-metric-label">对比年度</span>
         </div>
       </div>
     </header>
 
-    <div class="tab-toolbar">
-      <div class="toolbar-left">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="uc.addProduct()">+ 产品</el-button>
-        <el-button size="small" :disabled="isReadonly" @click="uc.addMaterial()">+ 材料</el-button>
-        <el-input
-          v-model="uc.searchQuery.value"
-          size="small"
-          placeholder="搜索产品 / 材料 / 规格"
-          clearable
-          prefix-icon="Search"
-          class="search"
-        />
-        <el-segmented v-model="uc.viewMode.value" :options="viewModes" size="small" />
-        <template v-if="uc.viewMode.value === 'group'">
-          <el-button size="small" link @click="expandAllGroups">全部展开</el-button>
-          <el-button size="small" link @click="collapseAllGroups">全部折叠</el-button>
-        </template>
+    <details class="guidance-details">
+      <summary>编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 按本年、上年逐月分析生产成本构成及各成本项目占比，自动计算月度与年度合计。</p>
+        <p>2. 通过期初在产品、本期投入、期末在产品与产量衔接测算单位生产成本；通过产成品成本衔接复核单位材料、人工、制造费用及单位成本。</p>
+        <p>3. 与同行业公司单位成本结构比较，并按主要原材料测算单位产量耗用量和单位成本。</p>
+        <p>4. 浅灰底列为自动计算项；月度行固定生成，可切换「本年 / 上年 / 两年对照」查看。</p>
       </div>
+    </details>
+    <el-alert type="info" :closable="false" :title="objectiveText" class="objective-alert" />
+
+    <div class="uc-meta-card">
+      <label class="uc-field">
+        <span>产品名称</span>
+        <el-input
+          :model-value="uc.sheet.value.productName"
+          size="small"
+          placeholder="填写主要产品名称"
+          :disabled="isReadonly"
+          @update:model-value="(v: string) => uc.updateMeta({ productName: v })"
+        />
+      </label>
+      <label class="uc-field year">
+        <span>本年</span>
+        <el-input
+          :model-value="uc.sheet.value.currentYear"
+          size="small"
+          :disabled="isReadonly"
+          @update:model-value="(v: string) => uc.updateMeta({ currentYear: v })"
+        />
+      </label>
+      <label class="uc-field year">
+        <span>上年</span>
+        <el-input
+          :model-value="uc.sheet.value.priorYear"
+          size="small"
+          :disabled="isReadonly"
+          @update:model-value="(v: string) => uc.updateMeta({ priorYear: v })"
+        />
+      </label>
       <div class="toolbar-right">
         <F2SheetToolbar
           :wp-id="wpId"
           api-prefix="f2-spe"
           sheet="F2-64"
           :disabled="isReadonly"
-          ai-section="consumption-analysis"
-          :existing-content="uc.auditNote.value"
           review-section="F2-64-consumption"
-          @ai-filled="(t: string) => { uc.auditNote.value = t }"
         />
-        <span class="chip-wrap"><GtIndexChip value="wp:F2-64" /></span>
-        <el-tag size="small" type="info">共 {{ uc.flatRows.value.length }} 行</el-tag>
+        <GtIndexChip value="wp:F2-64" />
       </div>
     </div>
 
-    <!-- 聚焦录入：左产品导航 + 右区段表格 -->
-    <div v-if="uc.viewMode.value === 'focus'" class="focus-layout">
-      <aside class="product-nav">
-        <div class="nav-title">产品列表</div>
-        <el-scrollbar max-height="520">
-          <button
-            v-for="g in uc.filteredProductGroups.value"
-            :key="g.productName"
-            type="button"
-            class="product-item"
-            :class="{ active: uc.selectedProduct.value === g.productName }"
-            @click="uc.selectProduct(g.productName)"
-          >
-            <span class="product-name">{{ g.productName }}</span>
-            <span class="product-meta">
-              {{ g.materialCount }} 材料
-              <el-tag v-if="g.abnormalCount" type="warning" size="small" effect="plain">
-                {{ g.abnormalCount }} 异常
-              </el-tag>
-            </span>
-          </button>
-        </el-scrollbar>
-      </aside>
+    <div class="uc-nav">
+      <nav class="uc-section-nav" aria-label="区块导航">
+        <button
+          v-for="sec in sectionNav"
+          :key="sec.id"
+          type="button"
+          class="uc-nav-btn"
+          :class="{ active: activeSection === sec.id }"
+          @click="scrollToSection(sec.id)"
+        >
+          <span class="uc-nav-idx">{{ sec.idx }}</span>
+          {{ sec.label }}
+        </button>
+      </nav>
+      <el-radio-group v-model="periodMode" size="small" class="uc-period">
+        <el-radio-button value="current">本年 {{ uc.sheet.value.currentYear }}</el-radio-button>
+        <el-radio-button value="prior">上年 {{ uc.sheet.value.priorYear }}</el-radio-button>
+        <el-radio-button value="both">两年对照</el-radio-button>
+      </el-radio-group>
+    </div>
 
-      <main class="focus-main">
-        <div v-if="uc.activeProductGroup.value" class="product-banner">
-          <strong>{{ uc.activeProductGroup.value.productName }}</strong>
-          <span class="banner-stats">
-            材料 {{ uc.activeProductGroup.value.materialCount }} 行
-            · 异常 {{ uc.activeProductGroup.value.abnormalCount }}
-            · 金额影响 {{ fmtMoney(uc.activeProductGroup.value.totalAmountImpact) }}
-            · 最大差异率 {{ uc.activeProductGroup.value.maxDeviationPct.toFixed(1) }}%
-          </span>
+    <!-- 一、生产成本构成及占比 -->
+    <section id="uc-structure" class="uc-card analysis-section">
+      <header class="uc-card-head">
+        <span class="uc-card-idx">01</span>
+        <div>
+          <h4>一、生产成本构成及上期各月发生额分析</h4>
+          <p>逐月金额与占比，合计自动汇总</p>
         </div>
-
-        <el-segmented v-model="uc.activeSegment.value" :options="segments" size="small" class="segment-bar" />
-
-        <el-table
-          :data="uc.focusRows.value"
-          border
+      </header>
+      <div class="material-name-row">
+        <span class="field-label">主要材料名称</span>
+        <el-input
+          v-for="(_, i) in uc.sheet.value.materialNames"
+          :key="i"
+          :model-value="uc.sheet.value.materialNames[i]"
           size="small"
-          max-height="440"
-          highlight-current-row
-          :row-class-name="rowClassName"
-        >
-          <el-table-column label="材料名称" width="120" fixed>
-            <template #default="{ row }">
-              <el-input v-if="!isReadonly" :model-value="row.materialName" size="small"
-                @change="(v: string) => uc.updateRow(row.id, { materialName: v })" />
-              <span v-else>{{ row.materialName }}</span>
+          :disabled="isReadonly"
+          :placeholder="`材料${i + 1}`"
+          @update:model-value="(v: string) => updateTuple('materialNames', i, v)"
+        />
+      </div>
+      <div class="table-scroll">
+        <table class="matrix-table structure-table">
+          <thead>
+            <tr>
+              <th rowspan="2">年度</th>
+              <th rowspan="2">月份</th>
+              <th colspan="7">金额</th>
+              <th colspan="6">占比</th>
+            </tr>
+            <tr>
+              <th v-for="name in structureAmountHeaders" :key="`a-${name}`">{{ name }}</th>
+              <th v-for="name in structureRateHeaders" :key="`r-${name}`">{{ name }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template v-for="period in visiblePeriods" :key="period.key">
+              <tr v-for="(row, index) in structureByPeriod(period.key)" :key="row.id">
+                <td
+                  v-if="index === 0"
+                  :rowspan="structureByPeriod(period.key).length + 1"
+                  class="year-cell"
+                >
+                  {{ periodLabel(period.key) }}
+                </td>
+                <td>{{ row.month }}月</td>
+                <td v-for="field in structureFields" :key="field">
+                  <el-input-number
+                    :model-value="row[field]"
+                    size="small"
+                    :controls="false"
+                    class="compact-num"
+                    :disabled="isReadonly"
+                    @change="(v: number | undefined) => uc.updateCostStructure(row.id, { [field]: v ?? 0 })"
+                  />
+                </td>
+                <td class="calc-cell">{{ fmt(row.total) }}</td>
+                <td
+                  v-for="field in structureFields"
+                  :key="`rate-${field}`"
+                  class="calc-cell"
+                >
+                  {{ fmtPct(row.rates[field]) }}
+                </td>
+              </tr>
+              <tr class="row-total">
+                <td>合计</td>
+                <td
+                  v-for="field in structureFields"
+                  :key="`total-${field}`"
+                  class="num"
+                >
+                  {{ fmt(sumStructure(period.key, field)) }}
+                </td>
+                <td class="calc-cell">{{ fmt(sumStructure(period.key, 'total')) }}</td>
+                <td
+                  v-for="field in structureFields"
+                  :key="`tr-${field}`"
+                  class="calc-cell"
+                >
+                  {{ fmtPct(totalStructureRate(period.key, field)) }}
+                </td>
+              </tr>
             </template>
-          </el-table-column>
-
-          <template v-if="uc.activeSegment.value === 'basic'">
-            <el-table-column label="规格" width="90">
-              <template #default="{ row }">
-                <el-input v-if="!isReadonly" :model-value="row.spec" size="small"
-                  @change="(v: string) => uc.updateRow(row.id, { spec: v })" />
-                <span v-else>{{ row.spec }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="单位" width="72">
-              <template #default="{ row }">
-                <el-input v-if="!isReadonly" :model-value="row.unit" size="small"
-                  @change="(v: string) => uc.updateRow(row.id, { unit: v })" />
-                <span v-else>{{ row.unit }}</span>
-              </template>
-            </el-table-column>
-          </template>
-
-          <template v-else-if="uc.activeSegment.value === 'consumption'">
-            <el-table-column label="标准单耗" width="95">
-              <template #default="{ row }">
-                <el-input-number :model-value="row.standardConsumption" size="small" :controls="false"
-                  :disabled="isReadonly" class="compact-num"
-                  @change="(v: number) => uc.updateRow(row.id, { standardConsumption: v ?? 0 })" />
-              </template>
-            </el-table-column>
-            <el-table-column label="实际单耗" width="95">
-              <template #default="{ row }">
-                <el-input-number :model-value="row.actualConsumption" size="small" :controls="false"
-                  :disabled="isReadonly" class="compact-num"
-                  @change="(v: number) => uc.updateRow(row.id, { actualConsumption: v ?? 0 })" />
-              </template>
-            </el-table-column>
-            <el-table-column label="差异率%" width="88" align="right" class-name="auto-calc-col">
-              <template #default="{ row }">
-                <span :class="devClass(row)" title="(实际单耗-标准单耗)/标准单耗×100">{{ row.deviationPct.toFixed(1) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="材料单价" width="95">
-              <template #default="{ row }">
-                <el-input-number :model-value="row.materialUnitPrice" size="small" :controls="false"
-                  :disabled="isReadonly" class="compact-num"
-                  @change="(v: number) => uc.updateRow(row.id, { materialUnitPrice: v ?? 0 })" />
-              </template>
-            </el-table-column>
-            <el-table-column label="金额影响" width="105" align="right" class-name="auto-calc-col">
-              <template #default="{ row }">
-                <span class="formula" title="(实际单耗-标准单耗)×材料单价×产量">{{ fmtMoney(row.amountImpact) }}</span>
-              </template>
-            </el-table-column>
-          </template>
-
-          <template v-else-if="uc.activeSegment.value === 'io'">
-            <el-table-column label="本期投入量" width="100">
-              <template #default="{ row }">
-                <el-input-number :model-value="row.inputQty" size="small" :controls="false"
-                  :disabled="isReadonly" class="compact-num"
-                  @change="(v: number) => uc.updateRow(row.id, { inputQty: v ?? 0 })" />
-              </template>
-            </el-table-column>
-            <el-table-column label="本期产出量" width="100">
-              <template #default="{ row }">
-                <el-input-number :model-value="row.outputQty" size="small" :controls="false"
-                  :disabled="isReadonly" class="compact-num"
-                  @change="(v: number) => uc.updateRow(row.id, { outputQty: v ?? 0 })" />
-              </template>
-            </el-table-column>
-            <el-table-column label="投入产出比" width="100" align="right" class-name="auto-calc-col">
-              <template #default="{ row }">
-                <span :class="ioClass(row)" title="本期投入量/本期产出量">{{ row.outputQty ? row.ioRatio.toFixed(3) : '—' }}</span>
-              </template>
-            </el-table-column>
-          </template>
-
-          <template v-else-if="uc.activeSegment.value === 'history'">
-            <el-table-column label="上期单耗" width="95">
-              <template #default="{ row }">
-                <el-input-number :model-value="row.priorConsumption" size="small" :controls="false"
-                  :disabled="isReadonly" class="compact-num"
-                  @change="(v: number) => uc.updateRow(row.id, { priorConsumption: v ?? 0 })" />
-              </template>
-            </el-table-column>
-            <el-table-column label="单耗变动率" width="100" align="right" class-name="auto-calc-col">
-              <template #default="{ row }">
-                <span class="formula" title="(本期单耗-上期单耗)/上期单耗×100">{{ uc.fmtRate(row.consumptionChangeRate) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="T-1期单耗" width="95">
-              <template #default="{ row }">
-                <el-input-number :model-value="row.consumptionT1" size="small" :controls="false"
-                  :disabled="isReadonly" class="compact-num"
-                  @change="(v: number) => uc.updateRow(row.id, { consumptionT1: v ?? 0 })" />
-              </template>
-            </el-table-column>
-            <el-table-column label="T-2期单耗" width="95">
-              <template #default="{ row }">
-                <el-input-number :model-value="row.consumptionT2" size="small" :controls="false"
-                  :disabled="isReadonly" class="compact-num"
-                  @change="(v: number) => uc.updateRow(row.id, { consumptionT2: v ?? 0 })" />
-              </template>
-            </el-table-column>
-          </template>
-
-          <template v-else>
-            <el-table-column label="合理性说明" min-width="140">
-              <template #default="{ row }">
-                <el-input v-if="!isReadonly" :model-value="row.rationalityNote" size="small"
-                  @update:model-value="(v: string) => uc.updateRow(row.id, { rationalityNote: v })" />
-                <span v-else>{{ row.rationalityNote }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="审计关注" width="120">
-              <template #default="{ row }">
-                <el-input v-if="!isReadonly" :model-value="row.auditFocus" size="small"
-                  @change="(v: string) => uc.updateRow(row.id, { auditFocus: v })" />
-                <span v-else>{{ row.auditFocus }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="备注" width="100">
-              <template #default="{ row }">
-                <el-input v-if="!isReadonly" :model-value="row.remark" size="small"
-                  @change="(v: string) => uc.updateRow(row.id, { remark: v })" />
-                <span v-else>{{ row.remark }}</span>
-              </template>
-            </el-table-column>
-          </template>
-
-          <el-table-column label="" width="52" fixed="right">
-            <template #default="{ row }">
-              <el-button link type="danger" size="small" :disabled="isReadonly" @click="uc.removeRow(row.id)">删</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </main>
-    </div>
-
-    <!-- 分组折叠浏览 -->
-    <div v-else-if="uc.viewMode.value === 'group'" class="group-view">
-      <el-collapse v-model="expandedGroups">
-        <el-collapse-item
-          v-for="g in uc.filteredProductGroups.value"
-          :key="g.productName"
-          :name="g.productName"
-        >
-          <template #title>
-            <div class="group-title">
-              <span class="group-name">{{ g.productName }}</span>
-              <el-tag size="small" type="info">{{ g.materialCount }} 材料</el-tag>
-              <el-tag v-if="g.abnormalCount" size="small" type="warning">{{ g.abnormalCount }} 异常</el-tag>
-              <span class="group-impact">金额影响 {{ fmtMoney(g.totalAmountImpact) }}</span>
-            </div>
-          </template>
-          <el-table :data="g.rows" border size="small" :row-class-name="rowClassName" @row-dblclick="onRowDblClick">
-            <el-table-column prop="materialName" label="材料" width="110" />
-            <el-table-column prop="spec" label="规格" width="80" />
-            <el-table-column label="标准/实际" width="110">
-              <template #default="{ row }">{{ row.standardConsumption }} / {{ row.actualConsumption }}</template>
-            </el-table-column>
-            <el-table-column label="差异率%" width="80" align="right">
-              <template #default="{ row }"><span :class="devClass(row)">{{ row.deviationPct.toFixed(1) }}</span></template>
-            </el-table-column>
-            <el-table-column label="投入产出比" width="95" align="right">
-              <template #default="{ row }"><span :class="ioClass(row)">{{ row.ioRatio.toFixed(3) }}</span></template>
-            </el-table-column>
-            <el-table-column label="金额影响" width="100" align="right">
-              <template #default="{ row }">{{ fmtMoney(row.amountImpact) }}</template>
-            </el-table-column>
-            <el-table-column label="操作" width="80">
-              <template #default="{ row }">
-                <el-button link size="small" @click="uc.jumpToRow(row)">编辑</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-collapse-item>
-      </el-collapse>
-    </div>
-
-    <!-- 虚拟滚动速览（232行） -->
-    <div v-else class="flat-view">
-      <div class="flat-hint">双击行进入聚焦编辑 · 共 {{ uc.flatRows.value.length }} 行 · 虚拟滚动已启用</div>
-      <el-table-v2
-        :columns="virtualColumns"
-        :data="uc.flatRows.value"
-        :width="flatWidth"
-        :height="480"
-        :row-height="36"
-        :header-height="40"
-        :row-event-handlers="flatRowHandlers"
-        fixed
+          </tbody>
+        </table>
+      </div>
+      <AuditNoteBlock
+        title="审计说明"
+        :value="notes.structure"
+        :readonly="isReadonly"
+        :loading="aiLoading"
+        :ai-disabled="!aiAvailable"
+        @update="saveNote('structure', $event)"
+        @ai="runAi('production-cost-structure-note')"
       />
-    </div>
+    </section>
 
-    <!-- 审计意见区（卡片式） -->
+    <!-- 二、生产成本衔接 -->
+    <section id="uc-flow" class="uc-card analysis-section">
+      <header class="uc-card-head">
+        <span class="uc-card-idx">02</span>
+        <div>
+          <h4>二、生产成本本期期初、上期期月结转、产量、产成品单位成本分析</h4>
+          <p>期初 / 投入 / 期末衔接，单位成本自动测算</p>
+        </div>
+      </header>
+      <div class="table-scroll">
+        <table class="matrix-table flow-table">
+          <thead>
+            <tr>
+              <th>年度</th>
+              <th>月份</th>
+              <th>期初余额</th>
+              <th>本期投入</th>
+              <th>转入产品</th>
+              <th>转入其他</th>
+              <th>期末余额</th>
+              <th>产量</th>
+              <th class="calc-head">单位成本</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template v-for="period in visiblePeriods" :key="period.key">
+              <tr v-for="(row, index) in flowByPeriod(period.key)" :key="row.id">
+                <td
+                  v-if="index === 0"
+                  :rowspan="flowByPeriod(period.key).length + 1"
+                  class="year-cell"
+                >
+                  {{ periodLabel(period.key) }}
+                </td>
+                <td>{{ row.month }}月</td>
+                <td v-for="field in flowFields" :key="field">
+                  <el-input-number
+                    :model-value="row[field]"
+                    size="small"
+                    :controls="false"
+                    class="compact-num"
+                    :disabled="isReadonly"
+                    @change="(v: number | undefined) => uc.updateCostFlow(row.id, { [field]: v ?? 0 })"
+                  />
+                </td>
+                <td class="calc-cell">{{ fmtPrice(row.unitCost) }}</td>
+              </tr>
+              <tr class="row-total">
+                <td>合计</td>
+                <td v-for="field in flowFields" :key="field" class="num">
+                  {{ fmt(sumFlow(period.key, field)) }}
+                </td>
+                <td class="calc-cell">{{ fmtPrice(totalFlowUnitCost(period.key)) }}</td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <AuditNoteBlock
+        title="审计说明"
+        :value="notes.flow"
+        :readonly="isReadonly"
+        :loading="aiLoading"
+        :ai-disabled="!aiAvailable"
+        @update="saveNote('flow', $event)"
+        @ai="runAi('production-cost-flow-note')"
+      />
+    </section>
+
+    <!-- 三、产品单位成本 -->
+    <section id="uc-unit" class="uc-card analysis-section">
+      <header class="uc-card-head">
+        <span class="uc-card-idx">03</span>
+        <div>
+          <h4>三、产品单位成本分析</h4>
+          <p>产成品成本衔接与单位成本拆解；同行业比较</p>
+        </div>
+      </header>
+      <div class="table-scroll">
+        <table class="matrix-table unit-table">
+          <thead>
+            <tr>
+              <th rowspan="2">年度</th>
+              <th rowspan="2">月份</th>
+              <th rowspan="2">期初产成品</th>
+              <th colspan="3">投入在产品</th>
+              <th rowspan="2">期末产成品</th>
+              <th rowspan="2" class="calc-head">成本小计</th>
+              <th rowspan="2">产量</th>
+              <th colspan="4">单位成本</th>
+            </tr>
+            <tr>
+              <th>直接材料</th>
+              <th>直接人工</th>
+              <th>制造费用</th>
+              <th class="calc-head">单位材料</th>
+              <th class="calc-head">单位人工</th>
+              <th class="calc-head">单位制造费用</th>
+              <th class="calc-head">单位成本</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template v-for="period in visiblePeriods" :key="period.key">
+              <tr v-for="(row, index) in unitByPeriod(period.key)" :key="row.id">
+                <td
+                  v-if="index === 0"
+                  :rowspan="unitByPeriod(period.key).length + 1"
+                  class="year-cell"
+                >
+                  {{ periodLabel(period.key) }}
+                </td>
+                <td>{{ row.month }}月</td>
+                <td v-for="field in unitInputFields" :key="field">
+                  <el-input-number
+                    :model-value="row[field]"
+                    size="small"
+                    :controls="false"
+                    class="compact-num"
+                    :disabled="isReadonly"
+                    @change="(v: number | undefined) => uc.updateUnitCost(row.id, { [field]: v ?? 0 })"
+                  />
+                </td>
+                <td class="calc-cell">{{ fmt(row.costTotal) }}</td>
+                <td>
+                  <el-input-number
+                    :model-value="row.outputQty"
+                    size="small"
+                    :controls="false"
+                    class="compact-num"
+                    :disabled="isReadonly"
+                    @change="(v: number | undefined) => uc.updateUnitCost(row.id, { outputQty: v ?? 0 })"
+                  />
+                </td>
+                <td class="calc-cell">{{ fmtPrice(row.unitMaterial) }}</td>
+                <td class="calc-cell">{{ fmtPrice(row.unitLabor) }}</td>
+                <td class="calc-cell">{{ fmtPrice(row.unitManufacturing) }}</td>
+                <td class="calc-cell">{{ fmtPrice(row.unitCost) }}</td>
+              </tr>
+              <tr class="row-total">
+                <td>合计</td>
+                <td v-for="field in unitInputFields" :key="field" class="num">
+                  {{ fmt(sumUnit(period.key, field)) }}
+                </td>
+                <td class="calc-cell">{{ fmt(sumUnit(period.key, 'costTotal')) }}</td>
+                <td class="num">{{ fmt(sumUnit(period.key, 'outputQty')) }}</td>
+                <td class="calc-cell">{{ fmtPrice(totalUnitComponent(period.key, 'directMaterial')) }}</td>
+                <td class="calc-cell">{{ fmtPrice(totalUnitComponent(period.key, 'directLabor')) }}</td>
+                <td class="calc-cell">{{ fmtPrice(totalUnitComponent(period.key, 'manufacturing')) }}</td>
+                <td class="calc-cell">{{ fmtPrice(totalUnitComponent(period.key, 'costTotal')) }}</td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="sub-panel">
+        <div class="sub-title">本年单位成本与同行业公司比较</div>
+        <div class="peer-name-row">
+          <el-input
+            v-for="(_, i) in uc.sheet.value.peerCompanies"
+            :key="i"
+            :model-value="uc.sheet.value.peerCompanies[i]"
+            size="small"
+            :disabled="isReadonly"
+            :placeholder="`同业公司${i + 1}`"
+            @update:model-value="(v: string) => updateTuple('peerCompanies', i, v)"
+          />
+        </div>
+        <div class="table-scroll">
+          <table class="matrix-table peer-table">
+            <thead>
+              <tr>
+                <th>项目</th>
+                <th>被审计单位单耗</th>
+                <th v-for="name in uc.sheet.value.peerCompanies" :key="name">{{ name }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in uc.sheet.value.peerRows" :key="row.id">
+                <td class="row-label">{{ row.item }}</td>
+                <td v-for="field in peerFields" :key="field">
+                  <el-input-number
+                    :model-value="row[field]"
+                    size="small"
+                    :controls="false"
+                    class="compact-num"
+                    :disabled="isReadonly"
+                    @change="(v: number | undefined) => uc.updatePeer(row.id, { [field]: v ?? 0 })"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <AuditNoteBlock
+        title="审计说明"
+        :value="notes.unit"
+        :readonly="isReadonly"
+        :loading="aiLoading"
+        :ai-disabled="!aiAvailable"
+        @update="saveNote('unit', $event)"
+        @ai="runAi('product-unit-cost-note')"
+      />
+    </section>
+
+    <!-- 四、主要原材料耗用 -->
+    <section id="uc-material" class="uc-card analysis-section">
+      <header class="uc-card-head">
+        <span class="uc-card-idx">04</span>
+        <div>
+          <h4>四、产品主要原材料耗用分析</h4>
+          <p>投入量、金额与单位产量耗用 / 单位成本</p>
+        </div>
+      </header>
+      <div class="material-name-row">
+        <span class="field-label">主要原材料</span>
+        <el-input
+          v-for="(_, i) in uc.sheet.value.consumptionMaterialNames"
+          :key="i"
+          :model-value="uc.sheet.value.consumptionMaterialNames[i]"
+          size="small"
+          :disabled="isReadonly"
+          :placeholder="`原材料${i + 1}`"
+          @update:model-value="(v: string) => updateTuple('consumptionMaterialNames', i, v)"
+        />
+      </div>
+      <div class="table-scroll">
+        <table class="matrix-table material-table">
+          <thead>
+            <tr>
+              <th rowspan="2">年度</th>
+              <th rowspan="2">月份</th>
+              <th rowspan="2">产量</th>
+              <th
+                v-for="name in uc.sheet.value.consumptionMaterialNames"
+                :key="name"
+                colspan="5"
+              >
+                {{ name }}
+              </th>
+            </tr>
+            <tr>
+              <template
+                v-for="name in uc.sheet.value.consumptionMaterialNames"
+                :key="`sub-${name}`"
+              >
+                <th>投入量</th>
+                <th>单位</th>
+                <th>投入金额</th>
+                <th class="calc-head">单位产量</th>
+                <th class="calc-head">单位成本</th>
+              </template>
+            </tr>
+          </thead>
+          <tbody>
+            <template v-for="period in visiblePeriods" :key="period.key">
+              <tr v-for="(row, index) in materialByPeriod(period.key)" :key="row.id">
+                <td
+                  v-if="index === 0"
+                  :rowspan="materialByPeriod(period.key).length + 1"
+                  class="year-cell"
+                >
+                  {{ periodLabel(period.key) }}
+                </td>
+                <td>{{ row.month }}月</td>
+                <td>
+                  <el-input-number
+                    :model-value="row.outputQty"
+                    size="small"
+                    :controls="false"
+                    class="compact-num"
+                    :disabled="isReadonly"
+                    @change="(v: number | undefined) => uc.updateMaterialConsumption(row.id, { outputQty: v ?? 0 })"
+                  />
+                </td>
+                <template v-for="key in materialKeys" :key="key">
+                  <td>
+                    <el-input-number
+                      :model-value="row[key].inputQty"
+                      size="small"
+                      :controls="false"
+                      class="compact-num"
+                      :disabled="isReadonly"
+                      @change="(v: number | undefined) => uc.updateMaterialCell(row.id, key, { inputQty: v ?? 0 })"
+                    />
+                  </td>
+                  <td>
+                    <el-input
+                      :model-value="row[key].unit"
+                      size="small"
+                      :disabled="isReadonly"
+                      @update:model-value="(v: string) => uc.updateMaterialCell(row.id, key, { unit: v })"
+                    />
+                  </td>
+                  <td>
+                    <el-input-number
+                      :model-value="row[key].inputAmount"
+                      size="small"
+                      :controls="false"
+                      class="compact-num"
+                      :disabled="isReadonly"
+                      @change="(v: number | undefined) => uc.updateMaterialCell(row.id, key, { inputAmount: v ?? 0 })"
+                    />
+                  </td>
+                  <td class="calc-cell">{{ fmtPrice(row[key].unitOutput) }}</td>
+                  <td class="calc-cell">{{ fmtPrice(row[key].unitCost) }}</td>
+                </template>
+              </tr>
+              <tr class="row-total">
+                <td>合计</td>
+                <td class="num">{{ fmt(sumMaterial(period.key, 'outputQty')) }}</td>
+                <template v-for="key in materialKeys" :key="key">
+                  <td class="num">{{ fmt(sumMaterialCell(period.key, key, 'inputQty')) }}</td>
+                  <td>—</td>
+                  <td class="num">{{ fmt(sumMaterialCell(period.key, key, 'inputAmount')) }}</td>
+                  <td class="calc-cell">{{ fmtPrice(totalMaterialMetric(period.key, key, 'inputQty')) }}</td>
+                  <td class="calc-cell">{{ fmtPrice(totalMaterialMetric(period.key, key, 'inputAmount')) }}</td>
+                </template>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+      <AuditNoteBlock
+        title="审计说明"
+        :value="notes.material"
+        :readonly="isReadonly"
+        :loading="aiLoading"
+        :ai-disabled="!aiAvailable"
+        @update="saveNote('material', $event)"
+        @ai="runAi('material-consumption-note')"
+      />
+    </section>
+
     <el-card class="opinion-card" shadow="never">
       <template #header>
         <div class="opinion-header">
-          <span class="opinion-title">分析结论</span>
+          <span class="opinion-title">五、审计结论</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="runAi('unit-consumption-conclusion')"
+          >
+            AI 生成结论
+          </el-button>
         </div>
       </template>
-      <el-input v-model="uc.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="汇总单耗异常原因、投入产出失衡说明及审计结论…" />
+      <el-input
+        :model-value="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="A、未见异常。B、除已识别事项外，其余未见异常。C、不可确认。"
+        @update:model-value="saveConclusion"
+      />
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, toRef, h } from 'vue'
-import { useF2UnitConsumption, type EnrichedUnitConsumptionRow } from '../../composables/useF2UnitConsumption'
+import { computed, defineComponent, h, onMounted, onUnmounted, reactive, ref, toRef, type Ref } from 'vue'
+import { ElButton, ElInput } from 'element-plus'
+import { useF2UnitConsumption } from '../../composables/useF2UnitConsumption'
+import { F2_64_OBJECTIVE, type UnitConsumptionSheet } from '../../composables/useF2UnitConsumptionFormulas'
+import { useF2SpecialAiGenerate, type F2SpeAiSection } from '../../composables/useF2SpecialAiGenerate'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -352,243 +578,633 @@ const uc = useF2UnitConsumption({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
 })
+const objectiveText = F2_64_OBJECTIVE
+const periods = [{ key: 'current' as const }, { key: 'prior' as const }]
+const periodMode = ref<'current' | 'prior' | 'both'>('current')
+const activeSection = ref('uc-structure')
+const visiblePeriods = computed(() => {
+  if (periodMode.value === 'both') return periods
+  return periods.filter((p) => p.key === periodMode.value)
+})
 
-const viewModes = [
-  { label: '聚焦录入', value: 'focus' },
-  { label: '分组折叠', value: 'group' },
-  { label: '全部速览', value: 'flat' },
+const sectionNav = [
+  { id: 'uc-structure', idx: '01', label: '成本构成' },
+  { id: 'uc-flow', idx: '02', label: '成本衔接' },
+  { id: 'uc-unit', idx: '03', label: '单位成本' },
+  { id: 'uc-material', idx: '04', label: '原材料单耗' },
 ]
 
-const segments = [
-  { label: '基础信息', value: 'basic' },
-  { label: '单耗分析', value: 'consumption' },
-  { label: '投入产出', value: 'io' },
-  { label: '历史对比', value: 'history' },
-  { label: '审计说明', value: 'audit' },
-]
-
-const expandedGroups = ref<string[]>([])
-const flatWidth = ref(1100)
-
-function expandAllGroups(): void {
-  expandedGroups.value = uc.filteredProductGroups.value.map((g) => g.productName)
+function scrollToSection(id: string) {
+  activeSection.value = id
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-function collapseAllGroups(): void {
-  expandedGroups.value = []
+let sectionObserver: IntersectionObserver | null = null
+onMounted(() => {
+  sectionObserver = new IntersectionObserver(
+    (entries) => {
+      const visible = entries
+        .filter((e) => e.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0]
+      if (visible?.target?.id) activeSection.value = visible.target.id
+    },
+    { rootMargin: '-20% 0px -55% 0px', threshold: [0.1, 0.35, 0.6] },
+  )
+  for (const sec of sectionNav) {
+    const el = document.getElementById(sec.id)
+    if (el) sectionObserver.observe(el)
+  }
+})
+onUnmounted(() => {
+  sectionObserver?.disconnect()
+  sectionObserver = null
+})
+
+const structureFields = ['material1', 'material2', 'material3', 'otherMaterial', 'directLabor', 'manufacturing'] as const
+const structureAmountHeaders = ['主要原材料1', '主要原材料2', '主要原材料3', '其他材料', '直接人工', '制造费用', '小计']
+const structureRateHeaders = ['主要原材料1', '主要原材料2', '主要原材料3', '其他材料', '直接人工', '制造费用']
+const flowFields = ['openingWip', 'materialInput', 'laborInput', 'manufacturingInput', 'endingWip', 'outputQty'] as const
+const unitInputFields = ['openingFinished', 'directMaterial', 'directLabor', 'manufacturing', 'endingFinished'] as const
+const peerFields = ['auditedUnit', 'peer1Unit', 'peer2Unit', 'peer3Unit'] as const
+const materialKeys = ['material1', 'material2'] as const
+
+function periodLabel(period: 'current' | 'prior'): string {
+  return period === 'current' ? uc.sheet.value.currentYear : uc.sheet.value.priorYear
+}
+function structureByPeriod(period: 'current' | 'prior') {
+  return uc.costStructureRows.value.filter((r) => r.period === period)
+}
+function flowByPeriod(period: 'current' | 'prior') {
+  return uc.costFlowRows.value.filter((r) => r.period === period)
+}
+function unitByPeriod(period: 'current' | 'prior') {
+  return uc.unitCostRows.value.filter((r) => r.period === period)
+}
+function materialByPeriod(period: 'current' | 'prior') {
+  return uc.materialConsumptionRows.value.filter((r) => r.period === period)
+}
+function sum<T>(rows: T[], getter: (row: T) => number): number {
+  return rows.reduce((s, row) => s + (getter(row) || 0), 0)
+}
+function sumStructure(period: 'current' | 'prior', field: typeof structureFields[number] | 'total') {
+  return sum(structureByPeriod(period), (r) => r[field])
+}
+function totalStructureRate(period: 'current' | 'prior', field: typeof structureFields[number]) {
+  const total = sumStructure(period, 'total')
+  return total ? sumStructure(period, field) / total : null
+}
+function sumFlow(period: 'current' | 'prior', field: typeof flowFields[number]) {
+  return sum(flowByPeriod(period), (r) => r[field])
+}
+function totalFlowUnitCost(period: 'current' | 'prior') {
+  const rows = flowByPeriod(period)
+  const qty = sum(rows, (r) => r.outputQty)
+  return qty ? sum(rows, (r) => r.productionCost) / qty : null
+}
+function sumUnit(period: 'current' | 'prior', field: typeof unitInputFields[number] | 'costTotal' | 'outputQty') {
+  return sum(unitByPeriod(period), (r) => r[field])
+}
+function totalUnitComponent(
+  period: 'current' | 'prior',
+  field: 'directMaterial' | 'directLabor' | 'manufacturing' | 'costTotal',
+) {
+  const qty = sumUnit(period, 'outputQty')
+  return qty ? sumUnit(period, field) / qty : null
+}
+function sumMaterial(period: 'current' | 'prior', field: 'outputQty') {
+  return sum(materialByPeriod(period), (r) => r[field])
+}
+function sumMaterialCell(
+  period: 'current' | 'prior',
+  key: typeof materialKeys[number],
+  field: 'inputQty' | 'inputAmount',
+) {
+  return sum(materialByPeriod(period), (r) => r[key][field])
+}
+function totalMaterialMetric(
+  period: 'current' | 'prior',
+  key: typeof materialKeys[number],
+  field: 'inputQty' | 'inputAmount',
+) {
+  const output = sumMaterial(period, 'outputQty')
+  return output ? sumMaterialCell(period, key, field) / output : null
+}
+function updateTuple(
+  key: 'materialNames' | 'consumptionMaterialNames' | 'peerCompanies',
+  index: number,
+  value: string,
+) {
+  const next = [...uc.sheet.value[key]]
+  next[index] = value
+  uc.updateMeta({ [key]: next } as Partial<UnitConsumptionSheet>)
+}
+function fmt(value: number): string {
+  return value ? value.toLocaleString('zh-CN', { maximumFractionDigits: 2 }) : '—'
+}
+function fmtPrice(value: number | null): string {
+  return value === null || !Number.isFinite(value)
+    ? '—'
+    : value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+}
+function fmtPct(value: number | null): string {
+  return value === null ? '—' : `${(value * 100).toFixed(2)}%`
 }
 
-function syncExpandedGroups(): void {
-  if (expandedGroups.value.length === 0 && uc.viewMode.value === 'group') {
-    expandedGroups.value = uc.filteredProductGroups.value.map((g) => g.productName)
+const AuditNoteBlock = defineComponent({
+  props: {
+    title: { type: String, required: true },
+    value: { type: String, required: true },
+    readonly: Boolean,
+    loading: Boolean,
+    aiDisabled: Boolean,
+  },
+  emits: ['update', 'ai'],
+  setup(p, { emit }) {
+    return () => h('div', { class: 'inline-note' }, [
+      h('div', { class: 'inline-note-head' }, [
+        h('strong', p.title),
+        h(ElButton, {
+          size: 'small',
+          type: 'primary',
+          plain: true,
+          disabled: p.readonly || p.aiDisabled || p.loading,
+          loading: p.loading,
+          onClick: () => emit('ai'),
+        }, () => 'AI 起草'),
+      ]),
+      h(ElInput, {
+        modelValue: p.value,
+        type: 'textarea',
+        autosize: { minRows: 2, maxRows: 8 },
+        disabled: p.readonly,
+        placeholder: '说明所执行程序、月度波动及异常原因与核查结果……',
+        'onUpdate:modelValue': (value: string) => emit('update', value),
+      }),
+    ])
+  },
+})
+
+type NoteKind = 'structure' | 'flow' | 'unit' | 'material'
+const noteKeys: Record<NoteKind, string> = {
+  structure: 'F2-64-note-structure',
+  flow: 'F2-64-note-flow',
+  unit: 'F2-64-note-unit',
+  material: 'F2-64-note-material',
+}
+const notes = reactive<Record<NoteKind, string>>({
+  structure: '',
+  flow: '',
+  unit: '',
+  material: '',
+})
+const auditConclusion = ref('')
+const CONCLUSION_KEY = 'F2-64-audit-conclusion'
+function persistText(key: string, value: string) {
+  const item = { item_id: key, conclusion: null, remark: value }
+  props.allResponses.set(key, item)
+  window.dispatchEvent(new CustomEvent('f2-spe:save-items', { detail: { items: [item] } }))
+}
+function saveNote(kind: NoteKind, value: string) {
+  if (props.isReadonly) return
+  notes[kind] = value
+  persistText(noteKeys[kind], value)
+}
+function saveConclusion(value: string) {
+  if (props.isReadonly) return
+  auditConclusion.value = value
+  persistText(CONCLUSION_KEY, value)
+}
+onMounted(() => {
+  for (const kind of Object.keys(noteKeys) as NoteKind[]) {
+    notes[kind] = props.allResponses.get(noteKeys[kind])?.remark || ''
+  }
+  if (!notes.structure && uc.auditNote.value) notes.structure = uc.auditNote.value
+  auditConclusion.value = props.allResponses.get(CONCLUSION_KEY)?.remark || ''
+})
+
+const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2SpecialAiGenerate(wpIdRef)
+function aiContext() {
+  return {
+    sheet: 'F2-64',
+    productName: uc.sheet.value.productName,
+    currentYear: uc.sheet.value.currentYear,
+    priorYear: uc.sheet.value.priorYear,
+    costStructure: uc.costStructureRows.value,
+    costFlow: uc.costFlowRows.value,
+    unitCost: uc.unitCostRows.value,
+    peerRows: uc.sheet.value.peerRows,
+    materialConsumption: uc.materialConsumptionRows.value,
   }
 }
-
-function fmtMoney(v: number): string {
-  if (!v) return '0'
-  return v.toLocaleString(undefined, { maximumFractionDigits: 0 })
+async function runAi(section: F2SpeAiSection) {
+  const map: Record<string, { kind?: NoteKind; title: string }> = {
+    'production-cost-structure-note': { kind: 'structure', title: 'AI 起草 · 生产成本构成说明' },
+    'production-cost-flow-note': { kind: 'flow', title: 'AI 起草 · 生产成本衔接说明' },
+    'product-unit-cost-note': { kind: 'unit', title: 'AI 起草 · 产品单位成本说明' },
+    'material-consumption-note': { kind: 'material', title: 'AI 起草 · 原材料耗用说明' },
+    'unit-consumption-conclusion': { title: 'AI 生成 · F2-64审计结论' },
+  }
+  const config = map[section]
+  const existing = config.kind ? notes[config.kind] : auditConclusion.value
+  const text = await generateAndConfirm(section, existing, aiContext(), config.title)
+  if (!text) return
+  if (config.kind) saveNote(config.kind, text)
+  else saveConclusion(text)
 }
-
-function devClass(row: EnrichedUnitConsumptionRow): string {
-  return row.isHighDeviation ? 'dev-warn' : 'formula'
-}
-
-function ioClass(row: EnrichedUnitConsumptionRow): string {
-  return row.isIoImbalance ? 'io-warn' : 'formula'
-}
-
-function rowClassName({ row }: { row: EnrichedUnitConsumptionRow }): string {
-  if (row.warningLevel === 'both') return 'row-both'
-  if (row.warningLevel === 'deviation') return 'row-dev'
-  if (row.warningLevel === 'io') return 'row-io'
-  return ''
-}
-
-function onRowDblClick(row: EnrichedUnitConsumptionRow): void {
-  uc.jumpToRow(row)
-}
-
-const flatRowHandlers = {
-  onDblclick: ({ rowData }: { rowData: EnrichedUnitConsumptionRow }) => uc.jumpToRow(rowData),
-}
-
-const virtualColumns = computed(() => [
-  { key: 'productName', dataKey: 'productName', title: '产品', width: 100 },
-  { key: 'materialName', dataKey: 'materialName', title: '材料', width: 100 },
-  { key: 'spec', dataKey: 'spec', title: '规格', width: 80 },
-  { key: 'standardConsumption', dataKey: 'standardConsumption', title: '标准单耗', width: 90, align: 'right' },
-  { key: 'actualConsumption', dataKey: 'actualConsumption', title: '实际单耗', width: 90, align: 'right' },
-  {
-    key: 'deviationPct', dataKey: 'deviationPct', title: '差异率%', width: 80, align: 'right',
-    cellRenderer: ({ rowData }: { rowData: EnrichedUnitConsumptionRow }) =>
-      h('span', { class: devClass(rowData) }, rowData.deviationPct.toFixed(1)),
-  },
-  { key: 'inputQty', dataKey: 'inputQty', title: '投入量', width: 80, align: 'right' },
-  { key: 'outputQty', dataKey: 'outputQty', title: '产出量', width: 80, align: 'right' },
-  {
-    key: 'ioRatio', dataKey: 'ioRatio', title: '投入产出比', width: 95, align: 'right',
-    cellRenderer: ({ rowData }: { rowData: EnrichedUnitConsumptionRow }) =>
-      h('span', { class: ioClass(rowData) }, rowData.outputQty ? rowData.ioRatio.toFixed(3) : '—'),
-  },
-  {
-    key: 'amountImpact', dataKey: 'amountImpact', title: '金额影响', width: 100, align: 'right',
-    cellRenderer: ({ cellData }: { cellData: number }) => h('span', {}, fmtMoney(cellData)),
-  },
-  {
-    key: 'auditFocus', dataKey: 'auditFocus', title: '审计关注', width: 120,
-  },
-])
-
-function updateFlatWidth(): void {
-  const el = document.querySelector('.f2-unit-consumption')
-  if (el) flatWidth.value = Math.max(900, el.clientWidth - 24)
-}
-
-onMounted(() => {
-  updateFlatWidth()
-  window.addEventListener('resize', updateFlatWidth)
-  syncExpandedGroups()
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', updateFlatWidth)
-})
 </script>
 
+<style scoped src="../../f2/valuation/f2ValSheetStyles.css"></style>
+<style scoped src="./f2IpoSoftStyles.css"></style>
 <style scoped>
 .f2-unit-consumption {
-  padding: 12px 16px;
+  --uc-ink: #1f2937;
+  --uc-muted: #6b7280;
+  --uc-line: #e5e7eb;
+  --uc-soft: #f8fafc;
+  --uc-accent: #334155;
+  --uc-accent-soft: #f1f5f9;
+  --uc-calc: #eff6ff;
+  --uc-calc-ink: #1d4ed8;
   font-size: var(--wp-font-size, 13px);
-  background: linear-gradient(180deg, #f8fafc 0%, #fff 120px);
-  border-radius: 8px;
 }
 
-.sheet-header {
+.uc-hero {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
   margin-bottom: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--uc-line);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fff 0%, var(--uc-soft) 100%);
+}
+.uc-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
 }
-
-.header-text h3 { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
-.sheet-code {
-  font-size: 12px; color: #909399; background: #f0f2f5;
-  padding: 2px 8px; border-radius: 4px; margin-left: 8px;
+.uc-title-row h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+  color: var(--uc-ink);
+  letter-spacing: 0.01em;
 }
-
-.stat-cards { display: flex; gap: 10px; flex-wrap: wrap; }
-.stat-card {
-  min-width: 88px; padding: 8px 14px; border-radius: 8px;
-  background: #fff; border: 1px solid #ebeef5;
-  box-shadow: 0 1px 3px rgba(0,0,0,.04);
-  display: flex; flex-direction: column; align-items: center;
-}
-.stat-card.warn { border-color: #faecd8; background: #fffbf0; }
-.stat-card.impact { border-color: #d9ecff; background: #f0f9ff; }
-.stat-val { font-size: 18px; font-weight: 700; color: #303133; line-height: 1.2; }
-.stat-label { font-size: 11px; color: #909399; margin-top: 2px; }
-
-/* 编制提示 */
-.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
-.guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
-
-/* 工具栏 */
-.tab-toolbar {
-  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;
-  margin-bottom: 12px; padding: 8px 10px; gap: 8px;
-  background: #fff; border-radius: 8px; border: 1px solid #ebeef5;
-}
-.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.chip-wrap { display: inline-flex; align-items: center; }
-.search { width: 200px; }
-
-.f2-unit-consumption :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
-.f2-unit-consumption :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
-:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
-
-.focus-layout {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: 12px;
-  min-height: 520px;
-}
-
-.product-nav {
-  background: #fff;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-  overflow: hidden;
-}
-.nav-title {
-  padding: 10px 12px;
+.uc-code {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--uc-accent-soft);
+  color: var(--uc-accent);
+  font-size: 11px;
   font-weight: 600;
+}
+.uc-desc {
+  margin: 6px 0 0;
+  color: var(--uc-muted);
   font-size: 12px;
-  color: #606266;
-  border-bottom: 1px solid #ebeef5;
-  background: #fafafa;
 }
-.product-item {
-  display: flex; flex-direction: column; align-items: flex-start;
-  width: 100%; padding: 10px 12px; border: none; background: transparent;
-  border-bottom: 1px solid #f2f3f5; cursor: pointer; text-align: left;
-  transition: background .15s;
+.uc-metrics {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
-.product-item:hover { background: #f5f7fa; }
-.product-item.active {
-  background: #ecf5ff;
-  border-left: 3px solid #409eff;
-  padding-left: 9px;
-}
-.product-name { font-weight: 500; color: #303133; margin-bottom: 4px; }
-.product-meta { font-size: 11px; color: #909399; display: flex; gap: 6px; align-items: center; }
-
-.focus-main {
-  background: #fff;
-  border: 1px solid #ebeef5;
+.uc-metric {
+  min-width: 88px;
+  padding: 8px 12px;
+  border: 1px solid var(--uc-line);
   border-radius: 8px;
+  background: #fff;
+  text-align: center;
+}
+.uc-metric.danger {
+  border-color: #fecaca;
+  background: #fff7f7;
+}
+.uc-metric.muted .uc-metric-val {
+  font-size: 13px;
+}
+.uc-metric-val {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--uc-ink);
+  line-height: 1.2;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.uc-metric.danger .uc-metric-val {
+  color: #b91c1c;
+}
+.uc-metric-label {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--uc-muted);
+}
+
+.uc-meta-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: end;
+  margin: 10px 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--uc-line);
+  border-radius: 10px;
+  background: #fff;
+}
+.uc-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+  flex: 1;
+}
+.uc-field.year {
+  min-width: 96px;
+  flex: 0 0 110px;
+}
+.uc-field > span,
+.field-label {
+  font-size: 11px;
+  color: var(--uc-muted);
+  font-weight: 500;
+}
+.toolbar-right {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-left: auto;
+}
+
+.uc-nav {
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--uc-line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+}
+.uc-section-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.uc-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--uc-muted);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.uc-nav-btn:hover {
+  background: var(--uc-soft);
+  color: var(--uc-ink);
+}
+.uc-nav-btn.active {
+  background: var(--uc-accent-soft);
+  border-color: #cbd5e1;
+  color: var(--uc-ink);
+  font-weight: 600;
+}
+.uc-nav-idx {
+  font-size: 10px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.04em;
+}
+.uc-nav-btn.active .uc-nav-idx {
+  color: #64748b;
+}
+
+.uc-card {
+  margin: 0 0 14px;
+  padding: 14px;
+  border: 1px solid var(--uc-line);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  scroll-margin-top: 64px;
+}
+.uc-card-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.uc-card-idx {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--uc-accent-soft);
+  color: var(--uc-accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+.uc-card-head h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--uc-ink);
+}
+.uc-card-head p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--uc-muted);
+}
+
+.material-name-row,
+.peer-name-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 0 0 10px;
+}
+.material-name-row :deep(.el-input),
+.peer-name-row :deep(.el-input) {
+  max-width: 160px;
+}
+
+.sub-panel {
+  margin-top: 14px;
   padding: 12px;
+  border: 1px dashed #dbe3ee;
+  border-radius: 10px;
+  background: #fbfdff;
 }
-.product-banner {
-  margin-bottom: 10px; padding: 8px 12px;
-  background: linear-gradient(90deg, #ecf5ff, #fff);
-  border-radius: 6px; border-left: 3px solid #409eff;
+.sub-title {
+  margin: 0 0 8px;
+  font-weight: 650;
+  color: #334155;
+  font-size: 13px;
 }
-.banner-stats { margin-left: 12px; font-size: 12px; color: #606266; }
-.segment-bar { margin-bottom: 10px; }
 
-.group-view :deep(.el-collapse-item__header) { font-size: var(--wp-font-size, 13px); }
-.group-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.group-name { font-weight: 600; }
-.group-impact { font-size: 12px; color: #909399; margin-left: auto; }
+.table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+  border: 1px solid var(--uc-line);
+  border-radius: 8px;
+}
+.matrix-table {
+  width: 100%;
+  min-width: 1000px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+}
+.structure-table {
+  min-width: 1450px;
+}
+.unit-table {
+  min-width: 1300px;
+}
+.material-table {
+  min-width: 1250px;
+}
+.matrix-table th,
+.matrix-table td {
+  border-right: 1px solid #eef2f7;
+  border-bottom: 1px solid #eef2f7;
+  padding: 5px 6px;
+  text-align: center;
+  vertical-align: middle;
+  background: #fff;
+}
+.matrix-table th:last-child,
+.matrix-table td:last-child {
+  border-right: none;
+}
+.matrix-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8fafc;
+  color: #475569;
+  font-weight: 600;
+  font-size: 11px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.matrix-table thead th.calc-head {
+  background: #eff6ff;
+  color: #1e40af;
+}
+.year-cell {
+  min-width: 64px;
+  background: #f8fafc !important;
+  font-weight: 700;
+  color: #334155;
+}
+.row-label {
+  text-align: left !important;
+  font-weight: 500;
+  color: #334155;
+  background: #fafbfc !important;
+}
+.calc-cell {
+  background: var(--uc-calc) !important;
+  color: var(--uc-calc-ink);
+  text-align: right !important;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.num {
+  text-align: right !important;
+  white-space: nowrap;
+}
+.row-total td {
+  background: #f1f5f9 !important;
+  font-weight: 700;
+  color: #0f172a;
+}
 
-.flat-view { background: #fff; border: 1px solid #ebeef5; border-radius: 8px; padding: 8px; }
-.flat-hint { font-size: 12px; color: #909399; margin-bottom: 6px; padding: 0 4px; }
+.inline-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--uc-line);
+  background: #fcfdff;
+  border-radius: 8px;
+}
+.inline-note-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  color: #334155;
+}
+.inline-note textarea {
+  width: 100%;
+  min-height: 64px;
+  resize: vertical;
+  box-sizing: border-box;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  padding: 8px;
+  font: inherit;
+}
 
-.formula { border-bottom: 1px dashed #909399; cursor: help; }
-.dev-warn { color: #e6a23c; font-weight: 600; background: #fdf6ec; padding: 0 4px; border-radius: 2px; }
-.io-warn { color: #f56c6c; font-weight: 600; background: #fef0f0; padding: 0 4px; border-radius: 2px; }
+.opinion-card {
+  margin-top: 8px;
+  border-radius: 12px !important;
+  border: 1px solid var(--uc-line) !important;
+}
+.opinion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.opinion-title {
+  font-weight: 650;
+  color: var(--uc-ink);
+}
 
-:deep(.row-dev) { background: #fdf6ec !important; }
-:deep(.row-io) { background: #fef0f0 !important; }
-:deep(.row-both) { background: #fde2e2 !important; }
+:deep(.compact-num) {
+  width: 78px;
+}
+:deep(.compact-num .el-input__inner) {
+  text-align: right;
+  padding: 0 3px;
+  font-size: 12px;
+}
 
-:deep(.compact-num) { width: 100%; }
-:deep(.compact-num .el-input__inner) { text-align: right; padding: 0 6px; }
-
-/* 审计意见卡片 */
-.opinion-card { margin-top: 16px; border-radius: 8px; }
-.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.opinion-header { display: flex; align-items: center; justify-content: space-between; }
-.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
-
-@media (max-width: 960px) {
-  .focus-layout { grid-template-columns: 1fr; }
-  .product-nav { max-height: 200px; }
+@media (max-width: 1000px) {
+  .uc-hero {
+    flex-direction: column;
+  }
+  .toolbar-right {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+  }
+  .uc-nav {
+    position: static;
+  }
 }
 </style>

@@ -5,8 +5,8 @@
 
 - Property 12: Export header generation from bands
     对任意长度 N 的有效 segments，build_aging_headers 生成的列头包含全部 N 个段
-    label，且带正确期间前缀（期初/期末未审/期末审定 for 3-period D2/K1/K3/G5 → 3N 列头；
-    期初/期末审定 for 2-period D3/F1 → 2N 列头）。
+    label，且带正确期间前缀（期初/期末未审/期末审定 for 3-period D2/K1/K3/G5/F1 → 3N 列头；
+    期初/期末审定 for 2-period D3 → 2N 列头）。
                                                        — Validates Requirements 8.1
 - Property 13: Import label matching maps correctly
     对任意带账龄 label 列头的导入行 + 任意匹配的项目账龄配置，match_import_aging 将每列值
@@ -41,8 +41,8 @@ _PBT = settings(
 # 期间 key → nested 字段名（与 _cycle_import_export_common._AGING_PERIOD_FIELD 对齐）
 _PERIOD_FIELD = {"prior": "agingPrior", "current": "agingCurrent", "audited": "agingAudited"}
 
-_THREE_PERIOD = ["D2", "K1", "K3", "G5"]
-_TWO_PERIOD = ["D3", "F1"]
+_THREE_PERIOD = ["D2", "K1", "K3", "G5", "F1"]
+_TWO_PERIOD = ["D3"]
 
 # 段 label 字母表：限定为中文/字母/数字，避免括号/空白干扰列头解析
 st_label = st.text(
@@ -84,7 +84,7 @@ def test_property_12_export_header_count_and_labels(segments, subject):
     """Feature: aging-config-enhancement, Property 12: Export header generation from bands.
 
     build_aging_headers 生成 len(periods)×N 列头，含全部 N 个 label，
-    每个期间前缀正确（3N for D2/K1/K3/G5，2N for D3/F1）。
+    每个期间前缀正确（3N for D2/K1/K3/G5/F1，2N for D3）。
 
     Validates: Requirements 8.1
     """
@@ -135,7 +135,7 @@ def test_property_12_three_period_has_all_three_prefixes(segments, subject):
 def test_property_12_two_period_has_only_prior_audited(segments, subject):
     """Feature: aging-config-enhancement, Property 12: Export header generation from bands.
 
-    2-period 科目（D3/F1）每段仅含 期初/期末审定，无 期末未审。
+    2-period 科目（D3）每段仅含 期初/期末审定，无 期末未审。
 
     Validates: Requirements 8.1
     """

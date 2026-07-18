@@ -42,7 +42,11 @@
       </div>
     </header>
 
-    <F2CutoffOverviewCard :all-responses="allResponses" :bs-date="bsDate" />
+    <F2CutoffOverviewCard
+      v-if="overviewReady"
+      :all-responses="allResponses"
+      :bs-date="bsDate"
+    />
 
     <details class="ct-guide guidance-details">
       <summary>编制提示</summary>
@@ -230,14 +234,16 @@
     </div>
 
     <div v-if="!isReadonly && wpId && projectId" class="auto-extract">
-      <el-collapse>
+      <el-collapse v-model="autoExtractOpen">
         <el-collapse-item
           :title="config.trace === 'source_to_voucher'
             ? '⚡ 自动提取凭证（单→账：先抽邻近入账，再补全单据；理想起点为入库/出库流水）'
             : '⚡ 自动提取凭证'"
           name="auto-extract"
         >
+          <!-- 折叠未展开时不挂载：避免首屏打 AI health / 拉起重型抽样面板 -->
           <GtCutoffAutoSampling
+            v-if="autoExtractOpen.includes('auto-extract')"
             :key="`${config.sheetCode}-${cutoff.meta.value.sampleWindowMode}-${cutoff.meta.value.amountThreshold}-${cutoff.samplingDays.value.daysBefore}-${cutoff.samplingDays.value.daysAfter}`"
             :account-code="samplingAccountCodes"
             :cutoff-direction="effectiveCutoffDirection"
@@ -256,6 +262,15 @@
         </el-collapse-item>
       </el-collapse>
     </div>
+
+    <el-alert
+      v-if="cutoff.cutoffSummary.value.uncategorizedCount >= 50"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="ct-uncat-alert"
+      :title="`当前有 ${cutoff.cutoffSummary.value.uncategorizedCount} 笔未分类样本。请在「存货类别」列标记原材料/产成品，或顶部筛选后分批处理；大样本已分页，避免卡顿。`"
+    />
 
     <!-- 按原材料 / 产成品分类编制 -->
     <template v-for="block in cutoff.categoryBlocks.value" :key="block.key || 'uncat'">
@@ -414,19 +429,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, inject, onMounted, ref, toRef, watch, type PropType, type Ref, type VNode } from 'vue'
+import { computed, defineAsyncComponent, defineComponent, h, inject, onMounted, ref, toRef, watch, type PropType, type Ref, type VNode } from 'vue'
 import {
   ElButton,
   ElDatePicker,
   ElInput,
   ElInputNumber,
   ElOption,
+  ElPagination,
   ElSelect,
   ElSwitch,
   ElTable,
   ElTableColumn,
   ElTooltip,
   ElTag,
+  ElAlert,
 } from 'element-plus'
 import { useF2CutoffSheet, type F2CutoffRow } from '../../composables/useF2CutoffSheet'
 import { useF2AiGenerate } from '../../composables/useF2AiGenerate'
@@ -442,11 +459,12 @@ import {
 } from './f2CutoffSheetConfigs'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
 import type { ExtractedVoucher, FillMode } from '../../composables/useCutoffAutoSampling'
-import GtCutoffAutoSampling from '../../cutoff/GtCutoffAutoSampling.vue'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2ReviewChip from '../shared/F2ReviewChip.vue'
 import F2CutoffOverviewCard from './F2CutoffOverviewCard.vue'
+
+const GtCutoffAutoSampling = defineAsyncComponent(() => import('../../cutoff/GtCutoffAutoSampling.vue'))
 
 type ColEmit = (e: 'update', id: string, patch: Partial<F2CutoffRow>) => void
 
@@ -524,6 +542,8 @@ function docPair(
   ])
 }
 
+const CUTOFF_PAGE_SIZE = 50
+
 const CutoffTable = defineComponent({
   name: 'F2CutoffTable',
   props: {
@@ -536,6 +556,20 @@ const CutoffTable = defineComponent({
     remove: (_id: string) => true,
   },
   setup(props, { emit }) {
+    const page = ref(1)
+    watch(
+      () => props.rows.length,
+      (len) => {
+        const maxPage = Math.max(1, Math.ceil(len / CUTOFF_PAGE_SIZE) || 1)
+        if (page.value > maxPage) page.value = maxPage
+      },
+    )
+    const pagedRows = computed(() => {
+      if (props.rows.length <= CUTOFF_PAGE_SIZE) return props.rows
+      const start = (page.value - 1) * CUTOFF_PAGE_SIZE
+      return props.rows.slice(start, start + CUTOFF_PAGE_SIZE)
+    })
+
     return () => {
       const sourceCols: VNode[] = [
         docPair(props.config.primaryDocLabel, 'docNo', 'docDate', false, props, emit),
@@ -562,13 +596,14 @@ const CutoffTable = defineComponent({
         ? [...voucherCols, ...sourceCols]
         : [...sourceCols, ...voucherCols]
 
-      return h(
+      const needPaging = props.rows.length > CUTOFF_PAGE_SIZE
+      const table = h(
         ElTable,
         {
-          data: props.rows,
+          data: pagedRows.value,
           border: true,
           size: 'small',
-          maxHeight: 360,
+          maxHeight: 420,
           class: 'cutoff-detail-table',
           rowClassName: ({ row }: { row: F2CutoffRow }) => (!row.isCorrect ? 'error-row' : ''),
         },
@@ -681,6 +716,29 @@ const CutoffTable = defineComponent({
           }),
         ],
       )
+
+      if (!needPaging) return table
+
+      return h('div', { class: 'cutoff-table-paged' }, [
+        h(ElAlert, {
+          type: 'info',
+          closable: false,
+          showIcon: true,
+          title: `本段共 ${props.rows.length} 笔，分页展示（每页 ${CUTOFF_PAGE_SIZE} 行）以保障流畅编辑`,
+          style: 'margin-bottom: 8px',
+        }),
+        table,
+        h(ElPagination, {
+          class: 'cutoff-pager',
+          background: true,
+          layout: 'total, prev, pager, next',
+          total: props.rows.length,
+          pageSize: CUTOFF_PAGE_SIZE,
+          currentPage: page.value,
+          small: true,
+          'onUpdate:currentPage': (p: number) => { page.value = p },
+        }),
+      ])
     }
   },
 })
@@ -696,6 +754,14 @@ const props = defineProps<{
 
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 async function onImported() { await reloadWorkpaperData?.() }
+
+/** 自动提取面板默认收起；展开后再挂载抽样组件 */
+const autoExtractOpen = ref<string[]>([])
+/** 总览四表汇总延后一帧，优先渲染当前表 */
+const overviewReady = ref(false)
+onMounted(() => {
+  requestAnimationFrame(() => { overviewReady.value = true })
+})
 
 const configRef = computed(() => props.config)
 const samplingParams = computed(() => getF2CutoffSamplingParams(props.config))
@@ -1037,6 +1103,12 @@ async function generateTextField(target: CutoffAiTarget): Promise<void> {
 }
 
 .summary-footer { margin: 4px 0 12px; font-size: 12px; color: #606266; }
+.ct-uncat-alert { margin-bottom: 12px; }
+.cutoff-table-paged { width: 100%; }
+.cutoff-pager {
+  margin-top: 10px;
+  justify-content: flex-end;
+}
 .ct-footer-tips {
   margin-top: 8px;
   padding: 10px 14px;

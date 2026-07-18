@@ -15,22 +15,8 @@
       <el-input v-model="noteText" type="textarea" :autosize="{ minRows: 8, maxRows: 30 }"
         :disabled="props.readonly" placeholder="长期应收款附注披露（国企格式）..." />
     </el-card>
-    <el-card shadow="never" style="margin-top: 12px">
-      <template #header><span>审计说明</span></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="props.readonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：披露项目的核对情况、审定数据来源、与明细表/审定表勾稽结果及未决事项。"
-        @change="saveAuditNote" />
-    </el-card>
-
-    <el-card shadow="never" style="margin-top: 12px">
-      <template #header><span>审计结论</span></template>
-      <el-input type="textarea" :model-value="auditConclusion" :disabled="props.readonly"
-        :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：A、附注披露完整准确。B、除下述事项外披露恰当。C、存在重大披露缺失或错误，需修改。"
-        @change="saveAuditConclusion" />
-    </el-card>
-
+    
+    
     <details class="prep-hint">
       <summary>编制提示</summary>
       <ul>
@@ -49,30 +35,6 @@ import { useG5LonRecFormData } from '../../composables/useG5LonRecFormData'
 
 const props = defineProps<{ htmlData?: any; wpId: string; projectId: string; readonly?: boolean }>()
 const noteText = ref('')
-
-// ─── 审计说明 / 审计结论（持久化 checklist_responses，item_id 前缀 G5-）───
-const g5Notes = useG5LonRecFormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
-const auditNote = ref('')
-const auditConclusion = ref('')
-const G5_NOTE_KEY = 'G5-disclosure-soe-audit-note'
-const G5_CONCLUSION_KEY = 'G5-disclosure-soe-audit-conclusion'
-function saveAuditNote(val: string): void {
-  if (props.readonly) return
-  auditNote.value = val
-  void g5Notes.saveImmediate(G5_NOTE_KEY, { conclusion: null, remark: val })
-}
-function saveAuditConclusion(val: string): void {
-  if (props.readonly) return
-  auditConclusion.value = val
-  void g5Notes.saveImmediate(G5_CONCLUSION_KEY, { conclusion: null, remark: val })
-}
-onMounted(async () => {
-  try { await g5Notes.loadAll() } catch { /* ignore */ }
-  const n = g5Notes.allResponses.value.get(G5_NOTE_KEY)
-  if (n?.remark) auditNote.value = n.remark
-  const c = g5Notes.allResponses.value.get(G5_CONCLUSION_KEY)
-  if (c?.remark) auditConclusion.value = c.remark
-})
 
 watch(noteText, (val) => {
   try {

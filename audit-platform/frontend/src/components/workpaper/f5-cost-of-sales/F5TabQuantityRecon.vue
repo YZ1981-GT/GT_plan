@@ -1,333 +1,607 @@
 <template>
   <div class="f5-qty-recon">
-    <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>1. 本表核对各品种销售数量与结转成本数量的一致性，是营业成本量本核对的核心程序。</p>
-        <p>2. 灰色底纹列为自动计算列（数量差异/差异率/可供销售量/理论结转量/理论差异），不可手工编辑。</p>
-        <p>3. 差异率超过 5% 标橙、超过 10% 标红，请从下拉选择差异原因；理论结转量=期初+产量+采购-期末。</p>
-        <p>4. 可通过 📎 上传出库单由 OCR 识别数量自动填入；量差异常可能提示成本结转错误或存货舞弊。</p>
+        <p>1. 本表验算主营业务收入确认数量与成本结转数量是否匹配；适用于制造业产品销售，其他行业可改参考格式。</p>
+        <p>2. 分厂→产品层级：产品行录入 1~12 月数量；分厂行与总计行为公式汇总；总计列=各月合计。</p>
+        <p>3. 「差异」= 本期销售数量 − 本期结转销售成本数量（各月及总计只读）。差异≠0 的产品标黄。</p>
+        <p>4. 可增删分厂/产品；销售与结转两表结构同步。交叉索引见 F5-2 / F5-5。</p>
+        <p>5. 可上传出库单/发货单 OCR，确认后回填结转数量对应月份。</p>
       </div>
     </details>
 
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：核实销售数量与结转成本数量匹配，验证成本结转的完整与准确，识别多结转/少结转导致的营业成本错报。"
+      title="审计目标：核实销售数量与结转成本数量的完整与匹配，识别月度及全年数量差异。"
       class="objective-alert"
     />
 
-    <!-- 工具栏 -->
+    <el-alert
+      v-if="recon.significantDiffs.value.length"
+      type="warning"
+      :closable="false"
+      class="change-alert"
+      :title="`存在数量差异的产品：${recon.significantDiffs.value.map((d) => `${d.plant}/${d.product}(${d.diffTotal})`).join('、')}`"
+    />
+
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="promptAddRow">+ 品种</el-button>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="promptAddPlant">+ 分厂</el-button>
+        <el-upload
+          :show-file-list="false"
+          :auto-upload="false"
+          accept=".pdf,.png,.jpg,.jpeg"
+          :disabled="isReadonly || ocrLoading"
+          @change="(upload: any) => uploadOutboundOcr(upload.raw || upload)"
+        >
+          <el-button size="small" :loading="ocrLoading" :disabled="isReadonly">出库单OCR</el-button>
+        </el-upload>
       </div>
       <div class="toolbar-right">
-        <CycleImportExportDropdown v-if="importExportCtx" :wp-id="wpId" :api-prefix="importExportCtx.apiPrefix"
-          :sheet="importExportCtx.sheet" :disabled="isReadonly" @imported="$emit('imported')" />
-        <span class="chip-wrap"><GtIndexChip value="wp:F5-2" /></span>
-        <el-tag size="small" type="info">共 {{ recon.rows.value.length }} 行</el-tag>
+        <CycleImportExportDropdown
+          v-if="ieCtx"
+          :wp-id="wpId"
+          :api-prefix="ieCtx.apiPrefix"
+          :sheet="ieCtx.sheet"
+          :disabled="isReadonly"
+          @imported="$emit('imported')"
+        />
+        <span class="chip-wrap"><GtIndexChip value="wp:F5-2" :context-project-id="projectIdStr" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:F5-5" :context-project-id="projectIdStr" /></span>
+        <el-tag size="small" type="info">{{ recon.plants.value.length }} 个分厂</el-tag>
       </div>
     </div>
 
-    <el-table :data="recon.rows.value" size="small" border stripe :row-class-name="rowClass" max-height="540">
-      <el-table-column label="#" type="index" width="44" fixed />
-      <el-table-column label="品种" width="120" fixed>
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" v-model="row.product" size="small"
-            @change="(v: string) => recon.updateCell(row.id, 'product', v)" />
-          <span v-else>{{ row.product }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="规格" width="90">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" v-model="row.spec" size="small"
-            @change="(v: string) => recon.updateCell(row.id, 'spec', v)" />
-          <span v-else>{{ row.spec }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="单位" width="70">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" v-model="row.unit" size="small"
-            @change="(v: string) => recon.updateCell(row.id, 'unit', v)" />
-          <span v-else>{{ row.unit }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="销售数量" width="110" align="right">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" v-model.number="row.salesQty" size="small"
-            @change="(v: any) => recon.updateCell(row.id, 'salesQty', v)" />
-          <span v-else>{{ fmt(row.salesQty) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="结转成本数量" width="120" align="right">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" v-model.number="row.costQty" size="small"
-            @change="(v: any) => recon.updateCell(row.id, 'costQty', v)" />
-          <span v-else>{{ fmt(row.costQty) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="数量差异" width="100" align="right" class-name="auto-calc-col">
-        <template #default="{ row }"><span class="f5-formula" title="销售-结转">{{ fmt(row.qtyVariance) }}</span></template>
-      </el-table-column>
-      <el-table-column label="差异率%" width="100" align="right" class-name="auto-calc-col">
-        <template #default="{ row }">
-          <span class="f5-formula" :class="hlClass(row)" title="数量差异/销售数量×100">{{ pct(row.varianceRate) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="差异原因" width="120">
-        <template #default="{ row }">
-          <el-select v-if="!isReadonly" v-model="row.varianceReason" size="small" clearable
-            @change="(v: string) => recon.updateCell(row.id, 'varianceReason', v)">
-            <el-option v-for="opt in recon.varianceReasonOptions" :key="opt" :value="opt" :label="opt" />
-          </el-select>
-          <span v-else>{{ row.varianceReason }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="期初库存" width="100" align="right">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" v-model.number="row.openingInventory" size="small"
-            @change="(v: any) => recon.updateCell(row.id, 'openingInventory', v)" />
-          <span v-else>{{ fmt(row.openingInventory) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="本期产量" width="100" align="right">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" v-model.number="row.currentProduction" size="small"
-            @change="(v: any) => recon.updateCell(row.id, 'currentProduction', v)" />
-          <span v-else>{{ fmt(row.currentProduction) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="本期采购" width="100" align="right">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" v-model.number="row.currentPurchase" size="small"
-            @change="(v: any) => recon.updateCell(row.id, 'currentPurchase', v)" />
-          <span v-else>{{ fmt(row.currentPurchase) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="可供销售量" width="110" align="right" class-name="auto-calc-col">
-        <template #default="{ row }"><span class="f5-formula" title="期初+产量+采购">{{ fmt(row.availableForSale) }}</span></template>
-      </el-table-column>
-      <el-table-column label="期末库存" width="100" align="right">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" v-model.number="row.closingInventory" size="small"
-            @change="(v: any) => recon.updateCell(row.id, 'closingInventory', v)" />
-          <span v-else>{{ fmt(row.closingInventory) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="理论结转量" width="110" align="right" class-name="auto-calc-col">
-        <template #default="{ row }"><span class="f5-formula" title="可供销售-期末">{{ fmt(row.theoreticalCostQty) }}</span></template>
-      </el-table-column>
-      <el-table-column label="理论差异" width="100" align="right" class-name="auto-calc-col">
-        <template #default="{ row }"><span class="f5-formula" title="理论结转-结转">{{ fmt(row.theoreticalVariance) }}</span></template>
-      </el-table-column>
-      <el-table-column label="📎OCR" width="70" v-if="!isReadonly">
-        <template #default="{ row }">
-          <el-upload :show-file-list="false" accept="image/*,.pdf" :auto-upload="false"
-            @change="(f: any) => onOcr(row.id, f)">
-            <el-button size="small" link :loading="ocrLoadingId === row.id">📎</el-button>
-          </el-upload>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="60" v-if="!isReadonly">
-        <template #default="{ row }">
-          <el-popconfirm title="确认删除？" @confirm="recon.removeRow(row.id)">
-            <template #reference><el-button size="small" type="danger" link>删除</el-button></template>
-          </el-popconfirm>
-        </template>
-      </el-table-column>
-    </el-table>
+    <F5SheetAttachments
+      v-if="projectId"
+      :project-id="projectId"
+      :wp-id="wpId"
+      sheet-code="F5-6"
+      label="数量核对附件"
+    />
 
-    <!-- 底部汇总 -->
-    <div class="f5-qty-summary">
-      <span>总销售量：<b>{{ fmt(recon.summary.value.totalSales) }}</b></span>
-      <span>总结转量：<b>{{ fmt(recon.summary.value.totalCost) }}</b></span>
-      <span>总差异：<b>{{ fmt(recon.summary.value.totalVariance) }}</b></span>
-      <span>异常品种数：<b class="warn">{{ recon.summary.value.abnormalCount }}</b></span>
-      <span>红色警告品种数：<b class="danger">{{ recon.summary.value.redCount }}</b></span>
+    <nav class="st-sec-nav" aria-label="F5-6 分区导航">
+      <button
+        v-for="item in f5QtyNav"
+        :key="item.id"
+        type="button"
+        class="st-sec-btn"
+        :class="{ active: activeId === item.id }"
+        @click="scrollTo(item.id)"
+      >{{ item.label }}</button>
+    </nav>
+
+    <!-- 1. 销售数量 -->
+    <div id="f5-6-sales" class="section-block">
+      <div class="section-title">1、本期销售数量表</div>
+      <el-table
+        :data="salesTableData"
+        size="small"
+        border
+        stripe
+        :row-class-name="rowClass"
+        max-height="360"
+      >
+        <el-table-column label="项目" width="160" fixed>
+          <template #default="{ row }">
+            <template v-if="row.__type === 'plant'">
+              <el-input
+                v-if="!isReadonly"
+                :model-value="row.name"
+                size="small"
+                @change="(v: string) => recon.updatePlantName(row.plantId, v)"
+              />
+              <strong v-else>{{ row.name }}</strong>
+            </template>
+            <template v-else-if="row.__type === 'product'">
+              <div class="product-cell">
+                <el-input
+                  v-if="!isReadonly"
+                  :model-value="row.name"
+                  size="small"
+                  @change="(v: string) => recon.updateProductName(row.plantId, row.productId, v)"
+                />
+                <span v-else class="product-name">{{ row.name }}</span>
+              </div>
+            </template>
+            <strong v-else>总计</strong>
+          </template>
+        </el-table-column>
+        <el-table-column
+          v-for="(label, mi) in monthLabels"
+          :key="`s-${label}`"
+          :label="label"
+          width="78"
+          align="right"
+        >
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.__type === 'product' && !isReadonly"
+              :model-value="row.months[mi]"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @change="(v: number | undefined) => recon.updateMonth(row.plantId, row.productId, 'sales', mi, v ?? 0)"
+            />
+            <span v-else class="f5-formula">{{ fmt(row.months[mi]) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="总计" width="90" align="right" class-name="auto-calc-col">
+          <template #default="{ row }">
+            <span class="f5-formula" title="Σ(1~12月)">{{ fmt(row.total) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="操作" width="120" fixed="right">
+          <template #default="{ row }">
+            <template v-if="row.__type === 'plant'">
+              <el-button size="small" link type="primary" @click="promptAddProduct(row.plantId)">+产品</el-button>
+              <el-popconfirm title="删除该分厂？" @confirm="recon.removePlant(row.plantId)">
+                <template #reference>
+                  <el-button size="small" link type="danger">删</el-button>
+                </template>
+              </el-popconfirm>
+            </template>
+            <el-popconfirm
+              v-else-if="row.__type === 'product'"
+              title="删除该产品？"
+              @confirm="recon.removeProduct(row.plantId, row.productId)"
+            >
+              <template #reference>
+                <el-button size="small" link type="danger">删</el-button>
+              </template>
+            </el-popconfirm>
+          </template>
+        </el-table-column>
+      </el-table>
     </div>
 
-    <!-- 审计意见区（卡片式） -->
-    <el-card class="opinion-card" shadow="never">
+    <!-- 2. 结转成本数量 -->
+    <div id="f5-6-cost" class="section-block">
+      <div class="section-title">2、本期结转销售成本数量表</div>
+      <el-table
+        :data="costTableData"
+        size="small"
+        border
+        stripe
+        :row-class-name="rowClass"
+        max-height="360"
+      >
+        <el-table-column label="项目" width="160" fixed>
+          <template #default="{ row }">
+            <strong v-if="row.__type === 'plant'">{{ row.name }}</strong>
+            <span v-else-if="row.__type === 'product'" class="product-name">{{ row.name }}</span>
+            <strong v-else>总计</strong>
+          </template>
+        </el-table-column>
+        <el-table-column
+          v-for="(label, mi) in monthLabels"
+          :key="`c-${label}`"
+          :label="label"
+          width="78"
+          align="right"
+        >
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.__type === 'product' && !isReadonly"
+              :model-value="row.months[mi]"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @change="(v: number | undefined) => recon.updateMonth(row.plantId, row.productId, 'cost', mi, v ?? 0)"
+            />
+            <span v-else class="f5-formula">{{ fmt(row.months[mi]) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="总计" width="90" align="right" class-name="auto-calc-col">
+          <template #default="{ row }">
+            <span class="f5-formula" title="Σ(1~12月)">{{ fmt(row.total) }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+
+    <!-- 3. 差异 -->
+    <div id="f5-6-diff" class="section-block">
+      <div class="section-title">3、差异（销售数量 − 结转成本数量）</div>
+      <el-table
+        :data="diffTableData"
+        size="small"
+        border
+        stripe
+        :row-class-name="diffRowClass"
+        max-height="360"
+      >
+        <el-table-column label="项目" width="160" fixed>
+          <template #default="{ row }">
+            <strong v-if="row.__type === 'plant'">{{ row.name }}</strong>
+            <span v-else-if="row.__type === 'product'" class="product-name">{{ row.name }}</span>
+            <strong v-else>总计</strong>
+          </template>
+        </el-table-column>
+        <el-table-column
+          v-for="(label, mi) in monthLabels"
+          :key="`d-${label}`"
+          :label="label"
+          width="78"
+          align="right"
+          class-name="auto-calc-col"
+        >
+          <template #default="{ row }">
+            <span class="f5-formula" :class="{ 'is-warn': row.months[mi] !== 0 }" title="销售 − 结转">
+              {{ fmt(row.months[mi]) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="总计" width="90" align="right" class-name="auto-calc-col">
+          <template #default="{ row }">
+            <span class="f5-formula" :class="{ 'is-warn': row.total !== 0 }" title="销售总计 − 结转总计">
+              {{ fmt(row.total) }}
+            </span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+
+    <el-card id="f5-6-note" class="opinion-card" shadow="never">
       <template #header>
         <div class="opinion-header">
-          <span class="opinion-title">审计说明</span>
+          <span class="opinion-title">三、审计说明</span>
           <div class="opinion-actions">
-            <el-button size="small" @click="openReview">💬</el-button>
+            <el-button
+              size="small"
+              type="primary"
+              plain
+              :disabled="isReadonly || !aiAvailable"
+              :loading="aiLoading"
+              @click="generateAiNote"
+            >🤖 AI生成说明</el-button>
+            <el-button v-if="openReviewDialog" size="small" @click="openReview">复核</el-button>
           </div>
         </div>
       </template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="销售数量与结转成本数量核对说明（差异原因、理论结转验证结论等）..." @change="saveNote" />
+      <el-input
+        :model-value="recon.auditNote.value"
+        type="textarea"
+        :autosize="{ minRows: 5, maxRows: 10 }"
+        :disabled="isReadonly"
+        placeholder="说明销售数量与结转数量的勾稽情况、月度/全年差异原因及交叉索引…"
+        @change="recon.saveAuditNote"
+      />
     </el-card>
 
-    <!-- 审计结论 -->
-    <el-card class="opinion-card" shadow="never">
+    <el-card id="f5-6-conclusion" class="opinion-card" shadow="never">
       <template #header>
         <div class="opinion-header">
-          <span class="opinion-title">审计结论</span>
+          <span class="opinion-title">四、审计结论</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="generateAiConclusion"
+          >🤖 AI生成结论</el-button>
         </div>
       </template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" :disabled="isReadonly"
-        placeholder="量本核对审计结论：销售数量与结转成本数量是否匹配，量差异常是否已查明并调整。"
-        @change="saveConclusion" />
+      <el-input
+        :model-value="recon.auditConclusion.value"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="综合评价量本数量核对是否支持成本结转完整性结论（A/B/C口径）…"
+        @change="recon.saveAuditConclusion"
+      />
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * F5TabQuantityRecon.vue — F5-6 数量核对（16列，81行）
- * >5%橙色/>10%红色 + 差异原因下拉 + 理论结转验证 + 📎OCR出库单数量识别 + 底部汇总
+ * F5TabQuantityRecon — F5-6 销售数量与结转成本数量核对明细表
+ * 源表：分厂→产品 × 销售/结转/差异 三表（1~12月+总计）+ AI说明结论
  */
-import { ref, computed, inject, toRef, type Ref } from 'vue'
+import { computed, inject, ref, toRef, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import http from '@/services/apiProxy'
-import { useF5QuantityRecon } from '../composables/useF5QuantityRecon'
+import http from '@/utils/http'
+import {
+  useF5QuantityRecon,
+  F5_QTY_MONTH_LABELS,
+} from '../composables/useF5QuantityRecon'
+import { useF5AiGenerate } from '../composables/useF5AiGenerate'
+import { useStickySectionNav } from '../composables/useStickySectionNav'
 import { resolveImportExportSheet, isImportExportSheet } from '../shared/cycleImportExportRegistry'
 import CycleImportExportDropdown from '../shared/CycleImportExportDropdown.vue'
+import F5SheetAttachments from './F5SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
+const f5QtyNav = [
+  { id: 'f5-6-sales', label: '销售' },
+  { id: 'f5-6-cost', label: '结转' },
+  { id: 'f5-6-diff', label: '差异' },
+  { id: 'f5-6-note', label: '说明' },
+  { id: 'f5-6-conclusion', label: '结论' },
+]
+const { activeId, scrollTo } = useStickySectionNav(f5QtyNav)
+
 defineEmits<{ imported: [] }>()
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   allResponses: Map<string, ChecklistResponse>
   wpId: string
+  projectId?: string
   isReadonly: boolean
-}>()
+}>(), {
+  projectId: '',
+})
 
-// 父组件模板绑定会自动解包 computed → 子组件收到纯 Map；重新包成 ref 供内部逻辑使用
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
-
-const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
-const NOTE_KEY = 'F5-6-audit-note'
-const CONCLUSION_KEY = 'F5-6-audit-conclusion'
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
 const recon = useF5QuantityRecon({
   allResponses: allResponsesRef,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
-const auditNote = ref(allResponsesRef.value.get(NOTE_KEY)?.remark ?? '')
-const auditConclusion = ref(allResponsesRef.value.get(CONCLUSION_KEY)?.remark ?? '')
-const ocrLoadingId = ref<string | null>(null)
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF5AiGenerate(wpIdRef)
 
-const importExportCtx = computed(() =>
+const ocrLoading = ref(false)
+const monthLabels = F5_QTY_MONTH_LABELS
+const projectIdStr = computed(() => props.projectId)
+const ieCtx = computed(() =>
   isImportExportSheet('f5', 'F5-6') ? resolveImportExportSheet('f5', 'F5-6') : null,
 )
 
-function saveNote() {
-  allResponsesRef.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: auditNote.value })
-  window.dispatchEvent(new CustomEvent('f5:save-items', {
-    detail: { items: [{ item_id: NOTE_KEY, conclusion: null, remark: auditNote.value }] },
-  }))
-}
-
-function saveConclusion() {
-  allResponsesRef.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: auditConclusion.value })
-  window.dispatchEvent(new CustomEvent('f5:save-items', {
-    detail: { items: [{ item_id: CONCLUSION_KEY, conclusion: null, remark: auditConclusion.value }] },
-  }))
-}
-
-async function onOcr(rowId: string, uploadFile: any) {
-  const file: File | undefined = uploadFile?.raw ?? uploadFile
-  if (!file) return
-  ocrLoadingId.value = rowId
+async function uploadOutboundOcr(file: File): Promise<void> {
+  if (props.isReadonly || !props.wpId) return
+  ocrLoading.value = true
   try {
-    const formData = new FormData()
-    formData.append('file', file)
-    const res = await http.post(
-      `/api/workpapers/${props.wpId}/f5/contract-ocr`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await http.post(`/api/workpapers/${props.wpId}/f5/contract-ocr`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      _silent: true,
+    } as any)
+    const data = res.data?.data ?? res.data ?? {}
+    const fields = data.extracted_fields ?? {}
+    const confidence = Number(data.confidence ?? 0)
+    const summary = [
+      fields.product && `产品：${fields.product}`,
+      fields.quantity != null && `数量：${fields.quantity}`,
+      fields.date && `日期：${fields.date}`,
+      fields.voucherNo && `单号：${fields.voucherNo}`,
+    ].filter(Boolean).join('\n')
+    await ElMessageBox.confirm(
+      `OCR置信度 ${(confidence * 100).toFixed(0)}%\n\n${summary || '未提取到有效字段'}\n\n是否回填到结转数量表？`,
+      '出库单OCR',
+      { confirmButtonText: '回填', cancelButtonText: '取消', type: 'info' },
     )
-    const fields = (res.data?.data ?? res.data)?.extracted_fields || {}
-    const qty = Number(fields.quantity ?? fields.qty ?? fields.出库数量)
-    if (!Number.isFinite(qty)) {
-      ElMessage.info('OCR完成，未识别到出库单数量')
-      return
-    }
-    await ElMessageBox.confirm(`识别到出库单数量 ${qty}，是否填入销售数量？`, 'OCR识别结果', {
-      confirmButtonText: '填入', cancelButtonText: '取消',
+    const applied = recon.applyOcrOutbound({
+      product: fields.product,
+      quantity: fields.quantity,
+      date: fields.date,
+      voucherNo: fields.voucherNo,
     })
-    recon.mergeOcrQuantity(rowId, qty)
-    window.dispatchEvent(new CustomEvent('f5:save-items', {
-      detail: { items: [allResponsesRef.value.get('F5-6-quantity-recon-rows')].filter(Boolean) },
-    }))
-    ElMessage.success('已填入')
-  } catch (e) {
-    if (e !== 'cancel') ElMessage.warning('OCR识别失败')
+    if (applied) {
+      ElMessage.success(`已回填至 ${F5_QTY_MONTH_LABELS[applied.monthIndex]} 结转数量`)
+    } else {
+      ElMessage.warning('未能回填，请检查分厂/产品')
+    }
+  } catch (err: any) {
+    if (err !== 'cancel' && err?.message !== 'cancel') {
+      ElMessage.warning('OCR识别失败')
+    }
   } finally {
-    ocrLoadingId.value = null
+    ocrLoading.value = false
   }
 }
 
-async function promptAddRow() {
-  try {
-    const { value } = await ElMessageBox.prompt('请输入品种名称', '新增品种', {
-      confirmButtonText: '确定', cancelButtonText: '取消',
-      inputPattern: /\S+/, inputErrorMessage: '品种名称不能为空',
+type SeriesKey = 'sales' | 'cost' | 'diff'
+
+function buildTableData(series: SeriesKey) {
+  const rows: any[] = []
+  for (const plant of recon.plants.value) {
+    const plantSeries = plant[series]
+    rows.push({
+      __type: 'plant',
+      plantId: plant.id,
+      name: plant.name,
+      months: plantSeries.months,
+      total: plantSeries.total,
     })
-    if (value) recon.addRow(value.trim())
+    for (const prod of plant.products) {
+      const ps = prod[series]
+      rows.push({
+        __type: 'product',
+        plantId: plant.id,
+        productId: prod.id,
+        name: prod.name,
+        months: ps.months,
+        total: ps.total,
+        diffTotal: prod.diff.total,
+      })
+    }
+  }
+  const gt = recon.grandTotal.value[series]
+  rows.push({
+    __type: 'total',
+    name: '总计',
+    months: gt.months,
+    total: gt.total,
+  })
+  return rows
+}
+
+const salesTableData = computed(() => buildTableData('sales'))
+const costTableData = computed(() => buildTableData('cost'))
+const diffTableData = computed(() => buildTableData('diff'))
+
+function rowClass({ row }: { row: any }): string {
+  if (row.__type === 'plant') return 'f5-row-plant'
+  if (row.__type === 'total') return 'f5-row-total'
+  return ''
+}
+
+function diffRowClass({ row }: { row: any }): string {
+  if (row.__type === 'plant') return 'f5-row-plant'
+  if (row.__type === 'total') return 'f5-row-total'
+  if (row.__type === 'product' && recon.isDiffHighlighted(row.diffTotal ?? row.total)) {
+    return 'f5-row-warn'
+  }
+  return ''
+}
+
+async function promptAddPlant() {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入分厂名称', '新增分厂', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPattern: /\S+/,
+      inputErrorMessage: '分厂名称不能为空',
+    })
+    if (value) recon.addPlant(value.trim())
   } catch { /* 取消 */ }
 }
 
-function rowClass({ row }: { row: any }): string {
-  const lvl = recon.highlightLevel(row)
-  return lvl === 'red' ? 'f5-row-red' : lvl === 'orange' ? 'f5-row-orange' : ''
+async function promptAddProduct(plantId: string) {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入产品名称', '新增产品', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPattern: /\S+/,
+      inputErrorMessage: '产品名称不能为空',
+    })
+    if (value) recon.addProduct(plantId, value.trim())
+  } catch { /* 取消 */ }
 }
-function hlClass(row: any): string {
-  const lvl = recon.highlightLevel(row)
-  return lvl === 'red' ? 'is-danger' : lvl === 'orange' ? 'is-warn' : ''
-}
+
 function fmt(v: number | null | undefined): string {
   if (v == null) return '-'
-  return v.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+  if (Math.abs(v) < 0.0005) return '-'
+  const formatted = Math.abs(v).toLocaleString('zh-CN', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+  })
+  return v < 0 ? `(${formatted})` : formatted
 }
-function pct(v: number | 'N/A' | null | undefined): string {
-  if (v == null || v === 'N/A') return 'N/A'
-  return `${v.toFixed(2)}%`
+
+function openReview() {
+  openReviewDialog?.('F5-6-conclusion')
 }
-function openReview() { openReviewDialog('F5-6-conclusion') }
+
+function aiContext(): Record<string, unknown> {
+  return {
+    sheet: 'F5-6',
+    significantDiffs: recon.significantDiffs.value,
+    grandTotal: {
+      sales: recon.grandTotal.value.sales.total,
+      cost: recon.grandTotal.value.cost.total,
+      diff: recon.grandTotal.value.diff.total,
+      salesMonths: recon.grandTotal.value.sales.months,
+      costMonths: recon.grandTotal.value.cost.months,
+      diffMonths: recon.grandTotal.value.diff.months,
+    },
+    plants: recon.plants.value.map((p) => ({
+      name: p.name,
+      salesTotal: p.sales.total,
+      costTotal: p.cost.total,
+      diffTotal: p.diff.total,
+      products: p.products.map((pr) => ({
+        name: pr.name,
+        salesTotal: pr.sales.total,
+        costTotal: pr.cost.total,
+        diffTotal: pr.diff.total,
+        salesMonths: pr.sales.months,
+        costMonths: pr.cost.months,
+        diffMonths: pr.diff.months,
+      })),
+    })),
+  }
+}
+
+async function generateAiNote() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'quantity-reconciliation-note',
+    recon.auditNote.value,
+    aiContext(),
+    'AI 生成 · F5-6审计说明',
+  )
+  if (text) recon.saveAuditNote(text)
+}
+
+async function generateAiConclusion() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'quantity-reconciliation-conclusion',
+    recon.auditConclusion.value,
+    aiContext(),
+    'AI 生成 · F5-6审计结论',
+  )
+  if (text) recon.saveAuditConclusion(text)
+}
 </script>
 
 <style scoped>
-.f5-qty-recon { padding: 12px; }
+.f5-qty-recon { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .f5-qty-recon :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
 .f5-qty-recon :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
 
-/* 编制提示 */
-.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
-.guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #315a8a;
+  background: #eef4fa;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary { cursor: pointer; font-weight: 600; color: #315a8a; }
+.guidance-content { margin-top: 8px; color: #606266; line-height: 1.65; }
+.guidance-content p { margin: 3px 0; }
+.objective-alert, .change-alert { margin-bottom: 12px; }
 
-/* 工具栏 */
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left, .toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .chip-wrap { display: inline-flex; align-items: center; }
 
-/* 表格 */
+.section-block { margin-bottom: 20px; }
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+  padding-left: 4px;
+  border-left: 3px solid #315a8a;
+}
+
+.product-cell { padding-left: 12px; }
+.product-name { padding-left: 12px; color: #c45656; }
+
 .f5-formula { border-bottom: 1px dashed #909399; cursor: help; }
 .f5-formula.is-warn { color: #e6a23c; font-weight: 600; }
-.f5-formula.is-danger { color: #f56c6c; font-weight: 700; }
 :deep(.auto-calc-col) { background-color: #f5f7fa !important; }
-.f5-qty-summary { display: flex; gap: 20px; margin-top: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; flex-wrap: wrap; }
-.f5-qty-summary .warn { color: #e6a23c; }
-.f5-qty-summary .danger { color: #f56c6c; }
-:deep(.f5-row-orange) { background: #fdf6ec; }
-:deep(.f5-row-red) { background: #fef0f0; }
+:deep(.f5-row-plant) { background: #e8eaf6 !important; font-weight: 600; }
+:deep(.f5-row-total) { background: #f0f5fa !important; font-weight: 600; }
+:deep(.f5-row-warn) { background: #fdf6ec !important; }
 
-/* 审计意见卡片 */
 .opinion-card { margin-top: 16px; border-radius: 8px; }
-.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+.opinion-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.opinion-actions { display: flex; gap: 6px; align-items: center; }
 .opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
-.opinion-actions { display: flex; gap: 6px; }
 </style>
+
+<style src="../f2/stocktake/f2StocktakeSoftNav.css"></style>

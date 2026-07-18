@@ -42,6 +42,44 @@ export function readRowJson(resp: ChecklistResponse | undefined): string | null 
   return resp.remark ?? resp.conclusion ?? null
 }
 
+/** 把项目侧适用准则字段规整为 string[]（兼容 v2 对象 / 单字符串 / 数组） */
+export function normalizeApplicableStandards(raw: unknown): string[] {
+  if (raw == null || raw === '') return []
+  if (Array.isArray(raw)) {
+    return raw
+      .flatMap((item) => {
+        if (item == null) return []
+        if (typeof item === 'string') return [item]
+        if (typeof item === 'object') {
+          const o = item as Record<string, unknown>
+          const cand = o.type ?? o.code ?? o.value ?? o.id
+          return cand != null && cand !== '' ? [String(cand)] : []
+        }
+        return [String(item)]
+      })
+      .map((s) => s.trim())
+      .filter(Boolean)
+  }
+  if (typeof raw === 'string') {
+    const t = raw.trim()
+    if (!t) return []
+    if (t.startsWith('[') || t.startsWith('{')) {
+      try {
+        return normalizeApplicableStandards(JSON.parse(t))
+      } catch { /* fall through */ }
+    }
+    return t.split(/[,，;；|/]/).map((s) => s.trim()).filter(Boolean)
+  }
+  if (typeof raw === 'object') {
+    const o = raw as Record<string, unknown>
+    if (Array.isArray(o.standards)) return normalizeApplicableStandards(o.standards)
+    if (Array.isArray(o.list)) return normalizeApplicableStandards(o.list)
+    const type = o.type ?? o.code ?? o.value
+    return type != null && type !== '' ? [String(type)] : []
+  }
+  return []
+}
+
 export function useF2FormData(options: UseF2FormDataOptions) {
   const { wpId, projectId } = options
 
@@ -79,13 +117,19 @@ export function useF2FormData(options: UseF2FormDataOptions) {
     try {
       const data = await api.get(`/api/projects/${projectId.value}`)
       const ctx = data || {}
+      const standards = normalizeApplicableStandards(
+        ctx.applicable_standards
+        ?? ctx.applicable_standard_v2
+        ?? ctx.applicableStandards
+        ?? ctx.applicable_standard,
+      )
       projectContext.value = {
+        ...ctx,
         business_category: ctx.business_category ?? undefined,
-        applicable_standards: ctx.applicable_standards ?? [],
-        entity_name: ctx.entity_name ?? undefined,
+        applicable_standards: standards,
+        entity_name: ctx.entity_name ?? ctx.client_name ?? undefined,
         audit_period_end: ctx.audit_period_end ?? undefined,
         bs_date: ctx.bs_date ?? undefined,
-        ...ctx,
       }
     } catch {
       // 项目加载失败：跳过
@@ -106,6 +150,19 @@ export function useF2FormData(options: UseF2FormDataOptions) {
       }
     } catch {
       // selfLoad 失败不阻塞
+    }
+  }
+
+  /**
+   * 关键路径：checklist + 项目上下文（结构化底稿首屏必需）。
+   * render-config / sheetCache 仅 Grid/OO 回退需要，不阻塞首屏。
+   */
+  async function loadCritical(): Promise<void> {
+    isLoading.value = true
+    try {
+      await Promise.all([loadResponses(), loadProjectContext()])
+    } finally {
+      isLoading.value = false
     }
   }
 
@@ -246,7 +303,9 @@ export function useF2FormData(options: UseF2FormDataOptions) {
     isLoading,
     projectContext,
     sheetCache,
+    loadCritical,
     loadAll,
+    selfLoad,
     getSheet,
     saveImmediate,
     saveBatch,

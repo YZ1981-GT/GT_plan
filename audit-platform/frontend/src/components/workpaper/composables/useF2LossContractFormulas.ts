@@ -85,8 +85,27 @@ export function emptyLossContractProject(): LossContractProject {
 
 export function defaultLossContractSheet(): LossContractSheet {
   return {
-    projects: Array.from({ length: 8 }, () => emptyLossContractProject()),
+    projects: [emptyLossContractProject()],
   }
+}
+
+export function isBlankLossContractProject(row: LossContractProject): boolean {
+  return !(row.projectCode || '').trim()
+    && !(row.projectName || '').trim()
+    && Number(row.completionRate || 0) === 0
+    && Number(row.recognizedRevenue || 0) === 0
+    && Number(row.estimatedTotalRevenue || 0) === 0
+    && Number(row.estimatedTotalCost || 0) === 0
+    && Number(row.priorRecognizedLoss || 0) === 0
+    && Number(row.bookRecognizedLoss || 0) === 0
+    && !(row.remark || '').trim()
+}
+
+export function pruneBlankLossContractProjects(
+  rows: LossContractProject[],
+): LossContractProject[] {
+  const filled = rows.filter((row) => !isBlankLossContractProject(row))
+  return filled.length ? filled : [emptyLossContractProject()]
 }
 
 export function resolveCompletionRate(row: LossContractProject): number {
@@ -176,28 +195,32 @@ export function migrateLossContractSheet(legacy: unknown): LossContractSheet | n
   if (typeof legacy === 'object' && legacy !== null && 'projects' in legacy) {
     const s = legacy as LossContractSheet
     return {
-      projects: s.projects?.length ? s.projects : sheet.projects,
+      projects: pruneBlankLossContractProjects(
+        s.projects?.length ? s.projects : sheet.projects,
+      ),
     }
   }
 
   if (Array.isArray(legacy) && legacy.length) {
     const first = legacy[0] as Record<string, unknown>
     if ('estimatedTotalRevenue' in first || 'estimatedTotalCost' in first) {
-      sheet.projects = (legacy as Array<Record<string, unknown>>).map((r) => ({
-        ...emptyLossContractProject(),
-        id: String(r.id || newLossContractId()),
-        projectCode: String(r.projectCode || ''),
-        projectName: String(r.projectName || ''),
-        completionRate: Number(r.completionRate ?? r.rateNum ?? 0),
-        recognizedRevenue: Number(r.recognizedRevenue ?? 0),
-        estimatedTotalRevenue: Number(r.estimatedTotalRevenue ?? 0),
-        estimatedTotalCost: Number(r.estimatedTotalCost ?? 0),
-        priorRecognizedLoss: Number(r.priorRecognizedLoss ?? r.recognizedLossInPl ?? 0),
-        bookRecognizedLoss: Number(
-          r.bookRecognizedLoss ?? r.managementProvision ?? 0,
-        ),
-        remark: String(r.remark || ''),
-      }))
+      sheet.projects = pruneBlankLossContractProjects(
+        (legacy as Array<Record<string, unknown>>).map((r) => ({
+          ...emptyLossContractProject(),
+          id: String(r.id || newLossContractId()),
+          projectCode: String(r.projectCode || ''),
+          projectName: String(r.projectName || ''),
+          completionRate: Number(r.completionRate ?? r.rateNum ?? 0),
+          recognizedRevenue: Number(r.recognizedRevenue ?? 0),
+          estimatedTotalRevenue: Number(r.estimatedTotalRevenue ?? 0),
+          estimatedTotalCost: Number(r.estimatedTotalCost ?? 0),
+          priorRecognizedLoss: Number(r.priorRecognizedLoss ?? r.recognizedLossInPl ?? 0),
+          bookRecognizedLoss: Number(
+            r.bookRecognizedLoss ?? r.managementProvision ?? 0,
+          ),
+          remark: String(r.remark || ''),
+        })),
+      )
       return sheet
     }
   }

@@ -123,6 +123,12 @@ describe('F2-10 with real ElementPlus segmented', () => {
     await nextTick()
     await new Promise((r) => setTimeout(r, 50))
     await flushPromises()
+    // defineAsyncComponent(F2DetailSheetDev) 需额外等待
+    for (let i = 0; i < 20 && !/F2-10|开发产品/.test(wrap.text()); i++) {
+      await new Promise((r) => setTimeout(r, 50))
+      await flushPromises()
+      await nextTick()
+    }
 
     const errMsg = wrap.find('.gt-error-msg')
     if (errMsg.exists()) {

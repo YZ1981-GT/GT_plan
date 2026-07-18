@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
  * F2TabProductionSales — F2-19 存货产销量变动分析表
  * 库存商品产量/销量/产销比 + 原材料采购/耗用/采购产出比/产耗比 + 说明/结论
@@ -138,7 +138,7 @@ async function genQuestion(key: typeof F2_PS_QUESTION_DEFS[number]['key'], label
           <el-table-column v-for="(lab, mi) in F2_MONTH_LABELS" :key="'p'+mi" :label="lab" width="78" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.prodMonths[mi]" :controls="false" size="small" style="width:100%"
-                @change="(v: number) => updateProductMonth(row.rowId, 'prod', mi, v ?? 0)" />
+                @change="(v: number | undefined) => updateProductMonth(row.rowId, 'prod', mi, v ?? 0)" />
               <span v-else>{{ fmt(row.prodMonths[mi]) }}</span>
             </template>
           </el-table-column>
@@ -148,7 +148,7 @@ async function genQuestion(key: typeof F2_PS_QUESTION_DEFS[number]['key'], label
           <el-table-column label="上年度" width="90" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.prodPrior" :controls="false" size="small" style="width:100%"
-                @change="(v: number) => updateProduct(row.rowId, 'prodPrior', v ?? 0)" />
+                @change="(v: number | undefined) => updateProduct(row.rowId, 'prodPrior', v ?? 0)" />
               <span v-else>{{ fmt(row.prodPrior) }}</span>
             </template>
           </el-table-column>
@@ -177,7 +177,7 @@ async function genQuestion(key: typeof F2_PS_QUESTION_DEFS[number]['key'], label
           <el-table-column v-for="(lab, mi) in F2_MONTH_LABELS" :key="'s'+mi" :label="lab" width="78" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.salesMonths[mi]" :controls="false" size="small" style="width:100%"
-                @change="(v: number) => updateProductMonth(row.rowId, 'sales', mi, v ?? 0)" />
+                @change="(v: number | undefined) => updateProductMonth(row.rowId, 'sales', mi, v ?? 0)" />
               <span v-else>{{ fmt(row.salesMonths[mi]) }}</span>
             </template>
           </el-table-column>
@@ -187,7 +187,7 @@ async function genQuestion(key: typeof F2_PS_QUESTION_DEFS[number]['key'], label
           <el-table-column label="上年度" width="90" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.salesPrior" :controls="false" size="small" style="width:100%"
-                @change="(v: number) => updateProduct(row.rowId, 'salesPrior', v ?? 0)" />
+                @change="(v: number | undefined) => updateProduct(row.rowId, 'salesPrior', v ?? 0)" />
               <span v-else>{{ fmt(row.salesPrior) }}</span>
             </template>
           </el-table-column>
@@ -251,7 +251,7 @@ async function genQuestion(key: typeof F2_PS_QUESTION_DEFS[number]['key'], label
           <el-table-column v-for="(lab, mi) in F2_MONTH_LABELS" :key="'mp'+mi" :label="lab" width="78" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.purchaseMonths[mi]" :controls="false" size="small" style="width:100%"
-                @change="(v: number) => updateMaterialMonth(row.rowId, 'purchase', mi, v ?? 0)" />
+                @change="(v: number | undefined) => updateMaterialMonth(row.rowId, 'purchase', mi, v ?? 0)" />
               <span v-else>{{ fmt(row.purchaseMonths[mi]) }}</span>
             </template>
           </el-table-column>
@@ -261,7 +261,7 @@ async function genQuestion(key: typeof F2_PS_QUESTION_DEFS[number]['key'], label
           <el-table-column label="上年度" width="90" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.purchasePrior" :controls="false" size="small" style="width:100%"
-                @change="(v: number) => updateMaterial(row.rowId, 'purchasePrior', v ?? 0)" />
+                @change="(v: number | undefined) => updateMaterial(row.rowId, 'purchasePrior', v ?? 0)" />
               <span v-else>{{ fmt(row.purchasePrior) }}</span>
             </template>
           </el-table-column>
@@ -290,7 +290,7 @@ async function genQuestion(key: typeof F2_PS_QUESTION_DEFS[number]['key'], label
           <el-table-column v-for="(lab, mi) in F2_MONTH_LABELS" :key="'mc'+mi" :label="lab" width="78" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.consumeMonths[mi]" :controls="false" size="small" style="width:100%"
-                @change="(v: number) => updateMaterialMonth(row.rowId, 'consume', mi, v ?? 0)" />
+                @change="(v: number | undefined) => updateMaterialMonth(row.rowId, 'consume', mi, v ?? 0)" />
               <span v-else>{{ fmt(row.consumeMonths[mi]) }}</span>
             </template>
           </el-table-column>
@@ -300,7 +300,7 @@ async function genQuestion(key: typeof F2_PS_QUESTION_DEFS[number]['key'], label
           <el-table-column label="上年度" width="90" align="right">
             <template #default="{ row }">
               <el-input-number v-if="!isReadonly" :model-value="row.consumePrior" :controls="false" size="small" style="width:100%"
-                @change="(v: number) => updateMaterial(row.rowId, 'consumePrior', v ?? 0)" />
+                @change="(v: number | undefined) => updateMaterial(row.rowId, 'consumePrior', v ?? 0)" />
               <span v-else>{{ fmt(row.consumePrior) }}</span>
             </template>
           </el-table-column>

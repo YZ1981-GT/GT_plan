@@ -48,6 +48,7 @@
         v-else-if="currentSheet === 'F5-2'"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         @imported="onImported"
       />
@@ -57,6 +58,7 @@
         v-else-if="currentSheet === 'F5-3'"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         @imported="onImported"
       />
@@ -66,6 +68,7 @@
         v-else-if="currentSheet === 'F5-4'"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         @imported="onImported"
       />
@@ -75,6 +78,7 @@
         v-else-if="currentSheet === 'F5-5'"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         @imported="onImported"
       />
@@ -84,6 +88,7 @@
         v-else-if="currentSheet === 'F5-6'"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         @imported="onImported"
       />
@@ -93,6 +98,7 @@
         v-else-if="currentSheet === 'F5-7'"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         :adjudicated-c-o-g-s="adjudicatedCOGS"
         :tb-data="formData.rollforwardTb.value"
@@ -241,9 +247,17 @@ function seedAdjudicatedFromStore(): void {
   else if (formData.adjudicatedCogs.value) adjudicatedCOGS.value = formData.adjudicatedCogs.value
 }
 
+function handleF5Writeback(e: Event): void {
+  const d = (e as CustomEvent<{ accountCode: string; auditedAmount: number }>).detail
+  if (d?.accountCode != null && d.auditedAmount != null) {
+    void formData.writebackTrialBalance(d.accountCode, d.auditedAmount)
+  }
+}
+
 onMounted(async () => {
   window.addEventListener('f5:save-items', handleF5SaveItems)
   window.addEventListener('substantive:adjudicated', handleAdjudicated)
+  window.addEventListener('f5:writeback-trial-balance', handleF5Writeback)
   await formData.loadAll()
   seedAdjudicatedFromStore()
   isLoading.value = false
@@ -252,6 +266,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('f5:save-items', handleF5SaveItems)
   window.removeEventListener('substantive:adjudicated', handleAdjudicated)
+  window.removeEventListener('f5:writeback-trial-balance', handleF5Writeback)
 })
 </script>
 

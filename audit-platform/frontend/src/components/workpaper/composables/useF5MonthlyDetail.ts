@@ -1,19 +1,19 @@
 /**
- * useF5MonthlyDetail — F5-2 主营业务成本月度明细（24列拆2区段）
+ * useF5MonthlyDetail — F5-2 主营业务成本月度明细表
  *
- * Spec: .kiro/specs/f5-cost-of-sales/ Task 5.1
- *
- * 上半年区段(13列)：品种|1~6月|上半年合计|占比|月均|最高月|最低月|波动系数
- * 下半年区段(11列)：7~12月|下半年合计|全年合计|上期合计|变动额|变动率
- * 公式链：上半年合计=1~6月SUM / 下半年合计=7~12月SUM / 全年=上半年+下半年 / 变动额/率 / 波动系数
+ * 源表逻辑：
+ *  品种动态行 × (1~12月 + 本期未审/调整/审定 + 上期未审/调整/审定 + 未审/审定变动比例 + 备注)
+ *  本期未审 = SUM(1~12月)；本期审定 = 未审 + 账项调整 + 重分类
+ *  上期审定 = 上期未审 + 账项调整 + 重分类
+ *  合计行纵向 SUM；比例行 = 各月合计 / 本期未审合计
+ *  与 F5-1 联动：品种全年未审/上期未审可供审定表引用
  */
-import { computed, type Ref, type ComputedRef } from 'vue'
+import { computed, ref, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import {
   parseNum,
   calcSubtotal,
-  calcChangeAmount,
+  calcAdjustedAmount,
   calcChangeRate,
-  calcCoeffOfVariation,
 } from './useF5CosOfFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 
@@ -22,217 +22,365 @@ export interface UseF5MonthlyDetailOptions {
   isReadonly?: Ref<boolean>
 }
 
-/** 月度明细行（24列，含2区段计算字段） */
 export interface MonthlyDetailRow {
   id: string
   product: string
-  // 上半年
-  month1: number
-  month2: number
-  month3: number
-  month4: number
-  month5: number
-  month6: number
-  halfYear1Total: number // 公式=1~6月SUM
-  halfYear1Ratio: number | 'N/A' // 占比(公式)：本品种全年/所有品种全年
-  halfYear1Avg: number // 月均(公式)=上半年合计/6
-  halfYear1Max: number // 最高月(1~6)
-  halfYear1Min: number // 最低月(1~6)
-  coeffOfVariation: number // 波动系数(公式)=stddev/mean(全12月)
-  // 下半年
-  month7: number
-  month8: number
-  month9: number
-  month10: number
-  month11: number
-  month12: number
-  halfYear2Total: number // 公式=7~12月SUM
-  yearTotal: number // 公式=上半年+下半年
-  priorYearTotal: number // 上期合计
-  changeAmount: number // 变动额(公式)
-  changeRate: number | 'N/A' // 变动率(公式)
+  months: number[]
+  /** 本期未审数 = Σ月度 */
+  currentUnaudited: number
+  currentAje: number
+  currentRje: number
+  /** 本期审定 = 未审 + AJE + RJE */
+  currentAudited: number
+  priorUnaudited: number
+  priorAje: number
+  priorRje: number
+  priorAudited: number
+  /** 未审变动比例% */
+  unauditedChangeRate: number | 'N/A'
+  /** 审定变动比例% */
+  auditedChangeRate: number | 'N/A'
+  remark: string
 }
 
-/** 持久化用（仅原始输入字段） */
 interface StoredMonthlyRow {
   id: string
   product: string
-  months: number[] // 长度12
-  priorYearTotal: number
+  months: number[]
+  currentAje: number
+  currentRje: number
+  priorUnaudited: number
+  priorAje: number
+  priorRje: number
+  remark: string
+}
+
+export interface MonthlyTotalRow {
+  months: number[]
+  currentUnaudited: number
+  currentAje: number
+  currentRje: number
+  currentAudited: number
+  priorUnaudited: number
+  priorAje: number
+  priorRje: number
+  priorAudited: number
+  unauditedChangeRate: number | 'N/A'
+  auditedChangeRate: number | 'N/A'
+}
+
+/** 各月占本期未审合计的比例（源表「比例」行） */
+export interface MonthlyRatioRow {
+  months: Array<number | 'N/A'>
+  currentUnaudited: number | 'N/A'
 }
 
 const STORAGE_KEY = 'F5-2-monthly-rows'
-const HIGH_VOLATILITY_THRESHOLD = 0.5
-const CHANGE_RATE_THRESHOLD = 20
+const LEGACY_STORAGE_KEY = 'F5-2-rows'
+const NOTE_KEY = 'F5-2-audit-note'
+const CONCLUSION_KEY = 'F5-2-audit-conclusion'
+/** 变动比例绝对值超过此阈值标黄（与审定表口径一致） */
+export const F5_MONTHLY_CHANGE_RATE_THRESHOLD = 30
 
-/** 上半年区段列配置（13列） */
-export const FIRST_HALF_COLUMNS = [
-  { key: 'product', label: '品种', editable: true },
-  { key: 'month1', label: '1月', editable: true },
-  { key: 'month2', label: '2月', editable: true },
-  { key: 'month3', label: '3月', editable: true },
-  { key: 'month4', label: '4月', editable: true },
-  { key: 'month5', label: '5月', editable: true },
-  { key: 'month6', label: '6月', editable: true },
-  { key: 'halfYear1Total', label: '上半年合计', editable: false, formula: '1月+…+6月' },
-  { key: 'halfYear1Ratio', label: '上半年占比', editable: false, formula: '本品种全年/合计全年×100' },
-  { key: 'halfYear1Avg', label: '上半年月均', editable: false, formula: '上半年合计/6' },
-  { key: 'halfYear1Max', label: '最高月', editable: false },
-  { key: 'halfYear1Min', label: '最低月', editable: false },
-  { key: 'coeffOfVariation', label: '波动系数', editable: false, formula: '标准差/均值(12月)' },
-] as const
+const MONTH_LABELS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'] as const
+export { MONTH_LABELS }
 
-/** 下半年+合计区段列配置（11列） */
-export const SECOND_HALF_COLUMNS = [
-  { key: 'product', label: '品种', editable: false },
-  { key: 'month7', label: '7月', editable: true },
-  { key: 'month8', label: '8月', editable: true },
-  { key: 'month9', label: '9月', editable: true },
-  { key: 'month10', label: '10月', editable: true },
-  { key: 'month11', label: '11月', editable: true },
-  { key: 'month12', label: '12月', editable: true },
-  { key: 'halfYear2Total', label: '下半年合计', editable: false, formula: '7月+…+12月' },
-  { key: 'yearTotal', label: '全年合计', editable: false, formula: '上半年+下半年' },
-  { key: 'priorYearTotal', label: '上期合计', editable: true },
-  { key: 'changeAmount', label: '变动额', editable: false, formula: '全年-上期' },
-  { key: 'changeRate', label: '变动率%', editable: false, formula: '变动额/上期×100' },
-] as const
+function emptyMonths(): number[] {
+  return new Array(12).fill(0)
+}
 
-function safeParse(jsonStr: string | null | undefined): StoredMonthlyRow[] {
+function normalizeMonths(raw: unknown): number[] {
+  if (Array.isArray(raw)) {
+    return [...raw.map(parseNum), ...emptyMonths()].slice(0, 12)
+  }
+  // 旧宽表 m1..m12
+  if (raw && typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>
+    return Array.from({ length: 12 }, (_, i) => parseNum(obj[`m${i + 1}`] ?? obj[`month${i + 1}`]))
+  }
+  return emptyMonths()
+}
+
+export function emptyF5MonthlyRow(product = ''): StoredMonthlyRow {
+  return {
+    id: `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    product,
+    months: emptyMonths(),
+    currentAje: 0,
+    currentRje: 0,
+    priorUnaudited: 0,
+    priorAje: 0,
+    priorRje: 0,
+    remark: '',
+  }
+}
+
+export function migrateF5MonthlyRows(jsonStr: string | null | undefined): StoredMonthlyRow[] {
   if (!jsonStr) return []
   try {
     const parsed = JSON.parse(jsonStr)
     if (!Array.isArray(parsed)) return []
-    return parsed.map((r: any) => ({
-      id: String(r.id ?? Date.now()),
-      product: String(r.product ?? ''),
-      months: Array.isArray(r.months) ? r.months.slice(0, 12).map(parseNum) : new Array(12).fill(0),
-      priorYearTotal: parseNum(r.priorYearTotal),
-    }))
+    return parsed.map((r: any, i: number) => {
+      let months = emptyMonths()
+      if (Array.isArray(r?.months)) {
+        months = normalizeMonths(r.months)
+      } else {
+        months = Array.from({ length: 12 }, (_, mi) =>
+          parseNum(r?.[`m${mi + 1}`] ?? r?.[`month${mi + 1}`]),
+        )
+      }
+      return {
+        id: String(r?.id ?? r?.rowId ?? `m-${Date.now()}-${i}`),
+        product: String(r?.product ?? r?.variety ?? r?.label ?? ''),
+        months,
+        currentAje: parseNum(r?.currentAje),
+        currentRje: parseNum(r?.currentRje),
+        priorUnaudited: parseNum(r?.priorUnaudited ?? r?.priorYearTotal ?? r?.priorTotal),
+        priorAje: parseNum(r?.priorAje),
+        priorRje: parseNum(r?.priorRje),
+        remark: String(r?.remark ?? ''),
+      }
+    })
   } catch {
     return []
   }
 }
 
-function computeRow(stored: StoredMonthlyRow, allYearTotal: number): MonthlyDetailRow {
-  const m = stored.months.concat(new Array(12).fill(0)).slice(0, 12)
-  const h1 = calcSubtotal(m.slice(0, 6))
-  const h2 = calcSubtotal(m.slice(6, 12))
-  const year = h1 + h2
-  const changeAmount = calcChangeAmount(year, stored.priorYearTotal)
+export function computeF5MonthlyRow(stored: StoredMonthlyRow): MonthlyDetailRow {
+  const months = normalizeMonths(stored.months)
+  const currentUnaudited = calcSubtotal(months)
+  const currentAudited = calcAdjustedAmount(currentUnaudited, stored.currentAje, stored.currentRje)
+  const priorAudited = calcAdjustedAmount(stored.priorUnaudited, stored.priorAje, stored.priorRje)
   return {
     id: stored.id,
     product: stored.product,
-    month1: m[0], month2: m[1], month3: m[2], month4: m[3], month5: m[4], month6: m[5],
-    halfYear1Total: h1,
-    halfYear1Ratio: allYearTotal === 0 ? 'N/A' : (year / allYearTotal) * 100,
-    halfYear1Avg: h1 / 6,
-    halfYear1Max: Math.max(...m.slice(0, 6)),
-    halfYear1Min: Math.min(...m.slice(0, 6)),
-    coeffOfVariation: calcCoeffOfVariation(m),
-    month7: m[6], month8: m[7], month9: m[8], month10: m[9], month11: m[10], month12: m[11],
-    halfYear2Total: h2,
-    yearTotal: year,
-    priorYearTotal: stored.priorYearTotal,
-    changeAmount,
-    changeRate: calcChangeRate(year, stored.priorYearTotal),
+    months,
+    currentUnaudited,
+    currentAje: stored.currentAje,
+    currentRje: stored.currentRje,
+    currentAudited,
+    priorUnaudited: stored.priorUnaudited,
+    priorAje: stored.priorAje,
+    priorRje: stored.priorRje,
+    priorAudited,
+    unauditedChangeRate: calcChangeRate(currentUnaudited, stored.priorUnaudited),
+    auditedChangeRate: calcChangeRate(currentAudited, priorAudited),
+    remark: stored.remark,
+  }
+}
+
+export function buildF5MonthlyTotal(rows: MonthlyDetailRow[]): MonthlyTotalRow {
+  const months = emptyMonths()
+  let currentAje = 0
+  let currentRje = 0
+  let priorUnaudited = 0
+  let priorAje = 0
+  let priorRje = 0
+  for (const row of rows) {
+    for (let i = 0; i < 12; i++) months[i] += row.months[i] || 0
+    currentAje += row.currentAje
+    currentRje += row.currentRje
+    priorUnaudited += row.priorUnaudited
+    priorAje += row.priorAje
+    priorRje += row.priorRje
+  }
+  const currentUnaudited = calcSubtotal(months)
+  const currentAudited = calcAdjustedAmount(currentUnaudited, currentAje, currentRje)
+  const priorAudited = calcAdjustedAmount(priorUnaudited, priorAje, priorRje)
+  return {
+    months,
+    currentUnaudited,
+    currentAje,
+    currentRje,
+    currentAudited,
+    priorUnaudited,
+    priorAje,
+    priorRje,
+    priorAudited,
+    unauditedChangeRate: calcChangeRate(currentUnaudited, priorUnaudited),
+    auditedChangeRate: calcChangeRate(currentAudited, priorAudited),
+  }
+}
+
+export function buildF5MonthlyRatioRow(total: MonthlyTotalRow): MonthlyRatioRow {
+  const base = total.currentUnaudited
+  return {
+    months: total.months.map((m) => (base === 0 ? 'N/A' as const : (m / base) * 100)),
+    currentUnaudited: base === 0 ? 'N/A' : 100,
   }
 }
 
 export function useF5MonthlyDetail(options: UseF5MonthlyDetailOptions) {
   const { allResponses, isReadonly } = options
-  const readonly = isReadonly ?? computed(() => false)
+  const readonly = isReadonly ?? ref(false)
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null
+  let lastPersisted = ''
 
-  const storedRows = computed<StoredMonthlyRow[]>(() =>
-    safeParse(allResponses.value.get(STORAGE_KEY)?.remark),
-  )
+  const storedRows = ref<StoredMonthlyRow[]>([])
+  const auditNote = ref('')
+  const auditConclusion = ref('')
 
-  const allYearTotal = computed(() =>
-    calcSubtotal(storedRows.value.map((r) => calcSubtotal(r.months.slice(0, 12)))),
+  function rawJson(): string | null | undefined {
+    return allResponses.value.get(STORAGE_KEY)?.remark
+      ?? allResponses.value.get(LEGACY_STORAGE_KEY)?.remark
+  }
+
+  function loadRows(): void {
+    const migrated = migrateF5MonthlyRows(rawJson())
+    storedRows.value = migrated.length
+      ? migrated
+      : [emptyF5MonthlyRow('品种1'), emptyF5MonthlyRow('品种2'), emptyF5MonthlyRow('品种3')]
+  }
+
+  watch(() => rawJson(), (raw) => {
+    if (raw && (raw === lastPersisted || raw === JSON.stringify(storedRows.value))) return
+    loadRows()
+  }, { immediate: true })
+
+  watch(
+    () => [
+      allResponses.value.get(NOTE_KEY)?.remark,
+      allResponses.value.get(CONCLUSION_KEY)?.remark,
+    ],
+    ([note, conclusion]) => {
+      auditNote.value = typeof note === 'string' ? note : ''
+      auditConclusion.value = typeof conclusion === 'string' ? conclusion : ''
+    },
+    { immediate: true },
   )
 
   const rows: ComputedRef<MonthlyDetailRow[]> = computed(() =>
-    storedRows.value.map((s) => computeRow(s, allYearTotal.value)),
+    storedRows.value.map(computeF5MonthlyRow),
+  )
+  const totalRow = computed(() => buildF5MonthlyTotal(rows.value))
+  const ratioRow = computed(() => buildF5MonthlyRatioRow(totalRow.value))
+
+  const significantChanges = computed(() =>
+    rows.value.filter((row) => {
+      const rates = [row.unauditedChangeRate, row.auditedChangeRate]
+      return rates.some((r) => typeof r === 'number' && Math.abs(r) >= F5_MONTHLY_CHANGE_RATE_THRESHOLD)
+    }),
   )
 
-  /** 底部合计行 */
-  const totalRow = computed(() => {
-    const monthTotals = new Array(12).fill(0)
-    let priorTotal = 0
-    for (const r of storedRows.value) {
-      for (let i = 0; i < 12; i++) monthTotals[i] += r.months[i] ?? 0
-      priorTotal += r.priorYearTotal
+  /** 持久化时附带 m1..m12，便于导入导出宽表与 months 数组互转 */
+  function toPersistRows(): Array<StoredMonthlyRow & Record<string, number | string>> {
+    return storedRows.value.map((r) => {
+      const flat: StoredMonthlyRow & Record<string, number | string> = { ...r, months: [...r.months] }
+      for (let i = 0; i < 12; i++) flat[`m${i + 1}`] = r.months[i] || 0
+      return flat
+    })
+  }
+
+  function persist(): void {
+    const json = JSON.stringify(toPersistRows())
+    lastPersisted = json
+    allResponses.value.set(STORAGE_KEY, { item_id: STORAGE_KEY, conclusion: null, remark: json })
+    debounceSave()
+  }
+
+  function debounceSave(): void {
+    if (debounceTimer) clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      flushSave()
+    }, 1200)
+  }
+
+  function flushSave(): void {
+    const items = [
+      allResponses.value.get(STORAGE_KEY),
+      allResponses.value.get(NOTE_KEY),
+      allResponses.value.get(CONCLUSION_KEY),
+    ].filter(Boolean)
+    if (items.length) {
+      window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items } }))
     }
-    const h1 = calcSubtotal(monthTotals.slice(0, 6))
-    const h2 = calcSubtotal(monthTotals.slice(6, 12))
-    const year = h1 + h2
-    return {
-      monthTotals,
-      halfYear1Total: h1,
-      halfYear2Total: h2,
-      yearTotal: year,
-      priorYearTotal: priorTotal,
-      changeAmount: calcChangeAmount(year, priorTotal),
-      changeRate: calcChangeRate(year, priorTotal),
-    }
-  })
-
-  /** 高亮判定：变动率绝对值>20% 或 波动系数>0.5 */
-  function isRowHighlighted(row: MonthlyDetailRow): boolean {
-    const rateExceed = row.changeRate !== 'N/A' && Math.abs(row.changeRate) > CHANGE_RATE_THRESHOLD
-    return rateExceed || row.coeffOfVariation > HIGH_VOLATILITY_THRESHOLD
   }
 
-  function isVolatilityHigh(row: MonthlyDetailRow): boolean {
-    return row.coeffOfVariation > HIGH_VOLATILITY_THRESHOLD
-  }
-
-  function persist(rows: StoredMonthlyRow[]): void {
-    allResponses.value.set(STORAGE_KEY, { item_id: STORAGE_KEY, conclusion: null, remark: JSON.stringify(rows) })
-  }
-
-  /** 更新单元格（区段间通过同一 storedRow 共享 → 行同步） */
   function updateCell(id: string, key: string, value: number | string): void {
     if (readonly.value) return
-    const stored = safeParse(allResponses.value.get(STORAGE_KEY)?.remark)
-    const idx = stored.findIndex((r) => r.id === id)
-    if (idx === -1) return
+    const row = storedRows.value.find((r) => r.id === id)
+    if (!row) return
     const monthMatch = /^month(\d{1,2})$/.exec(key)
     if (monthMatch) {
-      const mIdx = Number(monthMatch[1]) - 1
-      if (mIdx >= 0 && mIdx < 12) stored[idx].months[mIdx] = parseNum(value)
+      const idx = Number(monthMatch[1]) - 1
+      if (idx >= 0 && idx < 12) row.months[idx] = parseNum(value)
+    } else if (key === 'product' || key === 'remark') {
+      ;(row as any)[key] = String(value ?? '')
+    } else if (['currentAje', 'currentRje', 'priorUnaudited', 'priorAje', 'priorRje'].includes(key)) {
+      ;(row as any)[key] = parseNum(value)
     } else if (key === 'priorYearTotal') {
-      stored[idx].priorYearTotal = parseNum(value)
-    } else if (key === 'product') {
-      stored[idx].product = String(value ?? '')
+      // 兼容旧字段名
+      row.priorUnaudited = parseNum(value)
     }
-    persist(stored)
+    persist()
   }
 
-  function addRow(product: string): void {
-    if (readonly.value || !product) return
-    const stored = safeParse(allResponses.value.get(STORAGE_KEY)?.remark)
-    stored.push({ id: `m-${Date.now()}`, product, months: new Array(12).fill(0), priorYearTotal: 0 })
-    persist(stored)
+  function updateMonth(id: string, monthIndex: number, value: number | string): void {
+    if (monthIndex < 0 || monthIndex > 11) return
+    updateCell(id, `month${monthIndex + 1}`, value)
+  }
+
+  function addRow(product = ''): void {
+    if (readonly.value) return
+    storedRows.value.push(emptyF5MonthlyRow(product || `品种${storedRows.value.length + 1}`))
+    persist()
   }
 
   function removeRow(id: string): void {
     if (readonly.value) return
-    const stored = safeParse(allResponses.value.get(STORAGE_KEY)?.remark).filter((r) => r.id !== id)
-    persist(stored)
+    if (storedRows.value.length <= 1) {
+      storedRows.value = [emptyF5MonthlyRow('品种1')]
+      persist()
+      return
+    }
+    storedRows.value = storedRows.value.filter((r) => r.id !== id)
+    persist()
   }
+
+  function isRowHighlighted(row: MonthlyDetailRow): boolean {
+    return [row.unauditedChangeRate, row.auditedChangeRate].some(
+      (r) => typeof r === 'number' && Math.abs(r) >= F5_MONTHLY_CHANGE_RATE_THRESHOLD,
+    )
+  }
+
+  function saveAuditNote(value: string): void {
+    if (readonly.value) return
+    auditNote.value = value
+    allResponses.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: value })
+    debounceSave()
+  }
+
+  function saveAuditConclusion(value: string): void {
+    if (readonly.value) return
+    auditConclusion.value = value
+    allResponses.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: value })
+    debounceSave()
+  }
+
+  onBeforeUnmount(() => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
+      flushSave()
+    }
+  })
 
   return {
     rows,
     totalRow,
-    allYearTotal,
-    firstHalfColumns: FIRST_HALF_COLUMNS,
-    secondHalfColumns: SECOND_HALF_COLUMNS,
-    isRowHighlighted,
-    isVolatilityHigh,
+    ratioRow,
+    significantChanges,
+    auditNote,
+    auditConclusion,
     updateCell,
+    updateMonth,
     addRow,
     removeRow,
+    isRowHighlighted,
+    saveAuditNote,
+    saveAuditConclusion,
+    loadRows: loadRows,
   }
 }
 

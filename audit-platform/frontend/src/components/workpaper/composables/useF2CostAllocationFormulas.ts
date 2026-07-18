@@ -70,13 +70,32 @@ export function emptyAllocationProduct(): CostAllocationProduct {
   }
 }
 
-/** 源模板约 12 个产品行 */
+/** 是否为尚未录入的空白产品行 */
+export function isBlankAllocationProduct(row: CostAllocationProduct): boolean {
+  return !(
+    row.productName.trim()
+    || n(row.outputQty)
+    || n(row.bookUnitCost)
+    || n(row.allocationBase)
+    || row.baseNote.trim()
+  )
+}
+
+/** 裁剪预留空行：只保留已填行；若全部空白则仅保留 1 行 */
+export function pruneBlankAllocationProducts(
+  rows: CostAllocationProduct[],
+): CostAllocationProduct[] {
+  const filled = rows.filter((r) => !isBlankAllocationProduct(r))
+  return filled.length ? filled : [rows[0] ?? emptyAllocationProduct()]
+}
+
+/** 不预留空行；需要时由「+ 增行」添加 */
 export function defaultAllocationSheet(): CostAllocationSheet {
   return {
     sampleMonth: '',
     workshop: '',
     pool: { material: 0, labor: 0, overhead: 0, other: 0, linkSource: true },
-    products: Array.from({ length: 12 }, () => emptyAllocationProduct()),
+    products: [emptyAllocationProduct()],
   }
 }
 
@@ -182,9 +201,11 @@ export function migrateAllocationSheet(legacy: unknown): CostAllocationSheet | n
       sampleMonth: String(obj.sampleMonth ?? ''),
       workshop: String(obj.workshop ?? ''),
       pool: { ...base.pool, ...(typeof obj.pool === 'object' && obj.pool ? obj.pool : {}) },
-      products: Array.isArray(obj.products) && obj.products.length
-        ? (obj.products as Record<string, unknown>[]).map(sanitizeProduct)
-        : base.products,
+      products: pruneBlankAllocationProducts(
+        Array.isArray(obj.products) && obj.products.length
+          ? (obj.products as Record<string, unknown>[]).map(sanitizeProduct)
+          : base.products,
+      ),
     }
   }
   if (Array.isArray(legacy) && legacy.length) {
@@ -192,7 +213,9 @@ export function migrateAllocationSheet(legacy: unknown): CostAllocationSheet | n
     if ('allocationBase' in first || 'productName' in first) {
       return {
         ...defaultAllocationSheet(),
-        products: (legacy as Record<string, unknown>[]).map(sanitizeProduct),
+        products: pruneBlankAllocationProducts(
+          (legacy as Record<string, unknown>[]).map(sanitizeProduct),
+        ),
       }
     }
   }

@@ -6,11 +6,38 @@ import {
   calcCheckStats,
   migrateContractCostCheckSheet,
   emptyCheckSample,
+  isBlankContractCostCheckSample,
+  pruneBlankContractCostCheckSamples,
+  evaluateContractCostEvidence,
 } from '../useF2ContractCostCheckFormulas'
 
 describe('useF2ContractCostCheckFormulas', () => {
-  it('default sheet has 8 samples', () => {
-    expect(defaultContractCostCheckSheet().samples).toHaveLength(8)
+  it('default sheet keeps one editable sample', () => {
+    expect(defaultContractCostCheckSheet().samples).toHaveLength(1)
+    expect(isBlankContractCostCheckSample(defaultContractCostCheckSheet().samples[0])).toBe(true)
+  })
+
+  it('prunes reserved blank samples and retains entered rows', () => {
+    const entered = { ...emptyCheckSample(), voucherNo: '记-001' }
+    expect(pruneBlankContractCostCheckSamples([
+      emptyCheckSample(),
+      entered,
+      emptyCheckSample(),
+    ])).toEqual([entered])
+  })
+
+  it('evaluates missing and mismatched supporting documents', () => {
+    const checks = evaluateContractCostEvidence({
+      ...emptyCheckSample(),
+      voucherNo: '记-001',
+      businessContent: '材料采购',
+      voucherAmount: 1000,
+      receiptProductName: '钢材',
+      receiptAmount: 800,
+    })
+    expect(checks.find((item) => item.key === 'voucher')?.status).toBe('ok')
+    expect(checks.find((item) => item.key === 'receipt')?.status).toBe('mismatch')
+    expect(checks.find((item) => item.key === 'contract')?.status).toBe('missing')
   })
 
   it('flags abnormal rows', () => {

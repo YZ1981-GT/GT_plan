@@ -1,0 +1,712 @@
+{
+  "config": {
+    "configFile": "D:\\GT_plan\\audit-platform\\frontend\\playwright.config.ts",
+    "rootDir": "D:/GT_plan/audit-platform/frontend/e2e",
+    "forbidOnly": false,
+    "fullyParallel": true,
+    "globalSetup": "D:\\GT_plan\\audit-platform\\frontend\\e2e\\global-setup.ts",
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "D:/GT_plan/audit-platform/frontend/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "D:/GT_plan/audit-platform/frontend/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.60.0",
+    "workers": 1,
+    "webServer": {
+      "command": "npm run dev",
+      "url": "http://localhost:3030",
+      "reuseExistingServer": true
+    }
+  },
+  "suites": [
+    {
+      "title": "evidence-governance-secure-intake-uat.spec.ts",
+      "file": "evidence-governance-secure-intake-uat.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Wave9 安全接收 suite — 附件/OCR/AI 证据链治理加固",
+          "file": "evidence-governance-secure-intake-uat.spec.ts",
+          "line": 167,
+          "column": 6,
+          "specs": [
+            {
+              "title": "UAT-01 每次上传先建最小 UploadAttempt 审计；仅合法附件形成可用记录，失败尝试保留 outcome 但无可用 Attachment/Version 或可访问恶意文件 (R1)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 119,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[secure-intake-uat wiring]\n{\n  \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiNmY4ZThkMC04YjY0LTQ3YWItYmJjMy1iZmFlZDJiNTFlOTgiLCJleHAiOjE3ODQyMjM1MTgsInR5cGUiOiJhY2Nlc3MiLCJqdGkiOiI0M2Q4YjRmZDNjNzU0MTAxYWI4ODgyNjgzNzM0ZTBjMCJ9.9kLD0XZ9XRYdiZn3HIo0JK21LuxSECE5sU7qlSoGChw\",\n  \"loginOk\": true,\n  \"refsListStatus\": 200,\n  \"refsListHealthy\": true,\n  \"uploadStatus\": 201,\n  \"uploadWired\": true,\n  \"contentStatus\": 404,\n  \"contentWired\": true,\n  \"notes\": []\n}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:38.122Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0025a64ba13b9e6afc43-7ca558b6be7c1fe34320",
+              "file": "evidence-governance-secure-intake-uat.spec.ts",
+              "line": 173,
+              "column": 3
+            },
+            {
+              "title": "UAT-02 [一票否决] Storage_Boundary 外路径在读取字节前被否决，且不泄露路径/存在性 (R1, R12)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 13,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:38.888Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0025a64ba13b9e6afc43-af19818bb9ce985693df",
+              "file": "evidence-governance-secure-intake-uat.spec.ts",
+              "line": 220,
+              "column": 3
+            },
+            {
+              "title": "UAT-03 [一票否决] 项目 A 附件关联项目 B 底稿被否决；关联数不变；不暴露 B 信息 (R3, R4)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 36,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:38.912Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "0025a64ba13b9e6afc43-e08ccab41823bd98d282",
+              "file": "evidence-governance-secure-intake-uat.spec.ts",
+              "line": 249,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "uat-ocr-rag-governance.spec.ts",
+      "file": "uat-ocr-rag-governance.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "证据治理 UAT — OCR & RAG 套件 (R5/R6/R7/R9)",
+          "file": "uat-ocr-rag-governance.spec.ts",
+          "line": 238,
+          "column": 6,
+          "specs": [
+            {
+              "title": "A1 · 浏览器登录 + 应用外壳可达（admin/admin123）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 2029,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:38.995Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "940b353303b049ca5ebc-600fda676439f8eaa806",
+              "file": "uat-ocr-rag-governance.spec.ts",
+              "line": 249,
+              "column": 3
+            },
+            {
+              "title": "A2 · OCR 治理路由已注册（未认证 → 401，非 404）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:41.153Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "940b353303b049ca5ebc-0c93010c44ea13eaa022",
+              "file": "uat-ocr-rag-governance.spec.ts",
+              "line": 259,
+              "column": 3
+            },
+            {
+              "title": "A3 · OCR 治理契约返回脱敏编码结果（404 SCOPE_NOT_FOUND + error_code 信封）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 201,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:41.167Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "940b353303b049ca5ebc-01709cdd0df0802edf45",
+              "file": "uat-ocr-rag-governance.spec.ts",
+              "line": 266,
+              "column": 3
+            },
+            {
+              "title": "A4 · 安全上传端点已接线（可自供受治理 OCR 源：201 + content_hash + version）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 267,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:41.374Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "940b353303b049ca5ebc-1ce9927cd8be3b94ffd6",
+              "file": "uat-ocr-rag-governance.spec.ts",
+              "line": 283,
+              "column": 3
+            },
+            {
+              "title": "A5 · citation 治理 HTTP 契约已接线（list/locate/validate 可达，受 scope 治理）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 218,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:41.647Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "940b353303b049ca5ebc-53605a44400d88646c42",
+              "file": "uat-ocr-rag-governance.spec.ts",
+              "line": 295,
+              "column": 3
+            },
+            {
+              "title": "A6 · 无浏览器可达的 OCR 识别/结果播种入口（映射/确认/写回受治理但无 500）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 331,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:41.872Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "940b353303b049ca5ebc-733abcd96c2c45830f5e",
+              "file": "uat-ocr-rag-governance.spec.ts",
+              "line": 331,
+              "column": 3
+            },
+            {
+              "title": "UAT-06 · Job 重启恢复：同一 Job/transition 恢复、幂等复用、不重复消费",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "UAT-06 验收判据",
+                      "description": "OCR running/queued 时刷新/重启后：复用同一 OCRJob（幂等键命中 + 相同载荷编排复用）、transition 恢复可查、不重复消费。真实进程重启不可行 → 以新会话重查证明持久化。"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 598,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:42.209Z",
+                      "annotations": [
+                        {
+                          "type": "UAT-06 验收判据",
+                          "description": "OCR running/queued 时刷新/重启后：复用同一 OCRJob（幂等键命中 + 相同载荷编排复用）、transition 恢复可查、不重复消费。真实进程重启不可行 → 以新会话重查证明持久化。"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "940b353303b049ca5ebc-4a80e74b8a3ef971720a",
+              "file": "uat-ocr-rag-governance.spec.ts",
+              "line": 377,
+              "column": 3
+            },
+            {
+              "title": "UAT-07(契约) · 确认/写回/映射端点受治理且绝不 500（可达网络契约）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "UAT-07 可达契约",
+                      "description": "对已提交但尚无 OCRResult 的 Job，映射/确认/写回端点必须受 scope+capability 治理并返回稳定编码（404/422），绝不 500 崩溃。这证明端点已正确接线、错误脱敏、幂等键强制。"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 366,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:42.815Z",
+                      "annotations": [
+                        {
+                          "type": "UAT-07 可达契约",
+                          "description": "对已提交但尚无 OCRResult 的 Job，映射/确认/写回端点必须受 scope+capability 治理并返回稳定编码（404/422），绝不 500 崩溃。这证明端点已正确接线、错误脱敏、幂等键强制。"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "940b353303b049ca5ebc-b544fbdb5ec98b499fc3",
+              "file": "uat-ocr-rag-governance.spec.ts",
+              "line": 462,
+              "column": 3
+            },
+            {
+              "title": "UAT-07(正向) · 人工确认 → 原子写回（required 均 decided / rejected 不映射 / 全写或全回滚）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "UAT-07 验收判据",
+                      "description": "低置信字段 corrected→confirm→原子写回；rejected 永不进入 mapping；所有 required 必须先 decided；目标版本冲突 → 无部分更新（成功全写/失败全回滚）。"
+                    },
+                    {
+                      "type": "skip",
+                      "description": "BLOCKED（非一票否决）：原子写回正向流程需要一条带 OCRResult 的 Job，但 OCR 识别由 worker 调用 UnifiedOCRService 完成，POST /jobs 只创建 queued Job（不运行识别、不产 OCRResult），且无任何 HTTP 端点触发 worker 或播种 OCRResult → 浏览器/网络层无法进行 accept/correct/reject 与写回。 此外写回原子性/rejected 不映射/目标版本冲突全回滚属 §10.2 排除的 DB 事务范畴，权威证明落 PBT P12(未确认不可写回)/P13(写回原子性)/P14(写回幂等) + PG integration + 只读 fixture API。 端点本身已接线且对无结果 Job 返回受治理编码（见 UAT-07(契约)）。 解除条件：提供浏览器可达的 OCR 识别触发/结果播种入口或测试专用只读 fixture API。",
+                      "location": {
+                        "file": "D:\\GT_plan\\audit-platform\\frontend\\e2e\\uat-ocr-rag-governance.spec.ts",
+                        "line": 525,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:43.187Z",
+                      "annotations": [
+                        {
+                          "type": "UAT-07 验收判据",
+                          "description": "低置信字段 corrected→confirm→原子写回；rejected 永不进入 mapping；所有 required 必须先 decided；目标版本冲突 → 无部分更新（成功全写/失败全回滚）。"
+                        },
+                        {
+                          "type": "skip",
+                          "description": "BLOCKED（非一票否决）：原子写回正向流程需要一条带 OCRResult 的 Job，但 OCR 识别由 worker 调用 UnifiedOCRService 完成，POST /jobs 只创建 queued Job（不运行识别、不产 OCRResult），且无任何 HTTP 端点触发 worker 或播种 OCRResult → 浏览器/网络层无法进行 accept/correct/reject 与写回。 此外写回原子性/rejected 不映射/目标版本冲突全回滚属 §10.2 排除的 DB 事务范畴，权威证明落 PBT P12(未确认不可写回)/P13(写回原子性)/P14(写回幂等) + PG integration + 只读 fixture API。 端点本身已接线且对无结果 Job 返回受治理编码（见 UAT-07(契约)）。 解除条件：提供浏览器可达的 OCR 识别触发/结果播种入口或测试专用只读 fixture API。",
+                          "location": {
+                            "file": "D:\\GT_plan\\audit-platform\\frontend\\e2e\\uat-ocr-rag-governance.spec.ts",
+                            "line": 525,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "940b353303b049ca5ebc-c0edd8f9094ea6a3189c",
+              "file": "uat-ocr-rag-governance.spec.ts",
+              "line": 518,
+              "column": 3
+            },
+            {
+              "title": "UAT-08(零副作用) · 对非 failed Job 重试 → 干净 409 且 Job/时间线零变化",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "UAT-08 相邻可达判据",
+                      "description": "重试路径受治理：对非 failed（queued）Job 重试被状态机守卫以干净 409 INVALID_STATE_TRANSITION 否决，且对 Job 与其时间线零副作用；对不存在 Job 重试 → 脱敏 404。"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 399,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:43.192Z",
+                      "annotations": [
+                        {
+                          "type": "UAT-08 相邻可达判据",
+                          "description": "重试路径受治理：对非 failed（queued）Job 重试被状态机守卫以干净 409 INVALID_STATE_TRANSITION 否决，且对 Job 与其时间线零副作用；对不存在 Job 重试 → 脱敏 404。"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "940b353303b049ca5ebc-6d9796bcfa355e7a974c",
+              "file": "uat-ocr-rag-governance.spec.ts",
+              "line": 538,
+              "column": 3
+            },
+            {
+              "title": "UAT-08(权限否决) · 越权角色重试被否决且零效果【一票否决】",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "UAT-08 验收判据",
+                      "description": "无 ocr.retry 权限的角色（readonly/qc/eqcr/auditor）重试被明确否决且零副作用；有权限角色（manager/partner/admin）按幂等重试 failed Job；ServiceIdentity 不能人工确认；capability 为唯一真源。"
+                    },
+                    {
+                      "type": "skip",
+                      "description": "BLOCKED【一票否决】：越权角色重试否决无法在网络层正向证明——(1) 仅有 admin 凭据；readonly/qc/eqcr/auditor 未分配到项目且无已知口令 → 无法以越权角色驱动；(2) 设计 §7.2/R4.2 将 capability-denied 与 not-found 刻意脱敏合并为 SCOPE_NOT_FOUND_OR_FORBIDDEN(404) → HTTP 层无法区分\"越权否决\"与\"不存在\"；(3) 无 failed 状态的种子 Job（识别失败由 worker 产生，无 HTTP 触发口）供有权限角色正向重试对照。 权威证明落 PBT P10(重试授权/越权零副作用) + side-effect 只读断言，§10.2 明确不由 Playwright 承担。 相邻的\"零副作用\"判据已由 UAT-08(零副作用) 真实验证（对非 failed Job 重试干净 409 且零变化）。 解除条件：多角色测试账号 + 已播种 failed Job + 只读 side-effect fixture API。",
+                      "location": {
+                        "file": "D:\\GT_plan\\audit-platform\\frontend\\e2e\\uat-ocr-rag-governance.spec.ts",
+                        "line": 601,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:43.597Z",
+                      "annotations": [
+                        {
+                          "type": "UAT-08 验收判据",
+                          "description": "无 ocr.retry 权限的角色（readonly/qc/eqcr/auditor）重试被明确否决且零副作用；有权限角色（manager/partner/admin）按幂等重试 failed Job；ServiceIdentity 不能人工确认；capability 为唯一真源。"
+                        },
+                        {
+                          "type": "skip",
+                          "description": "BLOCKED【一票否决】：越权角色重试否决无法在网络层正向证明——(1) 仅有 admin 凭据；readonly/qc/eqcr/auditor 未分配到项目且无已知口令 → 无法以越权角色驱动；(2) 设计 §7.2/R4.2 将 capability-denied 与 not-found 刻意脱敏合并为 SCOPE_NOT_FOUND_OR_FORBIDDEN(404) → HTTP 层无法区分\"越权否决\"与\"不存在\"；(3) 无 failed 状态的种子 Job（识别失败由 worker 产生，无 HTTP 触发口）供有权限角色正向重试对照。 权威证明落 PBT P10(重试授权/越权零副作用) + side-effect 只读断言，§10.2 明确不由 Playwright 承担。 相邻的\"零副作用\"判据已由 UAT-08(零副作用) 真实验证（对非 failed Job 重试干净 409 且零变化）。 解除条件：多角色测试账号 + 已播种 failed Job + 只读 side-effect fixture API。",
+                          "location": {
+                            "file": "D:\\GT_plan\\audit-platform\\frontend\\e2e\\uat-ocr-rag-governance.spec.ts",
+                            "line": 601,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "940b353303b049ca5ebc-16deb244ed84bf59669b",
+              "file": "uat-ocr-rag-governance.spec.ts",
+              "line": 594,
+              "column": 3
+            },
+            {
+              "title": "UAT-09 · 打开 citation 精确定位 / 停用来源致失效（完整正向流程）",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [
+                    {
+                      "type": "UAT-09 验收判据",
+                      "description": "注册 CitationSnapshot → 打开定位到精确 attachment 版本/page/region（打开时重鉴权，readable/version_valid/hash_valid 全真）→ 停用来源 EvidenceRef（替换来源）→ 同一 citation 转为 invalid/stale（reason=evidence_ref_deactivated，且不再暴露可定位 page/region）。"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 409,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-16T15:38:43.602Z",
+                      "annotations": [
+                        {
+                          "type": "UAT-09 验收判据",
+                          "description": "注册 CitationSnapshot → 打开定位到精确 attachment 版本/page/region（打开时重鉴权，readable/version_valid/hash_valid 全真）→ 停用来源 EvidenceRef（替换来源）→ 同一 citation 转为 invalid/stale（reason=evidence_ref_deactivated，且不再暴露可定位 page/region）。"
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "940b353303b049ca5ebc-a6f4ebe401b69afc8ffe",
+              "file": "uat-ocr-rag-governance.spec.ts",
+              "line": 615,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-16T15:38:37.630Z",
+    "duration": 6451.148,
+    "expected": 13,
+    "skipped": 2,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

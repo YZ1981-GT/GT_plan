@@ -1,5 +1,5 @@
-<template>
-  <div class="f2-val-sheet f2-spe-impairment">
+﻿<template>
+  <div class="f2-val-sheet f2-spe-impairment f2-soft-matrix">
     <header class="sheet-header">
       <div>
         <h3>合同履约成本减值准备测算表</h3>
@@ -37,18 +37,23 @@
           api-prefix="f2-spe"
           sheet="F2-57"
           :disabled="isReadonly"
-          ai-section="impairment-analysis"
-          :existing-content="imp.auditNote.value"
-          :related-context="{
-            impairedCount: imp.impairedCount.value,
-            diffCount: imp.diffCount.value,
-          }"
           review-section="F2-57-impairment"
-          @ai-filled="(t: string) => { imp.auditNote.value = t }"
         />
-        <GtIndexChip value="wp:F2-57" />
-        <el-tag size="small" type="info">{{ imp.enrichedProjects.value.length }} 个项目</el-tag>
+        <GtIndexChip value="wp:F2-57" :context-project-id="projectId" />
+        <el-tag size="small" type="info">{{ filledCount }} 个项目</el-tag>
       </div>
+    </div>
+
+    <div v-if="projectId && wpId" class="evidence-panel">
+      <h4>减值测算附件</h4>
+      <p>上传可收回金额测算、合同预计收入成本等支持性资料。</p>
+      <ItemAttachment
+        :project-id="projectId"
+        :wp-id="wpId"
+        sheet-key="F2-57"
+        :item-index="1"
+        accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
+      />
     </div>
 
     <div class="table-scroll">
@@ -159,13 +164,27 @@
     </div>
 
     <el-card class="opinion-card" shadow="never">
-      <template #header><span class="opinion-title">1、审计说明</span></template>
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">1、审计说明</span>
+          <el-button size="small" type="primary" plain
+            :disabled="isReadonly || !aiAvailable" :loading="aiLoading"
+            @click="runAi('contract-impairment-note')">AI 填写审计说明</el-button>
+        </div>
+      </template>
       <el-input v-model="imp.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="说明减值测算方法、管理层计提充分性判断及差异处理…" :disabled="isReadonly" />
     </el-card>
 
     <el-card class="opinion-card" shadow="never">
-      <template #header><span class="opinion-title">2、审计结论</span></template>
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">2、审计结论</span>
+          <el-button size="small" type="primary" plain
+            :disabled="isReadonly || !aiAvailable" :loading="aiLoading"
+            @click="runAi('contract-impairment-conclusion')">AI 生成结论</el-button>
+        </div>
+      </template>
       <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="A、未见异常。B、除上述应调整事项外，其余未见异常。C、不可确认。"
         :disabled="isReadonly" @update:model-value="saveAuditConclusion" />
@@ -181,15 +200,25 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, toRef } from 'vue'
+import { computed, onMounted, ref, toRef, type Ref } from 'vue'
 import { useF2Impairment } from '../../composables/useF2Impairment'
-import { F2_57_OBJECTIVE, F2_57_TIPS } from '../../composables/useF2ContractCostImpairmentFormulas'
+import {
+  F2_57_OBJECTIVE,
+  F2_57_TIPS,
+  isBlankImpairmentProject,
+} from '../../composables/useF2ContractCostImpairmentFormulas'
+import {
+  useF2SpecialAiGenerate,
+  type F2SpeAiSection,
+} from '../../composables/useF2SpecialAiGenerate'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import ItemAttachment from '../../ItemAttachment.vue'
 
 const props = defineProps<{
   wpId?: string
+  projectId?: string
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()
@@ -201,6 +230,16 @@ const imp = useF2Impairment({
 
 const objectiveText = F2_57_OBJECTIVE
 const tips = F2_57_TIPS
+
+const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
+const {
+  aiAvailable,
+  loading: aiLoading,
+  generateAndConfirm,
+} = useF2SpecialAiGenerate(wpIdRef)
+const filledCount = computed(() =>
+  imp.sheet.value.projects.filter((row) => !isBlankImpairmentProject(row)).length,
+)
 
 const CONCLUSION_KEY = 'F2-57-conclusion'
 const auditConclusion = ref('')
@@ -216,6 +255,48 @@ onMounted(() => {
   if (c?.remark) auditConclusion.value = c.remark
 })
 
+function aiContext(): Record<string, unknown> {
+  return {
+    sheet: 'F2-57',
+    projectCount: filledCount.value,
+    bookBalanceTotal: imp.columnTotals.value.bookBalance,
+    accumulatedProvisionTotal: imp.columnTotals.value.accumulatedProvision,
+    bookValueTotal: imp.columnTotals.value.bookValue,
+    netRealizableValueTotal: imp.columnTotals.value.netRealizableValue,
+    measuredProvisionTotal: imp.columnTotals.value.measuredProvision,
+    companyRecordedProvisionTotal: imp.columnTotals.value.companyRecordedProvision,
+    differenceTotal: imp.columnTotals.value.difference,
+    impairedCount: imp.impairedCount.value,
+    differenceCount: imp.diffCount.value,
+    projects: imp.enrichedProjects.value
+      .filter((row) => !isBlankImpairmentProject(row))
+      .slice(0, 30)
+      .map((row) => ({
+        projectCode: row.projectCode,
+        projectName: row.projectName,
+        bookValue: row.bookValue,
+        netRealizableValue: row.netRealizableValue,
+        isImpaired: row.isImpaired,
+        measuredProvision: row.measuredProvision,
+        companyRecordedProvision: row.companyRecordedProvision,
+        difference: row.difference,
+        remark: row.remark,
+      })),
+  }
+}
+
+async function runAi(section: F2SpeAiSection): Promise<void> {
+  const isNote = section === 'contract-impairment-note'
+  const existing = isNote ? imp.auditNote.value : auditConclusion.value
+  const title = isNote
+    ? 'AI 生成 · 减值测算审计说明'
+    : 'AI 生成 · 减值测算审计结论'
+  const text = await generateAndConfirm(section, existing || '', aiContext(), title)
+  if (!text) return
+  if (isNote) imp.auditNote.value = text
+  else saveAuditConclusion(text)
+}
+
 function fmt(v: number): string {
   if (!Number.isFinite(v) || v === 0) return '—'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -229,8 +310,10 @@ function fmtSigned(v: number): string {
 </script>
 
 <style scoped src="../../f2/valuation/f2ValSheetStyles.css"></style>
+<style scoped src="./f2SoftMatrixStyles.css"></style>
 <style scoped>
 .f2-spe-impairment { --gt-purple: #4b2d77; --gt-purple-soft: #f3eef8; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
 
 .table-scroll { overflow-x: auto; margin-bottom: 12px; }
 .matrix-table {

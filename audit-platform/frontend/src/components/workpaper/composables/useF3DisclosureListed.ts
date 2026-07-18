@@ -42,13 +42,21 @@ function parseAdjClosing(row: any): number {
   return calcAdjustedAmount(closingUnadj, parseNum(row.closingAje), parseNum(row.closingRje))
 }
 
+/** 审定表尚无数据时的模板固定两行（与附注章节「五、36 应付票据」行结构一致）。 */
+function defaultClassRows(): F3DisclosureRow[] {
+  return [
+    { rowId: 'cs-bank', label: '银行承兑汇票', endAmount: 0, priorAmount: 0 },
+    { rowId: 'cs-commercial', label: '商业承兑汇票', endAmount: 0, priorAmount: 0 },
+  ]
+}
+
 function rowsFromAdjudication(allResponses: Ref<Map<string, ChecklistResponse>>): F3DisclosureRow[] {
   const raw = allResponses.value.get(ADJ_KEY)?.remark
-  if (!raw) return []
+  if (!raw) return defaultClassRows()
   try {
     const stored = JSON.parse(raw) as any[]
-    if (!Array.isArray(stored)) return []
-    return stored
+    if (!Array.isArray(stored)) return defaultClassRows()
+    const rows = stored
       .filter((r) => r.rowKey === 'bank' || r.rowKey === 'commercial')
       .map((r) => ({
         rowId: `cs-${r.rowKey}`,
@@ -60,8 +68,9 @@ function rowsFromAdjudication(allResponses: Ref<Map<string, ChecklistResponse>>)
           parseNum(r.openingRje),
         ),
       }))
+    return rows.length ? rows : defaultClassRows()
   } catch {
-    return []
+    return defaultClassRows()
   }
 }
 
@@ -76,9 +85,16 @@ export function useF3DisclosureListed(options: {
 
   const adjudicatedRefreshKey = ref(0)
 
-  const isApplicable: ComputedRef<boolean> = computed(() =>
-    applicableStandards.value.some((s) => s === 'listed_standalone' || s === 'listed_consolidated'),
-  )
+  // 与 F2 附注同口径：项目未配置适用准则时默认适用（避免整页被"不适用"空态卡死），
+  // 已配置时按 listed 关键字判断。
+  const isApplicable: ComputedRef<boolean> = computed(() => {
+    const list = applicableStandards.value || []
+    if (list.length === 0) return true
+    return list.some((s) => {
+      const x = String(s).toLowerCase()
+      return x.includes('listed') || x.includes('上市')
+    })
+  })
 
   const section1Rows: ComputedRef<F3DisclosureRow[]> = computed(() => {
     void adjudicatedRefreshKey.value

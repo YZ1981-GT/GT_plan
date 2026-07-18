@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="h1-tab-disclosure-soe">
     <!-- 审计目标 -->
     <el-alert type="info" :closable="false" class="objective-alert" style="margin-bottom:12px"
@@ -71,19 +71,6 @@
       </el-card>
     </template>
 
-    <el-card shadow="never" class="note-card">
-      <template #header><span>附注披露审计说明</span></template>
-      <el-input v-model="disclosureNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写附注披露审计说明..." @change="saveDisclosureNote" />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="note-card">
-      <template #header><span>审计结论</span></template>
-      <el-input v-model="auditConclusionText" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
-        placeholder="填写附注披露审计结论..." @change="saveAuditConclusion" />
-    </el-card>
-
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
@@ -95,8 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, toRef, onMounted } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
+import { ref, computed, inject, toRef } from 'vue'
 import { useH1Disclosure, SOE_SECTIONS } from '../../composables/useH1Disclosure'
 
 const props = defineProps<{
@@ -107,18 +93,7 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
-const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
-const disclosureNote = ref('')
-const auditConclusionText = ref('')
-const NOTE_KEY = 'H1-note-soe-audit-note'
-const CONCLUSION_KEY = 'H1-note-soe-audit-conclusion'
-function saveDisclosureNote() { saveResponse(NOTE_KEY, disclosureNote.value) }
-function saveAuditConclusion() { saveResponse(CONCLUSION_KEY, auditConclusionText.value) }
-onMounted(() => {
-  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) disclosureNote.value = n.remark
-  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusionText.value = c.remark
-})
 const sections = SOE_SECTIONS
 
 const { costMatrixRows: overviewRows, sectionRows: dynamicRowsMap, addDynamicRow: _addDynamic } = useH1Disclosure(
@@ -155,7 +130,6 @@ function fmtAmt(val: number | null | undefined): string {
 .auto-fill-hint { font-size: 11px; color: var(--el-text-color-secondary); margin-top: 8px; }
 .dynamic-actions { margin-top: 8px; }
 .subtotal-row { margin-top: 8px; font-weight: 500; text-align: right; padding-right: 12px; }
-.note-card { margin-bottom: 12px; }
 .compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
 .compile-hint summary { cursor: pointer; font-weight: 500; }
 .compile-hint ul { padding-left: 20px; margin-top: 8px; }

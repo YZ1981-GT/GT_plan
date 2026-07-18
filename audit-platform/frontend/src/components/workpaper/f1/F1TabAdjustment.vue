@@ -33,6 +33,13 @@
     </div>
   </div>
 
+  <F1SheetAttachments
+    :project-id="projectId"
+    :wp-id="wpId"
+    sheet-code="F1-3"
+    label="调整分录附件"
+  />
+
   <!-- 调整分录表 -->
   <el-table
     :data="rows"
@@ -156,6 +163,7 @@ import type { ChecklistResponse } from '../composables/useF1FormData'
 
 // @ts-ignore - GtIndexChip may not have type declarations
 import GtIndexChip from '../GtIndexChip.vue'
+import F1SheetAttachments from './F1SheetAttachments.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>

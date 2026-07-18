@@ -36,12 +36,12 @@ defineProps<{
           title="根据被审计单位实际情况和风险评估情况裁剪、修改或增加审计程序"
         />
         <div class="f2-tab-stocktake-procedure__chips">
-          <GtIndexChip wp-code="F2-21" label="F2-21 问卷" />
-          <GtIndexChip wp-code="F2-22" label="F2-22 计划" />
-          <GtIndexChip wp-code="F2-23" label="F2-23 小结" />
-          <GtIndexChip wp-code="F2-24" label="F2-24 核对" />
-          <GtIndexChip wp-code="F2-25" label="F2-25 抽盘" />
-          <GtIndexChip wp-code="F2-26" label="F2-26 倒轧" />
+          <GtIndexChip value="wp:F2-21" :context-project-id="projectId" label="F2-21 问卷" />
+          <GtIndexChip value="wp:F2-22" :context-project-id="projectId" label="F2-22 计划" />
+          <GtIndexChip value="wp:F2-23" :context-project-id="projectId" label="F2-23 小结" />
+          <GtIndexChip value="wp:F2-24" :context-project-id="projectId" label="F2-24 核对" />
+          <GtIndexChip value="wp:F2-25" :context-project-id="projectId" label="F2-25 抽盘" />
+          <GtIndexChip value="wp:F2-26" :context-project-id="projectId" label="F2-26 倒轧" />
         </div>
       </div>
     </template>

@@ -10,11 +10,32 @@ import {
   calcBookValue,
   calcNetRealizableValue,
   calcMeasuredProvision,
+  isBlankImpairmentProject,
+  pruneBlankImpairmentProjects,
 } from '../useF2ContractCostImpairmentFormulas'
 
 describe('useF2ContractCostImpairmentFormulas', () => {
-  it('default sheet has 8 projects', () => {
-    expect(defaultContractCostImpairmentSheet().projects).toHaveLength(8)
+  it('default sheet keeps one editable project row', () => {
+    expect(defaultContractCostImpairmentSheet().projects).toHaveLength(1)
+    expect(isBlankImpairmentProject(defaultContractCostImpairmentSheet().projects[0])).toBe(true)
+  })
+
+  it('prunes reserved blank rows but retains entered projects', () => {
+    const entered = { ...emptyImpairmentProject(), projectName: '项目A', bookBalance: 100 }
+    expect(pruneBlankImpairmentProjects([
+      emptyImpairmentProject(),
+      entered,
+      emptyImpairmentProject(),
+    ])).toEqual([entered])
+  })
+
+  it('keeps one blank row when all rows are empty', () => {
+    const rows = pruneBlankImpairmentProjects([
+      emptyImpairmentProject(),
+      emptyImpairmentProject(),
+    ])
+    expect(rows).toHaveLength(1)
+    expect(isBlankImpairmentProject(rows[0])).toBe(true)
   })
 
   it('calculates book value and NRV', () => {

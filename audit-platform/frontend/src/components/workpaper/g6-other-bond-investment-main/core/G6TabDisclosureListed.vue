@@ -106,32 +106,6 @@
       </el-button>
     </div>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input
-        type="textarea"
-        :model-value="auditNote"
-        :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：附注披露项目的完整性、准确性与勾稽核对情况。"
-        @change="(v: string) => saveAuditNote(v)"
-      />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
-      <el-input
-        type="textarea"
-        :model-value="auditConclusion"
-        :disabled="isReadonly"
-        :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：A、未见异常。B、除上述调整事项予以调整外，其余未见异常。C、存在重大未调整事项，不可确认。"
-        @change="(v: string) => saveAuditConclusion(v)"
-      />
-    </el-card>
-
     <!-- 编制提示 -->
     <details class="prep-hint">
       <summary>编制提示</summary>
@@ -180,12 +154,6 @@ function fmtAmount(v: number | null | undefined): string {
 
 const isReadonly = computed(() => props.isReadonly)
 
-// ─── 审计说明 / 审计结论（走 checklist_responses，conclusion:null + remark 文本） ───
-const NOTE_KEY = 'G6-main-disclosure-listed-audit-note'
-const CONCLUSION_KEY = 'G6-main-disclosure-listed-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-
 function readSaved(key: string): string {
   const cr = props.htmlData?.checklist_responses
   if (cr && typeof cr === 'object' && (cr as Record<string, any>)[key]) {
@@ -208,15 +176,6 @@ async function saveAudit(key: string, val: string): Promise<void> {
       items: [{ item_id: key, conclusion: null, remark: val }],
     })
   } catch { /* silent */ }
-}
-
-function saveAuditNote(val: string): void {
-  auditNote.value = val
-  void saveAudit(NOTE_KEY, val)
-}
-function saveAuditConclusion(val: string): void {
-  auditConclusion.value = val
-  void saveAudit(CONCLUSION_KEY, val)
 }
 
 // ═══ 附注结构 —— 137行分为多section ═══

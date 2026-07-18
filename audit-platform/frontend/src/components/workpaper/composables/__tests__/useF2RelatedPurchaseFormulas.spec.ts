@@ -7,11 +7,37 @@ import {
   migrateRelatedPurchaseSheet,
   emptyRelatedPurchaseItem,
   calcPriceVariance,
+  isBlankRelatedPurchaseItem,
+  pruneBlankRelatedPurchaseItems,
 } from '../useF2RelatedPurchaseFormulas'
 
 describe('useF2RelatedPurchaseFormulas', () => {
-  it('default sheet has 10 rows', () => {
-    expect(defaultRelatedPurchaseSheet().products).toHaveLength(10)
+  it('default sheet only reserves one blank row', () => {
+    expect(defaultRelatedPurchaseSheet().products).toHaveLength(1)
+    expect(isBlankRelatedPurchaseItem(defaultRelatedPurchaseSheet().products[0])).toBe(true)
+  })
+
+  it('prunes reserved blank rows but keeps one blank shell when empty', () => {
+    const filled = { ...emptyRelatedPurchaseItem(), relatedPartyName: '甲公司' }
+    expect(pruneBlankRelatedPurchaseItems([
+      emptyRelatedPurchaseItem(),
+      filled,
+      emptyRelatedPurchaseItem(),
+    ])).toEqual([filled])
+    expect(pruneBlankRelatedPurchaseItems([
+      emptyRelatedPurchaseItem(),
+      emptyRelatedPurchaseItem(),
+    ])).toHaveLength(1)
+  })
+
+  it('prunes legacy reserved rows during migration', () => {
+    const filled = { ...emptyRelatedPurchaseItem(), relatedPartyName: '甲公司' }
+    const sheet = migrateRelatedPurchaseSheet({
+      auditNotes: undefined,
+      products: [emptyRelatedPurchaseItem(), filled, emptyRelatedPurchaseItem()],
+    })
+    expect(sheet?.products).toHaveLength(1)
+    expect(sheet?.products[0].relatedPartyName).toBe('甲公司')
   })
 
   it('calculates ratios and unit price', () => {

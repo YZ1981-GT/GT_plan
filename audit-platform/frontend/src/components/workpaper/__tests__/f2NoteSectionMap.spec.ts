@@ -25,6 +25,11 @@ describe('f2NoteSectionMap', () => {
     expect(isF2DisclosureApplicable('soe', [])).toBe(true)
   })
 
+  it('一般企业等非上市/国企标签时两侧仍适用', () => {
+    expect(isF2DisclosureApplicable('listed', ['general'])).toBe(true)
+    expect(isF2DisclosureApplicable('soe', ['一般企业'])).toBe(true)
+  })
+
   it('上市准则不适用国企页，反之亦然', () => {
     expect(isF2DisclosureApplicable('listed', ['listed_standalone'])).toBe(true)
     expect(isF2DisclosureApplicable('soe', ['listed_standalone'])).toBe(false)

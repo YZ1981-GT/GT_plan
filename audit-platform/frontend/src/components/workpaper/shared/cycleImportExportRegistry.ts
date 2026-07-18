@@ -47,15 +47,19 @@ export const CYCLE_IMPORT_EXPORT: Record<string, CycleImportExportEntry> = {
   },
   f3: {
     apiPrefix: 'f3',
-    sheets: ['F3-2', 'F3-3', 'F3-4', 'F3-5', 'F3-6'],
+    sheets: [
+      'F3-2', 'F3-3', 'F3-4', 'F3-5', 'F3-6',
+      'F3-7-debit', 'F3-7-credit', 'F3-7-subsequent',
+    ],
   },
   f4: {
     apiPrefix: 'f4',
     sheets: [
       'F4-2', 'F4-3', 'F4-5', 'F4-6',
-      'F4-7-purchase', 'F4-7-inbound', 'F4-7-invoice',
+      'F4-7-payment-window', 'F4-7-estimated-inbound', 'F4-7-unprocessed-invoice',
+      'F4-7-subsequent-payment', 'F4-7-subsequent-increase',
       'F4-8-debit', 'F4-8-credit',
-      'F4-9-factoring', 'F4-9-note', 'F4-9-supply',
+      'F4-9',
     ],
   },
   f5: {
@@ -100,9 +104,11 @@ export const COMPOUND_IMPORT_EXPORT: Record<string, CompoundImportExportGroup[]>
     {
       baseSheet: 'F4-7',
       variants: [
-        { label: '期后采购', sheet: 'F4-7-purchase' },
-        { label: '期后入库', sheet: 'F4-7-inbound' },
-        { label: '期后收票', sheet: 'F4-7-invoice' },
+        { label: '期后付款天数', sheet: 'F4-7-payment-window' },
+        { label: '暂估入库', sheet: 'F4-7-estimated-inbound' },
+        { label: '未处理发票', sheet: 'F4-7-unprocessed-invoice' },
+        { label: '期后付款', sheet: 'F4-7-subsequent-payment' },
+        { label: '期后增加', sheet: 'F4-7-subsequent-increase' },
       ],
     },
     {
@@ -112,12 +118,14 @@ export const COMPOUND_IMPORT_EXPORT: Record<string, CompoundImportExportGroup[]>
         { label: '贷方检查', sheet: 'F4-8-credit' },
       ],
     },
+  ],
+  f3: [
     {
-      baseSheet: 'F4-9',
+      baseSheet: 'F3-7',
       variants: [
-        { label: '保理融资', sheet: 'F4-9-factoring' },
-        { label: '票据融资', sheet: 'F4-9-note' },
-        { label: '供应链融资', sheet: 'F4-9-supply' },
+        { label: '本期借方', sheet: 'F3-7-debit' },
+        { label: '本期贷方', sheet: 'F3-7-credit' },
+        { label: '日后借方', sheet: 'F3-7-subsequent' },
       ],
     },
   ],

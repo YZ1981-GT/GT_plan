@@ -1,219 +1,298 @@
-<template>
-  <div class="f2-supplier-structure">
-    <!-- 编制提示 -->
+﻿<template>
+  <div class="f2-supplier-structure f2-ipo-soft">
+    <header class="sheet-header">
+      <div>
+        <h3>重要供应商结构分析</h3>
+        <span class="code">F2-68 · 本年/上年主要供应商采购结构与业务合理性</span>
+      </div>
+      <div class="stats">
+        <el-tag size="small">本年 {{ ss.currentSummary.value.supplierCount }} 家</el-tag>
+        <el-tag size="small" type="warning">
+          前5大占比 {{ fmtRate(ss.currentSummary.value.top5Ratio) }}
+        </el-tag>
+        <el-tag v-if="ss.currentSummary.value.riskCount" size="small" type="danger">
+          风险项 {{ ss.currentSummary.value.riskCount }}
+        </el-tag>
+      </div>
+    </header>
+
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>1. 本表分析重要供应商的采购集中度及其历年变动，评价采购结构合理性与供应链稳定性（CAS 1231 风险评估）。</p>
-        <p>2. 灰色底纹列为自动计算列（占比%/排名/变动率），由各期采购金额自动测算，不可手工编辑。</p>
-        <p>3. 关注前 5 大/前 10 大集中度过高、报告期新进入前 5 大、或采购额大幅波动的供应商，警惕关联方隐藏与利益输送。</p>
-        <p>4. 可通过工具栏"AI 生成"辅助撰写结构分析结论，"💬"发起复核对话，"导入导出"批量维护供应商结构数据。</p>
+        <p>1. 分别填列本年和上年重要供应商，比较采购金额、集中度、主要采购产品及交易条件变化。</p>
+        <p>2. 采购占比、排名、数量×单价复核及同比变化自动计算；异常差异会提示关注。</p>
+        <p>3. 重点检查采购额是否与供应商规模匹配、采购产品是否在其经营范围内，并识别新增或异常供应商。</p>
+        <p>4. 对关联方、规模或经营范围不匹配、金额复核差异，应在备注中记录原因及支持性证据索引。</p>
       </div>
     </details>
 
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：评价重要供应商采购集中度及其变动趋势的合理性，识别供应链集中风险与未披露关联方交易。"
+      title="审计目标：分析主要供应商采购数量、金额、单价、信用期、支付及运输方式变动，评价交易合理性、持续性及供应商结构风险。"
       class="objective-alert"
     />
 
-    <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="ss.addRow()">+ 新增供应商</el-button>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="ss.addRow('current')">
+          + 本年供应商
+        </el-button>
+        <el-button size="small" :disabled="isReadonly" @click="ss.addRow('prior')">
+          + 上年供应商
+        </el-button>
       </div>
       <div class="toolbar-right">
-        <el-tag size="small" type="warning">
-          前5大占比 {{ ss.concentrationSummary.value.top5Ratio.toFixed(1) }}%
-          | 前10大 {{ ss.concentrationSummary.value.top10Ratio.toFixed(1) }}%
-        </el-tag>
         <F2SheetToolbar
           :wp-id="wpId"
           api-prefix="f2-spe"
           sheet="F2-68"
           :disabled="isReadonly"
-          ai-section="supplier-analysis"
-          :existing-content="ss.auditNote.value"
           review-section="F2-68-structure"
-          @ai-filled="(t: string) => { ss.auditNote.value = t }"
         />
-        <span class="chip-wrap"><GtIndexChip value="wp:F2-68" /></span>
-        <el-tag size="small" type="info">共 {{ ss.enrichedRows.value.length }} 行</el-tag>
+        <GtIndexChip value="wp:F2-68" />
       </div>
     </div>
 
-    <div class="table-scroll-wrap">
-      <el-table
-        :data="ss.enrichedRows.value"
-        border
-        size="small"
-        max-height="480"
-        :row-class-name="({ row }) => row.highlight ? 'warn-row' : ''"
-      >
-        <!-- 固定列区 -->
-        <el-table-column type="index" label="序号" width="55" fixed />
-        <el-table-column label="供应商名称" width="140" fixed>
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.supplierName" size="small"
-              @change="(v: string) => ss.updateRow(row.id, { supplierName: v })" />
-            <span v-else>{{ row.supplierName }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="采购品类" width="100" fixed>
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.category" size="small"
-              @change="(v: string) => ss.updateRow(row.id, { category: v })" />
-            <span v-else>{{ row.category }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="合作年份" width="90" fixed>
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.coopYear" size="small"
-              @change="(v: string) => ss.updateRow(row.id, { coopYear: v })" />
-            <span v-else>{{ row.coopYear }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="关联方" width="80" fixed>
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.isRelated" size="small"
-              @change="(v: '是'|'否') => ss.updateRow(row.id, { isRelated: v })">
-              <el-option label="是" value="是" /><el-option label="否" value="否" />
-            </el-select>
-            <span v-else>{{ row.isRelated }}</span>
-          </template>
-        </el-table-column>
+    <section
+      v-for="section in sections"
+      :key="section.period"
+      class="period-section"
+    >
+      <div class="section-title">
+        <div>
+          <span class="period-badge">{{ section.period === 'current' ? '本' : '上' }}</span>
+          <strong>{{ section.title }}</strong>
+        </div>
+        <div class="section-summary">
+          合计 {{ fmtAmount(section.summary.total) }}
+          · 前5大 {{ fmtRate(section.summary.top5Ratio) }}
+          · 前10大 {{ fmtRate(section.summary.top10Ratio) }}
+        </div>
+      </div>
 
-        <!-- 滚动列区：各期金额/占比/排名 -->
-        <el-table-column label="T期" align="center">
-          <el-table-column label="金额" width="100">
-            <template #default="{ row }">
-              <el-input-number :model-value="row.amountT" size="small" :controls="false" :disabled="isReadonly"
-                @change="(v: number) => ss.updateRow(row.id, { amountT: v ?? 0 })" />
-            </template>
-          </el-table-column>
-          <el-table-column label="占比%" width="75" align="right" class-name="auto-calc-col">
-            <template #default="{ row }">
-              <span class="formula" :class="{ 'ratio-warn': row.isHighConcentration }" title="该供应商采购额/T期采购总额×100">{{ row.ratioT.toFixed(1) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="排名" width="60" align="right" class-name="auto-calc-col">
-            <template #default="{ row }"><span class="formula" title="按T期采购金额降序排名">{{ row.rankT || '—' }}</span></template>
-          </el-table-column>
-        </el-table-column>
+      <div class="table-scroll-wrap">
+        <table class="supplier-table">
+          <thead>
+            <tr>
+              <th rowspan="2" class="sticky seq">序号</th>
+              <th rowspan="2" class="sticky supplier">重要供应商名称</th>
+              <th rowspan="2">采购金额</th>
+              <th rowspan="2" class="calc-head">占比</th>
+              <th rowspan="2" class="calc-head">排名</th>
+              <th rowspan="2" class="calc-head">较上年变动</th>
+              <th rowspan="2">主要采购产品</th>
+              <th colspan="6">采购业务情况</th>
+              <th rowspan="2">是否关联方</th>
+              <th rowspan="2">采购额与供应商规模是否匹配</th>
+              <th rowspan="2">采购产品与经营范围是否匹配</th>
+              <th rowspan="2" class="remark-col">备注/异常原因</th>
+              <th rowspan="2">索引号</th>
+              <th rowspan="2">操作</th>
+            </tr>
+            <tr>
+              <th>数量</th>
+              <th>单价</th>
+              <th>信用期</th>
+              <th>支付方式</th>
+              <th>运输方式</th>
+              <th>其他条款</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(row, index) in section.rows"
+              :key="row.id"
+              :class="{ 'warn-row': row.isRisk }"
+            >
+              <td class="sticky seq">{{ index + 1 }}</td>
+              <td class="sticky supplier">
+                <CellInput
+                  :value="row.supplierName"
+                  :readonly="isReadonly"
+                  placeholder="供应商名称"
+                  @change="(value) => update(section.period, row.id, 'supplierName', value)"
+                />
+              </td>
+              <td>
+                <NumberInput
+                  :value="row.purchaseAmount"
+                  :readonly="isReadonly"
+                  @change="(value) => update(section.period, row.id, 'purchaseAmount', value)"
+                />
+              </td>
+              <td class="calc-cell"><span class="formula">{{ fmtRate(row.ratio) }}</span></td>
+              <td class="calc-cell"><span class="formula">{{ row.rank || '—' }}</span></td>
+              <td class="calc-cell" :class="{ danger: changeRate(row, section.period)?.abnormal }">
+                <span class="formula">{{ changeRate(row, section.period)?.text || '—' }}</span>
+              </td>
+              <td>
+                <CellInput
+                  :value="row.relatedProduct"
+                  :readonly="isReadonly"
+                  @change="(value) => update(section.period, row.id, 'relatedProduct', value)"
+                />
+              </td>
+              <td>
+                <NumberInput
+                  :value="row.purchaseQuantity"
+                  :readonly="isReadonly"
+                  @change="(value) => update(section.period, row.id, 'purchaseQuantity', value)"
+                />
+              </td>
+              <td :class="{ 'amount-mismatch': row.isAmountMismatch }">
+                <NumberInput
+                  :value="row.unitPrice"
+                  :readonly="isReadonly"
+                  @change="(value) => update(section.period, row.id, 'unitPrice', value)"
+                />
+              </td>
+              <td>
+                <CellInput
+                  :value="row.creditPeriod"
+                  :readonly="isReadonly"
+                  @change="(value) => update(section.period, row.id, 'creditPeriod', value)"
+                />
+              </td>
+              <td>
+                <CellInput
+                  :value="row.paymentMethod"
+                  :readonly="isReadonly"
+                  @change="(value) => update(section.period, row.id, 'paymentMethod', value)"
+                />
+              </td>
+              <td>
+                <CellInput
+                  :value="row.transportMethod"
+                  :readonly="isReadonly"
+                  @change="(value) => update(section.period, row.id, 'transportMethod', value)"
+                />
+              </td>
+              <td>
+                <CellInput
+                  :value="row.otherTerms"
+                  :readonly="isReadonly"
+                  @change="(value) => update(section.period, row.id, 'otherTerms', value)"
+                />
+              </td>
+              <td v-for="field in yesNoFields" :key="field.key">
+                <el-select
+                  v-if="!isReadonly"
+                  :model-value="row[field.key] || undefined"
+                  size="small"
+                  clearable
+                  @change="(value) => update(section.period, row.id, field.key, (value as YesNo) || '')"
+                >
+                  <el-option label="是" value="是" />
+                  <el-option label="否" value="否" />
+                </el-select>
+                <span v-else>{{ row[field.key] || '—' }}</span>
+              </td>
+              <td class="remark-col">
+                <CellInput
+                  :value="row.remark"
+                  :readonly="isReadonly"
+                  placeholder="变动或异常原因"
+                  @change="(value) => update(section.period, row.id, 'remark', value)"
+                />
+              </td>
+              <td>
+                <CellInput
+                  :value="row.indexRef"
+                  :readonly="isReadonly"
+                  @change="(value) => update(section.period, row.id, 'indexRef', value)"
+                />
+              </td>
+              <td>
+                <el-button
+                  link
+                  type="danger"
+                  size="small"
+                  :disabled="isReadonly || rawRows(section.period).length <= 1"
+                  @click="ss.removeRow(section.period, row.id)"
+                >删除</el-button>
+              </td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2">合计</td>
+              <td class="amount">{{ fmtAmount(section.summary.total) }}</td>
+              <td class="calc-cell">{{ section.summary.total ? '100.00%' : '—' }}</td>
+              <td colspan="15"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
 
-        <el-table-column label="T-1期" align="center">
-          <el-table-column label="金额" width="100">
-            <template #default="{ row }">
-              <el-input-number :model-value="row.amountT1" size="small" :controls="false" :disabled="isReadonly"
-                @change="(v: number) => ss.updateRow(row.id, { amountT1: v ?? 0 })" />
-            </template>
-          </el-table-column>
-          <el-table-column label="占比%" width="75" align="right" class-name="auto-calc-col">
-            <template #default="{ row }"><span class="formula" title="该供应商采购额/T-1期采购总额×100">{{ row.ratioT1.toFixed(1) }}</span></template>
-          </el-table-column>
-          <el-table-column label="排名" width="60" align="right" class-name="auto-calc-col">
-            <template #default="{ row }"><span class="formula" title="按T-1期采购金额降序排名">{{ row.rankT1 || '—' }}</span></template>
-          </el-table-column>
-        </el-table-column>
-
-        <el-table-column label="T-2期" align="center">
-          <el-table-column label="金额" width="100">
-            <template #default="{ row }">
-              <el-input-number :model-value="row.amountT2" size="small" :controls="false" :disabled="isReadonly"
-                @change="(v: number) => ss.updateRow(row.id, { amountT2: v ?? 0 })" />
-            </template>
-          </el-table-column>
-          <el-table-column label="占比%" width="75" align="right" class-name="auto-calc-col">
-            <template #default="{ row }"><span class="formula" title="该供应商采购额/T-2期采购总额×100">{{ row.ratioT2.toFixed(1) }}</span></template>
-          </el-table-column>
-          <el-table-column label="排名" width="60" align="right" class-name="auto-calc-col">
-            <template #default="{ row }"><span class="formula" title="按T-2期采购金额降序排名">{{ row.rankT2 || '—' }}</span></template>
-          </el-table-column>
-        </el-table-column>
-
-        <el-table-column label="T vs T-1" align="center">
-          <el-table-column label="变动率" width="80" align="right" class-name="auto-calc-col">
-            <template #default="{ row }">
-              <span v-if="typeof row.changeTvsT1 === 'number'" class="formula" title="(T期金额-T-1期金额)/T-1期金额×100">{{ (row.changeTvsT1 * 100).toFixed(1) }}%</span>
-              <span v-else>—</span>
-            </template>
-          </el-table-column>
-        </el-table-column>
-
-        <el-table-column label="新增/退出" width="90">
-          <template #default="{ row }">
-            <el-tag v-if="row.entryFlag" :type="row.isNewTop5 ? 'danger' : 'warning'" size="small">
-              {{ row.entryFlag }}
-            </el-tag>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="集中度评价" width="110">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.concentrationEval" size="small"
-              @change="(v: string) => ss.updateRow(row.id, { concentrationEval: v })" />
-            <span v-else>{{ row.concentrationEval }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="备注" width="100">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.remark" size="small"
-              @change="(v: string) => ss.updateRow(row.id, { remark: v })" />
-            <span v-else>{{ row.remark }}</span>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="操作" width="55" fixed="right">
-          <template #default="{ row }">
-            <el-button link type="danger" size="small" :disabled="isReadonly" @click="ss.removeRow(row.id)">删</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </div>
-
-    <div class="summary-bar">
-      T期采购总额：{{ ss.concentrationSummary.value.totalT.toLocaleString() }}
-      | 前5大集中度：{{ ss.concentrationSummary.value.top5Ratio.toFixed(1) }}%
-      | 前10大：{{ ss.concentrationSummary.value.top10Ratio.toFixed(1) }}%
-    </div>
-
-    <!-- 审计意见区（卡片式） -->
     <el-card class="opinion-card" shadow="never">
       <template #header>
         <div class="opinion-header">
-          <span class="opinion-title">分析结论</span>
+          <span>审计说明</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="runAi('supplier-structure-note')"
+          >AI 填写审计说明</el-button>
         </div>
       </template>
-      <el-input v-model="ss.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="汇总供应商集中度分析、变动趋势及审计结论…" />
+      <el-input
+        v-model="ss.auditNote.value"
+        type="textarea"
+        :autosize="{ minRows: 5, maxRows: 12 }"
+        :disabled="isReadonly"
+        placeholder="说明主要供应商集中度、年度变动、新增/异常供应商、交易条件及供应商规模和经营范围匹配情况……"
+      />
     </el-card>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="audit-card-header"><span>审计说明</span></div></template>
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span>审计结论</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="runAi('supplier-structure-conclusion')"
+          >AI 生成结论</el-button>
+        </div>
+      </template>
       <el-input
+        :model-value="auditConclusion"
         type="textarea"
-        :model-value="auditNoteText"
+        :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：概述所执行的供应商集中度分析程序、测试范围与结果，以及发现的异常事项及其处理。"
-        @change="saveAuditNote"
+        placeholder="综合评价重要供应商结构、采购集中度、交易合理性和持续性。"
+        @update:model-value="saveConclusion"
       />
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, toRef } from 'vue'
+import { computed, defineComponent, h, onMounted, ref, toRef, type Ref } from 'vue'
+import { ElInput, ElInputNumber } from 'element-plus'
 import { useF2SupplierStructure } from '../../composables/useF2SupplierStructure'
+import type {
+  EnrichedSupplierStructureRow,
+  SupplierPeriod,
+  SupplierStructureRow,
+  YesNo,
+} from '../../composables/useF2SupplierStructureFormulas'
+import { useF2SpecialAiGenerate, type F2SpeAiSection } from '../../composables/useF2SpecialAiGenerate'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   wpId?: string
+  projectId?: string
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()
@@ -223,57 +302,168 @@ const ss = useF2SupplierStructure({
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-// ─── 审计说明（逐 sheet 打磨补齐，持久化走 f2-spe:save-items）──────────────────
-const NOTE_KEY = 'F2-68-audit-note'
-const auditNoteText = ref('')
-function persistSpeAudit(key: string, val: string): void {
-  const item = { item_id: key, conclusion: null, remark: val }
-  props.allResponses.set(key, item)
+const CellInput = defineComponent({
+  props: {
+    value: { type: String, default: '' },
+    readonly: { type: Boolean, default: false },
+    placeholder: { type: String, default: '' },
+  },
+  emits: ['change'],
+  setup(componentProps, { emit }) {
+    return () => componentProps.readonly
+      ? h('span', componentProps.value || '—')
+      : h(ElInput, {
+          modelValue: componentProps.value,
+          size: 'small',
+          placeholder: componentProps.placeholder,
+          'onUpdate:modelValue': (value: string) => emit('change', value),
+        })
+  },
+})
+
+const NumberInput = defineComponent({
+  props: {
+    value: { type: Number, default: 0 },
+    readonly: { type: Boolean, default: false },
+  },
+  emits: ['change'],
+  setup(componentProps, { emit }) {
+    return () => componentProps.readonly
+      ? h('span', { class: 'amount' }, fmtAmount(componentProps.value))
+      : h(ElInputNumber, {
+          modelValue: componentProps.value,
+          size: 'small',
+          controls: false,
+          min: 0,
+          class: 'number-input',
+          'onUpdate:modelValue': (value: number | undefined) => emit('change', value ?? 0),
+        })
+  },
+})
+
+const sections = computed(() => [
+  {
+    period: 'current' as const,
+    title: '本年重要供应商',
+    rows: ss.currentRows.value,
+    summary: ss.currentSummary.value,
+  },
+  {
+    period: 'prior' as const,
+    title: '上年重要供应商',
+    rows: ss.priorRows.value,
+    summary: ss.priorSummary.value,
+  },
+])
+
+const yesNoFields: Array<{
+  key: 'isRelatedParty' | 'scaleMatches' | 'scopeMatches'
+  label: string
+}> = [
+  { key: 'isRelatedParty', label: '是否关联方' },
+  { key: 'scaleMatches', label: '规模匹配' },
+  { key: 'scopeMatches', label: '经营范围匹配' },
+]
+
+function rawRows(period: SupplierPeriod): SupplierStructureRow[] {
+  return period === 'current' ? ss.sheet.value.currentRows : ss.sheet.value.priorRows
+}
+
+function update<K extends keyof SupplierStructureRow>(
+  period: SupplierPeriod,
+  id: string,
+  field: K,
+  value: SupplierStructureRow[K],
+): void {
+  ss.updateRow(period, id, { [field]: value } as Pick<SupplierStructureRow, K>)
+}
+
+function fmtAmount(value: number): string {
+  return value
+    ? value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : '—'
+}
+
+function fmtRate(value: number): string {
+  return `${(value * 100).toFixed(2)}%`
+}
+
+function changeRate(row: EnrichedSupplierStructureRow, period: SupplierPeriod) {
+  if (period === 'prior' || !row.supplierName.trim()) return null
+  const prior = ss.priorRows.value.find((item) => item.supplierName.trim() === row.supplierName.trim())
+  if (!prior?.purchaseAmount) {
+    return row.purchaseAmount ? { text: '新增', abnormal: true } : null
+  }
+  const rate = (row.purchaseAmount - prior.purchaseAmount) / prior.purchaseAmount
+  return { text: `${(rate * 100).toFixed(1)}%`, abnormal: Math.abs(rate) >= 0.3 }
+}
+
+const CONCLUSION_KEY = 'F2-68-audit-conclusion'
+const auditConclusion = ref('')
+
+function saveConclusion(value: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = value
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: value }
+  props.allResponses.set(CONCLUSION_KEY, item)
   window.dispatchEvent(new CustomEvent('f2-spe:save-items', { detail: { items: [item] } }))
 }
-function saveAuditNote(val: string): void {
-  if (props.isReadonly) return
-  auditNoteText.value = val
-  persistSpeAudit(NOTE_KEY, val)
-}
+
 onMounted(() => {
-  const n = props.allResponses.get(NOTE_KEY)
-  if (n?.remark) auditNoteText.value = n.remark
+  auditConclusion.value = props.allResponses.get(CONCLUSION_KEY)?.remark || ''
+  const legacy = props.allResponses.get('F2-68-audit-note')?.remark
+  if (!ss.auditNote.value && legacy) ss.auditNote.value = legacy
 })
+
+const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2SpecialAiGenerate(wpIdRef)
+
+function aiContext(): Record<string, unknown> {
+  const mapRows = (rows: EnrichedSupplierStructureRow[]) => rows
+    .filter((row) => row.supplierName.trim())
+    .slice(0, 30)
+    .map((row) => ({
+      supplierName: row.supplierName,
+      amount: row.purchaseAmount,
+      ratio: row.ratio,
+      rank: row.rank,
+      relatedProduct: row.relatedProduct,
+      isRelatedParty: row.isRelatedParty,
+      scaleMatches: row.scaleMatches,
+      scopeMatches: row.scopeMatches,
+      amountMismatch: row.isAmountMismatch,
+      remark: row.remark,
+    }))
+  return {
+    sheet: 'F2-68',
+    currentSummary: ss.currentSummary.value,
+    priorSummary: ss.priorSummary.value,
+    currentRows: mapRows(ss.currentRows.value),
+    priorRows: mapRows(ss.priorRows.value),
+    auditNote: ss.auditNote.value,
+  }
+}
+
+async function runAi(section: F2SpeAiSection): Promise<void> {
+  const isNote = section === 'supplier-structure-note'
+  const content = await generateAndConfirm(
+    section,
+    isNote ? ss.auditNote.value : auditConclusion.value,
+    aiContext(),
+    isNote ? 'AI 生成 · 重要供应商结构审计说明' : 'AI 生成 · 重要供应商结构审计结论',
+  )
+  if (!content) return
+  if (isNote) ss.auditNote.value = content
+  else saveConclusion(content)
+}
 </script>
 
 <style scoped>
-.f2-supplier-structure { padding: 12px 16px; font-size: var(--wp-font-size, 13px); }
-.f2-supplier-structure :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
-.f2-supplier-structure :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
-
-/* 编制提示 */
-.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
-.guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
-
-/* 工具栏 */
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.chip-wrap { display: inline-flex; align-items: center; }
-
-/* 表格 */
-.table-scroll-wrap { overflow-x: auto; }
-.formula { border-bottom: 1px dashed #909399; cursor: help; }
-.ratio-warn { color: #e6a23c; font-weight: 600; }
-:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
-:deep(.warn-row) { background: #fdf6ec; }
-.summary-bar { margin-top: 12px; font-size: 12px; color: #606266; }
-
-/* 审计意见卡片 */
-.opinion-card { margin-top: 16px; border-radius: 8px; }
-.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.opinion-header { display: flex; align-items: center; justify-content: space-between; }
-.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
-.audit-note-card { margin-top: 16px; border-radius: 8px; }
-.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.audit-card-header { font-weight: 600; font-size: 14px; color: #303133; }
+.f2-supplier-structure{padding:14px 18px;font-size:var(--wp-font-size, 13px);background:linear-gradient(180deg,#faf8fc 0,#fff 130px);--purple:#4b2d77}
+.sheet-header,.stats,.tab-toolbar,.toolbar-left,.toolbar-right,.section-title,.opinion-header{display: flex;align-items:center}.sheet-header,.tab-toolbar,.section-title,.opinion-header{justify-content:space-between}.sheet-header{gap:12px;margin-bottom:12px}.sheet-header h3{margin:0;color:#35204f}.code{font-size:12px;color:#8c7b9d}.stats,.toolbar-left,.toolbar-right{gap:8px;flex-wrap:wrap}
+.guidance-details{margin-bottom:12px;border-left:3px solid var(--purple);background:#f7f2fa;border-radius:5px;padding:8px 12px}.guidance-details summary{cursor:pointer;font-weight:600;color:var(--purple)}.guidance-content{margin-top:8px;color:#606266;line-height:1.7}.guidance-content p{margin:3px 0}.objective-alert{margin-bottom:12px}.tab-toolbar{gap:10px;margin-bottom:14px}
+.period-section{margin-bottom:18px;border:1px solid #d7cae2;border-radius:7px;overflow:hidden}.section-title{padding:9px 12px;background:#f5f0f8;color:#4b2d77}.period-badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin-right:7px;border-radius:50%;background:var(--purple);color:#fff}.section-summary{font-size:12px;color:#72558e}.table-scroll-wrap{max-width:100%;overflow-x: auto}
+.supplier-table{width:100%;min-width:2050px;border-collapse:separate;border-spacing:0;font-size:11px}.supplier-table th,.supplier-table td{border-right:1px solid #d8cce3;border-bottom:1px solid #d8cce3;padding:4px;text-align:center;vertical-align:middle;background:#fff}.supplier-table th{position:sticky;top:0;z-index:3;background:var(--purple);color:#fff;font-weight:600;line-height:1.25}.supplier-table .sticky{position:sticky;z-index:4}.supplier-table th.sticky{z-index:5}.supplier-table td.sticky{background:#fff}.seq{left:0;width:45px;min-width:45px}.supplier{left:45px;width:150px;min-width:150px}.calc-head{background:#6b4b89!important}.calc-cell{background:#f2ecf7!important;color:#4b2d77;font-weight:600}.formula{border-bottom:1px dotted #8d78a2;cursor:help}.remark-col{width:170px;min-width:170px;text-align:left!important}.warn-row td{background:#fef0f0}.warn-row td.sticky{background:#fef0f0}.amount-mismatch{box-shadow:inset 0 0 0 2px #e6a23c}.danger{color:#c45656!important;font-weight:700}.amount{display:block;text-align:right;white-space:nowrap}.supplier-table tfoot td{background:#eee6f4;font-weight:700}
+:deep(.number-input){width:92px}:deep(.number-input .el-input__inner){text-align:right;padding:0 4px}
+.opinion-card{margin-top:16px;border-color:#ded3e8}.opinion-card :deep(.el-card__header){padding:10px 14px;background:#faf8fc}.opinion-header span{font-weight:700;color:var(--purple)}
 </style>

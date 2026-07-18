@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="f2-summary">
     <header class="sum-hero">
       <div class="sum-hero-main">
@@ -39,8 +39,20 @@
       sheet-code="F2-23"
     />
 
+    <nav class="st-sec-nav" aria-label="分区导航">
+      <button
+        v-for="item in sumNav"
+        :key="item.id"
+        type="button"
+        class="st-sec-btn"
+        :class="{ active: activeId === item.id }"
+        @click="scrollTo(item.id)"
+      >{{ item.label }}</button>
+    </nav>
+
     <section
       v-for="group in F2_23_LAYOUT"
+      :id="`st-${group.id}`"
       :key="group.id"
       class="sum-card"
     >
@@ -106,7 +118,7 @@
       </div>
     </section>
 
-    <section class="sum-card sum-card-conclusion">
+    <section id="st-extra-note" class="sum-card sum-card-conclusion">
       <header class="sum-card-head">
         <div>
           <h3>审计说明（补充）</h3>
@@ -162,8 +174,22 @@ import {
 } from './f2StocktakeConfigs'
 import { useF2StocktakeFields } from '../../composables/useF2StocktakeSheet'
 import { useF2StocktakeAiGenerate } from '../../composables/useF2StocktakeAiGenerate'
+import { useStickySectionNav } from '../../composables/useStickySectionNav'
 import type { ChecklistResponse } from '../../composables/useF2StocktakeFormData'
 import http from '@/utils/http'
+
+function shortNavLabel(title: string): string {
+  return title
+    .replace(/^[\d一二三四五六七八九十～\-·\s]+/, '')
+    .replace(/^[·\s]+/, '')
+    .slice(0, 8) || title
+}
+
+const sumNav = [
+  ...F2_23_LAYOUT.map((g) => ({ id: `st-${g.id}`, label: shortNavLabel(g.title) })),
+  { id: 'st-extra-note', label: '补充说明' },
+]
+const { activeId, scrollTo } = useStickySectionNav(sumNav)
 
 const props = defineProps<{
   wpId?: string
@@ -317,7 +343,7 @@ function uploadOcr() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, formData)
+      const res = await http.post(`/api/workpapers/${props.wpId}/f2-st/contract-ocr`, formData)
       const data = res.data?.data ?? res.data ?? {}
       const text = data.full_text ?? data.extracted_text ?? data.summary ?? data.extracted_fields?.content ?? ''
       if (!text) { ElMessage.warning('OCR 未识别到有效内容'); return }
@@ -340,7 +366,7 @@ function uploadOcr() {
   --sum-border: #e8eaef;
   --sum-muted: #6b7280;
   --sum-ink: #1f2937;
-  --sum-accent: var(--gt-color-primary, #4b2d77);
+  --sum-accent: var(--gt-color-primary, #334155);
   --sum-surface: var(--gt-color-primary-bg, #f4f0fa);
   padding: 8px 12px 20px;
   font-size: var(--wp-font-size, 13px);
@@ -357,7 +383,7 @@ function uploadOcr() {
   margin-bottom: 12px;
   border: 1px solid var(--sum-border);
   border-radius: 10px;
-  background: linear-gradient(135deg, #faf9ff 0%, #fff 55%);
+  background: linear-gradient(135deg, #f8fafc 0%, #fff 55%);
 }
 .sum-kicker {
   font-size: 11px;
@@ -486,7 +512,7 @@ function uploadOcr() {
   flex-shrink: 0;
 }
 .ai-chip:hover:not(:disabled) {
-  background: #ebe4f5;
+  background: #f1f5f9;
 }
 .ai-chip:disabled {
   opacity: 0.55;
@@ -514,3 +540,5 @@ function uploadOcr() {
   .sum-field.span2 { grid-column: auto; }
 }
 </style>
+
+<style src="./f2StocktakeSoftNav.css"></style>

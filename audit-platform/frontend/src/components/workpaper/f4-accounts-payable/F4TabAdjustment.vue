@@ -6,10 +6,11 @@
  * Requirements: 4.1~4.5, 6.1~6.4
  */
 import { inject, toRef, ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import axios from 'axios'
 import { parseNum, calcSubtotal } from '../composables/useF4AccPayFormulaEngine'
+import { useF4AiGenerate } from '../composables/useF4AiGenerate'
 import type { ChecklistResponse } from '../composables/useF4FormData'
+import F4ImportExportToolbar from './F4ImportExportToolbar.vue'
+import F4SheetAttachments from './F4SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -20,6 +21,12 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+const reloadWorkpaperData = inject<(() => void) | null>('reloadWorkpaperData', null)
+function onImported() { reloadWorkpaperData?.() }
+
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF4AiGenerate(
+  toRef(props, 'wpId') as Ref<string>,
+)
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -124,41 +131,6 @@ function persist() {
 
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); persist() } })
 
-// ─── 导入导出 ────────────────────────────────────────────────────────────────
-async function handleExportTemplate() {
-  try {
-    const resp = await axios.post(`/api/workpapers/${props.wpId}/f4/export-template?sheet=F4-3`, null, { responseType: 'blob' })
-    const url = URL.createObjectURL(resp.data)
-    const a = document.createElement('a'); a.href = url; a.download = 'F4-3调整分录模板.xlsx'; a.click()
-    URL.revokeObjectURL(url)
-  } catch { ElMessage.error('导出模板失败') }
-}
-
-async function handleExportData() {
-  try {
-    const resp = await axios.post(`/api/workpapers/${props.wpId}/f4/export-data?sheet=F4-3`, null, { responseType: 'blob' })
-    const url = URL.createObjectURL(resp.data)
-    const a = document.createElement('a'); a.href = url; a.download = 'F4-3调整分录数据.xlsx'; a.click()
-    URL.revokeObjectURL(url)
-  } catch { ElMessage.error('导出数据失败') }
-}
-
-function handleImportData() {
-  const input = document.createElement('input')
-  input.type = 'file'; input.accept = '.xlsx,.xls'
-  input.onchange = async () => {
-    const file = input.files?.[0]
-    if (!file) return
-    const fd = new FormData(); fd.append('file', file)
-    try {
-      await axios.post(`/api/workpapers/${props.wpId}/f4/import-data?sheet=F4-3`, fd)
-      ElMessage.success('导入成功')
-      window.location.reload()
-    } catch { ElMessage.error('导入失败') }
-  }
-  input.click()
-}
-
 function fmtAmount(v: number): string {
   if (v === 0) return '-'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -186,6 +158,26 @@ function saveAuditConclusion(val: string): void {
   if (props.isReadonly) return
   auditConclusion.value = val
   persistF4(CONCLUSION_KEY, val)
+}
+
+async function runAdjAi(section: 'adjustment-note' | 'adjustment-conclusion'): Promise<void> {
+  if (props.isReadonly) return
+  const isNote = section === 'adjustment-note'
+  const text = await generateAndConfirm(
+    section,
+    isNote ? auditNote.value : auditConclusion.value,
+    {
+      sheet: 'F4-3',
+      rowCount: rows.value.length,
+      debitTotal: totalDebit.value,
+      creditTotal: totalCredit.value,
+      isBalanced: isBalanced.value,
+    },
+    isNote ? 'AI · 审计说明' : 'AI · 审计结论',
+  )
+  if (!text) return
+  if (isNote) saveAuditNote(text)
+  else saveAuditConclusion(text)
 }
 
 onMounted(() => {
@@ -225,21 +217,20 @@ onMounted(() => {
         <el-button size="small" :disabled="isReadonly" @click="addRow">+ 新增行</el-button>
       </div>
       <div class="toolbar-right">
-        <el-dropdown size="small" trigger="click">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-              <el-dropdown-item @click="handleImportData">导入数据</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        <F4ImportExportToolbar
+          :wp-id="wpId"
+          :project-id="projectId"
+          sheet="F4-3"
+          :disabled="isReadonly"
+          @imported="onImported"
+        />
         <span class="chip-wrap"><GtIndexChip value="wp:F4-1" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
         <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-3-adjustment')">复核</el-button>
       </div>
     </div>
+
+    <F4SheetAttachments :project-id="projectId" :wp-id="wpId" sheet-code="F4-3" label="调整分录附件" />
 
     <el-table :data="rows" border size="small" style="width:100%;font-size:13px">
       <el-table-column prop="seq" label="序号" width="60" />
@@ -297,7 +288,17 @@ onMounted(() => {
       <template #header>
         <div class="opinion-header">
           <span class="opinion-title">审计说明</span>
-          <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-3-note')">💬</el-button>
+          <div class="opinion-actions">
+            <el-button
+              v-if="!isReadonly && aiAvailable"
+              size="small"
+              type="primary"
+              plain
+              :loading="aiLoading"
+              @click="runAdjAi('adjustment-note')"
+            >AI 填写说明</el-button>
+            <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-3-note')">💬</el-button>
+          </div>
         </div>
       </template>
       <el-input
@@ -315,6 +316,16 @@ onMounted(() => {
       <template #header>
         <div class="opinion-header">
           <span class="opinion-title">审计结论</span>
+          <div class="opinion-actions">
+            <el-button
+              v-if="!isReadonly && aiAvailable"
+              size="small"
+              type="primary"
+              plain
+              :loading="aiLoading"
+              @click="runAdjAi('adjustment-conclusion')"
+            >AI 填写结论</el-button>
+          </div>
         </div>
       </template>
       <el-input
@@ -346,6 +357,7 @@ onMounted(() => {
 .audit-objective { margin-bottom: 12px; }
 .opinion-card { margin-top: 16px; border-radius: 8px; }
 .opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.opinion-actions { display: flex; align-items: center; gap: 6px; }
 .opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
 </style>

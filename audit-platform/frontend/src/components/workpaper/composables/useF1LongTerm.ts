@@ -1,18 +1,8 @@
 /**
- * useF1LongTerm — F1-5 账龄1年以上检查表核心逻辑 composable
+ * useF1LongTerm — F1-5 账龄1年及以上大额预付账款检查表
  *
- * Spec: .kiro/specs/f1-prepayment/
- * Task: 11.1
- *
- * 职责：
- * - 定义 LongTermRow 类型（8列）
- * - rows reactive（从F1-lt-rows加载JSON）
- * - 从crossSheet.longTermRows导入功能
- * - subtotalRow computed（期末余额/结转金额SUM）
- * - addRow/removeRow/updateCell
- * - auditNote/conclusion 双向绑定
- *
- * Requirements: 9.1-9.8
+ * 对齐 Excel 13 列：债务人|期末余额|账龄|业务说明|未结转原因|计划供货/退款|
+ * 是否诉讼|是否转其他应收|坏账准备|审定余额(自动)|期后供货退款|支持性证据|备注
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal } from './useF1FormulaEngine'
@@ -23,14 +13,19 @@ import type { LongTermImportRow } from './useF1CrossSheet'
 
 export interface LongTermRow {
   rowId: string
-  customerName: string       // 对方单位名称
-  endBalance: number         // 期末余额
-  aging: string              // 账龄
-  businessDescription: string // 经济业务说明
-  reason: string             // 未结转或未偿还的原因
-  settlementAmount: number   // 至审计日结转或偿还金额
-  plan: string               // 处理计划
-  remark: string             // 备注
+  customerName: string              // A: 债务人名称
+  endBalance: number                // B: 期末余额
+  aging: string                     // C: 账龄
+  businessDescription: string       // D: 经济业务说明
+  reason: string                    // E: 未偿还或未结转的原因
+  plan: string                      // F: 计划供货还是退款
+  isLitigation: string              // G: 是否诉讼 Y/N
+  transferToOtherReceivable: string // H: 是否转入其他应收款 Y/N
+  badDebtProvision: number          // I: 计提坏账准备金额
+  auditedBalance: number            // J: 审定余额 = B − I（自动）
+  postSettlementAmount: number      // K: 期后供货或退款金额
+  supportingEvidence: string        // L: 支持性证据
+  remark: string                    // M: 备注
 }
 
 export interface UseD3LongTermOptions {
@@ -48,37 +43,58 @@ const ITEM_ID_ROWS = 'F1-lt-rows'
 const ITEM_ID_NOTE = 'F1-lt-note'
 const ITEM_ID_CONCLUSION = 'F1-lt-conclusion'
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+const YES_NO = ['Y', 'N'] as const
+
+// ─── Pure helpers ────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
   return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
 }
 
-function safeParseRows(jsonStr: string | null | undefined): LongTermRow[] {
-  if (!jsonStr) return []
-  try {
-    const parsed = JSON.parse(jsonStr)
-    return Array.isArray(parsed) ? parsed.map(normalizeRow) : []
-  } catch {
-    return []
+/** 审定余额 = 期末余额 − 坏账准备 */
+export function calcAuditedBalance(endBalance: number, badDebtProvision: number): number {
+  return parseNum(endBalance) - parseNum(badDebtProvision)
+}
+
+export function recalcLongTermRow(row: LongTermRow): LongTermRow {
+  return {
+    ...row,
+    auditedBalance: calcAuditedBalance(row.endBalance, row.badDebtProvision),
   }
 }
 
-function normalizeRow(raw: any): LongTermRow {
-  return {
+export function normalizeLongTermRow(raw: any): LongTermRow {
+  const endBalance = parseNum(raw.endBalance)
+  const badDebtProvision = parseNum(raw.badDebtProvision)
+  return recalcLongTermRow({
     rowId: raw.rowId || generateRowId(),
     customerName: raw.customerName || '',
-    endBalance: parseNum(raw.endBalance),
+    endBalance,
     aging: raw.aging || '',
     businessDescription: raw.businessDescription || '',
-    reason: raw.reason || '',
-    settlementAmount: parseNum(raw.settlementAmount),
+    reason: raw.reason || raw.unsettledReason || '',
     plan: raw.plan || '',
+    isLitigation: normalizeYn(raw.isLitigation),
+    transferToOtherReceivable: normalizeYn(raw.transferToOtherReceivable),
+    badDebtProvision,
+    auditedBalance: parseNum(raw.auditedBalance),
+    postSettlementAmount: parseNum(
+      raw.postSettlementAmount ?? raw.settlementAmount ?? raw.settledAmount,
+    ),
+    supportingEvidence: raw.supportingEvidence || '',
     remark: raw.remark || '',
-  }
+  })
 }
 
-function createEmptyRow(): LongTermRow {
+function normalizeYn(val: any): string {
+  if (val == null || val === '') return ''
+  const s = String(val).trim().toUpperCase()
+  if (s === 'Y' || s === '是' || s === 'TRUE' || s === '1') return 'Y'
+  if (s === 'N' || s === '否' || s === 'FALSE' || s === '0') return 'N'
+  return YES_NO.includes(s as any) ? s : ''
+}
+
+export function createEmptyLongTermRow(): LongTermRow {
   return {
     rowId: generateRowId(),
     customerName: '',
@@ -86,18 +102,65 @@ function createEmptyRow(): LongTermRow {
     aging: '',
     businessDescription: '',
     reason: '',
-    settlementAmount: 0,
     plan: '',
+    isLitigation: '',
+    transferToOtherReceivable: '',
+    badDebtProvision: 0,
+    auditedBalance: 0,
+    postSettlementAmount: 0,
+    supportingEvidence: '',
     remark: '',
   }
+}
+
+function safeParseRows(jsonStr: string | null | undefined): LongTermRow[] {
+  if (!jsonStr) return []
+  try {
+    const parsed = JSON.parse(jsonStr)
+    return Array.isArray(parsed) ? parsed.map(normalizeLongTermRow) : []
+  } catch {
+    return []
+  }
+}
+
+/** 从 F1-2 超1年行合并导入（同名更新余额/账龄，保留已填说明） */
+export function mergeLongTermFromImport(
+  existing: LongTermRow[],
+  imported: LongTermImportRow[],
+): LongTermRow[] {
+  const map = new Map(existing.map(r => [r.customerName, r]))
+  for (const src of imported) {
+    const name = src.customerName || ''
+    if (!name) continue
+    const prev = map.get(name)
+    if (prev) {
+      map.set(
+        name,
+        recalcLongTermRow({
+          ...prev,
+          endBalance: src.endAudited,
+          aging: src.agingDescription || prev.aging,
+        }),
+      )
+    } else {
+      map.set(
+        name,
+        recalcLongTermRow({
+          ...createEmptyLongTermRow(),
+          customerName: name,
+          endBalance: src.endAudited,
+          aging: src.agingDescription || '',
+        }),
+      )
+    }
+  }
+  return Array.from(map.values())
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useF1LongTerm(options: UseD3LongTermOptions) {
   const { allResponses, debouncedSave, isReadonly } = options
-
-  // ─── Reactive rows ───────────────────────────────────────────────────
 
   const rows = ref<LongTermRow[]>([])
 
@@ -107,48 +170,27 @@ export function useF1LongTerm(options: UseD3LongTermOptions) {
     { immediate: true },
   )
 
-  // ─── Persist ─────────────────────────────────────────────────────────
-
   function persistRows(): void {
     debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(rows.value) })
   }
 
-  // ─── subtotalRow computed ────────────────────────────────────────────
-
-  const subtotalRow: ComputedRef<{ endBalance: number; settlementAmount: number }> = computed(() => {
-    return {
-      endBalance: calcSubtotal(rows.value.map(r => r.endBalance)),
-      settlementAmount: calcSubtotal(rows.value.map(r => r.settlementAmount)),
-    }
-  })
-
-  // ─── Import from crossSheet ──────────────────────────────────────────
+  const subtotalRow = computed(() => ({
+    endBalance: calcSubtotal(rows.value.map(r => r.endBalance)),
+    badDebtProvision: calcSubtotal(rows.value.map(r => r.badDebtProvision)),
+    auditedBalance: calcSubtotal(rows.value.map(r => r.auditedBalance)),
+    postSettlementAmount: calcSubtotal(rows.value.map(r => r.postSettlementAmount)),
+  }))
 
   function importFromCrossSheet(longTermRows: LongTermImportRow[]): void {
     if (isReadonly.value) return
     if (longTermRows.length === 0) return
-
-    const imported: LongTermRow[] = longTermRows.map(r => ({
-      rowId: generateRowId(),
-      customerName: r.customerName,
-      endBalance: r.endAudited,
-      aging: r.agingDescription,
-      businessDescription: '',
-      reason: '',
-      settlementAmount: 0,
-      plan: '',
-      remark: '',
-    }))
-
-    rows.value = [...rows.value, ...imported]
+    rows.value = mergeLongTermFromImport(rows.value, longTermRows)
     persistRows()
   }
 
-  // ─── addRow / removeRow / updateCell ─────────────────────────────────
-
   function addRow(): void {
     if (isReadonly.value) return
-    rows.value = [...rows.value, createEmptyRow()]
+    rows.value = [...rows.value, createEmptyLongTermRow()]
     persistRows()
   }
 
@@ -158,25 +200,31 @@ export function useF1LongTerm(options: UseD3LongTermOptions) {
     persistRows()
   }
 
+  const NUMERIC_FIELDS = new Set([
+    'endBalance',
+    'badDebtProvision',
+    'postSettlementAmount',
+  ])
+
   function updateCell(rowId: string, field: string, value: any): void {
     if (isReadonly.value) return
     const idx = rows.value.findIndex(r => r.rowId === rowId)
     if (idx === -1) return
 
     const row = { ...rows.value[idx] }
-    if (field === 'endBalance' || field === 'settlementAmount') {
+    if (NUMERIC_FIELDS.has(field)) {
       ;(row as any)[field] = parseNum(value)
+    } else if (field === 'isLitigation' || field === 'transferToOtherReceivable') {
+      ;(row as any)[field] = normalizeYn(value)
     } else {
       ;(row as any)[field] = value
     }
 
     const newRows = [...rows.value]
-    newRows[idx] = row
+    newRows[idx] = recalcLongTermRow(row)
     rows.value = newRows
     persistRows()
   }
-
-  // ─── Audit Note / Conclusion ─────────────────────────────────────────
 
   const auditNote = ref('')
   const conclusion = ref('')
@@ -186,17 +234,13 @@ export function useF1LongTerm(options: UseD3LongTermOptions) {
     (val) => { auditNote.value = val || '' },
     { immediate: true },
   )
-
   watch(
     () => allResponses.value.get(ITEM_ID_CONCLUSION)?.remark,
     (val) => { conclusion.value = val || '' },
     { immediate: true },
   )
-
-  watch(() => auditNote.value, (val) => { debouncedSave(ITEM_ID_NOTE, { remark: val }) })
-  watch(() => conclusion.value, (val) => { debouncedSave(ITEM_ID_CONCLUSION, { remark: val }) })
-
-  // ─── Return ──────────────────────────────────────────────────────────
+  watch(() => auditNote.value, (val) => { if (!isReadonly.value) debouncedSave(ITEM_ID_NOTE, { remark: val }) })
+  watch(() => conclusion.value, (val) => { if (!isReadonly.value) debouncedSave(ITEM_ID_CONCLUSION, { remark: val }) })
 
   return {
     rows,

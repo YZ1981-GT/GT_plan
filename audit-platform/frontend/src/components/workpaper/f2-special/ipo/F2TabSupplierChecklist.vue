@@ -1,30 +1,45 @@
-<template>
-  <div class="f2-supplier-checklist">
-    <!-- 编制提示 -->
+﻿<template>
+  <div class="f2-supplier-checklist f2-ipo-soft">
+    <header class="sheet-header">
+      <div>
+        <h3>供应商核查清单</h3>
+        <span class="code">F2-69 · 选取原因、反向核查、函证资料与核查方式</span>
+      </div>
+      <div class="stats">
+        <el-tag size="small">已列示 {{ sc.summary.value.supplierCount }} 家</el-tag>
+        <el-tag size="small" type="success">已执行 {{ sc.summary.value.completedMethods }} 项</el-tag>
+        <el-tag v-if="sc.summary.value.incompleteCount" size="small" type="warning">
+          待完善 {{ sc.summary.value.incompleteCount }} 家
+        </el-tag>
+        <el-tag v-if="sc.summary.value.mismatchCount" size="small" type="danger">
+          金额差异 {{ sc.summary.value.mismatchCount }} 家
+        </el-tag>
+      </div>
+    </header>
+
     <details class="guidance-details">
-      <summary>📋 编制提示</summary>
+      <summary>📋 审计目标与核查步骤</summary>
       <div class="guidance-content">
-        <p>1. 本表核查主要供应商各审计程序的执行情况（工商核查、实地走访、函证等），确保采购交易真实、完整、与被审计单位有关（CAS 1141 舞弊 / CAS 1231 风险应对）。</p>
-        <p>2. 每个核查项从下拉选择状态（已完成/进行中/未开始/不适用），完成度自动计算；逾期供应商行以橙色底纹提示。</p>
-        <p>3. 关注新增、异常或集中度高的供应商，结合工商信息与资金流水核实其商业实质，警惕虚构采购与关联方非关联化。</p>
-        <p>4. 可通过工具栏"AI 生成"辅助撰写核查说明，"💬"发起复核对话，"导入导出"批量维护供应商清单。</p>
+        <p>1. 结合 F2-68 主要供应商结构分析，选取重大、异常、新增或集中度较高的供应商。</p>
+        <p>2. 对采购真实性、合同主要条款、资金支付、物流流向和期后付款进行核查。</p>
+        <p>3. 通过工商资料、互联网公开信息、访谈/电话访谈、函证及实地走访多渠道交叉验证。</p>
+        <p>4. 将供应商反向核查数据与公司账面及函证资料比较，差异超过 1% 自动提示关注。</p>
+        <p>5. 每家供应商应填写最终索引号；存在差异或未执行程序的，应在备注中说明。</p>
       </div>
     </details>
 
-    <!-- 审计目标 -->
-    <el-alert
-      type="info"
-      :closable="false"
-      title="审计目标：核实主要供应商采购交易的真实性与完整性，确认各项核查程序已执行到位，识别未披露关联方及异常采购风险。"
-      class="objective-alert"
-    />
-
-    <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="sc.addRow()">+ 新增供应商</el-button>
-        <el-input v-model="sc.searchQuery.value" size="small" placeholder="搜索供应商/负责人" clearable class="search" />
-        <el-segmented v-model="checkPage" :options="checkPages" size="small" />
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="sc.addRow()">
+          + 新增供应商
+        </el-button>
+        <el-input
+          v-model="sc.searchQuery.value"
+          size="small"
+          placeholder="搜索供应商/选取原因/备注"
+          clearable
+          class="search"
+        />
       </div>
       <div class="toolbar-right">
         <F2SheetToolbar
@@ -32,236 +47,351 @@
           api-prefix="f2-spe"
           sheet="F2-69"
           :disabled="isReadonly"
-          ai-section="supplier-analysis"
-          :existing-content="sc.auditNote.value"
           review-section="F2-69-checklist"
-          @ai-filled="(t: string) => { sc.auditNote.value = t }"
         />
-        <span class="chip-wrap"><GtIndexChip value="wp:F2-69" /></span>
-        <el-tag size="small" type="info">共 {{ sc.filteredRows.value.length }} 行</el-tag>
+        <GtIndexChip value="wp:F2-69" />
       </div>
     </div>
 
-    <!-- 进度概览 -->
-    <div class="progress-cards">
-      <span class="pcard done">已完成 {{ sc.progressSummary.value.done }}</span>
-      <span class="pcard prog">进行中 {{ sc.progressSummary.value.inProgress }}</span>
-      <span class="pcard todo">未开始 {{ sc.progressSummary.value.notStarted }}</span>
-      <span class="pcard na">不适用 {{ sc.progressSummary.value.na }}</span>
+    <div class="table-scroll">
+      <table class="checklist-table">
+        <thead>
+          <tr>
+            <th rowspan="2" class="sticky supplier">供应商名称</th>
+            <th rowspan="2" class="reason-col">选取原因</th>
+            <th rowspan="2">走访结论</th>
+            <th rowspan="2">上次实访时间</th>
+            <th colspan="2">反向核查</th>
+            <th colspan="2">函证资料</th>
+            <th colspan="5">核查方式（√）</th>
+            <th rowspan="2" class="calc-head">完成度</th>
+            <th rowspan="2" class="remark-col">差异/未执行原因</th>
+            <th rowspan="2">最终索引号</th>
+            <th rowspan="2">操作</th>
+          </tr>
+          <tr>
+            <th>期末余额</th>
+            <th>本期采购额</th>
+            <th>期末余额</th>
+            <th>本期采购额</th>
+            <th v-for="method in methods" :key="method.key">{{ method.label }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="row in sc.filteredRows.value"
+            :key="row.id"
+            :class="{ 'risk-row': row.isRisk }"
+          >
+            <td class="sticky supplier">
+              <TextCell
+                :value="row.supplierName"
+                :readonly="isReadonly"
+                placeholder="供应商名称"
+                @change="(value) => sc.updateRow(row.id, { supplierName: value })"
+              />
+            </td>
+            <td class="reason-col">
+              <TextCell
+                :value="row.selectionReason"
+                :readonly="isReadonly"
+                placeholder="重大/异常/新增等"
+                @change="(value) => sc.updateRow(row.id, { selectionReason: value })"
+              />
+            </td>
+            <td>
+              <TextCell
+                :value="row.visitConclusion"
+                :readonly="isReadonly"
+                placeholder="走访结果"
+                @change="(value) => sc.updateRow(row.id, { visitConclusion: value })"
+              />
+            </td>
+            <td>
+              <el-date-picker
+                v-if="!isReadonly"
+                :model-value="row.lastVisitDate"
+                type="date"
+                value-format="YYYY-MM-DD"
+                size="small"
+                class="date-input"
+                @update:model-value="(value: string | null) => sc.updateRow(row.id, { lastVisitDate: value || '' })"
+              />
+              <span v-else>{{ row.lastVisitDate || '—' }}</span>
+            </td>
+            <td>
+              <NumberCell
+                :value="row.reverseEndingBalance"
+                :readonly="isReadonly"
+                @change="(value) => sc.updateRow(row.id, { reverseEndingBalance: value })"
+              />
+            </td>
+            <td>
+              <NumberCell
+                :value="row.reversePurchaseAmount"
+                :readonly="isReadonly"
+                @change="(value) => sc.updateRow(row.id, { reversePurchaseAmount: value })"
+              />
+            </td>
+            <td :class="{ 'amount-mismatch': row.isAmountMismatch }">
+              <NumberCell
+                :value="row.confirmationEndingBalance"
+                :readonly="isReadonly"
+                @change="(value) => sc.updateRow(row.id, { confirmationEndingBalance: value })"
+              />
+            </td>
+            <td :class="{ 'amount-mismatch': row.isAmountMismatch }">
+              <NumberCell
+                :value="row.confirmationPurchaseAmount"
+                :readonly="isReadonly"
+                @change="(value) => sc.updateRow(row.id, { confirmationPurchaseAmount: value })"
+              />
+            </td>
+            <td v-for="method in methods" :key="method.key" class="method-cell">
+              <el-checkbox
+                :model-value="row[method.key]"
+                :disabled="isReadonly"
+                @change="(checked: boolean | string | number) => sc.toggleMethod(row.id, method.key, Boolean(checked))"
+              />
+            </td>
+            <td class="calc-cell">
+              <span class="formula">{{ row.completedMethodCount }}/{{ methods.length }}</span>
+              <el-progress
+                :percentage="Math.round(row.completionPct * 100)"
+                :show-text="false"
+                :stroke-width="5"
+                :status="row.completionPct === 1 ? 'success' : undefined"
+              />
+            </td>
+            <td class="remark-col">
+              <TextCell
+                :value="row.remark"
+                :readonly="isReadonly"
+                placeholder="差异或未执行原因"
+                @change="(value) => sc.updateRow(row.id, { remark: value })"
+              />
+            </td>
+            <td>
+              <TextCell
+                :value="row.finalIndexRef"
+                :readonly="isReadonly"
+                placeholder="索引"
+                @change="(value) => sc.updateRow(row.id, { finalIndexRef: value })"
+              />
+            </td>
+            <td>
+              <el-button
+                link
+                type="danger"
+                size="small"
+                :disabled="isReadonly || sc.rows.value.length <= 1"
+                @click="sc.removeRow(row.id)"
+              >删除</el-button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
-    <el-table
-      :data="sc.filteredRows.value"
-      border size="small" max-height="440"
-      :row-class-name="({ row }) => row.isOverdue ? 'overdue-row' : ''"
-    >
-      <el-table-column label="供应商" width="130" fixed>
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.supplierName" size="small"
-            @change="(v: string) => sc.updateRow(row.id, { supplierName: v })" />
-          <span v-else>{{ row.supplierName }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="完成度" width="120" fixed class-name="auto-calc-col">
-        <template #default="{ row }">
-          <el-progress :percentage="Math.round(row.completionPct)" :stroke-width="8"
-            :status="row.completionPct >= 100 ? 'success' : row.isOverdue ? 'exception' : undefined" />
-        </template>
-      </el-table-column>
-
-      <el-table-column
-        v-for="(label, i) in visibleChecks"
-        :key="label"
-        :label="label"
-        width="100"
-        align="center"
-      >
-        <template #default="{ row }">
-          <el-select
-            :model-value="row[visibleCheckKeys[i]]"
-            size="small"
-            :disabled="isReadonly"
-            @change="(v: CheckItemStatus) => sc.updateCheck(row.id, visibleCheckKeys[i], v)"
-          >
-            <el-option v-for="s in sc.CHECK_STATUS_OPTIONS" :key="s" :label="shortStatus(s)" :value="s" />
-          </el-select>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="负责人" width="85">
-        <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.owner" size="small"
-            @change="(v: string) => sc.updateRow(row.id, { owner: v })" />
-          <span v-else>{{ row.owner }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="完成日期" width="120">
-        <template #default="{ row }">
-          <el-date-picker v-if="!isReadonly" :model-value="row.completeDate" type="date" size="small"
-            value-format="YYYY-MM-DD" style="width: 100%"
-            @update:model-value="(v: string) => sc.updateRow(row.id, { completeDate: v ?? '' })" />
-          <span v-else>{{ row.completeDate }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="快捷" width="100">
-        <template #default="{ row }">
-          <el-button v-if="!isReadonly" link size="small" @click="sc.markAllChecks(row.id, '已完成')">全完成</el-button>
-        </template>
-      </el-table-column>
-      <el-table-column label="" width="48" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="danger" size="small" :disabled="isReadonly" @click="sc.removeRow(row.id)">删</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- 审计意见区（卡片式） -->
     <el-card class="opinion-card" shadow="never">
       <template #header>
         <div class="opinion-header">
-          <span class="opinion-title">核查进度说明</span>
+          <span>四、审计说明</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="runAi('supplier-checklist-note')"
+          >AI 填写审计说明</el-button>
         </div>
       </template>
-      <el-input v-model="sc.auditNote.value" type="textarea" :autosize="{ minRows: 2, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="记录供应商核查进度、发现的异常情况及处理说明…" />
-    </el-card>
-
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="audit-card-header"><span>审计说明</span></div></template>
       <el-input
+        v-model="sc.auditNote.value"
         type="textarea"
-        :model-value="auditNoteText"
+        :autosize="{ minRows: 5, maxRows: 12 }"
         :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：概述所执行的供应商核查程序、测试范围与结果，以及发现的异常事项及其处理。"
-        @change="saveAuditNote"
+        placeholder="说明供应商选取范围、已执行核查方式、账面与反向核查/函证差异、异常事项及处理情况……"
       />
     </el-card>
 
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="audit-card-header"><span>审计结论</span></div></template>
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span>五、审计结论</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="runAi('supplier-checklist-conclusion')"
+          >AI 生成结论</el-button>
+        </div>
+      </template>
       <el-input
+        :model-value="auditConclusion"
         type="textarea"
-        :model-value="auditConclusionText"
+        :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly"
-        :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
-        @change="saveAuditConclusion"
+        placeholder="综合评价主要供应商采购交易真实性、核查程序执行情况及异常事项。"
+        @update:model-value="saveConclusion"
       />
     </el-card>
+
+    <details class="tips-details">
+      <summary>提示：核查关注要点</summary>
+      <ol>
+        <li>核对采购真实性、合同签订及验收、付款等主要条款的一致性。</li>
+        <li>结合供应商规模、采购量、资金支付及物流流向评价交易合理性。</li>
+        <li>对新增、异常、集中度较高或期末大额交易供应商扩大核查范围。</li>
+        <li>结合工商资料、公开信息及访谈识别未披露关联方和商业实质风险。</li>
+        <li>函证、走访和反向核查证据应完整归档并填写最终索引号。</li>
+      </ol>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, toRef } from 'vue'
-import {
-  useF2SupplierChecklist,
-  type CheckItemStatus,
-  type CheckItemKey,
-} from '../../composables/useF2SupplierChecklist'
+import { defineComponent, h, onMounted, ref, toRef, type Ref } from 'vue'
+import { ElInput, ElInputNumber } from 'element-plus'
+import { useF2SupplierChecklist } from '../../composables/useF2SupplierChecklist'
+import type { CheckMethodField } from '../../composables/useF2SupplierChecklistFormulas'
+import { useF2SpecialAiGenerate, type F2SpeAiSection } from '../../composables/useF2SpecialAiGenerate'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
-const props = defineProps<{ wpId?: string; allResponses: Map<string, ChecklistResponse>; isReadonly: boolean }>()
+const props = defineProps<{
+  wpId?: string
+  projectId?: string
+  allResponses: Map<string, ChecklistResponse>
+  isReadonly: boolean
+}>()
 
 const sc = useF2SupplierChecklist({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-const checkPage = ref(0)
-const checkPages = [
-  { label: '核查项 1~5', value: 0 },
-  { label: '核查项 6~10', value: 1 },
+const methods: Array<{ key: CheckMethodField; label: string }> = [
+  { key: 'registryChecked', label: '工商资料查询' },
+  { key: 'internetChecked', label: '互联网信息查询' },
+  { key: 'interviewChecked', label: '访谈/电话访谈' },
+  { key: 'confirmationChecked', label: '函证' },
+  { key: 'siteVisitChecked', label: '实地走访' },
 ]
 
-const visibleChecks = computed(() =>
-  checkPage.value === 0
-    ? sc.CHECK_ITEM_LABELS.slice(0, 5)
-    : sc.CHECK_ITEM_LABELS.slice(5, 10),
-)
+const TextCell = defineComponent({
+  props: {
+    value: { type: String, default: '' },
+    readonly: { type: Boolean, default: false },
+    placeholder: { type: String, default: '' },
+  },
+  emits: ['change'],
+  setup(componentProps, { emit }) {
+    return () => componentProps.readonly
+      ? h('span', componentProps.value || '—')
+      : h(ElInput, {
+          modelValue: componentProps.value,
+          size: 'small',
+          placeholder: componentProps.placeholder,
+          'onUpdate:modelValue': (value: string) => emit('change', value),
+        })
+  },
+})
 
-const visibleCheckKeys = computed((): CheckItemKey[] =>
-  checkPage.value === 0
-    ? sc.CHECK_KEYS.slice(0, 5)
-    : sc.CHECK_KEYS.slice(5, 10),
-)
+const NumberCell = defineComponent({
+  props: {
+    value: { type: Number, default: 0 },
+    readonly: { type: Boolean, default: false },
+  },
+  emits: ['change'],
+  setup(componentProps, { emit }) {
+    return () => componentProps.readonly
+      ? h('span', { class: 'amount' }, fmtAmount(componentProps.value))
+      : h(ElInputNumber, {
+          modelValue: componentProps.value,
+          size: 'small',
+          controls: false,
+          class: 'number-input',
+          'onUpdate:modelValue': (value: number | undefined) => emit('change', value ?? 0),
+        })
+  },
+})
 
-function shortStatus(s: CheckItemStatus): string {
-  const map: Record<CheckItemStatus, string> = {
-    '已完成': '完成', '进行中': '进行', '未开始': '未始', '不适用': 'N/A',
-  }
-  return map[s]
+function fmtAmount(value: number): string {
+  return value
+    ? value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    : '—'
 }
 
-// ─── 审计说明 / 审计结论（逐 sheet 打磨补齐，持久化走 f2-spe:save-items）──────
-const NOTE_KEY = 'F2-69-audit-note'
 const CONCLUSION_KEY = 'F2-69-audit-conclusion'
-const auditNoteText = ref('')
-const auditConclusionText = ref('')
-function persistSpeAudit(key: string, val: string): void {
-  const item = { item_id: key, conclusion: null, remark: val }
-  props.allResponses.set(key, item)
+const auditConclusion = ref('')
+
+function saveConclusion(value: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = value
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: value }
+  props.allResponses.set(CONCLUSION_KEY, item)
   window.dispatchEvent(new CustomEvent('f2-spe:save-items', { detail: { items: [item] } }))
 }
-function saveAuditNote(val: string): void {
-  if (props.isReadonly) return
-  auditNoteText.value = val
-  persistSpeAudit(NOTE_KEY, val)
-}
-function saveAuditConclusion(val: string): void {
-  if (props.isReadonly) return
-  auditConclusionText.value = val
-  persistSpeAudit(CONCLUSION_KEY, val)
-}
+
 onMounted(() => {
-  const n = props.allResponses.get(NOTE_KEY)
-  if (n?.remark) auditNoteText.value = n.remark
-  const c = props.allResponses.get(CONCLUSION_KEY)
-  if (c?.remark) auditConclusionText.value = c.remark
+  auditConclusion.value = props.allResponses.get(CONCLUSION_KEY)?.remark || ''
+  const legacy = props.allResponses.get('F2-69-audit-note')?.remark
+  if (!sc.auditNote.value && legacy) sc.auditNote.value = legacy
 })
+
+const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2SpecialAiGenerate(wpIdRef)
+
+function aiContext(): Record<string, unknown> {
+  return {
+    sheet: 'F2-69',
+    summary: sc.summary.value,
+    suppliers: sc.enrichedRows.value
+      .filter((row) => row.supplierName.trim())
+      .slice(0, 30)
+      .map((row) => ({
+        supplierName: row.supplierName,
+        selectionReason: row.selectionReason,
+        visitConclusion: row.visitConclusion,
+        completedMethods: row.completedMethodCount,
+        reverseEndingBalance: row.reverseEndingBalance,
+        reversePurchaseAmount: row.reversePurchaseAmount,
+        confirmationEndingBalance: row.confirmationEndingBalance,
+        confirmationPurchaseAmount: row.confirmationPurchaseAmount,
+        amountMismatch: row.isAmountMismatch,
+        incomplete: row.isIncomplete,
+        remark: row.remark,
+        indexRef: row.finalIndexRef,
+      })),
+    auditNote: sc.auditNote.value,
+  }
+}
+
+async function runAi(section: F2SpeAiSection): Promise<void> {
+  const isNote = section === 'supplier-checklist-note'
+  const content = await generateAndConfirm(
+    section,
+    isNote ? sc.auditNote.value : auditConclusion.value,
+    aiContext(),
+    isNote ? 'AI 生成 · 供应商核查审计说明' : 'AI 生成 · 供应商核查审计结论',
+  )
+  if (!content) return
+  if (isNote) sc.auditNote.value = content
+  else saveConclusion(content)
+}
 </script>
 
 <style scoped>
-.f2-supplier-checklist { padding: 12px 16px; font-size: var(--wp-font-size, 13px); }
-.f2-supplier-checklist :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
-.f2-supplier-checklist :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
-
-/* 编制提示 */
-.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
-.guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
-
-/* 工具栏 */
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.chip-wrap { display: inline-flex; align-items: center; }
-.search { width: 180px; }
-
-/* 进度概览 */
-.progress-cards { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-.pcard { font-size: 12px; padding: 4px 10px; border-radius: 6px; }
-.pcard.done { background: #f0f9eb; color: #67c23a; }
-.pcard.prog { background: #ecf5ff; color: #409eff; }
-.pcard.todo { background: #fdf6ec; color: #e6a23c; }
-.pcard.na { background: #f4f4f5; color: #909399; }
-
-/* 表格 */
-:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
-:deep(.overdue-row) { background: #fdf6ec !important; }
-
-/* 审计意见卡片 */
-.opinion-card { margin-top: 16px; border-radius: 8px; }
-.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.opinion-header { display: flex; align-items: center; justify-content: space-between; }
-.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
-.audit-note-card { margin-top: 16px; border-radius: 8px; }
-.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.audit-card-header { font-weight: 600; font-size: 14px; color: #303133; }
+.f2-supplier-checklist{padding:14px 18px;font-size:var(--wp-font-size, 13px);background:linear-gradient(180deg,#faf8fc 0,#fff 130px);--purple:#4b2d77}
+.sheet-header,.stats,.tab-toolbar,.toolbar-left,.toolbar-right,.opinion-header{display: flex;align-items:center}.sheet-header,.tab-toolbar,.opinion-header{justify-content:space-between}.sheet-header{gap:12px;margin-bottom:12px}.sheet-header h3{margin:0;color:#35204f}.code{font-size:12px;color:#8c7b9d}.stats,.toolbar-left,.toolbar-right{gap:8px;flex-wrap:wrap}
+.guidance-details{margin-bottom:12px;border-left:3px solid var(--purple);background:#f7f2fa;border-radius:5px;padding:8px 12px}.guidance-details summary{cursor:pointer;font-weight:600;color:var(--purple)}.guidance-content{margin-top:8px;color:#606266;line-height:1.7}.guidance-content p{margin:3px 0}.tab-toolbar{gap:10px;margin-bottom:12px}.search{width:220px}
+.table-scroll{max-width:100%;overflow-x: auto;border:1px solid #d7cae2;border-radius:7px}.checklist-table{width:100%;min-width:1780px;border-collapse:separate;border-spacing:0;font-size:11px}.checklist-table th,.checklist-table td{border-right:1px solid #d8cce3;border-bottom:1px solid #d8cce3;padding:4px;text-align:center;vertical-align:middle;background:#fff}.checklist-table th{position:sticky;top:0;z-index:3;background:var(--purple);color:#fff;font-weight:600;line-height:1.25}.checklist-table .sticky{position:sticky;z-index:4}.checklist-table th.sticky{z-index:5}.checklist-table td.sticky{background:#fff}.supplier{left:0;width:145px;min-width:145px}.reason-col{width:155px;min-width:155px;text-align:left!important}.remark-col{width:165px;min-width:165px;text-align:left!important}.calc-head{background:#6b4b89!important}.calc-cell{background:#f2ecf7!important;min-width:85px;color:#4b2d77}.formula{border-bottom:1px dotted #8d78a2;cursor:help}.method-cell{width:74px;min-width:74px}.risk-row td{background:#fef0f0}.risk-row td.sticky{background:#fef0f0}.amount-mismatch{box-shadow:inset 0 0 0 2px #e6a23c}.amount{display:block;text-align:right;white-space:nowrap}
+:deep(.number-input){width:100px}:deep(.number-input .el-input__inner){text-align:right;padding:0 4px}:deep(.date-input){width:115px}
+.opinion-card{margin-top:16px;border-color:#ded3e8}.opinion-card :deep(.el-card__header){padding:10px 14px;background:#faf8fc}.opinion-header span{font-weight:700;color:var(--purple)}
+.tips-details{margin-top:14px;border:1px solid #d9ecff;border-left:3px solid #409eff;border-radius:5px}.tips-details summary{cursor:pointer;padding:8px 12px;color:#337ecc;font-weight:600}.tips-details ol{margin:2px 12px 10px;padding-left:20px;line-height:1.8;color:#606266}
 </style>

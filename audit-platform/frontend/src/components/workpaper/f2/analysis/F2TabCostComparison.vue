@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
  * F2TabCostComparison — F2-20 产成品单位成本年度比较分析表
  * 功能参照 F2-18：期间标签、阈值、表+说明/异常原因、总体结论、AI
@@ -116,7 +116,7 @@ function setThresholdPct(v: number) {
           :controls="false"
           style="width: 72px"
           :disabled="isReadonly"
-          @change="(v: number) => setThresholdPct(v ?? 20)"
+          @change="(v: number | undefined) => setThresholdPct(v ?? 20)"
         />
         <span class="thr-unit">%</span>
         <F2ReviewChip section-id="F2-20-cost" />
@@ -188,7 +188,7 @@ function setThresholdPct(v: number) {
                   :controls="false"
                   size="small"
                   style="width: 100%"
-                  @change="(v: number) => updateCell(row.rowId, 'currentMaterial', v ?? 0)"
+                  @change="(v: number | undefined) => updateCell(row.rowId, 'currentMaterial', v ?? 0)"
                 />
                 <span v-else>{{ fmt(row.currentMaterial) }}</span>
               </template>
@@ -201,7 +201,7 @@ function setThresholdPct(v: number) {
                   :controls="false"
                   size="small"
                   style="width: 100%"
-                  @change="(v: number) => updateCell(row.rowId, 'currentLabor', v ?? 0)"
+                  @change="(v: number | undefined) => updateCell(row.rowId, 'currentLabor', v ?? 0)"
                 />
                 <span v-else>{{ fmt(row.currentLabor) }}</span>
               </template>
@@ -214,7 +214,7 @@ function setThresholdPct(v: number) {
                   :controls="false"
                   size="small"
                   style="width: 100%"
-                  @change="(v: number) => updateCell(row.rowId, 'currentOverhead', v ?? 0)"
+                  @change="(v: number | undefined) => updateCell(row.rowId, 'currentOverhead', v ?? 0)"
                 />
                 <span v-else>{{ fmt(row.currentOverhead) }}</span>
               </template>
@@ -233,7 +233,7 @@ function setThresholdPct(v: number) {
                   :controls="false"
                   size="small"
                   style="width: 100%"
-                  @change="(v: number) => updateCell(row.rowId, 'priorMaterial', v ?? 0)"
+                  @change="(v: number | undefined) => updateCell(row.rowId, 'priorMaterial', v ?? 0)"
                 />
                 <span v-else>{{ fmt(row.priorMaterial) }}</span>
               </template>
@@ -246,7 +246,7 @@ function setThresholdPct(v: number) {
                   :controls="false"
                   size="small"
                   style="width: 100%"
-                  @change="(v: number) => updateCell(row.rowId, 'priorLabor', v ?? 0)"
+                  @change="(v: number | undefined) => updateCell(row.rowId, 'priorLabor', v ?? 0)"
                 />
                 <span v-else>{{ fmt(row.priorLabor) }}</span>
               </template>
@@ -259,7 +259,7 @@ function setThresholdPct(v: number) {
                   :controls="false"
                   size="small"
                   style="width: 100%"
-                  @change="(v: number) => updateCell(row.rowId, 'priorOverhead', v ?? 0)"
+                  @change="(v: number | undefined) => updateCell(row.rowId, 'priorOverhead', v ?? 0)"
                 />
                 <span v-else>{{ fmt(row.priorOverhead) }}</span>
               </template>

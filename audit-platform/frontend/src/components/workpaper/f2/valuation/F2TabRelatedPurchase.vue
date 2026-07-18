@@ -37,15 +37,10 @@
           api-prefix="f2-val"
           sheet="F2-52"
           :disabled="isReadonly"
-          ai-section="fairness-evaluation"
-          :existing-content="rp.auditNote.value"
-          :related-context="{ highDeviationCount: rp.highDeviationCount.value }"
-          ai-title="AI 生成 · 关联采购公允性评价"
           review-section="F2-52-conclusion"
-          @ai-filled="(t: string) => { rp.auditNote.value = t }"
         />
         <span class="chip-wrap"><GtIndexChip value="wp:F2-52" /></span>
-        <el-tag size="small" type="info">{{ rp.enrichedProducts.value.length }} 行</el-tag>
+        <el-tag size="small" type="info">{{ filledCount }} 行</el-tag>
       </div>
     </div>
 
@@ -181,7 +176,17 @@
       </table>
     </div>
 
-    <div class="section-label">1、审计说明</div>
+    <div class="section-label with-action">
+      <span>1、审计说明</span>
+      <el-button
+        size="small"
+        type="primary"
+        plain
+        :disabled="isReadonly || !aiAvailable"
+        :loading="aiLoading"
+        @click="runAi('related-purchase-note')"
+      >AI 填写审计说明</el-button>
+    </div>
     <div class="note-grid">
       <label v-for="(label, i) in auditNoteLabels" :key="i">
         <span class="note-label" :class="{ emphasis: i >= 2 }">{{ label }}</span>
@@ -204,7 +209,19 @@
     />
 
     <el-card class="opinion-card" shadow="never">
-      <template #header><span class="opinion-title">2、审计结论</span></template>
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">2、审计结论</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="runAi('related-purchase-conclusion')"
+          >AI 生成结论</el-button>
+        </div>
+      </template>
       <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
         placeholder="A、未见异常。B、除上述应调整事项外，其余未见异常。C、不可确认。"
         @update:model-value="saveAuditConclusion" />
@@ -220,13 +237,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, toRef } from 'vue'
+import { ref, computed, onMounted, toRef, type Ref } from 'vue'
 import { useF2RelatedPurchase } from '../../composables/useF2RelatedPurchase'
+import { useF2ValuationAiGenerate, type F2ValAiSection } from '../../composables/useF2ValuationAiGenerate'
 import {
   F2_52_DEFAULT_OBJECTIVE,
   F2_52_AUDIT_NOTE_LABELS,
   F2_52_TIPS,
   RELATIONSHIP_OPTIONS,
+  isBlankRelatedPurchaseItem,
   type RelatedPurchaseAuditNotes,
 } from '../../composables/useF2RelatedPurchaseFormulas'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
@@ -279,6 +298,47 @@ onMounted(() => {
   const c = props.allResponses.get(CONCLUSION_KEY)
   if (c?.remark) auditConclusion.value = c.remark
 })
+
+const filledCount = computed(
+  () => rp.enrichedProducts.value.filter((row) => !isBlankRelatedPurchaseItem(row)).length,
+)
+
+const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2ValuationAiGenerate(wpIdRef)
+
+function aiContext(): Record<string, unknown> {
+  return {
+    sheet: 'F2-52',
+    itemCount: filledCount.value,
+    relatedAmountTotal: rp.columnTotals.value.relatedAmount,
+    currentQtyRatio: rp.columnTotals.value.currentQtyRatio,
+    currentAmtRatio: rp.columnTotals.value.currentAmtRatio,
+    highDeviationCount: rp.highDeviationCount.value,
+    auditNotes: rp.sheet.value.auditNotes,
+    items: rp.enrichedProducts.value
+      .filter((row) => !isBlankRelatedPurchaseItem(row))
+      .slice(0, 30)
+      .map((row) => ({
+        relatedPartyName: row.relatedPartyName,
+        relationship: row.relationship,
+        itemNameSpec: row.itemNameSpec,
+        relatedAmount: row.relatedAmount,
+        currentAmtRatio: row.currentAmtRatio,
+        priorAmtRatio: row.priorAmtRatio,
+        priceVarianceRate: row.priceVarianceRate,
+      })),
+  }
+}
+
+async function runAi(section: F2ValAiSection): Promise<void> {
+  const isNote = section === 'related-purchase-note'
+  const existing = isNote ? rp.auditNote.value : auditConclusion.value
+  const title = isNote ? 'AI 生成 · 关联采购审计说明' : 'AI 生成 · 关联采购审计结论'
+  const text = await generateAndConfirm(section, existing || '', aiContext(), title)
+  if (!text) return
+  if (isNote) rp.auditNote.value = text
+  else saveAuditConclusion(text)
+}
 
 function fmt(v: number): string {
   if (!Number.isFinite(v) || v === 0) return '—'
@@ -334,12 +394,15 @@ function fmtPct(r: number): string {
 .col-act { width: 36px; }
 .row-total td { background: #f0ebf5; font-weight: 600; }
 .row-warn td { background: #fef0f0; }
-.auto { display: block; text-align: right; padding-right: 3px; white-space: nowrap; color: #606266; }
+.auto { text-align: right; padding-right: 3px; white-space: nowrap; color: #606266; }
+span.auto { display: block; }
 .calc { color: #4b2d77; font-weight: 500; }
 .var-warn { color: #f56c6c !important; font-weight: 600; }
 .idx { font-size: 10px; color: #909399; }
 
 .section-label { margin: 14px 0 8px; font-size: 14px; font-weight: 600; color: var(--gt-purple); }
+.section-label.with-action { display: flex; align-items: center; justify-content: space-between; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
 .note-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
 .note-grid label { display: flex; flex-direction: column; gap: 4px; }
 .note-label { font-size: 12px; color: #606266; }

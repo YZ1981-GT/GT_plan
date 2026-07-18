@@ -37,22 +37,30 @@ export function calcGrossMargin(revenue: number, cost: number): number | 'N/A' {
   return ((revenue - cost) / revenue) * 100
 }
 
-/** Property 2: 投入生产 = 期初原材料 + 本期购入 - 期末原材料 - 其他发出 */
+/** Property 2: 投入生产 / 直接材料成本 = 期初原材料 + 本期购入 - 期末原材料 - 其他发出
+ *  （源表可含「其他增加额」：opening + purchase + otherInc - closing - otherOut）
+ */
 export function calcCostRollforward(
   opening: number,
   purchase: number,
   closing: number,
   other: number,
+  otherIncrease = 0,
 ): number {
-  return opening + purchase - closing - other
+  return opening + purchase + otherIncrease - closing - other
 }
 
-/** 产品总成本 = 投入生产 + 直接人工 + 制造费用 */
-export function calcTotalProductionCost(input: number, labor: number, overhead: number): number {
-  return input + labor + overhead
+/** 产品总成本 / 产品生产成本 = 投入生产 + 直接人工 + 制造费用 [+ 专用工模具] */
+export function calcTotalProductionCost(
+  input: number,
+  labor: number,
+  overhead: number,
+  specialTooling = 0,
+): number {
+  return input + labor + overhead + specialTooling
 }
 
-/** Property 4: 完工产品成本 = 期初在产品 + 产品总成本 - 期末在产品 */
+/** Property 4: 完工产品成本 / 产成品成本 = 期初在产品 + 产品总成本 - 期末在产品 */
 export function calcFinishedGoodsCost(
   wipOpening: number,
   totalCost: number,
@@ -61,14 +69,63 @@ export function calcFinishedGoodsCost(
   return wipOpening + totalCost - wipClosing
 }
 
-/** Property 5: 本期营业成本 = 期初产成品 + 完工产品成本 - 期末产成品 - 其他发出 */
+/** Property 5: 本期营业成本 / 主营业务成本
+ *  简化：期初产成品 + 完工 - 期末 - 其他发出
+ *  完整源表：⒀+⒁+⒂-⒃-⒄-⒅-⒆
+ */
 export function calcCOGS(
   fgOpening: number,
   finishedCost: number,
   fgClosing: number,
   other: number,
+  fgOtherIncrease = 0,
+  selfUse = 0,
+  internalUse = 0,
 ): number {
-  return fgOpening + finishedCost - fgClosing - other
+  return finishedCost + fgOpening + fgOtherIncrease - fgClosing - selfUse - internalUse - other
+}
+
+/** F5-7 源表：直接材料成本 ⑹ = ⑴+⑵+⑶−⑷−⑸ */
+export function calcF57DirectMaterial(
+  opening: number,
+  purchaseNet: number,
+  otherIncrease: number,
+  closing: number,
+  otherIssue: number,
+): number {
+  return opening + purchaseNet + otherIncrease - closing - otherIssue
+}
+
+/** F5-7 源表：产品生产成本 ⑽ = ⑹+⑺+⑻+⑼（不含「其中：材料费用」明细行） */
+export function calcF57ProductionCost(
+  directMaterial: number,
+  directLabor: number,
+  overhead: number,
+  specialTooling: number,
+): number {
+  return directMaterial + directLabor + overhead + specialTooling
+}
+
+/** F5-7 源表：产成品成本 ⒀ = ⑽+⑾−⑿ */
+export function calcF57FinishedGoodsCost(
+  productionCost: number,
+  openingWIP: number,
+  closingWIP: number,
+): number {
+  return productionCost + openingWIP - closingWIP
+}
+
+/** F5-7 源表：主营业务成本 ⒇ = ⒀+⒁+⒂−⒃−⒄−⒅−⒆ */
+export function calcF57MainBusinessCOGS(
+  finishedCost: number,
+  openingFG: number,
+  fgOtherIncrease: number,
+  closingFG: number,
+  selfUse: number,
+  internalUse: number,
+  fgOtherIssue: number,
+): number {
+  return finishedCost + openingFG + fgOtherIncrease - closingFG - selfUse - internalUse - fgOtherIssue
 }
 
 /** Property 6: 数量差异 = 销售数量 - 结转成本数量 */

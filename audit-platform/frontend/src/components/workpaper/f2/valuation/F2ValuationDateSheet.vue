@@ -58,7 +58,7 @@
         :model-value="costingMode"
         size="small"
         :disabled="isReadonly"
-        @update:model-value="(v: string) => $emit('update:costingMode', v as DateCostingMode)"
+        @update:model-value="(v) => $emit('update:costingMode', v as DateCostingMode)"
       >
         <el-radio-button value="fifo">先进先出法</el-radio-button>
         <el-radio-button value="moving-wa">移动加权平均法</el-radio-button>

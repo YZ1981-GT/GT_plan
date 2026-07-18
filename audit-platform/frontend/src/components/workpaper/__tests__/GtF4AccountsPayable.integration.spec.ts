@@ -5,7 +5,7 @@
  * 1. sheetName 正则分发正确性（12个 sheet → 对应组件编码）
  * 2. 贷方余额公式链（期初+贷方-借方=期末 → +AJE+RJE=审定）
  * 3. 两级审定交叉校验（按性质小计===按账龄小计）
- * 4. F4-7 截止自动提取→3区域分配（期后采购/入库/收票）
+ * 4. F4-7 截止自动提取→期后付款/期后增加（按借贷方向）
  * 5. F4-8 抽凭引擎样本借贷分配
  * 6. F4-2 三区段Tab行同步+账龄交叉校验
  * 7. F4-9 供应商融资3区域独立操作
@@ -87,13 +87,13 @@ describe('F4 集成: sheetName 正则分发', () => {
 // 2. 贷方余额公式链（composition 测试）
 // ---------------------------------------------------------------------------
 describe('F4 集成: 贷方余额公式链', () => {
-  it('期末未审 = 期初审定 + 贷方 - 借方 → 审定 = 期末未审 + AJE + RJE', () => {
-    const openingAdjusted = 800000
+  it('期末未审 = 期初未审 + 贷方 - 借方 → 审定 = 期末未审 + AJE + RJE', () => {
+    const openingUnadjusted = 800000
     const creditAmount = 200000 // 贷方（增加）
     const debitAmount = 50000   // 借方（减少/付款）
 
-    // Step 1: 贷方余额公式
-    const closingUnadjusted = calcCreditBalance(openingAdjusted, creditAmount, debitAmount)
+    // Step 1: 贷方余额公式（源表以期初未审为起点）
+    const closingUnadjusted = calcCreditBalance(openingUnadjusted, creditAmount, debitAmount)
     expect(closingUnadjusted).toBe(800000 + 200000 - 50000) // 950000
 
     // Step 2: 审定公式
@@ -189,68 +189,49 @@ describe('F4 集成: 两级审定交叉校验', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 4. F4-7 截止自动提取→3区域分配（期后采购/入库/收票）
+// 4. F4-7 截止自动提取→期后付款 / 期后增加（按借贷方向）
 // ---------------------------------------------------------------------------
-describe('F4 集成: F4-7 截止自动提取→3区域分配', () => {
-  /**
-   * 复制 useF4UnrecordedCheck.distributeCutoffSamples 的分配逻辑
-   */
-  function classifyVoucher(v: { voucherType: string | null; summary: string | null }): 'purchase' | 'receipt' | 'invoice' {
-    const type = (v.voucherType || '').trim()
-    const summary = (v.summary || '').toLowerCase()
-
-    if (type === '付' || type === '转' || summary.includes('采购') || summary.includes('购')) {
-      return 'purchase'
-    } else if (type === '收' || summary.includes('入库') || summary.includes('验收')) {
-      return 'receipt'
-    } else {
-      return 'invoice'
-    }
+describe('F4 集成: F4-7 截止自动提取→期后付款/增加', () => {
+  /** 对齐 useF4UnrecordedCheck.distributeCutoffSamples：借方主导→付款，贷方主导→增加 */
+  function classifyCutoff(v: {
+    debitAmount: string | null
+    creditAmount: string | null
+  }): 'subsequent-payment' | 'subsequent-increase' {
+    const debit = parseNum(v.debitAmount)
+    const credit = parseNum(v.creditAmount)
+    return Math.abs(debit) >= Math.abs(credit) ? 'subsequent-payment' : 'subsequent-increase'
   }
 
-  it('凭证类型"付"或摘要含"采购" → purchase区域', () => {
-    expect(classifyVoucher({ voucherType: '付', summary: '支付供应商货款' })).toBe('purchase')
-    expect(classifyVoucher({ voucherType: '', summary: '采购原材料' })).toBe('purchase')
-    expect(classifyVoucher({ voucherType: '转', summary: '预付转采购' })).toBe('purchase')
+  it('借方金额主导 → subsequent-payment', () => {
+    expect(classifyCutoff({ debitAmount: '50000', creditAmount: '0' })).toBe('subsequent-payment')
+    expect(classifyCutoff({ debitAmount: '80000', creditAmount: '20000' })).toBe('subsequent-payment')
   })
 
-  it('凭证类型"收"或摘要含"入库"/"验收" → receipt区域', () => {
-    expect(classifyVoucher({ voucherType: '收', summary: '收到商品' })).toBe('receipt')
-    expect(classifyVoucher({ voucherType: '', summary: '原材料入库' })).toBe('receipt')
-    expect(classifyVoucher({ voucherType: '', summary: '设备验收入库' })).toBe('receipt')
+  it('贷方金额主导 → subsequent-increase', () => {
+    expect(classifyCutoff({ debitAmount: '0', creditAmount: '60000' })).toBe('subsequent-increase')
+    expect(classifyCutoff({ debitAmount: '10000', creditAmount: '90000' })).toBe('subsequent-increase')
   })
 
-  it('其他凭证 → invoice区域', () => {
-    expect(classifyVoucher({ voucherType: '', summary: '收到增值税发票' })).toBe('invoice')
-    expect(classifyVoucher({ voucherType: '', summary: '服务费确认' })).toBe('invoice')
-    expect(classifyVoucher({ voucherType: null, summary: null })).toBe('invoice')
-  })
-
-  it('批量分配场景：5张凭证正确分配到3区域', () => {
+  it('批量分配：按借贷方向落入两区', () => {
     const vouchers = [
-      { voucherType: '付', summary: '采购办公用品' },
-      { voucherType: '收', summary: '材料入库' },
-      { voucherType: '', summary: '收到发票' },
-      { voucherType: '转', summary: '购买设备' },
-      { voucherType: '', summary: '验收合格' },
+      { debitAmount: '50000', creditAmount: '0' },
+      { debitAmount: '0', creditAmount: '30000' },
+      { debitAmount: '20000', creditAmount: '10000' },
+      { debitAmount: '5000', creditAmount: '40000' },
     ]
-    const result = { purchase: 0, receipt: 0, invoice: 0 }
+    const result = { payments: 0, increases: 0 }
     for (const v of vouchers) {
-      result[classifyVoucher(v)]++
+      if (classifyCutoff(v) === 'subsequent-payment') result.payments++
+      else result.increases++
     }
-    expect(result.purchase).toBe(2) // 付+转(购)
-    expect(result.receipt).toBe(2)  // 收+验收
-    expect(result.invoice).toBe(1)  // 发票
+    expect(result.payments).toBe(2)
+    expect(result.increases).toBe(2)
   })
 
-  it('金额取 creditAmount 优先，无则取 debitAmount', () => {
-    const voucher = { creditAmount: '50000', debitAmount: '30000' }
-    const amount = parseNum(voucher.creditAmount) || parseNum(voucher.debitAmount)
-    expect(amount).toBe(50000) // creditAmount 优先
-
-    const voucher2 = { creditAmount: '', debitAmount: '20000' }
-    const amount2 = parseNum(voucher2.creditAmount) || parseNum(voucher2.debitAmount)
-    expect(amount2).toBe(20000) // fallback to debitAmount
+  it('金额取借贷绝对值较大者', () => {
+    const debit = parseNum('30000')
+    const credit = parseNum('50000')
+    expect(Math.max(Math.abs(debit), Math.abs(credit))).toBe(50000)
   })
 })
 
@@ -317,46 +298,46 @@ describe('F4 集成: F4-8 抽凭引擎样本借贷分配', () => {
 // 6. F4-2 三区段Tab行同步+账龄交叉校验
 // ---------------------------------------------------------------------------
 describe('F4 集成: F4-2 三区段Tab列定义+账龄交叉校验', () => {
-  it('基础信息区段9列完整', () => {
-    expect(F4_DETAIL_BASIC_COLUMNS).toHaveLength(9)
+  it('基础信息及余额滚动区段13列完整（源表A:M）', () => {
+    expect(F4_DETAIL_BASIC_COLUMNS).toHaveLength(13)
     const props = F4_DETAIL_BASIC_COLUMNS.map((c) => c.prop)
-    expect(props).toContain('seq')
     expect(props).toContain('creditor')
     expect(props).toContain('companyCode')
     expect(props).toContain('relatedPartyType')
     expect(props).toContain('paymentNature')
+    expect(props).toContain('openingUnadjusted')
+    expect(props).toContain('openingAje')
+    expect(props).toContain('openingRje')
     expect(props).toContain('openingAdjusted')
     expect(props).toContain('currentDebit')
     expect(props).toContain('currentCredit')
     expect(props).toContain('closingBalance')
+    expect(props).toContain('entityReclassification')
+    expect(props).toContain('closingUnadjusted')
   })
 
-  it('账龄与核对区段10列完整', () => {
-    expect(F4_DETAIL_AGING_COLUMNS).toHaveLength(10)
+  it('未审账龄及其他审计信息区段7列完整（N:Q/Y:AA）', () => {
+    expect(F4_DETAIL_AGING_COLUMNS).toHaveLength(7)
     const props = F4_DETAIL_AGING_COLUMNS.map((c) => c.prop)
-    expect(props).toContain('aging1Year')
-    expect(props).toContain('aging1to2Year')
-    expect(props).toContain('aging2to3Year')
-    expect(props).toContain('aging3YearPlus')
-    expect(props).toContain('agingTotal')
+    expect(props).toContain('unadjustedAgingLt1')
+    expect(props).toContain('unadjustedAging1to2')
+    expect(props).toContain('unadjustedAging2to3')
+    expect(props).toContain('unadjustedAgingGt3')
     expect(props).toContain('isConfirmed')
-    expect(props).toContain('confirmationResult')
     expect(props).toContain('subsequentPayment')
-    expect(props).toContain('subsequentPaymentDate')
     expect(props).toContain('remark')
   })
 
-  it('调整与审定区段8列完整', () => {
-    expect(F4_DETAIL_AUDIT_COLUMNS).toHaveLength(8)
+  it('调整及审定账龄区段7列完整（R:X）', () => {
+    expect(F4_DETAIL_AUDIT_COLUMNS).toHaveLength(7)
     const props = F4_DETAIL_AUDIT_COLUMNS.map((c) => c.prop)
-    expect(props).toContain('ajeAdjustment')
-    expect(props).toContain('rjeReclassification')
-    expect(props).toContain('adjustedBalance')
-    expect(props).toContain('adjustedAging1')
-    expect(props).toContain('adjustedAging2')
-    expect(props).toContain('adjustedAging3')
-    expect(props).toContain('adjustedAging4')
-    expect(props).toContain('indexRef')
+    expect(props).toContain('closingAje')
+    expect(props).toContain('closingRje')
+    expect(props).toContain('closingAdjusted')
+    expect(props).toContain('auditedAgingLt1')
+    expect(props).toContain('auditedAging1to2')
+    expect(props).toContain('auditedAging2to3')
+    expect(props).toContain('auditedAgingGt3')
   })
 
   it('三区段合计为27列', () => {
@@ -369,11 +350,11 @@ describe('F4 集成: F4-2 三区段Tab列定义+账龄交叉校验', () => {
     expect(closingCol?.editable).toBe(false)
     expect(closingCol?.formula).toBeDefined()
 
-    const agingTotalCol = F4_DETAIL_AGING_COLUMNS.find((c) => c.prop === 'agingTotal')
-    expect(agingTotalCol?.editable).toBe(false)
-    expect(agingTotalCol?.formula).toBeDefined()
+    const unadjustedCol = F4_DETAIL_BASIC_COLUMNS.find((c) => c.prop === 'closingUnadjusted')
+    expect(unadjustedCol?.editable).toBe(false)
+    expect(unadjustedCol?.formula).toBeDefined()
 
-    const adjustedCol = F4_DETAIL_AUDIT_COLUMNS.find((c) => c.prop === 'adjustedBalance')
+    const adjustedCol = F4_DETAIL_AUDIT_COLUMNS.find((c) => c.prop === 'closingAdjusted')
     expect(adjustedCol?.editable).toBe(false)
     expect(adjustedCol?.formula).toBeDefined()
   })
@@ -546,12 +527,13 @@ describe('F4 集成: 导入导出 spec 完整性', () => {
     content = fs.readFileSync(importExportPath, 'utf-8')
   })
 
-  it('包含全部12个sheet spec定义', () => {
+  it('包含全部12个动态区域sheet spec定义', () => {
     const expectedSheets = [
       'F4-2', 'F4-3', 'F4-5', 'F4-6',
-      'F4-7-purchase', 'F4-7-inbound', 'F4-7-invoice',
+      'F4-7-payment-window', 'F4-7-estimated-inbound',
+      'F4-7-unprocessed-invoice', 'F4-7-subsequent-payment', 'F4-7-subsequent-increase',
       'F4-8-debit', 'F4-8-credit',
-      'F4-9-factoring', 'F4-9-note', 'F4-9-supply',
+      'F4-9',
     ]
     for (const sheet of expectedSheets) {
       expect(content).toContain(`"${sheet}"`)
@@ -577,22 +559,24 @@ describe('F4 集成: 导入导出 spec 完整性', () => {
     }
   })
 
-  it('F4-6 spec 有15个 headers（关联方检查表）', () => {
+  it('F4-6 spec 有12个 headers（关联方及交易检查表源表结构）', () => {
     const f4_6_match = content.match(/"F4-6":\s*\{[^}]*?"headers":\s*\[([\s\S]*?)\]/m)
     expect(f4_6_match).not.toBeNull()
     if (f4_6_match) {
       const headerCount = (f4_6_match[1].match(/"/g) || []).length / 2
-      expect(headerCount).toBe(15)
+      expect(headerCount).toBe(12)
     }
   })
 
-  it('F4-7 拆为3个独立区域 spec', () => {
-    expect(content).toContain('"F4-7-purchase"')
-    expect(content).toContain('"F4-7-inbound"')
-    expect(content).toContain('"F4-7-invoice"')
-    expect(content).toContain('期后采购')
-    expect(content).toContain('期后入库')
-    expect(content).toContain('期后收票')
+  it('F4-7 严格拆为源表5个独立区域 spec', () => {
+    expect(content).toContain('"F4-7-payment-window"')
+    expect(content).toContain('"F4-7-estimated-inbound"')
+    expect(content).toContain('"F4-7-unprocessed-invoice"')
+    expect(content).toContain('"F4-7-subsequent-payment"')
+    expect(content).toContain('"F4-7-subsequent-increase"')
+    expect(content).toContain('平均付款')
+    expect(content).toContain('存货暂估入库')
+    expect(content).toContain('未处理的供应商发票')
   })
 
   it('F4-8 拆为借方/贷方独立 spec', () => {
@@ -602,21 +586,21 @@ describe('F4 集成: 导入导出 spec 完整性', () => {
     expect(content).toContain('贷方')
   })
 
-  it('F4-9 拆为3个独立区域 spec', () => {
-    expect(content).toContain('"F4-9-factoring"')
-    expect(content).toContain('"F4-9-note"')
-    expect(content).toContain('"F4-9-supply"')
-    expect(content).toContain('保理融资')
-    expect(content).toContain('票据融资')
-    expect(content).toContain('供应链融资')
+  it('F4-9 为按供应商动态分组的单一 spec', () => {
+    expect(content).toContain('"F4-9"')
+    expect(content).toContain('融资单号')
+    expect(content).toContain('本期采购金额')
+    expect(content).toContain('承诺付款方')
+    expect(content).not.toContain('"F4-9-factoring"')
   })
 
   it('每个 spec 都同时定义了 headers 和 field_keys', () => {
     const expectedSheets = [
       'F4-2', 'F4-3', 'F4-5', 'F4-6',
-      'F4-7-purchase', 'F4-7-inbound', 'F4-7-invoice',
+      'F4-7-payment-window', 'F4-7-estimated-inbound',
+      'F4-7-unprocessed-invoice', 'F4-7-subsequent-payment', 'F4-7-subsequent-increase',
       'F4-8-debit', 'F4-8-credit',
-      'F4-9-factoring', 'F4-9-note', 'F4-9-supply',
+      'F4-9',
     ]
     for (const sheet of expectedSheets) {
       const sheetIdx = content.indexOf(`"${sheet}"`)

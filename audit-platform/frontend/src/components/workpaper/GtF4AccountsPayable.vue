@@ -2,9 +2,8 @@
   <div class="f4-accounts-payable">
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
-      <div class="f4-accounts-payable-toolbar">
+      <div v-if="showHtmlToolbar" class="f4-accounts-payable-toolbar">
         <el-segmented
-          v-if="isHtmlSheet"
           v-model="dualMode.currentMode.value"
           :options="dualMode.modeOptions"
           size="small"
@@ -20,11 +19,11 @@
           @imported="onImported"
         />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
-        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
+        v-if="dualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -32,39 +31,114 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <CycleTabProcedure
-        v-else-if="currentSheet === 'F4A'"
-        sheet-code="F4A"
-        :html-data="props.htmlData"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-      />
+      <template v-else>
+        <CycleTabProcedure
+          v-if="currentSheet === 'F4A'"
+          sheet-code="F4A"
+          :html-data="props.htmlData"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="isReadonly"
+        />
 
-      <CycleTabAdjudication
-        v-else-if="adjudicationConfig"
-        :config="adjudicationConfig"
-        :all-responses="formData.allResponses.value"
-        :is-readonly="isReadonly"
-        :debounced-save="formData.debouncedSave"
-      />
+        <F4TabAdjudication
+          v-else-if="currentSheet === 'F4-1'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
 
-      <GtGridSheet
-        v-else-if="useGridFallback"
-        :html-data="props.htmlData || formData.getSheet(currentSheet)"
-        :readonly="isReadonly"
-      />
+        <F4TabDetail
+          v-else-if="currentSheet === 'F4-2'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
 
-      <GtOnlyOfficeSheet
-        v-else
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :sheet-name="props.sheetName || ''"
-        :readonly="isReadonly"
-        style="height: calc(100vh - 180px)"
-      />
+        <F4TabAdjustment
+          v-else-if="currentSheet === 'F4-3'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
 
-      <!-- 版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
+        <F4TabSubstantiveAnalysis
+          v-else-if="currentSheet === 'F4-4'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
+        <F4TabLongOutstanding
+          v-else-if="currentSheet === 'F4-5'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
+        <F4TabRelatedParty
+          v-else-if="currentSheet === 'F4-6'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
+        <F4TabUnrecordedCheck
+          v-else-if="currentSheet === 'F4-7'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
+        <F4TabVoucherCheck
+          v-else-if="currentSheet === 'F4-8'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+          :year="auditYear"
+        />
+
+        <F4TabSupplierFinancing
+          v-else-if="currentSheet === 'F4-9'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
+        <F4TabDisclosureListed
+          v-else-if="currentSheet === '附注上市'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
+        <F4TabDisclosureSOE
+          v-else-if="currentSheet === '附注国企'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
+        <GtOnlyOfficeSheet
+          v-else
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :sheet-name="props.sheetName || ''"
+          :readonly="isReadonly"
+          style="height: calc(100vh - 180px)"
+        />
+      </template>
     </template>
   </div>
 </template>
@@ -73,37 +147,54 @@
 /**
  * GtF4AccountsPayable.vue — F4 应付账款底稿主入口
  *
+ * 比照 GtF3NotesPayable：外层 GtWpRenderer 通过 sheetName 分发，无内层 el-tabs。
  * Spec: .kiro/specs/f4-accounts-payable/ Task 1.1, 9.1
- * 集成：useWorkpaperVersionToolbar(autoSnapshot on save) + provide('openReviewDialog')
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
-import { useF4AccPayFormData } from './composables/useF4AccPayFormData'
+import { useF4FormData, type ChecklistResponse } from './composables/useF4FormData'
 import { useF4DualMode } from './composables/useF4DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
-import CycleTabAdjudication from './shared/CycleTabAdjudication.vue'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import CycleImportExportDropdown from './shared/CycleImportExportDropdown.vue'
-import { getAdjudicationConfig } from './shared/cycleAdjudicationConfigs'
 import { isImportExportSheet, resolveImportExportSheet } from './shared/cycleImportExportRegistry'
-import type { ChecklistResponse } from './composables/useF1FormData'
 
-const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+const F4TabAdjudication = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabAdjudication.vue'))
+const F4TabDetail = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabDetail.vue'))
+const F4TabAdjustment = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabAdjustment.vue'))
+const F4TabSubstantiveAnalysis = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabSubstantiveAnalysis.vue'))
+const F4TabLongOutstanding = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabLongOutstanding.vue'))
+const F4TabRelatedParty = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabRelatedParty.vue'))
+const F4TabUnrecordedCheck = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabUnrecordedCheck.vue'))
+const F4TabVoucherCheck = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabVoucherCheck.vue'))
+const F4TabSupplierFinancing = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabSupplierFinancing.vue'))
+const F4TabDisclosureListed = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabDisclosureListed.vue'))
+const F4TabDisclosureSOE = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabDisclosureSOE.vue'))
 
 const props = defineProps<{
   wpId: string
   projectId: string
   wpCode?: string
   sheetName?: string
+  year?: number
   htmlData?: any
   readonly?: boolean
 }>()
 
+defineEmits<{ (e: 'save'): void; (e: 'completed'): void }>()
+
 const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
-const formData = useF4AccPayFormData({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
+const formData = useF4FormData({ wpId: wpIdRef, projectId: computed(() => props.projectId) })
 const isReadonly = computed(() => !!props.readonly)
-// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
+const allResponses = computed(() => formData.allResponses.value)
+const auditYear = computed(() => {
+  if (props.year) return props.year
+  const bs = formData.projectContext.value?.bs_date
+  if (bs && String(bs).length >= 4) return parseInt(String(bs).slice(0, 4), 10)
+  return new Date().getFullYear() - 1
+})
+
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionToolbar = runtime?.version ?? {
   versionTrailRef: ref<{ openDrawer: () => void } | null>(null),
@@ -123,11 +214,9 @@ const currentSheet = computed(() => {
   return m ? m[1] : ''
 })
 
-const adjudicationConfig = computed(() => getAdjudicationConfig(currentSheet.value))
-
-const isHtmlSheet = computed(() => {
+const showHtmlToolbar = computed(() => {
   const s = currentSheet.value
-  return s === 'F4A' || !!adjudicationConfig.value || s.startsWith('附注')
+  return !!s && (s === 'F4A' || /^F4-\d+$/.test(s) || s.startsWith('附注'))
 })
 
 const dualMode = useF4DualMode({
@@ -141,23 +230,17 @@ const importExportCtx = computed(() =>
     ? resolveImportExportSheet('f4', currentSheet.value)
     : null,
 )
-const useGridFallback = computed(() => {
-  const code = currentSheet.value
-  return !!code && code !== 'F4A' && !adjudicationConfig.value && !code.startsWith('附注')
-})
 
 async function onImported() {
   await formData.loadAll()
 }
 
-// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide（真实复核对话）
 provide('reloadWorkpaperData', () => formData.loadAll())
 
-// ─── 监听 f4:save-items → 保存 + autoSnapshot ───────────────────────────────
 async function handleF4SaveItems(e: Event): Promise<void> {
   const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
   if (Array.isArray(items) && items.length > 0) {
-    await formData.saveImmediate(items[0].item_id, items[0])
+    await formData.saveItemsFromEvent(items)
     versionToolbar.scheduleAutoSnapshot()
   }
 }
@@ -165,7 +248,7 @@ async function handleF4SaveItems(e: Event): Promise<void> {
 function handleF4Writeback(e: Event): void {
   const d = (e as CustomEvent<{ accountCode: string; auditedAmount: number }>).detail
   if (d?.accountCode != null && d.auditedAmount != null) {
-    // writeback is handled by individual composables via api
+    void formData.writebackTrialBalance(d.accountCode, d.auditedAmount)
   }
 }
 

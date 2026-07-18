@@ -114,8 +114,35 @@ export function emptyReversalItem(): ImpairmentReversalItem {
 
 export function defaultReversalSheet(): ImpairmentReversalSheet {
   return {
-    products: Array.from({ length: 10 }, () => emptyReversalItem()),
+    products: [emptyReversalItem()],
   }
+}
+
+export function isBlankReversalItem(row: ImpairmentReversalItem): boolean {
+  return !row.category.trim()
+    && !row.itemCode.trim()
+    && !row.itemName.trim()
+    && !row.specification.trim()
+    && !row.unit.trim()
+    && !row.openingQty
+    && !row.openingUnitPrice
+    && !agingTotal(row.aging)
+    && !row.priorProvision
+    && !row.issuance.total
+    && !row.issuance.production
+    && !row.issuance.sales
+    && !row.issuance.rnd
+    && !row.issuance.other
+    && !row.accountSplit.costOfSales
+    && !row.accountSplit.rndExpense
+    && !row.accountSplit.other
+}
+
+export function pruneBlankReversalItems(
+  products: ImpairmentReversalItem[],
+): ImpairmentReversalItem[] {
+  const filled = products.filter((row) => !isBlankReversalItem(row))
+  return filled.length ? filled : [products[0] || emptyReversalItem()]
 }
 
 function n(v: number): number {
@@ -230,7 +257,9 @@ export function migrateReversalSheet(legacy: unknown): ImpairmentReversalSheet |
   if (typeof legacy === 'object' && legacy !== null && 'products' in legacy) {
     const sheet = legacy as ImpairmentReversalSheet
     return {
-      products: sheet.products?.length ? sheet.products : defaultReversalSheet().products,
+      products: pruneBlankReversalItems(
+        Array.isArray(sheet.products) ? sheet.products : [],
+      ),
     }
   }
 
@@ -238,7 +267,7 @@ export function migrateReversalSheet(legacy: unknown): ImpairmentReversalSheet |
     const first = legacy[0] as Record<string, unknown>
     if ('rowId' in first || 'itemName' in first) {
       return {
-        products: (legacy as Array<Record<string, unknown>>).map((r) => ({
+        products: pruneBlankReversalItems((legacy as Array<Record<string, unknown>>).map((r) => ({
           ...emptyReversalItem(),
           id: String(r.rowId || newReversalItemId()),
           itemName: String(r.itemName || ''),
@@ -256,7 +285,7 @@ export function migrateReversalSheet(legacy: unknown): ImpairmentReversalSheet |
             rndExpense: 0,
             other: 0,
           },
-        })),
+        }))),
       }
     }
   }

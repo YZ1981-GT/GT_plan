@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="f2-plan">
     <!-- 顶栏 -->
     <header class="plan-hero">
@@ -40,9 +40,21 @@
       sheet-code="F2-22"
     />
 
+    <nav class="st-sec-nav" aria-label="分区导航">
+      <button
+        v-for="item in planNav"
+        :key="item.id"
+        type="button"
+        class="st-sec-btn"
+        :class="{ active: activeId === item.id }"
+        @click="scrollTo(item.id)"
+      >{{ item.label }}</button>
+    </nav>
+
     <!-- 分区卡片 -->
     <section
       v-for="group in F2_22_LAYOUT"
+      :id="`st-${group.id}`"
       :key="group.id"
       class="plan-card"
       :data-cols="group.cols"
@@ -107,7 +119,7 @@
     </section>
 
     <!-- 结论 -->
-    <section class="plan-card plan-card-conclusion">
+    <section id="st-conclusion" class="plan-card plan-card-conclusion">
       <header class="plan-card-head">
         <div>
           <h3>监盘计划结论</h3>
@@ -158,8 +170,22 @@ import F2StocktakeSheetAttachments from './F2StocktakeSheetAttachments.vue'
 import { F2_22_FIELDS, F2_22_LAYOUT, type F2PlanLayoutGroup, type StocktakeSectionField } from './f2StocktakeConfigs'
 import { useF2StocktakeFields } from '../../composables/useF2StocktakeSheet'
 import { useF2StocktakeAiGenerate } from '../../composables/useF2StocktakeAiGenerate'
+import { useStickySectionNav } from '../../composables/useStickySectionNav'
 import type { ChecklistResponse } from '../../composables/useF2StocktakeFormData'
 import http from '@/utils/http'
+
+function shortNavLabel(title: string): string {
+  return title
+    .replace(/^[\d一二三四五六七八九十～\-·\s]+/, '')
+    .replace(/^[·\s]+/, '')
+    .slice(0, 8) || title
+}
+
+const planNav = [
+  ...F2_22_LAYOUT.map((g) => ({ id: `st-${g.id}`, label: shortNavLabel(g.title) })),
+  { id: 'st-conclusion', label: '结论' },
+]
+const { activeId, scrollTo } = useStickySectionNav(planNav)
 
 const props = defineProps<{
   wpId?: string
@@ -295,7 +321,7 @@ function uploadOcr() {
   --plan-border: #e8eaef;
   --plan-muted: #6b7280;
   --plan-ink: #1f2937;
-  --plan-accent: var(--gt-color-primary, #4b2d77);
+  --plan-accent: var(--gt-color-primary, #334155);
   --plan-surface: var(--gt-color-primary-bg, #f4f0fa);
   padding: 8px 12px 20px;
   font-size: var(--wp-font-size, 13px);
@@ -312,7 +338,7 @@ function uploadOcr() {
   margin-bottom: 12px;
   border: 1px solid var(--plan-border);
   border-radius: 10px;
-  background: linear-gradient(135deg, #faf9ff 0%, #fff 55%);
+  background: linear-gradient(135deg, #f8fafc 0%, #fff 55%);
 }
 .plan-kicker {
   font-size: 11px;
@@ -441,7 +467,7 @@ function uploadOcr() {
   flex-shrink: 0;
 }
 .ai-chip:hover:not(:disabled) {
-  background: #ebe4f5;
+  background: #f1f5f9;
 }
 .ai-chip:disabled {
   opacity: 0.55;
@@ -469,3 +495,5 @@ function uploadOcr() {
   .plan-field.span2 { grid-column: auto; }
 }
 </style>
+
+<style src="./f2StocktakeSoftNav.css"></style>

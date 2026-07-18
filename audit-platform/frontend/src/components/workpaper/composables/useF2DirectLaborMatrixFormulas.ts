@@ -56,9 +56,9 @@ export function emptyLaborProductLine(name = ''): LaborProductLine {
   }
 }
 
-/** 源模板约 4 个产品行 */
+/** 默认 1 个产品行；需要时由「+ 增行」添加 */
 export function defaultLaborProductLines(): LaborProductLine[] {
-  return [1, 2, 3, 4].map(() => emptyLaborProductLine(''))
+  return [emptyLaborProductLine('')]
 }
 
 function n(v: number): number {

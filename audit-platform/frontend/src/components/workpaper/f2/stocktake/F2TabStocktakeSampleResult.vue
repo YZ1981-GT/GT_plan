@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="f2-sample">
     <header class="smp-hero">
       <div class="smp-hero-main">
@@ -45,7 +45,7 @@
       </ol>
     </details>
 
-    <section class="smp-card smp-objectives">
+    <section id="st-objectives" class="smp-card smp-objectives">
       <header class="smp-card-head">
         <div>
           <h3>一、审计目标</h3>
@@ -67,7 +67,18 @@
       sheet-code="F2-25"
     />
 
-    <section v-for="group in F2_25_LAYOUT" :key="group.id" class="smp-card">
+    <nav class="st-sec-nav" aria-label="分区导航">
+      <button
+        v-for="item in smpNav"
+        :key="item.id"
+        type="button"
+        class="st-sec-btn"
+        :class="{ active: activeId === item.id }"
+        @click="scrollTo(item.id)"
+      >{{ item.label }}</button>
+    </nav>
+
+    <section v-for="group in F2_25_LAYOUT" :id="`st-${group.id}`" :key="group.id" class="smp-card">
       <header class="smp-card-head">
         <div>
           <h3>{{ group.title }}</h3>
@@ -77,7 +88,7 @@
           v-if="group.id === 'meta' && wpId && !isReadonly"
           size="small"
           plain
-          @click="seedFromPlan"
+          @click="() => seedFromPlan()"
         >从计划/小结带入</el-button>
       </header>
       <div
@@ -137,7 +148,7 @@
     </section>
 
     <!-- （一）记录 → 实物 -->
-    <section class="smp-card">
+    <section id="st-exist" class="smp-card">
       <header class="smp-card-head">
         <div>
           <h3>（一）从存货盘点记录追查至实物</h3>
@@ -294,7 +305,7 @@
     </section>
 
     <!-- （二）实物 → 记录 -->
-    <section class="smp-card">
+    <section id="st-floor" class="smp-card">
       <header class="smp-card-head">
         <div>
           <h3>（二）从存货实物追查至盘点记录</h3>
@@ -440,7 +451,7 @@
       </div>
     </section>
 
-    <section class="smp-card smp-card-conclusion">
+    <section id="st-note" class="smp-card smp-card-conclusion">
       <header class="smp-card-head">
         <div>
           <h3>三、审计说明</h3>
@@ -468,7 +479,7 @@
       />
     </section>
 
-    <section class="smp-card smp-card-conclusion">
+    <section id="st-conclusion" class="smp-card smp-card-conclusion">
       <header class="smp-card-head">
         <div>
           <h3>四、审计结论</h3>
@@ -505,6 +516,7 @@ import { ElMessage } from 'element-plus'
 import { useF2StocktakeFields, useF2StocktakeRows } from '../../composables/useF2StocktakeSheet'
 import { useF2StocktakeOcr } from '../../composables/useF2StocktakeOcr'
 import { useF2StocktakeAiGenerate } from '../../composables/useF2StocktakeAiGenerate'
+import { useStickySectionNav } from '../../composables/useStickySectionNav'
 import {
   applyMetaSeedToFields,
   formatVarianceSummary,
@@ -520,6 +532,23 @@ import {
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
 import F2StocktakeSheetAttachments from './F2StocktakeSheetAttachments.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+
+function shortNavLabel(title: string): string {
+  return title
+    .replace(/^[\d一二三四五六七八九十～\-·\s]+/, '')
+    .replace(/^[·\s]+/, '')
+    .slice(0, 8) || title
+}
+
+const smpNav = [
+  { id: 'st-objectives', label: '审计目标' },
+  ...F2_25_LAYOUT.map((g) => ({ id: `st-${g.id}`, label: shortNavLabel(g.title) })),
+  { id: 'st-exist', label: '记录→实物' },
+  { id: 'st-floor', label: '实物→记录' },
+  { id: 'st-note', label: '审计说明' },
+  { id: 'st-conclusion', label: '审计结论' },
+]
+const { activeId, scrollTo } = useStickySectionNav(smpNav)
 
 type Enriched = StocktakeSampleRow & {
   sampleVsBook: number
@@ -826,7 +855,7 @@ async function runDiffAi() {
   --smp-border: #e8eaef;
   --smp-muted: #6b7280;
   --smp-ink: #1f2937;
-  --smp-accent: var(--gt-color-primary, #4b2d77);
+  --smp-accent: var(--gt-color-primary, #334155);
   --smp-surface: var(--gt-color-primary-bg, #f4f0fa);
   padding: 8px 12px 20px;
   font-size: var(--wp-font-size, 13px);
@@ -850,7 +879,7 @@ async function runDiffAi() {
   margin-bottom: 12px;
   border: 1px solid var(--smp-border);
   border-radius: 10px;
-  background: linear-gradient(135deg, #faf9ff 0%, #fff 55%);
+  background: linear-gradient(135deg, #f8fafc 0%, #fff 55%);
 }
 .smp-kicker {
   font-size: 11px;
@@ -983,7 +1012,7 @@ async function runDiffAi() {
   flex-shrink: 0;
 }
 .ai-chip:hover:not(:disabled) {
-  background: #ebe4f5;
+  background: #f1f5f9;
 }
 .ai-chip:disabled {
   opacity: 0.55;
@@ -1016,3 +1045,5 @@ async function runDiffAi() {
   .smp-field.span2 { grid-column: auto; }
 }
 </style>
+
+<style src="./f2StocktakeSoftNav.css"></style>

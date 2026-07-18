@@ -1,79 +1,15 @@
-/**
- * useF2UndisclosedParty — F2-67 识别未披露的关联方（45行×20列）
- */
+/** F2-67 识别未披露关联方：人员身份交叉核对状态管理。 */
 import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
 import { readSpeRowJson, type ChecklistResponse } from './useF2SpecialFormData'
-
-export type UndisclosedSegment = 'basic' | 'relation' | 'audit'
-
-export const RELATION_TYPES = [
-  '控股股东', '共同控制', '重大影响', '近亲属', '其他关联', '疑似关联',
-] as const
-
-export const CHECK_SOURCE_OPTIONS = [
-  '天眼查', '企查查', '工商登记', '裁判文书', '企业年报', '实地走访',
-] as const
-
-export const RISK_LEVELS = ['高', '中', '低'] as const
-
-export interface UndisclosedPartyRow {
-  id: string
-  supplierName: string
-  creditCode: string
-  legalRep: string
-  shareholderInfo: string
-  registeredAddress: string
-  regDate: string
-  registeredCapital: string
-  actualController: string
-  relationToClient: string
-  relationType: string
-  isDisclosed: '是' | '否' | ''
-  checkSources: string[]
-  checkDate: string
-  checker: string
-  checkConclusion: string
-  riskLevel: string
-  followUp: string
-  indexNo: string
-  remark: string
-}
-
-export interface EnrichedUndisclosedRow extends UndisclosedPartyRow {
-  isHighRisk: boolean
-  isUndisclosedConfirmed: boolean
-  highlight: boolean
-  highlightLevel: 'none' | 'orange' | 'red'
-}
+import {
+  emptyUndisclosedPartyRow,
+  enrichUndisclosedPartyRow,
+  migrateUndisclosedPartyRows,
+  type UndisclosedPartyRow,
+} from './useF2UndisclosedPartyFormulas'
 
 const ROWS_KEY = 'F2-67-rows'
 const NOTE_KEY = 'F2-67-note'
-
-function emptyRow(id: string): UndisclosedPartyRow {
-  return {
-    id, supplierName: '', creditCode: '', legalRep: '', shareholderInfo: '',
-    registeredAddress: '', regDate: '', registeredCapital: '',
-    actualController: '', relationToClient: '', relationType: '',
-    isDisclosed: '', checkSources: [], checkDate: '', checker: '',
-    checkConclusion: '', riskLevel: '', followUp: '', indexNo: '', remark: '',
-  }
-}
-
-export function enrichUndisclosedRow(r: UndisclosedPartyRow): EnrichedUndisclosedRow {
-  const isHighRisk = r.riskLevel === '高'
-  const isUndisclosedConfirmed = r.isDisclosed === '否' && r.relationType !== '疑似关联' && !!r.relationType
-  let highlightLevel: EnrichedUndisclosedRow['highlightLevel'] = 'none'
-  if (isHighRisk) highlightLevel = 'red'
-  else if (isUndisclosedConfirmed) highlightLevel = 'orange'
-  return {
-    ...r,
-    isHighRisk,
-    isUndisclosedConfirmed,
-    highlight: isHighRisk || isUndisclosedConfirmed,
-    highlightLevel,
-  }
-}
 
 export function useF2UndisclosedParty(opts: {
   allResponses: Ref<Map<string, ChecklistResponse>>
@@ -82,21 +18,29 @@ export function useF2UndisclosedParty(opts: {
   const readonly = opts.isReadonly ?? ref(false)
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-  const activeSegment = ref<UndisclosedSegment>('basic')
   const searchQuery = ref('')
-  const rows = ref<UndisclosedPartyRow[]>([emptyRow('1')])
+  const rows = ref<UndisclosedPartyRow[]>([emptyUndisclosedPartyRow()])
   const auditNote = ref('')
 
   function load(): void {
     const raw = readSpeRowJson(opts.allResponses.value.get(ROWS_KEY))
+    if (raw && raw === JSON.stringify(rows.value)) return
     if (raw) {
       try {
-        const parsed = JSON.parse(raw) as UndisclosedPartyRow[]
-        if (parsed.length) {
-          rows.value = parsed.map((r) => ({
-            ...r,
-            checkSources: Array.isArray(r.checkSources) ? r.checkSources : [],
-          }))
+        const parsed = JSON.parse(raw)
+        const migrated = migrateUndisclosedPartyRows(parsed)
+        rows.value = migrated
+        if (!readonly.value && JSON.stringify(parsed) !== JSON.stringify(migrated)) {
+          opts.allResponses.value.set(ROWS_KEY, {
+            item_id: ROWS_KEY,
+            conclusion: null,
+            remark: JSON.stringify(migrated),
+          })
+          if (debounceTimer) clearTimeout(debounceTimer)
+          debounceTimer = setTimeout(() => {
+            debounceTimer = null
+            flushSave()
+          }, 300)
         }
       } catch { /* ignore */ }
     }
@@ -105,22 +49,25 @@ export function useF2UndisclosedParty(opts: {
 
   watch(() => opts.allResponses.value.get(ROWS_KEY)?.remark, load, { immediate: true })
 
-  const enrichedRows = computed(() => rows.value.map(enrichUndisclosedRow))
+  const enrichedRows = computed(() => rows.value.map(enrichUndisclosedPartyRow))
 
   const filteredRows = computed(() => {
     const q = searchQuery.value.trim().toLowerCase()
     if (!q) return enrichedRows.value
     return enrichedRows.value.filter((r) =>
-      r.supplierName.toLowerCase().includes(q)
-      || r.creditCode.toLowerCase().includes(q)
-      || r.relationToClient.toLowerCase().includes(q),
+      r.name.toLowerCase().includes(q)
+      || r.identity.toLowerCase().includes(q)
+      || r.note.toLowerCase().includes(q),
     )
   })
 
   const riskSummary = computed(() => ({
-    high: enrichedRows.value.filter((r) => r.riskLevel === '高').length,
-    undisclosed: enrichedRows.value.filter((r) => r.isUndisclosedConfirmed).length,
-    total: enrichedRows.value.length,
+    matched: enrichedRows.value.filter((r) => r.isAbnormal).length,
+    totalPurchaseAmount: enrichedRows.value.reduce(
+      (sum, row) => sum + row.annualPurchaseAmount,
+      0,
+    ),
+    total: enrichedRows.value.filter((row) => row.name.trim()).length,
   }))
 
   function flushSave(): void {
@@ -145,15 +92,10 @@ export function useF2UndisclosedParty(opts: {
     persist()
   }
 
-  async function addRow(): Promise<void> {
+  function addRow(): void {
     if (readonly.value) return
-    try {
-      const { value } = await ElMessageBox.prompt('请输入供应商/实体名称', '新增核查对象', {
-        confirmButtonText: '确定', cancelButtonText: '取消',
-      })
-      rows.value = [...rows.value, { ...emptyRow(String(Date.now())), supplierName: value }]
-      persist()
-    } catch { /* cancelled */ }
+    rows.value = [...rows.value, emptyUndisclosedPartyRow()]
+    persist()
   }
 
   function removeRow(id: string): void {
@@ -172,7 +114,7 @@ export function useF2UndisclosedParty(opts: {
   onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
 
   return {
-    activeSegment,
+    rows,
     searchQuery,
     filteredRows,
     riskSummary,
@@ -180,10 +122,9 @@ export function useF2UndisclosedParty(opts: {
     updateRow,
     addRow,
     removeRow,
-    RELATION_TYPES,
-    CHECK_SOURCE_OPTIONS,
-    RISK_LEVELS,
   }
 }
+
+export type { UndisclosedPartyRow } from './useF2UndisclosedPartyFormulas'
 
 export default useF2UndisclosedParty

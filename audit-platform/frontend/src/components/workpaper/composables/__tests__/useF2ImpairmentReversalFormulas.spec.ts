@@ -8,11 +8,36 @@ import {
   calcEffectiveAccountSplit,
   migrateReversalSheet,
   emptyReversalItem,
+  isBlankReversalItem,
+  pruneBlankReversalItems,
 } from '../useF2ImpairmentReversalFormulas'
 
 describe('useF2ImpairmentReversalFormulas', () => {
-  it('default sheet has 10 rows', () => {
-    expect(defaultReversalSheet().products).toHaveLength(10)
+  it('default sheet only reserves one blank row', () => {
+    expect(defaultReversalSheet().products).toHaveLength(1)
+    expect(isBlankReversalItem(defaultReversalSheet().products[0])).toBe(true)
+  })
+
+  it('prunes reserved blank rows but keeps one blank shell when empty', () => {
+    const filled = { ...emptyReversalItem(), itemName: '产成品A' }
+    expect(pruneBlankReversalItems([
+      emptyReversalItem(),
+      filled,
+      emptyReversalItem(),
+    ])).toEqual([filled])
+    expect(pruneBlankReversalItems([
+      emptyReversalItem(),
+      emptyReversalItem(),
+    ])).toHaveLength(1)
+  })
+
+  it('prunes legacy reserved rows during migration', () => {
+    const filled = { ...emptyReversalItem(), itemName: '产成品A' }
+    const sheet = migrateReversalSheet({
+      products: [emptyReversalItem(), filled, emptyReversalItem()],
+    })
+    expect(sheet?.products).toHaveLength(1)
+    expect(sheet?.products[0].itemName).toBe('产成品A')
   })
 
   it('calculates reversal proportional to issuance', () => {

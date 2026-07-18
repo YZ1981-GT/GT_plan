@@ -203,6 +203,11 @@ export function useF2CutoffSheet(opts: {
     loadRows(opts.allResponses.value, sheetCode.value).map(enrichCutoffRow),
   )
   const cutoffConclusion = ref('')
+  /** 首屏 hydrate 期间禁止写库，避免打开底稿就触发保存/回声重载 */
+  let hydrateDepth = 0
+  const isHydrating = () => hydrateDepth > 0
+  function beginHydrate(): void { hydrateDepth += 1 }
+  function endHydrate(): void { hydrateDepth = Math.max(0, hydrateDepth - 1) }
 
   function applyStocktakeSeed(): void {
     const seed = readStocktakeMetaSeed(opts.allResponses.value)
@@ -211,7 +216,7 @@ export function useF2CutoffSheet(opts: {
     if (seed.bsDate && !meta.value.cutoffDate) patch.cutoffDate = seed.bsDate
     if (Object.keys(patch).length) {
       meta.value = { ...meta.value, ...patch }
-      if (!opts.isReadonly.value) persistMeta()
+      if (!opts.isReadonly.value && !isHydrating()) persistMeta()
     }
   }
 
@@ -238,17 +243,21 @@ export function useF2CutoffSheet(opts: {
   )
   watch(
     () => opts.allResponses.value.get(metaKey(sheetCode.value))?.remark,
-    () => loadMeta(),
+    () => {
+      beginHydrate()
+      try { loadMeta() } finally { endHydrate() }
+    },
     { immediate: true },
   )
   watch(periodEndDate, (d) => {
     if (d && !meta.value.cutoffDate) {
       meta.value = { ...meta.value, cutoffDate: d }
-      persistMeta()
+      if (!isHydrating()) persistMeta()
     }
   })
 
   watch(effectiveCutoff, () => {
+    if (isHydrating()) return
     rows.value = rows.value.map(enrichCutoffRow)
   })
 
@@ -462,16 +471,29 @@ export function useF2CutoffSheet(opts: {
     persistRows()
   }
 
-  watch(cutoffConclusion, () => { persistConclusion() })
+  watch(cutoffConclusion, () => {
+    if (isHydrating()) return
+    persistConclusion()
+  })
 
   watch(sheetCode, () => {
-    rows.value = loadRows(opts.allResponses.value, sheetCode.value).map(enrichCutoffRow)
-    loadMeta()
+    beginHydrate()
+    try {
+      rows.value = loadRows(opts.allResponses.value, sheetCode.value).map(enrichCutoffRow)
+      loadMeta()
+    } finally {
+      endHydrate()
+    }
   })
 
   function reloadRows(): void {
-    rows.value = loadRows(opts.allResponses.value, sheetCode.value).map(enrichCutoffRow)
-    loadMeta()
+    beginHydrate()
+    try {
+      rows.value = loadRows(opts.allResponses.value, sheetCode.value).map(enrichCutoffRow)
+      loadMeta()
+    } finally {
+      endHydrate()
+    }
   }
 
   // 导入 Excel 后父级会替换 allResponses Map；同步刷新当前结构化表格。

@@ -277,49 +277,12 @@ http.interceptors.response.use(
     // 请求被取消（去重导致）不弹错误
     if (axios.isCancel(error)) return Promise.reject(error)
 
-    // _silent 模式：调用方自行处理错误，不弹全局 toast
-    if ((error.config as any)?._silent) return Promise.reject(error)
-
-    // R8-S1-05：超时专门处理（大文件导入期间完全抑制超时弹窗）
-    if (error.code === 'ECONNABORTED') {
-      // 全局抑制标志：大文件上传/detect 进行中时不弹超时（避免 worker 阻塞导致的误报）
-      if ((globalThis as any).__suppressTimeoutToast) {
-        return Promise.reject(error)
-      }
-      const now = Date.now()
-      const lastTimeoutTs = (globalThis as any).__lastTimeoutNotify || 0
-      // 60 秒防抖
-      if (now - lastTimeoutTs > 60000) {
-        (globalThis as any).__lastTimeoutNotify = now
-        const { feedback } = await import('./feedback')
-        feedback.notify({
-          type: 'warning',
-          title: '请求超时',
-          message: '网络连接缓慢，已停止等待。建议检查网络或稍后重试。',
-          duration: 6000,
-        })
-      }
-      return Promise.reject(error)
-    }
-
-    // R8-S1-05：断网专门处理
-    if (!error.response && !navigator.onLine) {
-      const { feedback } = await import('./feedback')
-      feedback.notify({
-        type: 'warning',
-        title: '网络已断开',
-        message: '当前离线，部分操作可能无法完成。恢复网络后请重试。',
-        duration: 8000,
-      })
-      return Promise.reject(error)
-    }
-
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean; _retryCount?: number }
     const authStore = useAuthStore()
     const status = error.response?.status
 
-    // 401 → 刷新令牌
-    if (status === 401 && !originalRequest._retry) {
+    // 401 → 优先刷新令牌（须在 _silent 之前，避免 silent health/ACNR 跳过刷新导致后续鉴权连环失败）
+    if (status === 401 && originalRequest && !originalRequest._retry) {
       if (!authStore.refreshToken) {
         authStore.logout()
         window.location.href = '/login'
@@ -358,8 +321,54 @@ http.interceptors.response.use(
       }
     }
 
+    // 401 刷新后仍失败：静默拒绝并登出，不弹「无效的认证凭据」干扰底稿操作
+    if (status === 401) {
+      if (authStore.token || authStore.refreshToken) {
+        authStore.logout()
+        window.location.href = '/login'
+      }
+      return Promise.reject(error)
+    }
+
+    // _silent 模式：调用方自行处理错误，不弹全局 toast
+    if ((error.config as any)?._silent) return Promise.reject(error)
+
+    // R8-S1-05：超时专门处理（大文件导入期间完全抑制超时弹窗）
+    if (error.code === 'ECONNABORTED') {
+      // 全局抑制标志：大文件上传/detect 进行中时不弹超时（避免 worker 阻塞导致的误报）
+      if ((globalThis as any).__suppressTimeoutToast) {
+        return Promise.reject(error)
+      }
+      const now = Date.now()
+      const lastTimeoutTs = (globalThis as any).__lastTimeoutNotify || 0
+      // 60 秒防抖
+      if (now - lastTimeoutTs > 60000) {
+        (globalThis as any).__lastTimeoutNotify = now
+        const { feedback } = await import('./feedback')
+        feedback.notify({
+          type: 'warning',
+          title: '请求超时',
+          message: '网络连接缓慢，已停止等待。建议检查网络或稍后重试。',
+          duration: 6000,
+        })
+      }
+      return Promise.reject(error)
+    }
+
+    // R8-S1-05：断网专门处理
+    if (!error.response && !navigator.onLine) {
+      const { feedback } = await import('./feedback')
+      feedback.notify({
+        type: 'warning',
+        title: '网络已断开',
+        message: '当前离线，部分操作可能无法完成。恢复网络后请重试。',
+        duration: 8000,
+      })
+      return Promise.reject(error)
+    }
+
     // 500/502/503 自动重试（最多 2 次）+ loading 提示
-    if (status && status >= 500 && (originalRequest._retryCount ?? 0) < 2) {
+    if (status && status >= 500 && originalRequest && (originalRequest._retryCount ?? 0) < 2) {
       originalRequest._retryCount = (originalRequest._retryCount ?? 0) + 1
       _showRetryToast(originalRequest._retryCount)
       try {

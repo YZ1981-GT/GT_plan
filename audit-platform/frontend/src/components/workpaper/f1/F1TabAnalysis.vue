@@ -1,25 +1,22 @@
 <template>
-<div class="d3-analysis">
-  <!-- 编制提示 -->
+<div class="f1-analysis">
   <details class="guidance-details">
     <summary>📋 编制提示</summary>
     <div class="guidance-content">
-      <p>1. 本表对预付账款（科目1123）借方/贷方发生额及主要债务人集中度进行分析性复核。</p>
-      <p>2. 借贷方发生额应与序时账及明细表勾稽一致，差异行标红时须查明原因。</p>
-      <p>3. Top5 债务人集中度偏高或单户变动率超30%时应关注长期挂账与关联方预付风险。</p>
-      <p>4. 结合账龄结构评估预付款可收回性，识别潜在减值及重分类迹象。</p>
+      <p>1. 按 Excel F1-4：余额分析 → 借方发生额 → 贷方发生额 → 大额供应商 → 分块说明与结论。</p>
+      <p>2. 灰色列为自动计算（变动额/比例、汇总行、占比、期末余额、账面价值）。</p>
+      <p>3. 性质拆分可「从 F1-2 汇总」；大额供应商可「从 F1-2 取大额」后补账龄、原因、期后结算。</p>
+      <p>4. 大额收回款项、大额期末余额须关注商业合理性与关联方资金占用。</p>
     </div>
   </details>
 
-  <!-- 审计目标 -->
   <el-alert
     type="info"
     :closable="false"
-    title="审计目标：通过分析性复核评价预付账款发生额变动与集中度的合理性，识别异常波动、长期挂账及关联方预付风险。"
+    title="审计目标：核实预付款项存在性与计价；通过分析余额、借贷发生额及大额供应商，识别异常波动、减值迹象与资金占用风险。"
     class="objective-alert"
   />
 
-  <!-- 集中度警告 -->
   <el-alert
     v-if="top5ConcentrationWarning"
     type="warning"
@@ -29,132 +26,294 @@
     style="margin-bottom: 12px"
   />
 
-  <!-- 工具栏 -->
   <div class="tab-toolbar">
-    <div class="toolbar-left"></div>
+    <div class="toolbar-left">
+      <el-button size="small" type="primary" plain :disabled="isReadonly" @click="fillFromDetail">从 F1-2 汇总性质</el-button>
+      <el-button size="small" :disabled="isReadonly" @click="fillMajorSuppliersFromDetail()">从 F1-2 取大额供应商</el-button>
+    </div>
     <div class="toolbar-right">
-      <span class="chip-wrap"><GtIndexChip value="wp:F1-1" :context-project-id="projectId" /></span>
-      <el-tag size="small" type="info">主要债务人 {{ top5Debtors.length }} 户</el-tag>
+      <span class="chip-wrap"><GtIndexChip value="wp:F1-2" :context-project-id="projectId" /></span>
+      <el-tag size="small" type="info">大额 {{ supplierRows.length }} 户</el-tag>
     </div>
   </div>
 
-  <!-- 区块一：借方发生额分析 -->
-  <div class="analysis-card">
-    <h4 class="card-title">(一) 借方发生额分析</h4>
-    <el-table :data="debitTableData" size="small" border stripe>
-      <el-table-column prop="label" label="项目" width="180" />
-      <el-table-column label="金额" width="130" align="right">
-        <template #default="{ row }">
-          <span :class="{ 'diff-red': row.rowKey === 'debit-diff' && row.amount !== 0 }">
-            {{ fmtAmount(row.amount) }}
-          </span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="source" label="来源" width="140" />
-      <el-table-column prop="remark" label="备注" min-width="120" />
-    </el-table>
-  </div>
+  <F1SheetAttachments
+    :project-id="projectId"
+    :wp-id="wpId"
+    sheet-code="F1-4"
+    label="分析表附件"
+  />
 
-  <!-- 区块二：贷方发生额分析 -->
+  <!-- 1. 余额分析 -->
   <div class="analysis-card">
-    <h4 class="card-title">(二) 贷方发生额分析</h4>
-    <el-table :data="creditTableData" size="small" border stripe>
-      <el-table-column prop="label" label="项目" width="180" />
-      <el-table-column label="金额" width="130" align="right">
+    <h4 class="card-title">1. 预付款项余额分析</h4>
+    <el-table :data="balanceRows" size="small" border stripe :row-class-name="periodRowClass">
+      <el-table-column label="项目" min-width="280">
         <template #default="{ row }">
-          <span :class="{ 'diff-red': row.rowKey === 'credit-diff' && row.amount !== 0 }">
-            {{ fmtAmount(row.amount) }}
-          </span>
+          <span :class="{ indent: row.indent }">{{ row.label }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="source" label="来源" width="140" />
-      <el-table-column prop="remark" label="备注" min-width="120" />
-    </el-table>
-  </div>
-
-  <!-- 区块三：Top5债务人 -->
-  <div class="analysis-card">
-    <h4 class="card-title">(三) 期末主要债务人分析</h4>
-    <el-table :data="top5Debtors" size="small" border stripe>
-      <el-table-column type="index" label="序号" width="50" />
-      <el-table-column prop="customerName" label="债务人名称" width="160">
+      <el-table-column label="本期金额" width="130" align="right">
         <template #default="{ row }">
-          <span>{{ row.customerName }}</span>
-          <GtIndexChip value="wp:F1-2" :context-project-id="projectId" />
+          <template v-if="row.rowKind === 'ratio'">{{ ratioCurrent(row) }}</template>
+          <el-input v-else-if="row.editable && !isReadonly" v-model.number="editBuf[row.rowKey + '.current']" size="small"
+            @focus="() => seedEdit(row, 'current')"
+            @change="() => commitPeriod('balance', row, 'current')" />
+          <span v-else class="amt auto">{{ fmtAmount(row.current) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="期末余额" width="120" align="right">
-        <template #default="{ row }">{{ fmtAmount(row.endAudited) }}</template>
-      </el-table-column>
-      <el-table-column label="期初余额" width="120" align="right">
-        <template #default="{ row }">{{ fmtAmount(row.priorAudited) }}</template>
-      </el-table-column>
-      <el-table-column label="变动金额" width="120" align="right">
-        <template #default="{ row }">{{ fmtAmount(row.changeAmount) }}</template>
-      </el-table-column>
-      <el-table-column label="变动比例" width="90">
+      <el-table-column label="上期金额" width="130" align="right">
         <template #default="{ row }">
-          <span :class="{ 'rate-exceed': isRateHigh(row.changeRate) }">
-            {{ fmtRate(row.changeRate) }}
-          </span>
+          <template v-if="row.rowKind === 'ratio'">{{ ratioPrior(row) }}</template>
+          <el-input v-else-if="row.editable && !isReadonly" v-model.number="editBuf[row.rowKey + '.prior']" size="small"
+            @focus="() => seedEdit(row, 'prior')"
+            @change="() => commitPeriod('balance', row, 'prior')" />
+          <span v-else class="amt auto">{{ fmtAmount(row.prior) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="变动金额" width="120" align="right" class-name="auto-calc-col">
+        <template #default="{ row }">
+          <span v-if="row.rowKind !== 'ratio'" class="amt auto">{{ fmtAmount(row.changeAmount) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="变动比例" width="100" align="right" class-name="auto-calc-col">
+        <template #default="{ row }">
+          <span v-if="row.rowKind !== 'ratio'" :class="{ 'rate-exceed': isRateHigh(row.changeRate) }">{{ fmtRate(row.changeRate) }}</span>
         </template>
       </el-table-column>
     </el-table>
+    <div class="note-block">
+      <div class="note-label">
+        审计说明
+        <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genNote('balance')">🤖AI</el-button>
+      </div>
+      <el-input type="textarea" :autosize="{ minRows: 2, maxRows: 5 }" :disabled="isReadonly"
+        :model-value="notes.balance" @update:model-value="(v: string) => updateNote('balance', v)"
+        placeholder="说明余额结构变动及存货相关预付占比是否合理..." />
+    </div>
   </div>
 
-  <!-- 区块四：审计说明（卡片式） -->
+  <!-- 2. 借方发生额 -->
+  <div class="analysis-card">
+    <h4 class="card-title">2. 预付账款借方发生额分析</h4>
+    <el-table :data="debitRows" size="small" border stripe :row-class-name="periodRowClass">
+      <el-table-column label="项目" min-width="300">
+        <template #default="{ row }">
+          <span :class="{ indent: row.indent }">{{ row.indent ? '其中：' + row.label : row.label }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="本期金额" width="130" align="right">
+        <template #default="{ row }">
+          <template v-if="row.rowKind === 'ratio'">{{ ratioCurrent(row) }}</template>
+          <el-input v-else-if="row.editable && !isReadonly" v-model.number="editBuf['d.' + row.rowKey + '.current']" size="small"
+            @focus="() => seedEdit(row, 'current', 'd.')"
+            @change="() => commitPeriod('debit', row, 'current')" />
+          <span v-else class="amt auto">{{ fmtAmount(row.current) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="上期金额" width="130" align="right">
+        <template #default="{ row }">
+          <template v-if="row.rowKind === 'ratio'">{{ ratioPrior(row) }}</template>
+          <el-input v-else-if="row.editable && !isReadonly" v-model.number="editBuf['d.' + row.rowKey + '.prior']" size="small"
+            @focus="() => seedEdit(row, 'prior', 'd.')"
+            @change="() => commitPeriod('debit', row, 'prior')" />
+          <span v-else class="amt auto">{{ fmtAmount(row.prior) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="变动金额" width="120" align="right" class-name="auto-calc-col">
+        <template #default="{ row }">
+          <span v-if="row.rowKind !== 'ratio'" class="amt auto">{{ fmtAmount(row.changeAmount) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="变动比例" width="100" align="right" class-name="auto-calc-col">
+        <template #default="{ row }">
+          <span v-if="row.rowKind !== 'ratio'" :class="{ 'rate-exceed': isRateHigh(row.changeRate) }">{{ fmtRate(row.changeRate) }}</span>
+        </template>
+      </el-table-column>
+    </el-table>
+    <div class="note-block">
+      <div class="note-label">
+        审计说明
+        <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genNote('debit')">🤖AI</el-button>
+      </div>
+      <el-input type="textarea" :autosize="{ minRows: 2, maxRows: 5 }" :disabled="isReadonly"
+        :model-value="notes.debit" @update:model-value="(v: string) => updateNote('debit', v)"
+        placeholder="分析借方新增结构及与存货采购的勾稽关系..." />
+    </div>
+  </div>
+
+  <!-- 3. 贷方发生额 -->
+  <div class="analysis-card">
+    <h4 class="card-title">3. 预付账款贷方发生额分析</h4>
+    <p class="guide-tip">如存在大额预付账款收回，关注合理性、是否存在关联方资金占用等情形。</p>
+    <el-table :data="creditRows" size="small" border stripe :row-class-name="periodRowClass">
+      <el-table-column label="项目" min-width="260">
+        <template #default="{ row }">
+          <span :class="{ indent: row.indent }">{{ row.indent ? (row.rowKey === 'toInventory' ? '其中：' : '') + row.label : row.label }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="本期金额" width="130" align="right">
+        <template #default="{ row }">
+          <el-input v-if="row.editable && !isReadonly" v-model.number="editBuf['c.' + row.rowKey + '.current']" size="small"
+            @focus="() => seedEdit(row, 'current', 'c.')"
+            @change="() => commitPeriod('credit', row, 'current')" />
+          <span v-else class="amt auto">{{ fmtAmount(row.current) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="上期金额" width="130" align="right">
+        <template #default="{ row }">
+          <el-input v-if="row.editable && !isReadonly" v-model.number="editBuf['c.' + row.rowKey + '.prior']" size="small"
+            @focus="() => seedEdit(row, 'prior', 'c.')"
+            @change="() => commitPeriod('credit', row, 'prior')" />
+          <span v-else class="amt auto">{{ fmtAmount(row.prior) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="变动金额" width="120" align="right" class-name="auto-calc-col">
+        <template #default="{ row }"><span class="amt auto">{{ fmtAmount(row.changeAmount) }}</span></template>
+      </el-table-column>
+      <el-table-column label="变动比例" width="100" align="right" class-name="auto-calc-col">
+        <template #default="{ row }">
+          <span :class="{ 'rate-exceed': isRateHigh(row.changeRate) }">{{ fmtRate(row.changeRate) }}</span>
+        </template>
+      </el-table-column>
+    </el-table>
+    <div class="note-block">
+      <div class="note-label">
+        审计说明
+        <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genNote('credit')">🤖AI</el-button>
+      </div>
+      <el-input type="textarea" :autosize="{ minRows: 2, maxRows: 5 }" :disabled="isReadonly"
+        :model-value="notes.credit" @update:model-value="(v: string) => updateNote('credit', v)"
+        placeholder="说明贷方结转路径；对大额收回款项评价合理性..." />
+    </div>
+  </div>
+
+  <!-- 4. 大额供应商 -->
+  <div class="analysis-card">
+    <div class="card-title-row">
+      <h4 class="card-title">4. 大额供应商预付账款期末余额分析</h4>
+      <el-button size="small" type="primary" :disabled="isReadonly" @click="addSupplierRow">+ 添加行</el-button>
+    </div>
+    <p class="guide-tip">如存在大额预付账款期末余额，应重点关注支付预付款的商业合理性、交易是否真实、是否存在关联方资金占用。</p>
+    <el-table :data="supplierDisplayRows" size="small" border stripe :row-class-name="supplierRowClass">
+      <el-table-column label="供应商名称" width="150" fixed>
+        <template #default="{ row }">
+          <el-input v-if="!row._subtotal" :model-value="row.supplierName" size="small" :disabled="isReadonly"
+            @change="(v: string) => updateSupplierCell(row.rowId, 'supplierName', v)" />
+          <span v-else class="subtotal-label">小计</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="期初余额" width="110" align="right">
+        <template #default="{ row }">
+          <el-input v-if="!row._subtotal" :model-value="row.priorBalance" size="small" :disabled="isReadonly"
+            @change="(v: any) => updateSupplierCell(row.rowId, 'priorBalance', v)" />
+          <span v-else class="amt">{{ fmtAmount(row.priorBalance) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="借方发生" width="110" align="right">
+        <template #default="{ row }">
+          <el-input v-if="!row._subtotal" :model-value="row.debit" size="small" :disabled="isReadonly"
+            @change="(v: any) => updateSupplierCell(row.rowId, 'debit', v)" />
+          <span v-else class="amt">{{ fmtAmount(row.debit) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="贷方发生" width="110" align="right">
+        <template #default="{ row }">
+          <el-input v-if="!row._subtotal" :model-value="row.credit" size="small" :disabled="isReadonly"
+            @change="(v: any) => updateSupplierCell(row.rowId, 'credit', v)" />
+          <span v-else class="amt">{{ fmtAmount(row.credit) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="期末余额" width="110" align="right" class-name="auto-calc-col">
+        <template #default="{ row }"><span class="amt auto">{{ fmtAmount(row.endBalance) }}</span></template>
+      </el-table-column>
+      <el-table-column label="减：坏账准备" width="110" align="right">
+        <template #default="{ row }">
+          <el-input v-if="!row._subtotal" :model-value="row.badDebt" size="small" :disabled="isReadonly"
+            @change="(v: any) => updateSupplierCell(row.rowId, 'badDebt', v)" />
+          <span v-else class="amt">{{ fmtAmount(row.badDebt) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="账面价值" width="110" align="right" class-name="auto-calc-col">
+        <template #default="{ row }"><span class="amt auto">{{ fmtAmount(row.bookValue) }}</span></template>
+      </el-table-column>
+      <el-table-column label="发生时间及账龄" width="140">
+        <template #default="{ row }">
+          <el-input v-if="!row._subtotal" :model-value="row.aging" size="small" :disabled="isReadonly"
+            @change="(v: string) => updateSupplierCell(row.rowId, 'aging', v)" />
+        </template>
+      </el-table-column>
+      <el-table-column label="发生原因" min-width="120">
+        <template #default="{ row }">
+          <el-input v-if="!row._subtotal" :model-value="row.reason" size="small" :disabled="isReadonly"
+            @change="(v: string) => updateSupplierCell(row.rowId, 'reason', v)" />
+        </template>
+      </el-table-column>
+      <el-table-column label="期后结算" width="110" align="right">
+        <template #default="{ row }">
+          <el-input v-if="!row._subtotal" :model-value="row.postSettlement" size="small" :disabled="isReadonly"
+            @change="(v: any) => updateSupplierCell(row.rowId, 'postSettlement', v)" />
+          <span v-else class="amt">{{ fmtAmount(row.postSettlement) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column v-if="!isReadonly" label="操作" width="60" fixed="right">
+        <template #default="{ row }">
+          <el-popconfirm v-if="!row._subtotal" title="确认删除？" @confirm="removeSupplierRow(row.rowId)">
+            <template #reference><el-button size="small" type="danger" link>删除</el-button></template>
+          </el-popconfirm>
+        </template>
+      </el-table-column>
+    </el-table>
+    <div class="note-block">
+      <div class="note-label">
+        审计说明
+        <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genNote('supplier')">🤖AI</el-button>
+      </div>
+      <el-input type="textarea" :autosize="{ minRows: 2, maxRows: 5 }" :disabled="isReadonly"
+        :model-value="notes.supplier" @update:model-value="(v: string) => updateNote('supplier', v)"
+        placeholder="评价大额供应商预付的商业合理性、真实性及期后结算情况..." />
+    </div>
+  </div>
+
+  <!-- 结论 -->
   <el-card class="opinion-card" shadow="never">
     <template #header>
       <div class="opinion-header">
-        <span class="opinion-title">审计说明</span>
-        <div class="opinion-chips">
-          <GtIndexChip value="wp:F1-2" :context-project-id="projectId" />
-        </div>
+        <span class="opinion-title">三、审计结论</span>
+        <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading" @click="genConclusion">🤖AI</el-button>
       </div>
     </template>
-    <div class="opinion-section">
-      <div class="opinion-section-header">
-        <span class="opinion-section-label">分析性复核说明</span>
-      </div>
-      <el-input
-        v-model="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 4, maxRows: 10 }"
-        :disabled="isReadonly"
-        placeholder="对预付账款借贷方发生额变动、Top5集中度等进行分析性复核说明..."
-      />
-    </div>
-
-    <div class="opinion-section">
-      <div class="opinion-section-header">
-        <span class="opinion-section-label">审计结论</span>
-      </div>
-      <el-input
-        :model-value="auditConclusion"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        :disabled="isReadonly"
-        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。"
-        @change="saveAuditConclusion"
-      />
-    </div>
+    <el-input
+      type="textarea"
+      :autosize="{ minRows: 3, maxRows: 8 }"
+      :disabled="isReadonly"
+      :model-value="conclusion"
+      @update:model-value="(v: string) => updateConclusion(v)"
+      placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。"
+    />
   </el-card>
 </div>
 </template>
 
 <script setup lang="ts">
 /**
- * F1TabAnalysis.vue — F1-4 分析表
- * 4区块卡片：借方/贷方/Top5/审计说明
+ * F1TabAnalysis.vue — F1-4 实质性分析表（对齐 Excel）
  */
-import { computed, onMounted, ref, toRef, type Ref } from 'vue'
+import { computed, reactive, toRef, type Ref } from 'vue'
 import { isChangeRateExceeding } from '../composables/useF1FormulaEngine'
-import { useF1Analysis } from '../composables/useF1Analysis'
+import {
+  useF1Analysis,
+  type AnalysisNatureKey,
+  type PeriodAmountRow,
+  type CreditBreakdownRow,
+} from '../composables/useF1Analysis'
+import { useF1AiGenerate } from '../composables/useF1AiGenerate'
 import type { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
+import F1SheetAttachments from './F1SheetAttachments.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -167,17 +326,32 @@ const props = defineProps<{
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
 
 const {
-  sections,
-  top5Debtors,
-  top5ConcentrationWarning,
-  auditNote,
+  balanceRows,
   debitRows,
   creditRows,
+  supplierRows,
+  supplierSubtotal,
+  top5ConcentrationWarning,
+  notes,
+  conclusion,
+  updateBalanceNature,
+  updateInventoryBalance,
+  updateDebitNature,
+  updateInventoryPurchase,
+  updateCreditBreakdown,
+  updateNote,
+  updateConclusion,
+  addSupplierRow,
+  removeSupplierRow,
+  updateSupplierCell,
+  fillFromDetail,
+  fillMajorSuppliersFromDetail,
 } = useF1Analysis({
   allResponses: allResponsesRef,
-  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpId: wpIdRef,
   projectId: toRef(props, 'projectId') as Ref<string>,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
@@ -185,34 +359,56 @@ const {
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
-// ─── 审计结论 ──────────────────────────────────────────────────────────────
-const CONCLUSION_KEY = 'F1-analysis-audit-conclusion'
-const auditConclusion = ref('')
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(wpIdRef)
 
-function saveAuditConclusion(val: string): void {
-  if (props.isReadonly) return
-  auditConclusion.value = val
-  allResponsesRef.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
-  void props.saveImmediate(CONCLUSION_KEY, { conclusion: null, remark: val })
+const editBuf = reactive<Record<string, number>>({})
+
+function seedEdit(row: { rowKey: string; current: number; prior: number }, field: 'current' | 'prior', prefix = '') {
+  editBuf[prefix + row.rowKey + '.' + field] = row[field]
 }
 
-onMounted(() => {
-  const c = allResponsesRef.value.get(CONCLUSION_KEY)
-  if (c?.remark) auditConclusion.value = c.remark
-})
+function commitPeriod(
+  section: 'balance' | 'debit' | 'credit',
+  row: PeriodAmountRow | CreditBreakdownRow,
+  field: 'current' | 'prior',
+) {
+  const prefix = section === 'balance' ? '' : section === 'debit' ? 'd.' : 'c.'
+  const val = editBuf[prefix + row.rowKey + '.' + field]
+  if (section === 'balance') {
+    if (row.rowKey === 'inventoryBalance') updateInventoryBalance(field, val)
+    else updateBalanceNature(row.rowKey as AnalysisNatureKey, field, val)
+  } else if (section === 'debit') {
+    if (row.rowKey === 'inventoryPurchase') updateInventoryPurchase(field, val)
+    else updateDebitNature(row.rowKey as AnalysisNatureKey, field, val)
+  } else {
+    updateCreditBreakdown(row.rowKey, field, val)
+  }
+}
 
-// Build table data for debit/credit including total + diff rows
-const debitTableData = computed(() => {
-  const sec = sections.value[0]
-  if (!sec) return []
-  return [...sec.rows, ...(sec.totalRow ? [sec.totalRow] : []), ...(sec.diffRow ? [sec.diffRow] : [])]
-})
+const supplierDisplayRows = computed(() => [
+  ...supplierRows.value.map(r => ({ ...r, _subtotal: false })),
+  { ...supplierSubtotal.value, rowId: '__subtotal__', supplierName: '小计', aging: '', reason: '', _subtotal: true },
+])
 
-const creditTableData = computed(() => {
-  const sec = sections.value[1]
-  if (!sec) return []
-  return [...sec.rows, ...(sec.totalRow ? [sec.totalRow] : []), ...(sec.diffRow ? [sec.diffRow] : [])]
-})
+function periodRowClass({ row }: { row: any }) {
+  if (row.rowKind === 'total') return 'total-row'
+  if (row.rowKind === 'ratio') return 'ratio-row'
+  return ''
+}
+
+function supplierRowClass({ row }: { row: any }) {
+  return row._subtotal ? 'subtotal-row' : ''
+}
+
+function ratioCurrent(row: any): string {
+  if (row.ratioDisplay) return String(row.ratioDisplay).split(' / ')[0] || '-'
+  return row.current ? `${Number(row.current).toFixed(2)}%` : '#DIV/0!'
+}
+
+function ratioPrior(row: any): string {
+  if (row.ratioDisplay) return String(row.ratioDisplay).split(' / ')[1] || '-'
+  return row.prior ? `${Number(row.prior).toFixed(2)}%` : '#DIV/0!'
+}
 
 function fmtAmount(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
@@ -221,46 +417,78 @@ function fmtAmount(val: number | null | undefined): string {
 }
 
 function fmtRate(rate: number | '' | 'N/A'): string {
-  if (rate === '' || rate === 'N/A') return String(rate)
+  if (rate === '' || rate === 'N/A') return rate === '' ? '-' : 'N/A'
   return `${(rate * 100).toFixed(1)}%`
 }
 
 function isRateHigh(rate: number | '' | 'N/A'): boolean {
   return isChangeRateExceeding(rate, 0.3)
 }
+
+function noteContext() {
+  return {
+    sheet: 'F1-4',
+    supplierCount: supplierRows.value.length,
+    concentrationWarning: top5ConcentrationWarning.value || '',
+    balanceTotal: balanceRows.value.find(r => r.rowKey === 'total')?.current ?? 0,
+    debitTotal: debitRows.value.find(r => r.rowKey === 'total')?.current ?? 0,
+    creditTotal: creditRows.value.find(r => r.rowKey === 'total')?.current ?? 0,
+  }
+}
+
+async function genNote(section: 'balance' | 'debit' | 'credit' | 'supplier') {
+  const map = {
+    balance: { key: 'analysis-balance-note' as const, title: '余额分析说明', get: () => notes.value.balance },
+    debit: { key: 'analysis-debit-note' as const, title: '借方发生额说明', get: () => notes.value.debit },
+    credit: { key: 'analysis-credit-note' as const, title: '贷方发生额说明', get: () => notes.value.credit },
+    supplier: { key: 'analysis-supplier-note' as const, title: '大额供应商说明', get: () => notes.value.supplier },
+  }
+  const m = map[section]
+  const text = await generateAndConfirm(m.key, m.get(), noteContext(), m.title)
+  if (text) updateNote(section, text)
+}
+
+async function genConclusion() {
+  const text = await generateAndConfirm('analysis-conclusion', conclusion.value, noteContext(), '审计结论')
+  if (text) updateConclusion(text)
+}
 </script>
 
 <style scoped>
-.d3-analysis { padding: 16px; }
-.d3-analysis :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
-.d3-analysis :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
+.f1-analysis { padding: 16px; }
+.f1-analysis :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
+.f1-analysis :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
 
-/* 编制提示 */
 .guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .objective-alert { margin-bottom: 12px; }
 
-/* 工具栏 */
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.toolbar-left, .toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .chip-wrap { display: inline-flex; align-items: center; }
 
 .analysis-card { margin-bottom: 20px; padding: 16px; background: #fff; border: 1px solid #ebeef5; border-radius: 6px; }
-.card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #303133; }
-.diff-red { color: #f56c6c; font-weight: 600; }
+.card-title { font-size: 14px; font-weight: 600; margin: 0 0 12px; color: #303133; }
+.card-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.card-title-row .card-title { margin: 0; }
+.guide-tip { font-size: 12px; color: #409eff; margin: 0 0 10px; line-height: 1.5; }
+.indent { padding-left: 1.5em; }
+.amt { text-align: right; display: inline-block; width: 100%; }
+.auto { color: #909399; }
 .rate-exceed { color: #f56c6c; font-weight: 600; }
+.subtotal-label { font-weight: 700; }
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
+:deep(.total-row) { background-color: #fafafa !important; font-weight: 600; }
+:deep(.ratio-row) { background-color: #f0f9eb !important; }
+:deep(.subtotal-row) { background-color: #fafafa !important; font-weight: 600; }
 
-/* 审计意见卡片 */
-.opinion-card { margin-top: 16px; border-radius: 8px; }
-.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
+.note-block { margin-top: 12px; }
+.note-label { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 13px; font-weight: 500; }
+
+.opinion-card { margin-top: 8px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
 .opinion-header { display: flex; align-items: center; justify-content: space-between; }
-.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
-.opinion-chips { display: flex; gap: 6px; }
-.opinion-section { margin-bottom: 16px; }
-.opinion-section:last-child { margin-bottom: 0; }
-.opinion-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.opinion-section-label { font-size: 14px; font-weight: 500; color: #303133; }
+.opinion-title { font-size: 14px; font-weight: 600; }
 </style>

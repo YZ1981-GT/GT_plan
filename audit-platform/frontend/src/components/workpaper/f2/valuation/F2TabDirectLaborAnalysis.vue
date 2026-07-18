@@ -39,12 +39,7 @@
           api-prefix="f2-val"
           sheet="F2-42"
           :disabled="isReadonly"
-          ai-section="labor-analysis"
-          :existing-content="lb.auditNote.value"
-          :related-context="{ varianceCount: lb.varianceCount.value }"
-          ai-title="AI 生成 · 直接人工分析结论"
           review-section="F2-42-conclusion"
-          @ai-filled="(t: string) => { lb.auditNote.value = t }"
         />
       </div>
       <div class="toolbar-right">
@@ -104,7 +99,19 @@
     />
 
     <el-card shadow="never" class="conclusion-card">
-      <template #header><span class="conclusion-header">三、审计说明</span></template>
+      <template #header>
+        <div class="conclusion-card-header">
+          <span class="conclusion-header">三、审计说明</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="runAi('labor-note')"
+          >AI 填写审计说明</el-button>
+        </div>
+      </template>
       <el-input
         v-model="lb.auditNote.value"
         type="textarea"
@@ -115,7 +122,19 @@
     </el-card>
 
     <el-card shadow="never" class="conclusion-card">
-      <template #header><span class="conclusion-header">四、审计结论</span></template>
+      <template #header>
+        <div class="conclusion-card-header">
+          <span class="conclusion-header">四、审计结论</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="runAi('labor-conclusion')"
+          >AI 生成结论</el-button>
+        </div>
+      </template>
       <el-input
         :model-value="auditConclusion"
         type="textarea"
@@ -136,8 +155,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, toRef } from 'vue'
+import { ref, onMounted, toRef, type Ref } from 'vue'
 import { useF2DirectLaborAnalysis } from '../../composables/useF2DirectLaborAnalysis'
+import { useF2ValuationAiGenerate, type F2ValAiSection } from '../../composables/useF2ValuationAiGenerate'
 import {
   LABOR_MONTH_LABELS,
   F2_42_DEFAULT_OBJECTIVE,
@@ -179,6 +199,39 @@ onMounted(() => {
   if (c?.remark) auditConclusion.value = c.remark
 })
 
+const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2ValuationAiGenerate(wpIdRef)
+
+function aiContext(): Record<string, unknown> {
+  return {
+    sheet: 'F2-42',
+    productCount: lb.enrichedLines.value.length,
+    laborGrandTotal: lb.laborGrandTotal.value,
+    varianceCount: lb.varianceCount.value,
+    products: lb.enrichedLines.value.map((line) => ({
+      productName: line.productName,
+      laborTotal: line.laborTotal,
+      laborPriorYear: line.laborPriorYear,
+      laborChangeRate: line.laborChangeRate,
+      outputTotal: line.outputTotal,
+      unitAverage: line.unitAverage,
+      unitPriorYear: line.unitPriorYear,
+      unitChangeRate: line.unitChangeRate,
+      changeReason: line.changeReason,
+    })),
+  }
+}
+
+async function runAi(section: F2ValAiSection): Promise<void> {
+  const isNote = section === 'labor-note'
+  const existing = isNote ? lb.auditNote.value : auditConclusion.value
+  const title = isNote ? 'AI 生成 · 直接人工审计说明' : 'AI 生成 · 直接人工审计结论'
+  const text = await generateAndConfirm(section, existing || '', aiContext(), title)
+  if (!text) return
+  if (isNote) lb.auditNote.value = text
+  else saveAuditConclusion(text)
+}
+
 function fmt(v: number): string {
   if (!v) return '0'
   return v.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
@@ -198,6 +251,7 @@ function fmt(v: number): string {
 }
 .formula-hint { font-weight: 400; color: #909399; font-size: 12px; }
 .conclusion-card { margin-top: 14px; }
+.conclusion-card-header { display: flex; align-items: center; justify-content: space-between; }
 .conclusion-header { font-weight: 600; font-size: 14px; }
 .tips-box {
   margin-top: 16px;

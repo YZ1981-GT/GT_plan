@@ -2,22 +2,13 @@
  * useF1Detail — F1-2 明细表核心逻辑 composable
  *
  * Spec: .kiro/specs/f1-prepayment/
- * Task: 7.1, aging-config-enhancement Task 8.1
+ * Excel: F1-2 预付账款明细表（借方科目，3 期账龄）
  *
  * 职责：
- * - 定义 DetailRow 类型（动态账龄段，2-period: agingPrior/agingAudited）
- * - rows reactive（从F1-det-rows加载JSON数组）
- * - 行内公式自动计算（H=E+F+G, O=H+N-M, Q=O+P, T=Q+R+S）
- * - subtotalRow computed + verificationRow computed（合计-TB数）
- * - searchQuery + filteredRows computed（模糊搜索）
- * - addRow/removeRow/updateCell
- * - matchRelatedParty（从relatedParties列表包含匹配）
- * - importFromAuxBalance（调后端API批量导入）
- * - onConfirmationCompleted监听（标记isConfirmed='Y'）
- * - 动态账龄配置集成（useAgingConfig + migrateD3F1Keys + remapRowAgingData）
- *
- * Requirements: 4.1-4.12, 5.1-5.7, 6.1-6.5, 18.4
- * Aging Config Requirements: 5.1, 5.2, 5.3, 5.4
+ * - DetailRow（3-period: agingPrior / agingCurrent / agingAudited）
+ * - 行内公式：H=E+F+G, O=H+M-N, Q=O+P, X=Q+V+W
+ * - 合计 / 核对 / 账龄占比 / 账龄逻辑校验
+ * - 动态账龄配置（useAgingConfig + migrateD3F1Keys）
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -28,6 +19,9 @@ import {
   calcEndUnadjusted,
   calcEndAudited,
   calcSubtotal,
+  calcPercentage,
+  sumAgingValues,
+  checkAgingBalance,
 } from './useF1FormulaEngine'
 import { api } from '@/services/apiProxy'
 import type { ChecklistResponse } from './useF1FormData'
@@ -38,27 +32,28 @@ import { migrateD3F1Keys, remapRowAgingData, type AgingData } from '@/composable
 
 export interface DetailRow {
   rowId: string
-  customerName: string       // A: 对方单位名称
+  customerName: string       // A: 债权人名称
   companyCode: string        // B: 公司代码
-  nature: string             // C: 款项性质（下拉）
-  relationType: string       // D: 关联方类型（下拉）
-  priorUnadjusted: number    // E: 期初未审余额
+  relationType: string       // C: 关联方类型
+  nature: string             // D: 款项性质
+  priorUnadjusted: number    // E: 期初未审数
   priorAdjustment: number    // F: 期初账项调整
   priorReclass: number       // G: 期初重分类调整
-  priorAudited: number       // H: =E+F+G（自动）
-  agingPrior: AgingData      // I~L (动态账龄段，key 由项目配置决定)
+  priorAudited: number       // H: =E+F+G
+  agingPrior: AgingData      // I~L: 期初审定账龄
   debit: number              // M: 借方发生
   credit: number             // N: 贷方发生
-  endBalance: number         // O: =H+N-M（贷方科目，自动）
+  endBalance: number         // O: =H+M-N
   entityReclass: number      // P: 被审计单位重分类调整
-  endUnadjusted: number      // Q: =O+P（自动）
-  endAje: number             // R: 期末账项调整
-  endRje: number             // S: 期末重分类调整
-  endAudited: number         // T: =Q+R+S（自动）
-  agingAudited: AgingData    // U~X (动态账龄段，key 由项目配置决定)
-  isConfirmed: string        // Y: 是否发函
-  postPeriodSettlement: number // Z: 期后结转
-  remark: string             // AA: 备注
+  endUnadjusted: number      // Q: =O+P
+  agingCurrent: AgingData    // R~U: 期末未审账龄
+  endAje: number             // V: 账项调整
+  endRje: number             // W: 重分类调整
+  endAudited: number         // X: =Q+V+W
+  agingAudited: AgingData    // Y~AB: 期末审定账龄
+  isConfirmed: string        // AC: 是否函证
+  postPeriodSettlement: number // AD: 期后回款
+  remark: string             // AE: 备注
 }
 
 export interface UseD3DetailOptions {
@@ -75,11 +70,18 @@ export interface UseD3DetailOptions {
 
 const ITEM_ID_ROWS = 'F1-det-rows'
 const ITEM_ID_TB_AMOUNT = 'F1-adj-trial-balance-amount'
+const AGING_TOLERANCE = 0.01
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
   return `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2)}`
+}
+
+function emptyAging(segments: AgingSegment[]): AgingData {
+  const aging: AgingData = {}
+  for (const seg of segments) aging[seg.key] = 0
+  return aging
 }
 
 /** 安全解析 JSON 数组（使用动态 segments 进行迁移） */
@@ -95,7 +97,6 @@ function safeParseRows(jsonStr: string | null | undefined, segments: AgingSegmen
 
 /** 规范化行数据，确保所有字段存在且类型正确（使用动态 segments） */
 function normalizeRow(raw: any, segments: AgingSegment[]): DetailRow {
-  // 使用 migrateD3F1Keys 对齐 aging key 到当前项目配置
   const migrated = migrateD3F1Keys(raw, segments)
 
   return {
@@ -114,6 +115,7 @@ function normalizeRow(raw: any, segments: AgingSegment[]): DetailRow {
     endBalance: parseNum(raw.endBalance),
     entityReclass: parseNum(raw.entityReclass),
     endUnadjusted: parseNum(raw.endUnadjusted),
+    agingCurrent: migrated.agingCurrent || emptyAging(segments),
     endAje: parseNum(raw.endAje),
     endRje: parseNum(raw.endRje),
     endAudited: parseNum(raw.endAudited),
@@ -127,31 +129,28 @@ function normalizeRow(raw: any, segments: AgingSegment[]): DetailRow {
 /**
  * 对单行重新计算公式链：
  * H = E + F + G
- * O = H + N - M（贷方科目）
+ * O = H + M - N（借方科目）
  * Q = O + P
- * T = Q + R + S
+ * X = Q + V + W
  */
 export function recalcRowFormulas(row: DetailRow): DetailRow {
   const H = calcPriorAudited(row.priorUnadjusted, row.priorAdjustment, row.priorReclass)
-  const O = calcEndBalance(H, row.credit, row.debit)
+  const O = calcEndBalance(H, row.debit, row.credit)
   const Q = calcEndUnadjusted(O, row.entityReclass)
-  const T = calcEndAudited(Q, row.endAje, row.endRje)
+  const X = calcEndAudited(Q, row.endAje, row.endRje)
 
   return {
     ...row,
     priorAudited: H,
     endBalance: O,
     endUnadjusted: Q,
-    endAudited: T,
+    endAudited: X,
   }
 }
 
 /** 创建空行（账龄段基于当前项目配置动态初始化为 0） */
 export function createEmptyRow(segments: AgingSegment[] = []): DetailRow {
-  const emptyAging: AgingData = {}
-  for (const seg of segments) {
-    emptyAging[seg.key] = 0
-  }
+  const empty = emptyAging(segments)
   return {
     rowId: generateRowId(),
     customerName: '',
@@ -162,16 +161,17 @@ export function createEmptyRow(segments: AgingSegment[] = []): DetailRow {
     priorAdjustment: 0,
     priorReclass: 0,
     priorAudited: 0,
-    agingPrior: { ...emptyAging },
+    agingPrior: { ...empty },
     debit: 0,
     credit: 0,
     endBalance: 0,
     entityReclass: 0,
     endUnadjusted: 0,
+    agingCurrent: { ...empty },
     endAje: 0,
     endRje: 0,
     endAudited: 0,
-    agingAudited: { ...emptyAging },
+    agingAudited: { ...empty },
     isConfirmed: '',
     postPeriodSettlement: 0,
     remark: '',
@@ -180,9 +180,6 @@ export function createEmptyRow(segments: AgingSegment[] = []): DetailRow {
 
 /**
  * 关联方匹配逻辑（纯函数，方便测试）
- *
- * 检查 customerName 是否包含 relatedParties 列表中任一项（或反向包含）。
- * 匹配则返回该关联方名称（作为关联关系标识），否则返回'非关联方'。
  */
 export function matchRelatedPartyPure(customerName: string, relatedParties: string[]): string {
   if (!customerName) return '非关联方'
@@ -199,9 +196,6 @@ export function matchRelatedPartyPure(customerName: string, relatedParties: stri
 
 /**
  * 搜索过滤逻辑（纯函数，方便测试）
- *
- * 按 customerName 大小写不敏感模糊搜索。
- * 空查询串返回所有行。
  */
 export function filterRowsBySearch(rows: DetailRow[], query: string): DetailRow[] {
   if (!query) return rows
@@ -211,8 +205,6 @@ export function filterRowsBySearch(rows: DetailRow[], query: string): DetailRow[
 
 /**
  * 函证完成事件处理逻辑（纯函数，方便测试）
- *
- * 匹配 customerName 的行标记 isConfirmed='Y'，不匹配行保持不变。
  */
 export function applyConfirmationCompleted(rows: DetailRow[], customerName: string): DetailRow[] {
   if (!customerName) return rows
@@ -225,6 +217,28 @@ export function applyConfirmationCompleted(rows: DetailRow[], customerName: stri
   })
 }
 
+function sumAgingField(allRows: DetailRow[], field: 'agingPrior' | 'agingCurrent' | 'agingAudited', segments: AgingSegment[]): AgingData {
+  const result: AgingData = {}
+  for (const seg of segments) {
+    result[seg.key] = calcSubtotal(allRows.map(r => r[field]?.[seg.key] ?? 0))
+  }
+  return result
+}
+
+function buildMetaRow(
+  rowId: string,
+  customerName: string,
+  segments: AgingSegment[],
+  overrides: Partial<DetailRow> = {},
+): DetailRow {
+  return {
+    ...createEmptyRow(segments),
+    rowId,
+    customerName,
+    ...overrides,
+  }
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useF1Detail(options: UseD3DetailOptions) {
@@ -232,131 +246,132 @@ export function useF1Detail(options: UseD3DetailOptions) {
 
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
 
-  // ─── Aging Config Integration (subject='F1', 2-period) ──────────────
-
   const { segments, bands } = useAgingConfig(projectId, 'F1')
-
-  // ─── Reactive rows ───────────────────────────────────────────────────
 
   const rows = ref<DetailRow[]>([])
   const searchQuery = ref<string>('')
 
-  // Load rows from allResponses (with migration via migrateD3F1Keys)
   watch(
     [() => allResponses.value.get(ITEM_ID_ROWS)?.remark, segments],
     ([jsonStr]) => {
-      if (!segments.value.length) return  // 等待 segments 加载完成
+      if (!segments.value.length) return
       const parsed = safeParseRows(jsonStr as string | undefined, segments.value)
-      // Recalculate formula chain for each row
       rows.value = parsed.map(recalcRowFormulas)
     },
     { immediate: true },
   )
 
-  // ─── Persist ─────────────────────────────────────────────────────────
-
   function persistRows(): void {
-    // Strip computed fields before saving (they are recalculated on load)
-    const toSave = rows.value.map(row => ({
-      ...row,
-      // Keep computed fields in storage for crossSheet consumers
-    }))
+    const toSave = rows.value.map(row => ({ ...row }))
     debouncedSave(ITEM_ID_ROWS, { remark: JSON.stringify(toSave) })
   }
-
-  // ─── filteredRows computed ───────────────────────────────────────────
 
   const filteredRows: ComputedRef<DetailRow[]> = computed(() => {
     return filterRowsBySearch(rows.value, searchQuery.value)
   })
 
-  // ─── subtotalRow computed ────────────────────────────────────────────
-
   const subtotalRow: ComputedRef<DetailRow> = computed(() => {
     const allRows = rows.value
-    // 动态合计 aging 数据
-    const agingPriorSub: AgingData = {}
-    const agingAuditedSub: AgingData = {}
-    for (const seg of segments.value) {
-      agingPriorSub[seg.key] = calcSubtotal(allRows.map(r => r.agingPrior?.[seg.key] ?? 0))
-      agingAuditedSub[seg.key] = calcSubtotal(allRows.map(r => r.agingAudited?.[seg.key] ?? 0))
-    }
-
-    return {
-      rowId: '__subtotal__',
-      customerName: '合计',
-      companyCode: '',
-      nature: '',
-      relationType: '',
+    const segs = segments.value
+    return buildMetaRow('__subtotal__', '合计', segs, {
       priorUnadjusted: calcSubtotal(allRows.map(r => r.priorUnadjusted)),
       priorAdjustment: calcSubtotal(allRows.map(r => r.priorAdjustment)),
       priorReclass: calcSubtotal(allRows.map(r => r.priorReclass)),
       priorAudited: calcSubtotal(allRows.map(r => r.priorAudited)),
-      agingPrior: agingPriorSub,
+      agingPrior: sumAgingField(allRows, 'agingPrior', segs),
       debit: calcSubtotal(allRows.map(r => r.debit)),
       credit: calcSubtotal(allRows.map(r => r.credit)),
       endBalance: calcSubtotal(allRows.map(r => r.endBalance)),
       entityReclass: calcSubtotal(allRows.map(r => r.entityReclass)),
       endUnadjusted: calcSubtotal(allRows.map(r => r.endUnadjusted)),
+      agingCurrent: sumAgingField(allRows, 'agingCurrent', segs),
       endAje: calcSubtotal(allRows.map(r => r.endAje)),
       endRje: calcSubtotal(allRows.map(r => r.endRje)),
       endAudited: calcSubtotal(allRows.map(r => r.endAudited)),
-      agingAudited: agingAuditedSub,
-      isConfirmed: '',
+      agingAudited: sumAgingField(allRows, 'agingAudited', segs),
       postPeriodSettlement: calcSubtotal(allRows.map(r => r.postPeriodSettlement)),
-      remark: '',
-    }
+    })
   })
-
-  // ─── verificationRow computed（合计 - TB数）────────────────────────────
 
   const verificationRow: ComputedRef<DetailRow> = computed(() => {
     const tbAmount = parseNum(allResponses.value.get(ITEM_ID_TB_AMOUNT)?.remark)
     const sub = subtotalRow.value
-    return {
-      rowId: '__verification__',
-      customerName: '核对行（合计-TB数）',
-      companyCode: '',
-      nature: '',
-      relationType: '',
-      priorUnadjusted: sub.priorUnadjusted - tbAmount,
+    const segs = segments.value
+    return buildMetaRow('__verification__', '核对行（合计-TB数）', segs, {
+      priorUnadjusted: sub.priorUnadjusted,
       priorAdjustment: sub.priorAdjustment,
       priorReclass: sub.priorReclass,
-      priorAudited: sub.priorAudited - tbAmount,
+      priorAudited: sub.priorAudited,
       agingPrior: sub.agingPrior,
       debit: sub.debit,
       credit: sub.credit,
-      endBalance: sub.endBalance - tbAmount,
+      endBalance: sub.endBalance,
       entityReclass: sub.entityReclass,
-      endUnadjusted: sub.endUnadjusted - tbAmount,
+      endUnadjusted: sub.endUnadjusted,
+      agingCurrent: sub.agingCurrent,
       endAje: sub.endAje,
       endRje: sub.endRje,
       endAudited: sub.endAudited - tbAmount,
       agingAudited: sub.agingAudited,
-      isConfirmed: '',
       postPeriodSettlement: sub.postPeriodSettlement,
-      remark: '',
-    }
+    })
   })
 
-  // ─── addRow ──────────────────────────────────────────────────────────
+  /** 账龄占比行：各段金额 / 对应余额合计 */
+  const agingPctRow = computed(() => {
+    const sub = subtotalRow.value
+    const segs = segments.value
+    const priorPct: AgingData = {}
+    const currentPct: AgingData = {}
+    const auditedPct: AgingData = {}
+    for (const seg of segs) {
+      priorPct[seg.key] = calcPercentage(sub.agingPrior?.[seg.key] ?? 0, sub.priorAudited)
+      currentPct[seg.key] = calcPercentage(sub.agingCurrent?.[seg.key] ?? 0, sub.endUnadjusted)
+      auditedPct[seg.key] = calcPercentage(sub.agingAudited?.[seg.key] ?? 0, sub.endAudited)
+    }
+    return buildMetaRow('__aging_pct__', '账龄占比', segs, {
+      agingPrior: priorPct,
+      agingCurrent: currentPct,
+      agingAudited: auditedPct,
+    })
+  })
+
+  /** 账龄逻辑校验行：各段之和是否等于对应余额 */
+  const agingCheckRow = computed(() => {
+    const sub = subtotalRow.value
+    const segs = segments.value
+    const priorOk = checkAgingBalance(sumAgingValues(sub.agingPrior), sub.priorAudited, AGING_TOLERANCE)
+    const currentOk = checkAgingBalance(sumAgingValues(sub.agingCurrent), sub.endUnadjusted, AGING_TOLERANCE)
+    const auditedOk = checkAgingBalance(sumAgingValues(sub.agingAudited), sub.endAudited, AGING_TOLERANCE)
+
+    // 用 aging 字段存 TRUE/FALSE 标记（UI 按 rowId 特殊渲染）
+    const flag = (ok: boolean): AgingData => {
+      const d: AgingData = {}
+      for (const seg of segs) d[seg.key] = ok ? 1 : 0
+      return d
+    }
+
+    return buildMetaRow('__aging_check__', '账龄逻辑校验', segs, {
+      priorAudited: priorOk ? 1 : 0,
+      endUnadjusted: currentOk ? 1 : 0,
+      endAudited: auditedOk ? 1 : 0,
+      agingPrior: flag(priorOk),
+      agingCurrent: flag(currentOk),
+      agingAudited: flag(auditedOk),
+    })
+  })
 
   function addRow(): void {
     if (isReadonly.value) return
-    const newRow = createEmptyRow(segments.value)
-    rows.value = [...rows.value, newRow]
+    rows.value = [...rows.value, createEmptyRow(segments.value)]
     persistRows()
   }
-
-  // ─── removeRow ───────────────────────────────────────────────────────
 
   function removeRow(rowId: string): void {
     if (isReadonly.value) return
     rows.value = rows.value.filter(r => r.rowId !== rowId)
     persistRows()
   }
-
-  // ─── updateCell ──────────────────────────────────────────────────────
 
   function updateCell(rowId: string, field: string, value: any): void {
     if (isReadonly.value) return
@@ -366,10 +381,12 @@ export function useF1Detail(options: UseD3DetailOptions) {
 
     const row = { ...rows.value[idx] }
 
-    // Handle nested aging fields (dynamic keys)
     if (field.startsWith('agingPrior.')) {
       const subField = field.replace('agingPrior.', '')
       row.agingPrior = { ...row.agingPrior, [subField]: parseNum(value) }
+    } else if (field.startsWith('agingCurrent.')) {
+      const subField = field.replace('agingCurrent.', '')
+      row.agingCurrent = { ...row.agingCurrent, [subField]: parseNum(value) }
     } else if (field.startsWith('agingAudited.')) {
       const subField = field.replace('agingAudited.', '')
       row.agingAudited = { ...row.agingAudited, [subField]: parseNum(value) }
@@ -379,24 +396,20 @@ export function useF1Detail(options: UseD3DetailOptions) {
       ;(row as any)[field] = value
     }
 
-    // Recalculate formula chain
-    const recalculated = recalcRowFormulas(row)
+    if (field === 'customerName' && value) {
+      row.relationType = matchRelatedPartyPure(String(value), relatedParties.value)
+    }
 
-    // Update rows array
+    const recalculated = recalcRowFormulas(row)
     const newRows = [...rows.value]
     newRows[idx] = recalculated
     rows.value = newRows
-
     persistRows()
   }
-
-  // ─── matchRelatedParty ───────────────────────────────────────────────
 
   function matchRelatedParty(name: string): string {
     return matchRelatedPartyPure(name, relatedParties.value)
   }
-
-  // ─── importFromAuxBalance ────────────────────────────────────────────
 
   async function importFromAuxBalance(): Promise<void> {
     if (!wpId.value) return
@@ -412,7 +425,6 @@ export function useF1Detail(options: UseD3DetailOptions) {
         return
       }
 
-      // Merge imported rows into existing (add new customers, update existing)
       const existingMap = new Map(rows.value.map(r => [r.customerName, r]))
       let newCount = 0
 
@@ -421,16 +433,12 @@ export function useF1Detail(options: UseD3DetailOptions) {
         if (!name) continue
 
         if (existingMap.has(name)) {
-          // Update existing row with imported data
           const existing = existingMap.get(name)!
           existing.priorUnadjusted = parseNum(imported.priorUnadjusted ?? imported.prior_unadjusted)
           existing.credit = parseNum(imported.credit)
           existing.debit = parseNum(imported.debit)
-          // Recalculate formula chain
-          const recalculated = recalcRowFormulas(existing)
-          existingMap.set(name, recalculated)
+          existingMap.set(name, recalcRowFormulas(existing))
         } else {
-          // New customer row
           const newRow = normalizeRow({
             rowId: generateRowId(),
             customerName: name,
@@ -439,22 +447,18 @@ export function useF1Detail(options: UseD3DetailOptions) {
             credit: imported.credit ?? 0,
             debit: imported.debit ?? 0,
           }, segments.value)
-          const recalculated = recalcRowFormulas(newRow)
-          existingMap.set(name, recalculated)
+          existingMap.set(name, recalcRowFormulas(newRow))
           newCount++
         }
       }
 
       rows.value = Array.from(existingMap.values())
       persistRows()
-
       ElMessage.success(`成功导入${importedRows.length}行数据，${newCount}个新客户`)
     } catch {
       ElMessage.error('从辅助余额表导入失败，请稍后重试')
     }
   }
-
-  // ─── onConfirmationCompleted ─────────────────────────────────────────
 
   function onConfirmationCompleted(payload: { customerName: string }): void {
     if (!payload.customerName) return
@@ -462,24 +466,17 @@ export function useF1Detail(options: UseD3DetailOptions) {
     persistRows()
   }
 
-  // ─── EventBus Registration ───────────────────────────────────────────
-
   const confirmationHandler = (e: Event) => {
     const detail = (e as CustomEvent).detail
-    if (detail?.customerName) {
-      onConfirmationCompleted(detail)
-    }
+    if (detail?.customerName) onConfirmationCompleted(detail)
   }
   window.addEventListener('confirmation:completed', confirmationHandler)
   eventListeners.push({ event: 'confirmation:completed', handler: confirmationHandler })
 
-  // ─── Aging Config Changed EventBus ──────────────────────────────────
-
   const agingConfigHandler = () => {
-    // 配置变更时：对每行调用 remapRowAgingData 保留已有段/零初始化新增段
     if (!segments.value.length) return
     rows.value = rows.value.map(row =>
-      remapRowAgingData(row, segments.value, false) as DetailRow,
+      remapRowAgingData(row, segments.value, true) as DetailRow,
     )
     persistRows()
   }
@@ -492,24 +489,21 @@ export function useF1Detail(options: UseD3DetailOptions) {
     }
   })
 
-  // ─── Return ──────────────────────────────────────────────────────────
-
   return {
     rows,
     filteredRows,
     subtotalRow,
     verificationRow,
+    agingPctRow,
+    agingCheckRow,
     searchQuery,
-    // 账龄配置
     segments,
     bands,
-    // 操作
     addRow,
     removeRow,
     updateCell,
     matchRelatedParty,
     importFromAuxBalance,
-    // EventBus
     onConfirmationCompleted,
   }
 }

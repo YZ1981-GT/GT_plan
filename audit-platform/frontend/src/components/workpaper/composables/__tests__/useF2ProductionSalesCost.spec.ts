@@ -85,6 +85,6 @@ describe('useF2CostComparison F2-20', () => {
     c.conclusion.value = 'A、未见异常。'
     const parsed = JSON.parse(map.value.get('F2-20-pack')!.remark)
     expect(parsed.version).toBe(2)
-    expect(parsed.auditNote).toContain('F2-64')
+    expect(parsed.notes?.note ?? parsed.auditNote).toContain('F2-64')
   })
 })

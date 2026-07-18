@@ -110,8 +110,21 @@ export function useF2Policy(options: {
     persistSections()
   }
 
+  function updateConclusion(val: string): void {
+    if (readonly.value) return
+    policyConclusion.value = val
+    allResponses.value.set(CONCLUSION_KEY, {
+      item_id: CONCLUSION_KEY,
+      conclusion: null,
+      remark: val,
+    })
+    debounceSave()
+  }
+
   watch(policyConclusion, (val) => {
     if (readonly.value) return
+    // 组件内双向绑定时走此路径；单测无 effect scope 时用 updateConclusion
+    if (allResponses.value.get(CONCLUSION_KEY)?.remark === val) return
     allResponses.value.set(CONCLUSION_KEY, {
       item_id: CONCLUSION_KEY,
       conclusion: null,
@@ -129,6 +142,7 @@ export function useF2Policy(options: {
     policyConclusion,
     changedCount,
     updateSection,
+    updateConclusion,
   }
 }
 

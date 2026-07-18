@@ -5,7 +5,7 @@
  * - 期初审定余额 = 期初未审 + 期初账项调整 + 期初重分类调整 (H = E + F + G)
  * - 期末余额 = 期初审定余额 + 借方发生 - 贷方发生 (O = H + M - N，借方科目)
  * - 期末未审余额 = 期末余额 + 被审计单位重分类调整 (Q = O + P)
- * - 审定数 = 期末未审余额 + 账项调整 + 重分类调整 (T = Q + R + S)
+ * - 审定数 = 期末未审余额 + 账项调整 + 重分类调整 (X = Q + V + W)
  *
  * **Validates: Requirements 4.5, 4.6, 4.7, 13.3**
  */
@@ -44,6 +44,7 @@ function makeDetailRow(input: {
   endAje: number
   endRje: number
 }): DetailRow {
+  const emptyAging = { within1: 0, y1to2: 0, y2to3: 0, over3: 0 }
   return {
     rowId: 'test-row',
     customerName: 'Test',
@@ -53,17 +54,18 @@ function makeDetailRow(input: {
     priorUnadjusted: input.priorUnadjusted,
     priorAdjustment: input.priorAdjustment,
     priorReclass: input.priorReclass,
-    priorAudited: 0, // will be recalculated
-    agingPrior: { within1: 0, y1to2: 0, y2to3: 0, over3: 0 },
+    priorAudited: 0,
+    agingPrior: { ...emptyAging },
     debit: input.debit,
     credit: input.credit,
-    endBalance: 0, // will be recalculated
+    endBalance: 0,
     entityReclass: input.entityReclass,
-    endUnadjusted: 0, // will be recalculated
+    endUnadjusted: 0,
+    agingCurrent: { ...emptyAging },
     endAje: input.endAje,
     endRje: input.endRje,
-    endAudited: 0, // will be recalculated
-    agingAudited: { within1: 0, y1to2: 0, y2to3: 0, over3: 0 },
+    endAudited: 0,
+    agingAudited: { ...emptyAging },
     isConfirmed: '',
     postPeriodSettlement: 0,
     remark: '',
@@ -73,13 +75,6 @@ function makeDetailRow(input: {
 // ─── Property-Based Tests ───────────────────────────────────────────────────
 
 describe('F1 Property 8: 明细表余额计算公式链正确性', () => {
-  /**
-   * **Property 8a: 期初审定余额 = 期初未审 + 期初账项调整 + 期初重分类调整**
-   *
-   * H = E + F + G
-   *
-   * **Validates: Requirements 4.7, 13.3**
-   */
   it('calcPriorAudited(E, F, G) === E + F + G', () => {
     fc.assert(
       fc.property(detailInputArb, (input) => {
@@ -92,38 +87,25 @@ describe('F1 Property 8: 明细表余额计算公式链正确性', () => {
   })
 
   /**
-   * **Property 8b: 期末余额 = 期初审定 + 贷方发生 - 借方发生**
-   *
-   * O = H + N - M（recalcRowFormulas 中 calcEndBalance(H, credit, debit) → H + credit - debit）
-   * 注：F1为预付账款（资产类），但 recalcRowFormulas 用 credit 作为第二参数。
-   *
-   * **Validates: Requirements 4.5, 13.3**
+   * O = H + M - N（借方科目 / 预付账款）
    */
-  it('calcEndBalance(H, credit, debit) === H + credit - debit', () => {
+  it('calcEndBalance(H, debit, credit) === H + debit - credit', () => {
     fc.assert(
       fc.property(detailInputArb, (input) => {
         const H = calcPriorAudited(input.priorUnadjusted, input.priorAdjustment, input.priorReclass)
-        // recalcRowFormulas calls calcEndBalance(H, row.credit, row.debit)
-        const result = calcEndBalance(H, input.credit, input.debit)
-        const expected = H + input.credit - input.debit
+        const result = calcEndBalance(H, input.debit, input.credit)
+        const expected = H + input.debit - input.credit
         return Math.abs(result - expected) < 1e-6
       }),
       { numRuns: 100 },
     )
   })
 
-  /**
-   * **Property 8c: 期末未审余额 = 期末余额 + 被审计单位重分类调整**
-   *
-   * Q = O + P
-   *
-   * **Validates: Requirements 4.6**
-   */
   it('calcEndUnadjusted(O, P) === O + P', () => {
     fc.assert(
       fc.property(detailInputArb, (input) => {
         const H = calcPriorAudited(input.priorUnadjusted, input.priorAdjustment, input.priorReclass)
-        const O = calcEndBalance(H, input.credit, input.debit)
+        const O = calcEndBalance(H, input.debit, input.credit)
         const result = calcEndUnadjusted(O, input.entityReclass)
         const expected = O + input.entityReclass
         return Math.abs(result - expected) < 1e-6
@@ -132,18 +114,11 @@ describe('F1 Property 8: 明细表余额计算公式链正确性', () => {
     )
   })
 
-  /**
-   * **Property 8d: 审定数 = 期末未审 + 账项调整 + 重分类调整**
-   *
-   * T = Q + R + S
-   *
-   * **Validates: Requirements 4.6, 13.3**
-   */
-  it('calcEndAudited(Q, R, S) === Q + R + S', () => {
+  it('calcEndAudited(Q, V, W) === Q + V + W', () => {
     fc.assert(
       fc.property(detailInputArb, (input) => {
         const H = calcPriorAudited(input.priorUnadjusted, input.priorAdjustment, input.priorReclass)
-        const O = calcEndBalance(H, input.credit, input.debit)
+        const O = calcEndBalance(H, input.debit, input.credit)
         const Q = calcEndUnadjusted(O, input.entityReclass)
         const result = calcEndAudited(Q, input.endAje, input.endRje)
         const expected = Q + input.endAje + input.endRje
@@ -153,34 +128,22 @@ describe('F1 Property 8: 明细表余额计算公式链正确性', () => {
     )
   })
 
-  /**
-   * **Property 8e: recalcRowFormulas 完整公式链一致性**
-   *
-   * 通过 recalcRowFormulas 函数验证完整链：
-   * row.priorAudited === E+F+G
-   * row.endBalance === H + credit - debit (code passes credit as 2nd arg)
-   * row.endUnadjusted === O+P
-   * row.endAudited === Q+R+S
-   *
-   * **Validates: Requirements 4.5, 4.6, 4.7**
-   */
-  it('recalcRowFormulas 完整公式链一致性', () => {
+  it('recalcRowFormulas 完整公式链一致性（借方科目 O=H+M-N）', () => {
     fc.assert(
       fc.property(detailInputArb, (input) => {
         const row = makeDetailRow(input)
         const result = recalcRowFormulas(row)
 
         const expectedH = input.priorUnadjusted + input.priorAdjustment + input.priorReclass
-        // recalcRowFormulas calls calcEndBalance(H, row.credit, row.debit) → H + credit - debit
-        const expectedO = expectedH + input.credit - input.debit
+        const expectedO = expectedH + input.debit - input.credit
         const expectedQ = expectedO + input.entityReclass
-        const expectedT = expectedQ + input.endAje + input.endRje
+        const expectedX = expectedQ + input.endAje + input.endRje
 
         return (
           Math.abs(result.priorAudited - expectedH) < 1e-6 &&
           Math.abs(result.endBalance - expectedO) < 1e-6 &&
           Math.abs(result.endUnadjusted - expectedQ) < 1e-6 &&
-          Math.abs(result.endAudited - expectedT) < 1e-6
+          Math.abs(result.endAudited - expectedX) < 1e-6
         )
       }),
       { numRuns: 100 },

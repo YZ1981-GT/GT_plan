@@ -106,26 +106,6 @@
       </div>
     </el-card>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>
-        <div class="section-header"><span>审计说明</span></div>
-      </template>
-      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：概述附注各子节取数来源、资金来源/政府补助/责任人等额外披露的核查情况。" :disabled="isReadonly"
-        @change="saveAuditNote" />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>
-        <div class="section-header"><span>审计结论</span></div>
-      </template>
-      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：如附注披露完整、额外披露事项齐全、与审定表勾稽一致，符合国企披露要求，未见异常。" :disabled="isReadonly"
-        @change="saveAuditConclusion" />
-    </el-card>
-
     <!-- 编制提示 -->
     <details class="edit-tips">
       <summary>编制提示</summary>
@@ -145,8 +125,7 @@
  * 多子节卡片 + 跨sheet浅蓝色 + 动态行 + 合计
  * Spec: Task 4.6 | Requirements: 14.6
  */
-import { ref, inject, toRef, computed, onMounted } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
+import { ref, inject, toRef, computed } from 'vue'
 import { useH2Disclosure } from '../../composables/useH2Disclosure'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
@@ -180,30 +159,6 @@ const state = useH2Disclosure({
 
 const isReadonly = computed(() => props.isReadonly)
 
-// H2 附注(国企)审计说明/结论：本地变体键（listed/soe 共用同一 composable，避免串写）。
-const NOTE_KEY = 'H2-disc-soe-audit-note'
-const CONCLUSION_KEY = 'H2-disc-soe-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-function saveAuditNote(val: string): void {
-  if (props.isReadonly) return
-  auditNote.value = val
-  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
-  saveResponse(NOTE_KEY, val)
-}
-function saveAuditConclusion(val: string): void {
-  if (props.isReadonly) return
-  auditConclusion.value = val
-  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
-  saveResponse(CONCLUSION_KEY, val)
-}
-onMounted(() => {
-  const n = props.allResponses.get(NOTE_KEY)
-  if (n?.remark) auditNote.value = n.remark
-  const c = props.allResponses.get(CONCLUSION_KEY)
-  if (c?.remark) auditConclusion.value = c.remark
-})
-
 function onCellChange(sectionId: string, rowId: string, field: string, value: any) {
   state.updateRow(sectionId, rowId, field, value)
 }
@@ -219,7 +174,6 @@ function handleAddRow(sectionId: string) {
 function handleRemoveRow(sectionId: string, rowId: string) {
   state.removeRow(sectionId, rowId)
 }
-
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -237,7 +191,6 @@ function fmtAmt(val: number | null | undefined): string {
 .tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
 .toolbar-right { display: flex; gap: 6px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
-.audit-note-card { margin-bottom: 12px; }
 .disclosure-card { margin-bottom: 16px; }
 .cross-sheet-card { background: #f0f7ff; }
 .section-header { display: flex; align-items: center; justify-content: space-between; }

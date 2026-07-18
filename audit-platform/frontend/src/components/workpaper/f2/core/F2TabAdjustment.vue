@@ -1,7 +1,8 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /** F2TabAdjustment — F2-14 调整分录 | Task 15.4 */
 import { ref, toRef, inject, onMounted, type Ref } from 'vue'
 import { useF2Adjustment } from '../../composables/useF2Adjustment'
+import { useF2AiGenerate } from '../../composables/useF2AiGenerate'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
@@ -41,6 +42,38 @@ function saveAuditConclusion(val: string): void {
   persistAudit(CONCLUSION_KEY, val)
 }
 
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2AiGenerate(
+  toRef(props, 'wpId') as Ref<string>,
+)
+
+const {
+  rows, debitTotal, creditTotal, balanceDiff, isBalanced, accountOptions,
+  addRow, removeRow, updateCell, publishAdjustments,
+} = useF2Adjustment({
+  allResponses: toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>,
+  isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+})
+
+async function runAdjAi(section: 'f2-14-note' | 'f2-14-conclusion'): Promise<void> {
+  if (props.isReadonly) return
+  const isNote = section === 'f2-14-note'
+  const text = await generateAndConfirm(
+    section,
+    isNote ? auditNote.value : auditConclusion.value,
+    {
+      sheet: 'F2-14',
+      rowCount: rows.value.length,
+      debitTotal: debitTotal.value,
+      creditTotal: creditTotal.value,
+      isBalanced: isBalanced.value,
+    },
+    isNote ? 'AI · 审计说明' : 'AI · 审计结论',
+  )
+  if (!text) return
+  if (isNote) saveAuditNote(text)
+  else saveAuditConclusion(text)
+}
+
 onMounted(() => {
   const n = props.allResponses.get(NOTE_KEY)
   if (n?.remark) auditNote.value = n.remark
@@ -51,14 +84,6 @@ onMounted(() => {
 function fmt(v: number): string {
   return v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
-
-const {
-  rows, debitTotal, creditTotal, balanceDiff, isBalanced, accountOptions,
-  addRow, removeRow, updateCell, publishAdjustments,
-} = useF2Adjustment({
-  allResponses: toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>,
-  isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
-})
 </script>
 
 <template>
@@ -132,14 +157,14 @@ const {
       <el-table-column label="借方" width="110" align="right">
         <template #default="{ row }">
           <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" :controls="false" size="small" style="width:100%"
-            @change="(v: number) => updateCell(row.rowId, 'debitAmount', v ?? 0)" />
+            @change="(v: number | undefined) => updateCell(row.rowId, 'debitAmount', v ?? 0)" />
           <span v-else>{{ fmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="贷方" width="110" align="right">
         <template #default="{ row }">
           <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" :controls="false" size="small" style="width:100%"
-            @change="(v: number) => updateCell(row.rowId, 'creditAmount', v ?? 0)" />
+            @change="(v: number | undefined) => updateCell(row.rowId, 'creditAmount', v ?? 0)" />
           <span v-else>{{ fmt(row.creditAmount) }}</span>
         </template>
       </el-table-column>
@@ -177,7 +202,19 @@ const {
 
     <!-- 审计说明 -->
     <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <template #header>
+        <div class="card-header">
+          <span>审计说明</span>
+          <el-button
+            v-if="!isReadonly && aiAvailable"
+            size="small"
+            type="primary"
+            plain
+            :loading="aiLoading"
+            @click="runAdjAi('f2-14-note')"
+          >AI 填写说明</el-button>
+        </div>
+      </template>
       <el-input
         type="textarea"
         :model-value="auditNote"
@@ -190,7 +227,19 @@ const {
 
     <!-- 审计结论 -->
     <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <template #header>
+        <div class="card-header">
+          <span>审计结论</span>
+          <el-button
+            v-if="!isReadonly && aiAvailable"
+            size="small"
+            type="primary"
+            plain
+            :loading="aiLoading"
+            @click="runAdjAi('f2-14-conclusion')"
+          >AI 填写结论</el-button>
+        </div>
+      </template>
       <el-input
         type="textarea"
         :model-value="auditConclusion"

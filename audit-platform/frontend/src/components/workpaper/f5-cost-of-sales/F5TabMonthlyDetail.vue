@@ -1,259 +1,515 @@
 <template>
   <div class="f5-monthly">
-    <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>1. 本表列示主营业务成本（科目6401）各品种的月度明细，用于月度波动分析与成本结转合理性验证。</p>
-        <p>2. 灰色底纹列为自动计算列（合计/占比/月均/波动系数/变动额率），不可手工编辑。</p>
-        <p>3. 波动系数（标准差/均值）超过 0.5、变动率超过 20% 自动标橙，请关注异常月度并在核对中说明。</p>
-        <p>4. 上下半年两区段共享同一品种行，全年合计与 F5-1 审定表主营业务成本按品种核对一致。</p>
+        <p>1. 本表列示主营业务成本各品种 1~12 月结转明细；品种行可增删，亦可导入月度明细账。</p>
+        <p>2. 灰色列为公式列：本期未审=各月合计；本期/上期审定=未审+账项调整+重分类；变动比例=(本期−上期)/上期。</p>
+        <p>3. 合计行纵向汇总；比例行=各月合计÷本期未审合计。变动比例绝对值≥30% 标黄。</p>
+        <p>4. 品种全年未审/上期未审可同步至 F5-1 审定表主营业务成本区。</p>
       </div>
     </details>
 
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：核实营业成本各品种月度结转的完整与准确，识别异常月度波动，验证成本结转与生产/销售节奏匹配。"
+      title="审计目标：核实主营业务成本各品种月度结转的存在、完整与准确，识别异常波动，验证与生产经营节奏匹配。"
       class="objective-alert"
     />
 
-    <!-- 工具栏 -->
+    <el-alert
+      v-if="detail.significantChanges.value.length"
+      type="warning"
+      :closable="false"
+      class="change-alert"
+      :title="`未审/审定变动比例绝对值≥${threshold}% 的品种：${detail.significantChanges.value.map((r) => r.product).join('、')}`"
+    />
+
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="promptAddRow">+ 品种</el-button>
       </div>
       <div class="toolbar-right">
-        <CycleImportExportDropdown v-if="importExportCtx" :wp-id="wpId" :api-prefix="importExportCtx.apiPrefix"
-          :sheet="importExportCtx.sheet" :disabled="isReadonly" @imported="$emit('imported')" />
-        <span class="chip-wrap"><GtIndexChip value="wp:F5-1" /></span>
+        <CycleImportExportDropdown
+          v-if="importExportCtx"
+          :wp-id="wpId"
+          :api-prefix="importExportCtx.apiPrefix"
+          :sheet="importExportCtx.sheet"
+          :disabled="isReadonly"
+          @imported="$emit('imported')"
+        />
+        <span class="chip-wrap"><GtIndexChip value="wp:F5-1" :context-project-id="projectIdStr" /></span>
         <el-tag size="small" type="info">共 {{ detail.rows.value.length }} 行</el-tag>
       </div>
     </div>
 
-    <el-tabs v-model="segment" type="border-card">
-      <!-- 上半年区段 -->
-      <el-tab-pane label="上半年（1~6月 + 统计）" name="h1">
-        <el-table :data="detail.rows.value" size="small" border stripe :row-class-name="rowClass" max-height="480">
-          <el-table-column label="品种" width="130" fixed>
-            <template #default="{ row }">
-              <el-input v-if="!isReadonly" v-model="row.product" size="small"
-                @change="(v: string) => detail.updateCell(row.id, 'product', v)" />
-              <span v-else>{{ row.product }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column v-for="m in 6" :key="`m${m}`" :label="`${m}月`" width="90" align="right">
-            <template #default="{ row }">
-              <el-input v-if="!isReadonly" v-model.number="row[`month${m}`]" size="small"
-                @change="(v: any) => detail.updateCell(row.id, `month${m}`, v)" />
-              <span v-else>{{ fmt(row[`month${m}`]) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="上半年合计" width="110" align="right" class-name="auto-calc-col">
-            <template #default="{ row }"><span class="f5-formula" title="1月+…+6月">{{ fmt(row.halfYear1Total) }}</span></template>
-          </el-table-column>
-          <el-table-column label="占比%" width="90" align="right" class-name="auto-calc-col">
-            <template #default="{ row }"><span class="f5-formula" title="本品种全年/合计全年×100">{{ pct(row.halfYear1Ratio) }}</span></template>
-          </el-table-column>
-          <el-table-column label="月均" width="100" align="right" class-name="auto-calc-col">
-            <template #default="{ row }"><span class="f5-formula" title="上半年合计/6">{{ fmt(row.halfYear1Avg) }}</span></template>
-          </el-table-column>
-          <el-table-column label="最高月" width="90" align="right" class-name="auto-calc-col">
-            <template #default="{ row }">{{ fmt(row.halfYear1Max) }}</template>
-          </el-table-column>
-          <el-table-column label="最低月" width="90" align="right" class-name="auto-calc-col">
-            <template #default="{ row }">{{ fmt(row.halfYear1Min) }}</template>
-          </el-table-column>
-          <el-table-column label="波动系数" width="100" align="right" class-name="auto-calc-col">
-            <template #default="{ row }">
-              <span class="f5-formula" :class="{ 'is-warn': detail.isVolatilityHigh(row) }" title="标准差/均值(12月)">
-                {{ (row.coeffOfVariation ?? 0).toFixed(3) }}
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="60" v-if="!isReadonly">
-            <template #default="{ row }">
-              <el-popconfirm title="确认删除？" @confirm="detail.removeRow(row.id)">
-                <template #reference><el-button size="small" type="danger" link>删除</el-button></template>
-              </el-popconfirm>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-tab-pane>
+    <F5SheetAttachments
+      v-if="projectId"
+      :project-id="projectId"
+      :wp-id="wpId"
+      sheet-code="F5-2"
+      label="月度明细附件"
+    />
 
-      <!-- 下半年+合计区段 -->
-      <el-tab-pane label="下半年（7~12月 + 合计对比）" name="h2">
-        <el-table :data="detail.rows.value" size="small" border stripe :row-class-name="rowClass" max-height="480">
-          <el-table-column label="品种" width="130" fixed>
-            <template #default="{ row }"><span>{{ row.product }}</span></template>
-          </el-table-column>
-          <el-table-column v-for="m in 6" :key="`m${m + 6}`" :label="`${m + 6}月`" width="90" align="right">
-            <template #default="{ row }">
-              <el-input v-if="!isReadonly" v-model.number="row[`month${m + 6}`]" size="small"
-                @change="(v: any) => detail.updateCell(row.id, `month${m + 6}`, v)" />
-              <span v-else>{{ fmt(row[`month${m + 6}`]) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="下半年合计" width="110" align="right" class-name="auto-calc-col">
-            <template #default="{ row }"><span class="f5-formula" title="7月+…+12月">{{ fmt(row.halfYear2Total) }}</span></template>
-          </el-table-column>
-          <el-table-column label="全年合计" width="110" align="right" class-name="auto-calc-col">
-            <template #default="{ row }"><span class="f5-formula" title="上半年+下半年">{{ fmt(row.yearTotal) }}</span></template>
-          </el-table-column>
-          <el-table-column label="上期合计" width="110" align="right">
-            <template #default="{ row }">
-              <el-input v-if="!isReadonly" v-model.number="row.priorYearTotal" size="small"
-                @change="(v: any) => detail.updateCell(row.id, 'priorYearTotal', v)" />
-              <span v-else>{{ fmt(row.priorYearTotal) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="变动额" width="110" align="right" class-name="auto-calc-col">
-            <template #default="{ row }"><span class="f5-formula" title="全年-上期">{{ fmt(row.changeAmount) }}</span></template>
-          </el-table-column>
-          <el-table-column label="变动率%" width="100" align="right" class-name="auto-calc-col">
-            <template #default="{ row }">
-              <span class="f5-formula" :class="{ 'is-warn': detail.isRowHighlighted(row) }" title="变动额/上期×100">
-                {{ pct(row.changeRate) }}
-              </span>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-tab-pane>
-    </el-tabs>
+    <el-table
+      :data="tableData"
+      size="small"
+      border
+      stripe
+      :row-class-name="rowClass"
+      max-height="520"
+      class="monthly-table"
+    >
+      <el-table-column label="项目/月份" width="130" fixed>
+        <template #default="{ row }">
+          <template v-if="row.__type === 'data'">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.product"
+              size="small"
+              @change="(v: string) => detail.updateCell(row.id, 'product', v)"
+            />
+            <span v-else>{{ row.product }}</span>
+          </template>
+          <strong v-else-if="row.__type === 'total'">合计</strong>
+          <strong v-else>比例</strong>
+        </template>
+      </el-table-column>
 
-    <!-- 底部合计 -->
-    <div class="f5-monthly-total">
-      <span>全年合计：<b>{{ fmt(detail.totalRow.value.yearTotal) }}</b></span>
-      <span>上半年：{{ fmt(detail.totalRow.value.halfYear1Total) }}</span>
-      <span>下半年：{{ fmt(detail.totalRow.value.halfYear2Total) }}</span>
-      <span>上期合计：{{ fmt(detail.totalRow.value.priorYearTotal) }}</span>
-      <span>变动率：{{ pct(detail.totalRow.value.changeRate) }}</span>
-    </div>
+      <el-table-column label="主营业务成本月度小计" align="center">
+        <el-table-column
+          v-for="(label, mi) in monthLabels"
+          :key="label"
+          :label="label"
+          width="88"
+          align="right"
+        >
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.__type === 'data' && !isReadonly"
+              :model-value="row.months[mi]"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @change="(v: number | undefined) => detail.updateMonth(row.id, mi, v ?? 0)"
+            />
+            <span v-else-if="row.__type === 'ratio'" class="f5-formula" title="该月合计 / 本期未审合计">
+              {{ pct(row.months[mi]) }}
+            </span>
+            <span v-else class="f5-formula">{{ fmt(row.months[mi]) }}</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
 
-    <!-- 审计说明 -->
+      <el-table-column label="本期未审数" width="110" align="right" class-name="auto-calc-col">
+        <template #default="{ row }">
+          <span v-if="row.__type === 'ratio'" class="f5-formula">{{ pct(row.currentUnaudited) }}</span>
+          <span v-else class="f5-formula" title="Σ(1~12月)">{{ fmt(row.currentUnaudited) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="本期审计调整" align="center">
+        <el-table-column label="账项调整" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.__type === 'data' && !isReadonly"
+              :model-value="row.currentAje"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @change="(v: number | undefined) => detail.updateCell(row.id, 'currentAje', v ?? 0)"
+            />
+            <span v-else-if="row.__type !== 'ratio'">{{ fmt(row.currentAje) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="重分类调整" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.__type === 'data' && !isReadonly"
+              :model-value="row.currentRje"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @change="(v: number | undefined) => detail.updateCell(row.id, 'currentRje', v ?? 0)"
+            />
+            <span v-else-if="row.__type !== 'ratio'">{{ fmt(row.currentRje) }}</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <el-table-column label="本期审定数" width="110" align="right" class-name="auto-calc-col">
+        <template #default="{ row }">
+          <span v-if="row.__type !== 'ratio'" class="f5-formula" title="未审 + 账项 + 重分类">
+            {{ fmt(row.currentAudited) }}
+          </span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="上期未审数" width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number
+            v-if="row.__type === 'data' && !isReadonly"
+            :model-value="row.priorUnaudited"
+            :controls="false"
+            size="small"
+            style="width:100%"
+            @change="(v: number | undefined) => detail.updateCell(row.id, 'priorUnaudited', v ?? 0)"
+          />
+          <span v-else-if="row.__type !== 'ratio'">{{ fmt(row.priorUnaudited) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="上期审计调整" align="center">
+        <el-table-column label="账项调整" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.__type === 'data' && !isReadonly"
+              :model-value="row.priorAje"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @change="(v: number | undefined) => detail.updateCell(row.id, 'priorAje', v ?? 0)"
+            />
+            <span v-else-if="row.__type !== 'ratio'">{{ fmt(row.priorAje) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="重分类调整" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.__type === 'data' && !isReadonly"
+              :model-value="row.priorRje"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @change="(v: number | undefined) => detail.updateCell(row.id, 'priorRje', v ?? 0)"
+            />
+            <span v-else-if="row.__type !== 'ratio'">{{ fmt(row.priorRje) }}</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <el-table-column label="上期审定数" width="110" align="right" class-name="auto-calc-col">
+        <template #default="{ row }">
+          <span v-if="row.__type !== 'ratio'" class="f5-formula" title="上期未审 + 账项 + 重分类">
+            {{ fmt(row.priorAudited) }}
+          </span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="未审变动比例" width="110" align="right" class-name="auto-calc-col">
+        <template #default="{ row }">
+          <span
+            v-if="row.__type !== 'ratio'"
+            class="f5-formula"
+            :class="{ 'is-warn': isRateWarn(row.unauditedChangeRate) }"
+            title="(本期未审 − 上期未审) / 上期未审"
+          >{{ pct(row.unauditedChangeRate) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="审定变动比例" width="110" align="right" class-name="auto-calc-col">
+        <template #default="{ row }">
+          <span
+            v-if="row.__type !== 'ratio'"
+            class="f5-formula"
+            :class="{ 'is-warn': isRateWarn(row.auditedChangeRate) }"
+            title="(本期审定 − 上期审定) / 上期审定"
+          >{{ pct(row.auditedChangeRate) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="备注" min-width="120">
+        <template #default="{ row }">
+          <el-input
+            v-if="row.__type === 'data' && !isReadonly"
+            :model-value="row.remark"
+            size="small"
+            @change="(v: string) => detail.updateCell(row.id, 'remark', v)"
+          />
+          <span v-else-if="row.__type === 'data'">{{ row.remark }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column v-if="!isReadonly" label="操作" width="64" fixed="right">
+        <template #default="{ row }">
+          <el-popconfirm v-if="row.__type === 'data'" title="确认删除？" @confirm="detail.removeRow(row.id)">
+            <template #reference>
+              <el-button size="small" type="danger" link>删除</el-button>
+            </template>
+          </el-popconfirm>
+        </template>
+      </el-table-column>
+    </el-table>
+
     <el-card class="opinion-card" shadow="never">
       <template #header>
         <div class="opinion-header">
-          <span class="opinion-title">审计说明</span>
+          <span class="opinion-title">三、审计说明</span>
+          <div class="opinion-actions">
+            <el-button
+              size="small"
+              type="primary"
+              plain
+              :disabled="isReadonly || !aiAvailable"
+              :loading="aiLoading"
+              @click="generateAiNote"
+            >🤖 AI生成说明</el-button>
+            <el-button v-if="openReviewDialog" size="small" @click="openReview">复核</el-button>
+          </div>
         </div>
       </template>
-      <el-input v-model="note" type="textarea" :autosize="{ minRows: 5, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="营业成本月度明细分析说明（月度波动、异常月度原因、与生产/销售节奏匹配情况等）..." @change="saveNote" />
+      <el-input
+        :model-value="detail.auditNote.value"
+        type="textarea"
+        :autosize="{ minRows: 5, maxRows: 10 }"
+        :disabled="isReadonly"
+        placeholder="说明各品种月度结转情况、异常波动原因、与生产经营节奏匹配情况等…"
+        @change="detail.saveAuditNote"
+      />
     </el-card>
 
-    <!-- 审计结论 -->
     <el-card class="opinion-card" shadow="never">
       <template #header>
         <div class="opinion-header">
-          <span class="opinion-title">审计结论</span>
+          <span class="opinion-title">四、审计结论</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="generateAiConclusion"
+          >🤖 AI生成结论</el-button>
         </div>
       </template>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" :disabled="isReadonly"
-        placeholder="月度明细审计结论..." @change="saveConclusion" />
+      <el-input
+        :model-value="detail.auditConclusion.value"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="综合评价主营业务成本月度明细是否公允反映结转情况…"
+        @change="detail.saveAuditConclusion"
+      />
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * F5TabMonthlyDetail.vue — F5-2 月度明细（24列 → 2区段Tab）
- * 区段间行同步（共享同一 storedRow）+ 变动>20%橙色 / 波动系数>0.5橙色 + 动态品种行增删 + 底部合计
+ * F5TabMonthlyDetail — F5-2 主营业务成本月度明细表
+ * 源表：品种动态行 × 1~12月 + 本期/上期未审·调整·审定 + 变动比例 + 合计/比例行 + AI说明结论
  */
-import { ref, computed, inject, toRef, type Ref } from 'vue'
+import { computed, inject, toRef, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { useF5MonthlyDetail } from '../composables/useF5MonthlyDetail'
+import {
+  useF5MonthlyDetail,
+  MONTH_LABELS,
+  F5_MONTHLY_CHANGE_RATE_THRESHOLD,
+} from '../composables/useF5MonthlyDetail'
+import { useF5AiGenerate } from '../composables/useF5AiGenerate'
 import { resolveImportExportSheet, isImportExportSheet } from '../shared/cycleImportExportRegistry'
 import CycleImportExportDropdown from '../shared/CycleImportExportDropdown.vue'
+import F5SheetAttachments from './F5SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
 defineEmits<{ imported: [] }>()
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   allResponses: Map<string, ChecklistResponse>
   wpId: string
+  projectId?: string
   isReadonly: boolean
-}>()
+}>(), {
+  projectId: '',
+})
 
-// 父组件模板绑定会自动解包 computed → 子组件收到纯 Map；重新包成 ref 供内部逻辑使用
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
-
-const segment = ref('h1')
-const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
-const NOTE_KEY = 'F5-2-audit-note'
-const CONCLUSION_KEY = 'F5-2-audit-conclusion'
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
 const detail = useF5MonthlyDetail({
   allResponses: allResponsesRef,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
-const note = ref(allResponsesRef.value.get(NOTE_KEY)?.remark ?? '')
-const conclusion = ref(allResponsesRef.value.get(CONCLUSION_KEY)?.remark ?? '')
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF5AiGenerate(wpIdRef)
 
-function saveNote() {
-  allResponsesRef.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: note.value })
-  window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items: [{ item_id: NOTE_KEY, conclusion: null, remark: note.value }] } }))
-}
-function saveConclusion() {
-  allResponsesRef.value.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: conclusion.value })
-  window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items: [{ item_id: CONCLUSION_KEY, conclusion: null, remark: conclusion.value }] } }))
-}
+const monthLabels = MONTH_LABELS
+const threshold = F5_MONTHLY_CHANGE_RATE_THRESHOLD
+const projectIdStr = computed(() => props.projectId)
 
 const importExportCtx = computed(() =>
   isImportExportSheet('f5', 'F5-2') ? resolveImportExportSheet('f5', 'F5-2') : null,
 )
 
+const tableData = computed(() => {
+  const rows: any[] = detail.rows.value.map((r) => ({ __type: 'data', ...r }))
+  const total = detail.totalRow.value
+  const ratio = detail.ratioRow.value
+  rows.push({
+    __type: 'total',
+    id: '__total',
+    product: '合计',
+    months: total.months,
+    currentUnaudited: total.currentUnaudited,
+    currentAje: total.currentAje,
+    currentRje: total.currentRje,
+    currentAudited: total.currentAudited,
+    priorUnaudited: total.priorUnaudited,
+    priorAje: total.priorAje,
+    priorRje: total.priorRje,
+    priorAudited: total.priorAudited,
+    unauditedChangeRate: total.unauditedChangeRate,
+    auditedChangeRate: total.auditedChangeRate,
+    remark: '',
+  })
+  rows.push({
+    __type: 'ratio',
+    id: '__ratio',
+    product: '比例',
+    months: ratio.months,
+    currentUnaudited: ratio.currentUnaudited,
+    remark: '',
+  })
+  return rows
+})
+
+function rowClass({ row }: { row: any }): string {
+  if (row.__type === 'total' || row.__type === 'ratio') return 'f5-row-total'
+  if (detail.isRowHighlighted(row)) return 'f5-row-warn'
+  return ''
+}
+
+function isRateWarn(rate: number | 'N/A' | null | undefined): boolean {
+  return typeof rate === 'number' && Math.abs(rate) >= threshold
+}
+
 async function promptAddRow() {
   try {
     const { value } = await ElMessageBox.prompt('请输入品种名称', '新增品种', {
-      confirmButtonText: '确定', cancelButtonText: '取消',
-      inputPattern: /\S+/, inputErrorMessage: '品种名称不能为空',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPattern: /\S+/,
+      inputErrorMessage: '品种名称不能为空',
     })
     if (value) detail.addRow(value.trim())
   } catch { /* 取消 */ }
 }
 
-function rowClass() { return '' }
 function fmt(v: number | null | undefined): string {
   if (v == null) return '-'
-  return v.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+  if (Math.abs(v) < 0.005) return '-'
+  const formatted = Math.abs(v).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+  return v < 0 ? `(${formatted})` : formatted
 }
+
 function pct(v: number | 'N/A' | null | undefined): string {
   if (v == null || v === 'N/A') return 'N/A'
-  return `${v.toFixed(2)}%`
+  return `${Number(v).toFixed(2)}%`
 }
-void reloadWorkpaperData
+
+function openReview() {
+  openReviewDialog?.('F5-2-conclusion')
+}
+
+function aiContext(): Record<string, unknown> {
+  return {
+    sheet: 'F5-2',
+    accountCode: '6401',
+    threshold,
+    significantChanges: detail.significantChanges.value.map((r) => ({
+      product: r.product,
+      currentUnaudited: r.currentUnaudited,
+      currentAudited: r.currentAudited,
+      priorUnaudited: r.priorUnaudited,
+      priorAudited: r.priorAudited,
+      unauditedChangeRate: r.unauditedChangeRate,
+      auditedChangeRate: r.auditedChangeRate,
+    })),
+    total: detail.totalRow.value,
+    ratio: detail.ratioRow.value,
+    products: detail.rows.value.map((r) => ({
+      product: r.product,
+      months: r.months,
+      currentUnaudited: r.currentUnaudited,
+      currentAudited: r.currentAudited,
+      priorUnaudited: r.priorUnaudited,
+      priorAudited: r.priorAudited,
+      unauditedChangeRate: r.unauditedChangeRate,
+      auditedChangeRate: r.auditedChangeRate,
+      remark: r.remark,
+    })),
+  }
+}
+
+async function generateAiNote() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'monthly-detail-note',
+    detail.auditNote.value,
+    aiContext(),
+    'AI 生成 · F5-2审计说明',
+  )
+  if (text) detail.saveAuditNote(text)
+}
+
+async function generateAiConclusion() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'monthly-detail-conclusion',
+    detail.auditConclusion.value,
+    aiContext(),
+    'AI 生成 · F5-2审计结论',
+  )
+  if (text) detail.saveAuditConclusion(text)
+}
 </script>
 
 <style scoped>
-.f5-monthly { padding: 12px; }
+.f5-monthly { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .f5-monthly :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
 .f5-monthly :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
 
-/* 编制提示 */
-.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
-.guidance-content p { margin: 2px 0; }
-.objective-alert { margin-bottom: 12px; }
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #315a8a;
+  background: #eef4fa;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary { cursor: pointer; font-weight: 600; color: #315a8a; }
+.guidance-content { margin-top: 8px; color: #606266; line-height: 1.65; }
+.guidance-content p { margin: 3px 0; }
+.objective-alert, .change-alert { margin-bottom: 12px; }
 
-/* 工具栏 */
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left, .toolbar-right { display: flex; gap: 8px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 
-/* 表格 */
 .f5-formula { border-bottom: 1px dashed #909399; cursor: help; }
 .f5-formula.is-warn { color: #e6a23c; font-weight: 600; }
 :deep(.auto-calc-col) { background-color: #f5f7fa !important; }
-.f5-monthly-total { display: flex; gap: 20px; margin-top: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; flex-wrap: wrap; }
+:deep(.f5-row-total) { background: #f0f5fa !important; font-weight: 600; }
+:deep(.f5-row-warn) { background: #fdf6ec !important; }
 
-/* 审计意见卡片 */
 .opinion-card { margin-top: 16px; border-radius: 8px; }
-.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.opinion-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+.opinion-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.opinion-actions { display: flex; gap: 6px; align-items: center; }
 .opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
 </style>

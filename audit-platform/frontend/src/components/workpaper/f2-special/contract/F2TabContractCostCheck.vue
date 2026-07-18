@@ -1,5 +1,5 @@
-<template>
-  <div class="f2-val-sheet f2-contract-check">
+﻿<template>
+  <div class="f2-val-sheet f2-contract-check f2-soft-matrix">
     <header class="sheet-header">
       <div>
         <h3>合同履约成本检查表</h3>
@@ -96,7 +96,7 @@
 
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="chk.addSample()">+ 新增样本</el-button>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="addAndOpenSample">+ 新增样本</el-button>
       </div>
       <div class="toolbar-right">
         <F2SheetToolbar
@@ -104,14 +104,23 @@
           api-prefix="f2-spe"
           sheet="F2-56"
           :disabled="isReadonly"
-          ai-section="contract-cost-note"
-          :existing-content="chk.auditNote.value"
           review-section="F2-56-note"
-          @ai-filled="(t: string) => { chk.auditNote.value = t }"
         />
         <GtIndexChip value="wp:F2-56" :context-project-id="projectId" />
-        <el-tag size="small" type="info">{{ chk.enrichedSamples.value.length }} 行</el-tag>
+        <el-tag size="small" type="info">{{ filledCount }} 笔样本</el-tag>
       </div>
+    </div>
+
+    <div v-if="projectId && wpId" class="evidence-panel">
+      <h4>检查样本附件</h4>
+      <p>上传合同、验收单、物流单等；行内仍可对单笔样本做 OCR 确认回填。</p>
+      <ItemAttachment
+        :project-id="projectId"
+        :wp-id="wpId"
+        sheet-key="F2-56"
+        :item-index="1"
+        accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
+      />
     </div>
 
     <div class="section-block">
@@ -135,7 +144,6 @@
               <th rowspan="2" class="col-idx">索引号</th>
               <th rowspan="2" class="col-flag">是否<br>异常</th>
               <th rowspan="2" class="col-issue">异常说明</th>
-              <th v-if="wpId && !isReadonly" rowspan="2" class="col-ocr">📎</th>
               <th rowspan="2" class="col-act" />
             </tr>
             <tr>
@@ -287,14 +295,8 @@
                   @update:model-value="(v: string) => chk.updateSample(row.id, { issueDesc: v })" />
                 <span v-else class="text-left">{{ row.issueDesc || '—' }}</span>
               </td>
-              <td v-if="wpId && !isReadonly" class="col-ocr">
-                <el-upload :show-file-list="false" :auto-upload="false" accept=".pdf,.png,.jpg,.jpeg"
-                  :disabled="ocrLoadingId === row.id"
-                  @change="(f: any) => handleOcr(row.id, f?.raw)">
-                  <el-button link size="small" :loading="ocrLoadingId === row.id">📎</el-button>
-                </el-upload>
-              </td>
               <td class="col-act">
+                <el-button link type="primary" size="small" @click="openCheckDialog(row)">核对</el-button>
                 <el-button v-if="!isReadonly" link type="danger" size="small" @click="chk.removeSample(row.id)">删</el-button>
               </td>
             </tr>
@@ -305,7 +307,7 @@
               <td class="auto calc">{{ fmt(chk.stats.value.testedAmount) }}</td>
               <td colspan="14" />
               <td class="auto calc abn-yes">{{ fmt(chk.stats.value.incorrectAmount) }}</td>
-              <td :colspan="wpId && !isReadonly ? 3 : 2" />
+              <td />
             </tr>
           </tbody>
         </table>
@@ -342,35 +344,64 @@
     </div>
 
     <el-card class="opinion-card" shadow="never">
-      <template #header><span class="opinion-title">五、审计说明</span></template>
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">五、审计说明</span>
+          <el-button size="small" type="primary" plain
+            :disabled="isReadonly || !aiAvailable" :loading="aiLoading"
+            @click="runAi('contract-check-note')">AI 填写审计说明</el-button>
+        </div>
+      </template>
       <el-input v-model="chk.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="说明抽样检查结果、证据勾稽情况及异常处理…" :disabled="isReadonly" />
     </el-card>
 
     <el-card class="opinion-card" shadow="never">
-      <template #header><span class="opinion-title">六、审计结论</span></template>
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">六、审计结论</span>
+          <el-button size="small" type="primary" plain
+            :disabled="isReadonly || !aiAvailable" :loading="aiLoading"
+            @click="runAi('contract-check-conclusion')">AI 生成结论</el-button>
+        </div>
+      </template>
       <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="A、未见异常。B、除上述应调整事项外，其余未见异常。C、不可确认。"
         :disabled="isReadonly" @update:model-value="saveAuditConclusion" />
     </el-card>
+
+    <F2ContractCostCheckDialog
+      v-model="checkDialogVisible"
+      :row="checkDialogRow"
+      :wp-id="wpId"
+      :readonly="isReadonly"
+      @save="saveCheckedSample"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, toRef, type Ref } from 'vue'
 import { useF2ContractCostCheck } from '../../composables/useF2ContractCostCheck'
-import { useF2SpecialContractOcr } from '../../composables/useF2SpecialContractOcr'
+import {
+  useF2SpecialAiGenerate,
+  type F2SpeAiSection,
+} from '../../composables/useF2SpecialAiGenerate'
 import {
   F2_56_OBJECTIVES,
   F2_56_TEST_CHECKS,
   F2_56_TIPS,
+  isBlankContractCostCheckSample,
+  type ContractCostCheckSample,
 } from '../../composables/useF2ContractCostCheckFormulas'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import type { SampledVoucher, FillMode } from '../../composables/useSamplingAlgorithms'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import ItemAttachment from '../../ItemAttachment.vue'
 import F2ContractCostTestExampleRef from './F2ContractCostTestExampleRef.vue'
+import F2ContractCostCheckDialog from './F2ContractCostCheckDialog.vue'
 
 const props = defineProps<{
   wpId?: string
@@ -388,6 +419,17 @@ const chk = useF2ContractCostCheck({
 const objectives = F2_56_OBJECTIVES
 const testChecks = F2_56_TEST_CHECKS
 const tips = F2_56_TIPS
+const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
+const {
+  aiAvailable,
+  loading: aiLoading,
+  generateAndConfirm,
+} = useF2SpecialAiGenerate(wpIdRef)
+const filledCount = computed(() =>
+  chk.sheet.value.samples.filter((row) => !isBlankContractCostCheckSample(row)).length,
+)
+const checkDialogVisible = ref(false)
+const checkDialogRow = ref<ContractCostCheckSample | null>(null)
 
 const CONCLUSION_KEY = 'F2-56-conclusion'
 const auditConclusion = ref('')
@@ -398,24 +440,79 @@ function saveAuditConclusion(val: string): void {
   props.allResponses.set(CONCLUSION_KEY, item)
   window.dispatchEvent(new CustomEvent('f2-spe:save-items', { detail: { items: [item] } }))
 }
+
+function openCheckDialog(row: ContractCostCheckSample): void {
+  checkDialogRow.value = row
+  checkDialogVisible.value = true
+}
+
+function addAndOpenSample(): void {
+  const reusable = chk.sheet.value.samples.find(isBlankContractCostCheckSample)
+  if (reusable) {
+    openCheckDialog(reusable)
+    return
+  }
+  chk.addSample()
+  const row = chk.sheet.value.samples[chk.sheet.value.samples.length - 1]
+  if (row) openCheckDialog(row)
+}
+
+function saveCheckedSample(row: ContractCostCheckSample): void {
+  chk.updateSample(row.id, row)
+}
+
+function aiContext(): Record<string, unknown> {
+  return {
+    sheet: 'F2-56',
+    populationDescription: chk.params.value.populationDesc,
+    samplingMethod: chk.params.value.method,
+    samplingProcess: chk.params.value.process,
+    populationAmount: chk.params.value.populationAmount,
+    materiality: chk.params.value.materiality,
+    tolerableMisstatement: chk.params.value.tolerableMisstatement,
+    sampleCount: filledCount.value,
+    testedAmount: chk.stats.value.testedAmount,
+    incorrectAmount: chk.stats.value.incorrectAmount,
+    errorRate: chk.stats.value.errorRate,
+    coverageRatio: chk.coverageRatio.value,
+    abnormalCount: chk.issueCount.value,
+    samples: chk.enrichedSamples.value
+      .filter((row) => !isBlankContractCostCheckSample(row))
+      .slice(0, 30)
+      .map((row) => ({
+        projectName: row.projectName,
+        voucherNo: row.voucherNo,
+        voucherAmount: row.voucherAmount,
+        contractDateNo: row.contractDateNo,
+        receiptAmount: row.receiptAmount,
+        logisticsDateNo: row.logisticsDateNo,
+        allocationAmount: row.allocAmount,
+        isAbnormal: row.isAbnormal,
+        issueDescription: row.issueDesc,
+      })),
+  }
+}
+
+async function runAi(section: F2SpeAiSection): Promise<void> {
+  const isNote = section === 'contract-check-note'
+  const existing = isNote ? chk.auditNote.value : auditConclusion.value
+  const title = isNote
+    ? 'AI 生成 · 合同履约成本检查说明'
+    : 'AI 生成 · 合同履约成本检查结论'
+  const text = await generateAndConfirm(section, existing || '', aiContext(), title)
+  if (!text) return
+  if (isNote) chk.auditNote.value = text
+  else saveAuditConclusion(text)
+}
 onMounted(() => {
   const c = props.allResponses.get(CONCLUSION_KEY)
   if (c?.remark) auditConclusion.value = c.remark
 })
 
-const { ocrLoadingId, uploadAndMerge } = useF2SpecialContractOcr(
-  toRef(() => props.wpId || '') as Ref<string>,
-)
-
 const auditYear = computed(() => props.auditYear ?? new Date().getFullYear() - 1)
 
 function handleSamplingFilled(payload: { samples: SampledVoucher[]; fillMode: FillMode }) {
   chk.fillFromSampling(payload.samples, payload.fillMode)
-}
-
-function handleOcr(rowId: string, file?: File) {
-  if (!file || !props.wpId) return
-  void uploadAndMerge(rowId, file, (id, patch) => chk.updateRow(id, patch))
 }
 
 function fmt(v: number): string {
@@ -430,6 +527,7 @@ function fmtPct(v: number): string {
 </script>
 
 <style scoped src="../../f2/valuation/f2ValSheetStyles.css"></style>
+<style scoped src="./f2SoftMatrixStyles.css"></style>
 <style scoped>
 .f2-contract-check { --gt-purple: #4b2d77; --gt-purple-soft: #f3eef8; }
 .section-block { margin-bottom: 14px; }
@@ -505,8 +603,7 @@ function fmtPct(v: number): string {
 .col-idx { min-width: 56px; }
 .col-flag { min-width: 52px; }
 .col-issue { min-width: 80px; }
-.col-ocr { width: 36px; }
-.col-act { width: 36px; position: sticky; right: 0; z-index: 3; background: #fff !important; }
+.col-act { min-width: 76px; position: sticky; right: 0; z-index: 3; background: #fff !important; white-space: nowrap; }
 
 .row-total td { background: #f0ebf5 !important; font-weight: 600; }
 .row-warn td { background: #fdf6ec !important; }
@@ -530,6 +627,7 @@ span.auto { display: block; }
 }
 .stat-table th { background: var(--gt-purple-soft); color: #3d2a55; }
 .stat-note { margin-top: 4px; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
 
 :deep(.compact-num) { width: 62px; }
 :deep(.compact-num.wide) { width: 80px; }

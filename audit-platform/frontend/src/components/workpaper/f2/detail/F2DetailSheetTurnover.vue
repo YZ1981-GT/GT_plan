@@ -12,7 +12,7 @@
       <summary>编制提示</summary>
       <div class="guidance-body">
         <p>1. 按模板骨架分三块：（一）周转材料、（二）低值易耗品、（三）包装物（四个用途子类）。</p>
-        <p>2. 灰色列为自动计算：期末 = 期初 + 购进 − 发出；单价 = 金额 ÷ 数量；库龄合计须等于期末金额。</p>
+        <p>2. 灰色列为自动计算：期末 = 期初 + 本期增加 − 本期减少；单价 = 金额 ÷ 数量；库龄合计须等于期末金额。</p>
         <p>3. 摊销采用五五、分次摊销时，金额按<strong>摊余价值</strong>列示并在审计说明中写明方法。</p>
         <p>4. 包装物小计汇总四用途；页尾合计 − 跌价准备 = 净额。</p>
       </div>
@@ -101,8 +101,8 @@
       <div class="subtotal">
         <span class="sub-lab">小计</span>
         <template v-if="sheet.activeView.value !== 'aging'">
-          <span class="sub-item">购进 {{ fmtAmt(sheet.groupTotals.value[sec.key].increaseAmt) }}</span>
-          <span class="sub-item">发出 {{ fmtAmt(sheet.groupTotals.value[sec.key].decreaseAmt) }}</span>
+          <span class="sub-item">增加 {{ fmtAmt(sheet.groupTotals.value[sec.key].increaseAmt) }}</span>
+          <span class="sub-item">减少 {{ fmtAmt(sheet.groupTotals.value[sec.key].decreaseAmt) }}</span>
         </template>
         <span class="sub-item strong">期末 {{ fmtAmt(sheet.groupTotals.value[sec.key].closingAmt) }}</span>
         <span
@@ -142,8 +142,8 @@
       <div class="subtotal emph">
         <span class="sub-lab">包装物小计</span>
         <template v-if="sheet.activeView.value !== 'aging'">
-          <span class="sub-item">购进 {{ fmtAmt(sheet.packagingTotal.value.increaseAmt) }}</span>
-          <span class="sub-item">发出 {{ fmtAmt(sheet.packagingTotal.value.decreaseAmt) }}</span>
+          <span class="sub-item">增加 {{ fmtAmt(sheet.packagingTotal.value.increaseAmt) }}</span>
+          <span class="sub-item">减少 {{ fmtAmt(sheet.packagingTotal.value.decreaseAmt) }}</span>
         </template>
         <span class="sub-item strong">期末 {{ fmtAmt(sheet.packagingTotal.value.closingAmt) }}</span>
         <span
@@ -198,6 +198,28 @@
           @change="(v: string) => sheet.persistNotePack({ [f.packKey]: v })"
         />
       </div>
+    </section>
+
+    <section class="notes-panel conclusion">
+      <div class="note-label">
+        <span>审计结论</span>
+        <el-button
+          size="small"
+          text
+          type="primary"
+          :disabled="isReadonly || !aiAvailable || aiBusyKey === 'conclusion'"
+          :loading="aiBusyKey === 'conclusion'"
+          @click="generateConclusion"
+        >AI</el-button>
+      </div>
+      <el-input
+        type="textarea"
+        :rows="3"
+        :model-value="sheet.auditConclusion.value"
+        :disabled="isReadonly"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制），不可确认。"
+        @change="(v: string) => sheet.persistConclusion(v)"
+      />
     </section>
 
     <el-dialog v-model="showCustomDialog" title="自定义库龄段" width="420px" @close="cancelCustomAging">
@@ -268,6 +290,8 @@ async function generateNote(f: (typeof noteFields)[number]) {
       sheet.notePack.value[f.packKey],
       {
         sheetCode: 'F2-5',
+        sheetName: '周转材料/低值易耗品/包装物',
+        noteHint: f.label,
         closingAmt: sheet.grandTotal.value.closingAmt,
         netAmt: sheet.netAmt.value,
         agingOk: sheet.grandTotal.value.agingOk,
@@ -275,6 +299,27 @@ async function generateNote(f: (typeof noteFields)[number]) {
       `AI 生成 · F2-5 ${f.label}`,
     )
     if (text) sheet.persistNotePack({ [f.packKey]: text })
+  } finally {
+    aiBusyKey.value = null
+  }
+}
+
+async function generateConclusion() {
+  aiBusyKey.value = 'conclusion'
+  try {
+    const text = await generateAndConfirm(
+      'detail-conclusion',
+      sheet.auditConclusion.value,
+      {
+        sheetCode: 'F2-5',
+        sheetName: '周转材料/低值易耗品/包装物',
+        closingAmt: sheet.grandTotal.value.closingAmt,
+        netAmt: sheet.netAmt.value,
+        agingOk: sheet.grandTotal.value.agingOk,
+      },
+      'AI · F2-5 审计结论',
+    )
+    if (text) sheet.persistConclusion(text)
   } finally {
     aiBusyKey.value = null
   }
@@ -416,6 +461,7 @@ function cancelCustomAging() {
 .notes-panel {
   padding: 14px 16px; border-radius: 12px; border: 1px solid var(--f2-line); background: #fff;
 }
+.notes-panel.conclusion { margin-top: 12px; }
 .notes-panel h4 { margin: 0 0 10px; }
 .note-block { margin-bottom: 10px; }
 .note-label {

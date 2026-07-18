@@ -14,6 +14,7 @@ export type F3ImportableSheet =
   | 'F3-5'
   | 'F3-6'
   | 'F3-7-credit'
+  | 'F3-7-subsequent'
   | 'F3-7-debit'
 
 export interface F3ImportResult {

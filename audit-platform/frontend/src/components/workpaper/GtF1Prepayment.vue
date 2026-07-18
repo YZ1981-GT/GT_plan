@@ -1,188 +1,155 @@
 <template>
   <div class="f1-prepayment">
-    <!-- 加载状态 -->
     <div v-if="isLoading" class="loading-container">
       <el-skeleton :rows="8" animated />
     </div>
 
     <template v-else>
-      <!-- 顶部工具栏：双模式切换 -->
-      <div class="f1-header-toolbar">
+      <div v-if="showHtmlToolbar" class="f1-header-toolbar">
         <el-segmented
           v-model="dualMode.currentMode.value"
-          :options="dualMode.modeOptions.value"
+          :options="dualMode.modeOptions"
           size="small"
           @change="dualMode.onModeChange"
         />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
-        <el-tooltip v-if="dualMode.ooHealthy.value === false" content="OnlyOffice服务不可用" placement="top">
-          <el-tag size="small" type="warning">OO不可用</el-tag>
-        </el-tooltip>
+        <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
-      <!-- OnlyOffice 模式 -->
-      <template v-if="dualMode.currentMode.value === 'onlyoffice' && dualMode.ooConfig.value">
+      <GtOnlyOfficeSheet
+        v-if="dualMode.currentMode.value === 'onlyoffice'"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :sheet-name="props.sheetName || ''"
+        :readonly="isReadonly"
+        style="height: calc(100vh - 180px)"
+      />
+
+      <template v-else>
+        <CycleTabProcedure
+          v-if="currentSheet === 'F1A'"
+          sheet-code="F1A"
+          :html-data="props.htmlData"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="isReadonly"
+        />
+
+        <F1TabAdjudication
+          v-else-if="currentSheet === 'F1-1'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+          :cross-sheet="crossSheet"
+        />
+
+        <F1TabDetail
+          v-else-if="currentSheet === 'F1-2'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+        />
+
+        <F1TabAdjustment
+          v-else-if="currentSheet === 'F1-3'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+        />
+
+        <F1TabAnalysis
+          v-else-if="currentSheet === 'F1-4'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+          :cross-sheet="crossSheet"
+        />
+
+        <F1TabLongTerm
+          v-else-if="currentSheet === 'F1-5'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+          :cross-sheet="crossSheet"
+        />
+
+        <F1TabRelatedParty
+          v-else-if="currentSheet === 'F1-6'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+          :cross-sheet="crossSheet"
+        />
+
+        <F1TabComprehensiveCheck
+          v-else-if="currentSheet === 'F1-7'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+        />
+
+        <F1TabDisclosureListed
+          v-else-if="currentSheet === '附注上市'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+          :cross-sheet="crossSheet"
+          :applicable-standards="applicableStandards"
+        />
+
+        <F1TabDisclosureSoe
+          v-else-if="currentSheet === '附注国企'"
+          :all-responses="allResponses"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
+          :debounced-save="debouncedSave"
+          :cross-sheet="crossSheet"
+          :applicable-standards="applicableStandards"
+        />
+
+        <F1TabConfirmationProcedure
+          v-else-if="currentSheet === 'F1-CONF'"
+          :wp-id="wpIdRef"
+          :project-id="projectIdRef"
+          :is-readonly="isReadonly"
+        />
+
+        <!-- 兜底：未识别 sheet → OnlyOffice -->
         <GtOnlyOfficeSheet
-          :config="dualMode.ooConfig.value"
-          @document-ready="dualMode.onDocumentReady"
+          v-else
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :sheet-name="props.sheetName || ''"
+          :readonly="isReadonly"
+          style="height: calc(100vh - 180px)"
         />
       </template>
-
-      <!-- HTML 结构化视图 -->
-      <template v-else>
-        <el-tabs v-model="activeTab" type="border-card" class="f1-tabs">
-          <!-- Tab 1: F1A 程序表 -->
-          <el-tab-pane name="procedure" label="F1A 程序表" lazy>
-            <F1TabProcedure
-              v-if="activeTab === 'procedure'"
-              :wp-id="wpIdRef"
-              :project-id="projectIdRef"
-              :html-data="htmlData"
-              :is-readonly="isReadonly"
-            />
-          </el-tab-pane>
-
-          <!-- Tab 2: F1-1 审定表 -->
-          <el-tab-pane name="adjudication" label="F1-1 审定表" lazy>
-            <F1TabAdjudication
-              v-if="activeTab === 'adjudication'"
-              :all-responses="allResponses"
-              :wp-id="wpIdRef"
-              :project-id="projectIdRef"
-              :is-readonly="isReadonly"
-              :save-immediate="saveImmediate"
-              :debounced-save="debouncedSave"
-              :cross-sheet="crossSheet"
-            />
-          </el-tab-pane>
-
-          <!-- Tab 3: F1-2 明细表 -->
-          <el-tab-pane name="detail" label="F1-2 明细表" lazy>
-            <F1TabDetail
-              v-if="activeTab === 'detail'"
-              :all-responses="allResponses"
-              :wp-id="wpIdRef"
-              :project-id="projectIdRef"
-              :is-readonly="isReadonly"
-              :save-immediate="saveImmediate"
-              :debounced-save="debouncedSave"
-            />
-          </el-tab-pane>
-
-          <!-- Tab 4: F1-3 调整分录 -->
-          <el-tab-pane name="adjustment" label="F1-3 调整分录" lazy>
-            <F1TabAdjustment
-              v-if="activeTab === 'adjustment'"
-              :all-responses="allResponses"
-              :wp-id="wpIdRef"
-              :project-id="projectIdRef"
-              :is-readonly="isReadonly"
-              :save-immediate="saveImmediate"
-              :debounced-save="debouncedSave"
-            />
-          </el-tab-pane>
-
-          <!-- Tab 5: F1-4 分析表 -->
-          <el-tab-pane name="analysis" label="F1-4 分析表" lazy>
-            <F1TabAnalysis
-              v-if="activeTab === 'analysis'"
-              :all-responses="allResponses"
-              :wp-id="wpIdRef"
-              :project-id="projectIdRef"
-              :is-readonly="isReadonly"
-              :save-immediate="saveImmediate"
-              :debounced-save="debouncedSave"
-              :cross-sheet="crossSheet"
-            />
-          </el-tab-pane>
-
-          <!-- Tab 6: F1-5 长期检查 -->
-          <el-tab-pane name="longterm" label="F1-5 长期检查" lazy>
-            <F1TabLongTerm
-              v-if="activeTab === 'longterm'"
-              :all-responses="allResponses"
-              :wp-id="wpIdRef"
-              :project-id="projectIdRef"
-              :is-readonly="isReadonly"
-              :save-immediate="saveImmediate"
-              :debounced-save="debouncedSave"
-              :cross-sheet="crossSheet"
-            />
-          </el-tab-pane>
-
-          <!-- Tab 7: F1-6 关联方 -->
-          <el-tab-pane name="related-party" label="F1-6 关联方" lazy>
-            <F1TabRelatedParty
-              v-if="activeTab === 'related-party'"
-              :all-responses="allResponses"
-              :wp-id="wpIdRef"
-              :project-id="projectIdRef"
-              :is-readonly="isReadonly"
-              :save-immediate="saveImmediate"
-              :debounced-save="debouncedSave"
-              :cross-sheet="crossSheet"
-            />
-          </el-tab-pane>
-
-          <!-- Tab 8: F1-7 综合检查 -->
-          <el-tab-pane name="comprehensive-check" label="F1-7 综合检查" lazy>
-            <F1TabComprehensiveCheck
-              v-if="activeTab === 'comprehensive-check'"
-              :all-responses="allResponses"
-              :wp-id="wpIdRef"
-              :project-id="projectIdRef"
-              :is-readonly="isReadonly"
-              :save-immediate="saveImmediate"
-              :debounced-save="debouncedSave"
-            />
-          </el-tab-pane>
-
-          <!-- Tab 9: 附注 -->
-          <el-tab-pane name="disclosure" label="附注" lazy>
-            <div v-if="activeTab === 'disclosure'" class="disclosure-container">
-              <el-segmented
-                v-model="disclosureVariant"
-                :options="disclosureOptions"
-                size="small"
-                style="margin-bottom: 12px"
-              />
-              <F1TabDisclosureListed
-                v-if="disclosureVariant === 'listed'"
-                :all-responses="allResponses"
-                :wp-id="wpIdRef"
-                :project-id="projectIdRef"
-                :is-readonly="isReadonly"
-                :save-immediate="saveImmediate"
-                :debounced-save="debouncedSave"
-                :cross-sheet="crossSheet"
-              />
-              <F1TabDisclosureSoe
-                v-if="disclosureVariant === 'soe'"
-                :all-responses="allResponses"
-                :wp-id="wpIdRef"
-                :project-id="projectIdRef"
-                :is-readonly="isReadonly"
-                :save-immediate="saveImmediate"
-                :debounced-save="debouncedSave"
-                :cross-sheet="crossSheet"
-              />
-            </div>
-          </el-tab-pane>
-
-          <!-- Tab 10: 函证程序 -->
-          <el-tab-pane name="confirmation-procedure" label="函证程序" lazy>
-            <F1TabConfirmationProcedure
-              v-if="activeTab === 'confirmation-procedure'"
-              :wp-id="wpIdRef"
-              :project-id="projectIdRef"
-              :is-readonly="isReadonly"
-            />
-          </el-tab-pane>
-
-        </el-tabs>
-      </template>
-
-      <!-- 版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -191,20 +158,17 @@
 /**
  * GtF1Prepayment.vue — F1 预付账款底稿主入口
  *
- * el-tabs 10个tab-pane：F1A程序表 → F1-1审定表 → F1-2明细表 → F1-3调整分录
- * → F1-4分析表 → F1-5长期检查 → F1-6关联方 → F1-7综合检查 → 附注
+ * 比照 GtF3NotesPayable / GtF4AccountsPayable：
+ * 外层 GtWpRenderer 通过 sheetName 分发，无内层 el-tabs（避免双层嵌套）。
  *
- * 科目覆盖：1123 预付账款（贷方科目/负债类）
- * selfLoad: 当 htmlData prop 为 null 时自行调 render-config 加载数据。
+ * 科目覆盖：1123 预付账款（借方科目/资产类）
  */
-import { ref, computed, onMounted, provide, inject, defineAsyncComponent } from 'vue'
-import http from '@/utils/http'
+import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useF1FormData } from './composables/useF1FormData'
 import { useF1CrossSheet } from './composables/useF1CrossSheet'
 import { useF1DualMode } from './composables/useF1DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
-
-// ─── Async sub-components ────────────────────────────────────────────────────
+import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 const F1TabAdjudication = defineAsyncComponent(() => import('./f1/F1TabAdjudication.vue'))
 const F1TabDetail = defineAsyncComponent(() => import('./f1/F1TabDetail.vue'))
@@ -218,14 +182,11 @@ const F1TabDisclosureListed = defineAsyncComponent(() => import('./f1/F1TabDiscl
 const F1TabDisclosureSoe = defineAsyncComponent(() => import('./f1/F1TabDisclosureSoe.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 
-const F1TabProcedure = defineAsyncComponent(() => import('./f1/F1TabProcedure.vue'))
-
-// ─── Props / Emits ───────────────────────────────────────────────────────────
-
 const props = defineProps<{
   wpId: string
   projectId: string
   wpCode?: string
+  sheetName?: string
   year?: number
   htmlData?: any
   readonly?: boolean
@@ -236,45 +197,57 @@ defineEmits<{
   (e: 'completed'): void
 }>()
 
-// ─── State ───────────────────────────────────────────────────────────────────
-
 const isLoading = ref(true)
-const activeTab = ref('adjudication')
-const disclosureVariant = ref<'listed' | 'soe'>('listed')
-const applicableStandards = ref('')
-
 const isReadonly = computed(() => !!props.readonly)
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
+const sheetNameRef = computed(() => props.sheetName || '')
 
-/** 附注切换选项：根据 applicable_standards 自动判断 */
-const disclosureOptions = computed(() => {
-  const std = applicableStandards.value.toLowerCase()
-  const opts: Array<{ label: string; value: string; disabled?: boolean }> = []
-  const showListed = std.includes('listed') || !std
-  const showSoe = std.includes('soe') || !std
-  if (showListed) opts.push({ label: '上市公司', value: 'listed' })
-  if (showSoe) opts.push({ label: '国企', value: 'soe' })
-  if (opts.length === 0) {
-    opts.push({ label: '上市公司', value: 'listed' })
-    opts.push({ label: '国企', value: 'soe' })
-  }
-  return opts
+/** 从 sheetName 提取 F1A / F1-1~F1-7 / 附注 / 函证编码 */
+const currentSheet = computed(() => {
+  const name = props.sheetName || props.wpCode || ''
+  if (/F1-note-listed|附注披露.*上市|附注.*上市/.test(name)) return '附注上市'
+  if (/F1-note-soe|附注披露.*国企|附注.*国企/.test(name)) return '附注国企'
+  if (/附注/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
+  if (/函证|F1-CONF|F1CONF/i.test(name)) return 'F1-CONF'
+  const m = name.match(/(F1A|F1-\d+)/i)
+  return m ? m[1].toUpperCase().replace(/^F1A$/i, 'F1A') : ''
 })
 
-// ─── useF1FormData ───────────────────────────────────────────────────────────
+const showHtmlToolbar = computed(() => {
+  const s = currentSheet.value
+  return s.startsWith('F1-') || s === 'F1A' || s.startsWith('附注') || s === 'F1-CONF'
+})
+
+/** 适用准则：htmlData / project_context 可能是数组或逗号分隔字符串 */
+const applicableStandards = computed<string[]>(() => {
+  const raw =
+    props.htmlData?.project_context?.applicable_standards
+    ?? props.htmlData?.projectContext?.applicable_standards
+    ?? props.htmlData?.applicable_standards
+    ?? []
+  if (Array.isArray(raw)) return raw.map(String).filter(Boolean)
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean)
+    } catch { /* ignore */ }
+    return raw.split(/[,;|]+/).map((s: string) => s.trim()).filter(Boolean)
+  }
+  return []
+})
 
 const {
   allResponses,
   loadAll,
   saveImmediate: rawSaveImmediate,
   debouncedSave,
+  writebackTrialBalance,
 } = useF1FormData({
   wpId: wpIdRef,
   projectId: projectIdRef,
 })
 
-// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionToolbar = runtime?.version ?? {
   versionTrailRef: ref<{ openDrawer: () => void } | null>(null),
@@ -288,54 +261,42 @@ const saveImmediate = versionToolbar.wrapSaveImmediate(rawSaveImmediate)
 provide('f1VersionTrailRef', versionTrailRef)
 provide('f1OpenVersionHistory', openVersionHistory)
 
-// ─── useF1CrossSheet ─────────────────────────────────────────────────────────
-
 const crossSheet = useF1CrossSheet({ allResponses })
 
-// ─── useF1DualMode ───────────────────────────────────────────────────────────
+const dualMode = useF1DualMode({
+  wpId: wpIdRef,
+  sheetName: sheetNameRef,
+  reloadAll: () => loadAll(),
+})
 
-const dualMode = useF1DualMode({ wpId: wpIdRef, activeTab })
-
-// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide（真实复核对话）
 provide('reloadWorkpaperData', loadAll)
 
-// ─── selfLoad ────────────────────────────────────────────────────────────────
+function handleF1Writeback(e: Event): void {
+  const d = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number }>).detail
+  if (d?.auditedAmount == null) return
+  void writebackTrialBalance(d.auditedAmount)
+}
 
 async function selfLoad() {
   if (props.htmlData) {
-    // 从 props 提供的数据初始化（render-config已返回）
-    if (props.htmlData.applicable_standards || props.htmlData.project_context?.applicable_standards) {
-      applicableStandards.value = props.htmlData.applicable_standards || props.htmlData.project_context?.applicable_standards || ''
-    }
-    await loadAll()
-    isLoading.value = false
-    return
+    // htmlData 已由 render-config 注入，仍拉 checklist 全量
   }
-
-  // 当 htmlData 为空时（bundle 内嵌场景），自行加载
   try {
-    const res = await http.get(
-      `/api/workpapers/${props.wpId}/render-config`,
-      { params: { force_component_type: 'f1-prepayment' }, _silent: true } as any,
-    )
-    const renderData = res.data?.data ?? res.data
-    if (renderData?.sheets?.[0]?.html_data?.project_context) {
-      applicableStandards.value = renderData.sheets[0].html_data.project_context.applicable_standards || ''
-    }
+    await loadAll()
   } catch (err) {
-    console.warn('[GtF1Prepayment] selfLoad render-config failed:', err)
+    console.warn('[GtF1Prepayment] selfLoad failed:', err)
+  } finally {
+    isLoading.value = false
   }
-
-  await loadAll()
-  isLoading.value = false
 }
 
-// ─── Lifecycle ───────────────────────────────────────────────────────────────
+onMounted(() => {
+  window.addEventListener('f1:writeback-trial-balance', handleF1Writeback)
+  void selfLoad()
+})
 
-onMounted(async () => {
-  await selfLoad()
-  // 非阻塞检查 OO 健康状态
-  dualMode.checkOOHealth()
+onBeforeUnmount(() => {
+  window.removeEventListener('f1:writeback-trial-balance', handleF1Writeback)
 })
 </script>
 
@@ -356,13 +317,5 @@ onMounted(async () => {
   padding: 8px 12px;
   background: #f5f7fa;
   border-radius: 6px;
-}
-
-.f1-tabs {
-  min-height: 400px;
-}
-
-.disclosure-container {
-  padding: 8px 0;
 }
 </style>

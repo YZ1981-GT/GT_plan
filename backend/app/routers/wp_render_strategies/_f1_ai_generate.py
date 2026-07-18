@@ -6,10 +6,18 @@ Body: { section: string, existingContent: string, relatedContext: object }
 支持 sections:
 - adj-change-analysis: 审定表变动分析
 - adj-conclusion: 审定表结论
-- analysis-note: 分析程序说明
-- longterm-reason: 长期挂账原因建议
-- related-party-note: 关联方审计说明
+- analysis-note: 分析程序说明（兼容）
+- analysis-balance-note / analysis-debit-note / analysis-credit-note / analysis-supplier-note: F1-4 分块说明
+- analysis-conclusion: F1-4 审计结论
+- longterm-reason: 长期挂账原因/审计说明
+- longterm-conclusion: F1-5 审计结论
+- related-party-note: F1-6 关联方审计说明
+- related-party-conclusion: F1-6 关联方审计结论
 - comprehensive-conclusion: 综合检查结论
+- detail-prior-linkage: 明细表期初与上年报核对
+- detail-fluctuation: 明细表重大变动原因
+- detail-over1year: 明细表超1年预付款说明
+- detail-conclusion: 明细表审计结论
 """
 
 from __future__ import annotations
@@ -56,9 +64,20 @@ _SUPPORTED_SECTIONS = {
     "adj-change-analysis",
     "adj-conclusion",
     "analysis-note",
+    "analysis-balance-note",
+    "analysis-debit-note",
+    "analysis-credit-note",
+    "analysis-supplier-note",
+    "analysis-conclusion",
     "longterm-reason",
+    "longterm-conclusion",
     "related-party-note",
+    "related-party-conclusion",
     "comprehensive-conclusion",
+    "detail-prior-linkage",
+    "detail-fluctuation",
+    "detail-over1year",
+    "detail-conclusion",
 }
 
 _SYSTEM_PROMPT = """你是一位资深注册会计师（CPA），正在协助编制审计底稿 F1《预付账款》。
@@ -77,10 +96,21 @@ _SYSTEM_PROMPT = """你是一位资深注册会计师（CPA），正在协助编
 _SECTION_PROMPTS: dict[str, str] = {
     "adj-change-analysis": "请生成F1-1审定表的'预付账款变动分析'，基于期初期末数据变动和主要供应商变动情况。",
     "adj-conclusion": "请生成F1-1审定表的审计结论，综合审计程序结果对预付账款余额真实性/完整性/列报给出结论。",
-    "analysis-note": "请基于F1-4分析程序结果（借贷发生额分析+Top5供应商），生成分析性复核审计说明。",
-    "longterm-reason": "请为该供应商长期挂账的预付账款生成未结转原因建议文本，结合项目背景和行业惯例。",
-    "related-party-note": "请生成关联方预付账款审计说明，评价关联方交易的商业合理性和定价公允性。",
+    "analysis-note": "请基于F1-4分析程序结果（余额/借贷发生额/大额供应商），生成分析性复核审计说明。",
+    "analysis-balance-note": "请生成F1-4「预付款项余额分析」审计说明，评价余额结构（存货/费用/工程固定资产/其他）及占存货比重是否合理。",
+    "analysis-debit-note": "请生成F1-4「借方发生额分析」审计说明，评价新增预付结构及与存货采购金额的勾稽关系。",
+    "analysis-credit-note": "请生成F1-4「贷方发生额分析」审计说明，评价转销路径；对大额收回款项关注合理性与关联方资金占用。",
+    "analysis-supplier-note": "请生成F1-4「大额供应商期末余额分析」审计说明，评价商业合理性、交易真实性、账龄及期后结算。",
+    "analysis-conclusion": "请生成F1-4实质性分析审计结论（A未见异常 / B除重大调整外未见异常 / C存在重大未调整或范围受限），并简要陈述依据。",
+    "longterm-reason": "请生成F1-5账龄1年及以上大额预付检查的审计说明，归纳未结转原因分类、减值与重分类考虑、期后消化情况。",
+    "longterm-conclusion": "请生成F1-5审计结论（A未见异常 / B除重大调整外未见异常 / C存在重大未调整或范围受限），并简要陈述依据。",
+    "related-party-note": "请生成F1-6关联方预付账款审计说明，评价交易真实性、商业实质、定价公允性、是否存在资金占用及披露充分性。",
+    "related-party-conclusion": "请生成F1-6关联方及交易检查审计结论（A未见异常 / B除重大调整外未见异常 / C存在重大未调整或范围受限），并简要陈述依据。",
     "comprehensive-conclusion": "请基于综合检查(F1-7)的抽凭结果和异常发现，生成综合检查审计结论。",
+    "detail-prior-linkage": "请生成F1-2明细表审计说明(1)：期初审定余额与上年审计报告/附注披露的勾稽核对说明，如有差异说明原因。",
+    "detail-fluctuation": "请生成F1-2明细表审计说明(2)：预付账款本期重大增减变动原因分析（结合主要供应商、款项性质、项目进度）。",
+    "detail-over1year": "请生成F1-2明细表审计说明(3)：账龄超过1年的预付款款项性质、未结转/未收回原因及后续处理计划。",
+    "detail-conclusion": "请生成F1-2明细表审计结论（可选A未见异常 / B除重大调整外未见异常 / C存在重大未调整或范围受限不可确认），并简要陈述依据。",
 }
 
 

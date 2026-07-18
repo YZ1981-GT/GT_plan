@@ -77,20 +77,6 @@
       </el-card>
     </template>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="note-card">
-      <template #header><span>附注披露审计说明</span></template>
-      <el-input v-model="disclosureNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写附注披露审计说明..." @change="saveDisclosureNote" />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="note-card">
-      <template #header><span>审计结论</span></template>
-      <el-input v-model="auditConclusionText" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
-        placeholder="填写附注披露审计结论..." @change="saveAuditConclusion" />
-    </el-card>
-
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
@@ -109,8 +95,7 @@
  * - subscribe 'substantive:adjudicated' 刷新附注取数
  * - publish 'disclosure:note-text-updated' 通知外部
  */
-import { ref, computed, inject, toRef, onMounted } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
+import { ref, computed, inject, toRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import { useH1Disclosure, LISTED_SECTIONS } from '../../composables/useH1Disclosure'
 
@@ -122,18 +107,7 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
-const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
-const disclosureNote = ref('')
-const auditConclusionText = ref('')
-const NOTE_KEY = 'H1-note-listed-audit-note'
-const CONCLUSION_KEY = 'H1-note-listed-audit-conclusion'
-function saveDisclosureNote() {
-  saveResponse(NOTE_KEY, disclosureNote.value)
-  // P1: 真正发布附注文本更新事件（原 onPublishEvent 仅 console.log）
-  eventBus.emit('disclosure:note-text-updated', { wpCode: 'H1', section: 'listed', timestamp: Date.now() })
-}
-function saveAuditConclusion() { saveResponse(CONCLUSION_KEY, auditConclusionText.value) }
 
 const sections = LISTED_SECTIONS
 
@@ -155,10 +129,6 @@ const { costMatrixRows: overviewRows, sectionRows: dynamicRowsMap, addDynamicRow
 // ─── 附注取数刷新：跨 sheet 数据由主入口 GtH1FixedAssets 订阅 substantive:adjudicated
 //     统一刷新 allResponses（本 tab 的 overviewRows 为 computed，随 props.allResponses 重算）。
 //     此处不再自建失效的 SSE 订阅（原 EventSource 订阅客户端事件 + handler 仅 console.log，双重空操作）。
-onMounted(() => {
-  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) disclosureNote.value = n.remark
-  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusionText.value = c.remark
-})
 
 function getDynamicRows(key: string) {
   return dynamicRowsMap.value?.[key] ?? []
@@ -193,7 +163,6 @@ function fmtAmt(val: number | null | undefined): string {
 .auto-fill-hint { font-size: 11px; color: var(--el-text-color-secondary); margin-top: 8px; }
 .dynamic-actions { margin-top: 8px; }
 .subtotal-row { margin-top: 8px; font-weight: 500; text-align: right; padding-right: 12px; }
-.note-card { margin-bottom: 12px; }
 .compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
 .compile-hint summary { cursor: pointer; font-weight: 500; }
 .compile-hint ul { padding-left: 20px; margin-top: 8px; }

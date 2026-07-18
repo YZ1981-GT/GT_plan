@@ -1,71 +1,79 @@
 /**
- * useF4LongOutstanding — F4-5 长期挂账检查逻辑
+ * useF4LongOutstanding — F4-5 账龄1年以上应付账款检查表
  *
- * Spec: .kiro/specs/f4-accounts-payable/ Task 5.3
- * 挂账天数公式 + 高亮（>2年橙色，>3年红色）
- * 合计行（总额/2年以上/3年以上/建议转收入）+ 动态行增删
- * Requirements: 8.1~8.6
+ * 源表字段：债权人、期末余额、账龄、经济业务说明、未偿还/未结转原因、
+ * 是否无法支付、是否诉讼、支付计划、审定金额、支持性证据、备注。
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
-import { parseNum, calcOutstandingDays, calcSubtotal } from './useF4AccPayFormulaEngine'
-import type { ChecklistResponse } from './useF4FormData'
+import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { calcSubtotal, parseNum } from './useF4AccPayFormulaEngine'
+import { computeF4DetailRow, migrateF4DetailRows } from './useF4Detail'
+import { readRowJson, type ChecklistResponse } from './useF4FormData'
 
-// ─── 类型定义 ─────────────────────────────────────────────────────────────────
+export const F4_LONG_AGING_OPTIONS = ['1～2年', '2～3年', '3年以上'] as const
+export const F4_YES_NO_OPTIONS = ['是', '否', '不适用'] as const
+
+export interface F4LongOutstandingOcrFields {
+  creditor?: string
+  closingBalance?: number | string
+  aging?: string
+  businessDescription?: string
+  unsettledReason?: string
+  unableToPay?: string
+  litigation?: string
+  paymentPlan?: string
+  auditedAmount?: number | string
+  supportingEvidence?: string
+  remark?: string
+}
 
 export interface LongOutstandingRow {
   rowId: string
   seq: number
+  attSlot: number
+  /** F4-2归集行ID组合；空表示手工行。 */
+  sourceRowId: string
   creditor: string
-  amount: number
-  startDate: string
-  outstandingDays: number          // 公式=当前日期-挂账起始日
-  paymentNature: string
-  reason: string
-  hasDispute: string
-  shouldTransferIncome: string
-  suggestion: string
+  closingBalance: number
+  aging: string
+  businessDescription: string
+  unsettledReason: string
+  unableToPay: string
+  litigation: string
+  paymentPlan: string
+  auditedAmount: number
+  supportingEvidence: string
   remark: string
-  // 高亮标记
-  highlightLevel: 'none' | 'orange' | 'red'
+  linked: boolean
+  adjustmentAmount: number
+  riskFlags: string[]
+  highlightLevel: 'none' | 'warning' | 'danger'
 }
-
-export interface F4LongOutstandingColumn {
-  prop: keyof LongOutstandingRow | string
-  label: string
-  width?: number
-  minWidth?: number
-  formula?: string
-  editable?: boolean
-}
-
-export const F4_LONG_OUTSTANDING_COLUMNS: F4LongOutstandingColumn[] = [
-  { prop: 'seq', label: '序号', width: 60 },
-  { prop: 'creditor', label: '债权人', minWidth: 130, editable: true },
-  { prop: 'amount', label: '挂账金额', minWidth: 120, editable: true },
-  { prop: 'startDate', label: '挂账起始日', minWidth: 110, editable: true },
-  { prop: 'outstandingDays', label: '挂账天数', minWidth: 100, formula: '当前日期-起始日', editable: false },
-  { prop: 'paymentNature', label: '款项性质', minWidth: 100, editable: true },
-  { prop: 'reason', label: '挂账原因', minWidth: 140, editable: true },
-  { prop: 'hasDispute', label: '合同纠纷', minWidth: 90, editable: true },
-  { prop: 'shouldTransferIncome', label: '转营业外收入', minWidth: 110, editable: true },
-  { prop: 'suggestion', label: '处理建议', minWidth: 140, editable: true },
-  { prop: 'remark', label: '备注', minWidth: 120, editable: true },
-]
-
-// ─── 内部存储类型 ─────────────────────────────────────────────────────────────
 
 interface StoredLongOutstandingRow {
   rowId: string
   seq: number
+  attSlot: number
+  sourceRowId: string
   creditor: string
-  amount: number
-  startDate: string
-  paymentNature: string
-  reason: string
-  hasDispute: string
-  shouldTransferIncome: string
-  suggestion: string
+  closingBalance: number
+  aging: string
+  businessDescription: string
+  unsettledReason: string
+  unableToPay: string
+  litigation: string
+  paymentPlan: string
+  auditedAmount: number
+  supportingEvidence: string
   remark: string
+}
+
+export interface F4LongOutstandingCandidate {
+  sourceRowId: string
+  creditor: string
+  closingBalance: number
+  aging: string
+  businessDescription: string
+  auditedAmount: number
 }
 
 export interface UseF4LongOutstandingOptions {
@@ -75,145 +83,382 @@ export interface UseF4LongOutstandingOptions {
   isReadonly?: Ref<boolean>
 }
 
-// ─── 常量 ─────────────────────────────────────────────────────────────────────
-
 const STORAGE_KEY = 'F4-5-rows'
-const NOTE_KEY = 'F4-5-note'
-const DAYS_2_YEARS = 365 * 2
-const DAYS_3_YEARS = 365 * 3
-
-// ─── 工具函数 ─────────────────────────────────────────────────────────────────
+const DETAIL_KEY = 'F4-2-rows'
+const NOTE_KEY = 'F4-5-audit-note'
+const CONCLUSION_KEY = 'F4-5-audit-conclusion'
+const LEGACY_NOTE_KEY = 'F4-5-note'
+const TOLERANCE = 0.005
 
 function generateRowId(): string {
   return `f4lo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
 }
 
-function emptyStored(seq: number): StoredLongOutstandingRow {
+function nextAttSlot(rows: StoredLongOutstandingRow[]): number {
+  return Math.max(0, ...rows.map((row) => Number(row.attSlot) || 0)) + 1
+}
+
+export function emptyLongOutstandingRow(seq: number, attSlot = seq): StoredLongOutstandingRow {
   return {
     rowId: generateRowId(),
     seq,
+    attSlot,
+    sourceRowId: '',
     creditor: '',
-    amount: 0,
-    startDate: '',
-    paymentNature: '',
-    reason: '',
-    hasDispute: '否',
-    shouldTransferIncome: '否',
-    suggestion: '',
+    closingBalance: 0,
+    aging: '',
+    businessDescription: '',
+    unsettledReason: '',
+    unableToPay: '',
+    litigation: '',
+    paymentPlan: '',
+    auditedAmount: 0,
+    supportingEvidence: '',
     remark: '',
   }
 }
 
-function computeRow(stored: StoredLongOutstandingRow): LongOutstandingRow {
-  let outstandingDays = 0
-  if (stored.startDate) {
-    const start = new Date(stored.startDate)
-    if (!isNaN(start.getTime())) {
-      outstandingDays = calcOutstandingDays(new Date(), start)
-    }
-  }
-  let highlightLevel: 'none' | 'orange' | 'red' = 'none'
-  if (outstandingDays > DAYS_3_YEARS) highlightLevel = 'red'
-  else if (outstandingDays > DAYS_2_YEARS) highlightLevel = 'orange'
-
-  return { ...stored, outstandingDays, highlightLevel }
+function agingFromLegacyDays(days: number): string {
+  if (days > 365 * 3) return '3年以上'
+  if (days > 365 * 2) return '2～3年'
+  if (days > 365) return '1～2年'
+  return ''
 }
 
-function safeParseRows(jsonStr: string | null | undefined): StoredLongOutstandingRow[] {
-  if (!jsonStr) return []
+function legacyRemark(raw: any): string {
+  return [raw?.remark, raw?.suggestion ? `原处理建议：${raw.suggestion}` : '']
+    .filter(Boolean)
+    .join('；')
+}
+
+function migrateRow(raw: any, index: number): StoredLongOutstandingRow {
+  const base = emptyLongOutstandingRow(index + 1, Number(raw?.attSlot) || index + 1)
+  const closingBalance = parseNum(raw?.closingBalance ?? raw?.amount ?? raw?.hangAmount)
+  return {
+    ...base,
+    rowId: String(raw?.rowId ?? raw?.id ?? generateRowId()),
+    seq: Number(raw?.seq) || index + 1,
+    sourceRowId: String(raw?.sourceRowId ?? ''),
+    creditor: String(raw?.creditor ?? raw?.creditorName ?? ''),
+    closingBalance,
+    aging: String(raw?.aging || agingFromLegacyDays(parseNum(raw?.outstandingDays ?? raw?.hangDays))),
+    businessDescription: String(raw?.businessDescription ?? raw?.paymentNature ?? raw?.nature ?? ''),
+    unsettledReason: String(raw?.unsettledReason ?? raw?.reason ?? raw?.hangReason ?? ''),
+    unableToPay: String(
+      raw?.unableToPay
+      ?? raw?.shouldTransferIncome
+      ?? raw?.needTransferIncome
+      ?? '',
+    ),
+    litigation: String(raw?.litigation ?? raw?.hasDispute ?? ''),
+    paymentPlan: String(raw?.paymentPlan ?? ''),
+    auditedAmount: raw?.auditedAmount == null ? closingBalance : parseNum(raw.auditedAmount),
+    supportingEvidence: String(raw?.supportingEvidence ?? ''),
+    remark: legacyRemark(raw),
+  }
+}
+
+export function migrateF4LongOutstandingRows(value: string | null | undefined): StoredLongOutstandingRow[] {
+  if (!value) return []
   try {
-    const parsed = JSON.parse(jsonStr)
+    const parsed = JSON.parse(value)
     if (!Array.isArray(parsed)) return []
-    return parsed.map((raw: any, i: number) => ({
-      ...emptyStored(i + 1),
-      rowId: raw.rowId || raw.id || generateRowId(),
-      seq: raw.seq ?? i + 1,
-      creditor: raw.creditor || '',
-      amount: parseNum(raw.amount),
-      startDate: raw.startDate || '',
-      paymentNature: raw.paymentNature || '',
-      reason: raw.reason || '',
-      hasDispute: raw.hasDispute || '否',
-      shouldTransferIncome: raw.shouldTransferIncome || '否',
-      suggestion: raw.suggestion || '',
-      remark: raw.remark || '',
-    }))
+    return parsed.map(migrateRow).map((row, index) => ({ ...row, seq: index + 1 }))
   } catch {
     return []
   }
 }
 
-// ─── Composable ──────────────────────────────────────────────────────────────
+function ageLabels(amounts: number[]): string {
+  const labels = ['1～2年', '2～3年', '3年以上']
+    .filter((_, index) => Math.abs(amounts[index]) >= TOLERANCE)
+  return labels.join('、')
+}
+
+/** 从F4-2提取包含1年以上账龄的实际债权人，并按名称归集。 */
+export function extractF4LongOutstandingCandidates(
+  value: string | null | undefined,
+): F4LongOutstandingCandidate[] {
+  const detailRows = migrateF4DetailRows(value).map(computeF4DetailRow)
+  const grouped = new Map<string, {
+    rowIds: string[]
+    creditor: string
+    closingBalance: number
+    auditedAmount: number
+    longAging: number[]
+    descriptions: Set<string>
+  }>()
+
+  for (const row of detailRows) {
+    const creditor = row.creditor.trim()
+    if (!creditor) continue
+    const auditedBuckets = [
+      row.auditedAging1to2,
+      row.auditedAging2to3,
+      row.auditedAgingGt3,
+    ]
+    const unadjustedBuckets = [
+      row.unadjustedAging1to2,
+      row.unadjustedAging2to3,
+      row.unadjustedAgingGt3,
+    ]
+    const buckets = auditedBuckets.some((amount) => Math.abs(amount) >= TOLERANCE)
+      ? auditedBuckets
+      : unadjustedBuckets
+    if (!buckets.some((amount) => Math.abs(amount) >= TOLERANCE)) continue
+
+    const key = creditor.toLocaleLowerCase('zh-CN')
+    const target = grouped.get(key) ?? {
+      rowIds: [],
+      creditor,
+      closingBalance: 0,
+      auditedAmount: 0,
+      longAging: [0, 0, 0],
+      descriptions: new Set<string>(),
+    }
+    target.rowIds.push(row.rowId)
+    target.closingBalance += row.closingUnadjusted
+    target.auditedAmount += row.closingAdjusted
+    buckets.forEach((amount, index) => { target.longAging[index] += amount })
+    if (row.paymentNature) target.descriptions.add(row.paymentNature)
+    grouped.set(key, target)
+  }
+
+  return [...grouped.values()]
+    .sort((a, b) =>
+      Math.abs(b.auditedAmount) - Math.abs(a.auditedAmount)
+      || a.creditor.localeCompare(b.creditor, 'zh-CN'),
+    )
+    .map((row) => ({
+      sourceRowId: row.rowIds.sort().join('|'),
+      creditor: row.creditor,
+      closingBalance: row.closingBalance,
+      aging: ageLabels(row.longAging),
+      businessDescription: [...row.descriptions].join('、'),
+      auditedAmount: row.auditedAmount,
+    }))
+}
+
+function computeRow(
+  stored: StoredLongOutstandingRow,
+  source?: F4LongOutstandingCandidate,
+): LongOutstandingRow {
+  const creditor = source?.creditor ?? stored.creditor
+  const closingBalance = source?.closingBalance ?? stored.closingBalance
+  const aging = source?.aging ?? stored.aging
+  const businessDescription = stored.businessDescription || source?.businessDescription || ''
+  const auditedAmount = source?.auditedAmount ?? stored.auditedAmount
+  const riskFlags: string[] = []
+  if (aging.includes('3年以上')) riskFlags.push('含3年以上账龄')
+  if (stored.unableToPay === '是') riskFlags.push('可能无法支付')
+  else if (!stored.unableToPay) riskFlags.push('支付能力待判断')
+  if (stored.litigation === '是') riskFlags.push('涉及诉讼')
+  else if (!stored.litigation) riskFlags.push('诉讼状态待判断')
+  if (creditor && !stored.unsettledReason.trim()) riskFlags.push('未说明长期挂账原因')
+  if (creditor && !stored.paymentPlan.trim()) riskFlags.push('支付计划缺失')
+  if (creditor && !stored.supportingEvidence.trim()) riskFlags.push('支持性证据待补')
+  const adjustmentAmount = auditedAmount - closingBalance
+  if (Math.abs(adjustmentAmount) >= TOLERANCE) riskFlags.push('存在审计调整')
+
+  let highlightLevel: LongOutstandingRow['highlightLevel'] = 'none'
+  if (stored.unableToPay === '是' || stored.litigation === '是' || aging.includes('3年以上')) {
+    highlightLevel = 'danger'
+  } else if (riskFlags.length) {
+    highlightLevel = 'warning'
+  }
+
+  return {
+    ...stored,
+    creditor,
+    closingBalance,
+    aging,
+    businessDescription,
+    auditedAmount,
+    linked: !!source,
+    adjustmentAmount,
+    riskFlags,
+    highlightLevel,
+  }
+}
+
+export function isBlankLongOutstandingRow(row: StoredLongOutstandingRow): boolean {
+  return !row.creditor && !row.closingBalance && !row.aging && !row.businessDescription
+    && !row.unsettledReason && !row.paymentPlan && !row.auditedAmount
+    && !row.supportingEvidence && !row.remark && !row.sourceRowId
+}
 
 export function useF4LongOutstanding(options: UseF4LongOutstandingOptions) {
   const { allResponses, isReadonly } = options
   const readonly = isReadonly ?? ref(false)
-
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
+
   const storedData = ref<StoredLongOutstandingRow[]>([])
+  const auditNote = ref('')
   const auditConclusion = ref('')
 
-  // ─── 加载 ─────────────────────────────────────────────────────────────────
-
   function loadRows(): void {
-    storedData.value = safeParseRows(allResponses.value.get(STORAGE_KEY)?.remark)
-    if (storedData.value.length === 0) storedData.value = [emptyStored(1)]
+    storedData.value = migrateF4LongOutstandingRows(readRowJson(allResponses.value.get(STORAGE_KEY)))
+    if (!storedData.value.length) storedData.value = [emptyLongOutstandingRow(1)]
   }
 
-  watch(() => allResponses.value.get(STORAGE_KEY)?.remark, () => {
-    if (storedData.value.length === 0) loadRows()
-  }, { immediate: true })
+  watch(
+    () => readRowJson(allResponses.value.get(STORAGE_KEY)),
+    (raw) => {
+      if (raw && raw === JSON.stringify(storedData.value)) return
+      loadRows()
+    },
+    { immediate: true },
+  )
+  watch(
+    () => [
+      allResponses.value.get(NOTE_KEY)?.remark,
+      allResponses.value.get(CONCLUSION_KEY)?.remark,
+      allResponses.value.get(LEGACY_NOTE_KEY)?.remark,
+    ],
+    ([note, conclusion, legacy]) => {
+      auditNote.value = note || ''
+      auditConclusion.value = conclusion || legacy || ''
+    },
+    { immediate: true },
+  )
 
-  watch(() => allResponses.value.get(NOTE_KEY)?.remark, (v) => {
-    auditConclusion.value = v || ''
-  }, { immediate: true })
+  const detailCandidates = computed(() =>
+    extractF4LongOutstandingCandidates(readRowJson(allResponses.value.get(DETAIL_KEY))),
+  )
 
-  // ─── 计算行 ───────────────────────────────────────────────────────────────
-
-  const rows: ComputedRef<LongOutstandingRow[]> = computed(() => storedData.value.map(computeRow))
-
-  // ─── 汇总统计 ─────────────────────────────────────────────────────────────
-
-  const summary = computed(() => {
-    const all = rows.value
-    const totalAmount = calcSubtotal(all.map((r) => r.amount))
-    const over2YearAmount = calcSubtotal(all.filter((r) => r.outstandingDays > DAYS_2_YEARS).map((r) => r.amount))
-    const over3YearAmount = calcSubtotal(all.filter((r) => r.outstandingDays > DAYS_3_YEARS).map((r) => r.amount))
-    const transferAmount = calcSubtotal(
-      all.filter((r) => r.shouldTransferIncome === '是').map((r) => r.amount),
-    )
-    return { totalAmount, over2YearAmount, over3YearAmount, transferAmount }
+  const rows: ComputedRef<LongOutstandingRow[]> = computed(() =>
+    storedData.value.map((stored) => computeRow(
+      stored,
+      stored.sourceRowId
+        ? detailCandidates.value.find((source) => source.sourceRowId === stored.sourceRowId)
+        : undefined,
+    )),
+  )
+  const filledCount = computed(() => rows.value.filter((row) =>
+    row.creditor || Math.abs(row.closingBalance) >= TOLERANCE,
+  ).length)
+  const pendingSyncCount = computed(() => {
+    const linked = new Set(storedData.value.map((row) => row.sourceRowId).filter(Boolean))
+    return detailCandidates.value.filter((source) => !linked.has(source.sourceRowId)).length
   })
 
-  // ─── 动态行操作 ───────────────────────────────────────────────────────────
+  const summary = computed(() => ({
+    count: filledCount.value,
+    closingTotal: calcSubtotal(rows.value.map((row) => row.closingBalance)),
+    auditedTotal: calcSubtotal(rows.value.map((row) => row.auditedAmount)),
+    adjustmentTotal: calcSubtotal(rows.value.map((row) => row.adjustmentAmount)),
+    unableToPayAmount: calcSubtotal(
+      rows.value.filter((row) => row.unableToPay === '是').map((row) => row.auditedAmount),
+    ),
+    litigationAmount: calcSubtotal(
+      rows.value.filter((row) => row.litigation === '是').map((row) => row.auditedAmount),
+    ),
+    missingEvidenceCount: rows.value.filter((row) =>
+      row.creditor && !row.supportingEvidence.trim(),
+    ).length,
+    highRiskCount: rows.value.filter((row) => row.highlightLevel === 'danger').length,
+  }))
+
+  function syncFromDetail(): number {
+    if (readonly.value) return 0
+    const linked = new Set(storedData.value.map((row) => row.sourceRowId).filter(Boolean))
+    const pending = detailCandidates.value.filter((source) => !linked.has(source.sourceRowId))
+    if (pending.length && storedData.value.length === 1 && isBlankLongOutstandingRow(storedData.value[0])) {
+      storedData.value = []
+    }
+    for (const source of pending) {
+      storedData.value.push({
+        ...emptyLongOutstandingRow(storedData.value.length + 1, nextAttSlot(storedData.value)),
+        sourceRowId: source.sourceRowId,
+        creditor: source.creditor,
+        closingBalance: source.closingBalance,
+        aging: source.aging,
+        businessDescription: source.businessDescription,
+        auditedAmount: source.auditedAmount,
+      })
+    }
+    if (pending.length) persistRows()
+    return pending.length
+  }
 
   function addRow(): void {
     if (readonly.value) return
-    storedData.value.push(emptyStored(storedData.value.length + 1))
+    storedData.value.push(
+      emptyLongOutstandingRow(storedData.value.length + 1, nextAttSlot(storedData.value)),
+    )
     persistRows()
   }
 
   function removeRow(rowId: string): void {
-    if (readonly.value || storedData.value.length <= 1) return
-    const idx = storedData.value.findIndex((r) => r.rowId === rowId)
-    if (idx === -1) return
-    storedData.value.splice(idx, 1)
-    storedData.value.forEach((r, i) => { r.seq = i + 1 })
-    persistRows()
-  }
-
-  function updateCell(rowId: string, field: string, value: any): void {
     if (readonly.value) return
-    const row = storedData.value.find((r) => r.rowId === rowId)
-    if (!row) return
-    const strFields = ['creditor', 'startDate', 'paymentNature', 'reason', 'hasDispute',
-      'shouldTransferIncome', 'suggestion', 'remark']
-    if (strFields.includes(field)) (row as any)[field] = String(value ?? '')
-    else (row as any)[field] = parseNum(value)
+    const index = storedData.value.findIndex((row) => row.rowId === rowId)
+    if (index === -1) return
+    storedData.value.splice(index, 1)
+    if (!storedData.value.length) storedData.value.push(emptyLongOutstandingRow(1))
+    storedData.value.forEach((row, i) => { row.seq = i + 1 })
     persistRows()
   }
 
-  // ─── 持久化 ───────────────────────────────────────────────────────────────
+  function updateCell(rowId: string, field: string, value: unknown): void {
+    if (readonly.value) return
+    const row = storedData.value.find((item) => item.rowId === rowId)
+    if (!row) return
+    const numeric = new Set(['closingBalance', 'auditedAmount'])
+    ;(row as any)[field] = numeric.has(field)
+      ? parseNum(value as string | number | null | undefined)
+      : String(value ?? '')
+    persistRows()
+  }
+
+  function mergeOcrFields(
+    rowId: string,
+    fields: F4LongOutstandingOcrFields,
+    overwrite = false,
+  ): void {
+    if (readonly.value) return
+    const row = storedData.value.find((item) => item.rowId === rowId)
+    if (!row) return
+    const mapping: Array<[keyof StoredLongOutstandingRow, unknown]> = [
+      ['creditor', fields.creditor],
+      ['closingBalance', fields.closingBalance],
+      ['aging', fields.aging],
+      ['businessDescription', fields.businessDescription],
+      ['unsettledReason', fields.unsettledReason],
+      ['unableToPay', fields.unableToPay],
+      ['litigation', fields.litigation],
+      ['paymentPlan', fields.paymentPlan],
+      ['auditedAmount', fields.auditedAmount],
+      ['supportingEvidence', fields.supportingEvidence],
+      ['remark', fields.remark],
+    ]
+    const numeric = new Set<keyof StoredLongOutstandingRow>(['closingBalance', 'auditedAmount'])
+    for (const [field, value] of mapping) {
+      if (value == null || value === '') continue
+      const current = row[field]
+      if (!overwrite && current !== '' && current !== 0) continue
+      ;(row as any)[field] = numeric.has(field)
+        ? parseNum(value as string | number | null | undefined)
+        : String(value)
+    }
+    persistRows()
+  }
+
+  function setText(key: string, value: string): void {
+    allResponses.value.set(key, { item_id: key, conclusion: null, remark: value })
+    debounceSave()
+  }
+
+  function saveAuditNote(value: string): void {
+    if (readonly.value) return
+    auditNote.value = value
+    setText(NOTE_KEY, value)
+  }
+
+  function saveAuditConclusion(value: string): void {
+    if (readonly.value) return
+    auditConclusion.value = value
+    setText(CONCLUSION_KEY, value)
+  }
 
   function persistRows(): void {
     allResponses.value.set(STORAGE_KEY, {
@@ -226,42 +471,51 @@ export function useF4LongOutstanding(options: UseF4LongOutstandingOptions) {
 
   function debounceSave(): void {
     if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 2000)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      flushSave()
+    }, 1200)
   }
 
   function flushSave(): void {
-    const items = [allResponses.value.get(STORAGE_KEY), allResponses.value.get(NOTE_KEY)].filter(Boolean)
-    if (items.length) window.dispatchEvent(new CustomEvent('f4:save-items', { detail: { items } }))
+    const items = [STORAGE_KEY, NOTE_KEY, CONCLUSION_KEY]
+      .map((key) => allResponses.value.get(key))
+      .filter(Boolean)
+    if (items.length) {
+      window.dispatchEvent(new CustomEvent('f4:save-items', { detail: { items } }))
+    }
   }
 
-  watch(auditConclusion, (val) => {
-    allResponses.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
-    debounceSave()
-  })
-
-  // ─── 样式 ─────────────────────────────────────────────────────────────────
-
   function rowClassName({ row }: { row: LongOutstandingRow }): string {
-    if (row.highlightLevel === 'red') return 'long-outstanding-red'
-    if (row.highlightLevel === 'orange') return 'long-outstanding-orange'
+    if (row.highlightLevel === 'danger') return 'long-outstanding-danger'
+    if (row.highlightLevel === 'warning') return 'long-outstanding-warning'
     return ''
   }
 
-  // ─── 清理 ─────────────────────────────────────────────────────────────────
-
   onBeforeUnmount(() => {
-    if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; flushSave() }
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
+      flushSave()
+    }
   })
 
   return {
     rows,
     summary,
+    filledCount,
+    pendingSyncCount,
+    auditNote,
     auditConclusion,
+    loadRows,
+    syncFromDetail,
     addRow,
     removeRow,
     updateCell,
+    mergeOcrFields,
+    saveAuditNote,
+    saveAuditConclusion,
     rowClassName,
-    columns: F4_LONG_OUTSTANDING_COLUMNS,
   }
 }
 

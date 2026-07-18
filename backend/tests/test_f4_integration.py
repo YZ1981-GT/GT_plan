@@ -184,14 +184,17 @@ class TestF4ImportExport:
         assert router is not None
 
     def test_f4_import_export_sheet_specs(self):
-        """包含预期的12个sheet specs."""
+        """包含F4-1双分类、F4-7五段、F4-8借贷及F4-9共14个sheet specs."""
         from app.routers.wp_render_strategies._f4_import_export import _F4_SPECS
 
         expected_keys = {
+            "F4-1-nature", "F4-1-aging",
             "F4-2", "F4-3", "F4-5", "F4-6",
-            "F4-7-purchase", "F4-7-inbound", "F4-7-invoice",
+            "F4-7-payment-window", "F4-7-estimated-inbound",
+            "F4-7-unprocessed-invoice", "F4-7-subsequent-payment",
+            "F4-7-subsequent-increase",
             "F4-8-debit", "F4-8-credit",
-            "F4-9-factoring", "F4-9-note", "F4-9-supply",
+            "F4-9",
         }
         assert set(_F4_SPECS.keys()) == expected_keys
 
@@ -207,6 +210,68 @@ class TestF4ImportExport:
             assert len(spec["headers"]) == len(spec["field_keys"]), (
                 f"{key}: headers({len(spec['headers'])}) != field_keys({len(spec['field_keys'])})"
             )
+
+    def test_f4_2_spec_matches_source_27_columns(self):
+        """F4-2导入导出严格对应源表A:AA，无旧版自造字段."""
+        from app.routers.wp_render_strategies._f4_import_export import _F4_SPECS
+
+        spec = _F4_SPECS["F4-2"]
+        assert len(spec["headers"]) == 27
+        assert spec["headers"][:4] == ["债权人名称", "公司代码", "关联方类型", "款项性质"]
+        assert spec["headers"][13:17] == [
+            "未审账龄-1年以下", "未审账龄-1～2年", "未审账龄-2～3年", "未审账龄-3年以上",
+        ]
+        assert spec["headers"][20:24] == [
+            "审定账龄-1年以下", "审定账龄-1～2年", "审定账龄-2～3年", "审定账龄-3年以上",
+        ]
+        assert "confirmationResult" not in spec["field_keys"]
+        assert "subsequentPaymentDate" not in spec["field_keys"]
+        assert "indexRef" not in spec["field_keys"]
+
+    def test_f4_5_spec_matches_source_11_columns(self):
+        """F4-5导入导出对应账龄1年以上检查表原始11列."""
+        from app.routers.wp_render_strategies._f4_import_export import _F4_SPECS
+
+        spec = _F4_SPECS["F4-5"]
+        assert spec["headers"] == [
+            "债权人名称", "期末余额", "账龄", "经济业务说明", "未偿还或未结转的原因",
+            "是否无法支付", "是否诉讼", "支付计划", "审定金额", "支持性证据", "备注",
+        ]
+        assert spec["field_keys"] == [
+            "creditor", "closingBalance", "aging", "businessDescription", "unsettledReason",
+            "unableToPay", "litigation", "paymentPlan", "auditedAmount", "supportingEvidence", "remark",
+        ]
+
+    def test_f4_6_spec_matches_source_12_columns(self):
+        """F4-6导入导出对应关联方及交易检查表原始12列."""
+        from app.routers.wp_render_strategies._f4_import_export import _F4_SPECS
+
+        spec = _F4_SPECS["F4-6"]
+        assert spec["headers"] == [
+            "关联方名称", "关联关系", "期初余额", "本期借方", "本期贷方", "期末余额",
+            "账龄", "定价政策", "发生原因（款项性质）", "期后付款金额", "索引号", "备注",
+        ]
+        assert spec["field_keys"] == [
+            "partyName", "relationship", "openingBalance", "currentDebit", "currentCredit",
+            "closingBalance", "aging", "pricingPolicy", "transactionNature",
+            "postPaymentAmount", "indexNo", "remark",
+        ]
+
+    def test_f4_7_specs_match_five_source_sections(self):
+        """F4-7按源表五段分别导入导出，不再使用旧三段通用表."""
+        from app.routers.wp_render_strategies._f4_import_export import _F4_SPECS
+
+        keys = {
+            "F4-7-payment-window", "F4-7-estimated-inbound",
+            "F4-7-unprocessed-invoice", "F4-7-subsequent-payment",
+            "F4-7-subsequent-increase",
+        }
+        assert keys.issubset(_F4_SPECS)
+        assert len(_F4_SPECS["F4-7-payment-window"]["headers"]) == 10
+        assert len(_F4_SPECS["F4-7-estimated-inbound"]["headers"]) == 10
+        assert len(_F4_SPECS["F4-7-unprocessed-invoice"]["headers"]) == 9
+        assert len(_F4_SPECS["F4-7-subsequent-payment"]["headers"]) == 9
+        assert len(_F4_SPECS["F4-7-subsequent-increase"]["headers"]) == 9
 
     @pytest.mark.asyncio
     async def test_f4_export_template_route_registered(self):
@@ -241,6 +306,118 @@ class TestF4AiGenerate:
                 json={"section": "substantive-analysis", "existingContent": ""},
             )
         assert resp.status_code != 404, "F4 ai-generate route not registered"
+
+    def test_f4_contract_ocr_router_exists(self):
+        """F4长期挂账OCR模块有router及字段schema."""
+        from app.routers.wp_render_strategies._f4_contract_ocr import (
+            LONG_OUTSTANDING_FIELDS_SCHEMA,
+            router,
+        )
+
+        assert router is not None
+        assert set(LONG_OUTSTANDING_FIELDS_SCHEMA) == {
+            "creditor", "closingBalance", "aging", "businessDescription",
+            "unsettledReason", "unableToPay", "litigation", "paymentPlan",
+            "auditedAmount", "supportingEvidence", "remark",
+        }
+
+    def test_f4_contract_ocr_supports_all_unrecorded_sections(self):
+        """F4 OCR提供F4-7五种多单据提取schema."""
+        from app.routers.wp_render_strategies._f4_contract_ocr import DOCUMENT_SCHEMAS
+
+        assert {
+            "unrecorded-payment-window",
+            "unrecorded-estimated-inbound",
+            "unrecorded-unprocessed-invoice",
+            "unrecorded-subsequent-payment",
+            "unrecorded-subsequent-increase",
+        }.issubset(DOCUMENT_SCHEMAS)
+
+    def test_f4_contract_ocr_supports_voucher_check_documents(self):
+        """F4 OCR提供F4-8弹窗逐单据核对schema."""
+        from app.routers.wp_render_strategies._f4_contract_ocr import DOCUMENT_SCHEMAS
+
+        assert {
+            "voucher",
+            "approval",
+            "bank-receipt",
+            "goods-receipt",
+            "invoice",
+        }.issubset(DOCUMENT_SCHEMAS)
+        assert "supplierName" in DOCUMENT_SCHEMAS["voucher"]
+        assert "approvalProper" in DOCUMENT_SCHEMAS["approval"]
+        assert "bankAmount" in DOCUMENT_SCHEMAS["bank-receipt"]
+        assert "receiptProduct" in DOCUMENT_SCHEMAS["goods-receipt"]
+        assert "invoiceAmount" in DOCUMENT_SCHEMAS["invoice"]
+
+    def test_f4_8_spec_matches_source_debit_credit_columns(self):
+        """F4-8导入导出对应借/贷两区源表字段，不再使用旧三单匹配字段."""
+        from app.routers.wp_render_strategies._f4_import_export import _F4_SPECS
+
+        debit = _F4_SPECS["F4-8-debit"]
+        credit = _F4_SPECS["F4-8-credit"]
+        assert debit["headers"][:7] == [
+            "供应商名称", "日期", "凭证编号", "业务内容", "对方科目", "明细科目", "借方金额",
+        ]
+        assert "付款审批单日期/编号" in debit["headers"]
+        assert "银行回单日期" in debit["headers"]
+        assert "threeWayMatch" not in debit["field_keys"]
+        assert credit["headers"][:7] == [
+            "供应商名称", "日期", "凭证编号", "业务内容", "对方科目", "明细科目", "贷方金额",
+        ]
+        assert "入库单日期/编号" in credit["headers"]
+        assert "发票金额" in credit["headers"]
+        assert "purchaseOrder" not in credit["field_keys"]
+
+    def test_f4_ai_supports_voucher_check_sections(self):
+        """F4 AI支持检查表说明、结论与单笔异常说明."""
+        from app.routers.wp_render_strategies._f4_accounts_payable_ai import _SUPPORTED_SECTIONS
+
+        assert {
+            "voucher-check",
+            "voucher-check-note",
+            "voucher-check-conclusion",
+            "voucher-check-issue",
+        }.issubset(_SUPPORTED_SECTIONS)
+
+    def test_f4_9_spec_matches_source_supplier_financing_columns(self):
+        """F4-9导入导出对应供应商融资源表字段，不再使用旧三区模型."""
+        from app.routers.wp_render_strategies._f4_import_export import _F4_SPECS
+
+        spec = _F4_SPECS["F4-9"]
+        assert spec["headers"][:6] == [
+            "供应商名称", "承诺付款方", "融资单号", "资金提供方（金融机构）", "状态", "融资金额",
+        ]
+        assert "本期采购金额" in spec["headers"]
+        assert "借款余额" in spec["headers"]
+        assert "difference" not in spec["field_keys"]  # 公式列不导入
+        assert "F4-9-factoring" not in _F4_SPECS
+
+    def test_f4_contract_ocr_supports_supplier_financing(self):
+        """F4 OCR提供供应商融资单据提取schema."""
+        from app.routers.wp_render_strategies._f4_contract_ocr import DOCUMENT_SCHEMAS
+
+        assert "supplier-financing" in DOCUMENT_SCHEMAS
+        assert "financingNo" in DOCUMENT_SCHEMAS["supplier-financing"]
+        assert "financingAmount" in DOCUMENT_SCHEMAS["supplier-financing"]
+
+    def test_f4_ai_supports_financing_sections(self):
+        """F4 AI支持供应商融资说明与结论."""
+        from app.routers.wp_render_strategies._f4_accounts_payable_ai import _SUPPORTED_SECTIONS
+
+        assert {
+            "financing-evaluation",
+            "financing-note",
+            "financing-conclusion",
+        }.issubset(_SUPPORTED_SECTIONS)
+
+    @pytest.mark.asyncio
+    async def test_f4_contract_ocr_route_registered(self):
+        """contract-ocr路由注册；缺少file应为422而非404."""
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post("/api/workpapers/test-wp/f4/contract-ocr")
+        assert resp.status_code != 404, "F4 contract-ocr route not registered"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

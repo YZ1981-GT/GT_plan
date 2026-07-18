@@ -96,8 +96,9 @@ export function emptyProductProject(seq: number, itemName = ''): ValuationProduc
 }
 
 /** 默认 4 个测试项目（源模板列示规模） */
+/** 默认 1 个测试项目；需要时由「+ 增行」添加 */
 export function defaultFourProjects(): ValuationProductProject[] {
-  return [1, 2, 3, 4].map((n) => emptyProductProject(n, ''))
+  return [emptyProductProject(1, '')]
 }
 
 function n(v: number): number {
@@ -272,10 +273,7 @@ export function migrateLegacyValuationRows(
     if (r.stdPrice) p.stdPrice = Number(r.stdPrice) || 0
     return p
   })
-  while (projects.length < 4) {
-    projects.push(emptyProductProject(projects.length + 1))
-  }
-  return projects
+  return projects.length ? projects : [emptyProductProject(1)]
 }
 
 export const VALUATION_PREP_NOTES = [

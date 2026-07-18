@@ -30,60 +30,15 @@
           :is-readonly="isReadonly"
         />
 
-        <F2TabStocktakeProcedure
-          v-else-if="currentSheet === 'F2-21A'"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :is-readonly="isReadonly"
-          :html-data="props.htmlData"
-        />
-
-        <F2TabStocktakeQuestionnaire
-          v-else-if="currentSheet === 'F2-21'"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-        />
-
-        <F2TabStocktakePlan
-          v-else-if="currentSheet === 'F2-22'"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-        />
-
-        <F2TabStocktakeSummary
-          v-else-if="currentSheet === 'F2-23'"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-        />
-
-        <F2TabStocktakeReconcile
-          v-else-if="currentSheet === 'F2-24'"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-        />
-
-        <F2TabStocktakeSampleResult
-          v-else-if="currentSheet === 'F2-25'"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-        />
-
-        <F2TabStocktakeRollforward
-          v-else-if="currentSheet === 'F2-26'"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
+        <!-- F2-21~26 监盘由 f2-stocktake-bundle 承载；Main 仅兼容误路由 -->
+        <el-alert
+          v-else-if="isStocktakeSheet"
+          type="info"
+          :closable="false"
+          show-icon
+          title="监盘底稿（F2-21~26）请通过「F2 存货监盘」包打开"
+          description="本组件为存货核心包，监盘已拆至独立入口，避免双路由写库冲突。"
+          style="margin: 12px 0"
         />
 
         <F2TabAdjudication
@@ -98,6 +53,7 @@
 
         <F2TabDetailSummary
           v-else-if="currentSheet === 'F2-2'"
+          :wp-id="props.wpId"
           :all-responses="allResponses"
           :project-id="props.projectId"
           :is-readonly="isReadonly"
@@ -144,6 +100,22 @@
           :is-readonly="isReadonly"
         />
 
+        <F2DetailSheetTurnover
+          v-else-if="currentSheet === 'F2-5'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
+        <F2DetailSheetOutsourced
+          v-else-if="currentSheet === 'F2-7'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
         <F2DetailSheet
           v-else-if="detailConfig"
           :config="detailConfig"
@@ -156,6 +128,31 @@
         <F2DetailSheetDev
           v-else-if="currentSheet === 'F2-10'"
           :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
+        <F2DetailSheetDevCost
+          v-else-if="currentSheet === 'F2-11'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
+        <F2DetailSheetContractPerf
+          v-else-if="currentSheet === 'F2-12'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+        />
+
+        <F2DetailSheetBio
+          v-else-if="currentSheet === 'F2-13'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
@@ -223,13 +220,6 @@ import { getF2CutoffConfig } from './f2/inspection/f2CutoffSheetConfigs'
 
 // defineAsyncComponent lazy loading — 首屏仅加载当前 sheet 组件（Req 20.7）
 const F2TabProcedure = defineAsyncComponent(() => import('./f2/core/F2TabProcedure.vue'))
-const F2TabStocktakeProcedure = defineAsyncComponent(() => import('./f2/stocktake/F2TabStocktakeProcedure.vue'))
-const F2TabStocktakeQuestionnaire = defineAsyncComponent(() => import('./f2/stocktake/F2TabStocktakeQuestionnaire.vue'))
-const F2TabStocktakePlan = defineAsyncComponent(() => import('./f2/stocktake/F2TabStocktakePlan.vue'))
-const F2TabStocktakeSummary = defineAsyncComponent(() => import('./f2/stocktake/F2TabStocktakeSummary.vue'))
-const F2TabStocktakeReconcile = defineAsyncComponent(() => import('./f2/stocktake/F2TabStocktakeReconcile.vue'))
-const F2TabStocktakeSampleResult = defineAsyncComponent(() => import('./f2/stocktake/F2TabStocktakeSampleResult.vue'))
-const F2TabStocktakeRollforward = defineAsyncComponent(() => import('./f2/stocktake/F2TabStocktakeRollforward.vue'))
 const F2TabAdjudication = defineAsyncComponent(() => import('./f2/core/F2TabAdjudication.vue'))
 const F2TabDetailSummary = defineAsyncComponent(() => import('./f2/core/F2TabDetailSummary.vue'))
 const F2TabAdjustment = defineAsyncComponent(() => import('./f2/core/F2TabAdjustment.vue'))
@@ -240,7 +230,12 @@ const F2TabOverallAnalysis = defineAsyncComponent(() => import('./f2/analysis/F2
 const F2TabProductionSales = defineAsyncComponent(() => import('./f2/analysis/F2TabProductionSales.vue'))
 const F2TabCostComparison = defineAsyncComponent(() => import('./f2/analysis/F2TabCostComparison.vue'))
 const F2DetailSheet = defineAsyncComponent(() => import('./f2/detail/F2DetailSheet.vue'))
+const F2DetailSheetTurnover = defineAsyncComponent(() => import('./f2/detail/F2DetailSheetTurnover.vue'))
+const F2DetailSheetOutsourced = defineAsyncComponent(() => import('./f2/detail/F2DetailSheetOutsourced.vue'))
 const F2DetailSheetDev = defineAsyncComponent(() => import('./f2/detail/F2DetailSheetDev.vue'))
+const F2DetailSheetDevCost = defineAsyncComponent(() => import('./f2/detail/F2DetailSheetDevCost.vue'))
+const F2DetailSheetContractPerf = defineAsyncComponent(() => import('./f2/detail/F2DetailSheetContractPerf.vue'))
+const F2DetailSheetBio = defineAsyncComponent(() => import('./f2/detail/F2DetailSheetBio.vue'))
 const F2CutoffSheet = defineAsyncComponent(() => import('./f2/inspection/F2CutoffSheet.vue'))
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -298,8 +293,12 @@ const currentSheet = computed(() => {
   return m ? m[1] : ''
 })
 
+const STOCKTAKE_SHEETS = new Set(['F2-21A', 'F2-21', 'F2-22', 'F2-23', 'F2-24', 'F2-25', 'F2-26'])
+const isStocktakeSheet = computed(() => STOCKTAKE_SHEETS.has(currentSheet.value))
+
 const showHtmlToolbar = computed(() => {
   const s = currentSheet.value
+  if (isStocktakeSheet.value) return false
   return s.startsWith('F2-') || s === 'F2A' || s.startsWith('附注')
 })
 
@@ -312,9 +311,9 @@ const cutoffConfig = computed(() => getF2CutoffConfig(currentSheet.value))
 
 const useGridFallback = computed(() => {
   const code = currentSheet.value
+  if (isStocktakeSheet.value) return false
   const htmlSheets = new Set([
     'F2-1', 'F2-2', 'F2-14', 'F2-16', 'F2-18', 'F2-19', 'F2-20', 'F2A',
-    'F2-21A', 'F2-21', 'F2-22', 'F2-23', 'F2-24', 'F2-25', 'F2-26',
   ])
   return code && !htmlSheets.has(code) && !code.startsWith('附注')
     && !detailConfig.value && !cutoffConfig.value
@@ -343,7 +342,9 @@ async function selfLoad(): Promise<void> {
     formData.projectContext.value = props.htmlData.projectContext
   }
   try {
-    await formData.loadAll()
+    // 结构化首屏只等 checklist + 项目上下文；render-config 后台补齐（F2-29~32 不依赖 sheetCache）
+    await formData.loadCritical()
+    void formData.selfLoad()
   } catch (err) {
     console.warn('[GtF2InventoryMain] selfLoad failed:', err)
   } finally {
@@ -353,14 +354,12 @@ async function selfLoad(): Promise<void> {
 
 onMounted(() => {
   window.addEventListener('f2:save-items', handleF2SaveItems)
-  window.addEventListener('f2-stocktake:save-items', handleF2SaveItems)
   window.addEventListener('f2:writeback-trial-balance', handleF2Writeback)
   void selfLoad()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('f2:save-items', handleF2SaveItems)
-  window.removeEventListener('f2-stocktake:save-items', handleF2SaveItems)
   window.removeEventListener('f2:writeback-trial-balance', handleF2Writeback)
 })
 </script>

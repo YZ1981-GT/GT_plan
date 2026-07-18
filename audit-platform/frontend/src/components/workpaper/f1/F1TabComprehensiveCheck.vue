@@ -84,6 +84,13 @@
     </div>
   </div>
 
+  <F1SheetAttachments
+    :project-id="projectId"
+    :wp-id="wpId"
+    sheet-code="F1-7"
+    label="综合检查附件"
+  />
+
   <!-- (1) 本期增减变动 -->
   <div class="vc-section">
     <div class="section-header">
@@ -350,7 +357,22 @@
 
   <!-- 审计结论 -->
   <el-card shadow="never" class="audit-note-card">
-    <template #header><div class="card-header"><span>审计结论</span></div></template>
+    <template #header>
+      <div class="card-header">
+        <span>审计结论</span>
+        <div class="opinion-actions">
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="generateComprehensiveConclusion"
+          >AI 生成结论</el-button>
+          <el-button v-if="openReviewDialog" size="small" @click="openReview">复核</el-button>
+        </div>
+      </div>
+    </template>
     <el-input
       type="textarea"
       :model-value="auditConclusion"
@@ -360,11 +382,6 @@
       @change="saveAuditConclusion"
     />
   </el-card>
-
-  <!-- 复核入口 -->
-  <div class="review-actions">
-    <el-button size="small" @click="openReview">💬 复核</el-button>
-  </div>
 </div>
 </template>
 
@@ -375,11 +392,13 @@
  */
 import { computed, inject, onMounted, ref, toRef, type Ref } from 'vue'
 import { useF1VoucherCheck } from '../composables/useF1ComprehensiveCheck'
+import { useF1AiGenerate } from '../composables/useF1AiGenerate'
 import { useF1ImportExport, type F1ImportSheet } from '../composables/useWorkpaperImportExport'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
 // @ts-ignore - GtIndexChip may not have type declarations
 import GtIndexChip from '../GtIndexChip.vue'
+import F1SheetAttachments from './F1SheetAttachments.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -391,8 +410,9 @@ const props = defineProps<{
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
 
-const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
 const {
   samplingParams,
@@ -407,12 +427,14 @@ const {
   updateSamplingParams,
 } = useF1VoucherCheck({
   allResponses: allResponsesRef,
-  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpId: wpIdRef,
   projectId: toRef(props, 'projectId') as Ref<string>,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
+
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(wpIdRef)
 
 // ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────────
 const NOTE_KEY = 'F1-vc-audit-note'
@@ -473,11 +495,27 @@ const postPeriodCrossValidation = computed(() => {
 })
 
 function openReview() {
-  openReviewDialog('F1-vc-review')
+  openReviewDialog?.('F1-vc-review')
+}
+
+async function generateComprehensiveConclusion() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'comprehensive-conclusion',
+    auditConclusion.value,
+    {
+      sheet: 'F1-7',
+      totalChecked: totalChecked.value,
+      anomalyCount: anomalyCount.value,
+      anomalyRate: anomalyRate.value,
+    },
+    'AI 生成 · F1-7 审计结论',
+  )
+  if (text) saveAuditConclusion(text)
 }
 
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
-const { exportTemplate, exportData, importData, importing } = useF1ImportExport({ wpId: toRef(props, 'wpId') as Ref<string> })
+const { exportTemplate, exportData, importData, importing } = useF1ImportExport({ wpId: wpIdRef })
 
 async function handleImport(file: File, sheet: F1ImportSheet): Promise<boolean> {
   const result = await importData(sheet, file)
@@ -507,6 +545,7 @@ async function handleImport(file: File, sheet: F1ImportSheet): Promise<boolean> 
 /* 审计说明/结论卡片 */
 .audit-note-card { margin-top: 16px; }
 .audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
+.opinion-actions { display: flex; gap: 6px; align-items: center; }
 
 .sampling-params-card { padding: 16px; background: #fff; border: 1px solid #ebeef5; border-radius: 6px; margin-bottom: 16px; }
 .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; }
@@ -519,5 +558,4 @@ async function handleImport(file: File, sheet: F1ImportSheet): Promise<boolean> 
 .section-header h4 { font-size: 14px; font-weight: 600; }
 .section-header-actions { display: flex; gap: 8px; align-items: center; }
 .abnormal-cell :deep(.el-input__inner) { color: #f56c6c; font-weight: 600; }
-.review-actions { margin-top: 12px; }
 </style>

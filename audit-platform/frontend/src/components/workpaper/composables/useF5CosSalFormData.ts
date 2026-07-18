@@ -100,7 +100,32 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
 
   function getSheet(name: string) { return sheetCache.value[name] ?? { rows: [] } }
 
+  /** 审定数回写试算平衡表（比照 useF3FormData / useF4FormData） */
+  async function writebackTrialBalance(accountCode: string, auditedAmount: number): Promise<void> {
+    if (!opts.projectId.value) return
+    try {
+      await api.put(`/api/projects/${opts.projectId.value}/trial-balance/writeback`, {
+        account_code: accountCode,
+        audited_amount: auditedAmount,
+      })
+    } catch {
+      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
+    }
+  }
+
   onScopeDispose(() => { for (const t of _debounceTimers.values()) clearTimeout(t) })
 
-  return { isLoading, sheetCache, allResponses, rollforwardTb, adjudicatedCogs, loadAll, getSheet, saveImmediate, debouncedSave, saveBatch }
+  return {
+    isLoading,
+    sheetCache,
+    allResponses,
+    rollforwardTb,
+    adjudicatedCogs,
+    loadAll,
+    getSheet,
+    saveImmediate,
+    debouncedSave,
+    saveBatch,
+    writebackTrialBalance,
+  }
 }

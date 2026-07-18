@@ -115,66 +115,86 @@ describe('F5 集成 — 成本倒轧全链路（4区公式 → 校验区差异�
   })
 })
 
-describe('F5 集成 — 数量核对（销售vs结转 + 理论结转）', () => {
-  it('数量差异/可供销售/理论结转/高亮等级', () => {
+describe('F5 集成 — 数量核对（分厂→产品×销售/结转/差异）', () => {
+  it('差异=销售−结转；分厂与总计纵向汇总', () => {
+    const sales = [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10] // 120
+    const cost = [8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8] // 96
     const allResponses = mkResponses({
-      'F5-6-quantity-recon-rows': JSON.stringify([
-        { id: 'r1', product: 'A', spec: '', unit: '件', salesQty: 100, costQty: 88, varianceReason: '', openingInventory: 20, currentProduction: 100, currentPurchase: 0, closingInventory: 30 },
-      ]),
+      'F5-6-quantity-recon-plants': JSON.stringify([{
+        id: 'p1', plantId: 'pl1', plant: '分厂1', product: 'A',
+        sm1: 10, sm2: 10, sm3: 10, sm4: 10, sm5: 10, sm6: 10,
+        sm7: 10, sm8: 10, sm9: 10, sm10: 10, sm11: 10, sm12: 10,
+        cm1: 8, cm2: 8, cm3: 8, cm4: 8, cm5: 8, cm6: 8,
+        cm7: 8, cm8: 8, cm9: 8, cm10: 8, cm11: 8, cm12: 8,
+      }]),
     })
     const recon = useF5QuantityRecon({ allResponses, isReadonly: ref(false) })
-    const row = recon.rows.value[0]
-    expect(row.qtyVariance).toBe(12) // 100 - 88
-    expect(row.availableForSale).toBe(120) // 20 + 100 + 0
-    expect(row.theoreticalCostQty).toBe(90) // 120 - 30
-    expect(row.theoreticalVariance).toBe(2) // 90 - 88
-    // 差异率 12/100 = 12% > 10% → red
-    expect(recon.highlightLevel(row)).toBe('red')
-    expect(recon.summary.value.redCount).toBe(1)
+    const prod = recon.plants.value[0].products[0]
+    expect(prod.sales.total).toBe(120)
+    expect(prod.cost.total).toBe(96)
+    expect(prod.diff.total).toBe(24)
+    expect(prod.diff.months[0]).toBe(2)
+    expect(recon.grandTotal.value.diff.total).toBe(24)
+    expect(recon.isDiffHighlighted(24)).toBe(true)
+    void sales
+    void cost
   })
 
-  it('OCR识别数量 merge 进销售数量', () => {
+  it('legacy 年累计 salesQty/costQty 迁移至12月', () => {
     const allResponses = mkResponses({
       'F5-6-quantity-recon-rows': JSON.stringify([
-        { id: 'r1', product: 'A', spec: '', unit: '件', salesQty: 0, costQty: 0, varianceReason: '', openingInventory: 0, currentProduction: 0, currentPurchase: 0, closingInventory: 0 },
+        { id: 'r1', product: 'A', salesQty: 100, costQty: 88 },
       ]),
     })
     const recon = useF5QuantityRecon({ allResponses, isReadonly: ref(false) })
-    recon.mergeOcrQuantity('r1', 555)
-    expect(recon.rows.value[0].salesQty).toBe(555)
+    const prod = recon.plants.value[0].products[0]
+    expect(prod.sales.months[11]).toBe(100)
+    expect(prod.cost.months[11]).toBe(88)
+    expect(prod.diff.total).toBe(12)
   })
 })
 
-describe('F5 集成 — 月度明细 2区段合计（上半年+下半年=全年）', () => {
-  it('全年合计 = 上半年合计 + 下半年合计', () => {
+describe('F5 集成 — 月度明细（源表：未审=Σ月、审定=未审+调整、变动≥30%高亮）', () => {
+  it('本期未审=12月合计；审定=未审+AJE+RJE；变动比例≥30%高亮', () => {
     const months = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]
     const allResponses = mkResponses({
-      'F5-2-monthly-rows': JSON.stringify([{ id: 'm1', product: 'A', months, priorYearTotal: 600 }]),
+      'F5-2-monthly-rows': JSON.stringify([{
+        id: 'm1', product: 'A', months,
+        currentAje: 20, currentRje: 0,
+        priorUnaudited: 600, priorAje: 0, priorRje: 0,
+      }]),
     })
     const detail = useF5MonthlyDetail({ allResponses, isReadonly: ref(false) })
     const row = detail.rows.value[0]
-    expect(row.halfYear1Total).toBe(210) // 10..60
-    expect(row.halfYear2Total).toBe(570) // 70..120
-    expect(row.yearTotal).toBe(780)
-    expect(row.halfYear1Total + row.halfYear2Total).toBe(row.yearTotal)
-    // 变动率 = (780-600)/600 = 30% > 20% → highlighted
+    expect(row.currentUnaudited).toBe(780)
+    expect(row.currentAudited).toBe(800)
+    expect(row.priorAudited).toBe(600)
+    // 未审变动 (780-600)/600 = 30%
+    expect(row.unauditedChangeRate).toBeCloseTo(30, 5)
     expect(detail.isRowHighlighted(row)).toBe(true)
+    expect(detail.totalRow.value.currentUnaudited).toBe(780)
+    expect(detail.ratioRow.value.months[0]).toBeCloseTo((10 / 780) * 100, 5)
   })
 })
 
-describe('F5 集成 — 毛利率计算 + 变动高亮', () => {
-  it('毛利率与毛利率变动>5pp高亮', () => {
+describe('F5 集成 — 比较分析（数量×单价→总成本，变动≥30%高亮）', () => {
+  it('总成本=数量×单价；变动率；≥30%高亮', () => {
     const allResponses = mkResponses({
-      'F5-5-comparison-rows': JSON.stringify([
-        { id: 'c1', product: 'A', currentRevenue: 1000, currentCost: 700, priorRevenue: 1000, priorCost: 850, changeReason: '', auditEvaluation: '', remark: '' },
-      ]),
+      'F5-5-comparison-rows': JSON.stringify([{
+        id: 'c1', product: 'A',
+        currentQty: 100, currentUnitCost: 13,
+        priorQty: 100, priorUnitCost: 10,
+        changeReason: '', indexRef: '',
+      }]),
     })
     const cmp = useF5Comparison({ allResponses, isReadonly: ref(false) })
     const row = cmp.rows.value[0]
-    expect(row.currentGrossMargin).toBeCloseTo(30, 5) // (1000-700)/1000*100
-    expect(row.priorGrossMargin).toBeCloseTo(15, 5) // (1000-850)/1000*100
-    expect(row.marginChange).toBeCloseTo(15, 5) // 30 - 15 = 15pp > 5
-    expect(cmp.isMarginChangeHigh(row)).toBe(true)
+    expect(row.currentTotalCost).toBe(1300)
+    expect(row.priorTotalCost).toBe(1000)
+    expect(row.totalCostChange).toBe(300)
+    expect(row.totalCostChangeRate).toBeCloseTo(30, 5)
+    expect(cmp.isRowHighlighted(row)).toBe(true)
+    expect(cmp.totalRow.value.currentTotalCost).toBe(1300)
   })
 })
 

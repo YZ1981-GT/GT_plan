@@ -69,32 +69,6 @@
       </el-card>
     </template>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input
-        type="textarea"
-        :model-value="auditNote"
-        :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：附注披露项与审定表/明细表的勾稽核对情况，披露完整性与准确性的测试结果。"
-        @change="(v: string) => saveAuditNote(v)"
-      />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
-      <el-input
-        type="textarea"
-        :model-value="auditConclusion"
-        :disabled="isReadonly"
-        :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：A、附注披露完整、准确。B、除下述事项外，附注披露未见异常。C、存在重大披露不当事项，不可确认。"
-        @change="(v: string) => saveAuditConclusion(v)"
-      />
-    </el-card>
-
     <!-- 编制提示 -->
     <details class="prep-hint">
       <summary>编制提示</summary>
@@ -139,12 +113,6 @@ function fmtAmount(v: number | null | undefined): string {
 
 const isReadonly = computed(() => props.isReadonly)
 
-// ═══ 审计说明 / 审计结论（走 checklist_responses，conclusion:null + remark 文本） ═══
-const NOTE_KEY = 'G4-disclosure-soe-audit-note'
-const CONCLUSION_KEY = 'G4-disclosure-soe-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-
 function readSaved(key: string): string {
   const cr = props.htmlData?.checklist_responses
   if (cr && typeof cr === 'object' && (cr as Record<string, any>)[key]) {
@@ -167,15 +135,6 @@ async function saveAudit(key: string, val: string): Promise<void> {
       items: [{ item_id: key, conclusion: null, remark: val }],
     })
   } catch { /* silent */ }
-}
-
-function saveAuditNote(val: string): void {
-  auditNote.value = val
-  void saveAudit(NOTE_KEY, val)
-}
-function saveAuditConclusion(val: string): void {
-  auditConclusion.value = val
-  void saveAudit(CONCLUSION_KEY, val)
 }
 
 // ═══ 附注结构 —— 71行分为多section ═══
@@ -276,8 +235,6 @@ function handleAdjudicated(e: Event): void {
 onMounted(() => {
   window.addEventListener('substantive:adjudicated', handleAdjudicated)
   loadFromHtmlData()
-  auditNote.value = readSaved(NOTE_KEY)
-  auditConclusion.value = readSaved(CONCLUSION_KEY)
 })
 onBeforeUnmount(() => {
   window.removeEventListener('substantive:adjudicated', handleAdjudicated)
@@ -328,8 +285,6 @@ function loadFromHtmlData(): void {
 .text-card { margin-bottom: 12px; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
 .objective-alert { margin-bottom: 12px; }
-.audit-note-card { margin-top: 12px; }
-.audit-note-card .card-header { display: flex; align-items: center; justify-content: space-between; font-weight: 500; }
 .prep-hint { margin-top: 16px; font-size: 12px; color: #909399; }
 .prep-hint summary { cursor: pointer; }
 .prep-hint ul { margin: 8px 0 0; padding-left: 18px; }

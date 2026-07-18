@@ -1,87 +1,81 @@
 /**
- * useF4RelatedParty — F4-6 关联方检查逻辑
+ * useF4RelatedParty — F4-6 应付账款关联方及交易检查表
  *
- * Spec: .kiro/specs/f4-accounts-payable/ Task 5.4
- * 贷方余额公式 + 占比公式 + 集中度>30%橙色
- * 合计行 + 动态行增删
- * Requirements: 9.1~9.6
+ * 源表逻辑：识别关联方 → 核对期初与借贷发生额 → 计算期末余额 →
+ * 检查账龄、定价政策、交易性质和期后付款 → 评价披露与未识别关联方风险。
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
-import {
-  parseNum,
-  calcCreditBalance,
-  calcConcentration,
-  calcSubtotal,
-} from './useF4AccPayFormulaEngine'
-import type { ChecklistResponse } from './useF4FormData'
+import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { calcConcentration, calcCreditBalance, calcSubtotal, parseNum } from './useF4AccPayFormulaEngine'
+import { computeF4DetailRow, migrateF4DetailRows } from './useF4Detail'
+import { readRowJson, type ChecklistResponse } from './useF4FormData'
 
-// ─── 类型定义 ─────────────────────────────────────────────────────────────────
+export const F4_RELATED_RELATIONSHIPS = [
+  '实际控制人',
+  '控股股东',
+  '控股股东、实际控制人的附属企业',
+  '持有5%以上股份的法人或其他组织',
+  '联营企业',
+  '合营企业',
+  '董高监等关键管理人员',
+  '其他关联方',
+] as const
+
+export const F4_RELATED_AGING_OPTIONS = ['1年以内', '1～2年', '2～3年', '3年以上'] as const
+export const F4_RELATED_PRICING_OPTIONS = ['市场定价', '协议定价', '成本加成', '参考第三方价格', '政府定价', '其他'] as const
 
 export interface RelatedPartyAPRow {
   rowId: string
   seq: number
+  sourceRowId: string
   partyName: string
   relationship: string
-  paymentNature: string
   openingBalance: number
-  currentIncrease: number
-  currentDecrease: number
-  closingBalance: number           // 公式=期初+贷方增加-借方减少
-  concentration: number            // 占比(公式)
-  settlementCycle: string
-  isOverdue: string
-  fairness: string
+  currentDebit: number
+  currentCredit: number
+  closingBalance: number
   aging: string
-  auditEvaluation: string
+  pricingPolicy: string
+  transactionNature: string
+  postPaymentAmount: number
+  indexNo: string
   remark: string
-  // 标记
-  isHighConcentration: boolean
+  linked: boolean
+  sourceClosingBalance: number
+  reconciliationDifference: number
+  concentration: number
+  riskFlags: string[]
+  riskLevel: 'none' | 'warning' | 'danger'
 }
-
-export interface F4RelatedPartyColumn {
-  prop: keyof RelatedPartyAPRow | string
-  label: string
-  width?: number
-  minWidth?: number
-  formula?: string
-  editable?: boolean
-}
-
-export const F4_RELATED_PARTY_COLUMNS: F4RelatedPartyColumn[] = [
-  { prop: 'seq', label: '序号', width: 60 },
-  { prop: 'partyName', label: '关联方名称', minWidth: 130, editable: true },
-  { prop: 'relationship', label: '关联关系', minWidth: 110, editable: true },
-  { prop: 'paymentNature', label: '款项性质', minWidth: 100, editable: true },
-  { prop: 'openingBalance', label: '期初余额', minWidth: 110, editable: true },
-  { prop: 'currentIncrease', label: '本期增加', minWidth: 110, editable: true },
-  { prop: 'currentDecrease', label: '本期减少', minWidth: 110, editable: true },
-  { prop: 'closingBalance', label: '期末余额', minWidth: 110, formula: '期初+增加-减少', editable: false },
-  { prop: 'concentration', label: '占比(%)', minWidth: 90, formula: '余额/总额×100', editable: false },
-  { prop: 'settlementCycle', label: '结算周期', minWidth: 100, editable: true },
-  { prop: 'isOverdue', label: '是否超期', minWidth: 80, editable: true },
-  { prop: 'fairness', label: '定价公允性', minWidth: 100, editable: true },
-  { prop: 'aging', label: '账龄', minWidth: 90, editable: true },
-  { prop: 'auditEvaluation', label: '审计评价', minWidth: 140, editable: true },
-  { prop: 'remark', label: '备注', minWidth: 120, editable: true },
-]
-
-// ─── 内部存储类型 ─────────────────────────────────────────────────────────────
 
 interface StoredRelatedPartyRow {
   rowId: string
   seq: number
+  sourceRowId: string
   partyName: string
   relationship: string
-  paymentNature: string
   openingBalance: number
-  currentIncrease: number
-  currentDecrease: number
-  settlementCycle: string
-  isOverdue: string
-  fairness: string
+  currentDebit: number
+  currentCredit: number
   aging: string
-  auditEvaluation: string
+  pricingPolicy: string
+  transactionNature: string
+  postPaymentAmount: number
+  indexNo: string
   remark: string
+  sourceClosingBalance: number
+}
+
+export interface F4RelatedPartyCandidate {
+  sourceRowId: string
+  partyName: string
+  relationship: string
+  openingBalance: number
+  currentDebit: number
+  currentCredit: number
+  sourceClosingBalance: number
+  aging: string
+  transactionNature: string
+  postPaymentAmount: number
 }
 
 export interface UseF4RelatedPartyOptions {
@@ -91,194 +85,469 @@ export interface UseF4RelatedPartyOptions {
   isReadonly?: Ref<boolean>
 }
 
-// ─── 常量 ─────────────────────────────────────────────────────────────────────
-
 const STORAGE_KEY = 'F4-6-rows'
-const NOTE_KEY = 'F4-6-note'
+const DETAIL_KEY = 'F4-2-rows'
+const NOTE_KEY = 'F4-6-audit-note'
+const CONCLUSION_KEY = 'F4-6-audit-conclusion'
+const LEGACY_NOTE_KEY = 'F4-6-note'
+const TOLERANCE = 0.005
 const CONCENTRATION_THRESHOLD = 30
-
-// ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
 function generateRowId(): string {
   return `f4rp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
 }
 
-function emptyStored(seq: number): StoredRelatedPartyRow {
+export function emptyF4RelatedPartyRow(seq: number): StoredRelatedPartyRow {
   return {
     rowId: generateRowId(),
     seq,
+    sourceRowId: '',
     partyName: '',
     relationship: '',
-    paymentNature: '',
     openingBalance: 0,
-    currentIncrease: 0,
-    currentDecrease: 0,
-    settlementCycle: '',
-    isOverdue: '否',
-    fairness: '公允',
+    currentDebit: 0,
+    currentCredit: 0,
     aging: '',
-    auditEvaluation: '',
+    pricingPolicy: '',
+    transactionNature: '',
+    postPaymentAmount: 0,
+    indexNo: '',
     remark: '',
+    sourceClosingBalance: 0,
   }
 }
 
-function computeRow(stored: StoredRelatedPartyRow, totalClosing: number): RelatedPartyAPRow {
-  const closingBalance = calcCreditBalance(stored.openingBalance, stored.currentIncrease, stored.currentDecrease)
-  const concentration = calcConcentration(closingBalance, totalClosing)
-  const isHighConcentration = concentration > CONCENTRATION_THRESHOLD
-  return { ...stored, closingBalance, concentration, isHighConcentration }
+function legacyRemark(raw: any): string {
+  return [
+    raw?.remark,
+    raw?.settlementCycle ? `原结算周期：${raw.settlementCycle}` : '',
+    raw?.isOverdue ? `原是否超期：${raw.isOverdue}` : '',
+    raw?.fairness ? `原定价公允性：${raw.fairness}` : '',
+    raw?.auditEvaluation ? `原审计评价：${raw.auditEvaluation}` : '',
+  ].filter(Boolean).join('；')
 }
 
-function safeParseRows(jsonStr: string | null | undefined): StoredRelatedPartyRow[] {
-  if (!jsonStr) return []
+function migrateRow(raw: any, index: number): StoredRelatedPartyRow {
+  const base = emptyF4RelatedPartyRow(index + 1)
+  const openingBalance = parseNum(raw?.openingBalance)
+  const currentDebit = parseNum(raw?.currentDebit ?? raw?.currentDecrease ?? raw?.debit)
+  const currentCredit = parseNum(raw?.currentCredit ?? raw?.currentIncrease ?? raw?.credit)
+  return {
+    ...base,
+    rowId: String(raw?.rowId ?? raw?.id ?? generateRowId()),
+    seq: Number(raw?.seq) || index + 1,
+    sourceRowId: String(raw?.sourceRowId ?? ''),
+    partyName: String(raw?.partyName ?? raw?.relatedPartyName ?? ''),
+    relationship: String(raw?.relationship ?? ''),
+    openingBalance,
+    currentDebit,
+    currentCredit,
+    aging: String(raw?.aging ?? ''),
+    pricingPolicy: String(raw?.pricingPolicy ?? ''),
+    transactionNature: String(raw?.transactionNature ?? raw?.paymentNature ?? raw?.nature ?? ''),
+    postPaymentAmount: parseNum(raw?.postPaymentAmount ?? raw?.subsequentPaymentAmount),
+    indexNo: String(raw?.indexNo ?? raw?.indexRef ?? ''),
+    remark: legacyRemark(raw),
+    sourceClosingBalance: parseNum(
+      raw?.sourceClosingBalance
+      ?? raw?.closingBalance
+      ?? calcCreditBalance(openingBalance, currentCredit, currentDebit),
+    ),
+  }
+}
+
+export function migrateF4RelatedPartyRows(
+  value: string | null | undefined,
+): StoredRelatedPartyRow[] {
+  if (!value) return []
   try {
-    const parsed = JSON.parse(jsonStr)
+    const parsed = JSON.parse(value)
     if (!Array.isArray(parsed)) return []
-    return parsed.map((raw: any, i: number) => ({
-      ...emptyStored(i + 1),
-      rowId: raw.rowId || raw.id || generateRowId(),
-      seq: raw.seq ?? i + 1,
-      partyName: raw.partyName || '',
-      relationship: raw.relationship || '',
-      paymentNature: raw.paymentNature || '',
-      openingBalance: parseNum(raw.openingBalance),
-      currentIncrease: parseNum(raw.currentIncrease),
-      currentDecrease: parseNum(raw.currentDecrease),
-      settlementCycle: raw.settlementCycle || '',
-      isOverdue: raw.isOverdue || '否',
-      fairness: raw.fairness || '公允',
-      aging: raw.aging || '',
-      auditEvaluation: raw.auditEvaluation || '',
-      remark: raw.remark || '',
-    }))
+    return parsed.map(migrateRow).map((row, index) => ({ ...row, seq: index + 1 }))
   } catch {
     return []
   }
 }
 
-// ─── Composable ──────────────────────────────────────────────────────────────
+function agingLabels(amounts: number[]): string {
+  return F4_RELATED_AGING_OPTIONS
+    .filter((_, index) => Math.abs(amounts[index]) >= TOLERANCE)
+    .join('、')
+}
+
+/** 从F4-2提取已标识的关联方明细，并按实际债权人名称归集。 */
+export function extractF4RelatedPartyCandidates(
+  value: string | null | undefined,
+): F4RelatedPartyCandidate[] {
+  const grouped = new Map<string, {
+    rowIds: string[]
+    partyName: string
+    relationships: Set<string>
+    openingBalance: number
+    currentDebit: number
+    currentCredit: number
+    sourceClosingBalance: number
+    aging: number[]
+    natures: Set<string>
+    postPaymentAmount: number
+  }>()
+
+  for (const row of migrateF4DetailRows(value).map(computeF4DetailRow)) {
+    const partyName = row.creditor.trim()
+    const relationship = row.relatedPartyType.trim()
+    if (!partyName || !relationship || relationship === '非关联方') continue
+    const key = partyName.toLocaleLowerCase('zh-CN')
+    const target = grouped.get(key) ?? {
+      rowIds: [],
+      partyName,
+      relationships: new Set<string>(),
+      openingBalance: 0,
+      currentDebit: 0,
+      currentCredit: 0,
+      sourceClosingBalance: 0,
+      aging: [0, 0, 0, 0],
+      natures: new Set<string>(),
+      postPaymentAmount: 0,
+    }
+    target.rowIds.push(row.rowId)
+    target.relationships.add(relationship)
+    target.openingBalance += row.openingAdjusted
+    target.currentDebit += row.currentDebit
+    target.currentCredit += row.currentCredit
+    target.sourceClosingBalance += row.closingAdjusted
+    target.aging[0] += row.auditedAgingLt1
+    target.aging[1] += row.auditedAging1to2
+    target.aging[2] += row.auditedAging2to3
+    target.aging[3] += row.auditedAgingGt3
+    if (row.paymentNature) target.natures.add(row.paymentNature)
+    target.postPaymentAmount += row.subsequentPayment
+    grouped.set(key, target)
+  }
+
+  return [...grouped.values()]
+    .sort((a, b) =>
+      Math.abs(b.sourceClosingBalance) - Math.abs(a.sourceClosingBalance)
+      || a.partyName.localeCompare(b.partyName, 'zh-CN'),
+    )
+    .map((row) => ({
+      sourceRowId: row.rowIds.sort().join('|'),
+      partyName: row.partyName,
+      relationship: [...row.relationships].join('、'),
+      openingBalance: row.openingBalance,
+      currentDebit: row.currentDebit,
+      currentCredit: row.currentCredit,
+      sourceClosingBalance: row.sourceClosingBalance,
+      aging: agingLabels(row.aging),
+      transactionNature: [...row.natures].join('、'),
+      postPaymentAmount: row.postPaymentAmount,
+    }))
+}
+
+function isBlankRow(row: StoredRelatedPartyRow): boolean {
+  return !row.partyName && !row.relationship && !row.openingBalance && !row.currentDebit
+    && !row.currentCredit && !row.aging && !row.pricingPolicy && !row.transactionNature
+    && !row.postPaymentAmount && !row.indexNo && !row.remark && !row.sourceRowId
+}
+
+function computeRow(
+  stored: StoredRelatedPartyRow,
+  totalClosing: number,
+  source?: F4RelatedPartyCandidate,
+): RelatedPartyAPRow {
+  const partyName = source?.partyName ?? stored.partyName
+  const relationship = stored.relationship || source?.relationship || ''
+  const openingBalance = source?.openingBalance ?? stored.openingBalance
+  const currentDebit = source?.currentDebit ?? stored.currentDebit
+  const currentCredit = source?.currentCredit ?? stored.currentCredit
+  const aging = source?.aging ?? stored.aging
+  const transactionNature = stored.transactionNature || source?.transactionNature || ''
+  const postPaymentAmount = source?.postPaymentAmount ?? stored.postPaymentAmount
+  // 联动行直接采用 F4-2 审定期末；勿用「期初审定+贷−借」去比审定数（AJE/RJE 会导致系统性误报）
+  const rollForwardClosing = calcCreditBalance(openingBalance, currentCredit, currentDebit)
+  const sourceClosingBalance = source?.sourceClosingBalance
+    ?? (stored.sourceRowId ? stored.sourceClosingBalance : rollForwardClosing)
+  const closingBalance = source ? sourceClosingBalance : rollForwardClosing
+  const reconciliationDifference = closingBalance - sourceClosingBalance
+  const concentration = calcConcentration(closingBalance, totalClosing)
+  const riskFlags: string[] = []
+
+  if (partyName) {
+    if (!relationship) riskFlags.push('关联关系待核实')
+    else if (relationship === '合并范围内关联方' || relationship === '合并范围外关联方') {
+      riskFlags.push('关联关系需细化')
+    }
+    if (!stored.pricingPolicy) riskFlags.push('定价政策未说明')
+    if (!transactionNature) riskFlags.push('交易性质未说明')
+    if (!stored.indexNo) riskFlags.push('索引号待补')
+  }
+  if (Math.abs(reconciliationDifference) >= TOLERANCE && !source && stored.sourceRowId) {
+    riskFlags.push('与F4-2审定数不一致')
+  }
+  if (closingBalance < -TOLERANCE) riskFlags.push('期末余额为负')
+  if (postPaymentAmount > Math.max(0, closingBalance) + TOLERANCE) riskFlags.push('期后付款超过期末余额')
+  if ((aging.includes('2～3年') || aging.includes('3年以上')) && postPaymentAmount < TOLERANCE) {
+    riskFlags.push('长期账龄且无期后付款')
+  }
+  if (concentration > CONCENTRATION_THRESHOLD) riskFlags.push('关联方余额集中度较高')
+
+  const riskLevel: RelatedPartyAPRow['riskLevel'] = riskFlags.some((flag) =>
+    ['与F4-2审定数不一致', '期末余额为负', '期后付款超过期末余额'].includes(flag),
+  ) ? 'danger' : riskFlags.length ? 'warning' : 'none'
+
+  return {
+    ...stored,
+    partyName,
+    relationship,
+    openingBalance,
+    currentDebit,
+    currentCredit,
+    closingBalance,
+    aging,
+    transactionNature,
+    postPaymentAmount,
+    linked: !!source,
+    sourceClosingBalance,
+    reconciliationDifference,
+    concentration,
+    riskFlags,
+    riskLevel,
+  }
+}
 
 export function useF4RelatedParty(options: UseF4RelatedPartyOptions) {
   const { allResponses, isReadonly } = options
   const readonly = isReadonly ?? ref(false)
-
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
+  let lastPersistedJson = ''
+
   const storedData = ref<StoredRelatedPartyRow[]>([])
   const auditNote = ref('')
-
-  // ─── 加载 ─────────────────────────────────────────────────────────────────
+  const auditConclusion = ref('')
 
   function loadRows(): void {
-    storedData.value = safeParseRows(allResponses.value.get(STORAGE_KEY)?.remark)
-    if (storedData.value.length === 0) storedData.value = [emptyStored(1)]
+    storedData.value = migrateF4RelatedPartyRows(readRowJson(allResponses.value.get(STORAGE_KEY)))
+    if (!storedData.value.length) storedData.value = [emptyF4RelatedPartyRow(1)]
   }
 
-  watch(() => allResponses.value.get(STORAGE_KEY)?.remark, () => {
-    if (storedData.value.length === 0) loadRows()
-  }, { immediate: true })
+  watch(
+    () => readRowJson(allResponses.value.get(STORAGE_KEY)),
+    (raw) => {
+      if (raw && (raw === lastPersistedJson || raw === JSON.stringify(storedData.value))) return
+      loadRows()
+    },
+    { immediate: true },
+  )
+  watch(
+    () => [
+      allResponses.value.get(NOTE_KEY)?.remark,
+      allResponses.value.get(CONCLUSION_KEY)?.remark,
+      allResponses.value.get(LEGACY_NOTE_KEY)?.remark,
+    ],
+    ([note, conclusion, legacy]) => {
+      auditNote.value = note || ''
+      auditConclusion.value = conclusion || legacy || ''
+    },
+    { immediate: true },
+  )
 
-  watch(() => allResponses.value.get(NOTE_KEY)?.remark, (v) => {
-    auditNote.value = v || ''
-  }, { immediate: true })
+  const detailCandidates = computed(() =>
+    extractF4RelatedPartyCandidates(readRowJson(allResponses.value.get(DETAIL_KEY))),
+  )
+  watch(
+    () => readRowJson(allResponses.value.get(DETAIL_KEY)),
+    () => {
+      if (!readonly.value && storedData.value.some((row) => row.sourceRowId)) persistRows()
+    },
+  )
 
-  // ─── 计算行 ───────────────────────────────────────────────────────────────
+  function sourceFor(row: StoredRelatedPartyRow): F4RelatedPartyCandidate | undefined {
+    return row.sourceRowId
+      ? detailCandidates.value.find((source) => source.sourceRowId === row.sourceRowId)
+      : undefined
+  }
 
-  /** 总期末余额用于计算各行占比 */
-  const totalClosing = computed(() => {
-    return calcSubtotal(
-      storedData.value.map((r) => calcCreditBalance(r.openingBalance, r.currentIncrease, r.currentDecrease)),
+  const totalClosing = computed(() => calcSubtotal(storedData.value.map((stored) => {
+    const source = sourceFor(stored)
+    return calcCreditBalance(
+      source?.openingBalance ?? stored.openingBalance,
+      source?.currentCredit ?? stored.currentCredit,
+      source?.currentDebit ?? stored.currentDebit,
     )
-  })
+  })))
 
-  const rows: ComputedRef<RelatedPartyAPRow[]> = computed(() => {
-    const t = totalClosing.value
-    return storedData.value.map((r) => computeRow(r, t))
+  const rows: ComputedRef<RelatedPartyAPRow[]> = computed(() =>
+    storedData.value.map((stored) => computeRow(stored, totalClosing.value, sourceFor(stored))),
+  )
+  const filledCount = computed(() => rows.value.filter((row) =>
+    row.partyName || Math.abs(row.closingBalance) >= TOLERANCE,
+  ).length)
+  const pendingSyncCount = computed(() => {
+    const linked = new Set(storedData.value.map((row) => row.sourceRowId).filter(Boolean))
+    return detailCandidates.value.filter((source) => !linked.has(source.sourceRowId)).length
   })
-
-  // ─── 汇总统计 ─────────────────────────────────────────────────────────────
 
   const summary = computed(() => ({
-    totalClosing: totalClosing.value,
-    overdueCount: rows.value.filter((r) => r.isOverdue === '是').length,
-    highConcentrationCount: rows.value.filter((r) => r.isHighConcentration).length,
+    count: filledCount.value,
+    openingTotal: calcSubtotal(rows.value.map((row) => row.openingBalance)),
+    debitTotal: calcSubtotal(rows.value.map((row) => row.currentDebit)),
+    creditTotal: calcSubtotal(rows.value.map((row) => row.currentCredit)),
+    closingTotal: totalClosing.value,
+    postPaymentTotal: calcSubtotal(rows.value.map((row) => row.postPaymentAmount)),
+    sourceClosingTotal: calcSubtotal(rows.value.map((row) => row.sourceClosingBalance)),
+    reconciliationDifference: calcSubtotal(rows.value.map((row) => row.reconciliationDifference)),
+    highRiskCount: rows.value.filter((row) => row.riskLevel === 'danger').length,
+    missingPricingCount: rows.value.filter((row) => row.partyName && !row.pricingPolicy).length,
   }))
 
-  // ─── 动态行操作 ───────────────────────────────────────────────────────────
+  function syncFromDetail(): number {
+    if (readonly.value) return 0
+    const linked = new Set(storedData.value.map((row) => row.sourceRowId).filter(Boolean))
+    const pending = detailCandidates.value.filter((source) => !linked.has(source.sourceRowId))
+    if (pending.length && storedData.value.length === 1 && isBlankRow(storedData.value[0])) {
+      storedData.value = []
+    }
+    for (const source of pending) {
+      storedData.value.push({
+        ...emptyF4RelatedPartyRow(storedData.value.length + 1),
+        sourceRowId: source.sourceRowId,
+        partyName: source.partyName,
+        relationship: source.relationship,
+        openingBalance: source.openingBalance,
+        currentDebit: source.currentDebit,
+        currentCredit: source.currentCredit,
+        aging: source.aging,
+        transactionNature: source.transactionNature,
+        postPaymentAmount: source.postPaymentAmount,
+        sourceClosingBalance: source.sourceClosingBalance,
+      })
+    }
+    if (pending.length) persistRows()
+    return pending.length
+  }
 
   function addRow(): void {
     if (readonly.value) return
-    storedData.value.push(emptyStored(storedData.value.length + 1))
+    storedData.value.push(emptyF4RelatedPartyRow(storedData.value.length + 1))
     persistRows()
   }
 
   function removeRow(rowId: string): void {
-    if (readonly.value || storedData.value.length <= 1) return
-    const idx = storedData.value.findIndex((r) => r.rowId === rowId)
-    if (idx === -1) return
-    storedData.value.splice(idx, 1)
-    storedData.value.forEach((r, i) => { r.seq = i + 1 })
-    persistRows()
-  }
-
-  function updateCell(rowId: string, field: string, value: any): void {
     if (readonly.value) return
-    const row = storedData.value.find((r) => r.rowId === rowId)
-    if (!row) return
-    const strFields = ['partyName', 'relationship', 'paymentNature', 'settlementCycle',
-      'isOverdue', 'fairness', 'aging', 'auditEvaluation', 'remark']
-    if (strFields.includes(field)) (row as any)[field] = String(value ?? '')
-    else (row as any)[field] = parseNum(value)
+    const index = storedData.value.findIndex((row) => row.rowId === rowId)
+    if (index === -1) return
+    storedData.value.splice(index, 1)
+    if (!storedData.value.length) storedData.value.push(emptyF4RelatedPartyRow(1))
+    storedData.value.forEach((row, i) => { row.seq = i + 1 })
     persistRows()
   }
 
-  // ─── 持久化 ───────────────────────────────────────────────────────────────
+  function updateCell(rowId: string, field: string, value: unknown): void {
+    if (readonly.value) return
+    const row = storedData.value.find((item) => item.rowId === rowId)
+    if (!row) return
+    const numericFields = new Set([
+      'openingBalance', 'currentDebit', 'currentCredit', 'postPaymentAmount', 'sourceClosingBalance',
+    ])
+    ;(row as any)[field] = numericFields.has(field)
+      ? parseNum(value as string | number | null | undefined)
+      : String(value ?? '')
+    persistRows()
+  }
+
+  function setText(key: string, value: string): void {
+    allResponses.value.set(key, { item_id: key, conclusion: null, remark: value })
+    debounceSave()
+  }
+
+  function saveAuditNote(value: string): void {
+    if (readonly.value) return
+    auditNote.value = value
+    setText(NOTE_KEY, value)
+  }
+
+  function saveAuditConclusion(value: string): void {
+    if (readonly.value) return
+    auditConclusion.value = value
+    setText(CONCLUSION_KEY, value)
+  }
 
   function persistRows(): void {
+    // 导出接口读取持久化JSON，因此同步保存源表字段及公式期末余额快照。
+    const serialized = storedData.value.map((stored) => {
+      const source = sourceFor(stored)
+      const openingBalance = source?.openingBalance ?? stored.openingBalance
+      const currentDebit = source?.currentDebit ?? stored.currentDebit
+      const currentCredit = source?.currentCredit ?? stored.currentCredit
+      return {
+        ...stored,
+        partyName: source?.partyName ?? stored.partyName,
+        relationship: stored.relationship || source?.relationship || '',
+        openingBalance,
+        currentDebit,
+        currentCredit,
+        closingBalance: calcCreditBalance(openingBalance, currentCredit, currentDebit),
+        aging: source?.aging ?? stored.aging,
+        transactionNature: stored.transactionNature || source?.transactionNature || '',
+        postPaymentAmount: source?.postPaymentAmount ?? stored.postPaymentAmount,
+        sourceClosingBalance: source?.sourceClosingBalance ?? stored.sourceClosingBalance,
+      }
+    })
+    lastPersistedJson = JSON.stringify(serialized)
     allResponses.value.set(STORAGE_KEY, {
       item_id: STORAGE_KEY,
       conclusion: null,
-      remark: JSON.stringify(storedData.value),
+      remark: lastPersistedJson,
     })
     debounceSave()
   }
 
   function debounceSave(): void {
     if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 2000)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      flushSave()
+    }, 1200)
   }
 
   function flushSave(): void {
-    const items = [allResponses.value.get(STORAGE_KEY), allResponses.value.get(NOTE_KEY)].filter(Boolean)
-    if (items.length) window.dispatchEvent(new CustomEvent('f4:save-items', { detail: { items } }))
+    const items = [STORAGE_KEY, NOTE_KEY, CONCLUSION_KEY]
+      .map((key) => allResponses.value.get(key))
+      .filter(Boolean)
+    if (items.length) {
+      window.dispatchEvent(new CustomEvent('f4:save-items', { detail: { items } }))
+    }
   }
-
-  watch(auditNote, (val) => {
-    allResponses.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
-    debounceSave()
-  })
-
-  // ─── 样式 ─────────────────────────────────────────────────────────────────
 
   function rowClassName({ row }: { row: RelatedPartyAPRow }): string {
-    return row.isHighConcentration ? 'concentration-warn' : ''
+    if (row.riskLevel === 'danger') return 'related-risk-danger'
+    if (row.riskLevel === 'warning') return 'related-risk-warning'
+    return ''
   }
 
-  // ─── 清理 ─────────────────────────────────────────────────────────────────
-
   onBeforeUnmount(() => {
-    if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; flushSave() }
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
+      flushSave()
+    }
   })
 
   return {
     rows,
-    totalClosing,
     summary,
+    totalClosing,
+    filledCount,
+    pendingSyncCount,
     auditNote,
+    auditConclusion,
+    loadRows,
+    syncFromDetail,
     addRow,
     removeRow,
     updateCell,
+    saveAuditNote,
+    saveAuditConclusion,
     rowClassName,
-    columns: F4_RELATED_PARTY_COLUMNS,
   }
 }
 

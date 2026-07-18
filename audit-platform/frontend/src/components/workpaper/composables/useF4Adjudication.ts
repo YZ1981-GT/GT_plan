@@ -1,21 +1,18 @@
 /**
- * useF4Adjudication — F4-1 审定表核心逻辑（贷方科目 2202 应付账款）
+ * useF4Adjudication — F4-1 应付账款审定表
  *
- * Spec: .kiro/specs/f4-accounts-payable/ Task 4.1
- * 两级结构：按性质(货款/工程款/服务费/其他) + 按账龄(1年以内/1-2年/2-3年/3年以上)
- * 交叉校验：按性质小计 === 按账龄小计
- * EventBus: publish substantive:adjudicated(accountCode='2202')
+ * 对齐源工作簿：
+ * 1. 按性质（货款、工程款、设备款、服务费、其他）；
+ * 2. 按账龄（1年以内、1至2年、2至3年、3年以上、其他/未分类）；
+ * 3. 每种口径均为“期初未审+AJE+RJE=期初审定；期末未审+AJE+RJE=期末审定”；
+ * 4. 比较本期与上期审定数，自动计算变动额、变动率并分析重大变动；
+ * 5. 期末数按源表逻辑从 F4-2 明细表汇总，期初/期末分别与试算平衡表勾稽。
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
-import {
-  parseNum,
-  calcAdjustedAmount,
-  calcCreditBalance,
-  calcSubtotal,
-} from './useF4AccPayFormulaEngine'
+import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { calcAdjustedAmount, calcCreditBalance, calcSubtotal, parseNum } from './useF4AccPayFormulaEngine'
 import type { ChecklistResponse } from './useF4FormData'
 
-// ─── 类型定义 ─────────────────────────────────────────────────────────────────
+export type F4AdjudicationSection = 'nature' | 'aging'
 
 export interface UseF4AdjudicationOptions {
   wpId: Ref<string>
@@ -24,397 +21,549 @@ export interface UseF4AdjudicationOptions {
   isReadonly?: Ref<boolean>
 }
 
-export interface F4AdjudicationRow {
+export interface StoredF4AdjRow {
   rowKey: string
   label: string
   isFixed: boolean
-  /** 期初未审 */
   openingUnadjusted: number
-  /** 期初 AJE */
   openingAje: number
-  /** 期初 RJE */
   openingRje: number
-  /** 期初审定 = 期初未审 + AJE + RJE */
-  openingAdjusted: number
-  /** 本期贷方发生额 */
-  periodCredit: number
-  /** 本期借方发生额 */
-  periodDebit: number
-  /** 期末未审 = 期初审定 + 贷方 - 借方 */
   closingUnadjusted: number
-  /** 期末 AJE */
   closingAje: number
-  /** 期末 RJE */
   closingRje: number
-  /** 期末审定 = 期末未审 + AJE + RJE */
+  reasonAnalysis: string
+}
+
+export interface F4AdjudicationRow extends StoredF4AdjRow {
+  openingAdjusted: number
   closingAdjusted: number
-  /** 索引 */
-  indexRef: string
-  /** 是否可编辑 */
+  changeAmount: number
+  changeRate: number
   isEditable: boolean
+  closingFromDetail: boolean
 }
 
-/** 持久化用（不含计算字段） */
-interface StoredF4AdjRow {
-  rowKey: string
-  label: string
-  isFixed: boolean
-  openingUnadjusted: number
-  openingAje: number
-  openingRje: number
-  periodCredit: number
-  periodDebit: number
-  closingAje: number
-  closingRje: number
-  indexRef: string
+export interface F4DetailAggregation {
+  hasData: boolean
+  nature: Record<string, Pick<StoredF4AdjRow, 'closingUnadjusted' | 'closingAje' | 'closingRje'>>
+  aging: Record<string, Pick<StoredF4AdjRow, 'closingUnadjusted' | 'closingAje' | 'closingRje'>>
+  openingAdjusted: number
+  closingAdjusted: number
 }
 
-export interface F4AdjudicationTwoLevel {
-  byNature: ComputedRef<F4AdjudicationRow[]>
-  byAging: ComputedRef<F4AdjudicationRow[]>
-  natureSubtotal: ComputedRef<F4AdjudicationRow>
-  agingSubtotal: ComputedRef<F4AdjudicationRow>
-  total: ComputedRef<F4AdjudicationRow>
-  trialBalanceAmount: ComputedRef<number>
-  variance: ComputedRef<number>
-  crossCheckPassed: ComputedRef<boolean>
+export interface F4TrialBalance {
+  opening: number
+  closing: number
 }
 
-// ─── 存储键 ──────────────────────────────────────────────────────────────────
+export const F4_NATURE_DEFAULTS: StoredF4AdjRow[] = [
+  createStoredRow('goods', '货款'),
+  createStoredRow('construction', '工程款'),
+  createStoredRow('equipment', '设备款'),
+  createStoredRow('service', '服务费'),
+  createStoredRow('other', '其他'),
+]
+
+export const F4_AGING_DEFAULTS: StoredF4AdjRow[] = [
+  createStoredRow('within1year', '1年以内（含1年）'),
+  createStoredRow('1to2year', '1至2年（含2年）'),
+  createStoredRow('2to3year', '2至3年（含3年）'),
+  createStoredRow('3yearplus', '3年以上'),
+  createStoredRow('aging-other', '其他/未分类'),
+]
 
 const NATURE_STORAGE_KEY = 'F4-1-adj-nature-rows'
 const AGING_STORAGE_KEY = 'F4-1-adj-aging-rows'
 const TB_STORAGE_KEY = 'F4-1-adj-tb-2202'
 const NOTE_STORAGE_KEY = 'F4-1-adj-note'
 const CONCLUSION_STORAGE_KEY = 'F4-1-adj-conclusion'
-
+const DETAIL_STORAGE_KEY = 'F4-2-rows'
 const BALANCE_TOLERANCE = 0.005
 
-// ─── 默认行定义 ──────────────────────────────────────────────────────────────
+function createStoredRow(rowKey: string, label: string): StoredF4AdjRow {
+  return {
+    rowKey,
+    label,
+    isFixed: true,
+    openingUnadjusted: 0,
+    openingAje: 0,
+    openingRje: 0,
+    closingUnadjusted: 0,
+    closingAje: 0,
+    closingRje: 0,
+    reasonAnalysis: '',
+  }
+}
 
-const DEFAULT_NATURE_ROWS: StoredF4AdjRow[] = [
-  { rowKey: 'goods', label: '货款', isFixed: true, openingUnadjusted: 0, openingAje: 0, openingRje: 0, periodCredit: 0, periodDebit: 0, closingAje: 0, closingRje: 0, indexRef: '' },
-  { rowKey: 'construction', label: '工程款', isFixed: true, openingUnadjusted: 0, openingAje: 0, openingRje: 0, periodCredit: 0, periodDebit: 0, closingAje: 0, closingRje: 0, indexRef: '' },
-  { rowKey: 'service', label: '服务费', isFixed: true, openingUnadjusted: 0, openingAje: 0, openingRje: 0, periodCredit: 0, periodDebit: 0, closingAje: 0, closingRje: 0, indexRef: '' },
-  { rowKey: 'other', label: '其他', isFixed: true, openingUnadjusted: 0, openingAje: 0, openingRje: 0, periodCredit: 0, periodDebit: 0, closingAje: 0, closingRje: 0, indexRef: '' },
-]
+export function calcF4ChangeRate(openingAdjusted: number, changeAmount: number): number {
+  if (Math.abs(openingAdjusted) < BALANCE_TOLERANCE) {
+    if (Math.abs(changeAmount) < BALANCE_TOLERANCE) return 0
+    return changeAmount > 0 ? 1 : -1
+  }
+  return changeAmount / openingAdjusted
+}
 
-const DEFAULT_AGING_ROWS: StoredF4AdjRow[] = [
-  { rowKey: 'within1year', label: '1年以内', isFixed: true, openingUnadjusted: 0, openingAje: 0, openingRje: 0, periodCredit: 0, periodDebit: 0, closingAje: 0, closingRje: 0, indexRef: '' },
-  { rowKey: '1to2year', label: '1-2年', isFixed: true, openingUnadjusted: 0, openingAje: 0, openingRje: 0, periodCredit: 0, periodDebit: 0, closingAje: 0, closingRje: 0, indexRef: '' },
-  { rowKey: '2to3year', label: '2-3年', isFixed: true, openingUnadjusted: 0, openingAje: 0, openingRje: 0, periodCredit: 0, periodDebit: 0, closingAje: 0, closingRje: 0, indexRef: '' },
-  { rowKey: '3yearplus', label: '3年以上', isFixed: true, openingUnadjusted: 0, openingAje: 0, openingRje: 0, periodCredit: 0, periodDebit: 0, closingAje: 0, closingRje: 0, indexRef: '' },
-]
+export function computeF4AdjudicationRow(
+  stored: StoredF4AdjRow,
+  detail?: Pick<StoredF4AdjRow, 'closingUnadjusted' | 'closingAje' | 'closingRje'>,
+): F4AdjudicationRow {
+  const closing = detail ?? stored
+  const openingAdjusted = calcAdjustedAmount(
+    stored.openingUnadjusted,
+    stored.openingAje,
+    stored.openingRje,
+  )
+  const closingAdjusted = calcAdjustedAmount(
+    closing.closingUnadjusted,
+    closing.closingAje,
+    closing.closingRje,
+  )
+  const changeAmount = closingAdjusted - openingAdjusted
+  return {
+    ...stored,
+    closingUnadjusted: closing.closingUnadjusted,
+    closingAje: closing.closingAje,
+    closingRje: closing.closingRje,
+    openingAdjusted,
+    closingAdjusted,
+    changeAmount,
+    changeRate: calcF4ChangeRate(openingAdjusted, changeAmount),
+    isEditable: true,
+    closingFromDetail: !!detail,
+  }
+}
 
-// ─── 工具函数 ─────────────────────────────────────────────────────────────────
+function subtotal(rows: F4AdjudicationRow[], rowKey: string): F4AdjudicationRow {
+  const row = computeF4AdjudicationRow({
+    rowKey,
+    label: '合计',
+    isFixed: true,
+    openingUnadjusted: calcSubtotal(rows.map((item) => item.openingUnadjusted)),
+    openingAje: calcSubtotal(rows.map((item) => item.openingAje)),
+    openingRje: calcSubtotal(rows.map((item) => item.openingRje)),
+    closingUnadjusted: calcSubtotal(rows.map((item) => item.closingUnadjusted)),
+    closingAje: calcSubtotal(rows.map((item) => item.closingAje)),
+    closingRje: calcSubtotal(rows.map((item) => item.closingRje)),
+    reasonAnalysis: '',
+  })
+  row.isEditable = false
+  row.closingFromDetail = rows.some((item) => item.closingFromDetail)
+  return row
+}
 
-function safeParseRows<T>(jsonStr: string | null | undefined): T[] {
-  if (!jsonStr) return []
+function safeJsonArray(value: string | null | undefined): any[] {
+  if (!value) return []
   try {
-    const parsed = JSON.parse(jsonStr)
+    const parsed = JSON.parse(value)
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
   }
 }
 
-function computeRow(stored: StoredF4AdjRow): F4AdjudicationRow {
-  const openingAdjusted = calcAdjustedAmount(stored.openingUnadjusted, stored.openingAje, stored.openingRje)
-  const closingUnadjusted = calcCreditBalance(openingAdjusted, stored.periodCredit, stored.periodDebit)
-  const closingAdjusted = calcAdjustedAmount(closingUnadjusted, stored.closingAje, stored.closingRje)
+export function migrateF4AdjRows(
+  value: string | null | undefined,
+  defaults: StoredF4AdjRow[],
+): StoredF4AdjRow[] {
+  const parsed = safeJsonArray(value)
+  const aliases: Record<string, string> = {
+    services: 'service',
+    within1: 'within1year',
+    '1to2': '1to2year',
+    '2to3': '2to3year',
+    '3plus': '3yearplus',
+  }
+  const migrated = parsed.map((raw: any, index) => {
+    const key = aliases[String(raw?.rowKey ?? '')] ?? String(raw?.rowKey ?? defaults[index]?.rowKey ?? `custom-${index}`)
+    const openingUnadjusted = parseNum(raw?.openingUnadjusted)
+    const openingAje = parseNum(raw?.openingAje)
+    const openingRje = parseNum(raw?.openingRje)
+    const openingAdjusted = calcAdjustedAmount(openingUnadjusted, openingAje, openingRje)
+    // 旧模型没有期末直接输入列，以“期初审定+贷方-借方”迁移，确保历史数据不丢失。
+    const legacyClosing = calcCreditBalance(
+      openingAdjusted,
+      parseNum(raw?.periodCredit),
+      parseNum(raw?.periodDebit),
+    )
+    return {
+      rowKey: key,
+      label: String(raw?.label ?? defaults[index]?.label ?? ''),
+      isFixed: raw?.isFixed !== false,
+      openingUnadjusted,
+      openingAje,
+      openingRje,
+      closingUnadjusted: raw?.closingUnadjusted == null
+        ? legacyClosing
+        : parseNum(raw.closingUnadjusted),
+      closingAje: parseNum(raw?.closingAje),
+      closingRje: parseNum(raw?.closingRje),
+      reasonAnalysis: String(raw?.reasonAnalysis ?? raw?.reason ?? ''),
+    }
+  })
+
+  const byKey = new Map(migrated.map((row) => [row.rowKey, row]))
+  return defaults.map((item) => ({ ...item, ...(byKey.get(item.rowKey) ?? {}) }))
+}
+
+function classifyNature(value: unknown): string {
+  const text = String(value ?? '').trim()
+  if (text.includes('工程')) return 'construction'
+  if (text.includes('设备')) return 'equipment'
+  if (text.includes('服务') || text.includes('劳务')) return 'service'
+  if (text.includes('货') || text.includes('材料') || text.includes('采购')) return 'goods'
+  return 'other'
+}
+
+function emptyAggregate(keys: string[]): F4DetailAggregation['nature'] {
+  return Object.fromEntries(keys.map((key) => [
+    key,
+    { closingUnadjusted: 0, closingAje: 0, closingRje: 0 },
+  ]))
+}
+
+function addAggregate(
+  target: Pick<StoredF4AdjRow, 'closingUnadjusted' | 'closingAje' | 'closingRje'>,
+  closingUnadjusted: number,
+  closingAje: number,
+  closingRje: number,
+): void {
+  target.closingUnadjusted += closingUnadjusted
+  target.closingAje += closingAje
+  target.closingRje += closingRje
+}
+
+/**
+ * 模拟源表 SUMIF / 明细表链接：
+ * - 按性质：由 F4-2 款项性质汇总期末未审、AJE、RJE；
+ * - 按账龄：未审账龄取 F4-2 四段账龄，审定账龄取四段审定账龄，
+ *   AJE = 审定账龄 - 未审账龄 - RJE（与源表 G=I-F-H 一致）。
+ */
+export function aggregateF4Detail(value: string | null | undefined): F4DetailAggregation {
+  const rows = safeJsonArray(value)
+  const meaningful = rows.filter((raw) =>
+    String(raw?.creditor ?? '').trim()
+    || parseNum(raw?.openingUnadjusted ?? raw?.openingAdjusted)
+    || parseNum(raw?.currentDebit ?? raw?.debit)
+    || parseNum(raw?.currentCredit ?? raw?.credit)
+    || parseNum(raw?.closingUnadjusted ?? raw?.closingBalance)
+    || parseNum(raw?.closingAdjusted ?? raw?.adjustedBalance ?? raw?.auditedBalance),
+  )
+  const nature = emptyAggregate(F4_NATURE_DEFAULTS.map((row) => row.rowKey))
+  const aging = emptyAggregate(F4_AGING_DEFAULTS.map((row) => row.rowKey))
+  let openingAdjusted = 0
+  let closingAdjusted = 0
+
+  for (const raw of meaningful) {
+    const openingUnadjusted = parseNum(raw?.openingUnadjusted ?? raw?.openingAdjusted)
+    const opening = raw?.openingAdjusted == null
+      ? calcAdjustedAmount(
+        openingUnadjusted,
+        parseNum(raw?.openingAje),
+        parseNum(raw?.openingRje),
+      )
+      : parseNum(raw.openingAdjusted)
+    const debit = parseNum(raw?.currentDebit ?? raw?.debit)
+    const credit = parseNum(raw?.currentCredit ?? raw?.credit)
+    const ledgerClosing = raw?.closingBalance == null
+      ? calcCreditBalance(openingUnadjusted, credit, debit)
+      : parseNum(raw.closingBalance)
+    const closing = raw?.closingUnadjusted == null
+      ? ledgerClosing + parseNum(raw?.entityReclassification)
+      : parseNum(raw.closingUnadjusted)
+    const aje = parseNum(raw?.closingAje ?? raw?.ajeAdjustment ?? raw?.aje)
+    const rje = parseNum(raw?.closingRje ?? raw?.rjeReclassification ?? raw?.rje)
+    const audited = raw?.closingAdjusted == null
+      && raw?.adjustedBalance == null
+      && raw?.auditedBalance == null
+      ? calcAdjustedAmount(closing, aje, rje)
+      : parseNum(raw?.closingAdjusted ?? raw?.adjustedBalance ?? raw?.auditedBalance)
+
+    openingAdjusted += opening
+    closingAdjusted += audited
+    addAggregate(nature[classifyNature(raw?.paymentNature ?? raw?.nature)], closing, aje, rje)
+
+    const unadjustedBuckets = [
+      parseNum(raw?.unadjustedAgingLt1 ?? raw?.aging1Year ?? raw?.agingLt1),
+      parseNum(raw?.unadjustedAging1to2 ?? raw?.aging1to2Year ?? raw?.aging1to2),
+      parseNum(raw?.unadjustedAging2to3 ?? raw?.aging2to3Year ?? raw?.aging2to3),
+      parseNum(raw?.unadjustedAgingGt3 ?? raw?.aging3YearPlus ?? raw?.agingGt3),
+    ]
+    const auditedBuckets = [
+      parseNum(raw?.auditedAgingLt1 ?? raw?.adjustedAging1),
+      parseNum(raw?.auditedAging1to2 ?? raw?.adjustedAging2),
+      parseNum(raw?.auditedAging2to3 ?? raw?.adjustedAging3),
+      parseNum(raw?.auditedAgingGt3 ?? raw?.adjustedAging4),
+    ]
+    const bucketKeys = ['within1year', '1to2year', '2to3year', '3yearplus']
+    const unadjustedTotal = calcSubtotal(unadjustedBuckets)
+    const auditedTotal = calcSubtotal(auditedBuckets)
+    const hasAuditedBuckets = auditedBuckets.some((amount) => Math.abs(amount) >= BALANCE_TOLERANCE)
+    const rowRjeTotal = rje
+
+    bucketKeys.forEach((key, index) => {
+      const unadjusted = unadjustedBuckets[index]
+      const auditedBucket = hasAuditedBuckets ? auditedBuckets[index] : unadjusted
+      // 明细表未提供按账龄拆分的 RJE，保守地将其归入“其他/未分类”，避免臆测分配。
+      addAggregate(aging[key], unadjusted, auditedBucket - unadjusted, 0)
+    })
+    const closingResidual = closing - unadjustedTotal
+    const auditedResidual = audited - (hasAuditedBuckets ? auditedTotal : unadjustedTotal)
+    addAggregate(
+      aging['aging-other'],
+      closingResidual,
+      auditedResidual - closingResidual - rowRjeTotal,
+      rowRjeTotal,
+    )
+  }
+
   return {
-    rowKey: stored.rowKey,
-    label: stored.label,
-    isFixed: stored.isFixed,
-    openingUnadjusted: stored.openingUnadjusted,
-    openingAje: stored.openingAje,
-    openingRje: stored.openingRje,
+    hasData: meaningful.length > 0,
+    nature,
+    aging,
     openingAdjusted,
-    periodCredit: stored.periodCredit,
-    periodDebit: stored.periodDebit,
-    closingUnadjusted,
-    closingAje: stored.closingAje,
-    closingRje: stored.closingRje,
     closingAdjusted,
-    indexRef: stored.indexRef,
-    isEditable: true,
   }
 }
 
-function computeSubtotalRow(rows: F4AdjudicationRow[], label: string, rowKey: string): F4AdjudicationRow {
-  const stored: StoredF4AdjRow = {
-    rowKey,
-    label,
-    isFixed: true,
-    openingUnadjusted: calcSubtotal(rows.map((r) => r.openingUnadjusted)),
-    openingAje: calcSubtotal(rows.map((r) => r.openingAje)),
-    openingRje: calcSubtotal(rows.map((r) => r.openingRje)),
-    periodCredit: calcSubtotal(rows.map((r) => r.periodCredit)),
-    periodDebit: calcSubtotal(rows.map((r) => r.periodDebit)),
-    closingAje: calcSubtotal(rows.map((r) => r.closingAje)),
-    closingRje: calcSubtotal(rows.map((r) => r.closingRje)),
-    indexRef: '',
+export function parseF4TrialBalance(value: string | null | undefined): F4TrialBalance {
+  if (!value) return { opening: 0, closing: 0 }
+  try {
+    const parsed = JSON.parse(value)
+    if (parsed && typeof parsed === 'object') {
+      return {
+        opening: parseNum(parsed.opening),
+        closing: parseNum(parsed.closing),
+      }
+    }
+  } catch {
+    // 兼容旧存储：单个数字代表期末试算表数。
   }
-  const row = computeRow(stored)
-  row.isEditable = false
-  return row
+  return { opening: 0, closing: parseNum(value) }
 }
-
-function ensureDefaultRows(stored: StoredF4AdjRow[], defaults: StoredF4AdjRow[]): StoredF4AdjRow[] {
-  if (stored.length === 0) return defaults.map((r) => ({ ...r }))
-  const keys = new Set(stored.map((r) => r.rowKey))
-  const merged = [...stored]
-  for (const def of defaults) {
-    if (!keys.has(def.rowKey)) merged.push({ ...def })
-  }
-  return merged
-}
-
-// ─── 主 composable ───────────────────────────────────────────────────────────
 
 export function useF4Adjudication(options: UseF4AdjudicationOptions) {
-  const { wpId, projectId, allResponses, isReadonly } = options
+  const { allResponses, isReadonly, projectId } = options
   const readonly = isReadonly ?? ref(false)
-
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
-
+  const natureStored = ref<StoredF4AdjRow[]>([])
+  const agingStored = ref<StoredF4AdjRow[]>([])
   const auditNote = ref('')
   const auditConclusion = ref('')
 
-  // ─── 按性质行 ────────────────────────────────────────────────────────────
+  function loadRows(): void {
+    natureStored.value = migrateF4AdjRows(
+      allResponses.value.get(NATURE_STORAGE_KEY)?.remark,
+      F4_NATURE_DEFAULTS,
+    )
+    agingStored.value = migrateF4AdjRows(
+      allResponses.value.get(AGING_STORAGE_KEY)?.remark,
+      F4_AGING_DEFAULTS,
+    )
+  }
 
-  const storedNatureRows = computed<StoredF4AdjRow[]>(() => {
-    const resp = allResponses.value.get(NATURE_STORAGE_KEY)
-    return ensureDefaultRows(safeParseRows<StoredF4AdjRow>(resp?.remark), DEFAULT_NATURE_ROWS)
-  })
+  watch(
+    () => [
+      allResponses.value.get(NATURE_STORAGE_KEY)?.remark,
+      allResponses.value.get(AGING_STORAGE_KEY)?.remark,
+    ],
+    () => {
+      if (!natureStored.value.length || !agingStored.value.length) loadRows()
+    },
+    { immediate: true },
+  )
 
+  const detailAggregation = computed(() =>
+    aggregateF4Detail(allResponses.value.get(DETAIL_STORAGE_KEY)?.remark),
+  )
   const natureDataRows: ComputedRef<F4AdjudicationRow[]> = computed(() =>
-    storedNatureRows.value.map((s) => computeRow(s)),
+    natureStored.value.map((row) => computeF4AdjudicationRow(
+      row,
+      detailAggregation.value.hasData ? detailAggregation.value.nature[row.rowKey] : undefined,
+    )),
   )
-
-  const natureSubtotalRow: ComputedRef<F4AdjudicationRow> = computed(() =>
-    computeSubtotalRow(natureDataRows.value, '按性质小计', 'nature-subtotal'),
-  )
-
-  // ─── 按账龄行 ────────────────────────────────────────────────────────────
-
-  const storedAgingRows = computed<StoredF4AdjRow[]>(() => {
-    const resp = allResponses.value.get(AGING_STORAGE_KEY)
-    return ensureDefaultRows(safeParseRows<StoredF4AdjRow>(resp?.remark), DEFAULT_AGING_ROWS)
-  })
-
   const agingDataRows: ComputedRef<F4AdjudicationRow[]> = computed(() =>
-    storedAgingRows.value.map((s) => computeRow(s)),
+    agingStored.value.map((row) => computeF4AdjudicationRow(
+      row,
+      detailAggregation.value.hasData ? detailAggregation.value.aging[row.rowKey] : undefined,
+    )),
+  )
+  const natureSubtotalRow = computed(() => subtotal(natureDataRows.value, 'nature-subtotal'))
+  const agingSubtotalRow = computed(() => subtotal(agingDataRows.value, 'aging-subtotal'))
+  const totalRow = computed(() => ({ ...natureSubtotalRow.value, rowKey: 'total' }))
+
+  const openingCrossCheckPassed = computed(() =>
+    Math.abs(natureSubtotalRow.value.openingAdjusted - agingSubtotalRow.value.openingAdjusted)
+      < BALANCE_TOLERANCE,
+  )
+  const closingCrossCheckPassed = computed(() =>
+    Math.abs(natureSubtotalRow.value.closingAdjusted - agingSubtotalRow.value.closingAdjusted)
+      < BALANCE_TOLERANCE,
+  )
+  const crossCheckPassed = computed(() =>
+    openingCrossCheckPassed.value && closingCrossCheckPassed.value,
   )
 
-  const agingSubtotalRow: ComputedRef<F4AdjudicationRow> = computed(() =>
-    computeSubtotalRow(agingDataRows.value, '按账龄小计', 'aging-subtotal'),
+  const trialBalance = computed(() =>
+    parseF4TrialBalance(allResponses.value.get(TB_STORAGE_KEY)?.remark),
   )
-
-  // ─── 交叉校验：按性质小计 === 按账龄小计 ─────────────────────────────────
-
-  const crossCheckPassed: ComputedRef<boolean> = computed(() =>
-    Math.abs(natureSubtotalRow.value.closingAdjusted - agingSubtotalRow.value.closingAdjusted) < BALANCE_TOLERANCE,
+  const openingVariance = computed(() =>
+    natureSubtotalRow.value.openingAdjusted - trialBalance.value.opening,
   )
-
-  // ─── 合计行（取按性质小计，两者相等时一致） ────────────────────────────────
-
-  const totalRow: ComputedRef<F4AdjudicationRow> = computed(() => {
-    const row = { ...natureSubtotalRow.value }
-    row.rowKey = 'total'
-    row.label = '合计'
-    return row
-  })
-
-  // ─── 试算表数 + 差异 ─────────────────────────────────────────────────────
-
-  const trialBalanceAmount: ComputedRef<number> = computed(() =>
-    parseNum(allResponses.value.get(TB_STORAGE_KEY)?.remark),
+  const closingVariance = computed(() =>
+    natureSubtotalRow.value.closingAdjusted - trialBalance.value.closing,
   )
+  // 兼容旧调用方：原 trialBalanceAmount/variance 均表示期末。
+  const trialBalanceAmount = computed(() => trialBalance.value.closing)
+  const variance = closingVariance
 
-  const variance: ComputedRef<number> = computed(() =>
-    totalRow.value.closingAdjusted - trialBalanceAmount.value,
+  const significantChanges = computed(() =>
+    natureDataRows.value
+      .filter((row) => Math.abs(row.changeRate) > 0.3)
+      .map((row) => ({
+        rowKey: row.rowKey,
+        label: row.label,
+        changeAmount: row.changeAmount,
+        changeRate: row.changeRate,
+        reasonAnalysis: row.reasonAnalysis,
+      })),
   )
-
-  // ─── 审计说明/结论 watch ──────────────────────────────────────────────────
 
   watch(
     () => allResponses.value.get(NOTE_STORAGE_KEY)?.remark,
-    (v) => { auditNote.value = v || '' },
+    (value) => { auditNote.value = value || '' },
     { immediate: true },
   )
   watch(
     () => allResponses.value.get(CONCLUSION_STORAGE_KEY)?.remark,
-    (v) => { auditConclusion.value = v || '' },
+    (value) => { auditConclusion.value = value || '' },
     { immediate: true },
   )
 
-  // ─── 编辑 + 保存 ─────────────────────────────────────────────────────────
-
-  function updateNatureCell(rowKey: string, field: string, value: number | string): void {
+  function updateCell(
+    section: F4AdjudicationSection,
+    rowKey: string,
+    field: keyof StoredF4AdjRow,
+    value: unknown,
+  ): void {
     if (readonly.value) return
-    const stored = ensureDefaultRows(
-      safeParseRows<StoredF4AdjRow>(allResponses.value.get(NATURE_STORAGE_KEY)?.remark),
-      DEFAULT_NATURE_ROWS,
-    )
-    const idx = stored.findIndex((r) => r.rowKey === rowKey)
-    if (idx === -1) return
-    if (field === 'indexRef') {
-      stored[idx].indexRef = String(value ?? '')
-    } else {
-      ;(stored[idx] as any)[field] = typeof value === 'number' ? value : parseNum(value)
+    const target = section === 'nature' ? natureStored : agingStored
+    const row = target.value.find((item) => item.rowKey === rowKey)
+    if (!row) return
+    if (field === 'reasonAnalysis' || field === 'label') {
+      ;(row as any)[field] = String(value ?? '')
+    } else if (!['rowKey', 'isFixed'].includes(field)) {
+      ;(row as any)[field] = parseNum(value as string | number | null | undefined)
     }
-    persistNatureRows(stored)
+    persistRows(section)
   }
 
-  function updateAgingCell(rowKey: string, field: string, value: number | string): void {
-    if (readonly.value) return
-    const stored = ensureDefaultRows(
-      safeParseRows<StoredF4AdjRow>(allResponses.value.get(AGING_STORAGE_KEY)?.remark),
-      DEFAULT_AGING_ROWS,
-    )
-    const idx = stored.findIndex((r) => r.rowKey === rowKey)
-    if (idx === -1) return
-    if (field === 'indexRef') {
-      stored[idx].indexRef = String(value ?? '')
-    } else {
-      ;(stored[idx] as any)[field] = typeof value === 'number' ? value : parseNum(value)
-    }
-    persistAgingRows(stored)
+  function persistRows(section: F4AdjudicationSection): void {
+    const key = section === 'nature' ? NATURE_STORAGE_KEY : AGING_STORAGE_KEY
+    const rows = section === 'nature' ? natureStored.value : agingStored.value
+    allResponses.value.set(key, {
+      item_id: key,
+      conclusion: null,
+      remark: JSON.stringify(rows),
+    })
+    debounceSave()
   }
 
-  function updateTrialBalance(value: number | string): void {
+  function updateTrialBalance(period: keyof F4TrialBalance, value: unknown): void {
     if (readonly.value) return
-    const numVal = typeof value === 'number' ? value : parseNum(value)
+    const next = {
+      ...trialBalance.value,
+      [period]: parseNum(value as string | number | null | undefined),
+    }
     allResponses.value.set(TB_STORAGE_KEY, {
       item_id: TB_STORAGE_KEY,
       conclusion: null,
-      remark: String(numVal),
+      remark: JSON.stringify(next),
     })
     debounceSave()
   }
 
-  function persistNatureRows(rows: StoredF4AdjRow[]): void {
-    const json = JSON.stringify(rows)
-    allResponses.value.set(NATURE_STORAGE_KEY, {
-      item_id: NATURE_STORAGE_KEY,
-      conclusion: null,
-      remark: json,
-    })
-    debounceSave()
+  function updateNatureCell(rowKey: string, field: string, value: unknown): void {
+    updateCell('nature', rowKey, field as keyof StoredF4AdjRow, value)
   }
 
-  function persistAgingRows(rows: StoredF4AdjRow[]): void {
-    const json = JSON.stringify(rows)
-    allResponses.value.set(AGING_STORAGE_KEY, {
-      item_id: AGING_STORAGE_KEY,
-      conclusion: null,
-      remark: json,
-    })
-    debounceSave()
+  function updateAgingCell(rowKey: string, field: string, value: unknown): void {
+    updateCell('aging', rowKey, field as keyof StoredF4AdjRow, value)
   }
 
-  // ─── debounce 保存 ────────────────────────────────────────────────────────
+  function updateLegacyTrialBalance(value: unknown): void {
+    updateTrialBalance('closing', value)
+  }
 
   function debounceSave(): void {
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => {
       debounceTimer = null
       flushSave()
-    }, 2000)
+    }, 1500)
   }
 
   function flushSave(): void {
-    try {
-      const items = [
-        allResponses.value.get(NATURE_STORAGE_KEY),
-        allResponses.value.get(AGING_STORAGE_KEY),
-        allResponses.value.get(TB_STORAGE_KEY),
-        allResponses.value.get(NOTE_STORAGE_KEY),
-        allResponses.value.get(CONCLUSION_STORAGE_KEY),
-      ].filter(Boolean)
+    const items = [
+      allResponses.value.get(NATURE_STORAGE_KEY),
+      allResponses.value.get(AGING_STORAGE_KEY),
+      allResponses.value.get(TB_STORAGE_KEY),
+      allResponses.value.get(NOTE_STORAGE_KEY),
+      allResponses.value.get(CONCLUSION_STORAGE_KEY),
+    ].filter(Boolean)
+    if (items.length) {
       window.dispatchEvent(new CustomEvent('f4:save-items', { detail: { items } }))
-    } catch { /* silent */ }
+    }
   }
-
-  // ─── EventBus: substantive:adjudicated ────────────────────────────────────
 
   function publishAdjudicated(): void {
-    const amount = totalRow.value.closingAdjusted
-    const payload = {
-      wpCode: 'F4',
-      accountCode: '2202',
-      auditedAmount: amount,
-    }
-    try {
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
-    } catch { /* silent */ }
-
-    // 试算表回写通知
+    const auditedAmount = totalRow.value.closingAdjusted
+    window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
+      detail: { wpCode: 'F4', accountCode: '2202', auditedAmount },
+    }))
     if (projectId.value) {
-      try {
-        window.dispatchEvent(new CustomEvent('f4:writeback-trial-balance', {
-          detail: { projectId: projectId.value, accountCode: '2202', auditedAmount: amount },
-        }))
-      } catch { /* silent */ }
+      window.dispatchEvent(new CustomEvent('f4:writeback-trial-balance', {
+        detail: { projectId: projectId.value, accountCode: '2202', auditedAmount },
+      }))
     }
   }
 
-  // ─── 审计说明/结论 watch → 保存 ──────────────────────────────────────────
-
-  watch(auditNote, (val) => {
-    allResponses.value.set(NOTE_STORAGE_KEY, { item_id: NOTE_STORAGE_KEY, conclusion: null, remark: val })
+  watch(auditNote, (value) => {
+    allResponses.value.set(NOTE_STORAGE_KEY, {
+      item_id: NOTE_STORAGE_KEY,
+      conclusion: null,
+      remark: value,
+    })
     debounceSave()
   })
-
-  watch(auditConclusion, (val) => {
-    allResponses.value.set(CONCLUSION_STORAGE_KEY, { item_id: CONCLUSION_STORAGE_KEY, conclusion: null, remark: val })
+  watch(auditConclusion, (value) => {
+    allResponses.value.set(CONCLUSION_STORAGE_KEY, {
+      item_id: CONCLUSION_STORAGE_KEY,
+      conclusion: null,
+      remark: value,
+    })
     debounceSave()
   })
-
-  // ─── 序列化/反序列化 ─────────────────────────────────────────────────────
 
   function serialize(): Record<string, string> {
     return {
-      [NATURE_STORAGE_KEY]: JSON.stringify(storedNatureRows.value),
-      [AGING_STORAGE_KEY]: JSON.stringify(storedAgingRows.value),
-      [TB_STORAGE_KEY]: String(trialBalanceAmount.value),
+      [NATURE_STORAGE_KEY]: JSON.stringify(natureStored.value),
+      [AGING_STORAGE_KEY]: JSON.stringify(agingStored.value),
+      [TB_STORAGE_KEY]: JSON.stringify(trialBalance.value),
       [NOTE_STORAGE_KEY]: auditNote.value,
       [CONCLUSION_STORAGE_KEY]: auditConclusion.value,
     }
   }
 
   function deserialize(data: Record<string, string>): void {
-    if (data[NATURE_STORAGE_KEY]) {
-      allResponses.value.set(NATURE_STORAGE_KEY, {
-        item_id: NATURE_STORAGE_KEY,
-        conclusion: null,
-        remark: data[NATURE_STORAGE_KEY],
-      })
+    for (const key of [NATURE_STORAGE_KEY, AGING_STORAGE_KEY, TB_STORAGE_KEY]) {
+      if (data[key]) {
+        allResponses.value.set(key, { item_id: key, conclusion: null, remark: data[key] })
+      }
     }
-    if (data[AGING_STORAGE_KEY]) {
-      allResponses.value.set(AGING_STORAGE_KEY, {
-        item_id: AGING_STORAGE_KEY,
-        conclusion: null,
-        remark: data[AGING_STORAGE_KEY],
-      })
-    }
-    if (data[TB_STORAGE_KEY]) {
-      allResponses.value.set(TB_STORAGE_KEY, {
-        item_id: TB_STORAGE_KEY,
-        conclusion: null,
-        remark: data[TB_STORAGE_KEY],
-      })
-    }
-    if (data[NOTE_STORAGE_KEY]) {
-      auditNote.value = data[NOTE_STORAGE_KEY]
-    }
-    if (data[CONCLUSION_STORAGE_KEY]) {
-      auditConclusion.value = data[CONCLUSION_STORAGE_KEY]
-    }
+    if (data[NOTE_STORAGE_KEY] != null) auditNote.value = data[NOTE_STORAGE_KEY]
+    if (data[CONCLUSION_STORAGE_KEY] != null) auditConclusion.value = data[CONCLUSION_STORAGE_KEY]
+    loadRows()
   }
-
-  // ─── cleanup ──────────────────────────────────────────────────────────────
 
   onBeforeUnmount(() => {
     if (debounceTimer) {
@@ -425,28 +574,29 @@ export function useF4Adjudication(options: UseF4AdjudicationOptions) {
   })
 
   return {
-    // 按性质
     natureDataRows,
     natureSubtotalRow,
-    // 按账龄
     agingDataRows,
     agingSubtotalRow,
-    // 合计 / 试算表 / 差异
     totalRow,
-    trialBalanceAmount,
-    variance,
-    // 交叉校验
+    detailAggregation,
+    openingCrossCheckPassed,
+    closingCrossCheckPassed,
     crossCheckPassed,
-    // 编辑
+    trialBalance,
+    trialBalanceAmount,
+    openingVariance,
+    closingVariance,
+    variance,
+    significantChanges,
+    updateCell,
     updateNatureCell,
     updateAgingCell,
     updateTrialBalance,
-    // 审计说明/结论
+    updateLegacyTrialBalance,
     auditNote,
     auditConclusion,
-    // EventBus
     publishAdjudicated,
-    // 序列化
     serialize,
     deserialize,
   }

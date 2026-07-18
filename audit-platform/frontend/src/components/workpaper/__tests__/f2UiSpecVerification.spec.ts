@@ -39,8 +39,8 @@ describe('F2 UI Specification Verification', () => {
   describe('Requirement 20.1: 13px font-size globally', () => {
     it.each(CORE_COMPONENTS)('%s uses font-size: 13px', (component) => {
       const content = readVueFile(component)
-      // Match both "font-size: 13px" (scoped CSS) and "font-size:13px" (inline style)
-      expect(content).toMatch(/font-size:\s*13px/)
+      // Literal 13px or CSS var fallback (--wp-font-size, 13px)
+      expect(content).toMatch(/font-size:\s*13px|font-size:\s*var\(--wp-font-size,\s*13px\)/)
     })
   })
 
@@ -130,7 +130,7 @@ describe('F2 UI Specification Verification', () => {
       const content = readVueFile('core/F2TabAdjudication.vue')
       // Should have el-card wrapping the audit notes section
       expect(content).toContain('audit-note-card')
-      expect(content).toMatch(/<el-card[^>]*class="audit-note-card"/)
+      expect(content).toMatch(/<el-card[^>]*class="[^"]*audit-note-card[^"]*"/)
     })
 
     it('F2CutoffSheet wraps conclusion in section card', () => {

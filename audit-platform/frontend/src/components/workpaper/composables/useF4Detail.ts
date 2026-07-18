@@ -1,11 +1,12 @@
 /**
- * useF4Detail — F4-2 应付账款明细表（27列 / 3区段Tab）
+ * useF4Detail — F4-2 应付账款明细表（源表27列）
  *
- * Spec: .kiro/specs/f4-accounts-payable/ Task 5.1
- * 贷方科目公式：期末 = 期初 + 贷方 - 借方
- * 账龄合计 = 各段SUM；审定 = 期末 + AJE + RJE
- * 账龄交叉校验：合计≠期末 → 红色标记
- * Requirements: 5.1~5.8
+ * 公式严格对齐 Excel：
+ * H 期初审定余额 = E期初未审 + F期初AJE + G期初RJE
+ * K 期末余额 = E期初未审 + J贷方发生 - I借方发生
+ * M 期末未审余额 = K期末余额 + L被审计单位重分类
+ * T 审定数 = M期末未审 + R账项调整 + S重分类调整
+ * N:Q 未审账龄合计应等于 M；U:X 审定账龄合计应等于 T。
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import {
@@ -16,124 +17,156 @@ import {
   calcAgingCrossCheck,
   calcSubtotal,
 } from './useF4AccPayFormulaEngine'
-import type { ChecklistResponse } from './useF4FormData'
+import { readRowJson, type ChecklistResponse } from './useF4FormData'
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
 export interface APDetailRow {
   rowId: string
   seq: number
-  // 基础信息区段 (9列)
+  // A:D 基础信息
   creditor: string
   companyCode: string
   relatedPartyType: string
   paymentNature: string
+  // E:M 期初、本期发生及期末未审
+  openingUnadjusted: number
+  openingAje: number
+  openingRje: number
   openingAdjusted: number
   currentDebit: number
   currentCredit: number
-  closingBalance: number          // 公式=期初+贷方-借方
-  // 账龄与核对区段 (10列)
-  aging1Year: number
-  aging1to2Year: number
-  aging2to3Year: number
-  aging3YearPlus: number
-  agingTotal: number              // 公式=各账龄段SUM
+  closingBalance: number
+  entityReclassification: number
+  closingUnadjusted: number
+  // N:Q 未审账龄
+  unadjustedAgingLt1: number
+  unadjustedAging1to2: number
+  unadjustedAging2to3: number
+  unadjustedAgingGt3: number
+  unadjustedAgingTotal: number
+  // R:T 调整与审定
+  closingAje: number
+  closingRje: number
+  closingAdjusted: number
+  // U:X 审定账龄
+  auditedAgingLt1: number
+  auditedAging1to2: number
+  auditedAging2to3: number
+  auditedAgingGt3: number
+  auditedAgingTotal: number
+  // Y:AA 其他审计信息
   isConfirmed: string
-  confirmationResult: string
   subsequentPayment: number
-  subsequentPaymentDate: string
   remark: string
-  // 调整与审定区段 (8列)
-  ajeAdjustment: number
-  rjeReclassification: number
-  adjustedBalance: number         // 公式=期末+AJE+RJE
-  adjustedAging1: number
-  adjustedAging2: number
-  adjustedAging3: number
-  adjustedAging4: number
-  indexRef: string
-  // 交叉校验标记
-  agingMismatch: boolean
+  unadjustedAgingMismatch: boolean
+  auditedAgingMismatch: boolean
+  subsequentPaymentExceedsBalance: boolean
 }
+
+export type F4DetailInputType = 'text' | 'number' | 'select'
 
 export interface F4DetailColumn {
   prop: keyof APDetailRow | string
   label: string
+  group: 'identity' | 'movement' | 'unadjusted-aging' | 'audit' | 'other'
   width?: number
   minWidth?: number
   formula?: string
   editable?: boolean
+  inputType?: F4DetailInputType
+  options?: readonly string[]
 }
 
-// ─── 3区段列配置 ──────────────────────────────────────────────────────────────
+export const F4_RELATED_PARTY_OPTIONS = [
+  '合并范围内关联方',
+  '合并范围外关联方',
+  '非关联方',
+] as const
 
-/** 基础信息区段 9列 */
+export const F4_PAYMENT_NATURE_OPTIONS = ['货款', '工程款', '设备款', '服务费', '其他'] as const
+export const F4_CONFIRMATION_OPTIONS = ['是', '否', '不适用'] as const
+export const F4_AGING_BUCKET_OPTIONS = [
+  { value: 'lt1', label: '1年以下' },
+  { value: '1to2', label: '1～2年' },
+  { value: '2to3', label: '2～3年' },
+  { value: 'gt3', label: '3年以上' },
+] as const
+export type F4AgingBucket = typeof F4_AGING_BUCKET_OPTIONS[number]['value']
+
+/** A:M 身份、期初及本期变动（13列） */
 export const F4_DETAIL_BASIC_COLUMNS: F4DetailColumn[] = [
-  { prop: 'seq', label: '序号', width: 60 },
-  { prop: 'creditor', label: '债权人', minWidth: 130, editable: true },
-  { prop: 'companyCode', label: '公司代码', minWidth: 100, editable: true },
-  { prop: 'relatedPartyType', label: '关联方类型', minWidth: 100, editable: true },
-  { prop: 'paymentNature', label: '款项性质', minWidth: 100, editable: true },
-  { prop: 'openingAdjusted', label: '期初审定', minWidth: 110, editable: true },
-  { prop: 'currentDebit', label: '本期借方', minWidth: 110, editable: true },
-  { prop: 'currentCredit', label: '本期贷方', minWidth: 110, editable: true },
-  { prop: 'closingBalance', label: '期末余额', minWidth: 110, formula: '期初+贷方-借方', editable: false },
+  { prop: 'creditor', label: '债权人名称', group: 'identity', minWidth: 150, editable: true, inputType: 'text' },
+  { prop: 'companyCode', label: '公司代码', group: 'identity', minWidth: 110, editable: true, inputType: 'text' },
+  { prop: 'relatedPartyType', label: '关联方类型', group: 'identity', minWidth: 150, editable: true, inputType: 'select', options: F4_RELATED_PARTY_OPTIONS },
+  { prop: 'paymentNature', label: '款项性质', group: 'identity', minWidth: 110, editable: true, inputType: 'select', options: F4_PAYMENT_NATURE_OPTIONS },
+  { prop: 'openingUnadjusted', label: '期初未审余额', group: 'movement', minWidth: 120, editable: true, inputType: 'number' },
+  { prop: 'openingAje', label: '期初账项调整', group: 'movement', minWidth: 120, editable: true, inputType: 'number' },
+  { prop: 'openingRje', label: '期初重分类调整', group: 'movement', minWidth: 130, editable: true, inputType: 'number' },
+  { prop: 'openingAdjusted', label: '期初审定余额', group: 'movement', minWidth: 120, formula: '期初未审+期初AJE+期初RJE', editable: false },
+  { prop: 'currentDebit', label: '借方发生', group: 'movement', minWidth: 110, editable: true, inputType: 'number' },
+  { prop: 'currentCredit', label: '贷方发生', group: 'movement', minWidth: 110, editable: true, inputType: 'number' },
+  { prop: 'closingBalance', label: '期末余额', group: 'movement', minWidth: 110, formula: '期初未审+贷方-借方', editable: false },
+  { prop: 'entityReclassification', label: '被审计单位重分类调整', group: 'movement', minWidth: 160, editable: true, inputType: 'number' },
+  { prop: 'closingUnadjusted', label: '期末未审余额', group: 'movement', minWidth: 120, formula: '期末余额+被审计单位重分类', editable: false },
 ]
 
-/** 账龄与核对区段 10列 */
+/** N:Q + Y:AA 未审账龄及其他审计信息（7列） */
 export const F4_DETAIL_AGING_COLUMNS: F4DetailColumn[] = [
-  { prop: 'aging1Year', label: '1年以内', minWidth: 100, editable: true },
-  { prop: 'aging1to2Year', label: '1-2年', minWidth: 90, editable: true },
-  { prop: 'aging2to3Year', label: '2-3年', minWidth: 90, editable: true },
-  { prop: 'aging3YearPlus', label: '3年以上', minWidth: 90, editable: true },
-  { prop: 'agingTotal', label: '账龄合计', minWidth: 100, formula: '各账龄段SUM', editable: false },
-  { prop: 'isConfirmed', label: '是否函证', minWidth: 90, editable: true },
-  { prop: 'confirmationResult', label: '函证结果', minWidth: 100, editable: true },
-  { prop: 'subsequentPayment', label: '期后付款金额', minWidth: 110, editable: true },
-  { prop: 'subsequentPaymentDate', label: '期后付款日期', minWidth: 110, editable: true },
-  { prop: 'remark', label: '备注', minWidth: 120, editable: true },
+  { prop: 'unadjustedAgingLt1', label: '未审账龄·1年以下', group: 'unadjusted-aging', minWidth: 125, editable: true, inputType: 'number' },
+  { prop: 'unadjustedAging1to2', label: '未审账龄·1～2年', group: 'unadjusted-aging', minWidth: 125, editable: true, inputType: 'number' },
+  { prop: 'unadjustedAging2to3', label: '未审账龄·2～3年', group: 'unadjusted-aging', minWidth: 125, editable: true, inputType: 'number' },
+  { prop: 'unadjustedAgingGt3', label: '未审账龄·3年以上', group: 'unadjusted-aging', minWidth: 130, editable: true, inputType: 'number' },
+  { prop: 'isConfirmed', label: '是否函证', group: 'other', minWidth: 100, editable: true, inputType: 'select', options: F4_CONFIRMATION_OPTIONS },
+  { prop: 'subsequentPayment', label: '期后付款', group: 'other', minWidth: 115, editable: true, inputType: 'number' },
+  { prop: 'remark', label: '备注', group: 'other', minWidth: 180, editable: true, inputType: 'text' },
 ]
 
-/** 调整与审定区段 8列 */
+/** R:X 调整、审定及审定账龄（7列） */
 export const F4_DETAIL_AUDIT_COLUMNS: F4DetailColumn[] = [
-  { prop: 'ajeAdjustment', label: '账项调整', minWidth: 100, editable: true },
-  { prop: 'rjeReclassification', label: '重分类', minWidth: 100, editable: true },
-  { prop: 'adjustedBalance', label: '审定余额', minWidth: 110, formula: '期末+AJE+RJE', editable: false },
-  { prop: 'adjustedAging1', label: '审定1年内', minWidth: 100, editable: true },
-  { prop: 'adjustedAging2', label: '审定1-2年', minWidth: 100, editable: true },
-  { prop: 'adjustedAging3', label: '审定2-3年', minWidth: 100, editable: true },
-  { prop: 'adjustedAging4', label: '审定3年以上', minWidth: 100, editable: true },
-  { prop: 'indexRef', label: '索引', minWidth: 90, editable: true },
+  { prop: 'closingAje', label: '账项调整', group: 'audit', minWidth: 110, editable: true, inputType: 'number' },
+  { prop: 'closingRje', label: '重分类调整', group: 'audit', minWidth: 120, editable: true, inputType: 'number' },
+  { prop: 'closingAdjusted', label: '审定数', group: 'audit', minWidth: 115, formula: '期末未审+AJE+RJE', editable: false },
+  { prop: 'auditedAgingLt1', label: '审定账龄·1年以下', group: 'audit', minWidth: 125, editable: true, inputType: 'number' },
+  { prop: 'auditedAging1to2', label: '审定账龄·1～2年', group: 'audit', minWidth: 125, editable: true, inputType: 'number' },
+  { prop: 'auditedAging2to3', label: '审定账龄·2～3年', group: 'audit', minWidth: 125, editable: true, inputType: 'number' },
+  { prop: 'auditedAgingGt3', label: '审定账龄·3年以上', group: 'audit', minWidth: 130, editable: true, inputType: 'number' },
 ]
 
-// ─── 内部类型（存储用，不含公式列） ──────────────────────────────────────────
+/** 严格按 Excel A:AA 排列的27列。 */
+export const F4_DETAIL_ALL_COLUMNS: F4DetailColumn[] = [
+  ...F4_DETAIL_BASIC_COLUMNS,
+  ...F4_DETAIL_AGING_COLUMNS.slice(0, 4),
+  ...F4_DETAIL_AUDIT_COLUMNS,
+  ...F4_DETAIL_AGING_COLUMNS.slice(4),
+]
 
-interface StoredAPDetailRow {
+export interface StoredAPDetailRow {
   rowId: string
   seq: number
   creditor: string
   companyCode: string
   relatedPartyType: string
   paymentNature: string
-  openingAdjusted: number
+  openingUnadjusted: number
+  openingAje: number
+  openingRje: number
   currentDebit: number
   currentCredit: number
-  aging1Year: number
-  aging1to2Year: number
-  aging2to3Year: number
-  aging3YearPlus: number
+  entityReclassification: number
+  unadjustedAgingLt1: number
+  unadjustedAging1to2: number
+  unadjustedAging2to3: number
+  unadjustedAgingGt3: number
+  closingAje: number
+  closingRje: number
+  auditedAgingLt1: number
+  auditedAging1to2: number
+  auditedAging2to3: number
+  auditedAgingGt3: number
   isConfirmed: string
-  confirmationResult: string
   subsequentPayment: number
-  subsequentPaymentDate: string
   remark: string
-  ajeAdjustment: number
-  rjeReclassification: number
-  adjustedAging1: number
-  adjustedAging2: number
-  adjustedAging3: number
-  adjustedAging4: number
-  indexRef: string
 }
 
 export interface UseF4DetailOptions {
@@ -159,43 +192,82 @@ function emptyStored(seq: number): StoredAPDetailRow {
     companyCode: '',
     relatedPartyType: '',
     paymentNature: '',
-    openingAdjusted: 0,
+    openingUnadjusted: 0,
+    openingAje: 0,
+    openingRje: 0,
     currentDebit: 0,
     currentCredit: 0,
-    aging1Year: 0,
-    aging1to2Year: 0,
-    aging2to3Year: 0,
-    aging3YearPlus: 0,
+    entityReclassification: 0,
+    unadjustedAgingLt1: 0,
+    unadjustedAging1to2: 0,
+    unadjustedAging2to3: 0,
+    unadjustedAgingGt3: 0,
+    closingAje: 0,
+    closingRje: 0,
+    auditedAgingLt1: 0,
+    auditedAging1to2: 0,
+    auditedAging2to3: 0,
+    auditedAgingGt3: 0,
     isConfirmed: '',
-    confirmationResult: '',
     subsequentPayment: 0,
-    subsequentPaymentDate: '',
     remark: '',
-    ajeAdjustment: 0,
-    rjeReclassification: 0,
-    adjustedAging1: 0,
-    adjustedAging2: 0,
-    adjustedAging3: 0,
-    adjustedAging4: 0,
-    indexRef: '',
   }
 }
 
-function computeRow(stored: StoredAPDetailRow): APDetailRow {
-  const closingBalance = calcCreditBalance(stored.openingAdjusted, stored.currentCredit, stored.currentDebit)
-  const agingTotal = calcAgingTotal(stored.aging1Year, stored.aging1to2Year, stored.aging2to3Year, stored.aging3YearPlus)
-  const adjustedBalance = calcAuditedAmount(closingBalance, stored.ajeAdjustment, stored.rjeReclassification)
-  const agingMismatch = !calcAgingCrossCheck(agingTotal, closingBalance)
+export function computeF4DetailRow(stored: StoredAPDetailRow): APDetailRow {
+  const openingAdjusted = calcAuditedAmount(
+    stored.openingUnadjusted,
+    stored.openingAje,
+    stored.openingRje,
+  )
+  // 源表 K 列以期初未审余额（E）为起点，而非期初审定余额（H）。
+  const closingBalance = calcCreditBalance(
+    stored.openingUnadjusted,
+    stored.currentCredit,
+    stored.currentDebit,
+  )
+  const closingUnadjusted = closingBalance + stored.entityReclassification
+  const unadjustedAgingTotal = calcAgingTotal(
+    stored.unadjustedAgingLt1,
+    stored.unadjustedAging1to2,
+    stored.unadjustedAging2to3,
+    stored.unadjustedAgingGt3,
+  )
+  const closingAdjusted = calcAuditedAmount(
+    closingUnadjusted,
+    stored.closingAje,
+    stored.closingRje,
+  )
+  const auditedAgingTotal = calcAgingTotal(
+    stored.auditedAgingLt1,
+    stored.auditedAging1to2,
+    stored.auditedAging2to3,
+    stored.auditedAgingGt3,
+  )
   return {
     ...stored,
+    openingAdjusted,
     closingBalance,
-    agingTotal,
-    adjustedBalance,
-    agingMismatch,
+    closingUnadjusted,
+    unadjustedAgingTotal,
+    closingAdjusted,
+    auditedAgingTotal,
+    unadjustedAgingMismatch: !calcAgingCrossCheck(unadjustedAgingTotal, closingUnadjusted),
+    auditedAgingMismatch: !calcAgingCrossCheck(auditedAgingTotal, closingAdjusted),
+    subsequentPaymentExceedsBalance:
+      stored.subsequentPayment - Math.abs(closingAdjusted) >= 0.01,
   }
 }
 
-function safeParseRows(jsonStr: string | null | undefined): StoredAPDetailRow[] {
+function joinLegacyRemark(raw: any): string {
+  const parts = [String(raw?.remark ?? '').trim()]
+  if (raw?.confirmationResult) parts.push(`函证结果：${raw.confirmationResult}`)
+  if (raw?.subsequentPaymentDate) parts.push(`期后付款日期：${raw.subsequentPaymentDate}`)
+  if (raw?.indexRef) parts.push(`原索引：${raw.indexRef}`)
+  return parts.filter(Boolean).join('；')
+}
+
+export function migrateF4DetailRows(jsonStr: string | null | undefined): StoredAPDetailRow[] {
   if (!jsonStr) return []
   try {
     const parsed = JSON.parse(jsonStr)
@@ -208,25 +280,25 @@ function safeParseRows(jsonStr: string | null | undefined): StoredAPDetailRow[] 
       companyCode: raw.companyCode || '',
       relatedPartyType: raw.relatedPartyType || '',
       paymentNature: raw.paymentNature || '',
-      openingAdjusted: parseNum(raw.openingAdjusted),
-      currentDebit: parseNum(raw.currentDebit),
-      currentCredit: parseNum(raw.currentCredit),
-      aging1Year: parseNum(raw.aging1Year),
-      aging1to2Year: parseNum(raw.aging1to2Year),
-      aging2to3Year: parseNum(raw.aging2to3Year),
-      aging3YearPlus: parseNum(raw.aging3YearPlus),
+      openingUnadjusted: parseNum(raw.openingUnadjusted ?? raw.openingAdjusted),
+      openingAje: parseNum(raw.openingAje),
+      openingRje: parseNum(raw.openingRje),
+      currentDebit: parseNum(raw.currentDebit ?? raw.debit),
+      currentCredit: parseNum(raw.currentCredit ?? raw.credit),
+      entityReclassification: parseNum(raw.entityReclassification),
+      unadjustedAgingLt1: parseNum(raw.unadjustedAgingLt1 ?? raw.aging1Year ?? raw.agingLt1),
+      unadjustedAging1to2: parseNum(raw.unadjustedAging1to2 ?? raw.aging1to2Year ?? raw.aging1to2),
+      unadjustedAging2to3: parseNum(raw.unadjustedAging2to3 ?? raw.aging2to3Year ?? raw.aging2to3),
+      unadjustedAgingGt3: parseNum(raw.unadjustedAgingGt3 ?? raw.aging3YearPlus ?? raw.agingGt3),
+      closingAje: parseNum(raw.closingAje ?? raw.ajeAdjustment ?? raw.aje),
+      closingRje: parseNum(raw.closingRje ?? raw.rjeReclassification ?? raw.rje),
+      auditedAgingLt1: parseNum(raw.auditedAgingLt1 ?? raw.adjustedAging1),
+      auditedAging1to2: parseNum(raw.auditedAging1to2 ?? raw.adjustedAging2),
+      auditedAging2to3: parseNum(raw.auditedAging2to3 ?? raw.adjustedAging3),
+      auditedAgingGt3: parseNum(raw.auditedAgingGt3 ?? raw.adjustedAging4),
       isConfirmed: raw.isConfirmed || '',
-      confirmationResult: raw.confirmationResult || '',
       subsequentPayment: parseNum(raw.subsequentPayment),
-      subsequentPaymentDate: raw.subsequentPaymentDate || '',
-      remark: raw.remark || '',
-      ajeAdjustment: parseNum(raw.ajeAdjustment),
-      rjeReclassification: parseNum(raw.rjeReclassification),
-      adjustedAging1: parseNum(raw.adjustedAging1),
-      adjustedAging2: parseNum(raw.adjustedAging2),
-      adjustedAging3: parseNum(raw.adjustedAging3),
-      adjustedAging4: parseNum(raw.adjustedAging4),
-      indexRef: raw.indexRef || '',
+      remark: joinLegacyRemark(raw),
     }))
   } catch {
     return []
@@ -247,17 +319,17 @@ export function useF4Detail(options: UseF4DetailOptions) {
   // ─── 加载 ─────────────────────────────────────────────────────────────────
 
   function loadRows(): void {
-    storedData.value = safeParseRows(allResponses.value.get(STORAGE_KEY)?.remark)
+    storedData.value = migrateF4DetailRows(readRowJson(allResponses.value.get(STORAGE_KEY)))
     if (storedData.value.length === 0) storedData.value = [emptyStored(1)]
   }
 
-  watch(() => allResponses.value.get(STORAGE_KEY)?.remark, () => {
+  watch(() => readRowJson(allResponses.value.get(STORAGE_KEY)), () => {
     if (storedData.value.length === 0) loadRows()
   }, { immediate: true })
 
   // ─── 计算行 ───────────────────────────────────────────────────────────────
 
-  const rows: ComputedRef<APDetailRow[]> = computed(() => storedData.value.map(computeRow))
+  const rows: ComputedRef<APDetailRow[]> = computed(() => storedData.value.map(computeF4DetailRow))
 
   const filteredRows: ComputedRef<APDetailRow[]> = computed(() => {
     const q = searchQuery.value.trim().toLowerCase()
@@ -266,32 +338,48 @@ export function useF4Detail(options: UseF4DetailOptions) {
       (r) =>
         r.creditor.toLowerCase().includes(q) ||
         r.companyCode.toLowerCase().includes(q) ||
-        r.paymentNature.toLowerCase().includes(q),
+        r.paymentNature.toLowerCase().includes(q) ||
+        r.relatedPartyType.toLowerCase().includes(q),
     )
   })
 
   // ─── 合计行 ───────────────────────────────────────────────────────────────
 
   const subtotalRow: ComputedRef<APDetailRow> = computed(() =>
-    computeRow({
+    computeF4DetailRow({
       ...emptyStored(0),
       rowId: 'subtotal',
       creditor: '合计',
-      openingAdjusted: calcSubtotal(rows.value.map((r) => r.openingAdjusted)),
+      openingUnadjusted: calcSubtotal(rows.value.map((r) => r.openingUnadjusted)),
+      openingAje: calcSubtotal(rows.value.map((r) => r.openingAje)),
+      openingRje: calcSubtotal(rows.value.map((r) => r.openingRje)),
       currentDebit: calcSubtotal(rows.value.map((r) => r.currentDebit)),
       currentCredit: calcSubtotal(rows.value.map((r) => r.currentCredit)),
-      aging1Year: calcSubtotal(rows.value.map((r) => r.aging1Year)),
-      aging1to2Year: calcSubtotal(rows.value.map((r) => r.aging1to2Year)),
-      aging2to3Year: calcSubtotal(rows.value.map((r) => r.aging2to3Year)),
-      aging3YearPlus: calcSubtotal(rows.value.map((r) => r.aging3YearPlus)),
-      ajeAdjustment: calcSubtotal(rows.value.map((r) => r.ajeAdjustment)),
-      rjeReclassification: calcSubtotal(rows.value.map((r) => r.rjeReclassification)),
-      adjustedAging1: calcSubtotal(rows.value.map((r) => r.adjustedAging1)),
-      adjustedAging2: calcSubtotal(rows.value.map((r) => r.adjustedAging2)),
-      adjustedAging3: calcSubtotal(rows.value.map((r) => r.adjustedAging3)),
-      adjustedAging4: calcSubtotal(rows.value.map((r) => r.adjustedAging4)),
+      entityReclassification: calcSubtotal(rows.value.map((r) => r.entityReclassification)),
+      unadjustedAgingLt1: calcSubtotal(rows.value.map((r) => r.unadjustedAgingLt1)),
+      unadjustedAging1to2: calcSubtotal(rows.value.map((r) => r.unadjustedAging1to2)),
+      unadjustedAging2to3: calcSubtotal(rows.value.map((r) => r.unadjustedAging2to3)),
+      unadjustedAgingGt3: calcSubtotal(rows.value.map((r) => r.unadjustedAgingGt3)),
+      closingAje: calcSubtotal(rows.value.map((r) => r.closingAje)),
+      closingRje: calcSubtotal(rows.value.map((r) => r.closingRje)),
+      auditedAgingLt1: calcSubtotal(rows.value.map((r) => r.auditedAgingLt1)),
+      auditedAging1to2: calcSubtotal(rows.value.map((r) => r.auditedAging1to2)),
+      auditedAging2to3: calcSubtotal(rows.value.map((r) => r.auditedAging2to3)),
+      auditedAgingGt3: calcSubtotal(rows.value.map((r) => r.auditedAgingGt3)),
+      subsequentPayment: calcSubtotal(rows.value.map((r) => r.subsequentPayment)),
     }),
   )
+
+  const filledCount = computed(() => rows.value.filter((row) =>
+    row.creditor.trim()
+    || Math.abs(row.openingUnadjusted) >= 0.01
+    || Math.abs(row.closingUnadjusted) >= 0.01,
+  ).length)
+  const abnormalCount = computed(() => rows.value.filter((row) =>
+    row.unadjustedAgingMismatch
+    || row.auditedAgingMismatch
+    || row.subsequentPaymentExceedsBalance,
+  ).length)
 
   // ─── 动态行操作 ───────────────────────────────────────────────────────────
 
@@ -316,10 +404,35 @@ export function useF4Detail(options: UseF4DetailOptions) {
     if (!row) return
     const strFields = [
       'creditor', 'companyCode', 'relatedPartyType', 'paymentNature',
-      'isConfirmed', 'confirmationResult', 'subsequentPaymentDate', 'remark', 'indexRef',
+      'isConfirmed', 'remark',
     ]
     if (strFields.includes(field)) (row as any)[field] = String(value ?? '')
     else (row as any)[field] = parseNum(value)
+    persistRows()
+  }
+
+  function allocateAging(
+    rowId: string,
+    stage: 'unadjusted' | 'audited',
+    bucket: F4AgingBucket,
+  ): void {
+    if (readonly.value) return
+    const row = storedData.value.find((item) => item.rowId === rowId)
+    if (!row) return
+    const fields = stage === 'unadjusted'
+      ? ['unadjustedAgingLt1', 'unadjustedAging1to2', 'unadjustedAging2to3', 'unadjustedAgingGt3'] as const
+      : ['auditedAgingLt1', 'auditedAging1to2', 'auditedAging2to3', 'auditedAgingGt3'] as const
+    const fieldByBucket: Record<F4AgingBucket, typeof fields[number]> = {
+      lt1: fields[0],
+      '1to2': fields[1],
+      '2to3': fields[2],
+      gt3: fields[3],
+    }
+    for (const field of fields) row[field] = 0
+    const computed = computeF4DetailRow(row)
+    row[fieldByBucket[bucket]] = stage === 'unadjusted'
+      ? computed.closingUnadjusted
+      : computed.closingAdjusted
     persistRows()
   }
 
@@ -329,7 +442,8 @@ export function useF4Detail(options: UseF4DetailOptions) {
     allResponses.value.set(STORAGE_KEY, {
       item_id: STORAGE_KEY,
       conclusion: null,
-      remark: JSON.stringify(storedData.value),
+      // 同时存入公式快照，保证导出和F4-1联动无需重复猜测公式。
+      remark: JSON.stringify(storedData.value.map(computeF4DetailRow)),
     })
     debounceSave()
   }
@@ -347,7 +461,11 @@ export function useF4Detail(options: UseF4DetailOptions) {
   // ─── 样式 ─────────────────────────────────────────────────────────────────
 
   function rowClassName({ row }: { row: APDetailRow }): string {
-    return row.agingMismatch ? 'aging-mismatch-row' : ''
+    return row.unadjustedAgingMismatch || row.auditedAgingMismatch
+      ? 'aging-mismatch-row'
+      : row.subsequentPaymentExceedsBalance
+        ? 'subsequent-warning-row'
+        : ''
   }
 
   // ─── 清理 ─────────────────────────────────────────────────────────────────
@@ -361,14 +479,19 @@ export function useF4Detail(options: UseF4DetailOptions) {
     rows,
     filteredRows,
     subtotalRow,
+    filledCount,
+    abnormalCount,
     searchQuery,
+    loadRows,
     addRow,
     removeRow,
     updateCell,
+    allocateAging,
     rowClassName,
     basicColumns: F4_DETAIL_BASIC_COLUMNS,
     agingColumns: F4_DETAIL_AGING_COLUMNS,
     auditColumns: F4_DETAIL_AUDIT_COLUMNS,
+    allColumns: F4_DETAIL_ALL_COLUMNS,
   }
 }
 

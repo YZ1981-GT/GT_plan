@@ -8,11 +8,37 @@ import {
   emptyLossContractProject,
   calcContractEstimatedLoss,
   resolveCompletionRate,
+  isBlankLossContractProject,
+  pruneBlankLossContractProjects,
 } from '../useF2LossContractFormulas'
 
 describe('useF2LossContractFormulas', () => {
-  it('default sheet has 8 projects', () => {
-    expect(defaultLossContractSheet().projects).toHaveLength(8)
+  it('default sheet keeps one editable project row', () => {
+    const projects = defaultLossContractSheet().projects
+    expect(projects).toHaveLength(1)
+    expect(isBlankLossContractProject(projects[0])).toBe(true)
+  })
+
+  it('prunes reserved blank rows but retains entered projects', () => {
+    const entered = {
+      ...emptyLossContractProject(),
+      projectName: '项目A',
+      estimatedTotalRevenue: 100,
+    }
+    expect(pruneBlankLossContractProjects([
+      emptyLossContractProject(),
+      entered,
+      emptyLossContractProject(),
+    ])).toEqual([entered])
+  })
+
+  it('keeps one blank row when all rows are empty', () => {
+    const projects = pruneBlankLossContractProjects([
+      emptyLossContractProject(),
+      emptyLossContractProject(),
+    ])
+    expect(projects).toHaveLength(1)
+    expect(isBlankLossContractProject(projects[0])).toBe(true)
   })
 
   it('calculates contract estimated loss ④=③−②', () => {

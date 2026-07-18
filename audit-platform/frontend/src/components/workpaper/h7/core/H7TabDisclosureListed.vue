@@ -62,16 +62,7 @@
       </div>
     </el-card>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="note-card">
-      <template #header><div class="section-title"><span>审计说明</span></div></template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly" placeholder="记录附注披露项的编制依据、与审定表勾稽核对情况。" @blur="persist('H7-disc-listed-note', auditNote)" />
-    </el-card>
-    <el-card shadow="never" class="note-card">
-      <template #header><div class="section-title"><span>审计结论</span></div></template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="附注披露完整、准确，与审定数一致，未见异常。" @blur="persist('H7-disc-listed-conclusion', auditConclusion)" />
-    </el-card>
-
+    
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示（CAS 5 生物资产准则）</summary>
@@ -114,8 +105,6 @@ const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => 
 const localResponses = ref<Map<string, any>>(new Map(props.allResponses ?? []))
 const policyText = ref('')
 const disclosureText = ref('')
-const auditNote = ref('')
-const auditConclusion = ref('')
 const adjudicatedAmount = ref<number | null>(null)
 
 function num(v: any): number { const n = Number(v); return Number.isFinite(n) ? n : 0 }
@@ -174,8 +163,6 @@ async function loadOwn() {
   } catch { /* empty */ }
   policyText.value = getStr('H7-disc-listed-policy')
   disclosureText.value = getStr('H7-disc-listed-text')
-  auditNote.value = getStr('H7-disc-listed-note')
-  auditConclusion.value = getStr('H7-disc-listed-conclusion')
 }
 
 async function persist(itemId: string, value: any) {
@@ -210,7 +197,6 @@ onUnmounted(() => {
 .tab-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .chip-wrap { display: inline-flex; }
 .block-card { margin-bottom: 16px; }
-.note-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 8px; }
 .hint-alert { margin-bottom: 12px; }

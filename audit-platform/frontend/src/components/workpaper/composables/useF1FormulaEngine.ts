@@ -18,8 +18,12 @@ export interface DetailRowForFormula {
   nature: string
   endAudited: number
   priorAudited: number
-  agingAudited: { within1: number; y1to2: number; y2to3: number; over3: number }
+  /** 审定账龄：key 与项目 aging config segment.key 一致（within1 / y1to2 …） */
+  agingAudited: Record<string, number>
 }
+
+/** 默认 3 年段 keys（与 F1 默认 THREE_YEAR 一致） */
+export const DEFAULT_F1_AGING_KEYS = ['within1', 'y1to2', 'y2to3', 'over3'] as const
 
 // ─── 数值解析 ─────────────────────────────────────────────────────────────────
 
@@ -92,10 +96,9 @@ export function calcPriorAudited(unadjusted: number, adjustment: number, reclass
 // ─── 借方科目期末余额 ───────────────────────────────────────────────────────
 
 /**
- * 期末余额（借方科目）= 期初审定 + 贷方发生 - 借方发生
+ * 期末余额（借方科目/资产类）= 期初审定 + 借方发生 - 贷方发生
  *
- * F1-2 明细表 O列 = H + N - M。
- * 核心差异：借方科目贷方增加、借方减少（vs D2借方科目相反）。
+ * F1-2 明细表 O列 = H + M - N（预付账款 1123）。
  */
 export function calcEndUnadjustedDebit(priorAudited: number, debit: number, credit: number): number {
   return priorAudited + debit - credit
@@ -130,12 +133,29 @@ export function calcEndAudited(endUnadjusted: number, endAje: number, endRje: nu
 // ─── 关联方期末余额 ─────────────────────────────────────────────────────────
 
 /**
- * 关联方期末余额（借方科目）= 期初 + 贷方 - 借方
+ * 关联方期末余额（借方科目）= 期初 + 借方 - 贷方
  *
  * F1-6 关联方检查表行内公式。与 calcEndBalance 逻辑一致，语义区分。
  */
 export function calcRelatedPartyEndBalance(prior: number, debit: number, credit: number): number {
   return prior + debit - credit
+}
+
+/** 账龄各段合计 */
+export function sumAgingValues(aging: Record<string, number> | null | undefined): number {
+  if (!aging || typeof aging !== 'object') return 0
+  return Object.values(aging).reduce((s, v) => s + parseNum(v), 0)
+}
+
+/**
+ * 账龄逻辑校验：各段之和是否等于对应余额（默认容差 0.01）
+ */
+export function checkAgingBalance(
+  agingSum: number,
+  balance: number,
+  tolerance = 0.01,
+): boolean {
+  return Math.abs(parseNum(agingSum) - parseNum(balance)) <= tolerance
 }
 
 // ─── 阈值判定 ────────────────────────────────────────────────────────────────
@@ -188,19 +208,33 @@ export function aggregateByNature(
 // ─── 按审定账龄聚合 ─────────────────────────────────────────────────────────
 
 /**
- * 按审定账龄聚合：从明细行按 U~X 列聚合
+ * 按审定账龄聚合：从明细行按账龄段 key 聚合
  *
  * 适用于 F1-1 "按账龄分类"区块自动取数。
+ * keys 缺省为 THREE_YEAR 四段；传入项目 segments 时可支持 5 年段/自定义。
  */
 export function aggregateByAging(
-  rows: DetailRowForFormula[]
-): { within1: number; y1to2: number; y2to3: number; over3: number } {
-  const result = { within1: 0, y1to2: 0, y2to3: 0, over3: 0 }
+  rows: DetailRowForFormula[],
+  keys: readonly string[] = DEFAULT_F1_AGING_KEYS,
+): Record<string, number> {
+  const result: Record<string, number> = {}
+  for (const k of keys) result[k] = 0
   for (const row of rows) {
-    result.within1 += row.agingAudited.within1
-    result.y1to2 += row.agingAudited.y1to2
-    result.y2to3 += row.agingAudited.y2to3
-    result.over3 += row.agingAudited.over3
+    const aging = row.agingAudited || {}
+    for (const k of keys) {
+      result[k] += parseNum(aging[k])
+    }
   }
   return result
+}
+
+/**
+ * 占比（%）：part / total × 100；分母为 0 时返回 0
+ */
+export function calcPercentage(part: number, total: number): number {
+  if (!total || !isFinite(total)) return 0
+  const p = parseNum(part)
+  const t = parseNum(total)
+  if (!t) return 0
+  return (p / t) * 100
 }

@@ -28,9 +28,10 @@ export interface D2DetailRowV2 {
   [key: string]: any
 }
 
-/** D3/F1 新格式行（2 period） */
+/** D3/F1 新格式行（D3 为 2 period；F1-2 Excel 含期末未审 agingCurrent 为 3 period） */
 export interface D3F1DetailRowV2 {
   agingPrior: AgingData
+  agingCurrent?: AgingData
   agingAudited: AgingData
   [key: string]: any
 }
@@ -156,7 +157,7 @@ export function migrateD3F1Keys(raw: any, segments: AgingSegment[]): D3F1DetailR
 
   // 复制所有非 aging 字段
   for (const key of Object.keys(raw)) {
-    if (key !== 'agingPrior' && key !== 'agingAudited') {
+    if (key !== 'agingPrior' && key !== 'agingCurrent' && key !== 'agingAudited') {
       result[key] = raw[key]
     }
   }
@@ -164,20 +165,26 @@ export function migrateD3F1Keys(raw: any, segments: AgingSegment[]): D3F1DetailR
   const oldPrior: AgingData = (raw.agingPrior && typeof raw.agingPrior === 'object')
     ? raw.agingPrior
     : {}
+  const oldCurrent: AgingData = (raw.agingCurrent && typeof raw.agingCurrent === 'object')
+    ? raw.agingCurrent
+    : {}
   const oldAudited: AgingData = (raw.agingAudited && typeof raw.agingAudited === 'object')
     ? raw.agingAudited
     : {}
 
   // 按新 segments 构建 nested 对象：匹配 key 保留，不匹配初始化 0
   const newPrior: AgingData = {}
+  const newCurrent: AgingData = {}
   const newAudited: AgingData = {}
 
   for (const seg of segments) {
     newPrior[seg.key] = _toNumber(oldPrior[seg.key])
+    newCurrent[seg.key] = _toNumber(oldCurrent[seg.key])
     newAudited[seg.key] = _toNumber(oldAudited[seg.key])
   }
 
   result.agingPrior = newPrior
+  result.agingCurrent = newCurrent
   result.agingAudited = newAudited
 
   return result as D3F1DetailRowV2
@@ -223,8 +230,11 @@ export function remapRowAgingData(
   if (row.agingPrior && typeof row.agingPrior === 'object') {
     result.agingPrior = remapAgingData(row.agingPrior, newSegments)
   }
-  if (isThreePeriod && row.agingCurrent && typeof row.agingCurrent === 'object') {
+  // F1-2 等含期末未审账龄：有 agingCurrent 即重映射（isThreePeriod 或已有字段）
+  if ((isThreePeriod || row.agingCurrent) && row.agingCurrent && typeof row.agingCurrent === 'object') {
     result.agingCurrent = remapAgingData(row.agingCurrent, newSegments)
+  } else if (isThreePeriod) {
+    result.agingCurrent = remapAgingData({}, newSegments)
   }
   if (row.agingAudited && typeof row.agingAudited === 'object') {
     result.agingAudited = remapAgingData(row.agingAudited, newSegments)

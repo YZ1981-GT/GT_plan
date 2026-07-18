@@ -34,6 +34,9 @@ export function useF2ObsoleteInventory(options: {
 
   function load(): void {
     const raw = readValRowJson(allResponses.value.get(ROWS_KEY))
+    // 自回声守卫：persist() 写回后 watcher 会再次触发 load，
+    // 若内容与内存一致则跳过，避免 migrate 的空行裁剪吃掉刚新增的空行。
+    if (raw && raw === JSON.stringify(sheet.value)) return
     if (raw) {
       try {
         const parsed = JSON.parse(raw)

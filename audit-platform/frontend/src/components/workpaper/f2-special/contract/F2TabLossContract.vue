@@ -1,5 +1,5 @@
-<template>
-  <div class="f2-val-sheet f2-loss-contract">
+﻿<template>
+  <div class="f2-val-sheet f2-loss-contract f2-soft-matrix">
     <header class="sheet-header">
       <div>
         <h3>亏损合同预计损失测算表</h3>
@@ -37,18 +37,23 @@
           api-prefix="f2-spe"
           sheet="F2-58"
           :disabled="isReadonly"
-          ai-section="loss-analysis"
-          :existing-content="loss.auditNote.value"
-          :related-context="{
-            lossCount: loss.lossCount.value,
-            adjustCount: loss.adjustCount.value,
-          }"
           review-section="F2-58-loss"
-          @ai-filled="(t: string) => { loss.auditNote.value = t }"
         />
-        <GtIndexChip value="wp:F2-58" />
-        <el-tag size="small" type="info">{{ loss.enrichedProjects.value.length }} 个项目</el-tag>
+        <GtIndexChip value="wp:F2-58" :context-project-id="projectId" />
+        <el-tag size="small" type="info">{{ filledCount }} 个项目</el-tag>
       </div>
+    </div>
+
+    <div v-if="projectId && wpId" class="evidence-panel">
+      <h4>亏损合同测算附件</h4>
+      <p>上传合同、预计收入成本测算、履行成本依据等支持性资料。</p>
+      <ItemAttachment
+        :project-id="projectId"
+        :wp-id="wpId"
+        sheet-key="F2-58"
+        :item-index="1"
+        accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
+      />
     </div>
 
     <div class="table-scroll">
@@ -155,13 +160,27 @@
     </div>
 
     <el-card class="opinion-card" shadow="never">
-      <template #header><span class="opinion-title">1、审计说明</span></template>
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">1、审计说明</span>
+          <el-button size="small" type="primary" plain
+            :disabled="isReadonly || !aiAvailable" :loading="aiLoading"
+            @click="runAi('loss-contract-note')">AI 填写审计说明</el-button>
+        </div>
+      </template>
       <el-input v-model="loss.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="说明亏损合同识别、预计损失测算及差异处理…" :disabled="isReadonly" />
     </el-card>
 
     <el-card class="opinion-card" shadow="never">
-      <template #header><span class="opinion-title">2、审计结论</span></template>
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">2、审计结论</span>
+          <el-button size="small" type="primary" plain
+            :disabled="isReadonly || !aiAvailable" :loading="aiLoading"
+            @click="runAi('loss-contract-conclusion')">AI 生成结论</el-button>
+        </div>
+      </template>
       <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
         placeholder="A、未见异常。B、除上述应调整事项外，其余未见异常。C、不可确认。"
         :disabled="isReadonly" @update:model-value="saveAuditConclusion" />
@@ -177,15 +196,25 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, toRef } from 'vue'
+import { computed, onMounted, ref, toRef, type Ref } from 'vue'
 import { useF2LossContract } from '../../composables/useF2LossContract'
-import { F2_58_OBJECTIVE, F2_58_TIPS } from '../../composables/useF2LossContractFormulas'
+import {
+  F2_58_OBJECTIVE,
+  F2_58_TIPS,
+  isBlankLossContractProject,
+} from '../../composables/useF2LossContractFormulas'
+import {
+  useF2SpecialAiGenerate,
+  type F2SpeAiSection,
+} from '../../composables/useF2SpecialAiGenerate'
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import ItemAttachment from '../../ItemAttachment.vue'
 
 const props = defineProps<{
   wpId?: string
+  projectId?: string
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()
@@ -197,6 +226,15 @@ const loss = useF2LossContract({
 
 const objectiveText = F2_58_OBJECTIVE
 const tips = F2_58_TIPS
+const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
+const {
+  aiAvailable,
+  loading: aiLoading,
+  generateAndConfirm,
+} = useF2SpecialAiGenerate(wpIdRef)
+const filledCount = computed(() =>
+  loss.sheet.value.projects.filter((row) => !isBlankLossContractProject(row)).length,
+)
 
 const CONCLUSION_KEY = 'F2-58-conclusion'
 const auditConclusion = ref('')
@@ -211,6 +249,50 @@ onMounted(() => {
   const c = props.allResponses.get(CONCLUSION_KEY)
   if (c?.remark) auditConclusion.value = c.remark
 })
+
+function aiContext(): Record<string, unknown> {
+  return {
+    sheet: 'F2-58',
+    projectCount: filledCount.value,
+    estimatedTotalRevenue: loss.columnTotals.value.estimatedTotalRevenue,
+    estimatedTotalCost: loss.columnTotals.value.estimatedTotalCost,
+    contractEstimatedLoss: loss.columnTotals.value.contractEstimatedLoss,
+    recognizedLossInPl: loss.columnTotals.value.recognizedLossInPl,
+    currentPeriodLoss: loss.columnTotals.value.currentPeriodLoss,
+    bookRecognizedLoss: loss.columnTotals.value.bookRecognizedLoss,
+    differenceTotal: loss.columnTotals.value.difference,
+    lossCount: loss.lossCount.value,
+    differenceCount: loss.adjustCount.value,
+    projects: loss.enrichedProjects.value
+      .filter((row) => !isBlankLossContractProject(row))
+      .slice(0, 30)
+      .map((row) => ({
+        projectCode: row.projectCode,
+        projectName: row.projectName,
+        completionRate: row.effectiveCompletionRate,
+        estimatedTotalRevenue: row.estimatedTotalRevenue,
+        estimatedTotalCost: row.estimatedTotalCost,
+        contractEstimatedLoss: row.contractEstimatedLoss,
+        recognizedLossInPl: row.recognizedLossInPl,
+        currentPeriodLoss: row.currentPeriodLoss,
+        bookRecognizedLoss: row.bookRecognizedLoss,
+        difference: row.difference,
+        remark: row.remark,
+      })),
+  }
+}
+
+async function runAi(section: F2SpeAiSection): Promise<void> {
+  const isNote = section === 'loss-contract-note'
+  const existing = isNote ? loss.auditNote.value : auditConclusion.value
+  const title = isNote
+    ? 'AI 生成 · 亏损合同审计说明'
+    : 'AI 生成 · 亏损合同审计结论'
+  const text = await generateAndConfirm(section, existing || '', aiContext(), title)
+  if (!text) return
+  if (isNote) loss.auditNote.value = text
+  else saveAuditConclusion(text)
+}
 
 function fmt(v: number): string {
   if (!Number.isFinite(v) || v === 0) return '—'
@@ -230,8 +312,10 @@ function fmtPct(v: number): string {
 </script>
 
 <style scoped src="../../f2/valuation/f2ValSheetStyles.css"></style>
+<style scoped src="./f2SoftMatrixStyles.css"></style>
 <style scoped>
 .f2-loss-contract { --gt-purple: #4b2d77; --gt-purple-soft: #f3eef8; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
 
 .table-scroll { overflow-x: auto; margin-bottom: 12px; }
 .matrix-table {

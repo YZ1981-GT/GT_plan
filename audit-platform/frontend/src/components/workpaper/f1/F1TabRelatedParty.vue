@@ -1,29 +1,26 @@
 <template>
-<div class="d3-related-party">
-  <!-- 编制提示 -->
+<div class="f1-related-party">
   <details class="guidance-details">
     <summary>📋 编制提示</summary>
     <div class="guidance-content">
-      <p>1. 本表列示关联方预付账款（科目1123），逐户填列关联关系、发生额与期末余额。</p>
-      <p>2. 期末余额自动计算（期末=期初+借方-贷方，灰底列不可手工编辑）。</p>
-      <p>3. 关注关联方预付是否具有商业实质、定价是否公允，警惕通过预付款变相资金占用。</p>
-      <p>4. 关联方及其交易须在附注充分披露，结论应与 F1-1 审定表、附注勾稽一致。</p>
+      <p>1. 本表列示关联方预付账款，核真实性、商业实质与定价公允性，防止漏识关联方及资金占用。</p>
+      <p>2. 期末余额 = 期初 + 借方 − 贷方；账面价值 = 期末 − 坏账准备（灰底自动）。</p>
+      <p>3. 关联关系按模板枚举选择；款项性质与 F1-2 一致；大额长期关联预付关注占资与披露。</p>
+      <p>4. 可从 F1-2 导入非「非关联方」户（同名合并）；结论与附注披露勾稽。</p>
     </div>
   </details>
 
-  <!-- 审计目标 -->
   <el-alert
     type="info"
     :closable="false"
-    title="审计目标：核实关联方预付账款的真实性与完整性，评估交易的商业实质与定价公允性，确认关联方关系及交易披露的充分性。"
+    title="审计目标：核实对关联方预付款项的真实性、合理性、合法性及会计处理正确性，确认不存在未识别关联方，关联方关系及交易披露恰当。"
     class="objective-alert"
   />
 
-  <!-- 工具栏 -->
   <div class="tab-toolbar">
     <div class="toolbar-left">
       <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加关联方</el-button>
-      <el-button size="small" :disabled="isReadonly" @click="doImport">从F1-2导入</el-button>
+      <el-button size="small" :disabled="isReadonly" @click="doImport">从 F1-2 导入</el-button>
     </div>
     <div class="toolbar-right">
       <el-dropdown size="small" trigger="click" :disabled="isReadonly">
@@ -41,107 +38,108 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-      <span class="chip-wrap"><GtIndexChip value="wp:F1-1" :context-project-id="projectId" /></span>
+      <span class="chip-wrap"><GtIndexChip value="wp:F1-2" :context-project-id="projectId" /></span>
       <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
     </div>
   </div>
 
-  <!-- 10列表格 -->
-  <el-table :data="tableData" size="small" border stripe>
-    <el-table-column label="关联方名称" width="140">
+  <F1SheetAttachments
+    :project-id="projectId"
+    :wp-id="wpId"
+    sheet-code="F1-6"
+    label="关联方检查附件"
+  />
+
+  <el-table :data="tableData" size="small" border stripe :row-class-name="rowClassName">
+    <el-table-column label="关联方名称" width="140" fixed>
       <template #default="{ row }">
-        <template v-if="row.rowId === '__subtotal__'">
-          <span class="subtotal-label">合计</span>
-        </template>
-        <template v-else>
-          <el-input v-model="row.partyName" size="small" :disabled="isReadonly"
-            @change="(val: string) => updateCell(row.rowId, 'partyName', val)" />
-          <GtIndexChip value="wp:F1-2" :context-project-id="projectId" />
-        </template>
+        <span v-if="row.rowId === '__subtotal__'" class="subtotal-label">合计</span>
+        <el-input v-else :model-value="row.partyName" size="small" :disabled="isReadonly"
+          @change="(val: string) => updateCell(row.rowId, 'partyName', val)" />
       </template>
     </el-table-column>
-    <el-table-column label="关联关系" width="120">
+    <el-table-column label="关联关系" width="160">
       <template #default="{ row }">
-        <el-select v-if="row.rowId !== '__subtotal__'" v-model="row.relationship" size="small" :disabled="isReadonly"
+        <el-select v-if="row.rowId !== '__subtotal__'" :model-value="row.relationship" size="small"
+          :disabled="isReadonly" filterable allow-create
           @change="(val: string) => updateCell(row.rowId, 'relationship', val)">
-          <el-option value="母公司" />
-          <el-option value="子公司" />
-          <el-option value="联营企业" />
-          <el-option value="合营企业" />
-          <el-option value="关键管理人员" />
-          <el-option value="其他关联方" />
+          <el-option v-for="opt in F1_RELATED_PARTY_RELATIONSHIP_OPTIONS" :key="opt" :label="opt" :value="opt" />
         </el-select>
       </template>
     </el-table-column>
     <el-table-column label="期初余额" width="110" align="right">
       <template #default="{ row }">
-        <template v-if="row.rowId === '__subtotal__'">
-          <span class="subtotal-val">{{ fmtAmount(subtotalRow.priorBalance) }}</span>
-        </template>
-        <template v-else>
-          <el-input v-model.number="row.priorBalance" size="small" :disabled="isReadonly"
-            @change="(val: any) => updateCell(row.rowId, 'priorBalance', val)" />
-        </template>
+        <span v-if="row.rowId === '__subtotal__'" class="amt subtotal-val">{{ fmtAmount(subtotalRow.priorBalance) }}</span>
+        <el-input v-else :model-value="row.priorBalance" size="small" :disabled="isReadonly"
+          @change="(val: any) => updateCell(row.rowId, 'priorBalance', val)" />
       </template>
     </el-table-column>
-    <el-table-column label="借方发生" width="110" align="right">
+    <el-table-column label="借方发生额" width="110" align="right">
       <template #default="{ row }">
-        <template v-if="row.rowId === '__subtotal__'">
-          <span class="subtotal-val">{{ fmtAmount(subtotalRow.debit) }}</span>
-        </template>
-        <template v-else>
-          <el-input v-model.number="row.debit" size="small" :disabled="isReadonly"
-            @change="(val: any) => updateCell(row.rowId, 'debit', val)" />
-        </template>
+        <span v-if="row.rowId === '__subtotal__'" class="amt subtotal-val">{{ fmtAmount(subtotalRow.debit) }}</span>
+        <el-input v-else :model-value="row.debit" size="small" :disabled="isReadonly"
+          @change="(val: any) => updateCell(row.rowId, 'debit', val)" />
       </template>
     </el-table-column>
-    <el-table-column label="贷方发生" width="110" align="right">
+    <el-table-column label="贷方发生额" width="110" align="right">
       <template #default="{ row }">
-        <template v-if="row.rowId === '__subtotal__'">
-          <span class="subtotal-val">{{ fmtAmount(subtotalRow.credit) }}</span>
-        </template>
-        <template v-else>
-          <el-input v-model.number="row.credit" size="small" :disabled="isReadonly"
-            @change="(val: any) => updateCell(row.rowId, 'credit', val)" />
-        </template>
+        <span v-if="row.rowId === '__subtotal__'" class="amt subtotal-val">{{ fmtAmount(subtotalRow.credit) }}</span>
+        <el-input v-else :model-value="row.credit" size="small" :disabled="isReadonly"
+          @change="(val: any) => updateCell(row.rowId, 'credit', val)" />
       </template>
     </el-table-column>
     <el-table-column label="期末余额" width="110" align="right" class-name="auto-calc-col">
       <template #default="{ row }">
-        <template v-if="row.rowId === '__subtotal__'">
-          <span class="subtotal-val">{{ fmtAmount(subtotalRow.endBalance) }}</span>
-        </template>
-        <template v-else>
-          <span class="auto-calc">{{ fmtAmount(row.endBalance) }}</span>
-        </template>
+        <span class="amt auto">{{ fmtAmount(row.rowId === '__subtotal__' ? subtotalRow.endBalance : row.endBalance) }}</span>
       </template>
     </el-table-column>
-    <el-table-column label="发生时间及账龄" width="130">
+    <el-table-column label="减：坏账准备" width="110" align="right">
       <template #default="{ row }">
-        <el-input v-if="row.rowId !== '__subtotal__'" v-model="row.agingDescription" size="small" :disabled="isReadonly"
+        <span v-if="row.rowId === '__subtotal__'" class="amt subtotal-val">{{ fmtAmount(subtotalRow.badDebt) }}</span>
+        <el-input v-else :model-value="row.badDebt" size="small" :disabled="isReadonly"
+          @change="(val: any) => updateCell(row.rowId, 'badDebt', val)" />
+      </template>
+    </el-table-column>
+    <el-table-column label="账面价值" width="110" align="right" class-name="auto-calc-col">
+      <template #default="{ row }">
+        <span class="amt auto">{{ fmtAmount(row.rowId === '__subtotal__' ? subtotalRow.bookValue : row.bookValue) }}</span>
+      </template>
+    </el-table-column>
+    <el-table-column label="发生时间及账龄" width="140">
+      <template #default="{ row }">
+        <el-input v-if="row.rowId !== '__subtotal__'" :model-value="row.agingDescription" size="small" :disabled="isReadonly"
           @change="(val: string) => updateCell(row.rowId, 'agingDescription', val)" />
       </template>
     </el-table-column>
-    <el-table-column label="款项性质" width="120">
+    <el-table-column label="发生原因（款项性质）" width="140">
       <template #default="{ row }">
-        <el-input v-if="row.rowId !== '__subtotal__'" v-model="row.natureDescription" size="small" :disabled="isReadonly"
-          @change="(val: string) => updateCell(row.rowId, 'natureDescription', val)" />
+        <el-select v-if="row.rowId !== '__subtotal__'" :model-value="row.natureDescription" size="small"
+          :disabled="isReadonly" filterable allow-create clearable
+          @change="(val: string) => updateCell(row.rowId, 'natureDescription', val || '')">
+          <el-option v-for="opt in F1_PAYMENT_NATURE_OPTIONS" :key="opt" :label="opt" :value="opt" />
+        </el-select>
       </template>
     </el-table-column>
-    <el-table-column label="索引" width="70">
+    <el-table-column label="期后到货" width="110" align="right">
       <template #default="{ row }">
-        <el-input v-if="row.rowId !== '__subtotal__'" v-model="row.indexRef" size="small" :disabled="isReadonly"
+        <span v-if="row.rowId === '__subtotal__'" class="amt subtotal-val">{{ fmtAmount(subtotalRow.postPeriodDelivery) }}</span>
+        <el-input v-else :model-value="row.postPeriodDelivery" size="small" :disabled="isReadonly"
+          @change="(val: any) => updateCell(row.rowId, 'postPeriodDelivery', val)" />
+      </template>
+    </el-table-column>
+    <el-table-column label="索引号" width="90">
+      <template #default="{ row }">
+        <el-input v-if="row.rowId !== '__subtotal__'" :model-value="row.indexRef" size="small" :disabled="isReadonly"
           @change="(val: string) => updateCell(row.rowId, 'indexRef', val)" />
       </template>
     </el-table-column>
     <el-table-column label="备注" min-width="100">
       <template #default="{ row }">
-        <el-input v-if="row.rowId !== '__subtotal__'" v-model="row.remark" size="small" :disabled="isReadonly"
+        <el-input v-if="row.rowId !== '__subtotal__'" :model-value="row.remark" size="small" :disabled="isReadonly"
           @change="(val: string) => updateCell(row.rowId, 'remark', val)" />
       </template>
     </el-table-column>
-    <!-- 操作 -->
-    <el-table-column label="操作" width="60" v-if="!isReadonly">
+    <el-table-column label="操作" width="60" fixed="right" v-if="!isReadonly">
       <template #default="{ row }">
         <el-popconfirm v-if="row.rowId !== '__subtotal__'" title="确认删除？" @confirm="removeRow(row.rowId)">
           <template #reference><el-button size="small" type="danger" link>删除</el-button></template>
@@ -150,7 +148,6 @@
     </el-table-column>
   </el-table>
 
-  <!-- 审计说明区（卡片式） -->
   <el-card class="opinion-card" shadow="never">
     <template #header>
       <div class="opinion-header">
@@ -165,30 +162,24 @@
     <div class="opinion-section">
       <div class="opinion-section-header">
         <span class="opinion-section-label">审计说明</span>
+        <el-button size="small" type="primary" plain :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading"
+          @click="generateNote">🤖AI</el-button>
       </div>
-      <el-input
-        v-model="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        :disabled="isReadonly"
-        placeholder="对关联方预付账款的分析说明..."
-      />
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
+        placeholder="评价关联方预付的商业实质、定价公允性、是否存在资金占用及披露充分性..." />
     </div>
 
     <div class="opinion-section">
       <div class="opinion-section-header">
         <span class="opinion-section-label">审计结论</span>
         <div class="opinion-actions">
-          <el-button size="small" @click="openReview">💬</el-button>
+          <el-button size="small" :disabled="isReadonly || !aiAvailable || aiLoading" :loading="aiLoading"
+            @click="generateConclusion">🤖AI</el-button>
+          <el-button v-if="openReviewDialog" size="small" @click="openReview">复核</el-button>
         </div>
       </div>
-      <el-input
-        v-model="conclusion"
-        type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }"
-        :disabled="isReadonly"
-        placeholder="审计结论..."
-      />
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
+        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。" />
     </div>
   </el-card>
 </div>
@@ -196,17 +187,22 @@
 
 <script setup lang="ts">
 /**
- * F1TabRelatedParty.vue — F1-6 关联方检查表
- * 10列表 + 行内公式(期末=期初+贷方-借方) + 从F1-2导入 + 复核
+ * F1TabRelatedParty.vue — F1-6 关联方及交易检查表（13列，对齐 Excel）
  */
 import { computed, inject, toRef, type Ref } from 'vue'
-import { useF1RelatedParty } from '../composables/useF1RelatedParty'
+import {
+  useF1RelatedParty,
+  F1_RELATED_PARTY_RELATIONSHIP_OPTIONS,
+} from '../composables/useF1RelatedParty'
+import { F1_PAYMENT_NATURE_OPTIONS } from '../composables/useF1Adjudication'
+import { useF1AiGenerate } from '../composables/useF1AiGenerate'
 import { useF1ImportExport, type F1ImportSheet } from '../composables/useWorkpaperImportExport'
 import type { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
+import F1SheetAttachments from './F1SheetAttachments.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -219,8 +215,8 @@ const props = defineProps<{
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
-
-const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
 const {
   rows,
@@ -233,21 +229,63 @@ const {
   importFromCrossSheet,
 } = useF1RelatedParty({
   allResponses: allResponsesRef,
-  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpId: wpIdRef,
   projectId: toRef(props, 'projectId') as Ref<string>,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(wpIdRef)
+
 const tableData = computed(() => [
   ...rows.value,
-  { rowId: '__subtotal__', partyName: '合计', relationship: '', priorBalance: 0, debit: 0, credit: 0, endBalance: 0, agingDescription: '', natureDescription: '', indexRef: '', remark: '' },
+  {
+    rowId: '__subtotal__',
+    partyName: '合计',
+    relationship: '',
+    priorBalance: 0,
+    debit: 0,
+    credit: 0,
+    endBalance: 0,
+    badDebt: 0,
+    bookValue: 0,
+    agingDescription: '',
+    natureDescription: '',
+    postPeriodDelivery: 0,
+    indexRef: '',
+    remark: '',
+  },
 ])
 
+function rowClassName({ row }: { row: any }) {
+  return row.rowId === '__subtotal__' ? 'subtotal-row' : ''
+}
+
 function doImport() {
-  const rpRows = props.crossSheet.relatedPartyRows.value
-  importFromCrossSheet(rpRows)
+  importFromCrossSheet(props.crossSheet.relatedPartyRows.value)
+}
+
+function noteContext() {
+  return {
+    sheet: 'F1-6',
+    rowCount: rows.value.length,
+    endBalanceTotal: subtotalRow.value.endBalance,
+    bookValueTotal: subtotalRow.value.bookValue,
+    parties: rows.value.map(r => `${r.partyName}(${r.relationship}):${r.endBalance}`).slice(0, 8).join('; '),
+  }
+}
+
+async function generateNote() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('related-party-note', auditNote.value, noteContext(), 'F1-6 审计说明')
+  if (text) auditNote.value = text
+}
+
+async function generateConclusion() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm('related-party-conclusion', conclusion.value, noteContext(), 'F1-6 审计结论')
+  if (text) conclusion.value = text
 }
 
 function fmtAmount(val: number | null | undefined): string {
@@ -257,11 +295,11 @@ function fmtAmount(val: number | null | undefined): string {
 }
 
 function openReview() {
-  openReviewDialog('F1-rp-conclusion')
+  openReviewDialog?.('F1-rp-conclusion')
 }
 
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
-const { exportTemplate, exportData, importData, importing } = useF1ImportExport({ wpId: toRef(props, 'wpId') as Ref<string> })
+const { exportTemplate, exportData, importData, importing } = useF1ImportExport({ wpId: wpIdRef })
 
 async function handleImport(file: File, sheet: F1ImportSheet): Promise<boolean> {
   const result = await importData(sheet, file)
@@ -271,37 +309,35 @@ async function handleImport(file: File, sheet: F1ImportSheet): Promise<boolean> 
 </script>
 
 <style scoped>
-.d3-related-party { padding: 16px; }
-.d3-related-party :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
-.d3-related-party :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
+.f1-related-party { padding: 16px; }
+.f1-related-party :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
+.f1-related-party :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
 
-/* 编制提示 */
 .guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .objective-alert { margin-bottom: 12px; }
 
-/* 工具栏 */
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.toolbar-left, .toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .chip-wrap { display: inline-flex; align-items: center; }
 
 .subtotal-label { font-weight: 700; }
 .subtotal-val { font-weight: 700; }
-.auto-calc { color: #909399; }
+.amt { text-align: right; display: inline-block; width: 100%; }
+.auto { color: #909399; }
 :deep(.auto-calc-col) { background-color: #f5f7fa !important; }
+:deep(.subtotal-row) { background-color: #fafafa !important; font-weight: 600; }
 
-/* 审计意见卡片 */
 .opinion-card { margin-top: 16px; border-radius: 8px; }
 .opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
 .opinion-header { display: flex; align-items: center; justify-content: space-between; }
-.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+.opinion-title { font-size: 14px; font-weight: 600; }
 .opinion-chips { display: flex; gap: 6px; }
 .opinion-section { margin-bottom: 16px; }
 .opinion-section:last-child { margin-bottom: 0; }
-.opinion-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.opinion-section-label { font-size: 14px; font-weight: 500; color: #303133; }
+.opinion-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 8px; }
+.opinion-section-label { font-size: 14px; font-weight: 500; }
 .opinion-actions { display: flex; gap: 6px; }
 </style>

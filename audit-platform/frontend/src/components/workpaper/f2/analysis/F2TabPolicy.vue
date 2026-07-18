@@ -42,7 +42,7 @@ onMounted(() => {
   if (c?.remark) auditConclusion.value = c.remark
 })
 
-const { sections, policyConclusion, changedCount, updateSection } = useF2Policy({
+const { sections, policyConclusion, changedCount, updateSection, updateConclusion } = useF2Policy({
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
@@ -56,7 +56,7 @@ async function generatePolicyConclusion() {
     { changedCount: changedCount.value },
     'AI 生成 · 会计政策评价',
   )
-  if (text) policyConclusion.value = text
+  if (text) updateConclusion(text)
 }
 </script>
 

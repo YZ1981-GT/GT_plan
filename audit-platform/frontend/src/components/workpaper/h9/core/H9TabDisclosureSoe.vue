@@ -79,36 +79,6 @@
       />
     </el-card>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>
-        <div class="section-title"><span>审计说明</span></div>
-      </template>
-      <el-input
-        v-model="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 5 }"
-        :readonly="isReadonly"
-        placeholder="请填写附注披露的审计说明：披露口径、净额计算依据、与审定表勾稽核对情况等..."
-        @change="saveAuditNote"
-      />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>
-        <div class="section-title"><span>审计结论</span></div>
-      </template>
-      <el-input
-        v-model="auditConclusion"
-        type="textarea"
-        :autosize="{ minRows: 3 }"
-        :readonly="isReadonly"
-        placeholder="请填写附注披露的审计结论..."
-        @change="saveAuditConclusion"
-      />
-    </el-card>
-
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -155,8 +125,6 @@ interface DisclosureRow {
 
 const editableRows = ref<DisclosureRow[]>([])
 const supplementNote = ref('')
-const auditNote = ref('')
-const auditConclusion = ref('')
 
 const defaultRows: DisclosureRow[] = [
   { item: '租赁付款额', endBalance: null, beginBalance: null, isSummary: false },
@@ -196,9 +164,7 @@ function loadFromResponses() {
     editableRows.value = [...defaultRows]
   }
   const noteItem = props.allResponses.get('H9-disc-soe-audit-note')
-  auditNote.value = noteItem?.remark ?? noteItem?.conclusion ?? ''
   const conclusionItem = props.allResponses.get('H9-disc-soe-audit-conclusion')
-  auditConclusion.value = conclusionItem?.remark ?? conclusionItem?.conclusion ?? ''
 }
 
 // --- 保存 ---
@@ -208,14 +174,6 @@ function onDataChange() {
 
 function saveSupplementNote() {
   saveAll()
-}
-
-function saveAuditNote() {
-  emit('save', 'H9-disc-soe-audit-note', auditNote.value)
-}
-
-function saveAuditConclusion() {
-  emit('save', 'H9-disc-soe-audit-conclusion', auditConclusion.value)
 }
 
 function saveAll() {
@@ -255,7 +213,6 @@ watch(() => props.allResponses, loadFromResponses, { deep: true })
 .h9-tab-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .objective-alert { margin-bottom: 12px; }
-.audit-note-card { margin-bottom: 16px; }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;

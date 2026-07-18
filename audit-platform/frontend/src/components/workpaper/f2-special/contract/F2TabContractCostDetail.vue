@@ -1,5 +1,5 @@
-<template>
-  <div class="f2-val-sheet f2-contract-cost">
+﻿<template>
+  <div class="f2-val-sheet f2-contract-cost f2-soft-matrix">
     <header class="sheet-header">
       <div>
         <h3>合同履约成本构成明细表</h3>
@@ -36,14 +36,23 @@
           api-prefix="f2-spe"
           sheet="F2-55"
           :disabled="isReadonly"
-          ai-section="contract-cost-note"
-          :existing-content="cc.auditNote.value"
           review-section="F2-55-detail"
-          @ai-filled="(t: string) => { cc.auditNote.value = t }"
         />
-        <GtIndexChip value="wp:F2-55" />
-        <el-tag size="small" type="info">{{ cc.enrichedProducts.value.length }} 个项目</el-tag>
+        <GtIndexChip value="wp:F2-55" :context-project-id="projectId" />
+        <el-tag size="small" type="info">{{ filledCount }} 个项目</el-tag>
       </div>
+    </div>
+
+    <div v-if="projectId && wpId" class="evidence-panel">
+      <h4>合同履约成本附件</h4>
+      <p>上传合同台账、成本明细、结转依据等支持性资料。</p>
+      <ItemAttachment
+        :project-id="projectId"
+        :wp-id="wpId"
+        sheet-key="F2-55"
+        :item-index="1"
+        accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
+      />
     </div>
 
     <div class="table-scroll">
@@ -205,13 +214,27 @@
     </div>
 
     <el-card class="opinion-card" shadow="never">
-      <template #header><span class="opinion-title">1、审计说明</span></template>
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">1、审计说明</span>
+          <el-button size="small" type="primary" plain
+            :disabled="isReadonly || !aiAvailable" :loading="aiLoading"
+            @click="runAi('contract-cost-note')">AI 填写审计说明</el-button>
+        </div>
+      </template>
       <el-input v-model="cc.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
         placeholder="说明构成完整性、计量准确性、资本化条件及与1410科目勾稽..." />
     </el-card>
 
     <el-card class="opinion-card" shadow="never">
-      <template #header><span class="opinion-title">2、审计结论</span></template>
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">2、审计结论</span>
+          <el-button size="small" type="primary" plain
+            :disabled="isReadonly || !aiAvailable" :loading="aiLoading"
+            @click="runAi('contract-cost-conclusion')">AI 生成结论</el-button>
+        </div>
+      </template>
       <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
         placeholder="A、未见异常。B、除上述应调整事项外，其余未见异常。C、不可确认。"
         @update:model-value="saveAuditConclusion" />
@@ -227,12 +250,17 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, toRef } from 'vue'
+import { computed, onMounted, ref, toRef } from 'vue'
 import { useF2ContractCost } from '../../composables/useF2ContractCost'
+import {
+  useF2SpecialAiGenerate,
+  type F2SpeAiSection,
+} from '../../composables/useF2SpecialAiGenerate'
 import {
   CONTRACT_COST_CATEGORIES,
   F2_55_DEFAULT_OBJECTIVE,
   F2_55_TIPS,
+  isBlankContractCostProject,
   type EnrichedContractCost,
   type CostCategoryKey,
   type ContractCostProject,
@@ -240,9 +268,11 @@ import {
 import type { ChecklistResponse } from '../../composables/useF2SpecialFormData'
 import F2SheetToolbar from '../../f2/shared/F2SheetToolbar.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import ItemAttachment from '../../ItemAttachment.vue'
 
 const props = defineProps<{
   wpId?: string
+  projectId?: string
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()
@@ -251,6 +281,15 @@ const cc = useF2ContractCost({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
 })
+const wpIdRef = toRef(() => props.wpId || '')
+const {
+  aiAvailable,
+  loading: aiLoading,
+  generateAndConfirm,
+} = useF2SpecialAiGenerate(wpIdRef)
+const filledCount = computed(() =>
+  cc.sheet.value.products.filter((row) => !isBlankContractCostProject(row)).length,
+)
 
 const objectiveText = F2_55_DEFAULT_OBJECTIVE
 const tips = F2_55_TIPS
@@ -272,6 +311,49 @@ function saveAuditConclusion(val: string): void {
   const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
   props.allResponses.set(CONCLUSION_KEY, item)
   window.dispatchEvent(new CustomEvent('f2-spe:save-items', { detail: { items: [item] } }))
+}
+
+function aiContext(): Record<string, unknown> {
+  return {
+    sheet: 'F2-55',
+    projectCount: filledCount.value,
+    openingTotal: cc.columnTotals.value.opening_subtotal,
+    increaseTotal: cc.columnTotals.value.increase_subtotal,
+    decreaseTotal: cc.columnTotals.value.decrease_subtotal,
+    endingBookTotal: cc.columnTotals.value.end_subtotal,
+    adjustmentTotal: cc.columnTotals.value.adj_subtotal,
+    auditedTotal: cc.columnTotals.value.audited_subtotal,
+    exceptionCount: cc.highlightCount.value,
+    projects: cc.enrichedProducts.value
+      .filter((row) => !isBlankContractCostProject(row))
+      .slice(0, 30)
+      .map((row) => ({
+        projectCode: row.projectCode,
+        projectName: row.projectName,
+        contractName: row.contractName,
+        contractAmount: row.contractAmount,
+        endingBookAmount: row.end_subtotal,
+        adjustmentAmount: row.adj_subtotal,
+        auditedAmount: row.audited_subtotal,
+        matchesLedger: row.matchesLedger,
+        carriedByProgress: row.carriedByProgress,
+        isDirectlyRelated: row.isDirectlyRelated,
+        isRecoverable: row.isRecoverable,
+        remark: row.remark,
+      })),
+  }
+}
+
+async function runAi(section: F2SpeAiSection): Promise<void> {
+  const isNote = section === 'contract-cost-note'
+  const existing = isNote ? cc.auditNote.value : auditConclusion.value
+  const title = isNote
+    ? 'AI 生成 · 合同履约成本审计说明'
+    : 'AI 生成 · 合同履约成本审计结论'
+  const text = await generateAndConfirm(section, existing || '', aiContext(), title)
+  if (!text) return
+  if (isNote) cc.auditNote.value = text
+  else saveAuditConclusion(text)
 }
 onMounted(() => {
   const c = props.allResponses.get(CONCLUSION_KEY)
@@ -299,10 +381,12 @@ function fmt(v: number): string {
 </script>
 
 <style scoped src="../../f2/valuation/f2ValSheetStyles.css"></style>
+<style scoped src="./f2SoftMatrixStyles.css"></style>
 <style scoped>
 .f2-contract-cost { --gt-purple: #4b2d77; --gt-purple-soft: #f3eef8; }
 .tab-toolbar { display: flex; gap: 8px; }
 .formula { text-decoration: underline dotted #909399; cursor: help; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
 
 .table-scroll { overflow-x: auto; margin-bottom: 12px; }
 .matrix-table {

@@ -35,7 +35,17 @@
     <div class="section-label">二、样本选取标准与范围</div>
     <div class="meta-grid">
       <label>
-        审计对象
+        <span class="sampling-label">
+          审计对象
+          <el-button
+            link
+            type="primary"
+            size="small"
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="runAi('impairment-audit-object')"
+          >AI</el-button>
+        </span>
         <el-input
           :model-value="imp.sheet.value.sampling.auditObject"
           type="textarea"
@@ -47,7 +57,17 @@
         />
       </label>
       <label>
-        具体样本选取
+        <span class="sampling-label">
+          具体样本选取
+          <el-button
+            link
+            type="primary"
+            size="small"
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="runAi('impairment-sample-criteria')"
+          >AI</el-button>
+        </span>
         <el-input
           :model-value="imp.sheet.value.sampling.sampleCriteria"
           type="textarea"
@@ -70,7 +90,17 @@
         </el-select>
       </label>
       <label>
-        抽样过程
+        <span class="sampling-label">
+          抽样过程
+          <el-button
+            link
+            type="primary"
+            size="small"
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="runAi('impairment-sampling-process')"
+          >AI</el-button>
+        </span>
         <el-input
           :model-value="imp.sheet.value.sampling.samplingProcess"
           type="textarea"
@@ -438,6 +468,17 @@ function aiContext(): Record<string, unknown> {
   return {
     sheet: 'F2-47',
     sampleCount: filledCount.value,
+    samplingMethod: imp.sheet.value.sampling.samplingMethod,
+    sampleItems: imp.enrichedProducts.value
+      .filter((r) => !isBlankProduct(r))
+      .slice(0, 30)
+      .map((r) => ({
+        category: r.category,
+        itemName: r.itemName,
+        bookCost: r.bookCost,
+        inventoryStatus: r.inventoryStatus,
+        requiredProvision: r.requiredProvision,
+      })),
     bookCostTotal: imp.columnTotals.value.bookCost,
     requiredProvisionTotal: imp.columnTotals.value.requiredProvision,
     auditedAmountTotal: imp.columnTotals.value.auditedAmount,
@@ -449,14 +490,43 @@ function aiContext(): Record<string, unknown> {
   }
 }
 
+const AI_TARGETS: Partial<Record<F2ValAiSection, {
+  title: string
+  get: () => string
+  set: (t: string) => void
+}>> = {
+  'impairment-note': {
+    title: 'AI 生成 · 审计说明',
+    get: () => auditNote.value,
+    set: (t) => { auditNote.value = t },
+  },
+  'impairment-conclusion': {
+    title: 'AI 生成 · 跌价测试结论',
+    get: () => imp.testConclusion.value,
+    set: (t) => { imp.testConclusion.value = t },
+  },
+  'impairment-audit-object': {
+    title: 'AI 生成 · 审计对象',
+    get: () => imp.sheet.value.sampling.auditObject,
+    set: (t) => imp.updateSampling({ auditObject: t }),
+  },
+  'impairment-sample-criteria': {
+    title: 'AI 生成 · 具体样本选取',
+    get: () => imp.sheet.value.sampling.sampleCriteria,
+    set: (t) => imp.updateSampling({ sampleCriteria: t }),
+  },
+  'impairment-sampling-process': {
+    title: 'AI 生成 · 抽样过程',
+    get: () => imp.sheet.value.sampling.samplingProcess,
+    set: (t) => imp.updateSampling({ samplingProcess: t }),
+  },
+}
+
 async function runAi(section: F2ValAiSection): Promise<void> {
-  const isNote = section === 'impairment-note'
-  const existing = isNote ? auditNote.value : imp.testConclusion.value
-  const title = isNote ? 'AI 生成 · 审计说明' : 'AI 生成 · 跌价测试结论'
-  const text = await generateAndConfirm(section, existing || '', aiContext(), title)
-  if (!text) return
-  if (isNote) auditNote.value = text
-  else imp.testConclusion.value = text
+  const target = AI_TARGETS[section]
+  if (!target) return
+  const text = await generateAndConfirm(section, target.get() || '', aiContext(), target.title)
+  if (text) target.set(text)
 }
 
 function handleOcrUpload(rowId: string, file?: File) {
@@ -506,6 +576,12 @@ function fmtRatio(r: number): string {
   font-size: 12px;
   color: #606266;
 }
+.sampling-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sampling-label .el-button { padding: 0; height: auto; font-size: 12px; }
 :deep(.sampling-textarea .el-textarea__inner) {
   min-height: 54px !important;
   line-height: 20px;

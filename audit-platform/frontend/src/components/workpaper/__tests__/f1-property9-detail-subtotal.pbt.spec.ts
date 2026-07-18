@@ -19,7 +19,7 @@ const detailRowArb: fc.Arbitrary<DetailRow> = fc.record({
   rowId: fc.string({ minLength: 1, maxLength: 10 }).map(s => `row-${s}`),
   customerName: fc.constantFrom('供应商A', '供应商B', '供应商C', '供应商D', '供应商E'),
   companyCode: fc.constant(''),
-  nature: fc.constantFrom('预付货款', '预付服务费', '预付租金', '其他'),
+  nature: fc.constantFrom('货款', '工程款', '设备款', '服务费', '其他'),
   relationType: fc.constant('非关联方'),
   priorUnadjusted: fc.float({ min: -1e8, max: 1e8, noNaN: true }),
   priorAdjustment: fc.float({ min: -1e8, max: 1e8, noNaN: true }),
@@ -36,6 +36,12 @@ const detailRowArb: fc.Arbitrary<DetailRow> = fc.record({
   endBalance: fc.constant(0), // will be recalculated
   entityReclass: fc.float({ min: -1e8, max: 1e8, noNaN: true }),
   endUnadjusted: fc.constant(0), // will be recalculated
+  agingCurrent: fc.record({
+    within1: fc.float({ min: 0, max: 1e8, noNaN: true }),
+    y1to2: fc.float({ min: 0, max: 1e8, noNaN: true }),
+    y2to3: fc.float({ min: 0, max: 1e8, noNaN: true }),
+    over3: fc.float({ min: 0, max: 1e8, noNaN: true }),
+  }),
   endAje: fc.float({ min: -1e8, max: 1e8, noNaN: true }),
   endRje: fc.float({ min: -1e8, max: 1e8, noNaN: true }),
   endAudited: fc.constant(0), // will be recalculated

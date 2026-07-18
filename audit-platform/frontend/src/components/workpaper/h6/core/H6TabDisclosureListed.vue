@@ -117,36 +117,6 @@
       </el-card>
     </div>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>
-        <div class="section-header" style="margin-bottom:0">
-          <span>审计说明</span>
-          <div class="section-header-actions">
-            <el-button size="small" circle @click="openReview('H6-disclosure-listed-note')">💬</el-button>
-          </div>
-        </div>
-      </template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5, maxRows: 10 }"
-        placeholder="请填写审计说明..." :disabled="props.isReadonly"
-        @blur="saveAuditNote" />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>
-        <div class="section-header" style="margin-bottom:0">
-          <span>审计结论</span>
-          <div class="section-header-actions">
-            <el-button size="small" circle @click="openReview('H6-disclosure-listed-conclusion')">💬</el-button>
-          </div>
-        </div>
-      </template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请填写审计结论..." :disabled="props.isReadonly"
-        @blur="saveAuditConclusion" />
-    </el-card>
-
     <!-- 编制提示 -->
     <details class="edit-tips">
       <summary>编制提示</summary>
@@ -260,20 +230,6 @@ function saveNoteText() {
   saveResponse('H6-disclosure-listed-text', noteText.value)
 }
 
-// ─── 审计说明 / 审计结论 ─────────────────────────────────────────────────────
-const auditNote = ref('')
-const auditNoteResp = props.allResponses.get('H6-disclosure-listed-note')
-if (auditNoteResp?.remark) auditNote.value = auditNoteResp.remark
-function saveAuditNote() {
-  saveResponse('H6-disclosure-listed-note', auditNote.value)
-}
-const auditConclusion = ref('')
-const auditConcResp = props.allResponses.get('H6-disclosure-listed-conclusion')
-if (auditConcResp?.remark) auditConclusion.value = auditConcResp.remark
-function saveAuditConclusion() {
-  saveResponse('H6-disclosure-listed-conclusion', auditConclusion.value)
-}
-
 // ─── EventBus Subscribe ──────────────────────────────────────────────────────
 let unsubscribe: (() => void) | null = null
 
@@ -322,7 +278,6 @@ function fmtAmt(val: number | null | undefined): string {
 .h6-tab-disclosure-listed { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .objective-alert { margin-bottom: 12px; }
-.audit-note-card { margin-top: 12px; }
 
 .methodology-context {
   border-left: 4px solid #d97706;

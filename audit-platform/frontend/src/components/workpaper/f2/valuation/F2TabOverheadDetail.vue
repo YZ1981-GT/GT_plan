@@ -34,10 +34,7 @@
           api-prefix="f2-val"
           sheet="F2-43"
           :disabled="isReadonly"
-          ai-section="cost-analysis"
-          :existing-content="oh.auditNote.value"
           review-section="F2-43-conclusion"
-          @ai-filled="(t: string) => { oh.auditNote.value = t }"
         />
         <span class="chip-wrap"><GtIndexChip value="wp:F2-43" /></span>
       </div>
@@ -108,7 +105,19 @@
     </div>
 
     <el-card shadow="never" class="conclusion-card">
-      <template #header><span class="conclusion-header">三、审计说明</span></template>
+      <template #header>
+        <div class="conclusion-card-header">
+          <span class="conclusion-header">三、审计说明</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="runAi('overhead-note')"
+          >AI 填写审计说明</el-button>
+        </div>
+      </template>
       <el-input
         v-model="oh.auditNote.value"
         type="textarea"
@@ -119,7 +128,19 @@
     </el-card>
 
     <el-card shadow="never" class="conclusion-card">
-      <template #header><span class="conclusion-header">四、审计结论</span></template>
+      <template #header>
+        <div class="conclusion-card-header">
+          <span class="conclusion-header">四、审计结论</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="runAi('overhead-conclusion')"
+          >AI 生成结论</el-button>
+        </div>
+      </template>
       <el-input
         :model-value="auditConclusion"
         type="textarea"
@@ -140,8 +161,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, toRef } from 'vue'
+import { ref, onMounted, toRef, type Ref } from 'vue'
 import { useF2OverheadDetail } from '../../composables/useF2OverheadDetail'
+import { useF2ValuationAiGenerate, type F2ValAiSection } from '../../composables/useF2ValuationAiGenerate'
 import {
   OVERHEAD_MONTH_KEYS,
   OVERHEAD_MONTH_LABELS,
@@ -185,6 +207,36 @@ onMounted(() => {
   const c = props.allResponses.get(CONCLUSION_KEY)
   if (c?.remark) auditConclusion.value = c.remark
 })
+
+const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2ValuationAiGenerate(wpIdRef)
+
+function aiContext(): Record<string, unknown> {
+  return {
+    sheet: 'F2-43',
+    annualTotal: oh.annualTotal.value,
+    highVarianceCount: oh.highVarianceCount.value,
+    expenseItems: oh.enriched.value.rows
+      .filter((row) => row.kind === 'item')
+      .map((row) => ({
+        item: row.label,
+        annualTotal: row.total,
+        priorYear: row.priorYear,
+        changeRate: row.changeRate,
+        changeReason: row.changeReason,
+      })),
+  }
+}
+
+async function runAi(section: F2ValAiSection): Promise<void> {
+  const isNote = section === 'overhead-note'
+  const existing = isNote ? oh.auditNote.value : auditConclusion.value
+  const title = isNote ? 'AI 生成 · 制造费用审计说明' : 'AI 生成 · 制造费用审计结论'
+  const text = await generateAndConfirm(section, existing || '', aiContext(), title)
+  if (!text) return
+  if (isNote) oh.auditNote.value = text
+  else saveAuditConclusion(text)
+}
 
 function isHighVariance(row: OverheadMatrixRow): boolean {
   return row.kind === 'item' && typeof row.changeRate === 'number' && Math.abs(row.changeRate) > 0.2
@@ -238,6 +290,7 @@ function fmtRate(r: number | '' | 'N/A'): string {
 .var-warn { color: #f56c6c !important; font-weight: 600; }
 
 .conclusion-card { margin-top: 14px; }
+.conclusion-card-header { display: flex; align-items: center; justify-content: space-between; }
 .conclusion-header { font-weight: 600; font-size: 14px; }
 .tips-box {
   margin-top: 16px;

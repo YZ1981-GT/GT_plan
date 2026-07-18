@@ -95,8 +95,9 @@ export function emptyStdCostProject(seq: number, itemName = ''): StdCostProductP
 }
 
 /** F2-40 源模板列示 3 个测试项目 */
+/** 默认 1 个测试项目；需要时由「+ 增行」添加 */
 export function defaultThreeStdCostProjects(): StdCostProductProject[] {
-  return [1, 2, 3].map((n) => emptyStdCostProject(n, ''))
+  return [emptyStdCostProject(1, '')]
 }
 
 function n(v: number): number {
@@ -223,13 +224,12 @@ export function migrateToStdCostProjects(
   const first = legacy[0] as Record<string, unknown>
   if (first && Array.isArray(first.months) && 'expEndStdCost' in (first.months[0] as object)) {
     const projects = legacy as unknown as StdCostProductProject[]
-    while (projects.length < 3) projects.push(emptyStdCostProject(projects.length + 1))
-    return projects.slice(0, 12)
+    return projects.length ? projects.slice(0, 12) : [emptyStdCostProject(1)]
   }
 
   // 旧 F2-38 式月度结构
   if (first && Array.isArray(first.months) && 'prodAmt' in (first.months[0] as object)) {
-    return (legacy as Array<{ itemName?: string; remark?: string; stdPrice?: number; months: Array<Record<string, unknown>> }>)
+    const migrated = (legacy as Array<{ itemName?: string; remark?: string; stdPrice?: number; months: Array<Record<string, unknown>> }>)
       .slice(0, 8)
       .map((p, i) => {
         const proj = emptyStdCostProject(i + 1, String(p.itemName || ''))
@@ -254,12 +254,7 @@ export function migrateToStdCostProjects(
           })
         return proj
       })
-      .concat(
-        Array.from({ length: Math.max(0, 3 - legacy.length) }, (_, j) =>
-          emptyStdCostProject(legacy.length + j + 1),
-        ),
-      )
-      .slice(0, 12)
+    return migrated.length ? migrated.slice(0, 12) : [emptyStdCostProject(1)]
   }
 
   const projects = legacy.slice(0, 8).map((r, i) => {
@@ -273,8 +268,7 @@ export function migrateToStdCostProjects(
     jan.saleStdCost = Number(r.bookIssueAmt || 0)
     return p
   })
-  while (projects.length < 3) projects.push(emptyStdCostProject(projects.length + 1))
-  return projects
+  return projects.length ? projects : [emptyStdCostProject(1)]
 }
 
 export const F2_40_DEFAULT_OBJECTIVE =

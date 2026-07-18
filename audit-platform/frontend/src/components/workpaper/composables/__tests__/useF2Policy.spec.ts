@@ -1,12 +1,12 @@
 /**
- * useF2Policy — F2-16 pack v2 + legacy migration
+ * useF2Policy — F2-16 会计政策（与 useF2Policy / F2TabPolicy 现行 API 对齐）
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { ref } from 'vue'
 import { useF2Policy } from '../useF2Policy'
 import type { ChecklistResponse } from '../useF2FormData'
 
-describe('useF2Policy F2-16 rebuild', () => {
+describe('useF2Policy F2-16', () => {
   let handler: EventListener
 
   beforeEach(() => {
@@ -26,37 +26,32 @@ describe('useF2Policy F2-16 rebuild', () => {
     return useF2Policy({ allResponses: ref(map), isReadonly: ref(false) })
   }
 
-  it('defaults to 6 Excel policy rows + empty cost process', () => {
+  it('defaults to 5 policy sections', () => {
     const p = setup()
-    expect(p.policyRows.value).toHaveLength(6)
-    expect(p.policyRows.value.map((r) => r.key)).toEqual([
-      'pricing', 'nrv', 'impairment', 'count', 'amort', 'wip',
+    expect(p.sections.value).toHaveLength(5)
+    expect(p.sections.value.map((r) => r.key)).toEqual([
+      'classification', 'initial', 'pricing', 'impairment', 'count',
     ])
-    expect(p.costProcess.value.processFlow).toBe('')
-    expect(p.auditNote.value).toBe('')
+    expect(p.policyConclusion.value).toBe('')
   })
 
-  it('persists updates to F2-16-policy as version 2 JSON', () => {
+  it('persists section updates to F2-16-policy JSON', () => {
     const map = new Map<string, ChecklistResponse>()
     const p = useF2Policy({ allResponses: ref(map), isReadonly: ref(false) })
-    p.updatePolicyRow('count', 'methodAdopted', '永续盘存制')
-    p.updatePolicyRow('count', 'compliesStandard', '是')
-    p.updateCostProcess('processFlow', '机加工→装配→入库')
-    p.auditNote.value = '已核对政策与流程'
-    p.auditConclusion.value = 'A、未见异常。'
+    p.updateSection('count', 'policyDesc', '永续盘存制')
+    p.updateSection('count', 'isChanged', '是')
+    p.updateConclusion('A、未见异常。')
 
     const stored = map.get('F2-16-policy')?.remark
     expect(stored).toBeTruthy()
     const parsed = JSON.parse(stored!)
-    expect(parsed.version).toBe(2)
-    expect(parsed.policyRows.find((r: any) => r.key === 'count').compliesStandard).toBe('是')
-    expect(parsed.costProcess.processFlow).toContain('装配')
-    expect(parsed.auditNote).toContain('政策')
-    expect(parsed.auditConclusion).toContain('未见异常')
+    expect(Array.isArray(parsed)).toBe(true)
+    expect(parsed.find((r: any) => r.key === 'count').policyDesc).toContain('永续')
+    expect(map.get('F2-16-conclusion')?.remark).toContain('未见异常')
   })
 
-  it('migrates legacy section cards into v2 rows', () => {
-    const legacy = JSON.stringify([
+  it('hydrates saved section cards', () => {
+    const saved = JSON.stringify([
       {
         key: 'pricing',
         title: '发出存货计价方法',
@@ -67,19 +62,16 @@ describe('useF2Policy F2-16 rebuild', () => {
         indexRef: '',
       },
     ])
-    const p = setup(legacy)
-    const pricing = p.policyRows.value.find((r) => r.key === 'pricing')!
-    expect(pricing.methodAdopted).toBe('先进先出法')
-    expect(pricing.consistentlyAdopted).toBe('否')
-    expect(pricing.remark).toContain('管理层变更')
+    const p = setup(saved)
+    const pricing = p.sections.value.find((r) => r.key === 'pricing')!
+    expect(pricing.policyDesc).toBe('先进先出法')
+    expect(pricing.isChanged).toBe('是')
+    expect(pricing.changeReason).toContain('管理层变更')
   })
 
-  it('counts non-compliant and inconsistent rows', () => {
+  it('counts changed rows', () => {
     const p = setup()
-    p.updatePolicyRow('pricing', 'compliesStandard', '否')
-    p.updatePolicyRow('nrv', 'consistentlyAdopted', '否')
-    expect(p.nonCompliantCount.value).toBe(1)
-    expect(p.inconsistentCount.value).toBe(1)
+    p.updateSection('pricing', 'isChanged', '是')
     expect(p.changedCount.value).toBe(1)
   })
 })

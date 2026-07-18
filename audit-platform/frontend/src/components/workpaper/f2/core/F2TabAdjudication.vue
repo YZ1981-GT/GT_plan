@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="f2-adjudication">
     <!-- 编制提示 -->
     <details class="guidance-details">
@@ -88,14 +88,14 @@
         size="small"
         :controls="false"
         :disabled="isReadonly"
-        @change="(v: number) => updateTrialBalanceAmount(v ?? 0)"
+        @change="(v: number | undefined) => updateTrialBalanceAmount(v ?? 0)"
       />
       <el-tag v-if="trialBalanceDiff === 0" type="success" size="small">核对一致</el-tag>
       <el-tag v-else type="danger" size="small">差异 {{ trialBalanceDiff.toLocaleString() }}</el-tag>
     </div>
 
     <!-- 审计意见区（卡片式） -->
-    <el-card class="opinion-card" shadow="never">
+    <el-card class="opinion-card audit-note-card" shadow="never">
       <template #header>
         <div class="opinion-header">
           <span class="opinion-title">审计说明与结论</span>

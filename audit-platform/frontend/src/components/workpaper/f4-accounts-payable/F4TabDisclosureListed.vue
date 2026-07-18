@@ -1,14 +1,13 @@
 <script setup lang="ts">
 /**
- * F4TabDisclosureListed — 附注披露（上市公司）
- * Spec: .kiro/specs/f4-accounts-payable/ Task 6.6
- * 订阅EventBus `substantive:adjudicated`(accountCode='2202') 自动刷新
- * 发布 `disclosure:note-text-updated` 联动附注模块
- * Requirements: 4.1~4.5
+ * F4TabDisclosureListed — 附注披露信息（上市公司）
+ * 对齐源表：按性质披露（联动F4-1审定数、可无限量添加行）+
+ * 账龄超过1年的重要应付账款（联动F4-5长期挂账检查表）。
  */
-import { inject, toRef, ref, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { computed, inject, onBeforeUnmount, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import type { ChecklistResponse } from '../composables/useF4FormData'
+import { useF4DisclosureListed } from '../composables/useF4DisclosureListed'
+import { useF4AiGenerate } from '../composables/useF4AiGenerate'
 import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -20,89 +19,107 @@ const props = defineProps<{
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
-// ─── 数据 ────────────────────────────────────────────────────────────────────
-
-const STORAGE_KEY = 'F4-disclosure-listed'
-let debounceTimer: ReturnType<typeof setTimeout> | null = null
-
-const noteText = ref('')
-
-watch(() => (props.allResponses as Map<string, any>).get(STORAGE_KEY)?.remark, (v) => {
-  if (!noteText.value && v) noteText.value = v
-}, { immediate: true })
-
-watch(noteText, (val) => {
-  const map = props.allResponses as Map<string, ChecklistResponse>
-  map.set(STORAGE_KEY, { item_id: STORAGE_KEY, conclusion: null, remark: val })
-  if (debounceTimer) clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => {
-    debounceTimer = null
-    const item = map.get(STORAGE_KEY)
-    if (item) {
-      window.dispatchEvent(new CustomEvent('f4:save-items', { detail: { items: [item] } }))
-      // 发布附注更新事件
-      window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-        detail: { accountCode: '2202', type: 'listed', text: val },
-      }))
-    }
-  }, 2000)
+const {
+  natureRows,
+  natureClosingTotal,
+  naturePriorTotal,
+  adjClosingTotal,
+  adjPriorTotal,
+  closingMatchesAdjudication,
+  priorMatchesAdjudication,
+  agingRows,
+  agingTotal,
+  pendingSyncCount,
+  addNatureRow,
+  removeNatureRow,
+  updateNatureCell,
+  addAgingRow,
+  removeAgingRow,
+  updateAgingCell,
+  syncFromLongOutstanding,
+  disclosureText,
+} = useF4DisclosureListed({
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
+  isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
 
-// ─── 审计说明 / 审计结论 ─────────────────────────────────────────────────────
-const NOTE_KEY = 'F4-disclosure-listed-audit-note'
-const CONCLUSION_KEY = 'F4-disclosure-listed-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF4AiGenerate(
+  toRef(props, 'wpId') as Ref<string>,
+)
 
-function persistF4(key: string, val: string): void {
-  const item = { item_id: key, conclusion: null, remark: val }
-  ;(props.allResponses as Map<string, any>).set(key, item)
-  window.dispatchEvent(new CustomEvent('f4:save-items', { detail: { items: [item] } }))
+const totalsConsistent = computed(() =>
+  closingMatchesAdjudication.value && priorMatchesAdjudication.value,
+)
+
+function amount(value: number): string {
+  if (Math.abs(value) < 0.005) return '-'
+  const formatted = Math.abs(value).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+  return value < 0 ? `(${formatted})` : formatted
 }
 
-function saveAuditNote(val: string): void {
-  if (props.isReadonly) return
-  auditNote.value = val
-  persistF4(NOTE_KEY, val)
+function handleSync(): void {
+  const added = syncFromLongOutstanding()
+  if (added > 0) ElMessage.success(`已从F4-5同步 ${added} 条账龄超过1年的应付账款`)
+  else ElMessage.info('F4-5中账龄超过1年的项目均已同步')
 }
 
-function saveAuditConclusion(val: string): void {
-  if (props.isReadonly) return
-  auditConclusion.value = val
-  persistF4(CONCLUSION_KEY, val)
-}
-
-onMounted(() => {
-  const map = props.allResponses as Map<string, any>
-  const n = map.get(NOTE_KEY)
-  if (n?.remark) auditNote.value = n.remark
-  const c = map.get(CONCLUSION_KEY)
-  if (c?.remark) auditConclusion.value = c.remark
-})
-
-// 订阅审定完成事件
-function onAdjudicated(e: Event) {
-  const detail = (e as CustomEvent).detail
-  if (detail?.accountCode === '2202') {
-    ElMessage.info('审定数据已更新，请检查附注披露内容')
+function aiContext() {
+  return {
+    natureRows: natureRows.value.map((row) => ({
+      item: row.label,
+      closingBalance: row.closingBalance,
+      priorBalance: row.priorBalance,
+      linkedToAdjudication: row.linked,
+    })),
+    totals: {
+      closing: natureClosingTotal.value,
+      prior: naturePriorTotal.value,
+      matchesAdjudication: totalsConsistent.value,
+    },
+    overOneYearRows: agingRows.value.map((row) => ({
+      creditor: row.creditor,
+      amount: row.amount,
+      reason: row.reason,
+      linkedToF45: row.linked,
+    })),
+    overOneYearTotal: agingTotal.value,
   }
 }
 
+async function generateDisclosure(): Promise<void> {
+  const generated = await generateAndConfirm(
+    'disclosure-listed',
+    disclosureText.value,
+    aiContext(),
+    'AI 生成 · 附注披露内容（上市公司）',
+  )
+  if (generated) disclosureText.value = generated
+}
+
+function onAdjudicated(event: Event): void {
+  const detail = (event as CustomEvent).detail
+  if (detail?.accountCode === '2202') {
+    ElMessage.info('F4-1审定数据已更新，披露表金额已自动联动，请复核')
+  }
+}
 window.addEventListener('substantive:adjudicated', onAdjudicated)
-onBeforeUnmount(() => {
-  window.removeEventListener('substantive:adjudicated', onAdjudicated)
-  if (debounceTimer) { clearTimeout(debounceTimer) }
-})
+onBeforeUnmount(() => window.removeEventListener('substantive:adjudicated', onAdjudicated))
 </script>
 
 <template>
   <div class="f4-tab-disclosure-listed">
     <details class="guidance-details">
-      <summary>📋 编制提示</summary>
+      <summary>📋 编制思路与联动逻辑</summary>
       <div class="guidance-content">
-        <p>1. 上市公司附注披露需按准则要求披露应付账款的主要内容。</p>
-        <p>2. 包括：按性质分类、前五名供应商、账龄分析、关联方应付等。</p>
-        <p>3. 当审定表确认后，本页面会收到通知提醒检查披露内容是否需要更新。</p>
+        <p>1. 按性质披露：货款、工程款等固定项目自动取自F4-1审定表（期末余额=期末审定数、上年年末余额=期初审定数），带🔗标记的行不可改金额。</p>
+        <p>2. 可无限量添加行：新增的手工行可自行填写项目与金额，用于补充F4-1未涵盖的披露项目。</p>
+        <p>3. 账龄超过1年的重要应付账款：点击"从F4-5同步"自动带入长期挂账检查表中挂账超过1年的债权人、金额及挂账原因，也可手工补行。</p>
+        <p>4. 披露合计与F4-1审定合计不一致时红色预警，应先核对审定表或手工行。</p>
       </div>
     </details>
 
@@ -111,87 +128,234 @@ onBeforeUnmount(() => {
       type="info"
       :closable="false"
       show-icon
-      title="审计目标：核实应付账款(2202)在上市公司财务报表附注中的列报完整、分类准确，按性质/前五名/账龄/关联方等要求充分披露。"
+      title="审计目标：核实应付账款(2202)在上市公司财务报表附注中的列报完整、分类准确，账龄超过1年的重要应付账款已披露未偿还或未结转原因。"
     />
+
+    <el-alert v-if="!totalsConsistent" type="error" :closable="false" class="warning-alert">
+      披露合计与F4-1审定表不一致：
+      <span v-if="!closingMatchesAdjudication">
+        期末披露 {{ amount(natureClosingTotal) }} ≠ 审定 {{ amount(adjClosingTotal) }}；
+      </span>
+      <span v-if="!priorMatchesAdjudication">
+        上年年末披露 {{ amount(naturePriorTotal) }} ≠ 期初审定 {{ amount(adjPriorTotal) }}。
+      </span>
+    </el-alert>
 
     <div class="section-toolbar">
       <div class="toolbar-left">
-        <span class="section-label">附注披露（上市公司）</span>
+        <span class="section-label">一、应付账款附注披露信息（按性质）</span>
+        <el-button size="small" type="primary" plain :disabled="isReadonly" @click="addNatureRow">+ 添加行</el-button>
       </div>
       <div class="toolbar-right">
-        <span class="chip-wrap"><GtIndexChip value="wp:F4-1" :context-project-id="projectId" /></span>
+        <GtIndexChip value="wp:F4-1" :context-project-id="projectId" />
         <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-disclosure-listed')">复核</el-button>
       </div>
+    </div>
+
+    <el-table :data="natureRows" border size="small" class="disclosure-table">
+      <el-table-column label="项目" min-width="180">
+        <template #default="{ row }">
+          <span v-if="row.linked" class="linked-label">🔗 {{ row.label }}</span>
+          <el-input
+            v-else-if="!isReadonly"
+            :model-value="row.label"
+            size="small"
+            placeholder="披露项目名称"
+            @change="(value: string) => updateNatureCell(row.rowId, 'label', value)"
+          />
+          <span v-else>{{ row.label }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="期末余额" width="170" align="right">
+        <template #default="{ row }">
+          <el-tooltip v-if="row.linked" content="联动F4-1期末审定数，请在审定表或明细表中修改">
+            <span class="linked-amount">{{ amount(row.closingBalance) }}</span>
+          </el-tooltip>
+          <el-input-number
+            v-else-if="!isReadonly"
+            :model-value="row.closingBalance"
+            :controls="false"
+            size="small"
+            style="width:100%"
+            @change="(value: number | undefined) => updateNatureCell(row.rowId, 'closingBalance', value ?? 0)"
+          />
+          <span v-else>{{ amount(row.closingBalance) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="上年年末余额" width="170" align="right">
+        <template #default="{ row }">
+          <el-tooltip v-if="row.linked" content="联动F4-1期初审定数">
+            <span class="linked-amount">{{ amount(row.priorBalance) }}</span>
+          </el-tooltip>
+          <el-input-number
+            v-else-if="!isReadonly"
+            :model-value="row.priorBalance"
+            :controls="false"
+            size="small"
+            style="width:100%"
+            @change="(value: number | undefined) => updateNatureCell(row.rowId, 'priorBalance', value ?? 0)"
+          />
+          <span v-else>{{ amount(row.priorBalance) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="70" align="center">
+        <template #default="{ row }">
+          <el-button
+            v-if="!row.linked"
+            link
+            type="danger"
+            size="small"
+            :disabled="isReadonly"
+            @click="removeNatureRow(row.rowId)"
+          >删</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    <div class="total-strip">
+      <span>合计</span>
+      <span class="num" :class="{ danger: !closingMatchesAdjudication }">{{ amount(natureClosingTotal) }}</span>
+      <span class="num" :class="{ danger: !priorMatchesAdjudication }">{{ amount(naturePriorTotal) }}</span>
+      <span class="spacer"></span>
+    </div>
+
+    <div class="section-toolbar second-section">
+      <div class="toolbar-left">
+        <span class="section-label">二、其中，账龄超过1年的重要应付账款</span>
+        <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleSync">
+          ⇄ 从F4-5同步
+          <el-badge v-if="pendingSyncCount" :value="pendingSyncCount" class="sync-badge" />
+        </el-button>
+        <el-button size="small" plain :disabled="isReadonly" @click="addAgingRow">+ 手工添加</el-button>
+      </div>
+      <div class="toolbar-right">
+        <GtIndexChip value="wp:F4-5" :context-project-id="projectId" />
+      </div>
+    </div>
+
+    <el-table :data="agingRows" border size="small" class="disclosure-table">
+      <el-table-column label="项目（债权人）" min-width="180">
+        <template #default="{ row }">
+          <span v-if="row.linked" class="linked-label">🔗 {{ row.creditor }}</span>
+          <el-input
+            v-else-if="!isReadonly"
+            :model-value="row.creditor"
+            size="small"
+            placeholder="债权人名称"
+            @change="(value: string) => updateAgingCell(row.rowId, 'creditor', value)"
+          />
+          <span v-else>{{ row.creditor }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="期末余额" width="160" align="right">
+        <template #default="{ row }">
+          <el-tooltip v-if="row.linked" content="联动F4-5挂账金额，请在长期挂账检查表中修改">
+            <span class="linked-amount">{{ amount(row.amount) }}</span>
+          </el-tooltip>
+          <el-input-number
+            v-else-if="!isReadonly"
+            :model-value="row.amount"
+            :controls="false"
+            size="small"
+            style="width:100%"
+            @change="(value: number | undefined) => updateAgingCell(row.rowId, 'amount', value ?? 0)"
+          />
+          <span v-else>{{ amount(row.amount) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="未偿还或未结转的原因" min-width="240">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.reason"
+            type="textarea"
+            :autosize="{ minRows: 1, maxRows: 3 }"
+            :placeholder="row.linked ? '默认取F4-5挂账原因，可修改补充' : '填写未偿还或未结转的原因'"
+            @change="(value: string) => updateAgingCell(row.rowId, 'reason', value)"
+          />
+          <span v-else>{{ row.reason }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="70" align="center">
+        <template #default="{ row }">
+          <el-button
+            link
+            type="danger"
+            size="small"
+            :disabled="isReadonly"
+            @click="removeAgingRow(row.rowId)"
+          >删</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    <div class="total-strip aging-total">
+      <span>合计</span>
+      <span class="num">{{ amount(agingTotal) }}</span>
+      <span class="spacer"></span>
     </div>
 
     <el-card class="opinion-card" shadow="never">
       <template #header>
         <div class="opinion-header">
-          <span class="opinion-title">附注披露内容</span>
+          <span class="opinion-title">附注披露文字</span>
           <div class="opinion-actions">
+            <el-button
+              size="small"
+              type="primary"
+              plain
+              :disabled="isReadonly || !aiAvailable"
+              :loading="aiLoading"
+              @click="generateDisclosure"
+            >🤖 AI生成披露</el-button>
             <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-disclosure-listed')">💬</el-button>
           </div>
         </div>
       </template>
       <el-input
-        v-model="noteText"
+        v-model="disclosureText"
         type="textarea"
-        :autosize="{ minRows: 10, maxRows: 30 }"
+        :autosize="{ minRows: 8, maxRows: 24 }"
         :disabled="isReadonly"
-        placeholder="请编写上市公司附注披露内容（应付账款按性质分类、前五名、账龄分析等）..."
-      />
-    </el-card>
-
-    <!-- ─── 审计说明 ──────────────────────────────────────────────────── -->
-    <el-card class="opinion-card" shadow="never" style="margin-top:16px">
-      <template #header>
-        <div class="opinion-header">
-          <span class="opinion-title">审计说明</span>
-          <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-disclosure-listed-note')">💬</el-button>
-        </div>
-      </template>
-      <el-input
-        :model-value="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 5 }"
-        :disabled="isReadonly"
-        placeholder="填写审计说明：说明披露内容与审定表/明细表的核对情况及依据。"
-        @change="saveAuditNote"
-      />
-    </el-card>
-
-    <!-- ─── 审计结论 ──────────────────────────────────────────────────── -->
-    <el-card class="opinion-card" shadow="never" style="margin-top:16px">
-      <template #header>
-        <div class="opinion-header">
-          <span class="opinion-title">审计结论</span>
-        </div>
-      </template>
-      <el-input
-        :model-value="auditConclusion"
-        type="textarea"
-        :autosize="{ minRows: 3 }"
-        :disabled="isReadonly"
-        placeholder="填写审计结论：附注披露是否符合企业会计准则列报要求。"
-        @change="saveAuditConclusion"
+        placeholder="根据上方披露表编写上市公司附注披露文字（按性质分类、账龄超过1年的重要应付账款及原因等）..."
       />
     </el-card>
   </div>
 </template>
 
 <style scoped>
-.f4-tab-disclosure-listed { font-size: var(--wp-font-size, 13px); }
-.guidance-details { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; font-size: var(--wp-font-size, 13px); }
-.guidance-details .guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
-.guidance-details .guidance-content p { margin: 2px 0; }
-.section-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; }
-.toolbar-right { display: flex; gap: 8px; align-items: center; }
-.chip-wrap { display: inline-flex; align-items: center; }
+.f4-tab-disclosure-listed { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.guidance-details {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-left: 3px solid #315a8a;
+  border-radius: 4px;
+  background: #eef4fa;
+}
+.guidance-details summary { cursor: pointer; color: #315a8a; font-weight: 600; }
+.guidance-content { margin-top: 8px; color: #606266; line-height: 1.65; }
+.guidance-content p { margin: 3px 0; }
+.audit-objective, .warning-alert { margin-bottom: 10px; }
+.section-toolbar { display: flex; justify-content: space-between; align-items: center; margin: 10px 0 8px; }
+.second-section { margin-top: 20px; }
+.toolbar-left, .toolbar-right { display: flex; gap: 8px; align-items: center; }
 .section-label { font-weight: 600; font-size: 14px; color: #303133; }
-.audit-objective { margin-bottom: 12px; }
-.opinion-card { border-radius: 8px; }
+.sync-badge { margin-left: 4px; }
+.disclosure-table { width: 100%; }
+.disclosure-table :deep(.el-input-number) { width: 100%; }
+.linked-label { font-weight: 600; color: #315a8a; }
+.linked-amount { color: #7b4ba3; font-weight: 600; border-bottom: 1px dashed #b7bcc5; cursor: help; }
+.total-strip {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 170px 170px 70px;
+  padding: 8px 12px;
+  background: #f3f5f8;
+  border: 1px solid #dcdfe6;
+  border-top: none;
+  font-weight: 700;
+}
+.total-strip.aging-total { grid-template-columns: minmax(180px, 1fr) 160px minmax(240px, 1fr) 70px; }
+.total-strip .num { text-align: right; }
+.total-strip .danger { color: #d03050; }
+.opinion-card { margin-top: 16px; border-radius: 8px; }
 .opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
 .opinion-header { display: flex; align-items: center; justify-content: space-between; }
 .opinion-title { font-size: 14px; font-weight: 600; color: #303133; }

@@ -47,8 +47,10 @@
       <GtVoucherSamplingEngine
         v-if="wpId && projectId && !isReadonly"
         :project-id="projectId"
-        :account-codes="valuationAccountCodes"
-        :phase="'final'"
+        :workpaper-id="wpId"
+        :account-code="valuationAccountCodes.join(',')"
+        :year="new Date().getFullYear()"
+        phase="final"
         dialog-mode
         @filled="handleSamplingFilled"
       />

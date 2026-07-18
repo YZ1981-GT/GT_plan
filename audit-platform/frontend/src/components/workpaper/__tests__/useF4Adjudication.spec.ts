@@ -14,6 +14,14 @@ import {
   calcAdjustedAmount,
   calcSubtotal,
 } from '../composables/useF4AccPayFormulaEngine'
+import {
+  F4_NATURE_DEFAULTS,
+  F4_AGING_DEFAULTS,
+  aggregateF4Detail,
+  calcF4ChangeRate,
+  computeF4AdjudicationRow,
+  parseF4TrialBalance,
+} from '../composables/useF4Adjudication'
 
 // ─── 1. 贷方余额公式方向 ─────────────────────────────────────────────────────
 
@@ -199,5 +207,103 @@ describe('F4 variance = adjudicated - trial balance (Req 3.7)', () => {
     const trialBalance = 11900
     const variance = total - trialBalance
     expect(variance).toBeCloseTo(50, 5)
+  })
+})
+
+describe('F4-1 source-template aligned adjudication model', () => {
+  it('按性质含源表五项，按账龄保留四档及其他/未分类', () => {
+    expect(F4_NATURE_DEFAULTS.map((row) => row.label)).toEqual([
+      '货款', '工程款', '设备款', '服务费', '其他',
+    ])
+    expect(F4_AGING_DEFAULTS.map((row) => row.label)).toEqual([
+      '1年以内（含1年）', '1至2年（含2年）', '2至3年（含3年）', '3年以上', '其他/未分类',
+    ])
+  })
+
+  it('期初/期末分别按 未审+AJE+RJE 审定，并计算变动额及变动率', () => {
+    const row = computeF4AdjudicationRow({
+      rowKey: 'goods',
+      label: '货款',
+      isFixed: true,
+      openingUnadjusted: 1000,
+      openingAje: 50,
+      openingRje: -20,
+      closingUnadjusted: 1400,
+      closingAje: 30,
+      closingRje: 0,
+      reasonAnalysis: '',
+    })
+    expect(row.openingAdjusted).toBe(1030)
+    expect(row.closingAdjusted).toBe(1430)
+    expect(row.changeAmount).toBe(400)
+    expect(row.changeRate).toBeCloseTo(400 / 1030)
+  })
+
+  it('上期为零时变动率采用正负100%，避免除零', () => {
+    expect(calcF4ChangeRate(0, 100)).toBe(1)
+    expect(calcF4ChangeRate(0, -100)).toBe(-1)
+    expect(calcF4ChangeRate(0, 0)).toBe(0)
+  })
+
+  it('从F4-2按性质汇总期末未审、AJE、RJE', () => {
+    const result = aggregateF4Detail(JSON.stringify([
+      {
+        creditor: '甲供应商',
+        paymentNature: '货款',
+        openingAdjusted: 100,
+        currentDebit: 20,
+        currentCredit: 80,
+        ajeAdjustment: 5,
+        rjeReclassification: -2,
+        aging1Year: 160,
+        adjustedAging1: 163,
+      },
+      {
+        creditor: '乙供应商',
+        paymentNature: '设备款',
+        openingAdjusted: 200,
+        currentDebit: 50,
+        currentCredit: 100,
+        ajeAdjustment: 10,
+        rjeReclassification: 0,
+        aging1to2Year: 250,
+        adjustedAging2: 260,
+      },
+    ]))
+    expect(result.hasData).toBe(true)
+    expect(result.nature.goods.closingUnadjusted).toBe(160)
+    expect(result.nature.goods.closingAje).toBe(5)
+    expect(result.nature.goods.closingRje).toBe(-2)
+    expect(result.nature.equipment.closingUnadjusted).toBe(250)
+    expect(result.closingAdjusted).toBe(423)
+  })
+
+  it('按账龄采用审定账龄-未审账龄-RJE计算调整，残差归其他/未分类', () => {
+    const result = aggregateF4Detail(JSON.stringify([{
+      creditor: '丙供应商',
+      paymentNature: '服务费',
+      openingAdjusted: 100,
+      currentDebit: 0,
+      currentCredit: 20,
+      ajeAdjustment: 8,
+      rjeReclassification: 2,
+      aging1Year: 80,
+      adjustedAging1: 85,
+    }]))
+    expect(result.aging.within1year.closingUnadjusted).toBe(80)
+    expect(result.aging.within1year.closingAje).toBe(5)
+    expect(result.aging['aging-other'].closingUnadjusted).toBe(40)
+    expect(result.aging['aging-other'].closingRje).toBe(2)
+    // 期末审定130；1年内审定85，残差审定45。
+    const other = result.aging['aging-other']
+    expect(other.closingUnadjusted + other.closingAje + other.closingRje).toBe(45)
+  })
+
+  it('试算平衡表兼容新双期间JSON与旧单一期末值', () => {
+    expect(parseF4TrialBalance('{"opening":100,"closing":120}')).toEqual({
+      opening: 100,
+      closing: 120,
+    })
+    expect(parseF4TrialBalance('88')).toEqual({ opening: 0, closing: 88 })
   })
 })

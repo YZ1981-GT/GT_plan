@@ -170,9 +170,12 @@ describe('F3 disclosure EventBus', () => {
 })
 
 describe('F3-2 detail 3-segment columns', () => {
-  it('basic + info + audit columns cover 25 fields', () => {
+  it('basic + info + audit columns cover source wide table plus aging fields', () => {
     const total = F3_DETAIL_BASIC_COLUMNS.length + F3_DETAIL_INFO_COLUMNS.length + F3_DETAIL_AUDIT_COLUMNS.length
-    expect(total).toBe(25)
+    expect(total).toBe(27)
+    expect(F3_DETAIL_BASIC_COLUMNS.some((c) => c.prop === 'ticketNo')).toBe(true)
+    expect(F3_DETAIL_INFO_COLUMNS.some((c) => c.prop === 'maturityBucket')).toBe(true)
+    expect(F3_DETAIL_AUDIT_COLUMNS.some((c) => c.prop === 'depositAmount')).toBe(true)
   })
 
   it('segment switch keeps same row count across tabs', () => {
@@ -199,14 +202,15 @@ describe('F3-2 detail 3-segment columns', () => {
     expect(rows.value[0].rowId).toBe('a')
   })
 
-  it('closing balance = opening + increase - decrease', () => {
+  it('期末未审=期初+本期开票-本期承兑，审定数再加调整', () => {
     const allResponses = ref(new Map<string, ChecklistResponse>([
       ['F3-2-rows', {
         item_id: 'F3-2-rows',
         conclusion: null,
         remark: JSON.stringify([{
-          rowId: 'r1', seq: 1, openingBalance: 1000, increase: 500, decrease: 200,
+          rowId: 'r1', seq: 1, openingBalance: 1000, currentIssued: 500, currentAccepted: 200,
           issueDate: '2025-01-01', dueDate: '2025-06-01', noteType: '银行承兑',
+          aje: 20, rje: -10,
         }]),
       }],
     ]))
@@ -216,8 +220,34 @@ describe('F3-2 detail 3-segment columns', () => {
       allResponses,
       isReadonly: ref(false),
     })
-    expect(rows.value[0].closingBalance).toBeCloseTo(1300, 5)
-    expect(rows.value[0].adjustedBalance).toBeCloseTo(1300, 5)
+    expect(rows.value[0].closingUnadjusted).toBeCloseTo(1300, 5)
+    expect(rows.value[0].closingAdjusted).toBeCloseTo(1310, 5)
+  })
+
+  it('旧字段 increase/decrease/acceptBank 可迁移且到期账龄自动枚举', () => {
+    const due = new Date()
+    due.setDate(due.getDate() - 45)
+    const allResponses = ref(new Map<string, ChecklistResponse>([
+      ['F3-2-rows', {
+        item_id: 'F3-2-rows',
+        conclusion: null,
+        remark: JSON.stringify([{
+          rowId: 'legacy', seq: 1, openingBalance: 100, increase: 50, decrease: 20,
+          noteType: '商业承兑', acceptBank: '某银行', dueDate: due.toISOString().slice(0, 10),
+        }]),
+      }],
+    ]))
+    const { rows } = useF3Detail({
+      wpId: ref('wp1'),
+      projectId: ref('p1'),
+      allResponses,
+      isReadonly: ref(false),
+    })
+    expect(rows.value[0].noteType).toBe('商业承兑汇票')
+    expect(rows.value[0].acceptor).toBe('某银行')
+    expect(rows.value[0].currentIssued).toBe(50)
+    expect(rows.value[0].currentAccepted).toBe(20)
+    expect(rows.value[0].maturityBucket).toBe('逾期31-90天')
   })
 })
 
@@ -240,19 +270,31 @@ describe('F3-5 overdue risk suggestion', () => {
       isReadonly: ref(false),
     })
     expect(rows.value[0].overdueDays).toBeGreaterThan(90)
-    expect(rows.value[0].riskLevel).toBe('高')
+    expect(rows.value[0].riskFlags).toContain('逾期超过90天')
   })
 })
 
 describe('F3 import/export field keys contract', () => {
+  const F3_7_DEBIT_KEYS = [
+    'seq', 'voucherDate', 'voucherNo', 'businessContent', 'counterAccount', 'detailAccount',
+    'amount', 'noteType', 'approvalDateNo', 'approvalProper', 'bankReceiptDate', 'bankPayee',
+    'bankAmount', 'otherEvidence', 'indexNo', 'isAbnormal', 'issueDesc',
+  ]
   const F3_7_CREDIT_KEYS = [
-    'seq', 'summary', 'counterAccount', 'amount', 'voucherDate', 'voucherNo',
-    'noteType', 'acceptor', 'purchaseContractCheck', 'goodsReceiptCheck', 'auditConclusion', 'remark',
+    'seq', 'voucherDate', 'voucherNo', 'businessContent', 'counterAccount', 'detailAccount',
+    'amount', 'noteType', 'receiptDateNo', 'receiptProduct', 'receiptUnit', 'receiptQty',
+    'invoiceDateNo', 'invoiceCounterparty', 'invoiceAmount', 'otherEvidence', 'indexNo', 'isAbnormal', 'issueDesc',
   ]
 
-  it('F3-7-credit export keys align with composable row shape', () => {
-    expect(F3_7_CREDIT_KEYS).toContain('summary')
-    expect(F3_7_CREDIT_KEYS).toContain('amount')
-    expect(F3_7_CREDIT_KEYS).toHaveLength(12)
+  it('F3-7-debit export keys align with composable row shape (payment evidence)', () => {
+    expect(F3_7_DEBIT_KEYS).toContain('approvalDateNo')
+    expect(F3_7_DEBIT_KEYS).toContain('bankAmount')
+    expect(F3_7_DEBIT_KEYS).toHaveLength(17)
+  })
+
+  it('F3-7-credit export keys align with composable row shape (purchase evidence)', () => {
+    expect(F3_7_CREDIT_KEYS).toContain('receiptDateNo')
+    expect(F3_7_CREDIT_KEYS).toContain('invoiceAmount')
+    expect(F3_7_CREDIT_KEYS).toHaveLength(19)
   })
 })

@@ -76,21 +76,6 @@
       </ul>
     </details>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>
-        <div class="card-header"><span>审计说明</span></div>
-      </template>
-      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" placeholder="填写审计说明：各披露子项的取数来源、用途/产权/抵押披露核对、与审定表及报表的勾稽情况。" :disabled="isReadonly" @change="saveAuditNote" />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>
-        <div class="card-header"><span>审计结论</span></div>
-      </template>
-      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" placeholder="填写审计结论：A、披露完整准确，与审定表/报表一致。B、除下列事项外未见异常。C、披露存在重大遗漏或错误，需更正。" :disabled="isReadonly" @change="saveAuditConclusion" />
-    </el-card>
   </div>
 </template>
 
@@ -100,7 +85,7 @@
  * 多子节卡片+计量模式说明+动态行+合计+用途列
  * EventBus: subscribe 'substantive:adjudicated' 刷新 / publish 'disclosure:note-text-updated'
  */
-import { ref, computed, inject, toRef, onMounted } from 'vue'
+import { ref, computed, inject, toRef } from 'vue'
 import { useH3Disclosure } from '../../composables/useH3Disclosure'
 import { useH3FormData } from '../../composables/useH3FormData'
 import { eventBus } from '@/utils/eventBus'
@@ -134,30 +119,6 @@ const {
   measurementModel: toRef(props, 'measurementModel') as any,
   variant: ref('soe') as any,
 })
-
-// ─── 审计说明 / 审计结论（标准 checklist_responses 持久化） ───────────────────
-const NOTE_KEY = 'H3-disc-soe-audit-note'
-const CONCLUSION_KEY = 'H3-disc-soe-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-onMounted(() => {
-  const n = props.allResponses.get(NOTE_KEY)
-  if (n?.remark) auditNote.value = n.remark
-  const c = props.allResponses.get(CONCLUSION_KEY)
-  if (c?.remark) auditConclusion.value = c.remark
-})
-function saveAuditNote(val: string) {
-  if (props.isReadonly) return
-  auditNote.value = val
-  props.allResponses.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
-  void saveImmediate(NOTE_KEY, val)
-}
-function saveAuditConclusion(val: string) {
-  if (props.isReadonly) return
-  auditConclusion.value = val
-  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
-  void saveImmediate(CONCLUSION_KEY, val)
-}
 
 // ─── 附注取数刷新 ────────────────────────────────────────────────────────────
 // 跨 sheet 数据刷新由主入口 GtH3InvestmentProperty 订阅 substantive:adjudicated 统一处理
@@ -213,8 +174,6 @@ function generateAI(section: string) {
 <style scoped>
 .h3-tab-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .objective-alert { margin-bottom: 12px; }
-.audit-note-card { margin-top: 16px; }
-.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .method-context { margin-bottom: 16px; }
 .context-bar { border-left: 3px solid var(--el-color-warning); background: #fffbe6; padding: 8px 12px; border-radius: 4px; font-size: 12px; }
 .note-section { margin-bottom: 16px; }

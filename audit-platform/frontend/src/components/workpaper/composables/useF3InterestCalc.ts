@@ -1,31 +1,48 @@
 /**
- * useF3InterestCalc — F3-4 带息票据利息测算（13列）
- * Spec: .kiro/specs/f3-notes-payable/ Task 5.2
+ * useF3InterestCalc — F3-4 应付票据（带息）利息测算表
+ *
+ * 对齐源表结构：票据类别 | 票据号 | 出票日/到期日/期限 | 票面金额 | 票面利率 |
+ * 应计利息(公式) | 账面已计利息 | 差异(公式) | 说明，末尾合计行。
+ * 公式：期限 = 到期日 - 出票日；应计利息 = 票面金额 × 票面利率% × 期限 / 360
+ * （无日期时退化为 票面金额 × 票面利率%，与源表 ROUND(F*G,2) 一致）；
+ * 差异 = 应计利息 - 账面已计利息。
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
-import { parseNum, calcInterest, calcAccruedDays, calcTermDays, calcSubtotal } from './useF3FormulaEngine'
-import type { ChecklistResponse } from './useF3FormData'
+import { parseNum, calcInterest, calcTermDays, calcSubtotal } from './useF3FormulaEngine'
 import type { UseF3BaseOptions } from './useF3Adjudication'
+
+export const F3_INTEREST_NOTE_TYPES = ['银行承兑汇票', '商业承兑汇票', '供应链票据', '其他'] as const
 
 export interface F3InterestCalcRow {
   rowId: string
   seq: number
-  drawer: string
-  faceValue: number
-  interestRate: number
+  /** 票据类别 */
+  noteType: string
+  /** 票据号 */
+  ticketNo: string
+  /** 出票日 */
   issueDate: string
+  /** 到期日 */
   dueDate: string
+  /** 期限（天）＝到期日－出票日（公式列） */
   termDays: number
-  interestStart: string
-  interestEnd: string
-  accruedDays: number
+  /** 票面金额 */
+  faceValue: number
+  /** 票面利率(%) */
+  interestRate: number
+  /** 应计利息（公式列） */
   payableInterest: number
+  /** 账面已计利息 */
   bookInterest: number
+  /** 差异（公式列）＝应计利息－账面已计利息 */
   variance: number
+  /** 说明 */
+  note: string
 }
 
 export interface F3NoteOcrFields {
   noteNo?: string
+  noteType?: string
   drawer?: string
   acceptor?: string
   faceValue?: number | string
@@ -43,41 +60,66 @@ function generateRowId(): string {
   return `f3i-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
 }
 
-function emptyRow(seq: number): F3InterestCalcRow {
+function round2(v: number): number {
+  return Math.round(v * 100) / 100
+}
+
+export function emptyInterestRow(seq: number): F3InterestCalcRow {
   return {
-    rowId: generateRowId(), seq, drawer: '', faceValue: 0, interestRate: 0,
-    issueDate: '', dueDate: '', termDays: 0, interestStart: '', interestEnd: '',
-    accruedDays: 0, payableInterest: 0, bookInterest: 0, variance: 0,
+    rowId: generateRowId(), seq, noteType: '', ticketNo: '', issueDate: '', dueDate: '',
+    termDays: 0, faceValue: 0, interestRate: 0, payableInterest: 0, bookInterest: 0,
+    variance: 0, note: '',
   }
 }
 
-function computeRow(stored: Omit<F3InterestCalcRow, 'termDays' | 'accruedDays' | 'payableInterest' | 'variance'>): F3InterestCalcRow {
-  const termDays = stored.termDays > 0 ? stored.termDays : calcTermDays(stored.issueDate, stored.dueDate)
-  const accruedDays = calcAccruedDays(stored.interestStart, stored.interestEnd)
-  const payableInterest = calcInterest(stored.faceValue, stored.interestRate, accruedDays)
-  const variance = payableInterest - stored.bookInterest
-  return { ...stored, termDays, accruedDays, payableInterest, variance }
+export function isBlankInterestRow(row: F3InterestCalcRow): boolean {
+  return !row.noteType && !row.ticketNo && !row.issueDate && !row.dueDate
+    && !row.faceValue && !row.interestRate && !row.bookInterest && !row.note.trim()
 }
 
-function safeParseRows(jsonStr: string | null | undefined): F3InterestCalcRow[] {
+export function computeInterestRow(stored: F3InterestCalcRow): F3InterestCalcRow {
+  const termDays = calcTermDays(stored.issueDate, stored.dueDate)
+  const payableInterest = termDays > 0
+    ? round2(calcInterest(stored.faceValue, stored.interestRate, termDays))
+    : round2(stored.faceValue * stored.interestRate / 100)
+  const variance = round2(payableInterest - stored.bookInterest)
+  return { ...stored, termDays, payableInterest, variance }
+}
+
+/** 旧数据迁移：出票人并入说明，计息起止日兜底推算期限 */
+function migrateRow(raw: any, i: number): F3InterestCalcRow {
+  const base = emptyInterestRow(i + 1)
+  let issueDate = raw.issueDate || ''
+  let dueDate = raw.dueDate || ''
+  if (!issueDate && !dueDate && (raw.interestStart || raw.interestEnd)) {
+    issueDate = raw.interestStart || ''
+    dueDate = raw.interestEnd || ''
+  }
+  let note = String(raw.note ?? raw.remark ?? '')
+  if (!note && raw.drawer) note = `出票人：${raw.drawer}`
+  return computeInterestRow({
+    ...base,
+    rowId: raw.rowId || raw.id || generateRowId(),
+    seq: raw.seq ?? i + 1,
+    noteType: String(raw.noteType ?? ''),
+    ticketNo: String(raw.ticketNo ?? raw.noteNo ?? ''),
+    issueDate,
+    dueDate,
+    faceValue: parseNum(raw.faceValue ?? raw.principal),
+    interestRate: parseNum(raw.interestRate ?? raw.rate),
+    bookInterest: parseNum(raw.bookInterest ?? raw.companyInterest),
+    note,
+  })
+}
+
+export function safeParseInterestRows(jsonStr: string | null | undefined): F3InterestCalcRow[] {
   if (!jsonStr) return []
   try {
     const parsed = JSON.parse(jsonStr)
     if (!Array.isArray(parsed)) return []
-    return parsed.map((raw: any, i: number) => computeRow({
-      ...emptyRow(i + 1),
-      rowId: raw.rowId || raw.id || generateRowId(),
-      seq: raw.seq ?? i + 1,
-      drawer: raw.drawer || '',
-      faceValue: parseNum(raw.faceValue ?? raw.principal),
-      interestRate: parseNum(raw.interestRate ?? raw.rate),
-      issueDate: raw.issueDate || '',
-      dueDate: raw.dueDate || '',
-      termDays: parseNum(raw.termDays),
-      interestStart: raw.interestStart || raw.accrualStart || '',
-      interestEnd: raw.interestEnd || raw.accrualEnd || '',
-      bookInterest: parseNum(raw.bookInterest ?? raw.companyInterest),
-    }))
+    const rows = parsed.map(migrateRow)
+    const pruned = rows.filter((r) => !isBlankInterestRow(r))
+    return pruned.length ? pruned.map((r, i) => ({ ...r, seq: i + 1 })) : rows.slice(0, 1)
   } catch {
     return []
   }
@@ -92,11 +134,13 @@ export function useF3InterestCalc(options: UseF3BaseOptions) {
   const auditConclusion = ref('')
 
   function loadRows(): void {
-    storedData.value = safeParseRows(allResponses.value.get(STORAGE_KEY)?.remark)
-    if (storedData.value.length === 0) storedData.value = [computeRow(emptyRow(1))]
+    storedData.value = safeParseInterestRows(allResponses.value.get(STORAGE_KEY)?.remark)
+    if (storedData.value.length === 0) storedData.value = [computeInterestRow(emptyInterestRow(1))]
   }
 
-  watch(() => allResponses.value.get(STORAGE_KEY)?.remark, () => {
+  watch(() => allResponses.value.get(STORAGE_KEY)?.remark, (raw) => {
+    // 自回声守卫：persist() 写回的内容与当前状态一致时跳过，避免新增空行被立即修剪
+    if (raw && raw === JSON.stringify(storedData.value)) return
     if (storedData.value.length === 0) loadRows()
   }, { immediate: true })
 
@@ -106,24 +150,19 @@ export function useF3InterestCalc(options: UseF3BaseOptions) {
 
   const rows: ComputedRef<F3InterestCalcRow[]> = computed(() => storedData.value)
 
-  const subtotalRow = computed(() => computeRow({
-    ...emptyRow(0),
-    rowId: 'subtotal',
-    drawer: '合计',
-    faceValue: calcSubtotal(rows.value.map((r) => r.faceValue)),
-    bookInterest: calcSubtotal(rows.value.map((r) => r.bookInterest)),
-  }))
+  const filledCount = computed(() => storedData.value.filter((r) => !isBlankInterestRow(r)).length)
+  const abnormalCount = computed(() => storedData.value.filter((r) => Math.abs(r.variance) > VARIANCE_WARN).length)
 
   const totals = computed(() => ({
-    faceValue: subtotalRow.value.faceValue,
+    faceValue: calcSubtotal(rows.value.map((r) => r.faceValue)),
     payableInterest: calcSubtotal(rows.value.map((r) => r.payableInterest)),
-    bookInterest: subtotalRow.value.bookInterest,
+    bookInterest: calcSubtotal(rows.value.map((r) => r.bookInterest)),
     variance: calcSubtotal(rows.value.map((r) => r.variance)),
   }))
 
   function addRow(): void {
     if (readonly.value) return
-    storedData.value.push(computeRow(emptyRow(storedData.value.length + 1)))
+    storedData.value.push(computeInterestRow(emptyInterestRow(storedData.value.length + 1)))
     persistRows()
   }
 
@@ -140,11 +179,11 @@ export function useF3InterestCalc(options: UseF3BaseOptions) {
     if (readonly.value) return
     const row = storedData.value.find((r) => r.rowId === rowId)
     if (!row) return
-    const strFields = ['drawer', 'issueDate', 'dueDate', 'interestStart', 'interestEnd']
+    const strFields = ['noteType', 'ticketNo', 'issueDate', 'dueDate', 'note']
     if (strFields.includes(field)) (row as any)[field] = String(value ?? '')
     else (row as any)[field] = parseNum(value)
     const idx = storedData.value.indexOf(row)
-    storedData.value[idx] = computeRow(row)
+    storedData.value[idx] = computeInterestRow(row)
     persistRows()
   }
 
@@ -188,16 +227,16 @@ export function useF3InterestCalc(options: UseF3BaseOptions) {
       else (row as any)[field] = String(val)
     }
 
-    setIf('drawer', fields.drawer)
+    setIf('noteType', fields.noteType)
+    setIf('ticketNo', fields.noteNo)
     setIf('faceValue', fields.faceValue)
     setIf('interestRate', fields.interestRate)
-    setIf('issueDate', fields.issueDate)
-    setIf('dueDate', fields.dueDate)
-    setIf('interestStart', fields.interestStart)
-    setIf('interestEnd', fields.interestEnd)
+    setIf('issueDate', fields.issueDate || fields.interestStart)
+    setIf('dueDate', fields.dueDate || fields.interestEnd)
+    if (fields.drawer && !row.note) row.note = `出票人：${fields.drawer}`
 
     const idx = storedData.value.indexOf(row)
-    storedData.value[idx] = computeRow(row)
+    storedData.value[idx] = computeInterestRow(row)
     persistRows()
   }
 
@@ -205,7 +244,11 @@ export function useF3InterestCalc(options: UseF3BaseOptions) {
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; flushSave() }
   })
 
-  return { rows, subtotalRow, totals, auditConclusion, addRow, removeRow, updateCell, rowClassName, mergeOcrFields, varianceWarn: VARIANCE_WARN }
+  return {
+    rows, totals, filledCount, abnormalCount, auditConclusion,
+    addRow, removeRow, updateCell, rowClassName, mergeOcrFields,
+    varianceWarn: VARIANCE_WARN,
+  }
 }
 
 export default useF3InterestCalc

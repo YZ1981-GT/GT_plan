@@ -32,8 +32,6 @@
 
     </el-alert>
 
-
-
     <el-alert v-if="dis.adjudicatedAmount.value != null" type="success" :closable="false" class="sync-hint">
 
       已同步审定数（6702）：{{ fmt(dis.adjudicatedAmount.value) }}
@@ -41,8 +39,6 @@
       <el-button link size="small" @click="dis.pullLatestAdjudicated()">刷新</el-button>
 
     </el-alert>
-
-
 
     <el-table :data="dis.displayRows.value" border size="small" style="font-size:13px" max-height="480"
       data-testid="g14-disclosure-listed-table"
@@ -109,8 +105,6 @@
 
     </el-table>
 
-
-
     <el-card shadow="never" class="note-card">
 
       <template #header>附注说明</template>
@@ -122,8 +116,6 @@
         @update:model-value="dis.updateNoteText" />
 
     </el-card>
-
-
 
     <GCycleDisclosureExtras
 
@@ -145,17 +137,7 @@
 
     />
 
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>审计说明</template>
-      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="录入信用减值损失披露的审计说明…" @update:model-value="saveAuditNote" />
-    </el-card>
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>审计结论</template>
-      <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
-        placeholder="录入审计结论…" @update:model-value="saveAuditConclusion" />
-    </el-card>
-
+        
     <details class="compile-hint">
 
       <summary>📋 编制提示</summary>
@@ -176,11 +158,9 @@
 
 </template>
 
-
-
 <script setup lang="ts">
 
-import { ref, toRef, computed, onMounted } from 'vue'
+import { ref, toRef, computed } from 'vue'
 
 import { useG14Disclosure } from '../composables/useG14Disclosure'
 
@@ -194,8 +174,6 @@ import GtIndexChip from '../GtIndexChip.vue'
 
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 
-
-
 const props = defineProps<{
 
   allResponses: Map<string, ChecklistResponse>
@@ -207,8 +185,6 @@ const props = defineProps<{
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 
 }>()
-
-
 
 const dis = useG14Disclosure({
 
@@ -224,63 +200,11 @@ const dis = useG14Disclosure({
 
 })
 
-
-
-const NOTE_KEY = 'G14-disclosure-listed-audit-note'
-
-const CONCLUSION_KEY = 'G14-disclosure-listed-audit-conclusion'
-
-const auditNote = ref('')
-
-const auditConclusion = ref('')
-
-
-
-function saveAuditNote(val: string) {
-
-  if (props.isReadonly) return
-
-  auditNote.value = val
-
-  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
-
-}
-
-
-
-function saveAuditConclusion(val: string) {
-
-  if (props.isReadonly) return
-
-  auditConclusion.value = val
-
-  props.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
-
-}
-
-
-
-onMounted(() => {
-
-  const n = props.allResponses.get(NOTE_KEY)
-
-  if (n?.remark) auditNote.value = n.remark
-
-  const c = props.allResponses.get(CONCLUSION_KEY)
-
-  if (c?.remark) auditConclusion.value = c.remark
-
-})
-
-
-
 function rowClassName({ row }: { row: { rowKey: string } }): string {
 
   return row.rowKey === 'total' ? 'g14-row-total' : ''
 
 }
-
-
 
 function fmt(v: number): string {
 
@@ -289,8 +213,6 @@ function fmt(v: number): string {
 }
 
 </script>
-
-
 
 <style scoped>
 
@@ -309,8 +231,6 @@ function fmt(v: number): string {
 .formula-cell { border-bottom: 1px dashed #909399; }
 
 .note-card { margin-top: 12px; }
-
-.audit-note-card { margin-top: 12px; }
 
 .compile-hint { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; }
 

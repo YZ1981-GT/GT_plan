@@ -88,7 +88,26 @@ export function useF2DualMode(options: UseF2DualModeOptions) {
 
   onMounted(() => {
     loadPersistedMode()
-    void checkOOHealth()
+    // OO 健康检查不阻塞首屏；仅在用户曾选 OO 或主动切换时再探测
+    void (async () => {
+      let saved: string | null = null
+      try {
+        saved = localStorage.getItem(STORAGE_PREFIX + wpId.value)
+      } catch { /* ignore */ }
+
+      if (saved === 'onlyoffice') {
+        const healthy = await checkOOHealth()
+        if (healthy) {
+          await switchMode('onlyoffice')
+        } else {
+          currentMode.value = 'html'
+          persistMode('html')
+        }
+      } else {
+        // 结构化视图：后台轻量探测，失败不影响渲染
+        void checkOOHealth()
+      }
+    })()
   })
 
   return {

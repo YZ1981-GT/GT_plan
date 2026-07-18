@@ -37,11 +37,31 @@ export function useF2LossContract(opts: {
 
   function load(): void {
     const raw = readSpeRowJson(opts.allResponses.value.get(ROWS_KEY))
+    // persist() 会触发 watcher；内容未变化时跳过，避免刚新增的空行被迁移裁剪。
+    if (raw && raw === JSON.stringify(sheet.value)) return
     if (raw) {
       try {
         const parsed = JSON.parse(raw)
         const migrated = migrateLossContractSheet(parsed)
-        if (migrated) sheet.value = migrated
+        if (migrated) {
+          const beforeCount = Array.isArray(parsed?.projects)
+            ? parsed.projects.length
+            : (Array.isArray(parsed) ? parsed.length : 0)
+          sheet.value = migrated
+          // 清理历史预留空行后立即写回，避免刷新时再次出现。
+          if (!readonly.value && beforeCount > migrated.projects.length) {
+            opts.allResponses.value.set(ROWS_KEY, {
+              item_id: ROWS_KEY,
+              conclusion: null,
+              remark: JSON.stringify(migrated),
+            })
+            if (debounceTimer) clearTimeout(debounceTimer)
+            debounceTimer = setTimeout(() => {
+              debounceTimer = null
+              flushSave()
+            }, 300)
+          }
+        }
       } catch { /* ignore */ }
     }
     auditNote.value = opts.allResponses.value.get(NOTE_KEY)?.remark || ''

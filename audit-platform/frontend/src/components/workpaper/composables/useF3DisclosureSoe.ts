@@ -50,17 +50,31 @@ export function useF3DisclosureSoe(options: {
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   const adjudicatedRefreshKey = ref(0)
 
-  const isApplicable: ComputedRef<boolean> = computed(() =>
-    applicableStandards.value.some((s) => s === 'soe_standalone' || s === 'soe_consolidated'),
-  )
+  // 与 F2 附注同口径：项目未配置适用准则时默认适用，已配置时按 soe/国企 关键字判断。
+  const isApplicable: ComputedRef<boolean> = computed(() => {
+    const list = applicableStandards.value || []
+    if (list.length === 0) return true
+    return list.some((s) => {
+      const x = String(s).toLowerCase()
+      return x.includes('soe') || x.includes('state_owned') || x.includes('国企') || x.includes('国有')
+    })
+  })
+
+  /** 审定表尚无数据时的模板固定两行（与附注章节「八、36 应付票据」行结构一致）。 */
+  function defaultClassRows(): F3SoeDisclosureRow[] {
+    return [
+      { rowId: 'cs-bank', label: '银行承兑汇票', endAmount: 0, priorAmount: 0 },
+      { rowId: 'cs-commercial', label: '商业承兑汇票', endAmount: 0, priorAmount: 0 },
+    ]
+  }
 
   const section1Rows: ComputedRef<F3SoeDisclosureRow[]> = computed(() => {
     void adjudicatedRefreshKey.value
     const raw = allResponses.value.get(ADJ_KEY)?.remark
-    if (!raw) return []
+    if (!raw) return defaultClassRows()
     try {
       const stored = JSON.parse(raw) as any[]
-      return stored
+      const rows = stored
         .filter((r) => r.rowKey === 'bank' || r.rowKey === 'commercial')
         .map((r) => ({
           rowId: `cs-${r.rowKey}`,
@@ -72,8 +86,9 @@ export function useF3DisclosureSoe(options: {
             parseNum(r.openingRje),
           ),
         }))
+      return rows.length ? rows : defaultClassRows()
     } catch {
-      return []
+      return defaultClassRows()
     }
   })
 

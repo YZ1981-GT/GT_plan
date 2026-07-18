@@ -1,177 +1,295 @@
 <template>
   <div class="f5-rollforward">
-    <!-- 蓝色渐变引导区 -->
-    <div class="f5-guide">
-      <div class="f5-guide-title">成本倒轧逻辑（4步骤结构化验证）</div>
-      <div class="f5-guide-steps">
-        <span class="f5-guide-step"><b>①</b> 材料流转</span>
-        <span class="f5-guide-arrow">→</span>
-        <span class="f5-guide-step"><b>②</b> 成本构成</span>
-        <span class="f5-guide-arrow">→</span>
-        <span class="f5-guide-step"><b>③</b> 成本结转</span>
-        <span class="f5-guide-arrow">→</span>
-        <span class="f5-guide-step"><b>④</b> 营业成本</span>
+    <details class="guidance-details">
+      <summary>📋 编制思路（灵魂表 · 四段倒轧链）</summary>
+      <div class="guidance-content">
+        <p><b>① 直接材料成本 ⑹</b>＝期初原材料⑴＋购入净额⑵＋其他增加⑶−期末原材料⑷−其他发出⑸</p>
+        <p><b>② 产品生产成本 ⑽</b>＝直接材料⑹＋直接人工⑺＋制造费用⑻＋专用工模具⑼（「其中：材料费用」仅明细，不计入合计）</p>
+        <p><b>③ 产成品成本 ⒀</b>＝产品生产成本⑽＋在产品期初⑾−在产品期末⑿</p>
+        <p><b>④ 主营业务成本 ⒇</b>＝产成品成本⒀＋产成品期初⒁＋其他增加⒂−产成品期末⒃−自制自用⒄−内部领用⒅−其他发出⒆</p>
+        <p>每行：审定＝未审＋审计调整；公式行对未审/调整/上期分别轧差。悬停「计算说明」或审定数可查看公式。索引号链接试算表、F2 存货、F5-1 审定等。</p>
       </div>
-    </div>
+    </details>
 
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：通过成本倒轧（材料→成本构成→成本结转→营业成本）验证营业成本结转的完整与准确，将倒轧结果与 F5-1 审定营业成本核对，差异超重要性水平须查明。"
+      title="审计目标：核实营业成本的发生、完整与准确；通过材料→生产→产成品→主营成本倒轧，与 F5-1 审定核对。"
       class="objective-alert"
     />
 
-    <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
-        <span class="toolbar-hint">科目6401 · 4区结构化倒轧验证</span>
+        <el-tag size="small" type="warning">灵魂表</el-tag>
+        <span class="toolbar-hint">科目 6401 · 交叉引用 TB / F2 / F5-1 / F5-2</span>
       </div>
       <div class="toolbar-right">
-        <span class="chip-wrap"><GtIndexChip value="wp:F5-1" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:F5-1" :context-project-id="projectIdStr" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:F5-2" :context-project-id="projectIdStr" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:F2" :context-project-id="projectIdStr" /></span>
       </div>
     </div>
 
-    <!-- ① 材料流转区 -->
-    <el-card class="f5-zone" shadow="never">
-      <template #header><span class="f5-zone-title">① 材料流转区</span></template>
-      <div class="f5-line"><span>期初原材料（TB取数）</span><span class="f5-tb">{{ fmt(d.openingMaterial) }}</span></div>
-      <div class="f5-line"><span>+ 本期购入</span>{{ editable('purchase') }}</div>
-      <div class="f5-line"><span>− 期末原材料（TB取数）</span><span class="f5-tb">{{ fmt(d.closingMaterial) }}</span></div>
-      <div class="f5-line"><span>− 其他发出</span>{{ editable('otherIssue1') }}</div>
-      <div class="f5-line f5-result"><span>= 投入生产</span>
-        <span class="f5-formula" title="期初原材料+购入-期末原材料-其他发出">{{ fmt(d.materialInput) }}</span>
-      </div>
-    </el-card>
+    <F5SheetAttachments
+      v-if="projectId"
+      :project-id="projectId"
+      :wp-id="wpId"
+      sheet-code="F5-7"
+      label="成本倒轧附件"
+    />
 
-    <!-- ② 成本构成区 -->
-    <el-card class="f5-zone" shadow="never">
-      <template #header><span class="f5-zone-title">② 成本构成区</span></template>
-      <div class="f5-line"><span>投入生产（来自①）</span><span class="f5-tb">{{ fmt(d.materialInput) }}</span></div>
-      <div class="f5-line"><span>+ 直接人工</span>{{ editable('directLabor') }}</div>
-      <div class="f5-line"><span>+ 制造费用</span>{{ editable('overhead') }}</div>
-      <div class="f5-line f5-result"><span>= 产品总成本</span>
-        <span class="f5-formula" title="投入生产+直接人工+制造费用">{{ fmt(d.totalProductionCost) }}</span>
-      </div>
-    </el-card>
+    <nav class="st-sec-nav" aria-label="F5-7 分区导航">
+      <button
+        v-for="item in f5RollNav"
+        :key="item.id"
+        type="button"
+        class="st-sec-btn"
+        :class="{ active: activeId === item.id }"
+        @click="scrollTo(item.id)"
+      >{{ item.label }}</button>
+    </nav>
 
-    <!-- ③ 成本结转区 -->
-    <el-card class="f5-zone" shadow="never">
-      <template #header><span class="f5-zone-title">③ 成本结转区</span></template>
-      <div class="f5-line"><span>期初在产品（TB取数）</span><span class="f5-tb">{{ fmt(d.openingWIP) }}</span></div>
-      <div class="f5-line"><span>+ 产品总成本（来自②）</span><span class="f5-tb">{{ fmt(d.totalProductionCost) }}</span></div>
-      <div class="f5-line"><span>− 期末在产品（TB取数）</span><span class="f5-tb">{{ fmt(d.closingWIP) }}</span></div>
-      <div class="f5-line f5-result"><span>= 完工产品成本</span>
-        <span class="f5-formula" title="期初在产品+产品总成本-期末在产品">{{ fmt(d.finishedGoodsCost) }}</span>
-      </div>
-    </el-card>
+    <el-table
+      id="f5-7-roll"
+      :data="roll.rows.value"
+      size="small"
+      border
+      stripe
+      :row-class-name="rowClass"
+      max-height="560"
+      class="roll-table"
+    >
+      <el-table-column label="项目内容" min-width="200" fixed>
+        <template #default="{ row }">
+          <el-tooltip :content="row.formulaExpr" placement="top" :show-after="300">
+            <span :class="{ 'result-label': row.isResult, 'detail-label': row.rowType === 'detail' }">
+              {{ row.label }}
+            </span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
 
-    <!-- ④ 营业成本区 -->
-    <el-card class="f5-zone" shadow="never">
-      <template #header><span class="f5-zone-title">④ 营业成本区</span></template>
-      <div class="f5-line"><span>期初产成品（TB取数）</span><span class="f5-tb">{{ fmt(d.openingFG) }}</span></div>
-      <div class="f5-line"><span>+ 完工产品成本（来自③）</span><span class="f5-tb">{{ fmt(d.finishedGoodsCost) }}</span></div>
-      <div class="f5-line"><span>− 期末产成品（TB取数）</span><span class="f5-tb">{{ fmt(d.closingFG) }}</span></div>
-      <div class="f5-line"><span>− 其他发出</span>{{ editable('otherIssue2') }}</div>
-      <div class="f5-line f5-result f5-cogs"><span>= 本期营业成本</span>
-        <span class="f5-formula" title="期初产成品+完工产品成本-期末产成品-其他发出">{{ fmt(d.cogs) }}</span>
-      </div>
-    </el-card>
+      <el-table-column label="计算说明" width="160">
+        <template #default="{ row }">
+          <el-tooltip :content="row.formulaExpr" placement="top" :show-after="200">
+            <span class="f5-formula formula-legend">{{ row.formulaLegend || '—' }}</span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
 
-    <!-- 校验区 -->
-    <el-card class="f5-verify" shadow="never" :class="{ 'is-error': roll.varianceExceedsMateriality.value }">
-      <template #header><span class="f5-zone-title">校验区</span></template>
-      <div class="f5-verify-grid">
-        <div><span>审定表营业成本（F5-1取）</span><b>{{ fmt(d.adjudicatedCOGS) }}</b></div>
-        <div><span>倒轧营业成本</span><b>{{ fmt(d.cogs) }}</b></div>
-        <div><span>与倒轧差异</span>
-          <b :class="roll.varianceExceedsMateriality.value ? 'danger' : 'ok'">{{ fmt(d.rollforwardVariance) }}</b>
-        </div>
-        <div><span>结论</span>
-          <el-tag :type="roll.varianceExceedsMateriality.value ? 'danger' : 'success'" size="small">
-            {{ roll.varianceExceedsMateriality.value ? '差异超重要性水平，需查明' : '倒轧一致，通过' }}
-          </el-tag>
-        </div>
-      </div>
-    </el-card>
+      <el-table-column label="数据来源" min-width="160" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span class="data-source">{{ row.dataSource }}</span>
+        </template>
+      </el-table-column>
 
-    <!-- 审计说明 -->
-    <el-card class="opinion-card" shadow="never">
+      <el-table-column label="索引号" width="130">
+        <template #default="{ row }">
+          <template v-if="row.rowType !== 'formula'">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.indexRef"
+              size="small"
+              placeholder="tb:1401 / wp:F2"
+              @change="(v: string) => roll.updateIndexRef(row.rowKey, v)"
+            />
+            <span v-else-if="row.indexRef" class="chip-wrap">
+              <GtIndexChip :value="normalizeIndex(row.indexRef)" :context-project-id="projectIdStr" />
+            </span>
+          </template>
+          <span v-else-if="row.indexRef" class="chip-wrap">
+            <GtIndexChip :value="normalizeIndex(row.indexRef)" :context-project-id="projectIdStr" />
+          </span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="未审数" width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number
+            v-if="row.rowType !== 'formula' && !isReadonly"
+            :model-value="row.unadjusted"
+            :controls="false"
+            size="small"
+            style="width:100%"
+            @change="(v: number | undefined) => roll.updateAmount(row.rowKey, 'unadjusted', v ?? 0)"
+          />
+          <el-tooltip v-else-if="row.rowType === 'formula'" :content="row.formulaExpr" placement="top">
+            <span class="f5-formula">{{ fmt(row.unadjusted) }}</span>
+          </el-tooltip>
+          <span v-else :class="{ 'tb-val': roll.isTbField(row.rowKey) }">{{ fmt(row.unadjusted) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="审计调整" width="100" align="right">
+        <template #default="{ row }">
+          <el-input-number
+            v-if="row.rowType !== 'formula' && !isReadonly"
+            :model-value="row.aje"
+            :controls="false"
+            size="small"
+            style="width:100%"
+            @change="(v: number | undefined) => roll.updateAmount(row.rowKey, 'aje', v ?? 0)"
+          />
+          <el-tooltip v-else-if="row.rowType === 'formula'" :content="`调整轧差：${row.formulaLegend}`" placement="top">
+            <span class="f5-formula">{{ fmt(row.aje) }}</span>
+          </el-tooltip>
+          <span v-else>{{ fmt(row.aje) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="审定数" width="110" align="right" class-name="auto-calc-col">
+        <template #default="{ row }">
+          <el-tooltip
+            :content="row.rowType === 'formula'
+              ? row.formulaExpr
+              : `审定 = 未审 + 审计调整 = ${row.unadjusted} + ${row.aje}`"
+            placement="top"
+            :show-after="200"
+          >
+            <span class="f5-formula" :class="{ 'result-val': row.isResult }">{{ fmt(row.audited) }}</span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="上期数" width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number
+            v-if="row.rowType !== 'formula' && !isReadonly"
+            :model-value="row.prior"
+            :controls="false"
+            size="small"
+            style="width:100%"
+            @change="(v: number | undefined) => roll.updateAmount(row.rowKey, 'prior', v ?? 0)"
+          />
+          <el-tooltip v-else-if="row.rowType === 'formula'" :content="`上期轧差：${row.formulaLegend}`" placement="top">
+            <span class="f5-formula">{{ fmt(row.prior) }}</span>
+          </el-tooltip>
+          <span v-else>{{ fmt(row.prior) }}</span>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <!-- 校验区（HTML 扩展，与 F5-1 EventBus 联动） -->
+    <el-card id="f5-7-verify" class="verify-card" shadow="never" :class="{ 'verify-warn': roll.varianceExceedsMateriality.value }">
       <template #header>
         <div class="opinion-header">
-          <span class="opinion-title">审计说明</span>
+          <span class="opinion-title">与 F5-1 审定营业成本核对</span>
+          <span class="chip-wrap"><GtIndexChip value="wp:F5-1" :context-project-id="projectIdStr" /></span>
         </div>
       </template>
-      <el-input v-model="note" type="textarea" :autosize="{ minRows: 5, maxRows: 8 }" :disabled="isReadonly"
-        placeholder="成本倒轧审计说明（材料流转、成本构成、成本结转链条验证情况，与 F5-1 审定营业成本差异分析等）..."
-        @change="saveNote" />
+      <div class="verify-grid">
+        <div>
+          <span class="verify-label">倒轧主营业务成本（审定）</span>
+          <el-tooltip :content="roll.mainCogsRow.value?.formulaExpr" placement="top">
+            <b class="f5-formula">{{ fmt(d.cogsAudited) }}</b>
+          </el-tooltip>
+        </div>
+        <div>
+          <span class="verify-label">F5-1 审定营业成本</span>
+          <b>{{ fmt(d.adjudicatedCOGS) }}</b>
+        </div>
+        <div>
+          <span class="verify-label">差异（审定 − 倒轧）</span>
+          <b :class="{ 'is-warn': roll.varianceExceedsMateriality.value }">{{ fmt(d.rollforwardVariance) }}</b>
+        </div>
+      </div>
+      <p v-if="roll.varianceExceedsMateriality.value" class="verify-hint">
+        差异超过重要性水平（或非零），请查明倒轧链条断点或调整未入账原因。
+      </p>
     </el-card>
 
-    <!-- 审计意见区（卡片式） -->
-    <el-card class="opinion-card" shadow="never">
+    <el-card id="f5-7-note" class="opinion-card" shadow="never">
       <template #header>
         <div class="opinion-header">
-          <span class="opinion-title">审计结论</span>
+          <span class="opinion-title">三、审计说明</span>
           <div class="opinion-actions">
-            <el-button size="small" @click="openReview">💬</el-button>
+            <el-button
+              size="small"
+              type="primary"
+              plain
+              :disabled="isReadonly || !aiAvailable"
+              :loading="aiLoading"
+              @click="generateAiNote"
+            >🤖 AI生成说明</el-button>
+            <el-button v-if="openReviewDialog" size="small" @click="openReview">复核</el-button>
           </div>
         </div>
       </template>
-      <el-input v-model="roll.auditConclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }"
-        :disabled="isReadonly" placeholder="成本倒轧审计结论..." @change="saveConclusion" />
+      <el-input
+        :model-value="roll.auditNote.value"
+        type="textarea"
+        :autosize="{ minRows: 4, maxRows: 10 }"
+        :disabled="isReadonly"
+        placeholder="说明倒轧各环节取数来源、重大调整、与 F5-1 / 存货底稿勾稽情况…"
+        @change="roll.saveAuditNote"
+      />
     </el-card>
 
-    <!-- 编制提示 -->
-    <details class="guidance-details guidance-bottom">
-      <summary>📋 编制提示</summary>
-      <div class="guidance-content">
-        <p>1. 期初/期末原材料(1401)、在产品(1404)、产成品(1405)由试算表自动取数（灰底只读），确保存货口径与 F2 存货底稿一致。</p>
-        <p>2. 可编辑字段：本期购入、直接人工、制造费用、其他发出；各区结果按公式自动倒轧（公式列虚线，悬停查看来源）。</p>
-        <p>3. 倒轧营业成本 = 期初产成品 + 完工产品成本 − 期末产成品 − 其他发出，逐区串联验证成本结转链条。</p>
-        <p>4. 校验区从 F5-1 审定表获取审定营业成本，与倒轧结果差异超重要性水平以红色标记，须查明原因。</p>
-      </div>
-    </details>
+    <el-card id="f5-7-conclusion" class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">四、审计结论</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="generateAiConclusion"
+          >🤖 AI生成结论</el-button>
+        </div>
+      </template>
+      <el-input
+        :model-value="roll.auditConclusion.value"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="综合评价倒轧结果与审定营业成本是否相符（A/B/C口径）…"
+        @change="(v: string) => roll.saveAuditConclusion(v)"
+      />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * F5TabCostRollforward.vue — F5-7 成本倒轧表（4区结构化验证）
- * 蓝色引导区 + 4区el-card(公式行虚线+tooltip) + TB取数只读/可编辑高亮 + 校验区(绿/红) + 审计结论(AI) + 编制提示折叠
+ * F5TabCostRollforward — F5-7 主营业务成本倒轧表（灵魂表）
+ * 21 行源表网格 + 公式悬停 + 交叉索引 + F5-1 校验 + AI
  */
-import { ref, computed, inject, toRef, watch, h, type Ref, type VNode } from 'vue'
-import { ElInput } from 'element-plus'
+import { computed, inject, toRef, watch, type Ref } from 'vue'
 import { useF5CostRollforward } from '../composables/useF5CostRollforward'
+import { useF5AiGenerate } from '../composables/useF5AiGenerate'
+import { useStickySectionNav } from '../composables/useStickySectionNav'
+import F5SheetAttachments from './F5SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
-const props = defineProps<{
+const f5RollNav = [
+  { id: 'f5-7-roll', label: '倒轧' },
+  { id: 'f5-7-verify', label: '核对' },
+  { id: 'f5-7-note', label: '说明' },
+  { id: 'f5-7-conclusion', label: '结论' },
+]
+const { activeId, scrollTo } = useStickySectionNav(f5RollNav)
+
+const props = withDefaults(defineProps<{
   allResponses: Map<string, ChecklistResponse>
   wpId: string
+  projectId?: string
   isReadonly: boolean
-  materiality?: number
   adjudicatedCOGS?: number
-  /** TB 自动取数（1401/1404/1405 期初期末），来自 render 策略 */
-  tbData?: Record<string, number>
-}>()
+  tbData?: Record<string, number> | null
+  materiality?: number
+}>(), {
+  projectId: '',
+  adjudicatedCOGS: 0,
+  tbData: null,
+  materiality: 0,
+})
 
-// 父组件模板绑定会自动解包 computed → 子组件收到纯 Map；重新包成 ref 供内部逻辑使用
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
-
-const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
-const CONCLUSION_KEY = 'F5-7-conclusion'
-const NOTE_KEY = 'F5-7-audit-note'
-const ROLL_KEY = 'F5-7-cost-rollforward'
-
-const note = ref(allResponsesRef.value.get(NOTE_KEY)?.remark ?? '')
-
-function saveNote() {
-  allResponsesRef.value.set(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: note.value })
-  window.dispatchEvent(new CustomEvent('f5:save-items', {
-    detail: { items: [{ item_id: NOTE_KEY, conclusion: null, remark: note.value }] },
-  }))
-}
-
+const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 const roll = useF5CostRollforward({
   allResponses: allResponsesRef,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
@@ -179,102 +297,177 @@ const roll = useF5CostRollforward({
   adjudicatedCOGS: computed(() => props.adjudicatedCOGS ?? 0) as unknown as Ref<number>,
 })
 
-/** 倒轧数据（computed ref，模板自动解包 → d.xxx） */
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF5AiGenerate(wpIdRef)
+
 const d = computed(() => roll.data.value)
+const projectIdStr = computed(() => props.projectId)
 
-/** TB 自动取数写入只读字段（1401/1404/1405 期初期末） */
-const TB_KEYS = ['openingMaterial', 'closingMaterial', 'openingWIP', 'closingWIP', 'openingFG', 'closingFG'] as const
-function seedTb(tb?: Record<string, number>): void {
-  if (props.isReadonly || !tb) return
-  const patch: Record<string, number> = {}
-  for (const k of TB_KEYS) {
-    if (tb[k] != null && Number.isFinite(Number(tb[k]))) patch[k] = Number(tb[k])
-  }
-  if (Object.keys(patch).length) {
-    roll.setTbValues(patch as any)
-    window.dispatchEvent(new CustomEvent('f5:save-items', {
-      detail: { items: [allResponsesRef.value.get(ROLL_KEY)].filter(Boolean) },
-    }))
-  }
-}
-watch(() => props.tbData, (tb) => seedTb(tb), { immediate: true })
+// TB 自动取数灌入：仅填充空/零字段，避免覆盖人工改数
+watch(
+  () => props.tbData,
+  (tb) => {
+    if (!tb || props.isReadonly) return
+    const patch: Record<string, number> = {}
+    const data = roll.data.value as Record<string, unknown>
+    for (const k of roll.tbFields) {
+      if (tb[k] == null) continue
+      const current = Number(data[k] ?? 0)
+      if (Math.abs(current) < 0.005) patch[k] = Number(tb[k])
+    }
+    if (Object.keys(patch).length) roll.setTbValues(patch as any)
+  },
+  { immediate: true, deep: true },
+)
 
-/** 可编辑字段渲染函数（返回 el-input 或只读 span） */
-function editable(field: string): VNode {
-  if (props.isReadonly) {
-    return h('span', { class: 'f5-edit-ro' }, fmt((roll.data.value as any)[field]))
-  }
-  return h(ElInput, {
-    modelValue: (roll.data.value as any)[field],
-    size: 'small',
-    class: 'f5-edit-input',
-    'onUpdate:modelValue': (v: any) => roll.updateField(field, v),
-    onChange: (v: any) => {
-      roll.updateField(field, v)
-      window.dispatchEvent(new CustomEvent('f5:save-items', {
-        detail: { items: [allResponsesRef.value.get(ROLL_KEY)].filter(Boolean) },
-      }))
-    },
-  })
+function rowClass({ row }: { row: any }): string {
+  if (row.isResult) return 'f5-row-result'
+  if (row.rowType === 'detail') return 'f5-row-detail'
+  return ''
 }
 
-function saveConclusion() {
-  window.dispatchEvent(new CustomEvent('f5:save-items', {
-    detail: { items: [allResponsesRef.value.get(CONCLUSION_KEY)].filter(Boolean) },
-  }))
+function normalizeIndex(ref: string): string {
+  const t = ref.trim()
+  if (!t) return t
+  if (t.startsWith('wp:') || t.startsWith('tb:')) return t
+  if (/^\d{4}/.test(t)) return `tb:${t}`
+  return `wp:${t}`
 }
 
 function fmt(v: number | null | undefined): string {
   if (v == null) return '-'
-  return v.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+  if (Math.abs(v) < 0.005) return '-'
+  const formatted = Math.abs(v).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+  return v < 0 ? `(${formatted})` : formatted
 }
-function openReview() { openReviewDialog('F5-7-conclusion') }
+
+function openReview() {
+  openReviewDialog?.('F5-7-conclusion')
+}
+
+function aiContext(): Record<string, unknown> {
+  return {
+    sheet: 'F5-7',
+    chain: {
+      directMaterial: roll.rows.value.find((r) => r.rowKey === 'directMaterialCost'),
+      productionCost: roll.rows.value.find((r) => r.rowKey === 'productProductionCost'),
+      finishedGoods: roll.rows.value.find((r) => r.rowKey === 'finishedGoodsCost'),
+      mainCOGS: roll.mainCogsRow.value,
+    },
+    verification: {
+      cogsAudited: d.value.cogsAudited,
+      adjudicatedCOGS: d.value.adjudicatedCOGS,
+      variance: d.value.rollforwardVariance,
+      exceedsMateriality: roll.varianceExceedsMateriality.value,
+    },
+    rows: roll.rows.value.map((r) => ({
+      seqNo: r.seqNo,
+      label: r.label,
+      formulaLegend: r.formulaLegend,
+      unadjusted: r.unadjusted,
+      aje: r.aje,
+      audited: r.audited,
+      prior: r.prior,
+      indexRef: r.indexRef,
+      rowType: r.rowType,
+    })),
+  }
+}
+
+async function generateAiNote() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'rollforward-note',
+    roll.auditNote.value,
+    aiContext(),
+    'AI 生成 · F5-7审计说明',
+  )
+  if (text) roll.saveAuditNote(text)
+}
+
+async function generateAiConclusion() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'rollforward-evaluation',
+    roll.auditConclusion.value,
+    aiContext(),
+    'AI 生成 · F5-7审计结论',
+  )
+  if (text) roll.saveAuditConclusion(text)
+}
 </script>
 
 <style scoped>
 .f5-rollforward { padding: 12px; font-size: var(--wp-font-size, 13px); }
-.f5-guide { background: linear-gradient(135deg, #409eff, #66b1ff); color: #fff; padding: 12px 16px; border-radius: 6px; margin-bottom: 12px; }
-.f5-guide-title { font-weight: 700; margin-bottom: 6px; }
-.f5-guide-steps { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.f5-guide-step b { font-size: 16px; margin-right: 4px; }
-.f5-guide-arrow { opacity: 0.8; }
-.f5-zone { margin-bottom: 10px; }
-.f5-zone-title { font-weight: 600; }
-.f5-line { display: flex; align-items: center; justify-content: space-between; padding: 4px 0; border-bottom: 1px dotted #ebeef5; }
-.f5-line > span:first-child { color: #606266; }
-.f5-tb { background: #f5f7fa; padding: 2px 8px; border-radius: 3px; color: #909399; }
-.f5-result { font-weight: 700; border-top: 1px solid #dcdfe6; margin-top: 4px; }
-.f5-cogs { color: #409eff; font-size: 15px; }
-.f5-formula { border-bottom: 1px dashed #909399; cursor: help; }
-:deep(.f5-edit-input) { width: 160px; }
-.f5-verify { margin-top: 12px; border: 1px solid #67c23a; }
-.f5-verify.is-error { border-color: #f56c6c; }
-.f5-verify-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-.f5-verify-grid > div { display: flex; flex-direction: column; gap: 4px; }
-.f5-verify-grid .danger { color: #f56c6c; }
-.f5-verify-grid .ok { color: #67c23a; }
-.f5-card-header { display: flex; align-items: center; justify-content: space-between; }
+.f5-rollforward :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
+.f5-rollforward :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px) !important; }
 
-/* 审计目标 */
+.guidance-details {
+  margin-bottom: 12px;
+  border-left: 3px solid #b88230;
+  background: #fdf6ec;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary { cursor: pointer; font-weight: 600; color: #b88230; }
+.guidance-content { margin-top: 8px; color: #606266; line-height: 1.7; }
+.guidance-content p { margin: 4px 0; }
 .objective-alert { margin-bottom: 12px; }
 
-/* 工具栏 */
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; }
-.toolbar-hint { font-size: var(--wp-font-size, 13px); color: #909399; }
+.tab-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.toolbar-left, .toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar-hint { color: #909399; font-size: 12px; }
 .chip-wrap { display: inline-flex; align-items: center; }
 
-/* 审计意见卡片 */
-.opinion-card { margin-top: 12px; border-radius: 8px; }
-.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.opinion-header { display: flex; align-items: center; justify-content: space-between; }
-.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
-.opinion-actions { display: flex; gap: 6px; }
+.f5-formula { border-bottom: 1px dashed #909399; cursor: help; }
+.formula-legend { color: #315a8a; font-weight: 500; }
+.result-label { font-weight: 700; color: #303133; }
+.detail-label { padding-left: 12px; color: #909399; font-size: 12px; }
+.result-val { font-weight: 700; color: #315a8a; }
+.tb-val { color: #67c23a; }
+.data-source { color: #909399; font-size: 12px; }
+.is-warn { color: #f56c6c; font-weight: 700; }
 
-/* 编制提示 */
-.guidance-details { margin-top: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
-.guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
-.guidance-content p { margin: 2px 0; }
+:deep(.auto-calc-col) { background-color: #f5f7fa !important; }
+:deep(.f5-row-result) { background: #eef4fa !important; font-weight: 600; }
+:deep(.f5-row-detail) { background: #fafafa !important; color: #909399; }
+
+.verify-card {
+  margin-top: 16px;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+}
+.verify-card.verify-warn { border-color: #f56c6c; background: #fef0f0; }
+.verify-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.verify-label { display: block; color: #909399; font-size: 12px; margin-bottom: 4px; }
+.verify-hint { margin: 10px 0 0; color: #f56c6c; font-size: 13px; }
+
+.opinion-card { margin-top: 16px; border-radius: 8px; }
+.opinion-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #ebeef5;
+}
+.opinion-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.opinion-actions { display: flex; gap: 6px; align-items: center; }
+.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
+
+@media (max-width: 900px) {
+  .verify-grid { grid-template-columns: 1fr; }
+}
 </style>
+
+<style src="../f2/stocktake/f2StocktakeSoftNav.css"></style>

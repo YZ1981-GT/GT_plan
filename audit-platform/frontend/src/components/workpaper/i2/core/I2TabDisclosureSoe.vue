@@ -109,20 +109,11 @@
       <el-button size="small" type="success" @click="handleSave">保存</el-button>
     </div>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><span>审计说明</span></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }" placeholder="记录审计过程、发现的问题及处理..." @change="saveAuditNote" />
-    </el-card>
-    <el-card shadow="never" class="audit-conclusion-card">
-      <template #header><span>审计结论</span></template>
-      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }" placeholder="填写附注披露审计结论..." @change="saveAuditConclusion" />
-    </el-card>
-  </div>
+      </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, inject, onMounted } from 'vue'
+import { ref, watch, inject } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -212,17 +203,6 @@ async function handleSave() {
 function handleReview() { openReviewDialog('I2-附注披露-国企') }
 function fmtNum(v: number): string { return v == null || isNaN(v) ? '—' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 
-// ─── 审计说明 / 审计结论 ───
-const AUDIT_NOTE_KEY = 'I2-disc-soe-audit-note'
-const AUDIT_CONCLUSION_KEY = 'I2-disc-soe-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-function readRemark(key: string): string { const raw = props.allResponses.get(key); if (raw == null) return ''; return typeof raw === 'string' ? raw : (raw.remark ?? '') }
-function hydrateAudit() { auditNote.value = readRemark(AUDIT_NOTE_KEY); auditConclusion.value = readRemark(AUDIT_CONCLUSION_KEY) }
-function saveAuditNote(val: string) { auditNote.value = val; void props.saveResponse('disc-soe', { [AUDIT_NOTE_KEY]: val }) }
-function saveAuditConclusion(val: string) { auditConclusion.value = val; void props.saveResponse('disc-soe', { [AUDIT_CONCLUSION_KEY]: val }) }
-watch(() => props.allResponses, () => hydrateAudit(), { immediate: true })
-onMounted(hydrateAudit)
 </script>
 
 <style scoped>
@@ -243,5 +223,4 @@ onMounted(hydrateAudit)
 .guidance-details .guidance-content p { margin: 0 0 4px; }
 .tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 10px; }
 .tab-toolbar .toolbar-right { display: flex; align-items: center; gap: 8px; }
-.audit-note-card, .audit-conclusion-card { margin-top: 16px; }
 </style>

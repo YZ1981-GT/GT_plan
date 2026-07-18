@@ -91,18 +91,8 @@
         placeholder="交易性金融资产附注披露说明（上市公司格式）..." />
     </el-card>
 
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：（1）附注披露项目、金额、公允价值层级的核对情况；（2）与审定表（科目1501）勾稽结果。" />
-    </el-card>
-
-    <el-card class="conclusion-card" shadow="never">
-      <template #header>审计结论</template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
-        placeholder="填写审计结论：附注披露是否完整、准确，是否符合企业会计准则及监管要求。" />
-    </el-card>
-
+    
+    
     <details class="prep-hint">
       <summary>编制提示</summary>
       <ul>
@@ -115,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, computed, h, inject, watch } from 'vue'
+import { ref, toRef, computed, h, inject } from 'vue'
 import { useG1Disclosure } from '../../composables/useG1Disclosure'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import type { VirtualColumn } from '@/composables/useVirtualTable'
@@ -134,17 +124,6 @@ const dis = useG1Disclosure({
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
-})
-
-const AUDIT_NOTE_KEY = 'G1-note-listed-audit-note'
-const AUDIT_CONCLUSION_KEY = 'G1-note-listed-audit-conclusion'
-const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
-const auditConclusion = ref(props.allResponses.get(AUDIT_CONCLUSION_KEY)?.remark ?? '')
-watch(auditNote, (v) => {
-  if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
-})
-watch(auditConclusion, (v) => {
-  if (!props.isReadonly) props.debouncedSave(AUDIT_CONCLUSION_KEY, { conclusion: null, remark: v })
 })
 
 function fmtAmt(v: number): string {

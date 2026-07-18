@@ -39,15 +39,10 @@
           api-prefix="f2-val"
           sheet="F2-49"
           :disabled="isReadonly"
-          ai-section="reversal-evaluation"
-          :existing-content="rev.auditNote.value"
-          :related-context="{ reverseCount: rev.summary.value.reverseCount }"
-          ai-title="AI 生成 · 跌价转回评价"
           review-section="F2-49-conclusion"
-          @ai-filled="(t: string) => { rev.auditNote.value = t }"
         />
         <span class="chip-wrap"><GtIndexChip value="wp:F2-49" /></span>
-        <el-tag size="small" type="info">{{ rev.enrichedProducts.value.length }} 行</el-tag>
+        <el-tag size="small" type="info">{{ filledCount }} 行</el-tag>
       </div>
     </div>
 
@@ -156,7 +151,7 @@
             </td>
             <td class="col-flag">
               <el-checkbox v-if="!isReadonly" :model-value="row.separateProvision"
-                @change="(v: boolean) => rev.updateProduct(row.id, { separateProvision: !!v })" />
+                @change="(v) => rev.updateProduct(row.id, { separateProvision: !!v })" />
               <span v-else>{{ row.separateProvision ? '是' : '否' }}</span>
             </td>
             <td>
@@ -239,13 +234,37 @@
     </div>
 
     <el-card class="opinion-card" shadow="never">
-      <template #header><span class="opinion-title">1、审计说明</span></template>
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">1、审计说明</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="runAi('reversal-note')"
+          >AI 填写审计说明</el-button>
+        </div>
+      </template>
       <el-input v-model="rev.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
         placeholder="说明跌价转回的测算依据、发出核对及科目分摊..." />
     </el-card>
 
     <el-card class="opinion-card" shadow="never">
-      <template #header><span class="opinion-title">2、审计结论</span></template>
+      <template #header>
+        <div class="opinion-header">
+          <span class="opinion-title">2、审计结论</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="runAi('reversal-conclusion')"
+          >AI 生成结论</el-button>
+        </div>
+      </template>
       <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
         placeholder="A、未见异常。B、除上述应调整事项外，其余未见异常。C、不可确认。"
         @update:model-value="saveAuditConclusion" />
@@ -261,11 +280,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, toRef } from 'vue'
+import { ref, computed, onMounted, toRef, type Ref } from 'vue'
 import { useF2ImpairmentReversal } from '../../composables/useF2ImpairmentReversal'
+import { useF2ValuationAiGenerate, type F2ValAiSection } from '../../composables/useF2ValuationAiGenerate'
 import {
   F2_49_DEFAULT_OBJECTIVE,
   F2_49_TIPS,
+  isBlankReversalItem,
 } from '../../composables/useF2ImpairmentReversalFormulas'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -284,6 +305,9 @@ const rev = useF2ImpairmentReversal({
 
 const objectiveText = F2_49_DEFAULT_OBJECTIVE
 const tips = F2_49_TIPS
+const filledCount = computed(
+  () => rev.enrichedProducts.value.filter((row) => !isBlankReversalItem(row)).length,
+)
 
 const CONCLUSION_KEY = 'F2-49-audit-conclusion'
 const auditConclusion = ref('')
@@ -298,6 +322,37 @@ onMounted(() => {
   const c = props.allResponses.get(CONCLUSION_KEY)
   if (c?.remark) auditConclusion.value = c.remark
 })
+
+const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2ValuationAiGenerate(wpIdRef)
+
+function aiContext(): Record<string, unknown> {
+  return {
+    sheet: 'F2-49',
+    itemCount: filledCount.value,
+    reversalTotal: rev.columnTotals.value.reversalTotal,
+    priorProvisionTotal: rev.columnTotals.value.priorProvision,
+    reverseCount: rev.summary.value.reverseCount,
+    verifyFailCount: rev.summary.value.verifyFailCount,
+    issuanceMismatchCount: rev.summary.value.issuanceMismatchCount,
+    agingMismatchCount: rev.summary.value.agingMismatchCount,
+    accountAllocation: {
+      costOfSales: rev.columnTotals.value.costOfSales,
+      rndExpense: rev.columnTotals.value.rndExpense,
+      other: rev.columnTotals.value.other,
+    },
+  }
+}
+
+async function runAi(section: F2ValAiSection): Promise<void> {
+  const isNote = section === 'reversal-note'
+  const existing = isNote ? rev.auditNote.value : auditConclusion.value
+  const title = isNote ? 'AI 生成 · 跌价转回审计说明' : 'AI 生成 · 跌价转回审计结论'
+  const text = await generateAndConfirm(section, existing || '', aiContext(), title)
+  if (!text) return
+  if (isNote) rev.auditNote.value = text
+  else saveAuditConclusion(text)
+}
 
 function fmt(v: number): string {
   if (!Number.isFinite(v) || v === 0) return '—'
@@ -356,10 +411,12 @@ function fmtUnit(v: number): string {
 .row-total td { background: #f0ebf5; font-weight: 600; }
 .row-warn td { background: #fdf6ec; }
 .row-aging td { box-shadow: inset 0 0 0 1px #f56c6c; }
-.auto { display: block; text-align: right; padding-right: 3px; white-space: nowrap; color: #606266; }
+.auto { text-align: right; padding-right: 3px; white-space: nowrap; color: #606266; }
+span.auto { display: block; }
 .calc { font-weight: 500; color: #4b2d77; }
 .verify-ok { color: #67c23a; }
 .verify-fail { color: #f56c6c; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
 
 .tips-box {
   margin-top: 16px;

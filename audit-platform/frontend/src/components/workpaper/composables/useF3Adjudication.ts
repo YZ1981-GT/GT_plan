@@ -12,6 +12,7 @@ import {
   calcSubtotal,
 } from './useF3FormulaEngine'
 import type { ChecklistResponse } from './useF3FormData'
+import { rowClosingAdjusted } from './useF3CrossSheet'
 
 export interface UseF3BaseOptions {
   wpId: Ref<string>
@@ -199,14 +200,16 @@ function mergeCrossSheet(stored: StoredF3AdjRow): StoredF3AdjRow {
   )
 
   const detailCrossValidation: ComputedRef<string | null> = computed(() => {
-    const f3_2 = allResponses.value.get('F3-2-rows')
-    if (!f3_2?.remark) return null
-    const detailRows = safeParseRows<any>(f3_2.remark)
-    if (detailRows.length === 0) return null
-    let total = 0
-    for (const row of detailRows) {
-      total += parseNum(row.adjustedBalance ?? row.closingBalance)
-    }
+    const total = crossSheet?.hasDetailData.value
+      ? crossSheet.detailGrandTotal.value
+      : (() => {
+          const f3_2 = allResponses.value.get('F3-2-rows')
+          if (!f3_2?.remark) return null
+          const detailRows = safeParseRows<any>(f3_2.remark)
+          if (detailRows.length === 0) return null
+          return calcSubtotal(detailRows.map(rowClosingAdjusted))
+        })()
+    if (total == null) return null
     const diff = subtotalRow.value.closingAdjusted - total
     if (Math.abs(diff) > BALANCE_TOLERANCE) {
       return `F3-1合计(${subtotalRow.value.closingAdjusted.toFixed(2)}) 与 F3-2合计(${total.toFixed(2)}) 差异${diff.toFixed(2)}`

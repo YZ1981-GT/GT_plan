@@ -36,9 +36,11 @@
     <GtAProgramConsole
       v-if="programData"
       :wp-id="wpId"
-      :project-id="projectId"
+      sheet-name="F2-55A"
+      :schema="programData.schema || { columns: [], rows: [] }"
       :html-data="programData"
       :readonly="isReadonly"
+      cycle-sheet-mode
     />
     <div v-else-if="isLoading" class="loading-placeholder">
       <el-skeleton :rows="6" animated />
@@ -52,18 +54,17 @@
 /**
  * F2TabContractProcedure.vue — F2-55A 合同履约成本实质性程序表
  *
- * 复用 GtAProgramConsole（selfLoad: force_component_type=a-program-console）
+ * 复用 GtAProgramConsole，加载逻辑对齐 F2A/F2-21A：
+ * useCycleProcedureConsole 携带 sheet_name 拉取 render-config，
+ * 并按 F2-55A 编码匹配目标 sheet（避免误取整本工作簿的第一个 sheet）。
  * 交叉索引：F2-55~F2-58 + F2-1 + A1-13
- *
- * Task: 7.1
- * Requirements: 1.1
  */
-import { ref, onMounted } from 'vue'
-import http from '@/utils/http'
+import { toRef } from 'vue'
 
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtAProgramConsole from '../../GtAProgramConsole.vue'
 import F2ContractCostTestExampleRef from './F2ContractCostTestExampleRef.vue'
+import { useCycleProcedureConsole } from '../../composables/useCycleProcedureConsole'
 
 const props = defineProps<{
   htmlData?: any
@@ -72,37 +73,12 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const isLoading = ref(true)
-const programData = ref<any>(null)
-
-async function selfLoad() {
-  if (props.htmlData?.programs || props.htmlData?.schema) {
-    programData.value = props.htmlData
-    isLoading.value = false
-    return
-  }
-
-  if (!props.wpId) {
-    isLoading.value = false
-    return
-  }
-
-  try {
-    const res = await http.get(
-      `/api/workpapers/${props.wpId}/render-config`,
-      { params: { force_component_type: 'a-program-console' }, _silent: true } as any,
-    )
-    const renderData = res.data?.data ?? res.data
-    const sheetData = renderData?.sheets?.[0]?.html_data ?? renderData
-    programData.value = sheetData
-  } catch (err) {
-    console.warn('[F2TabContractProcedure] selfLoad failed:', err)
-  }
-
-  isLoading.value = false
-}
-
-onMounted(selfLoad)
+const { isLoading, programData } = useCycleProcedureConsole({
+  wpId: toRef(props, 'wpId'),
+  htmlData: toRef(props, 'htmlData'),
+  sheetLabel: '合同履约成本实质性程序表F2-55A',
+  sheetCode: 'F2-55A',
+})
 </script>
 
 <style scoped>

@@ -48,11 +48,14 @@ export function isF2DisclosureApplicable(
   variant: F2DisclosureVariant,
   applicableStandards: readonly string[] | null | undefined,
 ): boolean {
-  const list = applicableStandards || []
+  const list = (applicableStandards || []).map((s) => String(s).trim()).filter(Boolean)
+  // 未配置：两侧均可编制，避免整页被「不适用」空态卡死
   if (list.length === 0) return true
-  return variant === 'listed'
-    ? list.some(isListedStandard)
-    : list.some(isSoeStandard)
+  const hasListed = list.some(isListedStandard)
+  const hasSoe = list.some(isSoeStandard)
+  // 仅配置了一般企业等非上市/国企标签时，目录中的两页仍可打开编制
+  if (!hasListed && !hasSoe) return true
+  return variant === 'listed' ? hasListed : hasSoe
 }
 
 /**

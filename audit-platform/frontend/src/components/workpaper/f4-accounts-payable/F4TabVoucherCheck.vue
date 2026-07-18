@@ -1,43 +1,62 @@
 <script setup lang="ts">
-/**
- * F4TabVoucherCheck — F4-8 应付账款检查表（借方/贷方区块）
- * Spec: .kiro/specs/f4-accounts-payable/ Task 6.4
- * 借方区(付款减少) + 贷方区(采购增加) 独立el-table
- * GtVoucherSamplingEngine集成(dialog, 科目2202, 样本按借贷分配)
- * 贷方区特色：三单匹配(采购订单/入库单/发票)
- * 各区独立增删 + 底部小计 + 审计结论textarea(AI)
- * 导入导出 + 虚拟滚动(73行)
- * Requirements: 11.1~11.9, 14.2
- */
-import { inject, toRef, ref, onMounted, type Ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import axios from 'axios'
-import { useF4VoucherCheck } from '../composables/useF4VoucherCheck'
+/** F4TabVoucherCheck — F4-8 应付账款检查表（借/贷两区 + 弹窗逐单据核对） */
+import { computed, inject, ref, toRef, type Ref } from 'vue'
+import {
+  useF4VoucherCheck,
+  F4_VOUCHER_SECTION_LABELS,
+  type F4VoucherCheckRow,
+  type F4VoucherSection,
+} from '../composables/useF4VoucherCheck'
+import { useF4AiGenerate } from '../composables/useF4AiGenerate'
+import { useStickySectionNav } from '../composables/useStickySectionNav'
+import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
+import type { SampledVoucher, FillMode, Phase } from '../composables/useSamplingAlgorithms'
+import F4VoucherCheckTable from './F4VoucherCheckTable.vue'
+import F4VoucherCheckDialog from './F4VoucherCheckDialog.vue'
+import F4SheetAttachments from './F4SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
+
+const f4VoucherNav = [
+  { id: 'f4-8-sample', label: '样本' },
+  { id: 'f4-8-sampling', label: '抽凭' },
+  { id: 'f4-8-debit', label: '借方' },
+  { id: 'f4-8-credit', label: '贷方' },
+  { id: 'f4-8-note', label: '说明' },
+  { id: 'f4-8-conclusion', label: '结论' },
+]
+const { activeId, scrollTo } = useStickySectionNav(f4VoucherNav)
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  year?: number
 }>()
 
+const reloadWorkpaperData = inject<(() => void) | null>('reloadWorkpaperData', null)
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
 const {
   debitRows,
   creditRows,
-  debitSubtotal,
-  creditSubtotal,
-  debitConclusion,
-  creditConclusion,
-  addDebitRow,
-  addCreditRow,
-  removeDebitRow,
-  removeCreditRow,
-  updateDebitCell,
-  updateCreditCell,
-  distributeSamples,
+  debitTotal,
+  creditTotal,
+  debitAbnormal,
+  creditAbnormal,
+  checkRatios,
+  auditNote,
+  auditConclusion,
+  sampleBasis,
+  loadSection,
+  addRow,
+  removeRow,
+  updateCell,
+  saveRow,
+  applySamplingResults,
+  saveAuditNote,
+  saveAuditConclusion,
+  saveSampleBasis,
 } = useF4VoucherCheck({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
@@ -45,128 +64,108 @@ const {
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
 
-// ─── 抽凭引擎 ───────────────────────────────────────────────────────────────
-const samplingDialogVisible = ref(false)
-const samplingLoading = ref(false)
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF4AiGenerate(
+  toRef(props, 'wpId') as Ref<string>,
+)
 
-async function openSamplingDialog() {
-  samplingDialogVisible.value = true
+const auditYear = computed(() => props.year ?? new Date().getFullYear() - 1)
+const currentPhase = computed<Phase>(() => 'final')
+const totalRowCount = computed(() => debitRows.value.length + creditRows.value.length)
+const totalAbnormal = computed(() => debitAbnormal.value + creditAbnormal.value)
+
+function fmt(v: number): string {
+  return v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-async function executeSampling() {
-  samplingLoading.value = true
-  try {
-    const { data } = await axios.post(`/api/workpapers/${props.wpId}/voucher-sampling/execute`, {
-      accountCode: '2202',
-      sampleSize: 20,
-    })
-    const samples = data?.data?.samples || data?.samples || []
-    if (!samples.length) {
-      ElMessage.warning('未获取到抽样结果')
-      return
-    }
-    distributeSamples(samples)
-    ElMessage.success(`抽凭完成：共 ${samples.length} 笔，已按借贷分配`)
-    samplingDialogVisible.value = false
-  } catch {
-    ElMessage.error('抽凭引擎执行失败')
-  } finally {
-    samplingLoading.value = false
+function ratioClass(ratio: number): string {
+  return ratio > 0 && ratio < 50 ? 'ratio-low' : ''
+}
+
+async function onImported(section: F4VoucherSection): Promise<void> {
+  if (reloadWorkpaperData) await reloadWorkpaperData()
+  loadSection(section)
+}
+
+// ─── 弹窗逐单据核对 ───
+const checkDialogVisible = ref(false)
+const activeSection = ref<F4VoucherSection>('debit')
+const activeRow = ref<F4VoucherCheckRow | null>(null)
+
+function openCheckDialog(section: F4VoucherSection, rowId: string): void {
+  const rows = section === 'debit' ? debitRows.value : creditRows.value
+  const row = rows.find((item) => item.rowId === rowId)
+  if (!row) return
+  activeSection.value = section
+  activeRow.value = row
+  checkDialogVisible.value = true
+}
+
+function onDialogSave(section: F4VoucherSection, patch: F4VoucherCheckRow): void {
+  saveRow(section, patch)
+}
+
+function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase; fillMode: FillMode }): void {
+  applySamplingResults(payload.samples, payload.fillMode)
+}
+
+function aiContext() {
+  return {
+    sheet: 'F4-8',
+    sampleBasis: sampleBasis.value,
+    checkRatios: checkRatios.value,
+    sections: (['debit', 'credit'] as F4VoucherSection[]).map((section) => {
+      const rows = section === 'debit' ? debitRows.value : creditRows.value
+      return {
+        section: F4_VOUCHER_SECTION_LABELS[section],
+        sampleCount: rows.filter((row) => row.voucherNo || row.amount).length,
+        totalAmount: section === 'debit' ? debitTotal.value : creditTotal.value,
+        abnormalCount: section === 'debit' ? debitAbnormal.value : creditAbnormal.value,
+        abnormalRows: rows
+          .filter((row) => row.isAbnormal === '是')
+          .map((row) => ({
+            supplierName: row.supplierName,
+            voucherNo: row.voucherNo,
+            amount: row.amount,
+            issueDesc: row.issueDesc,
+          })),
+      }
+    }),
   }
 }
 
-// ─── AI 生成结论 ─────────────────────────────────────────────────────────────
-const debitAiLoading = ref(false)
-const creditAiLoading = ref(false)
-
-async function generateDebitConclusion() {
-  debitAiLoading.value = true
-  try {
-    const { data } = await axios.post(`/api/workpapers/${props.wpId}/f4/ai/voucher-check`)
-    debitConclusion.value = data?.data?.debitConclusion || data?.debitConclusion || ''
-    ElMessage.success('借方检查AI结论已生成')
-  } catch { ElMessage.error('AI生成失败') }
-  finally { debitAiLoading.value = false }
-}
-
-async function generateCreditConclusion() {
-  creditAiLoading.value = true
-  try {
-    const { data } = await axios.post(`/api/workpapers/${props.wpId}/f4/ai/voucher-check`)
-    creditConclusion.value = data?.data?.creditConclusion || data?.creditConclusion || ''
-    ElMessage.success('贷方检查AI结论已生成')
-  } catch { ElMessage.error('AI生成失败') }
-  finally { creditAiLoading.value = false }
-}
-
-// ─── 导入导出 ────────────────────────────────────────────────────────────────
-async function handleExportTemplate() {
-  try {
-    const resp = await axios.post(`/api/workpapers/${props.wpId}/f4/export-template?sheet=F4-8`, null, { responseType: 'blob' })
-    const url = URL.createObjectURL(resp.data)
-    const a = document.createElement('a'); a.href = url; a.download = 'F4-8检查表模板.xlsx'; a.click()
-    URL.revokeObjectURL(url)
-  } catch { ElMessage.error('导出模板失败') }
-}
-
-async function handleExportData() {
-  try {
-    const resp = await axios.post(`/api/workpapers/${props.wpId}/f4/export-data?sheet=F4-8`, null, { responseType: 'blob' })
-    const url = URL.createObjectURL(resp.data)
-    const a = document.createElement('a'); a.href = url; a.download = 'F4-8检查表数据.xlsx'; a.click()
-    URL.revokeObjectURL(url)
-  } catch { ElMessage.error('导出数据失败') }
-}
-
-function handleImportData() {
-  const input = document.createElement('input')
-  input.type = 'file'; input.accept = '.xlsx,.xls'
-  input.onchange = async () => {
-    const file = input.files?.[0]
-    if (!file) return
-    const fd = new FormData(); fd.append('file', file)
-    try {
-      await axios.post(`/api/workpapers/${props.wpId}/f4/import-data?sheet=F4-8`, fd)
-      ElMessage.success('导入成功')
-      window.location.reload()
-    } catch { ElMessage.error('导入失败') }
-  }
-  input.click()
-}
-
-function fmtAmount(v: number): string {
-  if (v === 0) return '-'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-// ─── 审计说明 ────────────────────────────────────────────────────────────────
-const NOTE_KEY = 'F4-8-audit-note'
-const auditNote = ref('')
-
-function saveAuditNote(val: string): void {
+async function generateAiNote() {
   if (props.isReadonly) return
-  auditNote.value = val
-  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
-  props.allResponses.set(NOTE_KEY, item)
-  window.dispatchEvent(new CustomEvent('f4:save-items', { detail: { items: [item] } }))
+  const text = await generateAndConfirm(
+    'voucher-check-note',
+    auditNote.value,
+    aiContext(),
+    'AI 生成 · F4-8审计说明',
+  )
+  if (text) saveAuditNote(text)
 }
 
-onMounted(() => {
-  const n = props.allResponses.get(NOTE_KEY)
-  if (n?.remark) auditNote.value = n.remark
-})
+async function generateAiConclusion() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'voucher-check-conclusion',
+    auditConclusion.value,
+    aiContext(),
+    'AI 生成 · F4-8审计结论',
+  )
+  if (text) saveAuditConclusion(text)
+}
 </script>
 
 <template>
   <div class="f4-tab-voucher-check">
     <details class="guidance-details">
-      <summary>📋 编制提示</summary>
+      <summary>📋 编制思路与单据核对逻辑</summary>
       <div class="guidance-content">
-        <p>1. 检查表分为借方区(付款减少)和贷方区(采购增加)两个独立区块。</p>
-        <p>2. 借方检查：核实付款是否有真实采购背景、授权审批是否完整。</p>
-        <p>3. 贷方检查：验证采购入账是否有三单匹配（采购订单+入库单+发票）。</p>
-        <p>4. 使用抽凭引擎(科目2202)自动抽样，样本按借贷自动分配到对应区域。</p>
-        <p>5. 三单匹配不一致需重点关注，记录不一致原因及审计处理。</p>
+        <p>1. 审计目标：验证应付账款存在、权属、计价分摊及披露；本表通过借/贷发生额抽凭核对原始凭证完整性与账务处理正确性。</p>
+        <p>2. 借方区核对「记账凭证 → 付款审批单 → 银行回单」；贷方区核对「记账凭证 → 入库单/验收单 → 采购发票」，贷方可结合存货采购入库检查 F2-33。</p>
+        <p>3. 每行点击「单据核对」进入弹窗：分单据逐一上传影像、OCR识别、确认回填；回填后仍可二次编辑，右侧实时勾稽金额与对手方。</p>
+        <p>4. 特定样本（大额、关联方、异常款项）全部测试；其余可用抽凭引擎按借贷方向自动分配样本。</p>
+        <p>5. 检查比例自动与 F4-2 明细表账面借贷发生额比对；比例偏低时须扩大样本量或在审计说明中解释原因。</p>
       </div>
     </details>
 
@@ -175,28 +174,33 @@ onMounted(() => {
       type="info"
       :closable="false"
       show-icon
-      title="审计目标：对应付账款(2202)借方(付款)与贷方(采购)发生额抽凭检查，验证真实性、准确性与截止，贷方关注采购订单/入库单/发票三单匹配。"
+      title="审计目标：1.资产负债表中记录的应付账款是存在的，且已经记录在恰当的账户中；2.记录的应付账款由被审计单位拥有或控制；3.应付账款以恰当的金额包括在财务报表中，相关计价分摊调整及披露恰当。"
     />
 
-    <div class="section-toolbar tab-toolbar">
+    <el-card id="f4-8-sample" shadow="never" class="sample-card">
+      <template #header>
+        <div class="card-header">
+          <span>二、样本选取标准与规模</span>
+          <GtIndexChip value="wp:F4-2" :context-project-id="projectId" />
+        </div>
+      </template>
+      <el-input
+        :model-value="sampleBasis"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="记录测试总体、特定样本、抽样总体、抽样方法、样本量及抽样工具过程索引……"
+        @change="saveSampleBasis"
+      />
+    </el-card>
+
+    <div class="tab-toolbar">
       <div class="toolbar-left">
-        <el-button type="primary" size="small" :disabled="isReadonly" @click="openSamplingDialog">
-          抽凭引擎
-        </el-button>
+        <el-tag size="small" type="info">共 {{ totalRowCount }} 行</el-tag>
+        <el-tag v-if="totalAbnormal" size="small" type="danger">异常 {{ totalAbnormal }} 笔</el-tag>
       </div>
       <div class="toolbar-right">
-        <el-dropdown size="small" trigger="click">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-              <el-dropdown-item @click="handleImportData">导入数据</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-        <span class="chip-wrap"><GtIndexChip value="wp:F4-2" :context-project-id="projectId" /></span>
-        <el-tag size="small" type="info">共 {{ debitRows.length + creditRows.length }} 行</el-tag>
+        <GtIndexChip value="wp:F2-33" :context-project-id="projectId" />
         <el-button
           v-if="openReviewDialog"
           size="small"
@@ -205,330 +209,192 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- ─── 借方区（付款减少） ────────────────────────────────────────── -->
-    <div class="section-block">
-      <div class="block-header">
-        <h4 class="block-title">一、借方检查（付款减少）</h4>
-        <el-button size="small" :disabled="isReadonly" @click="addDebitRow">+ 新增行</el-button>
-      </div>
+    <F4SheetAttachments :project-id="projectId" :wp-id="wpId" sheet-code="F4-8" label="检查表附件" />
 
-      <el-table
-        :data="debitRows"
-        border
-        size="small"
-        style="width: 100%; font-size: 13px"
-        max-height="400"
-      >
-        <el-table-column prop="seq" label="序号" width="60" />
-        <el-table-column label="凭证号" min-width="100">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small" @change="(v: string) => updateDebitCell(row.rowId, 'voucherNo', v)" />
-            <span v-else>{{ row.voucherNo }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="凭证日期" min-width="110">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.voucherDate" size="small" placeholder="YYYY-MM-DD" @change="(v: string) => updateDebitCell(row.rowId, 'voucherDate', v)" />
-            <span v-else>{{ row.voucherDate }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="供应商" min-width="130">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.counterparty" size="small" @change="(v: string) => updateDebitCell(row.rowId, 'counterparty', v)" />
-            <span v-else>{{ row.counterparty }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="付款金额" min-width="120" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.amount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateDebitCell(row.rowId, 'amount', v ?? 0)" />
-            <span v-else>{{ fmtAmount(row.amount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="摘要" min-width="140">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.summary" size="small" @change="(v: string) => updateDebitCell(row.rowId, 'summary', v)" />
-            <span v-else>{{ row.summary }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="审计程序" min-width="140">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.auditProcedure" size="small" @change="(v: string) => updateDebitCell(row.rowId, 'auditProcedure', v)" />
-            <span v-else>{{ row.auditProcedure }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="检查结果" min-width="120">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.checkResult" size="small" @change="(v: string) => updateDebitCell(row.rowId, 'checkResult', v)" />
-            <span v-else>{{ row.checkResult }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="60">
-          <template #default="{ row }">
-            <el-button v-if="!isReadonly" link size="small" type="danger" @click="removeDebitRow(row.rowId)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+    <nav class="st-sec-nav" aria-label="F4-8 分区导航">
+      <button
+        v-for="item in f4VoucherNav"
+        :key="item.id"
+        type="button"
+        class="st-sec-btn"
+        :class="{ active: activeId === item.id }"
+        @click="scrollTo(item.id)"
+      >{{ item.label }}</button>
+    </nav>
 
-      <div class="block-subtotal">借方合计：{{ fmtAmount(debitSubtotal) }}</div>
-
-      <el-card class="opinion-card" shadow="never">
-        <template #header>
-          <div class="opinion-header">
-            <span class="opinion-title">借方检查审计结论</span>
-            <div class="opinion-actions">
-              <el-button size="small" type="primary" plain :loading="debitAiLoading" :disabled="isReadonly" @click="generateDebitConclusion">🤖 AI辅助</el-button>
-              <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-8-debit-conclusion')">💬</el-button>
-            </div>
-          </div>
-        </template>
-        <el-input
-          v-model="debitConclusion"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 6 }"
-          :disabled="isReadonly"
-          placeholder="借方检查（付款减少）审计结论..."
+    <el-collapse id="f4-8-sampling" class="sampling-engine-collapse">
+      <el-collapse-item title="自动抽凭（科目 2202 应付账款 · 样本按借贷方向自动分配）" name="auto-sampling">
+        <GtVoucherSamplingEngine
+          account-code="2202"
+          :phase="currentPhase"
+          default-method="random"
+          :workpaper-id="wpId"
+          :project-id="projectId"
+          :year="auditYear"
+          @filled="handleSamplingFilled"
         />
-      </el-card>
+      </el-collapse-item>
+    </el-collapse>
+
+    <div id="f4-8-debit">
+      <F4VoucherCheckTable
+        section="debit"
+        :rows="debitRows"
+        :is-readonly="isReadonly"
+        :wp-id="wpId"
+        :project-id="projectId"
+        :all-responses="allResponses"
+        @add-row="addRow('debit')"
+        @remove-row="(rowId) => removeRow('debit', rowId)"
+        @update-cell="(rowId, field, value) => updateCell('debit', rowId, field, value)"
+        @open-check="(rowId) => openCheckDialog('debit', rowId)"
+        @imported="onImported('debit')"
+      />
     </div>
 
-    <!-- ─── 贷方区（采购增加） ────────────────────────────────────────── -->
-    <div class="section-block">
-      <div class="block-header">
-        <h4 class="block-title">二、贷方检查（采购增加）— 三单匹配</h4>
-        <el-button size="small" :disabled="isReadonly" @click="addCreditRow">+ 新增行</el-button>
-      </div>
-
-      <el-table
-        :data="creditRows"
-        border
-        size="small"
-        style="width: 100%; font-size: 13px"
-        max-height="400"
-      >
-        <el-table-column prop="seq" label="序号" width="60" />
-        <el-table-column label="凭证号" min-width="100">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small" @change="(v: string) => updateCreditCell(row.rowId, 'voucherNo', v)" />
-            <span v-else>{{ row.voucherNo }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="凭证日期" min-width="110">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.voucherDate" size="small" placeholder="YYYY-MM-DD" @change="(v: string) => updateCreditCell(row.rowId, 'voucherDate', v)" />
-            <span v-else>{{ row.voucherDate }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="供应商" min-width="130">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.counterparty" size="small" @change="(v: string) => updateCreditCell(row.rowId, 'counterparty', v)" />
-            <span v-else>{{ row.counterparty }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="采购金额" min-width="120" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.amount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCreditCell(row.rowId, 'amount', v ?? 0)" />
-            <span v-else>{{ fmtAmount(row.amount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="摘要" min-width="130">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.summary" size="small" @change="(v: string) => updateCreditCell(row.rowId, 'summary', v)" />
-            <span v-else>{{ row.summary }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="采购订单号" min-width="110">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.purchaseOrderNo" size="small" @change="(v: string) => updateCreditCell(row.rowId, 'purchaseOrderNo', v)" />
-            <span v-else>{{ row.purchaseOrderNo }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="入库单号" min-width="100">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.receiptNo" size="small" @change="(v: string) => updateCreditCell(row.rowId, 'receiptNo', v)" />
-            <span v-else>{{ row.receiptNo }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="发票号" min-width="100">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.invoiceNo" size="small" @change="(v: string) => updateCreditCell(row.rowId, 'invoiceNo', v)" />
-            <span v-else>{{ row.invoiceNo }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="三单匹配" min-width="90">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.threeWayMatch" size="small" @change="(v: string) => updateCreditCell(row.rowId, 'threeWayMatch', v)">
-              <el-option label="" value="" />
-              <el-option label="一致" value="一致" />
-              <el-option label="不一致" value="不一致" />
-            </el-select>
-            <span v-else :class="{ 'match-fail': row.threeWayMatch === '不一致' }">{{ row.threeWayMatch }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="检查结果" min-width="120">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.checkResult" size="small" @change="(v: string) => updateCreditCell(row.rowId, 'checkResult', v)" />
-            <span v-else>{{ row.checkResult }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="60">
-          <template #default="{ row }">
-            <el-button v-if="!isReadonly" link size="small" type="danger" @click="removeCreditRow(row.rowId)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div class="block-subtotal">贷方合计：{{ fmtAmount(creditSubtotal) }}</div>
-
-      <el-card class="opinion-card" shadow="never">
-        <template #header>
-          <div class="opinion-header">
-            <span class="opinion-title">贷方检查审计结论</span>
-            <div class="opinion-actions">
-              <el-button size="small" type="primary" plain :loading="creditAiLoading" :disabled="isReadonly" @click="generateCreditConclusion">🤖 AI辅助</el-button>
-              <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-8-credit-conclusion')">💬</el-button>
-            </div>
-          </div>
-        </template>
-        <el-input
-          v-model="creditConclusion"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 6 }"
-          :disabled="isReadonly"
-          placeholder="贷方检查（采购增加 + 三单匹配）审计结论..."
-        />
-      </el-card>
+    <div id="f4-8-credit">
+      <F4VoucherCheckTable
+        section="credit"
+        :rows="creditRows"
+        :is-readonly="isReadonly"
+        :wp-id="wpId"
+        :project-id="projectId"
+        :all-responses="allResponses"
+        @add-row="addRow('credit')"
+        @remove-row="(rowId) => removeRow('credit', rowId)"
+        @update-cell="(rowId, field, value) => updateCell('credit', rowId, field, value)"
+        @open-check="(rowId) => openCheckDialog('credit', rowId)"
+        @imported="onImported('credit')"
+      />
     </div>
 
-    <!-- ─── 审计说明 ──────────────────────────────────────────────────── -->
-    <el-card class="opinion-card" shadow="never">
+    <el-card id="f4-8-note" shadow="never" class="ratio-card">
       <template #header>
-        <div class="opinion-header">
-          <span class="opinion-title">审计说明</span>
-          <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-8-note')">💬</el-button>
+        <div class="card-header">
+          <span>四、审计说明 · 本期发生额检查比例</span>
+          <span class="ratio-hint">如果检查比例较低应扩大检查样本量或说明原因</span>
+        </div>
+      </template>
+      <el-table :data="checkRatios" border size="small" style="max-width: 640px">
+        <el-table-column prop="label" label="方向" width="120" />
+        <el-table-column label="账面金额" align="right">
+          <template #default="{ row }">{{ fmt(row.bookAmount) }}</template>
+        </el-table-column>
+        <el-table-column label="检查金额" align="right">
+          <template #default="{ row }">{{ fmt(row.checkedAmount) }}</template>
+        </el-table-column>
+        <el-table-column label="检查比例" align="right">
+          <template #default="{ row }">
+            <span :class="ratioClass(row.ratio)">{{ row.ratio.toFixed(2) }}%</span>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div class="overall-note">
+        <div class="note-actions">
+          <span>总体审计说明</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="generateAiNote"
+          >🤖 AI生成说明</el-button>
+        </div>
+        <el-input
+          :model-value="auditNote"
+          type="textarea"
+          :autosize="{ minRows: 4, maxRows: 10 }"
+          :disabled="isReadonly"
+          placeholder="综合说明样本选取、借/贷单据勾稽结果、检查比例偏低原因及扩大测试情况。"
+          @change="saveAuditNote"
+        />
+      </div>
+    </el-card>
+
+    <el-card id="f4-8-conclusion" shadow="never" class="conclusion-card">
+      <template #header>
+        <div class="card-header">
+          <span>五、审计结论</span>
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="generateAiConclusion"
+          >🤖 AI生成结论</el-button>
         </div>
       </template>
       <el-input
-        :model-value="auditNote"
+        :model-value="auditConclusion"
         type="textarea"
-        :autosize="{ minRows: 5 }"
+        :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly"
-        placeholder="填写审计说明：可概述借方(付款)与贷方(采购)抽凭检查的样本选取、真实性/准确性/截止测试情况，以及三单匹配异常的处理。"
-        @change="saveAuditNote"
+        placeholder="综合评价应付账款借/贷发生额抽凭检查结果，评价存在、计价、截止及披露是否恰当。"
+        @change="saveAuditConclusion"
       />
     </el-card>
 
-    <!-- ─── 抽凭引擎对话框 ───────────────────────────────────────────── -->
-    <el-dialog
-      v-model="samplingDialogVisible"
-      title="抽凭引擎 — 科目2202应付账款"
-      width="500px"
-    >
-      <p style="margin-bottom:12px">将对科目2202(应付账款)执行抽凭采样，样本按借方/贷方自动分配到对应检查区域。</p>
-      <template #footer>
-        <el-button @click="samplingDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="samplingLoading" @click="executeSampling">执行抽凭</el-button>
-      </template>
-    </el-dialog>
+    <F4VoucherCheckDialog
+      v-model="checkDialogVisible"
+      :row="activeRow"
+      :section="activeSection"
+      :wp-id="wpId"
+      :project-id="projectId"
+      :readonly="isReadonly"
+      @save="onDialogSave"
+    />
   </div>
 </template>
 
 <style scoped>
-.f4-tab-voucher-check {
-  font-size: var(--wp-font-size, 13px);
-}
+.f4-tab-voucher-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
 .guidance-details {
   margin-bottom: 12px;
-  border-left: 3px solid #409eff;
-  background: #ecf5ff;
-  border-radius: 4px;
   padding: 8px 12px;
-}
-.guidance-details summary {
-  cursor: pointer;
-  font-weight: 500;
-  color: #409eff;
-  font-size: var(--wp-font-size, 13px);
-}
-.guidance-details .guidance-content {
-  margin-top: 8px;
-  font-size: var(--wp-font-size, 13px);
-  color: #606266;
-  line-height: 1.6;
-}
-.guidance-details .guidance-content p {
-  margin: 2px 0;
-}
-.audit-objective {
-  margin-bottom: 12px;
-}
-.section-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-.toolbar-left {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.toolbar-right {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-.chip-wrap {
-  display: inline-flex;
-  align-items: center;
-}
-.section-block {
-  margin-bottom: 24px;
-}
-.block-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-.block-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-  margin: 0;
-}
-.block-subtotal {
-  margin-top: 6px;
-  padding: 6px 12px;
-  background: #f5f7fa;
+  border-left: 3px solid #315a8a;
   border-radius: 4px;
-  font-size: 12px;
-  font-weight: 600;
+  background: #eef4fa;
 }
-.opinion-card {
-  margin-top: 10px;
+.guidance-details summary { cursor: pointer; color: #315a8a; font-weight: 600; }
+.guidance-content { margin-top: 8px; color: #606266; line-height: 1.65; }
+.guidance-content p { margin: 3px 0; }
+.audit-objective { margin-bottom: 12px; }
+.sample-card, .ratio-card, .conclusion-card {
+  margin-bottom: 16px;
   border-radius: 8px;
 }
-.opinion-card :deep(.el-card__header) {
-  padding: 12px 16px;
+.sample-card :deep(.el-card__header),
+.ratio-card :deep(.el-card__header),
+.conclusion-card :deep(.el-card__header) {
+  padding: 11px 14px;
   background: #fafafa;
-  border-bottom: 1px solid #ebeef5;
 }
-.opinion-header {
+.card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
 }
-.opinion-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
-.opinion-actions {
+.tab-toolbar {
   display: flex;
-  gap: 6px;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
 }
-.match-fail {
-  color: #f56c6c;
-  font-weight: 600;
+.toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; }
+.sampling-engine-collapse { margin-bottom: 16px; }
+.ratio-hint { color: #d03050; font-size: 12px; }
+.ratio-low { color: #d03050; font-weight: 700; }
+.overall-note { margin-top: 14px; }
+.note-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 </style>
+
+<style src="../f2/stocktake/f2StocktakeSoftNav.css"></style>

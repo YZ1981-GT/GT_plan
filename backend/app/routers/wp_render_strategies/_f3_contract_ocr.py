@@ -13,7 +13,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import aiofiles
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["f3-ai"])
 
 NOTE_FIELDS_SCHEMA = {
+    "noteType": "票据类别（银行承兑汇票/商业承兑汇票/供应链票据/其他）",
     "noteNo": "票据号码",
     "drawer": "出票人",
     "acceptor": "承兑人",
@@ -39,9 +40,86 @@ NOTE_FIELDS_SCHEMA = {
     "interestEnd": "计息截止日(YYYY-MM-DD,无则空)",
 }
 
-_EMPTY_FIELDS = {k: "" for k in NOTE_FIELDS_SCHEMA}
-_EMPTY_FIELDS["faceValue"] = 0
-_EMPTY_FIELDS["interestRate"] = 0
+OVERDUE_FIELDS_SCHEMA = {
+    "noteType": "票据类别（银行承兑汇票/商业承兑汇票/供应链票据/其他）",
+    "noteNo": "票据号码",
+    "drawer": "出票人",
+    "acceptor": "承兑人",
+    "payee": "收款人",
+    "issueDate": "出票日期(YYYY-MM-DD)",
+    "dueDate": "到期日期(YYYY-MM-DD)",
+    "interestRate": "票面利率%(数字,无则0)",
+    "faceValue": "票面金额(数字)",
+    "postPaymentAmount": "期后支付金额(数字,无则0)",
+    "loanConditions": "借款/票据条件、违约或罚息条款",
+    "isAdjusted": "是否已作会计调整（是/否/不适用）",
+    "collateralName": "抵押或担保物品名称",
+    "collateralAmount": "抵押或担保金额(数字,无则0)",
+}
+
+# F3-7 应付票据检查表 — 弹窗逐单据核对（参照F2-56模式）
+VOUCHER_FIELDS_SCHEMA = {
+    "voucherDate": "凭证日期(YYYY-MM-DD)",
+    "voucherNo": "凭证编号",
+    "businessContent": "业务内容/摘要",
+    "counterAccount": "对方科目",
+    "detailAccount": "明细科目",
+    "amount": "凭证金额(数字)",
+    "noteType": "票据类别（银行承兑汇票/商业承兑汇票/供应链票据/其他，无则空）",
+}
+
+APPROVAL_FIELDS_SCHEMA = {
+    "approvalDateNo": "付款审批单日期/编号",
+    "approvalProper": "是否经过恰当审批（是/否，根据审批签字/流程判断，不确定填空）",
+}
+
+BANK_RECEIPT_FIELDS_SCHEMA = {
+    "bankReceiptDate": "银行回单日期(YYYY-MM-DD)",
+    "bankPayee": "收款方名称",
+    "bankAmount": "回单金额(数字)",
+}
+
+GOODS_RECEIPT_FIELDS_SCHEMA = {
+    "receiptDateNo": "入库单/验收单日期/编号",
+    "receiptProduct": "品名",
+    "receiptUnit": "计量单位",
+    "receiptQty": "数量(数字)",
+}
+
+INVOICE_FIELDS_SCHEMA = {
+    "invoiceDateNo": "发票日期/号码",
+    "invoiceCounterparty": "对手方（销售方）名称",
+    "invoiceAmount": "发票金额(数字)",
+}
+
+_DOCUMENT_SCHEMAS: dict[str, dict[str, str]] = {
+    "note": NOTE_FIELDS_SCHEMA,
+    "overdue-note": OVERDUE_FIELDS_SCHEMA,
+    "voucher": VOUCHER_FIELDS_SCHEMA,
+    "approval": APPROVAL_FIELDS_SCHEMA,
+    "bank-receipt": BANK_RECEIPT_FIELDS_SCHEMA,
+    "goods-receipt": GOODS_RECEIPT_FIELDS_SCHEMA,
+    "invoice": INVOICE_FIELDS_SCHEMA,
+}
+
+_DOCUMENT_CONTEXTS: dict[str, str] = {
+    "note": "应付票据或承兑汇票",
+    "overdue-note": "逾期未付票据、期后付款凭证、借款合同、诉讼文书或抵押担保文件",
+    "voucher": "记账凭证",
+    "approval": "付款审批单/付款申请单",
+    "bank-receipt": "银行回单/电子回单",
+    "goods-receipt": "入库单/验收单/到货单",
+    "invoice": "增值税发票/采购发票",
+}
+
+_NUMERIC_FIELDS = {
+    "faceValue", "interestRate", "postPaymentAmount", "collateralAmount",
+    "amount", "bankAmount", "receiptQty", "invoiceAmount",
+}
+
+
+def _empty_fields(schema: dict[str, str]) -> dict:
+    return {key: 0 if key in _NUMERIC_FIELDS else "" for key in schema}
 
 
 class F3NoteOcrResponse(BaseModel):
@@ -51,11 +129,14 @@ class F3NoteOcrResponse(BaseModel):
     confidence: float
 
 
-_LLM_SYSTEM_PROMPT = (
-    "你是审计票据信息提取专家。请从以下OCR文本中提取应付票据/承兑汇票的关键信息。\n"
-    "严格按JSON格式返回以下字段（不确定的填空字符串，金额/利率填0）：\n"
-    f"{json.dumps(NOTE_FIELDS_SCHEMA, ensure_ascii=False, indent=2)}"
-)
+def _system_prompt(schema: dict[str, str], document_type: str) -> str:
+    context = _DOCUMENT_CONTEXTS.get(document_type, "应付票据或承兑汇票")
+    return (
+        f"你是审计票据信息提取专家。请从以下OCR文本中提取{context}的关键信息。\n"
+        "只能提取文本中明确存在的内容，不得推测。严格按JSON格式返回以下字段"
+        "（不确定的填空字符串，金额/利率填0）：\n"
+        f"{json.dumps(schema, ensure_ascii=False, indent=2)}"
+    )
 
 
 def _build_extraction_prompt(ocr_text: str) -> str:
@@ -66,10 +147,13 @@ def _build_extraction_prompt(ocr_text: str) -> str:
 async def f3_contract_ocr(
     wp_id: str,
     file: UploadFile = File(...),
+    document_type: str = Form("note"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> F3NoteOcrResponse:
     """上传票据附件，OCR识别并提取关键字段"""
+    schema = _DOCUMENT_SCHEMAS.get(document_type, NOTE_FIELDS_SCHEMA)
+    empty_fields = _empty_fields(schema)
 
     allowed_types = (".pdf", ".png", ".jpg", ".jpeg")
     filename = file.filename or "upload.pdf"
@@ -96,7 +180,7 @@ async def f3_contract_ocr(
         return F3NoteOcrResponse(
             attachment_id=attachment_id,
             ocr_text="",
-            extracted_fields=dict(_EMPTY_FIELDS),
+            extracted_fields=dict(empty_fields),
             confidence=0,
         )
 
@@ -104,16 +188,16 @@ async def f3_contract_ocr(
         return F3NoteOcrResponse(
             attachment_id=attachment_id,
             ocr_text="",
-            extracted_fields=dict(_EMPTY_FIELDS),
+            extracted_fields=dict(empty_fields),
             confidence=0,
         )
 
-    extracted_fields = dict(_EMPTY_FIELDS)
+    extracted_fields = dict(empty_fields)
     confidence = 0.0
 
     try:
         messages = [
-            {"role": "system", "content": _LLM_SYSTEM_PROMPT},
+            {"role": "system", "content": _system_prompt(schema, document_type)},
             {"role": "user", "content": _build_extraction_prompt(ocr_text)},
         ]
         llm_result = await chat_completion(
@@ -131,7 +215,7 @@ async def f3_contract_ocr(
 
             parsed = json.loads(json_str)
             if isinstance(parsed, dict):
-                for key in NOTE_FIELDS_SCHEMA:
+                for key in schema:
                     if key in parsed and parsed[key] is not None:
                         extracted_fields[key] = parsed[key]
 
@@ -139,14 +223,14 @@ async def f3_contract_ocr(
                     1 for k, v in extracted_fields.items()
                     if v and v != "" and v != 0
                 )
-                confidence = round(filled / len(NOTE_FIELDS_SCHEMA), 2)
+                confidence = round(filled / len(schema), 2)
 
     except Exception as e:
         logger.warning("F3 note LLM extraction failed for %s: %s", wp_id, e)
         return F3NoteOcrResponse(
             attachment_id=attachment_id,
             ocr_text=ocr_text,
-            extracted_fields=dict(_EMPTY_FIELDS),
+            extracted_fields=dict(empty_fields),
             confidence=0,
         )
 

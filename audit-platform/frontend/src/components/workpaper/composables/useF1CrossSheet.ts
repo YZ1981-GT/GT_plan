@@ -13,9 +13,28 @@ import {
   aggregateByNature,
   aggregateByAging,
   parseNum,
+  DEFAULT_F1_AGING_KEYS,
   type DetailRowForFormula,
 } from './useF1FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
+
+function collectAgingKeys(rows: D3DetailRowRaw[]): string[] {
+  const keys = new Set<string>()
+  for (const row of rows) {
+    Object.keys(row.agingAudited || {}).forEach(k => keys.add(k))
+    Object.keys(row.agingPrior || {}).forEach(k => keys.add(k))
+  }
+  if (keys.size === 0) {
+    DEFAULT_F1_AGING_KEYS.forEach(k => keys.add(k))
+  }
+  return [...keys]
+}
+
+function sumAgingMap(aging: Record<string, number> | undefined, keys: string[]): Record<string, number> {
+  const result: Record<string, number> = {}
+  for (const k of keys) result[k] = parseNum(aging?.[k])
+  return result
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -33,7 +52,7 @@ export interface D3DetailRowRaw {
   priorUnadjusted?: number
   priorAdjustment?: number
   priorReclass?: number
-  agingPrior?: { within1: number; y1to2: number; y2to3: number; over3: number }
+  agingPrior?: Record<string, number>
   debit?: number
   credit?: number
   entityReclass?: number
@@ -41,7 +60,7 @@ export interface D3DetailRowRaw {
   endRje?: number
   endAudited?: number
   priorAudited?: number
-  agingAudited?: { within1: number; y1to2: number; y2to3: number; over3: number }
+  agingAudited?: Record<string, number>
   isConfirmed?: string
   postPeriodSettlement?: number
   remark?: string
@@ -74,7 +93,7 @@ export interface LongTermImportRow {
   customerName: string
   endAudited: number
   agingDescription: string
-  agingAudited: { within1: number; y1to2: number; y2to3: number; over3: number }
+  agingAudited: Record<string, number>
 }
 
 /** 关联方检查导入行 */
@@ -85,15 +104,16 @@ export interface RelatedPartyImportRow {
   endAudited: number
   debit: number
   credit: number
+  nature?: string
+  agingDescription?: string
+  postPeriodSettlement?: number
 }
 
 /** 附注数据结构 */
 export interface DisclosureSourceData {
   natureAggregation: Record<string, { prior: number; current: number }>
-  agingAggregation: {
-    within1: number; y1to2: number; y2to3: number; over3: number
-    prior_within1: number; prior_y1to2: number; prior_y2to3: number; prior_over3: number
-  }
+  /** 当期段 key + prior_{key} */
+  agingAggregation: Record<string, number>
   longTermRows: LongTermImportRow[]
 }
 
@@ -128,16 +148,12 @@ export function useF1CrossSheet(options: UseD3CrossSheetOptions) {
 
   /** 将原始行转为公式引擎所需的 DetailRowForFormula 结构 */
   const detailRowsForFormula = computed<DetailRowForFormula[]>(() => {
+    const keys = collectAgingKeys(detailRows.value)
     return detailRows.value.map(row => ({
       nature: row.nature || '',
       endAudited: parseNum(row.endAudited),
       priorAudited: parseNum(row.priorAudited),
-      agingAudited: {
-        within1: parseNum(row.agingAudited?.within1),
-        y1to2: parseNum(row.agingAudited?.y1to2),
-        y2to3: parseNum(row.agingAudited?.y2to3),
-        over3: parseNum(row.agingAudited?.over3),
-      },
+      agingAudited: sumAgingMap(row.agingAudited, keys),
     }))
   })
 
@@ -166,64 +182,54 @@ export function useF1CrossSheet(options: UseD3CrossSheetOptions) {
   // ─── F1-2 → F1-1 按审定账龄聚合 ──────────────────────────────────────
 
   /**
-   * agingAggregation: 按审定账龄 U~X 列聚合
+   * agingAggregation: 按审定账龄段动态聚合
    * 用于 F1-1 审定表"按账龄分类"区块
-   * 同时计算期初审定账龄（agingPrior）
+   * 返回：{ [segmentKey]: current, prior_${segmentKey}: prior }
    */
-  const agingAggregation: ComputedRef<{
-    within1: number; y1to2: number; y2to3: number; over3: number
-    prior_within1: number; prior_y1to2: number; prior_y2to3: number; prior_over3: number
-  }> = computed(() => {
-    const rows = detailRowsForFormula.value
-    const currentAging = aggregateByAging(rows)
+  const agingAggregation: ComputedRef<Record<string, number>> = computed(() => {
+    const keys = collectAgingKeys(detailRows.value)
+    const currentAging = aggregateByAging(detailRowsForFormula.value, keys)
 
-    // 期初账龄聚合：从原始行的 agingPrior 字段
-    let prior_within1 = 0
-    let prior_y1to2 = 0
-    let prior_y2to3 = 0
-    let prior_over3 = 0
+    const result: Record<string, number> = { ...currentAging }
+    for (const k of keys) {
+      result[`prior_${k}`] = 0
+    }
     for (const row of detailRows.value) {
-      prior_within1 += parseNum(row.agingPrior?.within1)
-      prior_y1to2 += parseNum(row.agingPrior?.y1to2)
-      prior_y2to3 += parseNum(row.agingPrior?.y2to3)
-      prior_over3 += parseNum(row.agingPrior?.over3)
+      for (const k of keys) {
+        result[`prior_${k}`] += parseNum(row.agingPrior?.[k])
+      }
     }
-
-    return {
-      ...currentAging,
-      prior_within1,
-      prior_y1to2,
-      prior_y2to3,
-      prior_over3,
-    }
+    return result
   })
 
   // ─── F1-2 → F1-5 筛选账龄>1年行 ─────────────────────────────────────
 
   /**
-   * longTermRows: 筛选审定账龄中 y1to2 + y2to3 + over3 > 0 的行
+   * longTermRows: 筛选审定账龄中非「1年以内」段合计 > 0 的行
    * 用于 F1-5 长期检查表"从F1-2导入"功能
    */
   const longTermRows: ComputedRef<LongTermImportRow[]> = computed(() => {
+    const keys = collectAgingKeys(detailRows.value)
+    const over1Keys = keys.filter(k => k !== 'within1')
     return detailRows.value
       .filter(row => {
-        const y1to2 = parseNum(row.agingAudited?.y1to2)
-        const y2to3 = parseNum(row.agingAudited?.y2to3)
-        const over3 = parseNum(row.agingAudited?.over3)
-        return y1to2 + y2to3 + over3 > 0
+        const over1 = over1Keys.reduce((s, k) => s + parseNum(row.agingAudited?.[k]), 0)
+        return over1 > 0
       })
       .map(row => {
-        const aging = {
-          within1: parseNum(row.agingAudited?.within1),
-          y1to2: parseNum(row.agingAudited?.y1to2),
-          y2to3: parseNum(row.agingAudited?.y2to3),
-          over3: parseNum(row.agingAudited?.over3),
-        }
-        // 构建账龄描述
+        const aging = sumAgingMap(row.agingAudited, keys)
         const parts: string[] = []
-        if (aging.y1to2 > 0) parts.push('1-2年')
-        if (aging.y2to3 > 0) parts.push('2-3年')
-        if (aging.over3 > 0) parts.push('3年以上')
+        for (const k of over1Keys) {
+          if (aging[k] > 0) {
+            if (k === 'y1to2') parts.push('1-2年')
+            else if (k === 'y2to3') parts.push('2-3年')
+            else if (k === 'over3') parts.push('3年以上')
+            else if (k === 'y3to4') parts.push('3-4年')
+            else if (k === 'y4to5') parts.push('4-5年')
+            else if (k === 'over5') parts.push('5年以上')
+            else parts.push(k)
+          }
+        }
         return {
           customerName: row.customerName || '',
           endAudited: parseNum(row.endAudited),
@@ -242,14 +248,24 @@ export function useF1CrossSheet(options: UseD3CrossSheetOptions) {
   const relatedPartyRows: ComputedRef<RelatedPartyImportRow[]> = computed(() => {
     return detailRows.value
       .filter(row => row.relationType !== '非关联方' && row.relationType !== '')
-      .map(row => ({
-        customerName: row.customerName || '',
-        relationType: row.relationType,
-        priorAudited: parseNum(row.priorAudited),
-        endAudited: parseNum(row.endAudited),
-        debit: parseNum(row.debit),
-        credit: parseNum(row.credit),
-      }))
+      .map(row => {
+        const aging = row.agingAudited || {}
+        const agingParts: string[] = []
+        for (const [k, v] of Object.entries(aging)) {
+          if (parseNum(v) !== 0) agingParts.push(`${k}:${parseNum(v)}`)
+        }
+        return {
+          customerName: row.customerName || '',
+          relationType: row.relationType,
+          priorAudited: parseNum(row.priorAudited),
+          endAudited: parseNum(row.endAudited),
+          debit: parseNum(row.debit),
+          credit: parseNum(row.credit),
+          nature: row.nature || '',
+          agingDescription: agingParts.join('; '),
+          postPeriodSettlement: parseNum(row.postPeriodSettlement),
+        }
+      })
   })
 
   // ─── F1-3 → F1-1 AJE/RJE 汇总 ───────────────────────────────────────

@@ -119,6 +119,7 @@ const SHEET = 'F2-5'
 const DATA_KEY = `${SHEET}-rows`
 const NOTE_KEY = `${SHEET}-note-pack`
 const IMP_KEY = `${SHEET}-impairment-provision`
+const CONCLUSION_KEY = `${SHEET}-audit-conclusion`
 const F2_AGING_PRESET_KEY = 'f2-aging-preset'
 const F2_AGING_CUSTOM_KEY = 'f2-aging-custom'
 
@@ -325,10 +326,12 @@ export function useF2DetailTurnover(opts: {
     longAgingReason: '',
     impairmentReason: '',
   })
+  const auditConclusion = ref('')
 
   function hydrateMeta(): void {
     const imp = opts.allResponses.value.get(IMP_KEY)?.remark
     impairmentProvision.value = Number(imp || 0) || 0
+    auditConclusion.value = opts.allResponses.value.get(CONCLUSION_KEY)?.remark ?? ''
     const raw = opts.allResponses.value.get(NOTE_KEY)?.remark
     if (raw) {
       try {
@@ -374,6 +377,12 @@ export function useF2DetailTurnover(opts: {
     if (opts.isReadonly.value) return
     notePack.value = { ...notePack.value, ...patch }
     persistItem(NOTE_KEY, JSON.stringify(notePack.value))
+  }
+
+  function persistConclusion(val: string): void {
+    if (opts.isReadonly.value) return
+    auditConclusion.value = val
+    persistItem(CONCLUSION_KEY, val)
   }
 
   function applyAgingPreset(val: AgingPreset, customLabels?: string[]): boolean {
@@ -509,6 +518,8 @@ export function useF2DetailTurnover(opts: {
     persistImpairment,
     notePack,
     persistNotePack,
+    auditConclusion,
+    persistConclusion,
     agingMismatchCount,
     updateRow,
     updateAgingCell,

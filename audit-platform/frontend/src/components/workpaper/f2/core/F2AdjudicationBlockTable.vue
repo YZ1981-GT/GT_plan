@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="f2-adjudication-block">
     <!-- 编制提示（可编辑审定区块，随 allResponses 提供时展示） -->
     <details v-if="allResponses" class="guidance-details">
@@ -47,7 +47,7 @@
           :model-value="row.opening"
           size="small"
           :controls="false"
-          @change="(v: number) => onUpdate(row.rowKey, 'opening', v)"
+          @change="(v: number | undefined) => onUpdate(row.rowKey, 'opening', v ?? 0)"
         />
         <span v-else>{{ fmt(row.opening) }}</span>
       </template>
@@ -59,7 +59,7 @@
           :model-value="row.increase"
           size="small"
           :controls="false"
-          @change="(v: number) => onUpdate(row.rowKey, 'increase', v)"
+          @change="(v: number | undefined) => onUpdate(row.rowKey, 'increase', v ?? 0)"
         />
         <span v-else>{{ fmt(row.increase) }}</span>
       </template>
@@ -71,7 +71,7 @@
           :model-value="row.decrease"
           size="small"
           :controls="false"
-          @change="(v: number) => onUpdate(row.rowKey, 'decrease', v)"
+          @change="(v: number | undefined) => onUpdate(row.rowKey, 'decrease', v ?? 0)"
         />
         <span v-else>{{ fmt(row.decrease) }}</span>
       </template>
@@ -90,7 +90,7 @@
           :model-value="row.adjustment"
           size="small"
           :controls="false"
-          @change="(v: number) => onUpdate(row.rowKey, 'adjustment', v)"
+          @change="(v: number | undefined) => onUpdate(row.rowKey, 'adjustment', v ?? 0)"
         />
         <span v-else>{{ fmt(row.adjustment) }}</span>
       </template>

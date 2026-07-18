@@ -99,15 +99,20 @@ export function useF2ValuationFormData(options: { wpId: Ref<string>; projectId: 
   async function _doSave(items: ChecklistResponse[]): Promise<void> {
     if (!wpId.value || !items.length) return
     try {
-      await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
-        project_id: projectId.value,
+      const payload: Record<string, unknown> = {
         items: items.map((item) => ({
           item_id: item.item_id,
           conclusion: item.conclusion || null,
           remark: item.remark || null,
         })),
-      })
-    } catch {
+      }
+      // 空字符串会导致后端 UUID 校验 422；缺省时由服务端按底稿解析 project_id
+      if (projectId.value) payload.project_id = projectId.value
+      await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, payload)
+    } catch (err: any) {
+      // HTTP 层对相同 PUT body 去重会 abort 后发请求；不应提示「保存失败」
+      const msg = String(err?.message || '')
+      if (msg === 'canceled' || err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') return
       ElMessage.error('保存失败')
     }
   }

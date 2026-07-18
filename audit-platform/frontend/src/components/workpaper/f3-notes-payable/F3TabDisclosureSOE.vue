@@ -1,7 +1,11 @@
 <script setup lang="ts">
-/** F3TabDisclosureSOE — 附注披露（国企）| Task 9.2 */
-import { ref, watch, toRef, type Ref } from 'vue'
+/** F3TabDisclosureSOE — 附注披露（国企）| 与附注模块（八、36 应付票据）联动 */
+import { ref, toRef, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { api } from '@/services/apiProxy'
 import { useF3DisclosureSoe } from '../composables/useF3DisclosureSoe'
+import { useF3AiGenerate } from '../composables/useF3AiGenerate'
+import { buildF3SyncPayload, F3_NOTE_SECTION } from '../composables/f3NoteSectionMap'
 import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -25,20 +29,61 @@ const {
   applicableStandards: toRef(props, 'applicableStandards') as Ref<string[]>,
 })
 
-// ─── 审计说明 / 审计结论（F3 约定：写入 allResponses + f3:save-items 事件持久化） ───
-const NOTE_KEY = 'F3-note-soe-note'
-const CONCLUSION_KEY = 'F3-note-soe-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-function persistAudit(key: string, val: string): void {
-  const item = { item_id: key, conclusion: null, remark: val }
-  props.allResponses.set(key, item)
-  window.dispatchEvent(new CustomEvent('f3:save-items', { detail: { items: [item] } }))
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF3AiGenerate(
+  toRef(props, 'wpId') as Ref<string>,
+)
+
+async function generateSoeNote(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'soe-note',
+    noteText.value,
+    {
+      sheet: 'F3-note-soe',
+      section1: section1Rows.value.map((r) => ({
+        label: r.label,
+        endAmount: r.endAmount,
+        priorAmount: r.priorAmount,
+      })),
+      subtotal: section1Subtotal.value,
+    },
+    'AI · 附注说明',
+  )
+  if (text) noteText.value = text
 }
-function saveAuditNote(val: string): void { if (props.isReadonly) return; auditNote.value = val; persistAudit(NOTE_KEY, val) }
-function saveAuditConclusion(val: string): void { if (props.isReadonly) return; auditConclusion.value = val; persistAudit(CONCLUSION_KEY, val) }
-watch(() => props.allResponses.get(NOTE_KEY)?.remark, (v) => { if (typeof v === 'string') auditNote.value = v }, { immediate: true })
-watch(() => props.allResponses.get(CONCLUSION_KEY)?.remark, (v) => { if (typeof v === 'string') auditConclusion.value = v }, { immediate: true })
+
+// ─── 同步到附注模块（disclosure_notes 八、36 应付票据，单向 push 保证披露一致） ───
+const noteSectionId = F3_NOTE_SECTION.soe
+const isSyncing = ref(false)
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || !props.projectId) return
+  const payload = buildF3SyncPayload(
+    'soe',
+    props.wpId,
+    props.applicableStandards,
+    section1Rows.value.map((r) => ({ label: r.label, endAmount: r.endAmount, priorAmount: r.priorAmount })),
+    {
+      label: '合计',
+      endAmount: section1Subtotal.value.endAmount,
+      priorAmount: section1Subtotal.value.priorAmount,
+    },
+    noteText.value,
+  )
+  isSyncing.value = true
+  try {
+    const result: any = await api.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      payload,
+    )
+    const data = result?.data ?? result
+    ElMessage.success(`已同步 ${Number(data?.rows_synced ?? 0)} 行到附注模块「${noteSectionId} 应付票据」`)
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
 </script>
 
 <template>
@@ -54,6 +99,7 @@ watch(() => props.allResponses.get(CONCLUSION_KEY)?.remark, (v) => { if (typeof 
           <p>2. 期末已到期未兑付的应付票据金额及原因、开具票据的保证金存款受限情况应单独披露。</p>
           <p>3. 国企需关注关联方（同一控制下企业）票据及集团资金池票据的披露完整性。</p>
           <p>4. 分类合计应与 F3-1 审定表、资产负债表"应付票据"项目核对一致（浅蓝为跨sheet取数）。</p>
+          <p>5. 编制完成后点击「同步到附注模块」，将分类余额与附注说明推送到附注章节「{{ noteSectionId }} 应付票据」，保证两边披露信息一致。</p>
         </div>
       </details>
 
@@ -65,6 +111,21 @@ watch(() => props.allResponses.get(CONCLUSION_KEY)?.remark, (v) => { if (typeof 
         class="objective-alert"
       />
 
+      <!-- 附注联动工具条 -->
+      <div class="sync-toolbar">
+        <div class="sync-left">
+          <el-tag size="small" type="warning">关联附注章节：{{ noteSectionId }} 应付票据</el-tag>
+          <GtIndexChip :value="`Note:${noteSectionId}`" :context-project-id="projectId" />
+        </div>
+        <el-button
+          size="small"
+          type="primary"
+          :disabled="isReadonly"
+          :loading="isSyncing"
+          @click="syncToDisclosureNotes"
+        >同步到附注模块</el-button>
+      </div>
+
       <div class="disclosure-card">
         <h4 class="card-title">
           (1) 应付票据分类
@@ -72,7 +133,7 @@ watch(() => props.allResponses.get(CONCLUSION_KEY)?.remark, (v) => { if (typeof 
           <GtIndexChip value="wp:F3-1" :context-project-id="projectId" />
         </h4>
         <el-table :data="[...section1Rows, section1Subtotal]" size="small" border stripe class="disclosure-table">
-          <el-table-column prop="label" label="项目" width="200" />
+          <el-table-column prop="label" label="类别" width="200" />
           <el-table-column label="期末余额" width="130" align="right">
             <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmount(row.endAmount) }}</span></template>
           </el-table-column>
@@ -117,36 +178,25 @@ watch(() => props.allResponses.get(CONCLUSION_KEY)?.remark, (v) => { if (typeof 
       </div>
 
       <div class="note-area">
-        <span class="note-prefix">附注说明：</span>
+        <div class="note-head">
+          <span class="note-prefix">附注说明（随附注一并披露）：</span>
+          <el-button
+            v-if="!isReadonly && aiAvailable"
+            size="small"
+            type="primary"
+            plain
+            :loading="aiLoading"
+            @click="generateSoeNote"
+          >AI 填写说明</el-button>
+        </div>
         <el-input v-model="noteText" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
-          placeholder="应付票据附注披露说明（到期未兑付、保证金受限、关联方票据等）..." />
+          placeholder="注：企业应说明本期已到期未支付的应付票据总金额。（另可补充保证金受限、关联方票据等披露事项）" />
       </div>
 
-      <!-- 审计说明 -->
-      <el-card shadow="never" class="audit-note-card">
-        <template #header><div class="card-header"><span>审计说明</span></div></template>
-        <el-input
-          type="textarea"
-          :model-value="auditNote"
-          :disabled="isReadonly"
-          :autosize="{ minRows: 5 }"
-          placeholder="填写审计说明：披露项目的取数与核对、分类披露完整性、关联方及集团资金池票据的审计过程。"
-          @change="(v: string) => saveAuditNote(v)"
-        />
-      </el-card>
-
-      <!-- 审计结论 -->
-      <el-card shadow="never" class="audit-note-card">
-        <template #header><div class="card-header"><span>审计结论</span></div></template>
-        <el-input
-          type="textarea"
-          :model-value="auditConclusion"
-          :disabled="isReadonly"
-          :autosize="{ minRows: 3 }"
-          placeholder="填写审计结论：附注披露是否真实、完整、准确，是否符合企业会计准则列报要求。"
-          @change="(v: string) => saveAuditConclusion(v)"
-        />
-      </el-card>
+      <!-- 源模板蓝字编制指引 -->
+      <div class="template-guide">
+        注：企业应说明本期已到期未支付的应付票据总金额。
+      </div>
     </template>
   </div>
 </template>
@@ -203,21 +253,43 @@ watch(() => props.allResponses.get(CONCLUSION_KEY)?.remark, (v) => { if (typeof 
 .note-area {
   margin-top: 12px;
 }
+.note-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
 .note-prefix {
   font-weight: 600;
-  display: block;
-  margin-bottom: 4px;
 }
 .objective-alert {
   margin-bottom: 12px;
 }
-.audit-note-card {
-  margin-top: 16px;
-}
-.audit-note-card .card-header {
+.sync-toolbar {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  font-weight: 500;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: #fdf6ec;
+  border: 1px solid #f5dab1;
+  border-radius: 6px;
+}
+.sync-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.template-guide {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed #409eff;
+  border-radius: 6px;
+  background: #ecf5ff;
+  color: #2b6cb0;
+  line-height: 1.7;
+  font-size: 12px;
 }
 </style>

@@ -22,3 +22,26 @@ describe('cycleImportExportRegistry f2-st', () => {
     }
   })
 })
+
+describe('cycleImportExportRegistry f4', () => {
+  it('f4 F4-7 对齐后端五段 sheet 名', () => {
+    const sheets = CYCLE_IMPORT_EXPORT.f4.sheets
+    expect(sheets).toContain('F4-7-payment-window')
+    expect(sheets).toContain('F4-7-estimated-inbound')
+    expect(sheets).toContain('F4-7-unprocessed-invoice')
+    expect(sheets).toContain('F4-7-subsequent-payment')
+    expect(sheets).toContain('F4-7-subsequent-increase')
+    expect(sheets).not.toContain('F4-7-purchase')
+    expect(sheets).not.toContain('F4-7-inbound')
+    expect(sheets).not.toContain('F4-7-invoice')
+  })
+})
+
+describe('cycleImportExportRegistry f5', () => {
+  it('f5 sheets 与后端 _F5_SPECS 对齐', () => {
+    expect([...CYCLE_IMPORT_EXPORT.f5.sheets]).toEqual([
+      'F5-2', 'F5-3', 'F5-4', 'F5-5', 'F5-6', 'F5-8',
+    ])
+    expect(CYCLE_IMPORT_EXPORT.f5.apiPrefix).toBe('f5')
+  })
+})

@@ -303,26 +303,6 @@
       />
     </el-card>
 
-    <!-- ═══ Section 7: 审计说明及结论 ═══ -->
-    <el-card shadow="never" class="disclosure-card">
-      <template #header>
-        <div class="card-header">
-          <span>七、审计说明及结论</span>
-          <el-button size="small" @click="handleAI('section-conclusion')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
-        </div>
-      </template>
-      <el-input
-        v-model="conclusionNote"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        :readonly="isReadonly"
-        placeholder="说明递延所得税资产附注披露的完整性、准确性，是否符合SASAC相关要求..."
-        @change="handleConclusionChange"
-      />
-    </el-card>
-
     <!-- ═══ 编制提示 ═══ -->
     <details class="n1-details-tip">
       <summary>编制提示</summary>
@@ -363,7 +343,7 @@
  * - AI辅助按钮 per section
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import { MagicStick, Check } from '@element-plus/icons-vue'
+import { Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { useN1FormData } from '../../composables/useN1FormData'
 import { useN1CrossSheet } from '../../composables/useN1CrossSheet'

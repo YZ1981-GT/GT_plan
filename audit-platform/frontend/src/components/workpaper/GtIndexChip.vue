@@ -127,14 +127,14 @@ const acnrResult = ref<AcnrResolveResult | null>(null)
 
 // ─── Computed ───
 const projectId = computed(() => {
-  return props.contextProjectId || (route.params.projectId as string) || ''
+  return props.contextProjectId || (route?.params?.projectId as string) || ''
 })
 
 const isCrossProject = computed(() => {
   // If contextProjectId is provided and differs from current route project, it's cross-project
   if (!props.contextProjectId) return false
-  const routeProjectId = route.params.projectId as string
-  return routeProjectId && props.contextProjectId !== routeProjectId
+  const routeProjectId = route?.params?.projectId as string
+  return !!routeProjectId && props.contextProjectId !== routeProjectId
 })
 
 const isMultiTarget = computed(() => {
@@ -380,12 +380,12 @@ function navigateToTarget(resolved: ResolvedIndexRef) {
   const { ns, target } = resolved
 
   // Task 11.2: push current location to navigation history before jumping
-  const currentWpId = route.params.id as string || route.params.wpId as string || ''
+  const currentWpId = (route?.params?.id as string) || (route?.params?.wpId as string) || ''
   if (currentWpId && ns === 'wp') {
     pushNavHistory({
       wpId: currentWpId,
-      wpCode: route.query.wp_code as string || '',
-      sheetName: route.query.sheet as string || '',
+      wpCode: (route?.query?.wp_code as string) || '',
+      sheetName: (route?.query?.sheet as string) || '',
     })
   }
 

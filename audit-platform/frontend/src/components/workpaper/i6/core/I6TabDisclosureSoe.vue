@@ -78,18 +78,6 @@
       <el-input v-model="supplementNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="费用化与资本化划分说明、重大项目概况..." @blur="onNoteBlur" />
     </el-card>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="disclosure-card audit-note-card">
-      <template #header><span class="section-title">审计说明</span></template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly" placeholder="请填写审计说明（披露分类与审定表/明细表勾稽、披露完整性核对等）..." @blur="onAuditNoteBlur" />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="disclosure-card audit-note-card">
-      <template #header><span class="section-title">审计结论</span></template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="请填写审计结论（附注披露完整、准确、符合国有企业披露要求）..." @blur="onAuditConclusionBlur" />
-    </el-card>
-
     <details class="guidance-details compile-hint"><summary>编制提示</summary><ul>
       <li>国企版：16行×6列（费用类别/本期/上期/变动额/变动率/说明）</li>
       <li>EventBus: publish 'disclosure:note-text-updated'</li>
@@ -107,14 +95,10 @@ const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', 
 interface CategoryRow { rowId: string; item: string; currentAmount: number; priorAmount: number; remark: string }
 
 const ITEM_ID = 'I6-disc-S-categories'
-const NOTE_KEY = 'I6-disc-S-audit-note'
-const CONCLUSION_KEY = 'I6-disc-S-audit-conclusion'
 const DEFAULT_CATEGORIES = ['人工费', '材料费', '折旧费', '无形资产摊销', '设计费', '装备调试费', '委外研发费', '其他费用']
 
 const categoryRows = ref<CategoryRow[]>([])
 const supplementNote = ref('')
-const auditNote = ref('')
-const auditConclusion = ref('')
 
 const totalCurrent = computed(() => categoryRows.value.reduce((s, r) => s + (r.currentAmount || 0), 0))
 const totalPrior = computed(() => categoryRows.value.reduce((s, r) => s + (r.priorAmount || 0), 0))
@@ -128,8 +112,6 @@ function _load(): void {
 }
 function _loadNote(): void {
   supplementNote.value = _str('I6-disc-S-supplement')
-  auditNote.value = _str(NOTE_KEY)
-  auditConclusion.value = _str(CONCLUSION_KEY)
 }
 function _str(id: string): string { const item = props.allResponses.get(id); return (item?.remark ?? (typeof item === 'string' ? item : '')) as string }
 watch(() => props.allResponses, () => _load(), { immediate: true })
@@ -138,8 +120,6 @@ function _persist(): void { emit('save', ITEM_ID, JSON.stringify(categoryRows.va
 function onEdit(rowId: string, field: string, value: any): void { const row = categoryRows.value.find((r) => r.rowId === rowId); if (row) { (row as any)[field] = value; _persist() } }
 function onNoteBlur(): void { emit('save', 'I6-disc-S-supplement', supplementNote.value); window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', { detail: { wpCode: 'I6-附注国企' } })) }
 
-function onAuditNoteBlur(): void { if (props.isReadonly) return; emit('save', NOTE_KEY, auditNote.value) }
-function onAuditConclusionBlur(): void { if (props.isReadonly) return; emit('save', CONCLUSION_KEY, auditConclusion.value) }
 function handleReview(section: string): void { openReviewDialog(`I6 附注国企-${section}`) }
 function isHighRate(row: CategoryRow): boolean { if (!row.priorAmount) return false; return Math.abs((row.currentAmount - row.priorAmount) / row.priorAmount) > 0.3 }
 function fmtAmt(v: number | null | undefined): string { if (v == null || Math.abs(v) < 0.005) return '-'; return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
@@ -149,7 +129,6 @@ function fmtPct(current: number, prior: number): string { if (!prior) return '-'
 <style scoped>
 .i6-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .objective-alert { margin-bottom: 12px; }
-.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
 .guide-area { background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .guide-step { display: flex; align-items: flex-start; gap: 6px; font-size: var(--wp-font-size, 13px); }

@@ -50,7 +50,7 @@ interface AgingConfigResponse {
 
 // ─── 3-period subjects（有 agingCurrent 字段） ────────────────────────────────
 
-const THREE_PERIOD_SUBJECTS = new Set(['D2', 'K1', 'K3', 'G5'])
+const THREE_PERIOD_SUBJECTS = new Set(['D2', 'K1', 'K3', 'G5', 'F1'])
 
 // ─── Per-project-session 缓存 ─────────────────────────────────────────────────
 
@@ -88,8 +88,8 @@ export const AGING_EXPORT_PERIOD_LABELS = {
 /**
  * 从 bands 生成导出账龄列头（供导出服务动态列头使用）。
  *
- * - 3-period subjects（D2/K1/K3/G5）：每个 band 生成 3 列（期初/期末未审/期末审定）→ 3N 列
- * - 2-period subjects（D3/F1）：每个 band 生成 2 列（期初/期末审定）→ 2N 列
+ * - 3-period subjects（D2/K1/K3/G5/F1）：每个 band 生成 3 列（期初/期末未审/期末审定）→ 3N 列
+ * - 2-period subjects（D3）：每个 band 生成 2 列（期初/期末审定）→ 2N 列
  *
  * 列头顺序严格遵循 bands 数组顺序，并使用 band.label。
  * 列头格式：`{label}({periodLabel})`，例如 `1年以内(期初)`。

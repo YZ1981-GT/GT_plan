@@ -113,8 +113,31 @@ export function emptyRelatedPurchaseItem(): RelatedPurchaseItem {
 export function defaultRelatedPurchaseSheet(): RelatedPurchaseSheet {
   return {
     auditNotes: emptyAuditNotes(),
-    products: Array.from({ length: 10 }, () => emptyRelatedPurchaseItem()),
+    products: [emptyRelatedPurchaseItem()],
   }
+}
+
+export function isBlankRelatedPurchaseItem(row: RelatedPurchaseItem): boolean {
+  return !row.relatedPartyName.trim()
+    && !row.relationship.trim()
+    && !row.itemNameSpec.trim()
+    && !row.unit.trim()
+    && !row.relatedQty
+    && !row.relatedAmount
+    && !row.totalQty
+    && !row.totalAmount
+    && !row.priorQtyRatio
+    && !row.priorAmtRatio
+    && !row.nonRelatedAvgPrice
+    && !row.priorAvgPrice
+    && !row.indexRef.trim()
+}
+
+export function pruneBlankRelatedPurchaseItems(
+  products: RelatedPurchaseItem[],
+): RelatedPurchaseItem[] {
+  const filled = products.filter((row) => !isBlankRelatedPurchaseItem(row))
+  return filled.length ? filled : [products[0] || emptyRelatedPurchaseItem()]
 }
 
 function n(v: number): number {
@@ -180,7 +203,9 @@ export function migrateRelatedPurchaseSheet(legacy: unknown): RelatedPurchaseShe
       ...defaultRelatedPurchaseSheet(),
       ...sheet,
       auditNotes: { ...emptyAuditNotes(), ...sheet.auditNotes },
-      products: sheet.products?.length ? sheet.products : defaultRelatedPurchaseSheet().products,
+      products: pruneBlankRelatedPurchaseItems(
+        Array.isArray(sheet.products) ? sheet.products : [],
+      ),
     }
   }
 
@@ -189,7 +214,7 @@ export function migrateRelatedPurchaseSheet(legacy: unknown): RelatedPurchaseShe
     if ('rowId' in first || 'relatedParty' in first) {
       return {
         auditNotes: emptyAuditNotes(),
-        products: (legacy as Array<Record<string, unknown>>).map((r) => {
+        products: pruneBlankRelatedPurchaseItems((legacy as Array<Record<string, unknown>>).map((r) => {
           const qty = Number(r.quantity || r.relatedQty || 0)
           const price = Number(r.relatedPrice || 0)
           const amount = Number(r.relatedAmount || 0) || qty * price
@@ -203,7 +228,7 @@ export function migrateRelatedPurchaseSheet(legacy: unknown): RelatedPurchaseShe
             nonRelatedAvgPrice: Number(r.comparablePrice || r.nonRelatedAvgPrice || 0),
             indexRef: String(r.indexRef || ''),
           }
-        }),
+        })),
       }
     }
   }
