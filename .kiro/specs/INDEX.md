@@ -3,7 +3,7 @@
 **最后更新**：2026-07-17
 **当前分支**：`work/2026-05-30-wp-specs`
 **统计基线**：2026-06-29 的总数统计尚待批量重算（原记录：240，active 21 + archived 219）
-**本次完成 Spec**：`procedure-delegation-visibility-isolation`（服务端强制的底稿/页面可见性隔离 + 两层委派分层联动 + Completion Guard 关闭）— Task 1–18 全部完成，最终 Completion Guard 通过
+**本次完成 Spec**：`visibility-isolation-go-live-hardening`（父 spec 可见性隔离机制的上线加固：编辑器令牌强制启用 + 失效 dispatcher 挂载 + 72 native_authz 审计 + 真实容量冻结限流 + Playwright 多角色验收 + PR 提交 + Go_Live_Gate 关闭）— Task 1–8 全部完成，Go_Live_Gate 判定 LIVE（6 个 Go_Live_Item 全 LIVE/ACCEPTED，2 条残留环境 GAP 透明 surface 不阻断）
 **最高迁移**：**V113**（`V113__wp_visibility_delegation_history_audit_epoch.sql`；以 `migration_status` 实测为准）
 **测试总数**：~17500+（含 PBT 40+ properties，旧统计）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
@@ -28,10 +28,11 @@
 
 ## 一、Active Specs（23个）
 
-### 全局治理（4，未启动 + 1 已完成）
+### 全局治理（4，未启动 + 2 已完成）
 
 | Spec | 说明 | 状态 |
 |------|------|------|
+| `visibility-isolation-go-live-hardening` | 父 spec 可见性隔离机制上线加固(不重建系统)：R1 ONLYOFFICE_JWT_ENFORCE env-gated 启用 + R2 InvalidationDispatcher 挂 app.main lifespan + R3 审计 72 native_authz(19 gated/52 justified/1 worker) + R4 真实容量冻结 Rate_Limit_Profile + R5 Playwright 8 角色 fresh-context + R6 PR 提交与依赖交互 + R7 Go_Live_Gate 关闭，7需求7P8任务 | ✅ 完成 (Task 1–8 全部完成, Go_Live_Gate verdict=live: 6 Go_Live_Item 全 LIVE/ACCEPTED + latest-run-per-task 重算 artifact 干净 + smoke 未冒充; 2 残留环境 GAP 透明 surface-not-block: GLI-4 6000 诚实外推(R4.2 许可)/GLI-6 PR 未实际开启(gh 未认证,分支+push+精确命令已记录未伪造); rate-6000-golive-v1/perf-6000-golive-v1; 分支 pr/visibility-isolation-go-live-hardening(6ac477b1); 迁移保持 V113; 2026-07-17) |
 | `procedure-delegation-visibility-isolation` | 服务端强制 fail-closed 底稿/页面可见性隔离(wp_index_id+sheet_key)+统一 Wp_Bound_Gate/Action_Matrix+不可枚举 404+两层委派分层联动(WorkingPaper.assigned_to↔ProcedureInstance/ProcedureRowTask)+persistent policy epoch+6000并发限流+Completion Guard 16需求20P18任务 | ✅ 完成 (Task 1–18 全部完成, 最终 Completion Guard 通过: latest-run-per-task 全 passed + 覆盖/漂移守卫 0 unmigrated 双向相等 + correctness≥100样例, 迁移V113/perf-6000-visibility-v1/rate-6000-visibility-v1, 2026-07-17) |
 | `acnr-runtime-convergence` | ACNR运行时闭环修复(公共resolve/L2-L3生命周期/权限/版本锁定/治理真守卫) Phase1+2共20需求22P25任务 | ✅ 完成 (Phase1+2全量: 后端468+前端41=509测试全绿, CI守卫pass, 2026-07-16) |
 | `formula-runtime-convergence` | 公式运行时真实写入/回滚/并发/生产入口收敛，14需求16P18任务，最大并行6子代理 | ✅ 完成 (18/18任务, CI守卫pass) |

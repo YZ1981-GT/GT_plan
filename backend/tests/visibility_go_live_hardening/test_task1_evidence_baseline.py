@@ -123,23 +123,55 @@ def test_real_manifest_precheck_returns_empty():
 
 
 # ---------------------------------------------------------------------------
-# 3. Go_Live_Gate honestly blocks at baseline (built-not-live)
+# 3. Go_Live_Gate honestly blocks when items are built-not-live (fail-closed).
+#     NOTE: The live spec manifest has since evolved (Task 2..7 now have accepted
+#     runs — see Task 8), so this fail-closed property is exercised against a
+#     CONTROLLED empty manifest rather than the live one. The property itself
+#     ("gate blocks when no Go_Live_Item has an accepted run") is what matters and
+#     stays true regardless of manifest evolution.
 # ---------------------------------------------------------------------------
-def test_go_live_gate_blocks_while_items_built_not_live():
-    res = glg.evaluate()
-    assert res.live is False, "gate must NOT be live at baseline"
-    assert res.blocked is True, "gate must block the go-live claim at baseline"
+def test_go_live_gate_blocks_while_items_built_not_live(tmp_path: Path):
+    evidence = tmp_path / "evidence"
+    evidence.mkdir(parents=True, exist_ok=True)
+    manifest = evidence / "manifest.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "spec": gle.SPEC_NAME,
+                "schema_version": gle.SCHEMA_VERSION,
+                "created_at": "2026-01-01T00:00:00+00:00",
+                "runs": [],  # no Go_Live_Item has an accepted run
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    res = glg.evaluate(manifest_path=manifest, schema_path=gle.SCHEMA_PATH, spec_dir=tmp_path)
+    assert res.live is False, "gate must NOT be live when no item is accepted"
+    assert res.blocked is True, "gate must block the go-live claim"
     assert res.report["verdict"] == "blocked"
     assert res.report["go_live_items_total"] == 6
     assert res.report["go_live_items_live"] == 0
 
-    # every one of the 6 items is built-not-live (Tasks 2..7 have no accepted run).
+    # every one of the 6 items is built-not-live (no accepted run present).
     states = {row["id"]: row["state"] for row in res.report["go_live_items"]}
     assert set(states) == {"GLI-1", "GLI-2", "GLI-3", "GLI-4", "GLI-5", "GLI-6"}
     assert all(v == "built-not-live" for v in states.values()), states
 
-    # at least the 6 built-not-live problems are reported (7.8), fail-closed.
-    assert sum(1 for p in res.problems if "[7.8]" in p) == 6
+    # the 6 built-not-live problems are reported (7.8), fail-closed. (Curated
+    # residual GAPs also raise drift problems here since the empty manifest has no
+    # evidence markers — that is itself fail-closed and expected.)
+    assert sum(1 for p in res.problems if "仅已构建" in p) == 6
+
+
+def test_go_live_gate_is_live_on_current_manifest():
+    """现网 manifest（Task 1–7 全 passed）上门判定 LIVE（Task 8 终局；见 test_task8_*）。"""
+    res = glg.evaluate()
+    assert res.live is True, f"gate must be LIVE on current manifest; problems={res.problems}"
+    assert res.report["go_live_items_live"] == 6
 
 
 def test_gate_reuses_artifact_integrity_recompute():

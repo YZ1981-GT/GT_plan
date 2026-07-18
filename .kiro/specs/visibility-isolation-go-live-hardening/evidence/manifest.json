@@ -294,6 +294,34 @@
         }
       ],
       "notes": "Task 7 PR 提交与依赖 spec 交互验证（R6 / 组件 H6 CommitAndInteraction）。GIT: 从 work/2026-05-30-wp-specs HEAD 建新分支 pr/visibility-isolation-go-live-hardening（不直推 main/master），仅 stage 本次交付（221 文件：wp_visibility 服务 + app/security + 已接门 routers/router_registry + V113/R113 迁移 + invalidation worker + 两个可见性 spec 文档与证据 + 可见性测试 + 前端可见性 + 配置编辑），显式排除依赖 spec procedure-delegation-notification（tasks.md + test_p35_current_revision_pbt.py）与 scratch/temp/test-results。提交前 secret 扫描：无 .env/私钥/真实 token；4 处 pattern 命中均为测试文件内合成 fixture 字面量（JWT 签名不匹配用例），非真实凭据。commit 6ac477b120ffbdab95e10d39fb6d99c351c22b11；git fetch 后 git push -u origin 设置远程跟踪成功。PR: gh v2.87.3 已装但未认证（无登录 host，GH_TOKEN/GITHUB_TOKEN 未设），未运行交互式 gh auth login → PR 创建被环境阻断，不伪造 PR 号（诚实 GAP）；已记录精确 gh pr create 命令 + compare URL + pr_body.md 于 artifact。DEPENDENCY INTERACTION（R6.5-6.7）：对 backend/tests/procedure_delegation（procedure-delegation-notification 套件）分别在(a)本交付工作树与(b)干净 HEAD git worktree（detached 69a52b56）跑并比较失败节点集。两侧均 55 failed + 2 errors，失败节点集完全相同（identical=True）；本交付引入 NEW 回归=0。全部失败根因为既有 service_identities create_all 失败：NoReferencedTableError FK 'attachments.actor_service_identity_id' -> 'service_identities'（evidence_governance FK 目标未在这些测试 metadata 注册），与可见性交付无关。工作树比 HEAD 多 5 个 PASSING 收集用例=依赖 spec 未跟踪的 test_p35_current_revision_pbt.py（未纳入本交付 stage）。结论：Parent_Spec 实现与 Dependency_Spec 共存互不引入新回归，既有 service_identities 失败与本交付区分记录。🔴 诚实 GAP：PR 未实际开启（环境未认证）——分支+push+精确 PR 命令+compare URL 已真实记录，未伪造 PR 号。迁移 head 保持 V113。"
+    },
+    {
+      "run_id": "8. 执行 Go_Live_Gate 并关闭规格（R7）-0009-2026-07-17T13:39:21.802116+00:00",
+      "seq": 9,
+      "task_id": "8. 执行 Go_Live_Gate 并关闭规格（R7）",
+      "test_ids": [
+        "backend/tests/visibility_go_live_hardening/test_task8_go_live_gate.py"
+      ],
+      "criterion_ids": [
+        "7.5",
+        "7.6",
+        "7.7",
+        "7.8",
+        "7.9",
+        "7.10"
+      ],
+      "status": "passed",
+      "command": "python -m app.security.go_live_gate --report-task8 ; python -m pytest tests/visibility_go_live_hardening/test_task8_go_live_gate.py ; python -m app.security.go_live_evidence",
+      "started_at": "2026-07-17T13:39:21.802116+00:00",
+      "finished_at": "2026-07-17T13:39:21.802116+00:00",
+      "artifacts": [
+        {
+          "path": "evidence/artifacts/task8/go_live_gate_report.json",
+          "sha256": "48db053eb7202b746ce7efada1b2c1799fa1d89f8a4a76c6e01245e302f900a2",
+          "size": 4664
+        }
+      ],
+      "notes": "Task 8 执行 Go_Live_Gate 并关闭规格（R7 / 组件 H7 GoLiveGate）。终局评估聚合 Task 1–7 的 latest-run-per-task：逐 run 重算 artifact SHA-256/size、拒绝 '..'/绝对路径/缺 artifact/旧 (superseded) run（latest-run 语义天然剔除历史 run，如 Task 4 seq-4 被 seq-5 取代）、拒绝 smoke 冒充验收（复用 completion_guard 机制 _verify_run_artifacts/_validate_schema/_SMOKE_MARKERS）。结论 verdict=live：6 个 Go_Live_Item(GLI-1..6 → Task 2..7) 均有最新 passed run 且非 smoke → 全部 LIVE/ACCEPTED；latest_artifacts_verified.clean=True。残留环境 GAP 处理立场=surface-not-block（透明列出、不掩盖、不伪造）：①GLI-4(Task 5) 6000 并发未字面运行，以 64 in-flight × 6000 请求代表性闭环 + Honest_Extrapolation 达成最大可诚实规模并记录外推依据——R4.2 显式许可，为符合要求的环境说明；②GLI-6(Task 7) PR 未实际开启(gh 未认证/无 GH_TOKEN)，分支已 push+远程跟踪、精确 gh pr create 命令+compare URL+pr_body.md 已记录、未伪造 PR 号，且实质性依赖交互验证(R6.5–6.7)已通过、0 新回归——可逆环境 blocker。二者均记录于各自 passed run 内，故仍分类 LIVE/ACCEPTED，同时在 report.residual_gaps 逐条 surface(evidence marker 在各自 latest-run notes 中检出，registry 不与证据漂移)。frozen 生产 Rate_Limit_Profile=rate-6000-golive-v1(源 Performance_Profile=perf-6000-golive-v1，以 Capacity_Report_Hash 绑定)。hash-pin 的 go_live_gate_report.json 为确定性 artifact(sort_keys 无时间戳，两次生成 SHA-256 一致，已实测 byte-stable)。junit 不 hash-pin(含时间戳)。迁移 head 保持 V113，本 spec 不新增迁移。本 run 追加后 spec precheck() 返回 []。仅在门真正通过后关闭 spec，Task 8 marker [-]→[x]。"
     }
   ]
 }

@@ -67,9 +67,10 @@
   - 追加 Closeout Evidence run 记录 PR 标识、分支名与 Interaction_Validation 结果。
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8_
 
-- [ ] 8. 执行 Go_Live_Gate 并关闭规格（R7）
+- [x] 8. 执行 Go_Live_Gate 并关闭规格（R7）
   - 汇总 Task 1–7 最新 run；`H7 GoLiveGate` 逐一确认 6 个 Go_Live_Item 为 LIVE/ACCEPTED（非"仅已构建"），latest-run-per-task 重算 SHA-256/size、拒绝 `..`/绝对路径/缺 artifact/旧 run/smoke 冒充。
   - 仅在全部门禁通过时将 Task 8 标 `[x]` 并关闭 spec，更新 INDEX/memory（记录启用方式、Rate_Limit_Profile 版本、PR 标识）；任一项仅"已构建"未 LIVE → 阻断并列出失败证据。
+  - ✅ 完成（2026-07-17）：`go_live_gate.evaluate()` 终局化——聚合 Task 1–7 latest-run-per-task、逐 run 重算 artifact SHA-256/size、拒绝 `..`/绝对路径/缺 artifact、latest-run 语义剔除 superseded 历史 run（Task 4 seq-4→seq-5）、拒绝 smoke 冒充。verdict=**live**：6 个 Go_Live_Item(GLI-1..6→Task 2..7) 均有最新 passed run → 全部 LIVE/ACCEPTED。残留环境 GAP 处理立场=**surface-not-block**（透明列出、不掩盖、不伪造）：GLI-4(Task 5) 6000 诚实外推(R4.2 显式许可)、GLI-6(Task 7) PR 未实际开启(gh 未认证；分支+push+精确 gh pr create 命令+compare URL+pr_body.md 已记录，未伪造 PR 号；实质性依赖交互验证 R6.5–6.7 已通过、0 新回归)——二者记录于各自 passed run 内且可逆，故仍 LIVE/ACCEPTED，同时在 report.residual_gaps 逐条 surface(evidence marker 检出，registry 不漂移)。确定性 artifact=`evidence/artifacts/task8/go_live_gate_report.json`(byte-stable)。已 append Task 8 run(seq-9, criterion 7.5–7.10, passed)；spec precheck() 返回 []。测试 `tests/visibility_go_live_hardening/test_task8_go_live_gate.py`(9 passed)+全 spec 套件 79 passed。frozen 生产 Rate_Limit_Profile=**rate-6000-golive-v1**(源 perf-6000-golive-v1，Capacity_Report_Hash 绑定)；启用方式=ONLYOFFICE_JWT_ENFORCE env-gated(prod/staging→True，dev→False，纯配置 Rollback)；分支 pr/visibility-isolation-go-live-hardening 已 push(commit 6ac477b1)。**spec 关闭**。
   - _Requirements: 7.5, 7.6, 7.7, 7.8, 7.9, 7.10_
 
 ## Notes
