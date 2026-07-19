@@ -355,6 +355,21 @@ export function useG5Adjudication(opts: {
 
   function handleAdjustmentConfirmed(e: Event): void {
     const d = (e as CustomEvent).detail || {}
+    if (d.writebacks && typeof d.writebacks === 'object') {
+      const wb = d.writebacks as Record<string, { aje?: number; rje?: number }>
+      const keys: Array<{ bucket: string; rowKey: string }> = [
+        { bucket: 'gross', rowKey: G5_ADJ_WRITEBACK_ROW_KEY },
+        { bucket: 'provision', rowKey: 'provision-collective-business' },
+        { bucket: 'oneYear', rowKey: 'gross-one-year' },
+      ]
+      for (const { bucket, rowKey } of keys) {
+        const nets = wb[bucket]
+        if (!nets) continue
+        applyAdjustmentWriteback(parseNum(nets.aje), parseNum(nets.rje), rowKey)
+      }
+      return
+    }
+    // 兼容旧事件：仅原值桶
     if (d.accountCode && d.accountCode !== G5_ACCOUNT_CODE) return
     applyAdjustmentWriteback(
       parseNum(d.netAje),

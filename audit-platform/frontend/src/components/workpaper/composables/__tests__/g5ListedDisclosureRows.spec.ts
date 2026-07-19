@@ -158,4 +158,36 @@ describe('g5ListedDisclosureRows', () => {
     expect(bad.individualTotals.end.provision).toBe(40)
     expect(bad.groupTotals.end.balance).toBe(200)
   })
+
+  it('从 G5-3 滚动态 leaf 推算期末准备（无 closingAudited）', () => {
+    const raw = JSON.stringify([
+      {
+        category: 'individual',
+        item: '债务人甲',
+        openingUnadjusted: 80,
+        openingAdjustment: 0,
+        provisionIncrease: 20,
+        otherIncrease: 0,
+        reversal: 0,
+        writeOff: 0,
+        otherDecrease: 0,
+        closingAdjustment: 0,
+      },
+      {
+        category: 'portfolio',
+        item: '账龄组合',
+        openingUnadjusted: 10,
+        openingAdjustment: 0,
+        provisionIncrease: 5,
+        otherIncrease: 0,
+        reversal: 0,
+        writeOff: 0,
+        otherDecrease: 0,
+        closingAdjustment: 0,
+      },
+    ])
+    const bad = extractBadDebtForDisclosure(raw)
+    expect(bad.individualTotals.end.provision).toBe(100)
+    expect(bad.groupTotals.end.provision).toBe(15)
+  })
 })

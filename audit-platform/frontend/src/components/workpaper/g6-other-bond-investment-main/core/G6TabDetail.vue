@@ -133,12 +133,22 @@
                   @update:model-value="(v: string) => detail.updateRow(row.id, col.prop, v ?? '')"
                 />
               </template>
-              <template v-else-if="col.type === 'number' || col.type === 'rate'">
+              <template v-else-if="col.type === 'rate'">
+                <el-input-number
+                  :model-value="Number(row[col.prop] ?? 0) * 100"
+                  size="small"
+                  :controls="false"
+                  :precision="4"
+                  class="compact-num"
+                  @change="(v: number) => detail.updateRow(row.id, col.prop, (v ?? 0) / 100)"
+                />
+              </template>
+              <template v-else-if="col.type === 'number'">
                 <el-input-number
                   :model-value="Number(row[col.prop] ?? 0)"
                   size="small"
                   :controls="false"
-                  :precision="col.type === 'rate' ? 4 : 2"
+                  :precision="2"
                   class="compact-num"
                   @change="(v: number) => detail.updateRow(row.id, col.prop, v ?? 0)"
                 />

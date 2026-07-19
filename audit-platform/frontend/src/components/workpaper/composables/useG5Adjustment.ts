@@ -5,7 +5,7 @@
  * 调整事项说明 | 类别（报表调整/账项调整/其他）| 报表项目 | 科目名称 |
  * 附注项目 | 借方调整金额 | 贷方调整金额 | 索引 | 备注
  *
- * 保留确认回写 G5-1；兼容旧版 AJE/RJE 行数据。
+ * 确认回写 G5-1：按科目拆桶（原值 / 坏账 / 一年内），避免混入同一行。
  */
 import { ref, computed, watch, onMounted, type Ref } from 'vue'
 import { parseNum, isDebitCreditBalanced } from '@/composables/useG5FormulaEngine'
@@ -57,7 +57,20 @@ export const G5_LTR_ACCOUNTS = [
   { code: '1002', name: '银行存款' },
 ] as const
 
-const G5_RELATED_PREFIXES = ['1531', '1532', '1231', '1481']
+export type G5WritebackBucket = 'gross' | 'provision' | 'oneYear'
+
+export const G5_WRITEBACK_ROW_KEYS: Record<G5WritebackBucket, string> = {
+  gross: G5_ADJ_WRITEBACK_ROW_KEY,
+  provision: 'provision-collective-business',
+  oneYear: 'gross-one-year',
+}
+
+export interface G5WritebackBucketNets {
+  aje: number
+  rje: number
+}
+
+export type G5WritebackNets = Record<G5WritebackBucket, G5WritebackBucketNets>
 
 function generateId(): string {
   return `g5a-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
@@ -129,14 +142,86 @@ function safeParseEntries(raw: string | null | undefined): AdjustmentEntry[] {
   }
 }
 
-function isG5Related(code: string, name: string): boolean {
-  const c = String(code || '')
-  if (G5_RELATED_PREFIXES.some((p) => c === p || c.startsWith(p))) return true
-  return String(name || '').includes('长期应收') || String(name || '').includes('未实现融资')
-}
-
 function isRje(row: AdjustmentEntry): boolean {
   return row.category === '报表调整' || row.entryType === 'RJE'
+}
+
+/** 分录归属回写桶：原值 / 坏账 / 一年内 */
+export function classifyG5WritebackBucket(code: string, name: string): G5WritebackBucket | null {
+  const c = String(code || '').trim()
+  const n = String(name || '')
+  if (c) {
+    if (c === '1231' || c.startsWith('1231')) return 'provision'
+    if (c === '1481' || c.startsWith('1481')) return 'oneYear'
+    if (c.startsWith('1531') || c.startsWith('1532')) return 'gross'
+    return null // 有科目代码但不属于回写范围时，不按名称误归
+  }
+  if (n.includes('坏账准备')) return 'provision'
+  if (n.includes('一年内到期')) return 'oneYear'
+  if (n.includes('长期应收') || n.includes('未实现融资')) return 'gross'
+  return null
+}
+
+/**
+ * 回写符号：
+ * - 原值/一年内：借−贷（资产增加为正）
+ * - 坏账准备行：贷−借（贷记坏账准备增加准备余额）
+ */
+export function entryNetForBucket(entry: AdjustmentEntry, bucket: G5WritebackBucket): number {
+  const debit = parseNum(entry.debitAmount)
+  const credit = parseNum(entry.creditAmount)
+  return bucket === 'provision' ? credit - debit : debit - credit
+}
+
+export function computeG5WritebackNets(entries: AdjustmentEntry[]): G5WritebackNets {
+  const out: G5WritebackNets = {
+    gross: { aje: 0, rje: 0 },
+    provision: { aje: 0, rje: 0 },
+    oneYear: { aje: 0, rje: 0 },
+  }
+  for (const e of entries) {
+    const bucket = classifyG5WritebackBucket(e.accountCode, e.accountName)
+    if (!bucket) continue
+    const net = entryNetForBucket(e, bucket)
+    if (isRje(e)) out[bucket].rje = Math.round((out[bucket].rje + net) * 100) / 100
+    else out[bucket].aje = Math.round((out[bucket].aje + net) * 100) / 100
+  }
+  return out
+}
+
+function patchWritebackIntoStore(store: any, nets: G5WritebackNets): any {
+  const applyTo = (target: Record<string, any>) => {
+    const next = { ...target }
+    for (const bucket of Object.keys(G5_WRITEBACK_ROW_KEYS) as G5WritebackBucket[]) {
+      const rowKey = G5_WRITEBACK_ROW_KEYS[bucket]
+      next[rowKey] = {
+        ...(next[rowKey] || {}),
+        closingAJE: nets[bucket].aje,
+        closingRJE: nets[bucket].rje,
+      }
+    }
+    return next
+  }
+
+  if (store?.rows && typeof store.rows === 'object' && store.version) {
+    return {
+      ...store,
+      rows: applyTo({ ...store.rows }),
+      writeback: {
+        ...(store.writeback || {}),
+        [WRITEBACK_ROW_ID]: { closingAJE: nets.gross.aje, closingRJE: nets.gross.rje },
+        [G5_WRITEBACK_ROW_KEYS.provision]: {
+          closingAJE: nets.provision.aje,
+          closingRJE: nets.provision.rje,
+        },
+        [G5_WRITEBACK_ROW_KEYS.oneYear]: {
+          closingAJE: nets.oneYear.aje,
+          closingRJE: nets.oneYear.rje,
+        },
+      },
+    }
+  }
+  return applyTo({ ...(store || {}) })
 }
 
 export function useG5Adjustment(opts?: {
@@ -169,27 +254,11 @@ export function useG5Adjustment(opts?: {
     credit: entries.value.filter((e) => isRje(e)).reduce((s, e) => s + parseNum(e.creditAmount), 0),
   }))
 
-  /** 影响 1531 等的净 AJE（借−贷；资产增加为正） */
-  const netAjeToG5 = computed(() => {
-    let net = 0
-    for (const e of entries.value) {
-      if (isRje(e)) continue
-      if (!isG5Related(e.accountCode, e.accountName)) continue
-      net += parseNum(e.debitAmount) - parseNum(e.creditAmount)
-    }
-    return net
-  })
+  const writebackNets = computed(() => computeG5WritebackNets(entries.value))
 
-  /** 影响 1531 等的净 RJE */
-  const netRjeToG5 = computed(() => {
-    let net = 0
-    for (const e of entries.value) {
-      if (!isRje(e)) continue
-      if (!isG5Related(e.accountCode, e.accountName)) continue
-      net += parseNum(e.debitAmount) - parseNum(e.creditAmount)
-    }
-    return net
-  })
+  /** 兼容旧 API：仅原值桶净额 */
+  const netAjeToG5 = computed(() => writebackNets.value.gross.aje)
+  const netRjeToG5 = computed(() => writebackNets.value.gross.rje)
 
   function readStored(): string | null | undefined {
     return readCanonicalRaw(opts?.allResponses?.value.get(STORAGE_KEY))
@@ -273,8 +342,7 @@ export function useG5Adjustment(opts?: {
       return false
     }
 
-    const aje = netAjeToG5.value
-    const rje = netRjeToG5.value
+    const nets = writebackNets.value
 
     if (opts?.allResponses && (opts.saveImmediate || opts.debouncedSave)) {
       try {
@@ -283,25 +351,7 @@ export function useG5Adjustment(opts?: {
         if (raw) {
           try { store = JSON.parse(raw) } catch { store = {} }
         }
-        // 扁平 keyed store（与 G5-1 IE / serialize 一致）
-        if (store.rows && typeof store.rows === 'object' && store.version) {
-          const rows = { ...store.rows }
-          rows[WRITEBACK_ROW_ID] = {
-            ...(rows[WRITEBACK_ROW_ID] || {}),
-            closingAJE: aje,
-            closingRJE: rje,
-          }
-          store = { ...store, rows, writeback: { [WRITEBACK_ROW_ID]: { closingAJE: aje, closingRJE: rje } } }
-        } else {
-          store = {
-            ...store,
-            [WRITEBACK_ROW_ID]: {
-              ...(store[WRITEBACK_ROW_ID] || {}),
-              closingAJE: aje,
-              closingRJE: rje,
-            },
-          }
-        }
+        store = patchWritebackIntoStore(store, nets)
         const payload = buildCanonicalPayload(G5_1_ROWS_KEY, store)
         opts.allResponses.value.set(G5_1_ROWS_KEY, payload)
         if (opts.saveImmediate) {
@@ -318,15 +368,21 @@ export function useG5Adjustment(opts?: {
       window.dispatchEvent(new CustomEvent('g5:adjustment-confirmed', {
         detail: {
           accountCode: G5_ACCOUNT_CODE,
-          netAje: aje,
-          netRje: rje,
+          netAje: nets.gross.aje,
+          netRje: nets.gross.rje,
           rowId: WRITEBACK_ROW_ID,
+          writebacks: nets,
           rowCount: entries.value.length,
         },
       }))
     } catch { /* silent */ }
 
-    ElMessage.success(`已确认回写 G5-1（AJE ${aje.toFixed(2)} / RJE ${rje.toFixed(2)}）`)
+    const parts = [
+      `原值 AJE ${nets.gross.aje.toFixed(2)}/RJE ${nets.gross.rje.toFixed(2)}`,
+      `坏账 AJE ${nets.provision.aje.toFixed(2)}/RJE ${nets.provision.rje.toFixed(2)}`,
+      `一年内 AJE ${nets.oneYear.aje.toFixed(2)}/RJE ${nets.oneYear.rje.toFixed(2)}`,
+    ]
+    ElMessage.success(`已确认回写 G5-1（${parts.join('；')}）`)
     return true
   }
 
@@ -346,6 +402,7 @@ export function useG5Adjustment(opts?: {
     balanceDiff,
     ajeTotal,
     rjeTotal,
+    writebackNets,
     netAjeToG5,
     netRjeToG5,
     addEntry,

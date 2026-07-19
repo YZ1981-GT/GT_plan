@@ -2,6 +2,8 @@
  * useG5PriorYearRollForward — G5 上年结转
  * G5-2：上年 agingAudited → 本期 agingPrior
  * G5-3：上年期末审定 → 本期 openingUnadjusted
+ * G5-5/6：上年末期 closing* → 本期首期 opening*
+ * G5-10：上年 ECL 准备 → 本期 bookProvision（单项）
  */
 import { ref, type Ref } from 'vue'
 import { api } from '@/services/apiProxy'
@@ -11,8 +13,11 @@ import {
   G5_ITEM_IDS,
   buildCanonicalPayload,
   parseCanonicalArray,
+  parseCanonicalJson,
+  readCanonicalRaw,
 } from './g5StorageContract'
 import { closingAuditedOfLeaf } from './g5SuiteStatus'
+import { parseG510Payload } from './useG5ImpairmentCalc'
 
 export interface G5RollForwardChange {
   itemId: string
@@ -47,6 +52,11 @@ function populated(value: unknown): boolean {
   return String(value).trim() !== ''
 }
 
+function num(value: unknown): number {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : 0
+}
+
 function balanceKey(row: any): string {
   const stable = String(row?.crossSheetReceivableId || '').trim()
   if (stable) return `id:${stable}`
@@ -63,6 +73,49 @@ function badDebtKey(row: any): string {
   const item = String(row?.item || row?.debtorOrGroup || '').trim()
   if (category || item) return `name:${category}|${item}`
   return ''
+}
+
+function amortGroupKey(group: any): string {
+  const name = String(group?.projectName || '').trim()
+  if (name) return `name:${name}`
+  const stable = String(group?.crossSheetReceivableId || '').trim()
+  if (stable) return `id:${stable}`
+  return ''
+}
+
+function asGroups(raw: unknown): any[] {
+  if (!raw) return []
+  if (Array.isArray(raw)) return raw
+  if (typeof raw === 'object' && Array.isArray((raw as any).groups)) return (raw as any).groups
+  return []
+}
+
+function wrapGroups(groups: any[], envelope: unknown): Record<string, unknown> {
+  if (envelope && typeof envelope === 'object' && !Array.isArray(envelope)) {
+    return { ...(envelope as Record<string, unknown>), groups }
+  }
+  return { groups }
+}
+
+function lastPeriod(group: any): any | null {
+  const periods = Array.isArray(group?.periods) ? group.periods : []
+  return periods.length ? periods[periods.length - 1] : null
+}
+
+function ensureFirstPeriod(group: any): any {
+  if (!Array.isArray(group.periods) || group.periods.length === 0) {
+    group.periods = [{
+      id: `${group.id || 'p'}-1`,
+      periodNo: 1,
+      openingReceivable: 0,
+      openingUnrealized: 0,
+      periodCollection: 0,
+      periodIncome: 0,
+      closingReceivable: 0,
+      closingUnrealized: 0,
+    }]
+  }
+  return group.periods[0]
 }
 
 function normalizeResponses(raw: any): Map<string, ChecklistResponse> {
@@ -205,6 +258,123 @@ export function buildG53RollForward(prior: any[], current: any[], force: boolean
   return { rows: result, changedRows, skippedRows }
 }
 
+/** G5-5/G5-6：上年末期 closing → 本期首期 opening */
+export function buildAmortizationRollForward(
+  priorRaw: unknown,
+  currentRaw: unknown,
+  force: boolean,
+): { envelope: Record<string, unknown>; changedRows: number; skippedRows: number } {
+  const priorGroups = asGroups(priorRaw)
+  const currentGroups = asGroups(currentRaw)
+  let changedRows = 0
+  let skippedRows = 0
+  const result = currentGroups.map((g) => ({
+    ...g,
+    periods: Array.isArray(g.periods) ? g.periods.map((p: any) => ({ ...p })) : [],
+  }))
+  const resultByKey = new Map(result.map((g) => [amortGroupKey(g), g]))
+
+  for (const priorGroup of priorGroups) {
+    const key = amortGroupKey(priorGroup)
+    if (!key) continue
+    const last = lastPeriod(priorGroup)
+    if (!last) continue
+    const openRec = num(last.closingReceivable)
+    const openUnr = num(last.closingUnrealized)
+    if (!populated(openRec) && !populated(openUnr)) continue
+
+    let existing = resultByKey.get(key)
+    if (existing) {
+      const first = ensureFirstPeriod(existing)
+      const already =
+        populated(first.openingReceivable) || populated(first.openingUnrealized)
+      if (already && !force) {
+        skippedRows++
+        continue
+      }
+      first.openingReceivable = openRec
+      first.openingUnrealized = openUnr
+      existing.crossSheetReceivableId =
+        existing.crossSheetReceivableId
+        || priorGroup.crossSheetReceivableId
+        || priorGroup.id
+    } else {
+      existing = {
+        id: `${priorGroup.id || key}-rf`,
+        projectName: priorGroup.projectName || key.replace(/^name:/, ''),
+        basic: priorGroup.basic ? { ...priorGroup.basic } : {},
+        initial: priorGroup.initial ? { ...priorGroup.initial } : undefined,
+        periods: [{
+          id: 'p1-rf',
+          periodNo: 1,
+          openingReceivable: openRec,
+          openingUnrealized: openUnr,
+          periodCollection: 0,
+          periodIncome: 0,
+          companyBookIncome: 0,
+          closingReceivable: openRec,
+          closingUnrealized: openUnr,
+        }],
+        crossSheetReceivableId: priorGroup.crossSheetReceivableId || priorGroup.id,
+      }
+      result.push(existing)
+      resultByKey.set(key, existing)
+    }
+    changedRows++
+  }
+
+  return {
+    envelope: wrapGroups(result, currentRaw ?? priorRaw),
+    changedRows,
+    skippedRows,
+  }
+}
+
+/** G5-10：上年应计提/账面准备 → 本期 bookProvision（仅单项） */
+export function buildG510RollForward(
+  priorRaw: unknown,
+  currentRaw: unknown,
+  force: boolean,
+): { payload: ReturnType<typeof parseG510Payload>; changedRows: number; skippedRows: number } {
+  const prior = parseG510Payload(priorRaw)
+  const current = parseG510Payload(currentRaw)
+  const payload = parseG510Payload(JSON.parse(JSON.stringify(current)))
+  const byLabel = new Map(payload.singleRows.map((r) => [String(r.label || '').trim(), r]))
+  let changedRows = 0
+  let skippedRows = 0
+
+  for (const priorRow of prior.singleRows) {
+    const label = String(priorRow.label || '').trim()
+    if (!label) continue
+    const bookFromPrior = num(priorRow.bookProvision) || num(priorRow.expectedProvision)
+    if (!populated(bookFromPrior)) continue
+    const existing = byLabel.get(label)
+    if (existing) {
+      if (!force && populated(existing.bookProvision)) {
+        skippedRows++
+        continue
+      }
+      existing.bookProvision = bookFromPrior
+      existing.difference = Math.round((num(existing.expectedProvision) - bookFromPrior) * 100) / 100
+      changedRows++
+    } else {
+      payload.singleRows.push({
+        ...priorRow,
+        rowId: `${priorRow.rowId || label}-rf`,
+        auditedBalance: 0,
+        expectedProvision: 0,
+        bookProvision: bookFromPrior,
+        difference: Math.round((0 - bookFromPrior) * 100) / 100,
+        basis: priorRow.basis || '上年结转账面准备',
+      })
+      byLabel.set(label, payload.singleRows[payload.singleRows.length - 1])
+      changedRows++
+    }
+  }
+
+  return { payload, changedRows, skippedRows }
+}
+
 export function useG5PriorYearRollForward(options: Options) {
   const loading = ref(false)
   const applying = ref(false)
@@ -256,6 +426,49 @@ export function useG5PriorYearRollForward(options: Options) {
           changedRows: badDebt.changedRows,
           skippedRows: badDebt.skippedRows,
           payload: buildCanonicalPayload(G5_ITEM_IDS.G5_3_ROWS, badDebt.rows),
+        })
+      }
+
+      const lease = buildAmortizationRollForward(
+        parseCanonicalJson(prior.get(G5_ITEM_IDS.G5_5_ROWS)),
+        parseCanonicalJson(current.get(G5_ITEM_IDS.G5_5_ROWS)),
+        force,
+      )
+      if (lease.changedRows) {
+        changes.push({
+          itemId: G5_ITEM_IDS.G5_5_ROWS,
+          label: 'G5-5 租赁期初',
+          changedRows: lease.changedRows,
+          skippedRows: lease.skippedRows,
+          payload: buildCanonicalPayload(G5_ITEM_IDS.G5_5_ROWS, lease.envelope),
+        })
+      }
+
+      const sales = buildAmortizationRollForward(
+        parseCanonicalJson(prior.get(G5_ITEM_IDS.G5_6_ROWS)),
+        parseCanonicalJson(current.get(G5_ITEM_IDS.G5_6_ROWS)),
+        force,
+      )
+      if (sales.changedRows) {
+        changes.push({
+          itemId: G5_ITEM_IDS.G5_6_ROWS,
+          label: 'G5-6 分期期初',
+          changedRows: sales.changedRows,
+          skippedRows: sales.skippedRows,
+          payload: buildCanonicalPayload(G5_ITEM_IDS.G5_6_ROWS, sales.envelope),
+        })
+      }
+
+      const priorG10 = readCanonicalRaw(prior.get(G5_ITEM_IDS.G5_10_ROWS))
+      const currentG10 = readCanonicalRaw(current.get(G5_ITEM_IDS.G5_10_ROWS))
+      const ecl = buildG510RollForward(priorG10, currentG10, force)
+      if (ecl.changedRows) {
+        changes.push({
+          itemId: G5_ITEM_IDS.G5_10_ROWS,
+          label: 'G5-10 账面准备',
+          changedRows: ecl.changedRows,
+          skippedRows: ecl.skippedRows,
+          payload: buildCanonicalPayload(G5_ITEM_IDS.G5_10_ROWS, ecl.payload),
         })
       }
 

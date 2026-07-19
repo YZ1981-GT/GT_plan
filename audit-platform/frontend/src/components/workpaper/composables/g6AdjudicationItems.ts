@@ -322,6 +322,29 @@ export function applyG6SplitAdjustmentWriteback(
   return next
 }
 
+/**
+ * 多维回写：成本 / 利息调整 / 减值 / 公允价值 → 各组合（或 FV 叶子）行
+ */
+export function applyG6MultiAdjustmentWriteback(
+  store: G6AdjRowStore,
+  nets: { cost?: number; interest?: number; impairment?: number; fv?: number },
+): G6AdjRowStore {
+  let next = store
+  if (nets.cost != null) {
+    next = applyG6AdjustmentWriteback(next, nets.cost, 'cost-portfolio')
+  }
+  if (nets.interest != null) {
+    next = applyG6AdjustmentWriteback(next, nets.interest, 'interest-portfolio')
+  }
+  if (nets.impairment != null) {
+    next = applyG6AdjustmentWriteback(next, nets.impairment, 'impairment-portfolio')
+  }
+  if (nets.fv != null) {
+    next = applyG6AdjustmentWriteback(next, nets.fv, 'fv-item-1')
+  }
+  return next
+}
+
 export function listG6WritebackAllocTargets(): Array<{ rowKey: string; label: string }> {
   return [
     { rowKey: 'cost-individual', label: '投资成本 · 单项' },

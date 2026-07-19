@@ -14,7 +14,8 @@ import {
 } from '../g5StorageContract'
 import { G5_IMPORTABLE_SHEETS } from '../useG5ImportExport'
 import { evaluateG5SuiteStatus } from '../g5SuiteStatus'
-import { buildG52RollForward, buildG53RollForward } from '../useG5PriorYearRollForward'
+import { buildG52RollForward, buildG53RollForward, buildAmortizationRollForward, buildG510RollForward } from '../useG5PriorYearRollForward'
+
 
 describe('G5 full-chain regression', () => {
   it('G5-9→G5-10 sync preserves V2 credit/aging groups', () => {
@@ -90,10 +91,17 @@ describe('G5 full-chain regression', () => {
           writeoff: [],
         }),
       }],
+      ['G5-2-rows', {
+        item_id: 'G5-2-rows',
+        conclusion: JSON.stringify([
+          { netAmount: 100, agingAudited: { within1: 60 }, agingTotal: 60 },
+        ]),
+      }],
     ])
     const statuses = evaluateG5SuiteStatus(map)
     expect(statuses.find((s) => s.code === 'G5-4')?.balance).toBe(false)
     expect(statuses.find((s) => s.code === 'G5-11')?.gate).toBe(false)
+    expect(statuses.find((s) => s.code === 'G5-2')?.gate).toBe(false)
   })
 
   it('prior-year builders protect populated openings unless forced', () => {
@@ -141,6 +149,69 @@ describe('G5 full-chain regression', () => {
     expect(g53.rows[0].openingUnadjusted).toBe(100)
   })
 
+  it('amortization roll-forward carries last closing to first opening', () => {
+    const prior = {
+      groups: [{
+        projectName: '租赁A',
+        periods: [
+          { periodNo: 1, closingReceivable: 90, closingUnrealized: 8 },
+          { periodNo: 2, closingReceivable: 80, closingUnrealized: 5 },
+        ],
+      }],
+    }
+    const current = {
+      groups: [{
+        projectName: '租赁A',
+        periods: [{ periodNo: 1, openingReceivable: 0, openingUnrealized: 0 }],
+      }],
+    }
+    const out = buildAmortizationRollForward(prior, current, false)
+    expect(out.changedRows).toBe(1)
+    expect((out.envelope.groups as any[])[0].periods[0].openingReceivable).toBe(80)
+    expect((out.envelope.groups as any[])[0].periods[0].openingUnrealized).toBe(5)
+
+    const skip = buildAmortizationRollForward(prior, {
+      groups: [{
+        projectName: '租赁A',
+        periods: [{ periodNo: 1, openingReceivable: 1, openingUnrealized: 0 }],
+      }],
+    }, false)
+    expect(skip.skippedRows).toBe(1)
+  })
+
+  it('G5-10 roll-forward sets bookProvision from prior book/expected', () => {
+    const prior = {
+      version: 2,
+      singleRows: [{
+        rowId: 's1',
+        label: '债务人A',
+        auditedBalance: 100,
+        expectedProvision: 99, // parse 后会按余额×率重算，优先用 bookProvision
+        bookProvision: 12,
+        lossRate: 0.1,
+      }],
+      creditGroups: [],
+      agingGroups: [],
+    }
+    const current = {
+      version: 2,
+      singleRows: [{
+        rowId: 's1',
+        label: '债务人A',
+        auditedBalance: 120,
+        expectedProvision: 15,
+        bookProvision: 0,
+        lossRate: 0.1,
+      }],
+      creditGroups: [],
+      agingGroups: [],
+    }
+    const out = buildG510RollForward(prior, current, false)
+    expect(out.changedRows).toBe(1)
+    expect(out.payload.singleRows[0].bookProvision).toBe(12)
+    expect(out.payload.creditGroups.length).toBeGreaterThan(0)
+  })
+
   it('parseRowsRemark accepts response objects preferring conclusion', async () => {
     const { parseRowsRemark } = await import('../g5CrossHelpers')
     const rows = parseRowsRemark({
@@ -149,5 +220,14 @@ describe('G5 full-chain regression', () => {
     })
     expect(rows).toEqual([{ id: 1 }])
     expect(parseRowsRemark({ remark: JSON.stringify([{ id: 3 }]) })).toEqual([{ id: 3 }])
+  })
+
+  it('parseG5Bool treats 否/FALSE as false', async () => {
+    const { parseG5Bool } = await import('../useG5BalanceDetail')
+    expect(parseG5Bool('否')).toBe(false)
+    expect(parseG5Bool('FALSE')).toBe(false)
+    expect(parseG5Bool('是')).toBe(true)
+    expect(parseG5Bool(true)).toBe(true)
+    expect(parseG5Bool('')).toBe(false)
   })
 })

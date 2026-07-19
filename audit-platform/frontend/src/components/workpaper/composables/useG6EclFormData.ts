@@ -47,24 +47,57 @@ export interface StageClassificationData {
   conclusion: string
 }
 
+/**
+ * G6-12 减值准备测算行（对齐 Excel）
+ *
+ * 字段语义：
+ * - amortizedCost ① = Excel「账面余额」（计提基数；内部字段名保留兼容）
+ * - bookValue ④ = Excel「摊余成本」= ① − ③
+ * - adjBookValue ⑨ = Excel 审定「摊余成本」= ⑦ − ⑧
+ */
 export interface ImpairmentCalcRow {
   id: string
   seq: number
   investProject: string
   stageGroup: 'Stage1' | 'Stage2' | 'Stage3'
+  /** ① 账面余额（计提基数） */
   amortizedCost: number
+  /** 预计未来现金流量现值（Excel C列；Stage3 常用） */
+  pvFutureCashFlow: number
+  /** Stage3 审定用现值；未触碰时回落为 pvFutureCashFlow */
+  adjustedPvFutureCashFlow: number
+  /** 用户是否显式改过审定现值 */
+  adjPvTouched?: boolean
+  /** 公允价值（辅助参考，非 Excel 核心列） */
   fairValue: number
+  /** ② 预期信用损失率 */
   creditLossRate: number
+  /** ③ 减值准备 */
   impairmentProvision: number
+  /** ④ 摊余成本 = ① − ③ */
   bookValue: number
+  /** ⑤ 账面余额调整 */
   balanceAdjustment: number
+  /** ②A 调整后预期信用损失率 */
   adjustedCreditLossRate: number
+  /** 用户是否显式改过 ②A；false 时默认用 ② */
+  adjRateTouched?: boolean
+  /** ⑥ 减值准备调整 */
   impairmentAdjustment: number
+  /** 阶段划分（与 stageGroup 同步） */
   stage: 'Stage1' | 'Stage2' | 'Stage3'
+  /** 信用组合方式（Excel K） */
+  creditGroupMethod: string
+  /** 信用组合名称（Excel L） */
+  creditGroupName: string
+  /** OCI 影响（FVOCI 辅助） */
   ociImpact: number
   indexRef: string
+  /** ⑦ 审定账面余额 = ① + ⑤ */
   adjBalance: number
+  /** ⑧ 审定减值准备 = ③ + ⑥ */
   adjImpairment: number
+  /** ⑨ 审定摊余成本 = ⑦ − ⑧ */
   adjBookValue: number
   adjFairValue: number
   priorImpairment: number
@@ -79,6 +112,7 @@ export interface ImpairmentCalcData {
   conclusion: string
 }
 
+/** @deprecated 旧版 G6-13 问卷行；迁移后写入 parameterEvaluation / 废弃 */
 export interface EclCheckRow {
   id: string
   seq: number
@@ -93,15 +127,91 @@ export interface EclCheckRow {
   remark: string
 }
 
-export interface EclMeasurementData {
-  pdSection: EclCheckRow[]
-  lgdSection: EclCheckRow[]
-  eadSection: EclCheckRow[]
-  discountRateSection: EclCheckRow[]
-  forwardLookingSection: EclCheckRow[]
-  methodologyContext: string
+export interface MethodEvalRow {
+  id: string
+  checkItem: string
+  checkContent: string
+  companyMethod: string
+  auditEvaluation: '合理' | '基本合理' | '不合理' | ''
+  note: string
 }
 
+export interface GroupBasisRow {
+  id: string
+  groupName: string
+  basis: string
+  riskCharacteristic: string
+  sampleSize: number
+  auditEvaluation: '合理' | '不合理' | ''
+  note: string
+}
+
+export interface ParameterEvalRow {
+  id: string
+  paramName: string
+  dataSource: string
+  calcMethod: string
+  verificationResult: string
+  auditEvaluation: '合理' | '基本合理' | '不合理' | ''
+  note: string
+}
+
+/** G6-13 PD/LGD 法测算行（对齐 Excel） */
+export interface PdLgdCalcRow {
+  id: string
+  projectName: string
+  bookBalance: number
+  remainingMonths: number
+  stage: 'Stage1' | 'Stage2' | 'Stage3' | ''
+  rating: string
+  externalMappedPd: number
+  termAdjustedPd: number
+  lgd: number
+  eclRate: number
+  eclAmount: number
+  priorHistoricalLossRate: number
+  note: string
+}
+
+/** G6-13 损失率法测算行 */
+export interface LossRateCalcRow {
+  id: string
+  projectName: string
+  bookBalance: number
+  remainingMonths: number
+  stage: 'Stage1' | 'Stage2' | 'Stage3' | ''
+  rating: string
+  lossRate: number
+  description: string
+  forwardLookingAdj: number
+  eclRate: number
+  eclAmount: number
+  priorHistoricalLossRate: number
+  note: string
+}
+
+/**
+ * G6-13 预期信用损失计量测试（对齐 Excel / G4-11）
+ * schemaVersion≥2：双路径测算；旧版含 pdSection 等问卷字段
+ */
+export interface EclMeasurementData {
+  schemaVersion?: number
+  methodEvaluation: MethodEvalRow[]
+  groupBasis: GroupBasisRow[]
+  parameterEvaluation: ParameterEvalRow[]
+  pdLgdRows: PdLgdCalcRow[]
+  lossRateRows: LossRateCalcRow[]
+  conclusion: string
+  /** 旧问卷残留（只读兼容） */
+  pdSection?: EclCheckRow[]
+  lgdSection?: EclCheckRow[]
+  eadSection?: EclCheckRow[]
+  discountRateSection?: EclCheckRow[]
+  forwardLookingSection?: EclCheckRow[]
+  methodologyContext?: string
+}
+
+/** @deprecated 旧版单表行；迁移后拆入 reversals / writeOffs */
 export interface ReversalWriteOffRow {
   id: string
   seq: number
@@ -114,9 +224,47 @@ export interface ReversalWriteOffRow {
   indexRef: string
 }
 
+/** G6-14（一）转回/收回检查行 — 对齐 Excel */
+export interface G6ReversalRow {
+  id: string
+  seq: number
+  /** 单位名称 / 投资项目 */
+  unitName: string
+  reversalReason: string
+  recoveryMethod: string
+  originalBasis: string
+  reversalAmount: number
+  accumulatedProvision: number
+  reasonAnalysis: string
+  isReasonable: '合理' | '基本合理' | '不合理' | ''
+  indexRef: string
+  /** 兼容：转回 / 收回 */
+  kind?: '转回' | '收回'
+}
+
+/** G6-14（二）核销检查行 — 对齐 Excel */
+export interface G6WriteOffRow {
+  id: string
+  seq: number
+  unitName: string
+  /** 其他债权投资的性质 */
+  writeOffType: string
+  writeOffAmount: number
+  writeOffReason: string
+  writeOffProcedure: string
+  isRelatedParty: boolean
+  reasonAnalysis: string
+  isReasonable: '合理' | '基本合理' | '不合理' | ''
+  indexRef: string
+}
+
 export interface ReversalWriteOffData {
-  rows: ReversalWriteOffRow[]
+  schemaVersion?: number
+  reversals: G6ReversalRow[]
+  writeOffs: G6WriteOffRow[]
   conclusion: string
+  /** 旧单表残留 */
+  rows?: ReversalWriteOffRow[]
 }
 
 export interface VoucherCheckRow {

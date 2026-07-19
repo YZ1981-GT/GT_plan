@@ -164,18 +164,16 @@ _G6_3_NUMERIC_KEYS = {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _G6_4_HEADERS = [
-    "序号", "分录类型(AJE/RJE)", "日期", "摘要",
-    "科目编码", "科目名称", "借方金额", "贷方金额",
-    "索引", "备注",
+    "调整事项说明", "类别（报表调整/账项调整/其他）", "报表项目", "科目代码", "科目名称",
+    "附注项目", "借方调整金额", "贷方调整金额", "索引", "备注",
 ]
 _G6_4_KEYS = [
-    "seq", "entryType", "date", "summary",
-    "accountCode", "accountName", "debitAmount", "creditAmount",
-    "indexRef", "remark",
+    "description", "category", "reportItem", "accountCode", "accountName",
+    "noteItem", "debitAmount", "creditAmount", "indexRef", "remark",
 ]
 
 # G6-4 数值字段
-_G6_4_NUMERIC_KEYS = {"seq", "debitAmount", "creditAmount"}
+_G6_4_NUMERIC_KEYS = {"debitAmount", "creditAmount"}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -465,10 +463,10 @@ async def g6_main_export_template(
             guidance=[
                 "G6-4 调整分录汇总 编制说明",
                 "",
-                "每行一笔调整分录，分录类型填 AJE 或 RJE。",
-                "借方金额和贷方金额不能同时有值（一借一贷）。",
-                "同一笔分录的借方合计与贷方合计必须相等（借贷平衡）。",
-                "日期格式：YYYY-MM-DD。",
+                "列结构对齐 Excel：调整事项说明 / 类别 / 报表项目 / 科目 / 附注项目 / 借贷金额 / 索引 / 备注。",
+                "类别填：账项调整、报表调整、其他。报表调整不回写审定表。",
+                "同一调整事项的借方合计与贷方合计必须相等（借贷平衡）。",
+                "科目代码示例：150301 成本、150302 利息调整、150305 减值准备。",
             ],
         )
         return workbook_to_response(wb, "G6-4_调整分录_模板.xlsx")
@@ -569,7 +567,13 @@ def _parse_g6_4_import(content: bytes) -> tuple[list[dict], list[dict]]:
         if not row_cells:
             continue
         test_row = [str(c.value).strip() if c.value else "" for c in row_cells[0]]
-        if "序号" in test_row or "分录类型" in test_row or "摘要" in test_row:
+        if (
+            "调整事项说明" in test_row
+            or "类别" in "".join(test_row)
+            or "序号" in test_row
+            or "分录类型" in test_row
+            or "摘要" in test_row
+        ):
             header_row_idx = r
             break
 

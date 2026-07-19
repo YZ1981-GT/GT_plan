@@ -1,48 +1,40 @@
-<!--
-  G6TabImpairmentCalc.vue — G6-12 减值准备测算表（22列 → 2区段Tab）
-
-  2区段Tab切换（el-segmented）：
-  - Tab1: 未审+调整(12列): 投资项目|①摊余成本余额|公允价值|②预期信用损失率|③坏账准备(公式)|④账面价值(公式)|⑤余额调整|②A调整后损失率|⑥坏账调整(公式)|阶段|OCI影响|索引
-  - Tab2: 审定数(10列): 投资项目|⑦审定余额(公式)|⑧审定坏账(公式)|⑨审定账面价值(公式)|审定公允价值|上年坏账|本年计提(公式)|本年转回|OCI调整|差异说明
-
-  区段间行同步：所有区段共享同一行集合，切换Tab只改可见列
-  按Stage分组：Stage1/Stage2/Stage3 + 分组小计 + 总计行
-  公式列：虚线下划线 + cursor:help + el-tooltip显示公式来源
-
-  Spec: .kiro/specs/g6-other-bond-investment-ecl/ Task 6.2
-  Requirements: 3.1, 3.2, 3.3, 3.4, 6.3
--->
 <template>
-  <div class="g6-impairment-calc">
-    <!-- 方法论上下文（琥珀色） -->
-    <div class="methodology-context">
-      <span class="methodology-icon">📋</span>
-      <span>其他债权投资按<b>摊余成本口径</b>计算预期信用损失（ECL）。</span>
-      <span>公式链：③=①×② / ⑥=⑤×②A+①×(②A-②) / ⑦=①+⑤ / ⑧=③+⑥ / ⑨=⑦-⑧</span>
-    </div>
-
-    <!-- 审计目标 -->
+  <div class="g6-impairment-calc" data-testid="g6-impairment-calc">
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：验证其他债权投资减值准备（预期信用损失）计量的准确性与充分性，复核损失率、账面价值及审定坏账计算，确认本年计提/转回金额的合理性。"
+      show-icon
+      title="审计目标：确定其他债权投资减值准备计提是否充分、准确；按账面余额口径重算 ECL，核对审定减值、摊余成本及本年计提/转回。"
       class="objective-alert"
     />
 
-    <!-- 工具栏：索引 + 行数 -->
-    <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
-      <div class="toolbar-right">
-        <span class="chip-wrap"><GtIndexChip value="wp:G6-12" :context-project-id="projectId" /></span>
-        <el-tag size="small" type="info">共 {{ calc.rows.value.length }} 行</el-tag>
-      </div>
+    <div class="methodology-context">
+      <p class="methodology-title">编制逻辑（对齐 Excel G6-12）：</p>
+      <p>① 账面余额 → ③减值=①×②（Stage1/2）或 max(0,①−现值)（Stage3）→ ④摊余成本=①−③</p>
+      <p>⑥ 调整：损失率法 ⑤×②A+①×(②A−②)；Stage3 现值法倒挤目标审定减值−③</p>
+      <p>⑦=①+⑤；⑧=③+⑥；⑨=⑦−⑧（审定摊余成本）</p>
     </div>
 
-    <!-- 顶部工具栏 -->
-    <div class="section-head">
-      <h3 class="sheet-title">G6-12 减值准备测算表</h3>
-      <div class="head-actions">
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-12" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-3" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-11" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">共 {{ calc.rows.value.length }} 行</el-tag>
+      </div>
+      <div class="toolbar-right">
         <el-segmented v-model="activeTab" :options="segmentOptions" size="small" />
+        <el-select
+          v-if="!isReadonly"
+          v-model="newRowStage"
+          size="small"
+          style="width: 110px"
+          placeholder="Stage"
+        >
+          <el-option label="Stage1" value="Stage1" />
+          <el-option label="Stage2" value="Stage2" />
+          <el-option label="Stage3" value="Stage3" />
+        </el-select>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">
           + 投资项目
         </el-button>
@@ -54,19 +46,14 @@
         />
         <el-button
           size="small"
-          type="primary"
-          link
           :disabled="isReadonly || !aiAvailable"
           :loading="aiLoading"
           @click="handleAiConclusion"
-        >
-          🤖 AI
-        </el-button>
+        >🤖 AI</el-button>
         <el-button size="small" @click="openReviewDialog('G6-12-impairment-calc')">💬复核</el-button>
       </div>
     </div>
 
-    <!-- Stage分组表格 -->
     <el-table
       :data="displayRows"
       border
@@ -78,286 +65,363 @@
       class="impairment-table"
       @current-change="onCurrentChange"
     >
-      <!-- 序号列（始终显示） -->
       <el-table-column label="序号" width="55" align="center" fixed>
         <template #default="{ row }">
-          <template v-if="row._isSubtotal">
-            <span class="subtotal-label">{{ row._groupLabel }}小计</span>
-          </template>
-          <template v-else-if="row._isTotal">
-            <span class="total-label">合计</span>
-          </template>
-          <template v-else>{{ row.seq }}</template>
+          <span v-if="row._isSubtotal" class="subtotal-label">{{ row._groupLabel }}小计</span>
+          <span v-else-if="row._isTotal" class="total-label">合计</span>
+          <span v-else>{{ row.seq }}</span>
         </template>
       </el-table-column>
 
-      <!-- 投资项目列（始终显示作为锚定列） -->
-      <el-table-column label="投资项目" width="140" fixed>
+      <el-table-column label="投资项目" min-width="130" fixed>
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal" />
           <span v-else>{{ row.investProject }}</span>
         </template>
       </el-table-column>
 
-      <!-- ═══ Tab1: 未审+调整列 (12列) ═══ -->
+      <!-- ═══ Tab1: 未审 + 调整 ═══ -->
       <template v-if="activeTab === 'tab1'">
-        <el-table-column label="①摊余成本余额" min-width="130" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal">
-              <span class="subtotal-num">{{ fmtNum(row.amortizedCost) }}</span>
-            </template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.amortizedCost" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'amortizedCost', v)" />
+        <el-table-column label="未审数" align="center">
+          <el-table-column label="①账面余额" min-width="120" align="right">
+            <template #default="{ row }">
+              <span v-if="row._isSubtotal || row._isTotal" class="subtotal-num">{{ fmtNum(row.amortizedCost) }}</span>
+              <el-input-number
+                v-else-if="!isReadonly"
+                :model-value="row.amortizedCost"
+                size="small"
+                :controls="false"
+                class="compact-num"
+                @change="(v: number | undefined) => updateField(row.id, 'amortizedCost', v ?? 0)"
+              />
               <span v-else>{{ fmtNum(row.amortizedCost) }}</span>
             </template>
-          </template>
-        </el-table-column>
+          </el-table-column>
 
-        <el-table-column label="公允价值(参考)" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.fairValue" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'fairValue', v)" />
-              <span v-else>{{ fmtNum(row.fairValue) }}</span>
+          <el-table-column label="预计未来现金流量现值" min-width="140" align="right">
+            <template #default="{ row }">
+              <span v-if="row._isSubtotal || row._isTotal" class="subtotal-num">{{ fmtNum(row.pvFutureCashFlow) }}</span>
+              <el-input-number
+                v-else-if="!isReadonly"
+                :model-value="row.pvFutureCashFlow"
+                size="small"
+                :controls="false"
+                class="compact-num"
+                :class="{ 'stage3-hint': row.stage === 'Stage3' }"
+                @change="(v: number | undefined) => updateField(row.id, 'pvFutureCashFlow', v ?? 0)"
+              />
+              <span v-else>{{ fmtNum(row.pvFutureCashFlow) }}</span>
             </template>
-          </template>
-        </el-table-column>
+          </el-table-column>
 
-        <el-table-column label="②预期信用损失率" min-width="140" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.creditLossRate" size="small"
-                :controls="false" :precision="4" :step="0.01" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'creditLossRate', v)" />
-              <span v-else>{{ (row.creditLossRate * 100).toFixed(2) }}%</span>
+          <el-table-column label="②预期信用损失率" min-width="130" align="right">
+            <template #default="{ row }">
+              <template v-if="row._isSubtotal || row._isTotal">
+                <el-tooltip v-if="row._isTotal && calc.totalRecoveryRate.value != null" content="合计参考：Σ现值/Σ账面余额（Excel 合计D列）">
+                  <span class="formula-cell">{{ fmtPct(calc.totalRecoveryRate.value) }}</span>
+                </el-tooltip>
+              </template>
+              <template v-else-if="row.stage === 'Stage3' && row.pvFutureCashFlow > 0">
+                <el-tooltip content="Stage3 由现值反推：③/①">
+                  <span class="formula-cell">{{ fmtPct(row.creditLossRate) }}</span>
+                </el-tooltip>
+              </template>
+              <el-input-number
+                v-else-if="!isReadonly"
+                :model-value="row.creditLossRate"
+                size="small"
+                :controls="false"
+                :precision="4"
+                :step="0.01"
+                class="compact-num"
+                @change="(v: number | undefined) => updateField(row.id, 'creditLossRate', v ?? 0)"
+              />
+              <span v-else>{{ fmtPct(row.creditLossRate) }}</span>
             </template>
-          </template>
-        </el-table-column>
+          </el-table-column>
 
-        <el-table-column label="③坏账准备" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal">
-              <span class="subtotal-num">{{ fmtNum(row.impairmentProvision) }}</span>
-            </template>
-            <template v-else>
-              <el-tooltip content="③ = ① × ②" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.impairmentProvision) }}</span>
+          <el-table-column label="③减值准备" min-width="110" align="right">
+            <template #default="{ row }">
+              <el-tooltip
+                :content="row.stage === 'Stage3' && row.pvFutureCashFlow > 0 ? '③ = max(0, ① − 现值)' : '③ = ① × ②'"
+                placement="top"
+              >
+                <span class="formula-cell" :class="{ 'subtotal-num': row._isSubtotal || row._isTotal }">
+                  {{ fmtNum(row.impairmentProvision) }}
+                </span>
               </el-tooltip>
             </template>
-          </template>
-        </el-table-column>
+          </el-table-column>
 
-        <el-table-column label="④账面价值" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal">
-              <span class="subtotal-num">{{ fmtNum(row.bookValue) }}</span>
-            </template>
-            <template v-else>
-              <el-tooltip content="④ = ① - ③" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.bookValue) }}</span>
+          <el-table-column label="④摊余成本" min-width="110" align="right">
+            <template #default="{ row }">
+              <el-tooltip content="④ = ① − ③" placement="top">
+                <span class="formula-cell" :class="{ 'subtotal-num': row._isSubtotal || row._isTotal }">
+                  {{ fmtNum(row.bookValue) }}
+                </span>
               </el-tooltip>
             </template>
-          </template>
+          </el-table-column>
         </el-table-column>
 
-        <el-table-column label="⑤余额调整" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal">
-              <span class="subtotal-num">{{ fmtNum(row.balanceAdjustment) }}</span>
-            </template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.balanceAdjustment" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'balanceAdjustment', v)" />
+        <el-table-column label="审计调整" align="center">
+          <el-table-column label="⑤账面余额调整" min-width="120" align="right">
+            <template #default="{ row }">
+              <span v-if="row._isSubtotal || row._isTotal" class="subtotal-num">{{ fmtNum(row.balanceAdjustment) }}</span>
+              <el-input-number
+                v-else-if="!isReadonly"
+                :model-value="row.balanceAdjustment"
+                size="small"
+                :controls="false"
+                class="compact-num"
+                @change="(v: number | undefined) => updateField(row.id, 'balanceAdjustment', v ?? 0)"
+              />
               <span v-else>{{ fmtNum(row.balanceAdjustment) }}</span>
             </template>
-          </template>
-        </el-table-column>
+          </el-table-column>
 
-        <el-table-column label="②A调整后损失率" min-width="140" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.adjustedCreditLossRate" size="small"
-                :controls="false" :precision="4" :step="0.01" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'adjustedCreditLossRate', v)" />
-              <span v-else>{{ (row.adjustedCreditLossRate * 100).toFixed(2) }}%</span>
+          <el-table-column label="②A / 审定现值" min-width="130" align="right">
+            <template #default="{ row }">
+              <template v-if="row._isSubtotal || row._isTotal" />
+              <template v-else-if="row.stage === 'Stage3'">
+                <el-input-number
+                  v-if="!isReadonly"
+                  :model-value="calc.effectiveAdjPv(row)"
+                  size="small"
+                  :controls="false"
+                  class="compact-num"
+                  placeholder="审定现值"
+                  @change="(v: number | undefined) => updateField(row.id, 'adjustedPvFutureCashFlow', v ?? 0)"
+                />
+                <span v-else>{{ fmtNum(calc.effectiveAdjPv(row)) }}</span>
+              </template>
+              <template v-else>
+                <el-input-number
+                  v-if="!isReadonly"
+                  :model-value="calc.effectiveAdjRate(row)"
+                  size="small"
+                  :controls="false"
+                  :precision="4"
+                  :step="0.01"
+                  class="compact-num"
+                  @change="(v: number | undefined) => updateField(row.id, 'adjustedCreditLossRate', v ?? 0)"
+                />
+                <span v-else>{{ fmtPct(calc.effectiveAdjRate(row)) }}</span>
+              </template>
             </template>
-          </template>
-        </el-table-column>
+          </el-table-column>
 
-        <el-table-column label="⑥坏账调整" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal">
-              <span class="subtotal-num">{{ fmtNum(row.impairmentAdjustment) }}</span>
-            </template>
-            <template v-else>
-              <el-tooltip content="⑥ = ⑤×②A + ①×(②A-②)" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.impairmentAdjustment) }}</span>
+          <el-table-column label="⑥减值准备调整" min-width="120" align="right">
+            <template #default="{ row }">
+              <el-tooltip
+                :content="row.stage === 'Stage3' && row.pvFutureCashFlow > 0
+                  ? '⑥ = 目标审定减值 − ③'
+                  : '⑥ = ⑤×②A + ①×(②A−②)'"
+                placement="top"
+              >
+                <span class="formula-cell" :class="{ 'subtotal-num': row._isSubtotal || row._isTotal }">
+                  {{ fmtNum(row.impairmentAdjustment) }}
+                </span>
               </el-tooltip>
             </template>
+          </el-table-column>
+        </el-table-column>
+
+        <el-table-column label="阶段" width="100" align="center">
+          <template #default="{ row }">
+            <template v-if="row._isSubtotal || row._isTotal" />
+            <el-select
+              v-else-if="!isReadonly"
+              :model-value="row.stage"
+              size="small"
+              style="width: 100%"
+              @change="(v: string) => updateField(row.id, 'stage', v)"
+            >
+              <el-option label="Stage1" value="Stage1" />
+              <el-option label="Stage2" value="Stage2" />
+              <el-option label="Stage3" value="Stage3" />
+            </el-select>
+            <el-tag
+              v-else
+              size="small"
+              :type="row.stage === 'Stage3' ? 'danger' : row.stage === 'Stage2' ? 'warning' : 'success'"
+            >{{ row.stage }}</el-tag>
           </template>
         </el-table-column>
 
-        <el-table-column label="阶段" min-width="90" align="center">
+        <el-table-column label="信用组合方式" min-width="110">
           <template #default="{ row }">
             <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-select v-if="!isReadonly" :model-value="row.stage" size="small"
-                @change="(v: string) => updateField(row.id, 'stage', v)">
-                <el-option label="Stage1" value="Stage1" />
-                <el-option label="Stage2" value="Stage2" />
-                <el-option label="Stage3" value="Stage3" />
-              </el-select>
-              <span v-else>{{ row.stage }}</span>
-            </template>
+            <el-input
+              v-else-if="!isReadonly"
+              :model-value="row.creditGroupMethod"
+              size="small"
+              placeholder="单项/组合..."
+              @change="(v: string) => updateField(row.id, 'creditGroupMethod', v)"
+            />
+            <span v-else>{{ row.creditGroupMethod || '-' }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="信用组合名称" min-width="110">
+          <template #default="{ row }">
+            <template v-if="row._isSubtotal || row._isTotal" />
+            <el-input
+              v-else-if="!isReadonly"
+              :model-value="row.creditGroupName"
+              size="small"
+              placeholder="组合名..."
+              @change="(v: string) => updateField(row.id, 'creditGroupName', v)"
+            />
+            <span v-else>{{ row.creditGroupName || '-' }}</span>
           </template>
         </el-table-column>
 
         <el-table-column label="OCI影响" min-width="100" align="right">
           <template #default="{ row }">
             <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.ociImpact" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'ociImpact', v)" />
-              <span v-else>{{ fmtNum(row.ociImpact) }}</span>
-            </template>
+            <el-input-number
+              v-else-if="!isReadonly"
+              :model-value="row.ociImpact"
+              size="small"
+              :controls="false"
+              class="compact-num"
+              @change="(v: number | undefined) => updateField(row.id, 'ociImpact', v ?? 0)"
+            />
+            <span v-else>{{ fmtNum(row.ociImpact) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="索引" min-width="80" align="center">
+        <el-table-column label="索引" width="90" align="center">
           <template #default="{ row }">
             <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <GtIndexChip :value="row.indexRef" @update="(v: string) => updateField(row.id, 'indexRef', v)" />
-            </template>
+            <GtIndexChip
+              v-else
+              :value="row.indexRef"
+              @update="(v: string) => updateField(row.id, 'indexRef', v)"
+            />
           </template>
         </el-table-column>
       </template>
 
-      <!-- ═══ Tab2: 审定数列 (10列) ═══ -->
+      <!-- ═══ Tab2: 审定净值 ═══ -->
       <template v-if="activeTab === 'tab2'">
-        <el-table-column label="⑦审定余额" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal">
-              <span class="subtotal-num">{{ fmtNum(row.adjBalance) }}</span>
-            </template>
-            <template v-else>
+        <el-table-column label="审计后的债权净值" align="center">
+          <el-table-column label="⑦账面余额" min-width="120" align="right">
+            <template #default="{ row }">
               <el-tooltip content="⑦ = ① + ⑤" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.adjBalance) }}</span>
+                <span class="formula-cell" :class="{ 'subtotal-num': row._isSubtotal || row._isTotal }">
+                  {{ fmtNum(row.adjBalance) }}
+                </span>
               </el-tooltip>
             </template>
-          </template>
-        </el-table-column>
+          </el-table-column>
 
-        <el-table-column label="⑧审定坏账" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal">
-              <span class="subtotal-num">{{ fmtNum(row.adjImpairment) }}</span>
-            </template>
-            <template v-else>
+          <el-table-column label="⑧减值准备" min-width="110" align="right">
+            <template #default="{ row }">
               <el-tooltip content="⑧ = ③ + ⑥" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.adjImpairment) }}</span>
+                <span class="formula-cell" :class="{ 'subtotal-num': row._isSubtotal || row._isTotal }">
+                  {{ fmtNum(row.adjImpairment) }}
+                </span>
               </el-tooltip>
             </template>
-          </template>
-        </el-table-column>
+          </el-table-column>
 
-        <el-table-column label="⑨审定账面价值" min-width="130" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal">
-              <span class="subtotal-num">{{ fmtNum(row.adjBookValue) }}</span>
-            </template>
-            <template v-else>
-              <el-tooltip content="⑨ = ⑦ - ⑧" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.adjBookValue) }}</span>
+          <el-table-column label="⑨摊余成本" min-width="110" align="right">
+            <template #default="{ row }">
+              <el-tooltip content="⑨ = ⑦ − ⑧" placement="top">
+                <span class="formula-cell" :class="{ 'subtotal-num': row._isSubtotal || row._isTotal }">
+                  {{ fmtNum(row.adjBookValue) }}
+                </span>
               </el-tooltip>
             </template>
+          </el-table-column>
+        </el-table-column>
+
+        <el-table-column label="上年减值" min-width="110" align="right">
+          <template #default="{ row }">
+            <template v-if="row._isSubtotal || row._isTotal" />
+            <el-input-number
+              v-else-if="!isReadonly"
+              :model-value="row.priorImpairment"
+              size="small"
+              :controls="false"
+              class="compact-num"
+              @change="(v: number | undefined) => updateField(row.id, 'priorImpairment', v ?? 0)"
+            />
+            <span v-else>{{ fmtNum(row.priorImpairment) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="审定公允价值" min-width="120" align="right">
+        <el-table-column label="本年计提" min-width="100" align="right">
           <template #default="{ row }">
             <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.adjFairValue" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'adjFairValue', v)" />
-              <span v-else>{{ fmtNum(row.adjFairValue) }}</span>
-            </template>
+            <el-tooltip v-else content="max(0, ⑧ − 上年减值)" placement="top">
+              <span class="formula-cell">{{ fmtNum(row.currentProvision) }}</span>
+            </el-tooltip>
           </template>
         </el-table-column>
 
-        <el-table-column label="上年坏账" min-width="110" align="right">
+        <el-table-column label="本年转回" min-width="100" align="right">
           <template #default="{ row }">
             <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.priorImpairment" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'priorImpairment', v)" />
-              <span v-else>{{ fmtNum(row.priorImpairment) }}</span>
-            </template>
+            <el-tooltip v-else content="max(0, 上年减值 − ⑧)" placement="top">
+              <span class="formula-cell">{{ fmtNum(row.currentReversal) }}</span>
+            </el-tooltip>
           </template>
         </el-table-column>
 
-        <el-table-column label="本年计提" min-width="110" align="right">
+        <el-table-column label="公允价值(参考)" min-width="120" align="right">
           <template #default="{ row }">
             <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-tooltip content="本年计提 = max(0, ⑧ - 上年坏账)" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.currentProvision) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="本年转回" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.currentReversal" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'currentReversal', v)" />
-              <span v-else>{{ fmtNum(row.currentReversal) }}</span>
-            </template>
+            <el-input-number
+              v-else-if="!isReadonly"
+              :model-value="row.adjFairValue || row.fairValue"
+              size="small"
+              :controls="false"
+              class="compact-num"
+              @change="(v: number | undefined) => updateField(row.id, 'adjFairValue', v ?? 0)"
+            />
+            <span v-else>{{ fmtNum(row.adjFairValue || row.fairValue) }}</span>
           </template>
         </el-table-column>
 
         <el-table-column label="OCI调整" min-width="100" align="right">
           <template #default="{ row }">
             <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.ociAdjustment" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'ociAdjustment', v)" />
-              <span v-else>{{ fmtNum(row.ociAdjustment) }}</span>
-            </template>
+            <el-input-number
+              v-else-if="!isReadonly"
+              :model-value="row.ociAdjustment"
+              size="small"
+              :controls="false"
+              class="compact-num"
+              @change="(v: number | undefined) => updateField(row.id, 'ociAdjustment', v ?? 0)"
+            />
+            <span v-else>{{ fmtNum(row.ociAdjustment) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="差异说明" min-width="150">
+        <el-table-column label="差异说明" min-width="140">
           <template #default="{ row }">
             <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-input v-if="!isReadonly" :model-value="row.differenceNote" size="small"
-                @change="(v: string) => updateField(row.id, 'differenceNote', v)" />
-              <span v-else>{{ row.differenceNote }}</span>
-            </template>
+            <el-input
+              v-else-if="!isReadonly"
+              :model-value="row.differenceNote"
+              size="small"
+              @change="(v: string) => updateField(row.id, 'differenceNote', v)"
+            />
+            <span v-else>{{ row.differenceNote }}</span>
           </template>
         </el-table-column>
       </template>
 
-      <!-- 操作列（删除） -->
       <el-table-column v-if="!isReadonly" label="" width="50" align="center" fixed="right">
         <template #default="{ row }">
-          <el-popconfirm v-if="!row._isSubtotal && !row._isTotal" title="确认删除？"
-            @confirm="calc.removeRow(row.id)">
+          <el-popconfirm
+            v-if="!row._isSubtotal && !row._isTotal"
+            title="确认删除？"
+            @confirm="calc.removeRow(row.id)"
+          >
             <template #reference>
               <el-icon class="delete-icon"><Delete /></el-icon>
             </template>
@@ -366,7 +430,13 @@
       </el-table-column>
     </el-table>
 
-    <!-- 审计说明 -->
+    <div class="summary-bar">
+      <span class="sum-item">①账面余额 <strong>{{ fmtNum(calc.grandTotal.value.amortizedCost) }}</strong></span>
+      <span class="sum-item">③减值 <strong>{{ fmtNum(calc.grandTotal.value.impairmentProvision) }}</strong></span>
+      <span class="sum-item">⑧审定减值 <strong>{{ fmtNum(calc.grandTotal.value.adjImpairment) }}</strong></span>
+      <span class="sum-item">⑨审定摊余成本 <strong>{{ fmtNum(calc.grandTotal.value.adjBookValue) }}</strong></span>
+    </div>
+
     <el-card class="audit-note-card" shadow="never">
       <template #header>
         <div class="audit-note-header"><span>审计说明</span></div>
@@ -375,13 +445,12 @@
         type="textarea"
         :model-value="auditNote"
         :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：概述减值测算执行的审计程序、参数复核情况与结果、拟调整/未调整事项及其影响。"
-        @change="saveAuditNote"
+        :autosize="{ minRows: 4 }"
+        placeholder="概述减值测算程序、组合划分、Stage3 现值假设、拟调整/未调整事项及与 G6-3/G6-1 勾稽。"
+        @update:model-value="saveAuditNote"
       />
     </el-card>
 
-    <!-- 底部审计结论 -->
     <el-card class="conclusion-card" shadow="never">
       <div class="conclusion-header">
         <span class="conclusion-title">审计结论</span>
@@ -392,54 +461,40 @@
           :disabled="isReadonly || !aiAvailable"
           :loading="aiLoading"
           @click="handleAiConclusion"
-        >
-          🤖 AI生成
-        </el-button>
+        >🤖 AI生成</el-button>
       </div>
       <el-input
         v-model="conclusion"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请输入减值准备测算的审计结论..."
+        placeholder="A、计提充分准确。B、除下述事项外未见异常。C、存在重大差异须调整。"
         :disabled="isReadonly"
       />
     </el-card>
 
-    <!-- 编制提示 -->
     <details class="prep-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>③ 坏账准备 = ① 摊余成本余额 × ② 预期信用损失率</li>
-        <li>④ 账面价值 = ① - ③</li>
-        <li>⑥ 坏账调整 = ⑤×②A + ①×(②A-②)，可为负值（代表冲回）</li>
-        <li>⑦ 审定余额 = ① + ⑤</li>
-        <li>⑧ 审定坏账 = ③ + ⑥</li>
-        <li>⑨ 审定账面价值 = ⑦ - ⑧</li>
-        <li>本年计提 = max(0, ⑧ - 上年坏账)</li>
-        <li>本年转回 = max(0, 上年坏账 - ⑧)</li>
-        <li>按Stage分组：Stage1(12个月ECL) / Stage2(整个存续期ECL) / Stage3(存续期ECL+净额利息)</li>
-        <li>其他债权投资减值按摊余成本口径计算（非公允价值口径）</li>
+        <li>① 账面余额为计提基数；④/⑨ 摊余成本 = 账面余额 − 减值准备。</li>
+        <li>Stage1/2：③=①×②；⑥=⑤×②A+①×(②A−②)。</li>
+        <li>Stage3：填预计未来现金流量现值后，③=max(0,①−现值)；⑥按审定现值倒挤。</li>
+        <li>本年计提/转回由⑧与上年减值自动轧差，不可手改。</li>
+        <li>审定减值合计应与 G6-3 期末坏账、G6-1 减值层勾稽。</li>
       </ul>
-    </details>
-
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * G6TabImpairmentCalc.vue — G6-12 减值准备测算表（2区段Tab + Stage分组）
- *
- * - el-segmented 切换 Tab1(未审+调整 12列) / Tab2(审定数 10列)
- * - 行共享同一reactive数组，Tab切换只改可见列（不销毁表格实例）
- * - selectedRowIndex跨Tab保持（行同步）
- * - Stage1/Stage2/Stage3分组 + 小计行 + 总计行
- * - 公式列: 虚线下划线 + cursor:help + el-tooltip显示公式来源
- * - 导入导出 dropdown + AI按钮 + 复核按钮 + GtIndexChip
+ * G6TabImpairmentCalc.vue — 对齐 Excel《减值准备测算表G6-12》
  */
-import { ref, computed, inject, onMounted } from 'vue'
+import { ref, computed, inject, onMounted, watch } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
-import { useG6EclImpairmentCalc } from '../../composables/useG6EclImpairmentCalc'
+import {
+  useG6EclImpairmentCalc,
+  createEmptyImpairmentRow,
+} from '../../composables/useG6EclImpairmentCalc'
 import { useG6EclFormData, type ImpairmentCalcRow } from '../../composables/useG6EclFormData'
 import { useG6EclAiGenerate } from '../../composables/useG6EclAiGenerate'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -459,35 +514,31 @@ const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog',
 const calc = useG6EclImpairmentCalc()
 const conclusion = ref('')
 const activeTab = ref<'tab1' | 'tab2'>('tab1')
+const newRowStage = ref<'Stage1' | 'Stage2' | 'Stage3'>('Stage1')
 
 const wpIdRef = computed(() => props.wpId)
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG6EclAiGenerate(wpIdRef)
 
-// ─── 审计说明（持久化 checklist_responses, conclusion:null） ───
 const NOTE_KEY = 'G6-12-impairment-calc-audit-note'
+const DATA_KEY = 'G6-12-impairment-calc-data'
 const auditNote = ref('')
-const noteFormData = useG6EclFormData({
+const formData = useG6EclFormData({
   wpId: wpIdRef,
   projectId: computed(() => props.projectId),
 })
+
 function saveAuditNote(val: string): void {
   if (props.isReadonly) return
   auditNote.value = val
-  noteFormData.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+  formData.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
 }
-
-// ─── 区段Tab选项 ─────────────────────────────────────────────────────────────
 
 const segmentOptions = [
   { label: '未审+调整', value: 'tab1' },
-  { label: '审定数', value: 'tab2' },
+  { label: '审定净值', value: 'tab2' },
 ]
 
-// ─── 只读属性便利ref ─────────────────────────────────────────────────────────
-
 const isReadonly = computed(() => props.isReadonly)
-
-// ─── Stage分组显示行（插入小计和总计行） ─────────────────────────────────────
 
 interface DisplayRow extends ImpairmentCalcRow {
   _isSubtotal?: boolean
@@ -499,42 +550,23 @@ const displayRows = computed<DisplayRow[]>(() => {
   const grouped = calc.groupedRows.value
   const result: DisplayRow[] = []
 
-  // Stage1
-  if (grouped.stage1.rows.length > 0) {
-    for (const r of grouped.stage1.rows) result.push(r as DisplayRow)
+  function pushGroup(label: string, group: { rows: ImpairmentCalcRow[]; subtotal: Record<string, number> }) {
+    if (!group.rows.length) return
+    for (const r of group.rows) result.push(r as DisplayRow)
     result.push({
-      ...createEmptyRow(),
+      ...createEmptyImpairmentRow({ id: `__sub-${label}`, seq: 0, investProject: '' }),
       _isSubtotal: true,
-      _groupLabel: 'Stage1',
-      ...grouped.stage1.subtotal,
+      _groupLabel: label,
+      ...group.subtotal,
     } as DisplayRow)
   }
 
-  // Stage2
-  if (grouped.stage2.rows.length > 0) {
-    for (const r of grouped.stage2.rows) result.push(r as DisplayRow)
-    result.push({
-      ...createEmptyRow(),
-      _isSubtotal: true,
-      _groupLabel: 'Stage2',
-      ...grouped.stage2.subtotal,
-    } as DisplayRow)
-  }
+  pushGroup('Stage1', grouped.stage1)
+  pushGroup('Stage2', grouped.stage2)
+  pushGroup('Stage3', grouped.stage3)
 
-  // Stage3
-  if (grouped.stage3.rows.length > 0) {
-    for (const r of grouped.stage3.rows) result.push(r as DisplayRow)
-    result.push({
-      ...createEmptyRow(),
-      _isSubtotal: true,
-      _groupLabel: 'Stage3',
-      ...grouped.stage3.subtotal,
-    } as DisplayRow)
-  }
-
-  // 总计行
   result.push({
-    ...createEmptyRow(),
+    ...createEmptyImpairmentRow({ id: '__total__', seq: 0, investProject: '' }),
     _isTotal: true,
     ...grouped.grandTotal,
   } as DisplayRow)
@@ -542,44 +574,11 @@ const displayRows = computed<DisplayRow[]>(() => {
   return result
 })
 
-function createEmptyRow(): ImpairmentCalcRow {
-  return {
-    id: crypto.randomUUID(),
-    seq: 0,
-    investProject: '',
-    stageGroup: 'Stage1',
-    amortizedCost: 0,
-    fairValue: 0,
-    creditLossRate: 0,
-    impairmentProvision: 0,
-    bookValue: 0,
-    balanceAdjustment: 0,
-    adjustedCreditLossRate: 0,
-    impairmentAdjustment: 0,
-    stage: 'Stage1',
-    ociImpact: 0,
-    indexRef: '',
-    adjBalance: 0,
-    adjImpairment: 0,
-    adjBookValue: 0,
-    adjFairValue: 0,
-    priorImpairment: 0,
-    currentProvision: 0,
-    currentReversal: 0,
-    ociAdjustment: 0,
-    differenceNote: '',
-  }
-}
-
-// ─── 行同步（selectedRowIndex 跨Tab保持） ───────────────────────────────────
-
 function onCurrentChange(row: DisplayRow | null) {
   if (!row || row._isSubtotal || row._isTotal) return
   const idx = calc.rows.value.findIndex(r => r.id === row.id)
   if (idx >= 0) calc.selectedRowIndex.value = idx
 }
-
-// ─── 行样式 ─────────────────────────────────────────────────────────────────
 
 function rowClassName({ row }: { row: DisplayRow }): string {
   if (row._isSubtotal) return 'row-subtotal'
@@ -587,58 +586,95 @@ function rowClassName({ row }: { row: DisplayRow }): string {
   return ''
 }
 
-// ─── 字段更新（触发公式重算） ───────────────────────────────────────────────
-
 function updateField(id: string, field: keyof ImpairmentCalcRow, value: any) {
-  const row = calc.rows.value.find(r => r.id === id)
-  if (!row) return
-  ;(row as any)[field] = value ?? 0
-  calc.recalcRow(row)
+  calc.updateRow(id, field, value ?? (typeof value === 'string' ? '' : 0))
+  persistData()
 }
-
-// ─── 动态行增删（ElMessageBox.prompt） ──────────────────────────────────────
 
 async function handleAddRow() {
-  await calc.addRow('Stage1')
+  await calc.addRow(newRowStage.value)
+  persistData()
 }
-
-// ─── AI生成审计结论 ─────────────────────────────────────────────────────────
 
 async function handleAiConclusion(): Promise<void> {
   if (props.isReadonly) return
   const text = await generateAndConfirm(
     'impairment-conclusion',
     conclusion.value || '',
-    { rowCount: calc.rows.value.length },
+    {
+      rowCount: calc.rows.value.length,
+      totals: calc.grandTotal.value,
+      stageCounts: {
+        s1: calc.groupedRows.value.stage1.rows.length,
+        s2: calc.groupedRows.value.stage2.rows.length,
+        s3: calc.groupedRows.value.stage3.rows.length,
+      },
+    },
     'AI 审计结论',
   )
-  if (text) conclusion.value = text
+  if (text) {
+    conclusion.value = text
+    persistData()
+  }
 }
-
-// ─── 数字格式化 ─────────────────────────────────────────────────────────────
 
 function fmtNum(v: unknown): string {
-  if (v === 0) return '0.00'
-  if (typeof v === 'number') {
-    return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
-  return String(v ?? '')
+  if (v === undefined || v === null || v === '') return '-'
+  const n = Number(v)
+  if (!Number.isFinite(n)) return '-'
+  if (Math.abs(n) < 0.0000001) return '-'
+  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-// ─── 数据加载（从htmlData初始化） ───────────────────────────────────────────
+function fmtPct(v: number | null | undefined): string {
+  if (v === null || v === undefined) return '-'
+  return `${(Number(v) * 100).toFixed(2)}%`
+}
+
+function persistData(): void {
+  if (props.isReadonly) return
+  formData.debouncedSave(DATA_KEY, {
+    conclusion: JSON.stringify({
+      rows: calc.toJSON(),
+      conclusion: conclusion.value,
+    }),
+  })
+}
+
+watch(conclusion, () => persistData())
+
+function initFromData(): void {
+  const fromHtml = props.htmlData?.impairmentCalc
+  if (fromHtml?.rows) {
+    calc.loadRows(fromHtml.rows)
+    if (fromHtml.conclusion) conclusion.value = fromHtml.conclusion
+    return
+  }
+  const content = formData.parseContent?.()
+  if (content?.impairmentCalc?.rows) {
+    calc.loadRows(content.impairmentCalc.rows)
+    if (content.impairmentCalc.conclusion) conclusion.value = content.impairmentCalc.conclusion
+  }
+}
 
 onMounted(async () => {
-  if (props.htmlData?.impairmentCalc) {
-    const data = props.htmlData.impairmentCalc
-    if (data.rows) calc.loadRows(data.rows)
-    if (data.conclusion) conclusion.value = data.conclusion
+  await formData.loadAll()
+  initFromData()
+  const saved = formData.allResponses.value.get(DATA_KEY)
+  if (saved?.conclusion) {
+    try {
+      const parsed = JSON.parse(saved.conclusion)
+      if (parsed.rows?.length) calc.loadRows(parsed.rows)
+      if (parsed.conclusion) conclusion.value = parsed.conclusion
+    } catch { /* ignore */ }
   }
-  await noteFormData.loadAll()
-  const n = noteFormData.allResponses.value.get(NOTE_KEY)
+  const n = formData.allResponses.value.get(NOTE_KEY)
   if (n?.remark) auditNote.value = n.remark
 })
 
-// ─── 暴露序列化接口供父组件保存使用 ─────────────────────────────────────────
+watch(() => props.htmlData, (d) => {
+  if (d?.impairmentCalc) initFromData()
+})
 
 defineExpose({
   toJSON: () => ({
@@ -649,167 +685,47 @@ defineExpose({
 </script>
 
 <style scoped>
-.g6-impairment-calc {
-  padding: 12px;
-  font-size: var(--wp-font-size, 13px);
-}
-
-/* 方法论上下文（琥珀色左边线+浅黄背景） */
+.g6-impairment-calc { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
 .methodology-context {
-  border-left: 4px solid #e6a23c;
-  background: #fdf6ec;
-  padding: 10px 14px;
-  margin-bottom: 14px;
-  font-size: var(--wp-font-size, 13px);
-  color: #6b5900;
-  line-height: 1.6;
-  border-radius: 0 4px 4px 0;
+  border-left: 4px solid #e6a23c; background: #fdf6ec;
+  padding: 10px 14px; margin-bottom: 12px; border-radius: 0 4px 4px 0;
+  font-size: 12px; line-height: 1.7; color: #6b5900;
 }
-.methodology-icon {
-  margin-right: 6px;
-}
-
-.objective-alert {
-  margin-bottom: 12px;
-}
+.methodology-title { font-weight: 600; margin: 0 0 4px; }
+.methodology-context p { margin: 2px 0; }
 .tab-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; margin-bottom: 10px; flex-wrap: wrap;
 }
-.toolbar-left { display: flex; gap: 8px; align-items: center; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; }
-.chip-wrap { display: inline-flex; align-items: center; }
-.audit-note-card {
-  margin-top: 16px;
+.toolbar-left, .toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; }
+.impairment-table { font-size: var(--wp-font-size, 13px); }
+.compact-num { width: 100%; }
+.compact-num :deep(.el-input__inner) { text-align: right; }
+.formula-cell { border-bottom: 1px dashed #909399; cursor: help; display: inline-block; min-width: 40px; text-align: right; }
+:deep(.row-subtotal) { background-color: #f5f7fa !important; font-weight: 600; }
+:deep(.row-total) { background-color: #ecf5ff !important; font-weight: 700; }
+.subtotal-label { color: #606266; font-weight: 600; font-size: 12px; }
+.total-label { color: #409eff; font-weight: 700; }
+.subtotal-num { font-weight: 600; }
+:deep(.stage3-hint .el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }
+.delete-icon { cursor: pointer; color: #909399; }
+.delete-icon:hover { color: #f56c6c; }
+.summary-bar {
+  display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+  margin: 12px 0; padding: 8px 12px;
+  background: #fafafa; border: 1px solid #ebeef5; border-radius: 4px;
+  font-size: 13px; color: #606266;
 }
-.audit-note-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
+.sum-item strong { color: #303133; }
+.audit-note-card, .conclusion-card { margin-top: 14px; }
+.audit-note-header, .conclusion-header {
+  display: flex; justify-content: space-between; align-items: center; font-weight: 600;
 }
-
-.section-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.sheet-title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.head-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-/* 表格 */
-.impairment-table {
-  font-size: var(--wp-font-size, 13px);
-}
-
-.compact-num {
-  width: 100%;
-}
-
-.compact-num :deep(.el-input__inner) {
-  text-align: right;
-}
-
-/* 公式列：虚线下划线 + cursor:help */
-.formula-cell {
-  border-bottom: 1px dashed #909399;
-  cursor: help;
-  display: inline-block;
-  min-width: 50px;
-  text-align: right;
-}
-
-/* 小计行 */
-:deep(.row-subtotal) {
-  background-color: #f5f7fa !important;
-  font-weight: 600;
-}
-:deep(.row-subtotal td) {
-  background-color: #f5f7fa !important;
-}
-
-.subtotal-label {
-  color: #606266;
-  font-weight: 600;
-  font-size: 12px;
-}
-
-.subtotal-num {
-  font-weight: 600;
-  color: #303133;
-}
-
-/* 总计行 */
-:deep(.row-total) {
-  background-color: #ecf5ff !important;
-  font-weight: 700;
-}
-:deep(.row-total td) {
-  background-color: #ecf5ff !important;
-}
-
-.total-label {
-  color: #409eff;
-  font-weight: 700;
-}
-
-/* 删除图标 */
-.delete-icon {
-  cursor: pointer;
-  color: #909399;
-  transition: color 0.2s;
-}
-.delete-icon:hover {
-  color: #f56c6c;
-}
-
-/* 审计结论卡片 */
-.conclusion-card {
-  margin-top: 16px;
-}
-
-.conclusion-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.conclusion-title {
-  font-weight: 600;
-  font-size: 14px;
-}
-
-/* 编制提示 */
-.prep-hint {
-  margin-top: 12px;
-  font-size: 12px;
-  color: #909399;
-}
-.prep-hint summary {
-  cursor: pointer;
-  font-weight: 500;
-}
-.prep-hint ul {
-  margin: 8px 0 0;
-  padding-left: 18px;
-}
-.prep-hint li {
-  margin-bottom: 4px;
-}
+.conclusion-title { font-weight: 600; font-size: 14px; margin-bottom: 8px; }
+.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
+.prep-hint summary { cursor: pointer; font-weight: 500; }
+.prep-hint ul { margin: 8px 0 0; padding-left: 18px; }
+.prep-hint li { margin-bottom: 4px; }
 </style>

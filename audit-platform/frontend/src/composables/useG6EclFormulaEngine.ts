@@ -5,11 +5,9 @@
  * 所有数值结果保留2位小数（Math.round(x * 100) / 100）。
  *
  * 核心公式链（G6-12减值准备测算）：
- * - ③ 坏账准备 = ① 摊余成本余额 × ② 预期信用损失率
- * - ⑥ 坏账调整 = ⑤×②A + ①×(②A-②)（可负）
- * - ⑦ 审定余额 = ① + ⑤
- * - ⑧ 审定坏账 = ③ + ⑥
- * - ⑨ 审定账面价值 = ⑦ - ⑧
+ * - Stage1/2：③ = ①账面余额 × ②损失率；⑥ = ⑤×②A + ①×(②A−②)
+ * - Stage3：③ = max(0, ① − 现值)；⑥ = 目标审定减值 − ③
+ * - ⑦ = ① + ⑤；⑧ = ③ + ⑥；⑨ = ⑦ − ⑧（审定摊余成本）
  *
  * 辅助判定：
  * - 三阶段划分（hasCreditImpairment优先级最高）
@@ -26,10 +24,40 @@ export function parseNum(v: unknown): number {
   return Number.isFinite(n) ? n : 0
 }
 
-// ═══ P1: 坏账准备 ③ = ① 摊余成本余额 × ② 预期信用损失率 ═══
+function round2(n: number): number {
+  return Math.round(n * 100) / 100
+}
 
-export function calcImpairmentProvision(amortizedCost: number, creditLossRate: number): number {
-  return Math.round(parseNum(amortizedCost) * parseNum(creditLossRate) * 100) / 100
+// ═══ P1: 减值准备 ③ = ① 账面余额 × ② 预期信用损失率（Stage1/2）═══
+
+export function calcImpairmentProvision(bookBalance: number, creditLossRate: number): number {
+  return round2(parseNum(bookBalance) * parseNum(creditLossRate))
+}
+
+/**
+ * Stage3 现值法：减值准备 = max(0, 账面余额 − 预计未来现金流量现值)
+ */
+export function calcImpairmentFromPv(bookBalance: number, pvFutureCashFlow: number): number {
+  return round2(Math.max(0, parseNum(bookBalance) - parseNum(pvFutureCashFlow)))
+}
+
+/**
+ * 由现值反推隐含损失率 = ③ / ①（①=0 时返回 0）
+ */
+export function calcImpliedLossRate(bookBalance: number, impairment: number): number {
+  const bal = parseNum(bookBalance)
+  if (bal === 0) return 0
+  return Math.round((parseNum(impairment) / bal) * 1e6) / 1e6
+}
+
+/**
+ * ⑥ 恒等倒挤 = 目标审定减值 − ③（Stage3 现值法）
+ */
+export function calcImpairmentAdjustmentIdentity(
+  targetAuditedImpairment: number,
+  unadjImpairment: number,
+): number {
+  return round2(parseNum(targetAuditedImpairment) - parseNum(unadjImpairment))
 }
 
 // ═══ P2: 坏账调整 ⑥ = ⑤×②A + ①×(②A-②)（可负）═══
@@ -41,25 +69,25 @@ export function calcImpairmentAdjustment(
   const ar = parseNum(adjRate)
   const ob = parseNum(origBalance)
   const or_ = parseNum(origRate)
-  return Math.round((ba * ar + ob * (ar - or_)) * 100) / 100
+  return round2(ba * ar + ob * (ar - or_))
 }
 
-// ═══ P3: 审定余额 ⑦ = ① + ⑤ ═══
+// ═══ P3: 审定账面余额 ⑦ = ① + ⑤ ═══
 
 export function calcAdjustedBalance(origBalance: number, balanceAdj: number): number {
-  return Math.round((parseNum(origBalance) + parseNum(balanceAdj)) * 100) / 100
+  return round2(parseNum(origBalance) + parseNum(balanceAdj))
 }
 
-// ═══ P4: 审定坏账 ⑧ = ③ + ⑥ ═══
+// ═══ P4: 审定减值准备 ⑧ = ③ + ⑥ ═══
 
 export function calcAdjustedImpairment(origImpairment: number, impairmentAdj: number): number {
-  return Math.round((parseNum(origImpairment) + parseNum(impairmentAdj)) * 100) / 100
+  return round2(parseNum(origImpairment) + parseNum(impairmentAdj))
 }
 
-// ═══ P5: 审定账面价值 ⑨ = ⑦ - ⑧ ═══
+// ═══ P5: 审定摊余成本 ⑨ = ⑦ - ⑧ ═══
 
 export function calcAdjustedBookValue(adjBalance: number, adjImpairment: number): number {
-  return Math.round((parseNum(adjBalance) - parseNum(adjImpairment)) * 100) / 100
+  return round2(parseNum(adjBalance) - parseNum(adjImpairment))
 }
 
 // ═══ P6: 三阶段划分（hasCreditImpairment优先级最高）═══
@@ -78,4 +106,45 @@ export function isDebitCreditBalanced(debits: number[], credits: number[]): bool
   const sumD = debits.reduce((s, v) => s + parseNum(v), 0)
   const sumC = credits.reduce((s, v) => s + parseNum(v), 0)
   return Math.abs(sumD - sumC) < 0.01
+}
+
+// ═══ G6-13: 期限折算 PD / ECL 率 / 与上期差异 ═══
+
+/** 一年期边际 PD → 剩余月数期限折算 PD */
+export function calcTermAdjustedPd(annualPd: number, remainingMonths: number): number {
+  const pd = Math.min(1, Math.max(0, parseNum(annualPd)))
+  const months = parseNum(remainingMonths)
+  if (months <= 0 || pd <= 0) return 0
+  if (pd >= 1) return 1
+  const result = 1 - Math.pow(1 - pd, months / 12)
+  return Math.round(result * 1e6) / 1e6
+}
+
+/** PD/LGD 法：ECL率 = PD × LGD（夹到 [0,1]） */
+export function calcEclRateFromPdLgd(pd: number, lgd: number): number {
+  const rate = parseNum(pd) * parseNum(lgd)
+  return Math.round(Math.min(1, Math.max(0, rate)) * 1e6) / 1e6
+}
+
+/** 损失率法：ECL率 = 基础损失率 + 前瞻性调整（夹到 [0,1]） */
+export function calcEclRateFromLossRate(baseLossRate: number, forwardLookingAdj: number): number {
+  const rate = parseNum(baseLossRate) + parseNum(forwardLookingAdj)
+  return Math.round(Math.min(1, Math.max(0, rate)) * 1e6) / 1e6
+}
+
+/** 与上期历史损失率绝对差异 */
+export function calcLossRateVariance(eclRate: number, priorHistoricalLossRate: number): number {
+  return Math.round(Math.abs(parseNum(eclRate) - parseNum(priorHistoricalLossRate)) * 1e6) / 1e6
+}
+
+// ═══ G6-14: 转回校验 / 列合计 ═══
+
+/** 转回金额 ≤ 累计已计提减值准备（允许相等） */
+export function isReversalValid(reversalAmount: number, accumulatedProvision: number): boolean {
+  return parseNum(reversalAmount) <= parseNum(accumulatedProvision) + 0.005
+}
+
+export function calcSumColumn(values: number[]): number {
+  const total = values.reduce((s, v) => s + parseNum(v), 0)
+  return Math.round(total * 100) / 100
 }

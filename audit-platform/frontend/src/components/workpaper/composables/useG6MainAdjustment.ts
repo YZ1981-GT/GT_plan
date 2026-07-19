@@ -154,19 +154,14 @@ export function parseG6AdjustmentEntries(
   }
 }
 
-export function isG6CostAccount(code: string): boolean {
-  const c = String(code || '')
-  return c === '1503' || c === '150301' || c === '150303' || (c.startsWith('1503') && !isG6InterestAccount(c) && !isG6FvAccount(c) && !isG6ImpairmentAccount(c))
-}
-
 export function isG6InterestAccount(code: string): boolean {
   const c = String(code || '')
-  return c === '150302' || c.includes('150302')
+  return c === '150302' || c.startsWith('150302')
 }
 
 export function isG6FvAccount(code: string): boolean {
   const c = String(code || '')
-  return c === '150304' || c.includes('150304')
+  return c === '150304' || c.startsWith('150304')
 }
 
 export function isG6ImpairmentAccount(code: string, name = ''): boolean {
@@ -178,6 +173,13 @@ export function isG6ImpairmentAccount(code: string, name = ''): boolean {
     || /减值准备/.test(n)
     || (c.startsWith('1503') && /减值/.test(n))
   )
+}
+
+export function isG6CostAccount(code: string, name = ''): boolean {
+  const c = String(code || '')
+  if (!c.startsWith('1503')) return false
+  if (isG6InterestAccount(c) || isG6FvAccount(c) || isG6ImpairmentAccount(c, name)) return false
+  return true
 }
 
 function isReportReclass(entry: G6AdjustmentEntry): boolean {
@@ -205,7 +207,7 @@ export function aggregateG6WritebackNets(entries: G6AdjustmentEntry[]): {
       interestNet += debitMinusCredit
     } else if (isG6FvAccount(entry.accountCode)) {
       fvNet += debitMinusCredit
-    } else if (isG6CostAccount(entry.accountCode) || entry.accountCode.startsWith('1503')) {
+    } else if (isG6CostAccount(entry.accountCode, entry.accountName)) {
       costNet += debitMinusCredit
     }
   }

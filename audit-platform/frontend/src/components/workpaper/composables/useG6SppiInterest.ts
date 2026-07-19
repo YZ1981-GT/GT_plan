@@ -4,12 +4,10 @@
  * Spec: .kiro/specs/g6-other-bond-investment-sppi/ Task 5.1
  * Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 7.1
  *
- * 职责：
- * - 投资项目分组结构（每项目多期）
- * - calcEffectiveInterest / calcCashInflow / calcEndingAmortized per period
- * - 链式计算（上期末 = 下期初）
- * - 合计汇总 + 交叉验证（利息合计 vs G6-1审定数）
- * - 动态行管理（新增项目ElMessageBox.prompt / 新增期间 / 删除）
+ * 三层勾稽：
+ * 1) 损益：Σ实际利息收入 ↔ 账面利息收入（手工/总账）
+ * 2) 利息调整摊销：Σ(实际利息−票息) ↔ G6-1 利息调整本期变动
+ * 3) 项目级期末摊余成本由页面展示，供与 G6-2 核对
  */
 import { ref, computed, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
@@ -17,6 +15,7 @@ import {
   calcEffectiveInterest,
   calcCashInflow,
   calcEndingAmortized,
+  calcInterestDays,
   parseNum,
 } from '@/composables/useG6SppiFormulaEngine'
 
@@ -25,18 +24,23 @@ import {
 /** 单期利息计算 */
 export interface InterestPeriod {
   id: string
+  periodStart: string        // 起息日（可自上一截止日继承）
   periodEnd: string          // 截止日（如 "2024-06-30"）
   openingAmortized: number   // 期初摊余成本
   effectiveInterest: number  // 实际利息收入（公式）
   cashInflow: number         // 现金流入（公式）
+  principalRecovered: number // 已收回本金
   endingAmortized: number    // 期末摊余成本（公式）
   days: number               // 计息天数
+  daysManualOverride: boolean // true=手工天数，不按日期覆盖
   remark: string             // 备注
+  indexRef: string           // 期间级证据/索引
 }
 
 /** 投资项目分组 */
 export interface InterestGroup {
   id: string
+  crossSheetInvestmentId: string // 跨表稳定 ID（优先 G6-2）
   investProject: string      // 投资项目名称
   faceValue: number          // 面值
   couponRate: number         // 票面利率（如 0.04 = 4%）
@@ -49,9 +53,53 @@ export interface InterestCalculationData {
   groups: InterestGroup[]
   conclusion: string
   crossValidation: {
-    totalInterest: number       // 利息合计（本表计算）
-    auditedInterest: number     // G6-1审定数（外部输入）
-    difference: number          // 差异
+    totalInterest: number
+    totalCashInflow: number
+    totalAmortization: number
+    /** 账面利息收入（损益口径，可手工） */
+    bookInterestIncome: number
+    /** 是否已明确填写账面利息（含合法 0） */
+    bookInterestIncomeSet?: boolean
+    /** G6-1 利息调整本期变动（摊销口径） */
+    interestAdjPeriodChange: number
+    incomeDiff: number
+    amortizationDiff: number
+    /** @deprecated 兼容旧字段：曾误用为利息调整对比数 */
+    auditedInterest?: number
+    difference?: number
+  }
+}
+
+export interface G6InterestRateWarning {
+  groupId: string
+  investProject: string
+  message: string
+}
+
+export interface G6InterestDayWarning {
+  groupId: string
+  periodId: string
+  investProject: string
+  message: string
+}
+
+const VARIANCE_THRESHOLD = 0.01
+const RATE_DIFF_THRESHOLD = 0.02 // 200bp
+
+function emptyPeriod(partial: Partial<InterestPeriod> = {}): InterestPeriod {
+  return {
+    id: partial.id || `ip-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    periodStart: partial.periodStart || '',
+    periodEnd: partial.periodEnd || '',
+    openingAmortized: parseNum(partial.openingAmortized),
+    effectiveInterest: 0,
+    cashInflow: 0,
+    principalRecovered: parseNum(partial.principalRecovered),
+    endingAmortized: 0,
+    days: parseNum(partial.days) || 180,
+    daysManualOverride: Boolean(partial.daysManualOverride),
+    remark: partial.remark || '',
+    indexRef: partial.indexRef || '',
   }
 }
 
@@ -60,7 +108,13 @@ export interface InterestCalculationData {
 export function useG6SppiInterest() {
   const groups = ref<InterestGroup[]>([])
   const conclusion = ref('')
-  const auditedInterest = ref(0) // G6-1利息审定数（外部数据）
+  /** 账面利息收入基准（损益口径，手工/总账） */
+  const bookInterestIncome = ref(0)
+  /** G6-1 利息调整本期变动基准（摊销口径） */
+  const interestAdjPeriodChange = ref(0)
+
+  /** @deprecated 兼容旧名：实际指向利息调整本期变动 */
+  const auditedInterest = interestAdjPeriodChange
 
   // ─── 公式计算 ──────────────────────────────────────────────────────────────
 
@@ -87,7 +141,6 @@ export function useG6SppiInterest() {
   function recalcGroup(group: InterestGroup): void {
     for (let i = 0; i < group.periods.length; i++) {
       const period = group.periods[i]
-      // 第一期之后，上期末摊余 = 本期初摊余
       if (i > 0) {
         period.openingAmortized = group.periods[i - 1].endingAmortized
       }
@@ -95,21 +148,18 @@ export function useG6SppiInterest() {
     }
   }
 
-  /** 重算所有组 */
   function recalcAll(): void {
     for (const group of groups.value) {
       recalcGroup(group)
     }
   }
 
-  // watch groups 变化时自动重算
   watch(groups, () => {
     recalcAll()
   }, { deep: true })
 
-  // ─── 合计计算 ──────────────────────────────────────────────────────────────
+  // ─── 合计与三层勾稽 ────────────────────────────────────────────────────────
 
-  /** 全部利息合计 */
   const totalInterest = computed(() => {
     let sum = 0
     for (const group of groups.value) {
@@ -120,15 +170,52 @@ export function useG6SppiInterest() {
     return Math.round(sum * 100) / 100
   })
 
-  /** 交叉验证差异 */
-  const crossValidationDiff = computed(() => {
-    return Math.round((totalInterest.value - parseNum(auditedInterest.value)) * 100) / 100
+  const totalCashInflow = computed(() => {
+    let sum = 0
+    for (const group of groups.value) {
+      for (const period of group.periods) {
+        sum += parseNum(period.cashInflow)
+      }
+    }
+    return Math.round(sum * 100) / 100
   })
 
-  /** 交叉验证是否通过（差异=0） */
-  const crossValidationPassed = computed(() => {
-    return Math.abs(crossValidationDiff.value) < 0.01
-  })
+  /** 利息调整摊销额 = 实际利息 − 票息 */
+  const totalAmortization = computed(() =>
+    Math.round((totalInterest.value - totalCashInflow.value) * 100) / 100,
+  )
+
+  const incomeDiff = computed(() =>
+    Math.round((totalInterest.value - parseNum(bookInterestIncome.value)) * 100) / 100,
+  )
+
+  const amortizationDiff = computed(() =>
+    Math.round((totalAmortization.value - parseNum(interestAdjPeriodChange.value)) * 100) / 100,
+  )
+
+  /** 兼容旧：默认展示摊销层差异（若仅填了旧 auditedInterest） */
+  const crossValidationDiff = computed(() => amortizationDiff.value)
+
+  /** 账面利息未填时不强制失败损益层（避免旧数据误报） */
+  const incomeLayerActive = computed(() => Math.abs(parseNum(bookInterestIncome.value)) >= VARIANCE_THRESHOLD)
+  const incomePassed = computed(() =>
+    !incomeLayerActive.value || Math.abs(incomeDiff.value) < VARIANCE_THRESHOLD,
+  )
+  const amortizationPassed = computed(() => Math.abs(amortizationDiff.value) < VARIANCE_THRESHOLD)
+  /** 主勾稽：摊销层；损益层仅在已填账面利息时一并要求 */
+  const crossValidationPassed = computed(() => amortizationPassed.value && incomePassed.value)
+
+  function applyCrossValidation(cv: InterestCalculationData['crossValidation'] | undefined): void {
+    if (!cv) {
+      bookInterestIncome.value = 0
+      interestAdjPeriodChange.value = 0
+      return
+    }
+    bookInterestIncome.value = parseNum(cv.bookInterestIncome)
+    interestAdjPeriodChange.value = parseNum(
+      cv.interestAdjPeriodChange ?? cv.auditedInterest,
+    )
+  }
 
   // ─── 分组管理 ──────────────────────────────────────────────────────────────
 
@@ -294,6 +381,7 @@ export function useG6SppiInterest() {
       periods.forEach((p, idx) => {
         flat.push({
           id: idx === 0 ? g.id : `${g.id}-${p.id || idx}`,
+          periodId: p.id || '',
           investProject: g.investProject,
           faceValue: g.faceValue,
           couponRate: g.couponRate,
@@ -313,8 +401,24 @@ export function useG6SppiInterest() {
   }
 
   function loadData(data: InterestCalculationData | any[] | null): void {
-    // 兼容 IE 扁平行数组
+    // 兼容 IE 扁平行数组；若已是分组结构则直接装载
     if (Array.isArray(data)) {
+      if (data.length && Array.isArray(data[0]?.periods)) {
+        loadData({
+          groups: data as InterestGroup[],
+          conclusion: '',
+          crossValidation: {
+            totalInterest: 0,
+            totalCashInflow: 0,
+            totalAmortization: 0,
+            bookInterestIncome: 0,
+            interestAdjPeriodChange: 0,
+            incomeDiff: 0,
+            amortizationDiff: 0,
+          },
+        })
+        return
+      }
       groups.value = nestFlatRows(data)
       conclusion.value = ''
       recalcAll()
@@ -324,7 +428,7 @@ export function useG6SppiInterest() {
     if (!data?.groups?.length) {
       groups.value = []
       conclusion.value = data?.conclusion || ''
-      auditedInterest.value = data?.crossValidation?.auditedInterest || 0
+      applyCrossValidation(data?.crossValidation)
       return
     }
 
@@ -346,12 +450,12 @@ export function useG6SppiInterest() {
       })),
     }))
     conclusion.value = data.conclusion || ''
-    auditedInterest.value = data.crossValidation?.auditedInterest || 0
+    applyCrossValidation(data.crossValidation)
     recalcAll()
   }
 
   /**
-   * 从 G6-2 明细种子合并投资项目：按名称匹配，已有项目保留期间数据，仅补参数空位。
+   * 从 G6-2 明细种子合并：优先稳定 id，其次名称；已有项目保留期间，仅补空参数。
    */
   function mergeSeedsFromDetail(
     seeds: Array<{
@@ -365,18 +469,36 @@ export function useG6SppiInterest() {
   ): { added: number; updated: number } {
     let added = 0
     let updated = 0
+    const byId = new Map(groups.value.filter((g) => g.id).map((g) => [g.id, g]))
     const byName = new Map(
       groups.value.map((g) => [g.investProject.trim().replace(/\s+/g, ''), g]),
     )
 
     for (const seed of seeds) {
       const key = seed.investProject.trim().replace(/\s+/g, '')
-      const existing = byName.get(key)
+      const existing =
+        (seed.id && byId.get(seed.id)) ||
+        byName.get(key) ||
+        undefined
       if (existing) {
+        if (seed.id && existing.id !== seed.id) {
+          byId.delete(existing.id)
+          existing.id = seed.id
+          byId.set(seed.id, existing)
+        }
         if (!existing.faceValue && seed.faceValue) existing.faceValue = seed.faceValue
-        if (!existing.couponRate && seed.couponRate) existing.couponRate = seed.couponRate
-        if (!existing.effectiveRate && seed.effectiveRate) existing.effectiveRate = seed.effectiveRate
-        if (existing.periods.length === 0 && seed.openingAmortized) {
+        // 空值补全；或修正疑似百分数误存（|rate|>1）
+        if (seed.couponRate) {
+          if (!existing.couponRate || Math.abs(existing.couponRate) > 1) {
+            existing.couponRate = seed.couponRate
+          }
+        }
+        if (seed.effectiveRate) {
+          if (!existing.effectiveRate || Math.abs(existing.effectiveRate) > 1) {
+            existing.effectiveRate = seed.effectiveRate
+          }
+        }
+        if (existing.periods.length === 0 && (seed.openingAmortized != null)) {
           existing.periods.push({
             id: `ip-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             periodEnd: '',
@@ -398,7 +520,7 @@ export function useG6SppiInterest() {
         faceValue: seed.faceValue,
         couponRate: seed.couponRate,
         effectiveRate: seed.effectiveRate,
-        periods: seed.openingAmortized
+        periods: seed.openingAmortized != null
           ? [{
               id: `ip-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
               periodEnd: '',
@@ -412,6 +534,7 @@ export function useG6SppiInterest() {
           : [],
       }
       groups.value.push(newGroup)
+      byId.set(newGroup.id, newGroup)
       byName.set(key, newGroup)
       added += 1
     }
@@ -425,8 +548,14 @@ export function useG6SppiInterest() {
       conclusion: conclusion.value,
       crossValidation: {
         totalInterest: totalInterest.value,
-        auditedInterest: auditedInterest.value,
-        difference: crossValidationDiff.value,
+        totalCashInflow: totalCashInflow.value,
+        totalAmortization: totalAmortization.value,
+        bookInterestIncome: bookInterestIncome.value,
+        interestAdjPeriodChange: interestAdjPeriodChange.value,
+        incomeDiff: incomeDiff.value,
+        amortizationDiff: amortizationDiff.value,
+        auditedInterest: interestAdjPeriodChange.value,
+        difference: amortizationDiff.value,
       },
     }
   }
@@ -448,9 +577,18 @@ export function useG6SppiInterest() {
     // State
     groups,
     conclusion,
+    bookInterestIncome,
+    interestAdjPeriodChange,
     auditedInterest,
     // Computed
     totalInterest,
+    totalCashInflow,
+    totalAmortization,
+    incomeDiff,
+    amortizationDiff,
+    incomePassed,
+    amortizationPassed,
+    incomeLayerActive,
     crossValidationDiff,
     crossValidationPassed,
     // Methods

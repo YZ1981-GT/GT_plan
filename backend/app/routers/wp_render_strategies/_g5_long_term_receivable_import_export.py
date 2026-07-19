@@ -77,10 +77,12 @@ _G5_3_KEYS = [
 ]
 
 _G5_4_HEADERS = [
-    "序号", "分录类型", "日期", "摘要", "科目代码", "科目名称", "借方", "贷方", "编制人", "备注",
+    "序号", "类别", "分录类型", "日期", "摘要", "报表项目", "科目代码", "科目名称",
+    "借方", "贷方", "索引", "编制人", "备注",
 ]
 _G5_4_KEYS = [
-    "seq", "entryType", "date", "summary", "accountCode", "accountName", "debitAmount", "creditAmount", "preparedBy", "remark",
+    "seq", "category", "entryType", "date", "description", "reportItem", "accountCode", "accountName",
+    "debitAmount", "creditAmount", "indexRef", "preparedBy", "remark",
 ]
 
 _G5_5_HEADERS = [
@@ -699,7 +701,12 @@ _G5_SPECS: dict[str, dict[str, Any]] = {
         "field_keys": _G5_4_KEYS,
         "storage_field": "conclusion",
         "dual_write": True,
-        "guidance": ["G5-4 调整分录", "", "分录类型填 AJE 或 RJE；借贷须平衡。"],
+        "guidance": [
+            "G5-4 调整分录",
+            "",
+            "类别填 账项调整/报表调整/其他；分录类型填 AJE 或 RJE（与类别联动）。",
+            "摘要对应 description；借贷须平衡。",
+        ],
     },
     "G5-5": {
         "item_id": "G5-5-rows",

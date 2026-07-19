@@ -12,7 +12,7 @@
  *
  * EventBus: substantive:adjudicated(accountCode='1503')
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref } from 'vue'
 import {
   G6_ACCOUNT_CODE,
   G6_CHANGE_RATE_THRESHOLD,
@@ -21,6 +21,7 @@ import {
   parseG6AdjStore,
   applyG6AdjustmentWriteback,
   applyG6SplitAdjustmentWriteback,
+  applyG6MultiAdjustmentWriteback,
   listG6WritebackAllocTargets,
   type G6AdjRowDef,
   type G6AdjRowStore,
@@ -41,6 +42,7 @@ export {
   G6_CHANGE_RATE_THRESHOLD,
   applyG6AdjustmentWriteback,
   applyG6SplitAdjustmentWriteback,
+  applyG6MultiAdjustmentWriteback,
   listG6WritebackAllocTargets,
 }
 
@@ -669,13 +671,84 @@ export function useG6MainAdjudication(options: UseG6MainAdjudicationOptions) {
     persistStore(next)
   }
 
-  onMounted(() => {
-    fetchTrialBalance()
-  })
+  function applyMultiWriteback(nets: {
+    cost?: number
+    interest?: number
+    impairment?: number
+    fv?: number
+  }): void {
+    const next = applyG6MultiAdjustmentWriteback(store.value, nets)
+    lastWritebackNet.value = parseNum(nets.cost) + parseNum(nets.interest)
+    persistStore(next)
+  }
 
-  onBeforeUnmount(() => {
-    if (debounceTimer) clearTimeout(debounceTimer)
-  })
+  function onAdjustmentWriteback(e: Event): void {
+    const detail = (e as CustomEvent).detail
+    if (
+      detail?.costNet != null
+      || detail?.interestNet != null
+      || detail?.impairmentNet != null
+      || detail?.fvNet != null
+    ) {
+      applyMultiWriteback({
+        cost: parseNum(detail.costNet),
+        interest: parseNum(detail.interestNet),
+        impairment: parseNum(detail.impairmentNet),
+        fv: parseNum(detail.fvNet),
+      })
+      return
+    }
+    const summaries = detail?.summaries as
+      | Array<{ accountCode: string; ajeNet?: number; rjeNet?: number; net?: number }>
+      | undefined
+    if (Array.isArray(summaries)) {
+      let costNet = 0
+      let interestNet = 0
+      let impairmentNet = 0
+      let fvNet = 0
+      for (const item of summaries) {
+        const code = String(item.accountCode || '')
+        const aje = parseNum(item.ajeNet)
+        if (code === '150305' || code.startsWith('150305')) {
+          impairmentNet += -aje
+        } else if (code === '150302' || code.startsWith('150302')) {
+          interestNet += aje
+        } else if (code === '150304' || code.startsWith('150304')) {
+          fvNet += aje
+        } else if (code.startsWith('1503')) {
+          costNet += aje
+        }
+      }
+      applyMultiWriteback({ cost: costNet, interest: interestNet, impairment: impairmentNet, fv: fvNet })
+      return
+    }
+    if (detail?.totalAdjustment != null || detail?.ajeTotal != null) {
+      applyWriteback(parseNum(detail.totalAdjustment ?? detail.ajeTotal))
+    }
+  }
+
+  function attachListeners(): void {
+    window.addEventListener('g6:adjustment-writeback', onAdjustmentWriteback)
+    window.addEventListener('g6:adjustment-confirmed', onAdjustmentWriteback)
+  }
+  function detachListeners(): void {
+    window.removeEventListener('g6:adjustment-writeback', onAdjustmentWriteback)
+    window.removeEventListener('g6:adjustment-confirmed', onAdjustmentWriteback)
+  }
+
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      attachListeners()
+      fetchTrialBalance()
+    })
+    onBeforeUnmount(() => {
+      detachListeners()
+      if (debounceTimer) clearTimeout(debounceTimer)
+    })
+  } else {
+    // 单测直调 composable 时仍挂载监听，并暴露 dispose 便于清理
+    attachListeners()
+  }
 
   return {
     rows,
@@ -692,6 +765,8 @@ export function useG6MainAdjudication(options: UseG6MainAdjudicationOptions) {
     updateCell,
     setTrialBalance,
     applyWriteback,
+    applyMultiWriteback,
     fetchTrialBalance,
+    dispose: detachListeners,
   }
 }

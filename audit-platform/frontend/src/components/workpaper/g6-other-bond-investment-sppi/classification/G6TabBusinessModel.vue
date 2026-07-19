@@ -1,6 +1,5 @@
 <template>
   <div class="g6-tab-business-model">
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
@@ -8,53 +7,119 @@
       class="objective-alert"
     />
 
-    <!-- 工具栏 -->
     <div class="tab-toolbar">
-      <span class="chip-wrap"><GtIndexChip value="wp:G6-7" :context-project-id="projectId" /></span>
-      <el-tag size="small" type="info">共 {{ bm.section1.value.items.length + bm.section2.value.items.length }} 项检查</el-tag>
+      <span class="chip-wrap">
+        <GtIndexChip value="wp:G6-7" :context-project-id="projectId" />
+      </span>
+      <el-tag size="small" type="info">共 {{ itemCount }} 项检查</el-tag>
+      <el-tag v-if="bm.unansweredCount.value" size="small" type="warning">
+        {{ bm.unansweredCount.value }} 项未回答
+      </el-tag>
+      <el-button
+        size="small"
+        :disabled="isReadonly"
+        :loading="salePrefillLoading"
+        @click="prefillSaleActivity"
+      >
+        从 G6-2 预填出售说明
+      </el-button>
+      <el-button size="small" @click="exportJson">JSON 导出</el-button>
+      <el-button size="small" :disabled="isReadonly" @click="openImport">JSON 导入</el-button>
+      <input
+        ref="importInput"
+        type="file"
+        accept=".json"
+        hidden
+        @change="importJson"
+      >
     </div>
 
-    <!-- 方法论上下文（琥珀色左边线+浅黄背景） -->
     <div class="methodology-context">
       <p><strong>CAS22 业务模式三类定义：</strong></p>
       <p>① <strong>持有以收取合同现金流量</strong>：管理金融资产的目标是收取合同现金流量，而非持有并出售</p>
       <p>② <strong>既以收取合同现金流量又以出售为目标</strong>：通过收取合同现金流量和出售金融资产两者实现目标</p>
       <p>③ <strong>其他</strong>：不符合上述两类的业务模式（如以交易为目的持有）</p>
-      <p style="color: #92400e; font-size: 11px; margin-top: 4px;">
-        依据CAS22《金融工具确认和计量》第十六条至第十九条，企业应在金融资产组合层次确定其业务模式，而非逐个金融资产确定。
+      <p class="methodology-basis">
+        依据 CAS22《金融工具确认和计量》第十六条至第十九条，企业应在金融资产组合层次确定其业务模式，而非逐个金融资产确定。
       </p>
     </div>
 
-    <!-- ═══ (一) 业务模式确定 ═══ -->
-    <el-card shadow="never" class="section-card">
+    <el-card
+      v-for="section in sectionDefs"
+      :key="section.key"
+      shadow="never"
+      class="section-card"
+    >
       <template #header>
         <div class="section-header">
-          <span class="section-title">(一) 业务模式确定</span>
+          <span class="section-title">{{ section.title }}</span>
           <div class="section-actions">
-            <el-tag size="small" type="info">
-              完成度：{{ bm.section1CompletionRate.value }}%
-            </el-tag>
+            <el-tag size="small" type="info">完成度：{{ section.completion }}%</el-tag>
+            <el-button
+              size="small"
+              :disabled="isReadonly"
+              @click="addItem(section.key)"
+            >
+              新增检查项
+            </el-button>
             <el-button
               size="small"
               :disabled="isReadonly || aiLoading"
               :loading="aiLoading"
-              @click="handleAi('section1')"
-            >✨ AI辅助</el-button>
-            <el-button size="small" @click="openReview('G6-7-business-model-s1')">💬 复核</el-button>
+              @click="handleAi(section.key)"
+            >
+              ✨ AI辅助
+            </el-button>
+            <el-button size="small" @click="openReview(section.reviewId)">💬 复核</el-button>
           </div>
         </div>
       </template>
-      <el-table :data="bm.section1.value.items" border size="small" class="bm-table">
+
+      <el-table :data="section.items" border size="small" class="bm-table">
         <el-table-column label="序号" width="50" align="center">
           <template #default="{ row }">{{ row.seq }}</template>
         </el-table-column>
-        <el-table-column label="检查项目" width="200" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.checkItem }}</template>
+
+        <el-table-column label="检查项目" min-width="190">
+          <template #default="{ row }">
+            <div class="check-item-cell">
+              <el-input
+                v-if="!isReadonly"
+                v-model="row.checkItem"
+                type="textarea"
+                :autosize="{ minRows: 1, maxRows: 4 }"
+                @input="triggerSave"
+              />
+              <span v-else class="cell-text">{{ row.checkItem || '-' }}</span>
+              <div class="critical-row">
+                <el-tag v-if="row.critical" size="small" type="danger">关键</el-tag>
+                <el-checkbox
+                  v-if="!isReadonly"
+                  :model-value="Boolean(row.critical)"
+                  size="small"
+                  @change="(value: boolean) => changeCritical(section.key, row.id, value)"
+                >
+                  关键项
+                </el-checkbox>
+              </div>
+            </div>
+          </template>
         </el-table-column>
-        <el-table-column label="审计要求" width="200" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.auditRequirement }}</template>
+
+        <el-table-column label="审计要求" min-width="190">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.auditRequirement"
+              type="textarea"
+              :autosize="{ minRows: 1, maxRows: 4 }"
+              @input="triggerSave"
+            />
+            <span v-else class="cell-text">{{ row.auditRequirement || '-' }}</span>
+          </template>
         </el-table-column>
-        <el-table-column label="管理层说明" min-width="200">
+
+        <el-table-column label="管理层说明" min-width="210">
           <template #default="{ row }">
             <el-input
               v-if="!isReadonly"
@@ -62,11 +127,12 @@
               type="textarea"
               :autosize="{ minRows: 2, maxRows: 5 }"
               placeholder="管理层对该事项的说明..."
-              @update:model-value="(v: string) => handleUpdateField('section1', row.id, 'managementExplanation', v)"
+              @update:model-value="(value: string) => updateText(section.key, row.id, 'managementExplanation', value)"
             />
             <span v-else class="cell-text">{{ row.managementExplanation || '-' }}</span>
           </template>
         </el-table-column>
+
         <el-table-column label="是否满足" width="100" align="center">
           <template #default="{ row }">
             <el-select
@@ -75,8 +141,7 @@
               size="small"
               placeholder="选择"
               clearable
-              style="width: 85px"
-              @update:model-value="(v: boolean | null) => handleUpdateIsSatisfied('section1', row.id, v)"
+              @update:model-value="(value: boolean | null) => updateSatisfied(section.key, row.id, value)"
             >
               <el-option :value="true" label="是" />
               <el-option :value="false" label="否" />
@@ -86,6 +151,7 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
+
         <el-table-column label="审计结论" min-width="200">
           <template #default="{ row }">
             <el-input
@@ -94,12 +160,13 @@
               type="textarea"
               :autosize="{ minRows: 2, maxRows: 5 }"
               placeholder="审计结论..."
-              @update:model-value="(v: string) => handleUpdateField('section1', row.id, 'auditConclusion', v)"
+              @update:model-value="(value: string) => updateText(section.key, row.id, 'auditConclusion', value)"
             />
             <span v-else class="cell-text">{{ row.auditConclusion || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="风险评级" width="100" align="center">
+
+        <el-table-column label="风险" width="90" align="center">
           <template #default="{ row }">
             <el-select
               v-if="!isReadonly"
@@ -107,8 +174,7 @@
               size="small"
               placeholder="风险"
               clearable
-              style="width: 85px"
-              @update:model-value="(v: string | null) => handleUpdateRisk('section1', row.id, v as any)"
+              @update:model-value="(value: RiskLevel) => updateRisk(section.key, row.id, value)"
             >
               <el-option value="high" label="高" />
               <el-option value="medium" label="中" />
@@ -120,132 +186,46 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column label="索引" width="80">
+
+        <el-table-column label="索引" min-width="135">
           <template #default="{ row }">
             <el-input
               v-if="!isReadonly"
               :model-value="row.indexRef"
               size="small"
               placeholder="索引"
-              @update:model-value="(v: string) => handleUpdateField('section1', row.id, 'indexRef', v)"
+              @update:model-value="(value: string) => updateText(section.key, row.id, 'indexRef', value)"
             />
-            <span v-else>{{ row.indexRef || '-' }}</span>
+            <span v-else-if="!row.indexRef">-</span>
+            <div v-if="row.indexRef" class="row-index-chip">
+              <GtIndexChip :value="row.indexRef" :context-project-id="projectId" />
+            </div>
+          </template>
+        </el-table-column>
+
+        <el-table-column v-if="!isReadonly" label="操作" width="72" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button link type="danger" size="small" @click="removeItem(section.key, row.id)">
+              删除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="section-conclusion">
+        <label class="conclusion-label">分区小结</label>
+        <el-input
+          v-if="!isReadonly"
+          :model-value="section.conclusion"
+          type="textarea"
+          :autosize="{ minRows: 2, maxRows: 8 }"
+          placeholder="填写本分区审计小结..."
+          @update:model-value="(value: string) => updateSectionConclusion(section.key, value)"
+        />
+        <div v-else class="readonly-analysis">{{ section.conclusion || '（未填写）' }}</div>
+      </div>
     </el-card>
 
-    <!-- ═══ (二) 出售情况分析 ═══ -->
-    <el-card shadow="never" class="section-card">
-      <template #header>
-        <div class="section-header">
-          <span class="section-title">(二) 出售情况分析</span>
-          <div class="section-actions">
-            <el-tag size="small" type="info">
-              完成度：{{ bm.section2CompletionRate.value }}%
-            </el-tag>
-            <el-button
-              size="small"
-              :disabled="isReadonly || aiLoading"
-              :loading="aiLoading"
-              @click="handleAi('section2')"
-            >✨ AI辅助</el-button>
-            <el-button size="small" @click="openReview('G6-7-business-model-s2')">💬 复核</el-button>
-          </div>
-        </div>
-      </template>
-      <el-table :data="bm.section2.value.items" border size="small" class="bm-table">
-        <el-table-column label="序号" width="50" align="center">
-          <template #default="{ row }">{{ row.seq }}</template>
-        </el-table-column>
-        <el-table-column label="检查项目" width="200" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.checkItem }}</template>
-        </el-table-column>
-        <el-table-column label="审计要求" width="200" show-overflow-tooltip>
-          <template #default="{ row }">{{ row.auditRequirement }}</template>
-        </el-table-column>
-        <el-table-column label="管理层说明" min-width="200">
-          <template #default="{ row }">
-            <el-input
-              v-if="!isReadonly"
-              :model-value="row.managementExplanation"
-              type="textarea"
-              :autosize="{ minRows: 2, maxRows: 5 }"
-              placeholder="管理层对该事项的说明..."
-              @update:model-value="(v: string) => handleUpdateField('section2', row.id, 'managementExplanation', v)"
-            />
-            <span v-else class="cell-text">{{ row.managementExplanation || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="是否满足" width="100" align="center">
-          <template #default="{ row }">
-            <el-select
-              v-if="!isReadonly"
-              :model-value="row.isSatisfied"
-              size="small"
-              placeholder="选择"
-              clearable
-              style="width: 85px"
-              @update:model-value="(v: boolean | null) => handleUpdateIsSatisfied('section2', row.id, v)"
-            >
-              <el-option :value="true" label="是" />
-              <el-option :value="false" label="否" />
-            </el-select>
-            <el-tag v-else-if="row.isSatisfied === true" type="success" size="small">是</el-tag>
-            <el-tag v-else-if="row.isSatisfied === false" type="danger" size="small">否</el-tag>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="审计结论" min-width="200">
-          <template #default="{ row }">
-            <el-input
-              v-if="!isReadonly"
-              :model-value="row.auditConclusion"
-              type="textarea"
-              :autosize="{ minRows: 2, maxRows: 5 }"
-              placeholder="审计结论..."
-              @update:model-value="(v: string) => handleUpdateField('section2', row.id, 'auditConclusion', v)"
-            />
-            <span v-else class="cell-text">{{ row.auditConclusion || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="风险评级" width="100" align="center">
-          <template #default="{ row }">
-            <el-select
-              v-if="!isReadonly"
-              :model-value="row.riskLevel"
-              size="small"
-              placeholder="风险"
-              clearable
-              style="width: 85px"
-              @update:model-value="(v: string | null) => handleUpdateRisk('section2', row.id, v as any)"
-            >
-              <el-option value="high" label="高" />
-              <el-option value="medium" label="中" />
-              <el-option value="low" label="低" />
-            </el-select>
-            <el-tag v-else-if="row.riskLevel === 'high'" type="danger" size="small">高</el-tag>
-            <el-tag v-else-if="row.riskLevel === 'medium'" type="warning" size="small">中</el-tag>
-            <el-tag v-else-if="row.riskLevel === 'low'" type="success" size="small">低</el-tag>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="索引" width="80">
-          <template #default="{ row }">
-            <el-input
-              v-if="!isReadonly"
-              :model-value="row.indexRef"
-              size="small"
-              placeholder="索引"
-              @update:model-value="(v: string) => handleUpdateField('section2', row.id, 'indexRef', v)"
-            />
-            <span v-else>{{ row.indexRef || '-' }}</span>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- ═══ (三) 综合判断 ═══ -->
     <el-card shadow="never" class="section-card conclusion-section">
       <template #header>
         <div class="section-header">
@@ -263,23 +243,34 @@
               :disabled="isReadonly || aiLoading"
               :loading="aiLoading"
               @click="handleAi('conclusion')"
-            >✨ AI辅助</el-button>
-            <el-button size="small" @click="openReview('G6-7-business-model-conclusion')">💬 复核</el-button>
+            >
+              ✨ AI辅助
+            </el-button>
+            <el-button size="small" @click="openReview('G6-7-business-model-conclusion')">
+              💬 复核
+            </el-button>
           </div>
         </div>
       </template>
 
       <div class="conclusion-grid">
-        <!-- 最终分类结论下拉 -->
+        <el-alert
+          v-if="!bm.isComplete.value"
+          type="warning"
+          :closable="false"
+          :title="`尚有 ${bm.unansweredCount.value} 项未回答`"
+          show-icon
+        />
+
         <div class="conclusion-item">
-          <label class="conclusion-label">最终分类结论</label>
+          <label class="conclusion-label">最终结论</label>
           <el-select
             v-if="!isReadonly"
             :model-value="bm.finalConclusion.value"
             placeholder="请选择最终业务模式分类"
             clearable
-            style="width: 280px"
-            @update:model-value="handleFinalConclusionChange"
+            class="conclusion-select"
+            @update:model-value="changeFinalConclusion"
           >
             <el-option value="hold_collect" label="持有以收取合同现金流量" />
             <el-option value="hold_and_sell" label="既以收取合同现金流量又以出售为目标" />
@@ -292,25 +283,56 @@
             {{ bm.conclusionLabel.value.label }}
           </el-tag>
           <span v-else class="no-data">未确定</span>
+          <span v-if="!bm.isComplete.value" class="incomplete-hint">
+            检查项尚未全部回答，仍可手工选择结论；完成后请复核自动推导结果。
+          </span>
         </div>
 
-        <!-- 自动推导提示 -->
-        <div v-if="bm.derivedConclusion.value && bm.isComplete.value" class="derived-hint">
-          <el-icon style="color: #f59e0b; margin-right: 4px;">⚡</el-icon>
-          <span>系统根据填写结果自动推导为：{{ getDerivedLabel(bm.derivedConclusion.value) }}</span>
+        <div class="derived-hint">
+          <span>
+            自动推导：
+            {{ bm.derivedConclusion.value ? conclusionText(bm.derivedConclusion.value) : '待检查项全部回答后生成' }}
+          </span>
+          <span v-if="bm.manualOverride.value" class="override-sep">｜已手工覆盖</span>
+          <el-button
+            v-if="bm.manualOverride.value && !isReadonly"
+            link
+            type="primary"
+            size="small"
+            @click="clearOverride"
+          >
+            恢复自动
+          </el-button>
         </div>
 
-        <!-- 高风险项提示 -->
-        <div v-if="bm.highRiskCount.value > 0" class="risk-alert">
+        <el-alert
+          v-if="bm.overrideDiffersFromDerived.value"
+          type="warning"
+          :closable="false"
+          show-icon
+          :title="`结论已偏离自动推导：自动推导「${conclusionText(bm.derivedConclusion.value)}」；手工选择「${conclusionText(bm.finalConclusion.value)}」`"
+        />
+
+        <div v-if="crossCheck.level" class="cross-check-alert">
           <el-alert
-            :title="`存在 ${bm.highRiskCount.value} 个高风险检查项，请重点关注`"
+            :title="crossCheckTitle"
+            :type="crossCheckAlertType"
+            :closable="false"
+            show-icon
+          >
+            <template #default>{{ crossCheck.message }}</template>
+          </el-alert>
+        </div>
+
+        <div v-if="bm.highRiskCount.value" class="risk-alert">
+          <el-alert
             type="warning"
             :closable="false"
             show-icon
+            :title="`存在 ${bm.highRiskCount.value} 个高风险检查项，请重点关注`"
           />
         </div>
 
-        <!-- 综合分析说明 textarea -->
         <div class="conclusion-item full-width">
           <label class="conclusion-label">综合分析说明</label>
           <el-input
@@ -318,15 +340,14 @@
             :model-value="bm.finalAnalysis.value"
             type="textarea"
             :autosize="{ minRows: 4, maxRows: 12 }"
-            placeholder="综合分析说明：结合业务模式确定和出售情况分析两部分结论，说明最终分类为持有收取/兼有/其他的理由..."
-            @update:model-value="handleFinalAnalysisChange"
+            placeholder="结合业务模式确定和出售情况分析，说明最终分类判断的理由..."
+            @update:model-value="updateFinalAnalysis"
           />
           <div v-else class="readonly-analysis">{{ bm.finalAnalysis.value || '（未填写）' }}</div>
         </div>
       </div>
     </el-card>
 
-    <!-- 审计说明 -->
     <el-card shadow="never" class="section-card audit-note-card">
       <template #header>
         <div class="section-header"><span class="section-title">审计说明</span></div>
@@ -341,46 +362,43 @@
       />
     </el-card>
 
-    <!-- 编制提示 -->
     <details class="guide-details">
       <summary>📋 编制提示</summary>
       <div class="guide-content">
         <p>1. 业务模式评估应在金融资产组合层次进行，而非逐笔评估</p>
-        <p>2. 评估时应基于管理层确定业务模式的实际行动，而非仅声明的意图</p>
-        <p>3. 业务模式不取决于管理层对某项特定金融资产的意图，而非资产组合管理方式</p>
-        <p>4. 需关注以下因素：①日常出售频率和金额 ②业绩评价方式 ③管理层薪酬机制 ④风险管理策略</p>
-        <p>5. 出售分析重点：出售原因（信用恶化/临近到期/偶发事件）是否构成业务模式变更</p>
-        <p>6. 业务模式结论直接影响金融资产分类：①持有收取→AC或FVOCI-Debt ②兼有→FVOCI-Debt ③其他→FVTPL</p>
-        <p>7. 如存在出售但满足以下条件可不改变业务模式：出售不频繁、金额不大（即使合计重大）、或出售原因为信用风险恶化</p>
-        <p>8. 特别关注：临近到期的出售通常不影响业务模式判断</p>
+        <p>2. 评估应基于管理层确定业务模式的实际行动，而非仅声明的意图</p>
+        <p>3. 重点关注出售频率和金额、业绩评价方式、薪酬机制及风险管理策略</p>
+        <p>4. 临近到期、信用风险恶化或偶发出售通常不单独构成业务模式变更</p>
+        <p>5. 业务模式与 SPPI 结果共同决定 AC、FVOCI-Debt 或 FVTPL 分类</p>
       </div>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
-/**
- * G6TabBusinessModel.vue — G6-7 业务模式分析（三section问卷式）
- *
- * Spec: .kiro/specs/g6-other-bond-investment-sppi/ Task 7.2
- * Requirements: 4.1, 4.2, 4.3
- *
- * 功能：
- * - 方法论上下文(琥珀色): CAS22业务模式三类定义(①持有收取 ②兼有 ③其他)
- * - 三section结构:
- *   (一) 业务模式确定 — 8列表格问卷
- *   (二) 出售情况分析 — 8列表格问卷
- *   (三) 综合判断 — 最终分类下拉 + 综合分析textarea autosize
- * - 每section标题行右侧: AI辅助按钮 + 复核按钮
- * - 综合判断自动推导: 基于section1/section2的isSatisfied推导finalConclusion
- * - 编制提示details折叠底部
- * - emit 'save' debounced
- */
 import { computed, inject, onMounted, ref, watch } from 'vue'
-import { useG6SppiBusinessModel, type BusinessModelData } from '../../composables/useG6SppiBusinessModel'
+import { ElMessage } from 'element-plus'
+import {
+  BM_CONCLUSION_LABELS,
+  buildBusinessModelAiSummary,
+  evaluateG67G68Consistency,
+  useG6SppiBusinessModel,
+  type BusinessModelData,
+  type SppiOverallConclusion,
+} from '../../composables/useG6SppiBusinessModel'
 import { useG6SppiFormData } from '../../composables/useG6SppiFormData'
 import { useG6SppiAiGenerate } from '../../composables/useG6SppiAiGenerate'
+import {
+  fetchG62DetailRows,
+  parseG6ChecklistPayload,
+  summarizeG62SaleActivity,
+  writeG6ClassificationSummary,
+} from '../../composables/g6CrossHelpers'
 import GtIndexChip from '../../GtIndexChip.vue'
+
+type SectionKey = 'section1' | 'section2'
+type RiskLevel = 'high' | 'medium' | 'low' | null
+type BusinessModelConclusion = BusinessModelData['finalConclusion']
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -389,127 +407,209 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const emit = defineEmits<{
-  save: []
-}>()
+const emit = defineEmits<{ save: [] }>()
 
-// ─── 复核对话 inject ───
+const DATA_KEY = 'G6-7-business-model-data'
+const NOTE_KEY = 'G6-7-business-model-audit-note'
+const SPPI_KEY = 'G6-8-sppi-test-data'
+
+const bm = useG6SppiBusinessModel()
+const formData = useG6SppiFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const { generateAndConfirm, loading: aiLoading } = useG6SppiAiGenerate(
+  computed(() => props.wpId),
+)
+
+const auditNote = ref('')
+const importInput = ref<HTMLInputElement | null>(null)
+const salePrefillLoading = ref(false)
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+
+const itemCount = computed(
+  () => bm.section1.value.items.length + bm.section2.value.items.length,
+)
+
+const sectionDefs = computed(() => [
+  {
+    key: 'section1' as const,
+    title: '(一) 业务模式确定',
+    reviewId: 'G6-7-business-model-s1',
+    items: bm.section1.value.items,
+    completion: bm.section1CompletionRate.value,
+    conclusion: bm.section1.value.sectionConclusion,
+  },
+  {
+    key: 'section2' as const,
+    title: '(二) 出售情况分析',
+    reviewId: 'G6-7-business-model-s2',
+    items: bm.section2.value.items,
+    completion: bm.section2CompletionRate.value,
+    conclusion: bm.section2.value.sectionConclusion,
+  },
+])
+
+const sppiOverall = computed<SppiOverallConclusion>(() => {
+  const payload = parseG6ChecklistPayload(formData.allResponses.value.get(SPPI_KEY))
+  return payload?.overallConclusion === 'pass' || payload?.overallConclusion === 'fail'
+    ? payload.overallConclusion
+    : null
+})
+
+const crossCheck = computed(() =>
+  evaluateG67G68Consistency(bm.finalConclusion.value, sppiOverall.value),
+)
+const crossCheckTitle = computed(() =>
+  crossCheck.value.expectedClassification
+    ? `与 G6-8 SPPI 交叉提示 · 预期分类：${crossCheck.value.expectedClassification}`
+    : '与 G6-8 SPPI 交叉提示',
+)
+const crossCheckAlertType = computed<'success' | 'warning' | 'info'>(() => {
+  if (crossCheck.value.level === 'ok') return 'success'
+  if (crossCheck.value.level === 'warning') return 'warning'
+  return 'info'
+})
+
+onMounted(async () => {
+  await formData.loadAll()
+  loadSavedData()
+  const note = formData.allResponses.value.get(NOTE_KEY)
+  auditNote.value = note?.remark || ''
+})
+
+watch(
+  () => props.htmlData,
+  () => loadSavedData(),
+)
+
+function loadSavedData(): void {
+  const primary = parseG6ChecklistPayload(formData.allResponses.value.get(DATA_KEY))
+  if (primary?.section1?.items?.length || primary?.section2?.items?.length) {
+    bm.loadData(primary as BusinessModelData)
+    return
+  }
+  const fallback = formData.parseContent().businessModel
+  if (fallback?.section1) bm.loadData(fallback as BusinessModelData)
+}
+
+let saveTimer: ReturnType<typeof setTimeout> | null = null
+
+function triggerSave(): void {
+  if (props.isReadonly) return
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(() => {
+    formData.debouncedSave(DATA_KEY, { conclusion: JSON.stringify(bm.toJSON()) })
+    void syncClassificationWriteback()
+    emit('save')
+  }, 800)
+}
+
+async function syncClassificationWriteback(): Promise<void> {
+  const payload = parseG6ChecklistPayload(formData.allResponses.value.get(SPPI_KEY))
+  const overall: SppiOverallConclusion =
+    payload?.overallConclusion === 'pass' || payload?.overallConclusion === 'fail'
+      ? payload.overallConclusion
+      : null
+  const businessModel = bm.finalConclusion.value
+  const consistency = evaluateG67G68Consistency(businessModel, overall)
+  await writeG6ClassificationSummary({
+    projectId: props.projectId,
+    sppiWpId: props.wpId,
+    summary: {
+      businessModel,
+      businessModelLabel: businessModel ? BM_CONCLUSION_LABELS[businessModel] || null : null,
+      sppiOverall: overall,
+      expectedClassification: consistency.expectedClassification,
+      level: consistency.level,
+      message: consistency.message,
+      accountConflict:
+        consistency.level === 'warning' &&
+        consistency.expectedClassification === 'FVTPL',
+      updatedAt: new Date().toISOString(),
+      source: 'G6-7',
+    },
+  })
+}
 
 function openReview(sectionId: string): void {
   openReviewDialog(sectionId)
 }
 
-// ─── 数据层 ───
-const formData = useG6SppiFormData({
-  wpId: computed(() => props.wpId),
-  projectId: computed(() => props.projectId),
-})
-const bm = useG6SppiBusinessModel()
-const wpIdRef = computed(() => props.wpId)
-const { generateAndConfirm, loading: aiLoading } = useG6SppiAiGenerate(wpIdRef)
-
-// ─── 审计说明（独立持久化 checklist_responses） ───
-const NOTE_KEY = 'G6-7-business-model-audit-note'
-const auditNote = ref('')
-
-function saveAuditNote(val: string): void {
-  if (props.isReadonly) return
-  auditNote.value = val
-  formData.debouncedSave(NOTE_KEY, { remark: val })
+function addItem(section: SectionKey): void {
+  bm.addItem(section)
+  triggerSave()
 }
 
-// ─── 数据加载 ───
-onMounted(async () => {
-  await formData.loadAll()
-  initFromFormData()
-  const noteResp = formData.allResponses.value.get(NOTE_KEY)
-  if (noteResp?.remark) auditNote.value = noteResp.remark
-})
-
-watch(() => props.htmlData, (newData) => {
-  if (newData) {
-    initFromFormData()
+function removeItem(section: SectionKey, itemId: string): void {
+  if (!bm.removeItem(section, itemId)) {
+    ElMessage.warning('每个分区至少保留一项检查项')
+    return
   }
-})
-
-function initFromFormData(): void {
-  const content = formData.parseContent()
-  if (content.businessModel) {
-    bm.loadData(content.businessModel as BusinessModelData)
-  }
+  triggerSave()
 }
 
-// ─── 保存逻辑（debounced） ───
-let _saveTimer: ReturnType<typeof setTimeout> | null = null
-
-function triggerSave(): void {
-  if (_saveTimer) clearTimeout(_saveTimer)
-  _saveTimer = setTimeout(() => {
-    formData.debouncedSave('G6-7-business-model-data', {
-      conclusion: JSON.stringify(bm.toJSON()),
-    })
-    emit('save')
-  }, 800)
+function changeCritical(section: SectionKey, itemId: string, value: boolean): void {
+  bm.toggleCritical(section, itemId, value)
+  triggerSave()
 }
 
-// ─── 字段更新 handlers ───
-function handleUpdateField(
-  sectionKey: 'section1' | 'section2',
+function updateText(
+  section: SectionKey,
   itemId: string,
   field: 'managementExplanation' | 'auditConclusion' | 'indexRef',
   value: string,
 ): void {
-  if (field === 'managementExplanation') {
-    bm.updateManagementExplanation(sectionKey, itemId, value)
-  } else if (field === 'auditConclusion') {
-    bm.updateAuditConclusion(sectionKey, itemId, value)
-  } else if (field === 'indexRef') {
-    bm.updateIndexRef(sectionKey, itemId, value)
-  }
+  if (field === 'managementExplanation') bm.updateManagementExplanation(section, itemId, value)
+  if (field === 'auditConclusion') bm.updateAuditConclusion(section, itemId, value)
+  if (field === 'indexRef') bm.updateIndexRef(section, itemId, value)
   triggerSave()
 }
 
-function handleUpdateIsSatisfied(
-  sectionKey: 'section1' | 'section2',
-  itemId: string,
-  value: boolean | null,
-): void {
-  bm.updateIsSatisfied(sectionKey, itemId, value)
+function updateSatisfied(section: SectionKey, itemId: string, value: boolean | null): void {
+  bm.updateIsSatisfied(section, itemId, value)
   triggerSave()
 }
 
-function handleUpdateRisk(
-  sectionKey: 'section1' | 'section2',
-  itemId: string,
-  value: 'high' | 'medium' | 'low' | null,
-): void {
-  bm.updateRiskLevel(sectionKey, itemId, value)
+function updateRisk(section: SectionKey, itemId: string, value: RiskLevel): void {
+  bm.updateRiskLevel(section, itemId, value)
   triggerSave()
 }
 
-function handleFinalConclusionChange(value: 'hold_collect' | 'hold_and_sell' | 'other' | null): void {
+function updateSectionConclusion(section: SectionKey, value: string): void {
+  bm.updateSectionConclusion(section, value)
+  triggerSave()
+}
+
+function changeFinalConclusion(value: BusinessModelConclusion): void {
   bm.setFinalConclusion(value)
   triggerSave()
 }
 
-function handleFinalAnalysisChange(value: string): void {
+function clearOverride(): void {
+  bm.clearManualOverride()
+  triggerSave()
+}
+
+function updateFinalAnalysis(value: string): void {
   bm.setFinalAnalysis(value)
   triggerSave()
 }
 
-// ─── AI辅助 ───
-async function handleAi(section: string): Promise<void> {
+function saveAuditNote(value: string): void {
+  if (props.isReadonly) return
+  auditNote.value = value
+  formData.debouncedSave(NOTE_KEY, { remark: value })
+}
+
+async function handleAi(section: SectionKey | 'conclusion'): Promise<void> {
   if (props.isReadonly) return
   const text = await generateAndConfirm(
     'business-model-conclusion',
-    bm.finalAnalysis.value || '',
+    bm.finalAnalysis.value,
     {
       section,
-      finalConclusion: bm.finalConclusion.value,
-      section1Completion: bm.section1CompletionRate.value,
-      section2Completion: bm.section2CompletionRate.value,
-      highRiskCount: bm.highRiskCount.value,
+      businessModel: buildBusinessModelAiSummary(bm.toJSON()),
     },
     'AI 业务模式综合判断',
   )
@@ -519,20 +619,59 @@ async function handleAi(section: string): Promise<void> {
   }
 }
 
-// ─── 推导结论文字映射 ───
-function getDerivedLabel(value: string): string {
-  const map: Record<string, string> = {
-    hold_collect: '持有以收取合同现金流量',
-    hold_and_sell: '既以收取合同现金流量又以出售为目标',
-    other: '其他（以交易为目的等）',
+async function prefillSaleActivity(): Promise<void> {
+  if (props.isReadonly || salePrefillLoading.value) return
+  salePrefillLoading.value = true
+  try {
+    const rows = await fetchG62DetailRows(props.projectId, props.wpId)
+    const summary = summarizeG62SaleActivity(rows)
+    const applied = bm.applySaleDraft(summary.draftText)
+    if (applied) triggerSave()
+    ElMessage.success(`读取 G6-2 共 ${rows.length} 条明细，已预填 ${applied} 个检查项`)
+  } catch {
+    ElMessage.error('从 G6-2 预填出售说明失败')
+  } finally {
+    salePrefillLoading.value = false
   }
-  return map[value] || '未知'
 }
 
-// ─── 暴露接口 ───
-defineExpose({
-  toJSON: () => bm.toJSON(),
-})
+function exportJson(): void {
+  const blob = new Blob([JSON.stringify(bm.toJSON(), null, 2)], {
+    type: 'application/json;charset=utf-8',
+  })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = 'G6-7-business-model-data.json'
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
+function openImport(): void {
+  importInput.value?.click()
+}
+
+async function importJson(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  try {
+    const parsed = JSON.parse(await file.text()) as BusinessModelData
+    bm.loadData(parsed)
+    triggerSave()
+    ElMessage.success('业务模式 JSON 导入成功')
+  } catch {
+    ElMessage.error('JSON 文件格式无效，导入失败')
+  } finally {
+    input.value = ''
+  }
+}
+
+function conclusionText(value: BusinessModelConclusion): string {
+  return value ? BM_CONCLUSION_LABELS[value] || '未知' : '未确定'
+}
+
+defineExpose({ toJSON: () => bm.toJSON() })
 </script>
 
 <style scoped>
@@ -541,26 +680,24 @@ defineExpose({
   font-size: var(--wp-font-size, 13px);
 }
 
-/* ─── 审计目标 / 工具栏 ─── */
 .objective-alert {
   margin-bottom: 12px;
 }
+
 .tab-toolbar {
   display: flex;
   justify-content: flex-end;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 8px;
 }
+
 .chip-wrap {
   display: inline-flex;
   align-items: center;
 }
-.audit-note-card {
-  margin-top: 16px;
-}
 
-/* ─── 方法论上下文（琥珀色左边线+浅黄背景）─── */
 .methodology-context {
   margin-bottom: 16px;
   padding: 12px 16px;
@@ -575,7 +712,12 @@ defineExpose({
   margin: 0 0 2px;
 }
 
-/* ─── Section卡片 ─── */
+.methodology-basis {
+  margin-top: 4px !important;
+  color: #92400e;
+  font-size: 11px;
+}
+
 .section-card {
   margin-bottom: 16px;
 }
@@ -589,33 +731,56 @@ defineExpose({
 }
 
 .section-title {
-  font-weight: 600;
   font-size: 14px;
+  font-weight: 600;
 }
 
 .section-actions {
   display: flex;
-  gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-/* ─── 表格 ─── */
 .bm-table {
   font-size: var(--wp-font-size, 13px);
 }
 
 .bm-table :deep(.el-table__cell) {
   padding: 6px 0;
+  vertical-align: top;
 }
 
 .cell-text {
   white-space: pre-wrap;
-  word-break: break-all;
+  word-break: break-word;
   font-size: 12px;
   line-height: 1.5;
 }
 
-/* ─── 综合判断section ─── */
+.check-item-cell,
+.critical-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.critical-row {
+  flex-direction: row;
+  align-items: center;
+}
+
+.row-index-chip {
+  margin-top: 5px;
+}
+
+.section-conclusion {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+
 .conclusion-section {
   border-top: 2px solid #f59e0b;
 }
@@ -629,6 +794,7 @@ defineExpose({
 .conclusion-item {
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
 }
 
@@ -637,58 +803,74 @@ defineExpose({
 }
 
 .conclusion-label {
+  color: #303133;
   font-size: var(--wp-font-size, 13px);
   font-weight: 600;
-  color: #303133;
 }
 
+.conclusion-select {
+  width: 320px;
+  max-width: 100%;
+}
+
+.incomplete-hint,
 .no-data {
   color: #909399;
-  font-size: var(--wp-font-size, 13px);
+  font-size: 12px;
 }
 
 .derived-hint {
   display: flex;
   align-items: center;
-  font-size: 12px;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 10px;
   color: #92400e;
   background: #fffbeb;
   border-radius: 4px;
-  padding: 6px 10px;
+  font-size: 12px;
 }
 
+.override-sep {
+  color: #d97706;
+}
+
+.cross-check-alert,
 .risk-alert {
   margin-top: 4px;
 }
 
 .readonly-analysis {
+  min-height: 60px;
+  padding: 8px 12px;
+  color: #303133;
+  background: #f5f7fa;
+  border-radius: 4px;
   white-space: pre-wrap;
   font-size: var(--wp-font-size, 13px);
   line-height: 1.6;
-  color: #303133;
-  background: #f5f7fa;
-  padding: 8px 12px;
-  border-radius: 4px;
-  min-height: 60px;
 }
 
-/* ─── 编制提示 ─── */
+.audit-note-card {
+  margin-top: 16px;
+}
+
 .guide-details {
   margin-top: 16px;
 }
 
 .guide-details summary {
+  color: #606266;
   cursor: pointer;
   font-size: var(--wp-font-size, 13px);
-  color: #606266;
   font-weight: 600;
 }
 
 .guide-content {
+  margin-top: 6px;
   padding: 8px 12px;
   background: #fffbeb;
   border-left: 3px solid #f59e0b;
-  margin-top: 6px;
   font-size: 12px;
   line-height: 1.8;
 }

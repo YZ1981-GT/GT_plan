@@ -253,6 +253,47 @@ export function useG6SppiFormData(opts: UseG6SppiFormDataOptions) {
   }
 
   /**
+   * 多键原子防抖保存：同一计时器批量 PUT，避免 G6-6-interest-data / G6-6-rows 半成功
+   */
+  function debouncedSaveBatch(items: Array<{ itemId: string; data: Partial<ChecklistResponse> }>): void {
+    if (!items.length) return
+    const batchIds = items.map((it) => it.itemId)
+    const batchKey = `__batch__:${batchIds.sort().join('|')}`
+
+    for (const { itemId, data } of items) {
+      const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
+      const updated: ChecklistResponse = {
+        ...existing,
+        ...(data.conclusion !== undefined ? { conclusion: data.conclusion } : {}),
+        ...(data.remark !== undefined ? { remark: data.remark } : {}),
+      }
+      allResponses.value.set(itemId, updated)
+      _pendingItems.add(itemId)
+      const prev = _debounceTimers.get(itemId)
+      if (prev) clearTimeout(prev)
+    }
+
+    const prevBatch = _debounceTimers.get(batchKey)
+    if (prevBatch) clearTimeout(prevBatch)
+
+    const timer = setTimeout(() => {
+      _debounceTimers.delete(batchKey)
+      const toSave: ChecklistResponse[] = []
+      for (const itemId of batchIds) {
+        _debounceTimers.delete(itemId)
+        _pendingItems.delete(itemId)
+        const resp = allResponses.value.get(itemId)
+        if (resp) toSave.push(resp)
+      }
+      void _doSave(toSave)
+    }, 2000)
+    _debounceTimers.set(batchKey, timer)
+    for (const itemId of batchIds) {
+      _debounceTimers.set(itemId, timer)
+    }
+  }
+
+  /**
    * 保存完整 content JSON（POST到workpaper content端点）
    * 用于保存G6 SPPI组所有sheet的完整结构化数据
    */
@@ -315,6 +356,7 @@ export function useG6SppiFormData(opts: UseG6SppiFormDataOptions) {
     saveBatch,
     saveItemsFromEvent,
     debouncedSave,
+    debouncedSaveBatch,
     saveContent,
   }
 }

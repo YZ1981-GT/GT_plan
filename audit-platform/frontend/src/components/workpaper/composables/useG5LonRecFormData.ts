@@ -119,10 +119,11 @@ export function useG5LonRecFormData(opts: {
         account_code: G5_ACCOUNT_CODE,
         audited_amount: auditedAmount,
       })
+      const payload = JSON.stringify({ accountCode: G5_ACCOUNT_CODE, auditedAmount })
       await saveImmediate('G5-1-tb-writeback', {
         item_id: 'G5-1-tb-writeback',
-        conclusion: null,
-        remark: JSON.stringify({ accountCode: G5_ACCOUNT_CODE, auditedAmount }),
+        conclusion: payload,
+        remark: payload,
       })
       await saveImmediate('G5-1-adjudicated-amount', {
         item_id: 'G5-1-adjudicated-amount',

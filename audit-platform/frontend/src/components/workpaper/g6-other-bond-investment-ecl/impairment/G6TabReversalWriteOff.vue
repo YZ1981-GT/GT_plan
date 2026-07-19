@@ -1,53 +1,41 @@
-<!--
-  G6TabReversalWriteOff.vue — G6-14 减值准备转回（收回）、核销检查表
-
-  42行×8列简洁动态行表格：
-  序号|投资项目|转回/核销类型(下拉:转回/核销/收回)|金额|原因(textarea)|审批程序|合理性结论(下拉)|索引
-
-  功能：
-  - 动态行增删（ElMessageBox.prompt输入投资项目名称）
-  - 底部金额合计行
-  - 导入导出 el-dropdown（G6-14 单sheet）
-  - AI按钮（reversal-writeoff-conclusion）
-  - 复核按钮（inject openReviewDialog）
-  - GtIndexChip索引列
-
-  Spec: .kiro/specs/g6-other-bond-investment-ecl/ Task 9.1
-  Requirements: 5.1, 5.4
--->
 <template>
-  <div class="g6-reversal-writeoff">
-    <!-- 方法论上下文 -->
-    <div class="methodology-context">
-      <p>
-        <strong>转回/核销判定标准：</strong>
-        当导致减值的因素已消除且客观上与确认减值后发生事项有关时，可予转回（金额不超过原计提额）；
-        当确认债务人确实无法偿还或以物抵债/债务重组等实质性处置完成时，经审批可予核销；
-        收回指已核销坏账后续实际收到款项。三类操作均需充分审批程序和合理性说明。
-      </p>
-    </div>
-
-    <!-- 审计目标 -->
+  <div class="g6-reversal-writeoff" data-testid="g6-reversal-writeoff">
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：核实其他债权投资减值准备转回、核销及收回的真实性与合规性，验证转回不超过原计提额、核销经恰当审批，评价各项操作的合理性。"
+      show-icon
+      title="一、审计目标：其他债权投资以恰当的金额包括在财务报表中，与之相关的计价调整已恰当记录。"
       class="objective-alert"
     />
 
-    <!-- 工具栏：索引 + 行数 -->
-    <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
-      <div class="toolbar-right">
-        <span class="chip-wrap"><GtIndexChip value="wp:G6-14" :context-project-id="projectId" /></span>
-        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
-      </div>
+    <el-alert
+      v-if="!rw.gate.value.ready"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="gate-alert"
+      :title="gateAlertTitle"
+    />
+
+    <div class="methodology-context">
+      <p class="methodology-title">编制逻辑（对齐 Excel G6-14）：</p>
+      <p>（一）转回/收回：金额 ≤ 累计已计提；须说明原因、收回方式、原计提依据与合理性</p>
+      <p>（二）核销：关注投资性质、核销程序、是否关联交易及合理性分析</p>
     </div>
 
-    <!-- 顶部标题+操作 -->
-    <div class="section-head">
-      <h3 class="sheet-title">G6-14 减值准备转回（收回）、核销检查表</h3>
-      <div class="head-actions">
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-14" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-12" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">
+          转回 {{ rw.reversals.value.length }} · 核销 {{ rw.writeOffs.value.length }}
+        </el-tag>
+        <el-tag size="small" :type="rw.gate.value.ready ? 'success' : 'warning'">
+          闸门 {{ rw.gate.value.ready ? '通过' : '待补' }}
+        </el-tag>
+      </div>
+      <div class="toolbar-right">
+        <el-segmented v-model="rw.activeTab.value" :options="segmentOptions" size="small" />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">
           + 新增行
         </el-button>
@@ -55,136 +43,169 @@
           :wp-id="wpId"
           sheet="G6-14"
           :disabled="isReadonly"
-          @imported="emit('imported')"
+          @imported="onImported"
         />
         <el-button
           size="small"
-          type="primary"
-          link
           :disabled="isReadonly || !aiAvailable"
           :loading="aiLoading"
           @click="handleAi"
-        >
-          🤖 AI生成
-        </el-button>
-        <!-- 复核 -->
+        >🤖 AI</el-button>
         <el-button size="small" @click="openReviewDialog('G6-14-reversal-writeoff')">💬复核</el-button>
       </div>
     </div>
 
-    <!-- 主表格 -->
+    <p class="section-label">
+      二、审计过程 ·
+      {{ rw.activeTab.value === 'tab1' ? '（一）本期重要的减值准备转回或转销检查' : '（二）本期重要的核销检查' }}
+    </p>
+
+    <!-- Tab1: 转回/收回 -->
     <el-table
-      :data="displayRows"
+      v-show="rw.activeTab.value === 'tab1'"
+      :data="reversalDisplayRows"
       border
       size="small"
-      max-height="560"
-      highlight-current-row
+      max-height="480"
       row-key="id"
-      :row-class-name="rowClassName"
-      class="reversal-table"
+      :row-class-name="reversalRowClass"
+      class="rw-table"
+      highlight-current-row
+      @current-change="onReversalCurrent"
     >
-      <!-- 序号 -->
       <el-table-column label="序号" width="55" align="center">
         <template #default="{ row }">
           <span v-if="row._isTotal" class="total-label">合计</span>
           <span v-else>{{ row.seq }}</span>
         </template>
       </el-table-column>
-
-      <!-- 投资项目 -->
-      <el-table-column label="投资项目" min-width="130">
+      <el-table-column label="单位名称" min-width="130">
         <template #default="{ row }">
           <template v-if="row._isTotal" />
-          <span v-else>{{ row.investProject }}</span>
+          <el-input
+            v-else-if="!isReadonly"
+            :model-value="row.unitName"
+            size="small"
+            @change="(v: string) => { row.unitName = v; persist() }"
+          />
+          <span v-else>{{ row.unitName }}</span>
         </template>
       </el-table-column>
-
-      <!-- 转回/核销类型 -->
-      <el-table-column label="转回/核销类型" width="125" align="center">
+      <el-table-column label="转回原因" min-width="130">
         <template #default="{ row }">
           <template v-if="row._isTotal" />
-          <template v-else>
-            <el-select v-if="!isReadonly" v-model="row.type" size="small" placeholder="请选择"
-              style="width: 100px" @change="handleFieldChange">
-              <el-option label="转回" value="转回" />
-              <el-option label="核销" value="核销" />
-              <el-option label="收回" value="收回" />
-            </el-select>
-            <span v-else>{{ row.type }}</span>
-          </template>
+          <el-input
+            v-else-if="!isReadonly"
+            :model-value="row.reversalReason"
+            type="textarea"
+            :autosize="{ minRows: 1, maxRows: 3 }"
+            @update:model-value="(v: string) => { row.reversalReason = v; persist() }"
+          />
+          <span v-else>{{ row.reversalReason || '-' }}</span>
         </template>
       </el-table-column>
-
-      <!-- 金额 -->
-      <el-table-column label="金额" min-width="120" align="right">
-        <template #default="{ row }">
-          <template v-if="row._isTotal">
-            <span class="total-num">{{ fmtNum(totalAmount) }}</span>
-          </template>
-          <template v-else>
-            <el-input-number v-if="!isReadonly" v-model="row.amount" size="small"
-              :controls="false" class="compact-num" @change="handleFieldChange" />
-            <span v-else>{{ fmtNum(row.amount) }}</span>
-          </template>
-        </template>
-      </el-table-column>
-
-      <!-- 原因 -->
-      <el-table-column label="原因" min-width="160">
+      <el-table-column label="收回方式" min-width="110">
         <template #default="{ row }">
           <template v-if="row._isTotal" />
-          <template v-else>
-            <el-input v-if="!isReadonly" v-model="row.reason" size="small" type="textarea"
-              :autosize="{ minRows: 1, maxRows: 3 }" @change="handleFieldChange" />
-            <span v-else>{{ row.reason }}</span>
-          </template>
+          <el-input
+            v-else-if="!isReadonly"
+            :model-value="row.recoveryMethod"
+            size="small"
+            placeholder="现金/抵债..."
+            @change="(v: string) => { row.recoveryMethod = v; persist() }"
+          />
+          <span v-else>{{ row.recoveryMethod || '-' }}</span>
         </template>
       </el-table-column>
-
-      <!-- 审批程序 -->
-      <el-table-column label="审批程序" min-width="140">
+      <el-table-column label="原确定减值准备的依据" min-width="140">
         <template #default="{ row }">
           <template v-if="row._isTotal" />
-          <template v-else>
-            <el-input v-if="!isReadonly" v-model="row.approvalProcedure" size="small"
-              @change="handleFieldChange" />
-            <span v-else>{{ row.approvalProcedure }}</span>
-          </template>
+          <el-input
+            v-else-if="!isReadonly"
+            :model-value="row.originalBasis"
+            type="textarea"
+            :autosize="{ minRows: 1, maxRows: 3 }"
+            @update:model-value="(v: string) => { row.originalBasis = v; persist() }"
+          />
+          <span v-else>{{ row.originalBasis || '-' }}</span>
         </template>
       </el-table-column>
-
-      <!-- 合理性结论 -->
-      <el-table-column label="合理性结论" width="115" align="center">
+      <el-table-column label="收回或转回金额" min-width="120" align="right">
+        <template #default="{ row }">
+          <span v-if="row._isTotal" class="total-num">{{ fmtNum(rw.reversalSummary.value.totalReversalAmount) }}</span>
+          <el-input-number
+            v-else-if="!isReadonly"
+            :model-value="row.reversalAmount"
+            size="small"
+            :controls="false"
+            class="amt"
+            :class="{ 'amt-invalid': !rw.isRowValid(row) }"
+            @change="(v: number | undefined) => { row.reversalAmount = v ?? 0; persist() }"
+          />
+          <span v-else :class="{ 'amt-invalid-text': !rw.isRowValid(row) }">{{ fmtNum(row.reversalAmount) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="转回前累计已计提" min-width="130" align="right">
+        <template #default="{ row }">
+          <span v-if="row._isTotal" class="total-num">{{ fmtNum(rw.reversalSummary.value.totalAccumulatedProvision) }}</span>
+          <el-input-number
+            v-else-if="!isReadonly"
+            :model-value="row.accumulatedProvision"
+            size="small"
+            :controls="false"
+            class="amt"
+            @change="(v: number | undefined) => { row.accumulatedProvision = v ?? 0; persist() }"
+          />
+          <span v-else>{{ fmtNum(row.accumulatedProvision) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="合理性分析" min-width="140">
         <template #default="{ row }">
           <template v-if="row._isTotal" />
-          <template v-else>
-            <el-select v-if="!isReadonly" v-model="row.reasonConclusion" size="small"
-              placeholder="请选择" style="width: 95px" @change="handleFieldChange">
-              <el-option label="合理" value="合理" />
-              <el-option label="基本合理" value="基本合理" />
-              <el-option label="不合理" value="不合理" />
-            </el-select>
-            <span v-else>{{ row.reasonConclusion }}</span>
-          </template>
+          <el-input
+            v-else-if="!isReadonly"
+            :model-value="row.reasonAnalysis"
+            type="textarea"
+            :autosize="{ minRows: 1, maxRows: 3 }"
+            @update:model-value="(v: string) => { row.reasonAnalysis = v; persist() }"
+          />
+          <span v-else>{{ row.reasonAnalysis || '-' }}</span>
         </template>
       </el-table-column>
-
-      <!-- 索引 -->
-      <el-table-column label="索引" width="100">
+      <el-table-column label="是否合理" width="110" align="center">
         <template #default="{ row }">
           <template v-if="row._isTotal" />
-          <template v-else>
-            <GtIndexChip v-if="row.indexRef" :value="row.indexRef" />
-            <el-input v-else-if="!isReadonly" v-model="row.indexRef" size="small" placeholder="索引"
-              @change="handleFieldChange" />
-          </template>
+          <el-select
+            v-else-if="!isReadonly"
+            :model-value="row.isReasonable"
+            size="small"
+            style="width: 100%"
+            @change="(v: string) => { row.isReasonable = v as any; persist() }"
+          >
+            <el-option value="合理" label="合理" />
+            <el-option value="基本合理" label="基本合理" />
+            <el-option value="不合理" label="不合理" />
+          </el-select>
+          <span v-else>{{ row.isReasonable || '-' }}</span>
         </template>
       </el-table-column>
-
-      <!-- 操作列（删除） -->
+      <el-table-column label="索引" width="90" align="center">
+        <template #default="{ row }">
+          <template v-if="row._isTotal" />
+          <GtIndexChip
+            v-else
+            :value="row.indexRef"
+            @update="(v: string) => { row.indexRef = v; persist() }"
+          />
+        </template>
+      </el-table-column>
       <el-table-column v-if="!isReadonly" label="" width="50" align="center">
         <template #default="{ row }">
-          <el-popconfirm v-if="!row._isTotal" title="确认删除此行？" @confirm="handleDeleteRow(row.id)">
+          <el-popconfirm
+            v-if="!row._isTotal"
+            title="确认删除？"
+            @confirm="rw.removeReversalRow(row.id); persist()"
+          >
             <template #reference>
               <el-icon class="delete-icon"><Delete /></el-icon>
             </template>
@@ -193,71 +214,224 @@
       </el-table-column>
     </el-table>
 
-    <!-- 审计说明 -->
-    <el-card class="audit-note-card" shadow="never">
-      <template #header>
-        <div class="audit-note-header"><span>审计说明</span></div>
-      </template>
+    <!-- Tab2: 核销 -->
+    <el-table
+      v-show="rw.activeTab.value === 'tab2'"
+      :data="writeOffDisplayRows"
+      border
+      size="small"
+      max-height="480"
+      row-key="id"
+      :row-class-name="writeOffRowClass"
+      class="rw-table"
+      highlight-current-row
+      @current-change="onWriteOffCurrent"
+    >
+      <el-table-column label="序号" width="55" align="center">
+        <template #default="{ row }">
+          <span v-if="row._isTotal" class="total-label">合计</span>
+          <span v-else>{{ row.seq }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="单位名称" min-width="130">
+        <template #default="{ row }">
+          <template v-if="row._isTotal" />
+          <el-input
+            v-else-if="!isReadonly"
+            :model-value="row.unitName"
+            size="small"
+            @change="(v: string) => { row.unitName = v; persist() }"
+          />
+          <span v-else>{{ row.unitName }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="其他债权投资的性质" min-width="140">
+        <template #default="{ row }">
+          <template v-if="row._isTotal" />
+          <el-input
+            v-else-if="!isReadonly"
+            :model-value="row.writeOffType"
+            size="small"
+            placeholder="债券/信托..."
+            @change="(v: string) => { row.writeOffType = v; persist() }"
+          />
+          <span v-else>{{ row.writeOffType || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="核销金额" min-width="120" align="right">
+        <template #default="{ row }">
+          <span v-if="row._isTotal" class="total-num">{{ fmtNum(rw.writeOffSummary.value.totalWriteOffAmount) }}</span>
+          <el-input-number
+            v-else-if="!isReadonly"
+            :model-value="row.writeOffAmount"
+            size="small"
+            :controls="false"
+            class="amt"
+            @change="(v: number | undefined) => { row.writeOffAmount = v ?? 0; persist() }"
+          />
+          <span v-else>{{ fmtNum(row.writeOffAmount) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="核销原因" min-width="130">
+        <template #default="{ row }">
+          <template v-if="row._isTotal" />
+          <el-input
+            v-else-if="!isReadonly"
+            :model-value="row.writeOffReason"
+            type="textarea"
+            :autosize="{ minRows: 1, maxRows: 3 }"
+            @update:model-value="(v: string) => { row.writeOffReason = v; persist() }"
+          />
+          <span v-else>{{ row.writeOffReason || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="履行的核销程序" min-width="140">
+        <template #default="{ row }">
+          <template v-if="row._isTotal" />
+          <el-input
+            v-else-if="!isReadonly"
+            :model-value="row.writeOffProcedure"
+            type="textarea"
+            :autosize="{ minRows: 1, maxRows: 3 }"
+            @update:model-value="(v: string) => { row.writeOffProcedure = v; persist() }"
+          />
+          <span v-else>{{ row.writeOffProcedure || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="是否关联交易" width="110" align="center">
+        <template #default="{ row }">
+          <template v-if="row._isTotal" />
+          <el-switch
+            v-else-if="!isReadonly"
+            :model-value="row.isRelatedParty"
+            @change="(v: boolean) => { row.isRelatedParty = v; persist() }"
+          />
+          <el-tag v-else :type="row.isRelatedParty ? 'warning' : 'info'" size="small">
+            {{ row.isRelatedParty ? '是' : '否' }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="合理性分析" min-width="140">
+        <template #default="{ row }">
+          <template v-if="row._isTotal" />
+          <el-input
+            v-else-if="!isReadonly"
+            :model-value="row.reasonAnalysis"
+            type="textarea"
+            :autosize="{ minRows: 1, maxRows: 3 }"
+            :class="{ 'field-required': row.isRelatedParty && !row.reasonAnalysis }"
+            :placeholder="row.isRelatedParty ? '关联交易须说明' : ''"
+            @update:model-value="(v: string) => { row.reasonAnalysis = v; persist() }"
+          />
+          <span v-else>{{ row.reasonAnalysis || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="是否合理" width="110" align="center">
+        <template #default="{ row }">
+          <template v-if="row._isTotal" />
+          <el-select
+            v-else-if="!isReadonly"
+            :model-value="row.isReasonable"
+            size="small"
+            style="width: 100%"
+            @change="(v: string) => { row.isReasonable = v as any; persist() }"
+          >
+            <el-option value="合理" label="合理" />
+            <el-option value="基本合理" label="基本合理" />
+            <el-option value="不合理" label="不合理" />
+          </el-select>
+          <span v-else>{{ row.isReasonable || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="索引" width="90" align="center">
+        <template #default="{ row }">
+          <template v-if="row._isTotal" />
+          <GtIndexChip
+            v-else
+            :value="row.indexRef"
+            @update="(v: string) => { row.indexRef = v; persist() }"
+          />
+        </template>
+      </el-table-column>
+      <el-table-column v-if="!isReadonly" label="" width="50" align="center">
+        <template #default="{ row }">
+          <el-popconfirm
+            v-if="!row._isTotal"
+            title="确认删除？"
+            @confirm="rw.removeWriteOffRow(row.id); persist()"
+          >
+            <template #reference>
+              <el-icon class="delete-icon"><Delete /></el-icon>
+            </template>
+          </el-popconfirm>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <div class="summary-bar">
+      <span class="sum-item">转回合计 <strong>{{ fmtNum(rw.reversalSummary.value.totalReversalAmount) }}</strong></span>
+      <span class="sum-item">核销合计 <strong>{{ fmtNum(rw.writeOffSummary.value.totalWriteOffAmount) }}</strong></span>
+      <span v-if="rw.reversalSummary.value.invalidCount > 0" class="sum-warn">
+        超限 {{ rw.reversalSummary.value.invalidCount }} 项
+      </span>
+      <span v-if="rw.writeOffSummary.value.relatedPartyCount > 0" class="sum-warn">
+        关联交易核销 {{ rw.writeOffSummary.value.relatedPartyCount }} 项
+      </span>
+    </div>
+
+    <el-card shadow="never" class="section-card">
+      <template #header><div class="section-header"><span class="section-title">三、审计说明</span></div></template>
       <el-input
         type="textarea"
         :model-value="auditNote"
         :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：概述转回/核销/收回检查执行的审计程序、审批程序核查情况与结果、拟调整/未调整事项及其影响。"
-        @change="saveAuditNote"
+        :autosize="{ minRows: 4 }"
+        placeholder="概述转回/核销检查程序、审批核查、关联交易关注事项及与 G6-12 本年转回勾稽。"
+        @update:model-value="saveAuditNote"
       />
     </el-card>
 
-    <!-- 底部审计结论 -->
-    <el-card class="conclusion-card" shadow="never">
-      <div class="conclusion-header">
-        <span class="conclusion-title">审计结论</span>
-      </div>
+    <el-card shadow="never" class="section-card">
+      <template #header>
+        <div class="section-header">
+          <span class="section-title">四、审计结论</span>
+          <el-button size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="handleAi">🤖 AI</el-button>
+        </div>
+      </template>
       <el-input
-        v-model="conclusion"
+        v-model="rw.conclusion.value"
         type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请输入转回核销检查的审计结论..."
         :disabled="isReadonly"
-        @change="handleConclusionChange"
+        :autosize="{ minRows: 3 }"
+        placeholder="A、转回/核销恰当。B、除下述事项外未见异常。C、存在重大不当事项须调整。"
+        @change="persist"
       />
     </el-card>
 
-    <!-- 编制提示 -->
     <details class="prep-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>转回：原计提减值的事由已消除，需说明具体消除原因</li>
-        <li>核销：债务人确无偿还能力或完成债务重组/以物抵债，需附审批文件</li>
-        <li>收回：已核销坏账后续实际收款，关注对当期损益影响</li>
-        <li>三类操作均需充分的审批程序说明和合理性分析</li>
-        <li>合理性结论：基于审批流程完整性和商业理由充分性综合判断</li>
+        <li>转回/收回金额不得超过转回前累计已计提减值准备。</li>
+        <li>核销须检查审批程序；关联交易须额外说明合理性。</li>
+        <li>转回合计宜与 G6-12「本年转回」勾稽核对。</li>
       </ul>
-    </details>
-
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * G6TabReversalWriteOff.vue — G6-14 减值准备转回（收回）、核销检查表
- *
- * 42行×8列简洁动态行表格
- * 动态行增删（ElMessageBox.prompt输入投资项目名）+ 底部金额合计
- * 导入导出dropdown + AI结论 + 复核 + GtIndexChip
- *
- * Requirements: 5.1, 5.4
+ * G6TabReversalWriteOff.vue — 对齐 Excel《减值准备转回（收回）、核销检查表G6-14》
  */
 import { ref, computed, inject, onMounted } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import { useG6EclFormData, type ReversalWriteOffRow } from '../../composables/useG6EclFormData'
+import { ElMessage } from 'element-plus'
+import { useG6EclFormData } from '../../composables/useG6EclFormData'
+import type { G6ReversalRow, G6WriteOffRow } from '../../composables/useG6EclFormData'
+import { useG6EclReversalWriteOff } from '../../composables/useG6EclReversalWriteOff'
 import { useG6EclAiGenerate } from '../../composables/useG6EclAiGenerate'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G6EclImportExportDropdown from '../G6EclImportExportDropdown.vue'
-
-// ─── Props ──────────────────────────────────────────────────────────────────
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -268,364 +442,222 @@ const props = defineProps<{
 
 const emit = defineEmits<{ imported: [] }>()
 
-// ─── inject openReviewDialog ────────────────────────────────────────────────
+const DATA_KEY = 'G6-14-reversal-writeoff-data'
+const NOTE_KEY = 'G6-14-reversal-writeoff-audit-note'
+const CONCLUSION_KEY = 'G6-14-reversal-writeoff-conclusion'
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
-
-// ─── 数据状态 ───────────────────────────────────────────────────────────────
-
-const rows = ref<ReversalWriteOffRow[]>([])
-const conclusion = ref('')
-
-// ─── useG6EclFormData 用于持久化 ────────────────────────────────────────────
-
+const isReadonly = computed(() => props.isReadonly)
 const wpIdRef = computed(() => props.wpId)
-const projectIdRef = computed(() => props.projectId)
-const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG6EclAiGenerate(wpIdRef)
 
+const rw = useG6EclReversalWriteOff()
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG6EclAiGenerate(wpIdRef)
 const formData = useG6EclFormData({
   wpId: wpIdRef,
-  projectId: projectIdRef,
+  projectId: computed(() => props.projectId),
 })
 
-// ─── 审计说明（持久化 checklist_responses, conclusion:null） ───
-const NOTE_KEY = 'G6-14-reversal-writeoff-audit-note'
 const auditNote = ref('')
+const segmentOptions = [
+  { label: '（一）转回/收回', value: 'tab1' },
+  { label: '（二）核销', value: 'tab2' },
+]
+
+const gateAlertTitle = computed(() => {
+  const g = rw.gate.value
+  const parts: string[] = []
+  if (g.invalidReversals) parts.push(`${g.invalidReversals} 项转回超限`)
+  if (g.relatedMissingAnalysis) parts.push(`${g.relatedMissingAnalysis} 项关联核销缺分析`)
+  if (g.unreasonableReversals || g.unreasonableWriteOffs) {
+    parts.push(`${g.unreasonableReversals + g.unreasonableWriteOffs} 项判定不合理`)
+  }
+  return parts.length ? `质量闸门待补：${parts.join('；')}` : ''
+})
+
+type RevDisplay = G6ReversalRow & { _isTotal?: boolean }
+type WoDisplay = G6WriteOffRow & { _isTotal?: boolean }
+
+const reversalDisplayRows = computed<RevDisplay[]>(() => {
+  const list = rw.reversals.value as RevDisplay[]
+  if (!list.length) return []
+  return [
+    ...list,
+    {
+      ...list[0],
+      id: '__total_rev__',
+      seq: 0,
+      unitName: '',
+      _isTotal: true,
+      reversalAmount: rw.reversalSummary.value.totalReversalAmount,
+      accumulatedProvision: rw.reversalSummary.value.totalAccumulatedProvision,
+    },
+  ]
+})
+
+const writeOffDisplayRows = computed<WoDisplay[]>(() => {
+  const list = rw.writeOffs.value as WoDisplay[]
+  if (!list.length) return []
+  return [
+    ...list,
+    {
+      ...list[0],
+      id: '__total_wo__',
+      seq: 0,
+      unitName: '',
+      _isTotal: true,
+      writeOffAmount: rw.writeOffSummary.value.totalWriteOffAmount,
+    },
+  ]
+})
+
+function reversalRowClass({ row }: { row: RevDisplay }): string {
+  if (row._isTotal) return 'row-total'
+  if (!rw.isRowValid(row)) return 'row-invalid'
+  if (row.isReasonable === '不合理') return 'row-unreasonable'
+  return ''
+}
+
+function writeOffRowClass({ row }: { row: WoDisplay }): string {
+  if (row._isTotal) return 'row-total'
+  if (row.isRelatedParty) return 'row-related'
+  if (row.isReasonable === '不合理') return 'row-unreasonable'
+  return ''
+}
+
+function onReversalCurrent(row: RevDisplay | null) {
+  if (!row || row._isTotal) return
+  const idx = rw.reversals.value.findIndex(r => r.id === row.id)
+  if (idx >= 0) rw.activeRowIndex.value = idx
+}
+
+function onWriteOffCurrent(row: WoDisplay | null) {
+  if (!row || row._isTotal) return
+  const idx = rw.writeOffs.value.findIndex(r => r.id === row.id)
+  if (idx >= 0) rw.activeRowIndex.value = idx
+}
+
+async function handleAddRow() {
+  if (rw.activeTab.value === 'tab1') await rw.addReversalRow()
+  else await rw.addWriteOffRow()
+  persist()
+}
+
+function persist(): void {
+  if (props.isReadonly) return
+  const payload = rw.toJSON()
+  formData.debouncedSave(DATA_KEY, {
+    conclusion: null,
+    remark: JSON.stringify(payload),
+  })
+  formData.debouncedSave(CONCLUSION_KEY, { conclusion: rw.conclusion.value })
+}
+
 function saveAuditNote(val: string): void {
   if (props.isReadonly) return
   auditNote.value = val
   formData.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
 }
 
-// ─── 显示行（含底部合计行） ─────────────────────────────────────────────────
-
-interface DisplayRow extends ReversalWriteOffRow {
-  _isTotal?: boolean
-}
-
-const displayRows = computed<DisplayRow[]>(() => {
-  const result: DisplayRow[] = [...rows.value]
-  result.push({
-    id: '__total__',
-    seq: 0,
-    investProject: '',
-    type: '转回',
-    amount: 0,
-    reason: '',
-    approvalProcedure: '',
-    reasonConclusion: '合理',
-    indexRef: '',
-    _isTotal: true,
-  })
-  return result
-})
-
-/** 金额合计 */
-const totalAmount = computed(() => {
-  return rows.value.reduce((sum, r) => sum + (r.amount || 0), 0)
-})
-
-// ─── 行样式 ─────────────────────────────────────────────────────────────────
-
-function rowClassName({ row }: { row: DisplayRow }): string {
-  if (row._isTotal) return 'row-total'
-  if (row.reasonConclusion === '不合理') return 'row-unreasonable'
-  return ''
-}
-
-// ─── 动态行增删 ─────────────────────────────────────────────────────────────
-
-async function handleAddRow(): Promise<void> {
-  try {
-    const { value } = await ElMessageBox.prompt('请输入投资项目名称', '新增行', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      inputPlaceholder: '投资项目名称',
-      inputValidator: (v: string) => (v && v.trim() ? true : '项目名称不能为空'),
-    })
-    if (!value?.trim()) return
-
-    const newRow: ReversalWriteOffRow = {
-      id: `rwo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      seq: rows.value.length + 1,
-      investProject: value.trim(),
-      type: '转回',
-      amount: 0,
-      reason: '',
-      approvalProcedure: '',
-      reasonConclusion: '合理',
-      indexRef: '',
-    }
-    rows.value.push(newRow)
-    handleFieldChange()
-  } catch {
-    // 用户取消
-  }
-}
-
-function handleDeleteRow(rowId: string): void {
-  const idx = rows.value.findIndex((r) => r.id === rowId)
-  if (idx >= 0) {
-    rows.value.splice(idx, 1)
-    // 重新编号
-    rows.value.forEach((r, i) => { r.seq = i + 1 })
-    handleFieldChange()
-  }
-}
-
-// ─── 保存 ───────────────────────────────────────────────────────────────────
-
-function handleFieldChange(): void {
-  formData.debouncedSave('G6-14-reversal-writeoff-data', {
-    conclusion: null,
-    remark: JSON.stringify({ rows: rows.value, conclusion: conclusion.value }),
-  })
-}
-
-function handleConclusionChange(): void {
-  formData.saveImmediate('G6-14-reversal-writeoff-conclusion', {
-    conclusion: conclusion.value,
-  })
-}
-
-// ─── AI生成结论（reversal-writeoff-conclusion） ─────────────────────────────
-
 async function handleAi(): Promise<void> {
   if (props.isReadonly) return
   const text = await generateAndConfirm(
     'reversal-writeoff-conclusion',
-    conclusion.value || '',
-    { rowCount: rows.value.length, totalAmount: totalAmount.value },
+    rw.conclusion.value || '',
+    {
+      reversalCount: rw.reversals.value.length,
+      writeOffCount: rw.writeOffs.value.length,
+      totals: {
+        reversal: rw.reversalSummary.value.totalReversalAmount,
+        writeOff: rw.writeOffSummary.value.totalWriteOffAmount,
+      },
+      gate: rw.gate.value,
+    },
     'AI 审计结论',
   )
   if (text) {
-    conclusion.value = text
-    handleConclusionChange()
+    rw.conclusion.value = text
+    persist()
   }
 }
-
-// ─── 数字格式化 ─────────────────────────────────────────────────────────────
 
 function fmtNum(v: unknown): string {
-  if (v === 0) return '0.00'
-  if (typeof v === 'number') {
-    return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
-  return String(v ?? '')
+  const n = Number(v)
+  if (!Number.isFinite(n) || Math.abs(n) < 1e-9) return '-'
+  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-// ─── 数据加载 ───────────────────────────────────────────────────────────────
-
-async function loadData(): Promise<void> {
-  // 优先从 htmlData prop 加载
-  const source = props.htmlData?.reversalWriteOff ?? props.htmlData
-  if (source?.rows && Array.isArray(source.rows)) {
-    rows.value = source.rows.map((r: any, idx: number) => ({
-      id: r.id || `rwo-${idx}-${Date.now()}`,
-      seq: r.seq ?? idx + 1,
-      investProject: r.investProject || '',
-      type: r.type || '转回',
-      amount: r.amount ?? 0,
-      reason: r.reason || '',
-      approvalProcedure: r.approvalProcedure || '',
-      reasonConclusion: r.reasonConclusion || '合理',
-      indexRef: r.indexRef || '',
-    }))
-    if (source.conclusion) conclusion.value = source.conclusion
-    return
-  }
-
-  // fallback: checklist-responses 加载
-  await formData.loadAll()
-  const resp = formData.allResponses.value.get('G6-14-reversal-writeoff-data')
-  if (resp?.remark) {
-    try {
-      const parsed = JSON.parse(resp.remark)
-      if (Array.isArray(parsed.rows)) {
-        rows.value = parsed.rows
-      }
-      if (parsed.conclusion) conclusion.value = parsed.conclusion
-    } catch { /* ignore parse error */ }
-  }
-  const conclResp = formData.allResponses.value.get('G6-14-reversal-writeoff-conclusion')
-  if (conclResp?.conclusion) {
-    conclusion.value = conclResp.conclusion
-  }
+async function onImported(): Promise<void> {
+  try { await formData.loadAll() } catch { /* ignore */ }
+  initFromData()
+  emit('imported')
+  ElMessage.success('G6-14 数据已导入并刷新')
 }
 
-// ─── 生命周期 ───────────────────────────────────────────────────────────────
+function initFromData(): void {
+  const saved = formData.allResponses.value.get(DATA_KEY)
+  let raw: any = null
+  if (saved?.remark) {
+    try { raw = JSON.parse(saved.remark) } catch { /* ignore */ }
+  }
+  if (!raw) raw = formData.parseContent()?.reversalWriteOff
+  if (!raw && props.htmlData?.reversalWriteOff) raw = props.htmlData.reversalWriteOff
+  rw.loadData(raw)
+  const conc = formData.allResponses.value.get(CONCLUSION_KEY)
+  if (conc?.conclusion) rw.conclusion.value = conc.conclusion
+}
 
 onMounted(async () => {
-  await loadData()
   await formData.loadAll()
+  initFromData()
   const n = formData.allResponses.value.get(NOTE_KEY)
   if (n?.remark) auditNote.value = n.remark
 })
 
-// ─── 暴露序列化接口 ─────────────────────────────────────────────────────────
-
-defineExpose({
-  toJSON: () => ({
-    rows: rows.value,
-    conclusion: conclusion.value,
-    totalAmount: totalAmount.value,
-  }),
-})
+defineExpose({ toJSON: () => rw.toJSON() })
 </script>
 
 <style scoped>
-.g6-reversal-writeoff {
-  padding: 12px;
-  font-size: var(--wp-font-size, 13px);
-}
-
-/* 方法论上下文 */
+.g6-reversal-writeoff { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.objective-alert, .gate-alert { margin-bottom: 10px; }
 .methodology-context {
-  margin-bottom: 12px;
-  padding: 10px 14px;
-  border-left: 3px solid #e6a23c;
-  background: #fdf6ec;
-  border-radius: 4px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: #606266;
+  border-left: 4px solid #e6a23c; background: #fdf6ec;
+  padding: 10px 14px; margin-bottom: 12px; border-radius: 0 4px 4px 0;
+  font-size: 12px; line-height: 1.7; color: #6b5900;
 }
-.methodology-context p {
-  margin: 0;
-}
-.methodology-context strong {
-  color: #303133;
-}
-
-/* 审计目标 / 工具栏 */
-.objective-alert {
-  margin-bottom: 12px;
-}
+.methodology-title { font-weight: 600; margin: 0 0 4px; }
+.methodology-context p { margin: 2px 0; }
 .tab-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: flex; justify-content: space-between; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;
 }
-.toolbar-left { display: flex; gap: 8px; align-items: center; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; }
-.chip-wrap { display: inline-flex; align-items: center; }
-
-/* 审计说明卡片 */
-.audit-note-card {
-  margin-top: 16px;
+.toolbar-left, .toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; }
+.section-label { margin: 0 0 8px; font-size: 13px; color: #606266; font-weight: 600; }
+.rw-table { font-size: var(--wp-font-size, 13px); }
+.amt { width: 100%; }
+.amt :deep(.el-input__inner) { text-align: right; }
+:deep(.amt-invalid .el-input__wrapper) { box-shadow: 0 0 0 1px #f56c6c inset; }
+.amt-invalid-text { color: #f56c6c; font-weight: 600; }
+:deep(.field-required .el-textarea__inner) { box-shadow: 0 0 0 1px #e6a23c inset; }
+:deep(.row-total) { background: #ecf5ff !important; font-weight: 700; }
+:deep(.row-invalid) { background: #fef0f0 !important; }
+:deep(.row-related) { background: #fdf6ec !important; }
+:deep(.row-unreasonable) { background: #fef0f0 !important; }
+.total-label { color: #409eff; font-weight: 700; }
+.total-num { font-weight: 700; }
+.delete-icon { cursor: pointer; color: #909399; }
+.delete-icon:hover { color: #f56c6c; }
+.summary-bar {
+  display: flex; gap: 14px; flex-wrap: wrap; align-items: center;
+  margin: 12px 0; padding: 8px 12px;
+  background: #fafafa; border: 1px solid #ebeef5; border-radius: 4px;
+  font-size: 13px; color: #606266;
 }
-.audit-note-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
-}
-
-/* 标题栏 */
-.section-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.sheet-title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.head-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-/* 表格 */
-.reversal-table {
-  font-size: var(--wp-font-size, 13px);
-}
-
-.compact-num {
-  width: 100%;
-}
-
-.compact-num :deep(.el-input__inner) {
-  text-align: right;
-}
-
-/* 不合理行 */
-:deep(.row-unreasonable) {
-  background-color: #fef0f0 !important;
-}
-:deep(.row-unreasonable td) {
-  background-color: #fef0f0 !important;
-}
-
-/* 合计行 */
-:deep(.row-total) {
-  background-color: #ecf5ff !important;
-  font-weight: 700;
-}
-:deep(.row-total td) {
-  background-color: #ecf5ff !important;
-}
-
-.total-label {
-  color: #409eff;
-  font-weight: 700;
-}
-
-.total-num {
-  font-weight: 700;
-  color: #303133;
-}
-
-/* 删除图标 */
-.delete-icon {
-  cursor: pointer;
-  color: #909399;
-  transition: color 0.2s;
-}
-.delete-icon:hover {
-  color: #f56c6c;
-}
-
-/* 审计结论卡片 */
-.conclusion-card {
-  margin-top: 16px;
-}
-
-.conclusion-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.conclusion-title {
-  font-weight: 600;
-  font-size: 14px;
-}
-
-/* 编制提示 */
-.prep-hint {
-  margin-top: 12px;
-  font-size: 12px;
-  color: #909399;
-}
-.prep-hint summary {
-  cursor: pointer;
-  font-weight: 500;
-}
-.prep-hint ul {
-  margin: 8px 0 0;
-  padding-left: 18px;
-}
-.prep-hint li {
-  margin-bottom: 4px;
-}
+.sum-item strong { color: #303133; }
+.sum-warn { color: #e6a23c; font-weight: 600; }
+.section-card { margin-top: 14px; }
+.section-header { display: flex; justify-content: space-between; align-items: center; }
+.section-title { font-weight: 600; }
+.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
+.prep-hint summary { cursor: pointer; font-weight: 500; }
+.prep-hint ul { margin: 8px 0 0; padding-left: 18px; }
 </style>

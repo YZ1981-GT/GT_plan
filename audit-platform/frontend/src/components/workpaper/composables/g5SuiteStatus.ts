@@ -104,6 +104,19 @@ function g512Gate(map: Map<string, ChecklistResponse>): boolean | null {
   )
 }
 
+function g52AgingGate(map: Map<string, ChecklistResponse>): boolean | null {
+  const rows = parseCanonicalArray(map.get(G5_ITEM_IDS.G5_2_ROWS))
+  if (!rows.length) return null
+  return rows.every((row) => {
+    const net = num(row.netAmount)
+    const aging = row.agingAudited
+    if (!aging || typeof aging !== 'object') return Math.abs(net) < 0.01
+    const aged = Object.values(aging as Record<string, unknown>).reduce((s, v) => s + num(v), 0)
+    const agingTotal = num(row.agingTotal) || aged
+    return Math.abs(agingTotal - net) < 0.01
+  })
+}
+
 export function evaluateG5SuiteStatus(
   map: Map<string, ChecklistResponse>,
 ): G5SheetStatus[] {
@@ -111,6 +124,7 @@ export function evaluateG5SuiteStatus(
     const hasData = codeResponses(map, code).some(([, response]) => hasMeaningfulResponse(response))
     let gate: boolean | null = null
     let balance: boolean | null = null
+    if (code === 'G5-2') gate = g52AgingGate(map)
     if (code === 'G5-4') balance = g54Balance(map)
     if (code === 'G5-11') gate = g511Gate(map)
     if (code === 'G5-12') gate = g512Gate(map)

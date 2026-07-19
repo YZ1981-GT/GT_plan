@@ -83,10 +83,34 @@ export function calcCashInflow(faceValue: number, couponRate: number, days: numb
  * @param opening 期初摊余成本
  * @param interest 实际利息收入
  * @param cashInflow 现金流入（票息）
+ * @param principalRecovered 已收回本金（可选，默认 0）
  * @returns 期末摊余成本，保留2位小数
  */
-export function calcEndingAmortized(opening: number, interest: number, cashInflow: number): number {
-  return Math.round((parseNum(opening) + parseNum(interest) - parseNum(cashInflow)) * 100) / 100
+export function calcEndingAmortized(
+  opening: number,
+  interest: number,
+  cashInflow: number,
+  principalRecovered = 0,
+): number {
+  return Math.round(
+    (parseNum(opening) + parseNum(interest) - parseNum(cashInflow) - parseNum(principalRecovered)) * 100,
+  ) / 100
+}
+
+/**
+ * Actual/365：由起止日期推算计息天数（不含起点、含终点的日历差）。
+ * 无效/逆序/超 366 → null
+ */
+export function calcInterestDays(startDate: string, endDate: string): number | null {
+  const start = String(startDate || '').trim()
+  const end = String(endDate || '').trim()
+  if (!start || !end) return null
+  const a = new Date(`${start}T00:00:00`)
+  const b = new Date(`${end}T00:00:00`)
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime()) || b <= a) return null
+  const days = Math.round((b.getTime() - a.getTime()) / 86400000)
+  if (days < 1 || days > 366) return null
+  return days
 }
 
 // ══════════════════════════════════════════════════════════

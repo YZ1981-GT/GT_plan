@@ -21,6 +21,17 @@
         >
           从 G6-1/G6-2 更新
         </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="warning"
+          plain
+          :loading="writingBack"
+          :disabled="!interest.groups.value.length"
+          @click="writebackToG62"
+        >
+          回写利息调整至 G6-2
+        </el-button>
       </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:G6-6" :context-project-id="projectId" /></span>
@@ -214,7 +225,7 @@
       />
     </div>
 
-    <!-- ═══ 底部交叉验证 ═══ -->
+    <!-- ═══ 底部交叉验证（三层勾稽） ═══ -->
     <el-card shadow="never" class="cross-validation-card">
       <template #header>
         <div class="section-header">
@@ -223,36 +234,73 @@
       </template>
       <div class="cv-grid">
         <div class="cv-item">
-          <span class="cv-label">本表利息合计</span>
+          <span class="cv-label">本表实际利息合计</span>
           <span class="cv-value">{{ fmtNum(interest.totalInterest.value) }}</span>
+        </div>
+        <div class="cv-item">
+          <span class="cv-label">本表票息/现金流入</span>
+          <span class="cv-value">{{ fmtNum(interest.totalCashInflow.value) }}</span>
+        </div>
+        <div class="cv-item">
+          <span class="cv-label">利息调整摊销额</span>
+          <span class="cv-value">{{ fmtNum(interest.totalAmortization.value) }}</span>
+          <span class="cv-hint">实际利息 − 票息</span>
+        </div>
+        <div class="cv-item">
+          <span class="cv-label">账面利息收入（损益）</span>
+          <el-input-number
+            v-if="!isReadonly"
+            v-model="interest.bookInterestIncome.value"
+            size="small" :controls="false" :precision="2"
+            style="width: 140px"
+            @change="handleSave"
+          />
+          <span v-else class="cv-value">{{ fmtNum(interest.bookInterestIncome.value) }}</span>
+        </div>
+        <div class="cv-item">
+          <span class="cv-label">损益差异</span>
+          <span
+            class="cv-value"
+            :class="{
+              'cv-pass': interest.incomePassed.value,
+              'cv-fail': interest.incomeLayerActive.value && !interest.incomePassed.value,
+            }"
+          >
+            {{ interest.incomeLayerActive.value ? fmtNum(interest.incomeDiff.value) : '未填基准' }}
+            <el-icon v-if="interest.incomeLayerActive.value && interest.incomePassed.value" style="color: #10b981; margin-left: 4px;">✓</el-icon>
+            <el-icon v-else-if="interest.incomeLayerActive.value" style="color: #ef4444; margin-left: 4px;">✗</el-icon>
+          </span>
         </div>
         <div class="cv-item">
           <span class="cv-label">G6-1利息调整本期变动</span>
           <el-input-number
             v-if="!isReadonly"
-            v-model="interest.auditedInterest.value"
+            v-model="interest.interestAdjPeriodChange.value"
             size="small" :controls="false" :precision="2"
             style="width: 140px"
             @change="handleSave"
           />
-          <span v-else class="cv-value">{{ fmtNum(interest.auditedInterest.value) }}</span>
-          <span class="cv-hint">可手工改为账面利息收入</span>
+          <span v-else class="cv-value">{{ fmtNum(interest.interestAdjPeriodChange.value) }}</span>
+          <span class="cv-hint">摊销口径</span>
         </div>
         <div class="cv-item">
-          <span class="cv-label">差异</span>
+          <span class="cv-label">摊销差异</span>
           <span
             class="cv-value"
             :class="{
-              'cv-pass': interest.crossValidationPassed.value,
-              'cv-fail': !interest.crossValidationPassed.value,
+              'cv-pass': interest.amortizationPassed.value,
+              'cv-fail': !interest.amortizationPassed.value,
             }"
           >
-            {{ fmtNum(interest.crossValidationDiff.value) }}
-            <el-icon v-if="interest.crossValidationPassed.value" style="color: #10b981; margin-left: 4px;">✓</el-icon>
+            {{ fmtNum(interest.amortizationDiff.value) }}
+            <el-icon v-if="interest.amortizationPassed.value" style="color: #10b981; margin-left: 4px;">✓</el-icon>
             <el-icon v-else style="color: #ef4444; margin-left: 4px;">✗</el-icon>
           </span>
         </div>
       </div>
+      <p class="cv-hint" style="margin-top: 8px;">
+        第三层：各项目期末摊余成本应与 G6-2 明细摊余成本勾稽核对。
+      </p>
     </el-card>
 
     <!-- 审计说明 -->
@@ -315,10 +363,11 @@
         <p>3. 每期利息收入 = 期初摊余成本 × 实际利率 × 计息天数/365</p>
         <p>4. 现金流入（票息）= 面值 × 票面利率 × 计息天数/365</p>
         <p>5. 期末摊余成本 = 期初 + 实际利息 - 现金流入（摊余成本逐期调整）</p>
-        <p>6. 交叉验证：本表利息合计与 G6-1 利息调整本期变动（或账面利息收入）勾稽</p>
-        <p>7. 优先用「从 G6-1/G6-2 更新」带入项目、面值、利率与期初摊余成本</p>
-        <p>8. 关注计息天数的准确性（实际天数法vs30/360法）</p>
-        <p>9. 浮动利率债券需关注利率重置日的处理</p>
+        <p>6. 三层勾稽：损益（实际利息↔账面利息）／摊销（实际利息−票息↔G6-1利息调整变动）／项目期末摊余↔G6-2</p>
+        <p>7. 优先用「从 G6-1/G6-2 更新」带入项目、面值、利率与期初摊余成本（成本+利息调整，不含应计利息）</p>
+        <p>8. 测算完成后可用「回写利息调整至 G6-2」将 Σ(实际利息−票息) 写入本期利息调整变动</p>
+        <p>9. 关注计息天数的准确性（实际天数法vs30/360法）</p>
+        <p>10. 浮动利率债券需关注利率重置日的处理</p>
       </div>
     </details>
   </div>
@@ -340,16 +389,19 @@
  * - 审计结论textarea + AI按钮 + 编制提示折叠
  */
 import { computed, inject, onMounted, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useG6SppiInterest } from '../../composables/useG6SppiInterest'
 import { useG6SppiFormData } from '../../composables/useG6SppiFormData'
 import { useG6SppiAiGenerate } from '../../composables/useG6SppiAiGenerate'
 import {
+  applyG66InterestToDetailRows,
   fetchG61InterestAdjPeriodChange,
   fetchG62DetailRows,
   mapG62RowsToInterestSeeds,
   parseG6ChecklistPayload,
+  saveG62DetailRows,
 } from '../../composables/g6CrossHelpers'
+import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G6SppiImportExportDropdown from '../G6SppiImportExportDropdown.vue'
 
@@ -370,14 +422,18 @@ function openReview(sectionId: string): void {
 }
 
 // ─── 数据层 ───
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 const formData = useG6SppiFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
+  onAfterSave: () => scheduleAutoSnapshot(),
 })
 const interest = useG6SppiInterest()
 const wpIdRef = computed(() => props.wpId)
 const { generateAndConfirm, loading: aiLoading } = useG6SppiAiGenerate(wpIdRef)
 const syncing = ref(false)
+const writingBack = ref(false)
 
 const DATA_KEY = 'G6-6-interest-data'
 const ROWS_KEY = 'G6-6-rows'
@@ -426,27 +482,14 @@ watch(() => props.htmlData, (newData) => {
   if (newData) initFromData()
 })
 
-watch(
-  () => {
-    const a = formData.allResponses.value.get(DATA_KEY)
-    const b = formData.allResponses.value.get(ROWS_KEY)
-    return [a?.conclusion, a?.remark, b?.conclusion, b?.remark].join('|')
-  },
-  (fp, prev) => {
-    if (prev != null && fp !== prev) initFromData()
-  },
-)
-
-// ─── 保存：嵌套主键 + 扁平兼容双写 ───
+// ─── 保存：嵌套主键 + 扁平兼容双写（同批防抖） ───
 function handleSave(): void {
   if (props.isReadonly) return
   const nested = interest.toJSON()
-  formData.debouncedSave(DATA_KEY, {
-    conclusion: JSON.stringify(nested),
-  })
-  formData.debouncedSave(ROWS_KEY, {
-    conclusion: JSON.stringify(interest.flattenGroups()),
-  })
+  formData.debouncedSaveBatch([
+    { itemId: DATA_KEY, data: { conclusion: JSON.stringify(nested) } },
+    { itemId: ROWS_KEY, data: { conclusion: JSON.stringify(interest.flattenGroups()) } },
+  ])
 }
 
 async function onImported(): Promise<void> {
@@ -468,7 +511,7 @@ async function syncFromMain(): Promise<void> {
     const seeds = mapG62RowsToInterestSeeds(detailRows)
     const { added, updated } = interest.mergeSeedsFromDetail(seeds)
     if (interestAdjChange != null) {
-      interest.auditedInterest.value = interestAdjChange
+      interest.interestAdjPeriodChange.value = interestAdjChange
     }
     handleSave()
     if (!seeds.length && interestAdjChange == null) {
@@ -486,6 +529,42 @@ async function syncFromMain(): Promise<void> {
   }
 }
 
+async function writebackToG62(): Promise<void> {
+  if (props.isReadonly || !interest.groups.value.length) return
+  writingBack.value = true
+  try {
+    const existing = await fetchG62DetailRows(props.projectId)
+    if (!existing.length) {
+      ElMessage.warning('未找到 G6-2 明细，请先在 Main 底稿编制明细表')
+      return
+    }
+    const preview = applyG66InterestToDetailRows(existing, interest.groups.value)
+    const adjTotal = preview.rows.reduce(
+      (sum, row: any) => sum + (Number(row.periodInterestAdjChange) || 0),
+      0,
+    )
+    try {
+      await ElMessageBox.confirm(
+        `将 Σ(实际利息−票息) 回写至 G6-2「本期利息调整变动」：匹配 ${preview.matched.length} 条，未匹配 ${preview.unmatched.length} 条，回写合计 ${adjTotal.toFixed(2)}。`,
+        'G6-6 回写预览',
+        { confirmButtonText: '确认回写', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return
+    }
+    const mainWpId = await saveG62DetailRows(props.projectId, preview.rows)
+    if (!mainWpId) {
+      ElMessage.error('未找到 G6 Main 底稿，回写失败')
+      return
+    }
+    ElMessage.success(`已回写 ${preview.matched.length} 条利息调整至 G6-2`)
+  } catch {
+    ElMessage.error('回写 G6-2 失败，请稍后重试')
+  } finally {
+    writingBack.value = false
+  }
+}
+
 // watch groups / conclusion 深度变化保存
 watch(() => interest.groups.value, () => {
   handleSave()
@@ -499,8 +578,11 @@ function aiContext() {
   return {
     groupCount: interest.groups.value.length,
     totalInterest: interest.totalInterest.value,
-    auditedInterest: interest.auditedInterest.value,
-    crossValidationDiff: interest.crossValidationDiff.value,
+    totalAmortization: interest.totalAmortization.value,
+    bookInterestIncome: interest.bookInterestIncome.value,
+    interestAdjPeriodChange: interest.interestAdjPeriodChange.value,
+    incomeDiff: interest.incomeDiff.value,
+    amortizationDiff: interest.amortizationDiff.value,
     projects: interest.groups.value.map((g) => g.investProject),
   }
 }
@@ -541,6 +623,7 @@ function fmtNum(v: number | undefined, decimals = 2): string {
 defineExpose({
   toJSON: () => interest.toJSON(),
   syncFromMain,
+  writebackToG62,
 })
 </script>
 

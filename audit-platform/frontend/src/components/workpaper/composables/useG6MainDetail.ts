@@ -15,7 +15,7 @@
  *
  * 分类：按到期日 vs 资产负债表日 → 其他流动资产 / 超过一年
  */
-import { ref, computed, watch, type Ref } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import {
   parseNum,
@@ -25,6 +25,7 @@ import {
   calcDetailReportAmount,
 } from '@/composables/useG6MainFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
+import { normalizeG6Rate } from './g6CrossHelpers'
 
 const DATA_KEY = 'G6-2-rows'
 const BALANCE_SHEET_DATE_KEY = 'G6-2-balance-sheet-date'
@@ -353,8 +354,8 @@ function migrateLegacyRow(raw: any, seq: number): OtherBondDetailRow {
     ...base,
     investCategory: raw.investCategory || raw.invest_category || raw.investType || raw.invest_type || '',
     faceValue: parseNum(raw.faceValue ?? raw.face_value),
-    couponRate: parseNum(raw.couponRate ?? raw.coupon_rate),
-    effectiveRate: parseNum(raw.effectiveRate ?? raw.effective_rate),
+    couponRate: normalizeG6Rate(raw.couponRate ?? raw.coupon_rate),
+    effectiveRate: normalizeG6Rate(raw.effectiveRate ?? raw.effective_rate),
     maturityDate: raw.maturityDate || raw.maturity_date || '',
     openingCost: parseNum(raw.openingCost ?? raw.opening_cost),
     openingInterestAdj: parseNum(raw.openingInterestAdj ?? raw.opening_interest_adj),
@@ -616,6 +617,26 @@ export function useG6MainDetail(opts: UseG6MainDetailOptions) {
     loadFromStore()
     loadMeta()
   }
+
+  function onInterestWriteback(e: Event): void {
+    const detail = (e as CustomEvent<{ wpId?: string; rows?: any[] }>).detail
+    if (!detail?.rows?.length) return
+    if (detail.wpId && detail.wpId !== opts.wpId.value) return
+    rows.value = detail.rows.map((r: any, i: number) => migrateLegacyRow(r, i + 1))
+    const json = JSON.stringify(rows.value.map((r) => ({ ...r })))
+    opts.allResponses.value.set(DATA_KEY, {
+      item_id: DATA_KEY,
+      conclusion: json,
+      remark: json,
+    })
+  }
+
+  onMounted(() => {
+    window.addEventListener('g6:interest-writeback', onInterestWriteback)
+  })
+  onBeforeUnmount(() => {
+    window.removeEventListener('g6:interest-writeback', onInterestWriteback)
+  })
 
   return {
     rows,

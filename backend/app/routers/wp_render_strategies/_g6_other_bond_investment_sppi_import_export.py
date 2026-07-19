@@ -33,9 +33,11 @@ from ._cycle_import_export_common import (
     ROW_LIMIT,
     build_workbook_template,
     export_row_by_keys,
+    load_json_payload,
     load_json_rows,
     safe_float,
     safe_str,
+    upsert_json_payload,
     upsert_json_rows,
     workbook_to_response,
 )
@@ -163,6 +165,7 @@ _ITEM_IDS = {
     "G6-9": "G6-9-rows",
     "G6-10": "G6-10-rows",
 }
+_G6_6_PRIMARY_ITEM_ID = "G6-6-interest-data"
 
 _SUPPORTED_SHEETS = set(_ITEM_IDS.keys())
 
@@ -170,6 +173,175 @@ _SUPPORTED_SHEETS = set(_ITEM_IDS.keys())
 def _validate_sheet(sheet: str) -> None:
     if sheet not in _SUPPORTED_SHEETS:
         raise HTTPException(400, f"不支持的sheet: {sheet}。支持: {sorted(_SUPPORTED_SHEETS)}")
+
+
+def _rate_to_decimal(value: Any) -> float:
+    """Excel 可能填 5 或 0.05；统一存小数。"""
+    num = safe_float(value)
+    if abs(num) > 1:
+        return round(num / 100, 8)
+    return num
+
+
+def _flatten_g6_6_groups(groups: list[dict]) -> list[dict]:
+    """嵌套 InterestGroup[] → 扁平导出行。"""
+    flat: list[dict] = []
+    for group in groups or []:
+        if not isinstance(group, dict):
+            continue
+        if "periods" not in group and ("openingAmortized" in group or "cutoffDate" in group or "periodEnd" in group):
+            row = dict(group)
+            row["couponRate"] = _rate_to_decimal(row.get("couponRate"))
+            row["effectiveRate"] = _rate_to_decimal(row.get("effectiveRate"))
+            if not row.get("cutoffDate") and row.get("periodEnd"):
+                row["cutoffDate"] = row.get("periodEnd")
+            flat.append(row)
+            continue
+        periods = group.get("periods") if isinstance(group.get("periods"), list) else [{}]
+        if not periods:
+            periods = [{}]
+        for idx, period in enumerate(periods):
+            period = period if isinstance(period, dict) else {}
+            flat.append({
+                "id": group.get("id") if idx == 0 else f"{group.get('id')}-{period.get('id') or idx}",
+                "periodId": period.get("id") or "",
+                "investProject": group.get("investProject") or "",
+                "faceValue": group.get("faceValue"),
+                "couponRate": _rate_to_decimal(group.get("couponRate")),
+                "effectiveRate": _rate_to_decimal(group.get("effectiveRate")),
+                "cutoffDate": period.get("periodEnd") or period.get("cutoffDate") or "",
+                "periodEnd": period.get("periodEnd") or period.get("cutoffDate") or "",
+                "openingAmortized": period.get("openingAmortized"),
+                "effectiveInterest": period.get("effectiveInterest"),
+                "cashInflow": period.get("cashInflow"),
+                "endingAmortized": period.get("endingAmortized"),
+                "days": period.get("days"),
+                "remark": period.get("remark") or "",
+            })
+    return flat
+
+
+def _nest_g6_6_flat_rows(rows: list[dict], *, existing: dict | None = None) -> dict:
+    """扁平导出行 → 嵌套 InterestCalculationData。
+
+    保留已有 conclusion / crossValidation 元数据，避免导入清空审计结论与勾稽基准。
+    优先复用 periodId；缺省时按 项目+截止日 匹配旧期间 id。
+    """
+    prev = existing if isinstance(existing, dict) else {}
+    # (normName, periodEnd) → period id
+    prev_period_ids: dict[tuple[str, str], str] = {}
+    prev_group_ids: dict[str, str] = {}
+    for g in prev.get("groups") or []:
+        if not isinstance(g, dict):
+            continue
+        name_key = "".join(safe_str(g.get("investProject")).split())
+        if name_key and g.get("id"):
+            prev_group_ids[name_key] = safe_str(g.get("id"))
+        for p in g.get("periods") or []:
+            if not isinstance(p, dict):
+                continue
+            pend = safe_str(p.get("periodEnd") or p.get("cutoffDate"))
+            pid = safe_str(p.get("id"))
+            if name_key and pend and pid:
+                prev_period_ids[(name_key, pend)] = pid
+
+    grouped: dict[str, dict] = {}
+    order: list[str] = []
+    for row in rows or []:
+        name = safe_str(row.get("investProject") or row.get("projectName")) or "未命名投资项目"
+        key = "".join(name.split())
+        if key not in grouped:
+            row_id = safe_str(row.get("id"))
+            # 首行复合 id（组id-期间id）不作为组 id
+            if row_id and "-" in row_id and key in prev_group_ids:
+                row_id = ""
+            grouped[key] = {
+                "id": prev_group_ids.get(key) or row_id or str(uuid4()),
+                "investProject": name,
+                "faceValue": safe_float(row.get("faceValue")),
+                "couponRate": _rate_to_decimal(row.get("couponRate")),
+                "effectiveRate": _rate_to_decimal(row.get("effectiveRate")),
+                "periods": [],
+            }
+            order.append(key)
+        g = grouped[key]
+        if not g.get("faceValue") and safe_float(row.get("faceValue")):
+            g["faceValue"] = safe_float(row.get("faceValue"))
+        if not g.get("couponRate") and safe_float(row.get("couponRate")):
+            g["couponRate"] = _rate_to_decimal(row.get("couponRate"))
+        if not g.get("effectiveRate") and safe_float(row.get("effectiveRate")):
+            g["effectiveRate"] = _rate_to_decimal(row.get("effectiveRate"))
+        period_end = safe_str(row.get("periodEnd") or row.get("cutoffDate"))
+        period_id = (
+            safe_str(row.get("periodId"))
+            or prev_period_ids.get((key, period_end))
+            or str(uuid4())
+        )
+        g["periods"].append({
+            "id": period_id,
+            "periodEnd": period_end,
+            "openingAmortized": safe_float(row.get("openingAmortized")),
+            "effectiveInterest": safe_float(row.get("effectiveInterest")),
+            "cashInflow": safe_float(row.get("cashInflow")),
+            "endingAmortized": safe_float(row.get("endingAmortized")),
+            "days": safe_float(row.get("days")) or 180,
+            "remark": safe_str(row.get("remark")),
+        })
+
+    prev_cv = prev.get("crossValidation") if isinstance(prev.get("crossValidation"), dict) else {}
+    book_income = safe_float(prev_cv.get("bookInterestIncome"))
+    adj_change = safe_float(
+        prev_cv.get("interestAdjPeriodChange", prev_cv.get("auditedInterest")),
+    )
+    return {
+        "groups": [grouped[k] for k in order],
+        "conclusion": safe_str(prev.get("conclusion")) if prev.get("conclusion") is not None else "",
+        "crossValidation": {
+            "totalInterest": 0,
+            "totalCashInflow": 0,
+            "totalAmortization": 0,
+            "bookInterestIncome": book_income,
+            "interestAdjPeriodChange": adj_change,
+            "incomeDiff": 0,
+            "amortizationDiff": 0,
+            # 兼容旧字段
+            "auditedInterest": adj_change,
+            "difference": 0,
+        },
+    }
+
+
+async def _load_g6_6_nested_payload(db: AsyncSession, wp_id: str) -> dict | None:
+    """读取已有嵌套 G6-6-interest-data（若无则尝试从扁平行重建，但不用于元数据）。"""
+    for item_id in (_G6_6_PRIMARY_ITEM_ID, _ITEM_IDS["G6-6"]):
+        payload = await load_json_payload(db, wp_id, item_id, field="conclusion")
+        if payload is None:
+            payload = await load_json_payload(db, wp_id, item_id, field="remark")
+        if isinstance(payload, dict) and ("groups" in payload or "crossValidation" in payload or "conclusion" in payload):
+            return payload
+    return None
+
+
+async def _load_g6_6_flat_rows(db: AsyncSession, wp_id: str) -> list[dict]:
+    """优先读嵌套 G6-6-interest-data，兼容扁平 G6-6-rows。"""
+    for item_id in (_G6_6_PRIMARY_ITEM_ID, _ITEM_IDS["G6-6"]):
+        payload = await load_json_payload(db, wp_id, item_id, field="conclusion")
+        if payload is None:
+            payload = await load_json_payload(db, wp_id, item_id, field="remark")
+        if payload is None:
+            continue
+        if isinstance(payload, dict) and "groups" in payload:
+            return _flatten_g6_6_groups(payload.get("groups") or [])
+        if isinstance(payload, list):
+            if payload and isinstance(payload[0], dict) and "periods" in payload[0]:
+                return _flatten_g6_6_groups(payload)
+            return _flatten_g6_6_groups(payload)
+    return []
+
+
+async def _upsert_dual_fields(db: AsyncSession, wp_id: str, item_id: str, payload: Any) -> None:
+    await upsert_json_payload(db, wp_id, item_id, payload, field="conclusion")
+    await upsert_json_payload(db, wp_id, item_id, payload, field="remark")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -334,7 +506,10 @@ def _parse_g6_6_import(content: bytes) -> tuple[list[dict], list[dict]]:
                 break
             raw = values[col_i]
             if key in _G6_6_NUMERIC_KEYS:
-                parsed[key] = safe_float(raw)
+                if key in ("couponRate", "effectiveRate"):
+                    parsed[key] = _rate_to_decimal(raw)
+                else:
+                    parsed[key] = safe_float(raw)
             else:
                 parsed[key] = safe_str(raw)
         rows.append(parsed)
@@ -543,7 +718,8 @@ async def g6_sppi_export_template(
                 "实际利息 = 期初摊余成本 × 实际利率 × 计息天数/365。",
                 "现金流入 = 面值 × 票面利率 × 计息天数/365。",
                 "期末摊余 = 期初摊余 + 实际利息 - 现金流入。",
-                "票面利率和实际利率填小数（如0.05表示5%）。",
+                "票面利率和实际利率可填小数（0.05）或百分数（5）；系统统一按小数存储。",
+                "导入后写入 G6-6-interest-data（嵌套）并双写 G6-6-rows（扁平）。",
                 "所有金额列以元为单位。",
             ],
         )
@@ -580,8 +756,11 @@ async def g6_sppi_export_data(
 ) -> StreamingResponse:
     _validate_sheet(sheet)
     item_id = _ITEM_IDS[sheet]
-    rows = await load_json_rows(db, wp_id, item_id, field="conclusion")
-
+    rows = (
+        await _load_g6_6_flat_rows(db, wp_id)
+        if sheet == "G6-6"
+        else await load_json_rows(db, wp_id, item_id, field="conclusion")
+    )
     if sheet == "G6-5":
         wb = _build_g6_5_multi_sheet_workbook(rows)
         return workbook_to_response(wb, "G6-5_公允价值测试表_数据.xlsx")
@@ -647,7 +826,15 @@ async def g6_sppi_import_data(
 
     # 持久化
     item_id = _ITEM_IDS[sheet]
-    await upsert_json_rows(db, wp_id, item_id, rows, field="conclusion")
+    if sheet == "G6-6":
+        existing = await _load_g6_6_nested_payload(db, wp_id)
+        nested = _nest_g6_6_flat_rows(rows, existing=existing)
+        flat = _flatten_g6_6_groups(nested.get("groups") or [])
+        # UI 读嵌套 G6-6-interest-data；IE/兼容读扁平 G6-6-rows — 双写
+        await _upsert_dual_fields(db, wp_id, _G6_6_PRIMARY_ITEM_ID, nested)
+        await _upsert_dual_fields(db, wp_id, item_id, flat)
+    else:
+        await upsert_json_rows(db, wp_id, item_id, rows, field="conclusion")
 
     return {
         "ok": True,

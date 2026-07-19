@@ -275,3 +275,98 @@ async def test_ai_invalid_section():
             json={"existingContent": "", "relatedContext": {}},
         )
     assert resp.status_code == 400
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# G6-6 nest helpers（导入保留元数据）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def test_nest_g6_6_preserves_conclusion_and_cross_validation():
+    from app.routers.wp_render_strategies._g6_other_bond_investment_sppi_import_export import (
+        _nest_g6_6_flat_rows,
+    )
+
+    nested = _nest_g6_6_flat_rows(
+        [
+            {
+                "investProject": "债A",
+                "faceValue": 100,
+                "couponRate": 0.04,
+                "effectiveRate": 0.05,
+                "periodEnd": "2024-12-31",
+                "openingAmortized": 98,
+                "days": 365,
+            }
+        ],
+        existing={
+            "conclusion": "既有审计结论",
+            "crossValidation": {
+                "bookInterestIncome": 12.5,
+                "interestAdjPeriodChange": 1.2,
+                "auditedInterest": 1.2,
+            },
+        },
+    )
+    assert nested["conclusion"] == "既有审计结论"
+    assert nested["crossValidation"]["bookInterestIncome"] == 12.5
+    assert nested["crossValidation"]["interestAdjPeriodChange"] == 1.2
+    assert nested["crossValidation"]["auditedInterest"] == 1.2
+    assert len(nested["groups"]) == 1
+    assert nested["groups"][0]["investProject"] == "债A"
+
+
+def test_nest_g6_6_reuses_period_id_from_row_or_existing():
+    from app.routers.wp_render_strategies._g6_other_bond_investment_sppi_import_export import (
+        _flatten_g6_6_groups,
+        _nest_g6_6_flat_rows,
+    )
+
+    existing = {
+        "conclusion": "keep",
+        "groups": [{
+            "id": "g-stable",
+            "investProject": "债A",
+            "faceValue": 100,
+            "couponRate": 0.04,
+            "effectiveRate": 0.05,
+            "periods": [{
+                "id": "p-stable",
+                "periodEnd": "2024-12-31",
+                "openingAmortized": 98,
+                "days": 365,
+            }],
+        }],
+        "crossValidation": {},
+    }
+    # 有 periodId 时直接复用
+    with_pid = _nest_g6_6_flat_rows(
+        [{"investProject": "债A", "periodId": "p-from-flat", "periodEnd": "2024-06-30", "days": 180}],
+        existing=existing,
+    )
+    assert with_pid["groups"][0]["periods"][0]["id"] == "p-from-flat"
+
+    # Excel 无 periodId：按截止日匹配旧 id
+    by_date = _nest_g6_6_flat_rows(
+        [{"investProject": "债A", "periodEnd": "2024-12-31", "days": 365}],
+        existing=existing,
+    )
+    assert by_date["groups"][0]["id"] == "g-stable"
+    assert by_date["groups"][0]["periods"][0]["id"] == "p-stable"
+
+    # flatten 写出 periodId
+    flat = _flatten_g6_6_groups(existing["groups"])
+    assert flat[0]["periodId"] == "p-stable"
+
+
+def test_nest_g6_6_without_existing_defaults_meta():
+    from app.routers.wp_render_strategies._g6_other_bond_investment_sppi_import_export import (
+        _nest_g6_6_flat_rows,
+    )
+
+    nested = _nest_g6_6_flat_rows(
+        [{"investProject": "债B", "faceValue": 1, "periodEnd": "2024-06-30", "days": 180}]
+    )
+    assert nested["conclusion"] == ""
+    assert nested["crossValidation"]["bookInterestIncome"] == 0
+    assert nested["crossValidation"]["interestAdjPeriodChange"] == 0

@@ -31,7 +31,9 @@ import {
 
 import type {
   EclMeasurementData,
-  ReversalWriteOffRow,
+  PdLgdCalcRow,
+  G6ReversalRow,
+  G6WriteOffRow,
   VoucherCheckRow,
 } from '@/components/workpaper/composables/useG6EclFormData'
 
@@ -119,51 +121,41 @@ describe('G6-11 列式转置解析 (transposeToRows + getValidColumnIndices)', (
 // 2. G6-13 section结构完整性
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('G6-13 section结构完整性', () => {
-  it('EclMeasurementData接口包含5个必需section', () => {
-    // 构造一个完整的EclMeasurementData验证结构
+describe('G6-13 ECL计量数据结构', () => {
+  it('EclMeasurementData 含方法评价/组合/双路径测算', () => {
     const data: EclMeasurementData = {
-      pdSection: [],
-      lgdSection: [],
-      eadSection: [],
-      discountRateSection: [],
-      forwardLookingSection: [],
-      methodologyContext: '',
+      schemaVersion: 2,
+      methodEvaluation: [],
+      groupBasis: [],
+      parameterEvaluation: [],
+      pdLgdRows: [],
+      lossRateRows: [],
+      conclusion: '',
     }
-    // 验证5个section字段均存在
-    expect(data).toHaveProperty('pdSection')
-    expect(data).toHaveProperty('lgdSection')
-    expect(data).toHaveProperty('eadSection')
-    expect(data).toHaveProperty('discountRateSection')
-    expect(data).toHaveProperty('forwardLookingSection')
+    expect(data).toHaveProperty('methodEvaluation')
+    expect(data).toHaveProperty('groupBasis')
+    expect(data).toHaveProperty('pdLgdRows')
+    expect(data).toHaveProperty('lossRateRows')
+    expect(data).toHaveProperty('parameterEvaluation')
   })
 
-  it('各section初始化后为数组类型', () => {
-    const data: EclMeasurementData = {
-      pdSection: [{ id: '1', seq: 1, checkArea: 'PD', checkItem: '数据来源', auditRequirement: '', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' }],
-      lgdSection: [{ id: '2', seq: 1, checkArea: 'LGD', checkItem: '抵押品', auditRequirement: '', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' }],
-      eadSection: [{ id: '3', seq: 1, checkArea: 'EAD', checkItem: '余额口径', auditRequirement: '', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' }],
-      discountRateSection: [{ id: '4', seq: 1, checkArea: '折现率', checkItem: '实际利率', auditRequirement: '', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' }],
-      forwardLookingSection: [{ id: '5', seq: 1, checkArea: '前瞻性', checkItem: '宏观情景', auditRequirement: '', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' }],
-      methodologyContext: 'ECL三要素定义',
+  it('PD/LGD 行含 Excel 核心字段', () => {
+    const row: PdLgdCalcRow = {
+      id: '1',
+      projectName: '债A',
+      bookBalance: 100,
+      remainingMonths: 12,
+      stage: 'Stage1',
+      rating: 'A+',
+      externalMappedPd: 0.002,
+      termAdjustedPd: 0.002,
+      lgd: 0.45,
+      eclRate: 0.0009,
+      eclAmount: 0.09,
+      priorHistoricalLossRate: 0,
+      note: '',
     }
-    expect(Array.isArray(data.pdSection)).toBe(true)
-    expect(Array.isArray(data.lgdSection)).toBe(true)
-    expect(Array.isArray(data.eadSection)).toBe(true)
-    expect(Array.isArray(data.discountRateSection)).toBe(true)
-    expect(Array.isArray(data.forwardLookingSection)).toBe(true)
-    // 总行数 = 5(各1行用于测试)
-    const total = data.pdSection.length + data.lgdSection.length +
-      data.eadSection.length + data.discountRateSection.length + data.forwardLookingSection.length
-    expect(total).toBe(5)
-  })
-
-  it('section名称对应正确的检查区域', () => {
-    // 验证section分组命名一致性
-    const sectionNames = ['pdSection', 'lgdSection', 'eadSection', 'discountRateSection', 'forwardLookingSection'] as const
-    const expectedAreas = ['PD', 'LGD', 'EAD', '折现率', '前瞻性信息']
-    expect(sectionNames).toHaveLength(5)
-    expect(expectedAreas).toHaveLength(5)
+    expect(row.eclRate).toBeCloseTo(row.termAdjustedPd * row.lgd, 6)
   })
 })
 

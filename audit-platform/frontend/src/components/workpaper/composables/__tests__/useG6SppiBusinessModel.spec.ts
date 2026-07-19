@@ -12,6 +12,7 @@ import { nextTick } from 'vue'
 import {
   useG6SppiBusinessModel,
   deriveBusinessModelConclusion,
+  evaluateG67G68Consistency,
 } from '../useG6SppiBusinessModel'
 import type { BusinessModelSection } from '../useG6SppiBusinessModel'
 
@@ -146,6 +147,63 @@ describe('Task 7.3: G6-7 业务模式分析', () => {
       await nextTick()
       expect(finalConclusion.value).toBe('hold_and_sell')
     })
+
+    it('手工覆盖后修改 isSatisfied 不再覆盖 finalConclusion', async () => {
+      const {
+        section1,
+        section2,
+        updateIsSatisfied,
+        setFinalConclusion,
+        finalConclusion,
+        manualOverride,
+        derivedConclusion,
+      } = useG6SppiBusinessModel()
+
+      for (const item of section1.value.items) {
+        updateIsSatisfied('section1', item.id, true)
+      }
+      for (const item of section2.value.items) {
+        updateIsSatisfied('section2', item.id, true)
+      }
+      await nextTick()
+      expect(finalConclusion.value).toBe('hold_collect')
+
+      setFinalConclusion('other')
+      expect(manualOverride.value).toBe(true)
+      expect(finalConclusion.value).toBe('other')
+
+      updateIsSatisfied('section2', section2.value.items[0].id, false)
+      await nextTick()
+      expect(derivedConclusion.value).toBe('hold_and_sell')
+      expect(finalConclusion.value).toBe('other')
+    })
+
+    it('clearManualOverride 恢复自动推导', async () => {
+      const {
+        section1,
+        section2,
+        updateIsSatisfied,
+        setFinalConclusion,
+        clearManualOverride,
+        finalConclusion,
+        manualOverride,
+      } = useG6SppiBusinessModel()
+
+      for (const item of section1.value.items) {
+        updateIsSatisfied('section1', item.id, true)
+      }
+      for (const item of section2.value.items) {
+        updateIsSatisfied('section2', item.id, true)
+      }
+      await nextTick()
+
+      setFinalConclusion('hold_and_sell')
+      expect(manualOverride.value).toBe(true)
+
+      clearManualOverride()
+      expect(manualOverride.value).toBe(false)
+      expect(finalConclusion.value).toBe('hold_collect')
+    })
   })
 
   // ═══════════════════════════════════════════════════════════════════
@@ -160,8 +218,10 @@ describe('Task 7.3: G6-7 业务模式分析', () => {
       instance1.updateIsSatisfied('section1', instance1.section1.value.items[0].id, true)
       instance1.updateIsSatisfied('section2', instance1.section2.value.items[1].id, false)
       instance1.setFinalAnalysis('综合分析说明文本')
+      instance1.setFinalConclusion('other')
 
       const json = instance1.toJSON()
+      expect(json.manualOverride).toBe(true)
 
       // 新实例加载数据
       const instance2 = useG6SppiBusinessModel()
@@ -170,14 +230,17 @@ describe('Task 7.3: G6-7 业务模式分析', () => {
       expect(instance2.section1.value.items[0].isSatisfied).toBe(true)
       expect(instance2.section2.value.items[1].isSatisfied).toBe(false)
       expect(instance2.finalAnalysis.value).toBe('综合分析说明文本')
+      expect(instance2.finalConclusion.value).toBe('other')
+      expect(instance2.manualOverride.value).toBe(true)
     })
 
     it('loadData(null) 重置为默认', () => {
-      const { section1, section2, finalConclusion, loadData } = useG6SppiBusinessModel()
+      const { section1, section2, finalConclusion, manualOverride, loadData, setFinalConclusion } =
+        useG6SppiBusinessModel()
 
       // 先设置一些数据
       section1.value.items[0].isSatisfied = true
-      finalConclusion.value = 'hold_collect'
+      setFinalConclusion('hold_collect')
 
       // 重置
       loadData(null)
@@ -185,7 +248,45 @@ describe('Task 7.3: G6-7 业务模式分析', () => {
       expect(section1.value.items).toHaveLength(5)
       expect(section2.value.items).toHaveLength(4)
       expect(finalConclusion.value).toBeNull()
+      expect(manualOverride.value).toBe(false)
       expect(section1.value.items[0].isSatisfied).toBeNull()
+    })
+  })
+
+  // ═══════════════════════════════════════════════════════════════════
+  // G6-7 × G6-8 交叉一致性
+  // ═══════════════════════════════════════════════════════════════════
+
+  describe('evaluateG67G68Consistency', () => {
+    it('任一侧未完成 → 无提示', () => {
+      expect(evaluateG67G68Consistency(null, 'pass').level).toBeNull()
+      expect(evaluateG67G68Consistency('hold_and_sell', null).level).toBeNull()
+    })
+
+    it('兼有 + SPPI通过 → FVOCI-Debt ok', () => {
+      const r = evaluateG67G68Consistency('hold_and_sell', 'pass')
+      expect(r.level).toBe('ok')
+      expect(r.expectedClassification).toBe('FVOCI-Debt')
+    })
+
+    it('持有收取 + SPPI通过 → AC warning（非 FVOCI 选择）', () => {
+      const r = evaluateG67G68Consistency('hold_collect', 'pass')
+      expect(r.level).toBe('warning')
+      expect(r.expectedClassification).toBe('AC')
+      expect(r.message).toContain('摊余成本')
+      expect(r.message).not.toContain('FVOCI选择权')
+    })
+
+    it('业务模式其他 → FVTPL warning', () => {
+      const r = evaluateG67G68Consistency('other', 'pass')
+      expect(r.level).toBe('warning')
+      expect(r.expectedClassification).toBe('FVTPL')
+    })
+
+    it('SPPI失败 → FVTPL warning', () => {
+      const r = evaluateG67G68Consistency('hold_and_sell', 'fail')
+      expect(r.level).toBe('warning')
+      expect(r.expectedClassification).toBe('FVTPL')
     })
   })
 

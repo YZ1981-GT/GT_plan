@@ -96,4 +96,24 @@ describe('useG5BadDebtDetail movement', () => {
     expect(bad.groupNames).toContain('账龄组合')
     expect(bad.groupTotals.end.provision).toBe(30)
   })
+
+  it('附注取数从纯 movement 字段推算期末准备', () => {
+    const raw = JSON.stringify([
+      {
+        category: 'individual',
+        item: '甲',
+        openingUnadjusted: 50,
+        openingAdjustment: 10,
+        provisionIncrease: 5,
+        otherIncrease: 0,
+        reversal: 0,
+        writeOff: 0,
+        otherDecrease: 0,
+        closingAdjustment: 0,
+      },
+    ])
+    const bad = extractBadDebtForDisclosure(raw)
+    expect(bad.individualTotals.end.provision).toBe(65)
+    expect(bad.individualTotals.prior.provision).toBe(60)
+  })
 })

@@ -97,8 +97,19 @@ export interface BalanceDetailRow {
   agingAudited: AgingData
   agingTotal: number
   remark: string
-  /** 跨期稳定键（上年结转优先匹配） */
+  /** 跨期稳定键（上年结转优先匹配；勿用临时 row.id 冒充） */
   crossSheetReceivableId?: string
+}
+
+/** Excel/导入布尔：兼容 是/否、TRUE/FALSE、0/1（「否」不得为 true） */
+export function parseG5Bool(value: unknown): boolean {
+  if (value === true || value === 1) return true
+  if (value === false || value === 0 || value == null) return false
+  const s = String(value).trim().toLowerCase()
+  if (!s) return false
+  if (['否', 'false', 'n', 'no', '0', 'f'].includes(s)) return false
+  if (['是', 'true', 'y', 'yes', '1', 't'].includes(s)) return true
+  return false
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -167,13 +178,13 @@ export function useG5BalanceDetail(projectId?: Ref<string>) {
       contractNo: raw.contractNo ?? '',
       startDate: raw.startDate ?? '',
       maturityDate: raw.maturityDate ?? '',
-      isWithinOneYear: Boolean(raw.isWithinOneYear),
+      isWithinOneYear: parseG5Bool(raw.isWithinOneYear),
       contractAmount: parseNum(raw.contractAmount),
       recoveredAmount: parseNum(raw.recoveredAmount),
       closingBalance: parseNum(raw.closingBalance),
       debitOccurrence: parseNum(raw.debitOccurrence ?? raw.debit),
       creditOccurrence: parseNum(raw.creditOccurrence ?? raw.credit),
-      isRelatedParty: Boolean(raw.isRelatedParty),
+      isRelatedParty: parseG5Bool(raw.isRelatedParty),
       unrealizedIncome: parseNum(raw.unrealizedIncome),
       netAmount: parseNum(raw.netAmount),
       agingPrior,
@@ -183,7 +194,7 @@ export function useG5BalanceDetail(projectId?: Ref<string>) {
       remark: raw.remark ?? '',
       crossSheetReceivableId: raw.crossSheetReceivableId
         ? String(raw.crossSheetReceivableId)
-        : (raw.id ? String(raw.id) : undefined),
+        : undefined,
     }
 
     recalcRow(row)

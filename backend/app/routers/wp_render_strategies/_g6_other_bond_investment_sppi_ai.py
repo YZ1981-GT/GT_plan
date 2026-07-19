@@ -194,6 +194,44 @@ async def g6_sppi_ai_generate(
     return G6SppiAiGenerateResponse(content=result, sources=[])
 
 
+def _format_context_value(value: Any, *, depth: int = 0) -> str:
+    """将 relatedContext 中的嵌套 list/dict 格式化为可读文本，避免直接 str()。"""
+    import json
+
+    if value is None or value == "":
+        return ""
+    if isinstance(value, (str, int, float, bool)):
+        return str(value)
+    if depth >= 3:
+        try:
+            return json.dumps(value, ensure_ascii=False)[:800]
+        except Exception:  # noqa: BLE001
+            return str(value)[:800]
+    if isinstance(value, list):
+        if not value:
+            return "（空）"
+        lines: list[str] = []
+        for i, item in enumerate(value[:20]):
+            if isinstance(item, dict):
+                compact = "; ".join(
+                    f"{k}={_format_context_value(v, depth=depth + 1)}"
+                    for k, v in list(item.items())[:12]
+                    if v not in (None, "")
+                )
+                lines.append(f"  {i + 1}. {compact}")
+            else:
+                lines.append(f"  {i + 1}. {_format_context_value(item, depth=depth + 1)}")
+        if len(value) > 20:
+            lines.append(f"  …共 {len(value)} 条，已截断")
+        return "\n" + "\n".join(lines)
+    if isinstance(value, dict):
+        try:
+            return json.dumps(value, ensure_ascii=False)[:1200]
+        except Exception:  # noqa: BLE001
+            return str(value)[:1200]
+    return str(value)[:800]
+
+
 def _build_user_prompt(
     section: str,
     existing_content: str,
@@ -209,9 +247,15 @@ def _build_user_prompt(
     if ctx_lines:
         parts.append("## 项目信息\n" + "\n".join(ctx_lines) + "\n")
     if related_context:
-        ctx_str = "\n".join(f"- {k}: {v}" for k, v in related_context.items() if v)
-        if ctx_str:
-            parts.append(f"## 底稿数据\n{ctx_str}\n")
+        formatted: list[str] = []
+        for k, v in related_context.items():
+            if v in (None, "", [], {}):
+                continue
+            rendered = _format_context_value(v)
+            if rendered:
+                formatted.append(f"- {k}: {rendered}")
+        if formatted:
+            parts.append("## 底稿数据\n" + "\n".join(formatted) + "\n")
     if existing_content:
         parts.append(f"## 已有内容\n{existing_content[:2000]}\n请补充完善。")
     else:

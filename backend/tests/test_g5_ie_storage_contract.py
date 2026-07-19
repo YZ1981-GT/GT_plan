@@ -62,6 +62,7 @@ def test_g5_3_movement_schema():
     from app.routers.wp_render_strategies._g5_long_term_receivable_import_export import (
         _G5_3_HEADERS,
         _G5_3_KEYS,
+        _G5_4_KEYS,
         _G5_SPECS,
     )
 
@@ -71,3 +72,6 @@ def test_g5_3_movement_schema():
     assert "creditLossRate" not in _G5_3_KEYS
     assert len(_G5_3_HEADERS) == len(_G5_3_KEYS)
     assert _G5_SPECS["G5-3"]["field_keys"] == _G5_3_KEYS
+    assert "description" in _G5_4_KEYS
+    assert "category" in _G5_4_KEYS
+    assert "summary" not in _G5_4_KEYS

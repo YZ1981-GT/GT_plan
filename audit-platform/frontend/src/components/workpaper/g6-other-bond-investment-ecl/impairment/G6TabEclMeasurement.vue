@@ -1,462 +1,599 @@
 <template>
-  <div class="g6-tab-ecl-measurement">
-    <!-- 方法论上下文（琥珀色左边线+浅黄背景）: ECL三要素定义 -->
+  <div class="g6-tab-ecl-measurement" data-testid="g6-ecl-measurement">
+    <el-alert type="info" :closable="false" show-icon class="objective-alert">
+      <template #title>
+        审计目标：评价企业预期信用损失计量方法是否适当；是否反映无偏概率加权、货币时间价值，以及无需付出不当成本或努力即可获取的合理且有依据的信息（含前瞻性信息）。
+      </template>
+    </el-alert>
+
     <div class="methodology-context">
-      <p><strong>预期信用损失(ECL)三要素定义：</strong></p>
-      <ul>
-        <li><strong>ECL = PD × LGD × EAD × 折现因子</strong></li>
-        <li><strong>PD（违约概率）</strong>：债务人在未来特定期间内违约的可能性</li>
-        <li><strong>LGD（违约损失率）</strong>：违约发生后的损失比例（1 - 回收率）</li>
-        <li><strong>EAD（违约风险暴露）</strong>：违约时点的预期风险敞口余额</li>
-        <li><strong>折现因子</strong>：以原始实际利率或近似利率折现至报告日</li>
-      </ul>
-      <p style="margin-top:4px;color:#92400e">
-        检查要点：验证企业ECL模型中各参数的数据来源、估计方法及前瞻性调整是否合理。
-      </p>
+      <p class="methodology-title">编制逻辑（对齐 Excel G6-13）：</p>
+      <p>① 评价计量方法与组合划分 → ② PD/LGD 或损失率法抽样测算 → ③ 回写 G6-12 损失率</p>
+      <p>PD/LGD：ECL率 = 期限折算PD × LGD；损失率法：ECL率 = 损失率 + 前瞻性调整</p>
     </div>
 
-    <!-- 审计目标 -->
-    <el-alert
-      type="info"
-      :closable="false"
-      title="审计目标：测试企业预期信用损失（ECL）计量模型中 PD/LGD/EAD/折现率/前瞻性信息各要素的数据来源、估计方法与合理性，评价减值计量的适当性。"
-      class="objective-alert"
-    />
+    <div class="flow-hint">
+      <el-tag size="small" type="info" effect="plain">G6-11 三阶段</el-tag>
+      <span class="flow-arrow">→</span>
+      <el-tag size="small" type="warning" effect="dark">G6-13 计量测试（本表）</el-tag>
+      <span class="flow-arrow">→</span>
+      <el-tag size="small" type="success" effect="plain">G6-12 减值测算</el-tag>
+    </div>
 
-    <!-- 工具栏：索引 + 行数 -->
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
-      <div class="toolbar-right">
+      <div class="toolbar-left">
         <span class="chip-wrap"><GtIndexChip value="wp:G6-13" :context-project-id="projectId" /></span>
-        <el-tag size="small" type="info">共 {{ pdSection.length + lgdSection.length + eadSection.length + discountRateSection.length + forwardLookingSection.length }} 项</el-tag>
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-12" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">
+          PD/LGD {{ pdLgdRows.length }} · 损失率法 {{ lossRateRows.length }}
+        </el-tag>
+        <el-button size="small" :disabled="isReadonly" :loading="pulling" @click="pullFromG611">
+          从 G6-11 拉取项目
+        </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :disabled="isReadonly"
+          :loading="pushing"
+          @click="syncRatesToG612"
+        >
+          回写损失率至 G6-12
+        </el-button>
+      </div>
+      <div class="toolbar-right">
+        <el-button
+          size="small"
+          :disabled="isReadonly || !aiAvailable"
+          :loading="aiLoading"
+          @click="handleAi"
+        >🤖 AI</el-button>
+        <el-button size="small" @click="openReview('G6-13-ecl-measurement')">💬复核</el-button>
       </div>
     </div>
 
-    <!-- ═══ Section(一) PD（违约概率） ═══ -->
+    <!-- (一) 方法评价 -->
     <el-card shadow="never" class="section-card">
       <template #header>
         <div class="section-header">
-          <span class="section-title">(一) PD（违约概率）</span>
-          <div class="section-actions">
-            <el-button size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="handleAi('pd')">
-              🤖 AI辅助
-            </el-button>
-            <el-button size="small" @click="openReview('G6-13-pd')">💬复核</el-button>
-          </div>
+          <span class="section-title">(一) ECL计量方法评价</span>
         </div>
       </template>
-      <el-table :data="pdSection" border size="small" class="ecl-table">
-        <el-table-column label="序号" width="50" align="center" prop="seq" />
-        <el-table-column label="检查区域" min-width="80" prop="checkArea" />
-        <el-table-column label="检查项目" min-width="120" prop="checkItem" />
-        <el-table-column label="审计要求" min-width="160">
+      <el-table :data="methodEvaluation" border size="small">
+        <el-table-column label="检查项目" prop="checkItem" min-width="120" />
+        <el-table-column label="检查内容" prop="checkContent" min-width="200" />
+        <el-table-column label="企业采用方法" min-width="160">
           <template #default="{ row }">
-            <span class="audit-req-text">{{ row.auditRequirement }}</span>
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.companyMethod"
+              type="textarea"
+              :autosize="{ minRows: 1, maxRows: 3 }"
+              @update:model-value="(v: string) => { row.companyMethod = v; saveAll() }"
+            />
+            <span v-else>{{ row.companyMethod || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="企业参数" min-width="160">
+        <el-table-column label="审计评价" width="120" align="center">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.companyParam" type="textarea"
-              :autosize="{ minRows: 1, maxRows: 4 }" placeholder="企业参数..."
-              @update:model-value="(v: string) => updateRow(row.id, 'companyParam', v)" />
-            <span v-else>{{ row.companyParam || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="是否合理" width="110" align="center">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.isReasonable" size="small"
-              style="width:100%" placeholder="请选择"
-              @change="(v: string) => updateRow(row.id, 'isReasonable', v)">
+            <el-select
+              v-if="!isReadonly"
+              :model-value="row.auditEvaluation"
+              size="small"
+              style="width: 100%"
+              @change="(v: string) => { row.auditEvaluation = v as any; saveAll() }"
+            >
               <el-option value="合理" label="合理" />
               <el-option value="基本合理" label="基本合理" />
               <el-option value="不合理" label="不合理" />
             </el-select>
-            <span v-else>{{ row.isReasonable || '-' }}</span>
+            <span v-else>{{ row.auditEvaluation || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="审计结论" min-width="160">
+        <el-table-column label="说明" min-width="120">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.auditConclusion" type="textarea"
-              :autosize="{ minRows: 1, maxRows: 4 }" placeholder="审计结论..."
-              @update:model-value="(v: string) => updateRow(row.id, 'auditConclusion', v)" />
-            <span v-else>{{ row.auditConclusion || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="风险等级" width="90" align="center">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.riskLevel" size="small"
-              style="width:100%" placeholder="等级"
-              @change="(v: string) => updateRow(row.id, 'riskLevel', v)">
-              <el-option value="高" label="高" />
-              <el-option value="中" label="中" />
-              <el-option value="低" label="低" />
-            </el-select>
-            <span v-else>{{ row.riskLevel || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="索引" width="100" align="center">
-          <template #default="{ row }">
-            <GtIndexChip v-if="row.indexRef" :value="row.indexRef" />
-            <el-input v-else-if="!isReadonly" v-model="row.indexRef" size="small"
-              placeholder="索引" @change="() => updateRow(row.id, 'indexRef', row.indexRef)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="备注" min-width="120">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.remark" size="small"
-              placeholder="备注..."
-              @update:model-value="(v: string) => updateRow(row.id, 'remark', v)" />
-            <span v-else>{{ row.remark || '-' }}</span>
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.note"
+              size="small"
+              @update:model-value="(v: string) => { row.note = v; saveAll() }"
+            />
+            <span v-else>{{ row.note || '-' }}</span>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
-    <!-- ═══ Section(二) LGD（违约损失率） ═══ -->
+    <!-- (二) 组合依据 -->
     <el-card shadow="never" class="section-card">
       <template #header>
         <div class="section-header">
-          <span class="section-title">(二) LGD（违约损失率）</span>
-          <div class="section-actions">
-            <el-button size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="handleAi('lgd')">
-              🤖 AI辅助
-            </el-button>
-            <el-button size="small" @click="openReview('G6-13-lgd')">💬复核</el-button>
-          </div>
+          <span class="section-title">(二) 确定组合的依据</span>
+          <el-button v-if="!isReadonly" size="small" type="primary" @click="addGroupBasis">+ 组合</el-button>
         </div>
       </template>
-      <el-table :data="lgdSection" border size="small" class="ecl-table">
-        <el-table-column label="序号" width="50" align="center" prop="seq" />
-        <el-table-column label="检查区域" min-width="80" prop="checkArea" />
-        <el-table-column label="检查项目" min-width="120" prop="checkItem" />
-        <el-table-column label="审计要求" min-width="160">
+      <el-table :data="groupBasis" border size="small">
+        <el-table-column label="组合名称" min-width="120">
           <template #default="{ row }">
-            <span class="audit-req-text">{{ row.auditRequirement }}</span>
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.groupName"
+              size="small"
+              @change="(v: string) => { row.groupName = v; saveAll() }"
+            />
+            <span v-else>{{ row.groupName }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="企业参数" min-width="160">
+        <el-table-column label="划分依据" min-width="160">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.companyParam" type="textarea"
-              :autosize="{ minRows: 1, maxRows: 4 }" placeholder="企业参数..."
-              @update:model-value="(v: string) => updateRow(row.id, 'companyParam', v)" />
-            <span v-else>{{ row.companyParam || '-' }}</span>
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.basis"
+              type="textarea"
+              :autosize="{ minRows: 1, maxRows: 3 }"
+              @update:model-value="(v: string) => { row.basis = v; saveAll() }"
+            />
+            <span v-else>{{ row.basis || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="是否合理" width="110" align="center">
+        <el-table-column label="共同风险特征" min-width="140">
           <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.isReasonable" size="small"
-              style="width:100%" placeholder="请选择"
-              @change="(v: string) => updateRow(row.id, 'isReasonable', v)">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.riskCharacteristic"
+              size="small"
+              @change="(v: string) => { row.riskCharacteristic = v; saveAll() }"
+            />
+            <span v-else>{{ row.riskCharacteristic || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="样本量" width="90" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.sampleSize"
+              size="small"
+              :controls="false"
+              class="amt"
+              @change="(v: number | undefined) => { row.sampleSize = v ?? 0; saveAll() }"
+            />
+            <span v-else>{{ row.sampleSize }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="评价" width="100" align="center">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              :model-value="row.auditEvaluation"
+              size="small"
+              style="width: 100%"
+              @change="(v: string) => { row.auditEvaluation = v as any; saveAll() }"
+            >
+              <el-option value="合理" label="合理" />
+              <el-option value="不合理" label="不合理" />
+            </el-select>
+            <span v-else>{{ row.auditEvaluation || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="" width="50" align="center">
+          <template #default="{ $index }">
+            <el-button link type="danger" size="small" @click="groupBasis.splice($index, 1); saveAll()">删</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="!groupBasis.length" description="请新增组合并说明划分依据" :image-size="48" />
+    </el-card>
+
+    <!-- (三) 双路径测算 -->
+    <el-card shadow="never" class="section-card">
+      <template #header>
+        <div class="section-header">
+          <span class="section-title">(三) 单项/组合计提的预期信用损失率</span>
+          <el-segmented v-model="rateTab" :options="rateTabOptions" size="small" />
+        </div>
+      </template>
+
+      <!-- PD/LGD -->
+      <div v-show="rateTab === 'pdLgd'">
+        <div class="sub-toolbar">
+          <el-tag size="small" type="warning">【方法可选】PD/LGD</el-tag>
+          <el-tag v-if="pdLgdVarianceCount > 0" size="small" type="danger">
+            {{ pdLgdVarianceCount }} 项与上期差异&gt;2%
+          </el-tag>
+          <el-button v-if="!isReadonly" size="small" type="primary" @click="addPdLgdRow">+ 行</el-button>
+        </div>
+        <el-table :data="pdLgdRows" border size="small" show-summary :summary-method="pdLgdSummary">
+          <el-table-column label="投资项目/组合" min-width="130">
+            <template #default="{ row }">
+              <el-input
+                v-if="!isReadonly"
+                :model-value="row.projectName"
+                size="small"
+                @change="(v: string) => { row.projectName = v; saveAll() }"
+              />
+              <span v-else>{{ row.projectName }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="账面余额" min-width="110" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.bookBalance"
+                size="small"
+                :controls="false"
+                class="amt"
+                @change="(v: number | undefined) => { row.bookBalance = v ?? 0; recomputePdLgd(row); saveAll() }"
+              />
+              <span v-else>{{ fmtNum(row.bookBalance) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="剩余月数" width="90" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.remainingMonths"
+                size="small"
+                :controls="false"
+                :precision="0"
+                class="amt"
+                @change="(v: number | undefined) => { row.remainingMonths = v ?? 0; recomputePdLgd(row, true); saveAll() }"
+              />
+              <span v-else>{{ row.remainingMonths }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="阶段" width="100" align="center">
+            <template #default="{ row }">
+              <el-select
+                v-if="!isReadonly"
+                :model-value="row.stage"
+                size="small"
+                clearable
+                style="width: 100%"
+                @change="(v: string) => { row.stage = v as any; saveAll() }"
+              >
+                <el-option value="Stage1" label="Stage1" />
+                <el-option value="Stage2" label="Stage2" />
+                <el-option value="Stage3" label="Stage3" />
+              </el-select>
+              <span v-else>{{ row.stage || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="评级" width="100" align="center">
+            <template #default="{ row }">
+              <el-select
+                v-if="!isReadonly"
+                :model-value="row.rating"
+                size="small"
+                filterable
+                allow-create
+                style="width: 100%"
+                @change="(v: string) => onRatingChange(row, v)"
+              >
+                <el-option v-for="r in ratingOptions" :key="r" :value="r" :label="r" />
+              </el-select>
+              <span v-else>{{ row.rating || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="外部映射违约率" min-width="120" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.externalMappedPd"
+                size="small"
+                :controls="false"
+                :precision="6"
+                class="amt"
+                @change="(v: number | undefined) => { row.externalMappedPd = v ?? 0; recomputePdLgd(row, true); saveAll() }"
+              />
+              <span v-else>{{ fmtPct(row.externalMappedPd, 4) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="期限折算PD" min-width="110" align="right">
+            <template #default="{ row }">
+              <el-tooltip content="1−(1−一年期PD)^(月数/12)；可覆写">
+                <el-input-number
+                  v-if="!isReadonly"
+                  :model-value="row.termAdjustedPd"
+                  size="small"
+                  :controls="false"
+                  :precision="6"
+                  class="amt"
+                  @change="(v: number | undefined) => { row.termAdjustedPd = v ?? 0; recomputePdLgd(row, false); saveAll() }"
+                />
+                <span v-else class="formula-cell">{{ fmtPct(row.termAdjustedPd, 4) }}</span>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <el-table-column label="LGD" width="90" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.lgd"
+                size="small"
+                :controls="false"
+                :precision="4"
+                class="amt"
+                @change="(v: number | undefined) => { row.lgd = v ?? 0; recomputePdLgd(row, false); saveAll() }"
+              />
+              <span v-else>{{ fmtPct(row.lgd) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="预期信用损失率" min-width="120" align="right">
+            <template #default="{ row }">
+              <el-tooltip content="ECL率 = PD × LGD">
+                <span class="formula-cell" :class="{ 'rate-warn': isRateVarianceHigh(row.eclRate, row.priorHistoricalLossRate) }">
+                  {{ fmtPct(row.eclRate) }}
+                </span>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <el-table-column label="预期信用损失" min-width="110" align="right">
+            <template #default="{ row }">
+              <el-tooltip content="ECL = 账面余额 × ECL率">
+                <span class="formula-cell">{{ fmtNum(row.eclAmount) }}</span>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <el-table-column label="上期历史损失率" min-width="120" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.priorHistoricalLossRate"
+                size="small"
+                :controls="false"
+                :precision="4"
+                class="amt"
+                @change="(v: number | undefined) => { row.priorHistoricalLossRate = v ?? 0; saveAll() }"
+              />
+              <span v-else>{{ fmtPct(row.priorHistoricalLossRate) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="!isReadonly" label="" width="50" align="center">
+            <template #default="{ $index }">
+              <el-button link type="danger" size="small" @click="pdLgdRows.splice($index, 1); saveAll()">删</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
+      <!-- 损失率法 -->
+      <div v-show="rateTab === 'lossRate'">
+        <div class="sub-toolbar">
+          <el-tag size="small" type="warning">【方法可选】损失率法</el-tag>
+          <el-tag v-if="lossRateVarianceCount > 0" size="small" type="danger">
+            {{ lossRateVarianceCount }} 项与上期差异&gt;2%
+          </el-tag>
+          <el-button v-if="!isReadonly" size="small" type="primary" @click="addLossRateRow">+ 行</el-button>
+        </div>
+        <el-table :data="lossRateRows" border size="small" show-summary :summary-method="lossRateSummary">
+          <el-table-column label="投资项目/组合" min-width="130">
+            <template #default="{ row }">
+              <el-input
+                v-if="!isReadonly"
+                :model-value="row.projectName"
+                size="small"
+                @change="(v: string) => { row.projectName = v; saveAll() }"
+              />
+              <span v-else>{{ row.projectName }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="账面余额" min-width="110" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.bookBalance"
+                size="small"
+                :controls="false"
+                class="amt"
+                @change="(v: number | undefined) => { row.bookBalance = v ?? 0; recomputeLossRate(row); saveAll() }"
+              />
+              <span v-else>{{ fmtNum(row.bookBalance) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="剩余月数" width="90" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.remainingMonths"
+                size="small"
+                :controls="false"
+                :precision="0"
+                class="amt"
+                @change="(v: number | undefined) => { row.remainingMonths = v ?? 0; saveAll() }"
+              />
+              <span v-else>{{ row.remainingMonths }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="阶段" width="100" align="center">
+            <template #default="{ row }">
+              <el-select
+                v-if="!isReadonly"
+                :model-value="row.stage"
+                size="small"
+                clearable
+                style="width: 100%"
+                @change="(v: string) => { row.stage = v as any; saveAll() }"
+              >
+                <el-option value="Stage1" label="Stage1" />
+                <el-option value="Stage2" label="Stage2" />
+                <el-option value="Stage3" label="Stage3" />
+              </el-select>
+              <span v-else>{{ row.stage || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="评级" width="90" align="center">
+            <template #default="{ row }">
+              <el-input
+                v-if="!isReadonly"
+                :model-value="row.rating"
+                size="small"
+                @change="(v: string) => { row.rating = v; saveAll() }"
+              />
+              <span v-else>{{ row.rating || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="损失率" width="100" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.lossRate"
+                size="small"
+                :controls="false"
+                :precision="4"
+                class="amt"
+                @change="(v: number | undefined) => { row.lossRate = v ?? 0; recomputeLossRate(row); saveAll() }"
+              />
+              <span v-else>{{ fmtPct(row.lossRate) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="说明" min-width="120">
+            <template #default="{ row }">
+              <el-input
+                v-if="!isReadonly"
+                :model-value="row.description"
+                size="small"
+                @change="(v: string) => { row.description = v; saveAll() }"
+              />
+              <span v-else>{{ row.description || '-' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="前瞻性调整" min-width="110" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.forwardLookingAdj"
+                size="small"
+                :controls="false"
+                :precision="4"
+                class="amt"
+                @change="(v: number | undefined) => { row.forwardLookingAdj = v ?? 0; recomputeLossRate(row); saveAll() }"
+              />
+              <span v-else>{{ fmtPct(row.forwardLookingAdj) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="预期信用损失率" min-width="120" align="right">
+            <template #default="{ row }">
+              <el-tooltip content="ECL率 = 损失率 + 前瞻性调整">
+                <span class="formula-cell" :class="{ 'rate-warn': isRateVarianceHigh(row.eclRate, row.priorHistoricalLossRate) }">
+                  {{ fmtPct(row.eclRate) }}
+                </span>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <el-table-column label="预期信用损失" min-width="110" align="right">
+            <template #default="{ row }">
+              <span class="formula-cell">{{ fmtNum(row.eclAmount) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="上期历史损失率" min-width="120" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.priorHistoricalLossRate"
+                size="small"
+                :controls="false"
+                :precision="4"
+                class="amt"
+                @change="(v: number | undefined) => { row.priorHistoricalLossRate = v ?? 0; saveAll() }"
+              />
+              <span v-else>{{ fmtPct(row.priorHistoricalLossRate) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="!isReadonly" label="" width="50" align="center">
+            <template #default="{ $index }">
+              <el-button link type="danger" size="small" @click="lossRateRows.splice($index, 1); saveAll()">删</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </el-card>
+
+    <!-- 参数评价（精简） -->
+    <el-card shadow="never" class="section-card">
+      <template #header>
+        <div class="section-header"><span class="section-title">(四) 关键参数评价</span></div>
+      </template>
+      <el-table :data="parameterEvaluation" border size="small">
+        <el-table-column label="参数" prop="paramName" width="140" />
+        <el-table-column label="数据来源" min-width="140">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.dataSource"
+              size="small"
+              @change="(v: string) => { row.dataSource = v; saveAll() }"
+            />
+            <span v-else>{{ row.dataSource || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="估计方法" min-width="160" prop="calcMethod" />
+        <el-table-column label="验证结果" min-width="140">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.verificationResult"
+              size="small"
+              @change="(v: string) => { row.verificationResult = v; saveAll() }"
+            />
+            <span v-else>{{ row.verificationResult || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="评价" width="120" align="center">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              :model-value="row.auditEvaluation"
+              size="small"
+              style="width: 100%"
+              @change="(v: string) => { row.auditEvaluation = v as any; saveAll() }"
+            >
               <el-option value="合理" label="合理" />
               <el-option value="基本合理" label="基本合理" />
               <el-option value="不合理" label="不合理" />
             </el-select>
-            <span v-else>{{ row.isReasonable || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="审计结论" min-width="160">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.auditConclusion" type="textarea"
-              :autosize="{ minRows: 1, maxRows: 4 }" placeholder="审计结论..."
-              @update:model-value="(v: string) => updateRow(row.id, 'auditConclusion', v)" />
-            <span v-else>{{ row.auditConclusion || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="风险等级" width="90" align="center">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.riskLevel" size="small"
-              style="width:100%" placeholder="等级"
-              @change="(v: string) => updateRow(row.id, 'riskLevel', v)">
-              <el-option value="高" label="高" />
-              <el-option value="中" label="中" />
-              <el-option value="低" label="低" />
-            </el-select>
-            <span v-else>{{ row.riskLevel || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="索引" width="100" align="center">
-          <template #default="{ row }">
-            <GtIndexChip v-if="row.indexRef" :value="row.indexRef" />
-            <el-input v-else-if="!isReadonly" v-model="row.indexRef" size="small"
-              placeholder="索引" @change="() => updateRow(row.id, 'indexRef', row.indexRef)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="备注" min-width="120">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.remark" size="small"
-              placeholder="备注..."
-              @update:model-value="(v: string) => updateRow(row.id, 'remark', v)" />
-            <span v-else>{{ row.remark || '-' }}</span>
+            <span v-else>{{ row.auditEvaluation || '-' }}</span>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
-    <!-- ═══ Section(三) EAD（违约风险暴露） ═══ -->
     <el-card shadow="never" class="section-card">
-      <template #header>
-        <div class="section-header">
-          <span class="section-title">(三) EAD（违约风险暴露）</span>
-          <div class="section-actions">
-            <el-button size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="handleAi('ead')">
-              🤖 AI辅助
-            </el-button>
-            <el-button size="small" @click="openReview('G6-13-ead')">💬复核</el-button>
-          </div>
-        </div>
-      </template>
-      <el-table :data="eadSection" border size="small" class="ecl-table">
-        <el-table-column label="序号" width="50" align="center" prop="seq" />
-        <el-table-column label="检查区域" min-width="80" prop="checkArea" />
-        <el-table-column label="检查项目" min-width="120" prop="checkItem" />
-        <el-table-column label="审计要求" min-width="160">
-          <template #default="{ row }">
-            <span class="audit-req-text">{{ row.auditRequirement }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="企业参数" min-width="160">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.companyParam" type="textarea"
-              :autosize="{ minRows: 1, maxRows: 4 }" placeholder="企业参数..."
-              @update:model-value="(v: string) => updateRow(row.id, 'companyParam', v)" />
-            <span v-else>{{ row.companyParam || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="是否合理" width="110" align="center">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.isReasonable" size="small"
-              style="width:100%" placeholder="请选择"
-              @change="(v: string) => updateRow(row.id, 'isReasonable', v)">
-              <el-option value="合理" label="合理" />
-              <el-option value="基本合理" label="基本合理" />
-              <el-option value="不合理" label="不合理" />
-            </el-select>
-            <span v-else>{{ row.isReasonable || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="审计结论" min-width="160">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.auditConclusion" type="textarea"
-              :autosize="{ minRows: 1, maxRows: 4 }" placeholder="审计结论..."
-              @update:model-value="(v: string) => updateRow(row.id, 'auditConclusion', v)" />
-            <span v-else>{{ row.auditConclusion || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="风险等级" width="90" align="center">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.riskLevel" size="small"
-              style="width:100%" placeholder="等级"
-              @change="(v: string) => updateRow(row.id, 'riskLevel', v)">
-              <el-option value="高" label="高" />
-              <el-option value="中" label="中" />
-              <el-option value="低" label="低" />
-            </el-select>
-            <span v-else>{{ row.riskLevel || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="索引" width="100" align="center">
-          <template #default="{ row }">
-            <GtIndexChip v-if="row.indexRef" :value="row.indexRef" />
-            <el-input v-else-if="!isReadonly" v-model="row.indexRef" size="small"
-              placeholder="索引" @change="() => updateRow(row.id, 'indexRef', row.indexRef)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="备注" min-width="120">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.remark" size="small"
-              placeholder="备注..."
-              @update:model-value="(v: string) => updateRow(row.id, 'remark', v)" />
-            <span v-else>{{ row.remark || '-' }}</span>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- ═══ Section(四) 折现率 ═══ -->
-    <el-card shadow="never" class="section-card">
-      <template #header>
-        <div class="section-header">
-          <span class="section-title">(四) 折现率</span>
-          <div class="section-actions">
-            <el-button size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="handleAi('discount-rate')">
-              🤖 AI辅助
-            </el-button>
-            <el-button size="small" @click="openReview('G6-13-discount-rate')">💬复核</el-button>
-          </div>
-        </div>
-      </template>
-      <el-table :data="discountRateSection" border size="small" class="ecl-table">
-        <el-table-column label="序号" width="50" align="center" prop="seq" />
-        <el-table-column label="检查区域" min-width="80" prop="checkArea" />
-        <el-table-column label="检查项目" min-width="120" prop="checkItem" />
-        <el-table-column label="审计要求" min-width="160">
-          <template #default="{ row }">
-            <span class="audit-req-text">{{ row.auditRequirement }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="企业参数" min-width="160">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.companyParam" type="textarea"
-              :autosize="{ minRows: 1, maxRows: 4 }" placeholder="企业参数..."
-              @update:model-value="(v: string) => updateRow(row.id, 'companyParam', v)" />
-            <span v-else>{{ row.companyParam || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="是否合理" width="110" align="center">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.isReasonable" size="small"
-              style="width:100%" placeholder="请选择"
-              @change="(v: string) => updateRow(row.id, 'isReasonable', v)">
-              <el-option value="合理" label="合理" />
-              <el-option value="基本合理" label="基本合理" />
-              <el-option value="不合理" label="不合理" />
-            </el-select>
-            <span v-else>{{ row.isReasonable || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="审计结论" min-width="160">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.auditConclusion" type="textarea"
-              :autosize="{ minRows: 1, maxRows: 4 }" placeholder="审计结论..."
-              @update:model-value="(v: string) => updateRow(row.id, 'auditConclusion', v)" />
-            <span v-else>{{ row.auditConclusion || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="风险等级" width="90" align="center">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.riskLevel" size="small"
-              style="width:100%" placeholder="等级"
-              @change="(v: string) => updateRow(row.id, 'riskLevel', v)">
-              <el-option value="高" label="高" />
-              <el-option value="中" label="中" />
-              <el-option value="低" label="低" />
-            </el-select>
-            <span v-else>{{ row.riskLevel || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="索引" width="100" align="center">
-          <template #default="{ row }">
-            <GtIndexChip v-if="row.indexRef" :value="row.indexRef" />
-            <el-input v-else-if="!isReadonly" v-model="row.indexRef" size="small"
-              placeholder="索引" @change="() => updateRow(row.id, 'indexRef', row.indexRef)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="备注" min-width="120">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.remark" size="small"
-              placeholder="备注..."
-              @update:model-value="(v: string) => updateRow(row.id, 'remark', v)" />
-            <span v-else>{{ row.remark || '-' }}</span>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- ═══ Section(五) 前瞻性信息 ═══ -->
-    <el-card shadow="never" class="section-card">
-      <template #header>
-        <div class="section-header">
-          <span class="section-title">(五) 前瞻性信息</span>
-          <div class="section-actions">
-            <el-button size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="handleAi('forward-looking')">
-              🤖 AI辅助
-            </el-button>
-            <el-button size="small" @click="openReview('G6-13-forward-looking')">💬复核</el-button>
-          </div>
-        </div>
-      </template>
-      <el-table :data="forwardLookingSection" border size="small" class="ecl-table">
-        <el-table-column label="序号" width="50" align="center" prop="seq" />
-        <el-table-column label="检查区域" min-width="80" prop="checkArea" />
-        <el-table-column label="检查项目" min-width="120" prop="checkItem" />
-        <el-table-column label="审计要求" min-width="160">
-          <template #default="{ row }">
-            <span class="audit-req-text">{{ row.auditRequirement }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="企业参数" min-width="160">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.companyParam" type="textarea"
-              :autosize="{ minRows: 1, maxRows: 4 }" placeholder="企业参数..."
-              @update:model-value="(v: string) => updateRow(row.id, 'companyParam', v)" />
-            <span v-else>{{ row.companyParam || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="是否合理" width="110" align="center">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.isReasonable" size="small"
-              style="width:100%" placeholder="请选择"
-              @change="(v: string) => updateRow(row.id, 'isReasonable', v)">
-              <el-option value="合理" label="合理" />
-              <el-option value="基本合理" label="基本合理" />
-              <el-option value="不合理" label="不合理" />
-            </el-select>
-            <span v-else>{{ row.isReasonable || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="审计结论" min-width="160">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.auditConclusion" type="textarea"
-              :autosize="{ minRows: 1, maxRows: 4 }" placeholder="审计结论..."
-              @update:model-value="(v: string) => updateRow(row.id, 'auditConclusion', v)" />
-            <span v-else>{{ row.auditConclusion || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="风险等级" width="90" align="center">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.riskLevel" size="small"
-              style="width:100%" placeholder="等级"
-              @change="(v: string) => updateRow(row.id, 'riskLevel', v)">
-              <el-option value="高" label="高" />
-              <el-option value="中" label="中" />
-              <el-option value="低" label="低" />
-            </el-select>
-            <span v-else>{{ row.riskLevel || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="索引" width="100" align="center">
-          <template #default="{ row }">
-            <GtIndexChip v-if="row.indexRef" :value="row.indexRef" />
-            <el-input v-else-if="!isReadonly" v-model="row.indexRef" size="small"
-              placeholder="索引" @change="() => updateRow(row.id, 'indexRef', row.indexRef)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="备注" min-width="120">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.remark" size="small"
-              placeholder="备注..."
-              @update:model-value="(v: string) => updateRow(row.id, 'remark', v)" />
-            <span v-else>{{ row.remark || '-' }}</span>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>
-        <div class="audit-note-header"><span>审计说明</span></div>
-      </template>
+      <template #header><div class="section-header"><span class="section-title">审计说明</span></div></template>
       <el-input
         type="textarea"
         :model-value="auditNote"
         :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：概述 ECL 计量模型各要素的测试情况与结果、参数合理性判断、拟调整/未调整事项及其影响。"
-        @change="saveAuditNote"
+        :autosize="{ minRows: 4 }"
+        placeholder="概述方法评价、组合划分、抽样测算及与上期损失率差异原因。"
+        @update:model-value="saveAuditNote"
       />
     </el-card>
 
-    <!-- 编制提示 details 折叠 -->
-    <details class="g6-guide-details">
-      <summary>📋 编制提示</summary>
-      <div class="g6-guide-content">
-        <p>1. PD(违约概率)：验证数据来源(外部评级/内部模型/迁移矩阵)、估计方法(历史法/TTC→PIT转换)、前瞻性调整(宏观经济变量)</p>
-        <p>2. LGD(违约损失率)：检查抵押品覆盖率、回收率假设、清偿时间折现、优先/次级债结构差异</p>
-        <p>3. EAD(违约风险暴露)：确认余额口径(表内+表外×CCF)、利息应计、提前还款假设</p>
-        <p>4. 折现率：原则上使用原始实际利率；浮动利率可用当前实际利率近似；如使用替代利率需说明合理性</p>
-        <p>5. 前瞻性信息：检查宏观经济情景设置(至少基准/乐观/悲观)、概率权重分配合理性、经济变量选择与模型敏感度</p>
-        <p>6. 参考材料：CAS22/IFRS9减值要求、中证协金融工具减值指引、企业ECL模型文档</p>
+    <el-card shadow="never" class="section-card">
+      <template #header>
+        <div class="section-header">
+          <span class="section-title">审计结论</span>
+          <el-button size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="handleAi">🤖 AI</el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="conclusion"
+        type="textarea"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="A、计量方法适当、参数合理。B、除下述事项外未见异常。C、存在重大不当事项须调整。"
+        @change="saveAll"
+      />
+    </el-card>
+
+    <details class="guide-details">
+      <summary>编制提示</summary>
+      <div class="guide-content">
+        <p>1. 比率按小数录入（1%=0.01）；ECL率/金额为公式列。</p>
+        <p>2. PD/LGD：ECL率=期限折算PD×LGD；损失率法：ECL率=损失率+前瞻调整。</p>
+        <p>3. 评级下拉可带出参考一年期PD（示例映射，须替换为当期数据）。</p>
+        <p>4. 「回写损失率至 G6-12」按项目名匹配写入②信用损失率（默认跳过 Stage3）。</p>
+        <p>5. 与上期历史损失率差异&gt;2% 橙色高亮，须在说明中解释。</p>
       </div>
     </details>
   </div>
@@ -464,28 +601,37 @@
 
 <script setup lang="ts">
 /**
- * G6TabEclMeasurement.vue — G6-13 预期信用损失计量测试
- *
- * Spec: .kiro/specs/g6-other-bond-investment-ecl/ Task 8.1
- * Requirements: 4.1, 4.2, 4.3
- *
- * 49行×10列问卷式表格，5个section:
- * (一) PD（违约概率） — 数据来源/估计方法/前瞻性调整
- * (二) LGD（违约损失率） — 抵押品/回收率/优先级
- * (三) EAD（违约风险暴露） — 余额口径/表外承诺
- * (四) 折现率 — 原始实际利率/近似利率
- * (五) 前瞻性信息 — 宏观经济情景/权重
- *
- * 顶部方法论上下文（琥珀色：ECL三要素定义）
- * 每section标题右侧AI按钮(ecl-measurement-conclusion)
- * inject('openReviewDialog') for 复核按钮
- * GtIndexChip索引列
- * 底部编制提示details折叠
+ * G6TabEclMeasurement.vue — 对齐 Excel《预期信用损失的计量测试G6-13》
  */
-import { ref, inject, watch, onMounted, computed } from 'vue'
-import { useG6EclFormData } from '../../composables/useG6EclFormData'
-import type { EclCheckRow } from '../../composables/useG6EclFormData'
+import { ref, computed, inject, onMounted, watch } from 'vue'
+import { ElMessage } from 'element-plus'
+import type { SummaryMethod } from 'element-plus'
+import {
+  useG6EclFormData,
+  type MethodEvalRow,
+  type GroupBasisRow,
+  type ParameterEvalRow,
+  type PdLgdCalcRow,
+  type LossRateCalcRow,
+  type EclMeasurementData,
+} from '../../composables/useG6EclFormData'
+import {
+  useG6EclImpairmentCalc,
+  collectEclRateUpdates,
+} from '../../composables/useG6EclImpairmentCalc'
 import { useG6EclAiGenerate } from '../../composables/useG6EclAiGenerate'
+import {
+  G4_ECL_RATING_OPTIONS,
+  lookupAnnualPdByRating,
+} from '../../composables/g4EclRatingPdMap'
+import {
+  calcTermAdjustedPd,
+  calcEclRateFromPdLgd,
+  calcEclRateFromLossRate,
+  calcImpairmentProvision,
+  calcLossRateVariance,
+  parseNum,
+} from '@/composables/useG6EclFormulaEngine'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -495,110 +641,422 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-// ─── 复核对话 inject ───
-const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const emit = defineEmits<{ imported: [] }>()
 
-function openReview(sectionId: string): void {
-  openReviewDialog(sectionId)
-}
+const VARIANCE_THRESHOLD = 0.02
+const DATA_KEY = 'G6-13-ecl-measurement'
+const NOTE_KEY = 'G6-13-ecl-measurement-audit-note'
+const G612_KEY = 'G6-12-impairment-calc-data'
+const G6_ECL_RATE_EVENT = 'g6:ecl-rate-updated'
+
+const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+function openReview(id: string) { openReviewDialog(id) }
 
 const wpIdRef = computed(() => props.wpId)
+const isReadonly = computed(() => props.isReadonly)
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG6EclAiGenerate(wpIdRef)
-
-// ─── 数据层 ───
 const formData = useG6EclFormData({
   wpId: wpIdRef,
   projectId: computed(() => props.projectId),
 })
+const impairmentBridge = useG6EclImpairmentCalc()
 
-// ─── 审计说明（持久化 checklist_responses, conclusion:null） ───
-const NOTE_KEY = 'G6-13-ecl-measurement-audit-note'
+const ratingOptions = G4_ECL_RATING_OPTIONS
+const rateTab = ref<'pdLgd' | 'lossRate'>('pdLgd')
+const rateTabOptions = [
+  { label: '1、PD/LGD法', value: 'pdLgd' },
+  { label: '2、损失率法', value: 'lossRate' },
+]
+
+const DEFAULT_METHOD: MethodEvalRow[] = [
+  { id: 'me-1', checkItem: 'ECL计量方法选择', checkContent: '是否根据金融资产特征选择合适方法（单项/组合；PD/LGD或损失率法）', companyMethod: '', auditEvaluation: '合理', note: '' },
+  { id: 'me-2', checkItem: '无偏概率加权', checkContent: '计量是否反映通过评价一系列可能结果而确定的无偏概率加权平均金额', companyMethod: '', auditEvaluation: '合理', note: '' },
+  { id: 'me-3', checkItem: '货币时间价值', checkContent: '是否按实际利率（或近似利率）将预期现金短缺折现至报告日', companyMethod: '', auditEvaluation: '合理', note: '' },
+  { id: 'me-4', checkItem: '前瞻性信息运用', checkContent: '是否合理考虑过去事项、当前状况及对未来经济状况的预测', companyMethod: '', auditEvaluation: '合理', note: '' },
+  { id: 'me-5', checkItem: '模型验证与数据质量', checkContent: '是否定期回测，历史违约/回收等基础数据是否完整、准确', companyMethod: '', auditEvaluation: '合理', note: '' },
+]
+
+const DEFAULT_PARAMS: ParameterEvalRow[] = [
+  { id: 'pe-pd', paramName: 'PD（违约概率）', dataSource: '', calcMethod: '外部评级映射 / 迁移矩阵 / 剩余期限折算', verificationResult: '', auditEvaluation: '合理', note: '' },
+  { id: 'pe-lgd', paramName: 'LGD（违约损失率）', dataSource: '', calcMethod: '历史回收率 / 担保覆盖 / 行业基准', verificationResult: '', auditEvaluation: '合理', note: '' },
+  { id: 'pe-ead', paramName: 'EAD（违约风险敞口）', dataSource: '', calcMethod: '一般等于账面信用敞口', verificationResult: '', auditEvaluation: '合理', note: '' },
+]
+
+const methodEvaluation = ref<MethodEvalRow[]>([...DEFAULT_METHOD])
+const groupBasis = ref<GroupBasisRow[]>([])
+const parameterEvaluation = ref<ParameterEvalRow[]>([...DEFAULT_PARAMS])
+const pdLgdRows = ref<PdLgdCalcRow[]>([])
+const lossRateRows = ref<LossRateCalcRow[]>([])
+const conclusion = ref('')
 const auditNote = ref('')
+const pulling = ref(false)
+const pushing = ref(false)
+
+function emptyPdLgd(name = ''): PdLgdCalcRow {
+  return {
+    id: `pd-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    projectName: name,
+    bookBalance: 0,
+    remainingMonths: 12,
+    stage: '',
+    rating: '',
+    externalMappedPd: 0,
+    termAdjustedPd: 0,
+    lgd: 0.45,
+    eclRate: 0,
+    eclAmount: 0,
+    priorHistoricalLossRate: 0,
+    note: '',
+  }
+}
+
+function emptyLossRate(name = ''): LossRateCalcRow {
+  return {
+    id: `lr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    projectName: name,
+    bookBalance: 0,
+    remainingMonths: 12,
+    stage: '',
+    rating: '',
+    lossRate: 0,
+    description: '',
+    forwardLookingAdj: 0,
+    eclRate: 0,
+    eclAmount: 0,
+    priorHistoricalLossRate: 0,
+    note: '',
+  }
+}
+
+function recomputePdLgd(row: PdLgdCalcRow, autoTermPd = true): void {
+  if (autoTermPd) row.termAdjustedPd = calcTermAdjustedPd(row.externalMappedPd, row.remainingMonths)
+  row.eclRate = calcEclRateFromPdLgd(row.termAdjustedPd, row.lgd)
+  row.eclAmount = calcImpairmentProvision(row.bookBalance, row.eclRate)
+}
+
+function recomputeLossRate(row: LossRateCalcRow): void {
+  row.eclRate = calcEclRateFromLossRate(row.lossRate, row.forwardLookingAdj)
+  row.eclAmount = calcImpairmentProvision(row.bookBalance, row.eclRate)
+}
+
+function onRatingChange(row: PdLgdCalcRow, rating: string): void {
+  row.rating = rating
+  const pd = lookupAnnualPdByRating(rating)
+  if (pd != null) {
+    row.externalMappedPd = pd
+    recomputePdLgd(row, true)
+  }
+  saveAll()
+}
+
+function isRateVarianceHigh(eclRate: number, prior: number): boolean {
+  if (parseNum(prior) === 0 && parseNum(eclRate) === 0) return false
+  return calcLossRateVariance(eclRate, prior) > VARIANCE_THRESHOLD
+}
+
+const pdLgdVarianceCount = computed(() =>
+  pdLgdRows.value.filter(r => isRateVarianceHigh(r.eclRate, r.priorHistoricalLossRate)).length,
+)
+const lossRateVarianceCount = computed(() =>
+  lossRateRows.value.filter(r => isRateVarianceHigh(r.eclRate, r.priorHistoricalLossRate)).length,
+)
+
+function addGroupBasis(): void {
+  groupBasis.value.push({
+    id: `gb-${Date.now()}`,
+    groupName: `组合${groupBasis.value.length + 1}`,
+    basis: '',
+    riskCharacteristic: '',
+    sampleSize: 0,
+    auditEvaluation: '',
+    note: '',
+  })
+  saveAll()
+}
+
+function addPdLgdRow(): void {
+  const row = emptyPdLgd()
+  recomputePdLgd(row)
+  pdLgdRows.value.push(row)
+  saveAll()
+}
+
+function addLossRateRow(): void {
+  const row = emptyLossRate()
+  recomputeLossRate(row)
+  lossRateRows.value.push(row)
+  saveAll()
+}
+
+function fmtNum(n: number): string {
+  const v = parseNum(n)
+  if (Math.abs(v) < 1e-9) return '-'
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function fmtPct(n: number, digits = 2): string {
+  return `${(parseNum(n) * 100).toFixed(digits)}%`
+}
+
+const pdLgdSummary: SummaryMethod<PdLgdCalcRow> = ({ columns, data }) => {
+  const sums: string[] = []
+  columns.forEach((col, i) => {
+    if (i === 0) { sums[i] = '合计'; return }
+    const prop = col.property
+    if (prop === 'bookBalance' || col.label === '账面余额') {
+      sums[i] = fmtNum(data.reduce((s, r) => s + parseNum(r.bookBalance), 0))
+    } else if (col.label === '预期信用损失') {
+      sums[i] = fmtNum(data.reduce((s, r) => s + parseNum(r.eclAmount), 0))
+    } else sums[i] = ''
+  })
+  return sums
+}
+
+const lossRateSummary: SummaryMethod<LossRateCalcRow> = ({ columns, data }) => {
+  const sums: string[] = []
+  columns.forEach((col, i) => {
+    if (i === 0) { sums[i] = '合计'; return }
+    if (col.label === '账面余额') {
+      sums[i] = fmtNum(data.reduce((s, r) => s + parseNum(r.bookBalance), 0))
+    } else if (col.label === '预期信用损失') {
+      sums[i] = fmtNum(data.reduce((s, r) => s + parseNum(r.eclAmount), 0))
+    } else sums[i] = ''
+  })
+  return sums
+}
+
+function buildPayload(): EclMeasurementData {
+  return {
+    schemaVersion: 2,
+    methodEvaluation: methodEvaluation.value,
+    groupBasis: groupBasis.value,
+    parameterEvaluation: parameterEvaluation.value,
+    pdLgdRows: pdLgdRows.value,
+    lossRateRows: lossRateRows.value,
+    conclusion: conclusion.value,
+  }
+}
+
+function saveAll(): void {
+  if (props.isReadonly) return
+  formData.debouncedSave(DATA_KEY, { conclusion: JSON.stringify(buildPayload()) })
+}
+
 function saveAuditNote(val: string): void {
   if (props.isReadonly) return
   auditNote.value = val
   formData.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
 }
 
-// ─── 预定义检查行（49行 across 5 sections） ───
+/** 旧问卷 → 新结构迁移 */
+function migrateEclMeasurement(raw: any): EclMeasurementData {
+  if (!raw) {
+    return {
+      schemaVersion: 2,
+      methodEvaluation: [...DEFAULT_METHOD],
+      groupBasis: [],
+      parameterEvaluation: [...DEFAULT_PARAMS],
+      pdLgdRows: [],
+      lossRateRows: [],
+      conclusion: '',
+    }
+  }
+  if (raw.schemaVersion >= 2 || raw.pdLgdRows || raw.methodEvaluation) {
+    return {
+      schemaVersion: 2,
+      methodEvaluation: raw.methodEvaluation?.length ? raw.methodEvaluation : [...DEFAULT_METHOD],
+      groupBasis: raw.groupBasis || [],
+      parameterEvaluation: raw.parameterEvaluation?.length ? raw.parameterEvaluation : [...DEFAULT_PARAMS],
+      pdLgdRows: raw.pdLgdRows || [],
+      lossRateRows: raw.lossRateRows || [],
+      conclusion: raw.conclusion || '',
+    }
+  }
+  // 旧 5-section 问卷：保留为参数评价备注线索
+  const params = [...DEFAULT_PARAMS]
+  const noteBits: string[] = []
+  for (const key of ['pdSection', 'lgdSection', 'eadSection', 'discountRateSection', 'forwardLookingSection'] as const) {
+    const rows = raw[key]
+    if (Array.isArray(rows) && rows.length) {
+      noteBits.push(`${key}:${rows.length}项`)
+    }
+  }
+  if (noteBits.length && params[0]) {
+    params[0].note = `已从旧问卷迁移（${noteBits.join('；')}），请按双路径测算表重新填列`
+  }
+  return {
+    schemaVersion: 2,
+    methodEvaluation: [...DEFAULT_METHOD],
+    groupBasis: [],
+    parameterEvaluation: params,
+    pdLgdRows: [],
+    lossRateRows: [],
+    conclusion: '',
+    methodologyContext: raw.methodologyContext,
+  }
+}
 
-/** (一) PD（违约概率）— 12行 */
-const DEFAULT_PD_ROWS: EclCheckRow[] = [
-  { id: 'pd-1', seq: 1, checkArea: '数据来源', checkItem: 'PD数据来源', auditRequirement: '检查企业PD值来源是否可靠（外部评级机构/内部信用模型/迁移矩阵）', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'pd-2', seq: 2, checkArea: '数据来源', checkItem: '历史违约数据', auditRequirement: '验证历史违约数据的完整性、时间跨度（≥1个完整经济周期）及样本代表性', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'pd-3', seq: 3, checkArea: '数据来源', checkItem: '外部评级映射', auditRequirement: '如使用外部评级机构PD，检查评级映射表的合理性及更新频率', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'pd-4', seq: 4, checkArea: '估计方法', checkItem: 'PD估计模型', auditRequirement: '评估PD模型（如Logistic回归/Markov链/CreditMetrics）是否适用于债券投资', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'pd-5', seq: 5, checkArea: '估计方法', checkItem: 'TTC→PIT转换', auditRequirement: '如将跨周期PD(TTC)转换为时点PD(PIT)，验证转换方法及宏观经济调整因子', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'pd-6', seq: 6, checkArea: '估计方法', checkItem: '期限结构', auditRequirement: '检查PD期限结构（1年期→整个存续期）的推导方法是否合理', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'pd-7', seq: 7, checkArea: '估计方法', checkItem: '违约定义', auditRequirement: '确认企业采用的违约定义是否符合CAS22要求（逾期90天可推翻假设）', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'pd-8', seq: 8, checkArea: '前瞻性调整', checkItem: '宏观经济变量', auditRequirement: '检查前瞻性调整所选宏观经济变量（GDP/CPI/失业率等）与PD的相关性', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'pd-9', seq: 9, checkArea: '前瞻性调整', checkItem: '多情景设置', auditRequirement: '验证多情景设置（至少基准/乐观/悲观三种）及概率权重分配的合理性', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'pd-10', seq: 10, checkArea: '前瞻性调整', checkItem: '模型回测', auditRequirement: '检查企业是否定期对PD模型进行回测验证，偏差是否在可接受范围内', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'pd-11', seq: 11, checkArea: '前瞻性调整', checkItem: '行业/区域差异', auditRequirement: '评估PD是否区分行业、区域等维度，避免组合内信用风险异质性', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'pd-12', seq: 12, checkArea: '前瞻性调整', checkItem: '管理层覆盖', auditRequirement: '如存在管理层对模型PD的人工覆盖(overlay)，评估覆盖理由及金额合理性', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-]
+function applyPayload(ecl: EclMeasurementData): void {
+  methodEvaluation.value = ecl.methodEvaluation?.length ? ecl.methodEvaluation : [...DEFAULT_METHOD]
+  groupBasis.value = ecl.groupBasis || []
+  parameterEvaluation.value = ecl.parameterEvaluation?.length ? ecl.parameterEvaluation : [...DEFAULT_PARAMS]
+  pdLgdRows.value = (ecl.pdLgdRows || []).map((r) => {
+    const row = { ...emptyPdLgd(), ...r }
+    recomputePdLgd(row, false)
+    return row
+  })
+  lossRateRows.value = (ecl.lossRateRows || []).map((r) => {
+    const row = { ...emptyLossRate(), ...r }
+    recomputeLossRate(row)
+    return row
+  })
+  conclusion.value = ecl.conclusion || ''
+}
 
-/** (二) LGD（违约损失率）— 10行 */
-const DEFAULT_LGD_ROWS: EclCheckRow[] = [
-  { id: 'lgd-1', seq: 1, checkArea: '抵押品', checkItem: '抵押品识别', auditRequirement: '确认企业是否完整识别了所有有效抵押品及其类型（房产/股权/票据等）', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'lgd-2', seq: 2, checkArea: '抵押品', checkItem: '抵押品估值', auditRequirement: '检查抵押品估值方法（市场法/收益法）及估值日期的时效性', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'lgd-3', seq: 3, checkArea: '抵押品', checkItem: '折扣率(Haircut)', auditRequirement: '评估抵押品折扣率是否反映了变现难度、市场波动及处置成本', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'lgd-4', seq: 4, checkArea: '回收率', checkItem: '历史回收数据', auditRequirement: '验证历史回收率数据的样本量、时间跨度及代表性', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'lgd-5', seq: 5, checkArea: '回收率', checkItem: '回收时间假设', auditRequirement: '检查从违约到最终回收的时间假设是否合理，折现处理是否正确', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'lgd-6', seq: 6, checkArea: '回收率', checkItem: '处置费用', auditRequirement: '确认LGD计算中是否扣除了合理的处置费用（法律/评估/拍卖等）', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'lgd-7', seq: 7, checkArea: '优先级', checkItem: '债权优先级', auditRequirement: '核实债券的清偿优先级（优先级/次级/劣后）对LGD的影响', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'lgd-8', seq: 8, checkArea: '优先级', checkItem: '交叉违约条款', auditRequirement: '检查是否考虑了交叉违约条款对LGD的影响', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'lgd-9', seq: 9, checkArea: '优先级', checkItem: '经济下行调整', auditRequirement: '评估LGD是否进行了经济下行情景调整（Downturn LGD）', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'lgd-10', seq: 10, checkArea: '优先级', checkItem: 'LGD上下限', auditRequirement: '验证LGD取值是否在合理范围内（0%~100%），极端值是否有充分依据', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-]
+function initFromData(): void {
+  const saved = formData.allResponses.value.get(DATA_KEY)
+  let raw: any = null
+  if (saved?.conclusion) {
+    try { raw = JSON.parse(saved.conclusion) } catch { /* ignore */ }
+  }
+  if (!raw) raw = formData.parseContent()?.eclMeasurement
+  if (!raw && props.htmlData?.eclMeasurement) raw = props.htmlData.eclMeasurement
+  applyPayload(migrateEclMeasurement(raw))
+}
 
-/** (三) EAD（违约风险暴露）— 9行 */
-const DEFAULT_EAD_ROWS: EclCheckRow[] = [
-  { id: 'ead-1', seq: 1, checkArea: '余额口径', checkItem: '表内敞口确认', auditRequirement: '确认EAD的表内敞口口径（摊余成本/公允价值/账面余额）与会计政策一致', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'ead-2', seq: 2, checkArea: '余额口径', checkItem: '利息应计', auditRequirement: '检查EAD是否包含应计利息（已计入摊余成本部分）', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'ead-3', seq: 3, checkArea: '余额口径', checkItem: '减值准备扣除', auditRequirement: '确认EAD计算是否在扣除减值准备前的总额基础上进行', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'ead-4', seq: 4, checkArea: '表外承诺', checkItem: '信用转换因子(CCF)', auditRequirement: '如有表外承诺（如未使用授信额度），检查CCF取值依据', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'ead-5', seq: 5, checkArea: '表外承诺', checkItem: '提前还款假设', auditRequirement: '评估是否考虑了债务人提前还款行为对EAD的影响', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'ead-6', seq: 6, checkArea: '表外承诺', checkItem: '到期日确定', auditRequirement: '确认存续期的确定方法（合同到期日/行为到期日/提前终止条款）', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'ead-7', seq: 7, checkArea: '表外承诺', checkItem: 'EAD时点一致性', auditRequirement: '核实EAD与PD的时点口径一致（均为违约时点预期值）', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'ead-8', seq: 8, checkArea: '表外承诺', checkItem: '分期偿还考虑', auditRequirement: '对于分期偿还型债券，检查EAD是否反映了本金递减结构', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'ead-9', seq: 9, checkArea: '表外承诺', checkItem: '币种风险', auditRequirement: '如涉及外币计价债券，确认EAD是否考虑了汇率变动风险', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-]
+function normalizeName(n: string): string {
+  return String(n || '').trim().replace(/\s+/g, '').toLowerCase()
+}
 
-/** (四) 折现率 — 8行 */
-const DEFAULT_DISCOUNT_RATE_ROWS: EclCheckRow[] = [
-  { id: 'dr-1', seq: 1, checkArea: '折现率选择', checkItem: '原始实际利率', auditRequirement: '确认ECL折现使用的是初始确认时确定的原始实际利率（EIR）', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'dr-2', seq: 2, checkArea: '折现率选择', checkItem: '浮动利率处理', auditRequirement: '对浮动利率债券，检查是否使用当前实际利率进行折现', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'dr-3', seq: 3, checkArea: '折现率选择', checkItem: '近似利率使用', auditRequirement: '如使用替代/近似利率，评估其与原始EIR的差异及合理性说明', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'dr-4', seq: 4, checkArea: '折现率选择', checkItem: '信用调整忽略', auditRequirement: '确认折现率不包含信用风险溢价（避免双重计算）', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'dr-5', seq: 5, checkArea: '折现计算', checkItem: '折现期限', auditRequirement: '检查折现期限是否与现金流短缺发生的预期时点一致', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'dr-6', seq: 6, checkArea: '折现计算', checkItem: '折现频率', auditRequirement: '确认折现频率（年/半年/季度）与付息频率和PD期限结构匹配', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'dr-7', seq: 7, checkArea: '折现计算', checkItem: '多笔汇总折现', auditRequirement: '对于组合评估，检查加权平均折现率的计算方法是否合理', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'dr-8', seq: 8, checkArea: '折现计算', checkItem: '折现影响测试', auditRequirement: '评估折现对ECL金额的影响程度，短期限债券可豁免折现', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-]
+async function pullFromG611(): Promise<void> {
+  if (props.isReadonly) return
+  pulling.value = true
+  try {
+    try { await formData.loadAll() } catch { /* ignore */ }
+    const content = formData.parseContent()
+    const stageRows =
+      content.stageClassification?.rows
+      || props.htmlData?.stageClassification?.rows
+      || []
+    const sources = (stageRows as any[])
+      .filter(r => String(r?.investProject || '').trim())
+      .map(r => ({
+        projectName: String(r.investProject).trim(),
+        stage: (r.auditStage || r.companyStage || '') as PdLgdCalcRow['stage'],
+        bookBalance: Number(r.bookBalance || r.amortizedCost) || 0,
+      }))
+    if (!sources.length) {
+      ElMessage.warning('G6-11 无可用投资项目，请先完成三阶段划分')
+      return
+    }
+    const targetIsPd = rateTab.value === 'pdLgd'
+    const existing = targetIsPd ? pdLgdRows.value : lossRateRows.value
+    const byName = new Map(existing.map(r => [normalizeName(r.projectName), r]))
+    let added = 0
+    let updated = 0
+    for (const src of sources) {
+      const key = normalizeName(src.projectName)
+      const hit = byName.get(key)
+      if (hit) {
+        if (src.stage) hit.stage = src.stage
+        if (src.bookBalance > 0 && !parseNum(hit.bookBalance)) {
+          hit.bookBalance = src.bookBalance
+          if (targetIsPd) recomputePdLgd(hit as PdLgdCalcRow, false)
+          else recomputeLossRate(hit as LossRateCalcRow)
+        }
+        updated += 1
+      } else if (targetIsPd) {
+        const row = emptyPdLgd(src.projectName)
+        row.stage = src.stage || ''
+        row.bookBalance = src.bookBalance
+        recomputePdLgd(row, true)
+        pdLgdRows.value.push(row)
+        byName.set(key, row)
+        added += 1
+      } else {
+        const row = emptyLossRate(src.projectName)
+        row.stage = src.stage || ''
+        row.bookBalance = src.bookBalance
+        recomputeLossRate(row)
+        lossRateRows.value.push(row)
+        byName.set(key, row)
+        added += 1
+      }
+    }
+    saveAll()
+    ElMessage.success(`已从 G6-11 同步：新增 ${added}，更新 ${updated}`)
+  } catch {
+    ElMessage.error('从 G6-11 拉取失败')
+  } finally {
+    pulling.value = false
+  }
+}
 
-/** (五) 前瞻性信息 — 10行 */
-const DEFAULT_FORWARD_LOOKING_ROWS: EclCheckRow[] = [
-  { id: 'fl-1', seq: 1, checkArea: '情景设置', checkItem: '情景数量', auditRequirement: '确认企业设置了至少3种宏观经济情景（基准/乐观/悲观）', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'fl-2', seq: 2, checkArea: '情景设置', checkItem: '情景定义', auditRequirement: '评估各情景的经济假设是否具有内在一致性和区分度', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'fl-3', seq: 3, checkArea: '情景设置', checkItem: '概率权重', auditRequirement: '检查各情景概率权重的确定依据（专家判断/历史频率/市场隐含）', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'fl-4', seq: 4, checkArea: '情景设置', checkItem: '权重合理性', auditRequirement: '验证概率权重之和=100%，各情景权重与当前经济环境匹配', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'fl-5', seq: 5, checkArea: '宏观变量', checkItem: '变量选择', auditRequirement: '评估所选宏观经济变量（GDP/CPI/利率/失业率等）与信用风险的相关性', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'fl-6', seq: 6, checkArea: '宏观变量', checkItem: '变量预测值', auditRequirement: '验证宏观变量预测值来源（央行/IMF/市场共识）的权威性和时效性', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'fl-7', seq: 7, checkArea: '宏观变量', checkItem: '预测期限', auditRequirement: '确认前瞻性信息的预测期限覆盖了金融资产的预期存续期', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'fl-8', seq: 8, checkArea: '模型敏感度', checkItem: '敏感性分析', auditRequirement: '检查企业是否进行了ECL对关键宏观变量的敏感性分析', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'fl-9', seq: 9, checkArea: '模型敏感度', checkItem: '非线性效应', auditRequirement: '评估模型是否捕捉了经济下行时ECL的非线性加速增长效应', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-  { id: 'fl-10', seq: 10, checkArea: '模型敏感度', checkItem: '年度更新', auditRequirement: '确认前瞻性信息及情景权重是否在报告期末进行了重新评估和更新', companyParam: '', isReasonable: '', auditConclusion: '', riskLevel: '', indexRef: '', remark: '' },
-]
+async function syncRatesToG612(): Promise<void> {
+  if (props.isReadonly) return
+  pushing.value = true
+  try {
+    saveAll()
+    const prefer = rateTab.value === 'pdLgd' ? 'pdLgd' : 'lossRate'
+    const updates = collectEclRateUpdates(pdLgdRows.value, lossRateRows.value, prefer)
+    if (!updates.length) {
+      ElMessage.warning('无有效损失率可回写（请填写项目名称并完成 ECL 率计算）')
+      return
+    }
+    try { await formData.loadAll() } catch { /* ignore */ }
+    const saved = formData.allResponses.value.get(G612_KEY)
+    let existing: any[] = []
+    if (saved?.conclusion) {
+      try {
+        const parsed = JSON.parse(saved.conclusion)
+        existing = parsed.rows || parsed || []
+      } catch { /* ignore */ }
+    }
+    if (!Array.isArray(existing)) existing = []
+    impairmentBridge.loadRows(existing)
+    const applied = impairmentBridge.applyEclRateUpdates(updates)
+    for (const r of impairmentBridge.rows.value) impairmentBridge.recalcRow(r)
+    await formData.saveImmediate(G612_KEY, {
+      conclusion: JSON.stringify({
+        rows: impairmentBridge.toJSON(),
+        conclusion: '',
+      }),
+    })
+    try {
+      window.dispatchEvent(new CustomEvent(G6_ECL_RATE_EVENT, {
+        detail: { updates, matched: applied.matched, unmatched: applied.unmatched, skipped: applied.skipped },
+      }))
+    } catch { /* ignore */ }
+    ElMessage.success(
+      `已回写 G6-12：匹配 ${applied.count}；未匹配 ${applied.unmatched.length}；跳过 ${applied.skipped.length}`,
+    )
+    emit('imported')
+  } catch {
+    ElMessage.error('回写 G6-12 失败')
+  } finally {
+    pushing.value = false
+  }
+}
 
-// ─── 响应式数据（5 section） ───
-const pdSection = ref<EclCheckRow[]>([...DEFAULT_PD_ROWS])
-const lgdSection = ref<EclCheckRow[]>([...DEFAULT_LGD_ROWS])
-const eadSection = ref<EclCheckRow[]>([...DEFAULT_EAD_ROWS])
-const discountRateSection = ref<EclCheckRow[]>([...DEFAULT_DISCOUNT_RATE_ROWS])
-const forwardLookingSection = ref<EclCheckRow[]>([...DEFAULT_FORWARD_LOOKING_ROWS])
+async function handleAi(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'ecl-measurement-conclusion',
+    conclusion.value || '',
+    {
+      methodEvaluation: methodEvaluation.value,
+      groupCount: groupBasis.value.length,
+      pdLgdCount: pdLgdRows.value.length,
+      lossRateCount: lossRateRows.value.length,
+    },
+    'AI ECL计量结论',
+  )
+  if (text) {
+    conclusion.value = text
+    saveAll()
+  }
+}
 
-// ─── 数据加载 ───
 onMounted(async () => {
   await formData.loadAll()
   initFromData()
@@ -606,197 +1064,43 @@ onMounted(async () => {
   if (n?.remark) auditNote.value = n.remark
 })
 
-watch(() => props.htmlData, (newData) => {
-  if (newData) initFromData()
+watch(() => props.htmlData, (d) => {
+  if (d) initFromData()
 })
 
-function initFromData(): void {
-  const content = formData.parseContent()
-  const ecl = content.eclMeasurement
-  if (!ecl) return
-
-  if (ecl.pdSection?.length) pdSection.value = ecl.pdSection
-  if (ecl.lgdSection?.length) lgdSection.value = ecl.lgdSection
-  if (ecl.eadSection?.length) eadSection.value = ecl.eadSection
-  if (ecl.discountRateSection?.length) discountRateSection.value = ecl.discountRateSection
-  if (ecl.forwardLookingSection?.length) forwardLookingSection.value = ecl.forwardLookingSection
-}
-
-// ─── 保存逻辑 ───
-function saveAll(): void {
-  formData.debouncedSave('G6-13-ecl-measurement', {
-    conclusion: JSON.stringify({
-      pdSection: pdSection.value,
-      lgdSection: lgdSection.value,
-      eadSection: eadSection.value,
-      discountRateSection: discountRateSection.value,
-      forwardLookingSection: forwardLookingSection.value,
-    }),
-  })
-}
-
-// ─── 行更新（统一入口） ───
-function updateRow(rowId: string, field: keyof EclCheckRow, value: any): void {
-  // 查找所有section中的目标行
-  const allSections = [pdSection, lgdSection, eadSection, discountRateSection, forwardLookingSection]
-  for (const section of allSections) {
-    const row = section.value.find((r) => r.id === rowId)
-    if (row) {
-      ;(row as any)[field] = value
-      break
-    }
-  }
-  saveAll()
-}
-
-// ─── AI辅助 ───
-async function handleAi(section: string): Promise<void> {
-  if (props.isReadonly) return
-  const sectionMap: Record<string, typeof pdSection> = {
-    pd: pdSection, lgd: lgdSection, ead: eadSection,
-    'discount-rate': discountRateSection, 'forward-looking': forwardLookingSection,
-  }
-  const target = sectionMap[section]
-  const existing = target?.value?.length
-    ? (target.value[target.value.length - 1].auditConclusion || '')
-    : ''
-  const text = await generateAndConfirm(
-    'ecl-measurement-conclusion',
-    existing,
-    { section },
-    'AI 审计结论',
-  )
-  if (text && target && target.value.length > 0) {
-    const lastRow = target.value[target.value.length - 1]
-    lastRow.auditConclusion = text
-    saveAll()
-  }
-}
-
-// ─── 暴露序列化接口供父组件保存使用 ─────────────────────────
-defineExpose({
-  toJSON: () => ({
-    pdSection: pdSection.value,
-    lgdSection: lgdSection.value,
-    eadSection: eadSection.value,
-    discountRateSection: discountRateSection.value,
-    forwardLookingSection: forwardLookingSection.value,
-  }),
-})
+defineExpose({ toJSON: buildPayload })
 </script>
 
 <style scoped>
-.g6-tab-ecl-measurement {
-  padding: 12px;
-  font-size: var(--wp-font-size, 13px);
-}
-
-/* ─── 方法论上下文（琥珀色左边线+浅黄背景）─── */
+.g6-tab-ecl-measurement { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.objective-alert { margin-bottom: 12px; }
 .methodology-context {
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  background: #fffbeb;
-  border-left: 4px solid #f59e0b;
-  border-radius: 4px;
-  font-size: 12px;
-  line-height: 1.8;
+  border-left: 4px solid #e6a23c; background: #fdf6ec;
+  padding: 10px 14px; margin-bottom: 10px; border-radius: 0 4px 4px 0;
+  font-size: 12px; line-height: 1.7; color: #6b5900;
 }
-
-.methodology-context p {
-  margin: 0 0 4px;
-}
-
-.methodology-context ul {
-  margin: 0;
-  padding-left: 18px;
-}
-
-.methodology-context li {
-  margin-bottom: 2px;
-}
-
-/* ─── 审计目标 / 工具栏 ─── */
-.objective-alert {
-  margin-bottom: 12px;
-}
+.methodology-title { font-weight: 600; margin: 0 0 4px; }
+.methodology-context p { margin: 2px 0; }
+.flow-hint { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.flow-arrow { color: #909399; }
 .tab-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: flex; justify-content: space-between; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;
 }
-.toolbar-left { display: flex; gap: 8px; align-items: center; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; }
-.chip-wrap { display: inline-flex; align-items: center; }
-
-/* ─── 审计说明卡片 ─── */
-.audit-note-card {
-  margin-top: 16px;
+.toolbar-left, .toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; }
+.section-card { margin-bottom: 14px; }
+.section-header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.section-title { font-weight: 600; font-size: 14px; }
+.sub-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.amt { width: 100%; }
+.amt :deep(.el-input__inner) { text-align: right; }
+.formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+.rate-warn { color: #e6a23c; font-weight: 600; }
+.guide-details { margin-top: 12px; font-size: 12px; color: #606266; }
+.guide-details summary { cursor: pointer; font-weight: 600; }
+.guide-content {
+  margin-top: 6px; padding: 8px 12px; background: #fffbeb;
+  border-left: 3px solid #f59e0b; line-height: 1.8;
 }
-.audit-note-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
-}
-
-/* ─── Section卡片 ─── */
-.section-card {
-  margin-bottom: 16px;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.section-title {
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.section-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-/* ─── 表格 ─── */
-.ecl-table {
-  font-size: var(--wp-font-size, 13px);
-}
-
-.audit-req-text {
-  color: #606266;
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-/* ─── 编制提示 ─── */
-.g6-guide-details {
-  margin-top: 16px;
-}
-
-.g6-guide-details summary {
-  cursor: pointer;
-  font-size: var(--wp-font-size, 13px);
-  color: #606266;
-  font-weight: 600;
-}
-
-.g6-guide-content {
-  padding: 8px 12px;
-  background: #fffbeb;
-  border-left: 3px solid #f59e0b;
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.8;
-}
-
-.g6-guide-content p {
-  margin: 0;
-}
+.guide-content p { margin: 0; }
 </style>

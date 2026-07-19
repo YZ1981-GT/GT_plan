@@ -712,15 +712,34 @@ export function extractBadDebtForDisclosure(badRaw: string | null | undefined): 
     for (const r of rows) {
       if (r?.kind === 'section_header' || r?.kind === 'subtotal' || r?.kind === 'total') continue
       const name = String(r.item || r.debtorOrGroup || '').trim()
+      const openingUnadj = Number(r.openingUnadjusted) || 0
+      const openingAdj = Number(r.openingAdjustment) || 0
+      const hasMovement =
+        'openingUnadjusted' in (r || {})
+        || 'provisionIncrease' in (r || {})
+        || 'closingAdjustment' in (r || {})
+      const openingAudited = Number(r.openingAudited) || round2(openingUnadj + openingAdj)
+      const closingFromMovement = hasMovement
+        ? round2(
+          openingAudited
+          + (Number(r.provisionIncrease) || 0)
+          + (Number(r.otherIncrease) || 0)
+          - (Number(r.reversal) || 0)
+          - (Number(r.writeOff) || 0)
+          - (Number(r.otherDecrease) || 0)
+          + (Number(r.closingAdjustment) || 0),
+        )
+        : 0
       const endProv = Number(
         r.closingAudited
         ?? r.adjustedProvision
+        ?? (hasMovement ? closingFromMovement : undefined)
         ?? r.unadjustedProvision
         ?? 0,
       ) || 0
       const priorProv = Number(
         r.openingAudited
-        ?? ((Number(r.openingUnadjusted) || 0) + (Number(r.openingAdjustment) || 0))
+        ?? (hasMovement ? openingAudited : undefined)
         ?? r.priorYearProvision
         ?? 0,
       ) || 0

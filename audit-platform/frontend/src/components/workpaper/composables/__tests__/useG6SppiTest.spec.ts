@@ -2,6 +2,7 @@
  * Unit Tests — G6-8 SPPI测试 composable
  *
  * Task 8.3: SPPI决策逻辑（任一FAIL→红色）、hasFailedSection计算、section结论推导
+ * 另含：证据完整性闸门、全部不适用不得整体通过、合规陈述骨架
  *
  * Spec: .kiro/specs/g6-other-bond-investment-sppi/
  * Validates: Requirements 5.4, 5.5
@@ -13,13 +14,17 @@ import {
   useG6SppiTest,
   deriveSectionConclusion,
   deriveOverallConclusion,
+  findEvidenceGaps,
   SECTION_DEFINITIONS,
 } from '../useG6SppiTest'
 import type { SppiItem, SppiSection } from '../useG6SppiTest'
 
 // ─── Helper: 创建测试用SppiItem ─────────────────────────────────────────────
 
-function makeItem(isSPPISatisfied: 'yes' | 'no' | 'na' | null): SppiItem {
+function makeItem(
+  isSPPISatisfied: 'yes' | 'no' | 'na' | null,
+  extras?: Partial<SppiItem>,
+): SppiItem {
   return {
     id: `test-${Math.random().toString(36).slice(2)}`,
     seq: 1,
@@ -32,15 +37,15 @@ function makeItem(isSPPISatisfied: 'yes' | 'no' | 'na' | null): SppiItem {
     riskLevel: null,
     indexRef: '',
     remark: '',
+    ...extras,
   }
 }
 
-function makeSection(id: string, conclusions: ('yes' | 'no' | 'na' | null)[]): SppiSection {
-  return {
-    id,
-    title: `Section ${id}`,
-    items: conclusions.map(c => makeItem(c)),
-    sectionConclusion: null,
+function fillEvidence(item: SppiItem): void {
+  item.contractTermSummary = '合同第X条：……'
+  item.judgmentBasis = '与准则要求一致'
+  if (item.isSPPISatisfied === 'no' || item.riskLevel === 'high') {
+    item.indexRef = 'G6-2'
   }
 }
 
@@ -69,6 +74,13 @@ describe('Task 8.3: G6-8 SPPI测试', () => {
       sections.value.forEach((section, idx) => {
         expect(section.items.length).toBe(expectedCounts[idx])
       })
+    })
+
+    it('默认检查项为合规陈述（不含「是否存在」事实问句）', () => {
+      const { sections } = useG6SppiTest()
+      const allText = sections.value.flatMap(s => s.items.map(i => i.checkItem)).join('|')
+      expect(allText).not.toMatch(/是否存在/)
+      expect(allText).not.toMatch(/是否包含/)
     })
 
     it('初始overallConclusion为null', () => {
@@ -136,13 +148,21 @@ describe('Task 8.3: G6-8 SPPI测试', () => {
       expect(deriveOverallConclusion(sections)).toBe('fail')
     })
 
-    it("全部 'pass'/'na' → 'pass'", () => {
+    it("全部 'pass'/'na'（有pass、无证据缺口） → 'pass'", () => {
       const sections: SppiSection[] = [
         { id: 'a', title: 'A', items: [], sectionConclusion: 'pass' },
         { id: 'b', title: 'B', items: [], sectionConclusion: 'na' },
         { id: 'c', title: 'C', items: [], sectionConclusion: 'pass' },
       ]
       expect(deriveOverallConclusion(sections)).toBe('pass')
+    })
+
+    it("全部 'na' → null（不得整体通过）", () => {
+      const sections: SppiSection[] = [
+        { id: 'a', title: 'A', items: [], sectionConclusion: 'na' },
+        { id: 'b', title: 'B', items: [], sectionConclusion: 'na' },
+      ]
+      expect(deriveOverallConclusion(sections)).toBeNull()
     })
 
     it('有section未完成(null) → null', () => {
@@ -165,6 +185,28 @@ describe('Task 8.3: G6-8 SPPI测试', () => {
     it('空数组 → null', () => {
       expect(deriveOverallConclusion([])).toBeNull()
     })
+
+    it('判断为yes但缺证据 → 不得pass', () => {
+      const item = makeItem('yes')
+      const sections: SppiSection[] = [
+        {
+          id: 'a',
+          title: 'A',
+          items: [item],
+          sectionConclusion: 'pass',
+        },
+      ]
+      expect(findEvidenceGaps(sections).length).toBeGreaterThan(0)
+      expect(deriveOverallConclusion(sections)).toBeNull()
+    })
+
+    it('requireEvidence=false 时可跳过证据闸门', () => {
+      const item = makeItem('yes')
+      const sections: SppiSection[] = [
+        { id: 'a', title: 'A', items: [item], sectionConclusion: 'pass' },
+      ]
+      expect(deriveOverallConclusion(sections, { requireEvidence: false })).toBe('pass')
+    })
   })
 
   // ═══════════════════════════════════════════════════════════════════
@@ -173,7 +215,7 @@ describe('Task 8.3: G6-8 SPPI测试', () => {
 
   describe('hasFailedSection / failedSections 计算属性', () => {
     it('设置某section结论为fail后 hasFailedSection=true', () => {
-      const { sections, hasFailedSection, setSectionConclusion } = useG6SppiTest()
+      const { hasFailedSection, setSectionConclusion } = useG6SppiTest()
       setSectionConclusion('principal', 'fail')
       expect(hasFailedSection.value).toBe(true)
     })
@@ -198,36 +240,47 @@ describe('Task 8.3: G6-8 SPPI测试', () => {
       const firstSection = sections.value[0]
       const firstItem = firstSection.items[0]
 
-      // 先设置所有item为yes
       for (const item of firstSection.items) {
         updateItem(firstSection.id, item.id, 'isSPPISatisfied', 'yes')
       }
       recalcConclusions()
       expect(firstSection.sectionConclusion).toBe('pass')
 
-      // 将第一项改为no
       updateItem(firstSection.id, firstItem.id, 'isSPPISatisfied', 'no')
       recalcConclusions()
       expect(firstSection.sectionConclusion).toBe('fail')
     })
 
-    it('通过watch自动推导（nextTick后）', async () => {
+    it('通过watch自动推导（补全证据后 nextTick）', async () => {
       const { sections, updateItem, overallConclusion } = useG6SppiTest()
 
-      // 将所有section的所有item设为yes
+      for (const section of sections.value) {
+        for (const item of section.items) {
+          updateItem(section.id, item.id, 'isSPPISatisfied', 'yes')
+          updateItem(section.id, item.id, 'contractTermSummary', '摘录条款')
+          updateItem(section.id, item.id, 'judgmentBasis', '满足基本借贷安排')
+        }
+      }
+      await nextTick()
+      expect(overallConclusion.value).toBe('pass')
+
+      const targetSection = sections.value[2] // modified_time_value
+      updateItem(targetSection.id, targetSection.items[0].id, 'isSPPISatisfied', 'no')
+      updateItem(targetSection.id, targetSection.items[0].id, 'indexRef', 'G6-2')
+      await nextTick()
+      expect(overallConclusion.value).toBe('fail')
+    })
+
+    it('全部yes但无证据时 overall 仍为 null', async () => {
+      const { sections, updateItem, overallConclusion, evidenceGaps } = useG6SppiTest()
       for (const section of sections.value) {
         for (const item of section.items) {
           updateItem(section.id, item.id, 'isSPPISatisfied', 'yes')
         }
       }
       await nextTick()
-      expect(overallConclusion.value).toBe('pass')
-
-      // 将某section的某item设为no
-      const targetSection = sections.value[2] // modified_time_value
-      updateItem(targetSection.id, targetSection.items[0].id, 'isSPPISatisfied', 'no')
-      await nextTick()
-      expect(overallConclusion.value).toBe('fail')
+      expect(evidenceGaps.value.length).toBeGreaterThan(0)
+      expect(overallConclusion.value).toBeNull()
     })
   })
 
@@ -239,7 +292,6 @@ describe('Task 8.3: G6-8 SPPI测试', () => {
     it('只提供部分section时缺失的用默认骨架填充', () => {
       const { sections, loadData } = useG6SppiTest()
 
-      // 只提供2个section的数据
       loadData({
         sections: [
           {
@@ -267,22 +319,17 @@ describe('Task 8.3: G6-8 SPPI测试', () => {
         hasFailedSection: false,
       })
 
-      // 应有6个section
       expect(sections.value).toHaveLength(6)
-      // 第一个section用加载的数据
       expect(sections.value[0].items).toHaveLength(1)
       expect(sections.value[0].items[0].contractTermSummary).toBe('已填写内容')
-      // 其余section用默认骨架
       expect(sections.value[1].items.length).toBeGreaterThan(0)
     })
 
     it('loadData(null) 重置为默认', () => {
       const { sections, overallConclusion, loadData, setSectionConclusion } = useG6SppiTest()
 
-      // 先修改数据
       setSectionConclusion('principal', 'fail')
 
-      // 重置
       loadData(null)
       expect(sections.value).toHaveLength(6)
       expect(overallConclusion.value).toBeNull()
@@ -316,6 +363,43 @@ describe('Task 8.3: G6-8 SPPI测试', () => {
       const firstItem = sections.value[0].items[0]
       removeItem('principal', firstItem.id)
       expect(totalRows.value).toBe(before - 1)
+    })
+  })
+
+  describe('findEvidenceGaps', () => {
+    it('yes 缺摘要/依据 → 缺口', () => {
+      const gaps = findEvidenceGaps([
+        {
+          id: 'a',
+          title: 'A',
+          sectionConclusion: 'pass',
+          items: [makeItem('yes')],
+        },
+      ])
+      expect(gaps[0].missing).toEqual(
+        expect.arrayContaining(['contractTermSummary', 'judgmentBasis']),
+      )
+    })
+
+    it('no 另需 indexRef', () => {
+      const item = makeItem('no', {
+        contractTermSummary: '有条款',
+        judgmentBasis: '不满足',
+      })
+      const gaps = findEvidenceGaps([
+        { id: 'a', title: 'A', sectionConclusion: 'fail', items: [item] },
+      ])
+      expect(gaps[0].missing).toContain('indexRef')
+    })
+
+    it('补全后无缺口', () => {
+      const item = makeItem('yes')
+      fillEvidence(item)
+      expect(
+        findEvidenceGaps([
+          { id: 'a', title: 'A', sectionConclusion: 'pass', items: [item] },
+        ]),
+      ).toHaveLength(0)
     })
   })
 })

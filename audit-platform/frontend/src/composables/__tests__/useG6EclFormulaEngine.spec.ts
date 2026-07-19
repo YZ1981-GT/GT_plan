@@ -14,10 +14,16 @@ import { describe, it, expect } from 'vitest'
 import {
   parseNum,
   calcImpairmentProvision,
+  calcImpairmentFromPv,
+  calcImpliedLossRate,
+  calcImpairmentAdjustmentIdentity,
   calcImpairmentAdjustment,
   calcAdjustedBalance,
   calcAdjustedImpairment,
   calcAdjustedBookValue,
+  calcTermAdjustedPd,
+  calcEclRateFromPdLgd,
+  calcEclRateFromLossRate,
   determineStage,
   isDebitCreditBalanced,
 } from '../useG6EclFormulaEngine'
@@ -81,6 +87,22 @@ describe('G6-12 ECL公式链端到端', () => {
     expect(adjBookValue).toBe(11760000)
     // ⑨ === ⑦ - ⑧
     expect(adjBookValue).toBe(adjBalance - adjImpairment)
+  })
+
+  it('Stage3 现值法：③ = max(0, ① − PV)', () => {
+    expect(calcImpairmentFromPv(10000000, 8500000)).toBe(1500000)
+    expect(calcImpairmentFromPv(100, 150)).toBe(0)
+    expect(calcImpliedLossRate(10000000, 1500000)).toBe(0.15)
+  })
+
+  it('Stage3 ⑥ 恒等倒挤 = 目标⑧ − ③', () => {
+    expect(calcImpairmentAdjustmentIdentity(200000, 150000)).toBe(50000)
+  })
+
+  it('G6-13：期限折算PD / PD×LGD / 损失率法', () => {
+    expect(calcTermAdjustedPd(0.012, 24)).toBeGreaterThan(0.012)
+    expect(calcEclRateFromPdLgd(0.01, 0.45)).toBeCloseTo(0.0045, 6)
+    expect(calcEclRateFromLossRate(0.02, 0.01)).toBeCloseTo(0.03, 6)
   })
 })
 

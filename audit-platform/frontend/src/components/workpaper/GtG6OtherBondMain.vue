@@ -81,6 +81,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :all-responses="formData.allResponses.value"
         @imported="onSheetImported"
       />
 

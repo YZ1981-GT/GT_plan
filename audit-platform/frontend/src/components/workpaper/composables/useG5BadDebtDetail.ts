@@ -366,7 +366,7 @@ export function normalizeStoredLeaves(raw: unknown): G5BadDebtLeaf[] {
         reason: String(r.reason || ''),
         crossSheetReceivableId: r.crossSheetReceivableId
           ? String(r.crossSheetReceivableId)
-          : (r.id ? String(r.id) : undefined),
+          : undefined,
       } as G5BadDebtLeaf
     })
 }
@@ -430,7 +430,7 @@ export function useG5BadDebtDetail() {
       reason: String(r.reason || ''),
       crossSheetReceivableId: r.crossSheetReceivableId
         ? String(r.crossSheetReceivableId)
-        : (r.id ? String(r.id) : undefined),
+        : undefined,
         }))
     },
   })

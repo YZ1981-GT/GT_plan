@@ -1,21 +1,18 @@
 <template>
   <div class="g6-tab-adjustment">
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
       show-icon
-      title="审计目标：确认针对其他债权投资的审计调整(AJE)与重分类(RJE)分录依据充分、借贷平衡，并正确汇总回写至 G6-1 审定表。"
+      title="审计目标：确认针对其他债权投资的审计调整依据充分、借贷平衡，并正确汇总回写至 G6-1 审定表。列结构对齐模板：调整事项说明 / 类别（报表调整·账项调整·其他）/ 报表项目 / 科目 / 附注项目 / 借贷金额。"
       style="margin-bottom: 12px"
     />
-    <!-- Section标题栏 + 复核按钮右对齐 -->
     <div class="section-head">
       <h3 class="sheet-title">G6-4 调整分录汇总</h3>
       <div class="head-actions">
-        <el-button size="small" type="success" :disabled="isReadonly || !isBalanced" @click="handleSaveWriteback">
+        <el-button size="small" type="success" :disabled="isReadonly" @click="handleSaveWriteback">
           保存&amp;回写
         </el-button>
-        <!-- 导入导出 el-dropdown -->
         <el-dropdown trigger="click" size="small" @command="handleIECommand">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -30,13 +27,11 @@
       </div>
     </div>
 
-    <!-- 借贷不平衡警告 -->
     <el-alert v-if="!isBalanced" type="error" :closable="false" style="margin-bottom:8px">
       ⚠️ 借贷不平衡：借方合计 {{ fmt(totalDebits) }} ≠ 贷方合计 {{ fmt(totalCredits) }}，差额
       <span class="balance-diff">{{ fmt(Math.abs(balanceDiff)) }}</span>
     </el-alert>
 
-    <!-- 工具栏：新增按钮 -->
     <div class="g6-adj-toolbar">
       <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddEntry">
         + 新增分录
@@ -44,10 +39,8 @@
       <span class="row-count">共 {{ entries.length }} 行</span>
     </div>
 
-    <!-- 隐藏的文件上传 -->
     <input ref="fileInputRef" type="file" accept=".xlsx" style="display:none" @change="onFileSelected" />
 
-    <!-- 10列调整分录表格 -->
     <el-table
       :data="entries"
       border
@@ -56,114 +49,115 @@
       max-height="520"
       :row-class-name="tableRowClassName"
     >
-      <el-table-column prop="seq" label="序号" width="56" align="center" />
+      <el-table-column label="调整事项说明" min-width="160">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.description"
+            size="small"
+            @change="(v: string) => updateCell(row.id, 'description', v)"
+          />
+          <span v-else>{{ row.description || '-' }}</span>
+        </template>
+      </el-table-column>
 
-      <el-table-column label="分录类型" width="100">
+      <el-table-column label="类别" width="130">
         <template #default="{ row }">
           <el-select
             v-if="!isReadonly"
-            v-model="row.entryType"
+            :model-value="row.category"
             size="small"
-            @change="markDirty"
+            @change="(v: string) => updateCell(row.id, 'category', v)"
           >
-            <el-option value="AJE" label="AJE" />
-            <el-option value="RJE" label="RJE" />
+            <el-option v-for="c in categoryOptions" :key="c" :value="c" :label="c" />
           </el-select>
-          <span v-else>{{ row.entryType }}</span>
+          <span v-else>{{ row.category }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="日期" width="120">
+      <el-table-column label="报表项目" width="120">
         <template #default="{ row }">
           <el-input
             v-if="!isReadonly"
-            v-model="row.date"
+            :model-value="row.reportItem"
             size="small"
-            placeholder="YYYY-MM-DD"
-            @change="markDirty"
+            @change="(v: string) => updateCell(row.id, 'reportItem', v)"
           />
-          <span v-else>{{ row.date }}</span>
+          <span v-else>{{ row.reportItem || '-' }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="摘要" min-width="140">
+      <el-table-column label="科目名称" min-width="160">
         <template #default="{ row }">
-          <el-input
+          <el-select
             v-if="!isReadonly"
-            v-model="row.summary"
+            :model-value="row.accountCode"
             size="small"
-            @change="markDirty"
-          />
-          <span v-else>{{ row.summary || '-' }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="科目代码" width="110">
-        <template #default="{ row }">
-          <el-input
-            v-if="!isReadonly"
-            v-model="row.accountCode"
-            size="small"
-            placeholder="如1503"
-            @change="markDirty"
-          />
-          <span v-else>{{ row.accountCode }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="科目名称" min-width="130">
-        <template #default="{ row }">
-          <el-input
-            v-if="!isReadonly"
-            v-model="row.accountName"
-            size="small"
-            @change="markDirty"
-          />
+            filterable
+            @change="(v: string) => updateCell(row.id, 'accountCode', v)"
+          >
+            <el-option
+              v-for="opt in accountOptions"
+              :key="opt.code"
+              :value="opt.code"
+              :label="`${opt.code} ${opt.name}`"
+            />
+          </el-select>
           <span v-else>{{ row.accountName || '-' }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="借方金额" width="120" align="right">
+      <el-table-column label="附注项目" width="120">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.noteItem"
+            size="small"
+            @change="(v: string) => updateCell(row.id, 'noteItem', v)"
+          />
+          <span v-else>{{ row.noteItem || '-' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="借方调整金额" width="120" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!isReadonly"
-            v-model="row.debitAmount"
+            :model-value="row.debitAmount"
             size="small"
             :controls="false"
             :precision="2"
-            :min="0"
             style="width:100%"
-            @change="markDirty"
+            @change="(v: number | undefined) => updateCell(row.id, 'debitAmount', v ?? 0)"
           />
           <span v-else>{{ fmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="贷方金额" width="120" align="right">
+      <el-table-column label="贷方调整金额" width="120" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!isReadonly"
-            v-model="row.creditAmount"
+            :model-value="row.creditAmount"
             size="small"
             :controls="false"
             :precision="2"
-            :min="0"
             style="width:100%"
-            @change="markDirty"
+            @change="(v: number | undefined) => updateCell(row.id, 'creditAmount', v ?? 0)"
           />
           <span v-else>{{ fmt(row.creditAmount) }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="编制人" width="90">
+      <el-table-column label="索引" width="90">
         <template #default="{ row }">
           <el-input
             v-if="!isReadonly"
-            v-model="row.preparedBy"
+            :model-value="row.indexRef"
             size="small"
-            @change="markDirty"
+            @change="(v: string) => updateCell(row.id, 'indexRef', v)"
           />
-          <span v-else>{{ row.preparedBy || '-' }}</span>
+          <span v-else>{{ row.indexRef || '-' }}</span>
         </template>
       </el-table-column>
 
@@ -171,9 +165,9 @@
         <template #default="{ row }">
           <el-input
             v-if="!isReadonly"
-            v-model="row.remark"
+            :model-value="row.remark"
             size="small"
-            @change="markDirty"
+            @change="(v: string) => updateCell(row.id, 'remark', v)"
           />
           <span v-else>{{ row.remark || '-' }}</span>
         </template>
@@ -181,14 +175,11 @@
 
       <el-table-column v-if="!isReadonly" label="操作" width="56" align="center">
         <template #default="{ row }">
-          <el-button link size="small" type="danger" @click="handleRemoveEntry(row.id)">
-            🗑️
-          </el-button>
+          <el-button link size="small" type="danger" @click="handleRemoveEntry(row.id)">删</el-button>
         </template>
       </el-table-column>
     </el-table>
 
-    <!-- 合计行（借贷不平衡时红色高亮） -->
     <div class="g6-adj-footer" :class="{ 'balance-fail': !isBalanced }">
       <span class="footer-label">合计</span>
       <span class="footer-debit">借方：{{ fmt(totalDebits) }}</span>
@@ -207,23 +198,26 @@
       note-ai-section="adjustment-note"
       conclusion-ai-section="adjustment-conclusion"
       :related-context="{
+        分录数: entries.length,
         借方合计: totalDebits,
         贷方合计: totalCredits,
         是否平衡: isBalanced,
+        成本回写: writebackNets.costNet,
+        利息回写: writebackNets.interestNet,
+        减值回写: writebackNets.impairmentNet,
       }"
       note-placeholder="填写审计说明：调整分录的依据、借贷平衡与回写情况，拟调整/未调整事项及其影响。"
-      note-hint="覆盖 AJE/RJE 依据与回写审定表情况。"
+      note-hint="覆盖账项调整依据与回写审定表情况。"
       conclusion-placeholder="填写审计结论：A、未见异常。B、除上述调整事项予以调整外，其余未见异常。C、存在重大未调整事项，不可确认。"
       conclusion-hint="按 A/B/C 口径评价调整分录充分性。"
     />
 
-    <!-- 编制提示 -->
     <details class="g6-guide-details">
       <summary>📋 编制提示</summary>
       <div class="g6-guide-content">
-        <p>1. 调整分录(AJE)用于更正被审计单位财务报表中的错报；重分类分录(RJE)用于分析性归类调整。</p>
-        <p>2. 借贷必须平衡后方可保存回写。点击"保存&amp;回写"将汇总数据回写G6-1审定表的调整列。</p>
-        <p>3. 科目代码1503为其他债权投资，保存后自动汇总AJE/RJE调整额回写审定表。</p>
+        <p>1. 列结构对齐 Excel：调整事项说明、类别（账项调整/报表调整/其他）、报表项目、科目名称、附注项目、借贷金额、索引、备注。</p>
+        <p>2. 「账项调整」按科目分流回写 G6-1（150301/150303→成本，150302→利息，150305→减值，150304→公允价值）；「报表调整」不计入审定。</p>
+        <p>3. 借贷须平衡后方可保存回写；科目选择后自动带出名称。</p>
       </div>
     </details>
   </div>
@@ -231,24 +225,13 @@
 
 <script setup lang="ts">
 /**
- * G6TabAdjustment.vue — G6-4 调整分录汇总（23行×10列）
- *
- * Spec: .kiro/specs/g6-other-bond-investment-main/ Task 7.1
- * Requirements: 7.1, 7.4
- *
- * 功能：
- * - 10列调整分录表格（序号|分录类型(AJE/RJE)|日期|摘要|科目代码|科目名称|借方金额|贷方金额|编制人|备注）
- * - 借贷平衡实时校验 (isDebitCreditBalanced) + 不平衡时红色差额高亮
- * - 不平衡时阻止保存
- * - 动态行增删 (ElMessageBox.prompt 输入摘要确认)
- * - 导入导出 (sheet='G6-4')
- * - 保存时汇总回写 G6-1 审定表 adjustment 列
+ * G6TabAdjustment.vue — G6-4 调整分录汇总（对齐 Excel 列 + useG6MainAdjustment）
  */
-import { ref, computed, inject, onMounted, watch } from 'vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ref, computed, inject, onMounted, watch, toRef } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import G6AuditTextCards from '../G6AuditTextCards.vue'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
-import { isDebitCreditBalanced, parseNum } from '@/composables/useG6MainFormulaEngine'
+import { useG6MainAdjustment } from '../../composables/useG6MainAdjustment'
 import { useG6MainImportExport } from '../../composables/useG6MainImportExport'
 import type { G6MainImportableSheet } from '../../composables/useG6MainImportExport'
 
@@ -257,19 +240,31 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  allResponses?: Map<string, ChecklistResponse>
 }>()
 
 const emit = defineEmits<{ imported: [] }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
-// ─── 审计说明 / 审计结论（经 g6:save-items 由父组件落库） ───
+const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
+watch(
+  () => props.allResponses,
+  (source) => {
+    if (!source) return
+    allResponses.value = source
+  },
+  { immediate: true, deep: true },
+)
+
 const NOTE_KEY = 'G6-4-adjustment-audit-note'
 const CONCLUSION_KEY = 'G6-4-adjustment-audit-conclusion'
 const auditNote = ref('')
 const auditConclusion = ref('')
 
 function readSaved(key: string): string {
+  const fromMap = allResponses.value.get(key)
+  if (fromMap?.remark) return fromMap.remark
   const cr = props.htmlData?.checklist_responses
   if (cr && typeof cr === 'object' && (cr as Record<string, any>)[key]) {
     const v = (cr as Record<string, any>)[key]
@@ -286,6 +281,7 @@ function readSaved(key: string): string {
 function dispatchSave(itemId: string, val: string): void {
   if (props.isReadonly) return
   const item: ChecklistResponse = { item_id: itemId, conclusion: null, remark: val }
+  allResponses.value.set(itemId, item)
   try {
     window.dispatchEvent(new CustomEvent('g6:save-items', { detail: { items: [item] } }))
   } catch { /* silent */ }
@@ -294,134 +290,59 @@ function dispatchSave(itemId: string, val: string): void {
 watch(auditNote, (val) => { dispatchSave(NOTE_KEY, val) })
 watch(auditConclusion, (val) => { dispatchSave(CONCLUSION_KEY, val) })
 
-// ═══ 数据模型 ═══
-interface AdjustmentEntry {
-  id: string
-  seq: number
-  entryType: 'AJE' | 'RJE'
-  date: string
-  summary: string
-  accountCode: string
-  accountName: string
-  debitAmount: number
-  creditAmount: number
-  preparedBy: string
-  remark: string
-}
+const isReadonlyRef = toRef(props, 'isReadonly')
+const {
+  entries,
+  totalDebits,
+  totalCredits,
+  balanceDiff,
+  isBalanced,
+  writebackNets,
+  addEntry,
+  removeEntry,
+  updateCell,
+  saveAndWriteback,
+  loadEntries,
+  accountOptions,
+  categoryOptions,
+} = useG6MainAdjustment({
+  allResponses,
+  isReadonly: isReadonlyRef,
+})
 
-// ═══ 状态 ═══
-const entries = ref<AdjustmentEntry[]>([])
-const isDirty = ref(false)
+const isReadonly = computed(() => props.isReadonly)
+const wpId = computed(() => props.wpId)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
-// ═══ 导入导出 ═══
 const ie = useG6MainImportExport({
   wpId: computed(() => props.wpId),
   onImported: () => { emit('imported') },
 })
 
-// ═══ 计算属性 ═══
-const totalDebits = computed(() =>
-  entries.value.reduce((sum, e) => sum + parseNum(e.debitAmount), 0),
-)
-const totalCredits = computed(() =>
-  entries.value.reduce((sum, e) => sum + parseNum(e.creditAmount), 0),
-)
-const balanceDiff = computed(() => totalDebits.value - totalCredits.value)
-const isBalanced = computed(() =>
-  isDebitCreditBalanced(
-    entries.value.map((e) => e.debitAmount),
-    entries.value.map((e) => e.creditAmount),
-  ),
-)
-
-// ═══ 初始化 ═══
-function generateId(): string {
-  return `adj-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-}
-
-function buildInitialEntries(count: number): AdjustmentEntry[] {
-  const rows: AdjustmentEntry[] = []
-  for (let i = 1; i <= count; i++) {
-    rows.push({
-      id: generateId(),
-      seq: i,
-      entryType: 'AJE',
-      date: '',
-      summary: '',
-      accountCode: '',
-      accountName: '',
-      debitAmount: 0,
-      creditAmount: 0,
-      preparedBy: '',
-      remark: '',
-    })
-  }
-  return rows
-}
-
-function loadFromHtmlData(): void {
-  if (props.htmlData?.adjustment?.entries) {
-    const saved = props.htmlData.adjustment.entries as AdjustmentEntry[]
-    entries.value = saved.map((e, i) => ({
-      ...e,
-      id: e.id || generateId(),
-      seq: i + 1,
-    }))
-  } else {
-    entries.value = buildInitialEntries(23)
-  }
-}
-
 onMounted(() => {
-  loadFromHtmlData()
+  loadEntries()
   auditNote.value = readSaved(NOTE_KEY)
   auditConclusion.value = readSaved(CONCLUSION_KEY)
 })
 
-// ═══ 操作方法 ═══
-function markDirty(): void {
-  isDirty.value = true
-}
-
-function reSequence(): void {
-  entries.value.forEach((e, i) => { e.seq = i + 1 })
-}
-
-/** 新增行 - 弹出ElMessageBox.prompt输入摘要 */
 async function handleAddEntry(): Promise<void> {
   try {
     const { value: summary } = await ElMessageBox.prompt(
-      '请输入新分录摘要：',
+      '请输入调整事项说明：',
       '新增调整分录',
       {
         confirmButtonText: '确认',
         cancelButtonText: '取消',
         inputPlaceholder: '如：调整其他债权投资减值损失',
-        inputValidator: (v) => (!v?.trim() ? '摘要不能为空' : true),
+        inputValidator: (v) => (!v?.trim() ? '说明不能为空' : true),
       },
     )
-    const newEntry: AdjustmentEntry = {
-      id: generateId(),
-      seq: entries.value.length + 1,
-      entryType: 'AJE',
-      date: new Date().toISOString().slice(0, 10),
-      summary: summary.trim(),
-      accountCode: '',
-      accountName: '',
-      debitAmount: 0,
-      creditAmount: 0,
-      preparedBy: '',
-      remark: '',
-    }
-    entries.value.push(newEntry)
-    markDirty()
+    addEntry(summary.trim())
   } catch {
-    // 用户取消
+    /* 取消 */
   }
 }
 
-/** 删除行 */
 async function handleRemoveEntry(id: string): Promise<void> {
   try {
     await ElMessageBox.confirm('确认删除该调整分录行？', '删除确认', {
@@ -429,40 +350,16 @@ async function handleRemoveEntry(id: string): Promise<void> {
       cancelButtonText: '取消',
       type: 'warning',
     })
-    entries.value = entries.value.filter((e) => e.id !== id)
-    reSequence()
-    markDirty()
+    removeEntry(id)
   } catch {
-    // 用户取消
+    /* 取消 */
   }
 }
 
-/** 保存并回写G6-1审定表 */
 function handleSaveWriteback(): void {
-  if (!isBalanced.value) {
-    ElMessage.error('借贷不平衡，无法保存')
-    return
-  }
-  // 汇总AJE/RJE调整总额
-  const ajeTotal = entries.value
-    .filter((e) => e.entryType === 'AJE')
-    .reduce((s, e) => s + parseNum(e.debitAmount) - parseNum(e.creditAmount), 0)
-  const rjeTotal = entries.value
-    .filter((e) => e.entryType === 'RJE')
-    .reduce((s, e) => s + parseNum(e.debitAmount) - parseNum(e.creditAmount), 0)
-
-  // 发布EventBus通知G6-1刷新调整列
-  try {
-    window.dispatchEvent(new CustomEvent('g6:adjustment-writeback', {
-      detail: { accountCode: '1503', ajeTotal, rjeTotal, totalAdjustment: ajeTotal + rjeTotal },
-    }))
-  } catch { /* silent */ }
-
-  ElMessage.success(`保存成功，AJE调整 ${fmt(ajeTotal)}，RJE调整 ${fmt(rjeTotal)}`)
-  isDirty.value = false
+  saveAndWriteback()
 }
 
-/** 导入导出命令处理 */
 function handleIECommand(cmd: string): void {
   const sheet: G6MainImportableSheet = 'G6-4'
   if (cmd === 'template') ie.exportTemplate(sheet)
@@ -470,30 +367,26 @@ function handleIECommand(cmd: string): void {
   else if (cmd === 'import') fileInputRef.value?.click()
 }
 
-/** 文件选择后导入 */
 async function onFileSelected(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
   const result = await ie.importData('G6-4', file)
   if (result) emit('imported')
-  input.value = '' // 重置file input
+  input.value = ''
 }
 
-/** 复核对话 */
 function openReview(): void {
   openReviewDialog('G6-4-adjustment')
 }
 
-/** 格式化金额 */
 function fmt(v: number | null | undefined): string {
   if (v == null || v === 0) return '-'
   return v.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 }
 
-/** 表格行class（RJE浅色区分） */
-function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
-  if (row.entryType === 'RJE') return 'rje-row'
+function tableRowClassName({ row }: { row: { category?: string; entryType?: string } }): string {
+  if (row.category === '报表调整' || row.entryType === 'RJE') return 'rje-row'
   return ''
 }
 </script>
@@ -535,7 +428,6 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
   font-size: 12px;
 }
 
-/* 合计行 */
 .g6-adj-footer {
   display: flex;
   align-items: center;
@@ -578,12 +470,10 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
   font-weight: 700;
 }
 
-/* RJE行浅色区分 */
 :deep(.rje-row) {
   background-color: #fdf6ec !important;
 }
 
-/* 编制提示 */
 .g6-guide-details {
   margin-top: 16px;
 }

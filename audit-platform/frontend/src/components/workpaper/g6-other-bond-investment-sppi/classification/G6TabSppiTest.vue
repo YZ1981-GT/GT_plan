@@ -224,6 +224,16 @@
         class="fail-alert"
       />
 
+      <!-- 证据完整性闸门 -->
+      <el-alert
+        v-else-if="!evidenceComplete && answeredWithoutFail"
+        title="已作答项须补全合同条款摘要与判断依据后，方可给出「满足SPPI」综合结论；判定为否或高风险项还需填写索引。"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="fail-alert"
+      />
+
       <!-- 失败section列表 -->
       <div v-if="failedSections.length > 0" class="failed-sections-list">
         <span class="failed-label">不通过section：</span>
@@ -237,9 +247,24 @@
         >{{ fs.title }}</el-tag>
       </div>
 
+      <!-- 证据缺口列表（最多展示 6 条） -->
+      <div v-if="evidenceGaps.length > 0 && !hasFailedSection" class="failed-sections-list">
+        <span class="failed-label">待补证据：</span>
+        <el-tag
+          v-for="gap in evidenceGaps.slice(0, 6)"
+          :key="gap.itemId"
+          type="warning"
+          size="small"
+          effect="plain"
+          class="failed-tag"
+        >{{ gap.checkItem.slice(0, 28) }}{{ gap.checkItem.length > 28 ? '…' : '' }}</el-tag>
+        <span v-if="evidenceGaps.length > 6" class="failed-label">等 {{ evidenceGaps.length }} 项</span>
+      </div>
+
       <!-- 总行数统计 -->
       <div class="total-rows-info">
         共 {{ totalRows }} 项检查 · {{ completedCount }} 项已完成 · {{ pendingCount }} 项待填
+        <template v-if="evidenceGaps.length"> · {{ evidenceGaps.length }} 项缺证据</template>
       </div>
     </el-card>
 
@@ -287,10 +312,11 @@
       <div class="guidance-content">
         <p>1. 本表用于分析金融资产的合同现金流量特征是否仅为对本金和利息的支付（SPPI测试）。</p>
         <p>2. 六个section分别评估本金定义、利息定义、修改时间价值、提前还款条款、合同关联工具及综合判断。</p>
-        <p>3. "CAS要求"列为只读方法论参考，"合同条款摘要"列摘录被审计单位合同关键条款。</p>
-        <p>4. "是否满足SPPI"栏选择"否"的任何一项将导致该section结论自动判定为"不通过"。</p>
-        <p>5. 任一section不通过将触发红色高亮提示，表明该金融资产不满足SPPI条件，需重新分类。</p>
-        <p>6. 每个section均可使用AI辅助按钮生成初始分析结论，人工复核后确认。</p>
+        <p>3. 「检查项目」均为合规陈述：「是否满足SPPI」选「是」表示本项满足，「否」表示不满足，「不适用」表示与合同无关。</p>
+        <p>4. 「CAS要求」列为只读方法论参考，「合同条款摘要」列摘录被审计单位合同关键条款；已作答项须同时填写判断依据。</p>
+        <p>5. 任一项选「否」将导致该section结论自动判定为「不通过」；判定为否或高风险项还需填写索引。</p>
+        <p>6. 任一section不通过将触发红色高亮提示，表明该金融资产不满足SPPI条件，需重新分类。</p>
+        <p>7. 审计结论可使用 AI 辅助生成初稿（基于失败项与判断依据），人工复核后确认。</p>
       </div>
     </details>
   </div>
@@ -344,6 +370,9 @@ const {
   overallConclusion,
   hasFailedSection,
   failedSections,
+  evidenceGaps,
+  evidenceComplete,
+  failedItemSummaries,
   totalRows,
   updateItem,
   loadData,
@@ -390,11 +419,31 @@ async function handleAi(): Promise<void> {
       hasFailedSection: hasFailedSection.value,
       failedSections: failedSections.value.map((s) => s.title),
       totalRows: totalRows.value,
+      evidenceGapCount: evidenceGaps.value.length,
+      failedItems: failedItemSummaries.value.slice(0, 20),
+      evidenceGapsSample: evidenceGaps.value.slice(0, 10).map((g) => ({
+        section: g.sectionTitle,
+        item: g.checkItem,
+        missing: g.missing.join(','),
+      })),
+      sectionConclusions: sections.value.map((s) => ({
+        id: s.id,
+        title: s.title,
+        conclusion: s.sectionConclusion,
+      })),
     },
     'AI SPPI 审计结论',
   )
   if (text) saveAuditConclusion(text)
 }
+
+/** 已作答且尚无 fail section（用于证据闸门提示） */
+const answeredWithoutFail = computed(() => {
+  if (hasFailedSection.value) return false
+  return sections.value.some((s) =>
+    s.items.some((i) => i.isSPPISatisfied === 'yes' || i.isSPPISatisfied === 'no'),
+  )
+})
 
 // ─── 加载数据 ──────────────────────────────────────────────────────────────
 onMounted(async () => {
