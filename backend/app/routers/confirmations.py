@@ -181,10 +181,178 @@ async def transition_confirmation(
                     reply_status=body.target_status,
                     reply_amount=body.reply_amount,
                     wp_code=wp_code,
-                    db=None,  # 状态已由 transition_status 更新，此处仅发事件
+                    # #5: 传 db 原子回写 confirmed_amount/diff（避免 transition 与 update 竞态）
+                    db=db if body.reply_amount is not None else None,
                 )
             except Exception:
                 pass  # 事件发布失败不阻断状态推进
 
     await db.commit()
     return result
+
+
+# ─── #4: 批量同步端点（减少前端 N+1 HTTP 请求） ────────────────────────────────
+
+
+class BatchSyncItem(BaseModel):
+    """单条函证同步请求"""
+    confirm_type: str
+    counterparty: str
+    wp_id: str | None = None
+    account_code: str | None = None
+    book_amount: float | None = None
+    confirmed_amount: float | None = None
+    diff_amount: float | None = None
+    diff_note: str | None = None
+    target_status: str | None = Field(None, description="期望 Hub 目标状态")
+    hub_confirmation_id: str | None = Field(None, description="已知 Hub ID（精确匹配）")
+
+
+class BatchSyncRequest(BaseModel):
+    items: list[BatchSyncItem] = Field(..., description="函证行列表")
+    wp_id: str | None = Field(None, description="源底稿 ID（全局）")
+    wp_code: str | None = Field(None, description="源循环码 D0/F0/G0…")
+    year: int | None = Field(None, description="审计年度")
+
+
+class BatchSyncResult(BaseModel):
+    created: int = 0
+    updated: int = 0
+    transitioned: int = 0
+    errors: list[str] = []
+    hub_ids: dict[str, str] = Field(default_factory=dict, description="counterparty→hub_id 映射")
+
+
+@router.post("/batch-sync")
+async def batch_sync_confirmations(
+    project_id: str,
+    body: BatchSyncRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """批量同步函证（前端一次调用替代 N+1 逐行 create/update/transition）。
+
+    逻辑：
+    1. 按 hub_confirmation_id 精确匹配 → 按 counterparty+confirm_type 模糊匹配
+    2. 不存在 → create；存在 → update 金额
+    3. target_status 高于当前 → 逐步 transition（不回退）
+    """
+    pid = uuid.UUID(project_id)
+    result = BatchSyncResult()
+
+    # 预取所有 Hub 记录
+    existing = await confirmation_service.list_confirmations(db, pid)
+    hub_map_by_id: dict[str, dict] = {item["id"]: item for item in existing}
+    hub_map_by_key: dict[str, dict] = {}
+    for item in existing:
+        key = f'{(item.get("counterparty") or "").strip().lower()}::{item.get("confirm_type") or ""}'
+        hub_map_by_key[key] = item
+
+    STATUS_RANK = {"pending": 0, "sent": 1, "returned": 2, "matched": 3, "discrepancy": 3}
+
+    for item in body.items:
+        name = (item.counterparty or "").strip()
+        if not name:
+            continue
+
+        # 查找已有记录
+        hub: dict | None = None
+        if item.hub_confirmation_id:
+            hub = hub_map_by_id.get(item.hub_confirmation_id)
+        if not hub:
+            key = f"{name.lower()}::{item.confirm_type}"
+            hub = hub_map_by_key.get(key)
+
+        try:
+            if not hub:
+                # Create
+                data = {
+                    "confirm_type": item.confirm_type,
+                    "counterparty": name,
+                    "wp_id": item.wp_id or body.wp_id or None,
+                    "account_code": item.account_code or None,
+                    "book_amount": item.book_amount,
+                    "confirmed_amount": item.confirmed_amount,
+                    "diff_amount": item.diff_amount,
+                    "diff_note": item.diff_note or None,
+                    "created_by": user.id if hasattr(user, "id") else None,
+                }
+                hub = await confirmation_service.create_confirmation(db, pid, data)
+                result.created += 1
+                # 注册到 map 供后续 dedup
+                hub_map_by_id[hub["id"]] = hub
+                key2 = f"{name.lower()}::{item.confirm_type}"
+                hub_map_by_key[key2] = hub
+            else:
+                # Update 金额
+                update_data: dict = {}
+                if item.book_amount is not None:
+                    update_data["book_amount"] = item.book_amount
+                if item.confirmed_amount is not None:
+                    update_data["confirmed_amount"] = item.confirmed_amount
+                if item.diff_amount is not None:
+                    update_data["diff_amount"] = item.diff_amount
+                if item.wp_id or body.wp_id:
+                    update_data["wp_id"] = item.wp_id or body.wp_id
+                if item.account_code:
+                    update_data["account_code"] = item.account_code
+                if item.diff_note:
+                    update_data["diff_note"] = item.diff_note
+                if update_data:
+                    hub = await confirmation_service.update_confirmation(
+                        db, uuid.UUID(hub["id"]), update_data
+                    )
+                    result.updated += 1
+
+            # Transition（仅正向推进）
+            if item.target_status and hub:
+                current = hub.get("status", "pending")
+                target_rank = STATUS_RANK.get(item.target_status, -1)
+                current_rank = STATUS_RANK.get(current, -1)
+                if target_rank > current_rank:
+                    # 构建推进路径
+                    chain: list[str] = []
+                    if item.target_status in ("matched", "discrepancy"):
+                        chain = ["sent", "returned", item.target_status]
+                    elif item.target_status == "returned":
+                        chain = ["sent", "returned"]
+                    elif item.target_status == "sent":
+                        chain = ["sent"]
+
+                    for step in chain:
+                        step_rank = STATUS_RANK.get(step, -1)
+                        if step_rank > STATUS_RANK.get(hub.get("status", "pending"), -1):
+                            try:
+                                hub = await confirmation_service.transition_status(
+                                    db, uuid.UUID(hub["id"]), step
+                                )
+                                result.transitioned += 1
+                            except ValueError:
+                                break  # 状态机不允许
+
+            # 记录映射
+            if hub:
+                result.hub_ids[name] = hub["id"] if isinstance(hub, dict) else str(hub.id)
+
+        except Exception as e:
+            result.errors.append(f"{name}: {str(e)}")
+
+    # 终态行发 CONFIRMATION_RECEIVED（仅当有推进到终态）
+    if result.transitioned > 0 and body.wp_code:
+        try:
+            year = body.year or 0
+            # 用最后一个终态记录触发（一次事件即可，stale 按 wp_code 级传播）
+            await confirmation_service.apply_confirmation_result(
+                project_id=pid,
+                year=year,
+                confirmation_id=uuid.UUID(list(result.hub_ids.values())[-1]) if result.hub_ids else uuid.uuid4(),
+                reply_status="batch_sync",
+                reply_amount=None,
+                wp_code=body.wp_code,
+                db=None,  # 仅发事件
+            )
+        except Exception:
+            pass
+
+    await db.commit()
+    return result.model_dump()

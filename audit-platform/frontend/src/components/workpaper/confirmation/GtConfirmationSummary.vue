@@ -172,12 +172,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
+import http from '@/utils/http'
 import { useConfirmationData } from './composables/useConfirmationData'
 import { useViewMode } from './composables/useViewMode'
-import { syncHubFromSummary } from './coordination/syncHubFromSummary'
+import { syncHubFromSummary, hubStatusToRowPatch } from './coordination/syncHubFromSummary'
+import { emitConfirmationCompletedFromSummary } from './coordination/emitConfirmationCompleted'
 import type { ConfirmationRow } from './confirmationTypes'
 
 import ConfirmationDashboard from './ConfirmationDashboard.vue'
@@ -229,6 +231,26 @@ const contextMenu = ref({ visible: false, x: 0, y: 0 })
 const syncing = ref(false)
 // 用户是否已操作过（新增/删除），用于区分首次空态 vs 删光后空态
 const hasInteracted = ref(false)
+
+// #3: 订阅 Hub 状态变更→反向刷新编制真源行（Hub 手动推进后同步回来）
+function _onConfirmationReceived(payload: { confirmationId?: string; accountCode?: string }) {
+  // Hub 推进到终态后触发——查找匹配行并补丁状态
+  // 因为此事件不带详细状态信息（仅 confirmationId），我们需从 Hub 重新拉取确认
+  // 简化方案：标记需刷新，下次 focus/save 时 re-sync
+  if (!payload?.confirmationId) return
+  const row = data.rows.value.find(r => r._hub_confirmation_id === payload.confirmationId)
+  if (row) {
+    // 已有 hubId 映射的行：标记 is_replied（终态必定已回函）
+    const patch = hubStatusToRowPatch('returned')
+    Object.assign(row, patch)
+  }
+}
+onMounted(() => {
+  eventBus.on('confirmation:received', _onConfirmationReceived)
+})
+onUnmounted(() => {
+  eventBus.off('confirmation:received', _onConfirmationReceived)
+})
 
 // 公式管理弹窗
 const showFormulaDialog = ref(false)
@@ -445,6 +467,68 @@ async function handleSyncHub() {
   }
 }
 
+/**
+ * #1+#2+#4: 保存后自动同步 Hub（批量端点，单次 HTTP 替代 N+1）。
+ * 同步成功后 hubId 写回 row._hub_confirmation_id → re-save 持久化映射。
+ */
+let _syncTimer: ReturnType<typeof setTimeout> | null = null
+async function _autoSyncAfterSave() {
+  if (_syncTimer) clearTimeout(_syncTimer)
+  _syncTimer = setTimeout(async () => {
+    if (syncing.value) return // 正在手动同步，跳过
+    const { isConfirmationInFlight } = await import('./coordination/emitConfirmationCompleted')
+    const { accountTypeToHubType, rowToHubStatus } = await import('./coordination/syncHubFromSummary')
+    const candidates = data.rows.value.filter(
+      (r) => r.entity_name?.trim() && isConfirmationInFlight(r),
+    )
+    if (!candidates.length) return
+
+    const cycleCode = (props.wpCode || '').split('-')[0] || undefined
+    const items = candidates.map((r) => ({
+      confirm_type: accountTypeToHubType(r.account_type),
+      counterparty: (r.entity_name || '').trim(),
+      wp_id: props.wpId || undefined,
+      account_code: r.confirm_index || undefined,
+      book_amount: Number(r.amount) || null,
+      confirmed_amount: Number(r.reply_amount) || null,
+      diff_amount: r.difference != null ? Number(r.difference) : null,
+      diff_note: r.remark || undefined,
+      target_status: rowToHubStatus(r),
+      hub_confirmation_id: r._hub_confirmation_id || undefined,
+    }))
+
+    try {
+      const res = await http.post<any>(
+        `/api/projects/${props.projectId}/confirmations/batch-sync`,
+        {
+          items,
+          wp_id: props.wpId,
+          wp_code: cycleCode,
+          year: props.year ? Number(props.year) : undefined,
+        },
+        { _silent: true } as any,
+      )
+      // #2: 写回 hubId 到各行
+      const hubIds: Record<string, string> = res?.hub_ids || {}
+      let anyMapped = false
+      for (const row of candidates) {
+        const name = (row.entity_name || '').trim()
+        if (hubIds[name] && row._hub_confirmation_id !== hubIds[name]) {
+          row._hub_confirmation_id = hubIds[name]
+          anyMapped = true
+        }
+      }
+      // re-save 持久化 hubId 映射（不触发二次同步）
+      if (anyMapped) {
+        const payload = data.buildPayload()
+        emit('save', payload)
+      }
+    } catch {
+      // 自动同步失败静默（不打扰用户，手动同步仍可用）
+    }
+  }, 2000) // debounce 2s 避免连续保存频繁同步
+}
+
 function handleSave() {
   const payload = data.buildPayload()
   emit('save', payload)
@@ -456,6 +540,16 @@ function handleSave() {
       wpId: props.wpId,
       timestamp: Date.now(),
     })
+  }
+  // #6: 批量回写科目明细 isConfirmed='Y'（此前为死代码，现接线）
+  emitConfirmationCompletedFromSummary({
+    projectId: props.projectId,
+    sourceWpCode: props.wpCode,
+    rows: data.rows.value,
+  })
+  // #1+#2: 保存后自动同步到函证中心（非阻塞，hubId 回写后自动 re-save 持久化）
+  if (props.projectId) {
+    _autoSyncAfterSave()
   }
 }
 
