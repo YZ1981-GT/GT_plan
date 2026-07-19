@@ -474,6 +474,64 @@ class BatchExecutionResult:
     errors: list[dict] = field(default_factory=list)
 
 
+def _topological_sort_formulas(
+    formulas: list[BatchFormulaDefinition],
+) -> list[BatchFormulaDefinition]:
+    """按引用依赖拓扑排序：被依赖的公式先执行（Kahn 算法）。
+
+    - 构建依赖图：如果公式 A 的 target addr_id 出现在公式 B 的 ref_addr_ids → B 依赖 A
+    - 循环依赖的公式保留相对原序（不抛错，degrade gracefully）
+    - 无 target（logic_check/reasonability）的公式排在末尾（不产值，不影响其他）
+    """
+    if len(formulas) <= 1:
+        return formulas
+
+    # 构建 target_addr_id → formula index 映射
+    target_to_idx: dict[str, int] = {}
+    for i, f in enumerate(formulas):
+        if f.target and hasattr(f.target, "addr_id") and f.target.addr_id:
+            target_to_idx[f.target.addr_id] = i
+        elif f.addr_id:
+            target_to_idx[f.addr_id] = i
+
+    # 构建邻接表 + 入度
+    n = len(formulas)
+    adj: list[list[int]] = [[] for _ in range(n)]
+    in_degree = [0] * n
+
+    for i, f in enumerate(formulas):
+        for ref_id in f.ref_addr_ids:
+            dep_idx = target_to_idx.get(ref_id)
+            if dep_idx is not None and dep_idx != i:
+                adj[dep_idx].append(i)
+                in_degree[i] += 1
+
+    # Kahn's BFS
+    from collections import deque
+    queue: deque[int] = deque()
+    for i in range(n):
+        if in_degree[i] == 0:
+            queue.append(i)
+
+    sorted_indices: list[int] = []
+    while queue:
+        node = queue.popleft()
+        sorted_indices.append(node)
+        for neighbor in adj[node]:
+            in_degree[neighbor] -= 1
+            if in_degree[neighbor] == 0:
+                queue.append(neighbor)
+
+    # 循环依赖的节点（未被排入）保留原始相对顺序追加到末尾
+    if len(sorted_indices) < n:
+        visited = set(sorted_indices)
+        for i in range(n):
+            if i not in visited:
+                sorted_indices.append(i)
+
+    return [formulas[i] for i in sorted_indices]
+
+
 def execute_batch(
     *,
     formulas: list[BatchFormulaDefinition],
@@ -498,6 +556,10 @@ def execute_batch(
         BatchExecutionResult（intents, issues, hints, errors）。
     """
     result = BatchExecutionResult()
+
+    # #2 拓扑排序：按引用依赖图排列执行顺序（被依赖者先执行），避免取值 miss。
+    # 循环依赖的公式保留原序（degrade gracefully）。
+    formulas = _topological_sort_formulas(formulas)
 
     # 构建 L1 内核 FormulaContext（从预载 addr_id→value 映射填充 row_cache）
     kernel_ctx = FormulaContext(row_cache={})

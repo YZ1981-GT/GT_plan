@@ -120,6 +120,9 @@ class DraftRefreshOrchestrator:
         Returns:
             ``(RefreshResult, PresetApplication)``：治理层刷新结果 + 预设套用明细。
         """
+        # #3: project-level advisory lock 防止并发刷新互相覆盖
+        lock_key = int.from_bytes(project_id.bytes[:8], "big") & 0x7FFFFFFFFFFFFFFF
+        await self.db.execute(sa.text("SELECT pg_advisory_xact_lock(:key)"), {"key": lock_key})
         # ── ① 校验 scopes ⊆ 动态发现集合（Req 20 共用口径；未知键忽略并 warning）──
         discovered = await RefreshScopeDiscovery(self.db).discover(
             project_id=project_id, year=year
