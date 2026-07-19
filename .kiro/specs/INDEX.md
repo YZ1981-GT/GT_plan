@@ -2,8 +2,8 @@
 
 **最后更新**：2026-07-19
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active 0 / Archived 408 = 总计 408
-**最高迁移**：**V118**（以 `migration_status` 实测为准）
+**统计**：Active 0 / Archived 409 = 总计 409
+**最高迁移**：**V119**（以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---

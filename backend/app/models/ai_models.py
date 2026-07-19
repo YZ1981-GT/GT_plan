@@ -25,6 +25,11 @@ from sqlalchemy import ForeignKey, Index, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+try:
+    from pgvector.sqlalchemy import Vector
+except ImportError:  # pragma: no cover
+    Vector = None  # type: ignore[assignment,misc]
+
 from app.models.base import Base, SoftDeleteMixin
 
 
@@ -672,6 +677,7 @@ class KnowledgeIndex(Base):
     source_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
     content_text: Mapped[str] = mapped_column(Text, nullable=False)
     embedding_vector: Mapped[str | None] = mapped_column(String(5000), nullable=True)
+    embedding_vec = mapped_column(Vector(1024), nullable=True)
     chunk_index: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False

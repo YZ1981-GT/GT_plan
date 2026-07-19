@@ -53,6 +53,82 @@ def _invalidate_bm25_cache(project_id: UUID) -> None:
         del _BM25_CACHE[k]
 
 
+# ─── Context-Aware Boost (V119) ──────────────────────────────────────────────
+
+# wp_code 前缀 → 审计循环分类映射
+_WP_CYCLE_MAP: dict[str, list[str]] = {
+    "D": ["应收", "收入", "销售"],
+    "E": ["货币资金", "银行", "现金"],
+    "F": ["存货", "采购", "成本"],
+    "G": ["投资", "长期股权", "金融资产"],
+    "H": ["固定资产", "无形资产", "在建工程"],
+    "I": ["长期资产", "递延", "商誉"],
+    "J": ["薪酬", "职工", "福利"],
+    "K": ["应付", "负债", "费用"],
+    "L": ["借款", "融资", "利息"],
+    "M": ["权益", "资本", "利润分配"],
+    "N": ["税费", "所得税", "增值税"],
+}
+
+# 常见科目编码前缀→名称映射
+_ACCOUNT_NAMES: dict[str, str] = {
+    "1122": "应收账款", "1123": "预付账款", "1221": "其他应收款",
+    "1401": "存货", "1501": "固定资产", "1601": "无形资产",
+    "1701": "长期股权投资", "2202": "应付账款", "2211": "应付职工薪酬",
+    "2221": "长期借款", "2241": "其他应付款", "6001": "营业收入",
+    "6601": "销售费用", "6602": "管理费用", "6603": "财务费用",
+}
+
+
+def _apply_context_boost(
+    results: list[dict],
+    wp_code: str | None,
+    account_code: str | None,
+    audit_area: str | None,
+) -> list[dict]:
+    """对结果应用上下文加权: final_score = 0.7 * vector_score + 0.3 * boost。
+
+    boost = 1.0 if both signals match, 0.5 if one matches, 0.0 if none match.
+    """
+    if not results:
+        return results
+
+    for r in results:
+        boost = 0.0
+        content_lower = (r.get("content") or "").lower()
+
+        if wp_code and _matches_cycle(content_lower, wp_code):
+            boost += 0.5
+
+        if account_code and _matches_account(content_lower, account_code):
+            boost += 0.5
+
+        if audit_area and audit_area.lower() in content_lower:
+            boost += 0.5
+
+        boost = min(boost, 1.0)
+        original_score = r.get("score", 0.0)
+        r["score"] = round(0.7 * original_score + 0.3 * boost, 4)
+
+    results.sort(key=lambda x: x.get("score", 0), reverse=True)
+    return results
+
+
+def _matches_cycle(content: str, wp_code: str) -> bool:
+    """检查内容是否包含 wp_code 对应循环的关键词。"""
+    prefix = wp_code[0].upper() if wp_code else ""
+    keywords = _WP_CYCLE_MAP.get(prefix, [])
+    return any(kw in content for kw in keywords)
+
+
+def _matches_account(content: str, account_code: str) -> bool:
+    """检查内容是否包含科目编码或常见科目名。"""
+    if account_code in content:
+        return True
+    name = _ACCOUNT_NAMES.get(account_code[:4] if len(account_code) >= 4 else account_code, "")
+    return name.lower() in content if name else False
+
+
 def _chunk_text(text: str, chunk_size: int = _CHUNK_SIZE) -> list[str]:
     """Split text into fixed-size chunks with overlap."""
     if not text or not text.strip():
@@ -106,10 +182,20 @@ class KnowledgeIndexService:
         chunk_index: int,
         doc_version: int | None = None,
     ) -> None:
-        """Upsert single chunk (source_id + chunk_index unique)."""
+        """Upsert single chunk (source_id + chunk_index unique).
+        
+        Dual-writes both:
+        - embedding_vector (TEXT, legacy) 
+        - embedding_vec (pgvector vector(1024), V119)
+        """
+        embedding_str = self._vector_to_str(embedding)
+        # pgvector expects a list of floats
+        embedding_list = embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
+        
         values = {
             "content_text": content_text,
-            "embedding_vector": self._vector_to_str(embedding),
+            "embedding_vector": embedding_str,
+            "embedding_vec": embedding_list,
             "is_deleted": False,
             "is_stale": False,
             "doc_version": doc_version,
@@ -123,7 +209,8 @@ class KnowledgeIndexService:
                 source_type=source_type,
                 source_id=source_id,
                 content_text=content_text,
-                embedding_vector=self._vector_to_str(embedding),
+                embedding_vector=embedding_str,
+                embedding_vec=embedding_list,
                 chunk_index=chunk_index,
                 is_deleted=False,
                 is_stale=False,
@@ -286,6 +373,9 @@ class KnowledgeIndexService:
         *,
         scope: str = "all",
         user: Any | None = None,
+        wp_code: str | None = None,
+        account_code: str | None = None,
+        audit_area: str | None = None,
     ) -> list[dict[str, Any]]:
         """
         Semantic search using embedding + cosine similarity.
@@ -297,6 +387,9 @@ class KnowledgeIndexService:
             top_k: 返回结果数量
             scope: 检索范围 ("project_data" | "knowledge_doc" | "cross_year" | "all")
             user: 可选用户对象，提供时按权限过滤 knowledge_doc 结果
+            wp_code: 可选底稿编码，用于上下文相关性加权
+            account_code: 可选科目编码，用于上下文相关性加权
+            audit_area: 可选审计领域，用于上下文相关性加权
 
         默认值保证现有调用方（ai_chat_service）零改动。
         向量召回失败时降级 ilike（双保险不崩）。
@@ -320,9 +413,16 @@ class KnowledgeIndexService:
             else:
                 results = await self._ilike_fallback(project_id, query, top_k, scope)
 
+        # V119: 上下文相关性加权
+        if wp_code or account_code or audit_area:
+            results = _apply_context_boost(results, wp_code, account_code, audit_area)
+
         # 权限过滤：当 user 提供时，过滤 knowledge_doc 结果
         if user is not None:
             results = await self._filter_by_permission(results, user)
+
+        # V119: 结果增强 — 附加 document_name + folder_path
+        results = await self._enrich_results(results)
 
         return results
 
@@ -333,15 +433,28 @@ class KnowledgeIndexService:
         top_k: int,
         scope: str,
     ) -> list[dict[str, Any]]:
-        """向量召回核心逻辑（可能抛异常，由调用方捕获降级）。"""
+        """向量召回核心逻辑 — 使用 pgvector cosine distance operator。
+        
+        V119: 优先使用 embedding_vec (pgvector vector(1024)) 列进行 ANN 搜索,
+        同时搜索项目文档 + 全局公共文档 (GLOBAL_KB_PROJECT_ID)。
+        pgvector 不可用时抛异常，由调用方捕获降级到 BM25。
+        """
+        from app.services.indexing_pipeline import GLOBAL_KB_PROJECT_ID
+
         # Encode query
         query_embedding = await self._ai_svc.embedding(query)
         query_vec = np.array(query_embedding)
+        query_list = query_vec.tolist()
+
+        # 同时搜索项目文档 + 全局公共文档
+        project_ids = [project_id, GLOBAL_KB_PROJECT_ID]
+        if project_id == GLOBAL_KB_PROJECT_ID:
+            project_ids = [GLOBAL_KB_PROJECT_ID]
 
         # Build scope filter conditions
         conditions = [
-            KnowledgeIndex.project_id == project_id,
-            KnowledgeIndex.is_deleted == False,
+            KnowledgeIndex.project_id.in_(project_ids),
+            KnowledgeIndex.is_deleted == False,  # noqa: E712
         ]
         if scope == "project_data":
             conditions.append(
@@ -351,37 +464,66 @@ class KnowledgeIndexService:
             conditions.append(
                 KnowledgeIndex.source_type == KnowledgeSourceType.knowledge_doc
             )
-        # scope == "all": no additional filter
 
-        # Fetch chunks matching scope
-        result = await self._db.execute(
-            select(KnowledgeIndex).where(*conditions)
-        )
-        chunks = result.scalars().all()
+        # 尝试 pgvector cosine distance (1 - cosine_similarity)
+        try:
+            stmt = (
+                select(
+                    KnowledgeIndex,
+                    (1 - KnowledgeIndex.embedding_vec.cosine_distance(query_list)).label("score"),
+                )
+                .where(*conditions)
+                .order_by(KnowledgeIndex.embedding_vec.cosine_distance(query_list))
+                .limit(top_k)
+            )
+            result = await self._db.execute(stmt)
+            rows = result.all()
 
-        # Compute similarity scores
-        scored = []
-        for chunk in chunks:
-            chunk_vec = self._str_to_vector(chunk.embedding_vector)
-            score = self._cosine_similarity(query_vec, chunk_vec)
-            scored.append((score, chunk))
+            return [
+                {
+                    "source_type": chunk.source_type.value,
+                    "source_id": str(chunk.source_id),
+                    "content": chunk.content_text,
+                    "score": round(float(score), 4),
+                    "chunk_index": chunk.chunk_index,
+                    "doc_version": chunk.doc_version,
+                    "is_stale": chunk.is_stale,
+                }
+                for chunk, score in rows
+            ]
+        except Exception as pgvec_err:
+            # pgvector 不可用 (列为 NULL 或扩展未安装) → 回退到内存暴力搜索
+            logger.warning(f"pgvector search failed, falling back to in-memory: {pgvec_err}")
 
-        # Sort and take top_k
-        scored.sort(key=lambda x: x[0], reverse=True)
-        top_results = scored[:top_k]
+            # Legacy in-memory fallback (TEXT embedding_vector column)
+            result = await self._db.execute(
+                select(KnowledgeIndex).where(*conditions)
+            )
+            chunks = result.scalars().all()
 
-        return [
-            {
-                "source_type": chunk.source_type.value,
-                "source_id": str(chunk.source_id),
-                "content": chunk.content_text,
-                "score": round(score, 4),
-                "chunk_index": chunk.chunk_index,
-                "doc_version": chunk.doc_version,
-                "is_stale": chunk.is_stale,
-            }
-            for score, chunk in top_results
-        ]
+            scored = []
+            for chunk in chunks:
+                if not chunk.embedding_vector:
+                    continue
+                chunk_vec = self._str_to_vector(chunk.embedding_vector)
+                score = self._cosine_similarity(query_vec, chunk_vec)
+                scored.append((score, chunk))
+
+            scored.sort(key=lambda x: x[0], reverse=True)
+            top_results = scored[:top_k]
+
+            return [
+                {
+                    "source_type": chunk.source_type.value,
+                    "source_id": str(chunk.source_id),
+                    "content": chunk.content_text,
+                    "score": round(score, 4),
+                    "chunk_index": chunk.chunk_index,
+                    "doc_version": chunk.doc_version,
+                    "is_stale": chunk.is_stale,
+                }
+                for score, chunk in top_results
+            ]
 
     async def _bm25_fallback(
         self,
@@ -392,7 +534,7 @@ class KnowledgeIndexService:
     ) -> list[dict[str, Any]]:
         """向量召回失败时的 BM25 词法检索（bm25s，纯 Python）。
 
-        中文分词用 _zh_tokenize 模块（2-gram bigram + 英文 split，不引 jieba）。
+        中文分词用 _zh_tokenize 模块（jieba + 审计领域词典）。
         bm25s 未安装或索引构建异常时降级 _ilike_fallback。
         返回与 _ilike_fallback 相同的 dict 结构（score 用 BM25 归一化分数，非 0.0）。
 
@@ -614,6 +756,54 @@ class KnowledgeIndexService:
         ]
 
         return non_doc_results + filtered_doc_results
+
+    async def _enrich_results(self, results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """V119: 为搜索结果附加 document_name + folder_path 用于引用显示。"""
+        if not results:
+            return results
+
+        # 收集所有 knowledge_doc 类型的 source_ids
+        doc_source_ids = [
+            UUID(r["source_id"]) for r in results
+            if r.get("source_type") == "knowledge_doc"
+        ]
+        if not doc_source_ids:
+            # 非 knowledge_doc 不需要 enrichment
+            for r in results:
+                r.setdefault("document_name", None)
+                r.setdefault("folder_path", None)
+            return results
+
+        # 批量查 document_name + folder_path
+        from app.models.knowledge_models import KnowledgeDocument, KnowledgeFolder
+        try:
+            enrich_query = (
+                select(
+                    KnowledgeDocument.id,
+                    KnowledgeDocument.name,
+                    KnowledgeFolder.name.label("folder_name"),
+                )
+                .join(KnowledgeFolder, KnowledgeDocument.folder_id == KnowledgeFolder.id)
+                .where(KnowledgeDocument.id.in_(doc_source_ids))
+            )
+            enrich_result = await self._db.execute(enrich_query)
+            enrich_map: dict[str, tuple[str, str]] = {}
+            for doc_id, doc_name, folder_name in enrich_result.all():
+                enrich_map[str(doc_id)] = (doc_name, folder_name)
+        except Exception:
+            enrich_map = {}
+
+        # 附加到每个结果
+        for r in results:
+            if r.get("source_type") == "knowledge_doc":
+                info = enrich_map.get(r["source_id"])
+                r["document_name"] = info[0] if info else None
+                r["folder_path"] = info[1] if info else None
+            else:
+                r.setdefault("document_name", None)
+                r.setdefault("folder_path", None)
+
+        return results
 
     @staticmethod
     def _user_can_access_doc(

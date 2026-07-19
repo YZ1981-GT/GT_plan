@@ -33,11 +33,13 @@ jsonpath-ng
 pypinyin
 locust
 python-docx
+PyMuPDF>=1.23
 docxtpl>=0.18.0
 instructor>=1.5,<2
 openai>=1.0,<2
 schemathesis>=3.36,<4
 bm25s
+jieba>=0.42
 opentelemetry-api>=1.20,<2
 opentelemetry-sdk>=1.20,<2
 opentelemetry-instrumentation-fastapi>=0.41b0,<1

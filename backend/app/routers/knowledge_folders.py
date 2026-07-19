@@ -7,7 +7,7 @@ CRUD 钩子：upload/update/delete 后触发向量索引联动（修 §21.3.1 �
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -297,6 +297,7 @@ async def upload_documents(
     files: list[UploadFile] = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    background_tasks: BackgroundTasks = None,
 ):
     """批量上传文档文件"""
     from app.core.config import settings
@@ -411,6 +412,12 @@ async def upload_documents(
                     )
         except Exception as exc:
             _logger.warning("[KB Hook] upload index hook failed for doc=%s: %s", file_info.get("id"), exc)
+
+    # V119: 触发完整索引流水线 (background task)
+    if background_tasks:
+        from app.services.indexing_pipeline import run_indexing_pipeline
+        for file_info in uploaded:
+            background_tasks.add_task(run_indexing_pipeline, UUID(file_info["id"]))
 
     return {"uploaded": len(uploaded), "files": uploaded}
 
