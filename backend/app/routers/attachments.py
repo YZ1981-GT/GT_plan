@@ -115,8 +115,17 @@ async def upload_attachment(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("edit")),
 ):
-    svc = _svc(db)
+    # #2: 文件大小限制（默认 50MB，防止 OOM）
+    from app.core.config import settings
+    max_size = getattr(settings, "ATTACHMENT_MAX_UPLOAD_BYTES", 50 * 1024 * 1024)
     content = await file.read()
+    if len(content) > max_size:
+        raise HTTPException(
+            status_code=413,
+            detail=f"文件过大（{len(content) / 1024 / 1024:.1f}MB），最大允许 {max_size / 1024 / 1024:.0f}MB",
+        )
+
+    svc = _svc(db)
     result = await svc.upload_attachment_file(
         project_id=project_id,
         file_name=file.filename or "attachment.bin",
@@ -438,8 +447,14 @@ async def download_attachment(attachment_id: UUID, db: AsyncSession = Depends(ge
     if not local_path.exists():
         local_path = Path("storage") / file_path.lstrip("/")
     if local_path.exists():
+        # #6: 用 generator 确保 file handle 正确关闭（客户端中断时不泄露）
+        async def _file_stream():
+            with open(local_path, "rb") as f:
+                while chunk := f.read(65536):
+                    yield chunk
+
         return StreamingResponse(
-            open(local_path, "rb"),
+            _file_stream(),
             media_type="application/octet-stream",
             headers={"Content-Disposition": _disposition},
         )
@@ -518,7 +533,13 @@ async def preview_attachment(attachment_id: UUID, db: AsyncSession = Depends(get
                     ".xls": "application/vnd.ms-excel", ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     ".csv": "text/csv"}
         mime = mime_map.get(ext, "application/octet-stream")
-        return StreamingResponse(open(local_path, "rb"), media_type=mime)
+
+        async def _preview_stream():
+            with open(local_path, "rb") as f:
+                while chunk := f.read(65536):
+                    yield chunk
+
+        return StreamingResponse(_preview_stream(), media_type=mime)
 
     return {"previewable": False, "file_name": file_name, "ocr_text": att.get("ocr_text", ""), "download_url": f"/api/attachments/{attachment_id}/download", "message": "文件暂不可预览，请下载查看"}
 
@@ -587,3 +608,186 @@ async def retry_ocr(
         return {"message": "OCR 重试任务已创建", "task_id": task_id}
     except Exception:
         return {"message": "OCR 状态已重置为 pending"}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# #1: DELETE 端点（软删除）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@router.delete("/api/attachments/{attachment_id}")
+async def delete_attachment(
+    attachment_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """软删除附件（标记 is_deleted=True，不物理删除文件）。
+
+    权限：项目 edit 权限 + 可见性隔离检查。
+    """
+    svc = _svc(db)
+    att = await svc.get_attachment(attachment_id)
+    if not att:
+        raise HTTPException(status_code=404, detail="附件不存在")
+    await _ensure_project_access(db, current_user, UUID(att["project_id"]), "edit")
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_read", method="DELETE", entrypoint="attachment.delete",
+    )
+
+    from app.models.phase10_models import Attachment as AttachmentModel
+    result = await db.execute(
+        sa.select(AttachmentModel).where(AttachmentModel.id == attachment_id)
+    )
+    att_obj = result.scalar_one_or_none()
+    if not att_obj or att_obj.is_deleted:
+        raise HTTPException(status_code=404, detail="附件不存在")
+
+    att_obj.is_deleted = True
+    await db.flush()
+    await db.commit()
+
+    logger.info(
+        "attachment_deleted: user=%s attachment_id=%s file_name=%s",
+        str(current_user.id), str(attachment_id), att.get("file_name", ""),
+    )
+    return {"deleted": True, "id": str(attachment_id)}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# #8: 版本管理端点（解锁前端 AttachmentVersionsDialog）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@router.get("/api/attachments/{attachment_id}/versions")
+async def list_attachment_versions(
+    attachment_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """列出附件版本链（按 version 降序）。"""
+    svc = _svc(db)
+    att = await svc.get_attachment(attachment_id)
+    if not att:
+        raise HTTPException(status_code=404, detail="附件不存在")
+    await _ensure_project_access(db, current_user, UUID(att["project_id"]), "readonly")
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_read", method="GET", entrypoint="attachment.read",
+    )
+
+    # 沿 previous_version_id 链回溯所有版本
+    from app.models.phase10_models import Attachment as AttachmentModel
+    versions = []
+    current_id = attachment_id
+
+    # 先向前找到最新版本（可能 attachment_id 不是最新）
+    # 查同 project_id + file_name + reference_id 的全部版本
+    stmt = (
+        sa.select(AttachmentModel)
+        .where(
+            AttachmentModel.project_id == UUID(att["project_id"]),
+            AttachmentModel.file_name == att.get("file_name"),
+            AttachmentModel.is_deleted == sa.false(),
+        )
+        .order_by(AttachmentModel.version.desc())
+    )
+    if att.get("reference_id"):
+        stmt = stmt.where(AttachmentModel.reference_id == UUID(att["reference_id"]))
+
+    result = await db.execute(stmt)
+    for a in result.scalars().all():
+        versions.append({
+            "id": str(a.id),
+            "version": a.version,
+            "file_name": a.file_name,
+            "file_size": a.file_size,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+            "is_current": str(a.id) == str(attachment_id),
+        })
+
+    return {"versions": versions, "total": len(versions)}
+
+
+@router.post("/api/attachments/{attachment_id}/rollback")
+async def rollback_attachment_version(
+    attachment_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """回退到此版本（创建新版本指向此版本的内容）。"""
+    svc = _svc(db)
+    att = await svc.get_attachment(attachment_id)
+    if not att:
+        raise HTTPException(status_code=404, detail="附件不存在")
+    await _ensure_project_access(db, current_user, UUID(att["project_id"]), "edit")
+    await enforce_attachment_wp_visibility(
+        db, current_user, attachment_id=attachment_id,
+        action="attach_read", method="POST", entrypoint="attachment.rollback",
+    )
+
+    from app.models.phase10_models import Attachment as AttachmentModel
+
+    # 找当前最新版本
+    stmt = (
+        sa.select(AttachmentModel)
+        .where(
+            AttachmentModel.project_id == UUID(att["project_id"]),
+            AttachmentModel.file_name == att.get("file_name"),
+            AttachmentModel.is_deleted == sa.false(),
+        )
+        .order_by(AttachmentModel.version.desc())
+        .limit(1)
+    )
+    if att.get("reference_id"):
+        stmt = stmt.where(AttachmentModel.reference_id == UUID(att["reference_id"]))
+
+    result = await db.execute(stmt)
+    latest = result.scalar_one_or_none()
+    if not latest:
+        raise HTTPException(status_code=404, detail="版本链异常")
+
+    target = await db.get(AttachmentModel, attachment_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="目标版本不存在")
+
+    if target.version == latest.version:
+        return {"message": "已是最新版本，无需回退", "version": latest.version}
+
+    # 创建新版本（复制目标版本的文件引用）
+    import uuid as _uuid
+    from datetime import datetime, timezone
+
+    new_version = latest.version + 1
+    rollback_att = AttachmentModel(
+        id=_uuid.uuid4(),
+        project_id=target.project_id,
+        file_name=target.file_name,
+        file_path=target.file_path,
+        file_type=target.file_type,
+        file_size=target.file_size,
+        attachment_type=target.attachment_type,
+        reference_id=target.reference_id,
+        reference_type=target.reference_type,
+        storage_type=target.storage_type,
+        paperless_document_id=target.paperless_document_id,
+        ocr_status=target.ocr_status,
+        ocr_text=target.ocr_text,
+        created_by=current_user.id,
+        version=new_version,
+        previous_version_id=latest.id,
+    )
+    db.add(rollback_att)
+    await db.flush()
+    await db.commit()
+
+    logger.info(
+        "attachment_rollback: user=%s from_version=%d to_version=%d (target=%s) new_id=%s",
+        str(current_user.id), latest.version, target.version, str(attachment_id), str(rollback_att.id),
+    )
+    return {
+        "id": str(rollback_att.id),
+        "version": new_version,
+        "rolled_back_to": target.version,
+        "message": f"已回退到版本 {target.version}",
+    }

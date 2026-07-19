@@ -143,14 +143,20 @@ class AttachmentService:
             use_paperless = self.primary_storage == "paperless" and self.paperless_enabled()
             if use_paperless:
                 update_task(task_id, TaskStatus.processing)
-                # 自动重试：Paperless 上传失败时重试 1 次
-                paperless_document_id = await self.upload_to_paperless(temp_path.as_posix(), metadata)
-                if paperless_document_id is None:
-                    import asyncio
-                    logger.warning("Paperless upload failed, retrying in 2s...")
-                    update_task(task_id, TaskStatus.retrying)
-                    await asyncio.sleep(2)
+                # #5: 指数退避重试（最多 3 次：2s/4s/8s）
+                paperless_document_id = None
+                max_retries = 3
+                for attempt in range(max_retries + 1):
                     paperless_document_id = await self.upload_to_paperless(temp_path.as_posix(), metadata)
+                    if paperless_document_id is not None:
+                        break
+                    if attempt < max_retries:
+                        import asyncio
+                        delay = 2 ** (attempt + 1)  # 2s, 4s, 8s
+                        logger.warning("Paperless upload failed (attempt %d/%d), retrying in %ds...", attempt + 1, max_retries + 1, delay)
+                        update_task(task_id, TaskStatus.retrying)
+                        await asyncio.sleep(delay)
+
                 if paperless_document_id is not None:
                     update_task(task_id, TaskStatus.success, result={"paperless_id": paperless_document_id})
                     return await self.create_attachment(
