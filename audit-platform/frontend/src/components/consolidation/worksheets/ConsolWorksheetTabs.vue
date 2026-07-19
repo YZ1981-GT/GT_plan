@@ -214,6 +214,81 @@ const CONSOL_SHEET_COLS: Record<string, ExcelColumn[]> = {
     { key: 'end_amount', header: '期末数', width: 14 },
     { key: 'remark', header: '备注', width: 16 },
   ],
+  // ── Phase 1 扩展：剩余 10 张表 ──────────────────────────────────────────
+  post_invest: [
+    { key: 'sub_name', header: '被投资单位', width: 20 },
+    { key: 'sub_code', header: '企业代码', width: 12 },
+    { key: 'method', header: '核算方式', width: 10 },
+    { key: 'cost_book_value', header: '账面价值（投资）', width: 16 },
+    { key: 'equity_sim_value', header: '模拟权益法金额', width: 16 },
+    { key: 'elim_amount', header: '抵消金额', width: 14 },
+    { key: 'post_elim_value', header: '抵消后长投', width: 14 },
+    { key: 'remark', header: '备注', width: 16 },
+  ],
+  post_income: [
+    { key: 'sub_name', header: '被投资单位', width: 20 },
+    { key: 'sub_code', header: '企业代码', width: 12 },
+    { key: 'cost_income', header: '成本法投资收益', width: 16 },
+    { key: 'equity_income', header: '权益法投资收益', width: 16 },
+    { key: 'elim_income', header: '抵消投资收益', width: 14 },
+    { key: 'post_elim_income', header: '抵消后投资收益', width: 16 },
+    { key: 'remark', header: '备注', width: 16 },
+  ],
+  minority: [
+    { key: 'sub_name', header: '被投资单位', width: 20 },
+    { key: 'sub_code', header: '企业代码', width: 12 },
+    { key: 'minority_ratio', header: '少数股东比例', width: 14 },
+    { key: 'begin_equity', header: '期初少数股东权益', width: 16 },
+    { key: 'net_profit_share', header: '少数股东损益', width: 14 },
+    { key: 'other_ci_share', header: '其他综合收益份额', width: 16 },
+    { key: 'dividend', header: '分红', width: 14 },
+    { key: 'end_equity', header: '期末少数股东权益', width: 16 },
+  ],
+  internal_arap: [
+    { key: 'from_company', header: '债务方', width: 16 },
+    { key: 'to_company', header: '债权方', width: 16 },
+    { key: 'subject', header: '科目', width: 16 },
+    { key: 'amount', header: '金额', width: 14 },
+    { key: 'direction', header: '借贷', width: 8 },
+    { key: 'confirmed', header: '已确认', width: 8 },
+    { key: 'diff_amount', header: '差异金额', width: 14 },
+    { key: 'remark', header: '说明', width: 16 },
+  ],
+  internal_trade: [
+    { key: 'seller', header: '销售方', width: 16 },
+    { key: 'buyer', header: '购买方', width: 16 },
+    { key: 'trade_type', header: '交易类型', width: 12 },
+    { key: 'revenue_amount', header: '收入金额', width: 14 },
+    { key: 'cost_amount', header: '成本金额', width: 14 },
+    { key: 'unrealized_profit', header: '未实现利润', width: 14 },
+    { key: 'direction', header: '借贷', width: 8 },
+    { key: 'remark', header: '说明', width: 16 },
+  ],
+  internal_cashflow: [
+    { key: 'from_company', header: '付款方', width: 16 },
+    { key: 'to_company', header: '收款方', width: 16 },
+    { key: 'cashflow_type', header: '现金流类型', width: 14 },
+    { key: 'amount', header: '金额', width: 14 },
+    { key: 'direction', header: '借贷', width: 8 },
+    { key: 'remark', header: '说明', width: 16 },
+  ],
+  elimination: [
+    { key: 'source', header: '来源', width: 10 },
+    { key: 'direction', header: '借贷', width: 8 },
+    { key: 'subject', header: '科目', width: 20 },
+    { key: 'detail', header: '二级明细', width: 16 },
+    { key: 'amount', header: '金额', width: 16 },
+    { key: 'desc', header: '说明', width: 24 },
+  ],
+  share_change: [
+    { key: 'company_name', header: '企业名称', width: 20 },
+    { key: 'change_date', header: '变动日期', width: 12 },
+    { key: 'before_ratio', header: '变动前比例', width: 12 },
+    { key: 'after_ratio', header: '变动后比例', width: 12 },
+    { key: 'change_type', header: '变动类型', width: 12 },
+    { key: 'amount', header: '变动金额', width: 14 },
+    { key: 'remark', header: '备注', width: 16 },
+  ],
 }
 
 interface SubsidiaryInfoRow {
@@ -673,19 +748,28 @@ const { exportTemplate: _ioExportTemplate, exportData: _ioExportData, onFileSele
 const importFileRef = ref<HTMLInputElement | null>(null)
 
 /** 当前 activeSheet 是否支持导入导出 */
-const canImportExport = computed(() => activeSheet.value in CONSOL_SHEET_COLS)
+const canImportExport = computed(() => {
+  if (activeSheet.value in CONSOL_SHEET_COLS) return true
+  // 动态股比变动表 share_change_1, share_change_2... 统一用 share_change 列定义
+  if (activeSheet.value.startsWith('share_change_')) return true
+  return false
+})
 
 /** 当前 sheet 的中文名 */
 const activeSheetLabel = computed(() => {
   const map: Record<string, string> = {
     info: '基本信息表', cost: '投资明细-成本法', equity_inv: '投资明细-权益法',
     net_asset: '净资产表', equity_sim: '模拟权益法', capital: '资本公积变动',
+    post_invest: '抵消后长投', post_income: '抵消后投资收益', minority: '少数股东权益损益',
+    internal_arap: '内部往来抵消', internal_trade: '内部交易抵消',
+    internal_cashflow: '内部现金流抵消', elimination: '合并抵消分录', share_change: '股比变动表',
   }
   return map[activeSheet.value] || activeSheet.value
 })
 
 async function handleExportTemplate() {
-  const cols = CONSOL_SHEET_COLS[activeSheet.value]
+  const colKey = activeSheet.value.startsWith('share_change_') ? 'share_change' : activeSheet.value
+  const cols = CONSOL_SHEET_COLS[colKey]
   if (!cols) return
   await _ioExportTemplate({
     columns: cols,
@@ -695,7 +779,8 @@ async function handleExportTemplate() {
 }
 
 async function handleExportData() {
-  const cols = CONSOL_SHEET_COLS[activeSheet.value]
+  const colKey = activeSheet.value.startsWith('share_change_') ? 'share_change' : activeSheet.value
+  const cols = CONSOL_SHEET_COLS[colKey]
   if (!cols) return
   // 从后端加载当前 sheet 数据
   const saved = await loadWorksheetData(projectId.value, year.value, activeSheet.value)
@@ -717,7 +802,8 @@ function handleImportClick() {
 }
 
 async function handleImportFile(e: Event) {
-  const cols = CONSOL_SHEET_COLS[activeSheet.value]
+  const colKey = activeSheet.value.startsWith('share_change_') ? 'share_change' : activeSheet.value
+  const cols = CONSOL_SHEET_COLS[colKey]
   if (!cols) return
   await _ioOnFileSelected(e, async (result) => {
     if (!result.rows.length) {
