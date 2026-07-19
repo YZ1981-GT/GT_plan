@@ -50,6 +50,26 @@
     <div class="cw-resizer" @mousedown="startResize" />
     <!-- 右侧：表样内容 -->
     <main class="cw-content">
+      <!-- 导入导出工具栏（合并工作底稿 Phase 1） -->
+      <div v-if="canImportExport" class="cw-ie-toolbar">
+        <el-dropdown trigger="click" @command="(cmd: string) => {
+          if (cmd === 'export-template') handleExportTemplate()
+          else if (cmd === 'export-data') handleExportData()
+          else if (cmd === 'import-data') handleImportClick()
+        }">
+          <el-button size="small" type="primary" plain>
+            导入导出 ▾
+          </el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="export-template">↓ 导出模板</el-dropdown-item>
+              <el-dropdown-item command="export-data">↓ 导出数据</el-dropdown-item>
+              <el-dropdown-item command="import-data" divided>↑ 导入数据</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <input ref="importFileRef" type="file" accept=".xlsx,.xls" style="display:none" @change="handleImportFile" />
+      </div>
       <SubsidiaryInfoSheet v-if="activeSheet === 'info'" v-model="data.subsidiaryInfo"
         @save="onSave('基本信息表', $event)" @open-share-change="onOpenShareChange" @open-formula="onOpenFormula" />
       <InvestmentCostSheet v-else-if="activeSheet === 'cost'" v-model="data.investmentCost"
@@ -134,6 +154,67 @@ import InternalCashFlowSheet from './InternalCashFlowSheet.vue'
 import { eventBus } from '@/utils/eventBus'
 import type { FormulaChangedPayload } from '@/utils/eventBus'
 import { handleApiError } from '@/utils/errorHandler'
+import { useExcelIO, type ExcelColumn } from '@/composables/useExcelIO'
+import { loadWorksheetData } from '@/services/consolWorksheetDataApi'
+
+// ─── 合并工作底稿导入导出列定义 ─────────────────────────────────────────────
+const CONSOL_SHEET_COLS: Record<string, ExcelColumn[]> = {
+  info: [
+    { key: 'company_name', header: '企业名称', width: 20 },
+    { key: 'company_code', header: '企业代码', width: 12 },
+    { key: 'parent_code', header: '上级企业代码', width: 12 },
+    { key: 'ultimate_controller', header: '最终控制方', width: 16 },
+    { key: 'accounting_method', header: '核算方式', width: 10 },
+    { key: 'holding_type', header: '持股方式', width: 8 },
+    { key: 'non_common_ratio', header: '非同一控制持股比例', width: 14 },
+    { key: 'common_ratio', header: '同一控制持股比例', width: 14 },
+    { key: 'acquisition_date', header: '取得日', width: 12 },
+    { key: 'merge_type', header: '合并类型', width: 10 },
+    { key: 'first_consol_date', header: '首次合并日', width: 12 },
+  ],
+  cost: [
+    { key: 'sub_name', header: '被投资单位', width: 20 },
+    { key: 'sub_code', header: '企业代码', width: 12 },
+    { key: 'initial_cost', header: '初始投资成本', width: 14 },
+    { key: 'book_value', header: '账面价值', width: 14 },
+    { key: 'fair_value', header: '公允价值', width: 14 },
+    { key: 'dividend_received', header: '已收股利', width: 14 },
+    { key: 'impairment', header: '减值准备', width: 14 },
+  ],
+  equity_inv: [
+    { key: 'sub_name', header: '被投资单位', width: 20 },
+    { key: 'sub_code', header: '企业代码', width: 12 },
+    { key: 'initial_cost', header: '初始投资成本', width: 14 },
+    { key: 'share_ratio', header: '持股比例', width: 10 },
+    { key: 'net_profit_share', header: '损益调整', width: 14 },
+    { key: 'other_ci_share', header: '其他综合收益', width: 14 },
+    { key: 'book_value', header: '账面价值', width: 14 },
+    { key: 'impairment', header: '减值准备', width: 14 },
+  ],
+  net_asset: [
+    { key: 'subject', header: '项目', width: 20 },
+    { key: 'begin_amount', header: '期初数', width: 14 },
+    { key: 'end_amount', header: '期末数', width: 14 },
+    { key: 'remark', header: '备注', width: 16 },
+  ],
+  equity_sim: [
+    { key: 'sub_name', header: '被投资单位', width: 20 },
+    { key: 'ratio', header: '持股比例', width: 10 },
+    { key: 'begin_equity', header: '期初净资产', width: 14 },
+    { key: 'end_equity', header: '期末净资产', width: 14 },
+    { key: 'net_profit', header: '本期净利润份额', width: 14 },
+    { key: 'other_ci', header: '其他综合收益份额', width: 14 },
+    { key: 'simulated_value', header: '模拟权益法金额', width: 14 },
+  ],
+  capital: [
+    { key: 'item', header: '项目', width: 20 },
+    { key: 'begin_amount', header: '期初数', width: 14 },
+    { key: 'increase', header: '本期增加', width: 14 },
+    { key: 'decrease', header: '本期减少', width: 14 },
+    { key: 'end_amount', header: '期末数', width: 14 },
+    { key: 'remark', header: '备注', width: 16 },
+  ],
+}
 
 interface SubsidiaryInfoRow {
   company_name: string; company_code: string; parent_code: string
@@ -309,30 +390,33 @@ async function loadConsolScope() {
   } catch { /* ignore */ }
 }
 
+async function loadAllData() {
+  if (!projectId.value) return
+  try {
+    const saved = await loadAllWorksheetData(projectId.value, year.value)
+    if (saved.info?.rows) data.subsidiaryInfo = saved.info.rows
+    if (saved.cost?.rows) data.investmentCost = saved.cost.rows
+    if (saved.equity_inv?.rows) data.investmentEquity = saved.equity_inv.rows
+    if (saved.net_asset?.rows) data.netAsset = saved.net_asset.rows
+    if (saved.equity_sim?.rows) {
+      if (saved.equity_sim.rows.direct) data.equitySimDirect = saved.equity_sim.rows.direct
+      if (saved.equity_sim.rows.indirect) data.equitySimIndirect = saved.equity_sim.rows.indirect
+    }
+    if (saved.elimination?.rows) {
+      if (saved.elimination.rows.equity) data.elimEquity = saved.elimination.rows.equity
+      if (saved.elimination.rows.income) data.elimIncome = saved.elimination.rows.income
+      if (saved.elimination.rows.cross) data.elimCross = saved.elimination.rows.cross
+    }
+    if (saved.capital?.rows) data.capitalReserve = saved.capital.rows
+  } catch { /* 首次使用无数据，忽略 */ }
+}
+
 onMounted(async () => {
   loadConsolScope()
   loadConsolidationType()
   eventBus.on('formula-changed', onFormulaChanged)
   // 从后端加载已保存的工作底稿数据
-  if (projectId.value) {
-    try {
-      const saved = await loadAllWorksheetData(projectId.value, year.value)
-      if (saved.info?.rows) data.subsidiaryInfo = saved.info.rows
-      if (saved.cost?.rows) data.investmentCost = saved.cost.rows
-      if (saved.equity_inv?.rows) data.investmentEquity = saved.equity_inv.rows
-      if (saved.net_asset?.rows) data.netAsset = saved.net_asset.rows
-      if (saved.equity_sim?.rows) {
-        if (saved.equity_sim.rows.direct) data.equitySimDirect = saved.equity_sim.rows.direct
-        if (saved.equity_sim.rows.indirect) data.equitySimIndirect = saved.equity_sim.rows.indirect
-      }
-      if (saved.elimination?.rows) {
-        if (saved.elimination.rows.equity) data.elimEquity = saved.elimination.rows.equity
-        if (saved.elimination.rows.income) data.elimIncome = saved.elimination.rows.income
-        if (saved.elimination.rows.cross) data.elimCross = saved.elimination.rows.cross
-      }
-      if (saved.capital?.rows) data.capitalReserve = saved.capital.rows
-    } catch { /* 首次使用无数据，忽略 */ }
-  }
+  await loadAllData()
 })
 onUnmounted(() => {
   eventBus.off('formula-changed', onFormulaChanged)
@@ -584,6 +668,93 @@ async function doSave(sheetKey: string, payload: any) {
   }
 }
 
+// ─── 合并工作底稿导入导出（Phase 1：前端 useExcelIO 统一） ──────────────────
+const { exportTemplate: _ioExportTemplate, exportData: _ioExportData, onFileSelected: _ioOnFileSelected } = useExcelIO()
+const importFileRef = ref<HTMLInputElement | null>(null)
+
+/** 当前 activeSheet 是否支持导入导出 */
+const canImportExport = computed(() => activeSheet.value in CONSOL_SHEET_COLS)
+
+/** 当前 sheet 的中文名 */
+const activeSheetLabel = computed(() => {
+  const map: Record<string, string> = {
+    info: '基本信息表', cost: '投资明细-成本法', equity_inv: '投资明细-权益法',
+    net_asset: '净资产表', equity_sim: '模拟权益法', capital: '资本公积变动',
+  }
+  return map[activeSheet.value] || activeSheet.value
+})
+
+async function handleExportTemplate() {
+  const cols = CONSOL_SHEET_COLS[activeSheet.value]
+  if (!cols) return
+  await _ioExportTemplate({
+    columns: cols,
+    fileName: `合并底稿_${activeSheetLabel.value}_模板.xlsx`,
+    includeNoteRow: false,
+  })
+}
+
+async function handleExportData() {
+  const cols = CONSOL_SHEET_COLS[activeSheet.value]
+  if (!cols) return
+  // 从后端加载当前 sheet 数据
+  const saved = await loadWorksheetData(projectId.value, year.value, activeSheet.value)
+  const rows = saved?.rows || []
+  if (!rows.length) {
+    ElMessage.info('当前表暂无数据可导出')
+    return
+  }
+  await _ioExportData({
+    data: rows,
+    columns: cols,
+    sheetName: activeSheetLabel.value,
+    fileName: `合并底稿_${activeSheetLabel.value}_数据.xlsx`,
+  })
+}
+
+function handleImportClick() {
+  importFileRef.value?.click()
+}
+
+async function handleImportFile(e: Event) {
+  const cols = CONSOL_SHEET_COLS[activeSheet.value]
+  if (!cols) return
+  await _ioOnFileSelected(e, async (result) => {
+    if (!result.rows.length) {
+      ElMessage.warning('未识别到有效数据行')
+      return
+    }
+    // 将 Excel 行映射为目标 JSON 格式（按 header→key 映射）
+    const headerToKey: Record<string, string> = {}
+    for (const col of cols) headerToKey[col.header] = col.key
+
+    const mapped = result.rows.map((raw: Record<string, any>) => {
+      const row: Record<string, any> = {}
+      for (const [header, key] of Object.entries(headerToKey)) {
+        if (raw[header] != null) row[key] = raw[header]
+      }
+      return row
+    }).filter((r: Record<string, any>) => Object.keys(r).length > 0)
+
+    if (!mapped.length) {
+      ElMessage.warning('导入数据为空，请检查列头是否匹配')
+      return
+    }
+
+    // 保存到后端
+    const ok = await saveWorksheetData(projectId.value, year.value, activeSheet.value, { rows: mapped })
+    if (ok) {
+      ElMessage.success(`已导入 ${mapped.length} 行到「${activeSheetLabel.value}」`)
+      // 触发前端数据刷新
+      await loadAllData()
+    } else {
+      ElMessage.error('导入保存失败')
+    }
+  }, { skipRows: 0 })
+  // 重置 file input
+  if (importFileRef.value) importFileRef.value.value = ''
+}
+
 // ─── 内部抵消分录汇总 ────────────────────────────────────────────────────────
 const internalEntries = reactive<{ arap: any[]; trade: any[]; cashflow: any[] }>({
   arap: [], trade: [], cashflow: [],
@@ -707,4 +878,5 @@ function onGotoSheet(k: string) {
 }
 .cw-resizer:hover, .cw-resizer:active { background: var(--gt-color-primary-lighter, #d8d0e8); }
 .cw-content { flex: 1; min-width: 0; overflow: auto; padding: 16px; background: var(--gt-color-bg-white); }
+.cw-ie-toolbar { display: flex; align-items: center; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px dashed var(--gt-color-border-light, #e8e4f0); }
 </style>
