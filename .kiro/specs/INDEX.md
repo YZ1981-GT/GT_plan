@@ -2,7 +2,7 @@
 
 **最后更新**：2026-07-19
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active 0 / Archived 406 = 总计 406
+**统计**：Active 0 / Archived 408 = 总计 408
 **最高迁移**：**V118**（以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -29,12 +29,10 @@
 | Spec | 说明 | 状态 |
 |------|------|------|
 | (无) | | |
-| `attachment-ocr-ai-evidence-governance-hardening` | 附件/OCR/AI/证据治理全面加固，65/66任务完成 | 🟡 64 done + 1 todo + 1 dash（11.4 容量环境 blocked，需专用 6000VU 环境） |
-| `fghi-sheet-content-completion` | F/G/H/I 全循环逐 sheet 打磨（审计目标/编制提示/结论/toolbar） | � 进行中（88/97，剩 I4/I5 打磨 + Playwright + 全局验证） |
 
 ---
 
-## 二、已归档 Spec（404个，15 分类）
+## 二、已归档 Spec（408个，15 分类）
 
 ```
 _archive/
@@ -43,7 +41,7 @@ _archive/
 ├── 03-refinement-rounds/              9
 ├── 04-infra/                          1
 ├── 04-infra-architecture/            34
-├── 05-business-features/            185
+├── 05-business-features/            187  (+2: workhour-entry-frontend, workhour-table-unification)
 ├── 06-engineering-governance/        12
 ├── 07-workpaper-slimdown/            22
 ├── 08-disclosure-notes/               7
@@ -55,7 +53,16 @@ _archive/
 └── 99-superseded/                     4
 ```
 
-### 本次归档（2026-07-18，26个 spec）
+### 最近归档（2026-07-19，工时模块重构）
+
+**→ 05-business-features（+2）**
+
+| Spec | 任务 | 说明 |
+|------|------|------|
+| workhour-entry-frontend | 6/6 | Phase7 细粒度工时填报前端入口（Dialog+List+ProjectView+路由） |
+| workhour-table-unification | 8/8 | 两套工时表统一迁移（V117 数据迁移+审批改造+兼容层+WeeklyTimesheet 改写） |
+
+### 上次归档（2026-07-18，26个 spec）
 
 **→ 04-infra-architecture（+5）**
 
