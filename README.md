@@ -8,18 +8,19 @@
 
 ### 平台现状（codegraph 实测）
 
-CodeGraph 索引统计：**3725 个文件 / 68280 个符号节点 / 140625 条关系边**。
+CodeGraph 索引统计：**10054 个文件 / 182868 个符号节点 / 401716 条关系边**。
 
 | 维度 | 规模 |
 |------|------|
-| 后端路由文件（routers） | 300+ 个 |
-| 后端服务文件（services） | 500+ 个 |
-| 数据模型文件（models） | 73 个 |
-| 后端测试文件 | 860+ 个 `test_*.py` |
-| 前端 Vue 组件/视图 | 610 个 |
-| 数据库迁移（V*.sql） | V001–V069（69 个版本 + R*.sql 回滚配对） |
+| 后端路由文件（routers） | 742 个 |
+| 后端服务文件（services） | 850 个 |
+| 数据模型文件（models） | 82 个 |
+| 后端测试文件 | 1637 个 `test_*.py` |
+| 前端 Vue 组件/视图 | 2159 个 |
+| 数据库迁移（V*.sql） | V001–V118（118 个版本 + R*.sql 回滚配对） |
+| Spec 三件套（已归档） | 408 个 |
 
-> 数据来源：`codegraph status` 与仓库实际文件计数（2026-06-11）。
+> 数据来源：`codegraph status` 与仓库实际文件计数（2026-07-19）。
 
 ### 核心功能
 
@@ -44,7 +45,7 @@ CodeGraph 索引统计：**3725 个文件 / 68280 个符号节点 / 140625 条�
 - **数据库**：PostgreSQL 16（pgvector 扩展用于 RAG 向量检索）
 - **缓存**：Redis 7
 - **ORM**：SQLAlchemy（async）
-- **迁移**：D6 版本化 SQL 脚本（`V*.sql` + `R*.sql` 回滚配对，启动时由 `MigrationRunner` 自动应用 + `schema_drift_detector` 漂移自检），当前最高 **V069**
+- **迁移**：D6 版本化 SQL 脚本（`V*.sql` + `R*.sql` 回滚配对，启动时由 `MigrationRunner` 自动应用 + `schema_drift_detector` 漂移自检），当前最高 **V118**
 - **AI/OCR**：PaddleOCR、Tesseract、MinerU（可选，需 GPU）、MarkItDown（本地文档转 markdown）
 - **LLM**：本地 vLLM（OpenAI 兼容接口）+ 熔断器；RAG 走 pgvector，未起 embed 实例时降级 ilike
 - **底稿模板**：致同 2025 修订版模板文件（xlsx/xlsm/docx），存于 `backend/wp_templates/`（按 A–S 循环分目录）
@@ -140,19 +141,19 @@ docker-compose -f docker-compose.mineru.yml up -d
 GT_plan/
 ├── backend/                      # FastAPI 后端
 │   ├── app/
-│   │   ├── models/               # 数据模型（73 个，含 phase10~16 分期模型）
-│   │   ├── services/             # 业务服务（500+，按领域分）
-│   │   ├── routers/              # API 路由（300+）
+│   │   ├── models/               # 数据模型（82 个，含 phase10~16 分期模型）
+│   │   ├── services/             # 业务服务（850 个，按领域分）
+│   │   ├── routers/              # API 路由（742 个）
 │   │   ├── router_registry/      # 路由分组注册（新 router 必在此注册）
 │   │   ├── middleware/           # 中间件（审计日志/限流/可观测/响应封装）
 │   │   └── core/                 # 核心（migration_runner / schema_drift_detector / security 等）
-│   ├── migrations/               # V*.sql + R*.sql 回滚（D6 版本化，V001–V069）
+│   ├── migrations/               # V*.sql + R*.sql 回滚（D6 版本化，V001–V118）
 │   ├── wp_templates/             # 致同底稿模板库（A–S 循环分目录）
 │   ├── data/                     # seed/模板/字体/映射 JSON（含 audit_report_templates/）
 │   ├── scripts/                  # 工具脚本（check/seed/gen/analyze/ops/fix/migrate/e2e）
-│   └── tests/                    # 测试（860+ test_*.py）
+│   └── tests/                    # 测试（1637 个 test_*.py）
 ├── audit-platform/frontend/      # Vue 3 前端（唯一前端路径）
-│   └── src/                      # views / components / composables（610 个 .vue）
+│   └── src/                      # views / components / composables（2159 个 .vue）
 ├── storage/                      # 项目级 + 用户私人库存储
 ├── .kiro/
 │   ├── specs/                    # Spec 三件套（active + _archive，详见 INDEX.md）
