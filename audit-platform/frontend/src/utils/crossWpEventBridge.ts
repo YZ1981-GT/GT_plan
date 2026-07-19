@@ -30,6 +30,9 @@ export const BRIDGED_EVENTS: ReadonlySet<string> = new Set<string>([
   // 两传输通道统一，任一侧生产者两侧消费者都能收到。
   'confirmation:received',
   'confirmation:completed',
+  // 调整分录联动：底稿 publishAdjustment 发出，集中式调整管理页及 A13 错报汇总订阅。
+  'adjustment:created',
+  'a13:push-misstatement',
 ])
 
 /** 再入守卫标记：源自 eventBus 转发到 window 的事件带此标记，window 监听器见此不回灌。 */
@@ -41,6 +44,7 @@ const FROM_WINDOW = '__fromWindow'
  * payload 归一化。就地补齐金额别名与兜底字段，返回同一对象。
  * - substantive:adjudicated：auditedAmount / adjudicatedAmount / auditedTotal 三别名互填。
  * - disclosure:note-text-updated：timestamp 兜底。
+ * - adjustment:created / a13:push-misstatement：wpCode + timestamp 兜底。
  */
 export function normalizeBridgedPayload(type: string, p: any): any {
   if (!p || typeof p !== 'object') return p
@@ -57,6 +61,9 @@ export function normalizeBridgedPayload(type: string, p: any): any {
     if (p.wpCode === undefined) p.wpCode = p.wp_code ?? ''
     if (p.timestamp === undefined) p.timestamp = Date.now()
   } else if (type === 'disclosure:note-text-updated') {
+    if (p.timestamp === undefined) p.timestamp = Date.now()
+  } else if (type === 'adjustment:created' || type === 'a13:push-misstatement') {
+    if (p.wpCode === undefined) p.wpCode = p.wp_code ?? ''
     if (p.timestamp === undefined) p.timestamp = Date.now()
   }
   return p

@@ -351,67 +351,64 @@ class TestSecurityIsolation:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 场景3: 生命周期 — 创建51个auto快照验证purge
+# 场景3: 生命周期 — 超过 5 个版本时 purge 最旧
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestLifecyclePurge:
-    """当auto快照超过50个时，enforce_lifecycle应删除最老的auto快照。
+    """超过 max_snapshots 时，enforce_lifecycle 应删除最旧快照。
 
-    Validates: Requirements 9.2
+    Validates: Requirements 9.2（限额已调整为每底稿最近 5 版）
     """
 
     @pytest.mark.asyncio
-    async def test_purge_when_exceeding_50(self):
-        """51 non-manual snapshots → purge 1 oldest."""
+    async def test_purge_when_at_limit_before_insert(self):
+        """已有 5 个 → 腾出 1 个空位（excess=1）。"""
         workpaper_id = uuid.uuid4()
         db = AsyncMock()
 
-        # count returns 51
         count_result = MagicMock()
-        count_result.mappings.return_value.first.return_value = {"cnt": 51}
+        count_result.mappings.return_value.first.return_value = {"cnt": 5}
         delete_result = MagicMock()
         db.execute.side_effect = [count_result, delete_result]
         db.flush = AsyncMock()
 
         purged = await VersionTrailService.enforce_lifecycle(
-            db=db, workpaper_id=workpaper_id, max_snapshots=50
+            db=db, workpaper_id=workpaper_id, max_snapshots=5
         )
         assert purged == 1
 
     @pytest.mark.asyncio
     async def test_no_purge_when_under_limit(self):
-        """49 non-manual snapshots → no purge."""
+        """4 个版本 → 不清理。"""
         workpaper_id = uuid.uuid4()
         db = AsyncMock()
 
         count_result = MagicMock()
-        count_result.mappings.return_value.first.return_value = {"cnt": 49}
+        count_result.mappings.return_value.first.return_value = {"cnt": 4}
         db.execute.side_effect = [count_result]
 
         purged = await VersionTrailService.enforce_lifecycle(
-            db=db, workpaper_id=workpaper_id, max_snapshots=50
+            db=db, workpaper_id=workpaper_id, max_snapshots=5
         )
         assert purged == 0
 
     @pytest.mark.asyncio
-    async def test_purge_preserves_manual_snapshots(self):
-        """enforce_lifecycle counts only non-manual snapshots for purge."""
+    async def test_purge_when_exceeding_limit(self):
+        """历史已有 8 个 → excess = 8-5+1 = 4。"""
         workpaper_id = uuid.uuid4()
         db = AsyncMock()
 
-        # The count query only counts WHERE snapshot_type != 'manual'
-        # So 60 non-manual → purge 10
         count_result = MagicMock()
-        count_result.mappings.return_value.first.return_value = {"cnt": 60}
+        count_result.mappings.return_value.first.return_value = {"cnt": 8}
         delete_result = MagicMock()
         db.execute.side_effect = [count_result, delete_result]
         db.flush = AsyncMock()
 
         purged = await VersionTrailService.enforce_lifecycle(
-            db=db, workpaper_id=workpaper_id, max_snapshots=50
+            db=db, workpaper_id=workpaper_id, max_snapshots=5
         )
-        assert purged == 10
+        assert purged == 4
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

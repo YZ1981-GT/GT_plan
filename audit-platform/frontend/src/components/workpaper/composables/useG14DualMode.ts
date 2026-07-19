@@ -2,7 +2,8 @@
  * useG14DualMode — G14 HTML ↔ OnlyOffice 双模式
  * Spec: .kiro/specs/g14-credit-impairment-loss/ Task 4.2
  */
-import { ref, onMounted, type Ref } from 'vue'
+import { ref, computed, onMounted, type Ref } from 'vue'
+import { dualModeHtmlOoOptions } from './dualModeLabels'
 
 export type G14RenderMode = 'html' | 'onlyoffice'
 
@@ -15,10 +16,7 @@ export function useG14DualMode(options: {
   const currentMode = ref<G14RenderMode>('html')
   const isOoAvailable = ref(false)
 
-  const modeOptions = [
-    { label: '结构化视图', value: 'html' },
-    { label: '在线编辑', value: 'onlyoffice' },
-  ]
+  const modeOptions = computed(() => dualModeHtmlOoOptions({ onlineDisabled: !isOoAvailable.value }))
 
   function loadPersistedMode(): void {
     try {
@@ -47,7 +45,10 @@ export function useG14DualMode(options: {
   async function onModeChange(val: string | number | boolean): Promise<void> {
     const target = val as G14RenderMode
     if (target === currentMode.value) return
-    if (target === 'onlyoffice' && !isOoAvailable.value) return
+    if (target === 'onlyoffice' && !isOoAvailable.value) {
+      currentMode.value = 'html'
+      return
+    }
     currentMode.value = target
     try {
       localStorage.setItem(STORAGE_PREFIX + options.wpId.value, target)
@@ -56,8 +57,16 @@ export function useG14DualMode(options: {
   }
 
   onMounted(() => {
-    loadPersistedMode()
-    void checkOOHealth()
+    void checkOOHealth().then((healthy) => {
+      if (healthy) {
+        loadPersistedMode()
+      } else {
+        currentMode.value = 'html'
+        try {
+          localStorage.setItem(STORAGE_PREFIX + options.wpId.value, 'html')
+        } catch { /* ignore */ }
+      }
+    })
   })
 
   return { currentMode, isOoAvailable, modeOptions, onModeChange, checkOOHealth }

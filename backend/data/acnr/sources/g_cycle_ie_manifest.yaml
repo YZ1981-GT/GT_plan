@@ -158,6 +158,13 @@ entries:
     depends_on_sheets: [G3-1]
 
   # ───────────────────────── G4 债权投资-主表（api_prefix: g4） ─────────────────────────
+  - sheet_code: G4-1
+    api_prefix: g4
+    item_id: G4-1-rows
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 5
+    depends_on_sheets: []
   - sheet_code: G4-2
     api_prefix: g4
     item_id: G4-2-rows
@@ -174,6 +181,13 @@ entries:
     depends_on_sheets: [G4-2]
 
   # ───────────────────────── G4 债权投资-SPPI（api_prefix: g4-sppi） ─────────────────────────
+  - sheet_code: G4-5
+    api_prefix: g4-sppi
+    item_id: G4-5-questionnaire
+    storage_field: conclusion
+    storage_mode: row_json
+    import_order: 25
+    depends_on_sheets: [G4-2]
   - sheet_code: G4-6
     api_prefix: g4-sppi
     item_id: G4-6-bond-items
@@ -204,6 +218,13 @@ entries:
     storage_mode: row_json
     import_order: 60
     depends_on_sheets: [G4-2]
+  - sheet_code: G4-11
+    api_prefix: g4-ecl
+    item_id: G4-11-ecl-measurement
+    storage_field: conclusion
+    storage_mode: payload_json
+    import_order: 65
+    depends_on_sheets: [G4-9]
   - sheet_code: G4-12
     api_prefix: g4-ecl
     item_id: G4-12-rows
@@ -223,21 +244,21 @@ entries:
   - sheet_code: G5-2
     api_prefix: g5
     item_id: G5-2-rows
-    storage_field: remark
+    storage_field: conclusion
     storage_mode: row_json
     import_order: 10
     depends_on_sheets: []
   - sheet_code: G5-3
     api_prefix: g5
     item_id: G5-3-rows
-    storage_field: remark
+    storage_field: conclusion
     storage_mode: row_json
     import_order: 20
     depends_on_sheets: [G5-2]
   - sheet_code: G5-4
     api_prefix: g5
     item_id: G5-4-rows
-    storage_field: remark
+    storage_field: conclusion
     storage_mode: row_json
     import_order: 30
     depends_on_sheets: [G5-2]

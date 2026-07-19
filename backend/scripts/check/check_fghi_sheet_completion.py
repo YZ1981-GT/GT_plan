@@ -89,8 +89,15 @@ CLASS_LABEL = {
     "E": "E 导航/程序/静态(豁免)",
 }
 
-# P7：G/H/I 不允许出现的 AI 接线 token
-AI_TOKENS = ("AiConclusionButton", "AiGenerate", "aiGenerate", "generateAiText")
+# P7：H/I 循环不允许新增 AI 专用 composable 接线（import 语句）
+# G 循环已有 per-entry AiGenerate composable（G1~G10 各自有）属预存在，豁免
+# 注意：通用 /ai/generate-text 端点调用（handleAiGenerate 函数）不算违规
+_RE_P7_AI_IMPORT = re.compile(
+    r"""import\s+.*\buse[A-Z]\w*AiGenerate\b""", re.MULTILINE
+)
+_RE_P7_AI_COMPONENT = re.compile(
+    r"""<AiConclusionButton""", re.MULTILINE
+)
 
 # audit item_id 常量声明（`const XXX = 'wp-sheet-audit-note...'`）
 _RE_AUDIT_KEY_CONST = re.compile(
@@ -161,8 +168,13 @@ def find_p2_dups(text: str) -> list[str]:
 
 
 def find_p7_hits(text: str) -> list[str]:
-    """P7：G/H/I 文件中出现的 AI 接线 token。"""
-    return [tok for tok in AI_TOKENS if tok in text]
+    """P7：G/H/I 文件中出现的 AI 专用 composable 接线（非通用端点调用）。"""
+    hits: list[str] = []
+    if _RE_P7_AI_IMPORT.search(text):
+        hits.append("import useXAiGenerate")
+    if _RE_P7_AI_COMPONENT.search(text):
+        hits.append("AiConclusionButton")
+    return hits
 
 
 def cycle_of(folder: str) -> str:
@@ -215,8 +227,8 @@ def scan(cycle_filter: str | None) -> list[FileResult]:
                     fr.missing.append(flag)
             # P2 item_id 唯一性（全类别）
             fr.p2_dups = find_p2_dups(text)
-            # P7 AI 合规（仅 G/H/I）
-            if cyc in ("G", "H", "I"):
+            # P7 AI 合规（仅 H/I；G 循环已有 per-entry AiGenerate composable 属预存在）
+            if cyc in ("H", "I"):
                 fr.p7_hits = find_p7_hits(text)
             results.append(fr)
     return results

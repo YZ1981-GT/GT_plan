@@ -23,10 +23,11 @@
                 size="small"
                 type="primary"
                 text
-                :disabled="isReadonly"
+                :disabled="isReadonly || !aiAvailable"
+                :loading="aiLoading"
                 @click="fillAiDraft(sIdx)"
               >
-                🤖AI辅助
+                AI辅助
               </el-button>
               <GtReviewTrigger :section-id="`G7-disclosure-listed-${section.id}`" />
             </div>
@@ -114,8 +115,8 @@
 
       <!-- 底部AI辅助按钮 -->
       <div class="bottom-ai-actions">
-        <el-button type="primary" size="small" :disabled="isReadonly" @click="fillAiDraftAll">
-          🤖 AI辅助生成全部附注
+        <el-button type="primary" size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="fillAiDraftAll">
+          AI辅助生成全部附注
         </el-button>
       </div>
 
@@ -157,9 +158,10 @@
  *           publish disclosure:note-text-updated on text change
  * AI辅助按钮 + 复核按钮（每个section标题行右侧）
  */
-import { reactive, ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { reactive, ref, computed, onMounted, onBeforeUnmount, toRef } from 'vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import { api } from '@/services/apiProxy'
+import { useG7MainAiGenerate } from '../../composables/useG7MainAiGenerate'
 
 const G7_ACCOUNT_CODE = '1511'
 /** 每段懒加载行数 */
@@ -173,6 +175,8 @@ const props = defineProps<{
 }>()
 
 const scrollContainerRef = ref<HTMLDivElement | null>(null)
+const wpIdRef = toRef(props, 'wpId')
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useG7MainAiGenerate(wpIdRef)
 
 // ═══ 格式化 ═══
 function fmtAmount(v: number | null | undefined): string {
@@ -383,34 +387,37 @@ function onNoteTextChange(_sectionIdx: number): void {
   } catch { /* silent */ }
 }
 
-// ═══ AI辅助（单section） ═══
-function fillAiDraft(sectionIdx: number): void {
+// ═══ AI辅助（单section）—— 比照 F2：走 g7-main/ai/disclosure-text ═══
+async function fillAiDraft(sectionIdx: number): Promise<void> {
   if (isReadonly.value) return
   const section = sections[sectionIdx]
   if (!section) return
 
-  // 按section id生成不同的AI草稿
-  const draftMap: Record<string, string> = {
-    'cost-equity-summary': '根据审计结果，长期股权投资按成本法核算的子公司投资期末余额为 [金额] 元；按权益法核算的合营企业投资期末余额为 [金额] 元，联营企业投资期末余额为 [金额] 元。',
-    'important-jv-associate': '重要合营/联营企业基本信息及财务数据如下。本期权益法确认投资收益合计 [金额] 元，其他综合收益份额 [金额] 元。',
-    'unconsolidated-entity': '公司不纳入合并范围的结构化主体包括 [主体名称]。未纳入合并的原因为 [原因说明]。',
-    'over-5pct-investee': '持股比例5%以上的被投资单位信息如下，主要集中于 [行业] 领域。',
-    'investment-restriction': '对外投资存在以下限制性条件：[条件描述]。涉及质押/冻结的长期股权投资账面价值为 [金额] 元。',
-  }
-
-  const draft = draftMap[section.id] || `${section.title}相关信息如下：[待填写]`
-  section.textContent = section.textContent ? `${section.textContent}\n${draft}` : draft
+  const text = await generateAndConfirm(
+    'disclosure-text',
+    section.textContent || '',
+    {
+      sectionId: section.id,
+      sectionTitle: section.title,
+      disclosureType: 'listed',
+      accountCode: G7_ACCOUNT_CODE,
+    },
+    `AI 生成：${section.title}`,
+  )
+  if (!text) return
+  section.textContent = text
   onNoteTextChange(sectionIdx)
 }
 
 // ═══ AI辅助（全部section） ═══
-function fillAiDraftAll(): void {
+async function fillAiDraftAll(): Promise<void> {
   if (isReadonly.value) return
-  sections.forEach((section, idx) => {
+  for (let idx = 0; idx < sections.length; idx++) {
+    const section = sections[idx]
     if (section.hasTextArea && !section.textContent) {
-      fillAiDraft(idx)
+      await fillAiDraft(idx)
     }
-  })
+  }
 }
 
 // ═══ 数据加载 ═══

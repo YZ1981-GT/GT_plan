@@ -15,7 +15,7 @@
  * 比照 useG2InterestCalc / useG4MainAdjustment
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   parseNum,
   calcInitialCarryingAmount,
@@ -25,6 +25,22 @@ import {
   calcEndingBalance,
 } from '@/composables/useG4MainFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
+import {
+  G4_ITEM_IDS,
+  buildCanonicalPayload,
+  parseCanonicalJson,
+} from './g4StorageContract'
+import {
+  applyG44InterestToDetailRows,
+  fetchCanonicalRowsFromWorkpaper,
+  resolveG4MainWorkpaperId,
+  saveCanonicalRowsToWorkpaper,
+  type G4CrossApplyResult,
+} from './g4CrossHelpers'
+import {
+  buildG44InterestVarianceDraft,
+  dispatchG4ExceptionDrafts,
+} from './g4ExceptionRouting'
 
 // ═══ 数据模型 ═══
 
@@ -69,7 +85,9 @@ export interface InterestCalcSummary {
 
 // ═══ 常量 ═══
 
-const STORAGE_KEY = 'G4-4-interest-calc'
+const STORAGE_KEY = G4_ITEM_IDS.G4_4_INTEREST
+const IE_COMPAT_STORAGE_KEY = G4_ITEM_IDS.G4_4_ROWS
+const INTEREST_BENCHMARK_KEY = G4_ITEM_IDS.G4_4_BENCHMARK
 const VARIANCE_THRESHOLD = 0.01
 const MAX_GROUPS = 50
 const MAX_PERIODS_PER_GROUP = 36  // 最多36个计息期间(3年月度)
@@ -159,7 +177,7 @@ function computePeriodRow(
   }
 }
 
-/** 对整个 group 进行公式计算 */
+/** 对整个 group 进行公式计算（期间自动倒轧：首期开口=初始入账价值，其后期=上期期末） */
 function computeGroup(group: InterestCalcGroup): InterestCalcGroup {
   const initialCarryingAmount = calcInitialCarryingAmount(
     parseNum(group.initial.purchasePrice),
@@ -171,7 +189,20 @@ function computeGroup(group: InterestCalcGroup): InterestCalcGroup {
     initialCarryingAmount: Math.round(initialCarryingAmount * 100) / 100,
   }
 
-  const computedPeriods = group.periods.map((p) => computePeriodRow(p, computedInitial))
+  const computedPeriods: InterestPeriodRow[] = []
+  let prevClosing = computedInitial.initialCarryingAmount
+  for (let i = 0; i < group.periods.length; i++) {
+    const p = { ...group.periods[i] }
+    // 首期默认用初始入账价值；后续期自动从上期期末倒轧（用户填了非零 opening 则保留）
+    if (i === 0) {
+      if (!parseNum(p.openingBalance)) p.openingBalance = prevClosing
+    } else if (!parseNum(p.openingBalance)) {
+      p.openingBalance = prevClosing
+    }
+    const computed = computePeriodRow(p, computedInitial)
+    computedPeriods.push(computed)
+    prevClosing = computed.closingBalance
+  }
 
   return {
     ...group,
@@ -182,21 +213,29 @@ function computeGroup(group: InterestCalcGroup): InterestCalcGroup {
 
 function normalizeGroup(raw: any): InterestCalcGroup | null {
   if (!raw || typeof raw !== 'object') return null
+  // 兼容扁平 IE 行：initial.* 字段在顶层
+  const initialSrc = raw.initial && typeof raw.initial === 'object' ? raw.initial : raw
+  const hasFlatPeriod = raw.cutoffDate != null || raw.openingBalance != null || raw.effectiveInterest != null
+  const periodsSrc = Array.isArray(raw.periods) && raw.periods.length > 0
+    ? raw.periods
+    : hasFlatPeriod
+      ? [raw]
+      : []
   return {
     id: raw.id || generateId('group'),
     projectName: raw.projectName || '未命名投资项目',
     initial: {
-      faceValueTotal: parseNum(raw.initial?.faceValueTotal),
-      initialDate: raw.initial?.initialDate || '',
-      maturityDate: raw.initial?.maturityDate || '',
-      purchasePrice: parseNum(raw.initial?.purchasePrice),
-      transactionCost: parseNum(raw.initial?.transactionCost),
-      initialCarryingAmount: parseNum(raw.initial?.initialCarryingAmount),
-      couponRate: parseNum(raw.initial?.couponRate),
-      effectiveRate: parseNum(raw.initial?.effectiveRate),
+      faceValueTotal: parseNum(initialSrc.faceValueTotal),
+      initialDate: initialSrc.initialDate || '',
+      maturityDate: initialSrc.maturityDate || '',
+      purchasePrice: parseNum(initialSrc.purchasePrice),
+      transactionCost: parseNum(initialSrc.transactionCost),
+      initialCarryingAmount: parseNum(initialSrc.initialCarryingAmount),
+      couponRate: parseNum(initialSrc.couponRate),
+      effectiveRate: parseNum(initialSrc.effectiveRate),
     },
-    periods: Array.isArray(raw.periods) && raw.periods.length > 0
-      ? raw.periods.map((p: any) => ({
+    periods: periodsSrc.length > 0
+      ? periodsSrc.map((p: any) => ({
           id: p.id || generateId('period'),
           cutoffDate: p.cutoffDate || '',
           openingBalance: parseNum(p.openingBalance),
@@ -213,15 +252,102 @@ function normalizeGroup(raw: any): InterestCalcGroup | null {
   }
 }
 
-function parseStoredGroups(json: string | null | undefined): InterestCalcGroup[] {
-  if (!json) return []
-  try {
-    const parsed = JSON.parse(json)
-    if (!Array.isArray(parsed)) return []
-    return parsed.map(normalizeGroup).filter(Boolean) as InterestCalcGroup[]
-  } catch {
-    return []
+/** 将扁平导入行（百分数利率）归并为嵌套 groups（小数利率） */
+export function flattenInterestGroupsToRows(groups: InterestCalcGroup[]): Record<string, unknown>[] {
+  const rows: Record<string, unknown>[] = []
+  for (const group of groups) {
+    const initial = group.initial || ({} as InitialCarryingData)
+    const periods = group.periods?.length ? group.periods : [createEmptyPeriod()]
+    periods.forEach((period, index) => {
+      rows.push({
+        id: index === 0 ? group.id : `${group.id}-${period.id}`,
+        projectName: group.projectName,
+        faceValueTotal: initial.faceValueTotal,
+        initialDate: initial.initialDate,
+        maturityDate: initial.maturityDate,
+        purchasePrice: initial.purchasePrice,
+        transactionCost: initial.transactionCost,
+        initialCarryingAmount: initial.initialCarryingAmount,
+        couponRate: Math.round(parseNum(initial.couponRate) * 10000) / 100, // 小数→百分数
+        effectiveRate: Math.round(parseNum(initial.effectiveRate) * 10000) / 100,
+        cutoffDate: period.cutoffDate,
+        openingBalance: period.openingBalance,
+        openingImpairment: period.openingImpairment,
+        openingAmortizedCost: period.openingAmortizedCost,
+        effectiveInterest: period.effectiveInterest,
+        cashInflow: period.cashInflow,
+        principalRepaid: period.principalRepaid,
+        closingBalance: period.closingBalance,
+        days: period.days,
+        stage: period.stage,
+      })
+    })
   }
+  return rows
+}
+
+export function nestFlatInterestRows(rows: Record<string, unknown>[]): InterestCalcGroup[] {
+  const byProject = new Map<string, InterestCalcGroup>()
+  for (const raw of rows || []) {
+    const projectName = String(raw.projectName || '').trim() || '未命名投资项目'
+    const key = projectName.replace(/\s+/g, '')
+    let group = byProject.get(key)
+    if (!group) {
+      // 百分数→小数（>1 视为百分数）
+      const toDecimal = (v: unknown) => {
+        const n = parseNum(v)
+        return n > 1 ? n / 100 : n
+      }
+      group = {
+        id: String(raw.id || generateId('group')),
+        projectName,
+        initial: {
+          faceValueTotal: parseNum(raw.faceValueTotal),
+          initialDate: String(raw.initialDate || ''),
+          maturityDate: String(raw.maturityDate || ''),
+          purchasePrice: parseNum(raw.purchasePrice),
+          transactionCost: parseNum(raw.transactionCost),
+          initialCarryingAmount: parseNum(raw.initialCarryingAmount),
+          couponRate: toDecimal(raw.couponRate),
+          effectiveRate: toDecimal(raw.effectiveRate),
+        },
+        periods: [],
+      }
+      byProject.set(key, group)
+    }
+    group.periods.push({
+      id: generateId('period'),
+      cutoffDate: String(raw.cutoffDate || ''),
+      openingBalance: parseNum(raw.openingBalance),
+      openingImpairment: parseNum(raw.openingImpairment),
+      openingAmortizedCost: parseNum(raw.openingAmortizedCost),
+      effectiveInterest: parseNum(raw.effectiveInterest),
+      cashInflow: parseNum(raw.cashInflow),
+      principalRepaid: parseNum(raw.principalRepaid),
+      closingBalance: parseNum(raw.closingBalance),
+      days: parseNum(raw.days) || 365,
+      stage: ['Stage1', 'Stage2', 'Stage3'].includes(String(raw.stage))
+        ? (raw.stage as InterestPeriodRow['stage'])
+        : 'Stage1',
+    })
+  }
+  return Array.from(byProject.values())
+}
+
+function parseStoredGroups(resp: ChecklistResponse | undefined): InterestCalcGroup[] {
+  let parsed = parseCanonicalJson<unknown>(resp)
+  // Some pre-contract data used conclusion for audit text and remark for rows.
+  if (!Array.isArray(parsed) && resp?.remark) {
+    parsed = parseCanonicalJson<unknown>({ remark: resp.remark })
+  }
+  if (!Array.isArray(parsed)) return []
+  const looksFlat = parsed.some(
+    (row: any) => row && typeof row === 'object' && !row.initial && (
+      row.faceValueTotal != null || row.cutoffDate != null || row.openingBalance != null
+    ),
+  )
+  if (looksFlat) return nestFlatInterestRows(parsed as Record<string, unknown>[])
+  return parsed.map(normalizeGroup).filter(Boolean) as InterestCalcGroup[]
 }
 
 // ═══ 接口定义 ═══
@@ -231,6 +357,8 @@ export interface UseG4MainInterestCalcOptions {
   isReadonly?: Ref<boolean> | ComputedRef<boolean>
   /** G4-1 审定表中利息收入审定数（用于差异比对） */
   g4_1InterestAdjusted?: Ref<number> | ComputedRef<number>
+  wpId?: Ref<string>
+  projectId?: Ref<string>
 }
 
 // ═══ Composable 主体 ═══
@@ -238,21 +366,62 @@ export interface UseG4MainInterestCalcOptions {
 export function useG4MainInterestCalc(options: UseG4MainInterestCalcOptions) {
   const { allResponses, isReadonly, g4_1InterestAdjusted } = options
   const readonly = isReadonly ?? ref(false)
-  const interestAdjustedRef = g4_1InterestAdjusted ?? ref(0)
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
   // ─── 响应式数据 ───
   const groups = ref<InterestCalcGroup[]>([])
+  const writebackPreview = ref<G4CrossApplyResult | null>(null)
+
+  /** G4-1 利息审定比对基准：优先外部传入，否则读 checklist / G4-3·6011 净额 */
+  const interestBenchmark = computed(() => {
+    if (g4_1InterestAdjusted) return parseNum(g4_1InterestAdjusted.value)
+    const stored = parseNum(allResponses.value.get(INTEREST_BENCHMARK_KEY)?.remark)
+    if (stored !== 0) return stored
+    // 从 G4-3 汇总 6011（利息收入）账项调整净额作参照（贷方增加收入为正）
+    try {
+      const raw = allResponses.value.get('G4-3-rows')?.remark
+      if (!raw) return 0
+      const entries = JSON.parse(raw) as Array<{
+        accountCode?: string
+        category?: string
+        entryType?: string
+        debitAmount?: number
+        creditAmount?: number
+      }>
+      if (!Array.isArray(entries)) return 0
+      let net = 0
+      for (const e of entries) {
+        if (String(e.accountCode || '') !== '6011') continue
+        if (e.category === '报表调整' || e.entryType === 'RJE') continue
+        // 收入类：贷−借 为审定调增利息收入
+        net += parseNum(e.creditAmount) - parseNum(e.debitAmount)
+      }
+      return net
+    } catch {
+      return 0
+    }
+  })
 
   // ─── 从存储加载 ───
   function loadGroups(): void {
-    const stored = parseStoredGroups(allResponses.value.get(STORAGE_KEY)?.remark)
+    const stored = parseStoredGroups(
+      allResponses.value.get(STORAGE_KEY) ?? allResponses.value.get(IE_COMPAT_STORAGE_KEY),
+    )
     groups.value = stored.length > 0 ? stored : []
   }
 
   watch(
-    () => allResponses.value.get(STORAGE_KEY)?.remark,
-    () => { if (groups.value.length === 0) loadGroups() },
+    () => {
+      const primary = allResponses.value.get(STORAGE_KEY)
+      const compat = allResponses.value.get(IE_COMPAT_STORAGE_KEY)
+      return [primary?.conclusion, primary?.remark, compat?.conclusion, compat?.remark].join('|')
+    },
+    (fingerprint, previous) => {
+      // 初次或外部导入/结转导致存储指纹变化时重载；避免空表永久不刷新
+      if (groups.value.length === 0 || (previous != null && fingerprint !== previous)) {
+        loadGroups()
+      }
+    },
     { immediate: true },
   )
 
@@ -269,10 +438,10 @@ export function useG4MainInterestCalc(options: UseG4MainInterestCalcOptions) {
     ),
   )
 
-  /** 与 G4-1 审定利息收入比对 */
+  /** 与 G4-1 / 基准利息收入比对 */
   const summary: ComputedRef<InterestCalcSummary> = computed(() => {
     const total = totalEffectiveInterest.value
-    const adjusted = parseNum(interestAdjustedRef.value)
+    const adjusted = interestBenchmark.value
     const variance = Math.round((total - adjusted) * 100) / 100
     return {
       totalEffectiveInterest: Math.round(total * 100) / 100,
@@ -281,6 +450,20 @@ export function useG4MainInterestCalc(options: UseG4MainInterestCalcOptions) {
       isVarianceAcceptable: Math.abs(variance) <= VARIANCE_THRESHOLD,
     }
   })
+
+  function setInterestBenchmark(amount: number): void {
+    if (readonly.value) return
+    allResponses.value.set(INTEREST_BENCHMARK_KEY, {
+      item_id: INTEREST_BENCHMARK_KEY,
+      conclusion: null,
+      remark: String(amount),
+    })
+    window.dispatchEvent(
+      new CustomEvent('g4:save-items', {
+        detail: { items: [allResponses.value.get(INTEREST_BENCHMARK_KEY)] },
+      }),
+    )
+  }
 
   // ─── 差异高亮判断 ───
 
@@ -343,11 +526,13 @@ export function useG4MainInterestCalc(options: UseG4MainInterestCalcOptions) {
   // ─── 持久化 ───
 
   function persist(): void {
-    allResponses.value.set(STORAGE_KEY, {
-      item_id: STORAGE_KEY,
-      conclusion: null,
-      remark: JSON.stringify(groups.value),
-    })
+    const primary = buildCanonicalPayload(STORAGE_KEY, groups.value)
+    const ieCompat = buildCanonicalPayload(
+      IE_COMPAT_STORAGE_KEY,
+      flattenInterestGroupsToRows(computedGroups.value),
+    )
+    allResponses.value.set(STORAGE_KEY, primary)
+    allResponses.value.set(IE_COMPAT_STORAGE_KEY, ieCompat)
     debounceSave()
   }
 
@@ -360,9 +545,12 @@ export function useG4MainInterestCalc(options: UseG4MainInterestCalcOptions) {
   }
 
   function flushSave(): void {
-    const item = allResponses.value.get(STORAGE_KEY)
-    if (item) {
-      window.dispatchEvent(new CustomEvent('g4:save-items', { detail: { items: [item] } }))
+    const items = [
+      allResponses.value.get(STORAGE_KEY),
+      allResponses.value.get(IE_COMPAT_STORAGE_KEY),
+    ].filter((item): item is ChecklistResponse => Boolean(item))
+    if (items.length) {
+      window.dispatchEvent(new CustomEvent('g4:save-items', { detail: { items } }))
     }
   }
 
@@ -546,6 +734,86 @@ export function useG4MainInterestCalc(options: UseG4MainInterestCalcOptions) {
     persist()
   }
 
+  async function previewWriteback(): Promise<G4CrossApplyResult | null> {
+    const targetWpId = await resolveG4MainWorkpaperId(
+      options.projectId?.value || '',
+      options.wpId?.value,
+    )
+    if (!targetWpId) {
+      ElMessage.error('未找到 G4 主底稿')
+      return null
+    }
+    try {
+      const existing = await fetchCanonicalRowsFromWorkpaper(targetWpId, G4_ITEM_IDS.G4_2_ROWS)
+      writebackPreview.value = applyG44InterestToDetailRows(existing, computedGroups.value)
+      return writebackPreview.value
+    } catch {
+      ElMessage.error('读取 G4-2 明细失败')
+      return null
+    }
+  }
+
+  async function confirmInterestWriteback(): Promise<void> {
+    if (readonly.value) return
+    const preview = await previewWriteback()
+    if (!preview) return
+    const componentLines = computedGroups.value.map((group) => {
+      const actualInterest = group.periods.reduce((s, p) => s + parseNum(p.effectiveInterest), 0)
+      const coupon = group.periods.reduce((s, p) => s + parseNum(p.cashInflow), 0)
+      const amortization = Math.round((actualInterest - coupon) * 100) / 100
+      return `${group.projectName || group.id || '未命名'}: 实际利息 ${actualInterest.toFixed(2)} / 票息 ${coupon.toFixed(2)} / 利息调整(摊销) ${amortization.toFixed(2)}`
+    })
+    const adjustmentTotal = preview.rows.reduce(
+      (sum, row: any) => sum + parseNum(row.periodInterestAdjChange),
+      0,
+    )
+    const hasVarianceDraft = Math.abs(summary.value.variance) >= VARIANCE_THRESHOLD
+    const breakdown = componentLines.length
+      ? `\n\n分项预览：\n${componentLines.slice(0, 8).join('\n')}${componentLines.length > 8 ? `\n…另有 ${componentLines.length - 8} 项` : ''}`
+      : ''
+    try {
+      await ElMessageBox.confirm(
+        `将实际利息－票息净额回写至 G4-2 的“本期利息调整变动”：匹配 ${preview.matched.length} 条，未匹配 ${preview.unmatched.length} 条，回写合计 ${adjustmentTotal.toFixed(2)}。${
+          hasVarianceDraft ? `另将审计差额 ${summary.value.variance.toFixed(2)} 作为 G4-3 例外草稿。` : ''
+        }不会将利息测算总额直接写入 G4-3。${breakdown}`,
+        'G4-4 回写预览',
+        { confirmButtonText: '确认回写', cancelButtonText: '取消', type: 'warning', customClass: 'g4-interest-writeback-preview' },
+      )
+    } catch {
+      return
+    }
+    const targetWpId = await resolveG4MainWorkpaperId(
+      options.projectId?.value || '',
+      options.wpId?.value,
+    )
+    if (!targetWpId) return
+    try {
+      await saveCanonicalRowsToWorkpaper(
+        targetWpId,
+        options.projectId?.value || '',
+        G4_ITEM_IDS.G4_2_ROWS,
+        preview.rows,
+      )
+      // 同步当前 Main 内存，避免同实例切回 G4-2 时用旧行覆盖写回结果
+      const detailPayload = buildCanonicalPayload(G4_ITEM_IDS.G4_2_ROWS, preview.rows)
+      allResponses.value.set(G4_ITEM_IDS.G4_2_ROWS, detailPayload)
+      try {
+        window.dispatchEvent(new CustomEvent('g4:save-items', {
+          detail: { items: [detailPayload] },
+        }))
+      } catch { /* silent */ }
+      const drafts = buildG44InterestVarianceDraft(summary.value.variance, {
+        description: 'G4-4 实际利率测算与审定利息收入差异',
+      })
+      dispatchG4ExceptionDrafts(drafts, allResponses.value)
+      ElMessage.success(`已回写 ${preview.matched.length} 条 G4-2 利息调整${
+        drafts.length ? '，并生成 G4-3 差异草稿' : ''
+      }`)
+    } catch {
+      ElMessage.error('G4-4 回写失败')
+    }
+  }
+
   // ─── 生命周期清理 ───
   onBeforeUnmount(() => {
     if (debounceTimer) {
@@ -576,10 +844,16 @@ export function useG4MainInterestCalc(options: UseG4MainInterestCalcOptions) {
     // 单元格编辑
     updateInitialField,
     updatePeriodField,
+    setInterestBenchmark,
     // 批量设置
     setGroups,
+    loadGroups,
+    writebackPreview,
+    previewWriteback,
+    confirmInterestWriteback,
     // 常量
     STORAGE_KEY,
+    INTEREST_BENCHMARK_KEY,
     VARIANCE_THRESHOLD,
   }
 }

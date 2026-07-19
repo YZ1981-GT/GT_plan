@@ -187,9 +187,15 @@ async function reloadAll() {
   await formData.loadAll()
 }
 
-const availableSheets = computed(() =>
-  props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets ?? [],
-)
+const availableSheets = computed(() => {
+  const fromHtml = props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets
+  if (Array.isArray(fromHtml) && fromHtml.length) return fromHtml
+  const metaSheets = formData.renderMeta.value?.sheets
+  if (Array.isArray(metaSheets) && metaSheets.length) return metaSheets
+  // 对齐 G1：无 sheets 元数据时用自加载 render-config 的 sheetCache 兜底，
+  // 保证底稿目录架构树非空
+  return Object.keys(formData.sheetCache.value).map(sheet_name => ({ sheet_name }))
+})
 
 // 复核对话 provider 由 Runtime Boundary(GtWpRenderer) 统一提供 openReviewDialog
 const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)

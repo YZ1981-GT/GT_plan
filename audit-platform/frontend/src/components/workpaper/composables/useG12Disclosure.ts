@@ -175,7 +175,7 @@ export function useG12Disclosure(opts: {
         { existingContent: noteText.value, relatedContext: { rows: rows.value, total: totalRow.value.currentAmount } },
         { _silent: true } as any,
       )
-      const content = res?.data?.content ?? res?.content ?? ''
+      const content = res?.data?.data?.content ?? res?.data?.content ?? res?.content ?? ''
       if (content) { noteText.value = content; persist() }
     } catch {
       const draft = `本期净敞口套期收益合计 ${totalRow.value.currentAmount.toLocaleString()} 元，详见套期关系明细及公允价值测试。`

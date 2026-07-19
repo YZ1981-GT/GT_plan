@@ -4,7 +4,7 @@
  * 验证 'g3-dividend-receivable' componentType 在三个注册表中正确注册：
  * 1. htmlRendererRegistry（前端组件映射）
  * 2. VALID_COMPONENT_TYPES（后端 wp_classification_service.py）
- * 3. wp_code_overrides（G3A/G3-1~G3-5/G3-note-listed/G3-note-soe 共8个映射）
+ * 3. wp_code_overrides（G3A/G3/G3-1~G3-5/note/附注/目录 共12个映射）
  *
  * **Validates: Requirements 1.3, 1.4, 1.5**
  */
@@ -97,10 +97,11 @@ describe('G3 应收股利 — 注册契约测试', () => {
       expect(overrides['G3-note-soe']).toBe('g3-dividend-receivable')
     })
 
-    it('g3-dividend-receivable 共有8个wp_code映射', () => {
+    it('g3-dividend-receivable 共有12个wp_code映射', () => {
       const expectedCodes = [
-        'G3A', 'G3-1', 'G3-2', 'G3-3', 'G3-4',
-        'G3-5', 'G3-note-listed', 'G3-note-soe',
+        'G3A', 'G3', 'G3-1', 'G3-2', 'G3-3', 'G3-4', 'G3-5',
+        'G3-note-listed', 'G3-note-soe',
+        'G3-附注披露信息（上市公司）', 'G3-附注披露信息（国企）', 'G3-底稿目录',
       ]
       for (const code of expectedCodes) {
         expect(overrides[code]).toBe('g3-dividend-receivable')
@@ -108,7 +109,7 @@ describe('G3 应收股利 — 注册契约测试', () => {
       const actualCount = Object.entries(overrides)
         .filter(([, v]) => v === 'g3-dividend-receivable')
         .length
-      expect(actualCount).toBe(8)
+      expect(actualCount).toBe(12)
     })
   })
 })

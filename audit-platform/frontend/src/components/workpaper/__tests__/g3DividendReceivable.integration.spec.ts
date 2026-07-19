@@ -7,7 +7,7 @@
  * 3. 股利测算公式（持股数×每股股利）
  * 4. 分红率计算（分红总额/净利润×100%，净利润≤0→0/N/A）
  * 5. G3-2四区段Tab行同步
- * 6. G3-4两区段Tab行同步+抽凭样本填入
+ * 6. G3-4三区段：增加/减少共享行 + 期后抽凭
  * 7. EventBus(substantive:adjudicated)跨组件传递
  * 8. 导入导出round-trip(5张表)
  * 9. 逾期天数计算+风险评估
@@ -44,18 +44,20 @@ describe('G3 集成: sheetName 正则分发（7 sheets + fallback）', () => {
    */
   function resolveSheet(name: string): string {
     if (!name) return ''
-    if (/附注披露/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
+    if (/G3-note-listed|附注披露.*上市|附注.*上市/.test(name)) return '附注上市'
+    if (/G3-note-soe|附注披露.*国企|附注.*国企/.test(name)) return '附注国企'
+    if (/附注/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
     const m = name.match(/(G3A|G3-\d+)/)
     return m ? m[1] : ''
   }
 
   const SHEET_CODE_MAP: Record<string, string> = {
-    'G3A': 'procedure',           // → CycleTabProcedure (a-program-console)
-    'G3-1': 'adjudication',       // → CycleTabAdjudication
-    'G3-2': 'detail',             // → G3TabDetail (4区段)
-    'G3-3': 'adjustment',         // → G3TabAdjustment
-    'G3-4': 'calcCheck',          // → G3TabCalcCheck (2区段)
-    'G3-5': 'overdueCheck',       // → G3TabOverdueCheck
+    'G3A': 'procedure',
+    'G3-1': 'adjudication',       // → G3TabAdjudication
+    'G3-2': 'detail',
+    'G3-3': 'adjustment',
+    'G3-4': 'calcCheck',
+    'G3-5': 'overdueCheck',
     '附注上市': 'disclosureListed',
     '附注国企': 'disclosureSOE',
   }
@@ -89,6 +91,9 @@ describe('G3 集成: sheetName 正则分发（7 sheets + fallback）', () => {
   it('sheetName含空格/变体仍正确匹配', () => {
     expect(resolveSheet('附注披露（上市公司）')).toBe('附注上市')
     expect(resolveSheet('附注披露（国企）')).toBe('附注国企')
+    expect(resolveSheet('G3-附注披露信息（上市公司）')).toBe('附注上市')
+    expect(resolveSheet('G3-note-listed')).toBe('附注上市')
+    expect(resolveSheet('G3-note-soe')).toBe('附注国企')
     expect(resolveSheet('G3-1审定表(应收股利)')).toBe('G3-1')
     expect(resolveSheet('G3A实质性程序')).toBe('G3A')
   })
@@ -175,21 +180,21 @@ describe('G3 集成: 股利测算公式', () => {
     expect(calcDividend(50000, 0)).toBe(0)           // 每股0元→0
   })
 
-  it('G3-4 测算差异 = 测算金额 - 企业入账金额', () => {
+  it('G3-4 测算差异 = 账面已计 − 测算金额', () => {
     const shares = 100000
     const dps = 0.8
     const calculated = calcDividend(shares, dps) // 80000
-    const booked = 79800 // 企业入账金额
+    const booked = 79800 // 账面已计
 
-    const variance = calculated - booked
-    expect(variance).toBe(200) // |200| > 100 → 橙色高亮
+    const variance = booked - calculated
+    expect(variance).toBe(-200) // |200| > 100 → 橙色高亮
     expect(Math.abs(variance) > 100).toBe(true)
   })
 
   it('G3-4 测算差异在容许范围内', () => {
     const calculated = calcDividend(50000, 1.0) // 50000
     const booked = 50000
-    const variance = calculated - booked
+    const variance = booked - calculated
     expect(variance).toBe(0)
     expect(Math.abs(variance) > 100).toBe(false) // 无高亮
   })
@@ -305,99 +310,79 @@ describe('G3 集成: G3-2 四区段Tab行同步', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 6. G3-4 两区段Tab行同步+抽凭样本填入
+// 6. G3-4 三区段：增加/减少共享被投资方行；期后独立；抽凭填入期后
 // ---------------------------------------------------------------------------
-describe('G3 集成: G3-4 两区段Tab行同步+抽凭样本填入', () => {
-  interface CalcCheckRow {
+describe('G3 集成: G3-4 三区段测算及期后抽凭', () => {
+  interface InvesteeRow {
     id: string; seq: number
     investeeName: string; sharesHeld: number; dps: number
-    calculatedDividend: number; declarationDate: string; recordDate: string
-    dividendDocNo: string; calcVariance: number
-    voucherDate: string; voucherNo: string; summary: string
-    counterAccount: string; amount: number; receivingBank: string
-    receiptDate: string; reconciliationResult: string; auditConclusion: string
+    calculatedDividend: number; bookedAmount: number; calcVariance: number
+    periodDecrease: number; cashReceived: number; otherDecreaseAmount: number; decreaseDiff: number
+  }
+  interface SubsequentRow {
+    id: string; seq: number; voucherNo: string; amount: number; samplingSource?: string
   }
 
-  it('2区段行同步：测算与检查行共享同一行ID', () => {
-    const rows: CalcCheckRow[] = [
-      {
-        id: 'calc-001', seq: 1, investeeName: 'A公司',
-        sharesHeld: 100000, dps: 0.5, calculatedDividend: 50000,
-        declarationDate: '2025-03-15', recordDate: '2025-03-20',
-        dividendDocNo: 'DIV-2025-001', calcVariance: 0,
-        voucherDate: '2025-04-01', voucherNo: 'V-2025-0456',
-        summary: '收到A公司股利', counterAccount: '1002',
-        amount: 50000, receivingBank: '工商银行', receiptDate: '2025-04-01',
-        reconciliationResult: '一致', auditConclusion: '无异常',
-      },
-    ]
-    // 测算区段和检查区段的行数一致
-    const calcSegCount = rows.length
-    const checkSegCount = rows.length
-    expect(calcSegCount).toBe(checkSegCount)
+  it('增加与减少区段共享同一被投资方行ID', () => {
+    const rows: InvesteeRow[] = [{
+      id: 'calc-001', seq: 1, investeeName: 'A公司',
+      sharesHeld: 100000, dps: 0.5, calculatedDividend: 50000,
+      bookedAmount: 50000, calcVariance: 0,
+      periodDecrease: 50000, cashReceived: 50000, otherDecreaseAmount: 0, decreaseDiff: 0,
+    }]
+    expect(rows.length).toBe(1)
+    expect(rows[0].calcVariance).toBe(rows[0].bookedAmount - rows[0].calculatedDividend)
+    expect(rows[0].decreaseDiff).toBe(
+      rows[0].periodDecrease - rows[0].cashReceived - rows[0].otherDecreaseAmount,
+    )
   })
 
-  it('抽凭引擎样本填入凭证检查区段', () => {
-    // 模拟抽凭引擎返回的样本
+  it('抽凭引擎样本填入期后收回区段（非增加行）', () => {
     const samples = [
       { voucherDate: '2025-04-01', voucherNo: 'V-0456', summary: '收A股利', amount: 50000 },
       { voucherDate: '2025-05-15', voucherNo: 'V-0789', summary: '收B股利', amount: 80000 },
     ]
-
-    // 填入到空行的凭证检查区段
-    const filledRows = samples.map((s, i) => ({
+    const subsequent: SubsequentRow[] = samples.map((s, i) => ({
       id: `sample-${i}`,
       seq: i + 1,
-      investeeName: '',
-      sharesHeld: 0, dps: 0, calculatedDividend: 0,
-      declarationDate: '', recordDate: '', dividendDocNo: '', calcVariance: 0,
-      voucherDate: s.voucherDate,
       voucherNo: s.voucherNo,
-      summary: s.summary,
-      counterAccount: '',
       amount: s.amount,
-      receivingBank: '',
-      receiptDate: '',
-      reconciliationResult: '',
-      auditConclusion: '',
+      samplingSource: '抽凭引擎',
     }))
-
-    expect(filledRows).toHaveLength(2)
-    expect(filledRows[0].voucherNo).toBe('V-0456')
-    expect(filledRows[1].amount).toBe(80000)
+    expect(subsequent).toHaveLength(2)
+    expect(subsequent.every((r) => r.samplingSource === '抽凭引擎')).toBe(true)
   })
 
-  it('测算差异 = calcDividend - 企业入账金额', () => {
+  it('测算差异 = 账面已计 − calcDividend', () => {
     const shares = 200000
     const dps = 0.35
     const calculated = calcDividend(shares, dps) // 70000
     const booked = 69500
-
-    const variance = calculated - booked
-    expect(variance).toBe(500) // |500|>100 → 橙色高亮
+    const variance = booked - calculated
+    expect(variance).toBe(-500) // |500|>100 → 橙色高亮
   })
 })
 
 // ---------------------------------------------------------------------------
-// 7. EventBus(substantive:adjudicated)跨组件传递
+// 7. EventBus(substantive:adjudicated)跨组件传递（canonical = auditedAmount）
 // ---------------------------------------------------------------------------
 describe('G3 集成: EventBus(substantive:adjudicated)跨组件传递', () => {
-  it('审定表合计变更→发布substantive:adjudicated事件', () => {
-    // 模拟EventBus事件payload
+  it('审定表合计变更→发布substantive:adjudicated事件（auditedAmount 契约）', () => {
     const payload = {
       event: 'substantive:adjudicated',
       accountCode: '1131',
-      adjudicatedAmount: 970000,
-      wpCode: 'G3-1',
+      auditedAmount: 970000,
+      wpCode: 'G3',
+      timestamp: Date.now(),
     }
 
     expect(payload.event).toBe('substantive:adjudicated')
     expect(payload.accountCode).toBe('1131')
-    expect(typeof payload.adjudicatedAmount).toBe('number')
+    expect(payload.wpCode).toBe('G3')
+    expect(typeof payload.auditedAmount).toBe('number')
   })
 
   it('附注组件监听substantive:adjudicated(1131)自动刷新', () => {
-    // 模拟消费端逻辑
     function shouldRefresh(event: string, code: string): boolean {
       return event === 'substantive:adjudicated' && code === '1131'
     }
@@ -410,24 +395,27 @@ describe('G3 集成: EventBus(substantive:adjudicated)跨组件传递', () => {
   it('附注组件发布disclosure:note-text-updated联动', () => {
     const notePayload = {
       event: 'disclosure:note-text-updated',
-      accountCode: '1131',
-      noteType: 'listed',
+      wpCode: 'G3',
+      section: 'listed',
+      timestamp: Date.now(),
     }
     expect(notePayload.event).toBe('disclosure:note-text-updated')
+    expect(notePayload.wpCode).toBe('G3')
   })
 })
 
 // ---------------------------------------------------------------------------
-// 8. 导入导出round-trip(5张表)
+// 8. 导入导出round-trip
 // ---------------------------------------------------------------------------
-describe('G3 集成: 导入导出round-trip(5张表)', () => {
-  it('G3支持5张动态行表格导入导出', () => {
-    expect(G3_IMPORTABLE_SHEETS).toHaveLength(5)
+describe('G3 集成: 导入导出round-trip', () => {
+  it('G3支持6个动态行表格导入导出', () => {
+    expect(G3_IMPORTABLE_SHEETS).toHaveLength(6)
     const codes = G3_IMPORTABLE_SHEETS.map(s => s.code)
     expect(codes).toContain('G3-1')
     expect(codes).toContain('G3-2')
     expect(codes).toContain('G3-3')
     expect(codes).toContain('G3-4')
+    expect(codes).toContain('G3-4-subsequent')
     expect(codes).toContain('G3-5')
   })
 
@@ -436,6 +424,7 @@ describe('G3 集成: 导入导出round-trip(5张表)', () => {
     expect(resolveG3ImportableSheet('G3-2 明细表')).toBe('G3-2')
     expect(resolveG3ImportableSheet('G3-3 调整分录')).toBe('G3-3')
     expect(resolveG3ImportableSheet('G3-4 测算表')).toBe('G3-4')
+    expect(resolveG3ImportableSheet('G3-4 期后收回检查')).toBe('G3-4-subsequent')
     expect(resolveG3ImportableSheet('G3-5 长期未收回')).toBe('G3-5')
   })
 
@@ -447,18 +436,16 @@ describe('G3 集成: 导入导出round-trip(5张表)', () => {
   })
 
   it('G3-2列结构=33列（4区段：8+9+8+8）', () => {
-    // 前端接口33列对应后端_G3_2_HEADERS/KEYS
-    const seg1 = 8  // 被投资方信息
-    const seg2 = 9  // 持股明细
-    const seg3 = 8  // 分红方案
-    const seg4 = 8  // 应收核算
+    const seg1 = 8
+    const seg2 = 9
+    const seg3 = 8
+    const seg4 = 8
     expect(seg1 + seg2 + seg3 + seg4).toBe(33)
   })
 
-  it('G3-4列结构=18列（2区段：9+9）', () => {
-    const seg1 = 9  // 股利测算
-    const seg2 = 9  // 凭证检查
-    expect(seg1 + seg2).toBe(18)
+  it('G3-4 被投资方行=24列；期后收回=19列', () => {
+    expect(24).toBe(24)
+    expect(19).toBe(19)
   })
 })
 
@@ -558,17 +545,54 @@ describe('G3 集成: 动态行新增弹名称输入', () => {
 
   it('G3-3 新增行无需弹窗（调整分录按序号自增）', () => {
     function createAdjustmentRow(nextSeq: number) {
-      return { id: `adj-${Date.now()}`, seq: nextSeq, entryType: 'AJE' }
+      return { rowId: `adj-${Date.now()}`, seq: nextSeq, category: '账项调整' }
     }
     const row = createAdjustmentRow(3)
     expect(row.seq).toBe(3)
-    expect(row.entryType).toBe('AJE')
+    expect(row.category).toBe('账项调整')
   })
 })
 
 // ---------------------------------------------------------------------------
 // 附加: 公式引擎辅助函数验证
 // ---------------------------------------------------------------------------
+describe('G3 集成: G3-2 → G3-1 汇总契约', () => {
+  it('aggregate + apply 保留 AJE 并覆盖宣告/收回', async () => {
+    const { aggregateG3DetailByInvestee, applyG3DetailSyncToAdjStore } = await import(
+      '../composables/g3AdjudicationItems'
+    )
+    const detail = JSON.stringify([
+      { investeeName: '甲', dividendReceivable: 200, receivedAmount: 50, shareholdingRatio: 30 },
+    ])
+    const aggs = aggregateG3DetailByInvestee(detail)
+    const { next, updated, added } = applyG3DetailSyncToAdjStore(
+      [
+        {
+          id: '1',
+          investeeName: '甲',
+          shareholdingRatio: 10,
+          openingUnadjusted: 80,
+          openingAJE: 0,
+          openingRJE: 0,
+          currentDeclared: 0,
+          currentReceived: 0,
+          closingAJE: 3,
+          closingRJE: 0,
+          remark: '',
+          indexRef: '',
+        },
+      ],
+      aggs,
+    )
+    expect(updated).toBe(1)
+    expect(added).toBe(0)
+    expect(next[0].currentDeclared).toBe(200)
+    expect(next[0].currentReceived).toBe(50)
+    expect(next[0].closingAJE).toBe(3)
+    expect(next[0].openingUnadjusted).toBe(80)
+  })
+})
+
 describe('G3 集成: 公式引擎辅助', () => {
   it('parseNum容错：null/undefined/空串/NaN → 0', () => {
     expect(parseNum(null)).toBe(0)

@@ -9,8 +9,9 @@
  *   POST /api/workpapers/{wpId}/g4-ecl/export-data?sheet={code}
  *   POST /api/workpapers/{wpId}/g4-ecl/import-data?sheet={code}  (multipart/form-data)
  *
- * sheet codes: G4-9 / G4-10 / G4-12 / G4-13
+ * sheet codes: G4-9 / G4-10 / G4-11 / G4-12 / G4-13
  * G4-10 按2区段分sheet导出（未审数+审计调整 / 审定数+差异）
+ * G4-11 按多区块分sheet导出（方法评价/组合/PD-LGD/损失率/参数）
  * G4-12 按2个Tab分sheet导出（转回检查 / 核销检查）
  * G4-13 按3区段分sheet导出（记账凭证 / 支持性文件+核对 / 结论+备注）
  *
@@ -24,8 +25,8 @@ import http from '@/utils/http'
 
 // ═══ 类型定义 ═══
 
-/** G4(ECL组) 支持导入导出的 sheet 编码（4张动态行表格） */
-export type G4EclImportableSheet = 'G4-9' | 'G4-10' | 'G4-12' | 'G4-13'
+/** G4(ECL组) 支持导入导出的 sheet 编码 */
+export type G4EclImportableSheet = 'G4-9' | 'G4-10' | 'G4-11' | 'G4-12' | 'G4-13'
 
 /** 导入结果 */
 export interface G4EclImportResult {
@@ -64,10 +65,16 @@ export interface G4EclDropdownOption {
 
 export const G4_ECL_API_PREFIX = 'g4-ecl'
 
-/** 4张可导入导出 sheet 的中文标签 */
+/** 可导入导出 sheet 的中文标签 */
 export const G4_ECL_IMPORT_EXPORT_SHEETS: G4EclSheetMeta[] = [
   { code: 'G4-9', label: 'G4-9 三阶段划分' },
   { code: 'G4-10', label: 'G4-10 减值测算（2区段）', multiSheet: true, multiSheetDesc: '未审数+审计调整 / 审定数+差异' },
+  {
+    code: 'G4-11',
+    label: 'G4-11 ECL计量测试',
+    multiSheet: true,
+    multiSheetDesc: '方法评价 / 组合 / PD-LGD / 损失率 / 参数',
+  },
   { code: 'G4-12', label: 'G4-12 转回核销（2Tab）', multiSheet: true, multiSheetDesc: '转回检查 / 核销检查' },
   { code: 'G4-13', label: 'G4-13 凭证检查（3区段）', multiSheet: true, multiSheetDesc: '记账凭证 / 支持性文件+核对 / 结论+备注' },
 ]

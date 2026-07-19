@@ -30,22 +30,23 @@
     <div class="section-head">
       <h3 class="sheet-title">G6-15 凭证检查表</h3>
       <div class="head-actions">
-        <el-button size="small" type="primary" link :disabled="isReadonly"
-          @click="handleAiConclusion">
+        <el-button
+          size="small"
+          type="primary"
+          link
+          :disabled="isReadonly || !aiAvailable"
+          :loading="aiLoading"
+          @click="handleAiConclusion"
+        >
           🤖 AI生成结论
         </el-button>
         <el-button size="small" @click="openReviewDialog('G6-15-voucher-check')">💬复核</el-button>
-        <!-- 导入导出 dropdown -->
-        <el-dropdown size="small" trigger="click" @command="handleImportExportCmd">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="export-template">导出模板（3区段）</el-dropdown-item>
-              <el-dropdown-item command="export-data">导出数据（3区段）</el-dropdown-item>
-              <el-dropdown-item command="import-data">导入数据</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        <G6EclImportExportDropdown
+          :wp-id="wpId"
+          sheet="G6-15"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
       </div>
     </div>
 
@@ -324,8 +325,14 @@
     <el-card class="conclusion-card" shadow="never">
       <div class="conclusion-header">
         <span class="conclusion-title">审计结论</span>
-        <el-button size="small" type="primary" link :disabled="isReadonly"
-          @click="handleAiConclusion">
+        <el-button
+          size="small"
+          type="primary"
+          link
+          :disabled="isReadonly || !aiAvailable"
+          :loading="aiLoading"
+          @click="handleAiConclusion"
+        >
           🤖 AI生成
         </el-button>
       </div>
@@ -337,10 +344,6 @@
         :disabled="isReadonly"
       />
     </el-card>
-
-    <!-- 隐藏的导入文件 input -->
-    <input ref="importFileRef" type="file" accept=".xlsx,.xls" style="display: none"
-      @change="handleImportFile" />
 
     <!-- 编制提示 -->
     <details class="prep-hint">
@@ -378,7 +381,8 @@ import { ref, computed, inject, onMounted } from 'vue'
 import { Delete, Paperclip } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useG6EclVoucherCheck } from '@/composables/useG6EclVoucherCheck'
-import { useG6EclImportExport } from '../../composables/useG6EclImportExport'
+import { useG6EclAiGenerate } from '../../composables/useG6EclAiGenerate'
+import G6EclImportExportDropdown from '../G6EclImportExportDropdown.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import { useG6EclFormData, type VoucherCheckRow } from '../../composables/useG6EclFormData'
@@ -390,10 +394,13 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
+const emit = defineEmits<{ imported: [] }>()
+
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG6EclAiGenerate(wpIdRef)
 
 const vc = useG6EclVoucherCheck(
   wpIdRef,
@@ -402,7 +409,6 @@ const vc = useG6EclVoucherCheck(
 )
 const conclusion = ref('')
 const showSampling = ref(false)
-const importFileRef = ref<HTMLInputElement | null>(null)
 
 // ─── 审计说明（持久化 checklist_responses, conclusion:null） ───
 const noteFormData = useG6EclFormData({ wpId: wpIdRef, projectId: projectIdRef })
@@ -414,35 +420,6 @@ function saveAuditNote(val: string): void {
   noteFormData.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
 }
 
-// ─── 导入导出 ────────────────────────────────────────────────────────────────
-
-const importExport = useG6EclImportExport({
-  wpId: wpIdRef,
-  onImported: () => {
-    // 导入后重新加载数据
-    if (props.htmlData?.voucherCheck) {
-      vc.loadRows(props.htmlData.voucherCheck.rows || [])
-    }
-  },
-})
-
-function handleImportExportCmd(cmd: string) {
-  if (cmd === 'export-template') {
-    importExport.exportTemplate('G6-15')
-  } else if (cmd === 'export-data') {
-    importExport.exportData('G6-15')
-  } else if (cmd === 'import-data') {
-    importFileRef.value?.click()
-  }
-}
-
-async function handleImportFile(e: Event) {
-  const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-  await importExport.importData('G6-15', file)
-  input.value = '' // reset for re-upload
-}
 
 // ─── 当前年份（从htmlData或默认） ────────────────────────────────────────────
 
@@ -518,8 +495,18 @@ function handleSamplingFilled(payload: { samples: Array<{
 
 // ─── AI生成审计结论 ─────────────────────────────────────────────────────────
 
-function handleAiConclusion() {
-  ElMessage.info('AI生成凭证检查结论功能将在AI模块完成后启用')
+async function handleAiConclusion(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'voucher-conclusion',
+    conclusion.value || '',
+    {
+      rowCount: vc.rows?.value?.length ?? 0,
+      isBalanced: vc.isBalanced?.value,
+    },
+    'AI 审计结论',
+  )
+  if (text) conclusion.value = text
 }
 
 // ─── 数字格式化 ─────────────────────────────────────────────────────────────

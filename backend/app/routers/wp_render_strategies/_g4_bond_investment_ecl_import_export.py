@@ -1,13 +1,14 @@
 """G4 债权投资(ECL组) — 导入导出端点
 
-支持 4 张动态行表格：
+支持动态行表格：
   G4-9 三阶段划分 / G4-10 减值准备测算表(2区段Tab) /
+  G4-11 预期信用损失计量测试(多区块) /
   G4-12 转回核销检查表(2Tab) / G4-13 凭证检查表(3区段Tab)
 
-字段键与前端 composable（useG4EclStageClassification / useG4EclImpairmentCalc /
-useG4EclReversalWriteOff / useG4EclVoucherCheck 的行接口）严格对齐，保证 round-trip。
+字段键与前端 composable 严格对齐，保证 round-trip。
 
 G4-10 按2区段分sheet导出（未审数+审计调整 / 审定数+差异）。
+G4-11 按多区块分sheet导出（方法评价/组合/PD-LGD/损失率/参数）。
 G4-12 按2Tab分sheet导出（转回检查 / 核销检查）。
 G4-13 按3区段分sheet导出（记账凭证 / 支持性文件+核对 / 结论+备注）。
 """
@@ -34,11 +35,13 @@ from ._cycle_import_export_common import (
     build_workbook_template,
     export_row_by_keys,
     is_numeric_field_key,
+    load_json_payload,
     load_json_rows,
     parse_row_by_headers,
     parse_upload_xlsx,
     safe_float,
     safe_str,
+    upsert_json_payload,
     upsert_json_rows,
     workbook_to_response,
 )
@@ -67,16 +70,18 @@ _G4_9_KEYS = [
 # G4-10 减值准备测算表（19列 → 2区段Tab多sheet导出）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# 区段1: 未审数+审计调整(11列)
+# 区段1: 未审数+审计调整
 _G4_10_SEG1_HEADERS = [
     "投资项目", "所属Stage", "账面余额①", "预计未来现金流量现值",
     "预期信用损失率②", "减值准备③", "账面价值④",
-    "账面余额调整⑤", "调整后信用损失率②A", "减值准备调整⑥", "差异说明",
+    "账面余额调整⑤", "调整后信用损失率②A", "审定现金流量现值",
+    "减值准备调整⑥", "差异说明",
 ]
 _G4_10_SEG1_KEYS = [
     "investProject", "stageGroup", "bookBalance", "pvFutureCashFlow",
     "creditLossRate", "impairmentProvision", "bookValue",
-    "balanceAdjustment", "adjustedCreditLossRate", "impairmentAdjustment", "differenceNote",
+    "balanceAdjustment", "adjustedCreditLossRate", "adjustedPvFutureCashFlow",
+    "impairmentAdjustment", "differenceNote",
 ]
 
 # 区段2: 审定数+差异(8列)
@@ -93,14 +98,16 @@ _G4_10_SEG2_KEYS = [
 _G4_10_ALL_HEADERS = [
     "投资项目", "所属Stage", "账面余额①", "预计未来现金流量现值",
     "预期信用损失率②", "减值准备③", "账面价值④",
-    "账面余额调整⑤", "调整后信用损失率②A", "减值准备调整⑥",
+    "账面余额调整⑤", "调整后信用损失率②A", "审定现金流量现值",
+    "减值准备调整⑥",
     "审定账面余额⑦", "审定减值准备⑧", "审定账面价值⑨",
     "上年减值准备", "本年计提", "本年转回", "差异说明",
 ]
 _G4_10_ALL_KEYS = [
     "investProject", "stageGroup", "bookBalance", "pvFutureCashFlow",
     "creditLossRate", "impairmentProvision", "bookValue",
-    "balanceAdjustment", "adjustedCreditLossRate", "impairmentAdjustment",
+    "balanceAdjustment", "adjustedCreditLossRate", "adjustedPvFutureCashFlow",
+    "impairmentAdjustment",
     "adjBookBalance", "adjImpairment", "adjBookValue",
     "priorImpairment", "currentProvision", "currentReversal", "differenceNote",
 ]
@@ -110,14 +117,17 @@ _G4_10_SEGMENTS = [
     ("审定数+差异", _G4_10_SEG2_HEADERS, _G4_10_SEG2_KEYS),
 ]
 
+# 新增列：旧模板可缺，按表头名映射时跳过即可
+_G4_10_OPTIONAL_HEADERS = frozenset({"审定现金流量现值"})
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # G4-12 转回核销检查表（20列 → 2 Tab多sheet导出）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Tab1: 转回检查(10列)
 _G4_12_TAB1_HEADERS = [
-    "序号", "单位名称", "转回原因", "收回方式", "原确定坏账准备依据",
-    "收回或转回金额", "收回前累计计提", "合理性分析", "是否合理", "索引",
+    "序号", "单位名称", "转回原因", "收回方式", "原确定坏账准备的依据",
+    "收回或转回金额", "收回或转回前累计已计提", "合理性分析", "是否合理", "索引号",
 ]
 _G4_12_TAB1_KEYS = [
     "seq", "unitName", "reversalReason", "recoveryMethod", "originalBasis",
@@ -126,8 +136,8 @@ _G4_12_TAB1_KEYS = [
 
 # Tab2: 核销检查(10列)
 _G4_12_TAB2_HEADERS = [
-    "序号", "单位名称", "核销性质", "核销金额", "核销原因",
-    "核销程序", "是否关联交易(是/否)", "合理性分析", "是否合理", "索引",
+    "序号", "单位名称", "债权投资的性质", "核销金额", "核销原因",
+    "履行的核销程序", "是否由关联交易产生(是/否)", "合理性分析", "是否合理", "索引号",
 ]
 _G4_12_TAB2_KEYS = [
     "seq", "unitName", "writeOffType", "writeOffAmount", "writeOffReason",
@@ -213,18 +223,42 @@ _ITEM_IDS = {
     "G4-13": "G4-13-rows",
 }
 
+_G4_11_ITEM_ID = "G4-11-ecl-measurement"
+
 # G4-12 分别存储转回和核销
 _G4_12_ITEM_IDS = {
     "reversals": "G4-12-reversals",
     "writeOffs": "G4-12-writeoffs",
 }
 
-_SUPPORTED_SHEETS = set(_ITEM_IDS.keys())
+_SUPPORTED_SHEETS = set(_ITEM_IDS.keys()) | {"G4-11"}
+
+
+async def _load_g4_12_export_rows(
+    db: AsyncSession,
+    wp_id: str,
+    kind: str,
+) -> list[dict]:
+    """优先读聚合 G4-12-rows，再回落 split 键；conclusion 优先，兼容 remark。"""
+    aggregate_key = "reversals" if kind == "reversals" else "writeOffs"
+    for field in ("conclusion", "remark"):
+        payload = await load_json_payload(db, wp_id, _ITEM_IDS["G4-12"], field=field)
+        if isinstance(payload, dict):
+            rows = payload.get(aggregate_key)
+            if isinstance(rows, list) and rows:
+                return rows
+    for field in ("conclusion", "remark"):
+        rows = await load_json_rows(db, wp_id, _G4_12_ITEM_IDS[kind], field=field)
+        if rows:
+            return rows
+    return []
+
 
 # G4-10 数值字段
 _G4_10_NUMERIC_KEYS = {
     "bookBalance", "pvFutureCashFlow", "creditLossRate", "impairmentProvision",
-    "bookValue", "balanceAdjustment", "adjustedCreditLossRate", "impairmentAdjustment",
+    "bookValue", "balanceAdjustment", "adjustedCreditLossRate", "adjustedPvFutureCashFlow",
+    "impairmentAdjustment",
     "adjBookBalance", "adjImpairment", "adjBookValue",
     "priorImpairment", "currentProvision", "currentReversal",
 }
@@ -250,6 +284,48 @@ _G4_13_BOOL_KEYS = {
 def _validate_sheet(sheet: str) -> None:
     if sheet not in _SUPPORTED_SHEETS:
         raise HTTPException(400, f"不支持的sheet: {sheet}。支持: {sorted(_SUPPORTED_SHEETS)}")
+
+
+async def _load_canonical_rows(
+    db: AsyncSession,
+    wp_id: str,
+    item_id: str,
+) -> list[dict]:
+    rows = await load_json_rows(db, wp_id, item_id, field="conclusion")
+    if rows:
+        return rows
+    return await load_json_rows(db, wp_id, item_id, field="remark")
+
+
+async def _load_canonical_payload(
+    db: AsyncSession,
+    wp_id: str,
+    item_id: str,
+) -> Any:
+    payload = await load_json_payload(db, wp_id, item_id, field="conclusion")
+    if payload is not None:
+        return payload
+    return await load_json_payload(db, wp_id, item_id, field="remark")
+
+
+async def _upsert_dual_rows(
+    db: AsyncSession,
+    wp_id: str,
+    item_id: str,
+    rows: list[dict],
+) -> None:
+    await upsert_json_rows(db, wp_id, item_id, rows, field="conclusion")
+    await upsert_json_rows(db, wp_id, item_id, rows, field="remark")
+
+
+async def _upsert_dual_payload(
+    db: AsyncSession,
+    wp_id: str,
+    item_id: str,
+    payload: Any,
+) -> None:
+    await upsert_json_payload(db, wp_id, item_id, payload, field="conclusion")
+    await upsert_json_payload(db, wp_id, item_id, payload, field="remark")
 
 
 def _parse_bool(val: Any) -> bool:
@@ -341,11 +417,15 @@ def _build_g4_10_multi_sheet_workbook(rows: list[dict], *, template_only: bool =
     ws_guide.append(["G4-10 减值准备测算表 编制说明"])
     ws_guide.append([])
     guidance_lines = [
-        "19列拆为2区段Tab：未审数+审计调整(11列) / 审定数+差异(8列)。",
-        "公式列（③=①×②, ④=①-③, ⑥=⑤×②A+①×(②A-②), ⑦=①+⑤, ⑧=③+⑥, ⑨=⑦-⑧）导入后前端自动重算。",
+        "拆为2区段Tab：未审数+审计调整 / 审定数+差异。",
+        "跨表链路：G4-9 三阶段 → G4-11 损失率测试 → G4-10 减值测算；可与试算/G4-1 减值小计勾稽。",
+        "Stage1/2 损失率法：③=①×②；目标审定减值=(①+⑤)×②A；⑥=目标−③；⑦=①+⑤；⑧=③+⑥；⑨=⑦−⑧。",
+        "Stage3 现值法：③=max(0,①−未审PV)；目标审定减值=max(0,⑦−审定PV)；⑥=目标−③。",
+        "当企业账面③恰好=①×②时，损失率路径⑥等价于旧展开式 ⑤×②A+①×(②A−②)。",
         "所属Stage填：Stage1 / Stage2 / Stage3。",
-        "信用损失率②和调整后信用损失率②A填小数（如 0.05 表示 5%）。",
-        "减值准备调整⑥可为负数（当审计师调低信用损失率时）。",
+        "信用损失率②和调整后信用损失率②A填小数（如 0.05 表示 5%）；②A未填时前端回落为②。",
+        "审定现金流量现值为可选列（旧模板可缺）；未填时前端回落为未审PV。",
+        "减值准备调整⑥可为负数；导入后前端按 Stage 自动重算公式列。",
     ]
     for line in guidance_lines:
         ws_guide.append([line])
@@ -377,18 +457,37 @@ def _parse_g4_10_import(content: bytes) -> tuple[list[dict], list[dict]]:
                 str(c.value).strip() if c.value else ""
                 for c in next(ws.iter_rows(min_row=header_row_idx, max_row=header_row_idx))
             ]
-            missing = [h for h in seg_headers if h not in actual_headers]
-            if missing:
-                errors.append({"row_number": 0, "field": seg_name, "reason": f"缺少列: {', '.join(missing)}"})
+            missing_required = [
+                h for h in seg_headers
+                if h not in actual_headers and h not in _G4_10_OPTIONAL_HEADERS
+            ]
+            missing_optional = [
+                h for h in seg_headers
+                if h not in actual_headers and h in _G4_10_OPTIONAL_HEADERS
+            ]
+            if missing_required:
+                errors.append({
+                    "row_number": 0,
+                    "field": seg_name,
+                    "reason": f"缺少列: {', '.join(missing_required)}",
+                })
                 continue
+            if missing_optional:
+                errors.append({
+                    "row_number": 0,
+                    "field": seg_name,
+                    "reason": f"可选列缺失（已兼容跳过）: {', '.join(missing_optional)}",
+                })
+            header_to_key = dict(zip(seg_headers, seg_keys))
             for row_idx, row in enumerate(ws.iter_rows(min_row=header_row_idx + 1, values_only=True)):
                 if all(v is None for v in row):
                     continue
                 if row_idx not in rows_dict:
                     rows_dict[row_idx] = {"id": str(uuid4())}
-                values = list(row) + [None] * max(0, len(seg_headers) - len(row))
-                for col_i, key in enumerate(seg_keys):
-                    if key == "id":
+                values = list(row) + [None] * max(0, len(actual_headers) - len(row))
+                for col_i, h in enumerate(actual_headers):
+                    key = header_to_key.get(h)
+                    if not key or key == "id":
                         continue
                     raw = values[col_i] if col_i < len(values) else None
                     if key in _G4_10_NUMERIC_KEYS:
@@ -494,7 +593,8 @@ def _build_g4_12_multi_sheet_workbook(
     guidance_lines = [
         "20列拆为2Tab：转回检查(10列) / 核销检查(10列)。",
         "Tab1 转回检查：收回或转回金额不得超过收回前累计计提（前端自动校验红色高亮）。",
-        "Tab2 核销检查：核销性质填 到期/逾期/其他；是否关联交易填 是/否。",
+        "Tab2 核销检查：「债权投资的性质」填标的类型；是否由关联交易产生填 是/否；关联交易须填合理性分析。",
+        "转回金额不得超过累计已计提金额；可交叉索引 G4-10 / G4-13。",
         "是否合理填：合理 / 不合理。",
     ]
     for line in guidance_lines:
@@ -564,7 +664,7 @@ def _parse_g4_12_import(content: bytes) -> tuple[list[dict], list[dict], list[di
                 reversals.append(_parse_row_with_types(
                     row, _G4_12_TAB1_HEADERS, _G4_12_TAB1_KEYS, _G4_12_NUMERIC_KEYS,
                 ))
-        elif "核销金额" in actual_headers or "核销性质" in actual_headers:
+        elif "核销金额" in actual_headers or "核销性质" in actual_headers or "债权投资的性质" in actual_headers:
             for row in ws.iter_rows(min_row=header_row_idx + 1, values_only=True):
                 if all(v is None for v in row):
                     continue
@@ -722,6 +822,210 @@ def _parse_g4_13_import(content: bytes) -> tuple[list[dict], list[dict]]:
     return result, errors
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# G4-11 预期信用损失计量测试（payload JSON → 多 worksheet）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_G4_11_METHOD_HEADERS = ["检查项目", "检查内容", "企业采用方法", "审计评价", "说明"]
+_G4_11_METHOD_KEYS = ["checkItem", "checkContent", "companyMethod", "auditEvaluation", "note"]
+
+_G4_11_GROUP_HEADERS = ["组合名称", "划分依据", "信用风险特征", "样本量", "审计评价", "说明"]
+_G4_11_GROUP_KEYS = ["groupName", "basis", "riskCharacteristic", "sampleSize", "auditEvaluation", "note"]
+
+_G4_11_PDLGD_HEADERS = [
+    "投资项目/组合", "账面余额", "剩余月数", "阶段", "评级",
+    "外部映射PD", "期限折算PD", "LGD", "ECL率", "预期信用损失",
+    "上期历史损失率", "说明",
+]
+_G4_11_PDLGD_KEYS = [
+    "projectName", "bookBalance", "remainingMonths", "stage", "rating",
+    "externalMappedPd", "termAdjustedPd", "lgd", "eclRate", "eclAmount",
+    "priorHistoricalLossRate", "note",
+]
+
+_G4_11_LOSS_HEADERS = [
+    "投资项目/组合", "账面余额", "剩余月数", "阶段", "评级",
+    "损失率", "说明", "前瞻性调整", "ECL率", "预期信用损失",
+    "上期历史损失率", "备注",
+]
+_G4_11_LOSS_KEYS = [
+    "projectName", "bookBalance", "remainingMonths", "stage", "rating",
+    "lossRate", "description", "forwardLookingAdj", "eclRate", "eclAmount",
+    "priorHistoricalLossRate", "note",
+]
+
+_G4_11_PARAM_HEADERS = ["参数名称", "数据来源", "计算方法", "审计验证结果", "审计评价", "说明"]
+_G4_11_PARAM_KEYS = [
+    "paramName", "dataSource", "calcMethod", "verificationResult", "auditEvaluation", "note",
+]
+
+_G4_11_SEGMENTS = [
+    ("方法评价", _G4_11_METHOD_HEADERS, _G4_11_METHOD_KEYS, "methodEvaluation"),
+    ("组合划分", _G4_11_GROUP_HEADERS, _G4_11_GROUP_KEYS, "groupBasis"),
+    ("PD-LGD测算", _G4_11_PDLGD_HEADERS, _G4_11_PDLGD_KEYS, "pdLgdRows"),
+    ("损失率法", _G4_11_LOSS_HEADERS, _G4_11_LOSS_KEYS, "lossRateRows"),
+    ("参数评价", _G4_11_PARAM_HEADERS, _G4_11_PARAM_KEYS, "parameterEvaluation"),
+]
+
+_G4_11_NUMERIC_KEYS = {
+    "sampleSize", "bookBalance", "remainingMonths",
+    "externalMappedPd", "termAdjustedPd", "lgd", "eclRate", "eclAmount",
+    "priorHistoricalLossRate", "lossRate", "forwardLookingAdj",
+}
+
+
+def _empty_g4_11_payload() -> dict[str, Any]:
+    return {
+        "methodEvaluation": [],
+        "groupBasis": [],
+        "parameterEvaluation": [],
+        "pdLgdRows": [],
+        "lossRateRows": [],
+        "conclusion": "",
+    }
+
+
+def _normalize_g4_11_payload(raw: Any) -> dict[str, Any]:
+    base = _empty_g4_11_payload()
+    if not isinstance(raw, dict):
+        return base
+    for key in (
+        "methodEvaluation",
+        "groupBasis",
+        "parameterEvaluation",
+        "pdLgdRows",
+        "lossRateRows",
+    ):
+        val = raw.get(key)
+        base[key] = val if isinstance(val, list) else []
+    conclusion = raw.get("conclusion")
+    base["conclusion"] = safe_str(conclusion) if conclusion is not None else ""
+    return base
+
+
+def _build_g4_11_multi_sheet_workbook(payload: dict[str, Any], *, template_only: bool = False) -> Workbook:
+    wb = Workbook()
+    wb.remove(wb.active)
+    data = _normalize_g4_11_payload(payload)
+
+    for seg_name, headers, keys, payload_key in _G4_11_SEGMENTS:
+        ws = wb.create_sheet(title=seg_name)
+        ws.append([f"G4-11 预期信用损失计量测试 — {seg_name}"])
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=max(len(headers), 1))
+        ws["A1"].font = Font(bold=True, size=12)
+        ws.append(headers)
+        ws.freeze_panes = "A3"
+        for col_idx in range(1, len(headers) + 1):
+            ws.column_dimensions[get_column_letter(col_idx)].width = 16
+        if not template_only:
+            for row_data in data.get(payload_key) or []:
+                if isinstance(row_data, dict):
+                    ws.append(export_row_by_keys(row_data, keys))
+
+    ws_conc = wb.create_sheet(title="审计结论")
+    ws_conc.append(["G4-11 审计结论"])
+    ws_conc["A1"].font = Font(bold=True, size=12)
+    ws_conc.append(["结论"])
+    if not template_only:
+        ws_conc.append([data.get("conclusion") or ""])
+    else:
+        ws_conc.append([""])
+    ws_conc.column_dimensions["A"].width = 80
+
+    ws_guide = wb.create_sheet("编制说明")
+    ws_guide.append(["G4-11 预期信用损失计量测试 编制说明"])
+    ws_guide.append([])
+    for line in (
+        "本表含：方法评价 / 组合划分 / PD-LGD测算 / 损失率法 / 参数评价 / 审计结论。",
+        "比率一律按小数录入（1%=0.01）。",
+        "PD/LGD：ECL率≈期限折算PD×LGD；损失率法：ECL率≈损失率+前瞻性调整。",
+        "测算结果可回写 G4-10「②信用损失率」；Stage3 通常走现值法，回写时默认跳过。",
+        "评级→外部映射PD可参考前端「参考映射表」，实际项目须替换当期违约率数据版本。",
+    ):
+        ws_guide.append([line])
+    ws_guide.column_dimensions["A"].width = 90
+    return wb
+
+
+def _parse_g4_11_sheet_rows(
+    ws: Any,
+    headers: list[str],
+    keys: list[str],
+) -> tuple[list[dict], list[dict]]:
+    """从单个 worksheet 解析行（标题行1 + 表头行2）。"""
+    errors: list[dict] = []
+    rows: list[dict] = []
+    header_row = None
+    for idx, row in enumerate(ws.iter_rows(values_only=True), start=1):
+        values = list(row)
+        if idx == 1:
+            continue
+        if idx == 2:
+            header_row = [safe_str(v) for v in values[: len(headers)]]
+            continue
+        if not any(v is not None and str(v).strip() != "" for v in values):
+            continue
+        if len(rows) >= ROW_LIMIT:
+            errors.append({
+                "row_number": idx,
+                "field": "",
+                "reason": f"数据行超过{ROW_LIMIT}行限制，已截断",
+            })
+            break
+        # 按标准 headers 位置解析；若表头不完全匹配仍按列序
+        parsed = _parse_row_with_types(
+            tuple(values),
+            headers,
+            keys,
+            _G4_11_NUMERIC_KEYS,
+        )
+        # 保留导入文件中的 id（若有额外列则忽略）
+        if not parsed.get("id"):
+            parsed["id"] = str(uuid4())
+        rows.append(parsed)
+    if header_row and header_row[:3] != headers[:3]:
+        # 软提示，不阻断
+        errors.append({
+            "row_number": 2,
+            "field": "",
+            "reason": f"表头与模板不完全一致（期望以 {headers[:3]} 开头），已按列序解析",
+        })
+    return rows, errors
+
+
+def _parse_g4_11_import(content: bytes) -> tuple[dict[str, Any], list[dict], int]:
+    """解析 G4-11 多sheet 导入。返回 (payload, errors, imported_count)。"""
+    wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    payload = _empty_g4_11_payload()
+    errors: list[dict] = []
+    total = 0
+
+    name_to_seg = {seg[0]: seg for seg in _G4_11_SEGMENTS}
+    for ws_name in wb.sheetnames:
+        if ws_name in ("编制说明",):
+            continue
+        if ws_name == "审计结论":
+            ws = wb[ws_name]
+            # 第3行 A 列为结论正文
+            for idx, row in enumerate(ws.iter_rows(values_only=True), start=1):
+                if idx == 3:
+                    payload["conclusion"] = safe_str(row[0] if row else "")
+                    if payload["conclusion"]:
+                        total += 1
+                    break
+            continue
+        seg = name_to_seg.get(ws_name)
+        if not seg:
+            continue
+        _, headers, keys, payload_key = seg
+        rows, sheet_errors = _parse_g4_11_sheet_rows(wb[ws_name], headers, keys)
+        errors.extend(sheet_errors)
+        payload[payload_key] = rows
+        total += len(rows)
+
+    wb.close()
+    return payload, errors, total
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 端点
@@ -754,6 +1058,9 @@ async def g4_ecl_export_template(
     elif sheet == "G4-10":
         wb = _build_g4_10_multi_sheet_workbook([], template_only=True)
         return workbook_to_response(wb, "G4-10_减值准备测算表_模板.xlsx")
+    elif sheet == "G4-11":
+        wb = _build_g4_11_multi_sheet_workbook(_empty_g4_11_payload(), template_only=True)
+        return workbook_to_response(wb, "G4-11_预期信用损失计量测试_模板.xlsx")
     elif sheet == "G4-12":
         wb = _build_g4_12_multi_sheet_workbook([], [], template_only=True)
         return workbook_to_response(wb, "G4-12_转回核销检查表_模板.xlsx")
@@ -773,7 +1080,7 @@ async def g4_ecl_export_data(
 
     if sheet == "G4-9":
         item_id = _ITEM_IDS["G4-9"]
-        rows = await load_json_rows(db, wp_id, item_id, field="conclusion")
+        rows = await _load_canonical_rows(db, wp_id, item_id)
         wb = build_workbook_template(
             "G4-9",
             _G4_9_HEADERS,
@@ -787,19 +1094,24 @@ async def g4_ecl_export_data(
 
     elif sheet == "G4-10":
         item_id = _ITEM_IDS["G4-10"]
-        rows = await load_json_rows(db, wp_id, item_id, field="conclusion")
+        rows = await _load_canonical_rows(db, wp_id, item_id)
         wb = _build_g4_10_multi_sheet_workbook(rows, template_only=False)
         return workbook_to_response(wb, "G4-10_减值准备测算表_数据.xlsx")
 
+    elif sheet == "G4-11":
+        raw = await _load_canonical_payload(db, wp_id, _G4_11_ITEM_ID)
+        wb = _build_g4_11_multi_sheet_workbook(_normalize_g4_11_payload(raw), template_only=False)
+        return workbook_to_response(wb, "G4-11_预期信用损失计量测试_数据.xlsx")
+
     elif sheet == "G4-12":
-        reversals = await load_json_rows(db, wp_id, _G4_12_ITEM_IDS["reversals"], field="conclusion")
-        writeoffs = await load_json_rows(db, wp_id, _G4_12_ITEM_IDS["writeOffs"], field="conclusion")
+        reversals = await _load_g4_12_export_rows(db, wp_id, "reversals")
+        writeoffs = await _load_g4_12_export_rows(db, wp_id, "writeOffs")
         wb = _build_g4_12_multi_sheet_workbook(reversals, writeoffs, template_only=False)
         return workbook_to_response(wb, "G4-12_转回核销检查表_数据.xlsx")
 
     else:  # G4-13
         item_id = _ITEM_IDS["G4-13"]
-        rows = await load_json_rows(db, wp_id, item_id, field="conclusion")
+        rows = await _load_canonical_rows(db, wp_id, item_id)
         wb = _build_g4_13_multi_sheet_workbook(rows, template_only=False)
         return workbook_to_response(wb, "G4-13_凭证检查表_数据.xlsx")
 
@@ -846,7 +1158,7 @@ async def g4_ecl_import_data(
         if errors and not rows:
             return {"ok": False, "errors": errors, "imported_count": 0}
         item_id = _ITEM_IDS["G4-9"]
-        await upsert_json_rows(db, wp_id, item_id, rows, field="conclusion")
+        await _upsert_dual_rows(db, wp_id, item_id, rows)
         return {"ok": True, "imported_count": len(rows), "errors": errors}
 
     elif sheet == "G4-10":
@@ -854,20 +1166,44 @@ async def g4_ecl_import_data(
         if errors and not rows:
             return {"ok": False, "errors": errors, "imported_count": 0}
         item_id = _ITEM_IDS["G4-10"]
-        await upsert_json_rows(db, wp_id, item_id, rows, field="conclusion")
+        await _upsert_dual_rows(db, wp_id, item_id, rows)
         out: dict[str, Any] = {"ok": True, "imported_count": len(rows), "errors": errors}
         if len(rows) >= ROW_LIMIT:
             out["warning"] = f"数据行数超过{ROW_LIMIT}行限制，已截断"
         return out
 
+    elif sheet == "G4-11":
+        payload, errors, imported_count = _parse_g4_11_import(content)
+        if errors and imported_count == 0:
+            return {"ok": False, "errors": errors, "imported_count": 0}
+        await _upsert_dual_payload(db, wp_id, _G4_11_ITEM_ID, payload)
+        return {"ok": True, "imported_count": imported_count, "errors": errors}
+
     elif sheet == "G4-12":
         reversals, writeoffs, errors = _parse_g4_12_import(content)
         if errors and not reversals and not writeoffs:
             return {"ok": False, "errors": errors, "imported_count": 0}
+        # UI 优先读聚合键 G4-12-rows；同时双写 split 键以兼容旧 IE
+        await upsert_json_payload(
+            db,
+            wp_id,
+            _ITEM_IDS["G4-12"],
+            {"reversals": reversals, "writeOffs": writeoffs},
+            field="conclusion",
+        )
+        await upsert_json_payload(
+            db,
+            wp_id,
+            _ITEM_IDS["G4-12"],
+            {"reversals": reversals, "writeOffs": writeoffs},
+            field="remark",
+        )
         if reversals:
             await upsert_json_rows(db, wp_id, _G4_12_ITEM_IDS["reversals"], reversals, field="conclusion")
+            await upsert_json_rows(db, wp_id, _G4_12_ITEM_IDS["reversals"], reversals, field="remark")
         if writeoffs:
             await upsert_json_rows(db, wp_id, _G4_12_ITEM_IDS["writeOffs"], writeoffs, field="conclusion")
+            await upsert_json_rows(db, wp_id, _G4_12_ITEM_IDS["writeOffs"], writeoffs, field="remark")
         total = len(reversals) + len(writeoffs)
         return {"ok": True, "imported_count": total, "errors": errors}
 
@@ -876,7 +1212,7 @@ async def g4_ecl_import_data(
         if errors and not rows:
             return {"ok": False, "errors": errors, "imported_count": 0}
         item_id = _ITEM_IDS["G4-13"]
-        await upsert_json_rows(db, wp_id, item_id, rows, field="conclusion")
+        await _upsert_dual_rows(db, wp_id, item_id, rows)
         out = {"ok": True, "imported_count": len(rows), "errors": errors}
         if len(rows) >= ROW_LIMIT:
             out["warning"] = f"数据行数超过{ROW_LIMIT}行限制，已截断"

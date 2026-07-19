@@ -1,5 +1,9 @@
 <template>
   <div class="i5-tab-index">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：提供I5其他非流动资产底稿导航目录，追踪各sheet编制进度。" />
+
     <!-- 顶部蓝色渐变引导区 -->
     <div class="guide-area">
       <div class="guide-grid">
@@ -223,6 +227,9 @@ function handleNavigate(row: SheetEntry) {
 
 <style scoped>
 .i5-tab-index { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+/* 审计目标 */
+.objective-alert { margin-bottom: 14px; }
 
 /* 蓝色渐变引导区 */
 .guide-area {

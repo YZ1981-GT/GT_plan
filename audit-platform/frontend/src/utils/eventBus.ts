@@ -348,6 +348,14 @@ export type Events = {
     timestamp: number
   }
 
+  /** G3-3 确认回写 → G3-1 账项调整汇总 */
+  'g3:adjustment-confirmed': {
+    accountCode: string
+    netAJE: number
+    netRJE: number
+    rowCount: number
+  }
+
   // 附注文本更新（Disclosure → Adjudication 双向同步）
   'disclosure:note-text-updated': {
     wpCode: string
@@ -367,6 +375,12 @@ export type Events = {
   'adjustment:created': {
     wpCode: string
     timestamp: number
+    [key: string]: any
+  } | void
+  'a13:push-misstatement': {
+    wpCode?: string
+    timestamp?: number
+    items?: unknown[]
     [key: string]: any
   } | void
   'adjustment:updated': void

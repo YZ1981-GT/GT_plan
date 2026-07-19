@@ -2,8 +2,14 @@ import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import type { ChecklistResponse } from './useF1FormData'
+import { G1_ACCOUNT_CODE } from './g1AdjudicationItems'
+import { useWorkpaperAuditYear } from './workpaperAuditYear'
 
-export function useG1TraFinFormData(opts: { wpId: Ref<string>; projectId: Ref<string>; onAfterSave?: () => void }) {
+export function useG1TraFinFormData(opts: {
+  wpId: Ref<string>
+  projectId: Ref<string>
+  onAfterSave?: () => void
+}) {
   const isLoading = ref(false)
   const sheetCache = ref<Record<string, any>>({})
   const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
@@ -54,7 +60,7 @@ export function useG1TraFinFormData(opts: { wpId: Ref<string>; projectId: Ref<st
 
   async function saveImmediate(itemId: string, data: Partial<ChecklistResponse>) {
     const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
-    const updated = { ...existing, ...data }
+    const updated = { ...existing, ...data, item_id: itemId }
     allResponses.value.set(itemId, updated)
     await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
       project_id: opts.projectId.value,
@@ -65,7 +71,7 @@ export function useG1TraFinFormData(opts: { wpId: Ref<string>; projectId: Ref<st
 
   function debouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
     const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
-    const updated = { ...existing, ...data }
+    const updated = { ...existing, ...data, item_id: itemId }
     allResponses.value.set(itemId, updated)
     const prev = _debounceTimers.get(itemId)
     if (prev) clearTimeout(prev)
@@ -82,9 +88,53 @@ export function useG1TraFinFormData(opts: { wpId: Ref<string>; projectId: Ref<st
     return sheetCache.value[name] ?? { rows: [] }
   }
 
+  /** 将 G1-1 审定账面余额回写试算平衡表 1501 */
+  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
+    if (!opts.projectId.value) return
+    try {
+      await api.put(`/api/projects/${opts.projectId.value}/trial-balance/writeback`, {
+        account_code: G1_ACCOUNT_CODE,
+        audited_amount: auditedAmount,
+      })
+      await saveImmediate('G1-1-tb-writeback', {
+        item_id: 'G1-1-tb-writeback',
+        conclusion: null,
+        remark: JSON.stringify({ accountCode: G1_ACCOUNT_CODE, auditedAmount }),
+      })
+      await saveImmediate('G1-1-adjudicated-amount', {
+        item_id: 'G1-1-adjudicated-amount',
+        conclusion: String(auditedAmount),
+        remark: null,
+      })
+    } catch {
+      ElMessage.warning('审定数回写试算失败，请手动确认试算表 1501')
+    }
+  }
+
+  /** 切表/卸载前刷出未到点的 debounce，避免 <2s 编辑丢失 */
+  function flushPending(): void {
+    for (const [itemId, timer] of _debounceTimers.entries()) {
+      clearTimeout(timer)
+      const resp = allResponses.value.get(itemId)
+      if (resp) void saveImmediate(itemId, resp)
+    }
+    _debounceTimers.clear()
+  }
+
   onScopeDispose(() => {
-    for (const t of _debounceTimers.values()) clearTimeout(t)
+    flushPending()
   })
 
-  return { isLoading, sheetCache, allResponses, loadAll, getSheet, saveImmediate, debouncedSave }
+  return {
+    isLoading,
+    sheetCache,
+    allResponses,
+    loadAll,
+    getSheet,
+    saveImmediate,
+    debouncedSave,
+    flushPending,
+    writebackTrialBalance,
+    writebackTB: writebackTrialBalance,
+  }
 }

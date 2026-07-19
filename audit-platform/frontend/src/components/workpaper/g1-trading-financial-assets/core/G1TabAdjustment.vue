@@ -1,8 +1,53 @@
 <template>
-  <div class="g1-adjustment">
-    <div class="section-head">
-      <h3 class="sheet-title">G1-3 交易性金融资产调整分录</h3>
-      <div class="head-actions">
+  <div class="g1-adjustment" data-testid="g1-adjustment">
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 本表对齐 Excel「调整分录汇总 G1-3」：记录与交易性金融资产（1501）相关的审计调整。</p>
+        <p>2. 「账项调整」影响科目余额（AJE）；「报表调整」为重分类（RJE），仅影响列报。</p>
+        <p>3. 借贷合计必须平衡；确认后同步至调整分录模块，并可回写 G1-1 审定表。</p>
+        <p>4. 可从「调整分录」模块拉取涉及 1501/6101 等相关科目的分录；亦可推送选中行至 A13 错报汇总。</p>
+        <p>5. 调整分录较多、较复杂的项目建议使用本表；项目组可按实际情况选用。</p>
+      </div>
+    </details>
+
+    <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：核实交易性金融资产相关账项/报表调整的完整与借贷平衡，确认与调整分录模块、G1-1 审定表勾稽一致。"
+    />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-tooltip placement="top" :show-after="300">
+          <template #content>
+            本表与调整分录模块双向联动。<br />
+            此处确认的分录会发布至调整分录模块（科目 1501）；<br />
+            亦可从模块拉取已有相关分录。
+          </template>
+          <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">
+            + 新增调整分录
+          </el-button>
+        </el-tooltip>
+        <el-button
+          size="small"
+          :loading="syncing"
+          :disabled="isReadonly || !projectId"
+          @click="onSyncFromModule"
+        >
+          从调整分录模块同步
+        </el-button>
+        <el-button
+          size="small"
+          :disabled="isReadonly || selectedRows.length === 0"
+          @click="onPushA13"
+        >
+          推送至 A13
+        </el-button>
+        <span v-if="lastSyncMsg" class="sync-msg">{{ lastSyncMsg }}</span>
+      </div>
+      <div class="toolbar-right">
         <G1ImportExportDropdown
           v-if="wpId"
           :wp-id="wpId"
@@ -10,97 +55,169 @@
           :disabled="isReadonly"
           @imported="emit('imported')"
         />
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">新增分录</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-1" /></span>
-        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+        <el-button
+          size="small"
+          type="success"
+          :disabled="isReadonly || !isBalanced || rows.length === 0"
+          @click="onConfirm"
+        >
+          确认调整
+        </el-button>
         <el-button size="small" @click="openReviewDialog('G1-3-conclusion')">💬复核</el-button>
       </div>
     </div>
 
-    <!-- 审计目标 -->
-    <el-alert
-      type="info"
-      :closable="false"
-      title="审计目标：核实交易性金融资产（科目1501）审计调整分录（AJE）与重分类分录（RJE）的完整、准确与借贷平衡，确认调整依据充分、账务处理恰当。"
-      class="objective-alert"
-    />
+    <div class="balance-indicator">
+      <span>借方合计：<strong>{{ fmt(debitTotal) }}</strong></span>
+      <span>贷方合计：<strong>{{ fmt(creditTotal) }}</strong></span>
+      <el-tag v-if="isBalanced" type="success" size="small">借贷平衡</el-tag>
+      <el-tag v-else type="danger" size="small">不平衡 差异 {{ fmt(balanceDiff) }}</el-tag>
+      <el-tag v-if="netAjeToG1 !== 0" type="info" size="small">
+        1501 净调整 {{ fmt(netAjeToG1) }}
+      </el-tag>
+    </div>
 
-    <el-table :data="rows" border size="small" max-height="500">
-      <el-table-column prop="seq" label="序号" width="60">
-        <template #default="{ $index }">{{ $index + 1 }}</template>
-      </el-table-column>
-      <el-table-column label="分录类型" width="100">
+    <el-table
+      :data="rows"
+      border
+      size="small"
+      style="width: 100%"
+      max-height="520"
+      empty-text="暂无调整分录。点击「新增调整分录」或「从调整分录模块同步」。"
+      @selection-change="onSelectionChange"
+    >
+      <el-table-column type="selection" width="40" />
+      <el-table-column label="调整事项说明" min-width="180">
         <template #default="{ row }">
-          <el-select v-model="row.entryType" size="small" :disabled="isReadonly"
-            @change="updateRow(row.id, { entryType: row.entryType })">
-            <el-option value="AJE" label="AJE" />
-            <el-option value="RJE" label="RJE" />
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.description"
+            size="small"
+            placeholder="调整事项说明"
+            @change="(v: string) => updateCell(row.rowId, 'description', v)"
+          />
+          <span v-else>{{ row.description || '—' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="类别" width="110">
+        <template #default="{ row }">
+          <el-select
+            v-if="!isReadonly"
+            :model-value="row.category"
+            size="small"
+            @change="(v: string) => updateCell(row.rowId, 'category', v)"
+          >
+            <el-option v-for="opt in categoryOptions" :key="opt" :label="opt" :value="opt" />
           </el-select>
+          <span v-else>{{ row.category }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="日期" width="140">
+      <el-table-column label="报表项目" width="120">
         <template #default="{ row }">
-          <el-input v-model="row.date" size="small" placeholder="YYYY-MM-DD" :disabled="isReadonly"
-            @change="updateRow(row.id, { date: row.date })" />
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.reportItem"
+            size="small"
+            @change="(v: string) => updateCell(row.rowId, 'reportItem', v)"
+          />
+          <span v-else>{{ row.reportItem || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="摘要" width="180">
+      <el-table-column label="科目名称" width="140">
         <template #default="{ row }">
-          <el-input v-model="row.summary" size="small" :disabled="isReadonly"
-            @change="updateRow(row.id, { summary: row.summary })" />
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.accountName"
+            size="small"
+            placeholder="如 1501-交易性金融资产"
+            @change="(v: string) => updateCell(row.rowId, 'accountName', v)"
+          />
+          <span v-else>{{ row.accountName || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="科目代码" width="110">
+      <el-table-column label="科目编码" width="100">
         <template #default="{ row }">
-          <el-input v-model="row.accountCode" size="small" :disabled="isReadonly"
-            @change="updateRow(row.id, { accountCode: row.accountCode })" />
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.accountCode"
+            size="small"
+            @change="(v: string) => updateCell(row.rowId, 'accountCode', v)"
+          />
+          <span v-else>{{ row.accountCode || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="科目名称" width="150">
+      <el-table-column label="附注项目" width="100">
         <template #default="{ row }">
-          <el-input v-model="row.accountName" size="small" :disabled="isReadonly"
-            @change="updateRow(row.id, { accountName: row.accountName })" />
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.noteItem"
+            size="small"
+            @change="(v: string) => updateCell(row.rowId, 'noteItem', v)"
+          />
+          <span v-else>{{ row.noteItem || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="借方金额" width="130" align="right">
+      <el-table-column label="借方调整金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.debit" size="small" :controls="false" :disabled="isReadonly" style="width: 100%"
-            @change="updateRow(row.id, { debit: row.debit })" />
+          <el-input-number
+            v-if="!isReadonly"
+            :model-value="row.debitAmount"
+            size="small"
+            :controls="false"
+            style="width: 100%"
+            @update:model-value="(v: number) => updateCell(row.rowId, 'debitAmount', v ?? 0)"
+          />
+          <span v-else>{{ fmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="贷方金额" width="130" align="right">
+      <el-table-column label="贷方调整金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.credit" size="small" :controls="false" :disabled="isReadonly" style="width: 100%"
-            @change="updateRow(row.id, { credit: row.credit })" />
+          <el-input-number
+            v-if="!isReadonly"
+            :model-value="row.creditAmount"
+            size="small"
+            :controls="false"
+            style="width: 100%"
+            @update:model-value="(v: number) => updateCell(row.rowId, 'creditAmount', v ?? 0)"
+          />
+          <span v-else>{{ fmt(row.creditAmount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="编制人" width="100">
+      <el-table-column label="索引" width="80">
         <template #default="{ row }">
-          <el-input v-model="row.preparer" size="small" :disabled="isReadonly"
-            @change="updateRow(row.id, { preparer: row.preparer })" />
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.indexRef"
+            size="small"
+            @change="(v: string) => updateCell(row.rowId, 'indexRef', v)"
+          />
+          <span v-else>{{ row.indexRef || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="备注" width="140">
+      <el-table-column label="备注" min-width="100">
         <template #default="{ row }">
-          <el-input v-model="row.remark" size="small" :disabled="isReadonly"
-            @change="updateRow(row.id, { remark: row.remark })" />
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.remark"
+            size="small"
+            @change="(v: string) => updateCell(row.rowId, 'remark', v)"
+          />
+          <span v-else>{{ row.remark || '—' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="操作" width="60" fixed="right">
         <template #default="{ row }">
-          <el-button v-if="!isReadonly" size="small" type="danger" link @click="removeRow(row.id)">删</el-button>
+          <el-button
+            v-if="!isReadonly"
+            size="small"
+            type="danger"
+            link
+            @click="removeRow(row.rowId)"
+          >删</el-button>
         </template>
       </el-table-column>
     </el-table>
-
-    <!-- 借贷平衡校验 -->
-    <div class="balance-bar" :class="{ 'balance-ok': balanced, 'balance-bad': !balanced }">
-      <span>借方合计：{{ totalDebit.toLocaleString() }}</span>
-      <span>贷方合计：{{ totalCredit.toLocaleString() }}</span>
-      <span v-if="balanced" class="balance-flag">✓ 借贷平衡</span>
-      <span v-else class="balance-flag">✗ 借贷不平衡，差额：{{ balanceDiff.toLocaleString() }}</span>
-    </div>
-
 
     <G1AuditTextCards
       :wp-id="wpId"
@@ -109,25 +226,17 @@
       v-model:conclusion="conclusion"
       note-ai-section="adjustment-note"
       conclusion-ai-section="adjustment-conclusion"
-      note-placeholder="填写审计说明：（1）调整分录的编制依据及事项说明；（2）AJE/RJE 对科目1501及相关损益的影响。"
+      note-placeholder="填写审计说明：调整依据、事项性质、对 1501 及损益的影响、与调整分录模块勾稽情况。"
       note-hint="覆盖调整依据、借贷平衡与回写影响。"
+      conclusion-hint="按 A/B/C 口径评价调整分录是否恰当、完整。"
     />
-
-
-    <details class="prep-hint">
-      <summary>📋 编制提示</summary>
-      <ul>
-        <li>AJE=审计调整分录，RJE=重分类调整分录，需分别录入。</li>
-        <li>每张凭证借贷方金额必须相等，底部实时校验借贷平衡。</li>
-        <li>交易性金融资产科目代码为 1501，公允价值变动损益计入投资收益/公允价值变动损益。</li>
-      </ul>
-    </details>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, watch } from 'vue'
-import { isDebitCreditBalanced, parseNum } from '../../composables/useG1TraFinFormulaEngine'
+import { ref, computed, watch, inject, toRef } from 'vue'
+import { ElMessage } from 'element-plus'
+import { useG1Adjustment, type G1AdjustmentRow } from '../../composables/useG1Adjustment'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G1AuditTextCards from '../G1AuditTextCards.vue'
@@ -138,119 +247,102 @@ const props = defineProps<{
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   wpId?: string
+  projectId?: string
+  auditYear?: number | string | null
 }>()
-
-const wpId = computed(() => props.wpId ?? '')
 
 const emit = defineEmits<{ imported: [] }>()
 
+const wpId = computed(() => props.wpId ?? '')
+const projectId = computed(() => props.projectId ?? '')
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
-const DATA_KEY = 'G1-3-rows'
-const CONCLUSION_KEY = 'G1-3-conclusion'
+const categoryOptions = ['账项调整', '报表调整', '其他']
 
-interface AdjustmentRow {
-  id: string
-  entryType: 'AJE' | 'RJE'
-  date: string
-  summary: string
-  accountCode: string
-  accountName: string
-  debit: number
-  credit: number
-  preparer: string
-  remark: string
-}
-
-function emptyRow(id: string): AdjustmentRow {
-  return {
-    id,
-    entryType: 'AJE',
-    date: '',
-    summary: '',
-    accountCode: '',
-    accountName: '',
-    debit: 0,
-    credit: 0,
-    preparer: '',
-    remark: '',
-  }
-}
-
-function loadRows(): AdjustmentRow[] {
-  const raw = props.allResponses.get(DATA_KEY)?.conclusion
-  if (!raw) return [emptyRow('1')]
-  try {
-    const parsed = JSON.parse(raw) as AdjustmentRow[]
-    return Array.isArray(parsed) && parsed.length ? parsed : [emptyRow('1')]
-  } catch {
-    return [emptyRow('1')]
-  }
-}
-
-const rows = ref<AdjustmentRow[]>(loadRows())
-const conclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.conclusion ?? '')
-
-const AUDIT_NOTE_KEY = 'G1-3-audit-note'
-const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
-watch(auditNote, (v) => {
-  if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
+const {
+  rows,
+  debitTotal,
+  creditTotal,
+  balanceDiff,
+  isBalanced,
+  netAjeToG1,
+  syncing,
+  lastSyncMsg,
+  addRow,
+  removeRow,
+  updateCell,
+  publishAdjustment,
+  pushToA13,
+  syncFromAdjustmentModule,
+} = useG1Adjustment({
+  allResponses: toRef(props, 'allResponses'),
+  debouncedSave: props.debouncedSave,
+  isReadonly: toRef(props, 'isReadonly'),
+  wpId,
+  projectId,
+  auditYear: toRef(props, 'auditYear'),
 })
 
-const totalDebit = computed(() => rows.value.reduce((s, r) => s + parseNum(r.debit), 0))
-const totalCredit = computed(() => rows.value.reduce((s, r) => s + parseNum(r.credit), 0))
-const balanced = computed(() =>
-  isDebitCreditBalanced(
-    rows.value.map((r) => parseNum(r.debit)),
-    rows.value.map((r) => parseNum(r.credit)),
-  ),
-)
-const balanceDiff = computed(() => totalDebit.value - totalCredit.value)
-
-function persist() {
-  if (props.isReadonly) return
-  props.debouncedSave(DATA_KEY, { conclusion: JSON.stringify(rows.value) })
+const selectedRows = ref<G1AdjustmentRow[]>([])
+function onSelectionChange(sel: G1AdjustmentRow[]) {
+  selectedRows.value = sel
 }
 
-function updateRow(id: string, patch: Partial<AdjustmentRow>) {
-  if (props.isReadonly) return
-  rows.value = rows.value.map((r) => (r.id === id ? { ...r, ...patch } : r))
-  persist()
-}
+const NOTE_KEY = 'G1-3-audit-note'
+const CONCLUSION_KEY = 'G1-3-conclusion'
+const auditNote = ref(props.allResponses.get(NOTE_KEY)?.remark ?? '')
+const conclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.conclusion ?? '')
 
-function addRow() {
-  if (props.isReadonly) return
-  rows.value = [...rows.value, emptyRow(`row-${Date.now()}`)]
-  persist()
-}
-
-function removeRow(id: string) {
-  if (props.isReadonly || rows.value.length <= 1) return
-  rows.value = rows.value.filter((r) => r.id !== id)
-  persist()
-}
-
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(NOTE_KEY, { remark: v })
+})
 watch(conclusion, (v) => {
   if (!props.isReadonly) props.debouncedSave(CONCLUSION_KEY, { conclusion: v })
 })
+
+function fmt(n: number): string {
+  if (!n) return '—'
+  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+async function onSyncFromModule() {
+  const n = await syncFromAdjustmentModule()
+  if (n > 0) ElMessage.success(`已从调整分录模块同步 ${n} 行`)
+  else ElMessage.info(lastSyncMsg.value || '无相关分录')
+}
+
+function onPushA13() {
+  pushToA13(selectedRows.value.map((r) => r.rowId))
+  ElMessage.success(`已推送 ${selectedRows.value.length} 行至 A13`)
+}
+
+function onConfirm() {
+  if (!isBalanced.value) {
+    ElMessage.warning('借贷不平衡，无法确认')
+    return
+  }
+  publishAdjustment()
+  ElMessage.success('已确认调整并联动调整分录模块 / G1-1')
+}
 </script>
 
 <style scoped>
 .g1-adjustment { padding: 12px; font-size: var(--wp-font-size, 13px); }
-.g1-adjustment :deep(.el-table) { --el-table-font-size: var(--wp-font-size, 13px); font-size: var(--wp-font-size, 13px); }
-.g1-adjustment :deep(.el-table .cell) { font-size: var(--wp-font-size, 13px); }
-.section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
-.sheet-title { margin: 0; font-size: 16px; font-weight: 600; color: #1f2a37; }
-.head-actions { display: flex; gap: 8px; align-items: center; }
+.guidance-details { margin-bottom: 10px; font-size: 12px; color: #606266; }
+.guidance-details summary { cursor: pointer; color: #4b2d77; font-weight: 500; }
+.guidance-content { margin-top: 8px; padding-left: 4px; }
+.guidance-content p { margin: 4px 0; }
+.objective-alert { margin-bottom: 10px; }
+.tab-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px; flex-wrap: wrap; margin-bottom: 10px;
+}
+.toolbar-left, .toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .chip-wrap { display: inline-flex; align-items: center; }
-.objective-alert { margin-bottom: 12px; }
-.stats-bar { margin-bottom: 10px; padding: 8px 12px; background: #f8f9fb; border: 1px solid #ebeef5; border-radius: 6px; font-size: 12px; color: #606266; }
-.balance-bar { display: flex; gap: 24px; align-items: center; margin: 14px 0; padding: 8px 12px; border-radius: 4px; }
-.balance-ok { background: #f0f9eb; color: #67c23a; }
-.balance-bad { background: #fef0f0; color: #f56c6c; }
-.balance-flag { font-weight: 600; }
-.conclusion-card { margin-top: 12px; }
-.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
-.prep-hint summary { cursor: pointer; }
-.prep-hint ul { margin: 8px 0 0; padding-left: 18px; }
+.sync-msg { font-size: 12px; color: #909399; }
+.balance-indicator {
+  display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  margin-bottom: 10px; padding: 8px 12px; background: #f8f9fb;
+  border: 1px solid #ebeef5; border-radius: 6px; font-size: 13px;
+}
 </style>

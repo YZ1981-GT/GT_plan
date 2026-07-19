@@ -181,7 +181,7 @@ export function useG11VoucherCheck(opts: {
         rows: rows.value.filter((r) => r.isAbnormal),
         existingContent: conclusion.value,
       }, { _silent: true } as any)
-      const text = res?.data?.content ?? res?.content ?? ''
+      const text = res?.data?.data?.content ?? res?.data?.content ?? res?.content ?? ''
       if (text) updateConclusion(text)
     } catch { /* AI optional */ }
     finally { aiLoading.value = false }

@@ -1,133 +1,230 @@
 <template>
-  <div class="g1-adjudication">
+  <div class="g1-adjudication" data-testid="g1-adjudication">
     <div class="section-head">
       <h3 class="sheet-title">G1-1 交易性金融资产审定表</h3>
       <div class="head-actions tab-toolbar">
+        <G1ImportExportDropdown
+          v-if="wpId"
+          :wp-id="wpId"
+          sheet="G1-1"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
+        <el-button size="small" :disabled="isReadonly" @click="onSyncDetail">从 G1-2 汇总未审</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-2" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-3" /></span>
         <el-button size="small" @click="openReviewDialog('G1-1-conclusion')">💬复核</el-button>
       </div>
     </div>
 
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：核实交易性金融资产（科目1501）各投资品种本期与上期审定金额的准确与完整，确认公允价值变动损益及处置损益列报恰当，为资产负债表列报及附注披露提供审定依据。"
+      title="审计目标：核实交易性金融资产（科目1501）投资成本、累计公允价值变动及账面余额的准确与完整，确认分类（交易性/划分为/指定为）列报恰当，为资产负债表及附注披露提供审定依据。"
       class="objective-alert"
     />
 
-    <el-table :data="rows" border size="small" :span-method="spanInvest">
-      <el-table-column prop="investLabel" label="投资品种" width="100" fixed />
-      <el-table-column prop="measureLabel" label="项目" width="120" fixed />
-      <el-table-column label="上期未审" width="110">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.rowKey !== 'subtotal'"
-            :model-value="row.priorUnadjusted"
-            size="small" :controls="false" :disabled="isReadonly"
-            @update:model-value="(v: number) => updateField(row.investKey, row.measureKey, 'prior', 'unadj', v ?? 0)"
-          />
-        </template>
-      </el-table-column>
-      <el-table-column label="上期AJE" width="100">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.rowKey !== 'subtotal'"
-            :model-value="row.priorAje"
-            size="small" :controls="false" :disabled="isReadonly"
-            @update:model-value="(v: number) => updateField(row.investKey, row.measureKey, 'prior', 'aje', v ?? 0)"
-          />
-        </template>
-      </el-table-column>
-      <el-table-column label="上期RJE" width="100">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.rowKey !== 'subtotal'"
-            :model-value="row.priorRje"
-            size="small" :controls="false" :disabled="isReadonly"
-            @update:model-value="(v: number) => updateField(row.investKey, row.measureKey, 'prior', 'rje', v ?? 0)"
-          />
-        </template>
-      </el-table-column>
-      <el-table-column label="上期审定" width="110" class-name="auto-calc-col">
-        <template #default="{ row }">
-          <span class="formula-cell" title="上期审定 = 上期未审 + 上期AJE + 上期RJE">{{ row.priorAudited.toLocaleString() }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="本期未审" width="110">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.rowKey !== 'subtotal'"
-            :model-value="row.currentUnadjusted"
-            size="small" :controls="false" :disabled="isReadonly"
-            @update:model-value="(v: number) => updateField(row.investKey, row.measureKey, 'cur', 'unadj', v ?? 0)"
-          />
-        </template>
-      </el-table-column>
-      <el-table-column label="本期AJE" width="100">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.rowKey !== 'subtotal'"
-            :model-value="row.currentAje"
-            size="small" :controls="false" :disabled="isReadonly"
-            @update:model-value="(v: number) => updateField(row.investKey, row.measureKey, 'cur', 'aje', v ?? 0)"
-          />
-        </template>
-      </el-table-column>
-      <el-table-column label="本期RJE" width="100">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.rowKey !== 'subtotal'"
-            :model-value="row.currentRje"
-            size="small" :controls="false" :disabled="isReadonly"
-            @update:model-value="(v: number) => updateField(row.investKey, row.measureKey, 'cur', 'rje', v ?? 0)"
-          />
-        </template>
-      </el-table-column>
-      <el-table-column label="本期审定" width="110" class-name="auto-calc-col">
-        <template #default="{ row }">
-          <span class="formula-cell" title="本期审定 = 本期未审 + 本期AJE + 本期RJE">{{ row.currentAudited.toLocaleString() }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="变动额" width="100" class-name="auto-calc-col">
-        <template #default="{ row }">
-          <span class="formula-cell" title="变动额 = 本期审定 - 上期审定">{{ row.changeAmount.toLocaleString() }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="变动率" width="80" class-name="auto-calc-col">
-        <template #default="{ row }">
-          <span v-if="row.changeRate === 'N/A'">N/A</span>
-          <span v-else-if="row.changeRate === ''">—</span>
-          <span v-else>{{ (Number(row.changeRate) * 100).toFixed(1) }}%</span>
-        </template>
-      </el-table-column>
-    </el-table>
+    <el-alert
+      v-if="lastWritebackNet !== 0"
+      type="success"
+      :closable="false"
+      class="writeback-alert"
+      :title="`已自 G1-3 回写期末账项调整 ${fmt(lastWritebackNet)}（默认行：投资成本·交易性·其他）`"
+    >
+      <div class="writeback-actions">
+        <span>多分类/多品种时请分摊，避免审定集中在「其他」。</span>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :disabled="isReadonly"
+          @click="openAllocDialog"
+        >
+          分摊到明细行
+        </el-button>
+      </div>
+    </el-alert>
 
-    <el-table :data="[totalRow]" border size="small" class="subtotal-table" :show-header="false">
-      <el-table-column width="100"><template #default="{ row }"><b>{{ row.investLabel }}</b></template></el-table-column>
-      <el-table-column width="120" />
-      <el-table-column width="110"><template #default="{ row }">{{ row.priorUnadjusted.toLocaleString() }}</template></el-table-column>
-      <el-table-column width="100"><template #default="{ row }">{{ row.priorAje.toLocaleString() }}</template></el-table-column>
-      <el-table-column width="100"><template #default="{ row }">{{ row.priorRje.toLocaleString() }}</template></el-table-column>
-      <el-table-column width="110"><template #default="{ row }">{{ row.priorAudited.toLocaleString() }}</template></el-table-column>
-      <el-table-column width="110"><template #default="{ row }">{{ row.currentUnadjusted.toLocaleString() }}</template></el-table-column>
-      <el-table-column width="100"><template #default="{ row }">{{ row.currentAje.toLocaleString() }}</template></el-table-column>
-      <el-table-column width="100"><template #default="{ row }">{{ row.currentRje.toLocaleString() }}</template></el-table-column>
-      <el-table-column width="110"><template #default="{ row }">{{ row.currentAudited.toLocaleString() }}</template></el-table-column>
-      <el-table-column width="100"><template #default="{ row }">{{ row.changeAmount.toLocaleString() }}</template></el-table-column>
-      <el-table-column width="80" />
+    <el-dialog
+      v-model="allocVisible"
+      title="G1-3 回写净额分摊"
+      width="560px"
+      append-to-body
+      destroy-on-close
+    >
+      <p class="alloc-hint">
+        将净额 <b>{{ fmt(lastWritebackNet) }}</b> 分摊至「投资成本 · 交易性」下各品种。
+        合计须接近净额；差额自动留在默认「其他」行。
+      </p>
+      <el-table :data="allocRows" border size="small" max-height="360">
+        <el-table-column prop="label" label="目标行" min-width="220" />
+        <el-table-column label="分摊金额" width="160">
+          <template #default="{ row }">
+            <el-input-number
+              v-model="row.amount"
+              size="small"
+              :controls="false"
+              :disabled="isReadonly"
+              class="alloc-input"
+            />
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="alloc-sum">
+        已填合计 {{ fmt(allocSum) }}
+        <span :class="{ warn: Math.abs(allocSum - lastWritebackNet) > 0.05 }">
+          （差额 {{ fmt(allocSum - lastWritebackNet) }}）
+        </span>
+      </div>
+      <template #footer>
+        <el-button @click="allocVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="isReadonly" @click="onApplyAlloc">应用分摊</el-button>
+      </template>
+    </el-dialog>
+    <details class="prep-hint">
+      <summary>📋 编制提示</summary>
+      <ul>
+        <li>结构对齐模板：（一）投资成本 →（二）累计公允价值变动 →（三）账面余额＝成本＋累计 FV。</li>
+        <li>可「从 G1-2 汇总未审」按会计分类×投资品种自动填入未审数，已有账项调整与原因分析保留。</li>
+        <li>G1-3「确认调整」后，1501 净调整默认回写至「投资成本·交易性·其他」；可用「分摊到明细行」拆到债务/权益等品种。</li>
+        <li>每层按「交易性 / 划分为 FVTPL / 指定为 FVTPL」× 品种明细展开；分类行与小计自动汇总。</li>
+        <li>审定＝未审＋账项调整；变动额／变动率自动计算；|变动率|&gt;{{ Math.round(G1_CHANGE_RATE_THRESHOLD * 100) }}% 时原因分析必填。</li>
+        <li>账面余额合计（减一年以上到期）应与试算平衡表 1501 勾稽，差异为 0。</li>
+      </ul>
+    </details>
+
+    <el-table
+      :data="rows"
+      border
+      size="small"
+      :row-class-name="rowClassName"
+      :max-height="tableMaxHeight"
+      style="width: 100%"
+    >
+      <el-table-column label="项目" min-width="280" fixed>
+        <template #default="{ row }">
+          <span :style="{ paddingLeft: `${(row.indent || 0) * 14}px` }" :class="{ 'label-strong': row.kind !== 'leaf' }">
+            {{ row.label }}
+          </span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="期初数" align="center">
+        <el-table-column label="未审数" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.editable && !isReadonly"
+              :model-value="row.openingUnadjusted"
+              size="small"
+              :controls="false"
+              style="width: 100%"
+              @update:model-value="(v: number) => updateField(row.rowKey, 'openingUnadjusted', v ?? 0)"
+            />
+            <span v-else :class="{ 'formula-cell': !row.editable }">{{ fmt(row.openingUnadjusted) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账项调整" width="96" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.editable && !isReadonly"
+              :model-value="row.openingAdjustment"
+              size="small"
+              :controls="false"
+              style="width: 100%"
+              @update:model-value="(v: number) => updateField(row.rowKey, 'openingAdjustment', v ?? 0)"
+            />
+            <span v-else :class="{ 'formula-cell': !row.editable }">{{ fmt(row.openingAdjustment) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="审定数" width="100" align="right" class-name="auto-calc-col">
+          <template #default="{ row }">
+            <span class="formula-cell" title="审定 = 未审 + 账项调整">{{ fmt(row.openingAudited) }}</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <el-table-column label="期末数" align="center">
+        <el-table-column label="未审数" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.editable && !isReadonly"
+              :model-value="row.closingUnadjusted"
+              size="small"
+              :controls="false"
+              style="width: 100%"
+              @update:model-value="(v: number) => updateField(row.rowKey, 'closingUnadjusted', v ?? 0)"
+            />
+            <span v-else :class="{ 'formula-cell': !row.editable }">{{ fmt(row.closingUnadjusted) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账项调整" width="96" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.editable && !isReadonly"
+              :model-value="row.closingAdjustment"
+              size="small"
+              :controls="false"
+              style="width: 100%"
+              @update:model-value="(v: number) => updateField(row.rowKey, 'closingAdjustment', v ?? 0)"
+            />
+            <span v-else :class="{ 'formula-cell': !row.editable }">{{ fmt(row.closingAdjustment) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="审定数" width="100" align="right" class-name="auto-calc-col">
+          <template #default="{ row }">
+            <span class="formula-cell" title="审定 = 未审 + 账项调整">{{ fmt(row.closingAudited) }}</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <el-table-column label="本期与上期审定数比较" align="center">
+        <el-table-column label="变动额" width="96" align="right" class-name="auto-calc-col">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ fmt(row.changeAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="变动率" width="80" align="right" class-name="auto-calc-col">
+          <template #default="{ row }">
+            <span v-if="row.changeRate === 'N/A'">N/A</span>
+            <span v-else-if="row.changeRate === ''">—</span>
+            <span v-else :class="{ 'rate-warn': row.changeRateHighlight }">
+              {{ (Number(row.changeRate) * 100).toFixed(1) }}%
+            </span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <el-table-column label="原因分析" min-width="140">
+        <template #default="{ row }">
+          <el-input
+            v-if="row.editable && !isReadonly"
+            :model-value="row.reasonAnalysis"
+            size="small"
+            :class="{ 'reason-required': row.reasonRequired && !row.reasonAnalysis }"
+            :placeholder="row.reasonRequired ? `|变动率|>${Math.round(G1_CHANGE_RATE_THRESHOLD * 100)}% 必填` : ''"
+            @change="(v: string) => updateField(row.rowKey, 'reasonAnalysis', v)"
+          />
+          <span v-else>{{ row.reasonAnalysis || '—' }}</span>
+        </template>
+      </el-table-column>
     </el-table>
 
     <div class="tb-diff-row">
       <span>试算平衡表数（1501）：
-        <el-input-number v-model="trialBalanceAmount" size="small" :controls="false" :disabled="isReadonly" />
+        <el-input-number
+          :model-value="trialBalanceAmount"
+          size="small"
+          :controls="false"
+          :disabled="isReadonly"
+          @update:model-value="(v: number) => updateTrialBalance(v ?? 0)"
+        />
       </span>
       <span :class="{ 'diff-red': trialBalanceDiff !== 0 }">
-        差异：{{ trialBalanceDiff.toLocaleString() }}
+        差异数：{{ fmt(trialBalanceDiff) }}
         <template v-if="trialBalanceDiff === 0"> ✓</template>
         <template v-else> ✗</template>
       </span>
+      <span class="book-total-hint">账面余额合计审定：{{ fmt(totalRow.closingAudited) }}</span>
     </div>
 
     <G1AuditTextCards
@@ -137,44 +234,36 @@
       v-model:conclusion="conclusion"
       note-ai-section="adjudication-note"
       conclusion-ai-section="adjudication-conclusion"
-      note-placeholder="交易性金融资产审定说明（如公允价值变动来源、处置损益核对、与试算表核对等）..."
-      note-hint="评价各投资品种审定、AJE/RJE 及与试算表勾稽。"
+      note-placeholder="交易性金融资产审定说明（成本与累计 FV 构成、分类依据、重大波动原因、与试算表核对等）..."
+      note-hint="评价投资成本、累计公允价值变动、分类列报及与试算表勾稽。"
       conclusion-hint="按 A/B/C 口径评价科目 1501 列报是否公允。"
     />
-
-    <details class="prep-hint">
-      <summary>📋 编制提示</summary>
-      <ul>
-        <li>审定 = 未审 + AJE + RJE；本表按投资品种（股票/基金/债券/衍生工具/其他）×损益分类（成本/公允价值变动/处置损益）矩阵列示。</li>
-        <li>灰底列为自动计算列（审定/变动额/变动率），不可手动编辑。</li>
-        <li>本期审定合计应与试算平衡表科目1501核对一致，差异为 0 方为核对通过。</li>
-        <li>审定数变更自动发布 EventBus（substantive:adjudicated，科目1501）联动附注披露与 trial_balance。</li>
-      </ul>
-    </details>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, toRef, inject } from 'vue'
+import { computed, toRef, inject, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useG1Adjudication } from '../../composables/useG1Adjudication'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G1AuditTextCards from '../G1AuditTextCards.vue'
+import G1ImportExportDropdown from '../G1ImportExportDropdown.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   wpId?: string
+  htmlData?: any
 }>()
 
-const wpId = computed(() => props.wpId ?? '')
+const emit = defineEmits<{ imported: [] }>()
 
+const wpId = computed(() => props.wpId ?? '')
+const tableMaxHeight = computed(() => Math.max(420, window.innerHeight - 320))
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
-// 解构到顶层：composable 返回的 ref/computed 只有作为顶层绑定时才会在模板中自动解包。
-// 嵌套访问（adj.rows / adj.trialBalanceAmount）不解包 → el-table 收到 Ref（空表）、
-// v-model 绑定到 ref 对象、computed 值读为 undefined（空白）。
 const {
   rows,
   totalRow,
@@ -183,20 +272,60 @@ const {
   auditNote,
   conclusion,
   updateField,
+  updateTrialBalance,
+  syncFromDetail,
+  lastWritebackNet,
+  allocateWriteback,
+  writebackAllocTargets,
+  rowClassName,
+  G1_CHANGE_RATE_THRESHOLD,
 } = useG1Adjudication({
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
+  htmlData: toRef(props, 'htmlData'),
 })
 
-function spanInvest({ row, rowIndex, columnIndex }: { row: { investKey: string; rowKey: string }; rowIndex: number; columnIndex: number }) {
-  if (columnIndex !== 0) return { rowspan: 1, colspan: 1 }
-  const data = rows.value
-  if (row.rowKey === 'subtotal') return { rowspan: 1, colspan: 1 }
-  const firstIdx = data.findIndex((r) => r.investKey === row.investKey)
-  if (firstIdx !== rowIndex) return { rowspan: 0, colspan: 0 }
-  const same = data.filter((r) => r.investKey === row.investKey && r.rowKey !== 'subtotal').length
-  return { rowspan: same, colspan: 1 }
+const allocVisible = ref(false)
+const allocRows = ref<Array<{ rowKey: string; label: string; amount: number }>>([])
+const allocSum = computed(() =>
+  allocRows.value.reduce((s, r) => s + (Number(r.amount) || 0), 0),
+)
+
+function openAllocDialog() {
+  const net = lastWritebackNet.value
+  allocRows.value = writebackAllocTargets.map((t) => ({
+    rowKey: t.rowKey,
+    label: t.label,
+    amount: t.rowKey.endsWith('-other') ? net : 0,
+  }))
+  allocVisible.value = true
+}
+
+function onApplyAlloc() {
+  const res = allocateWriteback(
+    allocRows.value.map((r) => ({ rowKey: r.rowKey, amount: Number(r.amount) || 0 })),
+  )
+  if (!res.ok) {
+    ElMessage.warning(res.message)
+    return
+  }
+  ElMessage.success('已按明细行分摊回写净额')
+  allocVisible.value = false
+}
+
+function onSyncDetail() {
+  const n = syncFromDetail()
+  if (!n) {
+    ElMessage.warning('G1-2 无可用明细')
+    return
+  }
+  ElMessage.success(`已汇总 ${n} 组分类×品种未审数（保留原调整）`)
+}
+
+function fmt(n: number): string {
+  if (n === 0) return '—'
+  return n.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 }
 </script>
 
@@ -209,20 +338,28 @@ function spanInvest({ row, rowIndex, columnIndex }: { row: { investKey: string; 
 .head-actions { display: flex; gap: 8px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 .objective-alert { margin-bottom: 12px; }
-.subtotal-table { margin-top: -1px; }
-.tb-diff-row { display: flex; gap: 24px; margin: 16px 0; align-items: center; }
-.diff-red { color: #f56c6c; font-weight: 600; }
-.formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
-:deep(.auto-calc-col) { background-color: #f5f7fa; }
-.opinion-card { margin-top: 12px; border-radius: 8px; }
-.opinion-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; border-bottom: 1px solid #ebeef5; }
-.opinion-header { display: flex; align-items: center; justify-content: space-between; }
-.opinion-title { font-size: 14px; font-weight: 600; color: #303133; }
-.opinion-section { margin-bottom: 16px; }
-.opinion-section:last-child { margin-bottom: 0; }
-.opinion-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.opinion-section-label { font-size: 14px; font-weight: 500; color: #303133; }
-.prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
-.prep-hint summary { cursor: pointer; }
+.writeback-alert { margin-bottom: 10px; }
+.writeback-actions {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  margin-top: 6px; font-size: 12px;
+}
+.alloc-hint { margin: 0 0 12px; font-size: 13px; color: #606266; }
+.alloc-input { width: 140px; }
+.alloc-sum { margin-top: 10px; font-size: 13px; }
+.alloc-sum .warn { color: #e6a23c; font-weight: 600; }
+.prep-hint { margin: 0 0 12px; font-size: 12px; color: #606266; }
+.prep-hint summary { cursor: pointer; color: #4b2d77; font-weight: 500; }
 .prep-hint ul { margin: 8px 0 0; padding-left: 18px; }
+.label-strong { font-weight: 600; }
+.tb-diff-row { display: flex; flex-wrap: wrap; gap: 24px; margin: 16px 0; align-items: center; }
+.diff-red { color: #f56c6c; font-weight: 600; }
+.book-total-hint { color: #606266; }
+.formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+.rate-warn { color: #e6a23c; font-weight: 600; }
+.reason-required :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }
+:deep(.auto-calc-col) { background-color: #f5f7fa; }
+:deep(.row-section-header) { background: #f4f0fa !important; font-weight: 600; }
+:deep(.row-class-header) { background: #faf8fc !important; }
+:deep(.row-subtotal) { background: #f0f2f5 !important; font-weight: 600; }
+:deep(.row-footer) { background: #fafafa !important; }
 </style>

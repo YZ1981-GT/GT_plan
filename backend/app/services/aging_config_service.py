@@ -82,7 +82,7 @@ PRESET_SEGMENTS: dict[AgingPreset, list[AgingSegment]] = {
     ],
 }
 
-# 科目默认预设映射：D2/K1/K3/G5→FIVE_YEAR, D3/F1→THREE_YEAR
+# 科目默认预设映射：D2/K1/K3/G5→FIVE_YEAR, D3/F1/G2→THREE_YEAR
 DEFAULT_SUBJECT_PRESETS: dict[str, AgingPreset] = {
     "D2": AgingPreset.FIVE_YEAR,
     "K1": AgingPreset.FIVE_YEAR,
@@ -90,6 +90,7 @@ DEFAULT_SUBJECT_PRESETS: dict[str, AgingPreset] = {
     "G5": AgingPreset.FIVE_YEAR,
     "D3": AgingPreset.THREE_YEAR,
     "F1": AgingPreset.THREE_YEAR,
+    "G2": AgingPreset.THREE_YEAR,
 }
 
 

@@ -115,16 +115,16 @@ describe('useG1TraFinFormulaEngine (PBT)', () => {
     )
   })
 
-  // --- 2.8 Property 7: 倒轧余额 = 监盘日余额 + 增加 - 减少 ---
+  // --- 2.8 Property 7: 报表日 = 盘点日 − 增加 + 减少（资产负债表日→盘点日口径）---
   // Validates: Requirements 13.9, 12.5
-  it('Property 7: calcReconciliation(countDay, increase, decrease) ≈ countDay + increase - decrease', () => {
+  it('Property 7: calcReconciliation(countDay, increase, decrease) ≈ countDay - increase + decrease', () => {
     fc.assert(
       fc.property(
         fc.float({ min: 0, max: 1e9, noNaN: true }),
         fc.float({ min: 0, max: 1e9, noNaN: true }),
         fc.float({ min: 0, max: 1e9, noNaN: true }),
         (countDay, increase, decrease) => {
-          expect(approxEqual(calcReconciliation(countDay, increase, decrease), countDay + increase - decrease)).toBe(true)
+          expect(approxEqual(calcReconciliation(countDay, increase, decrease), countDay - increase + decrease)).toBe(true)
         },
       ),
       { numRuns: 200 },

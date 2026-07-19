@@ -69,6 +69,7 @@ const showDiffPanel = ref(false)
 
 const SNAPSHOT_TYPE_CONFIG: Record<SnapshotType, { label: string; color: string }> = {
   manual: { label: '手动保存', color: '#409eff' },
+  auto: { label: '自动快照', color: '#909399' },
   auto_sampling: { label: '抽凭快照', color: '#e6a23c' },
   auto_import: { label: '导入快照', color: '#9b59b6' },
   review_sign: { label: '签字快照', color: '#67c23a' },
@@ -114,14 +115,13 @@ async function handleCompare() {
 }
 
 async function handleRollback(versionId: string) {
-  await rollback(versionId)
-  // composable 内部处理了 ElMessageBox 确认弹窗
-  // 如果用户确认并成功，emit 通知父组件
-  emit('rollback-completed')
+  const ok = await rollback(versionId)
+  // 仅成功回滚后通知父组件刷新 render-config / 包内数据
+  if (ok) emit('rollback-completed')
 }
 
 async function handleLoadMore() {
-  await loadVersions(currentPage.value + 1)
+  await loadVersions(currentPage.value + 1, { append: true })
 }
 
 function handleDrawerClose() {
@@ -171,6 +171,13 @@ defineExpose({ openDrawer, drawerVisible })
         保存版本
       </el-button>
     </div>
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="vt-limit-tip"
+      title="每底稿仅保留最近 5 个历史版本；超出将自动删除最旧快照。"
+    />
 
     <!-- 版本对比区域 -->
     <div v-if="versions.length >= 2" class="vt-compare-bar">
@@ -306,8 +313,12 @@ defineExpose({ openDrawer, drawerVisible })
 .vt-action-bar {
   display: flex;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
   padding: 0 4px;
+}
+
+.vt-limit-tip {
+  margin: 0 4px 12px;
 }
 
 .vt-desc-input {

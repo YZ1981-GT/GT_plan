@@ -1,5 +1,9 @@
 <template>
   <div class="i5-tab-disclosure-listed">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：确认其他非流动资产附注披露信息的完整性、准确性，变动矩阵与审定表数据一致。" />
+
     <!-- 蓝色渐变引导区 -->
     <div class="guide-area">
       <div class="guide-grid">
@@ -204,6 +208,36 @@
       </el-card>
     </template>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计说明</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="请填写审计说明..."
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="请填写审计结论..."
+        @change="saveAuditConclusion"
+      />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -234,7 +268,7 @@
  * Task: 4.6
  * Requirements: 5.1-5.2
  */
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useI5Disclosure, type I5DisclosureMatrixRow } from '../../composables/useI5Disclosure'
@@ -322,6 +356,36 @@ function handleReview(sectionKey: string): void {
   openReviewDialog(`I5 附注上市-${sectionKey}`)
 }
 
+// ─── Audit Note / Conclusion (AN+AC) persistence ─────────────────────────────
+
+const NOTE_KEY = 'I5-disclosure-listed-audit-note'
+const CONCLUSION_KEY_AC = 'I5-disclosure-listed-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  emit('save', NOTE_KEY, val)
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY_AC, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY_AC, item)
+  emit('save', CONCLUSION_KEY_AC, val)
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY_AC)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmtAmt(val: number | null | undefined): string {
@@ -338,6 +402,14 @@ function fmtPercent(val: number | null | undefined, total: number | null | undef
 
 <style scoped>
 .i5-tab-disclosure-listed { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+/* 审计目标 */
+.objective-alert { margin-bottom: 14px; }
+
+/* 审计说明/结论 el-card */
+.audit-note-card { margin-bottom: 16px; }
+.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
+.card-header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 500; }
 
 /* 蓝色渐变引导区 */
 .guide-area {

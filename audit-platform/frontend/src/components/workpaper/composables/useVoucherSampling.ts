@@ -55,6 +55,8 @@ export interface VoucherSamplingOptions {
   accountCode: string
   phase: Ref<Phase>
   defaultMethod?: SamplingMethod
+  /** 初始期间月份 1-12（如期后默认 [1,2,3]） */
+  initialPeriodRange?: number[]
 }
 
 export interface ExtractionLogEntry {
@@ -139,6 +141,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     accountCode,
     phase,
     defaultMethod,
+    initialPeriodRange,
   } = options
 
   // ─── Config 初始化 ──────────────────────────────────────────────────────
@@ -149,11 +152,15 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       ? accountCode.split(',').map(c => c.trim()).filter(Boolean)
       : []
 
+    const months = (initialPeriodRange?.length
+      ? initialPeriodRange.filter((m) => m >= 1 && m <= 12)
+      : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+
     return {
       samplingMethod: defaultMethod ?? 'random',
       sampleSize: 30,
       accountCodes: codes,
-      periodRange: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+      periodRange: months.length ? months : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
       directionFilter: 'all',
       voucherTypeFilter: [],
       summaryKeyword: '',

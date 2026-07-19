@@ -199,31 +199,23 @@
       </span>
     </div>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input
-        type="textarea"
-        :model-value="auditNote"
-        :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：调整分录的依据、借贷平衡与回写情况，拟调整/未调整事项及其影响。"
-        @change="(v: string) => saveAuditNote(v)"
-      />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
-      <el-input
-        type="textarea"
-        :model-value="auditConclusion"
-        :disabled="isReadonly"
-        :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：A、未见异常。B、除上述调整事项予以调整外，其余未见异常。C、存在重大未调整事项，不可确认。"
-        @change="(v: string) => saveAuditConclusion(v)"
-      />
-    </el-card>
+    <G6AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="auditConclusion"
+      note-ai-section="adjustment-note"
+      conclusion-ai-section="adjustment-conclusion"
+      :related-context="{
+        借方合计: totalDebits,
+        贷方合计: totalCredits,
+        是否平衡: isBalanced,
+      }"
+      note-placeholder="填写审计说明：调整分录的依据、借贷平衡与回写情况，拟调整/未调整事项及其影响。"
+      note-hint="覆盖 AJE/RJE 依据与回写审定表情况。"
+      conclusion-placeholder="填写审计结论：A、未见异常。B、除上述调整事项予以调整外，其余未见异常。C、存在重大未调整事项，不可确认。"
+      conclusion-hint="按 A/B/C 口径评价调整分录充分性。"
+    />
 
     <!-- 编制提示 -->
     <details class="g6-guide-details">
@@ -252,9 +244,10 @@
  * - 导入导出 (sheet='G6-4')
  * - 保存时汇总回写 G6-1 审定表 adjustment 列
  */
-import { ref, computed, inject, onMounted } from 'vue'
+import { ref, computed, inject, onMounted, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import http from '@/utils/http'
+import G6AuditTextCards from '../G6AuditTextCards.vue'
+import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { isDebitCreditBalanced, parseNum } from '@/composables/useG6MainFormulaEngine'
 import { useG6MainImportExport } from '../../composables/useG6MainImportExport'
 import type { G6MainImportableSheet } from '../../composables/useG6MainImportExport'
@@ -266,9 +259,11 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
+const emit = defineEmits<{ imported: [] }>()
+
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
-// ─── 审计说明 / 审计结论（走 checklist_responses，conclusion:null + remark 文本） ───
+// ─── 审计说明 / 审计结论（经 g6:save-items 由父组件落库） ───
 const NOTE_KEY = 'G6-4-adjustment-audit-note'
 const CONCLUSION_KEY = 'G6-4-adjustment-audit-conclusion'
 const auditNote = ref('')
@@ -288,24 +283,16 @@ function readSaved(key: string): string {
   return ''
 }
 
-async function saveAudit(key: string, val: string): Promise<void> {
+function dispatchSave(itemId: string, val: string): void {
   if (props.isReadonly) return
+  const item: ChecklistResponse = { item_id: itemId, conclusion: null, remark: val }
   try {
-    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId || undefined,
-      items: [{ item_id: key, conclusion: null, remark: val }],
-    })
+    window.dispatchEvent(new CustomEvent('g6:save-items', { detail: { items: [item] } }))
   } catch { /* silent */ }
 }
 
-function saveAuditNote(val: string): void {
-  auditNote.value = val
-  void saveAudit(NOTE_KEY, val)
-}
-function saveAuditConclusion(val: string): void {
-  auditConclusion.value = val
-  void saveAudit(CONCLUSION_KEY, val)
-}
+watch(auditNote, (val) => { dispatchSave(NOTE_KEY, val) })
+watch(auditConclusion, (val) => { dispatchSave(CONCLUSION_KEY, val) })
 
 // ═══ 数据模型 ═══
 interface AdjustmentEntry {
@@ -330,7 +317,7 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 // ═══ 导入导出 ═══
 const ie = useG6MainImportExport({
   wpId: computed(() => props.wpId),
-  onImported: () => { /* 将在实际后端数据返回后刷新 */ },
+  onImported: () => { emit('imported') },
 })
 
 // ═══ 计算属性 ═══
@@ -488,7 +475,8 @@ async function onFileSelected(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
-  await ie.importData('G6-4', file)
+  const result = await ie.importData('G6-4', file)
+  if (result) emit('imported')
   input.value = '' // 重置file input
 }
 
@@ -534,10 +522,6 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
   gap: 8px;
   align-items: center;
 }
-
-/* 审计说明/结论卡片 */
-.audit-note-card { margin-top: 12px; }
-.audit-note-card .card-header { display: flex; align-items: center; justify-content: space-between; font-weight: 500; }
 
 .g6-adj-toolbar {
   display: flex;

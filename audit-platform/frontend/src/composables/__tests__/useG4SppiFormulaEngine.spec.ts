@@ -8,20 +8,33 @@ import { describe, it, expect } from 'vitest'
 import {
   parseNum,
   determineBusinessModel,
+  detectBusinessModelInconsistencies,
   determineSPPIConclusion,
   calcInventoryTotal,
   calcReportDateQuantity,
   calcReportDateTotal,
   calcReconciliationVariance,
+  calcQuantityVariance,
   isReconciliationBalanced,
+  isReconciliationFullyBalanced,
   calcSumColumn,
   determineFinalClassification,
   FINAL_CLASSIFICATION_LABELS,
 } from '../useG4SppiFormulaEngine'
 
-// ═══════════════════════════════════════════════════════════════════
-// parseNum
-// ═══════════════════════════════════════════════════════════════════
+function allNo(overrides: Partial<Parameters<typeof determineBusinessModel>[0]> = {}) {
+  return {
+    q1: false,
+    q2: false,
+    q2_1: false,
+    q2_2: false,
+    q2_3: false,
+    q3: false,
+    q4: false,
+    q5: false,
+    ...overrides,
+  }
+}
 
 describe('parseNum', () => {
   it('returns 0 for null', () => {
@@ -63,57 +76,56 @@ describe('parseNum', () => {
   })
 })
 
-// ═══════════════════════════════════════════════════════════════════
-// determineBusinessModel
-// ═══════════════════════════════════════════════════════════════════
-
-describe('determineBusinessModel', () => {
+describe('determineBusinessModel (Excel 否定筛查)', () => {
   it('returns INCOMPLETE when any answer is null', () => {
-    expect(determineBusinessModel({ q1: null, q2: false, q3: false, q4: false, q5: false })).toBe('INCOMPLETE')
-    expect(determineBusinessModel({ q1: true, q2: null, q3: false, q4: false, q5: false })).toBe('INCOMPLETE')
-    expect(determineBusinessModel({ q1: true, q2: false, q3: null, q4: false, q5: false })).toBe('INCOMPLETE')
+    expect(determineBusinessModel(allNo({ q1: null }))).toBe('INCOMPLETE')
+    expect(determineBusinessModel(allNo({ q2_1: null }))).toBe('INCOMPLETE')
+    expect(determineBusinessModel(allNo({ q5: null }))).toBe('INCOMPLETE')
   })
 
-  it('returns FVTPL when q5=true (持有以获取公允价值变动)', () => {
-    expect(determineBusinessModel({ q1: true, q2: false, q3: false, q4: false, q5: true })).toBe('FVTPL')
-    expect(determineBusinessModel({ q1: false, q2: false, q3: false, q4: false, q5: true })).toBe('FVTPL')
+  it('returns AC when all 否', () => {
+    expect(determineBusinessModel(allNo())).toBe('AC')
   })
 
-  it('returns FVTPL when q3=true (出售频繁且金额重大)', () => {
-    expect(determineBusinessModel({ q1: true, q2: true, q3: true, q4: false, q5: false })).toBe('FVTPL')
-    expect(determineBusinessModel({ q1: false, q2: false, q3: true, q4: false, q5: false })).toBe('FVTPL')
+  it('returns FVTPL when trading flags true (q2 / q2_* / q5)', () => {
+    expect(determineBusinessModel(allNo({ q2: true }))).toBe('FVTPL')
+    expect(determineBusinessModel(allNo({ q2_1: true }))).toBe('FVTPL')
+    expect(determineBusinessModel(allNo({ q2_3: true }))).toBe('FVTPL')
+    expect(determineBusinessModel(allNo({ q5: true }))).toBe('FVTPL')
   })
 
-  it('returns FVOCI when q4=true (同时以收取现金流和出售为目标)', () => {
-    expect(determineBusinessModel({ q1: true, q2: false, q3: false, q4: true, q5: false })).toBe('FVOCI')
-    expect(determineBusinessModel({ q1: false, q2: true, q3: false, q4: true, q5: false })).toBe('FVOCI')
+  it('returns FVTPL when q3=true (基于公允价值管理)', () => {
+    expect(determineBusinessModel(allNo({ q3: true }))).toBe('FVTPL')
   })
 
-  it('returns AC when q1=true && q2=false (以收取合同现金流量为目标，无出售活动)', () => {
-    expect(determineBusinessModel({ q1: true, q2: false, q3: false, q4: false, q5: false })).toBe('AC')
+  it('returns FVOCI when q1 or q4 true (大额频繁出售)', () => {
+    expect(determineBusinessModel(allNo({ q1: true }))).toBe('FVOCI')
+    expect(determineBusinessModel(allNo({ q4: true }))).toBe('FVOCI')
   })
 
-  it('returns FVTPL for fallback case (all false)', () => {
-    expect(determineBusinessModel({ q1: false, q2: false, q3: false, q4: false, q5: false })).toBe('FVTPL')
-  })
-
-  it('returns FVTPL when q1=true but q2=true (有出售活动)', () => {
-    expect(determineBusinessModel({ q1: true, q2: true, q3: false, q4: false, q5: false })).toBe('FVTPL')
-  })
-
-  it('priority: q5 > q3 > q4 > AC check', () => {
-    // q5 takes precedence over q3
-    expect(determineBusinessModel({ q1: true, q2: true, q3: true, q4: true, q5: true })).toBe('FVTPL')
-    // q3 takes precedence over q4
-    expect(determineBusinessModel({ q1: true, q2: true, q3: true, q4: true, q5: false })).toBe('FVTPL')
-    // q4 takes precedence over AC
-    expect(determineBusinessModel({ q1: true, q2: false, q3: false, q4: true, q5: false })).toBe('FVOCI')
+  it('priority aligns Excel A23 then CAS q3-only', () => {
+    // Excel step1：q1=是 + 非交易 + 非FV → 直接 FVOCI（不再看题5）
+    expect(determineBusinessModel(allNo({ q1: true, q5: true }))).toBe('FVOCI')
+    // Excel step2：q1=是 + FV管理 → 其他
+    expect(determineBusinessModel(allNo({ q1: true, q3: true }))).toBe('FVTPL')
+    // Excel：q4=是 且 q5≠是 → 收取+出售（即使题3=是，先走未来出售分支）
+    expect(determineBusinessModel(allNo({ q3: true, q4: true }))).toBe('FVOCI')
+    // 仅未来交易性
+    expect(determineBusinessModel(allNo({ q5: true }))).toBe('FVTPL')
+    expect(determineBusinessModel(allNo({ q1: true, q4: true }))).toBe('FVOCI')
   })
 })
 
-// ═══════════════════════════════════════════════════════════════════
-// determineSPPIConclusion
-// ═══════════════════════════════════════════════════════════════════
+describe('detectBusinessModelInconsistencies', () => {
+  it('flags q2 vs children mismatch and q3-only CAS note', () => {
+    expect(
+      detectBusinessModelInconsistencies(allNo({ q2: true, q2_1: false, q2_2: false, q2_3: false })),
+    ).toEqual(expect.arrayContaining([expect.stringContaining('题2勾选「是」')]))
+    expect(
+      detectBusinessModelInconsistencies(allNo({ q3: true })),
+    ).toEqual(expect.arrayContaining([expect.stringContaining('CAS22')]))
+  })
+})
 
 describe('determineSPPIConclusion', () => {
   it('returns PASS when all false', () => {
@@ -148,10 +160,6 @@ describe('determineSPPIConclusion', () => {
   })
 })
 
-// ═══════════════════════════════════════════════════════════════════
-// calcInventoryTotal
-// ═══════════════════════════════════════════════════════════════════
-
 describe('calcInventoryTotal', () => {
   it('computes faceValue * quantity with 2dp', () => {
     expect(calcInventoryTotal(100, 10)).toBe(1000)
@@ -160,28 +168,24 @@ describe('calcInventoryTotal', () => {
   })
 
   it('rounds to 2 decimal places', () => {
-    // 33.333 * 3 = 99.999, round(99.999*100)/100 = round(9999.9)/100 = 10000/100 = 100.00
     expect(calcInventoryTotal(33.333, 3)).toBe(100)
-    // 1.005 * 2 = 2.01, round(2.01*100)/100 = 201/100 = 2.01
     expect(calcInventoryTotal(1.005, 2)).toBe(2.01)
   })
 })
 
-// ═══════════════════════════════════════════════════════════════════
-// calcReportDateQuantity
-// ═══════════════════════════════════════════════════════════════════
-
 describe('calcReportDateQuantity', () => {
-  it('adds countDateQty + change', () => {
-    expect(calcReportDateQuantity(100, 10)).toBe(110)
-    expect(calcReportDateQuantity(100, -10)).toBe(90)
+  it('报表日 = 盘点日 − 增加 + 减少', () => {
+    expect(calcReportDateQuantity(1000, 100, 20)).toBe(920)
+    expect(calcReportDateQuantity(100, 0, 0)).toBe(100)
+    expect(calcReportDateQuantity(500, 50, 50)).toBe(500)
+  })
+
+  it('双参数兼容：报表日 = 盘点日 − 净增加', () => {
+    expect(calcReportDateQuantity(1000, 80)).toBe(920)
+    expect(calcReportDateQuantity(100, -10)).toBe(110)
     expect(calcReportDateQuantity(0, 0)).toBe(0)
   })
 })
-
-// ═══════════════════════════════════════════════════════════════════
-// calcReportDateTotal
-// ═══════════════════════════════════════════════════════════════════
 
 describe('calcReportDateTotal', () => {
   it('computes faceValue * quantity with 2dp', () => {
@@ -189,10 +193,6 @@ describe('calcReportDateTotal', () => {
     expect(calcReportDateTotal(1.5, 3)).toBe(4.5)
   })
 })
-
-// ═══════════════════════════════════════════════════════════════════
-// calcReconciliationVariance
-// ═══════════════════════════════════════════════════════════════════
 
 describe('calcReconciliationVariance', () => {
   it('computes reportDateTotal - bookTotal with 2dp', () => {
@@ -203,9 +203,21 @@ describe('calcReconciliationVariance', () => {
   })
 })
 
-// ═══════════════════════════════════════════════════════════════════
-// isReconciliationBalanced
-// ═══════════════════════════════════════════════════════════════════
+describe('calcQuantityVariance', () => {
+  it('computes reportQuantity - bookQuantity', () => {
+    expect(calcQuantityVariance(100, 100)).toBe(0)
+    expect(calcQuantityVariance(100, 95)).toBe(5)
+    expect(calcQuantityVariance(90, 100)).toBe(-10)
+  })
+})
+
+describe('isReconciliationFullyBalanced', () => {
+  it('requires both quantity and amount within tolerance', () => {
+    expect(isReconciliationFullyBalanced(100, 100, 1000, 1000)).toBe(true)
+    expect(isReconciliationFullyBalanced(100, 99, 1000, 1000)).toBe(false)
+    expect(isReconciliationFullyBalanced(100, 100, 1000, 999)).toBe(false)
+  })
+})
 
 describe('isReconciliationBalanced', () => {
   it('returns true when |difference| < 0.01', () => {
@@ -219,10 +231,6 @@ describe('isReconciliationBalanced', () => {
     expect(isReconciliationBalanced(100, 100.1)).toBe(false)
   })
 })
-
-// ═══════════════════════════════════════════════════════════════════
-// calcSumColumn
-// ═══════════════════════════════════════════════════════════════════
 
 describe('calcSumColumn', () => {
   it('sums array elements', () => {
@@ -238,10 +246,6 @@ describe('calcSumColumn', () => {
     expect(calcSumColumn([1, 2, null as any, 3])).toBe(6)
   })
 })
-
-// ═══════════════════════════════════════════════════════════════════
-// determineFinalClassification
-// ═══════════════════════════════════════════════════════════════════
 
 describe('determineFinalClassification', () => {
   it('FAIL → always FVTPL regardless of business model', () => {

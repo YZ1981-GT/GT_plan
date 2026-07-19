@@ -231,7 +231,9 @@ async function loadTree() {
         }]
       }
     }
-  } catch { /* ignore */ }
+  } catch (err: any) {
+    ElMessage.warning('加载企业树失败，请检查网络')
+  }
   finally { loading.value = false }
   // 如果后端没数据，尝试从基本信息表同步
   if (!rawTree.value.length || (rawTree.value[0]?.children?.length === 0 && !manualCompanies.value.length)) {
@@ -300,7 +302,9 @@ async function syncFromProject() {
         ElMessage.success(`已从基本信息表同步 ${companies.length} 家企业`)
       }
     }
-  } catch { /* ignore */ }
+  } catch (err: any) {
+    ElMessage.warning('从基本信息表同步企业数据失败')
+  }
   finally { loading.value = false }
 }
 

@@ -207,7 +207,11 @@ export function useWorkpaperScaffold(opts: UseWorkpaperScaffoldOptions): UseWork
   const reload = async (): Promise<void> => {
     await opts.reloadFn?.()
   }
-  useWorkpaperEntryInjections({ onJumpToSection: jumpToSection, reloadFn: reload })
+  useWorkpaperEntryInjections({
+    onJumpToSection: jumpToSection,
+    reloadFn: reload,
+    wpId: wpIdRef,
+  })
 
   const fontStyle = computed<Record<string, string>>(() => ({
     '--wp-font-size': displayPrefs.fontConfig?.tableFont ?? '13px',

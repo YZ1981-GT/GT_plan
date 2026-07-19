@@ -174,5 +174,5 @@ async function apiPost(wpId: string, rows: unknown[], totals: unknown): Promise<
     { rows, relatedContext: { totals } },
     { _silent: true } as any,
   )
-  return res?.data?.content ?? res?.content ?? ''
+  return res?.data?.data?.content ?? res?.data?.content ?? res?.content ?? ''
 }

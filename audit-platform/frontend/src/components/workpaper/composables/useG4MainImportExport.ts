@@ -23,7 +23,7 @@ import http from '@/utils/http'
 // ═══ 类型定义 ═══
 
 /** G4(main) 支持导入导出的 sheet 编码（3张动态行表格） */
-export type G4MainImportableSheet = 'G4-2' | 'G4-3' | 'G4-4'
+export type G4MainImportableSheet = 'G4-1' | 'G4-2' | 'G4-3' | 'G4-4'
 
 /** 导入结果 */
 export interface G4MainImportResult {
@@ -47,6 +47,7 @@ export const G4_MAIN_API_PREFIX = 'g4-main'
 
 /** 3张可导入导出 sheet 的中文标签 */
 export const G4_MAIN_IMPORT_EXPORT_SHEETS: G4MainSheetMeta[] = [
+  { code: 'G4-1', label: 'G4-1 审定表' },
   { code: 'G4-2', label: 'G4-2 明细表（5区段）', multiSheet: true },
   { code: 'G4-3', label: 'G4-3 调整分录汇总' },
   { code: 'G4-4', label: 'G4-4 利息测算表' },

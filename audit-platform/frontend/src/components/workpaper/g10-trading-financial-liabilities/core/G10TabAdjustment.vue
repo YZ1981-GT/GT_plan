@@ -89,19 +89,18 @@
       借方 {{ fmt(adj.debitTotal.value) }} · 贷方 {{ fmt(adj.creditTotal.value) }}
     </div>
 
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：可概述调整事项的性质、依据、借贷平衡核对情况及回写审定表的影响。"
-        @change="(val: string) => saveAuditNote(val)" />
-    </el-card>
-
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
-      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：调整分录是否恰当、借贷是否平衡、是否已正确回写审定表。"
-        @change="(val: string) => saveAuditConclusion(val)" />
-    </el-card>
+    <G10AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="auditConclusion"
+      note-ai-section="adjustment-note"
+      conclusion-ai-section="adjustment-conclusion"
+      note-placeholder="填写审计说明：可概述调整事项的性质、依据、借贷平衡核对情况及回写审定表的影响。"
+      note-hint="覆盖 AJE/RJE 依据、借贷平衡及回写 G10-1 影响。"
+      conclusion-placeholder="填写审计结论：调整分录是否恰当、借贷是否平衡、是否已正确回写审定表。"
+      :related-context="{ 借贷差额: adj.balanceDiff.value, 调整净额: adj.adjustmentNet.value }"
+    />
 
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
@@ -115,11 +114,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, onMounted } from 'vue'
+import { ref, toRef, watch } from 'vue'
 import { useG10Adjustment } from '../../composables/useG10Adjustment'
 import { useG10Adjudication } from '../../composables/useG10Adjudication'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import G10ImportExportDropdown from '../G10ImportExportDropdown.vue'
+import G10AuditTextCards from '../G10AuditTextCards.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const props = defineProps<{
@@ -147,24 +147,15 @@ const adj = useG10Adjustment({
   applyAdjustmentToAdjudication: (net) => adjudication.applyNetAdjustment(net),
 })
 
-// ─── 审计说明 / 审计结论（自由文本，conclusion:null 落库）────────────────────
 const NOTE_KEY = 'G10-3-adjustment-audit-note'
 const CONCLUSION_KEY = 'G10-3-adjustment-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-function saveAuditNote(val: string): void {
-  if (props.isReadonly) return
-  auditNote.value = val
-  props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
-}
-function saveAuditConclusion(val: string): void {
-  if (props.isReadonly) return
-  auditConclusion.value = val
-  props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
-}
-onMounted(() => {
-  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNote.value = n.remark
-  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusion.value = c.remark
+const auditNote = ref(props.allResponses.get(NOTE_KEY)?.remark ?? '')
+const auditConclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: v })
+})
+watch(auditConclusion, (v) => {
+  if (!props.isReadonly) props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: v })
 })
 
 function fmt(v: number) {
@@ -175,8 +166,6 @@ function fmt(v: number) {
 <style scoped>
 .g10-adjustment { font-size: var(--wp-font-size, 13px); }
 .objective-alert { margin-bottom: 8px; }
-.audit-note-card { margin-top: 12px; }
-.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 .section-head { display: flex; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .head-actions { display: flex; gap: 8px; flex-wrap: wrap; }

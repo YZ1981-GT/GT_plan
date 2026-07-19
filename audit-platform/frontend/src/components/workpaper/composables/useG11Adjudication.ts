@@ -1,3 +1,4 @@
+import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG11Adjudication — G11-1 审定表（损益类/本期-上期）
  */
@@ -68,6 +69,7 @@ export function useG11Adjudication(opts: {
   debouncedSave: (id: string, d: Partial<ChecklistResponse>) => void
   isReadonly: Ref<boolean> | ComputedRef<boolean>
 }) {
+  const _auditYearRef = useWorkpaperAuditYear()
   const rowStore = ref<RowStore>(parseG11AdjStore(undefined) as RowStore)
   const trialBalanceAmount = ref(0)
   const auditNote = ref('')
@@ -274,13 +276,20 @@ export function useG11Adjudication(opts: {
         detail: { accountCode: G11_ACCOUNT_CODE, adjudicatedAmount: amount },
       }))
     } catch { /* silent */ }
+    try {
+      window.dispatchEvent(new CustomEvent('g11:writeback-trial-balance', {
+        detail: { accountCode: G11_ACCOUNT_CODE, auditedAmount: amount },
+      }))
+    } catch { /* silent */ }
   }
 
   async function loadTrialBalanceFromApi(): Promise<void> {
+    const _year = _auditYearRef.value
+    if (_year == null) return
     if (!opts.projectId.value) return
     try {
       const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-        params: { account_prefix: G11_ACCOUNT_CODE },
+        params: { year: _year, account_prefix: G11_ACCOUNT_CODE  },
         _silent: true,
       } as any)
       const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
@@ -307,7 +316,7 @@ export function useG11Adjudication(opts: {
           changeRate: r.changeRate,
         })),
       }, { _silent: true } as any)
-      const text = res?.data?.content ?? res?.content ?? ''
+      const text = res?.data?.data?.content ?? res?.data?.content ?? res?.content ?? ''
       if (text) updateAuditNote(text)
     } catch { /* AI optional */ }
     finally { aiLoading.value = false }

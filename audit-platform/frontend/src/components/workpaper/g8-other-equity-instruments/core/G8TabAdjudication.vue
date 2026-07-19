@@ -5,7 +5,6 @@
       <div class="g8-actions">
         <GtReviewTrigger section-id="G8-1-adjudication" />
         <el-button size="small" :loading="validateLoading" :disabled="isReadonly" data-testid="g8-validate-btn" @click="runValidate">校验公式</el-button>
-        <el-button size="small" :loading="adj.aiLoading.value" :disabled="isReadonly" @click="adj.generateAiAnalysis()">🤖 AI</el-button>
       </div>
     </div>
 
@@ -170,17 +169,18 @@
       <el-button size="small" type="primary" :disabled="isReadonly" data-testid="g8-publish-adj" @click="adj.publishAdjudicated()">发布审定数</el-button>
     </div>
 
-    <el-card shadow="never" class="g8-note-card">
-      <template #header>审计说明</template>
-      <el-input v-if="!isReadonly" v-model="noteProxy" type="textarea" :rows="3" placeholder="审定分析说明" />
-      <p v-else class="note-text">{{ adj.auditNote.value || '—' }}</p>
-    </el-card>
-
-    <el-card shadow="never" class="g8-note-card">
-      <template #header>审计结论</template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
-        placeholder="填写审计结论：审定数是否准确、分类（OCI）是否恰当，是否与试算表及明细表勾稽一致。" />
-    </el-card>
+    <G8AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="noteProxy"
+      v-model:conclusion="auditConclusion"
+      note-ai-section="adjudication-note"
+      conclusion-ai-section="adjudication-conclusion"
+      note-placeholder="填写审计说明：可概述（1）程序的测试情况、结果；（2）拟调整事项及其调整分录、未调整事项及其影响。"
+      note-hint="覆盖期初/期末审定、OCI 分类及与试算表/明细表勾稽。"
+      conclusion-placeholder="填写审计结论：审定数是否准确、分类（OCI）是否恰当，是否与试算表及明细表勾稽一致。"
+      :related-context="{ 试算表差异: adj.variance.value, 缺失原因行数: adj.missingReasonCount.value }"
+    />
   </div>
 </template>
 
@@ -190,6 +190,7 @@ import { ElMessage } from 'element-plus'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtReviewDot from '../../GtReviewDot.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G8AuditTextCards from '../G8AuditTextCards.vue'
 import { useG8Adjudication } from '../../composables/useG8Adjudication'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
@@ -273,8 +274,6 @@ async function runValidate() {
 .reason-required :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }
 .g8-tb-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 10px 0; }
 .variance.is-error { color: #f56c6c; font-weight: 600; }
-.g8-note-card { margin-top: 8px; }
-.note-text { margin: 0; white-space: pre-wrap; }
 .total-table { margin-top: 8px; }
 .cross-alert { margin: 8px 0; }
 .fine-checks { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }

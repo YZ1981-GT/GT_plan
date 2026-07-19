@@ -159,23 +159,18 @@
       </el-table-column>
     </el-table>
 
-    <el-card shadow="never" class="conclusion-card">
-      <template #header>
-        <div class="conclusion-head">
-          <span>审计结论</span>
-          <el-button size="small" :loading="fv.aiLoading.value" :disabled="isReadonly" @click="fv.generateAiConclusion()">🤖 AI</el-button>
-        </div>
-      </template>
-      <el-input :model-value="fv.conclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
-        :disabled="isReadonly" @update:model-value="fv.updateConclusion" />
-    </el-card>
-
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：可概述公允价值测试的程序执行情况、估值方法与来源核实、Level3 输入值合理性及与 G10-6 调节表勾稽结果。"
-        @change="(val: string) => saveAuditNote(val)" />
-    </el-card>
+    <G10AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="conclusionProxy"
+      note-ai-section="fair-value-note"
+      conclusion-ai-section="fair-value-conclusion"
+      note-placeholder="填写审计说明：可概述公允价值测试的程序执行情况、估值方法与来源核实、Level3 输入值合理性及与 G10-6 调节表勾稽结果。"
+      note-hint="覆盖公允层级划分与估值来源可靠性。"
+      conclusion-placeholder="填写审计结论：公允价值计量是否准确、层次划分是否恰当。"
+      :related-context="{ 行数: fv.rows.value.length, Level3缺失: fv.level3Violations.value.length }"
+    />
 
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
@@ -189,10 +184,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, onMounted } from 'vue'
+import { ref, computed, toRef, watch } from 'vue'
 import { useG10FairValueTest } from '../../composables/useG10FairValueTest'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import G10ImportExportDropdown from '../G10ImportExportDropdown.vue'
+import G10AuditTextCards from '../G10AuditTextCards.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -212,16 +208,15 @@ const fv = useG10FairValueTest({
   wpId: toRef(props, 'wpId'),
 })
 
-// ─── 审计说明（自由文本，conclusion:null 落库）───────────────────────────────
 const NOTE_KEY = 'G10-5-fv-audit-note'
-const auditNote = ref('')
-function saveAuditNote(val: string): void {
-  if (props.isReadonly) return
-  auditNote.value = val
-  props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
-}
-onMounted(() => {
-  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNote.value = n.remark
+const auditNote = ref(props.allResponses.get(NOTE_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: v })
+})
+
+const conclusionProxy = computed({
+  get: () => fv.conclusion.value,
+  set: (v: string) => fv.updateConclusion(v),
 })
 
 const tabOptions = [
@@ -241,8 +236,6 @@ function fmt(v: number) {
 .toolbar h3 { margin: 0; font-size: 15px; flex: 1; }
 .formula { border-bottom: 1px dashed #909399; }
 .l3-alert { margin-bottom: 8px; }
-.conclusion-card { margin-top: 12px; }
-.conclusion-head { display: flex; justify-content: space-between; align-items: center; }
 :deep(.l3-required .el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }
 .guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
 .guidance-content p { margin: 4px 0; }
@@ -250,6 +243,4 @@ function fmt(v: number) {
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .toolbar-right { display: flex; gap: 6px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
-.audit-note-card { margin-top: 12px; }
-.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

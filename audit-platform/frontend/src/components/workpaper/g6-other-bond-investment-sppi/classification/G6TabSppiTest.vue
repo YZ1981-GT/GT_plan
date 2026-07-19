@@ -261,7 +261,15 @@
     <!-- ═══ 审计结论 ═══ -->
     <el-card shadow="never" class="audit-note-card">
       <template #header>
-        <div class="conclusion-header"><span class="conclusion-title">审计结论</span></div>
+        <div class="conclusion-header">
+          <span class="conclusion-title">审计结论</span>
+          <el-button
+            size="small"
+            :disabled="readonly || aiLoading"
+            :loading="aiLoading"
+            @click="handleAi"
+          >✨ AI辅助</el-button>
+        </div>
       </template>
       <el-input
         type="textarea"
@@ -307,6 +315,7 @@ import { ChatDotRound } from '@element-plus/icons-vue'
 import { useG6SppiTest } from '../../composables/useG6SppiTest'
 import type { SppiTestData, SppiItem } from '../../composables/useG6SppiTest'
 import { useG6SppiFormData } from '../../composables/useG6SppiFormData'
+import { useG6SppiAiGenerate } from '../../composables/useG6SppiAiGenerate'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -348,6 +357,9 @@ const formData = useG6SppiFormData({
   projectId: computed(() => props.projectId),
 })
 
+const wpIdRef = computed(() => props.wpId)
+const { generateAndConfirm, loading: aiLoading } = useG6SppiAiGenerate(wpIdRef)
+
 const SPPI_ITEM_ID = 'G6-8-sppi-test-data'
 
 // ─── 审计说明 / 审计结论（独立持久化 checklist_responses） ─────────────────
@@ -366,6 +378,22 @@ function saveAuditConclusion(val: string): void {
   if (props.isReadonly) return
   auditConclusion.value = val
   formData.debouncedSave(CONCLUSION_KEY, { remark: val })
+}
+
+async function handleAi(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'sppi-conclusion',
+    auditConclusion.value || '',
+    {
+      overallConclusion: overallConclusion.value,
+      hasFailedSection: hasFailedSection.value,
+      failedSections: failedSections.value.map((s) => s.title),
+      totalRows: totalRows.value,
+    },
+    'AI SPPI 审计结论',
+  )
+  if (text) saveAuditConclusion(text)
 }
 
 // ─── 加载数据 ──────────────────────────────────────────────────────────────

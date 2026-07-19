@@ -1,18 +1,32 @@
 <template>
   <div class="g5-long-term-receivable">
-    <div v-if="isLoading" class="loading-container">
-      <el-skeleton :rows="8" animated />
+    <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
+    <div v-else-if="loadError" class="error-container">
+      <el-card shadow="never">
+        <el-result icon="error" title="数据加载失败" :sub-title="loadError">
+          <template #extra>
+            <el-button type="primary" @click="retrySelfLoad">重试</el-button>
+          </template>
+        </el-result>
+      </el-card>
     </div>
     <template v-else>
-      <!-- 双模式切换 -->
       <div class="g5-long-term-receivable-toolbar">
-        <el-segmented v-model="viewMode" :options="viewModeOptions" size="small" />
+        <el-segmented
+          v-if="isHtmlSheet"
+          v-model="renderMode"
+          :options="dualMode.modeOptions"
+          size="small"
+        />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
+        <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
+          📖 编制手册
+        </el-button>
+        <el-tag v-if="isHtmlSheet && !isOoAvailable" size="small" type="warning">OO不可用</el-tag>
       </div>
 
-      <!-- OnlyOffice 模式 -->
       <GtOnlyOfficeSheet
-        v-if="viewMode === 'OO'"
+        v-if="isHtmlSheet && renderMode === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -20,110 +34,171 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <!-- HTML 模式：sheetName v-if dispatch -->
-      <template v-else>
-        <G5TabProcedure
-          v-if="currentSheet === 'G5A'"
-          :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :readonly="isReadonly"
+      <G5TabProcedure
+        v-else-if="currentSheet === 'G5A'"
+        :html-data="resolvedHtmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+      />
+      <G5TabAdjudication
+        v-else-if="currentSheet === 'G5-1'"
+        :html-data="resolvedHtmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+        @imported="onSheetImported"
+      />
+      <G5TabBalanceDetail
+        v-else-if="currentSheet === 'G5-2'"
+        :html-data="resolvedHtmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+        :roll-forward-loading="priorYear.loading.value || priorYear.applying.value"
+        @imported="onSheetImported"
+        @roll-forward="handlePriorYearRollForward"
+      />
+      <G5TabBadDebtDetail
+        v-else-if="currentSheet === 'G5-3'"
+        :html-data="resolvedHtmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+        @imported="onSheetImported"
+      />
+      <G5TabAdjustment
+        v-else-if="currentSheet === 'G5-4'"
+        :html-data="resolvedHtmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+        @imported="onSheetImported"
+      />
+      <G5TabLeaseAmortization
+        v-else-if="currentSheet === 'G5-5'"
+        :html-data="resolvedHtmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+        @imported="onSheetImported"
+      />
+      <G5TabInstallmentSales
+        v-else-if="currentSheet === 'G5-6'"
+        :html-data="resolvedHtmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+        @imported="onSheetImported"
+      />
+      <G5TabFactoringCheck
+        v-else-if="currentSheet === 'G5-7'"
+        :html-data="resolvedHtmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+        @imported="onSheetImported"
+      />
+      <G5TabEclPolicy
+        v-else-if="currentSheet === 'G5-8'"
+        :html-data="resolvedHtmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+      />
+      <G5TabStageClassification
+        v-else-if="currentSheet === 'G5-9'"
+        :html-data="resolvedHtmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :is-readonly="isReadonly"
+      />
+      <G5TabImpairmentCalc
+        v-else-if="currentSheet === 'G5-10'"
+        :html-data="resolvedHtmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :is-readonly="isReadonly"
+      />
+      <G5TabReversalWriteoff
+        v-else-if="currentSheet === 'G5-11'"
+        :html-data="resolvedHtmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+        @imported="onSheetImported"
+      />
+      <G5TabVoucherCheck
+        v-else-if="currentSheet === 'G5-12'"
+        :html-data="resolvedHtmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+        @imported="onSheetImported"
+      />
+      <G5TabDisclosureListed
+        v-else-if="currentSheet === '附注上市'"
+        :html-data="resolvedHtmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+      />
+      <G5TabDisclosureSOE
+        v-else-if="currentSheet === '附注国企'"
+        :html-data="resolvedHtmlData"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+      />
+      <template v-else-if="currentSheet === '底稿目录'">
+        <div class="g5-index-toolbar">
+          <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
+            📖 编制手册
+          </el-button>
+          <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
+        </div>
+        <GCycleBIndexExtras
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :sheet-name="props.sheetName"
+          :wp-code="props.wpCode"
+          :html-data="props.htmlData"
+          :available-sheets="availableSheets"
         />
-        <G5TabAdjudication
-          v-else-if="currentSheet === 'G5-1'"
-          :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :readonly="isReadonly"
-        />
-        <G5TabBalanceDetail
-          v-else-if="currentSheet === 'G5-2'"
-          :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :readonly="isReadonly"
-        />
-        <G5TabBadDebtDetail
-          v-else-if="currentSheet === 'G5-3'"
-          :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :readonly="isReadonly"
-        />
-        <G5TabAdjustment
-          v-else-if="currentSheet === 'G5-4'"
-          :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :readonly="isReadonly"
-        />
-        <G5TabLeaseAmortization
-          v-else-if="currentSheet === 'G5-5'"
-          :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :readonly="isReadonly"
-        />
-        <G5TabInstallmentSales
-          v-else-if="currentSheet === 'G5-6'"
-          :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :readonly="isReadonly"
-        />
-        <G5TabFactoringCheck
-          v-else-if="currentSheet === 'G5-7'"
-          :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :readonly="isReadonly"
-        />
-        <G5TabEclPolicy
-          v-else-if="currentSheet === 'G5-8'"
-          :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :readonly="isReadonly"
-        />
-        <G5TabStageClassification
-          v-else-if="currentSheet === 'G5-9'"
-          :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :is-readonly="isReadonly"
-        />
-        <G5TabImpairmentCalc
-          v-else-if="currentSheet === 'G5-10'"
-          :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :is-readonly="isReadonly"
-        />
-        <G5TabReversalWriteoff
-          v-else-if="currentSheet === 'G5-11'"
-          :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :readonly="isReadonly"
-        />
-        <G5TabVoucherCheck
-          v-else-if="currentSheet === 'G5-12'"
-          :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :readonly="isReadonly"
-        />
-        <G5TabDisclosureListed
-          v-else-if="currentSheet === '附注上市'"
-          :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :readonly="isReadonly"
-        />
-        <G5TabDisclosureSOE
-          v-else-if="currentSheet === '附注国企'"
-          :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :readonly="isReadonly"
-        />
-        <G5TabDirectory
-          v-else-if="currentSheet === '底稿目录'"
-          :html-data="sheetData" :wp-id="props.wpId"
-          :project-id="props.projectId" :readonly="isReadonly"
-        />
-        <!-- 未匹配 → OnlyOffice fallback -->
-        <GtOnlyOfficeSheet
-          v-else
-          :wp-id="props.wpId" :project-id="props.projectId"
-          :sheet-name="props.sheetName || ''" :readonly="isReadonly"
-          style="height: calc(100vh - 180px)"
-        />
+        <G5SheetStatusBar :all-responses="formData.allResponses.value" />
       </template>
+      <GtOnlyOfficeSheet
+        v-else
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :sheet-name="props.sheetName || ''"
+        :readonly="isReadonly"
+        style="height: calc(100vh - 180px)"
+      />
 
-      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
+      <G5PreparationHandbookDialog
+        v-model="handbookVisible"
+        :initial-tab="handbookTab"
+      />
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, defineAsyncComponent, provide, inject } from 'vue'
-import { useG5FormData } from './composables/useG5FormData'
+/**
+ * GtG5LongTermReceivable.vue — G5 长期应收款底稿主入口
+ * 对齐 G2/G3/G4：formData + g5:save-items + 附注路由 + 双模式 reload
+ */
+import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useG5DualMode } from './composables/useG5DualMode'
+import { useG5LonRecFormData, G5FormDataKey } from './composables/useG5LonRecFormData'
+import { useG5PriorYearRollForward } from './composables/useG5PriorYearRollForward'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import type { ChecklistResponse } from './composables/useF1FormData'
+import { extractG5SheetCode, resolveG5SheetLabel } from './composables/g5SheetLabels'
 
-// ═══ defineAsyncComponent × 16 lazy load ═══
-// core/
+const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const G5TabProcedure = defineAsyncComponent(() => import('./g5-long-term-receivable/core/G5TabProcedure.vue'))
 const G5TabAdjudication = defineAsyncComponent(() => import('./g5-long-term-receivable/core/G5TabAdjudication.vue'))
 const G5TabBalanceDetail = defineAsyncComponent(() => import('./g5-long-term-receivable/core/G5TabBalanceDetail.vue'))
@@ -131,20 +206,21 @@ const G5TabBadDebtDetail = defineAsyncComponent(() => import('./g5-long-term-rec
 const G5TabAdjustment = defineAsyncComponent(() => import('./g5-long-term-receivable/core/G5TabAdjustment.vue'))
 const G5TabDisclosureListed = defineAsyncComponent(() => import('./g5-long-term-receivable/core/G5TabDisclosureListed.vue'))
 const G5TabDisclosureSOE = defineAsyncComponent(() => import('./g5-long-term-receivable/core/G5TabDisclosureSOE.vue'))
-const G5TabDirectory = defineAsyncComponent(() => import('./g5-long-term-receivable/core/G5TabDirectory.vue'))
-// measurement/
 const G5TabLeaseAmortization = defineAsyncComponent(() => import('./g5-long-term-receivable/measurement/G5TabLeaseAmortization.vue'))
 const G5TabInstallmentSales = defineAsyncComponent(() => import('./g5-long-term-receivable/measurement/G5TabInstallmentSales.vue'))
 const G5TabFactoringCheck = defineAsyncComponent(() => import('./g5-long-term-receivable/measurement/G5TabFactoringCheck.vue'))
 const G5TabEclPolicy = defineAsyncComponent(() => import('./g5-long-term-receivable/measurement/G5TabEclPolicy.vue'))
-// impairment/
 const G5TabStageClassification = defineAsyncComponent(() => import('./g5-long-term-receivable/impairment/G5TabStageClassification.vue'))
 const G5TabImpairmentCalc = defineAsyncComponent(() => import('./g5-long-term-receivable/impairment/G5TabImpairmentCalc.vue'))
 const G5TabReversalWriteoff = defineAsyncComponent(() => import('./g5-long-term-receivable/impairment/G5TabReversalWriteoff.vue'))
-// voucher/
 const G5TabVoucherCheck = defineAsyncComponent(() => import('./g5-long-term-receivable/voucher/G5TabVoucherCheck.vue'))
-// shared
-const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+const G5PreparationHandbookDialog = defineAsyncComponent(
+  () => import('./g5-long-term-receivable/G5PreparationHandbookDialog.vue'),
+)
+const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
+const G5SheetStatusBar = defineAsyncComponent(
+  () => import('./g5-long-term-receivable/G5SheetStatusBar.vue'),
+)
 
 const props = defineProps<{
   wpId: string
@@ -155,53 +231,187 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
+const emit = defineEmits<{
+  (e: 'navigate-sheet', sheetName: string): void
+}>()
+
 const isLoading = ref(true)
+const loadError = ref<string | null>(null)
+const selfLoadData = ref<Record<string, any> | null>(null)
+const wpIdRef = computed(() => props.wpId)
+const projectIdRef = computed(() => props.projectId)
 const isReadonly = computed(() => !!props.readonly)
 
-// ═══ sheetName 正则提取编码 ═══
-const currentSheet = computed(() => {
-  const name = props.sheetName || props.wpCode || ''
-  if (/底稿目录/.test(name)) return '底稿目录'
-  if (/附注披露/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
-  const m = name.match(/(G5A|G5-1[0-2]|G5-[1-9])/)
-  return m ? m[1] : ''
+const formData = useG5LonRecFormData({
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+  onAfterSave: () => scheduleAutoSnapshot(),
+})
+provide(G5FormDataKey, formData)
+
+const priorYear = useG5PriorYearRollForward({
+  projectId: projectIdRef,
+  wpId: wpIdRef,
+  allResponses: formData.allResponses,
+  saveImmediate: formData.saveImmediate,
+  saveBatch: formData.saveBatch,
 })
 
-// ═══ 双模式 ═══
-const { viewMode, viewModeOptions } = useG5DualMode()
+async function handlePriorYearRollForward(): Promise<void> {
+  try {
+    let plan = await priorYear.loadPreview(false)
+    if (plan.changes.length === 0) {
+      try {
+        await ElMessageBox.confirm(
+          '没有可结转数据，或本期期初已填写。是否强制覆盖已填期初字段？',
+          '上年结转',
+          { type: 'warning', confirmButtonText: '强制覆盖', cancelButtonText: '取消' },
+        )
+      } catch {
+        return
+      }
+      plan = await priorYear.loadPreview(true)
+      if (plan.changes.length === 0) {
+        ElMessage.info('没有可结转数据')
+        return
+      }
+    }
+    if (await priorYear.applyPreview(plan)) {
+      ElMessage.success('上年数据结转完成')
+      await formData.loadAll()
+    }
+  } catch (error: any) {
+    if (error === 'cancel' || error === 'close') return
+    ElMessage.error(error?.response?.data?.detail || error?.message || '上年结转失败')
+  }
+}
 
-// ═══ selfLoad: htmlData 为 null 时自行调用 render-config ═══
-const formData = useG5FormData({
-  wpId: computed(() => props.wpId),
-  projectId: computed(() => props.projectId),
-  htmlData: computed(() => props.htmlData),
+const currentSheet = computed(() => extractG5SheetCode(props.sheetName || props.wpCode || ''))
+
+const HTML_SHEETS = new Set([
+  'G5A', 'G5-1', 'G5-2', 'G5-3', 'G5-4', 'G5-5', 'G5-6', 'G5-7',
+  'G5-8', 'G5-9', 'G5-10', 'G5-11', 'G5-12',
+  '附注上市', '附注国企', '底稿目录',
+])
+const isHtmlSheet = computed(() => HTML_SHEETS.has(currentSheet.value))
+const resolvedHtmlData = computed(() => props.htmlData ?? selfLoadData.value)
+
+const dualMode = useG5DualMode({
+  wpId: wpIdRef,
+  sheetName: computed(() => props.sheetName || ''),
+  reloadAll: () => formData.loadAll(),
 })
-const sheetData = computed(() => props.htmlData || formData.data.value)
 
-// ═══ Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ═══
+/** 对齐 G1：computed getter/setter 安全包装 dualMode ref 避免模板嵌套 .value */
+const renderMode = computed({
+  get: () => dualMode.currentMode.value,
+  set: (v: string) => { void dualMode.switchMode(v as any) },
+})
+const isOoAvailable = computed(() => dualMode.isOoAvailable.value)
+
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
 provide('g5VersionTrailRef', versionTrailRef)
 provide('g5OpenVersionHistory', openVersionHistory)
+provide('reloadWorkpaperData', () => formData.loadAll())
 
-// 复核对话 openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
-provide('reloadWorkpaperData', () => formData.load())
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage' = 'preparation'): void {
+  handbookTab.value = tab
+  handbookVisible.value = true
+}
+provide('openG5Handbook', openHandbook)
+
+const availableSheets = computed(() => {
+  const fromHtml = props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets
+  if (Array.isArray(fromHtml) && fromHtml.length) return fromHtml
+  // 对齐 G1：htmlData 无 sheets 时用自加载 render-config 的 sheetCache 兜底，
+  // 保证底稿目录架构树非空
+  return Object.keys(formData.sheetCache.value).map(sheet_name => ({ sheet_name }))
+})
+
+function onDirectoryJump(code: string): void {
+  emit('navigate-sheet', code)
+}
+
+function onSheetImported(): void {
+  void formData.loadAll()
+}
+
+async function handleG5SaveItems(e: Event): Promise<void> {
+  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
+  if (Array.isArray(items) && items.length > 0) {
+    for (const it of items) {
+      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
+    }
+    scheduleAutoSnapshot()
+  }
+}
+
+function handleAdjudicated(e: Event): void {
+  const d = (e as CustomEvent<{ accountCode: string; adjudicatedAmount: number }>).detail
+  if (d?.accountCode === '1531') {
+    void formData.saveImmediate('G5-1-adjudicated-amount', {
+      item_id: 'G5-1-adjudicated-amount',
+      conclusion: String(d.adjudicatedAmount),
+      remark: null,
+    })
+  }
+}
+
+function handleG5Writeback(e: Event): void {
+  const d = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number }>).detail
+  if (!d || d.accountCode !== '1531') return
+  if (typeof d.auditedAmount !== 'number' || !Number.isFinite(d.auditedAmount)) return
+  void formData.writebackTrialBalance(d.auditedAmount)
+}
+
+async function selfLoad(): Promise<void> {
+  try {
+    await formData.loadAll()
+    if (props.htmlData != null) return
+    // 复用 loadAll 已拉取的 render-config，避免二次请求
+    const cache = formData.sheetCache.value
+    const keys = Object.keys(cache)
+    if (keys.length === 0) return
+    const wanted = resolveG5SheetLabel(currentSheet.value || 'G5A', keys.map((k) => ({ sheet_name: k })))
+    selfLoadData.value = cache[wanted] ?? cache[keys[0]]
+  } catch (err: any) {
+    loadError.value = err?.message || '加载渲染配置失败'
+  }
+}
+
+async function retrySelfLoad(): Promise<void> {
+  loadError.value = null
+  isLoading.value = true
+  await selfLoad()
+  isLoading.value = false
+}
 
 onMounted(async () => {
-  await formData.load()
+  window.addEventListener('g5:save-items', handleG5SaveItems)
+  window.addEventListener('substantive:adjudicated', handleAdjudicated)
+  window.addEventListener('g5:writeback-trial-balance', handleG5Writeback)
+  await selfLoad()
   isLoading.value = false
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('g5:save-items', handleG5SaveItems)
+  window.removeEventListener('substantive:adjudicated', handleAdjudicated)
+  window.removeEventListener('g5:writeback-trial-balance', handleG5Writeback)
+  formData.flushPending()
 })
 </script>
 
 <style scoped>
 .g5-long-term-receivable { padding: 12px; }
 .loading-container { padding: 24px; }
-.g5-long-term-receivable-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-}
+.error-container { padding: 24px; }
+.g5-long-term-receivable-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
+.g5-index-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 </style>

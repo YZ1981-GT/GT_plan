@@ -1,3 +1,4 @@
+import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG8Adjudication — G8-1 审定表（借方/单分组公允价值/账项调整）
  */
@@ -51,6 +52,7 @@ export function useG8Adjudication(opts: {
   debouncedSave: (id: string, d: Partial<ChecklistResponse>) => void
   isReadonly: Ref<boolean> | ComputedRef<boolean>
 }) {
+  const _auditYearRef = useWorkpaperAuditYear()
   const rowStore = ref<RowStore>(parseG8AdjStore(undefined))
   const trialBalanceAmount = ref(0)
   const auditNote = ref('')
@@ -230,10 +232,12 @@ export function useG8Adjudication(opts: {
   }
 
   async function loadTrialBalanceFromApi(): Promise<void> {
+    const _year = _auditYearRef.value
+    if (_year == null) return
     if (!opts.projectId.value) return
     try {
       const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-        params: { account_prefix: G8_ACCOUNT_CODE },
+        params: { year: _year, account_prefix: G8_ACCOUNT_CODE  },
         _silent: true,
       } as any)
       const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])

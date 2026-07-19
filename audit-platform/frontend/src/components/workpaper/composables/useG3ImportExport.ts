@@ -10,7 +10,7 @@
  *   POST /api/workpapers/{wpId}/g3/import-data?sheet={code}
  *
  * UI 铁律：el-dropdown「导入导出 ▾」（导出模板/导出数据/导入数据）。
- * 支持 5 张动态行表格：G3-1/G3-2/G3-3/G3-4/G3-5。
+ * 支持动态行表格：G3-1/G3-2/G3-3/G3-4/G3-4-subsequent/G3-5。
  */
 import { type Ref } from 'vue'
 import {
@@ -18,28 +18,32 @@ import {
   type ImportExportResult,
 } from './useWorkpaperImportExport'
 
-/** G3 支持导入导出的 sheet 编码（5 张动态行表格） */
+/** G3 支持导入导出的 sheet 编码 */
 export type G3ImportableSheet =
   | 'G3-1'
   | 'G3-2'
   | 'G3-3'
   | 'G3-4'
+  | 'G3-4-subsequent'
   | 'G3-5'
 
 export const G3_API_PREFIX = 'g3'
 
-/** 5 张可导入导出 sheet 的中文标签（供下拉菜单展示） */
+/** 可导入导出 sheet 的中文标签（供下拉菜单展示） */
 export const G3_IMPORTABLE_SHEETS: { code: G3ImportableSheet; label: string }[] = [
   { code: 'G3-1', label: 'G3-1 审定表' },
   { code: 'G3-2', label: 'G3-2 明细表' },
   { code: 'G3-3', label: 'G3-3 调整分录' },
-  { code: 'G3-4', label: 'G3-4 测算及检查表' },
+  { code: 'G3-4', label: 'G3-4 测算及检查表（增加/减少）' },
+  { code: 'G3-4-subsequent', label: 'G3-4 期后收回检查' },
   { code: 'G3-5', label: 'G3-5 长期未收回检查' },
 ]
 
 /** sheetName → 可导入导出 sheet code（用于按当前 sheet 过滤下拉项） */
 export function resolveG3ImportableSheet(sheetName: string): G3ImportableSheet | null {
-  const m = (sheetName || '').match(/G3-(\d+)/)
+  const name = sheetName || ''
+  if (/G3-4.*期后|subsequent/i.test(name)) return 'G3-4-subsequent'
+  const m = name.match(/G3-(\d+)/)
   if (!m) return null
   const code = `G3-${m[1]}` as G3ImportableSheet
   return G3_IMPORTABLE_SHEETS.some((s) => s.code === code) ? code : null

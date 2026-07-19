@@ -1,3 +1,4 @@
+import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG10Adjudication — G10-1 审定表（贷方/期初期末列）
  */
@@ -56,6 +57,7 @@ export function useG10Adjudication(opts: {
   debouncedSave: (id: string, d: Partial<ChecklistResponse>) => void
   isReadonly: Ref<boolean> | ComputedRef<boolean>
 }) {
+  const _auditYearRef = useWorkpaperAuditYear()
   const rowStore = ref<RowStore>(parseG10AdjStore(undefined))
   const trialBalanceAmount = ref(0)
   const auditNote = ref('')
@@ -254,10 +256,12 @@ export function useG10Adjudication(opts: {
   }
 
   async function loadTrialBalanceFromApi(): Promise<void> {
+    const _year = _auditYearRef.value
+    if (_year == null) return
     if (!opts.projectId.value) return
     try {
       const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-        params: { account_prefix: G10_ACCOUNT_CODE },
+        params: { year: _year, account_prefix: G10_ACCOUNT_CODE  },
         _silent: true,
       } as any)
       const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])

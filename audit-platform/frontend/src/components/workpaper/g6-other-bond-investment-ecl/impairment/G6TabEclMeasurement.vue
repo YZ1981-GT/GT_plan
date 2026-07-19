@@ -38,7 +38,7 @@
         <div class="section-header">
           <span class="section-title">(一) PD（违约概率）</span>
           <div class="section-actions">
-            <el-button size="small" :disabled="isReadonly" @click="handleAi('pd')">
+            <el-button size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="handleAi('pd')">
               🤖 AI辅助
             </el-button>
             <el-button size="small" @click="openReview('G6-13-pd')">💬复核</el-button>
@@ -118,7 +118,7 @@
         <div class="section-header">
           <span class="section-title">(二) LGD（违约损失率）</span>
           <div class="section-actions">
-            <el-button size="small" :disabled="isReadonly" @click="handleAi('lgd')">
+            <el-button size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="handleAi('lgd')">
               🤖 AI辅助
             </el-button>
             <el-button size="small" @click="openReview('G6-13-lgd')">💬复核</el-button>
@@ -198,7 +198,7 @@
         <div class="section-header">
           <span class="section-title">(三) EAD（违约风险暴露）</span>
           <div class="section-actions">
-            <el-button size="small" :disabled="isReadonly" @click="handleAi('ead')">
+            <el-button size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="handleAi('ead')">
               🤖 AI辅助
             </el-button>
             <el-button size="small" @click="openReview('G6-13-ead')">💬复核</el-button>
@@ -278,7 +278,7 @@
         <div class="section-header">
           <span class="section-title">(四) 折现率</span>
           <div class="section-actions">
-            <el-button size="small" :disabled="isReadonly" @click="handleAi('discount-rate')">
+            <el-button size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="handleAi('discount-rate')">
               🤖 AI辅助
             </el-button>
             <el-button size="small" @click="openReview('G6-13-discount-rate')">💬复核</el-button>
@@ -358,7 +358,7 @@
         <div class="section-header">
           <span class="section-title">(五) 前瞻性信息</span>
           <div class="section-actions">
-            <el-button size="small" :disabled="isReadonly" @click="handleAi('forward-looking')">
+            <el-button size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="handleAi('forward-looking')">
               🤖 AI辅助
             </el-button>
             <el-button size="small" @click="openReview('G6-13-forward-looking')">💬复核</el-button>
@@ -483,11 +483,10 @@
  * 底部编制提示details折叠
  */
 import { ref, inject, watch, onMounted, computed } from 'vue'
-import { ElMessage } from 'element-plus'
 import { useG6EclFormData } from '../../composables/useG6EclFormData'
 import type { EclCheckRow } from '../../composables/useG6EclFormData'
+import { useG6EclAiGenerate } from '../../composables/useG6EclAiGenerate'
 import GtIndexChip from '../../GtIndexChip.vue'
-import http from '@/utils/http'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -503,9 +502,12 @@ function openReview(sectionId: string): void {
   openReviewDialog(sectionId)
 }
 
+const wpIdRef = computed(() => props.wpId)
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG6EclAiGenerate(wpIdRef)
+
 // ─── 数据层 ───
 const formData = useG6EclFormData({
-  wpId: computed(() => props.wpId),
+  wpId: wpIdRef,
   projectId: computed(() => props.projectId),
 })
 
@@ -649,29 +651,25 @@ function updateRow(rowId: string, field: keyof EclCheckRow, value: any): void {
 
 // ─── AI辅助 ───
 async function handleAi(section: string): Promise<void> {
-  try {
-    const { data } = await http.post(
-      `/api/workpapers/${props.wpId}/g6-ecl/ai/ecl-measurement-conclusion`,
-      { section, projectId: props.projectId },
-      { _silent: true } as any,
-    )
-    const result = data?.data?.conclusion || data?.conclusion
-    if (result) {
-      ElMessage.success('AI结论已生成')
-      // 将AI结论填入对应section最后一行的auditConclusion
-      const sectionMap: Record<string, typeof pdSection> = {
-        pd: pdSection, lgd: lgdSection, ead: eadSection,
-        'discount-rate': discountRateSection, 'forward-looking': forwardLookingSection,
-      }
-      const target = sectionMap[section]
-      if (target && target.value.length > 0) {
-        const lastRow = target.value[target.value.length - 1]
-        lastRow.auditConclusion = result
-        saveAll()
-      }
-    }
-  } catch {
-    ElMessage.info(`AI辅助(${section})功能将在AI模块完成后启用`)
+  if (props.isReadonly) return
+  const sectionMap: Record<string, typeof pdSection> = {
+    pd: pdSection, lgd: lgdSection, ead: eadSection,
+    'discount-rate': discountRateSection, 'forward-looking': forwardLookingSection,
+  }
+  const target = sectionMap[section]
+  const existing = target?.value?.length
+    ? (target.value[target.value.length - 1].auditConclusion || '')
+    : ''
+  const text = await generateAndConfirm(
+    'ecl-measurement-conclusion',
+    existing,
+    { section },
+    'AI 审计结论',
+  )
+  if (text && target && target.value.length > 0) {
+    const lastRow = target.value[target.value.length - 1]
+    lastRow.auditConclusion = text
+    saveAll()
   }
 }
 

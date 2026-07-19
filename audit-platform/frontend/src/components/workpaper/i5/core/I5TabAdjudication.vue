@@ -1,5 +1,9 @@
 <template>
   <div class="i5-adjudication">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：确认其他非流动资产期末余额的存在性、完整性、权利和义务、计价与分摊及列报与披露的恰当性。" />
+
     <!-- 方法论上下文（琥珀色左边线+浅黄背景） -->
     <div class="methodology-context">
       <p><strong>其他非流动资产审定原理：</strong>科目1911（借方/资产类）。期末=期初+增加-减少。</p>
@@ -478,6 +482,9 @@ function isHighChangeRate(rate: number | null | undefined): boolean {
 }
 .methodology-context p { margin: 0; }
 .methodology-context strong { color: #78350f; }
+
+/* 审计目标 */
+.objective-alert { margin-bottom: 14px; }
 
 /* 警告 */
 .adj-warning { margin-bottom: 12px; }

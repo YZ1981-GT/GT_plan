@@ -1,5 +1,8 @@
 <template>
   <div class="i4-adjudication">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" title="审计目标：检查长期待摊费用期末余额的存在性、完整性、准确性及列报的恰当性；确认摊销计提充分、资本化判断合理、期末余额与试算平衡表一致。" class="objective-alert" />
+
     <!-- 方法论上下文（琥珀色左边线+浅黄背景） -->
     <div class="methodology-context">
       <p><strong>长期待摊费用审定原理：</strong>科目1801（借方/资产类）。期末=期初+增加-摊销-减少。</p>
@@ -457,6 +460,10 @@ function fmtAmount(value: number | null | undefined): string {
   font-size: var(--wp-font-size, 13px);
   padding: 16px;
 }
+
+/* 审计目标 */
+.objective-alert { margin-bottom: 14px; }
+.i4-adjudication :deep(.objective-alert .el-alert__content) { padding: 2px 0; }
 
 /* 方法论上下文（琥珀色左边线+浅黄背景） */
 .methodology-context {

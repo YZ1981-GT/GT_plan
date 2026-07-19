@@ -135,7 +135,7 @@ export function useG12FairValueTest(opts: {
         { existingContent: conclusion.value, relatedContext: { rows: rows.value } },
         { _silent: true } as any,
       )
-      const content = res?.data?.content ?? res?.content ?? ''
+      const content = res?.data?.data?.content ?? res?.data?.content ?? res?.content ?? ''
       if (content) updateConclusion(content)
     } catch {
       updateConclusion(conclusion.value || '经测试，套期关系整体有效，公允价值变动与套期关系明细表 G12-2 交叉核对一致。')

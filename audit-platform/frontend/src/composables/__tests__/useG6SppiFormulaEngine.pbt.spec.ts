@@ -21,6 +21,9 @@ import {
   calcEndingAmortized,
   calcInventoryRollForward,
   calcFairValueDiff,
+  calcFairValueAmount,
+  calcFairValueQtyImpact,
+  calcFairValuePriceImpact,
 } from '../useG6SppiFormulaEngine'
 
 // ═══ Generators ═══
@@ -140,6 +143,41 @@ describe('Feature: g6-other-bond-investment-sppi, Property 5: 公允价值差异
         amounts(),
         (audited, unadjusted) => {
           expect(calcFairValueDiff(audited, unadjusted)).toBe(round2(audited - unadjusted))
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+
+  it('calcFairValueAmount(qty, price) === round(qty × price, 2)', () => {
+    fc.assert(
+      fc.property(
+        quantities(),
+        amounts(),
+        (qty, price) => {
+          expect(calcFairValueAmount(qty, price)).toBe(round2(qty * price))
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+
+  it('数量影响 + 价格影响 ≈ 总差异（分量各自四舍五入，允许 ±0.02）', () => {
+    // 价格用「分」整数再 /100，贴近财务金额
+    const prices = () => fc.integer({ min: 1, max: 1_000_000 }).map(cents => cents / 100)
+    fc.assert(
+      fc.property(
+        quantities(),
+        quantities(),
+        prices(),
+        prices(),
+        (unadjQty, auditedQty, unadjPrice, auditedPrice) => {
+          const unadjFv = calcFairValueAmount(unadjQty, unadjPrice)
+          const auditedFv = calcFairValueAmount(auditedQty, auditedPrice)
+          const diff = calcFairValueDiff(auditedFv, unadjFv)
+          const qtyImpact = calcFairValueQtyImpact(auditedQty, unadjQty, unadjPrice)
+          const priceImpact = calcFairValuePriceImpact(auditedQty, auditedPrice, unadjPrice)
+          expect(Math.abs(round2(qtyImpact + priceImpact) - diff)).toBeLessThanOrEqual(0.02)
         },
       ),
       { numRuns: 100 },

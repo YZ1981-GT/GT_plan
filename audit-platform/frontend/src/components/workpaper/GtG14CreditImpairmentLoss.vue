@@ -74,11 +74,10 @@
         :debounced-save="onDebouncedSave"
       />
 
-      <div v-else-if="currentSheet === '底稿目录'" class="g-cycle-tab-index-page">
-        <G14TabDirectory
-          :all-responses="formData.allResponses.value"
-          :available-sheets="availableSheets"
-        />
+      <template v-else-if="currentSheet === '底稿目录'">
+        <div class="g14-index-toolbar">
+          <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
+        </div>
         <GCycleBIndexExtras
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -87,7 +86,7 @@
           :html-data="props.htmlData"
           :available-sheets="availableSheets"
         />
-      </div>
+      </template>
 
       <GtGridSheet
         v-else-if="useGridFallback"
@@ -124,7 +123,6 @@ const G14TabDetail = defineAsyncComponent(() => import('./g14-credit-impairment-
 const G14TabAdjustment = defineAsyncComponent(() => import('./g14-credit-impairment-loss/G14TabAdjustment.vue'))
 const G14TabDisclosureListed = defineAsyncComponent(() => import('./g14-credit-impairment-loss/G14TabDisclosureListed.vue'))
 const G14TabDisclosureSOE = defineAsyncComponent(() => import('./g14-credit-impairment-loss/G14TabDisclosureSOE.vue'))
-const G14TabDirectory = defineAsyncComponent(() => import('./g14-credit-impairment-loss/G14TabDirectory.vue'))
 const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -187,9 +185,15 @@ async function reloadAll() {
   await formData.loadAll()
 }
 
-const availableSheets = computed(() =>
-  props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets ?? [],
-)
+const availableSheets = computed(() => {
+  const fromHtml = props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets
+  if (Array.isArray(fromHtml) && fromHtml.length) return fromHtml
+  const metaSheets = formData.renderMeta.value?.sheets
+  if (Array.isArray(metaSheets) && metaSheets.length) return metaSheets
+  // 对齐 G1：无 sheets 元数据时用自加载 render-config 的 sheetCache 兜底，
+  // 保证底稿目录架构树非空
+  return Object.keys(formData.sheetCache.value).map(sheet_name => ({ sheet_name }))
+})
 
 // 复核对话 provider 由 Runtime Boundary(GtWpRenderer) 统一提供 openReviewDialog
 const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
@@ -210,6 +214,7 @@ onMounted(async () => {
 <style scoped>
 .g14-credit-impairment-loss { padding: 12px; }
 .g-cycle-tab-index-page { padding: 0; }
+.g14-index-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 .loading-container { padding: 24px; }
 .g14-credit-impairment-loss-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
 </style>

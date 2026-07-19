@@ -46,20 +46,20 @@
         <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">
           + 投资项目
         </el-button>
-        <!-- 导入导出 dropdown -->
-        <el-dropdown size="small" trigger="click" @command="handleImportExportCommand">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item
-                v-for="opt in importExportOptions"
-                :key="opt.command"
-                :command="opt.command"
-              >{{ opt.label }}</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-        <el-button size="small" type="primary" link @click="handleAiConclusion">
+        <G6EclImportExportDropdown
+          :wp-id="wpId"
+          sheet="G6-12"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
+        <el-button
+          size="small"
+          type="primary"
+          link
+          :disabled="isReadonly || !aiAvailable"
+          :loading="aiLoading"
+          @click="handleAiConclusion"
+        >
           🤖 AI
         </el-button>
         <el-button size="small" @click="openReviewDialog('G6-12-impairment-calc')">💬复核</el-button>
@@ -385,7 +385,14 @@
     <el-card class="conclusion-card" shadow="never">
       <div class="conclusion-header">
         <span class="conclusion-title">审计结论</span>
-        <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleAiConclusion">
+        <el-button
+          size="small"
+          type="primary"
+          link
+          :disabled="isReadonly || !aiAvailable"
+          :loading="aiLoading"
+          @click="handleAiConclusion"
+        >
           🤖 AI生成
         </el-button>
       </div>
@@ -415,8 +422,7 @@
       </ul>
     </details>
 
-    <!-- 隐藏 file input 用于导入 -->
-    <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="handleFileSelected" />
+    </details>
   </div>
 </template>
 
@@ -433,11 +439,11 @@
  */
 import { ref, computed, inject, onMounted } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 import { useG6EclImpairmentCalc } from '../../composables/useG6EclImpairmentCalc'
-import { useG6EclImportExport } from '../../composables/useG6EclImportExport'
-import GtIndexChip from '../../GtIndexChip.vue'
 import { useG6EclFormData, type ImpairmentCalcRow } from '../../composables/useG6EclFormData'
+import { useG6EclAiGenerate } from '../../composables/useG6EclAiGenerate'
+import GtIndexChip from '../../GtIndexChip.vue'
+import G6EclImportExportDropdown from '../G6EclImportExportDropdown.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -446,17 +452,16 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
+const emit = defineEmits<{ imported: [] }>()
+
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
 const calc = useG6EclImpairmentCalc()
 const conclusion = ref('')
 const activeTab = ref<'tab1' | 'tab2'>('tab1')
-const fileInputRef = ref<HTMLInputElement | null>(null)
-
-// ─── 导入导出 ────────────────────────────────────────────────────────────────
 
 const wpIdRef = computed(() => props.wpId)
-const importExport = useG6EclImportExport({ wpId: wpIdRef })
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG6EclAiGenerate(wpIdRef)
 
 // ─── 审计说明（持久化 checklist_responses, conclusion:null） ───
 const NOTE_KEY = 'G6-12-impairment-calc-audit-note'
@@ -469,30 +474,6 @@ function saveAuditNote(val: string): void {
   if (props.isReadonly) return
   auditNote.value = val
   noteFormData.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
-}
-
-const importExportOptions = computed(() => importExport.getDropdownOptions('G6-12'))
-
-async function handleImportExportCommand(command: string) {
-  const [action, sheet] = command.split(':') as [string, string]
-  if (action === 'export-template') {
-    await importExport.exportTemplate('G6-12')
-  } else if (action === 'export-data') {
-    await importExport.exportData('G6-12')
-  } else if (action === 'import-data') {
-    fileInputRef.value?.click()
-  }
-}
-
-async function handleFileSelected(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-  const result = await importExport.importData('G6-12', file)
-  if (result) {
-    ElMessage.success(`导入成功：${result.rowCount}行`)
-  }
-  input.value = ''
 }
 
 // ─── 区段Tab选项 ─────────────────────────────────────────────────────────────
@@ -623,8 +604,15 @@ async function handleAddRow() {
 
 // ─── AI生成审计结论 ─────────────────────────────────────────────────────────
 
-function handleAiConclusion() {
-  ElMessage.info('AI生成减值测算结论(impairment-conclusion)将在AI模块完成后启用')
+async function handleAiConclusion(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'impairment-conclusion',
+    conclusion.value || '',
+    { rowCount: calc.rows.value.length },
+    'AI 审计结论',
+  )
+  if (text) conclusion.value = text
 }
 
 // ─── 数字格式化 ─────────────────────────────────────────────────────────────

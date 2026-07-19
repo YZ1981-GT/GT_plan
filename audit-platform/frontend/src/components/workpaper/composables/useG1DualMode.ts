@@ -1,10 +1,13 @@
 ﻿/**
- * useG1DualMode — G1 交易性金融资产 HTML ↔ OnlyOffice 双模式切换（比照 useF5CosOfDualMode）
+ * useG1DualMode — G1 HTML ↔ OnlyOffice 双模式（对齐 D4 useD4EntryDualMode / useWorkpaperEntryDualMode）
  *
- * Spec: .kiro/specs/g1-trading-financial-assets/ Task 8.2 / Req 15.4
- * 模式状态(html/onlyoffice) + 健康检查 + 切换 + localStorage 持久化(per wpId)
+ * - 健康检查后才允许切在线编辑；不可用时强制回结构化视图
+ * - resolveOoSheetName：编码 → 真实 sheet_name（供 GtOnlyOfficeSheet）
+ * - fallback：OO 初始化失败时由入口切回 html
  */
-import { ref, onMounted, type Ref } from 'vue'
+import { ref, computed, onMounted, type Ref } from 'vue'
+import { dualModeHtmlOoOptions } from './dualModeLabels'
+import { resolveG1SheetLabel } from './g1SheetLabels'
 
 export type G1RenderMode = 'html' | 'onlyoffice'
 
@@ -12,30 +15,40 @@ const STORAGE_PREFIX = 'g1-dual-mode:'
 
 export interface UseG1DualModeOptions {
   wpId: Ref<string>
+  /** 当前分发编码，如 G1-9 */
+  currentSheet: Ref<string>
+  /** render-config / htmlData.sheets */
+  availableSheets: Ref<Array<{ sheet_name?: string }>>
+  /** 外层传入的完整 sheetName（优先用于匹配） */
   sheetName?: Ref<string>
   reloadAll?: () => Promise<void>
 }
 
 export function useG1DualMode(options: UseG1DualModeOptions) {
-  const { wpId, reloadAll } = options
+  const { wpId, currentSheet, availableSheets, sheetName, reloadAll } = options
 
   const currentMode = ref<G1RenderMode>('html')
   const isOoAvailable = ref(false)
-  const ooConfig = ref<Record<string, any> | null>(null)
   const checking = ref(false)
 
-  const modeOptions = [
-    { label: '结构化视图', value: 'html' },
-    { label: '在线编辑', value: 'onlyoffice' },
-  ]
+  const modeOptions = computed(() =>
+    dualModeHtmlOoOptions({ onlineDisabled: !isOoAvailable.value }),
+  )
 
-  function loadPersistedMode(): void {
+  function resolveOoSheetName(): string {
+    const code = currentSheet.value
+    if (!code || code === '底稿目录') return sheetName?.value || 'G1-1'
+    return resolveG1SheetLabel(code, availableSheets.value, sheetName?.value)
+  }
+
+  function loadPersistedMode(): G1RenderMode | null {
     try {
       const saved = localStorage.getItem(STORAGE_PREFIX + wpId.value)
-      if (saved === 'html' || saved === 'onlyoffice') currentMode.value = saved
+      if (saved === 'html' || saved === 'onlyoffice') return saved
     } catch {
       /* ignore */
     }
+    return null
   }
 
   function persistMode(mode: G1RenderMode): void {
@@ -55,10 +68,11 @@ export function useG1DualMode(options: UseG1DualModeOptions) {
         return false
       }
       const result = await response.json()
-      // 健康端点双层信封兼容：result.data?.data?.healthy / result.data?.healthy / result.healthy
-      const healthy = result.data?.data?.healthy ?? result.data?.healthy ?? result.healthy ?? false
-      isOoAvailable.value = healthy
-      return healthy
+      // 兼容多层信封（与 GtOnlyOfficeSheet / D4 一致）
+      const healthy =
+        result.data?.data?.healthy ?? result.data?.healthy ?? result.healthy ?? false
+      isOoAvailable.value = !!healthy
+      return isOoAvailable.value
     } catch {
       isOoAvailable.value = false
       return false
@@ -76,7 +90,6 @@ export function useG1DualMode(options: UseG1DualModeOptions) {
       persistMode('onlyoffice')
     } else {
       currentMode.value = 'html'
-      ooConfig.value = null
       persistMode('html')
       if (reloadAll) await reloadAll()
     }
@@ -86,12 +99,19 @@ export function useG1DualMode(options: UseG1DualModeOptions) {
     void switchMode(val as G1RenderMode)
   }
 
+  /** OO 组件 fallback：强制回结构化视图 */
+  function onOoFallback(): void {
+    void switchMode('html')
+  }
+
   onMounted(() => {
-    loadPersistedMode()
+    const saved = loadPersistedMode()
+    // 先以结构化视图起页，待健康检查后再决定是否恢复在线编辑（避免 OO 死页）
+    currentMode.value = 'html'
     void checkOOHealth().then((healthy) => {
-      // OO 不可用时强制回结构化视图，避免「下载失败」死页
-      if (!healthy && currentMode.value === 'onlyoffice') {
-        currentMode.value = 'html'
+      if (healthy && saved === 'onlyoffice') {
+        currentMode.value = 'onlyoffice'
+      } else if (!healthy) {
         persistMode('html')
       }
     })
@@ -100,12 +120,13 @@ export function useG1DualMode(options: UseG1DualModeOptions) {
   return {
     currentMode,
     isOoAvailable,
-    ooConfig,
     checking,
     modeOptions,
     switchMode,
     onModeChange,
     checkOOHealth,
+    resolveOoSheetName,
+    onOoFallback,
   }
 }
 

@@ -153,6 +153,13 @@
         >
           + 新增行
         </el-button>
+        <G6SppiImportExportDropdown
+          v-if="wpId"
+          :wp-id="wpId"
+          sheet="G6-9"
+          :disabled="props.isReadonly"
+          @imported="emit('imported')"
+        />
         <span class="row-count">共 {{ inventory.totalCount.value }} 行</span>
       </div>
     </el-card>
@@ -177,6 +184,14 @@
       <template #header>
         <div class="section-header">
           <span class="section-title">审计结论</span>
+          <div class="section-actions">
+            <el-button
+              size="small"
+              :disabled="props.isReadonly || aiLoading"
+              :loading="aiLoading"
+              @click="handleAi"
+            >✨ AI辅助</el-button>
+          </div>
         </div>
       </template>
       <el-input
@@ -220,7 +235,9 @@ import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useG6SppiInventory } from '../../composables/useG6SppiInventory'
 import { useG6SppiFormData } from '../../composables/useG6SppiFormData'
 import type { SecuritiesInventoryData } from '../../composables/useG6SppiInventory'
+import { useG6SppiAiGenerate } from '../../composables/useG6SppiAiGenerate'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G6SppiImportExportDropdown from '../G6SppiImportExportDropdown.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -231,6 +248,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'save'): void
+  (e: 'imported'): void
 }>()
 
 // ─── 复核对话 inject ───
@@ -246,6 +264,8 @@ const formData = useG6SppiFormData({
   projectId: computed(() => props.projectId),
 })
 const inventory = useG6SppiInventory()
+const wpIdRef = computed(() => props.wpId)
+const { generateAndConfirm, loading: aiLoading } = useG6SppiAiGenerate(wpIdRef)
 
 // ─── 审计说明（独立持久化 checklist_responses） ───
 const NOTE_KEY = 'G6-9-securities-inventory-audit-note'
@@ -293,6 +313,23 @@ watch(() => inventory.items.value, () => {
 watch(() => inventory.auditConclusion.value, () => {
   handleSave()
 })
+
+async function handleAi(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'inventory-conclusion',
+    inventory.auditConclusion.value || '',
+    {
+      totalCount: inventory.totalCount.value,
+      varianceCount: inventory.varianceCount.value,
+    },
+    'AI 盘点审计结论',
+  )
+  if (text) {
+    inventory.auditConclusion.value = text
+    handleSave()
+  }
+}
 
 // ─── 数字格式化 ───
 function fmtNum(v: number | undefined, decimals = 2): string {

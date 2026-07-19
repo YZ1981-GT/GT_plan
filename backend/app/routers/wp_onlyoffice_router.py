@@ -583,18 +583,21 @@ async def get_sheet_onlyoffice_config(
     from app.services.wp_template_finder import find_template_file_any
 
     # 聚合包内的独立 source_wp_code sheet（如 D4-5）：尝试用 sheet 级编码找独立模板
+    # 完整Excel（whole_workbook）：始终用整册 wp_code（如 G1），禁止落到 G1-1/D4-12 等子码缓存，
+    # 否则打开的不是「整本」底稿。
     _sheet_wp_code = wp_code
-    # 从 sheet_name 提取可能的独立 wp_code（尾部匹配 or 头部匹配）
-    # 尾部匹配：如 "营业收入会计政策检查D4-5"、"存货采购入库检查表F2-33-新增"（忽略修订尾缀）
-    _m = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)(?:-新增)?\s*$", sheet_name)
-    # 头部匹配：如 "C14-2评价控制偏差" / "C14-2 xxx"
-    if not _m:
-        _m = re.match(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*", sheet_name)
-    if _m and _m.group(1) != wp_code:
-        _candidate = _m.group(1)
-        _candidate_tpl = find_template_file_any(_candidate)
-        if _candidate_tpl:
-            _sheet_wp_code = _candidate
+    if not whole_workbook:
+        # 从 sheet_name 提取可能的独立 wp_code（尾部匹配 or 头部匹配）
+        # 尾部匹配：如 "营业收入会计政策检查D4-5"、"存货采购入库检查表F2-33-新增"（忽略修订尾缀）
+        _m = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)(?:-新增)?\s*$", sheet_name)
+        # 头部匹配：如 "C14-2评价控制偏差" / "C14-2 xxx"
+        if not _m:
+            _m = re.match(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*", sheet_name)
+        if _m and _m.group(1) != wp_code:
+            _candidate = _m.group(1)
+            _candidate_tpl = find_template_file_any(_candidate)
+            if _candidate_tpl:
+                _sheet_wp_code = _candidate
 
     template_path = find_template_file_any(_sheet_wp_code)
     try:
@@ -729,6 +732,81 @@ async def get_sheet_onlyoffice_config(
 
 
 # ---------------------------------------------------------------------------
+# GET /api/workpapers/{wp_id}/whole-excel-grid
+# 「完整Excel」OnlyOffice 降级时：从整册模板抽取只读网格，避免空态
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{wp_id}/whole-excel-grid")
+async def get_whole_excel_grid(
+    wp_id: UUID,
+    sheet: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """完整Excel 降级展示：按整册 wp_code 取模板 xlsx，抽取指定 sheet 网格。
+
+    返回 sheets 列表 + 当前 sheet 的 html_data（cells/merged/…），供 GtGridSheet 渲染。
+    """
+    from app.services.wp_grid_extract import extract_grid, strip_standard_header
+    from app.services.wp_template_finder import (
+        find_template_file_any,
+        _should_skip_historical_sheet,
+    )
+
+    wp, wp_code = await _load_wp_or_404(db, wp_id)
+    project_id = wp.project_id
+
+    await _gate_editor(
+        db, current_user, wp_id=wp_id, project_id=project_id,
+        entrypoint="editor.config", action="editor_config", method="GET",
+        sheet_name=sheet or "__whole_excel__",
+    )
+
+    template_path = find_template_file_any(wp_code)
+    try:
+        file_path = _resolve_wp_file(project_id, wp_code, template_path, visible_sheet=None)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    if file_path.suffix.lower() in (".xlsx", ".xlsm"):
+        _ensure_all_sheets_visible(file_path)
+
+    import openpyxl
+
+    try:
+        wb = openpyxl.load_workbook(str(file_path), read_only=True, data_only=False)
+        all_names = list(wb.sheetnames)
+        wb.close()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"无法读取底稿 Excel: {exc}")
+
+    sheet_names = [n for n in all_names if not _should_skip_historical_sheet(n)]
+    if not sheet_names:
+        sheet_names = all_names
+
+    # 默认跳过「底稿目录」，优先展示业务 sheet
+    preferred = sheet
+    if not preferred:
+        preferred = next((n for n in sheet_names if "底稿目录" not in n), None)
+        preferred = preferred or (sheet_names[0] if sheet_names else None)
+    if not preferred or preferred not in all_names:
+        raise HTTPException(status_code=404, detail="模板中无可用 sheet")
+
+    grid = extract_grid(file_path, preferred)
+    if isinstance(grid, dict) and grid.get("cells"):
+        grid = strip_standard_header(grid)
+
+    return {
+        "wp_code": wp_code,
+        "template_name": template_path.name if template_path else file_path.name,
+        "sheets": sheet_names,
+        "active_sheet": preferred,
+        "html_data": grid or {"cells": {}},
+    }
+
+
+# ---------------------------------------------------------------------------
 # GET /api/workpapers/{wp_id}/sheets/{sheet_name}/wopi/contents
 # ---------------------------------------------------------------------------
 
@@ -757,18 +835,20 @@ async def get_sheet_wopi_contents(
     # 解析文件路径
     from app.services.wp_template_finder import find_template_file_any
 
-    # 🔴 必须与 onlyoffice-config 端点使用相同的 sheet 级 wp_code 解析逻辑：
-    # 聚合包内独立 source sheet（如 D4-5）应服务其独立文件，而非父 wp_code（D4）
-    # 对应的任意 D4 模板（否则 OO 下载到 D4-12 合同检查表却标题显示 D4-5）。
+    _is_whole = whole == "1"
+    # 完整Excel：始终用整册 wp_code；单 sheet：可落到独立子模板（如 D4-5）
     _sheet_wp_code = wp_code
-    # 从 sheet_name 提取可能的独立 wp_code（尾部匹配 or 头部匹配，忽略「-新增」修订尾缀）
-    _m = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)(?:-新增)?\s*$", sheet_name)
-    if not _m:
-        _m = re.match(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*", sheet_name)
-    if _m and _m.group(1) != wp_code:
-        _candidate = _m.group(1)
-        if find_template_file_any(_candidate):
-            _sheet_wp_code = _candidate
+    if not _is_whole:
+        # 🔴 必须与 onlyoffice-config 端点使用相同的 sheet 级 wp_code 解析逻辑：
+        # 聚合包内独立 source sheet（如 D4-5）应服务其独立文件，而非父 wp_code（D4）
+        # 对应的任意 D4 模板（否则 OO 下载到 D4-12 合同检查表却标题显示 D4-5）。
+        _m = re.search(r"([A-Z]\d+(?:-\d+)?[A-Z]?)(?:-新增)?\s*$", sheet_name)
+        if not _m:
+            _m = re.match(r"([A-Z]\d+(?:-\d+)?[A-Z]?)\s*", sheet_name)
+        if _m and _m.group(1) != wp_code:
+            _candidate = _m.group(1)
+            if find_template_file_any(_candidate):
+                _sheet_wp_code = _candidate
 
     # 全 claim 令牌逐项绑定校验（Req 10.4/10.5）：拦截跨资源重放（为其它 wp/sheet 签发的令牌）。
     ok, reason = _validate_editor_download_token(
@@ -781,7 +861,6 @@ async def get_sheet_wopi_contents(
             raise HTTPException(status_code=404, detail=EXTERNAL_NOT_FOUND_DETAIL)
 
     template_path = find_template_file_any(_sheet_wp_code)
-    _is_whole = whole == "1"
     try:
         file_path = _resolve_wp_file(
             project_id, _sheet_wp_code, template_path,

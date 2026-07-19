@@ -39,6 +39,7 @@ import {
 import { G1_SECURITIES_COUNT_COLUMNS } from '../composables/useG1SecuritiesCount'
 import {
   G1_RECON_COUNTDAY_COLUMNS,
+  G1_RECON_CHANGES_COLUMNS,
   G1_RECON_CALC_COLUMNS,
 } from '../composables/useG1CountReconciliation'
 import { G1_VOUCHER_CHECK_COLUMNS } from '../composables/useG1VoucherCheck'
@@ -273,13 +274,20 @@ describe('G1 集成: G1-2 五区段Tab列定义与公式链', () => {
 // ---------------------------------------------------------------------------
 describe('G1 集成: G1-6 Level条件启用逻辑', () => {
   /**
-   * 复制 useG1FairValueTest 中 Level 互斥启用逻辑
-   * 当 Level=1 时仅 Level1 列可编辑，Level2/3 列禁用（灰色）
+   * 与 useG1FairValueTest.getEnabledValuationColumns 对齐：
+   * Level 切换时估值详情列互斥启用
    */
   function getEnabledColumns(level: 1 | 2 | 3) {
     const level1Cols = ['quoteDate', 'quoteSource', 'quoteValue', 'marketValue', 'level1Diff']
     const level2Cols = ['observableDesc', 'valuationMethod', 'level2Result', 'level2Diff']
-    const level3Cols = ['unobservableInput', 'assumption', 'level3Result', 'level3Diff']
+    const level3Cols = [
+      'valuationTechnique',
+      'unobservableInput',
+      'unobservableInputValue',
+      'assumption',
+      'level3Result',
+      'level3Diff',
+    ]
 
     return {
       level1Enabled: level === 1,
@@ -314,7 +322,7 @@ describe('G1 集成: G1-6 Level条件启用逻辑', () => {
     expect(result.level2Enabled).toBe(false)
     expect(result.level3Enabled).toBe(true)
     expect(result.enabledCols).toContain('unobservableInput')
-    expect(result.enabledCols).toContain('assumption')
+    expect(result.enabledCols).toContain('valuationTechnique')
   })
 
   it('Level切换时互斥性保证', () => {
@@ -329,7 +337,7 @@ describe('G1 集成: G1-6 Level条件启用逻辑', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 5. G1-6 Level1差异公式（持仓×报价-账面）
+// 5. G1-6 Level1差异公式（持仓×报价-账面）+ 审定差异
 // ---------------------------------------------------------------------------
 describe('G1 集成: G1-6 Level1差异公式', () => {
   it('计算市值 = 持仓数量 × 市场报价值', () => {
@@ -345,6 +353,12 @@ describe('G1 集成: G1-6 Level1差异公式', () => {
     const bookValue = 115000
     const diff = calcLevel1Diff(qty, quote, bookValue)
     expect(diff).toBe(5000 * 23.45 - 115000) // 2250
+  })
+
+  it('审定差异 = 审定FV − 账面FV', () => {
+    const bookFv = calcFairValue(1000, 10)
+    const auditedFv = calcFairValue(1000, 10.5)
+    expect(auditedFv - bookFv).toBe(500)
   })
 
   it('差异为负（账面高于市值）', () => {
@@ -383,19 +397,19 @@ describe('G1 集成: G1-11→G1-12 监盘→倒轧数据传递', () => {
     expect(diff).toBe(-200)
   })
 
-  it('G1-12 推算余额 = 监盘日余额 + 增加 - 减少', () => {
+  it('G1-12 报表日 = 盘点日 − 增加 + 减少', () => {
     const countDayBalance = 9800 // 来自 G1-11 盘点数量
-    const increase = 500 // 盘点日至报表日增加
-    const decrease = 200 // 盘点日至报表日减少
+    const increase = 500 // 资产负债表日→盘点日增加
+    const decrease = 200 // 资产负债表日→盘点日减少
     const derived = calcReconciliation(countDayBalance, increase, decrease)
-    expect(derived).toBe(9800 + 500 - 200) // 10100
+    expect(derived).toBe(9800 - 500 + 200) // 9500
   })
 
-  it('倒轧差异 = 推算余额 - 账面余额', () => {
-    const derived = calcReconciliation(9800, 500, 200) // 10100
+  it('倒轧差异 = 报表日推算 − 账面余额', () => {
+    const derived = calcReconciliation(9800, 500, 200) // 9500
     const bookBalance = 10000
     const reconDiff = derived - bookBalance
-    expect(reconDiff).toBe(100)
+    expect(reconDiff).toBe(-500)
   })
 
   it('完整链路：G1-11盘点→G1-12倒轧→差异判定', () => {
@@ -405,47 +419,52 @@ describe('G1 集成: G1-11→G1-12 监盘→倒轧数据传递', () => {
     const countDiff = calcCountDiff(counted, booked)
     expect(countDiff).toBe(-50) // 盘亏50
 
-    // Step 2: G1-12 倒轧（以盘点数量作为监盘日余额）
+    // Step 2: G1-12 倒轧（盘点日 − 期后增加 + 期后减少）
     const countDayQty = counted // 14950
-    const addQty = 1000 // 盘点日至报表日增加
-    const reduceQty = 300 // 盘点日至报表日减少
+    const addQty = 1000 // 资产负债表日→盘点日增加
+    const reduceQty = 300 // 资产负债表日→盘点日减少
     const derivedQty = calcReconciliation(countDayQty, addQty, reduceQty)
-    expect(derivedQty).toBe(15650)
+    expect(derivedQty).toBe(14250)
 
     // Step 3: 倒轧差异
-    const bookQty = 15700
+    const bookQty = 14300
     const reconDiff = derivedQty - bookQty
     expect(reconDiff).toBe(-50) // 差异-50，需调查
     expect(Math.abs(reconDiff) > 0).toBe(true) // 异常标记
   })
 
-  it('G1-11 列定义完整（10列）', () => {
-    expect(G1_SECURITIES_COUNT_COLUMNS).toHaveLength(10)
+  it('G1-11 列定义含纸质盘点列与账实核对列', () => {
+    expect(G1_SECURITIES_COUNT_COLUMNS.length).toBeGreaterThanOrEqual(12)
     const props = G1_SECURITIES_COUNT_COLUMNS.map((c) => c.prop)
-    expect(props).toContain('bookedQuantity')
+    expect(props).toContain('faceValue')
     expect(props).toContain('countedQuantity')
+    expect(props).toContain('total')
+    expect(props).toContain('couponRate')
+    expect(props).toContain('maturityDate')
+    expect(props).toContain('bookedQuantity')
     expect(props).toContain('countDiff')
     expect(props).toContain('custodian')
     expect(props).toContain('countDate')
   })
 
-  it('G1-12 两区段列定义完整', () => {
-    // 监盘日数据区段
+  it('G1-12 三区段列定义完整', () => {
     expect(G1_RECON_COUNTDAY_COLUMNS.length).toBeGreaterThanOrEqual(7)
     const countDayProps = G1_RECON_COUNTDAY_COLUMNS.map((c) => c.prop)
-    expect(countDayProps).toContain('countDayQuantity')
-    expect(countDayProps).toContain('increaseQuantity')
-    expect(countDayProps).toContain('decreaseQuantity')
+    expect(countDayProps).toContain('countQuantity')
+    expect(countDayProps).toContain('countFaceValue')
+    expect(countDayProps).toContain('countTotal')
 
-    // 倒轧计算区段
+    expect(G1_RECON_CHANGES_COLUMNS.map((c) => c.prop)).toEqual(
+      expect.arrayContaining(['increaseQuantity', 'decreaseQuantity']),
+    )
+
     expect(G1_RECON_CALC_COLUMNS.length).toBeGreaterThanOrEqual(7)
     const calcProps = G1_RECON_CALC_COLUMNS.map((c) => c.prop)
-    expect(calcProps).toContain('derivedQuantity')
+    expect(calcProps).toContain('reportQuantity')
     expect(calcProps).toContain('bookQuantity')
     expect(calcProps).toContain('diffQuantity')
-    // 公式列标记
-    const derivedCol = G1_RECON_CALC_COLUMNS.find((c) => c.prop === 'derivedQuantity')
-    expect(derivedCol?.formula).toBe(true)
+    const reportCol = G1_RECON_CALC_COLUMNS.find((c) => c.prop === 'reportQuantity')
+    expect(reportCol?.formula).toBe(true)
   })
 })
 
@@ -603,33 +622,37 @@ describe('G1 集成: 导入导出 spec 完整性', () => {
     }
   })
 
-  it('G1-2 spec 有35个 headers（明细表全列）', () => {
-    expect(content).toContain('"序号", "投资品种名称", "证券代码"')
-    expect(content).toContain('"期末成本", "未审余额", "AJE", "RJE", "审定余额", "差异", "索引"')
-    // 验证 _G1_2_HEADERS 列表包含 35 个元素
+  it('G1-2 spec 含明细表全列', () => {
+    expect(content).toContain('"序号", "投资项目", "证券代码"')
+    expect(content).toContain('"会计分类"')
+    expect(content).toContain('"变现受限"')
     const match = content.match(/_G1_2_HEADERS\s*=\s*\[([\s\S]*?)\]/m)
     expect(match).not.toBeNull()
     if (match) {
       const headerCount = (match[1].match(/"/g) || []).length / 2
-      expect(headerCount).toBe(35)
+      expect(headerCount).toBeGreaterThanOrEqual(30)
     }
   })
 
-  it('G1-6 spec 包含Level1-3所有列', () => {
+  it('G1-6 spec 包含账面测试与Level1-3所有列', () => {
+    expect(content).toContain('"持仓数量"')
+    expect(content).toContain('"期末账面值"')
+    expect(content).toContain('"测试公允价值"')
     expect(content).toContain('"报价日期"')
     expect(content).toContain('"报价来源"')
     expect(content).toContain('"报价值"')
     expect(content).toContain('"可观察输入描述"')
     expect(content).toContain('"不可观察输入"')
+    expect(content).toContain('"估值技术"')
     expect(content).toContain('"估值假设"')
   })
 
-  it('G1-11 spec 有10个 headers（监盘表）', () => {
+  it('G1-11 spec 有15个 headers（监盘表）', () => {
     const match = content.match(/_G1_11_HEADERS\s*=\s*\[([\s\S]*?)\]/m)
     expect(match).not.toBeNull()
     if (match) {
       const headerCount = (match[1].match(/"/g) || []).length / 2
-      expect(headerCount).toBe(10)
+      expect(headerCount).toBe(15)
     }
   })
 

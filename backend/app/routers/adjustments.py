@@ -43,6 +43,7 @@ from app.models.audit_platform_schemas import (
 )
 from app.services.adjustment_service import AdjustmentService
 from app.services.adjustment_impact_service import preview_impact as preview_impact_service
+from app.services.formula_management.delivery_export import content_disposition_attachment
 from app.services.mapping_service import get_codes_by_cycles
 from app.services.misstatement_service import UnadjustedMisstatementService
 
@@ -523,7 +524,12 @@ async def export_adjustment_summary(
     return StreamingResponse(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": f"attachment; filename=adjustment_summary_{year}.xlsx"},
+        headers={
+            "Content-Disposition": content_disposition_attachment(
+                f"审计调整汇总表_{year}.xlsx",
+                ascii_fallback=f"adjustment_summary_{year}.xlsx",
+            )
+        },
     )
 
 
@@ -1020,7 +1026,10 @@ async def export_adjustment_template(
         buf,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
-            "Content-Disposition": f"attachment; filename=adjustment_template_{template_type}_{year}.xlsx"
+            "Content-Disposition": content_disposition_attachment(
+                f"调整分录导入模板_{template_label}_{year}.xlsx",
+                ascii_fallback=f"adjustment_template_{template_type}_{year}.xlsx",
+            )
         },
     )
 

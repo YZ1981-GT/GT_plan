@@ -41,7 +41,12 @@
             <el-tag v-if="reconciliation.varianceCount.value > 0" type="danger" size="small">
               {{ reconciliation.varianceCount.value }}项差异
             </el-tag>
-            <el-button size="small" :disabled="props.isReadonly" @click="handleAi">✨ AI辅助</el-button>
+            <el-button
+              size="small"
+              :disabled="props.isReadonly || aiLoading"
+              :loading="aiLoading"
+              @click="handleAi"
+            >✨ AI辅助</el-button>
             <el-button size="small" @click="openReview('G6-10-roll-forward')">💬 复核</el-button>
           </div>
         </div>
@@ -207,7 +212,12 @@
             <el-tag size="small" type="info">
               {{ reconciliation.changeDetailCount.value }}条明细
             </el-tag>
-            <el-button size="small" :disabled="props.isReadonly" @click="handleAi">✨ AI辅助</el-button>
+            <el-button
+              size="small"
+              :disabled="props.isReadonly || aiLoading"
+              :loading="aiLoading"
+              @click="handleAi"
+            >✨ AI辅助</el-button>
             <el-button size="small" @click="openReview('G6-10-change-detail')">💬 复核</el-button>
           </div>
         </div>
@@ -341,16 +351,13 @@
       >
         + 新增行
       </el-button>
-      <el-dropdown v-if="!props.isReadonly" size="small" class="import-export-dropdown">
-        <el-button size="small">导入导出 ▾</el-button>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-            <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-            <el-dropdown-item @click="handleImportData">导入数据</el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
+      <G6SppiImportExportDropdown
+        v-if="wpId"
+        :wp-id="wpId"
+        sheet="G6-10"
+        :disabled="props.isReadonly"
+        @imported="emit('imported')"
+      />
     </div>
 
     <!-- ═══ 审计说明 ═══ -->
@@ -374,7 +381,12 @@
         <div class="section-header">
           <span class="section-title">审计结论</span>
           <div class="section-actions">
-            <el-button size="small" :disabled="props.isReadonly" @click="handleAi">✨ AI辅助</el-button>
+            <el-button
+              size="small"
+              :disabled="props.isReadonly || aiLoading"
+              :loading="aiLoading"
+              @click="handleAi"
+            >✨ AI辅助</el-button>
           </div>
         </div>
       </template>
@@ -420,13 +432,14 @@
  * Props 对齐父级 GtG6OtherBondSppi 传入的 html-data / is-readonly（自加载走 useG6SppiFormData）
  */
 import { computed, inject, onMounted, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import {
   useG6SppiReconciliation,
   TRANSACTION_TYPE_OPTIONS,
 } from '../../composables/useG6SppiReconciliation'
 import { useG6SppiFormData } from '../../composables/useG6SppiFormData'
+import { useG6SppiAiGenerate } from '../../composables/useG6SppiAiGenerate'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G6SppiImportExportDropdown from '../G6SppiImportExportDropdown.vue'
 import type { ReconciliationItem, ReconciliationData } from '../../composables/useG6SppiReconciliation'
 
 const props = defineProps<{
@@ -435,6 +448,8 @@ const props = defineProps<{
   wpId: string
   projectId: string
 }>()
+
+const emit = defineEmits<{ imported: [] }>()
 
 // ─── 复核对话 inject ───
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
@@ -449,6 +464,8 @@ const formData = useG6SppiFormData({
   projectId: computed(() => props.projectId),
 })
 const reconciliation = useG6SppiReconciliation()
+const wpIdRef = computed(() => props.wpId)
+const { generateAndConfirm, loading: aiLoading } = useG6SppiAiGenerate(wpIdRef)
 
 // ─── Tab 状态 ───
 const activeTab = computed(() => reconciliation.activeTab.value)
@@ -507,25 +524,32 @@ function handleSave(): void {
   })
 }
 
-// watch items/changeDetails 深度变化保存
+// watch items/changeDetails/conclusion 深度变化保存
 watch([() => reconciliation.items.value, () => reconciliation.changeDetails.value], () => {
   handleSave()
 }, { deep: true })
 
-// ─── AI辅助 ───
-function handleAi(): void {
-  ElMessage.info('AI辅助(盘点倒轧结论)功能将在AI模块完成后启用')
-}
+watch(() => reconciliation.auditConclusion.value, () => {
+  handleSave()
+})
 
-// ─── 导入导出（占位） ───
-function handleExportTemplate(): void {
-  ElMessage.info('导出模板功能将在导入导出模块完成后启用')
-}
-function handleExportData(): void {
-  ElMessage.info('导出数据功能将在导入导出模块完成后启用')
-}
-function handleImportData(): void {
-  ElMessage.info('导入数据功能将在导入导出模块完成后启用')
+// ─── AI辅助 ───
+async function handleAi(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'reconciliation-conclusion',
+    reconciliation.auditConclusion.value || '',
+    {
+      itemCount: reconciliation.items.value.length,
+      varianceCount: reconciliation.varianceCount.value,
+      changeDetailCount: reconciliation.changeDetailCount.value,
+    },
+    'AI 盘点倒轧审计结论',
+  )
+  if (text) {
+    reconciliation.auditConclusion.value = text
+    handleSave()
+  }
 }
 
 // ─── 交易类型标签 ───

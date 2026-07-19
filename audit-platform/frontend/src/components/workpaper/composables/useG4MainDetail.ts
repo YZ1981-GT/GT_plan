@@ -1,18 +1,10 @@
 /**
- * useG4MainDetail — G4-2 明细表（44列 → 5区段Tab，行同步 + 公式链 + 分类）
- *
- * Spec: .kiro/specs/g4-bond-investment-main/ Task 6.1
+ * useG4MainDetail — G4-2 明细表（对齐 Excel A–AH → 5区段Tab）
  *
  * 职责：
- * - 44列拆为5区段Tab：基础信息(6)/期初余额(10)/本期变动(4)/期末余额+减值(10)/摊余成本+审定(8)
- * - 公式链：期初小计/期初摊余成本/本期变动小计/期末各项/期末小计/摊余成本/一年内到期小计/账面价值
- * - 按到期日与资产负债表日比较进行数据分类（一年内到期 vs 超过一年）
- * - 底部合计行（按投资种类分类小计 + 总计）
- * - 动态行增删（max 500行，ElMessageBox.prompt输入投资项目名称）
- * - 空值/非数字输入视为0参与计算
- * - selectedRowIndex ref 跨Tab同步
- *
- * Requirements: 5.1~5.17
+ * - 列结构对齐模板：基础信息 / 期初 / 本期变动 / 期末(含调整数·审定数) / 摊余成本+一年内到期
+ * - 公式：审定数 = 成本+利息调整+应计利息+调整数；摊余成本 = 审定数 − 减值；账面价值 = 摊余成本 − 一年内到期小计
+ * - 分类标题对齐模板「其他流动资产 / 超过一年」
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
@@ -25,6 +17,12 @@ import {
   calcBookValue,
 } from '@/composables/useG4MainFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
+import { buildCanonicalPayload, parseCanonicalArray } from './g4StorageContract'
+import {
+  applyG4ClassificationUpdates,
+  type G4ClassificationUpdate,
+  type G4MeasurementClassification,
+} from './g4CrossHelpers'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -32,56 +30,78 @@ export type G4InvestCategory = '企业债' | '国债' | '金融债' | '公司债
 
 export type G4StageClassification = 'Stage1' | 'Stage2' | 'Stage3'
 
-/** G4-2 明细行（44列分5区段） */
+/**
+ * G4-2 明细行 — 对齐 Excel A–AH（34 数据列 + 兼容字段）
+ * Template: 明细表G4-2
+ */
 export interface BondDetailRow {
   id: string
   seq: number
-  // ══ 基础信息(6列) ══
+  // ══ A–F 基础信息 ══
   investCategory: string
   investProject: string
   faceValue: number
   couponRate: number
   effectiveRate: number
   maturityDate: string
+  // ══ 跨表分类（G4-5/G4-6 → G4-2） ══
+  measurementClassification: G4MeasurementClassification
+  businessModelResult: string
+  sppiResult: string
+  classificationSource: string
+  classificationUpdatedAt: string
+  sourcePortfolioId: string
+  crossSheetInvestmentId: string
 
-  // ══ 期初余额(10列) ══
+  // ══ G–O 期初余额 ══
   openingCost: number
   openingInterestAdj: number
   openingAccruedInterest: number
-  openingSubtotal: number              // 公式
+  openingSubtotal: number              // 公式 J
   openingImpairment: number
-  openingAmortizedCost: number         // 公式
+  openingAmortizedCost: number         // 公式 L
   openingOneYearDeduct: number
   openingAdjustment: number
   openingAdjusted: number
+  /** @deprecated 模板无此列，保留兼容 */
   openingRemark: string
 
-  // ══ 本期变动(4列) ══
+  // ══ P–S 本期变动 ══
   periodCostChange: number
   periodInterestAdjChange: number
   periodAccruedInterestChange: number
   periodChangeSubtotal: number         // 公式
 
-  // ══ 期末余额+减值(10列) ══
-  closingCost: number                  // 公式
-  closingInterestAdj: number           // 公式
-  closingAccruedInterest: number       // 公式
-  closingSubtotal: number              // 公式
+  // ══ T–AB 期末余额+减值 ══
+  closingCost: number                  // 公式 T
+  closingInterestAdj: number           // 公式 U
+  closingAccruedInterest: number       // 公式 V
+  /** 期末成本+利息调整+应计利息（内部/兼容） */
+  closingSubtotal: number
+  /** Excel W：期末调整数 */
+  closingAdjustment: number
+  /** Excel X：期末审定数 = 小计 + 调整数 */
+  closingAudited: number
+  /** Excel Y：债权投资减值准备（审定）期末数 */
   closingImpairment: number
   stageClassification: G4StageClassification
   creditCombineMethod: string
   creditCombineName: string
+  /** @deprecated 与 closingImpairment 合并，保留兼容 */
   impairmentAdjusted: number
+  /** @deprecated 模板无此列 */
   closingRemark: string
 
-  // ══ 摊余成本+审定(8列) ══
-  amortizedCost: number                // 公式
+  // ══ AC–AH 摊余成本+一年内到期+账面价值+发函 ══
+  amortizedCost: number                // 公式 AC = 审定数 − 减值
   oneYearBalance: number
   oneYearImpairment: number
   oneYearSubtotal: number              // 公式
-  bookValue: number                    // 公式
+  bookValue: number                    // 公式 AG
   correspondenceStatus: string
+  /** @deprecated 模板无此列 */
   auditAdjustment: number
+  /** @deprecated 模板无此列 */
   indexRef: string
 }
 
@@ -106,6 +126,12 @@ export interface G4CategoryGroup {
   rows: BondDetailRow[]
 }
 
+/** 对齐 Excel 明细表两类标题 */
+export const G4_CATEGORY_LABELS: Record<'一年内到期' | '超过一年', string> = {
+  一年内到期: '一、购入的以摊余成本计量的一年内到期的债权投资（列报为“其他流动资产”）',
+  超过一年: '二、购入的以摊余成本计量的到期期限超过一年的债权投资',
+}
+
 /** 投资种类小计 */
 export interface G4InvestSubtotal {
   investCategory: string
@@ -125,13 +151,12 @@ export const G4_INVEST_CATEGORY_OPTIONS = [
   '企业债', '国债', '金融债', '公司债', '其他',
 ]
 
-/** 5区段列配置（44列） */
+/** 5区段列配置 — 对齐 Excel A–AH（不展示模板外备注/索引列） */
 export const G4_DETAIL_SEGMENTS: G4DetailSegment[] = [
   {
     key: 'basic',
     label: '基础信息',
     columns: [
-      { prop: 'seq', label: '序号', width: 55, formula: true },
       { prop: 'investCategory', label: '投资种类', width: 110, type: 'select' },
       { prop: 'investProject', label: '投资项目', width: 160, type: 'text' },
       { prop: 'faceValue', label: '面值', width: 120, type: 'number' },
@@ -141,59 +166,66 @@ export const G4_DETAIL_SEGMENTS: G4DetailSegment[] = [
     ],
   },
   {
+    key: 'classification',
+    label: '计量分类',
+    columns: [
+      { prop: 'measurementClassification', label: '计量分类', width: 120, type: 'text' },
+      { prop: 'businessModelResult', label: '业务模式', width: 120, type: 'text' },
+      { prop: 'sppiResult', label: 'SPPI结论', width: 120, type: 'text' },
+      { prop: 'classificationSource', label: '分类来源', width: 140, type: 'text' },
+      { prop: 'classificationUpdatedAt', label: '更新时间', width: 180, type: 'text' },
+    ],
+  },
+  {
     key: 'opening',
     label: '期初余额',
     columns: [
-      { prop: 'openingCost', label: '期初成本', width: 120, type: 'number' },
-      { prop: 'openingInterestAdj', label: '期初利息调整', width: 120, type: 'number' },
-      { prop: 'openingAccruedInterest', label: '期初应计利息', width: 120, type: 'number' },
-      { prop: 'openingSubtotal', label: '期初小计', width: 120, formula: true },
-      { prop: 'openingImpairment', label: '期初减值准备', width: 120, type: 'number' },
-      { prop: 'openingAmortizedCost', label: '期初摊余成本', width: 130, formula: true },
-      { prop: 'openingOneYearDeduct', label: '减:一年内到期', width: 120, type: 'number' },
+      { prop: 'openingCost', label: '成本', width: 120, type: 'number' },
+      { prop: 'openingInterestAdj', label: '利息调整（贷方余额填负数）', width: 160, type: 'number' },
+      { prop: 'openingAccruedInterest', label: '应计利息', width: 120, type: 'number' },
+      { prop: 'openingSubtotal', label: '小计', width: 120, formula: true },
+      { prop: 'openingImpairment', label: '债权投资期初减值准备', width: 140, type: 'number' },
+      { prop: 'openingAmortizedCost', label: '债权投资期初摊余成本', width: 140, formula: true },
+      { prop: 'openingOneYearDeduct', label: '减：期初一年内到期部分', width: 150, type: 'number' },
       { prop: 'openingAdjustment', label: '期初调整数', width: 110, type: 'number' },
       { prop: 'openingAdjusted', label: '期初审定数', width: 110, type: 'number' },
-      { prop: 'openingRemark', label: '备注', width: 120, type: 'text' },
     ],
   },
   {
     key: 'period',
     label: '本期变动',
     columns: [
-      { prop: 'periodCostChange', label: '本期成本变动', width: 120, type: 'number' },
-      { prop: 'periodInterestAdjChange', label: '本期利息调整变动', width: 140, type: 'number' },
-      { prop: 'periodAccruedInterestChange', label: '本期应计利息变动', width: 140, type: 'number' },
-      { prop: 'periodChangeSubtotal', label: '本期变动小计', width: 120, formula: true },
+      { prop: 'periodCostChange', label: '成本', width: 120, type: 'number' },
+      { prop: 'periodInterestAdjChange', label: '利息调整', width: 120, type: 'number' },
+      { prop: 'periodAccruedInterestChange', label: '应计利息', width: 120, type: 'number' },
+      { prop: 'periodChangeSubtotal', label: '小计', width: 120, formula: true },
     ],
   },
   {
     key: 'closing',
     label: '期末余额+减值',
     columns: [
-      { prop: 'closingCost', label: '期末成本', width: 120, formula: true },
-      { prop: 'closingInterestAdj', label: '期末利息调整', width: 120, formula: true },
-      { prop: 'closingAccruedInterest', label: '期末应计利息', width: 120, formula: true },
-      { prop: 'closingSubtotal', label: '期末小计', width: 120, formula: true },
-      { prop: 'closingImpairment', label: '减值准备期末数', width: 130, type: 'number' },
+      { prop: 'closingCost', label: '成本', width: 120, formula: true },
+      { prop: 'closingInterestAdj', label: '利息调整（贷方余额填负数）', width: 160, formula: true },
+      { prop: 'closingAccruedInterest', label: '应计利息', width: 120, formula: true },
+      { prop: 'closingAdjustment', label: '调整数', width: 110, type: 'number' },
+      { prop: 'closingAudited', label: '审定数', width: 120, formula: true },
+      { prop: 'closingImpairment', label: '减值准备（审定）期末数', width: 150, type: 'number' },
       { prop: 'stageClassification', label: '阶段划分', width: 100, type: 'stage' },
       { prop: 'creditCombineMethod', label: '信用组合方式', width: 120, type: 'text' },
       { prop: 'creditCombineName', label: '信用组合名称', width: 120, type: 'text' },
-      { prop: 'impairmentAdjusted', label: '减值准备审定', width: 120, type: 'number' },
-      { prop: 'closingRemark', label: '备注', width: 120, type: 'text' },
     ],
   },
   {
     key: 'amortized',
-    label: '摊余成本+审定',
+    label: '摊余成本+一年内到期',
     columns: [
-      { prop: 'amortizedCost', label: '摊余成本', width: 120, formula: true },
-      { prop: 'oneYearBalance', label: '一年内到期余额', width: 130, type: 'number' },
-      { prop: 'oneYearImpairment', label: '一年内到期减值', width: 130, type: 'number' },
+      { prop: 'amortizedCost', label: '债权投资期末摊余成本', width: 150, formula: true },
+      { prop: 'oneYearBalance', label: '减：一年内到期账面余额', width: 150, type: 'number' },
+      { prop: 'oneYearImpairment', label: '减：一年内到期减值', width: 140, type: 'number' },
       { prop: 'oneYearSubtotal', label: '一年内到期小计', width: 130, formula: true },
-      { prop: 'bookValue', label: '期末账面价值', width: 120, formula: true },
+      { prop: 'bookValue', label: '债权投资期末账面价值', width: 150, formula: true },
       { prop: 'correspondenceStatus', label: '发函情况', width: 110, type: 'text' },
-      { prop: 'auditAdjustment', label: '审定调整', width: 110, type: 'number' },
-      { prop: 'indexRef', label: '索引', width: 100, type: 'text' },
     ],
   },
 ]
@@ -206,6 +238,7 @@ const SUM_FIELDS = [
   'openingAdjustment', 'openingAdjusted',
   'periodCostChange', 'periodInterestAdjChange', 'periodAccruedInterestChange', 'periodChangeSubtotal',
   'closingCost', 'closingInterestAdj', 'closingAccruedInterest', 'closingSubtotal',
+  'closingAdjustment', 'closingAudited',
   'closingImpairment', 'impairmentAdjusted',
   'amortizedCost', 'oneYearBalance', 'oneYearImpairment', 'oneYearSubtotal',
   'bookValue', 'auditAdjustment',
@@ -227,6 +260,13 @@ function emptyRow(id: string, seq: number): BondDetailRow {
     couponRate: 0,
     effectiveRate: 0,
     maturityDate: '',
+    measurementClassification: 'INCOMPLETE',
+    businessModelResult: '',
+    sppiResult: '',
+    classificationSource: '',
+    classificationUpdatedAt: '',
+    sourcePortfolioId: '',
+    crossSheetInvestmentId: id,
     openingCost: 0,
     openingInterestAdj: 0,
     openingAccruedInterest: 0,
@@ -245,6 +285,8 @@ function emptyRow(id: string, seq: number): BondDetailRow {
     closingInterestAdj: 0,
     closingAccruedInterest: 0,
     closingSubtotal: 0,
+    closingAdjustment: 0,
+    closingAudited: 0,
     closingImpairment: 0,
     stageClassification: 'Stage1',
     creditCombineMethod: '',
@@ -291,8 +333,12 @@ function enrich(r: BondDetailRow): BondDetailRow {
   // 期末小计 = 期末成本 + 期末利息调整 + 期末应计利息
   const closingSubtotal = calcBalanceSubtotal(closingCost, closingInterestAdj, closingAccruedInterest)
 
-  // 摊余成本 = 期末小计 - 减值准备期末数
-  const amortizedCost = calcAmortizedCost(closingSubtotal, parseNum(r.closingImpairment))
+  // Excel X：审定数 = 小计 + 调整数
+  const closingAudited = closingSubtotal + parseNum(r.closingAdjustment)
+
+  // 摊余成本 AC = 期末审定数 − 减值准备（审定）期末数
+  const impairment = parseNum(r.closingImpairment) || parseNum(r.impairmentAdjusted)
+  const amortizedCost = calcAmortizedCost(closingAudited, impairment)
 
   // 一年内到期小计 = 一年内到期余额 - 一年内到期减值
   const oneYearSubtotal = calcOneYearMaturity(parseNum(r.oneYearBalance), parseNum(r.oneYearImpairment))
@@ -309,6 +355,9 @@ function enrich(r: BondDetailRow): BondDetailRow {
     closingInterestAdj,
     closingAccruedInterest,
     closingSubtotal,
+    closingAudited,
+    closingImpairment: impairment,
+    impairmentAdjusted: impairment,
     amortizedCost,
     oneYearSubtotal,
     bookValue,
@@ -387,18 +436,12 @@ function detectMaturityAlert(row: BondDetailRow, balanceSheetDate: string): Matu
 }
 
 function loadRows(map: Map<string, ChecklistResponse>): BondDetailRow[] {
-  const raw = map.get(DATA_KEY)?.conclusion
-  if (!raw) return [enrich(emptyRow(generateId(), 1))]
-  try {
-    const parsed = JSON.parse(raw) as Partial<BondDetailRow>[]
-    if (!Array.isArray(parsed) || parsed.length === 0) return [enrich(emptyRow(generateId(), 1))]
-    return parsed.map((p, i) => enrich({
-      ...emptyRow(p.id ?? generateId(), p.seq ?? i + 1),
-      ...p,
-    }))
-  } catch {
-    return [enrich(emptyRow(generateId(), 1))]
-  }
+  const parsed = parseCanonicalArray(map.get(DATA_KEY)) as Partial<BondDetailRow>[]
+  if (!parsed.length) return [enrich(emptyRow(generateId(), 1))]
+  return parsed.map((p, i) => enrich({
+    ...emptyRow(p.id ?? generateId(), p.seq ?? i + 1),
+    ...p,
+  }))
 }
 
 function sumRowsBy(list: BondDetailRow[]): G4DetailTotals {
@@ -462,8 +505,16 @@ export function useG4MainDetail(opts: UseG4MainDetailOptions) {
       }
     }
     return [
-      { category: '一年内到期', label: '一、购入的以摊余成本计量的一年内到期的债权投资', rows: withinYear },
-      { category: '超过一年', label: '二、购入的以摊余成本计量的到期期限超过一年的债权投资', rows: overYear },
+      {
+        category: '一年内到期',
+        label: G4_CATEGORY_LABELS['一年内到期'],
+        rows: withinYear,
+      },
+      {
+        category: '超过一年',
+        label: G4_CATEGORY_LABELS['超过一年'],
+        rows: overYear,
+      },
     ]
   })
 
@@ -490,7 +541,15 @@ export function useG4MainDetail(opts: UseG4MainDetailOptions) {
 
   function persistAll() {
     if (opts.isReadonly.value) return
-    opts.debouncedSave(DATA_KEY, { conclusion: JSON.stringify(rows.value) })
+    opts.debouncedSave(DATA_KEY, buildCanonicalPayload(DATA_KEY, rows.value))
+  }
+
+  function applyClassificationWriteback(updates: G4ClassificationUpdate[]) {
+    if (opts.isReadonly.value) return { rows: rows.value, matched: [], unmatched: [] }
+    const result = applyG4ClassificationUpdates(rows.value, updates)
+    rows.value = result.rows.map(enrich)
+    persistAll()
+    return result
   }
 
   // ─── 单行更新（触发公式重算+持久化） ─────────────────────────────────────
@@ -598,6 +657,7 @@ export function useG4MainDetail(opts: UseG4MainDetailOptions) {
     // 操作
     loadAll,
     persistAll,
+    applyClassificationWriteback,
     updateRow,
     addRow,
     removeRow,

@@ -1,339 +1,440 @@
 <!--
-  G5TabImpairmentCalc.vue — G5-10 长期应收款坏账准备测算表（19列 → 2区段Tab）
+  G5TabImpairmentCalc.vue — G5-10 长期应收款坏账准备测算表
 
-  2区段Tab切换（el-segmented）：
-  - Tab1: 未审数+审计调整(11列): 债务人|①账面余额|现金流量现值|②信用损失率|③坏账准备(公式)|④账面价值(公式)|⑤余额调整|②A调整后损失率|⑥坏账调整(公式)
-  - Tab2: 审定数+差异(8列): 债务人|⑦审定余额(公式)|⑧审定坏账(公式)|⑨审定账面价值(公式)|上年坏账|本年计提(公式)|本年转回(公式)|差异说明
+  对齐源模板：
+    (一) 单项计提
+    (二) 信用期组合（默认 4 段，可自定义）
+    (三) 账龄组合（3年段 / 5年段 / 自定义，多组合）
 
-  区段间行同步：所有区段共享同一行集合，切换Tab只改可见列
-  按Stage分组：Stage1/Stage2/Stage3 + 分组小计 + 总计行
-  63行虚拟滚动 + Tab切换行同步
-  公式列：虚线下划线 + cursor:help + el-tooltip显示公式来源
-  动态行增删（ElMessageBox.prompt输入名称）
-
-  Spec: .kiro/specs/g5-long-term-receivable/ Task 11.2
-  Requirements: 13.1~13.12
+  公式：应计提③ = ①×②；差异⑤ = ③−④
 -->
 <template>
   <div class="g5-impairment-calc">
-    <!-- 顶部工具栏 -->
     <div class="section-head">
       <h3 class="sheet-title">G5-10 长期应收款坏账准备测算表</h3>
       <div class="head-actions tab-toolbar">
         <GtIndexChip value="wp:G5-10" />
-        <el-segmented v-model="activeTab" :options="segmentOptions" size="small" />
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">
-          + 新增债务人
-        </el-button>
+        <GtIndexChip value="wp:G5-3" />
+        <GtIndexChip value="wp:G5-9" />
         <el-button size="small" @click="openReviewDialog('G5-10-impairment-calc')">💬复核</el-button>
       </div>
     </div>
 
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
-      审计目标：测算长期应收款坏账准备（ECL）：按 Stage 分组验证信用损失率、坏账准备、账面价值及本年计提/转回的计算准确性。
+      审计目标：独立测算长期应收款坏账准备（单项 / 信用期组合 / 账龄组合），验证企业计提是否充分、准确，并与 G5-3、G5-9 勾稽。
     </el-alert>
 
-    <!-- Stage分组表格 -->
-    <el-table
-      :data="displayRows"
-      border
-      size="small"
-      max-height="520"
-      highlight-current-row
-      row-key="id"
-      :row-class-name="rowClassName"
-      class="impairment-table"
-      @current-change="onCurrentChange"
-    >
-      <!-- 序号列（始终显示） -->
-      <el-table-column label="序号" width="55" align="center" fixed>
-        <template #default="{ row }">
-          <template v-if="row._isSubtotal">
-            <span class="subtotal-label">{{ row._groupLabel }}小计</span>
-          </template>
-          <template v-else-if="row._isTotal">
-            <span class="total-label">合计</span>
-          </template>
-          <template v-else>{{ row.seq }}</template>
-        </template>
-      </el-table-column>
-
-      <!-- 债务人列（始终显示作为锚定列） -->
-      <el-table-column label="债务人" width="140" fixed>
-        <template #default="{ row }">
-          <template v-if="row._isSubtotal || row._isTotal" />
-          <span v-else>{{ row.debtor }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- ═══ Tab1: 未审数+审计调整列 ═══ -->
-      <template v-if="activeTab === 'tab1'">
-        <el-table-column label="①账面余额" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal">
-              <span class="subtotal-num">{{ fmtNum(row.bookBalance) }}</span>
-            </template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.bookBalance" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'bookBalance', v)" />
-              <span v-else>{{ fmtNum(row.bookBalance) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="现金流量现值" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.pvFutureCashFlow" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'pvFutureCashFlow', v)" />
-              <span v-else>{{ fmtNum(row.pvFutureCashFlow) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="②信用损失率" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.creditLossRate" size="small"
-                :controls="false" :precision="4" :step="0.01" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'creditLossRate', v)" />
-              <span v-else>{{ (row.creditLossRate * 100).toFixed(2) }}%</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="③坏账准备" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal">
-              <span class="subtotal-num">{{ fmtNum(row.impairmentProvision) }}</span>
-            </template>
-            <template v-else>
-              <el-tooltip content="③ = ① × ②" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.impairmentProvision) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="④账面价值" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal">
-              <span class="subtotal-num">{{ fmtNum(row.bookValue) }}</span>
-            </template>
-            <template v-else>
-              <el-tooltip content="④ = ① - ③" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.bookValue) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="⑤余额调整" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal">
-              <span class="subtotal-num">{{ fmtNum(row.balanceAdjustment) }}</span>
-            </template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.balanceAdjustment" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'balanceAdjustment', v)" />
-              <span v-else>{{ fmtNum(row.balanceAdjustment) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="②A调整后损失率" min-width="130" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.adjustedCreditLossRate" size="small"
-                :controls="false" :precision="4" :step="0.01" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'adjustedCreditLossRate', v)" />
-              <span v-else>{{ (row.adjustedCreditLossRate * 100).toFixed(2) }}%</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="⑥坏账调整" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal">
-              <span class="subtotal-num">{{ fmtNum(row.impairmentAdjustment) }}</span>
-            </template>
-            <template v-else>
-              <el-tooltip content="⑥ = ⑤×②A + ①×(②A-②)" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.impairmentAdjustment) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-      </template>
-
-      <!-- ═══ Tab2: 审定数+差异列 ═══ -->
-      <template v-if="activeTab === 'tab2'">
-        <el-table-column label="⑦审定账面余额" min-width="130" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal">
-              <span class="subtotal-num">{{ fmtNum(row.adjBookBalance) }}</span>
-            </template>
-            <template v-else>
-              <el-tooltip content="⑦ = ① + ⑤" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.adjBookBalance) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="⑧审定坏账准备" min-width="130" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal">
-              <span class="subtotal-num">{{ fmtNum(row.adjImpairment) }}</span>
-            </template>
-            <template v-else>
-              <el-tooltip content="⑧ = ③ + ⑥" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.adjImpairment) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="⑨审定账面价值" min-width="130" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal">
-              <span class="subtotal-num">{{ fmtNum(row.adjBookValue) }}</span>
-            </template>
-            <template v-else>
-              <el-tooltip content="⑨ = ⑦ - ⑧" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.adjBookValue) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="上年坏账准备" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.priorImpairment" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'priorImpairment', v)" />
-              <span v-else>{{ fmtNum(row.priorImpairment) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="本年计提" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-tooltip content="本年计提 = max(0, ⑧ - 上年坏账)" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.currentProvision) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="本年转回" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-tooltip content="本年转回 = max(0, 上年坏账 - ⑧)" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.currentReversal) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="差异说明" min-width="150">
-          <template #default="{ row }">
-            <template v-if="row._isSubtotal || row._isTotal" />
-            <template v-else>
-              <el-input v-if="!isReadonly" :model-value="row.differenceNote" size="small"
-                @change="(v: string) => updateField(row.id, 'differenceNote', v)" />
-              <span v-else>{{ row.differenceNote }}</span>
-            </template>
-          </template>
-        </el-table-column>
-      </template>
-
-      <!-- 操作列（删除） -->
-      <el-table-column v-if="!isReadonly" label="" width="50" align="center" fixed="right">
-        <template #default="{ row }">
-          <el-popconfirm v-if="!row._isSubtotal && !row._isTotal" title="确认删除？"
-            @confirm="calc.removeRow(row.id)">
-            <template #reference>
-              <el-icon class="delete-icon"><Delete /></el-icon>
-            </template>
-          </el-popconfirm>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：可概述 ECL 三阶段测算、信用损失率合理性、坏账计提/转回及与明细表勾稽情况。"
-        @change="(val: string) => saveAuditNote(val)" />
-    </el-card>
-
-    <!-- 底部审计结论 -->
-    <el-card class="conclusion-card" shadow="never">
-      <div class="conclusion-header">
-        <span class="conclusion-title">审计结论</span>
-        <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleAiConclusion">
-          🤖 AI生成
-        </el-button>
-      </div>
-      <el-input
-        v-model="conclusion"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请输入坏账准备测算的审计结论..."
-        :disabled="isReadonly"
-      />
-    </el-card>
-
-    <!-- 编制提示 -->
-    <details class="prep-hint">
+    <details class="prep-hint top-hint">
       <summary>📋 编制提示</summary>
       <ul>
-        <li>③ 坏账准备 = ① 账面余额 × ② 信用损失率</li>
-        <li>④ 账面价值 = ① - ③</li>
-        <li>⑥ 坏账调整 = ⑤×②A + ①×(②A-②)，可为负值（代表冲回）</li>
-        <li>⑦ 审定账面余额 = ① + ⑤</li>
-        <li>⑧ 审定坏账准备 = ③ + ⑥</li>
-        <li>⑨ 审定账面价值 = ⑦ - ⑧</li>
-        <li>本年计提 = max(0, ⑧ - 上年坏账准备)</li>
-        <li>本年转回 = max(0, 上年坏账准备 - ⑧)</li>
-        <li>按Stage分组：Stage1(12个月ECL) / Stage2(整个存续期ECL) / Stage3(存续期ECL+净额利息)</li>
-        <li>长期应收款坏账准备需关注融资租赁应收款和分期收款销售的到期风险</li>
+        <li>结构对齐源模板：单项 → 信用期组合 → 账龄组合；不适用的信用期行可删除。</li>
+        <li>公式：应计提③ = 审定余额① × 损失率②；差异⑤ = 应计提③ − 账面准备④。</li>
+        <li>账龄段支持「3年段 / 5年段 / 自定义」枚举（默认 5 年双标签，对齐模板）；切换后各组合账龄行自动同步并保留已填数。</li>
+        <li>逾期从确认资产凭证日期起算，需考虑信用期；组合划分应与 G5-8 会计政策及附注一致。</li>
+        <li>G5-9 同步的阶段写入（一）单项行的 Stage 标记，便于与三阶段划分对照。</li>
+        <li>可用「从 G5-2/G5-3 灌数」带入审定余额与账面准备；差异可用「推送差异至 G5-4」生成调整分录。</li>
       </ul>
     </details>
+
+    <div class="aging-toolbar">
+      <span class="muted">账龄口径</span>
+      <el-select
+        :model-value="calc.agingPreset.value"
+        size="small"
+        style="width: 110px"
+        :disabled="isReadonly"
+        @change="onAgingPresetChange"
+      >
+        <el-option label="3年段" value="THREE_YEAR" />
+        <el-option label="5年段" value="FIVE_YEAR" />
+        <el-option label="自定义" value="CUSTOM" />
+      </el-select>
+      <el-tag size="small" type="info">{{ calc.agingSegments.value.length }} 段</el-tag>
+
+      <span class="muted" style="margin-left: 12px">信用期口径</span>
+      <el-select
+        :model-value="calc.creditPreset.value"
+        size="small"
+        style="width: 110px"
+        :disabled="isReadonly"
+        @change="onCreditPresetChange"
+      >
+        <el-option label="默认4段" value="DEFAULT" />
+        <el-option label="自定义" value="CUSTOM" />
+      </el-select>
+      <el-tag size="small" type="info">{{ calc.creditSegments.value.length }} 段</el-tag>
+
+      <el-button
+        size="small"
+        type="primary"
+        plain
+        :disabled="isReadonly"
+        @click="onPullFromSource"
+      >从 G5-2/G5-3 灌数</el-button>
+      <el-button
+        size="small"
+        type="warning"
+        :disabled="isReadonly || Math.abs(calc.grandTotal.value.diff) < 0.01"
+        @click="onPushDiffs"
+      >推送差异至 G5-4</el-button>
+    </div>
+
+    <el-alert
+      v-if="calc.diffAlert.value"
+      type="warning"
+      :closable="false"
+      show-icon
+      :title="calc.diffAlert.value"
+      style="margin-bottom: 10px"
+    />
+
+    <!-- (一) 单项 -->
+    <div class="ecl-block">
+      <div class="block-header">
+        <h4 class="block-title">（一）单项计提坏账准备</h4>
+        <el-button v-if="!isReadonly" size="small" type="primary" @click="calc.addSingleRow()">添加债务人</el-button>
+      </div>
+      <el-table :data="calc.singleRows.value" size="small" border stripe>
+        <el-table-column label="债务人/项目" min-width="140">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.label"
+              size="small"
+              @change="(v: string) => calc.updateSingleCell(row.rowId, 'label', v)"
+            />
+            <span v-else>{{ row.label || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="Stage" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.stageGroup" size="small" type="info">{{ row.stageGroup }}</el-tag>
+            <span v-else class="muted">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="审定余额①" width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.auditedBalance"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @update:model-value="(v: number) => calc.updateSingleCell(row.rowId, 'auditedBalance', v ?? 0)"
+            />
+            <span v-else>{{ fmtAmt(row.auditedBalance) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="损失率②" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.lossRate"
+              :controls="false"
+              :step="0.01"
+              :max="1"
+              size="small"
+              style="width:100%"
+              @update:model-value="(v: number) => calc.updateSingleCell(row.rowId, 'lossRate', v ?? 0)"
+            />
+            <span v-else>{{ fmtPct(row.lossRate) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="应计提③" width="120" align="right">
+          <template #default="{ row }">
+            <el-tooltip content="③ = ① × ②" placement="top">
+              <span class="formula-cell">{{ fmtAmt(row.expectedProvision) }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column label="账面准备④" width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.bookProvision"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @update:model-value="(v: number) => calc.updateSingleCell(row.rowId, 'bookProvision', v ?? 0)"
+            />
+            <span v-else>{{ fmtAmt(row.bookProvision) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="差异⑤" width="110" align="right">
+          <template #default="{ row }">
+            <span :class="['formula-cell', { 'diff-warn': Math.abs(row.difference) >= 0.01 }]">{{ fmtAmt(row.difference) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="计提依据" min-width="120">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.basis"
+              size="small"
+              @change="(v: string) => calc.updateSingleCell(row.rowId, 'basis', v)"
+            />
+            <span v-else>{{ row.basis || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="索引" width="80">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.indexRef"
+              size="small"
+              @change="(v: string) => calc.updateSingleCell(row.rowId, 'indexRef', v)"
+            />
+            <span v-else>{{ row.indexRef || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="" width="50" align="center">
+          <template #default="{ row }">
+            <el-button type="danger" text size="small" @click="calc.removeSingleRow(row.rowId)">删</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="subtotal-line">
+        单项小计 — 应计提 {{ fmtAmt(calc.singleTotal.value.expected) }}，账面 {{ fmtAmt(calc.singleTotal.value.book) }}，差异 {{ fmtAmt(calc.singleTotal.value.diff) }}
+      </div>
+    </div>
+
+    <!-- (二) 信用期 -->
+    <div class="ecl-block">
+      <div class="block-header">
+        <h4 class="block-title">（二）按组合计提坏账准备 — 信用期</h4>
+        <span class="hint-inline">【不适用的行项请删除】</span>
+      </div>
+      <p class="aging-hint">逾期从确认资产凭证日期起计算，逾期需考虑信用期。</p>
+      <div v-for="group in calc.creditGroups.value" :key="group.groupId" class="aging-group">
+        <el-table :data="group.rows.filter((r) => !r.archived)" size="small" border stripe>
+          <el-table-column prop="label" label="信用期/逾期" width="160" />
+          <el-table-column label="审定余额①" width="120" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.auditedBalance"
+                :controls="false"
+                size="small"
+                style="width:100%"
+                @update:model-value="(v: number) => calc.updateCreditCell(group.groupId, row.rowId, 'auditedBalance', v ?? 0)"
+              />
+              <span v-else>{{ fmtAmt(row.auditedBalance) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="损失率②" width="100" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.lossRate"
+                :controls="false"
+                :step="0.01"
+                :max="1"
+                size="small"
+                style="width:100%"
+                @update:model-value="(v: number) => calc.updateCreditCell(group.groupId, row.rowId, 'lossRate', v ?? 0)"
+              />
+              <span v-else>{{ fmtPct(row.lossRate) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="应计提③" width="120" align="right">
+            <template #default="{ row }"><span class="formula-cell">{{ fmtAmt(row.expectedProvision) }}</span></template>
+          </el-table-column>
+          <el-table-column label="账面准备④" width="120" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.bookProvision"
+                :controls="false"
+                size="small"
+                style="width:100%"
+                @update:model-value="(v: number) => calc.updateCreditCell(group.groupId, row.rowId, 'bookProvision', v ?? 0)"
+              />
+              <span v-else>{{ fmtAmt(row.bookProvision) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="差异⑤" width="110" align="right">
+            <template #default="{ row }">
+              <span :class="['formula-cell', { 'diff-warn': Math.abs(row.difference) >= 0.01 }]">{{ fmtAmt(row.difference) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="计提依据" min-width="120">
+            <template #default="{ row }">
+              <el-input
+                v-if="!isReadonly"
+                :model-value="row.basis"
+                size="small"
+                @change="(v: string) => calc.updateCreditCell(group.groupId, row.rowId, 'basis', v)"
+              />
+              <span v-else>{{ row.basis || '—' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="!isReadonly" label="" width="50" align="center">
+            <template #default="{ row }">
+              <el-button type="danger" text size="small" @click="calc.removeCreditRow(group.groupId, row.rowId)">删</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <div class="subtotal-line">
+        信用期小计 — 应计提 {{ fmtAmt(calc.creditTotal.value.expected) }}，账面 {{ fmtAmt(calc.creditTotal.value.book) }}，差异 {{ fmtAmt(calc.creditTotal.value.diff) }}
+      </div>
+    </div>
+
+    <!-- (三) 账龄组合 -->
+    <div class="ecl-block">
+      <div class="block-header">
+        <h4 class="block-title">（三）其他组合计提坏账准备 — 账龄</h4>
+        <el-button v-if="!isReadonly" size="small" type="primary" @click="calc.addAgingGroup()">添加组合</el-button>
+      </div>
+      <p class="aging-hint">默认 5 年段标签对齐源模板「账龄/逾期」双口径；可切换 3 年段或自定义段名。</p>
+
+      <div v-for="(group, gIdx) in calc.agingGroups.value" :key="group.groupId" class="aging-group">
+        <div class="group-header">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="group.groupName"
+            size="small"
+            placeholder="组合名称"
+            style="width:180px"
+            @change="(v: string) => calc.updateGroupName(group.groupId, v)"
+          />
+          <span v-else class="group-name">{{ group.groupName || `组合${gIdx + 1}` }}</span>
+          <el-button
+            v-if="!isReadonly"
+            type="danger"
+            text
+            size="small"
+            @click="calc.removeAgingGroup(group.groupId)"
+          >删除组合</el-button>
+        </div>
+        <el-table :data="group.rows.filter((r) => !r.archived)" size="small" border stripe>
+          <el-table-column prop="label" label="账龄" width="180" />
+          <el-table-column label="审定余额①" width="120" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.auditedBalance"
+                :controls="false"
+                size="small"
+                style="width:100%"
+                @update:model-value="(v: number) => calc.updateAgingCell(group.groupId, row.rowId, 'auditedBalance', v ?? 0)"
+              />
+              <span v-else>{{ fmtAmt(row.auditedBalance) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="损失率②" width="100" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.lossRate"
+                :controls="false"
+                :step="0.01"
+                :max="1"
+                size="small"
+                style="width:100%"
+                @update:model-value="(v: number) => calc.updateAgingCell(group.groupId, row.rowId, 'lossRate', v ?? 0)"
+              />
+              <span v-else>{{ fmtPct(row.lossRate) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="应计提③" width="120" align="right">
+            <template #default="{ row }"><span class="formula-cell">{{ fmtAmt(row.expectedProvision) }}</span></template>
+          </el-table-column>
+          <el-table-column label="账面准备④" width="120" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.bookProvision"
+                :controls="false"
+                size="small"
+                style="width:100%"
+                @update:model-value="(v: number) => calc.updateAgingCell(group.groupId, row.rowId, 'bookProvision', v ?? 0)"
+              />
+              <span v-else>{{ fmtAmt(row.bookProvision) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="差异⑤" width="110" align="right">
+            <template #default="{ row }">
+              <span :class="['formula-cell', { 'diff-warn': Math.abs(row.difference) >= 0.01 }]">{{ fmtAmt(row.difference) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="计提依据" min-width="120">
+            <template #default="{ row }">
+              <el-input
+                v-if="!isReadonly"
+                :model-value="row.basis"
+                size="small"
+                @change="(v: string) => calc.updateAgingCell(group.groupId, row.rowId, 'basis', v)"
+              />
+              <span v-else>{{ row.basis || '—' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="索引" width="80">
+            <template #default="{ row }">
+              <el-input
+                v-if="!isReadonly"
+                :model-value="row.indexRef"
+                size="small"
+                @change="(v: string) => calc.updateAgingCell(group.groupId, row.rowId, 'indexRef', v)"
+              />
+              <span v-else>{{ row.indexRef || '—' }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div class="group-sub">
+          小计 — 应计提 {{ fmtAmt(sumGroup(group)) }}
+        </div>
+      </div>
+      <div class="subtotal-line">
+        账龄合计 — 应计提 {{ fmtAmt(calc.agingTotal.value.expected) }}，账面 {{ fmtAmt(calc.agingTotal.value.book) }}，差异 {{ fmtAmt(calc.agingTotal.value.diff) }}
+      </div>
+      <div class="subtotal-line grand">
+        总计 — 应计提 {{ fmtAmt(calc.grandTotal.value.expected) }}，账面 {{ fmtAmt(calc.grandTotal.value.book) }}，差异 {{ fmtAmt(calc.grandTotal.value.diff) }}
+      </div>
+    </div>
+
+    <G5AuditTextCards
+      :wp-id="props.wpId"
+      :is-readonly="isReadonly"
+      :note="auditNote"
+      :conclusion="conclusion"
+      conclusion-ai-section="impairment-calc-conclusion"
+      note-placeholder="填写审计说明：可概述抽样阈值、损失率确定逻辑、与 G5-8/G5-9 政策及阶段划分的印证、重大差异处理。"
+      conclusion-placeholder="填写坏账准备测算结论：A、计提充分准确。B、除下述事项外未见异常。C、存在重大差异须调整。"
+      @update:note="saveAuditNote"
+      @update:conclusion="onConclusionUpdate"
+    />
+
+    <!-- 自定义账龄对话框 -->
+    <el-dialog v-model="showAgingDialog" title="自定义账龄段" width="420px" destroy-on-close @close="cancelAgingDialog">
+      <p class="muted">每行一个账龄段名称（至少 2 段，最多 10 段）。</p>
+      <el-input v-model="agingDraft" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" placeholder="例：&#10;6个月以内&#10;6个月-1年&#10;1-2年&#10;2年以上" />
+      <template #footer>
+        <el-button @click="cancelAgingDialog">取消</el-button>
+        <el-button type="primary" @click="confirmAgingCustom">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 自定义信用期对话框 -->
+    <el-dialog v-model="showCreditDialog" title="自定义信用期段" width="420px" destroy-on-close @close="cancelCreditDialog">
+      <p class="muted">每行一个信用期/逾期段名称（至少 2 段，最多 10 段）。</p>
+      <el-input v-model="creditDraft" type="textarea" :autosize="{ minRows: 5, maxRows: 10 }" placeholder="例：&#10;合同期内&#10;逾期1-60天&#10;逾期60天以上" />
+      <template #footer>
+        <el-button @click="cancelCreditDialog">取消</el-button>
+        <el-button type="primary" @click="confirmCreditCustom">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-/**
- * G5TabImpairmentCalc.vue — G5-10 坏账准备测算表（2区段Tab + Stage分组）
- *
- * - el-segmented 切换 Tab1(未审数+审计调整) / Tab2(审定数+差异)
- * - 行共享同一reactive数组，Tab切换只改可见列
- * - selectedRowIndex跨Tab保持（行同步）
- * - Stage1/Stage2/Stage3分组 + 小计行 + 总计行
- * - 公式列tooltip显示来源
- */
-import { ref, computed, inject, toRef, onMounted } from 'vue'
-import { Delete } from '@element-plus/icons-vue'
+import { ref, computed, inject, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useG5ImpairmentCalc } from '../../composables/useG5ImpairmentCalc'
-import type { G5ImpairmentCalcRow } from '../../composables/useG5ImpairmentCalc'
-import { useG5LonRecFormData } from '../../composables/useG5LonRecFormData'
+import { useG5ImpairmentCalc, type G5EclGroup, type G5AgingPreset, type G5CreditPreset } from '../../composables/useG5ImpairmentCalc'
+import { useInjectedG5FormData } from '../../composables/useG5LonRecFormData'
+import { G5_ITEM_IDS, readCanonicalRaw } from '../../composables/g5StorageContract'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G5AuditTextCards from '../G5AuditTextCards.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -343,173 +444,158 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
-
+const isReadonly = computed(() => props.isReadonly)
 const calc = useG5ImpairmentCalc()
 const conclusion = ref('')
-const activeTab = ref<'tab1' | 'tab2'>('tab1')
-
-// ─── 审计说明（持久化 checklist_responses，item_id 前缀 G5-）───
-const g5Notes = useG5LonRecFormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
 const auditNote = ref('')
+
+const g5Notes = useInjectedG5FormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
 const G5_NOTE_KEY = 'G5-10-audit-note'
+const G5_CONCLUSION_KEY = 'G5-10-audit-conclusion'
+const G5_ROWS_KEY = G5_ITEM_IDS.G5_10_ROWS
+
+const showAgingDialog = ref(false)
+const showCreditDialog = ref(false)
+const agingDraft = ref('')
+const creditDraft = ref('')
+let persistReady = false
+
 function saveAuditNote(val: string): void {
   if (props.isReadonly) return
   auditNote.value = val
   void g5Notes.saveImmediate(G5_NOTE_KEY, { conclusion: null, remark: val })
 }
+function onConclusionUpdate(val: string): void {
+  conclusion.value = val
+}
+watch(conclusion, (val) => {
+  if (props.isReadonly || !persistReady) return
+  void g5Notes.saveImmediate(G5_CONCLUSION_KEY, { conclusion: null, remark: val ?? '' })
+})
+
+function persistRows() {
+  if (!persistReady || props.isReadonly) return
+  const json = calc.serialize()
+  g5Notes.debouncedSave(G5_ROWS_KEY, { remark: json, conclusion: json })
+}
+
+watch(() => calc.payload.value, () => persistRows(), { deep: true })
+
 onMounted(async () => {
   try { await g5Notes.loadAll() } catch { /* ignore */ }
   const n = g5Notes.allResponses.value.get(G5_NOTE_KEY)
   if (n?.remark) auditNote.value = n.remark
-})
-
-// ─── 区段Tab选项 ─────────────────────────────────────────────────────────────
-const segmentOptions = [
-  { label: '未审数+审计调整', value: 'tab1' },
-  { label: '审定数+差异', value: 'tab2' },
-]
-
-// ─── Stage分组显示行（插入小计和总计行） ─────────────────────────────────────
-
-interface DisplayRow extends G5ImpairmentCalcRow {
-  _isSubtotal?: boolean
-  _isTotal?: boolean
-  _groupLabel?: string
-}
-
-const displayRows = computed<DisplayRow[]>(() => {
-  const grouped = calc.groupedRows.value
-  const result: DisplayRow[] = []
-
-  // Stage1
-  if (grouped.stage1.rows.length > 0) {
-    for (const r of grouped.stage1.rows) result.push(r as DisplayRow)
-    result.push({
-      ...createEmptyRow(),
-      _isSubtotal: true,
-      _groupLabel: 'Stage1',
-      ...grouped.stage1.subtotal,
-    } as DisplayRow)
-  }
-
-  // Stage2
-  if (grouped.stage2.rows.length > 0) {
-    for (const r of grouped.stage2.rows) result.push(r as DisplayRow)
-    result.push({
-      ...createEmptyRow(),
-      _isSubtotal: true,
-      _groupLabel: 'Stage2',
-      ...grouped.stage2.subtotal,
-    } as DisplayRow)
-  }
-
-  // Stage3
-  if (grouped.stage3.rows.length > 0) {
-    for (const r of grouped.stage3.rows) result.push(r as DisplayRow)
-    result.push({
-      ...createEmptyRow(),
-      _isSubtotal: true,
-      _groupLabel: 'Stage3',
-      ...grouped.stage3.subtotal,
-    } as DisplayRow)
-  }
-
-  // 总计行
-  result.push({
-    ...createEmptyRow(),
-    _isTotal: true,
-    ...grouped.grandTotal,
-  } as DisplayRow)
-
-  return result
-})
-
-function createEmptyRow(): G5ImpairmentCalcRow {
-  return {
-    id: crypto.randomUUID(),
-    seq: 0,
-    debtor: '',
-    stageGroup: 'Stage1',
-    bookBalance: 0,
-    pvFutureCashFlow: 0,
-    creditLossRate: 0,
-    impairmentProvision: 0,
-    bookValue: 0,
-    balanceAdjustment: 0,
-    adjustedCreditLossRate: 0,
-    impairmentAdjustment: 0,
-    adjBookBalance: 0,
-    adjImpairment: 0,
-    adjBookValue: 0,
-    priorImpairment: 0,
-    currentProvision: 0,
-    currentReversal: 0,
-    differenceNote: '',
-  }
-}
-
-// ─── 行同步（selectedRowIndex 跨Tab保持） ───────────────────────────────────
-
-function onCurrentChange(row: DisplayRow | null) {
-  if (!row || row._isSubtotal || row._isTotal) return
-  const idx = calc.rows.value.findIndex(r => r.id === row.id)
-  if (idx >= 0) calc.activeRowIndex.value = idx
-}
-
-// ─── 行样式 ─────────────────────────────────────────────────────────────────
-
-function rowClassName({ row }: { row: DisplayRow }): string {
-  if (row._isSubtotal) return 'row-subtotal'
-  if (row._isTotal) return 'row-total'
-  return ''
-}
-
-// ─── 字段更新（触发公式重算） ───────────────────────────────────────────────
-
-function updateField(id: string, field: keyof G5ImpairmentCalcRow, value: any) {
-  const row = calc.rows.value.find(r => r.id === id)
-  if (!row) return
-  ;(row as any)[field] = value ?? 0
-  calc.recalcRow(row)
-}
-
-// ─── 动态行增删（ElMessageBox.prompt） ──────────────────────────────────────
-
-async function handleAddRow() {
-  await calc.addRow('Stage1')
-}
-
-// ─── AI生成审计结论 ─────────────────────────────────────────────────────────
-
-function handleAiConclusion() {
-  ElMessage.info('AI生成审计结论功能将在AI模块完成后启用')
-}
-
-// ─── 数字格式化 ─────────────────────────────────────────────────────────────
-
-function fmtNum(v: unknown): string {
-  if (v === 0) return '0.00'
-  if (typeof v === 'number') {
-    return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
-  return String(v ?? '')
-}
-
-// ─── 数据加载（从htmlData初始化） ───────────────────────────────────────────
-
-onMounted(() => {
-  if (props.htmlData?.impairmentCalc) {
+  const c = g5Notes.allResponses.value.get(G5_CONCLUSION_KEY)
+  if (c?.remark) conclusion.value = c.remark
+  const saved = readCanonicalRaw(g5Notes.allResponses.value.get(G5_ROWS_KEY))
+  if (saved) {
+    calc.loadFromRaw(saved)
+  } else if (props.htmlData?.impairmentCalc) {
     const data = props.htmlData.impairmentCalc
     if (data.rows) calc.loadRows(data.rows)
-    if (data.conclusion) conclusion.value = data.conclusion
+    if (data.conclusion && !conclusion.value) conclusion.value = data.conclusion
   }
+  persistReady = true
+  window.addEventListener('g5:stage-updated', onStageUpdated as EventListener)
 })
 
-// ─── 暴露序列化接口供父组件保存使用 ─────────────────────────────────────────
+onBeforeUnmount(() => {
+  window.removeEventListener('g5:stage-updated', onStageUpdated as EventListener)
+})
+
+function onStageUpdated(e: Event): void {
+  const detail = (e as CustomEvent).detail
+  if (detail?.written) {
+    void g5Notes.loadAll().then(() => {
+      const saved = readCanonicalRaw(g5Notes.allResponses.value.get(G5_ROWS_KEY))
+      if (saved) calc.loadFromRaw(saved)
+    })
+    return
+  }
+  const updates = detail?.updates
+  if (!Array.isArray(updates) || !updates.length) return
+  const n = calc.applyStageUpdates(updates)
+  persistRows()
+  ElMessage.success(`已同步 ${n} 条阶段至单项计提`)
+}
+
+function onAgingPresetChange(val: G5AgingPreset) {
+  if (val === 'CUSTOM') {
+    agingDraft.value = (calc.customAgingLabels.value.length
+      ? calc.customAgingLabels.value
+      : calc.agingSegments.value.map((s) => s.label)
+    ).join('\n')
+    showAgingDialog.value = true
+    return
+  }
+  calc.setAgingPreset(val)
+}
+
+function confirmAgingCustom() {
+  const labels = agingDraft.value.split('\n').map((l) => l.trim()).filter(Boolean)
+  if (calc.setAgingPreset('CUSTOM', labels)) {
+    showAgingDialog.value = false
+  }
+}
+function cancelAgingDialog() {
+  showAgingDialog.value = false
+}
+
+function onCreditPresetChange(val: G5CreditPreset) {
+  if (val === 'CUSTOM') {
+    creditDraft.value = (calc.customCreditLabels.value.length
+      ? calc.customCreditLabels.value
+      : calc.creditSegments.value.map((s) => s.label)
+    ).join('\n')
+    showCreditDialog.value = true
+    return
+  }
+  calc.setCreditPreset(val)
+}
+
+function confirmCreditCustom() {
+  const labels = creditDraft.value.split('\n').map((l) => l.trim()).filter(Boolean)
+  if (calc.setCreditPreset('CUSTOM', labels)) {
+    showCreditDialog.value = false
+  }
+}
+function cancelCreditDialog() {
+  showCreditDialog.value = false
+}
+
+function onPullFromSource() {
+  if (props.isReadonly) return
+  calc.pullFromG52AndG53(g5Notes.allResponses.value)
+  persistRows()
+}
+
+function onPushDiffs() {
+  if (props.isReadonly) return
+  calc.pushDiffsToG54(g5Notes.allResponses.value, (itemId, data) => {
+    g5Notes.debouncedSave(itemId, data)
+  })
+}
+
+function sumGroup(group: G5EclGroup): number {
+  return group.rows
+    .filter((r) => !r.archived)
+    .reduce((s, r) => s + (r.expectedProvision || 0), 0)
+}
+
+function fmtAmt(v: unknown): string {
+  const n = typeof v === 'number' ? v : Number(v)
+  if (!Number.isFinite(n)) return '—'
+  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function fmtPct(v: unknown): string {
+  const n = typeof v === 'number' ? v : Number(v)
+  if (!Number.isFinite(n)) return '—'
+  return `${(n * 100).toFixed(2)}%`
+}
 
 defineExpose({
   toJSON: () => ({
-    rows: calc.toJSON(),
+    ...calc.toJSON(),
     conclusion: conclusion.value,
   }),
 })
@@ -520,139 +606,64 @@ defineExpose({
   padding: 12px;
   font-size: var(--wp-font-size, 13px);
 }
-
 .section-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
 }
-
-.sheet-title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.head-actions {
+.sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
+.head-actions { display: flex; gap: 8px; align-items: center; }
+.audit-objective { margin-bottom: 10px; }
+.prep-hint { margin: 0 0 10px; font-size: 12px; color: #909399; }
+.prep-hint summary { cursor: pointer; font-weight: 500; }
+.prep-hint ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.7; }
+.aging-toolbar {
   display: flex;
-  gap: 8px;
   align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
 }
-
-.audit-objective {
+.muted { color: #909399; font-size: 12px; }
+.ecl-block {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  padding: 12px;
   margin-bottom: 12px;
 }
-
-/* 表格 */
-.impairment-table {
-  font-size: var(--wp-font-size, 13px);
-}
-
-.compact-num {
-  width: 100%;
-}
-
-.compact-num :deep(.el-input__inner) {
-  text-align: right;
-}
-
-/* 公式列：虚线下划线 + cursor:help */
-.formula-cell {
-  border-bottom: 1px dashed #909399;
-  cursor: help;
-  display: inline-block;
-  min-width: 50px;
-  text-align: right;
-}
-
-/* 小计行 */
-:deep(.row-subtotal) {
-  background-color: #f5f7fa !important;
-  font-weight: 600;
-}
-:deep(.row-subtotal td) {
-  background-color: #f5f7fa !important;
-}
-
-.subtotal-label {
-  color: #606266;
-  font-weight: 600;
-  font-size: 12px;
-}
-
-.subtotal-num {
-  font-weight: 600;
-  color: #303133;
-}
-
-/* 总计行 */
-:deep(.row-total) {
-  background-color: #ecf5ff !important;
-  font-weight: 700;
-}
-:deep(.row-total td) {
-  background-color: #ecf5ff !important;
-}
-
-.total-label {
-  color: #409eff;
-  font-weight: 700;
-}
-
-/* 删除图标 */
-.delete-icon {
-  cursor: pointer;
-  color: #909399;
-  transition: color 0.2s;
-}
-.delete-icon:hover {
-  color: #f56c6c;
-}
-
-/* 审计说明卡片 */
-.audit-note-card {
-  margin-top: 16px;
-}
-.audit-note-card .card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 500;
-}
-
-/* 审计结论卡片 */
-.conclusion-card {
-  margin-top: 16px;
-}
-
-.conclusion-header {
+.block-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
 }
-
-.conclusion-title {
-  font-weight: 600;
-  font-size: 14px;
+.block-title { margin: 0; font-size: 13px; font-weight: 600; }
+.hint-inline { font-size: 12px; color: #e6a23c; }
+.aging-hint { margin: 0 0 8px; font-size: 12px; color: #909399; }
+.aging-group { margin-bottom: 12px; }
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
 }
-
-/* 编制提示 */
-.prep-hint {
-  margin-top: 12px;
+.group-name { font-weight: 500; }
+.group-sub { margin-top: 4px; font-size: 12px; color: #606266; }
+.subtotal-line {
+  margin-top: 8px;
+  padding: 6px 8px;
+  background: #f5f7fa;
   font-size: 12px;
-  color: #909399;
+  font-weight: 600;
 }
-.prep-hint summary {
-  cursor: pointer;
-  font-weight: 500;
+.subtotal-line.grand { background: #ecf5ff; color: #409eff; }
+.formula-cell {
+  border-bottom: 1px dashed #909399;
+  cursor: help;
+  display: inline-block;
+  min-width: 48px;
+  text-align: right;
 }
-.prep-hint ul {
-  margin: 8px 0 0;
-  padding-left: 18px;
-}
-.prep-hint li {
-  margin-bottom: 4px;
-}
+.diff-warn { color: #e6a23c; font-weight: 600; }
 </style>

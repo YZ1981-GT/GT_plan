@@ -1,3 +1,4 @@
+import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG7FormData — G7 长期股权投资(main组) 数据加载/保存/selfLoad/writebackTB
  *
@@ -106,6 +107,8 @@ export interface UseG7FormDataOptions {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useG7FormData(opts: UseG7FormDataOptions) {
+  const _auditYearRef = useWorkpaperAuditYear()
+
   const { wpId, projectId } = opts
 
   const isLoading = ref(false)
@@ -402,26 +405,25 @@ export function useG7FormData(opts: UseG7FormDataOptions) {
 
   /**
    * writebackTB: 保存审定数后回写 trial_balance（科目1511 长期股权投资）
-   * 同时保存到 checklist_responses 供 render 策略回读
+   * 比照 F2/G8：PUT /trial-balance/writeback，并持久化 checklist 供 render 回读
    */
   async function writebackTB(adjudicatedAmount: number): Promise<void> {
     if (!projectId.value) return
     try {
-      await api.post(`/api/projects/${projectId.value}/trial_balance`, {
+      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
         account_code: G7_ACCOUNT_CODE,
         audited_amount: adjudicatedAmount,
+      })
+      await saveImmediate('G7-1-adjudicated-amount', { conclusion: String(adjudicatedAmount) })
+      await saveImmediate('G7-main-tb-writeback', {
+        remark: JSON.stringify({ accountCode: G7_ACCOUNT_CODE, auditedAmount: adjudicatedAmount }),
       })
     } catch (err: any) {
       const msg = err?.message || ''
       if (msg !== 'canceled' && err?.code !== 'ERR_CANCELED') {
-        ElMessage.error('试算表回写失败，请稍后重试')
+        ElMessage.warning('审定数回写失败，请手动确认试算表数据')
       }
     }
-    // 同时持久化到 checklist_responses 供 render 策略回读
-    await saveImmediate('G7-1-adjudicated-amount', { conclusion: String(adjudicatedAmount) })
-    await saveImmediate('G7-main-tb-writeback', {
-      remark: JSON.stringify({ accountCode: G7_ACCOUNT_CODE, auditedAmount: adjudicatedAmount }),
-    })
   }
 
   /**
@@ -429,6 +431,8 @@ export function useG7FormData(opts: UseG7FormDataOptions) {
    * 优先使用 render 策略 seed 的值（持久化），fallback 到直接查询
    */
   async function fetchTrialBalanceAmount(): Promise<number | null> {
+    const _year = _auditYearRef.value
+    if (_year == null) return null
     // 优先从 render 策略 seed 的值取
     const seeded = renderMeta.value?.tb_values?.current_amount
     if (seeded != null && seeded !== '') return Number(seeded)
@@ -436,7 +440,7 @@ export function useG7FormData(opts: UseG7FormDataOptions) {
     if (!projectId.value) return null
     try {
       const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: G7_ACCOUNT_CODE },
+        params: { year: _year, account_prefix: G7_ACCOUNT_CODE  },
         _silent: true,
       } as any)
       const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
@@ -509,6 +513,8 @@ export function useG7FormData(opts: UseG7FormDataOptions) {
     debouncedSave,
     // Writeback
     writebackTB,
+    writebackTrialBalance: writebackTB,
+    accountCode: G7_ACCOUNT_CODE,
   }
 }
 

@@ -1,3 +1,8 @@
+<!--
+  历史简版桩（GtGridSheet + OO 兜底）。
+  htmlRendererRegistry 已改为加载 GtG6OtherBondInvestmentEcl.vue（完整 ECL 调度器）。
+  本文件保留以免旧路径/类型声明断裂，请勿再注册为 g6-other-bond-investment-ecl。
+-->
 <template>
   <div class="g6-other-bond-investment-ecl">
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="6" animated /></div>

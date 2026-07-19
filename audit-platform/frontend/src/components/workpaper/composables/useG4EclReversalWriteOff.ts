@@ -29,6 +29,15 @@ export interface ReversalSummary {
 export interface WriteOffSummary {
   totalWriteOffAmount: number
   relatedPartyCount: number
+  unreasonableCount: number
+}
+
+export interface ReversalWriteOffGate {
+  invalidReversals: number
+  relatedPartyWriteOffs: number
+  unreasonableReversals: number
+  unreasonableWriteOffs: number
+  ready: boolean
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -79,7 +88,30 @@ export function useG4EclReversalWriteOff() {
   const writeOffSummary = computed<WriteOffSummary>(() => ({
     totalWriteOffAmount: calcSumColumn(writeOffs.value.map(r => r.writeOffAmount)),
     relatedPartyCount: writeOffs.value.filter(r => r.isRelatedParty).length,
+    unreasonableCount: writeOffs.value.filter(r => r.isReasonable === '不合理').length,
   }))
+
+  /** 质量闸门：转回超限、关联核销未说明、判定不合理等 */
+  const gate = computed<ReversalWriteOffGate>(() => {
+    const invalidReversals = reversals.value.filter(r => !isRowValid(r)).length
+    const relatedPartyWriteOffs = writeOffs.value.filter(r => r.isRelatedParty).length
+    const unreasonableReversals = reversals.value.filter(r => r.isReasonable === '不合理').length
+    const unreasonableWriteOffs = writeOffs.value.filter(r => r.isReasonable === '不合理').length
+    const relatedMissingAnalysis = writeOffs.value.filter(
+      r => r.isRelatedParty && !(r.reasonAnalysis || '').trim(),
+    ).length
+    return {
+      invalidReversals,
+      relatedPartyWriteOffs,
+      unreasonableReversals,
+      unreasonableWriteOffs,
+      ready:
+        invalidReversals === 0
+        && relatedMissingAnalysis === 0
+        && unreasonableReversals === 0
+        && unreasonableWriteOffs === 0,
+    }
+  })
 
   // ─── 关联交易标记 ─────────────────────────────────────────────────────────
 
@@ -137,7 +169,7 @@ export function useG4EclReversalWriteOff() {
       id: crypto.randomUUID(),
       seq: writeOffs.value.length + 1,
       unitName: value.trim(),
-      writeOffType: '到期',
+      writeOffType: '',
       writeOffAmount: 0,
       writeOffReason: '',
       writeOffProcedure: '',
@@ -202,6 +234,7 @@ export function useG4EclReversalWriteOff() {
     // Computed
     reversalSummary,
     writeOffSummary,
+    gate,
     // Validation
     isRowValid,
     getReversalError,

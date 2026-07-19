@@ -10,7 +10,7 @@
  *   POST /api/workpapers/{wpId}/g2/import-data?sheet={code}
  *
  * UI 铁律：el-dropdown「导入导出 ▾」（导出模板/导出数据/导入数据）。
- * 支持 7 张动态行表格：G2-2/G2-3/G2-4/G2-5/G2-6/G2-7/G2-8。
+ * 支持：G2-1 审定表（keyed）+ G2-2~G2-8 动态行表格。
  */
 import { type Ref } from 'vue'
 import {
@@ -18,8 +18,9 @@ import {
   type ImportExportResult,
 } from './useWorkpaperImportExport'
 
-/** G2 支持导入导出的 sheet 编码（7 张动态行表格） */
+/** G2 支持导入导出的 sheet 编码 */
 export type G2ImportableSheet =
+  | 'G2-1'
   | 'G2-2'
   | 'G2-3'
   | 'G2-4'
@@ -30,8 +31,9 @@ export type G2ImportableSheet =
 
 export const G2_API_PREFIX = 'g2'
 
-/** 7 张可导入导出 sheet 的中文标签（供下拉菜单展示） */
+/** 可导入导出 sheet 的中文标签（供下拉菜单展示） */
 export const G2_IMPORTABLE_SHEETS: { code: G2ImportableSheet; label: string }[] = [
+  { code: 'G2-1', label: 'G2-1 审定表' },
   { code: 'G2-2', label: 'G2-2 明细表' },
   { code: 'G2-3', label: 'G2-3 坏账准备明细' },
   { code: 'G2-4', label: 'G2-4 调整分录' },

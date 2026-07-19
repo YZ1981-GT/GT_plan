@@ -30,6 +30,7 @@ import {
   calcOverdueDays,
   calcSubtotal,
 } from './useG3DivRecFormulaEngine'
+import { G3_DETAIL_ROWS_KEY } from './g3Constants'
 import type { ChecklistResponse } from './useF1FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -174,7 +175,7 @@ export const SEGMENT_RECEIVABLE_COLS = G3_DETAIL_SEGMENTS[3].columns
 
 // ─── Storage Key ─────────────────────────────────────────────────────────────
 
-const DATA_KEY = 'G3-2-detail-rows'
+const DATA_KEY = G3_DETAIL_ROWS_KEY
 
 // ─── Subtotal Fields ─────────────────────────────────────────────────────────
 

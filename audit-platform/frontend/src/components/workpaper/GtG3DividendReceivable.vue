@@ -6,25 +6,27 @@
         <el-segmented
           v-if="isHtmlSheet"
           v-model="dualMode.currentMode.value"
-          :options="dualMode.modeOptions"
+          :options="dualMode.modeOptions.value"
           size="small"
           @change="dualMode.onModeChange"
         />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
+        <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
+          📖 编制手册
+        </el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
-      <!-- 双模式：HTML sheet 切到 OnlyOffice -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
+        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice' && dualMode.isOoAvailable.value"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
+        @fallback="dualMode.onOoFallback"
       />
 
-      <!-- G3A 程序表（对齐 D4A） -->
       <CycleTabProcedure
         v-else-if="currentSheet === 'G3A'"
         sheet-code="G3A"
@@ -32,14 +34,33 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
-      />
+      >
+        <template #toolbar>
+          <el-alert
+            type="info"
+            :closable="false"
+            show-icon
+            class="g3a-handbook-tip"
+            title="本表为程序控制台：勾选拟执行程序并填索引。不熟悉编制逻辑？请打开手册。"
+          />
+          <el-button type="primary" size="small" @click="openHandbook('preparation')">
+            📖 编制手册
+          </el-button>
+          <el-button size="small" @click="openHandbook('usage')">
+            使用手册
+          </el-button>
+        </template>
+      </CycleTabProcedure>
 
-      <CycleTabAdjudication
-        v-else-if="adjudicationConfig"
-        :config="adjudicationConfig"
+      <G3TabAdjudication
+        v-else-if="currentSheet === 'G3-1'"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :audit-year="auditYear"
+        @imported="onSheetImported"
       />
 
       <G3TabDetail
@@ -49,6 +70,7 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        @imported="onSheetImported"
       />
 
       <G3TabAdjustment
@@ -58,6 +80,8 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :audit-year="auditYear"
+        @imported="onSheetImported"
       />
 
       <G3TabCalcCheck
@@ -67,6 +91,9 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :audit-year="auditYear"
+        :cutoff-date="cutoffDate"
+        @imported="onSheetImported"
       />
 
       <G3TabOverdueCheck
@@ -76,6 +103,7 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        @imported="onSheetImported"
       />
 
       <G3TabDisclosureListed
@@ -85,6 +113,7 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :applicable-standards="applicableStandards"
       />
 
       <G3TabDisclosureSOE
@@ -94,9 +123,35 @@
         :all-responses="formData.allResponses.value"
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
+        :applicable-standards="applicableStandards"
       />
 
-      <!-- 兜底：未迁移 sheet → OnlyOffice -->
+      <!-- 底稿目录：对齐 G1 目录页，显示泳道卡片 -->
+      <template v-else-if="currentSheet === '底稿目录'">
+        <div class="g3-index-toolbar">
+          <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
+            📖 编制手册
+          </el-button>
+          <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
+        </div>
+        <GCycleBIndexExtras
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :sheet-name="props.sheetName"
+          :wp-code="props.wpCode"
+          :html-data="props.htmlData"
+          :available-sheets="availableSheets"
+        />
+      </template>
+
+      <!-- 完整Excel：OO不可用时的友好提示 -->
+      <div v-else-if="currentSheet === '完整Excel'" class="g3-excel-fallback">
+        <el-empty description="完整Excel视图需要OnlyOffice服务可用">
+          <template #image><span style="font-size:48px">📄</span></template>
+          <el-button type="primary" size="small" @click="openHandbook('preparation')">查看编制手册</el-button>
+        </el-empty>
+      </div>
+
       <GtOnlyOfficeSheet
         v-else
         :wp-id="props.wpId"
@@ -106,7 +161,10 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
+      <G3PreparationHandbookDialog
+        v-model="handbookVisible"
+        :initial-tab="handbookTab"
+      />
     </template>
   </div>
 </template>
@@ -117,25 +175,30 @@
  *
  * Spec: .kiro/specs/g3-dividend-receivable/ Task 1.1, 9.1~9.3
  * sheetName 分发到 G3 专属子组件（G3A + G3-1~G3-5 + 附注），未迁移走 OnlyOffice
- * 集成：useWorkpaperVersionToolbar(autoSnapshot) + provide('openReviewDialog') + 双模式
- * EventBus：监听 g3:save-items 持久化 + substantive:adjudicated(1131)
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
-import { useG3DivRecFormData } from './composables/useG3DivRecFormData'
+import { useG3FormData } from './composables/useG3FormData'
 import { useG3DualMode } from './composables/useG3DualMode'
+import { eventBus } from '@/utils/eventBus'
+import { G3SaveItemsKey, G3WritebackTbKey, G3DetailRevisionKey } from './composables/g3InternalKeys'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
-import CycleTabAdjudication from './shared/CycleTabAdjudication.vue'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
-import { getAdjudicationConfig } from './shared/cycleAdjudicationConfigs'
 import type { ChecklistResponse } from './composables/useF1FormData'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+const G3TabAdjudication = defineAsyncComponent(() => import('./g3-dividend-receivable/G3TabAdjudication.vue'))
 const G3TabDetail = defineAsyncComponent(() => import('./g3-dividend-receivable/G3TabDetail.vue'))
 const G3TabCalcCheck = defineAsyncComponent(() => import('./g3-dividend-receivable/G3TabCalcCheck.vue'))
 const G3TabAdjustment = defineAsyncComponent(() => import('./g3-dividend-receivable/G3TabAdjustment.vue'))
 const G3TabOverdueCheck = defineAsyncComponent(() => import('./g3-dividend-receivable/G3TabOverdueCheck.vue'))
 const G3TabDisclosureListed = defineAsyncComponent(() => import('./g3-dividend-receivable/G3TabDisclosureListed.vue'))
 const G3TabDisclosureSOE = defineAsyncComponent(() => import('./g3-dividend-receivable/G3TabDisclosureSOE.vue'))
+const GCycleBIndexExtras = defineAsyncComponent(
+  () => import('./shared/GCycleBIndexExtras.vue'),
+)
+const G3PreparationHandbookDialog = defineAsyncComponent(
+  () => import('./g3-dividend-receivable/G3PreparationHandbookDialog.vue'),
+)
 
 const props = defineProps<{
   wpId: string
@@ -144,35 +207,77 @@ const props = defineProps<{
   sheetName?: string
   htmlData?: any
   readonly?: boolean
+  /** 项目适用准则（上市/国企等），用于附注章节映射 */
+  applicableStandards?: string[]
 }>()
 
 const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
-const formData = useG3DivRecFormData({ wpId: wpIdRef, projectId: projectIdRef })
+
+const emit = defineEmits<{
+  (e: 'navigate-sheet', sheetName: string): void
+}>()
+
+const formData = useG3FormData({ wpId: wpIdRef, projectId: projectIdRef })
 const isReadonly = computed(() => !!props.readonly)
-// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const applicableStandards = computed<string[]>(() => {
+  const fromProp = props.applicableStandards
+  if (Array.isArray(fromProp) && fromProp.length) return fromProp.map(String).filter(Boolean)
+  const raw =
+    props.htmlData?.project_context?.applicable_standards
+    ?? props.htmlData?.projectContext?.applicable_standards
+    ?? props.htmlData?.applicable_standards
+    ?? props.htmlData?.applicableStandards
+    ?? []
+  if (Array.isArray(raw)) return raw.map(String).filter(Boolean)
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean)
+    } catch { /* ignore */ }
+    return raw.split(/[,;|]+/).map((s: string) => s.trim()).filter(Boolean)
+  }
+  return []
+})
 const runtime = inject(WorkpaperRuntimeContextKey, null)
-const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+// 再提供一层：保证 G3 子树能拿到 Runtime Boundary 的复核入口（缺省 null，Tab 侧 v-if）
+provide('openReviewDialog', openReviewDialog)
+
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
-provide('g3VersionTrailRef', versionTrailRef)
-provide('g3OpenVersionHistory', openVersionHistory)
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage') {
+  handbookTab.value = tab
+  handbookVisible.value = true
+}
 
+const availableSheets = computed(() => {
+  const fromHtml = props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets
+  if (Array.isArray(fromHtml) && fromHtml.length) return fromHtml
+  // 对齐 G1：htmlData 无 sheets 时用自加载 render-config 的 sheetCache 兜底，
+  // 保证底稿目录架构树非空
+  return Object.keys(formData.sheetCache.value).map(sheet_name => ({ sheet_name }))
+})
+
+/** 与 G2 对齐：兼容 note-listed / 附注披露信息（上市公司）等模板名 */
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''
-  if (/附注披露/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
+  if (/底稿目录/.test(name)) return '底稿目录'
+  if (/完整Excel|完整\s*Excel/i.test(name)) return '完整Excel'
+  if (/G3-note-listed|附注披露.*上市|附注.*上市/.test(name)) return '附注上市'
+  if (/G3-note-soe|附注披露.*国企|附注.*国企/.test(name)) return '附注国企'
+  if (/附注/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
   const m = name.match(/(G3A|G3-\d+)/)
   return m ? m[1] : ''
 })
 
-const adjudicationConfig = computed(() => getAdjudicationConfig(currentSheet.value))
-
-/** G3A + G3-1~G3-5 + 附注 为 HTML 专属组件（支持双模式） */
 const isHtmlSheet = computed(() => {
   const s = currentSheet.value
-  return s === 'G3A' || /^G3-[1-5]$/.test(s) || s.startsWith('附注') || !!adjudicationConfig.value
+  return s === 'G3A' || /^G3-[1-5]$/.test(s) || s.startsWith('附注') || s === '底稿目录' || s === '完整Excel'
 })
 
 const dualMode = useG3DualMode({
@@ -181,47 +286,86 @@ const dualMode = useG3DualMode({
   reloadAll: () => formData.loadAll(),
 })
 
-// 复核对话 openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
-provide('reloadWorkpaperData', () => formData.loadAll())
-
-// ─── 监听 g3:save-items → 保存 + autoSnapshot ───────────────────────────────
-async function handleG3SaveItems(e: Event): Promise<void> {
-  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
-  if (Array.isArray(items) && items.length > 0) {
-    for (const it of items) {
-      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
-    }
-    scheduleAutoSnapshot()
-  }
+function onSheetImported(): void {
+  void formData.loadAll()
 }
 
-// ─── 监听 substantive:adjudicated(1131) → 附注刷新 ──────────────────────────
-function handleAdjudicated(e: Event): void {
-  const d = (e as CustomEvent<{ accountCode: string; adjudicatedAmount: number }>).detail
-  if (d?.accountCode === '1131') {
-    void formData.saveImmediate('G3-1-adjudicated-amount', {
-      item_id: 'G3-1-adjudicated-amount',
-      conclusion: String(d.adjudicatedAmount),
-      remark: null,
-    })
+/** 审计年度：供 G3-1 取试算 / G3-3 从调整分录模块取数；优先 htmlData，回退 Runtime */
+const auditYear = computed(() =>
+  props.htmlData?.project_context?.audit_year
+  ?? props.htmlData?.projectContext?.audit_year
+  ?? props.htmlData?.audit_year
+  ?? runtime?.year?.value
+  ?? null,
+)
+
+/** 资产负债表日：优先项目上下文 period_end，否则审计年度末 */
+const cutoffDate = computed(() => {
+  const fromCtx =
+    props.htmlData?.project_context?.period_end
+    ?? props.htmlData?.project_context?.audit_period_end
+    ?? props.htmlData?.projectContext?.period_end
+    ?? props.htmlData?.projectContext?.audit_period_end
+  if (fromCtx) return String(fromCtx).slice(0, 10)
+  const y = auditYear.value
+  if (y != null && y !== '') {
+    const n = Number(y)
+    if (Number.isFinite(n) && n >= 1900) return `${Math.trunc(n)}-12-31`
   }
+  return ''
+})
+
+provide('reloadWorkpaperData', () => formData.loadAll())
+provide(G3DetailRevisionKey, formData.detailRevision)
+
+provide(G3SaveItemsKey, async (items: ChecklistResponse[]) => {
+  if (!Array.isArray(items) || !items.length) return
+  for (const it of items) {
+    if (it?.item_id) await formData.saveImmediate(it.item_id, it)
+  }
+  scheduleAutoSnapshot()
+})
+
+provide(G3WritebackTbKey, async (auditedAmount: number) => {
+  if (typeof auditedAmount !== 'number' || !Number.isFinite(auditedAmount)) return
+  await formData.writebackTrialBalance(auditedAmount)
+})
+
+/** 经 eventBus 订阅（crossWpEventBridge 已桥接 window ↔ mitt） */
+function handleAdjudicated(d: {
+  accountCode: string
+  auditedAmount?: number
+  adjudicatedAmount?: number
+}): void {
+  if (d?.accountCode !== '1131') return
+  const amt = d.auditedAmount ?? (d as { adjudicatedAmount?: number }).adjudicatedAmount
+  if (amt == null || !Number.isFinite(Number(amt))) return
+  void formData.saveImmediate('G3-1-adjudicated-amount', {
+    item_id: 'G3-1-adjudicated-amount',
+    conclusion: String(amt),
+    remark: null,
+  })
 }
 
 onMounted(async () => {
-  window.addEventListener('g3:save-items', handleG3SaveItems)
-  window.addEventListener('substantive:adjudicated', handleAdjudicated)
+  eventBus.on('substantive:adjudicated', handleAdjudicated)
   await formData.loadAll()
   isLoading.value = false
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('g3:save-items', handleG3SaveItems)
-  window.removeEventListener('substantive:adjudicated', handleAdjudicated)
+  eventBus.off('substantive:adjudicated', handleAdjudicated)
+  formData.flushPending()
 })
 </script>
 
 <style scoped>
 .g3-dividend-receivable { padding: 12px; }
 .loading-container { padding: 24px; }
-.g3-dividend-receivable-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
+.g3-dividend-receivable-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.g3a-handbook-tip { flex: 1; min-width: 220px; margin-right: 4px; }
+
+.g3-index-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+
+.g3-excel-fallback { padding: 48px 24px; text-align: center; }
 </style>

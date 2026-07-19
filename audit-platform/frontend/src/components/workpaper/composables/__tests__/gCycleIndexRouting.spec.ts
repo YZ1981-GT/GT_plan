@@ -37,4 +37,18 @@ describe('gCycleIndexRouting', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].content).toBe('审定表G12-1')
   })
+
+  it('buildCycleArchitectureHtmlData 也按名称跳过底稿目录', () => {
+    const data = buildCycleArchitectureHtmlData(
+      {},
+      [
+        { sheet_name: '底稿目录', componentType: 'g2-interest-receivable' },
+        { sheet_name: '审定表G2-1', componentType: 'g2-interest-receivable' },
+      ],
+      'G2',
+    )
+    const rows = data.navigation_rows as Array<{ content: string }>
+    expect(rows).toHaveLength(1)
+    expect(rows[0].content).toBe('审定表G2-1')
+  })
 })

@@ -175,7 +175,7 @@ export function useG11ReturnRateAnalysis(opts: {
       const res = await api.post(`/api/workpapers/${opts.wpId.value}/g11/ai/return-rate-conclusion`, {
         rows: rows.value.filter((r) => r.abnormalHighlight),
       }, { _silent: true } as any)
-      const text = res?.data?.content ?? res?.content ?? ''
+      const text = res?.data?.data?.content ?? res?.data?.content ?? res?.content ?? ''
       if (text) updateConclusion(text)
     } catch { /* AI optional */ }
     finally { aiLoading.value = false }

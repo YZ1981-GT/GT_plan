@@ -47,7 +47,13 @@ export function buildCycleArchitectureHtmlData(
   return {
     ...base,
     navigation_rows: availableSheets
-      .filter(s => (s.componentType ?? s.component_type) !== 'b-index')
+      .filter((s) => {
+        const ct = s.componentType ?? s.component_type
+        const name = s.sheet_name || ''
+        if (ct === 'b-index') return false
+        if (name.includes('底稿目录')) return false
+        return !!name
+      })
       .map((s, i) => {
         const name = s.sheet_name || ''
         const m = name.match(/([A-Z]\d+[A-Z]?(?:-\d+)*)\s*$/)

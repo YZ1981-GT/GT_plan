@@ -4,7 +4,6 @@
       <h3 class="g10-title">G10-1 交易性金融负债审定表</h3>
       <div class="g10-actions">
         <GtReviewTrigger section-id="G10-1-adjudication" />
-        <el-button size="small" :loading="adj.aiLoading.value" :disabled="isReadonly" @click="adj.generateAiAnalysis()">🤖 AI</el-button>
       </div>
     </div>
 
@@ -169,18 +168,18 @@
       <el-button size="small" type="primary" :disabled="isReadonly" @click="adj.publishAdjudicated()">发布审定数</el-button>
     </div>
 
-    <el-card shadow="never" class="g10-note-card">
-      <template #header>审计说明</template>
-      <el-input v-if="!isReadonly" v-model="noteProxy" type="textarea" :rows="3" placeholder="审定分析说明" />
-      <p v-else class="note-text">{{ adj.auditNote.value || '—' }}</p>
-    </el-card>
-
-    <el-card shadow="never" class="g10-note-card">
-      <template #header>审计结论</template>
-      <el-input v-if="!isReadonly" v-model="conclusionProxy" type="textarea" :rows="3"
-        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。" />
-      <p v-else class="note-text">{{ adj.auditConclusion.value || '—' }}</p>
-    </el-card>
+    <G10AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="noteProxy"
+      v-model:conclusion="conclusionProxy"
+      note-ai-section="adjudication-note"
+      conclusion-ai-section="adjudication-conclusion"
+      note-placeholder="填写审计说明：可概述审定分析程序、重大变动原因及与试算表/明细表勾稽结果。"
+      note-hint="覆盖期初/期末审定、贷方公式勾稽及与 G10-2 明细表勾稽。"
+      conclusion-placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。"
+      :related-context="{ 试算表差异: adj.variance.value, 明细勾稽差异: adj.detailCrossVariance.value }"
+    />
   </div>
 </template>
 
@@ -189,6 +188,7 @@ import { computed } from 'vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtReviewDot from '../../GtReviewDot.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G10AuditTextCards from '../G10AuditTextCards.vue'
 import { useG10Adjudication } from '../../composables/useG10Adjudication'
 import { G10_VIRTUAL_SCROLL_THRESHOLD } from '../../composables/g10Constants'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
@@ -259,8 +259,6 @@ function rowClassName({ row }: { row: { reasonRequired?: boolean; reasonAnalysis
 .fine-checks { display: flex; gap: 8px; margin: 10px 0; }
 .g10-tb-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 10px 0; }
 .variance.is-error { color: #f56c6c; font-weight: 600; }
-.g10-note-card { margin-top: 8px; }
-.note-text { margin: 0; white-space: pre-wrap; }
 .total-table { margin-top: 8px; }
 :deep(.row-warn) { background-color: #fdf6ec !important; }
 </style>

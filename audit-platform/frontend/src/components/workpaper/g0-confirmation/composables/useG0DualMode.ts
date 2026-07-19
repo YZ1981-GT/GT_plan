@@ -5,8 +5,9 @@
  * G0-3S(证券差异)/G0-6(替代程序) 专属组件默认 HTML；OnlyOffice 作为降级/偏好切换。
  * OO 健康检查响应双层兼容：health.data?.data?.healthy。
  */
-import { ref, onMounted, type Ref } from 'vue'
+import { ref, computed, onMounted, type Ref } from 'vue'
 import http from '@/utils/http'
+import { dualModeHtmlOoOptions } from '../../composables/dualModeLabels'
 
 export type G0RenderMode = 'html' | 'onlyoffice'
 
@@ -26,10 +27,7 @@ export function useG0DualMode(options: UseG0DualModeOptions) {
   const ooConfig = ref<Record<string, any> | null>(null)
   const checking = ref(false)
 
-  const modeOptions = [
-    { label: '结构化视图', value: 'html' },
-    { label: '在线编辑', value: 'onlyoffice' },
-  ]
+  const modeOptions = computed(() => dualModeHtmlOoOptions({ onlineDisabled: !isOoAvailable.value }))
 
   function storageKey(): string {
     return STORAGE_PREFIX + wpId.value
@@ -70,7 +68,10 @@ export function useG0DualMode(options: UseG0DualModeOptions) {
 
   async function switchMode(target: G0RenderMode): Promise<void> {
     if (target === currentMode.value) return
-    if (target === 'onlyoffice' && !isOoAvailable.value) return
+    if (target === 'onlyoffice' && !isOoAvailable.value) {
+      currentMode.value = 'html'
+      return
+    }
 
     if (target === 'onlyoffice') {
       const sn = sheetName?.value || 'G0'
@@ -99,8 +100,14 @@ export function useG0DualMode(options: UseG0DualModeOptions) {
   }
 
   onMounted(() => {
-    loadPersistedMode()
-    void checkOOHealth()
+    void checkOOHealth().then((healthy) => {
+      if (healthy) {
+        loadPersistedMode()
+      } else {
+        currentMode.value = 'html'
+        persistMode('html')
+      }
+    })
   })
 
   return {

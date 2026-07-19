@@ -13,7 +13,15 @@
       <div class="section-head">
         <h4 class="section-title">{{ section.title }}</h4>
         <div class="head-actions">
-          <el-button v-if="section.hasTextArea" size="small" type="primary" text :disabled="isReadonly" @click="fillAiDraft(sIdx)">
+          <el-button
+            v-if="section.hasTextArea"
+            size="small"
+            type="primary"
+            text
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading"
+            @click="fillAiDraft(sIdx)"
+          >
             🤖AI辅助
           </el-button>
           <GtReviewTrigger :section-id="`G6-disclosure-listed-${section.id}`" />
@@ -101,7 +109,7 @@
 
     <!-- 底部AI辅助按钮 -->
     <div class="bottom-ai-actions">
-      <el-button type="primary" size="small" :disabled="isReadonly" @click="fillAiDraftAll">
+      <el-button type="primary" size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="fillAiDraftAll">
         🤖 AI辅助生成全部附注
       </el-button>
     </div>
@@ -133,9 +141,10 @@
  * 多section结构 + 每个文本区section标题行右侧AI辅助按钮 + 复核按钮
  * 底部AI辅助按钮生成全部附注
  */
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
-import http from '@/utils/http'
+import { useG6MainAiGenerate } from '../../composables/useG6MainAiGenerate'
+import type { ChecklistResponse } from '../../composables/useF1FormData'
 
 const G6_ACCOUNT_CODE = '1503'
 
@@ -153,28 +162,14 @@ function fmtAmount(v: number | null | undefined): string {
 }
 
 const isReadonly = computed(() => props.isReadonly)
+const wpIdRef = computed(() => props.wpId)
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG6MainAiGenerate(wpIdRef)
 
-function readSaved(key: string): string {
-  const cr = props.htmlData?.checklist_responses
-  if (cr && typeof cr === 'object' && (cr as Record<string, any>)[key]) {
-    const v = (cr as Record<string, any>)[key]
-    return typeof v === 'object' ? (v.remark ?? '') : String(v ?? '')
-  }
-  const resp = props.htmlData?.responses
-  if (Array.isArray(resp)) {
-    const found = resp.find((r: any) => r?.item_id === key)
-    if (found?.remark) return found.remark
-  }
-  return ''
-}
-
-async function saveAudit(key: string, val: string): Promise<void> {
+function dispatchSave(itemId: string, val: string): void {
   if (props.isReadonly) return
+  const item: ChecklistResponse = { item_id: itemId, conclusion: null, remark: val }
   try {
-    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId || undefined,
-      items: [{ item_id: key, conclusion: null, remark: val }],
-    })
+    window.dispatchEvent(new CustomEvent('g6:save-items', { detail: { items: [item] } }))
   } catch { /* silent */ }
 }
 
@@ -316,12 +311,13 @@ onBeforeUnmount(() => {
   window.removeEventListener('substantive:adjudicated', handleAdjudicated)
 })
 
-// ═══ EventBus: publish disclosure:note-text-updated ═══
+// ═══ EventBus: publish disclosure:note-text-updated + 持久化 ═══
 function onNoteTextChange(_sectionIdx: number): void {
   const allText = sections
     .filter(s => s.hasTextArea && s.textContent)
     .map(s => `【${s.title}】\n${s.textContent}`)
     .join('\n\n')
+  dispatchSave('G6-disclosure-listed-text', allText)
   try {
     window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
       detail: { accountCode: G6_ACCOUNT_CODE, section: 'listed', text: allText },
@@ -330,23 +326,42 @@ function onNoteTextChange(_sectionIdx: number): void {
 }
 
 // ═══ AI辅助（单section） ═══
-function fillAiDraft(sectionIdx: number): void {
+async function fillAiDraft(sectionIdx: number): Promise<void> {
   if (isReadonly.value) return
   const section = sections[sectionIdx]
   if (!section) return
-  const draft = `根据审计结果，${section.title}期末余额为 [审定金额] 元。其他债权投资以公允价值计量且变动计入其他综合收益(FVOCI-Debt)，具体构成如下：...`
-  section.textContent = section.textContent ? `${section.textContent}\n${draft}` : draft
-  onNoteTextChange(sectionIdx)
+  const text = await generateAndConfirm(
+    'disclosure-listed-note',
+    section.textContent || '',
+    { sectionTitle: section.title },
+    'AI 附注披露',
+  )
+  if (text) {
+    section.textContent = text
+    onNoteTextChange(sectionIdx)
+  }
 }
 
 // ═══ AI辅助（全部section） ═══
-function fillAiDraftAll(): void {
+async function fillAiDraftAll(): Promise<void> {
   if (isReadonly.value) return
-  sections.forEach((section, idx) => {
-    if (section.hasTextArea && !section.textContent) {
-      fillAiDraft(idx)
-    }
-  })
+  const existing = sections
+    .filter(s => s.hasTextArea && s.textContent)
+    .map(s => `【${s.title}】\n${s.textContent}`)
+    .join('\n\n')
+  const text = await generateAndConfirm(
+    'disclosure-text',
+    existing,
+    { format: 'listed' },
+    'AI 全部附注',
+  )
+  if (!text) return
+  // 填入第一个空文本区；若均已有内容则追加到末尾 section
+  const emptyIdx = sections.findIndex(s => s.hasTextArea && !s.textContent)
+  const targetIdx = emptyIdx >= 0 ? emptyIdx : sections.findIndex(s => s.hasTextArea)
+  if (targetIdx < 0) return
+  sections[targetIdx].textContent = text
+  onNoteTextChange(targetIdx)
 }
 
 // ═══ 数据加载 ═══

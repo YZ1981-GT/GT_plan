@@ -173,14 +173,49 @@
       />
 
       <!-- Grid 兜底（Univer 有网格 / C-附注无 schema / OnlyOffice 降级 / 无注册表 renderer 但有 grid cells） -->
-      <GtGridSheet
-        v-else-if="(componentType === 'univer' && hasGridCells) || cNoteGridFallback || noRendererGridFallback || onlyOfficeFallback"
-        :wp-id="wpId"
-        :sheet-name="activeSheetName"
-        :schema="activeSheetSchema"
-        :html-data="activeSheetHtmlData"
-        :readonly="true"
-      />
+      <template v-else-if="(componentType === 'univer' && hasGridCells) || cNoteGridFallback || noRendererGridFallback || onlyOfficeFallback">
+        <div v-if="isWholeExcelTab && onlyOfficeFallback" class="gt-wp-renderer__whole-excel-fallback">
+          <el-alert
+            type="warning"
+            :closable="false"
+            show-icon
+            title="OnlyOffice 暂不可用，已从整册 Excel 模板拉取只读网格展示"
+            class="gt-wp-renderer__whole-excel-alert"
+          />
+          <div v-if="wholeExcelSheets.length" class="gt-wp-renderer__whole-excel-sheets">
+            <el-select
+              v-model="wholeExcelActiveSheet"
+              size="small"
+              filterable
+              placeholder="选择 sheet"
+              style="min-width: 240px"
+              @change="(v: string) => loadWholeExcelGrid(v)"
+            >
+              <el-option v-for="s in wholeExcelSheets" :key="s" :label="s" :value="s" />
+            </el-select>
+            <el-tag v-if="wholeExcelTemplateName" size="small" type="info">{{ wholeExcelTemplateName }}</el-tag>
+          </div>
+          <div v-if="wholeExcelGridLoading" class="gt-wp-renderer__whole-excel-loading">
+            <el-skeleton :rows="6" animated />
+          </div>
+          <GtGridSheet
+            v-else
+            :wp-id="wpId"
+            :sheet-name="wholeExcelActiveSheet || activeSheetName"
+            :schema="activeSheetSchema"
+            :html-data="wholeExcelGridData"
+            :readonly="true"
+          />
+        </div>
+        <GtGridSheet
+          v-else
+          :wp-id="wpId"
+          :sheet-name="activeSheetName"
+          :schema="activeSheetSchema"
+          :html-data="activeSheetHtmlData"
+          :readonly="true"
+        />
+      </template>
 
       <!-- Univer 占位（无模板网格数据时） -->
       <div v-else-if="componentType === 'univer'" class="gt-wp-renderer__univer-placeholder">
@@ -311,6 +346,12 @@ const isWpFullscreen = ref(false)
 const activeComponentRef = ref<any>(null)
 // OnlyOffice 降级状态（当 GtOnlyOfficeSheet emit fallback 时切换到 GtGridSheet）
 const onlyOfficeFallback = ref(false)
+/** 完整Excel 降级：从整册模板抽取的网格 */
+const wholeExcelGridLoading = ref(false)
+const wholeExcelGridData = ref<Record<string, any>>({})
+const wholeExcelSheets = ref<string[]>([])
+const wholeExcelActiveSheet = ref('')
+const wholeExcelTemplateName = ref('')
 
 // ─── Composables ───
 const wpIdRef = toRef(props, 'wpId')
@@ -389,6 +430,10 @@ const activeSheetName = computed<string>({
   set(name: string) {
     internalActiveSheetName.value = name
     onlyOfficeFallback.value = false  // 切换 sheet 时重置 OnlyOffice 降级状态
+    wholeExcelGridData.value = {}
+    wholeExcelSheets.value = []
+    wholeExcelActiveSheet.value = ''
+    wholeExcelTemplateName.value = ''
     emit('sheet-change', name)
   },
 })
@@ -414,8 +459,12 @@ const tabSheets = computed(() => {
     html_data: { onlyoffice: true, whole_workbook: true, sheet_name: WHOLE_EXCEL_TAB },
     cross_refs: [],
   }
-  // 底稿目录(b-index)通常是第一个 → 插在其右侧；否则插在最前
-  const firstIsIndex = sheets[0]?.componentType === 'b-index'
+  // 底稿目录通常是第一个 → 插在其右侧；否则插在最前。
+  // 除 b-index 外，也认 sheet 名含「底稿目录」（G 循环偶发被专属组件 override 时仍保持页签顺序）
+  const first = sheets[0]
+  const firstIsIndex =
+    first?.componentType === 'b-index'
+    || (!!first?.sheet_name && first.sheet_name.includes('底稿目录'))
   if (firstIsIndex) {
     return [sheets[0], wholeExcelTab, ...sheets.slice(1)]
   }
@@ -425,11 +474,23 @@ const tabSheets = computed(() => {
 /** 当前是否为「完整Excel」合成页签 */
 const isWholeExcelTab = computed<boolean>(() => activeSheetName.value === WHOLE_EXCEL_TAB)
 
-/** 完整Excel 模式下传给 config 端点的 sheet_name（用首个真实 sheet，仅用于满足 URL 路径，
- *  实际 OnlyOffice 打开整本 xlsx 显示全部 tab；whole_workbook=true 时后端不加 actionLink） */
+/** 是否为底稿目录页签（b-index 或 sheet 名含「底稿目录」；对齐后端 whole-excel 优先跳过目录） */
+function isIndexSheetTab(s: { sheet_name?: string; componentType?: string } | null | undefined): boolean {
+  if (!s) return false
+  if (s.componentType === 'b-index') return true
+  return !!(s.sheet_name && s.sheet_name.includes('底稿目录'))
+}
+
+/** 完整Excel 模式下传给 config 端点的 sheet_name（用首个真实业务 sheet，仅用于满足 URL 路径，
+ *  实际 OnlyOffice 打开整本 xlsx 显示全部 tab；whole_workbook=true 时后端不加 actionLink）。
+ *  必须跳过「底稿目录」：G 循环目录偶发仍挂在专属 Host 上，误传会导致 OO config/WOPI 失败并降级。 */
 const wholeWorkbookSheetName = computed<string>(() => {
-  const real = visibleSheets.value.find(s => s.sheet_name !== WHOLE_EXCEL_TAB && s.componentType !== 'b-index')
-  return real?.sheet_name ?? visibleSheets.value[0]?.sheet_name ?? ''
+  const real = visibleSheets.value.find(
+    (s) => s.sheet_name !== WHOLE_EXCEL_TAB && !isIndexSheetTab(s),
+  )
+  return real?.sheet_name
+    ?? visibleSheets.value.find((s) => s.sheet_name !== WHOLE_EXCEL_TAB)?.sheet_name
+    ?? ''
 })
 
 const activeSheetSchema = computed(() => activeSheet.value?.schema ?? {})
@@ -537,8 +598,14 @@ const rendererEntry = computed(() =>
  */
 const htmlRendererKey = computed(() => {
   const ct = effectiveRendererComponentType.value
-  // 同 componentType 多 sheet 需带 sheet，避免内部状态卡住 / 双层 tabs 错位
-  if (ct === 'f2-stocktake-bundle' || ct === 'f1-prepayment') {
+  // 同 componentType 多 sheet 需带 sheet，避免内部状态卡住 / 双层 tabs 错位 / OO 串页
+  if (
+    ct === 'f2-stocktake-bundle'
+    || ct === 'f1-prepayment'
+    || ct === 'g1-trading-financial-assets'
+    || ct === 'g2-interest-receivable'
+    || ct === 'd4-operating-revenue'
+  ) {
     return `${ct}::${activeSheetName.value}`
   }
   // 其余 HTML 组件按类型复用即可，减少无谓重建与重复请求
@@ -705,6 +772,39 @@ const errorSubTitle = computed(() => {
 // OnlyOffice 降级回调：GtOnlyOfficeSheet emit('fallback') 时切换到 GtGridSheet
 function onOnlyOfficeFallback() {
   onlyOfficeFallback.value = true
+  // 完整Excel：从整册模板（如 G1.xlsx）拉取网格，避免空态
+  if (activeSheetName.value === WHOLE_EXCEL_TAB) {
+    void loadWholeExcelGrid()
+  }
+}
+
+/** 从整册 Excel 模板抽取只读网格（OO 降级兜底，对齐 D4/G1 模板拉取） */
+async function loadWholeExcelGrid(sheet?: string) {
+  if (!props.wpId) return
+  wholeExcelGridLoading.value = true
+  try {
+    const params: Record<string, string> = {}
+    if (sheet) params.sheet = sheet
+    const resp = await http.get(`/api/workpapers/${props.wpId}/whole-excel-grid`, {
+      params,
+      _silent: true,
+    } as any)
+    const data = resp.data?.data ?? resp.data ?? {}
+    wholeExcelSheets.value = Array.isArray(data.sheets) ? data.sheets : []
+    wholeExcelActiveSheet.value = data.active_sheet || sheet || ''
+    wholeExcelTemplateName.value = data.template_name || ''
+    wholeExcelGridData.value = data.html_data && typeof data.html_data === 'object'
+      ? data.html_data
+      : {}
+    if (!wholeExcelGridData.value?.cells || !Object.keys(wholeExcelGridData.value.cells).length) {
+      ElMessage.warning('整册 Excel 模板暂无可用网格内容，可点「导出模板」下载原文件')
+    }
+  } catch (e: any) {
+    wholeExcelGridData.value = {}
+    ElMessage.error('拉取整册 Excel 失败：' + (e?.response?.data?.detail || e?.message || '请稍后重试'))
+  } finally {
+    wholeExcelGridLoading.value = false
+  }
 }
 
 // 统一工具栏操作
@@ -822,7 +922,7 @@ function onJumpToSection(sheetName: string) {
  */
 const switchTreeHtmlData = computed(() => ({
   navigation_rows: visibleSheets.value
-    .filter(s => s.componentType !== 'b-index')
+    .filter((s) => !isIndexSheetTab(s))
     .map((s, i) => {
       const name = s.sheet_name || ''
       const m = name.match(/([A-Z]\d+[A-Z]?(?:-\d+)*)\s*$/)
@@ -986,6 +1086,25 @@ function onOpenFormula(payload: { sheetName: string }) {
 
 .gt-wp-renderer__fallback-banner {
   margin-bottom: 8px;
+}
+
+.gt-wp-renderer__whole-excel-fallback {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 300px;
+}
+.gt-wp-renderer__whole-excel-alert {
+  margin: 0;
+}
+.gt-wp-renderer__whole-excel-sheets {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.gt-wp-renderer__whole-excel-loading {
+  padding: 12px;
 }
 </style>
 

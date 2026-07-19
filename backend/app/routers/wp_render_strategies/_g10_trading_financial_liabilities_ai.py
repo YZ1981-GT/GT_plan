@@ -1,8 +1,6 @@
 """G10 交易性金融负债 — AI 辅助端点.
 
 POST /api/workpapers/{wp_id}/g10/ai/{section}
-sections: adjudication-analysis / classification-conclusion / fair-value-conclusion /
-          derivative-conclusion / voucher-conclusion
 """
 
 from __future__ import annotations
@@ -45,10 +43,25 @@ _SYSTEM = """你是一位资深注册会计师，协助编制 G10《交易性金
 
 _PROMPTS = {
     "adjudication-analysis": "请生成 G10-1 审定表审计说明，分析各负债项目期初期末变动及主要原因。",
+    "adjudication-note": "请生成 G10-1 审定表审计说明，概述程序执行情况、重大变动原因及与试算表/明细表勾稽结果。",
+    "adjudication-conclusion": "请生成 G10-1 审定表审计结论，按 A/B/C 口径评价科目2101审定数准确性与列报正确性。",
+    "detail-note": "请生成 G10-2 明细表审计说明，概述各负债项目核实、公允价值变动计入损益验证及与审定表勾稽情况。",
+    "detail-conclusion": "请生成 G10-2 明细表审计结论，评价明细完整性、准确性及与 G10-1 勾稽一致性。",
+    "adjustment-note": "请生成 G10-3 调整分录审计说明，概述 AJE/RJE 依据、借贷平衡核对及回写审定表影响。",
+    "adjustment-conclusion": "请生成 G10-3 调整分录审计结论，评价分录恰当性、借贷平衡及回写审定表情况。",
+    "classification-note": "请生成 G10-4 分类适当性检查审计说明，概述 CAS22/37 分类条件核查及各区段合规判断执行情况。",
     "classification-conclusion": "请根据 G10-4 分类适当性检查问卷，生成综合审计结论。",
+    "fair-value-note": "请生成 G10-5 公允价值测试审计说明，概述层次划分依据、估值来源及 Level3 输入值核实情况。",
     "fair-value-conclusion": "请根据 G10-5 公允价值测试表，生成公允价值计量审计结论。",
+    "l3-note": "请生成 G10-6 第三层次调节表审计说明，概述期初至期末调节核实、层次转入转出原因及差异核查结果。",
+    "l3-conclusion": "请生成 G10-6 第三层次调节表审计结论，评价调节完整性、准确性及与 G10-5 勾稽一致性。",
+    "derivative-note": "请生成 G10-8 衍生金融工具核查审计说明，概述五要素核查、嵌入衍生拆分、公允价值及套期关系测试情况。",
     "derivative-conclusion": "请根据 G10-8 衍生金融工具核查问卷，生成衍生工具审计结论。",
+    "voucher-note": "请生成 G10-7 凭证检查审计说明，概述抽样方法、样本量及逐笔核对发现的异常事项。",
     "voucher-conclusion": "请根据 G10-7 凭证检查表异常样本，生成凭证测试结论。",
+    "disclosure-listed-note": "请生成 G10 附注披露（上市公司格式）审计说明，概述披露项目、金额与公允价值层次核对及与审定表勾稽结果。",
+    "disclosure-soe-note": "请生成 G10 附注披露（国有企业格式）审计说明，概述披露项目、金额与相关风险管理披露核对及与审定表勾稽结果。",
+    "disclosure-conclusion": "请生成 G10 附注披露审计结论，评价披露完整性、准确性及是否符合企业会计准则与监管要求。",
 }
 
 

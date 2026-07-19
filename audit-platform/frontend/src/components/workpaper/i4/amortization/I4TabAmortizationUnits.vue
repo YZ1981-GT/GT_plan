@@ -1,5 +1,8 @@
 <template>
   <div class="i4-tab-amortization-units">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" title="审计目标：验证长期待摊费用工作量法摊销计算的准确性，确认月摊销额=原始金额×(当月工作量÷总预计工作量)，实际工作量数据可靠。" class="objective-alert" />
+
     <!-- 蓝色渐变引导区 -->
     <div class="guide-area">
       <div class="guide-grid">
@@ -154,6 +157,32 @@
       </el-table>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="请填写审计说明（工作量法摊销测算复核情况、实际产量数据来源等）..."
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="请填写审计结论..."
+        @change="saveAuditConclusion"
+      />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -183,7 +212,7 @@
  * Task: 4.8
  * Requirements: 6.1-6.6
  */
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { calcUnitsOfProductionAmort, calcAmortizationRate } from '../../composables/useI4AmortizationEngine'
@@ -391,10 +420,49 @@ function getProgressColor(rate: number | undefined): string {
 function _persist(): void {
   emit('save', `${PREFIX}-rows`, JSON.stringify(rows.value))
 }
+
+// ─── Audit Note / Conclusion (AN + AC) ───────────────────────────────────────
+
+const NOTE_KEY = 'I4-amortization-units-audit-note'
+const CONCLUSION_KEY = 'I4-amortization-units-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  emit('save', NOTE_KEY, val)
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  emit('save', CONCLUSION_KEY, val)
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 </script>
 
 <style scoped>
 .i4-tab-amortization-units { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+/* 审计目标 */
+.objective-alert { margin-bottom: 14px; }
+.i4-tab-amortization-units :deep(.objective-alert .el-alert__content) { padding: 2px 0; }
+
+/* 审计说明/结论 */
+.audit-note-card { margin-bottom: 16px; }
+.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
+.card-header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 500; }
 
 /* 蓝色渐变引导区 */
 .guide-area {

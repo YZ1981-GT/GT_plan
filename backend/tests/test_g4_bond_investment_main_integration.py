@@ -133,17 +133,17 @@ class TestG4MainRegistrationContract:
 
 
 class TestG4MainImportExportRoundTrip:
-    """验证 G4-2/G4-3/G4-4 三张表的导入导出列结构对齐."""
+    """验证 G4-1/2/3/4 导入导出列结构与当前 Excel 对齐契约."""
 
-    def test_g4_2_segments_total_44_columns(self):
+    def test_g4_2_segments_total_columns(self):
         from app.routers.wp_render_strategies._g4_bond_investment_main_import_export import (
             _G4_2_ALL_HEADERS,
             _G4_2_ALL_KEYS,
         )
 
-        # 44列 = 6 + 10 + 4 + 10 + 8 = 38... 实际44列
-        assert len(_G4_2_ALL_HEADERS) == 38  # 6+10+4+10+8=38 (区段内合计)
-        assert len(_G4_2_ALL_KEYS) == 38
+        # 对齐 Excel：6+9+4+9+6 = 34
+        assert len(_G4_2_ALL_HEADERS) == 34
+        assert len(_G4_2_ALL_KEYS) == 34
         assert len(_G4_2_ALL_HEADERS) == len(_G4_2_ALL_KEYS)
 
     def test_g4_2_five_segments_defined(self):
@@ -165,10 +165,10 @@ class TestG4MainImportExportRoundTrip:
         )
 
         assert len(_G4_2_SEG1_HEADERS) == 6   # 基础信息
-        assert len(_G4_2_SEG2_HEADERS) == 10  # 期初余额
+        assert len(_G4_2_SEG2_HEADERS) == 9   # 期初余额
         assert len(_G4_2_SEG3_HEADERS) == 4   # 本期变动
-        assert len(_G4_2_SEG4_HEADERS) == 10  # 期末余额+减值
-        assert len(_G4_2_SEG5_HEADERS) == 8   # 摊余成本+审定
+        assert len(_G4_2_SEG4_HEADERS) == 9   # 期末余额+减值
+        assert len(_G4_2_SEG5_HEADERS) == 6   # 摊余成本+审定
 
     def test_g4_3_headers_10_columns(self):
         from app.routers.wp_render_strategies._g4_bond_investment_main_import_export import (
@@ -178,27 +178,25 @@ class TestG4MainImportExportRoundTrip:
 
         assert len(_G4_3_HEADERS) == 10
         assert len(_G4_3_KEYS) == 10
-        assert "序号" in _G4_3_HEADERS
-        assert "分录类型" in _G4_3_HEADERS
-        assert "借方金额" in _G4_3_HEADERS
-        assert "贷方金额" in _G4_3_HEADERS
+        assert "调整事项说明" in _G4_3_HEADERS
+        assert "科目代码" in _G4_3_HEADERS
+        assert "借方调整金额" in _G4_3_HEADERS
+        assert "贷方调整金额" in _G4_3_HEADERS
 
-    def test_g4_4_headers_19_columns(self):
+    def test_g4_4_headers_18_columns(self):
         from app.routers.wp_render_strategies._g4_bond_investment_main_import_export import (
             _G4_4_HEADERS,
             _G4_4_KEYS,
         )
 
-        assert len(_G4_4_HEADERS) == 19
-        assert len(_G4_4_KEYS) == 19
-        # 初始入账价值 9列
+        assert len(_G4_4_HEADERS) == 18
+        assert len(_G4_4_KEYS) == 18
         assert "投资项目" in _G4_4_HEADERS
         assert "面值总额" in _G4_4_HEADERS
         assert "初始入账价值" in _G4_4_HEADERS
-        # 利息计算 10列
         assert "截止日" in _G4_4_HEADERS
         assert "实际利息收入" in _G4_4_HEADERS
-        assert "减值阶段" in _G4_4_HEADERS
+        assert "计息天数" in _G4_4_HEADERS
 
     def test_g4_2_headers_keys_alignment(self):
         from app.routers.wp_render_strategies._g4_bond_investment_main_import_export import (
@@ -206,7 +204,6 @@ class TestG4MainImportExportRoundTrip:
             _G4_2_ALL_KEYS,
         )
 
-        # 每个 header 都有对应 key
         for i, (h, k) in enumerate(zip(_G4_2_ALL_HEADERS, _G4_2_ALL_KEYS)):
             assert h, f"第{i}列 header 为空"
             assert k, f"第{i}列 key 为空"
@@ -216,10 +213,9 @@ class TestG4MainImportExportRoundTrip:
             _G4_3_KEYS,
         )
 
-        # 验证字段名与前端 AdjustmentEntry 接口一致
         expected_keys = [
-            "seq", "entryType", "date", "summary", "accountCode",
-            "accountName", "debitAmount", "creditAmount", "preparedBy", "remark",
+            "description", "category", "reportItem", "accountCode", "accountName",
+            "noteItem", "debitAmount", "creditAmount", "indexRef", "remark",
         ]
         assert _G4_3_KEYS == expected_keys
 
@@ -228,31 +224,65 @@ class TestG4MainImportExportRoundTrip:
             _G4_4_KEYS,
         )
 
-        # 验证前9个键为初始入账section，后10个为利息计算section
         initial_keys = _G4_4_KEYS[:9]
         interest_keys = _G4_4_KEYS[9:]
         assert "projectName" in initial_keys
         assert "initialCarryingAmount" in initial_keys
         assert "effectiveInterest" in interest_keys
-        assert "stage" in interest_keys
+        assert "days" in interest_keys
         assert len(initial_keys) == 9
-        assert len(interest_keys) == 10
+        assert len(interest_keys) == 9
 
-    def test_supported_sheets_are_g4_2_3_4(self):
+    def test_supported_sheets_include_g4_1_to_4(self):
         from app.routers.wp_render_strategies._g4_bond_investment_main_import_export import (
             _SUPPORTED_SHEETS,
         )
 
-        assert _SUPPORTED_SHEETS == {"G4-2", "G4-3", "G4-4"}
+        assert _SUPPORTED_SHEETS == {"G4-1", "G4-2", "G4-3", "G4-4"}
 
     def test_item_ids_mapping(self):
         from app.routers.wp_render_strategies._g4_bond_investment_main_import_export import (
             _ITEM_IDS,
+            _G4_4_PRIMARY_ITEM_ID,
         )
 
+        assert _ITEM_IDS["G4-1"] == "G4-1-rows"
         assert _ITEM_IDS["G4-2"] == "G4-2-rows"
         assert _ITEM_IDS["G4-3"] == "G4-3-rows"
         assert _ITEM_IDS["G4-4"] == "G4-4-rows"
+        assert _G4_4_PRIMARY_ITEM_ID == "G4-4-interest-calc"
+
+    def test_g4_4_nest_flatten_roundtrip_rates(self):
+        from app.routers.wp_render_strategies._g4_bond_investment_main_import_export import (
+            _flatten_g4_4_groups,
+            _nest_g4_4_flat_rows,
+        )
+
+        nested = [{
+            "id": "g1",
+            "projectName": "国债A",
+            "initial": {
+                "faceValueTotal": 100,
+                "couponRate": 0.035,
+                "effectiveRate": 0.04,
+                "initialCarryingAmount": 98,
+            },
+            "periods": [{
+                "cutoffDate": "2025-12-31",
+                "openingBalance": 98,
+                "effectiveInterest": 3.92,
+                "days": 365,
+            }],
+        }]
+        flat = _flatten_g4_4_groups(nested)
+        assert len(flat) == 1
+        assert flat[0]["couponRate"] == 3.5
+        assert flat[0]["effectiveRate"] == 4.0
+        restored = _nest_g4_4_flat_rows(flat)
+        assert len(restored) == 1
+        assert restored[0]["initial"]["couponRate"] == 0.035
+        assert restored[0]["initial"]["effectiveRate"] == 0.04
+        assert restored[0]["periods"][0]["cutoffDate"] == "2025-12-31"
 
     def test_g4_2_multi_sheet_workbook_structure(self):
         """验证G4-2多sheet导出的 workbook 结构."""

@@ -1,62 +1,170 @@
 /**
  * useG4EclStageClassification — G4-9 三阶段划分（列式→行式转换 + Stage判定 + 一致性比对）
  *
- * Spec: .kiro/specs/g4-bond-investment-ecl/ Task 5.2
- * Requirements: 2.1~2.13
+ * 对齐源模板《债权投资三阶段划分G4-9》（致同 2025 修订）：
+ * - (一) 14 项 SICR 考虑因素（含逾期≥30日可反驳推定）
+ * - (二) 3 项较低信用风险条件（须同时满足方可豁免）
+ * - (三) 9 项已发生信用减值可观察信息（含债权投资特有：回售/丧失清偿能力/其他债券违约）
  *
- * 职责：
- * - 列式→行式转换：解析源模板列式数据（投资1~N各占一列），转为行式reactive数组
- * - 三区块综合判定逻辑：
- *   (一) 13项任一为"是" → hasSignificantIncrease=true
- *   (二) 3项全为"是"   → hasLowCreditRisk=true
- *   (三) 8项任一为"是" → hasCreditImpairment=true
- * - Stage判定（调用 determineStage）
- * - 一致性比对（调用 isStageConsistent）
- * - 汇总统计（stage1Count / stage2Count / stage3Count / inconsistentCount）
- * - 16384列智能解析（仅取有数据列，忽略空列）
- * - 展开/折叠切换逻辑
+ * 判定优先级：Stage3（已减值）> Stage2（SICR 且未适用低风险豁免）> Stage1
  */
-import { ref, computed, type Ref } from 'vue'
+import { ref, computed } from 'vue'
 import { determineStage, isStageConsistent } from '@/composables/useG4EclFormulaEngine'
 import { ElMessageBox } from 'element-plus'
 
-// ═══ 三区块检查项标签常量 ═══
+// ═══ 三区块检查项（对齐源模板原文） ═══
 
-/** (一) 信用风险是否显著增加 — 13项考虑因素 */
-export const SECTION_ONE_LABELS: readonly string[] = [
-  '内部价格指标是否发生显著变化',
-  '信用利差是否显著变动',
-  '利率或其他合同条款是否发生不利变化',
-  '外部市场指标（如信用违约互换价格）是否恶化',
-  '外部信用评级是否实际或预期下调',
-  '借款人经营成果是否实际或预期发生显著不利变化',
-  '所处监管/经济/技术环境是否发生显著不利变化',
-  '担保物价值或第三方担保质量是否显著下降',
-  '借款人预期还款行为是否发生显著变化',
-  '贷款管理方法是否发生变化（如放宽标准）',
-  '是否逾期超过30天',
-  '同一借款人其他金融工具是否已发生违约',
-  '其他表明信用风险显著增加的信息',
+export interface CheckItemDef {
+  label: string
+  hint: string
+}
+
+/** (一) 信用风险是否显著增加 — 14 项（源表 R10–R23） */
+export const SECTION_ONE_ITEMS: readonly CheckItemDef[] = [
+  {
+    label: '信用风险变化所导致的内部价格指标的显著变化',
+    hint: '债券信用利差和价格的重大不利变化。例如，同一金融工具或具有相同条款及相同交易对手的类似金融工具，在最近期间发行时的信用利差相对于过去发行时的变化。',
+  },
+  {
+    label: '金融工具的利率或其他条款将发生的显著变化',
+    hint: '若现有金融工具在报告日作为新金融工具源生或发行，该金融工具的利率或其他条款将发生的显著变化（如更严格的合同条款、增加抵押品或担保物或者更高的收益率等）；增信措施的有效性发生重大不利变化。',
+  },
+  {
+    label: '类似金融工具的信用风险的外部市场指标的显著变化',
+    hint: '包括：①信用利差；②针对借款人的信用违约互换价格；③金融资产的公允价值小于其摊余成本的时间长短和程度；④与发行人相关的其他市场信息（如发行人债务/权益工具的价格变动）。',
+  },
+  {
+    label: '外部信用评级、内部信用评级下调',
+    hint: '境外：初始确认 BBB-（含）以上下调至 BBB- 以下；或初始确认已低于 BBB- 的再下调。境内：初始确认 AA（含）以上下调至 AA 以下；或初始确认已低于 AA 的再下调。含对发行人实际或预期的内部评级下调。',
+  },
+  {
+    label: '发行人业务、财务或外部经济状况的不利变化',
+    hint: '预期将导致发行人履行偿债义务能力发生显著变化的业务、财务或外部经济状况不利变化（如利率/失业率上升、有息及或有负债增长较快、主要资产权利受限、控股股东/实控人/治理结构重大不利变化、失信惩戒或重大处罚等）。',
+  },
+  {
+    label: '发行人经营成果实际或预期的显著变化',
+    hint: '例如收入或毛利率下降、经营风险增加、营运资金短缺、资产质量下降、杠杆率上升、流动比率下降、管理出现问题、业务范围或组织结构变更等。',
+  },
+  {
+    label: '发行人所处的监管、经济或技术环境的显著不利变化',
+    hint: '发行人所处行业环境或政策、地域环境的重大不利变化。例如技术变革导致对发行人产品的需求下降。',
+  },
+  {
+    label: '其他金融工具的信用风险的不利变化',
+    hint: '同一发行人发行的其他金融工具信用风险显著增加；未按规定履行信息披露义务或募集说明书承诺、未按约定用途使用募集资金等对偿债能力产生重大不利影响。',
+  },
+  {
+    label: '担保或信用增级质量的显著变化',
+    hint: '作为债务抵押的担保物价值或第三方担保/信用增级质量的显著变化，预期将降低按约定期限还款的经济动机或影响违约概率。',
+  },
+  {
+    label: '发行人履约还款的经济动机的显著变化',
+    hint: '预期将降低借款人按合同约定期限还款经济动机的显著变化（如母公司或其他关联方财务支持减少、信用增级质量变化）；应考虑担保人财务状况、次级权益能否吸收预期信用损失等。',
+  },
+  {
+    label: '发行合同的预期变更',
+    hint: '包括预计违反合同可能导致的合同义务免除或修订、给予免息期、利率跳升、要求追加抵押品或担保，或对金融工具合同框架做出其他变更。',
+  },
+  {
+    label: '发行人预期表现和还款行为的显著变化',
+    hint: '例如一组贷款资产中延期还款数量或金额增加、接近授信额度或每月最低还款额的持有人预期数量增加。',
+  },
+  {
+    label: '企业对金融工具信用管理方法的变化',
+    hint: '例如信用风险管理实务预计将变得更为积极或对该金融工具更加侧重，包括更密切监控/控制、对借款人实施特别干预。',
+  },
+  {
+    label: '逾期信息（逾期≥30日可反驳推定）',
+    hint: '合同付款逾期超过（含）30日，通常推定信用风险显著增加；除非以合理成本可获得合理且有依据的信息，证明即使逾期超过30日信用风险仍未显著增加（如管理疏忽而非财务困难，或历史数据表明违约风险上升与逾期>30日无相关性）。',
+  },
 ] as const
 
-/** (二) 是否具有较低信用风险 — 3项同时满足条件 */
-export const SECTION_TWO_LABELS: readonly string[] = [
-  '违约风险较低（如外部评级为投资级）',
-  '借款人短期内履行合同义务的能力很强',
-  '即使经济形势和经营环境存在不利变化也未必降低履约能力',
+/** (二) 是否具有较低信用风险 — 3 项须同时满足（源表 R29–R31） */
+export const SECTION_TWO_ITEMS: readonly CheckItemDef[] = [
+  {
+    label: '金融工具的违约风险较低',
+    hint: '通常“投资级”以上外部信用评级可作为参考；不能仅因担保物价值较高，或相对于其他工具/地区风险较低，即视为较低信用风险。',
+  },
+  {
+    label: '借款人在短期内履行其支付合同现金流量义务的能力很强',
+    hint: '资产负债表日对短期履约能力的评估结论应可验证。',
+  },
+  {
+    label: '即使较长时期内经济形势和经营环境存在不利变化，也不一定会降低借款人履行其支付合同现金流量义务的能力',
+    hint: '满足三项后，企业可选择直接假定信用风险自初始确认后未显著增加（不必与初始确认时比较）。',
+  },
 ] as const
 
-/** (三) 已发生信用减值的评估 — 8项可观察信息 */
-export const SECTION_THREE_LABELS: readonly string[] = [
-  '发行方或债务人发生重大财务困难',
-  '债务人违反合同（如偿付利息或本金违约或逾期）',
-  '债权人出于与债务人财务困难有关的经济或合同考虑给予让步',
-  '债务人很可能破产或进行其他财务重组',
-  '发行方或债务人财务困难导致该金融资产的活跃市场消失',
-  '以大幅折扣购买或源生一项金融资产（反映了发生信用损失的事实）',
-  '债务人经营活动产生的现金流量不足以偿付到期债务',
-  '其他表明已发生信用减值的客观证据',
+/** (三) 已发生信用减值 — 9 项可观察信息（源表 R37–R45，含债投特有项） */
+export const SECTION_THREE_ITEMS: readonly CheckItemDef[] = [
+  {
+    label: '发行人或债务人发生重大财务困难',
+    hint: '对金融资产预期未来现金流量具有不利影响的一项或多项事件发生时，该资产成为已发生信用减值的金融资产。',
+  },
+  {
+    label: '发行人违反合同，如偿付利息或本金违约或逾期等',
+    hint: '中证协指引：发行人不能按期偿付本金或利息（1–3项情形可给予不超过30天宽限期）。',
+  },
+  {
+    label: '发行人不能履行回售义务',
+    hint: '债权投资特有：回售条款下发行人未能履行回售义务。',
+  },
+  {
+    label: '发行人丧失清偿能力、被法院指定管理人或已开始相关的诉讼程序',
+    hint: '中证协客观减值证据之一。',
+  },
+  {
+    label: '债权人出于与债务人财务困难有关的经济或合同考虑，给予债务人在任何其他情况下都不会做出的让步',
+    hint: 'CAS 22 标准信用减值迹象。',
+  },
+  {
+    label: '发行人很可能破产或进行其他财务重组',
+    hint: '中证协客观减值证据之一。',
+  },
+  {
+    label: '发行人的其他债券违约',
+    hint: '债权投资特有：同一发行人其他债券已违约。',
+  },
+  {
+    label: '发行方或债务人财务困难导致该金融资产的活跃市场消失',
+    hint: '因财务困难（而非流动性等原因）导致活跃市场消失。',
+  },
+  {
+    label: '以大幅折扣购买或源生一项金融资产，该折扣反映了发生信用损失的事实',
+    hint: '购买/源生折扣本身已反映信用损失。',
+  },
 ] as const
+
+/** 兼容旧导出：仅标签数组 */
+export const SECTION_ONE_LABELS: readonly string[] = SECTION_ONE_ITEMS.map(i => i.label)
+export const SECTION_TWO_LABELS: readonly string[] = SECTION_TWO_ITEMS.map(i => i.label)
+export const SECTION_THREE_LABELS: readonly string[] = SECTION_THREE_ITEMS.map(i => i.label)
+
+export const SECTION_ONE_COUNT = SECTION_ONE_ITEMS.length // 14
+export const SECTION_TWO_COUNT = SECTION_TWO_ITEMS.length // 3
+export const SECTION_THREE_COUNT = SECTION_THREE_ITEMS.length // 9
+
+/** 底部/侧栏编制参考（对齐源模板蓝色提示精要） */
+export const G4_9_GUIDANCE = {
+  sicrCsrc: [
+    '宏观经济环境的重大不利变化',
+    '发行人所处行业环境或政策、地域环境的重大不利变化',
+    '境内外评级下调达到指引阈值（境外跨 BBB- / 境内跨 AA 或投资级以下再下调）',
+    '合并口径主要经营或财务指标重大不利变化（EBITDA利息保障倍数、经营现金流、净利润、资产负债率等）',
+    '控股股东、实际控制人或治理结构（董监高）重大不利变化',
+    '有息及或有负债快速增长、主要资产权利受限',
+    '未履行信息披露义务/募集资金用途违规等对偿债能力有重大不利影响',
+    '内部评级下调、增信有效性下降、失信惩戒、重大处罚、债券利差与价格重大不利变化等',
+  ],
+  overdue30:
+    '逾期≥30日：通常推定信用风险显著增加（可反驳）；反驳须有合理成本可获的合理且有依据信息。',
+  overdue90:
+    '逾期≥90日：通常推定已发生违约/进入第三阶段（可反驳）；违约时点不应迟于逾期90日，除非有合理可支持信息表明更长期间更恰当。',
+  lowRisk:
+    '资产负债表日具有较低信用风险的，可选用简化处理：不必与初始确认时比较，直接假定信用风险未显著增加。投资级外部评级常作为参考，但不能仅凭担保物价值高认定低风险。',
+  priority:
+    '判定优先级：已发生信用减值（Stage3）＞ 显著增加且未适用低风险豁免（Stage2）＞ 其余（Stage1，含低风险豁免）。',
+} as const
 
 // ═══ 类型定义 ═══
 
@@ -66,17 +174,26 @@ export type StageType = 'Stage1' | 'Stage2' | 'Stage3'
 
 export interface SectionOneCheck {
   label: string
+  hint: string
   value: SectionOneCheckValue
 }
 
 export interface SectionTwoCheck {
   label: string
+  hint: string
   value: SectionTwoBoolValue
 }
 
 export interface SectionThreeCheck {
   label: string
+  hint: string
   value: SectionTwoBoolValue
+}
+
+export interface SectionAnalysisConclusions {
+  significantIncrease: string
+  lowCreditRisk: string
+  creditImpairment: string
 }
 
 /** G4-9 三阶段划分行数据模型 */
@@ -84,32 +201,31 @@ export interface StageClassificationRow {
   id: string
   seq: number
   investProject: string
-  // 三区块检查明细
-  sectionOneChecks: SectionOneCheck[]       // 13项
-  sectionTwoChecks: SectionTwoCheck[]       // 3项
-  sectionThreeChecks: SectionThreeCheck[]   // 8项
-  // 综合判定
-  hasSignificantIncrease: boolean   // (一)任一为"是"
-  hasLowCreditRisk: boolean         // (二)全部为"是"
-  hasCreditImpairment: boolean      // (三)任一为"是"
-  companyStage: StageType           // 企业划分阶段(下拉)
-  auditStage: StageType             // 审计判断阶段(公式建议)
-  isConsistent: boolean             // companyStage === auditStage
-  discrepancyNote: string           // 差异说明(不一致时必填)
-  indexRef: string                  // 索引
+  /** 来自 G4-2 的审定账面余额（同步至 G4-10 用） */
+  bookBalance: number
+  sectionOneChecks: SectionOneCheck[]
+  sectionTwoChecks: SectionTwoCheck[]
+  sectionThreeChecks: SectionThreeCheck[]
+  /** 各区块分析结论（对齐源表「分析结论」行） */
+  sectionConclusions: SectionAnalysisConclusions
+  hasSignificantIncrease: boolean
+  hasLowCreditRisk: boolean
+  hasCreditImpairment: boolean
+  companyStage: StageType
+  auditStage: StageType
+  isConsistent: boolean
+  discrepancyNote: string
+  indexRef: string
 }
 
-/** 列式源数据结构（源模板格式/导入） */
+/** (一) 逾期信息项下标（0-based，第 14 项） */
+export const OVERDUE_CHECK_INDEX = SECTION_ONE_COUNT - 1
+
 export interface ColumnarSourceData {
-  /** 列头：各投资项目名称 */
   columnHeaders: string[]
-  /** (一) 13行×N列矩阵 */
   sectionOneMatrix: string[][]
-  /** (二) 3行×N列矩阵 */
   sectionTwoMatrix: string[][]
-  /** (三) 8行×N列矩阵 */
   sectionThreeMatrix: string[][]
-  /** 企业划分阶段（N列） */
   companyStages?: string[]
 }
 
@@ -121,35 +237,96 @@ export interface StageClassificationSummary {
   total: number
 }
 
+// ═══ 内部工具 ═══
+
+function emptyConclusions(): SectionAnalysisConclusions {
+  return { significantIncrease: '', lowCreditRisk: '', creditImpairment: '' }
+}
+
+function buildSectionOne(values?: Array<SectionOneCheckValue | string | undefined>): SectionOneCheck[] {
+  return SECTION_ONE_ITEMS.map((item, idx) => ({
+    label: item.label,
+    hint: item.hint,
+    value: normalizeSectionOneValue(values?.[idx]),
+  }))
+}
+
+function buildSectionTwo(values?: Array<SectionTwoBoolValue | string | undefined>): SectionTwoCheck[] {
+  return SECTION_TWO_ITEMS.map((item, idx) => ({
+    label: item.label,
+    hint: item.hint,
+    value: normalizeBoolValue(values?.[idx]),
+  }))
+}
+
+function buildSectionThree(values?: Array<SectionTwoBoolValue | string | undefined>): SectionThreeCheck[] {
+  return SECTION_THREE_ITEMS.map((item, idx) => ({
+    label: item.label,
+    hint: item.hint,
+    value: normalizeBoolValue(values?.[idx]),
+  }))
+}
+
+/** 标准化(一)区检查值（支持"不适用"） */
+function normalizeSectionOneValue(raw: string | undefined | null): SectionOneCheckValue {
+  const val = (raw ?? '').trim()
+  if (val === '是' || val === 'Y' || val === 'Yes' || val === '1' || val === 'true') return '是'
+  if (val === '不适用' || val === 'N/A' || val === 'NA' || val === 'n/a') return '不适用'
+  return '否'
+}
+
+/** 标准化(二)(三)区检查值（仅是/否） */
+function normalizeBoolValue(raw: string | undefined | null): SectionTwoBoolValue {
+  const val = (raw ?? '').trim()
+  if (val === '是' || val === 'Y' || val === 'Yes' || val === '1' || val === 'true') return '是'
+  return '否'
+}
+
+/** 标准化Stage值 */
+function normalizeStage(raw: string | undefined | null): StageType {
+  const val = (raw ?? '').trim().toLowerCase()
+  if (val.includes('3') || val.includes('三')) return 'Stage3'
+  if (val.includes('2') || val.includes('二')) return 'Stage2'
+  return 'Stage1'
+}
+
+/**
+ * 从旧版 13/8 项检查数组迁移到 14/9。
+ * 策略：按索引尽量保留已填值；新增项默认「否」。
+ */
+function migrateCheckValues<T extends string>(
+  saved: Array<{ value?: T } | T> | undefined,
+  targetLen: number,
+  normalize: (v: string | undefined) => T,
+): T[] {
+  const out: T[] = []
+  for (let i = 0; i < targetLen; i++) {
+    const raw = saved?.[i]
+    const val = typeof raw === 'string' ? raw : raw?.value
+    out.push(normalize(val))
+  }
+  return out
+}
+
 // ═══ Composable ═══
 
 export function useG4EclStageClassification(_opts?: any) {
-  // ─── 核心状态 ──────────────────────────────────────────────────────────────
-
   const rows = ref<StageClassificationRow[]>([])
   const conclusion = ref('')
   const expandedRowIds = ref<Set<string>>(new Set())
 
-  // ─── 三区块综合判定逻辑 ────────────────────────────────────────────────────
-
-  /** (一) 13项任一为"是" → hasSignificantIncrease=true */
   function calcHasSignificantIncrease(checks: SectionOneCheck[]): boolean {
     return checks.some(c => c.value === '是')
   }
 
-  /** (二) 3项全为"是" → hasLowCreditRisk=true */
   function calcHasLowCreditRisk(checks: SectionTwoCheck[]): boolean {
-    return checks.length === 3 && checks.every(c => c.value === '是')
+    return checks.length === SECTION_TWO_COUNT && checks.every(c => c.value === '是')
   }
 
-  /** (三) 8项任一为"是" → hasCreditImpairment=true */
   function calcHasCreditImpairment(checks: SectionThreeCheck[]): boolean {
     return checks.some(c => c.value === '是')
   }
 
-  // ─── 行级重算 ─────────────────────────────────────────────────────────────
-
-  /** 重算单行综合判定 + auditStage + 一致性 */
   function recalcRow(row: StageClassificationRow): void {
     row.hasSignificantIncrease = calcHasSignificantIncrease(row.sectionOneChecks)
     row.hasLowCreditRisk = calcHasLowCreditRisk(row.sectionTwoChecks)
@@ -162,12 +339,9 @@ export function useG4EclStageClassification(_opts?: any) {
     row.isConsistent = isStageConsistent(row.companyStage, row.auditStage)
   }
 
-  /** 重算所有行 */
   function recalcAll(): void {
     rows.value.forEach(recalcRow)
   }
-
-  // ─── 汇总统计 ─────────────────────────────────────────────────────────────
 
   const summary = computed<StageClassificationSummary>(() => {
     let stage1Count = 0
@@ -183,15 +357,10 @@ export function useG4EclStageClassification(_opts?: any) {
     return { stage1Count, stage2Count, stage3Count, inconsistentCount, total: rows.value.length }
   })
 
-  // ─── 展开/折叠切换 ────────────────────────────────────────────────────────
-
   function toggleExpand(rowId: string): void {
     const next = new Set(expandedRowIds.value)
-    if (next.has(rowId)) {
-      next.delete(rowId)
-    } else {
-      next.add(rowId)
-    }
+    if (next.has(rowId)) next.delete(rowId)
+    else next.add(rowId)
     expandedRowIds.value = next
   }
 
@@ -207,46 +376,48 @@ export function useG4EclStageClassification(_opts?: any) {
     expandedRowIds.value = new Set()
   }
 
-  // ─── 16384列智能解析（列式→行式转换）────────────────────────────────────────
+  function getValidColumnIndices(
+    headers: string[],
+    s1: string[][],
+    s2: string[][],
+    s3: string[][],
+  ): number[] {
+    const indices: number[] = []
+    for (let col = 0; col < headers.length; col++) {
+      if (headers[col]?.trim()) {
+        indices.push(col)
+        continue
+      }
+      const hasData =
+        s1?.some(row => row?.[col]?.trim()) ||
+        s2?.some(row => row?.[col]?.trim()) ||
+        s3?.some(row => row?.[col]?.trim())
+      if (hasData) indices.push(col)
+    }
+    return indices
+  }
 
-  /**
-   * 从列式源数据转换为行式数组。
-   * 16384列智能解析：仅取实际有数据的列，忽略空列（合并单元格虚列）。
-   *
-   * Requirements: 2.1, 2.12
-   */
   function parseColumnarData(source: ColumnarSourceData): StageClassificationRow[] {
     const { columnHeaders, sectionOneMatrix, sectionTwoMatrix, sectionThreeMatrix, companyStages } = source
     if (!columnHeaders?.length) return []
 
-    // 16384列中筛选有效列
     const validIndices = getValidColumnIndices(columnHeaders, sectionOneMatrix, sectionTwoMatrix, sectionThreeMatrix)
 
     return validIndices.map((colIdx, arrIdx) => {
       const investProject = (columnHeaders[colIdx] ?? '').trim()
-
-      const sectionOneChecks: SectionOneCheck[] = SECTION_ONE_LABELS.map((label, rowIdx) => ({
-        label,
-        value: normalizeSectionOneValue(sectionOneMatrix?.[rowIdx]?.[colIdx]),
-      }))
-
-      const sectionTwoChecks: SectionTwoCheck[] = SECTION_TWO_LABELS.map((label, rowIdx) => ({
-        label,
-        value: normalizeBoolValue(sectionTwoMatrix?.[rowIdx]?.[colIdx]),
-      }))
-
-      const sectionThreeChecks: SectionThreeCheck[] = SECTION_THREE_LABELS.map((label, rowIdx) => ({
-        label,
-        value: normalizeBoolValue(sectionThreeMatrix?.[rowIdx]?.[colIdx]),
-      }))
+      const s1vals = SECTION_ONE_ITEMS.map((_, rowIdx) => sectionOneMatrix?.[rowIdx]?.[colIdx])
+      const s2vals = SECTION_TWO_ITEMS.map((_, rowIdx) => sectionTwoMatrix?.[rowIdx]?.[colIdx])
+      const s3vals = SECTION_THREE_ITEMS.map((_, rowIdx) => sectionThreeMatrix?.[rowIdx]?.[colIdx])
 
       const row: StageClassificationRow = {
         id: crypto.randomUUID(),
         seq: arrIdx + 1,
         investProject: investProject || `投资${arrIdx + 1}`,
-        sectionOneChecks,
-        sectionTwoChecks,
-        sectionThreeChecks,
+        bookBalance: 0,
+        sectionOneChecks: buildSectionOne(s1vals),
+        sectionTwoChecks: buildSectionTwo(s2vals),
+        sectionThreeChecks: buildSectionThree(s3vals),
+        sectionConclusions: emptyConclusions(),
         hasSignificantIncrease: false,
         hasLowCreditRisk: false,
         hasCreditImpairment: false,
@@ -261,66 +432,16 @@ export function useG4EclStageClassification(_opts?: any) {
     })
   }
 
-  /**
-   * 智能检测有效列索引。
-   * 有效列条件：列头非空 OR 任一矩阵该列有非空数据。
-   */
-  function getValidColumnIndices(
-    headers: string[],
-    s1: string[][],
-    s2: string[][],
-    s3: string[][],
-  ): number[] {
-    const indices: number[] = []
-    for (let col = 0; col < headers.length; col++) {
-      if (headers[col]?.trim()) {
-        indices.push(col)
-        continue
-      }
-      // 检查矩阵数据
-      const hasData =
-        s1?.some(row => row?.[col]?.trim()) ||
-        s2?.some(row => row?.[col]?.trim()) ||
-        s3?.some(row => row?.[col]?.trim())
-      if (hasData) indices.push(col)
-    }
-    return indices
-  }
-
-  /** 标准化(一)区检查值（支持"不适用"） */
-  function normalizeSectionOneValue(raw: string | undefined | null): SectionOneCheckValue {
-    const val = (raw ?? '').trim()
-    if (val === '是' || val === 'Y' || val === 'Yes' || val === '1' || val === 'true') return '是'
-    if (val === '不适用' || val === 'N/A' || val === 'NA' || val === 'n/a') return '不适用'
-    return '否'
-  }
-
-  /** 标准化(二)(三)区检查值（仅是/否） */
-  function normalizeBoolValue(raw: string | undefined | null): SectionTwoBoolValue {
-    const val = (raw ?? '').trim()
-    if (val === '是' || val === 'Y' || val === 'Yes' || val === '1' || val === 'true') return '是'
-    return '否'
-  }
-
-  /** 标准化Stage值 */
-  function normalizeStage(raw: string | undefined | null): StageType {
-    const val = (raw ?? '').trim().toLowerCase()
-    if (val.includes('3') || val.includes('三')) return 'Stage3'
-    if (val.includes('2') || val.includes('二')) return 'Stage2'
-    return 'Stage1'
-  }
-
-  // ─── 行CRUD ───────────────────────────────────────────────────────────────
-
-  /** 创建空行 */
   function createEmptyRow(investProject: string): StageClassificationRow {
     return {
       id: crypto.randomUUID(),
       seq: rows.value.length + 1,
       investProject,
-      sectionOneChecks: SECTION_ONE_LABELS.map(label => ({ label, value: '否' as SectionOneCheckValue })),
-      sectionTwoChecks: SECTION_TWO_LABELS.map(label => ({ label, value: '否' as SectionTwoBoolValue })),
-      sectionThreeChecks: SECTION_THREE_LABELS.map(label => ({ label, value: '否' as SectionTwoBoolValue })),
+      bookBalance: 0,
+      sectionOneChecks: buildSectionOne(),
+      sectionTwoChecks: buildSectionTwo(),
+      sectionThreeChecks: buildSectionThree(),
+      sectionConclusions: emptyConclusions(),
       hasSignificantIncrease: false,
       hasLowCreditRisk: false,
       hasCreditImpairment: false,
@@ -332,10 +453,6 @@ export function useG4EclStageClassification(_opts?: any) {
     }
   }
 
-  /**
-   * 新增投资项目（直接传名称或弹 ElMessageBox.prompt）
-   * Requirements: 2.11
-   */
   async function addRow(investProject?: string): Promise<void> {
     let name = investProject?.trim()
     if (!name) {
@@ -348,62 +465,67 @@ export function useG4EclStageClassification(_opts?: any) {
         if (!value?.trim()) return
         name = value.trim()
       } catch {
-        return // 用户取消
+        return
       }
     }
-    const row = createEmptyRow(name)
-    rows.value.push(row)
+    rows.value.push(createEmptyRow(name))
   }
 
-  /** 删除行 */
   function removeRow(id: string): void {
     rows.value = rows.value.filter(r => r.id !== id)
     rows.value.forEach((r, i) => { r.seq = i + 1 })
-    // 清理展开状态
     const next = new Set(expandedRowIds.value)
     next.delete(id)
     expandedRowIds.value = next
   }
 
-  // ─── 数据加载 ─────────────────────────────────────────────────────────────
-
-  /** 从已保存行式数据恢复 */
   function loadRows(data: StageClassificationRow[]): void {
     rows.value = data.map((r, i) => {
+      const s1vals = migrateCheckValues(
+        r.sectionOneChecks as any,
+        SECTION_ONE_COUNT,
+        normalizeSectionOneValue,
+      )
+      const s2vals = migrateCheckValues(
+        r.sectionTwoChecks as any,
+        SECTION_TWO_COUNT,
+        normalizeBoolValue,
+      )
+      const s3vals = migrateCheckValues(
+        r.sectionThreeChecks as any,
+        SECTION_THREE_COUNT,
+        normalizeBoolValue,
+      )
       const row: StageClassificationRow = {
-        ...r,
         id: r.id || crypto.randomUUID(),
         seq: i + 1,
-        sectionOneChecks: r.sectionOneChecks?.length === 13
-          ? r.sectionOneChecks
-          : SECTION_ONE_LABELS.map((label, idx) => ({
-              label,
-              value: r.sectionOneChecks?.[idx]?.value ?? '否',
-            })),
-        sectionTwoChecks: r.sectionTwoChecks?.length === 3
-          ? r.sectionTwoChecks
-          : SECTION_TWO_LABELS.map((label, idx) => ({
-              label,
-              value: r.sectionTwoChecks?.[idx]?.value ?? '否',
-            })),
-        sectionThreeChecks: r.sectionThreeChecks?.length === 8
-          ? r.sectionThreeChecks
-          : SECTION_THREE_LABELS.map((label, idx) => ({
-              label,
-              value: r.sectionThreeChecks?.[idx]?.value ?? '否',
-            })),
+        investProject: r.investProject || `投资${i + 1}`,
+        bookBalance: Number(r.bookBalance) || 0,
+        sectionOneChecks: buildSectionOne(s1vals),
+        sectionTwoChecks: buildSectionTwo(s2vals),
+        sectionThreeChecks: buildSectionThree(s3vals),
+        sectionConclusions: {
+          significantIncrease: r.sectionConclusions?.significantIncrease ?? '',
+          lowCreditRisk: r.sectionConclusions?.lowCreditRisk ?? '',
+          creditImpairment: r.sectionConclusions?.creditImpairment ?? '',
+        },
+        hasSignificantIncrease: false,
+        hasLowCreditRisk: false,
+        hasCreditImpairment: false,
+        companyStage: normalizeStage(r.companyStage),
+        auditStage: 'Stage1',
+        isConsistent: true,
+        discrepancyNote: r.discrepancyNote ?? '',
+        indexRef: r.indexRef ?? '',
       }
       recalcRow(row)
       return row
     })
   }
 
-  /** 从列式源数据加载（Requirements: 2.1, 2.12） */
   function loadFromColumnar(source: ColumnarSourceData): void {
     rows.value = parseColumnarData(source)
   }
-
-  // ─── 序列化 ───────────────────────────────────────────────────────────────
 
   function toSaveData() {
     return {
@@ -413,9 +535,6 @@ export function useG4EclStageClassification(_opts?: any) {
     }
   }
 
-  // ─── Vue组件适配方法（供G4TabStageClassification.vue调用）─────────────────
-
-  /** 初始化数据（从htmlData或已保存数据） */
   function init(htmlData: Record<string, any> | null): void {
     if (!htmlData) return
     const stageData = htmlData.stageClassification ?? htmlData
@@ -427,7 +546,6 @@ export function useG4EclStageClassification(_opts?: any) {
     }
   }
 
-  /** 更新检查项值（section: 'significantIncrease' | 'lowCreditRisk' | 'creditImpairment'） */
   function updateCheckValue(
     rowId: string,
     section: 'significantIncrease' | 'lowCreditRisk' | 'creditImpairment',
@@ -446,7 +564,6 @@ export function useG4EclStageClassification(_opts?: any) {
     recalcRow(row)
   }
 
-  /** 更新企业划分阶段 */
   function updateCompanyStage(rowId: string, stage: StageType): void {
     const row = rows.value.find(r => r.id === rowId)
     if (!row) return
@@ -454,7 +571,6 @@ export function useG4EclStageClassification(_opts?: any) {
     row.isConsistent = isStageConsistent(row.companyStage, row.auditStage)
   }
 
-  /** 更新审计判断阶段 */
   function updateAuditStage(rowId: string, stage: StageType): void {
     const row = rows.value.find(r => r.id === rowId)
     if (!row) return
@@ -462,25 +578,106 @@ export function useG4EclStageClassification(_opts?: any) {
     row.isConsistent = isStageConsistent(row.companyStage, row.auditStage)
   }
 
-  /** 更新差异说明 */
   function updateDiscrepancyNote(rowId: string, note: string): void {
     const row = rows.value.find(r => r.id === rowId)
     if (!row) return
     row.discrepancyNote = note
   }
 
+  function updateSectionConclusion(
+    rowId: string,
+    section: keyof SectionAnalysisConclusions,
+    text: string,
+  ): void {
+    const row = rows.value.find(r => r.id === rowId)
+    if (!row) return
+    row.sectionConclusions[section] = text
+  }
+
+  const inconsistentRows = computed(() => rows.value.filter(r => !r.isConsistent))
+
+  /**
+   * 从 G4-2 明细带入投资项目：
+   * - 新增缺失项目；已有项目刷新余额/企业阶段
+   * - 逾期≥30日自动预填第14项 SICR=「是」并写入分析结论提示
+   */
+  function importFromDetailRows(
+    rawRows: unknown[],
+    opts?: { asOfDate?: string | null },
+  ): { added: number; refreshed: number; prefilledOverdue: number } {
+    if (!Array.isArray(rawRows) || !rawRows.length) {
+      return { added: 0, refreshed: 0, prefilledOverdue: 0 }
+    }
+
+    const byName = new Map(rows.value.map(r => [r.investProject.trim(), r]))
+    let added = 0
+    let refreshed = 0
+    let prefilledOverdue = 0
+
+    for (const raw of rawRows) {
+      const r = raw as Record<string, any>
+      const name = String(r.investProject || '').trim()
+      if (!name) continue
+
+      const bal = Number(r.closingAudited ?? r.amortizedCost ?? r.bookBalance ?? 0) || 0
+      const companyStage = normalizeStage(r.stageClassification ?? r.companyStage)
+      const overdueDays = Number(r.overdueDays) > 0
+        ? Number(r.overdueDays)
+        : calcOverdueDaysLocal(r.maturityDate, opts?.asOfDate)
+
+      let row = byName.get(name)
+      if (!row) {
+        row = createEmptyRow(name)
+        rows.value.push(row)
+        byName.set(name, row)
+        added += 1
+      } else {
+        refreshed += 1
+      }
+
+      row.bookBalance = bal
+      row.companyStage = companyStage
+
+      if (overdueDays >= 30 && bal > 0) {
+        const check = row.sectionOneChecks[OVERDUE_CHECK_INDEX]
+        if (check && check.value !== '是') {
+          check.value = '是'
+          prefilledOverdue += 1
+          const tip = `【预填】合同付款相对基准日已逾期${overdueDays}日（≥30日推定SICR，可反驳）`
+          if (!row.sectionConclusions.significantIncrease.includes('【预填】')) {
+            row.sectionConclusions.significantIncrease = [
+              tip,
+              row.sectionConclusions.significantIncrease,
+            ].filter(Boolean).join('；')
+          }
+        }
+      }
+
+      recalcRow(row)
+    }
+
+    rows.value.forEach((r, i) => { r.seq = i + 1 })
+    return { added, refreshed, prefilledOverdue }
+  }
+
+  function calcOverdueDaysLocal(maturityDate: unknown, asOfDate?: string | null): number {
+    if (!maturityDate) return 0
+    const mat = new Date(String(maturityDate))
+    const asOf = asOfDate ? new Date(asOfDate) : new Date()
+    if (Number.isNaN(mat.getTime()) || Number.isNaN(asOf.getTime())) return 0
+    const days = Math.round((asOf.getTime() - mat.getTime()) / 86400000)
+    return days > 0 ? days : 0
+  }
+
   return {
-    // State
     rows,
     conclusion,
     expandedRowIds,
-    // Computed
     summary,
-    // 判定函数（导出供测试）
+    inconsistentRows,
     calcHasSignificantIncrease,
     calcHasLowCreditRisk,
     calcHasCreditImpairment,
-    // 行操作
     recalcRow,
     recalcAll,
     addRow,
@@ -488,24 +685,22 @@ export function useG4EclStageClassification(_opts?: any) {
     loadRows,
     loadFromColumnar,
     createEmptyRow,
-    // 列式解析
+    importFromDetailRows,
     parseColumnarData,
     getValidColumnIndices,
     normalizeSectionOneValue,
     normalizeBoolValue,
     normalizeStage,
-    // 展开/折叠
     toggleExpand,
     expandAll,
     collapseAll,
     isExpanded,
-    // Vue组件适配
     init,
     updateCheckValue,
     updateCompanyStage,
     updateAuditStage,
     updateDiscrepancyNote,
-    // 序列化
+    updateSectionConclusion,
     toSaveData,
   }
 }

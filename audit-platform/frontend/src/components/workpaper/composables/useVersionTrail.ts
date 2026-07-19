@@ -7,12 +7,12 @@
  * 职责：
  * - 定义 TypeScript 接口：SnapshotType、SnapshotMeta、DiffItem、DiffResult、UseVersionTrailOptions
  * - 实现响应式状态：versions, totalCount, currentPage, loading, drawerVisible, diffResult, diffLoading, selectedVersions
- * - loadVersions(page?) — GET /versions?page=&page_size=20
+ * - loadVersions(page?) — GET /versions?page=&page_size=5（每底稿最多保留 5 版）
  * - createSnapshot(description?) — POST /versions {snapshot_type:'manual', description}
  * - compareDiff(versionAId, versionBId) — POST /versions/compare
- * - rollback(versionId) — ElMessageBox.confirm 确认弹窗 → POST /versions/{vid}/rollback
+ * - rollback(versionId) — ElMessageBox.confirm 确认弹窗 → POST /versions/{vid}/rollback；成功返回 true
  * - canRollback computed（基于用户角色：现场经理+）
- * - hasMore computed（currentPage * 20 < totalCount）
+ * - hasMore computed（currentPage * page_size < totalCount）
  *
  * Requirements: 3.1, 3.5, 4.1, 5.1, 5.5, 7.1, 7.3
  */
@@ -26,6 +26,7 @@ import { useRoleContextStore } from '@/stores/roleContext'
 
 export type SnapshotType =
   | 'manual'
+  | 'auto'
   | 'auto_sampling'
   | 'auto_import'
   | 'review_sign'
@@ -67,7 +68,9 @@ export interface UseVersionTrailOptions {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 5
+/** 与后端 _MAX_SNAPSHOTS_PER_WORKPAPER 对齐 */
+export const MAX_VERSION_TRAIL_SNAPSHOTS = 5
 
 /** 允许回滚的角色列表 */
 const ROLLBACK_ALLOWED_ROLES = ['admin', 'partner', 'manager', 'qc']
@@ -119,8 +122,9 @@ export function useVersionTrail(options: UseVersionTrailOptions) {
 
   // ─── loadVersions ──────────────────────────────────────────────────────
 
-  async function loadVersions(page?: number): Promise<void> {
+  async function loadVersions(page?: number, opts?: { append?: boolean }): Promise<void> {
     const targetPage = page ?? 1
+    const append = opts?.append === true && targetPage > 1
     loading.value = true
     try {
       const res = await http.get(basePath(), {
@@ -130,8 +134,9 @@ export function useVersionTrail(options: UseVersionTrailOptions) {
       const data = res.data as any
       const items: any[] = data?.items ?? []
       const total: number = data?.total ?? 0
+      const mapped = items.map(mapSnapshotMeta)
 
-      versions.value = items.map(mapSnapshotMeta)
+      versions.value = append ? [...versions.value, ...mapped] : mapped
       totalCount.value = total
       currentPage.value = targetPage
     } catch (err: any) {
@@ -206,7 +211,7 @@ export function useVersionTrail(options: UseVersionTrailOptions) {
 
   // ─── rollback ──────────────────────────────────────────────────────────
 
-  async function rollback(versionId: string): Promise<void> {
+  async function rollback(versionId: string): Promise<boolean> {
     // 找到目标版本以显示时间
     const targetVersion = versions.value.find(v => v.id === versionId)
     const targetTime = targetVersion?.createdAt ?? '未知时间'
@@ -223,7 +228,7 @@ export function useVersionTrail(options: UseVersionTrailOptions) {
       )
     } catch {
       // 用户取消
-      return
+      return false
     }
 
     loading.value = true
@@ -234,8 +239,21 @@ export function useVersionTrail(options: UseVersionTrailOptions) {
 
       // 刷新列表
       await loadVersions(1)
+
+      // 通知包内 formData 等内存态刷新
+      try {
+        window.dispatchEvent(
+          new CustomEvent('workpaper:rollback-completed', {
+            detail: { workpaperId: workpaperId.value, projectId: projectId.value },
+          }),
+        )
+      } catch {
+        /* ignore */
+      }
+      return true
     } catch (err: any) {
       ElMessage.error(err?.message || '回滚失败')
+      return false
     } finally {
       loading.value = false
     }
@@ -306,6 +324,8 @@ export function useVersionTrail(options: UseVersionTrailOptions) {
     // 计算属性
     canRollback,
     hasMore,
+    PAGE_SIZE,
+    MAX_VERSION_TRAIL_SNAPSHOTS,
   }
 }
 

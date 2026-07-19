@@ -354,7 +354,7 @@ const GtG4BondInvestmentEcl = defineAsyncComponent(() => import('./GtG4BondInves
 const GtG5LongTermReceivable = defineAsyncComponent(() => import('./GtG5LongTermReceivable.vue'))
 const GtG6OtherBondMain = defineAsyncComponent(() => import('./GtG6OtherBondMain.vue'))
 const GtG6OtherBondSppi = defineAsyncComponent(() => import('./GtG6OtherBondSppi.vue'))
-const GtG6OtherBondEcl = defineAsyncComponent(() => import('./GtG6OtherBondEcl.vue'))
+const GtG6OtherBondEcl = defineAsyncComponent(() => import('./GtG6OtherBondInvestmentEcl.vue'))
 const GtG7LongTermEquityMain = defineAsyncComponent(() => import('./GtG7LongTermEquityMain.vue'))
 const GtG7EquityMethod = defineAsyncComponent(() => import('./GtG7EquityMethod.vue'))
 const GtG7EquitySubsidiary = defineAsyncComponent(() => import('./GtG7EquitySubsidiary.vue'))

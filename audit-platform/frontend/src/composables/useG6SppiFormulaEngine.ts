@@ -110,6 +110,16 @@ export function calcInventoryRollForward(countDateQty: number, change: number): 
 // ══════════════════════════════════════════════════════════
 
 /**
+ * 计算公允价值金额（Excel G6-5：数量 × 单位公允价值）
+ * @param qty 数量
+ * @param unitPrice 单位公允价值
+ * @returns 公允价值，保留2位小数
+ */
+export function calcFairValueAmount(qty: number, unitPrice: number): number {
+  return Math.round(parseNum(qty) * parseNum(unitPrice) * 100) / 100
+}
+
+/**
  * 计算公允价值差异
  * @param audited 审定公允价值
  * @param unadjusted 未审公允价值
@@ -117,6 +127,34 @@ export function calcInventoryRollForward(countDateQty: number, change: number): 
  */
 export function calcFairValueDiff(audited: number, unadjusted: number): number {
   return Math.round((parseNum(audited) - parseNum(unadjusted)) * 100) / 100
+}
+
+/**
+ * 数量变动对公允价值差异的影响
+ * =（审定数量 − 未审数量）× 未审单价
+ */
+export function calcFairValueQtyImpact(
+  auditedQty: number,
+  unadjQty: number,
+  unadjPrice: number,
+): number {
+  return Math.round(
+    (parseNum(auditedQty) - parseNum(unadjQty)) * parseNum(unadjPrice) * 100,
+  ) / 100
+}
+
+/**
+ * 价格变动对公允价值差异的影响
+ * = 审定数量 ×（审定单价 − 未审单价）
+ */
+export function calcFairValuePriceImpact(
+  auditedQty: number,
+  auditedPrice: number,
+  unadjPrice: number,
+): number {
+  return Math.round(
+    parseNum(auditedQty) * (parseNum(auditedPrice) - parseNum(unadjPrice)) * 100,
+  ) / 100
 }
 
 // ══════════════════════════════════════════════════════════

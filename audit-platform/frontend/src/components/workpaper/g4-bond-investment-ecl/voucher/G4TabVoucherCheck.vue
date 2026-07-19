@@ -19,22 +19,37 @@
 -->
 <template>
   <div class="g4-voucher-check">
-    <!-- 审计目标 -->
-    <el-alert
-      type="info"
-      :closable="false"
-      show-icon
-      title="审计目标：通过检查债权投资相关记账凭证及支持性文件，确认业务真实发生、账务处理正确、借贷平衡，异常凭证已识别说明。"
-      style="margin-bottom: 12px"
-    />
-    <!-- 工具栏索引 -->
+    <!-- 一、审计目标（对齐纸质底稿三认定） -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert">
+      <template #title><span class="ao-title">一、审计目标</span></template>
+      <ol class="ao-list">
+        <li>资产负债表中记录的债权投资是存在的，且已经记录在恰当的账户中；</li>
+        <li>所有应当记录的债权投资交易均已记录；</li>
+        <li>债权投资以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录。</li>
+      </ol>
+    </el-alert>
+
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <G4EclImportExportDropdown
+          :wp-id="wpId"
+          sheet="G4-13"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-10" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-12" :context-project-id="projectId" /></span>
+      </div>
       <div class="toolbar-right">
+        <el-tag size="small" type="info">借 {{ vc.debitRows.value.length }} · 贷 {{ vc.creditRows.value.length }}</el-tag>
+        <el-tag v-if="abnormalCount" size="small" type="danger">异常 {{ abnormalCount }}</el-tag>
+        <el-tag size="small" :type="vc.isBalanced.value ? 'success' : 'warning'">
+          {{ vc.isBalanced.value ? '借贷平衡' : '借贷不平衡' }}
+        </el-tag>
         <span class="chip-wrap"><GtIndexChip value="wp:G4-13" :context-project-id="projectId" /></span>
       </div>
     </div>
-    <!-- 顶部工具栏 -->
+
     <div class="section-head">
       <h3 class="sheet-title">G4-13 凭证检查表</h3>
       <div class="head-actions">
@@ -48,11 +63,87 @@
         <el-button size="small" type="success" :disabled="isReadonly" @click="handleAddCredit">
           + 贷方行
         </el-button>
+        <el-button size="small" type="warning" plain :disabled="isReadonly" @click="pushAbnormalDrafts">
+          推送异常至 G4-3
+        </el-button>
         <el-button size="small" @click="openReviewDialog('G4-13-voucher-check')">💬复核</el-button>
       </div>
     </div>
 
-    <!-- 抽凭引擎（科目 1501 债权投资） -->
+    <!-- 二、样本选取标准与结果 -->
+    <el-card shadow="never" class="criteria-card">
+      <template #header>
+        <div class="card-header-row">
+          <span>二、样本选取标准与结果</span>
+          <el-button size="small" link type="primary" @click="showMethodGuide = !showMethodGuide">
+            {{ showMethodGuide ? '收起方法说明' : '选取方法说明' }}
+          </el-button>
+        </div>
+      </template>
+      <div class="criteria-grid">
+        <div class="cg-item cg-full">
+          <label>测试范围</label>
+          <el-input
+            v-model="criteria.testScope"
+            size="small"
+            :disabled="isReadonly"
+            placeholder="债权投资科目借方、贷方发生额检查（含减值计提/转回/核销）"
+            @change="persistCriteria"
+          />
+        </div>
+        <div class="cg-item">
+          <label>抽样总体（笔数 / 金额）</label>
+          <div class="cg-inline">
+            <el-input-number v-model="criteria.populationCount" :controls="false" size="small"
+              :disabled="isReadonly" placeholder="笔" class="num-sm" @change="persistCriteria" />
+            <span class="cg-unit">笔</span>
+            <el-input-number v-model="criteria.populationAmount" :controls="false" size="small"
+              :disabled="isReadonly" placeholder="金额" class="num-md" @change="persistCriteria" />
+            <span class="cg-unit">元</span>
+          </div>
+        </div>
+        <div class="cg-item">
+          <label>抽样方法</label>
+          <el-select v-model="criteria.samplingMethod" size="small" :disabled="isReadonly" @change="persistCriteria">
+            <el-option label="随机选样" value="随机选样" />
+            <el-option label="系统选样" value="系统选样" />
+            <el-option label="选取特定项目" value="特定项目" />
+            <el-option label="选取全部项目" value="全部项目" />
+          </el-select>
+        </div>
+        <div class="cg-item cg-full">
+          <label>特定样本</label>
+          <el-input
+            v-model="criteria.specificSample"
+            size="small"
+            :disabled="isReadonly"
+            placeholder="超过重要性水平、关联方、异常减值/转回/核销等全部测试，共XX笔"
+            @change="persistCriteria"
+          />
+        </div>
+        <div class="cg-item">
+          <label>代表性样本量</label>
+          <el-input-number v-model="criteria.representativeSize" :controls="false" size="small"
+            :disabled="isReadonly" @change="persistCriteria" />
+        </div>
+        <div class="cg-item">
+          <label>已检查金额 / 检查比例</label>
+          <div class="cg-inline">
+            <span class="ratio-val">{{ fmtNum(checkedAmount) }}</span>
+            <el-tag size="small" :type="inspectionRatio >= 0.1 ? 'success' : 'info'">
+              {{ (inspectionRatio * 100).toFixed(1) }}%
+            </el-tag>
+          </div>
+        </div>
+      </div>
+      <div v-if="showMethodGuide" class="method-guide">
+        <p><b>（1）选取全部项目：</b>总体较小或存在舞弊风险、重大非常规交易、重大关联方交易、重大估计变更时适用。</p>
+        <p><b>（2）选取特定项目：</b>大额、超过阈值、异常或高风险项目；不能推断至总体。</p>
+        <p><b>（3）审计抽样：</b>可分层后随机/系统选样；样本量结合置信水平与错报风险判断。预计错报扩展系数参考：1%→1.9；5%→1.6；10%→1.5。</p>
+      </div>
+    </el-card>
+
+    <!-- 抽凭引擎 -->
     <el-collapse v-if="showSampling && props.wpId && props.projectId && !isReadonly" class="sampling-collapse">
       <el-collapse-item title="⚡ 自动抽凭（科目 1501 债权投资）" name="sampling">
         <GtVoucherSamplingEngine
@@ -87,7 +178,7 @@
       <el-tag v-else type="danger" size="small">借贷不平衡</el-tag>
     </div>
 
-    <!-- ═══ 借方区 ═══ -->
+    <p class="section-label">三、测试 · 1. 本期发生额检查（按借贷分区记录）</p>
     <div class="section-block">
       <div class="block-header">（一）借方区</div>
       <el-table
@@ -235,7 +326,7 @@
           </el-table-column>
           <el-table-column label="索引号" width="100">
             <template #default="{ row }">
-              <GtIndexChip v-if="row.indexRef" :value="row.indexRef" />
+              <GtIndexChip v-if="row.indexRef" :value="row.indexRef" :context-project-id="projectId" />
               <el-input v-else-if="!isReadonly" v-model="row.indexRef" size="small"
                 placeholder="索引" />
             </template>
@@ -423,7 +514,7 @@
           </el-table-column>
           <el-table-column label="索引号" width="100">
             <template #default="{ row }">
-              <GtIndexChip v-if="row.indexRef" :value="row.indexRef" />
+              <GtIndexChip v-if="row.indexRef" :value="row.indexRef" :context-project-id="projectId" />
               <el-input v-else-if="!isReadonly" v-model="row.indexRef" size="small"
                 placeholder="索引" />
             </template>
@@ -463,47 +554,60 @@
       </el-table>
     </div>
 
-    <!-- 审计说明 -->
-    <el-card class="note-card" shadow="never">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input
-        v-model="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 5 }"
-        :disabled="isReadonly"
-        placeholder="填写审计说明：凭证检查范围、样本选取、核对结果、异常凭证处理及其影响等。"
-        @change="saveAuditNote"
-      />
-    </el-card>
+    <p class="post-period-hint">
+      2. 期后处置、新增检查：可在贷方区或借方区按业务性质登记截止日后事项，并在审计说明中单独说明覆盖范围。
+    </p>
 
-    <!-- 底部审计结论 -->
-    <el-card class="conclusion-card" shadow="never">
-      <div class="conclusion-header">
-        <span class="conclusion-title">审计结论</span>
-        <el-button size="small" type="primary" link :disabled="isReadonly"
-          @click="handleAiConclusion">
-          🤖 AI生成
-        </el-button>
-      </div>
-      <el-input
-        v-model="conclusion"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请输入凭证检查的审计结论..."
-        :disabled="isReadonly"
-      />
-    </el-card>
+    <G4AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      :show-conclusion="false"
+      v-model:note="auditNote"
+      note-title="四、审计说明"
+      note-placeholder="描述测试过程与结果；评估发现的问题对审计的影响；说明检查比例与样本覆盖。"
+      @update:note="saveAuditNote"
+    />
+    <div class="conclusion-toolbar no-print">
+      <el-select
+        v-if="!isReadonly"
+        v-model="conclusionOption"
+        size="small"
+        clearable
+        placeholder="参考结论"
+        style="width: 240px"
+        @change="applyConclusionTemplate"
+      >
+        <el-option label="A. 未见异常" value="A" />
+        <el-option label="B. 个别例外已说明" value="B" />
+        <el-option label="C. 重大事项/例外" value="C" />
+      </el-select>
+      <el-button size="small" type="primary" link :disabled="isReadonly || !aiAvailable"
+        :loading="aiLoading"
+        @click="handleAiConclusion">
+        🤖 AI生成
+      </el-button>
+    </div>
+    <G4AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      :show-note="false"
+      v-model:conclusion="conclusion"
+      conclusion-title="五、审计结论"
+      conclusion-placeholder="就存在、完整性、计价分摊认定是否达成作出结论。"
+    />
 
-    <!-- 编制提示 -->
-    <details class="prep-hint">
-      <summary>编制提示</summary>
+    <details class="prep-hint" open>
+      <summary>编制提示 / 选取方法要点</summary>
       <ul>
-        <li>凭证检查应按借方区和贷方区分别记录</li>
-        <li>6项核对内容全部✓后显示"全部通过"标签</li>
-        <li>任一核对项未通过(✗)将自动标记为异常行（红色高亮）</li>
-        <li>借贷金额合计应平衡，差额以红色显示在顶部汇总区</li>
-        <li>📎附件列可上传凭证附件进行OCR识别</li>
-        <li>索引号可跳转至关联底稿</li>
+        <li>先确定测试范围与抽样总体，大额/关联方/异常作特定样本全部测试后再抽样。</li>
+        <li>六项核对全部✓后显示「全部通过」；任一✗自动标异常（红色），须填异常说明。</li>
+        <li>检查比例 = 已检查借贷金额合计 ÷ 抽样总体金额（总体为 0 时显示 0%）。</li>
+        <li>减值计提金额可勾对
+          <span class="chip-wrap inline"><GtIndexChip value="wp:G4-10" :context-project-id="projectId" /></span>；
+          转回/核销可勾对
+          <span class="chip-wrap inline"><GtIndexChip value="wp:G4-12" :context-project-id="projectId" /></span>。
+        </li>
+        <li>📎 可上传凭证附件 OCR；⚡ 抽凭默认写入当前借贷区。</li>
       </ul>
     </details>
   </div>
@@ -524,16 +628,29 @@
  * - 集成 GtVoucherSamplingEngine 抽凭引擎
  * - 行级OCR：📎上传→POST /d4/contract-ocr→ElMessageBox确认→merge填入
  */
-import { ref, computed, inject, onMounted } from 'vue'
+import { ref, computed, inject, watch, onMounted } from 'vue'
 import { Delete, Paperclip } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useG4EclVoucherCheck } from '../../composables/useG4EclVoucherCheck'
 import { useG4EclFormData } from '../../composables/useG4EclFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G4AuditTextCards from '../../g4-bond-investment-main/G4AuditTextCards.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import G4EclImportExportDropdown from '../G4EclImportExportDropdown.vue'
 import type { VoucherCheckRow } from '../../composables/useG4EclFormData'
 import type { SampledVoucher, FillMode, Phase } from '../../composables/useSamplingAlgorithms'
+import { useG4EclAiGenerate } from '../../composables/useG4EclAiGenerate'
+import {
+  buildG413AbnormalMemos,
+  dispatchG4ExceptionDrafts,
+} from '../../composables/g4ExceptionRouting'
+import {
+  G4_ITEM_IDS,
+  buildCanonicalPayload,
+  parseCanonicalArray,
+  parseCanonicalJson,
+} from '../../composables/g4StorageContract'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -542,17 +659,79 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
+const emit = defineEmits<{ imported: [] }>()
+
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+
+const wpIdRef = computed(() => props.wpId)
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG4EclAiGenerate(wpIdRef)
 
 const vc = useG4EclVoucherCheck()
 const conclusion = ref('')
+const conclusionOption = ref('')
 const showSampling = ref(false)
+const showMethodGuide = ref(false)
 
-// ─── 审计说明（checklist_responses 持久化） ─────────────────────────────────
+// ─── 审计说明 / 抽样标准（checklist_responses 持久化） ───────────────────────
 const formData = useG4EclFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
+const rowsLoaded = ref(false)
+
+interface G4SampleCriteria {
+  testScope: string
+  populationCount: number
+  populationAmount: number
+  samplingMethod: string
+  specificSample: string
+  representativeSize: number
+}
+
+function emptyCriteria(): G4SampleCriteria {
+  return {
+    testScope: '债权投资科目借方、贷方发生额检查（含减值计提/转回/核销相关凭证）',
+    populationCount: 0,
+    populationAmount: 0,
+    samplingMethod: '随机选样',
+    specificSample: '',
+    representativeSize: 0,
+  }
+}
+
+const criteria = ref<G4SampleCriteria>(emptyCriteria())
+const CRITERIA_KEY = G4_ITEM_IDS.G4_13_CRITERIA
+
+function persistCriteria(): void {
+  if (props.isReadonly) return
+  const payload = buildCanonicalPayload(CRITERIA_KEY, criteria.value)
+  formData.debouncedSave(payload.item_id, payload)
+}
+
+const abnormalCount = computed(() => vc.rows.value.filter(r => r.isAbnormal).length)
+
+const checkedAmount = computed(() =>
+  Math.abs(vc.debitTotal.value) + Math.abs(vc.creditTotal.value),
+)
+
+const inspectionRatio = computed(() => {
+  const pop = Number(criteria.value.populationAmount) || 0
+  if (pop <= 0) return 0
+  return Math.min(checkedAmount.value / pop, 9.99)
+})
+
+const CONCLUSION_TEMPLATES: Record<string, string> = {
+  A: '经检查，所抽查债权投资相关凭证支持性文件完整、授权批准与账务处理未见异常，六项核对通过，借贷勾稽合理。未发现影响存在、完整性及计价分摊认定的错报。',
+  B: '经检查，除下列事项外其余样本未见异常：【列示例外凭证编号、差异性质及处理】。其余样本核对通过。请结合索引评价对认定的影响。',
+  C: '经检查发现重大事项或例外：【性质、金额、对报表影响及建议调整】。在未完成调查/调整前，不能仅依赖本表对相关认定形成无保留结论。',
+}
+
+function applyConclusionTemplate(opt: string): void {
+  if (!opt || props.isReadonly) return
+  const text = CONCLUSION_TEMPLATES[opt]
+  if (text) conclusion.value = text
+}
+
 const NOTE_KEY = 'G4-13-voucher-check-audit-note'
 const auditNote = ref('')
 function saveAuditNote(val: string): void {
@@ -560,6 +739,22 @@ function saveAuditNote(val: string): void {
   auditNote.value = val
   formData.debouncedSave(NOTE_KEY, { remark: val })
 }
+
+const CONCLUSION_KEY = 'G4-13-voucher-check-conclusion'
+watch(conclusion, (val) => {
+  if (props.isReadonly) return
+  formData.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
+})
+
+watch(
+  vc.rows,
+  (rows) => {
+    if (!rowsLoaded.value || props.isReadonly) return
+    const payload = buildCanonicalPayload(G4_ITEM_IDS.G4_13_ROWS, rows)
+    formData.debouncedSave(payload.item_id, payload)
+  },
+  { deep: true },
+)
 
 // ─── 当前年份（从htmlData或默认） ────────────────────────────────────────────
 
@@ -612,6 +807,16 @@ async function handleAddDebit() {
 
 async function handleAddCredit() {
   await vc.addRow('credit')
+}
+
+function pushAbnormalDrafts(): void {
+  const drafts = buildG413AbnormalMemos(vc.rows.value)
+  if (!drafts.length) {
+    ElMessage.info('没有可推送的异常凭证')
+    return
+  }
+  dispatchG4ExceptionDrafts(drafts, formData.allResponses.value)
+  ElMessage.success(`已推送 ${drafts.length} 条 G4-3 异常备忘`)
 }
 
 // ─── 抽凭引擎集成（Requirements: 6.3, 9.2） ─────────────────────────────────
@@ -746,8 +951,23 @@ async function handleRowOcr(row: VoucherCheckRow, file: File): Promise<boolean> 
 
 // ─── AI生成审计结论 ─────────────────────────────────────────────────────────
 
-function handleAiConclusion() {
-  ElMessage.info('AI生成审计结论功能将在AI模块完成后启用')
+async function handleAiConclusion(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'voucher-check-conclusion',
+    conclusion.value || '',
+    {
+      借方行数: vc.debitRows.value.length,
+      贷方行数: vc.creditRows.value.length,
+      异常行数: abnormalCount.value,
+      借贷平衡: vc.isBalanced.value,
+      检查比例: `${(inspectionRatio.value * 100).toFixed(1)}%`,
+      抽样方法: criteria.value.samplingMethod,
+      抽样总体金额: criteria.value.populationAmount,
+    },
+    'AI 审计结论',
+  )
+  if (text) conclusion.value = text
 }
 
 // ─── 数字格式化 ─────────────────────────────────────────────────────────────
@@ -763,14 +983,30 @@ function fmtNum(v: unknown): string {
 // ─── 数据加载 ───────────────────────────────────────────────────────────────
 
 onMounted(async () => {
-  if (props.htmlData?.voucherCheck) {
-    const data = props.htmlData.voucherCheck
-    vc.loadRows(data.rows || [])
-    if (data.conclusion) conclusion.value = data.conclusion
-  }
   await formData.loadAll()
+
+  const storedRows = formData.allResponses.value.get(G4_ITEM_IDS.G4_13_ROWS)
+  const storedRowsJson = parseCanonicalJson(storedRows)
+  if (storedRowsJson !== null) {
+    vc.loadRows(parseCanonicalArray(storedRows) as VoucherCheckRow[])
+  } else if (props.htmlData?.voucherCheck) {
+    vc.loadRows(props.htmlData.voucherCheck.rows || [])
+  }
+
+  if (props.htmlData?.voucherCheck?.conclusion) {
+    conclusion.value = props.htmlData.voucherCheck.conclusion
+  }
   const note = formData.allResponses.value.get(NOTE_KEY)
   if (note?.remark) auditNote.value = note.remark
+  const conc = formData.allResponses.value.get(CONCLUSION_KEY)
+  if (conc?.remark) conclusion.value = conc.remark
+  const storedCriteria = parseCanonicalJson<Partial<G4SampleCriteria>>(
+    formData.allResponses.value.get(CRITERIA_KEY),
+  )
+  if (storedCriteria && typeof storedCriteria === 'object') {
+    criteria.value = { ...emptyCriteria(), ...storedCriteria }
+  }
+  rowsLoaded.value = true
 })
 
 // ─── 暴露序列化接口供父组件保存使用 ─────────────────────────────────────────
@@ -779,6 +1015,7 @@ defineExpose({
   toJSON: () => ({
     ...vc.toJSON(),
     conclusion: conclusion.value,
+    criteria: criteria.value,
   }),
 })
 </script>
@@ -802,15 +1039,13 @@ defineExpose({
 .tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
 .tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
 
-/* 审计说明卡片 */
-.note-card {
-  margin-top: 16px;
-}
-.note-card .card-header {
+.conclusion-toolbar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  font-weight: 600;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
 }
 
 .section-head {
@@ -948,21 +1183,85 @@ defineExpose({
   color: #f56c6c;
 }
 
-/* 审计结论卡片 */
-.conclusion-card {
-  margin-top: 16px;
+.conclusion-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
 }
 
-.conclusion-header {
+.objective-alert { margin-bottom: 12px; }
+.ao-title { font-weight: 600; }
+.ao-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #606266;
+}
+
+.section-label {
+  margin: 12px 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.post-period-hint {
+  margin: 8px 0 12px;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.6;
+}
+
+.criteria-card { margin-bottom: 12px; }
+.card-header-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-}
-
-.conclusion-title {
   font-weight: 600;
-  font-size: 14px;
+}
+.criteria-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+}
+.cg-item label {
+  display: block;
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 4px;
+}
+.cg-full { grid-column: 1 / -1; }
+.cg-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cg-unit { font-size: 12px; color: #909399; }
+.num-sm { width: 88px; }
+.num-md { width: 140px; }
+.ratio-val { font-weight: 600; color: #303133; }
+.method-guide {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: #fafafa;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.7;
+}
+.method-guide p { margin: 0 0 4px; }
+
+.chip-wrap.inline {
+  display: inline-flex;
+  vertical-align: middle;
 }
 
 /* 编制提示 */

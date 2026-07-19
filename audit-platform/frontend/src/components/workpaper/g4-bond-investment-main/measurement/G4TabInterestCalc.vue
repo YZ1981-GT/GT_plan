@@ -10,10 +10,13 @@
     />
     <!-- Section标题栏 + 新增投资项目 + 复核按钮 -->
     <div class="section-head">
-      <h3 class="sheet-title">G4-4 利息测算表（实际利率法）</h3>
+      <h3 class="sheet-title">G4-4 利息收入测算表（实际利率法）</h3>
       <div class="head-actions">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="calc.addGroup()">
           + 新增投资项目
+        </el-button>
+        <el-button size="small" type="success" plain :disabled="isReadonly" @click="calc.confirmInterestWriteback()">
+          预览并回写 G4-2/G4-3
         </el-button>
         <!-- 导入导出 el-dropdown -->
         <el-dropdown trigger="click" size="small" @command="handleIECommand">
@@ -337,22 +340,6 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="减值阶段" width="120">
-          <template #default="{ row }">
-            <el-select
-              v-if="!isReadonly"
-              :model-value="row.stage"
-              size="small"
-              @change="(v: string) => calc.updatePeriodField(group.id, row.id, 'stage', v)"
-            >
-              <el-option value="Stage1" label="Stage1" />
-              <el-option value="Stage2" label="Stage2" />
-              <el-option value="Stage3" label="Stage3" />
-            </el-select>
-            <span v-else>{{ row.stage }}</span>
-          </template>
-        </el-table-column>
-
         <!-- 操作列：删除计息期间行 -->
         <el-table-column v-if="!isReadonly" label="" width="50" align="center">
           <template #default="{ row }">
@@ -363,25 +350,12 @@
               :disabled="group.periods.length <= 1"
               @click="calc.removePeriod(group.id, row.id)"
             >
-              🗑️
+              删
             </el-button>
           </template>
         </el-table-column>
       </el-table>
     </div>
-
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input
-        type="textarea"
-        :model-value="auditNote"
-        :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：实际利率法利息测算的执行情况、利率合理性判断与测算差异分析结果。"
-        @change="(v: string) => saveAuditNote(v)"
-      />
-    </el-card>
 
     <!-- 底部：合计对比行 -->
     <div v-if="calc.computedGroups.value.length > 0" class="summary-section">
@@ -390,49 +364,55 @@
         <span class="summary-item">
           利息测算合计：<strong>{{ fmt(calc.summary.value.totalEffectiveInterest) }}</strong>
         </span>
-        <span class="summary-item">
-          G4-1审定利息收入：<strong>{{ fmt(calc.summary.value.g4_1InterestAdjusted) }}</strong>
+        <span class="summary-item summary-benchmark">
+          审定利息收入基准：
+          <el-input-number
+            v-if="!isReadonly"
+            :model-value="calc.summary.value.g4_1InterestAdjusted"
+            size="small"
+            :controls="false"
+            :precision="2"
+            style="width:140px"
+            @change="(v: number | undefined) => calc.setInterestBenchmark(v ?? 0)"
+          />
+          <strong v-else>{{ fmt(calc.summary.value.g4_1InterestAdjusted) }}</strong>
         </span>
         <span class="summary-item" :class="{ 'red-highlight': calc.isVarianceHighlight() }">
           差异：<strong>{{ fmt(calc.summary.value.variance) }}</strong>
-          <template v-if="calc.isVarianceHighlight()"> ⚠️ 超差 >0.01</template>
+          <template v-if="calc.isVarianceHighlight()"> 超差 &gt;0.01</template>
         </span>
       </div>
 
-      <!-- 审计结论 el-card + AI按钮 -->
-      <el-card class="conclusion-card" shadow="never">
-        <template #header>
-          <div class="conclusion-header">
-            <span>审计结论</span>
-            <el-button size="small" :disabled="isReadonly" @click="fillAiConclusion">
-              🤖 AI辅助
-            </el-button>
-          </div>
-        </template>
-        <el-input
-          v-model="auditConclusion"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 8 }"
-          :disabled="isReadonly"
-          placeholder="对利息测算的复核结论..."
-        />
-      </el-card>
-
-      <!-- 编制提示 details 折叠 -->
       <details class="g4-guide-details">
-        <summary>📋 编制提示</summary>
+        <summary>编制提示</summary>
         <div class="g4-guide-content">
-          <p>1. 实际利率法：利息收入 = 期初摊余成本 × 实际利率 × 计息天数/365</p>
-          <p>2. 期初摊余成本 = 期初账面总额 - 期初减值准备余额</p>
-          <p>3. 现金流入 = 面值总额 × 票面利率 × 计息天数/365（整年时天数=365）</p>
-          <p>4. 期末账面总额 = 期初账面 + 实际利息收入 - 现金流入 - 已收回的本金</p>
-          <p>5. Stage1/2/3公式相同，区别在于Stage3减值准备通常更大，摊余成本基数更低</p>
-          <p>6. 各投资项目实际利息收入合计应与G4-1审定表利息收入核对，差异超0.01元需查明原因</p>
-          <p>7. 初始入账价值 = 购买对价 + 交易费用（含手续费等直接相关费用）</p>
-          <p>8. 利率精度至少保留4位小数，金额精度保留2位小数</p>
+          <p>1. 对齐 Excel《利息收入测算表》：（一）初始入账价值；（二）计算利息收入（9列，无减值阶段列）。</p>
+          <p>2. 实际利息收入 = 期初摊余成本 × 实际利率 × 计息天数/365；期初摊余成本 = 期初账面 − 减值准备。</p>
+          <p>3. 首期期初账面默认=初始入账价值；后续期间期初在未填时自动按上期期末倒轧。</p>
+          <p>4. 期末账面总额 = 期初账面 + 实际利息 − 现金流入 − 已收回本金。</p>
+          <p>5. 测算合计应与审定利息收入基准勾稽（可手填，或自动引用 G4-3 中 6011 账项调整净额），|差异|≤0.01。</p>
+          <p>6. 利率精度建议≥4位小数；实际利率与票面利率相差&gt;2% 时给出提示。</p>
         </div>
       </details>
     </div>
+
+    <G4AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="auditConclusion"
+      note-ai-section="interest-note"
+      conclusion-ai-section="interest-conclusion"
+      :related-context="{
+        投资项目数: calc.computedGroups.value.length,
+        测算利息合计: calc.summary.value.totalEffectiveInterest,
+        审定利息: calc.summary.value.g4_1InterestAdjusted,
+        差异: calc.summary.value.variance,
+      }"
+      note-placeholder="填写审计说明：实际利率法利息测算的执行情况、利率合理性判断与测算差异分析结果。"
+      note-hint="覆盖实际利率法测算程序与差异分析。"
+      conclusion-hint="按 A/B/C 口径评价利息收入确认准确性。"
+    />
   </div>
 </template>
 
@@ -453,28 +433,40 @@
  *
  * 使用 useG4MainInterestCalc composable（已实现）
  */
-import { ref, computed, inject, onMounted } from 'vue'
+import { ref, computed, watch, inject, onMounted } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import http from '@/utils/http'
 import { useG4MainInterestCalc } from '../../composables/useG4MainInterestCalc'
 import { useG4MainImportExport } from '../../composables/useG4MainImportExport'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G4AuditTextCards from '../G4AuditTextCards.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
   wpId: string
   projectId: string
   isReadonly: boolean
+  allResponses?: Map<string, ChecklistResponse>
 }>()
+
+const emit = defineEmits<{ imported: [] }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
-// ─── allResponses 本地状态管理 ───
+// ─── allResponses：优先使用父级共享 Map ───
 const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
 
-// ─── seed from htmlData ───
-if (props.htmlData?.interestCalc) {
+watch(
+  () => props.allResponses,
+  (source) => {
+    if (!source) return
+    allResponses.value = source
+  },
+  { immediate: true, deep: true },
+)
+
+// ─── seed from htmlData（仅在父级未提供数据时） ───
+if ((!props.allResponses || props.allResponses.size === 0) && props.htmlData?.interestCalc) {
   const seed = props.htmlData.interestCalc
   if (seed.groups) {
     allResponses.value.set('G4-4-interest-calc', {
@@ -487,9 +479,12 @@ if (props.htmlData?.interestCalc) {
 
 // ─── 初始化 composable ───
 const isReadonlyRef = ref(props.isReadonly)
+watch(() => props.isReadonly, (v) => { isReadonlyRef.value = v })
 const calc = useG4MainInterestCalc({
   allResponses,
   isReadonly: isReadonlyRef,
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
 })
 
 // ─── 导入导出 ───
@@ -503,14 +498,17 @@ function handleIECommand(cmd: string): void {
 async function onImportFile(f: { raw?: File } | File): Promise<void> {
   const file = f instanceof File ? f : (f.raw ?? null)
   if (!file) return
-  await ie.importData('G4-4', file)
+  const result = await ie.importData('G4-4', file)
+  if (result) {
+    emit('imported')
+    window.setTimeout(() => calc.loadGroups(), 80)
+  }
 }
 
-// ─── 审计结论 ───
-const auditConclusion = ref('')
-
-// ─── 审计说明（走 checklist_responses，conclusion:null + remark 文本） ───
+// ─── 审计结论 / 说明 ───
+const CONCLUSION_KEY = 'G4-4-interestcalc-audit-conclusion'
 const NOTE_KEY = 'G4-4-interestcalc-audit-note'
+const auditConclusion = ref('')
 const auditNote = ref('')
 
 function readSaved(key: string): string {
@@ -527,19 +525,30 @@ function readSaved(key: string): string {
   return ''
 }
 
-async function saveAuditNote(val: string): Promise<void> {
-  auditNote.value = val
+/** debouncedSave — 经 g4:save-items 由父组件落库 */
+function debouncedSave(itemId: string, data: Partial<ChecklistResponse>): void {
   if (props.isReadonly) return
+  const item: ChecklistResponse = {
+    item_id: itemId,
+    conclusion: data.conclusion ?? null,
+    remark: data.remark ?? null,
+  }
+  allResponses.value.set(itemId, item)
   try {
-    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId || undefined,
-      items: [{ item_id: NOTE_KEY, conclusion: null, remark: val }],
-    })
+    window.dispatchEvent(new CustomEvent('g4:save-items', { detail: { items: [item] } }))
   } catch { /* silent */ }
 }
 
+watch(auditNote, (val) => {
+  debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+})
+watch(auditConclusion, (val) => {
+  debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
+})
+
 onMounted(() => {
   auditNote.value = readSaved(NOTE_KEY)
+  auditConclusion.value = readSaved(CONCLUSION_KEY)
 })
 
 // ─── 事件处理 ───
@@ -565,24 +574,6 @@ async function handleRemoveGroup(groupId: string, projectName: string): Promise<
   } catch {
     // 用户取消
   }
-}
-
-/** AI辅助生成审计结论 */
-function fillAiConclusion(): void {
-  if (props.isReadonly) return
-  const s = calc.summary.value
-  const groupCount = calc.computedGroups.value.length
-  const draft =
-    `经对${groupCount}个债权投资项目进行实际利率法利息测算，` +
-    `测算利息收入合计 ${s.totalEffectiveInterest.toLocaleString('zh-CN')} 元，` +
-    `与G4-1审定表利息收入 ${s.g4_1InterestAdjusted.toLocaleString('zh-CN')} 元比对，` +
-    `差异 ${s.variance.toLocaleString('zh-CN')} 元。` +
-    (s.isVarianceAcceptable
-      ? '差异在可接受范围内（≤0.01元），利息收入确认恰当。'
-      : '差异超过可接受阈值（>0.01元），需进一步查明差异原因。')
-  auditConclusion.value = auditConclusion.value
-    ? `${auditConclusion.value}\n${draft}`
-    : draft
 }
 
 /** 格式化金额 */

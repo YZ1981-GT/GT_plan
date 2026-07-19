@@ -1,5 +1,8 @@
 <template>
   <div class="i4-tab-policy-check">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" title="审计目标：评价长期待摊费用摊销政策的适当性，检查摊销方法是否与费用受益模式一致、受益期限估计是否合理、会计估计变更是否恰当处理。" class="objective-alert" />
+
     <!-- 蓝色渐变引导区 -->
     <div class="guide-area">
       <div class="guide-grid">
@@ -135,15 +138,34 @@
     </el-card>
 
     <!-- 编制提示 -->
-    <details class="compile-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>本表为段落型检查，主要通过文字描述记录审计判断</li>
-        <li>每个section均可使用AI辅助生成初稿，审计师需复核修改</li>
-        <li>结论应与审定表I4-1结果一致</li>
-        <li>会计估计变更需特别关注：是否有合理理由+附注是否充分披露</li>
-      </ul>
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p><strong>CAS依据：</strong>《企业会计准则第6号——无形资产》应用指南、CAS 28号"会计政策、会计估计变更和差错更正"。</p>
+        <p><strong>编制要点：</strong></p>
+        <ul>
+          <li>摊销方法选择须与费用受益模式一致（直线法适用受益均匀分布，工作量法适用产出相关）</li>
+          <li>受益期限须有充分依据：装修费不超过租赁期/使用年限孰短，开办费3~5年，其他不超过10年</li>
+          <li>会计估计变更须未来适用法处理，附注充分披露变更内容/原因/影响金额</li>
+          <li>关注利润操纵：是否通过延长受益期减少当期费用</li>
+        </ul>
+      </div>
     </details>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="请填写审计结论..."
+        @change="saveAuditConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
@@ -161,7 +183,7 @@
  * Task: 4.5
  * Requirements: 4.1-4.2
  */
-import { ref, reactive, watch, inject } from 'vue'
+import { ref, reactive, watch, inject, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 
@@ -197,6 +219,19 @@ const sections = reactive({
 
 const conclusion = ref('')
 
+// ─── Audit Conclusion (standard textarea pattern) ────────────────────────────
+
+const CONCLUSION_KEY = 'I4-policycheck-audit-conclusion'
+const auditConclusion = ref('')
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  emit('save', CONCLUSION_KEY, val)
+}
+
 // ─── Load from allResponses ──────────────────────────────────────────────────
 
 function _load(): void {
@@ -212,6 +247,11 @@ function _getString(itemId: string): string {
 }
 
 watch(() => props.allResponses, () => _load(), { immediate: true })
+
+onMounted(() => {
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
 
 // ─── Save ────────────────────────────────────────────────────────────────────
 
@@ -267,6 +307,22 @@ function handleReview(): void {
 
 <style scoped>
 .i4-tab-policy-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+/* 审计目标 */
+.objective-alert { margin-bottom: 14px; }
+.i4-tab-policy-check :deep(.objective-alert .el-alert__content) { padding: 2px 0; }
+
+/* 审计结论卡片 */
+.audit-note-card { margin-bottom: 16px; }
+.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
+.card-header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 500; }
+
+/* 编制提示 (guidance-details) */
+.guidance-details { margin-top: 16px; margin-bottom: 16px; font-size: 12px; color: var(--el-text-color-secondary); }
+.guidance-details summary { cursor: pointer; font-weight: 500; font-size: 13px; }
+.guidance-content { padding: 8px 0 0 8px; line-height: 1.7; }
+.guidance-content ul { padding-left: 18px; margin-top: 4px; }
+.guidance-content li { margin-bottom: 3px; }
 
 /* 蓝色渐变引导区 */
 .guide-area {

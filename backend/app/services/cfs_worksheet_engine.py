@@ -326,20 +326,27 @@ class CFSWorksheetEngine:
         if amount <= Decimal("0"):
             raise ValueError("调整金额必须大于零")
 
-        # Generate adjustment number
-        count_result = await self.db.execute(
-            sa.select(sa.func.count()).select_from(CfsAdjustment).where(
+        # Generate adjustment number (use MAX to avoid collision after deletion)
+        max_result = await self.db.execute(
+            sa.select(sa.func.max(CfsAdjustment.adjustment_no)).where(
                 CfsAdjustment.project_id == project_id,
                 CfsAdjustment.year == year,
-                CfsAdjustment.is_deleted == sa.false(),
             )
         )
-        existing_count = count_result.scalar() or 0
+        max_no = max_result.scalar()
+        if max_no:
+            # Extract numeric part from "CFS-001" format
+            try:
+                next_num = int(max_no.replace("CFS-", "")) + 1
+            except (ValueError, AttributeError):
+                next_num = 1
+        else:
+            next_num = 1
 
         adjustment = CfsAdjustment(
             project_id=project_id,
             year=year,
-            adjustment_no=f"CFS-{existing_count + 1:03d}",
+            adjustment_no=f"CFS-{next_num:03d}",
             description=description,
             debit_account=debit_account,
             credit_account=credit_account,

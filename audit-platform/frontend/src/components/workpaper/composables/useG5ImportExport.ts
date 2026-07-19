@@ -1,20 +1,20 @@
 /**
  * useG5ImportExport — G5 长期应收款 导入导出
- * 8 张动态行表格：G5-2~G5-7 / G5-11~G5-12（G5-10 待 G4-10 完成后补齐）
+ * 含审定/明细/调整/计量/减值/凭证等可导入导出分表
  */
 import { type Ref } from 'vue'
 import {
   useWorkpaperImportExport,
-  type ImportExportResult,
 } from './useWorkpaperImportExport'
 
 export type G5ImportableSheet =
-  | 'G5-2' | 'G5-3' | 'G5-4' | 'G5-5' | 'G5-6'
+  | 'G5-1' | 'G5-2' | 'G5-3' | 'G5-4' | 'G5-5' | 'G5-6'
   | 'G5-7' | 'G5-11' | 'G5-12'
 
 export const G5_API_PREFIX = 'g5'
 
 export const G5_IMPORTABLE_SHEETS: { code: G5ImportableSheet; label: string }[] = [
+  { code: 'G5-1', label: 'G5-1 审定表' },
   { code: 'G5-2', label: 'G5-2 余额明细' },
   { code: 'G5-3', label: 'G5-3 坏账准备明细' },
   { code: 'G5-4', label: 'G5-4 调整分录' },

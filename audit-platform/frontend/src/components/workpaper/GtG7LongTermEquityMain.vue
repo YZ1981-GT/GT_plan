@@ -88,13 +88,19 @@
       />
 
       <!-- 底稿目录 -->
-      <G7TabDirectory
-        v-else-if="currentSheet === 'directory'"
-        :html-data="resolvedHtmlData"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-      />
+      <template v-else-if="currentSheet === 'directory'">
+        <div class="g7-index-toolbar">
+          <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
+        </div>
+        <GCycleBIndexExtras
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :sheet-name="props.sheetName"
+          :wp-code="'G7'"
+          :html-data="resolvedHtmlData ?? undefined"
+          :available-sheets="availableSheets"
+        />
+      </template>
 
       <!-- 兜底：未迁移/未匹配 sheet → OnlyOffice fallback -->
       <GtOnlyOfficeSheet
@@ -123,10 +129,12 @@
  *
  * Requirements: 1.1, 1.2, 1.4, 6.3, 6.7
  */
-import { ref, computed, onMounted, provide, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useG7DualMode } from './composables/useG7DualMode'
 import { useG7FormData } from './composables/useG7FormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+
+const G7_ACCOUNT_CODE = '1511'
 
 // ─── defineAsyncComponent 懒加载所有子组件 ───────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -142,15 +150,13 @@ const G7TabDetail = defineAsyncComponent(
 const G7TabAdjustment = defineAsyncComponent(
   () => import('./g7-long-term-equity-main/core/G7TabAdjustment.vue'),
 )
-const G7TabDirectory = defineAsyncComponent(
-  () => import('./g7-long-term-equity-main/core/G7TabDirectory.vue'),
-)
 const G7TabDisclosureListed = defineAsyncComponent(
   () => import('./g7-long-term-equity-main/disclosure/G7TabDisclosureListed.vue'),
 )
 const G7TabDisclosureSOE = defineAsyncComponent(
   () => import('./g7-long-term-equity-main/disclosure/G7TabDisclosureSOE.vue'),
 )
+const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 const props = defineProps<{
@@ -224,10 +230,15 @@ const isHtmlSheet = computed(() => HTML_SHEETS.has(currentSheet.value))
 /** 解析后的 htmlData（优先使用prop，fallback到selfLoad结果） */
 const resolvedHtmlData = computed(() => props.htmlData ?? selfLoadData.value)
 
-// ─── 双模式切换 (HTML ↔ OnlyOffice) ─────────────────────────────────────────
-const dualMode = useG7DualMode({
-  wpId: wpIdRef,
-  sheetName: computed(() => props.sheetName || ''),
+const availableSheets = computed(() => {
+  const hd = resolvedHtmlData.value
+  const fromHtml = hd?.sheets ?? hd?.render_config?.sheets
+  if (Array.isArray(fromHtml) && fromHtml.length) return fromHtml
+  const metaSheets = formData.renderMeta.value?.sheets
+  if (Array.isArray(metaSheets) && metaSheets.length) return metaSheets
+  // 对齐 G1：htmlData 无 sheets 时用自加载 render-config 的 sheetCache 兜底，
+  // 保证底稿目录架构树非空
+  return Object.keys(formData.sheetCache.value).map(sheet_name => ({ sheet_name }))
 })
 
 // ─── useG7FormData 用于selfLoad ─────────────────────────────────────────────
@@ -246,6 +257,35 @@ const formData = useG7FormData({
   onAfterSave: () => scheduleAutoSnapshot(),
 })
 // openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一提供，子组件 inject 命中祖先
+
+// ─── 双模式切换 (HTML ↔ OnlyOffice) ─────────────────────────────────────────
+const dualMode = useG7DualMode({
+  wpId: wpIdRef,
+  sheetName: computed(() => props.sheetName || ''),
+  reloadAll: async () => {
+    await formData.load()
+    const parsed = formData.parseContent()
+    if (parsed && Object.keys(parsed).length > 0) {
+      selfLoadData.value = parsed as Record<string, any>
+    }
+  },
+})
+
+function handleG7Adjudicated(e: Event): void {
+  const detail = (e as CustomEvent<{ accountCode?: string; adjudicatedAmount?: number }>).detail
+  if (detail?.accountCode !== G7_ACCOUNT_CODE) return
+  const amount = Number(detail.adjudicatedAmount)
+  if (!Number.isFinite(amount)) return
+  void formData.writebackTB(amount)
+}
+
+function handleG7Writeback(e: Event): void {
+  const detail = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number }>).detail
+  if (detail?.accountCode && detail.accountCode !== G7_ACCOUNT_CODE) return
+  const amount = Number(detail?.auditedAmount)
+  if (!Number.isFinite(amount)) return
+  void formData.writebackTB(amount)
+}
 
 // ─── selfLoad 模式：htmlData 为 null 时自动获取数据 ─────────────────────────
 async function selfLoadInit(): Promise<void> {
@@ -270,8 +310,15 @@ async function retrySelfLoad(): Promise<void> {
 
 // ─── 生命周期 ───────────────────────────────────────────────────────────────
 onMounted(async () => {
+  window.addEventListener('substantive:adjudicated', handleG7Adjudicated)
+  window.addEventListener('g7:writeback-trial-balance', handleG7Writeback)
   await selfLoadInit()
   isLoading.value = false
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('substantive:adjudicated', handleG7Adjudicated)
+  window.removeEventListener('g7:writeback-trial-balance', handleG7Writeback)
 })
 </script>
 
@@ -280,4 +327,5 @@ onMounted(async () => {
 .loading-container { padding: 24px; }
 .error-container { padding: 24px; }
 .g7-long-term-equity-main-toolbar { margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
+.g7-index-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 </style>

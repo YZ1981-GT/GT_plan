@@ -37,7 +37,7 @@
         </el-button>
         <el-button size="small" @click="stageLogic.expandAll()">全部展开</el-button>
         <el-button size="small" @click="stageLogic.collapseAll()">全部折叠</el-button>
-        <el-button size="small" :disabled="isReadonly" @click="requestAiConclusion">
+        <el-button size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="fillAiConclusion">
           🤖 AI辅助
         </el-button>
         <el-button size="small" @click="openReview">💬复核</el-button>
@@ -290,7 +290,7 @@
         <template #header>
           <div class="conclusion-header">
             <span>审计结论</span>
-            <el-button size="small" :disabled="isReadonly" @click="requestAiConclusion">
+            <el-button size="small" :disabled="isReadonly || !aiAvailable" :loading="aiLoading" @click="fillAiConclusion">
               🤖 AI辅助
             </el-button>
           </div>
@@ -363,6 +363,7 @@ import { computed, inject, watch, onMounted, ref } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useG6EclStageClassification } from '@/composables/useG6EclStageClassification'
 import { useG6EclFormData } from '../../composables/useG6EclFormData'
+import { useG6EclAiGenerate } from '../../composables/useG6EclAiGenerate'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -373,6 +374,9 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+
+const wpIdRef = computed(() => props.wpId)
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG6EclAiGenerate(wpIdRef)
 
 // ─── 初始化 composable ───
 const isReadonlyRef = computed(() => props.isReadonly)
@@ -385,9 +389,10 @@ const stageLogic = useG6EclStageClassification({
 
 // ─── 审计说明（持久化 checklist_responses, conclusion:null） ───
 const NOTE_KEY = 'G6-11-stage-classification-audit-note'
+const CONCLUSION_KEY = 'G6-11-stage-classification-conclusion'
 const auditNote = ref('')
 const noteFormData = useG6EclFormData({
-  wpId: computed(() => props.wpId),
+  wpId: wpIdRef,
   projectId: computed(() => props.projectId),
 })
 function saveAuditNote(val: string): void {
@@ -395,6 +400,11 @@ function saveAuditNote(val: string): void {
   auditNote.value = val
   noteFormData.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
 }
+
+watch(() => stageLogic.conclusion.value, (val) => {
+  if (props.isReadonly) return
+  noteFormData.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
+})
 
 // ─── 虚拟滚动：61行阈值 → 设置 max-height 约520px（~61×50px行高+表头） ───
 const VIRTUAL_SCROLL_THRESHOLD = 61
@@ -408,6 +418,8 @@ onMounted(async () => {
   await noteFormData.loadAll()
   const n = noteFormData.allResponses.value.get(NOTE_KEY)
   if (n?.remark) auditNote.value = n.remark
+  const conc = noteFormData.allResponses.value.get(CONCLUSION_KEY)
+  if (conc?.remark) stageLogic.conclusion.value = conc.remark
 })
 
 watch(() => props.htmlData, (newData) => {
@@ -477,21 +489,23 @@ function openReview(): void {
   openReviewDialog('G6-11-stage-classification')
 }
 
-// ─── AI辅助生成审计结论（stage-conclusion section） ───
-function requestAiConclusion(): void {
+// ─── AI辅助生成审计结论（stage-conclusion） ───
+async function fillAiConclusion(): Promise<void> {
   if (props.isReadonly) return
   const s = stageLogic.summary.value
-  const draft =
-    `经对${s.total}个其他债权投资项目进行信用风险评估和三阶段划分检查，其中` +
-    `Stage1（未显著增加）${s.stage1Count}项、` +
-    `Stage2（显著增加）${s.stage2Count}项、` +
-    `Stage3（已减值）${s.stage3Count}项。` +
-    (s.inconsistentCount === 0
-      ? '企业划分阶段与审计判断阶段全部一致，三阶段划分合理。'
-      : `企业划分阶段与审计判断阶段存在${s.inconsistentCount}项不一致，需关注差异原因并评估减值计提充分性。`)
-  stageLogic.conclusion.value = stageLogic.conclusion.value
-    ? `${stageLogic.conclusion.value}\n${draft}`
-    : draft
+  const text = await generateAndConfirm(
+    'stage-conclusion',
+    stageLogic.conclusion.value || '',
+    {
+      total: s.total,
+      stage1Count: s.stage1Count,
+      stage2Count: s.stage2Count,
+      stage3Count: s.stage3Count,
+      inconsistentCount: s.inconsistentCount,
+    },
+    'AI 审计结论',
+  )
+  if (text) stageLogic.conclusion.value = text
 }
 </script>
 

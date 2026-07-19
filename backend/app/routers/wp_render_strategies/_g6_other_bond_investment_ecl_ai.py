@@ -6,6 +6,7 @@ sections:
   - stage-conclusion                (G6-11 三阶段划分审计结论)
   - impairment-conclusion           (G6-12 减值准备测算审计结论)
   - ecl-measurement-conclusion      (G6-13 ECL计量测试审计结论)
+  - reversal-writeoff-conclusion    (G6-14 转回核销审计结论)
   - voucher-conclusion              (G6-15 凭证检查审计结论)
 """
 
@@ -94,6 +95,16 @@ _SECTION_PROMPTS: dict[str, str] = {
         "5. 前瞻性信息：宏观经济情景设定及权重分配是否合理\n"
         "6. 各参数与上期的变动分析及变更合理性\n"
         "7. ECL计量方法整体适当性的综合结论"
+    ),
+    "reversal-writeoff-conclusion": (
+        "请生成G6-14减值准备转回核销检查的审计结论，评价以下方面：\n"
+        "1. 转回原因是否合理，是否有客观证据支持信用风险改善\n"
+        "2. 转回金额是否超过累计计提金额（超过则不合规）\n"
+        "3. 核销是否经过适当审批程序\n"
+        "4. 核销对象是否确实无法收回（穷尽追索手段）\n"
+        "5. 关联交易核销的特殊关注\n"
+        "6. FVOCI减值转回/核销的会计处理是否正确（减值损失与OCI调整）\n"
+        "7. 转回/核销与G6-12测算表本年变动的勾稽一致性"
     ),
     "voucher-conclusion": (
         "请生成G6-15凭证检查的审计结论，评价以下方面：\n"

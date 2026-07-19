@@ -1,7 +1,6 @@
 """G8 其他权益工具投资 — AI 辅助端点.
 
 POST /api/workpapers/{wp_id}/g8/ai/{section}
-sections: adjudication-analysis / fair-value-conclusion / designation-conclusion / voucher-conclusion
 """
 
 from __future__ import annotations
@@ -28,10 +27,22 @@ _SYSTEM = """你是一位资深注册会计师，协助编制 G8《其他权益�
 
 _PROMPTS = {
     "adjudication-analysis": "请生成 G8-1 审定表审计说明，分析期初期末变动及公允价值计量合理性。",
+    "adjudication-note": "请生成 G8-1 审定表审计说明，概述程序执行情况、重大变动原因及与试算表/明细表勾稽结果。",
+    "adjudication-conclusion": "请生成 G8-1 审定表审计结论，按 A/B/C 口径评价科目1503审定数准确性与 OCI 分类恰当性。",
+    "detail-note": "请生成 G8-2 明细表审计说明，概述各被投资单位成本、公允价值及 OCI 变动核对情况。",
+    "detail-conclusion": "请生成 G8-2 明细表审计结论，评价明细完整性、准确性及与 G8-1 勾稽一致性。",
+    "adjustment-note": "请生成 G8-3 调整分录审计说明，概述 AJE/RJE 依据及对 OCI/留存收益的影响。",
+    "adjustment-conclusion": "请生成 G8-3 调整分录审计结论，评价分录恰当性、借贷平衡及回写审定表情况。",
+    "fair-value-note": "请生成 G8-4 公允价值测试审计说明，概述层次划分依据、取数来源及 Level3 估值核实情况。",
     "fair-value-conclusion": "请根据 G8-4 公允价值测试表，生成公允价值计量审计结论（含 Level1-3 层次分析）。",
+    "designation-note": "请生成 G8-5 指定适当性检查审计说明，概述 CAS22 指定条件核查及各区段合规判断执行情况。",
     "designation-conclusion": "请根据 G8-5 指定适当性检查表，生成非交易性权益工具指定 FVOCI 的合规性审计结论。",
+    "voucher-note": "请生成 G8-6 凭证检查审计说明，概述抽样方法、样本量及逐笔核对发现的异常事项。",
     "voucher-conclusion": "请根据 G8-6 凭证检查表异常样本，生成凭证测试结论。",
     "disclosure-section": "请为 G8 附注披露单行项目生成专业附注文本（科目1503其他权益工具投资）。",
+    "disclosure-listed-note": "请生成 G8 附注披露（上市公司格式）审计说明，概述披露项目、金额与公允价值层次核对及与审定表勾稽结果。",
+    "disclosure-soe-note": "请生成 G8 附注披露（国有企业格式）审计说明，概述披露项目、金额与 OCI 相关披露核对及与审定表勾稽结果。",
+    "disclosure-conclusion": "请生成 G8 附注披露审计结论，评价披露完整性、准确性及是否符合企业会计准则与监管要求。",
 }
 
 

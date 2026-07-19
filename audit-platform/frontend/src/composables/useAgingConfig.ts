@@ -1,7 +1,7 @@
 /**
  * useAgingConfig — 项目级账龄配置 composable
  *
- * 统一为所有往来款明细表（D2/D3/F1/K1/K3/G5）提供响应式的账龄段和列定义。
+ * 统一为所有往来款明细表（D2/D3/F1/K1/K3/G5/G2）提供响应式的账龄段和列定义。
  *
  * 核心能力：
  * - GET /api/projects/{id}/aging/config 获取配置

@@ -52,14 +52,22 @@ export interface ImpairmentCalcRow {
   id: string
   seq: number
   investProject: string
+  /** 跨表稳定投资 ID（优先匹配 G4-11 / G4-2） */
+  crossSheetInvestmentId?: string
   stageGroup: 'Stage1' | 'Stage2' | 'Stage3'
   bookBalance: number
   pvFutureCashFlow: number
+  /** Stage3 审定用现值；未触碰时 recalc 回落为 pvFutureCashFlow */
+  adjustedPvFutureCashFlow: number
   creditLossRate: number
   impairmentProvision: number
   bookValue: number
   balanceAdjustment: number
   adjustedCreditLossRate: number
+  /** 用户是否显式改过 ②A；false 时使用 ② */
+  adjRateTouched?: boolean
+  /** 用户是否显式改过审定现值；false 时使用未审现值 */
+  adjPvTouched?: boolean
   impairmentAdjustment: number
   adjBookBalance: number
   adjImpairment: number
@@ -104,10 +112,57 @@ export interface ParameterEvalRow {
   note: string
 }
 
+/** G4-11 PD/LGD 法测算行（对齐源底稿示例方法） */
+export interface PdLgdCalcRow {
+  id: string
+  projectName: string
+  /** 跨表稳定投资 ID；优先用于 G4-10 匹配 */
+  crossSheetInvestmentId?: string
+  bookBalance: number
+  remainingMonths: number
+  stage: 'Stage1' | 'Stage2' | 'Stage3' | ''
+  rating: string
+  externalMappedPd: number
+  /** 根据剩余期限折算的 PD（可由引擎自动计算，允许覆写） */
+  termAdjustedPd: number
+  lgd: number
+  /** 预期信用损失率 = PD × LGD（公式列） */
+  eclRate: number
+  /** 预期信用损失 = 账面余额 × 损失率（公式列） */
+  eclAmount: number
+  priorHistoricalLossRate: number
+  note: string
+}
+
+/** G4-11 损失率法测算行 */
+export interface LossRateCalcRow {
+  id: string
+  projectName: string
+  /** 跨表稳定投资 ID；优先用于 G4-10 匹配 */
+  crossSheetInvestmentId?: string
+  bookBalance: number
+  remainingMonths: number
+  stage: 'Stage1' | 'Stage2' | 'Stage3' | ''
+  rating: string
+  lossRate: number
+  description: string
+  forwardLookingAdj: number
+  /** 预期信用损失率 = 损失率 + 前瞻性调整（公式列） */
+  eclRate: number
+  eclAmount: number
+  priorHistoricalLossRate: number
+  note: string
+}
+
 export interface EclMeasurementData {
+  schemaVersion?: number
   methodEvaluation: MethodEvalRow[]
   groupBasis: GroupBasisRow[]
   parameterEvaluation: ParameterEvalRow[]
+  /** PD/LGD 法明细测算（源底稿二.1） */
+  pdLgdRows?: PdLgdCalcRow[]
+  /** 损失率法明细测算（源底稿二.2） */
+  lossRateRows?: LossRateCalcRow[]
   conclusion: string
 }
 
@@ -129,7 +184,8 @@ export interface WriteOffRow {
   id: string
   seq: number
   unitName: string
-  writeOffType: '到期' | '逾期' | '其他'
+  /** 债权投资的性质（纸质列；兼容旧值 到期/逾期/其他） */
+  writeOffType: string
   writeOffAmount: number
   writeOffReason: string
   writeOffProcedure: string
@@ -219,7 +275,7 @@ export function useG4EclFormData(opts: UseG4EclFormDataOptions) {
   const _pendingItems = new Set<string>()
 
   /** item_id前缀：筛选G4 ECL相关数据 */
-  const ITEM_PREFIXES = ['G4-9-', 'G4-10-', 'G4-11-', 'G4-12-', 'G4-13-', 'G4-ecl-']
+  const ITEM_PREFIXES = ['G4-3-', 'G4-9-', 'G4-10-', 'G4-11-', 'G4-12-', 'G4-13-', 'G4-ecl-']
 
   // ─── Load ────────────────────────────────────────────────────────────────
 

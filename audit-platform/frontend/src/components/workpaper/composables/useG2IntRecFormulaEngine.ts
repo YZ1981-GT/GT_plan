@@ -85,6 +85,16 @@ export function calcECLVariance(calculatedECL: number, companyProvision: number)
   return calculatedECL - companyProvision
 }
 
+/** 应计提 = 审定余额 × 损失率（账龄组合口径） */
+export function calcExpectedProvision(balance: number, lossRate: number): number {
+  return balance * lossRate
+}
+
+/** 差异 = 应计提 − 账面坏账准备 */
+export function calcEclDifference(expectedProvision: number, bookBalance: number): number {
+  return expectedProvision - bookBalance
+}
+
 /** 期末余额（alias for calcDebitBalance） */
 export function calcEndBalance(prior: number, debit: number, credit: number): number {
   return calcDebitBalance(prior, debit, credit)

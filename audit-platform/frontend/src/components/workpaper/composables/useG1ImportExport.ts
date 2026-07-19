@@ -9,8 +9,8 @@
  *   POST /api/workpapers/{wpId}/g1/export-data?sheet={code}
  *   POST /api/workpapers/{wpId}/g1/import-data?sheet={code}
  *
- * UI 铁律：el-dropdown「导入导出 ▾」（导出模板/导出数据/导入数据）。
- * 支持 10 张动态行表格：G1-2/G1-3/G1-4/G1-5/G1-6/G1-7/G1-11/G1-12/G1-13/G1-14。
+ * UI 铁律：el-dropdown「导入导出 ▾」（导出模板/导出数据/导入数据）— 对齐 D4-8。
+ * 支持：G1-1 审定表 + G1-2~7 / G1-10 / G1-11~14 动态行表格。
  */
 import { type Ref } from 'vue'
 import {
@@ -18,14 +18,16 @@ import {
   type ImportExportResult,
 } from './useWorkpaperImportExport'
 
-/** G1 支持导入导出的 sheet 编码（10 张动态行表格） */
+/** G1 支持导入导出的 sheet 编码 */
 export type G1ImportableSheet =
+  | 'G1-1'
   | 'G1-2'
   | 'G1-3'
   | 'G1-4'
   | 'G1-5'
   | 'G1-6'
   | 'G1-7'
+  | 'G1-10'
   | 'G1-11'
   | 'G1-12'
   | 'G1-13'
@@ -33,14 +35,16 @@ export type G1ImportableSheet =
 
 export const G1_API_PREFIX = 'g1'
 
-/** 10 张可导入导出 sheet 的中文标签（供下拉菜单展示） */
+/** 可导入导出 sheet 的中文标签（供下拉菜单展示） */
 export const G1_IMPORTABLE_SHEETS: { code: G1ImportableSheet; label: string }[] = [
+  { code: 'G1-1', label: 'G1-1 审定表' },
   { code: 'G1-2', label: 'G1-2 明细表' },
   { code: 'G1-3', label: 'G1-3 调整分录' },
   { code: 'G1-4', label: 'G1-4 结存表' },
   { code: 'G1-5', label: 'G1-5 收益测算表' },
   { code: 'G1-6', label: 'G1-6 公允价值测试表' },
   { code: 'G1-7', label: 'G1-7 第三层次调节表' },
+  { code: 'G1-10', label: 'G1-10 合同现金流量特征分析' },
   { code: 'G1-11', label: 'G1-11 有价证券监盘表' },
   { code: 'G1-12', label: 'G1-12 盘点倒轧表' },
   { code: 'G1-13', label: 'G1-13 检查表' },

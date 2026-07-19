@@ -1,5 +1,6 @@
+import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
- * useG9Adjudication — G9-1 审定表（借方/混合计量分组/AJE+RJE）
+ * useG9Adjudication ??G9-1 ??????/??????/AJE+RJE??
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import {
@@ -55,6 +56,7 @@ export function useG9Adjudication(opts: {
   debouncedSave: (id: string, d: Partial<ChecklistResponse>) => void
   isReadonly: Ref<boolean> | ComputedRef<boolean>
 }) {
+  const _auditYearRef = useWorkpaperAuditYear()
   const rowStore = ref<RowStore>(parseG9AdjStore(undefined))
   const trialBalanceAmount = ref(0)
   const auditNote = ref('')
@@ -121,7 +123,7 @@ export function useG9Adjudication(opts: {
     const changeRate = calcChangeRate(openingAdjusted, closingAdjusted)
     return {
       rowKey: `${category}_subtotal`,
-      label: '小计',
+      label: '??',
       category,
       openingUnadjusted: calcSubtotal(rows.map((r) => r.openingUnadjusted)),
       openingAJE: calcSubtotal(rows.map((r) => r.openingAJE)),
@@ -158,7 +160,7 @@ export function useG9Adjudication(opts: {
     const changeRate = calcChangeRate(openingAdjusted, closingAdjusted)
     return {
       rowKey: 'total',
-      label: '合计',
+      label: '??',
       openingAdjusted,
       closingAdjusted,
       changeAmount: calcChangeAmount(closingAdjusted, openingAdjusted),
@@ -252,13 +254,20 @@ export function useG9Adjudication(opts: {
         detail: { accountCode: G9_ACCOUNT_CODE, adjudicatedAmount: amount, groups },
       }))
     } catch { /* silent */ }
+    try {
+      window.dispatchEvent(new CustomEvent('g9:writeback-trial-balance', {
+        detail: { accountCode: G9_ACCOUNT_CODE, auditedAmount: amount },
+      }))
+    } catch { /* silent */ }
   }
 
   async function loadTrialBalanceFromApi(): Promise<void> {
+    const _year = _auditYearRef.value
+    if (_year == null) return
     if (!opts.projectId.value) return
     try {
       const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-        params: { account_prefix: G9_ACCOUNT_CODE },
+        params: { year: _year, account_prefix: G9_ACCOUNT_CODE  },
         _silent: true,
       } as any)
       const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
@@ -282,7 +291,7 @@ export function useG9Adjudication(opts: {
         { rows: dataRows.value.slice(0, 20), relatedContext: { total: totalRow.value } },
         { _silent: true } as any,
       )
-      const content = res?.data?.content ?? res?.content ?? ''
+      const content = res?.data?.data?.content ?? res?.data?.content ?? res?.content ?? ''
       if (content) {
         auditConclusion.value = content
         opts.debouncedSave(ITEM_ID_CONCLUSION, { conclusion: content })

@@ -40,6 +40,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @imported="onSheetImported"
       />
 
       <!-- G6-6 利息测算表 -->
@@ -49,6 +50,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @imported="onSheetImported"
       />
 
       <!-- G6-7 业务模式分析 -->
@@ -76,6 +78,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @imported="onSheetImported"
       />
 
       <!-- G6-10 盘点倒轧表 -->
@@ -85,6 +88,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @imported="onSheetImported"
       />
 
       <!-- 兜底：未迁移/未匹配 sheet → OnlyOffice fallback -->
@@ -106,18 +110,15 @@
 /**
  * GtG6OtherBondSppi.vue — G6 其他债权投资(SPPI组)主入口
  *
- * Spec: .kiro/specs/g6-other-bond-investment-sppi/ Task 3.1
+ * 对齐 G4 SPPI：formData + g6:save-items 持久化 + 双模式 reload + IE imported
  * sheetName正则提取编码(G6-5~G6-10) → v-if分发到6个defineAsyncComponent子组件
  * 未匹配 → OnlyOffice fallback
- * 集成：useWorkpaperVersionToolbar(autoSnapshot) + provide('openReviewDialog') + 双模式切换
- * selfLoad：htmlData为null时通过useG6SppiFormData调用render-config获取数据
- *
- * Requirements: 1.1, 1.2, 1.4, 7.2
  */
-import { ref, computed, onMounted, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useG6SppiDualMode } from './composables/useG6SppiDualMode'
-import { useG6SppiFormData } from './composables/useG6SppiFormData'
+import { useG6SppiFormData, type ChecklistResponse } from './composables/useG6SppiFormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import http from '@/utils/http'
 
 // ─── defineAsyncComponent 懒加载所有子组件 ───────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -194,14 +195,7 @@ const isHtmlSheet = computed(() => HTML_SHEETS.has(currentSheet.value))
 /** 解析后的 htmlData（优先使用prop，fallback到selfLoad结果） */
 const resolvedHtmlData = computed(() => props.htmlData ?? selfLoadData.value)
 
-// ─── 双模式切换 ─────────────────────────────────────────────────────────────
-const dualMode = useG6SppiDualMode({
-  wpId: wpIdRef,
-  sheetName: computed(() => props.sheetName || ''),
-})
-
-// ─── useG6SppiFormData 用于selfLoad ─────────────────────────────────────────
-// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
@@ -212,16 +206,50 @@ const formData = useG6SppiFormData({
   projectId: projectIdRef,
   onAfterSave: () => scheduleAutoSnapshot(),
 })
-// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一提供，子组件 inject 命中祖先
 
-// ─── selfLoad 模式：htmlData 为 null 时自动获取数据 ─────────────────────────
+// ─── 双模式切换 ─────────────────────────────────────────────────────────────
+const dualMode = useG6SppiDualMode({
+  wpId: wpIdRef,
+  sheetName: computed(() => props.sheetName || ''),
+  reloadAll: () => formData.loadAll(),
+})
+
+provide('g6VersionTrailRef', versionTrailRef)
+provide('g6OpenVersionHistory', openVersionHistory)
+provide('reloadWorkpaperData', () => formData.loadAll())
+
+function onSheetImported(): void {
+  void formData.loadAll()
+}
+
+async function handleG6SaveItems(e: Event): Promise<void> {
+  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
+  if (Array.isArray(items) && items.length > 0) {
+    for (const it of items) {
+      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
+    }
+    scheduleAutoSnapshot()
+  }
+}
+
+/** 始终 loadAll；htmlData 为空时再拉取 render-config 作 selfLoad */
 async function selfLoad(): Promise<void> {
-  if (props.htmlData != null) return
   try {
     await formData.loadAll()
-    const parsed = formData.parseContent()
-    if (parsed && Object.keys(parsed).length > 0) {
-      selfLoadData.value = parsed as Record<string, any>
+    if (props.htmlData != null) return
+    const { data } = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
+      params: { force_component_type: 'g6-other-bond-investment-sppi' },
+    })
+    const sheets = data?.sheets ?? data?.data?.sheets
+    if (sheets && sheets.length > 0) {
+      selfLoadData.value = sheets[0].html_data ?? sheets[0]
+    } else {
+      const parsed = formData.parseContent()
+      if (parsed && Object.keys(parsed).length > 0) {
+        selfLoadData.value = parsed as Record<string, any>
+      } else {
+        selfLoadData.value = data
+      }
     }
   } catch (err: any) {
     loadError.value = err?.message || '加载渲染配置失败'
@@ -237,8 +265,13 @@ async function retrySelfLoad(): Promise<void> {
 
 // ─── 生命周期 ───────────────────────────────────────────────────────────────
 onMounted(async () => {
+  window.addEventListener('g6:save-items', handleG6SaveItems)
   await selfLoad()
   isLoading.value = false
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('g6:save-items', handleG6SaveItems)
 })
 </script>
 

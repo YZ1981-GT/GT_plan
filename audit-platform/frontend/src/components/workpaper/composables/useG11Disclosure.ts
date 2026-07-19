@@ -163,7 +163,7 @@ export function useG11Disclosure(options: {
         variant,
         rows: rows.value,
       }, { _silent: true } as any)
-      const text = res?.data?.content ?? res?.content ?? ''
+      const text = res?.data?.data?.content ?? res?.data?.content ?? res?.content ?? ''
       if (text) updateNoteText(text)
     } catch { /* AI optional */ }
     finally { aiLoading.value = false }

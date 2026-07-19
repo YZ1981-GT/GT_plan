@@ -3,8 +3,11 @@
 POST /api/workpapers/{wp_id}/g6-main/ai/{section}
 
 sections:
-  - adjudication-analysis   (G6-1 审定表审计结论/变动分析)
-  - disclosure-text          (附注披露文本生成)
+  - adjudication-analysis / adjudication-note / adjudication-conclusion
+  - detail-note / detail-conclusion
+  - baddebt-note / baddebt-conclusion
+  - adjustment-note / adjustment-conclusion
+  - disclosure-text / disclosure-listed-note / disclosure-soe-note
 """
 
 from __future__ import annotations
@@ -72,6 +75,34 @@ _SECTION_PROMPTS: dict[str, str] = {
         "6. |变动率|>20%的科目重点变动原因分析\n"
         "7. 与试算表数据的一致性比对结论"
     ),
+    "adjudication-note": (
+        "请生成G6-1审定表的审计说明，概述其他债权投资(FVOCI-Debt)八层结构"
+        "（成本/利息调整/应计利息/小计/公允价值变动/减值/报表列示/重分类）的审定程序、"
+        "与试算勾稽及重大变动原因。"
+    ),
+    "adjudication-conclusion": (
+        "请生成G6-1审定表的审计结论，按A/B/C口径评价科目1503审定结果。"
+    ),
+    "detail-note": (
+        "请生成G6-2明细表的审计说明，概述逐笔其他债权投资明细核对、"
+        "成本/利息调整/应计利息/公允价值/减值计价及分类列报关注事项。"
+    ),
+    "detail-conclusion": (
+        "请生成G6-2明细表的审计结论，按A/B/C口径评价明细完整性与计价准确性。"
+    ),
+    "baddebt-note": (
+        "请生成G6-3坏账准备明细表的审计说明，评价ECL公式链、信用损失率、"
+        "Stage分层与审定坏账勾稽。"
+    ),
+    "baddebt-conclusion": (
+        "请生成G6-3坏账准备明细表的审计结论，按A/B/C口径评价减值准备充分性。"
+    ),
+    "adjustment-note": (
+        "请生成G6-4调整分录的审计说明，概述调整依据、AJE/RJE性质及对审定表影响。"
+    ),
+    "adjustment-conclusion": (
+        "请生成G6-4调整分录的审计结论，评价借贷平衡与依据充分性。"
+    ),
     "disclosure-text": (
         "请生成其他债权投资附注披露文本，需包含以下内容：\n"
         "1. 会计政策说明：FVOCI-Debt分类标准与计量方法\n"
@@ -81,6 +112,14 @@ _SECTION_PROMPTS: dict[str, str] = {
         "5. 减值准备：ECL三阶段分类及变动明细\n"
         "6. 重要项目说明：前五名持有情况（如适用）\n"
         "7. 限制性说明：质押或受限情况（如有）"
+    ),
+    "disclosure-listed-note": (
+        "请按上市公司附注格式生成其他债权投资(FVOCI-Debt)披露说明文字，"
+        "覆盖成本/利息调整/应计利息/公允价值变动(OCI)/减值/摊余成本，并与审定数勾稽。"
+    ),
+    "disclosure-soe-note": (
+        "请按国企附注格式生成其他债权投资(FVOCI-Debt)披露说明文字，"
+        "简要列示余额变动、减值及公允价值变动(OCI)，并与审定数勾稽。"
     ),
 }
 

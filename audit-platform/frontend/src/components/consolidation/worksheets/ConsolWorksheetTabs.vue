@@ -749,9 +749,10 @@ async function doSave(sheetKey: string, payload: any) {
 
 // ─── #4: 抵消分录 → 后端 elimination_entries 表同步 ─────────────────────────
 /**
- * 将 EliminationSheet 保存的自定义分录同步到后端 elimination_entries 表，
+ * 将 EliminationSheet 保存的自定义分录批量同步到后端 elimination_entries 表，
  * 使 recalc_full 的 _batch_load_eliminations 能读取到这些分录参与差额表计算。
- * 策略：全量替换（清旧 + 逐条创建），保证前端 JSON 与后端 ORM 一致。
+ * 策略：逐条 POST 自定义分录（_custom=true），已有分录忽略。
+ * 正确端点：POST /api/consolidation/eliminations?project_id=xxx
  */
 async function _syncEliminationEntries(payload: any) {
   if (!projectId.value) return
@@ -761,11 +762,10 @@ async function _syncEliminationEntries(payload: any) {
   if (!customEntries.length) return
 
   try {
-    // 调用后端批量同步端点（如不存在则逐条 POST）
     for (const entry of customEntries) {
       const amount = Math.abs(Number(entry.amount) || 0)
       const isDebit = entry.direction === '借'
-      await api.post(`/api/consolidation/${projectId.value}/eliminations`, {
+      await api.post('/api/consolidation/eliminations', {
         year: year.value,
         entry_type: entry.source || 'custom',
         description: entry.desc || `自定义抵消：${entry.subject}`,
@@ -776,7 +776,10 @@ async function _syncEliminationEntries(payload: any) {
           credit_amount: isDebit ? 0 : amount,
         }],
         related_company_codes: [],
-      }, { _silent: true } as any)
+      }, {
+        params: { project_id: projectId.value },
+        _silent: true,
+      } as any)
     }
   } catch {
     // 同步失败不阻断 JSON 保存（降级：前端 JSON 存储仍为真源，后端表为副本）

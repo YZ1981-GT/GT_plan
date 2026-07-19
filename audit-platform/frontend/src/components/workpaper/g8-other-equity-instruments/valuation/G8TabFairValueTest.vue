@@ -154,23 +154,18 @@
       </template>
     </el-table>
 
-    <el-card shadow="never" class="conclusion-card">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：公允价值取数来源、层次划分依据及 Level 3 估值技术/输入值的核实情况与异常事项。" />
-    </el-card>
-
-    <el-card shadow="never" class="conclusion-card">
-      <template #header>
-        <div class="conclusion-head">
-          <span>审计结论</span>
-          <el-button size="small" :loading="fv.aiLoading.value" :disabled="isReadonly"
-            data-testid="g8-fv-ai-btn" @click="fv.generateAiConclusion()">🤖 AI</el-button>
-        </div>
-      </template>
-      <el-input :model-value="fv.conclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
-        :disabled="isReadonly" @update:model-value="fv.updateConclusion" />
-    </el-card>
+    <G8AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="conclusionProxy"
+      note-ai-section="fair-value-note"
+      conclusion-ai-section="fair-value-conclusion"
+      note-placeholder="填写审计说明：公允价值取数来源、层次划分依据及 Level 3 估值技术/输入值的核实情况与异常事项。"
+      note-hint="覆盖公允层级划分与估值来源可靠性。"
+      conclusion-placeholder="填写审计结论：公允价值计量是否准确、层次划分是否恰当。"
+      :related-context="{ 行数: fv.rows.value.length }"
+    />
 
     <details class="methodology-hint">
       <summary>编制提示</summary>
@@ -183,6 +178,7 @@
 import { computed, ref, watch, toRef } from 'vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G8ImportExportDropdown from '../G8ImportExportDropdown.vue'
+import G8AuditTextCards from '../G8AuditTextCards.vue'
 import { useG8FairValueTest } from '../../composables/useG8FairValueTest'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
@@ -208,6 +204,11 @@ watch(auditNote, (v) => {
   if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
 })
 
+const conclusionProxy = computed({
+  get: () => fv.conclusion.value,
+  set: (v: string) => fv.updateConclusion(v),
+})
+
 function onImported() { emit('imported') }
 
 function onRowChange(row: { seq?: number } | undefined) {
@@ -225,7 +226,5 @@ function onRowChange(row: { seq?: number } | undefined) {
 .methodology { flex: 1; border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 8px 12px; }
 .l3-required :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #f56c6c inset; }
 .formula-cell { border-bottom: 1px dashed #909399; }
-.conclusion-card { margin-top: 12px; }
-.conclusion-head { display: flex; justify-content: space-between; align-items: center; }
 .methodology-hint { margin-top: 8px; font-size: 12px; color: #909399; }
 </style>

@@ -9,6 +9,8 @@
       class="ref-info-bar"
     />
 
+    <G4EclPdGuidance />
+
     <!-- 搜索栏 -->
     <div class="ref-toolbar">
       <el-input
@@ -58,6 +60,8 @@
       <ul>
         <li>本sheet内容来源于中证协《证券公司金融工具减值指引》</li>
         <li>共178行×13列，作为减值测算的参考依据</li>
+        <li>评级违约率属于历史模型输入，须结合当期数据、前瞻性调整和剩余期限使用</li>
+        <li>资本风险权重不等于会计PD，不得直接作为ECL参数</li>
         <li>支持全文搜索（输入关键字过滤匹配行）</li>
         <li>所有内容为只读，不可编辑</li>
       </ul>
@@ -79,6 +83,7 @@
  */
 import { ref, computed } from 'vue'
 import { Search } from '@element-plus/icons-vue'
+import G4EclPdGuidance from './G4EclPdGuidance.vue'
 
 interface Props {
   htmlData: Record<string, any> | null

@@ -143,11 +143,16 @@ export function formatG14EclCrossMessage(mismatches: G14EclMismatch[]): string |
   return `G14-2 与源科目 ECL 不一致 — ${parts.join('；')}`
 }
 
-/** G1 审定表 — 公允价值变动行本期审定合计 */
+/** G1 审定表 — 累计公允价值变动明细行本期审定合计（勿含分类汇总行） */
 export function calcG1FvChangeAuditedTotal(
-  rows: Array<{ measureKey: string; currentAudited: number }>,
+  rows: Array<{ measureKey?: string; section?: string; kind?: string; currentAudited?: number; closingAudited?: number }>,
 ): number {
   return calcSubtotal(
-    rows.filter((r) => r.measureKey === 'fv-change').map((r) => r.currentAudited),
+    rows
+      .filter((r) => {
+        if (r.kind && r.kind !== 'leaf') return false
+        return r.measureKey === 'fv-change' || r.section === 'fv'
+      })
+      .map((r) => r.currentAudited ?? r.closingAudited ?? 0),
   )
 }

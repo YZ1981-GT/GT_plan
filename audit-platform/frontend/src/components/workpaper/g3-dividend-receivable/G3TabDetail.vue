@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   G3TabDetail.vue — G3-2 应收股利明细表（33列 → 4区段Tab）
 
   4区段Tab切换：被投资方信息(8列) / 持股明细(9列) / 分红方案(8列) / 应收核算(8列)
@@ -14,17 +14,14 @@
       <h3 class="sheet-title">G3-2 应收股利明细表</h3>
       <div class="head-actions tab-toolbar">
         <el-button size="small" :disabled="isReadonly" @click="detail.addRow()">＋ 新增明细行</el-button>
-        <el-dropdown trigger="click" size="small">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-              <el-dropdown-item @click="handleImportData">导入数据</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-        <el-button size="small" @click="openReviewDialog('G3-2-detail')">💬复核</el-button>
+        <G3ImportExportDropdown
+          v-if="wpId"
+          :wp-id="wpId"
+          sheet="G3-2"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
+        <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('G3-2-detail')">💬复核</el-button>
         <GtIndexChip value="wp:G3-2" :context-project-id="projectId" />
         <el-tag size="small" type="info">共 {{ detail.rows.value.length }} 行</el-tag>
       </div>
@@ -187,31 +184,21 @@
       <span class="total-item">期末应收：{{ fmtNum(detail.totals.value.netReceivable) }}</span>
     </div>
 
-    <!-- 审计说明 -->
-    <el-card class="audit-note-card" shadow="never">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input
-        v-model="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 5 }"
-        :disabled="isReadonly"
-        placeholder="填写审计说明：概述明细核对程序执行情况、持股比例/分红方案/应收金额勾稽结果、拟调整及未调整事项及其影响。"
-        @change="persistNote"
-      />
-    </el-card>
+    <G3AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="auditConclusion"
+      note-ai-section="detail-note"
+      conclusion-ai-section="detail-conclusion"
+      :related-context="{
+        明细行数: detail.rows.value.length,
+      }"
+      note-placeholder="填写审计说明：概述明细核对程序执行情况、持股比例/分红方案/应收金额勾稽结果、拟调整及未调整事项及其影响。"
+      note-hint="覆盖持股/分红方案/应收核算勾稽。"
+      conclusion-hint="按 A/B/C 口径评价明细完整性与计价准确性。"
+    />
 
-    <!-- 审计结论 -->
-    <el-card class="audit-note-card" shadow="never">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
-      <el-input
-        v-model="auditConclusion"
-        type="textarea"
-        :autosize="{ minRows: 3 }"
-        :disabled="isReadonly"
-        placeholder="填写审计结论：A、未见异常。B、除上述调整事项外未见异常。C、存在重大未调整事项无法确认。"
-        @change="persistConclusion"
-      />
-    </el-card>
 
     <!-- 编制提示 -->
     <details class="guidance-details">
@@ -229,10 +216,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, toRef, inject } from 'vue'
+import { ref, computed, watch, toRef, inject } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 import GtIndexChip from '../GtIndexChip.vue'
+import G3ImportExportDropdown from './G3ImportExportDropdown.vue'
+import G3AuditTextCards from './G3AuditTextCards.vue'
 import {
   useG3Detail,
   G3_DETAIL_SEGMENTS,
@@ -251,7 +239,9 @@ const props = defineProps<{
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
 
-const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const emit = defineEmits<{ imported: [] }>()
+
+const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
 const detail = useG3Detail({
   allResponses: toRef(props, 'allResponses'),
@@ -267,14 +257,12 @@ const NOTE_KEY = 'G3-2-detail-audit-note'
 const CONCLUSION_KEY = 'G3-2-detail-audit-conclusion'
 const auditNote = ref(props.allResponses.get(NOTE_KEY)?.remark ?? '')
 const auditConclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.remark ?? '')
-function persistNote() {
-  if (props.isReadonly) return
-  props.debouncedSave(NOTE_KEY, { conclusion: null, remark: auditNote.value })
-}
-function persistConclusion() {
-  if (props.isReadonly) return
-  props.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: auditConclusion.value })
-}
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(NOTE_KEY, { conclusion: null, remark: v })
+})
+watch(auditConclusion, (v) => {
+  if (!props.isReadonly) props.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: v })
+})
 
 // ─── 当前区段可见列（排除seq和investeeName，已作固定列） ───
 const currentColumns = computed<G3DetailColumn[]>(() => {
@@ -324,16 +312,6 @@ function fmtNum(v: unknown): string {
   return String(v ?? '')
 }
 
-// ─── 导入导出（占位，useG3ImportExport Task 8.2 实现） ───
-function handleExportTemplate() {
-  ElMessage.info('导出模板功能将在导入导出模块完成后启用')
-}
-function handleExportData() {
-  ElMessage.info('导出数据功能将在导入导出模块完成后启用')
-}
-function handleImportData() {
-  ElMessage.info('导入数据功能将在导入导出模块完成后启用')
-}
 </script>
 
 <style scoped>

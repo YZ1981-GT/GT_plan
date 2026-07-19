@@ -47,9 +47,14 @@ interface Props {
   workpaperId: string
   projectId: string
   year: number
+  /** 初始期间月份（1-12），用于期后抽凭默认 Q1 等 */
+  initialPeriodRange?: number[]
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  defaultMethod: 'random',
+  initialPeriodRange: undefined,
+})
 
 // ─── Emits ────────────────────────────────────────────────────────────────────
 
@@ -107,6 +112,7 @@ const {
   accountCode: props.accountCode,
   phase: toRef(props, 'phase'),
   defaultMethod: props.defaultMethod,
+  initialPeriodRange: props.initialPeriodRange,
 })
 
 // ─── Composable: useSamplingPhase ─────────────────────────────────────────────

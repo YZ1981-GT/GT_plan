@@ -20,6 +20,7 @@
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
 import { parseNum } from './useD2FormulaEngine'
 import type { UseD2BaseOptions } from './useD2Adjudication'
+import { eventBus } from '@/utils/eventBus'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -197,7 +198,7 @@ export function useD2Adjustment(options: UseD2BaseOptions) {
   // ─── EventBus: publishAdjustment ───────────────────────────────────────
 
   /**
-   * 发布 'adjustment:created' 事件
+   * 发布 'adjustment:created' 事件（经 crossWpEventBridge 双通道桥接）
    * payload: { wpCode:'D2', entryType, amount, description, debitAccount, creditAccount }
    *
    * 取最近一条分录的信息作为事件payload
@@ -215,11 +216,7 @@ export function useD2Adjustment(options: UseD2BaseOptions) {
         debitAccount: entry.accountName,
         creditAccount: entry.accountName,
       }
-      try {
-        window.dispatchEvent(new CustomEvent('adjustment:created', { detail: payload }))
-      } catch {
-        // silent
-      }
+      eventBus.emit('adjustment:created', payload)
     }
   }
 
@@ -227,7 +224,7 @@ export function useD2Adjustment(options: UseD2BaseOptions) {
 
   /**
    * 推送选中分录到 A13 错报汇总
-   * 发布 window CustomEvent 'a13:push-misstatement'
+   * 发布 'a13:push-misstatement' 事件（经 crossWpEventBridge 双通道桥接）
    */
   function pushToA13(rowIds: string[]): void {
     const selected = entries.value.filter(e => rowIds.includes(e.rowId))
@@ -244,13 +241,7 @@ export function useD2Adjustment(options: UseD2BaseOptions) {
       indexRef: entry.indexRef,
     }))
 
-    try {
-      window.dispatchEvent(new CustomEvent('a13:push-misstatement', {
-        detail: { items: misstatements },
-      }))
-    } catch {
-      // silent
-    }
+    eventBus.emit('a13:push-misstatement', { items: misstatements })
   }
 
   // ─── Serialization & Save ──────────────────────────────────────────────

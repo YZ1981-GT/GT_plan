@@ -1,5 +1,6 @@
+import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
- * useG12Adjudication — G12-1 审定表
+ * useG12Adjudication �?G12-1 ??�?
  */
 import { ref, computed, watch, onMounted, type Ref, type ComputedRef } from 'vue'
 import { G12_ACCOUNT_CODE, G12_CHANGE_RATE_THRESHOLD, G12_ADJUDICATION_ITEMS } from './g12Constants'
@@ -23,6 +24,7 @@ export function useG12Adjudication(opts: {
   debouncedSave: (id: string, d: Partial<ChecklistResponse>) => void
   isReadonly: Ref<boolean> | ComputedRef<boolean>
 }) {
+  const _auditYearRef = useWorkpaperAuditYear()
   const priorStore = ref<PriorStore>({})
   const ajeOverlay = ref<Record<string, number>>({})
   const trialBalanceAmount = ref(0)
@@ -79,7 +81,7 @@ export function useG12Adjudication(opts: {
     const priorAudited = calcSubtotal(rows.map((r) => r.priorAudited))
     const changeRate = calcChangeRate(priorAudited, currentAudited)
     return {
-      rowKey: 'total', label: '合计',
+      rowKey: 'total', label: '??',
       currentUnadjusted: calcSubtotal(rows.map((r) => r.currentUnadjusted)),
       currentAdjustment: calcSubtotal(rows.map((r) => r.currentAdjustment)),
       currentAudited, priorUnadjusted: calcSubtotal(rows.map((r) => r.priorUnadjusted)),
@@ -108,9 +110,11 @@ export function useG12Adjudication(opts: {
   function updateAuditConclusion(v: string) { if (!opts.isReadonly.value) { auditConclusion.value = v; opts.debouncedSave(ITEM_CONCLUSION, { conclusion: v }) } }
 
   async function loadTrialBalanceFromApi() {
+    const _year = _auditYearRef.value
+    if (_year == null) return
     if (!opts.projectId.value) return
     try {
-      const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, { params: { account_prefix: G12_ACCOUNT_CODE }, _silent: true } as any)
+      const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, { params: { year: _year, account_prefix: G12_ACCOUNT_CODE  }, _silent: true } as any)
       const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
       const hit = list.find((r: any) => String(r.standard_account_code ?? r.account_code ?? '').startsWith(G12_ACCOUNT_CODE))
       if (hit) updateTrialBalance(parseNum(hit.credit_amount ?? 0) - parseNum(hit.debit_amount ?? 0))
@@ -120,7 +124,16 @@ export function useG12Adjudication(opts: {
   function publishAdjudicated() {
     const amount = totalRow.value.currentAudited
     opts.debouncedSave('G12-1-adjudicated-amount', { conclusion: String(amount) })
-    window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: { accountCode: G12_ACCOUNT_CODE, adjudicatedAmount: amount } }))
+    try {
+      window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
+        detail: { accountCode: G12_ACCOUNT_CODE, adjudicatedAmount: amount },
+      }))
+    } catch { /* silent */ }
+    try {
+      window.dispatchEvent(new CustomEvent('g12:writeback-trial-balance', {
+        detail: { accountCode: G12_ACCOUNT_CODE, auditedAmount: amount },
+      }))
+    } catch { /* silent */ }
   }
 
   async function generateAiAnalysis(): Promise<void> {
@@ -132,10 +145,10 @@ export function useG12Adjudication(opts: {
         { existingContent: auditNote.value, relatedContext: { totalAudited: totalRow.value.currentAudited } },
         { _silent: true } as any,
       )
-      const content = res?.data?.content ?? res?.content ?? ''
+      const content = res?.data?.data?.content ?? res?.data?.content ?? res?.content ?? ''
       if (content) { auditNote.value = content; opts.debouncedSave(ITEM_NOTE, { conclusion: content }) }
     } catch {
-      const draft = `本期净敞口套期收益审定数 ${totalRow.value.currentAudited.toLocaleString()} 元，套期无效部分需关注 G12-2/G12-4 交叉验证。`
+      const draft = `???????????�?${totalRow.value.currentAudited.toLocaleString()} ??????????? G12-2/G12-4 ?????`
       auditNote.value = auditNote.value ? `${auditNote.value}\n${draft}` : draft
       opts.debouncedSave(ITEM_NOTE, { conclusion: auditNote.value })
     } finally { aiLoading.value = false }

@@ -1,7 +1,9 @@
 ﻿/**
  * useG8DualMode — G8 HTML ↔ OnlyOffice 双模式
+ * 对齐 G5/G6：健康检查 + reloadAll + 不可用时强制 HTML
  */
 import { ref, onMounted, type Ref } from 'vue'
+import { dualModeHtmlOoOptions } from './dualModeLabels'
 
 export type G8RenderMode = 'html' | 'onlyoffice'
 
@@ -13,11 +15,9 @@ export function useG8DualMode(options: {
 }) {
   const currentMode = ref<G8RenderMode>('html')
   const isOoAvailable = ref(false)
+  const checking = ref(false)
 
-  const modeOptions = [
-    { label: '结构化视图', value: 'html' },
-    { label: '在线编辑', value: 'onlyoffice' },
-  ]
+  const modeOptions = dualModeHtmlOoOptions()
 
   function loadPersistedMode(): void {
     try {
@@ -26,7 +26,14 @@ export function useG8DualMode(options: {
     } catch { /* ignore */ }
   }
 
+  function persistMode(mode: G8RenderMode): void {
+    try {
+      localStorage.setItem(STORAGE_PREFIX + options.wpId.value, mode)
+    } catch { /* ignore */ }
+  }
+
   async function checkOOHealth(): Promise<boolean> {
+    checking.value = true
     try {
       const response = await fetch('/api/workpapers/onlyoffice/health')
       if (!response.ok) {
@@ -40,26 +47,43 @@ export function useG8DualMode(options: {
     } catch {
       isOoAvailable.value = false
       return false
+    } finally {
+      checking.value = false
     }
   }
 
-  async function onModeChange(val: string | number | boolean): Promise<void> {
-    const target = val as G8RenderMode
+  async function switchMode(target: G8RenderMode): Promise<void> {
     if (target === currentMode.value) return
     if (target === 'onlyoffice' && !isOoAvailable.value) return
     currentMode.value = target
-    try {
-      localStorage.setItem(STORAGE_PREFIX + options.wpId.value, target)
-    } catch { /* ignore */ }
+    persistMode(target)
     if (target === 'html' && options.reloadAll) await options.reloadAll()
+  }
+
+  function onModeChange(val: string | number | boolean): void {
+    void switchMode(val as G8RenderMode)
   }
 
   onMounted(() => {
     loadPersistedMode()
-    void checkOOHealth()
+    void checkOOHealth().then((healthy) => {
+      if (!healthy && currentMode.value === 'onlyoffice') {
+        currentMode.value = 'html'
+        persistMode('html')
+      }
+    })
   })
 
-  return { currentMode, isOoAvailable, modeOptions, onModeChange, checkOOHealth }
+  return {
+    currentMode,
+    isOoAvailable,
+    checking,
+    modeOptions,
+    switchMode,
+    onModeChange,
+    checkOOHealth,
+  }
 }
 
 export { useG8DualMode as useG8OthEquDualMode }
+export default useG8DualMode

@@ -1,31 +1,22 @@
 /**
- * useG3FormData — G3 应收股利数据加载/保存/selfLoad
+ * useG3FormData — G3 应收股利数据加载/保存/selfLoad + TB 回写
  *
- * Spec: .kiro/specs/g3-dividend-receivable/
- * Task: 3.1
- *
- * 职责：
- * - 从 GET /api/workpapers/:wpId/checklist-responses 加载 G3-* 数据
- * - debounce 500ms 文本字段保存（per item_id 独立计时器）
- * - 结论/状态/选择类字段立即保存（saveImmediate）
- * - 批量保存（saveBatch）
- * - 组件卸载时 flush 未保存数据（onScopeDispose）
- * - selfLoad逻辑（render-config?force_component_type=g3-dividend-receivable）
+ * Spec: .kiro/specs/g3-dividend-receivable/ Task 3.1
+ * 收敛：原 useG3DivRecFormData（含 writeback）并入本文件为唯一入口。
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import type { ChecklistResponse } from './useF1FormData'
+import { G3_ACCOUNT_CODE } from './g3Constants'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+export { G3_ACCOUNT_CODE }
 
 export interface UseG3FormDataOptions {
   wpId: Ref<string>
   projectId: Ref<string>
   onAfterSave?: () => void
 }
-
-// ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useG3FormData(opts: UseG3FormDataOptions) {
   const { wpId, projectId } = opts
@@ -34,15 +25,18 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
   const isLoading = ref(false)
   const loadError = ref<string | null>(null)
   const sheetCache = ref<Record<string, any>>({})
+  /** G3-2 明细保存后自增，供 G3-1/4/5 感知热更新 */
+  const detailRevision = ref(0)
 
-  // Per-item debounce timers
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
-  // Track pending items for flush
   const _pendingItems = new Set<string>()
 
   const ITEM_PREFIX = 'G3-'
+  const DETAIL_KEY = 'G3-2-detail-rows'
 
-  // ─── Load ────────────────────────────────────────────────────────────────
+  function bumpDetailRevisionIfNeeded(itemId: string): void {
+    if (itemId === DETAIL_KEY) detailRevision.value += 1
+  }
 
   async function loadResponses(): Promise<void> {
     if (!wpId.value) return
@@ -65,7 +59,7 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
     }
   }
 
-  /** selfLoad: 当组件在bundle内嵌时无htmlData，自行调render-config加载sheet数据 */
+  /** selfLoad: bundle 内嵌时无 htmlData，自行调 render-config */
   async function selfLoad(): Promise<void> {
     if (!wpId.value) return
     try {
@@ -79,11 +73,10 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
         sheetCache.value[s.sheet_name || s.name || 'default'] = s.html_data ?? s
       }
     } catch {
-      // selfLoad 失败不阻塞：组件仍可从 checklist_responses 加载数据
+      // selfLoad 失败不阻塞
     }
   }
 
-  /** 统一加载入口 */
   async function loadAll(): Promise<void> {
     isLoading.value = true
     loadError.value = null
@@ -96,14 +89,13 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
     }
   }
 
-  /** 获取缓存的sheet数据 */
   function getSheet(name: string) {
     return sheetCache.value[name] ?? { rows: [] }
   }
 
-  // ─── Save ────────────────────────────────────────────────────────────────
-
-  async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {
+  async function _doSave(
+    items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>,
+  ): Promise<void> {
     if (!wpId.value || items.length === 0) return
     try {
       await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
@@ -123,9 +115,7 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
     }
   }
 
-  /** 立即保存指定 item（结论/状态/选择类字段触发） */
   async function saveImmediate(itemId: string, data: Partial<ChecklistResponse>): Promise<void> {
-    // 取消该 item 的 debounce 定时器
     const timer = _debounceTimers.get(itemId)
     if (timer) {
       clearTimeout(timer)
@@ -133,7 +123,6 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
     }
     _pendingItems.delete(itemId)
 
-    // 合并到 allResponses
     const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
     const updated: ChecklistResponse = {
       ...existing,
@@ -141,15 +130,15 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
       ...(data.remark !== undefined ? { remark: data.remark } : {}),
     }
     allResponses.value.set(itemId, updated)
-
+    bumpDetailRevisionIfNeeded(itemId)
     await _doSave([updated])
   }
 
-  /** 批量保存多个 items */
-  async function saveBatch(items: Array<{ itemId: string; data: Partial<ChecklistResponse> }>): Promise<void> {
+  async function saveBatch(
+    items: Array<{ itemId: string; data: Partial<ChecklistResponse> }>,
+  ): Promise<void> {
     const toSave: ChecklistResponse[] = []
     for (const { itemId, data } of items) {
-      // 取消 debounce
       const timer = _debounceTimers.get(itemId)
       if (timer) {
         clearTimeout(timer)
@@ -164,15 +153,14 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
         ...(data.remark !== undefined ? { remark: data.remark } : {}),
       }
       allResponses.value.set(itemId, updated)
+      bumpDetailRevisionIfNeeded(itemId)
       toSave.push(updated)
     }
-
     await _doSave(toSave)
   }
 
   /** debounce 500ms 文本字段保存（per item_id 独立计时器） */
   function debouncedSave(itemId: string, data: Partial<ChecklistResponse>): void {
-    // 合并到 allResponses
     const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
     const updated: ChecklistResponse = {
       ...existing,
@@ -180,30 +168,49 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
       ...(data.remark !== undefined ? { remark: data.remark } : {}),
     }
     allResponses.value.set(itemId, updated)
+    bumpDetailRevisionIfNeeded(itemId)
     _pendingItems.add(itemId)
 
-    // 重置该 item 的定时器
     const prevTimer = _debounceTimers.get(itemId)
     if (prevTimer) clearTimeout(prevTimer)
 
     const timer = setTimeout(() => {
       _debounceTimers.delete(itemId)
       _pendingItems.delete(itemId)
-      _doSave([updated])
+      void _doSave([updated])
     }, 500)
     _debounceTimers.set(itemId, timer)
   }
 
-  // ─── Flush（组件卸载） ───────────────────────────────────────────────────
+  /** 将 G3-1 期末审定合计回写试算平衡表 1131 */
+  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
+    if (!projectId.value) return
+    try {
+      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
+        account_code: G3_ACCOUNT_CODE,
+        audited_amount: auditedAmount,
+      })
+      await saveImmediate('G3-1-tb-writeback', {
+        item_id: 'G3-1-tb-writeback',
+        conclusion: null,
+        remark: JSON.stringify({ accountCode: G3_ACCOUNT_CODE, auditedAmount }),
+      })
+      await saveImmediate('G3-1-adjudicated-amount', {
+        item_id: 'G3-1-adjudicated-amount',
+        conclusion: String(auditedAmount),
+        remark: null,
+      })
+    } catch {
+      ElMessage.warning('审定数回写试算失败，请手动确认试算表 1131')
+    }
+  }
 
-  function _flushPending(): void {
-    // 清除所有 debounce 定时器
+  function flushPending(): void {
     for (const timer of _debounceTimers.values()) {
       clearTimeout(timer)
     }
     _debounceTimers.clear()
 
-    // 保存所有 pending items
     if (_pendingItems.size > 0) {
       const items: ChecklistResponse[] = []
       for (const itemId of _pendingItems) {
@@ -211,20 +218,17 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
         if (resp) items.push(resp)
       }
       _pendingItems.clear()
-      if (items.length > 0) {
-        _doSave(items)
-      }
+      if (items.length > 0) void _doSave(items)
     }
   }
 
-  // ─── Lifecycle ───────────────────────────────────────────────────────────
-
   onScopeDispose(() => {
-    _flushPending()
+    flushPending()
   })
 
   return {
     allResponses,
+    detailRevision,
     isLoading,
     loadError,
     sheetCache,
@@ -233,6 +237,10 @@ export function useG3FormData(opts: UseG3FormDataOptions) {
     saveImmediate,
     saveBatch,
     debouncedSave,
+    flushPending,
+    writebackTrialBalance,
+    writebackTB: writebackTrialBalance,
+    accountCode: G3_ACCOUNT_CODE,
   }
 }
 

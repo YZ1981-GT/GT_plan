@@ -23,7 +23,6 @@
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
-      <!-- 双模式：HTML sheet 切到 OnlyOffice -->
       <GtOnlyOfficeSheet
         v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
@@ -33,7 +32,6 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <!-- G4A 程序表 -->
       <G4TabProcedure
         v-else-if="currentSheet === 'procedure'"
         :html-data="resolvedHtmlData"
@@ -42,43 +40,47 @@
         :is-readonly="isReadonly"
       />
 
-      <!-- G4-1 审定表 -->
       <G4TabAdjudication
         v-else-if="currentSheet === 'adjudication'"
         :html-data="resolvedHtmlData"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :all-responses="formData.allResponses.value"
       />
 
-      <!-- G4-2 明细表 -->
       <G4TabDetail
         v-else-if="currentSheet === 'detail'"
         :html-data="resolvedHtmlData"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :all-responses="formData.allResponses.value"
+        :roll-forward-loading="priorYear.loading.value || priorYear.applying.value"
+        @imported="onSheetImported"
+        @roll-forward="handlePriorYearRollForward"
       />
 
-      <!-- G4-3 调整分录 -->
       <G4TabAdjustment
         v-else-if="currentSheet === 'adjustment'"
         :html-data="resolvedHtmlData"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :all-responses="formData.allResponses.value"
+        @imported="onSheetImported"
       />
 
-      <!-- G4-4 利息测算表 -->
       <G4TabInterestCalc
         v-else-if="currentSheet === 'interestCalc'"
         :html-data="resolvedHtmlData"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :all-responses="formData.allResponses.value"
+        @imported="onSheetImported"
       />
 
-      <!-- 附注披露(上市) -->
       <G4TabDisclosureListed
         v-else-if="currentSheet === 'disclosureListed'"
         :html-data="resolvedHtmlData"
@@ -87,7 +89,6 @@
         :is-readonly="isReadonly"
       />
 
-      <!-- 附注披露(国企) -->
       <G4TabDisclosureSOE
         v-else-if="currentSheet === 'disclosureSOE'"
         :html-data="resolvedHtmlData"
@@ -96,16 +97,27 @@
         :is-readonly="isReadonly"
       />
 
-      <!-- 底稿目录 -->
-      <G4TabDirectory
-        v-else-if="currentSheet === 'directory'"
-        :html-data="resolvedHtmlData"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-      />
+      <template v-else-if="currentSheet === 'directory'">
+        <div class="g4-index-toolbar">
+          <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
+            📖 编制手册
+          </el-button>
+          <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
+          <el-button size="small" type="primary" plain @click="openVersionHistory()">
+            版本历史
+          </el-button>
+        </div>
+        <GCycleBIndexExtras
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :sheet-name="props.sheetName"
+          :wp-code="'G4'"
+          :html-data="resolvedHtmlData ?? undefined"
+          :available-sheets="availableSheets"
+        />
+        <G4SheetStatusBar :all-responses="suiteResponses" />
+      </template>
 
-      <!-- 兜底：未迁移/未匹配 sheet → OnlyOffice fallback -->
       <GtOnlyOfficeSheet
         v-else
         :wp-id="props.wpId"
@@ -114,8 +126,10 @@
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
       />
-
-      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
+      <G4PreparationHandbookDialog
+        v-model="handbookVisible"
+        :initial-tab="handbookTab"
+      />
     </template>
   </div>
 </template>
@@ -123,19 +137,19 @@
 <script setup lang="ts">
 /**
  * GtG4BondInvestmentMain.vue — G4 债权投资底稿(main组)主入口
- *
- * Spec: .kiro/specs/g4-bond-investment-main/ Task 3.1~3.6
- * sheetName正则提取编码 → v-if分发到8个子组件（defineAsyncComponent lazy）
- * 未匹配 → OnlyOffice fallback
- * 集成：useWorkpaperVersionToolbar(autoSnapshot) + provide('openReviewDialog') + 双模式切换
- * selfLoad：htmlData为null时自动调用 render-config 获取数据
+ * 对齐 G2/G3：formData + g4:save-items 持久化 + 附注路由 + 双模式 reload
  */
-import { ref, computed, onMounted, provide, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent, watch } from 'vue'
 import { useG4MainDualMode } from './composables/useG4MainDualMode'
+import { useG4BonInvFormData } from './composables/useG4BonInvFormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import type { ChecklistResponse } from './composables/useF1FormData'
+import { useG4MainAdjustment, type AdjustmentEntry } from './composables/useG4MainAdjustment'
+import { useG4PriorYearRollForward } from './composables/useG4PriorYearRollForward'
+import { fetchG4SuiteResponseMap } from './composables/g4CrossHelpers'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 
-// ─── defineAsyncComponent 懒加载所有子组件 ───────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const G4TabProcedure = defineAsyncComponent(() => import('./g4-bond-investment-main/core/G4TabProcedure.vue'))
 const G4TabAdjudication = defineAsyncComponent(() => import('./g4-bond-investment-main/core/G4TabAdjudication.vue'))
@@ -143,10 +157,13 @@ const G4TabDetail = defineAsyncComponent(() => import('./g4-bond-investment-main
 const G4TabAdjustment = defineAsyncComponent(() => import('./g4-bond-investment-main/core/G4TabAdjustment.vue'))
 const G4TabDisclosureListed = defineAsyncComponent(() => import('./g4-bond-investment-main/core/G4TabDisclosureListed.vue'))
 const G4TabDisclosureSOE = defineAsyncComponent(() => import('./g4-bond-investment-main/core/G4TabDisclosureSOE.vue'))
-const G4TabDirectory = defineAsyncComponent(() => import('./g4-bond-investment-main/core/G4TabDirectory.vue'))
 const G4TabInterestCalc = defineAsyncComponent(() => import('./g4-bond-investment-main/measurement/G4TabInterestCalc.vue'))
+const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
+const G4SheetStatusBar = defineAsyncComponent(() => import('./g4-bond-investment-main/G4SheetStatusBar.vue'))
+const G4PreparationHandbookDialog = defineAsyncComponent(
+  () => import('./g4-bond-investment-main/G4PreparationHandbookDialog.vue'),
+)
 
-// ─── Props ──────────────────────────────────────────────────────────────────
 const props = defineProps<{
   htmlData: Record<string, any> | null
   sheetName: string
@@ -155,7 +172,6 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
-// ─── sheetName 正则 → 编码映射 ──────────────────────────────────────────────
 const SHEET_CODE_MAP: Record<string, string> = {
   'G4A': 'procedure',
   'G4-1': 'adjudication',
@@ -174,56 +190,150 @@ const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
 const isReadonly = computed(() => !!props.readonly)
 
-/** 提取当前sheetName对应的组件标识 */
+const formData = useG4BonInvFormData({ wpId: wpIdRef, projectId: projectIdRef })
+const adjustmentRouting = useG4MainAdjustment({
+  allResponses: formData.allResponses,
+  isReadonly,
+})
+const priorYear = useG4PriorYearRollForward({
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+  allResponses: formData.allResponses,
+  saveImmediate: formData.saveImmediate,
+  saveBatch: formData.saveBatch,
+})
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+const suiteResponses = ref<Map<string, ChecklistResponse>>(new Map())
+
+async function refreshSuiteResponses(): Promise<void> {
+  try {
+    const merged = await fetchG4SuiteResponseMap(props.projectId, props.wpId)
+    // 当前 Main 内存态优先覆盖，避免刚保存未落库时状态滞后
+    for (const [key, value] of formData.allResponses.value) {
+      merged.set(key, value)
+    }
+    suiteResponses.value = merged
+  } catch {
+    suiteResponses.value = new Map(formData.allResponses.value)
+  }
+}
+
+function openHandbook(tab: 'preparation' | 'usage'): void {
+  handbookTab.value = tab
+  handbookVisible.value = true
+}
+
+async function handlePriorYearRollForward(): Promise<void> {
+  try {
+    let plan = await priorYear.loadPreview(false)
+    if (plan.changes.length === 0) {
+      try {
+        await ElMessageBox.confirm(
+          '没有可结转数据，或本期期初已填写。是否强制覆盖已填期初字段？',
+          '上年结转',
+          { type: 'warning', confirmButtonText: '强制覆盖', cancelButtonText: '取消' },
+        )
+      } catch {
+        return
+      }
+      plan = await priorYear.loadPreview(true)
+      if (plan.changes.length === 0) {
+        ElMessage.info('没有可结转数据')
+        return
+      }
+    }
+    if (await priorYear.applyPreview(plan)) {
+      ElMessage.success('上年数据结转完成')
+    }
+  } catch (error: any) {
+    if (error === 'cancel' || error === 'close') return
+    ElMessage.error(error?.response?.data?.detail || error?.message || '上年结转失败')
+  }
+}
+
 const currentSheet = computed(() => {
   const name = props.sheetName || ''
-  // 精确匹配中文全称
   if (SHEET_CODE_MAP[name]) return SHEET_CODE_MAP[name]
-  // 正则匹配：G4A、G4-1~G4-4
+  if (/G4-note-listed|附注披露.*上市|附注.*上市/.test(name)) return 'disclosureListed'
+  if (/G4-note-soe|附注披露.*国企|附注.*国企/.test(name)) return 'disclosureSOE'
+  if (/G4-directory|底稿目录/.test(name)) return 'directory'
+  if (/附注/.test(name)) return name.includes('国企') ? 'disclosureSOE' : 'disclosureListed'
   const codeMatch = name.match(/(G4A|G4-[1-4])/)
   if (codeMatch) return SHEET_CODE_MAP[codeMatch[1]] || ''
-  // 中文关键词匹配
-  if (/附注披露/.test(name)) {
-    return name.includes('国企') ? 'disclosureSOE' : 'disclosureListed'
-  }
-  if (/底稿目录/.test(name)) return 'directory'
   return ''
 })
 
-/** 已迁移为HTML专属组件的sheet列表（支持双模式切换） */
 const HTML_SHEETS = new Set([
   'procedure', 'adjudication', 'detail', 'adjustment',
   'interestCalc', 'disclosureListed', 'disclosureSOE', 'directory',
 ])
 const isHtmlSheet = computed(() => HTML_SHEETS.has(currentSheet.value))
-
-/** 解析后的 htmlData（优先使用prop，fallback到selfLoad结果） */
 const resolvedHtmlData = computed(() => props.htmlData ?? selfLoadData.value)
 
-// ─── 双模式切换 ─────────────────────────────────────────────────────────────
 const dualMode = useG4MainDualMode({
   wpId: wpIdRef,
   sheetName: computed(() => props.sheetName || ''),
+  reloadAll: () => formData.loadAll(),
 })
 
-// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+const availableSheets = computed(() => {
+  const hd = resolvedHtmlData.value
+  const fromHtml = hd?.sheets ?? hd?.render_config?.sheets
+  if (Array.isArray(fromHtml) && fromHtml.length) return fromHtml
+  // 对齐 G1：htmlData 无 sheets 时用自加载 render-config 的 sheetCache 兜底，
+  // 保证底稿目录架构树非空
+  return Object.keys(formData.sheetCache.value).map(sheet_name => ({ sheet_name }))
+})
+
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
 provide('g4VersionTrailRef', versionTrailRef)
 provide('g4OpenVersionHistory', openVersionHistory)
+provide('reloadWorkpaperData', () => formData.loadAll())
 
-// 复核对话 openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
+async function onSheetImported(): Promise<void> {
+  await formData.loadAll()
+}
 
-// ─── selfLoad 模式：htmlData 为 null 时自动获取数据 ─────────────────────────
+async function handleG4SaveItems(e: Event): Promise<void> {
+  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
+  if (Array.isArray(items) && items.length > 0) {
+    for (const it of items) {
+      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
+    }
+    scheduleAutoSnapshot()
+  }
+}
+
+function handleAdjudicated(e: Event): void {
+  const d = (e as CustomEvent<{ accountCode: string; adjudicatedAmount: number }>).detail
+  if (d?.accountCode === '1501') {
+    void formData.saveImmediate('G4-1-adjudicated-amount', {
+      item_id: 'G4-1-adjudicated-amount',
+      conclusion: String(d.adjudicatedAmount),
+      remark: null,
+    })
+  }
+}
+
+function handleExceptionDrafts(e: Event): void {
+  const drafts = (e as CustomEvent<{ drafts: AdjustmentEntry[] }>).detail?.drafts
+  if (Array.isArray(drafts) && drafts.length > 0) {
+    adjustmentRouting.upsertDraftsFromSource(drafts)
+  }
+}
+
 async function selfLoad(): Promise<void> {
-  if (props.htmlData != null) return
   try {
+    await formData.loadAll()
+    if (props.htmlData != null) return
     const { data } = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
       params: { force_component_type: 'g4-bond-investment-main' },
     })
-    // render-config 返回 {sheets:[{html_data:{...}}]}
     const sheets = data?.sheets ?? data?.data?.sheets
     if (sheets && sheets.length > 0) {
       selfLoadData.value = sheets[0].html_data ?? sheets[0]
@@ -242,10 +352,28 @@ async function retrySelfLoad(): Promise<void> {
   isLoading.value = false
 }
 
-// ─── 生命周期 ───────────────────────────────────────────────────────────────
 onMounted(async () => {
+  window.addEventListener('g4:save-items', handleG4SaveItems)
+  window.addEventListener('g4:exception-drafts', handleExceptionDrafts)
+  window.addEventListener('substantive:adjudicated', handleAdjudicated)
   await selfLoad()
   isLoading.value = false
+  if (currentSheet.value === 'directory') {
+    void refreshSuiteResponses()
+  }
+})
+
+watch(
+  () => currentSheet.value,
+  (sheet) => {
+    if (sheet === 'directory') void refreshSuiteResponses()
+  },
+)
+
+onBeforeUnmount(() => {
+  window.removeEventListener('g4:save-items', handleG4SaveItems)
+  window.removeEventListener('g4:exception-drafts', handleExceptionDrafts)
+  window.removeEventListener('substantive:adjudicated', handleAdjudicated)
 })
 </script>
 
@@ -253,5 +381,6 @@ onMounted(async () => {
 .g4-bond-investment-main { padding: 12px; }
 .loading-container { padding: 24px; }
 .error-container { padding: 24px; }
-.g4-bond-investment-main-toolbar { margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
+.g4-bond-investment-main-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
+.g4-index-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 </style>

@@ -49,6 +49,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @imported="onSheetImported"
       />
 
       <!-- G6-13 预期信用损失计量测试 -->
@@ -67,6 +68,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @imported="onSheetImported"
       />
 
       <!-- G6-15 凭证检查表 -->
@@ -76,6 +78,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @imported="onSheetImported"
       />
 
       <!-- 兜底：未迁移/未匹配 sheet → OnlyOffice fallback -->
@@ -95,30 +98,20 @@
 
 <script setup lang="ts">
 /**
- * ⚠️ 死代码标注（fghi-sheet-content-completion Task 13.2，2026-07-13）：
- *   htmlRendererRegistry.ts 将 componentType `g6-other-bond-investment-ecl`
- *   映射到 `GtG6OtherBondEcl.vue`（根目录同名简版：仅 GtGridSheet + OO 兜底），
- *   而非本文件。本文件（真正 v-if 分发 5 个子组件 StageClassification/
- *   ImpairmentCalc/EclMeasurement/ReversalWriteOff/VoucherCheck 的调度器）
- *   未在任何 registry / wp_code_overrides 中被引用 → 当前为孤立/死代码。
- *   与 main/sppi 组（短名 GtG6OtherBondMain/GtG6OtherBondSppi 即调度器且已注册）
- *   命名约定相反：ECL 的短名文件是简版桩、长名文件是调度器。
- *   注意：本 spec 打磨的 5 个 ECL 子组件仅经本（未注册）调度器可达。
- *   按任务要求仅标注不删除、不改注册表（重接属独立决策，需人工确认）。
- *
  * GtG6OtherBondInvestmentEcl.vue — G6 其他债权投资底稿(ECL组)主入口
  *
- * Spec: .kiro/specs/g6-other-bond-investment-ecl/ Task 3.1
+ * 已注册：htmlRendererRegistry 将 componentType `g6-other-bond-investment-ecl`
+ * 异步加载本文件（短名变量 GtG6OtherBondEcl → import InvestmentEcl）。
+ * 根目录 `GtG6OtherBondEcl.vue` 为历史简版桩，不再被 registry 引用。
+ *
  * sheetName正则提取编码(G6-11~G6-15) → v-if分发到5个defineAsyncComponent子组件
  * 未匹配 → OnlyOffice fallback
- * 集成：useWorkpaperVersionToolbar(autoSnapshot) + provide('openReviewDialog') + 双模式切换
- * selfLoad：htmlData为null时通过useG6EclFormData调用render-config获取数据
- *
- * Requirements: 1.1, 1.2, 1.3, 1.4, 6.2
+ * 集成：onAfterSave snapshot + dualMode.reloadAll + provide reloadWorkpaperData
+ *       + g6:save-items + @imported 重载 + 始终 loadAll
  */
-import { ref, computed, onMounted, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useG6EclDualMode } from './composables/useG6EclDualMode'
-import { useG6EclFormData } from './composables/useG6EclFormData'
+import { useG6EclFormData, type ChecklistResponse } from './composables/useG6EclFormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 
 // ─── defineAsyncComponent 懒加载所有子组件 ───────────────────────────────────
@@ -191,31 +184,49 @@ const isHtmlSheet = computed(() => HTML_SHEETS.has(currentSheet.value))
 /** 解析后的 htmlData（优先使用prop，fallback到selfLoad结果） */
 const resolvedHtmlData = computed(() => props.htmlData ?? selfLoadData.value)
 
-// ─── 双模式切换 ─────────────────────────────────────────────────────────────
-const dualMode = useG6EclDualMode({
-  wpId: wpIdRef,
-  sheetName: computed(() => props.sheetName || ''),
-})
-
-// ─── useG6EclFormData 用于selfLoad ──────────────────────────────────────────
-// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
+// ─── useG6EclFormData ───────────────────────────────────────────────────────
 const formData = useG6EclFormData({
   wpId: wpIdRef,
   projectId: projectIdRef,
   onAfterSave: () => scheduleAutoSnapshot(),
 })
-// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一提供，子组件 inject 命中祖先
 
-// ─── selfLoad 模式：htmlData 为 null 时自动获取数据 ─────────────────────────
+// ─── 双模式切换（切回 HTML 时 reloadAll） ───────────────────────────────────
+const dualMode = useG6EclDualMode({
+  wpId: wpIdRef,
+  sheetName: computed(() => props.sheetName || ''),
+  reloadAll: () => formData.loadAll(),
+})
+
+provide('g6VersionTrailRef', versionTrailRef)
+provide('g6OpenVersionHistory', openVersionHistory)
+provide('reloadWorkpaperData', () => formData.loadAll())
+
+function onSheetImported(): void {
+  void formData.loadAll()
+}
+
+async function handleG6SaveItems(e: Event): Promise<void> {
+  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
+  if (Array.isArray(items) && items.length > 0) {
+    for (const it of items) {
+      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
+    }
+    scheduleAutoSnapshot()
+  }
+}
+
+// ─── selfLoad：始终 loadAll；htmlData 缺失时再填充 selfLoadData ─────────────
 async function selfLoad(): Promise<void> {
-  if (props.htmlData != null) return
   try {
     await formData.loadAll()
+    if (props.htmlData != null) return
     const parsed = formData.parseContent()
     if (parsed && Object.keys(parsed).length > 0) {
       selfLoadData.value = parsed as Record<string, any>
@@ -234,8 +245,13 @@ async function retrySelfLoad(): Promise<void> {
 
 // ─── 生命周期 ───────────────────────────────────────────────────────────────
 onMounted(async () => {
+  window.addEventListener('g6:save-items', handleG6SaveItems)
   await selfLoad()
   isLoading.value = false
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('g6:save-items', handleG6SaveItems)
 })
 </script>
 

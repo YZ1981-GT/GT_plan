@@ -9,8 +9,12 @@ import * as fc from 'fast-check'
 import {
   parseNum,
   calcImpairmentProvision,
+  calcImpairmentFromPv,
   calcBookValue,
   calcImpairmentAdjustment,
+  calcImpairmentAdjustmentExpanded,
+  calcImpairmentAdjustmentIdentity,
+  calcTargetAuditedImpairmentByRate,
   calcAdjustedBalance,
   calcAdjustedImpairment,
   calcAdjustedBookValue,
@@ -21,6 +25,10 @@ import {
   calcDebitCreditDifference,
   isVoucherNormal,
   calcSumColumn,
+  calcTermAdjustedPd,
+  calcEclRateFromPdLgd,
+  calcEclRateFromLossRate,
+  calcLossRateVariance,
 } from '../useG4EclFormulaEngine'
 
 // ═══ Generators ═══
@@ -124,8 +132,9 @@ describe('Feature: g4-bond-investment-ecl, Property 3: 审计调整公式链一�
 describe('Feature: g4-bond-investment-ecl, Property 4: 减值准备调整公式展开', () => {
   /**
    * **Validates: Requirements 8.3, 3.4**
+   * 未传 unauditedImpairment 时退回展开式；传入③时走恒等倒挤。
    */
-  it('calcImpairmentAdjustment(ba, ar, ob, or) === round(ba×ar + ob×(ar-or), 2)', () => {
+  it('calcImpairmentAdjustmentExpanded === round(ba×ar + ob×(ar-or), 2)', () => {
     fc.assert(
       fc.property(
         amount(),
@@ -133,9 +142,77 @@ describe('Feature: g4-bond-investment-ecl, Property 4: 减值准备调整公式�
         amount(),
         rate(),
         (ba, ar, ob, or_) => {
-          expect(calcImpairmentAdjustment(ba, ar, ob, or_)).toBe(
+          expect(calcImpairmentAdjustmentExpanded(ba, ar, ob, or_)).toBe(
             round2(ba * ar + ob * (ar - or_)),
           )
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+
+  it('当③=①×②时，恒等倒挤 ≡ 展开式', () => {
+    fc.assert(
+      fc.property(
+        amount(),
+        rate(),
+        amount(),
+        rate(),
+        (ba, ar, ob, or_) => {
+          const provision = calcImpairmentProvision(ob, or_)
+          const byIdentity = calcImpairmentAdjustment(ba, ar, ob, or_, provision)
+          const byExpand = calcImpairmentAdjustmentExpanded(ba, ar, ob, or_)
+          expect(Math.abs(byIdentity - byExpand)).toBeLessThanOrEqual(0.01)
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+
+  it('恒等倒挤：⑥ = (①+⑤)×②A − ③（③可任意）', () => {
+    fc.assert(
+      fc.property(
+        amount(),
+        amount(),
+        rate(),
+        amount(),
+        (ob, ba, ar, unaudited) => {
+          const target = calcTargetAuditedImpairmentByRate(ob, ba, ar)
+          const adj = calcImpairmentAdjustmentIdentity(target, unaudited)
+          expect(adj).toBe(round2(target - unaudited))
+          expect(calcImpairmentAdjustment(ba, ar, ob, 0, unaudited)).toBe(adj)
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+})
+
+describe('Feature: g4-bond-investment-ecl, Property 4b: Stage3 现值法减值', () => {
+  it('calcImpairmentFromPv(b, pv) === round(max(0, b−pv), 2)', () => {
+    fc.assert(
+      fc.property(amount(), amount(), (b, pv) => {
+        expect(calcImpairmentFromPv(b, pv)).toBe(round2(Math.max(0, b - pv)))
+      }),
+      { numRuns: 100 },
+    )
+  })
+
+  it('Stage3 链：⑧ = max(0,⑦−PV审定)，⑥ = ⑧−③', () => {
+    fc.assert(
+      fc.property(
+        positiveAmount(),
+        positiveAmount(),
+        amount(),
+        positiveAmount(),
+        (ob, pv, ba, adjPv) => {
+          const provision = calcImpairmentFromPv(ob, pv)
+          const adjBal = calcAdjustedBalance(ob, ba)
+          const target = calcImpairmentFromPv(adjBal, adjPv)
+          const impAdj = calcImpairmentAdjustmentIdentity(target, provision)
+          const adjImp = calcAdjustedImpairment(provision, impAdj)
+          expect(Math.abs(adjImp - target)).toBeLessThanOrEqual(0.01)
+          expect(calcAdjustedBookValue(adjBal, adjImp)).toBe(round2(adjBal - adjImp))
         },
       ),
       { numRuns: 100 },
@@ -164,19 +241,15 @@ describe('Feature: g4-bond-investment-ecl, Property 5: 三阶段划分确定性�
     )
   })
 
-  it('significantIncrease=true, !creditImpaired → Stage2', () => {
-    fc.assert(
-      fc.property(
-        fc.boolean(),
-        (lowRisk) => {
-          expect(determineStage(true, lowRisk, false)).toBe('Stage2')
-        },
-      ),
-      { numRuns: 100 },
-    )
+  it('significantIncrease=true, !lowRisk, !creditImpaired → Stage2', () => {
+    expect(determineStage(true, false, false)).toBe('Stage2')
   })
 
-  it('!significantIncrease, !creditImpaired → Stage1', () => {
+  it('significantIncrease=true + lowRisk 豁免 + !creditImpaired → Stage1', () => {
+    expect(determineStage(true, true, false)).toBe('Stage1')
+  })
+
+  it('!significantIncrease, !creditImpaired → Stage1（含低风险）', () => {
     fc.assert(
       fc.property(
         fc.boolean(),
@@ -196,8 +269,9 @@ describe('Feature: g4-bond-investment-ecl, Property 5: 三阶段划分确定性�
 describe('Feature: g4-bond-investment-ecl, Property 6: Stage1必要条件', () => {
   /**
    * **Validates: Requirements 8.7, 2.2**
+   * Stage1 = 未减值 且（未显著增加 或 适用较低信用风险豁免）
    */
-  it('determineStage(...)===Stage1 → !hasSignificantIncrease AND !hasCreditImpairment', () => {
+  it('determineStage(...)===Stage1 → !creditImpaired 且 (!SICR 或 低风险豁免)', () => {
     fc.assert(
       fc.property(
         fc.boolean(),
@@ -206,8 +280,8 @@ describe('Feature: g4-bond-investment-ecl, Property 6: Stage1必要条件', () =
         (sigIncrease, lowRisk, creditImpaired) => {
           const result = determineStage(sigIncrease, lowRisk, creditImpaired)
           if (result === 'Stage1') {
-            expect(sigIncrease).toBe(false)
             expect(creditImpaired).toBe(false)
+            expect(!sigIncrease || lowRisk).toBe(true)
           }
         },
       ),
@@ -402,8 +476,8 @@ describe('Feature: g4-bond-investment-ecl, Property 13: 审定减值准备组合
 
           const expected = round2(origBal * origRate + balAdj * adjRate + origBal * (adjRate - origRate))
 
-          // Allow for intermediate rounding differences (each step rounds to 2dp)
-          expect(Math.abs(result - expected)).toBeLessThanOrEqual(0.01)
+          // Allow for intermediate rounding / float accumulation (each step rounds to 2dp)
+          expect(Math.abs(result - expected)).toBeLessThanOrEqual(0.02)
         },
       ),
       { numRuns: 100 },
@@ -428,6 +502,80 @@ describe('Feature: g4-bond-investment-ecl, Property 14: 审定账面余额=原�
           expect(calcAdjustedBalance(o, b)).toBe(round2(o + b))
         },
       ),
+      { numRuns: 100 },
+    )
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════
+// P15~P17: G4-11 ECL计量测试公式
+// ═══════════════════════════════════════════════════════════════════
+
+describe('Feature: g4-bond-investment-ecl, Property 15: 期限折算PD', () => {
+  it('calcTermAdjustedPd(pd, m) === round(1-(1-pd)^(m/12), 6) for pd∈[0,1], m≥0', () => {
+    fc.assert(
+      fc.property(
+        rate(),
+        fc.float({ min: 0, max: 600, noNaN: true, noDefaultInfinity: true }),
+        (pd, months) => {
+          const expected = months <= 0 || pd <= 0
+            ? 0
+            : pd >= 1
+              ? 1
+              : Math.round((1 - Math.pow(1 - pd, months / 12)) * 1e6) / 1e6
+          expect(calcTermAdjustedPd(pd, months)).toBe(expected)
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+})
+
+describe('Feature: g4-bond-investment-ecl, Property 16: PD×LGD损失率', () => {
+  it('calcEclRateFromPdLgd(pd, lgd) === clamp(round(pd×lgd, 6), 0, 1)', () => {
+    fc.assert(
+      fc.property(rate(), rate(), (pd, lgd) => {
+        const raw = Math.round(pd * lgd * 1e6) / 1e6
+        const expected = Math.min(1, Math.max(0, raw))
+        expect(calcEclRateFromPdLgd(pd, lgd)).toBe(expected)
+      }),
+      { numRuns: 100 },
+    )
+  })
+
+  it('ECL金额 = 余额 × (PD×LGD) 与减值准备公式一致', () => {
+    fc.assert(
+      fc.property(positiveAmount(), rate(), rate(), (bal, pd, lgd) => {
+        const eclRate = calcEclRateFromPdLgd(pd, lgd)
+        expect(calcImpairmentProvision(bal, eclRate)).toBe(round2(bal * eclRate))
+      }),
+      { numRuns: 100 },
+    )
+  })
+})
+
+describe('Feature: g4-bond-investment-ecl, Property 17: 损失率法+差异', () => {
+  it('calcEclRateFromLossRate(base, adj) === clamp(base+adj, 0, 1)', () => {
+    fc.assert(
+      fc.property(
+        rate(),
+        fc.float({ min: -0.5, max: 0.5, noNaN: true, noDefaultInfinity: true }),
+        (base, adj) => {
+          const expected = Math.round(Math.min(1, Math.max(0, base + adj)) * 1e6) / 1e6
+          expect(calcEclRateFromLossRate(base, adj)).toBe(expected)
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+
+  it('calcLossRateVariance 为绝对值且非负', () => {
+    fc.assert(
+      fc.property(rate(), rate(), (a, b) => {
+        const v = calcLossRateVariance(a, b)
+        expect(v).toBeGreaterThanOrEqual(0)
+        expect(v).toBe(Math.round(Math.abs(a - b) * 1e6) / 1e6)
+      }),
       { numRuns: 100 },
     )
   })

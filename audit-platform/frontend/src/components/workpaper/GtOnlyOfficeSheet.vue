@@ -61,6 +61,14 @@ const rootEl = ref<HTMLElement | null>(null)
 const editorContainer = ref<HTMLElement | null>(null)
 const isFullscreen = ref(false)
 let editorInstance: any = null
+let readyTimeout: ReturnType<typeof setTimeout> | null = null
+
+function clearReadyTimeout(): void {
+  if (readyTimeout != null) {
+    clearTimeout(readyTimeout)
+    readyTimeout = null
+  }
+}
 
 function updateAutoHeight(): void {
   const el = rootEl.value
@@ -224,12 +232,20 @@ async function initialize() {
         console.warn('[GtOnlyOfficeSheet] DocEditor onWarning:', e?.data)
       },
       onDocumentReady: () => {
+        clearReadyTimeout()
         loading.value = false
       },
     }
 
     // loading 由 onDocumentReady 关闭（不再在 new 之后立即关）
     editorInstance = new DocsAPI.DocEditor(containerId.value, editorConfig)
+
+    // 文档迟迟不 ready（错误 sheet / 下载挂起）时主动降级，避免「加载中」死页
+    readyTimeout = window.setTimeout(() => {
+      if (loading.value && !error.value) {
+        handleFallback('document-ready-timeout')
+      }
+    }, 45000)
   } catch (err: any) {
     console.warn('[GtOnlyOfficeSheet] initialization failed:', err?.message || err)
     handleFallback(err?.message)
@@ -238,6 +254,7 @@ async function initialize() {
 
 // ─── 降级处理 ───
 function handleFallback(reason?: string) {
+  clearReadyTimeout()
   loading.value = false
   error.value = true
   console.warn('[GtOnlyOfficeSheet] fallback triggered, reason:', reason)
@@ -252,6 +269,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearReadyTimeout()
   // 清理 editor 实例
   if (editorInstance) {
     try {

@@ -21,16 +21,33 @@ export function useWorkpaperVersionToolbar(options: UseWorkpaperVersionToolbarOp
     versionTrailRef.value?.openDrawer()
   }
 
-  async function createAutoSnapshot(): Promise<void> {
+  async function postSnapshot(
+    snapshotType: string,
+    description: string,
+  ): Promise<void> {
     if (!wpId.value || !projectId.value) return
+    await http.post(
+      `/api/projects/${projectId.value}/workpapers/${wpId.value}/versions`,
+      { snapshot_type: snapshotType, description },
+      { _silent: true } as any,
+    )
+  }
+
+  /** 编辑后自动快照（非 manual，可被生命周期淘汰） */
+  async function createAutoSnapshot(): Promise<void> {
     try {
-      await http.post(
-        `/api/projects/${projectId.value}/workpapers/${wpId.value}/versions`,
-        { snapshot_type: 'manual', description: '编辑后自动快照' },
-        { _silent: true } as any,
-      )
+      await postSnapshot('auto', '编辑后自动快照')
     } catch {
       // 自动快照失败不阻塞编辑
+    }
+  }
+
+  /** 导入前快照 */
+  async function createImportSnapshot(): Promise<void> {
+    try {
+      await postSnapshot('auto_import', '导入前快照')
+    } catch {
+      // 导入快照失败不阻塞导入
     }
   }
 
@@ -53,6 +70,8 @@ export function useWorkpaperVersionToolbar(options: UseWorkpaperVersionToolbarOp
     versionTrailRef,
     openVersionHistory,
     scheduleAutoSnapshot,
+    createAutoSnapshot,
+    createImportSnapshot,
     wrapSaveImmediate,
   }
 }

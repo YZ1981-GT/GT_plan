@@ -29,6 +29,8 @@ logger = logging.getLogger(__name__)
 
 # 2MB 阈值
 _MAX_DATA_SIZE_BYTES = 2 * 1024 * 1024
+# 每底稿最多保留最近 N 个版本（含手动/自动），避免 checklist 快照膨胀
+_MAX_SNAPSHOTS_PER_WORKPAPER = 5
 
 
 # ─── Pydantic Models ──────────────────────────────────────────────────────────
@@ -37,7 +39,7 @@ _MAX_DATA_SIZE_BYTES = 2 * 1024 * 1024
 class SnapshotCreate(BaseModel):
     """创建快照请求"""
 
-    snapshot_type: str  # manual/auto_sampling/auto_import/review_sign/status_change/rollback
+    snapshot_type: str  # manual/auto/auto_sampling/auto_import/review_sign/status_change/rollback
     description: Optional[str] = None
     change_summary: Optional[str] = None
 
@@ -127,7 +129,7 @@ class VersionTrailService:
         2. 序列化为 JSON array [{item_id, conclusion, remark, wp_ref}, ...]
         3. 计算 data_size_bytes，若 > 2MB 则降级存储（仅 item_id 列表）
         4. 若无 change_summary 且有上一快照，自动计算 diff summary
-        5. 执行生命周期清理（超 50 条时 purge oldest non-manual）
+        5. 执行生命周期清理（仅保留最近 5 个版本）
         6. INSERT into workpaper_snapshots
         """
         # Step 1: 读取当前 checklist_responses
@@ -592,31 +594,32 @@ class VersionTrailService:
     async def enforce_lifecycle(
         db: AsyncSession,
         workpaper_id: UUID,
-        max_snapshots: int = 50,
+        max_snapshots: int = _MAX_SNAPSHOTS_PER_WORKPAPER,
     ) -> int:
-        """生命周期管理：超过限额时清理最老的非手动快照
+        """生命周期管理：仅保留最近 max_snapshots 个版本（按 created_at）。
 
-        返回被清理的数量。保留所有 snapshot_type='manual' 的快照。
+        创建前若已达上限，删除最旧记录腾出空位（不区分 manual/auto）。
+        返回被清理的数量。
         """
-        # Count non-manual snapshots
         count_query = sa.text(
             "SELECT COUNT(*) AS cnt FROM workpaper_snapshots "
-            "WHERE workpaper_id = :workpaper_id AND snapshot_type != 'manual'"
+            "WHERE workpaper_id = :workpaper_id"
         )
         count_result = await db.execute(count_query, {"workpaper_id": workpaper_id})
         count_row = count_result.mappings().first()
-        current_count = count_row["cnt"] if count_row else 0
+        current_count = int(count_row["cnt"] if count_row else 0)
 
-        if current_count <= max_snapshots:
+        if current_count < max_snapshots:
             return 0
 
-        # Delete oldest non-manual snapshots exceeding the limit
-        excess = current_count - max_snapshots
+        # 即将再插入 1 条：至少腾 1 个空位；若历史已超限则一并压回
+        excess = current_count - max_snapshots + 1
+
         delete_query = sa.text(
             "DELETE FROM workpaper_snapshots "
             "WHERE id IN ("
             "  SELECT id FROM workpaper_snapshots "
-            "  WHERE workpaper_id = :workpaper_id AND snapshot_type != 'manual' "
+            "  WHERE workpaper_id = :workpaper_id "
             "  ORDER BY created_at ASC "
             "  LIMIT :excess"
             ")"
@@ -627,8 +630,9 @@ class VersionTrailService:
         await db.flush()
 
         logger.info(
-            "Lifecycle cleanup: removed %d non-manual snapshots for wp_id=%s",
+            "Lifecycle cleanup: removed %d snapshots for wp_id=%s (keep newest %d)",
             excess,
             workpaper_id,
+            max_snapshots,
         )
         return excess

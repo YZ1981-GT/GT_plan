@@ -105,7 +105,7 @@ describe('useVersionTrail - loadVersions', () => {
     // 验证 API 调用
     expect(mockGet).toHaveBeenCalledWith(
       '/api/projects/proj-001/workpapers/wp-001/versions',
-      { params: { page: 1, page_size: 20 } },
+      { params: { page: 1, page_size: 5 } },
     )
 
     // 验证数据映射
@@ -129,7 +129,7 @@ describe('useVersionTrail - loadVersions', () => {
 
     expect(mockGet).toHaveBeenCalledWith(
       '/api/projects/proj-001/workpapers/wp-001/versions',
-      { params: { page: 2, page_size: 20 } },
+      { params: { page: 2, page_size: 5 } },
     )
     expect(currentPage.value).toBe(2)
   })
@@ -175,7 +175,7 @@ describe('useVersionTrail - createSnapshot', () => {
     // 验证列表刷新（GET 被调用）
     expect(mockGet).toHaveBeenCalledWith(
       '/api/projects/proj-001/workpapers/wp-001/versions',
-      { params: { page: 1, page_size: 20 } },
+      { params: { page: 1, page_size: 5 } },
     )
     expect(versions.value).toHaveLength(2)
   })
@@ -265,7 +265,8 @@ describe('useVersionTrail - rollback', () => {
     // 刷新列表
     mockGet.mockResolvedValueOnce({ data: { items: MOCK_VERSIONS, total: 2 } })
 
-    await rollback('v-001')
+    const ok = await rollback('v-001')
+    expect(ok).toBe(true)
 
     // 验证弹窗被调用
     expect(mockElMessageBoxConfirm).toHaveBeenCalledTimes(1)
@@ -285,7 +286,8 @@ describe('useVersionTrail - rollback', () => {
     mockElMessageBoxConfirm.mockRejectedValueOnce(new Error('cancel'))
 
     const { rollback } = createComposable()
-    await rollback('v-001')
+    const ok = await rollback('v-001')
+    expect(ok).toBe(false)
 
     // 弹窗被调用
     expect(mockElMessageBoxConfirm).toHaveBeenCalledTimes(1)

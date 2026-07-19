@@ -33,6 +33,16 @@ declare module '*.vue' {
   export default component
 }
 
+declare module '*.md?raw' {
+  const content: string
+  export default content
+}
+
+declare module '*.md' {
+  const content: string
+  export default content
+}
+
 declare module '@univerjs/preset-sheets-core/lib/locales/zh-CN' {
   const locale: Record<string, any>
   export default locale

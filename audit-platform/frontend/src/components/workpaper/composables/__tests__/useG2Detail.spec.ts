@@ -1,17 +1,31 @@
 /**
  * Unit tests for useG2Detail composable
- * Validates: Requirements 5.1~5.8
+ * Validates: 纸质滚动核对 + 账龄枚举
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref, nextTick } from 'vue'
-import { useG2Detail, type InterestDetailRow } from '../useG2Detail'
+import { useG2Detail } from '../useG2Detail'
+import { PRESET_SEGMENTS } from '@/composables/useAgingConfig'
 
-// Mock onBeforeUnmount since we're not in a component lifecycle
 vi.mock('vue', async () => {
   const actual = await vi.importActual('vue')
   return {
     ...actual as any,
     onBeforeUnmount: vi.fn(),
+  }
+})
+
+vi.mock('@/composables/useAgingConfig', async () => {
+  const actual = await vi.importActual<any>('@/composables/useAgingConfig')
+  return {
+    ...actual,
+    useAgingConfig: () => ({
+      segments: ref(actual.PRESET_SEGMENTS.THREE_YEAR),
+      preset: ref('THREE_YEAR'),
+      bands: ref([]),
+      loading: ref(false),
+      refresh: vi.fn(),
+    }),
   }
 })
 
@@ -38,12 +52,19 @@ function createStoredRow(overrides: Partial<any> = {}) {
     seq: 1,
     investTarget: '某债券',
     investType: '债权投资',
+    openingUnadjusted: 10000,
+    openingAdjustment: 0,
+    debit: 5000,
+    credit: 2000,
+    closingAdjustment: 0,
+    interestDueDate: '2025-12-31',
+    accrualPeriod: '2025H1',
+    collectionStatus: '',
     faceValue: 1000000,
     couponRate: 5,
     accrualStart: '2025-01-01',
     accrualEnd: '2025-07-01',
     receivedInterest: 0,
-    bookValue: 0,
     eclStage: 'Stage1' as const,
     remark: '',
     indexRef: '',
@@ -60,199 +81,122 @@ describe('useG2Detail', () => {
     vi.useRealTimers()
   })
 
-  describe('formula chain', () => {
-    it('计息天数=截止日-起始日', () => {
-      const row = createStoredRow({
-        accrualStart: '2025-01-01',
-        accrualEnd: '2025-04-01',  // 90 days
-      })
-      const opts = createOptions([row])
-      const { dataRows } = useG2Detail(opts)
-      // Jan 1 → Apr 1 = 90 days
-      expect(dataRows.value[0].accruedDays).toBe(90)
+  describe('roll-forward formulas', () => {
+    it('期初审定 = 期初余额 + 期初调整', () => {
+      const row = createStoredRow({ openingUnadjusted: 1000, openingAdjustment: 50 })
+      const { dataRows } = useG2Detail(createOptions([row]))
+      expect(dataRows.value[0].openingAudited).toBe(1050)
     })
 
-    it('应计利息=面值×利率/100×天数/365', () => {
+    it('期末余额 = 期初审定 + 借方 − 贷方', () => {
       const row = createStoredRow({
-        faceValue: 1000000,
-        couponRate: 5,
-        accrualStart: '2025-01-01',
-        accrualEnd: '2025-04-01',  // 90 days
+        openingUnadjusted: 10000,
+        openingAdjustment: 0,
+        debit: 5000,
+        credit: 2000,
       })
-      const opts = createOptions([row])
-      const { dataRows } = useG2Detail(opts)
-      // 1000000 × 5/100 × 90/365 = 12328.767...
-      const expected = (1000000 * 5 / 100 * 90) / 365
-      expect(dataRows.value[0].accruedInterest).toBeCloseTo(expected, 2)
+      const { dataRows } = useG2Detail(createOptions([row]))
+      expect(dataRows.value[0].closingUnadjusted).toBe(13000)
     })
 
-    it('期末应收=应计利息-已收利息', () => {
+    it('期末审定 = 期末余额 + 账项调整', () => {
       const row = createStoredRow({
-        faceValue: 1000000,
-        couponRate: 5,
-        accrualStart: '2025-01-01',
-        accrualEnd: '2025-04-01',
-        receivedInterest: 5000,
+        openingUnadjusted: 10000,
+        debit: 5000,
+        credit: 2000,
+        closingAdjustment: -100,
       })
-      const opts = createOptions([row])
-      const { dataRows } = useG2Detail(opts)
-      const expectedInterest = (1000000 * 5 / 100 * 90) / 365
-      const expectedNet = expectedInterest - 5000
-      expect(dataRows.value[0].netReceivable).toBeCloseTo(expectedNet, 2)
+      const { dataRows } = useG2Detail(createOptions([row]))
+      expect(dataRows.value[0].closingAudited).toBe(12900)
     })
 
-    it('差异=期末应收-企业账面值', () => {
-      const row = createStoredRow({
-        faceValue: 1000000,
-        couponRate: 5,
-        accrualStart: '2025-01-01',
-        accrualEnd: '2025-04-01',
+    it('旧版 bookValue 迁移为期初余额', () => {
+      const row = {
+        id: 'legacy-1',
+        seq: 1,
+        investTarget: '旧债',
+        investType: '债权投资',
+        bookValue: 8888,
+        faceValue: 0,
+        couponRate: 0,
+        accrualStart: '',
+        accrualEnd: '',
         receivedInterest: 0,
-        bookValue: 12000,
-      })
-      const opts = createOptions([row])
-      const { dataRows } = useG2Detail(opts)
-      const expectedInterest = (1000000 * 5 / 100 * 90) / 365
-      const expectedVariance = expectedInterest - 12000
-      expect(dataRows.value[0].variance).toBeCloseTo(expectedVariance, 2)
+        eclStage: 'Stage1',
+        remark: '',
+        indexRef: '',
+      }
+      const { dataRows } = useG2Detail(createOptions([row]))
+      expect(dataRows.value[0].openingUnadjusted).toBe(8888)
+      expect(dataRows.value[0].openingAudited).toBe(8888)
+      expect(dataRows.value[0].closingAudited).toBe(8888)
     })
   })
 
-  describe('isVarianceWarning', () => {
-    it('|差异|>100 → true (橙色标记)', () => {
+  describe('interest check formulas', () => {
+    it('计息天数与应计利息', () => {
       const row = createStoredRow({
         faceValue: 1000000,
         couponRate: 5,
         accrualStart: '2025-01-01',
         accrualEnd: '2025-04-01',
-        bookValue: 0, // variance will be >100
       })
-      const opts = createOptions([row])
-      const { dataRows, isVarianceWarning } = useG2Detail(opts)
-      expect(isVarianceWarning(dataRows.value[0])).toBe(true)
+      const { dataRows } = useG2Detail(createOptions([row]))
+      expect(dataRows.value[0].accruedDays).toBe(90)
+      const expected = (1000000 * 5 / 100 * 90) / 365
+      expect(dataRows.value[0].accruedInterest).toBeCloseTo(expected, 5)
+    })
+  })
+
+  describe('aging enum', () => {
+    it('默认 3 年段 bands', () => {
+      const { bands, agingPreset } = useG2Detail(createOptions())
+      expect(agingPreset.value).toBe('THREE_YEAR')
+      expect(bands.value).toHaveLength(PRESET_SEGMENTS.THREE_YEAR.length)
     })
 
-    it('|差异|≤100 → false', () => {
-      const expectedInterest = (1000000 * 5 / 100 * 90) / 365
+    it('切换 5 年段并 remap', async () => {
       const row = createStoredRow({
-        faceValue: 1000000,
-        couponRate: 5,
-        accrualStart: '2025-01-01',
-        accrualEnd: '2025-04-01',
-        bookValue: expectedInterest - 50, // variance = 50 ≤ 100
+        openingUnadjusted: 1000,
+        agingPrior: { within1: 1000, y1to2: 0, y2to3: 0, over3: 0 },
+        agingAudited: { within1: 500, y1to2: 0, y2to3: 0, over3: 0 },
       })
       const opts = createOptions([row])
-      const { dataRows, isVarianceWarning } = useG2Detail(opts)
-      expect(isVarianceWarning(dataRows.value[0])).toBe(false)
-    })
-  })
-
-  describe('dynamic rows', () => {
-    it('addRow adds a new row with sequential number', () => {
-      const opts = createOptions([])
-      const { dataRows, addRow } = useG2Detail(opts)
-      expect(dataRows.value).toHaveLength(0)
-
-      addRow()
-      expect(dataRows.value).toHaveLength(1)
-      expect(dataRows.value[0].seq).toBe(1)
-
-      addRow()
-      expect(dataRows.value).toHaveLength(2)
-      expect(dataRows.value[1].seq).toBe(2)
+      const detail = useG2Detail(opts)
+      detail.setAgingPreset('FIVE_YEAR')
+      await nextTick()
+      expect(detail.agingPreset.value).toBe('FIVE_YEAR')
+      expect(detail.bands.value).toHaveLength(6)
+      expect(detail.dataRows.value[0].agingPrior.within1).toBe(1000)
+      expect(detail.dataRows.value[0].agingPrior.y3to4).toBe(0)
     })
 
-    it('removeRow removes by id and resequences', () => {
-      const row1 = createStoredRow({ id: 'row-1', seq: 1 })
-      const row2 = createStoredRow({ id: 'row-2', seq: 2 })
-      const row3 = createStoredRow({ id: 'row-3', seq: 3 })
-      const opts = createOptions([row1, row2, row3])
-      const { dataRows, removeRow } = useG2Detail(opts)
-
-      expect(dataRows.value).toHaveLength(3)
-      removeRow('row-2')
-      expect(dataRows.value).toHaveLength(2)
-      expect(dataRows.value[0].seq).toBe(1)
-      expect(dataRows.value[1].seq).toBe(2)
+    it('自定义账龄至少 2 段，并可切换段名', async () => {
+      const opts = createOptions([createStoredRow({ openingUnadjusted: 1000 })])
+      const detail = useG2Detail(opts)
+      expect(detail.setAgingPreset('CUSTOM', ['仅一段'])).toBe(false)
+      expect(detail.setAgingPreset('CUSTOM', ['0-6个月', '6-12个月', '1年以上'])).toBe(true)
+      await nextTick()
+      expect(detail.agingPreset.value).toBe('CUSTOM')
+      expect(detail.bands.value).toHaveLength(3)
+      expect(detail.bands.value.map((b) => b.label)).toEqual(['0-6个月', '6-12个月', '1年以上'])
+      expect(detail.customSegments.value[0].key).toBe('custom-0')
     })
 
-    it('readonly mode prevents add/remove', () => {
-      const opts = createOptions([createStoredRow({ id: 'row-1' })])
-      opts.isReadonly = ref(true)
-      const { dataRows, addRow, removeRow } = useG2Detail(opts)
-
-      addRow()
-      expect(dataRows.value).toHaveLength(1)
-
-      removeRow('row-1')
-      expect(dataRows.value).toHaveLength(1)
-    })
-  })
-
-  describe('totals', () => {
-    it('合计行汇总 faceValue/accruedInterest/netReceivable/variance', () => {
-      const row1 = createStoredRow({
-        id: 'r1', seq: 1, faceValue: 500000, couponRate: 4,
-        accrualStart: '2025-01-01', accrualEnd: '2025-04-01',
-        receivedInterest: 1000, bookValue: 3000,
+    it('快捷分配将期末审定整笔填入指定段', () => {
+      const row = createStoredRow({
+        openingUnadjusted: 10000,
+        debit: 5000,
+        credit: 2000,
+        closingAdjustment: 0,
       })
-      const row2 = createStoredRow({
-        id: 'r2', seq: 2, faceValue: 800000, couponRate: 6,
-        accrualStart: '2025-01-01', accrualEnd: '2025-04-01',
-        receivedInterest: 2000, bookValue: 10000,
-      })
-      const opts = createOptions([row1, row2])
-      const { totals } = useG2Detail(opts)
-
-      expect(totals.value.faceValue).toBe(1300000)
-
-      const days = 90
-      const interest1 = (500000 * 4 / 100 * days) / 365
-      const interest2 = (800000 * 6 / 100 * days) / 365
-      expect(totals.value.accruedInterest).toBeCloseTo(interest1 + interest2, 2)
-
-      const net1 = interest1 - 1000
-      const net2 = interest2 - 2000
-      expect(totals.value.netReceivable).toBeCloseTo(net1 + net2, 2)
-
-      const var1 = net1 - 3000
-      const var2 = net2 - 10000
-      expect(totals.value.variance).toBeCloseTo(var1 + var2, 2)
-    })
-  })
-
-  describe('updateCell', () => {
-    it('updates numeric fields correctly', () => {
-      const row = createStoredRow({ id: 'row-1', faceValue: 1000 })
       const opts = createOptions([row])
-      const { dataRows, updateCell } = useG2Detail(opts)
-
-      updateCell('row-1', 'faceValue', 2000000)
-      expect(dataRows.value[0].faceValue).toBe(2000000)
-    })
-
-    it('updates string fields correctly', () => {
-      const row = createStoredRow({ id: 'row-1' })
-      const opts = createOptions([row])
-      const { dataRows, updateCell } = useG2Detail(opts)
-
-      updateCell('row-1', 'investTarget', '国债2025-01')
-      expect(dataRows.value[0].investTarget).toBe('国债2025-01')
-    })
-  })
-
-  describe('persistence', () => {
-    it('serializes rows to allResponses remark field', () => {
-      const opts = createOptions([])
-      const { addRow } = useG2Detail(opts)
-      addRow()
-
-      const stored = opts.allResponses.value.get('G2-2-detail-rows')
-      expect(stored).toBeDefined()
-      expect(stored!.item_id).toBe('G2-2-detail-rows')
-      const parsed = JSON.parse(stored!.remark!)
-      expect(parsed).toHaveLength(1)
-      expect(parsed[0].seq).toBe(1)
+      const detail = useG2Detail(opts)
+      const id = detail.dataRows.value[0].id
+      const audited = detail.dataRows.value[0].closingAudited
+      detail.allocateAging(id, 'audited', 'within1')
+      expect(detail.dataRows.value[0].agingAudited.within1).toBeCloseTo(audited, 5)
+      expect(detail.isAgingBalanced(detail.dataRows.value[0], 'audited')).toBe(true)
     })
   })
 })

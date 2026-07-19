@@ -108,19 +108,18 @@
       </el-table-column>
     </el-table>
 
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：可概述第三层次调节表各行变动的核实情况、层次转入转出原因、企业期末与计算期末差异的核查结果。"
-        @change="(val: string) => saveAuditNote(val)" />
-    </el-card>
-
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
-      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。"
-        @change="(val: string) => saveAuditConclusion(val)" />
-    </el-card>
+    <G10AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="auditConclusion"
+      note-ai-section="l3-note"
+      conclusion-ai-section="l3-conclusion"
+      note-placeholder="填写审计说明：可概述第三层次调节表各行变动的核实情况、层次转入转出原因、企业期末与计算期末差异的核查结果。"
+      note-hint="覆盖期初至期末调节、层次转移及与 G10-5 勾稽。"
+      conclusion-placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。"
+      :related-context="{ 行数: l3.rows.value.length, 差异行数: l3.varianceRows.value.length }"
+    />
 
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
@@ -134,10 +133,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, onMounted } from 'vue'
+import { ref, toRef, watch } from 'vue'
 import { useG10L3Reconciliation } from '../../composables/useG10L3Reconciliation'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import G10ImportExportDropdown from '../G10ImportExportDropdown.vue'
+import G10AuditTextCards from '../G10AuditTextCards.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -156,24 +156,15 @@ const l3 = useG10L3Reconciliation({
   isReadonly: toRef(props, 'isReadonly'),
 })
 
-// ─── 审计说明 / 审计结论（自由文本，conclusion:null 落库）────────────────────
 const NOTE_KEY = 'G10-6-l3-audit-note'
 const CONCLUSION_KEY = 'G10-6-l3-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-function saveAuditNote(val: string): void {
-  if (props.isReadonly) return
-  auditNote.value = val
-  props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
-}
-function saveAuditConclusion(val: string): void {
-  if (props.isReadonly) return
-  auditConclusion.value = val
-  props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
-}
-onMounted(() => {
-  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNote.value = n.remark
-  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusion.value = c.remark
+const auditNote = ref(props.allResponses.get(NOTE_KEY)?.remark ?? '')
+const auditConclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: v })
+})
+watch(auditConclusion, (v) => {
+  if (!props.isReadonly) props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: v })
 })
 
 function onImported() {
@@ -200,6 +191,4 @@ function fmt(v: number) {
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .toolbar-right { display: flex; gap: 6px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
-.audit-note-card { margin-top: 12px; }
-.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

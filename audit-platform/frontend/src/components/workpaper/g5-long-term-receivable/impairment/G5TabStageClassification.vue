@@ -1,50 +1,62 @@
 <!--
   G5TabStageClassification.vue — G5-9 长期应收款三阶段划分
-
-  列式转置→行式交互视图（同G4-9方案）
-  行式：债务人|显著增加|低风险|已减值|企业阶段|审计阶段|一致|差异说明|索引
-  - determineStage规则计算审计判断阶段
-  - 不一致红色高亮+强制差异说明
-  - 展开/折叠详情（逐项检查明细）
-  - 底部汇总（S1/S2/S3数量/不一致数）
-  - 动态债务人增删（ElMessageBox.prompt输入名称）
-
-  Spec: .kiro/specs/g5-long-term-receivable/ Task 11.1
-  Requirements: 12.1~12.10
+  行式：债务人|余额|显著增加|低风险|已减值|企业阶段|建议阶段|审计阶段|一致|判断依据|差异说明|索引
 -->
 <template>
   <div class="g5-tab-stage-classification">
-    <!-- 方法论上下文（琥珀色左边线+浅黄背景） -->
     <div class="methodology-context">
-      <p><strong>ECL三阶段划分标准（长期应收款）：</strong></p>
+      <p><strong>ECL 三阶段划分（CAS 22 一般法）</strong></p>
       <ul>
-        <li><strong>Stage1</strong>：信用风险自初始确认以来未显著增加（或具有较低信用风险），按12个月ECL计提减值</li>
-        <li><strong>Stage2</strong>：信用风险显著增加但未发生信用减值，按整个存续期ECL计提</li>
-        <li><strong>Stage3</strong>：已发生信用减值（出现8项可观察信息之一），按整个存续期ECL计提且利息按净额确认</li>
+        <li><strong>Stage1</strong>：信用风险自初始确认以来未显著增加（或适用较低信用风险豁免）→ 12 个月 ECL</li>
+        <li><strong>Stage2</strong>：信用风险显著增加但未发生信用减值 → 整个存续期 ECL</li>
+        <li><strong>Stage3</strong>：已发生信用减值 → 整个存续期 ECL，利息按摊余净额确认</li>
       </ul>
+      <p class="method-sub">判定优先级：已减值(Stage3) &gt; 显著增加且非低风险豁免(Stage2) &gt; 其余(Stage1)。展开行可勾选 SICR/低风险/减值矩阵。</p>
     </div>
 
-    <!-- Section标题栏 -->
     <div class="section-head">
       <h3 class="sheet-title">G5-9 长期应收款三阶段划分</h3>
       <div class="head-actions tab-toolbar">
-        <el-button size="small" :disabled="isReadonly" @click="handleAddDebtor">
-          + 新增债务人
-        </el-button>
-        <el-button size="small" @click="stageLogic.expandAll()">全部展开</el-button>
-        <el-button size="small" @click="stageLogic.collapseAll()">全部折叠</el-button>
-        <el-button size="small" @click="openReview">💬复核</el-button>
+        <GtIndexChip value="wp:G5-9" />
+        <GtIndexChip value="wp:G5-2" />
+        <GtIndexChip value="wp:G5-10" />
+        <GtIndexChip value="wp:G5-4" />
+        <el-tag size="small" type="info">共 {{ stageLogic.rows.value.length }} 户</el-tag>
+        <el-tag
+          v-if="stageLogic.summary.value.inconsistentCount"
+          size="small"
+          type="danger"
+        >不一致 {{ stageLogic.summary.value.inconsistentCount }}</el-tag>
+        <GtReviewTrigger section-id="g5-9-stage-classification" />
       </div>
     </div>
 
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
-      审计目标：对各长期应收款债务人执行 ECL 三阶段划分，比对企业划分与审计判断的一致性，识别信用风险显著增加及已减值情形。
+      审计目标：按债务人执行 ECL 三阶段划分，比对企业划分与审计判断；识别信用风险显著增加及已减值情形，并将审计阶段同步至 G5-10 减值测算。
     </el-alert>
 
-    <!-- 无数据占位 -->
-    <el-empty v-if="stageLogic.rows.value.length === 0" description="暂无债务人，点击“新增债务人”开始" />
+    <div class="toolbar">
+      <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleAddDebtor">+ 新增债务人</el-button>
+      <el-button size="small" :disabled="isReadonly" @click="importFromG52">从 G5-2 带入</el-button>
+      <el-button
+        size="small"
+        type="primary"
+        :disabled="isReadonly || stageLogic.rows.value.length === 0"
+        @click="syncStagesToG510"
+      >同步阶段至 G5-10</el-button>
+      <el-button
+        size="small"
+        type="warning"
+        plain
+        :disabled="isReadonly || stageLogic.inconsistentRows.value.length === 0"
+        @click="pushInconsistenciesToG54"
+      >不一致推送 G5-4</el-button>
+      <el-button size="small" @click="stageLogic.expandAll()">全部展开</el-button>
+      <el-button size="small" @click="stageLogic.collapseAll()">全部折叠</el-button>
+    </div>
 
-    <!-- 主表格：行式汇总视图 -->
+    <el-empty v-if="stageLogic.rows.value.length === 0" description="暂无债务人，点击「新增债务人」或「从 G5-2 带入」" />
+
     <el-table
       v-else
       :data="stageLogic.rows.value"
@@ -56,13 +68,26 @@
       :expand-row-keys="Array.from(stageLogic.expandedRowIds.value)"
       @expand-change="handleExpandChange"
     >
-      <!-- 展开行：逐项检查明细 -->
       <el-table-column type="expand">
         <template #default="scope">
           <div class="expand-detail">
-            <!-- (一) 信用风险是否显著增加 -->
+            <div v-if="triggersOf(scope.row).length" class="trigger-box">
+              <strong>阶段触发因素：</strong>
+              <ul>
+                <li v-for="(t, i) in triggersOf(scope.row)" :key="i">{{ t }}</li>
+              </ul>
+              <el-button
+                v-if="scope.row.auditStageOverridden"
+                size="small"
+                text
+                type="primary"
+                :disabled="isReadonly"
+                @click="stageLogic.resetAuditStageToSuggested(scope.row.id)"
+              >清除审计覆写（恢复建议阶段 {{ scope.row.suggestedStage }}）</el-button>
+            </div>
+
             <div class="check-section">
-              <div class="check-section-title">(一) 信用风险是否显著增加（13项考虑因素）</div>
+              <div class="check-section-title">(一) 信用风险是否显著增加（13 项，任一项为「是」即显著增加）</div>
               <el-table :data="scope.row.sectionOneChecks" border size="small" class="check-detail-table">
                 <el-table-column label="序号" width="50" align="center">
                   <template #default="{ $index }">{{ $index + 1 }}</template>
@@ -87,9 +112,8 @@
               </el-table>
             </div>
 
-            <!-- (二) 是否具有较低信用风险 -->
             <div class="check-section">
-              <div class="check-section-title">(二) 是否具有较低信用风险（3项同时满足）</div>
+              <div class="check-section-title">(二) 是否具有较低信用风险（3 项须同时为「是」方可豁免）</div>
               <el-table :data="scope.row.sectionTwoChecks" border size="small" class="check-detail-table">
                 <el-table-column label="序号" width="50" align="center">
                   <template #default="{ $index }">{{ $index + 1 }}</template>
@@ -113,9 +137,8 @@
               </el-table>
             </div>
 
-            <!-- (三) 已发生信用减值的评估 -->
             <div class="check-section">
-              <div class="check-section-title">(三) 已发生信用减值的评估（8项可观察信息）</div>
+              <div class="check-section-title">(三) 已发生信用减值（8 项，任一项为「是」即 Stage3）</div>
               <el-table :data="scope.row.sectionThreeChecks" border size="small" class="check-detail-table">
                 <el-table-column label="序号" width="50" align="center">
                   <template #default="{ $index }">{{ $index + 1 }}</template>
@@ -142,8 +165,7 @@
         </template>
       </el-table-column>
 
-      <!-- 债务人 -->
-      <el-table-column label="债务人" prop="debtor" min-width="140" fixed="left">
+      <el-table-column label="债务人" prop="debtor" min-width="130" fixed="left">
         <template #default="{ row }">
           <div class="debtor-name-cell">
             <span>{{ row.debtor }}</span>
@@ -154,15 +176,26 @@
               link
               class="delete-btn"
               @click.stop="handleRemoveRow(row.id, row.debtor)"
-            >
-              🗑️
-            </el-button>
+            >删</el-button>
           </div>
+          <div v-if="row.businessType" class="sub-meta">{{ bizLabel(row.businessType) }}</div>
         </template>
       </el-table-column>
 
-      <!-- 信用风险显著增加判定(综合) -->
-      <el-table-column label="显著增加" width="100" align="center">
+      <el-table-column label="期末余额" width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number
+            v-if="!isReadonly"
+            :model-value="row.closingBalance"
+            size="small"
+            :controls="false"
+            @change="(v: number | undefined) => stageLogic.updateClosingBalance(row.id, Number(v) || 0)"
+          />
+          <span v-else>{{ fmt(row.closingBalance) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="显著增加" width="88" align="center">
         <template #default="{ row }">
           <el-tag :type="row.hasSignificantIncrease ? 'danger' : 'success'" size="small">
             {{ row.hasSignificantIncrease ? '是' : '否' }}
@@ -170,8 +203,7 @@
         </template>
       </el-table-column>
 
-      <!-- 较低信用风险(综合) -->
-      <el-table-column label="低风险" width="100" align="center">
+      <el-table-column label="低风险" width="80" align="center">
         <template #default="{ row }">
           <el-tag :type="row.hasLowCreditRisk ? 'success' : 'info'" size="small">
             {{ row.hasLowCreditRisk ? '是' : '否' }}
@@ -179,8 +211,7 @@
         </template>
       </el-table-column>
 
-      <!-- 已发生减值(综合) -->
-      <el-table-column label="已减值" width="100" align="center">
+      <el-table-column label="已减值" width="80" align="center">
         <template #default="{ row }">
           <el-tag :type="row.hasCreditImpairment ? 'danger' : 'success'" size="small">
             {{ row.hasCreditImpairment ? '是' : '否' }}
@@ -188,8 +219,7 @@
         </template>
       </el-table-column>
 
-      <!-- 企业划分阶段(下拉) -->
-      <el-table-column label="企业阶段" width="120" align="center">
+      <el-table-column label="企业阶段" width="100" align="center">
         <template #default="{ row }">
           <el-select
             v-if="!isReadonly"
@@ -206,8 +236,13 @@
         </template>
       </el-table-column>
 
-      <!-- 审计阶段(下拉) -->
-      <el-table-column label="审计阶段" width="120" align="center">
+      <el-table-column label="建议阶段" width="90" align="center">
+        <template #default="{ row }">
+          <span class="formula-cell" title="由检查矩阵自动判定">{{ row.suggestedStage }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="审计阶段" width="110" align="center">
         <template #default="{ row }">
           <el-select
             v-if="!isReadonly"
@@ -221,101 +256,112 @@
             <el-option value="Stage3" label="Stage3" />
           </el-select>
           <span v-else>{{ row.auditStage }}</span>
+          <div v-if="row.auditStageOverridden" class="override-hint">已覆写</div>
         </template>
       </el-table-column>
 
-      <!-- 一致性(公式badge) -->
-      <el-table-column label="一致性" width="100" align="center">
+      <el-table-column label="一致性" width="88" align="center">
         <template #default="{ row }">
           <span v-if="row.isConsistent" class="badge-consistent">✓一致</span>
           <span v-else class="badge-inconsistent">✗不一致</span>
         </template>
       </el-table-column>
 
-      <!-- 差异说明 -->
-      <el-table-column label="差异说明" min-width="180">
+      <el-table-column label="判断依据" min-width="140">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.judgmentBasis"
+            size="small"
+            placeholder="证据/合同要点"
+            @input="(v: string) => stageLogic.updateJudgmentBasis(row.id, v)"
+          />
+          <span v-else>{{ row.judgmentBasis || '—' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="差异说明" min-width="150">
         <template #default="{ row }">
           <el-input
             v-if="!isReadonly"
             :model-value="row.discrepancyNote"
             size="small"
-            :placeholder="row.isConsistent ? '' : '请填写差异说明（必填）'"
+            :placeholder="row.isConsistent ? '' : '不一致必填'"
             :class="{ 'required-field': !row.isConsistent && !row.discrepancyNote }"
             @input="(v: string) => stageLogic.updateDiscrepancyNote(row.id, v)"
           />
-          <span v-else>{{ row.discrepancyNote || '-' }}</span>
+          <span v-else>{{ row.discrepancyNote || '—' }}</span>
         </template>
       </el-table-column>
 
-      <!-- 索引(GtIndexChip) -->
-      <el-table-column label="索引" width="120" align="center">
+      <el-table-column label="索引" width="90" align="center">
         <template #default="{ row }">
-          <GtIndexChip :value="row.indexRef" />
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.indexRef"
+            size="small"
+            placeholder="索引"
+            @input="(v: string) => stageLogic.updateIndexRef(row.id, v)"
+          />
+          <GtIndexChip v-else-if="row.indexRef" :value="row.indexRef" />
+          <span v-else>—</span>
         </template>
       </el-table-column>
     </el-table>
 
-    <!-- 底部：汇总区 + 审计结论 + 编制提示 -->
     <div v-if="stageLogic.rows.value.length > 0" class="bottom-section">
-      <!-- 汇总统计 -->
       <div class="summary-stats">
-        <span class="summary-label">阶段统计：</span>
-        <el-tag type="success" size="small">Stage1: {{ stageLogic.summary.value.stage1Count }}</el-tag>
-        <el-tag type="warning" size="small">Stage2: {{ stageLogic.summary.value.stage2Count }}</el-tag>
-        <el-tag type="danger" size="small">Stage3: {{ stageLogic.summary.value.stage3Count }}</el-tag>
-        <el-tag
-          :type="stageLogic.summary.value.inconsistentCount > 0 ? 'danger' : 'info'"
-          size="small"
-        >
-          不一致: {{ stageLogic.summary.value.inconsistentCount }}
+        <span class="summary-label">阶段户数：</span>
+        <el-tag type="success" size="small">S1 {{ stageLogic.summary.value.stage1Count }}</el-tag>
+        <el-tag type="warning" size="small">S2 {{ stageLogic.summary.value.stage2Count }}</el-tag>
+        <el-tag type="danger" size="small">S3 {{ stageLogic.summary.value.stage3Count }}</el-tag>
+        <el-tag :type="stageLogic.summary.value.inconsistentCount > 0 ? 'danger' : 'info'" size="small">
+          不一致 {{ stageLogic.summary.value.inconsistentCount }}
         </el-tag>
-        <span class="summary-total">合计: {{ stageLogic.summary.value.total }} 项</span>
+        <span class="summary-sep">|</span>
+        <span class="summary-label">阶段余额：</span>
+        <span>S1 {{ fmt(stageLogic.summary.value.stage1Amount) }}</span>
+        <span>S2 {{ fmt(stageLogic.summary.value.stage2Amount) }}</span>
+        <span>S3 {{ fmt(stageLogic.summary.value.stage3Amount) }}</span>
+        <span>合计 {{ fmt(stageLogic.summary.value.totalAmount) }}</span>
+        <span
+          v-if="stageLogic.summary.value.inconsistentAmount > 0"
+          class="badge-inconsistent"
+        >不一致余额 {{ fmt(stageLogic.summary.value.inconsistentAmount) }}</span>
       </div>
 
-      <!-- 审计说明 el-card -->
-      <el-card class="audit-note-card" shadow="never">
-        <template #header><div class="card-header"><span>审计说明</span></div></template>
-        <el-input
-          :model-value="auditNote"
-          type="textarea"
-          :autosize="{ minRows: 5 }"
-          :disabled="isReadonly"
-          placeholder="填写审计说明：可概述三阶段划分依据、企业与审计判断差异、信用风险显著增加/已减值识别情况。"
-          @change="(val: string) => saveAuditNote(val)"
-        />
-      </el-card>
+      <G5AuditTextCards
+        :wp-id="props.wpId"
+        :is-readonly="isReadonly"
+        :note="auditNote"
+        :conclusion="stageLogic.conclusion.value"
+        conclusion-ai-section="stage-classification-conclusion"
+        note-placeholder="填写审计说明：SICR/已减值关键证据、企业与审计阶段差异原因、与 G5-8 政策及 G5-10 测算勾稽。"
+        conclusion-placeholder="A、三阶段划分适当，与企业一致。B、除下述阶段差异应调整减值测算外，其余未见异常。C、由于存在重大未决阶段判断或范围受限，不可确认。"
+        conclusion-hint="按 A/B/C 口径评价阶段划分结果。"
+        :related-context="{
+          Stage1: stageLogic.summary.value.stage1Count,
+          Stage2: stageLogic.summary.value.stage2Count,
+          Stage3: stageLogic.summary.value.stage3Count,
+          不一致: stageLogic.summary.value.inconsistentCount,
+          不一致余额: stageLogic.summary.value.inconsistentAmount,
+        }"
+        @update:note="saveAuditNote"
+        @update:conclusion="(v: string) => { stageLogic.conclusion.value = v }"
+      />
 
-      <!-- 审计结论 el-card + AI按钮 -->
-      <el-card class="conclusion-card" shadow="never">
-        <template #header>
-          <div class="conclusion-header">
-            <span>审计结论</span>
-            <el-button size="small" :disabled="isReadonly" @click="fillAiConclusion">
-              🤖 AI辅助
-            </el-button>
-          </div>
-        </template>
-        <el-input
-          v-model="stageLogic.conclusion.value"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 8 }"
-          :disabled="isReadonly"
-          placeholder="对三阶段划分合理性的综合评价..."
-        />
-      </el-card>
-
-      <!-- 编制提示 details 折叠 -->
-      <details class="g5-guide-details">
+      <details class="g5-guide-details" open>
         <summary>📋 编制提示</summary>
         <div class="g5-guide-content">
-          <p>1. 三阶段划分是确定ECL计提方法的关键步骤：Stage1→12个月ECL，Stage2/3→整个存续期ECL</p>
-          <p>2. (一)信用风险显著增加：13项考虑因素中任一项为"是"，则该债务人信用风险显著增加</p>
-          <p>3. (二)较低信用风险：3项条件须全部满足（全部为"是"），方可适用较低信用风险豁免</p>
-          <p>4. (三)已发生信用减值：8项可观察信息中任一项为"是"，则直接归入Stage3</p>
-          <p>5. 判定优先级：Stage3（已减值）> Stage2（显著增加且非低风险）> Stage1（未显著增加/低风险豁免）</p>
-          <p>6. 企业划分阶段与审计判断阶段不一致时，必须填写差异说明</p>
-          <p>7. 展开债务人行可查看该债务人的逐项检查明细</p>
-          <p>8. 长期应收款常见Stage2升级信号：逾期超30天、债务人经营困难、担保物贬值</p>
+          <ol>
+            <li>从 G5-2 带入债务人及余额 → 展开逐户勾选（一）（二）（三）矩阵 → 核对建议阶段与企业阶段。</li>
+            <li>（一）13 项任一为「是」→ SICR；（二）3 项全「是」才可低风险豁免；（三）8 项任一「是」→ Stage3。</li>
+            <li>建议阶段由公式自动给出；审计阶段默认同建议，可人工覆写（展开区可「清除覆写」）。</li>
+            <li>企业≠审计时须填差异说明；可推送备忘至 G5-4（金额待 G5-10 量化后补录）。</li>
+            <li>确认后点「同步阶段至 G5-10」，保证减值测算分组与本表审计阶段一致。</li>
+            <li>长期应收常见 Stage2 信号：逾期超 30 天、经营恶化、担保物贬值、合同展期让步。</li>
+          </ol>
+          <p class="cas-basis">CAS 依据：《企业会计准则第 22 号——金融工具确认和计量》预期信用损失三阶段模型。</p>
         </div>
       </details>
     </div>
@@ -323,24 +369,24 @@
 </template>
 
 <script setup lang="ts">
-/**
- * G5TabStageClassification.vue — G5-9 长期应收款三阶段划分
- *
- * 功能：
- * - 列式转置结构：源模板债务人为列，前端转换为行式交互视图
- * - 三区块检查：(一)信用风险显著增加(13项) / (二)较低信用风险(3项) / (三)已发生信用减值(8项)
- * - 行式汇总视图：债务人|显著增加|较低信用风险|已发生减值|企业阶段|审计阶段|一致性|差异说明|索引
- * - 支持展开/折叠详情模式（展开显示逐项检查明细）
- * - 不一致行红色高亮 + 强制差异说明
- * - 动态债务人增删（ElMessageBox.prompt输入名称）
- *
- * 使用 useG5StageClassification composable
- */
-import { ref, computed, inject, toRef, watch, onMounted } from 'vue'
+import { ref, computed, toRef, watch, onMounted } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { useG5StageClassification } from '../../composables/useG5StageClassification'
-import { useG5LonRecFormData } from '../../composables/useG5LonRecFormData'
+import {
+  useG5StageClassification,
+  getStageTriggerLabels,
+  type G5StageClassificationRow,
+} from '../../composables/useG5StageClassification'
+import { useInjectedG5FormData } from '../../composables/useG5LonRecFormData'
+import {
+  applyStageUpdatesToRows,
+  parseG510Payload,
+} from '../../composables/useG5ImpairmentCalc'
+import { parseRowsRemark } from '../../composables/g5CrossHelpers'
+import { G5_ITEM_IDS, readCanonicalRaw } from '../../composables/g5StorageContract'
+import { createEmptyEntry } from '../../composables/useG5Adjustment'
 import GtIndexChip from '../../GtIndexChip.vue'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import G5AuditTextCards from '../G5AuditTextCards.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -349,35 +395,54 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const isReadonly = computed(() => props.isReadonly)
+const isReadonlyRef = computed(() => props.isReadonly)
+const htmlDataRef = computed(() => props.htmlData)
 
-// ─── 审计说明（持久化 checklist_responses，item_id 前缀 G5-）───
-const g5Notes = useG5LonRecFormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const g5Notes = useInjectedG5FormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
 const auditNote = ref('')
 const G5_NOTE_KEY = 'G5-9-audit-note'
+const G5_CONCLUSION_KEY = 'G5-9-audit-conclusion'
+const G5_ROWS_KEY = 'G5-9-rows'
+const G5_4_KEY = 'G5-4-rows'
+const PUSH_MARK = '来自G5-9三阶段'
+
 function saveAuditNote(val: string): void {
   if (props.isReadonly) return
   auditNote.value = val
   void g5Notes.saveImmediate(G5_NOTE_KEY, { conclusion: null, remark: val })
 }
-onMounted(async () => {
-  try { await g5Notes.loadAll() } catch { /* ignore */ }
-  const n = g5Notes.allResponses.value.get(G5_NOTE_KEY)
-  if (n?.remark) auditNote.value = n.remark
-})
-
-// ─── 初始化 composable ───
-const isReadonlyRef = computed(() => props.isReadonly)
-const htmlDataRef = computed(() => props.htmlData)
 
 const stageLogic = useG5StageClassification({
   htmlData: htmlDataRef,
   isReadonly: isReadonlyRef,
 })
 
-// ─── 从htmlData初始化数据 ───
-onMounted(() => {
-  stageLogic.init(props.htmlData)
+watch(() => stageLogic.conclusion.value, (val) => {
+  if (props.isReadonly) return
+  void g5Notes.saveImmediate(G5_CONCLUSION_KEY, { conclusion: null, remark: val ?? '' })
+})
+
+let hydrating = false
+onMounted(async () => {
+  hydrating = true
+  try { await g5Notes.loadAll() } catch { /* ignore */ }
+  const n = g5Notes.allResponses.value.get(G5_NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = g5Notes.allResponses.value.get(G5_CONCLUSION_KEY)
+  if (c?.remark) stageLogic.conclusion.value = c.remark
+  const saved = readCanonicalRaw(g5Notes.allResponses.value.get(G5_ROWS_KEY))
+  if (saved) {
+    try {
+      const parsed = JSON.parse(saved)
+      if (Array.isArray(parsed)) stageLogic.loadRows(parsed)
+      else if (Array.isArray(parsed?.rows)) stageLogic.loadRows(parsed.rows)
+      if (parsed?.conclusion) stageLogic.conclusion.value = parsed.conclusion
+    } catch { /* ignore */ }
+  } else {
+    stageLogic.init(props.htmlData)
+  }
+  hydrating = false
 })
 
 watch(() => props.htmlData, (newData) => {
@@ -386,294 +451,230 @@ watch(() => props.htmlData, (newData) => {
   }
 })
 
-// ─── 展开行处理（el-table expand事件） ───
-function handleExpandChange(row: any, expandedRows: any[]): void {
+watch(
+  () => stageLogic.rows.value,
+  () => {
+    if (props.isReadonly || hydrating) return
+    const json = JSON.stringify(stageLogic.toSaveData())
+    g5Notes.debouncedSave(G5_ROWS_KEY, { remark: json, conclusion: json })
+  },
+  { deep: true },
+)
+
+function handleExpandChange(_row: any, expandedRows: any[]): void {
   stageLogic.expandedRowIds.value.clear()
-  for (const r of expandedRows) {
-    stageLogic.expandedRowIds.value.add(r.id)
-  }
+  for (const r of expandedRows) stageLogic.expandedRowIds.value.add(r.id)
 }
 
-// ─── 行样式：不一致行红色高亮 ───
-function getRowClassName({ row }: { row: any }): string {
+function getRowClassName({ row }: { row: G5StageClassificationRow }): string {
   if (!row.isConsistent) return 'row-inconsistent'
+  if (row.auditStage === 'Stage3') return 'row-stage3'
+  if (row.auditStage === 'Stage2') return 'row-stage2'
   return ''
 }
 
-// ─── 新增债务人（ElMessageBox.prompt输入名称） ───
+function triggersOf(row: G5StageClassificationRow): string[] {
+  return getStageTriggerLabels(row)
+}
+
+function bizLabel(bt: string): string {
+  const map: Record<string, string> = {
+    lease: '融资租赁',
+    installment: '分期销售',
+    factoring: '保理',
+    other: '其他',
+  }
+  return map[bt] || bt
+}
+
 async function handleAddDebtor(): Promise<void> {
   try {
-    const { value } = await ElMessageBox.prompt(
-      '请输入债务人名称',
-      '新增债务人',
-      {
-        confirmButtonText: '确认',
-        cancelButtonText: '取消',
-        inputPattern: /\S+/,
-        inputErrorMessage: '债务人名称不能为空',
-        inputPlaceholder: '例如：XX公司',
-      },
-    )
+    const { value } = await ElMessageBox.prompt('请输入债务人名称', '新增债务人', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      inputPattern: /\S+/,
+      inputErrorMessage: '债务人名称不能为空',
+    })
     if (value?.trim()) {
-      stageLogic.addRow(value.trim())
-      ElMessage.success(`已新增债务人"${value.trim()}"`)
+      await stageLogic.addRow(value.trim())
+      ElMessage.success(`已新增「${value.trim()}」`)
     }
+  } catch { /* cancel */ }
+}
+
+async function importFromG52(): Promise<void> {
+  if (props.isReadonly) return
+  try { await g5Notes.loadAll() } catch { /* ignore */ }
+  const list = parseRowsRemark(g5Notes.allResponses.value.get(G5_ITEM_IDS.G5_2_ROWS))
+  if (!list.length) {
+    ElMessage.warning('未找到 G5-2 明细数据')
+    return
+  }
+  const added = stageLogic.importFromBalanceRows(list)
+  ElMessage.success(added > 0 ? `已带入 ${added} 户（已有户仅刷新余额）` : '无新增户，已刷新同名余额')
+}
+
+async function syncStagesToG510(): Promise<void> {
+  if (props.isReadonly) return
+  const missingNote = stageLogic.inconsistentRows.value.filter(r => !r.discrepancyNote?.trim())
+  if (missingNote.length) {
+    ElMessage.warning(`${missingNote.length} 户阶段不一致但未填差异说明，请先补全`)
+    return
+  }
+  const updates = stageLogic.rows.value
+    .filter(r => r.debtor?.trim())
+    .map(r => ({ debtor: r.debtor.trim(), auditStage: r.auditStage as 'Stage1' | 'Stage2' | 'Stage3' }))
+  if (!updates.length) {
+    ElMessage.warning('无可同步的债务人')
+    return
+  }
+  try {
+    try { await g5Notes.loadAll() } catch { /* ignore */ }
+    const raw = readCanonicalRaw(g5Notes.allResponses.value.get(G5_ITEM_IDS.G5_10_ROWS))
+    let existing: unknown = []
+    if (raw) {
+      try { existing = JSON.parse(raw) } catch { existing = [] }
+    }
+    const applied = applyStageUpdatesToRows(parseG510Payload(existing), updates)
+    const json = JSON.stringify(applied.payload)
+    await g5Notes.saveImmediate(G5_ITEM_IDS.G5_10_ROWS, { remark: json, conclusion: json })
+    try {
+      window.dispatchEvent(new CustomEvent('g5:stage-updated', {
+        detail: { updates, source: 'G5-9', written: true },
+      }))
+    } catch { /* silent */ }
+    ElMessage.success(`已同步 ${applied.count} 条阶段至 G5-10`)
   } catch {
-    // 用户取消
+    ElMessage.error('阶段同步写入失败')
   }
 }
 
-// ─── 删除债务人确认 ───
+async function pushInconsistenciesToG54(): Promise<void> {
+  if (props.isReadonly) return
+  const drafts = stageLogic.buildInconsistencyAdjDrafts()
+  if (!drafts.length) {
+    ElMessage.info('无阶段不一致可推送')
+    return
+  }
+  const missing = stageLogic.inconsistentRows.value.filter(r => !r.discrepancyNote?.trim())
+  if (missing.length) {
+    ElMessage.warning('请先为不一致行填写差异说明')
+    return
+  }
+  try { await g5Notes.loadAll() } catch { /* ignore */ }
+  const raw = readCanonicalRaw(g5Notes.allResponses.value.get(G5_4_KEY))
+  let existing: any[] = []
+  try {
+    const parsed = raw ? JSON.parse(raw) : []
+    existing = Array.isArray(parsed) ? parsed : []
+  } catch {
+    existing = []
+  }
+  const kept = existing.filter((e: any) => !String(e.remark || '').includes(PUSH_MARK))
+  const added = drafts.map((d, i) => {
+    const e = createEmptyEntry(kept.length + i + 1, d.description)
+    e.accountCode = d.accountCode
+    e.accountName = d.accountName
+    e.reportItem = '坏账准备'
+    e.debitAmount = d.debitAmount
+    e.creditAmount = d.creditAmount
+    e.indexRef = d.indexRef
+    e.remark = d.remark
+    e.category = '其他'
+    e.entryType = 'AJE'
+    return e
+  })
+  const next = [...kept, ...added]
+  const json = JSON.stringify(next)
+  await g5Notes.saveImmediate(G5_4_KEY, { remark: json, conclusion: json })
+  try {
+    window.dispatchEvent(new CustomEvent('g5:stage-diff-pushed', {
+      detail: { count: added.length },
+    }))
+  } catch { /* silent */ }
+  ElMessage.success(`已向 G5-4 推送 ${added.length} 条阶段不一致备忘（金额待 G5-10 补录）`)
+}
+
 async function handleRemoveRow(rowId: string, debtorName: string): Promise<void> {
   try {
-    await ElMessageBox.confirm(
-      `确认删除债务人"${debtorName}"及其所有检查数据？`,
-      '删除确认',
-      {
-        confirmButtonText: '确认删除',
-        cancelButtonText: '取消',
-        type: 'warning',
-      },
-    )
+    await ElMessageBox.confirm(`确认删除「${debtorName}」及其检查数据？`, '删除确认', {
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
     stageLogic.removeRow(rowId)
-    ElMessage.success(`已删除"${debtorName}"`)
-  } catch {
-    // 用户取消
-  }
+    ElMessage.success(`已删除「${debtorName}」`)
+  } catch { /* cancel */ }
 }
 
-// ─── 打开复核对话 ───
-function openReview(): void {
-  openReviewDialog('G5-9-stage-classification')
+function onImported(rows: unknown[]) {
+  if (Array.isArray(rows)) stageLogic.loadRows(rows as any)
 }
 
-// ─── AI辅助生成审计结论 ───
-function fillAiConclusion(): void {
-  if (props.isReadonly) return
-  const s = stageLogic.summary.value
-  const draft =
-    `经对${s.total}个长期应收款债务人进行信用风险评估和三阶段划分检查，其中` +
-    `Stage1（未显著增加）${s.stage1Count}项、` +
-    `Stage2（显著增加）${s.stage2Count}项、` +
-    `Stage3（已减值）${s.stage3Count}项。` +
-    (s.inconsistentCount === 0
-      ? '企业划分阶段与审计判断阶段全部一致，三阶段划分合理。'
-      : `企业划分阶段与审计判断阶段存在${s.inconsistentCount}项不一致，需关注差异原因。`)
-  stageLogic.conclusion.value = stageLogic.conclusion.value
-    ? `${stageLogic.conclusion.value}\n${draft}`
-    : draft
+function fmt(v: number | null | undefined): string {
+  const n = Number(v) || 0
+  if (Math.abs(n) < 0.005) return '—'
+  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-// ─── 暴露序列化接口供父组件保存使用 ───
 defineExpose({
   toJSON: () => stageLogic.toSaveData(),
 })
 </script>
 
 <style scoped>
-.g5-tab-stage-classification {
-  padding: 12px;
-  font-size: var(--wp-font-size, 13px);
-}
-
-/* ─── 方法论上下文（琥珀色左边线+浅黄背景）─── */
+.g5-tab-stage-classification { padding: 4px 0; font-size: var(--wp-font-size, 13px); }
 .methodology-context {
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  background: #fffbeb;
-  border-left: 4px solid #f59e0b;
-  border-radius: 4px;
-  font-size: 12px;
-  line-height: 1.8;
+  margin-bottom: 12px; padding: 10px 14px; background: #fffbeb;
+  border-left: 4px solid #f59e0b; border-radius: 4px; font-size: 12px; line-height: 1.75;
 }
-
-.methodology-context p {
-  margin: 0 0 4px;
-}
-
-.methodology-context ul {
-  margin: 0;
-  padding-left: 18px;
-}
-
-.methodology-context li {
-  margin-bottom: 2px;
-}
-
-/* ─── Section标题栏 ─── */
+.methodology-context p { margin: 0 0 4px; }
+.methodology-context ul { margin: 0; padding-left: 18px; }
+.method-sub { margin-top: 6px !important; color: #865c0a; }
 .section-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px; gap: 8px; flex-wrap: wrap;
 }
-
-.sheet-title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
+.sheet-title { margin: 0; font-size: 15px; font-weight: 600; color: #1f2a37; }
+.head-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.audit-objective { margin-bottom: 10px; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.stage-main-table { width: 100%; font-size: var(--wp-font-size, 13px); }
+:deep(.row-inconsistent) { background-color: #fef0f0 !important; }
+:deep(.row-stage2) { background-color: #fdf6ec !important; }
+:deep(.row-stage3) { background-color: #fef0f0 !important; }
+.debtor-name-cell { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.delete-btn { opacity: 0.55; }
+.sub-meta { font-size: 11px; color: #909399; }
+.override-hint { font-size: 10px; color: #e6a23c; }
+.formula-cell { border-bottom: 1px dashed #999; cursor: help; font-weight: 600; }
+.badge-consistent { color: #67c23a; font-weight: 600; font-size: 12px; }
+.badge-inconsistent { color: #f56c6c; font-weight: 700; font-size: 12px; }
+.required-field :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #f56c6c inset; }
+.expand-detail { padding: 12px 20px; background: #fafafa; }
+.trigger-box {
+  margin-bottom: 12px; padding: 8px 12px; background: #fdf6ec;
+  border-left: 3px solid #e6a23c; border-radius: 0 4px 4px 0; font-size: 12px;
 }
-
-.head-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.audit-objective {
-  margin-bottom: 12px;
-}
-
-/* ─── 主表格 ─── */
-.stage-main-table {
-  width: 100%;
-  font-size: var(--wp-font-size, 13px);
-}
-
-/* 不一致行红色高亮 */
-:deep(.row-inconsistent) {
-  background-color: #fef0f0 !important;
-}
-
-:deep(.row-inconsistent:hover > td) {
-  background-color: #fde8e8 !important;
-}
-
-/* ─── 债务人名称单元格 ─── */
-.debtor-name-cell {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.delete-btn {
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.debtor-name-cell:hover .delete-btn {
-  opacity: 1;
-}
-
-/* ─── 一致性badge ─── */
-.badge-consistent {
-  color: #67c23a;
-  font-weight: 600;
-  font-size: 12px;
-}
-
-.badge-inconsistent {
-  color: #f56c6c;
-  font-weight: 700;
-  font-size: 12px;
-}
-
-/* ─── 差异说明必填提示 ─── */
-.required-field :deep(.el-input__wrapper) {
-  box-shadow: 0 0 0 1px #f56c6c inset;
-}
-
-/* ─── 展开详情区 ─── */
-.expand-detail {
-  padding: 12px 24px;
-  background: #fafafa;
-}
-
-.check-section {
-  margin-bottom: 16px;
-}
-
-.check-section:last-child {
-  margin-bottom: 0;
-}
-
+.trigger-box ul { margin: 4px 0 0; padding-left: 18px; line-height: 1.6; }
+.check-section { margin-bottom: 14px; }
 .check-section-title {
-  font-weight: 600;
-  font-size: var(--wp-font-size, 13px);
-  color: #303133;
-  margin-bottom: 8px;
-  padding-left: 8px;
-  border-left: 3px solid #409eff;
+  font-weight: 600; font-size: 13px; color: #303133; margin-bottom: 8px;
+  padding-left: 8px; border-left: 3px solid #409eff;
 }
-
-.check-detail-table {
-  width: 100%;
-  font-size: 12px;
-}
-
-/* ─── 底部区域 ─── */
-.bottom-section {
-  margin-top: 16px;
-}
-
-/* 汇总统计 */
+.check-detail-table { width: 100%; font-size: 12px; }
+.bottom-section { margin-top: 14px; }
 .summary-stats {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 16px;
-  background: #f5f7fa;
-  border-radius: 4px;
-  margin-bottom: 12px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 10px 14px; background: #f5f7fa; border-radius: 4px; margin-bottom: 12px; font-size: 12px;
 }
-
-.summary-label {
-  font-weight: 700;
-  color: #606266;
-}
-
-.summary-total {
-  margin-left: 8px;
-  font-weight: 600;
-  color: #303133;
-}
-
-/* 审计说明卡片 */
-.audit-note-card {
-  margin-top: 12px;
-}
-.audit-note-card .card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
-}
-
-/* 审计结论卡片 */
-.conclusion-card {
-  margin-top: 12px;
-}
-
-.conclusion-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
-}
-
-/* 编制提示 */
-.g5-guide-details {
-  margin-top: 16px;
-}
-
-.g5-guide-details summary {
-  cursor: pointer;
-  font-size: var(--wp-font-size, 13px);
-  color: #606266;
-  font-weight: 600;
-}
-
+.summary-label { font-weight: 700; color: #606266; }
+.summary-sep { color: #dcdfe6; }
+.g5-guide-details { margin-top: 14px; font-size: 12px; color: #606266; }
+.g5-guide-details summary { cursor: pointer; font-weight: 600; color: #409eff; }
 .g5-guide-content {
-  padding: 8px 12px;
-  background: #fffbeb;
-  border-left: 3px solid #f59e0b;
-  margin-top: 6px;
-  font-size: 12px;
-  line-height: 1.8;
+  padding: 8px 12px; background: #fffbeb; border-left: 3px solid #f59e0b; margin-top: 6px; line-height: 1.8;
 }
-
-.g5-guide-content p {
-  margin: 0;
-}
+.g5-guide-content ol { margin: 0; padding-left: 18px; }
+.cas-basis { margin: 8px 0 0; color: #909399; font-size: 11px; }
 </style>

@@ -4,7 +4,7 @@
  * Spec: .kiro/specs/g3-dividend-receivable/ Task 8.2 / Req 14.1~14.4
  * 模式状态(html/onlyoffice) + 健康检查 + 切换 + localStorage 持久化(per wpId)
  */
-import { ref, onMounted, type Ref } from 'vue'
+import { ref, computed, onMounted, type Ref } from 'vue'
 
 export type G3RenderMode = 'html' | 'onlyoffice'
 
@@ -24,10 +24,10 @@ export function useG3DualMode(options: UseG3DualModeOptions) {
   const ooConfig = ref<Record<string, any> | null>(null)
   const checking = ref(false)
 
-  const modeOptions = [
+  const modeOptions = computed(() => [
     { label: '结构化视图', value: 'html' },
-    { label: '在线编辑', value: 'onlyoffice' },
-  ]
+    { label: '在线编辑', value: 'onlyoffice', disabled: !isOoAvailable.value },
+  ])
 
   function loadPersistedMode(): void {
     try {
@@ -64,7 +64,11 @@ export function useG3DualMode(options: UseG3DualModeOptions) {
 
   async function switchMode(target: G3RenderMode): Promise<void> {
     if (target === currentMode.value) return
-    if (target === 'onlyoffice' && !isOoAvailable.value) return
+    if (target === 'onlyoffice' && !isOoAvailable.value) {
+      // 强制回退到 html（防止 segmented 视觉状态不同步）
+      currentMode.value = 'html'
+      return
+    }
 
     if (target === 'onlyoffice') {
       currentMode.value = 'onlyoffice'
@@ -81,9 +85,23 @@ export function useG3DualMode(options: UseG3DualModeOptions) {
     void switchMode(val as G3RenderMode)
   }
 
+  function onOoFallback(): void {
+    currentMode.value = 'html'
+    isOoAvailable.value = false
+    persistMode('html')
+  }
+
   onMounted(() => {
-    loadPersistedMode()
-    void checkOOHealth()
+    // 先检查 OO 健康状态，再恢复持久化模式（避免 race condition：恢复 OO→渲染→才发现不可用）
+    void checkOOHealth().then((healthy) => {
+      if (healthy) {
+        loadPersistedMode()
+      } else {
+        // OO 不可用，强制 html 不管 localStorage 存什么
+        currentMode.value = 'html'
+        persistMode('html')
+      }
+    })
   })
 
   return {
@@ -94,8 +112,7 @@ export function useG3DualMode(options: UseG3DualModeOptions) {
     modeOptions,
     switchMode,
     onModeChange,
+    onOoFallback,
     checkOOHealth,
   }
 }
-
-export default useG3DualMode

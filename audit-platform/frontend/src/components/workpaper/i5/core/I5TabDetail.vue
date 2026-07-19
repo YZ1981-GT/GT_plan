@@ -1,5 +1,9 @@
 <template>
   <div class="i5-tab-detail">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：逐项核实其他非流动资产明细的存在性、分类正确性及期末余额计价的恰当性。" />
+
     <!-- 方法论上下文（琥珀色左边线） -->
     <div class="methodology-context">
       <p><strong>I5-2 明细表 — 3区段Tab使用说明：</strong></p>
@@ -175,6 +179,36 @@
       <span class="subtotal-item">净值 {{ fmtAmount(subtotals.netValue) }}</span>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计说明</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :autosize="{ minRows: 5 }"
+        :disabled="props.isReadonly"
+        placeholder="请填写审计说明..."
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :autosize="{ minRows: 3 }"
+        :disabled="props.isReadonly"
+        placeholder="请填写审计结论..."
+        @change="saveAuditConclusion"
+      />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -205,7 +239,7 @@
  * Task: 4.3
  * Requirements: 3.1-3.4
  */
-import { computed, toRef, inject } from 'vue'
+import { computed, toRef, ref, onMounted, inject } from 'vue'
 import { ArrowDown, MagicStick } from '@element-plus/icons-vue'
 import { useI5Detail, type I5DetailRow } from '../../composables/useI5Detail'
 import { useI5ImportExport } from '../../composables/useI5ImportExport'
@@ -262,6 +296,38 @@ const {
 })
 
 // ─── Segment Options ─────────────────────────────────────────────────────────
+
+// ─── Audit Note / Conclusion (AN+AC) persistence ─────────────────────────────
+
+const NOTE_KEY = 'I5-detail-audit-note'
+const CONCLUSION_KEY = 'I5-detail-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  emit('save', NOTE_KEY, val)
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  emit('save', CONCLUSION_KEY, val)
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+
+// ─── Segment Options (continued) ─────────────────────────────────────────────
 
 const segmentOptions = computed(() =>
   sections.map((s) => ({ label: s.label, value: s.key })),
@@ -332,6 +398,14 @@ function fmtAmount(value: number | null | undefined): string {
 
 <style scoped>
 .i5-tab-detail { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+/* 审计目标 */
+.objective-alert { margin-bottom: 14px; }
+
+/* 审计说明/结论 el-card */
+.audit-note-card { margin-bottom: 16px; }
+.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
+.card-header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 500; }
 
 /* 方法论上下文（琥珀色左边线+浅黄背景） */
 .methodology-context {

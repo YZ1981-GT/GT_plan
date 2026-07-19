@@ -50,7 +50,7 @@ interface G4FormulaChainResult {
   bookValue: number
 }
 
-function computeG4FormulaChain(input: G4FormulaChainInput): G4FormulaChainResult {
+function computeG4FormulaChain(input: G4FormulaChainInput & { closingAdjustment?: number }): G4FormulaChainResult & { closingAudited: number } {
   const openingSubtotal = calcBalanceSubtotal(input.openingCost, input.openingInterestAdj, input.openingAccruedInterest)
   const openingAmortizedCost = calcAmortizedCost(openingSubtotal, input.openingImpairment)
   const periodChangeSubtotal = calcBalanceSubtotal(input.periodCostChange, input.periodInterestAdjChange, input.periodAccruedInterestChange)
@@ -58,7 +58,8 @@ function computeG4FormulaChain(input: G4FormulaChainInput): G4FormulaChainResult
   const closingInterestAdj = calcPeriodEndComponent(input.openingInterestAdj, input.periodInterestAdjChange)
   const closingAccruedInterest = calcPeriodEndComponent(input.openingAccruedInterest, input.periodAccruedInterestChange)
   const closingSubtotal = calcBalanceSubtotal(closingCost, closingInterestAdj, closingAccruedInterest)
-  const amortizedCost = calcAmortizedCost(closingSubtotal, input.closingImpairment)
+  const closingAudited = closingSubtotal + (input.closingAdjustment ?? 0)
+  const amortizedCost = calcAmortizedCost(closingAudited, input.closingImpairment)
   const oneYearSubtotal = calcOneYearMaturity(input.oneYearBalance, input.oneYearImpairment)
   const bookValue = calcBookValue(amortizedCost, oneYearSubtotal)
   return {
@@ -69,6 +70,7 @@ function computeG4FormulaChain(input: G4FormulaChainInput): G4FormulaChainResult
     closingInterestAdj,
     closingAccruedInterest,
     closingSubtotal,
+    closingAudited,
     amortizedCost,
     oneYearSubtotal,
     bookValue,

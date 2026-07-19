@@ -47,11 +47,34 @@ export function useG4BonInvFormData(opts: { wpId: Ref<string>; projectId: Ref<st
 
   async function saveImmediate(itemId: string, data: Partial<ChecklistResponse>) {
     const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
-    const updated = { ...existing, ...data }
+    const updated = { ...existing, ...data, item_id: itemId }
     allResponses.value.set(itemId, updated)
     await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
       project_id: opts.projectId.value,
       items: [{ item_id: itemId, conclusion: updated.conclusion, remark: updated.remark }],
+    })
+  }
+
+  /** 批量保存：单次 PUT，避免上年结转等多 item 更新半成功 */
+  async function saveBatch(items: ChecklistResponse[]): Promise<void> {
+    if (!items.length) return
+    const payload = items.map((item) => {
+      const existing = allResponses.value.get(item.item_id) || {
+        item_id: item.item_id,
+        conclusion: null,
+        remark: null,
+      }
+      const updated = { ...existing, ...item, item_id: item.item_id }
+      allResponses.value.set(item.item_id, updated)
+      return {
+        item_id: updated.item_id,
+        conclusion: updated.conclusion,
+        remark: updated.remark,
+      }
+    })
+    await api.put(`/api/workpapers/${opts.wpId.value}/checklist-responses`, {
+      project_id: opts.projectId.value,
+      items: payload,
     })
   }
 
@@ -71,5 +94,5 @@ export function useG4BonInvFormData(opts: { wpId: Ref<string>; projectId: Ref<st
 
   onScopeDispose(() => { for (const t of _debounceTimers.values()) clearTimeout(t) })
 
-  return { isLoading, sheetCache, allResponses, loadAll, getSheet, saveImmediate, debouncedSave }
+  return { isLoading, sheetCache, allResponses, loadAll, getSheet, saveImmediate, saveBatch, debouncedSave }
 }

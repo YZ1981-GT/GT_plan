@@ -10,7 +10,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
-        <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
+        <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
@@ -148,8 +148,6 @@
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
       />
-
-      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -157,8 +155,9 @@
 <script setup lang="ts">
 /**
  * GtG10TradingFinancialLiabilities — G10 交易性金融负债底稿主入口
+ * 对齐 G8：formData + g10:save-items + 附注路由 + 双模式 reload
  */
-import { ref, computed, onMounted, defineAsyncComponent, provide, inject } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject } from 'vue'
 import { useG10FormData } from './composables/useG10FormData'
 import { useG10DualMode } from './composables/useG10DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -200,7 +199,7 @@ const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
 const formData = useG10FormData({ wpId: wpIdRef, projectId: projectIdRef })
 const isReadonly = computed(() => !!props.readonly)
-// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
@@ -210,8 +209,10 @@ provide('g10OpenVersionHistory', openVersionHistory)
 
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''
-  if (/底稿目录/.test(name)) return '底稿目录'
-  if (/附注披露/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
+  if (/G10-note-listed|附注披露.*上市|附注.*上市/.test(name)) return '附注上市'
+  if (/G10-note-soe|附注披露.*国企|附注.*国企/.test(name)) return '附注国企'
+  if (/G10-directory|底稿目录/.test(name)) return '底稿目录'
+  if (/附注/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
   const m = name.match(/(G10A|G10-\d+)/)
   return m ? m[1] : ''
 })
@@ -240,15 +241,30 @@ function onDebouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
   scheduleAutoSnapshot()
 }
 
+async function handleG10SaveItems(e: Event): Promise<void> {
+  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
+  if (Array.isArray(items) && items.length > 0) {
+    for (const it of items) {
+      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
+    }
+    scheduleAutoSnapshot()
+  }
+}
+
 async function reloadAll() {
   await formData.loadAll()
 }
 
-const availableSheets = computed(() =>
-  props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets ?? [],
-)
+const availableSheets = computed(() => {
+  const fromHtml = props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets
+  if (Array.isArray(fromHtml) && fromHtml.length) return fromHtml
+  const metaSheets = formData.renderMeta.value?.sheets
+  if (Array.isArray(metaSheets) && metaSheets.length) return metaSheets
+  // 对齐 G1：无 sheets 元数据时用自加载 render-config 的 sheetCache 兜底，
+  // 保证底稿目录架构树非空
+  return Object.keys(formData.sheetCache.value).map(sheet_name => ({ sheet_name }))
+})
 
-// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
 const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
 provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
@@ -259,8 +275,13 @@ useWorkpaperEntryInjections({
 })
 
 onMounted(async () => {
+  window.addEventListener('g10:save-items', handleG10SaveItems)
   await formData.loadAll()
   isLoading.value = false
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('g10:save-items', handleG10SaveItems)
 })
 </script>
 

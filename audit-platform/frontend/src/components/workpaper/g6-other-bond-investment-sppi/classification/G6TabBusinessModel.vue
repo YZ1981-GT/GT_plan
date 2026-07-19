@@ -34,7 +34,12 @@
             <el-tag size="small" type="info">
               完成度：{{ bm.section1CompletionRate.value }}%
             </el-tag>
-            <el-button size="small" :disabled="isReadonly" @click="handleAi('section1')">✨ AI辅助</el-button>
+            <el-button
+              size="small"
+              :disabled="isReadonly || aiLoading"
+              :loading="aiLoading"
+              @click="handleAi('section1')"
+            >✨ AI辅助</el-button>
             <el-button size="small" @click="openReview('G6-7-business-model-s1')">💬 复核</el-button>
           </div>
         </div>
@@ -139,7 +144,12 @@
             <el-tag size="small" type="info">
               完成度：{{ bm.section2CompletionRate.value }}%
             </el-tag>
-            <el-button size="small" :disabled="isReadonly" @click="handleAi('section2')">✨ AI辅助</el-button>
+            <el-button
+              size="small"
+              :disabled="isReadonly || aiLoading"
+              :loading="aiLoading"
+              @click="handleAi('section2')"
+            >✨ AI辅助</el-button>
             <el-button size="small" @click="openReview('G6-7-business-model-s2')">💬 复核</el-button>
           </div>
         </div>
@@ -248,7 +258,12 @@
             >
               {{ bm.conclusionLabel.value.label }}
             </el-tag>
-            <el-button size="small" :disabled="isReadonly" @click="handleAi('conclusion')">✨ AI辅助</el-button>
+            <el-button
+              size="small"
+              :disabled="isReadonly || aiLoading"
+              :loading="aiLoading"
+              @click="handleAi('conclusion')"
+            >✨ AI辅助</el-button>
             <el-button size="small" @click="openReview('G6-7-business-model-conclusion')">💬 复核</el-button>
           </div>
         </div>
@@ -362,9 +377,9 @@
  * - emit 'save' debounced
  */
 import { computed, inject, onMounted, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
 import { useG6SppiBusinessModel, type BusinessModelData } from '../../composables/useG6SppiBusinessModel'
 import { useG6SppiFormData } from '../../composables/useG6SppiFormData'
+import { useG6SppiAiGenerate } from '../../composables/useG6SppiAiGenerate'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -391,6 +406,8 @@ const formData = useG6SppiFormData({
   projectId: computed(() => props.projectId),
 })
 const bm = useG6SppiBusinessModel()
+const wpIdRef = computed(() => props.wpId)
+const { generateAndConfirm, loading: aiLoading } = useG6SppiAiGenerate(wpIdRef)
 
 // ─── 审计说明（独立持久化 checklist_responses） ───
 const NOTE_KEY = 'G6-7-business-model-audit-note'
@@ -482,8 +499,24 @@ function handleFinalAnalysisChange(value: string): void {
 }
 
 // ─── AI辅助 ───
-function handleAi(section: string): void {
-  ElMessage.info(`AI辅助(业务模式-${section})功能将在AI模块完成后启用`)
+async function handleAi(section: string): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'business-model-conclusion',
+    bm.finalAnalysis.value || '',
+    {
+      section,
+      finalConclusion: bm.finalConclusion.value,
+      section1Completion: bm.section1CompletionRate.value,
+      section2Completion: bm.section2CompletionRate.value,
+      highRiskCount: bm.highRiskCount.value,
+    },
+    'AI 业务模式综合判断',
+  )
+  if (text) {
+    bm.setFinalAnalysis(text)
+    triggerSave()
+  }
 }
 
 // ─── 推导结论文字映射 ───

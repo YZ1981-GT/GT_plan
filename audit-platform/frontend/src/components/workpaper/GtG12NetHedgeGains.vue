@@ -138,12 +138,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, defineAsyncComponent, provide, inject } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject } from 'vue'
 import { useG12FormData } from './composables/useG12FormData'
 import { useG12DualMode } from './composables/useG12DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
+import { G12_ACCOUNT_CODE } from './composables/g12Constants'
+import { parseNum } from './composables/useG12FormulaEngine'
 import type { ChecklistResponse } from './composables/useF1FormData'
 
 const G12TabProcedure = defineAsyncComponent(() => import('./g12-net-hedge-gains/core/G12TabProcedure.vue'))
@@ -203,6 +205,7 @@ const isHtmlSheet = computed(() => {
 
 const dualMode = useG12DualMode({
   wpId: wpIdRef,
+  sheetName: computed(() => props.sheetName || ''),
   reloadAll: () => formData.loadAll(),
 })
 
@@ -216,13 +219,34 @@ function onDebouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
   scheduleAutoSnapshot()
 }
 
+function handleG12Adjudicated(e: Event): void {
+  const detail = (e as CustomEvent<{ accountCode?: string; adjudicatedAmount?: number }>).detail
+  if (detail?.accountCode !== G12_ACCOUNT_CODE) return
+  const amount = parseNum(detail.adjudicatedAmount)
+  void formData.writebackTrialBalance(amount)
+}
+
+function handleG12Writeback(e: Event): void {
+  const detail = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number }>).detail
+  if (detail?.accountCode && detail.accountCode !== G12_ACCOUNT_CODE) return
+  const amount = parseNum(detail?.auditedAmount)
+  if (!Number.isFinite(amount)) return
+  void formData.writebackTrialBalance(amount)
+}
+
 async function reloadAll() {
   await formData.loadAll()
 }
 
-const availableSheets = computed(() =>
-  props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets ?? [],
-)
+const availableSheets = computed(() => {
+  const metaSheets = formData.renderMeta.value?.sheets
+  if (Array.isArray(metaSheets) && metaSheets.length) return metaSheets
+  const fromHtml = props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets
+  if (Array.isArray(fromHtml) && fromHtml.length) return fromHtml
+  // 对齐 G1：无 sheets 元数据时用自加载 render-config 的 sheetCache 兜底，
+  // 保证底稿目录架构树非空
+  return Object.keys(formData.sheetCache.value).map(sheet_name => ({ sheet_name }))
+})
 
 // 复核对话 provider 由 Runtime Boundary(GtWpRenderer) 统一提供 openReviewDialog
 const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
@@ -235,8 +259,16 @@ useWorkpaperEntryInjections({
 })
 
 onMounted(async () => {
+  window.addEventListener('substantive:adjudicated', handleG12Adjudicated)
+  window.addEventListener('g12:writeback-trial-balance', handleG12Writeback)
   await formData.loadAll()
   isLoading.value = false
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('substantive:adjudicated', handleG12Adjudicated)
+  window.removeEventListener('g12:writeback-trial-balance', handleG12Writeback)
+  formData.flushPending()
 })
 </script>
 

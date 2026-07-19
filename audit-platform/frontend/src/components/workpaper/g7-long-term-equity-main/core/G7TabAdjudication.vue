@@ -471,24 +471,27 @@ const netValueRow = computed(() => {
 const adjudicatedAmount = computed(() => netValueRow.value.closingAdjusted)
 const variance = computed(() => Math.round((adjudicatedAmount.value - trialBalanceAmount.value) * 100) / 100)
 
-// ═══ EventBus publish: substantive:adjudicated ═══════════════════════════════
+// ═══ EventBus publish: substantive:adjudicated（window CustomEvent，比照 F2/G8）═══
 watch(adjudicatedAmount, (val) => {
   const subsidiarySub = calcGroupSubtotal(groups[0].rows)
   const jvSub = calcGroupSubtotal(groups[1].rows)
   const assocSub = calcGroupSubtotal(groups[2].rows)
+  const payload = {
+    accountCode: '1511',
+    adjudicatedAmount: val,
+    byControlType: {
+      subsidiary: subsidiarySub.closingAdjusted,
+      jointVenture: jvSub.closingAdjusted,
+      associate: assocSub.closingAdjusted,
+    },
+  }
   try {
-    api.post('/api/event-bus/publish', {
-      event: 'substantive:adjudicated',
-      payload: {
-        accountCode: '1511',
-        adjudicatedAmount: val,
-        byControlType: {
-          subsidiary: subsidiarySub.closingAdjusted,
-          jointVenture: jvSub.closingAdjusted,
-          associate: assocSub.closingAdjusted,
-        },
-      },
-    }, { _silent: true } as any).catch(() => {})
+    window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
+  } catch { /* best-effort */ }
+  try {
+    window.dispatchEvent(new CustomEvent('g7:writeback-trial-balance', {
+      detail: { accountCode: '1511', auditedAmount: val },
+    }))
   } catch { /* best-effort */ }
 })
 

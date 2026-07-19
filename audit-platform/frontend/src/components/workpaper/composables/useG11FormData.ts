@@ -1,3 +1,4 @@
+import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG11FormData — G11 投资收益底稿数据层
  */
@@ -14,6 +15,8 @@ function draftKey(wpId: string, itemId: string): string {
 }
 
 export function useG11FormData(opts: { wpId: Ref<string>; projectId: Ref<string> }) {
+  const _auditYearRef = useWorkpaperAuditYear()
+
   const isLoading = ref(false)
   const sheetCache = ref<Record<string, any>>({})
   const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
@@ -119,12 +122,14 @@ export function useG11FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
   }
 
   async function fetchTrialBalanceAmount(): Promise<number | null> {
+    const _year = _auditYearRef.value
+    if (_year == null) return null
     const seeded = renderMeta.value?.tb_values?.current_amount
     if (seeded != null && seeded !== '') return Number(seeded)
     if (!opts.projectId.value) return null
     try {
       const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-        params: { account_prefix: G11_ACCOUNT_CODE },
+        params: { year: _year, account_prefix: G11_ACCOUNT_CODE  },
         _silent: true,
       } as any)
       const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
@@ -141,18 +146,37 @@ export function useG11FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
   }
 
   async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    await saveImmediate('G11-adj-tb-writeback', {
-      remark: JSON.stringify({ accountCode: G11_ACCOUNT_CODE, auditedAmount }),
-    })
-    await saveImmediate('G11-1-adjudicated-amount', { conclusion: String(auditedAmount) })
+    if (!opts.projectId.value) return
+    try {
+      await api.put(`/api/projects/${opts.projectId.value}/trial-balance/writeback`, {
+        account_code: G11_ACCOUNT_CODE,
+        audited_amount: auditedAmount,
+      })
+      await saveImmediate('G11-adj-tb-writeback', {
+        remark: JSON.stringify({ accountCode: G11_ACCOUNT_CODE, auditedAmount }),
+      })
+      await saveImmediate('G11-1-adjudicated-amount', { conclusion: String(auditedAmount) })
+    } catch {
+      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
+    }
   }
 
   function getSheet(name: string) {
     return sheetCache.value[name] ?? { rows: [] }
   }
 
+  /** 卸载前刷出未落盘的 debounce 保存（比照 F2/G9） */
+  function flushPending(): void {
+    for (const [itemId, timer] of _debounceTimers.entries()) {
+      clearTimeout(timer)
+      const resp = allResponses.value.get(itemId)
+      if (resp) void saveImmediate(itemId, resp, 1)
+    }
+    _debounceTimers.clear()
+  }
+
   onScopeDispose(() => {
-    for (const t of _debounceTimers.values()) clearTimeout(t)
+    flushPending()
   })
 
   return {
@@ -160,11 +184,14 @@ export function useG11FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     sheetCache,
     allResponses,
     renderMeta,
+    accountCode: G11_ACCOUNT_CODE,
     loadAll,
     getSheet,
     saveImmediate,
     debouncedSave,
+    flushPending,
     fetchTrialBalanceAmount,
+    writebackTB: writebackTrialBalance,
     writebackTrialBalance,
   }
 }

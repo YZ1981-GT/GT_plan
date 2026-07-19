@@ -24,7 +24,7 @@
  */
 import { ref, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useG1ImportExport, type G1ImportableSheet } from '../../composables/useG1ImportExport'
+import { useG1ImportExport, type G1ImportableSheet } from '../composables/useG1ImportExport'
 
 const props = defineProps<{
   wpId: string

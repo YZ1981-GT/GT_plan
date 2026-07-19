@@ -223,17 +223,18 @@
       </el-table-column>
     </el-table>
 
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：（1）明细核对程序及结果；（2）各被投资单位成本、公允价值、OCI 变动的核实情况及异常事项。" />
-    </el-card>
-
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>审计结论</template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
-        placeholder="填写审计结论：明细金额是否准确、完整，是否与审定表 G8-1（科目1503）勾稽一致。" />
-    </el-card>
+    <G8AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="auditConclusion"
+      note-ai-section="detail-note"
+      conclusion-ai-section="detail-conclusion"
+      note-placeholder="填写审计说明：（1）明细核对程序及结果；（2）各被投资单位成本、公允价值、OCI 变动的核实情况及异常事项。"
+      note-hint="覆盖被投资单位明细、公允价值层次与指定 OCI 原因。"
+      conclusion-placeholder="填写审计结论：明细金额是否准确、完整，是否与审定表 G8-1（科目1503）勾稽一致。"
+      :related-context="{ 行数: detail.rows.value.length, 审定合计: detail.totals.value.closingAdjusted }"
+    />
   </div>
 </template>
 
@@ -242,6 +243,7 @@ import { computed, ref, watch } from 'vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G8ImportExportDropdown from '../G8ImportExportDropdown.vue'
+import G8AuditTextCards from '../G8AuditTextCards.vue'
 import { useG8Detail } from '../../composables/useG8Detail'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
@@ -300,5 +302,4 @@ function fmt(n: number) {
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; flex-wrap: wrap; gap: 8px; }
 .tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
 .tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
-.audit-note-card { margin-top: 12px; }
 </style>

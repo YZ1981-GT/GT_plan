@@ -1,5 +1,8 @@
 <template>
   <div class="i4-tab-adjustment">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" title="审计目标：汇总并核查长期待摊费用相关的审计调整分录(AJE)和重分类调整分录(RJE)，确认借贷平衡且科目归类正确。" class="objective-alert" />
+
     <!-- 方法论上下文（琥珀色左边线） -->
     <div class="methodology-block">
       <p><strong>长期待摊费用调整分录编制规则：</strong></p>
@@ -167,6 +170,32 @@
       </div>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="请填写审计说明（调整分录的编制原因、金额确定依据等）..."
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="请填写审计结论..."
+        @change="saveAuditConclusion"
+      />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -193,7 +222,7 @@
  * Task: 4.4
  * Requirements: 8.1
  */
-import { ref, computed, watch, toRef, inject } from 'vue'
+import { ref, computed, watch, toRef, inject, onMounted } from 'vue'
 import { ArrowDown, MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -440,6 +469,36 @@ function navigateTo(wpCode: string): void {
   emit('navigate-sheet', wpCode)
 }
 
+// ─── Audit Note / Conclusion (AN + AC) ───────────────────────────────────────
+
+const NOTE_KEY = 'I4-adjustment-audit-note'
+const CONCLUSION_KEY = 'I4-adjustment-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  emit('save', NOTE_KEY, val)
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY, item)
+  emit('save', CONCLUSION_KEY, val)
+}
+
+onMounted(() => {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY)
+  if (c?.remark) auditConclusion.value = c.remark
+})
+
 // ─── Formatter ───────────────────────────────────────────────────────────────
 
 function fmtAmount(value: number | null | undefined): string {
@@ -451,6 +510,15 @@ function fmtAmount(value: number | null | undefined): string {
 
 <style scoped>
 .i4-tab-adjustment { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+/* 审计目标 */
+.objective-alert { margin-bottom: 14px; }
+.i4-tab-adjustment :deep(.objective-alert .el-alert__content) { padding: 2px 0; }
+
+/* 审计说明/结论 */
+.audit-note-card { margin-bottom: 16px; }
+.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
+.card-header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 500; }
 
 /* 方法论（琥珀色） */
 .methodology-block {

@@ -94,38 +94,31 @@ interface DirectoryRow {
 }
 
 const directoryRows = ref<DirectoryRow[]>([
-  // ═══ main组（本spec） ═══
-  { seq: 1, content: '债权投资实质性程序表', indexCode: 'G4A', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 2, content: '债权投资审定表', indexCode: 'G4-1', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 3, content: '债权投资明细表', indexCode: 'G4-2', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 4, content: '调整分录汇总', indexCode: 'G4-3', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 5, content: '利息测算表', indexCode: 'G4-4', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 6, content: '附注披露信息（上市公司）', indexCode: 'G4-附注(上市)', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 7, content: '附注披露信息（国企）', indexCode: 'G4-附注(国企)', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  // ═══ SPPI组 ═══
-  { seq: 8, content: '业务模式分析', indexCode: 'G4-5', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 9, content: 'SPPI合同现金流测试', indexCode: 'G4-6', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 10, content: '盘点倒轧表', indexCode: 'G4-7', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 11, content: '结存表', indexCode: 'G4-8', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  // ═══ ECL组 ═══
-  { seq: 12, content: '三阶段划分', indexCode: 'G4-9', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 13, content: '减值测算表', indexCode: 'G4-10', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 14, content: 'ECL计算底稿', indexCode: 'G4-11', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 15, content: '凭证检查表', indexCode: 'G4-12', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 16, content: '减值准备变动检查', indexCode: 'G4-13', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  // ═══ 函证组(G0) ═══
-  { seq: 17, content: '函证控制表', indexCode: 'G0-1', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 18, content: '函证发出清单', indexCode: 'G0-2', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 19, content: '函证回收统计', indexCode: 'G0-3', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 20, content: '差异核对表', indexCode: 'G0-4', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 21, content: '替代程序底稿', indexCode: 'G0-5', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 22, content: '函证样本表', indexCode: 'G0-6', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 23, content: '函证模板-证券', indexCode: 'G0-7', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 24, content: '函证模板-债券', indexCode: 'G0-8', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  // ═══ 其他 ═══
-  { seq: 25, content: '审计说明', indexCode: '', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 26, content: '审计结论', indexCode: '', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 27, content: '底稿目录', indexCode: 'G4-目录', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  // 顺序/文案对齐 Excel《底稿目录》
+  { seq: 0, content: '债权投资实质性程序表', indexCode: 'G4A', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 1, content: '审定表', indexCode: 'G4-1', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 2, content: '附注披露信息（上市公司）', indexCode: '', pages: '', preparer: '', reviewer: '', date: '', remark: '无需打印', status: '' },
+  { seq: 3, content: '附注披露信息（国企）', indexCode: '', pages: '', preparer: '', reviewer: '', date: '', remark: '无需打印', status: '' },
+  { seq: 4, content: '明细表', indexCode: 'G4-2', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 5, content: '调整分录汇总', indexCode: 'G4-3', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 6, content: '利息测算表', indexCode: 'G4-4', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 7, content: '业务模式分析', indexCode: 'G4-5', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 8, content: '合同现金流量特征分析', indexCode: 'G4-6', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 9, content: '有价证券盘点表', indexCode: 'G4-7', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 10, content: '盘点倒轧表', indexCode: 'G4-8', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 11, content: '函证结果汇总表', indexCode: 'G0-1', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 12, content: '核实被函证单位信息', indexCode: 'G0-2', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 13, content: '跟函函证过程控制', indexCode: 'G0-3', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 14, content: '函证差异核对表（证券投资）', indexCode: 'G0-4', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 15, content: '函证差异核对表(非证券投资)', indexCode: 'G0-5', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 16, content: '替代程序检查表', indexCode: 'G0-6', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 17, content: '邮件传真回函可靠性验证', indexCode: 'G0-7', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 18, content: '函证程序舞弊风险评价表', indexCode: 'G0-8', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 19, content: '债权投资三阶段划分', indexCode: 'G4-9', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 20, content: '债权投资减值准备测算表', indexCode: 'G4-10', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 21, content: '预期信用损失的计量测试', indexCode: 'G4-11', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 22, content: '减值准备转回（收回）、核销检查表', indexCode: 'G4-12', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
+  { seq: 23, content: '凭证检查表', indexCode: 'G4-13', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
 ])
 </script>
 

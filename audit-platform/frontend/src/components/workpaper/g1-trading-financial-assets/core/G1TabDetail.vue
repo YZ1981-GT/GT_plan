@@ -3,7 +3,9 @@
     <div class="section-head">
       <div class="title-block">
         <h3 class="sheet-title">G1-2 交易性金融资产明细表</h3>
-        <p class="sheet-sub">按投资品种列示成本、公允价值与投资收益，勾稽审定表科目 1501</p>
+        <p class="sheet-sub">
+          成本与累计公允变动双桶滚动：期初审定 → 本期变动 → 期末审定 → 报表列报，勾稽 G1-1 / 科目 1501
+        </p>
       </div>
       <div class="head-actions">
         <G1ImportExportDropdown
@@ -13,35 +15,125 @@
           :disabled="isReadonly"
           @imported="onImported"
         />
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow()">+ 新增证券</el-button>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow()">+ 新增项目</el-button>
       </div>
     </div>
-
-    <details class="guidance-details">
-      <summary>编制提示</summary>
-      <div class="guidance-content">
-        <p>1. 本表按投资品种（股票 / 基金 / 债券 / 衍生工具 / 其他）分区段列示，涵盖成本、公允价值与投资收益。</p>
-        <p>2. 虚线下划线列为自动计算列（期末数量 / 期末公允价值 / 公允变动 / 已实现损益 / 投资收益合计 / 期末成本 / 审定 / 差异），不可手工改写。</p>
-        <p>3. 公允价值来源按 Level 1/2/3 划分，应与 G1-6 公允价值测试表一致。</p>
-        <p>4. 分类小计与总计应与审定表（G1-1，科目 1501）勾稽。</p>
-      </div>
-    </details>
 
     <el-alert
       type="info"
       :closable="false"
       show-icon
-      title="审计目标：核实各投资品种期末成本、公允价值及投资收益明细的准确与完整，验证公允价值层级划分恰当，为审定表（G1-1）提供明细支撑。"
+      title="审计目标：核实交易性金融资产的存在、完整、权利与计价；验证成本与累计公允变动滚动及分类列报恰当，为审定表（G1-1）提供明细支撑。"
       class="objective-alert"
     />
 
+    <!-- 编制闸门：把「编制说明」变成可完成步骤 -->
+    <section class="gates-card">
+      <header class="gates-head">
+        <div>
+          <h4>编制闸门</h4>
+          <p>完成后再填明细；对应 Excel「编制说明【非打印】」</p>
+        </div>
+        <el-tag :type="gatesReady ? 'success' : 'warning'" size="small" effect="plain">
+          {{ gatesReady ? '已就绪' : '待完成' }}
+        </el-tag>
+      </header>
+
+      <div class="gates-grid">
+        <label class="gate-item">
+          <el-checkbox
+            :model-value="gates.inclusionReviewed"
+            :disabled="isReadonly"
+            @change="(v: boolean | string | number) => updateGates({ inclusionReviewed: !!v })"
+          />
+          <span>
+            <strong>入表范围已复核</strong>
+            <small>未通过 SPPI / 其他业务模式 / 非套期衍生 / 持有≤1年权益 / 指定 FVPL（≤1年）等五类才入本表</small>
+          </span>
+        </label>
+        <label class="gate-item">
+          <el-checkbox
+            :model-value="gates.fxNoted"
+            :disabled="isReadonly"
+            @change="(v: boolean | string | number) => updateGates({ fxNoted: !!v })"
+          />
+          <span>
+            <strong>外币项目已注明</strong>
+            <small>外币资产在「准入基础」填写原币与折算汇率；明细按明细科目列示</small>
+          </span>
+        </label>
+        <label class="gate-item">
+          <el-checkbox
+            :model-value="gates.fraudRiskAssessed"
+            :disabled="isReadonly"
+            @change="(v: boolean | string | number) => updateGates({ fraudRiskAssessed: !!v })"
+          />
+          <span>
+            <strong>第三方资金舞弊风险已评估</strong>
+            <small>参照《中国注册会计师审计准则问题解答第18号》关注空转资金等风险因素</small>
+          </span>
+        </label>
+        <label class="gate-item">
+          <el-checkbox
+            :model-value="gates.fraudRiskFlag"
+            :disabled="isReadonly"
+            @change="(v: boolean | string | number) => updateGates({ fraudRiskFlag: !!v })"
+          />
+          <span>
+            <strong>识别到风险因素</strong>
+            <small>若勾选，须填写应对措施</small>
+          </span>
+        </label>
+      </div>
+
+      <el-alert
+        v-if="classificationWarnings.length"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="class-warn"
+        :title="`与 G1-9 分类结论不一致（${classificationWarnings.length}）`"
+        :description="classificationWarnings.slice(0, 5).join('；')"
+      />
+
+      <el-input
+        v-if="gates.fraudRiskFlag"
+        :model-value="gates.fraudResponse"
+        type="textarea"
+        :rows="2"
+        :disabled="isReadonly"
+        placeholder="舞弊风险应对措施（程序、范围、追加证据等）"
+        class="fraud-response"
+        @update:model-value="(v: string) => updateGates({ fraudResponse: v })"
+      />
+
+      <details class="guidance-details">
+        <summary>披露与结论提示（折叠）</summary>
+        <div class="guidance-content">
+          <p>提示：交易性金融资产与「以公允价值计量且其变动计入当期损益的金融资产」在附注中合并披露为后者名称。</p>
+          <p>注1：已到期应计利息在「应收利息」核算，不在本表明细列示。</p>
+          <p>结论口径 — A：未发现异常；B：除重大调整外未见其他异常；C：因未调整事项或范围受限无法确认。</p>
+        </div>
+      </details>
+    </section>
+
+    <!-- 勾稽状态条 -->
+    <div class="status-bar" :class="balanceStatus.ok ? 'ok' : 'warn'">
+      <span class="status-main">{{ balanceStatus.message }}</span>
+      <span class="status-meta">
+        期末审定 {{ fmtCell(grandTotal.auditedClosingFvTotal) }}
+        · 报表数 {{ fmtCell(grandTotal.closingReported) }}
+        · 质押 {{ balanceStatus.pledgedCount }}
+        · 受限 {{ balanceStatus.restrictedCount }}
+      </span>
+      <span class="chip-wrap"><GtIndexChip value="wp:G1-1" /></span>
+    </div>
+
     <div class="tab-toolbar">
       <el-segmented v-model="segment" :options="segmentOptions" size="small" class="segment-bar" />
-      <div class="toolbar-right">
-        <span class="chip-wrap"><GtIndexChip value="wp:G1-1" /></span>
-        <el-tag size="small" type="info" effect="plain">共 {{ rows.length }} 行</el-tag>
-      </div>
+      <el-tag size="small" type="info" effect="plain">共 {{ rows.length }} 行</el-tag>
     </div>
+    <p v-if="currentSegmentHint" class="segment-hint">{{ currentSegmentHint }}</p>
 
     <el-table
       :data="rows"
@@ -52,7 +144,7 @@
       highlight-current-row
       class="detail-table"
     >
-      <el-table-column prop="securityName" label="证券名称" width="140" fixed />
+      <el-table-column prop="securityName" label="投资项目" width="140" fixed />
 
       <el-table-column
         v-for="col in currentColumns"
@@ -75,6 +167,15 @@
             <el-option v-for="o in investOptions" :key="o.value" :value="o.value" :label="o.label" />
           </el-select>
           <el-select
+            v-else-if="col.type === 'acct'"
+            v-model="row.acctClass"
+            size="small"
+            :disabled="isReadonly"
+            @change="updateRow(row.id, { acctClass: row.acctClass })"
+          >
+            <el-option v-for="o in acctOptions" :key="o.value" :value="o.value" :label="o.label" />
+          </el-select>
+          <el-select
             v-else-if="col.type === 'level'"
             v-model="row.fairValueSource"
             size="small"
@@ -85,6 +186,12 @@
             <el-option value="2" label="Level 2" />
             <el-option value="3" label="Level 3" />
           </el-select>
+          <el-checkbox
+            v-else-if="col.type === 'flag'"
+            :model-value="!!row[col.prop]"
+            :disabled="isReadonly"
+            @change="(v: boolean | string | number) => updateRow(row.id, { [col.prop]: !!v })"
+          />
           <el-input-number
             v-else-if="col.type === 'number'"
             v-model="row[col.prop]"
@@ -120,8 +227,15 @@
     </el-table>
 
     <div class="totals-panel">
-      <div v-for="st in subtotalsByType" :key="st.investType" class="subtotal-line">
-        <span class="subtotal-label">{{ st.investLabel }}小计</span>
+      <div v-for="st in subtotalsByAcct" :key="st.key" class="subtotal-line">
+        <span class="subtotal-label">{{ st.label }}</span>
+        <span class="subtotal-meta">{{ st.count }} 项</span>
+        <span>期初审定 {{ fmtCell(st.totals.auditedOpeningFvTotal) }}</span>
+        <span>期末审定 {{ fmtCell(st.totals.auditedClosingFvTotal) }}</span>
+        <span>报表数 {{ fmtCell(st.totals.closingReported) }}</span>
+      </div>
+      <div v-for="st in subtotalsByType" :key="`t-${st.key}`" class="subtotal-line type-line">
+        <span class="subtotal-label">{{ st.label }}小计</span>
         <span class="subtotal-meta">{{ st.count }} 项</span>
         <span>期末成本 {{ fmtCell(st.totals.closingCost) }}</span>
         <span>公允价值 {{ fmtCell(st.totals.closingFairValue) }}</span>
@@ -132,7 +246,8 @@
         <span>期末成本 {{ fmtCell(grandTotal.closingCost) }}</span>
         <span>公允价值 {{ fmtCell(grandTotal.closingFairValue) }}</span>
         <span>投资收益 {{ fmtCell(grandTotal.totalIncome) }}</span>
-        <span>审定 {{ fmtCell(grandTotal.adjusted) }}</span>
+        <span>期末审定 {{ fmtCell(grandTotal.auditedClosingFvTotal) }}</span>
+        <span>报表数 {{ fmtCell(grandTotal.closingReported) }}</span>
       </div>
     </div>
 
@@ -145,14 +260,20 @@
       conclusion-ai-section="detail-conclusion"
       :related-context="{
         明细行数: rows.length,
+        闸门就绪: gatesReady,
+        滚动勾稽: balanceStatus.message,
         期末成本合计: grandTotal.closingCost,
         期末公允价值合计: grandTotal.closingFairValue,
+        期末审定合计: grandTotal.auditedClosingFvTotal,
+        期末报表数合计: grandTotal.closingReported,
         投资收益合计: grandTotal.totalIncome,
-        审定余额合计: grandTotal.adjusted,
+        质押项数: balanceStatus.pledgedCount,
+        变现受限项数: balanceStatus.restrictedCount,
       }"
-      note-placeholder="填写审计说明：（1）执行的明细核对程序及结果；（2）各投资品种成本、公允价值、投资收益的核实情况及异常事项；（3）与审定表勾稽结果。"
-      note-hint="覆盖明细核对程序、各品种成本/公允价值/收益核实、公允层级及与审定表勾稽。"
-      conclusion-hint="按 A/B/C 口径表述明细完整性、公允计量及与 G1-1 勾稽结论。"
+      note-placeholder="审计说明：（1）程序与结果；（2）提议调整及分录；（3）未调整事项及影响；（4）范围受限及影响。利息/股利与账面核对情况可在此说明。"
+      note-hint="覆盖明细核对、双桶滚动勾稽、公允层级、调整/未调整/范围受限及与 G1-1 勾稽。"
+      conclusion-hint="按 A/B/C：未见异常 / 除重大调整外未见异常 / 因未调整或范围受限无法确认。"
+      conclusion-placeholder="选择结论口径 A / B / C，并据实改写。"
     />
   </div>
 </template>
@@ -162,6 +283,7 @@ import { ref, toRef, computed, watch } from 'vue'
 import {
   useG1Detail,
   G1_INVEST_TYPE_OPTIONS,
+  G1_ACCT_CLASS_OPTIONS,
   type TradingDetailRow,
 } from '../../composables/useG1Detail'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
@@ -183,9 +305,15 @@ const {
   segment,
   rows,
   subtotalsByType,
+  subtotalsByAcct,
   grandTotal,
+  balanceStatus,
+  gates,
+  gatesReady,
+  classificationWarnings,
   addRow,
   updateRow,
+  updateGates,
   removeRow,
   loadAll,
 } = useG1Detail({
@@ -217,6 +345,7 @@ watch(auditConclusion, (v) => {
 })
 
 const investOptions = G1_INVEST_TYPE_OPTIONS
+const acctOptions = G1_ACCT_CLASS_OPTIONS
 const segmentOptions = segments.map((s) => ({ label: s.label, value: s.key }))
 
 const currentColumns = computed(() => {
@@ -224,15 +353,31 @@ const currentColumns = computed(() => {
   return (seg?.columns ?? []).filter((c) => c.prop !== 'securityName')
 })
 
+const currentSegmentHint = computed(
+  () => segments.find((s) => s.key === segment.value)?.hint ?? '',
+)
+
 const FORMULA_HINTS: Partial<Record<keyof TradingDetailRow, string>> = {
-  closingQuantity: '期末持有数量 = 期初 + 买入 - 卖出',
-  closingFairValue: '期末公允价值 = 期末持有数量 × 期末单位公允值',
-  fairValueChange: '公允价值变动 = 期末公允价值 - 期初公允价值',
-  realizedGain: '已实现损益 = 处置收入 - 处置成本',
-  totalIncome: '投资收益合计 = 已实现损益 + 利息/股利收入',
-  closingCost: '期末成本 = 期初成本 + 本期增加成本 - 本期减少成本',
-  adjusted: '审定余额 = 未审 + AJE + RJE',
-  variance: '差异 = 审定余额 - 期末公允价值',
+  openingFairValue: '期初公允价值 = 期初成本 + 期初累计公允变动',
+  auditedOpeningCost: '期初审定成本 = 期初成本 + 期初成本调整',
+  auditedOpeningCumulativeFv: '期初审定累计FV = 期初累计公允变动 + 期初公允调整',
+  auditedOpeningFvTotal: '期初审定公允价值 = 期初审定成本 + 期初审定累计FV',
+  openingReported: '期初报表数 = 期初审定公允价值 − 一年以上扣减',
+  closingQuantity: '期末数量 = 期初 + 买入 − 卖出',
+  closingCost: '期末成本 = 期初审定成本 + 本期增加 − 本期减少',
+  cumulativeFVChange: '期末累计公允变动 = 期初审定累计FV + 本期公允变动',
+  closingFairValue: '有单位公允：数量×单价；否则 = 期末成本 + 期末累计公允变动',
+  fairValueChange: '公允变动验算 = 期末公允价值 − 期初审定公允价值',
+  auditedClosingCost: '期末审定成本 = 期末成本 + 期末成本调整',
+  auditedClosingCumulativeFv: '期末审定累计FV = 期末累计公允变动 + 期末公允调整',
+  auditedClosingFvTotal: '期末审定公允价值 = 审定成本 + 审定累计FV + AJE + RJE',
+  closingReported: '期末报表数 = 期末审定公允价值 − 一年以上扣减',
+  rollForwardDiff: '账面双桶合计 − 市价（无市价时为 0）',
+  realizedGain: '已实现损益 = 处置收入 − 处置成本',
+  totalIncome: '投资收益合计 = 已实现损益 + 利息/股利',
+  adjusted: '审定余额(勾稽) = 期末审定公允价值',
+  unadjusted: '未审余额 = 期末公允价值',
+  variance: '差异 = 期末审定公允价值 − 期末公允价值',
 }
 
 function formulaHint(prop: keyof TradingDetailRow): string {
@@ -240,6 +385,7 @@ function formulaHint(prop: keyof TradingDetailRow): string {
 }
 
 function fmtCell(v: unknown): string {
+  if (typeof v === 'boolean') return v ? '是' : '否'
   return typeof v === 'number' ? v.toLocaleString() : String(v ?? '')
 }
 
@@ -290,42 +436,121 @@ function onImported() {
   gap: 8px;
 }
 
-.guidance-details {
+.objective-alert { margin-bottom: 12px; }
+
+.gates-card {
   margin-bottom: 12px;
   border: 1px solid #e8ecf2;
-  border-left: 3px solid #60418a;
-  background: linear-gradient(90deg, #f7f4fb 0%, #fafbfc 48%);
+  border-left: 3px solid #3d6b8e;
+  background: #f7fafc;
   border-radius: 6px;
-  padding: 8px 12px;
+  padding: 12px 14px;
+}
+.gates-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.gates-head h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1f2a37;
+}
+.gates-head p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: #86909c;
+}
+.gates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 8px 16px;
+}
+.gate-item {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  cursor: pointer;
+  font-size: 12px;
+  color: #4e5969;
+  line-height: 1.45;
+}
+.gate-item strong {
+  display: block;
+  color: #1f2a37;
+  font-weight: 600;
+}
+.gate-item small {
+  display: block;
+  color: #86909c;
+  margin-top: 2px;
+}
+.fraud-response { margin-top: 10px; }
+.class-warn { margin-top: 10px; }
+
+.guidance-details {
+  margin-top: 10px;
+  border-top: 1px dashed #dce3ea;
+  padding-top: 8px;
 }
 .guidance-details summary {
   cursor: pointer;
+  font-size: 12px;
   font-weight: 500;
-  color: #60418a;
+  color: #3d6b8e;
   list-style: none;
 }
 .guidance-details summary::-webkit-details-marker { display: none; }
 .guidance-content {
-  margin-top: 8px;
+  margin-top: 6px;
   font-size: 12px;
   color: #606266;
   line-height: 1.65;
 }
 .guidance-content p { margin: 2px 0; }
 
-.objective-alert { margin-bottom: 12px; }
+.status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  border: 1px solid #e4e7ed;
+}
+.status-bar.ok {
+  background: #f0f9f4;
+  border-color: #c6e8d4;
+  color: #2d6a4f;
+}
+.status-bar.warn {
+  background: #fff8f0;
+  border-color: #f0d9b8;
+  color: #9a5b1a;
+}
+.status-main { font-weight: 600; }
+.status-meta { color: #606266; flex: 1; }
 
 .tab-toolbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 6px;
   flex-wrap: wrap;
   gap: 8px;
 }
-.toolbar-right { display: flex; gap: 8px; align-items: center; }
-.chip-wrap { display: inline-flex; align-items: center; }
 .segment-bar { max-width: 100%; }
+.segment-hint {
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: #86909c;
+}
+.chip-wrap { display: inline-flex; align-items: center; }
 
 .detail-table { width: 100%; border-radius: 6px; overflow: hidden; }
 .formula-cell {
@@ -355,6 +580,7 @@ function onImported() {
 }
 .subtotal-label { font-weight: 600; color: #303133; min-width: 72px; }
 .subtotal-meta { color: #909399; }
+.type-line { opacity: 0.92; }
 .grand-total {
   margin-top: 2px;
   padding-top: 8px;
@@ -362,24 +588,4 @@ function onImported() {
   font-weight: 600;
   color: #303133;
 }
-
-.audit-text-card {
-  margin-top: 14px;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-}
-.audit-text-card :deep(.el-card__header) {
-  padding: 12px 16px;
-  background: #fafbfc;
-  border-bottom: 1px solid #ebeef5;
-}
-.audit-text-card :deep(.el-card__body) { padding: 12px 16px 16px; }
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-.card-title { font-size: 14px; font-weight: 600; color: #1f2a37; }
-.card-hint { margin-top: 2px; font-size: 12px; color: #86909c; line-height: 1.4; }
 </style>

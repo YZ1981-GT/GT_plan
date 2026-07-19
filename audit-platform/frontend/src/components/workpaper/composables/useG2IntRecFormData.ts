@@ -1,6 +1,7 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { G2_ACCOUNT_CODE } from './g2AdjudicationItems'
 import type { ChecklistResponse } from './useF1FormData'
 
 export function useG2IntRecFormData(opts: { wpId: Ref<string>; projectId: Ref<string> }) {
@@ -69,7 +70,53 @@ export function useG2IntRecFormData(opts: { wpId: Ref<string>; projectId: Ref<st
 
   function getSheet(name: string) { return sheetCache.value[name] ?? { rows: [] } }
 
-  onScopeDispose(() => { for (const t of _debounceTimers.values()) clearTimeout(t) })
+  /** 将 G2-1 审定净值回写试算平衡表 1132（对齐 G11） */
+  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
+    if (!opts.projectId.value) return
+    try {
+      await api.put(`/api/projects/${opts.projectId.value}/trial-balance/writeback`, {
+        account_code: G2_ACCOUNT_CODE,
+        audited_amount: auditedAmount,
+      })
+      await saveImmediate('G2-1-tb-writeback', {
+        item_id: 'G2-1-tb-writeback',
+        conclusion: null,
+        remark: JSON.stringify({ accountCode: G2_ACCOUNT_CODE, auditedAmount }),
+      })
+      await saveImmediate('G2-1-adjudicated-amount', {
+        item_id: 'G2-1-adjudicated-amount',
+        conclusion: String(auditedAmount),
+        remark: null,
+      })
+    } catch {
+      ElMessage.warning('审定数回写试算失败，请手动确认试算表 1132')
+    }
+  }
 
-  return { isLoading, sheetCache, allResponses, loadAll, getSheet, saveImmediate, debouncedSave }
+  function flushPending(): void {
+    for (const [itemId, timer] of _debounceTimers.entries()) {
+      clearTimeout(timer)
+      const resp = allResponses.value.get(itemId)
+      if (resp) void saveImmediate(itemId, resp)
+    }
+    _debounceTimers.clear()
+  }
+
+  onScopeDispose(() => {
+    flushPending()
+  })
+
+  return {
+    isLoading,
+    sheetCache,
+    allResponses,
+    loadAll,
+    getSheet,
+    saveImmediate,
+    debouncedSave,
+    flushPending,
+    writebackTrialBalance,
+    writebackTB: writebackTrialBalance,
+    accountCode: G2_ACCOUNT_CODE,
+  }
 }

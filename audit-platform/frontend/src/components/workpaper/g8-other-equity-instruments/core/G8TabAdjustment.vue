@@ -110,17 +110,18 @@
       </el-table-column>
     </el-table>
 
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：调整分录的依据、性质（AJE/RJE）及对 OCI/留存收益的影响。" />
-    </el-card>
-
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>审计结论</template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
-        placeholder="填写审计结论：调整分录是否恰当、借贷是否平衡、是否已正确回写审定表。" />
-    </el-card>
+    <G8AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="auditConclusion"
+      note-ai-section="adjustment-note"
+      conclusion-ai-section="adjustment-conclusion"
+      note-placeholder="填写审计说明：调整分录的依据、性质（AJE/RJE）及对 OCI/留存收益的影响。"
+      note-hint="覆盖调整依据、借贷平衡及回写审定表情况。"
+      conclusion-placeholder="填写审计结论：调整分录是否恰当、借贷是否平衡、是否已正确回写审定表。"
+      :related-context="{ 借贷平衡: adj.balanceOk.value, 差额: adj.balanceDiff.value }"
+    />
   </div>
 </template>
 
@@ -128,6 +129,7 @@
 import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import G8ImportExportDropdown from '../G8ImportExportDropdown.vue'
+import G8AuditTextCards from '../G8AuditTextCards.vue'
 import { G8_ADJ_WRITEBACK_ROW_KEY } from '../../composables/g8Constants'
 import { useG8Adjustment } from '../../composables/useG8Adjustment'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
@@ -190,5 +192,4 @@ onBeforeUnmount(() => {
 .guidance-content { margin-top: 8px; font-size: 12px; color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .objective-alert { margin-bottom: 10px; }
-.audit-note-card { margin-top: 12px; }
 </style>

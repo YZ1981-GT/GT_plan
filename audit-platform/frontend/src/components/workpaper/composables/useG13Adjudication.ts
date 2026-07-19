@@ -1,3 +1,4 @@
+import { useWorkpaperAuditYear } from './workpaperAuditYear'
 /**
  * useG13Adjudication — G13-1 审定表（本期自 G13-2 按科目汇总同步）
  */
@@ -63,6 +64,8 @@ export interface UseG13AdjudicationOptions {
 }
 
 export function useG13Adjudication(options: UseG13AdjudicationOptions) {
+  const _auditYearRef = useWorkpaperAuditYear()
+
   const priorStore = ref<PriorStore>({})
   const trialBalanceAmount = ref(0)
   const auditNote = ref('')
@@ -207,10 +210,12 @@ export function useG13Adjudication(options: UseG13AdjudicationOptions) {
   }
 
   async function loadTrialBalanceFromApi(): Promise<void> {
+    const _year = _auditYearRef.value
+    if (_year == null) return
     if (!options.projectId.value) return
     try {
       const res = await api.get(`/api/projects/${options.projectId.value}/trial-balance`, {
-        params: { account_prefix: G13_ACCOUNT_CODE },
+        params: { year: _year, account_prefix: G13_ACCOUNT_CODE  },
         _silent: true,
       } as any)
       const rows = res?.data ?? res

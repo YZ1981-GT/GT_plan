@@ -79,9 +79,15 @@ export interface BalanceDetailRow {
   contractNo: string
   startDate: string
   maturityDate: string
+  /** 是否属于「1年内到期」重分类部分（优先于到期日启发） */
+  isWithinOneYear: boolean
   contractAmount: number
   recoveredAmount: number
   closingBalance: number
+  /** 本期借方发生（对齐源模板 H 列，供 G5-12 检查比例勾稽） */
+  debitOccurrence: number
+  /** 本期贷方发生（对齐源模板 I 列） */
+  creditOccurrence: number
   isRelatedParty: boolean
   unrealizedIncome: number
   netAmount: number
@@ -91,6 +97,8 @@ export interface BalanceDetailRow {
   agingAudited: AgingData
   agingTotal: number
   remark: string
+  /** 跨期稳定键（上年结转优先匹配） */
+  crossSheetReceivableId?: string
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -159,9 +167,12 @@ export function useG5BalanceDetail(projectId?: Ref<string>) {
       contractNo: raw.contractNo ?? '',
       startDate: raw.startDate ?? '',
       maturityDate: raw.maturityDate ?? '',
+      isWithinOneYear: Boolean(raw.isWithinOneYear),
       contractAmount: parseNum(raw.contractAmount),
       recoveredAmount: parseNum(raw.recoveredAmount),
       closingBalance: parseNum(raw.closingBalance),
+      debitOccurrence: parseNum(raw.debitOccurrence ?? raw.debit),
+      creditOccurrence: parseNum(raw.creditOccurrence ?? raw.credit),
       isRelatedParty: Boolean(raw.isRelatedParty),
       unrealizedIncome: parseNum(raw.unrealizedIncome),
       netAmount: parseNum(raw.netAmount),
@@ -170,6 +181,9 @@ export function useG5BalanceDetail(projectId?: Ref<string>) {
       agingAudited,
       agingTotal: 0,
       remark: raw.remark ?? '',
+      crossSheetReceivableId: raw.crossSheetReceivableId
+        ? String(raw.crossSheetReceivableId)
+        : (raw.id ? String(raw.id) : undefined),
     }
 
     recalcRow(row)
@@ -200,6 +214,8 @@ export function useG5BalanceDetail(projectId?: Ref<string>) {
       recoveredAmount: rows.value.reduce((s, r) => s + parseNum(r.recoveredAmount), 0),
       closingBalance: rows.value.reduce((s, r) => s + parseNum(r.closingBalance), 0),
       netAmount: rows.value.reduce((s, r) => s + parseNum(r.netAmount), 0),
+      debitOccurrence: rows.value.reduce((s, r) => s + parseNum(r.debitOccurrence), 0),
+      creditOccurrence: rows.value.reduce((s, r) => s + parseNum(r.creditOccurrence), 0),
     }
 
     // 按 segment key 汇总账龄
@@ -229,9 +245,12 @@ export function useG5BalanceDetail(projectId?: Ref<string>) {
       contractNo: '',
       startDate: '',
       maturityDate: '',
+      isWithinOneYear: false,
       contractAmount: 0,
       recoveredAmount: 0,
       closingBalance: 0,
+      debitOccurrence: 0,
+      creditOccurrence: 0,
       isRelatedParty: false,
       unrealizedIncome: 0,
       netAmount: 0,

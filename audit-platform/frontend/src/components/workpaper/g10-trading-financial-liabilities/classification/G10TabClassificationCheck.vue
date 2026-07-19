@@ -67,23 +67,19 @@
       </el-collapse-item>
     </el-collapse>
 
-    <el-card shadow="never" class="conclusion-card">
-      <template #header>
-        <div class="conclusion-head">
-          <span>综合审计结论</span>
-          <el-button size="small" :loading="cc.aiLoading.value" :disabled="isReadonly" @click="cc.generateAiConclusion()">🤖 AI</el-button>
-        </div>
-      </template>
-      <el-input :model-value="cc.overallConclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
-        :disabled="isReadonly" @update:model-value="cc.updateOverallConclusion" />
-    </el-card>
-
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：可概述分类适当性检查的测试情况、管理层回复的核实结果、发现的不合规项及审计应对。"
-        @change="(val: string) => saveAuditNote(val)" />
-    </el-card>
+    <G10AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="conclusionProxy"
+      note-ai-section="classification-note"
+      conclusion-ai-section="classification-conclusion"
+      conclusion-title="综合审计结论"
+      note-placeholder="填写审计说明：可概述分类适当性检查的测试情况、管理层回复的核实结果、发现的不合规项及审计应对。"
+      note-hint="覆盖 CAS22/37 分类条件与各区段合规判断。"
+      conclusion-placeholder="填写综合审计结论：分类为以公允价值计量且其变动计入当期损益是否恰当。"
+      :related-context="{ 待填合规行数: cc.missingCompliance.value.length }"
+    />
 
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
@@ -93,12 +89,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, onMounted } from 'vue'
+import { ref, computed, toRef, watch } from 'vue'
 import { useG10ClassificationCheck } from '../../composables/useG10ClassificationCheck'
 import { G10_COMPLIANCE_OPTIONS } from '../../composables/g10Constants'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G10AuditTextCards from '../G10AuditTextCards.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -116,16 +113,15 @@ const cc = useG10ClassificationCheck({
 
 const expandedSections = ref<string[]>([])
 
-// ─── 审计说明（自由文本，conclusion:null 落库）───────────────────────────────
 const NOTE_KEY = 'G10-4-classification-audit-note'
-const auditNote = ref('')
-function saveAuditNote(val: string): void {
-  if (props.isReadonly) return
-  auditNote.value = val
-  props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
-}
-onMounted(() => {
-  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNote.value = n.remark
+const auditNote = ref(props.allResponses.get(NOTE_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: v })
+})
+
+const conclusionProxy = computed({
+  get: () => cc.overallConclusion.value,
+  set: (v: string) => cc.updateOverallConclusion(v),
 })
 </script>
 
@@ -135,14 +131,10 @@ onMounted(() => {
 .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .toolbar h3 { margin: 0; font-size: 15px; flex: 1; }
 .sec-title { font-weight: 600; }
-.conclusion-card { margin-top: 12px; }
-.conclusion-head { display: flex; justify-content: space-between; align-items: center; }
 .guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
 .objective-alert { margin-bottom: 10px; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .toolbar-right { display: flex; gap: 6px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
-.audit-note-card { margin-top: 12px; }
-.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 :deep(.missing .el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }
 </style>

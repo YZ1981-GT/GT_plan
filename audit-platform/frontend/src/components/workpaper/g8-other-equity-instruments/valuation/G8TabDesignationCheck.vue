@@ -32,8 +32,6 @@
         <template #title>
           <span class="sec-title">{{ sec.title }}</span>
           <el-tag size="small" type="info" style="margin-left:8px">{{ sec.rows.length }} 项</el-tag>
-          <el-button size="small" link :loading="dc.aiLoading.value" :disabled="isReadonly"
-            data-testid="g8-designation-ai-btn" @click.stop="dc.generateAiConclusion()">🤖 AI</el-button>
         </template>
         <el-table :data="sec.rows" border size="small" style="font-size:13px">
           <el-table-column label="#" prop="seq" width="44" />
@@ -72,22 +70,19 @@
       </el-collapse-item>
     </el-collapse>
 
-    <el-card shadow="never" class="conclusion-card">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：指定条件核查、证据获取及各区段合规判断的执行情况与异常事项。" />
-    </el-card>
-
-    <el-card shadow="never" class="conclusion-card">
-      <template #header>
-        <div class="conclusion-head">
-          <span>综合审计结论</span>
-          <el-button size="small" :loading="dc.aiLoading.value" :disabled="isReadonly" @click="dc.generateAiConclusion()">🤖 AI</el-button>
-        </div>
-      </template>
-      <el-input :model-value="dc.overallConclusion.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
-        :disabled="isReadonly" @update:model-value="dc.updateOverallConclusion" />
-    </el-card>
+    <G8AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="conclusionProxy"
+      note-ai-section="designation-note"
+      conclusion-ai-section="designation-conclusion"
+      conclusion-title="综合审计结论"
+      note-placeholder="填写审计说明：指定条件核查、证据获取及各区段合规判断的执行情况与异常事项。"
+      note-hint="覆盖 CAS22 指定条件、不可撤销性及后续会计处理。"
+      conclusion-placeholder="填写综合审计结论：指定 FVOCI 是否恰当、合规。"
+      :related-context="{ 待填合规行数: dc.missingCompliance.value.length }"
+    />
 
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
@@ -100,6 +95,7 @@
 import { ref, computed, watch, toRef } from 'vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G8AuditTextCards from '../G8AuditTextCards.vue'
 import { useG8DesignationCheck } from '../../composables/useG8DesignationCheck'
 import { G8_COMPLIANCE_OPTIONS } from '../../composables/g8Constants'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
@@ -125,6 +121,11 @@ const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
 watch(auditNote, (v) => {
   if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
 })
+
+const conclusionProxy = computed({
+  get: () => dc.overallConclusion.value,
+  set: (v: string) => dc.updateOverallConclusion(v),
+})
 </script>
 
 <style scoped>
@@ -137,8 +138,6 @@ watch(auditNote, (v) => {
 .toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .toolbar h3 { margin: 0; font-size: 15px; flex: 1; }
 .sec-title { font-weight: 600; }
-.conclusion-card { margin-top: 12px; }
-.conclusion-head { display: flex; justify-content: space-between; align-items: center; }
 .guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
 :deep(.missing .el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }
 </style>

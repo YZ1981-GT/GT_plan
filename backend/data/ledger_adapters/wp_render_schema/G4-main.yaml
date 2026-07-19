@@ -95,43 +95,48 @@ sheets:
     class_code: F-审定表
     account_code: '1501'
     direction: debit
+    # 对齐 Excel：期初/期末各「未审数|账项调整|审定数」（不分列 AJE/RJE）
     columns:
       - { field: item, label: 项目, type: text, width: 160, readonly: true }
       - { field: opening_unadjusted, label: 期初未审数, type: number, auto_source: trial_balance.opening_balance }
-      - { field: opening_aje, label: 期初账项调整, type: number }
-      - { field: opening_rje, label: 期初重分类调整, type: number }
-      - { field: opening_adjusted, label: 期初审定数, type: number, formula: "opening_unadjusted + opening_aje + opening_rje" }
-      - { field: closing_unadjusted, label: 期末未审数, type: number, formula: "opening_adjusted + debit - credit" }
-      - { field: closing_aje, label: 期末账项调整, type: number }
-      - { field: closing_rje, label: 期末重分类调整, type: number }
-      - { field: closing_adjusted, label: 期末审定数, type: number, formula: "closing_unadjusted + closing_aje + closing_rje" }
+      - { field: opening_adjustment, label: 期初账项调整, type: number }
+      - { field: opening_adjusted, label: 期初审定数, type: number, formula: "opening_unadjusted + opening_adjustment" }
+      - { field: closing_unadjusted, label: 期末未审数, type: number }
+      - { field: closing_adjustment, label: 期末账项调整, type: number }
+      - { field: closing_adjusted, label: 期末审定数, type: number, formula: "closing_unadjusted + closing_adjustment" }
       - { field: change_amount, label: 变动额, type: number, formula: "closing_adjusted - opening_adjusted" }
       - { field: change_rate, label: 变动率, type: percent, formula: "(closing_adjusted - opening_adjusted) / opening_adjusted" }
+      - { field: reason_analysis, label: 原因分析, type: text }
     sections:
       - name: 一、债权投资原值
         rows:
-          - { item: 单项计提, type: data }
-          - { item: 按组合计提, type: data }
-          - { item: 小计, type: subtotal, formula: "SUM(单项计提, 按组合计提)" }
-          - { item: "减：一年内到期", type: data }
+          - { item: 单项计提坏账准备, type: data }
+          - { item: 按组合计提坏账准备, type: data }
+          - { item: 小计, type: subtotal }
+          - { item: "减：一年内到期的部分", type: data }
+          - { item: 债权投资原值小计, type: formula, formula: "小计 - 一年内到期" }
       - name: 二、债权投资减值准备
         rows:
-          - { item: 单项计提, type: data }
-          - { item: 按组合计提, type: data }
-          - { item: 小计, type: subtotal, formula: "SUM(单项计提, 按组合计提)" }
-      - name: 三、债权投资摊余成本（净值）
+          - { item: 单项计提坏账准备, type: data }
+          - { item: 按组合计提坏账准备, type: data }
+          - { item: 小计, type: subtotal }
+          - { item: "减：一年内到期的部分", type: data }
+          - { item: 债权投资减值准备小计, type: formula }
+      - name: 三、债权投资净值
         rows:
-          - { item: 摊余成本合计, type: formula, formula: "原值小计 - 减值小计" }
-      - name: 附加：一年内到期非流动资产
-        rows:
-          - { item: 一年内到期列报数, type: data }
+          - { item: 单项计提坏账准备, type: formula, formula: "原值单项 - 减值单项" }
+          - { item: 按组合计提坏账准备, type: formula }
+          - { item: 合计, type: subtotal }
+          - { item: "减：一年内到期的部分", type: data }
+          - { item: 债权投资净值合计, type: formula }
+          - { item: 试算平衡表数, type: data }
+          - { item: 差异数, type: formula, formula: "净值合计 - 试算平衡表数" }
     formulas:
-      - { name: calcDebitBalance, target: closing_unadjusted, expr: "opening_adjusted + debit - credit" }
-      - { name: calcAdjustedAmount, target: closing_adjusted, expr: "closing_unadjusted + closing_aje + closing_rje" }
-      - { name: calcAmortizedCost, target: net_value, expr: "原值小计 - 减值小计" }
+      - { name: calcAuditedAmount, target: closing_adjusted, expr: "unadjusted + adjustment" }
+      - { name: calcAmortizedCost, target: net_value, expr: "原值审定 - 减值审定" }
       - { name: calcChangeRate, target: change_rate, expr: "(closing - opening) / opening, null if opening=0" }
     highlights:
-      - { condition: "|change_rate| > 0.20", style: orange, require_field: reason_analysis }
+      - { condition: "|change_rate| > 0.30", style: orange, require_field: reason_analysis }
       - { condition: "variance != 0", style: red }
     writeback:
       target: trial_balance.audited_amount
@@ -141,6 +146,8 @@ sheets:
     event_bus:
       publish:
         - { event: "substantive:adjudicated", payload: "{accountCode:'1501', adjudicatedAmount}" }
+      subscribe:
+        - { event: "g4:adjustment-writeback", filter: "accountCode startsWith 1501" }
     cross_refs:
       - ref_id: CW-G4-1-001
         target_wp: G4-2
@@ -166,18 +173,15 @@ sheets:
     component_type: g4-bond-investment-main
     class_code: C-附注披露
     virtual_scroll: true
+    # 对齐 Excel 主表：期末/上年年末 ×（账面余额|减值准备|账面价值）；另含多 section 披露块
     columns:
       - { field: item, label: 项目, type: text, width: 200 }
-      - { field: ending_cost, label: 期末余额—成本, type: number }
-      - { field: ending_interest_adj, label: 期末余额—利息调整, type: number }
-      - { field: ending_accrued_interest, label: 期末余额—应计利息, type: number }
+      - { field: ending_balance, label: 期末余额—账面余额, type: number }
       - { field: ending_impairment, label: 期末余额—减值准备, type: number }
-      - { field: ending_book_value, label: 期末余额—账面价值, type: number, formula: "cost + interest_adj + accrued_interest - impairment" }
-      - { field: prior_cost, label: 上年年末余额—成本, type: number }
-      - { field: prior_interest_adj, label: 上年年末余额—利息调整, type: number }
-      - { field: prior_accrued_interest, label: 上年年末余额—应计利息, type: number }
+      - { field: ending_book_value, label: 期末余额—账面价值, type: number, formula: "ending_balance - ending_impairment" }
+      - { field: prior_balance, label: 上年年末余额—账面余额, type: number }
       - { field: prior_impairment, label: 上年年末余额—减值准备, type: number }
-      - { field: prior_book_value, label: 上年年末余额—账面价值, type: number, formula: "cost + interest_adj + accrued_interest - impairment" }
+      - { field: prior_book_value, label: 上年年末余额—账面价值, type: number, formula: "prior_balance - prior_impairment" }
     rows: 130
     event_bus:
       subscribe:
@@ -309,16 +313,16 @@ sheets:
     component_type: g4-bond-investment-main
     class_code: F-调整分录
     dynamic_rows: true
+    # 对齐 Excel：叙述式调整事项（非 AJE/RJE 分录簿格式）
     columns:
-      - { field: seq, label: 序号, type: number, width: 50, auto_increment: true }
-      - { field: entry_type, label: 分录类型, type: select, width: 80, options: [AJE, RJE] }
-      - { field: entry_date, label: 日期, type: date, width: 100 }
-      - { field: summary, label: 摘要, type: text, width: 150 }
-      - { field: account_code, label: 科目代码, type: text, width: 80 }
+      - { field: description, label: 调整事项说明, type: text, width: 160 }
+      - { field: category, label: 类别（报表调整/账项调整/其他）, type: select, width: 120, options: [账项调整, 报表调整, 其他] }
+      - { field: report_item, label: 报表项目, type: text, width: 100 }
       - { field: account_name, label: 科目名称, type: text, width: 120 }
-      - { field: debit_amount, label: 借方金额, type: number, width: 100 }
-      - { field: credit_amount, label: 贷方金额, type: number, width: 100 }
-      - { field: preparer, label: 编制人, type: text, width: 80 }
+      - { field: note_item, label: 附注项目, type: text, width: 100 }
+      - { field: debit_amount, label: 借方调整金额, type: number, width: 100 }
+      - { field: credit_amount, label: 贷方调整金额, type: number, width: 100 }
+      - { field: index_ref, label: 索引, type: index_chip, width: 80 }
       - { field: remark, label: 备注, type: text, width: 100 }
     rows: 22
     formulas:
@@ -326,20 +330,21 @@ sheets:
     highlights:
       - { condition: "debit_credit_imbalanced", style: red, show_diff: true }
     import_export: true
-    add_row_prompt: summary
+    add_row_prompt: description
     writeback:
       target: G4-1
-      fields: [closing_aje, closing_rje]
-      aggregation: sum_by_entry_type
+      fields: [closing_adjustment]
+      aggregation: net_aje_by_1501
+      default_row: original-portfolio
     cross_refs:
       - ref_id: CW-G4-3-001
         target_wp: G4-1
-        description: 'AJE/RJE汇总 → G4-1 审定表账项调整'
+        description: '账项调整净额 → G4-1 审定表期末账项调整'
         severity: required
         direction: outbound
 
   # ═══════════════════════════════════════════════════════════════════════════
-  # Sheet 8: 利息测算表G4-4 (49行×11列, 实际利率法双section分组)
+  # Sheet 8: 利息收入测算表G4-4 (49行×11列, 实际利率法双section)
   # ═══════════════════════════════════════════════════════════════════════════
   利息测算表G4-4:
     code: G4-4
@@ -349,6 +354,7 @@ sheets:
     class_code: G-测算
     dynamic_rows: true
     dual_section: true
+    title: 利息收入测算表
     sections:
       - name: "(一) 确定初始入账价值"
         section_index: 0
@@ -377,7 +383,6 @@ sheets:
           - { field: principal_repaid, label: 已收回的本金, type: number, width: 110 }
           - { field: ending_book_total, label: 期末账面总额, type: number, width: 110, formula: "opening_book_total + effective_interest - cash_inflow - principal_repaid" }
           - { field: accrual_days, label: 计息天数, type: number, width: 80 }
-          - { field: impairment_stage, label: 减值阶段, type: select, width: 80, options: [Stage1, Stage2, Stage3] }
     formulas:
       - { name: calcInitialCarryingAmount, target: initial_carrying, expr: "purchasePrice + transactionCost" }
       - { name: calcEffectiveInterest, target: effective_interest, expr: "amortizedCost * effectiveRate * days / 365" }
@@ -388,6 +393,7 @@ sheets:
       target_field: interest_income_adjusted
       tolerance: 0.01
       highlight: red
+      source_fallback: "G4-3 account 6011 net / G4-4-interest-benchmark"
     import_export: true
     add_row_prompt: invest_project
     ai_sections:

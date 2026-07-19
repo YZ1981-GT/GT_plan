@@ -1,5 +1,8 @@
 <template>
   <div class="i4-tab-targeted-check">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" title="审计目标：针对长期待摊费用中大额新增项目的真实性与资本化判断、受益期变更的合理性、以及提前终止摊销的恰当处理进行专项核查。" class="objective-alert" />
+
     <!-- 蓝色渐变引导区 -->
     <div class="guide-area">
       <div class="guide-grid">
@@ -187,15 +190,19 @@
     </el-card>
 
     <!-- 编制提示 -->
-    <details class="compile-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>I4-5针对性检查为段落型，每个section独立结论+AI辅助</li>
-        <li>大额新增核查关注：超过重要性水平的单笔新增应逐项抽凭</li>
-        <li>受益期变更按CAS 28号未来适用法处理</li>
-        <li>提前终止项目剩余价值一次性计入当期损益</li>
-        <li>总体结论应与审定表I4-1结果一致</li>
-      </ul>
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p><strong>CAS依据：</strong>《企业会计准则第6号——无形资产》应用指南、CAS 28号"会计政策、会计估计变更和差错更正"。</p>
+        <p><strong>编制要点：</strong></p>
+        <ul>
+          <li>I4-5针对性检查为段落型，每个section独立结论+AI辅助</li>
+          <li>大额新增核查关注：超过重要性水平的单笔新增应逐项抽凭</li>
+          <li>受益期变更按CAS 28号未来适用法处理</li>
+          <li>提前终止项目剩余价值一次性计入当期损益</li>
+          <li>总体结论应与审定表I4-1结果一致</li>
+        </ul>
+      </div>
     </details>
   </div>
 </template>
@@ -338,6 +345,17 @@ function handleReview(): void {
 <style scoped>
 .i4-tab-targeted-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
+/* 审计目标 */
+.objective-alert { margin-bottom: 14px; }
+.i4-tab-targeted-check :deep(.objective-alert .el-alert__content) { padding: 2px 0; }
+
+/* 编制提示 (guidance-details) */
+.guidance-details { margin-top: 16px; margin-bottom: 16px; font-size: 12px; color: var(--el-text-color-secondary); }
+.guidance-details summary { cursor: pointer; font-weight: 500; font-size: 13px; }
+.guidance-content { padding: 8px 0 0 8px; line-height: 1.7; }
+.guidance-content ul { padding-left: 18px; margin-top: 4px; }
+.guidance-content li { margin-bottom: 3px; }
+
 /* 蓝色渐变引导区 */
 .guide-area {
   background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%);
@@ -380,10 +398,4 @@ function handleReview(): void {
 /* 总体结论卡片 */
 .conclusion-card { margin-bottom: 16px; }
 .conclusion-select { width: 100%; }
-
-/* 编制提示 */
-.compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
-.compile-hint summary { cursor: pointer; font-weight: 500; }
-.compile-hint ul { padding-left: 20px; margin-top: 8px; }
-.compile-hint li { margin-bottom: 4px; }
 </style>

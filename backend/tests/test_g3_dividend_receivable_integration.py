@@ -3,7 +3,7 @@
 验证：
 1. render策略静态配置正确性（科目前缀/审定item_id）
 2. VALID_COMPONENT_TYPES / RENDERER_DISPATCH / wp_code_overrides 注册契约
-3. 导入导出列结构对齐（5张表：G3-1/G3-2/G3-3/G3-4/G3-5）
+3. 导入导出列结构对齐（G3-1/G3-2/G3-3/G3-4/G3-4-subsequent/G3-5）
 4. round-trip: 导出→导入→数据一致
 
 Requirements: 1.1~1.5, 5.1, 6.1, 7.1, 8.1, 10.1
@@ -101,14 +101,16 @@ class TestG3RegistrationContract:
 
 
 class TestG3ImportExportStructure:
-    """验证 5 张表的导入导出列结构."""
+    """验证动态行表的导入导出列结构."""
 
-    def test_supported_sheets_are_5(self):
+    def test_supported_sheets_are_6(self):
         from app.routers.wp_render_strategies._g3_dividend_receivable_import_export import (
             _G3_SPECS,
         )
-        assert len(_G3_SPECS) == 5
-        assert set(_G3_SPECS.keys()) == {"G3-1", "G3-2", "G3-3", "G3-4", "G3-5"}
+        assert len(_G3_SPECS) == 6
+        assert set(_G3_SPECS.keys()) == {
+            "G3-1", "G3-2", "G3-3", "G3-4", "G3-4-subsequent", "G3-5",
+        }
 
     def test_g3_1_headers_14_columns(self):
         from app.routers.wp_render_strategies._g3_dividend_receivable_import_export import (
@@ -153,46 +155,51 @@ class TestG3ImportExportStructure:
         assert "借方金额" in _G3_3_HEADERS
         assert "贷方金额" in _G3_3_HEADERS
 
-    def test_g3_4_headers_18_columns(self):
+    def test_g3_4_headers_24_columns(self):
         from app.routers.wp_render_strategies._g3_dividend_receivable_import_export import (
             _G3_4_HEADERS, _G3_4_KEYS,
         )
-        assert len(_G3_4_HEADERS) == 18
-        assert len(_G3_4_KEYS) == 18
-        # 股利测算区段9列
+        assert len(_G3_4_HEADERS) == 24
+        assert len(_G3_4_KEYS) == 24
         assert _G3_4_HEADERS[0] == "序号"
         assert "应收股利(测算)" in _G3_4_HEADERS
+        assert "账面已计股利" in _G3_4_HEADERS
         assert "测算差异" in _G3_4_HEADERS
-        # 凭证检查区段9列
-        assert "凭证日期" in _G3_4_HEADERS
-        assert "审计结论" in _G3_4_HEADERS
+        assert "本期减少" in _G3_4_HEADERS
+        assert "减少差异" in _G3_4_HEADERS
 
-    def test_g3_4_two_segments_9_plus_9(self):
-        """2区段：股利测算9 + 凭证检查9 = 18."""
+    def test_g3_4_increase_and_decrease_segments(self):
+        """被投资方行：增加测算字段 + 减少检查字段."""
         from app.routers.wp_render_strategies._g3_dividend_receivable_import_export import (
             _G3_4_KEYS,
         )
-        # 股利测算区段前9个 keys
-        calc_keys = _G3_4_KEYS[:9]
-        assert "seq" in calc_keys
-        assert "calculatedDividend" in calc_keys
-        assert "calcVariance" in calc_keys
-        # 凭证检查区段后9个 keys
-        check_keys = _G3_4_KEYS[9:]
-        assert len(check_keys) == 9
-        assert "voucherDate" in check_keys
-        assert "auditConclusion" in check_keys
+        assert "calculatedDividend" in _G3_4_KEYS
+        assert "calcVariance" in _G3_4_KEYS
+        assert "periodDecrease" in _G3_4_KEYS
+        assert "decreaseDiff" in _G3_4_KEYS
+        assert "voucherDate" not in _G3_4_KEYS  # 期后独立 sheet
 
-    def test_g3_5_headers_13_columns(self):
+    def test_g3_4_subsequent_headers_19_columns(self):
+        from app.routers.wp_render_strategies._g3_dividend_receivable_import_export import (
+            _G3_4_SUBSEQUENT_HEADERS, _G3_4_SUBSEQUENT_KEYS,
+        )
+        assert len(_G3_4_SUBSEQUENT_HEADERS) == 19
+        assert len(_G3_4_SUBSEQUENT_KEYS) == 19
+        assert "凭证编号" in _G3_4_SUBSEQUENT_HEADERS
+        assert "是否异常" in _G3_4_SUBSEQUENT_HEADERS
+        assert "check1" in _G3_4_SUBSEQUENT_KEYS
+        assert "isAbnormal" in _G3_4_SUBSEQUENT_KEYS
+
+    def test_g3_5_headers_17_columns(self):
         from app.routers.wp_render_strategies._g3_dividend_receivable_import_export import (
             _G3_5_HEADERS, _G3_5_KEYS,
         )
-        assert len(_G3_5_HEADERS) == 13
-        assert len(_G3_5_KEYS) == 13
+        assert len(_G3_5_HEADERS) == 17
+        assert len(_G3_5_KEYS) == 17
         assert "被投资方" in _G3_5_HEADERS
         assert "逾期天数" in _G3_5_HEADERS
-        assert "风险等级" in _G3_5_HEADERS
-        assert "审计建议" in _G3_5_HEADERS
+        assert "期后收款金额" in _G3_5_HEADERS
+        assert "审定余额" in _G3_5_HEADERS
 
     def test_all_specs_have_required_fields(self):
         from app.routers.wp_render_strategies._g3_dividend_receivable_import_export import (
@@ -269,16 +276,16 @@ class TestG3ImportExportRoundTrip:
         assert "overdueDays" in _G3_2_KEYS
 
     def test_g3_5_key_field_alignment_with_frontend(self):
-        """G3-5 field_keys 包含前端 OverdueDividendRow 关键字段."""
+        """G3-5 field_keys 包含滚动余额与逾期勾稽关键字段."""
         from app.routers.wp_render_strategies._g3_dividend_receivable_import_export import (
             _G3_5_KEYS,
         )
         assert "investeeName" in _G3_5_KEYS
-        assert "receivableAmount" in _G3_5_KEYS
+        assert "openingBalance" in _G3_5_KEYS
+        assert "closingBalance" in _G3_5_KEYS
         assert "overdueDays" in _G3_5_KEYS
-        assert "recoverability" in _G3_5_KEYS
-        assert "riskLevel" in _G3_5_KEYS
-        assert "auditSuggestion" in _G3_5_KEYS
+        assert "postPeriodCollection" in _G3_5_KEYS
+        assert "auditedBalance" in _G3_5_KEYS
 
     def test_g3_1_adjudication_key_fields(self):
         """G3-1 审定表 field_keys 包含借方科目必要字段."""

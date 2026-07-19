@@ -23,7 +23,6 @@
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
-      <!-- 双模式：HTML sheet 切到 OnlyOffice -->
       <GtOnlyOfficeSheet
         v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
@@ -33,7 +32,6 @@
         style="height: calc(100vh - 180px)"
       />
 
-      <!-- G4-5 业务模式分析 -->
       <G4TabBusinessModel
         v-else-if="currentSheet === 'businessModel'"
         :html-data="resolvedHtmlData"
@@ -42,34 +40,33 @@
         :is-readonly="isReadonly"
       />
 
-      <!-- G4-6 SPPI合同现金流量特征分析 -->
       <G4TabSppiTest
         v-else-if="currentSheet === 'sppiTest'"
         :html-data="resolvedHtmlData"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @imported="onSheetImported"
       />
 
-      <!-- G4-7 有价证券盘点表 -->
       <G4TabSecuritiesInventory
         v-else-if="currentSheet === 'securitiesInventory'"
         :html-data="resolvedHtmlData"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @imported="onSheetImported"
       />
 
-      <!-- G4-8 盘点倒轧结存表 -->
       <G4TabInventoryReconciliation
         v-else-if="currentSheet === 'inventoryReconciliation'"
         :html-data="resolvedHtmlData"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @imported="onSheetImported"
       />
 
-      <!-- 兜底：未迁移/未匹配 sheet → OnlyOffice fallback -->
       <GtOnlyOfficeSheet
         v-else
         :wp-id="props.wpId"
@@ -78,8 +75,6 @@
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
       />
-
-      <!-- 复核对话与版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
     </template>
   </div>
 </template>
@@ -87,19 +82,18 @@
 <script setup lang="ts">
 /**
  * GtG4BondInvestmentSppi.vue — G4 债权投资底稿(SPPI组)主入口
- *
- * Spec: .kiro/specs/g4-bond-investment-sppi/ Task 3.1
- * sheetName正则提取编码(G4-5~G4-8) → v-if分发到4个子组件（defineAsyncComponent lazy）
- * 未匹配 → OnlyOffice fallback
- * 集成：useWorkpaperVersionToolbar(autoSnapshot) + provide('openReviewDialog') + 双模式切换
- * selfLoad：htmlData为null时自动调用 render-config 获取数据
+ * 对齐 G2/Main：formData + g4:save-items 持久化 + 双模式 reload + IE imported
  */
-import { ref, computed, onMounted, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useG4SppiDualMode } from '@/composables/useG4SppiDualMode'
+import { useG4SppiFormData } from '@/composables/useG4SppiFormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import type { ChecklistResponse } from '@/composables/useG4SppiFormData'
+import type { AdjustmentEntry } from './composables/useG4MainAdjustment'
+import { persistExceptionDraftsToMainWp } from './composables/g4ExceptionRouting'
+import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 
-// ─── defineAsyncComponent 懒加载所有子组件 ───────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const G4TabBusinessModel = defineAsyncComponent(
   () => import('./g4-bond-investment-sppi/classification/G4TabBusinessModel.vue'),
@@ -114,7 +108,6 @@ const G4TabInventoryReconciliation = defineAsyncComponent(
   () => import('./g4-bond-investment-sppi/inspection/G4TabInventoryReconciliation.vue'),
 )
 
-// ─── Props ──────────────────────────────────────────────────────────────────
 const props = defineProps<{
   htmlData: Record<string, any> | null
   sheetName: string
@@ -123,7 +116,6 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
-// ─── sheetName 正则 → 编码映射 ──────────────────────────────────────────────
 const SHEET_CODE_MAP: Record<string, string> = {
   'G4-5': 'businessModel',
   'G4-6': 'sppiTest',
@@ -138,10 +130,19 @@ const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
 const isReadonly = computed(() => !!props.readonly)
 
-/** 提取当前sheetName对应的组件标识 */
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
+
+const formData = useG4SppiFormData({
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+  onAfterSave: () => scheduleAutoSnapshot(),
+})
+
 const currentSheet = computed(() => {
   const name = props.sheetName || ''
-  // 正则匹配：G4-5/G4-6/G4-7/G4-8
   const codeMatch = name.match(/G4-([5-8])/)
   if (codeMatch) {
     const code = `G4-${codeMatch[1]}`
@@ -150,35 +151,55 @@ const currentSheet = computed(() => {
   return ''
 })
 
-/** 已迁移为HTML专属组件的sheet列表（支持双模式切换） */
 const HTML_SHEETS = new Set([
   'businessModel', 'sppiTest', 'securitiesInventory', 'inventoryReconciliation',
 ])
 const isHtmlSheet = computed(() => HTML_SHEETS.has(currentSheet.value))
-
-/** 解析后的 htmlData（优先使用prop，fallback到selfLoad结果） */
 const resolvedHtmlData = computed(() => props.htmlData ?? selfLoadData.value)
 
-// ─── 双模式切换 ─────────────────────────────────────────────────────────────
 const dualMode = useG4SppiDualMode({
   wpId: wpIdRef,
   sheetName: computed(() => props.sheetName || ''),
+  reloadAll: () => formData.loadAll(),
 })
 
-// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
-const runtime = inject(WorkpaperRuntimeContextKey, null)
-const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+provide('g4VersionTrailRef', versionTrailRef)
+provide('g4OpenVersionHistory', openVersionHistory)
+provide('reloadWorkpaperData', () => formData.loadAll())
 
-// 复核对话 openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
+function onSheetImported(): void {
+  void formData.loadAll()
+}
 
-// ─── selfLoad 模式：htmlData 为 null 时自动获取数据 ─────────────────────────
+async function handleG4SaveItems(e: Event): Promise<void> {
+  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
+  if (Array.isArray(items) && items.length > 0) {
+    for (const it of items) {
+      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
+    }
+    scheduleAutoSnapshot()
+  }
+}
+
+function handleExceptionDrafts(e: Event): void {
+  const drafts = (e as CustomEvent<{ drafts: AdjustmentEntry[] }>).detail?.drafts
+  if (!Array.isArray(drafts) || drafts.length === 0) return
+  void persistExceptionDraftsToMainWp(drafts, {
+    projectId: props.projectId,
+  }).then((result) => {
+    if (!result) ElMessage.error('未找到 G4 主底稿，异常草稿未写入 G4-3')
+  }).catch(() => {
+    ElMessage.error('写入 G4-3 异常草稿失败')
+  })
+}
+
 async function selfLoad(): Promise<void> {
-  if (props.htmlData != null) return
   try {
+    await formData.loadAll()
+    if (props.htmlData != null) return
     const { data } = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
       params: { force_component_type: 'g4-bond-investment-sppi' },
     })
-    // render-config 返回 {sheets:[{html_data:{...}}]}
     const sheets = data?.sheets ?? data?.data?.sheets
     if (sheets && sheets.length > 0) {
       selfLoadData.value = sheets[0].html_data ?? sheets[0]
@@ -197,10 +218,16 @@ async function retrySelfLoad(): Promise<void> {
   isLoading.value = false
 }
 
-// ─── 生命周期 ───────────────────────────────────────────────────────────────
 onMounted(async () => {
+  window.addEventListener('g4:save-items', handleG4SaveItems)
+  window.addEventListener('g4:exception-drafts', handleExceptionDrafts)
   await selfLoad()
   isLoading.value = false
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('g4:save-items', handleG4SaveItems)
+  window.removeEventListener('g4:exception-drafts', handleExceptionDrafts)
 })
 </script>
 
@@ -208,5 +235,5 @@ onMounted(async () => {
 .g4-bond-investment-sppi { padding: 12px; }
 .loading-container { padding: 24px; }
 .error-container { padding: 24px; }
-.g4-bond-investment-sppi-toolbar { margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
+.g4-bond-investment-sppi-toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; }
 </style>

@@ -5,24 +5,55 @@
  *   期初审定 = 期初未审 + 期初AJE + 期初RJE
  *   期末未审 = 期初审定 + 本期宣告(借方) - 本期收回(贷方)
  *   期末审定 = 期末未审 + 期末AJE + 期末RJE
+ *   变动额/率 = 期末审定 vs 期初审定；|变动率|>30% 原因分析必填
  *
  * 行结构：按被投资方逐行（动态增删）+ 合计 + 试算表数 + 差异
+ * 账龄汇总：参照 G3-5 逾期≥365天拆分一年内/一年以上（对齐 Excel 模板口径）
  *
  * Spec: .kiro/specs/g3-dividend-receivable/ Task 4.1
  * Requirements: 3.1~3.10
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, inject, type Ref, type ComputedRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
+import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
 import {
   parseNum,
   calcDebitBalance,
   calcAdjustedAmount,
   calcSubtotal,
+  calcChangeAmount,
+  calcChangeRate,
+  isChangeRateExceeding,
 } from './useG3DivRecFormulaEngine'
+import {
+  applyG3AdjustmentWriteback,
+  parseG3AdjStore,
+  computeG3AgingSummary,
+  aggregateG3DetailByInvestee,
+  applyG3DetailSyncToAdjStore,
+  G3_CHANGE_RATE_THRESHOLD,
+  G3_OVERDUE_STORAGE_KEY,
+  type StoredG3AdjRow,
+  type G3AgingSummary,
+} from './g3AdjudicationItems'
+import {
+  G3_ACCOUNT_CODE,
+  G3_ADJ_STORAGE_KEY,
+  G3_ADJ_TB_KEY,
+  G3_ADJ_NOTE_KEY,
+  G3_ADJ_CONCLUSION_KEY,
+  G3_WP_CODE,
+  G3_DETAIL_ROWS_KEY,
+} from './g3Constants'
+import { G3SaveItemsKey, G3WritebackTbKey, G3DetailRevisionKey } from './g3InternalKeys'
+import { useWorkpaperAuditYear, resolveAuditYearNumber } from './workpaperAuditYear'
 import type { ChecklistResponse } from './useF1FormData'
 
 /** 科目：应收股利 */
-export const G3_ACCOUNT_CODE = '1131'
+export { G3_ACCOUNT_CODE }
+
+export { G3_CHANGE_RATE_THRESHOLD }
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -40,44 +71,25 @@ export interface G3AdjudicationRow {
   closingAdjusted: number       // 公式：期末未审 + AJE + RJE
   currentDeclared: number       // 本期宣告(借方)
   currentReceived: number       // 本期收回(贷方)
-  remark: string
-  indexRef: string
-}
-
-/** 存储在 checklist_responses 中的行原始数据 */
-interface StoredG3AdjRow {
-  id: string
-  investeeName: string
-  shareholdingRatio: number
-  openingUnadjusted: number
-  openingAJE: number
-  openingRJE: number
-  currentDeclared: number
-  currentReceived: number
-  closingAJE: number
-  closingRJE: number
+  /** 期末审定 − 期初审定 */
+  changeAmount: number
+  /** (期末审定 − 期初审定) / 期初审定 */
+  changeRate: number | '' | 'N/A'
+  changeRateHighlight: boolean
+  reasonRequired: boolean
+  reasonAnalysis: string
   remark: string
   indexRef: string
 }
 
 // ─── Storage keys ────────────────────────────────────────────────────────────
 
-const ADJ_STORAGE_KEY = 'G3-1-adj-rows'
-const TB_STORAGE_KEY = 'G3-1-adj-tb-1131'
-const NOTE_KEY = 'G3-1-adj-note'
-const CONCLUSION_KEY = 'G3-1-adj-conclusion'
+const ADJ_STORAGE_KEY = G3_ADJ_STORAGE_KEY
+const TB_STORAGE_KEY = G3_ADJ_TB_KEY
+const NOTE_KEY = G3_ADJ_NOTE_KEY
+const CONCLUSION_KEY = G3_ADJ_CONCLUSION_KEY
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function safeParseRows(jsonStr: string | null | undefined): StoredG3AdjRow[] {
-  if (!jsonStr) return []
-  try {
-    const parsed = JSON.parse(jsonStr)
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
 
 /** 从存储行计算展示行（含公式字段） */
 function computeRow(stored: StoredG3AdjRow): G3AdjudicationRow {
@@ -85,6 +97,9 @@ function computeRow(stored: StoredG3AdjRow): G3AdjudicationRow {
   // 借方科目：期末未审 = 期初审定 + 本期宣告(借方) - 本期收回(贷方)
   const closingUnadjusted = calcDebitBalance(openingAdjusted, stored.currentDeclared, stored.currentReceived)
   const closingAdjusted = calcAdjustedAmount(closingUnadjusted, stored.closingAJE, stored.closingRJE)
+  const changeAmount = calcChangeAmount(closingAdjusted, openingAdjusted)
+  const changeRate = calcChangeRate(openingAdjusted, closingAdjusted)
+  const changeRateHighlight = isChangeRateExceeding(changeRate, G3_CHANGE_RATE_THRESHOLD)
   return {
     id: stored.id,
     investeeName: stored.investeeName,
@@ -99,6 +114,11 @@ function computeRow(stored: StoredG3AdjRow): G3AdjudicationRow {
     closingAdjusted,
     currentDeclared: stored.currentDeclared,
     currentReceived: stored.currentReceived,
+    changeAmount,
+    changeRate,
+    changeRateHighlight,
+    reasonRequired: changeRateHighlight,
+    reasonAnalysis: stored.reasonAnalysis ?? '',
     remark: stored.remark,
     indexRef: stored.indexRef,
   }
@@ -118,6 +138,7 @@ function makeEmptyStoredRow(id: string, investeeName: string): StoredG3AdjRow {
     closingRJE: 0,
     remark: '',
     indexRef: '',
+    reasonAnalysis: '',
   }
 }
 
@@ -128,13 +149,25 @@ export interface UseG3AdjudicationOptions {
   projectId: Ref<string>
   allResponses: Ref<Map<string, ChecklistResponse>>
   isReadonly?: Ref<boolean>
+  /** 审计年度；取试算平衡表必填 Query year */
+  auditYear?: Ref<number | string | null | undefined>
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useG3Adjudication(options: UseG3AdjudicationOptions) {
-  const { wpId, projectId, allResponses, isReadonly } = options
+  const { projectId, allResponses, isReadonly, auditYear } = options
   const readonly = isReadonly ?? ref(false)
+  const saveItemsFn = inject(G3SaveItemsKey, null)
+  const writebackTbFn = inject(G3WritebackTbKey, null)
+  const detailRevision = inject(G3DetailRevisionKey, null)
+  const runtimeYear = useWorkpaperAuditYear(auditYear)
+  /** 已跟进的 G3-2 修订号（热更新用） */
+  let lastDetailRevSeen = -1
+
+  function resolveAuditYear(): number | null {
+    return resolveAuditYearNumber(auditYear, runtimeYear.value)
+  }
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -142,10 +175,9 @@ export function useG3Adjudication(options: UseG3AdjudicationOptions) {
   const auditConclusion = ref('')
 
   // ─── 从 allResponses 解析行数据 ────────────────────────────────────────
-  const storedRows = computed<StoredG3AdjRow[]>(() => {
-    const resp = allResponses.value.get(ADJ_STORAGE_KEY)
-    return safeParseRows(resp?.remark)
-  })
+  const storedRows = computed<StoredG3AdjRow[]>(() =>
+    parseG3AdjStore(allResponses.value.get(ADJ_STORAGE_KEY)?.remark),
+  )
 
   /** 数据行（公式自动计算） */
   const dataRows: ComputedRef<G3AdjudicationRow[]> = computed(() =>
@@ -168,9 +200,30 @@ export function useG3Adjudication(options: UseG3AdjudicationOptions) {
       closingRJE: calcSubtotal(rows.map((r) => r.closingRJE)),
       remark: '',
       indexRef: '',
+      reasonAnalysis: '',
     }
     return computeRow(stored)
   })
+
+  /** 是否存在非零期初 AJE/RJE（前期差错/重述） */
+  const hasOpeningAdjustments: ComputedRef<boolean> = computed(() =>
+    dataRows.value.some(
+      (r) => Math.abs(r.openingAJE) > 0.005 || Math.abs(r.openingRJE) > 0.005,
+    ),
+  )
+
+  /** 账龄一年内/一年以上汇总（参照 G3-5） */
+  const agingSummary: ComputedRef<G3AgingSummary> = computed(() =>
+    computeG3AgingSummary(
+      subtotalRow.value.closingAdjusted,
+      allResponses.value.get(G3_OVERDUE_STORAGE_KEY)?.conclusion,
+    ),
+  )
+
+  /** 是否存在需填原因分析的行 */
+  const hasReasonGaps: ComputedRef<boolean> = computed(() =>
+    dataRows.value.some((r) => r.reasonRequired && !String(r.reasonAnalysis || '').trim()),
+  )
 
   /** 试算表取数（科目1131） */
   const trialBalanceAmount: ComputedRef<number> = computed(() =>
@@ -199,17 +252,19 @@ export function useG3Adjudication(options: UseG3AdjudicationOptions) {
     { immediate: true },
   )
 
-  // ─── EventBus: publish substantive:adjudicated（科目1131）───────────────
+  // ─── EventBus: publish substantive:adjudicated + TB writeback（科目1131）──
   function publishAdjudicated(): void {
     const amount = subtotalRow.value.closingAdjusted
-    const payload = {
-      wpCode: 'G3',
-      accountCode: G3_ACCOUNT_CODE,
-      adjudicatedAmount: amount,
-      auditedAmount: amount,
-    }
     try {
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
+      eventBus.emit('substantive:adjudicated', {
+        wpCode: G3_WP_CODE,
+        accountCode: G3_ACCOUNT_CODE,
+        auditedAmount: amount,
+        timestamp: Date.now(),
+      })
+      if (writebackTbFn) {
+        void writebackTbFn(amount)
+      }
     } catch { /* EventBus publish 失败不阻塞编辑 */ }
   }
 
@@ -222,13 +277,19 @@ export function useG3Adjudication(options: UseG3AdjudicationOptions) {
   // ─── 单元格编辑 ─────────────────────────────────────────────────────
   function updateCell(rowId: string, field: string, value: number | string): void {
     if (readonly.value) return
-    const stored = safeParseRows(allResponses.value.get(ADJ_STORAGE_KEY)?.remark)
+    const stored = parseG3AdjStore(allResponses.value.get(ADJ_STORAGE_KEY)?.remark)
     const idx = stored.findIndex((r) => r.id === rowId)
     if (idx === -1) return
-    if (field === 'indexRef' || field === 'remark' || field === 'investeeName') {
-      ;(stored[idx] as any)[field] = String(value ?? '')
+    if (
+      field === 'indexRef'
+      || field === 'remark'
+      || field === 'investeeName'
+      || field === 'reasonAnalysis'
+    ) {
+      ;(stored[idx] as Record<string, unknown>)[field] = String(value ?? '')
     } else {
-      ;(stored[idx] as any)[field] = typeof value === 'number' ? value : parseNum(value)
+      ;(stored[idx] as Record<string, unknown>)[field] =
+        typeof value === 'number' ? value : parseNum(value)
     }
     persistRows(stored)
   }
@@ -243,7 +304,7 @@ export function useG3Adjudication(options: UseG3AdjudicationOptions) {
         inputPattern: /\S+/,
         inputErrorMessage: '名称不能为空',
       })
-      const stored = safeParseRows(allResponses.value.get(ADJ_STORAGE_KEY)?.remark)
+      const stored = parseG3AdjStore(allResponses.value.get(ADJ_STORAGE_KEY)?.remark)
       const newRow = makeEmptyStoredRow(String(Date.now()), value.trim())
       stored.push(newRow)
       persistRows(stored)
@@ -252,7 +313,7 @@ export function useG3Adjudication(options: UseG3AdjudicationOptions) {
 
   function removeRow(rowId: string): void {
     if (readonly.value) return
-    const stored = safeParseRows(allResponses.value.get(ADJ_STORAGE_KEY)?.remark)
+    const stored = parseG3AdjStore(allResponses.value.get(ADJ_STORAGE_KEY)?.remark)
     const filtered = stored.filter((r) => r.id !== rowId)
     persistRows(filtered)
   }
@@ -265,6 +326,82 @@ export function useG3Adjudication(options: UseG3AdjudicationOptions) {
       remark: String(amount),
     })
     debounceSave()
+  }
+
+  /** 拉取试算 1131（优先 audited_amount / unadjusted_amount；year 必填） */
+  async function fetchTrialBalance(): Promise<number | null> {
+    const pid = projectId.value
+    const year = resolveAuditYear()
+    if (!pid || year == null) return null
+    try {
+      const res = await api.get(`/api/projects/${pid}/trial-balance`, {
+        params: { year, account_prefix: G3_ACCOUNT_CODE },
+        _silent: true,
+      } as any)
+      const list = Array.isArray(res?.data ?? res)
+        ? (res?.data ?? res)
+        : (res?.data?.items ?? [])
+      const hit = list.find((r: any) =>
+        String(r.standard_account_code ?? r.account_code ?? '').startsWith(G3_ACCOUNT_CODE),
+      )
+      if (!hit) return null
+      const amount = parseNum(
+        hit.audited_amount ?? hit.unadjusted_amount ?? hit.ending_balance
+          ?? ((Number(hit.debit_amount ?? 0) - Number(hit.credit_amount ?? 0))),
+      )
+      setTrialBalance(amount)
+      return amount
+    } catch {
+      return null
+    }
+  }
+
+  function applyAdjustmentWriteback(netAJE: number, netRJE: number): void {
+    if (readonly.value) return
+    const stored = parseG3AdjStore(allResponses.value.get(ADJ_STORAGE_KEY)?.remark)
+    persistRows(applyG3AdjustmentWriteback(stored, netAJE, netRJE))
+    publishAdjudicated()
+  }
+
+  /**
+   * 从 G3-2 按被投资方汇总本期宣告/收回 → G3-1。
+   * 保留期初未审与 AJE/RJE（含账项调整汇总行）；缺行则新建。
+   */
+  function syncFromDetail(opts?: { quiet?: boolean }): { added: number; updated: number } {
+    if (readonly.value) return { added: 0, updated: 0 }
+    const raw = allResponses.value.get(G3_DETAIL_ROWS_KEY)?.conclusion
+    const aggs = aggregateG3DetailByInvestee(raw)
+    if (!aggs.length) return { added: 0, updated: 0 }
+    const stored = parseG3AdjStore(allResponses.value.get(ADJ_STORAGE_KEY)?.remark)
+    const { next, added, updated } = applyG3DetailSyncToAdjStore(stored, aggs)
+    persistRows(next)
+    publishAdjudicated()
+    if (detailRevision) lastDetailRevSeen = detailRevision.value
+    void opts
+    return { added, updated }
+  }
+
+  /** G3-2 变更后：若已有审定行则静默刷新宣告/收回；无行不自动新建 */
+  function softSyncFromDetailIfNeeded(): void {
+    if (readonly.value || !detailRevision) return
+    const rev = detailRevision.value
+    if (rev <= lastDetailRevSeen) return
+    lastDetailRevSeen = rev
+    const hasInvestee = parseG3AdjStore(allResponses.value.get(ADJ_STORAGE_KEY)?.remark)
+      .some((r) => r.investeeName.trim() && r.investeeName !== '账项调整汇总' && r.id !== 'g3-adj-writeback')
+    if (!hasInvestee) return
+    // 已有行：完整 sync（含新建缺失被投资方），保持与按钮一致但无 UI 提示
+    syncFromDetail({ quiet: true })
+  }
+
+  function handleAdjustmentConfirmed(d: {
+    accountCode: string
+    netAJE: number
+    netRJE: number
+    rowCount?: number
+  }): void {
+    if (!d || d.accountCode !== G3_ACCOUNT_CODE) return
+    applyAdjustmentWriteback(Number(d.netAJE ?? 0), Number(d.netRJE ?? 0))
   }
 
   // ─── 持久化 ─────────────────────────────────────────────────────────
@@ -293,8 +430,8 @@ export function useG3Adjudication(options: UseG3AdjudicationOptions) {
         allResponses.value.get(NOTE_KEY),
         allResponses.value.get(CONCLUSION_KEY),
         allResponses.value.get(TB_STORAGE_KEY),
-      ].filter(Boolean)
-      window.dispatchEvent(new CustomEvent('g3:save-items', { detail: { items } }))
+      ].filter(Boolean) as ChecklistResponse[]
+      if (saveItemsFn) void saveItemsFn(items)
     } catch { /* silent */ }
   }
 
@@ -308,7 +445,17 @@ export function useG3Adjudication(options: UseG3AdjudicationOptions) {
     debounceSave()
   })
 
+  onMounted(() => {
+    eventBus.on('g3:adjustment-confirmed', handleAdjustmentConfirmed)
+    softSyncFromDetailIfNeeded()
+  })
+
+  if (detailRevision) {
+    watch(detailRevision, () => softSyncFromDetailIfNeeded())
+  }
+
   onBeforeUnmount(() => {
+    eventBus.off('g3:adjustment-confirmed', handleAdjustmentConfirmed)
     if (debounceTimer) {
       clearTimeout(debounceTimer)
       debounceTimer = null
@@ -322,12 +469,18 @@ export function useG3Adjudication(options: UseG3AdjudicationOptions) {
     trialBalanceAmount,
     variance,
     hasVarianceHighlight,
+    hasOpeningAdjustments,
+    agingSummary,
+    hasReasonGaps,
     auditNote,
     auditConclusion,
     updateCell,
     addRow,
     removeRow,
     setTrialBalance,
+    fetchTrialBalance,
+    syncFromDetail,
+    applyAdjustmentWriteback,
     publishAdjudicated,
   }
 }

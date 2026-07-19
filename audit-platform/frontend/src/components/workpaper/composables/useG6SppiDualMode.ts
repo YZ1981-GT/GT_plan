@@ -4,7 +4,8 @@
  * Spec: .kiro/specs/g6-other-bond-investment-sppi/ Task 1.9 / Req 7.7
  * 模式状态(html/onlyoffice) + 健康检查 + 切换 + localStorage 持久化(per wpId)
  */
-import { ref, onMounted, type Ref } from 'vue'
+import { ref, computed, onMounted, type Ref } from 'vue'
+import { dualModeHtmlOoOptions } from './dualModeLabels'
 
 export type G6SppiRenderMode = 'html' | 'onlyoffice'
 
@@ -24,10 +25,7 @@ export function useG6SppiDualMode(options: UseG6SppiDualModeOptions) {
   const ooConfig = ref<Record<string, any> | null>(null)
   const checking = ref(false)
 
-  const modeOptions = [
-    { label: '结构化视图', value: 'html' },
-    { label: '在线编辑', value: 'onlyoffice' },
-  ]
+  const modeOptions = computed(() => dualModeHtmlOoOptions({ onlineDisabled: !isOoAvailable.value }))
 
   function loadPersistedMode(): void {
     try {
@@ -64,7 +62,10 @@ export function useG6SppiDualMode(options: UseG6SppiDualModeOptions) {
 
   async function switchMode(target: G6SppiRenderMode): Promise<void> {
     if (target === currentMode.value) return
-    if (target === 'onlyoffice' && !isOoAvailable.value) return
+    if (target === 'onlyoffice' && !isOoAvailable.value) {
+      currentMode.value = 'html'
+      return
+    }
 
     if (target === 'onlyoffice') {
       currentMode.value = 'onlyoffice'
@@ -82,8 +83,14 @@ export function useG6SppiDualMode(options: UseG6SppiDualModeOptions) {
   }
 
   onMounted(() => {
-    loadPersistedMode()
-    void checkOOHealth()
+    void checkOOHealth().then((healthy) => {
+      if (healthy) {
+        loadPersistedMode()
+      } else {
+        currentMode.value = 'html'
+        persistMode('html')
+      }
+    })
   })
 
   return {

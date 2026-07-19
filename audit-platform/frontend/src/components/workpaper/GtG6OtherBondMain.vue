@@ -49,6 +49,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :all-responses="formData.allResponses.value"
       />
 
       <!-- G6-2 明细表 -->
@@ -58,6 +59,8 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :all-responses="formData.allResponses.value"
+        @imported="onSheetImported"
       />
 
       <!-- G6-3 坏账准备明细表 -->
@@ -67,6 +70,8 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :all-responses="formData.allResponses.value"
+        @imported="onSheetImported"
       />
 
       <!-- G6-4 调整分录汇总 -->
@@ -76,6 +81,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @imported="onSheetImported"
       />
 
       <!-- 附注披露信息（上市公司） -->
@@ -94,16 +100,23 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :all-responses="formData.allResponses.value"
       />
 
       <!-- 底稿目录 -->
-      <G6TabDirectory
-        v-else-if="currentSheet === 'directory'"
-        :html-data="resolvedHtmlData"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-      />
+      <template v-else-if="currentSheet === 'directory'">
+        <div class="g6-index-toolbar">
+          <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
+        </div>
+        <GCycleBIndexExtras
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :sheet-name="props.sheetName"
+          :wp-code="'G6'"
+          :html-data="resolvedHtmlData ?? undefined"
+          :available-sheets="availableSheets"
+        />
+      </template>
 
       <!-- 兜底：未迁移/未匹配 sheet → OnlyOffice fallback -->
       <GtOnlyOfficeSheet
@@ -124,18 +137,13 @@
 /**
  * GtG6OtherBondMain.vue — G6 其他债权投资底稿(main组)主入口
  *
- * Spec: .kiro/specs/g6-other-bond-investment-main/ Task 3.1
- * sheetName正则提取编码(G6A/G6-1~G6-4/附注上市/附注国企/底稿目录) → v-if分发到8个子组件（defineAsyncComponent lazy）
- * 未匹配 → OnlyOffice fallback
- * 集成：useWorkpaperVersionToolbar(autoSnapshot) + provide('openReviewDialog') + 双模式切换
- * selfLoad：htmlData为null时通过useG6MainFormData调用render-config获取数据
- *
- * Requirements: 1.1, 1.2, 1.6, 1.7, 1.8, 7.1, 7.7
+ * 对齐 G4/G5：formData + g6:save-items + 附注路由 + 双模式 reload
  */
-import { ref, computed, onMounted, provide, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useG6MainDualMode } from './composables/useG6MainDualMode'
 import { useG6MainFormData } from './composables/useG6MainFormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import type { ChecklistResponse } from './composables/useF1FormData'
 
 // ─── defineAsyncComponent 懒加载所有子组件 ───────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -160,9 +168,7 @@ const G6TabDisclosureListed = defineAsyncComponent(
 const G6TabDisclosureSOE = defineAsyncComponent(
   () => import('./g6-other-bond-investment-main/core/G6TabDisclosureSOE.vue'),
 )
-const G6TabDirectory = defineAsyncComponent(
-  () => import('./g6-other-bond-investment-main/core/G6TabDirectory.vue'),
-)
+const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 const props = defineProps<{
@@ -195,30 +201,16 @@ const isReadonly = computed(() => !!props.readonly)
 /** 提取当前sheetName对应的组件标识 */
 const currentSheet = computed(() => {
   const name = props.sheetName || ''
-
-  // 优先匹配中文sheet名
-  if (name.includes('附注披露信息（上市公司）') || name.includes('附注披露(上市)') || name.includes('附注-上市')) {
-    return 'disclosureListed'
-  }
-  if (name.includes('附注披露信息（国企）') || name.includes('附注披露(国企)') || name.includes('附注-国企')) {
-    return 'disclosureSOE'
-  }
-  if (name.includes('底稿目录')) {
-    return 'directory'
-  }
-
-  // 正则匹配：G6A
-  if (/G6A/i.test(name)) {
-    return 'procedure'
-  }
-
-  // 正则匹配：G6-1/G6-2/G6-3/G6-4
-  const codeMatch = name.match(/G6-([1-4])/)
+  if (SHEET_CODE_MAP[name]) return SHEET_CODE_MAP[name]
+  if (/G6-note-listed|附注披露.*上市|附注.*上市/.test(name)) return 'disclosureListed'
+  if (/G6-note-soe|附注披露.*国企|附注.*国企/.test(name)) return 'disclosureSOE'
+  if (/G6-directory|底稿目录/.test(name)) return 'directory'
+  if (/附注/.test(name)) return name.includes('国企') ? 'disclosureSOE' : 'disclosureListed'
+  const codeMatch = name.match(/(G6A|G6-[1-4])/i)
   if (codeMatch) {
-    const code = `G6-${codeMatch[1]}`
+    const code = codeMatch[1].toUpperCase().replace(/^G6A$/i, 'G6A')
     return SHEET_CODE_MAP[code] || ''
   }
-
   return ''
 })
 
@@ -238,35 +230,107 @@ const isHtmlSheet = computed(() => HTML_SHEETS.has(currentSheet.value))
 /** 解析后的 htmlData（优先使用prop，fallback到selfLoad结果） */
 const resolvedHtmlData = computed(() => props.htmlData ?? selfLoadData.value)
 
-// ─── 双模式切换 ─────────────────────────────────────────────────────────────
-const dualMode = useG6MainDualMode({
-  wpId: wpIdRef,
-  sheetName: computed(() => props.sheetName || ''),
-})
-
-// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
+// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
-// ─── useG6MainFormData 用于selfLoad ─────────────────────────────────────────
+// ─── useG6MainFormData ──────────────────────────────────────────────────────
 const formData = useG6MainFormData({
   wpId: wpIdRef,
   projectId: projectIdRef,
   onAfterSave: () => scheduleAutoSnapshot(),
 })
 
+// ─── 双模式切换 ─────────────────────────────────────────────────────────────
+const dualMode = useG6MainDualMode({
+  wpId: wpIdRef,
+  sheetName: computed(() => props.sheetName || ''),
+  reloadAll: () => formData.loadAll(),
+})
+
+const availableSheets = computed(() => {
+  const hd = resolvedHtmlData.value
+  const fromHtml = hd?.sheets ?? hd?.render_config?.sheets
+  if (Array.isArray(fromHtml) && fromHtml.length) return fromHtml
+  // 对齐 G1：htmlData 无 sheets 时用自加载 render-config 的 sheetCache 兜底，
+  // 保证底稿目录架构树非空
+  return Object.keys(formData.sheetCache.value).map(sheet_name => ({ sheet_name }))
+})
+
 provide('g6VersionTrailRef', versionTrailRef)
 provide('g6OpenVersionHistory', openVersionHistory)
+provide('reloadWorkpaperData', () => formData.loadAll())
 
-// 复核对话 openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
+function onSheetImported(): void {
+  void formData.loadAll()
+}
 
-// ─── selfLoad 模式：htmlData 为 null 时自动获取数据 ─────────────────────────
+async function handleG6SaveItems(e: Event): Promise<void> {
+  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
+  if (Array.isArray(items) && items.length > 0) {
+    for (const it of items) {
+      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
+    }
+    scheduleAutoSnapshot()
+  }
+}
+
+function handleAdjudicated(e: Event): void {
+  const d = (e as CustomEvent<{ accountCode: string; adjudicatedAmount: number }>).detail
+  if (d?.accountCode === '1503') {
+    void formData.saveImmediate('G6-1-adjudicated-amount', {
+      item_id: 'G6-1-adjudicated-amount',
+      conclusion: String(d.adjudicatedAmount),
+      remark: null,
+    })
+  }
+}
+
+/** G6-3 → G6-1 减值准备单项/组合期末未审回写 */
+function handleBadDebtWriteback(e: Event): void {
+  const d = (e as CustomEvent<{
+    individualClosing: number
+    portfolioClosing: number
+  }>).detail
+  if (!d) return
+  const map = formData.allResponses.value
+  const prevRaw = map.get('G6-1-rows')?.conclusion || map.get('G6-1-rows')?.remark || '{}'
+  let store: Record<string, any> = {}
+  try {
+    store = JSON.parse(String(prevRaw))
+    if (!store || typeof store !== 'object' || Array.isArray(store)) store = {}
+  } catch {
+    store = {}
+  }
+  const note = '来自 G6-3 坏账准备明细回写'
+  const patch = (key: string, amount: number) => {
+    const prev = store[key] ?? {}
+    const prevReason = String(prev.reasonAnalysis || '')
+    store[key] = {
+      ...prev,
+      closingUnadjusted: amount,
+      reasonAnalysis: prevReason.includes('G6-3')
+        ? prevReason
+        : [prevReason, note].filter(Boolean).join('；'),
+    }
+  }
+  patch('impairment-individual', Number(d.individualClosing) || 0)
+  patch('impairment-portfolio', Number(d.portfolioClosing) || 0)
+  const json = JSON.stringify(store)
+  void formData.saveImmediate('G6-1-rows', {
+    item_id: 'G6-1-rows',
+    conclusion: json,
+    remark: json,
+  })
+}
+
+// ─── selfLoad：始终 loadAll；htmlData 为空时再 hydrate selfLoadData ─────────
 async function selfLoad(): Promise<void> {
-  if (props.htmlData != null) return
   try {
     await formData.loadAll()
+    if (props.htmlData != null) return
     const parsed = formData.parseContent()
     if (parsed && Object.keys(parsed).length > 0) {
       selfLoadData.value = parsed as Record<string, any>
@@ -285,8 +349,17 @@ async function retrySelfLoad(): Promise<void> {
 
 // ─── 生命周期 ───────────────────────────────────────────────────────────────
 onMounted(async () => {
+  window.addEventListener('g6:save-items', handleG6SaveItems)
+  window.addEventListener('substantive:adjudicated', handleAdjudicated)
+  window.addEventListener('g6:bad-debt-writeback', handleBadDebtWriteback)
   await selfLoad()
   isLoading.value = false
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('g6:save-items', handleG6SaveItems)
+  window.removeEventListener('substantive:adjudicated', handleAdjudicated)
+  window.removeEventListener('g6:bad-debt-writeback', handleBadDebtWriteback)
 })
 </script>
 
@@ -295,4 +368,5 @@ onMounted(async () => {
 .loading-container { padding: 24px; }
 .error-container { padding: 24px; }
 .g6-other-bond-investment-main-toolbar { margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
+.g6-index-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 </style>

@@ -208,17 +208,18 @@
         :disabled="isReadonly" @update:model-value="vc.updateConclusion" />
     </el-card>
 
-    <el-card shadow="never" class="conclusion-card">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：凭证抽样方法、样本量、逐笔核对结果及发现的异常事项。" />
-    </el-card>
-
-    <el-card shadow="never" class="conclusion-card">
-      <template #header>审计结论</template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
-        placeholder="填写审计结论：凭证检查是否发现异常，交易真实性、完整性与计量准确性是否得到验证。" />
-    </el-card>
+    <G8AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="auditConclusion"
+      note-ai-section="voucher-note"
+      conclusion-ai-section="voucher-conclusion"
+      note-placeholder="填写审计说明：凭证抽样方法、样本量、逐笔核对结果及发现的异常事项。"
+      note-hint="覆盖抽样方法、核对结果与异常事项。"
+      conclusion-placeholder="填写审计结论：凭证检查是否发现异常，交易真实性、完整性与计量准确性是否得到验证。"
+      :related-context="{ 行数: vc.rows.value.length, 借贷平衡: vc.balanceOk.value }"
+    />
   </div>
 </template>
 
@@ -230,6 +231,7 @@ import http from '@/utils/http'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G8ImportExportDropdown from '../G8ImportExportDropdown.vue'
+import G8AuditTextCards from '../G8AuditTextCards.vue'
 import { useG8VoucherCheck, type G8VoucherRow } from '../../composables/useG8VoucherCheck'
 import { calcSubtotal, parseNum } from '../../composables/useG8FormulaEngine'
 import type { ChecklistResponse } from '../../composables/useF1FormData'

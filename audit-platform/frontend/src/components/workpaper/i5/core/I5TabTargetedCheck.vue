@@ -1,5 +1,9 @@
 <template>
   <div class="i5-tab-targeted-check">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：针对其他非流动资产的分类正确性、期限适当性及可回收性进行专项检查，确认列报与计价的恰当性。" />
+
     <!-- 蓝色渐变引导区 -->
     <div class="guide-area">
       <div class="guide-grid">
@@ -276,6 +280,21 @@
       </el-select>
     </el-card>
 
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="请填写审计结论..."
+        @change="saveAuditConclusion"
+      />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -355,6 +374,17 @@ const sectionConclusions = reactive({
 
 const conclusion = ref('')
 
+// ─── Audit Conclusion (AC) persistence ───────────────────────────────────────
+
+const CONCLUSION_KEY = 'I5-targeted-check-audit-conclusion'
+const auditConclusion = ref('')
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  emit('save', CONCLUSION_KEY, val)
+}
+
 // ─── Load from allResponses ──────────────────────────────────────────────────
 
 function _load(): void {
@@ -374,6 +404,8 @@ function _load(): void {
   sectionConclusions.recoverability = _getString(`${PREFIX}-recoverability-conclusion`)
   // Overall
   conclusion.value = _getString(`${PREFIX}-conclusion`)
+  // AC
+  auditConclusion.value = _getString(CONCLUSION_KEY)
 }
 
 function _getString(itemId: string): string {
@@ -453,6 +485,14 @@ function handleReview(): void {
 
 <style scoped>
 .i5-tab-targeted-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+/* 审计目标 */
+.objective-alert { margin-bottom: 14px; }
+
+/* 审计结论 el-card */
+.audit-note-card { margin-bottom: 16px; }
+.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
+.card-header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 500; }
 
 /* 蓝色渐变引导区 */
 .guide-area {

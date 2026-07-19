@@ -28,7 +28,7 @@ export {
 } from './workpaper'
 
 export {
-  staff, workHours, notifications, pbc, confirmations,
+  staff, workHours, workHourEntries, notifications, pbc, confirmations,
   annotations, reviewConversations, forum, events, presence,
   sync, independenceDeclarations, my,
 } from './collaboration'
@@ -70,7 +70,7 @@ import {
   excelHtml, jobs,
 } from './workpaper'
 import {
-  staff, workHours, notifications, pbc, confirmations,
+  staff, workHours, workHourEntries, notifications, pbc, confirmations,
   annotations, reviewConversations, forum, events, presence,
   sync, independenceDeclarations, my,
 } from './collaboration'
@@ -101,7 +101,7 @@ export const API = {
   forum, reportReview, ai, aiModels, aiProject, processRecord,
   attachments, ledger, tAccounts, sharedConfig, customTemplates,
   templateLibrary, reportFormatTemplates, excelHtml, importIntelligence,
-  addressRegistry, workHours, aging, regulatory, aiPlugins, gtCoding,
+  addressRegistry, workHours, workHourEntries, aging, regulatory, aiPlugins, gtCoding,
   dataValidation, fineChecks, projectIssues, ledgerImportValidationRules,
   accountChart, accountMapping, reportLineMapping, columnMappings, dataLifecycle, independenceDeclarations,
   admin, my, partner, qcDashboard, qcRules, qcInspections, qcCases,

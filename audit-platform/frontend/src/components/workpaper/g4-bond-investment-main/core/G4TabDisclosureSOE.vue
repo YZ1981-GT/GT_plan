@@ -1,291 +1,1129 @@
 <template>
+
   <div class="g4-disclosure-soe">
-    <!-- 审计目标 -->
+
     <el-alert
+
       type="info"
+
       :closable="false"
+
       show-icon
-      title="审计目标：确认债权投资在国有企业财务报表附注中完整、准确披露期初/期末余额、减值准备及摊余成本合计等信息，列报与分类符合企业会计准则披露要求。"
+
+      title="审计目标：确认债权投资在国有企业财务报表附注中完整、准确披露期初/期末账面余额、减值准备与账面价值，以及期末三阶段计提与减值准备变动情况。"
+
       class="objective-alert"
+
       style="margin-bottom: 12px"
+
     />
 
-    <!-- Section: 债权投资附注(国企) 71行×7列分多section -->
+
+
+    <!-- 非三阶段 section -->
+
     <template v-for="(section, sIdx) in sections" :key="section.id">
-      <div class="section-head">
-        <h4 class="section-title">{{ section.title }}</h4>
-        <div class="head-actions">
-          <el-button v-if="section.hasTextArea" size="small" type="primary" text :disabled="isReadonly" @click="fillAiDraft(sIdx)">
-            🤖AI辅助
-          </el-button>
-          <GtReviewTrigger :section-id="`G4-disclosure-soe-${section.id}`" />
+
+      <template v-if="section.id !== 'stage-impairment'">
+
+        <div class="section-head">
+
+          <h4 class="section-title">{{ section.title }}</h4>
+
+          <div class="head-actions">
+
+            <el-button
+
+              v-if="section.hasTextArea"
+
+              size="small"
+
+              type="primary"
+
+              text
+
+              :disabled="isReadonly || !aiAvailable"
+
+              :loading="aiLoading"
+
+              @click="fillAiDraft(sIdx)"
+
+            >
+
+              🤖AI辅助
+
+            </el-button>
+
+            <GtReviewTrigger :section-id="`G4-disclosure-soe-${section.id}`" />
+
+          </div>
+
         </div>
-      </div>
 
-      <!-- 结构化表格区 -->
-      <el-table
-        v-if="section.rows.length > 0"
-        :data="section.rows"
-        border
-        stripe
-        :max-height="section.rows.length > 50 ? 480 : undefined"
-        style="width: 100%; font-size: 13px; margin-bottom: 8px"
-      >
-        <el-table-column prop="item" label="项目" min-width="180" fixed />
-        <el-table-column label="期初余额" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmount(row.openingBalance) }}</template>
-        </el-table-column>
-        <el-table-column label="本期增加" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmount(row.periodIncrease) }}</template>
-        </el-table-column>
-        <el-table-column label="本期减少" width="130" align="right">
-          <template #default="{ row }">{{ fmtAmount(row.periodDecrease) }}</template>
-        </el-table-column>
-        <el-table-column label="期末余额" width="130" align="right">
-          <template #default="{ row }">
-            <span :class="{ 'formula-cell': row.isFormula }">{{ fmtAmount(row.closingBalance) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="摊余成本" width="130" align="right">
-          <template #default="{ row }">
-            <span :class="{ 'formula-cell': row.isFormula }">{{ fmtAmount(row.amortizedCost) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="备注" min-width="100">
-          <template #default="{ row }">{{ row.remark || '-' }}</template>
-        </el-table-column>
-      </el-table>
 
-      <!-- 文本区 -->
-      <el-card v-if="section.hasTextArea" shadow="never" class="text-card">
-        <el-input
-          v-model="section.textContent"
-          type="textarea"
-          :autosize="{ minRows: 3, maxRows: 15 }"
-          :disabled="isReadonly"
-          :placeholder="`${section.title} 附注文本...`"
-          @change="onNoteTextChange(sIdx)"
-        />
-      </el-card>
+
+        <el-table
+
+          v-if="section.rows.length > 0"
+
+          :data="section.rows"
+
+          border
+
+          stripe
+
+          style="width: 100%; font-size: 13px; margin-bottom: 8px"
+
+        >
+
+          <el-table-column prop="item" label="项目" min-width="160" fixed />
+
+          <el-table-column label="期末数" align="center">
+
+            <el-table-column label="账面余额" width="120" align="right">
+
+              <template #default="{ row }">
+
+                <span :class="{ 'formula-cell': row.isFormula }">{{ fmtAmount(row.endingBalance) }}</span>
+
+              </template>
+
+            </el-table-column>
+
+            <el-table-column label="减值准备" width="120" align="right">
+
+              <template #default="{ row }">{{ fmtAmount(row.endingImpairment) }}</template>
+
+            </el-table-column>
+
+            <el-table-column label="账面价值" width="120" align="right">
+
+              <template #default="{ row }">
+
+                <span class="formula-cell">{{ fmtAmount(row.endingBookValue) }}</span>
+
+              </template>
+
+            </el-table-column>
+
+          </el-table-column>
+
+          <el-table-column label="期初数" align="center">
+
+            <el-table-column label="账面余额" width="120" align="right">
+
+              <template #default="{ row }">{{ fmtAmount(row.priorBalance) }}</template>
+
+            </el-table-column>
+
+            <el-table-column label="减值准备" width="120" align="right">
+
+              <template #default="{ row }">{{ fmtAmount(row.priorImpairment) }}</template>
+
+            </el-table-column>
+
+            <el-table-column label="账面价值" width="120" align="right">
+
+              <template #default="{ row }">
+
+                <span class="formula-cell">{{ fmtAmount(row.priorBookValue) }}</span>
+
+              </template>
+
+            </el-table-column>
+
+          </el-table-column>
+
+        </el-table>
+
+
+
+        <el-card v-if="section.hasTextArea" shadow="never" class="text-card">
+
+          <el-input
+
+            v-model="section.textContent"
+
+            type="textarea"
+
+            :autosize="{ minRows: 3, maxRows: 12 }"
+
+            :disabled="isReadonly"
+
+            :placeholder="`${section.title} 附注文本...`"
+
+            @change="onNoteTextChange(sIdx)"
+
+          />
+
+        </el-card>
+
+      </template>
+
     </template>
 
-    <!-- 编制提示 -->
+
+
+    <!-- （3）期末三阶段：动态其中行（对齐上市披露逻辑，无上年对照） -->
+
+    <div class="section-head">
+
+      <h4 class="section-title">（3）减值准备计提情况（期末三阶段）</h4>
+
+      <div class="head-actions">
+
+        <GtReviewTrigger section-id="G4-disclosure-soe-stage-impairment" />
+
+      </div>
+
+    </div>
+
+    <el-alert
+
+      type="warning"
+
+      :closable="false"
+
+      show-icon
+
+      class="stage-tip"
+
+      title="国企附注仅披露期末三阶段。「其中」可动态增删（对应 Excel 预留插行区）；父级「按单项/按组合」自动汇总。"
+
+    />
+
+
+
+    <el-card
+
+      v-for="block in stageBlocks"
+
+      :key="block.id"
+
+      shadow="never"
+
+      class="stage-card"
+
+    >
+
+      <template #header>
+
+        <span class="stage-card-title">{{ block.title }}</span>
+
+      </template>
+
+
+
+      <div
+
+        v-for="method in (['individual', 'portfolio'] as const)"
+
+        :key="method"
+
+        class="method-block"
+
+      >
+
+        <div class="method-head">
+
+          <span class="method-label">
+
+            {{ method === 'individual' ? '按单项计提减值准备' : '按组合计提减值准备' }}
+
+          </span>
+
+          <el-button
+
+            size="small"
+
+            type="primary"
+
+            link
+
+            :disabled="isReadonly"
+
+            @click="onAddDetail(block.id, method)"
+
+          >
+
+            + 添加其中行
+
+          </el-button>
+
+        </div>
+
+        <el-table :data="methodTableRows(block, method)" border size="small" class="stage-table">
+
+          <el-table-column label="类别" min-width="140">
+
+            <template #default="{ row }">
+
+              <el-input
+
+                v-if="row.kind === 'detail' && !isReadonly"
+
+                :model-value="row.name"
+
+                size="small"
+
+                @change="(v: string) => onPatchDetail(block.id, method, row.id, { name: v })"
+
+              />
+
+              <span v-else :class="{ 'is-parent': row.kind === 'parent' }">{{ row.name }}</span>
+
+            </template>
+
+          </el-table-column>
+
+          <el-table-column label="账面余额" width="120" align="right">
+
+            <template #default="{ row }">
+
+              <el-input-number
+
+                v-if="row.kind === 'detail' && !isReadonly"
+
+                :model-value="row.bookBalance"
+
+                size="small"
+
+                :controls="false"
+
+                class="amt-input"
+
+                @change="(v: number) => onPatchDetail(block.id, method, row.id, { bookBalance: v ?? 0 })"
+
+              />
+
+              <span v-else class="amount-cell">{{ fmtAmount(row.bookBalance) }}</span>
+
+            </template>
+
+          </el-table-column>
+
+          <el-table-column :label="block.rateLabel" width="160" align="right">
+
+            <template #default="{ row }">
+
+              <span class="formula-cell">{{ fmtRate(row.ratePct) }}</span>
+
+            </template>
+
+          </el-table-column>
+
+          <el-table-column label="减值准备" width="120" align="right">
+
+            <template #default="{ row }">
+
+              <el-input-number
+
+                v-if="row.kind === 'detail' && !isReadonly"
+
+                :model-value="row.impairment"
+
+                size="small"
+
+                :controls="false"
+
+                class="amt-input"
+
+                @change="(v: number) => onPatchDetail(block.id, method, row.id, { impairment: v ?? 0 })"
+
+              />
+
+              <span v-else class="amount-cell">{{ fmtAmount(row.impairment) }}</span>
+
+            </template>
+
+          </el-table-column>
+
+          <el-table-column label="账面价值" width="120" align="right">
+
+            <template #default="{ row }">
+
+              <span class="formula-cell">{{ fmtAmount(row.bookValue) }}</span>
+
+            </template>
+
+          </el-table-column>
+
+          <el-table-column :label="block.reasonHeader" min-width="140">
+
+            <template #default="{ row }">
+
+              <el-input
+
+                v-if="row.kind === 'detail' && !isReadonly"
+
+                :model-value="row.reason"
+
+                size="small"
+
+                @change="(v: string) => onPatchDetail(block.id, method, row.id, { reason: v })"
+
+              />
+
+              <span v-else>{{ row.reason }}</span>
+
+            </template>
+
+          </el-table-column>
+
+          <el-table-column v-if="!isReadonly" label="" width="52" align="center">
+
+            <template #default="{ row }">
+
+              <el-button
+
+                v-if="row.kind === 'detail'"
+
+                size="small"
+
+                type="danger"
+
+                link
+
+                @click="onRemoveDetail(block.id, method, row.id)"
+
+              >
+
+                删
+
+              </el-button>
+
+            </template>
+
+          </el-table-column>
+
+        </el-table>
+
+      </div>
+
+
+
+      <div class="stage-total">
+
+        合计：账面余额 {{ fmtAmount(stageTotals(block).bookBalance) }}
+
+        ／ 减值准备 {{ fmtAmount(stageTotals(block).impairment) }}
+
+        ／ 账面价值 {{ fmtAmount(stageTotals(block).bookValue) }}
+
+        ／ ECL率 {{ fmtRate(stageTotals(block).ratePct) }}
+
+      </div>
+
+    </el-card>
+
+
+
+    <el-card shadow="never" class="text-card">
+
+      <el-input
+
+        v-model="stageNoteText"
+
+        type="textarea"
+
+        :autosize="{ minRows: 3, maxRows: 10 }"
+
+        :disabled="isReadonly"
+
+        placeholder="三阶段减值附注说明..."
+
+        @change="onStageNoteChange"
+
+      />
+
+    </el-card>
+
+
+
     <details class="prep-hint">
+
       <summary>编制提示</summary>
+
       <ul>
-        <li>国企附注格式（71行×7列），简化列示期初/期末/摊余成本</li>
-        <li>监听 substantive:adjudicated(1501) 自动同步审定数</li>
-        <li>编辑后发布 disclosure:note-text-updated 联动附注模块</li>
-        <li>超过50行启用虚拟滚动(el-table max-height)</li>
+
+        <li>对齐 Excel 国企附注：（1）余额表 →（2）重要债权投资 →（3）期末三阶段 → 减值准备变动</li>
+
+        <li>相对上市表：无上年三阶段对照、无重要核销明细；「其中」同样支持动态插行</li>
+
+        <li>账面价值 = 账面余额 − 减值准备；编辑后发布 disclosure:note-text-updated</li>
+
       </ul>
+
     </details>
+
   </div>
+
 </template>
 
+
+
 <script setup lang="ts">
+
 /**
+
  * G4TabDisclosureSOE.vue — 附注披露信息（国企）
- *
- * Spec: .kiro/specs/g4-bond-investment-main/ Req 4.2~4.6, 9.4, 11.1, 11.6
- * 71行×7列结构化表格 + 虚拟滚动(>50行阈值)
- * EventBus: subscribe substantive:adjudicated(1501) → auto-refresh
- *           publish disclosure:note-text-updated on text change
- * AI辅助按钮 + 复核按钮（每个section标题行右侧）
+
+ * 对齐 Excel 结构；三阶段「其中」动态增删（与上市披露同源逻辑）。
+
  */
+
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+
 import http from '@/utils/http'
+
+import { useG4MainAiGenerate } from '../../composables/useG4MainAiGenerate'
+
+import {
+
+  addStageDetail,
+
+  bookValue,
+
+  buildDefaultSoeStageBlocks,
+
+  eclRatePct,
+
+  methodTotals,
+
+  parseStageBlocks,
+
+  patchStageDetail,
+
+  removeStageDetail,
+
+  serializeStageBlocks,
+
+  stageTotals,
+
+  type G4StageBlock,
+
+  type G4StageDetailRow,
+
+  type G4StageMethod,
+
+} from '../../composables/g4ListedStageDisclosure'
+
+
 
 const G4_ACCOUNT_CODE = '1501'
 
+const STAGE_ROWS_KEY = 'G4-disclosure-soe-stages'
+
+const STAGE_NOTE_KEY = 'G4-disclosure-soe-stage-note'
+
+
+
 const props = defineProps<{
+
   htmlData: Record<string, any> | null
+
   wpId: string
+
   projectId: string
+
   isReadonly: boolean
+
 }>()
 
-// ═══ 格式化金额 ═══
+
+
 function fmtAmount(v: number | null | undefined): string {
+
   if (v == null || v === 0) return '-'
+
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
 }
+
+
+
+function fmtRate(v: number | null | undefined): string {
+
+  if (v == null || Number.isNaN(v)) return '—'
+
+  return `${v.toFixed(2)}%`
+
+}
+
+
 
 const isReadonly = computed(() => props.isReadonly)
 
+const wpIdRef = computed(() => props.wpId)
+
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG4MainAiGenerate(wpIdRef)
+
+
+
 function readSaved(key: string): string {
+
   const cr = props.htmlData?.checklist_responses
+
   if (cr && typeof cr === 'object' && (cr as Record<string, any>)[key]) {
+
     const v = (cr as Record<string, any>)[key]
+
     return typeof v === 'object' ? (v.remark ?? '') : String(v ?? '')
+
   }
+
   const resp = props.htmlData?.responses
+
   if (Array.isArray(resp)) {
+
     const found = resp.find((r: any) => r?.item_id === key)
+
     if (found?.remark) return found.remark
+
   }
+
   return ''
+
 }
+
+
 
 async function saveAudit(key: string, val: string): Promise<void> {
+
   if (props.isReadonly) return
+
   try {
+
     await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+
       project_id: props.projectId || undefined,
+
       items: [{ item_id: key, conclusion: null, remark: val }],
+
     })
+
   } catch { /* silent */ }
+
 }
 
-// ═══ 附注结构 —— 71行分为多section ═══
-interface DisclosureRowSOE {
+
+
+interface DisclosureRow {
+
   item: string
-  openingBalance: number
-  periodIncrease: number
-  periodDecrease: number
-  closingBalance: number
-  amortizedCost: number
-  remark: string
+
+  endingBalance: number
+
+  endingImpairment: number
+
+  endingBookValue: number
+
+  priorBalance: number
+
+  priorImpairment: number
+
+  priorBookValue: number
+
   isFormula?: boolean
+
 }
 
-interface DisclosureSectionSOE {
+
+
+interface DisclosureSection {
+
   id: string
+
   title: string
-  rows: DisclosureRowSOE[]
+
+  rows: DisclosureRow[]
+
   hasTextArea: boolean
+
   textContent: string
+
 }
 
-function buildSections(): DisclosureSectionSOE[] {
+
+
+function buildSections(): DisclosureSection[] {
+
   return [
+
     {
-      id: 'cost-overview',
-      title: '一、债权投资——成本',
-      rows: generateRows('成本', 14),
+
+      id: 'bond-overview',
+
+      title: '（1）债权投资情况',
+
+      rows: [
+
+        { item: '项目1', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
+
+        { item: '项目2', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
+
+        { item: '项目3', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
+
+        { item: '合计', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0, isFormula: true },
+
+      ],
+
       hasTextArea: true,
+
       textContent: '',
+
     },
+
     {
-      id: 'interest-adjustment',
-      title: '二、债权投资——利息调整',
-      rows: generateRows('利息调整', 12),
+
+      id: 'important-bonds',
+
+      title: '（2）期末重要的债权投资情况',
+
+      rows: [
+
+        { item: '重要项目1', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
+
+        { item: '重要项目2', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
+
+        { item: '合计', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0, isFormula: true },
+
+      ],
+
       hasTextArea: true,
+
       textContent: '',
+
     },
+
     {
-      id: 'accrued-interest',
-      title: '三、债权投资——应计利息',
-      rows: generateRows('应计利息', 12),
-      hasTextArea: true,
+
+      id: 'stage-impairment',
+
+      title: '（3）减值准备计提情况',
+
+      rows: [],
+
+      hasTextArea: false,
+
       textContent: '',
+
     },
+
     {
-      id: 'impairment',
-      title: '四、减值准备',
-      rows: generateRows('减值', 15),
+
+      id: 'provision-walkforward',
+
+      title: '本期计提、收回或转回的减值准备情况',
+
+      rows: [
+
+        { item: '期初余额', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
+
+        { item: '本期计提', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
+
+        { item: '本期转回', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
+
+        { item: '本期核销', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0 },
+
+        { item: '期末余额', endingBalance: 0, endingImpairment: 0, endingBookValue: 0, priorBalance: 0, priorImpairment: 0, priorBookValue: 0, isFormula: true },
+
+      ],
+
       hasTextArea: true,
+
       textContent: '',
+
     },
-    {
-      id: 'summary',
-      title: '五、摊余成本合计',
-      rows: generateRows('合计', 18),
-      hasTextArea: true,
-      textContent: '',
-    },
+
   ]
+
 }
 
-function generateRows(prefix: string, count: number): DisclosureRowSOE[] {
-  const rows: DisclosureRowSOE[] = []
-  for (let i = 1; i <= count; i++) {
+
+
+const sections = reactive<DisclosureSection[]>(buildSections())
+
+const stageBlocks = ref<G4StageBlock[]>(buildDefaultSoeStageBlocks())
+
+const stageNoteText = ref('')
+
+
+
+type DisplayKind = 'parent' | 'detail'
+
+interface MethodDisplayRow {
+
+  id: string
+
+  kind: DisplayKind
+
+  name: string
+
+  bookBalance: number
+
+  impairment: number
+
+  bookValue: number
+
+  ratePct: number | null
+
+  reason: string
+
+}
+
+
+
+function methodTableRows(block: G4StageBlock, method: G4StageMethod): MethodDisplayRow[] {
+
+  const mb = method === 'individual' ? block.individual : block.portfolio
+
+  const tot = methodTotals(mb)
+
+  const parentName = method === 'individual' ? '按单项计提减值准备' : '按组合计提减值准备'
+
+  const rows: MethodDisplayRow[] = [
+
+    {
+
+      id: `${block.id}-${method}-parent`,
+
+      kind: 'parent',
+
+      name: parentName,
+
+      bookBalance: tot.bookBalance,
+
+      impairment: tot.impairment,
+
+      bookValue: tot.bookValue,
+
+      ratePct: tot.ratePct,
+
+      reason: '',
+
+    },
+
+  ]
+
+  for (const d of mb.details) {
+
     rows.push({
-      item: `${prefix}项目${i}`,
-      openingBalance: 0,
-      periodIncrease: 0,
-      periodDecrease: 0,
-      closingBalance: 0,
-      amortizedCost: 0,
-      remark: '',
-      isFormula: i === count,
+
+      id: d.id,
+
+      kind: 'detail',
+
+      name: d.name,
+
+      bookBalance: d.bookBalance,
+
+      impairment: d.impairment,
+
+      bookValue: bookValue(d.bookBalance, d.impairment),
+
+      ratePct: eclRatePct(d.impairment, d.bookBalance),
+
+      reason: d.reason,
+
     })
+
   }
+
   return rows
+
 }
 
-const sections = reactive<DisclosureSectionSOE[]>(buildSections())
 
-// ═══ EventBus: subscribe substantive:adjudicated(1501) ═══
-let adjudicatedAmount = 0
+
+function persistStages(): void {
+
+  void saveAudit(STAGE_ROWS_KEY, serializeStageBlocks(stageBlocks.value))
+
+}
+
+
+
+function onAddDetail(blockId: string, method: G4StageMethod): void {
+
+  if (props.isReadonly) return
+
+  stageBlocks.value = addStageDetail(stageBlocks.value, blockId, method)
+
+  persistStages()
+
+}
+
+
+
+function onRemoveDetail(blockId: string, method: G4StageMethod, detailId: string): void {
+
+  if (props.isReadonly) return
+
+  stageBlocks.value = removeStageDetail(stageBlocks.value, blockId, method, detailId)
+
+  persistStages()
+
+}
+
+
+
+function onPatchDetail(
+
+  blockId: string,
+
+  method: G4StageMethod,
+
+  detailId: string,
+
+  patch: Partial<Pick<G4StageDetailRow, 'name' | 'bookBalance' | 'impairment' | 'reason'>>,
+
+): void {
+
+  if (props.isReadonly) return
+
+  stageBlocks.value = patchStageDetail(stageBlocks.value, blockId, method, detailId, patch)
+
+  persistStages()
+
+}
+
+
+
+function onStageNoteChange(): void {
+
+  void saveAudit(STAGE_NOTE_KEY, stageNoteText.value)
+
+  onNoteTextChange(-1)
+
+}
+
+
 
 function handleAdjudicated(e: Event): void {
+
   const d = (e as CustomEvent<{ accountCode: string; adjudicatedAmount: number }>).detail
+
   if (d?.accountCode === G4_ACCOUNT_CODE && d.adjudicatedAmount != null) {
-    adjudicatedAmount = d.adjudicatedAmount
-    // 自动刷新审定数据到合计section
-    const summarySection = sections.find(s => s.id === 'summary')
-    if (summarySection && summarySection.rows.length > 0) {
-      const lastRow = summarySection.rows[summarySection.rows.length - 1]
-      lastRow.amortizedCost = adjudicatedAmount
+
+    const overview = sections.find(s => s.id === 'bond-overview')
+
+    if (overview?.rows.length) {
+
+      const total = overview.rows.find(r => r.item === '合计') || overview.rows[overview.rows.length - 1]
+
+      total.endingBookValue = d.adjudicatedAmount
+
+      total.endingBalance = d.adjudicatedAmount
+
+      total.endingImpairment = 0
+
     }
+
   }
+
 }
+
+
 
 onMounted(() => {
+
   window.addEventListener('substantive:adjudicated', handleAdjudicated)
+
   loadFromHtmlData()
+
 })
+
 onBeforeUnmount(() => {
+
   window.removeEventListener('substantive:adjudicated', handleAdjudicated)
+
 })
 
-// ═══ EventBus: publish disclosure:note-text-updated ═══
+
+
 function onNoteTextChange(_sectionIdx: number): void {
-  const allText = sections
+
+  const parts = sections
+
     .filter(s => s.hasTextArea && s.textContent)
+
     .map(s => `【${s.title}】\n${s.textContent}`)
-    .join('\n\n')
+
+  if (stageNoteText.value) {
+
+    parts.push(`【（3）减值准备计提情况】\n${stageNoteText.value}`)
+
+  }
+
+  const allText = parts.join('\n\n')
+
+  void saveAudit('G4-disclosure-soe-text', allText)
+
   try {
+
     window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
+
       detail: { accountCode: G4_ACCOUNT_CODE, section: 'soe', text: allText },
+
     }))
+
   } catch { /* silent */ }
+
 }
 
-// ═══ AI辅助 ═══
-function fillAiDraft(sectionIdx: number): void {
-  if (isReadonly.value) return
+
+
+async function fillAiDraft(sectionIdx: number): Promise<void> {
+
+  if (props.isReadonly) return
+
   const section = sections[sectionIdx]
+
   if (!section) return
-  const draft = `${section.title}期末余额为 [审定金额] 元。`
-  section.textContent = section.textContent ? `${section.textContent}\n${draft}` : draft
-  onNoteTextChange(sectionIdx)
+
+  const text = await generateAndConfirm(
+
+    'disclosure-soe-note',
+
+    section.textContent || '',
+
+    { sectionTitle: section.title },
+
+    'AI 附注披露',
+
+  )
+
+  if (text) {
+
+    section.textContent = text
+
+    onNoteTextChange(sectionIdx)
+
+  }
+
 }
 
-// ═══ 数据加载 ═══
+
+
 function loadFromHtmlData(): void {
-  if (!props.htmlData?.disclosureSOE?.sections) return
-  const saved = props.htmlData.disclosureSOE.sections as DisclosureSectionSOE[]
-  saved.forEach((s, i) => {
-    if (sections[i]) {
-      if (s.textContent) sections[i].textContent = s.textContent
-      if (s.rows?.length) sections[i].rows = s.rows
+
+  if (props.htmlData?.disclosureSOE?.sections) {
+
+    const saved = props.htmlData.disclosureSOE.sections as DisclosureSection[]
+
+    saved.forEach((s, i) => {
+
+      if (sections[i] && sections[i].id !== 'stage-impairment') {
+
+        if (s.textContent) sections[i].textContent = s.textContent
+
+        if (s.rows?.length && 'endingBalance' in (s.rows[0] || {})) {
+
+          sections[i].rows = s.rows as DisclosureRow[]
+
+        }
+
+      }
+
+    })
+
+  }
+
+  const parsed = parseStageBlocks(readSaved(STAGE_ROWS_KEY))
+
+  if (parsed) {
+
+    // 国企仅保留期末三阶段
+
+    const soeIds = new Set(buildDefaultSoeStageBlocks().map(b => b.id))
+
+    const filtered = parsed.filter(b => soeIds.has(b.id))
+
+    stageBlocks.value = filtered.length ? filtered : buildDefaultSoeStageBlocks()
+
+    // 补全缺省 block
+
+    const have = new Set(stageBlocks.value.map(b => b.id))
+
+    for (const def of buildDefaultSoeStageBlocks()) {
+
+      if (!have.has(def.id)) stageBlocks.value.push(def)
+
     }
-  })
+
+  }
+
+  const note = readSaved(STAGE_NOTE_KEY)
+
+  if (note) stageNoteText.value = note
+
 }
+
 </script>
 
+
+
 <style scoped>
+
 .g4-disclosure-soe { padding: 12px; font-size: var(--wp-font-size, 13px); }
+
 .section-head { display: flex; justify-content: space-between; align-items: center; margin: 16px 0 8px; }
+
 .section-head:first-child { margin-top: 0; }
+
 .section-title { margin: 0; font-size: 14px; font-weight: 600; }
+
 .head-actions { display: flex; gap: 8px; align-items: center; }
-.text-card { margin-bottom: 12px; }
+
+.text-card { margin: 12px 0; }
+
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
+
 .objective-alert { margin-bottom: 12px; }
+
+.stage-tip { margin-bottom: 10px; }
+
+.stage-card { margin-bottom: 12px; }
+
+.stage-card-title { font-weight: 600; font-size: 13px; }
+
+.method-block { margin-bottom: 8px; }
+
+.method-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+
+.method-label { color: #c00; font-weight: 600; font-size: 13px; }
+
+.stage-table { width: 100%; }
+
+.amt-input { width: 110px; }
+
+.amount-cell { font-variant-numeric: tabular-nums; }
+
+.is-parent { color: #c00; font-weight: 600; }
+
+.stage-total {
+
+  margin-top: 8px;
+
+  padding: 6px 8px;
+
+  background: #f5f7fa;
+
+  font-size: 12px;
+
+  color: #606266;
+
+}
+
 .prep-hint { margin-top: 16px; font-size: 12px; color: #909399; }
+
 .prep-hint summary { cursor: pointer; }
+
 .prep-hint ul { margin: 8px 0 0; padding-left: 18px; }
+
 </style>
+
+

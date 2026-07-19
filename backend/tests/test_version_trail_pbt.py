@@ -450,17 +450,18 @@ class TestProperty6LifecycleBound:
     """Feature: workpaper-version-trail, Property 6: 生命周期上界
 
     For any workpaper, after any sequence of snapshot creation operations,
-    the non-manual snapshot count SHALL never exceed 50.
+    the snapshot count SHALL never exceed 5 (keep newest).
 
     **Validates: Requirements 9.2, 9.3, 9.4**
     """
 
     @settings(max_examples=100)
     @given(
-        num_creates=st.integers(min_value=1, max_value=80),
+        num_creates=st.integers(min_value=1, max_value=20),
         snapshot_type=st.sampled_from(
             [
                 "manual",
+                "auto",
                 "auto_sampling",
                 "auto_import",
                 "review_sign",
@@ -470,11 +471,11 @@ class TestProperty6LifecycleBound:
     )
     @pytest.mark.asyncio
     async def test_lifecycle_bound(self, num_creates: int, snapshot_type: str):
-        """At any moment, non-manual snapshot count ≤ 50 after enforce_lifecycle."""
+        """At any moment, total snapshot count ≤ 5 after enforce_lifecycle."""
         workpaper_id = uuid.uuid4()
-        max_snapshots = 50
+        max_snapshots = 5
 
-        # Simulate current non-manual count being num_creates
+        # Simulate current count being num_creates
         db = AsyncMock()
 
         # Mock count query result
@@ -493,16 +494,14 @@ class TestProperty6LifecycleBound:
             max_snapshots=max_snapshots,
         )
 
-        if num_creates <= max_snapshots:
-            # No deletion needed
+        if num_creates < max_snapshots:
             assert purged == 0
         else:
-            # Should purge exactly the excess
-            expected_purge = num_creates - max_snapshots
+            # 创建前腾空位：excess = count - max + 1
+            expected_purge = num_creates - max_snapshots + 1
             assert purged == expected_purge
-            # After purge, effective count = num_creates - purged = max_snapshots
             effective_count = num_creates - purged
-            assert effective_count <= max_snapshots
+            assert effective_count == max_snapshots - 1
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

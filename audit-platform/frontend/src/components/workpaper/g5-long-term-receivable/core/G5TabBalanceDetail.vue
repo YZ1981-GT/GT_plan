@@ -4,6 +4,22 @@
       <h3 class="sheet-title">G5-2 余额明细表</h3>
       <div class="head-actions tab-toolbar">
         <GtIndexChip value="wp:G5-2" />
+        <G5ImportExportDropdown
+          :wp-id="props.wpId"
+          sheet="G5-2"
+          :disabled="!!props.readonly"
+          @imported="onImported"
+        />
+        <el-button
+          size="small"
+          type="warning"
+          plain
+          :disabled="!!props.readonly"
+          :loading="!!props.rollForwardLoading"
+          @click="emit('roll-forward')"
+        >
+          上年结转
+        </el-button>
         <el-tag size="small" type="info">共 {{ detail.rows.value.length }} 行</el-tag>
         <GtReviewTrigger section-id="g5-2-balance-detail" />
       </div>
@@ -34,10 +50,14 @@
       @current-change="onRowChange"
     >
       <el-table-column type="index" label="序号" width="50" />
-      <el-table-column prop="debtorName" label="债务人名称" min-width="120" />
+      <el-table-column prop="debtorName" label="债务人名称" min-width="120">
+        <template #default="{ row }">
+          <el-input v-model="row.debtorName" size="small" :disabled="props.readonly" @change="onRowEdit(row)" />
+        </template>
+      </el-table-column>
       <el-table-column prop="businessType" label="业务类型" width="100">
         <template #default="{ row }">
-          <el-select v-model="row.businessType" size="small" :disabled="props.readonly">
+          <el-select v-model="row.businessType" size="small" :disabled="props.readonly" @change="onRowEdit(row)">
             <el-option label="融资租赁" value="lease" />
             <el-option label="分期销售" value="installment" />
             <el-option label="保理" value="factoring" />
@@ -45,19 +65,54 @@
           </el-select>
         </template>
       </el-table-column>
-      <el-table-column prop="contractNo" label="合同编号" min-width="100" />
-      <el-table-column prop="startDate" label="起始日" width="100" />
-      <el-table-column prop="maturityDate" label="到期日" width="100" />
-      <el-table-column prop="contractAmount" label="合同总额" min-width="100" align="right" />
-      <el-table-column prop="recoveredAmount" label="已收回金额" min-width="100" align="right" />
+      <el-table-column prop="contractNo" label="合同编号" min-width="100">
+        <template #default="{ row }">
+          <el-input v-model="row.contractNo" size="small" :disabled="props.readonly" @change="persistRows" />
+        </template>
+      </el-table-column>
+      <el-table-column prop="startDate" label="起始日" width="110">
+        <template #default="{ row }">
+          <el-input v-model="row.startDate" size="small" placeholder="YYYY-MM-DD" :disabled="props.readonly" @change="persistRows" />
+        </template>
+      </el-table-column>
+      <el-table-column prop="maturityDate" label="到期日" width="110">
+        <template #default="{ row }">
+          <el-input v-model="row.maturityDate" size="small" placeholder="YYYY-MM-DD" :disabled="props.readonly" @change="persistRows" />
+        </template>
+      </el-table-column>
+      <el-table-column prop="isWithinOneYear" label="1年内到期" width="90" align="center">
+        <template #default="{ row }">
+          <el-checkbox v-model="row.isWithinOneYear" :disabled="props.readonly" @change="persistRows" />
+        </template>
+      </el-table-column>
+      <el-table-column prop="contractAmount" label="合同总额" min-width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number v-model="row.contractAmount" size="small" :controls="false" :disabled="props.readonly" @change="onRowEdit(row)" />
+        </template>
+      </el-table-column>
+      <el-table-column prop="recoveredAmount" label="已收回金额" min-width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number v-model="row.recoveredAmount" size="small" :controls="false" :disabled="props.readonly" @change="onRowEdit(row)" />
+        </template>
+      </el-table-column>
       <el-table-column label="期末余额" min-width="100" align="right">
         <template #default="{ row }">
           <span class="formula-cell" title="合同总额-已收回">{{ fmt(row.closingBalance) }}</span>
         </template>
       </el-table-column>
+      <el-table-column prop="debitOccurrence" label="借方发生" min-width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number v-model="row.debitOccurrence" size="small" :controls="false" :disabled="props.readonly" @change="persistRows" />
+        </template>
+      </el-table-column>
+      <el-table-column prop="creditOccurrence" label="贷方发生" min-width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number v-model="row.creditOccurrence" size="small" :controls="false" :disabled="props.readonly" @change="persistRows" />
+        </template>
+      </el-table-column>
       <el-table-column prop="isRelatedParty" label="关联方" width="70" align="center">
         <template #default="{ row }">
-          <el-checkbox v-model="row.isRelatedParty" :disabled="props.readonly" />
+          <el-checkbox v-model="row.isRelatedParty" :disabled="props.readonly" @change="persistRows" />
         </template>
       </el-table-column>
     </el-table>
@@ -74,7 +129,11 @@
     >
       <el-table-column type="index" label="序号" width="50" />
       <el-table-column prop="debtorName" label="债务人名称" min-width="120" />
-      <el-table-column prop="unrealizedIncome" label="未实现融资收益" min-width="110" align="right" />
+      <el-table-column prop="unrealizedIncome" label="未实现融资收益" min-width="120" align="right">
+        <template #default="{ row }">
+          <el-input-number v-model="row.unrealizedIncome" size="small" :controls="false" :disabled="props.readonly" @change="onRowEdit(row)" />
+        </template>
+      </el-table-column>
       <el-table-column label="净额" min-width="100" align="right">
         <template #default="{ row }">
           <span class="formula-cell" title="期末余额-未实现融资收益">{{ fmt(row.netAmount) }}</span>
@@ -84,11 +143,17 @@
         v-for="band in bands"
         :key="band.key"
         :label="band.label"
-        min-width="80"
+        min-width="90"
         align="right"
       >
         <template #default="{ row }">
-          {{ fmt(row.agingAudited[band.key] ?? 0) }}
+          <el-input-number
+            :model-value="row.agingAudited[band.key] ?? 0"
+            size="small"
+            :controls="false"
+            :disabled="props.readonly"
+            @update:model-value="(v: number) => { row.agingAudited[band.key] = v; onRowEdit(row) }"
+          />
         </template>
       </el-table-column>
       <el-table-column label="账龄合计" min-width="90" align="right">
@@ -100,7 +165,11 @@
           >{{ fmt(row.agingTotal) }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="remark" label="备注" min-width="100" />
+      <el-table-column prop="remark" label="备注" min-width="100">
+        <template #default="{ row }">
+          <el-input v-model="row.remark" size="small" :disabled="props.readonly" @change="persistRows" />
+        </template>
+      </el-table-column>
     </el-table>
 
     <!-- 底部合计 -->
@@ -111,20 +180,17 @@
       净额: {{ fmt(detail.totals.value.netAmount) }}
     </div>
 
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="props.readonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：可概述明细核对情况、账龄勾稽结果、关联方及长账龄风险，以及拟调整/未调整事项及其影响。"
-        @change="(val: string) => saveAuditNote(val)" />
-    </el-card>
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
-      <el-input type="textarea" :model-value="auditConclusion" :disabled="props.readonly"
-        :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项，不可确认。"
-        @change="(val: string) => saveAuditConclusion(val)" />
-    </el-card>
+    <G5AuditTextCards
+      :wp-id="props.wpId"
+      :is-readonly="!!props.readonly"
+      :note="auditNote"
+      :conclusion="auditConclusion"
+      note-ai-section="detail-note"
+      conclusion-ai-section="detail-conclusion"
+      note-placeholder="填写审计说明：可概述明细核对情况、账龄勾稽结果、关联方及长账龄风险，以及拟调整/未调整事项及其影响。"
+      @update:note="saveAuditNote"
+      @update:conclusion="saveAuditConclusion"
+    />
 
     <details class="prep-hint">
       <summary>📋 编制提示</summary>
@@ -140,28 +206,56 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, onMounted } from 'vue'
+import { ref, toRef, onMounted, watch } from 'vue'
 import { useG5BalanceDetail } from '../../composables/useG5BalanceDetail'
-import { useG5LonRecFormData } from '../../composables/useG5LonRecFormData'
+import { useInjectedG5FormData } from '../../composables/useG5LonRecFormData'
+import { G5_ITEM_IDS, readCanonicalRaw } from '../../composables/g5StorageContract'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import G5ImportExportDropdown from '../G5ImportExportDropdown.vue'
+import G5AuditTextCards from '../G5AuditTextCards.vue'
 
 const props = defineProps<{
   htmlData?: any
   wpId: string
   projectId: string
   readonly?: boolean
+  rollForwardLoading?: boolean
 }>()
+
+const emit = defineEmits<{ imported: []; 'roll-forward': [] }>()
 
 const detail = useG5BalanceDetail(toRef(props, 'projectId'))
 const { bands } = detail
 
-// ─── 审计说明 / 审计结论（持久化 checklist_responses，item_id 前缀 G5-）───
-const g5Notes = useG5LonRecFormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const ROWS_KEY = G5_ITEM_IDS.G5_2_ROWS
+const g5Notes = useInjectedG5FormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
 const auditNote = ref('')
 const auditConclusion = ref('')
 const G5_NOTE_KEY = 'G5-2-audit-note'
 const G5_CONCLUSION_KEY = 'G5-2-audit-conclusion'
+let hydrating = false
+
+function persistRows(): void {
+  if (props.readonly || hydrating) return
+  const json = detail.serializeRows()
+  g5Notes.debouncedSave(ROWS_KEY, { remark: json, conclusion: json })
+  try {
+    window.dispatchEvent(new CustomEvent('g5:detail-updated', {
+      detail: {
+        closingBalance: detail.totals.value.closingBalance,
+        netAmount: detail.totals.value.netAmount,
+        rowCount: detail.rows.value.length,
+      },
+    }))
+  } catch { /* silent */ }
+}
+
+function onRowEdit(row: any): void {
+  detail.recalcRow(row)
+  persistRows()
+}
+
 function saveAuditNote(val: string): void {
   if (props.readonly) return
   auditNote.value = val
@@ -174,11 +268,22 @@ function saveAuditConclusion(val: string): void {
 }
 onMounted(async () => {
   try { await g5Notes.loadAll() } catch { /* ignore */ }
+  hydrating = true
+  const raw = readCanonicalRaw(g5Notes.allResponses.value.get(ROWS_KEY))
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) detail.loadRows(parsed)
+    } catch { /* ignore */ }
+  }
+  hydrating = false
   const n = g5Notes.allResponses.value.get(G5_NOTE_KEY)
   if (n?.remark) auditNote.value = n.remark
   const c = g5Notes.allResponses.value.get(G5_CONCLUSION_KEY)
   if (c?.remark) auditConclusion.value = c.remark
 })
+
+watch(() => detail.rows.value.length, () => { if (!hydrating) persistRows() })
 
 const tabOptions = [
   { label: '债务人基础信息', value: 'basic' },
@@ -190,6 +295,22 @@ function onRowChange(row: any) {
     const idx = detail.rows.value.findIndex(r => r.id === row.id)
     if (idx >= 0) detail.activeRowIndex.value = idx
   }
+}
+
+function onImported() {
+  void (async () => {
+    try { await g5Notes.loadAll() } catch { /* ignore */ }
+    hydrating = true
+    const raw = readCanonicalRaw(g5Notes.allResponses.value.get(ROWS_KEY))
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) detail.loadRows(parsed)
+      } catch { /* ignore */ }
+    }
+    hydrating = false
+    emit('imported')
+  })()
 }
 
 function fmt(v: number): string {
@@ -211,6 +332,4 @@ function fmt(v: number): string {
 .formula-cell { border-bottom: 1px dashed #999; cursor: help; }
 .mismatch { color: #f56c6c; font-weight: 600; }
 .totals-bar { margin-top: 8px; padding: 8px 12px; background: #f5f7fa; border-radius: 4px; font-size: 12px; }
-.audit-note-card { margin-top: 16px; }
-.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
 </style>

@@ -370,8 +370,15 @@ watch(() => props.changeTimes, (newTimes, oldTimes) => {
 // ─── 间接持股数据 ────────────────────────────────────────────────────────────
 const indirectSimData = reactive<Record<string, SimRow[]>>({})
 
+// #2: key 改用企业 code 而非数组 index，防止企业重排导致数据串联
+function _indirectKey(ci: number, ici: number): string {
+  const compCode = props.companies[ci]?.code || String(ci)
+  const indCode = indirectList.value[ici]?.code || String(ici)
+  return `${compCode}_${indCode}`
+}
+
 function getIndirectSimRows(ci: number, ici: number): SimRow[] {
-  const key = `${ci}_${ici}`
+  const key = _indirectKey(ci, ici)
   if (!indirectSimData[key]) {
     indirectSimData[key] = buildSimRows()
     const indComp = indirectList.value[ici]
@@ -443,7 +450,10 @@ function getEndInvest(ci: number): number {
 
 const allData = computed(() => companyData.map((cd, i) => ({
   company: props.companies[i], naRows: cd.naRows, simRows: cd.simRows,
-  indirectSimData: Object.fromEntries(Object.entries(indirectSimData).filter(([k]) => k.startsWith(`${i}_`))),
+  indirectSimData: Object.fromEntries(
+    indirectList.value.map((_, ici) => [_indirectKey(i, ici), getIndirectSimRows(i, ici)])
+      .filter(([k]) => indirectSimData[k as string])
+  ),
   endInvestTotal: getEndInvest(i),
 })))
 

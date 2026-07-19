@@ -1,279 +1,194 @@
 <template>
-  <div class="g6-adjudication">
-    <!-- 审计目标 -->
-    <el-alert
-      type="info"
-      :closable="false"
-      show-icon
-      title="审计目标：确认其他债权投资(FVOCI-Debt)期初/期末审定余额的准确性与完整性，公允价值变动(OCI)与减值(ECL)计量恰当，并与试算表科目1503勾稽一致，为报表列示提供审定依据。"
-      style="margin-bottom: 12px"
-    />
-    <!-- 方法论上下文（琥珀色左边线+浅黄背景） -->
-    <div class="methodology-context">
-      <p class="methodology-title">FVOCI-Debt计量特征：</p>
-      <p>① 账面以摊余成本列示（成本+利息调整+应计利息）</p>
-      <p>② 公允价值变动计入其他综合收益(OCI)</p>
-      <p>③ 减值按摊余成本口径计提（非公允价值口径）</p>
-      <p>④ 报表列示数=小计+公允价值变动-减值准备</p>
-    </div>
-
-    <!-- Section 标题栏 -->
+  <div class="g6-adjudication" data-testid="g6-adjudication">
     <div class="section-head">
       <h3 class="sheet-title">G6-1 其他债权投资审定表</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-1" :context-project-id="props.projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-2" :context-project-id="props.projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-3" :context-project-id="props.projectId" /></span>
         <el-button size="small" @click="openReviewDialog('G6-1-adjudication')">💬复核</el-button>
       </div>
     </div>
 
-    <!-- 工具栏：索引 chip + 行数 -->
-    <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
-      <div class="toolbar-right">
-        <span class="chip-wrap"><GtIndexChip value="wp:G6-1" :context-project-id="props.projectId" /></span>
-        <el-tag size="small" type="info">共 {{ detailRowCount }} 行</el-tag>
-      </div>
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：确认其他债权投资(FVOCI-Debt)公允价值与摊余成本审定余额准确完整，减值(ECL)计量恰当，账面价值合计与试算表科目1503勾稽一致。"
+      style="margin-bottom: 12px"
+    />
+
+    <div class="methodology-context">
+      <p class="methodology-title">FVOCI-Debt 计量与本表结构：</p>
+      <p>① 一、公允价值 — 报表列示口径（与附注/资产负债表衔接）</p>
+      <p>② 二、摊余成本 — 投资成本+利息调整→账面余额；减值按摊余成本口径计提；账面价值=账面余额−减值</p>
+      <p>③ 「单项/按组合计提坏账准备」在成本/利息层表示按 ECL 评估方式归类的余额，减值金额仅填在（四）减值准备</p>
+      <p>④ 差异数 = 其他债权投资账面价值合计 − 试算平衡表数（应为 0）</p>
     </div>
 
-    <!-- 8层分组表格（虚拟滚动容器） -->
-    <div class="adj-scroll-container" :style="{ maxHeight: '680px', overflowY: 'auto' }">
-      <template v-for="section in sections" :key="section.key">
-        <!-- 公式行（四、七）直接显示，无折叠 -->
-        <template v-if="section.isFormula">
-          <div class="group-header formula-header">
-            <span class="group-name">{{ section.label }}</span>
-            <span class="formula-tag">自动计算</span>
-          </div>
-          <el-table
-            :data="[section.formulaRow]"
-            border size="small" class="adj-table"
-            :row-class-name="() => 'row-formula'"
-          >
-            <el-table-column label="项目" width="160" fixed>
-              <template #default="{ row }"><span class="row-bold">{{ row.item }}</span></template>
-            </el-table-column>
-            <el-table-column label="期初未审" width="110" align="right">
-              <template #default="{ row }">
-                <span class="formula-cell" :title="section.formulaTooltip">{{ fmt(row.openingUnadjusted) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="期初调整" width="110" align="right">
-              <template #default="{ row }">
-                <span class="formula-cell" :title="section.formulaTooltip">{{ fmt(row.openingAdjustment) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="期初审定" width="120" align="right">
-              <template #default="{ row }">
-                <span class="formula-cell" :title="'期初审定 = 期初未审 + 期初调整'">{{ fmt(row.openingAdjusted) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="期末未审" width="110" align="right">
-              <template #default="{ row }">
-                <span class="formula-cell" :title="section.formulaTooltip">{{ fmt(row.closingUnadjusted) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="期末调整" width="110" align="right">
-              <template #default="{ row }">
-                <span class="formula-cell" :title="section.formulaTooltip">{{ fmt(row.closingAdjustment) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="期末审定" width="120" align="right">
-              <template #default="{ row }">
-                <span class="formula-cell" :title="'期末审定 = 期末未审 + 期末调整'">{{ fmt(row.closingAdjusted) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="变动额" width="110" align="right">
-              <template #default="{ row }">
-                <span class="formula-cell" title="变动额 = 期末审定 - 期初审定">{{ fmt(row.changeAmount) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="变动率" width="100" align="right">
-              <template #default="{ row }">
-                <span :class="['formula-cell', { 'rate-orange': isRateWarning(row.changeRate) }]"
-                  title="变动率 = (期末审定 - 期初审定) / 期初审定">{{ fmtRate(row.changeRate) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="原因分析" min-width="140">
-              <template #default><span>—</span></template>
-            </el-table-column>
-            <el-table-column label="索引" width="80">
-              <template #default><span></span></template>
-            </el-table-column>
-          </el-table>
-        </template>
-
-        <!-- 可折叠的数据section（一、二、三、五、六、八） -->
-        <template v-else>
-          <div class="group-header" @click="toggleSection(section.key)">
-            <el-icon class="collapse-icon" :class="{ 'is-collapsed': !expandedMap[section.key] }">
-              <ArrowDown />
-            </el-icon>
-            <span class="group-name">{{ section.label }}</span>
-          </div>
-
-          <div v-show="expandedMap[section.key]" class="group-body">
-            <el-table
-              :data="getSectionRows(section.key)"
-              border size="small" class="adj-table"
-              :max-height="400"
-              :row-class-name="adjRowClassName"
-            >
-              <!-- 项目列 -->
-              <el-table-column label="项目" width="160" fixed>
-                <template #default="{ row }">
-                  <span :class="{ 'row-bold': row._isSubtotal }">{{ row.item }}</span>
-                </template>
-              </el-table-column>
-              <!-- 期初未审 -->
-              <el-table-column label="期初未审" width="110" align="right">
-                <template #default="{ row }">
-                  <el-input-number
-                    v-if="!row._isSubtotal && !isReadonly"
-                    :model-value="row.openingUnadjusted"
-                    size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateCell(section.key, row._idx, 'openingUnadjusted', v)"
-                  />
-                  <span v-else :class="{ 'row-bold': row._isSubtotal }">{{ fmt(row.openingUnadjusted) }}</span>
-                </template>
-              </el-table-column>
-              <!-- 期初调整 -->
-              <el-table-column label="期初调整" width="110" align="right">
-                <template #default="{ row }">
-                  <el-input-number
-                    v-if="!row._isSubtotal && !isReadonly"
-                    :model-value="row.openingAdjustment"
-                    size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateCell(section.key, row._idx, 'openingAdjustment', v)"
-                  />
-                  <span v-else :class="{ 'row-bold': row._isSubtotal }">{{ fmt(row.openingAdjustment) }}</span>
-                </template>
-              </el-table-column>
-              <!-- 期初审定(公式) -->
-              <el-table-column label="期初审定" width="120" align="right">
-                <template #default="{ row }">
-                  <span :class="['formula-cell', { 'row-bold': row._isSubtotal }]"
-                    title="期初审定 = 期初未审 + 期初调整">{{ fmt(row.openingAdjusted) }}</span>
-                </template>
-              </el-table-column>
-              <!-- 期末未审 -->
-              <el-table-column label="期末未审" width="110" align="right">
-                <template #default="{ row }">
-                  <el-input-number
-                    v-if="!row._isSubtotal && !isReadonly"
-                    :model-value="row.closingUnadjusted"
-                    size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateCell(section.key, row._idx, 'closingUnadjusted', v)"
-                  />
-                  <span v-else :class="{ 'row-bold': row._isSubtotal }">{{ fmt(row.closingUnadjusted) }}</span>
-                </template>
-              </el-table-column>
-              <!-- 期末调整 -->
-              <el-table-column label="期末调整" width="110" align="right">
-                <template #default="{ row }">
-                  <el-input-number
-                    v-if="!row._isSubtotal && !isReadonly"
-                    :model-value="row.closingAdjustment"
-                    size="small" :controls="false" style="width:100%"
-                    @update:model-value="(v: number) => updateCell(section.key, row._idx, 'closingAdjustment', v)"
-                  />
-                  <span v-else :class="{ 'row-bold': row._isSubtotal }">{{ fmt(row.closingAdjustment) }}</span>
-                </template>
-              </el-table-column>
-              <!-- 期末审定(公式) -->
-              <el-table-column label="期末审定" width="120" align="right">
-                <template #default="{ row }">
-                  <span :class="['formula-cell', { 'row-bold': row._isSubtotal }]"
-                    title="期末审定 = 期末未审 + 期末调整">{{ fmt(row.closingAdjusted) }}</span>
-                </template>
-              </el-table-column>
-              <!-- 变动额(公式) -->
-              <el-table-column label="变动额" width="110" align="right">
-                <template #default="{ row }">
-                  <span :class="['formula-cell', { 'row-bold': row._isSubtotal }]"
-                    title="变动额 = 期末审定 - 期初审定">{{ fmt(row.changeAmount) }}</span>
-                </template>
-              </el-table-column>
-              <!-- 变动率(公式) -->
-              <el-table-column label="变动率" width="100" align="right">
-                <template #default="{ row }">
-                  <span :class="[
-                    'formula-cell',
-                    { 'row-bold': row._isSubtotal, 'rate-orange': isRateWarning(row.changeRate) },
-                  ]" title="变动率 = (期末审定 - 期初审定) / 期初审定">{{ fmtRate(row.changeRate) }}</span>
-                </template>
-              </el-table-column>
-              <!-- 原因分析 -->
-              <el-table-column label="原因分析" min-width="140">
-                <template #default="{ row }">
-                  <el-input
-                    v-if="!row._isSubtotal && !isReadonly"
-                    :model-value="row.reasonAnalysis"
-                    size="small"
-                    :class="{ 'reason-required': isRateWarning(row.changeRate) && !row.reasonAnalysis }"
-                    :placeholder="isRateWarning(row.changeRate) ? '变动率>20%，必填' : ''"
-                    @change="(v: string) => updateCell(section.key, row._idx, 'reasonAnalysis', v)"
-                  />
-                  <span v-else>{{ row.reasonAnalysis }}</span>
-                </template>
-              </el-table-column>
-              <!-- 索引 -->
-              <el-table-column label="索引" width="90">
-                <template #default="{ row }">
-                  <template v-if="!row._isSubtotal && !isReadonly">
-                    <el-input :model-value="row.indexRef" size="small"
-                      @change="(v: string) => updateCell(section.key, row._idx, 'indexRef', v)" />
-                  </template>
-                  <GtIndexChip v-else-if="row.indexRef" :value="row.indexRef" />
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
-        </template>
-      </template>
-    </div>
-
-    <!-- 底部：试算表数 + 差异 -->
-    <div class="tb-diff-row">
-      <span class="tb-label">试算平衡表数（科目1503）：</span>
-      <span class="tb-amount">{{ fmt(trialBalanceAmount) }}</span>
-      <span :class="['diff-value', { 'diff-red': Math.abs(variance) > 0.01 }]">
-        差异（审定-试算）：{{ fmt(variance) }}
-        <template v-if="Math.abs(variance) <= 0.01"> ✓</template>
-        <template v-else> ✗</template>
-      </span>
-    </div>
-
-    <!-- 审计说明 -->
-    <el-card class="note-card" shadow="never">
-      <template #header>
-        <div class="card-header"><span>审计说明</span></div>
-      </template>
-      <el-input :model-value="auditNote" type="textarea"
-        :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="对其他债权投资审定表的审计说明…"
-        @change="(v: string) => saveAuditNote(v)" />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card class="note-card" shadow="never">
-      <template #header>
-        <div class="card-header"><span>审计结论</span></div>
-      </template>
-      <el-input :model-value="auditConclusion" type="textarea"
-        :autosize="{ minRows: 3 }" :disabled="isReadonly"
-        placeholder="审计结论…"
-        @change="(v: string) => saveAuditConclusion(v)" />
-    </el-card>
-
-    <!-- 编制提示 -->
-    <details class="guidance-details">
+    <details class="prep-hint">
       <summary>编制提示</summary>
+      <ul>
+        <li>列结构对齐 Excel：期初/期末 ×（未审数｜账项调整｜审定数）+ 变动额/变动率 + 原因分析。</li>
+        <li>审定＝未审＋账项调整；|变动率|&gt;30% 时原因分析必填（与模板编制说明一致）。</li>
+        <li>账面余额叶子＝对应成本审定＋利息调整审定；账面价值叶子＝账面余额审定−减值审定（自动计算）。</li>
+        <li>账面一年内到期＝成本一年内＋利息一年内；账面价值一年内到期＝账面一年内−减值一年内。</li>
+        <li>自资产负债表日起一年内到期部分重分类至「一年内到期的非流动资产」或「其他流动资产」。</li>
+      </ul>
+    </details>
+
+    <el-table
+      :data="adj.rows.value"
+      border
+      size="small"
+      :row-class-name="rowClassName"
+      :max-height="620"
+      style="width: 100%"
+    >
+      <el-table-column label="项目" min-width="260" fixed>
+        <template #default="{ row }">
+          <span
+            :style="{ paddingLeft: `${(row.indent || 0) * 14}px` }"
+            :class="{ 'label-strong': row.kind !== 'leaf' }"
+          >{{ row.label }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="期初数" align="center">
+        <el-table-column label="未审数" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.editable && !isReadonly && row.kind !== 'footer'"
+              :model-value="row.openingUnadjusted"
+              size="small"
+              :controls="false"
+              style="width: 100%"
+              @update:model-value="(v: number) => adj.updateCell(row.rowKey, 'openingUnadjusted', v ?? 0)"
+            />
+            <span v-else :class="{ 'formula-cell': isFormulaRow(row) }">{{ fmt(row.openingUnadjusted) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账项调整" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.editable && !isReadonly && row.kind !== 'footer'"
+              :model-value="row.openingAdjustment"
+              size="small"
+              :controls="false"
+              style="width: 100%"
+              @update:model-value="(v: number) => adj.updateCell(row.rowKey, 'openingAdjustment', v ?? 0)"
+            />
+            <span v-else>{{ fmt(row.openingAdjustment) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="审定数" width="120" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell" title="期初审定 = 未审数 + 账项调整">{{ fmt(row.openingAudited) }}</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <el-table-column label="期末数" align="center">
+        <el-table-column label="未审数" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.editable && !isReadonly"
+              :model-value="row.closingUnadjusted"
+              size="small"
+              :controls="false"
+              style="width: 100%"
+              @update:model-value="(v: number) => adj.updateCell(row.rowKey, 'closingUnadjusted', v ?? 0)"
+            />
+            <span v-else class="formula-cell">{{ fmt(row.closingUnadjusted) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账项调整" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.editable && !isReadonly && row.kind !== 'footer'"
+              :model-value="row.closingAdjustment"
+              size="small"
+              :controls="false"
+              style="width: 100%"
+              @update:model-value="(v: number) => adj.updateCell(row.rowKey, 'closingAdjustment', v ?? 0)"
+            />
+            <span v-else>{{ fmt(row.closingAdjustment) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="审定数" width="120" align="right">
+          <template #default="{ row }">
+            <span
+              class="formula-cell"
+              :class="{ 'diff-red': row.rowKey === 'footer-variance' && adj.hasVarianceHighlight.value }"
+              title="期末审定 = 未审数 + 账项调整"
+            >{{ fmt(row.closingAudited) }}</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <el-table-column label="本期与上期比较" align="center">
+        <el-table-column label="变动额" width="110" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ fmt(row.changeAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="变动率" width="90" align="right">
+          <template #default="{ row }">
+            <span :class="{ 'rate-orange': row.changeRateHighlight }" class="formula-cell">
+              {{ fmtRate(row.changeRate) }}
+            </span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <el-table-column label="原因分析" min-width="140">
+        <template #default="{ row }">
+          <el-input
+            v-if="row.editable && !isReadonly && (row.kind === 'leaf' || row.kind === 'one_year_deduct')"
+            :model-value="row.reasonAnalysis"
+            size="small"
+            :class="{ 'reason-required': row.reasonRequired && !row.reasonAnalysis }"
+            :placeholder="row.reasonRequired ? '变动率>30%，必填' : ''"
+            @change="(v: string) => adj.updateCell(row.rowKey, 'reasonAnalysis', v)"
+          />
+          <span v-else>{{ row.reasonAnalysis || '' }}</span>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <!-- 审计说明：公允价值变动率摘要（对齐 Excel R64） -->
+    <div class="fv-summary">
+      <span>其他债权投资公允价值本期较上期变动：</span>
+      <strong :class="{ 'rate-orange': isFvRateWarning }">{{ fmtRate(adj.fvChangeRate.value) }}</strong>
+      <span v-if="isFvRateWarning" class="fv-hint">（超过 30%，请在审计说明中分析原因）</span>
+    </div>
+
+    <G6AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      :note="adj.auditNote.value"
+      :conclusion="adj.auditConclusion.value"
+      @update:note="(v: string) => { adj.auditNote.value = v }"
+      @update:conclusion="(v: string) => { adj.auditConclusion.value = v }"
+      note-ai-section="adjudication-note"
+      conclusion-ai-section="adjudication-conclusion"
+      :related-context="{
+        试算表数: adj.trialBalanceAmount.value,
+        差异: adj.variance.value,
+        公允价值合计变动率: adj.fvChangeRate.value,
+      }"
+      note-placeholder="对其他债权投资审定表的审计说明…"
+      note-hint="覆盖公允价值/摊余成本审定、一年内到期重分类、减值与试算勾稽；变动率>30%须说明原因。"
+      conclusion-placeholder="审计结论…"
+      conclusion-hint="按 A/B/C 口径评价科目 1503 审定结果。"
+    />
+
+    <details class="guidance-details">
+      <summary>编制说明【非打印内容】</summary>
       <div class="guidance-content">
-        <p>1. 本表为借方科目（资产类1503），期末未审 = 期初审定 + 借方发生额 - 贷方发生额</p>
-        <p>2. 审定数 = 未审数 + 审计调整(AJE+RJE合并为"调整"列)</p>
-        <p>3. 四、小计 = 一、成本 + 二、利息调整 + 三、应计利息</p>
-        <p>4. 七、报表列示数 = 四、小计 + 五、公允价值变动 - 六、减值准备</p>
-        <p>5. 变动率超过20%需填写原因分析</p>
-        <p>6. 差异 = 七、报表列示数（期末审定）- 试算表数</p>
+        <p>1. 「其他债权投资」项目，反映资产负债表日企业分类为以公允价值计量且其变动计入其他综合收益的长期债权投资的期末账面价值。</p>
+        <p>2. 自资产负债表日起一年内到期的长期债权投资的期末账面价值，在「一年内到期的非流动资产」项目反映。</p>
+        <p>3. 企业购入的以公允价值计量且其变动计入其他综合收益的一年内到期的债权投资的期末账面价值，在「其他流动资产」项目反映。</p>
       </div>
     </details>
   </div>
@@ -281,322 +196,76 @@
 
 <script setup lang="ts">
 /**
- * G6TabAdjudication.vue — G6-1 其他债权投资审定表（77行×11列，8层多层结构）
+ * G6TabAdjudication.vue — 对齐 Excel《审定表G6-1》列/行结构
  *
- * Spec: .kiro/specs/g6-other-bond-investment-main/ Req 3.1~3.5, 7.6
- *
- * 8层结构：
- *   一、成本 → 二、利息调整 → 三、应计利息 → 四、小计(=一+二+三)
- *   → 五、公允价值变动 → 六、减值准备 → 七、报表列示数(=四+五-六)
- *   → 八、一年内到期重分类
- *
- * 11列：项目|期初未审|期初调整|期初审定(公式)|期末未审|期末调整|期末审定(公式)|变动额(公式)|变动率(公式)|原因分析|索引
- *
- * 功能：
- * - 分组折叠(expanded toggle) + 虚拟滚动(maxHeight 680px)
- * - 方法论上下文(琥珀色左边线+浅黄背景): FVOCI-Debt计量特征
- * - 公式引用: calcAdjustedAmount / calcSubtotal / calcReportAmount / calcChangeRate
- * - 四小计=一+二+三; 七报表列示数=四+五-六
- * - 底部TB取数(1503)比对 + 差异红色>0.01
- * - |变动率|>20%橙色高亮+原因分析必填
- * - EventBus publish 'substantive:adjudicated' {accountCode:'1503', adjudicatedAmount}
- * - inject('openReviewDialog') for review button
+ * 相对源模板的改进：
+ * - 去掉组合下无名空行；账面余额/账面价值及对应一年内到期公式自动勾稽
+ * - 澄清「单项/组合」在成本层为 ECL 归类标签，减值仅填（四）
+ * - 变动率阈值 30%；试算差异嵌在表内（与 G4 一致）
  */
-import { ref, reactive, computed, watch, inject, onMounted } from 'vue'
-import { ArrowDown } from '@element-plus/icons-vue'
-import {
-  parseNum, calcAdjustedAmount, calcSubtotal, calcReportAmount, calcChangeRate,
-} from '@/composables/useG6MainFormulaEngine'
+import { ref, computed, toRef, inject, watch } from 'vue'
+import { useG6MainAdjudication } from '../../composables/useG6MainAdjudication'
+import type { G6AdjudicationRow } from '../../composables/useG6MainAdjudication'
+import type { ChecklistResponse } from '../../composables/useF1FormData'
+import { G6_CHANGE_RATE_THRESHOLD } from '../../composables/g6AdjudicationItems'
 import GtIndexChip from '../../GtIndexChip.vue'
-import { api } from '@/services/apiProxy'
-import http from '@/utils/http'
+import G6AuditTextCards from '../G6AuditTextCards.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
   wpId: string
   projectId: string
   isReadonly: boolean
+  allResponses?: Map<string, ChecklistResponse>
 }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const isReadonly = computed(() => props.isReadonly)
 
-// ═══ 8层section定义 ═══════════════════════════════════════════════════════════
-interface AdjRow {
-  item: string
-  openingUnadjusted: number
-  openingAdjustment: number
-  openingAdjusted: number
-  closingUnadjusted: number
-  closingAdjustment: number
-  closingAdjusted: number
-  changeAmount: number
-  changeRate: number | null
-  reasonAnalysis: string
-  indexRef: string
-  _isSubtotal?: boolean
-  _idx: number
-}
-
-interface SectionDef {
-  key: string
-  label: string
-  isFormula: boolean
-  formulaTooltip?: string
-  formulaRow?: AdjRow
-}
-
-// ═══ 数据层 — 6个可编辑section的行数据 ═══════════════════════════════════════
-const sectionData = reactive<Record<string, AdjRow[]>>({
-  cost: [],         // 一、成本
-  interestAdj: [],  // 二、利息调整
-  accrued: [],      // 三、应计利息
-  fvChange: [],     // 五、公允价值变动
-  impairment: [],   // 六、减值准备
-  reclass: [],      // 八、一年内到期重分类
-})
-
-const auditNote = ref('')
-const auditConclusion = ref('')
-const trialBalanceAmount = ref(0)
-
-// ─── 审计说明 / 审计结论（走 checklist_responses，conclusion:null + remark 文本） ───
-const NOTE_KEY = 'G6-1-adjudication-audit-note'
-const CONCLUSION_KEY = 'G6-1-adjudication-audit-conclusion'
-
-function readSaved(key: string): string {
-  const cr = props.htmlData?.checklist_responses
-  if (cr && typeof cr === 'object' && (cr as Record<string, any>)[key]) {
-    const v = (cr as Record<string, any>)[key]
-    return typeof v === 'object' ? (v.remark ?? '') : String(v ?? '')
-  }
-  const resp = props.htmlData?.responses
-  if (Array.isArray(resp)) {
-    const found = resp.find((r: any) => r?.item_id === key)
-    if (found?.remark) return found.remark
-  }
-  return ''
-}
-
-async function saveAudit(key: string, val: string): Promise<void> {
-  if (props.isReadonly) return
-  try {
-    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId || undefined,
-      items: [{ item_id: key, conclusion: null, remark: val }],
-    })
-  } catch { /* silent */ }
-}
-
-function saveAuditNote(val: string): void {
-  auditNote.value = val
-  void saveAudit(NOTE_KEY, val)
-}
-function saveAuditConclusion(val: string): void {
-  auditConclusion.value = val
-  void saveAudit(CONCLUSION_KEY, val)
-}
-
-// ═══ 折叠状态（默认全展开）═══════════════════════════════════════════════════
-const expandedMap = reactive<Record<string, boolean>>({
-  cost: true,
-  interestAdj: true,
-  accrued: true,
-  fvChange: true,
-  impairment: true,
-  reclass: true,
-})
-
-function toggleSection(key: string): void {
-  expandedMap[key] = !expandedMap[key]
-}
-
-// ═══ 小计计算 — 每个section汇总行 ═══════════════════════════════════════════
-function calcSectionSubtotal(rows: AdjRow[]): AdjRow {
-  const dataRows = rows.filter(r => !r._isSubtotal)
-  const sumField = (field: keyof AdjRow) =>
-    dataRows.reduce((s, r) => s + parseNum(r[field] as number), 0)
-  const openUnadj = sumField('openingUnadjusted')
-  const openAdj = sumField('openingAdjustment')
-  const openAdjusted = calcAdjustedAmount(openUnadj, openAdj)
-  const closeUnadj = sumField('closingUnadjusted')
-  const closeAdj = sumField('closingAdjustment')
-  const closeAdjusted = calcAdjustedAmount(closeUnadj, closeAdj)
-  const change = Math.round((closeAdjusted - openAdjusted) * 100) / 100
-  const rate = calcChangeRate(openAdjusted, closeAdjusted)
-  return {
-    item: '小计', openingUnadjusted: openUnadj, openingAdjustment: openAdj,
-    openingAdjusted: openAdjusted, closingUnadjusted: closeUnadj, closingAdjustment: closeAdj,
-    closingAdjusted: closeAdjusted, changeAmount: change, changeRate: rate,
-    reasonAnalysis: '', indexRef: '', _isSubtotal: true, _idx: -1,
-  }
-}
-
-/** 获取section显示行（含小计） */
-function getSectionRows(key: string): AdjRow[] {
-  const rows = sectionData[key] || []
-  const dataRows = rows.filter(r => !r._isSubtotal)
-  if (dataRows.length === 0) return []
-  return [...dataRows, calcSectionSubtotal(dataRows)]
-}
-
-// ═══ 四、小计(公式=一+二+三) / 七、报表列示数(公式=四+五-六) ═══════════════════
-const sectionFourRow = computed<AdjRow>(() => {
-  const costSub = calcSectionSubtotal(sectionData.cost.filter(r => !r._isSubtotal))
-  const intAdjSub = calcSectionSubtotal(sectionData.interestAdj.filter(r => !r._isSubtotal))
-  const accSub = calcSectionSubtotal(sectionData.accrued.filter(r => !r._isSubtotal))
-  const openUnadj = calcSubtotal(costSub.openingUnadjusted, intAdjSub.openingUnadjusted, accSub.openingUnadjusted)
-  const openAdj = calcSubtotal(costSub.openingAdjustment, intAdjSub.openingAdjustment, accSub.openingAdjustment)
-  const openAdjusted = calcAdjustedAmount(openUnadj, openAdj)
-  const closeUnadj = calcSubtotal(costSub.closingUnadjusted, intAdjSub.closingUnadjusted, accSub.closingUnadjusted)
-  const closeAdj = calcSubtotal(costSub.closingAdjustment, intAdjSub.closingAdjustment, accSub.closingAdjustment)
-  const closeAdjusted = calcAdjustedAmount(closeUnadj, closeAdj)
-  const change = Math.round((closeAdjusted - openAdjusted) * 100) / 100
-  return {
-    item: '四、小计(=一+二+三)', openingUnadjusted: openUnadj, openingAdjustment: openAdj,
-    openingAdjusted: openAdjusted, closingUnadjusted: closeUnadj, closingAdjustment: closeAdj,
-    closingAdjusted: closeAdjusted, changeAmount: change, changeRate: calcChangeRate(openAdjusted, closeAdjusted),
-    reasonAnalysis: '', indexRef: '', _isSubtotal: true, _idx: -1,
-  }
-})
-
-const sectionSevenRow = computed<AdjRow>(() => {
-  const four = sectionFourRow.value
-  const fvSub = calcSectionSubtotal(sectionData.fvChange.filter(r => !r._isSubtotal))
-  const impSub = calcSectionSubtotal(sectionData.impairment.filter(r => !r._isSubtotal))
-  const openAdjusted = calcReportAmount(four.openingAdjusted, fvSub.openingAdjusted, impSub.openingAdjusted)
-  const closeAdjusted = calcReportAmount(four.closingAdjusted, fvSub.closingAdjusted, impSub.closingAdjusted)
-  const openUnadj = calcReportAmount(four.openingUnadjusted, fvSub.openingUnadjusted, impSub.openingUnadjusted)
-  const openAdj = Math.round((openAdjusted - openUnadj) * 100) / 100
-  const closeUnadj = calcReportAmount(four.closingUnadjusted, fvSub.closingUnadjusted, impSub.closingUnadjusted)
-  const closeAdj = Math.round((closeAdjusted - closeUnadj) * 100) / 100
-  const change = Math.round((closeAdjusted - openAdjusted) * 100) / 100
-  return {
-    item: '七、报表列示数(=四+五-六)', openingUnadjusted: openUnadj, openingAdjustment: openAdj,
-    openingAdjusted: openAdjusted, closingUnadjusted: closeUnadj, closingAdjustment: closeAdj,
-    closingAdjusted: closeAdjusted, changeAmount: change, changeRate: calcChangeRate(openAdjusted, closeAdjusted),
-    reasonAnalysis: '', indexRef: '', _isSubtotal: true, _idx: -1,
-  }
-})
-
-// ═══ sections 渲染列表（按顺序） ═══════════════════════════════════════════════
-const sections = computed<SectionDef[]>(() => [
-  { key: 'cost', label: '一、成本', isFormula: false },
-  { key: 'interestAdj', label: '二、利息调整', isFormula: false },
-  { key: 'accrued', label: '三、应计利息', isFormula: false },
-  { key: 'four', label: '四、小计(=一+二+三)', isFormula: true, formulaTooltip: '四 = 一成本 + 二利息调整 + 三应计利息', formulaRow: sectionFourRow.value },
-  { key: 'fvChange', label: '五、公允价值变动（计入OCI）', isFormula: false },
-  { key: 'impairment', label: '六、减值准备（按摊余成本口径ECL）', isFormula: false },
-  { key: 'seven', label: '七、报表列示数(=四+五-六)', isFormula: true, formulaTooltip: '七 = 四小计 + 五公允价值变动 - 六减值准备', formulaRow: sectionSevenRow.value },
-  { key: 'reclass', label: '八、一年内到期重分类', isFormula: false },
-])
-
-// ═══ TB差异计算 ═══════════════════════════════════════════════════════════════
-/** 报表列示数（期末审定）为TB比对基准 */
-const adjudicatedAmount = computed(() => sectionSevenRow.value.closingAdjusted)
-const variance = computed(() => Math.round((adjudicatedAmount.value - trialBalanceAmount.value) * 100) / 100)
-
-// ═══ 明细行数（工具栏"共 N 行"） ═══
-const detailRowCount = computed(() =>
-  Object.values(sectionData).reduce((s, arr) => s + arr.length, 0),
+const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
+watch(
+  () => props.allResponses,
+  (source) => {
+    if (!source) return
+    allResponses.value = source
+  },
+  { immediate: true, deep: true },
 )
 
-// ═══ EventBus publish: substantive:adjudicated ═══════════════════════════════
-watch(adjudicatedAmount, (val) => {
-  try {
-    // EventBus通过api广播
-    api.post('/api/event-bus/publish', {
-      event: 'substantive:adjudicated',
-      payload: { accountCode: '1503', adjudicatedAmount: val },
-    }, { _silent: true } as any).catch(() => {})
-  } catch { /* best-effort */ }
+const adj = useG6MainAdjudication({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  allResponses,
+  isReadonly,
+  htmlData: toRef(props, 'htmlData'),
 })
 
-// ═══ 单元格更新 + 公式重算 ═══════════════════════════════════════════════════
-function updateCell(sectionKey: string, rowIdx: number, field: string, value: number | string): void {
-  const rows = sectionData[sectionKey]
-  if (!rows || rowIdx < 0 || rowIdx >= rows.length) return
-  const row = rows[rowIdx]
-  ;(row as any)[field] = value
-  // 重算公式列
-  recalcRow(row)
+const isFvRateWarning = computed(() => {
+  const r = adj.fvChangeRate.value
+  return r != null && Math.abs(r) > G6_CHANGE_RATE_THRESHOLD
+})
+
+function isFormulaRow(row: G6AdjudicationRow): boolean {
+  return (
+    row.kind === 'subtotal' ||
+    row.kind === 'section_net' ||
+    row.kind === 'footer' ||
+    (row.kind === 'leaf' && (row.section === 'book' || row.section === 'carrying')) ||
+    (row.kind === 'one_year_deduct' && (row.section === 'book' || row.section === 'carrying'))
+  )
 }
 
-function recalcRow(row: AdjRow): void {
-  row.openingAdjusted = calcAdjustedAmount(row.openingUnadjusted, row.openingAdjustment)
-  row.closingAdjusted = calcAdjustedAmount(row.closingUnadjusted, row.closingAdjustment)
-  row.changeAmount = Math.round((row.closingAdjusted - row.openingAdjusted) * 100) / 100
-  row.changeRate = calcChangeRate(row.openingAdjusted, row.closingAdjusted)
-}
-
-// ═══ 数据水合 — 从htmlData还原行数据 ═══════════════════════════════════════════
-function makeRow(item: string, idx: number, raw?: any): AdjRow {
-  const r: AdjRow = {
-    item,
-    openingUnadjusted: parseNum(raw?.openingUnadjusted ?? raw?.opening_unadjusted),
-    openingAdjustment: parseNum(raw?.openingAdjustment ?? raw?.opening_adjustment),
-    openingAdjusted: 0,
-    closingUnadjusted: parseNum(raw?.closingUnadjusted ?? raw?.closing_unadjusted),
-    closingAdjustment: parseNum(raw?.closingAdjustment ?? raw?.closing_adjustment),
-    closingAdjusted: 0,
-    changeAmount: 0, changeRate: null,
-    reasonAnalysis: raw?.reasonAnalysis ?? raw?.reason_analysis ?? '',
-    indexRef: raw?.indexRef ?? raw?.index_ref ?? '',
-    _isSubtotal: false, _idx: idx,
-  }
-  recalcRow(r)
-  return r
-}
-
-/** 默认投资项目骨架（无外部数据时） */
-const DEFAULT_ITEMS = ['投资项目A', '投资项目B', '投资项目C']
-
-function hydrateData(): void {
-  const data = props.htmlData
-  const sectionKeys = ['cost', 'interestAdj', 'accrued', 'fvChange', 'impairment', 'reclass'] as const
-  for (const key of sectionKeys) {
-    const raw = data?.[key] ?? data?.sections?.[key]
-    if (Array.isArray(raw) && raw.length > 0) {
-      sectionData[key] = raw.map((r: any, i: number) => makeRow(r.item || r.name || `项目${i + 1}`, i, r))
-    } else {
-      // 默认骨架：3行投资项目
-      sectionData[key] = DEFAULT_ITEMS.map((item, i) => makeRow(item, i))
-    }
-  }
-  auditNote.value = data?.auditNote ?? data?.audit_note ?? ''
-  auditConclusion.value = data?.auditConclusion ?? data?.audit_conclusion ?? ''
-}
-
-// ═══ TB取数 — 科目1503 ═══════════════════════════════════════════════════════
-async function fetchTrialBalance(): Promise<void> {
-  if (!props.projectId) return
-  try {
-    const res = await api.get('/api/trial-balance/query', {
-      params: { project_id: props.projectId, account_code: '1503' },
-      _silent: true,
-    } as any)
-    const items = res?.data?.items ?? res?.data ?? res?.items ?? []
-    if (Array.isArray(items) && items.length > 0) {
-      // 汇总叶子科目审定数
-      trialBalanceAmount.value = items.reduce(
-        (s: number, it: any) => s + parseNum(it.audited_amount ?? it.unadjusted_amount), 0,
-      )
-    } else if (typeof res?.data === 'number') {
-      trialBalanceAmount.value = res.data
-    }
-  } catch {
-    console.warn('[G6TabAdjudication] fetchTrialBalance failed')
-  }
-}
-
-// ═══ 辅助函数 ═══════════════════════════════════════════════════════════════
-function isRateWarning(rate: number | null): boolean {
-  if (rate == null) return false
-  return Math.abs(rate) > 0.2
+function rowClassName({ row }: { row: G6AdjudicationRow }): string {
+  if (row.kind === 'section_header') return 'row-section'
+  if (row.kind === 'subsection_header') return 'row-subsection'
+  if (row.kind === 'subtotal' || row.kind === 'section_net') return 'row-subtotal'
+  if (row.kind === 'footer') return 'row-footer'
+  return ''
 }
 
 function fmt(v: number | null | undefined): string {
   if (v == null) return ''
+  if (v === 0) return '-'
   return v.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 }
 
@@ -604,32 +273,16 @@ function fmtRate(v: number | null | undefined): string {
   if (v == null) return '-'
   return (v * 100).toFixed(2) + '%'
 }
-
-function adjRowClassName({ row }: { row: AdjRow }): string {
-  if (row._isSubtotal) return 'row-subtotal'
-  return ''
-}
-
-// ═══ 生命周期 ═══════════════════════════════════════════════════════════════
-onMounted(() => {
-  hydrateData()
-  fetchTrialBalance()
-  const savedNote = readSaved(NOTE_KEY)
-  if (savedNote) auditNote.value = savedNote
-  const savedConc = readSaved(CONCLUSION_KEY)
-  if (savedConc) auditConclusion.value = savedConc
-})
 </script>
 
 <style scoped>
 .g6-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
 
-/* 方法论上下文（琥珀色左边线+浅黄背景） */
 .methodology-context {
   border-left: 4px solid #d97706;
   background: #fffbeb;
   padding: 12px 16px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   border-radius: 0 4px 4px 0;
   font-size: 12px;
   line-height: 1.8;
@@ -638,76 +291,43 @@ onMounted(() => {
 .methodology-title { font-weight: 600; margin: 0 0 4px 0; color: #78350f; }
 .methodology-context p { margin: 2px 0; }
 
-/* Section 标题栏 */
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
-.head-actions { display: flex; gap: 8px; }
+.head-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; }
 
-/* 工具栏：索引 chip + 行数 */
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
-.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
-.tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
-
-/* 虚拟滚动容器 */
-.adj-scroll-container { overflow-y: auto; border: 1px solid #ebeef5; border-radius: 4px; padding: 4px; }
-
-/* 分组标题 */
-.group-header {
-  display: flex; align-items: center; gap: 6px;
-  padding: 8px 12px; background: #ecf5ff; border: 1px solid #d9ecff;
-  border-radius: 4px; margin-top: 8px; cursor: pointer;
-  user-select: none; transition: background 0.2s;
+.prep-hint {
+  margin-bottom: 12px; padding: 8px 12px;
+  background: #fafafa; border: 1px solid #ebeef5; border-radius: 4px;
+  font-size: 12px; color: #606266;
 }
-.group-header:hover { background: #d9ecff; }
-.group-header.formula-header {
-  background: #f0f9eb; border-color: #e1f3d8; cursor: default;
-}
-.group-name { font-weight: 600; font-size: var(--wp-font-size, 13px); color: #303133; }
-.formula-tag {
-  margin-left: auto; font-size: 11px; color: #67c23a;
-  background: #f0f9eb; border: 1px solid #e1f3d8;
-  padding: 1px 6px; border-radius: 3px;
-}
-.collapse-icon { transition: transform 0.2s; font-size: 14px; }
-.collapse-icon.is-collapsed { transform: rotate(-90deg); }
+.prep-hint summary { cursor: pointer; font-weight: 500; color: #303133; }
+.prep-hint ul { margin: 6px 0 0; padding-left: 18px; }
+.prep-hint li { margin: 2px 0; }
 
-/* 分组内容 */
-.group-body { margin-bottom: 4px; }
-
-/* 表格 */
-.adj-table { margin-top: 4px; }
-
-/* 公式列样式（虚线下划线+cursor:help） */
+.label-strong { font-weight: 700; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; }
-
-/* 行样式 */
-.row-bold { font-weight: 700; }
-:deep(.row-subtotal) { background: #f5f7fa !important; font-weight: 700; }
-:deep(.row-formula) { background: #f0f9eb !important; font-weight: 700; }
-
-/* 变动率橙色高亮 */
 .rate-orange { color: #e6a23c; font-weight: 600; }
+.diff-red { color: #f56c6c; font-weight: 700; }
 
-/* 原因分析必填提示 */
 :deep(.reason-required .el-input__wrapper) {
   box-shadow: 0 0 0 1px #e6a23c inset;
 }
+:deep(.row-section) { background: #ecf5ff !important; font-weight: 700; }
+:deep(.row-subsection) { background: #f5f7fa !important; font-weight: 600; }
+:deep(.row-subtotal) { background: #f0f9eb !important; font-weight: 700; }
+:deep(.row-footer) { background: #fdf6ec !important; font-weight: 600; }
 
-/* 试算表差异行 */
-.tb-diff-row { display: flex; gap: 16px; margin: 16px 0; align-items: center; font-size: var(--wp-font-size, 13px); }
-.tb-label { font-weight: 500; color: #606266; }
-.tb-amount { font-weight: 600; }
-.diff-value { font-weight: 600; }
-.diff-red { color: #f56c6c; }
+.fv-summary {
+  margin: 14px 0 8px;
+  font-size: var(--wp-font-size, 13px);
+  color: #606266;
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+}
+.fv-hint { color: #e6a23c; font-size: 12px; }
 
-/* 审计说明/结论卡片 */
-.note-card { margin-top: 12px; }
-.card-header { display: flex; align-items: center; justify-content: space-between; }
-
-/* 编制提示 */
 .guidance-details {
-  margin-top: 16px; padding: 8px 12px;
+  margin-top: 12px; padding: 8px 12px;
   background: #fafafa; border: 1px solid #ebeef5;
   border-radius: 4px; font-size: 12px; color: #606266;
 }

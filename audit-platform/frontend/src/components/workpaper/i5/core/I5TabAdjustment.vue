@@ -1,5 +1,9 @@
 <template>
   <div class="i5-tab-adjustment">
+    <!-- 审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert"
+      title="审计目标：确认其他非流动资产调整分录的准确性、完整性及借贷平衡，确保审定数正确反映经调整后余额。" />
+
     <!-- 方法论上下文（琥珀色左边线） -->
     <div class="methodology-block">
       <p><strong>其他非流动资产调整分录编制规则：</strong></p>
@@ -175,6 +179,36 @@
         <GtIndexChip value="A13" @click="navigateTo('A13')" />
       </div>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计说明</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="请填写审计说明..."
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="card-header"><span>审计结论</span></div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="请填写审计结论..."
+        @change="saveAuditConclusion"
+      />
+    </el-card>
 
     <!-- 编制提示 -->
     <details class="compile-hint">
@@ -381,6 +415,39 @@ function _persist(): void {
   emit('save', ITEM_ID, JSON.stringify(rows.value))
 }
 
+// ─── Audit Note / Conclusion (AN+AC) persistence ─────────────────────────────
+
+const NOTE_KEY = 'I5-adjustment-audit-note'
+const CONCLUSION_KEY_AC = 'I5-adjustment-audit-conclusion'
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function saveAuditNote(val: string): void {
+  if (props.isReadonly) return
+  auditNote.value = val
+  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
+  props.allResponses.set(NOTE_KEY, item)
+  emit('save', NOTE_KEY, val)
+}
+
+function saveAuditConclusion(val: string): void {
+  if (props.isReadonly) return
+  auditConclusion.value = val
+  const item = { item_id: CONCLUSION_KEY_AC, conclusion: null, remark: val }
+  props.allResponses.set(CONCLUSION_KEY_AC, item)
+  emit('save', CONCLUSION_KEY_AC, val)
+}
+
+// Load AN+AC from allResponses
+function _loadNoteConclusion(): void {
+  const n = props.allResponses.get(NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  const c = props.allResponses.get(CONCLUSION_KEY_AC)
+  if (c?.remark) auditConclusion.value = c.remark
+}
+
+watch(() => props.allResponses, () => _loadNoteConclusion(), { immediate: true })
+
 // ─── Import / Export ─────────────────────────────────────────────────────────
 
 async function handleImportExport(command: string): Promise<void> {
@@ -467,6 +534,14 @@ function fmtAmount(value: number | null | undefined): string {
 
 <style scoped>
 .i5-tab-adjustment { padding: 16px; font-size: var(--wp-font-size, 13px); }
+
+/* 审计目标 */
+.objective-alert { margin-bottom: 14px; }
+
+/* 审计说明/结论 el-card */
+.audit-note-card { margin-bottom: 16px; }
+.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
+.card-header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 500; }
 
 /* 方法论（琥珀色） */
 .methodology-block {

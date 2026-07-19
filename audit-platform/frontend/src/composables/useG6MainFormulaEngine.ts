@@ -124,3 +124,20 @@ export function isDebitCreditBalanced(debits: number[], credits: number[]): bool
 export function calcReportAmount(subtotal: number, fvChange: number, impairment: number): number {
   return Math.round((parseNum(subtotal) + parseNum(fvChange) - parseNum(impairment)) * 100) / 100
 }
+
+// ═══ P9–P11: G6-2 明细表公式（对齐 Excel） ═══
+
+/** P9: 期末分项 = 期初分项 + 本期变动（借方正数） */
+export function calcPeriodEndComponent(opening: number, periodChange: number): number {
+  return Math.round((parseNum(opening) + parseNum(periodChange)) * 100) / 100
+}
+
+/** P10: 审定数 = 公允价值 + 调整数（G6-2 O/AD 列，按公允价值口径） */
+export function calcFvAuditedAmount(fairValue: number, adjustment: number): number {
+  return Math.round((parseNum(fairValue) + parseNum(adjustment)) * 100) / 100
+}
+
+/** P11: 报表数 = 审定数 − 一年内到期/超过一年扣减 */
+export function calcDetailReportAmount(audited: number, deduct: number): number {
+  return Math.round((parseNum(audited) - parseNum(deduct)) * 100) / 100
+}

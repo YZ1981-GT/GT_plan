@@ -12,6 +12,16 @@
     <div class="section-head">
       <h3 class="sheet-title">G4-2 债权投资明细表</h3>
       <div class="head-actions">
+        <el-button
+          size="small"
+          type="success"
+          plain
+          :loading="rollForwardLoading"
+          :disabled="isReadonly"
+          @click="emit('roll-forward')"
+        >
+          上年结转
+        </el-button>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="detail.addRow()">新增行</el-button>
         <!-- 导入导出 el-dropdown -->
         <el-dropdown trigger="click" size="small" @command="handleIECommand">
@@ -228,58 +238,47 @@
       <div v-for="st in detail.subtotalsByCategory.value" :key="st.investCategory" class="subtotal-line">
         <span class="subtotal-label">{{ st.investCategory }}小计({{ st.count }})</span>
         面值 {{ fmtNum(st.totals.faceValue) }} ·
-        期末小计 {{ fmtNum(st.totals.closingSubtotal) }} ·
+        期末审定 {{ fmtNum(st.totals.closingAudited ?? st.totals.closingSubtotal) }} ·
         摊余成本 {{ fmtNum(st.totals.amortizedCost) }} ·
         账面价值 {{ fmtNum(st.totals.bookValue) }}
       </div>
       <div class="grand-total">
         <span class="subtotal-label">总计</span>
         面值 {{ fmtNum(detail.grandTotal.value.faceValue) }} ·
-        期末小计 {{ fmtNum(detail.grandTotal.value.closingSubtotal) }} ·
+        期末审定 {{ fmtNum(detail.grandTotal.value.closingAudited ?? detail.grandTotal.value.closingSubtotal) }} ·
         摊余成本 {{ fmtNum(detail.grandTotal.value.amortizedCost) }} ·
         账面价值 {{ fmtNum(detail.grandTotal.value.bookValue) }}
       </div>
     </div>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input
-        type="textarea"
-        :model-value="auditNote"
-        :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：债权投资明细的存在性、计价（摊余成本/账面价值）、一年内到期分类与列报的测试情况及结果。"
-        @change="(v: string) => saveAuditNote(v)"
-      />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
-      <el-input
-        type="textarea"
-        :model-value="auditConclusion"
-        :disabled="isReadonly"
-        :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：A、未见异常。B、除上述调整事项予以调整外，其余未见异常。C、存在重大未调整事项，不可确认。"
-        @change="(v: string) => saveAuditConclusion(v)"
-      />
-    </el-card>
+    <G4AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="auditConclusion"
+      note-ai-section="detail-note"
+      conclusion-ai-section="detail-conclusion"
+      :related-context="{
+        面值合计: detail.grandTotal.value.faceValue,
+        摊余成本合计: detail.grandTotal.value.amortizedCost,
+        账面价值合计: detail.grandTotal.value.bookValue,
+      }"
+      note-placeholder="填写审计说明：债权投资明细的存在性、计价（摊余成本/账面价值）、一年内到期分类与列报的测试情况及结果。"
+      note-hint="覆盖存在性、计价与一年内到期分类列报。"
+      conclusion-placeholder="填写审计结论：A、未见异常。B、除上述调整事项予以调整外，其余未见异常。C、存在重大未调整事项，不可确认。"
+      conclusion-hint="按 A/B/C 口径评价明细表测试结果。"
+    />
 
     <!-- 编制提示 -->
     <details class="prep-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>期初小计 = 期初成本 + 期初利息调整 + 期初应计利息</li>
-        <li>期初摊余成本 = 期初小计 - 期初减值准备</li>
-        <li>本期变动小计 = 本期成本变动 + 本期利息调整变动 + 本期应计利息变动</li>
-        <li>期末各项 = 期初对应项 + 本期变动对应项</li>
-        <li>摊余成本 = 期末小计 - 减值准备期末数</li>
-        <li>一年内到期小计 = 一年内到期账面余额 - 一年内到期减值</li>
-        <li>期末账面价值 = 摊余成本 - 一年内到期小计</li>
-        <li>数据分类按到期日与资产负债表日比较：到期日≤资产负债表日+1年归入"一年内到期"</li>
-        <li>行数超过50行自动启用虚拟滚动优化性能</li>
+        <li>对齐 Excel：两类明细（一年内→其他流动资产 / 超过一年→债权投资）；Excel 每类预留可插行区，平台「新增行」可无限扩展</li>
+        <li>期初小计 = 成本 + 利息调整 + 应计利息；期初摊余成本 = 期初小计 − 期初减值</li>
+        <li>期末分项 = 期初 + 本期变动；审定数 = 期末小计 + 调整数</li>
+        <li>摊余成本 = 审定数 − 减值；一年内到期小计 = 一年内到期余额 − 对应减值；账面价值 = 摊余成本 − 一年内到期小计</li>
+        <li>超过一年类账面价值合计应与审定表 G4-1 净值勾稽；减值合计与 G4-1 减值小计勾稽</li>
+        <li>分类：到期日 ≤ 资产负债表日+1年 →「一年内到期」；行数&gt;50 启用虚拟滚动</li>
       </ul>
     </details>
   </div>
@@ -300,7 +299,7 @@
  * - 公式列tooltip显示公式来源
  * - 新增行时空白名称阻止创建（composable内ElMessageBox.prompt + inputPattern）
  */
-import { ref, computed, inject, onMounted, toRef } from 'vue'
+import { ref, computed, inject, onMounted, onBeforeUnmount, toRef, watch } from 'vue'
 import {
   useG4MainDetail,
   G4_INVEST_CATEGORY_OPTIONS,
@@ -311,14 +310,22 @@ import {
 import { useG4MainImportExport } from '../../composables/useG4MainImportExport'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
-import http from '@/utils/http'
+import G4AuditTextCards from '../G4AuditTextCards.vue'
+import {
+  G4_CLASSIFICATION_WRITEBACK_EVENT,
+  type G4ClassificationUpdate,
+} from '../../composables/g4CrossHelpers'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
   wpId: string
   projectId: string
   isReadonly: boolean
+  allResponses?: Map<string, ChecklistResponse>
+  rollForwardLoading?: boolean
 }>()
+
+const emit = defineEmits<{ imported: []; 'roll-forward': [] }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -342,27 +349,18 @@ function readSaved(key: string): string {
   return ''
 }
 
-async function saveAudit(key: string, val: string): Promise<void> {
-  if (props.isReadonly) return
-  try {
-    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId || undefined,
-      items: [{ item_id: key, conclusion: null, remark: val }],
-    })
-  } catch { /* silent */ }
-}
-
-function saveAuditNote(val: string): void {
-  auditNote.value = val
-  void saveAudit(NOTE_KEY, val)
-}
-function saveAuditConclusion(val: string): void {
-  auditConclusion.value = val
-  void saveAudit(CONCLUSION_KEY, val)
-}
-
 // ─── 从 htmlData 中构建 allResponses Map ────────────────────────────────────
 const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
+
+watch(
+  () => props.allResponses,
+  (source) => {
+    if (!source) return
+    // 共享同一引用，保证异常草稿/写回与本表同步
+    allResponses.value = source
+  },
+  { immediate: true, deep: true },
+)
 
 function hydrateFromHtmlData(): void {
   if (!props.htmlData) return
@@ -385,19 +383,36 @@ function hydrateFromHtmlData(): void {
   }
 }
 
-/** debouncedSave — persist via parent save mechanism */
+/** debouncedSave — 经 g4:save-items 由父组件落库 */
 function debouncedSave(itemId: string, data: Partial<ChecklistResponse>): void {
-  allResponses.value.set(itemId, {
+  if (props.isReadonly) return
+  const item: ChecklistResponse = {
     item_id: itemId,
     conclusion: data.conclusion ?? null,
     remark: data.remark ?? null,
-  })
+  }
+  allResponses.value.set(itemId, item)
+  try {
+    window.dispatchEvent(new CustomEvent('g4:save-items', { detail: { items: [item] } }))
+  } catch { /* silent */ }
 }
+
+watch(auditNote, (val) => {
+  debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+})
+watch(auditConclusion, (val) => {
+  debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
+})
 
 onMounted(() => {
   hydrateFromHtmlData()
   auditNote.value = readSaved(NOTE_KEY)
   auditConclusion.value = readSaved(CONCLUSION_KEY)
+  window.addEventListener(G4_CLASSIFICATION_WRITEBACK_EVENT, onClassificationWriteback)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener(G4_CLASSIFICATION_WRITEBACK_EVENT, onClassificationWriteback)
 })
 
 // ─── Composable ─────────────────────────────────────────────────────────────
@@ -406,6 +421,11 @@ const detail = useG4MainDetail({
   debouncedSave,
   isReadonly: toRef(props, 'isReadonly') as any,
 })
+
+function onClassificationWriteback(event: Event): void {
+  const updates = (event as CustomEvent<{ updates?: G4ClassificationUpdate[] }>).detail?.updates
+  if (Array.isArray(updates) && updates.length) detail.applyClassificationWriteback(updates)
+}
 
 // ─── 导入导出 ───────────────────────────────────────────────────────────────
 const ie = useG4MainImportExport({ wpId: computed(() => props.wpId) })
@@ -419,7 +439,8 @@ function handleIECommand(cmd: string): void {
 async function onImportFile(f: { raw?: File } | File): Promise<void> {
   const file = f instanceof File ? f : (f.raw ?? null)
   if (!file) return
-  await ie.importData('G4-2', file)
+  const result = await ie.importData('G4-2', file)
+  if (result) emit('imported')
 }
 
 // ─── 区段选项（el-segmented） ────────────────────────────────────────────────
@@ -459,16 +480,16 @@ function currentRowKey(groupRows: BondDetailRow[]): string | undefined {
 
 // ─── 公式列tooltip提示 ──────────────────────────────────────────────────────
 const FORMULA_HINTS: Partial<Record<keyof BondDetailRow, string>> = {
-  openingSubtotal: '期初小计 = 期初成本 + 期初利息调整 + 期初应计利息',
-  openingAmortizedCost: '期初摊余成本 = 期初小计 - 期初减值准备',
-  periodChangeSubtotal: '本期变动小计 = 成本变动 + 利息调整变动 + 应计利息变动',
+  openingSubtotal: '小计 = 成本 + 利息调整 + 应计利息',
+  openingAmortizedCost: '期初摊余成本 = 小计 − 期初减值准备',
+  periodChangeSubtotal: '小计 = 成本变动 + 利息调整变动 + 应计利息变动',
   closingCost: '期末成本 = 期初成本 + 本期成本变动',
   closingInterestAdj: '期末利息调整 = 期初利息调整 + 本期利息调整变动',
   closingAccruedInterest: '期末应计利息 = 期初应计利息 + 本期应计利息变动',
-  closingSubtotal: '期末小计 = 期末成本 + 期末利息调整 + 期末应计利息',
-  amortizedCost: '摊余成本 = 期末小计 - 减值准备期末数',
-  oneYearSubtotal: '一年内到期小计 = 一年内到期余额 - 一年内到期减值',
-  bookValue: '期末账面价值 = 摊余成本 - 一年内到期小计',
+  closingAudited: '审定数 = 成本 + 利息调整 + 应计利息 + 调整数',
+  amortizedCost: '期末摊余成本 = 审定数 − 减值准备（审定）期末数',
+  oneYearSubtotal: '一年内到期小计 = 账面余额 − 减值',
+  bookValue: '期末账面价值 = 摊余成本 − 一年内到期小计',
 }
 
 function formulaHint(prop: keyof BondDetailRow): string {
@@ -493,8 +514,6 @@ function fmtNum(v: unknown): string {
 .tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
 .tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
 .tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
-.audit-note-card { margin-top: 12px; }
-.audit-note-card .card-header { display: flex; align-items: center; justify-content: space-between; font-weight: 500; }
 .balance-date-bar { margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
 .date-label { font-size: var(--wp-font-size, 13px); color: #606266; }
 .segment-bar { margin-bottom: 12px; }

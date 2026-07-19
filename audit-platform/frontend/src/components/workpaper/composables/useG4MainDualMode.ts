@@ -4,7 +4,7 @@
  * Spec: .kiro/specs/g4-bond-investment-main/ Task 3.5 / Req 10.6
  * 模式状态(html/onlyoffice) + 健康检查 + 切换 + localStorage 持久化(per wpId)
  */
-import { ref, onMounted, type Ref } from 'vue'
+import { ref, computed, onMounted, type Ref } from 'vue'
 import { dualModeHtmlOoOptions } from './dualModeLabels'
 
 export type G4MainRenderMode = 'html' | 'onlyoffice'
@@ -25,7 +25,7 @@ export function useG4MainDualMode(options: UseG4MainDualModeOptions) {
   const ooConfig = ref<Record<string, any> | null>(null)
   const checking = ref(false)
 
-  const modeOptions = dualModeHtmlOoOptions()
+  const modeOptions = computed(() => dualModeHtmlOoOptions({ onlineDisabled: !isOoAvailable.value }))
 
   function loadPersistedMode(): void {
     try {
@@ -62,7 +62,10 @@ export function useG4MainDualMode(options: UseG4MainDualModeOptions) {
 
   async function switchMode(target: G4MainRenderMode): Promise<void> {
     if (target === currentMode.value) return
-    if (target === 'onlyoffice' && !isOoAvailable.value) return
+    if (target === 'onlyoffice' && !isOoAvailable.value) {
+      currentMode.value = 'html'
+      return
+    }
 
     if (target === 'onlyoffice') {
       currentMode.value = 'onlyoffice'
@@ -80,8 +83,14 @@ export function useG4MainDualMode(options: UseG4MainDualModeOptions) {
   }
 
   onMounted(() => {
-    loadPersistedMode()
-    void checkOOHealth()
+    void checkOOHealth().then((healthy) => {
+      if (healthy) {
+        loadPersistedMode()
+      } else {
+        currentMode.value = 'html'
+        persistMode('html')
+      }
+    })
   })
 
   return {

@@ -94,11 +94,10 @@
         :debounced-save="onDebouncedSave"
       />
 
-      <div v-else-if="currentSheet === '底稿目录'" class="g-cycle-tab-index-page">
-        <G11TabDirectory
-          :all-responses="formData.allResponses.value"
-          :available-sheets="availableSheets"
-        />
+      <template v-else-if="currentSheet === '底稿目录'">
+        <div class="g11-index-toolbar">
+          <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
+        </div>
         <GCycleBIndexExtras
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -107,7 +106,7 @@
           :html-data="props.htmlData"
           :available-sheets="availableSheets"
         />
-      </div>
+      </template>
 
       <GtGridSheet
         v-else-if="useGridFallback"
@@ -134,12 +133,14 @@
  * GtG11InvestmentIncome — G11 投资收益底稿主入口
  * sheetName v-if 分发（参照 D4/G14 精细模式）
  */
-import { ref, computed, onMounted, defineAsyncComponent, provide, inject } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject } from 'vue'
 import { useG11FormData } from './composables/useG11FormData'
 import { useG11DualMode } from './composables/useG11DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
+import { G11_ACCOUNT_CODE } from './composables/g11Constants'
+import { parseNum } from './composables/useG11FormulaEngine'
 import type { ChecklistResponse } from './composables/useF1FormData'
 
 const G11TabProcedure = defineAsyncComponent(() => import('./g11-investment-income/core/G11TabProcedure.vue'))
@@ -150,7 +151,6 @@ const G11TabReturnRateAnalysis = defineAsyncComponent(() => import('./g11-invest
 const G11TabVoucherCheck = defineAsyncComponent(() => import('./g11-investment-income/voucher/G11TabVoucherCheck.vue'))
 const G11TabDisclosureListed = defineAsyncComponent(() => import('./g11-investment-income/core/G11TabDisclosureListed.vue'))
 const G11TabDisclosureSOE = defineAsyncComponent(() => import('./g11-investment-income/core/G11TabDisclosureSOE.vue'))
-const G11TabDirectory = defineAsyncComponent(() => import('./g11-investment-income/core/G11TabDirectory.vue'))
 const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -196,6 +196,7 @@ const isHtmlSheet = computed(() => {
 
 const dualMode = useG11DualMode({
   wpId: wpIdRef,
+  sheetName: computed(() => props.sheetName || ''),
   reloadAll: () => formData.loadAll(),
 })
 
@@ -209,13 +210,34 @@ function onDebouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
   scheduleAutoSnapshot()
 }
 
+function handleG11Adjudicated(e: Event): void {
+  const detail = (e as CustomEvent<{ accountCode?: string; adjudicatedAmount?: number }>).detail
+  if (detail?.accountCode !== G11_ACCOUNT_CODE) return
+  const amount = parseNum(detail.adjudicatedAmount)
+  void formData.writebackTrialBalance(amount)
+}
+
+function handleG11Writeback(e: Event): void {
+  const detail = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number }>).detail
+  if (detail?.accountCode && detail.accountCode !== G11_ACCOUNT_CODE) return
+  const amount = parseNum(detail?.auditedAmount)
+  if (!Number.isFinite(amount)) return
+  void formData.writebackTrialBalance(amount)
+}
+
 async function reloadAll() {
   await formData.loadAll()
 }
 
-const availableSheets = computed(() =>
-  props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets ?? [],
-)
+const availableSheets = computed(() => {
+  const metaSheets = formData.renderMeta.value?.sheets
+  if (Array.isArray(metaSheets) && metaSheets.length) return metaSheets
+  const fromHtml = props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets
+  if (Array.isArray(fromHtml) && fromHtml.length) return fromHtml
+  // 对齐 G1：无 sheets 元数据时用自加载 render-config 的 sheetCache 兜底，
+  // 保证底稿目录架构树非空
+  return Object.keys(formData.sheetCache.value).map(sheet_name => ({ sheet_name }))
+})
 
 // 复核对话 provider 由 Runtime Boundary(GtWpRenderer) 统一提供 openReviewDialog
 const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
@@ -228,8 +250,16 @@ useWorkpaperEntryInjections({
 })
 
 onMounted(async () => {
+  window.addEventListener('substantive:adjudicated', handleG11Adjudicated)
+  window.addEventListener('g11:writeback-trial-balance', handleG11Writeback)
   await formData.loadAll()
   isLoading.value = false
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('substantive:adjudicated', handleG11Adjudicated)
+  window.removeEventListener('g11:writeback-trial-balance', handleG11Writeback)
+  formData.flushPending()
 })
 </script>
 
@@ -237,4 +267,5 @@ onMounted(async () => {
 .g11-investment-income { padding: 12px; }
 .loading-container { padding: 24px; }
 .g11-investment-income-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.g11-index-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 </style>

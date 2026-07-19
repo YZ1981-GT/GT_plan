@@ -120,6 +120,14 @@ async def render(ctx: RenderContext) -> dict | None:
 
     tb_values = await _fetch_tb_values(ctx)
 
+    # 对齐 D4：把同底稿 sheet 列表塞进 html_data，供目录 / OO resolve 使用
+    sheets_payload: list[dict] = []
+    for cls in ctx.classifications or []:
+        sn = getattr(cls, "sheet_name", None) or ""
+        if not sn or "GT_Custom" in sn:
+            continue
+        sheets_payload.append({"sheet_name": sn})
+
     return {
         "component_type": "g2-interest-receivable",
         "invest_types": G2_INVEST_TYPES,
@@ -131,4 +139,5 @@ async def render(ctx: RenderContext) -> dict | None:
         "tb_values": tb_values,
         # 审定数回读 seed（EventBus 持久化后刷新不丢失）
         "adjudicated_amount": adjudicated_amount,
+        "sheets": sheets_payload,
     }

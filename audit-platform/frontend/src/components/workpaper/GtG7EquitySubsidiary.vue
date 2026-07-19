@@ -152,12 +152,6 @@ const isHtmlSheet = computed(() => !!activeComponent.value)
 /** 解析后的 htmlData（优先使用prop，fallback到selfLoad结果） */
 const resolvedHtmlData = computed(() => props.htmlData ?? selfLoadData.value)
 
-// ─── 双模式切换 (HTML ↔ OnlyOffice) ─────────────────────────────────────────
-const dualMode = useG7SubDualMode({
-  wpId: wpIdRef,
-  sheetName: computed(() => props.sheetName || ''),
-})
-
 // ─── useG7SubFormData 用于selfLoad ──────────────────────────────────────────
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
@@ -171,6 +165,19 @@ const formData = useG7SubFormData({
   onAfterSave: () => scheduleAutoSnapshot(),
 })
 // openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一提供，子组件 inject 命中祖先
+
+// ─── 双模式切换 (HTML ↔ OnlyOffice) ─────────────────────────────────────────
+const dualMode = useG7SubDualMode({
+  wpId: wpIdRef,
+  sheetName: computed(() => props.sheetName || ''),
+  reloadAll: async () => {
+    await formData.load()
+    const parsed = formData.parseContent()
+    if (parsed && Object.keys(parsed).length > 0) {
+      selfLoadData.value = parsed
+    }
+  },
+})
 
 // ─── selfLoad 模式：htmlData 为 null 时自动获取数据 ─────────────────────────
 async function selfLoadInit(): Promise<void> {

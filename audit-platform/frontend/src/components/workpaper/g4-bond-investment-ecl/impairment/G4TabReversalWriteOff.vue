@@ -15,22 +15,46 @@
 -->
 <template>
   <div class="g4-reversal-writeoff">
-    <!-- 审计目标 -->
+    <!-- 一、审计目标（对齐纸质底稿） -->
     <el-alert
       type="info"
       :closable="false"
       show-icon
-      title="审计目标：确认债权投资减值准备转回（收回）与核销的依据充分、程序合规，转回不超过累计计提，关注核销中的关联交易。"
+      title="一、审计目标：债权投资已按适当的金额包括在财务报表中，与之相关的计价调整已恰当记录。"
       style="margin-bottom: 12px"
     />
-    <!-- 工具栏索引 -->
+
+    <el-alert
+      v-if="!rw.gate.value.ready"
+      type="warning"
+      :closable="false"
+      show-icon
+      style="margin-bottom: 12px"
+      :title="gateAlertTitle"
+    />
+
+    <!-- 工具栏 -->
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <G4EclImportExportDropdown
+          :wp-id="wpId"
+          sheet="G4-12"
+          :disabled="isReadonly"
+          @imported="onImported"
+        />
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-10" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-11" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-13" :context-project-id="projectId" /></span>
+      </div>
       <div class="toolbar-right">
+        <el-tag size="small" type="info">转回 {{ rw.reversals.value.length }} · 核销 {{ rw.writeOffs.value.length }}</el-tag>
+        <el-tag size="small" :type="rw.gate.value.ready ? 'success' : 'warning'">
+          闸门 {{ rw.gate.value.ready ? '通过' : '待补' }}
+        </el-tag>
         <span class="chip-wrap"><GtIndexChip value="wp:G4-12" :context-project-id="projectId" /></span>
       </div>
     </div>
-    <!-- 顶部工具栏 -->
+
     <div class="section-head">
       <h3 class="sheet-title">G4-12 减值准备转回（收回）、核销检查表</h3>
       <div class="head-actions">
@@ -38,11 +62,19 @@
         <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">
           + 新增行
         </el-button>
+        <el-button size="small" type="warning" plain :disabled="isReadonly" @click="pushExceptionDrafts">
+          推送例外至 G4-3
+        </el-button>
         <el-button size="small" @click="openReviewDialog('G4-12-reversal-writeoff')">💬复核</el-button>
       </div>
     </div>
 
-    <!-- 单表格 + v-if列组切换（避免Tab切换闪烁） -->
+    <p class="section-label">
+      二、审计过程 ·
+      {{ rw.activeTab.value === 'tab1' ? '（一）本期重要的坏账准备转回或转销检查' : '（二）本期重要的核销检查' }}
+    </p>
+
+    <!-- 单表格 + v-if列组切换 -->
     <el-table
       :data="activeDisplayRows"
       border
@@ -54,7 +86,6 @@
       class="reversal-table"
       @current-change="onCurrentChange"
     >
-      <!-- 序号列（始终显示） -->
       <el-table-column label="序号" width="55" align="center" fixed>
         <template #default="{ row }">
           <template v-if="row._isTotal">
@@ -64,11 +95,13 @@
         </template>
       </el-table-column>
 
-      <!-- 单位名称（始终显示作为锚定列） -->
       <el-table-column label="单位名称" min-width="120" fixed>
         <template #default="{ row }">
           <template v-if="row._isTotal" />
-          <span v-else>{{ row.unitName }}</span>
+          <template v-else>
+            <el-input v-if="!isReadonly" v-model="row.unitName" size="small" />
+            <span v-else>{{ row.unitName }}</span>
+          </template>
         </template>
       </el-table-column>
 
@@ -78,7 +111,7 @@
           <template #default="{ row }">
             <template v-if="row._isTotal" />
             <template v-else>
-              <el-input v-if="!isReadonly" v-model="row.reversalReason" size="small" />
+              <el-input v-if="!isReadonly" v-model="row.reversalReason" size="small" placeholder="信用风险改善等" />
               <span v-else>{{ row.reversalReason }}</span>
             </template>
           </template>
@@ -88,18 +121,18 @@
           <template #default="{ row }">
             <template v-if="row._isTotal" />
             <template v-else>
-              <el-input v-if="!isReadonly" v-model="row.recoveryMethod" size="small" />
+              <el-input v-if="!isReadonly" v-model="row.recoveryMethod" size="small" placeholder="现金/抵债等" />
               <span v-else>{{ row.recoveryMethod }}</span>
             </template>
           </template>
         </el-table-column>
 
-        <el-table-column label="原确定坏账准备依据" min-width="150">
+        <el-table-column label="原确定坏账准备的依据" min-width="150">
           <template #default="{ row }">
             <template v-if="row._isTotal" />
             <template v-else>
               <el-input v-if="!isReadonly" v-model="row.originalBasis" size="small" type="textarea"
-                :autosize="{ minRows: 1, maxRows: 3 }" />
+                :autosize="{ minRows: 1, maxRows: 3 }" placeholder="原 Stage/ECL 依据" />
               <span v-else>{{ row.originalBasis }}</span>
             </template>
           </template>
@@ -114,7 +147,6 @@
               <el-input-number v-if="!isReadonly" v-model="row.reversalAmount" size="small"
                 :controls="false" class="compact-num" />
               <span v-else>{{ fmtNum(row.reversalAmount) }}</span>
-              <!-- 校验错误提示 -->
               <div v-if="rw.getReversalError(row)" class="validation-error">
                 {{ rw.getReversalError(row) }}
               </div>
@@ -122,7 +154,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="收回前累计计提" min-width="130" align="right">
+        <el-table-column label="收回或转回前累计已计提" min-width="150" align="right">
           <template #default="{ row }">
             <template v-if="row._isTotal">
               <span class="total-num">{{ fmtNum(rw.reversalSummary.value.totalAccumulatedProvision) }}</span>
@@ -159,11 +191,11 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="索引" width="100">
+        <el-table-column label="索引号" width="100">
           <template #default="{ row }">
             <template v-if="row._isTotal" />
             <template v-else>
-              <GtIndexChip v-if="row.indexRef" :value="row.indexRef" />
+              <GtIndexChip v-if="row.indexRef" :value="row.indexRef" :context-project-id="projectId" />
               <el-input v-else-if="!isReadonly" v-model="row.indexRef" size="small" placeholder="索引" />
             </template>
           </template>
@@ -172,15 +204,12 @@
 
       <!-- ═══ Tab2: 核销检查列 ═══ -->
       <template v-if="rw.activeTab.value === 'tab2'">
-        <el-table-column label="核销性质" width="100" align="center">
+        <el-table-column label="债权投资的性质" min-width="130">
           <template #default="{ row }">
             <template v-if="row._isTotal" />
             <template v-else>
-              <el-select v-if="!isReadonly" v-model="row.writeOffType" size="small" style="width: 80px">
-                <el-option label="到期" value="到期" />
-                <el-option label="逾期" value="逾期" />
-                <el-option label="其他" value="其他" />
-              </el-select>
+              <el-input v-if="!isReadonly" v-model="row.writeOffType" size="small"
+                placeholder="如：公司债/信托计划/贷款" />
               <span v-else>{{ row.writeOffType }}</span>
             </template>
           </template>
@@ -210,18 +239,18 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="核销程序" min-width="140">
+        <el-table-column label="履行的核销程序" min-width="140">
           <template #default="{ row }">
             <template v-if="row._isTotal" />
             <template v-else>
               <el-input v-if="!isReadonly" v-model="row.writeOffProcedure" size="small" type="textarea"
-                :autosize="{ minRows: 1, maxRows: 3 }" />
+                :autosize="{ minRows: 1, maxRows: 3 }" placeholder="审批/法务/董事会等" />
               <span v-else>{{ row.writeOffProcedure }}</span>
             </template>
           </template>
         </el-table-column>
 
-        <el-table-column label="是否关联交易" width="110" align="center">
+        <el-table-column label="是否由关联交易产生" width="130" align="center">
           <template #default="{ row }">
             <template v-if="row._isTotal" />
             <template v-else>
@@ -238,8 +267,15 @@
           <template #default="{ row }">
             <template v-if="row._isTotal" />
             <template v-else>
-              <el-input v-if="!isReadonly" v-model="row.reasonAnalysis" size="small" type="textarea"
-                :autosize="{ minRows: 1, maxRows: 3 }" />
+              <el-input
+                v-if="!isReadonly"
+                v-model="row.reasonAnalysis"
+                size="small"
+                type="textarea"
+                :autosize="{ minRows: 1, maxRows: 3 }"
+                :placeholder="row.isRelatedParty ? '关联交易核销须说明合理性' : ''"
+                :class="{ 'remark-required': row.isRelatedParty && !(row.reasonAnalysis || '').trim() }"
+              />
               <span v-else>{{ row.reasonAnalysis }}</span>
             </template>
           </template>
@@ -258,18 +294,17 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="索引" width="100">
+        <el-table-column label="索引号" width="100">
           <template #default="{ row }">
             <template v-if="row._isTotal" />
             <template v-else>
-              <GtIndexChip v-if="row.indexRef" :value="row.indexRef" />
+              <GtIndexChip v-if="row.indexRef" :value="row.indexRef" :context-project-id="projectId" />
               <el-input v-else-if="!isReadonly" v-model="row.indexRef" size="small" placeholder="索引" />
             </template>
           </template>
         </el-table-column>
       </template>
 
-      <!-- 操作列（删除） -->
       <el-table-column v-if="!isReadonly" label="" width="50" align="center" fixed="right">
         <template #default="{ row }">
           <el-popconfirm v-if="!row._isTotal" title="确认删除？"
@@ -282,45 +317,60 @@
       </el-table-column>
     </el-table>
 
-    <!-- 审计说明 -->
-    <el-card class="note-card" shadow="never">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input
-        v-model="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 5 }"
-        :disabled="isReadonly"
-        placeholder="填写审计说明：程序执行情况、测试结果、拟调整/未调整事项及其影响、审计范围受限情况等。"
-        @change="saveAuditNote"
-      />
-    </el-card>
+    <G4AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      :show-conclusion="false"
+      v-model:note="auditNote"
+      note-title="三、审计说明"
+      note-placeholder="填写：（1）重要转回/核销选取标准；（2）与 G4-10/G4-11 勾稽；（3）关联交易核销特别程序；（4）拟调整事项。"
+      @update:note="saveAuditNote"
+    />
+    <div class="conclusion-toolbar no-print">
+      <el-select
+        v-if="!isReadonly"
+        v-model="conclusionOption"
+        size="small"
+        clearable
+        placeholder="参考结论"
+        style="width: 220px"
+        @change="applyConclusionTemplate"
+      >
+        <el-option label="A. 未见异常" value="A" />
+        <el-option label="B. 个别例外已说明" value="B" />
+        <el-option label="C. 重大例外/拟调整" value="C" />
+      </el-select>
+      <el-button
+        size="small"
+        type="primary"
+        link
+        :disabled="isReadonly || !aiAvailable"
+        :loading="aiLoading"
+        @click="handleAiConclusion"
+      >
+        🤖 AI生成
+      </el-button>
+    </div>
+    <G4AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      :show-note="false"
+      v-model:conclusion="conclusion"
+      conclusion-title="四、审计结论"
+      conclusion-placeholder="就转回/核销的计价调整是否恰当记录作出结论。"
+    />
 
-    <!-- 底部审计结论 -->
-    <el-card class="conclusion-card" shadow="never">
-      <div class="conclusion-header">
-        <span class="conclusion-title">审计结论</span>
-        <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleAiConclusion">
-          🤖 AI生成
-        </el-button>
-      </div>
-      <el-input
-        v-model="conclusion"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请输入转回核销检查的审计结论..."
-        :disabled="isReadonly"
-      />
-    </el-card>
-
-    <!-- 编制提示 -->
-    <details class="prep-hint">
+    <details class="prep-hint" open>
       <summary>编制提示</summary>
       <ul>
-        <li>转回金额不得超过收回前累计计提金额（超出将红色高亮提示）</li>
-        <li>核销需关注是否为关联交易（关联交易行将橙色高亮提示）</li>
-        <li>核销性质：到期核销 / 逾期核销 / 其他原因核销</li>
-        <li>核销程序应记录审批流程及相关文件</li>
-        <li>转回原因应说明原减值事由是否已消除</li>
+        <li>转回金额不得超过收回前累计已计提金额（超出红色高亮；CAS22 转回上限）。</li>
+        <li>核销须记录审批程序；关联交易核销须填写合理性分析（闸门）。</li>
+        <li>「债权投资的性质」描述标的类型（公司债/信托/贷款等），勿与核销原因混淆。</li>
+        <li>转回/核销会计分录可交叉索引
+          <span class="chip-wrap inline"><GtIndexChip value="wp:G4-13" :context-project-id="projectId" /></span>；
+          金额可勾对
+          <span class="chip-wrap inline"><GtIndexChip value="wp:G4-10" :context-project-id="projectId" /></span>。
+        </li>
       </ul>
     </details>
   </div>
@@ -338,12 +388,25 @@
  * - 动态行增删（ElMessageBox.prompt输入单位名称）
  * - GtIndexChip索引列跳转
  */
-import { ref, computed, inject, onMounted } from 'vue'
+import { ref, computed, inject, watch, onMounted } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useG4EclReversalWriteOff } from '../../composables/useG4EclReversalWriteOff'
 import { useG4EclFormData } from '../../composables/useG4EclFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G4AuditTextCards from '../../g4-bond-investment-main/G4AuditTextCards.vue'
+import G4EclImportExportDropdown from '../G4EclImportExportDropdown.vue'
+import { useG4EclAiGenerate } from '../../composables/useG4EclAiGenerate'
+import {
+  buildG412ExceptionDrafts,
+  dispatchG4ExceptionDrafts,
+} from '../../composables/g4ExceptionRouting'
+import {
+  G4_ITEM_IDS,
+  buildCanonicalPayload,
+  parseCanonicalArray,
+  parseCanonicalJson,
+} from '../../composables/g4StorageContract'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -352,16 +415,46 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
+const emit = defineEmits<{ imported: [] }>()
+
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+
+const wpIdRef = computed(() => props.wpId)
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG4EclAiGenerate(wpIdRef)
 
 const rw = useG4EclReversalWriteOff()
 const conclusion = ref('')
+const conclusionOption = ref('')
+
+const gateAlertTitle = computed(() => {
+  const g = rw.gate.value
+  const parts: string[] = []
+  if (g.invalidReversals) parts.push(`转回超限 ${g.invalidReversals} 行`)
+  if (g.relatedPartyWriteOffs) parts.push(`关联交易核销 ${g.relatedPartyWriteOffs} 行（须填合理性分析）`)
+  if (g.unreasonableReversals || g.unreasonableWriteOffs) {
+    parts.push(`判定不合理 ${(g.unreasonableReversals || 0) + (g.unreasonableWriteOffs || 0)} 行`)
+  }
+  return parts.length ? `质量闸门待补：${parts.join('；')}` : ''
+})
+
+const CONCLUSION_TEMPLATES: Record<string, string> = {
+  A: '经检查，本期重要债权投资减值准备转回（收回）与核销事项依据充分、程序合规，转回金额未超过累计已计提金额，未发现需调整事项。债权投资相关计价调整已恰当记录。',
+  B: '经检查，除下列事项外，本期重要转回/核销总体合理：【列示例外项目及处理】。其余转回未超累计计提，核销程序合规。请结合索引说明影响。',
+  C: '经检查，发现重大例外或需调整事项：【性质、金额、对报表影响及建议调整分录】。在未完成调整前，不能仅依赖本表对计价认定形成无保留结论。',
+}
+
+function applyConclusionTemplate(opt: string): void {
+  if (!opt || props.isReadonly) return
+  const text = CONCLUSION_TEMPLATES[opt]
+  if (text) conclusion.value = text
+}
 
 // ─── 审计说明（checklist_responses 持久化） ─────────────────────────────────
 const formData = useG4EclFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
+const rowsLoaded = ref(false)
 const NOTE_KEY = 'G4-12-reversal-writeoff-audit-note'
 const auditNote = ref('')
 function saveAuditNote(val: string): void {
@@ -370,11 +463,32 @@ function saveAuditNote(val: string): void {
   formData.debouncedSave(NOTE_KEY, { remark: val })
 }
 
+const CONCLUSION_KEY = 'G4-12-reversal-writeoff-conclusion'
+watch(conclusion, (val) => {
+  if (props.isReadonly) return
+  formData.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
+})
+
+watch(
+  [rw.reversals, rw.writeOffs],
+  ([reversals, writeOffs]) => {
+    if (!rowsLoaded.value || props.isReadonly) return
+    const rowsPayload = buildCanonicalPayload(G4_ITEM_IDS.G4_12_ROWS, { reversals, writeOffs })
+    const reversalsPayload = buildCanonicalPayload(G4_ITEM_IDS.G4_12_REVERSALS, reversals)
+    const writeOffsPayload = buildCanonicalPayload(G4_ITEM_IDS.G4_12_WRITEOFFS, writeOffs)
+    formData.debouncedSave(rowsPayload.item_id, rowsPayload)
+    // Keep the legacy import/export keys in sync during the migration window.
+    formData.debouncedSave(reversalsPayload.item_id, reversalsPayload)
+    formData.debouncedSave(writeOffsPayload.item_id, writeOffsPayload)
+  },
+  { deep: true },
+)
+
 // ─── 区段Tab选项 ─────────────────────────────────────────────────────────────
 
 const segmentOptions = [
-  { label: '转回（收回）检查', value: 'tab1' },
-  { label: '核销检查', value: 'tab2' },
+  { label: '（一）转回（收回）检查', value: 'tab1' },
+  { label: '（二）核销检查', value: 'tab2' },
 ]
 
 // ─── 统一显示行（单表格方案 — 避免Tab切换闪烁） ─────────────────────────────
@@ -472,10 +586,39 @@ async function handleAddRow() {
   }
 }
 
+function pushExceptionDrafts(): void {
+  const drafts = buildG412ExceptionDrafts(
+    rw.reversals.value,
+    rw.writeOffs.value,
+    formData.allResponses.value,
+  )
+  if (!drafts.length) {
+    ElMessage.info('没有可推送的转回或核销例外')
+    return
+  }
+  dispatchG4ExceptionDrafts(drafts, formData.allResponses.value)
+  ElMessage.success(`已推送 ${drafts.length} 条 G4-3 草稿行`)
+}
+
 // ─── AI生成审计结论 ─────────────────────────────────────────────────────────
 
-function handleAiConclusion() {
-  ElMessage.info('AI生成审计结论功能将在AI模块完成后启用')
+async function handleAiConclusion(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'reversal-writeoff-conclusion',
+    conclusion.value || '',
+    {
+      转回行数: rw.reversals.value.length,
+      核销行数: rw.writeOffs.value.length,
+      转回金额合计: rw.reversalSummary.value.totalReversalAmount,
+      核销金额合计: rw.writeOffSummary.value.totalWriteOffAmount,
+      转回超限行: rw.gate.value.invalidReversals,
+      关联交易核销: rw.gate.value.relatedPartyWriteOffs,
+      闸门通过: rw.gate.value.ready,
+    },
+    'AI 审计结论',
+  )
+  if (text) conclusion.value = text
 }
 
 // ─── 数字格式化 ─────────────────────────────────────────────────────────────
@@ -490,18 +633,61 @@ function fmtNum(v: unknown): string {
 
 // ─── 数据加载 ───────────────────────────────────────────────────────────────
 
-onMounted(async () => {
+function hydrateFromResponses(): void {
+  const canonical = parseCanonicalJson<{
+    reversals?: typeof rw.reversals.value
+    writeOffs?: typeof rw.writeOffs.value
+  }>(formData.allResponses.value.get(G4_ITEM_IDS.G4_12_ROWS))
+
+  if (canonical && typeof canonical === 'object') {
+    rw.loadData({
+      reversals: Array.isArray(canonical.reversals) ? canonical.reversals : [],
+      writeOffs: Array.isArray(canonical.writeOffs) ? canonical.writeOffs : [],
+    })
+  } else {
+    const legacyReversalsResponse = formData.allResponses.value.get(G4_ITEM_IDS.G4_12_REVERSALS)
+    const legacyWriteOffsResponse = formData.allResponses.value.get(G4_ITEM_IDS.G4_12_WRITEOFFS)
+    const legacyReversals = parseCanonicalArray(legacyReversalsResponse)
+    const legacyWriteOffs = parseCanonicalArray(legacyWriteOffsResponse)
+    if (legacyReversalsResponse || legacyWriteOffsResponse) {
+      rw.loadData({
+        reversals: legacyReversals as typeof rw.reversals.value,
+        writeOffs: legacyWriteOffs as typeof rw.writeOffs.value,
+      })
+    } else if (props.htmlData?.reversalWriteOff) {
+      const data = props.htmlData.reversalWriteOff
+      rw.loadData({
+        reversals: data.reversals,
+        writeOffs: data.writeOffs,
+      })
+    }
+  }
+
   if (props.htmlData?.reversalWriteOff) {
     const data = props.htmlData.reversalWriteOff
-    rw.loadData({
-      reversals: data.reversals,
-      writeOffs: data.writeOffs,
-    })
     if (data.conclusion) conclusion.value = data.conclusion
   }
-  await formData.loadAll()
   const note = formData.allResponses.value.get(NOTE_KEY)
   if (note?.remark) auditNote.value = note.remark
+  const conc = formData.allResponses.value.get(CONCLUSION_KEY)
+  if (conc?.remark || conc?.conclusion) {
+    conclusion.value = conc.remark || conc.conclusion || conclusion.value
+  }
+  rowsLoaded.value = true
+}
+
+async function onImported(): Promise<void> {
+  try {
+    await formData.loadAll()
+  } catch { /* ignore */ }
+  rowsLoaded.value = false
+  hydrateFromResponses()
+  emit('imported')
+}
+
+onMounted(async () => {
+  await formData.loadAll()
+  hydrateFromResponses()
 })
 
 // ─── 暴露序列化接口供父组件保存使用 ─────────────────────────────────────────
@@ -552,15 +738,13 @@ defineExpose({
 .tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
 .tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
 
-/* 审计说明卡片 */
-.note-card {
-  margin-top: 16px;
-}
-.note-card .card-header {
+.conclusion-toolbar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  font-weight: 600;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
 }
 
 /* 表格 */
@@ -628,21 +812,29 @@ defineExpose({
   color: #f56c6c;
 }
 
-/* 审计结论卡片 */
-.conclusion-card {
-  margin-top: 16px;
-}
-
-.conclusion-header {
+.conclusion-toolbar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  margin-bottom: 8px;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
 }
 
-.conclusion-title {
+.section-label {
+  margin: 0 0 8px;
+  font-size: 13px;
   font-weight: 600;
-  font-size: 14px;
+  color: #303133;
+}
+
+.remark-required :deep(.el-textarea__inner) {
+  box-shadow: 0 0 0 1px #e6a23c inset;
+}
+
+.chip-wrap.inline {
+  display: inline-flex;
+  vertical-align: middle;
 }
 
 /* 编制提示 */

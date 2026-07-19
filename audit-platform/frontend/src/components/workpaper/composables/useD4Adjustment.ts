@@ -18,6 +18,7 @@
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { parseNum } from './useD4FormulaEngine'
 import type { ChecklistResponse } from './useD4FormData'
+import { eventBus } from '@/utils/eventBus'
 import type { UseD4BaseOptions } from './useD4Adjudication'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -174,7 +175,7 @@ export function useD4Adjustment(options: UseD4BaseOptions) {
   // ─── EventBus: publishAdjustment ─────────────────────────────────────
 
   /**
-   * 发布 'adjustment:created' 事件
+   * 发布 'adjustment:created' 事件（经 crossWpEventBridge 双通道桥接）
    * payload: { wpCode:'D4', entryType, amount, accountCode, description }
    */
   function publishAdjustment(): void {
@@ -187,9 +188,7 @@ export function useD4Adjustment(options: UseD4BaseOptions) {
         accountCode: row.accountName,
         description: row.description,
       }
-      try {
-        window.dispatchEvent(new CustomEvent('adjustment:created', { detail: payload }))
-      } catch { /* silent */ }
+      eventBus.emit('adjustment:created', payload)
     }
   }
 
@@ -213,11 +212,7 @@ export function useD4Adjustment(options: UseD4BaseOptions) {
       indexRef: row.indexRef,
     }))
 
-    try {
-      window.dispatchEvent(new CustomEvent('a13:push-misstatement', {
-        detail: { items: misstatements },
-      }))
-    } catch { /* silent */ }
+    eventBus.emit('a13:push-misstatement', { items: misstatements })
   }
 
   // ─── Persist / Save ──────────────────────────────────────────────────

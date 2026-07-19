@@ -56,7 +56,7 @@ export function useG4SppiFormData(opts: UseG4SppiFormDataOptions) {
       const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
       const map = new Map<string, ChecklistResponse>()
       for (const r of responses) {
-        if (r.item_id?.startsWith(ITEM_PREFIX) || r.item_id?.startsWith('G4-5-') || r.item_id?.startsWith('G4-6-') || r.item_id?.startsWith('G4-7-') || r.item_id?.startsWith('G4-8-')) {
+        if (r.item_id?.startsWith(ITEM_PREFIX) || r.item_id?.startsWith('G4-3-') || r.item_id?.startsWith('G4-5-') || r.item_id?.startsWith('G4-6-') || r.item_id?.startsWith('G4-7-') || r.item_id?.startsWith('G4-8-')) {
           map.set(r.item_id, {
             item_id: r.item_id,
             conclusion: r.conclusion ?? null,

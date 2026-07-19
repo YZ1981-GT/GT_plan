@@ -5,12 +5,15 @@
       type="info"
       :closable="false"
       show-icon
-      title="本sheet为参考材料，仅供查阅，不支持编辑"
+      title="本sheet为PD评级映射、前瞻性调整、期限折算及分阶段取值参考，仅供查阅，不支持编辑"
       class="ref-info-bar"
     />
 
-    <!-- 20行×2列只读表格（行数少，不需要虚拟滚动） -->
+    <G4EclPdGuidance />
+
+    <!-- 若源表数据可用，继续展示其评级/违约率明细 -->
     <el-table
+      v-if="tableRows.length > 0"
       :data="tableRows"
       border
       stripe
@@ -27,14 +30,23 @@
         align="center"
       />
     </el-table>
+    <el-alert
+      v-else
+      type="warning"
+      :closable="false"
+      show-icon
+      title="当前未加载源表评级违约率明细；请从当期有效数据源取值，不得沿用截图年份的历史比例。"
+    />
 
     <!-- 底部编制提示 -->
     <details class="guidance-details">
       <summary>编制提示</summary>
       <ul>
-        <li>本sheet为PD（违约概率）折算参考表</li>
-        <li>根据债权投资剩余期限查找对应的PD值</li>
-        <li>用于G4-10减值准备测算中信用损失率的确定依据</li>
+        <li>先在 G4-11 取得评级映射边际PD并执行前瞻性调整，再按 Stage 和剩余期限折算</li>
+        <li>Stage1只计未来12个月；Stage2计整个剩余存续期；Stage3参考PD=100%</li>
+        <li>中证协示例历史违约率应按年更新；国内/国际评级映射须保留依据</li>
+        <li>资本监管风险权重不等于会计PD，不得直接替代违约概率</li>
+        <li>测算后的ECL率带入G4-10，并与G4-9阶段划分勾稽</li>
         <li>所有内容为只读，不可编辑</li>
       </ul>
     </details>
@@ -54,6 +66,7 @@
  * Requirements: 7.2, 7.5, 7.6, 11.11
  */
 import { computed } from 'vue'
+import G4EclPdGuidance from './G4EclPdGuidance.vue'
 
 interface Props {
   htmlData: Record<string, any> | null
@@ -122,7 +135,7 @@ function extractRows(data: Record<string, any>): Record<string, any>[] {
 }
 
 function defaultColumns(): ColumnDef[] {
-  // 20行×2列PD折算对照表默认列定义
+  // 兼容历史 20行×2列PD折算对照表
   return [
     { prop: 'remainingTerm', label: '剩余期限', minWidth: 180 },
     { prop: 'pdValue', label: 'PD值（违约概率）', minWidth: 180 },

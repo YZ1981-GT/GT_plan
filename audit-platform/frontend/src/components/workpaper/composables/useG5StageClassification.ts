@@ -86,6 +86,10 @@ export interface G5StageClassificationRow {
   id: string
   seq: number
   debtor: string // G5用"债务人"(区别于G4的"投资项目")
+  /** 自 G5-2 带入的期末余额（用于阶段金额汇总） */
+  closingBalance: number
+  /** 业务类型：lease / installment / factoring / other */
+  businessType: string
   // 三区块检查明细
   sectionOneChecks: SectionOneCheck[]       // 13项
   sectionTwoChecks: SectionTwoCheck[]       // 3项
@@ -95,9 +99,16 @@ export interface G5StageClassificationRow {
   hasLowCreditRisk: boolean         // (二)全部为"是"
   hasCreditImpairment: boolean      // (三)任一为"是"
   companyStage: StageType           // 企业划分阶段(下拉)
-  auditStage: StageType             // 审计判断阶段(公式建议)
+  /** 公式建议阶段（检查项驱动，只读展示） */
+  suggestedStage: StageType
+  /** 审计最终阶段（默认同建议；人工可覆写） */
+  auditStage: StageType
+  /** 审计阶段是否经人工覆写（覆写后检查变更不再自动覆盖 auditStage） */
+  auditStageOverridden: boolean
   isConsistent: boolean             // companyStage === auditStage
   discrepancyNote: string           // 差异说明(不一致时必填)
+  /** 逐户综合判断依据（证据索引/合同要点） */
+  judgmentBasis: string
   indexRef: string                  // 索引
 }
 
@@ -121,6 +132,31 @@ export interface G5StageClassificationSummary {
   stage3Count: number
   inconsistentCount: number
   total: number
+  /** 按审计阶段汇总的期末余额 */
+  stage1Amount: number
+  stage2Amount: number
+  stage3Amount: number
+  inconsistentAmount: number
+  totalAmount: number
+}
+
+/** 触发当前阶段判定的关键因素摘要 */
+export function getStageTriggerLabels(row: G5StageClassificationRow): string[] {
+  const hits: string[] = []
+  if (row.hasCreditImpairment) {
+    for (const c of row.sectionThreeChecks) {
+      if (c.value === '是') hits.push(`[已减值] ${c.label}`)
+    }
+  }
+  if (row.hasSignificantIncrease) {
+    for (const c of row.sectionOneChecks) {
+      if (c.value === '是') hits.push(`[SICR] ${c.label}`)
+    }
+  }
+  if (row.hasLowCreditRisk) {
+    hits.push('[低风险豁免] 三项低信用风险条件均满足')
+  }
+  return hits
 }
 
 // ═══ Composable ═══
@@ -151,16 +187,21 @@ export function useG5StageClassification(_opts?: any) {
 
   // ─── 行级重算 ─────────────────────────────────────────────────────────────
 
-  /** 重算单行综合判定 + auditStage + 一致性 */
+  /** 重算单行综合判定 + suggestedStage + 一致性 */
   function recalcRow(row: G5StageClassificationRow): void {
     row.hasSignificantIncrease = calcHasSignificantIncrease(row.sectionOneChecks)
     row.hasLowCreditRisk = calcHasLowCreditRisk(row.sectionTwoChecks)
     row.hasCreditImpairment = calcHasCreditImpairment(row.sectionThreeChecks)
-    row.auditStage = determineStage(
+    const suggested = determineStage(
       row.hasSignificantIncrease,
       row.hasLowCreditRisk,
       row.hasCreditImpairment,
     )
+    row.suggestedStage = suggested
+    // 未人工覆写时，审计阶段跟随建议
+    if (!row.auditStageOverridden) {
+      row.auditStage = suggested
+    }
     row.isConsistent = row.companyStage === row.auditStage
   }
 
@@ -176,14 +217,44 @@ export function useG5StageClassification(_opts?: any) {
     let stage2Count = 0
     let stage3Count = 0
     let inconsistentCount = 0
+    let stage1Amount = 0
+    let stage2Amount = 0
+    let stage3Amount = 0
+    let inconsistentAmount = 0
+    let totalAmount = 0
     for (const row of rows.value) {
-      if (row.auditStage === 'Stage1') stage1Count++
-      else if (row.auditStage === 'Stage2') stage2Count++
-      else stage3Count++
-      if (!row.isConsistent) inconsistentCount++
+      const amt = Number(row.closingBalance) || 0
+      totalAmount += amt
+      if (row.auditStage === 'Stage1') {
+        stage1Count++
+        stage1Amount += amt
+      } else if (row.auditStage === 'Stage2') {
+        stage2Count++
+        stage2Amount += amt
+      } else {
+        stage3Count++
+        stage3Amount += amt
+      }
+      if (!row.isConsistent) {
+        inconsistentCount++
+        inconsistentAmount += amt
+      }
     }
-    return { stage1Count, stage2Count, stage3Count, inconsistentCount, total: rows.value.length }
+    return {
+      stage1Count,
+      stage2Count,
+      stage3Count,
+      inconsistentCount,
+      total: rows.value.length,
+      stage1Amount,
+      stage2Amount,
+      stage3Amount,
+      inconsistentAmount,
+      totalAmount,
+    }
   })
+
+  const inconsistentRows = computed(() => rows.value.filter(r => !r.isConsistent))
 
   // ─── 展开/折叠切换 ────────────────────────────────────────────────────────
 
@@ -236,6 +307,8 @@ export function useG5StageClassification(_opts?: any) {
         id: crypto.randomUUID(),
         seq: arrIdx + 1,
         debtor: debtor || `债务人${arrIdx + 1}`,
+        closingBalance: 0,
+        businessType: '',
         sectionOneChecks,
         sectionTwoChecks,
         sectionThreeChecks,
@@ -243,9 +316,12 @@ export function useG5StageClassification(_opts?: any) {
         hasLowCreditRisk: false,
         hasCreditImpairment: false,
         companyStage: normalizeStage(companyStages?.[colIdx]),
+        suggestedStage: 'Stage1',
         auditStage: 'Stage1',
+        auditStageOverridden: false,
         isConsistent: true,
         discrepancyNote: '',
+        judgmentBasis: '',
         indexRef: '',
       }
       recalcRow(row)
@@ -306,6 +382,8 @@ export function useG5StageClassification(_opts?: any) {
       id: crypto.randomUUID(),
       seq: rows.value.length + 1,
       debtor,
+      closingBalance: 0,
+      businessType: '',
       sectionOneChecks: SECTION_ONE_LABELS.map(label => ({ label, value: '否' as SectionOneCheckValue })),
       sectionTwoChecks: SECTION_TWO_LABELS.map(label => ({ label, value: '否' as SectionTwoBoolValue })),
       sectionThreeChecks: SECTION_THREE_LABELS.map(label => ({ label, value: '否' as SectionTwoBoolValue })),
@@ -313,9 +391,12 @@ export function useG5StageClassification(_opts?: any) {
       hasLowCreditRisk: false,
       hasCreditImpairment: false,
       companyStage: 'Stage1',
+      suggestedStage: 'Stage1',
       auditStage: 'Stage1',
+      auditStageOverridden: false,
       isConsistent: true,
       discrepancyNote: '',
+      judgmentBasis: '',
       indexRef: '',
     }
   }
@@ -358,6 +439,11 @@ export function useG5StageClassification(_opts?: any) {
         ...r,
         id: r.id || crypto.randomUUID(),
         seq: i + 1,
+        closingBalance: Number(r.closingBalance) || 0,
+        businessType: String(r.businessType || ''),
+        suggestedStage: r.suggestedStage || r.auditStage || 'Stage1',
+        auditStageOverridden: Boolean(r.auditStageOverridden),
+        judgmentBasis: String(r.judgmentBasis || ''),
         sectionOneChecks: r.sectionOneChecks?.length === 13
           ? r.sectionOneChecks
           : SECTION_ONE_LABELS.map((label, idx) => ({
@@ -380,6 +466,36 @@ export function useG5StageClassification(_opts?: any) {
       recalcRow(row)
       return row
     })
+  }
+
+  /**
+   * 从 G5-2 余额明细带入债务人（不覆盖已有同名行的检查结论；可刷新余额）。
+   */
+  function importFromBalanceRows(rawRows: unknown[]): number {
+    if (!Array.isArray(rawRows) || !rawRows.length) return 0
+    const byName = new Map(rows.value.map(r => [r.debtor.trim(), r]))
+    let added = 0
+    for (const raw of rawRows) {
+      const r = raw as Record<string, any>
+      const name = String(r.debtorName || '').trim()
+      if (!name) continue
+      const bal = Number(r.closingBalance ?? r.netAmount) || 0
+      const bt = String(r.businessType || '')
+      const existing = byName.get(name)
+      if (existing) {
+        existing.closingBalance = bal
+        if (bt) existing.businessType = bt
+        continue
+      }
+      const row = createEmptyRow(name)
+      row.closingBalance = bal
+      row.businessType = bt
+      rows.value.push(row)
+      byName.set(name, row)
+      added += 1
+    }
+    rows.value.forEach((r, i) => { r.seq = i + 1 })
+    return added
   }
 
   /** 从列式源数据加载 */
@@ -438,11 +554,21 @@ export function useG5StageClassification(_opts?: any) {
     row.isConsistent = row.companyStage === row.auditStage
   }
 
-  /** 更新审计判断阶段 */
+  /** 更新审计判断阶段（标记为人工覆写） */
   function updateAuditStage(rowId: string, stage: StageType): void {
     const row = rows.value.find(r => r.id === rowId)
     if (!row) return
     row.auditStage = stage
+    row.auditStageOverridden = stage !== row.suggestedStage
+    row.isConsistent = row.companyStage === row.auditStage
+  }
+
+  /** 清除审计覆写，恢复跟随建议阶段 */
+  function resetAuditStageToSuggested(rowId: string): void {
+    const row = rows.value.find(r => r.id === rowId)
+    if (!row) return
+    row.auditStageOverridden = false
+    row.auditStage = row.suggestedStage
     row.isConsistent = row.companyStage === row.auditStage
   }
 
@@ -453,6 +579,49 @@ export function useG5StageClassification(_opts?: any) {
     row.discrepancyNote = note
   }
 
+  function updateJudgmentBasis(rowId: string, note: string): void {
+    const row = rows.value.find(r => r.id === rowId)
+    if (!row) return
+    row.judgmentBasis = note
+  }
+
+  function updateIndexRef(rowId: string, ref: string): void {
+    const row = rows.value.find(r => r.id === rowId)
+    if (!row) return
+    row.indexRef = ref
+  }
+
+  function updateClosingBalance(rowId: string, amount: number): void {
+    const row = rows.value.find(r => r.id === rowId)
+    if (!row) return
+    row.closingBalance = Number(amount) || 0
+  }
+
+  /**
+   * 构造拟推送 G5-4 的阶段不一致备忘分录（金额默认 0，待 G5-10 量化后改）。
+   * 调用方负责写入 G5-4-rows。
+   */
+  function buildInconsistencyAdjDrafts(): Array<{
+    description: string
+    remark: string
+    accountCode: string
+    accountName: string
+    debitAmount: number
+    creditAmount: number
+    indexRef: string
+  }> {
+    return inconsistentRows.value.map(r => ({
+      description: `三阶段划分不一致：${r.debtor || '未命名'} 企业${r.companyStage}→审计${r.auditStage}`
+        + (r.closingBalance ? `（余额 ${r.closingBalance.toFixed(2)}）` : ''),
+      remark: `来自G5-9三阶段|${r.discrepancyNote || r.judgmentBasis || ''}|触发:${getStageTriggerLabels(r).slice(0, 3).join('；')}`,
+      accountCode: '1231',
+      accountName: '坏账准备',
+      debitAmount: 0,
+      creditAmount: 0,
+      indexRef: r.indexRef || 'G5-9',
+    }))
+  }
+
   return {
     // State
     rows,
@@ -460,10 +629,12 @@ export function useG5StageClassification(_opts?: any) {
     expandedRowIds,
     // Computed
     summary,
+    inconsistentRows,
     // 判定函数
     calcHasSignificantIncrease,
     calcHasLowCreditRisk,
     calcHasCreditImpairment,
+    getStageTriggerLabels,
     // 行操作
     recalcRow,
     recalcAll,
@@ -471,6 +642,7 @@ export function useG5StageClassification(_opts?: any) {
     removeRow,
     loadRows,
     loadFromColumnar,
+    importFromBalanceRows,
     createEmptyRow,
     // 列式解析
     parseColumnarData,
@@ -488,7 +660,12 @@ export function useG5StageClassification(_opts?: any) {
     updateCheckValue,
     updateCompanyStage,
     updateAuditStage,
+    resetAuditStageToSuggested,
     updateDiscrepancyNote,
+    updateJudgmentBasis,
+    updateIndexRef,
+    updateClosingBalance,
+    buildInconsistencyAdjDrafts,
     // 序列化
     toSaveData,
   }

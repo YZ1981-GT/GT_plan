@@ -106,5 +106,8 @@ DEDICATED_COMPONENT_TYPES: frozenset[str] = frozenset(
         "s21-data-asset",
         "s32-fraud-bundle",
         "s33-ann14-bundle",
+        # G 投资循环（整册多 sheet）
+        "g1-trading-financial-assets",
+        "g5-long-term-receivable",
     }
 )

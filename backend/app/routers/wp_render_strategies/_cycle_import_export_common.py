@@ -30,12 +30,12 @@ def is_numeric_field_key(key: str) -> bool:
         return True
     if _NUMERIC_KEY_RE.match(key):
         return True
-    if key.endswith(("Amt", "Qty", "Balance", "Total", "Rate", "Days", "Coef", "Share", "Pct")):
+    if key.endswith(("Amt", "Qty", "Balance", "Total", "Rate", "Days", "Coef", "Share", "Pct", "Decrease")):
         return True
     # G1 交易性金融资产等强数值语义后缀（避免 sppiResult 之类枚举被误判，故不含 Result）
     if key.endswith(("Quantity", "Cost", "Value", "Gain", "Income", "Price", "Diff", "Fee")):
         return True
-    if "Amount" in key or "Balance" in key:
+    if "Amount" in key or "Balance" in key or key.endswith("Occurrence"):
         return True
     # G1 专属数值字段（后缀无法覆盖：公允变动/调整分录/审定等）
     if key in {
@@ -43,6 +43,8 @@ def is_numeric_field_key(key: str) -> bool:
         "fvChangeInPL", "disposalProceeds", "unadjusted", "aje", "rje", "adjusted", "variance",
         "debit", "credit", "dividendPerShare", "dividendIncome", "margin", "notionalAmount",
         "quoteValue", "bookValue", "marketValue", "countDayQuantity", "countDayAmount",
+        "bookUnitFv", "level1Diff", "level2Result", "level2Diff", "level3Result", "level3Diff",
+        "testedValue", "activeDiff",
     }:
         return True
     return key in {
@@ -68,6 +70,7 @@ def is_numeric_field_key(key: str) -> bool:
         "unadjustedAging2to3", "unadjustedAgingGt3", "closingAje", "closingRje",
         "auditedAgingLt1", "auditedAging1to2", "auditedAging2to3", "auditedAgingGt3",
         "subsequentPayment",
+        "openingAdjustment", "closingAdjustment",
         "currentRevenue", "currentCost", "currentGross", "currentMargin", "priorRevenue", "priorCost",
         "priorGross", "priorMargin", "revenueChange", "revenueChangeRate", "costChange", "costChangeRate",
         "marginChange", "relatedRevenue", "costRate",
@@ -132,9 +135,43 @@ def col_val(row: tuple, headers: list[str], name: str) -> Any:
         return None
 
 
-def parse_row_by_headers(row: tuple, headers: list[str], field_keys: list[str]) -> dict[str, Any]:
+def apply_header_aliases(
+    actual_headers: list[str],
+    header_aliases: dict[str, list[str]] | None,
+) -> list[str]:
+    """将实际表头中的旧名归一为规范名。header_aliases: {规范名: [别名,…]}"""
+    if not header_aliases:
+        return list(actual_headers)
+    alias_to_canonical: dict[str, str] = {}
+    for canonical, aliases in header_aliases.items():
+        for a in aliases or []:
+            if a:
+                alias_to_canonical[str(a).strip()] = canonical
+    return [alias_to_canonical.get(h, h) for h in actual_headers]
+
+
+def parse_row_by_headers(
+    row: tuple,
+    headers: list[str],
+    field_keys: list[str],
+    *,
+    expected_headers: list[str] | None = None,
+) -> dict[str, Any]:
+    """按表头解析一行。
+
+    - 若提供 expected_headers：按名称匹配（与列顺序无关，缺列填空）
+    - 否则：按位置 zip（兼容旧调用）
+    """
     values = list(row) + [None] * max(0, len(headers) - len(row))
     out: dict[str, Any] = {"id": str(uuid4())}
+    if expected_headers is not None:
+        for h, key in zip(expected_headers, field_keys):
+            raw = col_val(tuple(values), headers, h)
+            if is_numeric_field_key(key):
+                out[key] = safe_float(raw)
+            else:
+                out[key] = safe_str(raw)
+        return out
     for h, key in zip(headers, field_keys):
         idx = headers.index(h)
         raw = values[idx] if idx < len(values) else None
@@ -158,33 +195,84 @@ def export_row_by_keys(data: dict, field_keys: list[str]) -> list:
     return row
 
 
-async def load_json_rows(
+async def load_json_payload(
     db: AsyncSession,
     wp_id: str,
     item_id: str,
     field: str = "conclusion",
-) -> list[dict]:
+) -> Any:
+    """读取 checklist_responses 字段原始 JSON（list / dict / 其它）。"""
     result = await db.execute(
         sa.text(f"SELECT {field} FROM checklist_responses WHERE wp_id = :wp_id AND item_id = :iid LIMIT 1"),
         {"wp_id": wp_id, "iid": item_id},
     )
     row = result.fetchone()
     if not row or not getattr(row, field, None):
-        return []
+        return None
     try:
-        parsed = json.loads(getattr(row, field))
-        return parsed if isinstance(parsed, list) else []
+        return json.loads(getattr(row, field))
     except (json.JSONDecodeError, TypeError):
-        return []
+        return None
 
 
-async def upsert_json_rows(
+def keyed_store_to_rows(store: dict[str, Any], keyed_by: str = "rowKey") -> list[dict]:
+    """将 {rowKey: {fields...}} 转为导出行列表。"""
+    rows: list[dict] = []
+    for key, fields in store.items():
+        if not isinstance(fields, dict):
+            continue
+        row = {**fields, keyed_by: key}
+        if keyed_by not in fields:
+            row[keyed_by] = key
+        rows.append(row)
+    return rows
+
+
+def rows_to_keyed_store(
+    rows: list[dict],
+    keyed_by: str = "rowKey",
+    keep_keys: list[str] | None = None,
+) -> dict[str, dict]:
+    """将导出行列表写回 {rowKey: {fields...}}。"""
+    store: dict[str, dict] = {}
+    for row in rows:
+        key = safe_str(row.get(keyed_by))
+        if not key:
+            continue
+        if keep_keys is not None:
+            cell = {k: row.get(k) for k in keep_keys if k in row and k != keyed_by}
+        else:
+            cell = {k: v for k, v in row.items() if k not in {keyed_by, "id"}}
+        store[key] = cell
+    return store
+
+
+async def load_json_rows(
     db: AsyncSession,
     wp_id: str,
     item_id: str,
-    rows_data: list[dict],
+    field: str = "conclusion",
+    *,
+    keyed_by: str | None = None,
+) -> list[dict]:
+    parsed = await load_json_payload(db, wp_id, item_id, field=field)
+    if parsed is None:
+        return []
+    if isinstance(parsed, list):
+        return parsed
+    if keyed_by and isinstance(parsed, dict):
+        return keyed_store_to_rows(parsed, keyed_by=keyed_by)
+    return []
+
+
+async def upsert_json_payload(
+    db: AsyncSession,
+    wp_id: str,
+    item_id: str,
+    payload: Any,
     field: str = "conclusion",
 ) -> None:
+    """写入 checklist_responses 字段任意 JSON（list / dict）。"""
     proj = await db.execute(
         sa.text(
             "SELECT project_id FROM working_paper WHERE id = :wp_id AND is_deleted = false"
@@ -207,10 +295,26 @@ async def upsert_json_rows(
             "project_id": str(project_id),
             "wp_id": wp_id,
             "item_id": item_id,
-            "payload": json.dumps(rows_data, ensure_ascii=False),
+            "payload": json.dumps(payload, ensure_ascii=False),
         },
     )
     await db.commit()
+
+
+async def upsert_json_rows(
+    db: AsyncSession,
+    wp_id: str,
+    item_id: str,
+    rows_data: list[dict],
+    field: str = "conclusion",
+    *,
+    keyed_by: str | None = None,
+    keep_keys: list[str] | None = None,
+) -> None:
+    payload: Any = rows_data
+    if keyed_by:
+        payload = rows_to_keyed_store(rows_data, keyed_by=keyed_by, keep_keys=keep_keys)
+    await upsert_json_payload(db, wp_id, item_id, payload, field=field)
 
 
 def build_workbook_template(
@@ -383,7 +487,14 @@ def workbook_to_response(wb: Workbook, filename: str) -> StreamingResponse:
     )
 
 
-def parse_upload_xlsx(content: bytes, expected_headers: list[str], header_row: int = 1) -> tuple[list[str], list[tuple]]:
+def parse_upload_xlsx(
+    content: bytes,
+    expected_headers: list[str],
+    header_row: int = 1,
+    *,
+    header_aliases: dict[str, list[str]] | None = None,
+    require_all_headers: bool = True,
+) -> tuple[list[str], list[tuple]]:
     wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
     ws = wb.active
     if ws is None:
@@ -393,10 +504,17 @@ def parse_upload_xlsx(content: bytes, expected_headers: list[str], header_row: i
         str(c.value).strip() if c.value else ""
         for c in next(ws.iter_rows(min_row=header_row, max_row=header_row))
     ]
-    missing = [h for h in expected_headers if h not in actual]
-    if missing:
-        wb.close()
-        raise ValueError(f"缺少列: {', '.join(missing)}")
+    actual = apply_header_aliases(actual, header_aliases)
+    if require_all_headers:
+        missing = [h for h in expected_headers if h not in actual]
+        if missing:
+            wb.close()
+            raise ValueError(f"缺少列: {', '.join(missing)}")
+    else:
+        # 至少要命中一张主键列或期望列交集，避免空表/错表被静默导入
+        if not any(h in actual for h in expected_headers):
+            wb.close()
+            raise ValueError("未匹配到任何预期列，请检查是否为正确模板")
     rows: list[tuple] = []
     for row in ws.iter_rows(min_row=header_row + 1, values_only=True):
         if all(v is None for v in row):
@@ -442,6 +560,65 @@ def create_cycle_import_export_router(
     def _spec(sheet: str) -> dict[str, Any]:
         return specs[sheet]
 
+    async def _load_payload_fallback(
+        db: AsyncSession,
+        wp_id: str,
+        item_id: str,
+        field: str,
+    ) -> Any:
+        payload = await load_json_payload(db, wp_id, item_id, field=field)
+        if payload is not None:
+            return payload
+        other = "remark" if field == "conclusion" else "conclusion"
+        return await load_json_payload(db, wp_id, item_id, field=other)
+
+    async def _load_rows_fallback(
+        db: AsyncSession,
+        wp_id: str,
+        item_id: str,
+        field: str,
+        keyed_by: str | None,
+    ) -> list[dict]:
+        rows = await load_json_rows(db, wp_id, item_id, field=field, keyed_by=keyed_by)
+        if rows:
+            return rows
+        other = "remark" if field == "conclusion" else "conclusion"
+        return await load_json_rows(db, wp_id, item_id, field=other, keyed_by=keyed_by)
+
+    async def _upsert_payload_maybe_dual(
+        db: AsyncSession,
+        wp_id: str,
+        item_id: str,
+        payload: Any,
+        field: str,
+        *,
+        dual: bool,
+    ) -> None:
+        await upsert_json_payload(db, wp_id, item_id, payload, field=field)
+        if dual:
+            other = "remark" if field == "conclusion" else "conclusion"
+            await upsert_json_payload(db, wp_id, item_id, payload, field=other)
+
+    async def _upsert_rows_maybe_dual(
+        db: AsyncSession,
+        wp_id: str,
+        item_id: str,
+        rows: list[dict],
+        field: str,
+        *,
+        dual: bool,
+        keyed_by: str | None = None,
+        keep_keys: list[str] | None = None,
+    ) -> None:
+        await upsert_json_rows(
+            db, wp_id, item_id, rows, field=field, keyed_by=keyed_by, keep_keys=keep_keys,
+        )
+        if dual:
+            other = "remark" if field == "conclusion" else "conclusion"
+            await upsert_json_rows(
+                db, wp_id, item_id, rows, field=other, keyed_by=keyed_by, keep_keys=keep_keys,
+            )
+
     async def _export_headers(sp: dict[str, Any], wp_id: str, db: AsyncSession) -> list[str]:
         """构建导出列头。含 aging 描述符时拼接动态账龄列头（Task 12.1）。"""
         aging = sp.get("aging")
@@ -475,9 +652,18 @@ def create_cycle_import_export_router(
     ) -> StreamingResponse:
         _validate(sheet)
         sp = _spec(sheet)
+        build_wb = sp.get("build_workbook")
+        if callable(build_wb):
+            wb = build_wb(None, template_only=True)
+            return workbook_to_response(wb, f"{sheet}_模板.xlsx")
         headers = await _export_headers(sp, wp_id, db)
         wb = build_workbook_template(
-            sheet, headers, title=sp.get("title"), subtitle=sp.get("subtitle"), guidance=sp.get("guidance"),
+            sheet,
+            headers,
+            title=sp.get("title"),
+            subtitle=sp.get("subtitle"),
+            guidance=sp.get("guidance"),
+            prefill_rows=sp.get("template_prefill"),
         )
         return workbook_to_response(wb, f"{sheet}_模板.xlsx")
 
@@ -491,14 +677,28 @@ def create_cycle_import_export_router(
         _validate(sheet)
         sp = _spec(sheet)
         item_id = sp.get("item_id", f"{sheet}-rows")
-        rows = await load_json_rows(db, wp_id, item_id, field=storage_field)
+        field = sp.get("storage_field", storage_field)
+        build_wb = sp.get("build_workbook")
+        if callable(build_wb):
+            payload = await _load_payload_fallback(db, wp_id, item_id, field)
+            wb = build_wb(payload, template_only=False)
+            return workbook_to_response(wb, f"{sheet}_数据.xlsx")
+        keyed_by = sp.get("keyed_by")
+        rows = await _load_rows_fallback(db, wp_id, item_id, field, keyed_by)
         headers = await _export_headers(sp, wp_id, db)
+        prefill = sp.get("template_prefill")
         wb = build_workbook_template(
-            sheet, headers, title=sp.get("title"), subtitle=sp.get("subtitle"), guidance=sp.get("guidance"),
+            sheet,
+            headers,
+            title=sp.get("title"),
+            subtitle=sp.get("subtitle"),
+            guidance=sp.get("guidance"),
+            prefill_rows=None if rows else prefill,
         )
         ws = wb[sheet]
         _seg_cache: dict = {}
-        for d in rows:
+        export_rows = rows if rows else []
+        for d in export_rows:
             ws.append(await _export_row(sp, d, wp_id, db, _seg_cache))
         return workbook_to_response(wb, f"{sheet}_数据.xlsx")
 
@@ -517,6 +717,30 @@ def create_cycle_import_export_router(
         if len(content) > 10 * 1024 * 1024:
             raise HTTPException(400, "文件大小不能超过10MB")
         sp = _spec(sheet)
+        parse_import = sp.get("parse_import")
+        if callable(parse_import):
+            try:
+                payload, errors, imported_count = parse_import(content)
+            except ValueError as e:
+                return {"ok": False, "errors": [str(e)], "imported_count": 0}
+            except Exception:
+                raise HTTPException(400, "无法解析xlsx文件")
+            if errors and not imported_count:
+                return {"ok": False, "errors": errors, "imported_count": 0}
+            item_id = sp.get("item_id", f"{sheet}-rows")
+            field = sp.get("storage_field", storage_field)
+            await _upsert_payload_maybe_dual(
+                db, wp_id, item_id, payload, field,                 dual=bool(sp.get("dual_write")),
+            )
+            out_custom: dict[str, Any] = {
+                "ok": True,
+                "imported_count": imported_count,
+                "errors": errors,
+            }
+            if imported_count >= ROW_LIMIT:
+                out_custom["warning"] = f"数据行数超过{ROW_LIMIT}行限制，已截断"
+            return out_custom
+
         hr = sp.get("header_row", header_row)
         aging = sp.get("aging")
 
@@ -550,7 +774,13 @@ def create_cycle_import_export_router(
 
             rows, truncated = import_rows_generic(raw, actual, base_field_keys, parse_fn=_parse_aging)
             item_id = sp.get("item_id", f"{sheet}-rows")
-            await upsert_json_rows(db, wp_id, item_id, rows, field=storage_field)
+            field = sp.get("storage_field", storage_field)
+            await _upsert_rows_maybe_dual(
+                db, wp_id, item_id, rows, field,
+                dual=bool(sp.get("dual_write")),
+                keyed_by=sp.get("keyed_by"),
+                keep_keys=sp.get("keep_keys"),
+            )
             out: dict[str, Any] = {"ok": True, "imported_count": len(rows), "errors": []}
             if truncated:
                 out["warning"] = f"数据行数超过{ROW_LIMIT}行限制，已截断"
@@ -560,17 +790,35 @@ def create_cycle_import_export_router(
             return out
 
         try:
-            actual, raw = parse_upload_xlsx(content, sp["headers"], header_row=hr)
+            actual, raw = parse_upload_xlsx(
+                content,
+                sp["headers"],
+                header_row=hr,
+                header_aliases=sp.get("header_aliases"),
+                require_all_headers=not bool(sp.get("allow_missing_headers")),
+            )
         except ValueError as e:
             return {"ok": False, "errors": [str(e)], "imported_count": 0}
         except Exception:
             raise HTTPException(400, "无法解析xlsx文件")
         keys = sp["field_keys"]
+        expected = list(sp["headers"])
         rows, truncated = import_rows_generic(
-            raw, actual, keys, parse_fn=lambda r, h: parse_row_by_headers(r, h, keys),
+            raw,
+            actual,
+            keys,
+            parse_fn=lambda r, h: parse_row_by_headers(
+                r, h, keys, expected_headers=expected,
+            ),
         )
         item_id = sp.get("item_id", f"{sheet}-rows")
-        await upsert_json_rows(db, wp_id, item_id, rows, field=storage_field)
+        field = sp.get("storage_field", storage_field)
+        await _upsert_rows_maybe_dual(
+            db, wp_id, item_id, rows, field,
+            dual=bool(sp.get("dual_write")),
+            keyed_by=sp.get("keyed_by"),
+            keep_keys=sp.get("keep_keys"),
+        )
         out2: dict[str, Any] = {"ok": True, "imported_count": len(rows), "errors": []}
         if truncated:
             out2["warning"] = f"数据行数超过{ROW_LIMIT}行限制，已截断"

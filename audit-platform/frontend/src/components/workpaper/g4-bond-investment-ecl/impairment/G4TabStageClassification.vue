@@ -10,19 +10,34 @@
     />
     <!-- 方法论上下文（琥珀色左边线+浅黄背景） -->
     <div class="methodology-context">
-      <p><strong>ECL三阶段划分标准：</strong></p>
+      <p><strong>ECL三阶段划分标准（对齐源底稿 G4-9 / CAS 22）：</strong></p>
       <ul>
-        <li><strong>Stage1</strong>：信用风险自初始确认以来未显著增加（或具有较低信用风险），按12个月ECL计提减值</li>
-        <li><strong>Stage2</strong>：信用风险显著增加但未发生信用减值，按整个存续期ECL计提</li>
-        <li><strong>Stage3</strong>：已发生信用减值（出现8项可观察信息之一），按整个存续期ECL计提且利息按净额确认</li>
+        <li><strong>Stage1</strong>：信用风险自初始确认以来未显著增加，或资产负债表日适用较低信用风险豁免 → 12个月ECL</li>
+        <li><strong>Stage2</strong>：信用风险显著增加且未适用低风险豁免、尚未发生信用减值 → 整个存续期ECL</li>
+        <li><strong>Stage3</strong>：已发生信用减值（9项可观察信息之一）→ 整个存续期ECL，利息按净额确认</li>
       </ul>
+      <p class="method-sub">判定优先级：已减值(Stage3) &gt; 显著增加且非低风险豁免(Stage2) &gt; 其余(Stage1)。逾期≥30日通常推定SICR；逾期≥90日通常推定违约（均可反驳）。</p>
+      <p class="method-sub">
+        外部评级及评级迁徙PD是阶段判断和ECL计量的输入之一，不能替代信用风险显著增加的综合判断；
+        资本监管风险权重亦不等于会计PD或三阶段结论。完成本表后，在G4-11按阶段执行前瞻性及期限调整。
+      </p>
     </div>
 
     <!-- 工具栏索引 -->
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <G4EclImportExportDropdown
+          :wp-id="wpId"
+          sheet="G4-9"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
+      </div>
       <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-2" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:G4-9" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-10" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G4-11" :context-project-id="projectId" /></span>
       </div>
     </div>
 
@@ -33,6 +48,18 @@
         <el-button size="small" :disabled="isReadonly" @click="handleAddProject">
           + 新增投资项目
         </el-button>
+        <el-button size="small" :disabled="isReadonly" @click="importFromG42">
+          从 G4-2 带入
+        </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          :disabled="isReadonly || stageLogic.rows.value.length === 0"
+          @click="syncStagesToG410"
+        >
+          同步阶段至 G4-10
+        </el-button>
+        <el-button size="small" @click="guidanceDrawerVisible = true">中证协指引</el-button>
         <el-button size="small" @click="stageLogic.expandAll()">全部展开</el-button>
         <el-button size="small" @click="stageLogic.collapseAll()">全部折叠</el-button>
         <el-button size="small" @click="openReview">💬复核</el-button>
@@ -40,7 +67,10 @@
     </div>
 
     <!-- 无数据占位 -->
-    <el-empty v-if="stageLogic.rows.value.length === 0" description="暂无投资项目，点击“新增投资项目”开始" />
+    <el-empty
+      v-if="stageLogic.rows.value.length === 0"
+      description="暂无投资项目，点击「新增投资项目」或「从 G4-2 带入」开始"
+    />
 
     <!-- 主表格：行式汇总视图 -->
     <el-table
@@ -60,13 +90,18 @@
           <div class="expand-detail">
             <!-- (一) 信用风险是否显著增加 -->
             <div class="check-section">
-              <div class="check-section-title">(一) 信用风险是否显著增加（13项考虑因素）</div>
+              <div class="check-section-title">(一) 信用风险是否显著增加（14项考虑因素，任一项为「是」即SICR）</div>
               <el-table :data="scope.row.sectionOneChecks" border size="small" class="check-detail-table">
                 <el-table-column label="序号" width="50" align="center">
                   <template #default="{ $index }">{{ $index + 1 }}</template>
                 </el-table-column>
-                <el-table-column label="考虑因素" prop="label" min-width="300" />
-                <el-table-column label="判断" width="140" align="center">
+                <el-table-column label="需要考虑的信息" prop="label" min-width="220" />
+                <el-table-column label="说明" min-width="280">
+                  <template #default="{ row: item }">
+                    <span class="hint-text">{{ item.hint }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="判断" width="120" align="center">
                   <template #default="{ $index, row: item }">
                     <el-select
                       v-if="!isReadonly"
@@ -83,17 +118,34 @@
                   </template>
                 </el-table-column>
               </el-table>
+              <div class="section-conclusion">
+                <span class="sc-label">分析结论</span>
+                <el-input
+                  v-if="!isReadonly"
+                  :model-value="scope.row.sectionConclusions.significantIncrease"
+                  type="textarea"
+                  :autosize="{ minRows: 1, maxRows: 3 }"
+                  placeholder="就本投资对信用风险显著增加的综合判断..."
+                  @input="(v: string) => stageLogic.updateSectionConclusion(scope.row.id, 'significantIncrease', v)"
+                />
+                <span v-else class="sc-text">{{ scope.row.sectionConclusions.significantIncrease || '—' }}</span>
+              </div>
             </div>
 
             <!-- (二) 是否具有较低信用风险 -->
             <div class="check-section">
-              <div class="check-section-title">(二) 是否具有较低信用风险（3项同时满足）</div>
+              <div class="check-section-title">(二) 是否具有较低信用风险（3项同时满足方可豁免）</div>
               <el-table :data="scope.row.sectionTwoChecks" border size="small" class="check-detail-table">
                 <el-table-column label="序号" width="50" align="center">
                   <template #default="{ $index }">{{ $index + 1 }}</template>
                 </el-table-column>
-                <el-table-column label="满足条件" prop="label" min-width="300" />
-                <el-table-column label="判断" width="140" align="center">
+                <el-table-column label="条件（同时满足）" prop="label" min-width="220" />
+                <el-table-column label="说明" min-width="280">
+                  <template #default="{ row: item }">
+                    <span class="hint-text">{{ item.hint }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="判断" width="120" align="center">
                   <template #default="{ $index, row: item }">
                     <el-select
                       v-if="!isReadonly"
@@ -109,17 +161,34 @@
                   </template>
                 </el-table-column>
               </el-table>
+              <div class="section-conclusion">
+                <span class="sc-label">分析结论</span>
+                <el-input
+                  v-if="!isReadonly"
+                  :model-value="scope.row.sectionConclusions.lowCreditRisk"
+                  type="textarea"
+                  :autosize="{ minRows: 1, maxRows: 3 }"
+                  placeholder="是否适用较低信用风险简化假定..."
+                  @input="(v: string) => stageLogic.updateSectionConclusion(scope.row.id, 'lowCreditRisk', v)"
+                />
+                <span v-else class="sc-text">{{ scope.row.sectionConclusions.lowCreditRisk || '—' }}</span>
+              </div>
             </div>
 
             <!-- (三) 已发生信用减值的评估 -->
             <div class="check-section">
-              <div class="check-section-title">(三) 已发生信用减值的评估（8项可观察信息）</div>
+              <div class="check-section-title">(三) 已发生信用减值的评估（9项可观察信息，任一项为「是」即Stage3）</div>
               <el-table :data="scope.row.sectionThreeChecks" border size="small" class="check-detail-table">
                 <el-table-column label="序号" width="50" align="center">
                   <template #default="{ $index }">{{ $index + 1 }}</template>
                 </el-table-column>
-                <el-table-column label="可观察信息" prop="label" min-width="300" />
-                <el-table-column label="判断" width="140" align="center">
+                <el-table-column label="可观察信息" prop="label" min-width="220" />
+                <el-table-column label="说明" min-width="280">
+                  <template #default="{ row: item }">
+                    <span class="hint-text">{{ item.hint }}</span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="判断" width="120" align="center">
                   <template #default="{ $index, row: item }">
                     <el-select
                       v-if="!isReadonly"
@@ -135,6 +204,18 @@
                   </template>
                 </el-table-column>
               </el-table>
+              <div class="section-conclusion">
+                <span class="sc-label">分析结论</span>
+                <el-input
+                  v-if="!isReadonly"
+                  :model-value="scope.row.sectionConclusions.creditImpairment"
+                  type="textarea"
+                  :autosize="{ minRows: 1, maxRows: 3 }"
+                  placeholder="是否存在客观减值证据；若逾期≥90日是否反驳违约推定..."
+                  @input="(v: string) => stageLogic.updateSectionConclusion(scope.row.id, 'creditImpairment', v)"
+                />
+                <span v-else class="sc-text">{{ scope.row.sectionConclusions.creditImpairment || '—' }}</span>
+              </div>
             </div>
           </div>
         </template>
@@ -156,6 +237,12 @@
               🗑️
             </el-button>
           </div>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="账面余额" width="110" align="right">
+        <template #default="{ row }">
+          {{ fmtAmt(row.bookBalance) }}
         </template>
       </el-table-column>
 
@@ -248,7 +335,7 @@
       <!-- 索引(GtIndexChip) -->
       <el-table-column label="索引" width="120" align="center">
         <template #default="{ row }">
-          <GtIndexChip :value="row.indexRef" />
+          <GtIndexChip :value="row.indexRef" :context-project-id="projectId" />
         </template>
       </el-table-column>
     </el-table>
@@ -270,53 +357,67 @@
         <span class="summary-total">合计: {{ stageLogic.summary.value.total }} 项</span>
       </div>
 
-      <!-- 审计说明 el-card -->
-      <el-card class="note-card" shadow="never">
-        <template #header><div class="card-header"><span>审计说明</span></div></template>
-        <el-input
-          v-model="auditNote"
-          type="textarea"
-          :autosize="{ minRows: 5 }"
-          :disabled="isReadonly"
-          placeholder="填写审计说明：三阶段划分测试的执行情况、企业与审计判断差异、拟调整/未调整事项及其影响等。"
-          @change="saveAuditNote"
-        />
-      </el-card>
-
-      <!-- 审计结论 el-card + AI按钮 -->
-      <el-card class="conclusion-card" shadow="never">
-        <template #header>
-          <div class="conclusion-header">
-            <span>审计结论</span>
-            <el-button size="small" :disabled="isReadonly" @click="fillAiConclusion">
-              🤖 AI辅助
-            </el-button>
-          </div>
-        </template>
-        <el-input
-          v-model="stageLogic.conclusion.value"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 8 }"
-          :disabled="isReadonly"
-          placeholder="对三阶段划分合理性的综合评价..."
-        />
-      </el-card>
+      <div v-if="!isReadonly" class="audit-ai-row">
+        <el-button
+          size="small"
+          :disabled="!aiAvailable"
+          :loading="aiLoading"
+          @click="fillAiConclusion"
+        >
+          🤖 AI辅助
+        </el-button>
+      </div>
+      <G4AuditTextCards
+        :wp-id="wpId"
+        :is-readonly="isReadonly"
+        v-model:note="auditNote"
+        :conclusion="stageLogic.conclusion.value"
+        note-placeholder="填写审计说明：三阶段划分测试的执行情况、企业与审计判断差异、拟调整/未调整事项及其影响等。"
+        conclusion-placeholder="对三阶段划分合理性的综合评价..."
+        @update:note="saveAuditNote"
+        @update:conclusion="(v: string) => { stageLogic.conclusion.value = v }"
+      />
 
       <!-- 编制提示 details 折叠 -->
       <details class="g4-guide-details">
-        <summary>📋 编制提示</summary>
+        <summary>📋 编制提示（源底稿逻辑 + 中证协指引要点）</summary>
         <div class="g4-guide-content">
-          <p>1. 三阶段划分是确定ECL计提方法的关键步骤：Stage1→12个月ECL，Stage2/3→整个存续期ECL</p>
-          <p>2. (一)信用风险显著增加：13项考虑因素中任一项为"是"，则该投资项目信用风险显著增加</p>
-          <p>3. (二)较低信用风险：3项条件须全部满足（全部为"是"），方可适用较低信用风险豁免</p>
-          <p>4. (三)已发生信用减值：8项可观察信息中任一项为"是"，则直接归入Stage3</p>
-          <p>5. 判定优先级：Stage3（已减值）> Stage2（显著增加）> Stage1（未显著增加/低风险）</p>
-          <p>6. 企业划分阶段与审计判断阶段不一致时，必须填写差异说明</p>
-          <p>7. 展开投资项目行可查看该项目的逐项检查明细</p>
-          <p>8. 参考中证协金融工具减值指引了解各判定标准的具体适用情形</p>
+          <p>1. 债务工具不适用简化方法，须按一般法三阶段追踪信用风险变化：Stage1→12个月ECL，Stage2/3→整个存续期ECL。</p>
+          <p>2. {{ G4_9_GUIDANCE.priority }}</p>
+          <p>3. 先「从 G4-2 带入」同步投资项目/余额/企业阶段；逾期≥30日自动预填 SICR 第14项（可反驳）。</p>
+          <p>4. (一) 14项任一项为「是」→SICR；(二) 3项须全部为「是」才可低风险豁免；(三) 9项任一项为「是」→Stage3。</p>
+          <p>5. {{ G4_9_GUIDANCE.overdue30 }}</p>
+          <p>6. {{ G4_9_GUIDANCE.overdue90 }}</p>
+          <p>7. {{ G4_9_GUIDANCE.lowRisk }}</p>
+          <p>8. 确认后点「同步阶段至 G4-10」，保证减值测算分组与本表审计阶段一致。</p>
+          <p>9. 企业阶段与审计阶段不一致时必须填写差异说明；各区块「分析结论」对应源表分析结论行。</p>
+          <p class="guide-sub-title">中证协《证券公司金融工具减值指引》— SICR 实务参考情形：</p>
+          <ol class="guide-list">
+            <li v-for="(item, idx) in G4_9_GUIDANCE.sicrCsrc" :key="idx">{{ item }}</li>
+          </ol>
         </div>
       </details>
     </div>
+
+    <!-- 中证协指引侧栏 -->
+    <el-drawer
+      v-model="guidanceDrawerVisible"
+      title="中证协《证券公司金融工具减值指引》要点"
+      size="420px"
+      append-to-body
+    >
+      <p class="drawer-lead">{{ G4_9_GUIDANCE.priority }}</p>
+      <p class="drawer-tip">{{ G4_9_GUIDANCE.overdue30 }}</p>
+      <p class="drawer-tip">{{ G4_9_GUIDANCE.overdue90 }}</p>
+      <p class="drawer-tip">{{ G4_9_GUIDANCE.lowRisk }}</p>
+      <h4 class="drawer-sub">SICR 实务参考情形</h4>
+      <ol class="drawer-list">
+        <li v-for="(item, idx) in G4_9_GUIDANCE.sicrCsrc" :key="idx">{{ item }}</li>
+      </ol>
+      <el-button type="primary" @click="openRefGuidanceSheet">
+        打开完整参考 sheet
+      </el-button>
+    </el-drawer>
   </div>
 </template>
 
@@ -329,22 +430,32 @@
  *
  * 功能：
  * - 列式转置结构：源模板投资项目为列，前端转换为行式交互视图
- * - 三区块检查：(一)信用风险显著增加(13项) / (二)较低信用风险(3项) / (三)已发生信用减值(8项)
- * - 行式汇总视图：投资项目|显著增加|较低信用风险|已发生减值|企业阶段|审计阶段|一致性|差异说明|索引
- * - 支持展开/折叠详情模式（展开显示逐项检查明细）
- * - 顶部方法论上下文（琥珀色左边线+浅黄背景）
- * - 底部汇总区 + 审计结论textarea + AI按钮 + 编制提示折叠
- * - 不一致行红色高亮 + 强制差异说明
- * - 动态投资项目增删（ElMessageBox.prompt输入名称）
- * - 16384列智能解析：仅取有数据的投资列
+ * - 三区块检查：(一)SICR 14项 / (二)较低信用风险 3项 / (三)已减值 9项（对齐源模板）
+ * - 展开明细含「说明」列 + 各区块分析结论
+ * - 判定优先级：Stage3 > Stage2(SICR且非低风险豁免) > Stage1
+ * - 底部汇总 + 审计说明/结论 + 中证协指引编制提示
  *
  * 使用 useG4EclStageClassification composable
  */
-import { ref, computed, inject, watch, onMounted } from 'vue'
+import { ref, computed, inject, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { useG4EclStageClassification } from '../../composables/useG4EclStageClassification'
+import {
+  useG4EclStageClassification,
+  G4_9_GUIDANCE,
+} from '../../composables/useG4EclStageClassification'
 import { useG4EclFormData } from '../../composables/useG4EclFormData'
+import { applyStageUpdatesToRows } from '../../composables/useG4EclImpairmentCalc'
+import {
+  fetchG42DetailRows,
+  parseChecklistRows,
+  G4_9_ROWS_KEY,
+  G4_10_ROWS_KEY,
+  G4_STAGE_UPDATED_EVENT,
+} from '../../composables/g4CrossHelpers'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G4AuditTextCards from '../../g4-bond-investment-main/G4AuditTextCards.vue'
+import G4EclImportExportDropdown from '../G4EclImportExportDropdown.vue'
+import { useG4EclAiGenerate } from '../../composables/useG4EclAiGenerate'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -353,9 +464,16 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const emit = defineEmits<{ imported: []; 'navigate-sheet': [sheetName: string] }>()
 
-// ─── 初始化 composable ───
+const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const navigateG4Sheet = inject<(code: string) => void>('navigateG4Sheet', (code) => {
+  emit('navigate-sheet', code)
+})
+
+const wpIdRef = computed(() => props.wpId)
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG4EclAiGenerate(wpIdRef)
+
 const isReadonlyRef = computed(() => props.isReadonly)
 const htmlDataRef = computed(() => props.htmlData)
 
@@ -364,25 +482,58 @@ const stageLogic = useG4EclStageClassification({
   isReadonly: isReadonlyRef,
 })
 
-// ─── 审计说明（checklist_responses 持久化） ─────────────────────────────────
 const formData = useG4EclFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
+
 const NOTE_KEY = 'G4-9-stage-classification-audit-note'
+const CONCLUSION_KEY = 'G4-9-stage-classification-conclusion'
 const auditNote = ref('')
+const guidanceDrawerVisible = ref(false)
+let persistTimer: ReturnType<typeof setTimeout> | null = null
+
 function saveAuditNote(val: string): void {
   if (props.isReadonly) return
   auditNote.value = val
   formData.debouncedSave(NOTE_KEY, { remark: val })
 }
 
-// ─── 从htmlData初始化数据 ───
+function persistRows(): void {
+  if (props.isReadonly) return
+  const json = JSON.stringify(stageLogic.rows.value)
+  formData.debouncedSave(G4_9_ROWS_KEY, { remark: json, conclusion: json })
+}
+
+function schedulePersistRows(): void {
+  if (props.isReadonly) return
+  if (persistTimer) clearTimeout(persistTimer)
+  persistTimer = setTimeout(() => persistRows(), 800)
+}
+
+watch(() => stageLogic.conclusion.value, (val) => {
+  if (props.isReadonly) return
+  formData.debouncedSave(CONCLUSION_KEY, { conclusion: null, remark: val })
+})
+
+watch(() => stageLogic.rows.value, () => schedulePersistRows(), { deep: true })
+
 onMounted(async () => {
   stageLogic.init(props.htmlData)
   await formData.loadAll()
+  const savedRows = formData.allResponses.value.get(G4_9_ROWS_KEY)
+  const list = parseChecklistRows(savedRows)
+  if (list.length && stageLogic.rows.value.length === 0) {
+    stageLogic.loadRows(list as any)
+  }
   const note = formData.allResponses.value.get(NOTE_KEY)
   if (note?.remark) auditNote.value = note.remark
+  const conc = formData.allResponses.value.get(CONCLUSION_KEY)
+  if (conc?.remark) stageLogic.conclusion.value = conc.remark
+})
+
+onBeforeUnmount(() => {
+  if (persistTimer) clearTimeout(persistTimer)
 })
 
 watch(() => props.htmlData, (newData) => {
@@ -390,6 +541,67 @@ watch(() => props.htmlData, (newData) => {
     stageLogic.init(newData)
   }
 })
+
+function fmtAmt(v: number): string {
+  const n = Number(v) || 0
+  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+async function importFromG42(): Promise<void> {
+  if (props.isReadonly) return
+  const list = await fetchG42DetailRows(props.wpId)
+  if (!list.length) {
+    ElMessage.warning('未找到 G4-2 明细数据，请先在主底稿填写明细表')
+    return
+  }
+  const result = stageLogic.importFromDetailRows(list)
+  persistRows()
+  ElMessage.success(
+    `已带入：新增 ${result.added} 项，刷新 ${result.refreshed} 项`
+      + (result.prefilledOverdue ? `；预填逾期SICR ${result.prefilledOverdue} 项` : ''),
+  )
+}
+
+async function syncStagesToG410(): Promise<void> {
+  if (props.isReadonly) return
+  const missingNote = stageLogic.inconsistentRows.value.filter(r => !r.discrepancyNote?.trim())
+  if (missingNote.length) {
+    ElMessage.warning(`${missingNote.length} 项阶段不一致但未填差异说明，请先补全`)
+    return
+  }
+  const updates = stageLogic.rows.value
+    .filter(r => r.investProject?.trim())
+    .map(r => ({
+      investProject: r.investProject.trim(),
+      auditStage: r.auditStage as 'Stage1' | 'Stage2' | 'Stage3',
+      bookBalance: r.bookBalance,
+    }))
+  if (!updates.length) {
+    ElMessage.warning('无可同步的投资项目')
+    return
+  }
+  try {
+    try { await formData.loadAll() } catch { /* ignore */ }
+    const existing = parseChecklistRows(formData.allResponses.value.get(G4_10_ROWS_KEY))
+    const applied = applyStageUpdatesToRows(existing, updates)
+    const json = JSON.stringify(applied.rows)
+    await formData.saveImmediate(G4_10_ROWS_KEY, { remark: json, conclusion: json })
+    persistRows()
+    try {
+      window.dispatchEvent(new CustomEvent(G4_STAGE_UPDATED_EVENT, {
+        detail: { updates, source: 'G4-9', written: true },
+      }))
+    } catch { /* silent */ }
+    ElMessage.success(`已同步 ${applied.count} 条阶段至 G4-10`)
+  } catch {
+    ElMessage.error('阶段同步写入失败')
+  }
+}
+
+function openRefGuidanceSheet(): void {
+  guidanceDrawerVisible.value = false
+  navigateG4Sheet('参考-中证协')
+}
 
 // ─── 展开行处理（el-table expand事件） ───
 function handleExpandChange(row: any, expandedRows: any[]): void {
@@ -454,20 +666,15 @@ function openReview(): void {
 }
 
 // ─── AI辅助生成审计结论 ───
-function fillAiConclusion(): void {
+async function fillAiConclusion(): Promise<void> {
   if (props.isReadonly) return
-  const s = stageLogic.summary.value
-  const draft =
-    `经对${s.total}个债权投资项目进行信用风险评估和三阶段划分检查，其中` +
-    `Stage1（未显著增加）${s.stage1Count}项、` +
-    `Stage2（显著增加）${s.stage2Count}项、` +
-    `Stage3（已减值）${s.stage3Count}项。` +
-    (s.inconsistentCount === 0
-      ? '企业划分阶段与审计判断阶段全部一致，三阶段划分合理。'
-      : `企业划分阶段与审计判断阶段存在${s.inconsistentCount}项不一致，需关注差异原因。`)
-  stageLogic.conclusion.value = stageLogic.conclusion.value
-    ? `${stageLogic.conclusion.value}\n${draft}`
-    : draft
+  const text = await generateAndConfirm(
+    'stage-classification-conclusion',
+    stageLogic.conclusion.value || '',
+    {},
+    'AI 审计结论',
+  )
+  if (text) stageLogic.conclusion.value = text
 }
 </script>
 
@@ -490,15 +697,10 @@ function fillAiConclusion(): void {
 .tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
 .tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
 
-/* 审计说明卡片 */
-.note-card {
-  margin-top: 12px;
-}
-.note-card .card-header {
+.audit-ai-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
+  justify-content: flex-end;
+  margin-top: 12px;
 }
 
 /* ─── 方法论上下文（琥珀色左边线+浅黄背景）─── */
@@ -523,6 +725,82 @@ function fillAiConclusion(): void {
 
 .methodology-context li {
   margin-bottom: 2px;
+}
+
+.methodology-context .method-sub {
+  margin: 6px 0 0;
+  color: #92400e;
+  font-size: 12px;
+}
+
+.hint-text {
+  color: #606266;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.section-conclusion {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.section-conclusion .sc-label {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #606266;
+  padding-top: 6px;
+  width: 64px;
+}
+
+.section-conclusion .sc-text {
+  font-size: 12px;
+  color: #303133;
+  white-space: pre-wrap;
+}
+
+.g4-guide-content .guide-sub-title {
+  margin-top: 8px;
+  font-weight: 600;
+  color: #1d4ed8;
+}
+
+.g4-guide-content .guide-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  color: #1e40af;
+}
+
+.g4-guide-content .guide-list li {
+  margin-bottom: 2px;
+}
+
+.drawer-lead {
+  font-weight: 600;
+  margin: 0 0 12px;
+  line-height: 1.6;
+}
+
+.drawer-tip {
+  font-size: 12px;
+  color: #606266;
+  margin: 0 0 8px;
+  line-height: 1.6;
+}
+
+.drawer-sub {
+  margin: 16px 0 8px;
+  font-size: 13px;
+}
+
+.drawer-list {
+  margin: 0 0 16px;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #1e40af;
 }
 
 /* ─── Section标题栏 ─── */
@@ -649,18 +927,6 @@ function fillAiConclusion(): void {
   margin-left: 8px;
   font-weight: 600;
   color: #303133;
-}
-
-/* 审计结论卡片 */
-.conclusion-card {
-  margin-top: 12px;
-}
-
-.conclusion-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 600;
 }
 
 /* 编制提示 */

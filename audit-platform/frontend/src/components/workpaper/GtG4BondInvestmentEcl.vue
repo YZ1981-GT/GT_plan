@@ -40,6 +40,8 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @imported="onSheetImported"
+        @navigate-sheet="onNavigateSheet"
       />
 
       <!-- G4-10 减值准备测算表 -->
@@ -49,6 +51,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @imported="onSheetImported"
       />
 
       <!-- G4-11 预期信用损失计量测试 -->
@@ -58,6 +61,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @imported="onSheetImported"
       />
 
       <!-- G4-12 减值准备转回核销检查 -->
@@ -67,6 +71,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @imported="onSheetImported"
       />
 
       <!-- G4-13 凭证检查表 -->
@@ -76,6 +81,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @imported="onSheetImported"
       />
 
       <!-- 参考-中证协金融工具减值指引 -->
@@ -119,14 +125,18 @@
  * sheetName正则提取编码(G4-9~G4-13, 参考-xxx) → v-if分发到7个子组件（defineAsyncComponent lazy）
  * 未匹配 → OnlyOffice fallback
  * 集成：useWorkpaperVersionToolbar(autoSnapshot) + provide('openReviewDialog') + 双模式切换
- * selfLoad：htmlData为null时通过useG4EclFormData调用render-config获取数据
+ * selfLoad：始终 formData.loadAll；htmlData为null时额外解析 sheetCache
  *
  * Requirements: 1.1, 1.2, 1.6, 1.7, 1.8, 1.9, 9.1, 9.4, 11.7
  */
-import { ref, computed, onMounted, provide, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useG4EclDualMode } from './composables/useG4EclDualMode'
 import { useG4EclFormData } from './composables/useG4EclFormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import type { ChecklistResponse } from './composables/useF1FormData'
+import type { AdjustmentEntry } from './composables/useG4MainAdjustment'
+import { persistExceptionDraftsToMainWp } from './composables/g4ExceptionRouting'
+import { ElMessage } from 'element-plus'
 
 // ─── defineAsyncComponent 懒加载所有子组件 ───────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -159,6 +169,12 @@ const props = defineProps<{
   wpId: string
   projectId: string
   readonly?: boolean
+}>()
+
+const emit = defineEmits<{
+  (e: 'navigate-sheet', sheetName: string): void
+  (e: 'save'): void
+  (e: 'completed'): void
 }>()
 
 // ─── sheetName 正则 → 编码映射 ──────────────────────────────────────────────
@@ -216,12 +232,6 @@ const isHtmlSheet = computed(() => HTML_SHEETS.has(currentSheet.value))
 /** 解析后的 htmlData（优先使用prop，fallback到selfLoad结果） */
 const resolvedHtmlData = computed(() => props.htmlData ?? selfLoadData.value)
 
-// ─── 双模式切换 ─────────────────────────────────────────────────────────────
-const dualMode = useG4EclDualMode({
-  wpId: wpIdRef,
-  sheetName: computed(() => props.sheetName || ''),
-})
-
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
@@ -235,13 +245,55 @@ const formData = useG4EclFormData({
   onAfterSave: () => scheduleAutoSnapshot(),
 })
 
+// ─── 双模式切换 ─────────────────────────────────────────────────────────────
+const dualMode = useG4EclDualMode({
+  wpId: wpIdRef,
+  sheetName: computed(() => props.sheetName || ''),
+  reloadAll: () => formData.loadAll(),
+})
+
+provide('g4VersionTrailRef', versionTrailRef)
+provide('g4OpenVersionHistory', openVersionHistory)
+provide('reloadWorkpaperData', () => formData.loadAll())
+provide('navigateG4Sheet', (code: string) => emit('navigate-sheet', code))
+
 // 复核对话 openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
 
-// ─── selfLoad 模式：htmlData 为 null 时自动获取数据 ─────────────────────────
+function onNavigateSheet(sheetName: string): void {
+  emit('navigate-sheet', sheetName)
+}
+
+function onSheetImported(): void {
+  void formData.loadAll()
+}
+
+async function handleG4SaveItems(e: Event): Promise<void> {
+  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
+  if (Array.isArray(items) && items.length > 0) {
+    for (const it of items) {
+      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
+    }
+    scheduleAutoSnapshot()
+  }
+}
+
+function handleExceptionDrafts(e: Event): void {
+  const drafts = (e as CustomEvent<{ drafts: AdjustmentEntry[] }>).detail?.drafts
+  if (!Array.isArray(drafts) || drafts.length === 0) return
+  void persistExceptionDraftsToMainWp(drafts, {
+    projectId: props.projectId,
+  }).then((result) => {
+    if (!result) ElMessage.error('未找到 G4 主底稿，异常草稿未写入 G4-3')
+  }).catch(() => {
+    ElMessage.error('写入 G4-3 异常草稿失败')
+  })
+}
+
+// ─── selfLoad：始终 loadAll；htmlData 缺失时再填充 selfLoadData ─────────────
 async function selfLoad(): Promise<void> {
-  if (props.htmlData != null) return
   try {
     await formData.loadAll()
+    if (props.htmlData != null) return
     // 从formData的sheetCache中获取当前sheet的数据
     const parsed = formData.parseContent()
     if (parsed && Object.keys(parsed).length > 0) {
@@ -261,8 +313,15 @@ async function retrySelfLoad(): Promise<void> {
 
 // ─── 生命周期 ───────────────────────────────────────────────────────────────
 onMounted(async () => {
+  window.addEventListener('g4:save-items', handleG4SaveItems)
+  window.addEventListener('g4:exception-drafts', handleExceptionDrafts)
   await selfLoad()
   isLoading.value = false
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('g4:save-items', handleG4SaveItems)
+  window.removeEventListener('g4:exception-drafts', handleExceptionDrafts)
 })
 </script>
 

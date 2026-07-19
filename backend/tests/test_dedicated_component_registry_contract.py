@@ -56,8 +56,8 @@ def test_whole_equals_dedicated_source():
 
 
 def test_dedicated_count_stable():
-    """防误删：当前整册专属为 82 项（含 A/B Bundle + C/H/I/J/K/L/M/N/S）。"""
-    assert len(DEDICATED_COMPONENT_TYPES) == 82
+    """防误删：当前整册专属为 84 项（含 A/B Bundle + C/H/I/J/K/L/M/N/S + G1/G5）。"""
+    assert len(DEDICATED_COMPONENT_TYPES) == 84
 
 
 def test_whole_subset_of_valid_and_fe(fe_types: set[str]):

@@ -66,8 +66,8 @@ export const G6_MAIN_API_PREFIX = 'g6-main'
 
 /** 3张可导入导出 sheet 的中文标签 */
 export const G6_MAIN_IMPORT_EXPORT_SHEETS: G6MainSheetMeta[] = [
-  { code: 'G6-2', label: 'G6-2 明细表（3区段）', multiSheet: true, multiSheetDesc: '基础信息/期初+变动/期末+审定' },
-  { code: 'G6-3', label: 'G6-3 坏账准备（2区段）', multiSheet: true, multiSheetDesc: '未审+调整/审定数' },
+  { code: 'G6-2', label: 'G6-2 明细表（4区段）', multiSheet: true, multiSheetDesc: '基础信息/期初余额/本期变动/期末+报表（4区段）' },
+  { code: 'G6-3', label: 'G6-3 坏账准备（滚动态）', multiSheet: false, multiSheetDesc: '单项/组合滚动态' },
   { code: 'G6-4', label: 'G6-4 调整分录' },
 ]
 

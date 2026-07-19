@@ -234,7 +234,93 @@ export function useG6SppiInterest() {
 
   // ─── 数据加载/导出 ─────────────────────────────────────────────────────────
 
-  function loadData(data: InterestCalculationData | null): void {
+  /** 扁平行（IE G6-6-rows）→ 分组结构 */
+  function nestFlatRows(rows: any[]): InterestGroup[] {
+    const order: string[] = []
+    const map = new Map<string, InterestGroup>()
+    for (const row of rows || []) {
+      const name = String(row.investProject || row.projectName || '').trim() || '未命名投资项目'
+      const key = name.replace(/\s+/g, '')
+      if (!map.has(key)) {
+        map.set(key, {
+          id: String(row.id || `ig-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
+          investProject: name,
+          faceValue: parseNum(row.faceValue),
+          couponRate: parseNum(row.couponRate),
+          effectiveRate: parseNum(row.effectiveRate),
+          periods: [],
+        })
+        order.push(key)
+      }
+      const group = map.get(key)!
+      // 同项目后续行继承组头参数（首行优先）
+      if (!group.faceValue && parseNum(row.faceValue)) group.faceValue = parseNum(row.faceValue)
+      if (!group.couponRate && parseNum(row.couponRate)) group.couponRate = parseNum(row.couponRate)
+      if (!group.effectiveRate && parseNum(row.effectiveRate)) group.effectiveRate = parseNum(row.effectiveRate)
+
+      const hasPeriod =
+        row.periodEnd || row.cutoffDate || row.openingAmortized != null || row.days != null
+      if (!hasPeriod && group.periods.length > 0) continue
+
+      group.periods.push({
+        id: String(row.periodId || `ip-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
+        periodEnd: String(row.periodEnd || row.cutoffDate || ''),
+        openingAmortized: parseNum(row.openingAmortized),
+        effectiveInterest: 0,
+        cashInflow: 0,
+        endingAmortized: 0,
+        days: parseNum(row.days) || 180,
+        remark: String(row.remark || ''),
+      })
+    }
+    return order.map((k) => map.get(k)!).filter(Boolean)
+  }
+
+  /** 分组 → 扁平行（供 IE 双写） */
+  function flattenGroups(source?: InterestGroup[]): any[] {
+    const list = source ?? groups.value
+    const flat: any[] = []
+    for (const g of list) {
+      const periods = g.periods?.length ? g.periods : [{
+        id: '',
+        periodEnd: '',
+        openingAmortized: 0,
+        effectiveInterest: 0,
+        cashInflow: 0,
+        endingAmortized: 0,
+        days: 180,
+        remark: '',
+      }]
+      periods.forEach((p, idx) => {
+        flat.push({
+          id: idx === 0 ? g.id : `${g.id}-${p.id || idx}`,
+          investProject: g.investProject,
+          faceValue: g.faceValue,
+          couponRate: g.couponRate,
+          effectiveRate: g.effectiveRate,
+          cutoffDate: p.periodEnd,
+          periodEnd: p.periodEnd,
+          openingAmortized: p.openingAmortized,
+          effectiveInterest: p.effectiveInterest,
+          cashInflow: p.cashInflow,
+          endingAmortized: p.endingAmortized,
+          days: p.days,
+          remark: p.remark,
+        })
+      })
+    }
+    return flat
+  }
+
+  function loadData(data: InterestCalculationData | any[] | null): void {
+    // 兼容 IE 扁平行数组
+    if (Array.isArray(data)) {
+      groups.value = nestFlatRows(data)
+      conclusion.value = ''
+      recalcAll()
+      return
+    }
+
     if (!data?.groups?.length) {
       groups.value = []
       conclusion.value = data?.conclusion || ''
@@ -250,7 +336,7 @@ export function useG6SppiInterest() {
       effectiveRate: parseNum(g.effectiveRate),
       periods: (g.periods || []).map(p => ({
         id: p.id || `ip-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        periodEnd: p.periodEnd || '',
+        periodEnd: p.periodEnd || (p as any).cutoffDate || '',
         openingAmortized: parseNum(p.openingAmortized),
         effectiveInterest: 0,
         cashInflow: 0,
@@ -262,6 +348,75 @@ export function useG6SppiInterest() {
     conclusion.value = data.conclusion || ''
     auditedInterest.value = data.crossValidation?.auditedInterest || 0
     recalcAll()
+  }
+
+  /**
+   * 从 G6-2 明细种子合并投资项目：按名称匹配，已有项目保留期间数据，仅补参数空位。
+   */
+  function mergeSeedsFromDetail(
+    seeds: Array<{
+      id: string
+      investProject: string
+      faceValue: number
+      couponRate: number
+      effectiveRate: number
+      openingAmortized: number
+    }>,
+  ): { added: number; updated: number } {
+    let added = 0
+    let updated = 0
+    const byName = new Map(
+      groups.value.map((g) => [g.investProject.trim().replace(/\s+/g, ''), g]),
+    )
+
+    for (const seed of seeds) {
+      const key = seed.investProject.trim().replace(/\s+/g, '')
+      const existing = byName.get(key)
+      if (existing) {
+        if (!existing.faceValue && seed.faceValue) existing.faceValue = seed.faceValue
+        if (!existing.couponRate && seed.couponRate) existing.couponRate = seed.couponRate
+        if (!existing.effectiveRate && seed.effectiveRate) existing.effectiveRate = seed.effectiveRate
+        if (existing.periods.length === 0 && seed.openingAmortized) {
+          existing.periods.push({
+            id: `ip-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            periodEnd: '',
+            openingAmortized: seed.openingAmortized,
+            effectiveInterest: 0,
+            cashInflow: 0,
+            endingAmortized: 0,
+            days: 180,
+            remark: '自G6-2带入',
+          })
+        }
+        updated += 1
+        continue
+      }
+
+      const newGroup: InterestGroup = {
+        id: seed.id || `ig-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        investProject: seed.investProject,
+        faceValue: seed.faceValue,
+        couponRate: seed.couponRate,
+        effectiveRate: seed.effectiveRate,
+        periods: seed.openingAmortized
+          ? [{
+              id: `ip-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+              periodEnd: '',
+              openingAmortized: seed.openingAmortized,
+              effectiveInterest: 0,
+              cashInflow: 0,
+              endingAmortized: 0,
+              days: 180,
+              remark: '自G6-2带入',
+            }]
+          : [],
+      }
+      groups.value.push(newGroup)
+      byName.set(key, newGroup)
+      added += 1
+    }
+    recalcAll()
+    return { added, updated }
   }
 
   function toJSON(): InterestCalculationData {
@@ -310,6 +465,9 @@ export function useG6SppiInterest() {
     updatePeriod,
     getGroupInterestTotal,
     loadData,
+    nestFlatRows,
+    flattenGroups,
+    mergeSeedsFromDetail,
     toJSON,
   }
 }

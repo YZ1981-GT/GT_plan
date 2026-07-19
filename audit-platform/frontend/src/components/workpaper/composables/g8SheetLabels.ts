@@ -91,8 +91,11 @@ export function isG8SheetComplete(code: string, m: Map<string, any>): boolean {
 }
 
 export function extractG8SheetCode(sheetName: string): string {
-  if (/底稿目录/.test(sheetName)) return '底稿目录'
-  if (/附注披露/.test(sheetName)) return sheetName.includes('国企') ? '附注国企' : '附注上市'
+  if (!sheetName) return ''
+  if (/G8-note-listed|附注披露.*上市|附注.*上市/.test(sheetName)) return '附注上市'
+  if (/G8-note-soe|附注披露.*国企|附注.*国企/.test(sheetName)) return '附注国企'
+  if (/G8-directory|底稿目录/.test(sheetName)) return '底稿目录'
+  if (/附注/.test(sheetName)) return sheetName.includes('国企') ? '附注国企' : '附注上市'
   const m = sheetName.match(/(G8A|G8-\d+)/)
   return m ? m[1] : ''
 }

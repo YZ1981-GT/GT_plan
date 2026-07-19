@@ -2,18 +2,31 @@
   <div class="g5-adjustment">
     <div class="section-head">
       <h3 class="sheet-title">G5-4 调整分录汇总</h3>
-      <div class="head-actions">
+      <div class="head-actions tab-toolbar">
         <GtIndexChip value="wp:G5-4" />
+        <G5ImportExportDropdown
+          :wp-id="props.wpId"
+          sheet="G5-4"
+          :disabled="!!props.readonly"
+          @imported="onImported"
+        />
         <el-tag size="small" type="info">共 {{ adj.entries.value.length }} 行</el-tag>
+        <el-button
+          size="small"
+          type="success"
+          :disabled="!!props.readonly || !adj.isBalanced.value || adj.entries.value.length === 0"
+          @click="adj.confirmWriteback()"
+        >
+          确认调整
+        </el-button>
         <GtReviewTrigger section-id="g5-4-adjustment" />
       </div>
     </div>
 
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
-      审计目标：汇总长期应收款相关审计调整分录（AJE）与重分类分录（RJE），校验借贷平衡，回写 G5-1 审定表调整列。
+      审计目标：汇总长期应收款相关账项/报表调整，校验借贷平衡，确认回写 G5-1 审定表。列结构对齐模板：调整事项说明 / 类别（报表调整·账项调整·其他）/ 报表项目 / 科目名称 / 附注项目 / 借贷金额 / 索引 / 备注。
     </el-alert>
 
-    <!-- 借贷平衡提示 -->
     <div v-if="!adj.isBalanced.value" class="balance-alert">
       <el-alert type="error" :closable="false">
         借贷不平衡！差额：{{ fmt(adj.balanceDiff.value) }}
@@ -22,88 +35,203 @@
 
     <div class="toolbar">
       <el-button size="small" type="primary" plain @click="adj.addEntry()" :disabled="props.readonly">
-        + 新增分录
+        + 新增调整分录
       </el-button>
       <span class="totals">
         借方合计: {{ fmt(adj.debitTotal.value) }} | 贷方合计: {{ fmt(adj.creditTotal.value) }}
+        <el-tag v-if="adj.isBalanced.value" size="small" type="success">借贷平衡</el-tag>
+        <el-tag v-if="adj.netAjeToG5.value !== 0" size="small" type="info" class="net-tag">
+          1531 净 AJE {{ fmt(adj.netAjeToG5.value) }}
+        </el-tag>
+        <el-tag v-if="adj.netRjeToG5.value !== 0" size="small" type="warning" class="net-tag">
+          1531 净 RJE {{ fmt(adj.netRjeToG5.value) }}
+        </el-tag>
       </span>
     </div>
 
-    <el-table :data="adj.entries.value" border stripe style="width: 100%; font-size: 13px" :height="420">
-      <el-table-column type="index" label="序号" width="50" />
-      <el-table-column prop="entryType" label="类型" width="70">
+    <!-- 对齐 Excel G5-4 / D4-4 -->
+    <el-table
+      :data="adj.entries.value"
+      border
+      stripe
+      size="small"
+      style="width: 100%; font-size: 13px"
+      :height="420"
+      empty-text="暂无调整分录。点击「新增调整分录」添加。"
+    >
+      <el-table-column label="调整事项说明" min-width="160">
         <template #default="{ row }">
-          <el-select v-model="row.entryType" size="small" :disabled="props.readonly">
-            <el-option label="AJE" value="AJE" />
-            <el-option label="RJE" value="RJE" />
+          <el-input
+            v-if="!props.readonly"
+            :model-value="row.description"
+            size="small"
+            placeholder="调整事项说明"
+            @change="(v: string) => adj.updateCell(row.id, 'description', v)"
+          />
+          <span v-else>{{ row.description || '—' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="类别" width="130">
+        <template #default="{ row }">
+          <el-select
+            v-if="!props.readonly"
+            :model-value="row.category"
+            size="small"
+            @change="(v: string) => adj.updateCell(row.id, 'category', v)"
+          >
+            <el-option
+              v-for="c in adj.categoryOptions"
+              :key="c"
+              :value="c"
+              :label="c"
+            />
           </el-select>
+          <span v-else>{{ row.category }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="date" label="日期" width="100">
+
+      <el-table-column label="报表项目" width="120">
         <template #default="{ row }">
-          <el-input v-model="row.date" size="small" :disabled="props.readonly" />
+          <el-input
+            v-if="!props.readonly"
+            :model-value="row.reportItem"
+            size="small"
+            @change="(v: string) => adj.updateCell(row.id, 'reportItem', v)"
+          />
+          <span v-else>{{ row.reportItem || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="summary" label="摘要" min-width="120">
+
+      <el-table-column label="科目名称" min-width="160">
         <template #default="{ row }">
-          <el-input v-model="row.summary" size="small" :disabled="props.readonly" />
+          <el-select
+            v-if="!props.readonly"
+            :model-value="row.accountCode"
+            size="small"
+            filterable
+            allow-create
+            default-first-option
+            @change="(v: string) => adj.updateCell(row.id, 'accountCode', v)"
+          >
+            <el-option
+              v-for="opt in adj.accountOptions"
+              :key="opt.code"
+              :value="opt.code"
+              :label="`${opt.code} ${opt.name}`"
+            />
+          </el-select>
+          <span v-else>{{ row.accountName || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="accountCode" label="科目代码" width="80" />
-      <el-table-column prop="accountName" label="科目名称" min-width="100" />
-      <el-table-column prop="debitAmount" label="借方金额" min-width="100" align="right">
+
+      <el-table-column label="附注项目" width="110">
         <template #default="{ row }">
-          <el-input-number v-model="row.debitAmount" size="small" :controls="false" :disabled="props.readonly" />
+          <el-input
+            v-if="!props.readonly"
+            :model-value="row.noteItem"
+            size="small"
+            @change="(v: string) => adj.updateCell(row.id, 'noteItem', v)"
+          />
+          <span v-else>{{ row.noteItem || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="creditAmount" label="贷方金额" min-width="100" align="right">
+
+      <el-table-column label="借方调整金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.creditAmount" size="small" :controls="false" :disabled="props.readonly" />
+          <el-input-number
+            v-if="!props.readonly"
+            :model-value="row.debitAmount"
+            size="small"
+            :controls="false"
+            :precision="2"
+            style="width: 100%"
+            @change="(v: number | undefined) => adj.updateCell(row.id, 'debitAmount', v ?? 0)"
+          />
+          <span v-else>{{ fmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="preparedBy" label="编制人" width="80" />
-      <el-table-column prop="remark" label="备注" min-width="80" />
-      <el-table-column label="操作" width="60" v-if="!props.readonly">
+
+      <el-table-column label="贷方调整金额" width="120" align="right">
         <template #default="{ row }">
-          <el-button size="small" type="danger" link @click="adj.removeEntry(row.id)">删除</el-button>
+          <el-input-number
+            v-if="!props.readonly"
+            :model-value="row.creditAmount"
+            size="small"
+            :controls="false"
+            :precision="2"
+            style="width: 100%"
+            @change="(v: number | undefined) => adj.updateCell(row.id, 'creditAmount', v ?? 0)"
+          />
+          <span v-else>{{ fmt(row.creditAmount) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="索引" width="90">
+        <template #default="{ row }">
+          <el-input
+            v-if="!props.readonly"
+            :model-value="row.indexRef"
+            size="small"
+            @change="(v: string) => adj.updateCell(row.id, 'indexRef', v)"
+          />
+          <span v-else>{{ row.indexRef || '—' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="备注" min-width="100">
+        <template #default="{ row }">
+          <el-input
+            v-if="!props.readonly"
+            :model-value="row.remark"
+            size="small"
+            @change="(v: string) => adj.updateCell(row.id, 'remark', v)"
+          />
+          <span v-else>{{ row.remark || '—' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column v-if="!props.readonly" label="操作" width="56" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button size="small" type="danger" link @click="adj.removeEntry(row.id)">删</el-button>
         </template>
       </el-table-column>
     </el-table>
 
-    <el-card shadow="never" style="margin-top: 12px">
-      <template #header><span>审计说明</span></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="props.readonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：调整分录的依据、事由、影响科目及回写审定表情况。"
-        @change="saveAuditNote" />
-    </el-card>
-
-    <el-card shadow="never" style="margin-top: 12px">
-      <template #header><span>审计结论</span></template>
-      <el-input type="textarea" :model-value="auditConclusion" :disabled="props.readonly"
-        :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：A、调整分录借贷平衡且依据充分。B、除下述事项外未见异常。C、存在未决调整事项。"
-        @change="saveAuditConclusion" />
-    </el-card>
+    <G5AuditTextCards
+      :wp-id="props.wpId"
+      :is-readonly="!!props.readonly"
+      :note="auditNote"
+      :conclusion="auditConclusion"
+      note-ai-section="adjustment-note"
+      conclusion-ai-section="adjustment-conclusion"
+      note-placeholder="填写审计说明：调整分录的依据、事由、影响科目及回写审定表情况。"
+      conclusion-placeholder="填写审计结论：A、调整分录借贷平衡且依据充分。B、除下述事项外未见异常。C、存在未决调整事项。"
+      @update:note="saveAuditNote"
+      @update:conclusion="saveAuditConclusion"
+    />
 
     <details class="prep-hint">
       <summary>📋 编制提示</summary>
       <ul>
-        <li>每条分录须借贷平衡；表底借方合计应等于贷方合计，否则顶部红色告警</li>
-        <li>AJE（审计调整）影响审定数；RJE（重分类）不改变损益仅调整列报</li>
-        <li>摘要应清晰说明调整事由，科目代码/名称与会计科目表一致</li>
-        <li>调整分录经复核后回写 G5-1 审定表对应项目的 AJE/RJE 列</li>
+        <li>列结构对齐 Excel：调整事项说明、类别（账项调整/报表调整/其他）、报表项目、科目名称、附注项目、借贷金额、索引、备注</li>
+        <li>「账项调整」影响审定数（AJE）；「报表调整」为重分类（RJE），仅影响列报</li>
+        <li>借贷合计必须平衡，否则无法「确认调整」回写 G5-1</li>
+        <li>点「确认调整」后，相关科目净 AJE/RJE 回写 G5-1「业务类型组合」行期末调整列</li>
+        <li>本底稿适用于调整分录较多、较复杂的项目；项目组可按实际情况选用</li>
       </ul>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, onMounted } from 'vue'
+import { ref, toRef, computed, onMounted } from 'vue'
 import { useG5Adjustment } from '../../composables/useG5Adjustment'
-import { useG5LonRecFormData } from '../../composables/useG5LonRecFormData'
+import { useInjectedG5FormData } from '../../composables/useG5LonRecFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import G5ImportExportDropdown from '../G5ImportExportDropdown.vue'
+import G5AuditTextCards from '../G5AuditTextCards.vue'
 
 const props = defineProps<{
   htmlData?: any
@@ -112,10 +240,18 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
-const adj = useG5Adjustment()
+const emit = defineEmits<{ imported: [] }>()
 
-// ─── 审计说明 / 审计结论（持久化 checklist_responses，item_id 前缀 G5-）───
-const g5Notes = useG5LonRecFormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const g5Notes = useInjectedG5FormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
+const readonlyRef = computed(() => !!props.readonly)
+
+const adj = useG5Adjustment({
+  allResponses: g5Notes.allResponses,
+  debouncedSave: g5Notes.debouncedSave,
+  saveImmediate: g5Notes.saveImmediate,
+  isReadonly: readonlyRef,
+})
+
 const auditNote = ref('')
 const auditConclusion = ref('')
 const G5_NOTE_KEY = 'G5-4-audit-note'
@@ -132,11 +268,18 @@ function saveAuditConclusion(val: string): void {
 }
 onMounted(async () => {
   try { await g5Notes.loadAll() } catch { /* ignore */ }
+  adj.loadEntries()
   const n = g5Notes.allResponses.value.get(G5_NOTE_KEY)
   if (n?.remark) auditNote.value = n.remark
   const c = g5Notes.allResponses.value.get(G5_CONCLUSION_KEY)
   if (c?.remark) auditConclusion.value = c.remark
 })
+
+async function onImported() {
+  try { await g5Notes.loadAll() } catch { /* ignore */ }
+  adj.loadEntries()
+  emit('imported')
+}
 
 function fmt(v: number): string {
   return v?.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) ?? '-'
@@ -154,5 +297,6 @@ function fmt(v: number): string {
 .prep-hint ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.8; }
 .balance-alert { margin-bottom: 8px; }
 .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-.totals { font-size: 12px; color: #606266; margin-left: auto; }
+.totals { font-size: 12px; color: #606266; margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.net-tag { margin-left: 4px; }
 </style>

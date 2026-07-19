@@ -73,25 +73,28 @@
         @update:model-value="disc.updateNoteText" />
     </el-card>
 
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>审计说明</template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：附注披露项目、金额、公允价值层次的核对情况及与审定表（科目1503）勾稽结果。" />
-    </el-card>
-
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>审计结论</template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
-        placeholder="填写审计结论：附注披露是否完整、准确，是否符合企业会计准则及监管披露要求。" />
-    </el-card>
+    <G8AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="auditConclusion"
+      :note-ai-section="noteAiSection"
+      conclusion-ai-section="disclosure-conclusion"
+      note-placeholder="填写审计说明：附注披露项目、金额、公允价值层次的核对情况及与审定表（科目1503）勾稽结果。"
+      note-hint="覆盖披露完整性、金额勾稽及监管格式要求。"
+      conclusion-placeholder="填写审计结论：附注披露是否完整、准确，是否符合企业会计准则及监管披露要求。"
+      :related-context="{ variant, 审定数: disc.adjudicatedAmount.value }"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch, toRef } from 'vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import G8AuditTextCards from '../G8AuditTextCards.vue'
 import { useG8Disclosure } from '../../composables/useG8Disclosure'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import type { G8AiSection } from '../../composables/useG8AiGenerate'
 
 const props = defineProps<{
   variant: 'listed' | 'soe'
@@ -113,6 +116,10 @@ const objectiveTitle = computed(() =>
   props.variant === 'listed'
     ? '审计目标：核实其他权益工具投资附注披露（上市公司格式）项目、金额与公允价值层次分类的完整准确，确认与审定表（科目1503）勾稽一致，披露符合企业会计准则及监管要求。'
     : '审计目标：核实其他权益工具投资附注披露（国有企业格式）项目、金额与 OCI 相关披露的完整准确，确认与审定表（科目1503）勾稽一致，披露符合企业会计准则要求。',
+)
+
+const noteAiSection = computed<G8AiSection>(() =>
+  props.variant === 'listed' ? 'disclosure-listed-note' : 'disclosure-soe-note',
 )
 
 const AUDIT_NOTE_KEY = `G8-disclosure-${props.variant}-audit-note`
@@ -142,7 +149,6 @@ function fmt(n: number): string {
 .guidance-content { margin-top: 8px; font-size: 12px; color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .objective-alert { margin-bottom: 10px; }
-.audit-note-card { margin-top: 12px; }
 .note-cell { display: flex; align-items: flex-start; gap: 4px; }
 .note-card { margin-top: 12px; }
 </style>

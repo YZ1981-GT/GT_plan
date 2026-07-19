@@ -1,10 +1,10 @@
 ﻿/**
- * useG7EquityMethodDualMode — G7 长期股权投资(权益法组) HTML ↔ OnlyOffice 双模式切换
- *
- * Spec: .kiro/specs/g7-long-term-equity-method/ Task 3.3 / Req 7.6
- * 模式状态(html/onlyoffice) + 健康检查 + 切换 + localStorage 持久化(per wpId)
+ * useG7EquityMethodDualMode — G7 权益法组 HTML ↔ OnlyOffice 双模式
+ * 比照 useF2DualMode / useG7DualMode
  */
-import { ref, onMounted, type Ref } from 'vue'
+import { ref, computed, onMounted, type Ref } from 'vue'
+import http from '@/utils/http'
+import { dualModeHtmlOoOptions } from './dualModeLabels'
 
 export type G7EquityMethodRenderMode = 'html' | 'onlyoffice'
 
@@ -17,17 +17,14 @@ export interface UseG7EquityMethodDualModeOptions {
 }
 
 export function useG7EquityMethodDualMode(options: UseG7EquityMethodDualModeOptions) {
-  const { wpId, reloadAll } = options
+  const { wpId, sheetName, reloadAll } = options
 
   const currentMode = ref<G7EquityMethodRenderMode>('html')
   const isOoAvailable = ref(false)
   const ooConfig = ref<Record<string, any> | null>(null)
   const checking = ref(false)
 
-  const modeOptions = [
-    { label: '结构化视图', value: 'html' },
-    { label: '在线编辑', value: 'onlyoffice' },
-  ]
+  const modeOptions = computed(() => dualModeHtmlOoOptions({ onlineDisabled: !isOoAvailable.value }))
 
   function loadPersistedMode(): void {
     try {
@@ -45,12 +42,8 @@ export function useG7EquityMethodDualMode(options: UseG7EquityMethodDualModeOpti
   async function checkOOHealth(): Promise<boolean> {
     checking.value = true
     try {
-      const response = await fetch('/api/workpapers/onlyoffice/health')
-      if (!response.ok) {
-        isOoAvailable.value = false
-        return false
-      }
-      const result = await response.json()
+      const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
+      const result = res.data?.data ?? res.data ?? {}
       const healthy = result.data?.healthy ?? result.healthy ?? false
       isOoAvailable.value = healthy
       return healthy
@@ -64,11 +57,25 @@ export function useG7EquityMethodDualMode(options: UseG7EquityMethodDualModeOpti
 
   async function switchMode(target: G7EquityMethodRenderMode): Promise<void> {
     if (target === currentMode.value) return
-    if (target === 'onlyoffice' && !isOoAvailable.value) return
+    if (target === 'onlyoffice' && !isOoAvailable.value) {
+      currentMode.value = 'html'
+      return
+    }
 
     if (target === 'onlyoffice') {
-      currentMode.value = 'onlyoffice'
-      persistMode('onlyoffice')
+      const sn = sheetName?.value || 'G7'
+      try {
+        const res = await http.get(
+          `/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config`,
+          { _silent: true } as any,
+        )
+        const result = res.data?.data ?? res.data ?? {}
+        ooConfig.value = result.data || result
+        currentMode.value = 'onlyoffice'
+        persistMode('onlyoffice')
+      } catch {
+        isOoAvailable.value = false
+      }
     } else {
       currentMode.value = 'html'
       ooConfig.value = null
@@ -81,13 +88,18 @@ export function useG7EquityMethodDualMode(options: UseG7EquityMethodDualModeOpti
     void switchMode(val as G7EquityMethodRenderMode)
   }
 
-  // Convenience computed-like getters
   const isHtml = () => currentMode.value === 'html'
   const isOO = () => currentMode.value === 'onlyoffice'
 
   onMounted(() => {
-    loadPersistedMode()
-    void checkOOHealth()
+    void checkOOHealth().then((healthy) => {
+      if (healthy) {
+        loadPersistedMode()
+      } else {
+        currentMode.value = 'html'
+        persistMode('html')
+      }
+    })
   })
 
   return {

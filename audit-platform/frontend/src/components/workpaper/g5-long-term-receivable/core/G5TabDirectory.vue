@@ -22,25 +22,21 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { G5_DIRECTORY_ROWS } from '../../composables/g5SheetLabels'
 
 defineProps<{ htmlData?: any; wpId: string; projectId: string; readonly?: boolean }>()
 const emit = defineEmits<{ jump: [code: string] }>()
 
-const rows = ref([
-  { seq: 1, indexCode: 'G5A', name: '长期应收款审计程序表', preparer: '', reviewer: '', date: '', pages: '', remark: '' },
-  { seq: 2, indexCode: 'G5-1', name: '长期应收款审定表', preparer: '', reviewer: '', date: '', pages: '', remark: '' },
-  { seq: 3, indexCode: 'G5-2', name: '长期应收款余额明细表', preparer: '', reviewer: '', date: '', pages: '', remark: '' },
-  { seq: 4, indexCode: 'G5-3', name: '坏账准备明细表', preparer: '', reviewer: '', date: '', pages: '', remark: '' },
-  { seq: 5, indexCode: 'G5-4', name: '调整分录汇总', preparer: '', reviewer: '', date: '', pages: '', remark: '' },
-  { seq: 6, indexCode: 'G5-5', name: '融资租赁测算表', preparer: '', reviewer: '', date: '', pages: '', remark: '' },
-  { seq: 7, indexCode: 'G5-6', name: '分期销售测算表', preparer: '', reviewer: '', date: '', pages: '', remark: '' },
-  { seq: 8, indexCode: 'G5-7', name: '保理核查表', preparer: '', reviewer: '', date: '', pages: '', remark: '' },
-  { seq: 9, indexCode: 'G5-8', name: '会计政策检查', preparer: '', reviewer: '', date: '', pages: '', remark: '' },
-  { seq: 10, indexCode: 'G5-9', name: '三阶段划分（暂缓）', preparer: '', reviewer: '', date: '', pages: '', remark: '' },
-  { seq: 11, indexCode: 'G5-10', name: '坏账准备测算（暂缓）', preparer: '', reviewer: '', date: '', pages: '', remark: '' },
-  { seq: 12, indexCode: 'G5-11', name: '转回核销检查', preparer: '', reviewer: '', date: '', pages: '', remark: '' },
-  { seq: 13, indexCode: 'G5-12', name: '凭证检查表', preparer: '', reviewer: '', date: '', pages: '', remark: '' },
-])
+const rows = ref(
+  G5_DIRECTORY_ROWS.map((r) => ({
+    ...r,
+    preparer: '',
+    reviewer: '',
+    date: '',
+    pages: '',
+    remark: '',
+  })),
+)
 </script>
 
 <style scoped>

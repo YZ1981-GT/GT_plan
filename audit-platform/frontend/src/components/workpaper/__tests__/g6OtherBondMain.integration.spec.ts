@@ -54,6 +54,18 @@ describe('G6 集成 — 借方公式链', () => {
     expect(calcSubtotal(100, 10, 5)).toBe(115)
   })
 
+  it('审定表行结构含公允价值与摊余成本五层（对齐 Excel G6-1）', async () => {
+    const { G6_ADJUDICATION_ITEMS } = await import('../composables/g6AdjudicationItems')
+    const labels = G6_ADJUDICATION_ITEMS.map((d) => d.label)
+    expect(labels).toContain('一、公允价值')
+    expect(labels).toContain('二、摊余成本')
+    expect(labels).toContain('（一）投资成本')
+    expect(labels).toContain('（五）账面价值/摊余成本（账面余额扣除累计计提的损失准备）')
+    expect(labels).toContain('其他债权投资账面价值合计')
+    expect(labels).toContain('试算平衡表数')
+    expect(labels).toContain('差异数')
+  })
+
   it('期末小计 = 期初小计 + 增加 - 减少 + 利息收入', () => {
     expect(calcEndingSubtotal(115, 20, 5, 8)).toBe(138)
   })
@@ -98,8 +110,21 @@ describe('G6 集成 — 导入导出配置', () => {
     expect(codes).toEqual(['G6-2', 'G6-3', 'G6-4'])
   })
 
-  it('G6-2/G6-3 为多 sheet 宽表导出', () => {
+  it('G6-2/G6-3 为多 sheet 宽表导出（G6-2 为4区段）', () => {
     const multi = G6_MAIN_IMPORT_EXPORT_SHEETS.filter((s) => s.multiSheet).map((s) => s.code)
-    expect(multi).toEqual(['G6-2', 'G6-3'])
+    expect(multi).toEqual(['G6-2'])
+    const g62 = G6_MAIN_IMPORT_EXPORT_SHEETS.find((s) => s.code === 'G6-2')
+    expect(g62?.multiSheetDesc).toContain('4区段')
+  })
+
+  it('明细表公式：审定=FV+调整，期末=期初+变动', async () => {
+    const {
+      calcFvAuditedAmount,
+      calcPeriodEndComponent,
+      calcDetailReportAmount,
+    } = await import('@/composables/useG6MainFormulaEngine')
+    expect(calcFvAuditedAmount(1000, 50)).toBe(1050)
+    expect(calcPeriodEndComponent(800, 100)).toBe(900)
+    expect(calcDetailReportAmount(1050, 50)).toBe(1000)
   })
 })

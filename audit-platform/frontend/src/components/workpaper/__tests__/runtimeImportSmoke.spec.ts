@@ -118,6 +118,9 @@ const DEDICATED_COMPONENT_TYPES: ReadonlySet<string> = new Set([
   's21-data-asset',
   's32-fraud-bundle',
   's33-ann14-bundle',
+  // G 投资循环
+  'g1-trading-financial-assets',
+  'g5-long-term-receivable',
 ])
 
 // ─── P11: Target Set Equivalence Property ────────────────────────────────────

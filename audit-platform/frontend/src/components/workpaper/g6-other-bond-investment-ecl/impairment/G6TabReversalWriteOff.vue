@@ -8,7 +8,7 @@
   - 动态行增删（ElMessageBox.prompt输入投资项目名称）
   - 底部金额合计行
   - 导入导出 el-dropdown（G6-14 单sheet）
-  - AI按钮（reversal-write-off section结论）
+  - AI按钮（reversal-writeoff-conclusion）
   - 复核按钮（inject openReviewDialog）
   - GtIndexChip索引列
 
@@ -51,19 +51,20 @@
         <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">
           + 新增行
         </el-button>
-        <!-- 导入导出 -->
-        <el-dropdown trigger="click" @command="handleImportExportCommand">
-          <el-button size="small">导入导出 ▾</el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="export-template">导出模板</el-dropdown-item>
-              <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
-              <el-dropdown-item command="import-data">导入数据</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-        <!-- AI -->
-        <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleAi">
+        <G6EclImportExportDropdown
+          :wp-id="wpId"
+          sheet="G6-14"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
+        <el-button
+          size="small"
+          type="primary"
+          link
+          :disabled="isReadonly || !aiAvailable"
+          :loading="aiLoading"
+          @click="handleAi"
+        >
           🤖 AI生成
         </el-button>
         <!-- 复核 -->
@@ -234,14 +235,7 @@
       </ul>
     </details>
 
-    <!-- 隐藏文件上传（导入数据用） -->
-    <input
-      ref="fileInputRef"
-      type="file"
-      accept=".xlsx,.xls"
-      style="display: none"
-      @change="handleFileImport"
-    />
+    </details>
   </div>
 </template>
 
@@ -259,9 +253,9 @@ import { ref, computed, inject, onMounted } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useG6EclFormData, type ReversalWriteOffRow } from '../../composables/useG6EclFormData'
-import { useG6EclImportExport } from '../../composables/useG6EclImportExport'
+import { useG6EclAiGenerate } from '../../composables/useG6EclAiGenerate'
 import GtIndexChip from '../../GtIndexChip.vue'
-import http from '@/utils/http'
+import G6EclImportExportDropdown from '../G6EclImportExportDropdown.vue'
 
 // ─── Props ──────────────────────────────────────────────────────────────────
 
@@ -272,6 +266,8 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
+const emit = defineEmits<{ imported: [] }>()
+
 // ─── inject openReviewDialog ────────────────────────────────────────────────
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
@@ -280,12 +276,12 @@ const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog',
 
 const rows = ref<ReversalWriteOffRow[]>([])
 const conclusion = ref('')
-const fileInputRef = ref<HTMLInputElement | null>(null)
 
 // ─── useG6EclFormData 用于持久化 ────────────────────────────────────────────
 
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
+const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG6EclAiGenerate(wpIdRef)
 
 const formData = useG6EclFormData({
   wpId: wpIdRef,
@@ -300,15 +296,6 @@ function saveAuditNote(val: string): void {
   auditNote.value = val
   formData.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
 }
-
-// ─── 导入导出 ───────────────────────────────────────────────────────────────
-
-const importExport = useG6EclImportExport({
-  wpId: wpIdRef,
-  onImported: async () => {
-    await loadData()
-  },
-})
 
 // ─── 显示行（含底部合计行） ─────────────────────────────────────────────────
 
@@ -401,45 +388,19 @@ function handleConclusionChange(): void {
   })
 }
 
-// ─── 导入导出 ───────────────────────────────────────────────────────────────
-
-function handleImportExportCommand(command: string): void {
-  switch (command) {
-    case 'export-template':
-      importExport.exportTemplate('G6-14')
-      break
-    case 'export-data':
-      importExport.exportData('G6-14')
-      break
-    case 'import-data':
-      fileInputRef.value?.click()
-      break
-  }
-}
-
-function handleFileImport(event: Event): void {
-  const target = event.target as HTMLInputElement
-  const file = target.files?.[0]
-  if (!file) return
-  importExport.importData('G6-14', file)
-  target.value = ''
-}
-
-// ─── AI生成结论 ─────────────────────────────────────────────────────────────
+// ─── AI生成结论（reversal-writeoff-conclusion） ─────────────────────────────
 
 async function handleAi(): Promise<void> {
-  try {
-    const { data } = await http.post(`/api/workpapers/${props.wpId}/g6-ecl/ai/reversal-write-off`, {
-      rows: rows.value,
-    })
-    const text = data?.data?.conclusion || data?.conclusion
-    if (text) {
-      conclusion.value = text
-      handleConclusionChange()
-      ElMessage.success('AI结论已生成')
-    }
-  } catch {
-    ElMessage.warning('AI生成暂不可用，请手动填写')
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'reversal-writeoff-conclusion',
+    conclusion.value || '',
+    { rowCount: rows.value.length, totalAmount: totalAmount.value },
+    'AI 审计结论',
+  )
+  if (text) {
+    conclusion.value = text
+    handleConclusionChange()
   }
 }
 

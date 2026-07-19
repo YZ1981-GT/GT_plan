@@ -500,6 +500,13 @@ async def _do_batch_save(
             elif item.item_id.startswith("G5-"):
                 # G5 长期应收款：审计说明/审计结论等自由格式（remark 存文本，conclusion 恒为 null）
                 pass
+            elif item.item_id.startswith(("G1-", "G1A-")):
+                # G1 交易性金融资产：问卷结论/明细 JSON/审计说明等自由格式
+                # （如 G1-8-model-result 存业务模式中文标签，G1-*-rows 存 JSON），跳过白名单校验
+                pass
+            elif item.item_id.startswith(("G2-", "G2A-", "G3-", "G3A-", "G4-", "G4A-")):
+                # G2/G3/G4 投资循环：明细/调整/测算等结构化 JSON 存 conclusion，跳过白名单校验
+                pass
             elif item.item_id.startswith("G8-"):
                 # G8 其他权益工具投资：审计说明/审计结论/明细行/审定数等自由格式
                 # （remark 存文本或 JSON，conclusion 恒为 null 或审定数字符串），跳过白名单校验

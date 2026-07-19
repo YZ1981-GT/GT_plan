@@ -5,16 +5,38 @@
  * 验证：借方余额公式方向、合计行汇总、差异=审定-试算表数
  * Requirements: 3.3~3.7
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
 import { useG3Adjudication } from '../useG3Adjudication'
+import { eventBus } from '@/utils/eventBus'
 import type { ChecklistResponse } from '../useF1FormData'
 
-function setup(seed?: Record<string, string>) {
+const apiGet = vi.fn()
+vi.mock('@/services/apiProxy', () => ({
+  api: {
+    get: (...args: unknown[]) => apiGet(...args),
+    put: vi.fn(),
+    post: vi.fn(),
+  },
+}))
+
+
+function setup(
+  seed?: Record<string, string | { remark?: string | null; conclusion?: string | null }>,
+  auditYear: number | string | null = 2025,
+) {
   const map = new Map<string, ChecklistResponse>()
   if (seed) {
     for (const [k, v] of Object.entries(seed)) {
-      map.set(k, { item_id: k, conclusion: null, remark: v })
+      if (typeof v === 'string') {
+        map.set(k, { item_id: k, conclusion: null, remark: v })
+      } else {
+        map.set(k, {
+          item_id: k,
+          conclusion: v.conclusion ?? null,
+          remark: v.remark ?? null,
+        })
+      }
     }
   }
   const allResponses = ref(map)
@@ -23,9 +45,15 @@ function setup(seed?: Record<string, string>) {
     projectId: ref('proj-1'),
     allResponses,
     isReadonly: ref(false),
+    auditYear: ref(auditYear),
   })
   return { adj, allResponses }
 }
+
+beforeEach(() => {
+  apiGet.mockReset()
+})
+
 
 describe('useG3Adjudication — 借方科目审定公式', () => {
   it('期末未审 = 期初审定 + 本期宣告 - 本期收回（借方科目方向）', () => {
@@ -174,5 +202,201 @@ describe('useG3Adjudication — 借方科目审定公式', () => {
     const { adj } = setup({ 'G3-1-adj-rows': rows, 'G3-1-adj-tb-1131': '1000' })
     expect(adj.variance.value).toBe(0)
     expect(adj.hasVarianceHighlight.value).toBe(false)
+  })
+
+  it('变动额/变动率 = 期末审定 vs 期初审定；|变动率|>30% 高亮且原因必填', () => {
+    const rows = JSON.stringify([
+      {
+        id: 'inv-1',
+        investeeName: '甲公司',
+        shareholdingRatio: 20,
+        openingUnadjusted: 1000,
+        openingAJE: 0,
+        openingRJE: 0,
+        currentDeclared: 500,
+        currentReceived: 0,
+        closingAJE: 0,
+        closingRJE: 0,
+        remark: '',
+        indexRef: '',
+      },
+    ])
+    const { adj } = setup({ 'G3-1-adj-rows': rows })
+    const row = adj.dataRows.value[0]
+    // 期初审定 1000 → 期末审定 1500；变动额 500；变动率 50%
+    expect(row.changeAmount).toBe(500)
+    expect(row.changeRate).toBe(0.5)
+    expect(row.changeRateHighlight).toBe(true)
+    expect(row.reasonRequired).toBe(true)
+    expect(adj.hasReasonGaps.value).toBe(true)
+  })
+
+  it('期初存在非零 AJE/RJE 时 hasOpeningAdjustments 为 true', () => {
+    const rows = JSON.stringify([
+      {
+        id: 'inv-1',
+        investeeName: '甲公司',
+        shareholdingRatio: 10,
+        openingUnadjusted: 1000,
+        openingAJE: 50,
+        openingRJE: 0,
+        currentDeclared: 0,
+        currentReceived: 0,
+        closingAJE: 0,
+        closingRJE: 0,
+        remark: '',
+        indexRef: '',
+      },
+    ])
+    const { adj } = setup({ 'G3-1-adj-rows': rows })
+    expect(adj.hasOpeningAdjustments.value).toBe(true)
+  })
+
+  it('账龄汇总：一年以上取自 G3-5 逾期≥365天', () => {
+    const past = new Date()
+    past.setFullYear(past.getFullYear() - 2)
+    const agreed = past.toISOString().slice(0, 10)
+    const rows = JSON.stringify([
+      {
+        id: 'inv-1',
+        investeeName: '甲公司',
+        shareholdingRatio: 20,
+        openingUnadjusted: 1000,
+        openingAJE: 0,
+        openingRJE: 0,
+        currentDeclared: 0,
+        currentReceived: 0,
+        closingAJE: 0,
+        closingRJE: 0,
+        remark: '',
+        indexRef: '',
+      },
+    ])
+    const overdue = JSON.stringify([
+      {
+        id: 'od-1',
+        investeeName: '甲公司',
+        receivableAmount: 300,
+        agreedPaymentDate: agreed,
+      },
+    ])
+    const map = new Map()
+    map.set('G3-1-adj-rows', { item_id: 'G3-1-adj-rows', conclusion: null, remark: rows })
+    map.set('G3-5-overdue-rows', { item_id: 'G3-5-overdue-rows', conclusion: overdue, remark: null })
+    const allResponses = ref(map)
+    const adj = useG3Adjudication({
+      wpId: ref('wp-1'),
+      projectId: ref('proj-1'),
+      allResponses,
+      isReadonly: ref(false),
+    })
+    expect(adj.subtotalRow.value.closingAdjusted).toBe(1000)
+    expect(adj.agingSummary.value.over1YearAmount).toBe(300)
+    expect(adj.agingSummary.value.within1YearAmount).toBe(700)
+    expect(adj.agingSummary.value.source).toBe('g3-5')
+  })
+
+  it('publishAdjudicated 经 eventBus 发出 auditedAmount 契约', () => {
+    const spy = vi.fn()
+    eventBus.on('substantive:adjudicated', spy)
+    const rows = JSON.stringify([
+      {
+        id: 'inv-pub',
+        investeeName: '丙公司',
+        shareholdingRatio: 10,
+        openingUnadjusted: 500,
+        openingAJE: 0,
+        openingRJE: 0,
+        currentDeclared: 100,
+        currentReceived: 50,
+        closingAJE: 0,
+        closingRJE: 0,
+        remark: '',
+        indexRef: '',
+      },
+    ])
+    const { adj } = setup({ 'G3-1-adj-rows': rows })
+    adj.publishAdjudicated()
+    expect(spy).toHaveBeenCalled()
+    const payload = spy.mock.calls[0][0]
+    expect(payload.accountCode).toBe('1131')
+    expect(payload.wpCode).toBe('G3')
+    expect(payload.auditedAmount).toBe(550)
+    expect(typeof payload.timestamp).toBe('number')
+    eventBus.off('substantive:adjudicated', spy)
+  })
+
+  it('fetchTrialBalance 无 year 时短路不请求', async () => {
+    const { adj } = setup(undefined, null)
+    const amount = await adj.fetchTrialBalance()
+    expect(amount).toBeNull()
+    expect(apiGet).not.toHaveBeenCalled()
+  })
+
+  it('fetchTrialBalance 请求带 year 并回写 TB 参考数', async () => {
+    apiGet.mockResolvedValue([
+      { standard_account_code: '1131', audited_amount: 888888.88 },
+    ])
+    const { adj } = setup(undefined, 2025)
+    const amount = await adj.fetchTrialBalance()
+    expect(amount).toBe(888888.88)
+    expect(apiGet).toHaveBeenCalledWith(
+      '/api/projects/proj-1/trial-balance',
+      expect.objectContaining({
+        params: expect.objectContaining({ year: 2025, account_prefix: '1131' }),
+      }),
+    )
+    expect(adj.trialBalanceAmount.value).toBe(888888.88)
+  })
+
+  it('syncFromDetail 从 G3-2 汇总宣告/收回并保留期末 AJE', () => {
+    const adjRows = JSON.stringify([
+      {
+        id: 'inv-1',
+        investeeName: '甲公司',
+        shareholdingRatio: 10,
+        openingUnadjusted: 100,
+        openingAJE: 0,
+        openingRJE: 0,
+        currentDeclared: 0,
+        currentReceived: 0,
+        closingAJE: 7,
+        closingRJE: 0,
+        remark: '',
+        indexRef: '',
+      },
+    ])
+    const detail = JSON.stringify([
+      {
+        id: 'd1',
+        investeeName: '甲公司',
+        shareholdingRatio: 25,
+        dividendReceivable: 400,
+        receivedAmount: 150,
+      },
+      {
+        id: 'd2',
+        investeeName: '乙公司',
+        shareholdingRatio: 5,
+        dividendReceivable: 80,
+        receivedAmount: 0,
+      },
+    ])
+    const { adj } = setup({
+      'G3-1-adj-rows': adjRows,
+      'G3-2-detail-rows': { conclusion: detail },
+    })
+    const r = adj.syncFromDetail()
+    expect(r.updated).toBe(1)
+    expect(r.added).toBe(1)
+    const jia = adj.dataRows.value.find((x) => x.investeeName === '甲公司')!
+    expect(jia.currentDeclared).toBe(400)
+    expect(jia.currentReceived).toBe(150)
+    expect(jia.closingAJE).toBe(7)
+    expect(jia.shareholdingRatio).toBe(25)
+    // 期末未审 = 期初审定100 + 400 - 150 = 350；期末审定 = 350 + 7
+    expect(jia.closingUnadjusted).toBe(350)
+    expect(jia.closingAdjusted).toBe(357)
+    expect(adj.dataRows.value.some((x) => x.investeeName === '乙公司')).toBe(true)
   })
 })

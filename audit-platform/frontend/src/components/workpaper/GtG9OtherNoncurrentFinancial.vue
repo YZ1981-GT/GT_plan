@@ -11,6 +11,7 @@
           @change="dualMode.onModeChange"
         />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
+        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
       <GtOnlyOfficeSheet
@@ -101,11 +102,10 @@
         :debounced-save="onDebouncedSave"
       />
 
-      <div v-else-if="currentSheet === '底稿目录'" class="g-cycle-tab-index-page">
-        <G9TabDirectory
-          :all-responses="formData.allResponses.value"
-          :available-sheets="availableSheets"
-        />
+      <template v-else-if="currentSheet === '底稿目录'">
+        <div class="g9-index-toolbar">
+          <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
+        </div>
         <GCycleBIndexExtras
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -114,7 +114,7 @@
           :html-data="props.htmlData"
           :available-sheets="availableSheets"
         />
-      </div>
+      </template>
 
       <GtGridSheet
         v-else-if="useGridFallback"
@@ -158,7 +158,6 @@ const G9TabL3Reconciliation = defineAsyncComponent(() => import('./g9-other-nonc
 const G9TabVoucherCheck = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/voucher/G9TabVoucherCheck.vue'))
 const G9TabDisclosureListed = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabDisclosureListed.vue'))
 const G9TabDisclosureSOE = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabDisclosureSOE.vue'))
-const G9TabDirectory = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabDirectory.vue'))
 const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -191,11 +190,20 @@ const isHtmlSheet = computed(() => HTML_SHEETS.has(currentSheet.value))
 const useGridFallback = computed(() => !!currentSheet.value && !isHtmlSheet.value)
 
 const availableSheets = computed(() => {
-  const sheets = formData.renderMeta.value?.sheets
-  return Array.isArray(sheets) ? sheets : []
+  const fromHtml = props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets
+  if (Array.isArray(fromHtml) && fromHtml.length) return fromHtml
+  const metaSheets = formData.renderMeta.value?.sheets
+  if (Array.isArray(metaSheets) && metaSheets.length) return metaSheets
+  // 对齐 G1：无 sheets 元数据时用自加载 render-config 的 sheetCache 兜底，
+  // 保证底稿目录架构树非空
+  return Object.keys(formData.sheetCache.value).map(sheet_name => ({ sheet_name }))
 })
 
-const dualMode = useG9DualMode({ wpId: wpIdRef, reloadAll: () => formData.loadAll() })
+const dualMode = useG9DualMode({
+  wpId: wpIdRef,
+  sheetName: computed(() => props.sheetName || ''),
+  reloadAll: () => formData.loadAll(),
+})
 
 function onDebouncedSave(id: string, d: Partial<ChecklistResponse>) {
   formData.debouncedSave(id, d)
@@ -209,18 +217,29 @@ function handleG9Adjudicated(e: Event): void {
   void formData.writebackTB(amount)
 }
 
+function handleG9Writeback(e: Event): void {
+  const detail = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number }>).detail
+  if (detail?.accountCode && detail.accountCode !== G9_ACCOUNT_CODE) return
+  const amount = parseNum(detail?.auditedAmount)
+  if (!Number.isFinite(amount)) return
+  void formData.writebackTB(amount)
+}
+
 async function reloadAll() {
   await formData.loadAll()
 }
 
 onMounted(async () => {
   window.addEventListener('substantive:adjudicated', handleG9Adjudicated)
+  window.addEventListener('g9:writeback-trial-balance', handleG9Writeback)
   await formData.loadAll()
   isLoading.value = false
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('substantive:adjudicated', handleG9Adjudicated)
+  window.removeEventListener('g9:writeback-trial-balance', handleG9Writeback)
+  formData.flushPending()
 })
 </script>
 
@@ -228,4 +247,5 @@ onBeforeUnmount(() => {
 .g9-other-noncurrent-financial { padding: 12px; }
 .loading-container { padding: 24px; }
 .g9-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.g9-index-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 </style>

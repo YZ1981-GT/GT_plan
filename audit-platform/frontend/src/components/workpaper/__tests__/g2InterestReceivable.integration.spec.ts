@@ -27,7 +27,9 @@ vi.mock('vue', async () => {
 
 describe('G2 集成测试 — sheetName分发', () => {
   function extractSheet(sheetName: string): string {
-    if (/附注披露/.test(sheetName)) return sheetName.includes('国企') ? '附注国企' : '附注上市'
+    if (/G2-note-listed|附注披露.*上市|附注.*上市/.test(sheetName)) return '附注上市'
+    if (/G2-note-soe|附注披露.*国企|附注.*国企/.test(sheetName)) return '附注国企'
+    if (/附注/.test(sheetName)) return sheetName.includes('国企') ? '附注国企' : '附注上市'
     const m = sheetName.match(/(G2A|G2-\d+)/)
     return m ? m[1] : ''
   }
@@ -37,6 +39,9 @@ describe('G2 集成测试 — sheetName分发', () => {
     expect(extractSheet('G2-1 审定表')).toBe('G2-1')
     expect(extractSheet('附注披露(上市)')).toBe('附注上市')
     expect(extractSheet('附注披露(国企)')).toBe('附注国企')
+    expect(extractSheet('附注披露信息（上市公司）')).toBe('附注上市')
+    expect(extractSheet('G2-附注披露信息（国企）')).toBe('附注国企')
+    expect(extractSheet('G2-note-listed')).toBe('附注上市')
     expect(extractSheet('G2-2 明细表')).toBe('G2-2')
     expect(extractSheet('G2-3 坏账准备明细')).toBe('G2-3')
     expect(extractSheet('G2-4 调整分录')).toBe('G2-4')
@@ -163,10 +168,11 @@ describe('G2 集成测试 — G2-8抽凭引擎样本分配', () => {
   })
 })
 
-describe('G2 集成测试 — 导入导出覆盖7张表', () => {
-  it('G2_IMPORTABLE_SHEETS 包含7个sheet code', () => {
-    expect(G2_IMPORTABLE_SHEETS).toHaveLength(7)
+describe('G2 集成测试 — 导入导出覆盖8张表', () => {
+  it('G2_IMPORTABLE_SHEETS 包含 G2-1~G2-8', () => {
+    expect(G2_IMPORTABLE_SHEETS).toHaveLength(8)
     const codes = G2_IMPORTABLE_SHEETS.map((s) => s.code)
+    expect(codes).toContain('G2-1')
     expect(codes).toContain('G2-2')
     expect(codes).toContain('G2-3')
     expect(codes).toContain('G2-4')
@@ -177,29 +183,45 @@ describe('G2 集成测试 — 导入导出覆盖7张表', () => {
   })
 })
 
-describe('G2 集成测试 — 逾期天数+阶段转移建议', () => {
-  it('逾期>180天建议Stage3, >90天建议Stage2', async () => {
-    const { useG2OverdueCheck } = await import('../composables/useG2OverdueCheck')
+describe('G2 集成测试 — 公式引擎逾期天数（G2-8 等仍用）', () => {
+  it('逾期天数按约定日计算', () => {
     const now = new Date('2025-07-01')
-    // 逾期200天: 约定日 = 2024-12-13
-    const overdue200 = calcOverdueDays('2024-12-13', now)
-    expect(overdue200).toBeGreaterThan(180)
-
-    // 逾期120天: 约定日 = 2025-03-03
-    const overdue120 = calcOverdueDays('2025-03-03', now)
-    expect(overdue120).toBeGreaterThan(90)
-    expect(overdue120).toBeLessThanOrEqual(180)
-
-    // 逾期30天
-    const overdue30 = calcOverdueDays('2025-06-01', now)
-    expect(overdue30).toBeLessThanOrEqual(90)
+    expect(calcOverdueDays('2024-12-13', now)).toBeGreaterThan(180)
+    expect(calcOverdueDays('2025-03-03', now)).toBeGreaterThan(90)
+    expect(calcOverdueDays('2025-06-01', now)).toBeLessThanOrEqual(90)
   })
 
   it('逾期天数恒≥0', () => {
-    // 未来日期
     expect(calcOverdueDays('2030-01-01')).toBe(0)
-    // 空字符串
     expect(calcOverdueDays('')).toBe(0)
+  })
+})
+
+describe('G2 集成测试 — G2-6 长期挂账滚动态', () => {
+  it('期末=期初+借方−贷方；账龄超1年计入长期', async () => {
+    const { useG2OverdueCheck } = await import('../composables/useG2OverdueCheck')
+    const { ref } = await import('vue')
+    const map = new Map()
+    map.set('G2-6-overdue-rows', {
+      item_id: 'G2-6-overdue-rows',
+      conclusion: null,
+      remark: JSON.stringify([
+        {
+          id: '1', seq: 1, debtorName: '甲',
+          openingBalance: 100, periodDebit: 50, periodCredit: 20,
+          aging: '1-2年', auditedBalance: 130, postPeriodCollection: 0,
+          businessDesc: '', unrecoveredReason: '', isUncollectible: '', actionPlan: '', remark: '',
+        },
+      ]),
+    })
+    const overdue = useG2OverdueCheck({
+      wpId: ref('w'),
+      projectId: ref('p'),
+      allResponses: ref(map),
+      isReadonly: ref(false),
+    })
+    expect(overdue.dataRows.value[0].closingBalance).toBe(130)
+    expect(overdue.summary.value.longTermCount).toBe(1)
   })
 })
 
