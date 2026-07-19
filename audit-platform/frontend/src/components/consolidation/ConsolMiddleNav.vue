@@ -112,6 +112,7 @@ import { useRoute } from 'vue-router'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import { getConsolScope, getWorksheetTree } from '@/services/consolidationApi'
+import { loadWorksheetData, saveWorksheetData } from '@/services/consolWorksheetDataApi'
 import { eventBus } from '@/utils/eventBus'
 import * as P from '@/services/apiPaths'
 import { rules } from '@/utils/formRules'
@@ -443,10 +444,34 @@ function doAddCompany() {
   addForm.ultimateController = ''; addForm.ultimateControllerCode = ''; addForm.ratio = 0
   showAddDialog.value = false
   ElMessage.success('已添加到合并范围')
+  // #3: 持久化手动添加的企业到后端
+  _persistManualCompanies()
+}
+
+/** 持久化 manualCompanies 到 consol_worksheet_data（sheet_key=manual_companies） */
+async function _persistManualCompanies() {
+  if (!projectId.value) return
+  try {
+    await saveWorksheetData(projectId.value, selectedYear.value, 'manual_companies', {
+      companies: manualCompanies.value,
+    })
+  } catch { /* 持久化失败不阻断 UI */ }
+}
+
+/** 从后端加载已保存的手动企业 */
+async function _loadManualCompanies() {
+  if (!projectId.value) return
+  try {
+    const saved = await loadWorksheetData(projectId.value, selectedYear.value, 'manual_companies')
+    if (saved?.companies && Array.isArray(saved.companies)) {
+      manualCompanies.value = saved.companies
+    }
+  } catch { /* 首次无数据，忽略 */ }
 }
 
 onMounted(() => {
   loadTree()
+  _loadManualCompanies()
   document.addEventListener('click', onDocClickTree)
 })
 

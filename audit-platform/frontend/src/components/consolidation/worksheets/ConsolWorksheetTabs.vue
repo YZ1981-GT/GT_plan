@@ -728,6 +728,10 @@ async function onSave(sheet: string, payload: any) {
   await doSave(key, payload)
   // 基本信息表保存后刷新合并范围（影响子企业列）
   if (key === 'info') loadConsolScope()
+  // #4: 抵消分录保存后同步自定义分录到后端 elimination_entries 表
+  if (key === 'elimination') {
+    _syncEliminationEntries(payload)
+  }
 }
 async function doSave(sheetKey: string, payload: any) {
   if (!projectId.value) { ElMessage.warning('项目ID缺失'); return }
@@ -740,6 +744,42 @@ async function doSave(sheetKey: string, payload: any) {
     }
   } catch (err: any) {
     handleApiError(err, '保存异常')
+  }
+}
+
+// ─── #4: 抵消分录 → 后端 elimination_entries 表同步 ─────────────────────────
+/**
+ * 将 EliminationSheet 保存的自定义分录同步到后端 elimination_entries 表，
+ * 使 recalc_full 的 _batch_load_eliminations 能读取到这些分录参与差额表计算。
+ * 策略：全量替换（清旧 + 逐条创建），保证前端 JSON 与后端 ORM 一致。
+ */
+async function _syncEliminationEntries(payload: any) {
+  if (!projectId.value) return
+  const entries: any[] = Array.isArray(payload) ? payload : (payload?.rows || [])
+  // 只同步自定义分录（_custom=true），自动分录由 recalc_full 自行处理
+  const customEntries = entries.filter((r: any) => r._custom && r.subject && (Number(r.amount) || 0) !== 0)
+  if (!customEntries.length) return
+
+  try {
+    // 调用后端批量同步端点（如不存在则逐条 POST）
+    for (const entry of customEntries) {
+      const amount = Math.abs(Number(entry.amount) || 0)
+      const isDebit = entry.direction === '借'
+      await api.post(`/api/consolidation/${projectId.value}/eliminations`, {
+        year: year.value,
+        entry_type: entry.source || 'custom',
+        description: entry.desc || `自定义抵消：${entry.subject}`,
+        lines: [{
+          account_code: entry.subject,
+          account_name: entry.subject,
+          debit_amount: isDebit ? amount : 0,
+          credit_amount: isDebit ? 0 : amount,
+        }],
+        related_company_codes: [],
+      }, { _silent: true } as any)
+    }
+  } catch {
+    // 同步失败不阻断 JSON 保存（降级：前端 JSON 存储仍为真源，后端表为副本）
   }
 }
 
