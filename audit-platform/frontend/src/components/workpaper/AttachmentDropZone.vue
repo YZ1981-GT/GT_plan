@@ -23,7 +23,14 @@
     <Transition name="gt-fade">
       <div v-if="uploading" class="gt-attachment-dropzone-uploading">
         <el-icon class="is-loading"><Loading /></el-icon>
-        <span>正在上传附件...</span>
+        <span>正在上传附件...{{ uploadProgress > 0 ? ` ${uploadProgress}%` : '' }}</span>
+        <el-progress
+          v-if="uploadProgress > 0"
+          :percentage="uploadProgress"
+          :show-text="false"
+          :stroke-width="3"
+          style="width: 80px; margin-left: 8px"
+        />
       </div>
     </Transition>
 
@@ -79,6 +86,7 @@ const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.pdf', '.doc', '.d
 // ─── 状态 ───
 const isDragOver = ref(false)
 const uploading = ref(false)
+const uploadProgress = ref(0)
 let dragLeaveTimer: ReturnType<typeof setTimeout> | null = null
 
 // ─── 拖拽事件处理 ───
@@ -140,13 +148,16 @@ async function processFile(file: File) {
 
   // 3. 上传
   uploading.value = true
+  uploadProgress.value = 0
   try {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('attachment_type', 'evidence')
     formData.append('reference_type', 'workpaper')
 
-    const uploadResult = await uploadAttachment(props.projectId, formData)
+    const uploadResult = await uploadAttachment(props.projectId, formData, (percent) => {
+      uploadProgress.value = percent
+    })
     const attachmentId = uploadResult?.id || uploadResult?.attachment_id
 
     if (!attachmentId) {
@@ -177,6 +188,7 @@ async function processFile(file: File) {
     emit('upload-error', msg)
   } finally {
     uploading.value = false
+    uploadProgress.value = 0
   }
 }
 

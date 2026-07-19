@@ -73,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Paperclip } from '@element-plus/icons-vue'
 import AttachmentDropZone from '@/components/workpaper/AttachmentDropZone.vue'
@@ -212,6 +212,45 @@ watch(
   () => loadList(),
   { immediate: true },
 )
+
+// #4: OCR 状态轮询 — processing 状态的附件每 5s 检查一次直到完成
+let _ocrPollTimer: ReturnType<typeof setInterval> | null = null
+
+function _startOcrPolling() {
+  _stopOcrPolling()
+  const hasPending = list.value.some((a: any) => a.ocr_status === 'processing' || a.ocr_status === 'pending')
+  if (!hasPending) return
+  _ocrPollTimer = setInterval(async () => {
+    const pending = list.value.filter((a: any) => a.ocr_status === 'processing' || a.ocr_status === 'pending')
+    if (!pending.length) { _stopOcrPolling(); return }
+    // 逐个检查更新（轻量 GET）
+    let anyUpdated = false
+    for (const att of pending) {
+      try {
+        const detail: any = await httpApi.get(`/api/attachments/${att.id}`, { _silent: true } as any)
+        if (detail?.ocr_status && detail.ocr_status !== (att as any).ocr_status) {
+          ;(att as any).ocr_status = detail.ocr_status
+          ;(att as any).ocr_text = detail.ocr_text
+          anyUpdated = true
+        }
+      } catch { /* 单个轮询失败不阻塞 */ }
+    }
+    if (anyUpdated) {
+      // 全部完成则停止轮询
+      const stillPending = list.value.some((a: any) => a.ocr_status === 'processing' || a.ocr_status === 'pending')
+      if (!stillPending) _stopOcrPolling()
+    }
+  }, 5000)
+}
+
+function _stopOcrPolling() {
+  if (_ocrPollTimer) { clearInterval(_ocrPollTimer); _ocrPollTimer = null }
+}
+
+onUnmounted(() => _stopOcrPolling())
+
+// loadList 完成后启动轮询
+watch(list, () => _startOcrPolling(), { deep: false })
 </script>
 
 <style scoped>

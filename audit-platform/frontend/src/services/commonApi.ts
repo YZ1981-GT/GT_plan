@@ -615,9 +615,19 @@ export async function searchAttachments(projectId: string, query: string): Promi
   return Array.isArray(data) ? data : []
 }
 
-export async function uploadAttachment(projectId: string, formData: FormData): Promise<any> {
+export async function uploadAttachment(
+  projectId: string,
+  formData: FormData,
+  onProgress?: (percent: number) => void,
+): Promise<any> {
   const { data } = await http.post(P_att.upload(projectId), formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: onProgress
+      ? (e: any) => {
+          const percent = e.total ? Math.round((e.loaded / e.total) * 100) : 0
+          onProgress(percent)
+        }
+      : undefined,
   })
   return data
 }
