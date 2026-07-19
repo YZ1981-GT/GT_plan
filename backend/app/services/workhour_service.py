@@ -1,6 +1,12 @@
 """工时管理服务
 
 Phase 9 Task 1.6: 工时 CRUD + 校验 + LLM 预填
+
+DEPRECATION NOTICE (V117, 2026-07-19):
+  本服务内查询 work_hours 表的方法（list_hours/create_hour/update_hour/project_summary/_validate_hours）
+  已被兼容层路由 workhours.py 改为查 work_hour_entries。
+  本文件保留供 WorkHourService.budget_consumption_rate / personnel_load / ai_suggest 使用。
+  计划 2027-01 完全移除 WorkHour 引用，届时这些方法也应迁移到直接查 WorkHourEntry。
 """
 
 from __future__ import annotations
@@ -340,7 +346,9 @@ class WorkHourService:
                 "project_id": str(p.project_id),
                 "project_name": p.project_name,
                 "work_date": str(target_date),
+                "date": str(target_date),
                 "hours": float(round(hours_per_project, 1)),
+                "cycle": "OTHER",
                 "description": f"参与 {p.project_name} 审计工作",
                 "ai_generated": False,
             })

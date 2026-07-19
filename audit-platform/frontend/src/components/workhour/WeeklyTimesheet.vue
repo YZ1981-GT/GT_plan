@@ -19,6 +19,9 @@
       </div>
       <div class="ts-toolbar-right">
         <span v-if="hasUnsavedChanges" class="ts-unsaved-badge">● 未保存</span>
+        <el-button size="small" @click="fillFromEditTime" title="从底稿编辑记录自动填充工时">
+          <el-icon><Clock /></el-icon><span style="margin-left:4px">编辑记录</span>
+        </el-button>
         <el-button size="small" @click="emit('ai-fill')">
           <el-icon><MagicStick /></el-icon><span style="margin-left:4px">LLM 预填</span>
         </el-button>
@@ -76,6 +79,11 @@
               style="width: 110px"
               @update:model-value="(v: number) => setCell(proj.project_id, selectedDate, v ?? 0)"
             />
+          </div>
+          <div class="ts-project-card-detail">
+            <el-button type="primary" link size="small" @click="openDetailDialog(proj.project_id)">
+              📋 详细
+            </el-button>
           </div>
         </div>
         <div class="ts-add-project-card" @click="openAddProject">
@@ -169,27 +177,91 @@
         <el-button type="primary" :disabled="!addProjectId" @click="confirmAddProject">添加</el-button>
       </template>
     </el-dialog>
+
+    <!-- 细粒度工时填报弹窗 -->
+    <WorkHourEntryDialog
+      v-model="detailDialogVisible"
+      :project-id="detailProjectId"
+      :date="selectedDate"
+      @saved="onDetailSaved"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import dayjs from 'dayjs'
 import { ArrowLeft, ArrowRight, Clock, MagicStick, Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { listWorkHours, createWorkHour, updateWorkHour, getMyAssignments, type WorkHourRecord } from '@/services/staffApi'
+import { listEntries, getMyAssignments, type WorkHourEntryRecord } from '@/services/staffApi'
+import WorkHourEntryDialog from './WorkHourEntryDialog.vue'
 import { listProjects } from '@/services/commonApi'
+import http from '@/utils/http'
+import { workHourEntries as P_whe, workHours as P_wh_paths } from '@/services/apiPaths'
 
-const props = defineProps<{ staffId: string }>()
+const props = defineProps<{ staffId: string; aiSuggestions?: any[] }>()
 const emit = defineEmits<{ (e: 'ai-fill'): void }>()
+
+// AI 建议回填
+watch(() => props.aiSuggestions, (suggestions) => {
+  if (!suggestions || suggestions.length === 0) return
+  for (const s of suggestions) {
+    const dateKey = s.work_date || s.date
+    if (s.project_id && dateKey && s.hours > 0) {
+      setCell(s.project_id, dateKey, s.hours)
+      if (!projects.value.some(p => p.project_id === s.project_id)) {
+        projects.value.push({ project_id: s.project_id, project_name: s.project_name || s.project_id })
+      }
+    }
+  }
+}, { deep: true })
 
 const viewMode = ref<'day' | 'week'>('day')
 const loading = ref(false)
 const saving = ref(false)
-const anchor = ref(dayjs()) // 日视图=当天，周视图=该周任意一天
+const anchor = ref(dayjs())
 const projects = ref<any[]>([])
-const records = ref<WorkHourRecord[]>([])
+const records = ref<WorkHourEntryRecord[]>([])
 const edits = ref<Record<string, number>>({})
+
+// 细粒度工时弹窗状态
+const detailDialogVisible = ref(false)
+const detailProjectId = ref('')
+
+function openDetailDialog(projectId: string) {
+  detailProjectId.value = projectId
+  detailDialogVisible.value = true
+}
+
+function onDetailSaved() {
+  ElMessage.success('细粒度工时已保存')
+}
+
+async function fillFromEditTime() {
+  const targetDate = selectedDate.value
+  try {
+    const { data } = await http.get(P_wh_paths.editTimeSuggest, {
+      params: { staff_id: props.staffId, target_date: targetDate }
+    })
+    const suggestions = data?.suggestions || (data as any)?.suggestions || []
+    if (suggestions.length === 0) {
+      ElMessage.info('当天无底稿编辑记录')
+      return
+    }
+    // 按底稿编辑时长合计→填入第一个项目（简化策略）
+    const totalHours = (data?.total_hours || (data as any)?.total_hours || 0) as number
+    if (totalHours > 0 && projects.value.length > 0) {
+      // 均分到有记录的项目
+      const perProject = +(totalHours / projects.value.length).toFixed(1)
+      for (const proj of projects.value) {
+        setCell(proj.project_id, targetDate, Math.min(perProject, 8))
+      }
+      ElMessage.success(`已从编辑记录填充 ${totalHours.toFixed(1)}h（${suggestions.length} 个底稿）`)
+    }
+  } catch {
+    ElMessage.warning('获取编辑记录失败')
+  }
+}
 
 const hasUnsavedChanges = computed(() => Object.keys(edits.value).length > 0)
 
@@ -253,8 +325,8 @@ function confirmAddProject() {
 }
 
 const recordMap = computed(() => {
-  const m: Record<string, WorkHourRecord> = {}
-  for (const r of records.value) m[`${r.project_id}|${r.work_date}`] = r
+  const m: Record<string, WorkHourEntryRecord> = {}
+  for (const r of records.value) m[`${r.project_id}|${r.date}`] = r
   return m
 })
 
@@ -345,11 +417,14 @@ async function loadRange() {
   try {
     const start = weekStart.value.format('YYYY-MM-DD')
     const end = weekStart.value.add(6, 'day').format('YYYY-MM-DD')
-    records.value = await listWorkHours(props.staffId, { start_date: start, end_date: end })
-    // 合并：已有工时记录的项目 + 手动添加的项目（确保都显示为行）
+    // 跨项目单次请求加载所有工时条目
+    const { data } = await http.get(P_wh_paths.myEntries, { params: { start_date: start, end_date: end } })
+    const allEntries = (Array.isArray(data) ? data : data?.items || []) as WorkHourEntryRecord[]
+    records.value = allEntries
+    // 合并：已有工时记录的项目（确保显示为行）
     for (const r of records.value) {
       if (!projects.value.some(p => p.project_id === r.project_id)) {
-        projects.value.push({ project_id: r.project_id, project_name: r.project_name || '未命名项目' })
+        projects.value.push({ project_id: r.project_id, project_name: (r as any).project_name || r.project_id })
       }
     }
     for (const m of manualProjects.value) {
@@ -367,14 +442,16 @@ async function saveAll() {
   if (changes.length === 0) { ElMessage.info('没有需要保存的修改'); return }
   saving.value = true
   try {
+    // 按 projectId 分组
+    const byProject: Record<string, Array<{ date: string; hours: number; description?: string }>> = {}
     for (const [key, hours] of changes) {
       const [projectId, date] = key.split('|')
-      const existing = recordMap.value[key]
-      if (existing) {
-        if (hours !== existing.hours) await updateWorkHour(existing.id, { hours })
-      } else if (hours > 0) {
-        await createWorkHour(props.staffId, { project_id: projectId, work_date: date, hours, description: '' })
-      }
+      if (!byProject[projectId]) byProject[projectId] = []
+      byProject[projectId].push({ date, hours, description: '' })
+    }
+    // 逐项目调 batch-quick 端点
+    for (const [projectId, items] of Object.entries(byProject)) {
+      await http.post(P_whe.list(projectId) + '/batch-quick', { items })
     }
     ElMessage.success(`已保存 ${changes.length} 项工时`)
     await loadRange()
@@ -486,6 +563,11 @@ defineExpose({ reload: loadRange })
 .ts-preset-btn:hover { border-color: var(--gt-purple, #4b2d77); color: var(--gt-purple, #4b2d77); }
 .ts-preset-btn.active {
   background: var(--gt-purple, #4b2d77); border-color: var(--gt-purple, #4b2d77); color: #fff;
+}
+
+.ts-project-card-detail {
+  margin-top: 8px;
+  text-align: right;
 }
 
 .ts-empty-card {

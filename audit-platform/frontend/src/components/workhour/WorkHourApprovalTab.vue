@@ -59,9 +59,15 @@
           <GtStatusTag :value="row.status" dict-key="workhour_status" />
         </template>
       </el-table-column>
+      <el-table-column prop="rejected_reason" label="退回原因" min-width="160" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span v-if="row.rejected_reason" style="color: #F56C6C; font-size: 12px;">{{ row.rejected_reason }}</span>
+          <span v-else style="color: var(--gt-color-text-tertiary);">—</span>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" min-width="180" align="center">
         <template #default="{ row }">
-          <template v-if="row.status === 'confirmed'">
+          <template v-if="row.status === 'submitted'">
             <el-button link type="success" size="small" @click="approveOne(row)">批准</el-button>
             <el-button link type="warning" size="small" @click="rejectOne(row)">退回</el-button>
           </template>
@@ -120,7 +126,7 @@ const singleRejectRow = ref<ApprovalRecord | null>(null)
 
 const selectedTotalHours = computed(() => selectedRows.value.reduce((s, r) => s + r.hours, 0))
 
-function isSelectable(row: ApprovalRecord) { return row.status === 'confirmed' }
+function isSelectable(row: ApprovalRecord) { return row.status === 'submitted' }
 function onSelectionChange(rows: ApprovalRecord[]) { selectedRows.value = rows }
 
 function getLastWeekRange(): [string, string] {

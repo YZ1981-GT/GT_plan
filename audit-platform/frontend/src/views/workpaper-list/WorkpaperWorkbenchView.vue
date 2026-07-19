@@ -62,6 +62,12 @@
                 :class="{ 'gt-wpb-cycle-item--parent': node.children.length > 0 }"
                 @click="onWorkbenchRowClick(node.row)"
               >
+                <el-checkbox
+                  :model-value="isWpSelected(node.row.id)"
+                  class="gt-wpb-cycle-item__checkbox"
+                  @click.stop
+                  @change="(val) => toggleWpSelection(node.row.id, !!val)"
+                />
                 <span class="gt-wpb-cycle-item__toggle" @click.stop="node.children.length ? toggleParentWp(node.row.wp_code) : undefined">
                   {{ node.children.length ? (expandedParentWps[node.row.wp_code] ? '▾' : '▸') : '' }}
                 </span>
@@ -352,7 +358,8 @@
 
     <!-- 列表视图（默认） -->
     <div v-else class="gt-wp-list-default">
-      <el-table :data="pagedWorkbenchData" stripe border style="width: 100%" max-height="calc(100vh - 280px)" class="gt-compact-table gt-tb-font-md" @row-click="onWorkbenchRowClick">
+      <el-table :data="pagedWorkbenchData" stripe border style="width: 100%" max-height="calc(100vh - 280px)" class="gt-compact-table gt-tb-font-md" @row-click="onWorkbenchRowClick" @selection-change="onTableSelectionChange">
+        <el-table-column type="selection" width="40" />
         <el-table-column prop="wp_code" label="编码" min-width="90" :sort-method="wpCodeSort" sortable resizable />
         <el-table-column prop="wp_name" label="底稿名称" min-width="220" show-overflow-tooltip resizable />
         <el-table-column prop="cycle_name" label="循环" min-width="110" show-overflow-tooltip resizable />
@@ -421,6 +428,29 @@ const workbenchProgressCollapsed = ref(false)
 const workbenchCycleFilter = ref<string[]>([])
 const wbPage = ref(1)
 const wbPageSize = ref(50)
+
+// ─── 多选状态（工作台+列表共用） ──────────────────────────────────────────────────
+const selectedWpIdsLocal = ref<string[]>([])
+
+function isWpSelected(wpId: string): boolean {
+  return selectedWpIdsLocal.value.includes(wpId)
+}
+
+function toggleWpSelection(wpId: string, checked: boolean) {
+  if (checked) {
+    if (!selectedWpIdsLocal.value.includes(wpId)) {
+      selectedWpIdsLocal.value.push(wpId)
+    }
+  } else {
+    selectedWpIdsLocal.value = selectedWpIdsLocal.value.filter(id => id !== wpId)
+  }
+  emit('wp-selection-change', [...selectedWpIdsLocal.value])
+}
+
+function onTableSelectionChange(rows: any[]) {
+  selectedWpIdsLocal.value = rows.map(r => r.id).filter(Boolean)
+  emit('wp-selection-change', [...selectedWpIdsLocal.value])
+}
 
 const COMPLETED_STATUSES = new Set(['review_passed', 'archived'])
 
@@ -1463,11 +1493,15 @@ function onGuideWpClick(wpCode: string) {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 12px 6px 44px;
+  padding: 6px 12px 6px 12px;
   border-bottom: 1px solid #f0f0f4;
   cursor: pointer;
   transition: background 0.12s;
   font-size: 13px;
+}
+.gt-wpb-cycle-item__checkbox {
+  flex-shrink: 0;
+  margin-right: -4px;
 }
 .gt-wpb-cycle-item:last-child { border-bottom: none; }
 .gt-wpb-cycle-item:hover { background: #f9f7fc; }

@@ -83,6 +83,7 @@
         @navigate="onNavigate"
         @refresh="fetchWpIndex"
         @mutate="onMutate"
+        @wp-selection-change="onChildSelectionChange"
       />
     </keep-alive>
 
@@ -387,6 +388,10 @@ provide(WP_LIST_CONTEXT_KEY, ctx)
 // ─── 子 SFC 事件处理 ─────────────────────────────────────────────────────────
 function onNavigate(wpId: string) {
   router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId } })
+}
+
+function onChildSelectionChange(wpIds: string[]) {
+  selectedWpIds.value = wpIds
 }
 
 async function onMutate(payload: MutatePayload) {

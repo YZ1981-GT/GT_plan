@@ -8,6 +8,7 @@
 import http from '@/utils/http'
 import {
   staff as P, projects as P_proj, workHours as P_wh,
+  workHourEntries as P_whe,
 } from '@/services/apiPaths'
 
 // ── Types ──
@@ -60,6 +61,25 @@ export interface WorkHourRecord {
   description?: string
   status: string
   ai_suggested: boolean
+}
+
+export interface WorkHourEntryRecord {
+  id: string
+  user_id: string
+  project_id: string
+  date: string
+  hours: number
+  cycle?: string
+  wp_code?: string
+  procedure?: string
+  description?: string
+  status: string
+  submitted_at?: string
+  approved_by?: string
+  approved_at?: string
+  rejected_reason?: string
+  created_at?: string
+  updated_at?: string
 }
 
 // ── Staff API ──
@@ -143,4 +163,43 @@ export async function getAISuggestions(staffId: string, targetDate: string) {
 export async function getProjectWorkHours(projectId: string) {
   const { data } = await http.get(P_proj.workHours(projectId))
   return data
+}
+
+// ── WorkHourEntry API (细粒度工时条目) ──
+
+export async function listEntries(projectId: string, params?: {
+  start_date?: string; end_date?: string; status?: string
+}): Promise<WorkHourEntryRecord[]> {
+  const { data } = await http.get(P_whe.list(projectId), { params })
+  return (Array.isArray(data) ? data : data?.items || []) as WorkHourEntryRecord[]
+}
+
+export async function createEntry(projectId: string, payload: {
+  date: string; hours: number; cycle?: string; wp_code?: string; procedure?: string; description?: string
+}): Promise<WorkHourEntryRecord> {
+  const { data } = await http.post(P_whe.create(projectId), payload)
+  return data as WorkHourEntryRecord
+}
+
+export async function updateEntry(projectId: string, entryId: string, payload: {
+  date?: string; hours?: number; cycle?: string; wp_code?: string; procedure?: string; description?: string
+}): Promise<WorkHourEntryRecord> {
+  const { data } = await http.put(P_whe.detail(projectId, entryId), payload)
+  return data as WorkHourEntryRecord
+}
+
+export async function deleteEntry(projectId: string, entryId: string): Promise<void> {
+  await http.delete(P_whe.detail(projectId, entryId))
+}
+
+export async function batchSubmitEntries(projectId: string, entryIds: string[]): Promise<{ submitted_count: number }> {
+  const { data } = await http.post(P_whe.batchSubmit(projectId), { entry_ids: entryIds })
+  return data as { submitted_count: number }
+}
+
+export async function getEntrySummary(projectId: string, params?: {
+  period?: string
+}): Promise<{ by_day: Record<string, number>; by_cycle: Record<string, number>; total: number }> {
+  const { data } = await http.get(P_whe.summary(projectId), { params })
+  return data as { by_day: Record<string, number>; by_cycle: Record<string, number>; total: number }
 }

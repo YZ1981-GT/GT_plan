@@ -156,10 +156,11 @@ async def list_entries(
     project_id: UUID,
     start_date: date | None = Query(None),
     end_date: date | None = Query(None),
+    status: str | None = Query(None, description="筛选状态: draft/submitted/approved/rejected"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """列出工时条目（支持日期过滤）"""
+    """列出工时条目（支持日期+状态过滤）"""
     stmt = select(WorkHourEntry).where(WorkHourEntry.project_id == project_id)
 
     # Only own entries unless admin
@@ -170,11 +171,38 @@ async def list_entries(
         stmt = stmt.where(WorkHourEntry.date >= start_date)
     if end_date:
         stmt = stmt.where(WorkHourEntry.date <= end_date)
+    if status:
+        stmt = stmt.where(WorkHourEntry.status == status)
 
     stmt = stmt.order_by(WorkHourEntry.date.desc(), WorkHourEntry.created_at.desc())
     result = await db.execute(stmt)
     entries = result.scalars().all()
     return [_entry_to_dict(e) for e in entries]
+
+
+@router.get("/{entry_id}")
+async def get_entry(
+    project_id: UUID,
+    entry_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """获取单条工时条目"""
+    result = await db.execute(
+        select(WorkHourEntry).where(
+            WorkHourEntry.id == entry_id,
+            WorkHourEntry.project_id == project_id,
+        )
+    )
+    entry = result.scalar_one_or_none()
+    if not entry:
+        raise HTTPException(404, "工时条目不存在")
+
+    # Only own entries (admin exempt)
+    if current_user.role.value != "admin" and entry.user_id != current_user.id:
+        raise HTTPException(403, "无权查看此工时条目")
+
+    return _entry_to_dict(entry)
 
 
 @router.put("/{entry_id}")
@@ -321,3 +349,71 @@ async def get_summary(
         "by_cycle": by_cycle,
         "total": float(total),
     }
+
+
+# ---------------------------------------------------------------------------
+# batch-quick: 快速批量填报（WeeklyTimesheet 用，upsert 语义）
+# ---------------------------------------------------------------------------
+
+
+class BatchQuickItem(BaseModel):
+    date: date
+    hours: Decimal = Field(ge=0, le=24)
+    description: str | None = None
+
+
+class BatchQuickRequest(BaseModel):
+    items: list[BatchQuickItem] = Field(..., min_length=1, max_length=50)
+
+
+@router.post("/batch-quick")
+async def batch_quick_save(
+    project_id: UUID,
+    body: BatchQuickRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """快速批量工时填报（WeeklyTimesheet 专用）。
+
+    upsert 语义：同 user+project+date+cycle='OTHER' 有记录则更新 hours，无则创建。
+    cycle 固定为 'OTHER'（粗粒度快速填报无需指定循环/底稿）。
+    """
+    created = 0
+    updated = 0
+
+    for item in body.items:
+        # 查找已有记录
+        stmt = select(WorkHourEntry).where(
+            WorkHourEntry.user_id == current_user.id,
+            WorkHourEntry.project_id == project_id,
+            WorkHourEntry.date == item.date,
+            WorkHourEntry.cycle == "OTHER",
+        )
+        result = await db.execute(stmt)
+        existing = result.scalar_one_or_none()
+
+        if existing:
+            # 仅 draft 状态可更新
+            if existing.status == WorkHourEntryStatus.draft.value:
+                if float(existing.hours) != float(item.hours) or existing.description != (item.description or existing.description):
+                    existing.hours = item.hours
+                    if item.description is not None:
+                        existing.description = item.description
+                    existing.updated_at = datetime.now(timezone.utc)
+                    updated += 1
+        else:
+            if float(item.hours) > 0:
+                entry = WorkHourEntry(
+                    user_id=current_user.id,
+                    project_id=project_id,
+                    date=item.date,
+                    hours=item.hours,
+                    cycle="OTHER",
+                    description=item.description or "",
+                    status=WorkHourEntryStatus.draft.value,
+                )
+                db.add(entry)
+                created += 1
+
+    await db.commit()
+    return {"created": created, "updated": updated, "total": created + updated}

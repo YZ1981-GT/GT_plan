@@ -104,6 +104,11 @@ GT_logo/
 # Commit 消息临时文件
 COMMIT_MSG_TMP.txt
 
+# 一次性调试/探测脚本（禁止入库）
+_tmp_*
+_probe*.py
+_dump_*.py
+
 # 开发日志
 backend_dev.log
 frontend_dev.log

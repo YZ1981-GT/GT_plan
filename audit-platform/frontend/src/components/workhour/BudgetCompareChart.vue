@@ -16,12 +16,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, watch, nextTick, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '@/services/apiProxy'
 
+const props = defineProps<{ projectId?: string }>()
+
 const route = useRoute()
-const projectId = route.params.id as string
+const resolvedProjectId = computed(() => {
+  // 优先使用 prop 传入的 projectId，回退到路由 params
+  return props.projectId || (route.params.id as string) || (route.params.projectId as string) || ''
+})
 
 const viewMode = ref<'cycle' | 'user'>('cycle')
 const loading = ref(false)
@@ -49,14 +54,14 @@ interface BudgetData {
 const data = ref<BudgetData>({ by_cycle: [], by_user: [] })
 
 async function loadData() {
-  if (!projectId || projectId === 'undefined') {
+  if (!resolvedProjectId.value || resolvedProjectId.value === 'undefined') {
     warning.value = '请从具体项目进入以查看预算对比'
     return
   }
   loading.value = true
   warning.value = ''
   try {
-    const res = await api.get(`/api/projects/${projectId}/workhours/budget-vs-actual`) as BudgetData
+    const res = await api.get(`/api/projects/${resolvedProjectId.value}/workhours/budget-vs-actual`) as BudgetData
     data.value = res
     if (res.warning) {
       warning.value = res.warning

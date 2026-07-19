@@ -320,6 +320,11 @@ const router = createRouter({
           component: () => import('@/views/WorkHoursPage.vue'),
         },
         {
+          path: 'projects/:projectId/work-hours',
+          name: 'ProjectWorkHours',
+          component: () => import('@/views/ProjectWorkHoursView.vue'),
+        },
+        {
           path: 'confirmation',
           name: 'ConfirmationIndex',
           component: () => import('@/views/ConfirmationIndex.vue'),

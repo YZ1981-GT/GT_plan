@@ -106,6 +106,7 @@ export interface WpChildEmits {
   (e: 'navigate', wpId: string): void
   (e: 'refresh'): void
   (e: 'mutate', payload: MutatePayload): void
+  (e: 'wp-selection-change', wpIds: string[]): void
 }
 
 // ─── 测试 helper ────────────────────────────────────────────────────────────

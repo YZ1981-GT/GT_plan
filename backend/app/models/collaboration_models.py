@@ -700,21 +700,6 @@ class ProjectTimeline(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now(), nullable=False)
 
 
-class WorkHours(Base):
-    """工时记录 — Phase 3 遗留表，已被 Phase 9 staff_models.WorkHour 替代"""
-    __tablename__ = "work_hours_legacy"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id"), nullable=False)
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
-    work_date: Mapped[date] = mapped_column(Date, nullable=False)
-    hours: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=sa.func.now(), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=sa.func.now(), onupdate=sa.func.now(), nullable=False)
-
-
 class BudgetHours(Base):
     """预算工时"""
     __tablename__ = "budget_hours"

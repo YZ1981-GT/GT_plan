@@ -1,11 +1,9 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-07-17
+**最后更新**：2026-07-19
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计基线**：2026-06-29 的总数统计尚待批量重算（原记录：240，active 21 + archived 219）
-**本次完成 Spec**：`visibility-isolation-go-live-hardening`（父 spec 可见性隔离机制的上线加固：编辑器令牌强制启用 + 失效 dispatcher 挂载 + 72 native_authz 审计 + 真实容量冻结限流 + Playwright 多角色验收 + PR 提交 + Go_Live_Gate 关闭）— Task 1–8 全部完成，Go_Live_Gate 判定 LIVE（6 个 Go_Live_Item 全 LIVE/ACCEPTED，2 条残留环境 GAP 透明 surface 不阻断）
-**最高迁移**：**V113**（`V113__wp_visibility_delegation_history_audit_epoch.sql`；以 `migration_status` 实测为准）
-**测试总数**：~17500+（含 PBT 40+ properties，旧统计）
+**统计**：Active 0 / Archived 406 = 总计 406
+**最高迁移**：**V118**（以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---
@@ -26,121 +24,69 @@
 
 ---
 
-## 一、Active Specs（23个）
-
-### 全局治理（4，未启动 + 2 已完成）
+## 一、Active Specs（0个）
 
 | Spec | 说明 | 状态 |
 |------|------|------|
-| `visibility-isolation-go-live-hardening` | 父 spec 可见性隔离机制上线加固(不重建系统)：R1 ONLYOFFICE_JWT_ENFORCE env-gated 启用 + R2 InvalidationDispatcher 挂 app.main lifespan + R3 审计 72 native_authz(19 gated/52 justified/1 worker) + R4 真实容量冻结 Rate_Limit_Profile + R5 Playwright 8 角色 fresh-context + R6 PR 提交与依赖交互 + R7 Go_Live_Gate 关闭，7需求7P8任务 | ✅ 完成 (Task 1–8 全部完成, Go_Live_Gate verdict=live: 6 Go_Live_Item 全 LIVE/ACCEPTED + latest-run-per-task 重算 artifact 干净 + smoke 未冒充; 2 残留环境 GAP 透明 surface-not-block: GLI-4 6000 诚实外推(R4.2 许可)/GLI-6 PR 未实际开启(gh 未认证,分支+push+精确命令已记录未伪造); rate-6000-golive-v1/perf-6000-golive-v1; 分支 pr/visibility-isolation-go-live-hardening(6ac477b1); 迁移保持 V113; 2026-07-17) |
-| `procedure-delegation-visibility-isolation` | 服务端强制 fail-closed 底稿/页面可见性隔离(wp_index_id+sheet_key)+统一 Wp_Bound_Gate/Action_Matrix+不可枚举 404+两层委派分层联动(WorkingPaper.assigned_to↔ProcedureInstance/ProcedureRowTask)+persistent policy epoch+6000并发限流+Completion Guard 16需求20P18任务 | ✅ 完成 (Task 1–18 全部完成, 最终 Completion Guard 通过: latest-run-per-task 全 passed + 覆盖/漂移守卫 0 unmigrated 双向相等 + correctness≥100样例, 迁移V113/perf-6000-visibility-v1/rate-6000-visibility-v1, 2026-07-17) |
-| `acnr-runtime-convergence` | ACNR运行时闭环修复(公共resolve/L2-L3生命周期/权限/版本锁定/治理真守卫) Phase1+2共20需求22P25任务 | ✅ 完成 (Phase1+2全量: 后端468+前端41=509测试全绿, CI守卫pass, 2026-07-16) |
-| `formula-runtime-convergence` | 公式运行时真实写入/回滚/并发/生产入口收敛，14需求16P18任务，最大并行6子代理 | ✅ 完成 (18/18任务, CI守卫pass) |
-| `display-format-single-source` | P0金额/时间/百分比格式化收口displayPrefs+CI守卫 | 未启动 |
-| `cycle-palette-single-source` | P0循环色板单一真源cyclePalette.ts+--gt-cycle-* | 未启动 |
-| `stale-propagation-cleanup-doc` | P2删死代码+分层文档 | 未启动 |
-
-### D1应收票据拆分（6，三件套齐全待执行）
-
-| Spec | 覆盖Sheet | 需求 | Property |
-|------|-----------|------|----------|
-| `d1-adjudication-table` | D1-1/2/3/4 审定+明细+坏账 | 11 | — |
-| `d1-disclosure-note` | 附注披露(上市+国企) | 20+2 | — |
-| `d1-endorsement-discount` | D1-6/7/8/9 业务模式+备查簿+贴现+贴息 | 18 | — |
-| `d1-inspection-check` | D1-10/11/12/13 监盘+关联方+质押+抽样 | 20 | 8 |
-| `d1-ecl-provision` | D1-14/15 政策检查+ECL测算 | 18 | 8 |
-| `d1-writeoff-check` | D1-16 坏账转回+核销 | 14 | 6 |
-
-### 通用组件（1，三件套齐全待执行）
-
-| Spec | 说明 |
-|------|------|
-| `audit-review-dialog` | 通用审计复核对话(GtReviewDialog+后端V095) 13需求14P39任务 |
-
-### C 类控制测试专项（5，三件套齐全待执行）
-
-> 源模板 `3.风险应对-一般性程序与控制测试（C1-C26）` 共 36 xlsx（无 VBA，导航靠底稿目录+命名区域下拉）。分析工具 `backend/scripts/analyze_c_category.py` + `dump_c_content.py`。C2~C15 循环控制测试已归档（`c-control-test-component`），本轮覆盖未做的 C1/C21/C22/C23/C24/C25/C26 + 翻新 C2~C15。
-
-| Spec | 覆盖底稿 | 类型 | 需求/波次 |
-|------|---------|------|-----------|
-| `c1-entity-level-control` | C1 企业层面控制（COSO五要素+财报内控子表） | D4专属 | 8需求/6波 |
-| `c22-itgc-bundle` | C22 IT一般控制(34sheet SA/PE/PM/NS)+C21+C21-1 | bundle | 9需求/7波 |
-| `c23-c24-journal-entry-testing` | C23分录控制+C24分录细节(跳号/异常/本福特) | D4专属(计算) | 8需求/7波 |
-| `c25-c26-internal-audit-info-control` | C25利用内审+C26信息处理控制 | D4专属 | 7需求/6波 |
-| `c-control-test-refresh` | C2~C15翻新(汇总表+控制测试+Cx-2偏差决策树)，取代c-control-test-component | D4专属 | 8需求/7波 |
-
-### S 类特定项目程序（6，三件套齐全待执行）
-
-> 源模板 `6.特定项目程序（S）` 共 87 个 xlsx。分析工具 `backend/scripts/analyze_s_category.py` + `dump_s34_content.py` + `dump_s_special_content.py`。
-
-| Spec | 覆盖底稿 | 类型 | 需求/波次 |
-|------|---------|------|-----------|
-| `s34-ipo-review-bundle` | S34-0~41（41个，IPO大组件一行分组页签） | bundle | 12需求/7波 |
-| `s32-fraud-response-bundle` | S32-1~13（551文舞弊核查） | bundle | 8需求/7波 |
-| `s33-announcement14-bundle` | S33-1~9（14号公告核查） | bundle | 8需求/7波 |
-| `s35-refinancing-bundle` | S35-1~5（再融资审核） | bundle | 8需求/7波 |
-| `s-estimate-calculation-workpapers` | S3/S15/S20/S21（计算型专属，4 componentType） | D4专属 | 11需求/8波 |
-| `s-special-transaction-workpapers` | S1/S2/S4/S5/S6/S8/S9/S10/S11/S12/S13/S14/S16/S17（交易/专家/检查型，6专属+检查表型） | D4专属 | 11需求/8波 |
+| (无) | | |
+| `attachment-ocr-ai-evidence-governance-hardening` | 附件/OCR/AI/证据治理全面加固，65/66任务完成 | 🟡 64 done + 1 todo + 1 dash（11.4 容量环境 blocked，需专用 6000VU 环境） |
+| `fghi-sheet-content-completion` | F/G/H/I 全循环逐 sheet 打磨（审计目标/编制提示/结论/toolbar） | � 进行中（88/97，剩 I4/I5 打磨 + Playwright + 全局验证） |
 
 ---
 
-## 二、已归档 Spec（219个，14 分类）
+## 二、已归档 Spec（404个，15 分类）
 
 ```
 _archive/
-├── 01-phase-foundation/         24
-├── 02-workpaper-cycles/         16
-├── 03-refinement-rounds/         9
-├── 04-infra-architecture/       29
-├── 05-business-features/        40   (+word-template-dual-mode)
-├── 06-engineering-governance/    6
-├── 07-workpaper-slimdown/       15
-├── 08-disclosure-notes/          5
-├── 09-consolidation-phases/      4
-├── 10-A~S-workpaper-all-cycles-complete/ 13
-├── 11-confirmation-d0-module/   10
-├── 12-2026-06-23-batch/         12
-├── 13-2026-06-29-batch/         33   (A类专属+B类专属+C控制+D1/D2+聚合bundle)
-└── 99-superseded/                5   (+b40-sampling-strategy)
+├── 01-phase-foundation/              24
+├── 02-workpaper-cycles/              16
+├── 03-refinement-rounds/              9
+├── 04-infra/                          1
+├── 04-infra-architecture/            34
+├── 05-business-features/            185
+├── 06-engineering-governance/        12
+├── 07-workpaper-slimdown/            22
+├── 08-disclosure-notes/               7
+├── 09-consolidation-phases/           4
+├── 10-A~S-workpaper-all-cycles-complete/ 31
+├── 11-confirmation-d0-module/        10
+├── 12-2026-06-23-batch/              12
+├── 13-2026-06-29-batch/              33
+└── 99-superseded/                     4
 ```
 
-### 13-2026-06-29-batch/（33个，本轮归档）
+### 本次归档（2026-07-18，26个 spec）
 
-| Spec | 类型 | 任务 | 测试 |
-|------|------|------|------|
-| a1-11-signing-control-form | A类专属 | 26/26 | 39 PBT+vitest |
-| a1-12-dual-mode-checklist | A类专属 | 9/9 | 99 |
-| a1-15-disclosure-checklist | A类专属 | 10/10 | 111 |
-| a1-dashboard-bundle-upgrade | Bundle | 14/14 | — |
-| a10-1-governance-communication | A类专属 | 22/22 | 77 |
-| a11-1-subsequent-events-inquiry | A类专属 | 17/17 | 103 |
-| a12-1-legal-confirmation | A类专属 | 19/19 | 91 |
-| a16-representation-bundle | Bundle | 11/11 | — |
-| a17-1-audit-summary | A17专属 | 22/22 | 85 |
-| a17-2-1-kam | A17专属 | 18/18 | 92 |
-| a17-3-consultation-record | A17专属 | 16/16 | 88 |
-| a17-3-1-consultation-execution | A17专属 | 16/16 | 69 |
-| a17-4-disagreement-record | A17专属 | 17/17 | 75 |
-| a17-6-closing-meeting | A17专属 | — | — |
-| a17-7-independence-declaration | A17专属 | 22/22 | 102 |
-| a17-audit-summary-bundle | Bundle | 17/17 | — |
-| a18-1-regulatory-submission | A类专属 | 15/15 | 26 |
-| a18-2-regulatory-communication | A类专属 | 15/15 | 80 |
-| a27-1-it-audit-memo | A类专属 | 22/22 | 83 |
-| a3-8-goodwill-impairment | A3合并 | 9/9 | 47 |
-| a5-1-cashflow-audit | A类专属 | 22/22 | 57 |
-| a8-1-other-info-representation | A类专属 | 17/17 | 106 |
-| a9-1-deficiency-letter | A类专属 | 22/22 | 84 |
-| a9-2-deficiency-letter-governance | A类专属 | 13/13 | 119 |
-| b1-4-due-diligence-report | B类专属 | 24/24 | 97 |
-| b22a-control-matrix | B类专属 | 38/38 | 48 |
-| b22b-deficiency-evaluation | B类专属 | 42/42 | 57 |
-| b23-process-control | B类专属 | 59/59 | 79 |
-| b30-group-audit | B类专属 | 25/25 | 37 |
-| b50-risk-assessment | B类专属 | 35/35 | 32 |
-| c-control-test-component | C类控制 | 25/25 | — |
-| d1-notes-receivable | D类专属 | 76/76 | 102 |
-| d2-accounts-receivable | D类专属 | 76/76 | 103 |
+**→ 04-infra-architecture（+5）**
+
+| Spec | 任务 | 说明 |
+|------|------|------|
+| acnr | 76/76 | ACNR 地址坐标名称库（五层模型+resolver+grammar） |
+| acnr-consumer-wiring | 100/100 | ACNR 消费者接入（P1-P15全实现） |
+| acnr-runtime-convergence | 25/25 | ACNR 运行时闭环修复（Phase1+2，509测试） |
+| formula-runtime-convergence | 18/18 | 公式运行时真实写入/回滚/并发收敛 |
+| platform-global-hardening | 79/79 | 全局工程治理（displayPrefs/GtWorkpaperShell/CI守卫） |
+
+**→ 05-business-features（+5）**
+
+| Spec | 任务 | 说明 |
+|------|------|------|
+| confirmation-alternative-factory-convergence | 13/13 | 函证 alternative 八套收敛为工厂（-47%代码） |
+| d5-enhancement-polish | 15/15 | D5 应收账款底稿精美化打磨 |
+| d6-enhancement-polish | 17/17 | D6 合同资产底稿增强打磨（列设置/勾稽/AI/结论模板） |
+| d7-enhancement-polish | 15/15 | D7 合同负债底稿增强打磨（列设置/TB勾稽/公允判断） |
+| procedure-delegation-notification | 17/17 | 程序委派通知机制 |
+
+**→ 06-engineering-governance（+6）**
+
+| Spec | 任务 | 说明 |
+|------|------|------|
+| procedure-delegation-visibility-isolation | 18/18 | 服务端 fail-closed 底稿可见性隔离（V113） |
+| visibility-isolation-go-live-hardening | 8/8 | 可见性隔离上线加固（Go_Live_Gate=LIVE） |
+| workpaper-maintainability-convergence | 37/37 | 底稿可维护性收敛（GtWpRenderer 465能力槽位） |
+| workpaper-maintainability-convergence-followup | 36/36 | 可维护性收敛后续（FormData工厂化） |
+| version-trail-full-coverage | 38/38 | 版本链全覆盖（89个D~N主入口+CI守卫） |
+| ui-pattern-unification | 18/18 | UI模式统一（抽凭dialog-mode+版本链Toolbar） |
 
 ---
 
@@ -150,7 +96,7 @@ _archive/
 |------|------|
 | 代码规模 | `codegraph status` |
 | 超标文件 | `python backend/scripts/check/check_file_size.py` |
-| 最高迁移 | `ls backend/migrations/V*.sql | sort | tail -1` |
+| 最高迁移 | `ls backend/migrations/V*.sql \| sort \| tail -1` |
 | 三件套完整性 | 扫描 `_archive/` 各 spec 目录是否含 requirements.md + design.md + tasks.md |
 
 ---

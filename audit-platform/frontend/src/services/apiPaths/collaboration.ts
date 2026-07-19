@@ -29,6 +29,18 @@ export const workHours = {
   editTimeSuggest: '/api/work-hours/edit-time-suggest',
   /** 智能填报建议（基于项目分配 + 历史工时推荐当日候选项） */
   aiSuggest: '/api/work-hours/ai-suggest',
+  /** 跨项目工时条目查询（消除逐项目 N+1） */
+  myEntries: '/api/my/work-hour-entries',
+} as const
+
+// ─── 工时条目（细粒度） ──────────────────────────────────────────────────────
+
+export const workHourEntries = {
+  list: (projectId: string) => `/api/projects/${projectId}/workhours`,
+  create: (projectId: string) => `/api/projects/${projectId}/workhours`,
+  detail: (projectId: string, entryId: string) => `/api/projects/${projectId}/workhours/${entryId}`,
+  batchSubmit: (projectId: string) => `/api/projects/${projectId}/workhours/batch-submit`,
+  summary: (projectId: string) => `/api/projects/${projectId}/workhours/summary`,
 } as const
 
 // ─── 通知 ───────────────────────────────────────────────────────────────────
