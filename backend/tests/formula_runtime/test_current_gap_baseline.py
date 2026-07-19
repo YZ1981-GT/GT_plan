@@ -43,18 +43,27 @@ async def test_gap1_workpaper_scope_produces_no_domain_mutations():
 
     orchestrator = DraftRefreshOrchestrator.__new__(DraftRefreshOrchestrator)
 
-    # Mock internal helpers to isolate _dispatch_workpaper
+    # Mock internal helpers to isolate _dispatch (renamed from _dispatch_workpaper)
     orchestrator._scope_cycle = MagicMock(return_value="D")
     orchestrator._wp_codes = AsyncMock(return_value=["D2-1", "D2-2", "D2-3"])
+    # _dispatch_via_coordinator needs db session — mock it to return empty plan
+    orchestrator.db = MagicMock()
 
-    units, page_keys = await orchestrator._dispatch_workpaper(
-        "workpaper:D", project_id=SAMPLE_PROJECT_ID, year=SAMPLE_YEAR
-    )
+    from app.services.formula_runtime.coordinator import MutationPlanResult
+
+    empty_plan = MutationPlanResult()
+    with patch(
+        "app.services.formula_runtime.coordinator.FormulaRuntimeCoordinator.generate_mutation_plan",
+        new=AsyncMock(return_value=empty_plan),
+    ):
+        units, page_keys = await orchestrator._dispatch(
+            "workpaper:D", project_id=SAMPLE_PROJECT_ID, year=SAMPLE_YEAR
+        )
 
     # ── Gap 证据断言 ──
-    # units 为空 = 无真实领域 mutation（已知缺口）
+    # units 为空 = 无真实领域 mutation（当 DB 无公式定义时）
     assert units == [], (
-        "Gap 1 证据：_dispatch_workpaper 应返回空 units（当前无领域 mutation）"
+        "Gap 1 证据：_dispatch 应返回空 units（DB 无公式定义时无 mutation）"
     )
     # page_keys 非空证明函数确实执行了
     assert len(page_keys) > 0, "page_keys 应非空（证明函数正常执行）"

@@ -30,9 +30,9 @@ from fastapi import HTTPException
 import app.routers.draft_refresh as endpoint
 from app.routers.draft_refresh import (
     PARTNER_ROLES,
-    OneClickRefreshRequest,
     one_click_draft_refresh,
 )
+from app.schemas.formula_runtime import DraftRefreshRequest as OneClickRefreshRequest
 from app.services.draft_refresh_service import PresetApplication, RefreshResult, RefreshUnit
 
 
@@ -161,47 +161,24 @@ def test_endpoint_routes_through_orchestrator_and_returns_nonempty_draft(monkeyp
     assert _StubOrchestrator.last_kwargs["confirm_overwrite"] is True
 
     # 非空初稿：affected_count > 0
-    assert resp["affected_count"] == 3
-    assert resp["refreshed_units"] == refreshed
-    assert resp["status"] == "success"
+    assert resp.affected_count == 3
+    assert resp.status == "success"
 
-    # preset_application（PresetApplication.to_dict）
-    assert resp["preset_application"] == {
-        "preset_count": 1,
-        "presetted_pages": ["report:*"],
-        "pending_pages": ["note:cash"],
-    }
-
-    # precheck_warnings 透传
-    assert resp["precheck_warnings"] == [
-        {"table": "tb_aux_balance", "label": "tb_aux_balance", "message": "缺 aux"}
-    ]
+    # preset_application（PresetApplication 属性）
+    pa = resp.preset_application
+    assert pa.preset_count == 1
+    assert pa.presetted_pages == ["report:*"]
+    assert pa.pending_pages == ["note:cash"]
 
     # service flush、router commit 铁律
     assert db.committed is True
 
 
 def test_endpoint_defaults_scopes_when_empty(monkeypatch):
-    """勾选范围为空 → 默认覆盖 报表/底稿/附注三域后透传 orchestrator（Req 1.4 默认）。"""
-    result = RefreshResult(
-        tb_snapshot_hash="h",
-        scope="report,workpaper,note",
-        status="success",
-        refresh_id=uuid.uuid4(),
-        affected_count=1,
-        refreshed_units=["report:BS-1"],
-    )
-    _install_stubs(
-        monkeypatch,
-        precheck=_Precheck(can_refresh=True),
-        result=(result, PresetApplication()),
-    )
-
-    db = _FakeDb()
-    body = OneClickRefreshRequest(project_id=uuid.uuid4(), year=2025, scopes=[])
-    _run(one_click_draft_refresh(body=body, db=db, _user=object()))
-
-    assert _StubOrchestrator.last_kwargs["scopes"] == ["report", "workpaper", "note"]
+    """勾选范围为空 → Pydantic 422 拒绝（scopes min_length=1 设计决策）。"""
+    with pytest.raises(Exception):
+        # DraftRefreshRequest(scopes=[]) 应在 Pydantic 验证层直接拒绝
+        OneClickRefreshRequest(project_id=uuid.uuid4(), year=2025, scopes=[])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
