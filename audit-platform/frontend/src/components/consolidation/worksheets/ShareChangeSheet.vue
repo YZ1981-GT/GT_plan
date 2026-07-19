@@ -341,6 +341,32 @@ watch(() => props.companies, (comps) => {
   companyData.length = comps.length
 }, { deep: true })
 
+// #1: changeTimes 运行时变化时扩展/收缩列（防止数据截断）
+watch(() => props.changeTimes, (newTimes, oldTimes) => {
+  if (newTimes === oldTimes) return
+  const newColCount = newTimes + 1
+  const newDcCount = newColCount * 2
+  for (const cd of companyData) {
+    // 扩展净资产列
+    for (const row of cd.naRows) {
+      while (row.vals.length < newColCount) row.vals.push(null)
+      if (row.vals.length > newColCount) row.vals.length = newColCount
+    }
+    // 扩展模拟借贷列
+    for (const row of cd.simRows) {
+      while (row.dc.length < newDcCount) row.dc.push(null)
+      if (row.dc.length > newDcCount) row.dc.length = newDcCount
+    }
+  }
+  // 间接持股数据同步扩展
+  for (const key of Object.keys(indirectSimData)) {
+    for (const row of indirectSimData[key]) {
+      while (row.dc.length < newDcCount) row.dc.push(null)
+      if (row.dc.length > newDcCount) row.dc.length = newDcCount
+    }
+  }
+})
+
 // ─── 间接持股数据 ────────────────────────────────────────────────────────────
 const indirectSimData = reactive<Record<string, SimRow[]>>({})
 
@@ -420,6 +446,15 @@ const allData = computed(() => companyData.map((cd, i) => ({
   indirectSimData: Object.fromEntries(Object.entries(indirectSimData).filter(([k]) => k.startsWith(`${i}_`))),
   endInvestTotal: getEndInvest(i),
 })))
+
+// #3: Debounced auto-save — 防止切 tab 丢数据
+let _autoSaveTimer: ReturnType<typeof setTimeout> | null = null
+watch([companyData, indirectSimData], () => {
+  if (_autoSaveTimer) clearTimeout(_autoSaveTimer)
+  _autoSaveTimer = setTimeout(() => {
+    _emit('save', allData.value)
+  }, 5000) // 5s debounce：用户停止编辑后自动保存
+}, { deep: true })
 
 // ─── 格式化 ──────────────────────────────────────────────────────────────────
 
@@ -528,22 +563,22 @@ async function onFileSelected(e: Event) {
         }
       }
     }
-    // 间接持股模拟导入
+    // 间接持股模拟导入（#9 修复：按 sheet 名匹配企业名而非灌入所有 ci）
     for (let ici = 0; ici < indirectList.value.length; ici++) {
       const indComp = indirectList.value[ici]
       const indSheet = wb.SheetNames.find(sn => sn.includes(indComp.name) && sn.includes('间接模拟'))
       if (indSheet) {
-        for (let ci = 0; ci < props.companies.length; ci++) {
-          const rows = getIndirectSimRows(ci, ici)
-          const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[indSheet], { header: 1 })
-          for (let i = 1; i < json.length; i++) {
-            const r = json[i]; const subj = String(r?.[0]||'').trim(); if (!subj) continue
-            const det = String(r?.[1]||'').trim()
-            const target = rows.find(row => row.subject === subj && row.detail === det)
-            if (!target || target.isSection) continue
-            for (let k = 0; k < dcCount.value; k++) { if (r[2+k] != null && r[2+k] !== '') target.dc[k] = Number(r[2+k]) || null }
-            matched++
-          }
+        // 只对第一家直接持股企业(ci=0)灌入间接持股数据，避免重复
+        const ci = 0
+        const rows = getIndirectSimRows(ci, ici)
+        const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[indSheet], { header: 1 })
+        for (let i = 1; i < json.length; i++) {
+          const r = json[i]; const subj = String(r?.[0]||'').trim(); if (!subj) continue
+          const det = String(r?.[1]||'').trim()
+          const target = rows.find(row => row.subject === subj && row.detail === det)
+          if (!target || target.isSection) continue
+          for (let k = 0; k < dcCount.value; k++) { if (r[2+k] != null && r[2+k] !== '') target.dc[k] = Number(r[2+k]) || null }
+          matched++
         }
       }
     }
