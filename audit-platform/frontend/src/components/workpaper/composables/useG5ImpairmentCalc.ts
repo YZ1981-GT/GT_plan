@@ -21,6 +21,12 @@ import { parseNum } from '@/composables/useG5FormulaEngine'
 import { createEmptyEntry, type AdjustmentEntry } from './useG5Adjustment'
 import { normalizeStoredLeaves, computeMovement } from './useG5BadDebtDetail'
 import { readCanonicalRaw } from './g5StorageContract'
+import {
+  resolveG5DisplaySegments,
+  resolveG5AgingSegments,
+  validateCustomAgingLabels,
+  remapAgingDataWithAggregation,
+} from './g5AgingScheme'
 import type { ChecklistResponse } from './useF1FormData'
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
@@ -95,22 +101,9 @@ export const G5_CREDIT_TERM_SEGMENTS: AgingSegment[] = [
   { key: 'od_90_plus', label: '逾期90天以上', dayFrom: 91, dayTo: null },
 ]
 
-/** 源模板（三）5 年段双标签（账龄 / 逾期） */
-export const G5_AGING_FIVE_YEAR: AgingSegment[] = [
-  { key: 'within1', label: '1年以内/未逾期', dayFrom: 0, dayTo: 365 },
-  { key: 'y1to2', label: '1-2年/逾期30天以内', dayFrom: 366, dayTo: 730 },
-  { key: 'y2to3', label: '2-3年/逾期31-90天', dayFrom: 731, dayTo: 1095 },
-  { key: 'y3to4', label: '3-4年/逾期91天-1年', dayFrom: 1096, dayTo: 1460 },
-  { key: 'y4to5', label: '4-5年/逾期1-2年', dayFrom: 1461, dayTo: 1825 },
-  { key: 'over5', label: '5年以上/逾期2年以上', dayFrom: 1826, dayTo: null },
-]
-
-export const G5_AGING_THREE_YEAR: AgingSegment[] = [
-  { key: 'within1', label: '1年以内(含1年)', dayFrom: 0, dayTo: 365 },
-  { key: 'y1to2', label: '1-2年(含2年)', dayFrom: 366, dayTo: 730 },
-  { key: 'y2to3', label: '2-3年(含3年)', dayFrom: 731, dayTo: 1095 },
-  { key: 'over3', label: '3年以上', dayFrom: 1096, dayTo: null },
-]
+/** @deprecated 请用 resolveAgingSegments；保留导出兼容旧测试 */
+export const G5_AGING_FIVE_YEAR: AgingSegment[] = resolveG5DisplaySegments('FIVE_YEAR')
+export const G5_AGING_THREE_YEAR: AgingSegment[] = resolveG5DisplaySegments('THREE_YEAR')
 
 const STORAGE_KEY = 'G5-10-rows'
 const G5_2_KEY = 'G5-2-rows'
@@ -157,21 +150,14 @@ function recalcLine(row: G5EclLineRow): G5EclLineRow {
 }
 
 function labelsToSegments(labels: string[]): AgingSegment[] {
-  return labels.map((label, i) => ({
-    key: `custom-${i}`,
-    label,
-    dayFrom: 0,
-    dayTo: null,
-  }))
+  return resolveG5AgingSegments('CUSTOM', labels)
 }
 
 export function resolveAgingSegments(
   preset: G5AgingPreset,
   customLabels: string[] = [],
 ): AgingSegment[] {
-  if (preset === 'CUSTOM' && customLabels.length >= 2) return labelsToSegments(customLabels)
-  if (preset === 'THREE_YEAR') return G5_AGING_THREE_YEAR.map((s) => ({ ...s }))
-  return G5_AGING_FIVE_YEAR.map((s) => ({ ...s }))
+  return resolveG5DisplaySegments(preset, customLabels)
 }
 
 export function resolveCreditSegments(
@@ -221,7 +207,7 @@ function createGroup(name: string, segs: AgingSegment[]): G5EclGroup {
   }
 }
 
-/** 切换段定义时保留同 key / 同名已填数；有数据的旧段归档 */
+/** 切换段定义时保留同 key / 同名已填数；5→3 汇入 over3；有数据且无法映射的旧段归档 */
 export function syncGroupRows(
   existingRows: G5EclLineRow[],
   newSegments: AgingSegment[],
@@ -233,27 +219,58 @@ export function syncGroupRows(
     if (row.segmentKey) byKey.set(row.segmentKey, row)
     if (row.label) byLabel.set(row.label, row)
   }
+
+  const balanceMap: Record<string, number> = {}
+  const bookMap: Record<string, number> = {}
+  for (const row of existingRows) {
+    if (!row.segmentKey || row.archived) continue
+    balanceMap[row.segmentKey] = parseNum(row.auditedBalance)
+    bookMap[row.segmentKey] = parseNum(row.bookProvision)
+  }
+  const rolledBalance = remapAgingDataWithAggregation(balanceMap, newSegments)
+  const rolledBook = remapAgingDataWithAggregation(bookMap, newSegments)
+
+  const absorbed = new Set<string>()
+  if (newKeys.has('over3')) {
+    for (const k of ['y3to4', 'y4to5', 'over5']) {
+      if (k in balanceMap || k in bookMap) absorbed.add(k)
+    }
+  }
+  if (newKeys.has('over5') && !newKeys.has('over3')) {
+    for (const k of ['over3', 'y3to4', 'y4to5']) {
+      if (k in balanceMap || k in bookMap) absorbed.add(k)
+    }
+  }
+
   const result = newSegments.map((seg) => {
     const hit = byKey.get(seg.key) || byLabel.get(seg.label)
+    const bal = rolledBalance[seg.key] ?? 0
+    const book = rolledBook[seg.key] ?? 0
     if (hit) {
       return recalcLine({
         ...hit,
         segmentKey: seg.key,
         label: seg.label,
+        auditedBalance: bal,
+        bookProvision: book,
         archived: undefined,
       })
     }
-    return createLineFromSegment(seg)
+    return recalcLine({
+      ...createLineFromSegment(seg),
+      auditedBalance: bal,
+      bookProvision: book,
+    })
   })
+
   for (const row of existingRows) {
     const key = row.segmentKey || ''
-    if (key && !newKeys.has(key) && !row.archived) {
-      const hasData =
-        parseNum(row.lossRate) !== 0
-        || parseNum(row.bookProvision) !== 0
-        || parseNum(row.auditedBalance) !== 0
-      if (hasData) result.push({ ...row, archived: true })
-    }
+    if (!key || newKeys.has(key) || row.archived || absorbed.has(key)) continue
+    const hasData =
+      parseNum(row.lossRate) !== 0
+      || parseNum(row.bookProvision) !== 0
+      || parseNum(row.auditedBalance) !== 0
+    if (hasData) result.push({ ...row, archived: true })
   }
   return result
 }
@@ -548,12 +565,9 @@ export function useG5ImpairmentCalc() {
   function setAgingPreset(preset: G5AgingPreset, customLabels?: string[]): boolean {
     if (preset === 'CUSTOM') {
       const labels = (customLabels || []).map((l) => l.trim()).filter(Boolean)
-      if (labels.length < 2) {
-        ElMessage.warning('自定义账龄至少需要 2 段')
-        return false
-      }
-      if (labels.length > 10) {
-        ElMessage.warning('自定义账龄最多 10 段')
+      const err = validateCustomAgingLabels(labels)
+      if (err) {
+        ElMessage.warning(err)
         return false
       }
       payload.value.customAgingLabels = labels

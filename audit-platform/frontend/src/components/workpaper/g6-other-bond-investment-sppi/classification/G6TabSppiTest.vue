@@ -10,8 +10,91 @@
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
-      <span class="chip-wrap"><GtIndexChip value="wp:G6-8" :context-project-id="projectId" /></span>
-      <el-tag size="small" type="info">共 {{ totalRows }} 项检查</el-tag>
+      <div class="toolbar-left">
+        <el-button
+          v-if="!readonly"
+          size="small"
+          type="success"
+          plain
+          :loading="syncing"
+          @click="syncFromMain"
+        >
+          从 G6-2 同步项目
+        </el-button>
+        <el-button
+          v-if="!readonly"
+          size="small"
+          @click="addProject"
+        >
+          新增项目
+        </el-button>
+        <el-button
+          v-if="!readonly && instruments.length > 1"
+          size="small"
+          type="danger"
+          plain
+          @click="removeCurrentProject"
+        >
+          删除当前项目
+        </el-button>
+      </div>
+      <div class="toolbar-right">
+        <G6SppiImportExportDropdown
+          v-if="wpId"
+          :wp-id="wpId"
+          sheet="G6-8"
+          :disabled="readonly"
+          @imported="onImported"
+        />
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-8" :context-project-id="projectId" /></span>
+        <el-tag size="small" type="info">{{ instruments.length }} 个项目 · {{ totalRows }} 项检查</el-tag>
+      </div>
+    </div>
+
+    <!-- 投资项目切换 -->
+    <div class="instrument-bar">
+      <el-radio-group
+        :model-value="activeInstrumentId || undefined"
+        size="small"
+        @update:model-value="(id: string) => setActiveInstrument(id)"
+      >
+        <el-radio-button
+          v-for="inst in instruments"
+          :key="inst.id"
+          :value="inst.id"
+        >
+          <span
+            :class="{
+              'inst-fail': inst.overallConclusion === 'fail',
+              'inst-pass': inst.overallConclusion === 'pass',
+            }"
+          >{{ inst.name || '未命名' }}</span>
+        </el-radio-button>
+      </el-radio-group>
+      <div v-if="activeInstrument" class="instrument-meta">
+        <el-input
+          :model-value="activeInstrument.name"
+          size="small"
+          :disabled="readonly"
+          placeholder="投资项目名称"
+          style="width: 240px"
+          @update:model-value="(v: string) => updateInstrumentName(activeInstrument!.id, v)"
+          @change="persist"
+        />
+        <el-tag
+          v-if="activeOverallConclusion === 'pass'"
+          type="success"
+          size="small"
+          effect="plain"
+        >本项目：满足</el-tag>
+        <el-tag
+          v-else-if="activeOverallConclusion === 'fail'"
+          type="danger"
+          size="small"
+          effect="plain"
+        >本项目：不满足</el-tag>
+        <el-tag v-else type="info" size="small" effect="plain">本项目：待完成</el-tag>
+      </div>
     </div>
 
     <!-- ═══ 顶部方法论上下文（琥珀色） ═══ -->
@@ -165,15 +248,19 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="索引" width="80">
+        <el-table-column label="索引" min-width="120">
           <template #default="{ row }">
             <el-input
+              v-if="!readonly"
               v-model="row.indexRef"
               size="small"
-              :disabled="readonly"
               placeholder="索引"
               @change="handleItemUpdate(section.id, row.id, 'indexRef', row.indexRef)"
             />
+            <span v-else-if="!row.indexRef">-</span>
+            <div v-if="row.indexRef" class="row-index-chip">
+              <GtIndexChip :value="row.indexRef" :context-project-id="projectId" />
+            </div>
           </template>
         </el-table-column>
 
@@ -200,12 +287,12 @@
             v-if="overallConclusion === 'pass'"
             type="success"
             effect="dark"
-          >满足SPPI</el-tag>
+          >全部项目满足SPPI</el-tag>
           <el-tag
             v-else-if="overallConclusion === 'fail'"
             type="danger"
             effect="dark"
-          >不满足SPPI</el-tag>
+          >存在项目不满足SPPI</el-tag>
           <el-tag
             v-else
             type="info"
@@ -261,6 +348,28 @@
         <span v-if="evidenceGaps.length > 6" class="failed-label">等 {{ evidenceGaps.length }} 项</span>
       </div>
 
+      <!-- G6-7 业务模式交叉一致性（与 G6-7 对称） -->
+      <div v-if="crossCheck.level" class="cross-check-alert">
+        <el-alert
+          :title="crossCheckTitle"
+          :type="crossCheckAlertType"
+          :closable="false"
+          show-icon
+        >
+          <template #default>
+            <span>{{ crossCheck.message }}</span>
+          </template>
+        </el-alert>
+      </div>
+      <div v-else-if="!businessModelConclusion" class="cross-check-alert">
+        <el-alert
+          title="尚未读取到 G6-7 业务模式最终结论；完成 G6-7 后将自动交叉提示分类影响。"
+          type="info"
+          :closable="false"
+          show-icon
+        />
+      </div>
+
       <!-- 总行数统计 -->
       <div class="total-rows-info">
         共 {{ totalRows }} 项检查 · {{ completedCount }} 项已完成 · {{ pendingCount }} 项待填
@@ -308,15 +417,16 @@
 
     <!-- ═══ 编制提示 ═══ -->
     <details class="guidance-details">
-      <summary>编制提示</summary>
+      <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>1. 本表用于分析金融资产的合同现金流量特征是否仅为对本金和利息的支付（SPPI测试）。</p>
-        <p>2. 六个section分别评估本金定义、利息定义、修改时间价值、提前还款条款、合同关联工具及综合判断。</p>
-        <p>3. 「检查项目」均为合规陈述：「是否满足SPPI」选「是」表示本项满足，「否」表示不满足，「不适用」表示与合同无关。</p>
-        <p>4. 「CAS要求」列为只读方法论参考，「合同条款摘要」列摘录被审计单位合同关键条款；已作答项须同时填写判断依据。</p>
-        <p>5. 任一项选「否」将导致该section结论自动判定为「不通过」；判定为否或高风险项还需填写索引。</p>
-        <p>6. 任一section不通过将触发红色高亮提示，表明该金融资产不满足SPPI条件，需重新分类。</p>
-        <p>7. 审计结论可使用 AI 辅助生成初稿（基于失败项与判断依据），人工复核后确认。</p>
+        <p>1. <b>编制目的</b>：按投资项目/合同测试现金流量是否仅为本金及未偿付本金之利息（SPPI），支持分类结论。</p>
+        <p>2. <b>建议顺序</b>：G6-2 维护项目清单 →「从 G6-2 同步项目」→ 逐项目完成六节检查 → 与 G6-7 业务模式交叉核对预期分类。</p>
+        <p>3. 六个 section：本金定义／利息定义／修改时间价值／提前还款／合同关联工具／综合判断；「是否满足SPPI」选「是/否/不适用」。</p>
+        <p>4. 已作答项须填合同条款摘要与判断依据；判定「否」或高风险项须填证据索引（合同原文页码、法律意见等）。</p>
+        <p>5. 任一项目任一项选「否」→ 该项目及整体不通过，并提示需重分类（通常不再适用 FVOCI-Debt）。</p>
+        <p>6. 完成 G6-7 后查看交叉提示中的预期分类；与本表结论冲突时先复核合同条款与业务模式证据，再写审计结论。</p>
+        <p>7. 支持 Excel 扁平行导入导出（投资项目×检查项）；结论可通过 AI 辅助初稿，但须人工确认后保存。</p>
+        <p>8. 分类结果影响后续 G6-5/G6-6/G6-11~14 及附注表述；变更结论后应通知复核人并核对 G6-1 顶部分类摘要。</p>
       </div>
     </details>
   </div>
@@ -336,13 +446,26 @@
  * - 任一section FAIL → 红色高亮section标题 + 底部"不满足SPPI，需重分类"提示
  * - 每section标题行AI辅助按钮 + 复核按钮 + 综合结论区 + 编制提示
  */
-import { inject, computed, ref, watch, onMounted } from 'vue'
+import { inject, computed, ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ChatDotRound } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useG6SppiTest } from '../../composables/useG6SppiTest'
 import type { SppiTestData, SppiItem } from '../../composables/useG6SppiTest'
+import {
+  evaluateG67G68Consistency,
+  buildG6ClassificationSummary,
+  type BusinessModelConclusion,
+} from '../../composables/useG6SppiBusinessModel'
 import { useG6SppiFormData } from '../../composables/useG6SppiFormData'
 import { useG6SppiAiGenerate } from '../../composables/useG6SppiAiGenerate'
+import {
+  parseG6ChecklistPayload,
+  writeG6ClassificationSummary,
+  fetchG62DetailRows,
+  mapG62RowsToSppiSeeds,
+} from '../../composables/g6CrossHelpers'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G6SppiImportExportDropdown from '../G6SppiImportExportDropdown.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -366,8 +489,12 @@ function handleReview(sectionId: string): void {
 
 // ─── useG6SppiTest composable ──────────────────────────────────────────────
 const {
+  instruments,
+  activeInstrumentId,
+  activeInstrument,
   sections,
   overallConclusion,
+  activeOverallConclusion,
   hasFailedSection,
   failedSections,
   evidenceGaps,
@@ -375,10 +502,17 @@ const {
   failedItemSummaries,
   totalRows,
   updateItem,
+  setActiveInstrument,
+  updateInstrumentName,
+  addInstrument,
+  removeInstrument,
+  syncFromSeeds,
   loadData,
   toJSON,
   getSectionMethodology,
 } = useG6SppiTest()
+
+const syncing = ref(false)
 
 // ─── 数据层（自加载/保存，对齐同组其他 tab） ──────────────────────────────
 const formData = useG6SppiFormData({
@@ -390,6 +524,7 @@ const wpIdRef = computed(() => props.wpId)
 const { generateAndConfirm, loading: aiLoading } = useG6SppiAiGenerate(wpIdRef)
 
 const SPPI_ITEM_ID = 'G6-8-sppi-test-data'
+const BM_ITEM_ID = 'G6-7-business-model-data'
 
 // ─── 审计说明 / 审计结论（独立持久化 checklist_responses） ─────────────────
 const NOTE_KEY = 'G6-8-sppi-test-audit-note'
@@ -409,17 +544,86 @@ function saveAuditConclusion(val: string): void {
   formData.debouncedSave(CONCLUSION_KEY, { remark: val })
 }
 
+const businessModelConclusion = computed<BusinessModelConclusion>(() => {
+  const payload = parseG6ChecklistPayload(formData.allResponses.value.get(BM_ITEM_ID))
+  const v = payload?.finalConclusion
+  if (v === 'hold_collect' || v === 'hold_and_sell' || v === 'other') return v
+  return null
+})
+
+const crossCheck = computed(() =>
+  evaluateG67G68Consistency(businessModelConclusion.value, overallConclusion.value),
+)
+
+const crossCheckTitle = computed(() => {
+  if (!crossCheck.value.expectedClassification) return '与 G6-7 业务模式交叉提示'
+  return `与 G6-7 业务模式交叉提示 · 预期分类：${crossCheck.value.expectedClassification}`
+})
+
+const crossCheckAlertType = computed(() => {
+  if (crossCheck.value.level === 'warning') return 'warning'
+  if (crossCheck.value.level === 'ok') return 'success'
+  return 'info'
+})
+
+async function syncClassificationWriteback(): Promise<void> {
+  const check = evaluateG67G68Consistency(businessModelConclusion.value, overallConclusion.value)
+  if (!check.expectedClassification && !businessModelConclusion.value && !overallConclusion.value) {
+    return
+  }
+  const summary = buildG6ClassificationSummary({
+    businessModel: businessModelConclusion.value,
+    sppiOverall: overallConclusion.value,
+    instruments: instruments.value.map((i) => ({
+      id: i.id,
+      name: i.name,
+      overallConclusion: i.overallConclusion,
+    })),
+    source: 'G6-8',
+  })
+  const result = await writeG6ClassificationSummary({
+    projectId: props.projectId,
+    sppiWpId: props.wpId,
+    summary,
+  })
+  if (!result.mainOk && result.resolveError) {
+    ElMessage.warning(`分类摘要已存 SPPI；Main 未写入：${result.resolveError}`)
+  }
+}
+
 async function handleAi(): Promise<void> {
   if (props.isReadonly) return
+  const unsatisfied = sections.value.flatMap((s) =>
+    s.items
+      .filter((i) => i.isSPPISatisfied === 'no' || i.riskLevel === 'high')
+      .slice(0, 3)
+      .map((i) => ({
+        section: s.title,
+        checkItem: i.checkItem,
+        isSPPISatisfied: i.isSPPISatisfied,
+        riskLevel: i.riskLevel,
+        contractExcerpt: (i.contractTermSummary || '').slice(0, 160),
+        judgmentBasis: (i.judgmentBasis || '').slice(0, 160),
+      })),
+  ).slice(0, 12)
+
   const text = await generateAndConfirm(
     'sppi-conclusion',
     auditConclusion.value || '',
     {
+      instrumentCount: instruments.value.length,
+      instruments: instruments.value.map((i) => ({
+        name: i.name,
+        conclusion: i.overallConclusion,
+      })),
       overallConclusion: overallConclusion.value,
       hasFailedSection: hasFailedSection.value,
       failedSections: failedSections.value.map((s) => s.title),
       totalRows: totalRows.value,
       evidenceGapCount: evidenceGaps.value.length,
+      businessModelConclusion: businessModelConclusion.value,
+      crossCheck: crossCheck.value,
+      unsatisfiedOrHighRisk: unsatisfied,
       failedItems: failedItemSummaries.value.slice(0, 20),
       evidenceGapsSample: evidenceGaps.value.slice(0, 10).map((g) => ({
         section: g.sectionTitle,
@@ -445,6 +649,47 @@ const answeredWithoutFail = computed(() => {
   )
 })
 
+function addProject(): void {
+  if (props.isReadonly) return
+  addInstrument('未命名投资项目')
+  persist()
+}
+
+function removeCurrentProject(): void {
+  if (props.isReadonly || !activeInstrumentId.value) return
+  removeInstrument(activeInstrumentId.value)
+  persist()
+}
+
+async function syncFromMain(): Promise<void> {
+  if (props.isReadonly) return
+  syncing.value = true
+  try {
+    const rows = await fetchG62DetailRows(props.projectId, props.wpId)
+    const seeds = mapG62RowsToSppiSeeds(rows)
+    if (!seeds.length) {
+      ElMessage.warning('未从 G6-2 取到投资项目，请先维护明细')
+      return
+    }
+    const { added, kept } = syncFromSeeds(seeds)
+    persist()
+    ElMessage.success(`已同步：新增 ${added} 个，保留 ${kept} 个`)
+  } catch {
+    ElMessage.error('从 G6-2 同步失败')
+  } finally {
+    syncing.value = false
+  }
+}
+
+async function onImported(): Promise<void> {
+  await formData.loadAll()
+  initFromData()
+  const noteResp = formData.allResponses.value.get(NOTE_KEY)
+  if (noteResp?.remark) auditNote.value = noteResp.remark
+  const concResp = formData.allResponses.value.get(CONCLUSION_KEY)
+  if (concResp?.remark) auditConclusion.value = concResp.remark
+}
+
 // ─── 加载数据 ──────────────────────────────────────────────────────────────
 onMounted(async () => {
   await formData.loadAll()
@@ -465,7 +710,7 @@ function initFromData(): void {
   if (saved?.conclusion) {
     try {
       const parsed = JSON.parse(saved.conclusion) as SppiTestData
-      if (parsed?.sections?.length) {
+      if (parsed?.instruments?.length || parsed?.sections?.length) {
         loadData(parsed)
         return
       }
@@ -473,7 +718,7 @@ function initFromData(): void {
   }
   // 其次从 render-config 解析内容
   const content = formData.parseContent()
-  if (content.sppiTest && (content.sppiTest as any).sections) {
+  if (content.sppiTest && ((content.sppiTest as any).instruments || (content.sppiTest as any).sections)) {
     loadData(content.sppiTest as SppiTestData)
   } else {
     loadData(null)
@@ -485,7 +730,18 @@ function persist(): void {
   formData.debouncedSave(SPPI_ITEM_ID, {
     conclusion: JSON.stringify(toJSON()),
   })
+  void syncClassificationWriteback()
 }
+
+function flushPersist(): void {
+  if (props.isReadonly) return
+  persist()
+  formData.flushPending()
+}
+
+onBeforeUnmount(() => {
+  flushPersist()
+})
 
 // ─── 完成度统计 ─────────────────────────────────────────────────────────────
 const completedCount = computed(() => {
@@ -530,14 +786,43 @@ watch(
 }
 .tab-toolbar {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   gap: 6px;
   margin-bottom: 12px;
+  flex-wrap: wrap;
 }
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.instrument-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  background: #fafafa;
+}
+.instrument-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.inst-fail { color: #f56c6c; font-weight: 600; }
+.inst-pass { color: #67c23a; font-weight: 600; }
 .chip-wrap {
   display: inline-flex;
   align-items: center;
+}
+.row-index-chip {
+  margin-top: 4px;
 }
 .audit-note-card {
   margin: 16px 0;
@@ -657,6 +942,10 @@ watch(
 
 .fail-alert {
   margin-bottom: 12px;
+}
+
+.cross-check-alert {
+  margin: 10px 0;
 }
 
 .failed-sections-list {

@@ -40,7 +40,7 @@ G7_SUBSIDIARY_SHEETS = [
     },
     {
         "code": "G7-8",
-        "sheetName": "同一控制下企业合并G7-8",
+        "sheetName": "子公司初始计量测试（同控）G7-8",
         "componentType": "g7-long-term-equity-subsidiary",
         "group": "initial",
         "columns": [],
@@ -59,6 +59,7 @@ G7_SUBSIDIARY_SHEETS = [
         "sheetName": "后续计量检查G7-10",
         "componentType": "g7-long-term-equity-subsidiary",
         "group": "subsequent",
+        "description": "股利测算/购买少数股权/不丧失控制权处置",
         "columns": [],
         "rows": [],
     },

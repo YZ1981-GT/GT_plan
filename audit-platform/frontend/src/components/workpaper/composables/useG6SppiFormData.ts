@@ -146,10 +146,11 @@ export function useG6SppiFormData(opts: UseG6SppiFormDataOptions) {
         result.businessModel = content
       } else if (key.includes('G6-8') || key.includes('SPPI') || key.includes('现金流量')) {
         result.sppiTest = content
+      } else if (key.includes('G6-10') || key.includes('倒轧')) {
+        // 须先于「盘点」判断：「盘点倒轧表G6-10」同时含「盘点」与「倒轧」
+        result.reconciliation = content
       } else if (key.includes('G6-9') || key.includes('盘点')) {
         result.inventory = content
-      } else if (key.includes('G6-10') || key.includes('倒轧')) {
-        result.reconciliation = content
       }
     }
 
@@ -358,6 +359,7 @@ export function useG6SppiFormData(opts: UseG6SppiFormDataOptions) {
     debouncedSave,
     debouncedSaveBatch,
     saveContent,
+    flushPending: _flushPending,
   }
 }
 

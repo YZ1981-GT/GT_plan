@@ -5,22 +5,32 @@
  * Requirements: 6.3 (aging-config-enhancement)
  *
  * Tab1: 债务人基础信息(10列)
- * Tab2: 余额分析+账龄(动态列 from useAgingConfig)
+ * Tab2: 余额分析+账龄(动态列；表级 3年/5年/自定义 + 项目配置兜底)
  *
  * 改造内容：
  * - nested keyed 结构: agingPrior/agingCurrent/agingAudited
  * - 旧格式自动迁移: 检测 aging1Year/aging1to2/... flat 字段并转为 nested
- * - 配置变更时 remapRowAgingData 保留已有段
+ * - 配置变更时 remapAgingDataWithAggregation（5→3 汇入 over3）
  * - 公式：期末余额=合同总额-已收回 / 净额=余额-未实现 / 账龄合计
  */
-import { ref, computed, onMounted, onUnmounted, type Ref } from 'vue'
-import { parseNum, calcAgingTotal as calcAgingTotalLegacy } from '@/composables/useG5FormulaEngine'
-import { ElMessageBox } from 'element-plus'
-import { useAgingConfig, createEmptyAgingData, type AgingSegment } from '@/composables/useAgingConfig'
+import { ref, computed, watch, onMounted, onUnmounted, type Ref, type ComputedRef } from 'vue'
+import { parseNum } from '@/composables/useG5FormulaEngine'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  remapRowAgingData,
-  type AgingData,
-} from '@/composables/useAgingMigration'
+  useAgingConfig,
+  createEmptyAgingData,
+  segmentsToBands,
+  type AgingSegment,
+  type AgingPreset,
+  type AgingBand,
+} from '@/composables/useAgingConfig'
+import { type AgingData } from '@/composables/useAgingMigration'
+import {
+  remapRowAgingWithAggregation,
+  resolveG5AgingSegments,
+  validateCustomAgingLabels,
+  type G5AgingPreset,
+} from './g5AgingScheme'
 
 // ─── G5 旧 flat 字段名 → segment key 映射 ───────────────────────────────────
 
@@ -115,16 +125,64 @@ export function parseG5Bool(value: unknown): boolean {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useG5BalanceDetail(projectId?: Ref<string>) {
-  // ─── Aging Config ──────────────────────────────────────────────────────────
+  // ─── Aging Config（项目级兜底 + 表级覆盖）──────────────────────────────────
 
   const _projectId = projectId ?? ref('')
-  const { segments, bands } = useAgingConfig(_projectId, 'G5')
+  const projectAging = useAgingConfig(_projectId, 'G5')
+
+  const sheetAgingPreset = ref<G5AgingPreset | null>(null)
+  const customAgingLabels = ref<string[]>([])
+
+  const agingPreset: ComputedRef<AgingPreset> = computed(() => {
+    if (sheetAgingPreset.value) return sheetAgingPreset.value
+    return projectAging.preset.value || 'FIVE_YEAR'
+  })
+
+  const segments: ComputedRef<AgingSegment[]> = computed(() => {
+    if (sheetAgingPreset.value === 'CUSTOM' && customAgingLabels.value.length >= 2) {
+      return resolveG5AgingSegments('CUSTOM', customAgingLabels.value)
+    }
+    if (sheetAgingPreset.value === 'THREE_YEAR' || sheetAgingPreset.value === 'FIVE_YEAR') {
+      return resolveG5AgingSegments(sheetAgingPreset.value)
+    }
+    // 跟随项目：CUSTOM 时项目已给 effective segments
+    if (projectAging.segments.value.length) return projectAging.segments.value
+    return resolveG5AgingSegments(agingPreset.value, customAgingLabels.value)
+  })
+
+  const bands: ComputedRef<AgingBand[]> = computed(() => segmentsToBands(segments.value, 'G5'))
 
   // ─── State ─────────────────────────────────────────────────────────────────
 
   const rows = ref<BalanceDetailRow[]>([])
   const activeTab = ref<'basic' | 'aging'>('basic')
   const activeRowIndex = ref(0)
+
+  function _applySegmentsToRows(nextSegs: AgingSegment[]): void {
+    rows.value = rows.value.map((row) => {
+      const remapped = remapRowAgingWithAggregation(row, nextSegs, true)
+      return {
+        ...row,
+        agingPrior: remapped.agingPrior,
+        agingCurrent: remapped.agingCurrent,
+        agingAudited: remapped.agingAudited,
+        agingTotal: _calcAgingTotal(remapped.agingAudited),
+      }
+    })
+  }
+
+  // 段定义变化时再 remap（避免与 async project refresh 抢跑）
+  watch(
+    segments,
+    (next, prev) => {
+      if (!rows.value.length) return
+      const nextKeys = next.map((s) => s.key).join('|')
+      const prevKeys = (prev || []).map((s) => s.key).join('|')
+      if (nextKeys === prevKeys) return
+      _applySegmentsToRows(next)
+    },
+    { deep: true },
+  )
 
   // ─── 创建空 aging 数据 ─────────────────────────────────────────────────────
 
@@ -310,19 +368,49 @@ export function useG5BalanceDetail(projectId?: Ref<string>) {
     }
   }
 
-  // ─── 配置变更处理 ──────────────────────────────────────────────────────────
+  // ─── 账龄口径切换 ──────────────────────────────────────────────────────────
+
+  function setAgingPreset(preset: G5AgingPreset, customLabels?: string[]): boolean {
+    if (preset === 'CUSTOM') {
+      const labels = (customLabels || customAgingLabels.value).map((l) => l.trim()).filter(Boolean)
+      const err = validateCustomAgingLabels(labels)
+      if (err) {
+        ElMessage.warning(err)
+        return false
+      }
+      customAgingLabels.value = labels
+    } else {
+      customAgingLabels.value = []
+    }
+    sheetAgingPreset.value = preset
+    const nextSegs = resolveG5AgingSegments(preset, customAgingLabels.value)
+    _applySegmentsToRows(nextSegs)
+    return true
+  }
+
+  function loadAgingPreset(presetRaw: string | null | undefined, customRaw?: string | null): void {
+    const p = String(presetRaw || '').trim() as G5AgingPreset
+    if (p === 'THREE_YEAR' || p === 'FIVE_YEAR' || p === 'CUSTOM') {
+      sheetAgingPreset.value = p
+    } else {
+      sheetAgingPreset.value = null
+    }
+    if (customRaw) {
+      try {
+        const parsed = JSON.parse(customRaw)
+        if (Array.isArray(parsed)) {
+          customAgingLabels.value = parsed.map((x) => String(x).trim()).filter(Boolean)
+        }
+      } catch { /* ignore */ }
+    }
+  }
+
+  // ─── 配置变更处理（项目级刷新完成后由 watch(segments) 驱动）──────────────
 
   function _onAgingConfigChanged(): void {
-    rows.value = rows.value.map(row => {
-      const remapped = remapRowAgingData(row, segments.value, true)
-      return {
-        ...row,
-        agingPrior: remapped.agingPrior,
-        agingCurrent: remapped.agingCurrent,
-        agingAudited: remapped.agingAudited,
-        agingTotal: _calcAgingTotal(remapped.agingAudited),
-      }
-    })
+    // 表级已覆盖时不跟随项目 remap 触发源；segments watch 会处理项目兜底变化
+    if (sheetAgingPreset.value) return
+    void projectAging.refresh()
   }
 
   // ─── EventBus 监听 ─────────────────────────────────────────────────────────
@@ -361,9 +449,13 @@ export function useG5BalanceDetail(projectId?: Ref<string>) {
   return {
     rows, activeTab, activeRowIndex,
     segments, bands,
+    agingPreset,
+    customAgingLabels,
     recalcRow, agingMismatchRows, totals,
     addRow, removeRow, updateCell,
     loadRows, serializeRows,
+    setAgingPreset,
+    loadAgingPreset,
   }
 }
 

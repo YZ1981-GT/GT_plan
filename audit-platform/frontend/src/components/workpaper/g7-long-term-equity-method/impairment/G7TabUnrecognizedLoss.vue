@@ -290,6 +290,7 @@
         :autosize="{ minRows: 2, maxRows: 8 }"
         :disabled="isReadonly"
         placeholder="对未确认投资损失测试结果的综合评价（超额亏损分配是否合理）..."
+        @change="persistRows"
       />
     </el-card>
 
@@ -382,6 +383,7 @@ const auditFormData = useG7EquityMethodFormData({
   projectId: computed(() => props.projectId),
 })
 const AUDIT_NOTE_KEY = 'G7-16-audit-note'
+const ROWS_KEY = 'G7-16-rows'
 const auditNote = ref('')
 
 function saveAuditNote(val: string): void {
@@ -390,10 +392,46 @@ function saveAuditNote(val: string): void {
   auditFormData.debouncedSave(AUDIT_NOTE_KEY, { remark: val, conclusion: null })
 }
 
+function persistRows(): void {
+  if (isReadonly.value) return
+  auditFormData.debouncedSave(ROWS_KEY, {
+    conclusion: JSON.stringify({ rows: [...rows], conclusion: conclusion.value }),
+    remark: null,
+  })
+}
+
+function loadRowsFromChecklist(): boolean {
+  const saved = auditFormData.data.value.get(ROWS_KEY)
+  const parsed = (() => {
+    try {
+      return saved?.conclusion ? JSON.parse(String(saved.conclusion)) : null
+    } catch {
+      return null
+    }
+  })()
+  const rawRows = Array.isArray(parsed?.rows) ? parsed.rows : Array.isArray(parsed) ? parsed : null
+  if (!rawRows?.length) return false
+  rows.length = 0
+  for (let i = 0; i < rawRows.length; i++) {
+    const raw = rawRows[i]
+    const row: UnrecognizedLossRow = {
+      ...createEmptyRow(i + 1, raw.investeeName || ''),
+      ...raw,
+      seq: i + 1,
+      id: raw.id || crypto.randomUUID(),
+    }
+    rows.push(row)
+    recalcRow(row)
+  }
+  if (typeof parsed?.conclusion === 'string') conclusion.value = parsed.conclusion
+  return true
+}
+
 onMounted(async () => {
   await auditFormData.load()
   const n = auditFormData.data.value.get(AUDIT_NOTE_KEY)
   if (n?.remark) auditNote.value = n.remark
+  if (!loadRowsFromChecklist()) loadFromHtmlData(props.htmlData)
 })
 
 // ─── 超额亏损为0时Tab2禁用判断 ──────────────────────────────────────────────
@@ -462,6 +500,7 @@ function updateField(id: string, field: keyof UnrecognizedLossRow, value: any) {
   const row = rows.find(r => r.id === id)
   if (row) {
     ;(row as any)[field] = value
+    persistRows()
   }
 }
 
@@ -470,6 +509,7 @@ function updateFieldWithRecalc(id: string, field: keyof UnrecognizedLossRow, val
   if (row) {
     ;(row as any)[field] = value ?? 0
     recalcRow(row)
+    persistRows()
   }
 }
 
@@ -492,6 +532,7 @@ async function handleAddRow() {
     if (value?.trim()) {
       const newRow = createEmptyRow(rows.length + 1, value.trim())
       rows.push(newRow)
+      persistRows()
       ElMessage.success(`已添加「${value.trim()}」`)
     }
   } catch {
@@ -505,6 +546,7 @@ function removeRow(id: string) {
     rows.splice(idx, 1)
     // 重新排序
     rows.forEach((r, i) => { r.seq = i + 1 })
+    persistRows()
   }
 }
 
@@ -570,11 +612,7 @@ function getData(): { rows: UnrecognizedLossRow[]; conclusion: string } {
   return { rows: [...rows], conclusion: conclusion.value }
 }
 
-defineExpose({ getData, loadFromHtmlData })
-
-onMounted(() => {
-  loadFromHtmlData(props.htmlData)
-})
+defineExpose({ getData, loadFromHtmlData, persistRows })
 </script>
 
 <style scoped>

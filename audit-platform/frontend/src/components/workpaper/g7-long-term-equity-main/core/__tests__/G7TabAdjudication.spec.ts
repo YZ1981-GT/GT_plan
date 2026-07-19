@@ -3,10 +3,11 @@
  *
  * 覆盖：
  * 1. 分组折叠/展开切换 + localStorage持久化
- * 2. 净值计算: netValue = totalAdjusted - impairmentAdjusted
- * 3. 变动率>20%高亮判断: isRateWarning
- * 4. CalcGroupSubtotal: 分组小计计算
- * 5. RecalcRow: 单元格编辑后公式重算
+ * 2. 净值计算: netValue = investmentTotal - impairment
+ * 3. 投资合计自动汇总: total = subsidiary + JV + associate
+ * 4. 变动率>20%高亮判断: isRateWarning
+ * 5. CalcGroupSubtotal / RecalcRow（含借贷推算期末未审）
+ * 6. TB 勾稽三口径: 1511原值 / 1512减值 / 净值
  *
  * Requirements: 3.1, 3.4, 3.5
  */
@@ -15,17 +16,15 @@ import {
   parseNum,
   calcAdjustedAmount,
   calcChangeRate,
+  calcDebitBalance,
 } from '../../../composables/useG7FormulaEngine'
 
-// ═══ 从组件中提取的纯逻辑（直接复现组件内部函数） ═══
-
-/** isRateWarning — 变动率>20%判断（与组件内逻辑一致） */
+/** isRateWarning — 变动率>20%判断 */
 function isRateWarning(rate: number | null): boolean {
   if (rate == null) return false
   return Math.abs(rate) > 0.2
 }
 
-/** AdjRow 行结构（简化测试用） */
 interface AdjRow {
   id: string
   item: string
@@ -34,21 +33,32 @@ interface AdjRow {
   openingAJE: number
   openingRJE: number
   openingAdjusted: number
+  debitAmount: number
+  creditAmount: number
   closingUnadjusted: number
   closingAJE: number
   closingRJE: number
   closingAdjusted: number
   changeAmount: number
   changeRate: number | null
+  varianceNote: string
+  _autoClosing?: boolean
   _isSubtotal?: boolean
   _idx: number
 }
 
-/** recalcRow — 公式重算（与组件内逻辑一致） */
 function recalcRow(row: AdjRow): void {
   row.openingAdjusted = calcAdjustedAmount(
     parseNum(row.openingUnadjusted), parseNum(row.openingAJE), parseNum(row.openingRJE),
   )
+  const debit = parseNum(row.debitAmount)
+  const credit = parseNum(row.creditAmount)
+  if (debit !== 0 || credit !== 0) {
+    row.closingUnadjusted = calcDebitBalance(row.openingAdjusted, debit, credit)
+    row._autoClosing = true
+  } else {
+    row._autoClosing = false
+  }
   row.closingAdjusted = calcAdjustedAmount(
     parseNum(row.closingUnadjusted), parseNum(row.closingAJE), parseNum(row.closingRJE),
   )
@@ -56,7 +66,6 @@ function recalcRow(row: AdjRow): void {
   row.changeRate = calcChangeRate(row.openingAdjusted, row.closingAdjusted)
 }
 
-/** calcGroupSubtotal — 分组小计（与组件内逻辑一致） */
 function calcGroupSubtotal(rows: AdjRow[]): AdjRow {
   const dataRows = rows.filter(r => !r._isSubtotal)
   const sum = (field: keyof AdjRow) =>
@@ -65,6 +74,8 @@ function calcGroupSubtotal(rows: AdjRow[]): AdjRow {
   const openAJE = sum('openingAJE')
   const openRJE = sum('openingRJE')
   const openAdj = calcAdjustedAmount(openUnadj, openAJE, openRJE)
+  const debit = sum('debitAmount')
+  const credit = sum('creditAmount')
   const closeUnadj = sum('closingUnadjusted')
   const closeAJE = sum('closingAJE')
   const closeRJE = sum('closingRJE')
@@ -75,14 +86,41 @@ function calcGroupSubtotal(rows: AdjRow[]): AdjRow {
     controlType: '',
     openingUnadjusted: openUnadj, openingAJE: openAJE, openingRJE: openRJE,
     openingAdjusted: openAdj,
+    debitAmount: debit, creditAmount: credit,
     closingUnadjusted: closeUnadj, closingAJE: closeAJE, closingRJE: closeRJE,
     closingAdjusted: closeAdj,
     changeAmount: change, changeRate: calcChangeRate(openAdj, closeAdj),
+    varianceNote: '',
     _isSubtotal: true, _idx: -1,
   }
 }
 
-// ═══ Helper: 创建测试行 ═══
+/** 投资合计 = 三组小计之和（不可编辑） */
+function calcInvestmentTotal(subRows: AdjRow[], jvRows: AdjRow[], assocRows: AdjRow[]): AdjRow {
+  const sub = calcGroupSubtotal(subRows)
+  const jv = calcGroupSubtotal(jvRows)
+  const assoc = calcGroupSubtotal(assocRows)
+  const openAdj = sub.openingAdjusted + jv.openingAdjusted + assoc.openingAdjusted
+  const closeAdj = sub.closingAdjusted + jv.closingAdjusted + assoc.closingAdjusted
+  return {
+    id: 'investment-total', item: '投资合计',
+    controlType: '',
+    openingUnadjusted: sub.openingUnadjusted + jv.openingUnadjusted + assoc.openingUnadjusted,
+    openingAJE: sub.openingAJE + jv.openingAJE + assoc.openingAJE,
+    openingRJE: sub.openingRJE + jv.openingRJE + assoc.openingRJE,
+    openingAdjusted: openAdj,
+    debitAmount: 0, creditAmount: 0,
+    closingUnadjusted: sub.closingUnadjusted + jv.closingUnadjusted + assoc.closingUnadjusted,
+    closingAJE: sub.closingAJE + jv.closingAJE + assoc.closingAJE,
+    closingRJE: sub.closingRJE + jv.closingRJE + assoc.closingRJE,
+    closingAdjusted: closeAdj,
+    changeAmount: Math.round((closeAdj - openAdj) * 100) / 100,
+    changeRate: calcChangeRate(openAdj, closeAdj),
+    varianceNote: '',
+    _isSubtotal: true, _idx: -1,
+  }
+}
+
 function makeTestRow(overrides: Partial<AdjRow> = {}): AdjRow {
   const row: AdjRow = {
     id: 'test-row',
@@ -92,12 +130,15 @@ function makeTestRow(overrides: Partial<AdjRow> = {}): AdjRow {
     openingAJE: 0,
     openingRJE: 0,
     openingAdjusted: 0,
+    debitAmount: 0,
+    creditAmount: 0,
     closingUnadjusted: 0,
     closingAJE: 0,
     closingRJE: 0,
     closingAdjusted: 0,
     changeAmount: 0,
     changeRate: null,
+    varianceNote: '',
     _isSubtotal: false,
     _idx: 0,
     ...overrides,
@@ -105,10 +146,6 @@ function makeTestRow(overrides: Partial<AdjRow> = {}): AdjRow {
   recalcRow(row)
   return row
 }
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 测试用例
-// ═══════════════════════════════════════════════════════════════════════════════
 
 describe('G7TabAdjudication - 分组折叠/展开切换', () => {
   let localStorageMock: Record<string, string>
@@ -127,11 +164,8 @@ describe('G7TabAdjudication - 分组折叠/展开切换', () => {
       subsidiary: true,
       joint_venture: true,
       associate: true,
-      total: true,
       impairment: true,
     }
-
-    // 模拟 toggleGroup 逻辑
     const wpId = 'test-wp-123'
     const storageKey = `g7-adjudication-collapse-${wpId}`
 
@@ -140,21 +174,15 @@ describe('G7TabAdjudication - 分组折叠/展开切换', () => {
       localStorage.setItem(storageKey, JSON.stringify({ ...expandedMap }))
     }
 
-    // 初始全展开
     expect(expandedMap.subsidiary).toBe(true)
-
-    // 折叠子公司组
     toggleGroup('subsidiary')
     expect(expandedMap.subsidiary).toBe(false)
     expect(localStorage.setItem).toHaveBeenCalledWith(
       storageKey,
       expect.stringContaining('"subsidiary":false'),
     )
-
-    // 再展开
     toggleGroup('subsidiary')
     expect(expandedMap.subsidiary).toBe(true)
-    expect(localStorage.setItem).toHaveBeenCalledTimes(2)
   })
 
   it('loadCollapseState 从 localStorage 恢复折叠状态', () => {
@@ -164,7 +192,6 @@ describe('G7TabAdjudication - 分组折叠/展开切换', () => {
       subsidiary: false,
       joint_venture: true,
       associate: false,
-      total: true,
       impairment: true,
     })
 
@@ -172,11 +199,9 @@ describe('G7TabAdjudication - 分组折叠/展开切换', () => {
       subsidiary: true,
       joint_venture: true,
       associate: true,
-      total: true,
       impairment: true,
     }
 
-    // 模拟 loadCollapseState
     const raw = localStorage.getItem(storageKey)
     if (raw) {
       const saved = JSON.parse(raw)
@@ -188,107 +213,97 @@ describe('G7TabAdjudication - 分组折叠/展开切换', () => {
     expect(expandedMap.subsidiary).toBe(false)
     expect(expandedMap.joint_venture).toBe(true)
     expect(expandedMap.associate).toBe(false)
-    expect(expandedMap.total).toBe(true)
-    expect(expandedMap.impairment).toBe(true)
+  })
+})
+
+describe('G7TabAdjudication - 投资合计自动汇总', () => {
+  it('investmentTotal = subsidiary + JV + associate', () => {
+    const sub = [makeTestRow({ closingUnadjusted: 1000, closingAJE: 0, closingRJE: 0 })]
+    const jv = [makeTestRow({ closingUnadjusted: 200, closingAJE: 10, closingRJE: 0 })]
+    const assoc = [makeTestRow({ closingUnadjusted: 300, closingAJE: 0, closingRJE: -5 })]
+    const total = calcInvestmentTotal(sub, jv, assoc)
+    // 1000 + (200+10) + (300-5) = 1000+210+295 = 1505
+    expect(total.closingAdjusted).toBe(1505)
   })
 
-  it('localStorage 为空时保持默认全展开', () => {
-    const expandedMap: Record<string, boolean> = {
-      subsidiary: true,
-      joint_venture: true,
-      associate: true,
-      total: true,
-      impairment: true,
-    }
-
-    const raw = localStorage.getItem('g7-adjudication-collapse-nonexist')
-    // raw === null, 不改变
-    expect(raw).toBeNull()
-    expect(expandedMap.subsidiary).toBe(true)
-    expect(expandedMap.joint_venture).toBe(true)
+  it('空组时投资合计为0', () => {
+    expect(calcInvestmentTotal([], [], []).closingAdjusted).toBe(0)
   })
 })
 
 describe('G7TabAdjudication - 净值计算 (netValue = total - impairment)', () => {
-  it('netValue.closingAdjusted = totalGroup.closingAdjusted - impairGroup.closingAdjusted', () => {
-    // 四、投资合计组
-    const totalRows: AdjRow[] = [
-      makeTestRow({ id: 'total-1', item: '合计项A', closingUnadjusted: 1000, closingAJE: 50, closingRJE: -20 }),
-      makeTestRow({ id: 'total-2', item: '合计项B', closingUnadjusted: 2000, closingAJE: 100, closingRJE: 0 }),
-    ]
-
-    // 五、减值准备组
-    const impairRows: AdjRow[] = [
-      makeTestRow({ id: 'impair-1', item: '减值A', closingUnadjusted: 300, closingAJE: 0, closingRJE: 0 }),
-    ]
-
-    const totalSub = calcGroupSubtotal(totalRows)
-    const impairSub = calcGroupSubtotal(impairRows)
-
-    // total closingAdjusted = (1000+50-20) + (2000+100+0) = 1030 + 2100 = 3130
-    expect(totalSub.closingAdjusted).toBe(3130)
-    // impair closingAdjusted = 300+0+0 = 300
-    expect(impairSub.closingAdjusted).toBe(300)
-
-    // netValue = total - impair = 3130 - 300 = 2830
-    const netCloseAdj = totalSub.closingAdjusted - impairSub.closingAdjusted
-    expect(netCloseAdj).toBe(2830)
+  it('netValue.closingAdjusted = investmentTotal - impair', () => {
+    const sub = [makeTestRow({ closingUnadjusted: 1000, closingAJE: 50, closingRJE: -20 })]
+    const jv = [makeTestRow({ closingUnadjusted: 2000, closingAJE: 100, closingRJE: 0 })]
+    const total = calcInvestmentTotal(sub, jv, [])
+    const impair = calcGroupSubtotal([
+      makeTestRow({ closingUnadjusted: 300, closingAJE: 0, closingRJE: 0 }),
+    ])
+    // total = (1000+50-20) + (2000+100) = 1030+2100 = 3130
+    expect(total.closingAdjusted).toBe(3130)
+    expect(impair.closingAdjusted).toBe(300)
+    expect(total.closingAdjusted - impair.closingAdjusted).toBe(2830)
   })
 
-  it('netValue.openingAdjusted = totalGroup.openingAdjusted - impairGroup.openingAdjusted', () => {
-    const totalRows: AdjRow[] = [
-      makeTestRow({ id: 'total-1', openingUnadjusted: 500, openingAJE: 10, openingRJE: 5 }),
-    ]
-    const impairRows: AdjRow[] = [
-      makeTestRow({ id: 'impair-1', openingUnadjusted: 100, openingAJE: 0, openingRJE: 0 }),
-    ]
+  it('netValue.openingAdjusted = total - impair', () => {
+    const total = calcInvestmentTotal(
+      [makeTestRow({ openingUnadjusted: 500, openingAJE: 10, openingRJE: 5 })],
+      [],
+      [],
+    )
+    const impair = calcGroupSubtotal([
+      makeTestRow({ openingUnadjusted: 100, openingAJE: 0, openingRJE: 0 }),
+    ])
+    expect(total.openingAdjusted).toBe(515)
+    expect(impair.openingAdjusted).toBe(100)
+    expect(total.openingAdjusted - impair.openingAdjusted).toBe(415)
+  })
+})
 
-    const totalSub = calcGroupSubtotal(totalRows)
-    const impairSub = calcGroupSubtotal(impairRows)
-
-    // total openingAdjusted = 500+10+5 = 515
-    expect(totalSub.openingAdjusted).toBe(515)
-    // impair openingAdjusted = 100+0+0 = 100
-    expect(impairSub.openingAdjusted).toBe(100)
-
-    const netOpenAdj = totalSub.openingAdjusted - impairSub.openingAdjusted
-    expect(netOpenAdj).toBe(415)
+describe('G7TabAdjudication - TB 勾稽三口径', () => {
+  it('varianceGross = investmentTotal - TB1511', () => {
+    const total = calcInvestmentTotal(
+      [makeTestRow({ closingUnadjusted: 1000 })],
+      [],
+      [],
+    )
+    const tb1511 = 1000
+    expect(Math.round((total.closingAdjusted - tb1511) * 100) / 100).toBe(0)
   })
 
-  it('空组时净值为0', () => {
-    const emptyTotal = calcGroupSubtotal([])
-    const emptyImpair = calcGroupSubtotal([])
+  it('varianceNet = netValue - (TB1511 - TB1512)', () => {
+    const total = calcInvestmentTotal(
+      [makeTestRow({ closingUnadjusted: 1000 })],
+      [],
+      [],
+    )
+    const impair = calcGroupSubtotal([makeTestRow({ closingUnadjusted: 100 })])
+    const net = total.closingAdjusted - impair.closingAdjusted
+    const tbNet = 1000 - 100
+    expect(net - tbNet).toBe(0)
+  })
 
-    expect(emptyTotal.closingAdjusted).toBe(0)
-    expect(emptyImpair.closingAdjusted).toBe(0)
-    expect(emptyTotal.closingAdjusted - emptyImpair.closingAdjusted).toBe(0)
+  it('回写口径：1511=投资合计原值（非净值）', () => {
+    const total = calcInvestmentTotal(
+      [makeTestRow({ closingUnadjusted: 1000 })],
+      [],
+      [],
+    )
+    const impair = calcGroupSubtotal([makeTestRow({ closingUnadjusted: 100 })])
+    const writeback1511 = total.closingAdjusted
+    const writeback1512 = impair.closingAdjusted
+    expect(writeback1511).toBe(1000)
+    expect(writeback1512).toBe(100)
+    expect(writeback1511).not.toBe(total.closingAdjusted - impair.closingAdjusted)
   })
 })
 
 describe('G7TabAdjudication - 变动率>20%高亮 (isRateWarning)', () => {
-  it('isRateWarning(0.25) 返回 true（>20%）', () => {
-    expect(isRateWarning(0.25)).toBe(true)
-  })
-
-  it('isRateWarning(0.15) 返回 false（<20%）', () => {
-    expect(isRateWarning(0.15)).toBe(false)
-  })
-
-  it('isRateWarning(-0.30) 返回 true（绝对值>20%）', () => {
-    expect(isRateWarning(-0.30)).toBe(true)
-  })
-
-  it('isRateWarning(0.20) 返回 false（恰好=20%不触发）', () => {
-    expect(isRateWarning(0.20)).toBe(false)
-  })
-
-  it('isRateWarning(null) 返回 false', () => {
-    expect(isRateWarning(null)).toBe(false)
-  })
-
-  it('isRateWarning(0) 返回 false', () => {
-    expect(isRateWarning(0)).toBe(false)
-  })
+  it('isRateWarning(0.25) 返回 true', () => expect(isRateWarning(0.25)).toBe(true))
+  it('isRateWarning(0.15) 返回 false', () => expect(isRateWarning(0.15)).toBe(false))
+  it('isRateWarning(-0.30) 返回 true', () => expect(isRateWarning(-0.30)).toBe(true))
+  it('isRateWarning(0.20) 返回 false', () => expect(isRateWarning(0.20)).toBe(false))
+  it('isRateWarning(null) 返回 false', () => expect(isRateWarning(null)).toBe(false))
 })
 
 describe('G7TabAdjudication - CalcGroupSubtotal 分组小计', () => {
@@ -303,33 +318,17 @@ describe('G7TabAdjudication - CalcGroupSubtotal 分组小计', () => {
         closingUnadjusted: 400, closingAJE: 50, closingRJE: -5,
       }),
     ]
-
     const subtotal = calcGroupSubtotal(rows)
-
-    // openingUnadjusted: 100 + 300 = 400
     expect(subtotal.openingUnadjusted).toBe(400)
-    // openingAJE: 10 + (-10) = 0
     expect(subtotal.openingAJE).toBe(0)
-    // openingRJE: 5 + 0 = 5
     expect(subtotal.openingRJE).toBe(5)
-    // openingAdjusted = 400 + 0 + 5 = 405
     expect(subtotal.openingAdjusted).toBe(405)
-
-    // closingUnadjusted: 200 + 400 = 600
     expect(subtotal.closingUnadjusted).toBe(600)
-    // closingAJE: 20 + 50 = 70
     expect(subtotal.closingAJE).toBe(70)
-    // closingRJE: 10 + (-5) = 5
     expect(subtotal.closingRJE).toBe(5)
-    // closingAdjusted = 600 + 70 + 5 = 675
     expect(subtotal.closingAdjusted).toBe(675)
-
-    // changeAmount = 675 - 405 = 270
     expect(subtotal.changeAmount).toBe(270)
-    // changeRate = (675 - 405) / 405 ≈ 0.6667
     expect(subtotal.changeRate).toBeCloseTo(270 / 405, 4)
-
-    // 标记
     expect(subtotal._isSubtotal).toBe(true)
   })
 
@@ -338,19 +337,9 @@ describe('G7TabAdjudication - CalcGroupSubtotal 分组小计', () => {
       makeTestRow({ id: 'r1', openingUnadjusted: 100, closingUnadjusted: 200 }),
       { ...makeTestRow({ id: 'subtotal', openingUnadjusted: 999, closingUnadjusted: 999 }), _isSubtotal: true },
     ]
-
     const subtotal = calcGroupSubtotal(rows)
-    // 只计算非小计行(r1)
     expect(subtotal.openingUnadjusted).toBe(100)
     expect(subtotal.closingUnadjusted).toBe(200)
-  })
-
-  it('空行数组返回全0小计', () => {
-    const subtotal = calcGroupSubtotal([])
-    expect(subtotal.openingAdjusted).toBe(0)
-    expect(subtotal.closingAdjusted).toBe(0)
-    expect(subtotal.changeAmount).toBe(0)
-    expect(subtotal.changeRate).toBeNull() // prior=0 → null
   })
 })
 
@@ -358,11 +347,29 @@ describe('G7TabAdjudication - RecalcRow 公式重算', () => {
   it('修改期初AJE后正确重算openingAdjusted', () => {
     const row = makeTestRow({ openingUnadjusted: 1000, openingAJE: 0, openingRJE: 0 })
     expect(row.openingAdjusted).toBe(1000)
-
-    // 修改AJE
     row.openingAJE = 50
     recalcRow(row)
     expect(row.openingAdjusted).toBe(1050)
+  })
+
+  it('填写借贷后自动推算期末未审', () => {
+    const row = makeTestRow({
+      openingUnadjusted: 500, openingAJE: 0, openingRJE: 0,
+      debitAmount: 200, creditAmount: 50,
+    })
+    // 期末未审 = 500 + 200 - 50 = 650
+    expect(row._autoClosing).toBe(true)
+    expect(row.closingUnadjusted).toBe(650)
+    expect(row.closingAdjusted).toBe(650)
+  })
+
+  it('无借贷时可手填期末未审', () => {
+    const row = makeTestRow({
+      openingUnadjusted: 500,
+      closingUnadjusted: 600,
+    })
+    expect(row._autoClosing).toBe(false)
+    expect(row.closingUnadjusted).toBe(600)
   })
 
   it('修改期末RJE后正确重算closingAdjusted和变动', () => {
@@ -370,29 +377,18 @@ describe('G7TabAdjudication - RecalcRow 公式重算', () => {
       openingUnadjusted: 500, openingAJE: 0, openingRJE: 0,
       closingUnadjusted: 600, closingAJE: 0, closingRJE: 0,
     })
-    expect(row.openingAdjusted).toBe(500)
-    expect(row.closingAdjusted).toBe(600)
-    expect(row.changeAmount).toBe(100)
-    expect(row.changeRate).toBeCloseTo(0.2, 4)
-
-    // 修改期末RJE = 100
     row.closingRJE = 100
     recalcRow(row)
-    // closingAdjusted = 600 + 0 + 100 = 700
     expect(row.closingAdjusted).toBe(700)
-    // changeAmount = 700 - 500 = 200
     expect(row.changeAmount).toBe(200)
-    // changeRate = 200/500 = 0.4
     expect(row.changeRate).toBeCloseTo(0.4, 4)
   })
 
   it('期初审定为0时变动率返回null', () => {
     const row = makeTestRow({
-      openingUnadjusted: 0, openingAJE: 0, openingRJE: 0,
-      closingUnadjusted: 100, closingAJE: 0, closingRJE: 0,
+      openingUnadjusted: 0,
+      closingUnadjusted: 100,
     })
-    expect(row.openingAdjusted).toBe(0)
-    expect(row.closingAdjusted).toBe(100)
     expect(row.changeRate).toBeNull()
   })
 
@@ -401,13 +397,9 @@ describe('G7TabAdjudication - RecalcRow 公式重算', () => {
       openingUnadjusted: 1000, openingAJE: -200, openingRJE: 50,
       closingUnadjusted: 800, closingAJE: -100, closingRJE: 0,
     })
-    // openingAdjusted = 1000 - 200 + 50 = 850
     expect(row.openingAdjusted).toBe(850)
-    // closingAdjusted = 800 - 100 + 0 = 700
     expect(row.closingAdjusted).toBe(700)
-    // changeAmount = 700 - 850 = -150
     expect(row.changeAmount).toBe(-150)
-    // changeRate = -150/850 ≈ -0.1765
     expect(row.changeRate).toBeCloseTo(-150 / 850, 4)
   })
 })

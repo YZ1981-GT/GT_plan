@@ -67,6 +67,7 @@ export function createEmptyImpairmentRow(
 ): ImpairmentCalcRow {
   const stage = (partial.stage || partial.stageGroup || 'Stage1') as ImpairmentCalcRow['stage']
   const { stage: _s, stageGroup: _sg, ...rest } = partial
+  const id = rest.id || crypto.randomUUID()
   return {
     amortizedCost: 0,
     pvFutureCashFlow: 0,
@@ -94,6 +95,8 @@ export function createEmptyImpairmentRow(
     ociAdjustment: 0,
     differenceNote: '',
     ...rest,
+    id,
+    crossSheetInvestmentId: rest.crossSheetInvestmentId || id,
     stageGroup: stage,
     stage,
   }
@@ -102,10 +105,12 @@ export function createEmptyImpairmentRow(
 /** 旧数据迁移补全新字段 */
 export function migrateImpairmentRow(raw: any, seq: number): ImpairmentCalcRow {
   const stage = (raw.stage || raw.stageGroup || 'Stage1') as ImpairmentCalcRow['stage']
+  const id = String(raw.id || `imp-${Date.now()}-${seq}`)
   return createEmptyImpairmentRow({
-    id: String(raw.id || `imp-${Date.now()}-${seq}`),
+    id,
     seq,
     investProject: String(raw.investProject || ''),
+    crossSheetInvestmentId: String(raw.crossSheetInvestmentId || raw.id || id),
     stageGroup: stage,
     stage,
     amortizedCost: parseNum(raw.amortizedCost ?? raw.bookBalance),
@@ -136,6 +141,8 @@ function normalizeInvestName(name: string): string {
 
 export type EclRateUpdateInput = {
   projectName: string
+  /** 稳定投资 ID（优先匹配） */
+  crossSheetInvestmentId?: string
   eclRate: number
   method: 'pdLgd' | 'lossRate'
   stage?: '' | 'Stage1' | 'Stage2' | 'Stage3'
@@ -149,32 +156,59 @@ export type EclRateApplyResult = {
   matched: string[]
   unmatched: string[]
   skipped: Array<{ projectName: string; reason: EclRateSkipReason }>
+  matchReport: {
+    byId: string[]
+    byName: string[]
+    ambiguous: string[]
+    unmatched: string[]
+  }
 }
 
-/** 从 G6-13 两套测算行收集待回写损失率 */
+/** 从 G6-13 两套测算行收集待回写损失率（优先保留稳定 ID） */
 export function collectEclRateUpdates(
-  pdLgdRows: Array<{ projectName?: string; stage?: string; eclRate?: number }> | null | undefined,
-  lossRateRows: Array<{ projectName?: string; stage?: string; eclRate?: number }> | null | undefined,
+  pdLgdRows: Array<{
+    id?: string
+    projectName?: string
+    crossSheetInvestmentId?: string
+    stage?: string
+    eclRate?: number
+  }> | null | undefined,
+  lossRateRows: Array<{
+    id?: string
+    projectName?: string
+    crossSheetInvestmentId?: string
+    stage?: string
+    eclRate?: number
+  }> | null | undefined,
   prefer: 'pdLgd' | 'lossRate' = 'pdLgd',
 ): EclRateUpdateInput[] {
   const map = new Map<string, EclRateUpdateInput>()
   const ingest = (
-    list: Array<{ projectName?: string; stage?: string; eclRate?: number }> | null | undefined,
+    list: Array<{
+      id?: string
+      projectName?: string
+      crossSheetInvestmentId?: string
+      stage?: string
+      eclRate?: number
+    }> | null | undefined,
     method: 'pdLgd' | 'lossRate',
   ) => {
     for (const r of list || []) {
       const name = String(r.projectName || '').trim()
-      if (!name) continue
+      const stableId = String(r.crossSheetInvestmentId || r.id || '').trim()
+      const nameKey = normalizeInvestName(name)
+      if (!stableId && !nameKey) continue
       const rate = Number(r.eclRate)
       if (!Number.isFinite(rate) || rate < 0) continue
-      const key = normalizeInvestName(name)
+      const mapKey = stableId ? `id:${stableId}` : `name:${nameKey}`
       const next: EclRateUpdateInput = {
-        projectName: name,
+        projectName: name || stableId,
+        crossSheetInvestmentId: stableId || undefined,
         eclRate: rate,
         method,
         stage: (r.stage as EclRateUpdateInput['stage']) || '',
       }
-      if (!map.has(key) || prefer === method) map.set(key, next)
+      if (!map.has(mapKey) || prefer === method) map.set(mapKey, next)
     }
   }
   if (prefer === 'pdLgd') {
@@ -193,38 +227,184 @@ export function applyEclRateUpdatesToRows(
   options?: { skipStage3?: boolean },
 ): EclRateApplyResult {
   const skipStage3 = options?.skipStage3 !== false
-  const byName = new Map(base.map(r => [normalizeInvestName(r.investProject), r]))
+  const rows = base.map(r => ({ ...r }))
+  const nameCounts = new Map<string, number>()
+  const byId = new Map<string, ImpairmentCalcRow>()
+  const byName = new Map<string, ImpairmentCalcRow>()
+  for (const row of rows) {
+    const nameKey = normalizeInvestName(row.investProject)
+    if (nameKey) {
+      nameCounts.set(nameKey, (nameCounts.get(nameKey) || 0) + 1)
+      byName.set(nameKey, row)
+    }
+    for (const id of [row.crossSheetInvestmentId, row.id]) {
+      const key = String(id || '').trim()
+      if (key) byId.set(key, row)
+    }
+  }
   const matched: string[] = []
   const unmatched: string[] = []
   const skipped: Array<{ projectName: string; reason: EclRateSkipReason }> = []
+  const matchedById: string[] = []
+  const matchedByName: string[] = []
+  const ambiguous: string[] = []
   let count = 0
-  const rows = base.map(r => ({ ...r }))
 
   for (const u of updates) {
-    const key = normalizeInvestName(u.projectName)
-    const idx = rows.findIndex(r => normalizeInvestName(r.investProject) === key)
-    if (idx < 0) {
-      unmatched.push(u.projectName)
-      skipped.push({ projectName: u.projectName, reason: 'not-found' })
+    const name = String(u.projectName || '').trim()
+    const stableId = String(u.crossSheetInvestmentId || '').trim()
+    const nameKey = normalizeInvestName(name)
+    const label = name || stableId || nameKey
+    if (!stableId && !nameKey) continue
+
+    let matchVia: 'id' | 'name' | null = null
+    let row = stableId ? byId.get(stableId) : undefined
+    if (row) matchVia = 'id'
+    if (!row && nameKey) {
+      row = byName.get(nameKey)
+      if (row) matchVia = 'name'
+    }
+    if (!row) {
+      unmatched.push(label)
+      skipped.push({ projectName: label, reason: 'not-found' })
       continue
     }
-    const row = rows[idx]
+    if (matchVia === 'name' && (nameCounts.get(nameKey) || 0) > 1) {
+      ambiguous.push(label)
+    }
     if (skipStage3 && (row.stageGroup === 'Stage3' || row.stage === 'Stage3')) {
-      skipped.push({ projectName: u.projectName, reason: 'stage3' })
+      skipped.push({ projectName: row.investProject || label, reason: 'stage3' })
       continue
     }
     if (!Number.isFinite(u.eclRate) || u.eclRate < 0 || u.eclRate > 1) {
-      skipped.push({ projectName: u.projectName, reason: 'invalid-rate' })
+      skipped.push({ projectName: label, reason: 'invalid-rate' })
       continue
     }
     row.creditLossRate = u.eclRate
     if (!row.adjRateTouched) row.adjustedCreditLossRate = u.eclRate
-    matched.push(u.projectName)
+    if (stableId) row.crossSheetInvestmentId = row.crossSheetInvestmentId || stableId
+    matched.push(row.investProject || label)
+    if (matchVia === 'id') matchedById.push(row.investProject || label)
+    else matchedByName.push(row.investProject || label)
     count += 1
-    byName.set(key, row)
   }
 
-  return { rows, count, matched, unmatched, skipped }
+  return {
+    rows,
+    count,
+    matched,
+    unmatched,
+    skipped,
+    matchReport: {
+      byId: matchedById,
+      byName: matchedByName,
+      ambiguous: [...new Set(ambiguous)],
+      unmatched: [...unmatched],
+    },
+  }
+}
+
+export interface StageUpdateInput {
+  investProject: string
+  auditStage: 'Stage1' | 'Stage2' | 'Stage3'
+  bookBalance?: number
+  crossSheetInvestmentId?: string
+}
+
+/**
+ * G6-11 → G6-12：优先稳定 ID，其次项目名；缺失则新建空行。
+ */
+export function applyStageUpdatesToRows(
+  existing: ImpairmentCalcRow[] | unknown,
+  updates: StageUpdateInput[],
+): { rows: ImpairmentCalcRow[]; count: number; created: number; updated: number; ambiguous: string[]; matchedById: string[]; matchedByName: string[] } {
+  const rows: ImpairmentCalcRow[] = Array.isArray(existing)
+    ? existing.map((r: any, i: number) => migrateImpairmentRow(r, Number(r?.seq) || i + 1))
+    : []
+
+  const nameCounts = new Map<string, number>()
+  const byId = new Map<string, ImpairmentCalcRow>()
+  const byName = new Map<string, ImpairmentCalcRow>()
+  for (const r of rows) {
+    const key = normalizeInvestName(r.investProject)
+    if (key) {
+      nameCounts.set(key, (nameCounts.get(key) || 0) + 1)
+      byName.set(key, r)
+    }
+    for (const id of [r.crossSheetInvestmentId, r.id]) {
+      const k = String(id || '').trim()
+      if (k) byId.set(k, r)
+    }
+  }
+
+  let count = 0
+  let created = 0
+  let updated = 0
+  const ambiguous: string[] = []
+  const matchedById: string[] = []
+  const matchedByName: string[] = []
+
+  for (const u of updates) {
+    const name = String(u.investProject || '').trim()
+    const stableId = String(u.crossSheetInvestmentId || '').trim()
+    const key = normalizeInvestName(name)
+    if (!stableId && !key) continue
+
+    let matchVia: 'id' | 'name' | null = null
+    let row = stableId ? byId.get(stableId) : undefined
+    if (row) matchVia = 'id'
+    if (!row && key) {
+      row = byName.get(key)
+      if (row) matchVia = 'name'
+    }
+    if (matchVia === 'name' && (nameCounts.get(key) || 0) > 1) ambiguous.push(name)
+
+    if (!row) {
+      const id = stableId || crypto.randomUUID()
+      row = createEmptyImpairmentRow({
+        id,
+        seq: rows.length + 1,
+        investProject: name || id,
+        crossSheetInvestmentId: id,
+        stage: u.auditStage,
+        stageGroup: u.auditStage,
+        amortizedCost: parseNum(u.bookBalance),
+        differenceNote: '来自G6-11三阶段',
+      })
+      rows.push(row)
+      byName.set(normalizeInvestName(row.investProject), row)
+      byId.set(id, row)
+      nameCounts.set(normalizeInvestName(row.investProject), 1)
+      created += 1
+      matchedById.push(row.investProject)
+    } else {
+      row.stage = u.auditStage
+      row.stageGroup = u.auditStage
+      if (stableId) row.crossSheetInvestmentId = row.crossSheetInvestmentId || stableId
+      const incoming = parseNum(u.bookBalance)
+      if (incoming > 0 && !parseNum(row.amortizedCost)) {
+        row.amortizedCost = incoming
+      }
+      if (!row.differenceNote?.includes('来自G6-11')) {
+        row.differenceNote = [row.differenceNote, '来自G6-11三阶段'].filter(Boolean).join('|')
+      }
+      updated += 1
+      if (matchVia === 'id') matchedById.push(row.investProject)
+      else matchedByName.push(row.investProject)
+    }
+    count += 1
+  }
+
+  rows.forEach((r, i) => { r.seq = i + 1 })
+  return {
+    rows,
+    count,
+    created,
+    updated,
+    ambiguous: [...new Set(ambiguous)],
+    matchedById,
+    matchedByName,
+  }
 }
 
 export function useG6EclImpairmentCalc() {
@@ -254,7 +434,8 @@ export function useG6EclImpairmentCalc() {
     const isStage3 = (row.stageGroup || row.stage) === 'Stage3'
     const bal = parseNum(row.amortizedCost)
 
-    if (isStage3 && (parseNum(row.pvFutureCashFlow) > 0 || row.adjPvTouched)) {
+    // Stage3 始终按现值法：PV=0 表示零回收 → ③=①（对齐 G4，避免退回损失率法少计）
+    if (isStage3) {
       row.impairmentProvision = calcImpairmentFromPv(bal, row.pvFutureCashFlow)
       row.creditLossRate = calcImpliedLossRate(bal, row.impairmentProvision)
     } else {
@@ -272,7 +453,7 @@ export function useG6EclImpairmentCalc() {
 
     row.adjBalance = calcAdjustedBalance(bal, row.balanceAdjustment)
 
-    if (isStage3 && (parseNum(row.pvFutureCashFlow) > 0 || row.adjPvTouched)) {
+    if (isStage3) {
       const targetAudited = calcImpairmentFromPv(row.adjBalance, effectiveAdjPv(row))
       row.impairmentAdjustment = calcImpairmentAdjustmentIdentity(
         targetAudited,
@@ -410,7 +591,16 @@ export function useG6EclImpairmentCalc() {
   ): EclRateApplyResult {
     const result = applyEclRateUpdatesToRows(rows.value, updates, options)
     rows.value = result.rows
+    for (const row of rows.value) recalcRow(row)
     return result
+  }
+
+  /** 应用 G6-11 阶段更新 */
+  function applyStageUpdates(updates: StageUpdateInput[]): number {
+    const applied = applyStageUpdatesToRows(rows.value, updates)
+    rows.value = applied.rows
+    for (const row of rows.value) recalcRow(row)
+    return applied.count
   }
 
   return {
@@ -427,6 +617,7 @@ export function useG6EclImpairmentCalc() {
     loadRows,
     toJSON,
     applyEclRateUpdates,
+    applyStageUpdates,
     effectiveAdjRate,
     effectiveAdjPv,
   }

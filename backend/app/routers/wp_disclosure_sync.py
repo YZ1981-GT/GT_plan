@@ -26,6 +26,7 @@ from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.services.wp_disclosure_sync_service import (
     ConflictError,
+    sync_batch_from_workpaper,
     sync_from_workpaper,
     wp_disclosure_sync_service,
 )
@@ -77,6 +78,35 @@ class SyncFromWorkpaperResponse(BaseModel):
         ...,
         description="是否新建了 disclosure_notes 记录（False=更新现有）",
     )
+    texts_synced: int = Field(0, description="写入的叙述正文章节数")
+
+
+class SyncBatchItem(BaseModel):
+    """批量同步中的单个章节载荷"""
+
+    sheet_name: str = Field(..., min_length=1)
+    section_id: str = Field(..., min_length=1)
+    sub_table_data: dict[str, list[dict]] = Field(default_factory=dict)
+
+
+class SyncBatchFromWorkpaperRequest(BaseModel):
+    """多章节一次事务同步请求"""
+
+    wp_id: UUID
+    current_standard: str = Field(..., min_length=1)
+    items: list[SyncBatchItem] = Field(..., min_length=1)
+    year: int | None = None
+
+
+class SyncBatchFromWorkpaperResponse(BaseModel):
+    """批量同步结果"""
+
+    success: bool
+    sections_synced: int
+    rows_synced: int
+    texts_synced: int = 0
+    synced_at: str
+    results: list[dict] = Field(default_factory=list)
 
 
 # ─── Endpoint ────────────────────────────────────────────────────────────────
@@ -126,6 +156,43 @@ async def sync_disclosure_from_workpaper(
         ) from exc
 
     return SyncFromWorkpaperResponse(**result)
+
+
+@router.post(
+    "/{project_id}/disclosure-notes/sync-batch-from-workpaper",
+    response_model=SyncBatchFromWorkpaperResponse,
+)
+async def sync_disclosure_batch_from_workpaper(
+    project_id: UUID,
+    body: SyncBatchFromWorkpaperRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+) -> SyncBatchFromWorkpaperResponse:
+    """多章节一次事务同步（国企 G7 等跨章节编排器用）。"""
+    try:
+        result = await sync_batch_from_workpaper(
+            db,
+            project_id,
+            wp_id=body.wp_id,
+            current_standard=body.current_standard,
+            items=[item.model_dump() for item in body.items],
+            user=current_user,
+            year=body.year,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.exception(
+            "sync_disclosure_batch_from_workpaper failed: project=%s wp_id=%s",
+            project_id, body.wp_id,
+        )
+        await db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"附注批量同步失败: {exc}",
+        ) from exc
+
+    return SyncBatchFromWorkpaperResponse(**result)
 
 
 # ─── US-3: HTML 渲染器路径同步端点 ───────────────────────────────────────────

@@ -212,6 +212,27 @@ async def batch_save_checklist_responses(
             resolved_project_id,
             existing_versions,
         )
+        # G7 源变更后标记已联动的合并底稿过期，提示重新预览导入
+        try:
+            from app.services.g7_consol_linkage_service import (
+                SOURCE_KEYS as _G7_LINK_KEYS,
+                mark_consol_linkage_stale_from_g7,
+            )
+            touched = [item.item_id for item in body.items if item.item_id in _G7_LINK_KEYS]
+            if touched and resolved_project_id:
+                year_val = int(context.audit_year) if context.audit_year else None
+                await mark_consol_linkage_stale_from_g7(
+                    db,
+                    resolved_project_id,
+                    year=year_val,
+                    touched_keys=touched,
+                )
+        except Exception:
+            logger.exception(
+                "标记 G7→合并联动过期失败 wp_id=%s project_id=%s",
+                wp_id,
+                resolved_project_id,
+            )
         await db.commit()
     except HTTPException as exc:
         await db.rollback()
@@ -499,6 +520,10 @@ async def _do_batch_save(
                 pass
             elif item.item_id.startswith("G5-"):
                 # G5 长期应收款：审计说明/审计结论等自由格式（remark 存文本，conclusion 恒为 null）
+                pass
+            elif item.item_id.startswith(("G7-", "G7A-")):
+                # G7 长期股权投资（main / 权益法组）：明细行、基本信息、测算表等结构化 JSON
+                # 存 conclusion（如 G7-2-rows / G7-4-rows），审计说明存 remark，跳过白名单校验
                 pass
             elif item.item_id.startswith(("G6-", "G6A-")):
                 # G6 其他债权投资（main / SPPI / ECL）：明细行、问卷 JSON、审定数、审计说明等自由格式

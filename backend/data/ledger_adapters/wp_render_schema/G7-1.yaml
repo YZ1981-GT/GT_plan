@@ -1,8 +1,10 @@
 # backend/data/wp_render_schema/G7-1.yaml
 # 长期股权投资审定表 — d-form-table 渲染 schema（降级/元数据）
 # Template: G7 长期股权投资.xlsx / sheet: 长期股权投资审定表G7-1
-# 真实结构：按被投资单位分行(权益法/成本法分组)，审定数=未审数+账项调整(单列)；减值准备扣减+净额
-# 修订(2026-07-01)：修正公式列AJE/RJE四列→账项调整单列；cross_ref调整分录G7-8→G7-3/权益法G7-3→G7-14/减值G7-4→G7-17
+# 专属组件 G7TabAdjudication 为权威实现：AJE/RJE 分列（对接 G7-3）；
+# 投资合计=子公司+合营+联营自动汇总；净值=合计-减值；勾稽1511原值/1512减值。
+# 修订(2026-07-19)：与专属组件对齐 — 恢复 AJE/RJE；投资合计改为自动汇总行；
+#   TB 勾稽分 1511/1512；回写口径为原值+减值而非净值误写1511。
 
 wp_code: G7-1
 wp_name: 长期股权投资审定表
@@ -17,83 +19,113 @@ related_accounts:
     name: 长期股权投资减值准备
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 审定表 — 按被投资单位分行 + 权益法/成本法分组 + 减值准备扣减 + 净额
-# 期初/期末各含：未审数/账项调整/审定数(=未审数+账项调整)
+# 审定表 — 按控制类型分组（子公司成本法 / 合营联营权益法）+ 减值扣减 + 净额
+# 期初/期末各含：未审数/AJE/RJE/审定数(=未审+AJE+RJE)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 sections:
-  - name: 权益法核算
-    group_key: equity_method
+  - name: 对子公司投资（成本法）
+    group_key: subsidiary
     row_type: group_header
     dynamic_rows: true
     row_source: investee_list
-    row_filter: "method == 'equity'"
+    row_filter: "control_type == 'subsidiary'"
     fields: &audit_determination_fields
       - { field: investee_name, label: 被投资单位, type: text }
       - { field: opening_unaudited, label: 期初未审数, type: number, auto_source: trial_balance.opening_balance }
-      - { field: opening_adjustment, label: 期初账项调整, type: number }
-      - { field: opening_audited, label: 期初审定数, type: number, formula: "opening_unaudited + opening_adjustment" }
-      - { field: ending_unaudited, label: 期末未审数, type: number, auto_source: trial_balance.unadjusted_amount }
-      - { field: ending_adjustment, label: 期末账项调整, type: number }
-      - { field: ending_audited, label: 期末审定数, type: number, formula: "ending_unaudited + ending_adjustment" }
+      - { field: opening_aje, label: 期初AJE, type: number }
+      - { field: opening_rje, label: 期初RJE, type: number }
+      - { field: opening_audited, label: 期初审定数, type: number, formula: "opening_unaudited + opening_aje + opening_rje" }
+      - { field: debit_amount, label: 借方发生额, type: number }
+      - { field: credit_amount, label: 贷方发生额, type: number }
+      - { field: ending_unaudited, label: 期末未审数, type: number, formula: "opening_audited + debit_amount - credit_amount" }
+      - { field: ending_aje, label: 期末AJE, type: number, cross_ref: G7-3 }
+      - { field: ending_rje, label: 期末RJE, type: number, cross_ref: G7-3 }
+      - { field: ending_audited, label: 期末审定数, type: number, formula: "ending_unaudited + ending_aje + ending_rje" }
       - { field: variance_amount, label: 变动额, type: number, formula: "ending_audited - opening_audited" }
       - { field: variance_pct, label: 变动率, type: percent, formula: "variance_amount / opening_audited" }
       - { field: variance_note, label: 原因分析, type: textarea }
 
-  - name: 权益法小计
+  - name: 子公司小计
     row_type: subtotal
-    formula_source: "SUM(权益法核算)"
+    formula_source: "SUM(对子公司投资（成本法）)"
     fields: *audit_determination_fields
 
-  - name: 成本法核算
-    group_key: cost_method
+  - name: 对合营企业投资（权益法）
+    group_key: joint_venture
     row_type: group_header
     dynamic_rows: true
     row_source: investee_list
-    row_filter: "method == 'cost'"
+    row_filter: "control_type == 'joint_venture'"
     fields: *audit_determination_fields
 
-  - name: 成本法小计
+  - name: 合营小计
     row_type: subtotal
-    formula_source: "SUM(成本法核算)"
+    formula_source: "SUM(对合营企业投资（权益法）)"
+    fields: *audit_determination_fields
+
+  - name: 对联营企业投资（权益法）
+    group_key: associate
+    row_type: group_header
+    dynamic_rows: true
+    row_source: investee_list
+    row_filter: "control_type == 'associate'"
+    fields: *audit_determination_fields
+
+  - name: 联营小计
+    row_type: subtotal
+    formula_source: "SUM(对联营企业投资（权益法）)"
     fields: *audit_determination_fields
 
   - name: 长期股权投资合计
     row_type: total
-    formula_source: "权益法小计 + 成本法小计"
+    formula_source: "子公司小计 + 合营小计 + 联营小计"
+    editable: false
     fields: *audit_determination_fields
+    writeback_account: '1511'
 
   - name: 减：长期股权投资减值准备
     account_code_prefix: '1512'
     row_type: deduction
     fields: *audit_determination_fields
+    writeback_account: '1512'
 
   - name: 长期股权投资净额
     row_type: net
     formula_source: "长期股权投资合计 - 减：长期股权投资减值准备"
+    editable: false
     fields: *audit_determination_fields
+    reconcile: "trial_balance.1511 - trial_balance.1512"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 联动配置
+# 联动配置 — 1511回写投资合计（原值），1512回写减值
 # ═══════════════════════════════════════════════════════════════════════════════
 
 writeback:
-  target: trial_balance.audited_amount
-  trigger: WORKPAPER_SAVED
-  handler: _on_d_audit_determination_saved
-  match_pattern: "^[D-N]\\d+-1$"
-  key_field: account_code
-  value_field: ending_audited
+  - target: trial_balance.audited_amount
+    account_code: '1511'
+    trigger: WORKPAPER_SAVED
+    handler: _on_d_audit_determination_saved
+    key_field: account_code
+    value_field: ending_audited
+    source_section: 长期股权投资合计
+  - target: trial_balance.audited_amount
+    account_code: '1512'
+    trigger: WORKPAPER_SAVED
+    handler: _on_d_audit_determination_saved
+    key_field: account_code
+    value_field: ending_audited
+    source_section: 减：长期股权投资减值准备
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 跨底稿引用（真实：G7-3调整分录/G7-14权益法测算/G7-17减值测试）
+# 跨底稿引用
 # ═══════════════════════════════════════════════════════════════════════════════
 
 cross_refs:
   - ref_id: CW-G7-1-001
     target_wp: G7-3
     target_field: 调整分录汇总
-    description: '审定表账项调整 ← G7-3 调整分录汇总'
+    description: '审定表期末AJE/RJE ← G7-3 调整分录汇总'
     severity: required
     direction: inbound
 

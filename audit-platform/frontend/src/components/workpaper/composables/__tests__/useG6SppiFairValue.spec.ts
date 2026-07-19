@@ -21,6 +21,7 @@ import {
   enrichFairValueRow,
   migrateFairValueRow,
   getLevelValidationErrors,
+  pickG6FairValuePayload,
   G6_FV_DIFF_THRESHOLD,
   type FairValueItem,
   type FairValueTestData,
@@ -394,5 +395,25 @@ describe('useG6SppiFairValue — levelSummary / totals', () => {
     expect(totals.value.unadjFairValue).toBe(2000)
     expect(totals.value.auditedFairValue).toBe(2000)
     expect(totals.value.difference).toBe(0)
+  })
+})
+
+describe('pickG6FairValuePayload', () => {
+  it('优先使用 checklist 落库，避免被 htmlData 空壳覆盖', () => {
+    const checklist = {
+      rows: [createMockRow({ id: 'saved' })],
+      conclusion: '已保存结论',
+    }
+    const html = { rows: [], conclusion: '' }
+    const picked = pickG6FairValuePayload(checklist, null, html)
+    expect(picked?.conclusion).toBe('已保存结论')
+    expect(picked?.rows?.[0]?.id).toBe('saved')
+  })
+
+  it('无 checklist 时回退 content / htmlData', () => {
+    const content = { rows: [createMockRow({ id: 'content' })], conclusion: 'c' }
+    expect(pickG6FairValuePayload(null, content, null)?.rows?.[0]?.id).toBe('content')
+    expect(pickG6FairValuePayload(null, null, content)?.rows?.[0]?.id).toBe('content')
+    expect(pickG6FairValuePayload(null, null, null)).toBeNull()
   })
 })

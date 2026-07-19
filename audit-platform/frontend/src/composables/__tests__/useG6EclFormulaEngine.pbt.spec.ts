@@ -109,16 +109,12 @@ describe('Feature: g6-other-bond-investment-ecl, Property 2+3: 三阶段确定�
     )
   })
 
-  it('P3 corollary: hasSignificantIncrease=true, !creditImpaired → Stage2', () => {
-    fc.assert(
-      fc.property(
-        fc.boolean(),
-        (lowRisk) => {
-          expect(determineStage(true, lowRisk, false)).toBe('Stage2')
-        },
-      ),
-      { numRuns: 100 },
-    )
+  it('P3 corollary: hasSignificantIncrease=true, !lowRisk, !creditImpaired → Stage2', () => {
+    expect(determineStage(true, false, false)).toBe('Stage2')
+  })
+
+  it('P3 corollary: hasSignificantIncrease=true + lowRisk + !creditImpaired → Stage1（低风险豁免）', () => {
+    expect(determineStage(true, true, false)).toBe('Stage1')
   })
 
   it('P3 corollary: !significantIncrease, !creditImpaired → Stage1', () => {

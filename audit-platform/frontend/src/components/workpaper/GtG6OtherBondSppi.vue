@@ -118,6 +118,7 @@ import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsync
 import { useG6SppiDualMode } from './composables/useG6SppiDualMode'
 import { useG6SppiFormData, type ChecklistResponse } from './composables/useG6SppiFormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { matchG6SaveItemsEvent } from './composables/g6CrossHelpers'
 import http from '@/utils/http'
 
 // ─── defineAsyncComponent 懒加载所有子组件 ───────────────────────────────────
@@ -217,19 +218,17 @@ const dualMode = useG6SppiDualMode({
 provide('g6VersionTrailRef', versionTrailRef)
 provide('g6OpenVersionHistory', openVersionHistory)
 provide('reloadWorkpaperData', () => formData.loadAll())
+provide('g6SppiFormData', formData)
 
 function onSheetImported(): void {
   void formData.loadAll()
 }
 
 async function handleG6SaveItems(e: Event): Promise<void> {
-  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
-  if (Array.isArray(items) && items.length > 0) {
-    for (const it of items) {
-      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
-    }
-    scheduleAutoSnapshot()
-  }
+  const items = matchG6SaveItemsEvent(e, props.wpId)
+  if (!items?.length) return
+  await formData.saveItemsFromEvent(items as ChecklistResponse[])
+  scheduleAutoSnapshot()
 }
 
 /** 始终 loadAll；htmlData 为空时再拉取 render-config 作 selfLoad */

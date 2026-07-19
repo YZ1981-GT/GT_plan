@@ -266,18 +266,21 @@
     </el-card>
 
     <details class="prep-hint">
-      <summary>编制提示</summary>
+      <summary>📋 编制提示</summary>
       <ul>
-        <li>Excel 与平台结构一致：余额（8–12）→重要投资（14–20）→三阶段（22–74）→减值滚动（75–89）。</li>
-        <li>余额从 G6-1、重要投资从 G6-2、减值合计从 G6-3 更新；三阶段明细按 G6-11/G6-12 填列。</li>
-        <li>“同步至附注”单向写入国企附注“其他债权投资”，不反向覆盖底稿。</li>
+        <li><b>编制目的</b>：按国企附注结构编制其他债权投资披露底稿，并单向同步至附注模块。</li>
+        <li><b>建议顺序</b>：完成 G6-1/G6-2/G6-3（及 G6-11/G6-12 三阶段）→ 点「从 G6-1/G6-2/G6-3 更新」→ 核对各区块 → 填写附注说明 →「同步至附注」。</li>
+        <li>结构：余额（成本/利息调整/公允价值/减值等）→ 重要投资明细 → 三阶段 ECL → 减值滚动；缺数时回到对应源表补录后再更新。</li>
+        <li>余额优先取 G6-1，重要投资取 G6-2，减值合计取 G6-3；三阶段明细按 G6-11/G6-12 填列，勿与审定表口径混用。</li>
+        <li>「同步至附注」仅写入国企附注「其他债权投资」区块，不反向覆盖本底稿；同步前请确认数字与文字已复核。</li>
+        <li>G6-1 审定变更后可再次「更新」；若附注模块仍显示旧数，确认已重新同步且未在附注侧手工覆盖关键行。</li>
       </ul>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
@@ -298,6 +301,7 @@ import {
   type G4StageMethod,
 } from '../../composables/g4ListedStageDisclosure'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import { dispatchG6SaveItems } from '../../composables/g6CrossHelpers'
 
 interface BalanceRow {
   item: string
@@ -442,9 +446,7 @@ function readResponse(key: string): string {
 
 function saveResponse(key: string, remark: string): void {
   if (props.isReadonly) return
-  window.dispatchEvent(new CustomEvent('g6:save-items', {
-    detail: { items: [{ item_id: key, conclusion: null, remark }] },
-  }))
+  dispatchG6SaveItems(props.wpId, [{ item_id: key, conclusion: null, remark }])
 }
 
 function persistStructured(): void {
@@ -784,6 +786,20 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('substantive:adjudicated', handleAdjudicated)
 })
+
+/** 版本恢复 / 父级 loadAll 后重新灌入已落库附注 */
+watch(
+  () => [
+    props.allResponses?.get(STRUCTURED_KEY)?.remark ?? '',
+    props.allResponses?.get(STAGES_KEY)?.remark ?? '',
+    props.allResponses?.get(TEXT_KEY)?.remark ?? '',
+  ],
+  (next, prev) => {
+    if (!prev) return
+    if (next[0] === prev[0] && next[1] === prev[1] && next[2] === prev[2]) return
+    loadPersisted()
+  },
+)
 </script>
 
 <style scoped>

@@ -66,14 +66,42 @@ def _detect_manual_override(table_data: dict[str, Any] | None) -> bool:
 
 
 def _count_rows_synced(sub_table_data: dict[str, list[dict]] | None) -> int:
-    """统计 sub_table_data 中所有子表行数总和。"""
+    """统计 sub_table_data 中所有子表行数总和（跳过 _ 元数据键）。"""
     if not sub_table_data:
         return 0
     total = 0
-    for rows in sub_table_data.values():
+    for key, rows in sub_table_data.items():
+        if str(key).startswith("_"):
+            continue
         if isinstance(rows, list):
             total += len(rows)
     return total
+
+
+def _extract_note_texts(
+    sub_table_data: dict[str, Any] | None,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """分离表格数据与叙述正文 ``_note_texts``。"""
+    data = dict(sub_table_data or {})
+    raw = data.pop("_note_texts", None)
+    texts: list[dict[str, Any]] = []
+    if isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, dict):
+                texts.append(item)
+    return data, texts
+
+
+def _format_note_texts(note_texts: list[dict[str, Any]]) -> str:
+    """将 _note_texts 列表格式化为附注 text_content。"""
+    parts: list[str] = []
+    for item in note_texts:
+        text = str(item.get("text") or "").strip()
+        if not text:
+            continue
+        title = str(item.get("title") or item.get("section") or "").strip()
+        parts.append(f"【{title}】\n{text}" if title else text)
+    return "\n\n".join(parts)
 
 
 def _derive_section_title(section_id: str) -> str:
@@ -110,13 +138,15 @@ async def sync_from_workpaper(
     user: User,
     year: int | None = None,
     propagation_origin: Literal["user_edit", "system_recompute"] = "user_edit",
+    commit: bool = True,
 ) -> dict[str, Any]:
     """C 类底稿 sheet 保存时，将 sub_table_data 同步到 disclosure_notes 模块对应 section。
 
     行为：
     - 查 disclosure_notes WHERE (project_id, year, note_section=section_id, is_deleted=false)
     - 已存在：更新 table_data（merge sub_table_data）+ 同步标记
-    - 不存在：新建一条记录（status=draft，content_type=table）+ 同步标记
+    - 不存在：新建一条记录（status=draft，content_type=table|mixed）+ 同步标记
+    - ``sub_table_data['_note_texts']`` 写入 ``text_content``，并从子表字典中剥离
 
     manual_override 守卫（Req 7 AC 1/2/6/7）：
     - 如果目标 disclosure_note 当前 table_data 带有 ``_manual_override=True`` 标记，
@@ -124,6 +154,9 @@ async def sync_from_workpaper(
         * propagation_origin='user_edit'   → 入队 cross_module_conflict 并跳过 table_data 更新
         * propagation_origin='system_recompute' → auto_resolve 留痕并继续写入
     - 如果目标无 manual_override，正常写入（保持既有行为，不影响兼容性）
+
+    Args:
+        commit: 是否立即 commit。批量同步时应传 False，由调用方统一提交。
 
     Returns:
         {
@@ -133,6 +166,7 @@ async def sync_from_workpaper(
             "rows_synced": int,
             "created": bool,             # 本次是否新建（True=create，False=update）
             "blocked_by_manual_override": bool,  # 是否被 manual_override 拦截（True=table_data 未更新）
+            "texts_synced": int,
         }
     """
     if not section_id or not section_id.strip():
@@ -141,7 +175,9 @@ async def sync_from_workpaper(
 
     target_year = _derive_year(year)
     now = datetime.now(timezone.utc)
-    rows_synced = _count_rows_synced(sub_table_data)
+    clean_sub_table_data, note_texts = _extract_note_texts(sub_table_data)
+    rows_synced = _count_rows_synced(clean_sub_table_data)
+    formatted_texts = _format_note_texts(note_texts)
 
     # ─── 查现有记录 ───────────────────────────────────────────────────
     stmt = sa.select(DisclosureNote).where(
@@ -157,12 +193,20 @@ async def sync_from_workpaper(
     # 约定：将 C sheet 的 sub_table_data 整体写入 table_data["sub_table_data"]，
     #     并保留 _source / _current_standard / _last_sync_wp / _last_sync_sheet 元数据
     new_table_data: dict[str, Any] = dict(note.table_data) if note and note.table_data else {}
-    new_table_data["sub_table_data"] = dict(sub_table_data or {})
+    new_table_data["sub_table_data"] = dict(clean_sub_table_data or {})
     new_table_data["_source"] = "workpaper"
     new_table_data["_current_standard"] = current_standard
     new_table_data["_last_sync_wp_id"] = str(wp_id)
     new_table_data["_last_sync_sheet"] = sheet_name
     new_table_data["_last_sync_at"] = now.isoformat()
+    if note_texts:
+        new_table_data["_note_texts"] = note_texts
+
+    content_type = ContentType.table
+    if formatted_texts or (note and note.content_type == ContentType.mixed):
+        content_type = ContentType.mixed
+    if note and note.content_type == ContentType.text and formatted_texts:
+        content_type = ContentType.mixed
 
     created = False
     blocked_by_manual_override = False
@@ -182,8 +226,9 @@ async def sync_from_workpaper(
             year=target_year,
             note_section=section_id,
             section_title=_derive_section_title(section_id),
-            content_type=ContentType.table,
+            content_type=content_type,
             table_data=new_table_data,
+            text_content=formatted_texts or None,
             source_template=source_template_value,
             status=NoteStatus.draft,
             last_sync_source="workpaper",
@@ -196,8 +241,8 @@ async def sync_from_workpaper(
         created = True
         logger.info(
             "wp_disclosure_sync: created new disclosure_note "
-            "project=%s section=%s wp_id=%s rows=%d",
-            project_id, section_id, wp_id, rows_synced,
+            "project=%s section=%s wp_id=%s rows=%d texts=%d",
+            project_id, section_id, wp_id, rows_synced, len(note_texts),
         )
     else:
         # ─── 更新 ─────────────────────────────────────────────────────
@@ -230,7 +275,8 @@ async def sync_from_workpaper(
                     "id=%s section=%s wp_id=%s",
                     note.id, section_id, wp_id,
                 )
-                await db.commit()
+                if commit:
+                    await db.commit()
                 return {
                     "success": True,
                     "section_id": section_id,
@@ -238,9 +284,16 @@ async def sync_from_workpaper(
                     "rows_synced": 0,
                     "created": False,
                     "blocked_by_manual_override": True,
+                    "texts_synced": 0,
                 }
             # decision in ('auto_resolved', 'allow') → 继续走更新分支
         note.table_data = new_table_data
+        note.content_type = content_type
+        if formatted_texts:
+            note.text_content = formatted_texts
+        elif note_texts is not None and not note_texts:
+            # 显式空列表不强制清空；仅当有正文载荷时覆盖
+            pass
         note.last_sync_source = "workpaper"
         note.last_sync_wp_id = wp_id
         note.last_sync_at = now
@@ -249,11 +302,12 @@ async def sync_from_workpaper(
         note.updated_at = now
         logger.info(
             "wp_disclosure_sync: updated disclosure_note "
-            "id=%s section=%s wp_id=%s rows=%d",
-            note.id, section_id, wp_id, rows_synced,
+            "id=%s section=%s wp_id=%s rows=%d texts=%d",
+            note.id, section_id, wp_id, rows_synced, len(note_texts),
         )
 
-    await db.commit()
+    if commit:
+        await db.commit()
 
     return {
         "success": True,
@@ -262,6 +316,61 @@ async def sync_from_workpaper(
         "rows_synced": rows_synced,
         "created": created,
         "blocked_by_manual_override": blocked_by_manual_override,
+        "texts_synced": len(note_texts),
+    }
+
+
+async def sync_batch_from_workpaper(
+    db: AsyncSession,
+    project_id: UUID,
+    *,
+    wp_id: UUID,
+    current_standard: str,
+    items: list[dict[str, Any]],
+    user: User,
+    year: int | None = None,
+    propagation_origin: Literal["user_edit", "system_recompute"] = "user_edit",
+) -> dict[str, Any]:
+    """多章节一次事务同步：任一失败则整批回滚。"""
+    if not items:
+        raise ValueError("items 不能为空")
+
+    results: list[dict[str, Any]] = []
+    try:
+        for item in items:
+            section_id = str(item.get("section_id") or "").strip()
+            sheet_name = str(item.get("sheet_name") or "").strip()
+            if not section_id or not sheet_name:
+                raise ValueError("每个 item 必须包含 section_id 与 sheet_name")
+            sub_table_data = item.get("sub_table_data") or {}
+            if not isinstance(sub_table_data, dict):
+                raise ValueError(f"section {section_id} 的 sub_table_data 必须为对象")
+            result = await sync_from_workpaper(
+                db,
+                project_id,
+                wp_id=wp_id,
+                sheet_name=sheet_name,
+                section_id=section_id,
+                sub_table_data=sub_table_data,
+                current_standard=current_standard,
+                user=user,
+                year=year,
+                propagation_origin=propagation_origin,
+                commit=False,
+            )
+            results.append(result)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
+
+    return {
+        "success": True,
+        "sections_synced": len(results),
+        "rows_synced": sum(int(item.get("rows_synced") or 0) for item in results),
+        "texts_synced": sum(int(item.get("texts_synced") or 0) for item in results),
+        "results": results,
+        "synced_at": results[-1]["synced_at"] if results else datetime.now(timezone.utc).isoformat(),
     }
 
 

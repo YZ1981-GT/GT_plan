@@ -58,6 +58,36 @@ describe('useG6EclImpairmentCalc — Stage1/2 损失率法', () => {
 })
 
 describe('useG6EclImpairmentCalc — Stage3 现值法', () => {
+  it('PV>0 时按余额−PV 计提', () => {
+    const { loadRows, rows } = useG6EclImpairmentCalc()
+    loadRows([{
+      id: '1',
+      seq: 1,
+      investProject: 'A',
+      stage: 'Stage3',
+      stageGroup: 'Stage3',
+      amortizedCost: 1_000_000,
+      pvFutureCashFlow: 700_000,
+    } as any])
+    expect(rows.value[0].impairmentProvision).toBe(300_000)
+  })
+
+  it('PV=0（零回收）仍按现值法全额计提，不退回损失率法', () => {
+    const { loadRows, rows } = useG6EclImpairmentCalc()
+    loadRows([{
+      id: '1',
+      seq: 1,
+      investProject: '零回收',
+      stage: 'Stage3',
+      stageGroup: 'Stage3',
+      amortizedCost: 500_000,
+      pvFutureCashFlow: 0,
+      creditLossRate: 0.05,
+    } as any])
+    expect(rows.value[0].impairmentProvision).toBe(500_000)
+    expect(rows.value[0].bookValue).toBe(0)
+  })
+
   it('③=①−PV；损失率反推；⑥倒挤', async () => {
     const { rows, loadRows } = useG6EclImpairmentCalc()
     loadRows([

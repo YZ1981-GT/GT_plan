@@ -810,6 +810,8 @@ declare module 'vue' {
     G5TabVoucherCheck: typeof import('./components/workpaper/g5-long-term-receivable/voucher/G5TabVoucherCheck.vue')['default']
     G6AuditTextCards: typeof import('./components/workpaper/g6-other-bond-investment-main/G6AuditTextCards.vue')['default']
     G6EclImportExportDropdown: typeof import('./components/workpaper/g6-other-bond-investment-ecl/G6EclImportExportDropdown.vue')['default']
+    G6EclSheetStatusBar: typeof import('./components/workpaper/g6-other-bond-investment-ecl/G6EclSheetStatusBar.vue')['default']
+    G6InventoryRollForwardGuideDialog: typeof import('./components/workpaper/g6-other-bond-investment-sppi/inspection/G6InventoryRollForwardGuideDialog.vue')['default']
     G6SppiImportExportDropdown: typeof import('./components/workpaper/g6-other-bond-investment-sppi/G6SppiImportExportDropdown.vue')['default']
     G6TabAdjudication: typeof import('./components/workpaper/g6-other-bond-investment-main/core/G6TabAdjudication.vue')['default']
     G6TabAdjustment: typeof import('./components/workpaper/g6-other-bond-investment-main/core/G6TabAdjustment.vue')['default']

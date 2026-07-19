@@ -7,6 +7,7 @@ import {
   sumG6BadDebtLeaves,
   buildG6BadDebtDisplayRows,
   migrateLegacyEclToMovement,
+  buildG6BadDebtWritebackDetail,
   type G6BadDebtLeaf,
 } from '../useG6BadDebtDetail'
 
@@ -104,5 +105,32 @@ describe('sumG6BadDebtLeaves', () => {
     ])
     expect(t.openingUnadjusted).toBe(30)
     expect(t.closingUnadjusted).toBe(40)
+  })
+})
+
+describe('buildG6BadDebtWritebackDetail（G6-3→G6-1 用未审）', () => {
+  it('回写载荷取期末未审，忽略 closingAdjustment', () => {
+    const detail = buildG6BadDebtWritebackDetail([
+      leaf({
+        category: 'individual',
+        item: '甲',
+        openingUnadjusted: 100,
+        provisionIncrease: 20,
+        closingAdjustment: 50, // 审定=170，未审=120
+      }),
+      leaf({
+        category: 'portfolio',
+        item: '乙',
+        openingUnadjusted: 200,
+        provisionIncrease: 10,
+        closingAdjustment: 30, // 审定=240，未审=210
+      }),
+    ])
+    expect(detail.individualClosing).toBe(120)
+    expect(detail.portfolioClosing).toBe(210)
+    expect(detail.totalClosing).toBe(330)
+    // 若误用审定会得到 170/240/410
+    expect(detail.individualClosing).not.toBe(170)
+    expect(detail.portfolioClosing).not.toBe(240)
   })
 })

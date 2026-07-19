@@ -214,8 +214,10 @@
     </div>
 
     <!-- 底部操作栏 -->
-    <div v-if="!isReadonly && groups.length > 0" class="bottom-actions">
+    <div v-if="!isReadonly" class="bottom-actions">
       <el-button type="primary" size="small" @click="addNewGroup">+ 新增被投资单位分组</el-button>
+      <el-button size="small" @click="syncGroupsFromG74">从 G7-4 同步合营/联营</el-button>
+      <el-button v-if="groups.length > 0" size="small" type="success" @click="handleSave">💾 保存</el-button>
     </div>
 
     <!-- 审计说明 -->
@@ -291,6 +293,7 @@ import { fmtAmount } from '@/utils/formatters'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useG7EquityMethodFormData } from '../../composables/useG7EquityMethodFormData'
 import type { FinancialInfoRow } from '../../composables/useG7EquityMethodFormData'
+import { G7_4_ROWS_KEY, loadEquityInvestees } from '../../composables/g7EquityMethodCrossSheet'
 
 // ═══ Props ═══════════════════════════════════════════════════════════════════
 
@@ -302,16 +305,13 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
-const emit = defineEmits<{
-  (e: 'save', data: { rows: FinancialInfoRow[]; groups: FinancialGroup[] }): void
-}>()
-
 // ═══ Injections ═══════════════════════════════════════════════════════════════
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
 // ═══ Constants ═══════════════════════════════════════════════════════════════
 
+const ROWS_KEY = 'G7-5-rows'
 const STORAGE_KEY_PREFIX = 'g7-financial-info-collapse-'
 
 // ═══ 默认报表项目模板 ═══════════════════════════════════════════════════════
@@ -327,6 +327,7 @@ const DEFAULT_REPORT_ITEMS = [
 
 interface FinancialGroup {
   investeeName: string
+  investeeId?: string
   rows: FinancialInfoRow[]
 }
 
@@ -337,9 +338,9 @@ const expandedMap = reactive<Record<string, boolean>>({})
 const isReadonly = computed(() => !!props.readonly)
 const rowCount = computed(() => groups.reduce((n, g) => n + g.rows.length, 0))
 
-// ═══ 审计说明 / 审计结论持久化（checklist_responses，conclusion:null） ═════════
+// ═══ 持久化（checklist_responses） ═══════════════════════════════════════════
 
-const auditFormData = useG7EquityMethodFormData({
+const formData = useG7EquityMethodFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
@@ -351,22 +352,14 @@ const auditConclusion = ref('')
 function saveAuditNote(val: string): void {
   if (isReadonly.value) return
   auditNote.value = val
-  auditFormData.debouncedSave(AUDIT_NOTE_KEY, { remark: val, conclusion: null })
+  formData.debouncedSave(AUDIT_NOTE_KEY, { remark: val, conclusion: null })
 }
 
 function saveAuditConclusion(val: string): void {
   if (isReadonly.value) return
   auditConclusion.value = val
-  auditFormData.debouncedSave(AUDIT_CONCLUSION_KEY, { remark: val, conclusion: null })
+  formData.debouncedSave(AUDIT_CONCLUSION_KEY, { remark: val, conclusion: null })
 }
-
-onMounted(async () => {
-  await auditFormData.load()
-  const n = auditFormData.data.value.get(AUDIT_NOTE_KEY)
-  if (n?.remark) auditNote.value = n.remark
-  const c = auditFormData.data.value.get(AUDIT_CONCLUSION_KEY)
-  if (c?.remark) auditConclusion.value = c.remark
-})
 
 // ═══ 折叠状态持久化 ═══════════════════════════════════════════════════════
 
@@ -427,11 +420,11 @@ function recalcRow(row: FinancialInfoRow): void {
 function updateAmount(groupName: string, row: FinancialInfoRow, field: 'priorAmount' | 'currentAmount', value: number): void {
   ;(row as any)[field] = value
   recalcRow(row)
-  emitSave()
+  persistRows()
 }
 
 function handleCellChange(_groupName: string, _row: FinancialInfoRow): void {
-  emitSave()
+  persistRows()
 }
 
 // ═══ 动态行增删 ═══════════════════════════════════════════════════════════════
@@ -455,7 +448,7 @@ function addRowToGroup(groupName: string): void {
     remark: '',
   }
   group.rows.push(newRow)
-  emitSave()
+  persistRows()
 }
 
 function deleteRow(groupName: string, index: number): void {
@@ -464,7 +457,7 @@ function deleteRow(groupName: string, index: number): void {
   group.rows.splice(index, 1)
   // 重排序号
   group.rows.forEach((r, i) => { r.seq = i + 1 })
-  emitSave()
+  persistRows()
 }
 
 async function addNewGroup(): Promise<void> {
@@ -487,36 +480,153 @@ async function addNewGroup(): Promise<void> {
       return
     }
 
-    // 创建默认行（资产/负债/净资产/收入/利润等）
-    const newRows: FinancialInfoRow[] = DEFAULT_REPORT_ITEMS.map((item, idx) => ({
-      id: `fi-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 8)}`,
-      seq: idx + 1,
-      investeeName: name,
-      reportItem: item,
-      priorAmount: 0,
-      currentAmount: 0,
-      changeAmount: 0,
-      changeRate: null,
-      analysisNote: '',
-      dataSource: '',
-      auditStatus: '未审' as const,
-      remark: '',
-    }))
-
-    groups.push({ investeeName: name, rows: newRows })
-    expandedMap[name] = true
-    saveCollapseState()
-    emitSave()
+    pushDefaultGroup(name)
+    persistRows()
   } catch {
     // 用户取消
   }
 }
 
+function pushDefaultGroup(name: string, investeeId = ''): void {
+  const newRows: FinancialInfoRow[] = DEFAULT_REPORT_ITEMS.map((item, idx) => ({
+    id: `fi-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 8)}`,
+    seq: idx + 1,
+    investeeName: name,
+    reportItem: item,
+    priorAmount: 0,
+    currentAmount: 0,
+    changeAmount: 0,
+    changeRate: null,
+    analysisNote: '',
+    dataSource: '',
+    auditStatus: '未审' as const,
+    remark: '',
+  }))
+  groups.push({
+    investeeName: name,
+    investeeId: investeeId || undefined,
+    rows: newRows,
+  })
+  expandedMap[name] = true
+  saveCollapseState()
+}
+
+/** 从 G7-4 同步合营/联营单位（已存在的分组不覆盖；回填 investeeId） */
+function syncGroupsFromG74(): void {
+  const investees = loadEquityInvestees(formData.data.value.get(G7_4_ROWS_KEY)?.conclusion)
+  if (investees.length === 0) {
+    ElMessage.warning('G7-4 中暂无合营/联营企业，请先维护基本信息')
+    return
+  }
+  let added = 0
+  let linked = 0
+  for (const inv of investees) {
+    const existing = groups.find((g) =>
+      (inv.investeeId && g.investeeId === inv.investeeId)
+      || g.investeeName === inv.name,
+    )
+    if (existing) {
+      if (inv.investeeId && !existing.investeeId) {
+        existing.investeeId = inv.investeeId
+        linked++
+      }
+      continue
+    }
+    pushDefaultGroup(inv.name, inv.investeeId)
+    added++
+  }
+  if (added === 0 && linked === 0) {
+    ElMessage.info('合营/联营单位已全部同步，无需新增')
+    return
+  }
+  persistRows()
+  ElMessage.success(
+    added > 0
+      ? `已从 G7-4 新增 ${added} 个被投资单位分组`
+      : `已为 ${linked} 个现有分组回填被投资单位ID`,
+  )
+}
+
 // ═══ 保存 ═══════════════════════════════════════════════════════════════════
 
-function emitSave(): void {
+function persistRows(): void {
+  if (isReadonly.value) return
   const allRows = groups.flatMap(g => g.rows)
-  emit('save', { rows: allRows, groups: groups.map(g => ({ investeeName: g.investeeName, rows: g.rows })) })
+  formData.debouncedSave(ROWS_KEY, {
+    conclusion: JSON.stringify({
+      rows: allRows,
+      groups: groups.map(g => ({
+        investeeName: g.investeeName,
+        investeeId: g.investeeId,
+        rows: g.rows,
+      })),
+    }),
+    remark: null,
+  })
+}
+
+function handleSave(): void {
+  persistRows()
+  void formData.saveImmediate(ROWS_KEY, {
+    conclusion: JSON.stringify({
+      rows: groups.flatMap(g => g.rows),
+      groups: groups.map(g => ({
+        investeeName: g.investeeName,
+        investeeId: g.investeeId,
+        rows: g.rows,
+      })),
+    }),
+    remark: null,
+  })
+  ElMessage.success('财务信息已保存')
+}
+
+function mapRawRow(r: any, name: string, idx: number): FinancialInfoRow {
+  const row: FinancialInfoRow = {
+    id: r.id ?? `fi-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 8)}`,
+    seq: r.seq ?? idx + 1,
+    investeeName: name,
+    reportItem: r.reportItem ?? r.report_item ?? '',
+    priorAmount: parseNum(r.priorAmount ?? r.prior_amount),
+    currentAmount: parseNum(r.currentAmount ?? r.current_amount),
+    changeAmount: 0,
+    changeRate: null,
+    analysisNote: r.analysisNote ?? r.analysis_note ?? '',
+    dataSource: r.dataSource ?? r.data_source ?? '',
+    auditStatus: r.auditStatus ?? r.audit_status ?? '未审',
+    remark: r.remark ?? '',
+  }
+  recalcRow(row)
+  return row
+}
+
+function applyGroupsFromPayload(payload: any): boolean {
+  const rawGroups = payload?.groups ?? []
+  if (Array.isArray(rawGroups) && rawGroups.length > 0) {
+    for (const g of rawGroups) {
+      const name = g.investeeName ?? g.investee_name ?? g.name ?? '未命名'
+      const investeeId = String(g.investeeId ?? g.investee_id ?? '').trim()
+      const rows = (g.rows ?? []).map((r: any, idx: number) => mapRawRow(r, name, idx))
+      groups.push({ investeeName: name, investeeId: investeeId || undefined, rows })
+      if (expandedMap[name] === undefined) expandedMap[name] = true
+    }
+    return true
+  }
+  const rawRows = payload?.rows ?? []
+  if (Array.isArray(rawRows) && rawRows.length > 0) {
+    const groupMap = new Map<string, FinancialInfoRow[]>()
+    for (const r of rawRows) {
+      const name = r.investeeName ?? r.investee_name ?? '未分组'
+      if (!groupMap.has(name)) groupMap.set(name, [])
+      groupMap.get(name)!.push(mapRawRow(r, name, groupMap.get(name)!.length))
+    }
+    for (const [name, rows] of groupMap.entries()) {
+      groups.push({ investeeName: name, rows })
+      if (expandedMap[name] === undefined) expandedMap[name] = true
+    }
+    return true
+  }
+  return false
 }
 
 // ═══ 数据水合 ═══════════════════════════════════════════════════════════════
@@ -524,66 +634,15 @@ function emitSave(): void {
 function hydrateData(): void {
   const data = props.htmlData
   const financialInfo = data?.financialInfo ?? data?.financial_info ?? data
+  applyGroupsFromPayload(financialInfo)
+}
 
-  // 尝试从分组数据恢复
-  const rawGroups = financialInfo?.groups ?? []
-  if (Array.isArray(rawGroups) && rawGroups.length > 0) {
-    for (const g of rawGroups) {
-      const name = g.investeeName ?? g.investee_name ?? g.name ?? '未命名'
-      const rows: FinancialInfoRow[] = (g.rows ?? []).map((r: any, idx: number) => {
-        const row: FinancialInfoRow = {
-          id: r.id ?? `fi-${Date.now()}-${idx}`,
-          seq: r.seq ?? idx + 1,
-          investeeName: name,
-          reportItem: r.reportItem ?? r.report_item ?? '',
-          priorAmount: parseNum(r.priorAmount ?? r.prior_amount),
-          currentAmount: parseNum(r.currentAmount ?? r.current_amount),
-          changeAmount: 0,
-          changeRate: null,
-          analysisNote: r.analysisNote ?? r.analysis_note ?? '',
-          dataSource: r.dataSource ?? r.data_source ?? '',
-          auditStatus: r.auditStatus ?? r.audit_status ?? '未审',
-          remark: r.remark ?? '',
-        }
-        recalcRow(row)
-        return row
-      })
-      groups.push({ investeeName: name, rows })
-      expandedMap[name] = true
-    }
-  } else {
-    // 从扁平 rows 恢复
-    const rawRows = financialInfo?.rows ?? []
-    if (Array.isArray(rawRows) && rawRows.length > 0) {
-      const groupMap = new Map<string, FinancialInfoRow[]>()
-      for (const r of rawRows) {
-        const name = r.investeeName ?? r.investee_name ?? '未分组'
-        if (!groupMap.has(name)) groupMap.set(name, [])
-        const row: FinancialInfoRow = {
-          id: r.id ?? `fi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          seq: r.seq ?? groupMap.get(name)!.length + 1,
-          investeeName: name,
-          reportItem: r.reportItem ?? r.report_item ?? '',
-          priorAmount: parseNum(r.priorAmount ?? r.prior_amount),
-          currentAmount: parseNum(r.currentAmount ?? r.current_amount),
-          changeAmount: 0,
-          changeRate: null,
-          analysisNote: r.analysisNote ?? r.analysis_note ?? '',
-          dataSource: r.dataSource ?? r.data_source ?? '',
-          auditStatus: r.auditStatus ?? r.audit_status ?? '未审',
-          remark: r.remark ?? '',
-        }
-        recalcRow(row)
-        groupMap.get(name)!.push(row)
-      }
-      for (const [name, rows] of groupMap.entries()) {
-        groups.push({ investeeName: name, rows })
-        expandedMap[name] = true
-      }
-    }
+function parseStoredPayload(value: unknown): any | null {
+  if (!value) return null
+  if (typeof value === 'string') {
+    try { return JSON.parse(value) } catch { return null }
   }
-
-  // 无数据时不创建默认组——用户手动新增
+  return value
 }
 
 // ═══ 辅助函数 ═══════════════════════════════════════════════════════════════
@@ -609,9 +668,19 @@ function auditStatusType(status: string): '' | 'success' | 'warning' | 'info' {
 
 // ═══ 生命周期 ═══════════════════════════════════════════════════════════════
 
-onMounted(() => {
+onMounted(async () => {
   loadCollapseState()
-  hydrateData()
+  await formData.load()
+
+  const saved = parseStoredPayload(formData.data.value.get(ROWS_KEY)?.conclusion)
+  if (saved && applyGroupsFromPayload(saved)) {
+    // 已从 checklist 恢复
+  } else {
+    hydrateData()
+  }
+
+  auditNote.value = formData.data.value.get(AUDIT_NOTE_KEY)?.remark ?? ''
+  auditConclusion.value = formData.data.value.get(AUDIT_CONCLUSION_KEY)?.remark ?? ''
 })
 </script>
 

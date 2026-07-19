@@ -24,7 +24,9 @@ function baseRow(partial: Partial<OtherBondDetailRow> = {}): OtherBondDetailRow 
     seq: 1,
     investCategory: '国债',
     investProject: '测试债',
+    securitiesCode: '',
     faceValue: 1000,
+    bookQuantity: 0,
     couponRate: 0.03,
     effectiveRate: 0.032,
     maturityDate: '2027-06-30',
@@ -98,9 +100,50 @@ describe('G6_DETAIL_SEGMENTS 结构', () => {
     ])
   })
 
+  it('基础信息含证券代码与持仓数量', () => {
+    const basic = G6_DETAIL_SEGMENTS.find((s) => s.key === 'basic')!
+    const props = basic.columns.map((c) => c.prop)
+    expect(props).toContain('securitiesCode')
+    expect(props).toContain('bookQuantity')
+  })
+
   it('分类标题含其他流动资产', () => {
     expect(G6_CATEGORY_LABELS['一年内到期']).toContain('其他流动资产')
     expect(G6_CATEGORY_LABELS['超过一年']).toContain('超过一年')
+  })
+})
+
+describe('useG6MainDetail 加载保留跨表字段', () => {
+  it('migrate 保留 securitiesCode / bookQuantity 别名', () => {
+    const map = new Map<string, ChecklistResponse>()
+    map.set('G6-2-rows', {
+      item_id: 'G6-2-rows',
+      conclusion: JSON.stringify([
+        {
+          id: 'x1',
+          investProject: '国开债',
+          bondCode: '101001',
+          holding_quantity: 120,
+          faceValue: 100,
+          maturityDate: '2028-01-01',
+        },
+      ]),
+      remark: null,
+    })
+    map.set('G6-2-balance-sheet-date', {
+      item_id: 'G6-2-balance-sheet-date',
+      conclusion: '2025-12-31',
+      remark: '2025-12-31',
+    })
+    const d = useG6MainDetail({
+      wpId: ref('wp'),
+      projectId: ref('p'),
+      allResponses: ref(map),
+      isReadonly: ref(false),
+    })
+    d.reload()
+    expect(d.rows.value[0].securitiesCode).toBe('101001')
+    expect(d.rows.value[0].bookQuantity).toBe(120)
   })
 })
 

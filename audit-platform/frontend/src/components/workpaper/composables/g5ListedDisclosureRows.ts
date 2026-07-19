@@ -118,6 +118,9 @@ export interface G5ListedDisclosureState {
   writeoffRows: G5WriteoffRow[]
   leaseMlpRows: G5LeaseMlpRow[]
   useThreeStageHintAck: boolean
+  /** 组合账龄口径；缺省按已有 agingRows 推断，新建默认 THREE_YEAR */
+  agingPreset?: 'THREE_YEAR' | 'FIVE_YEAR' | 'CUSTOM'
+  customAgingLabels?: string[]
 }
 
 const uid = (prefix: string) =>
@@ -151,6 +154,7 @@ export const G5_DEFAULT_AGING_BANDS: ReadonlyArray<{ bandKey: string; label: str
   { bandKey: 'within1', label: '1年以内' },
   { bandKey: 'y1to2', label: '1-2年' },
   { bandKey: 'y2to3', label: '2-3年' },
+  { bandKey: 'over3', label: '3年以上' },
 ]
 
 export function createAgingRows(
@@ -384,6 +388,8 @@ export function buildDefaultListedState(): G5ListedDisclosureState {
     writeoffRows: [],
     leaseMlpRows: buildDefaultLeaseMlpRows(),
     useThreeStageHintAck: false,
+    agingPreset: 'THREE_YEAR',
+    customAgingLabels: [],
   }
 }
 
@@ -599,6 +605,15 @@ export function parseListedDisclosure(
           }))
         : base.leaseMlpRows,
       useThreeStageHintAck: !!parsed.useThreeStageHintAck,
+      agingPreset:
+        parsed.agingPreset === 'THREE_YEAR'
+        || parsed.agingPreset === 'FIVE_YEAR'
+        || parsed.agingPreset === 'CUSTOM'
+          ? parsed.agingPreset
+          : 'THREE_YEAR',
+      customAgingLabels: Array.isArray(parsed.customAgingLabels)
+        ? parsed.customAgingLabels.map((x: unknown) => String(x).trim()).filter(Boolean)
+        : [],
     }
   } catch {
     return null

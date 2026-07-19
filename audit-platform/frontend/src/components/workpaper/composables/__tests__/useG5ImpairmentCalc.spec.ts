@@ -109,7 +109,7 @@ describe('useG5ImpairmentCalc', () => {
     expect(applied.payload.singleRows[0].stageGroup).toBe('Stage3')
   })
 
-  it('syncGroupRows 归档有数据的旧段', () => {
+  it('syncGroupRows 5→3 将长账龄汇入 over3 且不归档已吸收段', () => {
     const oldSegs = resolveAgingSegments('FIVE_YEAR')
     const rows = oldSegs.map((s, i) => ({
       rowId: `r${i}`,
@@ -125,7 +125,9 @@ describe('useG5ImpairmentCalc', () => {
     }))
     const next = syncGroupRows(rows, resolveAgingSegments('THREE_YEAR'))
     expect(next.filter((r) => !r.archived)).toHaveLength(4)
-    expect(next.some((r) => r.archived && r.segmentKey === 'y4to5')).toBe(true)
+    expect(next.some((r) => r.archived && r.segmentKey === 'y4to5')).toBe(false)
+    const over3 = next.find((r) => r.segmentKey === 'over3' && !r.archived)
+    expect(over3?.auditedBalance).toBe(100)
   })
 
   it('从 G5-2/G5-3 灌数并推送差异至 G5-4', () => {

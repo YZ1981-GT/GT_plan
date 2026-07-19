@@ -10,6 +10,13 @@ import { G5_ACCOUNT_CODE } from './g5Constants'
 import { parseG5AdjStore } from './g5AdjudicationItems'
 import { readCanonicalRaw } from './g5StorageContract'
 import {
+  remapDisclosureAgingRows,
+  resolveG5AgingSegments,
+  validateCustomAgingLabels,
+  type G5AgingPreset,
+} from './g5AgingScheme'
+import { ElMessage } from 'element-plus'
+import {
   bookValue,
   classifyNatureFromDetail,
   computeNatureMethodTieOut,
@@ -252,12 +259,13 @@ export function useG5DisclosureSoe(opts: {
 
   function addPortfolio(name = '') {
     if (isReadonly.value) return
+    const preset = (state.value.agingPreset || 'THREE_YEAR') as G5AgingPreset
+    const segs = resolveG5AgingSegments(preset, state.value.customAgingLabels || [])
+    const pf = createEmptyPortfolio(name || `组合${state.value.portfolios.length + 1}`)
+    pf.agingRows = remapDisclosureAgingRows([], segs)
     state.value = {
       ...state.value,
-      portfolios: [
-        ...state.value.portfolios,
-        createEmptyPortfolio(name || `组合${state.value.portfolios.length + 1}`),
-      ],
+      portfolios: [...state.value.portfolios, pf],
     }
     persistRows()
   }
@@ -310,6 +318,33 @@ export function useG5DisclosureSoe(opts: {
       }),
     }
     persistRows()
+  }
+
+  function setAgingPreset(preset: G5AgingPreset, customLabels?: string[]): boolean {
+    if (isReadonly.value) return false
+    let labels = state.value.customAgingLabels || []
+    if (preset === 'CUSTOM') {
+      labels = (customLabels || labels).map((l) => l.trim()).filter(Boolean)
+      const err = validateCustomAgingLabels(labels)
+      if (err) {
+        ElMessage.warning(err)
+        return false
+      }
+    } else {
+      labels = []
+    }
+    const segs = resolveG5AgingSegments(preset, labels)
+    state.value = {
+      ...state.value,
+      agingPreset: preset,
+      customAgingLabels: labels,
+      portfolios: state.value.portfolios.map((p) => ({
+        ...p,
+        agingRows: remapDisclosureAgingRows(p.agingRows, segs),
+      })),
+    }
+    persistRows()
+    return true
   }
 
   function addAgingBand(portfolioId: string, label = '其他账龄段') {
@@ -587,6 +622,7 @@ export function useG5DisclosureSoe(opts: {
     removePortfolio,
     patchPortfolioName,
     patchAgingCell,
+    setAgingPreset,
     addAgingBand,
     removeAgingBandRow,
     addDerecogRow,

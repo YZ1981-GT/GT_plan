@@ -135,6 +135,7 @@ import { useG7FormData } from './composables/useG7FormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 
 const G7_ACCOUNT_CODE = '1511'
+const G7_IMPAIRMENT_CODE = '1512'
 
 // ─── defineAsyncComponent 懒加载所有子组件 ───────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -271,20 +272,23 @@ const dualMode = useG7DualMode({
   },
 })
 
+/** 审定发布：1511 回写投资合计（原值），1512 回写减值；不再监听 g7:writeback-trial-balance 以免重复回写 */
 function handleG7Adjudicated(e: Event): void {
-  const detail = (e as CustomEvent<{ accountCode?: string; adjudicatedAmount?: number }>).detail
+  const detail = (e as CustomEvent<{
+    accountCode?: string
+    adjudicatedAmount?: number
+    impairmentAccountCode?: string
+    impairmentAmount?: number
+  }>).detail
   if (detail?.accountCode !== G7_ACCOUNT_CODE) return
   const amount = Number(detail.adjudicatedAmount)
-  if (!Number.isFinite(amount)) return
-  void formData.writebackTB(amount)
-}
-
-function handleG7Writeback(e: Event): void {
-  const detail = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number }>).detail
-  if (detail?.accountCode && detail.accountCode !== G7_ACCOUNT_CODE) return
-  const amount = Number(detail?.auditedAmount)
-  if (!Number.isFinite(amount)) return
-  void formData.writebackTB(amount)
+  if (Number.isFinite(amount)) {
+    void formData.writebackTB(amount, G7_ACCOUNT_CODE)
+  }
+  const impairAmt = Number(detail.impairmentAmount)
+  if (Number.isFinite(impairAmt)) {
+    void formData.writebackTB(impairAmt, detail.impairmentAccountCode || G7_IMPAIRMENT_CODE)
+  }
 }
 
 // ─── selfLoad 模式：htmlData 为 null 时自动获取数据 ─────────────────────────
@@ -311,14 +315,12 @@ async function retrySelfLoad(): Promise<void> {
 // ─── 生命周期 ───────────────────────────────────────────────────────────────
 onMounted(async () => {
   window.addEventListener('substantive:adjudicated', handleG7Adjudicated)
-  window.addEventListener('g7:writeback-trial-balance', handleG7Writeback)
   await selfLoadInit()
   isLoading.value = false
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('substantive:adjudicated', handleG7Adjudicated)
-  window.removeEventListener('g7:writeback-trial-balance', handleG7Writeback)
 })
 </script>
 

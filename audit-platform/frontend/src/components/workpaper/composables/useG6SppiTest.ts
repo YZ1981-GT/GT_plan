@@ -1,146 +1,274 @@
-/**
- * useG6SppiTest — G6-8 合同现金流量特征分析（SPPI测试，六section）
- *
- * Spec: .kiro/specs/g6-other-bond-investment-sppi/ Task 8.1
- * Requirements: 5.1, 5.2, 5.4, 5.5
- *
- * 职责：
- * - SppiTestData / SppiSection / SppiItem 数据模型
- * - 六section管理：本金定义/利息定义/修改时间价值/提前还款条款/合同关联工具/综合判断
- * - SPPI_METHODOLOGY 方法论映射（CAS22/CAS37合同现金流量特征）
- * - 检查项措辞为「合规陈述」：是=满足SPPI、否=不满足SPPI、不适用=本项不适用
- * - 综合结论推导：任一section的item isSPPISatisfied='no' → sectionConclusion='fail'
- *   任一section sectionConclusion='fail' → overallConclusion='fail', hasFailedSection=true
- * - 整体通过前须填合同条款摘要与判断依据（证据完整性闸门）
- * - 初始化六section默认items骨架
- */
-import { ref, computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
-// ─── 数据模型 ────────────────────────────────────────────────────────────────
+export type SppiAnswer = 'yes' | 'no' | 'na' | null
+export type SppiConclusion = 'pass' | 'fail' | 'na' | null
+export type SppiOverallConclusion = 'pass' | 'fail' | null
 
-/** SPPI测试单行检查项 */
 export interface SppiItem {
   id: string
   seq: number
-  checkArea: string                    // 检查区域
-  checkItem: string                    // 检查项目
-  casRequirement: string               // CAS要求（只读方法论）
-  contractTermSummary: string          // 企业合同条款摘要（textarea）
-  isSPPISatisfied: 'yes' | 'no' | 'na' | null  // 是否满足SPPI
-  judgmentBasis: string                // 判断依据（textarea）
-  riskLevel: 'high' | 'medium' | 'low' | null  // 风险等级
-  indexRef: string                     // 索引
-  remark: string                       // 备注
+  checkArea: string
+  checkItem: string
+  casRequirement: string
+  contractTermSummary: string
+  isSPPISatisfied: SppiAnswer
+  judgmentBasis: string
+  riskLevel: 'high' | 'medium' | 'low' | null
+  indexRef: string
+  remark: string
 }
 
-/** SPPI测试section */
 export interface SppiSection {
   id: string
   title: string
   items: SppiItem[]
-  sectionConclusion: 'pass' | 'fail' | 'na' | null
+  sectionConclusion: SppiConclusion
 }
 
-/** 完整SPPI测试数据 */
-export interface SppiTestData {
+export interface SppiInstrument {
+  id: string
+  name: string
   sections: SppiSection[]
-  overallConclusion: 'pass' | 'fail' | null
+  overallConclusion: SppiOverallConclusion
   hasFailedSection: boolean
 }
 
-// ─── 方法论映射（六section CAS引用） ─────────────────────────────────────────
+export interface SppiTestData {
+  instruments?: SppiInstrument[]
+  activeInstrumentId?: string | null
+  /** 当前项目的 sections，保留用于兼容旧版持久化格式。 */
+  sections?: SppiSection[]
+  overallConclusion?: SppiOverallConclusion
+  hasFailedSection?: boolean
+}
+
+export interface SppiInstrumentSeed {
+  id?: string
+  projectId?: string
+  name?: string
+  projectName?: string
+  instrumentName?: string
+}
+
+export interface SppiFlatRow extends SppiItem {
+  instrumentId: string
+  instrumentName: string
+  sectionId: string
+  sectionTitle: string
+  sectionConclusion: SppiConclusion
+}
+
+export interface SppiEvidenceGap {
+  instrumentId?: string
+  instrumentName?: string
+  sectionId: string
+  sectionTitle: string
+  itemId: string
+  checkItem: string
+  missing: Array<'contractTermSummary' | 'judgmentBasis' | 'indexRef'>
+}
 
 export const SPPI_METHODOLOGY: Record<string, string> = {
-  principal: '本金是指金融资产在初始确认时的公允价值。本金金额可能因还款而在整个存续期内变化。',
-  interest: '利息包括对货币时间价值、信用风险、流动性风险、管理成本的对价以及利润率。',
-  modified_time_value: '如果利率重置与计息期不匹配，需评估合同现金流量差异是否仅代表货币时间价值的对价。',
-  prepayment: '如提前偿付金额基本代表未偿付本金及利息（含合理补偿），则仍可满足SPPI。',
-  contractual_linked: '优先/次级结构中需评估标的池每项资产是否满足SPPI条件。',
-  comprehensive: '结合以上各项分析，整体评估合同现金流量特征是否满足SPPI。',
+  principal:
+    'CAS 22：本金是金融资产在初始确认时的公允价值，并可因后续偿还而在存续期内变化；合同现金流量不得引入与基本借贷安排无关的本金风险。',
+  interest:
+    'CAS 22：利息由货币时间价值、与特定期间未偿付本金相关的信用风险、其他基本借贷风险和成本以及合理利润率构成。',
+  modified_time_value:
+    'CAS 22：货币时间价值要素被修改时，应以定性及必要的定量基准测试评估未折现合同现金流量与基准现金流量的差异。',
+  prepayment:
+    'CAS 22：提前还款或展期条款仅在结算金额基本代表未偿付本金、应计利息及合理补偿等准则允许成分时保持 SPPI 特征。',
+  contractual_linked:
+    'CAS 22：合同关联工具应穿透评估底层工具现金流量、信用风险集中程度及分层结构，持有层级的信用风险敞口不得高于底层工具组合。',
+  comprehensive:
+    'CAS 22：结合全部合同条款及可能影响现金流量金额和时点的情形，判断现金流量是否仅为本金及以未偿付本金为基础的利息。',
 }
 
-/** Section定义（id, title, methodologyKey） */
-export const SECTION_DEFINITIONS: Array<{ id: string; title: string; methodologyKey: string }> = [
+export const SECTION_DEFINITIONS = [
   { id: 'principal', title: '(一) 本金定义：初始确认时的公允价值', methodologyKey: 'principal' },
-  { id: 'interest', title: '(二) 利息定义：货币时间价值+信用风险+流动性风险+管理成本+利润', methodologyKey: 'interest' },
-  { id: 'modified_time_value', title: '(三) 修改时间价值：期限错配/利率重置不匹配', methodologyKey: 'modified_time_value' },
-  { id: 'prepayment', title: '(四) 提前还款条款：提前还款/延期权', methodologyKey: 'prepayment' },
-  { id: 'contractual_linked', title: '(五) 合同关联工具：优先/次级结构', methodologyKey: 'contractual_linked' },
-  { id: 'comprehensive', title: '(六) 综合判断：是否满足SPPI', methodologyKey: 'comprehensive' },
-]
+  { id: 'interest', title: '(二) 利息定义：基本借贷安排的对价', methodologyKey: 'interest' },
+  { id: 'modified_time_value', title: '(三) 修改时间价值：期限及利率重置匹配', methodologyKey: 'modified_time_value' },
+  { id: 'prepayment', title: '(四) 提前还款及展期条款', methodologyKey: 'prepayment' },
+  { id: 'contractual_linked', title: '(五) 合同关联工具及分层结构', methodologyKey: 'contractual_linked' },
+  { id: 'comprehensive', title: '(六) 综合判断：合同现金流量特征', methodologyKey: 'comprehensive' },
+] as const
 
-// ─── 默认检查项骨架 ──────────────────────────────────────────────────────────
+type ItemDefinition = { checkArea: string; checkItem: string }
 
-/**
- * 每个section的默认检查项（合规陈述，非事实性是/否问句）。
- * 「是否满足SPPI」列：是=本项满足SPPI；否=本项不满足；不适用=本项与合同无关。
- */
-const DEFAULT_SECTION_ITEMS: Record<string, Array<{ checkArea: string; checkItem: string }>> = {
+function statements(checkArea: string, ...checkItems: string[]): ItemDefinition[] {
+  return checkItems.map(checkItem => ({ checkArea, checkItem }))
+}
+
+/** 70 项合规陈述：10 / 14 / 12 / 12 / 12 / 10。 */
+export const DEFAULT_SECTION_ITEMS: Record<string, ItemDefinition[]> = {
   principal: [
-    { checkArea: '本金确认', checkItem: '初始确认时的本金等于实际支付对价（公允价值），无重大非现金对价扭曲' },
-    { checkArea: '本金确认', checkItem: '折溢价属正常市场定价，不导致本金定义偏离基本借贷安排' },
-    { checkArea: '本金变动', checkItem: '本金金额仅因正常还款而变化，无不与本金/利息相关的调整条款' },
-    { checkArea: '本金变动', checkItem: '不存在导致本金非正常增减的或有/杠杆/权益挂钩条款' },
-    { checkArea: '本金变动', checkItem: '本金偿还安排明确、可预期，现金流可按本金基础计量' },
+    ...statements(
+      '初始确认',
+      '初始确认本金以金融资产公允价值为基础确定',
+      '交易价格与公允价值差异已按适用准则识别并处理',
+      '非现金对价不会使本金偏离基本借贷安排',
+    ),
+    ...statements(
+      '本金变动',
+      '存续期本金变动仅源于合同约定的正常偿还',
+      '折价或溢价摊销反映实际利率法下的本金与利息关系',
+      '本金调整不与权益价格、商品价格或其他非借贷变量挂钩',
+      '或有本金调整仅补偿基本借贷风险或成本',
+    ),
+    ...statements(
+      '偿付基础',
+      '本金偿付金额和时点可由合同条款可靠确定',
+      '本金受偿顺序不会形成超出债务人信用风险的额外敞口',
+      '本金结算机制不会产生杠杆或放大非基本借贷风险',
+    ),
   ],
   interest: [
-    { checkArea: '货币时间价值', checkItem: '合同利率反映货币时间价值的基本对价' },
-    { checkArea: '货币时间价值', checkItem: '利息以未偿付本金金额为基础计算' },
-    { checkArea: '信用风险', checkItem: '利率中的信用风险补偿合理且与债务人信用状况匹配' },
-    { checkArea: '信用风险', checkItem: '信用风险溢价不引入与基本借贷安排无关的其他风险敞口' },
-    { checkArea: '流动性风险', checkItem: '流动性风险对价（如有）属基本借贷安排的合理组成部分' },
-    { checkArea: '管理成本', checkItem: '管理成本补偿合理，不构成对非借贷服务的额外对价' },
-    { checkArea: '利润率', checkItem: '利润率合理且不含杠杆、权益或商品价格挂钩成分' },
-    { checkArea: '综合评估', checkItem: '利息各组成部分均为基本贷款安排的对价，无非SPPI成分' },
+    ...statements(
+      '货币时间价值',
+      '合同利率反映特定期间货币时间价值的基本对价',
+      '利息以该期间未偿付本金为计算基础',
+      '固定利率安排体现合同订立日的市场货币时间价值',
+      '浮动利率基准与计价币种及市场惯例相符',
+    ),
+    ...statements(
+      '信用风险',
+      '信用利差补偿债务人在相关期间的信用风险',
+      '信用利差调整与债务人信用状况变化具有合理关联',
+      '担保与增信安排仅影响合理信用风险补偿',
+    ),
+    ...statements(
+      '借贷风险与成本',
+      '流动性风险补偿属于基本借贷安排的合理组成部分',
+      '行政管理成本补偿与持有和服务该金融资产直接相关',
+      '资金成本补偿未引入独立的非借贷风险敞口',
+      '税费及监管成本转嫁具有合理且可识别的借贷基础',
+    ),
+    ...statements(
+      '利润及其他',
+      '合同利润率与同类基本借贷安排的合理回报相符',
+      '利息公式不包含权益、商品、加密资产或业绩指数回报',
+      '利息条款整体不会形成杠杆收益或损失',
+    ),
   ],
   modified_time_value: [
-    { checkArea: '计息期匹配', checkItem: '利率重置频率与计息期匹配，或不存在修改时间价值问题' },
-    { checkArea: '计息期匹配', checkItem: '若重置频率与计息期不匹配，合同现金流与基准现金流差异不显著' },
-    { checkArea: '基准利率', checkItem: '浮动利率基准为公开市场利率或可观察基准，不引入无关风险' },
-    { checkArea: '基准利率', checkItem: '利率上下限(Cap/Floor)（如有）不使合同现金流特征偏离SPPI' },
-    { checkArea: '修改评估', checkItem: '修改后的货币时间价值仍代表基本贷款对价' },
-    { checkArea: '修改评估', checkItem: '需做基准测试时已执行，且结论支持差异不显著/可忽略' },
-    { checkArea: '修改评估', checkItem: '不存在因修改时间价值导致应判定不满足SPPI的情形' },
+    ...statements(
+      '重置匹配',
+      '利率重置频率与对应计息期间保持匹配',
+      '利率期限与重置后的剩余计息期间保持匹配',
+      '重置日与计息起止日差异不会显著修改货币时间价值',
+      '观察期、回溯期或锁定期安排不会显著改变利息经济实质',
+    ),
+    ...statements(
+      '基准特征',
+      '利率基准能够代表相关币种和期限的货币时间价值',
+      '平均利率或滞后利率机制不会引入与基本借贷无关的风险',
+      '利率上限和下限仅限制浮动性且不引入杠杆',
+      '管理人或发行人的利率选择权受客观市场参数约束',
+    ),
+    ...statements(
+      '基准测试',
+      '定性分析已覆盖可能造成现金流量差异的全部修改因素',
+      '需要定量评估时已选取具有可比条款的未修改基准工具',
+      '合理可能情景下合同现金流量与基准现金流量差异不显著',
+      '基准测试期间覆盖金融工具存续期内具有代表性的利率环境',
+    ),
   ],
   prepayment: [
-    { checkArea: '提前偿付', checkItem: '无提前偿付条款，或提前偿付金额基本代表未偿付本金及应计利息（含合理补偿）' },
-    { checkArea: '提前偿付', checkItem: '提前偿付补偿金额合理，不引入与基本借贷无关的额外回报' },
-    { checkArea: '提前偿付', checkItem: '不存在对贷方不利的负补偿条款（或已评估仍满足SPPI例外）' },
-    { checkArea: '提前偿付', checkItem: '提前偿付选择权的行使不导致合同现金流含非本金/利息成分' },
-    { checkArea: '延期权', checkItem: '无展期/延期选择权，或延期期间现金流量仍仅为对本金和利息的支付' },
-    { checkArea: '延期权', checkItem: '延期条款不含与基本借贷安排无关的对价或风险敞口' },
-    { checkArea: '延期权', checkItem: '展期利率重置（如有）仍满足SPPI利息定义' },
+    ...statements(
+      '提前还款',
+      '提前还款金额基本代表未偿付本金及应计未付利息',
+      '提前还款补偿仅覆盖合理的提前终止损失或收益',
+      '借款人提前还款权不会带来与基本借贷无关的回报',
+      '贷款人回售或赎回权的结算基础符合本金及利息定义',
+      '监管、税务或违约触发的提前结算金额符合准则允许成分',
+    ),
+    ...statements(
+      '折溢价例外',
+      '以折价或溢价取得的工具符合准则规定的提前还款例外条件',
+      '提前还款特征的初始公允价值不重大或已按准则要求评估',
+      '提前结算金额中的合理补偿不形成独立衍生回报',
+    ),
+    ...statements(
+      '展期安排',
+      '展期期间现金流量仍仅包含未偿付本金及合规利息',
+      '展期利率按基本借贷风险和成本重新确定',
+      '展期费用仅补偿合理管理成本、信用风险或利润率',
+      '展期选择权不会使持有人承担权益、商品或其他非借贷风险',
+    ),
   ],
   contractual_linked: [
-    { checkArea: '结构评估', checkItem: '不存在优先/次级分层结构，或虽存在但本层级及标的池均满足穿透SPPI条件' },
-    { checkArea: '结构评估', checkItem: '标的资产池中每项资产（或充分样本）均满足SPPI' },
-    { checkArea: '结构评估', checkItem: '信用增级措施不改变本层级合同现金流量的SPPI特征' },
-    { checkArea: '信用风险', checkItem: '本层级信用风险敞口等于或低于标的资产池整体敞口' },
-    { checkArea: '信用风险', checkItem: '不存在使现金流量加速或延迟且引入非SPPI特征的触发条件' },
-    { checkArea: '穿透分析', checkItem: '穿透至底层资产后，现金流量特征仍满足仅本金和利息' },
+    ...statements(
+      '结构识别',
+      '合同分层及现金流量瀑布安排已被完整识别',
+      '持有层级的受偿权及损失吸收顺序已得到清晰界定',
+      '结构中的信用增级仅重新分配底层资产信用风险',
+    ),
+    ...statements(
+      '底层工具',
+      '底层资产合同现金流量本身符合本金和利息定义',
+      '底层资产组合仅包含准则允许的合规工具或降低波动的工具',
+      '衍生工具仅用于降低底层现金流量波动并保持 SPPI 特征',
+      '底层资产替换机制受合规资产标准约束',
+    ),
+    ...statements(
+      '信用风险',
+      '持有层级信用风险敞口不高于底层资产组合信用风险敞口',
+      '损失分配机制不会形成对非信用变量的杠杆敞口',
+      '触发事件仅反映信用恶化、偿付不足或其他基本借贷风险',
+    ),
+    ...statements(
+      '穿透证据',
+      '穿透信息足以支持对底层资产特征和风险的持续评估',
+      '无法直接逐项穿透时采用的组合证据足以形成可靠结论',
+    ),
   ],
   comprehensive: [
-    { checkArea: '综合评估', checkItem: '合同现金流量整体仅为对本金和以未偿付本金为基础的利息的支付' },
-    { checkArea: '综合评估', checkItem: '合同中不存在导致不满足SPPI的嵌入衍生、杠杆或权益/商品挂钩条款' },
-    { checkArea: '综合评估', checkItem: '各section分析结论一致，共同支持最终SPPI判断' },
-    { checkArea: '最终结论', checkItem: '综合判断：本合同/本组合满足SPPI条件' },
-    { checkArea: '最终结论', checkItem: '若不满足SPPI，已识别需重分类为FVTPL（或其他恰当分类）的处理路径' },
+    ...statements(
+      '条款完整性',
+      '全部可能改变合同现金流量金额或时点的条款均已纳入分析',
+      '合同主协议、补充协议及嵌入条款之间的影响已综合考虑',
+      '极端、异常或发生概率极低但真实的情景已按准则要求考虑',
+    ),
+    ...statements(
+      '非借贷敞口',
+      '合同现金流量不与权益价格、商品价格或债务人经营业绩挂钩',
+      '合同安排不包含放大现金流量波动的杠杆机制',
+      '非真实条款或对现金流量影响极小的条款已具备充分判断依据',
+    ),
+    ...statements(
+      '结论衔接',
+      '本金、利息及特殊条款分析之间不存在相互矛盾的结论',
+      '合同现金流量整体仅为本金及以未偿付本金为基础的利息',
+      'SPPI 结论与金融资产分类及后续计量建议保持一致',
+      '关键判断、合同摘录和审计索引足以支持复核与追溯',
+    ),
   ],
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+export const defaultItemCounts: Record<string, number> = Object.fromEntries(
+  SECTION_DEFINITIONS.map(def => [def.id, DEFAULT_SECTION_ITEMS[def.id].length]),
+)
 
-function generateId(): string {
-  return `sppi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+export const defaultTotalRows = Object.values(defaultItemCounts).reduce(
+  (total, count) => total + count,
+  0,
+)
+
+let idCounter = 0
+function generateId(prefix = 'sppi'): string {
+  idCounter += 1
+  return `${prefix}-${Date.now().toString(36)}-${idCounter.toString(36)}`
 }
 
-/** 创建单个SppiItem */
-function createSppiItem(seq: number, checkArea: string, checkItem: string, casRequirement: string): SppiItem {
+function createItem(
+  seq: number,
+  definition: ItemDefinition,
+  casRequirement: string,
+): SppiItem {
   return {
-    id: generateId(),
+    id: generateId('item'),
     seq,
-    checkArea,
-    checkItem,
+    checkArea: definition.checkArea,
+    checkItem: definition.checkItem,
     casRequirement,
     contractTermSummary: '',
     isSPPISatisfied: null,
@@ -151,120 +279,108 @@ function createSppiItem(seq: number, checkArea: string, checkItem: string, casRe
   }
 }
 
-/** 创建一个section含默认items */
-function createSection(def: { id: string; title: string; methodologyKey: string }): SppiSection {
-  const methodology = SPPI_METHODOLOGY[def.methodologyKey] || ''
-  const defaultItems = DEFAULT_SECTION_ITEMS[def.id] || []
-
+function createSection(definition: (typeof SECTION_DEFINITIONS)[number]): SppiSection {
   return {
-    id: def.id,
-    title: def.title,
-    items: defaultItems.map((item, idx) =>
-      createSppiItem(idx + 1, item.checkArea, item.checkItem, methodology),
+    id: definition.id,
+    title: definition.title,
+    items: DEFAULT_SECTION_ITEMS[definition.id].map((item, index) =>
+      createItem(index + 1, item, SPPI_METHODOLOGY[definition.methodologyKey]),
     ),
     sectionConclusion: null,
   }
 }
 
-/** 初始化六section完整默认骨架 */
-function createDefaultSections(): SppiSection[] {
-  return SECTION_DEFINITIONS.map(def => createSection(def))
+export function createDefaultSections(): SppiSection[] {
+  return SECTION_DEFINITIONS.map(createSection)
 }
 
-// ─── Section结论推导逻辑 ─────────────────────────────────────────────────────
-
-/**
- * 推导单个section的结论
- * - 任一item isSPPISatisfied='no' → 'fail'
- * - 所有item均为'yes'或'na'（且至少有一个'yes'） → 'pass'
- * - 所有item均为'na' → 'na'
- * - 有item未填(null) → null（未完成）
- */
-export function deriveSectionConclusion(items: SppiItem[]): 'pass' | 'fail' | 'na' | null {
-  if (!items.length) return null
-
-  let hasNo = false
-  let hasYes = false
-  let hasNull = false
-
-  for (const item of items) {
-    if (item.isSPPISatisfied === 'no') hasNo = true
-    else if (item.isSPPISatisfied === 'yes') hasYes = true
-    else if (item.isSPPISatisfied === null) hasNull = true
-    // 'na' 不影响判断
+function normalizeItem(
+  item: Partial<SppiItem>,
+  index: number,
+  methodology: string,
+): SppiItem {
+  return {
+    id: item.id || generateId('item'),
+    seq: index + 1,
+    checkArea: item.checkArea || '',
+    checkItem: item.checkItem || '',
+    casRequirement: item.casRequirement || methodology,
+    contractTermSummary: item.contractTermSummary || '',
+    isSPPISatisfied: item.isSPPISatisfied ?? null,
+    judgmentBasis: item.judgmentBasis || '',
+    riskLevel: item.riskLevel ?? null,
+    indexRef: item.indexRef || '',
+    remark: item.remark || '',
   }
-
-  // 任一"否" → fail
-  if (hasNo) return 'fail'
-  // 有未填项 → 未完成
-  if (hasNull) return null
-  // 全为na → na
-  if (!hasYes) return 'na'
-  // 全部yes/na（且有yes） → pass
-  return 'pass'
 }
 
-/**
- * 推导综合结论
- * - 任一section sectionConclusion='fail' → 'fail'
- * - 所有section均为'pass'或'na' → 'pass'（但须通过证据完整性闸门）
- * - 有section未完成(null) → null
- * - 证据不完整时不得给出 'pass'（返回 null，由 UI 提示补全）
- */
-export function deriveOverallConclusion(
-  sections: SppiSection[],
-  options?: { requireEvidence?: boolean },
-): 'pass' | 'fail' | null {
-  if (!sections.length) return null
+function normalizeSections(input?: SppiSection[]): SppiSection[] {
+  return SECTION_DEFINITIONS.map(definition => {
+    const existing = input?.find(section => section.id === definition.id)
+    if (!existing) return createSection(definition)
+    return {
+      id: definition.id,
+      title: existing.title || definition.title,
+      items: (existing.items || []).map((item, index) =>
+        normalizeItem(item, index, SPPI_METHODOLOGY[definition.methodologyKey]),
+      ),
+      sectionConclusion: existing.sectionConclusion ?? null,
+    }
+  })
+}
 
-  let hasFail = false
-  let hasNull = false
-  let hasPass = false
+function createInstrument(name: string, id?: string): SppiInstrument {
+  return {
+    id: id || generateId('instrument'),
+    name: name.trim() || '未命名投资项目',
+    sections: createDefaultSections(),
+    overallConclusion: null,
+    hasFailedSection: false,
+  }
+}
 
+function cloneInstrument(input: Partial<SppiInstrument>, fallbackName: string): SppiInstrument {
+  const sections = normalizeSections(input.sections)
   for (const section of sections) {
-    if (section.sectionConclusion === 'fail') hasFail = true
-    else if (section.sectionConclusion === null) hasNull = true
-    else if (section.sectionConclusion === 'pass') hasPass = true
-    // 'na' 不阻断
+    section.sectionConclusion = deriveSectionConclusion(section.items)
   }
-
-  if (hasFail) return 'fail'
-  if (hasNull) return null
-  // 全部为 na、无任何有效 pass → 不可视为整体通过
-  if (!hasPass) return null
-
-  const requireEvidence = options?.requireEvidence !== false
-  if (requireEvidence && findEvidenceGaps(sections).length > 0) return null
-
-  return 'pass'
+  return {
+    id: input.id || generateId('instrument'),
+    name: input.name?.trim() || fallbackName,
+    sections,
+    overallConclusion: deriveOverallConclusion(sections),
+    hasFailedSection: sections.some(section => section.sectionConclusion === 'fail'),
+  }
 }
 
-/** 已作答（yes/no）但缺少合同摘要或判断依据的检查项 */
-export interface SppiEvidenceGap {
-  sectionId: string
-  sectionTitle: string
-  itemId: string
-  checkItem: string
-  missing: Array<'contractTermSummary' | 'judgmentBasis' | 'indexRef'>
+export function deriveSectionConclusion(items: SppiItem[]): SppiConclusion {
+  if (!items.length) return null
+  if (items.some(item => item.isSPPISatisfied === 'no')) return 'fail'
+  if (items.some(item => item.isSPPISatisfied === null)) return null
+  return items.some(item => item.isSPPISatisfied === 'yes') ? 'pass' : 'na'
 }
 
-export function findEvidenceGaps(sections: SppiSection[]): SppiEvidenceGap[] {
+export function findEvidenceGaps(
+  sections: SppiSection[],
+  instrument?: Pick<SppiInstrument, 'id' | 'name'>,
+): SppiEvidenceGap[] {
   const gaps: SppiEvidenceGap[] = []
   for (const section of sections) {
     for (const item of section.items) {
       if (item.isSPPISatisfied !== 'yes' && item.isSPPISatisfied !== 'no') continue
       const missing: SppiEvidenceGap['missing'] = []
-      if (!item.contractTermSummary?.trim()) missing.push('contractTermSummary')
-      if (!item.judgmentBasis?.trim()) missing.push('judgmentBasis')
-      // 判定为“否”或高风险时，索引必填以便复核追溯
+      if (!item.contractTermSummary.trim()) missing.push('contractTermSummary')
+      if (!item.judgmentBasis.trim()) missing.push('judgmentBasis')
       if (
         (item.isSPPISatisfied === 'no' || item.riskLevel === 'high') &&
-        !item.indexRef?.trim()
+        !item.indexRef.trim()
       ) {
         missing.push('indexRef')
       }
       if (missing.length) {
         gaps.push({
+          instrumentId: instrument?.id,
+          instrumentName: instrument?.name,
           sectionId: section.id,
           sectionTitle: section.title,
           itemId: item.id,
@@ -277,242 +393,417 @@ export function findEvidenceGaps(sections: SppiSection[]): SppiEvidenceGap[] {
   return gaps
 }
 
-/** 供 AI / 审计结论使用的精简失败项摘要 */
+export function deriveOverallConclusion(
+  sections: SppiSection[],
+  options: { requireEvidence?: boolean } = {},
+): SppiOverallConclusion {
+  if (!sections.length) return null
+  if (sections.some(section => section.sectionConclusion === 'fail')) return 'fail'
+  if (sections.some(section => section.sectionConclusion === null)) return null
+  // 全部不适用不能证明合同现金流量通过 SPPI。
+  if (!sections.some(section => section.sectionConclusion === 'pass')) return null
+  if (options.requireEvidence !== false && findEvidenceGaps(sections).length) return null
+  return 'pass'
+}
+
+export function deriveAggregateInstrumentConclusion(
+  instruments: SppiInstrument[],
+): SppiOverallConclusion {
+  if (!instruments.length) return null
+  if (instruments.some(instrument => instrument.overallConclusion === 'fail')) return 'fail'
+  if (instruments.some(instrument => instrument.overallConclusion !== 'pass')) return null
+  return 'pass'
+}
+
 export function summarizeFailedItems(sections: SppiSection[]): Array<{
   sectionTitle: string
   checkItem: string
   contractTermSummary: string
   judgmentBasis: string
-  riskLevel: string | null
+  riskLevel: SppiItem['riskLevel']
 }> {
-  const rows: Array<{
-    sectionTitle: string
-    checkItem: string
-    contractTermSummary: string
-    judgmentBasis: string
-    riskLevel: string | null
-  }> = []
-  for (const section of sections) {
-    for (const item of section.items) {
-      if (item.isSPPISatisfied !== 'no') continue
-      rows.push({
+  return sections.flatMap(section =>
+    section.items
+      .filter(item => item.isSPPISatisfied === 'no')
+      .map(item => ({
         sectionTitle: section.title,
         checkItem: item.checkItem,
-        contractTermSummary: item.contractTermSummary || '',
-        judgmentBasis: item.judgmentBasis || '',
+        contractTermSummary: item.contractTermSummary,
+        judgmentBasis: item.judgmentBasis,
         riskLevel: item.riskLevel,
-      })
+      })),
+  )
+}
+
+export function flattenSppiInstruments(instruments: SppiInstrument[]): SppiFlatRow[] {
+  const rows: SppiFlatRow[] = []
+  for (const instrument of instruments) {
+    for (const section of instrument.sections) {
+      for (const item of section.items) {
+        rows.push({
+          instrumentId: instrument.id,
+          instrumentName: instrument.name,
+          sectionId: section.id,
+          sectionTitle: section.title,
+          sectionConclusion: section.sectionConclusion,
+          ...item,
+        })
+      }
     }
   }
   return rows
 }
 
-// ─── Composable ──────────────────────────────────────────────────────────────
+export function nestSppiFlatRows(rows: SppiFlatRow[]): SppiInstrument[] {
+  // 按投资项目归组答案，再与默认六 section 骨架合并，避免导入缺行导致 section 丢失
+  type Bucket = { id: string; name: string; answers: Map<string, SppiFlatRow> }
+  const buckets = new Map<string, Bucket>()
+  const order: string[] = []
 
-export function useG6SppiTest() {
-  const sections = ref<SppiSection[]>(createDefaultSections())
-  const overallConclusion = ref<'pass' | 'fail' | null>(null)
-
-  // ─── 计算属性 ────────────────────────────────────────────────────────────
-
-  /** 是否存在失败section（任一section conclusion='fail'） */
-  const hasFailedSection = computed(() => {
-    return sections.value.some(s => s.sectionConclusion === 'fail')
-  })
-
-  /** 获取失败的section列表（用于红色高亮） */
-  const failedSections = computed(() => {
-    return sections.value.filter(s => s.sectionConclusion === 'fail')
-  })
-
-  /** 证据缺口（已作答但缺摘要/依据/索引） */
-  const evidenceGaps = computed(() => findEvidenceGaps(sections.value))
-
-  /** 证据是否完整（整体通过的前提之一） */
-  const evidenceComplete = computed(() => evidenceGaps.value.length === 0)
-
-  /** 失败检查项摘要（供 AI） */
-  const failedItemSummaries = computed(() => summarizeFailedItems(sections.value))
-
-  /** 所有items平铺（用于虚拟滚动80行渲染） */
-  const allItems = computed(() => {
-    const result: Array<SppiItem & { sectionId: string; sectionTitle: string }> = []
-    let globalSeq = 1
-    for (const section of sections.value) {
-      for (const item of section.items) {
-        result.push({
-          ...item,
-          seq: globalSeq++,
-          sectionId: section.id,
-          sectionTitle: section.title,
-        })
-      }
+  for (const row of rows) {
+    const name = (row.instrumentName || '').trim() || '未命名投资项目'
+    const key = name.replace(/\s+/g, '')
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        id: row.instrumentId || generateId('instrument'),
+        name,
+        answers: new Map(),
+      })
+      order.push(key)
     }
-    return result
-  })
+    const bucket = buckets.get(key)!
+    if (row.instrumentId) bucket.id = row.instrumentId
+    const answerKey = `${row.sectionId}::${row.checkItem || row.id}`
+    bucket.answers.set(answerKey, row)
+  }
 
-  /** 总行数 */
-  const totalRows = computed(() => allItems.value.length)
-
-  // ─── 自动推导结论 ──────────────────────────────────────────────────────────
-
-  /** 重算所有section结论 + 综合结论 */
-  function recalcConclusions(): void {
-    for (const section of sections.value) {
+  return order.map(key => {
+    const bucket = buckets.get(key)!
+    const instrument = createInstrument(bucket.name, bucket.id)
+    for (const section of instrument.sections) {
+      for (const item of section.items) {
+        const hit =
+          bucket.answers.get(`${section.id}::${item.checkItem}`) ||
+          bucket.answers.get(`${section.id}::${item.id}`)
+        if (!hit) continue
+        item.contractTermSummary = hit.contractTermSummary || ''
+        item.judgmentBasis = hit.judgmentBasis || ''
+        item.indexRef = hit.indexRef || ''
+        item.remark = hit.remark || ''
+        const sat = String(hit.isSPPISatisfied || '').toLowerCase()
+        if (sat === 'yes' || sat === '是') item.isSPPISatisfied = 'yes'
+        else if (sat === 'no' || sat === '否') item.isSPPISatisfied = 'no'
+        else if (sat === 'na' || sat === '不适用' || sat === 'n/a') item.isSPPISatisfied = 'na'
+        const risk = String(hit.riskLevel || '').toLowerCase()
+        if (risk === 'high' || risk === '高') item.riskLevel = 'high'
+        else if (risk === 'medium' || risk === '中') item.riskLevel = 'medium'
+        else if (risk === 'low' || risk === '低') item.riskLevel = 'low'
+      }
       section.sectionConclusion = deriveSectionConclusion(section.items)
     }
-    overallConclusion.value = deriveOverallConclusion(sections.value)
-  }
+    instrument.hasFailedSection = instrument.sections.some(s => s.sectionConclusion === 'fail')
+    instrument.overallConclusion = deriveOverallConclusion(instrument.sections)
+    return instrument
+  })
+}
 
-  // watch items 变化时自动重算结论（含证据字段，以便闸门生效）
-  watch(
+function seedName(seed: SppiInstrumentSeed): string {
+  return (seed.projectName || seed.name || seed.instrumentName || '').trim()
+}
+
+export function useG6SppiTest() {
+  const initialInstrument = createInstrument('综合问卷')
+  const instruments = ref<SppiInstrument[]>([initialInstrument])
+  const activeInstrumentId = ref<string | null>(initialInstrument.id)
+
+  const activeInstrument = computed(
     () =>
-      sections.value.map(s =>
-        s.items.map(i => [
-          i.isSPPISatisfied,
-          i.contractTermSummary,
-          i.judgmentBasis,
-          i.indexRef,
-          i.riskLevel,
-        ]),
-      ),
-    () => {
-      recalcConclusions()
-    },
-    { deep: true },
+      instruments.value.find(instrument => instrument.id === activeInstrumentId.value) ||
+      instruments.value[0] ||
+      null,
   )
-
-  // ─── Item操作 ──────────────────────────────────────────────────────────────
-
-  /** 更新某个item字段 */
-  function updateItem(sectionId: string, itemId: string, field: keyof SppiItem, value: any): void {
-    const section = sections.value.find(s => s.id === sectionId)
-    if (!section) return
-    const item = section.items.find(i => i.id === itemId)
-    if (!item) return
-    ;(item as any)[field] = value
-  }
-
-  /** 新增检查项到指定section */
-  function addItem(sectionId: string, checkArea?: string, checkItem?: string): void {
-    const section = sections.value.find(s => s.id === sectionId)
-    if (!section) return
-
-    const methodology = SPPI_METHODOLOGY[sectionId] || ''
-    const seq = section.items.length + 1
-    const newItem = createSppiItem(
-      seq,
-      checkArea || '',
-      checkItem || '',
-      methodology,
+  const sections = computed<SppiSection[]>(() => activeInstrument.value?.sections || [])
+  /** 当前项目结论（页面标签用） */
+  const activeOverallConclusion = computed<SppiOverallConclusion>(
+    () => activeInstrument.value?.overallConclusion ?? null,
+  )
+  /** 跨项目汇总结论（持久化 / G6-7 交叉校验用） */
+  const aggregateConclusion = computed(() =>
+    deriveAggregateInstrumentConclusion(instruments.value),
+  )
+  const overallConclusion = aggregateConclusion
+  const hasFailedSection = computed(() =>
+    instruments.value.some(instrument => instrument.hasFailedSection),
+  )
+  const failedSections = computed(() =>
+    sections.value.filter(section => section.sectionConclusion === 'fail'),
+  )
+  const evidenceGaps = computed(() =>
+    findEvidenceGaps(
+      sections.value,
+      activeInstrument.value
+        ? { id: activeInstrument.value.id, name: activeInstrument.value.name }
+        : undefined,
+    ),
+  )
+  const evidenceComplete = computed(() => evidenceGaps.value.length === 0)
+  const failedItemSummaries = computed(() => summarizeFailedItems(sections.value))
+  const allItems = computed(() => {
+    let seq = 0
+    return sections.value.flatMap(section =>
+      section.items.map(item => ({
+        ...item,
+        seq: ++seq,
+        sectionId: section.id,
+        sectionTitle: section.title,
+      })),
     )
-    section.items.push(newItem)
-  }
+  })
+  const totalRows = computed(() => allItems.value.length)
 
-  /** 删除检查项 */
-  function removeItem(sectionId: string, itemId: string): void {
-    const section = sections.value.find(s => s.id === sectionId)
-    if (!section) return
-    section.items = section.items.filter(i => i.id !== itemId)
-    // 重排序号
-    section.items.forEach((item, idx) => {
-      item.seq = idx + 1
-    })
-  }
-
-  /** 手动设置section结论（覆盖自动推导） */
-  function setSectionConclusion(sectionId: string, value: 'pass' | 'fail' | 'na' | null): void {
-    const section = sections.value.find(s => s.id === sectionId)
-    if (!section) return
-    section.sectionConclusion = value
-    // 重算综合结论（仍受证据闸门约束）
-    overallConclusion.value = deriveOverallConclusion(sections.value)
-  }
-
-  /** 手动设置综合结论（仍受证据闸门：证据不全时不可强制 pass） */
-  function setOverallConclusion(value: 'pass' | 'fail' | null): void {
-    if (value === 'pass' && findEvidenceGaps(sections.value).length > 0) {
-      overallConclusion.value = null
-      return
+  function recalcConclusions(): void {
+    for (const instrument of instruments.value) {
+      for (const section of instrument.sections) {
+        const next = deriveSectionConclusion(section.items)
+        if (section.sectionConclusion !== next) section.sectionConclusion = next
+      }
+      const failed = instrument.sections.some(section => section.sectionConclusion === 'fail')
+      if (instrument.hasFailedSection !== failed) instrument.hasFailedSection = failed
+      const next = deriveOverallConclusion(instrument.sections)
+      if (instrument.overallConclusion !== next) instrument.overallConclusion = next
     }
-    overallConclusion.value = value
   }
 
-  // ─── 数据加载/导出 ─────────────────────────────────────────────────────────
+  watch(instruments, recalcConclusions, { deep: true })
+
+  function updateItem(
+    sectionId: string,
+    itemId: string,
+    field: keyof SppiItem,
+    value: unknown,
+    instrumentId = activeInstrumentId.value,
+  ): void {
+    const instrument = instruments.value.find(current => current.id === instrumentId)
+    const item = instrument?.sections
+      .find(section => section.id === sectionId)
+      ?.items.find(current => current.id === itemId)
+    if (item) (item as Record<string, unknown>)[field] = value
+  }
+
+  function addItem(sectionId: string, checkArea = '', checkItem = ''): void {
+    const section = sections.value.find(current => current.id === sectionId)
+    if (!section) return
+    section.items.push(
+      createItem(
+        section.items.length + 1,
+        { checkArea, checkItem },
+        SPPI_METHODOLOGY[sectionId] || '',
+      ),
+    )
+  }
+
+  function removeItem(sectionId: string, itemId: string): void {
+    const section = sections.value.find(current => current.id === sectionId)
+    if (!section) return
+    section.items = section.items.filter(item => item.id !== itemId)
+    section.items.forEach((item, index) => { item.seq = index + 1 })
+  }
+
+  function setSectionConclusion(sectionId: string, value: SppiConclusion): void {
+    const section = sections.value.find(current => current.id === sectionId)
+    if (section) section.sectionConclusion = value
+    const instrument = activeInstrument.value
+    if (instrument) {
+      instrument.hasFailedSection = instrument.sections.some(
+        current => current.sectionConclusion === 'fail',
+      )
+      instrument.overallConclusion = deriveOverallConclusion(instrument.sections)
+    }
+  }
+
+  function setOverallConclusion(value: SppiOverallConclusion): void {
+    const instrument = activeInstrument.value
+    if (!instrument) return
+    instrument.overallConclusion =
+      value === 'pass' && (
+        findEvidenceGaps(instrument.sections).length ||
+        !instrument.sections.some(section => section.sectionConclusion === 'pass')
+      )
+        ? null
+        : value
+  }
+
+  function setActiveInstrument(id: string): void {
+    if (instruments.value.some(instrument => instrument.id === id)) {
+      activeInstrumentId.value = id
+    }
+  }
+
+  function updateInstrumentName(id: string, name: string): void {
+    const instrument = instruments.value.find(current => current.id === id)
+    if (instrument) instrument.name = name
+  }
+
+  function addInstrument(name = '未命名投资项目', id?: string): SppiInstrument {
+    const instrument = createInstrument(name, id)
+    instruments.value.push(instrument)
+    activeInstrumentId.value = instrument.id
+    return instrument
+  }
+
+  function removeInstrument(id: string): void {
+    const index = instruments.value.findIndex(instrument => instrument.id === id)
+    if (index < 0) return
+    instruments.value.splice(index, 1)
+    if (!instruments.value.length) instruments.value.push(createInstrument('综合问卷'))
+    if (!instruments.value.some(instrument => instrument.id === activeInstrumentId.value)) {
+      activeInstrumentId.value = instruments.value[Math.min(index, instruments.value.length - 1)].id
+    }
+  }
+
+  /** 优先按稳定 ID 合并，其次按项目名；同名异 ID 可并存；名称命中时回填稳定 ID。 */
+  function syncFromSeeds(seeds: SppiInstrumentSeed[]): { added: number; kept: number } {
+    const existingById = new Map(
+      instruments.value.map(instrument => [instrument.id, instrument]),
+    )
+    const existingByName = new Map(
+      instruments.value.map(instrument => [instrument.name.trim().replace(/\s+/g, ''), instrument]),
+    )
+    const usedIds = new Set<string>()
+    const usedNames = new Set<string>()
+    const merged: SppiInstrument[] = []
+    let added = 0
+    let kept = 0
+    for (const seed of seeds) {
+      const name = seedName(seed)
+      if (!name) continue
+      const nameKey = name.replace(/\s+/g, '')
+      const seedId = String(seed.id || seed.projectId || '').trim()
+      if (seedId && usedIds.has(seedId)) continue
+      if (!seedId && usedNames.has(nameKey)) continue
+
+      let existing = seedId ? existingById.get(seedId) : undefined
+      if (!existing) {
+        const byName = existingByName.get(nameKey)
+        if (byName && !usedIds.has(byName.id)) existing = byName
+      }
+
+      if (existing) {
+        if (seedId && existing.id !== seedId && !existingById.has(seedId)) {
+          existingById.delete(existing.id)
+          existing.id = seedId
+          existingById.set(seedId, existing)
+        }
+        merged.push(existing)
+        usedIds.add(existing.id)
+        usedNames.add(nameKey)
+        kept += 1
+      } else {
+        const created = createInstrument(name, seedId || undefined)
+        merged.push(created)
+        usedIds.add(created.id)
+        usedNames.add(nameKey)
+        added += 1
+      }
+    }
+    for (const instrument of instruments.value) {
+      if (usedIds.has(instrument.id)) continue
+      const answered = instrument.sections.some(section =>
+        section.items.some(
+          item => item.isSPPISatisfied !== null || Boolean(item.contractTermSummary?.trim()),
+        ),
+      )
+      if (answered) {
+        merged.push(instrument)
+        usedIds.add(instrument.id)
+        kept += 1
+      }
+    }
+    instruments.value = merged.length ? merged : [createInstrument('综合问卷')]
+    if (!instruments.value.some(instrument => instrument.id === activeInstrumentId.value)) {
+      activeInstrumentId.value = instruments.value[0].id
+    }
+    recalcConclusions()
+    return { added, kept }
+  }
 
   function loadData(data: SppiTestData | null): void {
-    if (!data?.sections?.length) {
-      sections.value = createDefaultSections()
-      overallConclusion.value = null
-      return
+    if (data?.instruments?.length) {
+      instruments.value = data.instruments.map((instrument, index) =>
+        cloneInstrument(instrument, `投资项目 ${index + 1}`),
+      )
+      activeInstrumentId.value =
+        instruments.value.find(instrument => instrument.id === data.activeInstrumentId)?.id ||
+        instruments.value[0].id
+    } else if (data?.sections?.length) {
+      // 旧格式只有 sections，升级为单一历史项目。
+      const historical = cloneInstrument(
+        { name: '综合问卷（历史）', sections: data.sections },
+        '综合问卷（历史）',
+      )
+      instruments.value = [historical]
+      activeInstrumentId.value = historical.id
+    } else {
+      const instrument = createInstrument('综合问卷')
+      instruments.value = [instrument]
+      activeInstrumentId.value = instrument.id
     }
-
-    // 加载已有数据，保持section结构完整性
-    sections.value = SECTION_DEFINITIONS.map(def => {
-      const existingSection = data.sections.find(s => s.id === def.id)
-      if (existingSection) {
-        return {
-          id: def.id,
-          title: def.title,
-          items: existingSection.items.map((item, idx) => ({
-            id: item.id || generateId(),
-            seq: idx + 1,
-            checkArea: item.checkArea || '',
-            checkItem: item.checkItem || '',
-            casRequirement: item.casRequirement || SPPI_METHODOLOGY[def.methodologyKey] || '',
-            contractTermSummary: item.contractTermSummary || '',
-            isSPPISatisfied: item.isSPPISatisfied ?? null,
-            judgmentBasis: item.judgmentBasis || '',
-            riskLevel: item.riskLevel ?? null,
-            indexRef: item.indexRef || '',
-            remark: item.remark || '',
-          })),
-          sectionConclusion: existingSection.sectionConclusion ?? null,
-        }
-      }
-      // section不存在 → 用默认骨架
-      return createSection(def)
-    })
-
-    overallConclusion.value = data.overallConclusion ?? null
-    // 确保结论一致性
     recalcConclusions()
   }
 
   function toJSON(): SppiTestData {
+    const currentSections = sections.value.map(section => ({
+      ...section,
+      items: section.items.map(item => ({ ...item })),
+    }))
     return {
-      sections: sections.value.map(s => ({
-        id: s.id,
-        title: s.title,
-        items: s.items.map(i => ({ ...i })),
-        sectionConclusion: s.sectionConclusion,
+      instruments: instruments.value.map(instrument => ({
+        ...instrument,
+        sections: instrument.sections.map(section => ({
+          ...section,
+          items: section.items.map(item => ({ ...item })),
+        })),
       })),
-      overallConclusion: overallConclusion.value,
+      activeInstrumentId: activeInstrumentId.value,
+      sections: currentSections,
+      overallConclusion: aggregateConclusion.value,
       hasFailedSection: hasFailedSection.value,
     }
   }
 
-  /** 重置为默认骨架 */
-  function reset(): void {
-    sections.value = createDefaultSections()
-    overallConclusion.value = null
+  function toFlatRows(): SppiFlatRow[] {
+    return flattenSppiInstruments(instruments.value)
   }
 
-  /** 获取section的方法论文本 */
+  function loadFromFlatRows(rows: SppiFlatRow[]): void {
+    const nested = nestSppiFlatRows(rows)
+    instruments.value = nested.length ? nested : [createInstrument('综合问卷')]
+    activeInstrumentId.value = instruments.value[0].id
+    recalcConclusions()
+  }
+
+  function reset(): void {
+    const instrument = createInstrument('综合问卷')
+    instruments.value = [instrument]
+    activeInstrumentId.value = instrument.id
+  }
+
   function getSectionMethodology(sectionId: string): string {
     return SPPI_METHODOLOGY[sectionId] || ''
   }
 
-  /** 获取section定义信息 */
   function getSectionDef(sectionId: string) {
-    return SECTION_DEFINITIONS.find(d => d.id === sectionId) || null
+    return SECTION_DEFINITIONS.find(definition => definition.id === sectionId) || null
   }
 
   return {
-    // State
+    instruments,
+    activeInstrumentId,
+    activeInstrument,
     sections,
     overallConclusion,
-    // Computed
+    activeOverallConclusion,
+    aggregateConclusion,
     hasFailedSection,
     failedSections,
     evidenceGaps,
@@ -520,15 +811,21 @@ export function useG6SppiTest() {
     failedItemSummaries,
     allItems,
     totalRows,
-    // Methods
     recalcConclusions,
     updateItem,
     addItem,
     removeItem,
     setSectionConclusion,
     setOverallConclusion,
+    setActiveInstrument,
+    updateInstrumentName,
+    addInstrument,
+    removeInstrument,
+    syncFromSeeds,
     loadData,
     toJSON,
+    toFlatRows,
+    loadFromFlatRows,
     reset,
     getSectionMethodology,
     getSectionDef,

@@ -9,11 +9,11 @@
  *   POST /api/workpapers/{wpId}/g6-sppi/export-data?sheet={code}
  *   POST /api/workpapers/{wpId}/g6-sppi/import-data?sheet={code}  (multipart/form-data)
  *
- * sheet codes: G6-5 / G6-6 / G6-9 / G6-10
+ * sheet codes: G6-5 / G6-6 / G6-8 / G6-9 / G6-10
  * G6-5按2区段分sheet导出 (基础+审定 / 估值详情)
  * G6-10按2区段分sheet导出 (倒轧计算 / 增减明细)
- * G6-6单sheet导出
- * G6-9单sheet导出
+ * G6-6/G6-8/G6-9单sheet导出
+ * G6-8为问卷扁平行（投资项目×检查项）
  *
  * UI 铁律：el-dropdown「导入导出 ▾」（导出模板/导出数据/导入数据）
  * 使用 axios (http from @/utils/http) 非原生 fetch — for Authorization header
@@ -25,8 +25,8 @@ import http from '@/utils/http'
 
 // ═══ 类型定义 ═══
 
-/** G6(SPPI组) 支持导入导出的 sheet 编码（4张动态行表格） */
-export type G6SppiImportableSheet = 'G6-5' | 'G6-6' | 'G6-9' | 'G6-10'
+/** G6(SPPI组) 支持导入导出的 sheet 编码 */
+export type G6SppiImportableSheet = 'G6-5' | 'G6-6' | 'G6-8' | 'G6-9' | 'G6-10'
 
 /** 导入结果 */
 export interface G6SppiImportResult {
@@ -69,12 +69,13 @@ export const G6_SPPI_API_PREFIX = 'g6-sppi'
 export const G6_SPPI_IMPORT_EXPORT_SHEETS: G6SppiSheetMeta[] = [
   { code: 'G6-5', label: 'G6-5 公允价值测试表（2区段）', multiSheet: true, multiSheetDesc: '基础+审定/估值详情' },
   { code: 'G6-6', label: 'G6-6 利息测算表' },
+  { code: 'G6-8', label: 'G6-8 SPPI合同现金流量测试' },
   { code: 'G6-9', label: 'G6-9 有价证券盘点表' },
   { code: 'G6-10', label: 'G6-10 盘点倒轧表（2区段）', multiSheet: true, multiSheetDesc: '倒轧计算/增减明细' },
 ]
 
 /** 可导入sheet codes列表 */
-export const G6_SPPI_IMPORTABLE_SHEETS: G6SppiImportableSheet[] = ['G6-5', 'G6-6', 'G6-9', 'G6-10']
+export const G6_SPPI_IMPORTABLE_SHEETS: G6SppiImportableSheet[] = ['G6-5', 'G6-6', 'G6-8', 'G6-9', 'G6-10']
 
 // ═══ 工具函数 ═══
 
@@ -123,7 +124,7 @@ function downloadBlob(blob: Blob, filename: string): void {
  * sheetName → 可导入导出 sheet code（用于按当前 sheet 过滤下拉项）
  */
 export function resolveG6SppiImportableSheet(sheetName: string): G6SppiImportableSheet | null {
-  const m = (sheetName || '').match(/G6-(5|6|9|10)/)
+  const m = (sheetName || '').match(/G6-(5|6|8|9|10)/)
   if (!m) return null
   const code = `G6-${m[1]}` as G6SppiImportableSheet
   return G6_SPPI_IMPORT_EXPORT_SHEETS.some((s) => s.code === code) ? code : null

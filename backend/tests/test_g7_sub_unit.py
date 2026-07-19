@@ -12,7 +12,7 @@ Tests:
 from __future__ import annotations
 
 import io
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -27,6 +27,12 @@ from app.routers.wp_render_strategies._g7_long_term_equity_subsidiary import (
 )
 from app.routers.wp_render_strategies._g7_long_term_equity_subsidiary_service import (
     G7SubsidiaryService,
+)
+from app.routers.wp_render_strategies._g7_long_term_equity_subsidiary_import_export import (
+    _build_g7_8_workbook,
+    _build_g7_9_workbook,
+    _parse_g7_8_import,
+    _parse_g7_9_import,
 )
 
 
@@ -76,6 +82,167 @@ def _make_xlsx_bytes(headers: list[str], rows: list[list] | None = None) -> byte
     wb.save(buf)
     buf.seek(0)
     return buf.getvalue()
+
+
+def test_g7_8_three_section_export_import_roundtrip():
+    source_rows = [
+        {
+            "id": "m1",
+            "section": "merger",
+            "seq": 1,
+            "investeeName": "公司1",
+            "finalController": "最终控制方A",
+            "ownerEquityBookValue": 100,
+            "ownershipRatio": 0.32,
+            "cashConsideration": 2,
+            "nonCashAssetBookValue": 2,
+            "debtBookValue": 3,
+            "equitySecuritiesFaceValue": 0,
+            "contingentConsideration": 3,
+            "adjustmentTreatment": "增加资本公积",
+            "indexRef": "G7-8-1",
+            "auditConclusion": "无差异",
+        },
+        {
+            "id": "s1",
+            "section": "step",
+            "companyId": "p",
+            "companyName": "P公司",
+            "seq": 1,
+            "transactionNo": 1,
+            "transactionDate": "2024-01-01",
+            "purchaseRatio": 0.01,
+            "consideration": 1,
+            "netAssetsBookValue": 22,
+            "priorInvestmentAdjustments": 22,
+            "notPackageBasis": "独立交易",
+            "indexRef": "G7-8-2",
+        },
+        {
+            "id": "r1",
+            "section": "reverse",
+            "seq": 1,
+            "transactionContent": "发行股份取得控制",
+            "accountingAcquirer": "非上市公司A",
+            "acquirerShareholders": "A原股东",
+            "accountingAcquiree": "上市公司B",
+            "acquireeOriginalShareholders": "B原股东",
+            "reversePurchaseBasis": "A原股东取得控制",
+            "businessDeterminationBasis": "B构成业务",
+            "indexRef": "G7-8-3",
+        },
+    ]
+    workbook = _build_g7_8_workbook(source_rows)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+
+    parsed, errors = _parse_g7_8_import(buffer.getvalue())
+    assert errors == []
+    assert {row["section"] for row in parsed} == {"merger", "step", "reverse"}
+    merger = next(row for row in parsed if row["section"] == "merger")
+    assert merger["initialInvestmentCost"] == 32
+    assert merger["totalConsideration"] == 10
+    assert merger["capitalReserveRetainedEarningsAdjustment"] == 22
+
+
+def test_g7_9_three_section_export_import_roundtrip():
+    source_rows = [
+        {
+            "id": "m1",
+            "section": "merger",
+            "seq": 1,
+            "investeeName": "目标公司",
+            "acquisitionDate": "2024-06-30",
+            "acquisitionDateEvidenceRef": "G7-9-A1",
+            "cashConsideration": 100,
+            "nonCashAssetFV": 20,
+            "debtFV": 10,
+            "equitySecuritiesFV": 5,
+            "contingentConsiderationFV": 5,
+            "priorHoldingFV": 40,
+            "considerationBookValue": 120,
+            "acquisitionCostsExpensed": 8,
+            "acquireeIdentifiableNetAssetsFV": 200,
+            "ownershipRatio": 0.8,
+            "bargainPurchaseReviewed": "是",
+            "bargainPurchaseReviewNote": "已复核",
+            "considerationEvidenceRef": "G7-9-A2",
+            "valuationReportRef": "G7-9-A3",
+            "indexRef": "G7-9-1",
+            "auditConclusion": "无差异",
+        },
+        {
+            "id": "s1",
+            "section": "step",
+            "companyId": "p",
+            "companyName": "P公司",
+            "seq": 1,
+            "transactionNo": 1,
+            "transactionDate": "2024-01-01",
+            "purchaseRatio": 0.3,
+            "considerationFV": 30,
+            # 兼容旧字段名，导出前应迁为 netAssetsFVAtTxn / priorEquityMethodAdjustments
+            "netAssetsBookValueAtTxn": 100,
+            "priorHoldingBookValue": 25,
+            "priorHoldingFV": 40,
+            "priorOCIReclassify": 2,
+            "isPackageDeal": "否",
+            "notPackageBasis": "独立定价",
+            "indexRef": "G7-9-2",
+        },
+        {
+            "id": "r1",
+            "section": "reverse",
+            "seq": 1,
+            "transactionContent": "发行股份取得控制",
+            "accountingAcquirer": "非上市公司A",
+            "acquirerShareholders": "A原股东",
+            "accountingAcquiree": "上市公司B",
+            "acquireeOriginalShareholders": "B原股东",
+            "reversePurchaseBasis": "A原股东取得控制",
+            "constitutesBusiness": "是",
+            "businessDeterminationBasis": "B构成业务",
+            "indexRef": "G7-9-3",
+        },
+    ]
+    workbook = _build_g7_9_workbook(source_rows)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+
+    # 表头对齐源底稿编号
+    merger_ws = workbook["1-一次购买取得"]
+    merger_headers = [cell.value for cell in merger_ws[2]]
+    assert "初始投资成本⑥=③+④" in merger_headers
+    assert "对价损益⑦=③-⑤" in merger_headers
+    assert "商誉/廉价购买利得⑧=⑥-①×②" in merger_headers
+    assert "廉价购买已复核" in merger_headers
+    reverse_ws = workbook["3-反向购买"]
+    reverse_headers = [cell.value for cell in reverse_ws[2]]
+    assert "是否构成业务" in reverse_headers
+
+    parsed, errors = _parse_g7_9_import(buffer.getvalue())
+    assert errors == []
+    assert {row["section"] for row in parsed} == {"merger", "step", "reverse"}
+    merger = next(row for row in parsed if row["section"] == "merger")
+    assert merger["totalConsiderationFV"] == 140  # ③
+    assert merger["initialInvestmentCost"] == 180  # ⑥=③+④
+    assert merger["considerationGainLoss"] == 20  # ⑦=③−⑤
+    assert merger["shareOfFV"] == 160
+    assert merger["nonControllingInterestShare"] == 40
+    assert merger["goodwill"] == 20  # ⑧=⑥−①×②
+    assert merger["acquisitionCostsExpensed"] == 8
+    assert merger["bargainPurchaseReviewed"] == "是"
+
+    step = next(row for row in parsed if row["section"] == "step")
+    assert step["netAssetsFVAtTxn"] == 100
+    assert step["priorEquityMethodAdjustments"] == 2
+    assert step["shareOfFVAtTxn"] == 30  # ④=①×③
+    assert step["goodwillAtTxn"] == 0  # ⑤=②−④
+    assert step["adjustmentScope"] == "transaction"
+    assert step["companyId"] == "p"
+
+    reverse = next(row for row in parsed if row["section"] == "reverse")
+    assert reverse["constitutesBusiness"] == "是"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -138,7 +305,7 @@ class TestServiceFormulaValidation:
                 {"row_key": "r1", "net_assets": 1000, "ratio": 0.6, "cost": 600},
             ],
             "not_same_control_checks": [
-                {"row_key": "r2", "price": 500, "fees": 50, "cost": 550},
+                {"row_key": "r2", "price": 500, "fees": 50, "cost": 500},
             ],
             "goodwill_checks": [
                 {"row_key": "r3", "cost": 550, "share": 400, "goodwill": 150},
@@ -212,6 +379,63 @@ class TestServiceFormulaValidation:
         errors = self.svc.validate_formulas(data)
         assert len(errors) == 1
         assert errors[0].field == "not_same_control_cost"
+
+    def test_prepare_g7_9_rows_recalculates_and_rejects_hard_errors(self):
+        """G7-9实际rows由服务端重算，廉价购买/反向购买规则不可绕过。"""
+        rows, errors = self.svc.prepare_g7_9_rows([
+            {
+                "id": "m1",
+                "section": "merger",
+                "cashConsideration": 100,
+                "priorHoldingFV": 20,
+                "considerationBookValue": 80,
+                "acquireeIdentifiableNetAssetsFV": 100,
+                "ownershipRatio": 0.6,
+                "initialInvestmentCost": 999,
+                "goodwill": 999,
+            },
+            {
+                "id": "r1",
+                "section": "reverse",
+                "constitutesBusiness": "否",
+                "businessDeterminationBasis": "仅持有资产",
+            },
+        ])
+        assert rows[0]["initialInvestmentCost"] == 120
+        assert rows[0]["considerationGainLoss"] == 20
+        assert rows[0]["goodwill"] == 60
+        assert any(error.field == "constitutesBusiness" for error in errors)
+
+    def test_prepare_g7_9_step_generates_stable_company_id_and_recalculates(self):
+        rows, errors = self.svc.prepare_g7_9_rows([
+            {
+                "section": "step",
+                "companyId": "",
+                "companyName": "P公司",
+                "transactionNo": 1,
+                "purchaseRatio": 0.3,
+                "considerationFV": 40,
+                "netAssetsFVAtTxn": 100,
+                "priorEquityMethodAdjustments": 2,
+                "isPackageDeal": "否",
+            },
+            {
+                "section": "step",
+                "companyId": "",
+                "companyName": "P公司",
+                "transactionNo": 2,
+                "purchaseRatio": 0.4,
+                "considerationFV": 50,
+                "netAssetsFVAtTxn": 100,
+                "priorEquityMethodAdjustments": 3,
+                "isPackageDeal": "否",
+            },
+        ])
+        assert errors == []
+        assert rows[0]["companyId"] == rows[1]["companyId"]
+        assert rows[0]["shareOfFVAtTxn"] == 30
+        assert rows[0]["goodwillAtTxn"] == 10
+        assert rows[0]["adjustmentScope"] == "transaction"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

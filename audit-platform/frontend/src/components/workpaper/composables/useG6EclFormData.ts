@@ -59,6 +59,8 @@ export interface ImpairmentCalcRow {
   id: string
   seq: number
   investProject: string
+  /** 跨表稳定投资 ID（优先匹配 G6-11 / G6-13） */
+  crossSheetInvestmentId?: string
   stageGroup: 'Stage1' | 'Stage2' | 'Stage3'
   /** ① 账面余额（计提基数） */
   amortizedCost: number
@@ -159,6 +161,8 @@ export interface ParameterEvalRow {
 /** G6-13 PD/LGD 法测算行（对齐 Excel） */
 export interface PdLgdCalcRow {
   id: string
+  /** 跨表稳定投资 ID（优先匹配 G6-11 / G6-12） */
+  crossSheetInvestmentId?: string
   projectName: string
   bookBalance: number
   remainingMonths: number
@@ -176,6 +180,8 @@ export interface PdLgdCalcRow {
 /** G6-13 损失率法测算行 */
 export interface LossRateCalcRow {
   id: string
+  /** 跨表稳定投资 ID（优先匹配 G6-11 / G6-12） */
+  crossSheetInvestmentId?: string
   projectName: string
   bookBalance: number
   remainingMonths: number
@@ -230,6 +236,8 @@ export interface G6ReversalRow {
   seq: number
   /** 单位名称 / 投资项目 */
   unitName: string
+  /** 跨表稳定投资 ID（与 G6-12 对齐） */
+  crossSheetInvestmentId?: string
   reversalReason: string
   recoveryMethod: string
   originalBasis: string
@@ -267,40 +275,79 @@ export interface ReversalWriteOffData {
   rows?: ReversalWriteOffRow[]
 }
 
+export type VoucherCheckResult = '' | 'Y' | 'N' | 'NA'
+export type VoucherCheckPeriod = 'occurrence' | 'post'
+/** specific=特定项目；representative=代表性抽样；manual=手工补录 */
+export type VoucherSelectionCategory = '' | 'specific' | 'representative' | 'manual'
+
+export interface VoucherSampleCriteria {
+  populationDebitCount: number
+  populationDebitAmount: number
+  populationCreditCount: number
+  populationCreditAmount: number
+  specificSample: string
+  /** 特定样本笔数（全部测试，不含代表性抽样） */
+  specificSampleCount: number
+  /** 特定样本金额 */
+  specificSampleAmount: number
+  samplingPopulationCount: number
+  samplingPopulationAmount: number
+  /** 代表性抽样样本量（不含特定项目） */
+  sampleSize: number
+  samplingMethod: string
+  samplingProcess: string
+  bookDebitOccurrence: number
+  bookCreditOccurrence: number
+}
+
 export interface VoucherCheckRow {
   id: string
   seq: number
+  period: VoucherCheckPeriod
   date: string
   voucherNo: string
   businessContent: string
+  businessType: string
   counterAccount: string
   detailAccount: string
   debitAmount: number
   creditAmount: number
   attachment: string | null
+  /** OCR/上传落库后的附件 ID */
+  attachmentId: string | null
+  attachmentUrl: string | null
+  attachmentUploadedAt: string | null
   supportingDoc: string
-  checkOriginal: boolean
-  checkAuthorized: boolean
-  checkAccounting: boolean
-  checkAmount: boolean
-  checkClassification: boolean
-  checkImpairment: boolean
-  checkInterest: boolean
+  checkOriginal: VoucherCheckResult
+  checkAuthorized: VoucherCheckResult
+  checkAccounting: VoucherCheckResult
+  checkInitialCost: VoucherCheckResult
+  checkInterest: VoucherCheckResult
+  checkFairValue: VoucherCheckResult
   indexRef: string
   isAbnormal: boolean
+  manualAbnormal: boolean
   abnormalNote: string
   riskLevel: '高' | '中' | '低' | ''
   suggestion: string
   remark: string
+  source: string
+  selectionReason: string
+  samplingMethod: string
+  selectionCategory: VoucherSelectionCategory
+  /** 抽凭/总账行稳定标识，优先用于去重 */
+  sourceId: string
 }
 
 export interface VoucherCheckData {
+  schemaVersion?: number
+  criteria: VoucherSampleCriteria
   rows: VoucherCheckRow[]
-  debitTotal: number
-  creditTotal: number
-  difference: number
-  isBalanced: boolean
+  occurrenceRows?: VoucherCheckRow[]
+  postPeriodRows?: VoucherCheckRow[]
+  auditNote: string
   conclusion: string
+  conclusionOption: string
 }
 
 /** G6 ECL组 完整 content JSON 顶层接口 */
@@ -574,6 +621,11 @@ export function useG6EclFormData(opts: UseG6EclFormDataOptions) {
     }
   }
 
+  /** 对外：切 Tab / 卸载前强制刷出防抖队列 */
+  function flushPending(): void {
+    _flushPending()
+  }
+
   // ─── Lifecycle ───────────────────────────────────────────────────────────
 
   onScopeDispose(() => {
@@ -597,6 +649,7 @@ export function useG6EclFormData(opts: UseG6EclFormDataOptions) {
     saveItemsFromEvent,
     debouncedSave,
     saveContent,
+    flushPending,
   }
 }
 

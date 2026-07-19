@@ -20,6 +20,7 @@
         <span class="chip-wrap"><GtIndexChip value="wp:G6-12" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:G6-3" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:G6-11" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-13" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ calc.rows.value.length }} 行</el-tag>
       </div>
       <div class="toolbar-right">
@@ -38,11 +39,27 @@
         <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">
           + 投资项目
         </el-button>
+        <el-button
+          size="small"
+          :disabled="isReadonly"
+          :loading="pullingG611"
+          @click="pullFromG611"
+        >
+          从 G6-11 拉取阶段
+        </el-button>
+        <el-button
+          size="small"
+          :disabled="isReadonly"
+          :loading="pullingG613"
+          @click="pullFromG613"
+        >
+          从 G6-13 拉取损失率
+        </el-button>
         <G6EclImportExportDropdown
           :wp-id="wpId"
           sheet="G6-12"
           :disabled="isReadonly"
-          @imported="emit('imported')"
+          @imported="onImported"
         />
         <el-button
           size="small"
@@ -420,7 +437,7 @@
           <el-popconfirm
             v-if="!row._isSubtotal && !row._isTotal"
             title="确认删除？"
-            @confirm="calc.removeRow(row.id)"
+            @confirm="handleRemoveRow(row.id)"
           >
             <template #reference>
               <el-icon class="delete-icon"><Delete /></el-icon>
@@ -477,7 +494,7 @@
       <ul>
         <li>① 账面余额为计提基数；④/⑨ 摊余成本 = 账面余额 − 减值准备。</li>
         <li>Stage1/2：③=①×②；⑥=⑤×②A+①×(②A−②)。</li>
-        <li>Stage3：填预计未来现金流量现值后，③=max(0,①−现值)；⑥按审定现值倒挤。</li>
+        <li>Stage3：始终按现值法 ③=max(0,①−现值)；PV=0 表示零回收、全额计提；⑥按审定现值倒挤。</li>
         <li>本年计提/转回由⑧与上年减值自动轧差，不可手改。</li>
         <li>审定减值合计应与 G6-3 期末坏账、G6-1 减值层勾稽。</li>
       </ul>
@@ -489,14 +506,24 @@
 /**
  * G6TabImpairmentCalc.vue — 对齐 Excel《减值准备测算表G6-12》
  */
-import { ref, computed, inject, onMounted, watch } from 'vue'
+import { ref, computed, inject, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import {
   useG6EclImpairmentCalc,
   createEmptyImpairmentRow,
+  collectEclRateUpdates,
 } from '../../composables/useG6EclImpairmentCalc'
 import { useG6EclFormData, type ImpairmentCalcRow } from '../../composables/useG6EclFormData'
 import { useG6EclAiGenerate } from '../../composables/useG6EclAiGenerate'
+import {
+  parseG6ChecklistRows,
+  parseG6ChecklistPayload,
+  G6_11_ROWS_KEY,
+  G6_12_DATA_KEY,
+  G6_STAGE_UPDATED_EVENT,
+  G6_ECL_RATE_UPDATED_EVENT,
+} from '../../composables/g6CrossHelpers'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G6EclImportExportDropdown from '../G6EclImportExportDropdown.vue'
 
@@ -596,6 +623,134 @@ async function handleAddRow() {
   persistData()
 }
 
+function handleRemoveRow(id: string): void {
+  calc.removeRow(id)
+  persistData()
+}
+
+const pullingG611 = ref(false)
+const pullingG613 = ref(false)
+let persistTimer: ReturnType<typeof setTimeout> | null = null
+let hydrating = false
+
+function schedulePersistData(): void {
+  if (props.isReadonly || hydrating) return
+  if (persistTimer) clearTimeout(persistTimer)
+  persistTimer = setTimeout(() => persistData(), 800)
+}
+
+async function pullFromG611(): Promise<void> {
+  if (props.isReadonly) return
+  pullingG611.value = true
+  try {
+    try { await formData.loadAll() } catch { /* ignore */ }
+    const g611 = parseG6ChecklistRows(formData.allResponses.value.get(G6_11_ROWS_KEY))
+    const updates = g611
+      .filter((r: any) => String(r?.investProject || '').trim() && r?.auditStage)
+      .map((r: any) => ({
+        investProject: String(r.investProject).trim(),
+        auditStage: r.auditStage as 'Stage1' | 'Stage2' | 'Stage3',
+        bookBalance: Number(r.bookBalance) || 0,
+        crossSheetInvestmentId: String(r.crossSheetInvestmentId || r.id || ''),
+      }))
+    if (!updates.length) {
+      ElMessage.warning('G6-11 无可用投资项目/阶段，请先完成三阶段划分')
+      return
+    }
+    const n = calc.applyStageUpdates(updates)
+    persistData()
+    ElMessage.success(`已从 G6-11 同步 ${n} 条阶段`)
+  } catch {
+    ElMessage.error('从 G6-11 拉取失败')
+  } finally {
+    pullingG611.value = false
+  }
+}
+
+async function pullFromG613(): Promise<void> {
+  if (props.isReadonly) return
+  pullingG613.value = true
+  try {
+    try { await formData.loadAll() } catch { /* ignore */ }
+    const payload = parseG6ChecklistPayload(formData.allResponses.value.get('G6-13-ecl-measurement'))
+    const pdLgdRows = Array.isArray(payload?.pdLgdRows) ? payload.pdLgdRows : []
+    const lossRateRows = Array.isArray(payload?.lossRateRows) ? payload.lossRateRows : []
+    const updates = collectEclRateUpdates(pdLgdRows, lossRateRows, 'pdLgd')
+    if (!updates.length) {
+      ElMessage.warning('G6-13 无有效损失率行（需填写项目名称与 ECL 率）')
+      return
+    }
+    const result = calc.applyEclRateUpdates(updates)
+    persistData()
+    const amb = result.matchReport.ambiguous.length
+      ? `；重名冲突 ${result.matchReport.ambiguous.length}`
+      : ''
+    ElMessage.success(
+      `已从 G6-13 回写 ${result.count} 条损失率；未匹配 ${result.unmatched.length}；跳过 ${result.skipped.length}${amb}`,
+    )
+  } catch {
+    ElMessage.error('从 G6-13 拉取损失率失败')
+  } finally {
+    pullingG613.value = false
+  }
+}
+
+function reloadFromSaved(): void {
+  const primary = parseG6ChecklistPayload(
+    formData.allResponses.value.get(DATA_KEY)
+      ?? formData.allResponses.value.get(G6_12_DATA_KEY),
+  )
+  const fallbackRows = parseG6ChecklistRows(formData.allResponses.value.get('G6-12-rows'))
+
+  if (Array.isArray(primary?.rows)) {
+    calc.loadRows(primary.rows)
+    if (typeof primary.conclusion === 'string') conclusion.value = primary.conclusion
+  } else if (Array.isArray(primary) && primary.length) {
+    calc.loadRows(primary)
+  } else if (fallbackRows.length) {
+    calc.loadRows(fallbackRows)
+  }
+}
+
+function onStageUpdated(e: Event): void {
+  const detail = (e as CustomEvent).detail
+  if (detail?.written) {
+    void formData.loadAll().then(() => {
+      hydrating = true
+      try { reloadFromSaved() } finally { hydrating = false }
+    })
+    return
+  }
+  const updates = detail?.updates
+  if (!Array.isArray(updates) || !updates.length) return
+  calc.applyStageUpdates(updates)
+  persistData()
+}
+
+function onEclRateUpdated(e: Event): void {
+  const detail = (e as CustomEvent).detail
+  if (detail?.written) {
+    void formData.loadAll().then(() => {
+      hydrating = true
+      try { reloadFromSaved() } finally { hydrating = false }
+    })
+    return
+  }
+  const updates = detail?.updates
+  if (!Array.isArray(updates) || !updates.length) return
+  calc.applyEclRateUpdates(updates)
+  persistData()
+}
+
+async function onImported(): Promise<void> {
+  try {
+    await formData.loadAll()
+    hydrating = true
+    try { reloadFromSaved() } finally { hydrating = false }
+  } catch { /* ignore */ }
+  emit('imported')
+}
+
 async function handleAiConclusion(): Promise<void> {
   if (props.isReadonly) return
   const text = await generateAndConfirm(
@@ -632,48 +787,88 @@ function fmtPct(v: number | null | undefined): string {
 }
 
 function persistData(): void {
-  if (props.isReadonly) return
+  if (props.isReadonly || hydrating) return
   formData.debouncedSave(DATA_KEY, {
     conclusion: JSON.stringify({
       rows: calc.toJSON(),
       conclusion: conclusion.value,
     }),
   })
+  const json = JSON.stringify(calc.toJSON())
+  formData.debouncedSave('G6-12-rows', { remark: json, conclusion: json })
 }
 
-watch(conclusion, () => persistData())
+function flushPersist(): void {
+  if (persistTimer) {
+    clearTimeout(persistTimer)
+    persistTimer = null
+  }
+  persistData()
+  formData.flushPending()
+}
+
+watch(conclusion, () => {
+  if (!hydrating) persistData()
+})
+watch(() => calc.rows.value, () => schedulePersistData(), { deep: true })
 
 function initFromData(): void {
+  // 已有 checklist 时勿用 render 壳覆盖
+  const hasSaved = Boolean(
+    formData.allResponses.value.get(DATA_KEY)
+    || formData.allResponses.value.get(G6_12_DATA_KEY)
+    || formData.allResponses.value.get('G6-12-rows'),
+  )
+  if (hasSaved) {
+    reloadFromSaved()
+    return
+  }
   const fromHtml = props.htmlData?.impairmentCalc
   if (fromHtml?.rows) {
     calc.loadRows(fromHtml.rows)
-    if (fromHtml.conclusion) conclusion.value = fromHtml.conclusion
+    if (typeof fromHtml.conclusion === 'string') conclusion.value = fromHtml.conclusion
     return
   }
   const content = formData.parseContent?.()
   if (content?.impairmentCalc?.rows) {
     calc.loadRows(content.impairmentCalc.rows)
-    if (content.impairmentCalc.conclusion) conclusion.value = content.impairmentCalc.conclusion
+    if (typeof content.impairmentCalc.conclusion === 'string') {
+      conclusion.value = content.impairmentCalc.conclusion
+    }
   }
 }
 
 onMounted(async () => {
-  await formData.loadAll()
-  initFromData()
-  const saved = formData.allResponses.value.get(DATA_KEY)
-  if (saved?.conclusion) {
-    try {
-      const parsed = JSON.parse(saved.conclusion)
-      if (parsed.rows?.length) calc.loadRows(parsed.rows)
-      if (parsed.conclusion) conclusion.value = parsed.conclusion
-    } catch { /* ignore */ }
+  hydrating = true
+  try {
+    await formData.loadAll()
+    initFromData()
+    reloadFromSaved()
+    const n = formData.allResponses.value.get(NOTE_KEY)
+    if (n?.remark) auditNote.value = n.remark
+  } finally {
+    hydrating = false
   }
-  const n = formData.allResponses.value.get(NOTE_KEY)
-  if (n?.remark) auditNote.value = n.remark
+  window.addEventListener(G6_STAGE_UPDATED_EVENT, onStageUpdated)
+  window.addEventListener(G6_ECL_RATE_UPDATED_EVENT, onEclRateUpdated)
+})
+
+onBeforeUnmount(() => {
+  flushPersist()
+  window.removeEventListener(G6_STAGE_UPDATED_EVENT, onStageUpdated)
+  window.removeEventListener(G6_ECL_RATE_UPDATED_EVENT, onEclRateUpdated)
 })
 
 watch(() => props.htmlData, (d) => {
-  if (d?.impairmentCalc) initFromData()
+  if (!d?.impairmentCalc) return
+  const hasSaved = Boolean(
+    formData.allResponses.value.get(DATA_KEY)
+    || formData.allResponses.value.get(G6_12_DATA_KEY)
+    || formData.allResponses.value.get('G6-12-rows'),
+  )
+  if (hasSaved) return
+  hydrating = true
+  try { initFromData() } finally { hydrating = false }
 })
 
 defineExpose({

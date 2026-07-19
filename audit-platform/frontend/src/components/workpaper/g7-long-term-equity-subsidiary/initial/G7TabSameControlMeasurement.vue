@@ -1,372 +1,472 @@
-<!--
-  G7TabSameControlMeasurement.vue — G7-8 同一控制下企业合并初始计量测试（52行×9列）
-
-  方法论上下文区域（琥珀色左边线+浅黄背景：CAS20同控合并规则）
-  蓝色渐变引导区（4步骤指引, 2列grid）
-
-  9列单表：
-  被投资单位|合并日|合并方式(下拉)|被合并方账面净资产|持股比例|享有份额(公式=calcSameControlCost)|
-  初始投资成本(=享有份额)|支付对价|差额处理(textarea)|审计结论
-
-  公式列：shareOfNetAssets = calcSameControlCost(acquireeNetAssets, shareholdingRatio)
-  差额 = consideration - initialCost → 调整资本公积→留存收益
-  差额过大(>初始成本50%)→橙色高亮+tooltip提示
-
-  动态行增删(ElMessageBox.prompt命名)
-  导入导出el-dropdown(useG7SubImportExport, sheet='G7-8')
-  AI辅助(initial-measurement-conclusion)
-  复核对话(inject openReviewDialog)
-
-  Spec: .kiro/specs/g7-long-term-equity-subsidiary/ Task 5.1
-  Requirements: 3.1, 3.3, 3.5
--->
 <template>
   <div class="g7-tab-same-control">
-    <!-- Section 标题栏 -->
     <div class="section-head">
-      <h3 class="sheet-title">G7-8 同一控制下企业合并初始计量测试</h3>
+      <div>
+        <h3 class="sheet-title">G7-8 子公司初始计量测试表（同一控制）</h3>
+        <div class="sheet-subtitle">按一次合并、分步合并和反向购买三类交易分别测试</div>
+      </div>
       <div class="head-actions">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">
-          + 被投资单位
+        <span class="save-status" :class="`save-${formData.savePhase.value}`">{{ saveStatusText }}</span>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          :loading="syncing"
+          @click="syncFromRelatedSheets"
+        >
+          同步 G7-7/G7-2/G7-4
         </el-button>
-        <el-dropdown trigger="click" size="small" @command="handleImportExportCommand">
+        <el-dropdown v-if="!isReadonly" @command="handleAddCommand">
+          <el-button size="small" type="primary">新增测试 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="merger">合并方式取得</el-dropdown-item>
+              <el-dropdown-item command="step">分步实现同控合并</el-dropdown-item>
+              <el-dropdown-item command="reverse">反向购买</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <el-dropdown @command="handleImportExportCommand">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="template">导出模板</el-dropdown-item>
               <el-dropdown-item command="export">导出数据</el-dropdown-item>
-              <el-dropdown-item command="import">导入数据</el-dropdown-item>
+              <el-dropdown-item v-if="!isReadonly" command="import">导入数据</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" type="primary" link @click="handleAiConclusion">
-          🤖 AI辅助
-        </el-button>
+        <el-button size="small" type="primary" link @click="handleAiConclusion">🤖 AI辅助</el-button>
         <el-button size="small" @click="openReviewDialog('G7-8-same-control')">💬复核</el-button>
+        <GtIndexChip value="wp:G7-8" :context-project-id="projectId" />
       </div>
     </div>
 
-    <!-- 蓝色渐变引导区（4步骤指引, 2列grid） -->
-    <div class="guidance-steps">
-      <div class="step-item">
-        <span class="step-num">①</span>
-        <span class="step-text">新增被投资单位并填写合并日与合并方式</span>
-      </div>
-      <div class="step-item">
-        <span class="step-num">②</span>
-        <span class="step-text">填入被合并方账面净资产和持股比例</span>
-      </div>
-      <div class="step-item">
-        <span class="step-num">③</span>
-        <span class="step-text">系统自动计算享有份额(=初始投资成本)</span>
-      </div>
-      <div class="step-item">
-        <span class="step-num">④</span>
-        <span class="step-text">填入支付对价，系统提示差额处理方式</span>
-      </div>
-    </div>
+    <el-alert type="info" :closable="false" show-icon class="objective-alert">
+      审计目标：确定被审计单位对子公司长期股权投资初始计量是否恰当。
+    </el-alert>
 
-    <!-- 方法论上下文区域（琥珀色左边线+浅黄背景） -->
     <div class="methodology-context">
-      <p><strong>同一控制下企业合并（CAS20）：</strong></p>
-      <p>• 合并方以被合并方净资产的<strong>账面价值</strong>份额作为长期股权投资初始成本</p>
-      <p>• 初始投资成本 = 被合并方所有者权益账面价值 × 持股比例</p>
-      <p>• 差额处理：支付对价与初始成本的差额，先调整资本公积(股本溢价)，不足部分调整留存收益</p>
-      <p>• 同控合并<strong>不确认商誉</strong></p>
+      <strong>核心逻辑：</strong>
+      同控合并以合并日应享有被合并方在最终控制方合并报表中的所有者权益账面价值份额作为初始投资成本；
+      不确认商誉。合并前会计政策不一致时，应先统一政策再计算。
     </div>
 
-    <!-- 审计目标 -->
-    <el-alert type="info" :closable="false" show-icon class="objective-alert"
-      title="审计目标：验证同一控制下企业合并的长期股权投资初始投资成本按被合并方净资产账面价值份额确定（CAS20），支付对价与初始成本的差额调整资本公积/留存收益处理恰当，未确认商誉。" />
-
-    <!-- 工具栏：索引 chip + 行数 -->
-    <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
-      <div class="toolbar-right">
-        <span class="chip-wrap"><GtIndexChip value="wp:G7-8" :context-project-id="projectId" /></span>
-        <el-tag size="small" type="info">共 {{ rowCount }} 行</el-tag>
+    <div class="summary-bar">
+      <div class="summary-left">
+        <el-tag type="info">一次合并 {{ mergerRows.length }} 家</el-tag>
+        <el-tag type="info">分步合并 {{ stepSummaries.length }} 家</el-tag>
+        <el-tag type="info">反向购买 {{ reverseRows.length }} 项</el-tag>
+        <el-tag v-if="errorCount" type="danger">{{ errorCount }} 项错误</el-tag>
+        <el-tag v-if="warningCount" type="warning">{{ warningCount }} 项待补充</el-tag>
       </div>
     </div>
 
-    <!-- 52行×9列数据表格 -->
-    <el-table
-      :data="rows"
-      border
-      size="small"
-      class="same-control-table"
-      :max-height="600"
-      highlight-current-row
-      row-key="id"
+    <el-alert
+      v-if="issues.length"
+      :type="errorCount ? 'error' : 'warning'"
+      :closable="false"
+      show-icon
+      class="validation-alert"
     >
-      <!-- #序号 -->
-      <el-table-column type="index" label="#" width="45" align="center" fixed />
-
-      <!-- 被投资单位 -->
-      <el-table-column label="被投资单位" min-width="140" fixed>
-        <template #default="{ row }">
-          <span class="investee-name">{{ row.investeeName }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 合并日 -->
-      <el-table-column label="合并日" min-width="140" align="center">
-        <template #default="{ row }">
-          <el-date-picker
-            v-if="!isReadonly"
-            v-model="row.mergerDate"
-            type="date"
-            size="small"
-            value-format="YYYY-MM-DD"
-            placeholder="选择日期"
-            style="width: 100%"
-            @change="emitSave"
-          />
-          <span v-else>{{ row.mergerDate || '-' }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 合并方式(下拉) -->
-      <el-table-column label="合并方式" min-width="120" align="center">
-        <template #default="{ row }">
-          <el-select
-            v-if="!isReadonly"
-            v-model="row.mergerType"
-            size="small"
-            placeholder="请选择"
-            style="width: 100%"
-            @change="emitSave"
-          >
-            <el-option value="吸收合并" label="吸收合并" />
-            <el-option value="控股合并" label="控股合并" />
-            <el-option value="新设合并" label="新设合并" />
-          </el-select>
-          <span v-else>{{ row.mergerType || '-' }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 被合并方账面净资产 -->
-      <el-table-column label="被合并方账面净资产" min-width="160" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="!isReadonly"
-            :model-value="row.acquireeNetAssets"
-            size="small"
-            :controls="false"
-            style="width: 100%"
-            @update:model-value="(v: number) => updateField(row, 'acquireeNetAssets', v)"
-          />
-          <span v-else>{{ fmtAmount(row.acquireeNetAssets) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 持股比例 -->
-      <el-table-column label="持股比例" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="!isReadonly"
-            :model-value="row.shareholdingRatio"
-            size="small"
-            :controls="false"
-            :precision="4"
-            :step="0.01"
-            :min="0"
-            :max="1"
-            style="width: 100%"
-            @update:model-value="(v: number) => updateField(row, 'shareholdingRatio', v)"
-          />
-          <span v-else>{{ fmtPercent(row.shareholdingRatio) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 享有份额(公式列：calcSameControlCost) -->
-      <el-table-column label="享有份额" min-width="140" align="right">
-        <template #header>
-          <el-tooltip content="公式: 被合并方账面净资产 × 持股比例" placement="top">
-            <span class="formula-header">享有份额 <span class="formula-icon">ƒ</span></span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <el-tooltip content="= 被合并方账面净资产 × 持股比例 (CAS20同控)" placement="top">
-            <span class="formula-cell">{{ fmtAmount(row.shareOfNetAssets) }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-
-      <!-- 初始投资成本(=享有份额) -->
-      <el-table-column label="初始投资成本" min-width="140" align="right">
-        <template #header>
-          <el-tooltip content="同控合并下初始成本 = 享有份额" placement="top">
-            <span class="formula-header">初始投资成本 <span class="formula-icon">ƒ</span></span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <el-tooltip content="= 享有份额（同控合并按账面价值入账）" placement="top">
-            <span class="formula-cell">{{ fmtAmount(row.initialCost) }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-
-      <!-- 支付对价 -->
-      <el-table-column label="支付对价" min-width="140" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="!isReadonly"
-            :model-value="row.consideration"
-            size="small"
-            :controls="false"
-            style="width: 100%"
-            @update:model-value="(v: number) => updateField(row, 'consideration', v)"
-          />
-          <span v-else>{{ fmtAmount(row.consideration) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 差额处理(textarea) -->
-      <el-table-column label="差额处理" min-width="180">
-        <template #default="{ row }">
-          <div class="difference-cell">
-            <el-tag
-              v-if="getDifference(row) !== 0"
-              size="small"
-              :type="isDifferenceLarge(row) ? 'warning' : 'info'"
-              class="diff-tag"
-            >
-              差额: {{ fmtAmount(getDifference(row)) }}
-            </el-tag>
-            <el-tooltip
-              v-if="isDifferenceLarge(row)"
-              content="差额较大，请核实对价与账面份额的合理性"
-              placement="top"
-            >
-              <span class="diff-warning">⚠</span>
-            </el-tooltip>
-          </div>
-          <el-input
-            v-if="!isReadonly"
-            v-model="row.differenceHandling"
-            type="textarea"
-            :autosize="{ minRows: 1, maxRows: 3 }"
-            size="small"
-            placeholder="差额调整：资本公积(股本溢价)→留存收益"
-            @change="emitSave"
-          />
-          <span v-else class="text-cell">{{ row.differenceHandling || '-' }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 审计结论 -->
-      <el-table-column label="审计结论" min-width="120" align="center">
-        <template #default="{ row }">
-          <el-select
-            v-if="!isReadonly"
-            v-model="row.auditConclusion"
-            size="small"
-            placeholder="请选择"
-            style="width: 100%"
-            @change="emitSave"
-          >
-            <el-option value="无差异" label="无差异" />
-            <el-option value="差异可接受" label="差异可接受" />
-            <el-option value="差异需调整" label="差异需调整" />
-          </el-select>
-          <el-tag v-else size="small" :type="conclusionTagType(row.auditConclusion)">
-            {{ row.auditConclusion || '-' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-
-      <!-- 操作列（删除） -->
-      <el-table-column v-if="!isReadonly" label="" width="50" align="center" fixed="right">
-        <template #default="{ row }">
-          <el-popconfirm :title="`确认删除「${row.investeeName}」此行?`" @confirm="deleteRow(row)">
-            <template #reference>
-              <el-button type="danger" link size="small">✕</el-button>
-            </template>
-          </el-popconfirm>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- 空状态 -->
-    <div v-if="rows.length === 0" class="empty-state">
-      <p>暂无同控合并初始计量测试数据</p>
-      <el-button v-if="!isReadonly" type="primary" size="small" @click="handleAddRow">
-        + 新增被投资单位
-      </el-button>
-    </div>
-
-    <!-- 审计说明 -->
-    <el-card class="audit-note-card" shadow="never">
-      <div class="conclusion-head">
-        <span class="conclusion-title">审计说明</span>
+      <div v-for="(issue, index) in issues.slice(0, 8)" :key="`${issue.rowId}-${index}`">
+        {{ issue.message }}
       </div>
+      <div v-if="issues.length > 8">……另有 {{ issues.length - 8 }} 项</div>
+    </el-alert>
+
+    <el-card shadow="never" class="section-card">
+      <template #header>
+        <div class="card-head">
+          <div>
+            <strong>1、合并方式取得的长期股权投资初始投资成本</strong>
+            <span class="section-note">原底稿第7—19行</span>
+          </div>
+          <el-button v-if="!isReadonly" size="small" type="primary" plain @click="addMergerRow">
+            新增公司
+          </el-button>
+        </div>
+      </template>
+
+      <el-table :data="mergerRows" border size="small" row-key="id" empty-text="暂无一次合并测试">
+        <el-table-column label="公司名称" min-width="150" fixed="left">
+          <template #default="{ row }">
+            <TextCell :row="row" field="investeeName" :readonly="isReadonly" @change="updateMergerText" />
+          </template>
+        </el-table-column>
+        <el-table-column label="最终控制方" min-width="140">
+          <template #default="{ row }">
+            <TextCell :row="row" field="finalController" :readonly="isReadonly" @change="updateMergerText" />
+          </template>
+        </el-table-column>
+        <el-table-column label="会计政策一致" min-width="120">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              v-model="row.accountingPolicyConsistent"
+              clearable
+              size="small"
+              :class="{ 'required-select': !row.accountingPolicyConsistent }"
+              @change="persistRows"
+            >
+              <el-option label="是" value="是" />
+              <el-option label="否" value="否" />
+            </el-select>
+            <span v-else>{{ display(row.accountingPolicyConsistent) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="政策调整说明" min-width="160">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.accountingPolicyNote"
+              size="small"
+              :disabled="row.accountingPolicyConsistent !== '否'"
+              :class="{ 'required-input': row.accountingPolicyConsistent === '否' && !row.accountingPolicyNote }"
+              placeholder="不一致时必填"
+              @change="value => updateMergerText(row, 'accountingPolicyNote', value)"
+            />
+            <span v-else>{{ display(row.accountingPolicyNote) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="被合并方所有者权益账面价值①" min-width="180" align="right">
+          <template #default="{ row }">
+            <NumberCell :row="row" field="ownerEquityBookValue" :readonly="isReadonly" @change="updateMergerNumber" />
+          </template>
+        </el-table-column>
+        <el-table-column label="合并后出资比例②" min-width="130" align="right">
+          <template #default="{ row }">
+            <RatioCell :row="row" field="ownershipRatio" :readonly="isReadonly" @change="updateMergerNumber" />
+          </template>
+        </el-table-column>
+        <el-table-column label="初始投资成本③=①×②" min-width="155" align="right">
+          <template #default="{ row }"><FormulaAmount :value="row.initialInvestmentCost" /></template>
+        </el-table-column>
+        <el-table-column label="支付对价账面价值④" align="center">
+          <el-table-column label="现金" min-width="115" align="right">
+            <template #default="{ row }">
+              <NumberCell :row="row" field="cashConsideration" :readonly="isReadonly" @change="updateMergerNumber" />
+            </template>
+          </el-table-column>
+          <el-table-column label="非现金资产" min-width="120" align="right">
+            <template #default="{ row }">
+              <NumberCell :row="row" field="nonCashAssetBookValue" :readonly="isReadonly" @change="updateMergerNumber" />
+            </template>
+          </el-table-column>
+          <el-table-column label="债务" min-width="110" align="right">
+            <template #default="{ row }">
+              <NumberCell :row="row" field="debtBookValue" :readonly="isReadonly" @change="updateMergerNumber" />
+            </template>
+          </el-table-column>
+          <el-table-column label="权益证券面值" min-width="125" align="right">
+            <template #default="{ row }">
+              <NumberCell :row="row" field="equitySecuritiesFaceValue" :readonly="isReadonly" @change="updateMergerNumber" />
+            </template>
+          </el-table-column>
+          <el-table-column label="或有对价" min-width="110" align="right">
+            <template #default="{ row }">
+              <NumberCell :row="row" field="contingentConsideration" :readonly="isReadonly" @change="updateMergerNumber" />
+            </template>
+          </el-table-column>
+          <el-table-column label="合计" min-width="120" align="right">
+            <template #default="{ row }"><FormulaAmount :value="row.totalConsideration" /></template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="调整资本公积/留存收益⑤=③-④" min-width="190" align="right">
+          <template #default="{ row }">
+            <FormulaAmount :value="row.capitalReserveRetainedEarningsAdjustment" />
+            <div class="hint-text">{{ describeCapitalReserveAdjustment(row.capitalReserveRetainedEarningsAdjustment, 'merger') }}</div>
+          </template>
+        </el-table-column>
+        <el-table-column label="可用资本公积" min-width="125" align="right">
+          <template #default="{ row }">
+            <NumberCell :row="row" field="availableCapitalReserve" :readonly="isReadonly" @change="updateMergerNumber" />
+          </template>
+        </el-table-column>
+        <el-table-column label="差额处理说明" min-width="210">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.adjustmentTreatment"
+              type="textarea"
+              :rows="2"
+              :class="{ 'required-input': row.capitalReserveRetainedEarningsAdjustment !== 0 && !row.adjustmentTreatment }"
+              placeholder="说明调整资本公积及不足冲减留存收益的金额"
+              @change="value => updateMergerText(row, 'adjustmentTreatment', value)"
+            />
+            <span v-else>{{ display(row.adjustmentTreatment) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="索引" min-width="100">
+          <template #default="{ row }">
+            <TextCell :row="row" field="indexRef" :readonly="isReadonly" @change="updateMergerText" />
+          </template>
+        </el-table-column>
+        <el-table-column label="审计结论" min-width="125">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              v-model="row.auditConclusion"
+              clearable
+              size="small"
+              @change="persistRows"
+            >
+              <el-option label="无差异" value="无差异" />
+              <el-option label="差异可接受" value="差异可接受" />
+              <el-option label="差异需调整" value="差异需调整" />
+            </el-select>
+            <span v-else>{{ display(row.auditConclusion) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="操作" width="62" fixed="right">
+          <template #default="{ row }">
+            <el-button type="danger" link size="small" @click="removeMergerRow(row.id)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-card shadow="never" class="section-card">
+      <template #header>
+        <div class="card-head">
+          <div>
+            <strong>2、通过多次交易分步实现的同一控制下企业合并</strong>
+            <span class="section-note">不构成一揽子交易；原底稿第21—31行</span>
+          </div>
+          <el-button v-if="!isReadonly" size="small" type="primary" plain @click="addStepCompany">
+            新增公司
+          </el-button>
+        </div>
+      </template>
+
+      <el-empty v-if="!stepSummaries.length" description="暂无分步合并测试" :image-size="60" />
+      <div v-for="summary in stepSummaries" :key="summary.companyId" class="step-company">
+        <div class="step-company-head">
+          <strong>{{ summary.companyName || '未命名公司' }}</strong>
+          <div>
+            <el-button v-if="!isReadonly" size="small" link type="primary" @click="addStepTransaction(summary)">
+              新增交易
+            </el-button>
+            <el-button v-if="!isReadonly" size="small" link type="danger" @click="removeStepCompany(summary.companyId)">
+              删除公司
+            </el-button>
+          </div>
+        </div>
+        <el-table :data="stepRowsFor(summary.companyId)" border size="small" row-key="id">
+          <el-table-column label="次别" width="75" align="center">
+            <template #default="{ row }">
+              <el-input-number v-if="!isReadonly" v-model="row.transactionNo" :min="1" :controls="false" size="small" @change="persistRows" />
+              <span v-else>{{ row.transactionNo }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="交易日期" min-width="135">
+            <template #default="{ row }">
+              <el-date-picker v-if="!isReadonly" v-model="row.transactionDate" type="date" value-format="YYYY-MM-DD" size="small" @change="persistRows" />
+              <span v-else>{{ display(row.transactionDate) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="购买比例①" min-width="110" align="right">
+            <template #default="{ row }"><RatioCell :row="row" field="purchaseRatio" :readonly="isReadonly" @change="updateStepNumber" /></template>
+          </el-table-column>
+          <el-table-column label="支付对价②" min-width="120" align="right">
+            <template #default="{ row }"><NumberCell :row="row" field="consideration" :readonly="isReadonly" @change="updateStepNumber" /></template>
+          </el-table-column>
+          <el-table-column label="交易时被投资方可辨认净资产账面价值" min-width="210" align="right">
+            <template #default="{ row }"><NumberCell :row="row" field="netAssetsBookValue" :readonly="isReadonly" @change="updateStepNumber" /></template>
+          </el-table-column>
+          <el-table-column label="原投资累计其他综合收益/损益调整等③" min-width="230" align="right">
+            <template #default="{ row }"><NumberCell :row="row" field="priorInvestmentAdjustments" :readonly="isReadonly" @change="updateStepNumber" /></template>
+          </el-table-column>
+          <el-table-column v-if="!isReadonly" label="操作" width="62">
+            <template #default="{ row }"><el-button link type="danger" size="small" @click="removeStepRow(row.id)">删除</el-button></template>
+          </el-table-column>
+        </el-table>
+        <el-descriptions :column="3" border size="small" class="step-summary">
+          <el-descriptions-item label="是否一揽子交易">
+            <el-select
+              v-if="!isReadonly"
+              :model-value="summary.isPackageDeal"
+              clearable
+              size="small"
+              @change="value => updateStepGroupField(summary.companyId, 'isPackageDeal', value)"
+            >
+              <el-option label="是" value="是" />
+              <el-option label="否" value="否" />
+            </el-select>
+            <span v-else>{{ display(summary.isPackageDeal) }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="原持股账面价值" :span="2">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="summary.priorHoldingBookValue || undefined"
+              :controls="false"
+              :precision="2"
+              size="small"
+              class="cell-number"
+              @change="value => updateStepGroupField(summary.companyId, 'priorHoldingBookValue', value)"
+            />
+            <span v-else>{{ formatAmount(summary.priorHoldingBookValue) }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="累计购买比例①">{{ formatPercent(summary.cumulativeRatio) }}</el-descriptions-item>
+          <el-descriptions-item label="累计支付对价②">{{ formatAmount(summary.cumulativeConsideration) }}</el-descriptions-item>
+          <el-descriptions-item label="累计原投资调整③">{{ formatAmount(summary.cumulativePriorAdjustments) }}</el-descriptions-item>
+          <el-descriptions-item label="合并日净资产账面价值④">{{ formatAmount(summary.mergerDateNetAssets) }}</el-descriptions-item>
+          <el-descriptions-item label="初始投资成本⑤=④×①">{{ formatAmount(summary.initialInvestmentCost) }}</el-descriptions-item>
+          <el-descriptions-item label="调整⑥=②+原账面+③−⑤">
+            {{ formatAmount(summary.capitalReserveRetainedEarningsAdjustment) }}
+            <div class="hint-text">{{ summary.adjustmentHint }}</div>
+          </el-descriptions-item>
+          <el-descriptions-item label="可用资本公积">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="summary.availableCapitalReserve ?? undefined"
+              :controls="false"
+              :precision="2"
+              size="small"
+              class="cell-number"
+              @change="value => updateStepGroupField(summary.companyId, 'availableCapitalReserve', value)"
+            />
+            <span v-else>{{ display(summary.availableCapitalReserve) }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="不构成一揽子交易依据" :span="2">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="summary.notPackageBasis"
+              size="small"
+              :disabled="summary.isPackageDeal === '是'"
+              placeholder="说明各次交易独立定价、非整体安排等判断依据"
+              @change="value => updateStepGroupField(summary.companyId, 'notPackageBasis', value)"
+            />
+            <span v-else>{{ display(summary.notPackageBasis) }}</span>
+          </el-descriptions-item>
+          <el-descriptions-item label="索引/备注" :span="3">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="summary.indexRef"
+              size="small"
+              @change="value => updateStepGroupField(summary.companyId, 'indexRef', value)"
+            />
+            <span v-else>{{ display(summary.indexRef) }}</span>
+          </el-descriptions-item>
+        </el-descriptions>
+      </div>
+    </el-card>
+
+    <el-card shadow="never" class="section-card">
+      <template #header>
+        <div class="card-head">
+          <div>
+            <strong>3、反向购买</strong>
+            <span class="section-note">原底稿第33—37行</span>
+          </div>
+          <el-button v-if="!isReadonly" size="small" type="primary" plain @click="addReverseRow">
+            新增交易
+          </el-button>
+        </div>
+      </template>
+      <el-table :data="reverseRows" border size="small" row-key="id" empty-text="暂无反向购买测试">
+        <el-table-column label="交易内容" min-width="150">
+          <template #default="{ row }"><TextCell :row="row" field="transactionContent" :readonly="isReadonly" @change="updateReverseText" /></template>
+        </el-table-column>
+        <el-table-column label="会计上的购买方" min-width="140">
+          <template #default="{ row }"><TextCell :row="row" field="accountingAcquirer" :readonly="isReadonly" @change="updateReverseText" /></template>
+        </el-table-column>
+        <el-table-column label="会计上的购买方的股东" min-width="170">
+          <template #default="{ row }"><TextCell :row="row" field="acquirerShareholders" :readonly="isReadonly" @change="updateReverseText" /></template>
+        </el-table-column>
+        <el-table-column label="会计上的被购买方（上市公司）" min-width="190">
+          <template #default="{ row }"><TextCell :row="row" field="accountingAcquiree" :readonly="isReadonly" @change="updateReverseText" /></template>
+        </el-table-column>
+        <el-table-column label="被购买方原股东" min-width="160">
+          <template #default="{ row }"><TextCell :row="row" field="acquireeOriginalShareholders" :readonly="isReadonly" @change="updateReverseText" /></template>
+        </el-table-column>
+        <el-table-column label="构成反向购买的依据" min-width="220">
+          <template #default="{ row }"><TextAreaCell :row="row" field="reversePurchaseBasis" :readonly="isReadonly" @change="updateReverseText" /></template>
+        </el-table-column>
+        <el-table-column label="是否构成业务及判断依据" min-width="220">
+          <template #default="{ row }"><TextAreaCell :row="row" field="businessDeterminationBasis" :readonly="isReadonly" @change="updateReverseText" /></template>
+        </el-table-column>
+        <el-table-column label="索引号" min-width="100">
+          <template #default="{ row }"><TextCell :row="row" field="indexRef" :readonly="isReadonly" @change="updateReverseText" /></template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="操作" width="62" fixed="right">
+          <template #default="{ row }"><el-button link type="danger" size="small" @click="removeReverseRow(row.id)">删除</el-button></template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-card class="conclusion-card" shadow="never">
+      <template #header>审计说明</template>
       <el-input
         v-model="auditNote"
         type="textarea"
-        :autosize="{ minRows: 5 }"
+        :autosize="{ minRows: 4 }"
         :readonly="isReadonly"
-        placeholder="填写审计说明：可概述所执行程序、测试情况及结果，拟调整/未调整事项及其影响。"
+        placeholder="说明最终控制方、会计政策统一、非一揽子判断、反向购买判断及差异处理。"
         @change="saveAuditNote"
       />
     </el-card>
-
-    <!-- 底部审计结论 -->
     <el-card class="conclusion-card" shadow="never">
-      <div class="conclusion-head">
-        <span class="conclusion-title">审计结论</span>
-        <el-button size="small" type="primary" link @click="handleAiConclusion">
-          🤖 AI辅助
-        </el-button>
-      </div>
+      <template #header>
+        <div class="card-head">
+          <span>审计结论</span>
+          <el-button size="small" type="primary" link @click="handleAiConclusion">🤖 AI辅助</el-button>
+        </div>
+      </template>
       <el-input
-        v-model="conclusion"
+        v-model="auditConclusion"
         type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
+        :autosize="{ minRows: 3 }"
         :readonly="isReadonly"
-        placeholder="根据同控合并初始计量测试结果，总结各被投资单位入账金额是否准确..."
+        placeholder="总结初始投资成本、资本公积/留存收益调整及特殊交易判断是否恰当。"
         @change="saveAuditConclusion"
       />
     </el-card>
 
-    <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>编制提示</summary>
-      <div class="guidance-content">
-        <p>1. 同一控制下企业合并，合并方以被合并方净资产<strong>账面价值</strong>的份额作为初始投资成本</p>
-        <p>2. 初始投资成本 = 被合并方所有者权益账面价值 × 持股比例（公式自动计算）</p>
-        <p>3. 差额 = 支付对价 - 初始投资成本：正差额先冲资本公积(股本溢价)，不足冲留存收益；负差额增加资本公积</p>
-        <p>4. 同控合并不确认商誉，与非同控合并(G7-9)有本质区别</p>
-        <p>5. 合并方式包括：吸收合并(目标注销)、控股合并(目标存续为子公司)、新设合并(双方合为新公司)</p>
-        <p>6. 公式列显示虚线下划线，鼠标悬停可查看公式来源</p>
-      </div>
+      <ol>
+        <li>合并前会计政策不一致的，应先按重要性原则统一政策，再计算账面价值份额。</li>
+        <li>一次合并：③=①×②，④为现金、非现金资产、债务、权益证券面值及或有对价账面价值合计，⑤=③-④。</li>
+        <li>分步合并：⑤=④×累计①；⑥=累计对价②+原持股账面价值+原投资调整③−⑤。</li>
+        <li>若各次交易构成一揽子交易，应作为一项取得控制权交易处理，不适用第2部分。</li>
+        <li>反向购买应同时识别会计上的购买方，并判断会计上的被购买方是否构成业务。</li>
+      </ol>
     </details>
 
-    <!-- 隐藏文件上传(导入) -->
-    <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="handleFileChange" />
+    <input ref="fileInputRef" type="file" accept=".xlsx" class="hidden-input" @change="handleFileChange">
   </div>
 </template>
 
 <script setup lang="ts">
-/**
- * G7TabSameControlMeasurement — G7-8 同控初始计量测试（52行×9列）
- *
- * 公式引擎：calcSameControlCost(netAssets, ratio) → 享有份额 = 初始投资成本
- * 差额 = 支付对价 - 初始成本 → 调整资本公积→留存收益
- *
- * Spec: .kiro/specs/g7-long-term-equity-subsidiary/
- * Requirements: 3.1, 3.3, 3.5
- */
-import { ref, reactive, computed, inject, onMounted, toRef } from 'vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
-import { calcSameControlCost, parseNum } from '../../composables/useG7SubFormulaEngine'
+import { computed, defineComponent, h, inject, onMounted, reactive, ref, toRef } from 'vue'
+import { ElInput, ElInputNumber, ElMessage, ElMessageBox } from 'element-plus'
+import { fmtAmount } from '@/utils/formatters'
+import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
+import GtIndexChip from '../../GtIndexChip.vue'
 import { useG7SubImportExport } from '../../composables/useG7SubImportExport'
 import { useG7SubFormData } from '../../composables/useG7SubFormData'
-import type { G7SameControlRow } from '../../composables/useG7SubFormData'
-import { fmtAmount } from '@/utils/formatters'
-import GtIndexChip from '../../GtIndexChip.vue'
-import http from '@/utils/http'
-
-// ═══ Props ═══
+import {
+  createSameControlMergerRow,
+  createSameControlReverseRow,
+  createSameControlStepRow,
+  describeCapitalReserveAdjustment,
+  extractSameControlInvesteesFromG7Judgment,
+  extractSubsidiaryNamesFromG72,
+  extractSubsidiaryNamesFromG74,
+  normalizeSameControlRows,
+  recalcSameControlMergerRow,
+  summarizeSameControlSteps,
+  syncMergerRowsFromSameControlNames,
+  validateSameControlRows,
+  type G7SameControlMergerRow,
+  type G7SameControlReverseRow,
+  type G7SameControlStepRow,
+  type G7SameControlStepSummary,
+  type G7SameControlStoredRow,
+  type G7SameControlValidationContext,
+  type G7YesNo,
+} from './g7SameControlModel'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -376,469 +476,397 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
-const emit = defineEmits<{
-  (e: 'save', data: SameControlSavePayload): void
-}>()
-
-// ═══ Types ═══
-
-interface SameControlSavePayload {
-  rows: G7SameControlRow[]
-  conclusion: string
-}
-
-// ═══ Injections ═══
-
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
-
-// ═══ Import/Export ═══
-
-const wpIdRef = toRef(props, 'wpId')
-const { exportTemplate, exportData, importData } = useG7SubImportExport({ wpId: wpIdRef })
-
-// ═══ State ═══
-
 const isReadonly = computed(() => !!props.readonly)
-const rows = reactive<G7SameControlRow[]>([])
-const conclusion = ref('')
-const fileInputRef = ref<HTMLInputElement | null>(null)
-const rowCount = computed(() => rows.length)
-
-// ═══ 审计说明/结论持久化（checklist_responses，conclusion:null） ═══
-const auditFormData = useG7SubFormData({
+const formData = useG7SubFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
+const { exportTemplate, exportData, importData } = useG7SubImportExport({ wpId: toRef(props, 'wpId') })
+
+const ROWS_KEY = 'G7-8-rows'
 const NOTE_KEY = 'G7-8-same-control-audit-note'
 const CONCLUSION_KEY = 'G7-8-same-control-audit-conclusion'
+const mergerRows = reactive<G7SameControlMergerRow[]>([])
+const stepRows = reactive<G7SameControlStepRow[]>([])
+const reverseRows = reactive<G7SameControlReverseRow[]>([])
 const auditNote = ref('')
+const auditConclusion = ref('')
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const syncing = ref(false)
+const validationContext = reactive<G7SameControlValidationContext>({})
 
-function saveAuditNote(val: string): void {
+const allRows = computed<G7SameControlStoredRow[]>(() => [
+  ...mergerRows,
+  ...stepRows,
+  ...reverseRows,
+])
+const stepSummaries = computed(() => summarizeSameControlSteps(stepRows))
+const issues = computed(() => validateSameControlRows(allRows.value, validationContext))
+const errorCount = computed(() => issues.value.filter(issue => issue.severity === 'error').length)
+const warningCount = computed(() => issues.value.filter(issue => issue.severity === 'warning').length)
+const saveStatusText = computed(() => ({
+  idle: '',
+  pending: '待保存',
+  saving: '保存中…',
+  saved: '已保存',
+  error: '保存失败',
+}[formData.savePhase.value]))
+
+function display(value: unknown): string {
+  return value === '' || value == null ? '—' : String(value)
+}
+function formatAmount(value: unknown): string {
+  return fmtAmount(Number(value ?? 0))
+}
+function formatPercent(value: number): string {
+  // eslint-disable-next-line gt-audit/no-amount-toFixed -- percentage display, not monetary amount
+  return `${(value * 100).toFixed(2)}%`
+}
+function persistRows(): void {
   if (isReadonly.value) return
-  auditNote.value = val
-  auditFormData.debouncedSave(NOTE_KEY, { remark: val, conclusion: null })
-}
-function saveAuditConclusion(val: string): void {
-  if (isReadonly.value) return
-  conclusion.value = val
-  auditFormData.debouncedSave(CONCLUSION_KEY, { remark: val, conclusion: null })
-  emitSave()
-}
-
-// ═══ 公式自动计算 ═══
-
-/**
- * 重新计算单行公式列：
- * - shareOfNetAssets = calcSameControlCost(acquireeNetAssets, shareholdingRatio)
- * - initialCost = shareOfNetAssets（同控下初始成本=享有份额）
- */
-function recalcRow(row: G7SameControlRow): void {
-  row.shareOfNetAssets = calcSameControlCost(row.acquireeNetAssets, row.shareholdingRatio)
-  row.initialCost = row.shareOfNetAssets
-}
-
-/** 差额 = 支付对价 - 初始投资成本 */
-function getDifference(row: G7SameControlRow): number {
-  return Math.round((parseNum(row.consideration) - parseNum(row.initialCost)) * 100) / 100
-}
-
-/** 差额是否过大(>初始成本50%且初始成本>0) → 橙色高亮告警 */
-function isDifferenceLarge(row: G7SameControlRow): boolean {
-  const cost = parseNum(row.initialCost)
-  if (cost <= 0) return false
-  return Math.abs(getDifference(row)) > cost * 0.5
-}
-
-// ═══ 字段更新 + 触发重算 ═══
-
-function updateField(row: G7SameControlRow, field: keyof G7SameControlRow, value: any): void {
-  ;(row as any)[field] = value ?? 0
-  recalcRow(row)
-  emitSave()
-}
-
-// ═══ 动态行增删 ═══
-
-function createEmptyRow(investeeName: string, seq: number): G7SameControlRow {
-  return {
-    id: `sc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    seq,
-    investeeName,
-    mergerDate: '',
-    mergerType: '',
-    acquireeNetAssets: 0,
-    shareholdingRatio: 0,
-    shareOfNetAssets: 0,
-    initialCost: 0,
-    consideration: 0,
-    differenceHandling: '',
-    auditConclusion: '',
-  }
-}
-
-async function handleAddRow(): Promise<void> {
-  try {
-    const { value } = await ElMessageBox.prompt(
-      '请输入被投资单位名称',
-      '新增被投资单位（同控合并）',
-      {
-        confirmButtonText: '确认',
-        cancelButtonText: '取消',
-        inputPattern: /\S+/,
-        inputErrorMessage: '名称不能为空',
-      },
-    )
-    const name = value.trim()
-    // 校验唯一性
-    if (rows.some(r => r.investeeName === name)) {
-      ElMessage.warning(`「${name}」已存在，请勿重复添加`)
-      return
-    }
-    const newRow = createEmptyRow(name, rows.length + 1)
-    rows.push(newRow)
-    emitSave()
-    ElMessage.success(`已添加「${name}」`)
-  } catch {
-    // 用户取消
-  }
-}
-
-function deleteRow(row: G7SameControlRow): void {
-  const idx = rows.findIndex(r => r.id === row.id)
-  if (idx >= 0) {
-    rows.splice(idx, 1)
-    rows.forEach((r, i) => { r.seq = i + 1 })
-    emitSave()
-  }
-}
-
-// ═══ 导入导出 ═══
-
-function handleImportExportCommand(command: string): void {
-  switch (command) {
-    case 'template':
-      void exportTemplate('G7-8')
-      break
-    case 'export':
-      void exportData('G7-8')
-      break
-    case 'import':
-      fileInputRef.value?.click()
-      break
-  }
-}
-
-async function handleFileChange(event: Event): Promise<void> {
-  const target = event.target as HTMLInputElement
-  const file = target.files?.[0]
-  if (!file) return
-  const result = await importData('G7-8', file)
-  if (result && result.rowCount > 0) {
-    // 导入成功后重新加载数据（触发父组件刷新）
-    ElMessage.info('数据已导入，请刷新查看')
-  }
-  // 重置 input
-  target.value = ''
-}
-
-// ═══ AI辅助 ═══
-
-async function handleAiConclusion(): Promise<void> {
-  ElMessage.info('正在生成AI审计结论...')
-  try {
-    const res = await http.post(
-      `/api/workpapers/${props.wpId}/g7-sub/ai/initial-measurement-conclusion`,
-      { existingContent: conclusion.value, relatedContext: { sheet: 'G7-8', rows } },
-    )
-    const text = res?.data?.data?.conclusion || res?.data?.conclusion || res?.data?.text || ''
-    if (text) {
-      conclusion.value = String(text)
-      auditFormData.debouncedSave(CONCLUSION_KEY, { remark: String(text), conclusion: null })
-      emitSave()
-      ElMessage.success('AI结论生成完成')
-    }
-  } catch {
-    ElMessage.warning('AI结论生成暂未连接，请手动填写')
-  }
-}
-
-// ═══ 保存 ═══
-
-function emitSave(): void {
-  emit('save', {
-    rows: [...rows],
-    conclusion: conclusion.value,
+  formData.debouncedSave(ROWS_KEY, {
+    conclusion: JSON.stringify(allRows.value),
+    remark: 'G7-8同控初始计量三类测试',
   })
 }
-
-// ═══ 辅助格式化 ═══
-
-function fmtPercent(v: unknown): string {
-  if (typeof v === 'number' && v > 0) return `${(v * 100).toFixed(2)}%`
-  return String(v ?? '-')
+function updateMergerText(row: G7SameControlMergerRow, field: keyof G7SameControlMergerRow, value: unknown): void {
+  ;(row as any)[field] = value == null ? '' : String(value)
+  persistRows()
+}
+function updateMergerNumber(row: G7SameControlMergerRow, field: keyof G7SameControlMergerRow, value: unknown): void {
+  ;(row as any)[field] = value == null || value === '' ? null : Number(value)
+  recalcSameControlMergerRow(row)
+  persistRows()
+}
+function updateStepNumber(row: G7SameControlStepRow, field: keyof G7SameControlStepRow, value: unknown): void {
+  ;(row as any)[field] = value == null || value === '' ? null : Number(value)
+  persistRows()
+}
+function updateReverseText(row: G7SameControlReverseRow, field: keyof G7SameControlReverseRow, value: unknown): void {
+  ;(row as any)[field] = value == null ? '' : String(value)
+  persistRows()
 }
 
-function conclusionTagType(c: string): '' | 'success' | 'warning' | 'danger' {
-  switch (c) {
-    case '无差异': return 'success'
-    case '差异可接受': return 'warning'
-    case '差异需调整': return 'danger'
-    default: return ''
+async function promptName(title: string): Promise<string | null> {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入公司名称', title, {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPattern: /\S+/,
+      inputErrorMessage: '公司名称不能为空',
+    })
+    return value.trim()
+  } catch {
+    return null
   }
 }
-
-// ═══ 数据水合 ═══
-
-function hydrateData(): void {
-  const data = props.htmlData
-  if (!data) return
-
-  const sameControlData = data?.sameControl ?? data?.same_control ?? data?.sameControlMeasurement ?? data
-  conclusion.value = sameControlData?.conclusion ?? ''
-
-  const rawRows = sameControlData?.rows ?? []
-  rows.length = 0
-  if (Array.isArray(rawRows)) {
-    for (let i = 0; i < rawRows.length; i++) {
-      const r = rawRows[i]
-      const row: G7SameControlRow = {
-        id: r.id ?? `sc-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 8)}`,
-        seq: r.seq ?? i + 1,
-        investeeName: r.investeeName ?? r.investee_name ?? '未命名',
-        mergerDate: r.mergerDate ?? r.merger_date ?? '',
-        mergerType: r.mergerType ?? r.merger_type ?? '',
-        acquireeNetAssets: parseNum(r.acquireeNetAssets ?? r.acquiree_net_assets),
-        shareholdingRatio: parseNum(r.shareholdingRatio ?? r.shareholding_ratio),
-        shareOfNetAssets: 0,
-        initialCost: 0,
-        consideration: parseNum(r.consideration),
-        differenceHandling: r.differenceHandling ?? r.difference_handling ?? '',
-        auditConclusion: r.auditConclusion ?? r.audit_conclusion ?? '',
-      }
-      recalcRow(row)
-      rows.push(row)
+async function addMergerRow(): Promise<void> {
+  const name = await promptName('新增合并方式取得的子公司')
+  if (!name) return
+  if (mergerRows.some(row => row.investeeName === name) || stepRows.some(row => row.companyName === name)) {
+    ElMessage.warning(`「${name}」已存在于一次合并或分步合并`)
+    return
+  }
+  mergerRows.push(createSameControlMergerRow(mergerRows.length + 1, name))
+  persistRows()
+}
+function removeMergerRow(id: string): void {
+  const index = mergerRows.findIndex(row => row.id === id)
+  if (index < 0) return
+  mergerRows.splice(index, 1)
+  mergerRows.forEach((row, i) => { row.seq = i + 1 })
+  persistRows()
+}
+async function addStepCompany(): Promise<void> {
+  const name = await promptName('新增分步实现同控合并的公司')
+  if (!name) return
+  if (stepRows.some(row => row.companyName === name) || mergerRows.some(row => row.investeeName === name)) {
+    ElMessage.warning(`「${name}」已存在于一次合并或分步合并`)
+    return
+  }
+  const companyId = `step-company-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  stepRows.push(createSameControlStepRow(companyId, name, 1))
+  persistRows()
+}
+function addStepTransaction(summary: G7SameControlStepSummary): void {
+  const rows = stepRowsFor(summary.companyId)
+  const next = createSameControlStepRow(summary.companyId, summary.companyName, rows.length + 1)
+  next.priorHoldingBookValue = summary.priorHoldingBookValue || null
+  next.isPackageDeal = summary.isPackageDeal
+  next.notPackageBasis = summary.notPackageBasis
+  next.availableCapitalReserve = summary.availableCapitalReserve
+  next.indexRef = summary.indexRef
+  stepRows.push(next)
+  persistRows()
+}
+function stepRowsFor(companyId: string): G7SameControlStepRow[] {
+  return stepRows.filter(row => row.companyId === companyId)
+}
+function removeStepRow(id: string): void {
+  const row = stepRows.find(item => item.id === id)
+  if (!row) return
+  const index = stepRows.indexOf(row)
+  stepRows.splice(index, 1)
+  stepRowsFor(row.companyId).forEach((item, i) => {
+    item.seq = i + 1
+    item.transactionNo = i + 1
+  })
+  persistRows()
+}
+function removeStepCompany(companyId: string): void {
+  for (let index = stepRows.length - 1; index >= 0; index -= 1) {
+    if (stepRows[index].companyId === companyId) stepRows.splice(index, 1)
+  }
+  persistRows()
+}
+function updateStepGroupField(
+  companyId: string,
+  field: 'notPackageBasis' | 'indexRef' | 'isPackageDeal' | 'priorHoldingBookValue' | 'availableCapitalReserve',
+  value: unknown,
+): void {
+  for (const row of stepRowsFor(companyId)) {
+    if (field === 'priorHoldingBookValue' || field === 'availableCapitalReserve') {
+      ;(row as any)[field] = value == null || value === '' ? null : Number(value)
+    } else if (field === 'isPackageDeal') {
+      row.isPackageDeal = (value === '是' || value === '否' ? value : '') as G7YesNo
+    } else {
+      row[field] = value == null ? '' : String(value)
     }
   }
+  persistRows()
+}
+function addReverseRow(): void {
+  reverseRows.push(createSameControlReverseRow(reverseRows.length + 1))
+  persistRows()
+}
+function removeReverseRow(id: string): void {
+  const index = reverseRows.findIndex(row => row.id === id)
+  if (index < 0) return
+  reverseRows.splice(index, 1)
+  reverseRows.forEach((row, i) => { row.seq = i + 1 })
+  persistRows()
+}
+function handleAddCommand(command: string): void {
+  if (command === 'merger') void addMergerRow()
+  if (command === 'step') void addStepCompany()
+  if (command === 'reverse') addReverseRow()
 }
 
-// ═══ 对外暴露 ═══
+function parseRows(value: unknown): G7SameControlStoredRow[] {
+  if (Array.isArray(value)) return normalizeSameControlRows(value)
+  if (typeof value !== 'string' || !value.trim()) return []
+  try {
+    return normalizeSameControlRows(JSON.parse(value))
+  } catch {
+    return []
+  }
+}
+function hydrate(rows: G7SameControlStoredRow[]): void {
+  mergerRows.splice(0, mergerRows.length, ...rows.filter((row): row is G7SameControlMergerRow => row.section === 'merger'))
+  stepRows.splice(0, stepRows.length, ...rows.filter((row): row is G7SameControlStepRow => row.section === 'step'))
+  reverseRows.splice(0, reverseRows.length, ...rows.filter((row): row is G7SameControlReverseRow => row.section === 'reverse'))
+}
+function rowsFromHtmlData(): G7SameControlStoredRow[] {
+  const data = props.htmlData?.sameControl ?? props.htmlData?.same_control ?? props.htmlData
+  return normalizeSameControlRows(data?.rows ?? [])
+}
 
-function getData(): SameControlSavePayload {
-  return {
-    rows: [...rows],
-    conclusion: conclusion.value,
+function findChecklistItem(items: any[], itemId: string): any | undefined {
+  return items.find((item: any) => item.item_id === itemId)
+}
+
+async function refreshValidationContext(): Promise<void> {
+  if (!props.wpId) return
+  try {
+    const response = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`, { _silent: true } as any)
+    const items: any[] = Array.isArray(response) ? response : (response?.data ?? [])
+    const g77 = findChecklistItem(items, 'G7-7-control-judgment-data')
+    const g72 = findChecklistItem(items, 'G7-2-rows')
+    const g74 = findChecklistItem(items, 'G7-4-rows')
+    validationContext.sameControlInvestees = extractSameControlInvesteesFromG7Judgment(g77?.conclusion)
+    validationContext.detailInvestees = extractSubsidiaryNamesFromG72(g72?.conclusion)
+    validationContext.basicInfoInvestees = extractSubsidiaryNamesFromG74(g74?.conclusion)
+  } catch {
+    /* 勾稽名单加载失败不阻断编辑 */
   }
 }
 
-function loadFromHtmlData(data: Record<string, any> | null): void {
-  rows.length = 0
-  conclusion.value = ''
-  if (data) {
-    const prev = props.htmlData
-    // 临时覆盖用于水合
-    ;(props as any).htmlData = data
-    hydrateData()
-    ;(props as any).htmlData = prev
+async function syncFromRelatedSheets(): Promise<void> {
+  if (isReadonly.value || syncing.value) return
+  syncing.value = true
+  try {
+    await refreshValidationContext()
+    const names = validationContext.sameControlInvestees ?? []
+    if (!names.length) {
+      ElMessage.warning('G7-7 中未找到「控制+同一控制下企业合并」单位，仅已刷新名单勾稽')
+      return
+    }
+    const result = syncMergerRowsFromSameControlNames([...mergerRows], names)
+    mergerRows.splice(0, mergerRows.length, ...result.rows)
+    persistRows()
+    ElMessage.success(`已从 G7-7 同步同控单位：新增 ${result.added} 家`)
+  } catch {
+    ElMessage.error('同步 G7-7/G7-2/G7-4 失败')
+  } finally {
+    syncing.value = false
   }
 }
 
-defineExpose({ getData, loadFromHtmlData })
+function handleImportExportCommand(command: string): void {
+  if (command === 'template') void exportTemplate('G7-8')
+  if (command === 'export') void exportData('G7-8')
+  if (command === 'import') fileInputRef.value?.click()
+}
+async function handleFileChange(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  const result = await importData('G7-8', file)
+  if (!result) return
+  await formData.loadResponses()
+  hydrate(parseRows(formData.data.value.get(ROWS_KEY)?.conclusion))
+}
+function saveAuditNote(value: string): void {
+  if (isReadonly.value) return
+  formData.debouncedSave(NOTE_KEY, { remark: value, conclusion: null })
+}
+function saveAuditConclusion(value: string): void {
+  if (isReadonly.value) return
+  formData.debouncedSave(CONCLUSION_KEY, { remark: value, conclusion: null })
+}
+async function handleAiConclusion(): Promise<void> {
+  try {
+    const response = await http.post(
+      `/api/workpapers/${props.wpId}/g7-sub/ai/initial-measurement-conclusion`,
+      {
+        existingContent: auditConclusion.value,
+        relatedContext: {
+          sheet: 'G7-8',
+          rows: allRows.value,
+          stepSummaries: stepSummaries.value,
+          validationIssues: issues.value,
+        },
+      },
+    )
+    const data = response?.data?.data ?? response?.data ?? response
+    const text = data?.content ?? data?.conclusion ?? data?.text ?? ''
+    if (!text) throw new Error('empty')
+    auditConclusion.value = String(text)
+    saveAuditConclusion(auditConclusion.value)
+    ElMessage.success('AI结论生成完成')
+  } catch {
+    ElMessage.warning('AI结论生成失败，请手工填写')
+  }
+}
 
-// ═══ Lifecycle ═══
+const TextCell = defineComponent({
+  props: { row: { type: Object, required: true }, field: { type: String, required: true }, readonly: Boolean },
+  emits: ['change'],
+  setup(componentProps, { emit }) {
+    return () => componentProps.readonly
+      ? h('span', display((componentProps.row as any)[componentProps.field]))
+      : h(ElInput, {
+          modelValue: (componentProps.row as any)[componentProps.field],
+          size: 'small',
+          onChange: (value: string) => emit('change', componentProps.row, componentProps.field, value),
+        })
+  },
+})
+const TextAreaCell = defineComponent({
+  props: { row: { type: Object, required: true }, field: { type: String, required: true }, readonly: Boolean },
+  emits: ['change'],
+  setup(componentProps, { emit }) {
+    return () => componentProps.readonly
+      ? h('span', { class: 'multiline' }, display((componentProps.row as any)[componentProps.field]))
+      : h(ElInput, {
+          modelValue: (componentProps.row as any)[componentProps.field],
+          type: 'textarea',
+          rows: 2,
+          onChange: (value: string) => emit('change', componentProps.row, componentProps.field, value),
+        })
+  },
+})
+const NumberCell = defineComponent({
+  props: { row: { type: Object, required: true }, field: { type: String, required: true }, readonly: Boolean },
+  emits: ['change'],
+  setup(componentProps, { emit }) {
+    return () => componentProps.readonly
+      ? h('span', formatAmount((componentProps.row as any)[componentProps.field]))
+      : h(ElInputNumber, {
+          modelValue: (componentProps.row as any)[componentProps.field],
+          controls: false,
+          precision: 2,
+          size: 'small',
+          class: 'cell-number',
+          onChange: (value: number | undefined) => emit('change', componentProps.row, componentProps.field, value),
+        })
+  },
+})
+const RatioCell = defineComponent({
+  props: { row: { type: Object, required: true }, field: { type: String, required: true }, readonly: Boolean },
+  emits: ['change'],
+  setup(componentProps, { emit }) {
+    return () => componentProps.readonly
+      ? h('span', formatPercent(Number((componentProps.row as any)[componentProps.field] ?? 0)))
+      : h(ElInputNumber, {
+          modelValue: (componentProps.row as any)[componentProps.field],
+          controls: false,
+          precision: 6,
+          min: 0,
+          max: 1,
+          step: 0.01,
+          size: 'small',
+          class: 'cell-number',
+          onChange: (value: number | undefined) => emit('change', componentProps.row, componentProps.field, value),
+        })
+  },
+})
+const FormulaAmount = defineComponent({
+  props: { value: { type: Number, required: true } },
+  setup(componentProps) {
+    return () => h('span', { class: 'formula-cell' }, formatAmount(componentProps.value))
+  },
+})
 
 onMounted(async () => {
-  if (props.htmlData) {
-    hydrateData()
-  }
-  await auditFormData.load()
-  const n = auditFormData.data.value.get(NOTE_KEY)
-  if (n?.remark) auditNote.value = n.remark
-  const c = auditFormData.data.value.get(CONCLUSION_KEY)
-  if (c?.remark) conclusion.value = c.remark
+  await formData.load()
+  const saved = parseRows(formData.data.value.get(ROWS_KEY)?.conclusion)
+  hydrate(saved.length ? saved : rowsFromHtmlData())
+  auditNote.value = formData.data.value.get(NOTE_KEY)?.remark ?? ''
+  auditConclusion.value = formData.data.value.get(CONCLUSION_KEY)?.remark ?? ''
+  await refreshValidationContext()
 })
 </script>
 
 <style scoped>
-.g7-tab-same-control {
-  padding: 12px;
-  font-size: var(--wp-font-size, 13px);
-}
-
-/* ═══ Section标题栏 ═══ */
-.section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.sheet-title {
-  font-size: 15px;
-  font-weight: 600;
-  margin: 0;
-  color: #303133;
-}
-.head-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* ═══ 蓝色渐变引导区 ═══ */
-.guidance-steps {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  padding: 12px 16px;
-  margin-bottom: 12px;
-  background: linear-gradient(135deg, #e8f4fd 0%, #dbeafe 100%);
-  border-radius: 8px;
-  border: 1px solid #bae6fd;
-}
-.step-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.step-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #2563eb;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-.step-text {
-  font-size: var(--wp-font-size, 13px);
-  color: #1e40af;
-}
-
-/* ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ */
-.methodology-context {
-  padding: 12px 16px;
-  margin-bottom: 12px;
-  background: #fffbeb;
-  border-left: 4px solid #f59e0b;
-  border-radius: 0 6px 6px 0;
-  font-size: var(--wp-font-size, 13px);
-  line-height: 1.6;
-  color: #92400e;
-}
-.methodology-context p {
-  margin: 2px 0;
-}
-
-/* ═══ 表格 ═══ */
-.same-control-table {
-  margin-bottom: 16px;
-}
-.same-control-table :deep(.el-table__header th) {
-  background: #f8fafc;
-  font-size: var(--wp-font-size, 13px);
-  font-weight: 600;
-}
-.investee-name {
-  font-weight: 500;
-  color: #1d4ed8;
-}
-
-/* ═══ 公式列样式（虚线下划线+cursor:help） ═══ */
-.formula-cell {
-  border-bottom: 1px dashed #94a3b8;
-  cursor: help;
-  color: #1e40af;
-  font-weight: 500;
-  padding-bottom: 1px;
-}
-.formula-header {
-  cursor: help;
-}
-.formula-icon {
-  font-size: 11px;
-  color: #6366f1;
-  margin-left: 2px;
-  font-style: italic;
-}
-
-/* ═══ 差额处理列 ═══ */
-.difference-cell {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 4px;
-}
-.diff-tag {
-  font-size: 11px;
-}
-.diff-warning {
-  color: #f59e0b;
-  font-size: 14px;
-  cursor: help;
-}
-
-/* ═══ 空状态 ═══ */
-.empty-state {
-  text-align: center;
-  padding: 40px 0;
-  color: #9ca3af;
-}
-
-/* ═══ 审计目标 / 工具栏 ═══ */
-.objective-alert { margin-bottom: 12px; }
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; }
-.tab-toolbar .toolbar-right { display: flex; align-items: center; gap: 8px; }
-.tab-toolbar .chip-wrap { display: inline-flex; }
-
-/* ═══ 审计说明/结论卡片 ═══ */
-.audit-note-card {
-  margin-top: 16px;
-}
-.conclusion-card {
-  margin-top: 16px;
-}
-.conclusion-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-.conclusion-title {
-  font-weight: 600;
-  font-size: 14px;
-  color: #303133;
-}
-
-/* ═══ 编制提示折叠 ═══ */
-.guidance-details {
-  margin-top: 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
-  padding: 8px 12px;
-}
-.guidance-details summary {
-  cursor: pointer;
-  font-size: var(--wp-font-size, 13px);
-  color: #6b7280;
-  font-weight: 500;
-}
-.guidance-content {
-  margin-top: 8px;
-  font-size: 12px;
-  line-height: 1.8;
-  color: #4b5563;
-}
-.guidance-content p {
-  margin: 2px 0;
-}
-
-/* ═══ 文本单元格 ═══ */
-.text-cell {
-  white-space: pre-wrap;
-  font-size: 12px;
-  color: #6b7280;
-}
+.g7-tab-same-control { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.section-head, .card-head, .summary-bar, .step-company-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.section-head { margin-bottom: 12px; }
+.sheet-title { margin: 0; font-size: 16px; }
+.sheet-subtitle, .section-note { margin-left: 8px; color: #909399; font-size: 12px; }
+.head-actions, .summary-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.objective-alert, .methodology-context, .summary-bar, .validation-alert { margin-bottom: 12px; }
+.methodology-context { padding: 12px 16px; border-left: 4px solid #e6a23c; background: #fdf6ec; line-height: 1.7; }
+.section-card { margin-bottom: 14px; }
+.formula-cell { color: #1d4ed8; font-weight: 600; border-bottom: 1px dashed #94a3b8; }
+.hint-text { margin-top: 2px; color: #909399; font-size: 11px; line-height: 1.3; }
+.required-input :deep(.el-textarea__inner),
+.required-input :deep(.el-input__inner) { box-shadow: 0 0 0 1px #e6a23c inset; }
+.required-select :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }
+.cell-number { width: 100%; }
+.step-company { margin-bottom: 16px; border: 1px solid #ebeef5; border-radius: 6px; padding: 10px; }
+.step-company-head { margin-bottom: 8px; }
+.step-summary { margin-top: 8px; }
+.conclusion-card { margin-top: 14px; }
+.guidance-details { margin-top: 14px; padding: 10px 14px; border: 1px solid #e4e7ed; border-radius: 6px; color: #606266; }
+.guidance-details summary { cursor: pointer; font-weight: 600; }
+.guidance-details ol { line-height: 1.8; padding-left: 20px; }
+.multiline { white-space: pre-wrap; }
+.hidden-input { display: none; }
+.save-status { font-size: 12px; color: #909399; min-width: 3.5em; }
+.save-pending, .save-saving { color: #e6a23c; }
+.save-saved { color: #67c23a; }
+.save-error { color: #f56c6c; }
 </style>

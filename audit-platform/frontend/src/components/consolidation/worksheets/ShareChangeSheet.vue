@@ -206,6 +206,14 @@ const props = defineProps<{
   companies: CompanyInfo[]
   allCompanies: { name: string; code?: string; ratio: number }[]
   indirectCompanies?: { name: string; code?: string; ratio: number; indirectHolder?: string }[]
+  /** 已保存的按公司组数据；按 company.code 对齐回填 */
+  initialData?: Array<{
+    company?: CompanyInfo
+    naRows?: NARow[]
+    simRows?: SimRow[]
+    indirectSimData?: Record<string, SimRow[]>
+    endInvestTotal?: number
+  }>
 }>()
 
 const _emit = defineEmits<{
@@ -309,6 +317,42 @@ function buildSimRows(): SimRow[] {
 
 // ─── 直接持股数据（每家企业一组） ────────────────────────────────────────────
 const companyData = reactive<{ naRows: NARow[]; simRows: SimRow[] }[]>([])
+let _hydrated = false
+
+function hydrateFromSaved(ci: number, cd: { naRows: NARow[]; simRows: SimRow[] }) {
+  const savedList = props.initialData
+  if (!Array.isArray(savedList) || !savedList.length) return
+  const code = props.companies[ci]?.code
+  const saved = savedList.find((item) => {
+    const c = item?.company
+    if (!c) return false
+    if (code && c.code) return c.code === code
+    return c.name === props.companies[ci]?.name
+  })
+  if (!saved) return
+  if (Array.isArray(saved.naRows) && saved.naRows.length) {
+    cd.naRows = saved.naRows.map((r) => ({
+      ...r,
+      vals: Array.isArray(r.vals) ? [...r.vals] : new Array(colCount.value).fill(null),
+    }))
+  }
+  if (Array.isArray(saved.simRows) && saved.simRows.length) {
+    cd.simRows = saved.simRows.map((r) => ({
+      ...r,
+      dc: Array.isArray(r.dc) ? [...r.dc] : new Array(dcCount.value).fill(null),
+    }))
+  }
+  if (saved.indirectSimData && typeof saved.indirectSimData === 'object') {
+    for (const [key, rows] of Object.entries(saved.indirectSimData)) {
+      if (Array.isArray(rows)) {
+        indirectSimData[key] = rows.map((r) => ({
+          ...r,
+          dc: Array.isArray(r.dc) ? [...r.dc] : new Array(dcCount.value).fill(null),
+        }))
+      }
+    }
+  }
+}
 
 // setup 阶段同步初始化
 for (let ci = 0; ci < props.companies.length; ci++) {
@@ -325,6 +369,14 @@ for (let ci = 0; ci < props.companies.length; ci++) {
   companyData.push(cd)
 }
 
+// 间接持股数据需先声明，再执行回填（hydrate 可能写入）
+const indirectSimData = reactive<Record<string, SimRow[]>>({})
+
+for (let ci = 0; ci < companyData.length; ci++) {
+  hydrateFromSaved(ci, companyData[ci])
+}
+_hydrated = true
+
 // props 变化时同步
 watch(() => props.companies, (comps) => {
   while (companyData.length < comps.length) {
@@ -336,9 +388,18 @@ watch(() => props.companies, (comps) => {
         if (ratioRow.dc[t * 2] == null) ratioRow.dc[t * 2] = 0
       }
     }
+    hydrateFromSaved(companyData.length, cd)
     companyData.push(cd)
   }
   companyData.length = comps.length
+}, { deep: true })
+
+// 首次拿到后端 initialData 时回填（loadAllData 异步）
+watch(() => props.initialData, (rows) => {
+  if (!Array.isArray(rows) || !rows.length || !_hydrated) return
+  for (let ci = 0; ci < companyData.length; ci++) {
+    hydrateFromSaved(ci, companyData[ci])
+  }
 }, { deep: true })
 
 // #1: changeTimes 运行时变化时扩展/收缩列（防止数据截断）
@@ -368,8 +429,6 @@ watch(() => props.changeTimes, (newTimes, oldTimes) => {
 })
 
 // ─── 间接持股数据 ────────────────────────────────────────────────────────────
-const indirectSimData = reactive<Record<string, SimRow[]>>({})
-
 // #2: key 改用企业 code 而非数组 index，防止企业重排导致数据串联
 function _indirectKey(ci: number, ici: number): string {
   const compCode = props.companies[ci]?.code || String(ci)

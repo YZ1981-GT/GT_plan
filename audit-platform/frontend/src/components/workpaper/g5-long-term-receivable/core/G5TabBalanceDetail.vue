@@ -32,12 +32,41 @@
     <!-- 区段Tab切换 -->
     <div class="segment-tabs">
       <el-segmented v-model="detail.activeTab.value" :options="tabOptions" size="small" />
+      <div class="aging-toolbar">
+        <span class="muted">账龄口径</span>
+        <el-select
+          :model-value="detail.agingPreset.value"
+          size="small"
+          style="width: 120px"
+          :disabled="!!props.readonly"
+          @change="onAgingPresetChange"
+        >
+          <el-option label="3年段" value="THREE_YEAR" />
+          <el-option label="5年段" value="FIVE_YEAR" />
+          <el-option label="自定义" value="CUSTOM" />
+        </el-select>
+        <el-tag size="small" type="info">{{ detail.segments.value.length }} 段</el-tag>
+      </div>
       <div class="tab-actions">
         <el-button size="small" type="primary" plain @click="detail.addRow()" :disabled="props.readonly">
           + 新增债务人
         </el-button>
       </div>
     </div>
+
+    <el-dialog v-model="showAgingDialog" title="自定义账龄段" width="420px" destroy-on-close @close="cancelAgingDialog">
+      <p class="muted">每行一个账龄段名称（至少 2 段，最多 10 段）。</p>
+      <el-input
+        v-model="agingDraft"
+        type="textarea"
+        :autosize="{ minRows: 6, maxRows: 12 }"
+        placeholder="例：&#10;1年以内&#10;1-2年&#10;2-3年&#10;3年以上"
+      />
+      <template #footer>
+        <el-button @click="cancelAgingDialog">取消</el-button>
+        <el-button type="primary" @click="confirmAgingCustom">确定</el-button>
+      </template>
+    </el-dialog>
 
     <!-- Tab1: 债务人基础信息 -->
     <el-table
@@ -198,7 +227,7 @@
         <li>期末余额 = 合同总额 − 已收回金额（自动计算列）</li>
         <li>净额 = 期末余额 − 未实现融资收益</li>
         <li>账龄合计应等于净额，若不一致（红色）需核对账龄分段录入</li>
-        <li>账龄分段随项目账龄配置动态生成，可在"底稿配置"中调整</li>
+        <li>账龄口径支持 3年段 / 5年段 / 自定义；也可在项目「底稿配置」中统一调整</li>
         <li>关联方债务人须勾选，供关联方交易披露与减值单独评估</li>
       </ul>
     </details>
@@ -210,6 +239,7 @@ import { ref, toRef, onMounted, watch } from 'vue'
 import { useG5BalanceDetail } from '../../composables/useG5BalanceDetail'
 import { useInjectedG5FormData } from '../../composables/useG5LonRecFormData'
 import { G5_ITEM_IDS, readCanonicalRaw } from '../../composables/g5StorageContract'
+import type { G5AgingPreset } from '../../composables/g5AgingScheme'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import G5ImportExportDropdown from '../G5ImportExportDropdown.vue'
@@ -229,12 +259,31 @@ const detail = useG5BalanceDetail(toRef(props, 'projectId'))
 const { bands } = detail
 
 const ROWS_KEY = G5_ITEM_IDS.G5_2_ROWS
+const PRESET_KEY = G5_ITEM_IDS.G5_2_AGING_PRESET
+const CUSTOM_KEY = G5_ITEM_IDS.G5_2_AGING_CUSTOM
 const g5Notes = useInjectedG5FormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
 const auditNote = ref('')
 const auditConclusion = ref('')
 const G5_NOTE_KEY = 'G5-2-audit-note'
 const G5_CONCLUSION_KEY = 'G5-2-audit-conclusion'
+const showAgingDialog = ref(false)
+const agingDraft = ref('')
+const lastNonCustomPreset = ref<G5AgingPreset>('FIVE_YEAR')
 let hydrating = false
+
+function persistAgingMeta(): void {
+  if (props.readonly || hydrating) return
+  const preset = detail.agingPreset.value
+  void g5Notes.saveImmediate(PRESET_KEY, { conclusion: preset, remark: preset })
+  const labels = detail.customAgingLabels.value
+  const customJson = JSON.stringify(labels)
+  void g5Notes.saveImmediate(CUSTOM_KEY, { conclusion: customJson, remark: customJson })
+  try {
+    window.dispatchEvent(new CustomEvent('g5:aging-preset-changed', {
+      detail: { preset, customLabels: [...labels], segments: detail.segments.value },
+    }))
+  } catch { /* silent */ }
+}
 
 function persistRows(): void {
   if (props.readonly || hydrating) return
@@ -249,6 +298,39 @@ function persistRows(): void {
       },
     }))
   } catch { /* silent */ }
+}
+
+function onAgingPresetChange(val: G5AgingPreset) {
+  if (val === 'CUSTOM') {
+    agingDraft.value = (detail.customAgingLabels.value.length
+      ? detail.customAgingLabels.value
+      : detail.segments.value.map((s) => s.label)
+    ).join('\n')
+    showAgingDialog.value = true
+    return
+  }
+  lastNonCustomPreset.value = val
+  if (detail.setAgingPreset(val)) {
+    persistAgingMeta()
+    persistRows()
+  }
+}
+
+function confirmAgingCustom() {
+  const labels = agingDraft.value.split('\n').map((l) => l.trim()).filter(Boolean)
+  if (detail.setAgingPreset('CUSTOM', labels)) {
+    showAgingDialog.value = false
+    persistAgingMeta()
+    persistRows()
+  }
+}
+
+function cancelAgingDialog() {
+  showAgingDialog.value = false
+  if (detail.agingPreset.value !== 'CUSTOM') return
+  if (!detail.customAgingLabels.value.length) {
+    detail.setAgingPreset(lastNonCustomPreset.value)
+  }
 }
 
 function onRowEdit(row: any): void {
@@ -269,6 +351,12 @@ function saveAuditConclusion(val: string): void {
 onMounted(async () => {
   try { await g5Notes.loadAll() } catch { /* ignore */ }
   hydrating = true
+  const presetRaw = readCanonicalRaw(g5Notes.allResponses.value.get(PRESET_KEY))
+  const customRaw = readCanonicalRaw(g5Notes.allResponses.value.get(CUSTOM_KEY))
+  detail.loadAgingPreset(presetRaw, customRaw)
+  if (detail.agingPreset.value === 'THREE_YEAR' || detail.agingPreset.value === 'FIVE_YEAR') {
+    lastNonCustomPreset.value = detail.agingPreset.value
+  }
   const raw = readCanonicalRaw(g5Notes.allResponses.value.get(ROWS_KEY))
   if (raw) {
     try {
@@ -327,7 +415,9 @@ function fmt(v: number): string {
 .prep-hint { margin-top: 12px; font-size: 12px; color: #909399; }
 .prep-hint summary { cursor: pointer; font-weight: 500; }
 .prep-hint ul { margin: 6px 0 0; padding-left: 18px; line-height: 1.8; }
-.segment-tabs { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.segment-tabs { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.aging-toolbar { display: flex; align-items: center; gap: 8px; }
+.muted { font-size: 12px; color: #909399; }
 .tab-actions { margin-left: auto; }
 .formula-cell { border-bottom: 1px dashed #999; cursor: help; }
 .mismatch { color: #f56c6c; font-weight: 600; }

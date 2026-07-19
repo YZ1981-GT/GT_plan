@@ -16,7 +16,7 @@
       审计目标：确认非一揽子交易下处置子公司股权的处置损益计算准确（个别报表=对价−账面−应收股利+可转损益OCI；合并层面另加合并调整与净资产份额影响），会计处理符合 CAS2/CAS33，处置时点及对价确认恰当。
     </el-alert>
 
-    <el-skeleton v-if="!props.htmlData" :rows="6" animated />
+    <el-skeleton v-if="loading" :rows="6" animated />
     <div v-else class="disposal-single-content">
       <!-- 工具栏：索引 chip + 行数 -->
       <div class="tab-toolbar">
@@ -139,10 +139,8 @@ const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog',
 
 const conclusion = ref('')
 const aiLoading = ref(false)
-
-const rows = computed(() => {
-  return props.htmlData?.disposalSingle?.rows ?? []
-})
+const loading = ref(true)
+const rows = ref<Record<string, any>[]>([])
 const rowCount = computed(() => rows.value.length)
 
 // ═══ 审计说明/结论持久化（checklist_responses，conclusion:null） ═══
@@ -152,7 +150,32 @@ const auditFormData = useG7SubFormData({
 })
 const NOTE_KEY = 'G7-11-disposal-single-audit-note'
 const CONCLUSION_KEY = 'G7-11-disposal-single-audit-conclusion'
+const DATA_KEY = 'G7-11-rows'
 const auditNote = ref('')
+
+function parseRows(raw: unknown): Record<string, any>[] {
+  const source = Array.isArray(raw)
+    ? raw
+    : (raw && typeof raw === 'object' && Array.isArray((raw as any).rows) ? (raw as any).rows : [])
+  return source.map((row: Record<string, any>, index: number) => ({
+    id: row.id || `g11-${Date.now()}-${index}`,
+    seq: index + 1,
+    ...row,
+  }))
+}
+
+function parseJson(raw: string | null | undefined): unknown {
+  if (!raw) return null
+  try { return JSON.parse(raw) } catch { return null }
+}
+
+function saveRows(): void {
+  if (isReadonly.value || !rows.value.length) return
+  auditFormData.debouncedSave(DATA_KEY, {
+    conclusion: JSON.stringify(rows.value),
+    remark: null,
+  })
+}
 
 function saveAuditNote(val: string): void {
   if (isReadonly.value) return
@@ -171,6 +194,20 @@ onMounted(async () => {
   if (n?.remark) auditNote.value = n.remark
   const c = auditFormData.data.value.get(CONCLUSION_KEY)
   if (c?.remark) conclusion.value = c.remark
+
+  const saved = auditFormData.data.value.get(DATA_KEY)
+  let loaded = parseRows(parseJson(saved?.conclusion as string | undefined))
+  if (!loaded.length) {
+    const snapshot = props.htmlData?.responses_snapshot?.[DATA_KEY]
+    loaded = parseRows(parseJson(snapshot?.conclusion))
+  }
+  if (!loaded.length) {
+    loaded = parseRows(props.htmlData?.disposalSingle)
+  }
+  rows.value = loaded
+  // 种子数据写入 checklist，供披露/合并联动消费
+  if (loaded.length && !saved?.conclusion) saveRows()
+  loading.value = false
 })
 
 function calcIndividualGain(row: any): string {

@@ -21,23 +21,40 @@
       <p class="methodology-title">编制逻辑（对齐 Excel G6-14）：</p>
       <p>（一）转回/收回：金额 ≤ 累计已计提；须说明原因、收回方式、原计提依据与合理性</p>
       <p>（二）核销：关注投资性质、核销程序、是否关联交易及合理性分析</p>
+      <p>转回合计宜与 G6-12「本年转回」勾稽；可用「从 G6-12 带入」预填候选行。</p>
     </div>
 
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <span class="chip-wrap"><GtIndexChip value="wp:G6-14" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:G6-12" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-15" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">
           转回 {{ rw.reversals.value.length }} · 核销 {{ rw.writeOffs.value.length }}
         </el-tag>
         <el-tag size="small" :type="rw.gate.value.ready ? 'success' : 'warning'">
           闸门 {{ rw.gate.value.ready ? '通过' : '待补' }}
         </el-tag>
+        <el-tag
+          v-if="rw.gate.value.g12ReversalTotal != null"
+          size="small"
+          :type="rw.gate.value.g12ReversalGap > 0.05 ? 'danger' : 'success'"
+        >
+          vs G6-12 本年转回差 {{ fmtNum(rw.gate.value.g12ReversalGap) }}
+        </el-tag>
       </div>
       <div class="toolbar-right">
         <el-segmented v-model="rw.activeTab.value" :options="segmentOptions" size="small" />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">
           + 新增行
+        </el-button>
+        <el-button
+          size="small"
+          :disabled="isReadonly"
+          :loading="pullingG612"
+          @click="pullFromG612"
+        >
+          从 G6-12 带入转回
         </el-button>
         <G6EclImportExportDropdown
           :wp-id="wpId"
@@ -89,6 +106,22 @@
             @change="(v: string) => { row.unitName = v; persist() }"
           />
           <span v-else>{{ row.unitName }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="类型" width="100" align="center">
+        <template #default="{ row }">
+          <template v-if="row._isTotal" />
+          <el-select
+            v-else-if="!isReadonly"
+            :model-value="row.kind || '转回'"
+            size="small"
+            style="width: 100%"
+            @change="(v: string) => { row.kind = v as any; persist() }"
+          >
+            <el-option value="转回" label="转回" />
+            <el-option value="收回" label="收回" />
+          </el-select>
+          <span v-else>{{ row.kind || '转回' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="转回原因" min-width="130">
@@ -423,13 +456,21 @@
 /**
  * G6TabReversalWriteOff.vue — 对齐 Excel《减值准备转回（收回）、核销检查表G6-14》
  */
-import { ref, computed, inject, onMounted } from 'vue'
+import { ref, computed, inject, onMounted, onBeforeUnmount } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useG6EclFormData } from '../../composables/useG6EclFormData'
 import type { G6ReversalRow, G6WriteOffRow } from '../../composables/useG6EclFormData'
 import { useG6EclReversalWriteOff } from '../../composables/useG6EclReversalWriteOff'
 import { useG6EclAiGenerate } from '../../composables/useG6EclAiGenerate'
+import {
+  parseG6ChecklistPayload,
+  parseG6ChecklistRows,
+  fetchG612ImpairmentRows,
+  G6_12_DATA_KEY,
+  G6_14_DATA_KEY,
+  G6_14_ROWS_KEY,
+} from '../../composables/g6CrossHelpers'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G6EclImportExportDropdown from '../G6EclImportExportDropdown.vue'
 
@@ -442,7 +483,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{ imported: [] }>()
 
-const DATA_KEY = 'G6-14-reversal-writeoff-data'
+const DATA_KEY = G6_14_DATA_KEY
 const NOTE_KEY = 'G6-14-reversal-writeoff-audit-note'
 const CONCLUSION_KEY = 'G6-14-reversal-writeoff-conclusion'
 
@@ -471,9 +512,13 @@ const gateAlertTitle = computed(() => {
   if (g.unreasonableReversals || g.unreasonableWriteOffs) {
     parts.push(`${g.unreasonableReversals + g.unreasonableWriteOffs} 项判定不合理`)
   }
+  if (g.g12ReversalTotal != null && g.g12ReversalGap > 0.05) {
+    parts.push(`与 G6-12 本年转回差 ${g.g12ReversalGap.toFixed(2)}`)
+  }
   return parts.length ? `质量闸门待补：${parts.join('；')}` : ''
 })
 
+const pullingG612 = ref(false)
 type RevDisplay = G6ReversalRow & { _isTotal?: boolean }
 type WoDisplay = G6WriteOffRow & { _isTotal?: boolean }
 
@@ -545,9 +590,14 @@ async function handleAddRow() {
 function persist(): void {
   if (props.isReadonly) return
   const payload = rw.toJSON()
+  const json = JSON.stringify(payload)
   formData.debouncedSave(DATA_KEY, {
-    conclusion: null,
-    remark: JSON.stringify(payload),
+    conclusion: json,
+    remark: json,
+  })
+  formData.debouncedSave(G6_14_ROWS_KEY, {
+    conclusion: json,
+    remark: json,
   })
   formData.debouncedSave(CONCLUSION_KEY, { conclusion: rw.conclusion.value })
 }
@@ -556,6 +606,44 @@ function saveAuditNote(val: string): void {
   if (props.isReadonly) return
   auditNote.value = val
   formData.debouncedSave(NOTE_KEY, { conclusion: null, remark: val })
+}
+
+async function loadG612Rows(): Promise<any[]> {
+  const remote = await fetchG612ImpairmentRows(props.projectId, props.wpId)
+  if (remote.length) return remote
+  try { await formData.loadAll() } catch { /* ignore */ }
+  const payload = parseG6ChecklistPayload(formData.allResponses.value.get(G6_12_DATA_KEY))
+  if (Array.isArray(payload?.rows)) return payload.rows
+  if (Array.isArray(payload)) return payload
+  return []
+}
+
+async function refreshG12ReversalTotal(): Promise<void> {
+  const rows = await loadG612Rows()
+  const total = rows.reduce((s: number, r: any) => s + (Number(r?.currentReversal) || 0), 0)
+  rw.setG12ReversalTotal(Math.round(total * 100) / 100)
+}
+
+async function pullFromG612(): Promise<void> {
+  if (props.isReadonly) return
+  pullingG612.value = true
+  try {
+    const rows = await loadG612Rows()
+    if (!rows.length) {
+      ElMessage.warning('未解析到 G6-12 减值测算行，请确认 ECL 实例已创建并完成 G6-12')
+      return
+    }
+    const result = rw.importFromImpairmentRows(rows)
+    persist()
+    ElMessage.success(
+      `已从 G6-12 带入转回：新增 ${result.added}，刷新 ${result.refreshed}`
+        + (result.skipped ? `；跳过 ${result.skipped}` : ''),
+    )
+  } catch {
+    ElMessage.error('从 G6-12 带入失败')
+  } finally {
+    pullingG612.value = false
+  }
 }
 
 async function handleAi(): Promise<void> {
@@ -589,15 +677,21 @@ function fmtNum(v: unknown): string {
 async function onImported(): Promise<void> {
   try { await formData.loadAll() } catch { /* ignore */ }
   initFromData()
+  await refreshG12ReversalTotal()
   emit('imported')
   ElMessage.success('G6-14 数据已导入并刷新')
 }
 
 function initFromData(): void {
-  const saved = formData.allResponses.value.get(DATA_KEY)
-  let raw: any = null
-  if (saved?.remark) {
-    try { raw = JSON.parse(saved.remark) } catch { /* ignore */ }
+  const primary = parseG6ChecklistPayload(formData.allResponses.value.get(DATA_KEY))
+  const legacy = parseG6ChecklistPayload(formData.allResponses.value.get(G6_14_ROWS_KEY))
+  const fromRows = parseG6ChecklistRows(formData.allResponses.value.get(G6_14_ROWS_KEY))
+  let raw: any = primary
+  if (!raw || (!raw.reversals && !raw.writeOffs && !raw.rows)) {
+    raw = legacy
+  }
+  if ((!raw || (!raw.reversals && !raw.writeOffs)) && fromRows.length) {
+    raw = { rows: fromRows, conclusion: '' }
   }
   if (!raw) raw = formData.parseContent()?.reversalWriteOff
   if (!raw && props.htmlData?.reversalWriteOff) raw = props.htmlData.reversalWriteOff
@@ -609,8 +703,14 @@ function initFromData(): void {
 onMounted(async () => {
   await formData.loadAll()
   initFromData()
+  await refreshG12ReversalTotal()
   const n = formData.allResponses.value.get(NOTE_KEY)
   if (n?.remark) auditNote.value = n.remark
+})
+
+onBeforeUnmount(() => {
+  persist()
+  formData.flushPending()
 })
 
 defineExpose({ toJSON: () => rw.toJSON() })

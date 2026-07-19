@@ -5,13 +5,13 @@
  * Requirements: 3.5, 4.4, 5.5, 6.3, 7.3
  *
  * 6张动态行表格 × 3端点 = 18端点调用：
- *   POST /api/workpapers/{wpId}/g7-subsidiary/export-template?sheet={code}
- *   POST /api/workpapers/{wpId}/g7-subsidiary/export-data?sheet={code}
- *   POST /api/workpapers/{wpId}/g7-subsidiary/import-data?sheet={code}  (multipart/form-data)
+ *   POST /api/workpapers/{wpId}/g7-sub/export-template?sheet={code}
+ *   POST /api/workpapers/{wpId}/g7-sub/export-data?sheet={code}
+ *   POST /api/workpapers/{wpId}/g7-sub/import-data?sheet={code}  (multipart/form-data)
  *
  * sheet codes: G7-8 / G7-9 / G7-10 / G7-11 / G7-12 / G7-18
  * 宽表按区段分sheet导出：G7-18(3sheet: 凭证基础/检查证据/审计结论)
- * 单sheet导出：G7-8 / G7-9 / G7-10 / G7-11 / G7-12
+ * G7-8/G7-9/G7-10/G7-12按原底稿业务区段分sheet导出；普通单sheet：G7-11
  *
  * UI 铁律：el-dropdown「导入导出 ▾」（导出模板/导出数据/导入数据）
  * 使用 axios (http from @/utils/http) 非原生 fetch — for Authorization header
@@ -50,15 +50,15 @@ export interface G7SubSheetMeta {
 
 // ═══ 常量 ═══
 
-export const G7_SUB_API_PREFIX = 'g7-subsidiary'
+export const G7_SUB_API_PREFIX = 'g7-sub'
 
 /** 6张可导入导出 sheet 的中文标签 */
 export const G7_SUB_IMPORT_EXPORT_SHEETS: G7SubSheetMeta[] = [
-  { code: 'G7-8', label: 'G7-8 同控初始计量表' },
-  { code: 'G7-9', label: 'G7-9 非同控初始计量表' },
+  { code: 'G7-8', label: 'G7-8 同控初始计量表（三类业务）', multiSheet: true },
+  { code: 'G7-9', label: 'G7-9 非同控初始计量表（三类业务）', multiSheet: true },
   { code: 'G7-10', label: 'G7-10 后续计量表' },
   { code: 'G7-11', label: 'G7-11 非一揽子处置表' },
-  { code: 'G7-12', label: 'G7-12 一揽子交易处置表' },
+  { code: 'G7-12', label: 'G7-12 一揽子交易处置表（6区段）', multiSheet: true },
   { code: 'G7-18', label: 'G7-18 凭证检查表（3区段）', multiSheet: true },
 ]
 
@@ -157,7 +157,7 @@ export function useG7SubImportExport(
   }
 
   /**
-   * 导出模板 — POST /api/workpapers/{wp_id}/g7-subsidiary/export-template?sheet={code}
+   * 导出模板 — POST /api/workpapers/{wp_id}/g7-sub/export-template?sheet={code}
    * G7-18 按3区段分sheet导出（凭证基础/检查证据/审计结论，后端返回multi-sheet xlsx）
    */
   async function exportTemplate(sheet: G7SubImportableSheet): Promise<void> {
@@ -183,7 +183,7 @@ export function useG7SubImportExport(
   }
 
   /**
-   * 导出数据 — POST /api/workpapers/{wp_id}/g7-subsidiary/export-data?sheet={code}
+   * 导出数据 — POST /api/workpapers/{wp_id}/g7-sub/export-data?sheet={code}
    * G7-18 按3区段分sheet导出（凭证基础/检查证据/审计结论，后端返回multi-sheet xlsx with data）
    */
   async function exportData(sheet: G7SubImportableSheet): Promise<void> {
@@ -209,7 +209,7 @@ export function useG7SubImportExport(
   }
 
   /**
-   * 导入数据 — POST /api/workpapers/{wp_id}/g7-subsidiary/import-data?sheet={code}
+   * 导入数据 — POST /api/workpapers/{wp_id}/g7-sub/import-data?sheet={code}
    * multipart/form-data 上传 xlsx 文件
    */
   async function importData(

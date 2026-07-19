@@ -93,6 +93,72 @@ describe('useG6EclReversalWriteOff', () => {
     expect(gate.value.ready).toBe(false)
   })
 
+  it('与 G6-12 本年转回差异超阈值时闸门不通过', () => {
+    const { gate, loadData, setG12ReversalTotal } = useG6EclReversalWriteOff()
+    loadData({
+      schemaVersion: 2,
+      reversals: [{
+        id: '1', seq: 1, unitName: 'A',
+        reversalReason: '', recoveryMethod: '', originalBasis: '',
+        reversalAmount: 100, accumulatedProvision: 200,
+        reasonAnalysis: '', isReasonable: '合理', indexRef: '',
+      }],
+      writeOffs: [],
+      conclusion: '',
+    })
+    setG12ReversalTotal(150)
+    expect(gate.value.g12ReversalGap).toBe(50)
+    expect(gate.value.ready).toBe(false)
+    setG12ReversalTotal(100)
+    expect(gate.value.g12ReversalGap).toBe(0)
+    expect(gate.value.ready).toBe(true)
+  })
+
+  it('从 G6-12 带入本年转回>0 的项目（同名聚合）', () => {
+    const { reversals, importFromImpairmentRows, g12ReversalTotal } = useG6EclReversalWriteOff()
+    const result = importFromImpairmentRows([
+      { investProject: '债A', currentReversal: 80, priorImpairment: 200 },
+      { investProject: '债B', currentReversal: 0 },
+      { investProject: '债A', currentReversal: 10, priorImpairment: 200 },
+    ])
+    expect(result.added).toBe(1)
+    expect(result.refreshed).toBe(0)
+    expect(result.skipped).toBe(1)
+    expect(reversals.value).toHaveLength(1)
+    expect(reversals.value[0].unitName).toBe('债A')
+    expect(reversals.value[0].reversalAmount).toBe(90)
+    expect(g12ReversalTotal.value).toBe(90)
+  })
+
+  it('优先按 crossSheetInvestmentId 匹配并刷新金额', () => {
+    const { reversals, loadData, importFromImpairmentRows } = useG6EclReversalWriteOff()
+    loadData({
+      schemaVersion: 2,
+      reversals: [{
+        id: '1', seq: 1, unitName: '旧名称',
+        crossSheetInvestmentId: 'inv-1',
+        reversalReason: '', recoveryMethod: '', originalBasis: '',
+        reversalAmount: 10, accumulatedProvision: 0,
+        reasonAnalysis: '', isReasonable: '合理', indexRef: '',
+      }],
+      writeOffs: [],
+      conclusion: '',
+    })
+    const result = importFromImpairmentRows([
+      {
+        investProject: '新名称',
+        crossSheetInvestmentId: 'inv-1',
+        currentReversal: 55,
+        priorImpairment: 100,
+      },
+    ])
+    expect(result.added).toBe(0)
+    expect(result.refreshed).toBe(1)
+    expect(reversals.value[0].unitName).toBe('旧名称')
+    expect(reversals.value[0].reversalAmount).toBe(55)
+    expect(reversals.value[0].crossSheetInvestmentId).toBe('inv-1')
+  })
+
   it('addReversalRow 成功', async () => {
     vi.mocked(ElMessageBox.prompt).mockResolvedValue({ value: '新单位' } as any)
     const { reversals, addReversalRow } = useG6EclReversalWriteOff()

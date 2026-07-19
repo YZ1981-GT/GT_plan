@@ -90,13 +90,14 @@ export function calcAdjustedBookValue(adjBalance: number, adjImpairment: number)
   return round2(parseNum(adjBalance) - parseNum(adjImpairment))
 }
 
-// ═══ P6: 三阶段划分（hasCreditImpairment优先级最高）═══
+// ═══ P6: 三阶段划分（已减值 > SICR且无低风险豁免 > Stage1）═══
 
 export function determineStage(
   hasSignificantIncrease: boolean, hasLowCreditRisk: boolean, hasCreditImpairment: boolean
 ): 'Stage1' | 'Stage2' | 'Stage3' {
   if (hasCreditImpairment) return 'Stage3'
-  if (hasSignificantIncrease) return 'Stage2'
+  // 较低信用风险豁免：即使存在 SICR 信号，也可假定未显著增加 → Stage1（对齐 G4 / CAS22）
+  if (hasSignificantIncrease && !hasLowCreditRisk) return 'Stage2'
   return 'Stage1'
 }
 
@@ -110,10 +111,32 @@ export function isDebitCreditBalanced(debits: number[], credits: number[]): bool
 
 // ═══ G6-13: 期限折算 PD / ECL 率 / 与上期差异 ═══
 
-/** 一年期边际 PD → 剩余月数期限折算 PD */
-export function calcTermAdjustedPd(annualPd: number, remainingMonths: number): number {
+/**
+ * 按阶段确定 PD 展望期月数：
+ * Stage1 → min(剩余月数, 12)；Stage2/3 / 未填阶段 → 剩余存续期。
+ */
+export function effectivePdHorizonMonths(
+  stage: string | null | undefined,
+  remainingMonths: number,
+): number {
+  const months = Math.max(0, parseNum(remainingMonths))
+  const normalized = String(stage || '').trim().toLowerCase().replace(/\s+/g, '')
+  if (normalized === 'stage1' || normalized === '1' || normalized.includes('一阶段')) {
+    return Math.min(months, 12)
+  }
+  return months
+}
+
+/** 一年期边际 PD → 期限折算 PD；传入 stage 时 Stage1 自动封顶 12 个月 */
+export function calcTermAdjustedPd(
+  annualPd: number,
+  remainingMonths: number,
+  stage?: string | null,
+): number {
   const pd = Math.min(1, Math.max(0, parseNum(annualPd)))
-  const months = parseNum(remainingMonths)
+  const months = stage != null && String(stage).trim() !== ''
+    ? effectivePdHorizonMonths(stage, remainingMonths)
+    : parseNum(remainingMonths)
   if (months <= 0 || pd <= 0) return 0
   if (pd >= 1) return 1
   const result = 1 - Math.pow(1 - pd, months / 12)

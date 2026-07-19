@@ -515,9 +515,23 @@
       <template #header>
         <div class="card-title-row">
           <span class="card-title">按组合计提坏账准备</span>
-          <el-button size="small" type="primary" link :disabled="isReadonly" @click="dis.addPortfolio()">
-            + 新增组合块
-          </el-button>
+          <div class="aging-toolbar">
+            <span class="muted">账龄口径</span>
+            <el-select
+              :model-value="dis.state.value.agingPreset || 'THREE_YEAR'"
+              size="small"
+              style="width: 120px"
+              :disabled="isReadonly"
+              @change="onAgingPresetChange"
+            >
+              <el-option label="3年段" value="THREE_YEAR" />
+              <el-option label="5年段" value="FIVE_YEAR" />
+              <el-option label="自定义" value="CUSTOM" />
+            </el-select>
+            <el-button size="small" type="primary" link :disabled="isReadonly" @click="dis.addPortfolio()">
+              + 新增组合块
+            </el-button>
+          </div>
         </div>
       </template>
 
@@ -678,11 +692,20 @@
       <summary>编制提示</summary>
       <ul>
         <li>国企与上市共用取数链（G5-1/2/3），但专有（2）终止确认、（3）继续涉入、（4）方法说明红区。</li>
-        <li>组合名须与会计政策一致；账龄「……」用「+ 账龄段」动态扩展。</li>
+        <li>组合名须与会计政策一致；优先用账龄口径枚举（3年/5年/自定义），必要时仍可用「+ 账龄段」微调。</li>
         <li>比例/ECL 率分母为零显示「—」，避免 Excel 模板中的 #DIV/0!。</li>
         <li>应收保证金、应收关联方为重点关注行（红色标签样式）。</li>
       </ul>
     </details>
+
+    <el-dialog v-model="showAgingDialog" title="自定义账龄段" width="420px" destroy-on-close @close="cancelAgingDialog">
+      <p class="muted">每行一个账龄段名称（至少 2 段，最多 10 段）。</p>
+      <el-input v-model="agingDraft" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" />
+      <template #footer>
+        <el-button @click="cancelAgingDialog">取消</el-button>
+        <el-button type="primary" @click="confirmAgingCustom">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -691,7 +714,7 @@
  * G5TabDisclosureSOE — 附注披露信息（国企）
  * 对齐致同 Excel；共享上市取数/勾稽/组合同步，补国企专有段。
  */
-import { computed, onMounted, toRef } from 'vue'
+import { computed, onMounted, ref, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
@@ -701,6 +724,7 @@ import { useG5DisclosureSoe } from '../../composables/useG5DisclosureSoe'
 import { useG5AiGenerate } from '../../composables/useG5AiGenerate'
 import { G5_SOE_PROVISION_METHOD_PLACEHOLDER } from '../../composables/g5SoeDisclosureRows'
 import type { G5MethodRow } from '../../composables/g5ListedDisclosureRows'
+import type { G5AgingPreset } from '../../composables/g5AgingScheme'
 
 const props = defineProps<{
   htmlData?: unknown
@@ -782,6 +806,32 @@ function agingRowClass({ row }: { row: { kind: string } }) {
   return row.kind === 'total' ? 'row-total' : ''
 }
 
+const showAgingDialog = ref(false)
+const agingDraft = ref('')
+
+function onAgingPresetChange(val: G5AgingPreset) {
+  if (val === 'CUSTOM') {
+    const labels = dis.state.value.customAgingLabels?.length
+      ? dis.state.value.customAgingLabels
+      : (dis.state.value.portfolios[0]?.agingRows || [])
+          .filter((r) => r.kind === 'band')
+          .map((r) => r.label)
+    agingDraft.value = (labels.length ? labels : ['1年以内', '1-2年', '2-3年', '3年以上']).join('\n')
+    showAgingDialog.value = true
+    return
+  }
+  dis.setAgingPreset(val)
+}
+
+function confirmAgingCustom() {
+  const labels = agingDraft.value.split('\n').map((l) => l.trim()).filter(Boolean)
+  if (dis.setAgingPreset('CUSTOM', labels)) showAgingDialog.value = false
+}
+
+function cancelAgingDialog() {
+  showAgingDialog.value = false
+}
+
 function onRefresh() {
   dis.refreshFromSources(true)
   ElMessage.success('已从 G5-1 / G5-2 / G5-3 取数')
@@ -858,6 +908,15 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+}
+.aging-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.muted {
+  font-size: 12px;
+  color: #909399;
 }
 .card-title {
   font-weight: 600;

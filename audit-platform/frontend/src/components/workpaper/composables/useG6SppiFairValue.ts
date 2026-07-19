@@ -383,4 +383,18 @@ export function useG6SppiFairValue() {
   }
 }
 
+/** G6-5 加载优先级：checklist 落库 > content JSON > htmlData 渲染壳 */
+export function pickG6FairValuePayload(
+  checklist: FairValueTestData | null | undefined,
+  contentFairValue: FairValueTestData | null | undefined,
+  htmlFairValue: FairValueTestData | null | undefined,
+): FairValueTestData | null {
+  const hasRows = (v: FairValueTestData | null | undefined) =>
+    !!v && (Array.isArray(v.rows) || v.conclusion != null)
+  if (hasRows(checklist)) return checklist as FairValueTestData
+  if (hasRows(contentFairValue)) return contentFairValue as FairValueTestData
+  if (hasRows(htmlFairValue)) return htmlFairValue as FairValueTestData
+  return null
+}
+
 export default useG6SppiFairValue

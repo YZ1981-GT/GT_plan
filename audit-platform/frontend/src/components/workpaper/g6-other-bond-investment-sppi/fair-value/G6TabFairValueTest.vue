@@ -480,13 +480,15 @@
 /**
  * G6TabFairValueTest.vue — 对齐 Excel《公允价值测试表G6-5》
  */
-import { computed, inject, onMounted, ref, watch } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   useG6SppiFairValue,
+  pickG6FairValuePayload,
   type FairValueItem,
 } from '../../composables/useG6SppiFairValue'
 import { useG6SppiFormData } from '../../composables/useG6SppiFormData'
 import { useG6SppiAiGenerate } from '../../composables/useG6SppiAiGenerate'
+import { parseG6ChecklistPayload } from '../../composables/g6CrossHelpers'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G6SppiImportExportDropdown from '../G6SppiImportExportDropdown.vue'
 
@@ -568,8 +570,10 @@ function needField(row: FairValueItem, field: string): boolean {
   return errors.includes(labels[field] || '')
 }
 
+const DATA_KEY = 'G6-5-fair-value-data'
 const NOTE_KEY = 'G6-5-fair-value-test-audit-note'
 const auditNote = ref('')
+let hydrating = false
 
 function saveAuditNote(val: string): void {
   if (props.isReadonly) return
@@ -584,19 +588,41 @@ onMounted(async () => {
   if (noteResp?.remark) auditNote.value = noteResp.remark
 })
 
+onBeforeUnmount(() => {
+  flushPersist()
+})
+
 watch(() => props.htmlData, (newData) => {
-  if (newData) initFromData()
+  // 已有 checklist 落库时勿被 render-config 空壳覆盖
+  if (newData && !formData.allResponses.value.get(DATA_KEY)) initFromData()
 })
 
 function initFromData(): void {
-  const content = formData.parseContent()
-  if (content.fairValue) fairValue.loadData(content.fairValue)
+  hydrating = true
+  try {
+    const checklist = parseG6ChecklistPayload(formData.allResponses.value.get(DATA_KEY))
+    const content = formData.parseContent()
+    const payload = pickG6FairValuePayload(
+      checklist,
+      content.fairValue,
+      props.htmlData?.fairValue,
+    )
+    if (payload) fairValue.loadData(payload)
+  } finally {
+    hydrating = false
+  }
 }
 
 function handleSave(): void {
-  formData.debouncedSave('G6-5-fair-value-data', {
+  if (props.isReadonly || hydrating) return
+  formData.debouncedSave(DATA_KEY, {
     conclusion: JSON.stringify(fairValue.toJSON()),
   })
+}
+
+function flushPersist(): void {
+  handleSave()
+  formData.flushPending()
 }
 
 watch(() => fairValue.rows.value, () => { handleSave() }, { deep: true })

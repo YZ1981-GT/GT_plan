@@ -128,6 +128,75 @@ export function calcEquityMethodBalance(
   ) * 100) / 100
 }
 
+/**
+ * 投资收益差异（对齐原底稿 ⑩=⑨-⑤+⑧）
+ * = 账面确认投资收益 − 测算投资收益 + 已宣告股利
+ * 当⑨取“损益调整本期净增加”时，正确情况下差异≈0。
+ * @source G7-14 原底稿 L10，CAS2 权益法
+ */
+export function calcIncomeDifference(
+  confirmedIncome: number,
+  equityShare: number,
+  dividend: number,
+): number {
+  return Math.round(
+    (parseNum(confirmedIncome) - parseNum(equityShare) + parseNum(dividend)) * 100,
+  ) / 100
+}
+
+/**
+ * 长投账面余额 = 投资成本期末 + 损益调整期末 + OCI期末 + 其他权益变动期末
+ * @source G7-14 原底稿 R = O+L+I+F
+ */
+export function calcLteiBookBalance(
+  costClosing: number,
+  pnlAdjClosing: number,
+  ociClosing: number,
+  otherEquityClosing: number,
+): number {
+  return Math.round(
+    (
+      parseNum(costClosing)
+      + parseNum(pnlAdjClosing)
+      + parseNum(ociClosing)
+      + parseNum(otherEquityClosing)
+    ) * 100,
+  ) / 100
+}
+
+/**
+ * 与应享净资产差额 = 长投账面余额 − 经审计净资产×持股比例
+ * @source G7-14 原底稿 S = R − Q
+ */
+export function calcNetAssetShareVariance(
+  bookBalance: number,
+  auditedNetAssets: number,
+  ratio: number,
+): number {
+  const share = Math.round(parseNum(auditedNetAssets) * parseNum(ratio) * 100) / 100
+  return Math.round((parseNum(bookBalance) - share) * 100) / 100
+}
+
+/**
+ * 未解释差额 = 与享有净资产差额 − 商誉 − 累计公允价值调整 + 减值准备
+ * @source G7-14 优化后 ⑮=S−U−V+W
+ */
+export function calcUnexplainedVariance(
+  netAssetShareVariance: number,
+  goodwill: number,
+  cumulativeFvAdj: number,
+  impairment: number,
+): number {
+  return Math.round(
+    (
+      parseNum(netAssetShareVariance)
+      - parseNum(goodwill)
+      - parseNum(cumulativeFvAdj)
+      + parseNum(impairment)
+    ) * 100,
+  ) / 100
+}
+
 // ═══ P7（未实现利润）: 交易金额 × 毛利率 ═══
 
 /**

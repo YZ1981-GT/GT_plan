@@ -456,6 +456,7 @@ export function useG6MainFormData(opts: UseG6MainFormDataOptions) {
     saveItemsFromEvent,
     debouncedSave,
     saveContent,
+    flushPending: _flushPending,
     // TB writeback
     writebackTB,
   }

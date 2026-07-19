@@ -12,7 +12,7 @@
 
 公式引擎对齐前端 useG7SubFormulaEngine.ts 的 8 个纯函数：
 1. calcSameControlCost(netAssets, ratio) = netAssets × ratio
-2. calcNotSameControlCost(price, fees) = price + fees
+2. calcNotSameControlCost(price, fees) = price（fees仅兼容旧调用并费用化）
 3. calcGoodwill(cost, share) = cost - share
 4. calcCostMethodIncome(dividend, ratio) = dividend × ratio
 5. calcSubsequentBalance(opening, addition, impairment) = opening + addition - impairment
@@ -29,7 +29,7 @@ import json
 import logging
 from dataclasses import dataclass
 from typing import Any
-from uuid import UUID
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -94,12 +94,14 @@ class G7SubsidiaryService:
         return float(net_assets or 0) * float(ratio or 0)
 
     @staticmethod
-    def calc_not_same_control_cost(price: float, fees: float) -> float:
-        """非同一控制下企业合并初始投资成本 = 支付对价 + 直接费用.
+    def calc_not_same_control_cost(price: float, fees: float = 0) -> float:
+        """非同一控制下企业合并初始投资成本 = 合并对价公允价值.
 
-        CAS20: 非同控合并以公允价值计量。
+        CAS20: 审计、法律、评估等中介费用计入当期损益，不构成合并成本。
+        fees仅为兼容旧调用保留。
         """
-        return float(price or 0) + float(fees or 0)
+        _ = fees
+        return float(price or 0)
 
     @staticmethod
     def calc_goodwill(cost: float, share: float) -> float:
@@ -149,6 +151,136 @@ class G7SubsidiaryService:
         d = sum(float(x or 0) for x in debits)
         c = sum(float(x or 0) for x in credits)
         return abs(d - c) < _TOLERANCE
+
+    def prepare_g7_9_rows(
+        self, rows: list[dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]], list[FormulaError]]:
+        """重算G7-9公式列并执行不可绕过的业务校验。
+
+        上传值中的公式结果不可信，统一由服务端覆盖。返回新列表，不修改调用方对象。
+        """
+        prepared: list[dict[str, Any]] = []
+        errors: list[FormulaError] = []
+        transaction_numbers: dict[str, set[int]] = {}
+
+        for index, source in enumerate(rows, start=1):
+            row = dict(source)
+            section = str(row.get("section") or "merger")
+            row_key = str(row.get("id") or index)
+
+            if section == "merger":
+                consideration = round(sum(
+                    self.parse_num(row.get(key))
+                    for key in (
+                        "cashConsideration", "nonCashAssetFV", "debtFV",
+                        "equitySecuritiesFV", "contingentConsiderationFV",
+                    )
+                ), 2)
+                prior_fv = self.parse_num(row.get("priorHoldingFV"))
+                book_value = self.parse_num(row.get("considerationBookValue"))
+                net_assets = self.parse_num(row.get("acquireeIdentifiableNetAssetsFV"))
+                ratio = self.parse_num(row.get("ownershipRatio"))
+                share = round(net_assets * ratio, 2)
+                initial_cost = round(consideration + prior_fv, 2)
+                goodwill = round(initial_cost - share, 2)
+                row.update({
+                    "totalConsiderationFV": consideration,
+                    "initialInvestmentCost": initial_cost,
+                    "considerationGainLoss": round(consideration - book_value, 2),
+                    "shareOfFV": share,
+                    "nonControllingInterestShare": round(
+                        net_assets * max(0.0, 1.0 - ratio), 2
+                    ),
+                    "goodwill": goodwill,
+                })
+                if not 0 <= ratio <= 1:
+                    errors.append(FormulaError(
+                        row_key, "ownershipRatio", "持股比例应在0至1之间", ratio
+                    ))
+                if goodwill < -_TOLERANCE:
+                    if row.get("bargainPurchaseReviewed") != "是":
+                        errors.append(FormulaError(
+                            row_key, "bargainPurchaseReviewed",
+                            "廉价购买利得须完成计量复核后方可确认", goodwill,
+                        ))
+                    if not str(row.get("bargainPurchaseReviewNote") or "").strip():
+                        errors.append(FormulaError(
+                            row_key, "bargainPurchaseReviewNote",
+                            "廉价购买利得须填写复核过程", goodwill,
+                        ))
+
+            elif section == "step":
+                company_name = str(row.get("companyName") or "").strip()
+                company_id = str(row.get("companyId") or "").strip()
+                if not company_id:
+                    identity = company_name or f"row-{index}"
+                    company_id = (
+                        f"step-company-{uuid5(NAMESPACE_URL, f'g7-9:{identity}')}"
+                    )
+                row["companyId"] = company_id
+                row["companyName"] = company_name
+                row["adjustmentScope"] = "transaction"
+
+                ratio = self.parse_num(row.get("purchaseRatio"))
+                net_assets = self.parse_num(
+                    row.get("netAssetsFVAtTxn")
+                    if row.get("netAssetsFVAtTxn") not in (None, "")
+                    else row.get("netAssetsBookValueAtTxn")
+                )
+                consideration = self.parse_num(row.get("considerationFV"))
+                share = round(ratio * net_assets, 2)
+                row["netAssetsFVAtTxn"] = net_assets
+                row["shareOfFVAtTxn"] = share
+                row["goodwillAtTxn"] = round(consideration - share, 2)
+                if row.get("priorEquityMethodAdjustments") in (None, ""):
+                    row["priorEquityMethodAdjustments"] = row.get("priorOCIReclassify")
+
+                if not company_name:
+                    errors.append(FormulaError(
+                        row_key, "companyName", "分步合并公司名称不能为空", 0
+                    ))
+                if not 0 < ratio <= 1:
+                    errors.append(FormulaError(
+                        row_key, "purchaseRatio", "每笔购买比例应大于0且不超过1", ratio
+                    ))
+                transaction_no = int(self.parse_num(row.get("transactionNo")) or index)
+                row["transactionNo"] = transaction_no
+                seen = transaction_numbers.setdefault(company_id, set())
+                if transaction_no in seen:
+                    errors.append(FormulaError(
+                        row_key, "transactionNo", "同一公司交易次别不得重复", 0
+                    ))
+                seen.add(transaction_no)
+                if row.get("isPackageDeal") == "是":
+                    errors.append(FormulaError(
+                        row_key, "isPackageDeal",
+                        "一揽子交易不得使用分步合并区段", 0,
+                    ))
+
+            elif section == "reverse":
+                constitutes_business = str(row.get("constitutesBusiness") or "")
+                if constitutes_business not in {"是", "否"}:
+                    errors.append(FormulaError(
+                        row_key, "constitutesBusiness",
+                        "反向购买须判断会计被购买方是否构成业务", 0,
+                    ))
+                elif constitutes_business == "否":
+                    errors.append(FormulaError(
+                        row_key, "constitutesBusiness",
+                        "不构成业务应按资产购置处理，不得在本区段确认商誉", 0,
+                    ))
+                if not str(row.get("businessDeterminationBasis") or "").strip():
+                    errors.append(FormulaError(
+                        row_key, "businessDeterminationBasis",
+                        "反向购买须填写构成业务判断依据", 0,
+                    ))
+            else:
+                errors.append(FormulaError(
+                    row_key, "section", f"未知G7-9区段: {section}", 0
+                ))
+
+            prepared.append(row)
+        return prepared, errors
 
     # ─── 控制判断保存 (G7-7) ──────────────────────────────────────────────────
 
@@ -215,8 +347,27 @@ class G7SubsidiaryService:
                 "errors": [{"field": "sheet_code", "message": f"无效sheet编码: {sheet_code}"}],
             }
 
-        # 公式验证
-        errors = self.validate_formulas(data)
+        # G7-9公式字段由服务端覆盖；硬错误不得持久化。
+        if sheet_code == "G7-9":
+            prepared_rows, errors = self.prepare_g7_9_rows(
+                list(data.get("rows") or [])
+            )
+            data = {**data, "rows": prepared_rows}
+            if errors:
+                return {
+                    "success": False,
+                    "errors": [
+                        {
+                            "row_key": error.row_key,
+                            "field": error.field,
+                            "message": error.message,
+                            "variance": error.variance,
+                        }
+                        for error in errors
+                    ],
+                }
+        else:
+            errors = self.validate_formulas(data)
 
         item_id = f"G7-{sheet_code.split('-')[1]}-rows"
         conclusion_val = json.dumps(data, ensure_ascii=False) if data else ""
@@ -253,7 +404,7 @@ class G7SubsidiaryService:
 
         验证项：
         1. calcSameControlCost(netAssets, ratio) = netAssets × ratio
-        2. calcNotSameControlCost(price, fees) = price + fees
+        2. calcNotSameControlCost(price, fees) = price（fees费用化）
         3. calcGoodwill(cost, share) = cost - share
         4. calcCostMethodIncome(dividend, ratio) = dividend × ratio
         5. calcSubsequentBalance(opening, addition, impairment) = opening + addition - impairment
@@ -290,7 +441,7 @@ class G7SubsidiaryService:
                     errors.append(FormulaError(
                         row_key=str(check.get("row_key", "")),
                         field="not_same_control_cost",
-                        message=f"非同控成本公式不平: 对价({price})+费用({fees})={expected}, 实际={cost}",
+                        message=f"非同控成本公式不平: 对价FV({price})={expected}, 实际={cost}；费用({fees})应费用化",
                         variance=expected - cost,
                     ))
 

@@ -20,6 +20,7 @@ import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import type { ChecklistResponse } from './useF1FormData'
+import type { G7BasicInfoRow } from '../g7-long-term-equity-method/info/g7BasicInfoModel'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -33,34 +34,7 @@ function draftKey(wpId: string, itemId: string): string {
 
 // ─── Content Types ───────────────────────────────────────────────────────────
 
-export interface BasicInfoRow {
-  id: string
-  seq: number
-  investeeName: string
-  creditCode: string
-  establishDate: string
-  registeredCapital: number
-  paidInCapital: number
-  registeredAddress: string
-  industry: string
-  mainBusiness: string
-  legalRepresentative: string
-  controlType: '子公司' | '合营' | '联营'
-  investmentRatio: number
-  votingRatio: number
-  otherShareholderName: string
-  otherShareholderRatio: number
-  boardSeats: number
-  appointedDirectors: number
-  hasVeto: boolean
-  participatesInDecision: boolean
-  significantInfluenceBasis: string
-  managementComposition: string
-  latestAuditReportDate: string
-  auditOpinionType: string
-  relatedPartyRelation: string
-  remark: string
-}
+export type BasicInfoRow = G7BasicInfoRow
 
 export interface FinancialInfoRow {
   id: string
@@ -113,6 +87,8 @@ export interface EquityMethodCalcRow {
   id: string
   seq: number
   investeeName: string
+  /** 稳定被投资单位 ID（可选，优先取自 G7-4） */
+  investeeId?: string
   reportedNetProfit: number
   internalTransactionAdj: number
   fvDepreciationAdj: number
@@ -122,6 +98,11 @@ export interface EquityMethodCalcRow {
   investmentRatio: number
   equityShare: number
   confirmedIncome: number
+  /** 账面确认OCI（用于与测算OCI份额比较） */
+  confirmedOci: number
+  ociDifference: number
+  confirmedOtherEquity: number
+  otherEquityDifference: number
   incomeDifference: number
   ociChange: number
   ociShare: number
@@ -130,6 +111,42 @@ export interface EquityMethodCalcRow {
   dividendDistributed: number
   openingBalance: number
   closingBalance: number
+  /** 第2部分：长投四科目期末滚存与差额拆解 */
+  costOpening: number
+  costChange: number
+  costClosing: number
+  pnlAdjOpening: number
+  pnlAdjChange: number
+  pnlAdjClosing: number
+  ociBalOpening: number
+  ociBalChange: number
+  ociBalClosing: number
+  otherEqBalOpening: number
+  otherEqBalChange: number
+  otherEqBalClosing: number
+  auditedNetAssets: number
+  shareOfAuditedNetAssets: number
+  lteiBookBalance: number
+  netAssetShareVariance: number
+  goodwill: number
+  cumulativeFvAdj: number
+  impairment: number
+  unexplainedVariance: number
+  /**
+   * 未解释差额⑮处理性质；仅选定后才可生成对应科目建议分录
+   * pending=待拆解(不成账) / skip=无需调整
+   */
+  unexplainedNature:
+    | 'pending'
+    | 'skip'
+    | 'investmentIncome'
+    | 'impairment'
+    | 'oci'
+    | 'capitalReserve'
+    | 'priorPeriod'
+    | 'goodwill'
+    | 'fvAdj'
+  varianceExplanation: string
   auditConclusion: '无差异' | '差异可接受' | '差异需调整'
 }
 
@@ -283,7 +300,7 @@ export function useG7EquityMethodFormData(opts: UseG7EquityMethodFormDataOptions
       renderMeta.value = data?.html_data ?? data ?? {}
       const sheets = data?.sheets ?? data?.data?.sheets ?? []
       for (const s of sheets) {
-        const key = s.sheet_name || s.name || 'default'
+        const key = s.sheet_name || s.sheetName || s.name || 'default'
         sheetCache.value[key] = s.html_data ?? s
       }
     } catch {
@@ -382,6 +399,14 @@ export function useG7EquityMethodFormData(opts: UseG7EquityMethodFormDataOptions
         try {
           localStorage.removeItem(draftKey(wpId.value, itemId))
         } catch { /* ignore */ }
+        try {
+          const { emitG7SourceRowsSaved } = await import('./g7DisclosureCrossSheet')
+          emitG7SourceRowsSaved({
+            projectId: projectId.value,
+            wpId: wpId.value,
+            itemIds: [itemId],
+          })
+        } catch { /* ignore */ }
         opts.onAfterSave?.()
         return
       } catch {
@@ -439,6 +464,14 @@ export function useG7EquityMethodFormData(opts: UseG7EquityMethodFormDataOptions
         for (const item of toSave) {
           try { localStorage.removeItem(draftKey(wpId.value, item.item_id)) } catch { /* ignore */ }
         }
+        try {
+          const { emitG7SourceRowsSaved } = await import('./g7DisclosureCrossSheet')
+          emitG7SourceRowsSaved({
+            projectId: projectId.value,
+            wpId: wpId.value,
+            itemIds: toSave.map(item => item.item_id).filter(Boolean) as string[],
+          })
+        } catch { /* ignore */ }
         opts.onAfterSave?.()
         return
       } catch {
@@ -478,6 +511,55 @@ export function useG7EquityMethodFormData(opts: UseG7EquityMethodFormDataOptions
       void saveImmediate(itemId, updated)
     }, 2000)
     _debounceTimers.set(itemId, newTimer)
+  }
+
+  /**
+   * 多键原子防抖保存：同一计时器批量 PUT，避免 G7-14 SECTION/ROWS 半成功分叉
+   */
+  function debouncedSaveBatch(
+    items: Array<{ itemId: string; data: Partial<ChecklistResponse> }>,
+  ): void {
+    if (!items.length) return
+    const batchIds = items.map((it) => it.itemId)
+    const batchKey = `__batch__:${[...batchIds].sort().join('|')}`
+
+    for (const { itemId, data } of items) {
+      const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
+      const updated: ChecklistResponse = {
+        ...existing,
+        ...(data.conclusion !== undefined ? { conclusion: data.conclusion } : {}),
+        ...(data.remark !== undefined ? { remark: data.remark } : {}),
+        item_id: itemId,
+      }
+      allResponses.value.set(itemId, updated)
+      _pendingItems.add(itemId)
+      const prev = _debounceTimers.get(itemId)
+      if (prev) clearTimeout(prev)
+    }
+
+    const prevBatch = _debounceTimers.get(batchKey)
+    if (prevBatch) clearTimeout(prevBatch)
+
+    const timer = setTimeout(() => {
+      _debounceTimers.delete(batchKey)
+      const toSave: Array<{ itemId: string; data: Partial<ChecklistResponse> }> = []
+      for (const itemId of batchIds) {
+        _debounceTimers.delete(itemId)
+        _pendingItems.delete(itemId)
+        const resp = allResponses.value.get(itemId)
+        if (resp) {
+          toSave.push({
+            itemId,
+            data: { conclusion: resp.conclusion, remark: resp.remark },
+          })
+        }
+      }
+      void saveBatch(toSave)
+    }, 2000)
+    _debounceTimers.set(batchKey, timer)
+    for (const itemId of batchIds) {
+      _debounceTimers.set(itemId, timer)
+    }
   }
 
   /**
@@ -562,6 +644,7 @@ export function useG7EquityMethodFormData(opts: UseG7EquityMethodFormDataOptions
     saveBatch,
     saveContent,
     debouncedSave,
+    debouncedSaveBatch,
   }
 }
 

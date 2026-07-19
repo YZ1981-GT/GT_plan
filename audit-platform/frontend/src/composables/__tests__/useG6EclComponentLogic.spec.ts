@@ -7,7 +7,7 @@
  * 覆盖：
  *   1. G6-11 列式转置解析：空列过滤 / 合并单元格 / 全空列过滤
  *   2. G6-13 section结构完整性：5个section均存在且行数正确
- *   3. G6-14 转回类型校验：仅允许 转回/核销/收回
+ *   3. G6-14 转回/核销双表结构
  *   4. G6-15 凭证异常自动判定：7项核对全通过=正常，任一✗=异常
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -160,157 +160,135 @@ describe('G6-13 ECL计量数据结构', () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 3. G6-14 转回类型校验
+// 3. G6-14 转回/核销双表
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('G6-14 转回类型校验', () => {
-  const VALID_TYPES: Array<'转回' | '核销' | '收回'> = ['转回', '核销', '收回']
-
-  it('仅允许 转回/核销/收回 三种类型', () => {
-    // ReversalWriteOffRow.type 只接受这三种值
-    for (const t of VALID_TYPES) {
-      const row: ReversalWriteOffRow = {
-        id: 'test-1',
-        seq: 1,
-        investProject: '测试债券',
-        type: t,
-        amount: 10000,
-        reason: '测试原因',
-        approvalProcedure: '已审批',
-        reasonConclusion: '合理',
-        indexRef: '',
-      }
-      expect(VALID_TYPES).toContain(row.type)
-    }
-  })
-
-  it('TypeScript类型约束：type字段枚举值为3种', () => {
-    // 验证枚举完整性
-    expect(VALID_TYPES).toHaveLength(3)
-    expect(VALID_TYPES).toContain('转回')
-    expect(VALID_TYPES).toContain('核销')
-    expect(VALID_TYPES).toContain('收回')
-  })
-
-  it('转回金额可为正数（表示冲回减值）', () => {
-    const row: ReversalWriteOffRow = {
-      id: 'test-reversal',
+describe('G6-14 转回/核销双表结构', () => {
+  it('转回行含 Excel 核心字段且金额不超累计计提', () => {
+    const row: G6ReversalRow = {
+      id: '1',
       seq: 1,
-      investProject: '国开债2024',
-      type: '转回',
-      amount: 50000,
-      reason: '信用风险改善',
-      approvalProcedure: '经理审批',
-      reasonConclusion: '合理',
-      indexRef: 'G6-12',
-    }
-    expect(row.type).toBe('转回')
-    expect(row.amount).toBeGreaterThan(0)
-  })
-
-  it('核销金额为正数（表示坏账核销）', () => {
-    const row: ReversalWriteOffRow = {
-      id: 'test-writeoff',
-      seq: 2,
-      investProject: '企业债2023',
-      type: '核销',
-      amount: 200000,
-      reason: '债务人破产',
-      approvalProcedure: '董事会批准',
-      reasonConclusion: '合理',
+      unitName: '债A',
+      reversalReason: '信用改善',
+      recoveryMethod: '现金',
+      originalBasis: 'Stage3 单项',
+      reversalAmount: 100,
+      accumulatedProvision: 200,
+      reasonAnalysis: '合理',
+      isReasonable: '合理',
       indexRef: '',
     }
-    expect(row.type).toBe('核销')
-    expect(row.amount).toBeGreaterThan(0)
+    expect(row.reversalAmount).toBeLessThanOrEqual(row.accumulatedProvision)
+  })
+
+  it('核销行含关联交易标记', () => {
+    const row: G6WriteOffRow = {
+      id: '2',
+      seq: 1,
+      unitName: '债B',
+      writeOffType: '公司债',
+      writeOffAmount: 50,
+      writeOffReason: '破产',
+      writeOffProcedure: '董事会审批',
+      isRelatedParty: true,
+      reasonAnalysis: '已披露',
+      isReasonable: '合理',
+      indexRef: '',
+    }
+    expect(row.isRelatedParty).toBe(true)
+    expect(row.writeOffAmount).toBeGreaterThan(0)
   })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 4. G6-15 凭证异常自动判定 (recalcAbnormal)
+// 4. G6-15 凭证六项三态核对
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('G6-15 凭证异常自动判定 (recalcAbnormal)', () => {
+describe('G6-15 凭证六项三态核对', () => {
   function makeVoucherRow(overrides: Partial<VoucherCheckRow> = {}): VoucherCheckRow {
     return {
       id: 'test-v1',
       seq: 1,
+      period: 'occurrence',
       date: '2024-12-31',
       voucherNo: 'PZ-001',
       businessContent: '计提减值',
+      businessType: '减值计提',
       counterAccount: '资产减值损失',
       detailAccount: '1503',
       debitAmount: 10000,
       creditAmount: 0,
       attachment: null,
+      attachmentId: null,
+      attachmentUrl: null,
+      attachmentUploadedAt: null,
       supportingDoc: '',
-      checkOriginal: true,
-      checkAuthorized: true,
-      checkAccounting: true,
-      checkAmount: true,
-      checkClassification: true,
-      checkImpairment: true,
-      checkInterest: true,
+      checkOriginal: 'Y',
+      checkAuthorized: 'Y',
+      checkAccounting: 'Y',
+      checkInitialCost: 'Y',
+      checkInterest: 'Y',
+      checkFairValue: 'Y',
       indexRef: '',
       isAbnormal: false,
+      manualAbnormal: false,
       abnormalNote: '',
       riskLevel: '',
       suggestion: '',
       remark: '',
+      source: '手工',
+      selectionReason: '',
+      samplingMethod: '',
+      selectionCategory: 'manual',
+      sourceId: 'test-v1',
       ...overrides,
     }
   }
 
-  it('7项核对全通过 → isAbnormal = false（正常凭证）', () => {
+  it('六项核对全通过 → 已完成且正常', () => {
     const { recalcAbnormal } = useG6EclVoucherCheck(ref('wp-1'), ref('proj-1'))
     const row = makeVoucherRow({
-      checkOriginal: true,
-      checkAuthorized: true,
-      checkAccounting: true,
-      checkAmount: true,
-      checkClassification: true,
-      checkImpairment: true,
-      checkInterest: true,
+      checkOriginal: 'Y',
+      checkAuthorized: 'Y',
+      checkAccounting: 'Y',
+      checkInitialCost: 'Y',
+      checkInterest: 'Y',
+      checkFairValue: 'Y',
     })
     recalcAbnormal(row)
     expect(row.isAbnormal).toBe(false)
+    expect(useG6EclVoucherCheck(ref('wp-1'), ref('proj-1')).isAllChecked(row)).toBe(true)
   })
 
-  it('任一核对为false → isAbnormal = true（异常凭证）', () => {
+  it('任一核对为N → 异常凭证', () => {
     const { recalcAbnormal } = useG6EclVoucherCheck(ref('wp-1'), ref('proj-1'))
 
     // 逐项测试每个核对字段为false时的异常判定
     const checkFields: Array<keyof VoucherCheckRow> = [
       'checkOriginal', 'checkAuthorized', 'checkAccounting',
-      'checkAmount', 'checkClassification', 'checkImpairment', 'checkInterest',
+      'checkInitialCost', 'checkInterest', 'checkFairValue',
     ]
     for (const field of checkFields) {
-      const row = makeVoucherRow({ [field]: false })
+      const row = makeVoucherRow({ [field]: 'N' })
       recalcAbnormal(row)
-      expect(row.isAbnormal).toBe(true, `${field}为false时应判定为异常`)
+      expect(row.isAbnormal).toBe(true, `${field}为N时应判定为异常`)
     }
   })
 
-  it('多项核对为false → isAbnormal = true', () => {
+  it('未检查与检查不通过分离：空值待完成但不自动异常', () => {
     const { recalcAbnormal } = useG6EclVoucherCheck(ref('wp-1'), ref('proj-1'))
     const row = makeVoucherRow({
-      checkOriginal: false,
-      checkAmount: false,
-      checkImpairment: false,
+      checkOriginal: '',
     })
     recalcAbnormal(row)
-    expect(row.isAbnormal).toBe(true)
+    expect(row.isAbnormal).toBe(false)
+    expect(useG6EclVoucherCheck(ref('wp-1'), ref('proj-1')).isAllChecked(row)).toBe(false)
   })
 
-  it('全部核对为false → isAbnormal = true', () => {
+  it('人工标记可在六项通过时保留异常', () => {
     const { recalcAbnormal } = useG6EclVoucherCheck(ref('wp-1'), ref('proj-1'))
     const row = makeVoucherRow({
-      checkOriginal: false,
-      checkAuthorized: false,
-      checkAccounting: false,
-      checkAmount: false,
-      checkClassification: false,
-      checkImpairment: false,
-      checkInterest: false,
+      manualAbnormal: true,
     })
     recalcAbnormal(row)
     expect(row.isAbnormal).toBe(true)

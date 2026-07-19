@@ -37,6 +37,7 @@ function setupAdjustment(seed?: Record<string, string>) {
   }
   const allResponses = ref(map)
   const adjustment = useG6MainAdjustment({
+    wpId: ref('wp-g6-main'),
     allResponses,
     isReadonly: ref(false),
   })

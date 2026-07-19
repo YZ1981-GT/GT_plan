@@ -85,8 +85,9 @@ def is_numeric_field_key(key: str) -> bool:
         # G11 投资收益
         "currentIncome", "currentOpening", "currentClosing", "priorOpening", "priorClosing",
         "creditAmount",
-        # G7 长期股权投资明细表
-        "holdingRatio", "votingRatio",
+        # G7 长期股权投资明细表 / 同控初始计量
+        "holdingRatio", "votingRatio", "ownershipRatio", "shareholdingRatio",
+        "purchaseRatio", "transactionNo",
         "openingInvestCost", "openingEquityAdj", "openingImpairment", "openingBookValue",
         "openingAuditedCost", "openingAuditedEquity", "openingAuditedImpairment", "openingAuditedNetValue",
         "increaseNewInvest", "increaseEquityMethod", "decreaseDisposal", "decreaseEquityAdj",
@@ -98,6 +99,11 @@ def is_numeric_field_key(key: str) -> bool:
         "investeeNetAssets", "shareOfNetAssets", "goodwill",
         "internalTransElim", "unrecognizedLoss", "equityMethodIncome",
         "currentOCI", "dividendIncome",
+        "ownerEquityBookValue", "initialInvestmentCost", "cashConsideration",
+        "nonCashAssetBookValue", "debtBookValue", "equitySecuritiesFaceValue",
+        "contingentConsideration", "totalConsideration",
+        "capitalReserveRetainedEarningsAdjustment", "consideration",
+        "netAssetsBookValue", "priorInvestmentAdjustments",
         # I1 无形资产 / H1 固定资产共通数值字段
         "costOpening", "costIncrease", "costDecrease", "costClosing",
         "amortOpening", "amortProvision", "amortTransferOut", "amortClosing",

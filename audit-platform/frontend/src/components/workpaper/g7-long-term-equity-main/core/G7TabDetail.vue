@@ -1,28 +1,27 @@
-<!--
-  G7TabDetail.vue — G7-2 明细表（103行×54列 → 5区段Tab）
-
-  5区段Tab切换（el-segmented）：
-  - Tab1: 基础信息(8列): 被投资单位|控制类型(下拉)|持股比例|投票权比例|行业|注册地|主营业务|是否关联方
-  - Tab2: 期初余额(10列): 期初投资成本|期初权益法调整|期初减值准备|期初账面价值(公式)|期初审定成本|期初审定权益法|期初审定减值|期初审定净值(公式)|备注
-  - Tab3: 本期变动(12列): 新增投资|权益法增加|处置减少|权益法调整减少|减值计提|减值转回|被投资方净利润|持股比例调整|OCI|其他权益变动|利润分配
-  - Tab4: 期末+减值(12列): 期末投资成本(公式)|期末权益法调整(公式)|期末小计(公式)|期末减值(公式)|期末账面价值(公式)|审定调整|审定数(公式)|可收回金额|减值测试结论|发函情况|索引
-  - Tab5: 权益法详情(12列): 被投资方净资产|享有份额(公式)|商誉|内部交易抵销|未确认损失|权益法投资收益|本期OCI|股利收入|计量方法确认|处置损益|备注
-
-  区段间行同步：所有区段共享同一行集合，切换Tab只改可见列
-  虚拟滚动：103行 max-height
-  底部合计行
-  公式列：虚线下划线+cursor:help+tooltip来源
-
-  Spec: .kiro/specs/g7-long-term-equity-main/ Task 5.1
-  Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 6.4, 6.6
--->
+<!-- G7-2 长期股权投资明细表：按原始模板重建成本法、权益法、减值三条审定链。 -->
 <template>
   <div class="g7-detail">
-    <!-- 顶部工具栏 -->
     <div class="section-head">
-      <h3 class="sheet-title">G7-2 长期股权投资明细表</h3>
+      <div>
+        <h3 class="sheet-title">G7-2 长期股权投资明细表</h3>
+        <div class="sheet-subtitle">成本法 / 权益法 / 减值准备 × 未审 / AJE / RJE / 审定</div>
+      </div>
       <div class="head-actions">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">
+        <el-button
+          size="small"
+          type="primary"
+          :disabled="isReadonly || !isDirty"
+          :loading="saving"
+          @click="saveRows(false)"
+        >
+          保存
+        </el-button>
+        <el-button
+          v-if="activeSection !== 'summary'"
+          size="small"
+          :disabled="isReadonly"
+          @click="handleAddRow"
+        >
           + 被投资单位
         </el-button>
         <el-dropdown trigger="click" size="small" @command="handleDropdownCommand">
@@ -31,7 +30,7 @@
             <el-dropdown-menu>
               <el-dropdown-item command="template">导出模板</el-dropdown-item>
               <el-dropdown-item command="export">导出数据</el-dropdown-item>
-              <el-dropdown-item command="import">导入数据</el-dropdown-item>
+              <el-dropdown-item command="import" :disabled="isReadonly">导入数据</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -39,717 +38,206 @@
       </div>
     </div>
 
-    <!-- 审计目标 -->
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
-      审计目标：核实各被投资单位长期股权投资明细的期初、本期变动及期末余额的完整性与准确性，验证成本法/权益法核算方法适当，账面价值、减值准备及权益法调整计算正确，并与 G7-1 审定表勾稽一致。
+      按原表逐项记录投资成本、权益法变动和减值准备；每项均由未审数经 AJE、RJE 桥接到审定数，并自动汇总至 G7-1。
     </el-alert>
 
-    <!-- 5区段Tab切换 -->
-    <el-segmented v-model="activeTab" :options="segmentOptions" size="small" class="segment-bar" />
-
-    <!-- 工具栏：索引 chip + 行数 -->
-    <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
-      <div class="toolbar-right">
-        <span class="chip-wrap"><GtIndexChip value="wp:G7-2" :context-project-id="projectId" /></span>
-        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+    <div class="navigation-row">
+      <el-segmented v-model="activeSection" :options="sectionOptions" size="small" />
+      <div class="navigation-meta">
+        <GtIndexChip value="wp:G7-2" :context-project-id="projectId" />
+        <el-tag size="small" type="info">{{ sectionRowCount }} 行</el-tag>
+        <el-tag v-if="isDirty" size="small" type="warning">未保存</el-tag>
       </div>
     </div>
 
-    <!-- 明细表格（单一实例，列定义按Tab切换） -->
-    <el-table
-      :data="displayRows"
-      border
-      size="small"
-      max-height="580"
-      highlight-current-row
-      row-key="id"
-      :row-class-name="rowClassName"
-      class="detail-table"
-      @current-change="onCurrentChange"
-    >
-      <!-- 序号列（始终显示） -->
-      <el-table-column label="序号" width="55" align="center" fixed>
-        <template #default="{ row }">
-          <template v-if="row._isTotal">
-            <span class="total-label">合计</span>
-          </template>
-          <template v-else>{{ row.seq }}</template>
-        </template>
-      </el-table-column>
+    <template v-if="activeSection !== 'summary'">
+      <div class="layer-row">
+        <span class="layer-label">展示口径：</span>
+        <el-radio-group v-model="activeLayer" size="small">
+          <el-radio-button value="basic">投资信息</el-radio-button>
+          <el-radio-button value="unadjusted">期初及本期未审</el-radio-button>
+          <el-radio-button value="adjustment">AJE / RJE</el-radio-button>
+          <el-radio-button value="audited">审定数</el-radio-button>
+        </el-radio-group>
+        <span class="formula-hint">蓝色金额为公式列，不可手工覆盖</span>
+      </div>
 
-      <!-- 被投资单位列（始终显示作为锚定列） -->
-      <el-table-column label="被投资单位" width="150" fixed>
-        <template #default="{ row }">
-          <template v-if="row._isTotal" />
-          <span v-else>{{ row.investeeName }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- ═══ Tab1: 基础信息(8列) ═══ -->
-      <template v-if="activeTab === 'tab1'">
-        <el-table-column label="控制类型" min-width="120">
+      <el-table
+        :data="activeRows"
+        border
+        size="small"
+        max-height="620"
+        row-key="id"
+        class="detail-table"
+      >
+        <el-table-column label="序号" prop="seq" width="55" align="center" fixed />
+        <el-table-column label="被投资单位" min-width="160" fixed>
           <template #default="{ row }">
-            <template v-if="row._isTotal" />
-            <template v-else>
-              <el-select v-if="!isReadonly" :model-value="row.controlType" size="small" style="width:100%"
-                @change="(v: string) => updateField(row.id, 'controlType', v)">
-                <el-option value="subsidiary" label="子公司" />
-                <el-option value="joint_venture" label="合营企业" />
-                <el-option value="associate" label="联营企业" />
-              </el-select>
-              <span v-else>{{ controlTypeLabel(row.controlType) }}</span>
-            </template>
+            <el-input
+              v-if="!isReadonly && activeSection !== 'impairment'"
+              :model-value="row.investeeName"
+              size="small"
+              @update:model-value="(value: string) => updateField(row, 'investeeName', value)"
+            />
+            <span v-else>{{ row.investeeName }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="持股比例" min-width="100" align="right">
+        <el-table-column
+          v-for="column in activeColumns"
+          :key="column.key"
+          :label="column.label"
+          :min-width="column.width || 120"
+          :align="column.kind === 'text' || column.kind === 'date' || column.kind === 'select' ? 'left' : 'right'"
+        >
           <template #default="{ row }">
-            <template v-if="row._isTotal" />
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.holdingRatio" size="small"
-                :controls="false" :precision="4" :step="0.01" :min="0" :max="1" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'holdingRatio', v)" />
-              <span v-else>{{ fmtPercent(row.holdingRatio) }}</span>
-            </template>
+            <span v-if="column.formula" class="formula-cell" :title="column.formula">
+              {{ formatCell(row[column.key], column.kind) }}
+            </span>
+            <el-select
+              v-else-if="column.kind === 'select' && !isReadonly && activeSection !== 'impairment'"
+              :model-value="row[column.key]"
+              size="small"
+              @change="(value: string) => updateField(row, column.key, value)"
+            >
+              <el-option
+                v-for="option in column.options"
+                :key="option.value"
+                :value="option.value"
+                :label="option.label"
+              />
+            </el-select>
+            <el-date-picker
+              v-else-if="column.kind === 'date' && !isReadonly && activeSection !== 'impairment'"
+              :model-value="row[column.key]"
+              value-format="YYYY-MM-DD"
+              type="date"
+              size="small"
+              @update:model-value="(value: string) => updateField(row, column.key, value || '')"
+            />
+            <el-input
+              v-else-if="column.kind === 'text' && !isReadonly"
+              :model-value="row[column.key]"
+              size="small"
+              @update:model-value="(value: string) => updateField(row, column.key, value)"
+            />
+            <el-input-number
+              v-else-if="!isReadonly"
+              :model-value="row[column.key]"
+              :controls="false"
+              :precision="column.kind === 'percent' ? 6 : 2"
+              :step="column.kind === 'percent' ? 0.01 : 1"
+              size="small"
+              class="number-input"
+              @change="(value: number | undefined) => updateField(row, column.key, value ?? 0)"
+            />
+            <span v-else>{{ formatCell(row[column.key], column.kind) }}</span>
           </template>
         </el-table-column>
 
-        <el-table-column label="投票权比例" min-width="100" align="right">
+        <el-table-column v-if="!isReadonly && activeSection !== 'impairment'" label="操作" width="70" fixed="right">
           <template #default="{ row }">
-            <template v-if="row._isTotal" />
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.votingRatio" size="small"
-                :controls="false" :precision="4" :step="0.01" :min="0" :max="1" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'votingRatio', v)" />
-              <span v-else>{{ fmtPercent(row.votingRatio) }}</span>
-            </template>
+            <el-button link type="danger" size="small" @click="removeRow(row)">删除</el-button>
           </template>
         </el-table-column>
+      </el-table>
 
-        <el-table-column label="行业" min-width="100">
-          <template #default="{ row }">
-            <template v-if="row._isTotal" />
-            <template v-else>
-              <el-input v-if="!isReadonly" :model-value="row.industry" size="small"
-                @change="(v: string) => updateField(row.id, 'industry', v)" />
-              <span v-else>{{ row.industry }}</span>
-            </template>
-          </template>
-        </el-table-column>
+      <div class="section-total">
+        <span>{{ activeSectionLabel }}审定期末合计</span>
+        <strong>{{ fmtAmount(activeSectionClosing) }}</strong>
+      </div>
+    </template>
 
-        <el-table-column label="注册地" min-width="100">
-          <template #default="{ row }">
-            <template v-if="row._isTotal" />
-            <template v-else>
-              <el-input v-if="!isReadonly" :model-value="row.registeredPlace" size="small"
-                @change="(v: string) => updateField(row.id, 'registeredPlace', v)" />
-              <span v-else>{{ row.registeredPlace }}</span>
-            </template>
-          </template>
-        </el-table-column>
+    <template v-else>
+      <div class="summary-cards">
+        <div class="summary-card">
+          <span>投资原值（1511）</span>
+          <strong>{{ fmtAmount(summary.gross.closing) }}</strong>
+        </div>
+        <div class="summary-card impairment">
+          <span>减值准备（1512）</span>
+          <strong>{{ fmtAmount(summary.impairment.closing) }}</strong>
+        </div>
+        <div class="summary-card net">
+          <span>长期股权投资净值</span>
+          <strong>{{ fmtAmount(summary.net.closing) }}</strong>
+        </div>
+      </div>
 
-        <el-table-column label="主营业务" min-width="140">
-          <template #default="{ row }">
-            <template v-if="row._isTotal" />
-            <template v-else>
-              <el-input v-if="!isReadonly" :model-value="row.mainBusiness" size="small"
-                @change="(v: string) => updateField(row.id, 'mainBusiness', v)" />
-              <span v-else>{{ row.mainBusiness }}</span>
-            </template>
-          </template>
+      <el-table :data="summaryRows" border size="small" class="summary-table">
+        <el-table-column label="汇总项目" prop="label" min-width="150" />
+        <el-table-column label="期初审定" min-width="130" align="right">
+          <template #default="{ row }">{{ fmtAmount(row.opening) }}</template>
         </el-table-column>
+        <el-table-column label="本期增加" min-width="130" align="right">
+          <template #default="{ row }">{{ fmtAmount(row.increase) }}</template>
+        </el-table-column>
+        <el-table-column label="本期减少" min-width="130" align="right">
+          <template #default="{ row }">{{ fmtAmount(row.decrease) }}</template>
+        </el-table-column>
+        <el-table-column label="期末审定" min-width="130" align="right">
+          <template #default="{ row }"><strong>{{ fmtAmount(row.closing) }}</strong></template>
+        </el-table-column>
+        <el-table-column label="勾稽去向" prop="crossRef" min-width="150" />
+      </el-table>
 
-        <el-table-column label="是否关联方" min-width="90" align="center">
-          <template #default="{ row }">
-            <template v-if="row._isTotal" />
-            <template v-else>
-              <el-checkbox v-if="!isReadonly" :model-value="row.isRelatedParty"
-                @change="(v: boolean) => updateField(row.id, 'isRelatedParty', v)" />
-              <span v-else>{{ row.isRelatedParty ? '是' : '否' }}</span>
-            </template>
-          </template>
-        </el-table-column>
+      <el-alert
+        class="cross-reference"
+        type="success"
+        :closable="false"
+        title="勾稽关系"
+        description="投资原值期末审定数汇总至 G7-1/TB1511；减值准备期末审定数汇总至 G7-1/TB1512；权益法损益及股利分别为 G7-4、G7-14 等底稿提供明细基础。"
+      />
+    </template>
+
+    <el-card shadow="never" class="note-card">
+      <template #header>
+        <div class="card-header">
+          <span>审计说明</span>
+          <el-button v-if="!isReadonly" link type="primary" size="small" @click="saveNote">保存</el-button>
+        </div>
       </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :rows="3"
+        :disabled="isReadonly"
+        placeholder="记录核算方法判断、重大增减变动、权益法测算或减值测试索引……"
+        @blur="saveNote"
+      />
+    </el-card>
 
-      <!-- ═══ Tab2: 期初余额(10列) ═══ -->
-      <template v-if="activeTab === 'tab2'">
-        <el-table-column label="期初投资成本" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.openingInvestCost) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.openingInvestCost" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'openingInvestCost', v)" />
-              <span v-else>{{ fmtNum(row.openingInvestCost) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="期初权益法调整" min-width="130" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.openingEquityAdj) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.openingEquityAdj" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'openingEquityAdj', v)" />
-              <span v-else>{{ fmtNum(row.openingEquityAdj) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="期初减值准备" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.openingImpairment) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.openingImpairment" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'openingImpairment', v)" />
-              <span v-else>{{ fmtNum(row.openingImpairment) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="期初账面价值" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.openingBookValue) }}</span></template>
-            <template v-else>
-              <el-tooltip content="期初账面价值 = 期初投资成本 + 期初权益法调整 - 期初减值准备" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.openingBookValue) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="期初审定成本" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.openingAuditedCost) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.openingAuditedCost" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'openingAuditedCost', v)" />
-              <span v-else>{{ fmtNum(row.openingAuditedCost) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="期初审定权益法" min-width="130" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.openingAuditedEquity) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.openingAuditedEquity" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'openingAuditedEquity', v)" />
-              <span v-else>{{ fmtNum(row.openingAuditedEquity) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="期初审定减值" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.openingAuditedImpairment) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.openingAuditedImpairment" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'openingAuditedImpairment', v)" />
-              <span v-else>{{ fmtNum(row.openingAuditedImpairment) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="期初审定净值" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.openingAuditedNetValue) }}</span></template>
-            <template v-else>
-              <el-tooltip content="期初审定净值 = 期初审定成本 + 期初审定权益法 - 期初审定减值" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.openingAuditedNetValue) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="备注" min-width="140">
-          <template #default="{ row }">
-            <template v-if="row._isTotal" />
-            <template v-else>
-              <el-input v-if="!isReadonly" :model-value="row.openingRemark" size="small"
-                @change="(v: string) => updateField(row.id, 'openingRemark', v)" />
-              <span v-else>{{ row.openingRemark }}</span>
-            </template>
-          </template>
-        </el-table-column>
-      </template>
-
-      <!-- ═══ Tab3: 本期变动(12列) ═══ -->
-      <template v-if="activeTab === 'tab3'">
-        <el-table-column label="新增投资" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.increaseNewInvest) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.increaseNewInvest" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'increaseNewInvest', v)" />
-              <span v-else>{{ fmtNum(row.increaseNewInvest) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="权益法增加" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.increaseEquityMethod) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.increaseEquityMethod" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'increaseEquityMethod', v)" />
-              <span v-else>{{ fmtNum(row.increaseEquityMethod) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="处置减少" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.decreaseDisposal) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.decreaseDisposal" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'decreaseDisposal', v)" />
-              <span v-else>{{ fmtNum(row.decreaseDisposal) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="权益法调整减少" min-width="130" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.decreaseEquityAdj) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.decreaseEquityAdj" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'decreaseEquityAdj', v)" />
-              <span v-else>{{ fmtNum(row.decreaseEquityAdj) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="减值计提" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.impairmentProvision) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.impairmentProvision" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'impairmentProvision', v)" />
-              <span v-else>{{ fmtNum(row.impairmentProvision) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="减值转回" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.impairmentReversal) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.impairmentReversal" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'impairmentReversal', v)" />
-              <span v-else>{{ fmtNum(row.impairmentReversal) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="被投资方净利润" min-width="130" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.investeeNetProfit) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.investeeNetProfit" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'investeeNetProfit', v)" />
-              <span v-else>{{ fmtNum(row.investeeNetProfit) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="持股比例调整" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal" />
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.holdingRatioChange" size="small"
-                :controls="false" :precision="4" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'holdingRatioChange', v)" />
-              <span v-else>{{ fmtPercent(row.holdingRatioChange) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="其他综合收益" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.otherComprehensiveIncome) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.otherComprehensiveIncome" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'otherComprehensiveIncome', v)" />
-              <span v-else>{{ fmtNum(row.otherComprehensiveIncome) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="其他权益变动" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.otherEquityChange) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.otherEquityChange" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'otherEquityChange', v)" />
-              <span v-else>{{ fmtNum(row.otherEquityChange) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="利润分配" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.profitDistribution) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.profitDistribution" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'profitDistribution', v)" />
-              <span v-else>{{ fmtNum(row.profitDistribution) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-      </template>
-
-      <!-- ═══ Tab4: 期末+减值(12列) ═══ -->
-      <template v-if="activeTab === 'tab4'">
-        <el-table-column label="期末投资成本" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.closingInvestCost) }}</span></template>
-            <template v-else>
-              <el-tooltip content="期末投资成本 = 期初投资成本 + 新增投资 - 处置减少" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.closingInvestCost) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="期末权益法调整" min-width="130" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.closingEquityAdj) }}</span></template>
-            <template v-else>
-              <el-tooltip content="期末权益法调整 = 期初权益法调整 + 权益法增加 - 权益法调整减少" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.closingEquityAdj) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="期末小计" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.closingSubtotal) }}</span></template>
-            <template v-else>
-              <el-tooltip content="期末小计 = 期末投资成本 + 期末权益法调整" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.closingSubtotal) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="期末减值准备" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.closingImpairment) }}</span></template>
-            <template v-else>
-              <el-tooltip content="期末减值 = 期初减值 + 减值计提 - 减值转回" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.closingImpairment) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="期末账面价值" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.closingBookValue) }}</span></template>
-            <template v-else>
-              <el-tooltip content="期末账面价值 = 期末小计 - 期末减值准备" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.closingBookValue) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="审定调整" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.auditAdjustment) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.auditAdjustment" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'auditAdjustment', v)" />
-              <span v-else>{{ fmtNum(row.auditAdjustment) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="审定数" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.auditedAmount) }}</span></template>
-            <template v-else>
-              <el-tooltip content="审定数 = 期末账面价值 + 审定调整" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.auditedAmount) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="可收回金额" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal" />
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.recoverableAmount" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'recoverableAmount', v)" />
-              <span v-else>{{ fmtNum(row.recoverableAmount) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="减值测试结论" min-width="130">
-          <template #default="{ row }">
-            <template v-if="row._isTotal" />
-            <template v-else>
-              <el-input v-if="!isReadonly" :model-value="row.impairmentTestConclusion" size="small"
-                @change="(v: string) => updateField(row.id, 'impairmentTestConclusion', v)" />
-              <span v-else>{{ row.impairmentTestConclusion }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="发函情况" min-width="110">
-          <template #default="{ row }">
-            <template v-if="row._isTotal" />
-            <template v-else>
-              <el-input v-if="!isReadonly" :model-value="row.confirmationStatus" size="small"
-                @change="(v: string) => updateField(row.id, 'confirmationStatus', v)" />
-              <span v-else>{{ row.confirmationStatus }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="索引" width="90" align="center">
-          <template #default="{ row }">
-            <template v-if="row._isTotal" />
-            <GtIndexChip v-else :value="row.indexRef" />
-          </template>
-        </el-table-column>
-      </template>
-
-      <!-- ═══ Tab5: 权益法详情(12列) ═══ -->
-      <template v-if="activeTab === 'tab5'">
-        <el-table-column label="被投资方净资产" min-width="130" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.investeeNetAssets) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.investeeNetAssets" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'investeeNetAssets', v)" />
-              <span v-else>{{ fmtNum(row.investeeNetAssets) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="享有份额" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.shareOfNetAssets) }}</span></template>
-            <template v-else>
-              <el-tooltip content="享有份额 = 被投资方净资产 × 持股比例" placement="top">
-                <span class="formula-cell">{{ fmtNum(row.shareOfNetAssets) }}</span>
-              </el-tooltip>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="商誉" min-width="100" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.goodwill) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.goodwill" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'goodwill', v)" />
-              <span v-else>{{ fmtNum(row.goodwill) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="内部交易抵销" min-width="120" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.internalTransElim) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.internalTransElim" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'internalTransElim', v)" />
-              <span v-else>{{ fmtNum(row.internalTransElim) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="未确认损失" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.unrecognizedLoss) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.unrecognizedLoss" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'unrecognizedLoss', v)" />
-              <span v-else>{{ fmtNum(row.unrecognizedLoss) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="权益法投资收益" min-width="130" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.equityMethodIncome) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.equityMethodIncome" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'equityMethodIncome', v)" />
-              <span v-else>{{ fmtNum(row.equityMethodIncome) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="本期OCI" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.currentOCI) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.currentOCI" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'currentOCI', v)" />
-              <span v-else>{{ fmtNum(row.currentOCI) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="股利收入" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.dividendIncome) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.dividendIncome" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'dividendIncome', v)" />
-              <span v-else>{{ fmtNum(row.dividendIncome) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="计量方法确认" min-width="120">
-          <template #default="{ row }">
-            <template v-if="row._isTotal" />
-            <template v-else>
-              <el-input v-if="!isReadonly" :model-value="row.measurementConfirm" size="small"
-                @change="(v: string) => updateField(row.id, 'measurementConfirm', v)" />
-              <span v-else>{{ row.measurementConfirm }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="处置损益" min-width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="row._isTotal"><span class="total-num">{{ fmtNum(row.disposalGainLoss) }}</span></template>
-            <template v-else>
-              <el-input-number v-if="!isReadonly" :model-value="row.disposalGainLoss" size="small"
-                :controls="false" class="compact-num"
-                @change="(v: number) => updateField(row.id, 'disposalGainLoss', v)" />
-              <span v-else>{{ fmtNum(row.disposalGainLoss) }}</span>
-            </template>
-          </template>
-        </el-table-column>
-
-        <el-table-column label="备注" min-width="140">
-          <template #default="{ row }">
-            <template v-if="row._isTotal" />
-            <template v-else>
-              <el-input v-if="!isReadonly" :model-value="row.equityRemark" size="small"
-                @change="(v: string) => updateField(row.id, 'equityRemark', v)" />
-              <span v-else>{{ row.equityRemark }}</span>
-            </template>
-          </template>
-        </el-table-column>
-      </template>
-
-      <!-- 操作列（删除） -->
-      <el-table-column v-if="!isReadonly" label="" width="50" align="center" fixed="right">
-        <template #default="{ row }">
-          <el-popconfirm v-if="!row._isTotal" title="确认删除该被投资单位？"
-            @confirm="removeRow(row.id)">
-            <template #reference>
-              <el-button size="small" type="danger" link>删</el-button>
-            </template>
-          </el-popconfirm>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- 编制提示 -->
     <details class="prep-hint">
       <summary>编制提示</summary>
-      <ul>
-        <li>期初账面价值 = 期初投资成本 + 期初权益法调整 - 期初减值准备</li>
-        <li>期末投资成本 = 期初投资成本 + 新增投资 - 处置减少</li>
-        <li>期末权益法调整 = 期初权益法调整 + 权益法增加 - 权益法调整减少</li>
-        <li>期末小计 = 期末投资成本 + 期末权益法调整</li>
-        <li>期末减值 = 期初减值 + 减值计提 - 减值转回</li>
-        <li>期末账面价值 = 期末小计 - 期末减值准备</li>
-        <li>审定数 = 期末账面价值 + 审定调整</li>
-        <li>享有份额 = 被投资方净资产 × 持股比例</li>
-        <li>控制类型：子公司用成本法、合营/联营用权益法</li>
-        <li>5区段Tab切换保持当前选中行索引不变</li>
-      </ul>
+      <ol>
+        <li>成本法一般对应子公司；权益法按合营企业、联营企业分别汇总。</li>
+        <li>期末未审 = 期初未审 + 本期增加 − 本期减少；审定数在未审数基础上分别叠加 AJE、RJE。</li>
+        <li>权益法“权益变动小计” = 损益调整 + 其他综合收益 + 其他权益变动。</li>
+        <li>减值准备按每一被投资单位自动建行，基础信息与投资明细同步。</li>
+        <li>导入原始“明细表G7-2”工作表时，系统按原模板坐标识别成本法、权益法和减值区块。</li>
+      </ol>
     </details>
-
-    <!-- 审计说明 -->
-    <el-card class="note-card" shadow="never">
-      <template #header>
-        <div class="card-header"><span>审计说明</span></div>
-      </template>
-      <el-input v-model="auditNote" type="textarea"
-        :autosize="{ minRows: 5 }" :disabled="isReadonly"
-        placeholder="填写审计说明：各被投资单位明细的测试情况、成本法/权益法核算适当性、减值测试及与审定表勾稽结果。"
-        @change="saveNote" />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card class="note-card" shadow="never">
-      <template #header>
-        <div class="card-header"><span>审计结论</span></div>
-      </template>
-      <el-input v-model="auditConclusion" type="textarea"
-        :autosize="{ minRows: 3 }" :disabled="isReadonly"
-        placeholder="填写审计结论：长期股权投资明细期末余额经测试完整准确，核算方法适当，与 G7-1 审定表一致。"
-        @change="saveConclusion" />
-    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-/**
- * G7TabDetail.vue — G7-2 长期股权投资明细表（103行×54列→5区段Tab）
- *
- * - el-segmented 切换 Tab1~Tab5
- * - 行共享同一reactive数组，Tab切换只改可见列
- * - selectedRowIndex跨Tab保持（行同步 P9）
- * - 底部合计行
- * - Tab4/Tab5公式列自动计算(useG7FormulaEngine)
- * - 控制类型下拉(子公司/合营/联营)
- * - 动态行增删(ElMessageBox.prompt必填被投资单位名称)
- * - 导入导出(useG7ImportExport, sheet='G7-2')
- * - 虚拟滚动: 103行 max-height
- *
- * Spec: .kiro/specs/g7-long-term-equity-main/ Task 5.1
- * Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 6.4, 6.6
- */
-import { ref, reactive, computed, inject, onMounted } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
-import {
-  calcEndingCost,
-  calcEndingEquityAdj,
-  calcBookValue,
-  parseNum,
-} from '../../composables/useG7FormulaEngine'
 import { useG7ImportExport } from '../../composables/useG7ImportExport'
+import {
+  calcG7DetailSummary,
+  createG7CostRow,
+  createG7EquityRow,
+  normalizeG7DetailRows,
+  recalcG7DetailRow,
+  resequenceG7DetailState,
+  serializeG7DetailState,
+  syncG7ImpairmentRows,
+  type G7DetailState,
+  type G7DetailStoredRow,
+} from '../../composables/g7DetailModel'
 import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
@@ -759,390 +247,503 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
+type SectionKey = 'cost' | 'equity' | 'impairment' | 'summary'
+type LayerKey = 'basic' | 'unadjusted' | 'adjustment' | 'audited'
+type ColumnKind = 'text' | 'number' | 'percent' | 'date' | 'select'
+
+interface ColumnDef {
+  key: string
+  label: string
+  kind: ColumnKind
+  width?: number
+  formula?: string
+  options?: Array<{ value: string; label: string }>
+}
+
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const activeSection = ref<SectionKey>('cost')
+const activeLayer = ref<LayerKey>('basic')
+const state = reactive<G7DetailState>({ costRows: [], equityRows: [], impairmentRows: [] })
+const isDirty = ref(false)
+const saving = ref(false)
+const auditNote = ref('')
+let saveTimer: number | undefined
+let editRevision = 0
+let validationBlocked = false
 
-// ─── 5区段Tab ────────────────────────────────────────────────────────────────
-
-type TabKey = 'tab1' | 'tab2' | 'tab3' | 'tab4' | 'tab5'
-const activeTab = ref<TabKey>('tab1')
-
-const segmentOptions = [
-  { label: '基础信息(8)', value: 'tab1' },
-  { label: '期初余额(10)', value: 'tab2' },
-  { label: '本期变动(12)', value: 'tab3' },
-  { label: '期末+减值(12)', value: 'tab4' },
-  { label: '权益法详情(12)', value: 'tab5' },
+const sectionOptions = [
+  { label: '一、成本法（子公司）', value: 'cost' },
+  { label: '二、权益法（合营 / 联营）', value: 'equity' },
+  { label: '三、减值准备', value: 'impairment' },
+  { label: '四、汇总勾稽', value: 'summary' },
 ]
 
-// ─── 控制类型 ────────────────────────────────────────────────────────────────
-
-type ControlType = 'subsidiary' | 'joint_venture' | 'associate'
-
-const CONTROL_TYPE_LABELS: Record<ControlType, string> = {
-  subsidiary: '子公司',
-  joint_venture: '合营企业',
-  associate: '联营企业',
-}
-
-function controlTypeLabel(ct: string): string {
-  return CONTROL_TYPE_LABELS[ct as ControlType] || ct
-}
-
-// ─── 行数据模型（54列） ──────────────────────────────────────────────────────
-
-interface G7DetailRow {
-  id: string
-  seq: number
-  // Tab1: 基础信息
-  investeeName: string
-  controlType: ControlType
-  holdingRatio: number
-  votingRatio: number
-  industry: string
-  registeredPlace: string
-  mainBusiness: string
-  isRelatedParty: boolean
-  // Tab2: 期初余额
-  openingInvestCost: number
-  openingEquityAdj: number
-  openingImpairment: number
-  openingBookValue: number         // 公式
-  openingAuditedCost: number
-  openingAuditedEquity: number
-  openingAuditedImpairment: number
-  openingAuditedNetValue: number   // 公式
-  openingRemark: string
-  // Tab3: 本期变动
-  increaseNewInvest: number
-  increaseEquityMethod: number
-  decreaseDisposal: number
-  decreaseEquityAdj: number
-  impairmentProvision: number
-  impairmentReversal: number
-  investeeNetProfit: number
-  holdingRatioChange: number
-  otherComprehensiveIncome: number
-  otherEquityChange: number
-  profitDistribution: number
-  // Tab4: 期末+减值
-  closingInvestCost: number        // 公式
-  closingEquityAdj: number         // 公式
-  closingSubtotal: number          // 公式
-  closingImpairment: number        // 公式
-  closingBookValue: number         // 公式
-  auditAdjustment: number
-  auditedAmount: number            // 公式
-  recoverableAmount: number
-  impairmentTestConclusion: string
-  confirmationStatus: string
-  indexRef: string
-  // Tab5: 权益法详情
-  investeeNetAssets: number
-  shareOfNetAssets: number         // 公式
-  goodwill: number
-  internalTransElim: number
-  unrecognizedLoss: number
-  equityMethodIncome: number
-  currentOCI: number
-  dividendIncome: number
-  measurementConfirm: string
-  disposalGainLoss: number
-  equityRemark: string
-}
-
-interface DisplayRow extends G7DetailRow {
-  _isTotal?: boolean
-}
-
-function createEmptyRow(seq: number, name: string): G7DetailRow {
-  return {
-    id: crypto.randomUUID(),
-    seq,
-    investeeName: name,
-    controlType: 'subsidiary',
-    holdingRatio: 0,
-    votingRatio: 0,
-    industry: '',
-    registeredPlace: '',
-    mainBusiness: '',
-    isRelatedParty: false,
-    openingInvestCost: 0,
-    openingEquityAdj: 0,
-    openingImpairment: 0,
-    openingBookValue: 0,
-    openingAuditedCost: 0,
-    openingAuditedEquity: 0,
-    openingAuditedImpairment: 0,
-    openingAuditedNetValue: 0,
-    openingRemark: '',
-    increaseNewInvest: 0,
-    increaseEquityMethod: 0,
-    decreaseDisposal: 0,
-    decreaseEquityAdj: 0,
-    impairmentProvision: 0,
-    impairmentReversal: 0,
-    investeeNetProfit: 0,
-    holdingRatioChange: 0,
-    otherComprehensiveIncome: 0,
-    otherEquityChange: 0,
-    profitDistribution: 0,
-    closingInvestCost: 0,
-    closingEquityAdj: 0,
-    closingSubtotal: 0,
-    closingImpairment: 0,
-    closingBookValue: 0,
-    auditAdjustment: 0,
-    auditedAmount: 0,
-    recoverableAmount: 0,
-    impairmentTestConclusion: '',
-    confirmationStatus: '',
-    indexRef: '',
-    investeeNetAssets: 0,
-    shareOfNetAssets: 0,
-    goodwill: 0,
-    internalTransElim: 0,
-    unrecognizedLoss: 0,
-    equityMethodIncome: 0,
-    currentOCI: 0,
-    dividendIncome: 0,
-    measurementConfirm: '',
-    disposalGainLoss: 0,
-    equityRemark: '',
-  }
-}
-
-const rows = reactive<G7DetailRow[]>([])
-const selectedRowIndex = ref(0)
-
-// ─── 公式重算（使用 useG7FormulaEngine） ─────────────────────────────────────
-
-function recalcRow(row: G7DetailRow): void {
-  // Tab2 公式
-  row.openingBookValue = parseNum(row.openingInvestCost) + parseNum(row.openingEquityAdj) - parseNum(row.openingImpairment)
-  row.openingAuditedNetValue = parseNum(row.openingAuditedCost) + parseNum(row.openingAuditedEquity) - parseNum(row.openingAuditedImpairment)
-
-  // Tab4 公式（使用 useG7FormulaEngine）
-  row.closingInvestCost = calcEndingCost(parseNum(row.openingInvestCost), parseNum(row.increaseNewInvest), parseNum(row.decreaseDisposal))
-  row.closingEquityAdj = calcEndingEquityAdj(parseNum(row.openingEquityAdj), parseNum(row.increaseEquityMethod), parseNum(row.decreaseEquityAdj))
-  row.closingSubtotal = row.closingInvestCost + row.closingEquityAdj
-  row.closingImpairment = parseNum(row.openingImpairment) + parseNum(row.impairmentProvision) - parseNum(row.impairmentReversal)
-  row.closingBookValue = calcBookValue(row.closingSubtotal, row.closingImpairment)
-  row.auditedAmount = row.closingBookValue + parseNum(row.auditAdjustment)
-
-  // Tab5 公式
-  row.shareOfNetAssets = parseNum(row.investeeNetAssets) * parseNum(row.holdingRatio)
-}
-
-// ─── 合计行 ──────────────────────────────────────────────────────────────────
-
-/** 数值字段列表（合计用） */
-const NUMERIC_FIELDS: (keyof G7DetailRow)[] = [
-  'openingInvestCost', 'openingEquityAdj', 'openingImpairment', 'openingBookValue',
-  'openingAuditedCost', 'openingAuditedEquity', 'openingAuditedImpairment', 'openingAuditedNetValue',
-  'increaseNewInvest', 'increaseEquityMethod', 'decreaseDisposal', 'decreaseEquityAdj',
-  'impairmentProvision', 'impairmentReversal', 'investeeNetProfit',
-  'otherComprehensiveIncome', 'otherEquityChange', 'profitDistribution',
-  'closingInvestCost', 'closingEquityAdj', 'closingSubtotal', 'closingImpairment',
-  'closingBookValue', 'auditAdjustment', 'auditedAmount',
-  'investeeNetAssets', 'shareOfNetAssets', 'goodwill', 'internalTransElim',
-  'unrecognizedLoss', 'equityMethodIncome', 'currentOCI', 'dividendIncome', 'disposalGainLoss',
+const relationshipOptions = [
+  { value: 'joint_venture', label: '合营企业' },
+  { value: 'associate', label: '联营企业' },
 ]
 
-const totalRow = computed<DisplayRow>(() => {
-  const t: DisplayRow = { ...createEmptyRow(0, ''), _isTotal: true }
-  for (const r of rows) {
-    for (const f of NUMERIC_FIELDS) {
-      ;(t as any)[f] = ((t as any)[f] || 0) + parseNum((r as any)[f])
-    }
+const basicColumns: ColumnDef[] = [
+  { key: 'initialInvestmentCost', label: '初始投资成本', kind: 'number', width: 130 },
+  { key: 'investmentRatio', label: '投资比例', kind: 'percent', width: 105 },
+  { key: 'investmentDate', label: '投资日期', kind: 'date', width: 140 },
+  { key: 'investmentMethod', label: '取得方式', kind: 'text', width: 140 },
+]
+
+const costColumns: Record<LayerKey, ColumnDef[]> = {
+  basic: [
+    ...basicColumns,
+    { key: 'cashDividend', label: '本期现金股利', kind: 'number', width: 130 },
+  ],
+  unadjusted: [
+    { key: 'openingRatio', label: '期初比例', kind: 'percent' },
+    { key: 'openingAmount', label: '期初未审', kind: 'number' },
+    { key: 'increaseRatio', label: '本期增加比例', kind: 'percent' },
+    { key: 'increaseAmount', label: '本期增加金额', kind: 'number' },
+    { key: 'increaseIndex', label: '增加索引', kind: 'text' },
+    { key: 'decreaseRatio', label: '本期减少比例', kind: 'percent' },
+    { key: 'decreaseAmount', label: '本期减少金额', kind: 'number' },
+    { key: 'decreaseIndex', label: '减少索引', kind: 'text' },
+    { key: 'closingRatio', label: '期末比例', kind: 'percent', formula: '期初比例 + 增加比例 − 减少比例' },
+    { key: 'closingAmount', label: '期末未审', kind: 'number', formula: '期初未审 + 增加 − 减少' },
+  ],
+  adjustment: [
+    { key: 'openingAje', label: '期初AJE', kind: 'number' },
+    { key: 'openingRje', label: '期初RJE', kind: 'number' },
+    { key: 'ajeIncrease', label: '本期增加AJE', kind: 'number' },
+    { key: 'ajeDecrease', label: '本期减少AJE', kind: 'number' },
+    { key: 'rjeIncrease', label: '本期增加RJE', kind: 'number' },
+    { key: 'rjeDecrease', label: '本期减少RJE', kind: 'number' },
+  ],
+  audited: [
+    { key: 'auditedOpeningRatio', label: '期初审定比例', kind: 'percent', formula: '期初未审比例' },
+    { key: 'auditedOpeningAmount', label: '期初审定金额', kind: 'number', formula: '期初未审 + 期初AJE + 期初RJE' },
+    { key: 'auditedIncreaseRatio', label: '增加审定比例', kind: 'percent', formula: '未审增加比例' },
+    { key: 'auditedIncreaseAmount', label: '增加审定金额', kind: 'number', formula: '未审增加 + AJE + RJE' },
+    { key: 'auditedDecreaseRatio', label: '减少审定比例', kind: 'percent', formula: '未审减少比例' },
+    { key: 'auditedDecreaseAmount', label: '减少审定金额', kind: 'number', formula: '未审减少 + AJE + RJE' },
+    { key: 'auditedClosingRatio', label: '期末审定比例', kind: 'percent', formula: '期初审定比例 + 增加 − 减少' },
+    { key: 'auditedClosingAmount', label: '期末审定金额', kind: 'number', formula: '期初审定 + 增加审定 − 减少审定' },
+  ],
+}
+
+const equityColumns: Record<LayerKey, ColumnDef[]> = {
+  basic: [
+    { key: 'relationship', label: '投资关系', kind: 'select', width: 120, options: relationshipOptions },
+    ...basicColumns,
+  ],
+  unadjusted: [
+    { key: 'openingRatio', label: '期初比例', kind: 'percent' },
+    { key: 'openingAmount', label: '期初未审', kind: 'number' },
+    { key: 'increaseRatio', label: '增加比例', kind: 'percent' },
+    { key: 'costIncrease', label: '新增投资成本', kind: 'number' },
+    { key: 'profitLossAdjustment', label: '损益调整', kind: 'number' },
+    { key: 'otherComprehensiveIncome', label: '其他综合收益', kind: 'number' },
+    { key: 'otherEquityChange', label: '其他权益变动', kind: 'number' },
+    { key: 'equityIncreaseSubtotal', label: '权益变动小计', kind: 'number', formula: '损益调整 + OCI + 其他权益变动' },
+    { key: 'otherIncrease', label: '其他增加', kind: 'number' },
+    { key: 'decreaseRatio', label: '减少比例', kind: 'percent' },
+    { key: 'costDecrease', label: '投资成本减少', kind: 'number' },
+    { key: 'dividendReceived', label: '收到现金股利', kind: 'number' },
+    { key: 'otherDecrease', label: '其他减少', kind: 'number' },
+    { key: 'closingRatio', label: '期末比例', kind: 'percent', formula: '期初比例 + 增加比例 − 减少比例' },
+    { key: 'closingAmount', label: '期末未审', kind: 'number', formula: '期初 + 各项增加 − 各项减少' },
+  ],
+  adjustment: [
+    { key: 'openingAje', label: '期初AJE', kind: 'number' },
+    { key: 'openingRje', label: '期初RJE', kind: 'number' },
+    { key: 'ajeCostIncrease', label: '新增成本AJE', kind: 'number' },
+    { key: 'ajeProfitLoss', label: '损益调整AJE', kind: 'number' },
+    { key: 'ajeOci', label: 'OCI AJE', kind: 'number' },
+    { key: 'ajeOtherEquity', label: '其他权益AJE', kind: 'number' },
+    { key: 'ajeOtherIncrease', label: '其他增加AJE', kind: 'number' },
+    { key: 'ajeCostDecrease', label: '成本减少AJE', kind: 'number' },
+    { key: 'ajeDividend', label: '股利AJE', kind: 'number' },
+    { key: 'ajeOtherDecrease', label: '其他减少AJE', kind: 'number' },
+    { key: 'rjeCostIncrease', label: '新增成本RJE', kind: 'number' },
+    { key: 'rjeProfitLoss', label: '损益调整RJE', kind: 'number' },
+    { key: 'rjeOci', label: 'OCI RJE', kind: 'number' },
+    { key: 'rjeOtherEquity', label: '其他权益RJE', kind: 'number' },
+    { key: 'rjeOtherIncrease', label: '其他增加RJE', kind: 'number' },
+    { key: 'rjeCostDecrease', label: '成本减少RJE', kind: 'number' },
+    { key: 'rjeDividend', label: '股利RJE', kind: 'number' },
+    { key: 'rjeOtherDecrease', label: '其他减少RJE', kind: 'number' },
+  ],
+  audited: [
+    { key: 'auditedOpeningRatio', label: '期初审定比例', kind: 'percent', formula: '期初未审比例' },
+    { key: 'auditedOpeningAmount', label: '期初审定金额', kind: 'number', formula: '期初未审 + 期初AJE + 期初RJE' },
+    { key: 'auditedIncreaseRatio', label: '增加审定比例', kind: 'percent', formula: '未审增加比例' },
+    { key: 'auditedCostIncrease', label: '新增成本审定', kind: 'number', formula: '未审 + AJE + RJE' },
+    { key: 'auditedProfitLoss', label: '损益调整审定', kind: 'number', formula: '未审 + AJE + RJE' },
+    { key: 'auditedOci', label: 'OCI审定', kind: 'number', formula: '未审 + AJE + RJE' },
+    { key: 'auditedOtherEquity', label: '其他权益审定', kind: 'number', formula: '未审 + AJE + RJE' },
+    { key: 'auditedEquityIncreaseSubtotal', label: '权益变动审定小计', kind: 'number', formula: '损益 + OCI + 其他权益' },
+    { key: 'auditedOtherIncrease', label: '其他增加审定', kind: 'number', formula: '未审 + AJE + RJE' },
+    { key: 'auditedDecreaseRatio', label: '减少审定比例', kind: 'percent', formula: '未审减少比例' },
+    { key: 'auditedCostDecrease', label: '成本减少审定', kind: 'number', formula: '未审 + AJE + RJE' },
+    { key: 'auditedDividend', label: '股利审定', kind: 'number', formula: '未审 + AJE + RJE' },
+    { key: 'auditedOtherDecrease', label: '其他减少审定', kind: 'number', formula: '未审 + AJE + RJE' },
+    { key: 'auditedClosingRatio', label: '期末审定比例', kind: 'percent', formula: '期初审定比例 + 增加 − 减少' },
+    { key: 'auditedClosingAmount', label: '期末审定金额', kind: 'number', formula: '原表BB：期初审定 + 成本增加 + 权益增加小计 − 成本减少 − 分回利润（不含其他栏）' },
+  ],
+}
+
+const impairmentColumns: Record<LayerKey, ColumnDef[]> = {
+  basic: [
+    { key: 'relationship', label: '投资关系', kind: 'select', width: 120, options: [
+      { value: 'subsidiary', label: '子公司' },
+      ...relationshipOptions,
+    ] },
+    ...basicColumns.map(column => ({ ...column, formula: '与成本法/权益法明细同步' })),
+    { key: 'remark', label: '减值测试索引/说明', kind: 'text', width: 180 },
+  ],
+  unadjusted: [
+    { key: 'openingAmount', label: '期初未审', kind: 'number' },
+    { key: 'increaseAmount', label: '本期计提', kind: 'number' },
+    { key: 'decreaseAmount', label: '转回/转销', kind: 'number' },
+    { key: 'closingAmount', label: '期末未审', kind: 'number', formula: '期初未审 + 本期计提 − 转回/转销' },
+    { key: 'remark', label: '减值测试索引/说明', kind: 'text', width: 180 },
+  ],
+  adjustment: [
+    { key: 'openingAje', label: '期初AJE', kind: 'number' },
+    { key: 'openingRje', label: '期初RJE', kind: 'number' },
+    { key: 'ajeIncrease', label: '计提AJE', kind: 'number' },
+    { key: 'ajeDecrease', label: '转回/转销AJE', kind: 'number' },
+    { key: 'rjeIncrease', label: '计提RJE', kind: 'number' },
+    { key: 'rjeDecrease', label: '转回/转销RJE', kind: 'number' },
+  ],
+  audited: [
+    { key: 'auditedOpeningAmount', label: '期初审定', kind: 'number', formula: '期初未审 + 期初AJE + 期初RJE' },
+    { key: 'auditedIncreaseAmount', label: '本期计提审定', kind: 'number', formula: '未审计提 + AJE + RJE' },
+    { key: 'auditedDecreaseAmount', label: '转回/转销审定', kind: 'number', formula: '未审减少 + AJE + RJE' },
+    { key: 'auditedClosingAmount', label: '期末审定', kind: 'number', formula: '期初审定 + 计提审定 − 减少审定' },
+  ],
+}
+
+const activeRows = computed<G7DetailStoredRow[]>(() => {
+  if (activeSection.value === 'cost') return state.costRows
+  if (activeSection.value === 'equity') return state.equityRows
+  if (activeSection.value === 'impairment') return state.impairmentRows
+  return []
+})
+
+const activeColumns = computed(() => {
+  if (activeSection.value === 'cost') return costColumns[activeLayer.value]
+  if (activeSection.value === 'equity') return equityColumns[activeLayer.value]
+  return impairmentColumns[activeLayer.value]
+})
+
+const summary = computed(() => calcG7DetailSummary(state))
+const summaryRows = computed(() => [
+  { label: '成本法（子公司）', ...summary.value.cost, crossRef: 'G7-1 子公司' },
+  { label: '权益法（合营企业）', ...summary.value.jointVenture, crossRef: 'G7-1 合营企业' },
+  { label: '权益法（联营企业）', ...summary.value.associate, crossRef: 'G7-1 联营企业' },
+  { label: '投资原值合计', ...summary.value.gross, crossRef: 'G7-1 / TB1511' },
+  { label: '减值准备', ...summary.value.impairment, crossRef: 'G7-1 / TB1512' },
+  { label: '长期股权投资净值', ...summary.value.net, crossRef: '财务报表' },
+])
+
+const activeSectionLabel = computed(() => ({
+  cost: '成本法',
+  equity: '权益法',
+  impairment: '减值准备',
+  summary: '汇总',
+})[activeSection.value])
+const sectionRowCount = computed(() => activeSection.value === 'summary'
+  ? state.costRows.length + state.equityRows.length
+  : activeRows.value.length)
+const activeSectionClosing = computed(() => {
+  if (activeSection.value === 'cost') return summary.value.cost.closing
+  if (activeSection.value === 'equity') {
+    return summary.value.jointVenture.closing + summary.value.associate.closing
   }
-  return t
+  return summary.value.impairment.closing
 })
 
-const displayRows = computed<DisplayRow[]>(() => {
-  const result: DisplayRow[] = [...(rows as unknown as DisplayRow[])]
-  result.push(totalRow.value)
-  return result
-})
-
-// ─── 行同步（selectedRowIndex 跨Tab保持） ───────────────────────────────────
-
-function onCurrentChange(row: DisplayRow | null) {
-  if (!row || row._isTotal) return
-  const idx = rows.findIndex(r => r.id === row.id)
-  if (idx >= 0) selectedRowIndex.value = idx
+function queueAutoSave(): void {
+  if (saveTimer) window.clearTimeout(saveTimer)
+  saveTimer = window.setTimeout(() => { void saveRows(true) }, 1000)
 }
 
-// ─── 行样式 ─────────────────────────────────────────────────────────────────
-
-function rowClassName({ row }: { row: DisplayRow }): string {
-  if (row._isTotal) return 'row-total'
-  return ''
+function markDirty(): void {
+  editRevision += 1
+  validationBlocked = false
+  isDirty.value = true
+  queueAutoSave()
 }
 
-// ─── 字段更新（触发公式重算） ───────────────────────────────────────────────
-
-function updateField(id: string, field: keyof G7DetailRow, value: any) {
-  const row = rows.find(r => r.id === id)
-  if (!row) return
-  ;(row as any)[field] = value ?? (typeof (row as any)[field] === 'number' ? 0 : '')
-  recalcRow(row)
+function recalcAndPublish(row?: G7DetailStoredRow): void {
+  if (row) recalcG7DetailRow(row)
+  syncG7ImpairmentRows(state)
+  publishDetail()
 }
 
-// ─── 动态行增删（ElMessageBox.prompt必填被投资单位名称） ─────────────────────
+function publishDetail(): void {
+  window.dispatchEvent(new CustomEvent('g7:detail-updated', {
+    detail: {
+      summary: summary.value,
+      rows: serializeG7DetailState(state),
+    },
+  }))
+}
 
-async function handleAddRow() {
+function updateField(row: G7DetailStoredRow, key: string, value: unknown): void {
+  ;(row as any)[key] = value
+  recalcAndPublish(row)
+  markDirty()
+}
+
+async function handleAddRow(): Promise<void> {
+  if (activeSection.value === 'impairment') {
+    ElMessage.info('减值准备行由成本法、权益法明细自动生成')
+    return
+  }
   try {
-    const { value } = await ElMessageBox.prompt('请输入被投资单位名称', '新增被投资单位', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
+    const result = await ElMessageBox.prompt('请输入被投资单位名称', '新增投资明细', {
       inputPattern: /\S+/,
       inputErrorMessage: '被投资单位名称不能为空',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
     })
-    if (value?.trim()) {
-      const newRow = createEmptyRow(rows.length + 1, value.trim())
-      rows.push(newRow)
-      recalcRow(newRow)
+    if (activeSection.value === 'cost') {
+      state.costRows.push(createG7CostRow(state.costRows.length + 1, result.value.trim()))
+    } else {
+      state.equityRows.push(createG7EquityRow(state.equityRows.length + 1, result.value.trim()))
     }
+    recalcAndPublish()
+    markDirty()
   } catch {
-    // 用户取消
+    // cancelled
   }
 }
 
-function removeRow(id: string) {
-  const idx = rows.findIndex(r => r.id === id)
-  if (idx >= 0) {
-    rows.splice(idx, 1)
-    rows.forEach((r, i) => { r.seq = i + 1 })
+async function removeRow(row: G7DetailStoredRow): Promise<void> {
+  try {
+    await ElMessageBox.confirm(`确定删除“${row.investeeName}”及其减值明细吗？`, '删除确认', {
+      type: 'warning',
+    })
+    if (row.section === 'cost') state.costRows.splice(state.costRows.findIndex(item => item.id === row.id), 1)
+    if (row.section === 'equity') state.equityRows.splice(state.equityRows.findIndex(item => item.id === row.id), 1)
+    resequenceG7DetailState(state)
+    recalcAndPublish()
+    markDirty()
+  } catch {
+    // cancelled
   }
 }
 
-// ─── 导入导出 ────────────────────────────────────────────────────────────────
+function extractChecklistItems(response: any): any[] {
+  if (Array.isArray(response)) return response
+  if (Array.isArray(response?.data)) return response.data
+  if (Array.isArray(response?.items)) return response.items
+  if (Array.isArray(response?.data?.items)) return response.data.items
+  return []
+}
+
+function parseJson(value: unknown): unknown {
+  if (typeof value !== 'string') return value
+  try { return JSON.parse(value) } catch { return null }
+}
+
+function replaceState(next: G7DetailState): void {
+  state.costRows.splice(0, state.costRows.length, ...next.costRows)
+  state.equityRows.splice(0, state.equityRows.length, ...next.equityRows)
+  state.impairmentRows.splice(0, state.impairmentRows.length, ...next.impairmentRows)
+  recalcAndPublish()
+  isDirty.value = false
+}
+
+async function loadRows(): Promise<void> {
+  let payload: unknown = props.htmlData?.detail?.rows || props.htmlData?.rows || []
+  if (props.wpId) {
+    try {
+      const response = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`, { _silent: true } as any)
+      const items = extractChecklistItems(response)
+      const stored = items.find(item => item.item_id === 'G7-2-rows')
+      const note = items.find(item => item.item_id === 'G7-2-detail-audit-note')
+      if (stored?.conclusion) payload = parseJson(stored.conclusion)
+      if (note?.remark) auditNote.value = String(note.remark)
+    } catch {
+      // htmlData fallback
+    }
+  }
+  replaceState(normalizeG7DetailRows(payload))
+}
+
+async function saveRows(silent: boolean): Promise<void> {
+  if (props.isReadonly || !props.wpId || saving.value || !isDirty.value) return
+  const savingRevision = editRevision
+  const serialized = serializeG7DetailState(state)
+  saving.value = true
+  try {
+    const validation = await api.post(
+      `/api/workpapers/${props.wpId}/g7-main/validate-detail`,
+      serialized,
+      { _silent: true } as any,
+    )
+    const validationData = (validation as any)?.data ?? validation
+    if (validationData?.ok === false) {
+      validationBlocked = true
+      if (!silent) {
+        ElMessage.warning(`公式校验未通过：${validationData.errors?.length || 0} 项差异`)
+      }
+      return
+    }
+    await api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId || undefined,
+      items: [{
+        item_id: 'G7-2-rows',
+        conclusion: JSON.stringify(serialized),
+        remark: 'G7-2成本法/权益法/减值准备明细',
+      }],
+    }, { _silent: silent } as any)
+    if (savingRevision === editRevision) isDirty.value = false
+    if (!silent) ElMessage.success('G7-2 明细已保存')
+    publishDetail()
+    try {
+      const { emitG7SourceRowsSaved } = await import('../../composables/g7DisclosureCrossSheet')
+      emitG7SourceRowsSaved({
+        projectId: props.projectId,
+        wpId: props.wpId,
+        itemIds: ['G7-2-rows'],
+      })
+    } catch { /* ignore */ }
+  } catch {
+    validationBlocked = true
+    if (!silent) ElMessage.error('G7-2 明细保存失败')
+  } finally {
+    saving.value = false
+    if (isDirty.value && !validationBlocked) queueAutoSave()
+  }
+}
+
+async function saveNote(): Promise<void> {
+  if (props.isReadonly || !props.wpId) return
+  try {
+    await api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId || undefined,
+      items: [{ item_id: 'G7-2-detail-audit-note', conclusion: null, remark: auditNote.value }],
+    }, { _silent: true } as any)
+  } catch {
+    // Non-blocking narrative field.
+  }
+}
 
 const ie = useG7ImportExport({ wpId: computed(() => props.wpId) })
 
-async function handleDropdownCommand(command: string) {
-  if (command === 'template') {
-    await ie.exportTemplate('G7-2')
-  } else if (command === 'export') {
+async function handleDropdownCommand(command: string): Promise<void> {
+  if (command === 'template') await ie.exportTemplate('G7-2')
+  if (command === 'export') {
+    if (isDirty.value) await saveRows(true)
     await ie.exportData('G7-2')
-  } else if (command === 'import') {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.xlsx,.xls'
-    input.onchange = async (e: Event) => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (file) {
-        const result = await ie.importData('G7-2', file)
-        if (result) loadFromHtmlData(props.htmlData)
-      }
-    }
-    input.click()
   }
-}
-
-// ─── 格式化 ──────────────────────────────────────────────────────────────────
-
-function fmtNum(v: unknown): string {
-  if (v === 0) return '0.00'
-  if (typeof v === 'number') {
-    return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  if (command !== 'import') return
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async (event: Event) => {
+    const file = (event.target as HTMLInputElement).files?.[0]
+    if (!file) return
+    const result = await ie.importData('G7-2', file)
+    if (result) await loadRows()
   }
-  return String(v ?? '')
+  input.click()
 }
 
-function fmtPercent(v: unknown): string {
-  if (typeof v === 'number') return `${(v * 100).toFixed(2)}%`
-  return String(v ?? '')
+function fmtAmount(value: unknown): string {
+  const n = Number(value || 0)
+  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-// ─── 数据加载（从htmlData或导入后刷新） ─────────────────────────────────────
-
-// ─── 审计说明/结论 持久化（checklist_responses） ────────────────────────────
-
-const NOTE_KEY = 'G7-2-detail-audit-note'
-const CONCLUSION_KEY = 'G7-2-detail-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-
-function persistAudit(itemId: string, val: string): void {
-  if (props.isReadonly || !props.wpId) return
-  api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-    project_id: props.projectId || undefined,
-    items: [{ item_id: itemId, conclusion: null, remark: val }],
-  }, { _silent: true } as any).catch(() => {})
-}
-
-function saveNote(): void { persistAudit(NOTE_KEY, auditNote.value) }
-function saveConclusion(): void { persistAudit(CONCLUSION_KEY, auditConclusion.value) }
-
-async function loadAuditResponses(): Promise<void> {
-  if (!props.wpId) return
-  try {
-    const res = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`, { _silent: true } as any)
-    const items = Array.isArray(res) ? res : (res as any)?.data || []
-    for (const it of items) {
-      if (it.item_id === NOTE_KEY && it.remark) auditNote.value = it.remark
-      else if (it.item_id === CONCLUSION_KEY && it.remark) auditConclusion.value = it.remark
-    }
-  } catch { /* silent */ }
-}
-
-function loadFromHtmlData(data: Record<string, any> | null): void {
-  if (!data) return
-  rows.length = 0
-
-  // 尝试从htmlData.detail.rows加载
-  const detailData = data.detail || data
-  const rawRows = detailData?.rows || []
-
-  if (Array.isArray(rawRows) && rawRows.length > 0) {
-    for (let i = 0; i < rawRows.length; i++) {
-      const raw = rawRows[i]
-      const row: G7DetailRow = {
-        ...createEmptyRow(i + 1, raw.investeeName || raw.investee_name || ''),
-        ...raw,
-        seq: i + 1,
-        id: raw.id || crypto.randomUUID(),
-      }
-      rows.push(row)
-      recalcRow(row)
-    }
+function formatCell(value: unknown, kind: ColumnKind): string {
+  if (kind === 'number') return fmtAmount(value)
+  // eslint-disable-next-line gt-audit/no-amount-toFixed -- percentage display, not monetary amount
+  if (kind === 'percent') return `${(Number(value || 0) * 100).toFixed(2)}%`
+  if (kind === 'select') {
+    const options = [
+      { value: 'subsidiary', label: '子公司' },
+      ...relationshipOptions,
+    ]
+    return options.find(option => option.value === value)?.label || String(value || '')
   }
+  return String(value || '')
 }
 
-onMounted(() => {
-  loadFromHtmlData(props.htmlData)
-  loadAuditResponses()
+onMounted(() => { void loadRows() })
+onBeforeUnmount(() => {
+  if (saveTimer) window.clearTimeout(saveTimer)
+  if (isDirty.value) void saveRows(true)
 })
 </script>
 
 <style scoped>
 .g7-detail { padding: 12px; font-size: var(--wp-font-size, 13px); }
-.audit-objective { margin-bottom: 12px; }
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; }
-.toolbar-right { display: flex; gap: 6px; align-items: center; }
-.chip-wrap { display: inline-flex; align-items: center; }
-.note-card { margin-top: 12px; }
-.card-header { display: flex; align-items: center; justify-content: space-between; font-weight: 500; }
-.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
-.head-actions { display: flex; gap: 8px; align-items: center; }
-.segment-bar { margin-bottom: 12px; }
-.detail-table { font-size: var(--wp-font-size, 13px); }
-.compact-num { width: 100%; }
-.formula-cell { border-bottom: 1px dashed #909399; cursor: help; display: inline-block; min-width: 40px; text-align: right; }
-.total-label { font-weight: 600; color: #303133; }
-.total-num { font-weight: 600; color: #303133; }
-.prep-hint { margin-top: 16px; font-size: 12px; color: #909399; }
-.prep-hint summary { cursor: pointer; font-weight: 500; }
-.prep-hint ul { margin: 8px 0 0; padding-left: 18px; line-height: 1.8; }
-
-:deep(.row-total) {
-  background-color: #f5f7fa !important;
-  font-weight: 600;
+.section-head, .navigation-row, .layer-row, .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
-:deep(.row-total td) {
-  border-top: 2px solid #dcdfe6;
+.section-head { margin-bottom: 12px; }
+.sheet-title { margin: 0; font-size: 16px; font-weight: 600; }
+.sheet-subtitle { margin-top: 4px; color: #909399; font-size: 12px; }
+.head-actions, .navigation-meta { display: flex; align-items: center; gap: 8px; }
+.audit-objective { margin-bottom: 12px; }
+.navigation-row { flex-wrap: wrap; margin-bottom: 10px; }
+.layer-row {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  background: #f5f7fa;
+  border: 1px solid #ebeef5;
+  border-bottom: 0;
+}
+.layer-label { color: #606266; }
+.formula-hint { margin-left: auto; color: #909399; font-size: 12px; }
+.detail-table { width: 100%; }
+.number-input, :deep(.el-date-editor) { width: 100%; }
+.formula-cell {
+  color: #337ecc;
+  border-bottom: 1px dashed #79bbff;
+  display: inline-block;
+  min-width: 50px;
+  cursor: help;
+}
+.section-total {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  border: 1px solid #ebeef5;
+  border-top: 0;
+  background: #fafafa;
+}
+.section-total strong { min-width: 140px; text-align: right; color: #337ecc; font-size: 15px; }
+.summary-cards { display: grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap: 12px; margin: 8px 0 14px; }
+.summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid #c6e2ff;
+  border-radius: 6px;
+  background: #ecf5ff;
+}
+.summary-card span { color: #606266; }
+.summary-card strong { color: #337ecc; font-size: 20px; }
+.summary-card.impairment { border-color: #fde2e2; background: #fef0f0; }
+.summary-card.impairment strong { color: #f56c6c; }
+.summary-card.net { border-color: #b3e19d; background: #f0f9eb; }
+.summary-card.net strong { color: #529b2e; }
+.summary-table { margin-bottom: 12px; }
+.cross-reference { margin: 12px 0; }
+.note-card { margin-top: 14px; }
+.prep-hint { margin-top: 14px; color: #606266; font-size: 12px; }
+.prep-hint summary { cursor: pointer; font-weight: 500; }
+.prep-hint ol { margin: 8px 0 0; padding-left: 20px; line-height: 1.8; }
+@media (max-width: 900px) {
+  .section-head { align-items: flex-start; flex-direction: column; }
+  .summary-cards { grid-template-columns: 1fr; }
 }
 </style>

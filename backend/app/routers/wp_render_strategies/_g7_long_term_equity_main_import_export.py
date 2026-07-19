@@ -1,29 +1,22 @@
-"""G7 长期股权投资(main组) — 导入导出（G7-2 明细表 / G7-3 调整分录）.
+"""G7 长期股权投资(main组) — G7-2/G7-3 导入导出.
 
-支持 2 张动态行表格：
-  G7-2 明细表(54列/5区段Tab) / G7-3 调整分录(10列)
-
-G7-2 导出特殊处理：54列按5区段分5 worksheet 导出（多区块分sheet导出）。
-G7-3 单sheet导出。
-
-字段键与前端 composable（useG7ImportExport 的行接口）严格对齐，保证 round-trip。
+G7-2 以原底稿的三条业务链为数据模型：
+成本法(A:AI)、权益法(A:BB)、减值准备(A:U)，并保留未审、AJE、RJE、审定四层。
+导入同时支持系统三业务区工作簿和原始 ``明细表G7-2`` 模板。
 """
 
 from __future__ import annotations
 
 import io
-import json
 from typing import Any
 from uuid import uuid4
 
-import sqlalchemy as sa
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 from sqlalchemy.ext.asyncio import AsyncSession
-from urllib.parse import quote
 
 from app.core.database import get_db
 from app.deps import get_current_user
@@ -33,7 +26,6 @@ from ._cycle_import_export_common import (
     ROW_LIMIT,
     build_workbook_template,
     export_row_by_keys,
-    is_numeric_field_key,
     load_json_rows,
     parse_row_by_headers,
     parse_upload_xlsx,
@@ -46,103 +38,145 @@ from ._cycle_import_export_common import (
 router = APIRouter(tags=["g7-main-import-export"])
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# G7-2 明细表（54列，5区段Tab）— 多sheet导出
+# G7-2 明细表 — 成本法 / 权益法 / 减值准备
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# 区段1: 基础信息(8列)
-_G7_2_SEG1_HEADERS = [
-    "被投资单位名称", "控制类型", "持股比例(%)", "投票权比例(%)",
-    "行业", "注册地", "主营业务", "是否关联方",
-]
-_G7_2_SEG1_KEYS = [
-    "investeeName", "controlType", "holdingRatio", "votingRatio",
-    "industry", "registeredPlace", "mainBusiness", "isRelatedParty",
-]
-
-# 区段2: 期初余额(10列)
-_G7_2_SEG2_HEADERS = [
-    "期初投资成本", "期初权益法调整", "期初减值准备", "期初账面价值",
-    "期初审定成本", "期初审定权益法", "期初审定减值",
-    "期初审定净值", "期初余额备注", "序号",
-]
-_G7_2_SEG2_KEYS = [
-    "openingInvestCost", "openingEquityAdj", "openingImpairment", "openingBookValue",
-    "openingAuditedCost", "openingAuditedEquity", "openingAuditedImpairment",
-    "openingAuditedNetValue", "openingRemark", "seq",
+_COMMON_FIELDS = [
+    ("记录ID", "id"),
+    ("序号", "seq"),
+    ("被投资单位名称", "investeeName"),
+    ("初始投资成本", "initialInvestmentCost"),
+    ("投资比例", "investmentRatio"),
+    ("投资日期", "investmentDate"),
+    ("投资方式", "investmentMethod"),
 ]
 
-# 区段3: 本期变动(12列)
-_G7_2_SEG3_HEADERS = [
-    "本期增加(新增投资)", "本期增加(权益法)", "本期减少(处置)",
-    "本期减少(权益法调整)", "本期减值计提", "本期减值转回",
-    "被投资单位净利润", "持股比例调整", "其他综合收益",
-    "其他权益变动", "利润分配", "变动备注",
-]
-_G7_2_SEG3_KEYS = [
-    "increaseNewInvest", "increaseEquityMethod", "decreaseDisposal",
-    "decreaseEquityAdj", "impairmentProvision", "impairmentReversal",
-    "investeeNetProfit", "holdingRatioChange", "otherComprehensiveIncome",
-    "otherEquityChange", "profitDistribution", "changeRemark",
-]
-
-# 区段4: 期末+减值(12列)
-_G7_2_SEG4_HEADERS = [
-    "期末投资成本", "期末权益法调整", "期末小计",
-    "期末减值准备", "期末账面价值", "审定调整",
-    "审定数", "可收回金额", "减值测试结论",
-    "发函情况", "索引", "期末备注",
-]
-_G7_2_SEG4_KEYS = [
-    "closingInvestCost", "closingEquityAdj", "closingSubtotal",
-    "closingImpairment", "closingBookValue", "auditAdjustment",
-    "auditedAmount", "recoverableAmount", "impairmentTestConclusion",
-    "confirmationStatus", "indexRef", "closingRemark",
-]
-
-# 区段5: 权益法详情(12列)
-_G7_2_SEG5_HEADERS = [
-    "被投资方净资产", "享有份额", "商誉",
-    "内部交易抵销", "未确认损失", "权益法投资收益",
-    "本期OCI", "股利收入", "计量方法确认",
-    "处置损益", "权益法备注", "权益法序号",
-]
-_G7_2_SEG5_KEYS = [
-    "investeeNetAssets", "shareOfNetAssets", "goodwill",
-    "internalTransElim", "unrecognizedLoss", "equityMethodIncome",
-    "currentOCI", "dividendIncome", "measurementConfirm",
-    "disposalGainLoss", "equityRemark", "equitySeq",
+_COST_FIELDS = _COMMON_FIELDS + [
+    ("本期现金股利", "cashDividend"),
+    ("未审期初比例", "openingRatio"),
+    ("未审期初金额", "openingAmount"),
+    ("未审增加比例", "increaseRatio"),
+    ("未审增加金额", "increaseAmount"),
+    ("增加索引", "increaseIndex"),
+    ("未审减少比例", "decreaseRatio"),
+    ("未审减少金额", "decreaseAmount"),
+    ("减少索引", "decreaseIndex"),
+    ("未审期末比例", "closingRatio"),
+    ("未审期末金额", "closingAmount"),
+    ("期初AJE", "openingAje"),
+    ("期初RJE", "openingRje"),
+    ("本期增加AJE", "ajeIncrease"),
+    ("本期减少AJE", "ajeDecrease"),
+    ("本期增加RJE", "rjeIncrease"),
+    ("本期减少RJE", "rjeDecrease"),
+    ("审定期初比例", "auditedOpeningRatio"),
+    ("审定期初金额", "auditedOpeningAmount"),
+    ("审定增加比例", "auditedIncreaseRatio"),
+    ("审定增加金额", "auditedIncreaseAmount"),
+    ("审定减少比例", "auditedDecreaseRatio"),
+    ("审定减少金额", "auditedDecreaseAmount"),
+    ("审定期末比例", "auditedClosingRatio"),
+    ("审定期末金额", "auditedClosingAmount"),
 ]
 
-# 全54列合并（用于导入解析 - 宽表模式）
-_G7_2_ALL_HEADERS = (
-    _G7_2_SEG1_HEADERS + _G7_2_SEG2_HEADERS + _G7_2_SEG3_HEADERS
-    + _G7_2_SEG4_HEADERS + _G7_2_SEG5_HEADERS
-)
-_G7_2_ALL_KEYS = (
-    _G7_2_SEG1_KEYS + _G7_2_SEG2_KEYS + _G7_2_SEG3_KEYS
-    + _G7_2_SEG4_KEYS + _G7_2_SEG5_KEYS
-)
-
-# 5 区段名与对应列
-_G7_2_SEGMENTS = [
-    ("基础信息", _G7_2_SEG1_HEADERS, _G7_2_SEG1_KEYS),
-    ("期初余额", _G7_2_SEG2_HEADERS, _G7_2_SEG2_KEYS),
-    ("本期变动", _G7_2_SEG3_HEADERS, _G7_2_SEG3_KEYS),
-    ("期末+减值", _G7_2_SEG4_HEADERS, _G7_2_SEG4_KEYS),
-    ("权益法详情", _G7_2_SEG5_HEADERS, _G7_2_SEG5_KEYS),
+_EQUITY_FIELDS = _COMMON_FIELDS + [
+    ("投资关系", "relationship"),
+    ("未审期初比例", "openingRatio"),
+    ("未审期初金额", "openingAmount"),
+    ("未审增加比例", "increaseRatio"),
+    ("投资成本增加", "costIncrease"),
+    ("损益调整", "profitLossAdjustment"),
+    ("其他综合收益", "otherComprehensiveIncome"),
+    ("其他权益变动", "otherEquityChange"),
+    ("权益增加小计", "equityIncreaseSubtotal"),
+    ("其他增加", "otherIncrease"),
+    ("未审减少比例", "decreaseRatio"),
+    ("投资成本减少", "costDecrease"),
+    ("本期分回利润", "dividendReceived"),
+    ("其他减少", "otherDecrease"),
+    ("未审期末比例", "closingRatio"),
+    ("未审期末金额", "closingAmount"),
+    ("期初AJE", "openingAje"),
+    ("期初RJE", "openingRje"),
+    ("AJE-成本增加", "ajeCostIncrease"),
+    ("AJE-损益调整", "ajeProfitLoss"),
+    ("AJE-其他综合收益", "ajeOci"),
+    ("AJE-其他权益变动", "ajeOtherEquity"),
+    ("AJE-其他增加", "ajeOtherIncrease"),
+    ("AJE-成本减少", "ajeCostDecrease"),
+    ("AJE-分回利润", "ajeDividend"),
+    ("AJE-其他减少", "ajeOtherDecrease"),
+    ("RJE-成本增加", "rjeCostIncrease"),
+    ("RJE-损益调整", "rjeProfitLoss"),
+    ("RJE-其他综合收益", "rjeOci"),
+    ("RJE-其他权益变动", "rjeOtherEquity"),
+    ("RJE-其他增加", "rjeOtherIncrease"),
+    ("RJE-成本减少", "rjeCostDecrease"),
+    ("RJE-分回利润", "rjeDividend"),
+    ("RJE-其他减少", "rjeOtherDecrease"),
+    ("审定期初比例", "auditedOpeningRatio"),
+    ("审定期初金额", "auditedOpeningAmount"),
+    ("审定增加比例", "auditedIncreaseRatio"),
+    ("审定成本增加", "auditedCostIncrease"),
+    ("审定损益调整", "auditedProfitLoss"),
+    ("审定其他综合收益", "auditedOci"),
+    ("审定其他权益变动", "auditedOtherEquity"),
+    ("审定权益增加小计", "auditedEquityIncreaseSubtotal"),
+    ("审定其他增加", "auditedOtherIncrease"),
+    ("审定减少比例", "auditedDecreaseRatio"),
+    ("审定成本减少", "auditedCostDecrease"),
+    ("审定分回利润", "auditedDividend"),
+    ("审定其他减少", "auditedOtherDecrease"),
+    ("审定期末比例", "auditedClosingRatio"),
+    ("审定期末金额", "auditedClosingAmount"),
 ]
+
+_IMPAIRMENT_FIELDS = _COMMON_FIELDS + [
+    ("来源记录ID", "sourceId"),
+    ("投资关系", "relationship"),
+    ("未审期初", "openingAmount"),
+    ("未审增加", "increaseAmount"),
+    ("未审减少", "decreaseAmount"),
+    ("未审期末", "closingAmount"),
+    ("备注/索引", "remark"),
+    ("期初AJE", "openingAje"),
+    ("期初RJE", "openingRje"),
+    ("增加AJE", "ajeIncrease"),
+    ("减少AJE", "ajeDecrease"),
+    ("增加RJE", "rjeIncrease"),
+    ("减少RJE", "rjeDecrease"),
+    ("审定期初", "auditedOpeningAmount"),
+    ("审定增加", "auditedIncreaseAmount"),
+    ("审定减少", "auditedDecreaseAmount"),
+    ("审定期末", "auditedClosingAmount"),
+]
+
+_G7_2_SECTIONS = [
+    ("成本法", "cost", _COST_FIELDS),
+    ("权益法", "equity", _EQUITY_FIELDS),
+    ("减值准备", "impairment", _IMPAIRMENT_FIELDS),
+]
+
+_RATIO_KEYS = {
+    "investmentRatio", "openingRatio", "increaseRatio", "decreaseRatio", "closingRatio",
+    "auditedOpeningRatio", "auditedIncreaseRatio", "auditedDecreaseRatio", "auditedClosingRatio",
+}
+_TEXT_KEYS = {
+    "id", "section", "investeeName", "investmentDate", "investmentMethod", "increaseIndex",
+    "decreaseIndex", "relationship", "sourceId", "remark",
+}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # G7-3 调整分录汇总（10列）
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _G7_3_HEADERS = [
-    "序号", "分录类型", "日期", "摘要", "科目代码", "科目名称",
-    "借方金额", "贷方金额", "编制人", "备注",
+    "调整事项说明", "类别（报表调整/账项调整/其他）", "报表项目", "科目名称",
+    "附注项目", "……", "借方调整金额", "贷方调整金额", "索引", "备注",
 ]
 _G7_3_KEYS = [
-    "seq", "entryType", "date", "summary", "accountCode", "accountName",
-    "debitAmount", "creditAmount", "preparedBy", "remark",
+    "description", "category", "reportItem", "accountName", "noteItem",
+    "_spacer", "debitAmount", "creditAmount", "indexRef", "remark",
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -163,47 +197,49 @@ def _validate_sheet(sheet: str) -> None:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# G7-2 多sheet导出（5区段→5 worksheet）
+# G7-2 三业务区导出与原模板导入
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _build_g7_2_multi_sheet_workbook(rows: list[dict], *, template_only: bool = False) -> Workbook:
-    """G7-2 按5区段分sheet导出，每个区段一个worksheet。"""
+    """按成本法、权益法、减值准备三个原表业务区导出。"""
     wb = Workbook()
     wb.remove(wb.active)  # type: ignore[arg-type]
 
-    for seg_name, seg_headers, seg_keys in _G7_2_SEGMENTS:
-        ws = wb.create_sheet(title=seg_name)
-        # 标题行
-        ws.append([f"G7-2 明细表 — {seg_name}"])
-        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=max(len(seg_headers), 1))
+    for sheet_name, section, fields in _G7_2_SECTIONS:
+        headers = [item[0] for item in fields]
+        keys = [item[1] for item in fields]
+        ws = wb.create_sheet(title=sheet_name)
+        ws.append([f"G7-2 长期股权投资明细表 — {sheet_name}"])
+        ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=len(headers))
         ws["A1"].font = Font(bold=True, size=12)
-        # 表头行
-        ws.append(seg_headers)
+        ws.append(headers)
         ws.freeze_panes = "A3"
-        for col_idx in range(1, len(seg_headers) + 1):
-            ws.column_dimensions[get_column_letter(col_idx)].width = 14
+        for col_idx, key in enumerate(keys, start=1):
+            ws.column_dimensions[get_column_letter(col_idx)].width = (
+                20 if key in {"investeeName", "remark"} else 15
+            )
 
         if not template_only:
-            for row_data in rows:
-                ws.append(export_row_by_keys(row_data, seg_keys))
+            for row_data in (row for row in rows if row.get("section") == section):
+                ws.append(export_row_by_keys(row_data, keys))
+                excel_row = ws.max_row
+                for col_idx, key in enumerate(keys, start=1):
+                    if key in _RATIO_KEYS:
+                        ws.cell(excel_row, col_idx).number_format = "0.00%"
 
-    # 编制说明
     ws_guide = wb.create_sheet("编制说明")
     ws_guide.append(["G7-2 长期股权投资明细表 编制说明"])
     ws_guide.append([])
     guidance_lines = [
-        "54列拆为5区段Tab：基础信息(8) / 期初余额(10) / 本期变动(12) / 期末+减值(12) / 权益法详情(12)。",
-        "公式列导入后前端自动重算（期初账面价值/期末投资成本/期末权益法调整/期末小计/期末减值/期末账面价值/审定数/享有份额）。",
-        "期末投资成本 = 期初投资成本 + 新增投资 - 处置减少。",
-        "期末权益法调整 = 期初权益法调整 + 权益法增加 - 权益法减少。",
-        "期末小计 = 期末投资成本 + 期末权益法调整。",
-        "期末减值准备 = 期初减值 + 计提 - 转回。",
-        "期末账面价值 = 期末小计 - 期末减值准备。",
-        "审定数 = 期末账面价值 + 审定调整。",
-        "享有份额 = 被投资方净资产 × 持股比例。",
-        "控制类型填：子公司 / 合营 / 联营。",
-        "持股比例/投票权比例以百分数填写（如 51.00 表示 51%）。",
-        "是否关联方填：是 / 否。",
+        "本模板按原始底稿三大区块拆分：成本法、权益法、减值准备。",
+        "每个区块保留未审数、账项调整(AJE)、重分类调整(RJE)、审定数四层。",
+        "比例使用Excel百分比格式，例如直接输入51%（底层数值为0.51）。",
+        "蓝色/审定结果字段由系统导入后重算；请勿用审定结果替代未审及调整来源。",
+        "成本法审定期末 = 审定期初 + 审定增加 - 审定减少。",
+        "权益增加小计 = 损益调整 + 其他综合收益 + 其他权益变动。",
+        "权益法审定期末按原表口径，不包含“其他增加/其他减少”栏。",
+        "减值审定期末 = 审定期初 + 审定增加 - 审定减少。",
+        "也可直接导入项目原始《G7 长期股权投资.xlsx》中的“明细表G7-2”。",
     ]
     for line in guidance_lines:
         ws_guide.append([line])
@@ -211,101 +247,346 @@ def _build_g7_2_multi_sheet_workbook(rows: list[dict], *, template_only: bool = 
     return wb
 
 
-def _parse_g7_2_import(content: bytes) -> tuple[list[dict], list[str]]:
-    """解析G7-2导入文件，支持多sheet或单sheet宽表两种格式。"""
-    wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+def _ratio(value: Any) -> float:
+    if isinstance(value, str) and value.strip().endswith("%"):
+        return safe_float(value.strip()[:-1]) / 100
+    return safe_float(value)
+
+
+def _text(value: Any) -> str:
+    if value is None:
+        return ""
+    if hasattr(value, "isoformat"):
+        return value.isoformat()
+    return safe_str(value)
+
+
+def _typed_value(key: str, value: Any) -> Any:
+    if key == "relationship":
+        relation = _text(value)
+        return {
+            "子公司": "subsidiary",
+            "合营企业": "joint_venture",
+            "合营": "joint_venture",
+            "联营企业": "associate",
+            "联营": "associate",
+        }.get(relation, relation)
+    if key in _TEXT_KEYS:
+        return _text(value)
+    if key in _RATIO_KEYS:
+        return _ratio(value)
+    return safe_float(value)
+
+
+def _parse_structured_g7_2(wb: Any) -> tuple[list[dict], list[str]]:
+    rows: list[dict] = []
     errors: list[str] = []
-    rows_dict: dict[int, dict] = {}
-
-    # 策略1: 多sheet格式（5区段分sheet）
-    multi_sheet = len(wb.sheetnames) >= 5 and any("基础信息" in s for s in wb.sheetnames)
-
-    if multi_sheet:
-        for seg_name, seg_headers, seg_keys in _G7_2_SEGMENTS:
-            ws = None
-            for name in wb.sheetnames:
-                if seg_name in name:
-                    ws = wb[name]
-                    break
-            if ws is None:
-                errors.append(f"缺少工作表: {seg_name}")
+    for sheet_name, section, fields in _G7_2_SECTIONS:
+        if sheet_name not in wb.sheetnames:
+            errors.append(f"缺少工作表：{sheet_name}")
+            continue
+        ws = wb[sheet_name]
+        headers = [item[0] for item in fields]
+        key_by_header = dict(fields)
+        actual = [_text(cell.value) for cell in ws[2]]
+        missing = [name for name in ("序号", "被投资单位名称") if name not in actual]
+        if missing:
+            errors.append(f"工作表[{sheet_name}]缺少列：{', '.join(missing)}")
+            continue
+        for values in ws.iter_rows(min_row=3, values_only=True):
+            value_by_header = {
+                header: values[index] if index < len(values) else None
+                for index, header in enumerate(actual)
+            }
+            investee = _text(value_by_header.get("被投资单位名称"))
+            if not investee or investee == "……":
                 continue
-            # 表头在第2行（第1行是标题）
-            header_row_idx = 2
-            actual_headers = [
-                str(c.value).strip() if c.value else ""
-                for c in next(ws.iter_rows(min_row=header_row_idx, max_row=header_row_idx))
-            ]
-            missing = [h for h in seg_headers if h not in actual_headers]
-            if missing:
-                errors.append(f"工作表[{seg_name}]缺少列: {', '.join(missing)}")
-                continue
-            for row_idx, row in enumerate(ws.iter_rows(min_row=header_row_idx + 1, values_only=True)):
-                if all(v is None for v in row):
-                    continue
-                if row_idx >= ROW_LIMIT:
-                    errors.append(f"数据行超过{ROW_LIMIT}行限制，已截断")
-                    break
-                if row_idx not in rows_dict:
-                    rows_dict[row_idx] = {"id": str(uuid4())}
-                values = list(row) + [None] * max(0, len(seg_headers) - len(row))
-                for col_i, key in enumerate(seg_keys):
-                    raw = values[col_i] if col_i < len(values) else None
-                    if is_numeric_field_key(key):
-                        rows_dict[row_idx][key] = safe_float(raw)
-                    else:
-                        rows_dict[row_idx][key] = safe_str(raw)
-    else:
-        # 策略2: 单sheet宽表（54列合并）
-        ws = wb.active
-        if ws is None:
-            wb.close()
-            return [], ["xlsx文件中无活动工作表"]
-        # 自动检测表头行
-        header_row_idx = 1
-        for r in range(1, 5):
-            test_row = [str(c.value).strip() if c.value else "" for c in next(ws.iter_rows(min_row=r, max_row=r))]
-            if "被投资单位名称" in test_row:
-                header_row_idx = r
-                break
-        actual_headers = [
-            str(c.value).strip() if c.value else ""
-            for c in next(ws.iter_rows(min_row=header_row_idx, max_row=header_row_idx))
-        ]
-        if "被投资单位名称" not in actual_headers:
-            errors.append("无法识别表头，缺少'被投资单位名称'列")
-            wb.close()
-            return [], errors
-        for row_idx, row in enumerate(ws.iter_rows(min_row=header_row_idx + 1, values_only=True)):
-            if all(v is None for v in row):
-                continue
-            if row_idx >= ROW_LIMIT:
+            parsed: dict[str, Any] = {"section": section}
+            for header in headers:
+                key = key_by_header[header]
+                parsed[key] = _typed_value(key, value_by_header.get(header))
+            parsed["id"] = parsed.get("id") or str(uuid4())
+            parsed["section"] = section
+            rows.append(parsed)
+            if len(rows) >= ROW_LIMIT:
                 errors.append(f"数据行超过{ROW_LIMIT}行限制，已截断")
-                break
-            parsed: dict[str, Any] = {"id": str(uuid4())}
-            values = list(row) + [None] * max(0, len(actual_headers) - len(row))
-            for col_i, h in enumerate(actual_headers):
-                if h in _G7_2_ALL_HEADERS:
-                    key_idx = _G7_2_ALL_HEADERS.index(h)
-                    key = _G7_2_ALL_KEYS[key_idx]
-                    raw = values[col_i] if col_i < len(values) else None
-                    if is_numeric_field_key(key):
-                        parsed[key] = safe_float(raw)
-                    else:
-                        parsed[key] = safe_str(raw)
-            rows_dict[row_idx] = parsed
+                return rows, errors
+    return rows, errors
 
-    wb.close()
-    result = list(rows_dict.values())
-    if len(result) > ROW_LIMIT:
-        result = result[:ROW_LIMIT]
-        errors.append(f"数据行超过{ROW_LIMIT}行限制，已截断")
-    return result, errors
+
+def _base_original_row(
+    ws: Any,
+    row_no: int,
+    *,
+    section: str,
+    name_col: int,
+    initial_col: int,
+    ratio_col: int,
+    date_col: int,
+    method_col: int,
+) -> dict[str, Any] | None:
+    name = _text(ws.cell(row_no, name_col).value)
+    if not name or name == "……":
+        return None
+    return {
+        "id": str(uuid4()),
+        "section": section,
+        "seq": safe_float(ws.cell(row_no, 1).value),
+        "investeeName": name,
+        "initialInvestmentCost": safe_float(ws.cell(row_no, initial_col).value),
+        "investmentRatio": _ratio(ws.cell(row_no, ratio_col).value),
+        "investmentDate": _text(ws.cell(row_no, date_col).value),
+        "investmentMethod": _text(ws.cell(row_no, method_col).value),
+    }
+
+
+def _parse_original_g7_2(wb: Any) -> tuple[list[dict], list[str]]:
+    """按原始模板固定坐标读取 10条成本法、5条合营、5条联营及对应减值。"""
+    ws = wb["明细表G7-2"]
+    rows: list[dict] = []
+    sources: dict[tuple[str, int], dict] = {}
+
+    for index, row_no in enumerate(range(16, 26), start=1):
+        row = _base_original_row(
+            ws, row_no, section="cost", name_col=2, initial_col=6,
+            ratio_col=8, date_col=9, method_col=10,
+        )
+        if row is None:
+            continue
+        row.update({
+            "cashDividend": safe_float(ws.cell(row_no, 11).value),
+            "openingRatio": _ratio(ws.cell(row_no, 12).value),
+            "openingAmount": safe_float(ws.cell(row_no, 13).value),
+            "increaseRatio": _ratio(ws.cell(row_no, 14).value),
+            "increaseAmount": safe_float(ws.cell(row_no, 15).value),
+            "increaseIndex": _text(ws.cell(row_no, 16).value),
+            "decreaseRatio": _ratio(ws.cell(row_no, 17).value),
+            "decreaseAmount": safe_float(ws.cell(row_no, 18).value),
+            "decreaseIndex": _text(ws.cell(row_no, 19).value),
+            "closingRatio": _ratio(ws.cell(row_no, 20).value),
+            "closingAmount": safe_float(ws.cell(row_no, 21).value),
+            "openingAje": safe_float(ws.cell(row_no, 22).value),
+            "openingRje": safe_float(ws.cell(row_no, 23).value),
+            "ajeIncrease": safe_float(ws.cell(row_no, 24).value),
+            "ajeDecrease": safe_float(ws.cell(row_no, 25).value),
+            "rjeIncrease": safe_float(ws.cell(row_no, 26).value),
+            "rjeDecrease": safe_float(ws.cell(row_no, 27).value),
+        })
+        rows.append(row)
+        sources[("subsidiary", index)] = row
+
+    equity_ranges = [
+        ("joint_venture", range(33, 38)),
+        ("associate", range(40, 45)),
+    ]
+    for relationship, row_range in equity_ranges:
+        for index, row_no in enumerate(row_range, start=1):
+            row = _base_original_row(
+                ws, row_no, section="equity", name_col=2, initial_col=3,
+                ratio_col=4, date_col=5, method_col=6,
+            )
+            if row is None:
+                continue
+            row.update({
+                "relationship": relationship,
+                "openingRatio": _ratio(ws.cell(row_no, 7).value),
+                "openingAmount": safe_float(ws.cell(row_no, 8).value),
+                "increaseRatio": _ratio(ws.cell(row_no, 9).value),
+                "costIncrease": safe_float(ws.cell(row_no, 10).value),
+                "profitLossAdjustment": safe_float(ws.cell(row_no, 11).value),
+                "otherComprehensiveIncome": safe_float(ws.cell(row_no, 12).value),
+                "otherEquityChange": safe_float(ws.cell(row_no, 13).value),
+                "equityIncreaseSubtotal": safe_float(ws.cell(row_no, 14).value),
+                "otherIncrease": safe_float(ws.cell(row_no, 15).value),
+                "decreaseRatio": _ratio(ws.cell(row_no, 16).value),
+                "costDecrease": safe_float(ws.cell(row_no, 17).value),
+                "dividendReceived": safe_float(ws.cell(row_no, 18).value),
+                "otherDecrease": safe_float(ws.cell(row_no, 19).value),
+                "closingRatio": _ratio(ws.cell(row_no, 20).value),
+                "closingAmount": safe_float(ws.cell(row_no, 21).value),
+                "openingAje": safe_float(ws.cell(row_no, 22).value),
+                "openingRje": safe_float(ws.cell(row_no, 23).value),
+                "ajeCostIncrease": safe_float(ws.cell(row_no, 24).value),
+                "ajeProfitLoss": safe_float(ws.cell(row_no, 25).value),
+                "ajeOci": safe_float(ws.cell(row_no, 26).value),
+                "ajeOtherEquity": safe_float(ws.cell(row_no, 27).value),
+                "ajeOtherIncrease": safe_float(ws.cell(row_no, 28).value),
+                "ajeCostDecrease": safe_float(ws.cell(row_no, 29).value),
+                "ajeDividend": safe_float(ws.cell(row_no, 30).value),
+                "ajeOtherDecrease": safe_float(ws.cell(row_no, 31).value),
+                "rjeCostIncrease": safe_float(ws.cell(row_no, 32).value),
+                "rjeProfitLoss": safe_float(ws.cell(row_no, 33).value),
+                "rjeOci": safe_float(ws.cell(row_no, 34).value),
+                "rjeOtherEquity": safe_float(ws.cell(row_no, 35).value),
+                "rjeOtherIncrease": safe_float(ws.cell(row_no, 36).value),
+                "rjeCostDecrease": safe_float(ws.cell(row_no, 37).value),
+                "rjeDividend": safe_float(ws.cell(row_no, 38).value),
+                "rjeOtherDecrease": safe_float(ws.cell(row_no, 39).value),
+            })
+            rows.append(row)
+            sources[(relationship, index)] = row
+
+    impairment_ranges = [
+        ("subsidiary", range(53, 63)),
+        ("joint_venture", range(66, 71)),
+        ("associate", range(73, 78)),
+    ]
+    for relationship, row_range in impairment_ranges:
+        for index, row_no in enumerate(row_range, start=1):
+            source = sources.get((relationship, index))
+            if source is None:
+                continue
+            rows.append({
+                "id": str(uuid4()),
+                "section": "impairment",
+                "sourceId": source["id"],
+                "seq": index,
+                "investeeName": source["investeeName"],
+                "relationship": relationship,
+                "initialInvestmentCost": source["initialInvestmentCost"],
+                "investmentRatio": source["investmentRatio"],
+                "investmentDate": source["investmentDate"],
+                "investmentMethod": source["investmentMethod"],
+                "openingAmount": safe_float(ws.cell(row_no, 7).value),
+                "increaseAmount": safe_float(ws.cell(row_no, 8).value),
+                "decreaseAmount": safe_float(ws.cell(row_no, 9).value),
+                "closingAmount": safe_float(ws.cell(row_no, 10).value),
+                "remark": _text(ws.cell(row_no, 11).value),
+                "openingAje": safe_float(ws.cell(row_no, 12).value),
+                "openingRje": safe_float(ws.cell(row_no, 13).value),
+                "ajeIncrease": safe_float(ws.cell(row_no, 14).value),
+                "ajeDecrease": safe_float(ws.cell(row_no, 15).value),
+                "rjeIncrease": safe_float(ws.cell(row_no, 16).value),
+                "rjeDecrease": safe_float(ws.cell(row_no, 17).value),
+            })
+    return rows, []
+
+
+def _parse_g7_2_import(content: bytes) -> tuple[list[dict], list[str]]:
+    wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    try:
+        if "明细表G7-2" in wb.sheetnames:
+            return _parse_original_g7_2(wb)
+        if any(name in wb.sheetnames for name, _, _ in _G7_2_SECTIONS):
+            return _parse_structured_g7_2(wb)
+        return [], ["无法识别G7-2结构：请使用原始“明细表G7-2”或系统导出的三业务区模板"]
+    finally:
+        wb.close()
+
+
+def _validate_g7_2_rows(rows: list[dict]) -> list[dict[str, Any]]:
+    """复核前端派生金额，防止绕过前端后保存失真的审定链。"""
+    errors: list[dict[str, Any]] = []
+
+    def check(row: dict, field: str, expected: float) -> None:
+        actual = safe_float(row.get(field))
+        variance = round(actual - expected, 2)
+        if abs(variance) > 0.01:
+            errors.append({
+                "rowId": safe_str(row.get("id")),
+                "investeeName": safe_str(row.get("investeeName")),
+                "field": field,
+                "expected": round(expected, 2),
+                "actual": round(actual, 2),
+                "variance": variance,
+            })
+
+    for row in rows[:ROW_LIMIT]:
+        section = row.get("section")
+        opening = safe_float(row.get("openingAmount"))
+        increase = safe_float(row.get("increaseAmount"))
+        decrease = safe_float(row.get("decreaseAmount"))
+        opening_aje = safe_float(row.get("openingAje"))
+        opening_rje = safe_float(row.get("openingRje"))
+
+        if section == "cost":
+            check(row, "closingAmount", opening + increase - decrease)
+            audited_opening = opening + opening_aje + opening_rje
+            audited_increase = (
+                increase + safe_float(row.get("ajeIncrease")) + safe_float(row.get("rjeIncrease"))
+            )
+            audited_decrease = (
+                decrease + safe_float(row.get("ajeDecrease")) + safe_float(row.get("rjeDecrease"))
+            )
+            check(row, "auditedOpeningAmount", audited_opening)
+            check(row, "auditedIncreaseAmount", audited_increase)
+            check(row, "auditedDecreaseAmount", audited_decrease)
+            check(row, "auditedClosingAmount", audited_opening + audited_increase - audited_decrease)
+        elif section == "equity":
+            equity_subtotal = (
+                safe_float(row.get("profitLossAdjustment"))
+                + safe_float(row.get("otherComprehensiveIncome"))
+                + safe_float(row.get("otherEquityChange"))
+            )
+            check(row, "equityIncreaseSubtotal", equity_subtotal)
+            unadjusted_closing = (
+                opening
+                + safe_float(row.get("costIncrease"))
+                + equity_subtotal
+                + safe_float(row.get("otherIncrease"))
+                - safe_float(row.get("costDecrease"))
+                - safe_float(row.get("dividendReceived"))
+                - safe_float(row.get("otherDecrease"))
+            )
+            check(row, "closingAmount", unadjusted_closing)
+            audited_opening = opening + opening_aje + opening_rje
+            audited_cost_increase = (
+                safe_float(row.get("costIncrease"))
+                + safe_float(row.get("ajeCostIncrease"))
+                + safe_float(row.get("rjeCostIncrease"))
+            )
+            audited_equity_increase = sum(
+                safe_float(row.get(key))
+                for key in (
+                    "profitLossAdjustment", "ajeProfitLoss", "rjeProfitLoss",
+                    "otherComprehensiveIncome", "ajeOci", "rjeOci",
+                    "otherEquityChange", "ajeOtherEquity", "rjeOtherEquity",
+                )
+            )
+            audited_cost_decrease = (
+                safe_float(row.get("costDecrease"))
+                + safe_float(row.get("ajeCostDecrease"))
+                + safe_float(row.get("rjeCostDecrease"))
+            )
+            audited_dividend = (
+                safe_float(row.get("dividendReceived"))
+                + safe_float(row.get("ajeDividend"))
+                + safe_float(row.get("rjeDividend"))
+            )
+            check(
+                row,
+                "auditedClosingAmount",
+                audited_opening + audited_cost_increase + audited_equity_increase
+                - audited_cost_decrease - audited_dividend,
+            )
+        elif section == "impairment":
+            check(row, "closingAmount", opening + increase - decrease)
+            audited_opening = opening + opening_aje + opening_rje
+            audited_increase = (
+                increase + safe_float(row.get("ajeIncrease")) + safe_float(row.get("rjeIncrease"))
+            )
+            audited_decrease = (
+                decrease + safe_float(row.get("ajeDecrease")) + safe_float(row.get("rjeDecrease"))
+            )
+            check(row, "auditedClosingAmount", audited_opening + audited_increase - audited_decrease)
+    return errors
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 端点
 # ═══════════════════════════════════════════════════════════════════════════════
+
+@router.post("/api/workpapers/{wp_id}/g7-main/validate-detail")
+async def g7_main_validate_detail(
+    wp_id: str,
+    rows: list[dict] = Body(...),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """校验G7-2三业务区公式链；wp_id用于路由归属和权限上下文。"""
+    del wp_id, current_user
+    errors = _validate_g7_2_rows(rows)
+    return {"ok": not errors, "errors": errors, "checked_count": min(len(rows), ROW_LIMIT)}
+
 
 @router.post("/api/workpapers/{wp_id}/g7-main/export-template")
 async def g7_main_export_template(
@@ -313,7 +594,7 @@ async def g7_main_export_template(
     sheet: str = Query(...),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
-    """导出空模板：G7-2(5区段多sheet) / G7-3(单sheet)。"""
+    """导出空模板：G7-2(三业务区多sheet) / G7-3(单sheet)。"""
     _validate_sheet(sheet)
 
     if sheet == "G7-2":
@@ -327,9 +608,9 @@ async def g7_main_export_template(
             guidance=[
                 "G7-3 调整分录 编制说明",
                 "",
-                "分录类型填 AJE 或 RJE；每张凭证借贷方金额必须相等。",
-                "科目代码填完整编码（如 1511）。",
-                "保存后自动回写 G7-1 审定表 AJE/RJE 列。",
+                "类别填写：账项调整、报表调整或其他；同一调整事项的借贷金额必须相等。",
+                "科目名称请使用标准科目名称；系统将结合科目库识别编码。",
+                "确认后同步调整分录模块，并按 1511/1512 回写 G7-1。",
             ],
         )
         return workbook_to_response(wb, "G7-3_调整分录_模板.xlsx")
@@ -342,7 +623,7 @@ async def g7_main_export_data(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
-    """导出数据：G7-2(5区段多sheet含数据) / G7-3(单sheet含数据)。"""
+    """导出数据：G7-2(三业务区多sheet含数据) / G7-3(单sheet含数据)。"""
     _validate_sheet(sheet)
     item_id = _ITEM_IDS[sheet]
     rows = await load_json_rows(db, wp_id, item_id, field="conclusion")
@@ -355,7 +636,7 @@ async def g7_main_export_data(
             "G7-3",
             _G7_3_HEADERS,
             title="G7-3 调整分录汇总",
-            guidance=["分录类型填 AJE 或 RJE；每张凭证借贷方金额必须相等。"],
+            guidance=["类别填写账项调整、报表调整或其他；同一调整事项借贷金额必须相等。"],
         )
         ws = wb["G7-3"]
         for d in rows:
@@ -371,7 +652,7 @@ async def g7_main_import_data(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """导入数据：G7-2(支持多sheet或宽表) / G7-3(单sheet)。"""
+    """导入数据：G7-2(系统三业务区或原始工作簿) / G7-3(单sheet)。"""
     _validate_sheet(sheet)
     if not file.filename or not file.filename.endswith(".xlsx"):
         raise HTTPException(400, "请上传 .xlsx 格式文件")

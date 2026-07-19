@@ -16,7 +16,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 from app.core.database import get_db
 from app.deps import get_current_user
@@ -63,7 +63,7 @@ def _make_xlsx_bytes(headers: list[str], rows: list[list] | None = None) -> byte
     wb = Workbook()
     ws = wb.active
     # Title row (row 1)
-    ws.append([f"Template"])
+    ws.append(["Template"])
     # Header row (row 2)
     ws.append(headers)
     if rows:
@@ -176,7 +176,7 @@ class TestImportExportEndpoints:
     # --- export-template ---
 
     async def test_export_template_g7_8_returns_200(self):
-        """POST /g7-sub/export-template?sheet=G7-8 → 200."""
+        """G7-8模板应覆盖一次合并、分步合并和反向购买三类业务。"""
         async with AsyncClient(
             transport=ASGITransport(app=app),
             base_url="http://test",
@@ -187,6 +187,52 @@ class TestImportExportEndpoints:
             )
             assert resp.status_code == 200
             assert "spreadsheet" in resp.headers.get("content-type", "")
+            wb = load_workbook(io.BytesIO(resp.content))
+            assert wb.sheetnames[:3] == [
+                "1-合并方式取得",
+                "2-分步实现合并",
+                "3-反向购买",
+            ]
+            merger = wb["1-合并方式取得"]
+            headers = [cell.value for cell in merger[2]]
+            assert "最终控制方" in headers
+            assert "调整资本公积/留存收益⑤=③-④" in headers
+            assert any(
+                validation.formula1 == '"无差异,差异可接受,差异需调整"'
+                for validation in merger.data_validations.dataValidation
+            )
+            wb.close()
+
+    async def test_export_template_g7_9_returns_three_sections(self):
+        """G7-9模板覆盖一次购买、分步合并和反向购买，并使用CAS20费用化口径。"""
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+        ) as client:
+            resp = await client.post(
+                "/api/workpapers/test-wp/g7-sub/export-template",
+                params={"sheet": "G7-9"},
+            )
+            assert resp.status_code == 200
+            wb = load_workbook(io.BytesIO(resp.content))
+            assert wb.sheetnames[:3] == [
+                "1-一次购买取得",
+                "2-分步实现合并",
+                "3-反向购买",
+            ]
+            merger = wb["1-一次购买取得"]
+            headers = [cell.value for cell in merger[2]]
+            assert "直接费用（费用化）" in headers
+            assert "初始投资成本⑥=③+④" in headers
+            assert "对价损益⑦=③-⑤" in headers
+            assert "商誉/廉价购买利得⑧=⑥-①×②" in headers
+            assert "廉价购买已复核" in headers
+            assert "少数股东权益份额" in headers
+            assert "评估报告索引" in headers
+            reverse = wb["3-反向购买"]
+            reverse_headers = [cell.value for cell in reverse[2]]
+            assert "是否构成业务" in reverse_headers
+            wb.close()
 
     async def test_export_template_g7_18_multi_sheet_returns_200(self):
         """POST /g7-sub/export-template?sheet=G7-18 → 200 (多sheet导出)."""

@@ -11,10 +11,11 @@
  * 说明：旧实现误用 ECL①×② 公式链（属 G6-12）；本表聚焦坏账准备滚动与 G6-1 勾稽。
  * 兼容迁移旧 ECL 双 Tab 字段。
  */
-import { ref, computed, watch, type Ref } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { parseNum } from '@/composables/useG6MainFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
+import { dispatchG6SaveItems } from './g6CrossHelpers'
 
 export type G6BadDebtCategory = 'individual' | 'portfolio'
 export type G6BadDebtRowKind = 'section_header' | 'leaf' | 'subtotal' | 'total'
@@ -154,6 +155,23 @@ export function sumG6BadDebtLeaves(leaves: G6BadDebtLeaf[]): G6BadDebtTotals {
     closingUnadjusted: mv.closingUnadjusted,
     closingAdjustment,
     closingAudited: mv.closingAudited,
+  }
+}
+
+/** G6-3→G6-1 回写载荷：始终用期末未审（不含 closingAdjustment） */
+export function buildG6BadDebtWritebackDetail(leaves: G6BadDebtLeaf[]): {
+  individualClosing: number
+  portfolioClosing: number
+  totalClosing: number
+} {
+  return {
+    individualClosing: sumG6BadDebtLeaves(
+      leaves.filter((r) => r.category === 'individual'),
+    ).closingUnadjusted,
+    portfolioClosing: sumG6BadDebtLeaves(
+      leaves.filter((r) => r.category === 'portfolio'),
+    ).closingUnadjusted,
+    totalClosing: sumG6BadDebtLeaves(leaves).closingUnadjusted,
   }
 }
 
@@ -318,17 +336,22 @@ export function useG6BadDebtDetail(opts: UseG6BadDebtDetailOptions) {
   function debounceFlush(): void {
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(() => {
-      try {
-        const items: ChecklistResponse[] = []
-        for (const key of [DATA_KEY, NOTE_KEY, CONCLUSION_KEY]) {
-          const it = opts.allResponses.value.get(key)
-          if (it) items.push(it)
-        }
-        if (items.length) {
-          window.dispatchEvent(new CustomEvent('g6:save-items', { detail: { items } }))
-        }
-      } catch { /* silent */ }
+      saveTimer = null
+      flushPending()
     }, 500)
+  }
+
+  function flushPending(): void {
+    try {
+      const items: ChecklistResponse[] = []
+      for (const key of [DATA_KEY, NOTE_KEY, CONCLUSION_KEY]) {
+        const it = opts.allResponses.value.get(key)
+        if (it) items.push(it)
+      }
+      if (items.length) {
+        dispatchG6SaveItems(opts.wpId.value, items)
+      }
+    } catch { /* silent */ }
   }
 
   function persist(): void {
@@ -370,6 +393,12 @@ export function useG6BadDebtDetail(opts: UseG6BadDebtDetailOptions) {
     () => sumG6BadDebtLeaves(leaves.value.filter((r) => r.category === 'portfolio')).closingAudited,
   )
   const totalClosingAudited = computed(() => sumG6BadDebtLeaves(leaves.value).closingAudited)
+
+  /** 回写 G6-1 必须用期末未审，避免与 G6-1「未审+调整=审定」双重叠加 */
+  const writebackDetail = computed(() => buildG6BadDebtWritebackDetail(leaves.value))
+  const individualClosingUnadjusted = computed(() => writebackDetail.value.individualClosing)
+  const portfolioClosingUnadjusted = computed(() => writebackDetail.value.portfolioClosing)
+  const totalClosingUnadjusted = computed(() => writebackDetail.value.totalClosing)
 
   function updateCell(id: string, field: keyof G6BadDebtLeaf, value: string | number): void {
     if (opts.isReadonly.value) return
@@ -425,16 +454,16 @@ export function useG6BadDebtDetail(opts: UseG6BadDebtDetailOptions) {
     debounceFlush()
   })
 
-  /** 回写 G6-1 减值准备单项/组合期末未审（可选） */
+  /** 回写 G6-1 减值准备单项/组合期末未审（不含 closingAdjustment） */
   function writebackToAdjudication(): void {
     if (opts.isReadonly.value) return
     try {
       window.dispatchEvent(
         new CustomEvent('g6:bad-debt-writeback', {
           detail: {
-            individualClosing: individualClosingAudited.value,
-            portfolioClosing: portfolioClosingAudited.value,
-            totalClosing: totalClosingAudited.value,
+            individualClosing: individualClosingUnadjusted.value,
+            portfolioClosing: portfolioClosingUnadjusted.value,
+            totalClosing: totalClosingUnadjusted.value,
           },
         }),
       )
@@ -445,6 +474,14 @@ export function useG6BadDebtDetail(opts: UseG6BadDebtDetailOptions) {
     load()
   }
 
+  onBeforeUnmount(() => {
+    if (saveTimer) {
+      clearTimeout(saveTimer)
+      saveTimer = null
+    }
+    flushPending()
+  })
+
   return {
     leaves,
     displayRows,
@@ -453,6 +490,9 @@ export function useG6BadDebtDetail(opts: UseG6BadDebtDetailOptions) {
     individualClosingAudited,
     portfolioClosingAudited,
     totalClosingAudited,
+    individualClosingUnadjusted,
+    portfolioClosingUnadjusted,
+    totalClosingUnadjusted,
     updateCell,
     addRow,
     removeRow,

@@ -70,6 +70,13 @@ export interface G7DetailRow {
 export interface G7AdjustmentEntry {
   id: string
   seq: number
+  description?: string
+  category?: '账项调整' | '报表调整' | '其他'
+  reportItem?: string
+  noteItem?: string
+  indexRef?: string
+  sourceGroupId?: string
+  /** 以下字段保留用于兼容旧版 G7-3 数据 */
   entryType: 'AJE' | 'RJE'
   date: string
   summary: string
@@ -404,24 +411,33 @@ export function useG7FormData(opts: UseG7FormDataOptions) {
   // ─── writebackTB ────────────────────────────────────────────────────────────
 
   /**
-   * writebackTB: 保存审定数后回写 trial_balance（科目1511 长期股权投资）
-   * 比照 F2/G8：PUT /trial-balance/writeback，并持久化 checklist 供 render 回读
+   * writebackTB: 保存审定数后回写 trial_balance
+   * 默认科目1511（投资原值/合计）；可传 accountCode 回写1512减值等。
+   * 注意：1511 应回写投资合计（原值），不是净值。
    */
-  async function writebackTB(adjudicatedAmount: number): Promise<void> {
+  async function writebackTB(
+    adjudicatedAmount: number,
+    accountCode: string = G7_ACCOUNT_CODE,
+  ): Promise<void> {
     if (!projectId.value) return
     try {
       await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: G7_ACCOUNT_CODE,
+        account_code: accountCode,
         audited_amount: adjudicatedAmount,
       })
-      await saveImmediate('G7-1-adjudicated-amount', { conclusion: String(adjudicatedAmount) })
-      await saveImmediate('G7-main-tb-writeback', {
-        remark: JSON.stringify({ accountCode: G7_ACCOUNT_CODE, auditedAmount: adjudicatedAmount }),
-      })
+      if (accountCode === G7_ACCOUNT_CODE) {
+        await saveImmediate('G7-1-adjudicated-amount', { conclusion: String(adjudicatedAmount) })
+      }
+      await saveImmediate(
+        accountCode === G7_ACCOUNT_CODE ? 'G7-main-tb-writeback' : `G7-main-tb-writeback-${accountCode}`,
+        {
+          remark: JSON.stringify({ accountCode, auditedAmount: adjudicatedAmount }),
+        },
+      )
     } catch (err: any) {
       const msg = err?.message || ''
       if (msg !== 'canceled' && err?.code !== 'ERR_CANCELED') {
-        ElMessage.warning('审定数回写失败，请手动确认试算表数据')
+        ElMessage.warning(`审定数回写失败（${accountCode}），请手动确认试算表数据`)
       }
     }
   }

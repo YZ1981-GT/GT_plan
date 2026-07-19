@@ -34,6 +34,8 @@ from app.routers.wp_render_strategies._g7_long_term_equity_main import (
 )
 from app.routers.wp_render_strategies._g7_long_term_equity_main_import_export import (
     _SUPPORTED_SHEETS,
+    _parse_g7_2_import,
+    _validate_g7_2_rows,
 )
 
 
@@ -62,51 +64,33 @@ def override_deps():
 
 
 def _make_xlsx_g7_2() -> bytes:
-    """Create a minimal valid G7-2 multi-sheet xlsx for import testing."""
+    """Create a minimal valid G7-2 three-business-section workbook."""
     wb = Workbook()
     wb.remove(wb.active)  # type: ignore[arg-type]
 
-    # Segment 1: 基础信息
-    ws1 = wb.create_sheet("基础信息")
-    ws1.append(["G7-2 明细表 — 基础信息"])
-    ws1.append(["被投资单位名称", "控制类型", "持股比例(%)", "投票权比例(%)",
-                "行业", "注册地", "主营业务", "是否关联方"])
-    ws1.append(["测试子公司A", "子公司", "51.00", "51.00", "制造业", "上海", "电子产品", "否"])
+    cost = wb.create_sheet("成本法")
+    cost.append(["G7-2 长期股权投资明细表 — 成本法"])
+    cost.append([
+        "记录ID", "序号", "被投资单位名称", "初始投资成本", "投资比例",
+        "未审期初金额", "未审增加金额", "未审减少金额", "期初AJE", "本期增加AJE",
+    ])
+    cost.append(["cost-1", 1, "测试子公司A", 1_000_000, 0.51, 1_000_000, 500_000, 0, 0, 0])
 
-    # Segment 2: 期初余额
-    ws2 = wb.create_sheet("期初余额")
-    ws2.append(["G7-2 明细表 — 期初余额"])
-    ws2.append(["期初投资成本", "期初权益法调整", "期初减值准备", "期初账面价值",
-                "期初审定成本", "期初审定权益法", "期初审定减值",
-                "期初审定净值", "期初余额备注", "序号"])
-    ws2.append([1000000, 0, 0, 1000000, 1000000, 0, 0, 1000000, "", 1])
+    equity = wb.create_sheet("权益法")
+    equity.append(["G7-2 长期股权投资明细表 — 权益法"])
+    equity.append([
+        "记录ID", "序号", "被投资单位名称", "初始投资成本", "投资比例",
+        "投资关系", "未审期初金额", "投资成本增加", "损益调整",
+    ])
+    equity.append(["equity-1", 1, "测试联营企业", 800_000, 0.30, "associate", 800_000, 0, 60_000])
 
-    # Segment 3: 本期变动
-    ws3 = wb.create_sheet("本期变动")
-    ws3.append(["G7-2 明细表 — 本期变动"])
-    ws3.append(["本期增加(新增投资)", "本期增加(权益法)", "本期减少(处置)",
-                "本期减少(权益法调整)", "本期减值计提", "本期减值转回",
-                "被投资单位净利润", "持股比例调整", "其他综合收益",
-                "其他权益变动", "利润分配", "变动备注"])
-    ws3.append([500000, 0, 0, 0, 0, 0, 200000, 0, 0, 0, 50000, ""])
-
-    # Segment 4: 期末+减值
-    ws4 = wb.create_sheet("期末+减值")
-    ws4.append(["G7-2 明细表 — 期末+减值"])
-    ws4.append(["期末投资成本", "期末权益法调整", "期末小计",
-                "期末减值准备", "期末账面价值", "审定调整",
-                "审定数", "可收回金额", "减值测试结论",
-                "发函情况", "索引", "期末备注"])
-    ws4.append([1500000, 0, 1500000, 0, 1500000, 0, 1500000, 1800000, "无减值", "已回函", "G7-2-1", ""])
-
-    # Segment 5: 权益法详情
-    ws5 = wb.create_sheet("权益法详情")
-    ws5.append(["G7-2 明细表 — 权益法详情"])
-    ws5.append(["被投资方净资产", "享有份额", "商誉",
-                "内部交易抵销", "未确认损失", "权益法投资收益",
-                "本期OCI", "股利收入", "计量方法确认",
-                "处置损益", "权益法备注", "权益法序号"])
-    ws5.append([3000000, 1530000, 0, 0, 0, 0, 0, 50000, "成本法", 0, "", 1])
+    impairment = wb.create_sheet("减值准备")
+    impairment.append(["G7-2 长期股权投资明细表 — 减值准备"])
+    impairment.append([
+        "记录ID", "序号", "被投资单位名称", "来源记录ID", "投资关系",
+        "未审期初", "未审增加", "未审减少",
+    ])
+    impairment.append(["impair-1", 1, "测试子公司A", "cost-1", "subsidiary", 0, 20_000, 0])
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -123,18 +107,85 @@ def _make_xlsx_g7_3() -> bytes:
     # Title row
     ws.append(["G7-3 调整分录汇总"])
     # Header row (row 2)
-    ws.append(["序号", "分录类型", "日期", "摘要", "科目代码", "科目名称",
-               "借方金额", "贷方金额", "编制人", "备注"])
+    ws.append(["调整事项说明", "类别（报表调整/账项调整/其他）", "报表项目", "科目名称",
+               "附注项目", "……", "借方调整金额", "贷方调整金额", "索引", "备注"])
     # Data row
-    ws.append([1, "AJE", "2025-12-31", "调增长期股权投资",
-               "1511", "长期股权投资", 100000, 0, "张三", "权益法调整"])
-    ws.append([2, "AJE", "2025-12-31", "调增长期股权投资",
-               "6111", "投资收益", 0, 100000, "张三", "对应科目"])
+    ws.append(["调增长期股权投资", "账项调整", "长期股权投资", "长期股权投资",
+               "", "", 100000, 0, "G7-3", "权益法调整"])
+    ws.append(["调增长期股权投资", "账项调整", "投资收益", "投资收益",
+               "", "", 0, 100000, "G7-3", "对应科目"])
 
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
     return buf.getvalue()
+
+
+def test_parse_original_g7_2_coordinates():
+    """原始合并表头模板按固定业务区坐标导入，不依赖系统三sheet格式。"""
+    wb = Workbook()
+    ws = wb.active
+    assert ws is not None
+    ws.title = "明细表G7-2"
+    # 成本法第1行：B/F/H/K/M/O/R/V/W/X/Y/Z/AA
+    for col, value in {
+        1: 1, 2: "原表子公司", 6: 100, 8: 0.6, 11: 3,
+        12: 0.6, 13: 100, 14: 0.1, 15: 20, 17: 0.05, 18: 5,
+        22: 2, 23: -1, 24: 4, 25: 1, 26: 0, 27: 2,
+    }.items():
+        ws.cell(16, col, value)
+    # 权益法合营第1行：B:H、J:M、Q:R、V:W、X:AE、AF:AM
+    for col, value in {
+        1: 1, 2: "原表合营企业", 3: 80, 4: 0.3, 7: 0.3, 8: 80,
+        10: 10, 11: 6, 12: 2, 13: 1, 17: 3, 18: 4,
+        22: 1, 23: 0, 24: 2, 25: 1, 32: 0, 33: 1,
+    }.items():
+        ws.cell(33, col, value)
+    # 两项对应的减值明细。
+    ws.cell(53, 7, 5)
+    ws.cell(53, 8, 2)
+    ws.cell(66, 7, 1)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    rows, errors = _parse_g7_2_import(buf.getvalue())
+
+    assert errors == []
+    assert [row["section"] for row in rows] == [
+        "cost", "equity", "impairment", "impairment",
+    ]
+    assert rows[0]["investeeName"] == "原表子公司"
+    assert rows[0]["openingAmount"] == 100
+    assert rows[1]["relationship"] == "joint_venture"
+    assert rows[2]["sourceId"] == rows[0]["id"]
+
+
+def test_validate_g7_2_rejects_overridden_formula():
+    rows = [{
+        "id": "cost-1",
+        "section": "cost",
+        "investeeName": "子公司A",
+        "openingAmount": 100,
+        "increaseAmount": 20,
+        "decreaseAmount": 5,
+        "closingAmount": 999,
+        "openingAje": 0,
+        "openingRje": 0,
+        "ajeIncrease": 0,
+        "rjeIncrease": 0,
+        "ajeDecrease": 0,
+        "rjeDecrease": 0,
+        "auditedOpeningAmount": 100,
+        "auditedIncreaseAmount": 20,
+        "auditedDecreaseAmount": 5,
+        "auditedClosingAmount": 115,
+    }]
+
+    errors = _validate_g7_2_rows(rows)
+
+    assert len(errors) == 1
+    assert errors[0]["field"] == "closingAmount"
+    assert errors[0]["expected"] == 115
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

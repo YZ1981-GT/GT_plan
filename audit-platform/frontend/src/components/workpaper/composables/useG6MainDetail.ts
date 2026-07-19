@@ -25,7 +25,7 @@ import {
   calcDetailReportAmount,
 } from '@/composables/useG6MainFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
-import { normalizeG6Rate } from './g6CrossHelpers'
+import { normalizeG6Rate, dispatchG6SaveItems } from './g6CrossHelpers'
 
 const DATA_KEY = 'G6-2-rows'
 const BALANCE_SHEET_DATE_KEY = 'G6-2-balance-sheet-date'
@@ -41,7 +41,11 @@ export interface OtherBondDetailRow {
   // ══ A–F 基础信息 ══
   investCategory: string
   investProject: string
+  /** 证券代码（跨表匹配优先键） */
+  securitiesCode: string
   faceValue: number
+  /** 报表日持仓数量（账面），供 G6-9/G6-10 带入 */
+  bookQuantity: number
   couponRate: number
   effectiveRate: number
   maturityDate: string
@@ -112,7 +116,15 @@ export const G6_DETAIL_SEGMENTS: G6DetailSegment[] = [
     columns: [
       { prop: 'investCategory', label: '投资种类', width: 110, type: 'select' },
       { prop: 'investProject', label: '投资项目', width: 160, type: 'text' },
+      { prop: 'securitiesCode', label: '证券代码', width: 110, type: 'text' },
       { prop: 'faceValue', label: '面值', width: 120, type: 'number' },
+      {
+        prop: 'bookQuantity',
+        label: '持仓数量(账面)',
+        width: 130,
+        type: 'number',
+        tooltip: '资产负债表日账面持仓数量；供 G6-9 盘点 / G6-10 倒轧带入',
+      },
       { prop: 'couponRate', label: '票面利率', width: 110, type: 'rate' },
       { prop: 'effectiveRate', label: '实际利率', width: 110, type: 'rate' },
       { prop: 'maturityDate', label: '到期日', width: 130, type: 'date' },
@@ -231,7 +243,7 @@ export const G6_DETAIL_SEGMENTS: G6DetailSegment[] = [
 ]
 
 const SUM_FIELDS: (keyof OtherBondDetailRow)[] = [
-  'faceValue',
+  'faceValue', 'bookQuantity',
   'openingCost', 'openingInterestAdj', 'openingAccruedInterest', 'openingSubtotal',
   'openingFairValue', 'openingPeriodFvChange', 'openingCumulativeFvChange',
   'openingAdjustment', 'openingAudited', 'openingNonCurrentDeduct', 'openingReportAmount',
@@ -251,7 +263,9 @@ function emptyRow(id: string, seq: number, name = ''): OtherBondDetailRow {
     seq,
     investCategory: '',
     investProject: name,
+    securitiesCode: '',
     faceValue: 0,
+    bookQuantity: 0,
     couponRate: 0,
     effectiveRate: 0,
     maturityDate: '',
@@ -353,7 +367,19 @@ function migrateLegacyRow(raw: any, seq: number): OtherBondDetailRow {
   const merged: OtherBondDetailRow = {
     ...base,
     investCategory: raw.investCategory || raw.invest_category || raw.investType || raw.invest_type || '',
+    securitiesCode: String(
+      raw.securitiesCode || raw.securities_code || raw.bondCode || raw.bond_code
+      || raw.securityCode || raw.code || '',
+    ).trim(),
     faceValue: parseNum(raw.faceValue ?? raw.face_value),
+    bookQuantity: parseNum(
+      raw.bookQuantity
+      ?? raw.book_quantity
+      ?? raw.holdingQuantity
+      ?? raw.holding_quantity
+      ?? raw.closingQuantity
+      ?? raw.quantity,
+    ),
     couponRate: normalizeG6Rate(raw.couponRate ?? raw.coupon_rate),
     effectiveRate: normalizeG6Rate(raw.effectiveRate ?? raw.effective_rate),
     maturityDate: raw.maturityDate || raw.maturity_date || '',
@@ -433,17 +459,22 @@ export function useG6MainDetail(opts: UseG6MainDetailOptions) {
   function debounceFlush(): void {
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(() => {
-      try {
-        const items: ChecklistResponse[] = []
-        for (const key of [DATA_KEY, BALANCE_SHEET_DATE_KEY, NOTE_KEY, CONCLUSION_KEY]) {
-          const it = opts.allResponses.value.get(key)
-          if (it) items.push(it)
-        }
-        if (items.length) {
-          window.dispatchEvent(new CustomEvent('g6:save-items', { detail: { items } }))
-        }
-      } catch { /* silent */ }
+      saveTimer = null
+      flushPending()
     }, 500)
+  }
+
+  function flushPending(): void {
+    try {
+      const items: ChecklistResponse[] = []
+      for (const key of [DATA_KEY, BALANCE_SHEET_DATE_KEY, NOTE_KEY, CONCLUSION_KEY]) {
+        const it = opts.allResponses.value.get(key)
+        if (it) items.push(it)
+      }
+      if (items.length) {
+        dispatchG6SaveItems(opts.wpId.value, items)
+      }
+    } catch { /* silent */ }
   }
 
   function loadFromStore(): void {
@@ -636,6 +667,11 @@ export function useG6MainDetail(opts: UseG6MainDetailOptions) {
   })
   onBeforeUnmount(() => {
     window.removeEventListener('g6:interest-writeback', onInterestWriteback)
+    if (saveTimer) {
+      clearTimeout(saveTimer)
+      saveTimer = null
+    }
+    flushPending()
   })
 
   return {

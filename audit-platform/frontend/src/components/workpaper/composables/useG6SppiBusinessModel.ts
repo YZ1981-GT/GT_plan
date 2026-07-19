@@ -254,6 +254,7 @@ export interface BusinessModelAiSummaryItem {
   critical: boolean
   auditConclusion: string
   managementExplanation: string
+  indexRef: string
 }
 
 /** 供 AI 的检查项摘要（优先不满足/高风险，最多 12 条） */
@@ -279,6 +280,7 @@ export function buildBusinessModelAiSummary(data: BusinessModelData): {
         critical: Boolean(i.critical || inferCriticalFlag(i.checkItem)),
         auditConclusion: (i.auditConclusion || '').slice(0, 200),
         managementExplanation: (i.managementExplanation || '').slice(0, 200),
+        indexRef: (i.indexRef || '').slice(0, 80),
       }))
 
   const items = [
@@ -298,6 +300,73 @@ export const BM_CONCLUSION_LABELS: Record<string, string> = {
   hold_collect: '持有以收取合同现金流量',
   hold_and_sell: '既以收取合同现金流量又以出售为目标',
   other: '其他（以交易为目的等）',
+}
+
+export interface G6ClassificationInstrumentInput {
+  id: string
+  name: string
+  overallConclusion: SppiOverallConclusion
+}
+
+/** 组合层摘要 + 可选项目级矩阵（业务模式复用组合结论） */
+export function buildG6ClassificationSummary(opts: {
+  businessModel: BusinessModelConclusion
+  sppiOverall: SppiOverallConclusion
+  instruments?: G6ClassificationInstrumentInput[]
+  source: string
+}): {
+  businessModel: BusinessModelConclusion
+  businessModelLabel: string | null
+  sppiOverall: SppiOverallConclusion
+  expectedClassification: string | null
+  level: 'ok' | 'info' | 'warning' | null
+  message: string
+  accountConflict: boolean
+  updatedAt: string
+  source: string
+  instruments?: Array<{
+    instrumentId: string
+    instrumentName: string
+    businessModel: BusinessModelConclusion
+    businessModelLabel: string | null
+    sppiOverall: SppiOverallConclusion
+    expectedClassification: string | null
+    level: 'ok' | 'info' | 'warning' | null
+    message: string
+    accountConflict: boolean
+  }>
+} {
+  const check = evaluateG67G68Consistency(opts.businessModel, opts.sppiOverall)
+  const businessModelLabel = opts.businessModel
+    ? (BM_CONCLUSION_LABELS[opts.businessModel] || null)
+    : null
+  const instruments = (opts.instruments || []).map((inst) => {
+    const itemCheck = evaluateG67G68Consistency(opts.businessModel, inst.overallConclusion)
+    return {
+      instrumentId: inst.id,
+      instrumentName: inst.name,
+      businessModel: opts.businessModel,
+      businessModelLabel,
+      sppiOverall: inst.overallConclusion,
+      expectedClassification: itemCheck.expectedClassification,
+      level: itemCheck.level,
+      message: itemCheck.message,
+      accountConflict:
+        itemCheck.level === 'warning' && itemCheck.expectedClassification === 'FVTPL',
+    }
+  })
+  return {
+    businessModel: opts.businessModel,
+    businessModelLabel,
+    sppiOverall: opts.sppiOverall,
+    expectedClassification: check.expectedClassification,
+    level: check.level,
+    message: check.message,
+    accountConflict: check.level === 'warning' && check.expectedClassification === 'FVTPL',
+    updatedAt: new Date().toISOString(),
+    source: opts.source,
+    ...(instruments.length ? { instruments } : {}),
+  }
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────

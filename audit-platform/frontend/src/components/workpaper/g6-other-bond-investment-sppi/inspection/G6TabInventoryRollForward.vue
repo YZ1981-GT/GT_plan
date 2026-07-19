@@ -12,7 +12,90 @@
     <div class="tab-toolbar">
       <span class="chip-wrap"><GtIndexChip value="wp:G6-10" :context-project-id="projectId" /></span>
       <el-tag size="small" type="info">共 {{ reconciliation.items.value.length }} 行</el-tag>
+      <el-tag size="small" :type="directionTagType">{{ reconciliation.periodHint.value }}</el-tag>
+      <el-button
+        size="small"
+        type="success"
+        plain
+        @click="guideVisible = true"
+      >使用说明</el-button>
+      <el-button
+        v-if="!props.isReadonly"
+        size="small"
+        type="primary"
+        plain
+        @click="handleImportFromG69"
+      >从 G6-9 带入盘点</el-button>
+      <el-button
+        v-if="!props.isReadonly"
+        size="small"
+        plain
+        :loading="bookSyncing"
+        @click="handleImportBookFromG62"
+      >从 G6-2 带入账面</el-button>
+      <el-button
+        v-if="!props.isReadonly"
+        size="small"
+        plain
+        @click="handleImportBookFromG69"
+      >从 G6-9 带入账面</el-button>
     </div>
+
+    <!-- 日期头 -->
+    <el-form
+      :model="reconciliation.header.value"
+      label-width="100px"
+      size="small"
+      class="recon-header-form"
+      :disabled="props.isReadonly"
+    >
+      <el-row :gutter="16">
+        <el-col :span="8">
+          <el-form-item label="盘点日">
+            <el-date-picker
+              :model-value="reconciliation.header.value.countDate"
+              type="date"
+              value-format="YYYY-MM-DD"
+              style="width: 100%"
+              placeholder="监盘实际日期"
+              @update:model-value="(v: string) => onHeaderChange({ countDate: v || '' })"
+            />
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="资产负债表日">
+            <el-date-picker
+              :model-value="reconciliation.header.value.balanceSheetDate"
+              type="date"
+              value-format="YYYY-MM-DD"
+              style="width: 100%"
+              placeholder="截止日 / 报表日"
+              @update:model-value="(v: string) => onHeaderChange({ balanceSheetDate: v || '' })"
+            />
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="倒轧区间">
+            <span class="period-hint">{{ reconciliation.periodHint.value }}</span>
+          </el-form-item>
+        </el-col>
+      </el-row>
+    </el-form>
+
+    <el-alert
+      v-if="reconciliation.rollDirection.value === 'unknown'"
+      type="warning"
+      :closable="false"
+      class="direction-alert"
+      title="请填写盘点日与资产负债表日。未齐时按「期后盘点·倒推」计算：基准日数量 = 盘点日数量 − 期间净增加。"
+    />
+    <el-alert
+      v-else-if="reconciliation.rollDirection.value === 'sameDay'"
+      type="success"
+      :closable="false"
+      class="direction-alert"
+      title="盘点日与资产负债表日相同，基准日数量等于盘点日数量；期间增减应为空或为零。"
+    />
 
     <!-- ═══ 2区段Tab切换（行同步） ═══ -->
     <div class="tab-bar">
@@ -63,8 +146,8 @@
         @current-change="handleTab1RowChange"
       >
         <!-- 证券名称 -->
-        <el-table-column label="证券名称" min-width="150">
-          <template #default="{ row, $index }">
+        <el-table-column label="证券名称" min-width="140">
+          <template #default="{ row }">
             <div class="name-cell">
               <span>{{ row.securitiesName }}</span>
               <el-button
@@ -73,6 +156,18 @@
                 @click.stop="reconciliation.removeItem(row.id)"
               >🗑️</el-button>
             </div>
+          </template>
+        </el-table-column>
+        <!-- 证券代码 -->
+        <el-table-column label="证券代码" width="110">
+          <template #default="{ row }">
+            <el-input
+              v-if="!props.isReadonly"
+              v-model="row.securitiesCode"
+              size="small"
+              placeholder="代码"
+            />
+            <span v-else>{{ row.securitiesCode || '-' }}</span>
           </template>
         </el-table-column>
         <!-- 盘点日数量 -->
@@ -88,15 +183,24 @@
           </template>
         </el-table-column>
         <!-- 增减 -->
-        <el-table-column label="增减" width="100" align="right">
+        <el-table-column width="110" align="right">
+          <template #header>
+            <el-tooltip content="期间持仓净增加（买入/转入为正，卖出/到期/转出为负）。有 Tab2 明细时自动汇总。" placement="top">
+              <span>增减(净增加)</span>
+            </el-tooltip>
+          </template>
           <template #default="{ row }">
             <el-input-number
-              v-if="!props.isReadonly"
+              v-if="!props.isReadonly && !reconciliation.hasAutoChangeSource(row)"
               v-model="row.changeQuantity"
               size="small" :controls="false"
               style="width: 85px"
             />
-            <span v-else>{{ row.changeQuantity }}</span>
+            <span
+              v-else
+              class="formula-cell"
+              :title="reconciliation.hasAutoChangeSource(row) ? '由 Tab2 增减明细自动汇总' : ''"
+            >{{ row.changeQuantity }}</span>
           </template>
         </el-table-column>
         <!-- 基准日数量（公式列） -->
@@ -104,7 +208,7 @@
           <template #default="{ row }">
             <span
               class="formula-cell"
-              title="基准日数量 = 盘点日数量 + 增减"
+              :title="reportQtyFormulaTitle"
             >{{ row.reportDateQuantity }}</span>
           </template>
         </el-table-column>
@@ -155,6 +259,7 @@
               :autosize="{ minRows: 1, maxRows: 3 }"
               size="small"
               placeholder="结论..."
+              :class="{ 'variance-reason-required': reconciliation.isVarianceConclusionMissing(row) }"
             />
             <span v-else>{{ row.varianceConclusion || '-' }}</span>
           </template>
@@ -193,24 +298,30 @@
         class="variance-alert"
       >
         <template #title>
-          差异原因必填提示：以下项目存在差异但未填写原因
+          差异闭环提示：以下项目存在差异但未填写原因或结论
         </template>
         <ul class="variance-error-list">
-          <li v-for="item in reconciliation.varianceValidationErrors.value" :key="item.row.id">
-            {{ item.row.securitiesName }}（差异: {{ item.row.variance }}）
+          <li v-for="item in reconciliation.varianceValidationErrors.value" :key="item.row.id + item.field">
+            {{ item.row.securitiesName }}（差异: {{ item.row.variance }}，缺{{ item.field === 'reason' ? '原因' : '结论' }}）
           </li>
         </ul>
       </el-alert>
     </el-card>
 
-    <!-- ═══ Tab2: 增减明细(8列) ═══ -->
+    <!-- ═══ Tab2: 增减明细 ═══ -->
     <el-card v-if="activeTab === 'changeDetail'" shadow="never" class="section-card">
       <template #header>
         <div class="section-header">
           <span class="section-title">盘点倒轧表 — 增减明细</span>
           <div class="section-actions">
-            <el-tag size="small" type="info">
+            <el-tag
+              size="small"
+              :type="reconciliation.detailValidationErrors.value.length ? 'danger' : 'info'"
+            >
               {{ reconciliation.changeDetailCount.value }}条明细
+              <template v-if="reconciliation.detailValidationErrors.value.length">
+                · {{ reconciliation.detailValidationErrors.value.length }}条待补全
+              </template>
             </el-tag>
             <el-button
               size="small"
@@ -230,9 +341,10 @@
         class="recon-table"
         highlight-current-row
         row-key="id"
+        :row-class-name="detailRowClassName"
       >
         <!-- 证券名称 -->
-        <el-table-column label="证券名称" min-width="150">
+        <el-table-column label="证券名称" min-width="130">
           <template #default="{ row }">
             <div class="name-cell">
               <span>{{ row.securitiesName }}</span>
@@ -242,6 +354,17 @@
                 @click.stop="reconciliation.removeChangeDetail(row.id)"
               >🗑️</el-button>
             </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="证券代码" width="100">
+          <template #default="{ row }">
+            <el-input
+              v-if="!props.isReadonly"
+              v-model="row.securitiesCode"
+              size="small"
+              placeholder="代码"
+            />
+            <span v-else>{{ row.securitiesCode || '-' }}</span>
           </template>
         </el-table-column>
         <!-- 日期 -->
@@ -260,14 +383,14 @@
           </template>
         </el-table-column>
         <!-- 交易类型 -->
-        <el-table-column label="交易类型" width="100">
+        <el-table-column label="交易类型" width="110">
           <template #default="{ row }">
             <el-select
               v-if="!props.isReadonly"
               v-model="row.transactionType"
               size="small"
               placeholder="选择"
-              style="width: 90px"
+              style="width: 100px"
             >
               <el-option
                 v-for="opt in TRANSACTION_TYPE_OPTIONS"
@@ -340,9 +463,26 @@
           </template>
         </el-table-column>
       </el-table>
-    </el-card>
 
-    <!-- ═══ 底部操作区 ═══ -->
+      <el-alert
+        v-if="reconciliation.detailValidationErrors.value.length > 0"
+        type="warning"
+        :closable="false"
+        class="variance-alert"
+      >
+        <template #title>
+          增减明细校验：请补全日期、交易类型、数量、凭证号，并确保证券在倒轧表中且日期落在倒轧区间
+        </template>
+        <ul class="variance-error-list">
+          <li
+            v-for="issue in reconciliation.detailValidationErrors.value.slice(0, 8)"
+            :key="issue.detail.id"
+          >
+            第{{ issue.index + 1 }}行 {{ issue.detail.securitiesName || '(未命名)' }}：{{ issue.reasons.join('；') }}
+          </li>
+        </ul>
+      </el-alert>
+    </el-card>
     <div class="bottom-actions">
       <el-button
         v-if="!props.isReadonly"
@@ -356,7 +496,7 @@
         :wp-id="wpId"
         sheet="G6-10"
         :disabled="props.isReadonly"
-        @imported="emit('imported')"
+        @imported="onImported"
       />
     </div>
 
@@ -396,7 +536,7 @@
         :autosize="{ minRows: 3, maxRows: 10 }"
         :disabled="props.isReadonly"
         placeholder="对盘点倒轧结果的审计结论..."
-        @input="handleSave"
+        @input="handleConclusionInput"
       />
     </el-card>
 
@@ -405,13 +545,15 @@
       <summary>📋 编制提示</summary>
       <div class="guide-content">
         <p>1. 本表用于将盘点日实际持有数量倒轧至资产负债表日（基准日），以验证期末证券存在性</p>
-        <p>2. 基准日数量 = 盘点日数量 ± 盘点日至基准日之间的增减变动</p>
-        <p>3. 增减明细应逐笔记录盘点日至基准日的买入、卖出、到期、转让等交易</p>
-        <p>4. 差异（基准日数量 - 账面数量）不为零时，必须说明差异原因并形成差异结论</p>
-        <p>5. 需将增减明细的数量合计核对至Tab1的增减列，确保数据一致</p>
-        <p>6. 凭证号应与增减明细对应的会计凭证相匹配，确保交易真实发生</p>
+        <p>2. 请先填写盘点日与资产负债表日：期后盘点倒推（基准日=盘点日−净增加）；期前盘点顺推（基准日=盘点日+净增加）；同日则无需倒轧</p>
+        <p>3. 净增加口径为两日之间持仓变动（买入/转入为正，卖出/到期/转出为负）；有 Tab2 明细时自动汇总，删光明细后自动清零</p>
+        <p>4. 「从 G6-9 带入盘点」仅带入盘点日数量；账面数量可用「从 G6-2 带入账面」（优先）或「从 G6-9 带入账面」（须确认 G6-9 账面已是报表日口径）</p>
+        <p>5. 差异不为零时必须填写差异原因与差异结论；未闭环将阻断审计结论保存（结论独立存储）</p>
+        <p>6. 增减明细按证券代码/关联 ID/名称匹配主表；凭证号须与会计凭证一致</p>
       </div>
     </details>
+
+    <G6InventoryRollForwardGuideDialog v-model="guideVisible" />
   </div>
 </template>
 
@@ -431,15 +573,23 @@
  *
  * Props 对齐父级 GtG6OtherBondSppi 传入的 html-data / is-readonly（自加载走 useG6SppiFormData）
  */
-import { computed, inject, onMounted, ref, watch } from 'vue'
+import { computed, inject, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   useG6SppiReconciliation,
   TRANSACTION_TYPE_OPTIONS,
+  type ReconciliationHeader,
 } from '../../composables/useG6SppiReconciliation'
 import { useG6SppiFormData } from '../../composables/useG6SppiFormData'
 import { useG6SppiAiGenerate } from '../../composables/useG6SppiAiGenerate'
+import {
+  fetchG62DetailRows,
+  mapG62RowsToInventorySeeds,
+  parseG6ChecklistPayload,
+} from '../../composables/g6CrossHelpers'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G6SppiImportExportDropdown from '../G6SppiImportExportDropdown.vue'
+import G6InventoryRollForwardGuideDialog from './G6InventoryRollForwardGuideDialog.vue'
 import type { ReconciliationItem, ReconciliationData } from '../../composables/useG6SppiReconciliation'
 
 const props = defineProps<{
@@ -451,14 +601,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{ imported: [] }>()
 
-// ─── 复核对话 inject ───
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
 function openReview(sectionId: string): void {
   openReviewDialog(sectionId)
 }
 
-// ─── 数据层 ───
 const formData = useG6SppiFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
@@ -466,15 +614,50 @@ const formData = useG6SppiFormData({
 const reconciliation = useG6SppiReconciliation()
 const wpIdRef = computed(() => props.wpId)
 const { generateAndConfirm, loading: aiLoading } = useG6SppiAiGenerate(wpIdRef)
+const bookSyncing = ref(false)
+const guideVisible = ref(false)
 
-// ─── Tab 状态 ───
+const DATA_KEY = 'G6-10-reconciliation-data'
+const ROWS_KEY = 'G6-10-rows'
+const CONCLUSION_KEY = 'G6-10-audit-conclusion'
+const NOTE_KEY = 'G6-10-inventory-rollforward-audit-note'
+const INV_DATA_KEY = 'G6-9-securities-inventory-data'
+const INV_ROWS_KEY = 'G6-9-rows'
+
 const activeTab = computed(() => reconciliation.activeTab.value)
+
+const directionTagType = computed(() => {
+  switch (reconciliation.rollDirection.value) {
+    case 'sameDay': return 'success'
+    case 'forward': return 'warning'
+    case 'backward': return ''
+    default: return 'info'
+  }
+})
+
+const reportQtyFormulaTitle = computed(() => {
+  switch (reconciliation.rollDirection.value) {
+    case 'forward':
+      return '基准日数量 = 盘点日数量 + 期间净增加（期前盘点·顺推）'
+    case 'sameDay':
+      return '基准日数量 = 盘点日数量（同日盘点）'
+    case 'backward':
+      return '基准日数量 = 盘点日数量 − 期间净增加（期后盘点·倒推）'
+    default:
+      return '基准日数量 = 盘点日数量 − 期间净增加（日期未齐，默认倒推）'
+  }
+})
 
 function switchTab(tab: 'rollForward' | 'changeDetail'): void {
   reconciliation.switchTab(tab)
 }
 
-// ─── 行同步 ───
+function onHeaderChange(patch: Partial<ReconciliationHeader>): void {
+  if (props.isReadonly) return
+  reconciliation.updateHeader(patch)
+  handleSave()
+}
+
 const currentRowId = computed(() => {
   const rows = reconciliation.items.value
   if (rows.length === 0) return ''
@@ -488,8 +671,6 @@ function handleTab1RowChange(row: ReconciliationItem | null): void {
   if (idx >= 0) reconciliation.selectRow(idx)
 }
 
-// ─── 审计说明（独立持久化 checklist_responses） ───
-const NOTE_KEY = 'G6-10-inventory-rollforward-audit-note'
 const auditNote = ref('')
 
 function saveAuditNote(val: string): void {
@@ -498,44 +679,185 @@ function saveAuditNote(val: string): void {
   formData.debouncedSave(NOTE_KEY, { remark: val })
 }
 
-// ─── 数据加载 ───
+function loadConclusion(): void {
+  const conc = formData.allResponses.value.get(CONCLUSION_KEY)
+  if (conc?.conclusion != null && String(conc.conclusion).trim() !== '') {
+    reconciliation.auditConclusion.value = String(conc.conclusion)
+    return
+  }
+  // 兼容：旧数据可能把结论嵌在 reconciliation-data 内
+  const primary = parseG6ChecklistPayload(formData.allResponses.value.get(DATA_KEY))
+  if (primary?.auditConclusion) {
+    reconciliation.auditConclusion.value = String(primary.auditConclusion)
+  }
+}
+
 onMounted(async () => {
   await formData.loadAll()
   initFromData()
+  loadConclusion()
   const noteResp = formData.allResponses.value.get(NOTE_KEY)
   if (noteResp?.remark) auditNote.value = noteResp.remark
 })
 
 watch(() => props.htmlData, (newData) => {
-  if (newData) initFromData()
+  if (newData) {
+    initFromData()
+    loadConclusion()
+  }
 })
 
 function initFromData(): void {
+  const primary = parseG6ChecklistPayload(formData.allResponses.value.get(DATA_KEY))
+  if (primary && (Array.isArray(primary.items) || Array.isArray(primary.changeDetails))) {
+    reconciliation.loadData(primary as ReconciliationData)
+    return
+  }
+  const rowsPayload = parseG6ChecklistPayload(formData.allResponses.value.get(ROWS_KEY))
+  if (rowsPayload) {
+    if (Array.isArray(rowsPayload.items) || Array.isArray(rowsPayload.changeDetails)) {
+      reconciliation.loadData(rowsPayload as ReconciliationData)
+      return
+    }
+    if (Array.isArray(rowsPayload) && rowsPayload.length) {
+      reconciliation.loadFromFlatRows(rowsPayload)
+      return
+    }
+  }
   const content = formData.parseContent()
   if (content.reconciliation) {
-    reconciliation.loadData(content.reconciliation as ReconciliationData)
+    const rec = content.reconciliation as any
+    if (Array.isArray(rec.items) || Array.isArray(rec.changeDetails)) {
+      reconciliation.loadData(rec as ReconciliationData)
+    } else if (Array.isArray(rec)) {
+      reconciliation.loadFromFlatRows(rec)
+    } else if (Array.isArray(rec.rows)) {
+      reconciliation.loadFromFlatRows(rec.rows)
+    }
   }
 }
 
-// ─── 保存 ───
+/** 从 G6-9 带入盘点日数量（不覆盖账面数量） */
+async function handleImportFromG69(): Promise<void> {
+  if (props.isReadonly) return
+  await formData.loadAll()
+  const inv = parseG6ChecklistPayload(formData.allResponses.value.get(INV_DATA_KEY))
+  if (inv?.items && Array.isArray(inv.items) && inv.items.length) {
+    reconciliation.importFromInventory(inv.items)
+    handleSave()
+    return
+  }
+  const flat = parseG6ChecklistPayload(formData.allResponses.value.get(INV_ROWS_KEY))
+  if (Array.isArray(flat) && flat.length) {
+    reconciliation.importFromInventory(flat)
+    handleSave()
+    return
+  }
+  const content = formData.parseContent()
+  const sheetInv = content.inventory as any
+  if (sheetInv?.items && Array.isArray(sheetInv.items)) {
+    reconciliation.importFromInventory(sheetInv.items)
+    handleSave()
+    return
+  }
+  reconciliation.importFromInventory(null)
+}
+
+/** 从 G6-2 带入报表日账面数量（不改盘点日数量） */
+async function handleImportBookFromG62(): Promise<void> {
+  if (props.isReadonly) return
+  bookSyncing.value = true
+  try {
+    const rows = await fetchG62DetailRows(props.projectId, props.wpId)
+    const seeds = mapG62RowsToInventorySeeds(rows)
+    reconciliation.importBookFromSeeds(seeds, 'G6-2')
+    handleSave()
+  } catch {
+    ElMessage.warning('同步 G6-2 失败，请稍后重试')
+  } finally {
+    bookSyncing.value = false
+  }
+}
+
+/** 从 G6-9 带入账面（须确认已是报表日口径） */
+async function handleImportBookFromG69(): Promise<void> {
+  if (props.isReadonly) return
+  try {
+    await ElMessageBox.confirm(
+      '将覆盖倒轧表「账面数量」。请确认 G6-9 账面已按资产负债表日维护（非盘点日账面）。是否继续？',
+      '从 G6-9 带入账面',
+      { confirmButtonText: '确认带入', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  await formData.loadAll()
+  const inv = parseG6ChecklistPayload(formData.allResponses.value.get(INV_DATA_KEY))
+  const items = (inv?.items && Array.isArray(inv.items) ? inv.items : null)
+    || (() => {
+      const flat = parseG6ChecklistPayload(formData.allResponses.value.get(INV_ROWS_KEY))
+      return Array.isArray(flat) ? flat : null
+    })()
+  if (!items?.length) {
+    reconciliation.importBookFromSeeds(null, 'G6-9')
+    return
+  }
+  reconciliation.importBookFromSeeds(
+    items.map((r: any) => ({
+      id: r.id,
+      securitiesName: r.securitiesName || '',
+      securitiesCode: r.securitiesCode || '',
+      bookQuantity: r.bookQuantity,
+    })),
+    'G6-9',
+  )
+  handleSave()
+}
+
+async function onImported(): Promise<void> {
+  await formData.loadAll()
+  initFromData()
+  loadConclusion()
+  const noteResp = formData.allResponses.value.get(NOTE_KEY)
+  if (noteResp?.remark) auditNote.value = noteResp.remark
+  emit('imported')
+}
+
+/** 仅保存表格数据（不含审计结论） */
 function handleSave(): void {
-  formData.debouncedSave('G6-10-reconciliation-data', {
-    conclusion: JSON.stringify(reconciliation.toJSON()),
+  if (props.isReadonly) return
+  const nested = reconciliation.toJSON()
+  formData.debouncedSaveBatch([
+    { itemId: DATA_KEY, data: { conclusion: JSON.stringify(nested) } },
+    { itemId: ROWS_KEY, data: { conclusion: JSON.stringify(nested) } },
+  ])
+}
+
+onBeforeUnmount(() => {
+  handleSave()
+  formData.flushPending()
+})
+
+/** 审计结论独立持久化；未通过差异校验则拒绝写入 */
+function handleConclusionInput(): void {
+  if (props.isReadonly) return
+  if (!reconciliation.assertVarianceValidForSave('保存审计结论')) {
+    return
+  }
+  formData.saveImmediate(CONCLUSION_KEY, {
+    conclusion: reconciliation.auditConclusion.value || '',
   })
 }
 
-// watch items/changeDetails/conclusion 深度变化保存
-watch([() => reconciliation.items.value, () => reconciliation.changeDetails.value], () => {
-  handleSave()
-}, { deep: true })
+watch(
+  [() => reconciliation.items.value, () => reconciliation.changeDetails.value, () => reconciliation.header.value],
+  () => { handleSave() },
+  { deep: true },
+)
 
-watch(() => reconciliation.auditConclusion.value, () => {
-  handleSave()
-})
-
-// ─── AI辅助 ───
 async function handleAi(): Promise<void> {
   if (props.isReadonly) return
+  if (!reconciliation.assertVarianceValidForSave('生成审计结论')) return
   const text = await generateAndConfirm(
     'reconciliation-conclusion',
     reconciliation.auditConclusion.value || '',
@@ -543,30 +865,48 @@ async function handleAi(): Promise<void> {
       itemCount: reconciliation.items.value.length,
       varianceCount: reconciliation.varianceCount.value,
       changeDetailCount: reconciliation.changeDetailCount.value,
+      rollDirection: reconciliation.rollDirection.value,
+      periodHint: reconciliation.periodHint.value,
+      header: reconciliation.header.value,
+      items: reconciliation.items.value.map((r) => ({
+        securitiesName: r.securitiesName,
+        countDateQuantity: r.countDateQuantity,
+        changeQuantity: r.changeQuantity,
+        reportDateQuantity: r.reportDateQuantity,
+        bookQuantity: r.bookQuantity,
+        variance: r.variance,
+        varianceReason: r.varianceReason,
+        varianceConclusion: r.varianceConclusion,
+      })),
+      changeDetails: reconciliation.changeDetails.value.slice(0, 50),
+      changeDetailsTruncated: reconciliation.changeDetails.value.length > 50,
     },
     'AI 盘点倒轧审计结论',
   )
   if (text) {
     reconciliation.auditConclusion.value = text
-    handleSave()
+    handleConclusionInput()
   }
 }
 
-// ─── 交易类型标签 ───
 function getTransactionTypeLabel(value: string): string {
   const opt = TRANSACTION_TYPE_OPTIONS.find(o => o.value === value)
   return opt?.label || value || '-'
 }
 
-// ─── 数字格式化 ───
+function detailRowClassName({ row }: { row: { id: string } }): string {
+  const bad = reconciliation.detailValidationErrors.value.some((e) => e.detail.id === row.id)
+  return bad ? 'detail-invalid-row' : ''
+}
+
 function fmtNum(v: number | undefined, decimals = 2): string {
   if (v === undefined || v === null) return '-'
   return Number(v).toLocaleString('zh-CN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
 }
 
-// ─── 暴露接口 ───
 defineExpose({
   toJSON: () => reconciliation.toJSON(),
+  isVarianceValid: computed(() => reconciliation.isVarianceValid.value),
 })
 </script>
 
@@ -586,10 +926,27 @@ defineExpose({
   align-items: center;
   gap: 6px;
   margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 .chip-wrap {
   display: inline-flex;
   align-items: center;
+}
+
+.recon-header-form {
+  margin-bottom: 8px;
+  padding: 8px 12px 0;
+  background: #fafafa;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+}
+.period-hint {
+  color: #606266;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.direction-alert {
+  margin-bottom: 12px;
 }
 
 /* ─── Tab切换按钮 ─── */
@@ -668,6 +1025,10 @@ defineExpose({
 /* ─── 差异原因必填红色边框 ─── */
 .variance-reason-required :deep(.el-textarea__inner) {
   box-shadow: 0 0 0 1px #f56c6c inset;
+}
+
+.recon-table :deep(.detail-invalid-row td) {
+  background-color: #fff7ed !important;
 }
 
 /* ─── 差异校验提示 ─── */

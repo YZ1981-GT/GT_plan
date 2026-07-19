@@ -9,10 +9,12 @@
  *   POST /api/workpapers/{wpId}/g6-ecl/export-data?sheet={code}
  *   POST /api/workpapers/{wpId}/g6-ecl/import-data?sheet={code}  (multipart/form-data)
  *
- * sheet codes: G6-12 / G6-14 / G6-15
+ * sheet codes: G6-11 / G6-12 / G6-13 / G6-14 / G6-15
+ * G6-11 单sheet导出（三阶段划分汇总）
  * G6-12 按2区段分sheet导出（未审+调整 / 审定数）
- * G6-14 单sheet导出（8列简洁结构）
- * G6-15 按3区段分sheet导出（凭证基础 / 核对内容 / 结论）
+ * G6-13 按多区段分sheet导出（方法评价/组合/PD-LGD/损失率/参数）
+ * G6-14 按2区段分sheet导出（转回检查 / 核销检查；兼容旧8列单sheet）
+ * G6-15 按3区段分sheet导出（样本标准 / 本期发生额 / 期后处置新增）
  *
  * UI 铁律：el-dropdown「导入导出 ▾」（导出模板/导出数据/导入数据）
  * 使用 axios (http from @/utils/http) 非原生 fetch — for Authorization header
@@ -24,8 +26,8 @@ import http from '@/utils/http'
 
 // ═══ 类型定义 ═══
 
-/** G6(ECL组) 支持导入导出的 sheet 编码（3张动态行表格） */
-export type G6EclImportableSheet = 'G6-12' | 'G6-14' | 'G6-15'
+/** G6(ECL组) 支持导入导出的 sheet 编码 */
+export type G6EclImportableSheet = 'G6-11' | 'G6-12' | 'G6-13' | 'G6-14' | 'G6-15'
 
 /** 导入结果 */
 export interface G6EclImportResult {
@@ -64,11 +66,28 @@ export interface G6EclDropdownOption {
 
 export const G6_ECL_API_PREFIX = 'g6-ecl'
 
-/** 3张可导入导出 sheet 的中文标签 */
+/** 可导入导出 sheet 的中文标签 */
 export const G6_ECL_IMPORT_EXPORT_SHEETS: G6EclSheetMeta[] = [
+  { code: 'G6-11', label: 'G6-11 三阶段划分' },
   { code: 'G6-12', label: 'G6-12 减值测算（2区段）', multiSheet: true, multiSheetDesc: '未审+调整 / 审定数' },
-  { code: 'G6-14', label: 'G6-14 转回核销' },
-  { code: 'G6-15', label: 'G6-15 凭证检查（3区段）', multiSheet: true, multiSheetDesc: '凭证基础 / 核对内容 / 结论' },
+  {
+    code: 'G6-13',
+    label: 'G6-13 ECL计量测试',
+    multiSheet: true,
+    multiSheetDesc: '方法评价 / 组合 / PD-LGD / 损失率 / 参数',
+  },
+  {
+    code: 'G6-14',
+    label: 'G6-14 转回核销（2区段）',
+    multiSheet: true,
+    multiSheetDesc: '转回检查 / 核销检查',
+  },
+  {
+    code: 'G6-15',
+    label: 'G6-15 凭证检查',
+    multiSheet: true,
+    multiSheetDesc: '样本标准 / 本期发生额 / 期后处置新增',
+  },
 ]
 
 // ═══ 工具函数 ═══
@@ -193,7 +212,7 @@ export function useG6EclImportExport(options: UseG6EclImportExportOptions): UseG
 
   /**
    * 导出模板 — POST /api/workpapers/{wp_id}/g6-ecl/export-template?sheet={code}
-   * G6-12(2区段分sheet) / G6-14(单sheet) / G6-15(3区段分sheet)
+   * G6-12(2区段分sheet) / G6-14(2区段分sheet) / G6-15(3区段分sheet)
    */
   async function exportTemplate(sheet: G6EclImportableSheet): Promise<void> {
     importErrors.value = []
@@ -221,7 +240,7 @@ export function useG6EclImportExport(options: UseG6EclImportExportOptions): UseG
 
   /**
    * 导出数据 — POST /api/workpapers/{wp_id}/g6-ecl/export-data?sheet={code}
-   * G6-12(2区段分sheet) / G6-14(单sheet) / G6-15(3区段分sheet)
+   * G6-12(2区段分sheet) / G6-14(2区段分sheet) / G6-15(3区段分sheet)
    */
   async function exportData(sheet: G6EclImportableSheet): Promise<void> {
     importErrors.value = []

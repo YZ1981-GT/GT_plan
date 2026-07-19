@@ -6,13 +6,19 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import require_project_access
 from app.models.core import User
+from app.services.g7_consol_linkage_service import (
+    G7LinkageConfigError,
+    G7LinkageConflictError,
+    import_g7_linkage,
+    preview_g7_linkage,
+)
 
 router = APIRouter(prefix="/api/consol-worksheet-data", tags=["consolidation-worksheet-data"])
 
@@ -30,6 +36,91 @@ class WorksheetDataResponse(BaseModel):
     sheet_key: str
     content: dict
     updated_at: str | None = None
+
+
+class G7LinkageDiffSelection(BaseModel):
+    sheet_key: str
+    identity: str
+    field: str
+
+
+class G7LinkageImportRequest(BaseModel):
+    """G7 联动确认请求；名称映射由用户在预览界面确认。"""
+
+    company_mappings: dict[str, str] = Field(default_factory=dict)
+    sheet_keys: list[str] = Field(
+        default_factory=lambda: ["info", "cost", "equity_inv"]
+    )
+    overwrite: bool = False
+    expected_versions: dict[str, str] = Field(default_factory=dict)
+    # None=整表填空合并；传列表则仅写入勾选字段（可为空列表）
+    selected_diffs: list[G7LinkageDiffSelection] | None = None
+    apply_suggestion_ids: list[str] = Field(default_factory=list)
+
+
+@router.get("/g7-linkage/{project_id}/{year}/preview")
+async def get_g7_linkage_preview(
+    project_id: UUID,
+    year: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("readonly")),
+):
+    """预览 G7→合并工作底稿映射，不产生写入。"""
+    try:
+        return await preview_g7_linkage(db, project_id, year)
+    except G7LinkageConfigError as exc:
+        raise HTTPException(status_code=422, detail={"code": "g7_config", "message": str(exc)}) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/g7-linkage/{project_id}/{year}/import")
+async def apply_g7_linkage_import(
+    project_id: UUID,
+    year: int,
+    body: G7LinkageImportRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("edit")),
+):
+    """确认导入 G7 基础数据；默认只填空值，不覆盖合并侧已有值。"""
+    try:
+        return await import_g7_linkage(
+            db,
+            project_id,
+            year,
+            explicit_mappings=body.company_mappings,
+            sheet_keys=body.sheet_keys,
+            overwrite=body.overwrite,
+            expected_versions=body.expected_versions or None,
+            selected_diffs=(
+                [item.model_dump() for item in body.selected_diffs]
+                if body.selected_diffs is not None
+                else None
+            ),
+            apply_suggestion_ids=body.apply_suggestion_ids or None,
+        )
+    except G7LinkageConflictError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "g7_stale",
+                "message": str(exc),
+                "stale_keys": exc.stale_keys,
+            },
+        ) from exc
+    except G7LinkageConfigError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "g7_config", "message": str(exc)},
+        ) from exc
+    except ValueError as exc:
+        await db.rollback()
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"G7 linkage import failed: {exc}") from exc
 
 
 # ─── GET: 加载某张表的数据 ────────────────────────────────────────────────────

@@ -14,8 +14,13 @@ import { ref } from 'vue'
 import {
   calcEliminationAmount,
   calcEquityShare,
+  calcIncomeDifference,
   parseNum,
 } from '../../../composables/useG7EquityMethodFormulaEngine'
+import {
+  G714_PENNY_THRESHOLD,
+  isAmountOverMateriality,
+} from '../g7EquityMethodCalcModel'
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 1. 顺流/逆流差异化逻辑 — calcEliminationAmount
@@ -69,14 +74,14 @@ describe('G7Calculation — calcEliminationAmount 顺流/逆流差异化', () =>
 
 describe('G7Calculation — |incomeDifference| > materialityLevel 高亮触发', () => {
   /**
-   * 组件逻辑提取：
-   *   incomeDifference = equityShare - confirmedIncome
-   *   isHighlighted = Math.abs(incomeDifference) > materialityLevel
+   * 与 g7EquityMethodCalcModel.isAmountOverMateriality / 建议分录共用口径：
+   *   已设置水平 → |diff| > level
+   *   未设置(≤0) → |diff| > 分位 0.005
    *
    * **Validates: Requirements 5.8**
    */
   function shouldHighlight(incomeDifference: number, materialityLevel: number): boolean {
-    return Math.abs(incomeDifference) > materialityLevel
+    return isAmountOverMateriality(incomeDifference, materialityLevel)
   }
 
   it('差异绝对值 > 重要性水平 → 高亮', () => {
@@ -95,9 +100,11 @@ describe('G7Calculation — |incomeDifference| > materialityLevel 高亮触发',
     expect(shouldHighlight(-50000, 30000)).toBe(true)
   })
 
-  it('重要性水平为0时，任何非零差异都触发高亮', () => {
+  it('重要性未设置(≤0)时按分位阈值高亮', () => {
     expect(shouldHighlight(0.01, 0)).toBe(true)
-    expect(shouldHighlight(-0.01, 0)).toBe(true)
+    expect(shouldHighlight(-100, 0)).toBe(true)
+    expect(shouldHighlight(G714_PENNY_THRESHOLD, 0)).toBe(false)
+    expect(shouldHighlight(0.001, 0)).toBe(false)
   })
 
   it('差异为0时永远不高亮', () => {
@@ -105,13 +112,14 @@ describe('G7Calculation — |incomeDifference| > materialityLevel 高亮触发',
     expect(shouldHighlight(0, 100000)).toBe(false)
   })
 
-  it('结合公式引擎: equityShare - confirmedIncome 计算差异', () => {
-    // adjustedNetProfit=200000, ratio=0.3 → equityShare=60000
+  it('结合原底稿口径: ⑨-⑤+⑧ 计算差异', () => {
     const equityShare = calcEquityShare(200000, 0.3) // 60000
-    const confirmedIncome = 40000
-    const incomeDifference = equityShare - confirmedIncome // 20000
-    const materialityLevel = 15000
-    expect(shouldHighlight(incomeDifference, materialityLevel)).toBe(true)
+    const confirmedIncome = 50000
+    const dividend = 10000
+    const incomeDifference = calcIncomeDifference(confirmedIncome, equityShare, dividend) // 0
+    expect(incomeDifference).toBe(0)
+    expect(shouldHighlight(incomeDifference, 15000)).toBe(false)
+    expect(shouldHighlight(calcIncomeDifference(40000, equityShare, 0), 15000)).toBe(true)
   })
 })
 

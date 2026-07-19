@@ -22,9 +22,20 @@
       </div>
     </div>
 
+    <details class="g7-guide-details">
+      <summary>📋 编制提示</summary>
+      <div class="g7-guide-content">
+        <p>1. 本表按源 Excel G7-3 编制：调整事项说明、类别、报表项目、科目名称、附注项目、借贷调整金额、索引及备注。</p>
+        <p>2. 「账项调整」作为 AJE 影响账面余额；「报表调整」作为 RJE 影响列报；「其他」按 AJE 处理。</p>
+        <p>3. 每一调整事项应形成完整借贷分录，整表借贷平衡后才能确认；确认后同步集中调整分录模块并回写 G7-1。</p>
+        <p>4. 1511 长期股权投资按借方减贷方回写；1512 减值准备按贷方减借方回写。</p>
+        <p>5. 可从集中调整分录模块拉取涉及 1511/1512 的完整分录组，避免只取单边导致底稿失衡。</p>
+      </div>
+    </details>
+
     <!-- 审计目标 -->
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
-      审计目标：汇总长期股权投资相关的审计调整分录(AJE)与重分类分录(RJE)，验证借贷平衡，确认调整依据充分、金额准确，并将净调整额回写 G7-1 审定表对应列。
+      审计目标：汇总长期股权投资相关账项调整与报表调整，验证借贷平衡及依据充分，并与集中调整分录模块、G7-1 审定表保持一致。
     </el-alert>
 
     <!-- 借贷差额实时显示 -->
@@ -39,18 +50,27 @@
       <span class="balance-diff-text">{{ fmt(Math.abs(balanceDiff)) }}</span>
     </el-alert>
 
-    <!-- 工具栏：新增按钮 -->
+    <!-- 工具栏 -->
     <div class="g7-adj-toolbar">
       <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddEntry">
-        + 新增分录
+        + 新增调整分录
+      </el-button>
+      <el-button
+        size="small"
+        :loading="syncing"
+        :disabled="isReadonly || !projectId"
+        @click="handleSyncFromModule"
+      >
+        从调整分录模块同步
       </el-button>
       <span class="row-count">共 {{ entries.length }} 行</span>
+      <span v-if="lastSyncMsg" class="sync-msg">{{ lastSyncMsg }}</span>
     </div>
 
     <!-- 隐藏的文件上传 -->
     <input ref="fileInputRef" type="file" accept=".xlsx" style="display:none" @change="onFileSelected" />
 
-    <!-- 10列调整分录表格 -->
+    <!-- 源 Excel G7-3 列结构 -->
     <el-table
       :data="entries"
       border
@@ -59,74 +79,80 @@
       max-height="520"
       :row-class-name="tableRowClassName"
     >
-      <el-table-column prop="seq" label="序号" width="56" align="center" />
+      <el-table-column label="调整事项说明" min-width="180">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            v-model="row.description"
+            size="small"
+            placeholder="说明调整原因及依据"
+            @change="handleRowChanged(row)"
+          />
+          <span v-else>{{ row.description || '-' }}</span>
+        </template>
+      </el-table-column>
 
-      <el-table-column label="类型" width="100">
+      <el-table-column label="类别" width="120">
         <template #default="{ row }">
           <el-select
             v-if="!isReadonly"
-            v-model="row.entryType"
+            v-model="row.category"
             size="small"
-            @change="markDirty"
+            @change="handleRowChanged(row)"
           >
-            <el-option value="AJE" label="AJE" />
-            <el-option value="RJE" label="RJE" />
+            <el-option v-for="opt in categoryOptions" :key="opt" :label="opt" :value="opt" />
           </el-select>
-          <span v-else>{{ row.entryType }}</span>
+          <span v-else>{{ row.category }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="日期" width="120">
+      <el-table-column label="报表项目" width="130">
         <template #default="{ row }">
           <el-input
             v-if="!isReadonly"
-            v-model="row.date"
+            v-model="row.reportItem"
             size="small"
-            placeholder="YYYY-MM-DD"
-            @change="markDirty"
+            @change="handleRowChanged(row)"
           />
-          <span v-else>{{ row.date }}</span>
+          <span v-else>{{ row.reportItem || '-' }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="摘要" min-width="140">
+      <el-table-column label="科目名称" min-width="170">
         <template #default="{ row }">
-          <el-input
-            v-if="!isReadonly"
-            v-model="row.summary"
-            size="small"
-            @change="markDirty"
-          />
-          <span v-else>{{ row.summary || '-' }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="科目代码" width="110">
-        <template #default="{ row }">
-          <el-input
+          <el-select
             v-if="!isReadonly"
             v-model="row.accountCode"
             size="small"
-            placeholder="如1511"
-            @change="markDirty"
-          />
-          <span v-else>{{ row.accountCode }}</span>
+            filterable
+            allow-create
+            default-first-option
+            @change="handleAccountChanged(row)"
+          >
+            <el-option
+              v-for="opt in accountOptions"
+              :key="opt.code"
+              :value="opt.code"
+              :label="`${opt.code} ${opt.name}`"
+            />
+          </el-select>
+          <span v-else>{{ row.accountName || row.accountCode || '-' }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="科目名称" min-width="130">
+      <el-table-column label="附注项目" width="120">
         <template #default="{ row }">
           <el-input
             v-if="!isReadonly"
-            v-model="row.accountName"
+            v-model="row.noteItem"
             size="small"
-            @change="markDirty"
+            @change="handleRowChanged(row)"
           />
-          <span v-else>{{ row.accountName || '-' }}</span>
+          <span v-else>{{ row.noteItem || '-' }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="借方金额" width="120" align="right">
+      <el-table-column label="借方调整金额" width="125" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!isReadonly"
@@ -136,13 +162,13 @@
             :precision="2"
             :min="0"
             style="width:100%"
-            @change="markDirty"
+            @change="handleRowChanged(row)"
           />
           <span v-else>{{ fmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="贷方金额" width="120" align="right">
+      <el-table-column label="贷方调整金额" width="125" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!isReadonly"
@@ -152,21 +178,21 @@
             :precision="2"
             :min="0"
             style="width:100%"
-            @change="markDirty"
+            @change="handleRowChanged(row)"
           />
           <span v-else>{{ fmt(row.creditAmount) }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="编制人" width="90">
+      <el-table-column label="索引" width="90">
         <template #default="{ row }">
           <el-input
             v-if="!isReadonly"
-            v-model="row.preparedBy"
+            v-model="row.indexRef"
             size="small"
-            @change="markDirty"
+            @change="handleRowChanged(row)"
           />
-          <span v-else>{{ row.preparedBy || '-' }}</span>
+          <span v-else>{{ row.indexRef || '-' }}</span>
         </template>
       </el-table-column>
 
@@ -176,7 +202,7 @@
             v-if="!isReadonly"
             v-model="row.remark"
             size="small"
-            @change="markDirty"
+            @change="handleRowChanged(row)"
           />
           <span v-else>{{ row.remark || '-' }}</span>
         </template>
@@ -223,39 +249,32 @@
         @change="saveConclusion" />
     </el-card>
 
-    <!-- 编制提示 -->
-    <details class="g7-guide-details">
-      <summary>📋 编制提示</summary>
-      <div class="g7-guide-content">
-        <p>1. 调整分录(AJE)用于更正被审计单位财务报表中的错报；重分类分录(RJE)用于分析性归类调整。</p>
-        <p>2. 借贷必须平衡后方可保存回写。点击"保存&amp;回写"将汇总数据回写G7-1审定表的AJE/RJE列。</p>
-        <p>3. 科目代码1511为长期股权投资（借方/资产类），保存后自动按分录类型汇总AJE/RJE调整额回写审定表对应列。</p>
-        <p>4. 新增分录需先输入摘要确认；删除分录需二次确认。</p>
-      </div>
-    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * G7TabAdjustment.vue — G7-3 调整分录汇总（23行×10列）
+ * G7TabAdjustment.vue — G7-3 调整分录汇总（源模板22行×10列，HTML动态行）
  *
  * Spec: .kiro/specs/g7-long-term-equity-main/ Task 6.1
  * Requirements: 6.1, 6.4
  *
  * 功能：
- * - 10列调整分录表格（序号|类型(AJE/RJE)|日期|摘要|科目代码|科目名称|借方金额|贷方金额|编制人|备注）
+ * - 对齐源 Excel 列（调整事项说明|类别|报表项目|科目名称|附注项目|借方|贷方|索引|备注）
  * - 借贷平衡实时校验 (isDebitCreditBalanced) + 差额≠0红色❌ / 差额=0绿色✅
  * - 动态行增删 (ElMessageBox.prompt 输入摘要确认)
  * - 导入导出 (sheet='G7-3', useG7ImportExport)
- * - 保存时汇总回写 G7-1 审定表 AJE/RJE 列（CustomEvent + EventBus）
+ * - 与集中调整分录模块双向同步，保存时按 1511/1512 分流回写 G7-1
  */
-import { ref, computed, inject, onMounted } from 'vue'
+import { ref, computed, inject, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { isDebitCreditBalanced, parseNum } from '../../composables/useG7FormulaEngine'
 import { useG7ImportExport } from '../../composables/useG7ImportExport'
+import { useWorkpaperAuditYear } from '../../composables/workpaperAuditYear'
 import type { G7MainImportableSheet } from '../../composables/useG7ImportExport'
 import { api } from '@/services/apiProxy'
+import { adjustments as adjustmentPaths } from '@/services/apiPaths/accounting'
+import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -270,6 +289,13 @@ const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog',
 interface G7AdjustmentEntry {
   id: string
   seq: number
+  description: string
+  category: '账项调整' | '报表调整' | '其他'
+  reportItem: string
+  noteItem: string
+  indexRef: string
+  sourceGroupId?: string
+  /** 兼容历史存量和导入导出契约 */
   entryType: 'AJE' | 'RJE'
   date: string
   summary: string
@@ -285,6 +311,20 @@ interface G7AdjustmentEntry {
 const entries = ref<G7AdjustmentEntry[]>([])
 const isDirty = ref(false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const syncing = ref(false)
+const lastSyncMsg = ref('')
+const auditYear = useWorkpaperAuditYear()
+const ROWS_KEY = 'G7-3-rows'
+const categoryOptions = ['账项调整', '报表调整', '其他'] as const
+const accountOptions = [
+  { code: '1511', name: '长期股权投资' },
+  { code: '1512', name: '长期股权投资减值准备' },
+  { code: '6111', name: '投资收益' },
+  { code: '6701', name: '资产减值损失' },
+  { code: '1012', name: '银行存款' },
+  { code: '1122', name: '应收账款' },
+  { code: '2241', name: '其他应付款' },
+] as const
 
 // ═══ 审计说明/结论 持久化（checklist_responses）══════════════════════════════
 const NOTE_KEY = 'G7-3-adjustment-audit-note'
@@ -340,47 +380,122 @@ function generateId(): string {
   return `g7adj-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-function buildInitialEntries(count: number): G7AdjustmentEntry[] {
-  const rows: G7AdjustmentEntry[] = []
-  for (let i = 1; i <= count; i++) {
-    rows.push({
-      id: generateId(),
-      seq: i,
-      entryType: 'AJE',
-      date: '',
-      summary: '',
-      accountCode: '',
-      accountName: '',
-      debitAmount: 0,
-      creditAmount: 0,
-      preparedBy: '',
-      remark: '',
-    })
-  }
-  return rows
-}
-
-function loadFromHtmlData(): void {
-  if (props.htmlData?.adjustment?.entries) {
-    const saved = props.htmlData.adjustment.entries as G7AdjustmentEntry[]
-    entries.value = saved.map((e, i) => ({
-      ...e,
-      id: e.id || generateId(),
-      seq: i + 1,
-    }))
-  } else {
-    entries.value = buildInitialEntries(23)
+function createEntry(description = ''): G7AdjustmentEntry {
+  return {
+    id: generateId(),
+    seq: entries.value.length + 1,
+    description,
+    category: '账项调整',
+    reportItem: '长期股权投资',
+    noteItem: '',
+    indexRef: 'G7-3',
+    entryType: 'AJE',
+    date: '',
+    summary: description,
+    accountCode: '1511',
+    accountName: '长期股权投资',
+    debitAmount: 0,
+    creditAmount: 0,
+    preparedBy: '',
+    remark: '',
   }
 }
 
-onMounted(() => {
-  loadFromHtmlData()
-  loadAuditResponses()
+function normalizeEntry(raw: any, index: number): G7AdjustmentEntry {
+  const category = raw.category
+    || (raw.entryType === 'RJE' ? '报表调整' : '账项调整')
+  const knownByName = accountOptions.find((item) =>
+    String(raw.accountName || '').includes(item.name),
+  )
+  const accountCode = String(raw.accountCode || knownByName?.code || '1511')
+  const known = accountOptions.find((item) => item.code === accountCode)
+  const description = String(raw.description || raw.summary || '')
+  return {
+    id: String(raw.id || raw.rowId || generateId()),
+    seq: index + 1,
+    description,
+    category,
+    reportItem: String(raw.reportItem || '长期股权投资'),
+    noteItem: String(raw.noteItem || ''),
+    indexRef: String(raw.indexRef || 'G7-3'),
+    sourceGroupId: raw.sourceGroupId ? String(raw.sourceGroupId) : undefined,
+    entryType: category === '报表调整' ? 'RJE' : 'AJE',
+    date: String(raw.date || ''),
+    summary: description,
+    accountCode,
+    accountName: String(raw.accountName || known?.name || ''),
+    debitAmount: parseNum(raw.debitAmount ?? raw.debit),
+    creditAmount: parseNum(raw.creditAmount ?? raw.credit),
+    preparedBy: String(raw.preparedBy || ''),
+    remark: String(raw.remark || ''),
+  }
+}
+
+function parseStoredEntries(raw: unknown): G7AdjustmentEntry[] {
+  if (!raw) return []
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+    const list = Array.isArray(parsed)
+      ? parsed
+      : Array.isArray((parsed as any)?.entries) ? (parsed as any).entries : []
+    return list.map(normalizeEntry)
+  } catch {
+    return []
+  }
+}
+
+async function loadEntries(): Promise<void> {
+  let saved: G7AdjustmentEntry[] = []
+  if (props.wpId) {
+    try {
+      const res = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`, { _silent: true } as any)
+      const items = Array.isArray(res) ? res : (res as any)?.data || []
+      const rowItem = items.find((item: any) => item.item_id === ROWS_KEY)
+      saved = parseStoredEntries(rowItem?.conclusion || rowItem?.remark)
+    } catch { /* fallback to html data */ }
+  }
+  if (!saved.length) {
+    saved = parseStoredEntries(props.htmlData?.adjustment?.entries)
+  }
+  entries.value = saved.length ? saved : [createEntry()]
+}
+
+async function persistEntries(): Promise<void> {
+  if (props.isReadonly || !props.wpId) return
+  const json = JSON.stringify(entries.value)
+  await api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+    project_id: props.projectId || undefined,
+    items: [{ item_id: ROWS_KEY, conclusion: json, remark: json }],
+  }, { _silent: true } as any)
+}
+
+onMounted(async () => {
+  await Promise.all([loadEntries(), loadAuditResponses()])
+  eventBus.on('adjustment:updated', handleModuleUpdated)
+  eventBus.on('adjustment:saved', handleModuleUpdated)
+})
+
+onBeforeUnmount(() => {
+  eventBus.off('adjustment:updated', handleModuleUpdated)
+  eventBus.off('adjustment:saved', handleModuleUpdated)
+  if (isDirty.value) void persistEntries().catch(() => {})
 })
 
 // ═══ 操作方法 ═══
 function markDirty(): void {
   isDirty.value = true
+}
+
+function handleRowChanged(row: G7AdjustmentEntry): void {
+  row.entryType = row.category === '报表调整' ? 'RJE' : 'AJE'
+  row.summary = row.description
+  markDirty()
+}
+
+function handleAccountChanged(row: G7AdjustmentEntry): void {
+  const matched = accountOptions.find((item) => item.code === row.accountCode)
+  if (matched) row.accountName = matched.name
+  handleRowChanged(row)
 }
 
 function reSequence(): void {
@@ -400,19 +515,7 @@ async function handleAddEntry(): Promise<void> {
         inputValidator: (v) => (!v?.trim() ? '摘要不能为空' : true),
       },
     )
-    const newEntry: G7AdjustmentEntry = {
-      id: generateId(),
-      seq: entries.value.length + 1,
-      entryType: 'AJE',
-      date: new Date().toISOString().slice(0, 10),
-      summary: summary.trim(),
-      accountCode: '',
-      accountName: '',
-      debitAmount: 0,
-      creditAmount: 0,
-      preparedBy: '',
-      remark: '',
-    }
+    const newEntry = createEntry(summary.trim())
     entries.value.push(newEntry)
     markDirty()
   } catch {
@@ -436,36 +539,252 @@ async function handleRemoveEntry(id: string): Promise<void> {
   }
 }
 
-/** 保存并回写G7-1审定表AJE/RJE列 */
-function handleSaveWriteback(): void {
+function aggregateAccount(codePrefix: '1511' | '1512'): { ajeTotal: number; rjeTotal: number } {
+  let ajeTotal = 0
+  let rjeTotal = 0
+  for (const entry of entries.value) {
+    if (!entry.accountCode.startsWith(codePrefix)) continue
+    const debitMinusCredit = parseNum(entry.debitAmount) - parseNum(entry.creditAmount)
+    // 减值准备是资产备抵科目，增加额按贷方减借方列示
+    const amount = codePrefix === '1512' ? -debitMinusCredit : debitMinusCredit
+    if (entry.category === '报表调整') rjeTotal += amount
+    else ajeTotal += amount
+  }
+  return { ajeTotal, rjeTotal }
+}
+
+function dispatchWriteback(accountCode: '1511' | '1512', totals: { ajeTotal: number; rjeTotal: number }): void {
+  window.dispatchEvent(new CustomEvent('g7:adjustment-writeback', {
+    detail: {
+      accountCode,
+      ...totals,
+      totalAdjustment: totals.ajeTotal + totals.rjeTotal,
+      entries: entries.value,
+    },
+  }))
+}
+
+function applyTotalsToGroup(group: any, totals: { ajeTotal: number; rjeTotal: number }): void {
+  if (!Array.isArray(group?.rows) || group.rows.length === 0) return
+  for (const row of group.rows) {
+    row.closingAJE = 0
+    row.closingRJE = 0
+    row.closingAdjusted = parseNum(row.closingUnadjusted)
+  }
+  const target = group.rows[0]
+  target.closingAJE = totals.ajeTotal
+  target.closingRJE = totals.rjeTotal
+  target.closingAdjusted = parseNum(target.closingUnadjusted) + totals.ajeTotal + totals.rjeTotal
+}
+
+/** 直接落库 G7-1，避免审定表未挂载时 CustomEvent 丢失 */
+async function persistAdjudicationWriteback(
+  gross: { ajeTotal: number; rjeTotal: number },
+  impairment: { ajeTotal: number; rjeTotal: number },
+): Promise<void> {
+  if (!props.wpId || props.isReadonly) return
+  const response: any = await api.get(
+    `/api/workpapers/${props.wpId}/checklist-responses`,
+    { _silent: true } as any,
+  )
+  const items = Array.isArray(response) ? response : response?.data || []
+  const stored = items.find((item: any) => item.item_id === 'G7-1-adjudication-data')
+  let data: any
+  try {
+    data = JSON.parse(stored?.remark || '')
+  } catch {
+    data = structuredClone(props.htmlData?.adjudication || { groups: [] })
+  }
+  const saveItems: any[] = [{
+    item_id: 'G7-1-adjustment-writeback',
+    conclusion: null,
+    remark: JSON.stringify({ gross, impairment, updatedAt: new Date().toISOString() }),
+  }]
+  if (Array.isArray(data?.groups) && data.groups.length > 0) {
+    const impairmentGroup = data.groups.find((group: any) =>
+      group.id === 'impairment' || group.groupType === 'impairment',
+    )
+    const investmentGroup = data.groups.find((group: any) =>
+      !['impairment', 'total'].includes(group.id || group.groupType),
+    )
+    applyTotalsToGroup(investmentGroup, gross)
+    applyTotalsToGroup(impairmentGroup, impairment)
+    saveItems.push({
+      item_id: 'G7-1-adjudication-data',
+      conclusion: null,
+      remark: JSON.stringify(data),
+    })
+  }
+  await api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+    project_id: props.projectId || undefined,
+    items: saveItems,
+  }, { _silent: true } as any)
+}
+
+function publishCreatedEvents(): void {
+  for (const entry of entries.value) {
+    if (!entry.debitAmount && !entry.creditAmount) continue
+    eventBus.emit('adjustment:created', {
+      wpCode: 'G7-3',
+      entryType: entry.category === '报表调整' ? 'RJE' : 'AJE',
+      amount: Math.max(entry.debitAmount, entry.creditAmount),
+      accountCode: entry.accountCode,
+      accountName: entry.accountName,
+      description: entry.description,
+      debitAmount: entry.debitAmount,
+      creditAmount: entry.creditAmount,
+      timestamp: Date.now(),
+    })
+  }
+}
+
+/** 将未同步的完整分录组单向写入集中 adjustments 表 */
+async function pushToAdjustmentModule(): Promise<number> {
+  if (!props.projectId || props.isReadonly) return 0
+  const year = Number(auditYear.value)
+  if (!Number.isFinite(year) || year < 1900) return 0
+  const pending = entries.value.filter(
+    (entry) => !entry.sourceGroupId && (entry.debitAmount !== 0 || entry.creditAmount !== 0),
+  )
+  const groups = new Map<string, G7AdjustmentEntry[]>()
+  for (const entry of pending) {
+    const key = `${entry.category}||${entry.description || entry.id}`
+    groups.set(key, [...(groups.get(key) || []), entry])
+  }
+
+  let pushed = 0
+  for (const lines of groups.values()) {
+    const debit = lines.reduce((sum, line) => sum + parseNum(line.debitAmount), 0)
+    const credit = lines.reduce((sum, line) => sum + parseNum(line.creditAmount), 0)
+    if (Math.abs(debit - credit) >= 0.01) continue
+    try {
+      const res: any = await api.post(adjustmentPaths.create(props.projectId), {
+        adjustment_type: lines[0].category === '报表调整' ? 'rje' : 'aje',
+        year,
+        company_code: 'default',
+        description: `[G7] ${lines[0].description || '长期股权投资调整'}`,
+        line_items: lines.map((line) => ({
+          standard_account_code: line.accountCode,
+          account_name: line.accountName || undefined,
+          debit_amount: line.debitAmount,
+          credit_amount: line.creditAmount,
+        })),
+      }, { _silent: true } as any)
+      const groupId = res?.entry_group_id ?? res?.data?.entry_group_id ?? res?.id
+      if (!groupId) continue
+      const id = String(groupId)
+      entries.value = entries.value.map((entry) =>
+        lines.some((line) => line.id === entry.id) ? { ...entry, sourceGroupId: id } : entry,
+      )
+      pushed++
+    } catch {
+      lastSyncMsg.value = '底稿已保存，但部分分录未能同步至集中模块'
+    }
+  }
+  if (pushed > 0) {
+    await persistEntries()
+    eventBus.emit('adjustment:updated')
+  }
+  return pushed
+}
+
+/** 保存、同步集中模块并回写 G7-1 */
+async function handleSaveWriteback(): Promise<void> {
   if (!isBalanced.value) {
     ElMessage.error('借贷不平衡，无法保存')
     return
   }
-
-  // 按科目1511汇总AJE/RJE调整总额（借方增加-贷方减少=净调整额）
-  const ajeTotal = entries.value
-    .filter((e) => e.entryType === 'AJE')
-    .reduce((s, e) => s + parseNum(e.debitAmount) - parseNum(e.creditAmount), 0)
-  const rjeTotal = entries.value
-    .filter((e) => e.entryType === 'RJE')
-    .reduce((s, e) => s + parseNum(e.debitAmount) - parseNum(e.creditAmount), 0)
-
-  // 发布CustomEvent通知G7-1审定表刷新AJE/RJE列
   try {
-    window.dispatchEvent(new CustomEvent('g7:adjustment-writeback', {
-      detail: {
-        accountCode: '1511',
-        ajeTotal,
-        rjeTotal,
-        totalAdjustment: ajeTotal + rjeTotal,
-        entries: entries.value,
-      },
-    }))
-  } catch { /* silent */ }
+    await persistEntries()
+    const gross = aggregateAccount('1511')
+    const impairment = aggregateAccount('1512')
+    await persistAdjudicationWriteback(gross, impairment)
+    dispatchWriteback('1511', gross)
+    dispatchWriteback('1512', impairment)
+    publishCreatedEvents()
+    const pushed = await pushToAdjustmentModule()
+    isDirty.value = false
+    ElMessage.success(
+      `已保存并回写 G7-1；1511 AJE ${fmt(gross.ajeTotal)} / RJE ${fmt(gross.rjeTotal)}`
+      + (pushed ? `，同步集中模块 ${pushed} 笔` : ''),
+    )
+  } catch {
+    ElMessage.error('保存失败，请稍后重试')
+  }
+}
 
-  ElMessage.success(`保存成功，AJE调整 ${fmt(ajeTotal)}，RJE调整 ${fmt(rjeTotal)}`)
-  isDirty.value = false
+function categoryFromType(value: unknown): '账项调整' | '报表调整' | '其他' {
+  const text = String(value || '').toLowerCase()
+  if (text.includes('rje') || text.includes('报表') || text.includes('重分类')) return '报表调整'
+  if (text.includes('其他')) return '其他'
+  return '账项调整'
+}
+
+function isG7Account(code: unknown): boolean {
+  return /^151[12]/.test(String(code || ''))
+}
+
+/** 从集中模块拉取：命中 1511/1512 的分录组按完整借贷行导入 */
+async function syncFromAdjustmentModule(): Promise<number> {
+  if (!props.projectId || props.isReadonly) return 0
+  syncing.value = true
+  lastSyncMsg.value = ''
+  try {
+    const year = Number(auditYear.value) || new Date().getFullYear()
+    const res: any = await api.get(adjustmentPaths.list(props.projectId), {
+      params: { year, page: 1, page_size: 200 },
+      _silent: true,
+    } as any)
+    const items = res?.data?.data?.items ?? res?.data?.items ?? res?.items ?? []
+    if (!Array.isArray(items)) {
+      lastSyncMsg.value = '未获取到调整分录'
+      return 0
+    }
+
+    const imported: G7AdjustmentEntry[] = []
+    for (const item of items) {
+      const lines = item.line_items || item.lines || []
+      if (!lines.some((line: any) => isG7Account(line.standard_account_code || line.account_code))) continue
+      const groupId = String(item.entry_group_id || item.id || '')
+      for (const line of lines) {
+        const accountCode = String(line.standard_account_code || line.account_code || '')
+        imported.push(normalizeEntry({
+          id: `${groupId}-${imported.length}`,
+          description: item.description || item.adjustment_no || '调整分录模块同步',
+          category: categoryFromType(item.adjustment_type || item.type),
+          reportItem: isG7Account(accountCode) ? '长期股权投资' : '',
+          accountCode,
+          accountName: line.account_name || accountCode,
+          noteItem: '',
+          debitAmount: line.debit_amount,
+          creditAmount: line.credit_amount,
+          indexRef: item.adjustment_no || 'G7-3',
+          remark: '来自调整分录模块',
+          sourceGroupId: groupId,
+        }, imported.length))
+      }
+    }
+    const manual = entries.value.filter((entry) => !entry.sourceGroupId)
+    entries.value = [...manual, ...imported].map((entry, index) => ({ ...entry, seq: index + 1 }))
+    await persistEntries()
+    lastSyncMsg.value = imported.length ? `已同步 ${imported.length} 行` : '集中模块中无 1511/1512 相关分录'
+    return imported.length
+  } catch {
+    lastSyncMsg.value = '同步失败，请稍后重试'
+    return 0
+  } finally {
+    syncing.value = false
+  }
+}
+
+async function handleSyncFromModule(): Promise<void> {
+  const count = await syncFromAdjustmentModule()
+  if (count > 0) ElMessage.success(`已从调整分录模块同步 ${count} 行`)
+  else ElMessage.info(lastSyncMsg.value || '无相关分录')
+}
+
+function handleModuleUpdated(): void {
+  if (!props.isReadonly && props.projectId) void syncFromAdjustmentModule()
 }
 
 /** 导入导出命令处理 */
@@ -483,8 +802,8 @@ async function onFileSelected(event: Event): Promise<void> {
   if (!file) return
   const result = await ie.importData('G7-3', file)
   if (result) {
-    // 导入成功后重新加载数据（实际场景下后端返回更新后的entries）
-    ElMessage.info('数据已导入，请刷新查看最新分录')
+    await loadEntries()
+    ElMessage.success(`数据已导入，共 ${result.rowCount ?? 0} 行`)
   }
   input.value = '' // 重置file input
 }
@@ -570,6 +889,11 @@ function tableRowClassName({ row }: { row: G7AdjustmentEntry }): string {
 }
 
 .row-count {
+  color: #909399;
+  font-size: 12px;
+}
+
+.sync-msg {
   color: #909399;
   font-size: 12px;
 }

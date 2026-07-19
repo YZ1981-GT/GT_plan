@@ -52,12 +52,135 @@
 
     <!-- 工具栏：索引 chip + 行数 -->
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <el-tag size="small" :type="route.tone">
+          {{ route.code || '待判断' }} {{ route.label }}
+        </el-tag>
+      </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:G7-7" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ rowCount }} 行</el-tag>
       </div>
     </div>
+
+    <!-- 核心决策链：关系类型 → 合并类型 → 控制权转移日 → 后续底稿 -->
+    <el-card shadow="never" class="decision-card">
+      <template #header>
+        <div class="conclusion-header">
+          <span class="conclusion-title">三、初始确认决策结果</span>
+          <el-button v-if="!isReadonly" size="small" @click="fillConclusionDraft">生成结论草稿</el-button>
+        </div>
+      </template>
+      <el-form label-width="150px" class="decision-form">
+        <div class="decision-grid">
+          <el-form-item label="被投资单位">
+            <el-input
+              v-if="!isReadonly"
+              v-model="decision.investeeName"
+              placeholder="填写被投资单位全称"
+              @change="applyInvesteeName"
+            />
+            <span v-else>{{ decision.investeeName || '—' }}</span>
+          </el-form-item>
+          <el-form-item label="投资关系类型" required>
+            <el-select
+              v-if="!isReadonly"
+              v-model="decision.relationshipType"
+              placeholder="请选择"
+              style="width:100%"
+              @change="handleRelationshipChange"
+            >
+              <el-option value="控制" label="控制" />
+              <el-option value="共同控制" label="共同控制" />
+              <el-option value="重大影响" label="重大影响" />
+              <el-option value="无重大影响" label="无重大影响" />
+            </el-select>
+            <span v-else>{{ decision.relationshipType || '—' }}</span>
+          </el-form-item>
+          <el-form-item label="企业合并类型" :required="decision.relationshipType === '控制'">
+            <el-select
+              v-if="!isReadonly"
+              v-model="decision.combinationType"
+              :disabled="decision.relationshipType !== '控制'"
+              placeholder="请选择"
+              style="width:100%"
+              @change="persistData"
+            >
+              <el-option value="同一控制下企业合并" label="同一控制下企业合并" />
+              <el-option value="非同一控制下企业合并" label="非同一控制下企业合并" />
+              <el-option value="非企业合并（投资设立等）" label="非企业合并（投资设立等）" />
+            </el-select>
+            <span v-else>{{ decision.combinationType || '—' }}</span>
+          </el-form-item>
+          <el-form-item label="合并日/购买日">
+            <el-date-picker
+              v-if="!isReadonly"
+              v-model="decision.acquisitionDate"
+              type="date"
+              value-format="YYYY-MM-DD"
+              placeholder="控制权转移日"
+              style="width:100%"
+              :disabled="!isBusinessCombination"
+              @change="persistData"
+            />
+            <span v-else>{{ decision.acquisitionDate || '—' }}</span>
+          </el-form-item>
+          <el-form-item label="前期关系结论">
+            <el-select
+              v-if="!isReadonly"
+              v-model="decision.priorConclusion"
+              clearable
+              placeholder="首次投资可不填"
+              style="width:100%"
+              @change="persistData"
+            >
+              <el-option value="控制" label="控制" />
+              <el-option value="共同控制" label="共同控制" />
+              <el-option value="重大影响" label="重大影响" />
+              <el-option value="无重大影响" label="无重大影响" />
+            </el-select>
+            <span v-else>{{ decision.priorConclusion || '首次判断' }}</span>
+          </el-form-item>
+          <el-form-item label="后续底稿路线">
+            <el-tag :type="route.tone">{{ route.code || '—' }} {{ route.label }}</el-tag>
+          </el-form-item>
+        </div>
+        <el-form-item label="控制权转移日依据" :required="isBusinessCombination">
+          <el-input
+            v-model="decision.acquisitionDateBasis"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 4 }"
+            :disabled="isReadonly || !isBusinessCombination"
+            placeholder="说明批准、对价支付、财产权转移、管理层接管等事实及证据索引"
+            @change="persistData"
+          />
+        </el-form-item>
+        <el-form-item label="合并类型判断依据" :required="decision.relationshipType === '控制'">
+          <el-input
+            v-model="decision.combinationBasis"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 4 }"
+            :disabled="isReadonly || decision.relationshipType !== '控制'"
+            placeholder="说明是否构成业务、合并前后最终控制方、控制是否非暂时性等"
+            @change="persistData"
+          />
+        </el-form-item>
+        <el-form-item
+          v-if="decision.priorConclusion && decision.priorConclusion !== decision.relationshipType"
+          label="结论变化原因"
+          required
+        >
+          <el-input
+            v-model="decision.conclusionChangeReason"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 4 }"
+            :disabled="isReadonly"
+            placeholder="说明股权变化、协议变化、事实和情况变化及生效日期"
+            @change="persistData"
+          />
+        </el-form-item>
+      </el-form>
+    </el-card>
 
     <!-- ═══ 6 Sections ═══ -->
     <div v-for="section in sections" :key="section.id" class="judgment-section">
@@ -104,6 +227,7 @@
               v-model="row.investeeName"
               size="small"
               placeholder="被投资单位"
+              @change="persistData"
             />
             <span v-else>{{ row.investeeName }}</span>
           </template>
@@ -118,6 +242,7 @@
               placeholder="请选择"
               clearable
               style="width: 100%"
+              @change="persistData"
             >
               <el-option value="是" label="是" />
               <el-option value="否" label="否" />
@@ -138,6 +263,7 @@
               :autosize="{ minRows: 1, maxRows: 3 }"
               size="small"
               placeholder="填写判断依据"
+              @change="persistData"
             />
             <span v-else class="multiline-cell">{{ row.judgmentBasis }}</span>
           </template>
@@ -152,6 +278,7 @@
               placeholder="风险"
               clearable
               style="width: 100%"
+              @change="persistData"
             >
               <el-option value="高" label="高">
                 <span style="color:#F56C6C">● 高</span>
@@ -181,6 +308,7 @@
               :autosize="{ minRows: 1, maxRows: 3 }"
               size="small"
               placeholder="审计结论"
+              @change="persistData"
             />
             <span v-else class="multiline-cell">{{ row.auditConclusion }}</span>
           </template>
@@ -194,6 +322,7 @@
               v-model="row.indexRef"
               size="small"
               placeholder="索引"
+              @change="persistData"
             />
             <span v-else>—</span>
           </template>
@@ -238,6 +367,10 @@
       />
     </el-card>
 
+    <div v-if="!isReadonly" class="save-actions">
+      <el-button type="success" @click="handleSave">保存并校验</el-button>
+    </div>
+
     <!-- 编制提示 -->
     <details class="prep-hint">
       <summary>编制提示</summary>
@@ -270,6 +403,14 @@ import { ref, reactive, computed, inject, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useG7SubFormData } from '../../composables/useG7SubFormData'
+import {
+  buildG7ControlConclusion,
+  deriveG7ControlRoute,
+  validateG7ControlDecision,
+  type CombinationType,
+  type G7ControlDecision,
+  type RelationshipType,
+} from '../../composables/g7ControlJudgmentModel'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -312,6 +453,7 @@ interface G7ControlSection {
 interface G7ControlJudgmentData {
   sections: G7ControlSection[]
   overallConclusion: string
+  decision: G7ControlDecision
 }
 
 // ─── 方法论预填数据（CAS33六要素） ──────────────────────────────────────────
@@ -400,15 +542,15 @@ const SECTION_DEFINITIONS: Array<{
   {
     id: 'overallJudgment',
     sectionNo: '(六)',
-    title: '综合判断',
+    title: '分类与控制权转移时点判断',
     rows: [
       { dimension: '控制三要素同时满足', criterion: '权力+可变回报+联系三要素是否同时满足→控制' },
-      { dimension: '共同控制判断', criterion: '是否与其他方共同控制被投资方（共同安排CAS40）' },
-      { dimension: '重大影响判断', criterion: '是否对被投资方具有重大影响（20%-50%持股推定）' },
-      { dimension: '无重大影响', criterion: '是否既不控制、不共同控制也不具有重大影响' },
-      { dimension: '控制类型最终结论', criterion: '综合判断最终控制类型：控制/共同控制/重大影响/无重大影响' },
-      { dimension: '计量方法确定', criterion: '根据控制类型确定后续计量方法（成本法/权益法/公允价值）' },
-      { dimension: '前期结论变化', criterion: '与前期审计结论是否存在变化，变化原因是否充分' },
+      { dimension: '共同控制条件满足', criterion: '合同约定相关活动的决策是否必须经分享控制权的参与方一致同意' },
+      { dimension: '重大影响条件满足', criterion: '是否具有董事席位、参与政策制定、重大交易或技术依赖等重大影响证据' },
+      { dimension: '被购买方构成业务', criterion: '取得的活动和资产组合是否至少包含投入及实质性加工处理过程并能够产出' },
+      { dimension: '同一最终控制方', criterion: '合并前后是否受同一方或相同多方最终控制，且该控制并非暂时性' },
+      { dimension: '控制权已实际转移', criterion: '批准、对价支付、财产权交接、经营决策及财务政策控制等条件是否实质满足' },
+      { dimension: '前期结论变化已说明', criterion: '与前期关系分类或控制结论不一致时，变化原因及生效时点是否已有充分证据' },
     ],
   },
 ]
@@ -418,12 +560,28 @@ const SECTION_DEFINITIONS: Array<{
 const sections = reactive<G7ControlSection[]>([])
 const overallConclusion = ref('')
 const rowCount = computed(() => sections.reduce((n, s) => n + s.rows.length, 0))
+const decision = reactive<G7ControlDecision>({
+  investeeName: '',
+  relationshipType: '',
+  combinationType: '',
+  combinationBasis: '',
+  acquisitionDate: '',
+  acquisitionDateBasis: '',
+  priorConclusion: '',
+  conclusionChangeReason: '',
+})
+const route = computed(() => deriveG7ControlRoute(decision))
+const isBusinessCombination = computed(() =>
+  decision.combinationType === '同一控制下企业合并'
+  || decision.combinationType === '非同一控制下企业合并',
+)
 
-// ─── 审计说明/结论持久化（checklist_responses，conclusion:null） ───
+// ─── 明细/审计说明/结论持久化 ───
 const auditFormData = useG7SubFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
+const DATA_KEY = 'G7-7-control-judgment-data'
 const NOTE_KEY = 'G7-7-control-judgment-audit-note'
 const CONCLUSION_KEY = 'G7-7-control-judgment-audit-conclusion'
 const auditNote = ref('')
@@ -437,6 +595,69 @@ function saveAuditConclusion(val: string): void {
   if (isReadonly.value) return
   overallConclusion.value = val
   auditFormData.debouncedSave(CONCLUSION_KEY, { remark: val, conclusion: null })
+  persistData()
+}
+
+function persistData(): void {
+  if (isReadonly.value) return
+  auditFormData.debouncedSave(DATA_KEY, {
+    conclusion: JSON.stringify(getData()),
+    remark: null,
+  })
+}
+
+function applyInvesteeName(): void {
+  for (const section of sections) {
+    for (const row of section.rows) row.investeeName = decision.investeeName
+  }
+  persistData()
+}
+
+function handleRelationshipChange(value: RelationshipType): void {
+  if (value !== '控制') {
+    decision.combinationType = '不适用'
+    decision.combinationBasis = ''
+    decision.acquisitionDate = ''
+    decision.acquisitionDateBasis = ''
+  } else if (decision.combinationType === '不适用') {
+    decision.combinationType = '' as CombinationType
+  }
+  persistData()
+}
+
+function fillConclusionDraft(): void {
+  const errors = validateG7ControlDecision(decision)
+  if (errors.length > 0) {
+    ElMessage.warning(errors[0])
+    return
+  }
+  overallConclusion.value = buildG7ControlConclusion(decision)
+  saveAuditConclusion(overallConclusion.value)
+  ElMessage.success('已按决策结果生成结论草稿')
+}
+
+async function handleSave(): Promise<void> {
+  const errors = validateG7ControlDecision(decision)
+  if (errors.length > 0) {
+    ElMessage.error(errors.join('；'))
+    return
+  }
+  const unansweredKeyRows = sections
+    .find(s => s.id === 'overallJudgment')
+    ?.rows.filter(r => !r.judgmentResult).map(r => r.dimension) ?? []
+  if (unansweredKeyRows.length > 0) {
+    ElMessage.error(`综合判断尚未完成：${unansweredKeyRows.join('、')}`)
+    return
+  }
+  await auditFormData.saveImmediate(DATA_KEY, {
+    conclusion: JSON.stringify(getData()),
+    remark: null,
+  })
+  await auditFormData.saveImmediate(CONCLUSION_KEY, {
+    remark: overallConclusion.value,
+    conclusion: null,
+  })
+  ElMessage.success('G7-7 初始判断已保存')
 }
 
 // ─── 初始化 ──────────────────────────────────────────────────────────────────
@@ -502,9 +723,31 @@ function loadFromHtmlData(data: Record<string, any> | null): void {
       })
     }
     overallConclusion.value = judgmentData?.overallConclusion || ''
+    if (judgmentData?.decision) {
+      Object.assign(decision, {
+        investeeName: judgmentData.decision.investeeName ?? '',
+        relationshipType: judgmentData.decision.relationshipType ?? '',
+        combinationType: judgmentData.decision.combinationType ?? '',
+        combinationBasis: judgmentData.decision.combinationBasis ?? '',
+        acquisitionDate: judgmentData.decision.acquisitionDate ?? '',
+        acquisitionDateBasis: judgmentData.decision.acquisitionDateBasis ?? '',
+        priorConclusion: judgmentData.decision.priorConclusion ?? '',
+        conclusionChangeReason: judgmentData.decision.conclusionChangeReason ?? '',
+      })
+    } else {
+      decision.investeeName = rowsFirstInvesteeName()
+    }
   } else {
     initSections()
   }
+}
+
+function rowsFirstInvesteeName(): string {
+  for (const section of sections) {
+    const name = section.rows.find(r => r.investeeName.trim())?.investeeName
+    if (name) return name
+  }
+  return ''
 }
 
 // ─── UI辅助函数 ──────────────────────────────────────────────────────────────
@@ -548,6 +791,7 @@ async function handleAiSection(sectionId: string): Promise<void> {
           break // AI只填1行作为参考
         }
       }
+      persistData()
       ElMessage.success('AI辅助内容已生成')
     }
   } catch {
@@ -566,6 +810,8 @@ async function handleAiOverall(): Promise<void> {
         existingContent: overallConclusion.value,
         relatedContext: {
           type: 'overall',
+          decision: { ...decision },
+          route: route.value,
           sections: sections.map(s => ({
             id: s.id,
             title: `${s.sectionNo} ${s.title}`,
@@ -578,6 +824,7 @@ async function handleAiOverall(): Promise<void> {
     if (text) {
       overallConclusion.value = text
       auditFormData.debouncedSave(CONCLUSION_KEY, { remark: text, conclusion: null })
+      persistData()
       ElMessage.success('AI综合结论已生成')
       return
     }
@@ -585,38 +832,15 @@ async function handleAiOverall(): Promise<void> {
     // AI后端未连接，降级为本地逻辑生成草案
   }
 
-  // 降级：自动根据各section的判断结果生成综合结论草案
-  const powerSection = sections.find(s => s.id === 'power')
-  const returnSection = sections.find(s => s.id === 'variableReturns')
-  const linkSection = sections.find(s => s.id === 'powerReturnLink')
-  const overallSection = sections.find(s => s.id === 'overallJudgment')
-
-  const powerYes = powerSection?.rows.filter(r => r.judgmentResult === '是').length ?? 0
-  const returnYes = returnSection?.rows.filter(r => r.judgmentResult === '是').length ?? 0
-  const linkYes = linkSection?.rows.filter(r => r.judgmentResult === '是').length ?? 0
-
-  let draft = ''
-  if (powerYes > 0 && returnYes > 0 && linkYes > 0) {
-    draft = '经审查，投资方对被投资方同时满足权力、可变回报及权力与回报的联系三要素，' +
-      '根据CAS33的规定，投资方对被投资方实施控制。应采用成本法核算该项长期股权投资。'
-  } else if (powerYes > 0 && returnYes > 0) {
-    draft = '经审查，投资方对被投资方拥有权力且享有可变回报，但权力与回报的联系尚需进一步评估。' +
-      '建议结合代理人判断及实质性权利分析综合确定控制类型。'
-  } else {
-    draft = '经审查，投资方对被投资方未能同时满足控制三要素，不构成控制。' +
-      '需进一步评估是否构成共同控制或重大影响，以确定适用的计量方法。'
+  const errors = validateG7ControlDecision(decision)
+  if (errors.length > 0) {
+    ElMessage.warning(`AI不可用；生成本地结论前请完善：${errors[0]}`)
+    return
   }
-
-  // 追加综合判断section中的结论
-  const conclusionRow = overallSection?.rows.find(r => r.dimension === '控制类型最终结论')
-  if (conclusionRow?.judgmentResult) {
-    draft += `\n\n最终判断结果：${conclusionRow.judgmentResult}。`
-  }
-
-  overallConclusion.value = overallConclusion.value
-    ? `${overallConclusion.value}\n${draft}`
-    : draft
+  overallConclusion.value = buildG7ControlConclusion(decision)
   auditFormData.debouncedSave(CONCLUSION_KEY, { remark: overallConclusion.value, conclusion: null })
+  persistData()
+  ElMessage.success('已生成本地结论草稿')
 }
 
 // ─── 复核对话 ────────────────────────────────────────────────────────────────
@@ -636,6 +860,7 @@ function getData(): G7ControlJudgmentData {
       rows: s.rows.map(r => ({ ...r })),
     })),
     overallConclusion: overallConclusion.value,
+    decision: { ...decision },
   }
 }
 
@@ -644,8 +869,19 @@ defineExpose({ getData, loadFromHtmlData })
 // ─── 生命周期 ────────────────────────────────────────────────────────────────
 
 onMounted(async () => {
+  // 先同步渲染模板/传入数据，避免网络加载期间页面为空
   loadFromHtmlData(props.htmlData)
   await auditFormData.load()
+  const savedRaw = auditFormData.data.value.get(DATA_KEY)?.conclusion
+  let savedData: Record<string, any> | null = null
+  if (typeof savedRaw === 'string' && savedRaw.trim()) {
+    try {
+      savedData = JSON.parse(savedRaw)
+    } catch {
+      savedData = null
+    }
+  }
+  if (savedData) loadFromHtmlData(savedData)
   const n = auditFormData.data.value.get(NOTE_KEY)
   if (n?.remark) auditNote.value = n.remark
   const c = auditFormData.data.value.get(CONCLUSION_KEY)
@@ -747,9 +983,21 @@ watch(() => props.htmlData, (newData) => {
 
 /* ═══ 审计目标 / 工具栏 ═══ */
 .objective-alert { margin-bottom: 12px; }
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin: 8px 0 16px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin: 8px 0 16px; gap: 8px; flex-wrap: wrap; }
+.tab-toolbar .toolbar-left { display: flex; align-items: center; gap: 8px; }
 .tab-toolbar .toolbar-right { display: flex; align-items: center; gap: 8px; }
 .tab-toolbar .chip-wrap { display: inline-flex; }
+
+/* ═══ 初始确认决策链 ═══ */
+.decision-card { margin-bottom: 18px; border-color: #bfdbfe; }
+.decision-card :deep(.el-card__header) { background: #eff6ff; padding: 10px 16px; }
+.decision-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 18px;
+}
+.decision-form :deep(.el-form-item) { margin-bottom: 14px; }
+.save-actions { margin-top: 16px; display: flex; justify-content: flex-end; }
 
 /* ═══ 底部综合结论 ═══ */
 .audit-note-card { margin-top: 20px; }
@@ -763,4 +1011,8 @@ watch(() => props.htmlData, (newData) => {
 .prep-hint { margin-top: 16px; font-size: 12px; color: #909399; }
 .prep-hint summary { cursor: pointer; font-weight: 500; }
 .prep-hint ul { margin: 8px 0 0; padding-left: 18px; line-height: 1.8; }
+
+@media (max-width: 900px) {
+  .decision-grid { grid-template-columns: 1fr; }
+}
 </style>

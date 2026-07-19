@@ -150,6 +150,14 @@ def validate_config(payload: AgingConfigPayload) -> list[str]:
         if stripped:
             seen.add(stripped)
 
+    # subject_overrides 不允许 CUSTOM（无法携带独立 custom_segments）
+    if payload.subject_overrides:
+        for subject, override in payload.subject_overrides.items():
+            if override == AgingPreset.CUSTOM:
+                errors.append(
+                    f"INVALID_SUBJECT_OVERRIDE:{subject}科目覆盖不支持CUSTOM，请使用全局CUSTOM或THREE_YEAR/FIVE_YEAR"
+                )
+
     return errors
 
 
@@ -305,6 +313,9 @@ async def get_effective_segments(
     if subject in overrides:
         override_preset = AgingPreset(overrides[subject])
         # subject override 只支持预定义 preset (不支持 CUSTOM 覆盖)
+        if override_preset == AgingPreset.CUSTOM:
+            # 非法历史配置：回退全局 preset，避免空段
+            return resolve_segments(global_preset, custom_segments)
         return resolve_segments(override_preset, None)
 
     # 使用全局 preset

@@ -32,6 +32,26 @@
         >
           回写利息调整至 G6-2
         </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="primary"
+          plain
+          :loading="syncingEcl"
+          :disabled="!interest.groups.value.length"
+          @click="syncEclStage"
+        >
+          从 G6-12 同步阶段
+        </el-button>
+        <el-button
+          size="small"
+          plain
+          :loading="comparingEnding"
+          :disabled="!interest.groups.value.length"
+          @click="compareEndingToG62"
+        >
+          核对期末摊余 vs G6-2
+        </el-button>
       </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:G6-6" :context-project-id="projectId" /></span>
@@ -42,12 +62,48 @@
     <!-- 方法论上下文（琥珀色左边线+浅黄背景） -->
     <div class="methodology-context">
       <p><strong>实际利率法确认利息收入：</strong></p>
-      <p>利息收入 = 摊余成本 × 实际利率 × 计息天数 / 365</p>
-      <p>期末摊余成本 = 期初摊余成本 + 实际利息收入 - 现金流入（票息）</p>
+      <p>利息收入 = 摊余成本 × 实际利率 × 计息天数 / 年天数（计息基准 ACT/365、ACT/360 或 30/360）</p>
+      <p>现金流入（票息）= 剩余面值 × 票面利率 × 计息天数 / 年天数（剩余面值 = 面值 − 此前收回本金）</p>
+      <p>期末摊余成本 = 期初摊余成本 + 实际利息收入 - 现金流入（票息） - 收回本金</p>
       <p style="color: #92400e; font-size: 11px; margin-top: 4px;">
-        依据CAS22《金融工具确认和计量》，其他债权投资按实际利率法确认利息收入并调整摊余成本。
+        依据CAS22《金融工具确认和计量》，其他债权投资按实际利率法确认利息收入并调整摊余成本。填写起息日/截止日后可自动推算 ACT/365 天数。
       </p>
     </div>
+
+    <!-- 利率合理性告警 -->
+    <el-alert
+      v-if="interest.hasRateWarnings.value"
+      type="warning"
+      :closable="false"
+      class="warn-alert"
+    >
+      <template #title>利率合理性提示（{{ interest.rateWarnings.value.length }}项）</template>
+      <ul class="warn-list">
+        <li v-for="(w, i) in interest.rateWarnings.value" :key="`${w.groupId}-${i}`">{{ w.message }}</li>
+      </ul>
+    </el-alert>
+    <el-alert
+      v-if="interest.hasDayWarnings.value"
+      type="warning"
+      :closable="false"
+      class="warn-alert"
+    >
+      <template #title>计息期间提示（{{ interest.dayWarnings.value.length }}项）</template>
+      <ul class="warn-list">
+        <li v-for="(w, i) in interest.dayWarnings.value" :key="`${w.periodId}-${i}`">{{ w.message }}</li>
+      </ul>
+    </el-alert>
+    <el-alert
+      v-if="interest.hasPrincipalWarnings.value"
+      type="warning"
+      :closable="false"
+      class="warn-alert"
+    >
+      <template #title>收回本金/摊余提示（{{ interest.principalWarnings.value.length }}项）</template>
+      <ul class="warn-list">
+        <li v-for="(w, i) in interest.principalWarnings.value" :key="`${w.groupId}-${w.periodId || i}`">{{ w.message }}</li>
+      </ul>
+    </el-alert>
 
     <!-- ═══ 投资项目分组卡片 ═══ -->
     <template v-if="interest.groups.value.length > 0">
@@ -96,9 +152,70 @@
                   />
                   <span v-else>{{ (group.effectiveRate * 100).toFixed(4) }}</span>%
                 </span>
+                <span class="param-item">
+                  计息基准：
+                  <el-select
+                    v-if="!isReadonly"
+                    :model-value="group.dayCountBasis || 'ACT/365'"
+                    size="small"
+                    style="width: 110px"
+                    @update:model-value="(v: string) => interest.updateGroupHeader(group.id, 'dayCountBasis', v)"
+                  >
+                    <el-option label="ACT/365" value="ACT/365" />
+                    <el-option label="ACT/360" value="ACT/360" />
+                    <el-option label="30/360" value="30/360" />
+                  </el-select>
+                  <span v-else>{{ group.dayCountBasis || 'ACT/365' }}</span>
+                </span>
+              </div>
+              <div class="group-params initial-params">
+                <span class="param-item">
+                  购买对价：
+                  <el-input-number
+                    v-if="!isReadonly"
+                    :model-value="group.purchasePrice"
+                    size="small" :controls="false" :precision="2"
+                    style="width: 110px"
+                    @update:model-value="(v: number | undefined) => interest.updateGroupHeader(group.id, 'purchasePrice', v ?? 0)"
+                  />
+                  <span v-else>{{ fmtNum(group.purchasePrice) }}</span>
+                </span>
+                <span class="param-item">
+                  交易费用：
+                  <el-input-number
+                    v-if="!isReadonly"
+                    :model-value="group.transactionCost"
+                    size="small" :controls="false" :precision="2"
+                    style="width: 110px"
+                    @update:model-value="(v: number | undefined) => interest.updateGroupHeader(group.id, 'transactionCost', v ?? 0)"
+                  />
+                  <span v-else>{{ fmtNum(group.transactionCost) }}</span>
+                </span>
+                <span class="param-item">
+                  初始入账：
+                  <span class="formula-cell" title="购买对价 + 交易费用">{{ fmtNum(group.initialCarryingAmount) }}</span>
+                </span>
+                <span class="param-item">
+                  初始确认日：
+                  <el-date-picker
+                    v-if="!isReadonly"
+                    :model-value="group.initialDate"
+                    type="date" size="small"
+                    format="YYYY-MM-DD" value-format="YYYY-MM-DD"
+                    style="width: 130px"
+                    @update:model-value="(v: string) => interest.updateGroupHeader(group.id, 'initialDate', v || '')"
+                  />
+                  <span v-else>{{ group.initialDate || '-' }}</span>
+                </span>
               </div>
             </div>
             <div class="group-actions">
+              <span class="chip-wrap">
+                <GtIndexChip
+                  :value="group.crossSheetInvestmentId ? `wp:G6-2#${group.crossSheetInvestmentId}` : 'wp:G6-2'"
+                  :context-project-id="projectId"
+                />
+              </span>
               <el-tag size="small" type="info">
                 利息小计：{{ fmtNum(interest.getGroupInterestTotal(group.id)) }}
               </el-tag>
@@ -113,6 +230,22 @@
 
         <!-- 多期表格 -->
         <el-table :data="group.periods" border size="small" class="period-table">
+          <el-table-column label="起息日" width="120">
+            <template #default="{ row }">
+              <el-date-picker
+                v-if="!isReadonly"
+                :model-value="row.periodStart"
+                type="date"
+                size="small"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+                placeholder="起息日"
+                style="width: 110px"
+                @update:model-value="(v: string) => interest.updatePeriod(group.id, row.id, 'periodStart', v || '')"
+              />
+              <span v-else>{{ row.periodStart || '-' }}</span>
+            </template>
+          </el-table-column>
           <el-table-column label="截止日" width="120">
             <template #default="{ row }">
               <el-date-picker
@@ -129,13 +262,13 @@
               <span v-else>{{ row.periodEnd || '-' }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="期初摊余成本" width="140" align="right">
+          <el-table-column label="期初摊余成本" width="130" align="right">
             <template #default="{ row, $index }">
               <el-input-number
                 v-if="!isReadonly && $index === 0"
                 :model-value="row.openingAmortized"
                 size="small" :controls="false" :precision="2"
-                style="width: 120px"
+                style="width: 110px"
                 @update:model-value="(v: number | undefined) => interest.updatePeriod(group.id, row.id, 'openingAmortized', v ?? 0)"
               />
               <span v-else class="formula-cell" title="期初摊余 = 上期期末摊余">
@@ -143,43 +276,90 @@
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="实际利息收入" width="140" align="right">
+          <el-table-column label="阶段" width="100" align="center">
             <template #default="{ row }">
-              <span
-                class="formula-cell"
-                title="实际利息 = 期初摊余 × 实际利率 × 天数/365"
-              >{{ fmtNum(row.effectiveInterest) }}</span>
+              <el-select
+                v-if="!isReadonly"
+                :model-value="row.stage"
+                size="small"
+                style="width: 88px"
+                @update:model-value="(v: string) => interest.updatePeriod(group.id, row.id, 'stage', v)"
+              >
+                <el-option label="S1" value="Stage1" />
+                <el-option label="S2" value="Stage2" />
+                <el-option label="S3" value="Stage3" />
+              </el-select>
+              <span v-else>{{ row.stage === 'Stage3' ? 'S3' : row.stage === 'Stage2' ? 'S2' : 'S1' }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="现金流入" width="130" align="right">
+          <el-table-column label="期初减值" width="110" align="right">
             <template #default="{ row }">
-              <span
-                class="formula-cell"
-                title="现金流入 = 面值 × 票面利率 × 天数/365"
-              >{{ fmtNum(row.cashInflow) }}</span>
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.openingImpairment"
+                size="small" :controls="false" :precision="2"
+                style="width: 95px"
+                :disabled="row.stage !== 'Stage3'"
+                @update:model-value="(v: number | undefined) => interest.updatePeriod(group.id, row.id, 'openingImpairment', v ?? 0)"
+              />
+              <span v-else>{{ fmtNum(row.openingImpairment) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="期末摊余成本" width="140" align="right">
+          <el-table-column label="实际利息收入" width="130" align="right">
             <template #default="{ row }">
-              <span
-                class="formula-cell"
-                title="期末摊余 = 期初 + 实际利息 - 现金流入"
-              >{{ fmtNum(row.endingAmortized) }}</span>
+              <span class="formula-cell" title="实际利息 = 期初摊余 × 实际利率 × 天数/365">{{ fmtNum(row.effectiveInterest) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="天数" width="80" align="center">
+          <el-table-column label="现金流入" width="110" align="right">
+            <template #default="{ row }">
+              <span class="formula-cell" title="现金流入 = 面值 × 票面利率 × 天数/365">{{ fmtNum(row.cashInflow) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="收回本金" width="110" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.principalRecovered"
+                size="small" :controls="false" :precision="2"
+                style="width: 95px"
+                @update:model-value="(v: number | undefined) => interest.updatePeriod(group.id, row.id, 'principalRecovered', v ?? 0)"
+              />
+              <span v-else>{{ fmtNum(row.principalRecovered) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="期末摊余成本" width="130" align="right">
+            <template #default="{ row }">
+              <span class="formula-cell" title="期末摊余 = 期初 + 实际利息 - 现金流入 - 收回本金">{{ fmtNum(row.endingAmortized) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="天数" width="90" align="center">
             <template #default="{ row }">
               <el-input-number
                 v-if="!isReadonly"
                 :model-value="row.days"
                 size="small" :controls="false" :min="1" :max="366"
-                style="width: 60px"
+                style="width: 70px"
                 @update:model-value="(v: number | undefined) => interest.updatePeriod(group.id, row.id, 'days', v ?? 180)"
               />
               <span v-else>{{ row.days }}</span>
+              <div v-if="row.daysManualOverride" class="days-hint">手工</div>
             </template>
           </el-table-column>
-          <el-table-column label="备注" min-width="120">
+          <el-table-column label="索引" min-width="120">
+            <template #default="{ row }">
+              <el-input
+                v-if="!isReadonly"
+                :model-value="row.indexRef"
+                size="small" placeholder="证据"
+                @update:model-value="(v: string) => interest.updatePeriod(group.id, row.id, 'indexRef', v)"
+              />
+              <span v-else-if="!row.indexRef">-</span>
+              <div v-if="row.indexRef" class="row-index-chip">
+                <GtIndexChip :value="row.indexRef" :context-project-id="projectId" />
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column label="备注" min-width="90">
             <template #default="{ row }">
               <el-input
                 v-if="!isReadonly"
@@ -250,10 +430,10 @@
           <span class="cv-label">账面利息收入（损益）</span>
           <el-input-number
             v-if="!isReadonly"
-            v-model="interest.bookInterestIncome.value"
+            :model-value="interest.bookInterestIncome.value"
             size="small" :controls="false" :precision="2"
             style="width: 140px"
-            @change="handleSave"
+            @change="(v: number | undefined) => { interest.setBookInterestIncome(v ?? 0); handleSave() }"
           />
           <span v-else class="cv-value">{{ fmtNum(interest.bookInterestIncome.value) }}</span>
         </div>
@@ -297,10 +477,89 @@
             <el-icon v-else style="color: #ef4444; margin-left: 4px;">✗</el-icon>
           </span>
         </div>
+        <div class="cv-item">
+          <span class="cv-label">实际执行重要性(B15)</span>
+          <span class="cv-value">{{ interest.performanceMateriality.value > 0 ? fmtNum(interest.performanceMateriality.value) : '未取到' }}</span>
+        </div>
+      </div>
+      <el-alert
+        v-if="interest.materialVariance.value"
+        type="error"
+        :closable="false"
+        show-icon
+        title="差异超过实际执行重要性（B15），请追查原因并考虑调整分录"
+        style="margin-top: 10px"
+      />
+      <div
+        v-if="!isReadonly && (interest.materialVariance.value || interest.needsVarianceReason.value)"
+        style="margin-top: 10px"
+      >
+        <el-button
+          size="small"
+          type="danger"
+          plain
+          :loading="pushingAdj"
+          @click="pushVarianceToG64"
+        >
+          差异 → G6-4 调整草稿
+        </el-button>
+        <span class="cv-hint" style="margin-left: 8px;">按勾稽差异生成借贷草稿（150302↔6111），须人工确认后写入</span>
+      </div>
+      <el-alert
+        v-else-if="interest.needsVarianceReason.value"
+        type="warning"
+        :closable="false"
+        show-icon
+        title="差异超过舍入阈值（0.01），请填写差异说明"
+        style="margin-top: 10px"
+      />
+      <div v-if="interest.needsVarianceReason.value || interest.varianceReason.value" class="variance-reason" style="margin-top: 10px">
+        <span class="cv-label">差异说明</span>
+        <el-input
+          v-model="interest.varianceReason.value"
+          type="textarea"
+          :autosize="{ minRows: 2, maxRows: 4 }"
+          :disabled="isReadonly"
+          :class="{ 'is-missing': interest.varianceReasonMissing.value }"
+          placeholder="说明勾稽差异原因、拟调整/不调整依据…"
+          @input="handleSave"
+        />
       </div>
       <p class="cv-hint" style="margin-top: 8px;">
-        第三层：各项目期末摊余成本应与 G6-2 明细摊余成本勾稽核对。
+        第三层：点「核对期末摊余 vs G6-2」将各项目末期期末摊余与 G6-2「成本+利息调整」勾稽。Stage3 按「摊余−减值」净额计息；票息按剩余面值计算。
       </p>
+      <div v-if="interest.endingAmortizedCompare.value.length" class="ending-compare" style="margin-top: 12px">
+        <div class="cv-item" style="margin-bottom: 8px">
+          <span class="cv-label">第三层差异合计</span>
+          <span
+            class="cv-value"
+            :class="{
+              'cv-pass': interest.endingComparePassed.value,
+              'cv-fail': !interest.endingComparePassed.value,
+            }"
+          >
+            {{ fmtNum(interest.endingCompareDiffTotal.value) }}
+            <el-icon v-if="interest.endingComparePassed.value" style="color: #10b981; margin-left: 4px;">✓</el-icon>
+            <el-icon v-else style="color: #ef4444; margin-left: 4px;">✗</el-icon>
+          </span>
+        </div>
+        <el-table :data="interest.endingAmortizedCompare.value" size="small" border>
+          <el-table-column prop="investProject" label="投资项目" min-width="140" />
+          <el-table-column label="G6-6期末摊余" width="130" align="right">
+            <template #default="{ row }">{{ fmtNum(row.g66Ending) }}</template>
+          </el-table-column>
+          <el-table-column label="G6-2期末摊余" width="130" align="right">
+            <template #default="{ row }">{{ row.g62Ending == null ? '未匹配' : fmtNum(row.g62Ending) }}</template>
+          </el-table-column>
+          <el-table-column label="差异" width="110" align="right">
+            <template #default="{ row }">
+              <span :class="row.matched ? 'cv-pass' : 'cv-fail'">
+                {{ row.diff == null ? '—' : fmtNum(row.diff) }}
+              </span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
     </el-card>
 
     <!-- 审计说明 -->
@@ -360,14 +619,17 @@
       <div class="guide-content">
         <p>1. 实际利率在初始确认时确定，后续不因市场利率变动而调整</p>
         <p>2. 验证实际利率与票面利率的差异：溢价/折价购入时实际利率≠票面利率</p>
-        <p>3. 每期利息收入 = 期初摊余成本 × 实际利率 × 计息天数/365</p>
-        <p>4. 现金流入（票息）= 面值 × 票面利率 × 计息天数/365</p>
-        <p>5. 期末摊余成本 = 期初 + 实际利息 - 现金流入（摊余成本逐期调整）</p>
+        <p>3. 每期利息收入 = 期初摊余成本 × 实际利率 × 计息天数/年天数（计息基准 ACT/365、ACT/360 或 30/360）</p>
+        <p>4. 现金流入（票息）= 剩余面值 × 票面利率 × 计息天数/年天数（剩余面值 = 面值 − 此前收回本金）</p>
+        <p>5. 期末摊余成本 = 期初 + 实际利息 - 现金流入 - 收回本金</p>
         <p>6. 三层勾稽：损益（实际利息↔账面利息）／摊销（实际利息−票息↔G6-1利息调整变动）／项目期末摊余↔G6-2</p>
         <p>7. 优先用「从 G6-1/G6-2 更新」带入项目、面值、利率与期初摊余成本（成本+利息调整，不含应计利息）</p>
         <p>8. 测算完成后可用「回写利息调整至 G6-2」将 Σ(实际利息−票息) 写入本期利息调整变动</p>
-        <p>9. 关注计息天数的准确性（实际天数法vs30/360法）</p>
-        <p>10. 浮动利率债券需关注利率重置日的处理</p>
+        <p>9. 填写起息日与截止日可自动推算天数；手工改天数后标记为「手工」不再被覆盖</p>
+        <p>10. 关注实际利率与票面利率差异超过 200bp 的合理性提示</p>
+        <p>11. 「从 G6-12 同步阶段」仅更新末期阶段/减值；Stage3 按净额计息</p>
+        <p>12. 「核对期末摊余 vs G6-2」自动比对第三层（G6-6 末期摊余 ↔ G6-2 成本+利息调整）</p>
+        <p>13. 超差可用「差异 → G6-4 调整草稿」生成 150302↔6111 借贷草稿，须人工确认后写入 Main</p>
       </div>
     </details>
   </div>
@@ -388,18 +650,26 @@
  * - 底部交叉验证: 利息合计 vs G6-1审定表利息调整
  * - 审计结论textarea + AI按钮 + 编制提示折叠
  */
-import { computed, inject, onMounted, ref, watch } from 'vue'
+import { computed, inject, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useG6SppiInterest } from '../../composables/useG6SppiInterest'
 import { useG6SppiFormData } from '../../composables/useG6SppiFormData'
 import { useG6SppiAiGenerate } from '../../composables/useG6SppiAiGenerate'
 import {
   applyG66InterestToDetailRows,
+  buildG66InterestVarianceAdjustmentDrafts,
+  compareG66EndingToG62,
   fetchG61InterestAdjPeriodChange,
   fetchG62DetailRows,
+  fetchG612ImpairmentRows,
+  fetchG64AdjustmentEntries,
+  fetchPerformanceMateriality,
+  mapG612RowsToInterestStageSeeds,
   mapG62RowsToInterestSeeds,
+  mergeG64EntriesWithG66Drafts,
   parseG6ChecklistPayload,
   saveG62DetailRows,
+  saveG64AdjustmentEntries,
 } from '../../composables/g6CrossHelpers'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -434,6 +704,9 @@ const wpIdRef = computed(() => props.wpId)
 const { generateAndConfirm, loading: aiLoading } = useG6SppiAiGenerate(wpIdRef)
 const syncing = ref(false)
 const writingBack = ref(false)
+const syncingEcl = ref(false)
+const comparingEnding = ref(false)
+const pushingAdj = ref(false)
 
 const DATA_KEY = 'G6-6-interest-data'
 const ROWS_KEY = 'G6-6-rows'
@@ -476,10 +749,18 @@ onMounted(async () => {
   initFromData()
   const noteResp = formData.allResponses.value.get(NOTE_KEY)
   if (noteResp?.remark) auditNote.value = noteResp.remark
+  const pm = await fetchPerformanceMateriality(props.projectId)
+  if (pm != null) {
+    interest.setPerformanceMateriality(pm)
+    handleSave()
+  }
 })
 
 watch(() => props.htmlData, (newData) => {
-  if (newData) initFromData()
+  // 仅本地尚无编制数据时用 htmlData 初始化，避免覆盖未保存编辑
+  if (newData && interest.groups.value.length === 0) {
+    initFromData()
+  }
 })
 
 // ─── 保存：嵌套主键 + 扁平兼容双写（同批防抖） ───
@@ -491,6 +772,15 @@ function handleSave(): void {
     { itemId: ROWS_KEY, data: { conclusion: JSON.stringify(interest.flattenGroups()) } },
   ])
 }
+
+function flushPersist(): void {
+  handleSave()
+  formData.flushPending()
+}
+
+onBeforeUnmount(() => {
+  flushPersist()
+})
 
 async function onImported(): Promise<void> {
   await formData.loadAll()
@@ -539,10 +829,7 @@ async function writebackToG62(): Promise<void> {
       return
     }
     const preview = applyG66InterestToDetailRows(existing, interest.groups.value)
-    const adjTotal = preview.rows.reduce(
-      (sum, row: any) => sum + (Number(row.periodInterestAdjChange) || 0),
-      0,
-    )
+    const adjTotal = preview.matchedAdjustmentTotal
     try {
       await ElMessageBox.confirm(
         `将 Σ(实际利息−票息) 回写至 G6-2「本期利息调整变动」：匹配 ${preview.matched.length} 条，未匹配 ${preview.unmatched.length} 条，回写合计 ${adjTotal.toFixed(2)}。`,
@@ -565,6 +852,125 @@ async function writebackToG62(): Promise<void> {
   }
 }
 
+async function syncEclStage(): Promise<void> {
+  if (props.isReadonly || !interest.groups.value.length) return
+  syncingEcl.value = true
+  try {
+    const rows = await fetchG612ImpairmentRows(props.projectId)
+    const seeds = mapG612RowsToInterestStageSeeds(rows)
+    if (!seeds.length) {
+      ElMessage.warning('未找到 G6-12 减值测算数据，请确认 ECL 底稿已编制')
+      return
+    }
+    const { updated, unmatched } = interest.mergeEclStageSeeds(seeds)
+    handleSave()
+    ElMessage.success(
+      `已同步阶段/减值：更新 ${updated} 项` +
+        (unmatched ? `，未匹配 ${unmatched} 项` : ''),
+    )
+  } catch {
+    ElMessage.warning('同步 G6-12 阶段失败，请稍后重试')
+  } finally {
+    syncingEcl.value = false
+  }
+}
+
+async function compareEndingToG62(): Promise<void> {
+  if (!interest.groups.value.length) return
+  comparingEnding.value = true
+  try {
+    const detailRows = await fetchG62DetailRows(props.projectId)
+    if (!detailRows.length) {
+      ElMessage.warning('未找到 G6-2 明细，请确认 Main 底稿已编制')
+      return
+    }
+    const rows = compareG66EndingToG62(interest.groups.value, detailRows)
+    interest.setEndingAmortizedCompare(rows)
+    const unmatched = rows.filter((r) => !r.matched && r.g62Ending == null).length
+    const failed = rows.filter((r) => !r.matched && r.g62Ending != null).length
+    if (interest.endingComparePassed.value) {
+      ElMessage.success(`第三层勾稽通过：已核对 ${rows.length} 项`)
+    } else {
+      ElMessage.warning(
+        `第三层勾稽未完全通过：差异 ${failed} 项` +
+          (unmatched ? `，未匹配 ${unmatched} 项` : '') +
+          `，差异合计 ${interest.endingCompareDiffTotal.value.toFixed(2)}`,
+      )
+    }
+  } catch {
+    ElMessage.warning('核对 G6-2 期末摊余失败，请稍后重试')
+  } finally {
+    comparingEnding.value = false
+  }
+}
+
+async function pushVarianceToG64(): Promise<void> {
+  if (props.isReadonly) return
+  pushingAdj.value = true
+  try {
+    let { pairs, skipped } = buildG66InterestVarianceAdjustmentDrafts({
+      amortizationDiff: interest.amortizationDiff.value,
+      incomeDiff: interest.incomeDiff.value,
+      incomeLayerActive: interest.incomeLayerActive.value,
+      performanceMateriality: interest.performanceMateriality.value,
+      varianceReason: interest.varianceReason.value,
+      onlyMaterial: true,
+    })
+    if (!pairs.length) {
+      try {
+        await ElMessageBox.confirm(
+          `无超过 B15 的可生成层（跳过 ${skipped.length} 项）。是否按全部可识别差异（>|0.01|）生成草稿？`,
+          '生成 G6-4 调整草稿',
+          { type: 'warning', confirmButtonText: '全部生成', cancelButtonText: '取消' },
+        )
+      } catch {
+        return
+      }
+      ;({ pairs, skipped } = buildG66InterestVarianceAdjustmentDrafts({
+        amortizationDiff: interest.amortizationDiff.value,
+        incomeDiff: interest.incomeDiff.value,
+        incomeLayerActive: interest.incomeLayerActive.value,
+        performanceMateriality: interest.performanceMateriality.value,
+        varianceReason: interest.varianceReason.value,
+        onlyMaterial: false,
+      }))
+    }
+    if (!pairs.length) {
+      ElMessage.warning(
+        skipped.length
+          ? `无法生成草稿：${skipped.map((s) => s.reason).join('；')}`
+          : '无可写入的勾稽差异',
+      )
+      return
+    }
+    const preview = pairs
+      .map((p) => `${p.layerLabel}：差异 ${p.diff.toFixed(2)} → 金额 ${p.amount.toFixed(2)}`)
+      .join('\n')
+    try {
+      await ElMessageBox.confirm(
+        `将向 Main 底稿 G6-4 写入 ${pairs.length} 组借贷草稿（150302↔6111，须人工复核）：\n\n${preview}` +
+          (skipped.length ? `\n\n另跳过 ${skipped.length} 项` : ''),
+        '确认写入 G6-4',
+        { confirmButtonText: '确认写入', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch {
+      return
+    }
+    const { entries } = await fetchG64AdjustmentEntries(props.projectId)
+    const merged = mergeG64EntriesWithG66Drafts(entries, pairs)
+    const mainWpId = await saveG64AdjustmentEntries(props.projectId, merged)
+    if (!mainWpId) {
+      ElMessage.warning('未找到 Main 底稿实例，无法写入 G6-4')
+      return
+    }
+    ElMessage.success(`已写入 G6-4 调整草稿 ${pairs.length} 组（${pairs.length * 2} 行）`)
+  } catch {
+    ElMessage.warning('写入 G6-4 失败，请稍后重试')
+  } finally {
+    pushingAdj.value = false
+  }
+}
+
 // watch groups / conclusion 深度变化保存
 watch(() => interest.groups.value, () => {
   handleSave()
@@ -575,6 +981,14 @@ watch(() => interest.conclusion.value, () => {
 })
 
 function aiContext() {
+  const periods = interest.groups.value.flatMap((g) =>
+    (g.periods || []).map((p: any) => ({
+      project: g.investProject,
+      indexRef: p.indexRef || '',
+      eclStage: p.eclStage || g.eclStage || '',
+      days: p.days,
+    })),
+  )
   return {
     groupCount: interest.groups.value.length,
     totalInterest: interest.totalInterest.value,
@@ -584,6 +998,10 @@ function aiContext() {
     incomeDiff: interest.incomeDiff.value,
     amortizationDiff: interest.amortizationDiff.value,
     projects: interest.groups.value.map((g) => g.investProject),
+    indexRefsSample: periods.filter((p) => p.indexRef).slice(0, 8),
+    materialVariance:
+      Math.abs(Number(interest.incomeDiff.value) || 0) > 0.01
+      || Math.abs(Number(interest.amortizationDiff.value) || 0) > 0.01,
   }
 }
 
@@ -624,6 +1042,7 @@ defineExpose({
   toJSON: () => interest.toJSON(),
   syncFromMain,
   writebackToG62,
+  syncEclStage,
 })
 </script>
 
@@ -654,6 +1073,9 @@ defineExpose({
   display: inline-flex;
   align-items: center;
 }
+.row-index-chip {
+  margin-top: 4px;
+}
 
 /* ─── 方法论上下文（琥珀色左边线+浅黄背景）─── */
 .methodology-context {
@@ -668,6 +1090,22 @@ defineExpose({
 
 .methodology-context p {
   margin: 0 0 2px;
+}
+
+.warn-alert {
+  margin-bottom: 10px;
+}
+.warn-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.initial-params {
+  margin-top: 6px;
+}
+.variance-reason .is-missing :deep(.el-textarea__inner) {
+  border-color: #f59e0b;
 }
 
 /* ─── 分组卡片 ─── */

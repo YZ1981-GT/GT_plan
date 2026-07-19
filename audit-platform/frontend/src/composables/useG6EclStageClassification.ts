@@ -1,117 +1,179 @@
 /**
- * useG6EclStageClassification — G6-11 三阶段划分（列式→行式转换 + Stage判定 + 一致性比对）
- *
- * Spec: .kiro/specs/g6-other-bond-investment-ecl/ Task 5.1
- * Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6
- *
- * 职责：
- * - 列式→行式转换：解析源模板列式数据（投资1~N各占一列），转为行式reactive数组
- * - 三区块综合判定逻辑：
- *   (一) 13项任一为"是" → hasSignificantIncrease=true
- *   (二) 3项全为"是"   → hasLowCreditRisk=true
- *   (三) 8项任一为"是" → hasCreditImpairment=true
- * - Stage判定（调用 determineStage from useG6EclFormulaEngine）
- * - 一致性比对（companyStage === auditStage）
- * - 汇总统计（stage1Count / stage2Count / stage3Count / inconsistentCount）
- * - 16384列智能解析（仅取有数据列，忽略空列）
- * - 不一致时红色高亮 + 强制差异说明（block save）
- * - 动态增删（ElMessageBox.prompt命名）
- * - 展开/折叠切换逻辑
+ * G6-11 其他债权投资三阶段划分。
+ * 负责检查项维护、阶段判定、明细导入及持久化兼容。
  */
-import { ref, computed } from 'vue'
-import { determineStage } from '@/composables/useG6EclFormulaEngine'
+import { computed, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
+import { determineStage } from '@/composables/useG6EclFormulaEngine'
 
-// ═══ 三区块检查项标签常量 ═══
-
-/** (一) 信用风险是否显著增加 — 13项考虑因素 */
-export const SECTION_ONE_LABELS: readonly string[] = [
-  '内部价格指标是否发生显著变化',
-  '信用利差是否显著变动',
-  '利率或其他合同条款是否发生不利变化',
-  '外部市场指标（如信用违约互换价格）是否恶化',
-  '外部信用评级是否实际或预期下调',
-  '借款人经营成果是否实际或预期发生显著不利变化',
-  '所处监管/经济/技术环境是否发生显著不利变化',
-  '担保物价值或第三方担保质量是否显著下降',
-  '借款人预期还款行为是否发生显著变化',
-  '贷款管理方法是否发生变化（如放宽标准）',
-  '是否逾期超过30天',
-  '同一借款人其他金融工具是否已发生违约',
-  '其他表明信用风险显著增加的信息',
-] as const
-
-/** (二) 是否具有较低信用风险 — 3项同时满足条件 */
-export const SECTION_TWO_LABELS: readonly string[] = [
-  '违约风险较低（如外部评级为投资级）',
-  '借款人短期内履行合同义务的能力很强',
-  '即使经济形势和经营环境存在不利变化也未必降低履约能力',
-] as const
-
-/** (三) 已发生信用减值的评估 — 8项可观察信息 */
-export const SECTION_THREE_LABELS: readonly string[] = [
-  '发行方或债务人发生重大财务困难',
-  '债务人违反合同（如偿付利息或本金违约或逾期）',
-  '债权人出于与债务人财务困难有关的经济或合同考虑给予让步',
-  '债务人很可能破产或进行其他财务重组',
-  '发行方或债务人财务困难导致该金融资产的活跃市场消失',
-  '以大幅折扣购买或源生一项金融资产（反映了发生信用损失的事实）',
-  '债务人经营活动产生的现金流量不足以偿付到期债务',
-  '其他表明已发生信用减值的客观证据',
-] as const
-
-// ═══ 类型定义 ═══
-
-export type SectionOneCheckValue = '是' | '否' | '不适用'
-export type SectionTwoBoolValue = '是' | '否'
-export type StageType = 'Stage1' | 'Stage2' | 'Stage3'
-
-export interface SectionOneCheck {
+export interface CheckItemDef {
   label: string
+  hint: string
+}
+
+export const SECTION_ONE_ITEMS: readonly CheckItemDef[] = [
+  {
+    label: '内部价格指标是否发生显著变化',
+    hint: '关注信用风险变化引起的内部定价、收益率或信用利差显著变化。',
+  },
+  {
+    label: '信用利差是否显著变动',
+    hint: '比较初始确认日与报告日信用利差及同类工具市场水平。',
+  },
+  {
+    label: '利率或其他合同条款是否发生不利变化',
+    hint: '关注新发行时可能要求的更高利率、更严条款或更多增信措施。',
+  },
+  {
+    label: '外部市场指标（如信用违约互换价格）是否恶化',
+    hint: '关注信用违约互换价格、公允价值及其他市场信用指标。',
+  },
+  {
+    label: '外部信用评级是否实际或预期下调',
+    hint: '结合外部评级及内部评级的实际或预期下调情况判断。',
+  },
+  {
+    label: '借款人经营成果是否实际或预期发生显著不利变化',
+    hint: '关注收入、利润、现金流、杠杆及流动性等经营财务指标。',
+  },
+  {
+    label: '所处监管/经济/技术环境是否发生显著不利变化',
+    hint: '评估行业政策、宏观经济、地域或技术环境的不利影响。',
+  },
+  {
+    label: '担保物价值或第三方担保质量是否显著下降',
+    hint: '评估抵押物价值、担保人能力及其他信用增级的有效性。',
+  },
+  {
+    label: '借款人预期还款行为是否发生显著变化',
+    hint: '关注延期、最低还款、资金安排及其他履约行为变化。',
+  },
+  {
+    label: '贷款管理方法是否发生变化（如放宽标准）',
+    hint: '关注信用监控、催收、风险分类及管理策略的变化。',
+  },
+  {
+    label: '是否逾期超过30天',
+    hint: '逾期达到30日通常推定信用风险显著增加，但可用充分证据反驳。',
+  },
+  {
+    label: '同一借款人其他金融工具是否已发生违约',
+    hint: '关注同一发行人或借款人的其他债务违约及交叉违约影响。',
+  },
+  {
+    label: '其他表明信用风险显著增加的信息',
+    hint: '记录未被前述项目覆盖但能够支持信用风险显著增加的证据。',
+  },
+] as const
+
+export const SECTION_TWO_ITEMS: readonly CheckItemDef[] = [
+  {
+    label: '违约风险较低（如外部评级为投资级）',
+    hint: '投资级评级可作参考，但不能仅凭担保物价值较高认定低风险。',
+  },
+  {
+    label: '借款人短期内履行合同义务的能力很强',
+    hint: '评估报告日短期偿付能力及可获得的流动性支持。',
+  },
+  {
+    label: '即使经济形势和经营环境存在不利变化也未必降低履约能力',
+    hint: '评估较长期不利变化下借款人持续履约能力，三项须同时满足。',
+  },
+] as const
+
+export const SECTION_THREE_ITEMS: readonly CheckItemDef[] = [
+  {
+    label: '发行方或债务人发生重大财务困难',
+    hint: '关注持续亏损、流动性危机、资不抵债等重大财务困难。',
+  },
+  {
+    label: '债务人违反合同（如偿付利息或本金违约或逾期）',
+    hint: '关注本金、利息未按合同约定支付或其他重大违约。',
+  },
+  {
+    label: '债权人出于与债务人财务困难有关的经济或合同考虑给予让步',
+    hint: '识别正常情况下不会作出的展期、减免或合同条件修改。',
+  },
+  {
+    label: '债务人很可能破产或进行其他财务重组',
+    hint: '关注破产申请、债务重组、接管或类似程序。',
+  },
+  {
+    label: '发行方或债务人财务困难导致该金融资产的活跃市场消失',
+    hint: '确认市场消失源于发行人财务困难而非一般市场流动性。',
+  },
+  {
+    label: '以大幅折扣购买或源生一项金融资产（反映了发生信用损失的事实）',
+    hint: '判断交易折价是否已反映发行人发生信用损失。',
+  },
+  {
+    label: '债务人经营活动产生的现金流量不足以偿付到期债务',
+    hint: '分析经营现金流对到期本金、利息及其他债务的覆盖能力。',
+  },
+  {
+    label: '其他表明已发生信用减值的客观证据',
+    hint: '记录未被前述项目覆盖的其他可观察信用减值证据。',
+  },
+] as const
+
+/** 兼容旧调用方的标签数组导出。 */
+export const SECTION_ONE_LABELS: readonly string[] = SECTION_ONE_ITEMS.map(item => item.label)
+export const SECTION_TWO_LABELS: readonly string[] = SECTION_TWO_ITEMS.map(item => item.label)
+export const SECTION_THREE_LABELS: readonly string[] = SECTION_THREE_ITEMS.map(item => item.label)
+export const SECTION_ONE_COUNT = SECTION_ONE_ITEMS.length
+export const SECTION_TWO_COUNT = SECTION_TWO_ITEMS.length
+export const SECTION_THREE_COUNT = SECTION_THREE_ITEMS.length
+
+export type SectionOneCheckValue = '是' | '否' | '不适用' | ''
+export type SectionTwoBoolValue = '是' | '否' | ''
+export type StageType = 'Stage1' | 'Stage2' | 'Stage3'
+export type SectionKey = 'significantIncrease' | 'lowCreditRisk' | 'creditImpairment'
+
+export interface SectionOneCheck extends CheckItemDef {
   value: SectionOneCheckValue
 }
 
-export interface SectionTwoCheck {
-  label: string
+export interface SectionTwoCheck extends CheckItemDef {
   value: SectionTwoBoolValue
 }
 
-export interface SectionThreeCheck {
-  label: string
+export interface SectionThreeCheck extends CheckItemDef {
   value: SectionTwoBoolValue
 }
 
-/** G6-11 三阶段划分行数据模型 */
+export interface SectionAnalysisConclusions {
+  significantIncrease: string
+  lowCreditRisk: string
+  creditImpairment: string
+}
+
 export interface StageClassificationRow {
   id: string
   seq: number
   investProject: string
-  // 三区块检查明细
-  sectionOneChecks: SectionOneCheck[]       // 13项
-  sectionTwoChecks: SectionTwoCheck[]       // 3项
-  sectionThreeChecks: SectionThreeCheck[]   // 8项
-  // 综合判定
-  hasSignificantIncrease: boolean   // (一)任一为"是"
-  hasLowCreditRisk: boolean         // (二)全部为"是"
-  hasCreditImpairment: boolean      // (三)任一为"是"
-  companyStage: StageType           // 企业划分阶段(下拉)
-  auditStage: StageType             // 审计判断阶段(公式建议)
-  isConsistent: boolean             // companyStage === auditStage
-  discrepancyNote: string           // 差异说明(不一致时必填)
-  indexRef: string                  // 索引
+  /** 跨表稳定投资 ID（与 G6-12/G6-13 匹配） */
+  crossSheetInvestmentId?: string
+  bookBalance: number
+  sectionOneChecks: SectionOneCheck[]
+  sectionTwoChecks: SectionTwoCheck[]
+  sectionThreeChecks: SectionThreeCheck[]
+  sectionConclusions: SectionAnalysisConclusions
+  hasSignificantIncrease: boolean
+  hasLowCreditRisk: boolean
+  hasCreditImpairment: boolean
+  companyStage: StageType
+  auditStage: StageType
+  auditStageManualOverride?: boolean
+  isConsistent: boolean
+  discrepancyNote: string
+  indexRef: string
 }
 
-/** 列式源数据结构（源模板格式/导入） */
 export interface ColumnarSourceData {
-  /** 列头：各投资项目名称 */
   columnHeaders: string[]
-  /** (一) 13行×N列矩阵 */
   sectionOneMatrix: string[][]
-  /** (二) 3行×N列矩阵 */
   sectionTwoMatrix: string[][]
-  /** (三) 8行×N列矩阵 */
   sectionThreeMatrix: string[][]
-  /** 企业划分阶段（N列） */
   companyStages?: string[]
 }
 
@@ -123,53 +185,158 @@ export interface StageClassificationSummary {
   total: number
 }
 
-// ═══ Composable ═══
+export interface DetailImportResult {
+  added: number
+  refreshed: number
+  prefilledOverdue: number
+  /** 逾期≥90日预填已减值/违约推定项数 */
+  prefilledDefault: number
+}
 
-export function useG6EclStageClassification(_opts?: any) {
-  // ─── 核心状态 ──────────────────────────────────────────────────────────────
+function newId(): string {
+  return globalThis.crypto?.randomUUID?.()
+    ?? `g6-stage-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
 
+function emptyConclusions(): SectionAnalysisConclusions {
+  return { significantIncrease: '', lowCreditRisk: '', creditImpairment: '' }
+}
+
+export function normalizeSectionOneValue(
+  raw: string | undefined | null,
+): SectionOneCheckValue {
+  const value = String(raw ?? '').trim()
+  if (!value) return ''
+  if (value === '是' || /^(y|yes|1|true)$/i.test(value)) return '是'
+  if (value === '不适用' || /^(n\/a|na)$/i.test(value)) return '不适用'
+  return '否'
+}
+
+export function normalizeBoolValue(
+  raw: string | undefined | null,
+): SectionTwoBoolValue {
+  const value = String(raw ?? '').trim()
+  if (!value) return ''
+  if (value === '是' || /^(y|yes|1|true)$/i.test(value)) return '是'
+  return '否'
+}
+
+export function normalizeStage(raw: string | undefined | null): StageType {
+  const value = String(raw ?? '').trim().toLowerCase()
+  if (value.includes('3') || value.includes('三')) return 'Stage3'
+  if (value.includes('2') || value.includes('二')) return 'Stage2'
+  return 'Stage1'
+}
+
+function buildSectionOne(values?: Array<string | undefined | null>): SectionOneCheck[] {
+  return SECTION_ONE_ITEMS.map((item, index) => ({
+    ...item,
+    value: normalizeSectionOneValue(values?.[index]),
+  }))
+}
+
+function buildSectionTwo(values?: Array<string | undefined | null>): SectionTwoCheck[] {
+  return SECTION_TWO_ITEMS.map((item, index) => ({
+    ...item,
+    value: normalizeBoolValue(values?.[index]),
+  }))
+}
+
+function buildSectionThree(values?: Array<string | undefined | null>): SectionThreeCheck[] {
+  return SECTION_THREE_ITEMS.map((item, index) => ({
+    ...item,
+    value: normalizeBoolValue(values?.[index]),
+  }))
+}
+
+function savedValues(checks: unknown): Array<string | undefined> {
+  if (!Array.isArray(checks)) return []
+  return checks.map((check) => {
+    if (typeof check === 'string') return check
+    if (check && typeof check === 'object') {
+      return String((check as { value?: unknown }).value ?? '')
+    }
+    return undefined
+  })
+}
+
+function toFiniteNumber(value: unknown): number {
+  const number = Number(value)
+  return Number.isFinite(number) ? number : 0
+}
+
+function calcOverdueDays(
+  maturityDate: unknown,
+  asOfDate?: string | null,
+): number {
+  if (!maturityDate) return 0
+  const maturity = new Date(String(maturityDate))
+  const asOf = asOfDate ? new Date(asOfDate) : new Date()
+  if (Number.isNaN(maturity.getTime()) || Number.isNaN(asOf.getTime())) return 0
+  return Math.max(0, Math.floor((asOf.getTime() - maturity.getTime()) / 86400000))
+}
+
+export function getValidColumnIndices(
+  headers: string[],
+  sectionOne: string[][],
+  sectionTwo: string[][],
+  sectionThree: string[][],
+): number[] {
+  const indices: number[] = []
+  for (let column = 0; column < headers.length; column += 1) {
+    if (headers[column]?.trim()) {
+      indices.push(column)
+      continue
+    }
+    const hasData = [sectionOne, sectionTwo, sectionThree]
+      .some(matrix => matrix?.some(row => row?.[column]?.trim()))
+    if (hasData) indices.push(column)
+  }
+  return indices
+}
+
+export function useG6EclStageClassification(_opts?: unknown) {
   const rows = ref<StageClassificationRow[]>([])
   const conclusion = ref('')
   const expandedRowIds = ref<Set<string>>(new Set())
 
-  // ─── 三区块综合判定逻辑 ────────────────────────────────────────────────────
-
-  /** (一) 13项任一为"是" → hasSignificantIncrease=true */
   function calcHasSignificantIncrease(checks: SectionOneCheck[]): boolean {
-    return checks.some(c => c.value === '是')
+    return checks.some(check => check.value === '是')
   }
 
-  /** (二) 3项全为"是" → hasLowCreditRisk=true */
   function calcHasLowCreditRisk(checks: SectionTwoCheck[]): boolean {
-    return checks.length === 3 && checks.every(c => c.value === '是')
+    return checks.length === 3 && checks.every(check => check.value === '是')
   }
 
-  /** (三) 8项任一为"是" → hasCreditImpairment=true */
   function calcHasCreditImpairment(checks: SectionThreeCheck[]): boolean {
-    return checks.some(c => c.value === '是')
+    return checks.some(check => check.value === '是')
   }
 
-  // ─── 行级重算 ─────────────────────────────────────────────────────────────
+  function hasIncompleteChecks(row: StageClassificationRow): boolean {
+    return [
+      ...row.sectionOneChecks,
+      ...row.sectionTwoChecks,
+      ...row.sectionThreeChecks,
+    ].some(check => check.value === '')
+  }
 
-  /** 重算单行综合判定 + auditStage + 一致性 */
   function recalcRow(row: StageClassificationRow): void {
     row.hasSignificantIncrease = calcHasSignificantIncrease(row.sectionOneChecks)
     row.hasLowCreditRisk = calcHasLowCreditRisk(row.sectionTwoChecks)
     row.hasCreditImpairment = calcHasCreditImpairment(row.sectionThreeChecks)
-    row.auditStage = determineStage(
-      row.hasSignificantIncrease,
-      row.hasLowCreditRisk,
-      row.hasCreditImpairment,
-    )
+    if (!row.auditStageManualOverride) {
+      row.auditStage = determineStage(
+        row.hasSignificantIncrease,
+        row.hasLowCreditRisk,
+        row.hasCreditImpairment,
+      )
+    }
     row.isConsistent = row.companyStage === row.auditStage
   }
 
-  /** 重算所有行 */
   function recalcAll(): void {
     rows.value.forEach(recalcRow)
   }
-
-  // ─── 汇总统计 ─────────────────────────────────────────────────────────────
 
   const summary = computed<StageClassificationSummary>(() => {
     let stage1Count = 0
@@ -177,39 +344,35 @@ export function useG6EclStageClassification(_opts?: any) {
     let stage3Count = 0
     let inconsistentCount = 0
     for (const row of rows.value) {
-      if (row.auditStage === 'Stage1') stage1Count++
-      else if (row.auditStage === 'Stage2') stage2Count++
-      else stage3Count++
-      if (!row.isConsistent) inconsistentCount++
+      if (row.auditStage === 'Stage1') stage1Count += 1
+      else if (row.auditStage === 'Stage2') stage2Count += 1
+      else stage3Count += 1
+      if (!row.isConsistent) inconsistentCount += 1
     }
-    return { stage1Count, stage2Count, stage3Count, inconsistentCount, total: rows.value.length }
+    return {
+      stage1Count,
+      stage2Count,
+      stage3Count,
+      inconsistentCount,
+      total: rows.value.length,
+    }
   })
 
-  // ─── 一致性校验（保存前） ─────────────────────────────────────────────────
+  const inconsistentRows = computed(() => rows.value.filter(row => !row.isConsistent))
+  const incompleteRows = computed(() => rows.value.filter(hasIncompleteChecks))
 
-  /**
-   * 校验所有不一致行是否已填写差异说明。
-   * 返回未填写差异说明的行列表（用于block save提示）。
-   * Requirements: 2.4
-   */
   function validateConsistency(): StageClassificationRow[] {
-    return rows.value.filter(r => !r.isConsistent && !r.discrepancyNote.trim())
+    return rows.value.filter(row => !row.isConsistent && !row.discrepancyNote.trim())
   }
 
-  /** 是否可保存（所有不一致行都已填差异说明） */
   function canSave(): boolean {
     return validateConsistency().length === 0
   }
 
-  // ─── 展开/折叠切换 ────────────────────────────────────────────────────────
-
   function toggleExpand(rowId: string): void {
     const next = new Set(expandedRowIds.value)
-    if (next.has(rowId)) {
-      next.delete(rowId)
-    } else {
-      next.add(rowId)
-    }
+    if (next.has(rowId)) next.delete(rowId)
+    else next.add(rowId)
     expandedRowIds.value = next
   }
 
@@ -218,242 +381,144 @@ export function useG6EclStageClassification(_opts?: any) {
   }
 
   function expandAll(): void {
-    expandedRowIds.value = new Set(rows.value.map(r => r.id))
+    expandedRowIds.value = new Set(rows.value.map(row => row.id))
   }
 
   function collapseAll(): void {
     expandedRowIds.value = new Set()
   }
 
-  // ─── 16384列智能解析（列式→行式转换）────────────────────────────────────────
-
-  /**
-   * transposeToRows: 从列式源数据转换为行式数组。
-   * 16384列智能解析：仅取实际有数据的列，忽略空列（合并单元格虚列）。
-   *
-   * Requirements: 2.1, 2.6
-   */
-  function transposeToRows(source: ColumnarSourceData): StageClassificationRow[] {
-    const { columnHeaders, sectionOneMatrix, sectionTwoMatrix, sectionThreeMatrix, companyStages } = source
-    if (!columnHeaders?.length) return []
-
-    // 16384列中筛选有效列
-    const validIndices = getValidColumnIndices(columnHeaders, sectionOneMatrix, sectionTwoMatrix, sectionThreeMatrix)
-
-    return validIndices.map((colIdx, arrIdx) => {
-      const investProject = (columnHeaders[colIdx] ?? '').trim()
-
-      const sectionOneChecks: SectionOneCheck[] = SECTION_ONE_LABELS.map((label, rowIdx) => ({
-        label,
-        value: normalizeSectionOneValue(sectionOneMatrix?.[rowIdx]?.[colIdx]),
-      }))
-
-      const sectionTwoChecks: SectionTwoCheck[] = SECTION_TWO_LABELS.map((label, rowIdx) => ({
-        label,
-        value: normalizeBoolValue(sectionTwoMatrix?.[rowIdx]?.[colIdx]),
-      }))
-
-      const sectionThreeChecks: SectionThreeCheck[] = SECTION_THREE_LABELS.map((label, rowIdx) => ({
-        label,
-        value: normalizeBoolValue(sectionThreeMatrix?.[rowIdx]?.[colIdx]),
-      }))
-
-      const row: StageClassificationRow = {
-        id: crypto.randomUUID(),
-        seq: arrIdx + 1,
-        investProject: investProject || `投资${arrIdx + 1}`,
-        sectionOneChecks,
-        sectionTwoChecks,
-        sectionThreeChecks,
-        hasSignificantIncrease: false,
-        hasLowCreditRisk: false,
-        hasCreditImpairment: false,
-        companyStage: normalizeStage(companyStages?.[colIdx]),
-        auditStage: 'Stage1',
-        isConsistent: true,
-        discrepancyNote: '',
-        indexRef: '',
-      }
-      recalcRow(row)
-      return row
-    })
-  }
-
-  /**
-   * 智能检测有效列索引。
-   * 有效列条件：列头非空 OR 任一矩阵该列有非空数据。
-   * Requirements: 2.6
-   */
-  function getValidColumnIndices(
-    headers: string[],
-    s1: string[][],
-    s2: string[][],
-    s3: string[][],
-  ): number[] {
-    const indices: number[] = []
-    for (let col = 0; col < headers.length; col++) {
-      if (headers[col]?.trim()) {
-        indices.push(col)
-        continue
-      }
-      // 检查矩阵数据
-      const hasData =
-        s1?.some(row => row?.[col]?.trim()) ||
-        s2?.some(row => row?.[col]?.trim()) ||
-        s3?.some(row => row?.[col]?.trim())
-      if (hasData) indices.push(col)
-    }
-    return indices
-  }
-
-  /** 标准化(一)区检查值（支持"不适用"） */
-  function normalizeSectionOneValue(raw: string | undefined | null): SectionOneCheckValue {
-    const val = (raw ?? '').trim()
-    if (val === '是' || val === 'Y' || val === 'Yes' || val === '1' || val === 'true') return '是'
-    if (val === '不适用' || val === 'N/A' || val === 'NA' || val === 'n/a') return '不适用'
-    return '否'
-  }
-
-  /** 标准化(二)(三)区检查值（仅是/否） */
-  function normalizeBoolValue(raw: string | undefined | null): SectionTwoBoolValue {
-    const val = (raw ?? '').trim()
-    if (val === '是' || val === 'Y' || val === 'Yes' || val === '1' || val === 'true') return '是'
-    return '否'
-  }
-
-  /** 标准化Stage值 */
-  function normalizeStage(raw: string | undefined | null): StageType {
-    const val = (raw ?? '').trim().toLowerCase()
-    if (val.includes('3') || val.includes('三')) return 'Stage3'
-    if (val.includes('2') || val.includes('二')) return 'Stage2'
-    return 'Stage1'
-  }
-
-  // ─── 行CRUD ───────────────────────────────────────────────────────────────
-
-  /** 创建空行 */
   function createEmptyRow(investProject: string): StageClassificationRow {
+    const id = newId()
     return {
-      id: crypto.randomUUID(),
+      id,
       seq: rows.value.length + 1,
       investProject,
-      sectionOneChecks: SECTION_ONE_LABELS.map(label => ({ label, value: '否' as SectionOneCheckValue })),
-      sectionTwoChecks: SECTION_TWO_LABELS.map(label => ({ label, value: '否' as SectionTwoBoolValue })),
-      sectionThreeChecks: SECTION_THREE_LABELS.map(label => ({ label, value: '否' as SectionTwoBoolValue })),
+      crossSheetInvestmentId: id,
+      bookBalance: 0,
+      sectionOneChecks: buildSectionOne(),
+      sectionTwoChecks: buildSectionTwo(),
+      sectionThreeChecks: buildSectionThree(),
+      sectionConclusions: emptyConclusions(),
       hasSignificantIncrease: false,
       hasLowCreditRisk: false,
       hasCreditImpairment: false,
       companyStage: 'Stage1',
       auditStage: 'Stage1',
+      auditStageManualOverride: false,
       isConsistent: true,
       discrepancyNote: '',
       indexRef: '',
     }
   }
 
-  /**
-   * 新增投资项目（ElMessageBox.prompt命名）
-   * Requirements: 2.5
-   */
-  async function addRow(investProject?: string): Promise<void> {
-    let name = investProject?.trim()
-    if (!name) {
-      try {
-        const { value } = await ElMessageBox.prompt(
-          '请输入投资项目名称',
-          '新增投资项目',
-          { confirmButtonText: '确定', cancelButtonText: '取消' },
-        )
-        if (!value?.trim()) return
-        name = value.trim()
-      } catch {
-        return // 用户取消
-      }
-    }
-    const row = createEmptyRow(name)
-    rows.value.push(row)
-  }
-
-  /** 删除行 */
-  function removeRow(id: string): void {
-    rows.value = rows.value.filter(r => r.id !== id)
-    rows.value.forEach((r, i) => { r.seq = i + 1 })
-    // 清理展开状态
-    const next = new Set(expandedRowIds.value)
-    next.delete(id)
-    expandedRowIds.value = next
-  }
-
-  // ─── 数据加载 ─────────────────────────────────────────────────────────────
-
-  /** 从已保存行式数据恢复 */
-  function loadRows(data: StageClassificationRow[]): void {
-    rows.value = data.map((r, i) => {
-      const row: StageClassificationRow = {
-        ...r,
-        id: r.id || crypto.randomUUID(),
-        seq: i + 1,
-        sectionOneChecks: r.sectionOneChecks?.length === 13
-          ? r.sectionOneChecks
-          : SECTION_ONE_LABELS.map((label, idx) => ({
-              label,
-              value: r.sectionOneChecks?.[idx]?.value ?? '否',
-            })),
-        sectionTwoChecks: r.sectionTwoChecks?.length === 3
-          ? r.sectionTwoChecks
-          : SECTION_TWO_LABELS.map((label, idx) => ({
-              label,
-              value: r.sectionTwoChecks?.[idx]?.value ?? '否',
-            })),
-        sectionThreeChecks: r.sectionThreeChecks?.length === 8
-          ? r.sectionThreeChecks
-          : SECTION_THREE_LABELS.map((label, idx) => ({
-              label,
-              value: r.sectionThreeChecks?.[idx]?.value ?? '否',
-            })),
-      }
+  function transposeToRows(source: ColumnarSourceData): StageClassificationRow[] {
+    const {
+      columnHeaders,
+      sectionOneMatrix,
+      sectionTwoMatrix,
+      sectionThreeMatrix,
+      companyStages,
+    } = source
+    if (!columnHeaders?.length) return []
+    const validIndices = getValidColumnIndices(
+      columnHeaders,
+      sectionOneMatrix,
+      sectionTwoMatrix,
+      sectionThreeMatrix,
+    )
+    return validIndices.map((column, index) => {
+      const row = createEmptyRow(columnHeaders[column]?.trim() || `投资${index + 1}`)
+      row.seq = index + 1
+      row.sectionOneChecks = buildSectionOne(
+        SECTION_ONE_ITEMS.map((_, item) => sectionOneMatrix?.[item]?.[column]),
+      )
+      row.sectionTwoChecks = buildSectionTwo(
+        SECTION_TWO_ITEMS.map((_, item) => sectionTwoMatrix?.[item]?.[column]),
+      )
+      row.sectionThreeChecks = buildSectionThree(
+        SECTION_THREE_ITEMS.map((_, item) => sectionThreeMatrix?.[item]?.[column]),
+      )
+      row.companyStage = normalizeStage(companyStages?.[column])
       recalcRow(row)
       return row
     })
   }
 
-  /** 从列式源数据加载（Requirements: 2.1, 2.6） */
+  async function addRow(investProject?: string): Promise<void> {
+    let name = investProject?.trim()
+    if (!name) {
+      try {
+        const result = await ElMessageBox.prompt(
+          '请输入投资项目名称',
+          '新增投资项目',
+          { confirmButtonText: '确定', cancelButtonText: '取消' },
+        )
+        name = result.value?.trim()
+      } catch {
+        return
+      }
+    }
+    if (name) rows.value.push(createEmptyRow(name))
+  }
+
+  function removeRow(id: string): void {
+    rows.value = rows.value.filter(row => row.id !== id)
+    rows.value.forEach((row, index) => { row.seq = index + 1 })
+    const next = new Set(expandedRowIds.value)
+    next.delete(id)
+    expandedRowIds.value = next
+  }
+
+  function loadRows(data: StageClassificationRow[]): void {
+    if (!Array.isArray(data)) {
+      rows.value = []
+      return
+    }
+    rows.value = data.map((saved, index) => {
+      const source = (saved ?? {}) as Partial<StageClassificationRow>
+      const manualOverride = Boolean(source.auditStageManualOverride)
+      const row: StageClassificationRow = {
+        id: source.id || newId(),
+        seq: index + 1,
+        investProject: source.investProject || `投资${index + 1}`,
+        crossSheetInvestmentId: source.crossSheetInvestmentId || source.id || '',
+        bookBalance: toFiniteNumber(source.bookBalance),
+        sectionOneChecks: buildSectionOne(savedValues(source.sectionOneChecks)),
+        sectionTwoChecks: buildSectionTwo(savedValues(source.sectionTwoChecks)),
+        sectionThreeChecks: buildSectionThree(savedValues(source.sectionThreeChecks)),
+        sectionConclusions: {
+          significantIncrease: source.sectionConclusions?.significantIncrease ?? '',
+          lowCreditRisk: source.sectionConclusions?.lowCreditRisk ?? '',
+          creditImpairment: source.sectionConclusions?.creditImpairment ?? '',
+        },
+        hasSignificantIncrease: false,
+        hasLowCreditRisk: false,
+        hasCreditImpairment: false,
+        companyStage: normalizeStage(source.companyStage),
+        auditStage: manualOverride ? normalizeStage(source.auditStage) : 'Stage1',
+        auditStageManualOverride: manualOverride,
+        isConsistent: true,
+        discrepancyNote: source.discrepancyNote ?? '',
+        indexRef: source.indexRef ?? '',
+      }
+      if (!row.crossSheetInvestmentId) row.crossSheetInvestmentId = row.id
+      recalcRow(row)
+      return row
+    })
+  }
+
   function loadFromColumnar(source: ColumnarSourceData): void {
     rows.value = transposeToRows(source)
   }
 
-  // ─── 序列化 ───────────────────────────────────────────────────────────────
-
-  function toSaveData() {
-    return {
-      rows: rows.value,
-      summary: summary.value,
-      conclusion: conclusion.value,
-    }
-  }
-
-  // ─── Vue组件适配方法（供G6TabStageClassification.vue调用）─────────────────
-
-  /** 初始化数据（从htmlData或已保存数据） */
-  function init(htmlData: Record<string, any> | null): void {
-    if (!htmlData) return
-    const stageData = htmlData.stageClassification ?? htmlData
-    if (stageData?.rows && Array.isArray(stageData.rows)) {
-      loadRows(stageData.rows)
-    }
-    if (stageData?.conclusion) {
-      conclusion.value = stageData.conclusion
-    }
-  }
-
-  /** 更新检查项值（section: 'significantIncrease' | 'lowCreditRisk' | 'creditImpairment'） */
   function updateCheckValue(
     rowId: string,
-    section: 'significantIncrease' | 'lowCreditRisk' | 'creditImpairment',
+    section: SectionKey,
     checkIndex: number,
     value: SectionOneCheckValue | SectionTwoBoolValue,
   ): void {
-    const row = rows.value.find(r => r.id === rowId)
+    const row = rows.value.find(item => item.id === rowId)
     if (!row) return
     if (section === 'significantIncrease' && row.sectionOneChecks[checkIndex]) {
       row.sectionOneChecks[checkIndex].value = value as SectionOneCheckValue
@@ -465,41 +530,153 @@ export function useG6EclStageClassification(_opts?: any) {
     recalcRow(row)
   }
 
-  /** 更新企业划分阶段 */
   function updateCompanyStage(rowId: string, stage: StageType): void {
-    const row = rows.value.find(r => r.id === rowId)
+    const row = rows.value.find(item => item.id === rowId)
     if (!row) return
     row.companyStage = stage
     row.isConsistent = row.companyStage === row.auditStage
   }
 
-  /** 更新审计判断阶段（手动覆盖） */
   function updateAuditStage(rowId: string, stage: StageType): void {
-    const row = rows.value.find(r => r.id === rowId)
+    const row = rows.value.find(item => item.id === rowId)
     if (!row) return
     row.auditStage = stage
+    row.auditStageManualOverride = true
     row.isConsistent = row.companyStage === row.auditStage
   }
 
-  /** 更新差异说明 */
-  function updateDiscrepancyNote(rowId: string, note: string): void {
-    const row = rows.value.find(r => r.id === rowId)
+  function clearAuditStageOverride(rowId: string): void {
+    const row = rows.value.find(item => item.id === rowId)
     if (!row) return
-    row.discrepancyNote = note
+    row.auditStageManualOverride = false
+    recalcRow(row)
+  }
+
+  function updateDiscrepancyNote(rowId: string, note: string): void {
+    const row = rows.value.find(item => item.id === rowId)
+    if (row) row.discrepancyNote = note
+  }
+
+  function updateSectionConclusion(
+    rowId: string,
+    section: keyof SectionAnalysisConclusions,
+    text: string,
+  ): void {
+    const row = rows.value.find(item => item.id === rowId)
+    if (row) row.sectionConclusions[section] = text
+  }
+
+  function updateIndexRef(rowId: string, value: string): void {
+    const row = rows.value.find(item => item.id === rowId)
+    if (row) row.indexRef = value
+  }
+
+  function importFromDetailRows(
+    rawRows: unknown[],
+    opts?: { asOfDate?: string | null },
+  ): DetailImportResult {
+    if (!Array.isArray(rawRows) || rawRows.length === 0) {
+      return { added: 0, refreshed: 0, prefilledOverdue: 0, prefilledDefault: 0 }
+    }
+    const byProject = new Map(rows.value.map(row => [row.investProject.trim(), row]))
+    let added = 0
+    let refreshed = 0
+    let prefilledOverdue = 0
+    let prefilledDefault = 0
+
+    for (const raw of rawRows) {
+      if (!raw || typeof raw !== 'object') continue
+      const detail = raw as Record<string, unknown>
+      const investProject = String(detail.investProject ?? '').trim()
+      if (!investProject) continue
+
+      let row = byProject.get(investProject)
+      if (!row) {
+        row = createEmptyRow(investProject)
+        rows.value.push(row)
+        byProject.set(investProject, row)
+        added += 1
+      } else {
+        refreshed += 1
+      }
+
+      row.bookBalance = toFiniteNumber(
+        detail.closingAudited
+        ?? detail.closingSubtotal
+        ?? detail.amortizedCost
+        ?? detail.bookBalance,
+      )
+      row.companyStage = normalizeStage(
+        String(detail.stageClassification ?? detail.companyStage ?? 'Stage1'),
+      )
+
+      const explicitOverdue = toFiniteNumber(detail.overdueDays)
+      const overdueDays = explicitOverdue > 0
+        ? explicitOverdue
+        : calcOverdueDays(detail.maturityDate, opts?.asOfDate)
+      if (overdueDays >= 30) {
+        const overdueCheck = row.sectionOneChecks.find(check => check.label.includes('逾期'))
+        if (overdueCheck && overdueCheck.value !== '是') {
+          overdueCheck.value = '是'
+          prefilledOverdue += 1
+        }
+        if (!row.sectionConclusions.significantIncrease.includes('【预填】')) {
+          const prompt = `【预填】该项目已逾期${Math.floor(overdueDays)}日（≥30日），请复核是否可反驳信用风险显著增加推定`
+          row.sectionConclusions.significantIncrease = [
+            prompt,
+            row.sectionConclusions.significantIncrease,
+          ].filter(Boolean).join('；')
+        }
+      }
+      if (overdueDays >= 90) {
+        const defaultCheck = row.sectionThreeChecks.find(
+          check => check.label.includes('违反合同') || check.label.includes('逾期'),
+        )
+        if (defaultCheck && defaultCheck.value !== '是') {
+          defaultCheck.value = '是'
+          prefilledDefault += 1
+        }
+        if (!row.sectionConclusions.creditImpairment.includes('【预填】')) {
+          const tip = `【预填】已逾期${Math.floor(overdueDays)}日（≥90日通常推定违约/Stage3，可反驳）；请复核是否有合理依据支持更长违约时点`
+          row.sectionConclusions.creditImpairment = [
+            tip,
+            row.sectionConclusions.creditImpairment,
+          ].filter(Boolean).join('；')
+        }
+      }
+      recalcRow(row)
+    }
+
+    rows.value.forEach((row, index) => { row.seq = index + 1 })
+    return { added, refreshed, prefilledOverdue, prefilledDefault }
+  }
+
+  function toSaveData() {
+    return {
+      rows: rows.value,
+      summary: summary.value,
+      conclusion: conclusion.value,
+    }
+  }
+
+  function init(htmlData: Record<string, any> | null): void {
+    if (!htmlData) return
+    const stageData = htmlData.stageClassification ?? htmlData
+    if (Array.isArray(stageData?.rows)) loadRows(stageData.rows)
+    if (typeof stageData?.conclusion === 'string') conclusion.value = stageData.conclusion
   }
 
   return {
-    // State
     rows,
     conclusion,
     expandedRowIds,
-    // Computed
     summary,
-    // 判定函数（导出供测试）
+    inconsistentRows,
+    incompleteRows,
     calcHasSignificantIncrease,
     calcHasLowCreditRisk,
     calcHasCreditImpairment,
-    // 行操作
+    hasIncompleteChecks,
     recalcRow,
     recalcAll,
     addRow,
@@ -507,27 +684,26 @@ export function useG6EclStageClassification(_opts?: any) {
     loadRows,
     loadFromColumnar,
     createEmptyRow,
-    // 列式解析（核心转置函数）
+    importFromDetailRows,
     transposeToRows,
     getValidColumnIndices,
     normalizeSectionOneValue,
     normalizeBoolValue,
     normalizeStage,
-    // 一致性校验
     validateConsistency,
     canSave,
-    // 展开/折叠
     toggleExpand,
     expandAll,
     collapseAll,
     isExpanded,
-    // Vue组件适配
     init,
     updateCheckValue,
     updateCompanyStage,
     updateAuditStage,
+    clearAuditStageOverride,
     updateDiscrepancyNote,
-    // 序列化
+    updateSectionConclusion,
+    updateIndexRef,
     toSaveData,
   }
 }

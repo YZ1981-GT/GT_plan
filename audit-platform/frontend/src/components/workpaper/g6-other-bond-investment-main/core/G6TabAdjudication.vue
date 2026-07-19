@@ -18,6 +18,33 @@
       style="margin-bottom: 12px"
     />
 
+    <el-alert
+      v-if="classificationSummary"
+      :type="classificationAlertType"
+      :closable="false"
+      show-icon
+      style="margin-bottom: 12px"
+      :title="classificationBannerTitle"
+    >
+      <template #default>
+        <span>{{ classificationSummary.message }}</span>
+        <ul
+          v-if="classificationSummary.instruments?.length"
+          class="instrument-matrix"
+        >
+          <li
+            v-for="row in classificationSummary.instruments"
+            :key="row.instrumentId || row.instrumentName"
+          >
+            {{ row.instrumentName || row.instrumentId }}：
+            SPPI {{ row.sppiOverall === 'pass' ? '通过' : row.sppiOverall === 'fail' ? '未通过' : '未完成' }}
+            → {{ row.expectedClassification || '未定' }}
+            <template v-if="row.accountConflict">（科目冲突）</template>
+          </li>
+        </ul>
+      </template>
+    </el-alert>
+
     <div class="methodology-context">
       <p class="methodology-title">FVOCI-Debt 计量与本表结构：</p>
       <p>① 一、公允价值 — 报表列示口径（与附注/资产负债表衔接）</p>
@@ -27,13 +54,16 @@
     </div>
 
     <details class="prep-hint">
-      <summary>编制提示</summary>
+      <summary>📋 编制提示（如何编制）</summary>
       <ul>
-        <li>列结构对齐 Excel：期初/期末 ×（未审数｜账项调整｜审定数）+ 变动额/变动率 + 原因分析。</li>
-        <li>审定＝未审＋账项调整；|变动率|&gt;30% 时原因分析必填（与模板编制说明一致）。</li>
-        <li>账面余额叶子＝对应成本审定＋利息调整审定；账面价值叶子＝账面余额审定−减值审定（自动计算）。</li>
-        <li>账面一年内到期＝成本一年内＋利息一年内；账面价值一年内到期＝账面一年内−减值一年内。</li>
-        <li>自资产负债表日起一年内到期部分重分类至「一年内到期的非流动资产」或「其他流动资产」。</li>
+        <li><b>编制顺序</b>：先完成 G6-2 明细与 G6-4 调整（或确认无调整）→ 本表汇总审定 → 再勾稽试算与附注。</li>
+        <li><b>取数来源</b>：未审数来自科目余额表/明细汇总；账项调整来自 G6-4 回写（按 150301/302/303/304/305 分流）；明细勾稽看 G6-2，减值看 G6-3/G6-12。</li>
+        <li><b>三层结构</b>：①公允价值（报表列示）②摊余成本（成本+利息调整→账面余额；减值在（四））③账面价值=账面余额−减值。</li>
+        <li>审定＝未审＋账项调整；|变动率|&gt;30% 时「原因分析」必填。</li>
+        <li>账面余额叶子＝成本审定＋利息调整审定；账面价值叶子＝账面余额审定−减值审定（自动计算，勿手改公式列）。</li>
+        <li>一年内到期：成本一年内＋利息一年内；账面价值一年内到期＝账面一年内−减值一年内；与 G6-2 到期分类一致。</li>
+        <li>差异数（账面价值合计 − 试算 1503）应为 0；非零时先查 G6-4 是否已回写、G6-2/G6-3 是否已同步。</li>
+        <li>分类结论关注顶部 G6-7/G6-8 回写摘要；非 FVOCI-Debt 预期分类时须在说明中评价影响。</li>
       </ul>
     </details>
 
@@ -184,11 +214,12 @@
     />
 
     <details class="guidance-details">
-      <summary>编制说明【非打印内容】</summary>
+      <summary>编制说明【非打印内容】— 列报与准则口径</summary>
       <div class="guidance-content">
         <p>1. 「其他债权投资」项目，反映资产负债表日企业分类为以公允价值计量且其变动计入其他综合收益的长期债权投资的期末账面价值。</p>
         <p>2. 自资产负债表日起一年内到期的长期债权投资的期末账面价值，在「一年内到期的非流动资产」项目反映。</p>
         <p>3. 企业购入的以公允价值计量且其变动计入其他综合收益的一年内到期的债权投资的期末账面价值，在「其他流动资产」项目反映。</p>
+        <p>4. 操作路径提示：G6-2 提供明细与一年内到期拆分；G6-3/G6-12 提供减值；G6-4「保存并回写」后刷新本表账项调整列；附注表从本表审定带入。</p>
       </div>
     </details>
   </div>
@@ -208,6 +239,10 @@ import { useG6MainAdjudication } from '../../composables/useG6MainAdjudication'
 import type { G6AdjudicationRow } from '../../composables/useG6MainAdjudication'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { G6_CHANGE_RATE_THRESHOLD } from '../../composables/g6AdjudicationItems'
+import {
+  G6_CLASSIFICATION_SUMMARY_KEY,
+  parseG6ClassificationSummary,
+} from '../../composables/g6CrossHelpers'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G6AuditTextCards from '../G6AuditTextCards.vue'
 
@@ -238,6 +273,26 @@ const adj = useG6MainAdjudication({
   allResponses,
   isReadonly,
   htmlData: toRef(props, 'htmlData'),
+})
+
+const classificationSummary = computed(() =>
+  parseG6ClassificationSummary(allResponses.value.get(G6_CLASSIFICATION_SUMMARY_KEY)),
+)
+
+const classificationAlertType = computed(() => {
+  if (classificationSummary.value?.accountConflict || classificationSummary.value?.level === 'warning') {
+    return 'warning'
+  }
+  if (classificationSummary.value?.level === 'ok') return 'success'
+  return 'info'
+})
+
+const classificationBannerTitle = computed(() => {
+  const s = classificationSummary.value
+  if (!s) return ''
+  const cls = s.expectedClassification || '未定'
+  const conflict = s.accountConflict ? ' · 与「其他债权投资」科目定位可能冲突' : ''
+  return `G6-7×G6-8 分类摘要：${cls}${conflict}`
 })
 
 const isFvRateWarning = computed(() => {
@@ -290,6 +345,12 @@ function fmtRate(v: number | null | undefined): string {
 }
 .methodology-title { font-weight: 600; margin: 0 0 4px 0; color: #78350f; }
 .methodology-context p { margin: 2px 0; }
+.instrument-matrix {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.6;
+}
 
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }

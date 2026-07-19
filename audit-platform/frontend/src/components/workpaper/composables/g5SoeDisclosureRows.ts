@@ -46,6 +46,8 @@ export interface G5SoeDisclosureState {
   continuing: G5ContinuingInvolvement
   /** （4）坏账准备计提方法说明（模板红区） */
   provisionMethodNote: string
+  agingPreset?: 'THREE_YEAR' | 'FIVE_YEAR' | 'CUSTOM'
+  customAgingLabels?: string[]
 }
 
 const uid = (prefix: string) =>
@@ -74,6 +76,8 @@ export function buildDefaultSoeState(): G5SoeDisclosureState {
     derecogRows: [],
     continuing: { assetEnd: 0, liabilityEnd: 0 },
     provisionMethodNote: '',
+    agingPreset: 'THREE_YEAR',
+    customAgingLabels: [],
   }
 }
 
@@ -105,6 +109,8 @@ export function parseSoeDisclosure(raw: string | null | undefined): G5SoeDisclos
         writeoffRows: [],
         leaseMlpRows: [],
         useThreeStageHintAck: false,
+        agingPreset: parsed.agingPreset,
+        customAgingLabels: parsed.customAgingLabels,
       }),
     )
     return {
@@ -135,6 +141,9 @@ export function parseSoeDisclosure(raw: string | null | undefined): G5SoeDisclos
         liabilityEnd: Number(parsed.continuing?.liabilityEnd) || 0,
       },
       provisionMethodNote: String(parsed.provisionMethodNote ?? ''),
+      agingPreset: asListed?.agingPreset || parsed.agingPreset || 'THREE_YEAR',
+      customAgingLabels: asListed?.customAgingLabels
+        || (Array.isArray(parsed.customAgingLabels) ? parsed.customAgingLabels : []),
     }
   } catch {
     return null
@@ -151,6 +160,8 @@ function listedToSoe(listed: G5ListedDisclosureState): G5SoeDisclosureState {
     derecogRows: [],
     continuing: { assetEnd: 0, liabilityEnd: 0 },
     provisionMethodNote: listed.unrealizedNote || '',
+    agingPreset: listed.agingPreset || 'THREE_YEAR',
+    customAgingLabels: listed.customAgingLabels || [],
   }
 }
 

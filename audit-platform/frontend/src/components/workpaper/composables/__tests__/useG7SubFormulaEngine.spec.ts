@@ -6,7 +6,7 @@
  *
  * 8 Properties covering all 7 pure functions + parseNum:
  *   P1: calcSameControlCost — 同控初始投资成本 = 净资产 × 持股比例
- *   P2: calcNotSameControlCost — 非同控初始投资成本 = 支付对价 + 直接费用
+ *   P2: calcNotSameControlCost — 非同控初始投资成本 = 合并对价公允价值
  *   P3: calcGoodwill — 商誉 = 初始成本 - 享有份额；正=商誉，负=营业外收入
  *   P4: calcCostMethodIncome — 成本法投资收益 = 宣告股利 × 持股比例
  *   P5: calcSubsequentBalance — 期末账面 = 期初 + 追加 - 减值
@@ -19,6 +19,9 @@ import * as fc from 'fast-check'
 import {
   parseNum,
   calcSameControlCost,
+  calcSameControlMergerDifference,
+  calcSameControlStepCost,
+  calcSameControlStepDifference,
   calcNotSameControlCost,
   calcGoodwill,
   calcCostMethodIncome,
@@ -56,23 +59,56 @@ describe('Feature: g7-long-term-equity-subsidiary, Property 1: 同控初始投�
       { numRuns: 100 },
     )
   })
+
+  it('G7-8 merger difference ⑤ = ③ − ④', () => {
+    fc.assert(
+      fc.property(
+        amountArb(),
+        amountArb(),
+        (cost, consideration) => {
+          expect(calcSameControlMergerDifference(cost, consideration)).toBe(round2(cost - consideration))
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+
+  it('G7-8 step cost ⑤ = ④ × ① and difference ⑥ = ② + 原账面 + ③ − ⑤', () => {
+    fc.assert(
+      fc.property(
+        amountArb(),
+        ratioArb(),
+        amountArb(),
+        amountArb(),
+        amountArb(),
+        (netAssets, ratio, consideration, priorBv, priorAdj) => {
+          const cost = calcSameControlStepCost(netAssets, ratio)
+          expect(cost).toBe(round2(netAssets * ratio))
+          expect(calcSameControlStepDifference(consideration, priorBv, priorAdj, cost)).toBe(
+            round2(consideration + priorBv + priorAdj - cost),
+          )
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════════
-// P2: 非同控初始投资成本 = 支付对价 + 直接相关费用
+// P2: 非同控初始投资成本 = 合并对价公允价值（直接费用费用化）
 // ═══════════════════════════════════════════════════════════════════
 
 describe('Feature: g7-long-term-equity-subsidiary, Property 2: 非同控初始投资成本', () => {
   /**
    * **Validates: Requirements 3.4**
    */
-  it('calcNotSameControlCost(price, fees) === round(price + fees, 2) for all inputs', () => {
+  it('calcNotSameControlCost(price, fees) === round(price, 2)，旧费用参数不进入成本', () => {
     fc.assert(
       fc.property(
         amountArb(),
         amountArb(),
         (price, fees) => {
-          expect(calcNotSameControlCost(price, fees)).toBe(round2(price + fees))
+          expect(calcNotSameControlCost(price, fees)).toBe(round2(price))
         },
       ),
       { numRuns: 100 },

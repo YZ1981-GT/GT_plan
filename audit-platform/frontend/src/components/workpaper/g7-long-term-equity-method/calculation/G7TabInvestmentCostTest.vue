@@ -276,6 +276,7 @@
         :autosize="{ minRows: 2, maxRows: 8 }"
         :disabled="isReadonly"
         placeholder="对投资成本测试结果的综合评价（商誉/营业外收入确认是否合理）..."
+        @change="persistRows"
       />
     </el-card>
 
@@ -321,6 +322,7 @@ import {
   calcShareOfNetAssets,
   calcGoodwill,
 } from '../../composables/useG7EquityMethodFormulaEngine'
+import { G7_13_ROWS_KEY } from '../../composables/g7EquityMethodCrossSheet'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useG7EquityMethodFormData } from '../../composables/useG7EquityMethodFormData'
 import type { InvestmentCostTestRow } from '../../composables/useG7EquityMethodFormData'
@@ -386,11 +388,40 @@ function saveAuditNote(val: string): void {
   auditFormData.debouncedSave(AUDIT_NOTE_KEY, { remark: val, conclusion: null })
 }
 
-onMounted(async () => {
-  await auditFormData.load()
-  const n = auditFormData.data.value.get(AUDIT_NOTE_KEY)
-  if (n?.remark) auditNote.value = n.remark
-})
+function persistRows(): void {
+  if (isReadonly.value) return
+  auditFormData.debouncedSave(G7_13_ROWS_KEY, {
+    conclusion: JSON.stringify({ rows: [...rows], conclusion: conclusion.value }),
+    remark: null,
+  })
+}
+
+function loadRowsFromChecklist(): boolean {
+  const saved = auditFormData.data.value.get(G7_13_ROWS_KEY)
+  const parsed = (() => {
+    try {
+      return saved?.conclusion ? JSON.parse(String(saved.conclusion)) : null
+    } catch {
+      return null
+    }
+  })()
+  const rawRows = Array.isArray(parsed?.rows) ? parsed.rows : Array.isArray(parsed) ? parsed : null
+  if (!rawRows?.length) return false
+  rows.length = 0
+  for (let i = 0; i < rawRows.length; i++) {
+    const raw = rawRows[i]
+    const row: InvestmentCostTestRow = {
+      ...createEmptyRow(i + 1, raw.investeeName || ''),
+      ...raw,
+      seq: i + 1,
+      id: raw.id || crypto.randomUUID(),
+    }
+    rows.push(row)
+    recalcRow(row)
+  }
+  if (typeof parsed?.conclusion === 'string') conclusion.value = parsed.conclusion
+  return true
+}
 
 function createEmptyRow(seq: number, investeeName: string): InvestmentCostTestRow {
   return {
@@ -440,6 +471,7 @@ function updateField(id: string, field: keyof InvestmentCostTestRow, value: any)
   const row = rows.find(r => r.id === id)
   if (row) {
     ;(row as any)[field] = value
+    persistRows()
   }
 }
 
@@ -448,6 +480,7 @@ function updateFieldWithRecalc(id: string, field: keyof InvestmentCostTestRow, v
   if (row) {
     ;(row as any)[field] = value ?? 0
     recalcRow(row)
+    persistRows()
   }
 }
 
@@ -470,6 +503,7 @@ async function handleAddRow() {
     if (value?.trim()) {
       const newRow = createEmptyRow(rows.length + 1, value.trim())
       rows.push(newRow)
+      persistRows()
       ElMessage.success(`已添加「${value.trim()}」`)
     }
   } catch {
@@ -481,8 +515,8 @@ function removeRow(id: string) {
   const idx = rows.findIndex(r => r.id === id)
   if (idx >= 0) {
     rows.splice(idx, 1)
-    // 重新排序
     rows.forEach((r, i) => { r.seq = i + 1 })
+    persistRows()
   }
 }
 
@@ -577,8 +611,37 @@ function getData(): { rows: InvestmentCostTestRow[]; conclusion: string } {
 
 defineExpose({ getData, loadFromHtmlData, updateRatioMap })
 
-onMounted(() => {
-  loadFromHtmlData(props.htmlData)
+onMounted(async () => {
+  await auditFormData.load()
+  const n = auditFormData.data.value.get(AUDIT_NOTE_KEY)
+  if (n?.remark) auditNote.value = n.remark
+  if (!loadRowsFromChecklist()) {
+    const snapshot = props.htmlData?.responses_snapshot?.[G7_13_ROWS_KEY]
+    const snapParsed = (() => {
+      try {
+        return snapshot?.conclusion ? JSON.parse(String(snapshot.conclusion)) : null
+      } catch {
+        return null
+      }
+    })()
+    if (Array.isArray(snapParsed?.rows) && snapParsed.rows.length) {
+      rows.length = 0
+      for (let i = 0; i < snapParsed.rows.length; i++) {
+        const raw = snapParsed.rows[i]
+        const row: InvestmentCostTestRow = {
+          ...createEmptyRow(i + 1, raw.investeeName || ''),
+          ...raw,
+          seq: i + 1,
+          id: raw.id || crypto.randomUUID(),
+        }
+        rows.push(row)
+        recalcRow(row)
+      }
+      if (typeof snapParsed.conclusion === 'string') conclusion.value = snapParsed.conclusion
+    } else {
+      loadFromHtmlData(props.htmlData)
+    }
+  }
 })
 </script>
 

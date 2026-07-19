@@ -386,9 +386,23 @@
       <template #header>
         <div class="card-title-row">
           <span class="card-title">按组合计提坏账准备</span>
-          <el-button size="small" type="primary" link :disabled="isReadonly" @click="dis.addPortfolio()">
-            + 新增组合块
-          </el-button>
+          <div class="aging-toolbar">
+            <span class="muted">账龄口径</span>
+            <el-select
+              :model-value="dis.state.value.agingPreset || 'THREE_YEAR'"
+              size="small"
+              style="width: 120px"
+              :disabled="isReadonly"
+              @change="onAgingPresetChange"
+            >
+              <el-option label="3年段" value="THREE_YEAR" />
+              <el-option label="5年段" value="FIVE_YEAR" />
+              <el-option label="自定义" value="CUSTOM" />
+            </el-select>
+            <el-button size="small" type="primary" link :disabled="isReadonly" @click="dis.addPortfolio()">
+              + 新增组合块
+            </el-button>
+          </div>
         </div>
       </template>
 
@@ -718,8 +732,18 @@
         <li>「+ 添加行 / 新增组合块」对应 Excel「可无限量添加行」动态插行；合计、账面价值、ECL 率为公式列（分母为零显示「—」）。</li>
         <li>表(1)合计应与表(2)合计勾稽；组合名称须与会计政策披露一致（见顶部提示）。</li>
         <li>三阶段模型披露可参照应收账款附注格式（见组合区蓝色提示）。</li>
+        <li>组合账龄支持 3年段 / 5年段 / 自定义，与 G5-2、G5-10 口径保持一致。</li>
       </ul>
     </details>
+
+    <el-dialog v-model="showAgingDialog" title="自定义账龄段" width="420px" destroy-on-close @close="cancelAgingDialog">
+      <p class="muted">每行一个账龄段名称（至少 2 段，最多 10 段）。</p>
+      <el-input v-model="agingDraft" type="textarea" :autosize="{ minRows: 6, maxRows: 12 }" />
+      <template #footer>
+        <el-button @click="cancelAgingDialog">取消</el-button>
+        <el-button type="primary" @click="confirmAgingCustom">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -728,7 +752,7 @@
  * G5TabDisclosureListed — 附注披露信息（上市公司）
  * 结构化对齐致同 Excel；替换原纯文本 stub。
  */
-import { computed, onMounted, toRef } from 'vue'
+import { computed, onMounted, ref, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
@@ -737,6 +761,7 @@ import { useInjectedG5FormData } from '../../composables/useG5LonRecFormData'
 import { useG5DisclosureListed } from '../../composables/useG5DisclosureListed'
 import { useG5AiGenerate } from '../../composables/useG5AiGenerate'
 import type { G5MethodRow } from '../../composables/g5ListedDisclosureRows'
+import type { G5AgingPreset } from '../../composables/g5AgingScheme'
 
 const props = defineProps<{
   htmlData?: unknown
@@ -805,6 +830,34 @@ function agingRowClass({ row }: { row: { kind: string } }) {
 }
 function movementRowClass({ row }: { row: { kind: string } }) {
   return row.kind === 'closing' ? 'row-total' : ''
+}
+
+const showAgingDialog = ref(false)
+const agingDraft = ref('')
+const lastNonCustomPreset = ref<G5AgingPreset>('THREE_YEAR')
+
+function onAgingPresetChange(val: G5AgingPreset) {
+  if (val === 'CUSTOM') {
+    const labels = dis.state.value.customAgingLabels?.length
+      ? dis.state.value.customAgingLabels
+      : (dis.state.value.portfolios[0]?.agingRows || [])
+          .filter((r) => r.kind === 'band')
+          .map((r) => r.label)
+    agingDraft.value = (labels.length ? labels : ['1年以内', '1-2年', '2-3年', '3年以上']).join('\n')
+    showAgingDialog.value = true
+    return
+  }
+  lastNonCustomPreset.value = val
+  dis.setAgingPreset(val)
+}
+
+function confirmAgingCustom() {
+  const labels = agingDraft.value.split('\n').map((l) => l.trim()).filter(Boolean)
+  if (dis.setAgingPreset('CUSTOM', labels)) showAgingDialog.value = false
+}
+
+function cancelAgingDialog() {
+  showAgingDialog.value = false
 }
 
 function onRefresh() {
@@ -884,6 +937,15 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+}
+.aging-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.muted {
+  font-size: 12px;
+  color: #909399;
 }
 .card-title {
   font-weight: 600;

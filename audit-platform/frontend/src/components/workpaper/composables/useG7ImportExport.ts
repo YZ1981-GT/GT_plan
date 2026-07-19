@@ -10,7 +10,7 @@
  *   POST /api/workpapers/{wpId}/g7-main/import-data?sheet={code}  (multipart/form-data)
  *
  * sheet codes: G7-2 / G7-3
- * G7-2 按5区段分sheet导出（基础信息/期初余额/本期变动/期末+减值/权益法详情）
+ * G7-2 按原表三大业务区导出（成本法/权益法/减值准备），并支持导入原始模板。
  *
  * UI 铁律：el-dropdown「导入导出 ▾」（导出模板/导出数据/导入数据）
  * 使用 axios (http from @/utils/http) 非原生 fetch — for Authorization header
@@ -37,7 +37,7 @@ export interface G7MainImportResult {
 export interface G7MainSheetMeta {
   code: G7MainImportableSheet
   label: string
-  /** G7-2按5区段分sheet导出 */
+  /** G7-2按三大业务区分sheet导出 */
   multiSheet?: boolean
 }
 
@@ -47,17 +47,15 @@ export const G7_MAIN_API_PREFIX = 'g7-main'
 
 /** 2张可导入导出 sheet 的中文标签 */
 export const G7_MAIN_IMPORT_EXPORT_SHEETS: G7MainSheetMeta[] = [
-  { code: 'G7-2', label: 'G7-2 明细表（5区段）', multiSheet: true },
+  { code: 'G7-2', label: 'G7-2 明细表（成本法/权益法/减值）', multiSheet: true },
   { code: 'G7-3', label: 'G7-3 调整分录汇总' },
 ]
 
-/** G7-2 的5区段子sheet（multi-sheet导出） */
+/** G7-2 的三大业务区（multi-sheet导出） */
 export const G7_2_SEGMENTS = [
-  { key: 'basic', label: '基础信息' },
-  { key: 'opening', label: '期初余额' },
-  { key: 'period', label: '本期变动' },
-  { key: 'closing', label: '期末+减值' },
-  { key: 'equity', label: '权益法详情' },
+  { key: 'cost', label: '成本法' },
+  { key: 'equity', label: '权益法' },
+  { key: 'impairment', label: '减值准备' },
 ] as const
 
 // ═══ 工具函数 ═══
@@ -149,7 +147,7 @@ export function useG7ImportExport(options: UseG7ImportExportOptions): UseG7Impor
 
   /**
    * 导出模板 — POST /api/workpapers/{wp_id}/g7-main/export-template?sheet={code}
-   * G7-2 按5区段分sheet导出（后端返回multi-sheet xlsx）
+   * G7-2 按三大业务区分sheet导出（后端返回multi-sheet xlsx）
    */
   async function exportTemplate(sheet: G7MainImportableSheet): Promise<void> {
     lastError.value = null
@@ -174,7 +172,7 @@ export function useG7ImportExport(options: UseG7ImportExportOptions): UseG7Impor
 
   /**
    * 导出数据 — POST /api/workpapers/{wp_id}/g7-main/export-data?sheet={code}
-   * G7-2 按5区段分sheet导出（后端返回multi-sheet xlsx with data）
+   * G7-2 按三大业务区分sheet导出（后端返回multi-sheet xlsx with data）
    */
   async function exportData(sheet: G7MainImportableSheet): Promise<void> {
     lastError.value = null

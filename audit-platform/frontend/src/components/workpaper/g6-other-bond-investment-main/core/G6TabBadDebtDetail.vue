@@ -243,6 +243,9 @@
       conclusion-ai-section="baddebt-conclusion"
       :related-context="{
         行数: detail.leaves.value.length,
+        单项期末未审: detail.individualClosingUnadjusted.value,
+        组合期末未审: detail.portfolioClosingUnadjusted.value,
+        合计期末未审: detail.totalClosingUnadjusted.value,
         单项期末审定: detail.individualClosingAudited.value,
         组合期末审定: detail.portfolioClosingAudited.value,
         合计期末审定: detail.totalClosingAudited.value,
@@ -259,7 +262,7 @@
         <li>结构对齐 Excel：按单项评估计提 / 信用风险组合计提 / 合计。</li>
         <li>期末未审 = 期初未审 + 计提 + 其他增加 − 转回 − 转销 − 其他减少。</li>
         <li>单独计提的减值、转回或转销须在「原因」列说明。</li>
-        <li>「回写 G6-1 减值」将单项/组合期末审定写入审定表减值准备对应行。</li>
+        <li>「回写 G6-1 减值」将单项/组合期末未审写入审定表减值准备对应行（不含期末调整，避免双重叠加）。</li>
         <li>损失率/Stage 测算请在 ECL 组 G6-11~G6-13 完成。</li>
       </ul>
     </details>
@@ -334,7 +337,7 @@ function fmt(v: number | null | undefined): string {
 function onWriteback(): void {
   detail.writebackToAdjudication()
   ElMessage.success(
-    `已回写减值：单项 ${fmt(detail.individualClosingAudited.value)} / 组合 ${fmt(detail.portfolioClosingAudited.value)}`,
+    `已回写减值期末未审：单项 ${fmt(detail.individualClosingUnadjusted.value)} / 组合 ${fmt(detail.portfolioClosingUnadjusted.value)}`,
   )
 }
 

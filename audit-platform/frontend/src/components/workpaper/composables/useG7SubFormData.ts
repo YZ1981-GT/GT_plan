@@ -20,6 +20,8 @@ import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import type { ChecklistResponse } from './useF1FormData'
+import type { G7SameControlStoredRow } from '../g7-long-term-equity-subsidiary/initial/g7SameControlModel'
+import type { G7DisposalPackageRow } from '../g7-long-term-equity-subsidiary/disposal/g7DisposalPackageModel'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -58,35 +60,26 @@ export interface G7ControlJudgmentData {
   overallConclusion: string
 }
 
-export interface G7SameControlRow {
-  id: string
-  seq: number
-  investeeName: string
-  mergerDate: string
-  mergerType: string
-  acquireeNetAssets: number
-  shareholdingRatio: number
-  shareOfNetAssets: number
-  initialCost: number
-  consideration: number
-  differenceHandling: string
-  auditConclusion: string
-}
+export type G7SameControlRow = G7SameControlStoredRow
 
+/** @deprecated 旧版扁平行；新实现见 g7NotSameControlModel.G7NotSameControlStoredRow */
 export interface G7NotSameControlRow {
   id: string
   seq: number
   investeeName: string
   acquisitionDate: string
-  mergerType: string
-  consideration: number
-  directFees: number
-  initialCost: number
-  acquireeNetAssetsFV: number
-  shareholdingRatio: number
-  shareOfFV: number
-  goodwill: number
+  mergerType?: string
+  consideration?: number
+  directFees?: number
+  initialCost?: number
+  acquireeNetAssetsFV?: number
+  shareholdingRatio?: number
+  shareOfFV?: number
+  goodwill?: number
   auditConclusion: string
+  /** 新三类业务区段标记 */
+  section?: 'merger' | 'step' | 'reverse'
+  [key: string]: unknown
 }
 
 export interface G7SubsequentRow {
@@ -120,25 +113,6 @@ export interface G7DisposalSingleRow {
   consolidatedAdjustment: number
   consolidatedNetAssetShare: number
   consolidatedGain: number
-  auditConclusion: string
-  indexRef: string
-}
-
-export interface G7DisposalPackageRow {
-  id: string
-  seq: number
-  investeeName: string
-  transactionDate: string
-  transactionPrice: number
-  shareChange: number
-  cumulativePrice: number
-  cumulativeShareChange: number
-  lossOfControlDate: string
-  bookValueAtLoss: number
-  remainingFV: number
-  retrospectiveAdjustment: number
-  consolidatedGain: number
-  packageBasis: string
   auditConclusion: string
   indexRef: string
 }
@@ -195,6 +169,8 @@ export function useG7SubFormData(opts: UseG7SubFormDataOptions) {
   const sheetCache = ref<Record<string, any>>({})
   const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
   const renderMeta = ref<Record<string, any>>({})
+  /** idle | pending | saving | saved | error — 供底稿保存状态指示 */
+  const savePhase = ref<'idle' | 'pending' | 'saving' | 'saved' | 'error'>('idle')
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const _pendingItems = new Set<string>()
 
@@ -262,7 +238,7 @@ export function useG7SubFormData(opts: UseG7SubFormDataOptions) {
       renderMeta.value = data?.html_data ?? data ?? {}
       const sheets = data?.sheets ?? data?.data?.sheets ?? []
       for (const s of sheets) {
-        const key = s.sheet_name || s.name || 'default'
+        const key = s.sheet_name || s.sheetName || s.name || 'default'
         sheetCache.value[key] = s.html_data ?? s
       }
     } catch {
@@ -347,6 +323,7 @@ export function useG7SubFormData(opts: UseG7SubFormDataOptions) {
       item_id: itemId,
     }
     allResponses.value.set(itemId, updated)
+    savePhase.value = 'saving'
 
     // 指数退避重试
     for (let i = 0; i < retries; i++) {
@@ -359,6 +336,15 @@ export function useG7SubFormData(opts: UseG7SubFormDataOptions) {
         try {
           localStorage.removeItem(draftKey(wpId.value, itemId))
         } catch { /* ignore */ }
+        savePhase.value = 'saved'
+        try {
+          const { emitG7SourceRowsSaved } = await import('./g7DisclosureCrossSheet')
+          emitG7SourceRowsSaved({
+            projectId: projectId.value,
+            wpId: wpId.value,
+            itemIds: [itemId],
+          })
+        } catch { /* ignore */ }
         opts.onAfterSave?.()
         return
       } catch {
@@ -369,6 +355,7 @@ export function useG7SubFormData(opts: UseG7SubFormDataOptions) {
     }
 
     // 全部重试失败 → localStorage 暂存
+    savePhase.value = 'error'
     try {
       localStorage.setItem(draftKey(wpId.value, itemId), JSON.stringify(updated))
       ElMessage.warning(`G7(子公司) 数据暂存本地（${itemId}），网络恢复后将自动同步`)
@@ -416,6 +403,14 @@ export function useG7SubFormData(opts: UseG7SubFormDataOptions) {
         for (const item of toSave) {
           try { localStorage.removeItem(draftKey(wpId.value, item.item_id)) } catch { /* ignore */ }
         }
+        try {
+          const { emitG7SourceRowsSaved } = await import('./g7DisclosureCrossSheet')
+          emitG7SourceRowsSaved({
+            projectId: projectId.value,
+            wpId: wpId.value,
+            itemIds: toSave.map(item => item.item_id).filter(Boolean) as string[],
+          })
+        } catch { /* ignore */ }
         opts.onAfterSave?.()
         return
       } catch {
@@ -445,6 +440,7 @@ export function useG7SubFormData(opts: UseG7SubFormDataOptions) {
     }
     allResponses.value.set(itemId, updated)
     _pendingItems.add(itemId)
+    savePhase.value = 'pending'
 
     const prevTimer = _debounceTimers.get(itemId)
     if (prevTimer) clearTimeout(prevTimer)
@@ -527,6 +523,7 @@ export function useG7SubFormData(opts: UseG7SubFormDataOptions) {
     error: loadError,
     sheetCache,
     renderMeta,
+    savePhase,
     // Load
     load: loadAll,
     selfLoad,

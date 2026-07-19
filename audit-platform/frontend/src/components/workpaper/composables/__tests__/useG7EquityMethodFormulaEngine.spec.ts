@@ -13,6 +13,10 @@ import {
   calcAdjustedNetProfit,
   calcEquityShare,
   calcEquityMethodBalance,
+  calcIncomeDifference,
+  calcLteiBookBalance,
+  calcNetAssetShareVariance,
+  calcUnexplainedVariance,
   calcUnrealizedProfit,
   calcEliminationAmount,
   calcImpairmentAmount,
@@ -269,5 +273,28 @@ describe('useG7EquityMethodFormulaEngine — calcImpairmentAmount', () => {
 
   it('保留2位小数', () => {
     expect(calcImpairmentAmount(100.567, 50.123)).toBe(50.44)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════
+// G7-14 原底稿差异口径
+// ═══════════════════════════════════════════════════════════════════
+
+describe('useG7EquityMethodFormulaEngine — calcIncomeDifference / variance', () => {
+  it('投资收益差异⑩=⑨-⑤+⑧', () => {
+    expect(calcIncomeDifference(900, 1000, 100)).toBe(0)
+  })
+
+  it('长投账面余额四科目合计', () => {
+    expect(calcLteiBookBalance(100, 50, 20, 10)).toBe(180)
+  })
+
+  it('与享有净资产差额', () => {
+    expect(calcNetAssetShareVariance(180, 500, 0.3)).toBe(30)
+  })
+
+  it('未解释差额=S-U-V+W', () => {
+    expect(calcUnexplainedVariance(30, 20, 5, 0)).toBe(5)
+    expect(calcUnexplainedVariance(30, 20, 5, 3)).toBe(8)
   })
 })

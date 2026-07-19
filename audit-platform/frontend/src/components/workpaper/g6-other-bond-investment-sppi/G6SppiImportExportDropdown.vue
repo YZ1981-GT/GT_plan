@@ -21,7 +21,7 @@
 <script setup lang="ts">
 /**
  * G6 SPPI 导入导出下拉 — 对齐 G4/G2（导出模板 / 导出数据 / 导入数据）
- * 支持 sheet: G6-5 / G6-6 / G6-9 / G6-10
+ * 支持 sheet: G6-5 / G6-6 / G6-8 / G6-9 / G6-10
  */
 import { ref, toRef } from 'vue'
 import { ElMessage } from 'element-plus'

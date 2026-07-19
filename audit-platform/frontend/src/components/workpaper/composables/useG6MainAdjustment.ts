@@ -24,6 +24,7 @@ import {
   applyG6MultiAdjustmentWriteback,
   parseG6AdjStore,
 } from './g6AdjudicationItems'
+import { dispatchG6SaveItems } from './g6CrossHelpers'
 
 export const G6_ACCOUNT_CODE = '1503'
 export const G6_4_STORAGE_KEY = 'G6-4-rows'
@@ -220,12 +221,13 @@ export function aggregateG6WritebackNets(entries: G6AdjustmentEntry[]): {
 }
 
 export interface UseG6MainAdjustmentOptions {
+  wpId: Ref<string>
   allResponses: Ref<Map<string, ChecklistResponse>>
   isReadonly?: Ref<boolean> | ComputedRef<boolean>
 }
 
 export function useG6MainAdjustment(options: UseG6MainAdjustmentOptions) {
-  const { allResponses, isReadonly } = options
+  const { wpId, allResponses, isReadonly } = options
   const readonly = isReadonly ?? ref(false)
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   const entries = ref<G6AdjustmentEntry[]>([])
@@ -287,7 +289,7 @@ export function useG6MainAdjustment(options: UseG6MainAdjustmentOptions) {
   function flushSave(): void {
     const item = allResponses.value.get(G6_4_STORAGE_KEY)
     if (item) {
-      window.dispatchEvent(new CustomEvent('g6:save-items', { detail: { items: [item] } }))
+      dispatchG6SaveItems(wpId.value, [item])
     }
   }
 
@@ -386,7 +388,7 @@ export function useG6MainAdjustment(options: UseG6MainAdjustmentOptions) {
         remark: json,
       }
       allResponses.value.set('G6-1-rows', payload)
-      window.dispatchEvent(new CustomEvent('g6:save-items', { detail: { items: [payload] } }))
+      dispatchG6SaveItems(wpId.value, [payload])
     } catch {
       /* silent */
     }

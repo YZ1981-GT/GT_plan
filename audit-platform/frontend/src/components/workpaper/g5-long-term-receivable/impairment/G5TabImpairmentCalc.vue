@@ -497,11 +497,22 @@ onMounted(async () => {
   }
   persistReady = true
   window.addEventListener('g5:stage-updated', onStageUpdated as EventListener)
+  window.addEventListener('g5:aging-preset-changed', onAgingSynced as EventListener)
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('g5:stage-updated', onStageUpdated as EventListener)
+  window.removeEventListener('g5:aging-preset-changed', onAgingSynced as EventListener)
 })
+
+function onAgingSynced(e: Event): void {
+  if (props.isReadonly) return
+  const d = (e as CustomEvent).detail as { preset?: G5AgingPreset; customLabels?: string[] } | undefined
+  if (!d?.preset) return
+  if (calc.setAgingPreset(d.preset, d.customLabels)) {
+    ElMessage.success('已同步 G5-2 账龄口径')
+  }
+}
 
 function onStageUpdated(e: Event): void {
   const detail = (e as CustomEvent).detail

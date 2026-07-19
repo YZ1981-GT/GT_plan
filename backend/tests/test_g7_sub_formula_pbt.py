@@ -2,7 +2,7 @@
 
 Properties:
 - P1: calcSameControlCost(netAssets, ratio) == netAssets × ratio
-- P2: calcNotSameControlCost(price, fees) == price + fees
+- P2: calcNotSameControlCost(price, fees) == price（fees费用化）
 - P3: calcGoodwill(cost, share) == cost - share; 正=商誉, 负=营业外收入
 - P4: calcCostMethodIncome(dividend, ratio) == dividend × ratio
 - P5: calcSubsequentBalance(opening, addition, impairment) == opening + addition - impairment
@@ -16,10 +16,8 @@ Tag: Feature: g7-long-term-equity-subsidiary
 """
 from __future__ import annotations
 
-import math
 import sys
 
-import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -57,20 +55,20 @@ class TestP1SameControlCost:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Property 2: 非同一控制下企业合并初始投资成本 = 支付对价 + 直接费用
+# Property 2: 非同一控制下企业合并初始投资成本 = 合并对价公允价值
 # Tag: Feature: g7-long-term-equity-subsidiary, Property 2
 # **Validates: Requirements 3.4**
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestP2NotSameControlCost:
-    """Property 2: calcNotSameControlCost(price, fees) == price + fees."""
+    """Property 2: 直接费用费用化，旧fees参数不进入初始成本."""
 
     @given(price=finite_floats, fees=finite_floats)
     @settings(max_examples=5)
-    def test_not_same_control_cost_equals_sum(self, price: float, fees: float):
+    def test_not_same_control_cost_equals_consideration(self, price: float, fees: float):
         result = svc.calc_not_same_control_cost(price, fees)
-        expected = price + fees
+        expected = price
         assert result == expected
 
 

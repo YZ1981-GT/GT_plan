@@ -92,6 +92,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :all-responses="formData.allResponses.value"
       />
 
       <!-- 附注披露信息（国企） -->
@@ -145,6 +146,7 @@ import { useG6MainDualMode } from './composables/useG6MainDualMode'
 import { useG6MainFormData } from './composables/useG6MainFormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import type { ChecklistResponse } from './composables/useF1FormData'
+import { matchG6SaveItemsEvent } from './composables/g6CrossHelpers'
 
 // ─── defineAsyncComponent 懒加载所有子组件 ───────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -269,13 +271,10 @@ function onSheetImported(): void {
 }
 
 async function handleG6SaveItems(e: Event): Promise<void> {
-  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
-  if (Array.isArray(items) && items.length > 0) {
-    for (const it of items) {
-      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
-    }
-    scheduleAutoSnapshot()
-  }
+  const items = matchG6SaveItemsEvent(e, props.wpId)
+  if (!items?.length) return
+  await formData.saveItemsFromEvent(items as ChecklistResponse[])
+  scheduleAutoSnapshot()
 }
 
 function handleAdjudicated(e: Event): void {

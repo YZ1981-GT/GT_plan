@@ -9,7 +9,7 @@
     <div class="methodology-context">
       <p class="methodology-title">编制逻辑（对齐 Excel G6-13）：</p>
       <p>① 评价计量方法与组合划分 → ② PD/LGD 或损失率法抽样测算 → ③ 回写 G6-12 损失率</p>
-      <p>PD/LGD：ECL率 = 期限折算PD × LGD；损失率法：ECL率 = 损失率 + 前瞻性调整</p>
+      <p>PD/LGD：ECL率 = 期限折算PD × LGD（Stage1 展望期封顶 12 个月）；损失率法：ECL率 = 损失率 + 前瞻性调整</p>
     </div>
 
     <div class="flow-hint">
@@ -24,9 +24,16 @@
       <div class="toolbar-left">
         <span class="chip-wrap"><GtIndexChip value="wp:G6-13" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:G6-12" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G6-11" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">
           PD/LGD {{ pdLgdRows.length }} · 损失率法 {{ lossRateRows.length }}
         </el-tag>
+        <G6EclImportExportDropdown
+          :wp-id="wpId"
+          sheet="G6-13"
+          :disabled="isReadonly"
+          @imported="onImported"
+        />
         <el-button size="small" :disabled="isReadonly" :loading="pulling" @click="pullFromG611">
           从 G6-11 拉取项目
         </el-button>
@@ -249,7 +256,7 @@
                 size="small"
                 clearable
                 style="width: 100%"
-                @change="(v: string) => { row.stage = v as any; saveAll() }"
+                @change="(v: string) => { row.stage = v as any; recomputePdLgd(row, true); saveAll() }"
               >
                 <el-option value="Stage1" label="Stage1" />
                 <el-option value="Stage2" label="Stage2" />
@@ -603,7 +610,7 @@
 /**
  * G6TabEclMeasurement.vue — 对齐 Excel《预期信用损失的计量测试G6-13》
  */
-import { ref, computed, inject, onMounted, watch } from 'vue'
+import { ref, computed, inject, onMounted, onBeforeUnmount, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { SummaryMethod } from 'element-plus'
 import {
@@ -621,6 +628,12 @@ import {
 } from '../../composables/useG6EclImpairmentCalc'
 import { useG6EclAiGenerate } from '../../composables/useG6EclAiGenerate'
 import {
+  parseG6ChecklistRows,
+  parseG6ChecklistPayload,
+  G6_11_ROWS_KEY,
+  G6_ECL_RATE_UPDATED_EVENT,
+} from '../../composables/g6CrossHelpers'
+import {
   G4_ECL_RATING_OPTIONS,
   lookupAnnualPdByRating,
 } from '../../composables/g4EclRatingPdMap'
@@ -633,6 +646,7 @@ import {
   parseNum,
 } from '@/composables/useG6EclFormulaEngine'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G6EclImportExportDropdown from '../G6EclImportExportDropdown.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -647,7 +661,6 @@ const VARIANCE_THRESHOLD = 0.02
 const DATA_KEY = 'G6-13-ecl-measurement'
 const NOTE_KEY = 'G6-13-ecl-measurement-audit-note'
 const G612_KEY = 'G6-12-impairment-calc-data'
-const G6_ECL_RATE_EVENT = 'g6:ecl-rate-updated'
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 function openReview(id: string) { openReviewDialog(id) }
@@ -692,9 +705,11 @@ const auditNote = ref('')
 const pulling = ref(false)
 const pushing = ref(false)
 
-function emptyPdLgd(name = ''): PdLgdCalcRow {
+function emptyPdLgd(name = '', stableId = ''): PdLgdCalcRow {
+  const id = stableId || `pd-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
   return {
-    id: `pd-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id,
+    crossSheetInvestmentId: id,
     projectName: name,
     bookBalance: 0,
     remainingMonths: 12,
@@ -710,9 +725,11 @@ function emptyPdLgd(name = ''): PdLgdCalcRow {
   }
 }
 
-function emptyLossRate(name = ''): LossRateCalcRow {
+function emptyLossRate(name = '', stableId = ''): LossRateCalcRow {
+  const id = stableId || `lr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
   return {
-    id: `lr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    id,
+    crossSheetInvestmentId: id,
     projectName: name,
     bookBalance: 0,
     remainingMonths: 12,
@@ -729,7 +746,9 @@ function emptyLossRate(name = ''): LossRateCalcRow {
 }
 
 function recomputePdLgd(row: PdLgdCalcRow, autoTermPd = true): void {
-  if (autoTermPd) row.termAdjustedPd = calcTermAdjustedPd(row.externalMappedPd, row.remainingMonths)
+  if (autoTermPd) {
+    row.termAdjustedPd = calcTermAdjustedPd(row.externalMappedPd, row.remainingMonths, row.stage)
+  }
   row.eclRate = calcEclRateFromPdLgd(row.termAdjustedPd, row.lgd)
   row.eclAmount = calcImpairmentProvision(row.bookBalance, row.eclRate)
 }
@@ -933,15 +952,18 @@ async function pullFromG611(): Promise<void> {
   pulling.value = true
   try {
     try { await formData.loadAll() } catch { /* ignore */ }
-    const content = formData.parseContent()
+    const fromRows = parseG6ChecklistRows(formData.allResponses.value.get(G6_11_ROWS_KEY))
+    const content = formData.parseContent?.()
     const stageRows =
-      content.stageClassification?.rows
+      (fromRows.length ? fromRows : null)
+      || content?.stageClassification?.rows
       || props.htmlData?.stageClassification?.rows
       || []
     const sources = (stageRows as any[])
       .filter(r => String(r?.investProject || '').trim())
       .map(r => ({
         projectName: String(r.investProject).trim(),
+        crossSheetInvestmentId: String(r.crossSheetInvestmentId || r.id || '').trim(),
         stage: (r.auditStage || r.companyStage || '') as PdLgdCalcRow['stage'],
         bookBalance: Number(r.bookBalance || r.amortizedCost) || 0,
       }))
@@ -951,35 +973,48 @@ async function pullFromG611(): Promise<void> {
     }
     const targetIsPd = rateTab.value === 'pdLgd'
     const existing = targetIsPd ? pdLgdRows.value : lossRateRows.value
+    const byId = new Map(
+      existing
+        .map(r => [String(r.crossSheetInvestmentId || r.id || '').trim(), r] as const)
+        .filter(([id]) => id),
+    )
     const byName = new Map(existing.map(r => [normalizeName(r.projectName), r]))
     let added = 0
     let updated = 0
     for (const src of sources) {
       const key = normalizeName(src.projectName)
-      const hit = byName.get(key)
+      let hit = src.crossSheetInvestmentId
+        ? byId.get(src.crossSheetInvestmentId)
+        : undefined
+      if (!hit) hit = byName.get(key)
       if (hit) {
         if (src.stage) hit.stage = src.stage
+        if (src.crossSheetInvestmentId) {
+          hit.crossSheetInvestmentId = hit.crossSheetInvestmentId || src.crossSheetInvestmentId
+        }
         if (src.bookBalance > 0 && !parseNum(hit.bookBalance)) {
           hit.bookBalance = src.bookBalance
-          if (targetIsPd) recomputePdLgd(hit as PdLgdCalcRow, false)
-          else recomputeLossRate(hit as LossRateCalcRow)
         }
+        if (targetIsPd) recomputePdLgd(hit as PdLgdCalcRow, true)
+        else recomputeLossRate(hit as LossRateCalcRow)
         updated += 1
       } else if (targetIsPd) {
-        const row = emptyPdLgd(src.projectName)
+        const row = emptyPdLgd(src.projectName, src.crossSheetInvestmentId)
         row.stage = src.stage || ''
         row.bookBalance = src.bookBalance
         recomputePdLgd(row, true)
         pdLgdRows.value.push(row)
         byName.set(key, row)
+        if (row.crossSheetInvestmentId) byId.set(row.crossSheetInvestmentId, row)
         added += 1
       } else {
-        const row = emptyLossRate(src.projectName)
+        const row = emptyLossRate(src.projectName, src.crossSheetInvestmentId)
         row.stage = src.stage || ''
         row.bookBalance = src.bookBalance
         recomputeLossRate(row)
         lossRateRows.value.push(row)
         byName.set(key, row)
+        if (row.crossSheetInvestmentId) byId.set(row.crossSheetInvestmentId, row)
         added += 1
       }
     }
@@ -990,6 +1025,14 @@ async function pullFromG611(): Promise<void> {
   } finally {
     pulling.value = false
   }
+}
+
+async function onImported(): Promise<void> {
+  try {
+    await formData.loadAll()
+    initFromData()
+  } catch { /* ignore */ }
+  emit('imported')
 }
 
 async function syncRatesToG612(): Promise<void> {
@@ -1004,31 +1047,38 @@ async function syncRatesToG612(): Promise<void> {
       return
     }
     try { await formData.loadAll() } catch { /* ignore */ }
-    const saved = formData.allResponses.value.get(G612_KEY)
-    let existing: any[] = []
-    if (saved?.conclusion) {
-      try {
-        const parsed = JSON.parse(saved.conclusion)
-        existing = parsed.rows || parsed || []
-      } catch { /* ignore */ }
-    }
-    if (!Array.isArray(existing)) existing = []
+    const payload = parseG6ChecklistPayload(formData.allResponses.value.get(G612_KEY))
+    const existing = Array.isArray(payload)
+      ? payload
+      : (Array.isArray(payload?.rows) ? payload.rows : [])
+    const priorConclusion = typeof payload?.conclusion === 'string' ? payload.conclusion : ''
     impairmentBridge.loadRows(existing)
     const applied = impairmentBridge.applyEclRateUpdates(updates)
     for (const r of impairmentBridge.rows.value) impairmentBridge.recalcRow(r)
     await formData.saveImmediate(G612_KEY, {
       conclusion: JSON.stringify({
         rows: impairmentBridge.toJSON(),
-        conclusion: '',
+        conclusion: priorConclusion,
       }),
     })
+    const json = JSON.stringify(impairmentBridge.toJSON())
+    await formData.saveImmediate('G6-12-rows', { remark: json, conclusion: json })
     try {
-      window.dispatchEvent(new CustomEvent(G6_ECL_RATE_EVENT, {
-        detail: { updates, matched: applied.matched, unmatched: applied.unmatched, skipped: applied.skipped },
+      window.dispatchEvent(new CustomEvent(G6_ECL_RATE_UPDATED_EVENT, {
+        detail: {
+          updates,
+          matched: applied.matched,
+          unmatched: applied.unmatched,
+          skipped: applied.skipped,
+          written: true,
+        },
       }))
     } catch { /* ignore */ }
     ElMessage.success(
-      `已回写 G6-12：匹配 ${applied.count}；未匹配 ${applied.unmatched.length}；跳过 ${applied.skipped.length}`,
+      `已回写 G6-12：匹配 ${applied.count}；未匹配 ${applied.unmatched.length}；跳过 ${applied.skipped.length}`
+        + (applied.matchReport.ambiguous.length
+          ? `；重名冲突 ${applied.matchReport.ambiguous.length}`
+          : ''),
     )
     emit('imported')
   } catch {
@@ -1062,6 +1112,11 @@ onMounted(async () => {
   initFromData()
   const n = formData.allResponses.value.get(NOTE_KEY)
   if (n?.remark) auditNote.value = n.remark
+})
+
+onBeforeUnmount(() => {
+  saveAll()
+  formData.flushPending()
 })
 
 watch(() => props.htmlData, (d) => {

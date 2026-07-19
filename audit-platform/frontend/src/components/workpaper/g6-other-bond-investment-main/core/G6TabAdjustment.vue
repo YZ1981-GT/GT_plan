@@ -149,7 +149,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="索引" width="90">
+      <el-table-column label="索引" min-width="110">
         <template #default="{ row }">
           <el-input
             v-if="!isReadonly"
@@ -157,7 +157,10 @@
             size="small"
             @change="(v: string) => updateCell(row.id, 'indexRef', v)"
           />
-          <span v-else>{{ row.indexRef || '-' }}</span>
+          <span v-else-if="!row.indexRef">-</span>
+          <div v-if="row.indexRef" class="row-index-chip">
+            <GtIndexChip :value="row.indexRef" :context-project-id="projectId" />
+          </div>
         </template>
       </el-table-column>
 
@@ -234,6 +237,8 @@ import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { useG6MainAdjustment } from '../../composables/useG6MainAdjustment'
 import { useG6MainImportExport } from '../../composables/useG6MainImportExport'
 import type { G6MainImportableSheet } from '../../composables/useG6MainImportExport'
+import { dispatchG6SaveItems } from '../../composables/g6CrossHelpers'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -283,7 +288,7 @@ function dispatchSave(itemId: string, val: string): void {
   const item: ChecklistResponse = { item_id: itemId, conclusion: null, remark: val }
   allResponses.value.set(itemId, item)
   try {
-    window.dispatchEvent(new CustomEvent('g6:save-items', { detail: { items: [item] } }))
+    dispatchG6SaveItems(props.wpId, [item])
   } catch { /* silent */ }
 }
 
@@ -306,6 +311,7 @@ const {
   accountOptions,
   categoryOptions,
 } = useG6MainAdjustment({
+  wpId: computed(() => props.wpId),
   allResponses,
   isReadonly: isReadonlyRef,
 })
@@ -472,6 +478,10 @@ function tableRowClassName({ row }: { row: { category?: string; entryType?: stri
 
 :deep(.rje-row) {
   background-color: #fdf6ec !important;
+}
+
+.row-index-chip {
+  margin-top: 4px;
 }
 
 .g6-guide-details {

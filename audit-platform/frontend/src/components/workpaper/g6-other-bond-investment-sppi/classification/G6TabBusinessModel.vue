@@ -365,22 +365,25 @@
     <details class="guide-details">
       <summary>📋 编制提示</summary>
       <div class="guide-content">
-        <p>1. 业务模式评估应在金融资产组合层次进行，而非逐笔评估</p>
-        <p>2. 评估应基于管理层确定业务模式的实际行动，而非仅声明的意图</p>
-        <p>3. 重点关注出售频率和金额、业绩评价方式、薪酬机制及风险管理策略</p>
-        <p>4. 临近到期、信用风险恶化或偶发出售通常不单独构成业务模式变更</p>
-        <p>5. 业务模式与 SPPI 结果共同决定 AC、FVOCI-Debt 或 FVTPL 分类</p>
+        <p>1. <b>编制目的</b>：在组合层次评价业务模式（既收合同现金流又以出售为目标），支持 FVOCI-Debt 分类。</p>
+        <p>2. <b>建议顺序</b>：先维护 G6-2 明细 → 本表评估业务模式 → 再完成 G6-8 SPPI；两者共同决定 AC / FVOCI-Debt / FVTPL。</p>
+        <p>3. 可用「从 G6-2 预填出售说明」带入出售相关线索，再补充管理层实际行动证据（出售频率/金额、业绩评价、薪酬与风控策略）。</p>
+        <p>4. 评估基于实际行动而非仅声明意图；临近到期、信用恶化或偶发出售通常不单独构成业务模式变更。</p>
+        <p>5. 选定最终结论后，关注与 G6-8 的交叉提示（预期分类）；不一致须在审计说明中解释。</p>
+        <p>6. 分类摘要会提示至 G6-1 / 目录；后续利息（G6-6）、公允价值（G6-5）、ECL（G6-11~14）均以本结论为前提。</p>
+        <p>7. 证据索引应指向业务模式政策、投资委员会纪要、出售台账等；结论变更时同步复核 G6-8 与附注披露表述。</p>
       </div>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, inject, onMounted, ref, watch } from 'vue'
+import { computed, inject, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   BM_CONCLUSION_LABELS,
   buildBusinessModelAiSummary,
+  buildG6ClassificationSummary,
   evaluateG67G68Consistency,
   useG6SppiBusinessModel,
   type BusinessModelData,
@@ -478,6 +481,16 @@ onMounted(async () => {
   auditNote.value = note?.remark || ''
 })
 
+onBeforeUnmount(() => {
+  if (props.isReadonly) return
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+  formData.debouncedSave(DATA_KEY, { conclusion: JSON.stringify(bm.toJSON()) })
+  formData.flushPending()
+})
+
 watch(
   () => props.htmlData,
   () => loadSavedData(),
@@ -512,24 +525,30 @@ async function syncClassificationWriteback(): Promise<void> {
       ? payload.overallConclusion
       : null
   const businessModel = bm.finalConclusion.value
-  const consistency = evaluateG67G68Consistency(businessModel, overall)
-  await writeG6ClassificationSummary({
+  const instrumentRows = Array.isArray(payload?.instruments)
+    ? payload.instruments.map((i: any) => ({
+        id: String(i?.id || ''),
+        name: String(i?.name || '未命名'),
+        overallConclusion:
+          i?.overallConclusion === 'pass' || i?.overallConclusion === 'fail'
+            ? i.overallConclusion
+            : null,
+      }))
+    : undefined
+  const summary = buildG6ClassificationSummary({
+    businessModel,
+    sppiOverall: overall,
+    instruments: instrumentRows,
+    source: 'G6-7',
+  })
+  const result = await writeG6ClassificationSummary({
     projectId: props.projectId,
     sppiWpId: props.wpId,
-    summary: {
-      businessModel,
-      businessModelLabel: businessModel ? BM_CONCLUSION_LABELS[businessModel] || null : null,
-      sppiOverall: overall,
-      expectedClassification: consistency.expectedClassification,
-      level: consistency.level,
-      message: consistency.message,
-      accountConflict:
-        consistency.level === 'warning' &&
-        consistency.expectedClassification === 'FVTPL',
-      updatedAt: new Date().toISOString(),
-      source: 'G6-7',
-    },
+    summary,
   })
+  if (!result.mainOk && result.resolveError) {
+    ElMessage.warning(`分类摘要已存 SPPI；Main 未写入：${result.resolveError}`)
+  }
 }
 
 function openReview(sectionId: string): void {
@@ -701,10 +720,10 @@ defineExpose({ toJSON: () => bm.toJSON() })
 .methodology-context {
   margin-bottom: 16px;
   padding: 12px 16px;
-  background: #fffbeb;
-  border-left: 4px solid #f59e0b;
+  background: var(--gt-color-warning-light, #fffbeb);
+  border-left: 4px solid var(--gt-color-warning, #f59e0b);
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-sm, 12px);
   line-height: 1.8;
 }
 
@@ -714,8 +733,8 @@ defineExpose({ toJSON: () => bm.toJSON() })
 
 .methodology-basis {
   margin-top: 4px !important;
-  color: #92400e;
-  font-size: 11px;
+  color: var(--gt-color-warning-dark, #92400e);
+  font-size: var(--gt-font-size-xs, 11px);
 }
 
 .section-card {
@@ -731,7 +750,7 @@ defineExpose({ toJSON: () => bm.toJSON() })
 }
 
 .section-title {
-  font-size: 14px;
+  font-size: var(--gt-font-size-md, 14px);
   font-weight: 600;
 }
 
@@ -753,8 +772,8 @@ defineExpose({ toJSON: () => bm.toJSON() })
 
 .cell-text {
   white-space: pre-wrap;
-  word-break: break-word;
-  font-size: 12px;
+  overflow-wrap: break-word;
+  font-size: var(--gt-font-size-sm, 12px);
   line-height: 1.5;
 }
 
@@ -782,7 +801,7 @@ defineExpose({ toJSON: () => bm.toJSON() })
 }
 
 .conclusion-section {
-  border-top: 2px solid #f59e0b;
+  border-top: 2px solid var(--gt-color-warning, #f59e0b);
 }
 
 .conclusion-grid {
@@ -803,7 +822,7 @@ defineExpose({ toJSON: () => bm.toJSON() })
 }
 
 .conclusion-label {
-  color: #303133;
+  color: var(--gt-color-text-primary, #303133);
   font-size: var(--wp-font-size, 13px);
   font-weight: 600;
 }
@@ -815,8 +834,8 @@ defineExpose({ toJSON: () => bm.toJSON() })
 
 .incomplete-hint,
 .no-data {
-  color: #909399;
-  font-size: 12px;
+  color: var(--gt-color-text-tertiary, #909399);
+  font-size: var(--gt-font-size-sm, 12px);
 }
 
 .derived-hint {
@@ -825,14 +844,14 @@ defineExpose({ toJSON: () => bm.toJSON() })
   flex-wrap: wrap;
   gap: 4px;
   padding: 6px 10px;
-  color: #92400e;
-  background: #fffbeb;
+  color: var(--gt-color-warning-dark, #92400e);
+  background: var(--gt-color-warning-light, #fffbeb);
   border-radius: 4px;
-  font-size: 12px;
+  font-size: var(--gt-font-size-sm, 12px);
 }
 
 .override-sep {
-  color: #d97706;
+  color: var(--gt-color-warning, #d97706);
 }
 
 .cross-check-alert,
@@ -843,8 +862,8 @@ defineExpose({ toJSON: () => bm.toJSON() })
 .readonly-analysis {
   min-height: 60px;
   padding: 8px 12px;
-  color: #303133;
-  background: #f5f7fa;
+  color: var(--gt-color-text-primary, #303133);
+  background: var(--gt-color-bg-fill, #f5f7fa);
   border-radius: 4px;
   white-space: pre-wrap;
   font-size: var(--wp-font-size, 13px);
@@ -860,7 +879,7 @@ defineExpose({ toJSON: () => bm.toJSON() })
 }
 
 .guide-details summary {
-  color: #606266;
+  color: var(--gt-color-text-secondary, #606266);
   cursor: pointer;
   font-size: var(--wp-font-size, 13px);
   font-weight: 600;
@@ -869,9 +888,9 @@ defineExpose({ toJSON: () => bm.toJSON() })
 .guide-content {
   margin-top: 6px;
   padding: 8px 12px;
-  background: #fffbeb;
-  border-left: 3px solid #f59e0b;
-  font-size: 12px;
+  background: var(--gt-color-warning-light, #fffbeb);
+  border-left: 3px solid var(--gt-color-warning, #f59e0b);
+  font-size: var(--gt-font-size-sm, 12px);
   line-height: 1.8;
 }
 

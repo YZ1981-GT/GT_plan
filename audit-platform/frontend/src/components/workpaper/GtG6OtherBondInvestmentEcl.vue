@@ -23,6 +23,11 @@
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
+      <G6EclSheetStatusBar
+        v-if="isHtmlSheet && dualMode.currentMode.value !== 'onlyoffice'"
+        :all-responses="formData.allResponses.value"
+      />
+
       <!-- 双模式：HTML sheet 切到 OnlyOffice -->
       <GtOnlyOfficeSheet
         v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
@@ -113,9 +118,13 @@ import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsync
 import { useG6EclDualMode } from './composables/useG6EclDualMode'
 import { useG6EclFormData, type ChecklistResponse } from './composables/useG6EclFormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { matchG6SaveItemsEvent } from './composables/g6CrossHelpers'
 
 // ─── defineAsyncComponent 懒加载所有子组件 ───────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+const G6EclSheetStatusBar = defineAsyncComponent(
+  () => import('./g6-other-bond-investment-ecl/G6EclSheetStatusBar.vue'),
+)
 const G6TabStageClassification = defineAsyncComponent(
   () => import('./g6-other-bond-investment-ecl/impairment/G6TabStageClassification.vue'),
 )
@@ -213,13 +222,10 @@ function onSheetImported(): void {
 }
 
 async function handleG6SaveItems(e: Event): Promise<void> {
-  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
-  if (Array.isArray(items) && items.length > 0) {
-    for (const it of items) {
-      if (it?.item_id) await formData.saveImmediate(it.item_id, it)
-    }
-    scheduleAutoSnapshot()
-  }
+  const items = matchG6SaveItemsEvent(e, props.wpId)
+  if (!items?.length) return
+  await formData.saveItemsFromEvent(items as ChecklistResponse[])
+  scheduleAutoSnapshot()
 }
 
 // ─── selfLoad：始终 loadAll；htmlData 缺失时再填充 selfLoadData ─────────────

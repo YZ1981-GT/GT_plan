@@ -5,8 +5,8 @@ Validates: Requirements 1.4, 6.2, 6.3, 6.4
 
 Tests:
   1. selfLoad: render-config端点返回正确结构 (component_type, sheets=5)
-  2. 导入导出: 3张表×3端点 roundtrip (headers/keys正确性)
-  3. AI接口: 4个section各返回合理response structure
+  2. 导入导出: 多表×端点 + G6-14/15 结构 roundtrip
+  3. AI接口: 5个section各返回合理response structure
   4. 版本链: render策略返回responses_snapshot
 """
 
@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
 from app.core.database import get_db
 from app.deps import get_current_user
@@ -254,6 +254,52 @@ class TestImportExport:
         assert payload["imported_count"] > 0
 
     @pytest.mark.asyncio
+    async def test_export_template_g6_14_has_dual_tabs(self):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                "/api/workpapers/test-wp/g6-ecl/export-template?sheet=G6-14"
+            )
+        assert resp.status_code == 200
+        wb = load_workbook(io.BytesIO(resp.content))
+        assert any("转回检查" in n for n in wb.sheetnames)
+        assert any("核销检查" in n for n in wb.sheetnames)
+
+    @pytest.mark.asyncio
+    async def test_import_data_g6_14_dual_tabs(self):
+        """Import G6-14 双 Tab xlsx → imported_count >= 2."""
+        from app.routers.wp_render_strategies._g6_other_bond_investment_ecl_import_export import (
+            _build_g6_14_multi_sheet_workbook,
+        )
+        wb = _build_g6_14_multi_sheet_workbook(
+            [{
+                "seq": 1, "unitName": "农发债", "kind": "转回",
+                "reversalReason": "改善", "recoveryMethod": "",
+                "originalBasis": "", "reversalAmount": 1000,
+                "accumulatedProvision": 5000, "reasonAnalysis": "ok",
+                "isReasonable": "合理", "indexRef": "",
+            }],
+            [{
+                "seq": 1, "unitName": "企债", "writeOffType": "债",
+                "writeOffAmount": 2000, "writeOffReason": "破产",
+                "writeOffProcedure": "董事会", "isRelatedParty": False,
+                "reasonAnalysis": "", "isReasonable": "合理", "indexRef": "",
+            }],
+        )
+        buf = io.BytesIO()
+        wb.save(buf)
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                "/api/workpapers/test-wp/g6-ecl/import-data?sheet=G6-14",
+                files={"file": ("g6-14.xlsx", buf.getvalue(),
+                       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            )
+        assert resp.status_code == 200
+        payload = resp.json().get("data", resp.json())
+        assert payload["imported_count"] >= 2
+
+    @pytest.mark.asyncio
     async def test_import_data_g6_14(self):
         """Import G6-14 xlsx → 200, imported_count > 0."""
         # G6-14 uses parse_upload_xlsx with header_row=2,
@@ -325,12 +371,12 @@ class TestImportExport:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 3. AI接口: 4个section各返回合理response structure
+# 3. AI接口: 5个section各返回合理response structure
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestAiEndpoints:
-    """验证 4 个 AI section 端点返回正确结构."""
+    """验证 5 个 AI section 端点返回正确结构."""
 
     @pytest.mark.asyncio
     async def test_ai_stage_conclusion(self, monkeypatch):
@@ -388,6 +434,25 @@ class TestAiEndpoints:
         assert resp.status_code == 200
         payload = resp.json().get("data", resp.json())
         assert payload["content"] == "ECL计量测试审计结论初稿"
+
+    @pytest.mark.asyncio
+    async def test_ai_reversal_writeoff_conclusion(self, monkeypatch):
+        async def _fake_chat(**_kwargs):
+            return "转回核销审计结论初稿"
+
+        monkeypatch.setattr(
+            "app.routers.wp_render_strategies._g6_other_bond_investment_ecl_ai.chat_completion",
+            _fake_chat,
+        )
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            resp = await client.post(
+                "/api/workpapers/test-wp/g6-ecl/ai/reversal-writeoff-conclusion",
+                json={"existingContent": "", "relatedContext": {}},
+            )
+        assert resp.status_code == 200
+        payload = resp.json().get("data", resp.json())
+        assert payload["content"] == "转回核销审计结论初稿"
 
     @pytest.mark.asyncio
     async def test_ai_voucher_conclusion(self, monkeypatch):

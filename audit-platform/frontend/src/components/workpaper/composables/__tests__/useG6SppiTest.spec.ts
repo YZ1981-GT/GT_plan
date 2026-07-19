@@ -69,11 +69,17 @@ describe('Task 8.3: G6-8 SPPI测试', () => {
 
     it('每个section都有默认items', () => {
       const { sections } = useG6SppiTest()
-      // principal=5, interest=8, modified_time_value=7, prepayment=7, contractual_linked=6, comprehensive=5
-      const expectedCounts = [5, 8, 7, 7, 6, 5]
+      // principal=10, interest=14, modified_time_value=12, prepayment=12, contractual_linked=12, comprehensive=10
+      const expectedCounts = [10, 14, 12, 12, 12, 10]
       sections.value.forEach((section, idx) => {
         expect(section.items.length).toBe(expectedCounts[idx])
       })
+    })
+
+    it('默认包含一个投资项目', () => {
+      const { instruments } = useG6SppiTest()
+      expect(instruments.value).toHaveLength(1)
+      expect(instruments.value[0].name).toContain('综合')
     })
 
     it('默认检查项为合规陈述（不含「是否存在」事实问句）', () => {
@@ -346,8 +352,8 @@ describe('Task 8.3: G6-8 SPPI测试', () => {
       const { sections, totalRows } = useG6SppiTest()
       const expectedTotal = sections.value.reduce((sum, s) => sum + s.items.length, 0)
       expect(totalRows.value).toBe(expectedTotal)
-      // 5+8+7+7+6+5 = 38
-      expect(totalRows.value).toBe(38)
+      // 10+14+12+12+12+10 = 70
+      expect(totalRows.value).toBe(70)
     })
 
     it('新增item后totalRows增加', () => {
@@ -400,6 +406,66 @@ describe('Task 8.3: G6-8 SPPI测试', () => {
           { id: 'a', title: 'A', sectionConclusion: 'pass', items: [item] },
         ]),
       ).toHaveLength(0)
+    })
+  })
+
+  describe('多投资项目', () => {
+    it('syncFromSeeds 按名称合并并保留已有作答', () => {
+      const { instruments, syncFromSeeds, updateItem, sections, activeInstrumentId } = useG6SppiTest()
+      const first = sections.value[0].items[0]
+      updateItem(sections.value[0].id, first.id, 'isSPPISatisfied', 'yes')
+      updateItem(sections.value[0].id, first.id, 'contractTermSummary', '保留摘要')
+      const oldName = instruments.value[0].name
+
+      const result = syncFromSeeds([
+        { name: oldName },
+        { name: '新债券A' },
+        { name: '新债券A' }, // 去重
+      ])
+      expect(result.added).toBe(1)
+      expect(instruments.value).toHaveLength(2)
+      expect(instruments.value.some(i => i.name === '新债券A')).toBe(true)
+      const kept = instruments.value.find(i => i.name === oldName)!
+      expect(kept.sections[0].items[0].contractTermSummary).toBe('保留摘要')
+      expect(activeInstrumentId.value).toBeTruthy()
+    })
+
+    it('syncFromSeeds 优先按稳定 ID 合并并回填', () => {
+      const { instruments, syncFromSeeds, updateItem, sections } = useG6SppiTest()
+      const first = sections.value[0].items[0]
+      updateItem(sections.value[0].id, first.id, 'contractTermSummary', '旧答')
+      instruments.value[0].name = '国债A'
+      const ephemeralId = instruments.value[0].id
+
+      const result = syncFromSeeds([
+        { id: 'stable-1', name: '国债A' },
+        { id: 'stable-2', name: '国债A' },
+      ])
+      expect(result.kept).toBe(1)
+      expect(result.added).toBe(1)
+      expect(instruments.value).toHaveLength(2)
+      expect(instruments.value.map(i => i.id).sort()).toEqual(['stable-1', 'stable-2'])
+      const kept = instruments.value.find(i => i.id === 'stable-1')!
+      expect(kept.sections[0].items[0].contractTermSummary).toBe('旧答')
+      expect(ephemeralId).not.toBe('stable-1')
+    })
+
+    it('旧格式仅 sections 可升级为历史项目', () => {
+      const { loadData, instruments, toJSON } = useG6SppiTest()
+      loadData({
+        sections: [
+          {
+            id: 'principal',
+            title: '(一)',
+            sectionConclusion: null,
+            items: [makeItem('yes', { contractTermSummary: 'x', judgmentBasis: 'y' })],
+          },
+        ],
+        overallConclusion: null,
+        hasFailedSection: false,
+      } as any)
+      expect(instruments.value[0].name).toContain('历史')
+      expect(toJSON().instruments?.length).toBe(1)
     })
   })
 })

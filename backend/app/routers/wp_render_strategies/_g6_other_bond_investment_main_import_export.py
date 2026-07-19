@@ -45,14 +45,16 @@ router = APIRouter(tags=["g6-main-import-export"])
 # G6-2 明细表（33列，3区段Tab）— 多sheet导出
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# 区段1: 基础信息(10列)
+# 区段1: 基础信息
 _G6_2_SEG1_HEADERS = [
-    "投资种类", "投资项目", "面值", "票面利率(%)", "实际利率(%)",
-    "到期日", "计息方式", "付息周期", "信用评级", "担保情况",
+    "投资种类", "投资项目", "证券代码", "面值", "持仓数量(账面)",
+    "票面利率(%)", "实际利率(%)", "到期日", "计息方式", "付息周期",
+    "信用评级", "担保情况",
 ]
 _G6_2_SEG1_KEYS = [
-    "investCategory", "investProject", "faceValue", "couponRate", "effectiveRate",
-    "maturityDate", "interestMethod", "paymentCycle", "creditRating", "guarantee",
+    "investCategory", "investProject", "securitiesCode", "faceValue", "bookQuantity",
+    "couponRate", "effectiveRate", "maturityDate", "interestMethod", "paymentCycle",
+    "creditRating", "guarantee",
 ]
 
 # 区段2: 期初+变动(12列)
@@ -91,7 +93,7 @@ _G6_2_SEGMENTS = [
 
 # G6-2 数值字段
 _G6_2_NUMERIC_KEYS = {
-    "faceValue", "couponRate", "effectiveRate",
+    "faceValue", "bookQuantity", "couponRate", "effectiveRate",
     "openingCost", "openingInterestAdj", "openingAccruedInterest", "openingSubtotal",
     "periodIncrease", "periodDecrease", "interestIncome", "periodChangeSubtotal",
     "openingImpairment", "openingFVChange", "openingAmortizedCost",
@@ -222,7 +224,8 @@ def _build_g6_2_multi_sheet_workbook(rows: list[dict], *, template_only: bool = 
     ws_guide.append(["G6-2 其他债权投资明细表 编制说明"])
     ws_guide.append([])
     guidance_lines = [
-        "33列拆为3区段Tab：基础信息(10列) / 期初+变动(12列) / 期末+审定(11列)。",
+        "基础信息区段含：投资种类/项目、证券代码、面值、持仓数量(账面)、利率、到期日等。",
+        "持仓数量(账面)为资产负债表日账面持仓，供 G6-9 盘点 / G6-10 倒轧带入。",
         "期初小计=期初成本+期初利息调整+期初应计利息（前端自动计算）。",
         "期末小计=期初小计+本期增加-本期减少+利息收入（前端自动计算）。",
         "票面利率和实际利率填百分比数值（如5.5表示5.5%）。",

@@ -8,7 +8,7 @@
  * - P1: 实际利息收入 = amortizedCost × effectiveRate × days / 365（2dp）
  * - P2: 现金流入 = faceValue × couponRate × days / 365（2dp）
  * - P3: 期末摊余成本 = opening + interest - cashInflow（2dp）
- * - P4: 盘点倒轧 = 盘点日数量 + 增减（整数）
+ * - P4: 盘点倒轧 = 盘点日数量 − 净增加（整数）
  * - P5: 公允价值差异 = audited - unadjusted（2dp）
  * - P6: parseNum健壮性 — null/undefined/''/NaN → 0; finite n → n
  */
@@ -20,10 +20,13 @@ import {
   calcCashInflow,
   calcEndingAmortized,
   calcInventoryRollForward,
+  calcInventoryRollForwardByDirection,
   calcFairValueDiff,
   calcFairValueAmount,
   calcFairValueQtyImpact,
   calcFairValuePriceImpact,
+  resolveRollForwardDirection,
+  migrateLegacyChangeToNetIncrease,
 } from '../useG6SppiFormulaEngine'
 
 // ═══ Generators ═══
@@ -58,6 +61,20 @@ describe('Feature: g6-other-bond-investment-sppi, Property 1: 实际利息收入
       { numRuns: 100 },
     )
   })
+
+  it('calcEffectiveInterest(..., ACT/360) === round(cost * rate * days / 360, 2)', () => {
+    fc.assert(
+      fc.property(
+        amounts(),
+        rates(),
+        days(),
+        (cost, rate, d) => {
+          expect(calcEffectiveInterest(cost, rate, d, 'ACT/360')).toBe(round2(cost * rate * d / 360))
+        },
+      ),
+      { numRuns: 50 },
+    )
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════════
@@ -79,6 +96,20 @@ describe('Feature: g6-other-bond-investment-sppi, Property 2: 现金流入公式
         },
       ),
       { numRuns: 100 },
+    )
+  })
+
+  it('calcCashInflow(..., ACT/360) === round(face * coupon * days / 360, 2)', () => {
+    fc.assert(
+      fc.property(
+        amounts(),
+        rates(),
+        days(),
+        (face, coupon, d) => {
+          expect(calcCashInflow(face, coupon, d, 'ACT/360')).toBe(round2(face * coupon * d / 360))
+        },
+      ),
+      { numRuns: 50 },
     )
   })
 })
@@ -107,24 +138,50 @@ describe('Feature: g6-other-bond-investment-sppi, Property 3: 期末摊余成本
 })
 
 // ═══════════════════════════════════════════════════════════════════
-// P4: 盘点倒轧加法恒等
+// P4: 盘点倒轧减法恒等
 // ═══════════════════════════════════════════════════════════════════
 
-describe('Feature: g6-other-bond-investment-sppi, Property 4: 盘点倒轧加法恒等', () => {
+describe('Feature: g6-other-bond-investment-sppi, Property 4: 盘点倒轧减法恒等', () => {
   /**
    * **Validates: Requirements 6.3**
+   * 报表日 = 盘点日 − 净增加（资产负债表日→盘点日）
    */
-  it('calcInventoryRollForward(count, change) === count + change (integer)', () => {
+  it('calcInventoryRollForward(count, netIncrease) === count - netIncrease (integer)', () => {
     fc.assert(
       fc.property(
         quantities(),
         fc.integer({ min: -10000, max: 10000 }),
         (count, change) => {
-          expect(calcInventoryRollForward(count, change)).toBe(count + change)
+          expect(calcInventoryRollForward(count, change)).toBe(count - change)
         },
       ),
       { numRuns: 100 },
     )
+  })
+
+  it('calcInventoryRollForward(count, increase, decrease) === count - increase + decrease', () => {
+    fc.assert(
+      fc.property(
+        quantities(),
+        fc.integer({ min: 0, max: 5000 }),
+        fc.integer({ min: 0, max: 5000 }),
+        (count, increase, decrease) => {
+          expect(calcInventoryRollForward(count, increase, decrease)).toBe(count - increase + decrease)
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+
+  it('方向：期后倒推 / 期前顺推 / 同日', () => {
+    expect(resolveRollForwardDirection('2025-01-10', '2024-12-31')).toBe('backward')
+    expect(resolveRollForwardDirection('2024-12-20', '2024-12-31')).toBe('forward')
+    expect(resolveRollForwardDirection('2024-12-31', '2024-12-31')).toBe('sameDay')
+    expect(resolveRollForwardDirection('', '2024-12-31')).toBe('unknown')
+    expect(calcInventoryRollForwardByDirection(1000, 100, 'backward')).toBe(900)
+    expect(calcInventoryRollForwardByDirection(1000, 100, 'forward')).toBe(1100)
+    expect(calcInventoryRollForwardByDirection(1000, 100, 'sameDay')).toBe(1000)
+    expect(migrateLegacyChangeToNetIncrease(-50)).toBe(50)
   })
 })
 

@@ -116,13 +116,15 @@
 
     <!-- 编制提示 -->
     <details class="prep-hint">
-      <summary>编制提示</summary>
+      <summary>📋 编制提示</summary>
       <ul>
-        <li>上市公司附注格式（137行×16列），按投资类型分类列示期初/期末/变动/减值/摊余成本</li>
-        <li>监听 substantive:adjudicated(1503) 自动同步审定数</li>
-        <li>编辑后发布 disclosure:note-text-updated 联动附注模块</li>
-        <li>虚拟滚动已启用（el-table max-height）确保超长表格流畅渲染</li>
-        <li>FVOCI-Debt 双重计量：同时反映公允价值变动(OCI)和ECL减值(损益)</li>
+        <li><b>编制目的</b>：按上市公司附注格式列示其他债权投资（成本／公允价值变动(OCI)／减值／摊余成本等），与审定数勾稽。</li>
+        <li><b>建议顺序</b>：先完成 G6-1 审定（及必要的 G6-4 回写）→ 打开本表核对各 section 金额 → 补充文字披露 → 再联动正式附注模块。</li>
+        <li>G6-1 保存审定后会触发自动刷新（科目 1503）；若金额未更新，回到 G6-1 确认已保存并重新进入本表。</li>
+        <li>按 section 核对：期初/期末余额、本期变动、OCI 公允价值变动、ECL 减值、摊余成本口径是否与 G6-1/G6-2/G6-3 一致。</li>
+        <li>文字区可按 section 使用 AI 辅助初稿，须人工改写为项目事实与准则表述；重大项目应能索引到 G6-2。</li>
+        <li>编辑保存后会联动附注模块文本；正式对外附注以附注模块为准，本表为披露工作底稿。</li>
+        <li>FVOCI-Debt 双重计量：公允价值变动进 OCI，减值损失进损益；披露中勿混用两套口径。</li>
       </ul>
     </details>
   </div>
@@ -141,18 +143,22 @@
  * 多section结构 + 每个文本区section标题行右侧AI辅助按钮 + 复核按钮
  * 底部AI辅助按钮生成全部附注
  */
-import { reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import { useG6MainAiGenerate } from '../../composables/useG6MainAiGenerate'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import { dispatchG6SaveItems } from '../../composables/g6CrossHelpers'
 
 const G6_ACCOUNT_CODE = '1503'
+const LISTED_TEXT_KEY = 'G6-disclosure-listed-text'
+const LISTED_SECTIONS_KEY = 'G6-disclosure-listed-sections'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
   wpId: string
   projectId: string
   isReadonly: boolean
+  allResponses?: Map<string, ChecklistResponse>
 }>()
 
 // ═══ 格式化金额 ═══
@@ -169,7 +175,7 @@ function dispatchSave(itemId: string, val: string): void {
   if (props.isReadonly) return
   const item: ChecklistResponse = { item_id: itemId, conclusion: null, remark: val }
   try {
-    window.dispatchEvent(new CustomEvent('g6:save-items', { detail: { items: [item] } }))
+    dispatchG6SaveItems(props.wpId, [item])
   } catch { /* silent */ }
 }
 
@@ -305,11 +311,23 @@ function handleAdjudicated(e: Event): void {
 
 onMounted(() => {
   window.addEventListener('substantive:adjudicated', handleAdjudicated)
-  loadFromHtmlData()
+  loadListedContent()
 })
 onBeforeUnmount(() => {
   window.removeEventListener('substantive:adjudicated', handleAdjudicated)
 })
+
+watch(
+  () => [
+    props.allResponses?.get(LISTED_SECTIONS_KEY)?.remark ?? '',
+    props.allResponses?.get(LISTED_TEXT_KEY)?.remark ?? '',
+  ],
+  (next, prev) => {
+    if (!prev) return
+    if (next[0] === prev[0] && next[1] === prev[1]) return
+    loadListedContent()
+  },
+)
 
 // ═══ EventBus: publish disclosure:note-text-updated + 持久化 ═══
 function onNoteTextChange(_sectionIdx: number): void {
@@ -317,7 +335,15 @@ function onNoteTextChange(_sectionIdx: number): void {
     .filter(s => s.hasTextArea && s.textContent)
     .map(s => `【${s.title}】\n${s.textContent}`)
     .join('\n\n')
-  dispatchSave('G6-disclosure-listed-text', allText)
+  dispatchSave(LISTED_TEXT_KEY, allText)
+  dispatchSave(
+    LISTED_SECTIONS_KEY,
+    JSON.stringify(
+      sections
+        .filter(s => s.hasTextArea)
+        .map(s => ({ id: s.id, textContent: s.textContent || '' })),
+    ),
+  )
   try {
     window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
       detail: { accountCode: G6_ACCOUNT_CODE, section: 'listed', text: allText },
@@ -364,7 +390,47 @@ async function fillAiDraftAll(): Promise<void> {
   onNoteTextChange(targetIdx)
 }
 
-// ═══ 数据加载 ═══
+// ═══ 数据加载：checklist 结构化 → 标题文本块 → htmlData 渲染壳 ═══
+function applyListedTextBlob(blob: string): void {
+  if (!blob.trim()) return
+  const re = /【([^】]+)】\n?([\s\S]*?)(?=【|$)/g
+  let match: RegExpExecArray | null
+  while ((match = re.exec(blob)) !== null) {
+    const title = match[1].trim()
+    const text = match[2].trim()
+    const section = sections.find(s => s.title === title || s.title.includes(title) || title.includes(s.title))
+    if (section) section.textContent = text
+  }
+}
+
+function loadListedContent(): void {
+  const sectionsRaw = props.allResponses?.get(LISTED_SECTIONS_KEY)?.remark
+    || props.allResponses?.get(LISTED_SECTIONS_KEY)?.conclusion
+  if (sectionsRaw) {
+    try {
+      const arr = JSON.parse(String(sectionsRaw))
+      if (Array.isArray(arr)) {
+        for (const item of arr) {
+          const section = sections.find(s => s.id === item?.id)
+          if (section && item?.textContent != null) {
+            section.textContent = String(item.textContent)
+          }
+        }
+        return
+      }
+    } catch { /* fall through */ }
+  }
+
+  const textBlob = props.allResponses?.get(LISTED_TEXT_KEY)?.remark
+    || props.allResponses?.get(LISTED_TEXT_KEY)?.conclusion
+  if (textBlob) {
+    applyListedTextBlob(String(textBlob))
+    return
+  }
+
+  loadFromHtmlData()
+}
+
 function loadFromHtmlData(): void {
   if (!props.htmlData?.disclosureListed?.sections) return
   const saved = props.htmlData.disclosureListed.sections as DisclosureSection[]

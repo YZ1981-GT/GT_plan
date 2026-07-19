@@ -22,6 +22,7 @@ import {
   calcAdjustedImpairment,
   calcAdjustedBookValue,
   calcTermAdjustedPd,
+  effectivePdHorizonMonths,
   calcEclRateFromPdLgd,
   calcEclRateFromLossRate,
   determineStage,
@@ -104,6 +105,16 @@ describe('G6-12 ECL公式链端到端', () => {
     expect(calcEclRateFromPdLgd(0.01, 0.45)).toBeCloseTo(0.0045, 6)
     expect(calcEclRateFromLossRate(0.02, 0.01)).toBeCloseTo(0.03, 6)
   })
+
+  it('Stage1 期限 PD 封顶 12 个月；Stage2 用剩余存续期', () => {
+    const annual = 0.012
+    const capped = calcTermAdjustedPd(annual, 24, 'Stage1')
+    const lifetime = calcTermAdjustedPd(annual, 24, 'Stage2')
+    expect(capped).toBe(calcTermAdjustedPd(annual, 12))
+    expect(lifetime).toBeGreaterThan(capped)
+    expect(effectivePdHorizonMonths('Stage1', 36)).toBe(12)
+    expect(effectivePdHorizonMonths('Stage2', 36)).toBe(36)
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════════
@@ -165,7 +176,7 @@ describe('parseNum边界值', () => {
 // ═══════════════════════════════════════════════════════════════════
 
 describe('determineStage所有8种组合', () => {
-  // 8 combinations of 3 booleans
+  // 8 combinations of 3 booleans — 对齐 G4：低风险豁免可覆盖 SICR
   const cases: [boolean, boolean, boolean, 'Stage1' | 'Stage2' | 'Stage3'][] = [
     // [hasSignificantIncrease, hasLowCreditRisk, hasCreditImpairment, expected]
     [false, false, false, 'Stage1'],
@@ -174,7 +185,7 @@ describe('determineStage所有8种组合', () => {
     [false, true, true, 'Stage3'],    // creditImpairment优先
     [true, false, false, 'Stage2'],
     [true, false, true, 'Stage3'],    // creditImpairment优先
-    [true, true, false, 'Stage2'],
+    [true, true, false, 'Stage1'],    // 低风险豁免覆盖 SICR
     [true, true, true, 'Stage3'],     // creditImpairment优先
   ]
 

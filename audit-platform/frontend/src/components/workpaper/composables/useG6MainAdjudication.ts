@@ -36,6 +36,7 @@ import {
 } from '@/composables/useG6MainFormulaEngine'
 import { api } from '@/services/apiProxy'
 import type { ChecklistResponse } from './useF1FormData'
+import { dispatchG6SaveItems } from './g6CrossHelpers'
 
 export {
   G6_ACCOUNT_CODE,
@@ -555,21 +556,26 @@ export function useG6MainAdjudication(options: UseG6MainAdjudicationOptions) {
   function debounceSave(): void {
     if (debounceTimer) clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => {
-      try {
-        const items: ChecklistResponse[] = []
-        const rowsItem = allResponses.value.get(ITEM_ID_ROWS)
-        if (rowsItem) items.push(rowsItem)
-        const tbItem = allResponses.value.get(ITEM_ID_TB)
-        if (tbItem) items.push(tbItem)
-        const noteItem = allResponses.value.get(ITEM_ID_NOTE)
-        if (noteItem) items.push(noteItem)
-        const concItem = allResponses.value.get(ITEM_ID_CONCLUSION)
-        if (concItem) items.push(concItem)
-        if (items.length) {
-          window.dispatchEvent(new CustomEvent('g6:save-items', { detail: { items } }))
-        }
-      } catch { /* silent */ }
+      debounceTimer = null
+      flushSave()
     }, 400)
+  }
+
+  function flushSave(): void {
+    try {
+      const items: ChecklistResponse[] = []
+      const rowsItem = allResponses.value.get(ITEM_ID_ROWS)
+      if (rowsItem) items.push(rowsItem)
+      const tbItem = allResponses.value.get(ITEM_ID_TB)
+      if (tbItem) items.push(tbItem)
+      const noteItem = allResponses.value.get(ITEM_ID_NOTE)
+      if (noteItem) items.push(noteItem)
+      const concItem = allResponses.value.get(ITEM_ID_CONCLUSION)
+      if (concItem) items.push(concItem)
+      if (items.length) {
+        dispatchG6SaveItems(options.wpId.value, items)
+      }
+    } catch { /* silent */ }
   }
 
   function persistStore(next: G6AdjRowStore): void {
@@ -743,7 +749,11 @@ export function useG6MainAdjudication(options: UseG6MainAdjudicationOptions) {
     })
     onBeforeUnmount(() => {
       detachListeners()
-      if (debounceTimer) clearTimeout(debounceTimer)
+      if (debounceTimer) {
+        clearTimeout(debounceTimer)
+        debounceTimer = null
+      }
+      flushSave()
     })
   } else {
     // 单测直调 composable 时仍挂载监听，并暴露 dispose 便于清理

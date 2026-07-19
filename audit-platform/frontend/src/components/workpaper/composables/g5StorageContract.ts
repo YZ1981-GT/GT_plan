@@ -11,6 +11,8 @@ export const G5_STORAGE_SCHEMA_VERSION = 1
 export const G5_ITEM_IDS = {
   G5_1_ROWS: 'G5-1-rows',
   G5_2_ROWS: 'G5-2-rows',
+  G5_2_AGING_PRESET: 'G5-2-aging-preset',
+  G5_2_AGING_CUSTOM: 'G5-2-aging-custom',
   G5_3_ROWS: 'G5-3-rows',
   G5_4_ROWS: 'G5-4-rows',
   G5_5_ROWS: 'G5-5-rows',

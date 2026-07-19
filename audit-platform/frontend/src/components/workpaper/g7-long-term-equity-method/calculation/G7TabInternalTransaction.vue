@@ -371,6 +371,10 @@ import {
   calcEliminationAmount,
   parseNum,
 } from '../../composables/useG7EquityMethodFormulaEngine'
+import {
+  G7_15_ROWS_KEY,
+  G7_15_SECTION_KEY,
+} from '../../composables/g7EquityMethodCrossSheet'
 import { useG7EquityMethodFormData } from '../../composables/useG7EquityMethodFormData'
 import type { InternalTransactionRow } from '../../composables/useG7EquityMethodFormData'
 import { api } from '@/services/apiProxy'
@@ -394,7 +398,8 @@ const formData = useG7EquityMethodFormData({
   projectId: computed(() => props.projectId),
 })
 
-const SECTION_KEY = 'G7-15-internal-transaction'
+const SECTION_KEY = G7_15_SECTION_KEY
+const ROWS_KEY = G7_15_ROWS_KEY
 const CONCLUSION_KEY = 'G7-15-conclusion'
 const AUDIT_NOTE_KEY = 'G7-15-audit-note'
 
@@ -418,26 +423,54 @@ function saveAuditNote(val: string): void {
 onMounted(async () => {
   await formData.load()
 
-  // 从 htmlData 或 sheetCache 中恢复行数据
-  const content = props.htmlData ?? formData.parseContent()?.internalTransaction
-  if (content && Array.isArray((content as any).rows)) {
-    rows.value = (content as any).rows.map((r: any, idx: number) => ({
+  const hydrateRows = (raw: unknown): boolean => {
+    const list = Array.isArray(raw)
+      ? raw
+      : (raw && typeof raw === 'object' && Array.isArray((raw as any).rows) ? (raw as any).rows : null)
+    if (!list?.length) return false
+    rows.value = list.map((r: any, idx: number) => ({
       ...createEmptyRow(idx + 1),
       ...r,
+      seq: idx + 1,
+      id: r.id || `g15-${Date.now()}-${idx}`,
     }))
     recalcAll()
-  } else {
-    // 初始化默认行
+    return true
+  }
+
+  const parseSaved = (raw: unknown): unknown => {
+    if (raw == null || raw === '') return null
+    if (typeof raw === 'object') return raw
+    try { return JSON.parse(String(raw)) } catch { return null }
+  }
+
+  const sectionSaved = parseSaved(formData.data.value.get(SECTION_KEY)?.conclusion)
+  const rowsSaved = parseSaved(
+    formData.data.value.get(ROWS_KEY)?.conclusion
+    ?? formData.data.value.get(ROWS_KEY)?.remark,
+  )
+  const snapshotSection = parseSaved(props.htmlData?.responses_snapshot?.[SECTION_KEY]?.conclusion)
+  const snapshotRows = parseSaved(
+    props.htmlData?.responses_snapshot?.[ROWS_KEY]?.conclusion
+    ?? props.htmlData?.responses_snapshot?.[ROWS_KEY]?.remark,
+  )
+
+  if (
+    !hydrateRows(sectionSaved)
+    && !hydrateRows(rowsSaved)
+    && !hydrateRows(snapshotSection)
+    && !hydrateRows(snapshotRows)
+    && !hydrateRows(props.htmlData?.internalTransaction)
+    && !hydrateRows((props.htmlData as any)?.rows)
+  ) {
     rows.value = Array.from({ length: 5 }, (_, i) => createEmptyRow(i + 1))
   }
 
-  // 恢复结论
   const savedConclusion = formData.data.value.get(CONCLUSION_KEY)
   if (savedConclusion?.conclusion) {
     conclusion.value = savedConclusion.conclusion
   }
 
-  // 恢复审计说明
   const savedNote = formData.data.value.get(AUDIT_NOTE_KEY)
   if (savedNote?.remark) {
     auditNote.value = savedNote.remark
@@ -585,9 +618,20 @@ function handleRemoveRow(rowId: string): void {
 // ─── Persistence ─────────────────────────────────────────────────────────────
 
 function persistRows(): void {
-  formData.debouncedSave(SECTION_KEY, {
-    conclusion: JSON.stringify({ rows: rows.value }),
-  })
+  if (isReadonly.value) return
+  const payload = JSON.stringify({ rows: rows.value })
+  const flatRows = JSON.stringify(rows.value)
+  formData.debouncedSaveBatch([
+    {
+      itemId: SECTION_KEY,
+      data: { conclusion: payload, remark: null },
+    },
+    {
+      itemId: ROWS_KEY,
+      // 后端合并联动 / 导入导出认 G7-15-rows
+      data: { conclusion: flatRows, remark: flatRows },
+    },
+  ])
 }
 
 function persistConclusion(): void {

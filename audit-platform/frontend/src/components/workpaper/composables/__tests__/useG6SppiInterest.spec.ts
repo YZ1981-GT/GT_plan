@@ -23,17 +23,28 @@ import { useG6SppiInterest, type InterestGroup, type InterestPeriod, type Intere
 import { ElMessageBox } from 'element-plus'
 import {
   applyG66InterestToDetailRows,
+  buildG66InterestVarianceAdjustmentDrafts,
+  compareG66EndingToG62,
+  closingAmortizedFromG62Row,
+  mapG612RowsToInterestStageSeeds,
   mapG62RowsToInterestSeeds,
+  mergeG64EntriesWithG66Drafts,
   normalizeG6Rate,
 } from '../g6CrossHelpers'
 
 function createMockGroup(overrides: Partial<InterestGroup> = {}): InterestGroup {
   return {
     id: `ig-test-${Date.now()}`,
+    crossSheetInvestmentId: '',
     investProject: '测试债券A',
     faceValue: 100000,
     couponRate: 0.04,
     effectiveRate: 0.05,
+    dayCountBasis: 'ACT/365',
+    purchasePrice: 0,
+    transactionCost: 0,
+    initialDate: '',
+    initialCarryingAmount: 0,
     periods: [],
     ...overrides,
   }
@@ -42,13 +53,20 @@ function createMockGroup(overrides: Partial<InterestGroup> = {}): InterestGroup 
 function createMockPeriod(overrides: Partial<InterestPeriod> = {}): InterestPeriod {
   return {
     id: `ip-test-${Date.now()}`,
+    periodStart: '',
     periodEnd: '2024-06-30',
     openingAmortized: 100000,
+    openingImpairment: 0,
+    stage: 'Stage1',
     effectiveInterest: 0,
     cashInflow: 0,
+    principalRecovered: 0,
     endingAmortized: 0,
     days: 180,
+    daysManualOverride: true,
+    openingManualOverride: true,
     remark: '',
+    indexRef: '',
     ...overrides,
   }
 }
@@ -106,12 +124,12 @@ describe('useG6SppiInterest — 分组新增/删除', () => {
 })
 
 describe('useG6SppiInterest — 期间新增/删除', () => {
-  it('addPeriod 新增首期以faceValue为期初摊余', () => {
+  it('addPeriod 新增首期优先用初始入账价值，否则为 0', () => {
     const { groups, addPeriod } = useG6SppiInterest()
     groups.value = [createMockGroup({ id: 'g1', faceValue: 100000, effectiveRate: 0.05, couponRate: 0.04 })]
     addPeriod('g1')
     expect(groups.value[0].periods).toHaveLength(1)
-    expect(groups.value[0].periods[0].openingAmortized).toBe(100000)
+    expect(groups.value[0].periods[0].openingAmortized).toBe(0)
     expect(groups.value[0].periods[0].days).toBe(180)
   })
 
@@ -410,7 +428,7 @@ describe('useG6SppiInterest — 三层勾稽', () => {
   })
 
   it('损益层填基准后校验 incomeDiff', () => {
-    const { groups, recalcAll, bookInterestIncome, incomeDiff, incomePassed, incomeLayerActive, totalInterest } = useG6SppiInterest()
+    const { groups, recalcAll, setBookInterestIncome, incomeDiff, incomePassed, incomeLayerActive, totalInterest } = useG6SppiInterest()
     groups.value = [createMockGroup({
       id: 'g1',
       faceValue: 100000,
@@ -419,7 +437,7 @@ describe('useG6SppiInterest — 三层勾稽', () => {
       periods: [createMockPeriod({ id: 'p1', openingAmortized: 100000, days: 365 })],
     })]
     recalcAll()
-    bookInterestIncome.value = totalInterest.value
+    setBookInterestIncome(totalInterest.value)
     expect(incomeLayerActive.value).toBe(true)
     expect(incomeDiff.value).toBe(0)
     expect(incomePassed.value).toBe(true)
@@ -685,9 +703,40 @@ describe('applyG66InterestToDetailRows — G6-6→G6-2 回写', () => {
     )
     expect(result.matched).toEqual(['债A'])
     expect(result.unmatched).toHaveLength(0)
+    expect(result.matchedAdjustmentTotal).toBe(3)
     expect(result.rows[0].periodInterestAdjChange).toBe(3)
     expect(result.rows[0].closingInterestAdj).toBe(1)
+    expect(result.rows[0].closingCost).toBeUndefined()
     expect(result.rows[0].interestWritebackSource).toBe('G6-6')
+  })
+
+  it('预览合计仅含匹配行调整额', () => {
+    const result = applyG66InterestToDetailRows(
+      [
+        {
+          id: 'g1',
+          investProject: '债A',
+          openingInterestAdj: 0,
+          periodCostChange: 0,
+          periodAccruedInterestChange: 0,
+          closingCost: 100,
+          closingAccruedInterest: 2,
+          periodInterestAdjChange: 0,
+        },
+        {
+          id: 'other',
+          investProject: '债B',
+          periodInterestAdjChange: 50,
+          closingCost: 200,
+        },
+      ],
+      [{ id: 'g1', investProject: '债A', periods: [{ effectiveInterest: 5, cashInflow: 2 }] }],
+    )
+    expect(result.matchedAdjustmentTotal).toBe(3)
+    expect(result.rows[1].periodInterestAdjChange).toBe(50)
+    expect(result.rows[0].closingCost).toBe(100)
+    expect(result.rows[0].closingAccruedInterest).toBe(2)
+    expect(result.rows[0].closingSubtotal).toBe(105) // 100 + 3 + 2
   })
 
   it('未匹配项目进入 unmatched', () => {
@@ -697,5 +746,465 @@ describe('applyG66InterestToDetailRows — G6-6→G6-2 回写', () => {
     )
     expect(result.matched).toHaveLength(0)
     expect(result.unmatched).toEqual(['债A'])
+  })
+})
+
+describe('useG6SppiInterest — 日期天数与收回本金', () => {
+  it('填写起息日/截止日后自动推算天数', () => {
+    const { groups, updatePeriod, recalcAll } = useG6SppiInterest()
+    groups.value = [createMockGroup({
+      id: 'g1',
+      periods: [createMockPeriod({
+        id: 'p1',
+        periodStart: '',
+        periodEnd: '',
+        days: 180,
+        daysManualOverride: false,
+        openingAmortized: 100000,
+      })],
+    })]
+    updatePeriod('g1', 'p1', 'periodStart', '2024-01-01')
+    updatePeriod('g1', 'p1', 'periodEnd', '2024-01-31')
+    expect(groups.value[0].periods[0].days).toBe(30)
+    expect(groups.value[0].periods[0].daysManualOverride).toBe(false)
+  })
+
+  it('手工改天数后标记 override，改日期不再覆盖', () => {
+    const { groups, updatePeriod } = useG6SppiInterest()
+    groups.value = [createMockGroup({
+      id: 'g1',
+      periods: [createMockPeriod({
+        id: 'p1',
+        periodStart: '2024-01-01',
+        periodEnd: '2024-01-31',
+        days: 30,
+        daysManualOverride: false,
+      })],
+    })]
+    updatePeriod('g1', 'p1', 'days', 28)
+    expect(groups.value[0].periods[0].daysManualOverride).toBe(true)
+    updatePeriod('g1', 'p1', 'periodEnd', '2024-02-29')
+    expect(groups.value[0].periods[0].days).toBe(28)
+  })
+
+  it('期末摊余扣减收回本金', () => {
+    const { groups, recalcAll } = useG6SppiInterest()
+    groups.value = [createMockGroup({
+      id: 'g1',
+      faceValue: 100000,
+      couponRate: 0,
+      effectiveRate: 0,
+      periods: [createMockPeriod({
+        id: 'p1',
+        openingAmortized: 100000,
+        principalRecovered: 10000,
+        days: 365,
+        daysManualOverride: true,
+      })],
+    })]
+    recalcAll()
+    expect(groups.value[0].periods[0].endingAmortized).toBe(90000)
+  })
+
+  it('收回本金后后续期间票息按剩余面值计算', () => {
+    const { groups, recalcAll } = useG6SppiInterest()
+    groups.value = [createMockGroup({
+      id: 'g1',
+      faceValue: 100000,
+      couponRate: 0.04,
+      effectiveRate: 0,
+      periods: [
+        createMockPeriod({
+          id: 'p1',
+          openingAmortized: 100000,
+          principalRecovered: 20000,
+          days: 365,
+          daysManualOverride: true,
+        }),
+        createMockPeriod({
+          id: 'p2',
+          openingAmortized: 0,
+          principalRecovered: 0,
+          days: 365,
+          daysManualOverride: true,
+        }),
+      ],
+    })]
+    recalcAll()
+    // 第1期票息仍按全额面值 100000×4%=4000
+    expect(groups.value[0].periods[0].cashInflow).toBe(4000)
+    // 第2期票息按剩余面值 80000×4%=3200
+    expect(groups.value[0].periods[1].cashInflow).toBe(3200)
+  })
+
+  it('累计收回本金超过面值产生告警', () => {
+    const { groups, principalWarnings, hasPrincipalWarnings } = useG6SppiInterest()
+    groups.value = [createMockGroup({
+      id: 'g1',
+      faceValue: 100,
+      couponRate: 0,
+      effectiveRate: 0,
+      periods: [createMockPeriod({
+        id: 'p1',
+        openingAmortized: 100,
+        principalRecovered: 120,
+        days: 365,
+        daysManualOverride: true,
+      })],
+    })]
+    expect(hasPrincipalWarnings.value).toBe(true)
+    expect(principalWarnings.value[0].message).toContain('超过面值')
+  })
+
+  it('期末摊余为负产生告警', () => {
+    const { groups, principalWarnings, recalcAll } = useG6SppiInterest()
+    groups.value = [createMockGroup({
+      id: 'g1',
+      faceValue: 100,
+      couponRate: 0,
+      effectiveRate: 0,
+      periods: [createMockPeriod({
+        id: 'p1',
+        openingAmortized: 50,
+        principalRecovered: 80,
+        days: 365,
+        daysManualOverride: true,
+      })],
+    })]
+    recalcAll()
+    expect(groups.value[0].periods[0].endingAmortized).toBe(-30)
+    expect(principalWarnings.value.some((w) => w.message.includes('期末摊余成本为负'))).toBe(true)
+  })
+
+  it('ACT/360 计息基准按 360 年天数计算', () => {
+    const { groups, updateGroupHeader, recalcAll } = useG6SppiInterest()
+    groups.value = [createMockGroup({
+      id: 'g1',
+      faceValue: 360000,
+      couponRate: 0.04,
+      effectiveRate: 0.05,
+      dayCountBasis: 'ACT/365',
+      periods: [createMockPeriod({
+        id: 'p1',
+        openingAmortized: 360000,
+        days: 360,
+        daysManualOverride: true,
+      })],
+    })]
+    recalcAll()
+    // ACT/365: 360000×5%×360/365
+    expect(groups.value[0].periods[0].effectiveInterest).toBe(
+      Math.round(360000 * 0.05 * 360 / 365 * 100) / 100,
+    )
+    updateGroupHeader('g1', 'dayCountBasis', 'ACT/360')
+    // ACT/360: 360000×5%×360/360 = 18000
+    expect(groups.value[0].periods[0].effectiveInterest).toBe(18000)
+    expect(groups.value[0].periods[0].cashInflow).toBe(14400)
+  })
+
+  it('利率差异超过200bp 产生告警', () => {
+    const { groups, rateWarnings, hasRateWarnings } = useG6SppiInterest()
+    groups.value = [createMockGroup({
+      id: 'g1',
+      couponRate: 0.03,
+      effectiveRate: 0.06,
+      periods: [],
+    })]
+    expect(hasRateWarnings.value).toBe(true)
+    expect(rateWarnings.value[0].message).toContain('200bp')
+  })
+
+  it('初始入账价值 = 对价+费用，并可填充首期开口', () => {
+    const { groups, addPeriod, recalcAll } = useG6SppiInterest()
+    groups.value = [createMockGroup({
+      id: 'g1',
+      purchasePrice: 98000,
+      transactionCost: 200,
+      periods: [],
+    })]
+    recalcAll()
+    expect(groups.value[0].initialCarryingAmount).toBe(98200)
+    addPeriod('g1')
+    expect(groups.value[0].periods[0].openingAmortized).toBe(98200)
+  })
+
+  it('openingManualOverride 时合法 0 期初不被初始入账覆盖', () => {
+    const { groups, updatePeriod, recalcAll } = useG6SppiInterest()
+    groups.value = [createMockGroup({
+      id: 'g1',
+      purchasePrice: 98000,
+      transactionCost: 200,
+      periods: [createMockPeriod({
+        id: 'p1',
+        openingAmortized: 0,
+        openingManualOverride: true,
+        days: 180,
+        daysManualOverride: true,
+      })],
+    })]
+    recalcAll()
+    expect(groups.value[0].periods[0].openingAmortized).toBe(0)
+    updatePeriod('g1', 'p1', 'openingAmortized', 0)
+    expect(groups.value[0].periods[0].openingManualOverride).toBe(true)
+    expect(groups.value[0].periods[0].openingAmortized).toBe(0)
+  })
+
+  it('Stage3 按净额（摊余−减值）计息', () => {
+    const { groups, recalcAll } = useG6SppiInterest()
+    groups.value = [createMockGroup({
+      id: 'g1',
+      faceValue: 100000,
+      couponRate: 0,
+      effectiveRate: 0.10,
+      periods: [createMockPeriod({
+        id: 'p1',
+        openingAmortized: 100000,
+        openingImpairment: 20000,
+        stage: 'Stage3',
+        days: 365,
+        daysManualOverride: true,
+      })],
+    })]
+    recalcAll()
+    // 净额 80000 × 10% × 365/365 = 8000
+    expect(groups.value[0].periods[0].effectiveInterest).toBe(8000)
+  })
+
+  it('超 B15 重要性标记 materialVariance，并要求差异说明', () => {
+    const {
+      groups, recalcAll, interestAdjPeriodChange, setPerformanceMateriality,
+      materialVariance, needsVarianceReason, varianceReasonMissing, varianceReason,
+    } = useG6SppiInterest()
+    groups.value = [createMockGroup({
+      id: 'g1',
+      faceValue: 100000,
+      couponRate: 0.04,
+      effectiveRate: 0.05,
+      periods: [createMockPeriod({ id: 'p1', openingAmortized: 100000, days: 365 })],
+    })]
+    recalcAll()
+    interestAdjPeriodChange.value = 0
+    setPerformanceMateriality(1)
+    expect(needsVarianceReason.value).toBe(true)
+    expect(materialVariance.value).toBe(true)
+    expect(varianceReasonMissing.value).toBe(true)
+    varianceReason.value = '尾差待调整'
+    expect(varianceReasonMissing.value).toBe(false)
+  })
+
+  it('mergeEclStageSeeds 仅写入末期 Stage3 与减值', () => {
+    const { groups, mergeEclStageSeeds, recalcAll } = useG6SppiInterest()
+    groups.value = [createMockGroup({
+      id: 'g1',
+      crossSheetInvestmentId: 'ecl-1',
+      investProject: '债A',
+      faceValue: 100000,
+      couponRate: 0,
+      effectiveRate: 0.1,
+      periods: [
+        createMockPeriod({
+          id: 'p1',
+          openingAmortized: 100000,
+          stage: 'Stage1',
+          openingImpairment: 0,
+          days: 365,
+          daysManualOverride: true,
+        }),
+        createMockPeriod({
+          id: 'p2',
+          openingAmortized: 100000,
+          stage: 'Stage1',
+          openingImpairment: 0,
+          days: 365,
+          daysManualOverride: true,
+        }),
+      ],
+    })]
+    const result = mergeEclStageSeeds([
+      { id: 'ecl-1', investProject: '债A', stage: 'Stage3', openingImpairment: 25000 },
+    ])
+    expect(result.updated).toBe(1)
+    expect(groups.value[0].periods[0].stage).toBe('Stage1')
+    expect(groups.value[0].periods[0].openingImpairment).toBe(0)
+    expect(groups.value[0].periods[1].stage).toBe('Stage3')
+    expect(groups.value[0].periods[1].openingImpairment).toBe(25000)
+    recalcAll()
+    // 第1期仍按总额计息 → 期末 110000；第2期 Stage3 净额 (110000−25000)×10%=8500
+    expect(groups.value[0].periods[1].effectiveInterest).toBe(8500)
+  })
+})
+
+describe('mapG612RowsToInterestStageSeeds', () => {
+  it('优先审定减值并归一化阶段', () => {
+    const seeds = mapG612RowsToInterestStageSeeds([
+      { id: '1', investProject: '债A', stageGroup: 'Stage3', adjImpairment: 12, impairmentProvision: 9 },
+      { id: '2', investProject: '债A', stage: 'Stage1', impairmentProvision: 1 }, // 去重
+    ])
+    expect(seeds).toHaveLength(1)
+    expect(seeds[0].stage).toBe('Stage3')
+    expect(seeds[0].openingImpairment).toBe(12)
+  })
+})
+
+describe('compareG66EndingToG62 — 第三层期末摊余勾稽', () => {
+  it('closingAmortizedFromG62Row = 成本 + 利息调整', () => {
+    expect(closingAmortizedFromG62Row({
+      closingCost: 100,
+      closingInterestAdj: -3,
+      closingAccruedInterest: 5,
+      closingSubtotal: 102,
+    })).toBe(97)
+  })
+
+  it('按 id 匹配并计算差异', () => {
+    const result = compareG66EndingToG62(
+      [{
+        id: 'g1',
+        investProject: '债A',
+        periods: [
+          { endingAmortized: 90 },
+          { endingAmortized: 95 },
+        ],
+      }],
+      [{
+        id: 'g1',
+        investProject: '债A',
+        closingCost: 100,
+        closingInterestAdj: -5,
+      }],
+    )
+    expect(result).toHaveLength(1)
+    expect(result[0].g66Ending).toBe(95)
+    expect(result[0].g62Ending).toBe(95)
+    expect(result[0].diff).toBe(0)
+    expect(result[0].matched).toBe(true)
+  })
+
+  it('未匹配明细标记 matched=false', () => {
+    const result = compareG66EndingToG62(
+      [{ id: 'g1', investProject: '债A', periods: [{ endingAmortized: 10 }] }],
+      [{ id: 'other', investProject: '债B', closingCost: 10, closingInterestAdj: 0 }],
+    )
+    expect(result[0].matched).toBe(false)
+    expect(result[0].g62Ending).toBeNull()
+  })
+})
+
+describe('buildG66InterestVarianceAdjustmentDrafts — G6-6→G6-4', () => {
+  it('摊销层 diff>0 生成借利息调整贷投资收益', () => {
+    const { pairs, skipped } = buildG66InterestVarianceAdjustmentDrafts({
+      amortizationDiff: 120,
+      incomeDiff: 0,
+      incomeLayerActive: false,
+      performanceMateriality: 50,
+      varianceReason: '漏记摊销',
+    })
+    expect(skipped.some((s) => s.layer.includes('损益'))).toBe(true)
+    expect(pairs).toHaveLength(1)
+    expect(pairs[0].layer).toBe('amortization')
+    expect(pairs[0].amount).toBe(120)
+    const [dr, cr] = pairs[0].entries
+    expect(dr.accountCode).toBe('150302')
+    expect(dr.debitAmount).toBe(120)
+    expect(cr.accountCode).toBe('6111')
+    expect(cr.creditAmount).toBe(120)
+  })
+
+  it('diff<0 借贷方向相反；merge 替换同层旧草稿', () => {
+    const { pairs } = buildG66InterestVarianceAdjustmentDrafts({
+      amortizationDiff: -80,
+      incomeDiff: 0,
+      incomeLayerActive: false,
+      performanceMateriality: 10,
+    })
+    expect(pairs[0].entries[0].creditAmount).toBe(80)
+    expect(pairs[0].entries[1].debitAmount).toBe(80)
+
+    const existing = [
+      {
+        id: 'g66-amortization-dr',
+        rowId: 'g66-amortization-dr',
+        seq: 1,
+        description: 'old',
+        category: '账项调整',
+        reportItem: '',
+        accountCode: '150302',
+        accountName: '',
+        noteItem: '',
+        debitAmount: 1,
+        creditAmount: 0,
+        indexRef: 'G6-6',
+        remark: 'source=G6-6;layer=amortization;diff=1',
+        entryType: 'AJE' as const,
+        date: '',
+        summary: 'old',
+        preparedBy: '',
+      },
+      {
+        id: 'keep-me',
+        rowId: 'keep-me',
+        seq: 2,
+        description: 'other',
+        category: '账项调整',
+        reportItem: '',
+        accountCode: '150301',
+        accountName: '',
+        noteItem: '',
+        debitAmount: 5,
+        creditAmount: 0,
+        indexRef: 'G6-9',
+        remark: '',
+        entryType: 'AJE' as const,
+        date: '',
+        summary: 'other',
+        preparedBy: '',
+      },
+    ]
+    const merged = mergeG64EntriesWithG66Drafts(existing, pairs)
+    expect(merged.some((e) => e.id === 'keep-me')).toBe(true)
+    expect(merged.filter((e) => String(e.remark).includes('layer=amortization'))).toHaveLength(2)
+    expect(merged.find((e) => e.id === 'g66-amortization-dr' && e.debitAmount === 1)).toBeUndefined()
+  })
+
+  it('仅 material 时跳过低于 B15 的差异', () => {
+    const { pairs, skipped } = buildG66InterestVarianceAdjustmentDrafts({
+      amortizationDiff: 5,
+      incomeDiff: 0,
+      incomeLayerActive: false,
+      performanceMateriality: 100,
+      onlyMaterial: true,
+    })
+    expect(pairs).toHaveLength(0)
+    expect(skipped[0].reason).toContain('未超过阈值')
+  })
+})
+
+describe('30/360 计息基准', () => {
+  it('30/360 按欧洲规则推算天数并用 360 年天数计息', () => {
+    const { groups, updatePeriod, recalcAll } = useG6SppiInterest()
+    groups.value = [createMockGroup({
+      id: 'g1',
+      faceValue: 360000,
+      couponRate: 0,
+      effectiveRate: 0.05,
+      dayCountBasis: '30/360',
+      periods: [createMockPeriod({
+        id: 'p1',
+        periodStart: '2024-01-31',
+        periodEnd: '2024-02-29',
+        openingAmortized: 360000,
+        days: 180,
+        daysManualOverride: false,
+      })],
+    })]
+    // 强制走日期推算
+    updatePeriod('g1', 'p1', 'periodEnd', '2024-02-29')
+    // 30E/360: Jan31→Feb29 → D1=30,D2=29 → 29 days? 
+    // Actually: y same, m: 2-1=1, d: 29-30 = -1 → 30*1 + (-1) = 29
+    expect(groups.value[0].periods[0].days).toBe(29)
+    recalcAll()
+    expect(groups.value[0].periods[0].effectiveInterest).toBe(
+      Math.round(360000 * 0.05 * 29 / 360 * 100) / 100,
+    )
   })
 })

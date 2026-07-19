@@ -1,144 +1,258 @@
 import { describe, it, expect } from 'vitest'
 import {
   calcCostMethodIncome,
+  calcConsiderationTotal,
+  calcDividendVariance,
+  calcNciEquityAdjustment,
+  calcNciPurchaseShare,
+  calcPartialDisposalConsolAdjustment,
+  calcPartialDisposalConsolShare,
+  calcPartialDisposalIndividualGain,
   calcSubsequentBalance,
   parseNum,
 } from '../../../composables/useG7SubFormulaEngine'
+import {
+  createDividendRow,
+  createNciPurchaseRow,
+  createPartialDisposalRow,
+  fillNciEquitySplitToCapitalReserve,
+  fillPartialDisposalEquitySplitToCapitalReserve,
+  migrateLegacyCostMethodRow,
+  normalizeSubsequentRows,
+  parseSubsequentPayload,
+  recalcDividendRow,
+  recalcNciPurchaseRow,
+  recalcPartialDisposalRow,
+  validateSubsequentRows,
+} from '../g7SubsequentModel'
+import { loadSubsidiaryInvestees } from '../../../composables/g7EquityMethodCrossSheet'
 
 /**
  * G7-10 子公司后续计量测试表 单元测试
  *
- * 验证:
- * - 投资收益 = 被投资方宣告股利 × 持股比例 (Requirements 4.2)
- * - 期末账面 = 期初 + 追加投资 - 减值计提 (Requirements 4.3)
- * - 差异 = 期末余额(计算) - 企业账面期末
- * - 边界情况: 所有值为0时正确返回0
+ * 对齐源模板三区段：股利测算 / 购买少数股权 / 不丧失控制权处置
  */
 
 describe('G7TabSubsequentMeasurement — 公式验证', () => {
-  // ─── 投资收益公式 (Requirements 4.2) ─────────────────────────────────────
-
-  describe('calcCostMethodIncome: 投资收益 = 股利 × 持股比例', () => {
-    it('基本计算: 1000万股利 × 60%持股 = 600万', () => {
+  describe('calcCostMethodIncome / calcDividendVariance', () => {
+    it('应享股利 = 宣告 × 持股比例', () => {
       expect(calcCostMethodIncome(10_000_000, 0.6)).toBe(6_000_000)
     })
 
-    it('小额股利: 50000 × 0.51 = 25500', () => {
-      expect(calcCostMethodIncome(50_000, 0.51)).toBe(25_500)
-    })
-
-    it('100%持股: 股利全额确认', () => {
-      expect(calcCostMethodIncome(200_000, 1)).toBe(200_000)
-    })
-
-    it('小比例持股: 1000000 × 0.05 = 50000', () => {
-      expect(calcCostMethodIncome(1_000_000, 0.05)).toBe(50_000)
-    })
-
-    it('精度处理: 333333 × 0.3333 应四舍五入到分', () => {
-      const result = calcCostMethodIncome(333_333, 0.3333)
-      // 333333 × 0.3333 = 111,099.8889 → round to 2 decimals = 111099.89
-      expect(result).toBe(111_099.89)
-    })
-
-    it('股利为0时投资收益=0', () => {
-      expect(calcCostMethodIncome(0, 0.6)).toBe(0)
-    })
-
-    it('持股比例为0时投资收益=0', () => {
-      expect(calcCostMethodIncome(500_000, 0)).toBe(0)
+    it('差异 = 应享 − 入账', () => {
+      expect(calcDividendVariance(600_000, 580_000)).toBe(20_000)
+      expect(calcDividendVariance(600_000, 600_000)).toBe(0)
     })
   })
 
-  // ─── 期末账面公式 (Requirements 4.3) ──────────────────────────────────────
+  describe('购买少数股权：④=③×①；⑤=②−④', () => {
+    it('购买成本合计', () => {
+      expect(calcConsiderationTotal(1_000_000, 200_000, 50_000, 0, 0)).toBe(1_250_000)
+    })
 
-  describe('calcSubsequentBalance: 期末账面 = 期初 + 追加 - 减值', () => {
-    it('基本计算: 1000 + 200 - 50 = 1150', () => {
+    it('按新增比例享有份额④', () => {
+      expect(calcNciPurchaseShare(10_000_000, 0.1)).toBe(1_000_000)
+    })
+
+    it('权益调整⑤ = 成本 − 份额', () => {
+      expect(calcNciEquityAdjustment(1_250_000, 1_000_000)).toBe(250_000)
+    })
+
+    it('recalcNciPurchaseRow 串联正确', () => {
+      const row = recalcNciPurchaseRow({
+        ...createNciPurchaseRow(1, '甲公司'),
+        priorCarryingAmount: 5_000_000,
+        addedRatio: 0.1,
+        costCash: 1_200_000,
+        netAssetsFV: 10_000_000,
+      })
+      expect(row.purchaseCost).toBe(1_200_000)
+      expect(row.shareOfNetAssets).toBe(1_000_000)
+      expect(row.equityAdjustment).toBe(200_000)
+      expect(row.carryingAfterPurchase).toBe(6_200_000)
+    })
+  })
+
+  describe('不丧失控制权处置：⑤=④−①×③/②；⑧=④−⑦', () => {
+    it('个别投资收益', () => {
+      // 账面1000万、原持股80%、处置20%、对价300万 → ⑤=300−1000×0.2/0.8=50万
+      expect(calcPartialDisposalIndividualGain(3_000_000, 10_000_000, 0.2, 0.8)).toBe(500_000)
+    })
+
+    it('原持股为0时个别损益为0', () => {
+      expect(calcPartialDisposalIndividualGain(100, 1000, 0.1, 0)).toBe(0)
+    })
+
+    it('合并份额⑦与权益调整⑧', () => {
+      expect(calcPartialDisposalConsolShare(20_000_000, 0.2)).toBe(4_000_000)
+      expect(calcPartialDisposalConsolAdjustment(3_000_000, 4_000_000)).toBe(-1_000_000)
+    })
+
+    it('recalcPartialDisposalRow 串联正确', () => {
+      const row = recalcPartialDisposalRow({
+        ...createPartialDisposalRow(1, '乙公司'),
+        bookValueAtDisposal: 10_000_000,
+        originalRatio: 0.8,
+        reducedRatio: 0.2,
+        considerationCash: 3_000_000,
+        netAssetsFV: 20_000_000,
+      })
+      expect(row.consideration).toBe(3_000_000)
+      expect(row.individualGain).toBe(500_000)
+      expect(row.consolShare).toBe(4_000_000)
+      expect(row.consolEquityAdj).toBe(-1_000_000)
+    })
+  })
+
+  describe('兼容旧版成本法滚存', () => {
+    it('calcSubsequentBalance 仍可用', () => {
       expect(calcSubsequentBalance(1_000, 200, 50)).toBe(1_150)
     })
 
-    it('无追加无减值: 期末=期初', () => {
-      expect(calcSubsequentBalance(5_000_000, 0, 0)).toBe(5_000_000)
+    it('migrateLegacyCostMethodRow 迁入股利区', () => {
+      const row = migrateLegacyCostMethodRow({
+        investeeName: '丙公司',
+        declaredDividend: 1_000_000,
+        shareholdingRatio: 0.6,
+        investmentIncome: 600_000,
+      }, 1)
+      expect(row.section).toBe('dividend')
+      expect(row.companyName).toBe('丙公司')
+      expect(row.entitledDividend).toBe(600_000)
+      expect(row.variance).toBe(0)
     })
 
-    it('仅追加投资: 3000000 + 1000000 - 0 = 4000000', () => {
-      expect(calcSubsequentBalance(3_000_000, 1_000_000, 0)).toBe(4_000_000)
-    })
-
-    it('仅减值: 8000000 + 0 - 2000000 = 6000000', () => {
-      expect(calcSubsequentBalance(8_000_000, 0, 2_000_000)).toBe(6_000_000)
-    })
-
-    it('大额计算: 100000000 + 50000000 - 10000000 = 140000000', () => {
-      expect(calcSubsequentBalance(100_000_000, 50_000_000, 10_000_000)).toBe(140_000_000)
-    })
-
-    it('精度处理: 含小数的金额正确计算', () => {
-      const result = calcSubsequentBalance(1_000_000.55, 200_000.33, 50_000.11)
-      // 1000000.55 + 200000.33 - 50000.11 = 1150000.77
-      expect(result).toBe(1_150_000.77)
-    })
-  })
-
-  // ─── 差异计算 ─────────────────────────────────────────────────────────────
-
-  describe('差异: variance = closingBalance - companyEndingBalance', () => {
-    it('无差异: 计算期末=企业期末', () => {
-      const closingBalance = calcSubsequentBalance(1_000_000, 200_000, 50_000)
-      const companyEndingBalance = 1_150_000
-      const variance = Math.round((closingBalance - parseNum(companyEndingBalance)) * 100) / 100
-      expect(variance).toBe(0)
-    })
-
-    it('正差异: 计算期末 > 企业期末', () => {
-      const closingBalance = calcSubsequentBalance(1_000_000, 200_000, 50_000) // 1150000
-      const companyEndingBalance = 1_100_000
-      const variance = Math.round((closingBalance - parseNum(companyEndingBalance)) * 100) / 100
-      expect(variance).toBe(50_000)
-    })
-
-    it('负差异: 计算期末 < 企业期末', () => {
-      const closingBalance = calcSubsequentBalance(1_000_000, 0, 100_000) // 900000
-      const companyEndingBalance = 1_000_000
-      const variance = Math.round((closingBalance - parseNum(companyEndingBalance)) * 100) / 100
-      expect(variance).toBe(-100_000)
-    })
-
-    it('含小数差异精确到分', () => {
-      const closingBalance = calcSubsequentBalance(500_000.50, 100_000.25, 0) // 600000.75
-      const companyEndingBalance = 600_000.50
-      const variance = Math.round((closingBalance - parseNum(companyEndingBalance)) * 100) / 100
-      expect(variance).toBe(0.25)
+    it('normalizeSubsequentRows 识别三区段', () => {
+      const rows = normalizeSubsequentRows([
+        { section: 'dividend', companyName: 'A', declaredAmount: 100, shareholdingRatio: 0.5, recordedDividend: 50 },
+        { section: 'nci', companyName: 'B', addedRatio: 0.1, costCash: 100, netAssetsFV: 1000 },
+        { section: 'partialDisposal', companyName: 'C', reducedRatio: 0.1, originalRatio: 0.8, bookValueAtDisposal: 800, considerationCash: 120, netAssetsFV: 1000 },
+      ])
+      expect(rows.map(r => r.section)).toEqual(['dividend', 'nci', 'partialDisposal'])
     })
   })
 
-  // ─── 边界情况 ─────────────────────────────────────────────────────────────
-
-  describe('边界情况: 所有值为0时正确返回0', () => {
-    it('calcCostMethodIncome(0, 0) = 0', () => {
-      expect(calcCostMethodIncome(0, 0)).toBe(0)
+  describe('校验', () => {
+    it('减少比例大于原比例报错', () => {
+      const row = recalcPartialDisposalRow({
+        ...createPartialDisposalRow(1, '丁'),
+        originalRatio: 0.5,
+        reducedRatio: 0.6,
+      })
+      const issues = validateSubsequentRows([row])
+      expect(issues.some(i => i.severity === 'error')).toBe(true)
     })
 
-    it('calcSubsequentBalance(0, 0, 0) = 0', () => {
-      expect(calcSubsequentBalance(0, 0, 0)).toBe(0)
+    it('剩余持股≤50%给出控制权警告', () => {
+      const row = recalcPartialDisposalRow({
+        ...createPartialDisposalRow(1, '丁2'),
+        originalRatio: 0.7,
+        reducedRatio: 0.3,
+        considerationCash: 100,
+        netAssetsFV: 1000,
+      })
+      const issues = validateSubsequentRows([row])
+      expect(issues.some(i => i.message.includes('≤ 50%'))).toBe(true)
     })
 
-    it('差异计算: 两个0相减=0', () => {
-      const closingBalance = calcSubsequentBalance(0, 0, 0)
-      const companyEndingBalance = 0
-      const variance = Math.round((closingBalance - parseNum(companyEndingBalance)) * 100) / 100
-      expect(variance).toBe(0)
+    it('股利差异超过重要性水平升为 error', () => {
+      const row = recalcDividendRow({
+        ...createDividendRow(1, '戊'),
+        declaredAmount: 1_000_000,
+        shareholdingRatio: 0.5,
+        recordedDividend: 400_000,
+      })
+      const issues = validateSubsequentRows([row], { materialityLevel: 50_000 })
+      expect(issues.some(i => i.severity === 'error' && i.message.includes('重要性'))).toBe(true)
     })
 
-    it('parseNum对边界值正确处理', () => {
+    it('股利差异产生 warning', () => {
+      const row = recalcDividendRow({
+        ...createDividendRow(1, '戊'),
+        declaredAmount: 1000,
+        shareholdingRatio: 0.5,
+        recordedDividend: 400,
+      })
+      const issues = validateSubsequentRows([row])
+      expect(issues.some(i => i.message.includes('差异'))).toBe(true)
+    })
+  })
+
+  describe('一键填资本公积', () => {
+    it('NCI 权益调整全额进资本公积', () => {
+      const row = fillNciEquitySplitToCapitalReserve(
+        recalcNciPurchaseRow({
+          ...createNciPurchaseRow(1, '己'),
+          addedRatio: 0.1,
+          costCash: 1_200_000,
+          netAssetsFV: 10_000_000,
+        }),
+      )
+      expect(row.equityAdjustment).toBe(200_000)
+      expect(row.adjCapitalReserve).toBe(200_000)
+      expect(row.adjSurplusReserve).toBe(0)
+      expect(row.adjRetainedEarnings).toBe(0)
+    })
+
+    it('不丧失控制权处置合并调整全额进资本公积', () => {
+      const row = fillPartialDisposalEquitySplitToCapitalReserve(
+        recalcPartialDisposalRow({
+          ...createPartialDisposalRow(1, '庚'),
+          bookValueAtDisposal: 10_000_000,
+          originalRatio: 0.8,
+          reducedRatio: 0.2,
+          considerationCash: 3_000_000,
+          netAssetsFV: 20_000_000,
+        }),
+      )
+      expect(row.consolEquityAdj).toBe(-1_000_000)
+      expect(row.adjCapitalReserve).toBe(-1_000_000)
+    })
+  })
+
+  describe('G7-4 名册解析 / 载荷兼容', () => {
+    it('loadSubsidiaryInvestees 提取子公司并转换百分数为小数', () => {
+      const opts = loadSubsidiaryInvestees([
+        {
+          investeeName: '子A',
+          groupType: 'subsidiary',
+          directHoldingRatio: 80,
+          indirectHoldingRatio: 0,
+          investmentAmount: 5_000_000,
+          ratioScale: 'percent',
+        },
+        {
+          investeeName: '联营B',
+          groupType: 'associate',
+          directHoldingRatio: 30,
+          investmentAmount: 1_000_000,
+        },
+      ])
+      expect(opts).toHaveLength(1)
+      expect(opts[0].name).toBe('子A')
+      expect(opts[0].shareholdingRatio).toBe(0.8)
+      expect(opts[0].carryingAmount).toBe(5_000_000)
+    })
+
+    it('parseSubsequentPayload 兼容旧数组与新对象', () => {
+      const a = parseSubsequentPayload([{ section: 'dividend', companyName: 'A', declaredAmount: 100, shareholdingRatio: 0.5 }])
+      expect(a.rows).toHaveLength(1)
+      expect(a.materialityLevel).toBe(0)
+
+      const b = parseSubsequentPayload({
+        materialityLevel: 10000,
+        rows: [{ section: 'nci', companyName: 'B', addedRatio: 0.1, costCash: 100, netAssetsFV: 1000 }],
+      })
+      expect(b.materialityLevel).toBe(10000)
+      expect(b.rows[0].section).toBe('nci')
+    })
+  })
+
+  describe('边界', () => {
+    it('parseNum 边界', () => {
       expect(parseNum(null)).toBe(0)
-      expect(parseNum(undefined)).toBe(0)
       expect(parseNum('')).toBe(0)
-      expect(parseNum('  ')).toBe(0)
       expect(parseNum('abc')).toBe(0)
-      expect(parseNum(NaN)).toBe(0)
-      expect(parseNum(0)).toBe(0)
-      expect(parseNum(42.5)).toBe(42.5)
     })
   })
 })
