@@ -34,8 +34,29 @@ export interface ConfirmationCompletedPayload {
   differenceAmount?: number
 }
 
-/** 科目大类 → 科目底稿提示码 */
-export function accountTypeToWpHint(accountType?: string): string | undefined {
+/** 科目编码前缀 → 科目底稿提示码 */
+const ACCOUNT_CODE_TO_WP_HINT: Array<[RegExp, string]> = [
+  [/^1121/, 'D1'],   // 应收票据
+  [/^1122/, 'D2'],   // 应收账款
+  [/^1123/, 'D5'],   // 预收账款→合同负债
+  [/^1221/, 'D7'],   // 其他应收款
+  [/^1001|^1002|^1012/, 'E1'], // 货币资金
+  [/^1123|^2203/, 'D5'],   // 合同负债/预收
+  [/^2201|^2202/, 'F4'],   // 应付票据/应付账款
+  [/^1231/, 'F1'],   // 预付账款
+  [/^2241/, 'K'],    // 其他应付款
+]
+
+/** 科目大类 → 科目底稿提示码（优先用 account_code 前缀，fallback 中文名） */
+export function accountTypeToWpHint(accountType?: string, accountCode?: string): string | undefined {
+  // 优先：按科目编码前 4 位精确匹配
+  if (accountCode) {
+    const code = String(accountCode).trim()
+    for (const [pattern, wpHint] of ACCOUNT_CODE_TO_WP_HINT) {
+      if (pattern.test(code)) return wpHint
+    }
+  }
+  // Fallback：按中文科目名匹配
   const t = String(accountType || '').trim()
   if (!t) return undefined
   if (t.includes('其他应收')) return 'D7'

@@ -68,6 +68,64 @@ async def list_confirmations(
     return {"items": items, "total": len(items)}
 
 
+@router.get("/stats")
+async def confirmation_stats(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """#10: 函证覆盖率统计（供 Dashboard 概况卡片）
+
+    Returns:
+        total_count: 总笔数
+        sent_count: 已发函
+        replied_count: 已回函（returned/matched/discrepancy）
+        matched_count: 相符
+        discrepancy_count: 差异
+        total_book_amount: 账面总额
+        confirmed_amount: 已确认金额
+        reply_rate: 回函率 (%)
+        confirmation_coverage: 函证覆盖率 (%) — confirmed / book
+        warn_level: ok / warn / danger
+    """
+    pid = uuid.UUID(project_id)
+    items = await confirmation_service.list_confirmations(db, pid)
+    await db.commit()
+
+    total_count = len(items)
+    sent_count = sum(1 for i in items if i.get("status") != "pending")
+    terminal_statuses = {"returned", "matched", "discrepancy"}
+    replied_count = sum(1 for i in items if i.get("status") in terminal_statuses)
+    matched_count = sum(1 for i in items if i.get("status") == "matched")
+    discrepancy_count = sum(1 for i in items if i.get("status") == "discrepancy")
+
+    total_book = sum(float(i.get("book_amount") or 0) for i in items)
+    total_confirmed = sum(float(i.get("confirmed_amount") or 0) for i in items if i.get("status") in ("matched", "discrepancy"))
+
+    reply_rate = round((replied_count / sent_count * 100), 1) if sent_count > 0 else 0
+    coverage = round((total_confirmed / total_book * 100), 1) if total_book > 0 else 0
+
+    # 预警等级：覆盖率<50% danger，50-80% warn，>80% ok
+    warn_level = "ok"
+    if coverage < 50:
+        warn_level = "danger"
+    elif coverage < 80:
+        warn_level = "warn"
+
+    return {
+        "total_count": total_count,
+        "sent_count": sent_count,
+        "replied_count": replied_count,
+        "matched_count": matched_count,
+        "discrepancy_count": discrepancy_count,
+        "total_book_amount": total_book,
+        "confirmed_amount": total_confirmed,
+        "reply_rate": reply_rate,
+        "confirmation_coverage": coverage,
+        "warn_level": warn_level,
+    }
+
+
 @router.post("")
 async def create_confirmation(
     project_id: str,

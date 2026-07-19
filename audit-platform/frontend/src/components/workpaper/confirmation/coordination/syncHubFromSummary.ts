@@ -34,8 +34,24 @@ const STATUS_RANK: Record<string, number> = {
   discrepancy: 3,
 }
 
-/** 科目大类 → Hub confirm_type */
-export function accountTypeToHubType(accountType?: string): HubConfirmType {
+/** 科目编码前缀 → Hub confirm_type（优先于中文名匹配） */
+const ACCOUNT_CODE_TO_HUB_TYPE: Array<[RegExp, HubConfirmType]> = [
+  [/^(1001|1002|1012)/, 'bank'],    // 库存现金/银行存款/其他货币资金
+  [/^(1501|1502|1503|2501|2502)/, 'loan'], // 短期借款/长期借款/融资租赁
+  [/^(2201|2202|2203|2241)/, 'payable'], // 应付票据/应付账款/预收/其他应付
+  [/^(1121|1122|1123|1131|1221|1231)/, 'receivable'], // 应收票据/应收账款/预付/其他应收
+]
+
+/** 科目大类 → Hub confirm_type（优先用 account_code 前缀，fallback 中文名正则） */
+export function accountTypeToHubType(accountType?: string, accountCode?: string): HubConfirmType {
+  // 优先：按科目编码前 4 位精确匹配
+  if (accountCode) {
+    const code = String(accountCode).trim()
+    for (const [pattern, hubType] of ACCOUNT_CODE_TO_HUB_TYPE) {
+      if (pattern.test(code)) return hubType
+    }
+  }
+  // Fallback：按中文科目名匹配
   const t = String(accountType || '')
   if (/银行|存款|货币资金/.test(t)) return 'bank'
   if (/借款|贷款|融资/.test(t)) return 'loan'

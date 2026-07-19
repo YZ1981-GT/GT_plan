@@ -206,6 +206,27 @@ async def transition_status(
     record.updated_at = datetime.now(timezone.utc)
     await db.flush()
     await db.refresh(record)
+
+    # #9: 记录操作历史（结构化日志，供复核追溯）
+    try:
+        from app.services.event_bus import event_bus
+        from app.models.audit_platform_schemas import EventPayload, EventType
+
+        await event_bus.publish_immediate(EventPayload(
+            event_type=EventType.WORKPAPER_SAVED,  # 复用已有事件类型作通用审计日志
+            project_id=record.project_id,
+            extra={
+                "audit_action": "confirmation_transition",
+                "confirmation_id": str(confirmation_id),
+                "counterparty": record.counterparty,
+                "from_status": current,
+                "to_status": target_status,
+                "timestamp": record.updated_at.isoformat(),
+            },
+        ))
+    except Exception:
+        pass  # 日志失败不阻断
+
     return _to_dict(record)
 
 
