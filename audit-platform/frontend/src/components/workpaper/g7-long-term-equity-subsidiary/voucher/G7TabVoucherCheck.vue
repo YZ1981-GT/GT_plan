@@ -245,7 +245,7 @@
                 <span v-else-if="row.attachment">✓</span>
               </template>
             </el-table-column>
-            <el-table-column v-if="!isReadonly" label="操作" width="70" fixed="right">
+            <el-table-column v-if="!isReadonly" label="操作" width="70">
               <template #default="{ row }">
                 <el-button link type="danger" size="small" @click="handleRemoveRow(row.id)">删除</el-button>
               </template>
@@ -923,7 +923,9 @@ async function handleAi(section: string): Promise<void> {
 .balance-summary.is-unbalanced { background: #fef0f0; }
 .diff-warning { color: #f56c6c; font-weight: 600; }
 
-.voucher-tabs { margin-bottom: 8px; }
+.voucher-tabs { margin-bottom: 8px; overflow: hidden; }
+.voucher-tabs :deep(.el-tabs__content) { overflow: hidden; }
+.voucher-tabs :deep(.el-table) { width: 100% !important; }
 .pagination-wrapper { display: flex; justify-content: center; padding: 8px 0; }
 .conclusion-card, .audit-note-card { margin-top: 16px; }
 .conclusion-header { display: flex; justify-content: space-between; align-items: center; }
