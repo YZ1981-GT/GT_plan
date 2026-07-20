@@ -21,6 +21,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import type { ChecklistResponse } from './useF1FormData'
 import type { G7BasicInfoRow } from '../g7-long-term-equity-method/info/g7BasicInfoModel'
+import type { G7FinancialInfoRow } from '../g7-long-term-equity-method/info/g7FinancialInfoModel'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -35,21 +36,7 @@ function draftKey(wpId: string, itemId: string): string {
 // ─── Content Types ───────────────────────────────────────────────────────────
 
 export type BasicInfoRow = G7BasicInfoRow
-
-export interface FinancialInfoRow {
-  id: string
-  seq: number
-  investeeName: string
-  reportItem: string
-  priorAmount: number
-  currentAmount: number
-  changeAmount: number
-  changeRate: number | null
-  analysisNote: string
-  dataSource: string
-  auditStatus: '已审' | '未审' | '待确认'
-  remark: string
-}
+export type FinancialInfoRow = G7FinancialInfoRow
 
 export interface AccountingPolicyRow {
   id: string
@@ -66,6 +53,8 @@ export interface InvestmentCostTestRow {
   id: string
   seq: number
   investeeName: string
+  /** 稳定被投资单位 ID（优先取自 G7-4） */
+  investeeId?: string
   investDate: string
   mergeType: '合并' | '非合并'
   consideration: number
@@ -79,6 +68,8 @@ export interface InvestmentCostTestRow {
   fvAdjustmentDetail: string
   adjustedNetAssets: number
   adjustedShareOfNetAssets: number
+  /** 持股比例（小数 0~1）；优先于外部 ratioMap */
+  investmentRatio?: number
   auditConclusion: '无差异' | '存在差异-可接受' | '存在差异-需调整'
   indexRef: string
 }
@@ -94,6 +85,10 @@ export interface EquityMethodCalcRow {
   fvDepreciationAdj: number
   accountingPolicyAdj: number
   otherAdj: number
+  /**
+   * 由 G7-16 写入的 otherAdj 分量；再同步时先剥离再累加，避免覆盖手工/G7-6 调整。
+   */
+  otherAdjFromG716?: number
   adjustedNetProfit: number
   investmentRatio: number
   equityShare: number
@@ -128,6 +123,15 @@ export interface EquityMethodCalcRow {
   shareOfAuditedNetAssets: number
   lteiBookBalance: number
   netAssetShareVariance: number
+  /**
+   * G7-2 审定期初/期末总额（勾稽对照）。
+   * 期初勾稽差异P = 四段期初合计 − g72OpeningTotal
+   * 期末勾稽差异S = 长投账面余额 − g72ClosingTotal
+   */
+  g72OpeningTotal: number
+  g72ClosingTotal: number
+  openingReconVariance: number
+  closingReconVariance: number
   goodwill: number
   cumulativeFvAdj: number
   impairment: number
@@ -153,11 +157,17 @@ export interface EquityMethodCalcRow {
 export interface InternalTransactionRow {
   id: string
   seq: number
+  /** 稳定被投资单位 ID（来自 G7-4，优先用于跨表匹配） */
+  investeeId?: string
   investeeName: string
   transactionType: '顺流' | '逆流'
   transactionContent: string
   transactionAmount: number
+  /** 毛利率（小数 0~1）；未实现利润 = 交易金额 × 毛利率 */
+  grossMargin: number
   unrealizedProfit: number
+  /** true=用户手填未实现利润，金额/毛利率变更时不再自动覆盖 */
+  unrealizedProfitManual?: boolean
   investmentRatio: number
   eliminationAmount: number
   priorElimination: number
@@ -173,6 +183,7 @@ export interface UnrecognizedLossRow {
   id: string
   seq: number
   investeeName: string
+  investeeId?: string
   investmentBookValue: number
   longTermReceivable: number
   otherLongTermEquity: number
@@ -186,7 +197,13 @@ export interface UnrecognizedLossRow {
   reduceOtherEquity: number
   recognizeEstimatedLiability: number
   unrecognizedLoss: number
+  /** 上期累计未确认损失（披露 priorCumulative） */
+  priorCumulative: number
   currentChange: number
+  /** 手工锁定冲减分配（不再自动瀑布） */
+  allocationManual?: boolean
+  /** 手工覆盖本期变动 */
+  currentChangeManual?: boolean
   auditConclusion: '合理' | '基本合理' | '不合理'
 }
 
@@ -194,14 +211,25 @@ export interface ImpairmentTestRow {
   id: string
   seq: number
   investeeName: string
+  /** 稳定被投资单位 ID（优先取自 G7-4） */
+  investeeId?: string
   bookValue: number
+  /** 自 G7-14 带入时的账面快照，用于 stale 检测 */
+  sourceBookValue?: number | null
+  /** 期初已计提减值准备（consol → open_impairment） */
+  openingImpairment?: number
   recoverableAmount: number
+  /** true = 可收回金额手工覆盖（不再跟公式） */
+  recoverableManual?: boolean
+  recoverableOverrideReason?: string
   hasImpairmentSign: boolean
   impairmentAmount: number
   fvLessDisposalCost: number
   valueInUse: number
   auditConclusion: '无需计提' | '需计提' | '已充分计提'
   indexRef: string
+  /** 估值依据附件名 */
+  attachmentName?: string
 }
 
 export interface G7EquityMethodContent {

@@ -22,7 +22,7 @@ function onRiskUpdated(e: Event) {
   const detail = (e as CustomEvent).detail
   const inventoryAccounts = [
     '1401', '1402', '1403', '1404', '1405', '1406',
-    '1407', '1408', '1409', '1410', '1411', '1412',
+    '1407', '1408', '1409', '1410', '1411', '1412', '1471',
   ]
   const affected = detail?.affectedAccounts as string[] | undefined
   if (affected?.some((acc: string) => inventoryAccounts.includes(acc))) {

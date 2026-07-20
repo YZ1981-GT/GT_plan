@@ -18,7 +18,11 @@ import {
 
   createNotSameControlReverseRow,
 
+  collectNotSameControlPersistBlockers,
+
   describeGoodwill,
+
+  extractG79CarryToSubsequent,
 
   extractNotSameControlInvesteesFromG7Judgment,
 
@@ -466,6 +470,45 @@ describe('G7-9 校验与同步', () => {
 
   })
 
+})
+
+describe('G7-9 持久化硬拦与带入', () => {
+  it('廉价购买未复核时 collectNotSameControlPersistBlockers 拦截', () => {
+    const row = createNotSameControlMergerRow(1, '目标B')
+    row.cashConsideration = 100
+    row.acquireeIdentifiableNetAssetsFV = 200
+    row.ownershipRatio = 0.8
+    recalcNotSameControlMergerRow(row)
+    const blockers = collectNotSameControlPersistBlockers([row])
+    expect(blockers.some(m => m.includes('廉价购买'))).toBe(true)
+
+    row.bargainPurchaseReviewed = '是'
+    row.bargainPurchaseReviewNote = '已复核'
+    expect(collectNotSameControlPersistBlockers([row])).toEqual([])
+  })
+
+  it('反向购买不构成业务硬拦；空草稿不拦', () => {
+    const empty = createNotSameControlReverseRow(1)
+    expect(collectNotSameControlPersistBlockers([empty])).toEqual([])
+    empty.constitutesBusiness = '否'
+    expect(collectNotSameControlPersistBlockers([empty]).some(m => m.includes('资产购置'))).toBe(true)
+  })
+
+  it('extractG79CarryToSubsequent 输出一次购买与分步汇总', () => {
+    const merger = createNotSameControlMergerRow(1, '甲')
+    merger.ownershipRatio = 0.8
+    merger.cashConsideration = 100
+    recalcNotSameControlMergerRow(merger)
+    const step = createNotSameControlStepRow('c1', '乙', 1)
+    step.purchaseRatio = 0.6
+    step.considerationFV = 60
+    step.netAssetsFVAtTxn = 100
+    recalcNotSameControlStepRow(step)
+    const carry = extractG79CarryToSubsequent([merger, step])
+    expect(carry).toHaveLength(2)
+    expect(carry[0]).toMatchObject({ companyName: '甲', shareholdingRatio: 0.8, source: 'merger' })
+    expect(carry[1]).toMatchObject({ companyName: '乙', shareholdingRatio: 0.6, source: 'step' })
+  })
 })
 
 

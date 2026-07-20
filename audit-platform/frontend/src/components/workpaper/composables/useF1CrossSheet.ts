@@ -18,7 +18,7 @@ import {
 } from './useF1FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 
-function collectAgingKeys(rows: D3DetailRowRaw[]): string[] {
+function collectAgingKeys(rows: F1DetailRowRaw[]): string[] {
   const keys = new Set<string>()
   for (const row of rows) {
     Object.keys(row.agingAudited || {}).forEach(k => keys.add(k))
@@ -38,12 +38,12 @@ function sumAgingMap(aging: Record<string, number> | undefined, keys: string[]):
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export interface UseD3CrossSheetOptions {
+export interface UseF1CrossSheetOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
 }
 
 /** F1-2 明细行原始 JSON 结构（remark 中存储） */
-export interface D3DetailRowRaw {
+export interface F1DetailRowRaw {
   rowId: string
   customerName: string
   companyCode?: string
@@ -135,16 +135,16 @@ function safeParseRows<T>(jsonStr: string | null | undefined): T[] {
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-export function useF1CrossSheet(options: UseD3CrossSheetOptions) {
+export function useF1CrossSheet(options: UseF1CrossSheetOptions) {
   const { allResponses } = options
 
   const crossSheetStatus = ref<'loaded' | 'loading' | 'error'>('loaded')
 
   // ─── 解析 F1-2 明细行数据 ──────────────────────────────────────────────
 
-  const detailRows = computed<D3DetailRowRaw[]>(() => {
+  const detailRows = computed<F1DetailRowRaw[]>(() => {
     const resp = allResponses.value.get('F1-det-rows')
-    return safeParseRows<D3DetailRowRaw>(resp?.remark)
+    return safeParseRows<F1DetailRowRaw>(resp?.remark)
   })
 
   /** 将原始行转为公式引擎所需的 DetailRowForFormula 结构 */

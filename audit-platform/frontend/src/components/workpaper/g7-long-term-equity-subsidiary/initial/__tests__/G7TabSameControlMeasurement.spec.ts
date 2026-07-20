@@ -10,7 +10,8 @@
  * Requirements: 3.1, 3.3
  */
 import { describe, it, expect } from 'vitest'
-import { calcSameControlCost, parseNum } from '../../../composables/useG7SubFormulaEngine'
+import { calcSameControlCost } from '../../../composables/useG7SubFormulaEngine'
+import { isSameControlDifferenceLarge } from '../g7SameControlModel'
 
 // ═══════════════════════════════════════════════════════════════════
 // 1. calcSameControlCost 正确计算（净资产 × 比例）
@@ -62,74 +63,46 @@ describe('G7-8 同控初始计量: calcSameControlCost 正确计算', () => {
 describe('G7-8 同控初始计量: 差额计算与高亮提醒逻辑', () => {
   /**
    * **Validates: Requirements 3.1, 3.3**
-   *
-   * 业务逻辑复现 (来自 G7TabSameControlMeasurement.vue):
-   * - getDifference(row) = consideration - initialCost
-   * - isDifferenceLarge(row) = |差额| > initialCost * 0.5 && initialCost > 0
+   * 真实函数：isSameControlDifferenceLarge(initialCost, totalConsideration)
    */
-
-  /** 复现组件内 getDifference 逻辑 */
-  function getDifference(consideration: number, initialCost: number): number {
-    return Math.round((parseNum(consideration) - parseNum(initialCost)) * 100) / 100
-  }
-
-  /** 复现组件内 isDifferenceLarge 逻辑：差额过大(>初始成本50%)→橙色高亮 */
-  function isDifferenceLarge(consideration: number, initialCost: number): boolean {
-    const cost = parseNum(initialCost)
-    if (cost <= 0) return false
-    return Math.abs(getDifference(consideration, initialCost)) > cost * 0.5
-  }
-
   it('对价=初始成本 → 差额为0，无高亮', () => {
-    // 净资产10000, 比例60% → 初始成本=6000, 对价=6000
     const initialCost = calcSameControlCost(10000, 0.6) // 6000
-    expect(getDifference(6000, initialCost)).toBe(0)
-    expect(isDifferenceLarge(6000, initialCost)).toBe(false)
+    expect(isSameControlDifferenceLarge(initialCost, 6000)).toBe(false)
   })
 
   it('对价略高于初始成本(<50%) → 有差额但无高亮', () => {
     const initialCost = calcSameControlCost(10000, 0.6) // 6000
-    // 支付对价=7000, 差额=1000, 1000/6000=16.7% < 50%
-    expect(getDifference(7000, initialCost)).toBe(1000)
-    expect(isDifferenceLarge(7000, initialCost)).toBe(false)
+    expect(isSameControlDifferenceLarge(initialCost, 7000)).toBe(false)
   })
 
   it('对价远超账面(>50%) → 应触发橙色高亮', () => {
     const initialCost = calcSameControlCost(10000, 0.6) // 6000
-    // 支付对价=15000, 差额=9000, 9000/6000=150% > 50% → 高亮
-    expect(getDifference(15000, initialCost)).toBe(9000)
-    expect(isDifferenceLarge(15000, initialCost)).toBe(true)
+    expect(isSameControlDifferenceLarge(initialCost, 15000)).toBe(true)
   })
 
   it('对价远低于账面(负差额>50%) → 也应触发高亮', () => {
     const initialCost = calcSameControlCost(10000, 0.6) // 6000
-    // 支付对价=1000, 差额=-5000, |-5000|/6000=83.3% > 50% → 高亮
-    expect(getDifference(1000, initialCost)).toBe(-5000)
-    expect(isDifferenceLarge(1000, initialCost)).toBe(true)
+    expect(isSameControlDifferenceLarge(initialCost, 1000)).toBe(true)
   })
 
   it('对价恰好在临界点(差额=初始成本*50%) → 不触发高亮(需>不含=)', () => {
     const initialCost = calcSameControlCost(10000, 0.6) // 6000
-    // 对价=9000, 差额=3000, 3000/6000=50% → 不触发(>才触发)
-    expect(getDifference(9000, initialCost)).toBe(3000)
-    expect(isDifferenceLarge(9000, initialCost)).toBe(false)
+    expect(isSameControlDifferenceLarge(initialCost, 9000)).toBe(false)
   })
 
   it('对价刚超过临界(差额>初始成本*50.01%) → 触发高亮', () => {
     const initialCost = calcSameControlCost(10000, 0.6) // 6000
-    // 对价=9001, 差额=3001, 3001/6000=50.02% > 50% → 触发
-    expect(getDifference(9001, initialCost)).toBe(3001)
-    expect(isDifferenceLarge(9001, initialCost)).toBe(true)
+    expect(isSameControlDifferenceLarge(initialCost, 9001)).toBe(true)
   })
 
   it('初始成本为0时不触发高亮(避免除零)', () => {
     const initialCost = calcSameControlCost(0, 0.6) // 0
-    expect(isDifferenceLarge(5000, initialCost)).toBe(false)
+    expect(isSameControlDifferenceLarge(initialCost, 5000)).toBe(false)
   })
 
   it('初始成本为负时不触发高亮(资不抵债)', () => {
     const initialCost = calcSameControlCost(-10000, 0.6) // -6000
-    expect(isDifferenceLarge(5000, initialCost)).toBe(false)
+    expect(isSameControlDifferenceLarge(initialCost, 5000)).toBe(false)
   })
 })
 

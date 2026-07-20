@@ -67,4 +67,24 @@ describe('useF2CrossSheet', () => {
     const msg = cross.grossCrossValidation(1000)
     expect(msg).toContain('差异')
   })
+
+  it('routes 1471 AJE to impairment and 1412 AJE to price-difference', () => {
+    const map = new Map<string, ChecklistResponse>()
+    map.set('F2-14-rows', {
+      item_id: 'F2-14-rows',
+      conclusion: null,
+      remark: JSON.stringify([
+        { entryType: 'AJE', accountCode: '1471', debitAmount: 0, creditAmount: 80 },
+        { entryType: 'AJE', accountCode: '1412', debitAmount: 20, creditAmount: 0 },
+        { entryType: 'AJE', accountCode: '1406', debitAmount: 50, creditAmount: 0 },
+      ]),
+    })
+    const cross = useF2CrossSheet({
+      allResponses: ref(map),
+      projectContext: ref({}),
+    })
+    expect(cross.impairmentAdjustmentByRowKey.value['impairment-provision']).toBe(80)
+    expect(cross.grossAdjustmentByRowKey.value['price-difference']).toBe(20)
+    expect(cross.grossAdjustmentByRowKey.value['finished-goods']).toBe(50)
+  })
 })

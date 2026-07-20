@@ -1,18 +1,18 @@
 <!--
-  G7TabInternalTransaction.vue — G7-15 内部交易抵销测算表（41行×14列）
+  G7TabInternalTransaction.vue — G7-15 内部交易抵销测算表
 
   核心特色：顺流/逆流差异化抵销逻辑
   - 顺流交易(投资方→被投资方)：应抵销 = 未实现利润 × 100%（全额抵消）
   - 逆流交易(被投资方→投资方)：应抵销 = 未实现利润 × 持股比例（按份额）
   - 交易类型未选时应抵销列显示"—"
+  - 未实现利润 = 交易金额 × 毛利率（可手填覆盖）
 
-  14列：被投资单位|交易类型(下拉)|交易内容|交易金额|未实现利润(公式/可覆盖)|
-        持股比例|应抵销金额(公式)|上年抵销|本年变动(公式)|抵销分录|
-        是否关联交易|审计结论|索引|备注
+  列：被投资单位(G7-4下拉)|交易类型|交易内容|交易金额|毛利率|未实现利润|
+      持股比例|应抵销金额|上年抵销|本年变动|抵销分录|是否关联交易|审计结论|索引|备注
 
   Spec: .kiro/specs/g7-long-term-equity-method/
-  Task: 6.3
-  Requirements: 6.1, 6.2, 6.3, 7.4
+  Task: 6.3 / 9.2
+  Requirements: 6.1, 6.2, 6.3, 7.3, 7.4
 -->
 <template>
   <div class="g7-tab-internal-transaction">
@@ -39,13 +39,28 @@
       <h3 class="sheet-title">G7-15 内部交易抵销测算表</h3>
       <div class="head-actions">
         <el-button size="small" :disabled="isReadonly" @click="handleAddRow">＋ 新增</el-button>
-        <el-dropdown trigger="click" size="small">
-          <el-button size="small">导入导出 ▾</el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :disabled="isReadonly || syncingToG714"
+          :loading="syncingToG714"
+          @click="syncToG714"
+        >
+          同步至 G7-14
+        </el-button>
+        <el-dropdown
+          trigger="click"
+          size="small"
+          :disabled="importExport.importing.value"
+          @command="handleDropdownCommand"
+        >
+          <el-button size="small" :loading="importExport.importing.value">导入导出 ▾</el-button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-              <el-dropdown-item @click="handleImportData">导入数据</el-dropdown-item>
+              <el-dropdown-item command="template">导出模板</el-dropdown-item>
+              <el-dropdown-item command="export">导出数据</el-dropdown-item>
+              <el-dropdown-item v-if="!isReadonly" command="import">导入数据</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -63,7 +78,7 @@
       </div>
     </div>
 
-    <!-- 14列表格 -->
+    <!-- 主表 -->
     <el-table
       :data="rows"
       border
@@ -77,15 +92,28 @@
         <template #default="{ row }">{{ row.seq }}</template>
       </el-table-column>
 
-      <!-- 1. 被投资单位 -->
-      <el-table-column label="被投资单位" min-width="130" fixed>
+      <!-- 1. 被投资单位（G7-4 下拉，带 investeeId） -->
+      <el-table-column label="被投资单位" min-width="150" fixed>
         <template #default="{ row }">
-          <el-input
-            :model-value="row.investeeName"
+          <el-select
+            :model-value="row.investeeId || row.investeeName"
             size="small"
+            filterable
+            allow-create
+            default-first-option
+            clearable
+            placeholder="选择或输入"
             :disabled="isReadonly"
-            @change="(v: string) => updateField(row.id, 'investeeName', v)"
-          />
+            style="width:100%"
+            @change="(v: string) => handleInvesteeChange(row.id, v)"
+          >
+            <el-option
+              v-for="opt in investeeOptions"
+              :key="opt.investeeId || opt.name"
+              :label="opt.name"
+              :value="opt.investeeId || opt.name"
+            />
+          </el-select>
         </template>
       </el-table-column>
 
@@ -132,26 +160,59 @@
         </template>
       </el-table-column>
 
-      <!-- 5. 未实现利润(公式 OR 直接填写覆盖) -->
-      <el-table-column label="未实现利润" min-width="120" align="right">
+      <!-- 5. 毛利率 -->
+      <el-table-column label="毛利率" width="100" align="right">
+        <template #header>
+          <span class="formula-header" title="小数 0~1，如 0.2 表示 20%">毛利率</span>
+        </template>
+        <template #default="{ row }">
+          <el-input-number
+            :model-value="row.grossMargin"
+            size="small"
+            :controls="false"
+            :precision="4"
+            :step="0.01"
+            :min="0"
+            :max="1"
+            :disabled="isReadonly"
+            style="width:100%"
+            @change="(v: number | undefined) => handleMarginChange(row.id, v ?? 0)"
+          />
+        </template>
+      </el-table-column>
+
+      <!-- 6. 未实现利润(公式 OR 直接填写覆盖) -->
+      <el-table-column label="未实现利润" min-width="140" align="right">
         <template #header>
           <span class="formula-header" title="= 交易金额 × 毛利率（支持直接填写覆盖）">
             未实现利润
           </span>
         </template>
         <template #default="{ row }">
-          <el-input-number
-            :model-value="row.unrealizedProfit"
-            size="small"
-            :controls="false"
-            :disabled="isReadonly"
-            style="width:100%"
-            @change="(v: number | undefined) => handleProfitOverride(row.id, v ?? 0)"
-          />
+          <div class="profit-cell">
+            <el-input-number
+              :model-value="row.unrealizedProfit"
+              size="small"
+              :controls="false"
+              :disabled="isReadonly"
+              style="width:100%"
+              @change="(v: number | undefined) => handleProfitOverride(row.id, v ?? 0)"
+            />
+            <el-button
+              v-if="row.unrealizedProfitManual && !isReadonly"
+              size="small"
+              link
+              type="primary"
+              title="清除手工覆盖，按金额×毛利率重算"
+              @click="handleClearProfitManual(row.id)"
+            >
+              按公式
+            </el-button>
+          </div>
         </template>
       </el-table-column>
 
-      <!-- 6. 持股比例 -->
+      <!-- 7. 持股比例 -->
       <el-table-column label="持股比例" width="100" align="right">
         <template #default="{ row }">
           <el-input-number
@@ -169,7 +230,7 @@
         </template>
       </el-table-column>
 
-      <!-- 7. 应抵销金额(公式，核心差异化列) -->
+      <!-- 8. 应抵销金额(公式，核心差异化列) -->
       <el-table-column label="应抵销金额" min-width="120" align="right">
         <template #header>
           <span class="formula-header" title="顺流=未实现利润; 逆流=未实现利润×持股比例">
@@ -188,7 +249,7 @@
         </template>
       </el-table-column>
 
-      <!-- 8. 上年抵销 -->
+      <!-- 9. 上年抵销 -->
       <el-table-column label="上年抵销" min-width="110" align="right">
         <template #default="{ row }">
           <el-input-number
@@ -202,7 +263,7 @@
         </template>
       </el-table-column>
 
-      <!-- 9. 本年变动(公式) -->
+      <!-- 10. 本年变动(公式) -->
       <el-table-column label="本年变动" min-width="110" align="right">
         <template #header>
           <span class="formula-header" title="= 应抵销金额 - 上年抵销">本年变动</span>
@@ -219,7 +280,7 @@
         </template>
       </el-table-column>
 
-      <!-- 10. 抵销分录 -->
+      <!-- 11. 抵销分录 -->
       <el-table-column label="抵销分录" min-width="150">
         <template #default="{ row }">
           <el-input
@@ -231,7 +292,7 @@
         </template>
       </el-table-column>
 
-      <!-- 11. 是否关联交易 -->
+      <!-- 12. 是否关联交易 -->
       <el-table-column label="关联交易" width="90" align="center">
         <template #default="{ row }">
           <el-select
@@ -246,14 +307,14 @@
         </template>
       </el-table-column>
 
-      <!-- 12. 审计结论 -->
+      <!-- 13. 审计结论 -->
       <el-table-column label="审计结论" width="110" align="center">
         <template #default="{ row }">
           <el-select
             :model-value="row.auditConclusion"
             size="small"
-            placeholder="请选择"
             clearable
+            placeholder="—"
             :disabled="isReadonly"
             @change="(v: string) => updateField(row.id, 'auditConclusion', v)"
           >
@@ -264,7 +325,7 @@
         </template>
       </el-table-column>
 
-      <!-- 13. 索引 -->
+      <!-- 14. 索引 -->
       <el-table-column label="索引" width="90">
         <template #default="{ row }">
           <el-input
@@ -276,8 +337,8 @@
         </template>
       </el-table-column>
 
-      <!-- 14. 备注 -->
-      <el-table-column label="备注" min-width="130">
+      <!-- 15. 备注 -->
+      <el-table-column label="备注" min-width="100">
         <template #default="{ row }">
           <el-input
             :model-value="row.remark"
@@ -288,10 +349,14 @@
         </template>
       </el-table-column>
 
-      <!-- 操作列(删除) -->
-      <el-table-column v-if="!isReadonly" label="" width="50" align="center" fixed="right">
+      <!-- 删除 -->
+      <el-table-column label="" width="50" align="center" fixed="right">
         <template #default="{ row }">
-          <el-icon class="delete-icon" @click="handleRemoveRow(row.id)">
+          <el-icon
+            v-if="!isReadonly"
+            class="delete-icon"
+            @click="handleRemoveRow(row.id)"
+          >
             <Delete />
           </el-icon>
         </template>
@@ -306,16 +371,16 @@
         </div>
       </template>
       <el-input
-        v-model="auditNote"
         type="textarea"
-        :autosize="{ minRows: 5 }"
+        :autosize="{ minRows: 2, maxRows: 6 }"
+        :model-value="auditNote"
         :disabled="isReadonly"
-        placeholder="填写审计说明：可概述所执行程序、测试情况及结果，拟调整/未调整事项及其影响。"
-        @change="saveAuditNote"
+        placeholder="记录内部交易识别、毛利率来源、抵销分录索引等说明…"
+        @input="(v: string) => saveAuditNote(v)"
       />
     </el-card>
 
-    <!-- 审计结论（AI辅助） -->
+    <!-- 审计结论 -->
     <el-card class="conclusion-card" shadow="never">
       <template #header>
         <div class="conclusion-header">
@@ -324,12 +389,12 @@
         </div>
       </template>
       <el-input
-        v-model="conclusion"
         type="textarea"
-        :autosize="{ minRows: 2, maxRows: 8 }"
+        :autosize="{ minRows: 3, maxRows: 10 }"
+        :model-value="conclusion"
         :disabled="isReadonly"
-        placeholder="对内部交易抵销测算的审计结论..."
-        @change="persistConclusion"
+        placeholder="内部交易抵销审计结论…"
+        @input="(v: string) => { conclusion = v; persistConclusion() }"
       />
     </el-card>
 
@@ -337,46 +402,54 @@
     <details class="prep-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>顺流交易（投资方→被投资方）：全额抵销未实现利润</li>
-        <li>逆流交易（被投资方→投资方）：按持股比例抵销未实现利润</li>
+        <li>被投资单位优先从 G7-4 合营/联营下拉选择，自动带入持股比例与 investeeId</li>
         <li>未实现利润可由公式计算（交易金额×毛利率），也可直接填写覆盖</li>
-        <li>本年变动 = 应抵销金额 - 上年抵销金额</li>
-        <li>交易类型未选择时，应抵销金额和本年变动显示"—"</li>
-        <li>抵销分录建议填写：借/贷科目及金额</li>
-        <li>G7-15的抵销金额将联动G7-14权益法测算表中的"内部交易抵销"列</li>
+        <li>顺流全额抵销、逆流按持股比例抵销；未选交易类型时「应抵销/本年变动」显示 —</li>
+        <li>G7-15 的本年变动将联动 G7-14 权益法测算表中的「内部交易抵销」列（可用「同步至 G7-14」）</li>
       </ul>
     </details>
+
+    <input ref="fileInput" class="hidden-file-input" type="file" accept=".xlsx" @change="onFileSelected">
   </div>
 </template>
 
 <script setup lang="ts">
+import { extractG7AiText } from '../../composables/g7AiText'
 /**
  * G7TabInternalTransaction — G7-15 内部交易抵销测算表
  *
  * Spec: .kiro/specs/g7-long-term-equity-method/
- * Task: 6.3
+ * Task: 6.3 / 9.2
  *
- * 核心逻辑：
- * - calcEliminationAmount('downstream', profit, ratio) → profit (全额)
- * - calcEliminationAmount('upstream', profit, ratio) → profit × ratio (按份额)
- * - 交易类型未选时 eliminationAmount 显示 "—"
- * - unrealizedProfit 支持公式计算 OR 直接填写覆盖
- *
- * Requirements: 6.1, 6.2, 6.3, 7.4
+ * Requirements: 6.1, 6.2, 6.3, 7.3, 7.4
  */
 import { ref, computed, inject, onMounted } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { parseNum } from '../../composables/useG7EquityMethodFormulaEngine'
 import {
-  calcEliminationAmount,
-  parseNum,
-} from '../../composables/useG7EquityMethodFormulaEngine'
-import {
+  G7_4_ROWS_KEY,
   G7_15_ROWS_KEY,
   G7_15_SECTION_KEY,
+  applyInternalElimToG714Payload,
+  buildG714DualWriteItems,
+  loadEquityInvestees,
+  makeG714ConclusionGetter,
+  parseChecklistJson,
+  resolveG714PayloadFromChecklist,
+  stampLastCrossSheetSync,
+  type G7EquityInvesteeOption,
 } from '../../composables/g7EquityMethodCrossSheet'
 import { useG7EquityMethodFormData } from '../../composables/useG7EquityMethodFormData'
 import type { InternalTransactionRow } from '../../composables/useG7EquityMethodFormData'
+import { useG7EquityMethodImportExport } from '../../composables/useG7EquityMethodImportExport'
+import {
+  createEmptyInternalTransactionRow,
+  clearUnrealizedProfitManual,
+  hydrateInternalTransactionRows,
+  recalcInternalTransactionRow,
+} from './g7InternalTransactionModel'
+import { emitG7SourceRowsSaved } from '../../composables/g7DisclosureCrossSheet'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -391,11 +464,12 @@ const props = defineProps<{
 const isReadonly = computed(() => props.readonly ?? false)
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
-// ─── Data Layer ──────────────────────────────────────────────────────────────
-
 const formData = useG7EquityMethodFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
+})
+const importExport = useG7EquityMethodImportExport({
+  wpId: computed(() => props.wpId),
 })
 
 const SECTION_KEY = G7_15_SECTION_KEY
@@ -403,14 +477,12 @@ const ROWS_KEY = G7_15_ROWS_KEY
 const CONCLUSION_KEY = 'G7-15-conclusion'
 const AUDIT_NOTE_KEY = 'G7-15-audit-note'
 
-/** 行数据(响应式) */
 const rows = ref<InternalTransactionRow[]>([])
-
-/** 审计结论 */
 const conclusion = ref('')
-
-/** 审计说明（持久化 checklist_responses，conclusion:null） */
 const auditNote = ref('')
+const investeeOptions = ref<G7EquityInvesteeOption[]>([])
+const fileInput = ref<HTMLInputElement | null>(null)
+const syncingToG714 = ref(false)
 
 function saveAuditNote(val: string): void {
   if (isReadonly.value) return
@@ -418,37 +490,39 @@ function saveAuditNote(val: string): void {
   formData.debouncedSave(AUDIT_NOTE_KEY, { remark: val, conclusion: null })
 }
 
-// ─── Initialize ──────────────────────────────────────────────────────────────
+function refreshInvesteeOptions(): void {
+  const raw =
+    formData.data.value.get(G7_4_ROWS_KEY)?.conclusion
+    ?? props.htmlData?.responses_snapshot?.[G7_4_ROWS_KEY]?.conclusion
+  investeeOptions.value = loadEquityInvestees(raw)
+}
 
-onMounted(async () => {
-  await formData.load()
+function hydrateRows(raw: unknown): boolean {
+  const hydrated = hydrateInternalTransactionRows(raw)
+  if (!hydrated.length) return false
+  rows.value = hydrated
+  return true
+}
 
-  const hydrateRows = (raw: unknown): boolean => {
-    const list = Array.isArray(raw)
-      ? raw
-      : (raw && typeof raw === 'object' && Array.isArray((raw as any).rows) ? (raw as any).rows : null)
-    if (!list?.length) return false
-    rows.value = list.map((r: any, idx: number) => ({
-      ...createEmptyRow(idx + 1),
-      ...r,
-      seq: idx + 1,
-      id: r.id || `g15-${Date.now()}-${idx}`,
-    }))
-    recalcAll()
-    return true
-  }
+function parseSaved(raw: unknown): unknown {
+  if (raw == null || raw === '') return null
+  if (typeof raw === 'object') return raw
+  try { return JSON.parse(String(raw)) } catch { return null }
+}
 
-  const parseSaved = (raw: unknown): unknown => {
-    if (raw == null || raw === '') return null
-    if (typeof raw === 'object') return raw
-    try { return JSON.parse(String(raw)) } catch { return null }
-  }
-
+function loadRowsFromChecklist(): boolean {
   const sectionSaved = parseSaved(formData.data.value.get(SECTION_KEY)?.conclusion)
   const rowsSaved = parseSaved(
     formData.data.value.get(ROWS_KEY)?.conclusion
     ?? formData.data.value.get(ROWS_KEY)?.remark,
   )
+  return hydrateRows(sectionSaved) || hydrateRows(rowsSaved)
+}
+
+onMounted(async () => {
+  await formData.load()
+  refreshInvesteeOptions()
+
   const snapshotSection = parseSaved(props.htmlData?.responses_snapshot?.[SECTION_KEY]?.conclusion)
   const snapshotRows = parseSaved(
     props.htmlData?.responses_snapshot?.[ROWS_KEY]?.conclusion
@@ -456,14 +530,13 @@ onMounted(async () => {
   )
 
   if (
-    !hydrateRows(sectionSaved)
-    && !hydrateRows(rowsSaved)
+    !loadRowsFromChecklist()
     && !hydrateRows(snapshotSection)
     && !hydrateRows(snapshotRows)
     && !hydrateRows(props.htmlData?.internalTransaction)
     && !hydrateRows((props.htmlData as any)?.rows)
   ) {
-    rows.value = Array.from({ length: 5 }, (_, i) => createEmptyRow(i + 1))
+    rows.value = Array.from({ length: 5 }, (_, i) => createEmptyInternalTransactionRow(i + 1))
   }
 
   const savedConclusion = formData.data.value.get(CONCLUSION_KEY)
@@ -477,58 +550,20 @@ onMounted(async () => {
   }
 })
 
-// ─── Row Factory ─────────────────────────────────────────────────────────────
-
-function createEmptyRow(seq: number, investeeName = ''): InternalTransactionRow {
-  return {
-    id: `g15-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    seq,
-    investeeName,
-    transactionType: '' as any,
-    transactionContent: '',
-    transactionAmount: 0,
-    unrealizedProfit: 0,
-    investmentRatio: 0,
-    eliminationAmount: 0,
-    priorElimination: 0,
-    currentChange: 0,
-    eliminationEntry: '',
-    isRelatedParty: false,
-    auditConclusion: '' as any,
-    indexRef: '',
-    remark: '',
-  }
+function createEmptyRow(seq: number, investeeName = '', investeeId = ''): InternalTransactionRow {
+  return createEmptyInternalTransactionRow(seq, investeeName, investeeId)
 }
-
-// ─── Formula Recalculation ───────────────────────────────────────────────────
 
 /** 对单行重新计算公式列 */
 function recalcRow(row: InternalTransactionRow): void {
-  // eliminationAmount：取决于交易类型
-  if (row.transactionType === '顺流') {
-    row.eliminationAmount = calcEliminationAmount('downstream', row.unrealizedProfit, row.investmentRatio)
-  } else if (row.transactionType === '逆流') {
-    row.eliminationAmount = calcEliminationAmount('upstream', row.unrealizedProfit, row.investmentRatio)
-  } else {
-    row.eliminationAmount = 0
-  }
-
-  // currentChange = eliminationAmount - priorElimination
-  if (row.transactionType) {
-    row.currentChange = Math.round((row.eliminationAmount - parseNum(row.priorElimination)) * 100) / 100
-  } else {
-    row.currentChange = 0
-  }
+  recalcInternalTransactionRow(row)
 }
 
-/** 重新计算所有行公式 */
 function recalcAll(): void {
   for (const row of rows.value) {
     recalcRow(row)
   }
 }
-
-// ─── Field Update Handlers ───────────────────────────────────────────────────
 
 function updateField(rowId: string, field: keyof InternalTransactionRow, value: any): void {
   const row = rows.value.find((r) => r.id === rowId)
@@ -537,7 +572,34 @@ function updateField(rowId: string, field: keyof InternalTransactionRow, value: 
   persistRows()
 }
 
-/** 交易类型变更 → 重算应抵销金额 */
+function handleInvesteeChange(rowId: string, value: string): void {
+  const row = rows.value.find((r) => r.id === rowId)
+  if (!row) return
+  const v = String(value ?? '').trim()
+  if (!v) {
+    row.investeeId = undefined
+    row.investeeName = ''
+    persistRows()
+    return
+  }
+  const byId = investeeOptions.value.find((o) => o.investeeId && o.investeeId === v)
+  const byName = investeeOptions.value.find((o) => o.name === v)
+  const matched = byId || byName
+  if (matched) {
+    row.investeeId = matched.investeeId || undefined
+    row.investeeName = matched.name
+    if (matched.investmentRatio != null && matched.investmentRatio > 0 && !parseNum(row.investmentRatio)) {
+      row.investmentRatio = matched.investmentRatio
+      recalcRow(row)
+    }
+  } else {
+    // allow-create：自由文本，无 ID
+    row.investeeId = undefined
+    row.investeeName = v
+  }
+  persistRows()
+}
+
 function handleTypeChange(rowId: string, value: '顺流' | '逆流'): void {
   const row = rows.value.find((r) => r.id === rowId)
   if (!row) return
@@ -546,27 +608,38 @@ function handleTypeChange(rowId: string, value: '顺流' | '逆流'): void {
   persistRows()
 }
 
-/** 交易金额变更 → unrealizedProfit 公式重算（若未被手动覆盖） */
 function handleAmountChange(rowId: string, value: number): void {
   const row = rows.value.find((r) => r.id === rowId)
   if (!row) return
   row.transactionAmount = value
-  // 注意：unrealizedProfit 支持直接填写覆盖，此处不自动联动
-  // 若需要公式联动，用户可在"未实现利润"列重新触发
   recalcRow(row)
   persistRows()
 }
 
-/** 未实现利润直接填写覆盖 */
+function handleMarginChange(rowId: string, value: number): void {
+  const row = rows.value.find((r) => r.id === rowId)
+  if (!row) return
+  row.grossMargin = value
+  recalcRow(row)
+  persistRows()
+}
+
 function handleProfitOverride(rowId: string, value: number): void {
   const row = rows.value.find((r) => r.id === rowId)
   if (!row) return
   row.unrealizedProfit = value
+  row.unrealizedProfitManual = true
   recalcRow(row)
   persistRows()
 }
 
-/** 持股比例变更 → 重算应抵销金额（逆流时影响） */
+function handleClearProfitManual(rowId: string): void {
+  const row = rows.value.find((r) => r.id === rowId)
+  if (!row) return
+  clearUnrealizedProfitManual(row)
+  persistRows()
+}
+
 function handleRatioChange(rowId: string, value: number): void {
   const row = rows.value.find((r) => r.id === rowId)
   if (!row) return
@@ -575,7 +648,6 @@ function handleRatioChange(rowId: string, value: number): void {
   persistRows()
 }
 
-/** 上年抵销变更 → 重算本年变动 */
 function handlePriorChange(rowId: string, value: number): void {
   const row = rows.value.find((r) => r.id === rowId)
   if (!row) return
@@ -584,12 +656,46 @@ function handlePriorChange(rowId: string, value: number): void {
   persistRows()
 }
 
-// ─── Dynamic Rows ────────────────────────────────────────────────────────────
-
 async function handleAddRow(): Promise<void> {
+  if (investeeOptions.value.length) {
+    try {
+      const { value } = await ElMessageBox.prompt(
+        '选择或输入被投资单位（可从 G7-4 合营/联营中选择）',
+        '新增内部交易行',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          inputPlaceholder: investeeOptions.value.map((o) => o.name).slice(0, 5).join(' / ') || '被投资单位',
+        },
+      )
+      const name = String(value ?? '').trim()
+      if (!name) {
+        ElMessage.warning('被投资单位名称不能为空')
+        return
+      }
+      const matched = investeeOptions.value.find(
+        (o) => o.name === name || o.investeeId === name,
+      )
+      const newRow = createEmptyRow(
+        rows.value.length + 1,
+        matched?.name || name,
+        matched?.investeeId || '',
+      )
+      if (matched?.investmentRatio) {
+        newRow.investmentRatio = matched.investmentRatio
+      }
+      rows.value.push(newRow)
+      persistRows()
+      ElMessage.success(`已新增: ${newRow.investeeName}`)
+    } catch {
+      // 取消
+    }
+    return
+  }
+
   try {
     const { value: name } = await ElMessageBox.prompt(
-      '请输入被投资单位名称',
+      '请输入被投资单位名称（建议先维护 G7-4）',
       '新增内部交易行',
       { confirmButtonText: '确定', cancelButtonText: '取消', inputPlaceholder: '被投资单位名称' },
     )
@@ -610,12 +716,9 @@ function handleRemoveRow(rowId: string): void {
   const idx = rows.value.findIndex((r) => r.id === rowId)
   if (idx < 0) return
   rows.value.splice(idx, 1)
-  // 重排序号
   rows.value.forEach((r, i) => { r.seq = i + 1 })
   persistRows()
 }
-
-// ─── Persistence ─────────────────────────────────────────────────────────────
 
 function persistRows(): void {
   if (isReadonly.value) return
@@ -628,36 +731,63 @@ function persistRows(): void {
     },
     {
       itemId: ROWS_KEY,
-      // 后端合并联动 / 导入导出认 G7-15-rows
       data: { conclusion: flatRows, remark: flatRows },
     },
   ])
+  try {
+    emitG7SourceRowsSaved({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      itemIds: [SECTION_KEY, ROWS_KEY],
+    })
+  } catch { /* ignore */ }
 }
 
 function persistConclusion(): void {
   formData.debouncedSave(CONCLUSION_KEY, { conclusion: conclusion.value })
 }
 
-// ─── AI Conclusion ───────────────────────────────────────────────────────────
-
 async function handleAiConclusion(): Promise<void> {
   if (isReadonly.value) return
   try {
     const res = await api.post(
       `/api/workpapers/${props.wpId}/g7-equity-method/ai/internal-transaction-conclusion`,
-      { project_id: props.projectId, rows: rows.value },
+      {
+        existingContent: conclusion.value,
+        relatedContext: {
+          sheet: 'G7-15',
+          rowCount: rows.value.length,
+          downstreamCount: rows.value.filter((r) => r.transactionType === '顺流').length,
+          upstreamCount: rows.value.filter((r) => r.transactionType === '逆流').length,
+          totalElimination: rows.value.reduce((s, r) => s + parseNum(r.eliminationAmount), 0),
+          totalCurrentChange: rows.value.reduce((s, r) => s + parseNum(r.currentChange), 0),
+          relatedPartyCount: rows.value.filter((r) => r.isRelatedParty).length,
+          rows: rows.value.map((r) => ({
+            investeeId: r.investeeId,
+            investeeName: r.investeeName,
+            transactionType: r.transactionType,
+            transactionAmount: r.transactionAmount,
+            grossMargin: r.grossMargin,
+            unrealizedProfit: r.unrealizedProfit,
+            investmentRatio: r.investmentRatio,
+            eliminationAmount: r.eliminationAmount,
+            priorElimination: r.priorElimination,
+            currentChange: r.currentChange,
+            isRelatedParty: r.isRelatedParty,
+            auditConclusion: r.auditConclusion,
+          })),
+        },
+      },
     )
-    const aiText = res?.data?.conclusion ?? res?.conclusion ?? ''
+    const aiText = extractG7AiText(res?.data)
     if (aiText) {
       conclusion.value = conclusion.value ? `${conclusion.value}\n${aiText}` : aiText
       persistConclusion()
       ElMessage.success('AI结论已生成')
     } else {
-      // Fallback: 本地生成
       generateLocalConclusion()
     }
   } catch {
-    // AI端点不可用时本地生成
     generateLocalConclusion()
   }
 }
@@ -683,21 +813,81 @@ function generateLocalConclusion(): void {
   ElMessage.success('已生成本地结论')
 }
 
-// ─── Import/Export (placeholder, composable from Task 9.2) ───────────────────
-
-function handleExportTemplate(): void {
-  ElMessage.info('导出模板功能将在导入导出模块完成后启用')
-}
-function handleExportData(): void {
-  ElMessage.info('导出数据功能将在导入导出模块完成后启用')
-}
-function handleImportData(): void {
-  ElMessage.info('导入数据功能将在导入导出模块完成后启用')
+async function handleDropdownCommand(command: string): Promise<void> {
+  if (command === 'template') await importExport.exportTemplate('G7-15')
+  else if (command === 'export') await importExport.exportData('G7-15')
+  else if (command === 'import') fileInput.value?.click()
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+async function onFileSelected(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  const result = await importExport.importData('G7-15', file)
+  if (!result) return
+  await formData.load()
+  refreshInvesteeOptions()
+  if (loadRowsFromChecklist()) {
+    ElMessage.success(`导入完成，已刷新 ${rows.value.length} 行`)
+    try {
+      await ElMessageBox.confirm(
+        '导入已完成。是否将本年变动同步至 G7-14「内部交易抵销」列？',
+        '同步至 G7-14',
+        { confirmButtonText: '同步', cancelButtonText: '稍后', type: 'info' },
+      )
+      await syncToG714({ quiet: true })
+    } catch {
+      // 用户选择稍后
+    }
+  } else {
+    ElMessage.warning('导入完成，但未解析到行数据')
+  }
+}
 
-/** 获取应抵销金额的公式tooltip */
+/** 将 G7-15 本年变动汇总写入 G7-14.internalTransactionAdj */
+async function syncToG714(opts?: { quiet?: boolean }): Promise<boolean> {
+  if (isReadonly.value || syncingToG714.value) return false
+  const named = rows.value.filter((r) => r.investeeName || r.investeeId)
+  if (!named.length) {
+    ElMessage.warning('请先填写被投资单位与抵销数据')
+    return false
+  }
+  syncingToG714.value = true
+  try {
+    await formData.load()
+    const g714Raw = resolveG714PayloadFromChecklist(
+      makeG714ConclusionGetter(formData.data.value, props.htmlData?.responses_snapshot),
+    )
+    const result = applyInternalElimToG714Payload(g714Raw, { rows: rows.value })
+    if (!result.ok || !result.payload) {
+      ElMessage.warning(result.message || '同步失败')
+      return false
+    }
+    if (!opts?.quiet) {
+      try {
+        await ElMessageBox.confirm(
+          `${result.message}。确认覆盖 G7-14「内部交易抵销」列？`,
+          '同步至 G7-14',
+          { confirmButtonText: '确认覆盖', cancelButtonText: '取消', type: 'warning' },
+        )
+      } catch {
+        return false
+      }
+    }
+    stampLastCrossSheetSync(
+      result.payload,
+      ['G7-15'],
+      Array.isArray(result.payload.groups) ? result.payload.groups.length : 0,
+    )
+    formData.debouncedSaveBatch(buildG714DualWriteItems(result.payload))
+    ElMessage.success(result.message)
+    return true
+  } finally {
+    syncingToG714.value = false
+  }
+}
+
 function getEliminationTooltip(row: InternalTransactionRow): string {
   if (row.transactionType === '顺流') {
     return `顺流: 应抵销 = 未实现利润(${fmtNum(row.unrealizedProfit)}) × 100% = ${fmtNum(row.eliminationAmount)}`
@@ -708,7 +898,6 @@ function getEliminationTooltip(row: InternalTransactionRow): string {
   return '请先选择交易类型'
 }
 
-/** 数字格式化 */
 function fmtNum(v: unknown): string {
   if (v === 0) return '0.00'
   if (typeof v === 'number') {
@@ -743,8 +932,6 @@ function fmtNum(v: unknown): string {
   display: inline-flex;
   align-items: center;
 }
-
-/* 方法论上下文：琥珀色左边线+浅黄背景 */
 .methodology-context {
   border-left: 4px solid #e6a23c;
   background: #fdf6ec;
@@ -764,8 +951,6 @@ function fmtNum(v: unknown): string {
 .methodology-context li {
   margin-bottom: 2px;
 }
-
-/* section标题 */
 .section-head {
   display: flex;
   justify-content: space-between;
@@ -781,19 +966,13 @@ function fmtNum(v: unknown): string {
   gap: 8px;
   align-items: center;
 }
-
-/* 表格 */
 .internal-transaction-table {
   font-size: var(--wp-font-size, 13px);
 }
-
-/* 公式列header：虚线下划线 + cursor:help */
 .formula-header {
   border-bottom: 1px dashed #909399;
   cursor: help;
 }
-
-/* 公式值单元格 */
 .formula-cell {
   border-bottom: 1px dashed #909399;
   cursor: help;
@@ -801,8 +980,6 @@ function fmtNum(v: unknown): string {
   min-width: 40px;
   text-align: right;
 }
-
-/* 交易类型未选时占位符 */
 .no-type-placeholder {
   color: #c0c4cc;
   font-size: 14px;
@@ -810,8 +987,6 @@ function fmtNum(v: unknown): string {
   text-align: center;
   width: 100%;
 }
-
-/* 删除图标 */
 .delete-icon {
   cursor: pointer;
   color: #909399;
@@ -820,8 +995,6 @@ function fmtNum(v: unknown): string {
 .delete-icon:hover {
   color: #f56c6c;
 }
-
-/* 审计结论卡片 */
 .conclusion-card {
   margin-top: 14px;
 }
@@ -830,8 +1003,6 @@ function fmtNum(v: unknown): string {
   justify-content: space-between;
   align-items: center;
 }
-
-/* 编制提示 */
 .prep-hint {
   margin-top: 12px;
   font-size: 12px;
@@ -843,5 +1014,14 @@ function fmtNum(v: unknown): string {
 .prep-hint ul {
   margin: 8px 0 0;
   padding-left: 18px;
+}
+.hidden-file-input {
+  display: none;
+}
+.profit-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
 }
 </style>

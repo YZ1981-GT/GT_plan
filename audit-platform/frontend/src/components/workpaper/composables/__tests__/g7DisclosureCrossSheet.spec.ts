@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyListedMinorityFsFromG75,
+  applyListedMinoritySubsidiariesFromG74,
   applyListedMovementFromG72,
   applyListedSubsidiaryCompositionFromG74,
   applySoeClassificationFromG71,
+  applySoeCommonControlFromG78,
+  applySoeMinorityShareholdersFromG74,
+  applySoeNonCommonControlFromG79,
   applySoeSubsidiaryBasicFromG74,
   buildSourceBundleFromChecklistItems,
   collectDisclosureTruncations,
@@ -467,6 +472,260 @@ describe('g7DisclosureCrossSheet G7-5/12/16', () => {
     expect(soe.tables['important-associate-fs'].find(r => r.label === '按持股比例计算的净资产份额')?.values.a1Current).toBe(300)
   })
 
+  it('maps listed minority subsidiaries and FS from G7-4/5', () => {
+    const listed = createG7ListedDisclosureState()
+    const bundle = buildSourceBundleFromChecklistItems([
+      {
+        item_id: 'G7-4-rows',
+        conclusion: JSON.stringify([
+          {
+            groupType: 'subsidiary',
+            investeeName: '非全资子A',
+            directHoldingRatio: 60,
+            indirectHoldingRatio: 0,
+          },
+          {
+            groupType: 'subsidiary',
+            investeeName: '全资子B',
+            directHoldingRatio: 100,
+            indirectHoldingRatio: 0,
+          },
+        ]),
+      },
+      {
+        item_id: 'G7-5-rows',
+        conclusion: JSON.stringify({
+          groups: [
+            {
+              investeeName: '非全资子A',
+              rows: [
+                { investeeName: '非全资子A', reportItem: '流动资产', priorAmount: 10, currentAmount: 12 },
+                { investeeName: '非全资子A', reportItem: '非流动资产', priorAmount: 20, currentAmount: 22 },
+                { investeeName: '非全资子A', reportItem: '总资产', priorAmount: 30, currentAmount: 34 },
+                { investeeName: '非全资子A', reportItem: '流动负债', priorAmount: 4, currentAmount: 5 },
+                { investeeName: '非全资子A', reportItem: '非流动负债', priorAmount: 6, currentAmount: 7 },
+                { investeeName: '非全资子A', reportItem: '总负债', priorAmount: 10, currentAmount: 12 },
+                { investeeName: '非全资子A', reportItem: '营业收入', priorAmount: 40, currentAmount: 50 },
+                { investeeName: '非全资子A', reportItem: '净利润', priorAmount: 1, currentAmount: 2 },
+                { investeeName: '非全资子A', reportItem: '所有者权益（净资产）', priorAmount: 18, currentAmount: 20 },
+                { investeeName: '非全资子A', reportItem: '综合收益总额', priorAmount: 1.5, currentAmount: 2.5 },
+                { investeeName: '非全资子A', reportItem: '经营活动现金流量', priorAmount: 3, currentAmount: 4 },
+              ],
+            },
+          ],
+        }),
+      },
+    ])
+
+    expect(applyListedMinoritySubsidiariesFromG74(
+      listed.tables['important-minority-subsidiaries'],
+      bundle.basicInfo,
+      true,
+      bundle.financialInfo,
+    )).toBe(true)
+    expect(listed.tables['important-minority-subsidiaries'][0].label).toBe('非全资子A')
+    expect(listed.tables['important-minority-subsidiaries'][0].values.holdingRatio).toBe(40)
+    expect(listed.tables['important-minority-subsidiaries'][0].values.currentProfit).toBe(0.8)
+    expect(listed.tables['important-minority-subsidiaries'][0].values.closingEquity).toBe(8)
+
+    const filledFs = applyListedMinorityFsFromG75(
+      {
+        closing: listed.tables['minority-closing-balance'],
+        opening: listed.tables['minority-opening-balance'],
+        results: listed.tables['minority-results'],
+      },
+      bundle.financialInfo,
+      bundle.basicInfo,
+      true,
+    )
+    expect(filledFs).toEqual(expect.arrayContaining([
+      'minority-closing-balance',
+      'minority-opening-balance',
+      'minority-results',
+    ]))
+    expect(listed.tables['minority-closing-balance'][0].values.currentAssets).toBe(12)
+    expect(listed.tables['minority-opening-balance'][0].values.currentAssets).toBe(10)
+    expect(listed.tables['minority-results'][0].values.currentRevenue).toBe(50)
+    expect(listed.tables['minority-results'][0].values.priorProfit).toBe(1)
+
+    const listedFresh = createG7ListedDisclosureState()
+    const filled = refreshListedTablesFromSources(listedFresh.tables, bundle, true)
+    expect(filled).toEqual(expect.arrayContaining([
+      'important-minority-subsidiaries',
+      'minority-closing-balance',
+      'minority-opening-balance',
+      'minority-results',
+    ]))
+  })
+
+  it('maps G7-8/9 mergers and minority FS into SOE disclosure tables', () => {
+    const soe = createG7SoeDisclosureState()
+    const texts: Record<string, string> = {}
+    const bundle = buildSourceBundleFromChecklistItems([
+      {
+        item_id: 'G7-4-rows',
+        conclusion: JSON.stringify([
+          {
+            groupType: 'subsidiary',
+            investeeName: '非全资子A',
+            directHoldingRatio: 60,
+            indirectHoldingRatio: 0,
+          },
+          {
+            groupType: 'subsidiary',
+            investeeName: '全资子B',
+            directHoldingRatio: 100,
+            indirectHoldingRatio: 0,
+          },
+        ]),
+      },
+      {
+        item_id: 'G7-5-rows',
+        conclusion: JSON.stringify({
+          groups: [
+            {
+              investeeName: '非全资子A',
+              rows: [
+                { investeeName: '非全资子A', reportItem: '流动资产', priorAmount: 10, currentAmount: 12 },
+                { investeeName: '非全资子A', reportItem: '净利润', priorAmount: 1, currentAmount: 2 },
+              ],
+            },
+            {
+              investeeName: '已处置子C',
+              rows: [
+                { investeeName: '已处置子C', reportItem: '流动资产', priorAmount: 5, currentAmount: 8 },
+                { investeeName: '已处置子C', reportItem: '营业收入', priorAmount: 3, currentAmount: 4 },
+              ],
+            },
+            {
+              investeeName: '同控并入甲',
+              rows: [
+                { investeeName: '同控并入甲', reportItem: '营业收入', priorAmount: 0, currentAmount: 90 },
+                { investeeName: '同控并入甲', reportItem: '净利润', priorAmount: 0, currentAmount: 15 },
+                { investeeName: '同控并入甲', reportItem: '经营活动现金流量', priorAmount: 0, currentAmount: 12 },
+              ],
+            },
+            {
+              investeeName: '非同控并入乙',
+              rows: [
+                { investeeName: '非同控并入乙', reportItem: '营业收入', priorAmount: 0, currentAmount: 70 },
+                { investeeName: '非同控并入乙', reportItem: '净利润', priorAmount: 0, currentAmount: 9 },
+              ],
+            },
+          ],
+        }),
+      },
+      {
+        item_id: 'G7-8-rows',
+        conclusion: JSON.stringify([
+          {
+            section: 'merger',
+            investeeName: '同控并入甲',
+            acquisitionDate: '2024-03-01',
+            ownerEquityBookValue: 1000,
+            totalConsideration: 800,
+            finalController: '集团总部',
+            accountingPolicyConsistent: '是',
+          },
+        ]),
+      },
+      {
+        item_id: 'G7-9-rows',
+        conclusion: JSON.stringify([
+          {
+            section: 'merger',
+            investeeName: '非同控并入乙',
+            acquisitionDate: '2024-06-15',
+            acquisitionDateEvidenceRef: '董事会决议',
+            ownershipRatio: 0.7,
+            acquireeIdentifiableNetAssetsFV: 500,
+            valuationReportRef: '评估报告A',
+            totalConsiderationFV: 600,
+            goodwill: 100,
+          },
+        ]),
+      },
+      {
+        item_id: 'G7-12-rows',
+        conclusion: JSON.stringify({
+          rows: [
+            {
+              investeeName: '已处置子C',
+              registeredPlace: '深圳',
+              businessNature: '贸易',
+              originalShareholdingRatio: 0.8,
+              disposalReason: '出售',
+              lossOfControlDate: '2024-09-30',
+              lossOfControlBasis: '股权交割完成',
+              residualFairValue: 200,
+              residualBookValue: 150,
+              remainingShareholdingRatio: 0.2,
+              residualFairValueMethod: '市场法',
+            },
+          ],
+        }),
+      },
+    ])
+
+    expect(bundle.sourcesHit).toEqual(expect.arrayContaining(['G7-4', 'G7-5', 'G7-8', 'G7-9', 'G7-12']))
+    expect(bundle.commonControlMergers?.[0]?.investeeName).toBe('同控并入甲')
+    expect(bundle.nonCommonControlMergers?.[0]?.atCombinationHolding).toBe(70)
+
+    expect(applySoeCommonControlFromG78(
+      soe.tables['common-control-combination'],
+      bundle.commonControlMergers!,
+      true,
+      bundle.financialInfo,
+    )).toBe(true)
+    expect(soe.tables['common-control-combination'][0].label).toBe('同控并入甲')
+    expect(soe.tables['common-control-combination'][0].values.consideration).toBe(800)
+    expect(soe.tables['common-control-combination'][0].values.revenue).toBe(90)
+    expect(soe.tables['common-control-combination'][0].values.netProfit).toBe(15)
+
+    expect(applySoeNonCommonControlFromG79(
+      soe.tables['non-common-control-combination'],
+      bundle.nonCommonControlMergers!,
+      true,
+      bundle.financialInfo,
+    )).toBe(true)
+    expect(soe.tables['non-common-control-combination'][0].values.goodwill).toBe(100)
+    expect(soe.tables['non-common-control-combination'][0].values.atCombinationHolding).toBe(70)
+    expect(soe.tables['non-common-control-combination'][0].values.postRevenue).toBe(70)
+
+    expect(applySoeMinorityShareholdersFromG74(
+      soe.tables['minority-shareholders'],
+      bundle.basicInfo,
+      true,
+      bundle.financialInfo,
+    )).toBe(true)
+    expect(soe.tables['minority-shareholders'][0].label).toBe('非全资子A')
+    expect(soe.tables['minority-shareholders'][0].values.holdingRatio).toBe(40)
+    expect(soe.tables['minority-shareholders'][0].values.currentProfit).toBe(0.8)
+
+    const soeFresh = createG7SoeDisclosureState()
+    const filled = refreshSoeTablesFromSources(soeFresh.tables, bundle, true, texts)
+    expect(filled).toEqual(expect.arrayContaining([
+      'common-control-combination',
+      'non-common-control-combination',
+      'minority-shareholders',
+      'minority-financials',
+      'former-subsidiary-basic',
+      'former-subsidiary-position',
+      'former-subsidiary-results',
+      'common-control-basis',
+      'non-common-control-notes',
+      'sale-date-method',
+      'remaining-equity-remeasurement',
+    ]))
+    expect(soeFresh.tables['common-control-combination'][0].label).toBe('同控并入甲')
+    expect(soeFresh.tables['minority-financials'].find(r => r.label === '流动资产')?.values.c1Current).toBe(12)
+    expect(soeFresh.tables['former-subsidiary-position'].find(r => r.label === '流动资产')?.values.c1SaleDate).toBe(8)
+    expect(texts['common-control-basis']).toContain('同控并入甲')
+    expect(texts['non-common-control-notes']).toContain('非同控并入乙')
+    expect(texts['sale-date-method']).toContain('股权交割完成')
+    expect(texts['remaining-equity-remeasurement']).toContain('重新计量损益')
+  })
+
   it('reports truncation when important investees exceed disclosure column capacity', () => {
     const bundle = buildSourceBundleFromChecklistItems([
       {
@@ -498,5 +757,138 @@ describe('g7DisclosureCrossSheet G7-5/12/16', () => {
     const soe = collectDisclosureTruncations(bundle, 'soe')
     expect(soe.some(t => t.label === '重要联营企业' && t.omitted === 2)).toBe(true)
     expect(soe.some(t => t.label === '所有权变动交易' && t.omitted === 4)).toBe(true)
+  })
+
+  it('fills policy-difference narratives from G7-6 inconsistent rows', () => {
+    const bundle = buildSourceBundleFromChecklistItems([
+      {
+        item_id: 'G7-6-rows',
+        conclusion: JSON.stringify({
+          groups: [{
+            investeeName: '联营丙',
+            rows: [
+              {
+                isConsistent: '不一致',
+                policyItem: '收入确认',
+                adjustmentAmount: 120,
+                adjustmentNote: '权责发生制差异',
+              },
+              { isConsistent: '一致', policyItem: '折旧', adjustmentAmount: 0 },
+            ],
+          }],
+        }),
+      },
+    ])
+    expect(bundle.sourcesHit).toContain('G7-6')
+    expect(bundle.policyDifferences).toHaveLength(1)
+
+    const listed = createG7ListedDisclosureState()
+    const listedTexts: Record<string, string> = { ...listed.texts }
+    const listedFilled = refreshListedTablesFromSources(listed.tables, bundle, true, listedTexts)
+    expect(listedFilled).toContain('policy-differences')
+    expect(listedTexts['policy-differences']).toContain('联营丙')
+    expect(listedTexts['policy-differences']).toContain('收入确认')
+
+    const soe = createG7SoeDisclosureState()
+    const soeTexts: Record<string, string> = { ...soe.texts }
+    const soeFilled = refreshSoeTablesFromSources(soe.tables, bundle, true, soeTexts)
+    expect(soeFilled).toContain('policy-estimate-differences')
+    expect(soeTexts['policy-estimate-differences']).toContain('G7-6')
+  })
+
+  it('fills control / impairment / ownership narratives without changing table structure', () => {
+    const bundle = buildSourceBundleFromChecklistItems([
+      {
+        item_id: 'G7-4-rows',
+        conclusion: JSON.stringify([
+          {
+            groupType: 'subsidiary',
+            investeeName: '子控A',
+            directHoldingRatio: 40,
+            votingRatio: 55,
+            holdingVotingDifferenceReason: '委托表决权安排',
+            lessThanHalfControlReason: '董事会多数席位',
+          },
+          {
+            groupType: 'joint_venture',
+            investeeName: '合营丁',
+            directHoldingRatio: 50,
+            votingRatio: 50,
+          },
+        ]),
+      },
+      {
+        item_id: 'G7-10-rows',
+        conclusion: JSON.stringify({
+          rows: [{
+            section: 'nci',
+            companyName: '子控A',
+            costCash: 100,
+            purchaseCost: 100,
+            equityAdjustment: 20,
+          }],
+        }),
+      },
+      {
+        item_id: 'G7-17-rows',
+        conclusion: JSON.stringify([
+          {
+            investeeName: '合营丁',
+            hasImpairmentSign: true,
+            bookValue: 500,
+            recoverableAmount: 420,
+            impairmentAmount: 80,
+            fvLessDisposalCost: 400,
+            valueInUse: 420,
+          },
+        ]),
+      },
+    ])
+
+    const listedTexts: Record<string, string> = {}
+    const listed = createG7ListedDisclosureState()
+    const listedFilled = refreshListedTablesFromSources(listed.tables, bundle, true, listedTexts)
+    expect(listedFilled).toEqual(expect.arrayContaining([
+      'subsidiary-control-judgement',
+      'ownership-change-description',
+      'impairment-method',
+    ]))
+    expect(listedTexts['subsidiary-control-judgement']).toContain('委托表决权安排')
+    expect(listedTexts['ownership-change-description']).toContain('子控A')
+    expect(listedTexts['impairment-method']).toContain('可收回金额 420')
+
+    const soeTexts: Record<string, string> = {}
+    const soe = createG7SoeDisclosureState()
+    const soeFilled = refreshSoeTablesFromSources(soe.tables, bundle, true, soeTexts)
+    expect(soeFilled).toEqual(expect.arrayContaining([
+      'holding-voting-diff',
+      'joint-control-basis',
+      'ownership-change-description',
+    ]))
+    expect(soeTexts['joint-control-basis']).toContain('合营丁')
+  })
+
+  it('fills listed control judgement narrative from G7-7 overallConclusion', () => {
+    const bundle = buildSourceBundleFromChecklistItems([
+      {
+        item_id: 'G7-7-control-judgment-data',
+        conclusion: JSON.stringify({
+          decision: {
+            investeeName: '子甲',
+            relationshipType: '控制',
+            combinationType: '非同一控制下企业合并',
+          },
+          overallConclusion: '经审查，对子甲构成控制（来源 G7-7 测试）。',
+        }),
+      },
+    ])
+    expect(bundle.sourcesHit).toContain('G7-7')
+    expect(bundle.controlJudgmentNarrative).toContain('对子甲构成控制')
+
+    const texts: Record<string, string> = {}
+    const listed = createG7ListedDisclosureState()
+    const filled = refreshListedTablesFromSources(listed.tables, bundle, true, texts)
+    expect(filled).toContain('subsidiary-control-judgement')
+    expect(texts['subsidiary-control-judgement']).toContain('对子甲构成控制')
   })
 })

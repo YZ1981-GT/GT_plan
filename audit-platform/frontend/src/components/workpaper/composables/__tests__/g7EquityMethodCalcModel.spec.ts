@@ -67,6 +67,10 @@ function emptyRow(name: string, overrides: Partial<EquityMethodCalcRow> = {}): E
     shareOfAuditedNetAssets: 0,
     lteiBookBalance: 0,
     netAssetShareVariance: 0,
+    g72OpeningTotal: 0,
+    g72ClosingTotal: 0,
+    openingReconVariance: 0,
+    closingReconVariance: 0,
     goodwill: 0,
     cumulativeFvAdj: 0,
     impairment: 0,
@@ -220,6 +224,16 @@ describe('g7EquityMethodCalcModel suggested AJE', () => {
         sourceKind: G714_SUGGESTED_SOURCE_KIND,
         remark: `sourceKind=${G714_SUGGESTED_SOURCE_KIND}`,
       },
+      {
+        seq: 4,
+        description: '【G7-13】廉价购买',
+        accountCode: '1511',
+        debitAmount: 5,
+        creditAmount: 0,
+        indexRef: 'G7-13',
+        sourceKind: 'g7-13-bargain-suggested',
+        remark: 'sourceKind=g7-13-bargain-suggested',
+      },
     ]
     const suggested = toG73Entries(
       buildSuggestedAdjustments([emptyRow('甲', { incomeDifference: 20 })], 0),
@@ -227,6 +241,7 @@ describe('g7EquityMethodCalcModel suggested AJE', () => {
     const merged = mergeSuggestedIntoG73(existing, suggested)
     expect(merged.some((r) => r.description === '手工分录')).toBe(true)
     expect(merged.some((r) => r.description === '索引参见 G7-14')).toBe(true)
+    expect(merged.some((r) => r.description === '【G7-13】廉价购买')).toBe(true)
     expect(merged.filter((r) => r.sourceKind === G714_SUGGESTED_SOURCE_KIND)).toHaveLength(2)
     expect(merged.every((r, i) => r.seq === i + 1)).toBe(true)
   })

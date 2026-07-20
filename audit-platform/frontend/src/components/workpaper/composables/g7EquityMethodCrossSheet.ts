@@ -9,6 +9,8 @@ import {
   calcLteiBookBalance,
   calcNetAssetShareVariance,
   calcUnexplainedVariance,
+  calcOpeningReconVariance,
+  calcClosingReconVariance,
   parseNum,
 } from './useG7EquityMethodFormulaEngine'
 import { normalizeG7DetailRows } from './g7DetailModel'
@@ -22,6 +24,10 @@ export const G7_14_SECTION_KEY = 'G7-14-equity-method-calc'
 export const G7_14_ROWS_KEY = 'G7-14-rows'
 export const G7_15_SECTION_KEY = 'G7-15-internal-transaction'
 export const G7_15_ROWS_KEY = 'G7-15-rows'
+/** 页面 section 键（兼容旧数据）；导入导出/合并 linkage 认 ROWS_KEY */
+export const G7_17_SECTION_KEY = 'G7-17-impairment-test'
+export const G7_17_ROWS_KEY = 'G7-17-rows'
+export const G7_16_ROWS_KEY = 'G7-16-rows'
 export const G7_2_ROWS_KEY = 'G7-2-rows'
 
 export function parseChecklistJson(value: unknown): any | null {
@@ -33,6 +39,116 @@ export function parseChecklistJson(value: unknown): any | null {
   } catch {
     return null
   }
+}
+
+function extractFlatRows(parsed: unknown): any[] {
+  if (Array.isArray(parsed)) return parsed
+  if (parsed && typeof parsed === 'object' && Array.isArray((parsed as any).rows)) {
+    return (parsed as any).rows
+  }
+  return []
+}
+
+function groupsFromFlatRows(rows: any[]): { investeeName: string; rows: any[] }[] {
+  const byName = new Map<string, any[]>()
+  for (const r of rows) {
+    const name = normalizeInvesteeKey(r?.investeeName ?? r?.investee_name) || '未命名'
+    if (!byName.has(name)) byName.set(name, [])
+    byName.get(name)!.push(r)
+  }
+  return [...byName.entries()].map(([investeeName, rs]) => ({ investeeName, rows: rs }))
+}
+
+/**
+ * 从 checklist 读 G7-14 页面 payload：优先 SECTION（含 NA/GWF/结论/重要性）；
+ * SECTION 空而 ROWS 有数据时，用 ROWS 组装最小 payload，避免 G7-6 等外推覆盖空壳。
+ */
+export function resolveG714PayloadFromChecklist(
+  getConclusion: (itemId: string) => unknown,
+): any | null {
+  const section = parseChecklistJson(getConclusion(G7_14_SECTION_KEY))
+  const sectionObj =
+    section && typeof section === 'object' && !Array.isArray(section) ? section : null
+  const sectionRows = extractFlatRows(sectionObj)
+  const sectionGroups = Array.isArray(sectionObj?.groups) ? sectionObj!.groups : []
+  const sectionHasBody =
+    sectionRows.length > 0
+    || sectionGroups.some((g: any) => Array.isArray(g?.rows) && g.rows.length > 0)
+    || Boolean(sectionObj && (
+      sectionObj.materialityLevel != null
+      || sectionObj.conclusion
+      || (Array.isArray(sectionObj.netAssetAdjustments) && sectionObj.netAssetAdjustments.length > 0)
+      || (Array.isArray(sectionObj.goodwillFvDetails) && sectionObj.goodwillFvDetails.length > 0)
+    ))
+
+  if (sectionHasBody && sectionObj) return sectionObj
+
+  const rows = extractFlatRows(parseChecklistJson(getConclusion(G7_14_ROWS_KEY)))
+  if (!rows.length) return sectionObj
+
+  const base = sectionObj
+    ? { ...sectionObj }
+    : {
+        materialityLevel: 0,
+        conclusion: '',
+        netAssetAdjustments: [],
+        goodwillFvDetails: [],
+      }
+  base.rows = rows
+  if (!Array.isArray(base.groups) || base.groups.length === 0) {
+    base.groups = groupsFromFlatRows(rows)
+  }
+  return base
+}
+
+type G714ResponseLike = { conclusion?: unknown } | null | undefined
+
+/** Map + responses_snapshot 联合取值，供各表外推 G7-14 使用 */
+export function makeG714ConclusionGetter(
+  data?: Map<string, G714ResponseLike> | null,
+  snapshot?: Record<string, G714ResponseLike> | null,
+): (itemId: string) => unknown {
+  return (itemId: string) =>
+    data?.get(itemId)?.conclusion
+    ?? snapshot?.[itemId]?.conclusion
+}
+
+export function flattenG714Rows(payload: Record<string, any> | null | undefined): any[] {
+  if (!payload || typeof payload !== 'object') return []
+  if (Array.isArray(payload.rows) && payload.rows.length > 0) return payload.rows
+  if (Array.isArray(payload.groups)) {
+    return payload.groups.flatMap((g: any) => (Array.isArray(g?.rows) ? g.rows : []))
+  }
+  return []
+}
+
+/**
+ * G7-14 双写：SECTION=整页 JSON；ROWS=扁平 rows[]（IE/consol 认后者）。
+ */
+export function buildG714DualWriteItems(payload: Record<string, any>): Array<{
+  itemId: string
+  data: { conclusion: string; remark: string | null }
+}> {
+  const rows = flattenG714Rows(payload)
+  payload.rows = rows
+  if ((!Array.isArray(payload.groups) || payload.groups.length === 0) && rows.length > 0) {
+    payload.groups = groupsFromFlatRows(rows)
+  }
+  const pageJson = JSON.stringify(payload)
+  const rowsJson = JSON.stringify(rows)
+  return [
+    { itemId: G7_14_SECTION_KEY, data: { conclusion: pageJson, remark: null } },
+    { itemId: G7_14_ROWS_KEY, data: { conclusion: rowsJson, remark: rowsJson } },
+  ]
+}
+
+/** 与后端 g7_consol_linkage_service.G714_UNMAPPED_FIELDS 对齐，供 Tab4 明示 */
+export const G714_CONSOL_UNMAPPED_FIELD_LABELS: Record<string, string> = {
+  nonControllingInterest: '少数股东权益（展示项，不计入归母净资产）',
+  fvDiffAtAcquisition: '取得投资时公允价值差额（合并净资产表无对应行）',
+  otherProfitAdj: '其他需调整损益的项目（合并净资产表无对应行）',
+  openingFvDiffCumulative: '期初累计公允价值调整（合并净资产表无对应行）',
+  unrealizedInternalElim: '未实现内部交易损益（合并净资产表无对应行）',
 }
 
 /** 取第一个已定义的数值（0 有效；跳过 null/undefined/''） */
@@ -62,6 +178,37 @@ export interface G7EquityInvesteeOption {
   name: string
   /** G7-4 行 id，作为跨表 investeeId */
   investeeId: string
+  /**
+   * 持股比例（小数 0~1）。
+   * 优先直接+间接持股合计；皆空则用表决权比例。
+   */
+  investmentRatio: number | null
+}
+
+/** G7-4 比例字段 → 小数；G7-4 默认存百分数，ratioScale=fraction 时已是小数 */
+export function parseG74HoldingRatioFraction(r: Record<string, any>): number | null {
+  const asFraction = r.ratioScale === 'fraction'
+  const toFrac = (raw: number): number => (
+    asFraction
+      ? Math.round(raw * 1e6) / 1e6
+      : Math.round((raw / 100) * 1e6) / 1e6
+  )
+
+  const direct = Number(r.directHoldingRatio ?? r.direct_holding_ratio)
+  const indirect = Number(r.indirectHoldingRatio ?? r.indirect_holding_ratio)
+  const hasDirect = Number.isFinite(direct)
+  const hasIndirect = Number.isFinite(indirect)
+  if (hasDirect || hasIndirect) {
+    return toFrac((hasDirect ? direct : 0) + (hasIndirect ? indirect : 0))
+  }
+
+  const total = Number(r.holdingRatioTotal ?? r.holding_ratio_total)
+  if (Number.isFinite(total)) return toFrac(total)
+
+  const votingRaw = Number(r.votingRatio ?? r.voting_ratio)
+  if (Number.isFinite(votingRaw)) return toFrac(votingRaw)
+
+  return null
 }
 
 export function loadEquityInvestees(g74Conclusion: unknown): G7EquityInvesteeOption[] {
@@ -71,19 +218,18 @@ export function loadEquityInvestees(g74Conclusion: unknown): G7EquityInvesteeOpt
   const out: G7EquityInvesteeOption[] = []
   const seen = new Set<string>()
   for (const r of list) {
-    const groupType = String(r.groupType ?? r.group_type ?? '')
-    const method = String(r.accountingMethod ?? r.accounting_method ?? '')
-    const isEquity =
-      groupType === 'joint_venture'
-      || groupType === 'associate'
-      || method.includes('权益法')
+    if (!isG74EquityInvesteeRow(r)) continue
     const name = String(r.investeeName ?? r.investee_name ?? '').trim()
     const investeeId = String(r.id ?? r.investeeId ?? r.investee_id ?? '').trim()
-    if (!isEquity || !name) continue
+    if (!name) continue
     const dedupeKey = investeeId ? `id:${investeeId}` : `name:${name}`
     if (seen.has(dedupeKey)) continue
     seen.add(dedupeKey)
-    out.push({ name, investeeId })
+    out.push({
+      name,
+      investeeId,
+      investmentRatio: parseG74HoldingRatioFraction(r),
+    })
   }
   return out
 }
@@ -94,8 +240,8 @@ export function loadEquityInvesteeNames(g74Conclusion: unknown): string[] {
 }
 
 /**
- * G7-4 → G7-14：按 ID/名称确保被投资单位行存在，并回填 investeeId。
- * 不覆盖已有测算金额。
+ * G7-4 → G7-14：按 ID/名称确保被投资单位行存在，回填 investeeId；
+ * 持股比例仅在目标行为空(0)时写入，不覆盖已有测算比例。
  */
 export function applyG74InvesteesToG714Payload(
   g714Payload: any | null,
@@ -108,6 +254,7 @@ export function applyG74InvesteesToG714Payload(
   const payload = clonePayload(g714Payload)
   let created = 0
   let linked = 0
+  let ratioFilled = 0
   for (const inv of investees) {
     const beforeCount = (payload.groups || []).length
     const rows = ensureG714InvesteeRows(payload, {
@@ -119,17 +266,66 @@ export function applyG74InvesteesToG714Payload(
     if (inv.investeeId && rows.some((r: any) => String(r.investeeId || '') === inv.investeeId)) {
       linked += 1
     }
+    if (inv.investmentRatio != null && inv.investmentRatio > 0) {
+      for (const row of rows) {
+        if (!parseNum(row.investmentRatio)) {
+          row.investmentRatio = inv.investmentRatio
+          recalcEquityCalcRow(row)
+          ratioFilled += 1
+        }
+      }
+      const group = (payload.groups || []).find((g: any) => matchInvestee(g, {
+        investeeName: inv.name,
+        investeeId: inv.investeeId || undefined,
+      }))
+      if (group && !parseNum(group.ownershipRatio) && inv.investmentRatio) {
+        // 兼容旧 group 上偶发的 ownershipRatio
+        group.ownershipRatio = inv.investmentRatio
+      }
+    }
   }
+
+  // NA：ownershipRatio 为空时从刚写入的行比例回填
+  if (Array.isArray(payload.netAssetAdjustments)) {
+    for (const adj of payload.netAssetAdjustments) {
+      if (parseNum(adj.ownershipRatio)) continue
+      const row = (payload.rows || []).find((r: any) => matchInvestee(r, {
+        investeeName: adj.investeeName,
+        investeeId: adj.investeeId,
+      }))
+      const fromRow = parseNum(row?.investmentRatio)
+      if (fromRow > 0) adj.ownershipRatio = fromRow
+    }
+  }
+
   syncFlatRowsFromGroups(payload)
   return {
     ok: true,
-    message: `已从 G7-4 同步 ${investees.length} 家合营/联营（新增 ${created}，关联ID ${linked}）`,
+    message: `已从 G7-4 同步 ${investees.length} 家合营/联营（新增 ${created}，关联ID ${linked}，补比例 ${ratioFilled}）`,
     payload,
   }
 }
 
-/** G7-10 用：子公司名册选项（持股比例转为 0~1，账面取 investmentAmount） */
+/** 是否 G7-4 子公司行（与 loadSubsidiaryInvestees 口径一致） */
+export function isG74SubsidiaryRow(r: Record<string, unknown>): boolean {
+  const groupType = String(r.groupType ?? r.group_type ?? r.controlType ?? '')
+  const method = String(r.accountingMethod ?? r.accounting_method ?? '')
+  return groupType === 'subsidiary'
+    || groupType === '子公司'
+    || method.includes('成本法')
+}
+
+/** 是否 G7-4 权益法合营/联营行（与 loadEquityInvestees 口径一致） */
+export function isG74EquityInvesteeRow(r: Record<string, unknown>): boolean {
+  const groupType = String(r.groupType ?? r.group_type ?? '')
+  const method = String(r.accountingMethod ?? r.accounting_method ?? '')
+  return groupType === 'joint_venture'
+    || groupType === 'associate'
+    || method.includes('权益法')
+}
 export interface G7SubsidiaryInvesteeOption {
+  /** 与 G7-4 行 id 对齐，供跨表 investeeId 绑定 */
+  id: string
   name: string
   /** 直接+间接持股，小数 0~1 */
   shareholdingRatio: number | null
@@ -139,7 +335,7 @@ export interface G7SubsidiaryInvesteeOption {
 }
 
 /**
- * 从 G7-4 提取子公司清单，供 G7-10 下拉与预填。
+ * 从 G7-4 提取子公司清单，供 G7-7/10/11 下拉与预填。
  * G7-4 比例存百分数(0~100)；若 ratioScale=fraction 则已是小数。
  */
 export function loadSubsidiaryInvestees(g74Conclusion: unknown): G7SubsidiaryInvesteeOption[] {
@@ -151,14 +347,13 @@ export function loadSubsidiaryInvestees(g74Conclusion: unknown): G7SubsidiaryInv
   const seen = new Set<string>()
 
   for (const r of list) {
-    const groupType = String(r.groupType ?? r.group_type ?? '')
-    const method = String(r.accountingMethod ?? r.accounting_method ?? '')
-    const isSub =
-      groupType === 'subsidiary'
-      || method.includes('成本法')
+    if (!isG74SubsidiaryRow(r)) continue
     const name = String(r.investeeName ?? r.investee_name ?? '').trim()
-    if (!isSub || !name || seen.has(name)) continue
-    seen.add(name)
+    const id = String(r.id ?? r.investeeId ?? r.investee_id ?? '').trim()
+    if (!name) continue
+    const dedupeKey = id ? `id:${id}` : `name:${name}`
+    if (seen.has(dedupeKey)) continue
+    seen.add(dedupeKey)
 
     const asFraction = r.ratioScale === 'fraction'
     const direct = Number(r.directHoldingRatio ?? r.direct_holding_ratio)
@@ -183,6 +378,7 @@ export function loadSubsidiaryInvestees(g74Conclusion: unknown): G7SubsidiaryInv
 
     const carrying = Number(r.investmentAmount ?? r.investment_amount)
     options.push({
+      id: id || name,
       name,
       shareholdingRatio,
       carryingAmount: Number.isFinite(carrying) ? carrying : null,
@@ -208,6 +404,12 @@ function recalcEquityCalcRow(row: any): void {
     row.equityShare,
     row.dividendDistributed,
   )
+  row.ociDifference = Math.round(
+    (parseNum(row.confirmedOci) - parseNum(row.ociShare)) * 100,
+  ) / 100
+  row.otherEquityDifference = Math.round(
+    (parseNum(row.confirmedOtherEquity) - parseNum(row.otherEquityShare)) * 100,
+  ) / 100
   row.costClosing = Math.round((parseNum(row.costOpening) + parseNum(row.costChange)) * 100) / 100
   row.pnlAdjClosing = Math.round((parseNum(row.pnlAdjOpening) + parseNum(row.pnlAdjChange)) * 100) / 100
   row.ociBalChange = row.ociShare
@@ -224,6 +426,10 @@ function recalcEquityCalcRow(row: any): void {
   row.unexplainedVariance = calcUnexplainedVariance(
     row.netAssetShareVariance, row.goodwill, row.cumulativeFvAdj, row.impairment,
   )
+  row.openingReconVariance = calcOpeningReconVariance(
+    row.costOpening, row.pnlAdjOpening, row.ociBalOpening, row.otherEqBalOpening, row.g72OpeningTotal,
+  )
+  row.closingReconVariance = calcClosingReconVariance(row.lteiBookBalance, row.g72ClosingTotal)
   row.closingBalance = calcEquityMethodBalance(
     row.openingBalance,
     row.equityShare,
@@ -322,6 +528,92 @@ export function applyPolicyAdjToG714Payload(
   }
 }
 
+/**
+ * 从 G7-6 会计政策表（groups 或扁平 rows）汇总各被投资方「不一致」调整金额，写入 G7-14。
+ * 仅累加 isConsistent==='不一致' 的金额；合计为 0 的被投资方跳过，避免冲掉 G7-14 手工 policy。
+ */
+export function applyG76PolicyToG714Payload(
+  g714Payload: any | null,
+  g76Raw: unknown,
+): SyncPolicyAdjResult {
+  const parsed = parseChecklistJson(g76Raw) ?? g76Raw
+  if (parsed == null) {
+    return { ok: false, message: '未找到 G7-6 会计政策数据' }
+  }
+
+  type Agg = { name: string; investeeId?: string; total: number }
+  const byKey = new Map<string, Agg>()
+
+  const addInconsistent = (nameRaw: unknown, amount: unknown, idRaw?: unknown, isConsistent?: unknown) => {
+    const consistent = String(isConsistent ?? '').trim()
+    // 扁平旧数据无一致性字段时：仅非零金额计入（兼容）；有字段则必须「不一致」
+    if (consistent && consistent !== '不一致') return
+    if (!consistent && parseNum(amount) === 0) return
+    const name = String(nameRaw ?? '').trim()
+    if (!name || name === '未分组') return
+    const key = name
+    const prev = byKey.get(key) || { name, investeeId: undefined, total: 0 }
+    prev.total = Math.round((prev.total + parseNum(amount)) * 100) / 100
+    const id = String(idRaw ?? '').trim()
+    if (id && !prev.investeeId) prev.investeeId = id
+    byKey.set(key, prev)
+  }
+
+  if (typeof parsed === 'object' && Array.isArray((parsed as any).groups)) {
+    for (const g of (parsed as any).groups) {
+      const rows = Array.isArray(g?.rows) ? g.rows : []
+      for (const r of rows) {
+        addInconsistent(
+          g?.investeeName ?? g?.investee_name,
+          r?.adjustmentAmount,
+          g?.investeeId ?? g?.investee_id,
+          r?.isConsistent ?? r?.is_consistent,
+        )
+      }
+    }
+  } else {
+    const rows = Array.isArray(parsed)
+      ? parsed
+      : (Array.isArray((parsed as any)?.rows) ? (parsed as any).rows : [])
+    for (const r of rows) {
+      addInconsistent(
+        r?.investeeName ?? r?.investee_name,
+        r?.adjustmentAmount,
+        r?.investeeId ?? r?.investee_id,
+        r?.isConsistent ?? r?.is_consistent,
+      )
+    }
+  }
+
+  const actionable = [...byKey.values()].filter(agg => Math.abs(agg.total) > 0.005)
+  if (actionable.length === 0) {
+    return {
+      ok: false,
+      message: 'G7-6 无「不一致」调整金额可带入（全零已跳过，避免覆盖 G7-14 手工值）',
+    }
+  }
+
+  let payload = g714Payload
+  const names: string[] = []
+  for (const agg of actionable) {
+    const result = applyPolicyAdjToG714Payload(payload, agg.name, agg.total, agg.investeeId)
+    if (!result.ok || !result.payload) {
+      return { ok: false, message: result.message || `同步「${agg.name}」失败` }
+    }
+    payload = result.payload
+    names.push(agg.name)
+  }
+
+  const skipped = byKey.size - actionable.length
+  return {
+    ok: true,
+    message: skipped > 0
+      ? `已从 G7-6 带入 ${names.length} 家会计政策调整（另跳过 ${skipped} 家零金额）`
+      : `已从 G7-6 带入 ${names.length} 家会计政策调整`,
+    payload,
+  }
+}
+
 function createStubEquityRow(investeeName: string, accountingPolicyAdj: number): any {
   const row = {
     id: `emc-sync-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -333,6 +625,7 @@ function createStubEquityRow(investeeName: string, accountingPolicyAdj: number):
     fvDepreciationAdj: 0,
     accountingPolicyAdj,
     otherAdj: 0,
+    otherAdjFromG716: 0,
     adjustedNetProfit: 0,
     investmentRatio: 0,
     equityShare: 0,
@@ -365,6 +658,10 @@ function createStubEquityRow(investeeName: string, accountingPolicyAdj: number):
     shareOfAuditedNetAssets: 0,
     lteiBookBalance: 0,
     netAssetShareVariance: 0,
+    g72OpeningTotal: 0,
+    g72ClosingTotal: 0,
+    openingReconVariance: 0,
+    closingReconVariance: 0,
     goodwill: 0,
     cumulativeFvAdj: 0,
     impairment: 0,
@@ -608,6 +905,96 @@ export function applyFinancialInfoToG714Payload(
 }
 
 /**
+ * G7-17 → G7-14：按被投资单位写入减值准备列（impairment = impairmentAmount）
+ */
+export function applyG717ImpairmentToG714Payload(
+  g714Payload: any | null,
+  g717Payload: unknown,
+): SyncPolicyAdjResult {
+  const payload = clonePayload(g714Payload)
+  const parsed = parseChecklistJson(g717Payload) ?? g717Payload
+  const rows = Array.isArray((parsed as any)?.rows)
+    ? (parsed as any).rows
+    : Array.isArray(parsed) ? parsed : []
+  if (!rows.length) return { ok: false, message: 'G7-17 无减值测试数据' }
+
+  let touched = 0
+  for (const r of rows) {
+    const name = normalizeInvesteeKey(r.investeeName ?? r.investee_name)
+    const id = String(r.investeeId ?? r.investee_id ?? '').trim()
+    if (!name && !id) continue
+    const amt = Math.round(parseNum(r.impairmentAmount ?? r.impairment_amount) * 100) / 100
+    const targetRows = ensureG714InvesteeRows(payload, {
+      investeeName: name || id,
+      investeeId: id || undefined,
+    })
+    for (const row of targetRows) {
+      row.impairment = amt
+      const note = `【G7-17】减值测试金额 ${amt.toFixed(2)}`
+      const prev = String(row.varianceExplanation || '')
+      if (!prev.includes('【G7-17】减值测试')) {
+        row.varianceExplanation = prev ? `${prev}\n${note}` : note
+      }
+      recalcEquityCalcRow(row)
+    }
+    touched += 1
+  }
+  if (touched === 0) return { ok: false, message: 'G7-17 无有效被投资单位' }
+  syncFlatRowsFromGroups(payload)
+  return {
+    ok: true,
+    message: `已从 G7-17 同步 ${touched} 家减值金额至 G7-14 减值准备列`,
+    payload,
+  }
+}
+
+/**
+ * G7-16 → G7-14：未确认损失本期变动累加写入 otherAdj（保留其他来源分量）
+ * （正数=新增未确认→调增调整后净利润以停止确认超额损失；负数=利润恢复反序确认）
+ */
+export function applyUnrecognizedLossToG714Payload(
+  g714Payload: any | null,
+  g716Payload: unknown,
+): SyncPolicyAdjResult {
+  const payload = clonePayload(g714Payload)
+  const parsed = parseChecklistJson(g716Payload) ?? g716Payload
+  const rows = Array.isArray((parsed as any)?.rows)
+    ? (parsed as any).rows
+    : Array.isArray(parsed) ? parsed : []
+  if (!rows.length) return { ok: false, message: 'G7-16 无未确认损失数据' }
+
+  let touched = 0
+  for (const r of rows) {
+    const name = normalizeInvesteeKey(r.investeeName ?? r.investee_name)
+    const id = String(r.investeeId ?? r.investee_id ?? '').trim()
+    if (!name && !id) continue
+    const amt = hasDefinedField(r, 'currentChange', 'current_change')
+      ? pickDefinedNum(r.currentChange, r.current_change)
+      : pickDefinedNum(r.unrecognizedLoss, r.unrecognized_loss)
+    const g716Amt = Math.round(parseNum(amt) * 100) / 100
+    const targetRows = ensureG714InvesteeRows(payload, {
+      investeeName: name || id,
+      investeeId: id || undefined,
+    })
+    for (const row of targetRows) {
+      const prevG716 = parseNum(row.otherAdjFromG716)
+      const baseOther = Math.round((parseNum(row.otherAdj) - prevG716) * 100) / 100
+      row.otherAdjFromG716 = g716Amt
+      row.otherAdj = Math.round((baseOther + g716Amt) * 100) / 100
+      recalcEquityCalcRow(row)
+    }
+    touched += 1
+  }
+  if (touched === 0) return { ok: false, message: 'G7-16 无有效被投资单位' }
+  syncFlatRowsFromGroups(payload)
+  return {
+    ok: true,
+    message: `已从 G7-16 累加同步 ${touched} 家未确认损失变动至 G7-14（otherAdj，保留其他来源）`,
+    payload,
+  }
+}
+
+/**
  * G7-15 → G7-14：按被投资单位汇总本年抵销变动 → internalTransactionAdj
  */
 export function applyInternalElimToG714Payload(
@@ -693,14 +1080,20 @@ const G714_PREVIEW_FIELDS: { key: string; label: string }[] = [
   { key: 'reportedNetProfit', label: '报告净利润' },
   { key: 'auditedNetAssets', label: '经审计净资产' },
   { key: 'internalTransactionAdj', label: '内部交易抵销' },
+  { key: 'otherAdj', label: '其他调整' },
+  { key: 'otherAdjFromG716', label: '其中:G7-16未确认损失' },
   { key: 'openingBalance', label: '期初余额' },
   { key: 'investmentRatio', label: '持股比例' },
   { key: 'pnlAdjChange', label: '损益调整本期' },
   { key: 'confirmedIncome', label: '确认投资收益' },
+  { key: 'confirmedOci', label: '账面确认OCI' },
+  { key: 'confirmedOtherEquity', label: '账面确认其他权益' },
   { key: 'dividendDistributed', label: '股利' },
   { key: 'ociChange', label: 'OCI变动(被投资方)' },
   { key: 'otherEquityChange', label: '其他权益变动' },
   { key: 'costChange', label: '成本变动' },
+  { key: 'g72OpeningTotal', label: 'G7-2期初总额' },
+  { key: 'g72ClosingTotal', label: 'G7-2期末总额' },
   { key: 'goodwill', label: '商誉' },
   { key: 'cumulativeFvAdj', label: '累计FV' },
   { key: 'fvDepreciationAdj', label: 'FV折旧摊销' },
@@ -942,6 +1335,21 @@ export function applyInvestmentCostToG714Payload(
           indexRef,
         })
       }
+    } else if (difference < -0.005 || nature.includes('营业外')) {
+      // 廉价购买：备查明细（amount=0 不计入商誉/FV 汇总），并写入行说明
+      const bargain = Math.round(Math.abs(difference) * 100) / 100
+      payload.goodwillFvDetails.push({
+        id: `gwf-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        investeeName: displayName,
+        investeeId: investeeId || undefined,
+        kind: 'fvAdj',
+        description: `【G7-13】初始成本小于享有份额（营业外收入/廉价购买）${bargain}`,
+        amount: 0,
+        openingUnamortized: 0,
+        currentDepreciationAdj: 0,
+        otherChange: 0,
+        indexRef,
+      })
     }
     // 仅当「调整后享有份额」字段确有填写时才生成 FV 明细，避免默认 0 产生虚假差额
     if (hasDefinedField(r, 'adjustedShareOfNetAssets', 'adjusted_share_of_net_assets')) {
@@ -974,6 +1382,13 @@ export function applyInvestmentCostToG714Payload(
         // G7-13 通常已是小数；>1 则按百分数
         row.investmentRatio = Math.abs(ratioRaw) > 1.0001 ? ratioRaw / 100 : ratioRaw
       }
+      if (difference < -0.005) {
+        const note = `【G7-13】廉价购买利得 ${Math.abs(difference).toFixed(2)}`
+        const prev = String(row.varianceExplanation || '')
+        if (!prev.includes('【G7-13】廉价购买')) {
+          row.varianceExplanation = prev ? `${prev}\n${note}` : note
+        }
+      }
     }
     touched += 1
   }
@@ -981,7 +1396,7 @@ export function applyInvestmentCostToG714Payload(
   applyGoodwillFvDetailsToRows(payload)
   return {
     ok: touched > 0,
-    message: `已从 G7-13 同步 ${touched} 家商誉/FV 明细至 G7-14`,
+    message: `已从 G7-13 同步 ${touched} 家商誉/FV/廉价购买备查至 G7-14`,
     payload,
   }
 }
@@ -1020,6 +1435,12 @@ export function applyG72EquityToG714Payload(
       if (ratio) row.investmentRatio = Math.round(ratio * 1e8) / 1e8
       // normalize 后 audited* 由未审+AJE/RJE 重算；0 为合法审定数，不得用 || 回退
       row.openingBalance = pickDefinedNum(src.auditedOpeningAmount, src.openingAmount)
+      row.g72OpeningTotal = pickDefinedNum(src.auditedOpeningAmount, src.openingAmount)
+      row.g72ClosingTotal = pickDefinedNum(src.auditedClosingAmount, src.closingAmount)
+      // 若成本期初为空，默认将 G7-2 期初总额落入成本期初（与源表批注：期初仅投资成本时一致）
+      if (!parseNum(row.costOpening) && parseNum(row.g72OpeningTotal)) {
+        row.costOpening = row.g72OpeningTotal
+      }
       row.pnlAdjChange = pickDefinedNum(src.auditedProfitLoss, src.profitLossAdjustment)
       row.confirmedIncome = pickDefinedNum(src.auditedProfitLoss, src.profitLossAdjustment)
       row.dividendDistributed = pickDefinedNum(src.auditedDividend, src.dividendReceived)

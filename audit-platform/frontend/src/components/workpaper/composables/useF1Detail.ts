@@ -57,7 +57,7 @@ export interface DetailRow {
   remark: string             // AE: 备注
 }
 
-export interface UseD3DetailOptions {
+export interface UseF1DetailOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
   wpId: Ref<string>
   projectId: Ref<string>
@@ -244,7 +244,7 @@ function buildMetaRow(
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-export function useF1Detail(options: UseD3DetailOptions) {
+export function useF1Detail(options: UseF1DetailOptions) {
   const { allResponses, wpId, projectId, debouncedSave, isReadonly, relatedParties } = options
 
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []

@@ -1,7 +1,7 @@
 /**
  * G7 附注披露跨底稿取数。
  *
- * 优先从当前底稿 checklist_responses 读取 G7-1 / G7-2 / G7-4 / G7-5；
+ * 优先从当前底稿 checklist_responses 读取 G7-1/2/4/5/8/9/10/11·12/14/16/17；
  * 若缺键，再尝试 cycle_workpapers 中的同循环兄弟底稿。
  */
 import { api } from '@/services/apiProxy'
@@ -9,8 +9,14 @@ import {
   G7_4_ROWS_KEY,
   G7_14_ROWS_KEY,
   G7_14_SECTION_KEY,
+  G7_17_ROWS_KEY,
+  G7_17_SECTION_KEY,
   parseChecklistJson,
 } from './g7EquityMethodCrossSheet'
+import {
+  buildG7ControlConclusion,
+  listG7ControlDecisions,
+} from './g7ControlJudgmentModel'
 import { rollforwardEnd } from '../g7-long-term-equity-method/calculation/g7EquityMethodCalcModel'
 import {
   holdingRatioTotal,
@@ -32,6 +38,11 @@ import type { G7DisclosureRow, G7DisclosureValue } from '../g7-long-term-equity-
 export const G7_1_ADJ_KEY = 'G7-1-adjudication-data'
 export const G7_2_ROWS_KEY = 'G7-2-rows'
 export const G7_5_ROWS_KEY = 'G7-5-rows'
+export const G7_6_ROWS_KEY = 'G7-6-rows'
+export const G7_7_CONTROL_KEY = 'G7-7-control-judgment-data'
+export const G7_7_CONCLUSION_KEY = 'G7-7-control-judgment-audit-conclusion'
+export const G7_8_ROWS_KEY = 'G7-8-rows'
+export const G7_9_ROWS_KEY = 'G7-9-rows'
 export const G7_10_ROWS_KEY = 'G7-10-rows'
 export const G7_12_ROWS_KEY = 'G7-12-rows'
 export const G7_11_ROWS_KEY = 'G7-11-rows'
@@ -65,6 +76,13 @@ export interface G7FormerSubsidiaryRow {
   holdingRatio: number | null
   votingRights: number | null
   reason: string
+  /** 叙述用：丧失控制权日 / 依据 / 剩余股权重计量（G7-12） */
+  lossOfControlDate?: string
+  lossOfControlBasis?: string
+  residualFairValue?: number | null
+  remeasurementGain?: number | null
+  remainingShareholdingRatio?: number | null
+  residualFairValueMethod?: string
 }
 
 export interface G7UnrecognizedLossSourceRow {
@@ -92,6 +110,50 @@ export interface G7EquityBridgeRow {
   carrying: number | null
 }
 
+/** G7-17 减值测试 → 披露/勾稽源 */
+export interface G717ImpairmentSourceRow {
+  investeeName: string
+  impairmentAmount: number
+  openingImpairment: number
+  hasImpairmentSign?: boolean
+  bookValue?: number | null
+  recoverableAmount?: number | null
+  fvLessDisposalCost?: number | null
+  valueInUse?: number | null
+}
+
+/** G7-8 同控合并 → 披露行 */
+export interface G78CommonControlSourceRow {
+  investeeName: string
+  consolidationDate: string
+  bookNetAssets: number | null
+  consideration: number | null
+  ultimateController: string
+  basisNote: string
+}
+
+/** G7-9 非同控合并 → 披露行 */
+export interface G79NonCommonControlSourceRow {
+  investeeName: string
+  purchaseDate: string
+  purchaseDateBasis: string
+  preHolding: number | null
+  atCombinationHolding: number | null
+  fvIdentifiable: number | null
+  fvMethod: string
+  consideration: number | null
+  goodwill: number | null
+  notes: string
+}
+
+/** G7-6 会计政策不一致 → 披露叙述草稿 */
+export interface G7PolicyDifferenceSourceRow {
+  investeeName: string
+  policyItem: string
+  adjustmentAmount: number | null
+  adjustmentNote: string
+}
+
 export interface G7DisclosureSourceBundle {
   classification: G7ClassificationBundle | null
   detail: G7DetailState | null
@@ -101,6 +163,12 @@ export interface G7DisclosureSourceBundle {
   unrecognizedLoss: G7UnrecognizedLossSourceRow[]
   ownershipImpacts: G7OwnershipImpactTransaction[]
   equityBridge: G7EquityBridgeRow[]
+  impairmentTests?: G717ImpairmentSourceRow[]
+  commonControlMergers?: G78CommonControlSourceRow[]
+  nonCommonControlMergers?: G79NonCommonControlSourceRow[]
+  policyDifferences?: G7PolicyDifferenceSourceRow[]
+  /** G7-7 控制判断叙述草稿（综合结论或决策摘要） */
+  controlJudgmentNarrative?: string
   sourcesHit: string[]
 }
 
@@ -125,12 +193,18 @@ export const G7_DISCLOSURE_SOURCE_KEYS = new Set([
   G7_2_ROWS_KEY,
   G7_4_ROWS_KEY,
   G7_5_ROWS_KEY,
+  G7_6_ROWS_KEY,
+  G7_7_CONTROL_KEY,
+  G7_8_ROWS_KEY,
+  G7_9_ROWS_KEY,
   G7_10_ROWS_KEY,
   G7_11_ROWS_KEY,
   G7_12_ROWS_KEY,
   G7_14_SECTION_KEY,
   G7_14_ROWS_KEY,
   G7_16_ROWS_KEY,
+  G7_17_SECTION_KEY,
+  G7_17_ROWS_KEY,
 ])
 
 export const G7_SOURCE_SAVED_EVENT = 'g7:source-rows-saved'
@@ -182,13 +256,19 @@ export function collectDisclosureTruncations(
   const bridgeAssoc = bundle.equityBridge.filter(r => groupTypeOf(r.investeeName, bundle.basicInfo) === 'associate')
   const bridgeUntyped = !bridgeJv.length && !bridgeAssoc.length ? bundle.equityBridge : []
 
+  const minoritySubs = minoritySubsidiarySources(bundle.basicInfo)
+
   if (variant === 'listed') {
     push('G7-4', 'important-associate-balance', '重要联营企业', assoc.length, 3)
+    push('G7-4', 'important-minority-subsidiaries', '重要非全资子公司', minoritySubs.length, 5)
     push('G7-10', 'ownership-change-impact', '所有权变动交易', bundle.ownershipImpacts.length, 6)
     push('G7-14', 'important-associate-balance', '权益法调节联营', Math.max(bridgeAssoc.length, bridgeUntyped.slice(1).length), 3)
   } else {
     push('G7-4', 'important-jv-fs', '重要合营企业', jv.length, 2)
     push('G7-4', 'important-associate-fs', '重要联营企业', assoc.length, 2)
+    push('G7-4', 'minority-financials', '重要非全资子公司', minoritySubs.length, 5)
+    push('G7-11/12', 'former-subsidiary-position', '出售日子公司财务状况', bundle.formerSubsidiaries.length, 2)
+    push('G7-11/12', 'former-subsidiary-results', '出售日子公司经营成果', bundle.formerSubsidiaries.length, 5)
     push('G7-10', 'ownership-change-impact', '所有权变动交易', bundle.ownershipImpacts.length, 3)
     push('G7-14', 'important-associate-fs', '权益法调节联营', Math.max(bridgeAssoc.length, bridgeUntyped.slice(1).length), 2)
   }
@@ -299,6 +379,88 @@ function ensureDataSlots(
     slots = dataSlots(rows, prefix)
   }
   return slots
+}
+
+/** 国企：lte-classification 减值行 ← G7-17（优先于仅 G7-1 空壳） */
+export function applySoeImpairmentFromG717(
+  rows: G7DisclosureRow[],
+  tests: G717ImpairmentSourceRow[],
+  force = false,
+): boolean {
+  if (!tests.length) return false
+  const row = rows.find(item => item.id === 'lte-impairment')
+  if (!row) return false
+  const opening = tests.reduce((s, t) => s + n(t.openingImpairment), 0)
+  const increase = tests.reduce((s, t) => s + n(t.impairmentAmount), 0)
+  const closing = Math.round((opening + increase) * 100) / 100
+  if (!force && opening === 0 && increase === 0) return false
+  // G7-17 有测算结果时优先覆盖减值行（与「源键刷新」契约一致）
+  const prefer = true
+  let changed = false
+  if (opening !== 0 || force) {
+    changed = writeValue(row.values, 'opening', opening, prefer) || changed
+  }
+  changed = writeValue(row.values, 'increase', increase, prefer) || changed
+  changed = writeValue(row.values, 'closing', closing, prefer) || changed
+  if (changed) row.source = '减值测试G7-17'
+  return changed
+}
+
+/** 解析 G7-17 减值测试行 */
+export function parseG717Impairment(raw: unknown): G717ImpairmentSourceRow[] {
+  const parsed = parseChecklistJson(raw) ?? raw
+  if (!parsed) return []
+  const list = Array.isArray(parsed)
+    ? parsed
+    : (Array.isArray((parsed as any).rows) ? (parsed as any).rows : [])
+  if (!Array.isArray(list)) return []
+  return list
+    .map((row: any) => {
+      const investeeName = String(row?.investeeName ?? row?.investee_name ?? '').trim()
+      if (!investeeName) return null
+      const signRaw = row.hasImpairmentSign ?? row.has_impairment_sign
+      return {
+        investeeName,
+        impairmentAmount: n(row.impairmentAmount ?? row.impairment_amount),
+        openingImpairment: n(row.openingImpairment ?? row.opening_impairment),
+        hasImpairmentSign: signRaw === true || signRaw === '是' || signRaw === 'true' || signRaw === 1,
+        bookValue: nullableMoney(row.bookValue ?? row.book_value),
+        recoverableAmount: nullableMoney(row.recoverableAmount ?? row.recoverable_amount),
+        fvLessDisposalCost: nullableMoney(
+          row.fvLessDisposalCost ?? row.fv_less_disposal_cost ?? row.fairValueLessCosts,
+        ),
+        valueInUse: nullableMoney(row.valueInUse ?? row.value_in_use),
+      } as G717ImpairmentSourceRow
+    })
+    .filter((row): row is G717ImpairmentSourceRow => !!row)
+}
+
+/** 用 G7-17 覆盖/补全权益桥减值准备列 */
+export function mergeG717IntoEquityBridge(
+  bridge: G7EquityBridgeRow[],
+  tests: G717ImpairmentSourceRow[],
+): G7EquityBridgeRow[] {
+  if (!tests.length) return bridge
+  const byName = new Map(tests.map(t => [t.investeeName.trim(), t]))
+  const out = bridge.map((b) => {
+    const t = byName.get(b.investeeName.trim())
+    if (!t) return b
+    return { ...b, impairment: t.impairmentAmount }
+  })
+  for (const t of tests) {
+    if (out.some(b => b.investeeName.trim() === t.investeeName.trim())) continue
+    out.push({
+      investeeName: t.investeeName,
+      shareOfNetAssets: null,
+      adjustments: null,
+      goodwill: null,
+      unrealizedInternal: null,
+      impairment: t.impairmentAmount,
+      other: null,
+      carrying: null,
+    })
+  }
+  return out
 }
 
 /** 国企：lte-classification ← G7-1 */
@@ -650,6 +812,7 @@ const G75_LABEL_ALIASES: Record<string, string[]> = {
   财务费用: ['财务费用'],
   所得税费用: ['所得税费用'],
   营业成本: ['营业成本'],
+  经营活动现金流量: ['经营活动现金流量', '经营活动产生的现金流量净额'],
 }
 
 function normalizeReportLabel(reportItem: string): string[] {
@@ -689,24 +852,98 @@ export function parseG712FormerSubsidiaries(raw: unknown): G7FormerSubsidiaryRow
   const parsed = parseChecklistJson(raw)
   const list = Array.isArray(parsed) ? parsed : parsed?.rows
   if (!Array.isArray(list)) return []
+  const toPercent = (v: number | null): number | null => {
+    if (v == null || Number.isNaN(v)) return null
+    // UI 存小数 0~1；披露附注一般用百分数
+    if (Math.abs(v) <= 1) return Math.round(v * 10000) / 100
+    return v
+  }
   return list
-    .map((row: any) => ({
-      investeeName: String(row.investeeName ?? '').trim(),
-      registeredPlace: String(row.registeredPlace ?? '').trim(),
-      businessNature: String(row.businessNature ?? '').trim(),
-      holdingRatio: row.originalShareholdingRatio != null
-        ? n(row.originalShareholdingRatio)
-        : (row.holdingRatio != null
-          ? n(row.holdingRatio)
-          : (row.disposalRatio != null ? n(row.disposalRatio) : null)),
-      votingRights: row.votingRatio != null ? n(row.votingRatio) : (row.votingRights != null ? n(row.votingRights) : null),
-      reason: String(
-        row.disposalReason
-        ?? row.reason
-        ?? (row.disposalDate ? `处置日 ${row.disposalDate}` : ''),
-      ).trim(),
-    }))
+    .map((row: any) => {
+      const lossDate = String(row.lossOfControlDate ?? row.disposalDate ?? '').trim()
+      const residualFv = nullableMoney(row.residualFairValue ?? row.lossDateResidualFV ?? row.remainingInvestmentFV)
+      const remainingRatioRaw = row.remainingShareholdingRatio ?? row.remaining_shareholding_ratio
+      let remainingShareholdingRatio: number | null = null
+      if (remainingRatioRaw != null && remainingRatioRaw !== '') {
+        const v = Number(remainingRatioRaw)
+        if (Number.isFinite(v)) {
+          remainingShareholdingRatio = Math.abs(v) <= 1 ? Math.round(v * 10000) / 100 : Math.round(v * 100) / 100
+        }
+      }
+      const residualBook = nullableMoney(row.residualBookValue ?? row.residual_book_value)
+      const remeasurementGain = residualFv != null && residualBook != null
+        ? Math.round((residualFv - residualBook) * 100) / 100
+        : nullableMoney(row.remeasurementGain ?? row.remeasurement_gain ?? row.individualRemeasurementGain)
+      return {
+        investeeName: String(row.investeeName ?? '').trim(),
+        registeredPlace: String(row.registeredPlace ?? '').trim(),
+        businessNature: String(row.businessNature ?? '').trim(),
+        holdingRatio: toPercent(
+          row.originalShareholdingRatio != null
+            ? n(row.originalShareholdingRatio)
+            : (row.holdingRatio != null ? n(row.holdingRatio) : null),
+        ),
+        votingRights: toPercent(
+          row.votingRatio != null ? n(row.votingRatio) : (row.votingRights != null ? n(row.votingRights) : null),
+        ),
+        reason: String(
+          row.disposalReason
+          ?? row.reason
+          ?? (lossDate ? `处置日 ${lossDate}` : ''),
+        ).trim(),
+        lossOfControlDate: lossDate,
+        lossOfControlBasis: String(row.lossOfControlBasis ?? row.loss_of_control_basis ?? '').trim(),
+        residualFairValue: residualFv,
+        remeasurementGain,
+        remainingShareholdingRatio,
+        residualFairValueMethod: String(
+          row.residualFairValueMethod ?? row.residual_fair_value_method ?? '',
+        ).trim(),
+      }
+    })
     .filter(row => row.investeeName)
+}
+
+/**
+ * G7-11 非一揽子处置 → 披露「本期不再纳入合并」基本信息。
+ * 不用 disposalRatio 冒充持股比例（处置比例 ≠ 原持股）。
+ */
+export function parseG711FormerSubsidiaries(raw: unknown): G7FormerSubsidiaryRow[] {
+  const parsed = parseChecklistJson(raw)
+  const list = Array.isArray(parsed) ? parsed : parsed?.rows
+  if (!Array.isArray(list)) return []
+  const toPercent = (v: number | null): number | null => {
+    if (v == null || Number.isNaN(v)) return null
+    if (Math.abs(v) <= 1) return Math.round(v * 10000) / 100
+    return v
+  }
+  return list
+    .map((row: any) => {
+      const name = String(row.investeeName ?? '').trim()
+      if (!name) return null
+      const date = String(row.disposalDate ?? row.lossOfControlDate ?? '').trim()
+      const ratio = row.disposalRatio != null ? n(row.disposalRatio) : null
+      const ratioPct = ratio != null ? toPercent(ratio) : null
+      const reasonParts = [
+        date ? `处置日 ${date}` : '',
+        ratioPct != null ? `处置比例 ${ratioPct}%` : '',
+        String(row.auditConclusion ?? row.reason ?? '').trim(),
+      ].filter(Boolean)
+      return {
+        investeeName: name,
+        registeredPlace: String(row.registeredPlace ?? '').trim(),
+        businessNature: String(row.businessNature ?? '').trim(),
+        // 无原持股字段时不回填 holdingRatio，避免把处置比例误作持股
+        holdingRatio: row.originalShareholdingRatio != null
+          ? toPercent(n(row.originalShareholdingRatio))
+          : (row.holdingRatio != null ? toPercent(n(row.holdingRatio)) : null),
+        votingRights: toPercent(
+          row.votingRatio != null ? n(row.votingRatio) : (row.votingRights != null ? n(row.votingRights) : null),
+        ),
+        reason: reasonParts.join('；'),
+      } as G7FormerSubsidiaryRow
+    })
+    .filter((row): row is G7FormerSubsidiaryRow => !!row)
 }
 
 export function parseG716UnrecognizedLoss(raw: unknown): G7UnrecognizedLossSourceRow[] {
@@ -1037,7 +1274,13 @@ export function parseG714EquityBridge(raw: unknown): G7EquityBridgeRow[] {
         goodwill: nullableAmount(row.goodwill),
         unrealizedInternal: elimByName.has(investeeName)
           ? elimByName.get(investeeName)!
-          : nullableAmount(row.unrealizedInternalElim ?? row.unrealized_internal_elim),
+          : nullableAmount(
+            row.unrealizedInternalElim
+            ?? row.unrealized_internal_elim
+            // G7-15 同步写入的「内部交易抵销」列
+            ?? row.internalTransactionAdj
+            ?? row.internal_transaction_adj,
+          ),
         impairment: nullableAmount(row.impairment),
         other,
         carrying: nullableAmount(row.lteiBookBalance ?? row.ltei_book_balance ?? row.closingBalance),
@@ -1315,6 +1558,7 @@ export function applyFormerSubsidiaryBasicFromG712(
   rows: G7DisclosureRow[],
   former: G7FormerSubsidiaryRow[],
   force = false,
+  sourceLabel = '处置子公司测试表G7-12',
 ): boolean {
   const sources = former.filter(row => row.investeeName.trim())
   if (!sources.length) return false
@@ -1328,13 +1572,14 @@ export function applyFormerSubsidiaryBasicFromG712(
       label: '',
       values: {},
       kind: 'data',
-      source: '处置子公司测试表G7-12',
+      source: sourceLabel,
     }),
   )
   let changed = false
   sources.forEach((source, index) => {
     const row = slots[index]
     if (!row) return
+    if (!row.source || force) row.source = sourceLabel
     changed = writeLabel(row, source.investeeName, force) || changed
     changed = writeValue(row.values, 'registeredPlace', source.registeredPlace, force) || changed
     changed = writeValue(row.values, 'businessNature', source.businessNature, force) || changed
@@ -1421,6 +1666,705 @@ function findChecklistValue(
   return item.remark || item.conclusion || null
 }
 
+
+/** 小数持股 → 披露百分数；已是百分数则保持 */
+function ratioToPercentDisplay(raw: unknown): number | null {
+  if (raw == null || raw === '') return null
+  const v = Number(raw)
+  if (!Number.isFinite(v)) return null
+  if (Math.abs(v) <= 1.0000001) return Math.round(v * 10000) / 100
+  return Math.round(v * 100) / 100
+}
+
+function nullableMoney(raw: unknown): number | null {
+  if (raw == null || raw === '') return null
+  const v = Number(raw)
+  return Number.isFinite(v) ? Math.round(v * 100) / 100 : null
+}
+
+/** 解析 G7-8 同控初始计量 → 披露用合并行 */
+export function parseG78CommonControlMergers(raw: unknown): G78CommonControlSourceRow[] {
+  const parsed = parseChecklistJson(raw) ?? raw
+  const list = Array.isArray(parsed)
+    ? parsed
+    : (Array.isArray((parsed as any)?.rows) ? (parsed as any).rows : [])
+  if (!Array.isArray(list)) return []
+  const out: G78CommonControlSourceRow[] = []
+  for (const row of list) {
+    if (String(row?.section || '') !== 'merger') continue
+    const investeeName = String(row?.investeeName ?? row?.investee_name ?? '').trim()
+    if (!investeeName) continue
+    const notes: string[] = []
+    const policy = String(row?.accountingPolicyConsistent ?? '').trim()
+    if (policy) notes.push(`会计政策一致：${policy}`)
+    const policyNote = String(row?.accountingPolicyNote ?? '').trim()
+    if (policyNote) notes.push(policyNote)
+    const treatment = String(row?.adjustmentTreatment ?? '').trim()
+    if (treatment) notes.push(`差额处理：${treatment}`)
+    const idx = String(row?.indexRef ?? '').trim()
+    if (idx) notes.push(`索引：${idx}`)
+    out.push({
+      investeeName,
+      consolidationDate: String(row?.acquisitionDate ?? row?.acquisition_date ?? '').trim(),
+      bookNetAssets: nullableMoney(row?.ownerEquityBookValue ?? row?.owner_equity_book_value),
+      consideration: nullableMoney(row?.totalConsideration ?? row?.total_consideration),
+      ultimateController: String(row?.finalController ?? row?.final_controller ?? '').trim(),
+      basisNote: notes.join('；'),
+    })
+  }
+  return out
+}
+
+/** 解析 G7-9 非同控初始计量 → 披露用合并行 */
+export function parseG79NonCommonControlMergers(raw: unknown): G79NonCommonControlSourceRow[] {
+  const parsed = parseChecklistJson(raw) ?? raw
+  const list = Array.isArray(parsed)
+    ? parsed
+    : (Array.isArray((parsed as any)?.rows) ? (parsed as any).rows : [])
+  if (!Array.isArray(list)) return []
+  const out: G79NonCommonControlSourceRow[] = []
+  for (const row of list) {
+    if (String(row?.section || '') !== 'merger') continue
+    const investeeName = String(row?.investeeName ?? row?.investee_name ?? '').trim()
+    if (!investeeName) continue
+    const notes: string[] = []
+    const goodwill = nullableMoney(row?.goodwill)
+    if (goodwill != null && goodwill < -0.005) {
+      const reviewed = String(row?.bargainPurchaseReviewed ?? '').trim()
+      const amt = Math.abs(goodwill).toFixed(2)
+      notes.push(reviewed ? `廉价购买利得 ${amt}（复核：${reviewed}）` : `廉价购买利得 ${amt}`)
+      const bargainNote = String(row?.bargainPurchaseReviewNote ?? '').trim()
+      if (bargainNote) notes.push(bargainNote)
+    }
+    const contingent = nullableMoney(row?.contingentConsiderationFV ?? row?.contingent_consideration_fv)
+    if (contingent != null && Math.abs(contingent) > 0.005) {
+      notes.push(`或有对价FV ${contingent.toFixed(2)}`)
+    }
+    const idx = String(row?.indexRef ?? '').trim()
+    if (idx) notes.push(`索引：${idx}`)
+    out.push({
+      investeeName,
+      purchaseDate: String(row?.acquisitionDate ?? row?.acquisition_date ?? '').trim(),
+      purchaseDateBasis: String(
+        row?.acquisitionDateEvidenceRef ?? row?.acquisition_date_evidence_ref ?? '',
+      ).trim(),
+      preHolding: null,
+      atCombinationHolding: ratioToPercentDisplay(row?.ownershipRatio ?? row?.ownership_ratio),
+      fvIdentifiable: nullableMoney(
+        row?.acquireeIdentifiableNetAssetsFV ?? row?.acquiree_identifiable_net_assets_fv,
+      ),
+      fvMethod: String(row?.valuationReportRef ?? row?.valuation_report_ref ?? '').trim(),
+      consideration: nullableMoney(row?.totalConsiderationFV ?? row?.total_consideration_fv),
+      goodwill,
+      notes: notes.join('；'),
+    })
+  }
+  return out
+}
+
+/** 解析 G7-6「不一致」事项 → 披露政策差异草稿源 */
+export function parseG76PolicyDifferences(raw: unknown): G7PolicyDifferenceSourceRow[] {
+  const parsed = parseChecklistJson(raw) ?? raw
+  const out: G7PolicyDifferenceSourceRow[] = []
+
+  const pushRow = (investeeName: string, row: any) => {
+    const name = String(investeeName || '').trim()
+    if (!name || name === '未分组') return
+    const consistent = String(row?.isConsistent ?? row?.is_consistent ?? '').trim()
+    if (consistent !== '不一致') return
+    const amountRaw = row?.adjustmentAmount ?? row?.adjustment_amount
+    const amount = amountRaw == null || amountRaw === '' ? null : Number(amountRaw)
+    out.push({
+      investeeName: name,
+      policyItem: String(row?.policyItem ?? row?.policy_item ?? '').trim(),
+      adjustmentAmount: Number.isFinite(amount as number) ? (amount as number) : null,
+      adjustmentNote: String(row?.adjustmentNote ?? row?.adjustment_note ?? '').trim(),
+    })
+  }
+
+  if (parsed && typeof parsed === 'object' && Array.isArray((parsed as any).groups)) {
+    for (const g of (parsed as any).groups) {
+      const name = String(g?.investeeName ?? g?.investee_name ?? '').trim()
+      const rows = Array.isArray(g?.rows) ? g.rows : []
+      for (const r of rows) pushRow(name, r)
+    }
+  } else {
+    const list = Array.isArray(parsed)
+      ? parsed
+      : (Array.isArray((parsed as any)?.rows) ? (parsed as any).rows : [])
+    for (const r of list) {
+      pushRow(String(r?.investeeName ?? r?.investee_name ?? ''), r)
+    }
+  }
+  return out
+}
+
+/** 由 G7-6 不一致行生成附注叙述草稿 */
+export function buildG76PolicyDifferenceNarrative(rows: G7PolicyDifferenceSourceRow[]): string {
+  if (!rows.length) return ''
+  const byName = new Map<string, G7PolicyDifferenceSourceRow[]>()
+  for (const row of rows) {
+    const list = byName.get(row.investeeName) || []
+    list.push(row)
+    byName.set(row.investeeName, list)
+  }
+  const blocks: string[] = [
+    '经核对合营/联营企业会计政策，下列事项与本公司存在重大差异，已按投资方政策调整（来源 G7-6）：',
+  ]
+  for (const [name, items] of byName) {
+    const parts = items.map((item) => {
+      const bits: string[] = []
+      if (item.policyItem) bits.push(item.policyItem)
+      if (item.adjustmentAmount != null && Number.isFinite(item.adjustmentAmount)) {
+        bits.push(`调整 ${item.adjustmentAmount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 元`)
+      }
+      if (item.adjustmentNote) bits.push(item.adjustmentNote)
+      return bits.join('，') || '政策差异'
+    })
+    blocks.push(`【${name}】${parts.join('；')}`)
+  }
+  blocks.push('上述调整已（或应）计入 G7-14「会计政策调整」列；公允价值/可辨认净资产差异见 G7-13。')
+  return blocks.join('\n')
+}
+
+/** G7-7 控制判断 → 披露叙述草稿（优先综合结论，否则决策摘要） */
+export function parseG77ControlJudgmentNarrative(
+  controlRaw: unknown,
+  conclusionRaw: unknown,
+): string {
+  const parsed = parseChecklistJson(controlRaw) ?? controlRaw
+  const root = (parsed as any)?.controlJudgment ?? parsed
+  const overallFromData = root && typeof root === 'object'
+    ? String((root as any).overallConclusion ?? '').trim()
+    : ''
+  if (overallFromData) return overallFromData
+
+  let conclusion = ''
+  if (conclusionRaw != null && conclusionRaw !== '') {
+    if (typeof conclusionRaw === 'string') {
+      conclusion = conclusionRaw.trim()
+    } else if (typeof conclusionRaw === 'object') {
+      const obj = conclusionRaw as Record<string, unknown>
+      conclusion = String(obj.conclusion ?? obj.content ?? obj.text ?? obj.remark ?? '').trim()
+    }
+  }
+  if (conclusion) return conclusion
+
+  const decisions = listG7ControlDecisions(controlRaw)
+  return decisions
+    .filter(d => d.investeeName.trim() || d.relationshipType)
+    .map(d => buildG7ControlConclusion(d))
+    .join('\n')
+}
+
+/** G7-5 单户单项目本期金额（无则 null） */
+function g75CurrentAmount(
+  financialInfo: G7FinancialInfoMetric[],
+  investeeName: string,
+  label: string,
+): number | null {
+  const amounts = metricLookup(financialInfo, [investeeName], label)
+  if (!amounts) return null
+  return amounts.current
+}
+
+/** 按少数股东比例分摊 G7-5 金额 */
+function nciShareOf(
+  financialInfo: G7FinancialInfoMetric[],
+  investeeName: string,
+  label: string,
+  nciPercent: number | null,
+): number | null {
+  if (nciPercent == null || !Number.isFinite(nciPercent)) return null
+  const base = g75CurrentAmount(financialInfo, investeeName, label)
+  if (base == null) return null
+  return Math.round(base * (nciPercent / 100) * 100) / 100
+}
+
+/** 用 G7-5 补同控表未接列（收入/净利润/经营现金流；不臆造现金净增加额） */
+function enrichCommonControlPlFromG75(
+  row: G7DisclosureRow,
+  investeeName: string,
+  financialInfo: G7FinancialInfoMetric[],
+  force: boolean,
+): boolean {
+  if (!financialInfo.length) return false
+  let changed = false
+  const revenue = g75CurrentAmount(financialInfo, investeeName, '营业收入')
+  const profit = g75CurrentAmount(financialInfo, investeeName, '净利润')
+  const ocf = g75CurrentAmount(financialInfo, investeeName, '经营活动现金流量')
+  if (revenue != null) changed = writeValue(row.values, 'revenue', revenue, force) || changed
+  if (profit != null) changed = writeValue(row.values, 'netProfit', profit, force) || changed
+  if (ocf != null) changed = writeValue(row.values, 'operatingCashFlow', ocf, force) || changed
+  return changed
+}
+
+/** 用 G7-5 补非同控「购买日至期末」列（全期代理，有数才填） */
+function enrichNonCommonControlPlFromG75(
+  row: G7DisclosureRow,
+  investeeName: string,
+  financialInfo: G7FinancialInfoMetric[],
+  force: boolean,
+): boolean {
+  if (!financialInfo.length) return false
+  let changed = false
+  const revenue = g75CurrentAmount(financialInfo, investeeName, '营业收入')
+  const profit = g75CurrentAmount(financialInfo, investeeName, '净利润')
+  const ocf = g75CurrentAmount(financialInfo, investeeName, '经营活动现金流量')
+  if (revenue != null) changed = writeValue(row.values, 'postRevenue', revenue, force) || changed
+  if (profit != null) changed = writeValue(row.values, 'postProfit', profit, force) || changed
+  if (ocf != null) changed = writeValue(row.values, 'postCashFlow', ocf, force) || changed
+  return changed
+}
+
+function enrichMinorityNciAmounts(
+  row: G7DisclosureRow,
+  investeeName: string,
+  nciPercent: number | null,
+  financialInfo: G7FinancialInfoMetric[],
+  force: boolean,
+): boolean {
+  if (!financialInfo.length || nciPercent == null) return false
+  let changed = false
+  const profit = nciShareOf(financialInfo, investeeName, '净利润', nciPercent)
+  const equity = nciShareOf(financialInfo, investeeName, '所有者权益', nciPercent)
+    ?? nciShareOf(financialInfo, investeeName, '净资产', nciPercent)
+  if (profit != null) changed = writeValue(row.values, 'currentProfit', profit, force) || changed
+  if (equity != null) changed = writeValue(row.values, 'closingEquity', equity, force) || changed
+  return changed
+}
+
+/** G7-4 → 持股/表决权差异、控制例外叙述 */
+export function buildControlJudgementNarrative(
+  basicInfo: G7BasicInfoRow[],
+  scope: 'subsidiary' | 'jv-associate' | 'all' = 'all',
+): string {
+  const lines: string[] = []
+  for (const row of basicInfo) {
+    const name = row.investeeName.trim()
+    if (!name) continue
+    if (scope === 'subsidiary' && row.groupType !== 'subsidiary') continue
+    if (scope === 'jv-associate'
+      && row.groupType !== 'joint_venture'
+      && row.groupType !== 'associate') continue
+    const bits: string[] = []
+    if (row.holdingVotingDifferenceReason.trim()) {
+      bits.push(`持股与表决权差异：${row.holdingVotingDifferenceReason.trim()}`)
+    }
+    if (row.lessThanHalfControlReason.trim()) {
+      bits.push(`半数以下表决权仍控制：${row.lessThanHalfControlReason.trim()}`)
+    }
+    if (row.majorityNoControlReason.trim()) {
+      bits.push(`半数以上不控制：${row.majorityNoControlReason.trim()}`)
+    }
+    if (!bits.length) continue
+    lines.push(`【${name}】${bits.join('；')}`)
+  }
+  if (!lines.length) return ''
+  return ['根据被投资单位基本信息（G7-4），控制/重大影响相关判断如下：', ...lines].join('\n')
+}
+
+export function buildJointControlBasisNarrative(basicInfo: G7BasicInfoRow[]): string {
+  const jvs = basicInfo.filter(r => r.groupType === 'joint_venture' && r.investeeName.trim())
+  if (!jvs.length) return ''
+  const lines = jvs.map((row) => {
+    const bits = [`【${row.investeeName.trim()}】`]
+    const holding = holdingRatioTotal(row)
+    if (holding != null) bits.push(`持股合计 ${holding}%`)
+    if (row.votingRatio != null) bits.push(`表决权 ${row.votingRatio}%`)
+    if (row.holdingVotingDifferenceReason.trim()) bits.push(row.holdingVotingDifferenceReason.trim())
+    return bits.join('；')
+  })
+  return ['对下列合营企业具有共同控制（来源 G7-4）：', ...lines].join('\n')
+}
+
+export function buildJointOperationBasisNarrative(basicInfo: G7BasicInfoRow[]): string {
+  const ops = basicInfo.filter(r => r.groupType === 'joint_operation' && r.investeeName.trim())
+  if (!ops.length) return ''
+  const lines = ops.map((row) => {
+    const bits = [`【${row.investeeName.trim()}】`]
+    if (row.principalPlace) bits.push(`主要经营地 ${row.principalPlace}`)
+    if (row.registeredPlace) bits.push(`注册地 ${row.registeredPlace}`)
+    if (row.holdingVotingDifferenceReason.trim()) bits.push(row.holdingVotingDifferenceReason.trim())
+    return bits.join('；')
+  })
+  return ['共同经营判断依据（来源 G7-4）：', ...lines].join('\n')
+}
+
+export function buildOwnershipChangeNarrative(impacts: G7OwnershipImpactTransaction[]): string {
+  if (!impacts.length) return ''
+  const lines = impacts.map((tx) => {
+    const kindLabel = tx.kind === 'nci' ? '购买少数股权' : '不丧失控制权处置'
+    const consideration = tx.values['购买成本处置对价合计']
+    const diff = tx.values['差额']
+    const bits = [`【${tx.companyName}】${kindLabel}`]
+    if (consideration != null) bits.push(`对价合计 ${consideration}`)
+    if (diff != null) bits.push(`差额 ${diff}`)
+    return bits.join('；')
+  })
+  return ['未丧失控制权的所有者权益份额变动（来源 G7-10）：', ...lines].join('\n')
+}
+
+export function buildImpairmentMethodNarrative(tests: G717ImpairmentSourceRow[]): string {
+  const relevant = tests.filter(t =>
+    t.hasImpairmentSign || (t.impairmentAmount != null && Math.abs(t.impairmentAmount) > 0.005),
+  )
+  if (!relevant.length) return ''
+  const lines = relevant.map((t) => {
+    const bits = [`【${t.investeeName}】`]
+    if (t.bookValue != null) bits.push(`账面价值 ${t.bookValue}`)
+    if (t.recoverableAmount != null) bits.push(`可收回金额 ${t.recoverableAmount}`)
+    if (t.impairmentAmount != null && Math.abs(t.impairmentAmount) > 0.005) {
+      bits.push(`本期计提减值 ${t.impairmentAmount}`)
+    }
+    const methodBits: string[] = []
+    if (t.fvLessDisposalCost != null && Math.abs(t.fvLessDisposalCost) > 0.005) {
+      methodBits.push(`公允价值减处置费用净额 ${t.fvLessDisposalCost}`)
+    }
+    if (t.valueInUse != null && Math.abs(t.valueInUse) > 0.005) {
+      methodBits.push(`预计未来现金流量现值 ${t.valueInUse}`)
+    }
+    if (methodBits.length) bits.push(`确定方法：${methodBits.join(' / ')}`)
+    return bits.join('；')
+  })
+  return ['长期股权投资减值测试说明（来源 G7-17）：', ...lines].join('\n')
+}
+
+export function buildSaleDateMethodNarrative(former: G7FormerSubsidiaryRow[]): string {
+  const lines = former
+    .filter(r => r.investeeName.trim() && (r.lossOfControlDate || r.lossOfControlBasis))
+    .map((r) => {
+      const bits = [`【${r.investeeName}】`]
+      if (r.lossOfControlDate) bits.push(`丧失控制权日 ${r.lossOfControlDate}`)
+      if (r.lossOfControlBasis) bits.push(`依据：${r.lossOfControlBasis}`)
+      return bits.join('；')
+    })
+  if (!lines.length) return ''
+  return ['出售日/丧失控制权日确定方法（来源 G7-12/11）：', ...lines].join('\n')
+}
+
+export function buildRemainingEquityRemeasurementNarrative(former: G7FormerSubsidiaryRow[]): string {
+  const lines = former
+    .filter(r => r.investeeName.trim() && (
+      r.residualFairValue != null
+      || r.remeasurementGain != null
+      || r.remainingShareholdingRatio != null
+    ))
+    .map((r) => {
+      const bits = [`【${r.investeeName}】`]
+      if (r.remainingShareholdingRatio != null) bits.push(`剩余持股 ${r.remainingShareholdingRatio}%`)
+      if (r.residualFairValue != null) bits.push(`剩余股权公允价值 ${r.residualFairValue}`)
+      if (r.remeasurementGain != null) bits.push(`重新计量损益 ${r.remeasurementGain}`)
+      if (r.residualFairValueMethod) bits.push(`确定方法：${r.residualFairValueMethod}`)
+      return bits.join('；')
+    })
+  if (!lines.length) return ''
+  return ['丧失控制权日剩余股权公允价值及重新计量损益（来源 G7-12）：', ...lines].join('\n')
+}
+
+/** 国企：同一控制下企业合并 ← G7-8（P&L/现金流有 G7-5 时补列，不改表结构） */
+export function applySoeCommonControlFromG78(
+  rows: G7DisclosureRow[],
+  sources: G78CommonControlSourceRow[],
+  force = false,
+  financialInfo: G7FinancialInfoMetric[] = [],
+): boolean {
+  const list = sources.filter(s => s.investeeName.trim())
+  if (!list.length) return false
+  const slots = ensureDataSlots(
+    rows,
+    'common-control-',
+    list.length,
+    undefined,
+    index => ({
+      id: `common-control-manual-${Date.now()}-${index + 1}`,
+      label: '',
+      values: {},
+      kind: 'data',
+      source: '同一控制下企业合并测试表G7-8',
+    }),
+  )
+  let changed = false
+  list.forEach((source, index) => {
+    const row = slots[index]
+    if (!row) return
+    if (!row.source || force) {
+      row.source = financialInfo.length
+        ? '同一控制下企业合并测试表G7-8；损益/现金流←财务信息G7-5（全期代理）'
+        : '同一控制下企业合并测试表G7-8'
+    }
+    changed = writeLabel(row, source.investeeName, force) || changed
+    changed = writeValue(row.values, 'consolidationDate', source.consolidationDate, force) || changed
+    changed = writeValue(row.values, 'bookNetAssets', source.bookNetAssets, force) || changed
+    changed = writeValue(row.values, 'consideration', source.consideration, force) || changed
+    changed = writeValue(row.values, 'ultimateController', source.ultimateController, force) || changed
+    changed = enrichCommonControlPlFromG75(row, source.investeeName, financialInfo, force) || changed
+  })
+  return changed
+}
+
+/** 国企：非同一控制下企业合并 ← G7-9 */
+export function applySoeNonCommonControlFromG79(
+  rows: G7DisclosureRow[],
+  sources: G79NonCommonControlSourceRow[],
+  force = false,
+  financialInfo: G7FinancialInfoMetric[] = [],
+): boolean {
+  const list = sources.filter(s => s.investeeName.trim())
+  if (!list.length) return false
+  const slots = ensureDataSlots(
+    rows,
+    'non-common-control-',
+    list.length,
+    undefined,
+    index => ({
+      id: `non-common-control-manual-${Date.now()}-${index + 1}`,
+      label: '',
+      values: {},
+      kind: 'data',
+      source: '非同一控制下企业合并测试表G7-9',
+    }),
+  )
+  let changed = false
+  list.forEach((source, index) => {
+    const row = slots[index]
+    if (!row) return
+    if (!row.source || force) {
+      row.source = financialInfo.length
+        ? '非同一控制下企业合并测试表G7-9；购买日至期末←财务信息G7-5（全期代理）'
+        : '非同一控制下企业合并测试表G7-9'
+    }
+    changed = writeLabel(row, source.investeeName, force) || changed
+    changed = writeValue(row.values, 'purchaseDate', source.purchaseDate, force) || changed
+    changed = writeValue(row.values, 'purchaseDateBasis', source.purchaseDateBasis, force) || changed
+    changed = writeValue(row.values, 'preHolding', source.preHolding, force) || changed
+    changed = writeValue(row.values, 'atCombinationHolding', source.atCombinationHolding, force) || changed
+    changed = writeValue(row.values, 'fvIdentifiable', source.fvIdentifiable, force) || changed
+    changed = writeValue(row.values, 'fvMethod', source.fvMethod, force) || changed
+    changed = writeValue(row.values, 'consideration', source.consideration, force) || changed
+    changed = writeValue(row.values, 'goodwill', source.goodwill, force) || changed
+    changed = enrichNonCommonControlPlFromG75(row, source.investeeName, financialInfo, force) || changed
+  })
+  return changed
+}
+
+function appendNarrativeIfEmpty(
+  texts: Record<string, string> | undefined,
+  key: string,
+  draft: string,
+  force: boolean,
+): boolean {
+  if (!texts || !draft.trim()) return false
+  const prev = String(texts[key] || '').trim()
+  if (!force && prev) return false
+  if (prev === draft.trim()) return false
+  texts[key] = force && prev && !prev.includes(draft.trim())
+    ? `${prev}\n${draft.trim()}`
+    : draft.trim()
+  return true
+}
+
+function minoritySubsidiarySources(basicInfo: G7BasicInfoRow[]): G7BasicInfoRow[] {
+  return basicInfo.filter((row) => {
+    if (row.groupType !== 'subsidiary') return false
+    if (!row.investeeName.trim()) return false
+    const holding = holdingRatioTotal(row)
+    return holding != null && holding > 0 && holding < 99.999
+  })
+}
+
+/** 国企：重要非全资子公司少数股东表 ← G7-4；损益/权益有 G7-5 时按 NCI% 分摊 */
+export function applySoeMinorityShareholdersFromG74(
+  rows: G7DisclosureRow[],
+  basicInfo: G7BasicInfoRow[],
+  force = false,
+  financialInfo: G7FinancialInfoMetric[] = [],
+): boolean {
+  const sources = minoritySubsidiarySources(basicInfo)
+  if (!sources.length) return false
+  const slots = ensureDataSlots(
+    rows,
+    'minority-',
+    sources.length,
+    undefined,
+    index => ({
+      id: `minority-manual-${Date.now()}-${index + 1}`,
+      label: '',
+      values: {},
+      kind: 'data',
+      source: '被投资单位基本信息G7-4',
+    }),
+  )
+  let changed = false
+  sources.forEach((source, index) => {
+    const row = slots[index]
+    if (!row) return
+    if (!row.source || force) {
+      row.source = financialInfo.length
+        ? '被投资单位基本信息G7-4；少数股东损益/权益←财务信息G7-5×NCI%'
+        : '被投资单位基本信息G7-4'
+    }
+    const holding = holdingRatioTotal(source)
+    const nci = holding != null ? Math.round((100 - holding) * 100) / 100 : null
+    changed = writeLabel(row, source.investeeName, force) || changed
+    changed = writeValue(row.values, 'holdingRatio', nci, force) || changed
+    changed = enrichMinorityNciAmounts(row, source.investeeName, nci, financialInfo, force) || changed
+  })
+  return changed
+}
+
+/** 上市：重要的非全资子公司 ← G7-4（少数股东持股比例=100−持股合计） */
+export function applyListedMinoritySubsidiariesFromG74(
+  rows: G7DisclosureRow[],
+  basicInfo: G7BasicInfoRow[],
+  force = false,
+  financialInfo: G7FinancialInfoMetric[] = [],
+): boolean {
+  const sources = minoritySubsidiarySources(basicInfo)
+  if (!sources.length) return false
+  const slots = ensureDataSlots(
+    rows,
+    'minority-subsidiary-',
+    sources.length,
+    undefined,
+    index => ({
+      id: `minority-subsidiary-manual-${Date.now()}-${index + 1}`,
+      label: '',
+      values: {},
+      kind: 'data',
+      source: '被投资单位基本信息G7-4',
+    }),
+  )
+  let changed = false
+  sources.forEach((source, index) => {
+    const row = slots[index]
+    if (!row) return
+    if (!row.source || force) {
+      row.source = financialInfo.length
+        ? '被投资单位基本信息G7-4；少数股东损益/权益←财务信息G7-5×NCI%'
+        : '被投资单位基本信息G7-4'
+    }
+    const holding = holdingRatioTotal(source)
+    const nci = holding != null ? Math.round((100 - holding) * 100) / 100 : null
+    changed = writeLabel(row, source.investeeName, force) || changed
+    changed = writeValue(row.values, 'holdingRatio', nci, force) || changed
+    changed = enrichMinorityNciAmounts(row, source.investeeName, nci, financialInfo, force) || changed
+  })
+  return changed
+}
+
+const LISTED_MINORITY_BALANCE_FIELDS: Array<{ key: string; label: string }> = [
+  { key: 'currentAssets', label: '流动资产' },
+  { key: 'nonCurrentAssets', label: '非流动资产' },
+  { key: 'totalAssets', label: '资产合计' },
+  { key: 'currentLiabilities', label: '流动负债' },
+  { key: 'nonCurrentLiabilities', label: '非流动负债' },
+  { key: 'totalLiabilities', label: '负债合计' },
+]
+
+const LISTED_MINORITY_RESULT_FIELDS: Array<{ key: string; label: string; which: 'current' | 'prior' }> = [
+  { key: 'currentRevenue', label: '营业收入', which: 'current' },
+  { key: 'currentProfit', label: '净利润', which: 'current' },
+  { key: 'currentComprehensive', label: '综合收益总额', which: 'current' },
+  { key: 'currentCashFlow', label: '经营活动现金流量', which: 'current' },
+  { key: 'priorRevenue', label: '营业收入', which: 'prior' },
+  { key: 'priorProfit', label: '净利润', which: 'prior' },
+  { key: 'priorComprehensive', label: '综合收益总额', which: 'prior' },
+  { key: 'priorCashFlow', label: '经营活动现金流量', which: 'prior' },
+]
+
+/**
+ * 上市：重要非全资子公司主要财务信息（期末/期初/发生额三表）← G7-5。
+ * 行=公司（与 important-minority-subsidiaries 对齐），列=报表项目金额。
+ */
+export function applyListedMinorityFsFromG75(
+  tables: {
+    closing?: G7DisclosureRow[]
+    opening?: G7DisclosureRow[]
+    results?: G7DisclosureRow[]
+  },
+  financialInfo: G7FinancialInfoMetric[],
+  basicInfo: G7BasicInfoRow[],
+  force = false,
+): string[] {
+  if (!financialInfo.length) return []
+  const names = minoritySubsidiarySources(basicInfo).map(r => r.investeeName.trim()).slice(0, 5)
+  if (!names.length) return []
+  const filled: string[] = []
+  const sourceTag = '财务信息G7-5'
+
+  const fillBalance = (
+    rows: G7DisclosureRow[] | undefined,
+    prefix: string,
+    which: 'current' | 'prior',
+    tableId: string,
+  ) => {
+    if (!rows) return
+    const slots = ensureDataSlots(
+      rows,
+      prefix,
+      names.length,
+      undefined,
+      index => ({
+        id: `${prefix}manual-${Date.now()}-${index + 1}`,
+        label: '',
+        values: {},
+        kind: 'data',
+        source: sourceTag,
+      }),
+    )
+    let changed = false
+    names.forEach((name, index) => {
+      const row = slots[index]
+      if (!row) return
+      if (!row.source || force) row.source = sourceTag
+      changed = writeLabel(row, name, force) || changed
+      for (const field of LISTED_MINORITY_BALANCE_FIELDS) {
+        const amounts = metricLookup(financialInfo, [name], field.label)
+        if (!amounts) continue
+        const value = which === 'current' ? amounts.current : amounts.prior
+        changed = writeValue(row.values, field.key, value, force) || changed
+      }
+    })
+    if (changed) filled.push(tableId)
+  }
+
+  fillBalance(tables.closing, 'minority-closing-', 'current', 'minority-closing-balance')
+  fillBalance(tables.opening, 'minority-opening-', 'prior', 'minority-opening-balance')
+
+  if (tables.results) {
+    const slots = ensureDataSlots(
+      tables.results,
+      'minority-results-',
+      names.length,
+      undefined,
+      index => ({
+        id: `minority-results-manual-${Date.now()}-${index + 1}`,
+        label: '',
+        values: {},
+        kind: 'data',
+        source: sourceTag,
+      }),
+    )
+    let changed = false
+    names.forEach((name, index) => {
+      const row = slots[index]
+      if (!row) return
+      if (!row.source || force) row.source = sourceTag
+      changed = writeLabel(row, name, force) || changed
+      for (const field of LISTED_MINORITY_RESULT_FIELDS) {
+        const amounts = metricLookup(financialInfo, [name], field.label)
+        if (!amounts) continue
+        const value = field.which === 'current' ? amounts.current : amounts.prior
+        changed = writeValue(row.values, field.key, value, force) || changed
+      }
+    })
+    if (changed) filled.push('minority-results')
+  }
+
+  return filled
+}
+
 export function buildSourceBundleFromChecklistItems(
   items: Array<{ item_id?: string; conclusion?: unknown; remark?: unknown }>,
 ): G7DisclosureSourceBundle {
@@ -1442,11 +2386,12 @@ export function buildSourceBundleFromChecklistItems(
   if (financialInfo.length) sourcesHit.push('G7-5')
 
   let formerSubsidiaries = parseG712FormerSubsidiaries(findChecklistValue(items, G7_12_ROWS_KEY))
-  if (formerSubsidiaries.length) sourcesHit.push('G7-12')
-  else {
-    formerSubsidiaries = parseG712FormerSubsidiaries(findChecklistValue(items, G7_11_ROWS_KEY))
-    if (formerSubsidiaries.length) sourcesHit.push('G7-11')
+  let formerSource: 'G7-12' | 'G7-11' | null = formerSubsidiaries.length ? 'G7-12' : null
+  if (!formerSubsidiaries.length) {
+    formerSubsidiaries = parseG711FormerSubsidiaries(findChecklistValue(items, G7_11_ROWS_KEY))
+    if (formerSubsidiaries.length) formerSource = 'G7-11'
   }
+  if (formerSource) sourcesHit.push(formerSource)
 
   const unrecognizedLoss = parseG716UnrecognizedLoss(findChecklistValue(items, G7_16_ROWS_KEY))
   if (unrecognizedLoss.length) sourcesHit.push('G7-16')
@@ -1460,6 +2405,30 @@ export function buildSourceBundleFromChecklistItems(
   }
   if (equityBridge.length) sourcesHit.push('G7-14')
 
+  let impairmentTests = parseG717Impairment(findChecklistValue(items, G7_17_ROWS_KEY))
+  if (!impairmentTests.length) {
+    impairmentTests = parseG717Impairment(findChecklistValue(items, G7_17_SECTION_KEY))
+  }
+  if (impairmentTests.length) {
+    sourcesHit.push('G7-17')
+    equityBridge = mergeG717IntoEquityBridge(equityBridge, impairmentTests)
+  }
+
+  const commonControlMergers = parseG78CommonControlMergers(findChecklistValue(items, G7_8_ROWS_KEY))
+  if (commonControlMergers.length) sourcesHit.push('G7-8')
+
+  const nonCommonControlMergers = parseG79NonCommonControlMergers(findChecklistValue(items, G7_9_ROWS_KEY))
+  if (nonCommonControlMergers.length) sourcesHit.push('G7-9')
+
+  const policyDifferences = parseG76PolicyDifferences(findChecklistValue(items, G7_6_ROWS_KEY))
+  if (policyDifferences.length) sourcesHit.push('G7-6')
+
+  const controlJudgmentNarrative = parseG77ControlJudgmentNarrative(
+    findChecklistValue(items, G7_7_CONTROL_KEY),
+    findChecklistValue(items, G7_7_CONCLUSION_KEY),
+  )
+  if (controlJudgmentNarrative) sourcesHit.push('G7-7')
+
   return {
     classification,
     detail,
@@ -1469,6 +2438,11 @@ export function buildSourceBundleFromChecklistItems(
     unrecognizedLoss,
     ownershipImpacts,
     equityBridge,
+    impairmentTests,
+    commonControlMergers,
+    nonCommonControlMergers,
+    policyDifferences,
+    controlJudgmentNarrative,
     sourcesHit,
   }
 }
@@ -1477,6 +2451,7 @@ export function refreshListedTablesFromSources(
   tables: Record<string, G7DisclosureRow[]>,
   bundle: G7DisclosureSourceBundle,
   force = false,
+  texts?: Record<string, string>,
 ): string[] {
   const filled: string[] = []
   if (bundle.detail && tables['investment-movement']) {
@@ -1505,8 +2480,27 @@ export function refreshListedTablesFromSources(
       })) {
       filled.push('joint-operations')
     }
+    if (tables['important-minority-subsidiaries']
+      && applyListedMinoritySubsidiariesFromG74(
+        tables['important-minority-subsidiaries'],
+        bundle.basicInfo,
+        force,
+        bundle.financialInfo,
+      )) {
+      filled.push('important-minority-subsidiaries')
+    }
   }
   filled.push(...applyFinancialInfoFromG75(tables, bundle.financialInfo, bundle.basicInfo, force, 'listed'))
+  filled.push(...applyListedMinorityFsFromG75(
+    {
+      closing: tables['minority-closing-balance'],
+      opening: tables['minority-opening-balance'],
+      results: tables['minority-results'],
+    },
+    bundle.financialInfo,
+    bundle.basicInfo,
+    force,
+  ))
   filled.push(...applyListedEquityBridgeFromG714(tables, bundle.equityBridge, bundle.basicInfo, force))
   if (tables['unimportant-aggregate']) {
     const jv = bundle.basicInfo.filter(r => r.groupType === 'joint_venture').map(r => r.investeeName.trim())
@@ -1558,6 +2552,37 @@ export function refreshListedTablesFromSources(
       filled.push('excess-losses')
     }
   }
+  const policyDraft = buildG76PolicyDifferenceNarrative(bundle.policyDifferences ?? [])
+  if (appendNarrativeIfEmpty(texts, 'policy-differences', policyDraft, force)) {
+    filled.push('policy-differences')
+  }
+  // 优先 G7-7 综合叙述；否则用 G7-4 原因字段拼草稿
+  const controlDraft = String(bundle.controlJudgmentNarrative || '').trim()
+    || buildControlJudgementNarrative(bundle.basicInfo, 'subsidiary')
+  if (appendNarrativeIfEmpty(texts, 'subsidiary-control-judgement', controlDraft, force)) {
+    filled.push('subsidiary-control-judgement')
+  }
+  const jvJudgeDraft = buildControlJudgementNarrative(bundle.basicInfo, 'jv-associate')
+    || (
+      /共同控制|重大影响/.test(String(bundle.controlJudgmentNarrative || ''))
+        ? String(bundle.controlJudgmentNarrative || '').trim()
+        : ''
+    )
+  if (appendNarrativeIfEmpty(texts, 'jv-associate-judgement', jvJudgeDraft, force)) {
+    filled.push('jv-associate-judgement')
+  }
+  const ownershipDraft = buildOwnershipChangeNarrative(bundle.ownershipImpacts)
+  if (appendNarrativeIfEmpty(texts, 'ownership-change-description', ownershipDraft, force)) {
+    filled.push('ownership-change-description')
+  }
+  const impairmentDraft = buildImpairmentMethodNarrative(bundle.impairmentTests ?? [])
+  if (appendNarrativeIfEmpty(texts, 'impairment-method', impairmentDraft, force)) {
+    filled.push('impairment-method')
+  }
+  const joDraft = buildJointOperationBasisNarrative(bundle.basicInfo)
+  if (appendNarrativeIfEmpty(texts, 'joint-operation-basis', joDraft, force)) {
+    filled.push('joint-operation-basis')
+  }
   return [...new Set(filled)]
 }
 
@@ -1565,11 +2590,17 @@ export function refreshSoeTablesFromSources(
   tables: Record<string, G7DisclosureRow[]>,
   bundle: G7DisclosureSourceBundle,
   force = false,
+  texts?: Record<string, string>,
 ): string[] {
   const filled: string[] = []
   if (bundle.classification && tables['lte-classification']) {
     if (applySoeClassificationFromG71(tables['lte-classification'], bundle.classification, force)) {
       filled.push('lte-classification')
+    }
+  }
+  if (bundle.impairmentTests?.length && tables['lte-classification']) {
+    if (applySoeImpairmentFromG717(tables['lte-classification'], bundle.impairmentTests, force)) {
+      if (!filled.includes('lte-classification')) filled.push('lte-classification')
     }
   }
   if (bundle.detail && tables['lte-movement']) {
@@ -1595,8 +2626,32 @@ export function refreshSoeTablesFromSources(
       && applySoeNewlyConsolidatedFromG74(tables['newly-consolidated'], bundle.basicInfo, force)) {
       filled.push('newly-consolidated')
     }
+    if (tables['minority-shareholders']
+      && applySoeMinorityShareholdersFromG74(
+        tables['minority-shareholders'],
+        bundle.basicInfo,
+        force,
+        bundle.financialInfo,
+      )) {
+      filled.push('minority-shareholders')
+    }
   }
   filled.push(...applyFinancialInfoFromG75(tables, bundle.financialInfo, bundle.basicInfo, force, 'soe'))
+
+  if (tables['minority-financials'] && bundle.financialInfo.length && bundle.basicInfo.length) {
+    const minorityNames = minoritySubsidiarySources(bundle.basicInfo)
+      .map(r => r.investeeName.trim())
+      .slice(0, 5)
+    const slots = minorityNames.map((name, index) => ({
+      name,
+      currentKey: `c${index + 1}Current`,
+      priorKey: `c${index + 1}Prior`,
+    }))
+    if (applyMatrixMetrics(tables['minority-financials'], bundle.financialInfo, slots, force)) {
+      filled.push('minority-financials')
+    }
+  }
+
   filled.push(...applySoeEquityBridgeFromG714(tables, bundle.equityBridge, bundle.basicInfo, force))
   if (tables['insignificant-aggregate']) {
     const jv = bundle.basicInfo.filter(r => r.groupType === 'joint_venture').map(r => r.investeeName.trim())
@@ -1633,10 +2688,91 @@ export function refreshSoeTablesFromSources(
     }
   }
   if (tables['former-subsidiary-basic'] && bundle.formerSubsidiaries.length) {
-    if (applyFormerSubsidiaryBasicFromG712(tables['former-subsidiary-basic'], bundle.formerSubsidiaries, force)) {
+    const sourceLabel = bundle.sourcesHit.includes('G7-12')
+      ? '处置子公司测试表G7-12'
+      : '处置子公司测试表G7-11'
+    if (applyFormerSubsidiaryBasicFromG712(
+      tables['former-subsidiary-basic'],
+      bundle.formerSubsidiaries,
+      force,
+      sourceLabel,
+    )) {
       filled.push('former-subsidiary-basic')
     }
   }
+
+  if (bundle.formerSubsidiaries.length && bundle.financialInfo.length) {
+    const names = bundle.formerSubsidiaries.map(r => r.investeeName.trim()).filter(Boolean)
+    if (tables['former-subsidiary-position']) {
+      const slots = names.slice(0, 2).map((name, index) => ({
+        name,
+        currentKey: `c${index + 1}SaleDate`,
+        priorKey: `c${index + 1}Opening`,
+      }))
+      if (applyMatrixMetrics(tables['former-subsidiary-position'], bundle.financialInfo, slots, force)) {
+        filled.push('former-subsidiary-position')
+      }
+    }
+    if (tables['former-subsidiary-results']) {
+      const letters = ['a', 'b', 'c', 'd', 'e']
+      const slots = names.slice(0, 5).map((name, index) => ({
+        name,
+        currentKey: `${letters[index]}Current`,
+        priorKey: `${letters[index]}Prior`,
+      }))
+      if (applyMatrixMetrics(tables['former-subsidiary-results'], bundle.financialInfo, slots, force)) {
+        filled.push('former-subsidiary-results')
+      }
+    }
+  }
+
+  if (tables['common-control-combination'] && bundle.commonControlMergers?.length) {
+    if (applySoeCommonControlFromG78(
+      tables['common-control-combination'],
+      bundle.commonControlMergers,
+      force,
+      bundle.financialInfo,
+    )) {
+      filled.push('common-control-combination')
+    }
+    const draft = bundle.commonControlMergers
+      .map((s) => {
+        const bits = [`【${s.investeeName}】`]
+        if (s.consolidationDate) bits.push(`合并日 ${s.consolidationDate}`)
+        if (s.basisNote) bits.push(s.basisNote)
+        return bits.join('：')
+      })
+      .filter(Boolean)
+      .join('\n')
+    if (appendNarrativeIfEmpty(texts, 'common-control-basis', draft, force)) {
+      filled.push('common-control-basis')
+    }
+  }
+
+  if (tables['non-common-control-combination'] && bundle.nonCommonControlMergers?.length) {
+    if (applySoeNonCommonControlFromG79(
+      tables['non-common-control-combination'],
+      bundle.nonCommonControlMergers,
+      force,
+      bundle.financialInfo,
+    )) {
+      filled.push('non-common-control-combination')
+    }
+    const draft = bundle.nonCommonControlMergers
+      .map((s) => {
+        const bits = [`【${s.investeeName}】`]
+        if (s.purchaseDate) bits.push(`购买日 ${s.purchaseDate}`)
+        if (s.purchaseDateBasis) bits.push(`依据：${s.purchaseDateBasis}`)
+        if (s.notes) bits.push(s.notes)
+        return bits.join('；')
+      })
+      .filter(Boolean)
+      .join('\n')
+    if (appendNarrativeIfEmpty(texts, 'non-common-control-notes', draft, force)) {
+      filled.push('non-common-control-notes')
+    }
+  }
+
   if (tables['unrecognized-losses'] && bundle.unrecognizedLoss.length) {
     if (applyUnrecognizedLossFromG716(tables['unrecognized-losses'], bundle.unrecognizedLoss, bundle.basicInfo, {
       jvPrefix: 'ul-jv-',
@@ -1652,6 +2788,35 @@ export function refreshSoeTablesFromSources(
     })) {
       filled.push('unrecognized-losses')
     }
+  }
+  const policyDraft = buildG76PolicyDifferenceNarrative(bundle.policyDifferences ?? [])
+  if (appendNarrativeIfEmpty(texts, 'policy-estimate-differences', policyDraft, force)) {
+    filled.push('policy-estimate-differences')
+  }
+  const holdingVotingDraft = buildControlJudgementNarrative(bundle.basicInfo, 'subsidiary')
+    || String(bundle.controlJudgmentNarrative || '').trim()
+  if (appendNarrativeIfEmpty(texts, 'holding-voting-diff', holdingVotingDraft, force)) {
+    filled.push('holding-voting-diff')
+  }
+  const lteHoldingDraft = buildControlJudgementNarrative(bundle.basicInfo, 'jv-associate')
+  if (appendNarrativeIfEmpty(texts, 'lte-holding-voting-diff', lteHoldingDraft, force)) {
+    filled.push('lte-holding-voting-diff')
+  }
+  const jointControlDraft = buildJointControlBasisNarrative(bundle.basicInfo)
+  if (appendNarrativeIfEmpty(texts, 'joint-control-basis', jointControlDraft, force)) {
+    filled.push('joint-control-basis')
+  }
+  const ownershipDraft = buildOwnershipChangeNarrative(bundle.ownershipImpacts)
+  if (appendNarrativeIfEmpty(texts, 'ownership-change-description', ownershipDraft, force)) {
+    filled.push('ownership-change-description')
+  }
+  const saleDateDraft = buildSaleDateMethodNarrative(bundle.formerSubsidiaries)
+  if (appendNarrativeIfEmpty(texts, 'sale-date-method', saleDateDraft, force)) {
+    filled.push('sale-date-method')
+  }
+  const remMeasureDraft = buildRemainingEquityRemeasurementNarrative(bundle.formerSubsidiaries)
+  if (appendNarrativeIfEmpty(texts, 'remaining-equity-remeasurement', remMeasureDraft, force)) {
+    filled.push('remaining-equity-remeasurement')
   }
   return [...new Set(filled)]
 }
@@ -1684,7 +2849,7 @@ function mergeChecklistItems(target: ChecklistItem[], extra: ChecklistItem[]): C
   return [...map.values()]
 }
 
-/** 加载 G7-1/2/4/5/10/12/14/16 源数据：本底稿 + cycle_workpapers 兄弟底稿。 */
+/** 加载 G7-1/2/4/5/8/9/10/12/14/16 源数据：本底稿 + cycle_workpapers 兄弟底稿。 */
 export async function loadG7DisclosureSources(options: {
   wpId: string
   htmlData?: Record<string, unknown> | null
@@ -1736,6 +2901,24 @@ export async function loadG7DisclosureSources(options: {
       bundle.sourcesHit.push('G7-5')
     }
   }
+  if (!(bundle.policyDifferences?.length)) {
+    const fromHtml = parseG76PolicyDifferences(
+      html.accountingPolicy ?? html.accounting_policy ?? html.g76Rows ?? null,
+    )
+    if (fromHtml.length) {
+      bundle.policyDifferences = fromHtml
+      bundle.sourcesHit.push('G7-6')
+    }
+  }
+  if (!bundle.controlJudgmentNarrative) {
+    const fromHtml = parseG77ControlJudgmentNarrative(
+      html.controlJudgment ?? html.control_judgment ?? html.g77 ?? null,
+    )
+    if (fromHtml) {
+      bundle.controlJudgmentNarrative = fromHtml
+      bundle.sourcesHit.push('G7-7')
+    }
+  }
   if (!bundle.ownershipImpacts.length) {
     const fromHtml = parseG710OwnershipImpacts(
       html.subsequentMeasurement
@@ -1766,13 +2949,50 @@ export async function loadG7DisclosureSources(options: {
       bundle.sourcesHit.push('G7-16')
     }
   }
+  if (!bundle.impairmentTests?.length) {
+    const fromHtml = parseG717Impairment(
+      html.impairmentTest ?? html.impairment_test ?? html.g717Rows ?? html.g717 ?? null,
+    )
+    if (fromHtml.length) {
+      bundle.impairmentTests = fromHtml
+      bundle.sourcesHit.push('G7-17')
+      bundle.equityBridge = mergeG717IntoEquityBridge(bundle.equityBridge, fromHtml)
+    }
+  }
   if (!bundle.formerSubsidiaries.length) {
     const pkg = html.disposalPackage as any
     const single = html.disposalSingle as any
-    const fromHtml = parseG712FormerSubsidiaries(pkg ?? single ?? null)
+    if (pkg) {
+      const fromHtml = parseG712FormerSubsidiaries(pkg)
+      if (fromHtml.length) {
+        bundle.formerSubsidiaries = fromHtml
+        bundle.sourcesHit.push('G7-12')
+      }
+    }
+    if (!bundle.formerSubsidiaries.length && single) {
+      const fromHtml = parseG711FormerSubsidiaries(single)
+      if (fromHtml.length) {
+        bundle.formerSubsidiaries = fromHtml
+        bundle.sourcesHit.push('G7-11')
+      }
+    }
+  }
+  if (!bundle.commonControlMergers?.length) {
+    const fromHtml = parseG78CommonControlMergers(
+      html.sameControlMeasurement ?? html.same_control ?? html.g78Rows ?? html.g78 ?? null,
+    )
     if (fromHtml.length) {
-      bundle.formerSubsidiaries = fromHtml
-      bundle.sourcesHit.push(pkg ? 'G7-12' : 'G7-11')
+      bundle.commonControlMergers = fromHtml
+      bundle.sourcesHit.push('G7-8')
+    }
+  }
+  if (!bundle.nonCommonControlMergers?.length) {
+    const fromHtml = parseG79NonCommonControlMergers(
+      html.notSameControlMeasurement ?? html.not_same_control ?? html.g79Rows ?? html.g79 ?? null,
+    )
+    if (fromHtml.length) {
+      bundle.nonCommonControlMergers = fromHtml
+      bundle.sourcesHit.push('G7-9')
     }
   }
   return bundle

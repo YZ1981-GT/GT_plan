@@ -7,7 +7,6 @@
         <el-button size="small" type="success" :disabled="isReadonly || !isBalanced" @click="handleSaveWriteback">
           保存&amp;回写
         </el-button>
-        <!-- 导入导出 el-dropdown -->
         <el-dropdown trigger="click" size="small" @command="handleIECommand">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -18,6 +17,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
+        <el-button size="small" :disabled="isReadonly" @click="handleAiConclusion">🤖AI辅助</el-button>
         <el-button size="small" @click="openReview">💬复核</el-button>
       </div>
     </div>
@@ -30,6 +30,7 @@
         <p>3. 每一调整事项应形成完整借贷分录，整表借贷平衡后才能确认；确认后同步集中调整分录模块并回写 G7-1。</p>
         <p>4. 1511 长期股权投资按借方减贷方回写；1512 减值准备按贷方减借方回写。</p>
         <p>5. 可从集中调整分录模块拉取涉及 1511/1512 的完整分录组，避免只取单边导致底稿失衡。</p>
+        <p>6. G7-14/G7-13 推入的建议草稿标黄；请「采纳」后再保存推集中模块，「清除」则丢弃。</p>
       </div>
     </details>
 
@@ -63,6 +64,24 @@
       >
         从调整分录模块同步
       </el-button>
+      <el-button
+        size="small"
+        type="success"
+        plain
+        :disabled="isReadonly || suggestedDraftCount === 0"
+        @click="adoptAllSuggested"
+      >
+        采纳全部建议 ({{ suggestedDraftCount }})
+      </el-button>
+      <el-button
+        size="small"
+        type="warning"
+        plain
+        :disabled="isReadonly || suggestedDraftCount === 0"
+        @click="clearSuggestedDrafts"
+      >
+        清除建议草稿 ({{ suggestedDraftCount }})
+      </el-button>
       <span class="row-count">共 {{ entries.length }} 行</span>
       <span v-if="lastSyncMsg" class="sync-msg">{{ lastSyncMsg }}</span>
     </div>
@@ -81,14 +100,19 @@
     >
       <el-table-column label="调整事项说明" min-width="180">
         <template #default="{ row }">
-          <el-input
-            v-if="!isReadonly"
-            v-model="row.description"
-            size="small"
-            placeholder="说明调整原因及依据"
-            @change="handleRowChanged(row)"
-          />
-          <span v-else>{{ row.description || '-' }}</span>
+          <div class="desc-cell">
+            <el-tag v-if="isSuggestedDraft(row)" size="small" type="warning" class="draft-tag">
+              {{ sourceKindLabel(row.sourceKind) || '建议' }}
+            </el-tag>
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.description"
+              size="small"
+              placeholder="说明调整原因及依据"
+              @change="handleRowChanged(row)"
+            />
+            <span v-else>{{ row.description || '-' }}</span>
+          </div>
         </template>
       </el-table-column>
 
@@ -155,7 +179,7 @@
       <el-table-column label="借方调整金额" width="125" align="right">
         <template #default="{ row }">
           <el-input-number
-            v-if="!isReadonly"
+            v-if="!isReadonly && !isSuggestedDraft(row)"
             v-model="row.debitAmount"
             size="small"
             :controls="false"
@@ -171,7 +195,7 @@
       <el-table-column label="贷方调整金额" width="125" align="right">
         <template #default="{ row }">
           <el-input-number
-            v-if="!isReadonly"
+            v-if="!isReadonly && !isSuggestedDraft(row)"
             v-model="row.creditAmount"
             size="small"
             :controls="false"
@@ -208,8 +232,17 @@
         </template>
       </el-table-column>
 
-      <el-table-column v-if="!isReadonly" label="操作" width="56" align="center">
+      <el-table-column v-if="!isReadonly" label="操作" width="100" align="center">
         <template #default="{ row }">
+          <el-button
+            v-if="isSuggestedDraft(row)"
+            link
+            size="small"
+            type="success"
+            @click="adoptSuggestedRow(row.id)"
+          >
+            采纳
+          </el-button>
           <el-button link size="small" type="danger" @click="handleRemoveEntry(row.id)">
             🗑️
           </el-button>
@@ -230,7 +263,10 @@
     <!-- 审计说明 -->
     <el-card class="note-card" shadow="never">
       <template #header>
-        <div class="card-header"><span>审计说明</span></div>
+        <div class="card-header">
+          <span>审计说明</span>
+          <el-button size="small" :disabled="isReadonly" @click="handleAiNote">🤖AI辅助</el-button>
+        </div>
       </template>
       <el-input v-model="auditNote" type="textarea"
         :autosize="{ minRows: 5 }" :disabled="isReadonly"
@@ -241,7 +277,10 @@
     <!-- 审计结论 -->
     <el-card class="note-card" shadow="never">
       <template #header>
-        <div class="card-header"><span>审计结论</span></div>
+        <div class="card-header">
+          <span>审计结论</span>
+          <el-button size="small" :disabled="isReadonly" @click="handleAiConclusion">🤖AI辅助</el-button>
+        </div>
       </template>
       <el-input v-model="auditConclusion" type="textarea"
         :autosize="{ minRows: 3 }" :disabled="isReadonly"
@@ -275,6 +314,18 @@ import type { G7MainImportableSheet } from '../../composables/useG7ImportExport'
 import { api } from '@/services/apiProxy'
 import { adjustments as adjustmentPaths } from '@/services/apiPaths/accounting'
 import { eventBus } from '@/utils/eventBus'
+import {
+  G7_ADJUSTMENT_PUSHED_EVENT,
+  adoptAllSuggestedDrafts,
+  adoptSuggestedDraft,
+  aggregateAccount as aggregateAccountPure,
+  aggregateByInvestee,
+  applyInvesteeWritebackToGroups,
+  isPushableToModule,
+  isSuggestedDraft,
+  normalizeG73Entry,
+  sourceKindLabel,
+} from './g7AdjustmentModel'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -295,6 +346,10 @@ interface G7AdjustmentEntry {
   noteItem: string
   indexRef: string
   sourceGroupId?: string
+  /** 建议草稿来源：g7-14-suggested / g7-13-bargain-suggested */
+  sourceKind?: string
+  /** 被投资单位（建议分录 / 按单位回写） */
+  investeeName?: string
   /** 兼容历史存量和导入导出契约 */
   entryType: 'AJE' | 'RJE'
   date: string
@@ -374,6 +429,9 @@ const isBalanced = computed(() =>
     entries.value.map((e) => e.creditAmount),
   ),
 )
+const suggestedDraftCount = computed(() =>
+  entries.value.filter((e) => isSuggestedDraft(e)).length,
+)
 
 // ═══ 初始化 ═══
 function generateId(): string {
@@ -389,6 +447,8 @@ function createEntry(description = ''): G7AdjustmentEntry {
     reportItem: '长期股权投资',
     noteItem: '',
     indexRef: 'G7-3',
+    sourceKind: undefined,
+    investeeName: undefined,
     entryType: 'AJE',
     date: '',
     summary: description,
@@ -402,33 +462,7 @@ function createEntry(description = ''): G7AdjustmentEntry {
 }
 
 function normalizeEntry(raw: any, index: number): G7AdjustmentEntry {
-  const category = raw.category
-    || (raw.entryType === 'RJE' ? '报表调整' : '账项调整')
-  const knownByName = accountOptions.find((item) =>
-    String(raw.accountName || '').includes(item.name),
-  )
-  const accountCode = String(raw.accountCode || knownByName?.code || '1511')
-  const known = accountOptions.find((item) => item.code === accountCode)
-  const description = String(raw.description || raw.summary || '')
-  return {
-    id: String(raw.id || raw.rowId || generateId()),
-    seq: index + 1,
-    description,
-    category,
-    reportItem: String(raw.reportItem || '长期股权投资'),
-    noteItem: String(raw.noteItem || ''),
-    indexRef: String(raw.indexRef || 'G7-3'),
-    sourceGroupId: raw.sourceGroupId ? String(raw.sourceGroupId) : undefined,
-    entryType: category === '报表调整' ? 'RJE' : 'AJE',
-    date: String(raw.date || ''),
-    summary: description,
-    accountCode,
-    accountName: String(raw.accountName || known?.name || ''),
-    debitAmount: parseNum(raw.debitAmount ?? raw.debit),
-    creditAmount: parseNum(raw.creditAmount ?? raw.credit),
-    preparedBy: String(raw.preparedBy || ''),
-    remark: String(raw.remark || ''),
-  }
+  return normalizeG73Entry(raw, index, { generateId }) as G7AdjustmentEntry
 }
 
 function parseStoredEntries(raw: unknown): G7AdjustmentEntry[] {
@@ -473,11 +507,13 @@ onMounted(async () => {
   await Promise.all([loadEntries(), loadAuditResponses()])
   eventBus.on('adjustment:updated', handleModuleUpdated)
   eventBus.on('adjustment:saved', handleModuleUpdated)
+  window.addEventListener(G7_ADJUSTMENT_PUSHED_EVENT, onAdjustmentPushed as EventListener)
 })
 
 onBeforeUnmount(() => {
   eventBus.off('adjustment:updated', handleModuleUpdated)
   eventBus.off('adjustment:saved', handleModuleUpdated)
+  window.removeEventListener(G7_ADJUSTMENT_PUSHED_EVENT, onAdjustmentPushed as EventListener)
   if (isDirty.value) void persistEntries().catch(() => {})
 })
 
@@ -540,17 +576,7 @@ async function handleRemoveEntry(id: string): Promise<void> {
 }
 
 function aggregateAccount(codePrefix: '1511' | '1512'): { ajeTotal: number; rjeTotal: number } {
-  let ajeTotal = 0
-  let rjeTotal = 0
-  for (const entry of entries.value) {
-    if (!entry.accountCode.startsWith(codePrefix)) continue
-    const debitMinusCredit = parseNum(entry.debitAmount) - parseNum(entry.creditAmount)
-    // 减值准备是资产备抵科目，增加额按贷方减借方列示
-    const amount = codePrefix === '1512' ? -debitMinusCredit : debitMinusCredit
-    if (entry.category === '报表调整') rjeTotal += amount
-    else ajeTotal += amount
-  }
-  return { ajeTotal, rjeTotal }
+  return aggregateAccountPure(entries.value, codePrefix)
 }
 
 function dispatchWriteback(accountCode: '1511' | '1512', totals: { ajeTotal: number; rjeTotal: number }): void {
@@ -559,6 +585,7 @@ function dispatchWriteback(accountCode: '1511' | '1512', totals: { ajeTotal: num
       accountCode,
       ...totals,
       totalAdjustment: totals.ajeTotal + totals.rjeTotal,
+      byInvestee: aggregateByInvestee(entries.value, accountCode),
       entries: entries.value,
     },
   }))
@@ -595,20 +622,34 @@ async function persistAdjudicationWriteback(
   } catch {
     data = structuredClone(props.htmlData?.adjudication || { groups: [] })
   }
+  const byInvesteeGross = aggregateByInvestee(entries.value, '1511')
+  const byInvesteeImpair = aggregateByInvestee(entries.value, '1512')
   const saveItems: any[] = [{
     item_id: 'G7-1-adjustment-writeback',
     conclusion: null,
-    remark: JSON.stringify({ gross, impairment, updatedAt: new Date().toISOString() }),
+    remark: JSON.stringify({
+      gross,
+      impairment,
+      byInvesteeGross,
+      byInvesteeImpair,
+      updatedAt: new Date().toISOString(),
+    }),
   }]
   if (Array.isArray(data?.groups) && data.groups.length > 0) {
-    const impairmentGroup = data.groups.find((group: any) =>
-      group.id === 'impairment' || group.groupType === 'impairment',
-    )
-    const investmentGroup = data.groups.find((group: any) =>
-      !['impairment', 'total'].includes(group.id || group.groupType),
-    )
-    applyTotalsToGroup(investmentGroup, gross)
-    applyTotalsToGroup(impairmentGroup, impairment)
+    const appliedGross = applyInvesteeWritebackToGroups(data.groups, byInvesteeGross, '1511')
+    const appliedImpair = applyInvesteeWritebackToGroups(data.groups, byInvesteeImpair, '1512')
+    if (!appliedGross) {
+      const investmentGroup = data.groups.find((group: any) =>
+        !['impairment', 'total'].includes(group.id || group.groupType),
+      )
+      applyTotalsToGroup(investmentGroup, gross)
+    }
+    if (!appliedImpair) {
+      const impairmentGroup = data.groups.find((group: any) =>
+        group.id === 'impairment' || group.groupType === 'impairment',
+      )
+      applyTotalsToGroup(impairmentGroup, impairment)
+    }
     saveItems.push({
       item_id: 'G7-1-adjudication-data',
       conclusion: null,
@@ -643,9 +684,7 @@ async function pushToAdjustmentModule(): Promise<number> {
   if (!props.projectId || props.isReadonly) return 0
   const year = Number(auditYear.value)
   if (!Number.isFinite(year) || year < 1900) return 0
-  const pending = entries.value.filter(
-    (entry) => !entry.sourceGroupId && (entry.debitAmount !== 0 || entry.creditAmount !== 0),
-  )
+  const pending = entries.value.filter((entry) => isPushableToModule(entry))
   const groups = new Map<string, G7AdjustmentEntry[]>()
   for (const entry of pending) {
     const key = `${entry.category}||${entry.description || entry.id}`
@@ -783,8 +822,154 @@ async function handleSyncFromModule(): Promise<void> {
   else ElMessage.info(lastSyncMsg.value || '无相关分录')
 }
 
-function handleModuleUpdated(): void {
+function handleModuleUpdated(payload?: unknown): void {
+  // 建议推送只发 g7:adjustment-pushed；若误带 source=suggested 则忽略，防止覆盖草稿
+  const src = String((payload as any)?.source || (payload as any)?.detail?.source || '')
+  if (src.includes('suggested') || src.includes('G7-14') || src.includes('G7-13')) return
   if (!props.isReadonly && props.projectId) void syncFromAdjustmentModule()
+}
+
+async function onAdjustmentPushed(ev: Event): Promise<void> {
+  const detail = (ev as CustomEvent).detail || {}
+  if (detail.mainWpId && detail.mainWpId !== props.wpId) return
+  // 推送结果以 checklist 为准；丢弃本地 dirty，避免卸载时盖写
+  isDirty.value = false
+  await loadEntries()
+  ElMessage.success(
+    detail.count
+      ? `已接收上游建议分录 ${detail.count} 行`
+      : '已刷新 G7-3（上游建议分录已写入）',
+  )
+}
+
+async function adoptSuggestedRow(rowId: string): Promise<void> {
+  const row = entries.value.find((e) => e.id === rowId)
+  if (!row || !isSuggestedDraft(row)) return
+  const next = adoptSuggestedDraft(row)
+  Object.assign(row, next)
+  markDirty()
+  await persistEntries()
+  isDirty.value = false
+  ElMessage.success('已采纳为手工分录')
+}
+
+async function adoptAllSuggested(): Promise<void> {
+  if (props.isReadonly || suggestedDraftCount.value === 0) return
+  try {
+    await ElMessageBox.confirm(
+      `将采纳 ${suggestedDraftCount.value} 行建议草稿（清除来源标记，可随后推入集中模块）。是否继续？`,
+      '采纳全部建议',
+      { confirmButtonText: '采纳', cancelButtonText: '取消', type: 'info' },
+    )
+  } catch {
+    return
+  }
+  entries.value = adoptAllSuggestedDrafts(entries.value).map((e, i) => ({ ...e, seq: i + 1 }))
+  markDirty()
+  await persistEntries()
+  isDirty.value = false
+  ElMessage.success('已全部采纳')
+}
+
+async function clearSuggestedDrafts(): Promise<void> {
+  if (props.isReadonly || suggestedDraftCount.value === 0) return
+  try {
+    await ElMessageBox.confirm(
+      `将清除 ${suggestedDraftCount.value} 行建议草稿（保留手工分录与模块同步行）。是否继续？`,
+      '清除建议草稿',
+      { confirmButtonText: '清除', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  entries.value = entries.value
+    .filter((e) => !isSuggestedDraft(e))
+    .map((e, i) => ({ ...e, seq: i + 1 }))
+  if (!entries.value.length) entries.value = [createEntry()]
+  markDirty()
+  await persistEntries()
+  isDirty.value = false
+  ElMessage.success('已清除建议草稿')
+}
+
+async function handleAiConclusion(): Promise<void> {
+  if (props.isReadonly) return
+  try {
+    const res: any = await api.post(
+      `/api/workpapers/${props.wpId}/g7-main/ai/adjustment-conclusion`,
+      {
+        existingContent: auditConclusion.value,
+        relatedContext: {
+          entries: entries.value,
+          balanced: isBalanced.value,
+          totalDebits: totalDebits.value,
+          totalCredits: totalCredits.value,
+        },
+      },
+    )
+    const aiText = res?.data?.content ?? res?.content ?? ''
+    if (aiText) {
+      auditConclusion.value = auditConclusion.value
+        ? `${auditConclusion.value}\n${aiText}`
+        : aiText
+      saveConclusion()
+      ElMessage.success('AI结论已生成')
+    } else {
+      generateLocalConclusion()
+    }
+  } catch {
+    generateLocalConclusion()
+  }
+}
+
+async function handleAiNote(): Promise<void> {
+  if (props.isReadonly) return
+  try {
+    const res: any = await api.post(
+      `/api/workpapers/${props.wpId}/g7-main/ai/adjustment-note`,
+      {
+        existingContent: auditNote.value,
+        relatedContext: {
+          entries: entries.value,
+          suggestedDraftCount: suggestedDraftCount.value,
+        },
+      },
+    )
+    const aiText = res?.data?.content ?? res?.content ?? ''
+    if (aiText) {
+      auditNote.value = auditNote.value ? `${auditNote.value}\n${aiText}` : aiText
+      saveNote()
+      ElMessage.success('AI说明已生成')
+    } else {
+      generateLocalNote()
+    }
+  } catch {
+    generateLocalNote()
+  }
+}
+
+function generateLocalConclusion(): void {
+  const draft =
+    `经复核，本期 G7-3 共 ${entries.value.length} 行调整分录，` +
+    (isBalanced.value ? '借贷平衡。' : `借贷不平衡（差额 ${fmt(Math.abs(balanceDiff.value))}），待补齐。`) +
+    (suggestedDraftCount.value
+      ? `其中建议草稿 ${suggestedDraftCount.value} 行，需确认采纳或清除。`
+      : '') +
+    ` 1511 净影响 AJE ${fmt(aggregateAccount('1511').ajeTotal)} / RJE ${fmt(aggregateAccount('1511').rjeTotal)}。`
+  auditConclusion.value = auditConclusion.value
+    ? `${auditConclusion.value}\n${draft}`
+    : draft
+  saveConclusion()
+  ElMessage.success('已生成本地结论')
+}
+
+function generateLocalNote(): void {
+  const draft =
+    `已执行调整分录完整性与借贷平衡复核；` +
+    `建议草稿 ${suggestedDraftCount.value} 行、手工/模块同步 ${entries.value.length - suggestedDraftCount.value} 行。`
+  auditNote.value = auditNote.value ? `${auditNote.value}\n${draft}` : draft
+  saveNote()
+  ElMessage.success('已生成本地说明')
 }
 
 /** 导入导出命令处理 */
@@ -824,8 +1009,9 @@ function fmtAbs(v: number): string {
   return Math.abs(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-/** 表格行class（RJE浅色区分） */
+/** 表格行class（RJE / 建议草稿区分） */
 function tableRowClassName({ row }: { row: G7AdjustmentEntry }): string {
+  if (isSuggestedDraft(row)) return 'suggested-row'
   if (row.entryType === 'RJE') return 'rje-row'
   return ''
 }
@@ -945,10 +1131,21 @@ function tableRowClassName({ row }: { row: G7AdjustmentEntry }): string {
 /* 审计说明/结论卡片 */
 .note-card { margin-top: 12px; }
 .card-header { display: flex; align-items: center; justify-content: space-between; font-weight: 500; }
+.desc-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.draft-tag {
+  align-self: flex-start;
+}
 
 /* RJE行浅色区分 */
 :deep(.rje-row) {
   background-color: #fdf6ec !important;
+}
+:deep(.suggested-row) {
+  background-color: #f0f9eb !important;
 }
 
 /* 编制提示 */

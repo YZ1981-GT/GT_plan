@@ -68,14 +68,42 @@
       <template #header>
         <div class="conclusion-header">
           <span class="conclusion-title">三、初始确认决策结果</span>
-          <el-button v-if="!isReadonly" size="small" @click="fillConclusionDraft">生成结论草稿</el-button>
+          <div class="decision-header-actions">
+            <el-button v-if="!isReadonly" size="small" :loading="investeeLoading" @click="loadG74Investees(true)">刷新 G7-4</el-button>
+            <el-button v-if="!isReadonly" size="small" type="warning" plain @click="applyQuestionnaireSuggestion">按问卷建议关系类型</el-button>
+            <el-button v-if="!isReadonly" size="small" @click="fillConclusionDraft">生成结论草稿</el-button>
+          </div>
         </div>
       </template>
+      <el-alert
+        v-if="questionnaireHint.basis"
+        :type="questionnaireMismatch ? 'warning' : 'info'"
+        :closable="false"
+        show-icon
+        class="suggest-alert"
+      >
+        问卷建议：{{ questionnaireHint.relationshipType || '尚无明确类型' }}
+        （{{ questionnaireHint.basis }}）
+        <span v-if="questionnaireMismatch"> — 与决策卡「{{ decision.relationshipType || '未选' }}」不一致，请复核或点「按问卷建议」</span>
+      </el-alert>
       <el-form label-width="150px" class="decision-form">
         <div class="decision-grid">
           <el-form-item label="被投资单位">
+            <el-select
+              v-if="!isReadonly && investeeOptions.length"
+              :model-value="decision.investeeId || decision.investeeName"
+              filterable
+              allow-create
+              default-first-option
+              clearable
+              placeholder="从 G7-4 选择或输入"
+              style="width:100%"
+              @change="onInvesteePick"
+            >
+              <el-option v-for="opt in investeeOptions" :key="opt.id" :label="opt.name" :value="opt.id" />
+            </el-select>
             <el-input
-              v-if="!isReadonly"
+              v-else-if="!isReadonly"
               v-model="decision.investeeName"
               placeholder="填写被投资单位全称"
               @change="applyInvesteeName"
@@ -180,6 +208,51 @@
           />
         </el-form-item>
       </el-form>
+
+      <div class="additional-decisions">
+        <div class="additional-head">
+          <span>其他被投资单位结论（问卷针对主被投资单位；此处可登记其余单位的关系/合并类型供 G7-8/9 同步）</span>
+          <el-button v-if="!isReadonly" size="small" @click="addAdditionalDecision">添加</el-button>
+        </div>
+        <el-table v-if="additionalDecisions.length" :data="additionalDecisions" border size="small">
+          <el-table-column label="被投资单位" min-width="140">
+            <template #default="{ row }">
+              <el-input v-model="row.investeeName" size="small" :disabled="isReadonly" @change="persistData" />
+            </template>
+          </el-table-column>
+          <el-table-column label="关系类型" width="130">
+            <template #default="{ row }">
+              <el-select v-model="row.relationshipType" size="small" :disabled="isReadonly" style="width:100%" @change="persistData">
+                <el-option value="控制" label="控制" />
+                <el-option value="共同控制" label="共同控制" />
+                <el-option value="重大影响" label="重大影响" />
+                <el-option value="无重大影响" label="无重大影响" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column label="合并类型" min-width="160">
+            <template #default="{ row }">
+              <el-select
+                v-model="row.combinationType"
+                size="small"
+                :disabled="isReadonly || row.relationshipType !== '控制'"
+                style="width:100%"
+                @change="persistData"
+              >
+                <el-option value="同一控制下企业合并" label="同一控制下企业合并" />
+                <el-option value="非同一控制下企业合并" label="非同一控制下企业合并" />
+                <el-option value="非企业合并（投资设立等）" label="非企业合并（投资设立等）" />
+                <el-option value="不适用" label="不适用" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="!isReadonly" label="操作" width="70">
+            <template #default="{ $index }">
+              <el-button link type="danger" size="small" @click="removeAdditionalDecision($index)">删</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
     </el-card>
 
     <!-- ═══ 6 Sections ═══ -->
@@ -400,13 +473,19 @@
  * Requirements: 2.1, 2.2, 2.3
  */
 import { ref, reactive, computed, inject, onMounted, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import http from '@/utils/http'
+import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useG7SubFormData } from '../../composables/useG7SubFormData'
+import { loadSubsidiaryInvestees, type G7SubsidiaryInvesteeOption } from '../../composables/g7EquityMethodCrossSheet'
 import {
   buildG7ControlConclusion,
+  createEmptyG7ControlDecision,
   deriveG7ControlRoute,
-  validateG7ControlDecision,
+  extractG7SubAiText,
+  suggestRelationshipFromQuestionnaire,
+  validateG7ControlJudgmentForSave,
   type CombinationType,
   type G7ControlDecision,
   type RelationshipType,
@@ -454,6 +533,7 @@ interface G7ControlJudgmentData {
   sections: G7ControlSection[]
   overallConclusion: string
   decision: G7ControlDecision
+  additionalDecisions: G7ControlDecision[]
 }
 
 // ─── 方法论预填数据（CAS33六要素） ──────────────────────────────────────────
@@ -560,21 +640,20 @@ const SECTION_DEFINITIONS: Array<{
 const sections = reactive<G7ControlSection[]>([])
 const overallConclusion = ref('')
 const rowCount = computed(() => sections.reduce((n, s) => n + s.rows.length, 0))
-const decision = reactive<G7ControlDecision>({
-  investeeName: '',
-  relationshipType: '',
-  combinationType: '',
-  combinationBasis: '',
-  acquisitionDate: '',
-  acquisitionDateBasis: '',
-  priorConclusion: '',
-  conclusionChangeReason: '',
-})
+const decision = reactive<G7ControlDecision>(createEmptyG7ControlDecision())
+const additionalDecisions = ref<G7ControlDecision[]>([])
+const investeeOptions = ref<G7SubsidiaryInvesteeOption[]>([])
+const investeeLoading = ref(false)
 const route = computed(() => deriveG7ControlRoute(decision))
 const isBusinessCombination = computed(() =>
   decision.combinationType === '同一控制下企业合并'
   || decision.combinationType === '非同一控制下企业合并',
 )
+const questionnaireHint = computed(() => suggestRelationshipFromQuestionnaire(sections))
+const questionnaireMismatch = computed(() => {
+  const suggested = questionnaireHint.value.relationshipType
+  return !!suggested && !!decision.relationshipType && suggested !== decision.relationshipType
+})
 
 // ─── 明细/审计说明/结论持久化 ───
 const auditFormData = useG7SubFormData({
@@ -613,6 +692,60 @@ function applyInvesteeName(): void {
   persistData()
 }
 
+function onInvesteePick(id: string): void {
+  const opt = investeeOptions.value.find(o => o.id === id)
+  if (opt) {
+    decision.investeeId = opt.id
+    decision.investeeName = opt.name
+  } else if (id) {
+    decision.investeeId = id
+    decision.investeeName = id
+  } else {
+    decision.investeeId = undefined
+    decision.investeeName = ''
+  }
+  applyInvesteeName()
+}
+
+async function loadG74Investees(showToast = false): Promise<void> {
+  if (!props.wpId) return
+  investeeLoading.value = true
+  try {
+    const res = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
+    const item = responses.find((r: any) => r.item_id === 'G7-4-rows')
+    investeeOptions.value = loadSubsidiaryInvestees(item?.conclusion)
+    if (showToast && investeeOptions.value.length) {
+      ElMessage.success(`已加载 G7-4 子公司 ${investeeOptions.value.length} 家`)
+    }
+  } catch {
+    investeeOptions.value = []
+  } finally {
+    investeeLoading.value = false
+  }
+}
+
+function applyQuestionnaireSuggestion(): void {
+  const hint = suggestRelationshipFromQuestionnaire(sections)
+  if (!hint.relationshipType) {
+    ElMessage.warning(hint.basis || '问卷尚未形成可建议类型')
+    return
+  }
+  decision.relationshipType = hint.relationshipType
+  handleRelationshipChange(hint.relationshipType)
+  ElMessage.success(`已按问卷建议设为「${hint.relationshipType}」`)
+}
+
+function addAdditionalDecision(): void {
+  additionalDecisions.value.push(createEmptyG7ControlDecision())
+  persistData()
+}
+
+function removeAdditionalDecision(index: number): void {
+  additionalDecisions.value.splice(index, 1)
+  persistData()
+}
+
 function handleRelationshipChange(value: RelationshipType): void {
   if (value !== '控制') {
     decision.combinationType = '不适用'
@@ -626,7 +759,7 @@ function handleRelationshipChange(value: RelationshipType): void {
 }
 
 function fillConclusionDraft(): void {
-  const errors = validateG7ControlDecision(decision)
+  const errors = validateG7ControlJudgmentForSave(decision, sections, additionalDecisions.value)
   if (errors.length > 0) {
     ElMessage.warning(errors[0])
     return
@@ -637,17 +770,21 @@ function fillConclusionDraft(): void {
 }
 
 async function handleSave(): Promise<void> {
-  const errors = validateG7ControlDecision(decision)
+  const errors = validateG7ControlJudgmentForSave(decision, sections, additionalDecisions.value)
   if (errors.length > 0) {
     ElMessage.error(errors.join('；'))
     return
   }
-  const unansweredKeyRows = sections
-    .find(s => s.id === 'overallJudgment')
-    ?.rows.filter(r => !r.judgmentResult).map(r => r.dimension) ?? []
-  if (unansweredKeyRows.length > 0) {
-    ElMessage.error(`综合判断尚未完成：${unansweredKeyRows.join('、')}`)
-    return
+  if (questionnaireMismatch.value) {
+    try {
+      await ElMessageBox.confirm(
+        `问卷建议为「${questionnaireHint.value.relationshipType}」，决策卡为「${decision.relationshipType}」。确认仍按决策卡保存？`,
+        '问卷与决策不一致',
+        { type: 'warning', confirmButtonText: '仍按决策卡保存', cancelButtonText: '取消' },
+      )
+    } catch {
+      return
+    }
   }
   await auditFormData.saveImmediate(DATA_KEY, {
     conclusion: JSON.stringify(getData()),
@@ -724,7 +861,8 @@ function loadFromHtmlData(data: Record<string, any> | null): void {
     }
     overallConclusion.value = judgmentData?.overallConclusion || ''
     if (judgmentData?.decision) {
-      Object.assign(decision, {
+      Object.assign(decision, createEmptyG7ControlDecision(), {
+        investeeId: judgmentData.decision.investeeId ?? undefined,
         investeeName: judgmentData.decision.investeeName ?? '',
         relationshipType: judgmentData.decision.relationshipType ?? '',
         combinationType: judgmentData.decision.combinationType ?? '',
@@ -737,8 +875,16 @@ function loadFromHtmlData(data: Record<string, any> | null): void {
     } else {
       decision.investeeName = rowsFirstInvesteeName()
     }
+    additionalDecisions.value = Array.isArray(judgmentData?.additionalDecisions)
+      ? judgmentData.additionalDecisions.map((d: any) => ({
+        ...createEmptyG7ControlDecision(),
+        ...d,
+        investeeName: String(d?.investeeName ?? ''),
+      }))
+      : []
   } else {
     initSections()
+    additionalDecisions.value = []
   }
 }
 
@@ -775,24 +921,25 @@ async function handleAiSection(sectionId: string): Promise<void> {
 
   ElMessage.info('正在生成AI辅助内容...')
   try {
-    const res = await (await import('@/utils/http')).default.post(
+    const res = await http.post(
       `/api/workpapers/${props.wpId}/g7-sub/ai/control-judgment-conclusion`,
       {
         existingContent: section.rows.map(r => r.auditConclusion).filter(Boolean).join('\n'),
         relatedContext: { sectionId, sectionTitle: `${section.sectionNo} ${section.title}`, rows: section.rows },
       },
     )
-    const text = res?.data?.data?.conclusion ?? res?.data?.conclusion ?? res?.data?.text ?? ''
+    const text = extractG7SubAiText(res?.data)
     if (text) {
-      // 将AI生成内容填入该section各行的审计结论（仅填充空白行）
       for (const row of section.rows) {
         if (!row.auditConclusion) {
           row.auditConclusion = text
-          break // AI只填1行作为参考
+          break
         }
       }
       persistData()
       ElMessage.success('AI辅助内容已生成')
+    } else {
+      ElMessage.warning('AI未返回可用正文')
     }
   } catch {
     ElMessage.warning('AI辅助暂未连接，请手动填写')
@@ -804,14 +951,16 @@ async function handleAiOverall(): Promise<void> {
 
   ElMessage.info('正在生成AI综合结论...')
   try {
-    const res = await (await import('@/utils/http')).default.post(
+    const res = await http.post(
       `/api/workpapers/${props.wpId}/g7-sub/ai/control-judgment-conclusion`,
       {
         existingContent: overallConclusion.value,
         relatedContext: {
           type: 'overall',
           decision: { ...decision },
+          additionalDecisions: additionalDecisions.value,
           route: route.value,
+          questionnaireSuggestion: questionnaireHint.value,
           sections: sections.map(s => ({
             id: s.id,
             title: `${s.sectionNo} ${s.title}`,
@@ -820,7 +969,7 @@ async function handleAiOverall(): Promise<void> {
         },
       },
     )
-    const text = res?.data?.data?.conclusion ?? res?.data?.conclusion ?? res?.data?.text ?? ''
+    const text = extractG7SubAiText(res?.data)
     if (text) {
       overallConclusion.value = text
       auditFormData.debouncedSave(CONCLUSION_KEY, { remark: text, conclusion: null })
@@ -829,10 +978,10 @@ async function handleAiOverall(): Promise<void> {
       return
     }
   } catch {
-    // AI后端未连接，降级为本地逻辑生成草案
+    // fall through to local draft
   }
 
-  const errors = validateG7ControlDecision(decision)
+  const errors = validateG7ControlJudgmentForSave(decision, sections, additionalDecisions.value)
   if (errors.length > 0) {
     ElMessage.warning(`AI不可用；生成本地结论前请完善：${errors[0]}`)
     return
@@ -861,30 +1010,41 @@ function getData(): G7ControlJudgmentData {
     })),
     overallConclusion: overallConclusion.value,
     decision: { ...decision },
+    additionalDecisions: additionalDecisions.value.map(d => ({ ...d })),
   }
 }
 
 defineExpose({ getData, loadFromHtmlData })
 
-// ─── 生命周期 ────────────────────────────────────────────────────────────────
+function parseStoredConclusion(raw: unknown): Record<string, any> | null {
+  if (raw == null) return null
+  if (typeof raw === 'object') return raw as Record<string, any>
+  if (typeof raw === 'string' && raw.trim()) {
+    try { return JSON.parse(raw) } catch { return null }
+  }
+  return null
+}
 
 onMounted(async () => {
-  // 先同步渲染模板/传入数据，避免网络加载期间页面为空
   loadFromHtmlData(props.htmlData)
   await auditFormData.load()
-  const savedRaw = auditFormData.data.value.get(DATA_KEY)?.conclusion
-  let savedData: Record<string, any> | null = null
-  if (typeof savedRaw === 'string' && savedRaw.trim()) {
-    try {
-      savedData = JSON.parse(savedRaw)
-    } catch {
-      savedData = null
-    }
+  await loadG74Investees(false)
+
+  let savedData = parseStoredConclusion(auditFormData.data.value.get(DATA_KEY)?.conclusion)
+  if (!savedData) {
+    const snap = props.htmlData?.responses_snapshot?.[DATA_KEY]
+    savedData = parseStoredConclusion(snap?.conclusion ?? snap)
+  }
+  if (!savedData && props.htmlData?.controlJudgment) {
+    savedData = props.htmlData.controlJudgment
   }
   if (savedData) loadFromHtmlData(savedData)
+
   const n = auditFormData.data.value.get(NOTE_KEY)
+    ?? props.htmlData?.responses_snapshot?.[NOTE_KEY]
   if (n?.remark) auditNote.value = n.remark
   const c = auditFormData.data.value.get(CONCLUSION_KEY)
+    ?? props.htmlData?.responses_snapshot?.[CONCLUSION_KEY]
   if (c?.remark) overallConclusion.value = c.remark
 })
 
@@ -1003,7 +1163,14 @@ watch(() => props.htmlData, (newData) => {
 .audit-note-card { margin-top: 20px; }
 .overall-conclusion-card { margin-top: 20px; }
 .conclusion-header {
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.decision-header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.suggest-alert { margin-bottom: 12px; }
+.additional-decisions { margin-top: 16px; }
+.additional-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 8px;
+  margin-bottom: 8px; font-size: 12px; color: #606266;
 }
 .conclusion-title { font-weight: 600; font-size: 14px; color: #1e293b; }
 

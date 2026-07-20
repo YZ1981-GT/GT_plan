@@ -35,6 +35,7 @@ export type FixtureKind = 'FIX-A' | 'FIX-B' | 'FIX-INT' | 'FIX-RP' | 'FIX-F'
 export const F2_E2E_WP_CODES = [
   'F2-1',
   'F2-21', 'F2-22', 'F2-23', 'F2-24', 'F2-25', 'F2-26',
+  'F2-29', // 检查类 bundle：含 F2-29~35
   'F2-47', 'F2-55', 'F2-70',
 ] as const
 
@@ -160,8 +161,11 @@ export async function ensureFixtureProject(
   return { ...base, fixture: kind }
 }
 
+type WpListItem = { id?: string; wp_id?: string; wp_code?: string }
+
 /**
- * 验证特定 wp_code 的底稿存在
+ * 验证特定 wp_code 的底稿存在。
+ * API page_size 上限 100，需分页；条目主键多为 wp_id（兼容 id）。
  */
 export async function findWorkpaper(
   request: APIRequestContext,
@@ -170,29 +174,37 @@ export async function findWorkpaper(
   projectId: string = TEST_PROJECT_ID,
 ): Promise<{ exists: boolean; wpId?: string }> {
   try {
-    const resp = await request.get(`${projectBaseApi(projectId)}/working-papers`, {
-      headers: { Authorization: `Bearer ${token}` },
-      params: { page_size: 500 },
-    })
-    const body = await resp.json()
-    const list = parseWorkingPaperList(body)
-    const wp = list.find((w: { wp_code?: string }) => w.wp_code === wpCode)
-    return wp ? { exists: true, wpId: wp.id } : { exists: false }
+    for (let page = 1; page <= 30; page += 1) {
+      const resp = await request.get(`${projectBaseApi(projectId)}/working-papers`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { page, page_size: 100 },
+      })
+      if (!resp.ok()) return { exists: false }
+      const body = await resp.json()
+      const list = parseWorkingPaperList(body)
+      const wp = list.find((w) => w.wp_code === wpCode)
+      if (wp) {
+        const wpId = wp.wp_id || wp.id
+        return wpId ? { exists: true, wpId } : { exists: false }
+      }
+      if (list.length < 100) break
+    }
+    return { exists: false }
   } catch {
     return { exists: false }
   }
 }
 
-/** 解析 working-papers 列表（兼容 data 为 array 或 { items }） */
-export function parseWorkingPaperList(body: unknown): Array<{ id: string; wp_code?: string }> {
+/** 解析 working-papers 列表（兼容 data 为 array 或 { items }；主键 wp_id | id） */
+export function parseWorkingPaperList(body: unknown): WpListItem[] {
   if (!body || typeof body !== 'object') return []
   const b = body as Record<string, unknown>
   const data = b.data
-  if (Array.isArray(data)) return data as Array<{ id: string; wp_code?: string }>
+  if (Array.isArray(data)) return data as WpListItem[]
   if (data && typeof data === 'object' && Array.isArray((data as { items?: unknown }).items)) {
-    return (data as { items: Array<{ id: string; wp_code?: string }> }).items
+    return (data as { items: WpListItem[] }).items
   }
-  if (Array.isArray(b.items)) return b.items as Array<{ id: string; wp_code?: string }>
+  if (Array.isArray(b.items)) return b.items as WpListItem[]
   return []
 }
 

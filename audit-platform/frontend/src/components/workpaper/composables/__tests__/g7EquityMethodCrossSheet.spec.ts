@@ -7,15 +7,22 @@ import {
   applyInternalElimToG714Payload,
   applyInvestmentCostToG714Payload,
   applyPolicyAdjToG714Payload,
+  applyG76PolicyToG714Payload,
   addGoodwillFvDetail,
+  applyUnrecognizedLossToG714Payload,
+  buildG714DualWriteItems,
+  flattenG714Rows,
   buildG714SyncPreview,
   loadEquityInvesteeNames,
   loadEquityInvestees,
   loadSubsidiaryInvestees,
   matchInvestee,
+  makeG714ConclusionGetter,
   parseChecklistJson,
+  parseG74HoldingRatioFraction,
   pickDefinedNum,
   removeGoodwillFvDetail,
+  resolveG714PayloadFromChecklist,
   stampLastCrossSheetSync,
 } from '../g7EquityMethodCrossSheet'
 
@@ -44,14 +51,26 @@ describe('g7EquityMethodCrossSheet', () => {
   it('loads equity investees with G7-4 row id as investeeId', () => {
     const investees = loadEquityInvestees([
       { id: 'id-sub', investeeName: '子A', groupType: 'subsidiary', accountingMethod: '成本法' },
-      { id: 'id-b', investeeName: '联营B', groupType: 'associate', accountingMethod: '权益法' },
+      { id: 'id-b', investeeName: '联营B', groupType: 'associate', accountingMethod: '权益法', directHoldingRatio: 30 },
       { id: 'id-c', investeeName: '合营C', groupType: 'joint_venture', accountingMethod: '权益法' },
       { id: 'id-b', investeeName: '联营B-改名', groupType: 'associate', accountingMethod: '权益法' },
     ])
     expect(investees).toEqual([
-      { name: '联营B', investeeId: 'id-b' },
-      { name: '合营C', investeeId: 'id-c' },
+      { name: '联营B', investeeId: 'id-b', investmentRatio: 0.3 },
+      { name: '合营C', investeeId: 'id-c', investmentRatio: null },
     ])
+  })
+
+  it('parseG74HoldingRatioFraction prefers holding total then voting', () => {
+    expect(parseG74HoldingRatioFraction({
+      directHoldingRatio: 20,
+      indirectHoldingRatio: 10,
+    })).toBe(0.3)
+    expect(parseG74HoldingRatioFraction({ votingRatio: 25 })).toBe(0.25)
+    expect(parseG74HoldingRatioFraction({
+      ratioScale: 'fraction',
+      directHoldingRatio: 0.4,
+    })).toBe(0.4)
   })
 
   it('applyG74InvesteesToG714Payload creates rows and backfills investeeId', () => {
@@ -71,8 +90,8 @@ describe('g7EquityMethodCrossSheet', () => {
       rows: [],
     }
     const result = applyG74InvesteesToG714Payload(existing, [
-      { id: 'inv-b', investeeName: '联营B', groupType: 'associate', accountingMethod: '权益法' },
-      { id: 'inv-c', investeeName: '合营C', groupType: 'joint_venture', accountingMethod: '权益法' },
+      { id: 'inv-b', investeeName: '联营B', groupType: 'associate', accountingMethod: '权益法', directHoldingRatio: 40 },
+      { id: 'inv-c', investeeName: '合营C', groupType: 'joint_venture', accountingMethod: '权益法', votingRatio: 50 },
     ])
     expect(result.ok).toBe(true)
     expect(result.payload.groups).toHaveLength(2)
@@ -81,13 +100,57 @@ describe('g7EquityMethodCrossSheet', () => {
     expect(b.investeeId).toBe('inv-b')
     expect(b.rows[0].investeeId).toBe('inv-b')
     expect(b.rows[0].reportedNetProfit).toBe(100)
+    // 已有比例 0.3，不覆盖为 0.4
+    expect(b.rows[0].investmentRatio).toBe(0.3)
     expect(c.investeeId).toBe('inv-c')
     expect(c.rows[0].investeeId).toBe('inv-c')
+    expect(c.rows[0].investmentRatio).toBe(0.5)
+  })
+
+  it('applyG74 fills empty investmentRatio and NA ownershipRatio', () => {
+    const existing = {
+      groups: [{
+        investeeName: '联营B',
+        investeeId: 'inv-b',
+        rows: [{
+          id: '1', investeeName: '联营B', investeeId: 'inv-b',
+          reportedNetProfit: 1000, internalTransactionAdj: 0, fvDepreciationAdj: 0,
+          accountingPolicyAdj: 0, otherAdj: 0, investmentRatio: 0,
+          confirmedIncome: 0, dividendDistributed: 0, openingBalance: 0,
+          ociChange: 0, otherEquityChange: 0, goodwill: 0, cumulativeFvAdj: 0,
+          impairment: 0, costOpening: 0, costChange: 0, pnlAdjOpening: 0, pnlAdjChange: 0,
+          ociBalOpening: 0, otherEqBalOpening: 0, auditedNetAssets: 0,
+        }],
+      }],
+      rows: [],
+      netAssetAdjustments: [{
+        id: 'na-1',
+        investeeName: '联营B',
+        investeeId: 'inv-b',
+        ownershipRatio: 0,
+      }],
+    }
+    const result = applyG74InvesteesToG714Payload(existing, [
+      {
+        id: 'inv-b',
+        investeeName: '联营B',
+        groupType: 'associate',
+        accountingMethod: '权益法',
+        directHoldingRatio: 30,
+        indirectHoldingRatio: 5,
+      },
+    ])
+    expect(result.ok).toBe(true)
+    expect(result.payload.groups[0].rows[0].investmentRatio).toBe(0.35)
+    expect(result.payload.groups[0].rows[0].equityShare).toBe(350)
+    expect(result.payload.netAssetAdjustments[0].ownershipRatio).toBe(0.35)
+    expect(result.message).toContain('补比例 1')
   })
 
   it('loads subsidiary investees for G7-10 with percent→fraction conversion', () => {
     const opts = loadSubsidiaryInvestees([
       {
+        id: 'sub-a-id',
         investeeName: '子A',
         groupType: 'subsidiary',
         directHoldingRatio: 60,
@@ -99,6 +162,7 @@ describe('g7EquityMethodCrossSheet', () => {
     ])
     expect(opts).toHaveLength(1)
     expect(opts[0]).toMatchObject({
+      id: 'sub-a-id',
       name: '子A',
       shareholdingRatio: 0.7,
       carryingAmount: 8_000_000,
@@ -150,6 +214,42 @@ describe('g7EquityMethodCrossSheet', () => {
     expect(result.ok).toBe(true)
     expect(result.payload.groups[0].investeeName).toBe('新联营')
     expect(result.payload.groups[0].rows[0].accountingPolicyAdj).toBe(-20)
+  })
+
+  it('applies G7-6 policy groups into G7-14 accountingPolicyAdj', () => {
+    const result = applyG76PolicyToG714Payload(null, {
+      groups: [{
+        investeeName: '联营C',
+        investeeId: 'c1',
+        rows: [
+          { isConsistent: '不一致', adjustmentAmount: 100 },
+          { isConsistent: '不一致', adjustmentAmount: 50 },
+          { isConsistent: '一致', adjustmentAmount: 999 },
+        ],
+      }],
+    })
+    expect(result.ok).toBe(true)
+    expect(result.message).toContain('G7-6')
+    expect(result.payload.groups[0].investeeName).toBe('联营C')
+    expect(result.payload.groups[0].rows[0].accountingPolicyAdj).toBe(150)
+    expect(result.payload.groups[0].rows[0].investeeId).toBe('c1')
+  })
+
+  it('G7-6 skips zero totals to avoid wiping G7-14 policy', () => {
+    const existing = applyPolicyAdjToG714Payload(null, '联营Z', 88)
+    expect(existing.ok).toBe(true)
+    const result = applyG76PolicyToG714Payload(existing.payload, {
+      groups: [{
+        investeeName: '联营Z',
+        rows: [
+          { isConsistent: '一致', adjustmentAmount: 0 },
+          { isConsistent: '不一致', adjustmentAmount: 0 },
+        ],
+      }],
+    })
+    expect(result.ok).toBe(false)
+    expect(result.message).toMatch(/零|跳过/)
+    expect(existing.payload.groups[0].rows[0].accountingPolicyAdj).toBe(88)
   })
 
   it('applies G7-5 financial info to reportedNetProfit and auditedNetAssets', () => {
@@ -244,6 +344,177 @@ describe('g7EquityMethodCrossSheet', () => {
     expect(result.payload.groups[0].rows[0].internalTransactionAdj).toBe(100)
   })
 
+  it('G7-15 matches by investeeId preferentially over name', () => {
+    const result = applyInternalElimToG714Payload(
+      {
+        groups: [{
+          investeeName: '联营B-新名',
+          investeeId: 'inv-b',
+          rows: [{ investeeId: 'inv-b', investeeName: '联营B-新名', internalTransactionAdj: 0 }],
+        }],
+        rows: [],
+      },
+      {
+        rows: [{
+          investeeId: 'inv-b',
+          investeeName: '联营B-旧名',
+          currentChange: 42,
+          eliminationAmount: 100,
+        }],
+      },
+    )
+    expect(result.ok).toBe(true)
+    expect(result.payload.groups).toHaveLength(1)
+    const row = result.payload.groups[0].rows[0]
+    expect(row.investeeId).toBe('inv-b')
+    expect(row.internalTransactionAdj).toBe(42)
+  })
+
+  it('applies G7-16 currentChange into otherAdj and recalcs', () => {
+    const result = applyUnrecognizedLossToG714Payload(
+      {
+        groups: [{
+          investeeName: '联营B',
+          rows: [{
+            id: '1',
+            seq: 1,
+            investeeName: '联营B',
+            reportedNetProfit: 1000,
+            internalTransactionAdj: 0,
+            fvDepreciationAdj: 0,
+            accountingPolicyAdj: 0,
+            otherAdj: 50,
+            otherAdjFromG716: 0,
+            adjustedNetProfit: 0,
+            investmentRatio: 0.3,
+            equityShare: 0,
+            confirmedIncome: 0,
+            incomeDifference: 0,
+            ociChange: 0,
+            ociShare: 0,
+            otherEquityChange: 0,
+            otherEquityShare: 0,
+            dividendDistributed: 0,
+            openingBalance: 0,
+            closingBalance: 0,
+            auditConclusion: '无差异',
+          }],
+        }],
+        rows: [],
+      },
+      { rows: [{ investeeName: '联营B', currentChange: 80, unrecognizedLoss: 200 }] },
+    )
+    expect(result.ok).toBe(true)
+    expect(result.message).toContain('G7-16')
+    const row = result.payload.groups[0].rows[0]
+    expect(row.otherAdjFromG716).toBe(80)
+    expect(row.otherAdj).toBe(130) // 50 base + 80 g716
+    expect(row.adjustedNetProfit).toBe(1130)
+    expect(row.equityShare).toBe(339)
+  })
+
+  it('G7-16 re-sync replaces prior G716 slice without wiping other otherAdj', () => {
+    const result = applyUnrecognizedLossToG714Payload(
+      {
+        groups: [{
+          investeeName: '联营B',
+          rows: [{
+            id: '1', investeeName: '联营B',
+            reportedNetProfit: 0, internalTransactionAdj: 0, fvDepreciationAdj: 0,
+            accountingPolicyAdj: 0, otherAdj: 100, otherAdjFromG716: 40,
+            investmentRatio: 0.5,
+          }],
+        }],
+        rows: [],
+      },
+      { rows: [{ investeeName: '联营B', currentChange: 25 }] },
+    )
+    expect(result.ok).toBe(true)
+    const row = result.payload.groups[0].rows[0]
+    expect(row.otherAdjFromG716).toBe(25)
+    expect(row.otherAdj).toBe(85) // 100 - 40 + 25
+  })
+
+  it('G7-16 uses currentChange=0 instead of falling back to unrecognizedLoss', () => {
+    const result = applyUnrecognizedLossToG714Payload(
+      null,
+      { rows: [{ investeeName: '联营B', currentChange: 0, unrecognizedLoss: 200 }] },
+    )
+    expect(result.ok).toBe(true)
+    expect(result.payload.groups[0].rows[0].otherAdj).toBe(0)
+  })
+
+  it('G7-16 falls back to unrecognizedLoss when currentChange absent', () => {
+    const result = applyUnrecognizedLossToG714Payload(
+      null,
+      { rows: [{ investeeName: '联营B', unrecognizedLoss: 150 }] },
+    )
+    expect(result.ok).toBe(true)
+    expect(result.payload.groups[0].rows[0].otherAdj).toBe(150)
+  })
+
+  it('resolveG714PayloadFromChecklist prefers SECTION body', () => {
+    const payload = resolveG714PayloadFromChecklist((id) => {
+      if (id === 'G7-14-equity-method-calc') {
+        return JSON.stringify({
+          materialityLevel: 1000,
+          conclusion: 'section',
+          groups: [{ investeeName: 'A', rows: [{ investeeName: 'A', otherAdj: 1 }] }],
+          rows: [{ investeeName: 'A', otherAdj: 1 }],
+        })
+      }
+      if (id === 'G7-14-rows') {
+        return JSON.stringify([{ investeeName: 'B', otherAdj: 99 }])
+      }
+      return null
+    })
+    expect(payload.conclusion).toBe('section')
+    expect(payload.groups[0].investeeName).toBe('A')
+  })
+
+  it('resolveG714PayloadFromChecklist falls back to ROWS when SECTION empty', () => {
+    const payload = resolveG714PayloadFromChecklist((id) => {
+      if (id === 'G7-14-equity-method-calc') return JSON.stringify({ rows: [], groups: [] })
+      if (id === 'G7-14-rows') {
+        return JSON.stringify([
+          { investeeName: '联营B', otherAdj: 12 },
+          { investeeName: '联营C', otherAdj: 3 },
+        ])
+      }
+      return null
+    })
+    expect(payload.rows).toHaveLength(2)
+    expect(payload.groups).toHaveLength(2)
+    expect(payload.groups.map((g: any) => g.investeeName).sort()).toEqual(['联营B', '联营C'])
+  })
+
+  it('buildG714DualWriteItems writes flat rows to ROWS key', () => {
+    const items = buildG714DualWriteItems({
+      materialityLevel: 100,
+      conclusion: 'ok',
+      groups: [{ investeeName: '联营B', rows: [{ investeeName: '联营B', otherAdj: 5 }] }],
+      rows: [],
+    })
+    expect(items).toHaveLength(2)
+    expect(items[0].itemId).toBe('G7-14-equity-method-calc')
+    expect(items[1].itemId).toBe('G7-14-rows')
+    const page = JSON.parse(items[0].data.conclusion)
+    const rows = JSON.parse(items[1].data.conclusion)
+    expect(Array.isArray(rows)).toBe(true)
+    expect(rows[0].otherAdj).toBe(5)
+    expect(page.rows[0].otherAdj).toBe(5)
+    expect(page.conclusion).toBe('ok')
+  })
+
+  it('makeG714ConclusionGetter prefers map over snapshot', () => {
+    const get = makeG714ConclusionGetter(
+      new Map([['G7-14-rows', { conclusion: JSON.stringify([{ investeeName: 'A', otherAdj: 1 }]) }]]),
+      { 'G7-14-rows': { conclusion: JSON.stringify([{ investeeName: 'B', otherAdj: 9 }]) } },
+    )
+    const payload = resolveG714PayloadFromChecklist(get)
+    expect(flattenG714Rows(payload)[0].investeeName).toBe('A')
+  })
+
   it('applies G7-13 difference into goodwillFvDetails and writes back columns', () => {
     const result = applyInvestmentCostToG714Payload(null, {
       rows: [{
@@ -281,6 +552,45 @@ describe('g7EquityMethodCrossSheet', () => {
     expect(result.payload.groups[0].rows[0].cumulativeFvAdj).toBe(0)
   })
 
+  it('G7-13 negative difference writes bargain memo and varianceExplanation', () => {
+    const result = applyInvestmentCostToG714Payload(null, {
+      rows: [{
+        investeeName: '联营C',
+        investeeId: 'c1',
+        difference: -150,
+        differenceNature: '营业外收入',
+        shareOfNetAssets: 1000,
+        investmentRatio: 0.25,
+        indexRef: 'G7-13',
+      }],
+    })
+    expect(result.ok).toBe(true)
+    const details = result.payload.goodwillFvDetails
+    expect(details).toHaveLength(1)
+    expect(details[0].kind).toBe('fvAdj')
+    expect(details[0].amount).toBe(0)
+    expect(details[0].description).toContain('廉价购买')
+    expect(details[0].description).toContain('150')
+    const row = result.payload.groups[0].rows[0]
+    expect(row.investmentRatio).toBe(0.25)
+    expect(row.goodwill).toBe(0)
+    expect(String(row.varianceExplanation)).toContain('【G7-13】廉价购买利得')
+  })
+
+  it('G7-13 accepts flat array payload (IE / consol shape)', () => {
+    const result = applyInvestmentCostToG714Payload(null, [
+      {
+        investeeName: '联营D',
+        difference: 50,
+        differenceNature: '商誉',
+        shareOfNetAssets: 200,
+        indexRef: 'G7-13',
+      },
+    ])
+    expect(result.ok).toBe(true)
+    expect(result.payload.goodwillFvDetails[0].amount).toBe(50)
+  })
+
   it('applies G7-2 equity rows to opening / pnl / dividend', () => {
     const result = applyG72EquityToG714Payload(null, [
       {
@@ -308,6 +618,49 @@ describe('g7EquityMethodCrossSheet', () => {
     expect(row.dividendDistributed).toBe(50)
     expect(row.costChange).toBe(100)
     expect(row.ociChange).toBe(200) // 60 / 0.3
+    expect(row.g72OpeningTotal).toBe(5000)
+    expect(row.costOpening).toBe(5000) // 空成本期初时回填 G7-2 期初
+    expect(row.openingReconVariance).toBe(0)
+  })
+
+  it('G7-2 fills recon totals; opening recon zero when components match G7-2', () => {
+    const existing = {
+      groups: [{
+        investeeName: '联营B',
+        rows: [{
+          id: '1', investeeName: '联营B',
+          reportedNetProfit: 0, internalTransactionAdj: 0, fvDepreciationAdj: 0,
+          accountingPolicyAdj: 0, otherAdj: 0, investmentRatio: 0.3,
+          confirmedIncome: 0, dividendDistributed: 0, openingBalance: 0,
+          ociChange: 0, otherEquityChange: 0, goodwill: 0, cumulativeFvAdj: 0,
+          impairment: 0, costOpening: 1000, costChange: 0,
+          pnlAdjOpening: 200, pnlAdjChange: 0,
+          ociBalOpening: 0, otherEqBalOpening: 0, auditedNetAssets: 0,
+          g72OpeningTotal: 0, g72ClosingTotal: 0,
+        }],
+      }],
+      rows: [],
+    }
+    const result = applyG72EquityToG714Payload(existing, [
+      {
+        section: 'equity',
+        investeeName: '联营B',
+        relationship: 'associate',
+        openingRatio: 30,
+        closingRatio: 30,
+        openingAmount: 1200,
+        profitLossAdjustment: 0,
+        dividendReceived: 0,
+      },
+    ])
+    const row = result.payload.groups[0].rows[0]
+    expect(row.g72OpeningTotal).toBe(1200)
+    expect(row.g72ClosingTotal).toBe(1200)
+    // 已有成本期初1000，不覆盖；P = 1000+200 - 1200 = 0
+    expect(row.costOpening).toBe(1000)
+    expect(row.openingReconVariance).toBe(0)
+    expect(row.lteiBookBalance).toBe(1200)
+    expect(row.closingReconVariance).toBe(0)
   })
 
   it('G7-2 keeps audited opening 0 when amount is zero', () => {

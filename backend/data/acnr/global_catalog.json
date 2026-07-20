@@ -757,52 +757,64 @@
       "uri": "wp://F1/预付账款明细表#F50"
     },
     {
+      "addr_id": "F1/F1-2/G50",
+      "cell_address": "G50",
+      "domain": "wp",
+      "formula_ref": "WP('F1','预付账款明细表','G50')",
+      "parent_addr_id": "F1/F1-2",
+      "purpose": "aging_analysis",
+      "registry_version": "20260710000000",
+      "semantic_label": "合计行-1年以内合计",
+      "semantic_only": false,
+      "uri": "wp://F1/预付账款明细表#G50"
+    },
+    {
+      "addr_id": "F1/F1-2/H50",
+      "cell_address": "H50",
+      "domain": "wp",
+      "formula_ref": "WP('F1','预付账款明细表','H50')",
+      "parent_addr_id": "F1/F1-2",
+      "purpose": "aging_analysis",
+      "registry_version": "20260710000000",
+      "semantic_label": "合计行-1-2年合计",
+      "semantic_only": false,
+      "uri": "wp://F1/预付账款明细表#H50"
+    },
+    {
+      "addr_id": "F1/F1-2/I50",
+      "cell_address": "I50",
+      "domain": "wp",
+      "formula_ref": "WP('F1','预付账款明细表','I50')",
+      "parent_addr_id": "F1/F1-2",
+      "purpose": "aging_analysis",
+      "registry_version": "20260710000000",
+      "semantic_label": "合计行-2年以上合计",
+      "semantic_only": false,
+      "uri": "wp://F1/预付账款明细表#I50"
+    },
+    {
       "addr_id": "F1/F1-3/E50",
       "cell_address": "E50",
       "domain": "wp",
-      "formula_ref": "WP('F1','预付账款账龄分析','E50')",
+      "formula_ref": "WP('F1','预付账款调整分录汇总','E50')",
       "parent_addr_id": "F1/F1-3",
-      "purpose": "balance_verification",
+      "purpose": "adjustment_balance",
       "registry_version": "20260710000000",
-      "semantic_label": "合计行-期末余额合计",
+      "semantic_label": "合计行-借方合计",
       "semantic_only": false,
-      "uri": "wp://F1/预付账款账龄分析#E50"
+      "uri": "wp://F1/预付账款调整分录汇总#E50"
     },
     {
       "addr_id": "F1/F1-3/F50",
       "cell_address": "F50",
       "domain": "wp",
-      "formula_ref": "WP('F1','预付账款账龄分析','F50')",
+      "formula_ref": "WP('F1','预付账款调整分录汇总','F50')",
       "parent_addr_id": "F1/F1-3",
-      "purpose": "aging_analysis",
+      "purpose": "adjustment_balance",
       "registry_version": "20260710000000",
-      "semantic_label": "合计行-1年以内合计",
+      "semantic_label": "合计行-贷方合计",
       "semantic_only": false,
-      "uri": "wp://F1/预付账款账龄分析#F50"
-    },
-    {
-      "addr_id": "F1/F1-3/G50",
-      "cell_address": "G50",
-      "domain": "wp",
-      "formula_ref": "WP('F1','预付账款账龄分析','G50')",
-      "parent_addr_id": "F1/F1-3",
-      "purpose": "aging_analysis",
-      "registry_version": "20260710000000",
-      "semantic_label": "合计行-1-2年合计",
-      "semantic_only": false,
-      "uri": "wp://F1/预付账款账龄分析#G50"
-    },
-    {
-      "addr_id": "F1/F1-3/H50",
-      "cell_address": "H50",
-      "domain": "wp",
-      "formula_ref": "WP('F1','预付账款账龄分析','H50')",
-      "parent_addr_id": "F1/F1-3",
-      "purpose": "aging_analysis",
-      "registry_version": "20260710000000",
-      "semantic_label": "合计行-2-3年合计",
-      "semantic_only": false,
-      "uri": "wp://F1/预付账款账龄分析#H50"
+      "uri": "wp://F1/预付账款调整分录汇总#F50"
     },
     {
       "addr_id": "F2/F2-10/E50",

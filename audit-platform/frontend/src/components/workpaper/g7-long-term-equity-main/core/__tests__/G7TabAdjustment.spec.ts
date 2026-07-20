@@ -12,6 +12,15 @@ import {
   isDebitCreditBalanced,
   parseNum,
 } from '../../../composables/useG7FormulaEngine'
+import {
+  aggregateByInvestee,
+  applyInvesteeWritebackToGroups,
+  adoptSuggestedDraft,
+  inferSourceKind,
+  isPushableToModule,
+  isSuggestedDraft,
+  normalizeG73Entry,
+} from '../g7AdjustmentModel'
 
 // ═══ 从G7TabAdjustment.vue提取的纯逻辑 ═══
 
@@ -263,5 +272,72 @@ describe('G7TabAdjustment - AJE/RJE回写G7-1', () => {
     expect(isBalanced).toBe(false)
     // 组件中: if (!isBalanced.value) { ElMessage.error(...); return }
     // 不平衡时不会触发CustomEvent回写
+  })
+})
+
+// ═══ sourceKind 保留 / 按单位回写 ═══
+
+describe('G7-3 — sourceKind hydrate & 按单位回写', () => {
+  it('normalize 保留 sourceKind / investeeName', () => {
+    const row = normalizeG73Entry({
+      description: '联营甲差额',
+      accountCode: '1511',
+      accountName: '长期股权投资',
+      debitAmount: 100,
+      creditAmount: 0,
+      sourceKind: 'g7-14-suggested',
+      investeeName: '联营甲',
+      remark: 'sourceKind=g7-14-suggested',
+    }, 0)
+    expect(row.sourceKind).toBe('g7-14-suggested')
+    expect(row.investeeName).toBe('联营甲')
+    expect(isSuggestedDraft(row)).toBe(true)
+  })
+
+  it('仅 remark 也可推断 sourceKind', () => {
+    expect(inferSourceKind({ remark: 'foo;sourceKind=g7-13-bargain-suggested' }))
+      .toBe('g7-13-bargain-suggested')
+  })
+
+  it('按被投资单位拆分 1511', () => {
+    const parts = aggregateByInvestee([
+      { accountCode: '1511', investeeName: '甲', category: '账项调整', debitAmount: 100, creditAmount: 0 },
+      { accountCode: '1511', investeeName: '乙', category: '账项调整', debitAmount: 0, creditAmount: 40 },
+      { accountCode: '6111', investeeName: '甲', category: '账项调整', debitAmount: 0, creditAmount: 100 },
+    ], '1511')
+    expect(parts.find(p => p.investeeName === '甲')?.ajeTotal).toBe(100)
+    expect(parts.find(p => p.investeeName === '乙')?.ajeTotal).toBe(-40)
+  })
+
+  it('回写落到同名行，未匹配归第一行', () => {
+    const groups = [{
+      id: 'associate',
+      rows: [
+        { item: '甲公司', closingUnadjusted: 1000, closingAJE: 0, closingRJE: 0, closingAdjusted: 1000 },
+        { item: '乙公司', closingUnadjusted: 2000, closingAJE: 0, closingRJE: 0, closingAdjusted: 2000 },
+      ],
+    }]
+    applyInvesteeWritebackToGroups(groups, [
+      { investeeName: '甲公司', ajeTotal: 50, rjeTotal: 0 },
+      { investeeName: '未知丙', ajeTotal: 10, rjeTotal: 0 },
+    ], '1511')
+    expect(groups[0].rows[0].closingAJE).toBe(60) // 50 + unmatched 10
+    expect(groups[0].rows[1].closingAJE).toBe(0)
+  })
+
+  it('采纳建议清除 sourceKind；草稿不可推模块', () => {
+    const draft = normalizeG73Entry({
+      description: '建议',
+      sourceKind: 'g7-14-suggested',
+      remark: 'sourceKind=g7-14-suggested',
+      debitAmount: 10,
+      creditAmount: 0,
+      accountCode: '1511',
+    }, 0)
+    expect(isPushableToModule(draft)).toBe(false)
+    const adopted = adoptSuggestedDraft(draft)
+    expect(adopted.sourceKind).toBeUndefined()
+    expect(String(adopted.remark)).toContain('已采纳')
+    expect(isPushableToModule(adopted)).toBe(true)
   })
 })

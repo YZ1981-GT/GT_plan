@@ -266,8 +266,14 @@ async def load_json_rows(
         return []
     if isinstance(parsed, list):
         return parsed
-    if keyed_by and isinstance(parsed, dict):
-        return keyed_store_to_rows(parsed, keyed_by=keyed_by)
+    if isinstance(parsed, dict):
+        # 兼容页面存 {rows:[...], conclusion:...} / {data:[...]} / {items:[...]}
+        for key in ("rows", "data", "items"):
+            candidate = parsed.get(key)
+            if isinstance(candidate, list):
+                return [row for row in candidate if isinstance(row, dict)]
+        if keyed_by:
+            return keyed_store_to_rows(parsed, keyed_by=keyed_by)
     return []
 
 

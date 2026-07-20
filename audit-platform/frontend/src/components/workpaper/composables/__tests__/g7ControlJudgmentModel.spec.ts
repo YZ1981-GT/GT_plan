@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   buildG7ControlConclusion,
   deriveG7ControlRoute,
+  extractG7SubAiText,
+  suggestRelationshipFromQuestionnaire,
   validateG7ControlDecision,
   type G7ControlDecision,
 } from '../g7ControlJudgmentModel'
@@ -65,5 +67,21 @@ describe('g7ControlJudgmentModel', () => {
     expect(text).toContain('同一控制下企业合并')
     expect(text).toContain('2026-01-01')
     expect(text).toContain('G7-8')
+  })
+
+  it('suggests control from overall judgment row', () => {
+    const hint = suggestRelationshipFromQuestionnaire([
+      { id: 'power', rows: [] },
+      {
+        id: 'overallJudgment',
+        rows: [{ dimension: '控制三要素同时满足', judgmentResult: '是' }],
+      },
+    ])
+    expect(hint.relationshipType).toBe('控制')
+    expect(hint.confidence).toBe('high')
+  })
+
+  it('parses AI content field', () => {
+    expect(extractG7SubAiText({ data: { content: 'AI正文' } })).toBe('AI正文')
   })
 })

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   calculatePackageRow,
   createPackageRow,
+  syncRowFromSteps,
   validatePackageRows,
 } from '../g7DisposalPackageModel'
 
@@ -36,7 +37,7 @@ describe('G7-12 原底稿公式链', () => {
     expect(calculatePackageRow(row).consolidatedGain).toBe(240)
   })
 
-  it('权益法追溯调整区按90%/10%拆分以前年度损益', () => {
+  it('权益法追溯调整区按可配置盈余公积比例拆分', () => {
     const row = createPackageRow(1)
     Object.assign(row, {
       equityMethodRatio: 0.3,
@@ -44,6 +45,7 @@ describe('G7-12 原底稿公式链', () => {
       currentProfit: 20,
       otherComprehensiveIncome: 10,
       otherEquityChanges: 5,
+      surplusReserveRate: 0.1,
     })
 
     const result = calculatePackageRow(row)
@@ -52,6 +54,23 @@ describe('G7-12 原底稿公式链', () => {
     expect(result.investmentIncome).toBe(6)
     expect(result.longTermInvestmentOci).toBe(3)
     expect(result.longTermInvestmentOtherChanges).toBe(1.5)
+  })
+
+  it('各次交易累计回写对价与处置比例', () => {
+    const row = createPackageRow(1)
+    row.originalShareholdingRatio = 0.8
+    row.steps = [
+      { id: 's1', seq: 1, stepDate: '2024-01-01', consideration: 400, shareChange: 0.2, note: '' },
+      { id: 's2', seq: 2, stepDate: '2025-06-01', consideration: 500, shareChange: 0.3, note: '' },
+    ]
+    syncRowFromSteps(row)
+    expect(row.transactionPrice).toBe(900)
+    expect(row.disposalRatio).toBe(0.5)
+    expect(row.lossOfControlDate).toBe('2025-06-01')
+    const calc = calculatePackageRow(row)
+    expect(calc.cumulativePrice).toBe(900)
+    expect(calc.cumulativeShareChange).toBe(0.5)
+    expect(calc.remainingRatio).toBe(0.3)
   })
 })
 

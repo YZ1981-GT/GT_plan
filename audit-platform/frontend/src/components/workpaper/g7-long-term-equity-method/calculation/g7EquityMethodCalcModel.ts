@@ -66,12 +66,13 @@ export interface SuggestedAdjustmentLine {
   creditAmount: number
   indexRef: string
   remark: string
-  source: 'incomeDifference' | 'unexplainedVariance'
+  source: 'incomeDifference' | 'unexplainedVariance' | 'bargainPurchase'
   /** 同源草稿标记，用于 G7-3 精确替换 */
-  sourceKind: 'g7-14-suggested'
+  sourceKind: 'g7-14-suggested' | 'g7-13-bargain-suggested'
 }
 
 export const G714_SUGGESTED_SOURCE_KIND = 'g7-14-suggested' as const
+export const G713_BARGAIN_SOURCE_KIND = 'g7-13-bargain-suggested' as const
 
 function rf(begin = 0, increase = 0, decrease = 0): EquityRollforward {
   return { begin, increase, decrease }
@@ -437,19 +438,33 @@ export function toG73Entries(lines: SuggestedAdjustmentLine[]): Record<string, a
     preparedBy: '',
     remark: line.remark,
     sourceKind: line.sourceKind || G714_SUGGESTED_SOURCE_KIND,
+    investeeName: line.investeeName || '',
   }))
 }
 
-/** 合并进既有 G7-3 rows：仅替换同源建议草稿，保留手工及其他引用 */
+/** 合并进既有 G7-3 rows：仅替换与本次推送相同 sourceKind 的建议草稿，保留手工及其他来源 */
 export function mergeSuggestedIntoG73(
   existing: Record<string, any>[],
   suggested: Record<string, any>[],
 ): Record<string, any>[] {
-  const isSuggestedDraft = (row: Record<string, any>) =>
-    String(row.sourceKind || '') === G714_SUGGESTED_SOURCE_KIND
-    || String(row.remark || '').includes(`sourceKind=${G714_SUGGESTED_SOURCE_KIND}`)
+  const kinds = new Set(
+    suggested
+      .map((row) => String(row.sourceKind || '').trim())
+      .filter(Boolean),
+  )
+  if (!kinds.size) kinds.add(G714_SUGGESTED_SOURCE_KIND)
 
-  const kept = existing.filter((row) => !isSuggestedDraft(row))
+  const isReplacedDraft = (row: Record<string, any>) => {
+    const sk = String(row.sourceKind || '')
+    if (kinds.has(sk)) return true
+    const remark = String(row.remark || '')
+    for (const k of kinds) {
+      if (remark.includes(`sourceKind=${k}`)) return true
+    }
+    return false
+  }
+
+  const kept = existing.filter((row) => !isReplacedDraft(row))
   const merged = [...kept, ...suggested]
   return merged.map((row, index) => ({ ...row, seq: index + 1 }))
 }

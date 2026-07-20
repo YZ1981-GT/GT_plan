@@ -147,3 +147,73 @@ export function timingKindLabel(kind: CutoffTimingKind): string {
     default: return '正常'
   }
 }
+
+/** 截止逐笔勾稽项（引导弹窗实时面板；与 assessCutoffRow 同源） */
+export interface CutoffCheckResult {
+  key: string
+  label: string
+  status: 'ok' | 'mismatch' | 'missing' | 'pending'
+  detail: string
+}
+
+export function evaluateCutoffChecks(opts: {
+  voucherNo: string
+  bookDate: string
+  docNo: string
+  docDate: string
+  amount: number
+  docAmount?: number
+  periodEnd: string
+}): CutoffCheckResult[] {
+  const judge = assessCutoffRow({
+    docDate: opts.docDate,
+    bookDate: opts.bookDate,
+    periodEnd: opts.periodEnd,
+    voucherNo: opts.voucherNo,
+    docNo: opts.docNo,
+    amount: opts.amount,
+    docAmount: opts.docAmount,
+  })
+  const results: CutoffCheckResult[] = []
+
+  const hasBook = !!(opts.voucherNo || opts.bookDate)
+  const hasDoc = !!(opts.docNo || opts.docDate)
+
+  if (hasBook && !hasDoc) {
+    results.push({ key: 'doc', label: '原始单据', status: 'missing', detail: '有账无单' })
+  } else if (hasDoc && !hasBook) {
+    results.push({ key: 'book', label: '记账凭证', status: 'missing', detail: '有单无账' })
+  } else if (hasBook && hasDoc) {
+    results.push({ key: 'pair', label: '账证配对', status: 'ok', detail: '账、单均已填写' })
+  } else {
+    results.push({ key: 'pair', label: '账证配对', status: 'pending', detail: '待填写' })
+  }
+
+  if (!opts.docDate || !opts.bookDate || !opts.periodEnd) {
+    results.push({ key: 'timing', label: '截止细判', status: 'pending', detail: '请补全单据日/记账日/截止日' })
+  } else if (judge.timing === 'ok') {
+    results.push({ key: 'timing', label: '截止细判', status: 'ok', detail: '同侧 · 期间归属正确' })
+  } else {
+    results.push({
+      key: 'timing',
+      label: '截止细判',
+      status: 'mismatch',
+      detail: timingKindLabel(judge.timing) + (TIMING_LABEL[judge.timing] ? `：${TIMING_LABEL[judge.timing]}` : ''),
+    })
+  }
+
+  if (judge.evidenceGap === 'amount_mismatch') {
+    results.push({
+      key: 'amount',
+      label: '金额勾稽',
+      status: 'mismatch',
+      detail: `账 ${opts.amount} vs 单 ${opts.docAmount}`,
+    })
+  } else if ((opts.docAmount ?? 0) > 0 && opts.amount > 0) {
+    results.push({ key: 'amount', label: '金额勾稽', status: 'ok', detail: '一致' })
+  } else {
+    results.push({ key: 'amount', label: '金额勾稽', status: 'pending', detail: '单据金额可选填' })
+  }
+
+  return results
+}

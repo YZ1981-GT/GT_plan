@@ -65,6 +65,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :audit-year="auditYearNum"
         />
 
         <F2TabPolicy
@@ -256,6 +257,19 @@ const sheetNameRef = computed(() => props.sheetName || '')
 const formData = useF2FormData({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
+})
+
+const auditYearNum = computed(() => {
+  const ctx = formData.projectContext.value
+  const raw = ctx?.audit_year ?? ctx?.year
+  if (typeof raw === 'number' && raw >= 1900) return raw
+  if (typeof raw === 'string' && /^\d{4}$/.test(raw)) return Number(raw)
+  const end = ctx?.audit_period_end || ctx?.bs_date || ''
+  if (end.length >= 4) {
+    const y = parseInt(end.slice(0, 4), 10)
+    if (y >= 1900) return y
+  }
+  return undefined
 })
 
 const allResponses = computed(() => formData.allResponses.value)

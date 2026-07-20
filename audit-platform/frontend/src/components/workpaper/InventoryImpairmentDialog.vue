@@ -15,7 +15,7 @@
     >
       <template #default>
         基于成本与可变现净值孰低法，结合库龄分析，AI 给出每个产品的跌价计提建议。
-        当前 LLM 接入为 stub 实现，分析结果作为辅助参考，最终金额需审计师确认。
+        分析结果基于 CAS1 成本与可变现净值孰低规则引擎，供辅助参考，最终金额需审计师确认。
         <strong>「采纳并写回」会把分析结果写入当前底稿 parsed_data，便于后续溯源。</strong>
       </template>
     </el-alert>
@@ -230,7 +230,7 @@ async function onAnalyze() {
     if (resp?.is_llm_stub) {
       ElMessage.success('AI 分析完成（stub 模式）')
     } else {
-      ElMessage.success('AI 分析完成')
+      ElMessage.success('跌价分析完成（CAS1 孰低规则）')
     }
   } catch (e: any) {
     handleApiError(e, 'AI 分析')

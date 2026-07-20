@@ -1,12 +1,13 @@
 <!--
-  G7TabEquityMethodCalc.vue — G7-14 权益法测算表（对齐原底稿三段）
+  G7TabEquityMethodCalc.vue — G7-14 权益法测算表（对齐原底稿）
 
-  4区段Tab：
+  4区段Tab + 导入导出附表：
   - Tab1 本期权益法调整: 净利润调整→测算份额→账面确认→差异⑩=⑨-⑤+⑧
   - Tab2 期末余额审核: 成本/损益调整/OCI/其他权益滚存→应享净资产→账面差额
   - Tab3 差额拆解与滚存: 商誉/累计FV/减值→未解释差额→权益法期末余额→审计结论；商誉/FV明细附表
   - Tab4 净资产调整: 按被投资单位滚存所有者权益→回写经审计净资产；差异→建议分录推送G7-3
-  - 工具栏「从关联表带入」: G7-2/G7-5/G7-15/G7-13 → G7-14
+  - 工具栏「从关联表带入」: G7-2/G7-4/G7-5/G7-6/G7-13/G7-15/G7-16/G7-17 → G7-14
+  - IE 多 sheet：本期调整 / 期末余额 / 差额拆解 + 净资产调整 + 商誉FV明细
 
   公式：
   - adjustedNetProfit / equityShare / ociShare / otherEquityShare
@@ -43,11 +44,14 @@
           <el-button size="small" :loading="syncingCross">从关联表带入 ▾</el-button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item command="g74">G7-4 被投资单位（含ID）</el-dropdown-item>
+              <el-dropdown-item command="g74">G7-4 被投资单位（含ID/比例）</el-dropdown-item>
               <el-dropdown-item command="g72">G7-2 期初/本期变动</el-dropdown-item>
               <el-dropdown-item command="g75">G7-5 净利润/净资产</el-dropdown-item>
               <el-dropdown-item command="g715">G7-15 内部交易抵销</el-dropdown-item>
               <el-dropdown-item command="g713">G7-13 商誉/FV明细</el-dropdown-item>
+              <el-dropdown-item command="g76">G7-6 会计政策调整</el-dropdown-item>
+              <el-dropdown-item command="g716">G7-16 未确认损失→其他调整</el-dropdown-item>
+              <el-dropdown-item command="g717">G7-17 减值测试→减值准备</el-dropdown-item>
               <el-dropdown-item divided command="all">全部带入</el-dropdown-item>
             </el-dropdown-menu>
           </template>
@@ -102,8 +106,8 @@
       <p><strong>权益法核算公式（CAS2 / 原底稿G7-14）：</strong></p>
       <p>• 调整后净利润 = 报告净利润 − 内部交易抵销 − 公允价值折旧摊销 ± 会计政策调整 ± 其他调整</p>
       <p>• 测算投资收益⑤ = 调整后净利润 × 持股比例；OCI⑥/其他权益⑦同理</p>
-      <p>• 投资收益差异⑩ = 账面确认⑨ − 测算⑤ ＋ 已宣告股利⑧（⑨建议取损益调整本期净增加）</p>
-      <p>• 长投账面余额 = 投资成本＋损益调整＋OCI＋其他权益变动；差额须用商誉/累计FV调整/减值解释</p>
+      <p>• 投资收益差异⑩ = 账面确认⑨ − 测算⑤ ＋ 已宣告股利⑧；OCI差异⑫/其他权益差异⑭ = 账面确认 − 测算份额</p>
+      <p>• 长投账面余额 = 投资成本＋损益调整＋OCI＋其他权益变动；期初/期末勾稽差异P/S应≈0（对照G7-2）</p>
     </div>
 
     <!-- 审计目标 -->
@@ -182,6 +186,14 @@
         :closable="false"
         class="objective-alert"
         title="按被投资单位填列所有者权益滚存与公允价值/内部交易调整；期末调整后净资产回写至「期末余额审核」的经审计净资产。"
+      />
+      <el-alert
+        type="warning"
+        :closable="false"
+        class="consol-skip-alert"
+        show-icon
+        title="合并净资产表不会承接以下调整行（导出 linkage 会列入 skipped_net_asset_fields）："
+        :description="consolUnmappedHint"
       />
       <div v-if="netAssetAdjustments.length === 0" class="empty-state">
         <p>请先在 Tab1 添加被投资单位，或点击「按被投资单位刷新」</p>
@@ -523,6 +535,38 @@
                   <span class="formula-cell" title="长投账面余额−应享净资产">{{ fmtAmount(row.netAssetShareVariance) }}</span>
                 </template>
               </el-table-column>
+              <el-table-column label="G7-2期初总额" min-width="130" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-if="!isReadonly" :model-value="row.g72OpeningTotal" size="small" :controls="false" style="width:100%"
+                    @update:model-value="(v: number) => updateNumField(row, 'g72OpeningTotal', v)" />
+                  <span v-else>{{ fmtAmount(row.g72OpeningTotal) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="期初勾稽差异P" min-width="130" align="right">
+                <template #default="{ row }">
+                  <span
+                    class="formula-cell"
+                    :class="{ 'income-diff-warning': isOverMateriality(row.openingReconVariance) }"
+                    title="四段期初合计 − G7-2审定期初总额；应≈0"
+                  >{{ fmtAmount(row.openingReconVariance) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="G7-2期末总额" min-width="130" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-if="!isReadonly" :model-value="row.g72ClosingTotal" size="small" :controls="false" style="width:100%"
+                    @update:model-value="(v: number) => updateNumField(row, 'g72ClosingTotal', v)" />
+                  <span v-else>{{ fmtAmount(row.g72ClosingTotal) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="期末勾稽差异S" min-width="130" align="right">
+                <template #default="{ row }">
+                  <span
+                    class="formula-cell"
+                    :class="{ 'income-diff-warning': isOverMateriality(row.closingReconVariance) }"
+                    title="长投账面余额 − G7-2审定期末总额；应≈0"
+                  >{{ fmtAmount(row.closingReconVariance) }}</span>
+                </template>
+              </el-table-column>
             </template>
 
             <!-- ═══ Tab3: 差额拆解与滚存 ═══ -->
@@ -534,9 +578,25 @@
                   <span v-else>{{ fmtAmount(row.ociChange) }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="享有OCI" min-width="110" align="right">
+              <el-table-column label="享有OCI⑥" min-width="110" align="right">
                 <template #default="{ row }">
                   <span class="formula-cell" title="OCI变动×持股比例">{{ fmtAmount(row.ociShare) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="账面确认OCI⑪" min-width="130" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-if="!isReadonly" :model-value="row.confirmedOci" size="small" :controls="false" style="width:100%"
+                    @update:model-value="(v: number) => updateNumField(row, 'confirmedOci', v)" />
+                  <span v-else>{{ fmtAmount(row.confirmedOci) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="OCI差异⑫" min-width="110" align="right">
+                <template #default="{ row }">
+                  <span
+                    class="formula-cell"
+                    :class="{ 'income-diff-warning': isOverMateriality(row.ociDifference) }"
+                    title="⑫=⑪−⑥（账面确认OCI−享有OCI）"
+                  >{{ fmtAmount(row.ociDifference) }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="其他权益变动" min-width="120" align="right">
@@ -544,6 +604,27 @@
                   <el-input-number v-if="!isReadonly" :model-value="row.otherEquityChange" size="small" :controls="false" style="width:100%"
                     @update:model-value="(v: number) => updateNumField(row, 'otherEquityChange', v)" />
                   <span v-else>{{ fmtAmount(row.otherEquityChange) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="享有其他权益⑦" min-width="130" align="right">
+                <template #default="{ row }">
+                  <span class="formula-cell" title="其他权益变动×持股比例">{{ fmtAmount(row.otherEquityShare) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="账面确认其他权益⑬" min-width="150" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-if="!isReadonly" :model-value="row.confirmedOtherEquity" size="small" :controls="false" style="width:100%"
+                    @update:model-value="(v: number) => updateNumField(row, 'confirmedOtherEquity', v)" />
+                  <span v-else>{{ fmtAmount(row.confirmedOtherEquity) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="其他权益差异⑭" min-width="130" align="right">
+                <template #default="{ row }">
+                  <span
+                    class="formula-cell"
+                    :class="{ 'income-diff-warning': isOverMateriality(row.otherEquityDifference) }"
+                    title="⑭=⑬−⑦（账面确认其他权益−享有其他权益）"
+                  >{{ fmtAmount(row.otherEquityDifference) }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="商誉/初始差额" min-width="130" align="right">
@@ -834,8 +915,9 @@
       <summary>编制提示</summary>
       <div class="guidance-content">
         <p>1. 调整后净利润 = 报告净利润 − 内部交易 − FV折旧 ± 政策/其他调整；测算投资收益⑤ = 调整后净利润 × 持股比例</p>
-        <p>2. 投资收益差异⑩ = 账面确认⑨ − 测算⑤ ＋ 已宣告股利⑧（⑨建议取损益调整本期净增加，正确时⑩≈0）</p>
+        <p>2. 投资收益差异⑩ = 账面确认⑨ − 测算⑤ ＋ 已宣告股利⑧；OCI差异⑫ = ⑪−⑥；其他权益差异⑭ = ⑬−⑦</p>
         <p>3. 长投账面余额 = 投资成本＋损益调整＋OCI＋其他权益变动；应享净资产 = 经审计净资产 × 持股比例</p>
+        <p>3b. 期初勾稽差异P = 四段期初合计 − G7-2期初；期末勾稽差异S = 长投账面 − G7-2期末（应从关联表带入G7-2）</p>
         <p>4. 与享有净资产差额须拆解为商誉/累计公允价值调整/减值；未解释差额应接近0</p>
         <p>5. 经审计净资产取自「4.净资产调整」期末调整后所有者权益，或 G7-5/G7-15 相关测算后回写</p>
         <p>6. |投资收益差异| 或 |未解释差额| 超过重要性水平时红色高亮（未填重要性时按分位 0.005）；可一键生成借贷平衡建议分录并推送 G7-3</p>
@@ -860,9 +942,9 @@
  * Spec: .kiro/specs/g7-long-term-equity-method/
  * Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 7.4, 7.5
  */
-import { ref, reactive, computed, inject, onMounted, watch } from 'vue'
+import { ref, reactive, computed, inject, onMounted, onBeforeUnmount, watch } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ElMessageBox, ElMessage, ElNotification } from 'element-plus'
 import {
   parseNum,
   calcAdjustedNetProfit,
@@ -872,6 +954,8 @@ import {
   calcLteiBookBalance,
   calcNetAssetShareVariance,
   calcUnexplainedVariance,
+  calcOpeningReconVariance,
+  calcClosingReconVariance,
 } from '../../composables/useG7EquityMethodFormulaEngine'
 import { fmtAmount } from '@/utils/formatters'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -894,28 +978,40 @@ import {
 } from './g7EquityMethodCalcModel'
 import { pushSuggestedAdjustmentsToG73, resolveG7MainWorkpaperId } from './g7EquityMethodPushG73'
 import { useG7EquityMethodImportExport } from '../../composables/useG7EquityMethodImportExport'
+import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import {
   G7_2_ROWS_KEY,
   G7_5_ROWS_KEY,
+  G7_6_ROWS_KEY,
   G7_13_ROWS_KEY,
   G7_15_ROWS_KEY,
   G7_15_SECTION_KEY,
+  G7_16_ROWS_KEY,
+  G7_17_ROWS_KEY,
+  G7_17_SECTION_KEY,
   applyFinancialInfoToG714Payload,
   applyG72EquityToG714Payload,
   applyG74InvesteesToG714Payload,
+  applyG76PolicyToG714Payload,
+  applyG717ImpairmentToG714Payload,
   applyGoodwillFvDetailsToRows,
   applyInternalElimToG714Payload,
   applyInvestmentCostToG714Payload,
+  applyUnrecognizedLossToG714Payload,
   addGoodwillFvDetail,
+  buildG714DualWriteItems,
   buildG714SyncPreview,
   formatSyncPreviewMessage,
+  G714_CONSOL_UNMAPPED_FIELD_LABELS,
   removeGoodwillFvDetail,
   stampLastCrossSheetSync,
   G7_4_ROWS_KEY,
   type GoodwillFvDetailLine,
   type LastCrossSheetSyncMeta,
 } from '../../composables/g7EquityMethodCrossSheet'
+import { G7_IMPAIRMENT_UPDATED_EVENT } from '../impairment/g7ImpairmentTestModel'
 import http from '@/utils/http'
+import { extractG7AiText } from '../../composables/g7AiText'
 
 // ═══ Props ═══════════════════════════════════════════════════════════════════
 
@@ -951,6 +1047,8 @@ const AUDIT_NOTE_KEY = 'G7-14-audit-note'
 // ═══ Injections ═══════════════════════════════════════════════════════════════
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
 // ═══ State ═══════════════════════════════════════════════════════════════════
 
@@ -967,6 +1065,10 @@ const gwfTrackedNames = ref<string[]>([])
 const lastCrossSheetSync = ref<LastCrossSheetSyncMeta | null>(null)
 const pushingG73 = ref(false)
 const syncingCross = ref(false)
+
+const consolUnmappedHint = Object.entries(G714_CONSOL_UNMAPPED_FIELD_LABELS)
+  .map(([k, label]) => `${label}（${k}）`)
+  .join('；')
 
 const naLineDefs: { key: keyof NetAssetAdjustment; label: string }[] = [
   { key: 'shareCapital', label: '实收资本（或股本）' },
@@ -988,6 +1090,7 @@ const naLineDefs: { key: keyof NetAssetAdjustment; label: string }[] = [
 const formData = useG7EquityMethodFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
+  onAfterSave: () => scheduleAutoSnapshot(),
 })
 const importExport = useG7EquityMethodImportExport({
   wpId: computed(() => props.wpId),
@@ -1115,6 +1218,18 @@ function recalcRow(row: EquityMethodCalcRow): void {
     row.impairment,
   )
 
+  row.openingReconVariance = calcOpeningReconVariance(
+    row.costOpening,
+    row.pnlAdjOpening,
+    row.ociBalOpening,
+    row.otherEqBalOpening,
+    row.g72OpeningTotal,
+  )
+  row.closingReconVariance = calcClosingReconVariance(
+    row.lteiBookBalance,
+    row.g72ClosingTotal,
+  )
+
   row.closingBalance = calcEquityMethodBalance(
     row.openingBalance,
     row.equityShare,
@@ -1162,8 +1277,20 @@ const exceptionSummary = computed(() => {
     if (isOverMateriality(row.incomeDifference)) {
       msgs.push(`${name}：投资收益差异 ${row.incomeDifference.toFixed(2)} 超过重要性水平`)
     }
+    if (isOverMateriality(row.ociDifference)) {
+      msgs.push(`${name}：OCI差异 ${row.ociDifference.toFixed(2)} 超过重要性水平`)
+    }
+    if (isOverMateriality(row.otherEquityDifference)) {
+      msgs.push(`${name}：其他权益差异 ${row.otherEquityDifference.toFixed(2)} 超过重要性水平`)
+    }
     if (isOverMateriality(row.unexplainedVariance)) {
       msgs.push(`${name}：未解释差额 ${row.unexplainedVariance.toFixed(2)} 超过重要性水平`)
+    }
+    if (isOverMateriality(row.openingReconVariance)) {
+      msgs.push(`${name}：期初勾稽差异 ${row.openingReconVariance.toFixed(2)}（四段期初合计≠G7-2期初）`)
+    }
+    if (isOverMateriality(row.closingReconVariance)) {
+      msgs.push(`${name}：期末勾稽差异 ${row.closingReconVariance.toFixed(2)}（长投账面≠G7-2期末）`)
     }
     const suggested = suggestedPnlAdjChange(row)
     if (
@@ -1222,13 +1349,7 @@ function applyPayloadToUi(payload: any): void {
 
 async function persistPayloadNow(payload?: EquityMethodCalcSavePayload): Promise<void> {
   if (isReadonly.value) return
-  const data = payload ?? buildPayload()
-  const pageJson = JSON.stringify(data)
-  const rowsJson = JSON.stringify(data.rows)
-  await formData.saveBatch([
-    { itemId: SECTION_KEY, data: { conclusion: pageJson, remark: null } },
-    { itemId: ROWS_KEY, data: { conclusion: rowsJson, remark: rowsJson } },
-  ])
+  await formData.saveBatch(buildG714DualWriteItems((payload ?? buildPayload()) as Record<string, any>))
 }
 
 async function fetchChecklistConclusion(wpId: string, itemIds: string[]): Promise<unknown> {
@@ -1256,7 +1377,7 @@ async function loadLocalChecklist(itemIds: string[]): Promise<unknown> {
 }
 
 async function runCrossSheetSync(
-  kind: 'g74' | 'g72' | 'g75' | 'g715' | 'g713' | 'all',
+  kind: 'g74' | 'g72' | 'g75' | 'g715' | 'g713' | 'g76' | 'g716' | 'g717' | 'all',
 ): Promise<void> {
   if (isReadonly.value) return
   syncingCross.value = true
@@ -1338,6 +1459,24 @@ async function runCrossSheetSync(
         ?? (props.htmlData as any)?.investmentCostTest
       applyOne(applyInvestmentCostToG714Payload(payload, g713))
     }
+    if (kind === 'g76' || kind === 'all') {
+      const g76 = await loadLocalChecklist([G7_6_ROWS_KEY])
+        ?? formData.parseContent()?.accountingPolicy
+        ?? (props.htmlData as any)?.accountingPolicy
+      applyOne(applyG76PolicyToG714Payload(payload, g76))
+    }
+    if (kind === 'g716' || kind === 'all') {
+      const g716 = await loadLocalChecklist([G7_16_ROWS_KEY])
+        ?? formData.parseContent()?.unrecognizedLoss
+        ?? (props.htmlData as any)?.unrecognizedLoss
+      applyOne(applyUnrecognizedLossToG714Payload(payload, g716))
+    }
+    if (kind === 'g717' || kind === 'all') {
+      const g717 = await loadLocalChecklist([G7_17_ROWS_KEY, G7_17_SECTION_KEY])
+        ?? formData.parseContent()?.impairmentTest
+        ?? (props.htmlData as any)?.impairmentTest
+      applyOne(applyG717ImpairmentToG714Payload(payload, g717))
+    }
 
     if (!messages.length) {
       const tip = [
@@ -1356,6 +1495,9 @@ async function runCrossSheetSync(
       if (m.includes('G7-5')) return 'G7-5'
       if (m.includes('G7-15')) return 'G7-15'
       if (m.includes('G7-13')) return 'G7-13'
+      if (m.includes('G7-6')) return 'G7-6'
+      if (m.includes('G7-16')) return 'G7-16'
+      if (m.includes('G7-17')) return 'G7-17'
       return '关联表'
     })
     try {
@@ -1403,10 +1545,28 @@ function handleSyncCommand(command: string): void {
     || command === 'g75'
     || command === 'g715'
     || command === 'g713'
+    || command === 'g76'
+    || command === 'g716'
+    || command === 'g717'
     || command === 'all'
   ) {
     void runCrossSheetSync(command)
   }
+}
+
+function onG717ImpairmentUpdated(ev: Event): void {
+  if (isReadonly.value) return
+  const detail = (ev as CustomEvent).detail || {}
+  if (detail.wpId && detail.wpId !== props.wpId) return
+  const total = Number(detail.totalImpairment)
+  ElNotification({
+    title: 'G7-17 减值已更新',
+    message: Number.isFinite(total)
+      ? `∑减值 ${total.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}。可点「从关联表带入 → G7-17」同步到本表减值准备列。`
+      : '可点「从关联表带入 → G7-17」同步到本表减值准备列。',
+    type: 'info',
+    duration: 8000,
+  })
 }
 
 function onGoodwillFvChanged(): void {
@@ -1582,6 +1742,10 @@ function createEmptyRow(investeeName: string, seq: number): EquityMethodCalcRow 
     shareOfAuditedNetAssets: 0,
     lteiBookBalance: 0,
     netAssetShareVariance: 0,
+    g72OpeningTotal: 0,
+    g72ClosingTotal: 0,
+    openingReconVariance: 0,
+    closingReconVariance: 0,
     goodwill: 0,
     cumulativeFvAdj: 0,
     impairment: 0,
@@ -1652,22 +1816,77 @@ function deleteRow(row: EquityMethodCalcRow): void {
 
 // ═══ AI辅助 ═══════════════════════════════════════════════════════════════════
 
+function buildLocalEquityMethodConclusion(): string {
+  const rows = allRows.value
+  const mat = materialityLevel.value
+  const lines: string[] = [
+    `经复核 G7-14 权益法测算（共 ${rows.length} 家被投资单位，重要性水平 ${mat || 0}）：`,
+  ]
+  if (!rows.length) {
+    lines.push('本期无测算行，请先从关联表带入或手工维护被投资单位后重新生成结论。')
+    return lines.join('\n')
+  }
+  let overIncome = 0
+  let overUnexplained = 0
+  for (const r of rows) {
+    const name = r.investeeName || '未命名'
+    if (isOverMateriality(r.incomeDifference)) {
+      overIncome += 1
+      lines.push(`· ${name}：投资收益差异⑩=${Number(r.incomeDifference || 0).toFixed(2)}，超过重要性，需分析原因或调整。`)
+    }
+    if (isOverMateriality(r.unexplainedVariance)) {
+      overUnexplained += 1
+      lines.push(`· ${name}：未解释差额⑮=${Number(r.unexplainedVariance || 0).toFixed(2)}，超过重要性，建议完成差额拆解。`)
+    }
+  }
+  if (overIncome === 0 && overUnexplained === 0) {
+    lines.push('各被投资单位投资收益差异及未解释差额均未超过重要性水平；权益法投资收益确认与期末余额测算在重要性范围内可接受。')
+  } else {
+    lines.push(`合计：收益差异超限 ${overIncome} 家，未解释差额超限 ${overUnexplained} 家；请结合 G7-3 建议分录与管理层沟通后定稿。`)
+  }
+  return lines.join('\n')
+}
+
 async function handleAiConclusion(): Promise<void> {
+  if (isReadonly.value) return
   ElMessage.info('正在生成AI审计结论...')
+  const rows = allRows.value
+  const overIncome = rows.filter(r => isOverMateriality(r.incomeDifference)).length
+  const overUnexplained = rows.filter(r => isOverMateriality(r.unexplainedVariance)).length
+  const summary = rows.map(r => {
+    const name = r.investeeName || '未命名'
+    return `${name}: 调整后NP=${Number(r.adjustedNetProfit || 0).toFixed(2)}, 份额=${Number(r.equityShare || 0).toFixed(2)}, 收益差异⑩=${Number(r.incomeDifference || 0).toFixed(2)}, 未解释⑮=${Number(r.unexplainedVariance || 0).toFixed(2)}`
+  }).join(' | ')
   try {
-    const { default: http } = await import('@/utils/http')
     const res = await http.post(
       `/api/workpapers/${props.wpId}/g7-equity-method/ai/equity-method-conclusion`,
-      { rows: groups.flatMap(g => g.rows), materialityLevel: materialityLevel.value },
+      {
+        existingContent: conclusion.value,
+        relatedContext: {
+          sheet: 'G7-14',
+          materialityLevel: materialityLevel.value,
+          rowCount: rows.length,
+          overMaterialityIncomeDiff: overIncome,
+          overMaterialityUnexplained: overUnexplained,
+          investees: rows.map(r => r.investeeName).filter(Boolean).join('、'),
+          summary: summary || '无测算行',
+        },
+      },
     )
-    const text = res?.data?.conclusion || res?.data?.text || res?.data || ''
+    const text = extractG7AiText(res?.data)
     if (text) {
       conclusion.value = String(text)
       emitSave()
       ElMessage.success('AI结论生成完成')
+    } else {
+      conclusion.value = buildLocalEquityMethodConclusion()
+      emitSave()
+      ElMessage.warning('AI未返回内容，已生成本地结论草稿')
     }
   } catch {
-    ElMessage.warning('AI结论生成暂未连接，请手动填写')
+    conclusion.value = buildLocalEquityMethodConclusion()
+    emitSave()
+    ElMessage.warning('AI暂不可用，已生成本地结论草稿')
   }
 }
 
@@ -1750,13 +1969,7 @@ function buildPayload(): EquityMethodCalcSavePayload {
 
 function emitSave(): void {
   if (isReadonly.value) return
-  const payload = buildPayload()
-  const pageJson = JSON.stringify(payload)
-  const rowsJson = JSON.stringify(payload.rows)
-  formData.debouncedSaveBatch([
-    { itemId: SECTION_KEY, data: { conclusion: pageJson, remark: null } },
-    { itemId: ROWS_KEY, data: { conclusion: rowsJson, remark: rowsJson } },
-  ])
+  formData.debouncedSaveBatch(buildG714DualWriteItems(buildPayload()))
 }
 
 // ═══ 辅助格式化 ═══════════════════════════════════════════════════════════════
@@ -1901,6 +2114,10 @@ function hydrateRow(r: any, name: string, idx: number): EquityMethodCalcRow {
     shareOfAuditedNetAssets: 0,
     lteiBookBalance: 0,
     netAssetShareVariance: 0,
+    g72OpeningTotal: parseNum(r.g72OpeningTotal ?? r.g72_opening_total),
+    g72ClosingTotal: parseNum(r.g72ClosingTotal ?? r.g72_closing_total),
+    openingReconVariance: 0,
+    closingReconVariance: 0,
     goodwill: parseNum(r.goodwill),
     cumulativeFvAdj: parseNum(r.cumulativeFvAdj ?? r.cumulative_fv_adj),
     impairment: parseNum(r.impairment),
@@ -1945,6 +2162,12 @@ onMounted(async () => {
   }
 
   auditNote.value = formData.data.value.get(AUDIT_NOTE_KEY)?.remark ?? ''
+
+  window.addEventListener(G7_IMPAIRMENT_UPDATED_EVENT, onG717ImpairmentUpdated as EventListener)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener(G7_IMPAIRMENT_UPDATED_EVENT, onG717ImpairmentUpdated as EventListener)
 })
 </script>
 
@@ -1954,6 +2177,9 @@ onMounted(async () => {
   font-size: var(--wp-font-size, 13px);
 }
 .objective-alert {
+  margin-bottom: 12px;
+}
+.consol-skip-alert {
   margin-bottom: 12px;
 }
 .tab-toolbar {

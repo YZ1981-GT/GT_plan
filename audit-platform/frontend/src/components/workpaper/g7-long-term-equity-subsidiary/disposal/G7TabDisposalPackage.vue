@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="g7-tab-disposal-package">
     <div class="section-head">
       <div>
@@ -8,6 +8,16 @@
       <div class="head-actions">
         <GtIndexChip value="wp:G7-12" :context-project-id="projectId" />
         <el-button size="small" :disabled="isReadonly" @click="addRow">新增公司</el-button>
+        <el-dropdown @command="handleImportExportCommand">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="template">导出模板</el-dropdown-item>
+              <el-dropdown-item command="export">导出数据</el-dropdown-item>
+              <el-dropdown-item v-if="!isReadonly" command="import">导入数据</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-button size="small" type="primary" plain :disabled="isReadonly" :loading="aiLoading" @click="handleAi">
           <el-icon><MagicStick /></el-icon> AI结论
         </el-button>
@@ -85,7 +95,63 @@
       </section>
 
       <section class="workpaper-section">
-        <h4>3. 交易事实与丧失控制权时点</h4>
+        <h4>3. 各次交易明细（一揽子分步）</h4>
+        <p class="section-note">录入各次交易后，累计对价与累计持股变动自动回写至下方「交易事实」区；合并侧「前序交易差额」仍可手工填写已确认损益的追溯调整。</p>
+        <div v-if="!isReadonly" class="step-actions">
+          <el-button size="small" type="primary" plain @click="addStep()">新增交易次</el-button>
+        </div>
+        <el-table :data="flatSteps" border size="small" empty-text="暂无分步交易，可点「新增交易次」或直接在第4区录入汇总对价">
+          <el-table-column label="子公司" width="150">
+            <template #default="{ row: step }">
+              <el-select
+                :model-value="step.rowId"
+                :disabled="isReadonly"
+                placeholder="选择公司"
+                style="width: 100%"
+                @change="(v) => moveStepToRow(step.id, step.rowId, String(v))"
+              >
+                <el-option v-for="r in rows" :key="r.id" :label="r.investeeName || `行${r.seq}`" :value="r.id" />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column label="次别" width="70" align="center">
+            <template #default="{ row: step }">{{ step.seq }}</template>
+          </el-table-column>
+          <el-table-column label="交易日期" width="150">
+            <template #default="{ row: step }">
+              <el-date-picker v-model="findStep(step.rowId, step.id)!.stepDate" type="date" value-format="YYYY-MM-DD" :disabled="isReadonly" @change="onStepsChanged(step.rowId)" />
+            </template>
+          </el-table-column>
+          <el-table-column label="对价" width="140">
+            <template #default="{ row: step }">
+              <MoneyInput v-model="findStep(step.rowId, step.id)!.consideration" :disabled="isReadonly" @change="onStepsChanged(step.rowId)" />
+            </template>
+          </el-table-column>
+          <el-table-column label="持股变动" width="120">
+            <template #default="{ row: step }">
+              <RatioInput v-model="findStep(step.rowId, step.id)!.shareChange" :disabled="isReadonly" @change="onStepsChanged(step.rowId)" />
+            </template>
+          </el-table-column>
+          <el-table-column label="累计对价 / 累计持股" width="160" align="right">
+            <template #default="{ row: step }">
+              <span class="formula-cell">{{ calc(rows.find(r => r.id === step.rowId)!).cumulativePrice.toFixed(2) }} / {{ (calc(rows.find(r => r.id === step.rowId)!).cumulativeShareChange * 100).toFixed(2) }}%</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="备注" min-width="140">
+            <template #default="{ row: step }">
+              <el-input v-model="findStep(step.rowId, step.id)!.note" :disabled="isReadonly" @change="onStepsChanged(step.rowId)" />
+            </template>
+          </el-table-column>
+          <el-table-column v-if="!isReadonly" label="操作" width="70" fixed="right">
+            <template #default="{ row: step }">
+              <el-button link type="danger" @click="removeStep(step.rowId, step.id)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </section>
+
+      <section class="workpaper-section">
+        <h4>4. 交易事实与丧失控制权时点</h4>
         <el-table :data="rows" border size="small" row-key="id">
           <el-table-column prop="investeeName" label="子公司" width="140" fixed />
           <el-table-column label="交易日期" width="150">
@@ -127,7 +193,7 @@
       </section>
 
       <section class="workpaper-section">
-        <h4>4. 个别报表测算</h4>
+        <h4>5. 个别报表测算</h4>
         <el-table :data="rows" border size="small" row-key="id">
           <el-table-column prop="investeeName" label="子公司" width="140" fixed />
           <el-table-column label="处置日长投账面" width="150"><template #default="{ row }"><MoneyInput v-model="row.individualBookValue" :disabled="isReadonly" @change="saveRows" /></template></el-table-column>
@@ -144,7 +210,7 @@
       </section>
 
       <section class="workpaper-section">
-        <h4>5. 合并报表测算</h4>
+        <h4>6. 合并报表测算</h4>
         <el-table :data="rows" border size="small" row-key="id">
           <el-table-column prop="investeeName" label="子公司" width="140" fixed />
           <el-table-column label="处置日子公司净资产" width="160"><template #default="{ row }"><MoneyInput v-model="row.consolidatedNetAssets" :disabled="isReadonly" @change="saveRows" /></template></el-table-column>
@@ -159,7 +225,8 @@
       </section>
 
       <section class="workpaper-section">
-        <h4>6. 剩余股权为联营、合营时追溯调整为权益法</h4>
+        <h4>7. 剩余股权为联营、合营时追溯调整为权益法</h4>
+        <p class="section-note">盈余公积比例默认 10%（可按被投资单位章程调整）；以前年度净利润按「1−盈余公积比例」计入期初未分配利润。</p>
         <el-table :data="rows" border size="small" row-key="id">
           <el-table-column prop="investeeName" label="被投资单位" width="140" fixed />
           <el-table-column label="权益法比例" width="130"><template #default="{ row }"><RatioInput v-model="row.equityMethodRatio" :disabled="isReadonly" @change="saveRows" /></template></el-table-column>
@@ -167,8 +234,11 @@
           <el-table-column label="本期净利润" width="145"><template #default="{ row }"><MoneyInput v-model="row.currentProfit" :disabled="isReadonly" @change="saveRows" /></template></el-table-column>
           <el-table-column label="其他综合收益" width="145"><template #default="{ row }"><MoneyInput v-model="row.otherComprehensiveIncome" :disabled="isReadonly" @change="saveRows" /></template></el-table-column>
           <el-table-column label="其他所有者权益变动" width="170"><template #default="{ row }"><MoneyInput v-model="row.otherEquityChanges" :disabled="isReadonly" @change="saveRows" /></template></el-table-column>
-          <el-table-column label="期初未分配利润" width="145" align="right"><template #default="{ row }"><FormulaValue :value="calc(row).openingRetainedEarnings" title="比例×以前年度净利润×90%" /></template></el-table-column>
-          <el-table-column label="盈余公积" width="125" align="right"><template #default="{ row }"><FormulaValue :value="calc(row).surplusReserve" title="比例×以前年度净利润×10%" /></template></el-table-column>
+          <el-table-column label="盈余公积比例" width="120">
+            <template #default="{ row }"><RatioInput v-model="row.surplusReserveRate" :disabled="isReadonly" @change="saveRows" /></template>
+          </el-table-column>
+          <el-table-column label="期初未分配利润" width="145" align="right"><template #default="{ row }"><FormulaValue :value="calc(row).openingRetainedEarnings" :title="`比例×以前年度净利润×(1−盈余公积比例${((row.surplusReserveRate || 0.1) * 100).toFixed(0)}%)`" /></template></el-table-column>
+          <el-table-column label="盈余公积" width="125" align="right"><template #default="{ row }"><FormulaValue :value="calc(row).surplusReserve" :title="`比例×以前年度净利润×盈余公积比例`" /></template></el-table-column>
           <el-table-column label="投资收益" width="125" align="right"><template #default="{ row }"><FormulaValue :value="calc(row).investmentIncome" title="比例×本期净利润" /></template></el-table-column>
           <el-table-column label="长投-其他综合收益" width="155" align="right"><template #default="{ row }"><FormulaValue :value="calc(row).longTermInvestmentOci" title="比例×其他综合收益" /></template></el-table-column>
           <el-table-column label="长投-其他变动" width="145" align="right"><template #default="{ row }"><FormulaValue :value="calc(row).longTermInvestmentOtherChanges" title="比例×其他所有者权益变动" /></template></el-table-column>
@@ -184,21 +254,44 @@
       <template #header><div class="conclusion-header"><span>审计结论</span><el-tag :type="validationErrors.length ? 'warning' : 'success'">{{ validationErrors.length ? '待完善' : '编制完整' }}</el-tag></div></template>
       <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="对交易性质、丧失控制权时点及会计处理发表结论。" @change="saveAuditConclusion" />
     </el-card>
+
+    <details class="prep-hint">
+      <summary>📋 编制提示</summary>
+      <ul>
+        <li>一揽子交易四项迹象需整体判断，不是“满足一项即成立”；须记录反向证据</li>
+        <li>多次交易请在「各次交易明细」分录；累计对价/持股自动回写第4区，丧失控制权日统一确认损益</li>
+        <li>合并处置损益 = 处置价款 + 剩余股权FV − 净资产 − 商誉 + 可转OCI + 前序交易差额</li>
+        <li>个别侧重新计量损益 = 剩余股权FV − 剩余账面；可转损益 OCI 按处置比例结转</li>
+        <li>权益法追溯：盈余公积比例默认 10%，可按章程修改；比例以小数填写（0.30=30%）</li>
+        <li>非一揽子单次处置请用 G7-11；不丧失控制权处置请用 G7-10 第三区段</li>
+      </ul>
+    </details>
+
+    <input ref="fileInputRef" type="file" accept=".xlsx" class="hidden-input" @change="handleFileChange">
   </div>
 </template>
 
 <script setup lang="ts">
+/**
+ * G7TabDisposalPackage — G7-12 处置子公司测试表（一揽子交易）
+ * 持久化 G7-12-rows；六区段+各次交易；版本链 onAfterSave。
+ */
 import { computed, defineComponent, h, inject, onMounted, ref } from 'vue'
 import { ElInputNumber, ElMessage, ElOption, ElSelect } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import http from '@/utils/http'
+import { extractG7AiText } from '../../composables/g7AiText'
 import { useG7SubFormData } from '../../composables/useG7SubFormData'
+import { useG7SubImportExport } from '../../composables/useG7SubImportExport'
+import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import GtIndexChip from '../../GtIndexChip.vue'
 import {
   PACKAGE_CRITERIA,
   calculatePackageRow,
   createPackageRow,
+  createPackageStep,
   migratePackageRow,
+  syncRowFromSteps,
   validatePackageRows,
   type G7DisposalPackageRow,
   type JudgmentAnswer,
@@ -207,7 +300,14 @@ import {
 const props = defineProps<{ htmlData: Record<string, any> | null; sheetName: string; wpId: string; projectId: string; readonly?: boolean }>()
 const isReadonly = computed(() => !!props.readonly)
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
-const formData = useG7SubFormData({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const scheduleAutoSnapshot = runtime?.version?.scheduleAutoSnapshot ?? (() => undefined)
+const formData = useG7SubFormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+  onAfterSave: () => scheduleAutoSnapshot(),
+})
+const importExport = useG7SubImportExport({ wpId: computed(() => props.wpId) })
 const DATA_KEY = 'G7-12-rows'
 const NOTE_KEY = 'G7-12-disposal-package-audit-note'
 const CONCLUSION_KEY = 'G7-12-disposal-package-audit-conclusion'
@@ -216,8 +316,19 @@ const loading = ref(true)
 const auditNote = ref('')
 const conclusion = ref('')
 const aiLoading = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
 const validationErrors = computed(() => validatePackageRows(rows.value))
 const calc = (row: G7DisposalPackageRow) => calculatePackageRow(row)
+
+const flatSteps = computed(() =>
+  rows.value.flatMap(row =>
+    (row.steps || []).map(step => ({
+      ...step,
+      rowId: row.id,
+      investeeName: row.investeeName,
+    })),
+  ),
+)
 
 const MoneyInput = defineComponent({
   props: { modelValue: { type: Number, default: 0 }, disabled: Boolean },
@@ -268,6 +379,52 @@ function onRatioChange(row: G7DisposalPackageRow): void {
   if (!row.equityMethodRatio) row.equityMethodRatio = row.remainingShareholdingRatio
   saveRows()
 }
+function findStep(rowId: string, stepId: string) {
+  const row = rows.value.find(r => r.id === rowId)
+  return row?.steps?.find(s => s.id === stepId)
+}
+function onStepsChanged(rowId: string): void {
+  const row = rows.value.find(r => r.id === rowId)
+  if (!row) return
+  syncRowFromSteps(row)
+  saveRows()
+}
+function addStep(rowId?: string): void {
+  if (isReadonly.value) return
+  let row = rowId ? rows.value.find(r => r.id === rowId) : rows.value[0]
+  if (!row) {
+    addRow()
+    row = rows.value[0]
+  }
+  if (!row.steps) row.steps = []
+  row.steps.push(createPackageStep(row.steps.length + 1))
+  syncRowFromSteps(row)
+  saveRows()
+}
+function removeStep(rowId: string, stepId: string): void {
+  const row = rows.value.find(r => r.id === rowId)
+  if (!row?.steps) return
+  row.steps = row.steps.filter(s => s.id !== stepId)
+  row.steps.forEach((s, i) => { s.seq = i + 1 })
+  syncRowFromSteps(row)
+  saveRows()
+}
+function moveStepToRow(stepId: string, fromRowId: string, toRowId: string): void {
+  if (fromRowId === toRowId) return
+  const from = rows.value.find(r => r.id === fromRowId)
+  const to = rows.value.find(r => r.id === toRowId)
+  if (!from?.steps || !to) return
+  const idx = from.steps.findIndex(s => s.id === stepId)
+  if (idx < 0) return
+  const [step] = from.steps.splice(idx, 1)
+  from.steps.forEach((s, i) => { s.seq = i + 1 })
+  if (!to.steps) to.steps = []
+  to.steps.push(step)
+  to.steps.forEach((s, i) => { s.seq = i + 1 })
+  syncRowFromSteps(from)
+  syncRowFromSteps(to)
+  saveRows()
+}
 function addRow(): void {
   rows.value.push(createPackageRow(rows.value.length + 1))
   saveRows()
@@ -289,18 +446,52 @@ async function handleAi(): Promise<void> {
   try {
     const response = await http.post(`/api/workpapers/${props.wpId}/g7-sub/ai/disposal-conclusion`, {
       existingContent: conclusion.value,
-      relatedContext: { sheet: 'G7-12', validationErrors: validationErrors.value, rows: rows.value },
+      relatedContext: {
+        sheet: 'G7-12',
+        validationErrors: validationErrors.value,
+        rows: rows.value,
+        stepCount: flatSteps.value.length,
+      },
     })
-    const text = response?.data?.data?.conclusion ?? response?.data?.conclusion ?? response?.data?.text ?? ''
+    const text = extractG7AiText(response?.data)
     if (text) {
       conclusion.value = text
       saveAuditConclusion(text)
       ElMessage.success('AI结论已生成')
+    } else {
+      ElMessage.warning('AI辅助暂未连接，请手动填写')
     }
   } catch {
     ElMessage.warning('AI辅助暂未连接，请手动填写')
   } finally {
     aiLoading.value = false
+  }
+}
+
+function handleImportExportCommand(command: string): void {
+  if (command === 'template') void importExport.exportTemplate('G7-12')
+  else if (command === 'export') void importExport.exportData('G7-12')
+  else if (command === 'import') fileInputRef.value?.click()
+}
+
+async function handleFileChange(ev: Event): Promise<void> {
+  const input = ev.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  try {
+    await importExport.importData('G7-12', file)
+    await formData.load()
+    const saved = formData.data.value.get(DATA_KEY)
+    const loaded = parseRows(parseJson(saved?.conclusion as string | undefined))
+    if (loaded.length) {
+      rows.value = loaded
+      ElMessage.success(`导入完成，已刷新 ${loaded.length} 行`)
+    } else {
+      ElMessage.success('导入完成，请核对数据')
+    }
+  } catch {
+    ElMessage.error('导入失败')
   }
 }
 
@@ -322,6 +513,7 @@ onMounted(async () => {
 
 <style scoped>
 .g7-tab-disposal-package { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.hidden-input { display: none; }
 .section-head, .conclusion-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .sheet-title { margin: 0; font-size: 16px; font-weight: 600; }
 .sheet-subtitle { margin-top: 4px; color: #909399; font-size: 12px; }
@@ -330,8 +522,12 @@ onMounted(async () => {
 .workpaper-section { margin-top: 18px; }
 .workpaper-section h4 { margin: 0 0 8px; padding-left: 8px; border-left: 3px solid #409eff; font-size: 14px; }
 .section-note { margin: -2px 0 8px; color: #606266; font-size: 12px; }
+.step-actions { margin-bottom: 8px; }
 .formula-cell { border-bottom: 1px dashed #909399; color: #303133; cursor: help; font-variant-numeric: tabular-nums; }
 .audit-card { margin-top: 16px; }
+.prep-hint { margin-top: 12px; font-size: 12px; color: #606266; }
+.prep-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.prep-hint ul { margin: 4px 0 0 16px; line-height: 1.8; }
 :deep(.el-table .cell) { line-height: 1.35; }
 :deep(.el-date-editor.el-input) { width: 130px; }
 </style>

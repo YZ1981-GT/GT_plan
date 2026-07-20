@@ -26,6 +26,7 @@ export interface UseNoteRefreshReturn {
   onStaleRecalc: () => Promise<void>
   showRefreshResultMessage: (result: RefreshFromWorkpapersResult) => void
   onWorkpaperSaved: (payload: { projectId: string }) => void
+  onDisclosureNoteTextUpdated: (payload: Record<string, unknown>) => void
 }
 
 export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshReturn {
@@ -142,6 +143,48 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
     }, 1000)
   }
 
+  /** 底稿披露 tab 同步/改叙述后：若当前正在看对应附注节，刷新详情（不整树重拉） */
+  function onDisclosureNoteTextUpdated(payload: Record<string, unknown>) {
+    if (!payload || !currentNote.value) return
+    const pid = String(payload.projectId ?? payload.project_id ?? '')
+    if (pid && pid !== projectId.value) return
+
+    const current = String(currentNote.value.note_section || '')
+    if (!current) return
+
+    const sectionIds: string[] = []
+    const single = payload.sectionId ?? payload.section_id
+    if (typeof single === 'string' && single.trim()) sectionIds.push(single.trim())
+    if (Array.isArray(payload.sectionIds)) {
+      for (const id of payload.sectionIds) {
+        if (typeof id === 'string' && id.trim()) sectionIds.push(id.trim())
+      }
+    }
+    if (Array.isArray(payload.payloads)) {
+      for (const item of payload.payloads as Array<Record<string, unknown>>) {
+        const id = item?.noteSectionId ?? item?.section_id
+        if (typeof id === 'string' && id.trim()) sectionIds.push(id.trim())
+      }
+    }
+
+    const matched = sectionIds.some(id =>
+      current === id || current.startsWith(id) || id.startsWith(current),
+    )
+    // 1511 长期股权投资：上市五、18 / 国企八、18 及合并范围「七」
+    const isG7Lte = String(payload.accountCode || '') === '1511'
+      && (current.includes('18') || current.startsWith('七'))
+    if (!matched && !isG7Lte) return
+
+    if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
+    syncDebounceTimer = setTimeout(async () => {
+      try {
+        await fetchDetail(current)
+      } catch {
+        /* 静默：用户可手动刷新 */
+      }
+    }, 400)
+  }
+
   return {
     refreshLoading,
     syncError,
@@ -150,5 +193,6 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
     onStaleRecalc,
     showRefreshResultMessage,
     onWorkpaperSaved,
+    onDisclosureNoteTextUpdated,
   }
 }

@@ -26,14 +26,14 @@ export interface ChecklistResponse {
   remark: string | null
 }
 
-export interface UseD3FormDataOptions {
+export interface UseF1FormDataOptions {
   wpId: Ref<string>
   projectId: Ref<string>
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-export function useF1FormData(options: UseD3FormDataOptions) {
+export function useF1FormData(options: UseF1FormDataOptions) {
   const { wpId, projectId } = options
 
   const allResponses = ref<Map<string, ChecklistResponse>>(new Map())

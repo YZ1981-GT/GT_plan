@@ -447,6 +447,17 @@ const tbImpairment = ref(0)
 const scrollContainerRef = ref<HTMLElement>()
 const isDirty = ref(false)
 const saving = ref(false)
+/** G7-3 回写命中行（短暂高亮） */
+const writebackHitIds = ref<Set<string>>(new Set())
+let writebackHitTimer: ReturnType<typeof setTimeout> | null = null
+
+function markWritebackHits(ids: string[]): void {
+  writebackHitIds.value = new Set(ids.filter(Boolean))
+  if (writebackHitTimer) clearTimeout(writebackHitTimer)
+  writebackHitTimer = setTimeout(() => {
+    writebackHitIds.value = new Set()
+  }, 8000)
+}
 let persistTimer: ReturnType<typeof setTimeout> | null = null
 let publishTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -593,8 +604,8 @@ const missingReasonCount = computed(() => {
   return n
 })
 
-/** 仅发布一次 substantive:adjudicated（父组件负责回写 TB，避免双事件重复） */
-function publishAdjudicated(): void {
+/** 发布 substantive:adjudicated；仅 writebackTb=true 时父组件回写 TB */
+function publishAdjudicated(opts?: { writebackTb?: boolean }): void {
   const impair = calcGroupSubtotal(groups.find(g => g.id === 'impairment')?.rows ?? [])
   const subsidiarySub = calcGroupSubtotal(groups.find(g => g.id === 'subsidiary')?.rows ?? [])
   const jvSub = calcGroupSubtotal(groups.find(g => g.id === 'joint_venture')?.rows ?? [])
@@ -606,6 +617,7 @@ function publishAdjudicated(): void {
     impairmentAccountCode: ACCOUNT_IMPAIRMENT,
     impairmentAmount: impair.closingAdjusted,
     netAmount: netValueRow.value.closingAdjusted,
+    writebackTb: opts?.writebackTb === true,
     byControlType: {
       subsidiary: subsidiarySub.closingAdjusted,
       jointVenture: jvSub.closingAdjusted,
@@ -621,7 +633,8 @@ function schedulePublish(): void {
   if (publishTimer) clearTimeout(publishTimer)
   publishTimer = setTimeout(() => {
     publishTimer = null
-    publishAdjudicated()
+    // 编辑中仅通知联动，不回写 TB（避免打开/hydrate 误改试算表）
+    publishAdjudicated({ writebackTb: false })
   }, 300)
 }
 
@@ -877,7 +890,7 @@ async function persistTable(showMsg: boolean): Promise<void> {
     }, { _silent: !showMsg } as any)
     isDirty.value = false
     if (showMsg) ElMessage.success('审定表已保存')
-    publishAdjudicated()
+    publishAdjudicated({ writebackTb: true })
     try {
       const { emitG7SourceRowsSaved } = await import('../../composables/g7DisclosureCrossSheet')
       emitG7SourceRowsSaved({
@@ -905,6 +918,13 @@ function pickTbAmount(row: any): number {
 }
 
 async function fetchTrialBalance(): Promise<void> {
+  // 优先消费 render seed（html_data.tb_values），避免仅打开就依赖二次 API
+  const seeded = (props.htmlData as any)?.tb_values
+  if (seeded && (seeded.closing != null || seeded.opening != null || seeded.current_amount != null)) {
+    tbGross.value = parseNum(seeded.closing ?? seeded.current_amount ?? seeded.audited_amount)
+    if (seeded.impairment != null) tbImpairment.value = parseNum(seeded.impairment)
+  }
+
   if (!props.projectId) return
   try {
     const res = await api.get(`/api/projects/${props.projectId}/trial-balance`, {
@@ -921,7 +941,7 @@ async function fetchTrialBalance(): Promise<void> {
 
     if (exact1511) {
       tbGross.value = pickTbAmount(exact1511)
-    } else {
+    } else if (list.length) {
       tbGross.value = list
         .filter(it => /^1511/.test(codeOf(it)) && !/^1512/.test(codeOf(it)))
         .reduce((s, it) => s + pickTbAmount(it), 0)
@@ -929,7 +949,7 @@ async function fetchTrialBalance(): Promise<void> {
 
     if (exact1512) {
       tbImpairment.value = pickTbAmount(exact1512)
-    } else {
+    } else if (list.length) {
       tbImpairment.value = list
         .filter(it => /^1512/.test(codeOf(it)))
         .reduce((s, it) => s + pickTbAmount(it), 0)
@@ -952,41 +972,52 @@ async function fetchTrialBalance(): Promise<void> {
   }
 }
 
-/** G7-3 回写：将期末 AJE/RJE 汇总落到投资侧第一行（清空其他投资行期末调整后写入） */
+/** G7-3 回写：优先按被投资单位落到对应行；否则汇总落到投资侧第一行 */
 function onAdjustmentWriteback(ev: Event): void {
   const detail = (ev as CustomEvent).detail
   if (!detail) return
   const aje = parseNum(detail.ajeTotal)
   const rje = parseNum(detail.rjeTotal)
   const code = String(detail.accountCode || ACCOUNT_GROSS)
+  const byInvestee = Array.isArray(detail.byInvestee) ? detail.byInvestee : []
 
   if (code.startsWith(ACCOUNT_IMPAIRMENT)) {
     const impair = groups.find(g => g.id === 'impairment')
     if (!impair || impair.rows.length === 0) return
-    for (const r of impair.rows) {
-      r.closingAJE = 0
-      r.closingRJE = 0
-      recalcRow(r)
-    }
-    const target = impair.rows[0]
-    target.closingAJE = aje
-    target.closingRJE = rje
-    recalcRow(target)
-  } else {
-    const investGroups = groups.filter(g => g.id !== 'impairment')
-    for (const g of investGroups) {
-      for (const r of g.rows) {
+    if (byInvestee.length) {
+      applyInvesteeWritebackToGroupsLocal([impair], byInvestee)
+    } else {
+      for (const r of impair.rows) {
         r.closingAJE = 0
         r.closingRJE = 0
         recalcRow(r)
       }
-    }
-    const firstGroup = investGroups.find(g => g.rows.length > 0)
-    if (firstGroup) {
-      const target = firstGroup.rows[0]
+      const target = impair.rows[0]
       target.closingAJE = aje
       target.closingRJE = rje
       recalcRow(target)
+      markWritebackHits([target.id])
+    }
+  } else {
+    const investGroups = groups.filter(g => g.id !== 'impairment')
+    if (byInvestee.length) {
+      applyInvesteeWritebackToGroupsLocal(investGroups, byInvestee)
+    } else {
+      for (const g of investGroups) {
+        for (const r of g.rows) {
+          r.closingAJE = 0
+          r.closingRJE = 0
+          recalcRow(r)
+        }
+      }
+      const firstGroup = investGroups.find(g => g.rows.length > 0)
+      if (firstGroup) {
+        const target = firstGroup.rows[0]
+        target.closingAJE = aje
+        target.closingRJE = rje
+        recalcRow(target)
+        markWritebackHits([target.id])
+      }
     }
   }
   if (!isReadonly.value) {
@@ -994,6 +1025,44 @@ function onAdjustmentWriteback(ev: Event): void {
     schedulePersist()
   }
   if (!detail.silent) ElMessage.success('已接收 G7-3 调整回写')
+}
+
+function applyInvesteeWritebackToGroupsLocal(
+  targetGroups: typeof groups,
+  byInvestee: Array<{ investeeName: string; ajeTotal: number; rjeTotal: number }>,
+): void {
+  const allRows = targetGroups.flatMap(g => g.rows)
+  for (const r of allRows) {
+    r.closingAJE = 0
+    r.closingRJE = 0
+    recalcRow(r)
+  }
+  let unmatchedAje = 0
+  let unmatchedRje = 0
+  const hitIds: string[] = []
+  for (const part of byInvestee) {
+    const name = String(part.investeeName || '').trim()
+    const hit = allRows.find((row) => {
+      const item = String(row.item || '').trim()
+      return item && name && (item === name || item.includes(name) || name.includes(item))
+    })
+    if (hit) {
+      hit.closingAJE = parseNum(hit.closingAJE) + parseNum(part.ajeTotal)
+      hit.closingRJE = parseNum(hit.closingRJE) + parseNum(part.rjeTotal)
+      recalcRow(hit)
+      hitIds.push(hit.id)
+    } else {
+      unmatchedAje += parseNum(part.ajeTotal)
+      unmatchedRje += parseNum(part.rjeTotal)
+    }
+  }
+  if ((Math.abs(unmatchedAje) > 0.005 || Math.abs(unmatchedRje) > 0.005) && allRows[0]) {
+    allRows[0].closingAJE = parseNum(allRows[0].closingAJE) + unmatchedAje
+    allRows[0].closingRJE = parseNum(allRows[0].closingRJE) + unmatchedRje
+    recalcRow(allRows[0])
+    hitIds.push(allRows[0].id)
+  }
+  markWritebackHits(hitIds)
 }
 
 function isRateWarning(rate: number | null): boolean {
@@ -1013,6 +1082,7 @@ function fmtRate(v: number | null | undefined): string {
 
 function adjRowClassName({ row }: { row: AdjRow }): string {
   if (row._isSubtotal) return 'row-subtotal'
+  if (writebackHitIds.value.has(row.id)) return 'row-writeback-hit'
   if (isRateWarning(row.changeRate) && !(row.varianceNote || '').trim()) return 'row-need-reason'
   return ''
 }
@@ -1068,7 +1138,7 @@ onMounted(async () => {
   hydrateData()
   await loadAuditResponses()
   await fetchTrialBalance()
-  publishAdjudicated()
+  // 不在 mount 时 publish/writebackTB，避免仅打开页面就改写试算表
   window.addEventListener('g7:adjustment-writeback', onAdjustmentWriteback)
   window.addEventListener('g7:detail-updated', onDetailUpdated)
 })
@@ -1136,6 +1206,7 @@ onBeforeUnmount(() => {
 .row-bold { font-weight: 700; }
 :deep(.row-subtotal) { background: #f5f7fa !important; font-weight: 700; }
 :deep(.row-need-reason) { background: #fdf6ec !important; }
+:deep(.row-writeback-hit) { background: #e1f3d8 !important; transition: background-color 0.3s; }
 .rate-orange { color: #e6a23c; font-weight: 600; }
 .need-reason :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }
 

@@ -29,7 +29,7 @@ export interface RelatedPartyRow {
   remark: string              // 备注
 }
 
-export interface UseD3RelatedPartyOptions {
+export interface UseF1RelatedPartyOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
   wpId: Ref<string>
   projectId: Ref<string>
@@ -168,7 +168,7 @@ export function mergeRelatedPartyFromImport(
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-export function useF1RelatedParty(options: UseD3RelatedPartyOptions) {
+export function useF1RelatedParty(options: UseF1RelatedPartyOptions) {
   const { allResponses, debouncedSave, isReadonly } = options
 
   const rows = ref<RelatedPartyRow[]>([])

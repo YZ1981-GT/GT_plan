@@ -264,21 +264,45 @@
         </el-alert>
         <!-- 底稿同步来源提示（design §12.1：底稿 → 模块单向同步） -->
         <el-alert
-          v-if="(currentNote as any)?.last_sync_source === 'workpaper'"
+          v-if="(currentNote as any)?.last_sync_source === 'workpaper' || disclosureJumpTarget"
           type="info"
           :closable="false"
           show-icon
           style="margin-bottom: 12px"
         >
           <template #title>
-            <span>此数据由底稿同步</span>
+            <span>{{ (currentNote as any)?.last_sync_source === 'workpaper' ? '此数据由底稿同步' : '关联底稿披露表' }}</span>
           </template>
           <template #default>
             <div class="gt-de-sync-banner">
-              <span>建议在底稿编辑入口（C 类附注 sheet）维护，避免双源不一致。</span>
+              <span v-if="(currentNote as any)?.last_sync_source === 'workpaper'">
+                建议在底稿披露表维护，避免双源不一致。
+              </span>
+              <span v-else>
+                可跳转至 G7「{{ disclosureJumpTarget?.sheet }}」编辑后点「同步到附注」。
+              </span>
               <span v-if="(currentNote as any)?.last_sync_at" class="gt-de-sync-time">
                 · 最近同步：{{ formatSyncTime((currentNote as any).last_sync_at) }}
               </span>
+              <el-button
+                v-if="disclosureJumpTarget"
+                size="small"
+                type="primary"
+                plain
+                :loading="jumpingDisclosure"
+                @click="jumpToDisclosureSheet"
+              >
+                跳转至披露表
+              </el-button>
+              <el-button
+                v-else-if="(currentNote as any)?.last_sync_wp_id"
+                size="small"
+                link
+                type="primary"
+                @click="jumpToLastSyncWorkpaper"
+              >
+                打开同步底稿
+              </el-button>
             </div>
           </template>
         </el-alert>
@@ -990,6 +1014,8 @@ import { useNoteTree, type TreeNode } from '@/views/composables/useNoteTree'
 import { useNoteDetail } from '@/views/composables/useNoteDetail'
 import { useNotePersist } from '@/views/composables/useNotePersist'
 import { useNoteRefresh } from '@/views/composables/useNoteRefresh'
+import { resolveNoteDisclosureJumpTarget } from '@/views/composables/noteDisclosureJump'
+import { useAcnr } from '@/services/acnr'
 import { useNoteTemplate } from '@/views/composables/useNoteTemplate'
 import { useNoteExport } from '@/views/composables/useNoteExport'
 import { useNoteAi } from '@/views/composables/useNoteAi'
@@ -1565,7 +1591,7 @@ function isFormulaMismatch(row: any, colIdx: number): boolean {
 const {
   refreshLoading, syncError,
   onRefreshFromWP, onManualRefresh, onStaleRecalc,
-  showRefreshResultMessage, onWorkpaperSaved,
+  showRefreshResultMessage, onWorkpaperSaved, onDisclosureNoteTextUpdated,
 } = useNoteRefresh({
   projectId,
   year,
@@ -1574,6 +1600,61 @@ const {
   fetchTree,
   staleRecalc: () => stale.recalc(),
 })
+
+const { resolveInstance: acnrResolveInstance } = useAcnr()
+const jumpingDisclosure = ref(false)
+
+const disclosureJumpTarget = computed(() =>
+  resolveNoteDisclosureJumpTarget(currentNote.value),
+)
+
+function jumpToLastSyncWorkpaper(): void {
+  const note = currentNote.value as any
+  const wpId = note?.last_sync_wp_id
+  if (!wpId || !projectId.value) return
+  const sheet = note?.table_data?._last_sync_sheet
+    || note?.table_data?._last_sync_sheet_name
+    || ''
+  router.push({
+    path: `/projects/${projectId.value}/workpapers/${wpId}/edit`,
+    query: sheet ? { sheet: String(sheet) } : {},
+  })
+}
+
+/** 附注 → G7 披露表（上市/国企 sheet）；优先同步 wp_id，否则 ACNR 解析 G7 */
+async function jumpToDisclosureSheet(): Promise<void> {
+  const target = disclosureJumpTarget.value
+  if (!target || !projectId.value) {
+    ElMessage.warning('当前章节未关联长期股权投资披露表')
+    return
+  }
+  jumpingDisclosure.value = true
+  try {
+    let wpId = target.wpId
+    if (!wpId) {
+      const res = await acnrResolveInstance({
+        project_id: projectId.value,
+        parent: 'G7',
+        sheet_code: 'G7',
+      })
+      if (res?.found && res.wp_id) {
+        wpId = res.wp_id
+      }
+    }
+    if (!wpId) {
+      ElMessage.warning('未找到 G7 长期股权投资底稿，请先在项目中生成')
+      return
+    }
+    router.push({
+      path: `/projects/${projectId.value}/workpapers/${wpId}/edit`,
+      query: { sheet: target.sheet },
+    })
+  } catch {
+    ElMessage.warning('跳转披露表失败，请手动打开 G7 底稿')
+  } finally {
+    jumpingDisclosure.value = false
+  }
+}
 
 async function onFormulaApplied() {
   // 公式应用后刷新当前附注数据
@@ -2093,6 +2174,7 @@ onMounted(async () => {
   projectStore.loadProjectOptions()
   eventBus.on('shortcut:save', onShortcutSave)
   eventBus.on('workpaper:saved', onWorkpaperSaved)
+  eventBus.on('disclosure:note-text-updated', onDisclosureNoteTextUpdated)
   // Task 5.2: 监听四栏目录附注章节点击
   eventBus.on('catalog:note-select', onCatalogNoteSelect)
   await loadProjectTemplateConfig()
@@ -2126,6 +2208,7 @@ onContextChange(async () => {
 onUnmounted(() => {
   eventBus.off('shortcut:save', onShortcutSave)
   eventBus.off('workpaper:saved', onWorkpaperSaved)
+  eventBus.off('disclosure:note-text-updated', onDisclosureNoteTextUpdated)
   // Task 5.4: 清理 catalog:note-select 监听
   eventBus.off('catalog:note-select', onCatalogNoteSelect)
   window.removeEventListener('beforeunload', onBeforeUnload)

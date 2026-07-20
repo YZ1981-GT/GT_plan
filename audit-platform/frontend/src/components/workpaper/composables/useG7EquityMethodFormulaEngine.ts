@@ -12,6 +12,7 @@
  * - 权益法余额递推 = 期初 + 投资收益 + OCI + 其他权益 - 股利 (G7-14)
  * - 未实现利润 = 交易金额 × 毛利率 (G7-15)
  * - 应抵销金额 = 顺流:全额 / 逆流:×比例 (G7-15)
+ * - 可收回金额 = MAX(公允价值-处置费用, 使用价值) (G7-17 / CAS8)
  * - 减值金额 = MAX(0, 账面价值 - 可收回金额) (G7-17)
  *
  * Spec: .kiro/specs/g7-long-term-equity-method/
@@ -197,6 +198,41 @@ export function calcUnexplainedVariance(
   ) / 100
 }
 
+/**
+ * 期初勾稽差异P = 成本期初+损益调整期初+OCI期初+其他权益期初 − G7-2审定期初总额
+ * @source G7-14 原底稿 P
+ */
+export function calcOpeningReconVariance(
+  costOpening: number,
+  pnlAdjOpening: number,
+  ociBalOpening: number,
+  otherEqBalOpening: number,
+  g72OpeningTotal: number,
+): number {
+  return Math.round(
+    (
+      parseNum(costOpening)
+      + parseNum(pnlAdjOpening)
+      + parseNum(ociBalOpening)
+      + parseNum(otherEqBalOpening)
+      - parseNum(g72OpeningTotal)
+    ) * 100,
+  ) / 100
+}
+
+/**
+ * 期末勾稽差异S = 长投账面余额 − G7-2审定期末总额
+ * @source G7-14 原底稿 S = Q − R
+ */
+export function calcClosingReconVariance(
+  lteiBookBalance: number,
+  g72ClosingTotal: number,
+): number {
+  return Math.round(
+    (parseNum(lteiBookBalance) - parseNum(g72ClosingTotal)) * 100,
+  ) / 100
+}
+
 // ═══ P7（未实现利润）: 交易金额 × 毛利率 ═══
 
 /**
@@ -229,7 +265,21 @@ export function calcEliminationAmount(
   return Math.round((profit * parseNum(ratio)) * 100) / 100
 }
 
-// ═══ P9（减值金额）: MAX(0, 账面价值 - 可收回金额) ═══
+// ═══ P9（可收回金额 / 减值金额）CAS8 ═══
+
+/**
+ * 可收回金额 = MAX(公允价值减去处置费用后的净额, 使用价值)
+ * G7-17 减值测试
+ * @source CAS8 资产减值准则，Requirements 6.6
+ */
+export function calcRecoverableAmount(
+  fairValueLessDisposal: number,
+  valueInUse: number,
+): number {
+  return Math.round(
+    Math.max(parseNum(fairValueLessDisposal), parseNum(valueInUse)) * 100,
+  ) / 100
+}
 
 /**
  * 减值金额 = MAX(0, 账面价值 - 可收回金额)

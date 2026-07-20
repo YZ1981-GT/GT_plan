@@ -7,6 +7,7 @@ import {
   extractSameControlInvesteesFromG7Judgment,
   extractSubsidiaryNamesFromG72,
   extractSubsidiaryNamesFromG74,
+  isSameControlDifferenceLarge,
   normalizeSameControlRows,
   recalcSameControlMergerRow,
   summarizeSameControlSteps,
@@ -17,6 +18,7 @@ import {
 describe('G7-8 source-aligned model', () => {
   it('calculates one-step merger formulas exactly as the source workbook', () => {
     const row = createSameControlMergerRow(1, '公司1')
+    row.acquisitionDate = '2024-03-01'
     row.ownerEquityBookValue = 100
     row.ownershipRatio = 0.32
     row.cashConsideration = 2
@@ -29,6 +31,7 @@ describe('G7-8 source-aligned model', () => {
     expect(row.totalConsideration).toBe(10)
     expect(row.capitalReserveRetainedEarningsAdjustment).toBe(22)
     expect(describeCapitalReserveAdjustment(22, 'merger')).toContain('贷记')
+    expect(isSameControlDifferenceLarge(row.initialInvestmentCost, row.totalConsideration)).toBe(true)
   })
 
   it('calculates step-acquisition summary including prior holding book value', () => {
@@ -48,6 +51,7 @@ describe('G7-8 source-aligned model', () => {
     second.priorInvestmentAdjustments = 4
     second.priorHoldingBookValue = 10
     second.isPackageDeal = '否'
+    second.acquisitionDate = '2024-06-30'
 
     const [summary] = summarizeSameControlSteps([first, second])
     expect(summary.cumulativeRatio).toBe(0.03)
@@ -56,6 +60,7 @@ describe('G7-8 source-aligned model', () => {
     expect(summary.cumulativePriorAdjustments).toBe(26)
     expect(summary.mergerDateNetAssets).toBe(44)
     expect(summary.initialInvestmentCost).toBe(1.32)
+    expect(summary.acquisitionDate).toBe('2024-06-30')
     // ⑥ = 4 + 10 + 26 - 1.32 = 38.68
     expect(summary.capitalReserveRetainedEarningsAdjustment).toBe(38.68)
     expect(summary.adjustmentHint).toContain('冲减')
@@ -130,6 +135,20 @@ describe('G7-8 source-aligned model', () => {
         combinationType: '同一控制下企业合并',
       },
     })).toEqual(['甲子公司'])
+    expect(extractSameControlInvesteesFromG7Judgment({
+      decision: {
+        investeeName: '甲子公司',
+        relationshipType: '控制',
+        combinationType: '同一控制下企业合并',
+      },
+      additionalDecisions: [
+        {
+          investeeName: '丁子公司',
+          relationshipType: '控制',
+          combinationType: '同一控制下企业合并',
+        },
+      ],
+    })).toEqual(['甲子公司', '丁子公司'])
     expect(extractSubsidiaryNamesFromG72([
       { section: 'cost', investeeName: '子1' },
       { section: 'equity', investeeName: '联营1' },

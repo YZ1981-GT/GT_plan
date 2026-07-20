@@ -31,6 +31,15 @@
         >
           同步到附注模块
         </el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-1" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-2" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-4" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-5" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-10" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-14" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-16" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G7-17" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip :value="`Note:${NOTE_SECTION_ID}`" :context-project-id="projectId" /></span>
       </div>
     </div>
 
@@ -254,8 +263,8 @@
       <summary>编制逻辑与联动说明</summary>
       <ul>
         <li>保留源模板的实际层级：长期股权投资变动、子公司权益、合营/联营权益、共同经营；不再使用虚构的“五段统一13列表”。</li>
-        <li>带“来源”的行对应 G7-4、G7-5、G7-10、G7-14、G7-16。点击「从源表取数」可从 G7-1/2/4/5/10/14/16 自动承接。</li>
-        <li>提示、法规要求和示例文字只作为编制辅助；只有文本框中的项目实际披露内容会同步到附注模块。</li>
+        <li>带“来源”的行对应 G7-4、G7-5、G7-10、G7-14、G7-16。点击「从源表取数」可从 G7-1/2/4/5/10/14/16 自动承接；工具栏索引芯片可跳转源表或附注「{{ NOTE_SECTION_ID }}」。</li>
+        <li>提示、法规要求和示例文字只作为编制辅助；只有文本框中的项目实际披露内容会同步到附注模块（底稿→附注单向，附注改动不回写底稿）。</li>
         <li>表格与文本统一保存到 checklist_responses，并通过正式 sync-from-workpaper 接口写入附注模块。</li>
       </ul>
     </details>
@@ -268,6 +277,7 @@ import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import { useG7MainAiGenerate } from '../../composables/useG7MainAiGenerate'
 import {
   collectDisclosureTruncations,
@@ -640,12 +650,14 @@ function dispatchNoteUpdated(): void {
   window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
     detail: {
       accountCode: ACCOUNT_CODE,
+      projectId: props.projectId,
       wpId: props.wpId,
       sheetName: SHEET_NAME,
       section: 'listed',
       sectionId: NOTE_SECTION_ID,
       text: allNarrativeText(),
       tableData: buildG7ListedSyncData(serialisableState()),
+      timestamp: Date.now(),
     },
   }))
 }
@@ -721,7 +733,7 @@ async function refreshFromSources(force = false): Promise<void> {
       wpId: props.wpId,
       htmlData: props.htmlData as Record<string, unknown> | null,
     })
-    const filled = refreshListedTablesFromSources(state.tables, bundle, force)
+    const filled = refreshListedTablesFromSources(state.tables, bundle, force, state.texts)
     const truncHint = formatTruncationHint(collectDisclosureTruncations(bundle, 'listed'))
     if (filled.length) {
       scheduleSave({ userEdit: false })
@@ -734,7 +746,7 @@ async function refreshFromSources(force = false): Promise<void> {
     } else if (force) {
       lastRefreshHint.value = bundle.sourcesHit.length
         ? `源表已读（${bundle.sourcesHit.join('/')}），无可更新空位`
-        : '未找到 G7-1/2/4/5/10/14/16 源数据'
+        : '未找到 G7-2/4/5/10/14/16 源数据'
       ElMessage.warning(lastRefreshHint.value)
       if (truncHint) ElMessage.warning(truncHint)
     } else if (!bundle.sourcesHit.length) {
@@ -744,7 +756,7 @@ async function refreshFromSources(force = false): Promise<void> {
     }
   } catch {
     lastRefreshHint.value = '源表取数失败'
-    if (force) ElMessage.warning('从源表取数失败，请确认 G7-1/2/4/5/10/14/16 已保存')
+    if (force) ElMessage.warning('从源表取数失败，请确认 G7-2/4/5/10/14/16 已保存')
   } finally {
     isRefreshing.value = false
   }
@@ -838,6 +850,12 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chip-wrap {
+  display: inline-flex;
+  align-items: center;
 }
 
 .save-status {

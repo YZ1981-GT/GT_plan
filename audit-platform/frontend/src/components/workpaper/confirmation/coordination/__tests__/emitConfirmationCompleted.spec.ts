@@ -14,6 +14,19 @@ describe('emitConfirmationCompleted helpers', () => {
     expect(accountTypeToWpHint('合同负债')).toBe('D5')
   })
 
+  it('maps account codes per CAS chart (1123=预付→F1, 2203/2205=预收/合同负债→D5)', () => {
+    expect(accountTypeToWpHint(undefined, '1123')).toBe('F1')
+    expect(accountTypeToWpHint(undefined, '1123-01')).toBe('F1')
+    expect(accountTypeToWpHint(undefined, '2203')).toBe('D5')
+    expect(accountTypeToWpHint(undefined, '2205')).toBe('D5')
+    expect(accountTypeToWpHint(undefined, '1122')).toBe('D2')
+    // 1231 坏账准备：备抵科目，不映射往来明细底稿
+    expect(accountTypeToWpHint(undefined, '1231')).toBeUndefined()
+    expect(accountTypeToWpHint(undefined, '1231-04')).toBeUndefined()
+    // 编码优先于可能误导的中文名
+    expect(accountTypeToWpHint('预收账款', '1123')).toBe('F1')
+  })
+
   it('detects in-flight confirmation rows', () => {
     expect(isConfirmationInFlight({ send_date: '2025-01-01' })).toBe(true)
     expect(isConfirmationInFlight({ match_status: '未回函' })).toBe(true)

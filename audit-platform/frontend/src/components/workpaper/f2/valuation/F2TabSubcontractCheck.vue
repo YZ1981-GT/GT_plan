@@ -22,6 +22,12 @@
         <el-tag v-if="valuationCount" size="small" type="warning">
           计价差异 {{ valuationCount }}
         </el-tag>
+        <el-tag v-if="feeCross.status === 'mismatch'" size="small" type="warning">
+          加工费勾稽差
+        </el-tag>
+        <el-tag v-if="f27Recon.status === 'mismatch'" size="small" type="danger">
+          ≠F2-7
+        </el-tag>
       </div>
     </header>
 
@@ -30,9 +36,18 @@
       <ol>
         <li>获取委外明细，检查合同、发料凭证、加工费结算凭证；必要时向加工方函证加工费与期末结存。</li>
         <li>表一核对期初期末倒轧；表二关注主要供应商加工规模与结算单据；表三跟踪发出未收回风险。</li>
-        <li>可与 F2-7 委托加工物资明细表金额勾稽。</li>
+        <li>表一/二/三加工费合计应勾稽；期末余额应与 F2-7 委托加工物资明细表核对（可手工填对照数）。</li>
       </ol>
     </details>
+
+    <el-alert
+      v-if="feeCross.status === 'mismatch' || f27Recon.status === 'mismatch'"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="ic-cross-alert"
+      :title="crossAlertTitle"
+    />
 
     <section class="ic-card">
       <header class="ic-card-head"><h3>一、审计目标</h3></header>
@@ -52,6 +67,16 @@
         </div>
         <div class="ic-field"><label>截止日</label>
           <el-input :model-value="sc.meta.value.cutoffDate" :disabled="isReadonly" @update:model-value="(v: string) => sc.updateMeta({ cutoffDate: v })" />
+        </div>
+        <div class="ic-field"><label>F2-7 期末对照</label>
+          <el-input-number
+            :model-value="f27ClosingRef"
+            :controls="false"
+            :disabled="isReadonly"
+            class="compact-num"
+            style="width:100%"
+            @change="(v?: number) => onF27ClosingChange(v ?? 0)"
+          />
         </div>
         <div class="ic-field span2"><label>样本说明</label>
           <el-input :model-value="sc.meta.value.sampleNote" type="textarea" :rows="2" :disabled="isReadonly" @update:model-value="(v: string) => sc.updateMeta({ sampleNote: v })" />
@@ -263,6 +288,11 @@
               <el-input :model-value="row.remark" size="small" :disabled="isReadonly" @change="(v: string) => sc.updateSupplier2(row.id, { remark: v })" />
             </template>
           </el-table-column>
+          <el-table-column label="操作" width="72" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" size="small" @click="openVoucher(row)">核对</el-button>
+            </template>
+          </el-table-column>
           <el-table-column width="44">
             <template #default="{ row }">
               <el-button link type="danger" size="small" :disabled="isReadonly" @click="sc.removeSupplier2(row.id)">删</el-button>
@@ -271,6 +301,14 @@
         </el-table>
       </div>
     </section>
+
+    <F2SubcontractVoucherDialog
+      v-model="voucherVisible"
+      :row="voucherRow"
+      :wp-id="wpId"
+      :readonly="isReadonly"
+      @save="handleSaveVoucher"
+    />
 
     <section class="ic-card">
       <header class="ic-card-head">
@@ -307,11 +345,14 @@ import { useF2SubcontractSheet } from '../../composables/useF2SubcontractCheck'
 import { useF2ValuationAiGenerate } from '../../composables/useF2ValuationAiGenerate'
 import {
   evaluateSubcontractRecover,
+  evaluateSubcontractFeeCross,
+  reconcileSubcontractWithF27,
   type SubcontractSupplier2Row,
 } from '../../composables/useF2InspectionCheckFormulas'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
+import F2SubcontractVoucherDialog from './F2SubcontractVoucherDialog.vue'
 
 const props = defineProps<{
   wpId?: string
@@ -339,6 +380,66 @@ function supplier2RowClassName({ row }: { row: SubcontractSupplier2Row }): strin
   return s === 'unrecovered' ? 'error-row' : s === 'valuation' ? 'warn-row' : ''
 }
 
+const voucherVisible = ref(false)
+const voucherRow = ref<SubcontractSupplier2Row | null>(null)
+function openVoucher(row: SubcontractSupplier2Row) {
+  voucherRow.value = row
+  voucherVisible.value = true
+}
+function handleSaveVoucher(patch: Partial<SubcontractSupplier2Row> & { id: string }) {
+  const { id, ...rest } = patch
+  sc.updateSupplier2(id, rest)
+  voucherVisible.value = false
+}
+
+// ─── 表间加工费 + F2-7 期末勾稽 ─────────────────────────────────────────────
+const feeCross = computed(() =>
+  evaluateSubcontractFeeCross(sc.basicRows.value, sc.supplier1Rows.value, sc.supplier2Rows.value),
+)
+
+function parseF27ClosingFromResponses(): number | null {
+  const raw = props.allResponses.get('F2-7-rows')?.remark
+  if (!raw) return null
+  try {
+    const rows = JSON.parse(raw)
+    if (!Array.isArray(rows) || !rows.length) return null
+    return rows.reduce((s: number, r: Record<string, unknown>) => {
+      const v = Number(r.processingCost ?? r.closingAmt ?? 0) || 0
+      return s + v
+    }, 0)
+  } catch {
+    return null
+  }
+}
+
+const f27ClosingRef = computed(() => {
+  const fromMeta = Number(sc.meta.value.f27ClosingRef)
+  if (!Number.isNaN(fromMeta) && sc.meta.value.f27ClosingRef !== undefined && sc.meta.value.f27ClosingRef !== '') {
+    return fromMeta
+  }
+  return parseF27ClosingFromResponses() ?? 0
+})
+
+function onF27ClosingChange(v: number) {
+  sc.updateMeta({ f27ClosingRef: String(v) })
+}
+
+const f27Recon = computed(() =>
+  reconcileSubcontractWithF27(
+    sc.closingTotal.value,
+    sc.meta.value.f27ClosingRef !== undefined && sc.meta.value.f27ClosingRef !== ''
+      ? Number(sc.meta.value.f27ClosingRef)
+      : parseF27ClosingFromResponses(),
+  ),
+)
+
+const crossAlertTitle = computed(() => {
+  const parts: string[] = []
+  if (feeCross.value.status === 'mismatch') parts.push(`加工费：${feeCross.value.detail}`)
+  if (f27Recon.value.status === 'mismatch') parts.push(`F2-7：${f27Recon.value.detail}`)
+  return parts.join('；')
+})
+
 // ─── AI 辅助（与 D4/F2-33 gold 标准一致）─────────────────────────────────────
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2ValuationAiGenerate(
   toRef(() => props.wpId || '') as Ref<string>,
@@ -351,6 +452,8 @@ function aiCtx(): Record<string, unknown> {
     valuationCount: valuationCount.value,
     feeTotal: sc.feeTotal.value,
     closingTotal: sc.closingTotal.value,
+    feeCross: feeCross.value,
+    f27Recon: f27Recon.value,
   }
 }
 async function genNote(): Promise<void> {
@@ -395,4 +498,5 @@ onMounted(() => {
 .recover-unrecovered { color: var(--el-color-danger); font-weight: 600; }
 .recover-valuation { color: var(--el-color-warning); font-weight: 600; }
 .recover-pending { color: var(--el-text-color-placeholder); }
+.ic-cross-alert { margin: 0 0 12px; }
 </style>

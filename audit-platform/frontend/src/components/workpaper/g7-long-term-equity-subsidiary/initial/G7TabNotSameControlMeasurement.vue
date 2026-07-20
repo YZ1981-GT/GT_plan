@@ -556,12 +556,15 @@ import { computed, defineComponent, h, inject, onMounted, reactive, ref, toRef }
 import { ElInput, ElInputNumber, ElMessage, ElMessageBox } from 'element-plus'
 import { fmtAmount } from '@/utils/formatters'
 import http from '@/utils/http'
+import { extractG7AiText } from '../../composables/g7AiText'
 import { api } from '@/services/apiProxy'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useG7SubImportExport } from '../../composables/useG7SubImportExport'
 import { useG7SubFormData } from '../../composables/useG7SubFormData'
+import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import {
+  collectNotSameControlPersistBlockers,
   createNotSameControlMergerRow,
   createNotSameControlReverseRow,
   createNotSameControlStepRow,
@@ -593,10 +596,13 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const scheduleAutoSnapshot = runtime?.version?.scheduleAutoSnapshot ?? (() => undefined)
 const isReadonly = computed(() => !!props.readonly)
 const formData = useG7SubFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
+  onAfterSave: () => scheduleAutoSnapshot(),
 })
 const { exportTemplate, exportData, importData } = useG7SubImportExport({ wpId: toRef(props, 'wpId') })
 
@@ -641,6 +647,14 @@ function formatPercent(value: number): string {
 }
 function persistRows(): void {
   if (isReadonly.value) return
+  const blockers = collectNotSameControlPersistBlockers(allRows.value)
+  if (blockers.length) {
+    ElMessage.error({
+      message: `存在不可落库的硬错误，已阻止保存：${blockers[0]}${blockers.length > 1 ? `（另有 ${blockers.length - 1} 项）` : ''}`,
+      duration: 4500,
+    })
+    return
+  }
   formData.debouncedSave(ROWS_KEY, {
     conclusion: JSON.stringify(allRows.value),
     remark: 'G7-9非同控初始计量三类测试',
@@ -867,6 +881,34 @@ function saveAuditConclusion(value: string): void {
   if (isReadonly.value) return
   formData.debouncedSave(CONCLUSION_KEY, { remark: value, conclusion: null })
 }
+function buildLocalNotSameControlConclusion(): string {
+  const lines: string[] = [
+    '【G7-9 非同控初始计量 — 本地结论草稿】',
+    `一次购买 ${mergerRows.length} 家；分步合并 ${stepSummaries.value.length} 家；反向购买 ${reverseRows.length} 笔。`,
+  ]
+  for (const row of mergerRows) {
+    const name = row.investeeName || `第${row.seq}行`
+    const feeNote = Number(row.acquisitionCostsExpensed || 0) > 0
+      ? `；直接相关费用 ${formatAmount(row.acquisitionCostsExpensed)} 已费用化不进⑥`
+      : ''
+    lines.push(
+      `· ${name}：⑥初始成本 ${formatAmount(row.initialInvestmentCost)}，⑧${describeGoodwill(row.goodwill)}${feeNote}`,
+    )
+  }
+  for (const summary of stepSummaries.value) {
+    lines.push(
+      `· ${summary.companyName || summary.companyId}（分步）：累计持股 ${formatPercent(summary.cumulativeRatio)}，⑦母公司初始成本 ${formatAmount(summary.parentInitialCost)}`,
+    )
+  }
+  if (errorCount.value) {
+    lines.push(`校验：仍有 ${errorCount.value} 项错误、${warningCount.value} 项提示，需复核后再定稿。`)
+  } else {
+    lines.push('校验：未见硬错误；请核对购买日、对价FV证据及商誉/廉价购买利得披露。')
+  }
+  lines.push('结论：非同一控制下企业合并初始计量测试（CAS20）— 待项目组复核确认。')
+  return lines.join('\n')
+}
+
 async function handleAiConclusion(): Promise<void> {
   try {
     const response = await http.post(
@@ -882,13 +924,20 @@ async function handleAiConclusion(): Promise<void> {
       },
     )
     const data = response?.data?.data ?? response?.data ?? response
-    const text = data?.content ?? data?.conclusion ?? data?.text ?? ''
-    if (!text) throw new Error('empty')
+    const text = extractG7AiText(data)
+    if (!text) {
+      auditConclusion.value = buildLocalNotSameControlConclusion()
+      saveAuditConclusion(auditConclusion.value)
+      ElMessage.warning('AI未返回内容，已生成本地结论草稿')
+      return
+    }
     auditConclusion.value = String(text)
     saveAuditConclusion(auditConclusion.value)
     ElMessage.success('AI结论生成完成')
   } catch {
-    ElMessage.warning('AI结论生成失败，请手工填写')
+    auditConclusion.value = buildLocalNotSameControlConclusion()
+    saveAuditConclusion(auditConclusion.value)
+    ElMessage.warning('AI暂不可用，已生成本地结论草稿')
   }
 }
 

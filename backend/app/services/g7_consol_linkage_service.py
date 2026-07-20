@@ -194,6 +194,149 @@ def _first(row: dict[str, Any], *keys: str) -> Any:
     return None
 
 
+def _g75_item_kind(report_item: str) -> str | None:
+    """识别 G7-5 报表项目：net_profit / net_assets。"""
+    text = str(report_item or "").strip()
+    if not text:
+        return None
+    if any(k in text for k in ("净利润", "净亏损", "综合收益总额")):
+        return "net_profit"
+    if "所有者权益" in text or "净资产" in text:
+        return "net_assets"
+    return None
+
+
+def _aggregate_g75_financial(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """按被投资单位汇总 G7-5 净利润/净资产（优先已审；结构化写入 consol）。"""
+    by_name: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        name = _name(row)
+        if not name:
+            continue
+        bucket = by_name.setdefault(name, {
+            "companyName": name,
+            "item_count": 0,
+            "unaudited_count": 0,
+            "net_profit": None,
+            "net_assets": None,
+            "prior_net_profit": None,
+            "prior_net_assets": None,
+            "_profit_audited": False,
+            "_assets_audited": False,
+        })
+        bucket["item_count"] = int(bucket["item_count"]) + 1
+        status = str(row.get("auditStatus") or row.get("audit_status") or "").strip()
+        if status in {"未审", "待确认"}:
+            bucket["unaudited_count"] = int(bucket["unaudited_count"]) + 1
+        kind = _g75_item_kind(str(row.get("reportItem") or row.get("report_item") or ""))
+        if not kind:
+            continue
+        is_audited = (not status) or status == "已审"
+        current = _money(_first(row, "currentAmount", "current_amount"))
+        prior = _money(_first(row, "priorAmount", "prior_amount"))
+        if current is None:
+            continue
+        if kind == "net_profit":
+            if is_audited or (not bucket["_profit_audited"] and bucket["net_profit"] is None):
+                bucket["net_profit"] = current
+                bucket["prior_net_profit"] = prior
+                if is_audited:
+                    bucket["_profit_audited"] = True
+        else:
+            if is_audited or (not bucket["_assets_audited"] and bucket["net_assets"] is None):
+                bucket["net_assets"] = current
+                bucket["prior_net_assets"] = prior
+                if is_audited:
+                    bucket["_assets_audited"] = True
+
+    out: dict[str, dict[str, Any]] = {}
+    for name, bucket in by_name.items():
+        summary = {
+            "companyName": name,
+            "investeeName": name,
+            "item_count": bucket["item_count"],
+            "unaudited_count": bucket["unaudited_count"],
+            "net_profit": bucket["net_profit"],
+            "net_assets": bucket["net_assets"],
+            "prior_net_profit": bucket["prior_net_profit"],
+            "prior_net_assets": bucket["prior_net_assets"],
+        }
+        out[name] = summary
+    return out
+
+
+def _g7_8_step_initial_cost(group: list[dict[str, Any]]) -> float | None:
+    """分步同控：⑤ = 末次净资产账面价值 × 累计持股比例（与前端 summarize 一致）。"""
+    if not group:
+        return None
+    ordered = sorted(
+        group,
+        key=lambda r: (
+            int(r.get("transactionNo") or r.get("seq") or 0),
+            str(r.get("id") or ""),
+        ),
+    )
+    cumulative_ratio = Decimal("0")
+    for row in ordered:
+        ratio = _money(row.get("purchaseRatio"))
+        if ratio is not None:
+            cumulative_ratio += Decimal(str(ratio))
+    last_net = _money(ordered[-1].get("netAssetsBookValue"))
+    if last_net is None:
+        return None
+    return float(
+        (Decimal(str(last_net)) * cumulative_ratio).quantize(Decimal("0.01"))
+    )
+
+
+def _iter_g7_8_linkage_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """G7-8 联动行：一次合并原样；分步按公司汇总累计初始成本（避免单笔对价误写 add_cost）。"""
+    out: list[dict[str, Any]] = []
+    step_groups: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        section = str(row.get("section") or "merger")
+        if section == "reverse":
+            continue
+        if section == "step":
+            key = str(row.get("companyId") or row.get("companyName") or "").strip()
+            if not key:
+                continue
+            step_groups.setdefault(key, []).append(row)
+            continue
+        out.append(row)
+
+    for group in step_groups.values():
+        ordered = sorted(
+            group,
+            key=lambda r: (
+                int(r.get("transactionNo") or r.get("seq") or 0),
+                str(r.get("id") or ""),
+            ),
+        )
+        last = ordered[-1]
+        cost = _g7_8_step_initial_cost(group)
+        acq_date = ""
+        for item in ordered:
+            hit = _first(item, "acquisitionDate", "mergerDate")
+            if hit:
+                acq_date = str(hit)
+                break
+        if not acq_date:
+            acq_date = str(last.get("transactionDate") or "")
+        out.append({
+            "section": "step",
+            "companyName": last.get("companyName") or last.get("investeeName"),
+            "companyId": last.get("companyId"),
+            "initialInvestmentCost": cost,
+            "acquisitionDate": acq_date,
+            "ownershipRatio": sum(
+                float(_money(r.get("purchaseRatio")) or 0) for r in ordered
+            ),
+            "_g7_8_step_txn_count": len(ordered),
+        })
+    return out
+
+
 def _merge_non_empty(base: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
     merged = dict(base)
     for key, value in extra.items():
@@ -460,18 +603,21 @@ def build_g79_suggestions(
     payloads: dict[str, Any],
     resolve_company: Any,
 ) -> list[dict[str, Any]]:
-    """G7-9 商誉/少数股东建议草稿（默认不自动入账）。"""
+    """G7-9 商誉/少数股东建议草稿（默认不自动入账）。
+
+    一次购买按行输出；分步合并按公司汇总（⑦母公司初始成本、累计商誉）。
+    """
     suggestions: list[dict[str, Any]] = []
-    for row in _rows(payloads.get("G7-9-rows")):
-        if str(row.get("section") or "merger") != "merger":
-            continue
+    raw_rows = _rows(payloads.get("G7-9-rows"))
+
+    def _append(row: dict[str, Any], *, suggestion_id: str) -> None:
         name = _name(row)
         company = resolve_company(name) if name else None
         if not company or not company.get("company_code"):
-            continue
+            return
         ratio = _ratio_to_percent(row.get("ownershipRatio"), scale="fraction")
         suggestions.append({
-            "id": f"g7-9-{row.get('id') or company['company_code']}",
+            "id": suggestion_id,
             "type": "goodwill_nci",
             "source_sheet": "G7-9",
             "company_code": company["company_code"],
@@ -489,7 +635,72 @@ def build_g79_suggestions(
             "selected_default": False,
             "note": "建议草稿：确认后才写入商誉/少数股东结构化表",
         })
+
+    for row in raw_rows:
+        if str(row.get("section") or "merger") != "merger":
+            continue
+        _append(row, suggestion_id=f"g7-9-{row.get('id') or _name(row)}")
+
+    for summary in _aggregate_g79_step_companies(raw_rows):
+        _append(
+            summary,
+            suggestion_id=f"g7-9-step-{summary.get('companyId') or _name(summary)}",
+        )
     return suggestions
+
+
+def _aggregate_g79_step_companies(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """分步区段按公司汇总：⑦=Σ对价FV+Σ权益法调整；累计持股/商誉。"""
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        if str(row.get("section") or "") != "step":
+            continue
+        key = str(row.get("companyId") or row.get("companyName") or "").strip()
+        if not key:
+            continue
+        groups.setdefault(key, []).append(row)
+
+    summaries: list[dict[str, Any]] = []
+    for company_id, group in groups.items():
+        ordered = sorted(
+            group,
+            key=lambda r: (
+                int(r.get("transactionNo") or 0),
+                int(r.get("seq") or 0),
+            ),
+        )
+        last = ordered[-1]
+        name = _name(last)
+        consideration = sum(
+            (_money(r.get("considerationFV")) or 0.0) for r in ordered
+        )
+        adjustments = sum(
+            (_money(r.get("priorEquityMethodAdjustments")) or 0.0) for r in ordered
+        )
+        ratio_parts = [_decimal(r.get("purchaseRatio")) for r in ordered]
+        ratio_sum = sum((p for p in ratio_parts if p is not None), Decimal("0"))
+        goodwill = sum((_money(r.get("goodwillAtTxn")) or 0.0) for r in ordered)
+        share = sum((_money(r.get("shareOfFVAtTxn")) or 0.0) for r in ordered)
+        last_date = ""
+        for r in reversed(ordered):
+            last_date = str(r.get("transactionDate") or "").strip()
+            if last_date:
+                break
+        summaries.append({
+            "id": f"step-{company_id}",
+            "section": "step",
+            "companyId": company_id,
+            "companyName": name,
+            "investeeName": name,
+            "ownershipRatio": float(ratio_sum) if ratio_sum else None,
+            "initialInvestmentCost": round(consideration + adjustments, 2),
+            "goodwill": round(goodwill, 2),
+            "shareOfFV": round(share, 2),
+            "nonControllingInterestShare": None,
+            "acquireeIdentifiableNetAssetsFV": None,
+            "acquisitionDate": last_date,
+        })
+    return summaries
 
 
 def enrich_info_from_g710(
@@ -667,6 +878,249 @@ def build_g73_suggestions(
     return suggestions
 
 
+def build_g713_suggestions(
+    payloads: dict[str, Any],
+    resolve_company: Any,
+) -> list[dict[str, Any]]:
+    """G7-13 投资成本测试 → 商誉/廉价购买备查建议（不自动入账）。"""
+    suggestions: list[dict[str, Any]] = []
+    for row in _rows(payloads.get("G7-13-rows")):
+        name = _name(row)
+        if not name:
+            continue
+        difference = _money(_first(row, "difference"))
+        if difference is None or abs(float(difference)) <= 0.005:
+            continue
+        company = resolve_company(name) if name else None
+        code = (company or {}).get("company_code") or ""
+        nature = str(_first(row, "differenceNature", "difference_nature") or "")
+        if difference > 0 or "商誉" in nature:
+            sug_type = "investment_cost_goodwill"
+            note = "建议草稿：初始成本大于享有份额确认为商誉；正式以 G7-14 商誉/FV 明细为准"
+        else:
+            sug_type = "investment_cost_bargain"
+            note = "建议草稿：廉价购买利得（营业外收入）；正式入账前请复核 G7-14 备查说明"
+        suggestions.append({
+            "id": f"g7-13-{row.get('id') or name}",
+            "type": sug_type,
+            "source_sheet": "G7-13",
+            "company_code": code,
+            "company_name": name,
+            "initial_cost": _money(_first(row, "initialCost", "initial_cost")),
+            "share_of_net_assets": _money(
+                _first(row, "shareOfNetAssets", "share_of_net_assets")
+            ),
+            "difference": difference,
+            "difference_nature": nature or ("商誉" if difference > 0 else "营业外收入"),
+            "target_hint": "equity_inv / G7-14 goodwillFvDetails",
+            "selected_default": False,
+            "note": note,
+        })
+    return suggestions
+
+
+def build_g716_suggestions(
+    payloads: dict[str, Any],
+    resolve_company: Any,
+) -> list[dict[str, Any]]:
+    """G7-16 未确认投资损失 → 合并复核建议（备查，不自动入账）。"""
+    suggestions: list[dict[str, Any]] = []
+    for row in _rows(payloads.get("G7-16-rows")):
+        name = _name(row)
+        if not name:
+            continue
+        unrecognized = _money(_first(row, "unrecognizedLoss", "unrecognized_loss"))
+        excess = _money(_first(row, "excessLoss", "excess_loss"))
+        current_change = _money(_first(row, "currentChange", "current_change"))
+        if not any(v is not None and abs(float(v)) > 0.005 for v in (unrecognized, excess, current_change)):
+            continue
+        company = resolve_company(name) if name else None
+        code = (company or {}).get("company_code") or ""
+        suggestions.append({
+            "id": f"g7-16-{row.get('id') or name}",
+            "type": "unrecognized_loss",
+            "source_sheet": "G7-16",
+            "company_code": code,
+            "company_name": name,
+            "excess_loss": excess,
+            "unrecognized_loss": unrecognized,
+            "current_change": current_change,
+            "prior_cumulative": _money(_first(row, "priorCumulative", "prior_cumulative")),
+            "target_hint": "equity_inv / 备查簿",
+            "selected_default": False,
+            "note": (
+                "建议草稿：超额/未确认投资损失按 CAS2 第44条备查登记；"
+                "正式权益法确认以 G7-14 为准，合并侧勿直接改抵消分录"
+            ),
+        })
+    return suggestions
+
+
+def _g715_elim_amount(row: dict[str, Any]) -> float:
+    """与前端 applyInternalElimToG714Payload 一致：有 currentChange(含0)用本年变动，否则回退累计抵销。"""
+    if "currentChange" in row or "current_change" in row:
+        raw = row.get("currentChange", row.get("current_change"))
+        if raw not in (None, ""):
+            return float(_money(raw) or 0.0)
+    return float(_money(_first(row, "eliminationAmount", "elimination_amount")) or 0.0)
+
+
+def _aggregate_g76_policy(payload: Any) -> dict[str, dict[str, Any]]:
+    """按被投资方汇总 G7-6「不一致」调整金额。"""
+    rows = _rows(payload)
+    # groups 形态：若 flat rows 为空，从 groups 展开
+    if not rows and isinstance(payload, dict):
+        groups = payload.get("groups")
+        if isinstance(groups, list):
+            expanded: list[dict[str, Any]] = []
+            for g in groups:
+                if not isinstance(g, dict):
+                    continue
+                g_name = str(g.get("investeeName") or g.get("investee_name") or "").strip()
+                g_id = str(g.get("investeeId") or g.get("investee_id") or "").strip()
+                for r in g.get("rows") or []:
+                    if not isinstance(r, dict):
+                        continue
+                    expanded.append({
+                        **r,
+                        "investeeName": r.get("investeeName") or g_name,
+                        "investeeId": r.get("investeeId") or g_id,
+                    })
+            rows = expanded
+
+    sums: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        consistent = str(row.get("isConsistent") or row.get("is_consistent") or "").strip()
+        amount = _money(_first(row, "adjustmentAmount", "adjustment_amount")) or 0.0
+        if consistent and consistent != "不一致":
+            continue
+        if not consistent and abs(amount) < 0.005:
+            continue
+        name = _name(row)
+        if not name:
+            continue
+        prev = sums.get(name)
+        if not prev:
+            sums[name] = {
+                "name": name,
+                "total": amount,
+                "count": 1 if abs(amount) > 0.005 or consistent == "不一致" else 0,
+                "sample": row,
+            }
+        else:
+            prev["total"] = float(
+                (Decimal(str(prev["total"])) + Decimal(str(amount))).quantize(Decimal("0.01"))
+            )
+            if consistent == "不一致" or abs(amount) > 0.005:
+                prev["count"] = int(prev["count"]) + 1
+    return {
+        name: agg
+        for name, agg in sums.items()
+        if abs(float(agg["total"])) > 0.005 or int(agg["count"]) > 0
+    }
+
+
+def _aggregate_g715_elim(payloads: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """按被投资单位汇总 G7-15 本年抵销变动。优先 ROWS，避免与 section 双写重复加总。"""
+    rows = _rows(payloads.get("G7-15-rows"))
+    if not rows:
+        rows = _rows(payloads.get("G7-15-internal-transaction"))
+
+    # G7-4 id → 名称，便于 investeeId 对齐
+    id_to_name: dict[str, str] = {}
+    for r in _rows(payloads.get("G7-4-rows")):
+        rid = str(r.get("id") or r.get("investeeId") or r.get("investee_id") or "").strip()
+        n = _name(r)
+        if rid and n:
+            id_to_name[rid] = n
+
+    sums: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        rid = str(row.get("investeeId") or row.get("investee_id") or "").strip()
+        name = _name(row)
+        if rid and rid in id_to_name:
+            name = id_to_name[rid]
+        if not name and rid:
+            name = rid
+        if not name:
+            continue
+        amt = _g715_elim_amount(row)
+        prev = sums.get(name)
+        if not prev:
+            sums[name] = {
+                "name": name,
+                "investee_id": rid,
+                "amt": amt,
+                "sample": row,
+                "txn_count": 1,
+            }
+        else:
+            prev["amt"] = float(
+                (Decimal(str(prev["amt"])) + Decimal(str(amt))).quantize(Decimal("0.01"))
+            )
+            prev["txn_count"] = int(prev["txn_count"]) + 1
+            if rid and not prev.get("investee_id"):
+                prev["investee_id"] = rid
+    return sums
+
+
+def build_g715_suggestions(
+    payloads: dict[str, Any],
+    resolve_company: Any,
+) -> list[dict[str, Any]]:
+    """G7-15 内部交易抵销 → 合并复核建议（提示已同步至 G7-14 内部交易列）。"""
+    suggestions: list[dict[str, Any]] = []
+    for name, agg in _aggregate_g715_elim(payloads).items():
+        amt = agg.get("amt")
+        if amt is None or abs(float(amt)) < 0.005:
+            continue
+        company = resolve_company(name) if name else None
+        code = (company or {}).get("company_code") or ""
+        suggestions.append({
+            "id": f"g7-15-{agg.get('investee_id') or name}",
+            "type": "internal_transaction_elim",
+            "source_sheet": "G7-15",
+            "company_code": code,
+            "company_name": name,
+            "current_change": float(amt),
+            "txn_count": agg.get("txn_count"),
+            "target_hint": "equity_inv.internalTransactionAdj / G7-14",
+            "selected_default": False,
+            "note": (
+                "建议草稿：未实现内部交易抵销本年变动；正式入权益法测算以 G7-14"
+                "「内部交易抵销」为准，合并侧请先确认跨表同步"
+            ),
+        })
+    return suggestions
+
+
+def build_g76_suggestions(
+    payloads: dict[str, Any],
+    resolve_company: Any,
+) -> list[dict[str, Any]]:
+    """G7-6 会计政策调整 → 备查建议（默认不入账；正式以 G7-14 accountingPolicyAdj 为准）。"""
+    suggestions: list[dict[str, Any]] = []
+    for name, agg in _aggregate_g76_policy(payloads.get("G7-6-rows")).items():
+        total = float(agg.get("total") or 0)
+        if abs(total) <= 0.005:
+            continue
+        company = resolve_company(name) if name else None
+        code = (company or {}).get("company_code") or ""
+        suggestions.append({
+            "id": f"g7-6-{name}",
+            "type": "accounting_policy_adj",
+            "source_sheet": "G7-6",
+            "company_code": code,
+            "company_name": name,
+            "policy_adj_amount": total,
+            "inconsistent_count": int(agg.get("count") or 0),
+            "target_hint": "equity_inv._g7_accounting_policy_adj / G7-14 accountingPolicyAdj",
+            "selected_default": False,
+            "note": "建议草稿：按投资方政策调整净利润；确认后以 G7-14「会计政策调整」为准",
+        })
+    return suggestions
+
+
 def collect_all_suggestions(
     payloads: dict[str, Any],
     resolve_company: Any,
@@ -674,6 +1128,10 @@ def collect_all_suggestions(
     suggestions = build_g79_suggestions(payloads, resolve_company)
     suggestions.extend(build_g710_suggestions(payloads, resolve_company))
     suggestions.extend(build_g73_suggestions(payloads))
+    suggestions.extend(build_g715_suggestions(payloads, resolve_company))
+    suggestions.extend(build_g713_suggestions(payloads, resolve_company))
+    suggestions.extend(build_g716_suggestions(payloads, resolve_company))
+    suggestions.extend(build_g76_suggestions(payloads, resolve_company))
     return suggestions
 
 
@@ -996,8 +1454,7 @@ def build_linkage_candidates(
         ("G7-13-rows", "G7-13"),
         ("G7-14-equity-method-calc", "G7-14"),
         ("G7-14-rows", "G7-14"),
-        ("G7-15-rows", "G7-15"),
-        ("G7-15-internal-transaction", "G7-15"),
+        # G7-15 单独聚合后写入，避免多行覆盖/双写键重复加总
         ("G7-16-rows", "G7-16"),
         ("G7-17-rows", "G7-17"),
         ("G7-17-impairment-test", "G7-17"),
@@ -1005,20 +1462,69 @@ def build_linkage_candidates(
         ("G7-6-rows", "G7-6"),
     )
     for key, source_sheet in enrichments:
-        for row in _rows(payloads.get(key)):
+        raw_rows = _rows(payloads.get(key))
+        iter_rows = (
+            _iter_g7_8_linkage_rows(raw_rows)
+            if source_sheet == "G7-8"
+            else raw_rows
+        )
+        for row in iter_rows:
             name = _name(row)
             if not name:
                 continue
             target = equity_by_name.get(name) or cost_by_name.get(name)
             if not target:
                 continue
+            if source_sheet == "G7-6":
+                # 逐行跳过；下方按被投资方聚合「不一致」调整
+                continue
+            if source_sheet == "G7-5":
+                # 逐行跳过；下方按公司汇总净利润/净资产
+                continue
             sources_used.add(source_sheet)
-            if source_sheet in {"G7-8", "G7-9", "G7-13"}:
+            if source_sheet == "G7-8":
+                # 分步已汇总为累计初始成本；勿回退到单笔 consideration
+                initial_cost = _money(_first(row, "initialInvestmentCost", "initialCost"))
+                if initial_cost is None and str(row.get("section") or "") != "step":
+                    initial_cost = _money(_first(row, "consideration", "cashConsideration"))
+                if initial_cost is not None:
+                    target["add_cost"] = target.get("add_cost") or initial_cost
+                acq = _first(row, "acquisitionDate", "mergerDate", "transactionDate")
+                info = info_by_name.get(name)
+                if info and acq and not info.get("first_consol_date"):
+                    info["first_consol_date"] = acq
+                target["_g7_g7_8"] = deepcopy(row)
+            elif source_sheet in {"G7-9", "G7-13"}:
+                if source_sheet == "G7-9" and str(row.get("section") or "merger") != "merger":
+                    # 分步按公司汇总后再 enrich；反向购买无初始成本字段
+                    continue
                 initial_cost = _money(_first(
-                    row, "initialInvestmentCost", "initialCost", "consideration"
+                    row,
+                    "initialInvestmentCost",
+                    "initialCost",
+                    "parentInitialCost",
+                    "consideration",
                 ))
                 if initial_cost is not None:
                     target["add_cost"] = target.get("add_cost") or initial_cost
+                if source_sheet == "G7-13":
+                    difference = _money(_first(row, "difference"))
+                    target["_g7_initial_cost"] = initial_cost
+                    target["_g7_share_of_net_assets"] = _money(
+                        _first(row, "shareOfNetAssets", "share_of_net_assets")
+                    )
+                    target["_g7_difference"] = difference
+                    target["_g7_difference_nature"] = (
+                        _first(row, "differenceNature", "difference_nature") or ""
+                    )
+                    target["_g7_net_asset_fv"] = _money(
+                        _first(row, "netAssetFairValue", "net_asset_fair_value")
+                    )
+                    ratio_raw = _first(row, "investmentRatio", "investment_ratio")
+                    if ratio_raw is not None:
+                        target["_g7_investment_ratio"] = _ratio_to_percent(
+                            ratio_raw, scale="fraction"
+                        )
                 target[f"_g7_{source_sheet.lower().replace('-', '_')}"] = deepcopy(row)
             elif source_sheet == "G7-10":
                 section = str(row.get("section") or "")
@@ -1042,13 +1548,32 @@ def build_linkage_candidates(
             elif source_sheet == "G7-12":
                 info = info_by_name.get(name)
                 if info:
+                    # 前端六区段字段：lossOfControlDate/transactionDate/transactionPrice
+                    # 兼容旧键 disposalDate/consideration/disposalPrice/cumulative*
                     info.update({
-                        "disposal_date": row.get("disposalDate") or "",
+                        "disposal_date": _first(
+                            row,
+                            "lossOfControlDate",
+                            "transactionDate",
+                            "disposalDate",
+                        ) or "",
                         "disposal_amount": _money(
-                            _first(row, "consideration", "disposalPrice")
+                            _first(
+                                row,
+                                "transactionPrice",
+                                "cumulativePrice",
+                                "consideration",
+                                "disposalPrice",
+                            )
                         ),
                         "disposal_ratio": _ratio_to_percent(
-                            row.get("disposalRatio"), scale="fraction"
+                            _first(
+                                row,
+                                "disposalRatio",
+                                "cumulativeShareChange",
+                                "transactionShareChange",
+                            ),
+                            scale="fraction",
                         ),
                         "_g7_g7_12": deepcopy(row),
                     })
@@ -1066,16 +1591,114 @@ def build_linkage_candidates(
                     "_g7_audited_net_assets": _money(row.get("auditedNetAssets")),
                     "_g7_goodwill": _money(row.get("goodwill")),
                     "_g7_unexplained_variance": _money(row.get("unexplainedVariance")),
+                    # 跨表同步字段（G7-15/G7-6/G7-16→G7-14）可追溯
+                    "_g7_other_adj": _money(_first(row, "otherAdj", "other_adj")),
+                    "_g7_internal_transaction_adj": _money(
+                        _first(row, "internalTransactionAdj", "internal_transaction_adj")
+                    ),
+                    "_g7_accounting_policy_adj": _money(
+                        _first(row, "accountingPolicyAdj", "accounting_policy_adj")
+                    ),
                 })
+            elif source_sheet == "G7-16":
+                # 结构化未确认损失（不再仅 deepcopy blob）；正式金额仍以 G7-14 equityShare 为准
+                current_change = _money(_first(row, "currentChange", "current_change"))
+                unrecognized = _money(
+                    _first(row, "unrecognizedLoss", "unrecognized_loss")
+                )
+                excess = _money(_first(row, "excessLoss", "excess_loss"))
+                prior = _money(_first(row, "priorCumulative", "prior_cumulative"))
+                target["_g7_unrecognized_loss"] = unrecognized
+                target["_g7_excess_loss"] = excess
+                target["_g7_current_change"] = current_change
+                target["_g7_prior_cumulative"] = prior
+                target["_g7_unrecognized_note"] = (
+                    "未确认投资损失备查（CAS2§44）；正式权益法份额见 G7-14/add_income_adj"
+                )
+                target["_g7_g7_16"] = deepcopy(row)
             elif source_sheet == "G7-17":
-                # 减值金额作为本期增加减值（期初/期末累计需人工确认，不自动拆分）
+                # 期初已提 → open_impairment；本期测算减值 → add_impairment
+                opening = _money(
+                    _first(row, "openingImpairment", "opening_impairment")
+                )
                 impairment = _money(row.get("impairmentAmount"))
+                if opening is not None:
+                    target["open_impairment"] = opening
                 if impairment is not None:
                     target["add_impairment"] = impairment
                 target["_g7_recoverable_amount"] = _money(row.get("recoverableAmount"))
-                target["_g7_impairment_note"] = "本期增加减值（来自G7-17，未拆期初/累计）"
+                if opening is not None:
+                    target["_g7_impairment_note"] = (
+                        "期初减值←openingImpairment；本期增加←impairmentAmount（G7-17）"
+                    )
+                else:
+                    target["_g7_impairment_note"] = (
+                        "本期增加减值（来自G7-17）；期初请填 openingImpairment 或人工确认"
+                    )
             else:
                 target[f"_g7_{source_sheet.lower().replace('-', '_')}"] = deepcopy(row)
+
+    # G7-5：按公司汇总净利润/净资产（避免多行互相覆盖 _g7_g7_5）
+    g75_agg = _aggregate_g75_financial(_rows(payloads.get("G7-5-rows")))
+    if g75_agg:
+        sources_used.add("G7-5")
+        for name, summary in g75_agg.items():
+            target = equity_by_name.get(name) or cost_by_name.get(name)
+            if not target:
+                continue
+            if summary.get("net_profit") is not None:
+                target["_g7_reported_net_profit"] = summary["net_profit"]
+            if summary.get("net_assets") is not None:
+                target["_g7_net_assets"] = summary["net_assets"]
+            if summary.get("prior_net_profit") is not None:
+                target["_g7_prior_net_profit"] = summary["prior_net_profit"]
+            if summary.get("prior_net_assets") is not None:
+                target["_g7_prior_net_assets"] = summary["prior_net_assets"]
+            target["_g7_g7_5_item_count"] = summary.get("item_count")
+            target["_g7_g7_5_unaudited_count"] = summary.get("unaudited_count")
+            target["_g7_g7_5"] = deepcopy(summary)
+
+    # G7-9 分步：按公司汇总⑦初始成本写入 add_cost
+    for summary in _aggregate_g79_step_companies(_rows(payloads.get("G7-9-rows"))):
+        name = _name(summary)
+        if not name:
+            continue
+        target = equity_by_name.get(name) or cost_by_name.get(name)
+        if not target:
+            continue
+        sources_used.add("G7-9")
+        initial_cost = _money(summary.get("initialInvestmentCost"))
+        if initial_cost is not None:
+            target["add_cost"] = target.get("add_cost") or initial_cost
+        target["_g7_g7_9"] = deepcopy(summary)
+
+    # G7-6：按被投资方聚合「不一致」调整金额（不覆盖 G7-14 已写入的 _g7_accounting_policy_adj）
+    g76_agg = _aggregate_g76_policy(payloads.get("G7-6-rows"))
+    if g76_agg:
+        sources_used.add("G7-6")
+        for name, agg in g76_agg.items():
+            target = equity_by_name.get(name) or cost_by_name.get(name)
+            if not target:
+                continue
+            target["_g7_g7_6_policy_adj"] = float(agg["total"])
+            target["_g7_g7_6_inconsistent_count"] = agg["count"]
+            sample = agg.get("sample")
+            if isinstance(sample, dict):
+                target["_g7_g7_6"] = deepcopy(sample)
+
+    # G7-15：按被投资单位汇总本年抵销变动（ID 优先对齐 G7-4 名称）
+    g715_agg = _aggregate_g715_elim(payloads)
+    if g715_agg:
+        sources_used.add("G7-15")
+        for name, agg in g715_agg.items():
+            target = equity_by_name.get(name) or cost_by_name.get(name)
+            if not target:
+                continue
+            target["_g7_internal_elim_change"] = float(agg["amt"])
+            target["_g7_g7_15_txn_count"] = agg.get("txn_count")
+            sample = agg.get("sample")
+            if isinstance(sample, dict):
+                target["_g7_g7_15"] = deepcopy(sample)
 
     # G7-10 股比变动 → 基本信息标记（复杂 share_change 矩阵仅出建议）
     enrich_info_from_g710(info_by_name, payloads, resolve, unresolved, ambiguous)

@@ -3,15 +3,19 @@
 POST /api/workpapers/{wp_id}/g7-equity-method/ai/{section}
 
 sections:
+  - accounting-policy-conclusion    (G7-6 会计政策一致性结论)
   - cost-test-conclusion            (G7-13 投资成本测试结论)
   - equity-method-conclusion        (G7-14 权益法测算结论)
   - internal-transaction-conclusion (G7-15 内部交易抵销结论)
+  - unrecognized-loss-conclusion    (G7-16 未确认投资损失结论)
   - impairment-conclusion           (G7-17 减值测试结论)
+  - impairment-note                 (G7-17 审计说明)
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from typing import Any
 
@@ -77,6 +81,14 @@ _SYSTEM_PROMPT = """你是一位资深注册会计师（CPA），正在协助编
 输出要求：中文、审计专业用语、直接输出正文、简洁适合底稿。"""
 
 _SECTION_PROMPTS: dict[str, str] = {
+    "accounting-policy-conclusion": (
+        "请基于G7-6被投资公司会计政策一致性检查数据，生成审计结论。需包含：\n"
+        "1. 核对范围（被投资方家数、事项覆盖）\n"
+        "2. 一致/不一致/不适用概况；不一致事项摘要及调整金额\n"
+        "3. 调整是否应同步至G7-14「会计政策调整」列\n"
+        "4. 明确公允价值/可辨认净资产调整属G7-13，勿与本表混淆\n"
+        "5. 总体结论：是否符合CAS2按投资方政策调整后再计算应享份额的要求"
+    ),
     "cost-test-conclusion": (
         "请基于G7-13投资成本测试数据，生成审计结论。需包含以下方面：\n"
         "1. 各被投资单位初始投资成本的确定依据（对价+直接费用）\n"
@@ -106,6 +118,15 @@ _SECTION_PROMPTS: dict[str, str] = {
         "6. 抵销分录是否正确影响投资收益/长期股权投资\n"
         "7. 内部交易抵销总体结论：抵销金额是否合理、完整"
     ),
+    "unrecognized-loss-conclusion": (
+        "请基于G7-16未确认投资损失测试数据，生成审计结论。需包含以下方面：\n"
+        "1. 被投资单位累计亏损与合计长期权益（投资账面+长应收+其他实质权益+预计负债）的比较\n"
+        "2. 超额亏损 = MAX(0, 累计亏损−合计长期权益) 的计算是否准确\n"
+        "3. 抵减顺序是否符合CAS2第44条：①冲减投资账面→②冲减长应收→③确认预计负债\n"
+        "4. 未确认投资损失（超额−各项冲减，且≥0）是否在备查簿恰当登记\n"
+        "5. 本期变动与上期累计的勾稽关系\n"
+        "6. 未确认投资损失总体结论：超额亏损分配及未确认部分是否合理、完整"
+    ),
     "impairment-conclusion": (
         "请基于G7-17减值测试数据，生成审计结论。需包含以下方面：\n"
         "1. 减值迹象判断：是否存在被投资方持续亏损/净资产大幅下降/市场恶化等情形\n"
@@ -115,6 +136,14 @@ _SECTION_PROMPTS: dict[str, str] = {
         "5. 减值金额 = MAX(0, 账面价值-可收回金额)的计算准确性\n"
         "6. 减值计提的充分性评价（是否存在应提未提情形）\n"
         "7. 减值测试总体结论：减值准备是否充分、合理，符合CAS8"
+    ),
+    "impairment-note": (
+        "请基于G7-17减值测试数据，生成审计说明（程序与证据说明，非最终结论）。需包含：\n"
+        "1. 已执行的减值迹象识别程序（访谈/财报分析/行业对比等）\n"
+        "2. 可收回金额估计的证据来源（估值报告/可比交易/折现模型）\n"
+        "3. 对存在减值迹象但未计提、或全额减值等特殊情形的复核说明\n"
+        "4. 拟调整/未调整事项及其对报表的影响（如有）\n"
+        "语气为工作底稿说明，勿写成笼统的「总体结论」口号"
     ),
 }
 
@@ -152,6 +181,16 @@ async def g7_equity_method_ai_generate(
     return G7EquityMethodAiGenerateResponse(content=result, sources=[])
 
 
+def _format_related_context_value(value: Any) -> str:
+    """序列化 relatedContext 值；保留 0/False，嵌套结构用 JSON。"""
+    if isinstance(value, (dict, list)):
+        try:
+            return json.dumps(value, ensure_ascii=False, default=str)[:6000]
+        except (TypeError, ValueError):
+            return str(value)[:6000]
+    return str(value)
+
+
 def _build_user_prompt(
     section: str,
     existing_content: str,
@@ -167,7 +206,11 @@ def _build_user_prompt(
     if ctx_lines:
         parts.append("## 项目信息\n" + "\n".join(ctx_lines) + "\n")
     if related_context:
-        ctx_str = "\n".join(f"- {k}: {v}" for k, v in related_context.items() if v)
+        ctx_str = "\n".join(
+            f"- {k}: {_format_related_context_value(v)}"
+            for k, v in related_context.items()
+            if v is not None and v != ""
+        )
         if ctx_str:
             parts.append(f"## 底稿数据\n{ctx_str}\n")
     if existing_content:

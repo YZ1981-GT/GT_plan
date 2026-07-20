@@ -1,11 +1,6 @@
 /**
  * 单元测试 — G7-11 处置检查（非一揽子交易）
  *
- * 测试内容：
- * 1. 个别处置损益公式：calcDisposalGain(price, bookValue, dividend, oci)
- * 2. 处置比例>100%校验阻断
- * 3. 正常数据计算验证
- *
  * Spec: .kiro/specs/g7-long-term-equity-subsidiary/
  * Task: 8.3
  *
@@ -13,32 +8,28 @@
  */
 import { describe, it, expect } from 'vitest'
 import { calcDisposalGain, parseNum } from '../../../composables/useG7SubFormulaEngine'
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 1. 个别处置损益公式验证
-// ═══════════════════════════════════════════════════════════════════════════════
+import {
+  validateDisposalRatio,
+  normalizeDisposalRatio,
+  recalcDisposalSingleRow,
+  createEmptyDisposalSingleRow,
+  hydrateDisposalSingleRow,
+  clearConsolidatedGainManual,
+  setConsolidatedGainManual,
+  calcConsolidatedDisposalGain,
+  pickBookValueFromG710,
+} from '../g7DisposalSingleModel'
 
 describe('G7-11 个别处置损益公式: calcDisposalGain', () => {
-  /**
-   * **Validates: Requirements 5.3**
-   *
-   * 处置损益(个别报表) = 处置对价 - 处置日账面 - 应收股利 + 可转损益OCI
-   */
   it('基本公式: price - bookValue - dividend + oci', () => {
-    // 处置对价1000万, 账面800万, 应收股利50万, 可转OCI 30万
-    // 损益 = 1000 - 800 - 50 + 30 = 180
     expect(calcDisposalGain(1000, 800, 50, 30)).toBe(180)
   })
 
   it('OCI为负(原减值转损益)时减少处置损益', () => {
-    // 处置对价500, 账面400, 股利0, OCI=-20
-    // 损益 = 500 - 400 - 0 + (-20) = 80
     expect(calcDisposalGain(500, 400, 0, -20)).toBe(80)
   })
 
   it('处置亏损(对价<账面)时结果为负', () => {
-    // 处置对价300, 账面500, 股利10, OCI=5
-    // 损益 = 300 - 500 - 10 + 5 = -205
     expect(calcDisposalGain(300, 500, 10, 5)).toBe(-205)
   })
 
@@ -47,45 +38,20 @@ describe('G7-11 个别处置损益公式: calcDisposalGain', () => {
   })
 
   it('大额数据精度验证(亿级)', () => {
-    // 处置对价5亿, 账面3.5亿, 股利2000万, OCI 1500万
-    // 损益 = 500000000 - 350000000 - 20000000 + 15000000 = 145000000
     expect(calcDisposalGain(500000000, 350000000, 20000000, 15000000)).toBe(145000000)
   })
 
   it('小数精度: 结果保留两位小数', () => {
-    // 1000.555 - 800.333 - 50.111 + 30.222 = 180.333
     const result = calcDisposalGain(1000.555, 800.333, 50.111, 30.222)
     expect(result).toBeCloseTo(180.33, 2)
   })
 
   it('parseNum兜底: 非法输入视为0', () => {
-    // 使用parseNum处理非法值
     expect(calcDisposalGain(parseNum(null), parseNum(undefined), parseNum(''), parseNum('abc'))).toBe(0)
   })
 })
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// 2. 处置比例校验逻辑
-// ═══════════════════════════════════════════════════════════════════════════════
-
-describe('G7-11 处置比例校验', () => {
-  /**
-   * **Validates: Requirements 5.1**
-   *
-   * 处置比例>100%（即>1.0）→ 前端校验阻断
-   * 处置比例范围: 0 ~ 1.0 (0%~100%)
-   */
-  function validateDisposalRatio(ratio: number): { valid: boolean; message?: string } {
-    const r = parseNum(ratio)
-    if (r > 1) {
-      return { valid: false, message: '处置比例不能超过100%' }
-    }
-    if (r < 0) {
-      return { valid: false, message: '处置比例不能为负数' }
-    }
-    return { valid: true }
-  }
-
+describe('G7-11 处置比例校验（生产 validateDisposalRatio）', () => {
   it('处置比例=50%通过校验', () => {
     expect(validateDisposalRatio(0.5)).toEqual({ valid: true })
   })
@@ -105,8 +71,7 @@ describe('G7-11 处置比例校验', () => {
   })
 
   it('处置比例=101%阻断', () => {
-    const result = validateDisposalRatio(1.01)
-    expect(result.valid).toBe(false)
+    expect(validateDisposalRatio(1.01).valid).toBe(false)
   })
 
   it('处置比例为负数阻断', () => {
@@ -114,40 +79,19 @@ describe('G7-11 处置比例校验', () => {
     expect(result.valid).toBe(false)
     expect(result.message).toContain('负数')
   })
+
+  it('normalizeDisposalRatio: 百分数 30 → 0.3', () => {
+    expect(normalizeDisposalRatio(30)).toBe(0.3)
+  })
+
+  it('normalizeDisposalRatio: 已是小数保持', () => {
+    expect(normalizeDisposalRatio(0.3)).toBe(0.3)
+  })
 })
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// 3. 正常数据计算验证(完整行数据模拟)
-// ═══════════════════════════════════════════════════════════════════════════════
-
 describe('G7-11 完整行数据计算', () => {
-  /**
-   * **Validates: Requirements 5.1, 5.3**
-   *
-   * 模拟G7-11表完整行数据的公式列计算
-   */
-  interface G7DisposalSingleRow {
-    investeeName: string
-    disposalDate: string
-    disposalRatio: number
-    disposalPrice: number
-    disposalDateBookValue: number
-    disposalDateDividend: number
-    priorOCICumulative: number
-    transferableOCI: number
-  }
-
-  function calcRowGain(row: G7DisposalSingleRow): number {
-    return calcDisposalGain(
-      row.disposalPrice,
-      row.disposalDateBookValue,
-      row.disposalDateDividend,
-      row.transferableOCI,
-    )
-  }
-
   it('案例1: 全额处置子公司A', () => {
-    const row: G7DisposalSingleRow = {
+    const row = hydrateDisposalSingleRow({
       investeeName: '子公司A',
       disposalDate: '2025-06-30',
       disposalRatio: 1.0,
@@ -156,38 +100,119 @@ describe('G7-11 完整行数据计算', () => {
       disposalDateDividend: 200,
       priorOCICumulative: 150,
       transferableOCI: 120,
-    }
-    // 5000 - 3800 - 200 + 120 = 1120
-    expect(calcRowGain(row)).toBe(1120)
+    }, 1)
+    expect(row.individualGain).toBe(1120)
   })
 
   it('案例2: 部分处置子公司B(60%)', () => {
-    const row: G7DisposalSingleRow = {
+    const row = hydrateDisposalSingleRow({
       investeeName: '子公司B',
-      disposalDate: '2025-09-15',
       disposalRatio: 0.6,
       disposalPrice: 2400,
       disposalDateBookValue: 2000,
-      disposalDateDividend: 0,
-      priorOCICumulative: 80,
       transferableOCI: 50,
-    }
-    // 2400 - 2000 - 0 + 50 = 450
-    expect(calcRowGain(row)).toBe(450)
+    }, 1)
+    expect(row.individualGain).toBe(450)
   })
 
   it('案例3: 处置亏损(折价出售)', () => {
-    const row: G7DisposalSingleRow = {
+    const row = hydrateDisposalSingleRow({
       investeeName: '子公司C',
-      disposalDate: '2025-12-01',
       disposalRatio: 0.8,
       disposalPrice: 1000,
       disposalDateBookValue: 1500,
       disposalDateDividend: 100,
-      priorOCICumulative: 0,
-      transferableOCI: 0,
-    }
-    // 1000 - 1500 - 100 + 0 = -600
-    expect(calcRowGain(row)).toBe(-600)
+    }, 1)
+    expect(row.individualGain).toBe(-600)
+  })
+
+  it('priorOCICumulative 不进个别损益公式', () => {
+    const row = createEmptyDisposalSingleRow(1)
+    row.disposalPrice = 1000
+    row.disposalDateBookValue = 800
+    row.disposalDateDividend = 0
+    row.priorOCICumulative = 999
+    row.transferableOCI = 50
+    recalcDisposalSingleRow(row)
+    expect(row.individualGain).toBe(250)
+  })
+
+  it('合并处置损益默认公式', () => {
+    expect(calcConsolidatedDisposalGain(180, 20, 50)).toBe(150)
+  })
+
+  it('合并处置损益可手工覆盖，按公式可恢复', () => {
+    const row = hydrateDisposalSingleRow({
+      disposalPrice: 1000,
+      disposalDateBookValue: 800,
+      consolidationAdjustment: 10,
+      consolidatedNetAssetShare: 50,
+    }, 1)
+    expect(row.individualGain).toBe(200)
+    expect(row.consolidatedGain).toBe(160)
+    setConsolidatedGainManual(row, 999)
+    expect(row.consolidatedGainManual).toBe(true)
+    expect(row.consolidatedGain).toBe(999)
+    row.disposalPrice = 1100
+    recalcDisposalSingleRow(row)
+    expect(row.consolidatedGain).toBe(999)
+    clearConsolidatedGainManual(row)
+    expect(row.consolidatedGainManual).toBe(false)
+    expect(row.consolidatedGain).toBe(260)
+  })
+
+  it('hydrate 兼容旧字段名 bookValueDisposed', () => {
+    const row = hydrateDisposalSingleRow({
+      bookValueDisposed: 500,
+      dividendReceivable: 10,
+      consolAdjustment: 5,
+      netAssetShare: 20,
+      disposalPrice: 800,
+    }, 1)
+    expect(row.disposalDateBookValue).toBe(500)
+    expect(row.disposalDateDividend).toBe(10)
+    expect(row.consolidationAdjustment).toBe(5)
+    expect(row.consolidatedNetAssetShare).toBe(20)
+    expect(row.individualGain).toBe(290)
+  })
+
+  it('pickBookValueFromG710 按名称匹配 partialDisposal', () => {
+    const book = pickBookValueFromG710(
+      [{ section: 'partialDisposal', investeeName: '甲公司', bookValueAtDisposal: 1234 }],
+      '甲公司',
+    )
+    expect(book).toBe(1234)
+  })
+
+  it('pickBookValueFromG710 匹配 companyName 并算剩余账面', () => {
+    const book = pickBookValueFromG710(
+      {
+        rows: [{
+          section: 'partialDisposal',
+          companyName: '乙公司',
+          bookValueAtDisposal: 1000,
+          originalRatio: 0.8,
+          reducedRatio: 0.2,
+        }],
+      },
+      '乙公司',
+    )
+    // 剩余 = 1000 × (1 − 0.2/0.8) = 750
+    expect(book).toBe(750)
+  })
+
+  it('pickBookValueFromG710 信封+investeeId 优先', () => {
+    const book = pickBookValueFromG710(
+      {
+        materialityLevel: 1,
+        rows: [
+          { section: 'partialDisposal', companyName: '丙', investeeId: 'id-1', bookValueAtDisposal: 500, originalRatio: 1, reducedRatio: 0 },
+          { section: 'partialDisposal', companyName: '丁', investeeId: 'id-2', bookValueAtDisposal: 900 },
+        ],
+      },
+      '错名',
+      'id-2',
+    )
+    expect(book).toBe(900)
   })
 })

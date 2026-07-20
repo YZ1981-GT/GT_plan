@@ -8,17 +8,18 @@
       "sheet_name": "预付账款明细表",
       "coordinates": [
         {"cell_address": "E50", "description": "合计行-期末余额合计", "purpose": "balance_verification"},
-        {"cell_address": "F50", "description": "合计行-期初余额合计", "purpose": "balance_verification"}
+        {"cell_address": "F50", "description": "合计行-期初余额合计", "purpose": "balance_verification"},
+        {"cell_address": "G50", "description": "合计行-1年以内合计", "purpose": "aging_analysis"},
+        {"cell_address": "H50", "description": "合计行-1-2年合计", "purpose": "aging_analysis"},
+        {"cell_address": "I50", "description": "合计行-2年以上合计", "purpose": "aging_analysis"}
       ]
     },
     {
       "wp_code": "F1-3",
-      "sheet_name": "预付账款账龄分析",
+      "sheet_name": "预付账款调整分录汇总",
       "coordinates": [
-        {"cell_address": "E50", "description": "合计行-期末余额合计", "purpose": "balance_verification"},
-        {"cell_address": "F50", "description": "合计行-1年以内合计", "purpose": "aging_analysis"},
-        {"cell_address": "G50", "description": "合计行-1-2年合计", "purpose": "aging_analysis"},
-        {"cell_address": "H50", "description": "合计行-2-3年合计", "purpose": "aging_analysis"}
+        {"cell_address": "E50", "description": "合计行-借方合计", "purpose": "adjustment_balance"},
+        {"cell_address": "F50", "description": "合计行-贷方合计", "purpose": "adjustment_balance"}
       ]
     },
     {

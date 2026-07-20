@@ -138,8 +138,9 @@
  * 每组可 📎 上传 OCR 回填本组字段；右侧实时勾稽面板（evaluatePurchaseInboundChecks）
  * 逐项红黄提示，与主表「是否异常」同源。保存 emit 整行 patch 回父组件 updateRow。
  */
-import { ref, computed, watch, type Ref } from 'vue'
+import { computed, toRef, type Ref } from 'vue'
 import { useF2PurchaseOcr } from '../../composables/useF2PurchaseOcr'
+import { useVoucherCheckDialog } from '../../composables/useVoucherCheckDialog'
 import {
   evaluatePurchaseInboundChecks,
   assessPurchaseAbnormal,
@@ -160,20 +161,10 @@ const emit = defineEmits<{
   (e: 'save', patch: Partial<PurchaseInboundRow> & { id: string }): void
 }>()
 
-const form = ref<PurchaseInboundRow | null>(null)
-const abnormalChoice = ref<'auto' | 'yes' | 'no'>('auto')
-
-// 打开时克隆行，避免直接改父数据（保存才回写）
-watch(
-  () => [props.modelValue, props.row] as const,
-  ([visible, row]) => {
-    if (visible && row) {
-      form.value = { ...row }
-      abnormalChoice.value = row.abnormalOverride === null ? 'auto' : (row.abnormalOverride ? 'yes' : 'no')
-    }
-  },
-  { immediate: true },
-)
+const { form, abnormalChoice, buildSavePatch } = useVoucherCheckDialog<PurchaseInboundRow>({
+  modelValue: toRef(props, 'modelValue'),
+  row: toRef(props, 'row'),
+})
 
 const dialogTitle = computed(() =>
   form.value ? `逐笔核对 · ${form.value.party || form.value.voucherNo || '第 ' + form.value.seq + ' 笔'}` : '逐笔核对',
@@ -199,9 +190,9 @@ function runOcr(file?: File) {
 }
 
 function handleSave() {
-  if (!form.value) return
-  const abnormalOverride = abnormalChoice.value === 'auto' ? null : abnormalChoice.value === 'yes'
-  emit('save', { ...form.value, abnormalOverride })
+  const patch = buildSavePatch()
+  if (!patch) return
+  emit('save', patch)
   emit('update:modelValue', false)
 }
 </script>

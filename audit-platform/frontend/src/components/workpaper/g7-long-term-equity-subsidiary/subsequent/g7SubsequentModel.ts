@@ -24,6 +24,8 @@ export interface G7DividendRow {
   id: string
   section: 'dividend'
   seq: number
+  /** G7-4 行 id，可选 */
+  investeeId?: string
   companyName: string
   distributionPlan: string
   shareholdingRatio: number | null
@@ -40,6 +42,7 @@ export interface G7NciPurchaseRow {
   id: string
   section: 'nci'
   seq: number
+  investeeId?: string
   companyName: string
   /** 购买前长投账面 */
   priorCarryingAmount: number | null
@@ -72,6 +75,7 @@ export interface G7PartialDisposalRow {
   id: string
   section: 'partialDisposal'
   seq: number
+  investeeId?: string
   companyName: string
   /** ① 处置日长投账面 */
   bookValueAtDisposal: number | null
@@ -126,11 +130,12 @@ function round2(value: number): number {
   return Math.round(value * 100) / 100
 }
 
-export function createDividendRow(seq: number, companyName = ''): G7DividendRow {
+export function createDividendRow(seq: number, companyName = '', investeeId = ''): G7DividendRow {
   return recalcDividendRow({
     id: uid('div'),
     section: 'dividend',
     seq,
+    investeeId: investeeId || undefined,
     companyName,
     distributionPlan: '',
     shareholdingRatio: null,
@@ -144,11 +149,12 @@ export function createDividendRow(seq: number, companyName = ''): G7DividendRow 
   })
 }
 
-export function createNciPurchaseRow(seq: number, companyName = ''): G7NciPurchaseRow {
+export function createNciPurchaseRow(seq: number, companyName = '', investeeId = ''): G7NciPurchaseRow {
   return recalcNciPurchaseRow({
     id: uid('nci'),
     section: 'nci',
     seq,
+    investeeId: investeeId || undefined,
     companyName,
     priorCarryingAmount: null,
     originalRatio: null,
@@ -171,11 +177,12 @@ export function createNciPurchaseRow(seq: number, companyName = ''): G7NciPurcha
   })
 }
 
-export function createPartialDisposalRow(seq: number, companyName = ''): G7PartialDisposalRow {
+export function createPartialDisposalRow(seq: number, companyName = '', investeeId = ''): G7PartialDisposalRow {
   return recalcPartialDisposalRow({
     id: uid('pd'),
     section: 'partialDisposal',
     seq,
+    investeeId: investeeId || undefined,
     companyName,
     bookValueAtDisposal: null,
     originalRatio: null,
@@ -252,7 +259,11 @@ export function recalcPartialDisposalRow(row: G7PartialDisposalRow): G7PartialDi
 /** 兼容旧版成本法滚存行 → 迁移为股利测算行 */
 export function migrateLegacyCostMethodRow(raw: Record<string, any>, seq: number): G7DividendRow {
   return recalcDividendRow({
-    ...createDividendRow(seq, raw.investeeName || raw.companyName || ''),
+    ...createDividendRow(
+      seq,
+      raw.investeeName || raw.companyName || '',
+      String(raw.investeeId ?? raw.investee_id ?? '').trim(),
+    ),
     shareholdingRatio: nullableNumber(raw.shareholdingRatio),
     declaredAmount: nullableNumber(raw.declaredDividend ?? raw.declaredAmount),
     recordedDividend: nullableNumber(raw.recordedDividend ?? raw.investmentIncome),
@@ -536,4 +547,28 @@ export function parseSubsequentPayload(raw: unknown): {
     }
   }
   return { rows: [], materialityLevel: 0 }
+}
+
+/** 从 G7-9 带入：仅补缺股利测算行（不覆盖已有公司） */
+export function syncDividendRowsFromG79Carry(
+  existing: G7DividendRow[],
+  carry: Array<{ companyName: string; shareholdingRatio: number | null }>,
+): { rows: G7DividendRow[]; added: number } {
+  const rows = [...existing]
+  const have = new Set(rows.map(r => r.companyName.trim()).filter(Boolean))
+  let added = 0
+  for (const item of carry) {
+    const name = String(item.companyName || '').trim()
+    if (!name || have.has(name)) continue
+    const row = createDividendRow(rows.length + 1, name)
+    if (item.shareholdingRatio != null && Number.isFinite(item.shareholdingRatio)) {
+      row.shareholdingRatio = item.shareholdingRatio
+      Object.assign(row, recalcDividendRow(row))
+    }
+    rows.push(row)
+    have.add(name)
+    added += 1
+  }
+  rows.forEach((row, i) => { row.seq = i + 1 })
+  return { rows, added }
 }

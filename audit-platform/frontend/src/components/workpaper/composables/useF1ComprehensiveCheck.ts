@@ -109,7 +109,7 @@ export interface CoverageRatioRow {
   ratio: number | null
 }
 
-export interface UseD3VoucherCheckOptions {
+export interface UseF1VoucherCheckOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
   wpId: Ref<string>
   projectId: Ref<string>
@@ -355,7 +355,7 @@ function safeParseParams(jsonStr: string | null | undefined): SamplingParams {
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-export function useF1VoucherCheck(options: UseD3VoucherCheckOptions) {
+export function useF1VoucherCheck(options: UseF1VoucherCheckOptions) {
   const { allResponses, debouncedSave, isReadonly } = options
 
   const samplingParams = ref<SamplingParams>(safeParseParams(null))

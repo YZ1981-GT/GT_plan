@@ -289,18 +289,40 @@ class G7SubsidiaryService:
     ) -> dict[str, Any]:
         """保存G7-7控制判断数据到 checklist_responses.
 
-        data 结构:
+        与前端 DATA_KEY 对齐：item_id = G7-7-control-judgment-data
+        data 结构（与 G7TabControlJudgment.getData 一致）:
         {
-            "sections": [...],           # 六要素各section数据
-            "conclusion": str,           # 综合判断结论
-            "control_result": str,       # 控制/共同控制/重大影响/无
+            "sections": [...],
+            "overallConclusion": str,
+            "decision": {...},
+            "additionalDecisions": [...]  # 可选，多被投资单位结论
         }
 
         Returns: {"success": bool, "errors": list, "item_id": str}
         """
         assert self.db is not None, "db session required for async operations"
 
-        item_id = "G7-7-rows"
+        item_id = "G7-7-control-judgment-data"
+        # 兼容旧调用方把综合结论放在 conclusion / control_result
+        if isinstance(data, dict):
+            normalized = dict(data)
+            if "overallConclusion" not in normalized and normalized.get("conclusion"):
+                normalized["overallConclusion"] = normalized.pop("conclusion")
+            if "decision" not in normalized and normalized.get("control_result"):
+                normalized.setdefault(
+                    "decision",
+                    {
+                        "investeeName": "",
+                        "relationshipType": normalized.pop("control_result"),
+                        "combinationType": "",
+                        "combinationBasis": "",
+                        "acquisitionDate": "",
+                        "acquisitionDateBasis": "",
+                        "priorConclusion": "",
+                        "conclusionChangeReason": "",
+                    },
+                )
+            data = normalized
         conclusion_val = json.dumps(data, ensure_ascii=False) if data else ""
 
         try:

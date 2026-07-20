@@ -21,6 +21,16 @@
     <div class="toolbar-left">
       <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加行</el-button>
       <el-button size="small" :disabled="isReadonly" @click="doImport">从 F1-2 导入超1年</el-button>
+      <el-button
+        size="small"
+        type="warning"
+        plain
+        :disabled="isReadonly || suggestedAdjustmentCount === 0"
+        @click="doPushAdjustments"
+      >
+        推送拟调整至 F1-3
+        <template v-if="suggestedAdjustmentCount">（{{ suggestedAdjustmentCount }}）</template>
+      </el-button>
     </div>
     <div class="toolbar-right">
       <el-dropdown size="small" trigger="click" :disabled="isReadonly">
@@ -194,6 +204,7 @@
  * F1TabLongTerm.vue — F1-5 账龄1年及以上大额预付账款检查表（13列）
  */
 import { computed, inject, toRef, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useF1LongTerm } from '../composables/useF1LongTerm'
 import { useF1AiGenerate } from '../composables/useF1AiGenerate'
 import { useF1ImportExport, type F1ImportSheet } from '../composables/useWorkpaperImportExport'
@@ -232,10 +243,12 @@ const {
   subtotalRow,
   auditNote,
   conclusion,
+  suggestedAdjustmentCount,
   addRow,
   removeRow,
   updateCell,
   importFromCrossSheet,
+  pushSuggestedAdjustmentsToF13,
 } = useF1LongTerm({
   allResponses: allResponsesRef,
   wpId: wpIdRef,
@@ -245,6 +258,11 @@ const {
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
+function doPushAdjustments() {
+  const n = pushSuggestedAdjustmentsToF13()
+  if (n > 0) ElMessage.success(`已向 F1-3 追加 ${n} 笔拟调整（减值/重分类），请打开 F1-3 复核`)
+  else ElMessage.info('无新增拟调整（可能已推送过或未填坏账/转其他应收）')
+}
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(wpIdRef)
 
 const tableData = computed(() => [

@@ -80,4 +80,29 @@ describe('useF1Analysis pure helpers', () => {
     expect(r.top5).toEqual([])
     expect(r.concentrationWarning).toBeNull()
   })
+
+  it('buildCrossCycleHints warns when purchase missing / turnover high / payable compare', async () => {
+    const { buildCrossCycleHints } = await import('../useF1Analysis')
+    expect(
+      buildCrossCycleHints({
+        prepaidEndCurrent: 100,
+        prepaidEndPrior: 80,
+        inventoryRelatedDebit: 50,
+        inventoryPurchaseCurrent: 0,
+        inventoryBalanceCurrent: 0,
+        payableBalanceCurrent: 0,
+      }).some(h => h.includes('存货采购金额')),
+    ).toBe(true)
+
+    const turnoverHints = buildCrossCycleHints({
+      prepaidEndCurrent: 500,
+      prepaidEndPrior: 500,
+      inventoryRelatedDebit: 10,
+      inventoryPurchaseCurrent: 200,
+      inventoryBalanceCurrent: 100,
+      payableBalanceCurrent: 50,
+    })
+    expect(turnoverHints.some(h => h.includes('周转'))).toBe(true)
+    expect(turnoverHints.some(h => h.includes('应付'))).toBe(true)
+  })
 })

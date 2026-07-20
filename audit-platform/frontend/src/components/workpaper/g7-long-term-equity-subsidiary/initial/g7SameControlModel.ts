@@ -1,4 +1,9 @@
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
+import {
+  filterDecisionsByCombination,
+  listG7ControlDecisions,
+} from '../../composables/g7ControlJudgmentModel'
+import { isG74SubsidiaryRow } from '../../composables/g7EquityMethodCrossSheet'
 
 const moneyCalc = useDecimalCalc({ dp: 2 })
 const ratioCalc = useDecimalCalc({ dp: 6 })
@@ -11,6 +16,8 @@ export interface G7SameControlMergerRow {
   section: 'merger'
   seq: number
   investeeName: string
+  /** 合并日（consol first_consol_date / acquisitionDate） */
+  acquisitionDate: string
   finalController: string
   ownerEquityBookValue: number | null
   ownershipRatio: number | null
@@ -38,6 +45,8 @@ export interface G7SameControlStepRow {
   seq: number
   transactionNo: number
   transactionDate: string
+  /** 取得控制权的合并日（公司级，各次交易行同步；缺省可用末次交易日） */
+  acquisitionDate: string
   purchaseRatio: number | null
   consideration: number | null
   netAssetsBookValue: number | null
@@ -72,6 +81,7 @@ export type G7SameControlStoredRow =
 export interface G7SameControlStepSummary {
   companyId: string
   companyName: string
+  acquisitionDate: string
   cumulativeRatio: number
   cumulativeConsideration: number
   priorHoldingBookValue: number
@@ -137,12 +147,26 @@ export function describeCapitalReserveAdjustment(adjustment: number, mode: 'merg
     : '贷记资本公积（对价+原账面＜初始成本）'
 }
 
+/**
+ * 对价与初始成本差额过大（|差额| > 初始成本×50% 且初始成本>0）→ UI 橙色高亮。
+ * 差额口径与⑤一致：|初始成本 − 对价合计|。
+ */
+export function isSameControlDifferenceLarge(
+  initialCost: number,
+  totalConsideration: number,
+): boolean {
+  const cost = amount(initialCost)
+  if (cost <= 0) return false
+  return Math.abs(cost - amount(totalConsideration)) > cost * 0.5
+}
+
 export function createSameControlMergerRow(seq: number, investeeName = ''): G7SameControlMergerRow {
   return recalcSameControlMergerRow({
     id: uid('g7-8-merger'),
     section: 'merger',
     seq,
     investeeName,
+    acquisitionDate: '',
     finalController: '',
     ownerEquityBookValue: null,
     ownershipRatio: null,
@@ -194,6 +218,7 @@ export function createSameControlStepRow(
     seq,
     transactionNo: seq,
     transactionDate: '',
+    acquisitionDate: '',
     purchaseRatio: null,
     consideration: null,
     netAssetsBookValue: null,
@@ -250,9 +275,15 @@ export function summarizeSameControlSteps(rows: G7SameControlStepRow[]): G7SameC
       initialInvestmentCost,
     ))
     const isPackageDeal = asYesNo(ordered.find(row => row.isPackageDeal)?.isPackageDeal)
+    const acquisitionDate = (
+      ordered.find(row => row.acquisitionDate?.trim())?.acquisitionDate
+      || last?.transactionDate
+      || ''
+    )
     summaries.push({
       companyId,
       companyName: last?.companyName ?? '',
+      acquisitionDate,
       cumulativeRatio,
       cumulativeConsideration,
       priorHoldingBookValue,
@@ -288,6 +319,7 @@ export function normalizeSameControlRows(payload: unknown): G7SameControlStoredR
         ),
         ...raw,
         section: 'step',
+        acquisitionDate: String(raw.acquisitionDate || raw.mergerDate || ''),
         purchaseRatio: nullableNumber(raw.purchaseRatio),
         consideration: nullableNumber(raw.consideration),
         netAssetsBookValue: nullableNumber(raw.netAssetsBookValue),
@@ -310,6 +342,7 @@ export function normalizeSameControlRows(payload: unknown): G7SameControlStoredR
       Object.assign(row, {
         ...raw,
         section: 'merger',
+        acquisitionDate: String(raw.acquisitionDate || raw.mergerDate || ''),
         ownerEquityBookValue: nullableNumber(raw.ownerEquityBookValue ?? raw.acquireeNetAssets),
         ownershipRatio: nullableNumber(raw.ownershipRatio ?? raw.shareholdingRatio),
         cashConsideration: nullableNumber(raw.cashConsideration ?? raw.consideration),
@@ -378,6 +411,9 @@ export function validateSameControlRows(
     if (!row.finalController.trim()) {
       issues.push({ severity: 'warning', rowId: row.id, message: `「${name || row.seq}」未填写最终控制方` })
     }
+    if (!row.acquisitionDate.trim()) {
+      issues.push({ severity: 'warning', rowId: row.id, message: `「${name || row.seq}」未填写合并日` })
+    }
     if (row.ownershipRatio == null || row.ownershipRatio < 0 || row.ownershipRatio > 1) {
       issues.push({ severity: 'error', rowId: row.id, message: `「${name || row.seq}」出资比例应为0～1` })
     }
@@ -433,6 +469,9 @@ export function validateSameControlRows(
         severity: 'warning',
         message: `「${name}」未填写原持股账面价值，⑥勾稽可能不完整`,
       })
+    }
+    if (!summary.acquisitionDate.trim()) {
+      issues.push({ severity: 'warning', message: `「${name}」未填写合并日（取得控制权日）` })
     }
     pushCapitalReserveShortage(
       issues,
@@ -506,19 +545,7 @@ export function validateSameControlRows(
 
 /** 从 G7-7 持久化 JSON 提取同控（控制+同一控制）被投资单位 */
 export function extractSameControlInvesteesFromG7Judgment(payload: unknown): string[] {
-  let data = payload
-  if (typeof data === 'string') {
-    try { data = JSON.parse(data) } catch { return [] }
-  }
-  const root = (data as any)?.controlJudgment ?? data
-  const decision = root?.decision
-  if (!decision) return []
-  const name = String(decision.investeeName || '').trim()
-  if (!name) return []
-  if (decision.relationshipType === '控制' && decision.combinationType === '同一控制下企业合并') {
-    return [name]
-  }
-  return []
+  return filterDecisionsByCombination(listG7ControlDecisions(payload), '同一控制下企业合并')
 }
 
 /** 从 G7-2 明细 payload 提取子公司名称 */
@@ -544,7 +571,7 @@ export function extractSubsidiaryNamesFromG72(payload: unknown): string[] {
   )]
 }
 
-/** 从 G7-4 基本信息 payload 提取子公司组名称 */
+/** 从 G7-4 基本信息 payload 提取子公司组名称（与 loadSubsidiaryInvestees 同口径） */
 export function extractSubsidiaryNamesFromG74(payload: unknown): string[] {
   let data = payload
   if (typeof data === 'string') {
@@ -557,8 +584,7 @@ export function extractSubsidiaryNamesFromG74(payload: unknown): string[] {
       : []
   return [...new Set(
     rows
-      .filter(raw => String(raw.groupType || raw.controlType || '') === 'subsidiary'
-        || String(raw.groupType || raw.controlType || '') === '子公司')
+      .filter(raw => isG74SubsidiaryRow(raw || {}))
       .map(raw => String(raw.investeeName || raw.investee_name || raw.companyName || '').trim())
       .filter(Boolean),
   )]

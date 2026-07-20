@@ -7,10 +7,11 @@ import {
 } from '../../f2/inspection/f2CutoffSheetConfigs'
 
 describe('f2CutoffSheetConfigs', () => {
-  it('inventory accounts cover 1401~1411', () => {
+  it('inventory accounts cover 1401~1411 (exclude 1412 price-diff / 1471 impairment)', () => {
     expect(F2_INVENTORY_ACCOUNT_CODES).toContain('1401')
     expect(F2_INVENTORY_ACCOUNT_CODES).toContain('1411')
     expect(F2_INVENTORY_ACCOUNT_CODES).not.toContain('1412')
+    expect(F2_INVENTORY_ACCOUNT_CODES).not.toContain('1471')
   })
 
   it('titles cover 原材料/产成品 and dual directions', () => {

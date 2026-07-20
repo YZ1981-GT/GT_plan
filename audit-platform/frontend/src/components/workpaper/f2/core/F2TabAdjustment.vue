@@ -1,6 +1,6 @@
 ﻿<script setup lang="ts">
 /** F2TabAdjustment — F2-14 调整分录 | Task 15.4 */
-import { ref, toRef, inject, onMounted, type Ref } from 'vue'
+import { ref, toRef, inject, onMounted, computed, type Ref } from 'vue'
 import { useF2Adjustment } from '../../composables/useF2Adjustment'
 import { useF2AiGenerate } from '../../composables/useF2AiGenerate'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
@@ -13,6 +13,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
+  auditYear?: number
 }>()
 
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
@@ -46,12 +47,17 @@ const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2AiGenerate(
   toRef(props, 'wpId') as Ref<string>,
 )
 
+const auditYearRef = computed(() => props.auditYear)
+
 const {
   rows, debitTotal, creditTotal, balanceDiff, isBalanced, accountOptions,
-  addRow, removeRow, updateCell, publishAdjustments,
+  addRow, removeRow, updateCell, confirmAndSync,
+  pushConfirmedToCentralModule, pushing,
 } = useF2Adjustment({
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  auditYear: auditYearRef,
 })
 
 async function runAdjAi(section: 'f2-14-note' | 'f2-14-conclusion'): Promise<void> {
@@ -94,8 +100,9 @@ function fmt(v: number): string {
       <div class="guidance-content">
         <p>1. 记录存货相关的审计调整分录：AJE（账项调整，影响科目余额）/ RJE（重分类调整，仅影响列报）。</p>
         <p>2. 借贷合计必须平衡（借方合计 = 贷方合计），不平衡时无法同步。</p>
-        <p>3. 确认后的分录自动联动回写 F2-1 审定表的账项调整列。</p>
-        <p>4. 依《企业会计准则第 1 号——存货》，跌价准备计提/转回、成本结转差错等均通过本表调整。</p>
+        <p>3. 确认后点「同步至审定表」：EventBus 回写 F2-1，并自动将借贷平衡的未推送组分推送至集中调整表。</p>
+        <p>4. 「推送集中调整表」可单独重试；已带同步标记（sourceGroupId）的行不会重复推送。</p>
+        <p>5. 依《企业会计准则第 1 号——存货》，跌价准备计提/转回、成本结转差错等均通过本表调整。</p>
       </div>
     </details>
 
@@ -112,7 +119,15 @@ function fmt(v: number): string {
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 新增分录</el-button>
-        <el-button size="small" :disabled="isReadonly" @click="publishAdjustments">同步至审定表</el-button>
+        <el-button size="small" :disabled="isReadonly" :loading="pushing" @click="confirmAndSync">同步至审定表</el-button>
+        <el-button
+          size="small"
+          type="success"
+          plain
+          :disabled="isReadonly || !isBalanced"
+          :loading="pushing"
+          @click="() => pushConfirmedToCentralModule()"
+        >推送集中调整表</el-button>
         <F2ReviewChip section-id="F2-14-adjustment" />
       </div>
       <div class="toolbar-right">

@@ -1,5 +1,9 @@
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import {
+  filterDecisionsByCombination,
+  listG7ControlDecisions,
+} from '../../composables/g7ControlJudgmentModel'
+import {
   extractSubsidiaryNamesFromG72,
   extractSubsidiaryNamesFromG74,
   type G7YesNo,
@@ -551,7 +555,7 @@ export function validateNotSameControlRows(
         message: `「${name || row.seq}」直接相关费用 ${amount(row.acquisitionCostsExpensed).toFixed(2)} 应按 CAS20 计入当期损益，已不纳入⑥/⑧`,
       })
     }
-    // 廉价购买利得硬校验
+    // 廉价购买利得硬校验（与 prepare_g7_9_rows 一致：复核勾选+说明均为硬错误）
     if (row.goodwill < -0.005) {
       if (row.bargainPurchaseReviewed !== '是') {
         issues.push({
@@ -562,9 +566,9 @@ export function validateNotSameControlRows(
       }
       if (!row.bargainPurchaseReviewNote.trim()) {
         issues.push({
-          severity: 'warning',
+          severity: 'error',
           rowId: row.id,
-          message: `「${name || row.seq}」廉价购买利得应说明复核过程（可辨认资产/负债是否完整、FV是否可靠）`,
+          message: `「${name || row.seq}」廉价购买利得须填写复核过程（可辨认资产/负债是否完整、FV是否可靠）`,
         })
       }
     }
@@ -675,20 +679,102 @@ export function validateNotSameControlRows(
   return issues
 }
 
+/**
+ * 与后端 prepare_g7_9_rows 对齐的不可落库硬错误（不含草稿态空字段）。
+ * 用于 UI 保存拦截：普通缺填仍可草稿保存，CAS20 硬规则不可绕过。
+ */
+export function collectNotSameControlPersistBlockers(
+  rows: G7NotSameControlStoredRow[],
+): string[] {
+  const blockers: string[] = []
+  const stepTxnNos = new Map<string, Set<number>>()
+
+  for (const row of rows) {
+    if (row.section === 'merger') {
+      const name = normName(row.investeeName) || `第${row.seq}行`
+      if (row.ownershipRatio != null && (row.ownershipRatio < 0 || row.ownershipRatio > 1)) {
+        blockers.push(`「${name}」持股比例应在0至1之间`)
+      }
+      if (row.goodwill < -0.005) {
+        if (row.bargainPurchaseReviewed !== '是') {
+          blockers.push(`「${name}」廉价购买利得须完成计量复核后方可确认`)
+        }
+        if (!row.bargainPurchaseReviewNote.trim()) {
+          blockers.push(`「${name}」廉价购买利得须填写复核过程`)
+        }
+      }
+      continue
+    }
+    if (row.section === 'step') {
+      const key = row.companyId || row.companyName
+      const seen = stepTxnNos.get(key) ?? new Set<number>()
+      if (seen.has(row.transactionNo)) {
+        blockers.push(`「${normName(row.companyName) || key}」同一公司交易次别不得重复`)
+      }
+      seen.add(row.transactionNo)
+      stepTxnNos.set(key, seen)
+      if (row.isPackageDeal === '是') {
+        blockers.push(`「${normName(row.companyName) || key}」一揽子交易不得使用分步合并区段`)
+      }
+      continue
+    }
+    if (row.section === 'reverse') {
+      const label = `反向购买第${row.seq}行`
+      // 空草稿不拦保存；「不构成业务」或已选「是」却缺依据时硬拦（对齐 CAS20）
+      if (row.constitutesBusiness === '否') {
+        blockers.push(`${label}不构成业务应按资产购置处理，不得在本区段确认商誉`)
+      }
+      if (row.constitutesBusiness === '是' && !row.businessDeterminationBasis.trim()) {
+        blockers.push(`${label}须填写构成业务判断依据`)
+      }
+    }
+  }
+  return [...new Set(blockers)]
+}
+
+/** G7-9 → G7-10：带入公司名+持股（股利测算期初名单） */
+export interface G79CarryToSubsequent {
+  companyName: string
+  shareholdingRatio: number | null
+  initialInvestmentCost: number | null
+  acquisitionDate: string
+  source: 'merger' | 'step'
+}
+
+export function extractG79CarryToSubsequent(
+  rows: G7NotSameControlStoredRow[],
+): G79CarryToSubsequent[] {
+  const result: G79CarryToSubsequent[] = []
+  for (const row of rows) {
+    if (row.section !== 'merger') continue
+    const name = normName(row.investeeName)
+    if (!name) continue
+    result.push({
+      companyName: name,
+      shareholdingRatio: row.ownershipRatio,
+      initialInvestmentCost: row.initialInvestmentCost,
+      acquisitionDate: row.acquisitionDate,
+      source: 'merger',
+    })
+  }
+  for (const summary of summarizeNotSameControlSteps(
+    rows.filter((r): r is G7NotSameControlStepRow => r.section === 'step'),
+  )) {
+    const name = normName(summary.companyName)
+    if (!name) continue
+    result.push({
+      companyName: name,
+      shareholdingRatio: summary.cumulativeRatio > 0 ? summary.cumulativeRatio : null,
+      initialInvestmentCost: summary.parentInitialCost,
+      acquisitionDate: '',
+      source: 'step',
+    })
+  }
+  return result
+}
+
 export function extractNotSameControlInvesteesFromG7Judgment(payload: unknown): string[] {
-  let data = payload
-  if (typeof data === 'string') {
-    try { data = JSON.parse(data) } catch { return [] }
-  }
-  const root = (data as any)?.controlJudgment ?? data
-  const decision = root?.decision
-  if (!decision) return []
-  const name = String(decision.investeeName || '').trim()
-  if (!name) return []
-  if (decision.relationshipType === '控制' && decision.combinationType === '非同一控制下企业合并') {
-    return [name]
-  }
-  return []
+  return filterDecisionsByCombination(listG7ControlDecisions(payload), '非同一控制下企业合并')
 }
 
 export function syncMergerRowsFromNotSameControlNames(

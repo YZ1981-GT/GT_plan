@@ -3,6 +3,24 @@
     <div class="section-head">
       <h3 class="sheet-title">G7-6 被投资公司会计政策一致性检查</h3>
       <div class="head-actions">
+        <el-dropdown v-if="!isReadonly" @command="handleImportExportCommand">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="template">导出模板</el-dropdown-item>
+              <el-dropdown-item command="export">导出数据</el-dropdown-item>
+              <el-dropdown-item command="import">导入数据</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <el-button
+          size="small"
+          type="primary"
+          link
+          :loading="aiLoading"
+          :disabled="isReadonly"
+          @click="handleAiConclusion"
+        >🤖 AI辅助</el-button>
         <el-button size="small" @click="openReviewDialog('G7-6-accounting-policy')">💬复核</el-button>
       </div>
     </div>
@@ -206,6 +224,7 @@
       <el-button size="small" :disabled="groups.length === 0" @click="syncAllToG714">全部同步至 G7-14</el-button>
       <el-button size="small" @click="fillConclusionDraft">根据汇总生成结论草稿</el-button>
       <el-button size="small" type="success" @click="handleSave">💾 保存</el-button>
+      <el-button size="small" type="primary" :disabled="groups.length === 0" @click="handleSaveAndSync">保存并同步 G7-14</el-button>
     </div>
 
     <el-card class="conclusion-card" shadow="never">
@@ -238,10 +257,12 @@
       <div class="guidance-content">
         <p>1. 每个被投资单位单独核对；优先从 G7-4 同步合营/联营名单。</p>
         <p>2. 「是否一致」必填；双方政策文本相同将自动标「一致」。</p>
-        <p>3. 「同步至 G7-14」会写入对应被投资方的「会计政策调整」并重算相关公式。</p>
+        <p>3. 「同步至 G7-14」会写入对应被投资方的「会计政策调整」并重算相关公式；合计为 0 时不覆盖 G7-14 已有金额。</p>
         <p>4. 投资成本/公允价值调整走 G7-13，勿与本表混淆。</p>
       </div>
     </details>
+
+    <input ref="fileInputRef" type="file" accept=".xlsx" class="hidden-input" @change="handleFileChange">
   </div>
 </template>
 
@@ -250,21 +271,27 @@
  * G7TabAccountingPolicy — G7-6 被投资公司会计政策一致性检查
  * 按被投资单位分组；调整合计可同步至 G7-14 accountingPolicyAdj
  */
-import { reactive, ref, computed, inject, onMounted } from 'vue'
+import { reactive, ref, computed, inject, onMounted, toRef } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { fmtAmount } from '@/utils/formatters'
+import http from '@/utils/http'
+import { extractG7AiText } from '../../composables/g7AiText'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useG7EquityMethodFormData } from '../../composables/useG7EquityMethodFormData'
 import type { AccountingPolicyRow } from '../../composables/useG7EquityMethodFormData'
+import { useG7EquityMethodImportExport } from '../../composables/useG7EquityMethodImportExport'
+import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import {
   G7_4_ROWS_KEY,
   G7_6_ROWS_KEY,
-  G7_14_ROWS_KEY,
-  G7_14_SECTION_KEY,
+  applyG76PolicyToG714Payload,
   applyPolicyAdjToG714Payload,
+  buildG714DualWriteItems,
   loadEquityInvestees,
+  makeG714ConclusionGetter,
   parseChecklistJson,
+  resolveG714PayloadFromChecklist,
 } from '../../composables/g7EquityMethodCrossSheet'
 
 const props = defineProps<{
@@ -276,6 +303,8 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const scheduleAutoSnapshot = runtime?.version?.scheduleAutoSnapshot ?? (() => undefined)
 
 const CONCLUSION_KEY = 'G7-6-conclusion'
 const AUDIT_NOTE_KEY = 'G7-6-audit-note'
@@ -334,7 +363,13 @@ interface Summary {
 const formData = useG7EquityMethodFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
+  onAfterSave: () => scheduleAutoSnapshot(),
 })
+const { exportTemplate, exportData, importData } = useG7EquityMethodImportExport({
+  wpId: toRef(props, 'wpId'),
+})
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const aiLoading = ref(false)
 
 const groups = reactive<PolicyGroup[]>([])
 const expandedMap = reactive<Record<string, boolean>>({})
@@ -448,6 +483,22 @@ function pushGroup(name: string, rows?: AccountingPolicyRow[], investeeId = ''):
 
 function persistRows(): void {
   if (isReadonly.value) return
+  // debounce 路径：允许「未判断」草稿；「不一致」缺说明不可落库
+  const missingNote: string[] = []
+  for (const group of groups) {
+    for (const row of group.rows) {
+      if (row.isConsistent === '不一致' && !normalizePolicyText(row.adjustmentNote)) {
+        missingNote.push(`${group.investeeName}#${row.seq}`)
+      }
+    }
+  }
+  if (missingNote.length > 0) {
+    const shown = missingNote.length <= 3
+      ? missingNote.join('、')
+      : `${missingNote.slice(0, 3).join('、')}等${missingNote.length}处`
+    ElMessage.error(`「不一致」须填写调整说明后方可保存：${shown}`)
+    return
+  }
   formData.debouncedSave(G7_6_ROWS_KEY, {
     conclusion: JSON.stringify({
       groups: groups.map(g => ({
@@ -596,19 +647,23 @@ function removeGroup(name: string): void {
   saveCollapseState()
 }
 
+function loadG714Payload(): any | null {
+  return resolveG714PayloadFromChecklist(
+    makeG714ConclusionGetter(formData.data.value, props.htmlData?.responses_snapshot),
+  )
+}
+
 function persistG714Payload(payload: Record<string, any>): void {
-  const pageJson = JSON.stringify(payload)
-  const rows = Array.isArray(payload.rows) ? payload.rows : []
-  const rowsJson = JSON.stringify(rows)
-  void formData.saveBatch([
-    { itemId: G7_14_SECTION_KEY, data: { conclusion: pageJson, remark: null } },
-    { itemId: G7_14_ROWS_KEY, data: { conclusion: rowsJson, remark: rowsJson } },
-  ])
+  void formData.saveBatch(buildG714DualWriteItems(payload))
 }
 
 function syncGroupToG714(group: PolicyGroup): void {
   const adj = groupSummary(group).totalAdj
-  const existing = parseChecklistJson(formData.data.value.get(G7_14_SECTION_KEY)?.conclusion)
+  if (adj === 0) {
+    ElMessage.warning(`「${group.investeeName}」无不一致调整金额，已跳过以免覆盖 G7-14 手工值`)
+    return
+  }
+  const existing = loadG714Payload()
   const result = applyPolicyAdjToG714Payload(existing, group.investeeName, adj, group.investeeId)
   if (!result.ok || !result.payload) {
     ElMessage.error(result.message)
@@ -623,24 +678,87 @@ function syncAllToG714(): void {
     ElMessage.warning('暂无被投资单位可同步')
     return
   }
-  let payload = parseChecklistJson(formData.data.value.get(G7_14_SECTION_KEY)?.conclusion)
-  const messages: string[] = []
-  for (const group of groups) {
-    const result = applyPolicyAdjToG714Payload(
-      payload,
-      group.investeeName,
-      groupSummary(group).totalAdj,
-      group.investeeId,
+  const existing = loadG714Payload()
+  const result = applyG76PolicyToG714Payload(existing, {
+    groups: groups.map(g => ({
+      investeeName: g.investeeName,
+      investeeId: g.investeeId,
+      rows: g.rows,
+    })),
+  })
+  if (!result.ok || !result.payload) {
+    ElMessage.warning(result.message)
+    return
+  }
+  persistG714Payload(result.payload)
+  ElMessage.success(result.message)
+}
+
+function handleImportExportCommand(command: string): void {
+  if (command === 'template') void exportTemplate('G7-6')
+  if (command === 'export') void exportData('G7-6')
+  if (command === 'import') fileInputRef.value?.click()
+}
+
+async function handleFileChange(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  const result = await importData('G7-6', file)
+  if (!result) return
+  await formData.loadResponses()
+  const raw = formData.data.value.get(G7_6_ROWS_KEY)?.conclusion
+  const parsed = parseChecklistJson(raw) ?? raw
+  if (!applyPayload(parsed)) {
+    ElMessage.warning('导入成功但未能解析为会计政策分组，请检查模板')
+    return
+  }
+  ElMessage.success(`已导入并刷新 G7-6（${groups.length} 家）`)
+}
+
+async function handleAiConclusion(): Promise<void> {
+  if (isReadonly.value || aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const response = await http.post(
+      `/api/workpapers/${props.wpId}/g7-equity-method/ai/accounting-policy-conclusion`,
+      {
+        existingContent: conclusion.value,
+        relatedContext: {
+          sheet: 'G7-6',
+          summary: globalSummary.value,
+          groups: groups.map(g => ({
+            investeeName: g.investeeName,
+            investeeId: g.investeeId,
+            summary: groupSummary(g),
+            inconsistentRows: g.rows
+              .filter(r => r.isConsistent === '不一致')
+              .map(r => ({
+                policyItem: r.policyItem,
+                adjustmentAmount: r.adjustmentAmount,
+                adjustmentNote: r.adjustmentNote,
+              })),
+          })),
+        },
+      },
     )
-    if (!result.ok || !result.payload) {
-      ElMessage.error(result.message)
+    const data = response?.data?.data ?? response?.data ?? response
+    const text = extractG7AiText(data)
+    if (!text) {
+      fillConclusionDraft()
+      ElMessage.warning('AI未返回内容，已生成本地结论草稿')
       return
     }
-    payload = result.payload
-    messages.push(group.investeeName)
+    conclusion.value = String(text)
+    persistConclusion()
+    ElMessage.success('AI结论生成完成')
+  } catch {
+    fillConclusionDraft()
+    ElMessage.warning('AI暂不可用，已生成本地结论草稿')
+  } finally {
+    aiLoading.value = false
   }
-  persistG714Payload(payload)
-  ElMessage.success(`已同步 ${messages.length} 家被投资方调整至 G7-14`)
 }
 
 function validateBeforeSave(): boolean {
@@ -717,6 +835,12 @@ function handleSave(): void {
   })
   void formData.saveImmediate(CONCLUSION_KEY, { conclusion: conclusion.value })
   ElMessage.success('会计政策一致性检查已保存')
+}
+
+function handleSaveAndSync(): void {
+  if (!validateBeforeSave()) return
+  handleSave()
+  syncAllToG714()
 }
 
 function consistencyTagType(value: string): '' | 'success' | 'danger' | 'info' {
@@ -919,6 +1043,7 @@ onMounted(async () => {
   font-weight: 600;
 }
 .conclusion-text { margin: 0; color: #606266; white-space: pre-wrap; }
+.hidden-input { display: none; }
 .guidance-details {
   margin-top: 16px;
   padding: 8px 12px;

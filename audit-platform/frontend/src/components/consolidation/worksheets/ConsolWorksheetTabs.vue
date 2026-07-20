@@ -161,7 +161,7 @@
             冲突 {{ g7LinkagePreview.diff_summary?.conflict || 0 }}
           </el-descriptions-item>
           <el-descriptions-item label="建议草稿">
-            {{ g7LinkagePreview.suggestions?.length || 0 }} 条（G7-9/10/3）
+            {{ g7LinkagePreview.suggestions?.length || 0 }} 条（G7-9/10/3/16）
           </el-descriptions-item>
         </el-descriptions>
 
@@ -262,8 +262,30 @@
           </el-table>
         </div>
 
+        <div v-if="g7UnrecognizedMetaRows.length" class="g7-linkage-mapping">
+          <div class="g7-linkage-title">G7-16 未确认损失备查（结构化，不入正式抵消）</div>
+          <el-table :data="g7UnrecognizedMetaRows" border size="small" max-height="200">
+            <el-table-column label="企业" min-width="140" prop="company_name" />
+            <el-table-column label="超额亏损" width="110" align="right">
+              <template #default="{ row }">{{ formatDiffValue(row.excess_loss) }}</template>
+            </el-table-column>
+            <el-table-column label="未确认损失" width="110" align="right">
+              <template #default="{ row }">{{ formatDiffValue(row.unrecognized_loss) }}</template>
+            </el-table-column>
+            <el-table-column label="上期累计" width="110" align="right">
+              <template #default="{ row }">{{ formatDiffValue(row.prior_cumulative) }}</template>
+            </el-table-column>
+            <el-table-column label="本期变动" width="110" align="right">
+              <template #default="{ row }">{{ formatDiffValue(row.current_change) }}</template>
+            </el-table-column>
+            <el-table-column label="G7-14其他调整" width="120" align="right">
+              <template #default="{ row }">{{ formatDiffValue(row.other_adj) }}</template>
+            </el-table-column>
+          </el-table>
+        </div>
+
         <div v-if="(g7LinkagePreview.suggestions?.length || 0) > 0" class="g7-linkage-mapping">
-          <div class="g7-linkage-title">建议草稿（G7-9/10/3，不自动入正式抵消）</div>
+          <div class="g7-linkage-title">建议草稿（G7-9/10/3/16，不自动入正式抵消）</div>
           <el-table :data="g7LinkagePreview.suggestions" border size="small" max-height="240">
             <el-table-column width="52" align="center">
               <template #default="{ row }">
@@ -291,6 +313,8 @@
                     ?? row.equity_adjustment
                     ?? row.debit_amount
                     ?? row.credit_amount
+                    ?? row.unrecognized_loss
+                    ?? row.current_change
                     ?? row.amount,
                 ) }}
               </template>
@@ -638,6 +662,27 @@ const g7Overwrite = ref(false)
 const g7EditableDiffs = ref<G7LinkageFieldDiff[]>([])
 const g7SuggestionSelected = reactive<Record<string, boolean>>({})
 
+/** 从 importable equity_inv 提取 G7-16 结构化备查字段 */
+const g7UnrecognizedMetaRows = computed(() => {
+  const inv = g7LinkagePreview.value?.importable?.equity_inv
+  if (!Array.isArray(inv)) return [] as Array<Record<string, unknown>>
+  return inv
+    .filter((r: any) =>
+      r?._g7_unrecognized_loss != null
+      || r?._g7_excess_loss != null
+      || r?._g7_current_change != null
+      || r?._g7_g7_16,
+    )
+    .map((r: any) => ({
+      company_name: r.company_name || r.company_code || '—',
+      excess_loss: r._g7_excess_loss,
+      unrecognized_loss: r._g7_unrecognized_loss,
+      prior_cumulative: r._g7_prior_cumulative,
+      current_change: r._g7_current_change,
+      other_adj: r._g7_other_adj,
+    }))
+})
+
 const g7PendingMappings = computed(() => {
   const preview = g7LinkagePreview.value
   if (!preview) return [] as Array<{ name: string; reason: 'unresolved' | 'ambiguous' }>
@@ -676,6 +721,7 @@ function suggestionTypeLabel(type: string): string {
   if (type === 'goodwill_nci') return '商誉/NCI'
   if (type === 'share_change_capital') return '股比/资本公积'
   if (type === 'consol_adjustment_draft') return '调整草稿'
+  if (type === 'unrecognized_loss') return '未确认损失'
   return type || '建议'
 }
 

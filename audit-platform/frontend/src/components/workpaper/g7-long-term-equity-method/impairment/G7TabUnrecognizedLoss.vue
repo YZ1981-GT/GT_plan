@@ -41,19 +41,47 @@
         <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">
           + 被投资单位
         </el-button>
-        <el-dropdown trigger="click" size="small" @command="handleDropdownCommand">
-          <el-button size="small">导入导出 ▾</el-button>
+        <el-button size="small" :disabled="isReadonly || syncingCross" :loading="syncingCross" @click="syncFromRelated">
+          从关联表带入
+        </el-button>
+        <el-button size="small" :disabled="isReadonly || !rows.length" @click="applyWaterfallAll">
+          按CAS2自动分配
+        </el-button>
+        <el-button
+          size="small"
+          type="warning"
+          plain
+          :disabled="isReadonly || !recoveryHintRows.length"
+          @click="applyRecoveryAll"
+        >
+          反序恢复
+        </el-button>
+        <el-button size="small" :disabled="isReadonly || !rows.length" @click="snapshotAsOpening">
+          固化期初
+        </el-button>
+        <el-button size="small" :disabled="isReadonly || syncingToG714 || !rows.length" :loading="syncingToG714" @click="pushToG714">
+          同步至G7-14
+        </el-button>
+        <el-dropdown trigger="click" size="small" :disabled="importExport.importing.value" @command="handleDropdownCommand">
+          <el-button size="small" :loading="importExport.importing.value">导入导出 ▾</el-button>
           <template #dropdown>
             <el-dropdown-menu>
               <el-dropdown-item command="template">导出模板</el-dropdown-item>
               <el-dropdown-item command="export">导出数据</el-dropdown-item>
-              <el-dropdown-item command="import">导入数据</el-dropdown-item>
+              <el-dropdown-item v-if="!isReadonly" command="import">导入数据</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
         <el-button size="small" @click="openReviewDialog('G7-16-unrecognized-loss')">💬复核</el-button>
       </div>
     </div>
+    <input
+      ref="fileInput"
+      type="file"
+      accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      style="display:none"
+      @change="onFileSelected"
+    />
 
     <!-- 工具栏：索引 chip + 行数 -->
     <div class="tab-toolbar">
@@ -78,6 +106,31 @@
       所有被投资单位超额亏损均为0，无需分配超额亏损。Tab2数据已禁用。
     </el-alert>
 
+    <el-alert
+      v-if="recoveryHintRows.length"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="tab2-disabled-alert"
+      title="利润恢复提示"
+    >
+      以下单位本期变动为负，可点「反序恢复」按 预计负债→其他权益→长应收→投资 冲回已冲减：
+      {{ recoveryHintRows.map(r => r.investeeName).join('、') }}
+    </el-alert>
+
+    <el-alert
+      v-if="validationIssues.length"
+      :type="validationIssues.some(i => i.level === 'error') ? 'error' : 'warning'"
+      :closable="false"
+      show-icon
+      class="tab2-disabled-alert"
+    >
+      <div v-for="(iss, idx) in validationIssues.slice(0, 6)" :key="idx">
+        【{{ iss.investeeName }}】{{ iss.message }}
+      </div>
+      <div v-if="validationIssues.length > 6">…另有 {{ validationIssues.length - 6 }} 条</div>
+    </el-alert>
+
     <!-- 表格 -->
     <el-table
       :data="rows"
@@ -92,6 +145,14 @@
       <!-- 序号列（始终显示） -->
       <el-table-column label="序号" width="55" align="center" fixed>
         <template #default="{ row }">{{ row.seq }}</template>
+      </el-table-column>
+
+      <el-table-column label="索引" width="88" align="center" fixed>
+        <template #default="{ row }">
+          <span class="chip-wrap">
+            <GtIndexChip :value="`wp:G7-16#${row.seq}`" :context-project-id="projectId" />
+          </span>
+        </template>
       </el-table-column>
 
       <!-- 被投资单位列（始终显示作为锚定列） -->
@@ -181,7 +242,7 @@
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly && !isTab2Disabled(row)" :model-value="row.reduceInvestment" size="small"
               :controls="false" :precision="2" class="compact-num"
-              @change="(v: number) => updateFieldWithRecalc(row.id, 'reduceInvestment', v)" />
+              @change="(v: number) => updateReduceField(row.id, 'reduceInvestment', v)" />
             <span v-else :class="{ 'text-disabled': isTab2Disabled(row) }">{{ fmtNum(row.reduceInvestment) }}</span>
           </template>
         </el-table-column>
@@ -190,7 +251,7 @@
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly && !isTab2Disabled(row)" :model-value="row.reduceLongTermReceivable" size="small"
               :controls="false" :precision="2" class="compact-num"
-              @change="(v: number) => updateFieldWithRecalc(row.id, 'reduceLongTermReceivable', v)" />
+              @change="(v: number) => updateReduceField(row.id, 'reduceLongTermReceivable', v)" />
             <span v-else :class="{ 'text-disabled': isTab2Disabled(row) }">{{ fmtNum(row.reduceLongTermReceivable) }}</span>
           </template>
         </el-table-column>
@@ -199,7 +260,7 @@
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly && !isTab2Disabled(row)" :model-value="row.reduceOtherEquity" size="small"
               :controls="false" :precision="2" class="compact-num"
-              @change="(v: number) => updateFieldWithRecalc(row.id, 'reduceOtherEquity', v)" />
+              @change="(v: number) => updateReduceField(row.id, 'reduceOtherEquity', v)" />
             <span v-else :class="{ 'text-disabled': isTab2Disabled(row) }">{{ fmtNum(row.reduceOtherEquity) }}</span>
           </template>
         </el-table-column>
@@ -208,14 +269,14 @@
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly && !isTab2Disabled(row)" :model-value="row.recognizeEstimatedLiability" size="small"
               :controls="false" :precision="2" class="compact-num"
-              @change="(v: number) => updateFieldWithRecalc(row.id, 'recognizeEstimatedLiability', v)" />
+              @change="(v: number) => updateReduceField(row.id, 'recognizeEstimatedLiability', v)" />
             <span v-else :class="{ 'text-disabled': isTab2Disabled(row) }">{{ fmtNum(row.recognizeEstimatedLiability) }}</span>
           </template>
         </el-table-column>
 
         <el-table-column label="未确认损失" min-width="130" align="right">
           <template #default="{ row }">
-            <el-tooltip content="未确认损失 = 超额亏损 - 冲减投资 - 冲减长应收 - 冲减其他 - 确认预计负债" placement="top">
+            <el-tooltip content="未确认损失 = MAX(0, 超额亏损 − 各项冲减)" placement="top">
               <span class="formula-cell" :class="{ 'text-disabled': isTab2Disabled(row) }">
                 {{ fmtNum(row.unrecognizedLoss) }}
               </span>
@@ -223,12 +284,45 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="本期变动" min-width="120" align="right">
+        <el-table-column label="上期累计未确认" min-width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !isTab2Disabled(row)" :model-value="row.currentChange" size="small"
-              :controls="false" :precision="2" class="compact-num"
-              @change="(v: number) => updateField(row.id, 'currentChange', v)" />
-            <span v-else :class="{ 'text-disabled': isTab2Disabled(row) }">{{ fmtNum(row.currentChange) }}</span>
+            <el-input-number
+              v-if="!isReadonly && !isTab2Disabled(row)"
+              :model-value="row.priorCumulative"
+              size="small"
+              :controls="false"
+              :precision="2"
+              class="compact-num"
+              @change="(v: number) => updateFieldWithRecalc(row.id, 'priorCumulative', v)"
+            />
+            <span v-else :class="{ 'text-disabled': isTab2Disabled(row) }">{{ fmtNum(row.priorCumulative) }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="本期变动" min-width="150" align="right">
+          <template #default="{ row }">
+            <div v-if="!isReadonly && !isTab2Disabled(row)" class="current-change-cell">
+              <el-input-number
+                :model-value="row.currentChange"
+                size="small"
+                :controls="false"
+                :precision="2"
+                class="compact-num"
+                @change="(v: number) => updateCurrentChangeManual(row.id, v)"
+              />
+              <el-button
+                v-if="row.currentChangeManual"
+                link
+                type="primary"
+                size="small"
+                @click="clearCurrentChangeManual(row.id)"
+              >公式</el-button>
+            </div>
+            <el-tooltip v-else content="本期变动 = 未确认损失 − 上期累计（可手工覆盖）" placement="top">
+              <span class="formula-cell" :class="{ 'text-disabled': isTab2Disabled(row) }">
+                {{ fmtNum(row.currentChange) }}{{ row.currentChangeManual ? '·手' : '' }}
+              </span>
+            </el-tooltip>
           </template>
         </el-table-column>
 
@@ -301,31 +395,28 @@
         <li>超额亏损 = MAX(0, 累计亏损 - 合计长期权益)，即亏损超过可承受范围的部分</li>
         <li>合计长期权益 = 投资账面 + 长期应收款 + 其他实质长期权益 + 预计负债</li>
         <li>抵减顺序：先冲投资账面→再冲长应收→最后确认预计负债</li>
-        <li>超过上述各项可抵减部分 = 未确认投资损失（账外备查簿登记）</li>
+        <li>超过上述各项可抵减部分 = 未确认投资损失（≥0，账外备查簿登记）</li>
+        <li>本期变动 = 期末未确认损失 − 上期累计未确认（可手工覆盖；点「公式」恢复）</li>
         <li>被投资方实现净利润时，按相反顺序恢复（先恢复预计负债→恢复长应收→恢复投资）</li>
         <li>超额亏损为0时，无需进行Tab2分配（系统自动禁用Tab2输入）</li>
-        <li>对于合营/联营企业，按CAS2第44条处理超额亏损</li>
-        <li>长期应收款需为"实质上构成对被投资单位净投资"的部分</li>
+        <li>「从关联表带入」：G7-4 名册、G7-14 账面、G7-5 累计亏损（负净资产/未分配利润代理）</li>
+        <li>「按CAS2自动分配」：超额亏损按 投资→长应收→其他权益 瀑布冲减；预计负债需手工判断</li>
+        <li>「反序恢复」：本期变动为负时，按 预计负债→其他权益→长应收→投资 冲回已冲减</li>
+        <li>「固化期初」：将当前未确认损失写入 G7-16-opening-rows，供带入上期累计</li>
+        <li>「同步至G7-14」：本期变动累加写入 otherAdj（保留手工/其他来源分量）</li>
+        <li>长期应收款：优先 G5-2 关联方净额（剔一年内），其次 TB 1531 客户辅助；亦可从 G7-14 同名字段带入</li>
       </ul>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
+import { extractG7AiText } from '../../composables/g7AiText'
 /**
  * G7TabUnrecognizedLoss — G7-16 未确认投资损失测试表
  *
- * Spec: .kiro/specs/g7-long-term-equity-method/
- * Task: 8.1
- *
- * 40行×17列→2区段Tab：
- * - Tab1 长期权益分析(9列)：合计(公式)=各项之和 / 超额亏损(公式)=MAX(0,累计亏损-合计)
- * - Tab2 超额亏损分配(8列)：未确认损失(公式)=超额-各项冲减
- * - 方法论上下文（琥珀色：CAS2第44条超额亏损抵减顺序）
- * - 超额亏损为0时Tab2全部禁用
- * - 行同步 + 动态行增删
- *
- * Requirements: 6.4, 6.7
+ * 持久化：G7-16-rows 扁平数组（IE/consol/披露真源）+ G7-16-conclusion
+ * 兼容旧存：{ rows, conclusion } 对象
  */
 import { ref, reactive, inject, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -333,8 +424,34 @@ import { parseNum } from '../../composables/useG7EquityMethodFormulaEngine'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useG7EquityMethodFormData } from '../../composables/useG7EquityMethodFormData'
 import type { UnrecognizedLossRow } from '../../composables/useG7EquityMethodFormData'
-
-// ─── Props ───────────────────────────────────────────────────────────────────
+import { useG7EquityMethodImportExport } from '../../composables/useG7EquityMethodImportExport'
+import {
+  G7_4_ROWS_KEY,
+  G7_5_ROWS_KEY,
+  applyUnrecognizedLossToG714Payload,
+  buildG714DualWriteItems,
+  flattenG714Rows,
+  loadEquityInvestees,
+  makeG714ConclusionGetter,
+  parseChecklistJson,
+  resolveG714PayloadFromChecklist,
+} from '../../composables/g7EquityMethodCrossSheet'
+import {
+  applyProfitRecoveryReverseOrder,
+  extractCumulativeLossFromG75,
+  extractLongTermReceivableFromRelated,
+  extractPriorCumulativeMap,
+  parseUnrecognizedLossRowsPayload,
+  recalcUnrecognizedLossRow,
+  validateUnrecognizedLossRows,
+} from '../../composables/g7UnrecognizedLossModel'
+import {
+  fetchG52NetInvestmentByDebtor,
+  fetchTb1531AuxByCustomer,
+  normalizeDebtorName,
+} from '../../composables/g5CrossHelpers'
+import { emitG7SourceRowsSaved } from '../../composables/g7DisclosureCrossSheet'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -345,25 +462,16 @@ const props = defineProps<{
 }>()
 
 const isReadonly = computed(() => props.readonly ?? false)
-
-// ─── Inject ──────────────────────────────────────────────────────────────────
-
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
-
-// ─── 2区段Tab ────────────────────────────────────────────────────────────────
 
 type TabKey = 'tab1' | 'tab2'
 const activeTab = ref<TabKey>('tab1')
-
 const segmentOptions = [
   { label: '长期权益分析(9)', value: 'tab1' },
   { label: '超额亏损分配(8)', value: 'tab2' },
 ]
 
-// ─── 行同步: selectedRowIndex ────────────────────────────────────────────────
-
 const selectedRowIndex = ref<number>(-1)
-
 function onCurrentChange(row: UnrecognizedLossRow | null) {
   if (row) {
     const idx = rows.findIndex(r => r.id === row.id)
@@ -371,19 +479,29 @@ function onCurrentChange(row: UnrecognizedLossRow | null) {
   }
 }
 
-// ─── 行数据 ──────────────────────────────────────────────────────────────────
-
 const rows = reactive<UnrecognizedLossRow[]>([])
-const conclusion = ref<string>('')
+const conclusion = ref('')
+const syncingCross = ref(false)
+const syncingToG714 = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
 
-// ─── 审计说明持久化（checklist_responses，conclusion:null） ────────────────────
+const validationIssues = computed(() => validateUnrecognizedLossRows(rows))
+const recoveryHintRows = computed(() => rows.filter(r => parseNum(r.currentChange) < -0.005))
+const hasBlockingErrors = computed(() => validationIssues.value.some(i => i.level === 'error'))
 
 const auditFormData = useG7EquityMethodFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
+const importExport = useG7EquityMethodImportExport({
+  wpId: computed(() => props.wpId),
+})
+
 const AUDIT_NOTE_KEY = 'G7-16-audit-note'
 const ROWS_KEY = 'G7-16-rows'
+const CONCLUSION_KEY = 'G7-16-conclusion'
+/** 期初未确认（上期期末）快照，用于带入 priorCumulative */
+const OPENING_KEY = 'G7-16-opening-rows'
 const auditNote = ref('')
 
 function saveAuditNote(val: string): void {
@@ -392,84 +510,103 @@ function saveAuditNote(val: string): void {
   auditFormData.debouncedSave(AUDIT_NOTE_KEY, { remark: val, conclusion: null })
 }
 
-function persistRows(): void {
+function persistRows(opts?: { force?: boolean }): void {
   if (isReadonly.value) return
-  auditFormData.debouncedSave(ROWS_KEY, {
-    conclusion: JSON.stringify({ rows: [...rows], conclusion: conclusion.value }),
-    remark: null,
-  })
+  if (!opts?.force && hasBlockingErrors.value) {
+    ElMessage.warning('存在分配校验错误，已暂存但请先修正后再依赖下游勾稽')
+  }
+  const flatRows = JSON.stringify([...rows])
+  const pagePayload = JSON.stringify({ rows: [...rows], conclusion: conclusion.value })
+  // 扁平数组 → IE/consol；对象 payload 双写 remark 兼容旧消费者
+  if (typeof (auditFormData as any).debouncedSaveBatch === 'function') {
+    auditFormData.debouncedSaveBatch([
+      { itemId: ROWS_KEY, data: { conclusion: flatRows, remark: pagePayload } },
+      { itemId: CONCLUSION_KEY, data: { conclusion: conclusion.value, remark: null } },
+    ])
+  } else {
+    auditFormData.debouncedSave(ROWS_KEY, { conclusion: flatRows, remark: pagePayload })
+    auditFormData.debouncedSave(CONCLUSION_KEY, { conclusion: conclusion.value, remark: null })
+  }
+  try {
+    emitG7SourceRowsSaved({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      itemIds: [ROWS_KEY],
+    })
+  } catch { /* ignore */ }
+}
+
+function parseSaved(raw: unknown): unknown {
+  if (raw == null || raw === '') return null
+  if (typeof raw === 'object') return raw
+  try { return JSON.parse(String(raw)) } catch { return null }
+}
+
+function hydrateRows(raw: unknown): boolean {
+  if (raw == null) return false
+  const list = parseUnrecognizedLossRowsPayload(raw)
+  if (!list.length) return false
+  rows.length = 0
+  for (let i = 0; i < list.length; i++) {
+    const rawRow = list[i]
+    const row: UnrecognizedLossRow = {
+      ...createEmptyRow(i + 1, rawRow.investeeName || ''),
+      ...rawRow,
+      seq: i + 1,
+      id: rawRow.id || crypto.randomUUID(),
+      priorCumulative: parseNum(rawRow.priorCumulative),
+      allocationManual: !!rawRow.allocationManual,
+      currentChangeManual: !!rawRow.currentChangeManual,
+    }
+    rows.push(row)
+    // 加载时保留已存冲减，不强制重跑瀑布（用户可点「按CAS2自动分配」）
+    recalcUnrecognizedLossRow(row, { applyWaterfall: false })
+  }
+  if (typeof (raw as any)?.conclusion === 'string') conclusion.value = (raw as any).conclusion
+  return true
 }
 
 function loadRowsFromChecklist(): boolean {
   const saved = auditFormData.data.value.get(ROWS_KEY)
-  const parsed = (() => {
-    try {
-      return saved?.conclusion ? JSON.parse(String(saved.conclusion)) : null
-    } catch {
-      return null
-    }
-  })()
-  const rawRows = Array.isArray(parsed?.rows) ? parsed.rows : Array.isArray(parsed) ? parsed : null
-  if (!rawRows?.length) return false
-  rows.length = 0
-  for (let i = 0; i < rawRows.length; i++) {
-    const raw = rawRows[i]
-    const row: UnrecognizedLossRow = {
-      ...createEmptyRow(i + 1, raw.investeeName || ''),
-      ...raw,
-      seq: i + 1,
-      id: raw.id || crypto.randomUUID(),
-    }
-    rows.push(row)
-    recalcRow(row)
+  const fromConclusion = parseSaved(saved?.conclusion)
+  const fromRemark = parseSaved(saved?.remark)
+  if (hydrateRows(fromConclusion) || hydrateRows(fromRemark)) {
+    const c = auditFormData.data.value.get(CONCLUSION_KEY)
+    if (c?.conclusion) conclusion.value = String(c.conclusion)
+    return true
   }
-  if (typeof parsed?.conclusion === 'string') conclusion.value = parsed.conclusion
-  return true
+  return false
 }
 
 onMounted(async () => {
   await auditFormData.load()
   const n = auditFormData.data.value.get(AUDIT_NOTE_KEY)
   if (n?.remark) auditNote.value = n.remark
-  if (!loadRowsFromChecklist()) loadFromHtmlData(props.htmlData)
+
+  const snapshot = props.htmlData?.responses_snapshot?.[ROWS_KEY]
+  if (
+    !loadRowsFromChecklist()
+    && !hydrateRows(parseSaved(snapshot?.conclusion))
+    && !hydrateRows(parseSaved(snapshot?.remark))
+    && !hydrateRows(props.htmlData?.unrecognizedLoss)
+    && !hydrateRows((props.htmlData as any)?.rows)
+  ) {
+    // 空表起步
+  }
+
+  const c = auditFormData.data.value.get(CONCLUSION_KEY)
+  if (c?.conclusion && !conclusion.value) conclusion.value = String(c.conclusion)
 })
 
-// ─── 超额亏损为0时Tab2禁用判断 ──────────────────────────────────────────────
+const allExcessLossZero = computed(() => rows.length > 0 && rows.every(r => r.excessLoss === 0))
 
-/** 全局：所有行超额亏损都为0 → Tab2全局禁用提示 */
-const allExcessLossZero = computed(() => rows.every(r => r.excessLoss === 0))
-
-/** 单行：该行超额亏损为0时Tab2字段禁用 */
 function isTab2Disabled(row: UnrecognizedLossRow): boolean {
   return row.excessLoss === 0
 }
 
-// ─── 公式重算（核心） ────────────────────────────────────────────────────────
-
 function recalcRow(row: UnrecognizedLossRow): void {
-  // Tab1公式：合计长期权益 = 投资账面 + 长应收 + 其他权益 + 预计负债
-  row.totalLongTermEquity = Math.round((
-    parseNum(row.investmentBookValue)
-    + parseNum(row.longTermReceivable)
-    + parseNum(row.otherLongTermEquity)
-    + parseNum(row.estimatedLiability)
-  ) * 100) / 100
-
-  // Tab1公式：超额亏损 = MAX(0, 累计亏损 - 合计长期权益)
-  const diff = parseNum(row.cumulativeLoss) - row.totalLongTermEquity
-  row.excessLoss = Math.round(Math.max(0, diff) * 100) / 100
-
-  // Tab2公式：未确认损失 = 超额亏损 - 冲减投资 - 冲减长应收 - 冲减其他 - 确认预计负债
-  row.unrecognizedLoss = Math.round((
-    row.excessLoss
-    - parseNum(row.reduceInvestment)
-    - parseNum(row.reduceLongTermReceivable)
-    - parseNum(row.reduceOtherEquity)
-    - parseNum(row.recognizeEstimatedLiability)
-  ) * 100) / 100
+  recalcUnrecognizedLossRow(row)
 }
-
-// ─── 空行创建 ────────────────────────────────────────────────────────────────
 
 function createEmptyRow(seq: number, investeeName: string): UnrecognizedLossRow {
   return {
@@ -489,12 +626,13 @@ function createEmptyRow(seq: number, investeeName: string): UnrecognizedLossRow 
     reduceOtherEquity: 0,
     recognizeEstimatedLiability: 0,
     unrecognizedLoss: 0,
+    priorCumulative: 0,
     currentChange: 0,
+    allocationManual: false,
+    currentChangeManual: false,
     auditConclusion: '合理',
   }
 }
-
-// ─── 字段更新 ────────────────────────────────────────────────────────────────
 
 function updateField(id: string, field: keyof UnrecognizedLossRow, value: any) {
   const row = rows.find(r => r.id === id)
@@ -513,7 +651,75 @@ function updateFieldWithRecalc(id: string, field: keyof UnrecognizedLossRow, val
   }
 }
 
-// ─── 动态行增删（ElMessageBox.prompt + 名称唯一性校验） ──────────────────────
+function updateReduceField(
+  id: string,
+  field: 'reduceInvestment' | 'reduceLongTermReceivable' | 'reduceOtherEquity' | 'recognizeEstimatedLiability',
+  value: number,
+) {
+  const row = rows.find(r => r.id === id)
+  if (!row) return
+  row.allocationManual = true
+  ;(row as any)[field] = value ?? 0
+  recalcUnrecognizedLossRow(row, { applyWaterfall: false })
+  persistRows()
+}
+
+function updateCurrentChangeManual(id: string, value: number) {
+  const row = rows.find(r => r.id === id)
+  if (!row) return
+  row.currentChangeManual = true
+  row.currentChange = value ?? 0
+  persistRows()
+}
+
+function clearCurrentChangeManual(id: string) {
+  const row = rows.find(r => r.id === id)
+  if (!row) return
+  row.currentChangeManual = false
+  recalcRow(row)
+  persistRows()
+}
+
+function applyWaterfallAll() {
+  if (isReadonly.value) return
+  for (const row of rows) {
+    row.allocationManual = false
+    recalcUnrecognizedLossRow(row, { applyWaterfall: true })
+  }
+  persistRows()
+  ElMessage.success('已按 CAS2 第44条自动分配超额亏损（预计负债仍需手工确认）')
+}
+
+function applyRecoveryAll() {
+  if (isReadonly.value) return
+  const targets = rows.filter(r => parseNum(r.currentChange) < -0.005)
+  if (!targets.length) {
+    ElMessage.info('无需恢复的行')
+    return
+  }
+  let total = 0
+  for (const row of targets) {
+    const { recovered } = applyProfitRecoveryReverseOrder(row)
+    total += recovered
+  }
+  persistRows()
+  ElMessage.success(`已对 ${targets.length} 家按反序恢复，合计冲回 ${total.toFixed(2)}`)
+}
+
+function snapshotAsOpening() {
+  if (isReadonly.value || !rows.length) return
+  const opening = rows.map(r => ({
+    investeeName: r.investeeName,
+    investeeId: r.investeeId,
+    unrecognizedLoss: parseNum(r.unrecognizedLoss),
+    priorCumulative: parseNum(r.unrecognizedLoss),
+  }))
+  auditFormData.debouncedSave(OPENING_KEY, {
+    conclusion: JSON.stringify(opening),
+    remark: null,
+  })
+  ElMessage.success('已将当前未确认损失固化为期初快照（供下期/本期 prior 带入）')
+}
 
 async function handleAddRow() {
   try {
@@ -530,13 +736,12 @@ async function handleAddRow() {
       },
     })
     if (value?.trim()) {
-      const newRow = createEmptyRow(rows.length + 1, value.trim())
-      rows.push(newRow)
+      rows.push(createEmptyRow(rows.length + 1, value.trim()))
       persistRows()
       ElMessage.success(`已添加「${value.trim()}」`)
     }
   } catch {
-    // 用户取消
+    // cancelled
   }
 }
 
@@ -544,31 +749,271 @@ function removeRow(id: string) {
   const idx = rows.findIndex(r => r.id === id)
   if (idx >= 0) {
     rows.splice(idx, 1)
-    // 重新排序
     rows.forEach((r, i) => { r.seq = i + 1 })
     persistRows()
   }
 }
 
-// ─── AI生成审计结论 ──────────────────────────────────────────────────────────
-
-function handleAiConclusion() {
-  ElMessage.info('AI生成未确认损失结论(impairment-conclusion)将在AI模块完成后启用')
+function generateLocalConclusion(): void {
+  const total = rows.length
+  const withExcess = rows.filter(r => r.excessLoss > 0)
+  const totalUnrecognized = rows.reduce((s, r) => s + parseNum(r.unrecognizedLoss), 0)
+  const totalChange = rows.reduce((s, r) => s + parseNum(r.currentChange), 0)
+  conclusion.value =
+    `经检查，共测试 ${total} 家被投资单位，其中 ${withExcess.length} 家存在超额亏损。` +
+    `未确认投资损失期末合计 ${totalUnrecognized.toFixed(2)} 元，本期变动合计 ${totalChange.toFixed(2)} 元。` +
+    (withExcess.length
+      ? '超额亏损已按 CAS2 第44条顺序分配（冲减投资→冲减长应收→确认预计负债），超出部分已登记备查。'
+      : '本期无超额亏损需分配。') +
+    ' 未确认投资损失计算及抵减顺序恰当。'
+  persistRows()
+  ElMessage.success('已生成本地结论草稿')
 }
 
-// ─── 导入导出 ────────────────────────────────────────────────────────────────
-
-async function handleDropdownCommand(command: string) {
-  if (command === 'template') {
-    ElMessage.info('导出模板功能将在后续集成')
-  } else if (command === 'export') {
-    ElMessage.info('导出数据功能将在后续集成')
-  } else if (command === 'import') {
-    ElMessage.info('导入数据功能将在后续集成')
+async function handleAiConclusion() {
+  if (isReadonly.value) return
+  try {
+    const res = await api.post(
+      `/api/workpapers/${props.wpId}/g7-equity-method/ai/unrecognized-loss-conclusion`,
+      {
+        existingContent: conclusion.value,
+        relatedContext: {
+          sheet: 'G7-16',
+          rowCount: rows.length,
+          excessCount: rows.filter(r => r.excessLoss > 0).length,
+          recoveryCount: rows.filter(r => parseNum(r.currentChange) < -0.005).length,
+          totalUnrecognized: rows.reduce((s, r) => s + parseNum(r.unrecognizedLoss), 0),
+          totalCurrentChange: rows.reduce((s, r) => s + parseNum(r.currentChange), 0),
+          validationErrors: validationIssues.value.filter(i => i.level === 'error').slice(0, 8),
+          validationWarnings: validationIssues.value.filter(i => i.level === 'warning').slice(0, 8),
+          rows: rows.slice(0, 20).map(r => ({
+            investeeName: r.investeeName,
+            excessLoss: r.excessLoss,
+            unrecognizedLoss: r.unrecognizedLoss,
+            priorCumulative: r.priorCumulative,
+            currentChange: r.currentChange,
+            allocationManual: !!r.allocationManual,
+            currentChangeManual: !!r.currentChangeManual,
+            reduceInvestment: r.reduceInvestment,
+            reduceLongTermReceivable: r.reduceLongTermReceivable,
+            reduceOtherEquity: r.reduceOtherEquity,
+            recognizeEstimatedLiability: r.recognizeEstimatedLiability,
+          })),
+        },
+      },
+    )
+    const text = extractG7AiText(res?.data)
+    if (text) {
+      conclusion.value = conclusion.value ? `${conclusion.value}\n${text}` : text
+      persistRows()
+      ElMessage.success('AI结论已生成')
+    } else {
+      generateLocalConclusion()
+    }
+  } catch {
+    generateLocalConclusion()
   }
 }
 
-// ─── 格式化 ──────────────────────────────────────────────────────────────────
+async function handleDropdownCommand(command: string) {
+  if (command === 'template') await importExport.exportTemplate('G7-16')
+  else if (command === 'export') await importExport.exportData('G7-16')
+  else if (command === 'import') fileInput.value?.click()
+}
+
+async function onFileSelected(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  const result = await importExport.importData('G7-16', file)
+  if (!result) return
+  await auditFormData.load()
+  if (loadRowsFromChecklist()) {
+    ElMessage.success(`导入完成，已刷新 ${rows.length} 行`)
+  } else {
+    ElMessage.warning('导入完成，但未解析到行数据')
+  }
+}
+
+async function syncFromRelated(): Promise<void> {
+  if (isReadonly.value || syncingCross.value) return
+  syncingCross.value = true
+  try {
+    await auditFormData.loadResponses()
+    const g74 = loadEquityInvestees(
+      auditFormData.data.value.get(G7_4_ROWS_KEY)?.conclusion
+      ?? props.htmlData?.responses_snapshot?.[G7_4_ROWS_KEY]?.conclusion,
+    )
+    const g714Payload = resolveG714PayloadFromChecklist(
+      makeG714ConclusionGetter(auditFormData.data.value, props.htmlData?.responses_snapshot),
+    )
+    const g714Rows = flattenG714Rows(g714Payload)
+
+    const g75Raw = parseChecklistJson(
+      auditFormData.data.value.get(G7_5_ROWS_KEY)?.conclusion
+      ?? auditFormData.data.value.get(G7_5_ROWS_KEY)?.remark
+      ?? props.htmlData?.responses_snapshot?.[G7_5_ROWS_KEY]?.conclusion,
+    )
+    const lossMap = extractCumulativeLossFromG75(g75Raw)
+
+    const openingRaw = parseChecklistJson(
+      auditFormData.data.value.get(OPENING_KEY)?.conclusion
+      ?? props.htmlData?.responses_snapshot?.[OPENING_KEY]?.conclusion
+      ?? props.htmlData?.priorUnrecognizedLoss,
+    )
+    const priorMap = extractPriorCumulativeMap(openingRaw)
+
+    // G5-2 实质净投资长期应收（关联方优先）；失败则 TB 1531 辅助核算降级
+    let g52LtMap = new Map<string, number>()
+    try {
+      g52LtMap = await fetchG52NetInvestmentByDebtor(props.projectId, { relatedPartyOnly: true })
+      if (g52LtMap.size === 0) {
+        g52LtMap = await fetchG52NetInvestmentByDebtor(props.projectId, { relatedPartyOnly: false })
+      }
+      if (g52LtMap.size === 0) {
+        g52LtMap = await fetchTb1531AuxByCustomer(props.projectId)
+      }
+    } catch { /* ignore */ }
+
+    let added = 0
+    let filled = 0
+    let lossFilled = 0
+    let priorFilled = 0
+    let ltRecFilled = 0
+    const names = g74.length
+      ? g74.map(x => ({ name: x.name, id: x.investeeId }))
+      : g714Rows
+        .map((r: any) => ({
+          name: String(r.investeeName ?? '').trim(),
+          id: String(r.investeeId ?? '').trim() || undefined,
+        }))
+        .filter(x => x.name)
+
+    if (!names.length && !rows.length) {
+      ElMessage.warning('未找到 G7-4 / G7-14 被投资单位，请先维护关联表')
+      return
+    }
+
+    const targets = names.length
+      ? names
+      : rows.map(r => ({ name: r.investeeName, id: r.investeeId }))
+
+    for (const inv of targets) {
+      let row = rows.find(r =>
+        (inv.id && r.investeeId && r.investeeId === inv.id)
+        || r.investeeName === inv.name,
+      )
+      if (!row) {
+        row = createEmptyRow(rows.length + 1, inv.name)
+        if (inv.id) row.investeeId = inv.id
+        rows.push(row)
+        added++
+      } else if (inv.id && !row.investeeId) {
+        row.investeeId = inv.id
+      }
+      const match714 = g714Rows.find((r: any) => {
+        const rid = String(r.investeeId ?? '').trim()
+        if (inv.id && rid) return rid === inv.id
+        return String(r.investeeName ?? '').trim() === inv.name
+      })
+      if (match714) {
+        if (!parseNum(row.investmentBookValue)) {
+          const book = parseNum(
+            match714.closingBalance
+            ?? match714.lteiBookBalance
+            ?? match714.lteBookBalance
+            ?? match714.bookValue
+            ?? match714.costClosing,
+          )
+          if (book) {
+            row.investmentBookValue = book
+            filled++
+          }
+        }
+        if (!parseNum(row.otherLongTermEquity)) {
+          const other = parseNum(match714.ociBalClosing) + parseNum(match714.otherEqBalClosing)
+          if (other) {
+            row.otherLongTermEquity = Math.round(other * 100) / 100
+            filled++
+          }
+        }
+        if (!parseNum(row.longTermReceivable)) {
+          const lt = extractLongTermReceivableFromRelated(match714)
+          if (lt) {
+            row.longTermReceivable = lt
+            ltRecFilled++
+          }
+        }
+      }
+      if (!parseNum(row.longTermReceivable)) {
+        const fromG5 = g52LtMap.get(normalizeDebtorName(inv.name))
+        if (fromG5 && fromG5 > 0) {
+          row.longTermReceivable = fromG5
+          ltRecFilled++
+        }
+      }
+      const cumLoss = lossMap.get(inv.name)
+      if (cumLoss != null && cumLoss > 0 && !parseNum(row.cumulativeLoss)) {
+        row.cumulativeLoss = cumLoss
+        lossFilled++
+      }
+      const prior = priorMap.get(inv.name)
+      if (prior != null && prior > 0 && !parseNum(row.priorCumulative)) {
+        row.priorCumulative = prior
+        priorFilled++
+      }
+      recalcRow(row)
+    }
+    rows.forEach((r, i) => { r.seq = i + 1 })
+    persistRows()
+    ElMessage.success(
+      `已带入：新增 ${added} 家，账面 ${filled}，长应收 ${ltRecFilled}，累计亏损 ${lossFilled}，上期未确认 ${priorFilled}`,
+    )
+  } catch {
+    ElMessage.error('关联表带入失败')
+  } finally {
+    syncingCross.value = false
+  }
+}
+
+async function pushToG714(): Promise<void> {
+  if (isReadonly.value || syncingToG714.value || !rows.length) return
+  if (hasBlockingErrors.value) {
+    ElMessage.error('存在分配校验错误，请先修正后再同步至 G7-14')
+    return
+  }
+  syncingToG714.value = true
+  try {
+    await auditFormData.loadResponses()
+    const g714Raw = resolveG714PayloadFromChecklist(
+      makeG714ConclusionGetter(auditFormData.data.value, props.htmlData?.responses_snapshot),
+    )
+    const result = applyUnrecognizedLossToG714Payload(g714Raw, [...rows])
+    if (!result.ok || !result.payload) {
+      ElMessage.warning(result.message)
+      return
+    }
+    await ElMessageBox.confirm(
+      `${result.message}。将覆盖 G7-14 对应行的「其他调整(otherAdj)」，是否继续？`,
+      '同步至 G7-14',
+      { type: 'warning', confirmButtonText: '确认覆盖', cancelButtonText: '取消' },
+    )
+    const items = buildG714DualWriteItems(result.payload)
+    if (typeof (auditFormData as any).debouncedSaveBatch === 'function') {
+      auditFormData.debouncedSaveBatch(items)
+    } else {
+      for (const it of items) {
+        auditFormData.debouncedSave(it.itemId, it.data)
+      }
+    }
+    ElMessage.success(result.message)
+  } catch (e) {
+    if (e !== 'cancel') ElMessage.error('同步至 G7-14 失败')
+  } finally {
+    syncingToG714.value = false
+  }
+}
 
 function fmtNum(v: unknown): string {
   if (v === 0) return '0.00'
@@ -578,36 +1023,11 @@ function fmtNum(v: unknown): string {
   return String(v ?? '')
 }
 
-// ─── 数据加载 ────────────────────────────────────────────────────────────────
-
 function loadFromHtmlData(data: Record<string, any> | null): void {
   if (!data) return
-  rows.length = 0
-
-  const lossData = data.unrecognizedLoss || data
-  const rawRows = lossData?.rows || []
-  conclusion.value = lossData?.conclusion || ''
-
-  // 加载行数据
-  if (Array.isArray(rawRows) && rawRows.length > 0) {
-    for (let i = 0; i < rawRows.length; i++) {
-      const raw = rawRows[i]
-      const row: UnrecognizedLossRow = {
-        ...createEmptyRow(i + 1, raw.investeeName || ''),
-        ...raw,
-        seq: i + 1,
-        id: raw.id || crypto.randomUUID(),
-      }
-      rows.push(row)
-      // 重算公式确保数据一致性
-      recalcRow(row)
-    }
-  }
+  hydrateRows(data.unrecognizedLoss || data)
 }
 
-/**
- * 导出当前数据（供父组件保存调用）
- */
 function getData(): { rows: UnrecognizedLossRow[]; conclusion: string } {
   return { rows: [...rows], conclusion: conclusion.value }
 }
@@ -658,6 +1078,13 @@ defineExpose({ getData, loadFromHtmlData, persistRows })
   cursor: help;
   padding-bottom: 1px;
 }
+
+.current-change-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.current-change-cell .compact-num { flex: 1; }
 
 /* 超额亏损高亮 */
 .excess-highlight { color: #f56c6c; font-weight: 600; }

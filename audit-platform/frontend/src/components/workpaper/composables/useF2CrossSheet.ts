@@ -16,6 +16,19 @@ import { sumContractPerfMovement } from './useF2ContractPerfSheet'
 import { sumBioAssetMovement } from './useF2BioAssetSheet'
 
 import type { F2AdjustmentRow } from './useF2Adjustment'
+import {
+  F2_ACCOUNT_TO_ROW_KEY,
+  F2_ROW_KEY_ACCOUNT,
+  sumGrossAjeByRowKey,
+  sumImpairmentAjeByRowKey,
+} from './f2AccountModel'
+
+export {
+  F2_ACCOUNT_TO_ROW_KEY,
+  F2_ROW_KEY_ACCOUNT,
+  F2_PRICE_DIFF_ACCOUNT,
+  F2_IMPAIRMENT_ACCOUNT,
+} from './f2AccountModel'
 
 export interface UseF2CrossSheetOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
@@ -54,38 +67,6 @@ export const F2_ROW_KEY_TO_SHEET: Record<string, string> = Object.fromEntries(
 
 export function sheetCodeForRowKey(rowKey: string): string | undefined {
   return F2_ROW_KEY_TO_SHEET[rowKey]
-}
-
-export const F2_ROW_KEY_ACCOUNT: Record<string, string> = {
-  'raw-materials': '1401',
-  'material-in-transit': '1402',
-  'revolving-materials': '1403',
-  'semi-finished': '1404',
-  'outsourced-processing': '1405',
-  'finished-goods': '1406',
-  'goods-in-transit': '1407',
-  'dev-products': '1408',
-  'dev-costs': '1409',
-  'contract-performance': '1410',
-  'consumable-bio': '1411',
-  'price-difference': '1406',
-  'impairment-provision': '1412',
-}
-
-/** 科目编码 → 审定表 rowKey（1406 优先映射 finished-goods） */
-export const F2_ACCOUNT_TO_ROW_KEY: Record<string, string> = {
-  '1401': 'raw-materials',
-  '1402': 'material-in-transit',
-  '1403': 'revolving-materials',
-  '1404': 'semi-finished',
-  '1405': 'outsourced-processing',
-  '1406': 'finished-goods',
-  '1407': 'goods-in-transit',
-  '1408': 'dev-products',
-  '1409': 'dev-costs',
-  '1410': 'contract-performance',
-  '1411': 'consumable-bio',
-  '1412': 'impairment-provision',
 }
 
 const BALANCE_TOLERANCE = 0.005
@@ -187,29 +168,14 @@ export function useF2CrossSheet(options: UseF2CrossSheetOptions) {
     adjustmentRows.value.some((r) => r.debitAmount !== 0 || r.creditAmount !== 0),
   )
 
-  /** F2-14 AJE → F2-1 账项调整（按科目汇总） */
-  const grossAdjustmentByRowKey = computed((): Record<string, number> => {
-    const result: Record<string, number> = {}
-    for (const row of adjustmentRows.value) {
-      if (row.entryType !== 'AJE') continue
-      const rowKey = F2_ACCOUNT_TO_ROW_KEY[row.accountCode]
-      if (!rowKey || rowKey === 'impairment-provision') continue
-      const delta = row.debitAmount - row.creditAmount
-      result[rowKey] = (result[rowKey] || 0) + delta
-    }
-    return result
-  })
+  /** F2-14 AJE → F2-1 账项调整（按科目汇总；进销差价 1412 / 跌价 1471） */
+  const grossAdjustmentByRowKey = computed((): Record<string, number> =>
+    sumGrossAjeByRowKey(adjustmentRows.value),
+  )
 
-  const impairmentAdjustmentByRowKey = computed((): Record<string, number> => {
-    const result: Record<string, number> = {}
-    for (const row of adjustmentRows.value) {
-      if (row.entryType !== 'AJE') continue
-      if (row.accountCode !== '1412') continue
-      const delta = row.creditAmount - row.debitAmount
-      result['impairment-provision'] = (result['impairment-provision'] || 0) + delta
-    }
-    return result
-  })
+  const impairmentAdjustmentByRowKey = computed((): Record<string, number> =>
+    sumImpairmentAjeByRowKey(adjustmentRows.value),
+  )
 
   function summaryForRowKey(rowKey: string): F2CategorySummary | undefined {
     return categorySummaries.value.find((s) => s.rowKey === rowKey)

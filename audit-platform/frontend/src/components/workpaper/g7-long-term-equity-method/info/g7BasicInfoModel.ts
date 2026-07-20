@@ -43,12 +43,19 @@ export interface G7BasicInfoRow {
 }
 
 const GROUP_ALIASES: Record<string, G7BasicInfoGroup> = {
+  subsidiary: 'subsidiary',
+  joint_venture: 'joint_venture',
+  associate: 'associate',
+  joint_operation: 'joint_operation',
   子公司: 'subsidiary',
   合营: 'joint_venture',
   合营企业: 'joint_venture',
+  '合营企业（共同控制）': 'joint_venture',
   联营: 'associate',
   联营企业: 'associate',
+  '联营企业（重大影响）': 'associate',
   共同经营: 'joint_operation',
+  '共同经营（共同控制）': 'joint_operation',
 }
 
 function numberOrNull(value: unknown): number | null {
@@ -81,8 +88,31 @@ export function toPercentRatio(
 function isLegacyBasicInfoPayload(raw: Record<string, unknown>): boolean {
   if (raw.ratioScale === 'fraction') return true
   if (raw.ratioScale === 'percent') return false
-  if (raw.groupType) return false
-  return raw.controlType != null || raw.investmentRatio != null
+  if (raw.controlType != null || raw.investmentRatio != null) return true
+  return false
+}
+
+/**
+ * 推断比例刻度：显式 ratioScale 优先；否则若存在 >1 的值视为百分数；
+ * 全部落在 (0,1] 且至少有一个严格小于 1 → 按小数迁移（修复缺 stamp 的历史数据）。
+ */
+export function inferBasicInfoRatioScale(
+  raw: Record<string, unknown>,
+  ratioValues: Array<number | null>,
+): 'percent' | 'fraction' {
+  if (raw.ratioScale === 'percent') return 'percent'
+  if (raw.ratioScale === 'fraction' || isLegacyBasicInfoPayload(raw)) {
+    const vals = ratioValues.filter((v): v is number => v != null && Number.isFinite(v))
+    if (vals.some(v => v > 1)) return 'percent'
+    return 'fraction'
+  }
+  const vals = ratioValues.filter((v): v is number => v != null && Number.isFinite(v))
+  if (!vals.length) return 'percent'
+  if (vals.some(v => v > 1)) return 'percent'
+  if (vals.every(v => v >= 0 && v <= 1) && vals.some(v => v > 0 && v < 1)) {
+    return 'fraction'
+  }
+  return 'percent'
 }
 
 export function accountingMethodFor(groupType: G7BasicInfoGroup): string {
@@ -134,14 +164,15 @@ export function normalizeG7BasicInfoRow(
     index + 1,
     stringValue(raw.investeeName ?? raw.investee_name ?? raw.companyName),
   )
-  const legacy = isLegacyBasicInfoPayload(raw)
   const directRaw = numberOrNull(raw.directHoldingRatio ?? raw.investmentRatio)
   const indirectRaw = numberOrNull(raw.indirectHoldingRatio)
   const votingRaw = numberOrNull(raw.votingRatio)
+  const scale = inferBasicInfoRatioScale(raw, [directRaw, indirectRaw, votingRaw])
+  const force = scale === 'fraction'
 
   return {
     ...row,
-    id: stringValue(raw.id) || row.id,
+    id: stringValue(raw.id ?? raw.investeeId ?? raw.investee_id) || row.id,
     level: stringValue(raw.level),
     enterpriseType: stringValue(raw.enterpriseType),
     newlyConsolidated: G7_YES_NO_OPTIONS.includes(raw.newlyConsolidated as '是' | '否')
@@ -154,9 +185,9 @@ export function normalizeG7BasicInfoRow(
     investmentAmount: numberOrNull(raw.investmentAmount),
     endingNetAssets: numberOrNull(raw.endingNetAssets),
     currentNetProfit: numberOrNull(raw.currentNetProfit),
-    directHoldingRatio: toPercentRatio(directRaw, { force: legacy && looksLikeFractionRatio(directRaw) }),
-    indirectHoldingRatio: toPercentRatio(indirectRaw, { force: legacy && looksLikeFractionRatio(indirectRaw) }),
-    votingRatio: toPercentRatio(votingRaw, { force: legacy && looksLikeFractionRatio(votingRaw) }),
+    directHoldingRatio: toPercentRatio(directRaw, { force: force && looksLikeFractionRatio(directRaw) }),
+    indirectHoldingRatio: toPercentRatio(indirectRaw, { force: force && looksLikeFractionRatio(indirectRaw) }),
+    votingRatio: toPercentRatio(votingRaw, { force: force && looksLikeFractionRatio(votingRaw) }),
     holdingVotingDifferenceReason: stringValue(raw.holdingVotingDifferenceReason),
     lessThanHalfControlReason: stringValue(raw.lessThanHalfControlReason),
     majorityNoControlReason: stringValue(raw.majorityNoControlReason),
@@ -288,6 +319,11 @@ export function validateG7BasicInfoRows(rows: G7BasicInfoRow[]): G7BasicInfoIssu
   }
 
   return issues
+}
+
+/** 仅 error 级问题；用于阻止脏主数据写入 */
+export function hasG7BasicInfoBlockingErrors(rows: G7BasicInfoRow[]): boolean {
+  return validateG7BasicInfoRows(rows).some(issue => issue.severity === 'error')
 }
 
 function labelOf(groupType: G7BasicInfoGroup): string {

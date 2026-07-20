@@ -92,6 +92,12 @@
         <div class="g7-index-toolbar">
           <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         </div>
+        <G7TabDirectory
+          :html-data="resolvedHtmlData"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="isReadonly"
+        />
         <GCycleBIndexExtras
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -156,6 +162,9 @@ const G7TabDisclosureListed = defineAsyncComponent(
 )
 const G7TabDisclosureSOE = defineAsyncComponent(
   () => import('./g7-long-term-equity-main/disclosure/G7TabDisclosureSOE.vue'),
+)
+const G7TabDirectory = defineAsyncComponent(
+  () => import('./g7-long-term-equity-main/core/G7TabDirectory.vue'),
 )
 const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
 
@@ -272,15 +281,17 @@ const dualMode = useG7DualMode({
   },
 })
 
-/** 审定发布：1511 回写投资合计（原值），1512 回写减值；不再监听 g7:writeback-trial-balance 以免重复回写 */
+/** 审定发布：仅保存后 writebackTb=true 才回写 TB；打开/编辑中的广播不改试算表 */
 function handleG7Adjudicated(e: Event): void {
   const detail = (e as CustomEvent<{
     accountCode?: string
     adjudicatedAmount?: number
     impairmentAccountCode?: string
     impairmentAmount?: number
+    writebackTb?: boolean
   }>).detail
   if (detail?.accountCode !== G7_ACCOUNT_CODE) return
+  if (detail.writebackTb !== true) return
   const amount = Number(detail.adjudicatedAmount)
   if (Number.isFinite(amount)) {
     void formData.writebackTB(amount, G7_ACCOUNT_CODE)

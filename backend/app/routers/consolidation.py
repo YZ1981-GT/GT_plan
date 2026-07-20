@@ -234,21 +234,38 @@ async def calculate_equity_method_route(
     from decimal import Decimal
     from app.services.equity_method_service import EquityMethodInput, calculate_equity_method
 
+    def _dec(key: str, default: str = "0") -> Decimal:
+        val = data.get(key, default)
+        if val is None or val == "":
+            return Decimal(default)
+        return Decimal(str(val))
+
+    def _opt_dec(key: str) -> Decimal | None:
+        if data.get(key) is None or data.get(key) == "":
+            return None
+        return Decimal(str(data[key]))
+
     inp = EquityMethodInput(
         subsidiary_code=data.get("subsidiary_code", ""),
         subsidiary_name=data.get("subsidiary_name", ""),
-        parent_share_ratio=Decimal(str(data.get("parent_share_ratio", "0"))),
-        initial_investment_cost=Decimal(str(data.get("initial_investment_cost", "0"))),
-        opening_book_value=Decimal(str(data.get("opening_book_value", "0"))),
-        sub_net_profit=Decimal(str(data.get("sub_net_profit", "0"))),
-        sub_other_comprehensive_income=Decimal(str(data.get("sub_other_comprehensive_income", "0"))),
-        sub_net_assets_at_acquisition=Decimal(str(data.get("sub_net_assets_at_acquisition", "0"))),
-        sub_current_net_assets=Decimal(str(data.get("sub_current_net_assets", "0"))),
-        sub_dividend_declared=Decimal(str(data.get("sub_dividend_declared", "0"))),
-        unrealized_upstream_profit=Decimal(str(data.get("unrealized_upstream_profit", "0"))),
-        unrealized_downstream_profit=Decimal(str(data.get("unrealized_downstream_profit", "0"))),
-        recoverable_amount=Decimal(str(data["recoverable_amount"])) if data.get("recoverable_amount") is not None else None,
-        accumulated_impairment=Decimal(str(data.get("accumulated_impairment", "0"))),
+        parent_share_ratio=_dec("parent_share_ratio"),
+        initial_investment_cost=_dec("initial_investment_cost"),
+        opening_book_value=_dec("opening_book_value"),
+        sub_net_profit=_dec("sub_net_profit"),
+        sub_other_comprehensive_income=_dec("sub_other_comprehensive_income"),
+        sub_net_assets_at_acquisition=_dec("sub_net_assets_at_acquisition"),
+        sub_current_net_assets=_dec("sub_current_net_assets"),
+        sub_dividend_declared=_dec("sub_dividend_declared"),
+        unrealized_upstream_profit=_dec("unrealized_upstream_profit"),
+        unrealized_downstream_profit=_dec("unrealized_downstream_profit"),
+        recoverable_amount=_opt_dec("recoverable_amount"),
+        accumulated_impairment=_dec("accumulated_impairment"),
+        long_term_receivable=_dec("long_term_receivable"),
+        other_long_term_equity=_dec("other_long_term_equity"),
+        estimated_liability=_dec("estimated_liability"),
+        g716_unrecognized_loss=_opt_dec("g716_unrecognized_loss"),
+        g716_current_change=_opt_dec("g716_current_change"),
+        g716_excess_loss=_opt_dec("g716_excess_loss"),
     )
 
     result = calculate_equity_method(inp)
@@ -265,6 +282,18 @@ async def calculate_equity_method_route(
         "accumulated_impairment": str(result.accumulated_impairment),
         "excess_loss": str(result.excess_loss),
         "is_excess_loss": result.is_excess_loss,
+        "long_term_interest_capacity": str(result.long_term_interest_capacity),
+        "g716_unrecognized_loss": (
+            str(result.g716_unrecognized_loss)
+            if result.g716_unrecognized_loss is not None else None
+        ),
+        "g716_current_change": (
+            str(result.g716_current_change)
+            if result.g716_current_change is not None else None
+        ),
+        "g716_excess_loss": (
+            str(result.g716_excess_loss) if result.g716_excess_loss is not None else None
+        ),
         "goodwill": str(result.goodwill),
         "bargain_purchase_gain": str(result.bargain_purchase_gain),
         "closing_book_value": str(result.closing_book_value),

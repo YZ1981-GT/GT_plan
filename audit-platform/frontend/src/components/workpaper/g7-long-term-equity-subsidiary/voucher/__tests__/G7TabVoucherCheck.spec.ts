@@ -82,6 +82,39 @@ function goToPage(state: PaginationState, page: number): PaginationState {
 // 测试套件
 // ═══════════════════════════════════════════════════════════════════════════════
 
+/**
+ * 检查比例 = 已检查 / 账面；账面为 0 时 ratio=null
+ */
+function mkCheckRatio(direction: string, book: number, checked: number) {
+  return {
+    direction,
+    bookAmount: book,
+    checkedAmount: checked,
+    ratio: book > 0 ? checked / book : null as number | null,
+  }
+}
+
+describe('G7TabVoucherCheck - 检查比例', () => {
+  it('账面>0 时计算比例', () => {
+    const row = mkCheckRatio('本期借方', 1000, 300)
+    expect(row.ratio).toBeCloseTo(0.3)
+  })
+
+  it('账面为0 时 ratio=null', () => {
+    const row = mkCheckRatio('本期贷方', 0, 100)
+    expect(row.ratio).toBeNull()
+  })
+
+  it('比例<30% 触发偏低预警', () => {
+    const ratios = [
+      mkCheckRatio('本期借方', 1000, 200),
+      mkCheckRatio('本期贷方', 500, 250),
+    ]
+    const warnings = ratios.filter(r => r.ratio != null && r.ratio < 0.3 && r.bookAmount > 0)
+    expect(warnings.map(r => r.direction)).toEqual(['本期借方'])
+  })
+})
+
 describe('G7TabVoucherCheck - 异常自动检测逻辑', () => {
   /**
    * Validates: Requirements 6.1, 6.2

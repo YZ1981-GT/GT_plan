@@ -37,6 +37,12 @@
           </template>
         </el-dropdown>
         <el-button size="small" type="primary" link @click="handleAiConclusion">🤖 AI辅助</el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          :loading="syncingFromG79"
+          @click="syncFromG79"
+        >从G7-9带入</el-button>
         <el-button size="small" @click="openReviewDialog('G7-10-subsequent')">💬复核</el-button>
         <GtIndexChip value="wp:G7-10" :context-project-id="projectId" />
       </div>
@@ -121,7 +127,7 @@
           <template #default="{ row }">
             <CompanyPicker
               v-if="!isReadonly"
-              :model-value="row.companyName"
+              :model-value="row.investeeId || row.companyName"
               :options="investeeOptions"
               @update:model-value="(v: string) => onDividendCompanyChange(row, v)"
             />
@@ -242,7 +248,7 @@
         <div class="company-block-head">
           <CompanyPicker
             v-if="!isReadonly"
-            :model-value="row.companyName"
+            :model-value="row.investeeId || row.companyName"
             :options="investeeOptions"
             style="max-width: 280px"
             @update:model-value="(v: string) => onNciCompanyChange(row, v)"
@@ -358,7 +364,7 @@
         <div class="company-block-head">
           <CompanyPicker
             v-if="!isReadonly"
-            :model-value="row.companyName"
+            :model-value="row.investeeId || row.companyName"
             :options="investeeOptions"
             style="max-width: 280px"
             @update:model-value="(v: string) => onPartialCompanyChange(row, v)"
@@ -512,12 +518,14 @@ import {
   recalcDividendRow,
   recalcNciPurchaseRow,
   recalcPartialDisposalRow,
+  syncDividendRowsFromG79Carry,
   validateSubsequentRows,
   type G7DividendRow,
   type G7NciPurchaseRow,
   type G7PartialDisposalRow,
   type G7SubsequentStoredRow,
 } from './g7SubsequentModel'
+import { extractG79CarryToSubsequent, normalizeNotSameControlRows } from '../initial/g7NotSameControlModel'
 import {
   G7_4_ROWS_KEY,
   loadSubsidiaryInvestees,
@@ -525,8 +533,10 @@ import {
 } from '../../composables/g7EquityMethodCrossSheet'
 import { useG7SubImportExport } from '../../composables/useG7SubImportExport'
 import { useG7SubFormData } from '../../composables/useG7SubFormData'
+import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
+import { extractG7AiText } from '../../composables/g7AiText'
 import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
@@ -543,6 +553,8 @@ const emit = defineEmits<{
 
 const isReadonly = computed(() => props.readonly ?? false)
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
 const wpIdRef = toRef(props, 'wpId')
 const { exportTemplate, exportData, importData } = useG7SubImportExport({ wpId: wpIdRef })
@@ -554,10 +566,12 @@ const conclusion = ref('')
 const auditNote = ref('')
 const materialityLevel = ref(0)
 const investeeOptions = ref<G7SubsidiaryInvesteeOption[]>([])
+const syncingFromG79 = ref(false)
 
 const auditFormData = useG7SubFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
+  onAfterSave: () => scheduleAutoSnapshot(),
 })
 const ROWS_KEY = 'G7-10-rows'
 const NOTE_KEY = 'G7-10-subsequent-audit-note'
@@ -593,8 +607,23 @@ function varianceClass(variance: number): string {
   return ''
 }
 
-function findInvestee(name: string): G7SubsidiaryInvesteeOption | undefined {
-  return investeeOptions.value.find(o => o.name === name)
+function findInvestee(nameOrId: string): G7SubsidiaryInvesteeOption | undefined {
+  return investeeOptions.value.find(o => o.name === nameOrId || o.id === nameOrId)
+}
+
+function applyInvesteePick(
+  row: { companyName: string; investeeId?: string },
+  nameOrId: string,
+): G7SubsidiaryInvesteeOption | undefined {
+  const opt = findInvestee(nameOrId)
+  if (opt) {
+    row.companyName = opt.name
+    row.investeeId = opt.id
+  } else {
+    row.companyName = nameOrId
+    row.investeeId = undefined
+  }
+  return opt
 }
 
 function persistRows(): void {
@@ -642,8 +671,7 @@ function updatePartialNumber(row: G7PartialDisposalRow, field: string, value: un
 }
 
 function onDividendCompanyChange(row: G7DividendRow, name: string): void {
-  row.companyName = name
-  const opt = findInvestee(name)
+  const opt = applyInvesteePick(row, name)
   if (opt?.shareholdingRatio != null && (row.shareholdingRatio == null || row.shareholdingRatio === 0)) {
     row.shareholdingRatio = opt.shareholdingRatio
   }
@@ -651,8 +679,7 @@ function onDividendCompanyChange(row: G7DividendRow, name: string): void {
   persistRows()
 }
 function onNciCompanyChange(row: G7NciPurchaseRow, name: string): void {
-  row.companyName = name
-  const opt = findInvestee(name)
+  const opt = applyInvesteePick(row, name)
   if (opt) {
     if (opt.shareholdingRatio != null && (row.originalRatio == null || row.originalRatio === 0)) {
       row.originalRatio = opt.shareholdingRatio
@@ -665,8 +692,7 @@ function onNciCompanyChange(row: G7NciPurchaseRow, name: string): void {
   persistRows()
 }
 function onPartialCompanyChange(row: G7PartialDisposalRow, name: string): void {
-  row.companyName = name
-  const opt = findInvestee(name)
+  const opt = applyInvesteePick(row, name)
   if (opt) {
     if (opt.shareholdingRatio != null && (row.originalRatio == null || row.originalRatio === 0)) {
       row.originalRatio = opt.shareholdingRatio
@@ -809,6 +835,33 @@ async function loadG74Investees(): Promise<void> {
   }
 }
 
+async function syncFromG79(): Promise<void> {
+  if (isReadonly.value || syncingFromG79.value || !props.wpId) return
+  syncingFromG79.value = true
+  try {
+    const res = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`, { _silent: true } as any)
+    const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
+    const item = responses.find((r: any) => r.item_id === 'G7-9-rows')
+    let raw: unknown = item?.conclusion
+    if (typeof raw === 'string' && raw.trim()) {
+      try { raw = JSON.parse(raw) } catch { /* keep string */ }
+    }
+    const carry = extractG79CarryToSubsequent(normalizeNotSameControlRows(raw))
+    if (!carry.length) {
+      ElMessage.warning('G7-9 中暂无可带入的非同控子公司')
+      return
+    }
+    const result = syncDividendRowsFromG79Carry([...dividendRows], carry)
+    dividendRows.splice(0, dividendRows.length, ...result.rows)
+    persistRows()
+    ElMessage.success(`已从 G7-9 带入股利测算名单：新增 ${result.added} 家（已有公司未覆盖）`)
+  } catch {
+    ElMessage.error('从 G7-9 带入失败')
+  } finally {
+    syncingFromG79.value = false
+  }
+}
+
 async function handleAiConclusion(): Promise<void> {
   try {
     const res = await http.post(
@@ -818,22 +871,25 @@ async function handleAiConclusion(): Promise<void> {
         relatedContext: {
           sheet: 'G7-10',
           materialityLevel: materialityLevel.value,
+          dividendCount: dividendRows.length,
+          nciCount: nciRows.length,
+          partialDisposalCount: partialDisposalRows.length,
           dividendRows: [...dividendRows],
           nciRows: [...nciRows],
           partialDisposalRows: [...partialDisposalRows],
         },
       },
     )
-    const text = res?.data?.data?.conclusion || res?.data?.conclusion || res?.data?.text || ''
+    const text = extractG7AiText(res?.data)
     if (text) {
-      conclusion.value = text
-      auditFormData.debouncedSave(CONCLUSION_KEY, { remark: text, conclusion: null })
+      conclusion.value = String(text)
+      auditFormData.debouncedSave(CONCLUSION_KEY, { remark: conclusion.value, conclusion: null })
       ElMessage.success('AI结论已生成')
     } else {
-      ElMessage.warning('AI未能生成有效结论')
+      ElMessage.warning('AI未返回内容，请手动填写')
     }
   } catch {
-    ElMessage.info('AI辅助生成后续计量结论将在AI模块完成后启用')
+    ElMessage.warning('AI结论生成暂不可用，请手动填写')
   }
 }
 
@@ -850,7 +906,29 @@ async function handleImportExportCommand(command: string): Promise<void> {
       const file = (e.target as HTMLInputElement).files?.[0]
       if (!file) return
       const result = await importData('G7-10', file)
-      if (result) ElMessage.success('导入完成，请刷新数据')
+      if (result) {
+        await auditFormData.load()
+        const saved = auditFormData.data.value.get(ROWS_KEY)
+        let parsed: unknown = null
+        if (saved?.conclusion) {
+          try { parsed = JSON.parse(String(saved.conclusion)) } catch { parsed = saved.conclusion }
+        }
+        const list = Array.isArray(parsed)
+          ? parsed
+          : (parsed && typeof parsed === 'object' && Array.isArray((parsed as any).rows)
+            ? (parsed as any).rows
+            : [])
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          const mat = Number((parsed as any).materialityLevel ?? (parsed as any).materiality_level ?? NaN)
+          if (Number.isFinite(mat)) materialityLevel.value = mat
+        }
+        if (list.length) {
+          applyRows(list as any)
+          ElMessage.success(`导入完成，已刷新 ${list.length} 行`)
+        } else {
+          ElMessage.success('导入完成，请核对数据')
+        }
+      }
     }
     input.click()
   }
@@ -913,11 +991,11 @@ const CompanyPicker = defineComponent({
       {
         default: () => p.options.map(o =>
           h(ElOption, {
-            key: o.name,
+            key: o.id || o.name,
             label: o.shareholdingRatio != null
               ? `${o.name}（${(o.shareholdingRatio * 100).toFixed(2)}%）`
               : o.name,
-            value: o.name,
+            value: o.id || o.name,
           }),
         ),
       },

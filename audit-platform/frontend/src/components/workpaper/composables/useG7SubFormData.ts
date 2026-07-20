@@ -41,9 +41,10 @@ export interface G7ControlRow {
   dimension: string
   criterion: string
   investeeName: string
-  judgmentResult: 'control' | 'joint_control' | 'significant_influence' | 'none'
+  /** 是 / 否 / 不适用（与 UI 下拉一致） */
+  judgmentResult: '是' | '否' | '不适用' | ''
   judgmentBasis: string
-  riskFlag: 'high' | 'medium' | 'low' | 'none'
+  riskFlag: '高' | '中' | '低' | '无' | ''
   auditConclusion: string
   indexRef: string
 }
@@ -58,6 +59,8 @@ export interface G7ControlSection {
 export interface G7ControlJudgmentData {
   sections: G7ControlSection[]
   overallConclusion: string
+  decision?: import('./g7ControlJudgmentModel').G7ControlDecision
+  additionalDecisions?: import('./g7ControlJudgmentModel').G7ControlDecision[]
 }
 
 export type G7SameControlRow = G7SameControlStoredRow

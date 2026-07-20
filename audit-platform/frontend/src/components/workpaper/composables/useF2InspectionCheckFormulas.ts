@@ -203,6 +203,48 @@ export function evaluatePurchaseInboundChecks(r: PurchaseInboundRow): PurchaseCh
   return results
 }
 
+/** 材料领用逐项勾稽（账→单）：与 assessMaterialAbnormal 同源 */
+export function evaluateMaterialUsageChecks(r: MaterialUsageRow): PurchaseCheckResult[] {
+  const results: PurchaseCheckResult[] = []
+  const hasVoucher = !!(r.voucherNo || r.amount || r.qty)
+  const hasDoc = !!(r.docDateNo || r.docQty || r.docNo)
+
+  if (hasVoucher && !hasDoc) {
+    results.push({
+      key: 'doc_exist',
+      label: '出库单/领料单',
+      status: 'missing',
+      detail: '有记账凭证但缺少出库/领料单据',
+    })
+  } else if (hasDoc) {
+    results.push({ key: 'doc_exist', label: '出库单/领料单', status: 'ok', detail: '已填写' })
+  } else {
+    results.push({ key: 'doc_exist', label: '出库单/领料单', status: 'pending', detail: '待填写' })
+  }
+
+  results.push(_cmpQty('qty_doc', '账面数量 ↔ 出库数量', r.qty, r.docQty, '账', '出库'))
+
+  if (hasVoucher && r.amount <= 0 && r.qty <= 0) {
+    results.push({
+      key: 'voucher_amount',
+      label: '贷方金额/数量',
+      status: 'pending',
+      detail: '待填写贷方金额或数量',
+    })
+  } else if (hasVoucher) {
+    results.push({
+      key: 'voucher_amount',
+      label: '贷方金额/数量',
+      status: 'ok',
+      detail: r.amount > 0 ? `贷方 ${r.amount}` : `数量 ${r.qty}`,
+    })
+  } else {
+    results.push({ key: 'voucher_amount', label: '贷方金额/数量', status: 'pending', detail: '待填写' })
+  }
+
+  return results
+}
+
 function _cmpQty(
   key: string, label: string, a: number, b: number, aName: string, bName: string,
 ): PurchaseCheckResult {
@@ -449,4 +491,108 @@ export function evaluateSubcontractRecover(
     }
   }
   return { expected, variance: 0, status: 'ok', detail: '收回≈发出+加工费' }
+}
+
+/** 表三逐笔勾稽面板（与 evaluateSubcontractRecover 同源） */
+export function evaluateSubcontractRecoverChecks(
+  r: Pick<SubcontractSupplier2Row, 'issueCost' | 'fee' | 'recoverCost' | 'contractNo' | 'processor'>,
+): PurchaseCheckResult[] {
+  const recover = evaluateSubcontractRecover(r)
+  const statusMap: Record<SubcontractRecoverStatus, PurchaseCheckStatus> = {
+    ok: 'ok',
+    pending: 'pending',
+    unrecovered: 'mismatch',
+    valuation: 'mismatch',
+  }
+  return [
+    {
+      key: 'contract',
+      label: '合同/协议',
+      status: r.contractNo ? 'ok' : (r.processor || r.issueCost ? 'missing' : 'pending'),
+      detail: r.contractNo ? r.contractNo : '待填合同号',
+    },
+    {
+      key: 'recover_cost',
+      label: '收回≈发出+加工费',
+      status: statusMap[recover.status],
+      detail: recover.detail,
+    },
+  ]
+}
+
+/** 表间加工费交叉校验结果 */
+export interface SubcontractFeeCrossCheck {
+  basicFee: number
+  supplier1Fee: number
+  supplier2Fee: number
+  /** |basic − s1| 与 |basic − s2| 均 ≤ tol 视为 ok */
+  status: 'ok' | 'mismatch' | 'pending'
+  detail: string
+}
+
+/**
+ * F2-35 三表加工费交叉：表一 processingFee 合计 ≈ 表二 feeAmount ≈ 表三 fee。
+ * 任一表有金额时才判定；全 0 → pending。
+ */
+export function evaluateSubcontractFeeCross(
+  basic: Array<Pick<SubcontractBasicRow, 'processingFee'>>,
+  s1: Array<Pick<SubcontractSupplier1Row, 'feeAmount'>>,
+  s2: Array<Pick<SubcontractSupplier2Row, 'fee'>>,
+  tol = 0.01,
+): SubcontractFeeCrossCheck {
+  const round2 = (n: number) => Math.round(n * 100) / 100
+  const basicFee = round2(basic.reduce((s, r) => s + (Number(r.processingFee) || 0), 0))
+  const supplier1Fee = round2(s1.reduce((s, r) => s + (Number(r.feeAmount) || 0), 0))
+  const supplier2Fee = round2(s2.reduce((s, r) => s + (Number(r.fee) || 0), 0))
+  if (basicFee <= 0 && supplier1Fee <= 0 && supplier2Fee <= 0) {
+    return { basicFee, supplier1Fee, supplier2Fee, status: 'pending', detail: '加工费待填写' }
+  }
+  const d12 = Math.abs(basicFee - supplier1Fee)
+  const d13 = Math.abs(basicFee - supplier2Fee)
+  const d23 = Math.abs(supplier1Fee - supplier2Fee)
+  if (d12 <= tol && d13 <= tol) {
+    return { basicFee, supplier1Fee, supplier2Fee, status: 'ok', detail: '三表加工费勾稽一致' }
+  }
+  return {
+    basicFee,
+    supplier1Fee,
+    supplier2Fee,
+    status: 'mismatch',
+    detail: `表一 ${basicFee} / 表二 ${supplier1Fee} / 表三 ${supplier2Fee}（差 max=${Math.max(d12, d13, d23).toFixed(2)}）`,
+  }
+}
+
+/** F2-35 期末余额 ↔ F2-7 委托加工明细期末 */
+export interface SubcontractF27Reconcile {
+  f35Closing: number
+  f27Closing: number
+  variance: number
+  status: 'ok' | 'mismatch' | 'pending'
+  detail: string
+}
+
+export function reconcileSubcontractWithF27(
+  f35Closing: number,
+  f27Closing: number | null | undefined,
+  tol = 0.01,
+): SubcontractF27Reconcile {
+  const a = Math.round((Number(f35Closing) || 0) * 100) / 100
+  if (f27Closing == null || Number.isNaN(Number(f27Closing))) {
+    return { f35Closing: a, f27Closing: 0, variance: 0, status: 'pending', detail: '缺少 F2-7 对照余额' }
+  }
+  const b = Math.round((Number(f27Closing) || 0) * 100) / 100
+  if (a <= 0 && b <= 0) {
+    return { f35Closing: a, f27Closing: b, variance: 0, status: 'pending', detail: '两侧期末均为空' }
+  }
+  const variance = Math.round((a - b) * 100) / 100
+  if (Math.abs(variance) <= tol) {
+    return { f35Closing: a, f27Closing: b, variance: 0, status: 'ok', detail: 'F2-35 期末 ≈ F2-7 期末' }
+  }
+  return {
+    f35Closing: a,
+    f27Closing: b,
+    variance,
+    status: 'mismatch',
+    detail: `F2-35 ${a} ≠ F2-7 ${b}（差 ${variance}）`,
+  }
 }

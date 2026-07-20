@@ -34,11 +34,13 @@ from ._cycle_import_export_common import (
     build_workbook_template,
     export_row_by_keys,
     is_numeric_field_key,
+    load_json_payload,
     load_json_rows,
     parse_row_by_headers,
     parse_upload_xlsx,
     safe_float,
     safe_str,
+    upsert_json_payload,
     upsert_json_rows,
     workbook_to_response,
 )
@@ -52,14 +54,14 @@ router = APIRouter(tags=["g7-sub-import-export"])
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _G7_8_MERGER_HEADERS = [
-    "公司名称", "最终控制方", "会计政策一致", "政策调整说明",
+    "公司名称", "合并日", "最终控制方", "会计政策一致", "政策调整说明",
     "被合并方所有者权益账面价值①", "合并后出资比例②",
     "初始投资成本③=①×②", "现金", "非现金资产账面价值", "债务账面价值",
     "权益性证券面值", "或有对价", "支付对价合计④",
     "调整资本公积/留存收益⑤=③-④", "可用资本公积", "差额处理说明", "索引", "审计结论",
 ]
 _G7_8_MERGER_KEYS = [
-    "investeeName", "finalController", "accountingPolicyConsistent", "accountingPolicyNote",
+    "investeeName", "acquisitionDate", "finalController", "accountingPolicyConsistent", "accountingPolicyNote",
     "ownerEquityBookValue", "ownershipRatio",
     "initialInvestmentCost", "cashConsideration", "nonCashAssetBookValue", "debtBookValue",
     "equitySecuritiesFaceValue", "contingentConsideration", "totalConsideration",
@@ -68,13 +70,13 @@ _G7_8_MERGER_KEYS = [
 ]
 
 _G7_8_STEP_HEADERS = [
-    "公司名称", "公司标识", "次别", "交易日期", "购买比例①", "支付对价②",
+    "公司名称", "公司标识", "次别", "交易日期", "合并日", "购买比例①", "支付对价②",
     "交易时被投资方可辨认净资产账面价值", "原持股账面价值",
     "原投资累计其他综合收益/损益调整等③",
     "是否一揽子交易", "不构成一揽子交易依据", "可用资本公积", "索引/备注",
 ]
 _G7_8_STEP_KEYS = [
-    "companyName", "companyId", "transactionNo", "transactionDate", "purchaseRatio",
+    "companyName", "companyId", "transactionNo", "transactionDate", "acquisitionDate", "purchaseRatio",
     "consideration", "netAssetsBookValue", "priorHoldingBookValue",
     "priorInvestmentAdjustments",
     "isPackageDeal", "notPackageBasis", "availableCapitalReserve", "indexRef",
@@ -221,17 +223,29 @@ _G7_10_KEYS = [
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _G7_11_HEADERS = [
+    "被投资单位", "被投资单位ID", "处置日", "处置比例", "处置对价",
+    "处置日长投账面", "处置日应收股利", "处置前OCI累计", "可转损益OCI",
+    "个别报表处置损益", "合并报表调整", "合并层面净资产份额", "合并处置损益",
+    "合并损益手工覆盖", "审计结论", "索引",
+]
+_G7_11_KEYS = [
+    "investeeName", "investeeId", "disposalDate", "disposalRatio", "disposalPrice",
+    "disposalDateBookValue", "disposalDateDividend", "priorOCICumulative", "transferableOCI",
+    "individualGain", "consolidationAdjustment", "consolidatedNetAssetShare", "consolidatedGain",
+    "consolidatedGainManual", "auditConclusion", "indexRef",
+]
+_G7_11_CORE_HEADERS = [
     "被投资单位", "处置日", "处置比例", "处置对价",
     "处置日长投账面", "处置日应收股利", "处置前OCI累计", "可转损益OCI",
     "个别报表处置损益", "合并报表调整", "合并层面净资产份额", "合并处置损益",
     "审计结论", "索引",
 ]
-_G7_11_KEYS = [
-    "investeeName", "disposalDate", "disposalRatio", "disposalPrice",
-    "disposalDateBookValue", "disposalDateDividend", "priorOCICumulative", "transferableOCI",
-    "individualGain", "consolidationAdjustment", "consolidatedNetAssetShare", "consolidatedGain",
-    "auditConclusion", "indexRef",
-]
+_G7_11_OPTIONAL_HEADERS = ("被投资单位ID", "合并损益手工覆盖")
+_G7_11_HEADER_ALIASES = {
+    "被投资单位ID": ["investeeId", "被投资单位Id"],
+    "合并损益手工覆盖": ["consolidatedGainManual", "手工覆盖"],
+    "处置比例": ["处置比例(%)"],
+}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # G7-12 处置一揽子（14列，单sheet）
@@ -268,6 +282,11 @@ _G7_12_SEGMENTS = [
             "judgmentInterdependent", "judgmentEconomicTogether", "packageJudgmentConclusion",
             "packageJudgmentBasis",
         ],
+    ),
+    (
+        "各次交易明细",
+        ["企业名称", "次别", "交易日期", "对价", "持股变动", "备注"],
+        ["investeeName", "stepSeq", "stepDate", "consideration", "shareChange", "note"],
     ),
     (
         "3-交易与时点",
@@ -312,14 +331,14 @@ _G7_12_SEGMENTS = [
         "6-权益法追溯",
         [
             "企业名称", "权益法比例", "原取得日至处置日净利润", "本期净利润",
-            "其他综合收益", "其他所有者权益变动", "期初未分配利润", "盈余公积",
+            "其他综合收益", "其他所有者权益变动", "盈余公积比例", "期初未分配利润", "盈余公积",
             "投资收益", "长投-其他综合收益", "长投-其他变动",
         ],
         [
             "investeeName", "equityMethodRatio", "preDisposalProfit", "currentProfit",
-            "otherComprehensiveIncome", "otherEquityChanges", "openingRetainedEarnings",
-            "surplusReserve", "investmentIncome", "longTermInvestmentOci",
-            "longTermInvestmentOtherChanges",
+            "otherComprehensiveIncome", "otherEquityChanges", "surplusReserveRate",
+            "openingRetainedEarnings", "surplusReserve", "investmentIncome",
+            "longTermInvestmentOci", "longTermInvestmentOtherChanges",
         ],
     ),
 ]
@@ -333,9 +352,10 @@ _G7_12_NUMERIC_KEYS = {
     "consolidatedNetAssets", "consolidatedNetAssetShare", "priceShareDifference",
     "goodwill", "consolidatedRecyclableOci", "priorStepDifference", "consolidatedGain",
     "equityMethodRatio", "preDisposalProfit", "currentProfit",
-    "otherComprehensiveIncome", "otherEquityChanges", "openingRetainedEarnings",
-    "surplusReserve", "investmentIncome", "longTermInvestmentOci",
-    "longTermInvestmentOtherChanges",
+    "otherComprehensiveIncome", "otherEquityChanges", "surplusReserveRate",
+    "openingRetainedEarnings", "surplusReserve", "investmentIncome",
+    "longTermInvestmentOci", "longTermInvestmentOtherChanges",
+    "consideration", "shareChange", "stepSeq", "cumulativePrice", "cumulativeShareChange",
 }
 
 
@@ -414,9 +434,11 @@ _SINGLE_SHEET_SPECS: dict[str, dict[str, Any]] = {
         "guidance": [
             "G7-11 非一揽子处置测试 编制说明",
             "",
-            "处置比例以小数填写（如 0.30 表示处置30%股权）。",
+            "处置比例以小数填写（如 0.30 表示处置30%股权），范围 0~1。",
             "个别报表处置损益 = 处置对价 - 处置日长投账面 - 处置日应收股利 + 可转损益OCI。",
-            "合并处置损益需考虑合并报表调整及合并层面净资产份额。",
+            "合并处置损益默认 = 个别损益 + 合并调整 − 净资产份额；手工覆盖填「是」可保留 Excel 值。",
+            "处置前OCI累计为备查列，不进入个别损益公式；入账用「可转损益OCI」。",
+            "被投资单位ID 与 G7-4 行 id 对齐（可空）。",
             "审计结论填写处置定价公允性、关联方交易判断。",
         ],
     },
@@ -442,6 +464,117 @@ def _validate_sheet(sheet: str) -> None:
         raise HTTPException(400, f"不支持的sheet: {sheet}。支持: {sorted(_SUPPORTED_SHEETS)}")
 
 
+def _yes_no_to_bool(raw: Any) -> bool:
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, (int, float)):
+        return raw != 0
+    s = str(raw or "").strip().lower()
+    return s in {"是", "true", "1", "y", "yes"}
+
+
+def _normalize_ratio_to_fraction(raw: Any) -> float:
+    """处置比例：Excel 可能填 30 表示 30%，已是小数则保持。"""
+    v = safe_float(raw)
+    if abs(v) > 1.0000001:
+        return round(v / 100.0, 8)
+    return v
+
+
+def _recalculate_g7_11_row(row: dict) -> dict:
+    """与前端 recalcDisposalSingleRow 口径一致。"""
+    svc = G7SubsidiaryService
+    price = safe_float(row.get("disposalPrice"))
+    book = safe_float(row.get("disposalDateBookValue"))
+    dividend = safe_float(row.get("disposalDateDividend"))
+    oci = safe_float(row.get("transferableOCI"))
+    individual = round(svc.calc_disposal_gain(price, book, dividend, oci), 2)
+    row["individualGain"] = individual
+
+    manual = _yes_no_to_bool(row.get("consolidatedGainManual"))
+    row["consolidatedGainManual"] = manual
+    if not manual:
+        adj = safe_float(row.get("consolidationAdjustment"))
+        na_share = safe_float(row.get("consolidatedNetAssetShare"))
+        row["consolidatedGain"] = round(individual + adj - na_share, 2)
+    else:
+        row["consolidatedGain"] = round(safe_float(row.get("consolidatedGain")), 2)
+
+    # 比例归一（若仍为百分数）
+    if "disposalRatio" in row:
+        row["disposalRatio"] = _normalize_ratio_to_fraction(row.get("disposalRatio"))
+    return row
+
+
+def _normalize_g7_11_rows_import(rows: list[dict]) -> list[dict]:
+    out: list[dict] = []
+    for r in rows:
+        d = dict(r)
+        if "disposalRatio" in d:
+            d["disposalRatio"] = _normalize_ratio_to_fraction(d.get("disposalRatio"))
+        if "consolidatedGainManual" in d:
+            d["consolidatedGainManual"] = _yes_no_to_bool(d.get("consolidatedGainManual"))
+        _recalculate_g7_11_row(d)
+        out.append(d)
+    return out
+
+
+def _prepare_g7_11_rows_export(rows: list[dict]) -> list[dict]:
+    out: list[dict] = []
+    for r in rows:
+        d = _recalculate_g7_11_row(dict(r))
+        if "consolidatedGainManual" in d:
+            val = d.get("consolidatedGainManual")
+            d["consolidatedGainManual"] = "是" if _yes_no_to_bool(val) else "否"
+        out.append(d)
+    return out
+
+
+def _parse_g7_11_sheet_rows(content: bytes) -> tuple[list[dict], list[str], list[str]]:
+    """按表头名解析；强制旧 14 列，ID/手工覆盖可缺。"""
+    try:
+        actual, raw = parse_upload_xlsx(
+            content,
+            _G7_11_CORE_HEADERS,
+            header_row=2,
+            header_aliases=_G7_11_HEADER_ALIASES,
+            require_all_headers=True,
+        )
+    except ValueError as e:
+        return [], [str(e)], []
+
+    warnings: list[str] = []
+    missing_opt = [h for h in _G7_11_OPTIONAL_HEADERS if h not in actual]
+    if missing_opt:
+        warnings.append(f"兼容旧模板：缺列 {', '.join(missing_opt)} 已按空值导入")
+
+    errors: list[str] = []
+    rows: list[dict] = []
+    header_idx = {h: i for i, h in enumerate(actual)}
+    for i, r in enumerate(raw, start=1):
+        if i > ROW_LIMIT:
+            errors.append(f"数据行超过{ROW_LIMIT}行限制，已截断")
+            break
+        values = list(r)
+        parsed: dict[str, Any] = {"id": str(uuid4())}
+        for h, key in zip(_G7_11_HEADERS, _G7_11_KEYS):
+            idx = header_idx.get(h)
+            raw_val = values[idx] if idx is not None and idx < len(values) else None
+            if key in ("consolidatedGainManual",):
+                parsed[key] = safe_str(raw_val)
+            elif is_numeric_field_key(key) or key in {
+                "disposalRatio", "disposalPrice", "disposalDateBookValue",
+                "disposalDateDividend", "priorOCICumulative", "transferableOCI",
+                "individualGain", "consolidationAdjustment",
+                "consolidatedNetAssetShare", "consolidatedGain",
+            }:
+                parsed[key] = safe_float(raw_val)
+            else:
+                parsed[key] = safe_str(raw_val)
+        rows.append(parsed)
+    return rows, errors, warnings
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # G7-12 原底稿六区段导入导出
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -449,11 +582,22 @@ def _validate_sheet(sheet: str) -> None:
 def _g7_12_recalculate(source: dict[str, Any]) -> dict[str, Any]:
     """复核原底稿公式，导出计算结果；不信任客户端上传的公式列。"""
     row = dict(source)
+    steps = row.get("steps") if isinstance(row.get("steps"), list) else []
+    if steps:
+        cum_price = round(sum(safe_float(s.get("consideration")) for s in steps), 2)
+        cum_share = round(sum(abs(safe_float(s.get("shareChange"))) for s in steps), 6)
+        if cum_price:
+            row["transactionPrice"] = cum_price
+            row["cumulativePrice"] = cum_price
+        if cum_share:
+            row["disposalRatio"] = cum_share
+            row["cumulativeShareChange"] = cum_share
     original = safe_float(row.get("originalShareholdingRatio"))
     disposal = abs(safe_float(
         row.get("disposalRatio")
         or row.get("transactionShareChange")
         or row.get("shareholdingChange")
+        or row.get("cumulativeShareChange")
     ))
     ratio_of_original = disposal / original if original else 0.0
     remaining = max(0.0, original - disposal)
@@ -479,6 +623,10 @@ def _g7_12_recalculate(source: dict[str, Any]) -> dict[str, Any]:
     consolidated_net_assets = safe_float(row.get("consolidatedNetAssets"))
     consolidated_share = round(consolidated_net_assets * ratio_of_original, 2)
     equity_ratio = safe_float(row.get("equityMethodRatio")) or remaining
+    txn_price = safe_float(row.get("transactionPrice") or row.get("cumulativePrice"))
+    surplus_rate = safe_float(row.get("surplusReserveRate"))
+    if surplus_rate <= 0 or surplus_rate >= 1:
+        surplus_rate = 0.1
 
     row.update({
         "remainingShareholdingRatio": round(remaining, 6),
@@ -490,11 +638,9 @@ def _g7_12_recalculate(source: dict[str, Any]) -> dict[str, Any]:
             safe_float(row.get("nonRecyclableOci")) * ratio_of_original, 2
         ),
         "consolidatedNetAssetShare": consolidated_share,
-        "priceShareDifference": round(
-            safe_float(row.get("transactionPrice")) - consolidated_share, 2
-        ),
+        "priceShareDifference": round(txn_price - consolidated_share, 2),
         "consolidatedGain": round(
-            safe_float(row.get("transactionPrice"))
+            txn_price
             + residual_fv
             - consolidated_net_assets
             - safe_float(row.get("goodwill"))
@@ -502,11 +648,12 @@ def _g7_12_recalculate(source: dict[str, Any]) -> dict[str, Any]:
             + safe_float(row.get("priorStepDifference")),
             2,
         ),
+        "surplusReserveRate": surplus_rate,
         "openingRetainedEarnings": round(
-            equity_ratio * safe_float(row.get("preDisposalProfit")) * 0.9, 2
+            equity_ratio * safe_float(row.get("preDisposalProfit")) * (1 - surplus_rate), 2
         ),
         "surplusReserve": round(
-            equity_ratio * safe_float(row.get("preDisposalProfit")) * 0.1, 2
+            equity_ratio * safe_float(row.get("preDisposalProfit")) * surplus_rate, 2
         ),
         "investmentIncome": round(
             equity_ratio * safe_float(row.get("currentProfit")), 2
@@ -550,12 +697,29 @@ def _build_g7_12_workbook(
             )
             ws.add_data_validation(validation)
             validation.add("B3:F502")
+        if sheet_name == "各次交易明细":
+            if template_only:
+                ws.append(["示例子公司", 1, "2025-01-15", 0, 0, "第1次处置"])
+            else:
+                for row in calculated_rows:
+                    steps = row.get("steps") if isinstance(row.get("steps"), list) else []
+                    for step in steps:
+                        ws.append([
+                            row.get("investeeName") or "",
+                            step.get("seq") or "",
+                            step.get("stepDate") or "",
+                            step.get("consideration") or 0,
+                            step.get("shareChange") or 0,
+                            step.get("note") or "",
+                        ])
+            continue
         for row in calculated_rows:
             ws.append(export_row_by_keys(row, keys))
         for key_index, key in enumerate(keys, start=1):
             if key in {
                 "originalShareholdingRatio", "votingRatio", "disposalRatio",
-                "remainingShareholdingRatio", "equityMethodRatio",
+                "remainingShareholdingRatio", "equityMethodRatio", "surplusReserveRate",
+                "shareChange",
             }:
                 for cell in ws.iter_cols(
                     min_col=key_index, max_col=key_index, min_row=3,
@@ -567,9 +731,10 @@ def _build_g7_12_workbook(
 
 
 def _parse_g7_12_import(content: bytes) -> tuple[list[dict], list[str]]:
-    """按行号合并六区段；公式结果列导入后由后端统一重算。"""
+    """按行号合并六区段；公式结果列导入后由后端统一重算。各次交易明细按企业名称挂到 steps。"""
     errors: list[str] = []
     rows_by_index: dict[int, dict[str, Any]] = {}
+    steps_by_name: dict[str, list[dict[str, Any]]] = {}
     try:
         wb = load_workbook(io.BytesIO(content), data_only=True, read_only=False)
     except Exception:
@@ -585,6 +750,8 @@ def _parse_g7_12_import(content: bytes) -> tuple[list[dict], list[str]]:
     matched = False
     for sheet_name, headers, keys in _G7_12_SEGMENTS:
         if sheet_name not in wb.sheetnames:
+            if sheet_name == "各次交易明细":
+                continue  # 旧模板可无此 sheet
             errors.append(f"缺少工作表[{sheet_name}]")
             continue
         matched = True
@@ -597,6 +764,31 @@ def _parse_g7_12_import(content: bytes) -> tuple[list[dict], list[str]]:
         if missing:
             errors.append(f"工作表[{sheet_name}]缺少列: {', '.join(missing)}")
             continue
+
+        if sheet_name == "各次交易明细":
+            for values in ws.iter_rows(min_row=3, values_only=True):
+                if all(value in (None, "") for value in values):
+                    continue
+                payload: dict[str, Any] = {}
+                for header, key in zip(headers, keys):
+                    column_index = actual_headers.index(header)
+                    raw = values[column_index] if column_index < len(values) else None
+                    payload[key] = (
+                        safe_float(raw) if key in _G7_12_NUMERIC_KEYS else safe_str(raw)
+                    )
+                name = safe_str(payload.get("investeeName"))
+                if not name:
+                    continue
+                steps_by_name.setdefault(name, []).append({
+                    "id": str(uuid4()),
+                    "seq": int(payload.get("stepSeq") or len(steps_by_name[name]) + 1),
+                    "stepDate": safe_str(payload.get("stepDate")),
+                    "consideration": safe_float(payload.get("consideration")),
+                    "shareChange": safe_float(payload.get("shareChange")),
+                    "note": safe_str(payload.get("note")),
+                })
+            continue
+
         for row_index, values in enumerate(
             ws.iter_rows(min_row=3, values_only=True)
         ):
@@ -620,6 +812,10 @@ def _parse_g7_12_import(content: bytes) -> tuple[list[dict], list[str]]:
     wb.close()
     if not matched:
         return [], ["未找到G7-12六区段工作表"]
+    for row in rows_by_index.values():
+        name = safe_str(row.get("investeeName"))
+        if name and name in steps_by_name:
+            row["steps"] = steps_by_name[name]
     rows = [_g7_12_recalculate(row) for _, row in sorted(rows_by_index.items())]
     return rows, errors
 
@@ -680,14 +876,14 @@ def _build_g7_8_workbook(rows: list[dict], *, template_only: bool = False) -> Wo
                 allow_blank=True,
             )
             ws.add_data_validation(conclusion_validation)
-            conclusion_validation.add("R3:R502")
+            conclusion_validation.add("S3:S502")
             policy_validation = DataValidation(
                 type="list",
                 formula1='"是,否"',
                 allow_blank=True,
             )
             ws.add_data_validation(policy_validation)
-            policy_validation.add("C3:C502")
+            policy_validation.add("D3:D502")
         if section == "step":
             package_validation = DataValidation(
                 type="list",
@@ -695,7 +891,7 @@ def _build_g7_8_workbook(rows: list[dict], *, template_only: bool = False) -> Wo
                 allow_blank=True,
             )
             ws.add_data_validation(package_validation)
-            package_validation.add("J3:J502")
+            package_validation.add("K3:K502")
         if not template_only:
             for source in rows:
                 source_section = safe_str(source.get("section")) or "merger"
@@ -705,7 +901,8 @@ def _build_g7_8_workbook(rows: list[dict], *, template_only: bool = False) -> Wo
                 if section == "merger":
                     row = _g7_8_recalculate_merger(row)
                 ws.append(export_row_by_keys(row, keys))
-        ratio_column = 6 if section == "merger" else 5 if section == "step" else None
+        # merger: 出资比例②=列7；step: 购买比例①=列6
+        ratio_column = 7 if section == "merger" else 6 if section == "step" else None
         if ratio_column:
             for row_index in range(3, max(ws.max_row, 502) + 1):
                 ws.cell(row=row_index, column=ratio_column).number_format = "0.00%"
@@ -755,8 +952,8 @@ def _build_g7_8_workbook(rows: list[dict], *, template_only: bool = False) -> Wo
     guide = wb.create_sheet("编制说明")
     guidance = [
         "G7-8 子公司初始计量测试表（同一控制）",
-        "1. 合并方式取得：初始投资成本③=被合并方所有者权益账面价值①×合并后出资比例②；支付对价④为各类对价账面价值合计；调整金额⑤=③-④。",
-        "2. 分步实现同控合并（不构成一揽子交易）：合并日初始成本⑤=合并日净资产账面价值④×累计持股比例①；调整金额⑥=累计对价②+原持股账面价值+原投资累计调整③−初始成本⑤。",
+        "1. 合并方式取得：填写合并日；初始投资成本③=被合并方所有者权益账面价值①×合并后出资比例②；支付对价④为各类对价账面价值合计；调整金额⑤=③-④。",
+        "2. 分步实现同控合并（不构成一揽子交易）：填写取得控制权的合并日；合并日初始成本⑤=合并日净资产账面价值④×累计持股比例①；调整金额⑥=累计对价②+原持股账面价值+原投资累计调整③−初始成本⑤。",
         "3. 若构成一揽子交易，应作为一次取得控制权处理，不适用分步合并区段。",
         "4. 反向购买：识别会计上的购买方，并判断会计上的被购买方是否构成业务。",
         "5. 合并前会计政策不一致时，应先统一会计政策；同控合并不确认商誉。",
@@ -781,7 +978,7 @@ def _parse_g7_8_import(content: bytes) -> tuple[list[dict], list[str]]:
     ]
     matched = False
     optional_headers = {
-        "会计政策一致", "政策调整说明", "可用资本公积",
+        "合并日", "会计政策一致", "政策调整说明", "可用资本公积",
         "原持股账面价值", "是否一揽子交易",
     }
     for sheet_name, expected_headers, keys, section in specs:
@@ -1556,7 +1753,8 @@ async def g7_sub_export_data(
         guidance=spec.get("guidance"),
     )
     ws = wb[sheet]
-    for d in rows:
+    export_rows = _prepare_g7_11_rows_export(rows) if sheet == "G7-11" else rows
+    for d in export_rows:
         ws.append(export_row_by_keys(d, spec["field_keys"]))
     return workbook_to_response(wb, f"{sheet}_数据.xlsx")
 
@@ -1580,6 +1778,7 @@ async def g7_sub_import_data(
     item_id = _ITEM_IDS[sheet]
     errors: list[str] = []
     rows: list[dict] = []
+    warnings: list[str] = []
 
     if sheet == "G7-8":
         rows, errors = _parse_g7_8_import(content)
@@ -1587,6 +1786,8 @@ async def g7_sub_import_data(
         rows, errors = _parse_g7_9_import(content)
     elif sheet == "G7-10":
         rows, errors = _parse_g7_10_import(content)
+    elif sheet == "G7-11":
+        rows, errors, warnings = _parse_g7_11_sheet_rows(content)
     elif sheet == "G7-12":
         rows, errors = _parse_g7_12_import(content)
     elif sheet == "G7-18":
@@ -1626,8 +1827,35 @@ async def g7_sub_import_data(
                 "imported_count": 0,
             }
 
-    await upsert_json_rows(db, wp_id, item_id, rows, field="conclusion")
+    if sheet == "G7-11":
+        rows = _normalize_g7_11_rows_import(rows)
+
+    if sheet == "G7-10":
+        # 页面存 {rows, materialityLevel} 信封；导入只换行，保留既有重要性
+        existing = await load_json_payload(db, wp_id, item_id, field="conclusion")
+        materiality = 0
+        if isinstance(existing, dict):
+            try:
+                materiality = float(
+                    existing.get("materialityLevel")
+                    or existing.get("materiality_level")
+                    or 0
+                )
+            except (TypeError, ValueError):
+                materiality = 0
+        await upsert_json_payload(
+            db,
+            wp_id,
+            item_id,
+            {"rows": rows, "materialityLevel": materiality},
+            field="conclusion",
+        )
+    else:
+        await upsert_json_rows(db, wp_id, item_id, rows, field="conclusion")
     out: dict[str, Any] = {"ok": True, "imported_count": len(rows), "errors": errors}
+    if warnings:
+        out["warning"] = "；".join(warnings)
     if len(rows) >= ROW_LIMIT:
-        out["warning"] = f"数据行数超过{ROW_LIMIT}行限制，已截断"
+        trunc = f"数据行数超过{ROW_LIMIT}行限制，已截断"
+        out["warning"] = f"{out['warning']}；{trunc}" if out.get("warning") else trunc
     return out

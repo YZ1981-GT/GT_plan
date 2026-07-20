@@ -167,16 +167,26 @@ _TEXT_KEYS = {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# G7-3 调整分录汇总（10列）
+# G7-3 调整分录汇总（导出含扩展列；导入 CORE 兼容旧模板）
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_G7_3_HEADERS = [
+_G7_3_CORE_HEADERS = [
     "调整事项说明", "类别（报表调整/账项调整/其他）", "报表项目", "科目名称",
     "附注项目", "……", "借方调整金额", "贷方调整金额", "索引", "备注",
 ]
-_G7_3_KEYS = [
+_G7_3_CORE_KEYS = [
     "description", "category", "reportItem", "accountName", "noteItem",
     "_spacer", "debitAmount", "creditAmount", "indexRef", "remark",
+]
+_G7_3_OPTIONAL_HEADERS = ("科目代码", "来源标记", "被投资单位")
+_G7_3_HEADERS = [
+    "调整事项说明", "类别（报表调整/账项调整/其他）", "报表项目", "科目名称", "科目代码",
+    "附注项目", "……", "借方调整金额", "贷方调整金额", "索引", "备注", "来源标记", "被投资单位",
+]
+_G7_3_KEYS = [
+    "description", "category", "reportItem", "accountName", "accountCode",
+    "noteItem", "_spacer", "debitAmount", "creditAmount", "indexRef", "remark",
+    "sourceKind", "investeeName",
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -609,7 +619,7 @@ async def g7_main_export_template(
                 "G7-3 调整分录 编制说明",
                 "",
                 "类别填写：账项调整、报表调整或其他；同一调整事项的借贷金额必须相等。",
-                "科目名称请使用标准科目名称；系统将结合科目库识别编码。",
+                "科目名称请使用标准科目名称；可另填科目代码。来源标记/被投资单位用于建议草稿与按单位回写。",
                 "确认后同步调整分录模块，并按 1511/1512 回写 G7-1。",
             ],
         )
@@ -663,27 +673,41 @@ async def g7_main_import_data(
     item_id = _ITEM_IDS[sheet]
     errors: list[str] = []
     rows: list[dict] = []
+    warnings: list[str] = []
 
     if sheet == "G7-2":
         rows, errors = _parse_g7_2_import(content)
     else:  # G7-3
         try:
-            actual, raw = parse_upload_xlsx(content, _G7_3_HEADERS, header_row=2)
+            actual, raw = parse_upload_xlsx(
+                content,
+                _G7_3_CORE_HEADERS,
+                header_row=2,
+                require_all_headers=True,
+            )
         except ValueError as e:
             return {"ok": False, "errors": [str(e)], "imported_count": 0}
         except Exception:
             raise HTTPException(400, "无法解析xlsx文件")
+        missing_opt = [h for h in _G7_3_OPTIONAL_HEADERS if h not in actual]
+        if missing_opt:
+            warnings.append(f"兼容旧模板：缺列 {', '.join(missing_opt)} 已按空值导入")
         for i, r in enumerate(raw, start=1):
             if i > ROW_LIMIT:
                 errors.append(f"数据行超过{ROW_LIMIT}行限制，已截断")
                 break
-            rows.append(parse_row_by_headers(r, actual, _G7_3_KEYS))
+            rows.append(parse_row_by_headers(
+                r, actual, _G7_3_KEYS, expected_headers=_G7_3_HEADERS,
+            ))
 
     if errors and not rows:
         return {"ok": False, "errors": errors, "imported_count": 0}
 
     await upsert_json_rows(db, wp_id, item_id, rows, field="conclusion")
     out: dict[str, Any] = {"ok": True, "imported_count": len(rows), "errors": errors}
+    if warnings:
+        out["warning"] = "；".join(warnings)
     if len(rows) >= ROW_LIMIT:
-        out["warning"] = f"数据行数超过{ROW_LIMIT}行限制，已截断"
+        trunc = f"数据行数超过{ROW_LIMIT}行限制，已截断"
+        out["warning"] = f"{out.get('warning')}；{trunc}" if out.get("warning") else trunc
     return out

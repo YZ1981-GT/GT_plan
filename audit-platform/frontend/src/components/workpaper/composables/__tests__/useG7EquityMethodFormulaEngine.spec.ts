@@ -17,8 +17,11 @@ import {
   calcLteiBookBalance,
   calcNetAssetShareVariance,
   calcUnexplainedVariance,
+  calcOpeningReconVariance,
+  calcClosingReconVariance,
   calcUnrealizedProfit,
   calcEliminationAmount,
+  calcRecoverableAmount,
   calcImpairmentAmount,
 } from '../useG7EquityMethodFormulaEngine'
 
@@ -250,8 +253,26 @@ describe('useG7EquityMethodFormulaEngine — calcEliminationAmount', () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════
-// calcImpairmentAmount 单元测试
+// calcRecoverableAmount / calcImpairmentAmount 单元测试
 // ═══════════════════════════════════════════════════════════════════
+
+describe('useG7EquityMethodFormulaEngine — calcRecoverableAmount', () => {
+  it('公允净额 > 使用价值 → 取公允', () => {
+    expect(calcRecoverableAmount(900000, 800000)).toBe(900000)
+  })
+
+  it('使用价值 > 公允净额 → 取使用价值', () => {
+    expect(calcRecoverableAmount(700000, 850000)).toBe(850000)
+  })
+
+  it('相等时取该值', () => {
+    expect(calcRecoverableAmount(500000, 500000)).toBe(500000)
+  })
+
+  it('保留2位小数', () => {
+    expect(calcRecoverableAmount(100.567, 50.123)).toBe(100.57)
+  })
+})
 
 describe('useG7EquityMethodFormulaEngine — calcImpairmentAmount', () => {
   it('账面 > 可收回 → 正值减值', () => {
@@ -273,6 +294,11 @@ describe('useG7EquityMethodFormulaEngine — calcImpairmentAmount', () => {
 
   it('保留2位小数', () => {
     expect(calcImpairmentAmount(100.567, 50.123)).toBe(50.44)
+  })
+
+  it('与可收回金额公式串联：账面−MAX(公允,使用价值)', () => {
+    const recoverable = calcRecoverableAmount(750000, 820000)
+    expect(calcImpairmentAmount(1000000, recoverable)).toBe(180000)
   })
 })
 
@@ -296,5 +322,15 @@ describe('useG7EquityMethodFormulaEngine — calcIncomeDifference / variance', (
   it('未解释差额=S-U-V+W', () => {
     expect(calcUnexplainedVariance(30, 20, 5, 0)).toBe(5)
     expect(calcUnexplainedVariance(30, 20, 5, 3)).toBe(8)
+  })
+
+  it('期初勾稽差异P=四段期初−G7-2期初', () => {
+    expect(calcOpeningReconVariance(1000, 100, 50, 20, 1170)).toBe(0)
+    expect(calcOpeningReconVariance(1000, 0, 0, 0, 900)).toBe(100)
+  })
+
+  it('期末勾稽差异S=长投账面−G7-2期末', () => {
+    expect(calcClosingReconVariance(1200, 1200)).toBe(0)
+    expect(calcClosingReconVariance(1200, 1100)).toBe(100)
   })
 })

@@ -30,7 +30,7 @@ export interface F2CutoffSheetConfig {
   footerTips: string[]
 }
 
-/** 全量存货科目（1401~1411，不含1412跌价准备） */
+/** 全量存货原值科目（1401~1411；不含 1412 进销差价、1471 跌价准备） */
 export const F2_INVENTORY_ACCOUNT_CODES = '1401,1402,1403,1404,1405,1406,1407,1408,1409,1410,1411'
 
 /** 原材料及相关（材料采购/在途/原材料/周转材料等） */

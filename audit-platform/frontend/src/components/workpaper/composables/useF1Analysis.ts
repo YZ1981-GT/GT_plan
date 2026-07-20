@@ -261,11 +261,67 @@ function fmtAgingHint(agingAudited: Record<string, number> | undefined): string 
   return parts.join('; ')
 }
 
+/** F1-4 与 F2 存货采购 / F4 应付轻量联动提示（纯函数，便于单测） */
+export function buildCrossCycleHints(input: {
+  prepaidEndCurrent: number
+  prepaidEndPrior: number
+  inventoryRelatedDebit: number
+  inventoryPurchaseCurrent: number
+  inventoryBalanceCurrent: number
+  payableBalanceCurrent: number
+}): string[] {
+  const hints: string[] = []
+  const {
+    prepaidEndCurrent,
+    prepaidEndPrior,
+    inventoryRelatedDebit,
+    inventoryPurchaseCurrent,
+    inventoryBalanceCurrent,
+    payableBalanceCurrent,
+  } = input
+
+  if (inventoryRelatedDebit > 0 && inventoryPurchaseCurrent <= 0) {
+    hints.push('存货相关预付借方已有金额，但「存货采购金额」未填：请从 F2 录入采购数后再解读占比（与 F2 联动）。')
+  }
+
+  if (inventoryPurchaseCurrent > 0) {
+    const avgPrepaid = (Math.abs(prepaidEndCurrent) + Math.abs(prepaidEndPrior)) / 2
+    if (avgPrepaid > 0) {
+      const turnoverDays = (avgPrepaid / inventoryPurchaseCurrent) * 365
+      if (turnoverDays > 180) {
+        hints.push(
+          `预付周转约 ${turnoverDays.toFixed(0)} 天（均余÷存货采购×365），高于 180 天：请核长期挂账/合同进度，并对照 F1-5。`,
+        )
+      }
+    }
+    const ratio = calcPercentage(inventoryRelatedDebit, inventoryPurchaseCurrent)
+    if (ratio != null && ratio > 80) {
+      hints.push(`存货相关预付借方占采购 ${ratio.toFixed(1)}%，偏高：关注预付是否超合同比例或跨期。`)
+    }
+  }
+
+  if (inventoryBalanceCurrent > 0 && prepaidEndCurrent > inventoryBalanceCurrent * 0.5) {
+    hints.push('预付期末余额超过存货余额 50%：请在说明中解释业务模式（与 F2 存货余额联动）。')
+  }
+
+  if (payableBalanceCurrent > 0 && prepaidEndCurrent > payableBalanceCurrent) {
+    hints.push(
+      '预付期末余额大于应付账款期末余额：请核对是否与同一供应商并存预付+应付、是否应抵销列报（与 F4 联动）。',
+    )
+  } else if (prepaidEndCurrent > 0 && payableBalanceCurrent <= 0) {
+    hints.push('可录入「应付账款期末余额」（对照 F4）以启用预付/应付并存勾稽提示。')
+  }
+
+  return hints
+}
+
 interface AnalysisPack {
   balanceNatures: Record<AnalysisNatureKey, { current: number; prior: number }>
   inventoryBalance: { current: number; prior: number }
   debitNatures: Record<AnalysisNatureKey, { current: number; prior: number }>
   inventoryPurchase: { current: number; prior: number }
+  /** 应付账款期末余额（手工录入，用于与 F4 轻量联动） */
+  payableBalance: { current: number; prior: number }
   creditBreakdown: Record<string, { current: number; prior: number }>
   suppliers: MajorSupplierRow[]
   notes: AnalysisNotes
@@ -286,6 +342,7 @@ function emptyPack(): AnalysisPack {
     inventoryBalance: emptyPeriodPair(),
     debitNatures: natures(),
     inventoryPurchase: emptyPeriodPair(),
+    payableBalance: emptyPeriodPair(),
     creditBreakdown: credit,
     suppliers: [],
     notes: { balance: '', debit: '', credit: '', supplier: '' },
@@ -319,6 +376,12 @@ function normalizePack(raw: any): AnalysisPack {
     base.inventoryPurchase = {
       current: parseNum(raw.inventoryPurchase.current),
       prior: parseNum(raw.inventoryPurchase.prior),
+    }
+  }
+  if (raw.payableBalance) {
+    base.payableBalance = {
+      current: parseNum(raw.payableBalance.current),
+      prior: parseNum(raw.payableBalance.prior),
     }
   }
   for (const r of CREDIT_BREAKDOWN_ROWS) {
@@ -574,6 +637,24 @@ export function useF1Analysis(options: UseF1AnalysisOptions) {
   const top5Result = computed(() => computeTop5(detailSourceRows.value, 5))
   const top5ConcentrationWarning = computed(() => top5Result.value.concentrationWarning)
 
+  const prepaidEndCurrent = computed(() =>
+    calcSubtotal(Object.values(pack.value.balanceNatures).map(p => p.current)),
+  )
+  const prepaidEndPrior = computed(() =>
+    calcSubtotal(Object.values(pack.value.balanceNatures).map(p => p.prior)),
+  )
+
+  const crossCycleHints = computed(() =>
+    buildCrossCycleHints({
+      prepaidEndCurrent: prepaidEndCurrent.value,
+      prepaidEndPrior: prepaidEndPrior.value,
+      inventoryRelatedDebit: pack.value.debitNatures.inventory.current,
+      inventoryPurchaseCurrent: pack.value.inventoryPurchase.current,
+      inventoryBalanceCurrent: pack.value.inventoryBalance.current,
+      payableBalanceCurrent: pack.value.payableBalance.current,
+    }),
+  )
+
   // ─── Mutations ───────────────────────────────────────────────────────
 
   function updateBalanceNature(key: AnalysisNatureKey, field: 'current' | 'prior', value: number): void {
@@ -614,6 +695,15 @@ export function useF1Analysis(options: UseF1AnalysisOptions) {
     pack.value = {
       ...pack.value,
       inventoryPurchase: { ...pack.value.inventoryPurchase, [field]: parseNum(value) },
+    }
+    persist()
+  }
+
+  function updatePayableBalance(field: 'current' | 'prior', value: number): void {
+    if (isReadonly.value) return
+    pack.value = {
+      ...pack.value,
+      payableBalance: { ...pack.value.payableBalance, [field]: parseNum(value) },
     }
     persist()
   }
@@ -716,12 +806,15 @@ export function useF1Analysis(options: UseF1AnalysisOptions) {
     supplierRows,
     supplierSubtotal,
     top5ConcentrationWarning,
+    crossCycleHints,
+    payableBalance: computed(() => pack.value.payableBalance),
     notes,
     conclusion,
     updateBalanceNature,
     updateInventoryBalance,
     updateDebitNature,
     updateInventoryPurchase,
+    updatePayableBalance,
     updateCreditBreakdown,
     updateNote,
     updateConclusion,

@@ -28,7 +28,7 @@ export interface LongTermRow {
   remark: string                    // M: 备注
 }
 
-export interface UseD3LongTermOptions {
+export interface UseF1LongTermOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
   wpId: Ref<string>
   projectId: Ref<string>
@@ -157,9 +157,88 @@ export function mergeLongTermFromImport(
   return Array.from(map.values())
 }
 
+/** 从长期挂款行生成拟调整分录（减值 AJE + 转其他应收 RJE） */
+export function buildSuggestedAdjustmentRows(ltRows: LongTermRow[]): Array<{
+  description: string
+  category: string
+  reportItem: string
+  accountName: string
+  noteItem: string
+  debitAmount: number
+  creditAmount: number
+  indexRef: string
+  remark: string
+}> {
+  const out: Array<{
+    description: string
+    category: string
+    reportItem: string
+    accountName: string
+    noteItem: string
+    debitAmount: number
+    creditAmount: number
+    indexRef: string
+    remark: string
+  }> = []
+
+  for (const r of ltRows) {
+    const name = (r.customerName || '').trim()
+    if (!name) continue
+    const provision = parseNum(r.badDebtProvision)
+    if (provision > 0) {
+      out.push({
+        description: `F1-5 长期挂款减值—${name}`,
+        category: '账项调整',
+        reportItem: '资产减值损失/信用减值损失',
+        accountName: '坏账准备-预付账款(1231-04)',
+        noteItem: '预付账款',
+        debitAmount: provision,
+        creditAmount: provision,
+        indexRef: 'wp:F1-5',
+        remark: `期末余额 ${parseNum(r.endBalance)}；原因：${r.reason || '长期挂账'}`,
+      })
+    }
+    if (r.transferToOtherReceivable === 'Y' && parseNum(r.endBalance) > 0) {
+      const amt = parseNum(r.auditedBalance) || parseNum(r.endBalance)
+      out.push({
+        description: `F1-5 重分类至其他应收—${name}`,
+        category: '重分类调整',
+        reportItem: '其他应收款',
+        accountName: '预付账款(1123)→其他应收款(1221)',
+        noteItem: '预付账款/其他应收款',
+        debitAmount: amt,
+        creditAmount: amt,
+        indexRef: 'wp:F1-5',
+        remark: r.reason || '实质为往来占用，重分类',
+      })
+    }
+  }
+  return out
+}
+
+function mergeSuggestedIntoAje(
+  existingJson: string | null | undefined,
+  suggested: ReturnType<typeof buildSuggestedAdjustmentRows>,
+): string {
+  let existing: any[] = []
+  try {
+    const parsed = existingJson ? JSON.parse(existingJson) : []
+    existing = Array.isArray(parsed) ? parsed : []
+  } catch {
+    existing = []
+  }
+  const existingDesc = new Set(existing.map((r: any) => String(r.description || '')))
+  const toAdd = suggested.filter(s => !existingDesc.has(s.description)).map(s => ({
+    rowId: `row-${crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)}`,
+    placeholder: '',
+    ...s,
+  }))
+  return JSON.stringify([...existing, ...toAdd])
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-export function useF1LongTerm(options: UseD3LongTermOptions) {
+export function useF1LongTerm(options: UseF1LongTermOptions) {
   const { allResponses, debouncedSave, isReadonly } = options
 
   const rows = ref<LongTermRow[]>([])
@@ -242,15 +321,60 @@ export function useF1LongTerm(options: UseD3LongTermOptions) {
   watch(() => auditNote.value, (val) => { if (!isReadonly.value) debouncedSave(ITEM_ID_NOTE, { remark: val }) })
   watch(() => conclusion.value, (val) => { if (!isReadonly.value) debouncedSave(ITEM_ID_CONCLUSION, { remark: val }) })
 
+  const suggestedAdjustmentCount = computed(
+    () => buildSuggestedAdjustmentRows(rows.value).length,
+  )
+
+  /** 将减值/重分类拟调整合并写入 F1-3（F1-aje-rows），并 emit adjustment:created */
+  function pushSuggestedAdjustmentsToF13(): number {
+    if (isReadonly.value) return 0
+    const suggested = buildSuggestedAdjustmentRows(rows.value)
+    if (suggested.length === 0) return 0
+    const existing = allResponses.value.get('F1-aje-rows')?.remark
+    const beforeCount = (() => {
+      try {
+        const p = existing ? JSON.parse(existing) : []
+        return Array.isArray(p) ? p.length : 0
+      } catch {
+        return 0
+      }
+    })()
+    const merged = mergeSuggestedIntoAje(existing, suggested)
+    const after = JSON.parse(merged) as any[]
+    const added = after.length - beforeCount
+    if (added <= 0) return 0
+    debouncedSave('F1-aje-rows', { remark: merged })
+    for (const row of after.slice(beforeCount)) {
+      try {
+        window.dispatchEvent(
+          new CustomEvent('adjustment:created', {
+            detail: {
+              wpCode: 'F1',
+              entryType: row.category?.includes('重分类') ? 'RJE' : 'AJE',
+              amount: parseNum(row.debitAmount) || parseNum(row.creditAmount),
+              accountCode: '1123',
+              description: row.description,
+            },
+          }),
+        )
+      } catch {
+        /* ignore */
+      }
+    }
+    return added
+  }
+
   return {
     rows,
     subtotalRow,
     auditNote,
     conclusion,
+    suggestedAdjustmentCount,
     addRow,
     removeRow,
     updateCell,
     importFromCrossSheet,
+    pushSuggestedAdjustmentsToF13,
   }
 }
 

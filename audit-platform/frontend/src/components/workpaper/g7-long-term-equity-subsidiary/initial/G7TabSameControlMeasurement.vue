@@ -93,6 +93,20 @@
             <TextCell :row="row" field="investeeName" :readonly="isReadonly" @change="updateMergerText" />
           </template>
         </el-table-column>
+        <el-table-column label="合并日" min-width="135">
+          <template #default="{ row }">
+            <el-date-picker
+              v-if="!isReadonly"
+              v-model="row.acquisitionDate"
+              type="date"
+              value-format="YYYY-MM-DD"
+              size="small"
+              :class="{ 'required-select': !row.acquisitionDate }"
+              @change="persistRows"
+            />
+            <span v-else>{{ display(row.acquisitionDate) }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="最终控制方" min-width="140">
           <template #default="{ row }">
             <TextCell :row="row" field="finalController" :readonly="isReadonly" @change="updateMergerText" />
@@ -173,7 +187,11 @@
         </el-table-column>
         <el-table-column label="调整资本公积/留存收益⑤=③-④" min-width="190" align="right">
           <template #default="{ row }">
-            <FormulaAmount :value="row.capitalReserveRetainedEarningsAdjustment" />
+            <span
+              class="formula-cell"
+              :class="{ 'diff-large': isSameControlDifferenceLarge(row.initialInvestmentCost, row.totalConsideration) }"
+              :title="isSameControlDifferenceLarge(row.initialInvestmentCost, row.totalConsideration) ? '差额较大（超过初始成本50%），请核实对价与账面份额' : undefined"
+            >{{ formatAmount(row.capitalReserveRetainedEarningsAdjustment) }}</span>
             <div class="hint-text">{{ describeCapitalReserveAdjustment(row.capitalReserveRetainedEarningsAdjustment, 'merger') }}</div>
           </template>
         </el-table-column>
@@ -281,6 +299,17 @@
           </el-table-column>
         </el-table>
         <el-descriptions :column="3" border size="small" class="step-summary">
+          <el-descriptions-item label="合并日（取得控制权）">
+            <el-date-picker
+              v-if="!isReadonly"
+              :model-value="summary.acquisitionDate || undefined"
+              type="date"
+              value-format="YYYY-MM-DD"
+              size="small"
+              @change="value => updateStepGroupField(summary.companyId, 'acquisitionDate', value)"
+            />
+            <span v-else>{{ display(summary.acquisitionDate) }}</span>
+          </el-descriptions-item>
           <el-descriptions-item label="是否一揽子交易">
             <el-select
               v-if="!isReadonly"
@@ -294,7 +323,7 @@
             </el-select>
             <span v-else>{{ display(summary.isPackageDeal) }}</span>
           </el-descriptions-item>
-          <el-descriptions-item label="原持股账面价值" :span="2">
+          <el-descriptions-item label="原持股账面价值">
             <el-input-number
               v-if="!isReadonly"
               :model-value="summary.priorHoldingBookValue || undefined"
@@ -442,10 +471,12 @@ import { computed, defineComponent, h, inject, onMounted, reactive, ref, toRef }
 import { ElInput, ElInputNumber, ElMessage, ElMessageBox } from 'element-plus'
 import { fmtAmount } from '@/utils/formatters'
 import http from '@/utils/http'
+import { extractG7AiText } from '../../composables/g7AiText'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useG7SubImportExport } from '../../composables/useG7SubImportExport'
 import { useG7SubFormData } from '../../composables/useG7SubFormData'
+import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import {
   createSameControlMergerRow,
   createSameControlReverseRow,
@@ -454,6 +485,7 @@ import {
   extractSameControlInvesteesFromG7Judgment,
   extractSubsidiaryNamesFromG72,
   extractSubsidiaryNamesFromG74,
+  isSameControlDifferenceLarge,
   normalizeSameControlRows,
   recalcSameControlMergerRow,
   summarizeSameControlSteps,
@@ -478,9 +510,12 @@ const props = defineProps<{
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const isReadonly = computed(() => !!props.readonly)
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const scheduleAutoSnapshot = runtime?.version?.scheduleAutoSnapshot ?? (() => undefined)
 const formData = useG7SubFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
+  onAfterSave: () => scheduleAutoSnapshot(),
 })
 const { exportTemplate, exportData, importData } = useG7SubImportExport({ wpId: toRef(props, 'wpId') })
 
@@ -596,6 +631,7 @@ function addStepTransaction(summary: G7SameControlStepSummary): void {
   next.isPackageDeal = summary.isPackageDeal
   next.notPackageBasis = summary.notPackageBasis
   next.availableCapitalReserve = summary.availableCapitalReserve
+  next.acquisitionDate = summary.acquisitionDate
   next.indexRef = summary.indexRef
   stepRows.push(next)
   persistRows()
@@ -622,7 +658,7 @@ function removeStepCompany(companyId: string): void {
 }
 function updateStepGroupField(
   companyId: string,
-  field: 'notPackageBasis' | 'indexRef' | 'isPackageDeal' | 'priorHoldingBookValue' | 'availableCapitalReserve',
+  field: 'notPackageBasis' | 'indexRef' | 'isPackageDeal' | 'priorHoldingBookValue' | 'availableCapitalReserve' | 'acquisitionDate',
   value: unknown,
 ): void {
   for (const row of stepRowsFor(companyId)) {
@@ -751,7 +787,7 @@ async function handleAiConclusion(): Promise<void> {
       },
     )
     const data = response?.data?.data ?? response?.data ?? response
-    const text = data?.content ?? data?.conclusion ?? data?.text ?? ''
+    const text = extractG7AiText(data)
     if (!text) throw new Error('empty')
     auditConclusion.value = String(text)
     saveAuditConclusion(auditConclusion.value)
@@ -851,6 +887,13 @@ onMounted(async () => {
 .methodology-context { padding: 12px 16px; border-left: 4px solid #e6a23c; background: #fdf6ec; line-height: 1.7; }
 .section-card { margin-bottom: 14px; }
 .formula-cell { color: #1d4ed8; font-weight: 600; border-bottom: 1px dashed #94a3b8; }
+.formula-cell.diff-large {
+  color: #b45309;
+  background: #fff7ed;
+  padding: 0 4px;
+  border-radius: 2px;
+  border-bottom-color: #f59e0b;
+}
 .hint-text { margin-top: 2px; color: #909399; font-size: 11px; line-height: 1.3; }
 .required-input :deep(.el-textarea__inner),
 .required-input :deep(.el-input__inner) { box-shadow: 0 0 0 1px #e6a23c inset; }

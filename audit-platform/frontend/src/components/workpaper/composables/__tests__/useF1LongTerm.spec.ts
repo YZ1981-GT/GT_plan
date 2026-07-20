@@ -75,4 +75,26 @@ describe('useF1LongTerm helpers', () => {
     expect(a.reason).toBe('已填原因')
     expect(merged.find(r => r.customerName === '乙')!.endBalance).toBe(50)
   })
+
+  it('buildSuggestedAdjustmentRows emits impairment AJE and reclass RJE', async () => {
+    const { buildSuggestedAdjustmentRows, createEmptyLongTermRow, recalcLongTermRow } = await import('../useF1LongTerm')
+    const rows = [
+      recalcLongTermRow({
+        ...createEmptyLongTermRow(),
+        customerName: '甲',
+        endBalance: 1000,
+        badDebtProvision: 200,
+        transferToOtherReceivable: 'N',
+      }),
+      recalcLongTermRow({
+        ...createEmptyLongTermRow(),
+        customerName: '乙',
+        endBalance: 500,
+        transferToOtherReceivable: 'Y',
+      }),
+    ]
+    const suggested = buildSuggestedAdjustmentRows(rows)
+    expect(suggested.some(s => s.description.includes('减值') && s.debitAmount === 200)).toBe(true)
+    expect(suggested.some(s => s.description.includes('其他应收') && s.category.includes('重分类'))).toBe(true)
+  })
 })

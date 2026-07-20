@@ -991,7 +991,11 @@ services:
 
 volumes:
 
+  # 业务库数据在历史卷 gt_workplan_pg_data（422表/含projects）。
+  # 若用默认项目名 gt_plan 会新建空的 gt_plan_pg_data，导致「无核心表」。
   pg_data:
+    external: true
+    name: gt_workplan_pg_data
 
   redis_data:
 

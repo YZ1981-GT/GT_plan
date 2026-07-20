@@ -2,7 +2,7 @@
  * G5 跨表汇总辅助 — G5-2 / G5-3 → G5-1 未审数
  */
 import { parseNum } from '@/composables/useG5FormulaEngine'
-import { readCanonicalRaw } from './g5StorageContract'
+import { G5_ITEM_IDS, readCanonicalRaw } from './g5StorageContract'
 
 export interface G5GrossAggregate {
   individualClosing: number
@@ -43,6 +43,9 @@ function isWithinOneYearRow(r: any): boolean {
   }
   return false
 }
+
+/** 供跨循环（如 G7-16）判断是否一年内到期（不构成长期净投资） */
+export { isWithinOneYearRow }
 
 export function aggregateGrossFromG52(list: any[]): G5GrossAggregate {
   const result: G5GrossAggregate = {
@@ -164,4 +167,101 @@ export function parseRowsRemark(
     if (Array.isArray(parsed?.groups)) return parsed.groups
   } catch { /* ignore */ }
   return []
+}
+
+/**
+ * 从 G5-2 明细构建「实质净投资长期应收」Map（债务人归一名 → 金额）。
+ * 默认优先关联方；一年内到期部分剔除。
+ */
+export function buildG52NetInvestmentMap(
+  rows: any[],
+  opts?: { relatedPartyOnly?: boolean },
+): Map<string, number> {
+  const relatedOnly = opts?.relatedPartyOnly !== false
+  const map = new Map<string, number>()
+  if (!Array.isArray(rows)) return map
+  for (const r of rows) {
+    if (!r || r.kind === 'section_header' || r.kind === 'subtotal' || r.kind === 'total') continue
+    if (isWithinOneYearRow(r)) continue
+    const related = r.isRelatedParty === true || r.isRelatedParty === '是' || r.isRelatedParty === 1
+    if (relatedOnly && !related) continue
+    const name = normalizeDebtorName(r.debtorName || r.counterpartyName || '')
+    if (!name) continue
+    const amt = parseNum(r.netAmount ?? r.closingBalance ?? r.auditedClosing)
+    if (amt <= 0) continue
+    map.set(name, Math.round(((map.get(name) || 0) + amt) * 100) / 100)
+  }
+  return map
+}
+
+/** 解析 G5 主底稿 wp_id（G5-2 / G5-1 / G5） */
+export async function resolveG5WorkpaperId(
+  projectId: string,
+  fallbackWpId?: string,
+): Promise<string | null> {
+  if (!projectId) return fallbackWpId || null
+  const http = (await import('@/utils/http')).default
+  for (const sheetCode of ['G5-2', 'G5-1', 'G5']) {
+    try {
+      const { data } = await http.get('/api/acnr/resolve-instance', {
+        params: { project_id: projectId, parent: 'G5', sheet_code: sheetCode },
+        _silent: true,
+      } as any)
+      const resolved = data?.data?.wp_id ?? data?.wp_id
+      if (resolved) return String(resolved)
+    } catch { /* try next */ }
+  }
+  return fallbackWpId || null
+}
+
+/** 拉取 G5-2 并汇总为债务人→实质长期应收 Map */
+export async function fetchG52NetInvestmentByDebtor(
+  projectId: string,
+  opts?: { relatedPartyOnly?: boolean },
+): Promise<Map<string, number>> {
+  const empty = new Map<string, number>()
+  if (!projectId) return empty
+  try {
+    const { fetchChecklistResponseMap } = await import('./g4CrossHelpers')
+    const wpId = await resolveG5WorkpaperId(projectId)
+    if (!wpId) return empty
+    const map = await fetchChecklistResponseMap(wpId)
+    const rows = parseRowsRemark(map.get(G5_ITEM_IDS.G5_2_ROWS) || map.get('G5-2-rows'))
+    return buildG52NetInvestmentMap(rows, opts)
+  } catch {
+    return empty
+  }
+}
+
+/** TB 1531 辅助核算（客户）→ 债务人余额 Map，作 G5-2 缺失时的降级 */
+export async function fetchTb1531AuxByCustomer(
+  projectId: string,
+  year?: number,
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>()
+  if (!projectId) return out
+  try {
+    const http = (await import('@/utils/http')).default
+    const { resolveAuditYearNumber } = await import('./workpaperAuditYear')
+    const y = year
+      ?? resolveAuditYearNumber(undefined, new Date().getFullYear() - 1)
+      ?? (new Date().getFullYear() - 1)
+    const { data } = await http.get(`/api/projects/${projectId}/ledger/aux-balance-detail`, {
+      params: {
+        account_code: '1531',
+        dim_type: '客户',
+        year: y,
+      },
+      _silent: true,
+    } as any)
+    const rows: any[] = Array.isArray(data) ? data : (data?.data ?? data?.items ?? [])
+    for (const r of rows) {
+      const name = normalizeDebtorName(r.aux_name ?? r.auxName ?? r.name ?? '')
+      if (!name) continue
+      const amt = parseNum(r.closing_balance ?? r.closingBalance ?? r.ending_balance)
+      if (amt <= 0) continue
+      out.set(name, Math.round(((out.get(name) || 0) + amt) * 100) / 100)
+    }
+  } catch { /* ignore */ }
+  return out
 }

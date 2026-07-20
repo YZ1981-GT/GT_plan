@@ -361,11 +361,13 @@ import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useG7EquityMethodFormData } from '../../composables/useG7EquityMethodFormData'
 import { useG7EquityMethodImportExport } from '../../composables/useG7EquityMethodImportExport'
+import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import {
   G7_BASIC_INFO_GROUPS,
   G7_ENTERPRISE_TYPE_OPTIONS,
   G7_YES_NO_OPTIONS,
   createG7BasicInfoRow,
+  hasG7BasicInfoBlockingErrors,
   needsHoldingVotingReason,
   needsLessThanHalfControlReason,
   needsMajorityNoControlReason,
@@ -388,9 +390,12 @@ const props = defineProps<{
 
 const isReadonly = computed(() => props.readonly ?? false)
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const scheduleAutoSnapshot = runtime?.version?.scheduleAutoSnapshot ?? (() => undefined)
 const formData = useG7EquityMethodFormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
+  onAfterSave: () => scheduleAutoSnapshot(),
 })
 const importExport = useG7EquityMethodImportExport({ wpId: computed(() => props.wpId) })
 
@@ -440,8 +445,12 @@ function rowsForGroup(groupType: G7BasicInfoGroup): G7BasicInfoRow[] {
   return rows.filter(row => row.groupType === groupType)
 }
 
-function persistRows(): void {
+function persistRows(options: { force?: boolean } = {}): void {
   if (isReadonly.value) return
+  if (!options.force && hasG7BasicInfoBlockingErrors(rows)) {
+    ElMessage.warning('存在阻断性校验错误（空名称/重复/比例越界等），已暂不写入，请先修正')
+    return
+  }
   formData.debouncedSave(ROWS_KEY, {
     conclusion: JSON.stringify(serializeG7BasicInfoRows(rows)),
     remark: null,
@@ -638,7 +647,7 @@ onMounted(async () => {
   const savedRows = parseStoredRows(formData.data.value.get(ROWS_KEY)?.conclusion)
   hydrateRows(savedRows.length ? savedRows : htmlRows)
   // 迁移后的百分数立刻落盘，避免下次再次按小数解释
-  if (savedRows.length) persistRows()
+  if (savedRows.length) persistRows({ force: true })
   auditNote.value = formData.data.value.get(AUDIT_NOTE_KEY)?.remark ?? ''
   auditConclusion.value = formData.data.value.get(AUDIT_CONCLUSION_KEY)?.remark ?? ''
 })

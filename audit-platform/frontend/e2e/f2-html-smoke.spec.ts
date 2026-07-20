@@ -26,6 +26,8 @@ type SmokeCase = {
 
 const SMOKE_CASES: SmokeCase[] = [
   { wpCode: 'F2-1', componentType: 'f2-inventory-main', bodyHint: /审定|存货|期初/ },
+  // F2-14 是 F2-1 包内 sheet，无独立 wp_index；冒烟用 F2-1 打开后切 tab（见下方专用用例）
+  { wpCode: 'F2-29', componentType: 'f2-inventory-main', bodyHint: /截止|入库|凭证/ },
   { wpCode: 'F2-47', componentType: 'f2-inventory-valuation-impairment', bodyHint: /跌价|准备|可变现/ },
   { wpCode: 'F2-55', componentType: 'f2-inventory-special', bodyHint: /履约|合同|成本/ },
   { wpCode: 'F2-70', componentType: 'f2-inventory-special', bodyHint: /披露|IPO|存货/ },

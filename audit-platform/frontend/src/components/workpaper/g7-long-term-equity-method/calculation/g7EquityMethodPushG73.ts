@@ -3,7 +3,6 @@
  */
 import { listWorkpapers, getWorkpaper } from '@/services/workpaperApi'
 import http from '@/utils/http'
-import { eventBus } from '@/utils/eventBus'
 import {
   isG7MainWorkpaper,
   mergeSuggestedIntoG73,
@@ -181,10 +180,17 @@ export async function pushSuggestedAdjustmentsToG73(opts: {
   }
 
   try {
-    eventBus.emit('adjustment:updated')
+    // 不发 adjustment:updated，避免已打开的 G7-3 用集中模块 sync 覆盖刚写入的建议草稿
+    const kinds = [...new Set(suggested.map((r) => String(r.sourceKind || '').trim()).filter(Boolean))]
     window.dispatchEvent(
       new CustomEvent('g7:adjustment-pushed', {
-        detail: { source: 'G7-14', mainWpId, count: suggested.length, timestamp: Date.now() },
+        detail: {
+          source: kinds[0] || 'suggested',
+          sourceKinds: kinds,
+          mainWpId,
+          count: suggested.length,
+          timestamp: Date.now(),
+        },
       }),
     )
   } catch {

@@ -39,6 +39,29 @@
       </el-select>
     </div>
     <div class="toolbar-right">
+      <el-popover placement="bottom-end" :width="280" trigger="click">
+        <template #reference>
+          <el-button size="small">⚙ 列设置</el-button>
+        </template>
+        <div class="f1-col-prefs">
+          <div class="prefs-presets">
+            <el-button
+              v-for="p in presetOptions"
+              :key="p.name"
+              size="small"
+              :type="activePreset === p.name ? 'primary' : 'default'"
+              @click="applyPreset(p.name)"
+            >{{ p.label }}</el-button>
+          </div>
+          <el-divider style="margin: 8px 0" />
+          <div v-for="g in allGroups" :key="g" class="prefs-row">
+            <el-checkbox
+              :model-value="isGroupVisible(g)"
+              @change="(v: boolean | string | number) => toggleGroup(g, !!v)"
+            >{{ groupLabels[g] }}</el-checkbox>
+          </div>
+        </div>
+      </el-popover>
       <el-dropdown size="small" trigger="click" :disabled="isReadonly">
         <el-button size="small">导入导出 ▾</el-button>
         <template #dropdown>
@@ -122,7 +145,7 @@
       </template>
     </el-table-column>
     <!-- E: 期初未审 -->
-    <el-table-column label="期初未审" width="110" align="right">
+    <el-table-column v-if="isGroupVisible('prior')" label="期初未审" width="110" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.priorUnadjusted" size="small" :disabled="isReadonly"
@@ -132,7 +155,7 @@
       </template>
     </el-table-column>
     <!-- F: 期初账项调整 -->
-    <el-table-column label="期初账项调整" width="110" align="right">
+    <el-table-column v-if="isGroupVisible('prior')" label="期初账项调整" width="110" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.priorAdjustment" size="small" :disabled="isReadonly"
@@ -142,7 +165,7 @@
       </template>
     </el-table-column>
     <!-- G: 期初重分类 -->
-    <el-table-column label="期初重分类调整" width="120" align="right">
+    <el-table-column v-if="isGroupVisible('prior')" label="期初重分类调整" width="120" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.priorReclass" size="small" :disabled="isReadonly"
@@ -152,26 +175,28 @@
       </template>
     </el-table-column>
     <!-- H: 期初审定 -->
-    <el-table-column label="期初审定数" width="110" align="right" class-name="auto-calc-col">
+    <el-table-column v-if="isGroupVisible('prior')" label="期初审定数" width="110" align="right" class-name="auto-calc-col">
       <template #default="{ row }">
         <span v-if="isAmountFooter(row) || isDataRow(row)" class="auto-calc amt">{{ fmtAmount(row.priorAudited) }}</span>
         <span v-else-if="row.rowId === '__aging_check__'" :class="boolClass(row.priorAudited)">{{ boolLabel(row.priorAudited) }}</span>
       </template>
     </el-table-column>
     <!-- 期初审定账龄 -->
-    <el-table-column v-for="band in bands" :key="'prior-' + band.key" :label="`${band.label}(期初)`" width="100" align="right">
-      <template #default="{ row }">
-        <template v-if="isDataRow(row)">
-          <el-input v-model.number="row.agingPrior[band.key]" size="small" :disabled="isReadonly"
-            @change="(val: any) => onCellChange(row.rowId, `agingPrior.${band.key}`, val)" />
+    <template v-if="isGroupVisible('priorAging')">
+      <el-table-column v-for="band in bands" :key="'prior-' + band.key" :label="`${band.label}(期初)`" width="100" align="right">
+        <template #default="{ row }">
+          <template v-if="isDataRow(row)">
+            <el-input v-model.number="row.agingPrior[band.key]" size="small" :disabled="isReadonly"
+              @change="(val: any) => onCellChange(row.rowId, `agingPrior.${band.key}`, val)" />
+          </template>
+          <span v-else-if="row.rowId === '__aging_pct__'" class="amt pct">{{ fmtPct(row.agingPrior?.[band.key]) }}</span>
+          <span v-else-if="row.rowId === '__aging_check__'" :class="boolClass(row.agingPrior?.[band.key])">{{ boolLabel(row.agingPrior?.[band.key]) }}</span>
+          <span v-else-if="isAmountFooter(row)" class="amt">{{ fmtAmount(row.agingPrior?.[band.key]) }}</span>
         </template>
-        <span v-else-if="row.rowId === '__aging_pct__'" class="amt pct">{{ fmtPct(row.agingPrior?.[band.key]) }}</span>
-        <span v-else-if="row.rowId === '__aging_check__'" :class="boolClass(row.agingPrior?.[band.key])">{{ boolLabel(row.agingPrior?.[band.key]) }}</span>
-        <span v-else-if="isAmountFooter(row)" class="amt">{{ fmtAmount(row.agingPrior?.[band.key]) }}</span>
-      </template>
-    </el-table-column>
+      </el-table-column>
+    </template>
     <!-- M: 借方发生 -->
-    <el-table-column label="借方发生" width="100" align="right">
+    <el-table-column v-if="isGroupVisible('movement')" label="借方发生" width="100" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.debit" size="small" :disabled="isReadonly"
@@ -181,7 +206,7 @@
       </template>
     </el-table-column>
     <!-- N: 贷方发生 -->
-    <el-table-column label="贷方发生" width="100" align="right">
+    <el-table-column v-if="isGroupVisible('movement')" label="贷方发生" width="100" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.credit" size="small" :disabled="isReadonly"
@@ -191,13 +216,13 @@
       </template>
     </el-table-column>
     <!-- O: 期末余额 -->
-    <el-table-column label="期末余额" width="110" align="right" class-name="auto-calc-col">
+    <el-table-column v-if="isGroupVisible('movement')" label="期末余额" width="110" align="right" class-name="auto-calc-col">
       <template #default="{ row }">
         <span v-if="isAmountFooter(row) || isDataRow(row)" class="auto-calc amt">{{ fmtAmount(row.endBalance) }}</span>
       </template>
     </el-table-column>
     <!-- P: 被审计单位重分类 -->
-    <el-table-column label="被审计单位重分类调整" width="140" align="right">
+    <el-table-column v-if="isGroupVisible('current')" label="被审计单位重分类调整" width="140" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.entityReclass" size="small" :disabled="isReadonly"
@@ -207,26 +232,28 @@
       </template>
     </el-table-column>
     <!-- Q: 期末未审 -->
-    <el-table-column label="期末未审余额" width="120" align="right" class-name="auto-calc-col">
+    <el-table-column v-if="isGroupVisible('current')" label="期末未审余额" width="120" align="right" class-name="auto-calc-col">
       <template #default="{ row }">
         <span v-if="isAmountFooter(row) || isDataRow(row)" class="auto-calc amt">{{ fmtAmount(row.endUnadjusted) }}</span>
         <span v-else-if="row.rowId === '__aging_check__'" :class="boolClass(row.endUnadjusted)">{{ boolLabel(row.endUnadjusted) }}</span>
       </template>
     </el-table-column>
     <!-- 期末未审账龄 -->
-    <el-table-column v-for="band in bands" :key="'current-' + band.key" :label="`${band.label}(期末未审)`" width="110" align="right">
-      <template #default="{ row }">
-        <template v-if="isDataRow(row)">
-          <el-input v-model.number="row.agingCurrent[band.key]" size="small" :disabled="isReadonly"
-            @change="(val: any) => onCellChange(row.rowId, `agingCurrent.${band.key}`, val)" />
+    <template v-if="isGroupVisible('currentAging')">
+      <el-table-column v-for="band in bands" :key="'current-' + band.key" :label="`${band.label}(期末未审)`" width="110" align="right">
+        <template #default="{ row }">
+          <template v-if="isDataRow(row)">
+            <el-input v-model.number="row.agingCurrent[band.key]" size="small" :disabled="isReadonly"
+              @change="(val: any) => onCellChange(row.rowId, `agingCurrent.${band.key}`, val)" />
+          </template>
+          <span v-else-if="row.rowId === '__aging_pct__'" class="amt pct">{{ fmtPct(row.agingCurrent?.[band.key]) }}</span>
+          <span v-else-if="row.rowId === '__aging_check__'" :class="boolClass(row.agingCurrent?.[band.key])">{{ boolLabel(row.agingCurrent?.[band.key]) }}</span>
+          <span v-else-if="isAmountFooter(row)" class="amt">{{ fmtAmount(row.agingCurrent?.[band.key]) }}</span>
         </template>
-        <span v-else-if="row.rowId === '__aging_pct__'" class="amt pct">{{ fmtPct(row.agingCurrent?.[band.key]) }}</span>
-        <span v-else-if="row.rowId === '__aging_check__'" :class="boolClass(row.agingCurrent?.[band.key])">{{ boolLabel(row.agingCurrent?.[band.key]) }}</span>
-        <span v-else-if="isAmountFooter(row)" class="amt">{{ fmtAmount(row.agingCurrent?.[band.key]) }}</span>
-      </template>
-    </el-table-column>
+      </el-table-column>
+    </template>
     <!-- V: 账项调整 -->
-    <el-table-column label="账项调整" width="100" align="right">
+    <el-table-column v-if="isGroupVisible('adjust')" label="账项调整" width="100" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.endAje" size="small" :disabled="isReadonly"
@@ -236,7 +263,7 @@
       </template>
     </el-table-column>
     <!-- W: 重分类调整 -->
-    <el-table-column label="重分类调整" width="100" align="right">
+    <el-table-column v-if="isGroupVisible('adjust')" label="重分类调整" width="100" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.endRje" size="small" :disabled="isReadonly"
@@ -246,26 +273,28 @@
       </template>
     </el-table-column>
     <!-- X: 审定数 -->
-    <el-table-column label="审定数" width="110" align="right" class-name="auto-calc-col">
+    <el-table-column v-if="isGroupVisible('audited')" label="审定数" width="110" align="right" class-name="auto-calc-col">
       <template #default="{ row }">
         <span v-if="isAmountFooter(row) || isDataRow(row)" class="auto-calc amt">{{ fmtAmount(row.endAudited) }}</span>
         <span v-else-if="row.rowId === '__aging_check__'" :class="boolClass(row.endAudited)">{{ boolLabel(row.endAudited) }}</span>
       </template>
     </el-table-column>
     <!-- 期末审定账龄 -->
-    <el-table-column v-for="band in bands" :key="'audited-' + band.key" :label="`${band.label}(期末审定)`" width="110" align="right">
-      <template #default="{ row }">
-        <template v-if="isDataRow(row)">
-          <el-input v-model.number="row.agingAudited[band.key]" size="small" :disabled="isReadonly"
-            @change="(val: any) => onCellChange(row.rowId, `agingAudited.${band.key}`, val)" />
+    <template v-if="isGroupVisible('auditedAging')">
+      <el-table-column v-for="band in bands" :key="'audited-' + band.key" :label="`${band.label}(期末审定)`" width="110" align="right">
+        <template #default="{ row }">
+          <template v-if="isDataRow(row)">
+            <el-input v-model.number="row.agingAudited[band.key]" size="small" :disabled="isReadonly"
+              @change="(val: any) => onCellChange(row.rowId, `agingAudited.${band.key}`, val)" />
+          </template>
+          <span v-else-if="row.rowId === '__aging_pct__'" class="amt pct">{{ fmtPct(row.agingAudited?.[band.key]) }}</span>
+          <span v-else-if="row.rowId === '__aging_check__'" :class="boolClass(row.agingAudited?.[band.key])">{{ boolLabel(row.agingAudited?.[band.key]) }}</span>
+          <span v-else-if="isAmountFooter(row)" class="amt">{{ fmtAmount(row.agingAudited?.[band.key]) }}</span>
         </template>
-        <span v-else-if="row.rowId === '__aging_pct__'" class="amt pct">{{ fmtPct(row.agingAudited?.[band.key]) }}</span>
-        <span v-else-if="row.rowId === '__aging_check__'" :class="boolClass(row.agingAudited?.[band.key])">{{ boolLabel(row.agingAudited?.[band.key]) }}</span>
-        <span v-else-if="isAmountFooter(row)" class="amt">{{ fmtAmount(row.agingAudited?.[band.key]) }}</span>
-      </template>
-    </el-table-column>
+      </el-table-column>
+    </template>
     <!-- AC: 是否函证 -->
-    <el-table-column label="是否函证" width="90" align="center">
+    <el-table-column v-if="isGroupVisible('meta')" label="是否函证" width="90" align="center">
       <template #default="{ row }">
         <el-select v-if="isDataRow(row)" v-model="row.isConfirmed" size="small" :disabled="isReadonly" clearable
           @change="(val: string) => onCellChange(row.rowId, 'isConfirmed', val || '')">
@@ -275,7 +304,7 @@
       </template>
     </el-table-column>
     <!-- AD: 期后回款 -->
-    <el-table-column label="期后回款" width="110" align="right">
+    <el-table-column v-if="isGroupVisible('meta')" label="期后回款" width="110" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.postPeriodSettlement" size="small" :disabled="isReadonly"
@@ -285,7 +314,7 @@
       </template>
     </el-table-column>
     <!-- AE: 备注 -->
-    <el-table-column label="备注" min-width="120">
+    <el-table-column v-if="isGroupVisible('meta')" label="备注" min-width="120">
       <template #default="{ row }">
         <el-input v-if="isDataRow(row)" v-model="row.remark" size="small" :disabled="isReadonly"
           @change="(val: string) => onCellChange(row.rowId, 'remark', val)" />
@@ -408,6 +437,7 @@
  */
 import { computed, inject, ref, toRef, watch, type Ref } from 'vue'
 import { useF1Detail } from '../composables/useF1Detail'
+import { useF1DetailColumnPrefs } from '../composables/useF1DetailColumnPrefs'
 import { F1_PAYMENT_NATURE_OPTIONS } from '../composables/useF1Adjudication'
 import { useF1ImportExport, type F1ImportSheet } from '../composables/useWorkpaperImportExport'
 import { useF1AiGenerate } from '../composables/useF1AiGenerate'
@@ -429,6 +459,16 @@ const props = defineProps<{
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 const wpIdRef = toRef(props, 'wpId') as Ref<string>
+
+const {
+  activePreset,
+  presetOptions,
+  allGroups,
+  groupLabels,
+  isGroupVisible,
+  toggleGroup,
+  applyPreset,
+} = useF1DetailColumnPrefs()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 const relatedParties = ref<string[]>([])

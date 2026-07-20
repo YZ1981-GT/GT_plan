@@ -9,9 +9,9 @@
  *   POST /api/workpapers/{wpId}/g7-equity-method/export-data?sheet={code}
  *   POST /api/workpapers/{wpId}/g7-equity-method/import-data?sheet={code}  (multipart/form-data)
  *
- * sheet codes: G7-4 / G7-5 / G7-13 / G7-14 / G7-15 / G7-16 / G7-17
+ * sheet codes: G7-4 / G7-5 / G7-6 / G7-13 / G7-14 / G7-15 / G7-16 / G7-17
  * 宽表按区段分sheet导出：G7-13(2sheet) / G7-14(2sheet) / G7-16(2sheet)
- * 原底稿单sheet导出：G7-4；普通单sheet导出：G7-5 / G7-15 / G7-17
+ * 原底稿单sheet导出：G7-4；普通单sheet导出：G7-5 / G7-6 / G7-15 / G7-17
  *
  * UI 铁律：el-dropdown「导入导出 ▾」（导出模板/导出数据/导入数据）
  * 使用 axios (http from @/utils/http) 非原生 fetch — for Authorization header
@@ -23,10 +23,11 @@ import http from '@/utils/http'
 
 // ═══ 类型定义 ═══
 
-/** G7(权益法组) 支持导入导出的 sheet 编码（7张动态行表格） */
+/** G7(权益法组) 支持导入导出的 sheet 编码（含 G7-6 会计政策） */
 export type G7EquityMethodImportableSheet =
   | 'G7-4'
   | 'G7-5'
+  | 'G7-6'
   | 'G7-13'
   | 'G7-14'
   | 'G7-15'
@@ -57,8 +58,9 @@ export const G7_EQUITY_METHOD_API_PREFIX = 'g7-equity-method'
 export const G7_EQUITY_METHOD_IMPORT_EXPORT_SHEETS: G7EquityMethodSheetMeta[] = [
   { code: 'G7-4', label: 'G7-4 被投资单位基本信息' },
   { code: 'G7-5', label: 'G7-5 被投资单位财务信息' },
+  { code: 'G7-6', label: 'G7-6 被投资公司会计政策' },
   { code: 'G7-13', label: 'G7-13 投资成本测试表（2区段）', multiSheet: true },
-  { code: 'G7-14', label: 'G7-14 权益法测算表（4区段）', multiSheet: true },
+  { code: 'G7-14', label: 'G7-14 权益法测算表（3数据区+净资产/商誉附表）', multiSheet: true },
   { code: 'G7-15', label: 'G7-15 内部交易抵销测算表' },
   { code: 'G7-16', label: 'G7-16 未确认投资损失（2区段）', multiSheet: true },
   { code: 'G7-17', label: 'G7-17 减值测试表' },

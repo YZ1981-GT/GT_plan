@@ -18,9 +18,11 @@ export interface ConfirmationCompletedPayload {
   confirmIndex?: string
   /** 科目大类 */
   accountType?: string
+  /** 科目编码（优先于 accountType 推导 wpCode；对齐 standard_account_chart） */
+  accountCode?: string
   /**
    * 科目底稿提示码（D7 严格过滤 wpCode==='D7'）
-   * 由 accountType 推导，也可调用方覆盖
+   * 由 accountType / accountCode 推导，也可调用方覆盖
    */
   wpCode?: string
   projectId?: string
@@ -34,16 +36,19 @@ export interface ConfirmationCompletedPayload {
   differenceAmount?: number
 }
 
-/** 科目编码前缀 → 科目底稿提示码 */
+/**
+ * 科目编码前缀 → 科目底稿提示码
+ * 对齐 standard_account_chart：1123=预付账款→F1；2203=预收/2205=合同负债→D5；
+ * 1231=坏账准备（备抵，非往来函证对象，不映射科目明细底稿）。
+ */
 const ACCOUNT_CODE_TO_WP_HINT: Array<[RegExp, string]> = [
   [/^1121/, 'D1'],   // 应收票据
   [/^1122/, 'D2'],   // 应收账款
-  [/^1123/, 'D5'],   // 预收账款→合同负债
+  [/^1123/, 'F1'],   // 预付账款
   [/^1221/, 'D7'],   // 其他应收款
   [/^1001|^1002|^1012/, 'E1'], // 货币资金
-  [/^1123|^2203/, 'D5'],   // 合同负债/预收
+  [/^2203|^2205/, 'D5'],   // 预收账款 / 合同负债
   [/^2201|^2202/, 'F4'],   // 应付票据/应付账款
-  [/^1231/, 'F1'],   // 预付账款
   [/^2241/, 'K'],    // 其他应付款
 ]
 
@@ -91,7 +96,7 @@ export function emitConfirmationCompleted(payload: ConfirmationCompletedPayload)
   const detail: ConfirmationCompletedPayload = {
     ...payload,
     customerName: name,
-    wpCode: payload.wpCode || accountTypeToWpHint(payload.accountType),
+    wpCode: payload.wpCode || accountTypeToWpHint(payload.accountType, payload.accountCode),
   }
 
   try {

@@ -23,6 +23,7 @@ import {
   recalcDividendRow,
   recalcNciPurchaseRow,
   recalcPartialDisposalRow,
+  syncDividendRowsFromG79Carry,
   validateSubsequentRows,
 } from '../g7SubsequentModel'
 import { loadSubsidiaryInvestees } from '../../../composables/g7EquityMethodCrossSheet'
@@ -253,6 +254,22 @@ describe('G7TabSubsequentMeasurement — 公式验证', () => {
       expect(parseNum(null)).toBe(0)
       expect(parseNum('')).toBe(0)
       expect(parseNum('abc')).toBe(0)
+    })
+  })
+
+  describe('从 G7-9 带入股利名单', () => {
+    it('syncDividendRowsFromG79Carry 仅补缺不覆盖', () => {
+      const existing = [createDividendRow(1, '甲')]
+      existing[0].shareholdingRatio = 0.5
+      const { rows, added } = syncDividendRowsFromG79Carry(existing, [
+        { companyName: '甲', shareholdingRatio: 0.9 },
+        { companyName: '乙', shareholdingRatio: 0.8 },
+      ])
+      expect(added).toBe(1)
+      expect(rows).toHaveLength(2)
+      expect(rows[0].shareholdingRatio).toBe(0.5)
+      expect(rows[1].companyName).toBe('乙')
+      expect(rows[1].shareholdingRatio).toBe(0.8)
     })
   })
 })

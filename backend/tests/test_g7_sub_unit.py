@@ -33,6 +33,10 @@ from app.routers.wp_render_strategies._g7_long_term_equity_subsidiary_import_exp
     _build_g7_9_workbook,
     _parse_g7_8_import,
     _parse_g7_9_import,
+    _normalize_g7_11_rows_import,
+    _prepare_g7_11_rows_export,
+    _recalculate_g7_11_row,
+    _normalize_ratio_to_fraction,
 )
 
 
@@ -91,6 +95,7 @@ def test_g7_8_three_section_export_import_roundtrip():
             "section": "merger",
             "seq": 1,
             "investeeName": "公司1",
+            "acquisitionDate": "2024-03-01",
             "finalController": "最终控制方A",
             "ownerEquityBookValue": 100,
             "ownershipRatio": 0.32,
@@ -143,7 +148,7 @@ def test_g7_8_three_section_export_import_roundtrip():
     assert merger["initialInvestmentCost"] == 32
     assert merger["totalConsideration"] == 10
     assert merger["capitalReserveRetainedEarningsAdjustment"] == 22
-
+    assert merger["acquisitionDate"] == "2024-03-01"
 
 def test_g7_9_three_section_export_import_roundtrip():
     source_rows = [
@@ -488,3 +493,73 @@ class TestImportExportValidation:
             )
             assert resp.status_code == 200
             assert "spreadsheet" in resp.headers.get("content-type", "")
+
+# =============================================================================
+# G7-11 import recalc / ratio normalize
+# =============================================================================
+
+
+class TestG711ImportRecalc:
+    def test_normalize_ratio_percent_to_fraction(self):
+        assert _normalize_ratio_to_fraction(30) == 0.3
+        assert _normalize_ratio_to_fraction(0.3) == 0.3
+        assert _normalize_ratio_to_fraction(100) == 1.0
+
+    def test_recalculate_individual_and_consolidated_gain(self):
+        row = _recalculate_g7_11_row({
+            "disposalPrice": 1000,
+            "disposalDateBookValue": 800,
+            "disposalDateDividend": 50,
+            "transferableOCI": 30,
+            "consolidationAdjustment": 20,
+            "consolidatedNetAssetShare": 40,
+            "disposalRatio": 60,
+            "consolidatedGainManual": False,
+        })
+        assert row["individualGain"] == 180
+        assert row["consolidatedGain"] == 160
+        assert row["disposalRatio"] == 0.6
+
+    def test_manual_consolidated_gain_preserved(self):
+        row = _recalculate_g7_11_row({
+            "disposalPrice": 1000,
+            "disposalDateBookValue": 800,
+            "disposalDateDividend": 0,
+            "transferableOCI": 0,
+            "consolidationAdjustment": 0,
+            "consolidatedNetAssetShare": 0,
+            "consolidatedGain": 999,
+            "consolidatedGainManual": "yes",
+        })
+        assert row["individualGain"] == 200
+        assert row["consolidatedGain"] == 999
+        assert row["consolidatedGainManual"] is True
+
+    def test_normalize_import_batch(self):
+        rows = _normalize_g7_11_rows_import([{
+            "disposalPrice": 500,
+            "disposalDateBookValue": 400,
+            "disposalDateDividend": 0,
+            "transferableOCI": -20,
+            "consolidationAdjustment": 0,
+            "consolidatedNetAssetShare": 10,
+            "disposalRatio": 50,
+        }])
+        assert rows[0]["individualGain"] == 80
+        assert rows[0]["consolidatedGain"] == 70
+        assert rows[0]["disposalRatio"] == 0.5
+
+    def test_prepare_export_yes_no(self):
+        rows = _prepare_g7_11_rows_export([{
+            "disposalPrice": 100,
+            "disposalDateBookValue": 50,
+            "disposalDateDividend": 0,
+            "transferableOCI": 0,
+            "consolidationAdjustment": 0,
+            "consolidatedNetAssetShare": 0,
+            "consolidatedGainManual": True,
+            "consolidatedGain": 88,
+        }])
+        assert rows[0]["consolidatedGainManual"] == "\u662f"
+        assert rows[0]["consolidatedGain"] == 88
+

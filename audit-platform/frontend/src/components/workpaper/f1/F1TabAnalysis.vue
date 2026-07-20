@@ -25,6 +25,52 @@
     show-icon
     style="margin-bottom: 12px"
   />
+  <el-alert
+    v-for="(hint, idx) in crossCycleHints"
+    :key="'xcycle-' + idx"
+    type="warning"
+    :title="hint"
+    :closable="false"
+    show-icon
+    style="margin-bottom: 8px"
+  />
+
+  <div class="analysis-card linkage-card">
+    <h4 class="card-title">跨科目联动锚点（F2 / F4）</h4>
+    <p class="guide-tip">手工填入 F2 存货余额/采购、F4 应付期末余额后，上方将给出周转与并存勾稽提示。</p>
+    <el-table :data="linkageAnchorRows" size="small" border>
+      <el-table-column label="项目" min-width="220" prop="label" />
+      <el-table-column label="本期" width="140" align="right">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            v-model.number="editBuf['link.' + row.key + '.current']"
+            size="small"
+            @focus="() => { editBuf['link.' + row.key + '.current'] = row.current }"
+            @change="() => commitLinkage(row.key, 'current')"
+          />
+          <span v-else class="amt">{{ fmtAmount(row.current) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="上期" width="140" align="right">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            v-model.number="editBuf['link.' + row.key + '.prior']"
+            size="small"
+            @focus="() => { editBuf['link.' + row.key + '.prior'] = row.prior }"
+            @change="() => commitLinkage(row.key, 'prior')"
+          />
+          <span v-else class="amt">{{ fmtAmount(row.prior) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="索引" width="100">
+        <template #default="{ row }">
+          <span class="chip-wrap"><GtIndexChip :value="row.indexChip" :context-project-id="projectId" /></span>
+        </template>
+      </el-table-column>
+    </el-table>
+  </div>
 
   <div class="tab-toolbar">
     <div class="toolbar-left">
@@ -334,22 +380,25 @@ const {
   creditRows,
   supplierRows,
   supplierSubtotal,
-  top5ConcentrationWarning,
-  notes,
-  conclusion,
-  updateBalanceNature,
-  updateInventoryBalance,
-  updateDebitNature,
-  updateInventoryPurchase,
-  updateCreditBreakdown,
-  updateNote,
-  updateConclusion,
-  addSupplierRow,
-  removeSupplierRow,
-  updateSupplierCell,
-  fillFromDetail,
-  fillMajorSuppliersFromDetail,
-} = useF1Analysis({
+    top5ConcentrationWarning,
+    crossCycleHints,
+    payableBalance,
+    notes,
+    conclusion,
+    updateBalanceNature,
+    updateInventoryBalance,
+    updateDebitNature,
+    updateInventoryPurchase,
+    updatePayableBalance,
+    updateCreditBreakdown,
+    updateNote,
+    updateConclusion,
+    addSupplierRow,
+    removeSupplierRow,
+    updateSupplierCell,
+    fillFromDetail,
+    fillMajorSuppliersFromDetail,
+  } = useF1Analysis({
   allResponses: allResponsesRef,
   wpId: wpIdRef,
   projectId: toRef(props, 'projectId') as Ref<string>,
@@ -359,9 +408,38 @@ const {
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
+const projectId = computed(() => props.projectId)
+
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(wpIdRef)
 
 const editBuf = reactive<Record<string, number>>({})
+
+/** 跨科目锚点：存货余额在余额分析中已有编辑；此处集中展示采购+应付便于联动 */
+const linkageAnchorRows = computed(() => {
+  const purchase = debitRows.value.find(r => r.rowKey === 'inventoryPurchase')
+  return [
+    {
+      key: 'inventoryPurchase',
+      label: '存货采购金额（对照 F2）',
+      current: purchase?.current ?? 0,
+      prior: purchase?.prior ?? 0,
+      indexChip: 'wp:F2-1',
+    },
+    {
+      key: 'payableBalance',
+      label: '应付账款期末余额（对照 F4）',
+      current: payableBalance.value.current,
+      prior: payableBalance.value.prior,
+      indexChip: 'wp:F4-1',
+    },
+  ]
+})
+
+function commitLinkage(key: string, field: 'current' | 'prior') {
+  const val = editBuf['link.' + key + '.' + field]
+  if (key === 'inventoryPurchase') updateInventoryPurchase(field, val)
+  else if (key === 'payableBalance') updatePayableBalance(field, val)
+}
 
 function seedEdit(row: { rowKey: string; current: number; prior: number }, field: 'current' | 'prior', prefix = '') {
   editBuf[prefix + row.rowKey + '.' + field] = row[field]

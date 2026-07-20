@@ -140,12 +140,16 @@
           <span v-if="samplingInfo" class="sampling-info">{{ samplingInfo.method }} · {{ samplingInfo.count }} 笔</span>
         </div>
         <div class="ic-stage-toolbar-right">
+          <el-radio-group v-model="viewMode" size="small">
+            <el-radio-button value="table">完整表格</el-radio-button>
+            <el-radio-button value="card">逐笔核对</el-radio-button>
+          </el-radio-group>
           <el-tag size="small" type="info">共 {{ ic.rows.value.length }} 行</el-tag>
           <el-tag size="small">合计 {{ ic.checkedTotal.value.toLocaleString() }}</el-tag>
         </div>
       </div>
 
-      <div class="ic-table-wrap">
+      <div v-if="viewMode === 'table'" class="ic-table-wrap">
         <el-table :data="ic.rows.value" border size="small" max-height="520" :row-class-name="rowClass" style="min-width: 1200px">
           <el-table-column prop="seq" label="序号" width="52" fixed />
           <el-table-column label="记账凭证">
@@ -226,13 +230,41 @@
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column width="48" fixed="right">
+          <el-table-column label="操作" width="72" fixed="right">
             <template #default="{ row }">
+              <el-button link type="primary" size="small" @click="openVoucher(row)">核对</el-button>
               <el-button link type="danger" size="small" :disabled="isReadonly" @click="ic.removeRow(row.id)">删</el-button>
             </template>
           </el-table-column>
         </el-table>
       </div>
+
+      <div v-else class="ic-card-grid">
+        <div
+          v-for="row in ic.rows.value"
+          :key="row.id"
+          class="ic-vcard"
+          :class="{ abnormal: row.isAbnormal }"
+          @click="openVoucher(row)"
+        >
+          <div class="ic-vcard-head">
+            <span class="ic-vcard-title">{{ row.party || row.voucherNo || `第 ${row.seq} 笔` }}</span>
+            <template v-if="rowCheckSummary(row).bad">
+              <el-tag size="small" type="danger">{{ rowCheckSummary(row).bad }}项不符</el-tag>
+            </template>
+            <template v-else-if="rowCheckSummary(row).pending">
+              <el-tag size="small" type="info">待补 {{ rowCheckSummary(row).pending }}</el-tag>
+            </template>
+            <el-tag v-else size="small" type="success">核对通过</el-tag>
+          </div>
+          <div class="ic-vcard-body">
+            <span>{{ row.itemName || '—' }}</span>
+            <span>贷方 {{ Number(row.amount || 0).toLocaleString() }}</span>
+            <span>账 {{ row.qty }} / 出库 {{ row.docQty }}</span>
+          </div>
+        </div>
+      </div>
+
       <div class="ic-total">
         <span>合计贷方金额 {{ ic.checkedTotal.value.toLocaleString() }}</span>
       </div>
@@ -327,6 +359,13 @@
         @filled="handleSamplingFilled"
       />
     </el-dialog>
+
+    <F2MaterialUsageVoucherDialog
+      v-model="voucherDialogVisible"
+      :row="voucherDialogRow"
+      :readonly="isReadonly"
+      @save="handleSaveVoucher"
+    />
   </div>
 </template>
 
@@ -334,13 +373,18 @@
 import { ref, onMounted, inject, toRef, type Ref } from 'vue'
 import { useF2MaterialUsageCheck } from '../../composables/useF2InspectionCheck'
 import { useF2ValuationAiGenerate, type F2ValAiSection } from '../../composables/useF2ValuationAiGenerate'
-import { F2_INVENTORY_ACCOUNT_CODES } from '../../composables/useF2InspectionCheckFormulas'
+import {
+  F2_INVENTORY_ACCOUNT_CODES,
+  evaluateMaterialUsageChecks,
+  type MaterialUsageRow,
+} from '../../composables/useF2InspectionCheckFormulas'
 import type { ChecklistResponse } from '../../composables/useF2ValuationFormData'
 import type { SampledVoucher, FillMode, SamplingMethod } from '../../composables/useSamplingAlgorithms'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2ReviewChip from '../shared/F2ReviewChip.vue'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
+import F2MaterialUsageVoucherDialog from './F2MaterialUsageVoucherDialog.vue'
 
 const props = defineProps<{
   wpId?: string
@@ -432,6 +476,72 @@ function handleSamplingFilled(payload: { samples: SampledVoucher[]; fillMode: Fi
 function rowClass({ row }: { row: { isAbnormal?: boolean } }) {
   return row.isAbnormal ? 'error-row' : ''
 }
+
+const viewMode = ref<'table' | 'card'>('table')
+const voucherDialogVisible = ref(false)
+const voucherDialogRow = ref<MaterialUsageRow | null>(null)
+
+function openVoucher(row: MaterialUsageRow) {
+  voucherDialogRow.value = row
+  voucherDialogVisible.value = true
+}
+
+function handleSaveVoucher(patch: Partial<MaterialUsageRow> & { id: string }) {
+  ic.updateRow(patch.id, patch)
+}
+
+function rowCheckSummary(row: MaterialUsageRow): { bad: number; pending: number } {
+  const checks = evaluateMaterialUsageChecks(row)
+  return {
+    bad: checks.filter((c) => c.status === 'mismatch' || c.status === 'missing').length,
+    pending: checks.filter((c) => c.status === 'pending').length,
+  }
+}
 </script>
 
 <style scoped src="./f2InspectSheetStyles.css"></style>
+
+<style scoped>
+.ic-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  padding: 4px 0;
+}
+.ic-vcard {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: box-shadow 0.15s, border-color 0.15s;
+  background: var(--el-bg-color);
+}
+.ic-vcard:hover {
+  border-color: var(--el-color-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+.ic-vcard.abnormal {
+  border-left: 3px solid var(--el-color-danger);
+}
+.ic-vcard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.ic-vcard-title {
+  font-weight: 600;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ic-vcard-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+</style>

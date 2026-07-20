@@ -1,9 +1,9 @@
-"""F 采购存货循环 — F-F12 跌价准备 ECL 模型辅助 API
+"""F 采购存货循环 — F-F12 跌价准备分析 API
 
 POST /api/projects/{project_id}/workpapers/{wp_id}/f2/impairment-analysis
 
 输入：库龄分析 + 各产品成本/可变现净值
-输出：LLM 分析跌价准备计提充分性（stub 返回结构化建议）
+输出：按 CAS1 成本与可变现净值孰低法的确定性计提建议（非 LLM stub）
 
 对应 spec：workpaper-f-purchase-inventory F-F12
 """
@@ -65,7 +65,7 @@ class ImpairmentAnalysisResponse(BaseModel):
     suggestions: list[ImpairmentSuggestion]
     summary: str
     total_suggested_provision: str
-    is_llm_stub: bool = True
+    is_llm_stub: bool = False
     applied_to_sheet: str | None = None  # 写回时返回 sheet 名，否则 None
 
 
@@ -77,7 +77,7 @@ async def f2_impairment_analysis(
     db: AsyncSession = Depends(get_db),
     _user=Depends(require_project_access("edit")),
 ) -> ImpairmentAnalysisResponse:
-    """F-F12 跌价准备分析（LLM stub 实现）
+    """F-F12 跌价准备分析（确定性 CAS1 孰低法，同 G-ECL 模式 is_llm_stub=False）
 
     规则（成本与可变现净值孰低法）：
     - cost > nrv → 应计提 = cost - nrv
@@ -144,7 +144,7 @@ async def f2_impairment_analysis(
     summary = (
         f"共分析 {len(suggestions)} 个产品，建议合计计提跌价准备 ¥{total_provision:,.2f}。"
         f"其中高风险（库龄 ≥ 24 月）{high_risk_count} 个产品。"
-        f"方法：{payload.method}（LLM stub 返回，实际部署需接入 wp_ai_service）。"
+        f"方法：{payload.method}（CAS1 成本与可变现净值孰低，确定性规则引擎）。"
     )
 
     return ImpairmentAnalysisResponse(
@@ -153,7 +153,7 @@ async def f2_impairment_analysis(
         suggestions=suggestions,
         summary=summary,
         total_suggested_provision=str(total_provision),
-        is_llm_stub=True,
+        is_llm_stub=False,
         applied_to_sheet=await _maybe_apply_impairment_to_workpaper(
             db, wp_id, payload, suggestions, total_provision, summary
         ),

@@ -52,6 +52,34 @@ describe('G7-4 basic info model', () => {
     expect(row.votingRatio).toBe(0.5)
   })
 
+  it('migrates missing-stamp fraction-looking ratios on modern rows', () => {
+    const row = normalizeG7BasicInfoRow({
+      id: 'ambiguous',
+      groupType: 'joint_venture',
+      investeeName: '合营缺stamp',
+      directHoldingRatio: 0.4,
+      votingRatio: 0.4,
+    }, 0)
+    expect(row.groupType).toBe('joint_venture')
+    expect(row.directHoldingRatio).toBe(40)
+    expect(row.votingRatio).toBe(40)
+  })
+
+  it('maps export long labels to groupType', () => {
+    expect(normalizeG7BasicInfoRow({
+      groupType: '合营企业（共同控制）',
+      investeeName: '甲',
+      ratioScale: 'percent',
+      directHoldingRatio: 50,
+    }, 0).groupType).toBe('joint_venture')
+    expect(normalizeG7BasicInfoRow({
+      groupType: '联营企业（重大影响）',
+      investeeName: '乙',
+      ratioScale: 'percent',
+      directHoldingRatio: 20,
+    }, 0).groupType).toBe('associate')
+  })
+
   it('converts fraction ratios only when forced', () => {
     expect(toPercentRatio(0.3, { force: true })).toBe(30)
     expect(toPercentRatio(0.3)).toBe(0.3)

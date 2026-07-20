@@ -361,9 +361,9 @@ class TestP4SpecialProcedures:
         assert _WP_CODE_OVERRIDE["G4-5"] == "audit-sheet"
         assert _WP_CODE_OVERRIDE["G14-2"] == "audit-sheet"
 
-    def test_g7_3_equity_method_is_audit_sheet(self):
-        """G7-3 权益法核算走 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE["G7-3"] == "audit-sheet"
+    def test_g7_3_is_main_long_term_equity(self):
+        """G7-3 调整分录汇总走 g7-long-term-equity-main。"""
+        assert _WP_CODE_OVERRIDE["G7-3"] == "g7-long-term-equity-main"
 
     def test_g7_4_impairment_is_audit_sheet(self):
         """G7-4 减值测试走 audit-sheet。"""

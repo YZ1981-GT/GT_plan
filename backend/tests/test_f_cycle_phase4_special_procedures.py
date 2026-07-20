@@ -9,7 +9,7 @@
   Task 37: F2-16 会计政策检查 d-form-table schema
   Task 38: F2-52 关联交易检查 d-form-table schema + related_party_transactions
   Task 39: F2-55~F2-58 合同履约成本 f2-inventory-special schema
-  Task 40: F1-4/F3-4/F4-4 调整分录/坏账 d-form-table schema
+  Task 40: F1-4/F3-4/F4-4 分析/调整类 sheet 映射为 cycle HTML 入口
   Task 41: F 全系列底稿在前端正确打开（componentType 路由无 404）
 """
 from __future__ import annotations
@@ -459,12 +459,12 @@ class TestTask39ContractPerformanceCost:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Task 40: F1-4/F3-4/F4-4 调整分录/坏账 d-form-table schema 确认
+# Task 40: F1-4/F3-4/F4-4 分析/调整类 sheet 映射为 cycle HTML 入口
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestTask40AdjustmentEntriesSchema:
-    """验证 F1-4/F3-4/F4-4 调整分录/坏账映射为各 cycle HTML 入口。"""
+    """验证 F1-4/F3-4/F4-4 映射为各 cycle HTML 入口（对齐现网 HTML 命名）。"""
 
     _ADJUSTMENT_CODES = {
         "F1-4": F1_PREPAYMENT,
@@ -474,12 +474,12 @@ class TestTask40AdjustmentEntriesSchema:
 
     @pytest.mark.parametrize("wp_code,expected", list(_ADJUSTMENT_CODES.items()))
     def test_adjustment_is_cycle_html(self, wp_code, expected):
-        """F1-4/F3-4/F4-4 调整分录/坏账映射为 cycle HTML componentType。"""
+        """F1-4/F3-4/F4-4 映射为 cycle HTML componentType。"""
         assert wp_code in _WP_CODE_OVERRIDE, (
-            f"调整分录 '{wp_code}' 未在 _WP_CODE_OVERRIDE 中注册"
+            f"'{wp_code}' 未在 _WP_CODE_OVERRIDE 中注册"
         )
         assert _WP_CODE_OVERRIDE[wp_code] == expected, (
-            f"调整分录 '{wp_code}' 应为 {expected}，"
+            f"'{wp_code}' 应为 {expected}，"
             f"实际为 {_WP_CODE_OVERRIDE[wp_code]}"
         )
 
@@ -489,34 +489,34 @@ class TestTask40AdjustmentEntriesSchema:
         mapping_codes = {e["wp_code"] for e in f_class_entries}
         assert wp_code in mapping_codes
 
-    def test_f1_4_is_bad_debt(self, f_class_entries):
-        """F1-4 名称包含'坏账'关键词。"""
+    def test_f1_4_is_substantive_analysis(self, f_class_entries):
+        """F1-4 名称对齐 HTML：实质性分析（非坏账准备）。"""
         entry = next(
             (e for e in f_class_entries if e["wp_code"] == "F1-4"), None
         )
         assert entry is not None
-        assert "坏账" in entry["wp_name"], (
-            f"F1-4 名称应包含'坏账'，实际为 '{entry['wp_name']}'"
+        assert "实质性分析" in entry["wp_name"] or "分析" in entry["wp_name"], (
+            f"F1-4 名称应包含'实质性分析'，实际为 '{entry['wp_name']}'"
         )
 
-    def test_f3_4_is_adjustment(self, f_class_entries):
-        """F3-4 名称包含'调整分录'关键词。"""
+    def test_f3_4_is_interest_calc(self, f_class_entries):
+        """F3-4 名称对齐 HTML：利息测算（非调整分录）。"""
         entry = next(
             (e for e in f_class_entries if e["wp_code"] == "F3-4"), None
         )
         assert entry is not None
-        assert "调整分录" in entry["wp_name"], (
-            f"F3-4 名称应包含'调整分录'，实际为 '{entry['wp_name']}'"
+        assert "利息" in entry["wp_name"], (
+            f"F3-4 名称应包含'利息'，实际为 '{entry['wp_name']}'"
         )
 
-    def test_f4_4_is_adjustment(self, f_class_entries):
-        """F4-4 名称包含'调整分录'关键词。"""
+    def test_f4_4_is_substantive_analysis(self, f_class_entries):
+        """F4-4 名称对齐 HTML：实质性分析（非调整分录）。"""
         entry = next(
             (e for e in f_class_entries if e["wp_code"] == "F4-4"), None
         )
         assert entry is not None
-        assert "调整分录" in entry["wp_name"], (
-            f"F4-4 名称应包含'调整分录'，实际为 '{entry['wp_name']}'"
+        assert "分析" in entry["wp_name"], (
+            f"F4-4 名称应包含'分析'，实际为 '{entry['wp_name']}'"
         )
 
 

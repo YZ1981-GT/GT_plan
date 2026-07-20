@@ -296,6 +296,7 @@
             :is-readonly="isReadonly"
             @update="(id, patch) => cutoff.updateRow(id, patch)"
             @remove="(id) => cutoff.removeRow(id)"
+            @check="openCutoffVoucher"
           />
         </div>
       </section>
@@ -318,6 +319,7 @@
             :is-readonly="isReadonly"
             @update="(id, patch) => cutoff.updateRow(id, patch)"
             @remove="(id) => cutoff.removeRow(id)"
+            @check="openCutoffVoucher"
           />
         </div>
       </section>
@@ -336,6 +338,7 @@
             :is-readonly="isReadonly"
             @update="(id, patch) => cutoff.updateRow(id, patch)"
             @remove="(id) => cutoff.removeRow(id)"
+            @check="openCutoffVoucher"
           />
         </div>
       </section>
@@ -425,6 +428,16 @@
         <li v-for="(tip, i) in config.footerTips" :key="'tip-' + i">{{ tip }}</li>
       </ol>
     </footer>
+
+    <F2CutoffVoucherDialog
+      v-model="voucherDialogVisible"
+      :row="voucherDialogRow"
+      :period-end="cutoffDateRaw"
+      :primary-doc-label="config.primaryDocLabel"
+      :show-inspect="config.showInspect"
+      :readonly="isReadonly"
+      @save="handleCutoffVoucherSave"
+    />
   </div>
 </template>
 
@@ -463,6 +476,7 @@ import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vu
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2ReviewChip from '../shared/F2ReviewChip.vue'
 import F2CutoffOverviewCard from './F2CutoffOverviewCard.vue'
+import F2CutoffVoucherDialog from './F2CutoffVoucherDialog.vue'
 
 const GtCutoffAutoSampling = defineAsyncComponent(() => import('../../cutoff/GtCutoffAutoSampling.vue'))
 
@@ -554,6 +568,7 @@ const CutoffTable = defineComponent({
   emits: {
     update: (_id: string, _patch: Partial<F2CutoffRow>) => true,
     remove: (_id: string) => true,
+    check: (_row: F2CutoffRow) => true,
   },
   setup(props, { emit }) {
     const page = ref(1)
@@ -703,16 +718,24 @@ const CutoffTable = defineComponent({
                 'onUpdate:modelValue': (v: string) => emit('update', row.id, { remark: v }),
               }),
           }),
-          h(ElTableColumn, { width: 40, fixed: 'right' }, {
+          h(ElTableColumn, { width: 88, fixed: 'right' }, {
             default: ({ row }: { row: F2CutoffRow }) =>
-              props.isReadonly
-                ? null
-                : h(ElButton, {
-                    link: true,
-                    type: 'danger',
-                    size: 'small',
-                    onClick: () => emit('remove', row.id),
-                  }, () => '删'),
+              h('div', { class: 'cutoff-row-actions' }, [
+                h(ElButton, {
+                  link: true,
+                  type: 'primary',
+                  size: 'small',
+                  onClick: () => emit('check', row),
+                }, () => '核对'),
+                props.isReadonly
+                  ? null
+                  : h(ElButton, {
+                      link: true,
+                      type: 'danger',
+                      size: 'small',
+                      onClick: () => emit('remove', row.id),
+                    }, () => '删'),
+              ]),
           }),
         ],
       )
@@ -833,6 +856,19 @@ const displayCutoff = computed(() => {
   if (!m) return s
   return `${m[1]}年${Number(m[2])}月${Number(m[3])}日`
 })
+
+/** 弹窗细判用原始 YYYY-MM-DD */
+const cutoffDateRaw = computed(() => cutoff.meta.value.cutoffDate || props.bsDate || '')
+
+const voucherDialogVisible = ref(false)
+const voucherDialogRow = ref<F2CutoffRow | null>(null)
+function openCutoffVoucher(row: F2CutoffRow) {
+  voucherDialogRow.value = row
+  voucherDialogVisible.value = true
+}
+function handleCutoffVoucherSave(patch: Partial<F2CutoffRow> & { id: string }) {
+  cutoff.updateRow(patch.id, patch)
+}
 
 const d4Loading = ref(false)
 const d4Status = ref('产成品出库应与 D4-17/18 收入截止协调；点击对照')
@@ -1121,4 +1157,5 @@ async function generateTextField(target: CutoffAiTarget): Promise<void> {
 .ct-footer-label { font-weight: 650; color: var(--ct-accent); margin-bottom: 4px; }
 .ct-footer-tips ol { margin: 0; padding-left: 1.2em; }
 :deep(.error-row) { background: var(--gt-color-coral-light, #fff0ef); }
+:deep(.cutoff-row-actions) { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
 </style>

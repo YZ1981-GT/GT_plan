@@ -65,9 +65,10 @@ async def test_export_g7_4_source_aligned_template():
     assert "G7-4" in wb.sheetnames
     ws = wb["G7-4"]
     headers = [cell.value for cell in ws[2]]
-    assert headers[:5] == [
+    assert headers[:6] == [
         "投资关系",
         "公司名称",
+        "被投资单位ID",
         "级次（国企适用）",
         "企业类型（国企适用）",
         "是否为本期新纳入合并范围的子公司（国企适用）",
@@ -76,9 +77,51 @@ async def test_export_g7_4_source_aligned_template():
         str(validation.sqref): validation.formula1
         for validation in ws.data_validations.dataValidation
     }
-    assert validations["D3:D502"] == '"1,2,3,4,5"'
-    assert validations["E3:E502"] == '"是,否"'
+    assert validations["E3:E502"] == '"1,2,3,4,5"'
+    assert validations["F3:F502"] == '"是,否"'
     wb.close()
+
+
+@pytest.mark.asyncio
+async def test_g7_4_normalize_preserves_id_and_stamps_ratio_scale():
+    from app.routers.wp_render_strategies._g7_long_term_equity_method_import_export import (
+        _normalize_g7_4_rows,
+    )
+
+    rows, errors = _normalize_g7_4_rows([{
+        "id": "keep-me",
+        "groupType": "合营企业（共同控制）",
+        "investeeName": "甲合营",
+        "directHoldingRatio": 40,
+        "votingRatio": 40,
+    }])
+    assert errors == []
+    assert rows[0]["id"] == "keep-me"
+    assert rows[0]["groupType"] == "joint_venture"
+    assert rows[0]["ratioScale"] == "percent"
+    assert rows[0]["accountingMethod"] == "权益法"
+
+
+def test_g7_4_merge_ids_by_name_reuses_existing():
+    from app.routers.wp_render_strategies._g7_long_term_equity_method_import_export import (
+        _merge_g7_4_ids_by_name,
+        _normalize_g7_4_rows,
+    )
+
+    normalized, errors = _normalize_g7_4_rows([{
+        "groupType": "子公司",
+        "investeeName": "甲子公司",
+        "directHoldingRatio": 80,
+    }])
+    assert errors == []
+    assert "id" not in normalized[0] or not normalized[0].get("id")
+
+    merged, reused = _merge_g7_4_ids_by_name(
+        normalized,
+        [{"id": "old-甲", "investeeName": "甲子公司"}],
+    )
+    assert reused == 1
+    assert merged[0]["id"] == "old-甲"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -125,7 +168,7 @@ async def test_export_template_multi_sheet(sheet_code: str):
 async def test_export_template_single_sheet(sheet_code: str):
     """POST export-template for single-sheet tables → 200 + xlsx with 1 data worksheet.
 
-    G7-5(10列) / G7-15(14列) / G7-17(9列) 不需要区段拆分，导出为单个data sheet。
+    G7-5(10列) / G7-15(17列，含ID+毛利率+手工覆盖) / G7-17(9列) 不需要区段拆分，导出为单个data sheet。
 
     **Validates: Requirements 7.3**
     """
@@ -203,3 +246,99 @@ async def test_export_template_invalid_sheet_returns_400():
         )
 
     assert resp.status_code == 400
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 4. G7-17 归一化 / 导入导出公式列
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def test_normalize_g7_17_rows_recalculates_recoverable_and_impairment():
+    from app.routers.wp_render_strategies._g7_long_term_equity_method_import_export import (
+        _normalize_g7_17_rows,
+        _prepare_g7_17_rows_export,
+    )
+
+    rows = _normalize_g7_17_rows([
+        {
+            "investeeName": "甲联营",
+            "bookValue": 100000,
+            "hasImpairmentSign": "是",
+            "fvLessDisposalCost": 70000,
+            "valueInUse": 82000,
+            "recoverableAmount": 1,  # 脏值，应被重算覆盖
+            "impairmentAmount": 1,
+        },
+        {
+            "investeeName": "乙联营",
+            "bookValue": 50000,
+            "hasImpairmentSign": "否",
+            "fvLessDisposalCost": 10,
+            "valueInUse": 20,
+            "recoverableAmount": 99,
+            "impairmentAmount": 99,
+        },
+    ])
+
+    assert rows[0]["hasImpairmentSign"] is True
+    assert rows[0]["recoverableAmount"] == 82000.0
+    assert rows[0]["impairmentAmount"] == 18000.0
+
+    assert rows[1]["hasImpairmentSign"] is False
+    assert rows[1]["recoverableAmount"] == 0.0
+    assert rows[1]["fvLessDisposalCost"] == 0.0
+    assert rows[1]["valueInUse"] == 0.0
+    assert rows[1]["impairmentAmount"] == 0.0
+
+    exported = _prepare_g7_17_rows_export(rows)
+    assert exported[0]["hasImpairmentSign"] == "是"
+    assert exported[1]["hasImpairmentSign"] == "否"
+
+
+@pytest.mark.asyncio
+async def test_g7_17_import_normalizes_yes_no_and_formulas(monkeypatch, override_deps):
+    """导入 G7-17：是/否→bool，可收回/减值按 CAS8 重算后落库。"""
+    from openpyxl import Workbook
+    import app.routers.wp_render_strategies._g7_long_term_equity_method_import_export as ie_mod
+
+    captured: dict = {}
+
+    async def _fake_upsert(db, wp_id, item_id, rows, field="conclusion", **kwargs):
+        captured["wp_id"] = wp_id
+        captured["item_id"] = item_id
+        captured["field"] = field
+        captured["rows"] = rows
+
+    monkeypatch.setattr(ie_mod, "upsert_json_rows", _fake_upsert)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "G7-17"
+    ws.append(["G7-17 减值测试表"])
+    ws.append([
+        "被投资单位", "账面价值", "可收回金额", "减值迹象",
+        "减值金额", "公允价值-处置费用", "使用价值", "审计结论", "索引",
+    ])
+    ws.append(["测试联营", 100000, 0, "是", 0, 75000, 80000, "需计提", "IDX-1"])
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/workpapers/test-wp/g7-equity-method/import-data?sheet=G7-17",
+            files={"file": ("g7-17.xlsx", buf.getvalue(),
+                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        )
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    data = body.get("data", body)
+    assert data.get("ok") is True
+    assert data.get("imported_count") == 1
+    assert captured["item_id"] == "G7-17-rows"
+    row = captured["rows"][0]
+    assert row["hasImpairmentSign"] is True
+    assert row["recoverableAmount"] == 80000.0
+    assert row["impairmentAmount"] == 20000.0
+    assert row["investeeName"] == "测试联营"
