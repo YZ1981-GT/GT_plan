@@ -73,7 +73,7 @@ function hasJsonRows(m: Map<string, any>, key: string): boolean {
   }
 }
 
-/** 附注完成：结论 + 指定原因 + 与 G8-1 审定勾稽一致 */
+/** 附注完成：指定原因 + 与 G8-1 审定勾稽一致 */
 function isG8DisclosureComplete(m: Map<string, any>, variant: 'listed' | 'soe'): boolean {
   return isG8DisclosureSheetComplete(m, variant)
 }

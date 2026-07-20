@@ -48,6 +48,7 @@ inclusion: always
 - **✅ G7-6复盘修复(2026-07-20)**：①`onAfterSave→scheduleAutoSnapshot` ②`applyG76`只累加「不一致」+零金额跳过防覆盖 ③IE扁平行↔`{groups,rows}` ④AI `accounting-policy-conclusion`+本地降级 ⑤consol聚合`_g7_g7_6_policy_adj` ⑥披露源含`G7-6-rows` ⑦mapping名称纠偏。未commit。
 - **✅ G7-6增强二轮(2026-07-20)**：披露上市/国企从G7-6生成政策差异叙述；G7-4版本链；debounce拦「不一致无说明」；「保存并同步G7-14」；consol `accounting_policy_adj`建议。未commit。
 - **🔴 PG卷挂错(2026-07-20已修)**：`audit-postgres`曾挂空卷`gt_plan_pg_data`(25表无projects)；真库在`gt_workplan_pg_data`(422表/14项目)。已 remount + compose `pg_data.external→gt_workplan_pg_data`。
+- **✅ schema drift 2项修复(2026-07-20,commit 3481d9b8)**：①work_hours_legacy加入KNOWN_ALLOWLIST(历史残留) ②新增KNOWN_ORM_EXTRA_COLUMN_ALLOWLIST+scan过滤(knowledge_index.embedding_vec因pgvector扩展不可用)→health=healthy/drift=0
 - **🔴 G类开发效率改进**：①任务颗粒度压缩(PBT合并/Checkpoint去掉/验证合并,71→35) ②composable工厂化(DualMode/FormData/ImportExport参数化) ③render策略工厂化(create_cycle_render_strategy) ④并发3+stagger 5s ⑤代码预生成脚本(generate_g_cycle_spec.py)
 - **动态行新增交互**：需命名的动态行必须先弹ElMessageBox.prompt输入名称确认后再创建
 - **复杂底稿填报说明**：多步骤底稿顶部增加蓝色渐变引导区(序号步骤,2列grid)

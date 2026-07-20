@@ -88,16 +88,6 @@ const G8_CONCLUSION_SOURCES: Array<{
       { key: 'G8-6-audit-conclusion', field: 'remark' },
     ],
   },
-  {
-    code: '附注上市',
-    name: '附注（上市）',
-    textKeys: [{ key: 'G8-disclosure-listed-audit-conclusion', field: 'remark' }],
-  },
-  {
-    code: '附注国企',
-    name: '附注（国企）',
-    textKeys: [{ key: 'G8-disclosure-soe-audit-conclusion', field: 'remark' }],
-  },
 ]
 
 function readResponseText(

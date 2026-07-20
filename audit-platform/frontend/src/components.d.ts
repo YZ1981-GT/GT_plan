@@ -39,6 +39,7 @@ declare module 'vue' {
     AiContentTag: typeof import('./components/ai/AiContentTag.vue')['default']
     AiGateTab: typeof import('./components/evidence-governance/AiGateTab.vue')['default']
     AIInsightsDashboard: typeof import('./components/ai/AIInsightsDashboard.vue')['default']
+    AiReviewPanel: typeof import('./components/workpaper/review/AiReviewPanel.vue')['default']
     AISuggestionPopover: typeof import('./components/workpaper/AISuggestionPopover.vue')['default']
     AiTracesTab: typeof import('./components/trust/AiTracesTab.vue')['default']
     AlternativeD05Dashboard: typeof import('./components/workpaper/confirmation/alternativeD05/AlternativeD05Dashboard.vue')['default']

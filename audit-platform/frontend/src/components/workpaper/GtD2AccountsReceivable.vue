@@ -283,7 +283,7 @@ const D2TabWriteoffCheck = defineAsyncComponent(() => import('./d2/D2TabWriteoff
 const D2TabPledgeCheck = defineAsyncComponent(() => import('./d2/D2TabPledgeCheck.vue'))
 const D2TabBizModel = defineAsyncComponent(() => import('./d2/D2TabBizModel.vue'))
 const D2TabCutoff = defineAsyncComponent(() => import('./d2/D2TabCutoff.vue'))
-const ReviewPanel = defineAsyncComponent(() => import('./review/ReviewPanel.vue'))
+const ReviewPanel = defineAsyncComponent(() => import('./review/AiReviewPanel.vue'))
 
 const props = defineProps<{
   wpId: string

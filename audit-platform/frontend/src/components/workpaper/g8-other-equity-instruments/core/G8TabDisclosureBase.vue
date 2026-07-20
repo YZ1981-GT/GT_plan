@@ -18,9 +18,6 @@
           data-testid="g8-disclosure-sync-designation"
           @click="onSyncDesignation"
         >指定原因草稿</el-button>
-        <el-button size="small" :loading="disc.aiLoading.value" :disabled="isReadonly"
-          :data-testid="variant === 'listed' ? 'g8-disclosure-listed-ai' : 'g8-disclosure-soe-ai'"
-          @click="disc.generateAiConclusion()">🤖 AI</el-button>
         <GtReviewTrigger :section-id="variant === 'listed' ? 'G8-disclosure-listed' : 'G8-disclosure-soe'" />
       </div>
     </div>
@@ -59,7 +56,7 @@
       show-icon
       class="sync-hint"
       data-testid="g8-disclosure-completeness-gaps"
-      :title="`完成缺口：${disc.completenessGaps.value.join('；')}（目录完成需：指定原因 + 与审定勾稽 + 审计结论）`"
+      :title="`完成缺口：${disc.completenessGaps.value.join('；')}（目录完成需：指定原因 + 与审定勾稽）`"
     />
 
     <el-alert
@@ -307,43 +304,15 @@
         </el-table-column>
       </el-table>
     </template>
-
-    <el-card shadow="never" class="note-card">
-      <template #header>附注汇总</template>
-      <el-input :model-value="disc.noteText.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
-        :disabled="isReadonly" placeholder="附注披露汇总说明…"
-        @update:model-value="disc.updateNoteText" />
-    </el-card>
-
-    <G8AuditTextCards
-      :wp-id="wpId"
-      :is-readonly="isReadonly"
-      v-model:note="auditNote"
-      v-model:conclusion="auditConclusion"
-      :note-ai-section="noteAiSection"
-      conclusion-ai-section="disclosure-conclusion"
-      note-placeholder="填写审计说明：附注披露项目、金额、公允价值层次的核对情况及与审定表（科目1503）勾稽结果。"
-      note-hint="覆盖披露完整性、金额勾稽及监管格式要求。"
-      conclusion-placeholder="填写审计结论：A、附注披露完整准确，与 G8-1 勾稽一致。B、除已注明事项外未见异常。C、存在重大披露差异或范围受限，不可确认。"
-      conclusion-hint="按 A/B/C 口径评价附注披露充分性。"
-      :related-context="{
-        variant,
-        审定数: disc.adjudicatedAmount.value,
-        余额合计期末: disc.primaryCurrentAmount.value,
-        勾稽差异: disc.adjCrossVariance.value,
-      }"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, toRef } from 'vue'
+import { computed, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
-import G8AuditTextCards from '../G8AuditTextCards.vue'
 import { useG8Disclosure } from '../../composables/useG8Disclosure'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
-import type { G8AiSection } from '../../composables/useG8AiGenerate'
 
 const props = defineProps<{
   variant: 'listed' | 'soe'
@@ -370,21 +339,6 @@ const objectiveTitle = computed(() =>
     ? '审计目标：核实其他权益工具投资附注披露（上市公司格式）项目、金额与公允价值层次分类的完整准确，确认与审定表（科目1503）勾稽一致，披露符合企业会计准则及监管要求。'
     : '审计目标：核实其他权益工具投资附注披露（国有企业格式）项目、金额与 OCI 相关披露的完整准确，确认与审定表（科目1503）勾稽一致，披露符合企业会计准则要求。',
 )
-
-const noteAiSection = computed<G8AiSection>(() =>
-  props.variant === 'listed' ? 'disclosure-listed-note' : 'disclosure-soe-note',
-)
-
-const AUDIT_NOTE_KEY = `G8-disclosure-${props.variant}-audit-note`
-const AUDIT_CONCLUSION_KEY = `G8-disclosure-${props.variant}-audit-conclusion`
-const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
-const auditConclusion = ref(props.allResponses.get(AUDIT_CONCLUSION_KEY)?.remark ?? '')
-watch(auditNote, (v) => {
-  if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
-})
-watch(auditConclusion, (v) => {
-  if (!props.isReadonly) props.debouncedSave(AUDIT_CONCLUSION_KEY, { conclusion: null, remark: v })
-})
 
 function onSyncAdjudicated() {
   disc.pullLatestAdjudicated(true)
@@ -475,7 +429,6 @@ function fmt(n: number): string {
 .designation-hint { margin: 0 0 6px; font-size: 12px; color: #909399; }
 .section2-title { margin: 4px 0 8px; font-size: 14px; font-weight: 600; }
 .note-cell { display: flex; align-items: flex-start; gap: 4px; }
-.note-card { margin-top: 12px; }
 .total-label { font-weight: 600; }
 .formula-cell { font-weight: 600; color: #409eff; }
 :deep(.row-total) { background: #f5f7fa; font-weight: 600; }

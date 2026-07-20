@@ -281,14 +281,12 @@ export function g8DisclosureDesignationText(
   }
 }
 
-/** 附注完成：结论 + 指定原因非空 + 已发布审定且余额合计勾稽一致 */
+/** 附注完成：指定原因非空 + 已发布审定且余额合计勾稽一致 */
 export function isG8DisclosureSheetComplete(
   m: Map<string, any>,
   variant: 'listed' | 'soe',
 ): boolean {
   const storeKey = variant === 'listed' ? 'G8-disclosure-listed' : 'G8-disclosure-soe'
-  const conclusionKey = `G8-disclosure-${variant}-audit-conclusion`
-  if (!(m.get(conclusionKey)?.remark || '').trim()) return false
 
   const raw = m.get(storeKey)?.remark as string | undefined
   if (!raw) return false
