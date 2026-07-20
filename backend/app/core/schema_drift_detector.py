@@ -78,6 +78,8 @@ class SchemaDriftDetector:
         # 历史残留表（一次性脚本产物 / 联动审计日志）
         "linkage_audit_log",
         "seed_load_history",
+        # V117 工时统一后保留的旧表（work_hours 数据已迁移到 work_hour_entries）
+        "work_hours_legacy",
         # 符号约定迁移(V064)产生的备份表，迁移完成后未清理
         "_sign_migration_backup",
         # 科目类别修正迁移(migrate_account_category_correction.py)的回滚备份表，
@@ -96,6 +98,11 @@ class SchemaDriftDetector:
         ("cell_annotations", "sheet_name"),       # 旧版列，已被 sheet_id 取代
         ("adjustments", "status"),                # 旧 status 列，业务改用 review_status
         ("projects", "template_version_id"),      # 旧关联列，不再 ORM 映射
+    })
+
+    # ORM 定义但 DB 可能不存在的列（graceful 降级场景，如 pgvector 扩展未安装）
+    KNOWN_ORM_EXTRA_COLUMN_ALLOWLIST: frozenset[tuple[str, str]] = frozenset({
+        ("knowledge_index", "embedding_vec"),     # V119 pgvector 列，PG 扩展不可用时跳过
     })
 
     # 外部租户表前缀（与业务共用 audit_platform 库的第三方工具表）。
@@ -366,6 +373,8 @@ class SchemaDriftDetector:
             db_cols = db[table]
 
             for col in orm_cols.keys() - db_cols.keys():
+                if (table, col) in self.KNOWN_ORM_EXTRA_COLUMN_ALLOWLIST:
+                    continue
                 items.append(DriftItem(
                     table=table, column=col,
                     drift_type="orm_extra",
