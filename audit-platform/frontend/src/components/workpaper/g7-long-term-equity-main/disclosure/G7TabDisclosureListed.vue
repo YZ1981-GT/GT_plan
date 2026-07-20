@@ -143,7 +143,6 @@
             <div class="table-scroll">
               <el-table
                 :data="tableRows(table)"
-                border
                 size="small"
                 :row-class-name="tableRowClass"
                 class="disclosure-table"
@@ -841,8 +840,9 @@ onBeforeUnmount(() => {
   padding: 10px 12px;
   margin-bottom: 12px;
   border: 1px solid var(--el-border-color-light);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--el-bg-color);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
 }
 
 .toolbar > div,
@@ -886,15 +886,16 @@ onBeforeUnmount(() => {
 
 .table-block,
 .narrative-block {
-  padding: 12px;
-  margin: 0 0 12px;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 6px;
+  padding: 14px 16px;
+  margin: 0 0 14px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
   background: var(--el-bg-color);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 .block-head {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   display: flex;
   justify-content: space-between;
   gap: 8px;
@@ -911,6 +912,8 @@ onBeforeUnmount(() => {
 .block-head h4 {
   margin: 0 0 2px;
   font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
 }
 
 .block-head span,
@@ -926,14 +929,40 @@ onBeforeUnmount(() => {
 
 .table-scroll {
   overflow-x: auto;
+  border-radius: 6px;
 }
 
 .disclosure-table {
   min-width: 100%;
 }
 
+/* 去掉默认 border 的厚重感，改用轻量分隔 */
+.disclosure-table :deep(.el-table__inner-wrapper) {
+  border-radius: 6px;
+}
+
+.disclosure-table :deep(th.el-table__cell) {
+  background: var(--el-fill-color-lighter) !important;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-text-color-regular);
+  padding: 8px 6px;
+}
+
+.disclosure-table :deep(td.el-table__cell) {
+  padding: 6px 6px;
+}
+
 .disclosure-table :deep(.el-input-number) {
   width: 100%;
+}
+
+.disclosure-table :deep(.el-input-number .el-input__inner) {
+  font-size: 12px;
+}
+
+.disclosure-table :deep(.el-input .el-input__inner) {
+  font-size: 12px;
 }
 
 .disclosure-table :deep(.row-subtotal td) {
@@ -946,6 +975,13 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 
+.disclosure-table :deep(.row-group td) {
+  background: var(--el-fill-color-lighter);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
 .cell-source {
   display: block;
   margin-top: 3px;
@@ -956,6 +992,7 @@ onBeforeUnmount(() => {
 
 .computed-value {
   border-bottom: 1px dashed var(--el-color-success);
+  cursor: help;
 }
 
 .guidance-list,
@@ -964,16 +1001,21 @@ onBeforeUnmount(() => {
   padding-left: 20px;
   color: var(--el-text-color-secondary);
   font-size: 12px;
+  line-height: 1.8;
 }
 
 .prep-hint {
   margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 6px;
+  background: var(--el-fill-color-lighter);
   color: var(--el-text-color-secondary);
   font-size: 12px;
 }
 
 .prep-hint summary {
   cursor: pointer;
+  font-weight: 500;
 }
 
 @media (max-width: 900px) {
