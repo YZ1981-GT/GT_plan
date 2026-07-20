@@ -1,30 +1,52 @@
 <template>
   <div class="g8-adjudication" data-testid="g8-adjudication">
     <div class="g8-toolbar">
-      <h3 class="g8-title">G8-1 其他权益工具投资审定表</h3>
+      <div class="title-block">
+        <h3 class="g8-title">G8-1 其他权益工具投资审定表</h3>
+        <p class="sheet-sub">科目 1503 · 审定 = 未审 + 账项调整 · 与 TB / G8-2 / G8-3 / G8-4 勾稽</p>
+      </div>
       <div class="g8-actions">
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="primary"
+          plain
+          data-testid="g8-sync-from-detail"
+          @click="onSyncFromDetail"
+        >
+          从 G8-2 带入未审
+        </el-button>
         <GtReviewTrigger section-id="G8-1-adjudication" />
-        <el-button size="small" :loading="validateLoading" :disabled="isReadonly" data-testid="g8-validate-btn" @click="runValidate">校验公式</el-button>
+        <el-button size="small" :loading="validateLoading" :disabled="isReadonly" data-testid="g8-validate-btn" @click="runValidate">
+          校验公式
+        </el-button>
       </div>
     </div>
 
-    <details class="guidance-details">
+    <details class="guidance-details" open>
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>科目 1503 其他权益工具投资（借方/资产类），公允价值计量且变动计入 OCI。</p>
-        <p>审定数 = 未审 + 账项调整；|变动率|&gt;20% 时原因分析必填。</p>
+        <p>1. 本表汇总科目 1503 其他权益工具投资（FVOCI）期初/期末审定；审定数 = 未审数 + 账项调整。</p>
+        <p>2. 编制顺序：G8-2 明细取账面 →「从 G8-2 带入未审」→ G8-3 调整回写期末调整（默认写入「{{ adj.writebackRowKey }}」行）→ 刷新 TB 勾稽 → 核对 G8-4 公允合计。</p>
+        <p>3. |变动率|&gt;20% 时原因分析必填；试算表差异、明细/公允勾稽异常须追查后再发布审定数。</p>
+        <p>4. 公允价值变动计入 OCI，不经损益；处置时累计 OCI 可转留存收益。</p>
       </div>
     </details>
 
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：核实其他权益工具投资（科目1503）期末余额的存在与计价，验证以公允价值计量且变动计入其他综合收益（OCI）分类的恰当性，确认审定数与试算表、明细表勾稽一致。"
+      show-icon
+      title="审计目标：核实其他权益工具投资（1503）期末余额的存在与计价，验证 FVOCI/OCI 分类恰当，确认审定数与试算表、明细表及公允测试勾稽一致。"
       class="objective-alert"
     />
 
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <span class="chip-wrap"><GtIndexChip value="wp:G8-2" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G8-3" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G8-4" :context-project-id="projectId" /></span>
+      </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:G8-1" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ rowCount }} 行</el-tag>
@@ -35,6 +57,7 @@
       v-if="adj.hasMissingReasons.value"
       type="warning"
       :closable="false"
+      show-icon
       class="reason-alert"
       data-testid="g8-adj-reason-warn"
       :title="`有 ${adj.missingReasonCount.value} 行 |变动率|>20%，请填写原因分析`"
@@ -146,52 +169,97 @@
       v-if="adj.hasDetailCrossMismatch.value"
       type="warning"
       :closable="false"
+      show-icon
       class="cross-alert"
       data-testid="g8-detail-cross-alert"
     >
-      G8-1 合计 {{ fmt(adj.totalRow.value.closingAdjusted) }} 与 G8-2 明细合计
-      {{ fmt(adj.detailTotalClosing.value ?? 0) }} 差异 {{ fmt(adj.detailCrossVariance.value ?? 0) }}
+      <template #title>
+        <span>
+          G8-1 合计 {{ fmt(adj.totalRow.value.closingAdjusted) }} 与 G8-2 明细合计
+          {{ fmt(adj.detailTotalClosing.value ?? 0) }} 差异 {{ fmt(adj.detailCrossVariance.value ?? 0) }}
+        </span>
+        <el-button size="small" link type="primary" @click="goSheet('G8-2')">前往 G8-2</el-button>
+      </template>
+    </el-alert>
+
+    <el-alert
+      v-if="adj.hasFvCrossMismatch.value"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="cross-alert"
+      data-testid="g8-fv-cross-alert"
+    >
+      <template #title>
+        <span>
+          G8-1 合计 {{ fmt(adj.totalRow.value.closingAdjusted) }} 与 G8-4 审定公允价值合计
+          {{ fmt(adj.fvAuditedTotal.value ?? 0) }} 差异 {{ fmt(adj.fvCrossVariance.value ?? 0) }}
+        </span>
+        <el-button size="small" link type="primary" @click="goSheet('G8-4')">前往 G8-4</el-button>
+      </template>
     </el-alert>
 
     <div class="fine-checks" data-testid="g8-fine-checks">
       <el-tag size="small" :type="adj.hasVarianceHighlight.value ? 'danger' : 'success'">G8-CHK-01 试算表勾稽</el-tag>
       <el-tag size="small" :type="adj.hasDetailCrossMismatch.value ? 'warning' : 'success'">G8-CHK-02 明细表勾稽</el-tag>
+      <el-tag size="small" :type="adj.hasFvCrossMismatch.value ? 'warning' : 'success'">G8-CHK-05 公允测试勾稽</el-tag>
       <el-tag size="small" :type="adj.hasMissingReasons.value ? 'warning' : 'success'">G8-CHK-03 变动率原因</el-tag>
     </div>
 
-    <div class="g8-tb-row">
-      <span>试算平衡表数（1503）：</span>
-      <el-input-number v-if="!isReadonly" :model-value="adj.trialBalanceAmount.value" size="small" :controls="false"
-        style="width:140px" @update:model-value="(v: number) => adj.updateTrialBalance(v ?? 0)" />
+    <div class="tb-info-bar" :class="{ ok: !adj.hasVarianceHighlight.value, bad: adj.hasVarianceHighlight.value }" data-testid="g8-tb-bar">
+      <span class="tb-label">试算平衡表数（1503）</span>
+      <el-input-number
+        v-if="!isReadonly"
+        :model-value="adj.trialBalanceAmount.value"
+        size="small"
+        :controls="false"
+        style="width:140px"
+        @update:model-value="(v: number) => adj.updateTrialBalance(v ?? 0)"
+      />
       <span v-else>{{ fmt(adj.trialBalanceAmount.value) }}</span>
-      <span :class="['variance', { 'is-error': adj.hasVarianceHighlight.value }]">差异：{{ fmt(adj.variance.value) }}</span>
+      <span class="tb-var">差异 {{ fmt(adj.variance.value) }} {{ adj.hasVarianceHighlight.value ? '✗' : '✓' }}</span>
       <el-button v-if="!isReadonly" size="small" link @click="adj.loadTrialBalanceFromApi()">刷新TB</el-button>
-      <el-button size="small" type="primary" :disabled="isReadonly" data-testid="g8-publish-adj" @click="adj.publishAdjudicated()">发布审定数</el-button>
+      <el-button size="small" type="primary" :disabled="isReadonly" data-testid="g8-publish-adj" @click="onPublish">
+        发布审定数
+      </el-button>
+      <el-button size="small" link type="primary" @click="goSheet('G8-3')">查看 G8-3 调整</el-button>
     </div>
 
     <G8AuditTextCards
       :wp-id="wpId"
       :is-readonly="isReadonly"
       v-model:note="noteProxy"
-      v-model:conclusion="auditConclusion"
+      v-model:conclusion="conclusionProxy"
       note-ai-section="adjudication-note"
       conclusion-ai-section="adjudication-conclusion"
-      note-placeholder="填写审计说明：可概述（1）程序的测试情况、结果；（2）拟调整事项及其调整分录、未调整事项及其影响。"
-      note-hint="覆盖期初/期末审定、OCI 分类及与试算表/明细表勾稽。"
-      conclusion-placeholder="填写审计结论：审定数是否准确、分类（OCI）是否恰当，是否与试算表及明细表勾稽一致。"
-      :related-context="{ 试算表差异: adj.variance.value, 缺失原因行数: adj.missingReasonCount.value }"
+      note-placeholder="填写审计说明：（1）程序测试情况与结果；（2）与 TB/G8-2/G8-4 勾稽；（3）G8-3 调整及未调整事项影响。"
+      note-hint="覆盖期初/期末审定、OCI 分类及跨表勾稽。"
+      conclusion-placeholder="填写审计结论：A、审定数准确、FVOCI 分类恰当，与试算表及明细勾稽一致。B、除已调整事项外未见异常。C、存在重大未调整差异或范围受限，不可确认。"
+      conclusion-hint="可先选 A/B/C 口径，再按需补充说明。"
+      :related-context="{
+        期末审定: adj.totalRow.value.closingAdjusted,
+        试算表差异: adj.variance.value,
+        明细勾稽差异: adj.detailCrossVariance.value,
+        公允勾稽差异: adj.fvCrossVariance.value,
+        缺失原因行数: adj.missingReasonCount.value,
+      }"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+/**
+ * G8TabAdjudication.vue — G8-1 审定表
+ * 勾稽：TB / G8-2 明细 / G8-3 调整回写 / G8-4 公允合计
+ */
+import { computed, inject, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtReviewDot from '../../GtReviewDot.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G8AuditTextCards from '../G8AuditTextCards.vue'
 import { useG8Adjudication } from '../../composables/useG8Adjudication'
+import { jumpToG8Sheet } from '../../composables/g8CrossHelpers'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
 const props = defineProps<{
@@ -202,13 +270,8 @@ const props = defineProps<{
   debouncedSave: (id: string, d: Partial<ChecklistResponse>) => void
 }>()
 
+const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 const validateLoading = ref(false)
-
-const AUDIT_CONCLUSION_KEY = 'G8-1-audit-conclusion'
-const auditConclusion = ref(props.allResponses.get(AUDIT_CONCLUSION_KEY)?.remark ?? '')
-watch(auditConclusion, (v) => {
-  if (!props.isReadonly) props.debouncedSave(AUDIT_CONCLUSION_KEY, { conclusion: null, remark: v })
-})
 
 const adj = useG8Adjudication({
   wpId: computed(() => props.wpId),
@@ -221,6 +284,11 @@ const adj = useG8Adjudication({
 const noteProxy = computed({
   get: () => adj.auditNote.value,
   set: (v: string) => adj.updateAuditNote(v),
+})
+
+const conclusionProxy = computed({
+  get: () => adj.auditConclusion.value,
+  set: (v: string) => adj.updateAuditConclusion(v),
 })
 
 const rowCount = computed(() =>
@@ -242,6 +310,26 @@ function rowClassName({ row }: { row: { reasonRequired?: boolean; reasonAnalysis
   return ''
 }
 
+function goSheet(code: string) {
+  jumpToG8Sheet(code, jumpToSection)
+}
+
+function onSyncFromDetail() {
+  const res = adj.syncUnadjustedFromDetail()
+  if (!res.count) {
+    ElMessage.warning('G8-2 暂无明细，请先编制明细表')
+    return
+  }
+  ElMessage.success(
+    `已从 G8-2（${res.count} 行）带入未审：期初 ${fmt(res.opening)} / 期末 ${fmt(res.closing)}（保留账项调整）`,
+  )
+}
+
+function onPublish() {
+  adj.publishAdjudicated()
+  ElMessage.success(`已发布审定数 ${fmt(adj.totalRow.value.closingAdjusted)}`)
+}
+
 async function runValidate() {
   validateLoading.value = true
   try {
@@ -258,12 +346,23 @@ async function runValidate() {
 .g8-adjudication { font-size: var(--wp-font-size, 13px); }
 .objective-alert { margin-bottom: 10px; }
 .tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .toolbar-left,
+.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
-.g8-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
-.g8-title { margin: 0; font-size: 15px; }
-.g8-actions { display: flex; gap: 8px; }
-.guidance-details { margin-bottom: 10px; font-size: 12px; color: #606266; }
+.g8-toolbar { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.title-block .g8-title { margin: 0; font-size: 15px; }
+.sheet-sub { margin: 4px 0 0; font-size: 12px; color: #909399; }
+.g8-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.guidance-details {
+  margin-bottom: 10px;
+  border-left: 3px solid #409eff;
+  background: #ecf5ff;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.guidance-content { margin-top: 8px; font-size: 12px; color: #606266; line-height: 1.65; }
+.guidance-content p { margin: 2px 0; }
 .reason-alert { margin-bottom: 8px; }
 .group-block { margin-bottom: 8px; }
 .group-head { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #f5f7fa; cursor: pointer; border-radius: 4px; }
@@ -272,8 +371,22 @@ async function runValidate() {
 .formula-cell { border-bottom: 1px dashed #c0c4cc; cursor: help; }
 .rate-warn { color: #e6a23c; font-weight: 600; }
 .reason-required :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }
-.g8-tb-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 10px 0; }
-.variance.is-error { color: #f56c6c; font-weight: 600; }
+.tb-info-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+  padding: 8px 12px;
+  border-radius: 4px;
+  background: #f0f9eb;
+  font-size: 12px;
+}
+.tb-info-bar.bad { background: #fef0f0; }
+.tb-label { font-weight: 600; }
+.tb-var { font-weight: 600; }
+.tb-info-bar.bad .tb-var { color: #f56c6c; }
+.tb-info-bar.ok .tb-var { color: #67c23a; }
 .total-table { margin-top: 8px; }
 .cross-alert { margin: 8px 0; }
 .fine-checks { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }

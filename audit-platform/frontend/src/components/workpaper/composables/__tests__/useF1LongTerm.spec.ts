@@ -97,4 +97,21 @@ describe('useF1LongTerm helpers', () => {
     expect(suggested.some(s => s.description.includes('减值') && s.debitAmount === 200)).toBe(true)
     expect(suggested.some(s => s.description.includes('其他应收') && s.category.includes('重分类'))).toBe(true)
   })
+
+  it('mergeSuggestedIntoAje deduplicates by description', async () => {
+    const { mergeSuggestedIntoAje, buildSuggestedAdjustmentRows, createEmptyLongTermRow, recalcLongTermRow } = await import('../useF1LongTerm')
+    const rows = [
+      recalcLongTermRow({
+        ...createEmptyLongTermRow(),
+        customerName: '甲',
+        endBalance: 100,
+        badDebtProvision: 10,
+      }),
+    ]
+    const suggested = buildSuggestedAdjustmentRows(rows)
+    const first = mergeSuggestedIntoAje('[]', suggested)
+    const second = mergeSuggestedIntoAje(first, suggested)
+    expect(JSON.parse(first)).toHaveLength(1)
+    expect(JSON.parse(second)).toHaveLength(1)
+  })
 })

@@ -3,11 +3,21 @@ import { G8_ADJUDICATION_ITEMS, G8_GROUP_LABEL } from './g8AdjudicationItems'
 import {
   G8_DISCLOSURE_LISTED_SCHEMA,
   G8_DISCLOSURE_SOE_SCHEMA,
+  G8_LISTED_BALANCE_SLOTS,
+  G8_LISTED_OCI_SLOTS,
+  G8_SOE_BALANCE_SLOTS,
+  G8_SOE_DETAIL_SLOTS,
 } from './g8SchemaRows'
 
 export { G8_ADJUDICATION_ITEMS, G8_GROUP_LABEL }
 export type { G8AdjudicationLineDef } from './g8AdjudicationItems'
-export type { G8DisclosureRowDef, G8DisclosureSection } from './g8SchemaRows'
+export type { G8DisclosureRowDef, G8DisclosureSection, G8DisclosureStoreV2 } from './g8SchemaRows'
+export {
+  G8_LISTED_BALANCE_SLOTS,
+  G8_LISTED_OCI_SLOTS,
+  G8_SOE_BALANCE_SLOTS,
+  G8_SOE_DETAIL_SLOTS,
+}
 
 export const G8_ACCOUNT_CODE = '1503'
 
@@ -25,12 +35,13 @@ export const G8_COMPLIANCE_OPTIONS = [
   { value: 'not_applicable', label: '不适用' },
 ] as const
 
-export type G8ImportableSheet = 'G8-2' | 'G8-3' | 'G8-4' | 'G8-6'
+export type G8ImportableSheet = 'G8-2' | 'G8-3' | 'G8-4' | 'G8-5' | 'G8-6'
 
 export const G8_IMPORTABLE_SHEETS: { code: G8ImportableSheet; label: string }[] = [
   { code: 'G8-2', label: 'G8-2 明细表' },
   { code: 'G8-3', label: 'G8-3 调整分录' },
   { code: 'G8-4', label: 'G8-4 公允价值测试' },
+  { code: 'G8-5', label: 'G8-5 指定适当性' },
   { code: 'G8-6', label: 'G8-6 凭证检查' },
 ]
 

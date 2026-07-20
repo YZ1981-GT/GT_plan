@@ -26,6 +26,7 @@ G8_SHEETS = [
     {"sheet_name": "公允价值测试表G8-4", "component_type": "g8-other-equity-instruments"},
     {"sheet_name": "指定的适当性检查表G8-5", "component_type": "g8-other-equity-instruments"},
     {"sheet_name": "凭证检查表G8-6", "component_type": "g8-other-equity-instruments"},
+    {"sheet_name": "参考中证协《非上市公司股权估值指引》", "component_type": "g8-other-equity-instruments"},
 ]
 
 

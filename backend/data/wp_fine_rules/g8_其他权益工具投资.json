@@ -202,7 +202,7 @@
       "code": "G8-CHK-07",
       "type": "calculation",
       "severity": "warning",
-      "description": "预期信用损失计提合理"
+      "description": "OCI 核算正确（公允变动计入其他综合收益；处置时累计 OCI 可转留存收益、不经损益）"
     },
     {
       "code": "G8-CHK-02a",
@@ -215,6 +215,24 @@
       "type": "calculation",
       "severity": "warning",
       "description": "公允价值计量正确"
+    },
+    {
+      "code": "G8-CHK-08",
+      "type": "completeness",
+      "severity": "warning",
+      "description": "G8-5 指定适当性矩阵已按被投资单位完成勾选"
+    },
+    {
+      "code": "G8-CHK-09",
+      "type": "cross_ref",
+      "severity": "warning",
+      "description": "G8-5 被投资单位及账面合计与 G8-2 明细勾稽一致"
+    },
+    {
+      "code": "G8-CHK-10",
+      "type": "cross_ref",
+      "severity": "info",
+      "description": "G8-5 FV 可靠计量与 G8-4 公允价值层次结论一致"
     }
   ]
 }

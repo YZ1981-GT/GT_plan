@@ -13,6 +13,15 @@
           size="small"
         />
         <el-button
+          v-if="canStartAiReview && props.sheetName"
+          size="small"
+          type="success"
+          plain
+          @click="onCurrentSheetAiReview"
+        >
+          本页AI复核
+        </el-button>
+        <el-button
           v-if="canStartAiReview"
           size="small"
           type="primary"
@@ -230,11 +239,13 @@
     />
 
     <!-- AI 批量复核面板 -->
-    <el-dialog v-model="reviewDialogVisible" title="D2 应收账款 AI 批量复核" width="900px" :destroy-on-close="true">
+    <el-dialog v-model="reviewDialogVisible" title="D2 应收账款 AI 批量复核" width="900px" :destroy-on-close="false">
       <ReviewPanel
+        ref="reviewPanelRef"
         :project-id="props.projectId"
         wp-code-prefix="D2"
         :year="props.year || new Date().getFullYear()"
+        @navigate-sheet="onReviewNavigateSheet"
       />
     </el-dialog>
   </div>
@@ -244,7 +255,7 @@
 /**
  * GtD2AccountsReceivable.vue — D2 应收账款底稿主入口
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, inject, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, inject, toRef, defineAsyncComponent, nextTick } from 'vue'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { useD2FormData, type ChecklistResponse } from './composables/useD2FormData'
 import { useD2CrossSheet } from './composables/useD2CrossSheet'
@@ -295,6 +306,7 @@ const runtime = inject(WorkpaperRuntimeContextKey, null)
 
 const { currentRole } = usePermissionMatrix()
 const reviewDialogVisible = ref(false)
+const reviewPanelRef = ref<{ reviewCurrentSheet: (wpId: string, sheetName: string) => Promise<unknown> } | null>(null)
 const canStartAiReview = computed(() => {
   const allowedRoles = ['manager', 'partner', 'qc', 'admin']
   return allowedRoles.includes(currentRole.value)
@@ -371,6 +383,18 @@ const renderModeOptions = computed(() => [
 
 function onOoFallback(): void {
   void dualMode.switchMode('html')
+}
+
+async function onCurrentSheetAiReview(): Promise<void> {
+  if (!props.sheetName) return
+  reviewDialogVisible.value = true
+  await nextTick()
+  await reviewPanelRef.value?.reviewCurrentSheet(props.wpId, props.sheetName)
+}
+
+function onReviewNavigateSheet(sheetName: string): void {
+  reviewDialogVisible.value = false
+  emit('jump-to-section', sheetName)
 }
 
 const KNOWN_HTML_SHEETS = new Set([

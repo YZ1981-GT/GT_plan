@@ -183,27 +183,27 @@
       <el-button size="small" type="primary" :disabled="isReadonly" data-testid="g9-publish-adj" @click="adj.publishAdjudicated()">发布审定数</el-button>
     </div>
 
-    <el-card shadow="never" class="g9-note-card">
-      <template #header>审计说明</template>
-      <el-input v-if="!isReadonly" v-model="noteProxy" type="textarea" :rows="3" placeholder="审定分析说明" />
-      <p v-else class="note-text">{{ adj.auditNote.value || '—' }}</p>
-    </el-card>
-
-    <el-card shadow="never" class="g9-note-card">
-      <template #header>审计结论</template>
-      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制无法获取充分、适当证据），不可确认。"
-        @change="(val: string) => saveAuditConclusion(val)" />
-    </el-card>
+    <G9AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="noteProxy"
+      v-model:conclusion="auditConclusion"
+      note-ai-section="adjudication-analysis"
+      conclusion-ai-section="adjudication-conclusion"
+      note-placeholder="填写审定分析说明：可按 FVTPL/FVOCI/摊余成本分组概述期初期末变动、与 TB 差异及拟调整事项。"
+      note-hint="覆盖分组审定、TB 勾稽及 AJE/RJE 影响。"
+      :related-context="{ 行数: adjRowCount, TB差异: adj.variance.value }"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, toRef, ref, onMounted } from 'vue'
+import { computed, toRef, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtReviewDot from '../../GtReviewDot.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G9AuditTextCards from '../G9AuditTextCards.vue'
 import { useG9Adjudication } from '../../composables/useG9Adjudication'
 import { useWorkpaperBrowseMode } from '../../composables/useWorkpaperBrowseMode'
 import { virtualTextCol, virtualNumCol } from '../../composables/virtualColumnHelpers'
@@ -233,16 +233,12 @@ const noteProxy = computed({
   set: (v: string) => adj.updateAuditNote(v),
 })
 
-// ─── 审计结论（持久化 checklist_responses）─────────────────────────────────
 const CONCLUSION_KEY = 'G9-adjudication-audit-conclusion'
-const auditConclusion = ref('')
-function saveAuditConclusion(val: string): void {
-  if (props.isReadonly) return
-  auditConclusion.value = val
-  props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
-}
-onMounted(() => {
-  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusion.value = c.remark
+const auditConclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.remark ?? '')
+watch(auditConclusion, (v) => {
+  if (!props.isReadonly) {
+    props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: v })
+  }
 })
 
 const adjRowCount = computed(() =>

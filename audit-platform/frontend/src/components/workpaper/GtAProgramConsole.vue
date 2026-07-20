@@ -611,7 +611,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowDown } from '@element-plus/icons-vue'
 import GtAProgramLinkedChips from '@/components/workpaper/GtAProgramLinkedChips.vue'
@@ -1083,20 +1083,54 @@ function handleExpandChange(row: ProgramRow, expandedRows: ProgramRow[]) {
   expandedRowKeys.value = expandedRows.map(r => r.id)
 }
 
-// Sprint 4 Task 17.7: 滚动到指定程序行
-function scrollToProgramRow(programNo: number) {
+// Sprint 4 Task 17.7: 滚动到指定程序行（含高亮）
+function scrollToProgramRow(programNo: number, opts?: { highlight?: boolean }) {
   const row = programs.value.find(p => p.program_no === programNo)
-  if (row && tableRef.value) {
+  if (!row) return false
+  if (tableRef.value) {
     tableRef.value.setCurrentRow(row)
-    // 尝试滚动到该行
-    const el = tableRef.value.$el?.querySelector(`[data-row-key="${row.id}"]`)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    }
   }
+  if (opts?.highlight !== false) {
+    highlightRowId.value = row.id
+    setTimeout(() => {
+      if (highlightRowId.value === row.id) highlightRowId.value = ''
+    }, 4000)
+  }
+  const el = tableRef.value?.$el?.querySelector(`[data-row-key="${row.id}"]`)
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+  return true
 }
 
-function handleSelectionChange(selection: ProgramRow[]) {
+/** 会话内跳转：按 program_no 定位（definition_key 优先；无 key 时才用序号） */
+function focusProgramByNos(programNos: number[]): boolean {
+  for (const no of programNos) {
+    if (scrollToProgramRow(no, { highlight: true })) return true
+  }
+  return false
+}
+
+function onProcedureFocusEvent(ev: Event): void {
+  const detail = (ev as CustomEvent).detail || {}
+  const sheetCode = String(detail.sheetCode || '')
+  const sheetName = String(detail.sheetName || '')
+  // 仅响应指向本程序表的事件（sheetCode 匹配 props.sheetName，或 sheetName 含 sheetName）
+  const self = String(props.sheetName || '')
+  if (sheetCode && self && sheetCode !== self && !self.includes(sheetCode)) return
+  if (sheetName && self && sheetName !== self && !self.includes(sheetName) && !sheetName.includes(self)) {
+    // sheetName 全名与短码不一致时仍允许 sheetCode 命中
+    if (!(sheetCode && (self === sheetCode || self.includes(sheetCode)))) return
+  }
+  const nos = Array.isArray(detail.programNos)
+    ? detail.programNos.map((n: unknown) => Number(n)).filter((n: number) => Number.isFinite(n) && n > 0)
+    : []
+  if (!nos.length) return
+  // 延迟一帧，等待可能刚完成的 status 刷新
+  nextTick(() => { focusProgramByNos(nos) })
+}
+
+function handleSelectionChange(selection: ProgramRow[]): void {
   selectedIds.value = selection.map(r => r.id)
 }
 
@@ -1542,33 +1576,43 @@ function tableRowClassName({ row }: { row: ProgramRow }): string {
 
 async function applyDeepLink() {
   const defKey = deepLinkDefinitionKey.value
-  if (!defKey || !programs.value.length) return
-  const resolution = resolveDeepLink(
-    programs.value as unknown as OverlayRow[],
-    (route.query.sheet_key as string) || null,
-    defKey,
-  )
-  if (resolution.templateChanged) {
-    _ElMsg.warning('未能定位到目标程序行：模板可能已变化（不按序号猜测）')
+  if (defKey && programs.value.length) {
+    const resolution = resolveDeepLink(
+      programs.value as unknown as OverlayRow[],
+      (route.query.sheet_key as string) || null,
+      defKey,
+    )
+    if (resolution.templateChanged) {
+      _ElMsg.warning('未能定位到目标程序行：模板可能已变化（不按序号猜测）')
+      return
+    }
+    if (!resolution.matched || !resolution.row) return
+    const targetId = (resolution.row as any).id
+    activeCategory.value = ''
+    await nextTick()
+    if (hasExpandContent.value && !expandedRowKeys.value.includes(targetId)) {
+      expandedRowKeys.value = [...expandedRowKeys.value, targetId]
+    }
+    highlightRowId.value = targetId
+    await nextTick()
+    const el = tableRef.value?.$el?.querySelector(`[data-row-key="${targetId}"]`)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setTimeout(() => { if (highlightRowId.value === targetId) highlightRowId.value = '' }, 4000)
     return
   }
-  if (!resolution.matched || !resolution.row) return
-  const targetId = (resolution.row as any).id
-  // 清筛选
-  activeCategory.value = ''
-  await nextTick()
-  // 展开
-  if (hasExpandContent.value && !expandedRowKeys.value.includes(targetId)) {
-    expandedRowKeys.value = [...expandedRowKeys.value, targetId]
+
+  // 无 definition_key 时：支持显式 program_no 会话跳转（如 G8-4 回填后定位）
+  const rawNo = route.query.program_no
+  if (rawNo != null && String(rawNo).trim() !== '') {
+    const nos = String(rawNo)
+      .split(/[,，/\s]+/)
+      .map((s) => Number(s))
+      .filter((n) => Number.isFinite(n) && n > 0)
+    if (nos.length) {
+      await nextTick()
+      focusProgramByNos(nos)
+    }
   }
-  // 高亮
-  highlightRowId.value = targetId
-  await nextTick()
-  // 滚动
-  const el = tableRef.value?.$el?.querySelector(`[data-row-key="${targetId}"]`)
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  // 高亮 4s 后淡出
-  setTimeout(() => { if (highlightRowId.value === targetId) highlightRowId.value = '' }, 4000)
 }
 
 // 初始化 + 数据变化后重跑 overlay 加载与深链
@@ -1578,6 +1622,11 @@ onMounted(async () => {
   await loadStaffNames()
   await nextTick()
   await applyDeepLink()
+  window.addEventListener('procedure:focus-program', onProcedureFocusEvent)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('procedure:focus-program', onProcedureFocusEvent)
 })
 
 watch(programs, async () => {

@@ -181,23 +181,52 @@
         />
       </template>
     </el-table-column>
-    <el-table-column label="是否异常" width="90">
+    <el-table-column label="是否异常" width="110">
       <template #default="{ row }">
-        <el-input
+        <el-select
           v-if="row.rowId !== '__subtotal__'"
           :model-value="row.isAbnormal"
           size="small"
           :disabled="isReadonly"
-          :class="{ 'abnormal-cell': row.isAbnormal }"
-          @change="(v: string) => emit('update', row.rowId, 'isAbnormal', v)"
-        />
+          clearable
+          placeholder="—"
+          :class="{ 'abnormal-cell': isAbnormalFlag(row.isAbnormal) }"
+          @change="(v: string) => emit('update', row.rowId, 'isAbnormal', v || '')"
+        >
+          <el-option v-for="opt in F1_ABNORMAL_OPTIONS" :key="opt.value || '_empty'" :label="opt.label" :value="opt.value" />
+        </el-select>
       </template>
     </el-table-column>
-    <el-table-column v-if="!isReadonly" label="操作" width="50" fixed="right">
+    <el-table-column label="勾稽" width="88" align="center" fixed="right">
       <template #default="{ row }">
-        <el-popconfirm v-if="row.rowId !== '__subtotal__'" title="删除？" @confirm="emit('remove', row.rowId)">
-          <template #reference><el-button size="small" type="danger" link>删</el-button></template>
-        </el-popconfirm>
+        <el-tag
+          v-if="row.rowId !== '__subtotal__'"
+          size="small"
+          :type="creditEvidenceStatus(row).type"
+        >{{ creditEvidenceStatus(row).label }}</el-tag>
+      </template>
+    </el-table-column>
+    <el-table-column v-if="!isReadonly" label="OCR" width="56" align="center" fixed="right">
+      <template #default="{ row }">
+        <el-upload
+          v-if="row.rowId !== '__subtotal__'"
+          :show-file-list="false"
+          accept="image/*,.pdf"
+          :disabled="ocrLoadingRowId === row.rowId"
+          :before-upload="(file: File) => { emit('ocr', file, row.rowId); return false }"
+        >
+          <el-button link size="small" :loading="ocrLoadingRowId === row.rowId" title="上传凭证 OCR">📎</el-button>
+        </el-upload>
+      </template>
+    </el-table-column>
+    <el-table-column label="操作" :width="isReadonly ? 80 : 130" fixed="right">
+      <template #default="{ row }">
+        <template v-if="row.rowId !== '__subtotal__'">
+          <el-button link type="primary" size="small" @click="emit('open-check', row.rowId)">单据核对</el-button>
+          <el-popconfirm v-if="!isReadonly" title="删除？" @confirm="emit('remove', row.rowId)">
+            <template #reference><el-button size="small" type="danger" link>删</el-button></template>
+          </el-popconfirm>
+        </template>
       </template>
     </el-table-column>
   </el-table>
@@ -205,18 +234,31 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { F1CreditCheckRow } from '../composables/useF1ComprehensiveCheck'
+import {
+  F1_ABNORMAL_OPTIONS,
+  evaluateF1CreditEvidence,
+  f1EvidenceStatusLabel,
+  isAbnormalFlag,
+  type F1CreditCheckRow,
+} from '../composables/useF1ComprehensiveCheck'
 
 const props = defineProps<{
   rows: F1CreditCheckRow[]
   checkedTotal: number
   isReadonly: boolean
+  ocrLoadingRowId?: string | null
 }>()
 
 const emit = defineEmits<{
   update: [rowId: string, field: string, value: any]
   remove: [rowId: string]
+  ocr: [file: File, rowId: string]
+  'open-check': [rowId: string]
 }>()
+
+function creditEvidenceStatus(row: F1CreditCheckRow) {
+  return f1EvidenceStatusLabel(evaluateF1CreditEvidence(row))
+}
 
 const tableData = computed(() => [
   ...props.rows,

@@ -56,11 +56,19 @@ describe('G9 PBT — 公式引擎', () => {
     expect(parseNum('abc')).toBe(0)
   })
 
-  it('P7: calcEndingBalance 6 因子', () => {
+  it('P7: calcEndingBalance 6 因子（OCI 默认 0）', () => {
     fc.assert(fc.property(num, num, num, num, num, num,
       (o, inc, dec, fv, int_, imp) => {
         expect(calcEndingBalance(o, inc, dec, fv, int_, imp))
           .toBeCloseTo(o + inc - dec + fv + int_ - imp, 3)
+      }), { numRuns: 50 })
+  })
+
+  it('P7b: calcEndingBalance 含 OCI 变动', () => {
+    fc.assert(fc.property(num, num, num, num, num, num, num,
+      (o, inc, dec, fv, int_, imp, oci) => {
+        expect(calcEndingBalance(o, inc, dec, fv, int_, imp, oci))
+          .toBeCloseTo(o + inc - dec + fv + int_ - imp + oci, 3)
       }), { numRuns: 50 })
   })
 

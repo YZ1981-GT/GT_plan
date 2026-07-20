@@ -1,12 +1,18 @@
-"""ReviewPromptMixin：AI 复核（提示词驱动）
+"""ReviewPromptMixin：AI 复核（提示词驱动）— 已弃用
 
-review_workpaper_with_prompt、load_review_prompt、_base_review_prompt（property）、
-_audit_cycle_aliases（类属性）、check_pending_confirmations。
+`review_workpaper_with_prompt` 已迁移至：
+  - POST /api/workpapers/{wp_id}/review  （sheet-level）
+  - POST /api/workpapers/{wp_id}/ai/tsj-review  （兼容旧入口，内部走新链路）
+
+本 Mixin 仅保留 `check_pending_confirmations`；
+`review_workpaper_with_prompt` / `load_review_prompt` 保留为 deprecated 薄包装，
+防止外部脚本直接调用时静默走旧科目级路径。
 """
 
 from __future__ import annotations
 
 import logging
+import warnings
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -22,9 +28,15 @@ from app.services.ai_service import AIService
 
 logger = logging.getLogger(__name__)
 
+_DEPRECATION_MSG = (
+    "review_workpaper_with_prompt 已弃用，请改用 "
+    "POST /api/workpapers/{wp_id}/review（底稿级）或 "
+    "POST /api/workpapers/{wp_id}/ai/tsj-review（兼容入口）。"
+)
+
 
 class ReviewPromptMixin:
-    """提示词驱动的 AI 复核相关方法"""
+    """提示词驱动的 AI 复核相关方法（部分已弃用）"""
 
     async def review_workpaper_with_prompt(
         self,
@@ -33,252 +45,167 @@ class ReviewPromptMixin:
         ai_service: AIService,
     ) -> list[AIContent]:
         """
-        提示词驱动的底稿AI智能复核
+        [DEPRECATED] 科目级提示词驱动复核。
 
-        1. 通过 workpaper_id 查找 wp_index 获取 audit_cycle
-        2. 通过 audit_cycle 匹配 TSJ/ 下对应的审计复核提示词文件
-        3. 将提示词注入 LLM system prompt
-        4. LLM 按提示词框架逐项检查底稿
-        5. 输出结构化复核发现
-        6. 每个发现存入 ai_content 表
-
-        Args:
-            project_id: 项目ID
-            workpaper_id: 底稿ID
-            ai_service: AI服务实例
-
-        Returns:
-            list[AIContent]: 复核发现列表
+        内部转发到新链路（ReviewPromptService + review_content_loader），
+        并将结构化 findings 落库为 AIContent，保持旧调用方兼容。
         """
-        from app.models.workpaper_models import WpIndex, WorkingPaper
+        warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=2)
+        logger.warning(_DEPRECATION_MSG)
 
-        # 1. 获取底稿索引信息
-        result = await self.db.execute(
-            select(WpIndex).where(
-                WpIndex.project_id == project_id,
-                WpIndex.is_deleted == False,  # noqa: E712
-            )
-        )
-        wp_indexes = result.scalars().all()
+        from app.services.llm_client import chat_completion
+        from app.services.llm_response_parser import LlmResponseParser
+        from app.services.review_content_loader import load_workpaper_review_content
+        from app.services.review_prompt_service import ReviewPromptService
 
-        # 查找匹配的底稿
-        target_wp = None
-        audit_cycle = None
-        for wp in wp_indexes:
-            # 获取底稿文件
-            wp_file_result = await self.db.execute(
-                select(WorkingPaper).where(
-                    WorkingPaper.wp_index_id == wp.id,
-                    WorkingPaper.is_deleted == False,  # noqa: E712
-                )
-            )
-            wp_files = wp_file_result.scalars().all()
-            for wf in wp_files:
-                if str(wf.id) == str(workpaper_id):
-                    target_wp = wf
-                    audit_cycle = wp.audit_cycle
-                    break
-            if target_wp:
-                break
-
-        if not target_wp:
-            logger.warning(f"Workpaper {workpaper_id} not found")
-            return []
-
-        # 2. 加载审计复核提示词（从 TSJ/ 目录按 audit_cycle 匹配）
-        review_prompt = await self.load_review_prompt(audit_cycle or "general")
-
-        # 3. 读取底稿文件内容，注入提示词占位符 {{#sys.files#}}
-        workpaper_content = ""
+        # 查 wp_code
+        wp_code = None
         try:
-            if target_wp.file_path:
-                import os
-                if os.path.exists(target_wp.file_path):
-                    with open(target_wp.file_path, encoding="utf-8") as f:
-                        workpaper_content = f.read()
-                elif target_wp.content_text:
-                    workpaper_content = target_wp.content_text
+            from app.models.workpaper_models import WorkingPaper, WpIndex
+
+            result = await self.db.execute(
+                select(WorkingPaper, WpIndex)
+                .join(WpIndex, WpIndex.id == WorkingPaper.wp_index_id)
+                .where(WorkingPaper.id == workpaper_id)
+            )
+            row = result.first()
+            if row:
+                wp_code = row[1].wp_code
         except Exception as e:
-            logger.warning(f"Failed to read workpaper file: {e}")
+            logger.warning("deprecated review: failed to resolve wp_code: %s", e)
 
-        # 4. 替换提示词中的 {{#sys.files#}} 占位符
-        if workpaper_content:
-            # 截断过长内容避免超出上下文窗口
-            max_len = 8000
-            if len(workpaper_content) > max_len:
-                workpaper_content = workpaper_content[:max_len] + "\n... (内容已截断)"
-            prompt_content = review_prompt.replace("{{#sys.files#}}", workpaper_content)
-        else:
-            prompt_content = review_prompt.replace(
-                "{{#sys.files#}}",
-                f"[底稿文件 ID: {workpaper_id}]（文件内容不可用）"
-            )
+        prompt_service = ReviewPromptService()
+        prompt_result = prompt_service.load_prompt(wp_code or "general", sheet_name=None)
+        workpaper_content = await load_workpaper_review_content(workpaper_id, None)
 
-        # 5. 构建复核请求
-        prompt = f"""{prompt_content}
+        system_prompt = (
+            "你是资深审计师，请根据以下复核提示词对审计底稿内容进行智能复核。\n"
+            "请以严格 JSON 格式输出。\n\n"
+            f"## 复核提示词\n\n{prompt_result.content}"
+        )
+        user_prompt = f"以下是需要复核的底稿内容：\n\n{workpaper_content}"
 
-## 底稿信息
-- 底稿ID: {workpaper_id}
-- 项目ID: {project_id}
-- 审计循环: {audit_cycle or 'general'}
-
-请按提示词框架逐项检查底稿，输出结构化复核发现。
-"""
         try:
-            response = await ai_service.chat_completion(
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.3,
-            )
-            if hasattr(response, "__aiter__"):
-                content_parts = []
-                async for part in response:
-                    content_parts.append(part)
-                content_text = "".join(content_parts)
+            if ai_service is not None:
+                response = await ai_service.chat_completion(
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    temperature=0.1,
+                )
+                if hasattr(response, "__aiter__"):
+                    content_parts = []
+                    async for part in response:
+                        content_parts.append(part)
+                    content_text = "".join(content_parts)
+                else:
+                    content_text = str(response)
             else:
-                content_text = str(response)
+                content_text = await chat_completion(
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    temperature=0.1,
+                    max_tokens=3000,
+                )
+                if not isinstance(content_text, str):
+                    content_text = str(content_text or "")
         except Exception as e:
             logger.warning(f"AI chat failed for workpaper review: {e}")
             content_text = "【底稿复核】AI复核暂时不可用，请手动复核。"
 
-        # 4. 创建 AI 内容记录
-        ai_content = AIContent(
-            project_id=project_id,
-            workpaper_id=workpaper_id,
-            content_type=AIContentType.risk_alert,
-            content_text=content_text,
-            data_sources={
-                "audit_cycle": audit_cycle,
-                "review_type": "prompt_driven",
-            },
-            generation_model="unknown",
-            generation_time=datetime.now(timezone.utc),
-            confidence_level=ConfidenceLevel.medium,
-            confirmation_status=AIConfirmationStatus.pending,
-        )
-        self.db.add(ai_content)
-        await self.db.commit()
-        await self.db.refresh(ai_content)
+        parse_result = LlmResponseParser.parse(content_text)
+        created: list[AIContent] = []
 
-        return [ai_content]
+        if not parse_result.findings:
+            ai_content = AIContent(
+                project_id=project_id,
+                workpaper_id=workpaper_id,
+                content_type=AIContentType.risk_alert,
+                content_text=content_text,
+                data_sources={
+                    "review_type": "prompt_driven_migrated",
+                    "prompt_source": prompt_result.source_level,
+                    "deprecated_caller": True,
+                },
+                generation_model="unknown",
+                generation_time=datetime.now(timezone.utc),
+                confidence_level=ConfidenceLevel.medium,
+                confirmation_status=AIConfirmationStatus.pending,
+            )
+            self.db.add(ai_content)
+            created.append(ai_content)
+        else:
+            for f in parse_result.findings:
+                rem = f.suggestion or ""
+                text_body = f"{f.description}\n整改建议：{rem}" if rem else f.description
+                ai_content = AIContent(
+                    project_id=project_id,
+                    workpaper_id=workpaper_id,
+                    content_type=AIContentType.risk_alert,
+                    content_text=text_body,
+                    data_sources={
+                        "description": f.description,
+                        "remediation": rem,
+                        "severity": f.risk_level,
+                        "issue_type": f.category,
+                        "sheet": (f.sheet_location or "").split("!")[0] if f.sheet_location else "",
+                        "cell_range": (
+                            f.sheet_location.split("!")[-1]
+                            if f.sheet_location and "!" in f.sheet_location
+                            else ""
+                        ),
+                        "review_type": "prompt_driven_migrated",
+                        "prompt_source": prompt_result.source_level,
+                        "deprecated_caller": True,
+                    },
+                    generation_model="unknown",
+                    generation_time=datetime.now(timezone.utc),
+                    confidence_level=ConfidenceLevel.medium,
+                    confirmation_status=AIConfirmationStatus.pending,
+                )
+                self.db.add(ai_content)
+                created.append(ai_content)
+
+        await self.db.commit()
+        for item in created:
+            await self.db.refresh(item)
+        return created
 
     async def load_review_prompt(self, audit_cycle: str) -> str:
+        """[DEPRECATED] 按 audit_cycle 关键词加载科目级提示词。
+
+        请改用 ReviewPromptService.load_prompt(wp_code, sheet_name)。
         """
-        加载审计复核提示词
+        warnings.warn(
+            "load_review_prompt 已弃用，请改用 ReviewPromptService.load_prompt",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        from app.services.review_prompt_service import ReviewPromptService
 
-        按科目名称关键词匹配 TSJ/ 下的 .md 文件
-        未匹配到时返回通用复核提示词模板
-
-        Args:
-            audit_cycle: 审计循环（如 "cash"、"receivable"）
-
-        Returns:
-            str: 提示词内容
-        """
-        import os
-        import re
-        import glob
-
-        # 1. 查找 TSJ 目录（程序数据：backend/data/tsj_review_prompts/）
-        # 环境变量 TSJ_PROMPT_DIR / TSJ_KNOWLEDGE_DIR 可覆盖
-        tsj_base = os.environ.get("TSJ_PROMPT_DIR") or os.environ.get("TSJ_KNOWLEDGE_DIR")
-        if not tsj_base:
-            # __file__ = backend/app/services/wp_fill/_review_prompt.py
-            # → 上溯到 backend/ 后定位 data/tsj_review_prompts
-            # （比原 workpaper_fill_service.py 深一层 wp_fill/，故多上溯一级保持解析到 backend/）
-            backend_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-            tsj_base = os.path.join(backend_root, "data", "tsj_review_prompts")
-        tsj_base = os.path.abspath(tsj_base)
-
-        if not os.path.isdir(tsj_base):
-            logger.warning(f"TSJ prompt directory not found: {tsj_base}")
-            return self._base_review_prompt
-
-        # 2. 收集所有 .md 文件
-        md_files = glob.glob(os.path.join(tsj_base, "*.md"))
-        if not md_files:
-            logger.warning(f"No .md files found in {tsj_base}")
-            return self._base_review_prompt
-
-        # 3. 构造关键词匹配模式（支持中文和英文别名）
-        cycle_keywords = self._audit_cycle_aliases.get(audit_cycle.lower(), [audit_cycle])
-
-        matched_file = None
-        matched_score = 0
-
-        for md_path in md_files:
-            fname = os.path.basename(md_path)
-            score = 0
-            for kw in cycle_keywords:
-                # 匹配文件名中包含关键词（忽略"审计复核提示词"通用部分）
-                name_without_suffix = re.sub(r"审计复核提示词\.md$", "", fname)
-                if kw.lower() in name_without_suffix.lower():
-                    score += 2
-                if kw.lower() in fname.lower():
-                    score += 1
-            if score > matched_score:
-                matched_score = score
-                matched_file = md_path
-
-        # 4. 读取匹配到的文件内容
-        if matched_file and matched_score > 0:
-            try:
-                with open(matched_file, encoding="utf-8") as f:
-                    content = f.read().strip()
-                logger.info(f"Loaded TSJ prompt: {os.path.basename(matched_file)} (score={matched_score})")
-                return content
-            except Exception as e:
-                logger.warning(f"Failed to read TSJ file {matched_file}: {e}")
-
-        # 5. 未匹配时按通用关键词模糊搜索
-        generic_keywords = ["总体", "general", "审计方案"]
-        for md_path in md_files:
-            fname = os.path.basename(md_path)
-            for kw in generic_keywords:
-                if kw.lower() in fname.lower():
-                    try:
-                        with open(md_path, encoding="utf-8") as f:
-                            content = f.read().strip()
-                        logger.info(f"Fallback TSJ prompt (generic): {fname}")
-                        return content
-                    except Exception as e:
-                        logger.debug("读取 TSJ prompt 文件失败 %s: %s", fname, e)
-
-        logger.info("No matching TSJ prompt found, using base prompt")
-        return self._base_review_prompt
+        # 粗略映射：audit_cycle 英文别名 → 尝试 D2 等；否则走 base
+        cycle_to_wp = {
+            "receivable": "D2",
+            "cash": "E1",
+            "inventory": "F2",
+            "revenue": "D4",
+            "payable": "F4",
+        }
+        wp_code = cycle_to_wp.get((audit_cycle or "").lower(), audit_cycle or "general")
+        result = ReviewPromptService().load_prompt(wp_code, sheet_name=None)
+        return result.content
 
     @property
     def _base_review_prompt(self) -> str:
-        """通用复核提示词模板"""
-        return """你是审计师，请对审计底稿进行智能复核。
+        """通用复核提示词模板（兼容旧属性访问）"""
+        from app.services.review_prompt_service import ReviewPromptService
 
-## 复核框架
+        return ReviewPromptService().load_prompt("general", None).content
 
-### 1. 审计认定检查
-- 存在性：账面记录是否存在
-- 完整性：所有交易是否记录
-- 权利和义务：资产是否属于被审计单位
-- 计价或分摊：金额是否正确
-- 准确性、分类和截止：是否正确记录
-
-### 2. 程序执行检查
-- 审计程序是否完整执行
-- 样本量是否充分
-- 替代程序是否充分
-
-### 3. 数据完整性检查
-- 勾稽关系是否正确
-- 小计合计是否准确
-- 期初期末是否连续
-
-### 4. 风险评估复核
-- 异常事项是否标注
-- 高风险领域是否充分关注
-- 审计结论是否有充分证据支持
-
-请按上述框架检查底稿，识别潜在问题并给出建议。
-"""
-
-    # 审计循环关键词别名映射（支持中英文通用术语）
+    # 审计循环关键词别名映射（保留供外部只读，不再用于主路径）
     _audit_cycle_aliases: dict[str, list[str]] = {
         "cash": ["现金", "货币资金"],
         "bank": ["银行", "货币资金"],

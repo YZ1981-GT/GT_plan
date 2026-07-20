@@ -1,6 +1,6 @@
 <template>
-  <!-- 审计目标(objective-alert)/编制提示(guidance-details)/审计说明(-audit-note)/审计结论(-audit-conclusion) 均由 G9TabDisclosureBase 按 variant=listed 统一渲染 -->
-  <G9TabDisclosureBase variant="listed" v-bind="$props" />
+  <!-- 审计目标/编制提示/审计说明/结论 由 G9TabDisclosureBase 按 variant=listed 统一渲染 -->
+  <G9TabDisclosureBase variant="listed" v-bind="$props" @imported="emit('imported')" />
 </template>
 
 <script setup lang="ts">
@@ -13,4 +13,6 @@ defineProps<{
   isReadonly: boolean
   debouncedSave: (id: string, d: Partial<ChecklistResponse>) => void
 }>()
+
+const emit = defineEmits<{ imported: [] }>()
 </script>

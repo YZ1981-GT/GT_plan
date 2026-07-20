@@ -14,7 +14,6 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-import httpx
 from sqlalchemy import text
 
 from app.core.config import settings
@@ -352,8 +351,15 @@ class BatchReviewService:
             # 1. 加载提示词
             prompt_result = self._prompt_service.load_prompt(wp_code, sheet_name)
 
-            # 2. 获取底稿内容
+            # 2. 获取底稿内容 + D2 勾稽上下文
             workpaper_content = await self._get_workpaper_content(wp_id, sheet_name)
+            recon_context = ""
+            if (wp_code or "").upper().startswith("D2"):
+                from app.services.d2_review_context import (
+                    append_reconciliation_to_user_prompt,
+                    build_d2_reconciliation_context,
+                )
+                recon_context = await build_d2_reconciliation_context(wp_id)
 
             # 3. 调用 LLM
             system_prompt = (
@@ -368,6 +374,7 @@ class BatchReviewService:
                 "- 对每项检查点输出一个 finding 对象\n"
                 "- passed=true 表示该项通过，passed=false 表示未通过\n"
                 "- risk_level 根据检查项所属风险等级填写\n"
+                "- 如系统已给出勾稽差异，必须据此输出未通过 finding，不得忽略\n"
                 "- 如无问题可输出空 findings 数组\n\n"
                 "## 输出示例\n\n"
                 '{"findings": [\n'
@@ -378,6 +385,8 @@ class BatchReviewService:
                 f"## 复核提示词\n\n{prompt_result.content}"
             )
             user_prompt = f"以下是需要复核的底稿内容：\n\n{workpaper_content}"
+            if recon_context:
+                user_prompt = append_reconciliation_to_user_prompt(user_prompt, recon_context)
 
             messages = [
                 {"role": "system", "content": system_prompt},
@@ -409,7 +418,9 @@ class BatchReviewService:
 
             # 5. 解析
             parse_result = LlmResponseParser.parse(raw_response)
-            pass_status = LlmResponseParser.determine_pass_status(parse_result.findings)
+            pass_status = LlmResponseParser.determine_pass_status(
+                parse_result.findings, sheet_name=sheet_name
+            )
 
             # 如果解析失败且降级为 unknown，标记 manual_review_required
             if not parse_result.parse_success:
@@ -454,68 +465,10 @@ class BatchReviewService:
             )
 
     async def _get_workpaper_content(self, wp_id: str, sheet_name: str | None) -> str:
-        """获取底稿内容（从 render-config 提取 html_data 文本）"""
-        try:
-            url = f"http://localhost:{settings.PORT or 9980}/api/workpapers/{wp_id}/render-config"
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.get(url)
-                if resp.status_code != 200:
-                    return "(底稿内容获取失败)"
+        """获取底稿内容（DB 直读，不经 HTTP）"""
+        from app.services.review_content_loader import load_workpaper_review_content
 
-                data = resp.json()
-                payload = data.get("data", data)
-                sheets = payload.get("sheets", [])
-
-                if not sheets:
-                    return "(底稿无内容)"
-
-                # 如果有 sheet_name，尝试匹配
-                target_sheet = None
-                if sheet_name:
-                    for s in sheets:
-                        s_name = s.get("sheet_name", "") or ""
-                        if sheet_name in s_name or s_name in sheet_name:
-                            target_sheet = s
-                            break
-                if not target_sheet:
-                    target_sheet = sheets[0]
-
-                html_data = target_sheet.get("html_data", {}) or {}
-                return self._extract_text_from_html_data(html_data)
-
-        except Exception as e:
-            logger.warning("Failed to get workpaper content for %s: %s", wp_id, e)
-            return "(底稿内容获取异常)"
-
-    @staticmethod
-    def _extract_text_from_html_data(html_data: dict) -> str:
-        """从 html_data 提取关键文本内容"""
-        import json
-
-        parts: list[str] = []
-
-        for key in ("responses_snapshot", "allResponses", "checklist_responses"):
-            val = html_data.get(key)
-            if val and isinstance(val, (dict, list)):
-                text_repr = json.dumps(val, ensure_ascii=False, indent=None)
-                if len(text_repr) > 5000:
-                    text_repr = text_repr[:5000] + "...(已截断)"
-                parts.append(f"[{key}]\n{text_repr}")
-
-        tb_values = html_data.get("tb_values")
-        if tb_values and isinstance(tb_values, dict):
-            tb_text = json.dumps(tb_values, ensure_ascii=False, indent=None)
-            if len(tb_text) > 2000:
-                tb_text = tb_text[:2000] + "...(已截断)"
-            parts.append(f"[试算表数据]\n{tb_text}")
-
-        if not parts:
-            fallback = json.dumps(html_data, ensure_ascii=False, indent=None)
-            if len(fallback) > 6000:
-                fallback = fallback[:6000] + "...(已截断)"
-            parts.append(f"[底稿数据]\n{fallback}")
-
-        return "\n\n".join(parts)
+        return await load_workpaper_review_content(wp_id, sheet_name)
 
     @staticmethod
     def _compute_statistics(results: list[ReviewResult]) -> BatchStatistics:

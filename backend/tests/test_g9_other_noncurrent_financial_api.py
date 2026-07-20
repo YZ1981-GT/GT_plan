@@ -45,7 +45,7 @@ async def test_g9_render_dispatch_registered():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("sheet", ["G9-2", "G9-3", "G9-4", "G9-5", "G9-6"])
+@pytest.mark.parametrize("sheet", ["G9-2", "G9-3", "G9-4", "G9-5", "G9-6", "附注上市", "附注国企"])
 async def test_g9_export_template_all_sheets(sheet: str):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -63,9 +63,19 @@ async def test_g9_ai_sections():
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         for section in (
             "adjudication-analysis",
+            "adjudication-conclusion",
+            "detail-note",
+            "detail-conclusion",
+            "adjustment-note",
+            "adjustment-conclusion",
             "fair-value-conclusion",
+            "fair-value-note",
             "l3-reconciliation-conclusion",
+            "l3-note",
             "voucher-conclusion",
+            "voucher-note",
+            "disclosure-note",
+            "disclosure-conclusion",
             "disclosure-section",
         ):
             resp = await client.post(

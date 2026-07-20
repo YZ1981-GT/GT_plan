@@ -36,9 +36,52 @@ export function calcEndingBalance(
   )
 }
 
+/**
+ * G8-2 OCI 期末累计 = 期初累计 + 本期 OCI − 转入留存收益
+ *（处置等情形下 OCI 可转入留存收益，CAS22）
+ */
+export function calcOciCumulativeEnding(
+  openingCumulative: number,
+  currentChange: number,
+  toRetainedEarnings: number,
+): number {
+  return (
+    parseNum(openingCumulative)
+    + parseNum(currentChange)
+    - parseNum(toRetainedEarnings)
+  )
+}
+
+/** G8-4 公允价值 = 数量 × 单价（保留 2 位小数） */
+export function calcFairValueAmount(qty: number, unitPrice: number): number {
+  return Math.round(parseNum(qty) * parseNum(unitPrice) * 100) / 100
+}
+
 /** G8-4 公允价值差异 = 审定 - 未审 */
 export function calcFairValueDiff(audited: number, unadjusted: number): number {
-  return parseNum(audited) - parseNum(unadjusted)
+  return Math.round((parseNum(audited) - parseNum(unadjusted)) * 100) / 100
+}
+
+/** 数量变动对公允价值差异的影响 = (审定数量 − 未审数量) × 未审单价 */
+export function calcFairValueQtyImpact(
+  auditedQty: number,
+  unadjQty: number,
+  unadjPrice: number,
+): number {
+  return Math.round(
+    (parseNum(auditedQty) - parseNum(unadjQty)) * parseNum(unadjPrice) * 100,
+  ) / 100
+}
+
+/** 价格变动对公允价值差异的影响 = 审定数量 × (审定单价 − 未审单价) */
+export function calcFairValuePriceImpact(
+  auditedQty: number,
+  auditedPrice: number,
+  unadjPrice: number,
+): number {
+  return Math.round(
+    parseNum(auditedQty) * (parseNum(auditedPrice) - parseNum(unadjPrice)) * 100,
+  ) / 100
 }
 
 /** 变动额 = 期末审定 - 期初审定 */

@@ -111,6 +111,7 @@ export function mapCutoffToG8Adjustment(v: ExtractedVoucher, seq: number): G8Adj
 }
 
 export function mapCutoffToG8Voucher(v: ExtractedVoucher, seq: number): G8VoucherRow {
+  const crossPeriod = v.cutoffStatus === '可能跨期'
   return {
     rowId: genG8VoucherId(),
     seq,
@@ -122,17 +123,22 @@ export function mapCutoffToG8Voucher(v: ExtractedVoucher, seq: number): G8Vouche
     creditAmount: parseDecimal(v.creditAmount),
     attachment: '',
     supportingDocDesc: '',
-    check1OriginalComplete: true,
-    check2Authorization: true,
-    check3Accounting: true,
-    check4FairValueCorrect: true,
-    check5OCICorrect: true,
+    // 抽凭/截止回填默认未测，避免未核对却显示全✓
+    check1OriginalComplete: null,
+    check2Authorization: null,
+    check3Accounting: null,
+    check4FairValueCorrect: null,
+    check5OCICorrect: null,
     indexNo: '',
-    isAbnormal: v.cutoffStatus === '可能跨期',
-    abnormalDesc: v.cutoffStatus === '可能跨期' ? (v.remark || '截止测试：可能跨期') : '',
-    riskLevel: v.cutoffStatus === '可能跨期' ? 'high' : 'medium',
+    isAbnormal: crossPeriod,
+    forceAbnormal: crossPeriod,
+    abnormalType: crossPeriod ? 'qualitative' : 'none',
+    abnormalDesc: crossPeriod ? (v.remark || '截止测试：可能跨期') : '',
+    riskLevel: crossPeriod ? 'high' : 'medium',
     remark: `[截止提取] ${v.remark ?? ''}`.trim(),
     source: '截止',
+    detailRowId: '',
+    investeeName: '',
   }
 }
 
@@ -153,6 +159,7 @@ export function mapCutoffToG9Adjustment(v: ExtractedVoucher, seq: number): G9Adj
 }
 
 export function mapCutoffToG9Voucher(v: ExtractedVoucher, seq: number): G9VoucherRow {
+  const crossPeriod = v.cutoffStatus === '可能跨期'
   return {
     rowId: genG9VoucherId(),
     seq,
@@ -164,19 +171,24 @@ export function mapCutoffToG9Voucher(v: ExtractedVoucher, seq: number): G9Vouche
     creditAmount: parseDecimal(v.creditAmount),
     attachmentRef: '',
     supportDoc: '',
-    checkOriginal: true,
-    checkAuthorized: true,
-    checkAccounting: true,
-    checkClassification: true,
-    checkFairValue: true,
-    checkImpairment: true,
+    // 截止回填默认未测，避免未核对却显示全✓
+    checkOriginal: null,
+    checkAuthorized: null,
+    checkAccounting: null,
+    checkClassification: null,
+    checkFairValue: null,
+    checkImpairment: null,
     indexRef: '',
-    isAbnormal: v.cutoffStatus === '可能跨期',
-    abnormalDesc: v.cutoffStatus === '可能跨期' ? (v.remark || '截止测试：可能跨期') : '',
-    riskLevel: v.cutoffStatus === '可能跨期' ? 'high' : 'medium',
+    isAbnormal: crossPeriod,
+    forceAbnormal: crossPeriod,
+    abnormalType: crossPeriod ? 'qualitative' : 'none',
+    abnormalDesc: crossPeriod ? (v.remark || '截止测试：可能跨期') : '',
+    riskLevel: crossPeriod ? 'high' : 'medium',
     suggestion: '',
     remark: `[截止提取] ${v.remark ?? ''}`.trim(),
     source: '截止',
+    detailRowId: '',
+    assetName: '',
   }
 }
 

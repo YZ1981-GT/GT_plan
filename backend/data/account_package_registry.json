@@ -750,7 +750,7 @@
     },
     {
       "account_package_id": "G8_other_equity_instrument_investment",
-      "cycle": "G", "account_code": "1502", "account_name": "其他权益工具投资",
+      "cycle": "G", "account_code": "1503", "account_name": "其他权益工具投资",
       "report_row": null, "note_section": null,
       "mapping_status": "pending_inventory_reconciliation", "industry": ["通用"],
       "primary_wp_code": "G8", "control_panel_sheet": "G8A", "source_wp_codes": ["G0", "G8"],

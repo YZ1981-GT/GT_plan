@@ -6,10 +6,12 @@ import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref, type Comput
 import {
   G8_ACCOUNT_CODE,
   G8_ADJUDICATION_ITEMS,
+  G8_ADJ_WRITEBACK_ROW_KEY,
   G8_CHANGE_RATE_THRESHOLD,
   G8_GROUP_LABEL,
 } from './g8Constants'
 import { parseG8AdjStore, patchG8AdjRow, applyG8AdjustmentWriteback, type G8AdjustmentWriteback } from './g8AdjStorage'
+import { G8_DETAIL_KEY } from './g8CrossHelpers'
 import {
   parseNum,
   calcAdjustedAmount,
@@ -70,7 +72,11 @@ export function useG8Adjudication(opts: {
     auditNote.value = v ?? ''
   }, { immediate: true })
   watch(() => opts.allResponses.value.get(ITEM_ID_CONCLUSION)?.conclusion, (v) => {
-    auditConclusion.value = v ?? ''
+    if (v != null && v !== '') auditConclusion.value = v
+  }, { immediate: true })
+  // 兼容历史键 G8-1-audit-conclusion（remark）
+  watch(() => opts.allResponses.value.get('G8-1-audit-conclusion')?.remark, (v) => {
+    if (v && !auditConclusion.value) auditConclusion.value = v
   }, { immediate: true })
 
   function buildRow(def: (typeof G8_ADJUDICATION_ITEMS)[number]): G8AdjudicationRow {
@@ -153,16 +159,33 @@ export function useG8Adjudication(opts: {
   const variance = computed(() => totalRow.value.closingAdjusted - trialBalanceAmount.value)
   const hasVarianceHighlight = computed(() => Math.abs(variance.value) > 0.01)
 
-  const detailTotalClosing = computed(() => {
-    const json = opts.allResponses.value.get('G8-detail-rows')?.remark
+  function parseDetailRows(): any[] | null {
+    const json = opts.allResponses.value.get(G8_DETAIL_KEY)?.remark
     if (!json) return null
     try {
       const arr = JSON.parse(json)
-      if (!Array.isArray(arr)) return null
-      return calcSubtotal(arr.map((r: any) => parseNum(r.closingAdjusted ?? r.closingBalance)))
+      return Array.isArray(arr) ? arr : null
     } catch {
       return null
     }
+  }
+
+  const detailTotalClosing = computed(() => {
+    const arr = parseDetailRows()
+    if (!arr) return null
+    return calcSubtotal(arr.map((r: any) => parseNum(r.closingAdjusted ?? r.closingBalance)))
+  })
+
+  const detailTotalOpeningBook = computed(() => {
+    const arr = parseDetailRows()
+    if (!arr?.length) return null
+    return calcSubtotal(arr.map((r: any) => parseNum(r.openingBalance)))
+  })
+
+  const detailTotalClosingBook = computed(() => {
+    const arr = parseDetailRows()
+    if (!arr?.length) return null
+    return calcSubtotal(arr.map((r: any) => parseNum(r.closingBalance)))
   })
 
   const detailCrossVariance = computed(() => {
@@ -172,6 +195,33 @@ export function useG8Adjudication(opts: {
 
   const hasDetailCrossMismatch = computed(() =>
     detailCrossVariance.value != null && Math.abs(detailCrossVariance.value) > 0.01,
+  )
+
+  /** G8-4 审定公允价值合计 vs G8-1 期末审定 */
+  const fvAuditedTotal = computed(() => {
+    const json = opts.allResponses.value.get('G8-fv-test-rows')?.remark
+    if (!json) return null
+    try {
+      const arr = JSON.parse(json)
+      if (!Array.isArray(arr) || !arr.length) return null
+      return calcSubtotal(arr.map((r: any) => {
+        const qty = parseNum(r.closingAuditedQty)
+        const price = parseNum(r.closingAuditedPrice)
+        const fv = parseNum(r.closingAuditedFV)
+        return fv || (qty && price ? Math.round(qty * price * 100) / 100 : 0)
+      }))
+    } catch {
+      return null
+    }
+  })
+
+  const fvCrossVariance = computed(() => {
+    if (fvAuditedTotal.value == null) return null
+    return totalRow.value.closingAdjusted - fvAuditedTotal.value
+  })
+
+  const hasFvCrossMismatch = computed(() =>
+    fvCrossVariance.value != null && Math.abs(fvCrossVariance.value) > 0.01,
   )
 
   function persistRows(): void {
@@ -206,6 +256,32 @@ export function useG8Adjudication(opts: {
     if (opts.isReadonly.value) return
     auditNote.value = value
     opts.debouncedSave(ITEM_ID_NOTE, { conclusion: value })
+  }
+
+  function updateAuditConclusion(value: string): void {
+    if (opts.isReadonly.value) return
+    auditConclusion.value = value
+    opts.debouncedSave(ITEM_ID_CONCLUSION, { conclusion: value })
+    // 双写兼容历史键，避免 AI/旧 UI 分叉
+    opts.debouncedSave('G8-1-audit-conclusion', { conclusion: null, remark: value })
+  }
+
+  /**
+   * 从 G8-2 明细汇总带入 fv_1 期初/期末未审（账面余额合计），保留已有账项调整（含 G8-3 回写）。
+   */
+  function syncUnadjustedFromDetail(): { count: number; opening: number; closing: number } {
+    if (opts.isReadonly.value) return { count: 0, opening: 0, closing: 0 }
+    const arr = parseDetailRows()
+    if (!arr?.length) return { count: 0, opening: 0, closing: 0 }
+    const opening = calcSubtotal(arr.map((r: any) => parseNum(r.openingBalance)))
+    const closing = calcSubtotal(arr.map((r: any) => parseNum(r.closingBalance)))
+    rowStore.value = patchG8AdjRow(rowStore.value, G8_ADJ_WRITEBACK_ROW_KEY, {
+      openingUnadjusted: opening,
+      closingUnadjusted: closing,
+    })
+    persistRows()
+    publishAdjudicatedDebounced()
+    return { count: arr.length, opening, closing }
   }
 
   function toggleGroup(): void {
@@ -263,8 +339,7 @@ export function useG8Adjudication(opts: {
       )
       const content = res?.data?.content ?? res?.content ?? ''
       if (content) {
-        auditConclusion.value = content
-        opts.debouncedSave(ITEM_ID_CONCLUSION, { conclusion: content })
+        updateAuditConclusion(content)
       }
     } catch { /* optional */ }
     finally { aiLoading.value = false }
@@ -349,6 +424,11 @@ export function useG8Adjudication(opts: {
     hasDetailCrossMismatch,
     detailTotalClosing,
     detailCrossVariance,
+    detailTotalOpeningBook,
+    detailTotalClosingBook,
+    fvAuditedTotal,
+    fvCrossVariance,
+    hasFvCrossMismatch,
     trialBalanceAmount,
     auditNote,
     auditConclusion,
@@ -356,6 +436,8 @@ export function useG8Adjudication(opts: {
     updateField,
     updateTrialBalance,
     updateAuditNote,
+    updateAuditConclusion,
+    syncUnadjustedFromDetail,
     toggleGroup,
     loadTrialBalanceFromApi,
     generateAiAnalysis,
@@ -366,5 +448,6 @@ export function useG8Adjudication(opts: {
     missingReasonCount,
     hasMissingReasons,
     accountCode: G8_ACCOUNT_CODE,
+    writebackRowKey: G8_ADJ_WRITEBACK_ROW_KEY,
   }
 }

@@ -1,17 +1,18 @@
 <template>
 <div class="f1-comprehensive-check">
   <details class="guidance-details">
-    <summary>📋 编制提示</summary>
+    <summary>📋 编制思路与检查逻辑</summary>
     <div class="guidance-content">
-      <p>1. 本表对预付账款（科目1123）本期增减与期后结转抽样检查，验证真实性与截止恰当性。</p>
-      <p>2. 借方核对：记账凭证 ↔ 付款审批单 ↔ 银行回单 ↔ 合同/订单；贷方/期后核对：记账凭证 ↔ 入库/验收 ↔ 发票。</p>
-      <p>3. 大额、长账龄、关联方预付应作为特定样本必选；检查比例偏低（&lt;30%）须扩大样本或在说明中解释。</p>
-      <p>4. 期后贷方合计应与 F1-2 期后结转（Z列）勾稽；账面金额可从 F1-2 回填后计算覆盖率。</p>
+      <p>1. <b>目标</b>：对预付账款（1123）本期增减与期后结转抽样，验证真实性、审批合规与截止恰当。</p>
+      <p>2. <b>样本</b>：大额 / 关联方 / 超1年账龄作特定样本必选（可一键从 F1-2 带入）；其余用抽凭引擎按借贷分配。</p>
+      <p>3. <b>借方证据链</b>：记账凭证 ↔ 付款审批单 ↔ 银行回单 ↔ 合同/订单；点击「单据核对」分单据 OCR 回填，右侧实时勾稽。</p>
+      <p>4. <b>贷方/期后证据链</b>：记账凭证 ↔ 入库/验收 ↔ 发票；期后可按资产负债表日一键标注跨期疑点，核实合计应与 F1-2 期后结转（Z列）勾稽。</p>
+      <p>5. <b>检查比例</b>：账面基准 = F1-2 借方 / 贷方 / 期后结转合计；核实 = 本表样本金额；比例 &lt;30% 须扩大样本或在说明中解释。</p>
     </div>
   </details>
 
   <!-- 一、审计目标 -->
-  <el-alert type="info" :closable="false" class="objective-alert" show-icon>
+  <el-alert id="f1-7-objective" type="info" :closable="false" class="objective-alert" show-icon>
     <template #title>
       <div class="objective-title">一、审计目标</div>
       <ul class="objective-list">
@@ -23,7 +24,7 @@
   </el-alert>
 
   <!-- 二、样本选取 -->
-  <el-card class="sampling-card" shadow="never">
+  <el-card id="f1-7-sample" class="sampling-card" shadow="never">
     <template #header>
       <div class="card-header">
         <span>二、样本选取标准与规模</span>
@@ -111,12 +112,41 @@
       <el-tag :type="anomalyCount > 0 ? 'danger' : 'success'" size="small">异常 {{ anomalyCount }}</el-tag>
       <el-tag :type="anomalyRate > 10 ? 'danger' : 'info'" size="small">异常率 {{ anomalyRate.toFixed(1) }}%</el-tag>
       <el-button size="small" :disabled="isReadonly" @click="doFillBookFromDetail">从 F1-2 回填账面</el-button>
+      <el-button size="small" type="warning" plain :disabled="isReadonly" @click="doImportPrioritySamples">
+        从 F1-2 带入重点样本
+      </el-button>
     </div>
     <div class="toolbar-right">
       <span class="chip-wrap"><GtIndexChip value="wp:F1-1" :context-project-id="projectId" /></span>
       <span class="chip-wrap"><GtIndexChip value="wp:F1-2" :context-project-id="projectId" /></span>
+      <span class="chip-wrap"><GtIndexChip value="wp:F1-5" :context-project-id="projectId" /></span>
     </div>
   </div>
+
+  <nav class="st-sec-nav" aria-label="F1-7 分区导航">
+    <button
+      v-for="item in f1VoucherNav"
+      :key="item.id"
+      type="button"
+      class="st-sec-btn"
+      :class="{ active: activeId === item.id }"
+      @click="scrollTo(item.id)"
+    >{{ item.label }}</button>
+  </nav>
+
+  <el-collapse id="f1-7-sampling" class="sampling-engine-collapse" style="margin-bottom: 12px">
+    <el-collapse-item title="自动抽凭（科目 1123 预付账款 · 样本按借贷方向自动分配）" name="auto-sampling">
+      <GtVoucherSamplingEngine
+        account-code="1123"
+        :phase="currentPhase"
+        default-method="mus"
+        :workpaper-id="wpId"
+        :project-id="projectId"
+        :year="auditYear"
+        @filled="handleSamplingFilled"
+      />
+    </el-collapse-item>
+  </el-collapse>
 
   <F1SheetAttachments
     :project-id="projectId"
@@ -126,7 +156,7 @@
   />
 
   <!-- (1) 本期借方 -->
-  <div class="vc-section">
+  <div id="f1-7-debit" class="vc-section">
     <div class="section-header">
       <h4>(1) 本期借方发生额核查</h4>
       <div class="section-header-actions">
@@ -254,17 +284,21 @@
             />
           </template>
         </el-table-column>
-        <el-table-column label="是否审批" width="80">
-          <template #default="{ row }">
-            <el-input
-              v-if="row.rowId !== '__subtotal__'"
-              :model-value="row.approvalOk"
-              size="small"
-              :disabled="isReadonly"
-              @change="(v: string) => updateCell('debit', row.rowId, 'approvalOk', v)"
-            />
-          </template>
-        </el-table-column>
+      <el-table-column label="是否审批" width="90">
+        <template #default="{ row }">
+          <el-select
+            v-if="row.rowId !== '__subtotal__'"
+            :model-value="row.approvalOk"
+            size="small"
+            :disabled="isReadonly"
+            clearable
+            placeholder="—"
+            @change="(v: string) => updateCell('debit', row.rowId, 'approvalOk', v || '')"
+          >
+            <el-option v-for="opt in F1_YES_NO_OPTIONS" :key="opt.value" :label="opt.label" :value="opt.value" />
+          </el-select>
+        </template>
+      </el-table-column>
       </el-table-column>
       <el-table-column label="银行回单" align="center">
         <el-table-column label="付款方" width="90">
@@ -347,30 +381,59 @@
           />
         </template>
       </el-table-column>
-      <el-table-column label="是否异常" width="90">
+      <el-table-column label="是否异常" width="110">
         <template #default="{ row }">
-          <el-input
+          <el-select
             v-if="row.rowId !== '__subtotal__'"
             :model-value="row.isAbnormal"
             size="small"
             :disabled="isReadonly"
-            :class="{ 'abnormal-cell': row.isAbnormal }"
-            @change="(v: string) => updateCell('debit', row.rowId, 'isAbnormal', v)"
-          />
+            clearable
+            placeholder="—"
+            :class="{ 'abnormal-cell': isAbnormalFlag(row.isAbnormal) }"
+            @change="(v: string) => updateCell('debit', row.rowId, 'isAbnormal', v || '')"
+          >
+            <el-option v-for="opt in F1_ABNORMAL_OPTIONS" :key="opt.value || '_empty'" :label="opt.label" :value="opt.value" />
+          </el-select>
         </template>
       </el-table-column>
-      <el-table-column v-if="!isReadonly" label="操作" width="50" fixed="right">
+      <el-table-column label="勾稽" width="88" align="center" fixed="right">
         <template #default="{ row }">
-          <el-popconfirm v-if="row.rowId !== '__subtotal__'" title="删除？" @confirm="removeSample('debit', row.rowId)">
-            <template #reference><el-button size="small" type="danger" link>删</el-button></template>
-          </el-popconfirm>
+          <el-tag
+            v-if="row.rowId !== '__subtotal__'"
+            size="small"
+            :type="debitEvidenceStatus(row).type"
+          >{{ debitEvidenceStatus(row).label }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column v-if="!isReadonly" label="OCR" width="56" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-upload
+            v-if="row.rowId !== '__subtotal__'"
+            :show-file-list="false"
+            accept="image/*,.pdf"
+            :disabled="ocrLoadingRowId === row.rowId"
+            :before-upload="(file: File) => handleRowOcr(file, 'debit', row.rowId)"
+          >
+            <el-button link size="small" :loading="ocrLoadingRowId === row.rowId" title="上传凭证 OCR">📎</el-button>
+          </el-upload>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" :width="isReadonly ? 80 : 130" fixed="right">
+        <template #default="{ row }">
+          <template v-if="row.rowId !== '__subtotal__'">
+            <el-button link type="primary" size="small" @click="openCheckDialog('debit', row.rowId)">单据核对</el-button>
+            <el-popconfirm v-if="!isReadonly" title="删除？" @confirm="removeSample('debit', row.rowId)">
+              <template #reference><el-button size="small" type="danger" link>删</el-button></template>
+            </el-popconfirm>
+          </template>
         </template>
       </el-table-column>
     </el-table>
   </div>
 
   <!-- (2) 本期贷方 -->
-  <div class="vc-section">
+  <div id="f1-7-credit" class="vc-section">
     <div class="section-header">
       <h4>(2) 本期贷方发生额核查</h4>
       <div class="section-header-actions">
@@ -400,16 +463,35 @@
       :rows="creditRows"
       :checked-total="creditChecked"
       :is-readonly="isReadonly"
+      :ocr-loading-row-id="ocrLoadingRowId"
       @update="(rowId, field, value) => updateCell('credit', rowId, field, value)"
       @remove="(rowId) => removeSample('credit', rowId)"
+      @ocr="(file, rowId) => handleRowOcr(file, 'credit', rowId)"
+      @open-check="(rowId) => openCheckDialog('credit', rowId)"
     />
   </div>
 
   <!-- (3) 期后贷方 -->
-  <div class="vc-section">
+  <div id="f1-7-post" class="vc-section">
     <div class="section-header">
       <h4>(3) 期后贷方发生额核查</h4>
       <div class="section-header-actions">
+        <el-date-picker
+          v-model="crossPeriodCutoff"
+          type="date"
+          value-format="YYYY-MM-DD"
+          size="small"
+          placeholder="资产负债表日"
+          style="width: 150px"
+          :disabled="isReadonly"
+        />
+        <el-button
+          size="small"
+          type="warning"
+          plain
+          :disabled="isReadonly || !crossPeriodCutoff"
+          @click="doAutoMarkCrossPeriod"
+        >标注跨期疑点</el-button>
         <el-dropdown size="small" trigger="click" :disabled="isReadonly">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -436,10 +518,23 @@
       :rows="postPeriodRows"
       :checked-total="postChecked"
       :is-readonly="isReadonly"
+      :ocr-loading-row-id="ocrLoadingRowId"
       @update="(rowId, field, value) => updateCell('postPeriod', rowId, field, value)"
       @remove="(rowId) => removeSample('postPeriod', rowId)"
+      @ocr="(file, rowId) => handleRowOcr(file, 'postPeriod', rowId)"
+      @open-check="(rowId) => openCheckDialog('postPeriod', rowId)"
     />
   </div>
+
+  <F1VoucherCheckDialog
+    v-model="checkDialogVisible"
+    :row="activeCheckRow"
+    :section="activeCheckSection"
+    :wp-id="wpId"
+    :project-id="projectId"
+    :readonly="isReadonly"
+    @save="onDialogSave"
+  />
 
   <el-alert
     v-if="postPeriodCrossValidation"
@@ -451,11 +546,11 @@
   />
 
   <!-- 四、检查比例 -->
-  <el-card class="opinion-card" shadow="never">
+  <el-card id="f1-7-coverage" class="opinion-card" shadow="never">
     <template #header>
       <div class="opinion-header">
         <span class="opinion-title">四、检查比例</span>
-        <span class="ratio-hint">账面金额可编辑；核实金额自动汇总；比例 &lt;30% 将提示扩大样本</span>
+        <span class="ratio-hint">账面 = F1-2 借方/贷方/期后结转；核实自动汇总；比例 &lt;30% 提示扩大样本</span>
       </div>
     </template>
 
@@ -515,7 +610,7 @@
   </el-card>
 
   <!-- 五、审计结论 -->
-  <el-card class="opinion-card" shadow="never">
+  <el-card id="f1-7-conclusion" class="opinion-card" shadow="never">
     <template #header>
       <div class="opinion-header">
         <span class="opinion-title">五、审计结论</span>
@@ -546,30 +641,54 @@
  * F1TabComprehensiveCheck.vue — F1-7 预付账款检查表（对齐 Excel）
  * 一目标 / 二抽样 / 三(1)借方(2)贷方(3)期后 / 四检查比例 / 五结论
  */
-import { computed, inject, toRef, type Ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, inject, ref, toRef, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   useF1VoucherCheck,
   F1_SAMPLING_METHOD_OPTIONS,
+  F1_YES_NO_OPTIONS,
+  F1_ABNORMAL_OPTIONS,
   createEmptyDebitRow,
+  isAbnormalFlag,
+  evaluateF1DebitEvidence,
+  f1EvidenceStatusLabel,
   type F1DebitCheckRow,
+  type F1CreditCheckRow,
+  type F1VoucherSection,
 } from '../composables/useF1ComprehensiveCheck'
 import { useF1AiGenerate } from '../composables/useF1AiGenerate'
 import { useF1ImportExport, type F1ImportSheet } from '../composables/useWorkpaperImportExport'
 import { useF1CrossSheet } from '../composables/useF1CrossSheet'
+import { useStickySectionNav } from '../composables/useStickySectionNav'
 import { parseNum } from '../composables/useF1FormulaEngine'
 import type { ChecklistResponse } from '../composables/useF1FormData'
+import type { SampledVoucher, FillMode, Phase } from '../composables/useSamplingAlgorithms'
+import { api } from '@/services/apiProxy'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
+import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 import F1SheetAttachments from './F1SheetAttachments.vue'
 import F1CreditCheckTable from './F1CreditCheckTable.vue'
+import F1VoucherCheckDialog from './F1VoucherCheckDialog.vue'
+
+const f1VoucherNav = [
+  { id: 'f1-7-sample', label: '样本' },
+  { id: 'f1-7-sampling', label: '抽凭' },
+  { id: 'f1-7-debit', label: '借方' },
+  { id: 'f1-7-credit', label: '贷方' },
+  { id: 'f1-7-post', label: '期后' },
+  { id: 'f1-7-coverage', label: '比例' },
+  { id: 'f1-7-conclusion', label: '结论' },
+]
+const { activeId, scrollTo } = useStickySectionNav(f1VoucherNav)
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   wpId: string
   projectId: string
   isReadonly: boolean
+  year?: number
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
@@ -596,8 +715,12 @@ const {
   addSample,
   removeSample,
   updateCell,
+  saveRow,
   updateSamplingParams,
   fillBookFromDetail,
+  importPrioritySamples,
+  autoMarkCrossPeriod,
+  distributeSamples,
 } = useF1VoucherCheck({
   allResponses: allResponsesRef,
   wpId: wpIdRef,
@@ -611,7 +734,73 @@ const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(
 const { exportTemplate, exportData, importData, importing } = useF1ImportExport({ wpId: wpIdRef })
 const crossSheet = useF1CrossSheet({ allResponses: allResponsesRef })
 
-const BOOK_FIELDS = ['bookDebit', 'bookCredit', 'bookEndBalance'] as const
+const auditYear = computed(() => props.year ?? new Date().getFullYear() - 1)
+const currentPhase = computed<Phase>(() => 'final')
+const crossPeriodCutoff = ref(`${auditYear.value}-12-31`)
+
+const checkDialogVisible = ref(false)
+const activeCheckSection = ref<F1VoucherSection>('debit')
+const activeCheckRow = ref<F1DebitCheckRow | F1CreditCheckRow | null>(null)
+
+function debitEvidenceStatus(row: F1DebitCheckRow) {
+  return f1EvidenceStatusLabel(evaluateF1DebitEvidence(row))
+}
+
+function openCheckDialog(section: F1VoucherSection, rowId: string): void {
+  const rows =
+    section === 'debit' ? debitRows.value
+      : section === 'credit' ? creditRows.value
+        : postPeriodRows.value
+  const row = rows.find(item => item.rowId === rowId)
+  if (!row) return
+  activeCheckSection.value = section
+  activeCheckRow.value = row
+  checkDialogVisible.value = true
+}
+
+function onDialogSave(section: F1VoucherSection, patch: F1DebitCheckRow | F1CreditCheckRow): void {
+  saveRow(section, patch)
+  ElMessage.success('本笔单据核对已保存')
+}
+
+function doAutoMarkCrossPeriod(): void {
+  const n = autoMarkCrossPeriod(crossPeriodCutoff.value)
+  if (n > 0) ElMessage.success(`已标注 ${n} 笔期后跨期疑点`)
+  else ElMessage.info('无需标注（无符合条件的期后样本）')
+}
+
+function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase; fillMode: FillMode }): void {
+  distributeSamples(payload.samples as Array<Record<string, any>>)
+  ElMessage.success(`已回填 ${payload.samples.length} 笔抽凭样本（按借贷方向分配至借方/贷方表）`)
+}
+
+const BOOK_FIELDS = ['bookDebit', 'bookCredit', 'bookPostPeriod'] as const
+const ocrLoadingRowId = ref<string | null>(null)
+
+const F1_OCR_FIELD_MAP: Record<string, string> = {
+  date: 'date',
+  凭证日期: 'date',
+  voucher_date: 'date',
+  voucher_no: 'voucherNo',
+  凭证号: 'voucherNo',
+  凭证编号: 'voucherNo',
+  summary: 'businessContent',
+  摘要: 'businessContent',
+  business_content: 'businessContent',
+  业务内容: 'businessContent',
+  counter_account: 'counterAccount',
+  对方科目: 'counterAccount',
+  debit_amount: 'debitAmount',
+  借方金额: 'debitAmount',
+  credit_amount: 'creditAmount',
+  贷方金额: 'creditAmount',
+  amount: 'debitAmount',
+  金额: 'debitAmount',
+  supplier: 'supplierName',
+  counterpart_name: 'supplierName',
+  供应商: 'supplierName',
+  对方单位: 'supplierName',
+}
 
 const debitTableData = computed(() => {
   const sub: F1DebitCheckRow = {
@@ -637,27 +826,94 @@ function doFillBookFromDetail() {
   const detResp = allResponsesRef.value.get('F1-det-rows')
   let debit = 0
   let credit = 0
-  let endAudited = 0
+  let postPeriodSettlement = 0
   if (detResp?.remark) {
     try {
       const rows = JSON.parse(detResp.remark) as Array<{
         debit?: number
         credit?: number
-        endAudited?: number
+        postPeriodSettlement?: number
       }>
       for (const r of rows) {
         debit += parseNum(r.debit)
         credit += parseNum(r.credit)
-        endAudited += parseNum(r.endAudited)
+        postPeriodSettlement += parseNum(r.postPeriodSettlement)
       }
     } catch { /* ignore */ }
   }
-  if (debit === 0 && credit === 0 && endAudited === 0) {
-    ElMessage.warning('F1-2 明细暂无数据，请先编制明细表')
+  if (debit === 0 && credit === 0 && postPeriodSettlement === 0) {
+    ElMessage.warning('F1-2 明细暂无借/贷/期后结转数据，请先编制明细表')
     return
   }
-  fillBookFromDetail({ debit, credit, endAudited })
-  ElMessage.success('已从 F1-2 回填账面金额')
+  fillBookFromDetail({ debit, credit, postPeriodSettlement })
+  ElMessage.success('已从 F1-2 回填账面金额（借方/贷方/期后结转）')
+}
+
+function doImportPrioritySamples() {
+  if (props.isReadonly) return
+  const detResp = allResponsesRef.value.get('F1-det-rows')
+  if (!detResp?.remark) {
+    ElMessage.warning('F1-2 明细暂无数据')
+    return
+  }
+  try {
+    const rows = JSON.parse(detResp.remark) as Array<Record<string, any>>
+    const n = importPrioritySamples(rows)
+    if (n > 0) ElMessage.success(`已从 F1-2 带入 ${n} 户重点样本（关联方/超1年/大额）至借方核查`)
+    else ElMessage.info('无新增重点样本（可能已带入或明细无符合条件户）')
+  } catch {
+    ElMessage.warning('F1-2 明细解析失败')
+  }
+}
+
+async function handleRowOcr(file: File, section: 'debit' | 'credit' | 'postPeriod', rowId: string): Promise<boolean> {
+  if (props.isReadonly || !props) return false
+  ocrLoadingRowId.value = rowId
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const res: any = await api.post(
+      `/api/workpapers/${props.wpId}/d4/contract-ocr`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
+    )
+    const fields: Record<string, any> = (res?.data?.data ?? res?.data ?? res)?.extracted_fields || {}
+    if (!Object.keys(fields).length) {
+      ElMessage.info('OCR 完成，未识别到可填充字段')
+      return false
+    }
+    const preview = Object.entries(fields)
+      .slice(0, 12)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join('\n')
+    await ElMessageBox.confirm(`识别结果：\n${preview}\n\n是否填入当前行空字段？`, 'OCR 识别结果', {
+      type: 'info',
+      confirmButtonText: '填入',
+      cancelButtonText: '取消',
+    })
+    const amountField = section === 'debit' ? 'debitAmount' : 'creditAmount'
+    for (const [ocrKey, val] of Object.entries(fields)) {
+      let target = F1_OCR_FIELD_MAP[ocrKey] || F1_OCR_FIELD_MAP[ocrKey.toLowerCase()]
+      if (!target) continue
+      if (target === 'debitAmount' || target === 'creditAmount') target = amountField
+      const rows = section === 'debit'
+        ? debitRows.value
+        : section === 'credit'
+          ? creditRows.value
+          : postPeriodRows.value
+      const row = rows.find(r => r.rowId === rowId)
+      if (!row) continue
+      const cur = (row as any)[target]
+      if (cur != null && String(cur).trim() !== '' && cur !== 0) continue
+      updateCell(section, rowId, target, val)
+    }
+    ElMessage.success('OCR 结果已填入空字段')
+  } catch (e: any) {
+    if (e !== 'cancel' && e?.message !== 'cancel') ElMessage.warning('OCR 识别失败或已取消')
+  } finally {
+    ocrLoadingRowId.value = null
+  }
+  return false
 }
 
 /** F1-2 Z列合计 vs F1-7 期后贷方合计 */
@@ -779,14 +1035,42 @@ function ratioClass(ratio: number | null): string {
 .vc-section { margin-bottom: 20px; }
 .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
 .section-header h4 { font-size: 14px; font-weight: 600; margin: 0; }
-.section-header-actions { display: flex; gap: 8px; align-items: center; }
+.section-header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
 .subtotal-label { font-weight: 700; }
 .subtotal-val { font-weight: 700; }
 .amt { text-align: right; display: inline-block; width: 100%; }
 .auto { color: #909399; }
-.abnormal-cell :deep(.el-input__inner) { color: #f56c6c; font-weight: 600; }
+.abnormal-cell :deep(.el-input__inner),
+.abnormal-cell :deep(.el-select__wrapper) { color: #f56c6c; font-weight: 600; }
 :deep(.subtotal-row) { background-color: #fafafa !important; font-weight: 600; }
+
+.st-sec-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 8px 0;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(4px);
+}
+.st-sec-btn {
+  border: 1px solid #dcdfe6;
+  background: #fff;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #606266;
+  cursor: pointer;
+}
+.st-sec-btn.active {
+  border-color: #409eff;
+  color: #409eff;
+  background: #ecf5ff;
+}
 
 .cross-alert { margin: 12px 0; }
 .coverage-table { max-width: 720px; margin-bottom: 12px; }

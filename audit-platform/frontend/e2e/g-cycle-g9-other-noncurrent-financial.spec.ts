@@ -145,9 +145,19 @@ test.describe('G9 导入 round-trip（API）', () => {
 test.describe('G9 AI 端点注册', () => {
   for (const section of [
     'adjudication-analysis',
+    'adjudication-conclusion',
+    'detail-note',
+    'detail-conclusion',
+    'adjustment-note',
+    'adjustment-conclusion',
     'fair-value-conclusion',
+    'fair-value-note',
     'l3-reconciliation-conclusion',
+    'l3-note',
     'voucher-conclusion',
+    'voucher-note',
+    'disclosure-note',
+    'disclosure-conclusion',
     'disclosure-section',
   ] as const) {
     test(`POST /g9/ai/${section} 路由存在`, async ({ request }) => {

@@ -10,7 +10,7 @@ import {
   G9_IMPORTABLE_SHEETS,
   G9_VIRTUAL_SCROLL_THRESHOLD,
 } from '../composables/g9Constants'
-import { extractG9SheetCode } from '../composables/g9SheetLabels'
+import { extractG9SheetCode, jumpToG9Sheet } from '../composables/g9SheetLabels'
 import {
   parseNum,
   calcDebitBalance,
@@ -23,7 +23,7 @@ import {
   isDebitCreditBalanced,
 } from '../composables/useG9FormulaEngine'
 import { validateG9Level3 } from '../composables/useG9FairValueTest'
-import { deriveAbnormal } from '../composables/useG9VoucherCheck'
+import { deriveAbnormal, G9A_VOUCHER_PROGRAM_NOS } from '../composables/useG9VoucherCheck'
 import { aggregateG9AdjustmentAjeRje, applyG9AdjustmentWriteback, defaultG9AdjStore } from '../composables/g9AdjStorage'
 
 describe('G9 集成 — sheetName 分发', () => {
@@ -34,6 +34,17 @@ describe('G9 集成 — sheetName 分发', () => {
     expect(extractG9SheetCode('附注披露信息（上市公司）')).toBe('附注上市')
     expect(extractG9SheetCode('附注披露信息（国企）')).toBe('附注国企')
     expect(extractG9SheetCode('底稿目录')).toBe('底稿目录')
+  })
+
+  it('jumpToG9Sheet 调用 jumpFn', () => {
+    expect(jumpToG9Sheet('G9A', null)).toBe(false)
+    const calls: string[] = []
+    expect(jumpToG9Sheet('G9-6', (n) => { calls.push(n) })).toBe(true)
+    expect(calls[0]).toContain('凭证检查')
+  })
+
+  it('G9A 凭证程序含 6/7/12', () => {
+    expect([...G9A_VOUCHER_PROGRAM_NOS]).toEqual([6, 7, 12])
   })
 })
 
@@ -46,8 +57,12 @@ describe('G9 集成 — 借方公式', () => {
     expect(calcAdjustedAmount(1000, 200, -50)).toBe(1150)
   })
 
-  it('期末余额 6 因子', () => {
+  it('期末余额 6 因子（OCI=0）', () => {
     expect(calcEndingBalance(100, 30, 10, 5, 2, 3)).toBe(124)
+  })
+
+  it('期末余额含 OCI', () => {
+    expect(calcEndingBalance(100, 30, 10, 5, 2, 3, 4)).toBe(128)
   })
 
   it('L3 调节 10 因子', () => {
@@ -74,9 +89,9 @@ describe('G9 集成 — 种子行数', () => {
     expect(G9_DISCLOSURE_SOE_ROWS.length).toBe(4)
   })
 
-  it('5 张表可导入导出', () => {
+  it('7 张表可导入导出（含附注上市/国企）', () => {
     expect(G9_IMPORTABLE_SHEETS.map((s) => s.code)).toEqual([
-      'G9-2', 'G9-3', 'G9-4', 'G9-5', 'G9-6',
+      'G9-2', 'G9-3', 'G9-4', 'G9-5', 'G9-6', '附注上市', '附注国企',
     ])
   })
 
@@ -105,10 +120,24 @@ describe('G9 集成 — Level3 + 异常检测', () => {
       counterAccount: '', debitAmount: 0, creditAmount: 0, attachmentRef: '',
       supportDoc: '', checkOriginal: true, checkAuthorized: true, checkAccounting: true,
       checkClassification: true, checkFairValue: false, checkImpairment: true,
-      indexRef: '', isAbnormal: false, abnormalDesc: '', riskLevel: 'low',
-      suggestion: '', remark: '',
+      indexRef: '', isAbnormal: false, forceAbnormal: false, abnormalType: 'none',
+      abnormalDesc: '', riskLevel: 'low', suggestion: '', remark: '',
+      detailRowId: '', assetName: '',
     })
     expect(abnormal).toBe(true)
+  })
+
+  it('未测不计入异常', () => {
+    const abnormal = deriveAbnormal({
+      rowId: '2', seq: 1, voucherDate: '', voucherNo: '2', businessContent: '',
+      counterAccount: '', debitAmount: 0, creditAmount: 0, attachmentRef: '',
+      supportDoc: '', checkOriginal: null, checkAuthorized: null, checkAccounting: null,
+      checkClassification: null, checkFairValue: null, checkImpairment: null,
+      indexRef: '', isAbnormal: false, forceAbnormal: false, abnormalType: 'none',
+      abnormalDesc: '', riskLevel: 'low', suggestion: '', remark: '',
+      detailRowId: '', assetName: '',
+    })
+    expect(abnormal).toBe(false)
   })
 })
 

@@ -89,7 +89,7 @@ class TestPassFailDetermination:
             if f.risk_level == "medium" and not f.pass_status
         )
 
-        expected = "pass" if (high_count == 0 and medium_count < 3) else "fail"
+        expected = "pass" if (high_count == 0 and medium_count <= 2) else "fail"
 
         assert result == expected, (
             f"determine_pass_status returned '{result}' but expected '{expected}' "

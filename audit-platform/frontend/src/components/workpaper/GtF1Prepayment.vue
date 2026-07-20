@@ -104,6 +104,7 @@
           :all-responses="allResponses"
           :wp-id="wpIdRef"
           :project-id="projectIdRef"
+          :year="props.year"
           :is-readonly="isReadonly"
           :save-immediate="saveImmediate"
           :debounced-save="debouncedSave"
@@ -135,9 +136,11 @@
 
         <F1TabConfirmationProcedure
           v-else-if="currentSheet === 'F1-CONF'"
+          :all-responses="allResponses"
           :wp-id="wpIdRef"
           :project-id="projectIdRef"
           :is-readonly="isReadonly"
+          :save-immediate="saveImmediate"
         />
 
         <!-- 兜底：未识别 sheet → OnlyOffice -->

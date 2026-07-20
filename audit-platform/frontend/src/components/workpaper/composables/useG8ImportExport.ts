@@ -1,6 +1,6 @@
 /**
  * useG8ImportExport — G8 其他权益工具投资 导入导出
- * 4 张表 × 3 端点 = 12：G8-2 / G8-3 / G8-4 / G8-6
+ * 5 张表 × 3 端点 = 15：G8-2 / G8-3 / G8-4 / G8-5 / G8-6
  */
 import { type Ref } from 'vue'
 import { useWorkpaperImportExport } from './useWorkpaperImportExport'

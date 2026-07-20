@@ -124,7 +124,13 @@
         </el-select>
       </template>
     </el-table-column>
-    <el-table-column label="计提坏账准备金额" width="130" align="right">
+    <el-table-column width="130" align="right">
+      <template #header>
+        <span>计提坏账准备金额</span>
+        <el-tooltip content="对应科目 1231-04 坏账准备（预付减值计提）" placement="top">
+          <span class="col-hint">1231-04</span>
+        </el-tooltip>
+      </template>
       <template #default="{ row }">
         <span v-if="row.rowId === '__subtotal__'" class="amt subtotal-val">{{ fmtAmount(subtotalRow.badDebtProvision) }}</span>
         <el-input v-else :model-value="row.badDebtProvision" size="small" :disabled="isReadonly"
@@ -258,8 +264,8 @@ const {
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
-function doPushAdjustments() {
-  const n = pushSuggestedAdjustmentsToF13()
+async function doPushAdjustments() {
+  const n = await pushSuggestedAdjustmentsToF13()
   if (n > 0) ElMessage.success(`已向 F1-3 追加 ${n} 笔拟调整（减值/重分类），请打开 F1-3 复核`)
   else ElMessage.info('无新增拟调整（可能已推送过或未填坏账/转其他应收）')
 }
@@ -358,6 +364,7 @@ async function handleImport(file: File, sheet: F1ImportSheet): Promise<boolean> 
 .subtotal-val { font-weight: 700; }
 .amt { text-align: right; display: inline-block; width: 100%; }
 .auto { color: #909399; }
+.col-hint { margin-left: 4px; font-size: 11px; color: #909399; cursor: help; }
 :deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 :deep(.subtotal-row) { background-color: #fafafa !important; font-weight: 600; }
 

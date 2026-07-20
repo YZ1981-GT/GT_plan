@@ -21,7 +21,7 @@ export function calcAdjustedAmount(unadjusted: number, aje: number, rje: number)
   return parseNum(unadjusted) + parseNum(aje) + parseNum(rje)
 }
 
-/** G9-2 期末余额 = 期初审定 + 增加 - 减少 + FV变动 + 利息 - 减值 */
+/** G9-2 期末余额 = 期初审定 + 增加 - 减少 + FV变动 + 利息 - 减值 + OCI变动 */
 export function calcEndingBalance(
   openingAdjusted: number,
   increase: number,
@@ -29,6 +29,7 @@ export function calcEndingBalance(
   fvChange: number,
   interest: number,
   impairment: number,
+  ociChange: number = 0,
 ): number {
   return (
     parseNum(openingAdjusted)
@@ -37,12 +38,40 @@ export function calcEndingBalance(
     + parseNum(fvChange)
     + parseNum(interest)
     - parseNum(impairment)
+    + parseNum(ociChange)
   )
 }
 
-/** G9-4 公允价值差异 = 审定 - 未审 */
+/** G9-4 公允价值 = 数量 × 单价（保留 2 位小数） */
+export function calcFairValueAmount(qty: number, unitPrice: number): number {
+  return Math.round(parseNum(qty) * parseNum(unitPrice) * 100) / 100
+}
+
+/** G9-4 公允价值差异 = 审定 - 未审（保留 2 位） */
 export function calcFairValueDiff(audited: number, unadjusted: number): number {
-  return parseNum(audited) - parseNum(unadjusted)
+  return Math.round((parseNum(audited) - parseNum(unadjusted)) * 100) / 100
+}
+
+/** 数量变动影响 = (审定数量 − 未审数量) × 未审单价 */
+export function calcFairValueQtyImpact(
+  auditedQty: number,
+  unadjQty: number,
+  unadjPrice: number,
+): number {
+  return Math.round(
+    (parseNum(auditedQty) - parseNum(unadjQty)) * parseNum(unadjPrice) * 100,
+  ) / 100
+}
+
+/** 价格变动影响 = 审定数量 × (审定单价 − 未审单价) */
+export function calcFairValuePriceImpact(
+  auditedQty: number,
+  auditedPrice: number,
+  unadjPrice: number,
+): number {
+  return Math.round(
+    parseNum(auditedQty) * (parseNum(auditedPrice) - parseNum(unadjPrice)) * 100,
+  ) / 100
 }
 
 /** 变动额 = 期末审定 - 期初审定 */

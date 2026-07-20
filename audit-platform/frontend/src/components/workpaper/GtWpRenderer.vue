@@ -340,6 +340,8 @@ const internalActiveSheetName = ref<string>('')
 const switchPopoverVisible = ref(false)
 // 完整 Excel 合成页签标识（OnlyOffice 整本编辑，放在底稿目录右侧）
 const WHOLE_EXCEL_TAB = '__whole_excel__'
+/** F1 函证程序：HTML 虚拟 sheet（无 xlsx 页，由 GtF1Prepayment 渲染） */
+const F1_CONFIRM_SHEET = '函证程序F1-CONF'
 // 统一工具栏状态
 const isWpFullscreen = ref(false)
 // 子组件引用（用于转发工具栏操作）
@@ -401,9 +403,36 @@ function handleRedirectNavigation() {
 }
 
 // ─── Computed ───
+/** render-config sheets + 科目级 HTML 虚拟页（如 F1-CONF） */
+const augmentedSheets = computed(() => {
+  const sheets = [...(renderConfig.value?.sheets ?? [])]
+  const rootCt = String(
+    renderConfig.value?.component_type ?? renderConfig.value?.componentType ?? '',
+  )
+  const wpCode = String(renderConfig.value?.wp_code ?? '')
+  const isF1Prepayment =
+    rootCt === 'f1-prepayment'
+    || sheets.some((s) => String(s.componentType ?? (s as any).component_type) === 'f1-prepayment')
+    || wpCode === 'F1'
+    || wpCode.startsWith('F1-')
+  if (
+    isF1Prepayment
+    && !sheets.some((s) => /F1-CONF|函证程序/i.test(String(s.sheet_name || '')))
+  ) {
+    sheets.push({
+      sheet_name: F1_CONFIRM_SHEET,
+      componentType: 'f1-prepayment',
+      schema: null,
+      html_data: { virtual: true, confirmation_procedure: true },
+      cross_refs: [],
+    } as (typeof sheets)[number])
+  }
+  return sheets
+})
+
 /** 可见 sheet 列表（过滤掉 skip 类，但 skip 仍可在唯一 sheet 时显示） */
 const visibleSheets = computed(() => {
-  const sheets = renderConfig.value?.sheets ?? []
+  const sheets = augmentedSheets.value
   // 全部 skip 时仍展示一个；否则过滤 skip
   const nonSkip = sheets.filter(s => s.componentType !== 'skip')
   return nonSkip.length > 0 ? nonSkip : sheets
@@ -411,21 +440,22 @@ const visibleSheets = computed(() => {
 
 const activeSheetName = computed<string>({
   get() {
-    if (!renderConfig.value?.sheets?.length) return ''
+    const sheets = augmentedSheets.value
+    if (!sheets.length) return ''
     // 优先用内部 ref（用户切换过）
     if (internalActiveSheetName.value) {
       // 完整Excel 合成页签：直接放行（不在 renderConfig.sheets 中）
       if (internalActiveSheetName.value === WHOLE_EXCEL_TAB) return WHOLE_EXCEL_TAB
-      const exists = renderConfig.value.sheets.find(s => s.sheet_name === internalActiveSheetName.value)
+      const exists = sheets.find(s => s.sheet_name === internalActiveSheetName.value)
       if (exists) return internalActiveSheetName.value
     }
     // 否则匹配 initialSheet
     if (props.initialSheet) {
-      const matched = renderConfig.value.sheets.find(s => s.sheet_name === props.initialSheet)
+      const matched = sheets.find(s => s.sheet_name === props.initialSheet)
       if (matched) return matched.sheet_name
     }
     // 兜底：第一个非 skip 的 sheet
-    return visibleSheets.value[0]?.sheet_name ?? renderConfig.value.sheets[0].sheet_name
+    return visibleSheets.value[0]?.sheet_name ?? sheets[0].sheet_name
   },
   set(name: string) {
     internalActiveSheetName.value = name
@@ -439,8 +469,9 @@ const activeSheetName = computed<string>({
 })
 
 const activeSheet = computed(() => {
-  if (!renderConfig.value?.sheets?.length) return null
-  return renderConfig.value.sheets.find(s => s.sheet_name === activeSheetName.value) ?? null
+  const sheets = augmentedSheets.value
+  if (!sheets.length) return null
+  return sheets.find(s => s.sheet_name === activeSheetName.value) ?? null
 })
 
 // ─── 完整 Excel 页签（OnlyOffice 整本编辑，放在底稿目录右侧）───

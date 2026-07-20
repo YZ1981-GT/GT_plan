@@ -45,7 +45,7 @@ async def test_g8_render_dispatch_registered():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("sheet", ["G8-2", "G8-3", "G8-4", "G8-6"])
+@pytest.mark.parametrize("sheet", ["G8-2", "G8-3", "G8-4", "G8-5", "G8-6"])
 async def test_g8_export_template_all_sheets(sheet: str):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -142,3 +142,148 @@ async def test_g8_validate_formulas_detects_errors():
     fields = {e["field"] for e in data["errors"]}
     assert "openingAdjusted" in fields
     assert "balance" in fields
+
+
+def test_g8_validate_designation_rows_unit():
+    from app.routers.wp_render_strategies._g8_other_equity_instruments_service import (
+        G8OtherEquityInstrumentsService,
+    )
+
+    svc = G8OtherEquityInstrumentsService()
+    errs = svc.validate_designation_rows(
+        [
+            {
+                "investeeName": "甲",
+                "closingBookValue": 100,
+                "tradingNearTermSale": "no",
+                "tradingPortfolioShortTerm": "no",
+                "tradingDerivative": "no",
+                "equityInstrument": "yes",
+                "designatedFvtoci": "yes",
+                "fvReliable": "yes",
+            },
+            {
+                "investeeName": "乙",
+                "closingBookValue": 50,
+                # 缺勾选
+            },
+        ],
+        detail_rows=[
+            {"investeeName": "甲", "closingAdjusted": 100},
+            {"investeeName": "丙", "closingAdjusted": 80},
+        ],
+    )
+    messages = [e.message for e in errs]
+    assert any("未勾选" in m for m in messages)
+    assert any("G8-2 有该被投资单位" in m for m in messages)
+    assert any("G8-5 有该被投资单位" in m for m in messages)
+    assert any("账面合计" in m for m in messages)
+
+
+def test_g8_validate_designation_vs_fair_value_level():
+    from app.routers.wp_render_strategies._g8_other_equity_instruments_service import (
+        G8OtherEquityInstrumentsService,
+    )
+
+    svc = G8OtherEquityInstrumentsService()
+    errs = svc.validate_designation_rows(
+        [
+            {
+                "investeeName": "甲",
+                "closingBookValue": 100,
+                "tradingNearTermSale": "no",
+                "tradingPortfolioShortTerm": "no",
+                "tradingDerivative": "no",
+                "equityInstrument": "yes",
+                "designatedFvtoci": "yes",
+                "fvReliable": "yes",
+                "fairValueLevel": "Level2",
+            },
+            {
+                "investeeName": "乙",
+                "closingBookValue": 50,
+                "tradingNearTermSale": "no",
+                "tradingPortfolioShortTerm": "no",
+                "tradingDerivative": "no",
+                "equityInstrument": "yes",
+                "designatedFvtoci": "yes",
+                "fvReliable": "yes",
+                "fairValueLevel": "",
+            },
+        ],
+        detail_rows=[
+            {"investeeName": "甲", "closingAdjusted": 100},
+            {"investeeName": "乙", "closingAdjusted": 50},
+        ],
+        fair_value_rows=[
+            {"investeeName": "甲", "fairValueLevel": "Level1"},
+            {"investeeName": "乙", "fairValueLevel": "Level3"},
+            {"investeeName": "丙", "fairValueLevel": "Level2"},
+        ],
+    )
+    messages = [e.message for e in errs]
+    assert any("G8-4 为 Level1" in m for m in messages)
+    assert any("未标注 Level3" in m for m in messages)
+    assert any("G8-4 有该被投资单位" in m for m in messages)
+
+
+@pytest.mark.asyncio
+async def test_g8_validate_formulas_designation():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/workpapers/test-wp/g8/validate-formulas",
+            json={
+                "designation_rows": [
+                    {"investeeName": "甲", "closingBookValue": 10},
+                ],
+                "detail_rows": [
+                    {"investeeName": "甲", "closingAdjusted": 10},
+                ],
+            },
+        )
+    assert resp.status_code == 200
+    data = resp.json().get("data", resp.json())
+    assert data["ok"] is False
+    assert any(e["field"] == "tradingNearTermSale" for e in data["errors"])
+
+
+def test_g8_6_spec_includes_source_detail_force_columns():
+    from app.routers.wp_render_strategies._g8_other_equity_instruments_import_export import (
+        _G8_6_ALL_HEADERS,
+        _G8_6_ALL_KEYS,
+        _G8_6_OPTIONAL_HEADERS,
+    )
+
+    assert "来源" in _G8_6_ALL_HEADERS
+    assert "明细行ID" in _G8_6_ALL_HEADERS
+    assert "强制异常" in _G8_6_ALL_HEADERS
+    assert "source" in _G8_6_ALL_KEYS
+    assert "detailRowId" in _G8_6_ALL_KEYS
+    assert "forceAbnormal" in _G8_6_ALL_KEYS
+    assert _G8_6_OPTIONAL_HEADERS == frozenset({"来源", "明细行ID", "强制异常"})
+    assert _G8_SPECS["G8-6"]["item_id"] == "G8-voucher-rows"
+
+
+def test_summarize_voucher_abnormal_rows():
+    from app.routers.wp_render_strategies._g8_other_equity_instruments_ai import (
+        _summarize_voucher_abnormal_rows,
+    )
+
+    text = _summarize_voucher_abnormal_rows([
+        {
+            "voucherNo": "记-1",
+            "investeeName": "甲公司",
+            "abnormalType": "quantitative",
+            "abnormalDesc": "公允变动未入 OCI",
+            "debitAmount": 1000,
+            "creditAmount": 0,
+            "check4FairValueCorrect": False,
+            "check5OCICorrect": None,
+        },
+    ])
+    assert "记-1" in text
+    assert "quantitative" in text
+    assert "公允=不通过" in text
+    assert "OCI=未测" in text
+    assert _summarize_voucher_abnormal_rows([]) == ""

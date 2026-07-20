@@ -305,7 +305,7 @@
  * - 导入导出 (sheet='G7-3', useG7ImportExport)
  * - 与集中调整分录模块双向同步，保存时按 1511/1512 分流回写 G7-1
  */
-import { ref, computed, inject, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, onMounted, onBeforeUnmount, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { isDebitCreditBalanced, parseNum } from '../../composables/useG7FormulaEngine'
 import { useG7ImportExport } from '../../composables/useG7ImportExport'
@@ -402,7 +402,7 @@ async function loadAuditResponses(): Promise<void> {
   if (!props.wpId) return
   try {
     const res = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`, { _silent: true } as any)
-    const items = Array.isArray(res) ? res : (res as any)?.data || []
+    const items = extractChecklistItems(res)
     for (const it of items) {
       if (it.item_id === NOTE_KEY && it.remark) auditNote.value = it.remark
       else if (it.item_id === CONCLUSION_KEY && it.remark) auditConclusion.value = it.remark
@@ -465,6 +465,16 @@ function normalizeEntry(raw: any, index: number): G7AdjustmentEntry {
   return normalizeG73Entry(raw, index, { generateId }) as G7AdjustmentEntry
 }
 
+function extractChecklistItems(response: unknown): any[] {
+  if (Array.isArray(response)) return response
+  const res = response as { data?: unknown; items?: unknown }
+  if (Array.isArray(res?.data)) return res.data
+  if (Array.isArray(res?.items)) return res.items
+  const nested = res?.data as { items?: unknown } | undefined
+  if (Array.isArray(nested?.items)) return nested.items
+  return []
+}
+
 function parseStoredEntries(raw: unknown): G7AdjustmentEntry[] {
   if (!raw) return []
   try {
@@ -483,13 +493,18 @@ async function loadEntries(): Promise<void> {
   if (props.wpId) {
     try {
       const res = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`, { _silent: true } as any)
-      const items = Array.isArray(res) ? res : (res as any)?.data || []
+      const items = extractChecklistItems(res)
       const rowItem = items.find((item: any) => item.item_id === ROWS_KEY)
-      saved = parseStoredEntries(rowItem?.conclusion || rowItem?.remark)
+      const fromConclusion = parseStoredEntries(rowItem?.conclusion)
+      const fromRemark = parseStoredEntries(rowItem?.remark)
+      saved = fromConclusion.length >= fromRemark.length ? fromConclusion : fromRemark
     } catch { /* fallback to html data */ }
   }
   if (!saved.length) {
-    saved = parseStoredEntries(props.htmlData?.adjustment?.entries)
+    saved = parseStoredEntries(
+      props.htmlData?.adjustment?.entries
+      ?? (props.htmlData as { entries?: unknown })?.entries,
+    )
   }
   entries.value = saved.length ? saved : [createEntry()]
 }
@@ -508,6 +523,10 @@ onMounted(async () => {
   eventBus.on('adjustment:updated', handleModuleUpdated)
   eventBus.on('adjustment:saved', handleModuleUpdated)
   window.addEventListener(G7_ADJUSTMENT_PUSHED_EVENT, onAdjustmentPushed as EventListener)
+})
+
+watch(() => props.wpId, (id, prev) => {
+  if (id && id !== prev) void loadEntries()
 })
 
 onBeforeUnmount(() => {

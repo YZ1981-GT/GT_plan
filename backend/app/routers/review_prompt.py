@@ -18,13 +18,11 @@ from typing import Optional
 from urllib.parse import quote
 from uuid import UUID
 
-import httpx
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
-from app.core.config import settings
 from app.core.database import async_session
 from app.services.batch_review_service import BatchReviewService
 from app.services.llm_response_parser import LlmResponseParser, ReviewFinding
@@ -107,6 +105,10 @@ class BatchReviewRequest(BaseModel):
     """批量复核请求体"""
     wp_code_prefix: str = Field(..., description="底稿编码前缀，如 D2")
     year: int = Field(..., description="审计年度")
+    progress_session_id: Optional[str] = Field(
+        None,
+        description="前端生成的进度追踪 session_id，用于 batch-review-progress 轮询",
+    )
 
 
 class BatchFindingResponse(BaseModel):
@@ -194,8 +196,15 @@ async def review_workpaper(wp_id: UUID, body: ReviewRequest | None = None):
     prompt_service = ReviewPromptService()
     prompt_result = prompt_service.load_prompt(wp_code, sheet_name)
 
-    # 3. 获取底稿内容
+    # 3. 获取底稿内容 + D2 勾稽上下文
     workpaper_content = await _get_workpaper_content(wp_id, sheet_name)
+    recon_context = ""
+    if (wp_code or "").upper().startswith("D2"):
+        from app.services.d2_review_context import (
+            append_reconciliation_to_user_prompt,
+            build_d2_reconciliation_context,
+        )
+        recon_context = await build_d2_reconciliation_context(str(wp_id))
 
     # 4. 构建 LLM 消息并调用
     system_prompt = (
@@ -210,6 +219,7 @@ async def review_workpaper(wp_id: UUID, body: ReviewRequest | None = None):
         "- 对每项检查点输出一个 finding 对象\n"
         "- passed=true 表示该项通过，passed=false 表示未通过\n"
         "- risk_level 根据检查项所属风险等级填写\n"
+        "- 如系统已给出勾稽差异，必须据此输出未通过 finding，不得忽略\n"
         "- 如无问题可输出空 findings 数组\n\n"
         "## 输出示例\n\n"
         '{"findings": [\n'
@@ -220,6 +230,9 @@ async def review_workpaper(wp_id: UUID, body: ReviewRequest | None = None):
         f"## 复核提示词\n\n{prompt_result.content}"
     )
     user_prompt = f"以下是需要复核的底稿内容：\n\n{workpaper_content}"
+    if recon_context:
+        from app.services.d2_review_context import append_reconciliation_to_user_prompt
+        user_prompt = append_reconciliation_to_user_prompt(user_prompt, recon_context)
 
     raw_response = await _call_llm(system_prompt, user_prompt)
 
@@ -227,7 +240,9 @@ async def review_workpaper(wp_id: UUID, body: ReviewRequest | None = None):
     parse_result = LlmResponseParser.parse(raw_response)
 
     # 6. 计算总体通过状态和风险汇总
-    overall_pass_str = LlmResponseParser.determine_pass_status(parse_result.findings)
+    overall_pass_str = LlmResponseParser.determine_pass_status(
+        parse_result.findings, sheet_name=sheet_name
+    )
     overall_pass = overall_pass_str == "pass"
 
     risk_summary = {"high": 0, "medium": 0, "low": 0}
@@ -235,6 +250,45 @@ async def review_workpaper(wp_id: UUID, body: ReviewRequest | None = None):
         if not f.pass_status:
             if f.risk_level in risk_summary:
                 risk_summary[f.risk_level] += 1
+
+    # 6b. 持久化（与批量复核对齐，append-only）
+    try:
+        project_id = await _get_project_id(wp_id)
+        if project_id:
+            from app.services.batch_review_service import (
+                BatchReviewService,
+                BatchStatistics,
+                ReviewResult,
+            )
+            session_id = str(uuid.uuid4())
+            single_result = ReviewResult(
+                wp_id=str(wp_id),
+                sheet_name=sheet_name or wp_code,
+                wp_code=wp_code,
+                pass_status="pass" if overall_pass else "fail",
+                findings=parse_result.findings,
+                risk_summary=risk_summary,
+                reviewed_at=datetime.now(timezone.utc).isoformat(),
+                model_used="(single)",
+                prompt_source=prompt_result.source_level,
+            )
+            stats = BatchStatistics(
+                total_sheets=1,
+                passed_count=1 if overall_pass else 0,
+                failed_count=0 if overall_pass else 1,
+                error_count=0,
+                total_findings=len(parse_result.findings),
+                findings_by_risk=risk_summary,
+            )
+            await BatchReviewService().persist_review_results(
+                project_id=project_id,
+                session_id=session_id,
+                wp_code_prefix=(wp_code or "WP").split("-")[0] if wp_code else "WP",
+                results=[single_result],
+                statistics=stats,
+            )
+    except Exception as e:
+        logger.warning("Single review persist failed (non-blocking): %s", e)
 
     # 7. 构建响应
     findings_response = [
@@ -381,7 +435,13 @@ async def batch_review(pid: UUID, body: BatchReviewRequest):
 
     async with _batch_locks[lock_key]:
         service = BatchReviewService()
-        session_id_for_progress = str(uuid.uuid4())
+        session_id_for_progress = body.progress_session_id or str(uuid.uuid4())
+        _batch_progress[session_id_for_progress] = {
+            "status": "running",
+            "current": 0,
+            "total": 0,
+            "current_sheet": "准备中...",
+        }
 
         def _update_progress(current: int, total: int, current_sheet: str):
             _batch_progress[session_id_for_progress] = {
@@ -391,15 +451,15 @@ async def batch_review(pid: UUID, body: BatchReviewRequest):
                 "current_sheet": current_sheet,
             }
 
-        report = await service.execute_batch(
-            project_id=str(pid),
-            wp_code_prefix=body.wp_code_prefix,
-            year=body.year,
-            progress_callback=_update_progress,
-        )
-
-        # 清理进度
-        _batch_progress.pop(session_id_for_progress, None)
+        try:
+            report = await service.execute_batch(
+                project_id=str(pid),
+                wp_code_prefix=body.wp_code_prefix,
+                year=body.year,
+                progress_callback=_update_progress,
+            )
+        finally:
+            _batch_progress.pop(session_id_for_progress, None)
 
     # 将 dataclass 结果转为 Pydantic 响应
     results_response = [
@@ -702,7 +762,9 @@ async def _load_review_report_from_db(
                 if not f.pass_status and f.risk_level in risk_summary:
                     risk_summary[f.risk_level] += 1
 
-            pass_status = LlmResponseParser.determine_pass_status(findings)
+            pass_status = LlmResponseParser.determine_pass_status(
+                findings, sheet_name=findings_data[0]["data_sources"].get("sheet_name")
+            )
 
             results.append(ReviewResult(
                 wp_id=findings_data[0]["workpaper_id"],
@@ -766,94 +828,25 @@ async def _get_wp_code(wp_id: UUID) -> str | None:
         return row[0] if row else None
 
 
-async def _get_workpaper_content(wp_id: UUID, sheet_name: str | None) -> str:
-    """获取底稿内容（从 render-config 提取 html_data 文本）
-
-    TODO(P0-4): 理想情况应直接调用 _get_render_config_impl 避免自调 HTTP。
-    但该函数需要 db: AsyncSession + current_user 参数，直接导入会导致循环依赖
-    或需要 mock auth。当前保留 httpx 方式，待后续 render-config 提供无 auth 的
-    内部调用入口后再迁移。
-    """
-    try:
-        url = f"http://localhost:{settings.PORT or 9980}/api/workpapers/{wp_id}/render-config"
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.get(url)
-            if resp.status_code != 200:
-                logger.warning(
-                    "render-config fetch failed for wp %s: %d", wp_id, resp.status_code
-                )
-                return "(底稿内容获取失败)"
-
-            data = resp.json()
-            # ResponseWrapperMiddleware 包装: {code, message, data: {...}}
-            payload = data.get("data", data)
-            sheets = payload.get("sheets", [])
-
-            if not sheets:
-                return "(底稿无内容)"
-
-            # 如果有 sheet_name，尝试匹配
-            target_sheet = None
-            if sheet_name:
-                for s in sheets:
-                    s_name = s.get("sheet_name", "") or ""
-                    if sheet_name in s_name or s_name in sheet_name:
-                        target_sheet = s
-                        break
-            # 无匹配或无 sheet_name → 取第一个
-            if not target_sheet:
-                target_sheet = sheets[0]
-
-            # 提取 html_data 中的文本内容
-            html_data = target_sheet.get("html_data", {}) or {}
-            return _extract_text_from_html_data(html_data)
-
-    except Exception as e:
-        logger.warning("Failed to get workpaper content for %s: %s", wp_id, e)
-        return "(底稿内容获取异常)"
-
-
-def _extract_text_from_html_data(html_data: dict) -> str:
-    """从 html_data 提取关键文本内容作为 LLM 输入"""
-    parts: list[str] = []
-
-    # 提取 responses_snapshot / allResponses（checklist 回应数据）
-    for key in ("responses_snapshot", "allResponses", "checklist_responses"):
-        val = html_data.get(key)
-        if val and isinstance(val, (dict, list)):
-            # 将 JSON 转为可读文本
-            import json
-            text_repr = json.dumps(val, ensure_ascii=False, indent=None)
-            if len(text_repr) > 5000:
-                text_repr = text_repr[:5000] + "...(已截断)"
-            parts.append(f"[{key}]\n{text_repr}")
-
-    # 提取 tb_values（试算表数据）
-    tb_values = html_data.get("tb_values")
-    if tb_values and isinstance(tb_values, dict):
-        import json
-        tb_text = json.dumps(tb_values, ensure_ascii=False, indent=None)
-        if len(tb_text) > 2000:
-            tb_text = tb_text[:2000] + "...(已截断)"
-        parts.append(f"[试算表数据]\n{tb_text}")
-
-    # 提取项目上下文
-    project_context = html_data.get("projectContext") or html_data.get("project_context")
-    if project_context and isinstance(project_context, dict):
-        parts.append(
-            f"[项目信息] 客户: {project_context.get('client_name', '')} "
-            f"年度: {project_context.get('audit_year', '')}"
+async def _get_project_id(wp_id: UUID) -> str | None:
+    """从 working_paper 获取 project_id"""
+    async with async_session() as db:
+        result = await db.execute(
+            text(
+                "SELECT project_id FROM working_paper "
+                "WHERE id = :wp_id AND is_deleted = false"
+            ),
+            {"wp_id": str(wp_id)},
         )
+        row = result.first()
+        return str(row[0]) if row else None
 
-    # 如果什么都没提取到，将整个 html_data 的 key 列表和简要值作为输入
-    if not parts:
-        import json
-        fallback = json.dumps(html_data, ensure_ascii=False, indent=None)
-        if len(fallback) > 6000:
-            fallback = fallback[:6000] + "...(已截断)"
-        parts.append(f"[底稿数据]\n{fallback}")
 
-    return "\n\n".join(parts)
+async def _get_workpaper_content(wp_id: UUID, sheet_name: str | None) -> str:
+    """获取底稿内容（DB 直读 checklist_responses + parsed_data，不经 HTTP）"""
+    from app.services.review_content_loader import load_workpaper_review_content
+
+    return await load_workpaper_review_content(wp_id, sheet_name)
 
 
 async def _call_llm(system_prompt: str, user_prompt: str) -> str:

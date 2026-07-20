@@ -113,6 +113,13 @@ _SHEET_SUFFIX_RE = re.compile(
     re.IGNORECASE,
 )
 
+# 无编码后缀的中文 sheet 名 → 提示词文件 stem（与 GtD2 currentSheet 映射对齐）
+_SHEET_NAME_ALIASES: list[tuple[str, str]] = [
+    ("截止测试", "D2-cutoff"),
+    ("附注上市", "D2-note-listed"),
+    ("附注国企", "D2-note-soe"),
+]
+
 
 @dataclass
 class RiskArea:
@@ -173,6 +180,11 @@ class ReviewPromptService:
         match = _SHEET_SUFFIX_RE.search(sheet_name)
         if match:
             return match.group(1)
+
+        for keyword, suffix in _SHEET_NAME_ALIASES:
+            if keyword in sheet_name:
+                return suffix
+
         return None
 
     # ------------------------------------------------------------------

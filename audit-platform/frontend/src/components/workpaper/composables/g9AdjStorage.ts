@@ -28,6 +28,23 @@ export interface G9AdjustmentEntryLike {
   creditAmount?: number
 }
 
+export interface G9AdjustmentSummary {
+  rowCount: number
+  ajeCount: number
+  rjeCount: number
+  totalDebits: number
+  totalCredits: number
+  balanceDiff: number
+  /** 1504 借−贷净额（回写口径） */
+  net1504: number
+  ajeNet1504: number
+  rjeNet1504: number
+  /** 6101 公允变动损益净额 */
+  fvPlNet: number
+  /** 4002 OCI 净额 */
+  ociNet: number
+}
+
 export function defaultG9AdjStore(): G9AdjRowStore {
   const s: G9AdjRowStore = {}
   for (const def of G9_ADJUDICATION_ITEMS) {
@@ -65,12 +82,47 @@ export function patchG9AdjRow(
   }
 }
 
+function accountNet(
+  rows: Array<{ accountCode?: string; debitAmount?: number; creditAmount?: number }>,
+  prefix: string,
+): number {
+  return rows
+    .filter((r) => String(r.accountCode ?? '').startsWith(prefix))
+    .reduce((s, r) => s + parseNum(r.debitAmount) - parseNum(r.creditAmount), 0)
+}
+
 export function calcG9AdjustmentNet(
   rows: Array<{ accountCode?: string; debitAmount?: number; creditAmount?: number }>,
 ): number {
-  return rows
-    .filter((r) => String(r.accountCode ?? '1504').startsWith('1504'))
-    .reduce((s, r) => s + parseNum(r.debitAmount) - parseNum(r.creditAmount), 0)
+  return accountNet(rows, '1504')
+}
+
+export function summarizeG9Adjustment(
+  rows: Array<{
+    entryType?: string
+    accountCode?: string
+    debitAmount?: number
+    creditAmount?: number
+  }>,
+): G9AdjustmentSummary {
+  const list = rows ?? []
+  const totalDebits = list.reduce((s, r) => s + parseNum(r.debitAmount), 0)
+  const totalCredits = list.reduce((s, r) => s + parseNum(r.creditAmount), 0)
+  const aje = list.filter((r) => r.entryType !== 'RJE')
+  const rje = list.filter((r) => r.entryType === 'RJE')
+  return {
+    rowCount: list.length,
+    ajeCount: aje.length,
+    rjeCount: rje.length,
+    totalDebits,
+    totalCredits,
+    balanceDiff: totalDebits - totalCredits,
+    net1504: calcG9AdjustmentNet(list),
+    ajeNet1504: calcG9AdjustmentNet(aje),
+    rjeNet1504: calcG9AdjustmentNet(rje),
+    fvPlNet: accountNet(list, '6101'),
+    ociNet: accountNet(list, '4002'),
+  }
 }
 
 /** 按 AJE/RJE 分别汇总 1504 科目净额（借方−贷方），用于回写 G9-1 */

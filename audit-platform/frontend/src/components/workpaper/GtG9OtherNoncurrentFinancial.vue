@@ -44,6 +44,7 @@
         v-else-if="currentSheet === 'G9-2'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -53,6 +54,8 @@
         v-else-if="currentSheet === 'G9-3'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :audit-year="auditYear ?? undefined"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -62,6 +65,7 @@
         v-else-if="currentSheet === 'G9-4'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -81,6 +85,7 @@
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
         :project-id="props.projectId"
+        :year="auditYear ?? undefined"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -92,6 +97,7 @@
         :wp-id="props.wpId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
       />
 
       <G9TabDisclosureSOE
@@ -100,12 +106,17 @@
         :wp-id="props.wpId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
       />
 
       <template v-else-if="currentSheet === '底稿目录'">
         <div class="g9-index-toolbar">
           <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         </div>
+        <G9TabDirectory
+          :all-responses="formData.allResponses.value"
+          :available-sheets="availableSheets"
+        />
         <GCycleBIndexExtras
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -158,6 +169,7 @@ const G9TabL3Reconciliation = defineAsyncComponent(() => import('./g9-other-nonc
 const G9TabVoucherCheck = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/voucher/G9TabVoucherCheck.vue'))
 const G9TabDisclosureListed = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabDisclosureListed.vue'))
 const G9TabDisclosureSOE = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabDisclosureSOE.vue'))
+const G9TabDirectory = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabDirectory.vue'))
 const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -180,6 +192,20 @@ const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
+
+/** 审计年度：抽凭引擎 / G9A 回填；优先 htmlData，回退 Runtime */
+const auditYear = computed(() => {
+  const raw =
+    props.htmlData?.project_context?.audit_year
+    ?? props.htmlData?.projectContext?.audit_year
+    ?? props.htmlData?.audit_year
+    ?? runtime?.year?.value
+    ?? null
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) && n >= 1900 ? Math.trunc(n) : null
+})
+
 provide('g9VersionTrailRef', versionTrailRef)
 provide('g9OpenVersionHistory', openVersionHistory)
 

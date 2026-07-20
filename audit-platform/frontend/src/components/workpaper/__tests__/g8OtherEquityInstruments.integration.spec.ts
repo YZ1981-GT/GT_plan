@@ -4,9 +4,9 @@
  * 验证：
  * 1. 有效sheetName → 正确子组件编码（对齐 extractG8SheetCode / g8SheetLabels.ts）
  * 2. 未知sheetName → OnlyOffice fallback（空字符串触发fallback渲染）
- * 3. HTML_SHEETS 10 项（G8A + G8-1..6 + 3 note/dir）
- * 4. 可导入导出 4 张表（G8-2 / G8-3 / G8-4 / G8-6）
- * 5. 科目代码 1503 / Event bus g8:save-items / AI 前缀 /g8/ai/
+ * 3. HTML_SHEETS 11 项（G8A + G8-1..6 + 附注×2 + 目录 + 参考中证协）
+ * 4. 可导入导出 5 张表（G8-2 / G8-3 / G8-4 / G8-5 / G8-6）
+ * 5. 科目代码 1503 / Text bus g8:save-items / AI 前缀 /g8/ai/
  *
  * **Validates: Requirements G8 integration**
  */
@@ -17,12 +17,13 @@ import { extractG8SheetCode } from '../composables/g8SheetLabels'
 // ---------------------------------------------------------------------------
 // 1. sheetName 正则分发正确性（对齐 g8SheetLabels.ts extractG8SheetCode）
 // ---------------------------------------------------------------------------
-describe('G8 集成: sheetName 正则分发（10 sheets + fallback）', () => {
+describe('G8 集成: sheetName 正则分发（11 sheets + fallback）', () => {
   /**
    * 对齐 composables/g8SheetLabels.ts 中 extractG8SheetCode 为纯函数。
    */
   function resolveSheet(name: string): string {
     if (!name) return ''
+    if (/参考中证协|非上市公司股权估值|参考.*估值指引/.test(name)) return '参考中证协'
     if (/G8-note-listed|附注披露.*上市|附注.*上市/.test(name)) return '附注上市'
     if (/G8-note-soe|附注披露.*国企|附注.*国企/.test(name)) return '附注国企'
     if (/G8-directory|底稿目录/.test(name)) return '底稿目录'
@@ -42,6 +43,7 @@ describe('G8 集成: sheetName 正则分发（10 sheets + fallback）', () => {
     ['附注披露信息（上市公司）', '附注上市'],
     ['附注披露信息（国企）', '附注国企'],
     ['底稿目录', '底稿目录'],
+    ['参考中证协《非上市公司股权估值指引》', '参考中证协'],
     ['G8-note-listed', '附注上市'],
     ['G8-note-soe', '附注国企'],
     ['G8-directory', '底稿目录'],
@@ -78,36 +80,37 @@ describe('G8 集成: sheetName 正则分发（10 sheets + fallback）', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 2. HTML_SHEETS 配置（10 项）
+// 2. HTML_SHEETS 配置（11 项）
 // ---------------------------------------------------------------------------
 describe('G8 集成: HTML_SHEETS', () => {
   const HTML_SHEETS = new Set([
     'G8A', 'G8-1', 'G8-2', 'G8-3', 'G8-4', 'G8-5', 'G8-6',
-    '附注上市', '附注国企', '底稿目录',
+    '附注上市', '附注国企', '底稿目录', '参考中证协',
   ])
 
-  it('HTML_SHEETS 正好有10 项', () => {
-    expect(HTML_SHEETS.size).toBe(10)
+  it('HTML_SHEETS 正好有 11 项', () => {
+    expect(HTML_SHEETS.size).toBe(11)
   })
 
-  it('包含 G8A + G8-1..G8-6 + 3 note/dir', () => {
+  it('包含 G8A + G8-1..G8-6 + 附注/目录/参考', () => {
     for (const code of ['G8A', 'G8-1', 'G8-2', 'G8-3', 'G8-4', 'G8-5', 'G8-6']) {
       expect(HTML_SHEETS.has(code)).toBe(true)
     }
     expect(HTML_SHEETS.has('附注上市')).toBe(true)
     expect(HTML_SHEETS.has('附注国企')).toBe(true)
     expect(HTML_SHEETS.has('底稿目录')).toBe(true)
+    expect(HTML_SHEETS.has('参考中证协')).toBe(true)
   })
 })
 
 // ---------------------------------------------------------------------------
-// 3. 可导入导出 4 张表
+// 3. 可导入导出 5 张表
 // ---------------------------------------------------------------------------
 describe('G8 集成: 可导入导出', () => {
-  it('G8 支持4 张表动态行表格可导入导出', () => {
-    expect(G8_IMPORTABLE_SHEETS).toHaveLength(4)
+  it('G8 支持5 张表动态行表格可导入导出', () => {
+    expect(G8_IMPORTABLE_SHEETS).toHaveLength(5)
     const codes = G8_IMPORTABLE_SHEETS.map((s) => s.code)
-    expect(codes).toEqual(['G8-2', 'G8-3', 'G8-4', 'G8-6'])
+    expect(codes).toEqual(['G8-2', 'G8-3', 'G8-4', 'G8-5', 'G8-6'])
   })
 })
 

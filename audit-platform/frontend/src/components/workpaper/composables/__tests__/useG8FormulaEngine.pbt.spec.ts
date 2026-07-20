@@ -5,7 +5,9 @@ import {
   calcDebitBalance,
   calcAdjustedAmount,
   calcEndingBalance,
+  calcOciCumulativeEnding,
   calcFairValueDiff,
+  calcFairValueAmount,
   calcChangeRate,
   isDebitCreditBalanced,
 } from '../useG8FormulaEngine'
@@ -33,9 +35,21 @@ describe('G8 PBT — 公式引擎', () => {
       }), { numRuns: 100 })
   })
 
-  it('P4: calcFairValueDiff === audited - unadjusted', () => {
+  it('P3b: calcOciCumulativeEnding = opening + current - toRE', () => {
+    fc.assert(fc.property(num, num, num, (o, c, t) => {
+      expect(calcOciCumulativeEnding(o, c, t)).toBeCloseTo(o + c - t, 4)
+    }), { numRuns: 100 })
+  })
+
+  it('P4: calcFairValueDiff === audited - unadjusted (rounded)', () => {
     fc.assert(fc.property(num, num, (a, u) => {
-      expect(calcFairValueDiff(a, u)).toBeCloseTo(a - u, 4)
+      expect(calcFairValueDiff(a, u)).toBeCloseTo(Math.round((a - u) * 100) / 100, 2)
+    }), { numRuns: 100 })
+  })
+
+  it('P4b: calcFairValueAmount === qty × price (rounded)', () => {
+    fc.assert(fc.property(num, num, (q, p) => {
+      expect(calcFairValueAmount(q, p)).toBeCloseTo(Math.round(q * p * 100) / 100, 2)
     }), { numRuns: 100 })
   })
 

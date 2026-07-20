@@ -23,6 +23,7 @@ class G8ValidateRequest(BaseModel):
     adjudication_rows: list[dict[str, Any]] = Field(default_factory=list)
     detail_rows: list[dict[str, Any]] = Field(default_factory=list)
     fair_value_rows: list[dict[str, Any]] = Field(default_factory=list)
+    designation_rows: list[dict[str, Any]] = Field(default_factory=list)
     adjustment_debits: list[float] = Field(default_factory=list)
     adjustment_credits: list[float] = Field(default_factory=list)
 
@@ -57,6 +58,18 @@ async def validate_g8_formulas(
         })
 
     for err in _svc.validate_fair_value_rows(body.fair_value_rows):
+        errors.append({
+            "rowKey": err.row_key,
+            "field": err.field,
+            "message": err.message,
+            "variance": err.variance,
+        })
+
+    for err in _svc.validate_designation_rows(
+        body.designation_rows,
+        body.detail_rows or None,
+        body.fair_value_rows or None,
+    ):
         errors.append({
             "rowKey": err.row_key,
             "field": err.field,

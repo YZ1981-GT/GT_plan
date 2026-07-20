@@ -444,6 +444,13 @@ entries:
     storage_mode: row_json
     import_order: 30
     depends_on_sheets: [G8-2]
+  - sheet_code: G8-5
+    api_prefix: g8
+    item_id: G8-designation-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 35
+    depends_on_sheets: [G8-2, G8-4]
   - sheet_code: G8-6
     api_prefix: g8
     item_id: G8-voucher-rows

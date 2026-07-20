@@ -1,14 +1,30 @@
 <template>
   <div class="g9-detail" data-testid="g9-detail-table">
-    <div class="toolbar tab-toolbar">
-      <h3>G9-2 明细表</h3>
-      <div class="head-actions">
-        <GtIndexChip value="wp:G9-2" />
+    <div class="toolbar">
+      <div class="title-block">
+        <h3>G9-2 明细表</h3>
+        <p class="sheet-sub">分类计量明细 → 期初/变动/期末勾稽 → 分类合计回写 G9-1</p>
+      </div>
+      <div class="head-actions tab-toolbar">
+        <span class="chip-wrap"><GtIndexChip value="wp:G9-1" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G9-2" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G9-4" /></span>
         <el-tag size="small" type="info">共 {{ detail.rows.value.length }} 行</el-tag>
         <G9ImportExportDropdown :wp-id="wpId" sheet="G9-2" @imported="onImported" />
-        <el-button v-if="!isReadonly" size="small" @click="detail.addRow()">+ 新增行</el-button>
+        <GtReviewTrigger section-id="G9-2-detail" />
       </div>
     </div>
+
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <div class="guidance-content">
+        <p>1. 按 CAS 22：FVTPL / FVOCI / 摊余成本分类须与合同现金流量特征及业务模式一致。</p>
+        <p>2. 期初审定 = 期初 + 期初调整；期末余额 = 期初审定 + 增加 − 减少 + FV + 利息 − 减值 + OCI；审定 = 期末 + 调整。</p>
+        <p>3. 可「辅助核算取数」从 1504 带入；「回写 G9-1」按分类合计写入各组首行未审数。</p>
+        <p>4. Level3 须填估值方法，并在 G9-4 补充估值技术与不可观察输入值；可带入 G9-5。</p>
+        <p>5. 「工具种类」「指定FVTPL」供附注分项带入；分类非 FVTPL 时指定标记自动清除。</p>
+      </div>
+    </details>
 
     <el-alert
       type="info"
@@ -18,9 +34,83 @@
       title="审计目标：核对其他非流动金融资产明细的存在、计价与分类，期末审定合计应与 G9-1 审定表勾稽一致。"
     />
 
+    <div class="adj-toolbar">
+      <el-button v-if="!isReadonly" size="small" type="primary" @click="detail.addRow()">+ 新增行</el-button>
+      <el-button
+        v-if="!isReadonly"
+        size="small"
+        plain
+        :loading="detail.auxLoading.value"
+        :disabled="!projectId"
+        data-testid="g9-detail-aux"
+        @click="onSeedAux"
+      >
+        辅助核算取数
+      </el-button>
+      <el-button
+        v-if="!isReadonly"
+        size="small"
+        type="success"
+        plain
+        :disabled="!detail.rows.value.length"
+        data-testid="g9-detail-push-adj"
+        @click="detail.pushTotalsToAdjudication()"
+      >
+        ↑ 回写 G9-1
+      </el-button>
+      <el-button
+        v-if="!isReadonly"
+        size="small"
+        plain
+        data-testid="g9-detail-fv-oci"
+        @click="onFillOci"
+      >
+        FVOCI：FV→OCI
+      </el-button>
+      <el-tag v-if="detail.level3MissingMethodCount.value" size="small" type="danger">
+        L3缺估值方法 {{ detail.level3MissingMethodCount.value }}
+      </el-tag>
+    </div>
+
+    <el-alert
+      v-if="detail.hasAdjCrossMismatch.value"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="cross-alert"
+      data-testid="g9-detail-adj-cross"
+      :title="`明细审定合计 ${fmt(detail.totals.value.closingAdjusted)} 与 G9-1 审定合计 ${fmt(detail.adjudicationClosingTotal.value ?? 0)} 差异 ${fmt(detail.adjCrossVariance.value ?? 0)}`"
+    />
+
+    <el-alert
+      v-if="detail.integrityIssues.value.length"
+      type="error"
+      :closable="false"
+      show-icon
+      class="cross-alert"
+      title="以下明细行校验未通过"
+    >
+      <ul class="issue-list">
+        <li v-for="(item, i) in detail.integrityIssues.value.slice(0, 8)" :key="`${item.rowId}-${i}`">
+          {{ item.assetName }}：{{ item.message }}
+        </li>
+        <li v-if="detail.integrityIssues.value.length > 8">…共 {{ detail.integrityIssues.value.length }} 项</li>
+      </ul>
+    </el-alert>
+
     <el-segmented v-model="detail.activeTab.value" :options="tabOptions" size="small" />
-    <el-table :data="detail.rows.value" border size="small" style="font-size:13px;margin-top:8px" max-height="520"
-      highlight-current-row @current-change="onRowChange">
+
+    <el-table
+      :data="detail.rows.value"
+      border
+      size="small"
+      style="font-size:13px;margin-top:8px"
+      max-height="520"
+      highlight-current-row
+      :current-row-key="detail.currentRowKey.value"
+      row-key="rowId"
+      @current-change="onRowChange"
+    >
       <el-table-column prop="seq" label="#" width="44" align="center" fixed />
       <template v-if="detail.activeTab.value === 'basic'">
         <el-table-column label="资产名称" min-width="120" fixed>
@@ -29,12 +119,40 @@
             <span v-else>{{ row.assetName }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="分类" width="100">
+        <el-table-column label="分类" width="108">
           <template #default="{ row }">
             <el-select v-if="!isReadonly" :model-value="row.classification" size="small" @update:model-value="(v: string) => detail.updateRow(row.rowId, { classification: v })">
               <el-option v-for="o in detail.classificationOptions" :key="o" :label="o" :value="o" />
             </el-select>
             <span v-else>{{ row.classification }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="工具种类" width="120">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              :model-value="row.instrumentType"
+              size="small"
+              clearable
+              placeholder="选填"
+              data-testid="g9-detail-instrument-type"
+              @update:model-value="(v: string) => detail.updateRow(row.rowId, { instrumentType: v ?? '' })"
+            >
+              <el-option v-for="o in detail.instrumentTypeOptions" :key="o" :label="o" :value="o" />
+            </el-select>
+            <span v-else>{{ row.instrumentType || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="指定FVTPL" width="88" align="center">
+          <template #default="{ row }">
+            <el-checkbox
+              v-if="!isReadonly"
+              :model-value="row.isDesignated"
+              :disabled="row.classification !== 'FVTPL'"
+              data-testid="g9-detail-is-designated"
+              @update:model-value="(v: boolean | string | number) => detail.updateRow(row.rowId, { isDesignated: !!v })"
+            />
+            <span v-else>{{ row.isDesignated ? '是' : '否' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="初始投资日" width="108">
@@ -75,11 +193,17 @@
         <el-table-column label="关联方" width="72" align="center">
           <template #default="{ row }">
             <el-checkbox v-if="!isReadonly" :model-value="row.isRelatedParty"
-              @update:model-value="(v: boolean) => detail.updateRow(row.rowId, { isRelatedParty: v })" />
+              @update:model-value="(v: boolean | string | number) => detail.updateRow(row.rowId, { isRelatedParty: !!v })" />
             <span v-else>{{ row.isRelatedParty ? '是' : '否' }}</span>
           </template>
         </el-table-column>
+        <el-table-column v-if="!isReadonly" label="操作" width="56" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="danger" size="small" @click="detail.removeRow(row.rowId)">删</el-button>
+          </template>
+        </el-table-column>
       </template>
+
       <template v-else-if="detail.activeTab.value === 'movement'">
         <el-table-column label="资产名称" prop="assetName" min-width="100" fixed />
         <el-table-column label="期初余额" width="96" align="right">
@@ -142,10 +266,13 @@
           </template>
         </el-table-column>
       </template>
+
       <template v-else>
         <el-table-column label="资产名称" prop="assetName" min-width="100" fixed />
         <el-table-column label="期末余额" width="100" align="right">
-          <template #default="{ row }"><span class="formula-cell" title="期末余额 = 期初审定 + 增加 − 减少 + FV变动 + 利息 − 减值 + OCI">{{ fmt(row.closingBalance) }}</span></template>
+          <template #default="{ row }">
+            <span class="formula-cell" title="期末余额 = 期初审定 + 增加 − 减少 + FV + 利息 − 减值 + OCI">{{ fmt(row.closingBalance) }}</span>
+          </template>
         </el-table-column>
         <el-table-column label="调整数" width="96" align="right">
           <template #default="{ row }">
@@ -165,10 +292,20 @@
             <span v-else>{{ row.fairValueLevel }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="估值方法" width="100">
+        <el-table-column label="估值方法" width="110">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.valuationMethod" size="small"
-              @update:model-value="(v: string) => detail.updateRow(row.rowId, { valuationMethod: v })" />
+            <el-select
+              v-if="!isReadonly"
+              :model-value="row.valuationMethod"
+              size="small"
+              filterable
+              allow-create
+              default-first-option
+              :class="{ 'l3-required': row.fairValueLevel === 'Level3' && !row.valuationMethod }"
+              @update:model-value="(v: string) => detail.updateRow(row.rowId, { valuationMethod: v })"
+            >
+              <el-option v-for="o in detail.valuationMethodOptions" :key="o" :label="o" :value="o" />
+            </el-select>
             <span v-else>{{ row.valuationMethod }}</span>
           </template>
         </el-table-column>
@@ -186,11 +323,18 @@
             <span v-else>{{ fmt(row.impairmentProvision) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="发函情况" width="96">
+        <el-table-column label="发函情况" width="110">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.confirmationStatus" size="small"
-              @update:model-value="(v: string) => detail.updateRow(row.rowId, { confirmationStatus: v })" />
-            <span v-else>{{ row.confirmationStatus }}</span>
+            <el-select
+              v-if="!isReadonly"
+              :model-value="row.confirmationStatus"
+              size="small"
+              clearable
+              @update:model-value="(v: string) => detail.updateRow(row.rowId, { confirmationStatus: v || '' })"
+            >
+              <el-option v-for="o in detail.confirmationOptions" :key="o" :label="o" :value="o" />
+            </el-select>
+            <span v-else>{{ row.confirmationStatus || '—' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="备注" min-width="100">
@@ -202,46 +346,55 @@
         </el-table-column>
       </template>
     </el-table>
-    <div class="subtotals" data-testid="g9-detail-subtotals">
-      <span v-for="(amt, cls) in detail.classificationSubtotals.value" :key="cls"
-        :class="{ 'total-line': cls === '总计' }">{{ cls }}: {{ fmt(amt) }}</span>
+
+    <div class="summary-bar" data-testid="g9-detail-summary">
+      <span>期初审定 <strong>{{ fmt(detail.totals.value.openingAdjusted) }}</strong></span>
+      <span>期末余额 <strong>{{ fmt(detail.totals.value.closingBalance) }}</strong></span>
+      <span>审定合计 <strong>{{ fmt(detail.totals.value.closingAdjusted) }}</strong></span>
+      <span>OCI变动 <strong>{{ fmt(detail.totals.value.ociChange) }}</strong></span>
     </div>
 
-    <details class="guidance-details">
-      <summary>📋 编制提示</summary>
-      <div class="guidance-content">
-        <p>按 CAS 22 金融工具确认与计量：FVTPL / FVOCI / 摊余成本分类需与合同现金流量特征及业务模式一致。</p>
-        <p>期初审定 = 期初余额 + 期初调整；期末余额 = 期初审定 + 增加 − 减少 + FV变动 + 利息 − 减值 + OCI；审定数 = 期末余额 + 调整数。</p>
-        <p>Level3 层次资产须在 G9-4 补充估值技术与不可观察输入值。</p>
-      </div>
-    </details>
+    <div class="subtotals" data-testid="g9-detail-subtotals">
+      <span
+        v-for="(amt, cls) in detail.classificationSubtotals.value"
+        :key="cls"
+        :class="{ 'total-line': cls === '总计' }"
+      >{{ cls }}: {{ fmt(amt) }}</span>
+    </div>
 
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计说明</span></div></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：可概述明细核对情况、分类计量恰当性、与 G9-1 审定表合计勾稽情况及拟调整事项。"
-        @change="(val: string) => saveAuditNote(val)" />
-    </el-card>
-
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
-      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。C、由于存在以下重大未调整事项（或审计范围受到限制无法获取充分、适当证据），不可确认。"
-        @change="(val: string) => saveAuditConclusion(val)" />
-    </el-card>
+    <G9AuditTextCards
+      :wp-id="wpId"
+      :is-readonly="isReadonly"
+      v-model:note="auditNote"
+      v-model:conclusion="auditConclusion"
+      note-ai-section="detail-note"
+      conclusion-ai-section="detail-conclusion"
+      note-placeholder="填写审计说明：可概述明细核对情况、分类计量恰当性、与 G9-1 审定表合计勾稽情况及拟调整事项。"
+      note-hint="覆盖分类计量、明细加计及与 G9-1 / G9-4 / G9-5 勾稽。"
+      :related-context="{
+        行数: detail.rows.value.length,
+        审定合计: detail.totals.value.closingAdjusted,
+        与G91差异: detail.adjCrossVariance.value,
+        校验问题: detail.integrityIssues.value.length,
+      }"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import G9ImportExportDropdown from '../G9ImportExportDropdown.vue'
+import G9AuditTextCards from '../G9AuditTextCards.vue'
 import { useG9Detail } from '../../composables/useG9Detail'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   wpId: string
+  projectId?: string
   isReadonly: boolean
   debouncedSave: (id: string, d: Partial<ChecklistResponse>) => void
 }>()
@@ -258,33 +411,42 @@ const detail = useG9Detail({
   allResponses: computed(() => props.allResponses),
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly),
+  projectId: computed(() => props.projectId || ''),
 })
 
 function onImported() { emit('imported') }
 
-// ─── 审计说明 / 审计结论（持久化 checklist_responses）─────────────────────
+function onRowChange(r: { rowId?: string } | null) {
+  if (!r?.rowId) return
+  const idx = detail.rows.value.findIndex((x) => x.rowId === r.rowId)
+  if (idx >= 0) detail.activeRowIndex.value = idx
+}
+
+async function onSeedAux() {
+  const res = await detail.seedFromAuxBalance()
+  if (res.error) {
+    ElMessage.warning(res.error)
+    return
+  }
+  ElMessage.success(`辅助核算（${res.dimType}）：新增 ${res.added}，更新 ${res.updated}`)
+}
+
+function onFillOci() {
+  const n = detail.fillOciFromFvChange()
+  if (n > 0) ElMessage.success(`已为 ${n} 行 FVOCI 填入 OCI 变动`)
+  else ElMessage.info('无需填入（无 FVOCI 空白 OCI 行）')
+}
+
 const NOTE_KEY = 'G9-detail-audit-note'
 const CONCLUSION_KEY = 'G9-detail-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-function saveAuditNote(val: string): void {
-  if (props.isReadonly) return
-  auditNote.value = val
-  props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: val })
-}
-function saveAuditConclusion(val: string): void {
-  if (props.isReadonly) return
-  auditConclusion.value = val
-  props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
-}
-onMounted(() => {
-  const n = props.allResponses.get(NOTE_KEY); if (n?.remark) auditNote.value = n.remark
-  const c = props.allResponses.get(CONCLUSION_KEY); if (c?.remark) auditConclusion.value = c.remark
+const auditNote = ref(props.allResponses.get(NOTE_KEY)?.remark ?? '')
+const auditConclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.remark ?? '')
+watch(auditNote, (v) => {
+  if (!props.isReadonly) props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: v })
 })
-
-function onRowChange(r: any) {
-  if (r) detail.activeRowIndex.value = detail.rows.value.findIndex((x) => x.rowId === r.rowId)
-}
+watch(auditConclusion, (v) => {
+  if (!props.isReadonly) props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: v })
+})
 
 function fmt(n: number) {
   return Number(n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -293,14 +455,21 @@ function fmt(n: number) {
 
 <style scoped>
 .g9-detail { font-size: var(--wp-font-size, 13px); }
-.toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.head-actions { display: flex; gap: 8px; align-items: center; }
+.toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.title-block h3 { margin: 0; font-size: 15px; }
+.sheet-sub { margin: 4px 0 0; font-size: 12px; color: #909399; }
+.head-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; }
+.guidance-details { margin-bottom: 8px; font-size: 12px; color: #606266; }
+.guidance-content p { margin: 4px 0; }
+.audit-objective { margin-bottom: 10px; }
+.adj-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.cross-alert { margin-bottom: 8px; }
+.issue-list { margin: 4px 0 0; padding-left: 18px; }
+.summary-bar { display: flex; gap: 16px; margin-top: 10px; flex-wrap: wrap; font-size: 13px; }
 .subtotals { margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; color: #606266; }
 .total-line { font-weight: 600; color: #303133; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; background: #f5f7fa; display: inline-block; width: 100%; }
-.audit-objective { margin: 8px 0; }
-.guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
-.guidance-content p { margin: 4px 0; }
-.audit-note-card { margin-top: 12px; }
-.audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
+.l3-required :deep(.el-input__wrapper),
+.l3-required :deep(.el-select__wrapper) { box-shadow: 0 0 0 1px #f56c6c inset; }
 </style>

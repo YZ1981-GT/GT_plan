@@ -44,6 +44,7 @@
         v-else-if="currentSheet === 'G8-2'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -53,6 +54,7 @@
         v-else-if="currentSheet === 'G8-3'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -62,6 +64,7 @@
         v-else-if="currentSheet === 'G8-4'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -71,8 +74,10 @@
         v-else-if="currentSheet === 'G8-5'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
       />
 
       <G8TabVoucherCheck
@@ -80,6 +85,7 @@
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
         :project-id="props.projectId"
+        :year="auditYear ?? undefined"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -103,10 +109,22 @@
         :debounced-save="onDebouncedSave"
       />
 
+      <G8TabRefValuationGuidance
+        v-else-if="currentSheet === '参考中证协'"
+        :html-data="props.htmlData || formData.getSheet(currentSheet)"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :is-readonly="true"
+      />
+
       <template v-else-if="currentSheet === '底稿目录'">
         <div class="g8-index-toolbar">
           <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         </div>
+        <G8TabDirectory
+          :all-responses="formData.allResponses.value"
+          :available-sheets="availableSheets"
+        />
         <GCycleBIndexExtras
           :wp-id="props.wpId"
           :project-id="props.projectId"
@@ -157,6 +175,8 @@ const G8TabFairValueTest = defineAsyncComponent(() => import('./g8-other-equity-
 const G8TabDesignationCheck = defineAsyncComponent(() => import('./g8-other-equity-instruments/valuation/G8TabDesignationCheck.vue'))
 const G8TabVoucherCheck = defineAsyncComponent(() => import('./g8-other-equity-instruments/voucher/G8TabVoucherCheck.vue'))
 const G8TabDisclosureBase = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabDisclosureBase.vue'))
+const G8TabDirectory = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabDirectory.vue'))
+const G8TabRefValuationGuidance = defineAsyncComponent(() => import('./g8-other-equity-instruments/reference/G8TabRefValuationGuidance.vue'))
 const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -180,13 +200,26 @@ const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: ()
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
+/** 审计年度：抽凭引擎 / A13 错报 / G8A 回填；优先 htmlData，回退 Runtime */
+const auditYear = computed(() => {
+  const raw =
+    props.htmlData?.project_context?.audit_year
+    ?? props.htmlData?.projectContext?.audit_year
+    ?? props.htmlData?.audit_year
+    ?? runtime?.year?.value
+    ?? null
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) && n >= 1900 ? Math.trunc(n) : null
+})
+
 provide('g8VersionTrailRef', versionTrailRef)
 provide('g8OpenVersionHistory', openVersionHistory)
 provide('reloadWorkpaperData', () => formData.loadAll())
 
 const currentSheet = computed(() => extractG8SheetCode(props.sheetName || props.wpCode || ''))
 
-const HTML_SHEETS = new Set(['G8A', 'G8-1', 'G8-2', 'G8-3', 'G8-4', 'G8-5', 'G8-6', '附注上市', '附注国企', '底稿目录'])
+const HTML_SHEETS = new Set(['G8A', 'G8-1', 'G8-2', 'G8-3', 'G8-4', 'G8-5', 'G8-6', '附注上市', '附注国企', '底稿目录', '参考中证协'])
 const isHtmlSheet = computed(() => HTML_SHEETS.has(currentSheet.value))
 const useGridFallback = computed(() => !!currentSheet.value && !isHtmlSheet.value)
 

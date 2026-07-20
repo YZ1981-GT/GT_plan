@@ -77,6 +77,43 @@ _CATEGORY_KEYWORDS: dict[str, str] = {
 }
 
 
+@dataclass(frozen=True)
+class PassThreshold:
+    """通过判定阈值：未通过 high ≤ max_high 且 medium ≤ max_medium → pass"""
+
+    max_high: int = 0
+    max_medium: int = 2  # 默认 medium < 3 ⟺ ≤ 2
+
+
+# 按底稿类型配置阈值（sheet_name 关键词 / 后缀匹配，先匹配先生效）
+_PASS_THRESHOLD_RULES: list[tuple[tuple[str, ...], PassThreshold]] = [
+    # 审定表：枢纽底稿，更严
+    (("D2-1", "审定表"), PassThreshold(max_high=0, max_medium=1)),
+    # 凭证检查 / 抽凭：检查项多，中风险容忍略宽
+    (("D2-7", "凭证检查", "抽凭"), PassThreshold(max_high=0, max_medium=4)),
+    # 截止测试
+    (("cutoff", "截止"), PassThreshold(max_high=0, max_medium=2)),
+    # ECL / 坏账：参数敏感，保持默认偏严
+    (("D2-3", "D2-9", "D2-10", "坏账", "ECL"), PassThreshold(max_high=0, max_medium=2)),
+    # 调整分录 / 关联方
+    (("D2-4", "D2-6", "调整", "关联方"), PassThreshold(max_high=0, max_medium=2)),
+]
+
+_DEFAULT_PASS_THRESHOLD = PassThreshold(max_high=0, max_medium=2)
+
+
+def resolve_pass_threshold(sheet_name: str | None = None) -> PassThreshold:
+    """按 sheet_name 解析通过阈值，无匹配时返回默认"""
+    if not sheet_name:
+        return _DEFAULT_PASS_THRESHOLD
+    name_upper = sheet_name.upper()
+    for keywords, threshold in _PASS_THRESHOLD_RULES:
+        for kw in keywords:
+            if kw.upper() in name_upper or kw in sheet_name:
+                return threshold
+    return _DEFAULT_PASS_THRESHOLD
+
+
 class LlmResponseParser:
     """LLM 复核输出解析器"""
 
@@ -107,17 +144,21 @@ class LlmResponseParser:
             return LlmResponseParser._degrade_to_unknown(raw_text)
 
     @staticmethod
-    def determine_pass_status(findings: list[ReviewFinding]) -> str:
+    def determine_pass_status(
+        findings: list[ReviewFinding],
+        sheet_name: str | None = None,
+    ) -> str:
         """判定整体通过状态
 
-        Rules (Requirement 8.3):
-        - zero high-risk findings AND fewer than 3 medium-risk findings → "pass"
-        - otherwise → "fail"
+        Rules (Requirement 8.3 + sheet-type thresholds):
+        - 默认：0 high 且 medium ≤ 2 → "pass"
+        - 可按 sheet_name 放宽/收紧（见 resolve_pass_threshold）
 
         只统计 pass_status=False 的发现（即未通过的问题项）。
 
         Args:
             findings: ReviewFinding 列表
+            sheet_name: 可选，用于选择阈值配置
 
         Returns:
             "pass" 或 "fail"
@@ -132,7 +173,8 @@ class LlmResponseParser:
                 elif f.risk_level == "medium":
                     medium_count += 1
 
-        if high_count == 0 and medium_count < 3:
+        threshold = resolve_pass_threshold(sheet_name)
+        if high_count <= threshold.max_high and medium_count <= threshold.max_medium:
             return "pass"
         return "fail"
 

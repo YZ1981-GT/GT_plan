@@ -23,8 +23,8 @@ export const G9_INDEX_ROWS: GCycleIndexRowDef[] = [
   { seq: 6, name: 'G9-4 公允价值测试', code: 'G9-4', group: '分析', applicable: true },
   { seq: 7, name: 'G9-5 L3调节表', code: 'G9-5', group: '分析', applicable: true },
   { seq: 8, name: 'G9-6 凭证检查', code: 'G9-6', group: '检查', applicable: true },
-  { seq: 9, name: '附注披露（上市公司）', code: '附注上市', group: '附注', applicable: true },
-  { seq: 10, name: '附注披露（国企）', code: '附注国企', group: '附注', applicable: true },
+  { seq: 9, name: '附注披露（上市公司）— 监管主体选填其一', code: '附注上市', group: '附注', applicable: true },
+  { seq: 10, name: '附注披露（国企）— 监管主体选填其一', code: '附注国企', group: '附注', applicable: true },
 ]
 
 export function resolveG9SheetLabel(
@@ -83,8 +83,9 @@ export function isG9SheetComplete(code: string, m: Map<string, any>): boolean {
     case 'G9-6':
       return hasJsonRows(m, 'G9-voucher-rows')
     case '附注上市':
+      return m.has('G9-disclosure-listed')
     case '附注国企':
-      return m.has('G9-disclosure-listed') || m.has('G9-disclosure-soe')
+      return m.has('G9-disclosure-soe')
     default:
       return false
   }
@@ -95,4 +96,16 @@ export function extractG9SheetCode(sheetName: string): string {
   if (/附注披露/.test(sheetName)) return sheetName.includes('国企') ? '附注国企' : '附注上市'
   const m = sheetName.match(/(G9A|G9-\d+)/)
   return m ? m[1] : ''
+}
+
+/** 解析 G9 sheet 显示名并跳转（依赖 inject jumpToSection） */
+export function jumpToG9Sheet(
+  code: string,
+  jumpFn: ((sheetLabel: string) => void) | null | undefined,
+  availableSheets?: Array<{ sheet_name?: string }>,
+): boolean {
+  if (!jumpFn) return false
+  const label = resolveG9SheetLabel(code, availableSheets) || G9_SHEET_LABEL_MAP[code] || code
+  jumpFn(label)
+  return true
 }

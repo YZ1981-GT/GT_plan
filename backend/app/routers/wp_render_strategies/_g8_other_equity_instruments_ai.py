@@ -35,8 +35,8 @@ _PROMPTS = {
     "adjustment-conclusion": "请生成 G8-3 调整分录审计结论，评价分录恰当性、借贷平衡及回写审定表情况。",
     "fair-value-note": "请生成 G8-4 公允价值测试审计说明，概述层次划分依据、取数来源及 Level3 估值核实情况。",
     "fair-value-conclusion": "请根据 G8-4 公允价值测试表，生成公允价值计量审计结论（含 Level1-3 层次分析）。",
-    "designation-note": "请生成 G8-5 指定适当性检查审计说明，概述 CAS22 指定条件核查及各区段合规判断执行情况。",
-    "designation-conclusion": "请根据 G8-5 指定适当性检查表，生成非交易性权益工具指定 FVOCI 的合规性审计结论。",
+    "designation-note": "请生成 G8-5 指定适当性检查审计说明，概述按被投资单位矩阵核查 CAS22 非交易性/FVOCI 指定条件的执行情况、与 G8-2/G8-4 勾稽结果及异常事项。",
+    "designation-conclusion": "请根据 G8-5 按被投资单位指定适当性矩阵，生成非交易性权益工具指定 FVOCI 是否恰当的审计结论（A/B/C 口径）。",
     "voucher-note": "请生成 G8-6 凭证检查审计说明，概述抽样方法、样本量及逐笔核对发现的异常事项。",
     "voucher-conclusion": "请根据 G8-6 凭证检查表异常样本，生成凭证测试结论。",
     "disclosure-section": "请为 G8 附注披露单行项目生成专业附注文本（科目1503其他权益工具投资）。",
@@ -58,6 +58,54 @@ class G8AiGenerateResponse(BaseModel):
     sources: list[str] = []
 
 
+def _summarize_voucher_abnormal_rows(rows: list[dict[str, Any]], *, limit: int = 30) -> str:
+    """将 G8-6 异常行压缩为 AI 可用的短摘要。"""
+    if not rows:
+        return ""
+    lines: list[str] = []
+    for i, row in enumerate(rows[:limit]):
+        voucher = str(row.get("voucherNo") or "").strip() or f"行{i + 1}"
+        investee = str(row.get("investeeName") or "").strip()
+        abn_type = str(row.get("abnormalType") or "").strip() or "unknown"
+        desc = str(row.get("abnormalDesc") or row.get("businessContent") or "").strip()
+        debit = row.get("debitAmount")
+        credit = row.get("creditAmount")
+        checks = []
+        for label, key in (
+            ("原始", "check1OriginalComplete"),
+            ("授权", "check2Authorization"),
+            ("账务", "check3Accounting"),
+            ("公允", "check4FairValueCorrect"),
+            ("OCI", "check5OCICorrect"),
+        ):
+            v = row.get(key)
+            if v is False:
+                checks.append(f"{label}=不通过")
+            elif v is None or v == "":
+                checks.append(f"{label}=未测")
+        amt = ""
+        try:
+            d = abs(float(debit or 0))
+            c = abs(float(credit or 0))
+            if d or c:
+                amt = f"借{d:.2f}/贷{c:.2f}"
+        except (TypeError, ValueError):
+            amt = ""
+        parts = [f"{i + 1}. 凭证{voucher}", f"类型={abn_type}"]
+        if investee:
+            parts.append(investee)
+        if amt:
+            parts.append(amt)
+        if checks:
+            parts.append("核对:" + ",".join(checks))
+        if desc:
+            parts.append(desc[:120])
+        lines.append("｜".join(parts))
+    if len(rows) > limit:
+        lines.append(f"…另有 {len(rows) - limit} 笔未列入摘要")
+    return "\n".join(lines)
+
+
 @router.post("/api/workpapers/{wp_id}/g8/ai/{section}", response_model=G8AiGenerateResponse)
 async def generate_g8_ai(
     wp_id: str,
@@ -77,6 +125,18 @@ async def generate_g8_ai(
             prompt += f"\n本期金额：{body.relatedContext.get('currentAmount')}"
         if body.relatedContext.get("priorAmount") is not None:
             prompt += f"\n上期金额：{body.relatedContext.get('priorAmount')}"
+    if section in ("voucher-conclusion", "voucher-note") and body.rows:
+        summary = _summarize_voucher_abnormal_rows(body.rows)
+        if summary:
+            prompt += f"\n\n异常/样本摘要（共 {len(body.rows)} 笔）：\n{summary}"
+        if body.relatedContext:
+            ctx_bits = [f"{k}={v}" for k, v in list(body.relatedContext.items())[:12]]
+            if ctx_bits:
+                prompt += "\n\n相关上下文：" + "；".join(ctx_bits)
+    elif body.rows and section.endswith("-conclusion"):
+        # 其他结论类：给少量行上下文，避免 prompt 过长
+        preview = body.rows[:8]
+        prompt += f"\n\n相关行数：{len(body.rows)}；预览：{preview!s}"[:1500]
     if body.existingContent:
         prompt += f"\n\n已有内容：{body.existingContent[:2000]}"
     try:

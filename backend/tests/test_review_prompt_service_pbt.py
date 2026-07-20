@@ -292,3 +292,35 @@ class TestProperty4FilePathDeterminism:
         assert all(r == results[0] for r in results)
         # cycle_letter is always the first character uppercased
         assert results[0] == wp_code[0].upper()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# D2 sheet alias & coverage (regression)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestD2SheetAliasesAndCoverage:
+    """D2 中文 sheet 名别名与新增底稿提示词文件"""
+
+    def test_cutoff_sheet_alias(self):
+        svc = ReviewPromptService()
+        assert svc.resolve_sheet_suffix("截止测试") == "D2-cutoff"
+        assert svc.resolve_sheet_suffix("应收账款截止测试") == "D2-cutoff"
+
+    def test_disclosure_sheet_aliases(self):
+        svc = ReviewPromptService()
+        assert svc.resolve_sheet_suffix("附注上市") == "D2-note-listed"
+        assert svc.resolve_sheet_suffix("附注国企") == "D2-note-soe"
+
+    def test_d2_extended_prompts_load_as_sheet_level(self):
+        svc = ReviewPromptService()
+        for sheet_name in (
+            "ECL测算D2-9",
+            "计量测试D2-10",
+            "检查表D2-11",
+            "质押检查D2-12",
+            "业务模式D2-13",
+            "截止测试",
+        ):
+            result = svc.load_prompt("D2", sheet_name)
+            assert result.source_level == "sheet", f"{sheet_name} should load sheet-level prompt"
+            assert result.content.strip()

@@ -68,6 +68,56 @@ export function calcG8AdjustmentNet(
     .reduce((s, r) => s + parseNum(r.debitAmount) - parseNum(r.creditAmount), 0)
 }
 
+function accountNet(
+  rows: Array<{ accountCode?: string; debitAmount?: number; creditAmount?: number }>,
+  prefix: string,
+): number {
+  return rows
+    .filter((r) => String(r.accountCode ?? '').startsWith(prefix))
+    .reduce((s, r) => s + parseNum(r.debitAmount) - parseNum(r.creditAmount), 0)
+}
+
+/** G8-3 汇总看板：借贷合计、AJE/RJE、1503/OCI 净额 */
+export interface G8AdjustmentSummary {
+  rowCount: number
+  ajeCount: number
+  rjeCount: number
+  totalDebits: number
+  totalCredits: number
+  balanceDiff: number
+  net1503: number
+  ajeNet1503: number
+  rjeNet1503: number
+  ociNet: number
+}
+
+export function summarizeG8Adjustment(
+  rows: Array<{
+    entryType?: string
+    accountCode?: string
+    debitAmount?: number
+    creditAmount?: number
+  }>,
+): G8AdjustmentSummary {
+  const list = rows ?? []
+  const totalDebits = list.reduce((s, r) => s + parseNum(r.debitAmount), 0)
+  const totalCredits = list.reduce((s, r) => s + parseNum(r.creditAmount), 0)
+  const aje = list.filter((r) => r.entryType !== 'RJE')
+  const rje = list.filter((r) => r.entryType === 'RJE')
+  return {
+    rowCount: list.length,
+    ajeCount: aje.length,
+    rjeCount: rje.length,
+    totalDebits,
+    totalCredits,
+    balanceDiff: totalDebits - totalCredits,
+    net1503: calcG8AdjustmentNet(list),
+    ajeNet1503: calcG8AdjustmentNet(aje),
+    rjeNet1503: calcG8AdjustmentNet(rje),
+    ociNet: accountNet(list, '4002'),
+  }
+}
+
 /** 按 AJE/RJE 汇总 1503 科目净额，回写 G8-1 期末账项调整 */
 export function aggregateG8AdjustmentWriteback(
   rows: G8AdjustmentEntryLike[],

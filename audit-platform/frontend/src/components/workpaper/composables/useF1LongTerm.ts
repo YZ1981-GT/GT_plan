@@ -216,7 +216,7 @@ export function buildSuggestedAdjustmentRows(ltRows: LongTermRow[]): Array<{
   return out
 }
 
-function mergeSuggestedIntoAje(
+export function mergeSuggestedIntoAje(
   existingJson: string | null | undefined,
   suggested: ReturnType<typeof buildSuggestedAdjustmentRows>,
 ): string {
@@ -239,7 +239,7 @@ function mergeSuggestedIntoAje(
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useF1LongTerm(options: UseF1LongTermOptions) {
-  const { allResponses, debouncedSave, isReadonly } = options
+  const { allResponses, debouncedSave, saveImmediate, isReadonly } = options
 
   const rows = ref<LongTermRow[]>([])
 
@@ -326,7 +326,7 @@ export function useF1LongTerm(options: UseF1LongTermOptions) {
   )
 
   /** 将减值/重分类拟调整合并写入 F1-3（F1-aje-rows），并 emit adjustment:created */
-  function pushSuggestedAdjustmentsToF13(): number {
+  async function pushSuggestedAdjustmentsToF13(): Promise<number> {
     if (isReadonly.value) return 0
     const suggested = buildSuggestedAdjustmentRows(rows.value)
     if (suggested.length === 0) return 0
@@ -343,7 +343,7 @@ export function useF1LongTerm(options: UseF1LongTermOptions) {
     const after = JSON.parse(merged) as any[]
     const added = after.length - beforeCount
     if (added <= 0) return 0
-    debouncedSave('F1-aje-rows', { remark: merged })
+    await saveImmediate('F1-aje-rows', { remark: merged })
     for (const row of after.slice(beforeCount)) {
       try {
         window.dispatchEvent(

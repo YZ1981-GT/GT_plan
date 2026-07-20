@@ -8,7 +8,7 @@
  * 展示每张底稿的复核发现：通过/未通过徽章、发现项数、风险等级分布。
  * 支持批量复核、单底稿展开、Excel 导出。
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useReviewPanel } from './useReviewPanel'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 
@@ -30,12 +30,33 @@ const {
   progress,
   expandedSheet,
   startBatchReview,
+  reviewCurrentSheet,
   exportReviewExcel,
   toggleSheet,
   updateFindingStatus,
 } = useReviewPanel(props.projectId, props.wpCodePrefix, props.year)
 
+defineExpose({
+  reviewCurrentSheet,
+  startBatchReview,
+})
+
 const { currentRole } = usePermissionMatrix()
+
+/** 筛选：全部 / 仅底稿级 / 仅降级（科目级+通用） */
+const sourceFilter = ref<'all' | 'sheet' | 'fallback'>('all')
+
+const filteredSheets = computed(() => {
+  if (sourceFilter.value === 'all') return sheets.value
+  if (sourceFilter.value === 'sheet') {
+    return sheets.value.filter((s) => s.promptSource === 'sheet')
+  }
+  return sheets.value.filter((s) => s.promptSource === 'subject' || s.promptSource === 'base')
+})
+
+const fallbackCount = computed(() =>
+  sheets.value.filter((s) => s.promptSource === 'subject' || s.promptSource === 'base').length,
+)
 
 /** 批量复核按钮可见性：现场经理/业务合伙人/QC合伙人 */
 const canStartReview = computed(() => {
@@ -88,6 +109,25 @@ function getRiskLabel(level: string): string {
     default: return '未知'
   }
 }
+
+/** 提示词来源标签 */
+function getPromptSourceLabel(source?: string): string {
+  switch (source) {
+    case 'sheet': return '底稿级'
+    case 'subject': return '科目级'
+    case 'base': return '通用'
+    default: return ''
+  }
+}
+
+function getPromptSourceTagType(source?: string): string {
+  switch (source) {
+    case 'sheet': return 'success'
+    case 'subject': return 'warning'
+    case 'base': return 'info'
+    default: return 'info'
+  }
+}
 </script>
 
 <template>
@@ -108,6 +148,18 @@ function getRiskLabel(level: string): string {
       >
         导出Excel
       </el-button>
+      <el-radio-group
+        v-if="sheets.length > 0"
+        v-model="sourceFilter"
+        size="small"
+        class="review-panel__filter"
+      >
+        <el-radio-button value="all">全部</el-radio-button>
+        <el-radio-button value="sheet">底稿级</el-radio-button>
+        <el-radio-button value="fallback">
+          降级{{ fallbackCount > 0 ? `(${fallbackCount})` : '' }}
+        </el-radio-button>
+      </el-radio-group>
     </div>
 
     <!-- 复核汇总统计 -->
@@ -116,6 +168,7 @@ function getRiskLabel(level: string): string {
       <el-statistic title="通过" :value="sheets.filter(s => s.passStatus === 'pass').length" />
       <el-statistic title="未通过" :value="sheets.filter(s => s.passStatus === 'fail').length" />
       <el-statistic title="总发现项" :value="sheets.reduce((sum, s) => sum + s.findingCount, 0)" />
+      <el-statistic title="降级提示词" :value="fallbackCount" />
     </div>
 
     <!-- 复核进度 -->
@@ -132,16 +185,24 @@ function getRiskLabel(level: string): string {
     </div>
 
     <!-- 底稿卡片列表 -->
-    <div v-if="sheets.length > 0" class="review-panel__sheets">
+    <div v-if="filteredSheets.length > 0" class="review-panel__sheets">
       <el-collapse v-model="expandedSheet" accordion>
         <el-collapse-item
-          v-for="sheet in sheets"
+          v-for="sheet in filteredSheets"
           :key="sheet.sheetName"
           :name="sheet.sheetName"
         >
           <template #title>
             <div class="review-card__header">
               <span class="review-card__name">{{ sheet.sheetName }}</span>
+              <el-tag
+                v-if="sheet.promptSource"
+                :type="getPromptSourceTagType(sheet.promptSource)"
+                size="small"
+                effect="plain"
+              >
+                {{ getPromptSourceLabel(sheet.promptSource) }}
+              </el-tag>
               <el-tag
                 :type="getPassBadgeType(sheet.passStatus)"
                 size="small"
@@ -227,9 +288,14 @@ function getRiskLabel(level: string): string {
 
     <!-- 无数据 -->
     <el-empty
-      v-else-if="!isReviewing"
-      description="暂无复核结果，点击"开始批量复核"启动"
+      v-else-if="!isReviewing && sheets.length === 0"
+      description='暂无复核结果，点击"开始批量复核"启动'
       :image-size="100"
+    />
+    <el-empty
+      v-else-if="!isReviewing && filteredSheets.length === 0"
+      description="当前筛选条件下无底稿"
+      :image-size="80"
     />
   </div>
 </template>
@@ -243,6 +309,12 @@ function getRiskLabel(level: string): string {
   display: flex;
   gap: 12px;
   margin-bottom: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.review-panel__filter {
+  margin-left: auto;
 }
 
 .review-panel__summary {

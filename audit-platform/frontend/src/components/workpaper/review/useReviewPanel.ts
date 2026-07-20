@@ -22,10 +22,11 @@ export interface ReviewFinding {
 export interface SheetReviewCard {
   sheetName: string
   wpId: string
-  passStatus: 'pass' | 'fail' | 'pending' | 'review_error'
+  passStatus: 'pass' | 'fail' | 'pending' | 'review_error' | 'manual_review_required'
   findingCount: number
   riskDistribution: { high: number; medium: number; low: number }
   findings: ReviewFinding[]
+  promptSource?: 'sheet' | 'subject' | 'base'
 }
 
 export interface ReviewProgress {
@@ -73,6 +74,68 @@ export interface BatchReviewResult {
   }
 }
 
+export interface SingleReviewResult {
+  findings: ReviewFinding[]
+  overall_pass: boolean
+  risk_summary: Record<string, number>
+  sheet_info: {
+    wp_id: string
+    wp_code: string
+    sheet_name: string | null
+    prompt_source: 'sheet' | 'subject' | 'base'
+  }
+}
+
+function mapResultToCard(
+  r: BatchReviewResult['results'][number],
+): SheetReviewCard {
+  return {
+    sheetName: r.sheet_name,
+    wpId: r.wp_id,
+    passStatus: r.pass_status as SheetReviewCard['passStatus'],
+    findingCount: r.findings.length,
+    riskDistribution: {
+      high: r.risk_summary?.high ?? 0,
+      medium: r.risk_summary?.medium ?? 0,
+      low: r.risk_summary?.low ?? 0,
+    },
+    findings: r.findings,
+    promptSource: r.prompt_source as SheetReviewCard['promptSource'],
+  }
+}
+
+function mapSingleToCard(
+  wpId: string,
+  sheetName: string,
+  data: SingleReviewResult,
+): SheetReviewCard {
+  const passStatus = data.overall_pass
+    ? 'pass'
+    : 'fail'
+  return {
+    sheetName: sheetName,
+    wpId: wpId,
+    passStatus,
+    findingCount: data.findings.length,
+    riskDistribution: {
+      high: data.risk_summary?.high ?? 0,
+      medium: data.risk_summary?.medium ?? 0,
+      low: data.risk_summary?.low ?? 0,
+    },
+    findings: data.findings,
+    promptSource: data.sheet_info.prompt_source,
+  }
+}
+
+function upsertSheetCard(cards: SheetReviewCard[], card: SheetReviewCard): void {
+  const idx = cards.findIndex((s) => s.sheetName === card.sheetName)
+  if (idx >= 0) {
+    cards[idx] = card
+  } else {
+    cards.unshift(card)
+  }
+}
+
 export function useReviewPanel(projectId: string, wpCodePrefix: string, year: number) {
   const sheets = ref<SheetReviewCard[]>([])
   const isReviewing = ref(false)
@@ -97,9 +160,9 @@ export function useReviewPanel(projectId: string, wpCodePrefix: string, year: nu
     progress.total = 0
     progress.currentSheet = '准备中...'
 
-    // 进度轮询（每3秒检查一次）
     let progressTimer: ReturnType<typeof setInterval> | null = null
     const sessionIdForProgress = crypto.randomUUID?.() || `${Date.now()}`
+
     progressTimer = setInterval(async () => {
       try {
         const { data: prog } = await http.get(
@@ -114,28 +177,20 @@ export function useReviewPanel(projectId: string, wpCodePrefix: string, year: nu
       } catch {
         // 轮询失败不阻断
       }
-    }, 3000)
+    }, 1500)
 
     try {
       const { data } = await http.post<BatchReviewResult>(
         `/api/projects/${projectId}/batch-review`,
-        { wp_code_prefix: wpCodePrefix, year },
+        {
+          wp_code_prefix: wpCodePrefix,
+          year,
+          progress_session_id: sessionIdForProgress,
+        },
       )
 
       if (data) {
-        // 将后端返回结果转为前端卡片数据
-        sheets.value = data.results.map((r) => ({
-          sheetName: r.sheet_name,
-          wpId: r.wp_id,
-          passStatus: r.pass_status as SheetReviewCard['passStatus'],
-          findingCount: r.findings.length,
-          riskDistribution: {
-            high: r.risk_summary?.high ?? 0,
-            medium: r.risk_summary?.medium ?? 0,
-            low: r.risk_summary?.low ?? 0,
-          },
-          findings: r.findings,
-        }))
+        sheets.value = data.results.map(mapResultToCard)
         progress.current = data.statistics.total_sheets
         progress.total = data.statistics.total_sheets
         progress.currentSheet = '完成'
@@ -156,17 +211,52 @@ export function useReviewPanel(projectId: string, wpCodePrefix: string, year: nu
   }
 
   /**
-   * 单底稿复核
+   * 单底稿复核（API 调用）
    */
-  async function reviewSingleSheet(wpId: string, sheetName: string) {
+  async function reviewSingleSheet(wpId: string, sheetName: string): Promise<SingleReviewResult | null> {
     try {
-      const { data } = await http.post(`/api/workpapers/${wpId}/review`, {
+      const { data } = await http.post<SingleReviewResult>(`/api/workpapers/${wpId}/review`, {
         sheet_name: sheetName,
       })
       return data
     } catch (err: any) {
       ElMessage.error(err?.response?.data?.detail || '复核失败')
       return null
+    }
+  }
+
+  /**
+   * 复核当前页并更新面板卡片
+   */
+  async function reviewCurrentSheet(wpId: string, sheetName: string): Promise<SingleReviewResult | null> {
+    if (isReviewing.value) {
+      ElMessage.warning('复核正在进行中，请稍候')
+      return null
+    }
+    if (!sheetName) {
+      ElMessage.warning('当前页无有效 sheet 名称')
+      return null
+    }
+
+    isReviewing.value = true
+    progress.currentSheet = sheetName
+    try {
+      const data = await reviewSingleSheet(wpId, sheetName)
+      if (data) {
+        const card = mapSingleToCard(wpId, sheetName, data)
+        upsertSheetCard(sheets.value, card)
+        expandedSheet.value = sheetName
+        const srcLabel = data.sheet_info.prompt_source === 'sheet'
+          ? '底稿级'
+          : data.sheet_info.prompt_source === 'subject'
+            ? '科目级(降级)'
+            : '通用模板(降级)'
+        ElMessage.success(`本页复核完成（${srcLabel}）：${data.overall_pass ? '通过' : '未通过'}`)
+      }
+      return data
+    } finally {
+      isReviewing.value = false
+      progress.currentSheet = ''
     }
   }
 
@@ -203,7 +293,6 @@ export function useReviewPanel(projectId: string, wpCodePrefix: string, year: nu
   async function updateFindingStatus(findingId: string, status: FindingStatus) {
     try {
       await http.patch(`/api/review-findings/${findingId}/status`, { status })
-      // Update local state
       for (const sheet of sheets.value) {
         const finding = sheet.findings.find(f => f.id === findingId)
         if (finding) {
@@ -218,15 +307,13 @@ export function useReviewPanel(projectId: string, wpCodePrefix: string, year: nu
   }
 
   return {
-    // 状态
     sheets,
     isReviewing,
     progress,
     expandedSheet,
-
-    // 方法
     startBatchReview,
     reviewSingleSheet,
+    reviewCurrentSheet,
     exportReviewExcel,
     toggleSheet,
     updateFindingStatus,

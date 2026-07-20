@@ -1,7 +1,12 @@
 """G9 其他非流动金融资产 — AI 辅助端点.
 
 POST /api/workpapers/{wp_id}/g9/ai/{section}
-sections: adjudication-analysis / fair-value-conclusion / l3-reconciliation-conclusion / voucher-conclusion
+sections: adjudication-analysis / adjudication-conclusion /
+          detail-note / detail-conclusion / adjustment-note / adjustment-conclusion /
+          fair-value-conclusion / fair-value-note /
+          l3-reconciliation-conclusion / l3-note /
+          voucher-conclusion / voucher-note /
+          disclosure-note / disclosure-conclusion / disclosure-section
 """
 
 from __future__ import annotations
@@ -28,9 +33,19 @@ _SYSTEM = """你是一位资深注册会计师，协助编制 G9《其他非流�
 
 _PROMPTS = {
     "adjudication-analysis": "请生成 G9-1 审定表审计说明，按 FVTPL/FVOCI/摊余成本分组分析期初期末变动。",
+    "adjudication-conclusion": "请根据 G9-1 审定表，按 A/B/C 口径生成总体审计结论。",
+    "detail-note": "请根据 G9-2 明细表，生成审计说明：概述明细核对、分类计量恰当性、与 G9-1 勾稽及拟调整事项。",
+    "detail-conclusion": "请根据 G9-2 明细表，按 A/B/C 口径生成审计结论。",
+    "adjustment-note": "请根据 G9-3 调整分录，生成审计说明：概述调整依据、借贷平衡及回写审定表影响。",
+    "adjustment-conclusion": "请根据 G9-3 调整分录，按 A/B/C 口径生成审计结论。",
     "fair-value-conclusion": "请根据 G9-4 公允价值测试表，生成公允价值计量审计结论。",
+    "fair-value-note": "请根据 G9-4 公允价值测试表，生成审计说明：概述取数来源、层次划分、估值技术与不可观察输入值核对及差异分析。",
     "l3-reconciliation-conclusion": "请根据 G9-5 第三层次调节表 10 因子变动分析，生成 L3 审计结论。",
-    "voucher-conclusion": "请根据 G9-6 凭证检查表异常样本，生成凭证测试结论。",
+    "l3-note": "请根据 G9-5 第三层次调节表，生成审计说明：概述十因子取数、层次转入转出原因、公式期末与企业报告勾稽、仍持有未实现及披露恰当性。",
+    "voucher-conclusion": "请根据 G9-6 凭证检查表异常样本与抽样覆盖情况，生成凭证测试结论（含对存在/计价等认定的影响）。",
+    "voucher-note": "请根据 G9-6 凭证检查表，生成审计说明：概述抽样方法与样本量、六项核对（原始/授权/账务/分类/公允价值/减值）执行情况、异常与跨期处理。",
+    "disclosure-note": "请根据 G9 附注披露核对结果，生成审计说明：概述披露完整性、列报格式及与审定数勾稽。",
+    "disclosure-conclusion": "请根据 G9 附注披露核对结果，按 A/B/C 口径生成审计结论。",
     "disclosure-section": "请为 G9 附注披露单行项目生成专业附注文本（科目1504其他非流动金融资产）。",
 }
 
@@ -78,5 +93,5 @@ async def generate_g9_ai(
         )
     except Exception as e:  # noqa: BLE001
         logger.warning("G9 AI %s failed: %s", section, e)
-        content = f"【G9 {section} 审计结论占位】请结合 G9 底稿数据补充专业结论。（AI 暂不可用）"
-    return G9AiGenerateResponse(content=content or "", sources=[f"g9/{section}"])
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    return G9AiGenerateResponse(content=content or "")

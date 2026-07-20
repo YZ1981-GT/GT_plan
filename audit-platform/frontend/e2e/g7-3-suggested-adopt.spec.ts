@@ -2,8 +2,9 @@
  * G7-3 建议草稿：落库 → 打开 → 采纳 → sourceKind 清除
  */
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
+import { findWorkpaper, TEST_PROJECT_ID } from './fixtures/ensure-test-project'
 
-const PROJECT_ID = process.env.E2E_PROJECT_ID || '0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49'
+const PROJECT_ID = process.env.E2E_PROJECT_ID || TEST_PROJECT_ID
 const ROWS_KEY = 'G7-3-rows'
 const MARKER = `G73-ADOPT-${Date.now()}`
 const SOURCE_KIND = 'g7-14-suggested'
@@ -32,23 +33,9 @@ async function resolveG7MainWpId(request: APIRequestContext, token: string): Pro
   const envWp = process.env.E2E_G7_MAIN_WP_ID || process.env.E2E_G7_WP_ID
   if (envWp) return envWp
 
-  const res = await request.get(`/api/projects/${PROJECT_ID}/workpapers`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  expect(res.ok(), '项目底稿列表应成功').toBeTruthy()
-  const body = await res.json()
-  const data = body?.data ?? body
-  const list = Array.isArray(data) ? data : (data?.items ?? data?.workpapers ?? [])
-  const hit = list.find((w: any) => {
-    const code = String(w.wp_code ?? w.code ?? w.index_code ?? '')
-    const name = String(w.name ?? w.sheet_name ?? w.title ?? w.wp_name ?? '')
-    const ctype = String(w.component_type ?? w.componentType ?? '')
-    return ctype.includes('g7-long-term-equity-main')
-      || (code === 'G7' && !/权益法|子公司/.test(name))
-      || /调整分录汇总|长期股权投资主/.test(name)
-  })
-  expect(hit?.id || hit?.wp_id, '应找到 G7 主表底稿').toBeTruthy()
-  return String(hit.id ?? hit.wp_id)
+  const hit = await findWorkpaper(request, token, 'G7', PROJECT_ID)
+  expect(hit.wpId, '应找到 G7 主表底稿').toBeTruthy()
+  return hit.wpId!
 }
 
 async function checklistItem(
@@ -79,12 +66,12 @@ function parseRows(item: any): any[] {
 }
 
 async function openG73(page: Page) {
-  const card = page.locator('.gt-b-arch__card').filter({ hasText: /G7-3|调整分录/ }).first()
+  const card = page.locator('.gt-b-arch__card').filter({ hasText: /G7-3/ }).first()
   if (await card.isVisible({ timeout: 8000 }).catch(() => false)) {
     await card.scrollIntoViewIfNeeded()
     await card.click()
   } else {
-    const tab = page.locator('.gt-wp-renderer__sheet-tabs-inner [role="tab"]').filter({ hasText: /G7-3|调整分录/ })
+    const tab = page.locator('.gt-wp-renderer__sheet-tabs-inner [role="tab"]').filter({ hasText: /G7-3/ })
     await expect(tab.first(), 'G7-3 tab 应可见').toBeVisible({ timeout: 30_000 })
     await tab.first().click()
   }
@@ -148,7 +135,13 @@ test.describe('G7-3 建议草稿采纳', () => {
       },
     ]
 
-    await request.put(`/api/workpapers/${wpId}/checklist-responses`, {
+    await page.goto(
+      `/projects/${PROJECT_ID}/workpapers/${wpId}/edit?sheet=${encodeURIComponent('调整分录汇总G7-3')}`,
+      { waitUntil: 'domcontentloaded' },
+    )
+    await openG73(page)
+
+    const putRes = await request.put(`/api/workpapers/${wpId}/checklist-responses`, {
       headers: { Authorization: `Bearer ${token}` },
       data: {
         project_id: PROJECT_ID,
@@ -157,16 +150,23 @@ test.describe('G7-3 建议草稿采纳', () => {
         ],
       },
     })
+    expect(putRes.ok(), `PUT 应成功 status=${putRes.status()}`).toBeTruthy()
 
-    await page.goto(
-      `/projects/${PROJECT_ID}/workpapers/${wpId}/edit?g73=${encodeURIComponent(MARKER)}`,
-      { waitUntil: 'domcontentloaded' },
-    )
+    await expect.poll(async () => {
+      const rows = parseRows(await checklistItem(request, token, wpId, ROWS_KEY))
+      return rows.filter(r => String(r.description || '').includes(MARKER)).length
+    }, { timeout: 10_000 }).toBe(3)
+
+    await page.reload({ waitUntil: 'domcontentloaded' })
     await openG73(page)
 
     const root = page.locator('.g7-tab-adjustment')
-    await expect(root.getByRole('button', { name: /采纳全部建议/ })).toBeVisible({ timeout: 15_000 })
-    await expect(root.locator('.draft-tag').filter({ hasText: /G7-14|建议/ }).first()).toBeVisible()
+    await expect.poll(async () => {
+      const text = await root.innerText()
+      return text.includes(`${MARKER}-建议借`) && text.includes(`${MARKER}-建议贷`)
+    }, { timeout: 20_000 }).toBeTruthy()
+    await expect(root.getByRole('button', { name: /采纳全部建议 \(2\)/ })).toBeVisible({ timeout: 15_000 })
+    await expect(root.locator('.draft-tag').filter({ hasText: /G7-14建议/ }).first()).toBeVisible()
 
     // 建议行借贷应为只读（无 input-number）
     const sugRow = root.locator('.el-table__body tr').filter({ hasText: `${MARKER}-建议借` }).first()

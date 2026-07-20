@@ -101,7 +101,7 @@ test.describe('G8 其他权益工具投资 — HTML 页面冒烟', () => {
 })
 
 test.describe('G8 导入 round-trip（API）', () => {
-  for (const sheet of ['G8-2', 'G8-3', 'G8-4', 'G8-6'] as const) {
+  for (const sheet of ['G8-2', 'G8-3', 'G8-4', 'G8-5', 'G8-6'] as const) {
     test(`${sheet} — export-template → import-data`, async ({ request }) => {
       test.setTimeout(60_000)
       const token = await getToken(request)
