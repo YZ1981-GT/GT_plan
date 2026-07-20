@@ -284,6 +284,10 @@ def register_system_routers(app: FastAPI) -> None:
     # rotation_router 内部 prefix="/rotation"，需补 /api 前缀 → /api/rotation/*
     app.include_router(rotation_router, prefix="/api")
 
+    # ═══ §136. review-prompt-sheet-level-split: 底稿级复核提示词 ═══
+    from app.routers.review_prompt import router as review_prompt_router
+    app.include_router(review_prompt_router, tags=["review-prompt"])
+
     # ═══ §131. platform-linkage-contract-stale P0-3: 路由解析 ═══
     from app.routers.linkage_resolve import router as linkage_resolve_router
     app.include_router(linkage_resolve_router, tags=["linkage"])

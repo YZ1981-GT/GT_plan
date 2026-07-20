@@ -12,6 +12,15 @@
           :options="renderModeOptions"
           size="small"
         />
+        <el-button
+          v-if="canStartAiReview"
+          size="small"
+          type="primary"
+          plain
+          @click="reviewDialogVisible = true"
+        >
+          批量AI复核
+        </el-button>
         <el-tag v-if="saving" type="info" size="small">保存中…</el-tag>
       </div>
 
@@ -219,6 +228,15 @@
       :section-id="d2ReviewSection.id"
       :section-label="d2ReviewSection.label"
     />
+
+    <!-- AI 批量复核面板 -->
+    <el-dialog v-model="reviewDialogVisible" title="D2 应收账款 AI 批量复核" width="900px" :destroy-on-close="true">
+      <ReviewPanel
+        :project-id="props.projectId"
+        wp-code-prefix="D2"
+        :year="props.year || new Date().getFullYear()"
+      />
+    </el-dialog>
   </div>
 </template>
 
@@ -227,6 +245,7 @@
  * GtD2AccountsReceivable.vue — D2 应收账款底稿主入口
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, toRef, defineAsyncComponent } from 'vue'
+import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { useD2FormData, type ChecklistResponse } from './composables/useD2FormData'
 import { useD2CrossSheet } from './composables/useD2CrossSheet'
 import { useD2EntryDualMode, type D2RenderMode } from './composables/useD2EntryDualMode'
@@ -253,6 +272,7 @@ const D2TabWriteoffCheck = defineAsyncComponent(() => import('./d2/D2TabWriteoff
 const D2TabPledgeCheck = defineAsyncComponent(() => import('./d2/D2TabPledgeCheck.vue'))
 const D2TabBizModel = defineAsyncComponent(() => import('./d2/D2TabBizModel.vue'))
 const D2TabCutoff = defineAsyncComponent(() => import('./d2/D2TabCutoff.vue'))
+const ReviewPanel = defineAsyncComponent(() => import('./review/ReviewPanel.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -272,6 +292,13 @@ const emit = defineEmits<{
 
 const isReadonly = computed(() => !!props.readonly)
 const runtime = inject(WorkpaperRuntimeContextKey, null)
+
+const { currentRole } = usePermissionMatrix()
+const reviewDialogVisible = ref(false)
+const canStartAiReview = computed(() => {
+  const allowedRoles = ['manager', 'partner', 'qc', 'admin']
+  return allowedRoles.includes(currentRole.value)
+})
 
 const formData = useD2FormData(toRef(props, 'wpId'), toRef(props, 'projectId'))
 const allResponses = computed(() => formData.allResponses.value)

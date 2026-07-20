@@ -20,6 +20,34 @@ inclusion: always
 - **🔴 D~N底稿跨模块联动标准（6大集成）**：①版本链(useVersionTrail主入口集成+autoSnapshot) ②抽凭引擎(检查表GtVoucherSamplingEngine dialog→样本填入) ③截止自动提取(useCutoffAutoSampling→序时账±5天) ④附注EventBus(subscribe substantive:adjudicated刷新+publish disclosure:note-text-updated) ⑤行级OCR(📎列POST contract-ocr→ElMessageBox确认→merge) ⑥复核对话(主入口provide openReviewDialog→子组件inject→section标题栏右侧按钮)
 - **不要考虑轻量**：要考虑针对性、联动性、美观性、实操性、易懂性；审计UI要有逻辑追溯能力
 - **🔴 G4复盘改进方向（业务层）**：①附注自动从审定表/明细表抓数(EventBus不够,需主动拉取) ②G4-4利率合理性校验(effectiveRate与couponRate差>200bp告警+IRR反推) ③到期日预警+逾期检测(关联ECL Stage升级信号) ④跨底稿勾稽面板(G4-1↔G4-2合计/G4-ecl减值↔G4-1减值小计) ⑤截止测试改为跨期利息检查(非序时账模式)
+- **✅ F2存货复盘收尾(2026-07-20)**：P0科目1412/1471+`f2AccountModel`；F提示词102张；F2-29~35弹窗全接入`useVoucherCheckDialog`；F2-35表三OCR(`useF2SubcontractOcr`合同/加工费两组📎)；F2-14`confirmAndSync`；E2E 5/5含OCR入口+`findWorkpaper`分页+FIX-F seed F2-29。未commit。
+- **✅ 附注→G7披露表跳转(2026-07-20)**：DisclosureEditor 对五、18/八、18/七、* 显示「跳转至披露表」；优先 last_sync_wp+sheet，否则 ACNR 解析 G7 打开上市/国企披露 sheet。`noteDisclosureJump` 单测。未commit。
+- **✅ G7披露↔附注联动(上市+国企,2026-07-20)**：披露tab加`Note:`/`wp:G7-*`溯源芯片；事件补`projectId`/`sectionIds`；DisclosureEditor订阅`disclosure:note-text-updated`刷新当前节+「打开同步底稿」(last_sync_wp_id)。仍单向底稿→附注。未commit。
+- **✅ G7披露增强(不改表结构,2026-07-20)**：叙述空位草稿G7-4/6/7/10/12/17；同控/非同控补G7-5收入利润现金流(全期代理)；上市/国企少数股东损益权益=G7-5×NCI%(股利仍手填)；`parseG77`补全。vitest13绿。未commit。
+- **✅ G7上市披露少数股东跨表(2026-07-20)**：源模板无同控/非同控合并表；接G7-4→`important-minority-subsidiaries`、G7-5→`minority-closing/opening/results`；截断容量5。与国企P0并列。未commit。
+- **✅ G7国企披露跨表P0(2026-07-20)**：`g7DisclosureCrossSheet`接G7-8同控/G7-9非同控→`common-control-combination`/`non-common-control-combination`+叙述`common-control-basis`/`non-common-control-notes`；G7-4非全资→少数股东表；G7-5矩阵→`minority-financials`+出售日FS(position/results)；SOE refresh传`texts`；htmlData兜底g78/g79；截断提示含少数/出售列容量。vitest披露单测绿。未commit。
+- **🟡→✅ G7长期股权投资三组复盘修复(2026-07-20)**：P0①G7-17统一写读`G7-17-rows`+section双写+hydrate(兼容旧`G7-17-impairment-test`) ②G7-1仅保存后`writebackTb:true`才回写TB(禁mount) ③G7-18行落库+字段对齐后端+抽凭1511+IE ④G7-11可编辑+公式+IE。P1⑤AI读`content` ⑥G7-14全部带入含G7-6(`applyG76PolicyToG714Payload`) ⑦目录挂载G7TabDirectory ⑧TB优先htmlData.tb_values ⑨G7-10/12导入hydrate+IE。**G7-17续修**：IE+关联带入+可收回公式MAX+tips/事件；前端vitest85+后端23 pass。**Playwright实测通过**(重药安徽0ec33ac9/wp 65052ba7：迹象=是→公允75k/使用82k→可收回82k+减值18k落库+刷新回显+导出200；顺手修script-setup非法export)。未commit。
+- **✅ G7-18凭证检查复盘加固(2026-07-20)**：①`onAfterSave→scheduleAutoSnapshot`接版本链 ②AI `relatedContext`含异常/借贷/平衡/比例 ③样本选取+检查比例表(`G7-18-criteria`) ④Playwright round-trip通过(0ec33ac9/wp65052ba7: PUT→刷新共2行异常1+导出200)。vitest34绿。未commit。
+- **✅ G7-12一揽子处置复盘加固(2026-07-20)**：①版本链onAfterSave ②consol linkage别名`lossOfControlDate/transactionPrice` ③各次交易明细steps+累计回写+盈余公积比例可配+编制提示 ④IE「各次交易明细」sheet ⑤Playwright round-trip。vitest5+consol单测绿。未commit。
+- **✅ G7-8同控初始计量复盘加固(2026-07-20)**：①版本链onAfterSave ②merger/step补`acquisitionDate`+IE列 ③`isSameControlDifferenceLarge`橙色高亮 ④consol分步汇总累计初始成本⑤+合并日回填info ⑤Playwright round-trip。vitest27+consol/IE单测绿。未commit。
+- **✅ G7-5四项加固(2026-07-20)**：①consol `_aggregate_g75_financial`按公司汇总净利润/净资产（已审优先，结构化`_g7_g7_5`）②未审/待确认汇总告警条③上年金额滚存（可清空本年）④多户真虚拟滚动。vitest+consol单测。未commit。
+- **✅ review-prompt-sheet-level-split 全部完成+二轮增强(2026-07-20,42/42+10+13改进)**：D2试点10张底稿级提示词(YAML front-matter版本化v1.0.0)+ReviewPromptService(三级降级+version解析)+LlmResponseParser(JSON优先→checklist降级+定位/建议解析)+BatchReviewService(容错续行+progress_callback)+HTTP路由7端点(单底稿/批量/导出从DB读/覆盖率/进度轮询/Finding状态PATCH/metrics监控)+并发锁409+temperature=0.1+Few-shot 3示例+前端ReviewPanel(挂载GtD2 el-dialog+汇总统计el-statistic+Finding状态el-select+navigate-sheet跳转emit)+generate_sheet_prompts.py(--from-source自动抽取)+check_review_prompt_coverage.py CI守卫+27测试全绿。未commit。
+- **✅ G7-5财务信息复盘加固(2026-07-20)**：①版本链onAfterSave ②工具栏IE+导入hydrate ③`g7FinancialInfoModel`变动额/率+异常变动/缺关键项目校验 ④IE变动率百分数往返 ⑤Playwright round-trip。vitest6绿。未commit。
+- **✅ G7-16未确认损失修复(2026-07-20)**：扁平`G7-16-rows`+conclusion双写(IE可读)/`load_json_rows`解包`.rows`/真接ImportExport/未确认MAX(0)+本期变动=期末−上期累计/priorCumulative列/emit披露事件/AI section `unrecognized-loss-conclusion`+本地降级/从G7-4·G7-14带入。未commit。
+- **✅ G7-16增强二轮(2026-07-20)**：CAS2瀑布自动分配(投资→长应收→其他权益,预计负债手工)+校验告警(冲减超账面/合计超超额)+利润恢复反序提示+本期变动手工覆盖+行级索引chip+从G7-5带累计亏损代理+同步至G7-14(otherAdj)+G7-14下拉接g716/g76+`g7UnrecognizedLossModel.ts`单测。未commit。
+- **✅ G7-16增强三轮(2026-07-20)**：consol结构化映射(`_g7_unrecognized_loss`等)+G7-14透传otherAdj/内部交易/政策调整+G7-15/16专用分支+`build_g716_suggestions`+合并UI建议含G7-16；后端IE补investeeId/手工标志+`_normalize_g7_16_rows_import`瀑布重算。未commit。
+- **✅ G7-16增强四轮(2026-07-20)**：反序恢复一键+固化期初`G7-16-opening-rows`带入prior+长应收关联字段带入；`otherAdjFromG716`累加不覆盖；consol备查表展示G7-16元数据；AI行级上下文；IE旧模板兼容说明；E2E冒烟。未commit。
+- **✅ G7-16增强五轮(2026-07-20)**：`equity_method_service` CAS2§44容量含长应收/其他权益+`calc_cas2_excess_loss`与G7-16瀑布对齐+API透传g716字段；G5-2实质净投资长应收跨循环带入(+TB1531降级)；E2E加强。未commit。
+- **✅ G7-13投资成本测试修复(2026-07-20)**：扁平`G7-13-rows`+remark信封；行内`investeeId`/`investmentRatio`；真接IE+导入重算；从G7-4带入；AI `cost-test-conclusion`；同步至G7-14(正差额商誉/负差额廉价购买备查)；consol结构化`_g7_difference`等+建议草稿；IE补ID/比例列+表头名映射兼容旧模板。未commit。
+- **✅ G7-13增强二轮(2026-07-20)**：从G7-5带净资产代理(空值才填)+行级校验告警+负差额同步后廉价购买闭环(可推送借1511/贷6301建议AJE至G7-3，sourceKind隔离)+`mergeSuggestedIntoG73`按本次sourceKind替换+E2E API round-trip。未commit。
+- **✅ G7-13增强三轮(2026-07-20)**：行级`wp:G7-13#seq`索引chip+证据索引chip；调整后享有份额公式化(=调整后净资产×比例，前后端导入权威重算)。未commit。
+- **✅ G7-14复盘收口(2026-07-20)**：AI改`existingContent`+`relatedContext`；G7-6 `resolveG714PayloadFromChecklist`+双写；G7-16→14 vitest。前端36+后端30绿。未commit。
+- **✅ G7-14改进逐项(2026-07-20)**：①外推统一`resolveG714PayloadFromChecklist`+`buildG714DualWriteItems`(G7-6/15/16/17) ②修G7-16 ROWS整页JSON污染 ③AI本地降级结论 ④Tab4 consol skip明示 ⑤G7-14 `onAfterSave→scheduleAutoSnapshot` ⑥文案对齐。单测40绿；API双写ok；Playwright增行+reload回显通过。未commit。
+- **✅ G7-10复盘修复(2026-07-20)**：AI读`content`+改catch文案；`pickBookValueFromG710`匹配`companyName`+剩余账面①×(1−③/②)；子表`onAfterSave→scheduleAutoSnapshot`；IE写`{rows,materialityLevel}`保留重要性。前端47测绿。未commit。
+- **✅ G7-9复盘修复(2026-07-20)**：①保存硬拦对齐`prepare_g7_9_rows`(廉价购买/一揽子/反向不构成业务) ②`onAfterSave→scheduleAutoSnapshot` ③AI prompt费用化+本地结论降级 ④consol分步汇总建议/`add_cost` ⑤披露源含`G7-9-rows` ⑥G7-10「从G7-9带入」股利名单+持股。未commit。
+- **✅ G7-6复盘修复(2026-07-20)**：①`onAfterSave→scheduleAutoSnapshot` ②`applyG76`只累加「不一致」+零金额跳过防覆盖 ③IE扁平行↔`{groups,rows}` ④AI `accounting-policy-conclusion`+本地降级 ⑤consol聚合`_g7_g7_6_policy_adj` ⑥披露源含`G7-6-rows` ⑦mapping名称纠偏。未commit。
+- **✅ G7-6增强二轮(2026-07-20)**：披露上市/国企从G7-6生成政策差异叙述；G7-4版本链；debounce拦「不一致无说明」；「保存并同步G7-14」；consol `accounting_policy_adj`建议。未commit。
+- **🔴 PG卷挂错(2026-07-20已修)**：`audit-postgres`曾挂空卷`gt_plan_pg_data`(25表无projects)；真库在`gt_workplan_pg_data`(422表/14项目)。已 remount + compose `pg_data.external→gt_workplan_pg_data`。
 - **🔴 G类开发效率改进**：①任务颗粒度压缩(PBT合并/Checkpoint去掉/验证合并,71→35) ②composable工厂化(DualMode/FormData/ImportExport参数化) ③render策略工厂化(create_cycle_render_strategy) ④并发3+stagger 5s ⑤代码预生成脚本(generate_g_cycle_spec.py)
 - **动态行新增交互**：需命名的动态行必须先弹ElMessageBox.prompt输入名称确认后再创建
 - **复杂底稿填报说明**：多步骤底稿顶部增加蓝色渐变引导区(序号步骤,2列grid)
