@@ -17,9 +17,11 @@ from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-# 科目前缀：1604在建工程（借方/资产类）
+# 科目前缀：1604在建工程 + 1605工程物资（审定表与试算核对）
+# 键名同时提供短名与 cip_1604_* / eng_mat_1605_* 别名，兼容前后端
 _H2_ACCOUNT_PREFIXES = {
-    "1604": ("cip_unadjusted", "cip_audited"),  # 在建工程
+    "1604": ("cip_unadjusted", "cip_audited"),
+    "1605": ("eng_mat_unadjusted", "eng_mat_audited"),
 }
 
 H2_SHEETS = [
@@ -47,8 +49,21 @@ H2_SHEETS = [
 ]
 
 
+def _alias_tb_keys(tb: dict[str, float]) -> dict[str, float]:
+    """补充前端常用别名键，避免 cip_unadjusted vs cip_1604_unadjusted 不一致."""
+    aliases = {
+        "cip_1604_unadjusted": tb.get("cip_unadjusted", 0.0),
+        "cip_1604_audited": tb.get("cip_audited", 0.0),
+        "eng_mat_1605_unadjusted": tb.get("eng_mat_unadjusted", 0.0),
+        "eng_mat_1605_audited": tb.get("eng_mat_audited", 0.0),
+    }
+    for k, v in aliases.items():
+        tb.setdefault(k, v)
+    return tb
+
+
 async def _fetch_tb_data(ctx: RenderContext) -> dict:
-    """取科目1604的期初/期末余额及未审数."""
+    """取科目1604/1605的期初/期末余额及未审数/审定数."""
     tb: dict[str, float] = {}
     try:
         active_filter = await get_active_filter(
@@ -65,7 +80,7 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
         )
         for row in result.fetchall():
             code = (row.account_code or "").strip()
-            for prefix, (unadj_key, audited_key) in _H2_ACCOUNT_PREFIXES.items():
+            for prefix, (unadj_key, _audited_key) in _H2_ACCOUNT_PREFIXES.items():
                 if code == prefix or code.startswith(prefix):
                     tb[f"{unadj_key}_opening"] = tb.get(f"{unadj_key}_opening", 0.0) + float(row.opening_balance or 0)
                     tb[f"{unadj_key}_closing"] = tb.get(f"{unadj_key}_closing", 0.0) + float(row.closing_balance or 0)
@@ -75,14 +90,17 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
     except Exception as e:  # noqa: BLE001
         logger.warning("H2 TB balance fetch failed: %s", e)
 
-    # 从trial_balance取未审数
+    # 从trial_balance取未审数/审定数（1604 + 1605）
     try:
         result = await ctx.db.execute(
             sa.text("""
                 SELECT standard_account_code, unadjusted_amount, audited_amount
                 FROM trial_balance
                 WHERE project_id = :pid AND year = :year AND is_deleted = false
-                  AND standard_account_code LIKE '1604%'
+                  AND (
+                    standard_account_code LIKE '1604%'
+                    OR standard_account_code LIKE '1605%'
+                  )
             """),
             {"pid": str(ctx.project_id), "year": ctx.year},
         )
@@ -96,12 +114,21 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
     except Exception as e:  # noqa: BLE001
         logger.warning("H2 trial_balance fetch failed: %s", e)
 
-    return tb
+    return _alias_tb_keys(tb)
 
 
 async def _load_project_context(ctx: RenderContext) -> dict:
-    """加载项目上下文（客户名/审计年度/适用准则）."""
-    project_ctx: dict = {}
+    """加载项目上下文（客户名/审计年度/适用准则/资产负债表日/关联方清单）."""
+    project_ctx: dict = {
+        "client_name": "",
+        "audit_year": "",
+        "business_category": "",
+        "applicable_standards": "",
+        # bs_date（资产负债表日）：供 H2-5 转固期后窗口/少计折旧 asOf、H2-13 盘点基准日等取数
+        "bs_date": "",
+        # 关联方清单：供 H2-17 关联交易检查自动识别
+        "related_parties": [],
+    }
     try:
         result = await ctx.db.execute(
             sa.text("""
@@ -118,8 +145,27 @@ async def _load_project_context(ctx: RenderContext) -> dict:
             project_ctx["audit_year"] = str(row.audit_year) if row.audit_year else ""
             project_ctx["business_category"] = row.business_category or ""
             project_ctx["applicable_standards"] = row.applicable_standards or ""
+            if row.audit_year:
+                project_ctx["bs_date"] = f"{row.audit_year}-12-31"
     except Exception as e:  # noqa: BLE001
         logger.warning("H2 project context load failed: %s", e)
+
+    # 关联方清单：从关联方登记表（related_party_registry）取项目级名单
+    try:
+        rp_rows = (
+            await ctx.db.execute(
+                sa.text(
+                    "SELECT name FROM related_party_registry "
+                    "WHERE project_id = :pid AND is_deleted = false "
+                    "AND name IS NOT NULL AND name <> ''"
+                ),
+                {"pid": str(ctx.project_id)},
+            )
+        ).fetchall()
+        project_ctx["related_parties"] = [r.name for r in rp_rows if r.name]
+    except Exception as e:  # noqa: BLE001
+        logger.warning("H2 render: related_parties 查询失败: %s", e)
+
     return project_ctx
 
 
@@ -147,7 +193,7 @@ async def render(ctx: RenderContext) -> dict | None:
 
     return {
         "component_type": "h2-construction-in-progress",
-        "account_codes": ["1604"],
+        "account_codes": ["1604", "1605"],
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
         "project_context": project_context,

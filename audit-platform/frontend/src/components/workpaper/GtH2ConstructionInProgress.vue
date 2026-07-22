@@ -36,14 +36,40 @@
         />
 
         <!-- H2A 程序表 -->
-        <CycleTabProcedure
-          v-else-if="currentSheet === 'H2A'"
-          sheet-code="H2A"
-          :html-data="props.htmlData"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :is-readonly="isReadonly"
-        />
+        <template v-else-if="currentSheet === 'H2A'">
+          <el-alert
+            v-if="c7State.completed && c7State.needsExtended"
+            type="error"
+            :closable="false"
+            show-icon
+            class="c7-prereq-alert"
+            title="C7 控制测试结论为失效/存在无效控制点：请扩大实质性程序样本量，并在 H2A 程序表记录应对。"
+            :description="c7AlertDesc"
+          />
+          <el-alert
+            v-else-if="c7State.completed"
+            type="success"
+            :closable="false"
+            show-icon
+            class="c7-prereq-alert"
+            :title="`C7 控制测试前置已完成（结论：${c7State.conclusion || '已记录'}）`"
+          />
+          <el-alert
+            v-else
+            type="warning"
+            :closable="false"
+            show-icon
+            class="c7-prereq-alert"
+            title="C7 在建工程循环控制测试尚未完成：完成 C7 后将自动回写本程序表前置状态。"
+          />
+          <CycleTabProcedure
+            sheet-code="H2A"
+            :html-data="props.htmlData"
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :is-readonly="isReadonly"
+          />
+        </template>
 
         <!-- H2-1 审定表（三角勾稽含转固扣减） -->
         <H2TabAdjudication
@@ -52,6 +78,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :html-data="props.htmlData"
         />
 
         <!-- H2-2 明细表（3区段Tab 50列） -->
@@ -70,6 +97,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
         />
 
         <!-- H2-4 分析表 -->
@@ -88,9 +116,10 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
         />
 
-        <!-- H2-6 审核记录（签章式） -->
+        <!-- H2-6 审核记录（按工程核查 + 弹窗填报） -->
         <H2TabReviewRecord
           v-else-if="currentSheet === 'H2-6'"
           :wp-id="props.wpId"
@@ -115,6 +144,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
         />
 
         <!-- H2-9 减少检查 -->
@@ -124,19 +154,30 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
         />
 
-        <!-- H2-10/H2-11 利息资本化（2分支选择器） -->
+        <!-- H2-10/H2-11 利息资本化（互斥分支：随 sheet 锁定，切换即导航） -->
         <template v-else-if="currentSheet === 'H2-10' || currentSheet === 'H2-11'">
-          <div class="interest-cap-branch-selector" style="margin-bottom:12px;padding:0 16px">
-            <el-segmented v-model="interestCapBranch" :options="[{label:'无专门借款',value:'noBorrow'},{label:'有专门借款',value:'withBorrow'}]" size="small" />
+          <div class="interest-cap-branch-selector">
+            <el-segmented
+              :model-value="currentSheet === 'H2-11' ? 'withBorrow' : 'noBorrow'"
+              :options="[
+                { label: '无专门借款 (H2-10)', value: 'noBorrow' },
+                { label: '有专门借款 (H2-11)', value: 'withBorrow' },
+              ]"
+              size="small"
+              @change="onInterestCapBranchChange"
+            />
+            <span class="branch-hint">二者互斥，按是否存在专门借款择一编制</span>
           </div>
           <H2TabInterestCapNoBorrow
-            v-if="interestCapBranch === 'noBorrow'"
+            v-if="currentSheet === 'H2-10'"
             :wp-id="props.wpId"
             :project-id="props.projectId"
             :all-responses="allResponses"
             :is-readonly="isReadonly"
+            @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
           />
           <H2TabInterestCapWithBorrow
             v-else
@@ -144,6 +185,7 @@
             :project-id="props.projectId"
             :all-responses="allResponses"
             :is-readonly="isReadonly"
+            @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
           />
         </template>
 
@@ -154,6 +196,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H2-13 盘点检查表 -->
@@ -163,6 +206,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H2-14 监盘小结 -->
@@ -172,6 +216,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H2-15 减值测算 -->
@@ -203,20 +248,28 @@
 
         <!-- 附注披露（上市） -->
         <H2TabDisclosureListed
-          v-else-if="currentSheet === '附注上市'"
+          v-else-if="currentSheet === '附注上市' && disclosureStd.showListed.value"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />
+        <el-empty
+          v-else-if="currentSheet === '附注上市' && !disclosureStd.showListed.value"
+          description="本项目适用准则不含上市公司附注版（applicable_standards）"
+        />
 
         <!-- 附注披露（国企） -->
         <H2TabDisclosureSoe
-          v-else-if="currentSheet === '附注国企'"
+          v-else-if="currentSheet === '附注国企' && disclosureStd.showSoe.value"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+        />
+        <el-empty
+          v-else-if="currentSheet === '附注国企' && !disclosureStd.showSoe.value"
+          description="本项目适用准则不含国有企业附注版（applicable_standards）"
         />
 
         <!-- 未匹配 → OnlyOffice fallback -->
@@ -250,11 +303,18 @@
  * Spec: .kiro/specs/h2-construction-in-progress/ Task 1.1
  * Requirements: 1.1, 1.2, 1.6, 1.7, 1.8, 1.9
  */
-import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import useH2DualMode from './composables/useH2DualMode'
 import useH2ImportExport from './composables/useH2ImportExport'
+import { useH2C7Prerequisite } from './composables/useH2C7Prerequisite'
+import { useH2ApplicableStandards } from './composables/useH2ApplicableStandards'
+import {
+  H2_INTEREST_BRANCH_KEY,
+  inactiveInterestCapResultKey,
+  type InterestCapBranch,
+} from './composables/h2InterestCapBranch'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
@@ -302,13 +362,23 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
-defineEmits<{ (e: 'save'): void; (e: 'completed'): void }>()
+const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navigate-sheet', sheetName: string): void }>()
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
 const isLoading = ref(true)
 const allResponses = ref<Map<string, any>>(new Map())
-const interestCapBranch = ref<'noBorrow' | 'withBorrow'>('noBorrow')
+
+function onInterestCapBranchChange(val: string | number | boolean) {
+  const b: InterestCapBranch = val === 'withBorrow' ? 'withBorrow' : 'noBorrow'
+  persistResponse(H2_INTEREST_BRANCH_KEY, b)
+  persistResponse(inactiveInterestCapResultKey(b), null)
+  if (b === 'withBorrow') {
+    emit('navigate-sheet', 'H2-11 利息资本化有专门借款')
+  } else {
+    emit('navigate-sheet', 'H2-10 利息资本化无专门借款')
+  }
+}
 
 // ─── 双模式 useH2DualMode (Task 6.2) ────────────────────────────────────────
 const {
@@ -356,7 +426,8 @@ const showHtmlToolbar = computed(() => {
 /** 合并一个 responses 对象（{item_id: {...}}）到目标 Map */
 function _mergeResponses(map: Map<string, any>, src: any): void {
   if (!src || typeof src !== 'object') return
-  for (const [k, v] of Object.entries(src)) map.set(k, v)
+  // 注入权威 item_id：dict 值缺 item_id 时以键补齐（否则保存 items 缺 item_id 触发 422）；v 自带 item_id 则以其为准
+  for (const [k, v] of Object.entries(src)) map.set(k, (v && typeof v === 'object' && !Array.isArray(v)) ? { item_id: k, ...v } : { item_id: k, remark: v })
 }
 
 async function selfLoad(): Promise<void> {
@@ -395,12 +466,24 @@ async function selfLoad(): Promise<void> {
 // 子组件契约：inject('saveResponse')(itemId, value)。value 为字符串或对象（对象序列化进 remark）。
 // 防抖 800ms 批量 PUT /checklist-responses，并乐观更新本地 Map 供 selfLoad/跨表读取。
 const _saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
-function persistResponse(itemId: string, value: any): void {
+function persistResponse(
+  itemId: string,
+  value: any,
+  opts?: { conclusion?: string | null },
+): void {
   if (!itemId || !props.wpId) return
   const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
   const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
-  const updated = { ...existing, item_id: itemId, remark: strVal }
-  allResponses.value.set(itemId, updated)
+  const updated = {
+    ...existing,
+    item_id: itemId,
+    remark: strVal,
+    conclusion: opts && 'conclusion' in opts ? (opts.conclusion ?? null) : existing.conclusion,
+  }
+  // 替换 Map 引用以触发依赖 allResponses 的 computed（目录完成度/C7 等）
+  const next = new Map(allResponses.value)
+  next.set(itemId, updated)
+  allResponses.value = next
   if (isReadonly.value) return
   const prev = _saveTimers.get(itemId)
   if (prev) clearTimeout(prev)
@@ -419,28 +502,58 @@ function persistResponse(itemId: string, value: any): void {
 provide('allResponses', allResponses)
 provide('saveResponse', persistResponse)
 
+const disclosureStd = useH2ApplicableStandards({
+  projectId: toRef(props, 'projectId'),
+  allResponses,
+  htmlData: toRef(props, 'htmlData'),
+  onPersist: persistResponse,
+})
+
+watch(
+  () => currentSheet.value,
+  (sheet) => {
+    if (!sheet) return
+    const redirect = disclosureStd.redirectSheetName(sheet)
+    if (redirect) emit('navigate-sheet', redirect)
+  },
+  { immediate: true },
+)
+
+// ─── C7 前置（真实落库，非 console.log） ────────────────────────────────────
+const { state: c7State } = useH2C7Prerequisite({
+  allResponses,
+  onPersist: persistResponse,
+  isReadonly,
+})
+const c7AlertDesc = computed(() => {
+  const s = c7State.value
+  const parts: string[] = []
+  if (s.conclusion) parts.push(`循环结论：${s.conclusion}`)
+  if (s.ineffectiveCount > 0) parts.push(`无效控制点 ${s.ineffectiveCount} 个`)
+  if (s.maxDeviationRate > 0) parts.push(`最高偏差率 ${(s.maxDeviationRate * 100).toFixed(1)}%`)
+  if (s.timestamp) parts.push(`记录于 ${s.timestamp}`)
+  return parts.join('；') || undefined
+})
+
 // ─── EventBus 订阅（Task 6.8 + 6.9） ────────────────────────────────────────
 /**
  * Task 6.8: subscribe 'substantive:adjudicated' → 刷新附注取数
- * Task 6.9: subscribe 'control:c7-completed' → 更新H2A前置状态
- *
- * EventBus integration via SSE subscription in the platform layer.
- * The allResponses map is reactive and auto-updates from render-config polling.
- * Below we declare intent; actual SSE listener is handled by GtWpRenderer parent.
+ * Task 6.9: C7 由 useH2C7Prerequisite 直接监听 window 事件并落库 H2A-c7-prerequisite
  */
 const eventSubscriptions = {
   'substantive:adjudicated': () => {
-    // 刷新附注取数：触发 selfLoad 重新获取最新数据
     void selfLoad()
   },
-  'control:c7-completed': (payload: any) => {
-    // 更新H2A程序表前置状态
-    console.log('[H2] C7前置完成，更新H2A状态', payload)
-    // allResponses will auto-refresh on next render-config poll
+  'control:test-concluded': () => {
+    // C7 状态由 useH2C7Prerequisite 写入；此处刷新附属数据
+    void selfLoad()
+  },
+  'control:c7-completed': () => {
     void selfLoad()
   },
 }
 provide('eventSubscriptions', eventSubscriptions)
+provide('h2C7Prerequisite', c7State)
 
 // ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
 const runtime = inject(WorkpaperRuntimeContextKey, null)
@@ -452,7 +565,7 @@ provide('h2OpenVersionHistory', openVersionHistory)
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
-  void selfLoad()
+  void selfLoad().then(() => disclosureStd.loadFromProject())
 })
 </script>
 
@@ -473,5 +586,16 @@ onMounted(() => {
 .interest-cap-branch-selector {
   display: flex;
   align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 0 16px;
+  flex-wrap: wrap;
+}
+.interest-cap-branch-selector .branch-hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.c7-prereq-alert {
+  margin: 8px 12px 12px;
 }
 </style>
