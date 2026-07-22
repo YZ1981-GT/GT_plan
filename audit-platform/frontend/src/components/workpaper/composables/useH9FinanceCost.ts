@@ -55,6 +55,14 @@ export interface H9FinanceCostRow {
   reclassification: number
   /** O: 最终审定=M-N */
   finalAudited: number
+  /** 到期日分析：1年以内（对齐 Excel P） */
+  dueWithin1Y: number
+  /** 1–2年 */
+  due1To2Y: number
+  /** 2–3年 */
+  due2To3Y: number
+  /** 3年以上 */
+  dueOver3Y: number
   /** Q: 对应利息期 */
   interestPeriod: string
   /** R: 备注 */
@@ -129,6 +137,10 @@ export function useH9FinanceCost(params: {
       auditedEnd,
       reclassification,
       finalAudited,
+      dueWithin1Y: Number(raw.dueWithin1Y) || 0,
+      due1To2Y: Number(raw.due1To2Y) || 0,
+      due2To3Y: Number(raw.due2To3Y) || 0,
+      dueOver3Y: Number(raw.dueOver3Y) || 0,
       interestPeriod: raw.interestPeriod ?? '',
       remark: raw.remark ?? '',
       isRelatedParty: raw.isRelatedParty ?? '否',
@@ -160,9 +172,67 @@ export function useH9FinanceCost(params: {
     auditedDecrease: calcSubtotal(rows.value.map(r => r.auditedDecrease)),
     auditedEnd: calcSubtotal(rows.value.map(r => r.auditedEnd)),
     finalAudited: calcSubtotal(rows.value.map(r => r.finalAudited)),
+    dueWithin1Y: calcSubtotal(rows.value.map(r => r.dueWithin1Y)),
+    due1To2Y: calcSubtotal(rows.value.map(r => r.due1To2Y)),
+    due2To3Y: calcSubtotal(rows.value.map(r => r.due2To3Y)),
+    dueOver3Y: calcSubtotal(rows.value.map(r => r.dueOver3Y)),
   }))
 
   // ─── Actions ───────────────────────────────────────────────────────────────
+
+  /**
+   * 从 H9-2 同步出租方/合同号行骨架（Excel：H9-3!A = H9-2!A）。
+   * 已有行按合同号/出租方匹配保留金额；新增合同补空行；H9-2 已删合同标备注。
+   */
+  function syncLessorsFromH92(): { added: number; updated: number; message: string } {
+    const detail = _getJson('H9-2-rows')
+    if (!Array.isArray(detail) || detail.length === 0) {
+      return { added: 0, updated: 0, message: 'H9-2 暂无明细行可同步' }
+    }
+    let added = 0
+    let updated = 0
+    const next: H9FinanceCostRow[] = []
+    const used = new Set<string>()
+
+    for (const d of detail) {
+      const lessor = String(d.lessor || '').trim()
+      const contractNo = String(d.contractNo || '').trim()
+      if (!lessor && !contractNo) continue
+      const key = contractNo || lessor
+      const existing = rows.value.find(r =>
+        (contractNo && r.contractNo === contractNo)
+        || (!contractNo && r.lessor === lessor),
+      )
+      if (existing) {
+        existing.lessor = lessor || existing.lessor
+        existing.contractNo = contractNo || existing.contractNo
+        if (d.isRelatedParty) existing.isRelatedParty = d.isRelatedParty
+        next.push(existing)
+        used.add(existing.rowId)
+        updated += 1
+      } else {
+        next.push(_normalizeRow({
+          lessor,
+          contractNo,
+          isRelatedParty: d.isRelatedParty ?? '否',
+        }))
+        added += 1
+      }
+    }
+    // 保留 H9-2 未覆盖但已有金额的行（避免误删手工行）
+    for (const r of rows.value) {
+      if (!used.has(r.rowId) && !next.some(n => n.rowId === r.rowId)) {
+        next.push(r)
+      }
+    }
+    rows.value = next
+    _persist()
+    return {
+      added,
+      updated,
+      message: `已从 H9-2 同步出租方：更新 ${updated} / 新增 ${added}`,
+    }
+  }
 
   function addRow(lessor: string): void {
     if (!lessor?.trim()) return
@@ -198,6 +268,10 @@ export function useH9FinanceCost(params: {
       case 'increaseAje': row.increaseAje = numVal; break
       case 'otherAje': row.otherAje = numVal; break
       case 'reclassification': row.reclassification = numVal; break
+      case 'dueWithin1Y': row.dueWithin1Y = numVal; break
+      case 'due1To2Y': row.due1To2Y = numVal; break
+      case 'due2To3Y': row.due2To3Y = numVal; break
+      case 'dueOver3Y': row.dueOver3Y = numVal; break
       default: return
     }
 
@@ -220,10 +294,12 @@ export function useH9FinanceCost(params: {
       beginBalance: r.beginBalance, debitIncrease: r.debitIncrease, creditDecrease: r.creditDecrease,
       beginAje: r.beginAje, confirmAje: r.confirmAje, increaseAje: r.increaseAje, otherAje: r.otherAje,
       reclassification: r.reclassification,
+      dueWithin1Y: r.dueWithin1Y, due1To2Y: r.due1To2Y, due2To3Y: r.due2To3Y, dueOver3Y: r.dueOver3Y,
       interestPeriod: r.interestPeriod, remark: r.remark, isRelatedParty: r.isRelatedParty,
     }))
     onSave(ROWS_KEY, toPersist)
     onSave(TOTAL_END_KEY, totalRow.value.auditedEnd)
+    onSave('H9-3-detail-total-audited', totalRow.value.finalAudited || totalRow.value.auditedEnd)
   }
 
   // ─── Return ────────────────────────────────────────────────────────────────
@@ -231,6 +307,7 @@ export function useH9FinanceCost(params: {
   return {
     rows, totalRow,
     addRow, deleteRow, updateCell, save, load,
+    syncLessorsFromH92,
   }
 }
 

@@ -61,8 +61,17 @@
       </el-descriptions>
     </div>
 
+    <!-- ─── B60 系列底稿面板（B60 专属：10 个系列底稿完整清单） ─── -->
+    <B60SeriesPanel
+      v-if="isB60Series"
+      :project-id="projectId"
+      :wp-id="wpId"
+      :worktime-sheet-name="worktimeSheetName"
+      @jump-to-sheet="handleNavigate"
+    />
+
     <!-- ─── 底稿架构导航（流程图，取代表格式索引导航） ─── -->
-    <div class="gt-b-index__navigation">
+    <div v-else class="gt-b-index__navigation">
       <div class="gt-b-index__navigation-header">
         <h4 class="gt-b-index__navigation-title">底稿架构</h4>
         <span class="gt-b-index__navigation-hint">点击程序卡片可跳转至对应底稿</span>
@@ -111,9 +120,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
+
+const B60SeriesPanel = defineAsyncComponent(() => import('./B60SeriesPanel.vue'))
 
 // ─── Types ───
 interface NavigationRow {
@@ -151,8 +162,11 @@ const props = withDefaults(defineProps<{
   schema: BIndexSchema
   htmlData: BIndexHtmlData
   readonly?: boolean
+  /** 当前底稿编码（由 GtWpRenderer 透传，用于 B60 系列多文件识别） */
+  wpCode?: string
 }>(), {
   readonly: false,
+  wpCode: '',
 })
 
 const emit = defineEmits<{
@@ -172,6 +186,24 @@ const projectId = computed(() => (route.params.projectId as string) || '')
 const cycleWorkpapers = computed<CycleWorkpaper[]>(
   () => props.htmlData?.cycle_workpapers ?? [],
 )
+
+// ─── B60 系列多文件识别 ───
+// 当前底稿编码：优先用 props.wpCode，回退到 cycleWorkpapers 中 is_current 项
+const currentWpCode = computed<string>(() => {
+  if (props.wpCode) return props.wpCode
+  const cur = cycleWorkpapers.value.find((w) => w.is_current)
+  return cur?.wp_code || ''
+})
+// B60「总体审计策略及具体审计计划」是多文件底稿（1 xlsx + 9 docx）
+const isB60Series = computed<boolean>(() => currentWpCode.value === 'B60')
+// 从 navigation_rows 提取工时表（B60-1）真实 sheet 名，供 B60SeriesPanel 切换页签
+const worktimeSheetName = computed<string>(() => {
+  const rows = props.htmlData?.navigation_rows ?? []
+  const hit = rows.find(
+    (r) => (r.index_ref || '').startsWith('B60-1') || String(r.content || '').includes('工时'),
+  )
+  return hit?.content || ''
+})
 
 // 编制信息折叠状态（默认展开）；收起时在标题栏显示概要
 const prepCollapsed = ref(false)

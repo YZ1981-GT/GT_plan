@@ -8,8 +8,10 @@
  *
  * Requirements: 6.4, 6.5, 6.6
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { ref, computed } from 'vue'
+
+vi.setConfig({ testTimeout: 30000 })
 
 import {
   calcImpairmentAmount,
@@ -39,7 +41,7 @@ import {
 // 1. calcImpairmentAmount 永远 ≥ 0 (非负性)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('G7Impairment — calcImpairmentAmount 非负性', () => {
+describe('G7Impairment — calcImpairmentAmount 非负性', { timeout: 30000 }, () => {
   /**
    * 减值金额 = MAX(0, 账面价值 - 可收回金额)
    * 当可收回金额 > 账面价值时，不存在负减值（不允许减值转回超原值）

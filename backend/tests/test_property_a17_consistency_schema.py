@@ -90,13 +90,15 @@ def test_consistency_output_schema_invariant(chapters, category):
         assert isinstance(result.affected_chapters, list)
         assert len(result.affected_chapters) > 0
 
-        # affected_chapters 中的每个元素都是合法章节 ID
+        # affected_chapters 中的每个元素都是合法章节 ID 或跨底稿编码
         import re
         for ch_id in result.affected_chapters:
             assert isinstance(ch_id, str)
-            assert re.match(VALID_CHAPTER_ID_PATTERN, ch_id), (
-                f"Invalid chapter ID: {ch_id}"
+            ok = (
+                re.match(VALID_CHAPTER_ID_PATTERN, ch_id)
+                or ch_id in {"A17-3", "A17-3-1", "A17-7", "A17-7A"}
             )
+            assert ok, f"Invalid chapter ID: {ch_id}"
 
         # description: 非空字符串
         assert isinstance(result.description, str)
@@ -109,12 +111,16 @@ def test_consistency_output_schema_invariant(chapters, category):
     category=business_category_st,
 )
 def test_consistency_results_only_known_rule_ids(chapters, category):
-    """输出的 rule_id 只能是已知的 4 个规则之一。"""
+    """输出的 rule_id 只能是已知规则之一。"""
     known_rule_ids = {
         "gc_vs_opinion",
         "kam_required_listed",
         "fraud_vs_opinion",
         "risk_vs_opinion",
+        "independence_empty_a_class",
+        "independence_vs_a177",
+        "consultation_without_execution",
+        "opinion_empty_a_class",
     }
 
     results = check_consistency(chapters, business_category=category)

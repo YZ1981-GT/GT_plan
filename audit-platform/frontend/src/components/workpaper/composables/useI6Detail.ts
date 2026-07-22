@@ -460,6 +460,26 @@ export function useI6Detail(options: {
     _persist()
   }
 
+  /** 从 I1-9 回填「无形资产摊销」行 */
+  function applyI1AmortAmount(amount: number, keywords: string[] = ['无形资产摊销']): {
+    ok: boolean
+    message: string
+  } {
+    if (readonly.value) return { ok: false, message: '只读' }
+    const hit = storedRows.value.find((r) =>
+      keywords.some((k) => String(r.category || '').includes(k)),
+    )
+    if (!hit) {
+      return { ok: false, message: '未找到「无形资产摊销」明细行' }
+    }
+    const months = new Array(12).fill(0)
+    months[11] = amount
+    hit.months = months
+    storedRows.value = [...storedRows.value]
+    _persist()
+    return { ok: true, message: `已回填「${hit.category}」= ${amount.toFixed(2)}` }
+  }
+
   // ─── Persist ───────────────────────────────────────────────────────────────
 
   function _persist(): void {
@@ -482,6 +502,8 @@ export function useI6Detail(options: {
     addRow,
     /** 动态行删除 */
     removeRow,
+    /** 从 I1-9 回填无形资产摊销 */
+    applyI1AmortAmount,
     /** 更新单元格 */
     updateCell,
     /** 异常月份索引（合计行级别） */

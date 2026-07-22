@@ -126,7 +126,7 @@ describe('WorkpaperWordEditor — 主/补分离', () => {
         return Promise.resolve({ sign_status: 'pending' })
       }
       if (url.includes('/onlyoffice/health')) {
-        return Promise.resolve({ available: false })
+        return Promise.resolve({ healthy: false })
       }
       if (url.includes('/misstatements/for-letter')) {
         return Promise.resolve({ summary: '' })
@@ -352,13 +352,11 @@ describe('WorkpaperWordEditor — 主/补分离', () => {
       // The component's radio change triggers onVersionChange
       // Simulate by calling directly via vm (since radio stubs don't emit)
       const vm = wrapper.vm as any
-      vm.onVersionChange('A16-2')
+      await vm.onVersionChange('A16-2')
       await flushPromises()
 
-      // Should load sign status with new version
-      expect(mockApiGet).toHaveBeenCalledWith(
-        expect.stringContaining('version=A16-2'),
-      )
+      const fileInfoCall = mockApiGet.mock.calls.find((c) => String(c[0]).includes('file-info'))
+      expect(fileInfoCall?.[0]).toContain('version=A16-2')
     })
   })
 })
@@ -389,7 +387,7 @@ describe('WorkpaperWordEditor — selected_version 持久化 + 按版本 sign_st
           return Promise.resolve({}) // No persisted version initially
         }
         if (url.includes('/onlyoffice/health')) {
-          return Promise.resolve({ available: false })
+          return Promise.resolve({ healthy: false })
         }
         if (url.includes('/misstatements/for-letter')) {
           return Promise.resolve({ summary: '' })
@@ -435,7 +433,7 @@ describe('WorkpaperWordEditor — selected_version 持久化 + 按版本 sign_st
           return Promise.resolve({ selected_version: { value: 'A16-2' } })
         }
         if (url.includes('/onlyoffice/health')) {
-          return Promise.resolve({ available: false })
+          return Promise.resolve({ healthy: false })
         }
         if (url.includes('/misstatements/for-letter')) {
           return Promise.resolve({ summary: '' })
@@ -474,7 +472,7 @@ describe('WorkpaperWordEditor — selected_version 持久化 + 按版本 sign_st
           return Promise.resolve({ selected_version: { value: 'A16-2' } })
         }
         if (url.includes('/onlyoffice/health')) {
-          return Promise.resolve({ available: false })
+          return Promise.resolve({ healthy: false })
         }
         if (url.includes('/misstatements/for-letter')) {
           return Promise.resolve({ summary: '' })
@@ -505,9 +503,6 @@ describe('WorkpaperWordEditor — selected_version 持久化 + 按版本 sign_st
         if (url.includes('/a16/recommended-version')) {
           return Promise.resolve({ main: { code: 'A16-1' }, supplement: null })
         }
-        if (url.includes('/projects/')) {
-          return Promise.resolve({ client_name: '测试公司' })
-        }
         if (url.includes('/file-info')) {
           callCount++
           if (url.includes('version=A16-5')) {
@@ -515,11 +510,14 @@ describe('WorkpaperWordEditor — selected_version 持久化 + 按版本 sign_st
           }
           return Promise.resolve({ sign_status: 'pending' })
         }
+        if (url.includes('/projects/')) {
+          return Promise.resolve({ client_name: '测试公司' })
+        }
         if (url.includes('/field-overrides')) {
           return Promise.resolve({})
         }
         if (url.includes('/onlyoffice/health')) {
-          return Promise.resolve({ available: false })
+          return Promise.resolve({ healthy: false })
         }
         if (url.includes('/misstatements/for-letter')) {
           return Promise.resolve({ summary: '' })
@@ -545,11 +543,7 @@ describe('WorkpaperWordEditor — selected_version 持久化 + 按版本 sign_st
         if (url.includes('/a16/recommended-version')) {
           return Promise.resolve({ main: { code: 'A16-2' }, supplement: null })
         }
-        if (url.includes('/projects/')) {
-          return Promise.resolve({ client_name: '测试公司' })
-        }
         if (url.includes('/file-info')) {
-          // A16-2 is signed, A16-1 is pending
           if (url.includes('version=A16-2')) {
             return Promise.resolve({ sign_status: 'signed' })
           }
@@ -558,11 +552,14 @@ describe('WorkpaperWordEditor — selected_version 持久化 + 按版本 sign_st
           }
           return Promise.resolve({ sign_status: 'pending' })
         }
+        if (url.includes('/projects/')) {
+          return Promise.resolve({ client_name: '测试公司' })
+        }
         if (url.includes('/field-overrides')) {
           return Promise.resolve({})
         }
         if (url.includes('/onlyoffice/health')) {
-          return Promise.resolve({ available: false })
+          return Promise.resolve({ healthy: false })
         }
         if (url.includes('/misstatements/for-letter')) {
           return Promise.resolve({ summary: '' })
@@ -599,7 +596,7 @@ describe('WorkpaperWordEditor — selected_version 持久化 + 按版本 sign_st
           return Promise.resolve({})
         }
         if (url.includes('/onlyoffice/health')) {
-          return Promise.resolve({ available: false })
+          return Promise.resolve({ healthy: false })
         }
         if (url.includes('/misstatements/for-letter')) {
           return Promise.resolve({ summary: '' })
@@ -661,7 +658,7 @@ describe('WorkpaperWordEditor — OnlyOffice / 降级下载 upload', () => {
         return Promise.resolve({ sign_status: 'pending' })
       }
       if (url.includes('/onlyoffice/health')) {
-        return Promise.resolve({ available: true })
+        return Promise.resolve({ healthy: true })
       }
       if (url.includes('/misstatements/for-letter')) {
         return Promise.resolve({ summary: '' })
@@ -745,7 +742,7 @@ describe('WorkpaperWordEditor — OnlyOffice / 降级下载 upload', () => {
           return Promise.resolve({ sign_status: 'pending' })
         }
         if (url.includes('/onlyoffice/health')) {
-          return Promise.resolve({ available: true })
+          return Promise.resolve({ healthy: true })
         }
         if (url.includes('/misstatements/for-letter')) {
           return Promise.resolve({ summary: '' })
@@ -786,7 +783,7 @@ describe('WorkpaperWordEditor — OnlyOffice / 降级下载 upload', () => {
     it('OnlyOffice 不可用时 openEditor 不发请求 + 提示消息', async () => {
       mockApiGet.mockImplementation((url: string) => {
         if (url.includes('/onlyoffice/health')) {
-          return Promise.resolve({ available: false })
+          return Promise.resolve({ healthy: false })
         }
         if (url.includes('/a16/recommended-version')) {
           return Promise.resolve({ main: { code: 'A16-1' }, supplement: null })
@@ -945,7 +942,7 @@ describe('WorkpaperWordEditor — OnlyOffice / 降级下载 upload', () => {
           return Promise.resolve({ sign_status: 'pending' })
         }
         if (url.includes('/onlyoffice/health')) {
-          return Promise.resolve({ available: true })
+          return Promise.resolve({ healthy: true })
         }
         if (url.includes('/misstatements/for-letter')) {
           return Promise.resolve({ summary: '' })
@@ -1007,7 +1004,7 @@ describe('WorkpaperWordEditor — CW-76 签署日期对话框', () => {
         return Promise.resolve({ sign_status: 'pending' })
       }
       if (url.includes('/onlyoffice/health')) {
-        return Promise.resolve({ available: false })
+        return Promise.resolve({ healthy: false })
       }
       if (url.includes('/misstatements/for-letter')) {
         return Promise.resolve({ summary: '' })
@@ -1068,7 +1065,7 @@ describe('WorkpaperWordEditor — CW-76 签署日期对话框', () => {
         return Promise.resolve({ sign_status: 'pending' })
       }
       if (url.includes('/onlyoffice/health')) {
-        return Promise.resolve({ available: false })
+        return Promise.resolve({ healthy: false })
       }
       if (url.includes('/misstatements/for-letter')) {
         return Promise.resolve({ summary: '' })

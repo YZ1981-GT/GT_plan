@@ -9,8 +9,10 @@
  *       本子组件为内部展示组件，以「函数 props 下行（读取/回调）」透传主组件 composable 方法，
  *       保持模板表达式与原文逐字一致、响应式不破。activeCell 为纯 UI 编辑态，仅本块使用，下沉到子组件。
  */
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { ChecklistSection, ChecklistItem, ResponseData, ReviewSignHint } from './checklistTypes'
+import { parsePresetWpRefs } from './composables/useA17BundleState'
+import GtIndexChip from './GtIndexChip.vue'
 
 const props = defineProps<{
   currentSection: ChecklistSection | null
@@ -19,6 +21,9 @@ const props = defineProps<{
   readonly: boolean
   hasStandardRef?: boolean
   allowCustomItems?: boolean
+  /** completion=A17-5 是/否/不适用；disclosure=Y/X/I/X/W/N/A */
+  conclusionMode?: 'completion' | 'disclosure'
+  projectId?: string
   getResponse: (itemId: string) => ResponseData
   getConclusionClass: (conclusion: string | null) => string
   signHintForItem: (item: ChecklistItem) => ReviewSignHint | null | undefined
@@ -36,6 +41,30 @@ const props = defineProps<{
   /** A17-5: 签字确认项（独立卡片渲染） */
   conclusionItem?: ChecklistItem | null
 }>()
+
+const isCompletionMode = computed(() => props.conclusionMode === 'completion')
+
+function isNoConclusion(conclusion: string | null | undefined): boolean {
+  const c = String(conclusion || '').trim()
+  return c === '否' || c === 'N' || c.toLowerCase() === 'no' || c === 'X/W'
+}
+
+function upstreamRefsFor(item: ChecklistItem): string[] {
+  const fromResp = props.getResponse(item.id).wp_ref
+  const codes = parsePresetWpRefs(fromResp || item.preset_wp_ref || '')
+  return codes.slice(0, 4)
+}
+
+/** 「否」闭环：改为「是」并在备注追加闭环时间 */
+function closeNoItem(item: ChecklistItem) {
+  const prev = props.getResponse(item.id).remark || ''
+  const stamp = new Date().toISOString().slice(0, 19).replace('T', ' ')
+  const note = prev.trim()
+    ? `${prev.trim()}\n[闭环 ${stamp}] 上游程序已补做，结论改「是」`
+    : `[闭环 ${stamp}] 上游程序已补做，结论改「是」`
+  props.updateRemark(item.id, note)
+  props.updateConclusion(item.id, '是')
+}
 
 // 默认显示准则索引号列（A1-15/A1-16 有该列）
 const showRefCol = props.hasStandardRef !== false
@@ -206,26 +235,33 @@ function activateCell(itemId: string, field: string) {
                 @change="(val: string) => { updateConclusion(item.id, val || null); activeCell = '' }"
                 @visible-change="(visible: boolean) => { if (!visible) activeCell = '' }"
               >
-                <el-option label="Y" value="Y">
-                  <el-tooltip content="适用并已在财务报表中披露" placement="left" :show-after="300">
-                    <span>Y</span>
-                  </el-tooltip>
-                </el-option>
-                <el-option label="X/I" value="X/I">
-                  <el-tooltip content="适用但不重大，未在财务报表中披露" placement="left" :show-after="300">
-                    <span>X/I</span>
-                  </el-tooltip>
-                </el-option>
-                <el-option label="X/W" value="X/W">
-                  <el-tooltip content="适用且重大，未在报表中披露，已在另附工作底稿说明原因" placement="left" :show-after="300">
-                    <span>X/W</span>
-                  </el-tooltip>
-                </el-option>
-                <el-option label="N/A" value="N/A">
-                  <el-tooltip content="不适用于被审计单位财务报表" placement="left" :show-after="300">
-                    <span>N/A</span>
-                  </el-tooltip>
-                </el-option>
+                <template v-if="isCompletionMode">
+                  <el-option label="是" value="是" />
+                  <el-option label="否" value="否" />
+                  <el-option label="不适用" value="不适用" />
+                </template>
+                <template v-else>
+                  <el-option label="Y" value="Y">
+                    <el-tooltip content="适用并已在财务报表中披露" placement="left" :show-after="300">
+                      <span>Y</span>
+                    </el-tooltip>
+                  </el-option>
+                  <el-option label="X/I" value="X/I">
+                    <el-tooltip content="适用但不重大，未在财务报表中披露" placement="left" :show-after="300">
+                      <span>X/I</span>
+                    </el-tooltip>
+                  </el-option>
+                  <el-option label="X/W" value="X/W">
+                    <el-tooltip content="适用且重大，未在报表中披露，已在另附工作底稿说明原因" placement="left" :show-after="300">
+                      <span>X/W</span>
+                    </el-tooltip>
+                  </el-option>
+                  <el-option label="N/A" value="N/A">
+                    <el-tooltip content="不适用于被审计单位财务报表" placement="left" :show-after="300">
+                      <span>N/A</span>
+                    </el-tooltip>
+                  </el-option>
+                </template>
               </el-select>
               <span v-else class="cell-display cell-conclusion" :class="{ 'cell-empty': !getResponse(item.id).conclusion }">
                 {{ getResponse(item.id).conclusion || '—' }}
@@ -268,6 +304,34 @@ function activateCell(itemId: string, field: string) {
                 >{{ item.preset_wp_ref }}</span>
               </template>
             </div>
+          </div>
+
+          <!-- A17-5「否」：上游底稿跳转提示 -->
+          <div
+            v-if="item.type === 'actionable' && isCompletionMode && isNoConclusion(getResponse(item.id).conclusion)"
+            class="gt-checklist-table__no-followup"
+            :class="{ 'is-missing-remark': !(getResponse(item.id).remark || '').trim() }"
+          >
+            <span class="no-followup__label">
+              {{ (getResponse(item.id).remark || '').trim() ? '已选「否」— 可跳转补程序：' : '已选「否」须填写备注；建议跳转上游底稿补做：' }}
+            </span>
+            <template v-if="upstreamRefsFor(item).length">
+              <GtIndexChip
+                v-for="code in upstreamRefsFor(item)"
+                :key="`${item.id}-${code}`"
+                :value="code"
+                :context-project-id="projectId || ''"
+              />
+            </template>
+            <span v-else class="no-followup__empty">（本项无预置索引，请在「底稿索引」列填写后跳转）</span>
+            <el-button
+              v-if="!readonly"
+              size="small"
+              type="success"
+              link
+              class="no-followup__close"
+              @click.stop="closeNoItem(item)"
+            >✓ 已补做，改「是」并闭环</el-button>
           </div>
 
           <!-- 提示性子项 (children of actionable, collapsed by default) -->
@@ -451,6 +515,32 @@ function activateCell(itemId: string, field: string) {
 }
 .gt-checklist-table__item-row.conclusion-na {
   background: #f5f5f5;
+}
+
+.gt-checklist-table__no-followup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 8px 12px;
+  margin: 0 0 4px;
+  background: #fdf6ec;
+  border-bottom: 1px solid var(--gt-color-border-light, #ebeef5);
+  font-size: 12px;
+  color: #b88230;
+}
+.gt-checklist-table__no-followup.is-missing-remark {
+  background: #fef0f0;
+  color: #c45656;
+}
+.no-followup__label {
+  font-weight: 500;
+}
+.no-followup__empty {
+  opacity: 0.85;
+}
+.no-followup__close {
+  margin-left: auto;
 }
 
 .item-ref__text {

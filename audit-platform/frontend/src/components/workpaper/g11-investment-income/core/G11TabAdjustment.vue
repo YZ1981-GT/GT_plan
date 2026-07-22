@@ -1,11 +1,13 @@
 <template>
-  <div class="g11-adjustment">
+  <div class="g11-adjustment" data-testid="g11-adjustment">
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>1. 本表汇总投资收益相关的审计调整分录（AJE）与重分类分录（RJE），每笔分录借贷必须平衡。</p>
-        <p>2. 调整净额自动回写 G11-1 审定表 / G11-2 明细表"其他"行，确保审定数与调整一致。</p>
-        <p>3. 摘要应清晰说明调整事由（如公允价值变动结转、权益法损益补提、跨期收益调整等），并交叉索引至底稿。</p>
+        <p>1. 本表对齐 Excel「投资收益调整分录汇总表 G11-3」：调整事项说明 / 类别 / 报表项目 / 科目名称 / 附注项目 / 借贷 / 索引 / 备注。</p>
+        <p>2. 「账项调整」影响审定数（AJE）；「报表调整」为重分类（RJE），仅影响列报，不回写 G11-1/G11-2；「其他」按账项调整处理。</p>
+        <p>3. 系统仅汇总科目 <b>6111 投资收益</b> 的贷−借净额，按「回写行」分项写入 G11-1 审定表与 G11-2 明细表对应项目。</p>
+        <p>4. 摘要应说明调整事由（权益法补提、跨期收益、处置损益更正等），并交叉索引至 G11-2 / G11-5 / 相关资产底稿。</p>
+        <p class="cas-basis">CAS 依据：调整分录应有充分、适当的审计证据支持（《中国注册会计师审计准则第 1301 号——审计证据》）。</p>
       </div>
     </details>
 
@@ -13,8 +15,34 @@
       type="info"
       :closable="false"
       class="objective-alert"
-      title="审计目标：确认投资收益调整分录的依据充分、借贷平衡、回写准确，保证审定数据的完整与准确。"
+      title="审计目标：确认投资收益相关账项/报表调整依据充分、借贷平衡，并按分项准确回写 G11-1 / G11-2。"
     />
+
+    <div class="tab-toolbar">
+      <div class="toolbar-left">
+        <el-button
+          size="small"
+          :loading="adj.syncing.value"
+          :disabled="isReadonly || !projectId"
+          @click="onSyncFromModule"
+        >
+          从调整分录模块同步
+        </el-button>
+        <el-button
+          size="small"
+          type="success"
+          :disabled="isReadonly || !adj.isBalanced.value || adj.rows.value.length === 0"
+          @click="onConfirm"
+        >
+          确认调整
+        </el-button>
+        <span v-if="adj.lastSyncMsg.value" class="sync-msg">{{ adj.lastSyncMsg.value }}</span>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:G11-1" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:G11-2" /></span>
+      </div>
+    </div>
 
     <div class="section-head">
       <h3 class="sheet-title">G11-3 调整分录汇总</h3>
@@ -24,56 +52,183 @@
         <el-button size="small" type="primary" plain :disabled="isReadonly" @click="adj.addRow()">+ 新增</el-button>
       </div>
     </div>
-    <el-alert v-if="!adj.isBalanced.value" type="error" :closable="false" class="balance-alert">
-      借贷不平衡，差额 {{ fmt(adj.balanceDiff.value) }}
-    </el-alert>
-    <el-alert v-else-if="adj.adjustmentNet.value !== 0" type="info" :closable="false" class="balance-alert">
-      已回写 G11-1/G11-2「其他」行调整数 {{ fmt(adj.adjustmentNet.value) }}
-    </el-alert>
-    <el-table :data="adj.rows.value" border size="small" style="font-size:13px" max-height="480">
-      <el-table-column label="类型" width="72">
+
+    <div class="balance-indicator">
+      <span>借方合计：<strong>{{ fmt(adj.debitTotal.value) }}</strong></span>
+      <span>贷方合计：<strong>{{ fmt(adj.creditTotal.value) }}</strong></span>
+      <el-tag v-if="adj.isBalanced.value" type="success" size="small">借贷平衡</el-tag>
+      <el-tag v-else type="danger" size="small">不平衡 差异 {{ fmt(adj.balanceDiff.value) }}</el-tag>
+      <el-tag v-if="adj.summary.value.netAje6111 !== 0" type="info" size="small">
+        6111 账项净额 {{ fmt(adj.summary.value.netAje6111) }}
+      </el-tag>
+      <el-tag v-if="adj.summary.value.netRje6111 !== 0" type="warning" size="small">
+        报表调整净额 {{ fmt(adj.summary.value.netRje6111) }}（不回写）
+      </el-tag>
+    </div>
+
+    <el-alert
+      v-if="writebackHint"
+      type="success"
+      :closable="false"
+      class="balance-alert"
+      :title="writebackHint"
+    />
+
+    <el-table
+      :data="adj.rows.value"
+      border
+      size="small"
+      style="font-size:13px"
+      max-height="520"
+      :row-class-name="adj.tableRowClassName"
+      empty-text="暂无调整分录。点击「新增」录入；6111 净额将按回写行分项写入 G11-1/G11-2。"
+    >
+      <el-table-column label="调整事项说明" min-width="160">
         <template #default="{ row }">
-          <el-select v-if="!isReadonly" :model-value="row.entryType" size="small"
-            @change="(v: 'AJE'|'RJE') => adj.updateRow(row.rowId, { entryType: v })">
-            <el-option label="AJE" value="AJE" /><el-option label="RJE" value="RJE" />
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.description"
+            size="small"
+            placeholder="调整事项说明"
+            @update:model-value="(v: string) => adj.updateCell(row.rowId, 'description', v)"
+          />
+          <span v-else>{{ row.description || '—' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="类别" width="110">
+        <template #default="{ row }">
+          <el-select
+            v-if="!isReadonly"
+            :model-value="row.category"
+            size="small"
+            @change="(v: string) => adj.updateCell(row.rowId, 'category', v)"
+          >
+            <el-option v-for="opt in adj.categoryOptions" :key="opt" :label="opt" :value="opt" />
           </el-select>
-          <span v-else>{{ row.entryType }}</span>
+          <span v-else>{{ row.category }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="摘要" min-width="120">
+      <el-table-column label="报表项目" width="100">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.summary" size="small"
-            @update:model-value="(v: string) => adj.updateRow(row.rowId, { summary: v })" />
-          <span v-else>{{ row.summary }}</span>
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.reportItem"
+            size="small"
+            @update:model-value="(v: string) => adj.updateCell(row.rowId, 'reportItem', v)"
+          />
+          <span v-else>{{ row.reportItem || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="科目" width="100">
+      <el-table-column label="科目" width="150">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.accountName" size="small"
-            @update:model-value="(v: string) => adj.updateRow(row.rowId, { accountName: v })" />
-          <span v-else>{{ row.accountName }}</span>
+          <el-select
+            v-if="!isReadonly"
+            :model-value="row.accountCode"
+            size="small"
+            filterable
+            allow-create
+            default-first-option
+            @change="(v: string) => adj.updateRow(row.rowId, { accountCode: v })"
+          >
+            <el-option
+              v-for="opt in adj.accountOptions"
+              :key="opt.code"
+              :label="`${opt.code} ${opt.name}`"
+              :value="opt.code"
+            />
+          </el-select>
+          <span v-else>{{ row.accountCode }} {{ row.accountName }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="借方" width="100" align="right">
+      <el-table-column label="附注项目" width="100">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" size="small" :controls="false" style="width:100%"
-            @update:model-value="(v: number) => adj.updateRow(row.rowId, { debitAmount: v ?? 0 })" />
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.noteItem"
+            size="small"
+            @update:model-value="(v: string) => adj.updateCell(row.rowId, 'noteItem', v)"
+          />
+          <span v-else>{{ row.noteItem || '—' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="回写行" width="150">
+        <template #default="{ row }">
+          <el-select
+            v-if="!isReadonly"
+            :model-value="row.adjudicationRowKey"
+            size="small"
+            filterable
+            @change="(v: string) => adj.updateRow(row.rowId, { adjudicationRowKey: v })"
+          >
+            <el-option
+              v-for="opt in adj.writebackOptions"
+              :key="opt.rowKey"
+              :label="opt.label"
+              :value="opt.rowKey"
+            />
+          </el-select>
+          <span v-else>{{ writebackLabel(row.adjudicationRowKey) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="借方调整金额" width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number
+            v-if="!isReadonly"
+            :model-value="row.debitAmount"
+            size="small"
+            :controls="false"
+            style="width:100%"
+            @update:model-value="(v: number) => adj.updateCell(row.rowId, 'debitAmount', v ?? 0)"
+          />
           <span v-else>{{ fmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="贷方" width="100" align="right">
+      <el-table-column label="贷方调整金额" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" size="small" :controls="false" style="width:100%"
-            @update:model-value="(v: number) => adj.updateRow(row.rowId, { creditAmount: v ?? 0 })" />
+          <el-input-number
+            v-if="!isReadonly"
+            :model-value="row.creditAmount"
+            size="small"
+            :controls="false"
+            style="width:100%"
+            @update:model-value="(v: number) => adj.updateCell(row.rowId, 'creditAmount', v ?? 0)"
+          />
           <span v-else>{{ fmt(row.creditAmount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="64" v-if="!isReadonly">
+      <el-table-column label="索引" width="88">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.indexRef"
+            size="small"
+            @update:model-value="(v: string) => adj.updateCell(row.rowId, 'indexRef', v)"
+          />
+          <GtIndexChip v-else-if="row.indexRef" :value="row.indexRef.startsWith('wp:') ? row.indexRef : `wp:${row.indexRef}`" />
+          <span v-else>—</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="备注" min-width="90">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.remark"
+            size="small"
+            @update:model-value="(v: string) => adj.updateCell(row.rowId, 'remark', v)"
+          />
+          <span v-else>{{ row.remark || '—' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="56" v-if="!isReadonly">
         <template #default="{ row }">
           <el-button link type="danger" size="small" @click="adj.removeRow(row.rowId)">删</el-button>
         </template>
       </el-table-column>
     </el-table>
+
+    <p class="footer-note">
+      【注：本底稿适用于调整分录较多、较复杂的项目，且仅列示与投资收益相关的审计调整。项目组可根据项目实际情况选择是否使用该底稿。】
+    </p>
 
     <el-card shadow="never" class="audit-note-card">
       <template #header><div class="card-header"><span>审计说明</span></div></template>
@@ -82,7 +237,7 @@
         :model-value="auditNote"
         :disabled="isReadonly"
         :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：可概述调整分录的事由、依据及对投资收益的影响，未调整事项及其原因。"
+        placeholder="填写审计说明：可概述调整分录的事由、依据及对投资收益分项的影响，未调整事项及其原因。"
         @change="saveAuditNote"
       />
     </el-card>
@@ -94,7 +249,7 @@
         :model-value="auditConclusion"
         :disabled="isReadonly"
         :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：调整分录借贷平衡、依据充分，回写审定表/明细表准确，未见异常（或列明重大未调整事项）。"
+        placeholder="填写审计结论：调整分录借贷平衡、依据充分，分项回写审定表/明细表准确，未见异常（或列明重大未调整事项）。"
         @change="saveAuditConclusion"
       />
     </el-card>
@@ -102,24 +257,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, onMounted } from 'vue'
+import { ref, toRef, onMounted, computed } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useG11Adjustment } from '../../composables/useG11Adjustment'
 import { useG11DetailAnalysis } from '../../composables/useG11DetailAnalysis'
-import { parseG11AdjStore, patchG11AdjRow } from '../../composables/g11AdjStorage'
+import { G11_ADJUDICATION_WRITEBACK_OPTIONS } from '../../composables/g11AccountMatch'
+import { dispatchG11OfferDisclosurePull } from '../../composables/g11DisclosureSync'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import G11ImportExportDropdown from '../G11ImportExportDropdown.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   wpId: string
+  projectId?: string
+  auditYear?: number | string | null
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
 
 const emit = defineEmits<{ imported: [] }>()
 
-// ─── 审计说明 / 审计结论 ───
+const projectId = computed(() => props.projectId ?? '')
+const auditYearRef = computed(() => props.auditYear ?? null)
+
 const NOTE_KEY = 'G11-adjustment-audit-note'
 const CONCLUSION_KEY = 'G11-adjustment-audit-conclusion'
 const auditNote = ref('')
@@ -135,15 +297,15 @@ function saveAuditNote(val: string): void {
 function saveAuditConclusion(val: string): void {
   if (props.isReadonly) return
   auditConclusion.value = val
-  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: val })
-  props.debouncedSave(CONCLUSION_KEY, { remark: val, conclusion: null })
+  props.allResponses.set(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: val, remark: null })
+  props.debouncedSave(CONCLUSION_KEY, { conclusion: val, remark: null })
 }
 
 onMounted(() => {
   const n = props.allResponses.get(NOTE_KEY)
   if (n?.remark) auditNote.value = n.remark
   const c = props.allResponses.get(CONCLUSION_KEY)
-  if (c?.remark) auditConclusion.value = c.remark
+  if (c?.conclusion || c?.remark) auditConclusion.value = String(c.conclusion ?? c.remark ?? '')
 })
 
 const detail = useG11DetailAnalysis({
@@ -156,16 +318,42 @@ const adj = useG11Adjustment({
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
-  applyAdjustmentToAdjudication: (net) => {
-    const store = parseG11AdjStore(props.allResponses.get('G11-adj-rows')?.remark)
-    props.debouncedSave('G11-adj-rows', {
-      remark: JSON.stringify(patchG11AdjRow(store, 'other', { currentAdjustment: net })),
-    })
-  },
-  applyAdjustmentToDetail: (net) => detail.applyOtherAdjustment(net),
+  projectId,
+  auditYear: auditYearRef,
+  applyAdjustmentToDetail: (byRow) => detail.applyAdjustmentByRow(byRow),
 })
 
-function fmt(v: number) { return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+async function onSyncFromModule() {
+  const n = await adj.syncFromAdjustmentModule()
+  if (n > 0) ElMessage.success(adj.lastSyncMsg.value || `已同步 ${n} 行`)
+  else if (adj.lastSyncMsg.value) ElMessage.info(adj.lastSyncMsg.value)
+}
+
+function onConfirm() {
+  adj.publishAdjustment()
+  ElMessage.success('已确认调整并回写 G11-1/G11-2')
+  dispatchG11OfferDisclosurePull('G11-3')
+}
+
+const writebackHint = computed(() => {
+  const map = adj.writebackPreview.value
+  const parts = Object.entries(map)
+    .filter(([, v]) => Math.abs(v) > 0.005)
+    .map(([k, v]) => {
+      const label = G11_ADJUDICATION_WRITEBACK_OPTIONS.find((o) => o.rowKey === k)?.label ?? k
+      return `${label} ${fmt(v)}`
+    })
+  if (!parts.length) return ''
+  return `已分项回写 G11-1/G11-2：${parts.join('；')}`
+})
+
+function writebackLabel(key: string): string {
+  return G11_ADJUDICATION_WRITEBACK_OPTIONS.find((o) => o.rowKey === key)?.label ?? key
+}
+
+function fmt(v: number) {
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
 </script>
 
 <style scoped>
@@ -174,10 +362,21 @@ function fmt(v: number) { return v.toLocaleString('zh-CN', { minimumFractionDigi
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
+.cas-basis { color: #909399; font-size: 12px; }
 .objective-alert { margin-bottom: 12px; }
 .audit-note-card { margin-top: 16px; }
 .audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
-.section-head { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.section-head { display: flex; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
+.head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.balance-indicator { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 8px; font-size: 13px; }
 .balance-alert { margin-bottom: 8px; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; }
+.toolbar-left { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.toolbar-right { display: flex; gap: 6px; align-items: center; }
+.sync-msg { font-size: 12px; color: #606266; }
+.chip-wrap { display: inline-flex; align-items: center; }
+.footer-note { margin: 10px 0; color: #909399; font-size: 12px; }
+:deep(.rje-row) { background: #fdf6ec; }
+:deep(.g11-acct-row) { background: #f0f9eb; }
 </style>

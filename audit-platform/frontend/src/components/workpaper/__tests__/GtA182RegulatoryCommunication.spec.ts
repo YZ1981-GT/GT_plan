@@ -49,6 +49,14 @@ vi.mock('../GtOnlyOfficeSheet.vue', () => ({
   default: defineComponent({ name: 'GtOnlyOfficeSheet', template: '<div class="oo-stub" />' }),
 }))
 
+vi.mock('../GtIndexChip.vue', () => ({
+  default: {
+    name: 'GtIndexChip',
+    props: ['value', 'contextProjectId', 'context'],
+    template: '<span class="gt-index-chip-stub">{{ value }}</span>',
+  },
+}))
+
 describe('GtA182RegulatoryCommunication.vue', () => {
   beforeEach(() => {
     setActivePinia(createPinia())

@@ -12,6 +12,13 @@ import {
   calcTotalCapWithBorrow,
   calcDcfPresentValue,
   calcTerminalValue,
+  calcWeightedPrincipal,
+  calcCapRateFromActualInterest,
+  calcMonthlyWeightedExpChain,
+  calcExpTotal,
+  annualRateToMonthly,
+  calcExcessWeightedExp,
+  calcCapDiffRate,
 } from '../composables/useH2InterestCapEngine'
 
 describe('useH2InterestCapEngine — 加权资本化率', () => {
@@ -33,8 +40,6 @@ describe('useH2InterestCapEngine — 加权资本化率', () => {
       { principal: 1_000_000, rate: 0.04, days: 100 },
       { principal: 1_000_000, rate: 0.06, days: 300 },
     ]
-    // weight1 = 1e6 * 100/365, weight2 = 1e6 * 300/365
-    // rate = (w1*0.04 + w2*0.06) / (w1+w2) = (100*0.04 + 300*0.06)/400 = (4+18)/400 = 0.055
     expect(calcWeightedCapRate(loans)).toBeCloseTo(0.055, 10)
   })
 
@@ -48,6 +53,57 @@ describe('useH2InterestCapEngine — 加权资本化率', () => {
   })
 })
 
+describe('useH2InterestCapEngine — 本金加权与账面倒算利率（xlsx H2-10）', () => {
+  it('本金加权平均数 = 本金×计息天数/当期天数', () => {
+    expect(calcWeightedPrincipal(1_000_000, 180, 360)).toBeCloseTo(500_000, 5)
+  })
+
+  it('当期天数为0返回0', () => {
+    expect(calcWeightedPrincipal(1_000_000, 180, 0)).toBe(0)
+  })
+
+  it('资本化率 = Σ实际利息 / Σ本金加权', () => {
+    const loans = [
+      { weightedPrincipal: 500_000, actualInterest: 20_000 },
+      { weightedPrincipal: 500_000, actualInterest: 30_000 },
+    ]
+    expect(calcCapRateFromActualInterest(loans)).toBeCloseTo(0.05, 10)
+  })
+
+  it('本金加权合计为0返回0', () => {
+    expect(calcCapRateFromActualInterest([{ weightedPrincipal: 0, actualInterest: 100 }])).toBe(0)
+  })
+})
+
+describe('useH2InterestCapEngine — 月度加权支出链（半月平均法）', () => {
+  it('工程支出合计', () => {
+    expect(calcExpTotal({
+      prelimDev: 10, engCost: 20, borrowCost: 5, install: 30, land: 15,
+      decrease: 0, prepaid: 0,
+    })).toBe(80)
+  })
+
+  it('年初加权 = 支出合计+预付-借款费用；次月滚动半月平均', () => {
+    const opening = {
+      prelimDev: 100, engCost: 0, borrowCost: 10, install: 0, land: 0,
+      decrease: 0, prepaid: 20,
+    }
+    const months = [
+      {
+        prelimDev: 0, engCost: 40, borrowCost: 0, install: 0, land: 0,
+        decrease: 0, prepaid: 0,
+      },
+    ]
+    const chain = calcMonthlyWeightedExpChain(opening, months)
+    expect(chain.openingWeighted).toBeCloseTo(120, 5)
+    expect(chain.monthlyWeighted[0]).toBeCloseTo(140, 5)
+  })
+
+  it('年利率转月利率 /12', () => {
+    expect(annualRateToMonthly(0.06)).toBeCloseTo(0.005, 10)
+  })
+})
+
 describe('useH2InterestCapEngine — 累计支出加权平均数', () => {
   it('单笔支出占满全期返回该金额', () => {
     const expenditures = [{ amount: 500_000, days: 365 }]
@@ -56,7 +112,6 @@ describe('useH2InterestCapEngine — 累计支出加权平均数', () => {
 
   it('单笔支出占半期返回半额', () => {
     const expenditures = [{ amount: 1_000_000, days: 180 }]
-    // 1_000_000 * 180 / 360 = 500_000
     expect(calcWeightedExpenditure(expenditures, 360)).toBeCloseTo(500_000, 5)
   })
 
@@ -65,7 +120,6 @@ describe('useH2InterestCapEngine — 累计支出加权平均数', () => {
       { amount: 100_000, days: 300 },
       { amount: 200_000, days: 200 },
     ]
-    // (100000*300 + 200000*200) / 365 = (30000000 + 40000000) / 365 ≈ 191780.82
     expect(calcWeightedExpenditure(expenditures, 365)).toBeCloseTo(70_000_000 / 365, 2)
   })
 
@@ -98,6 +152,10 @@ describe('useH2InterestCapEngine — 专门借款资本化', () => {
   it('闲置收益为0时返回全部利息', () => {
     expect(calcSpecialLoanCap(100_000, 0)).toBe(100_000)
   })
+
+  it('闲置收益超过利息时下限为0', () => {
+    expect(calcSpecialLoanCap(10_000, 20_000)).toBe(0)
+  })
 })
 
 describe('useH2InterestCapEngine — 一般借款补充资本化', () => {
@@ -108,6 +166,19 @@ describe('useH2InterestCapEngine — 一般借款补充资本化', () => {
   it('超额为0时返回0', () => {
     expect(calcGeneralLoanSupp(0, 0.06)).toBe(0)
   })
+
+  it('利率为0时返回0', () => {
+    expect(calcGeneralLoanSupp(200_000, 0)).toBe(0)
+  })
+})
+
+describe('useH2InterestCapEngine — 超额与差异率', () => {
+  it('calcExcessWeightedExp / calcCapDiffRate', () => {
+    expect(calcExcessWeightedExp(500_000, 300_000)).toBe(200_000)
+    expect(calcExcessWeightedExp(200_000, 300_000)).toBe(0)
+    expect(calcCapDiffRate(100, 0)).toBeNull()
+    expect(calcCapDiffRate(100, 1000)).toBeCloseTo(0.1, 10)
+  })
 })
 
 describe('useH2InterestCapEngine — 有专门借款合计', () => {
@@ -116,15 +187,38 @@ describe('useH2InterestCapEngine — 有专门借款合计', () => {
   })
 })
 
+describe('useH2InterestCapEngine — 月度加权链(含SP)', () => {
+  it('H2-11 扣减专门借款占用额', () => {
+    const opening = {
+      prelimDev: 100, engCost: 0, borrowCost: 0, install: 0, land: 0,
+      decrease: 0, prepaid: 0, specialLoanUsed: 40,
+    }
+    const months = [{
+      prelimDev: 60, engCost: 0, borrowCost: 0, install: 0, land: 0,
+      decrease: 0, prepaid: 0, specialLoanUsed: 20,
+    }]
+    const noSp = calcMonthlyWeightedExpChain(opening, months, false)
+    const withSp = calcMonthlyWeightedExpChain(opening, months, true)
+    expect(noSp.openingWeighted).toBe(100)
+    expect(withSp.openingWeighted).toBe(60)
+    expect(withSp.monthlyWeighted[0]).toBe(80)
+  })
+
+  it('负基数下限为0', () => {
+    const opening = {
+      prelimDev: 10, engCost: 0, borrowCost: 0, install: 0, land: 0,
+      decrease: 0, prepaid: 0, specialLoanUsed: 50,
+    }
+    expect(calcMonthlyWeightedExpChain(opening, [], true).openingWeighted).toBe(0)
+  })
+})
+
 describe('useH2InterestCapEngine — DCF现值', () => {
   it('单期现金流折现', () => {
-    // 100 / (1+0.1)^1 = 90.909...
     expect(calcDcfPresentValue([100], 0.1)).toBeCloseTo(90.9091, 3)
   })
 
   it('多期现金流折现', () => {
-    // 100/(1.1) + 200/(1.1^2) + 300/(1.1^3)
-    // = 90.909 + 165.289 + 225.394 = 481.593
     const expected = 100 / 1.1 + 200 / (1.1 ** 2) + 300 / (1.1 ** 3)
     expect(calcDcfPresentValue([100, 200, 300], 0.1)).toBeCloseTo(expected, 3)
   })
@@ -141,7 +235,6 @@ describe('useH2InterestCapEngine — DCF现值', () => {
 
 describe('useH2InterestCapEngine — 终值（Gordon模型）', () => {
   it('perpetuityCF / (discountRate - growthRate)', () => {
-    // 100 / (0.1 - 0.03) = 100 / 0.07 ≈ 1428.57
     expect(calcTerminalValue(100, 0.1, 0.03)).toBeCloseTo(1428.5714, 2)
   })
 
@@ -154,7 +247,6 @@ describe('useH2InterestCapEngine — 终值（Gordon模型）', () => {
   })
 
   it('growthRate=0时退化为perpetuity', () => {
-    // 100 / (0.1 - 0) = 1000
     expect(calcTerminalValue(100, 0.1, 0)).toBeCloseTo(1000, 5)
   })
 })

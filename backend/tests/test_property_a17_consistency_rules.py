@@ -181,17 +181,18 @@ def test_risk_vs_opinion_triggers(risk_phrase, opinion_phrase, filler):
 
 @settings(max_examples=100)
 @given(
+    ch02=st.text(min_size=5, max_size=50),
     ch06=safe_text,
     ch10=safe_text,
     ch12_content=st.text(min_size=5, max_size=50),
-    ch14=safe_text,
+    ch14=st.text(min_size=5, max_size=50),
     ch15=safe_text,
     category=st.one_of(business_categories, st.none()),
 )
-def test_no_false_positives_when_no_triggers(ch06, ch10, ch12_content, ch14, ch15, category):
+def test_no_false_positives_when_no_triggers(ch02, ch06, ch10, ch12_content, ch14, ch15, category):
     """无触发条件时结果为空。
 
-    构造内容不包含任何触发关键词。
+    构造内容不包含任何触发关键词；A 类必填章（ch02/ch12/ch14）均非空。
     """
     # 确保生成的内容不包含任何触发关键词
     trigger_words = [
@@ -201,13 +202,15 @@ def test_no_false_positives_when_no_triggers(ch06, ch10, ch12_content, ch14, ch1
         "保留", "否定", "无法表示",
         "未解决", "遗留", "未应对", "未消除",
     ]
-    all_content = ch06 + ch10 + ch14 + ch15
+    all_content = ch02 + ch06 + ch10 + ch14 + ch15 + ch12_content
     assume(not any(kw in all_content for kw in trigger_words))
-    # ch12 非空以避免 kam_required_listed
+    assume(len(ch02.strip()) > 0)
     assume(len(ch12_content.strip()) > 0)
+    assume(len(ch14.strip()) > 0)
 
     chapters = make_chapters(
         **{
+            "A17-1-ch02": ch02,
             "A17-1-ch06": ch06,
             "A17-1-ch10": ch10,
             "A17-1-ch12": ch12_content,
@@ -215,5 +218,10 @@ def test_no_false_positives_when_no_triggers(ch06, ch10, ch12_content, ch14, ch1
             "A17-1-ch15": ch15,
         }
     )
-    results = check_consistency(chapters, business_category=category)
+    # 有填写的独立性章节时，默认假定 A17-7 已签，避免 independence_vs_a177 误报
+    results = check_consistency(
+        chapters,
+        business_category=category,
+        context={"a177_signed": True, "a173_has_content": False, "a1731_closed": True},
+    )
     assert len(results) == 0, f"Unexpected results: {[r.rule_id for r in results]}"

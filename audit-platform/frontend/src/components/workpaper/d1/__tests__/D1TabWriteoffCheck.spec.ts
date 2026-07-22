@@ -146,12 +146,12 @@ describe('预警高亮显示条件', () => {
   })
 
   it('missingWriteoffFields: amount>0 且字段为空时返回缺失字段', () => {
-    const row: WriteoffRow = { id: '1', unitName: '', noteNature: '', writeoffAmount: 200, writeoffReason: '', writeoffProcedure: '' }
-    expect(getMissingWriteoffFields(row)).toEqual(['writeoffReason', 'writeoffProcedure'])
+    const row: WriteoffRow = { id: '1', unitName: '', noteNature: '', writeoffAmount: 200, writeoffReason: '', writeoffProcedure: '', reasonabilityAnalysis: '' }
+    expect(getMissingWriteoffFields(row)).toEqual(['writeoffReason', 'writeoffProcedure', 'reasonabilityAnalysis'])
   })
 
   it('missingWriteoffFields: amount=0 时无必填要求', () => {
-    const row: WriteoffRow = { id: '1', unitName: '', noteNature: '', writeoffAmount: 0, writeoffReason: '', writeoffProcedure: '' }
+    const row: WriteoffRow = { id: '1', unitName: '', noteNature: '', writeoffAmount: 0, writeoffReason: '', writeoffProcedure: '', reasonabilityAnalysis: '' }
     expect(getMissingWriteoffFields(row)).toEqual([])
   })
 })

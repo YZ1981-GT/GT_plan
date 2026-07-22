@@ -2,37 +2,35 @@
   <div class="i1-tab-detail">
     <!-- 方法论上下文（琥珀色左边线） -->
     <div class="methodology-context">
-      <p><strong>I1-2 无形资产明细表 — 4区段Tab使用说明：</strong></p>
-      <p>本表56列按功能拆分为4个区段Tab切换查看，切换Tab时当前选中行保持同步高亮。</p>
-      <p>① 基础信息：资产分类/名称/取得日期/使用寿命/残值率/摊销方法</p>
-      <p>② 原值变动：期初原值/本期增加/本期减少/期末原值（公式自动计算）</p>
-      <p>③ 摊销：摊销期初/本期摊销/摊销转出/摊销期末/净值（公式自动计算）</p>
-      <p>④ 减值：减值期初/本期计提/本期转回/减值期末（公式自动计算）</p>
+      <p><strong>I1-2 明细表编制逻辑（对齐 Excel 56 列）：</strong></p>
+      <p>横向三区块：原值 | 累计摊销 | 减值准备；每块「未审数 → 期初/账项调整 → 审定数」。</p>
+      <p>右侧：期初/期末净值（未审+审定）+ 权属证明 + 抵押受限。区段 Tab 拆分仅为可读性，行数据一体。</p>
+      <p>公式：期末=期初+增加−减少；净值=原值−摊销−减值；审定=未审+调整。</p>
     </div>
 
     <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：核实无形资产各项目分类、原值、摊销、减值明细登记的完整、准确，并与审定表 I1 三科目小计勾稽一致。"
+      show-icon
       class="objective-alert"
+      title="审计目标：核实明细账与总账、报表及上年底稿是否相符，确认期初、期末余额的准确性。"
     />
 
-    <!-- 编制提示 -->
     <details class="guidance-details">
-      <summary>📋 编制提示</summary>
+      <summary>编制说明</summary>
       <div class="guidance-content">
-        <p>1. 逐项登记无形资产明细，资产分类与摊销方法应与被审计单位会计政策一致（CAS6）。</p>
-        <p>2. 原值期末=期初+增加-减少；累计摊销期末=期初+本期摊销-转出；减值期末=期初+计提-转回；净值=原值期末-摊销期末-减值期末（灰底列自动计算）。</p>
-        <p>3. "摊销原值"列即原值期末，作为摊销测算(I1-10/I1-11)的计算基数，来源"原值变动"区段。</p>
-        <p>4. 明细合计应与审定表 I1 原值/摊销/减值小计勾稽一致，差异超过阈值将黄色告警。</p>
+        <p>1、本科目核算企业持有的无形资产成本，包括专利权、非专利技术、商标权、著作权、土地使用权等。</p>
+        <p>2、对于使用寿命不确定的无形资产，每年进行减值测试。</p>
+        <p>3、对于尚未达到可使用状态的无形资产，由于其价值通常具有较大的不确定性，也应当每年进行减值测试。</p>
+        <p>4、增加方式（购置/内部研发/企业合并/其他）联动 I1-5；减少方式（处置/失效终止/其他）联动 I1-6。</p>
+        <p>5、无形资产减值损失一经确认不得转回；减值「减少」一般为处置结转。</p>
       </div>
     </details>
 
-    <!-- 交叉验证警告 -->
     <div v-if="crossValidation.hasAnyWarning" class="cross-validation-warning">
       <el-icon class="warning-icon"><WarningFilled /></el-icon>
-      <span>明细表合计与I1审定表小计不一致：</span>
+      <span>明细审定合计与 I1 审定表小计不一致：</span>
       <span v-if="crossValidation.hasCostWarning" class="warning-item">
         原值差异 {{ fmtAmount(crossValidation.costDiff) }}
       </span>
@@ -44,33 +42,36 @@
       </span>
     </div>
 
-    <!-- 工具栏：新增行 + 导入导出 -->
     <div class="tab-toolbar">
-      <el-button
+      <el-button v-if="!isReadonly" type="primary" size="small" @click="handleAddRow">+ 新增</el-button>
+      <el-dropdown
         v-if="!isReadonly"
-        type="primary"
         size="small"
-        @click="handleAddRow"
+        :disabled="ieBusy"
+        @command="handleIeCommand"
       >
-        + 新增
-      </el-button>
-      <el-dropdown v-if="!isReadonly" trigger="click" class="import-export-dropdown">
-        <el-button size="small">
-          导入导出 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-        </el-button>
+        <el-button size="small" :loading="ieBusy">导入导出 ▾</el-button>
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-            <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-            <el-dropdown-item @click="handleImportData">导入数据</el-dropdown-item>
+            <el-dropdown-item command="export-template">导出模板</el-dropdown-item>
+            <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
+            <el-dropdown-item command="import-data" divided>导入数据</el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
+      <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
       <span class="chip-wrap"><GtIndexChip value="wp:I1-2" :context-project-id="projectId" /></span>
-      <span class="row-count">共 {{ rows.length }} 行</span>
+      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      <el-tag v-if="needAnnualImpairmentCount" size="small" type="warning">
+        须年测减值 {{ needAnnualImpairmentCount }}
+      </el-tag>
+      <el-tag size="small" class="nav-chip" @click="emit('navigate-sheet', 'I1-1')">→ 审定表</el-tag>
+      <el-tag size="small" class="nav-chip" @click="emit('navigate-sheet', 'I1-5')">I1-5</el-tag>
+      <el-tag size="small" class="nav-chip" @click="emit('navigate-sheet', 'I1-6')">I1-6</el-tag>
+      <span class="row-count">未审净值 {{ fmtAmount(summaryRow.netValue) }} / 审定净值 {{ fmtAmount(summaryRow.auditedNetEnd) }}</span>
     </div>
 
-    <!-- 4区段Tab切换 -->
+    <!-- 5区段Tab切换（Excel 56列可读性拆分，行数据一体） -->
     <el-tabs v-model="activeTab" type="border-card" class="segment-tabs" @tab-change="onTabChange">
       <el-tab-pane
         v-for="tab in tabs"
@@ -78,7 +79,6 @@
         :label="tab.label"
         :name="tab.key"
       >
-        <!-- 每区段对应的el-table -->
         <el-table
           :data="rows"
           border
@@ -90,10 +90,8 @@
           :row-class-name="getRowClassName"
           @current-change="onCurrentRowChange"
         >
-          <!-- 序号列 -->
           <el-table-column type="index" label="#" width="50" align="center" />
 
-          <!-- 动态列 -->
           <el-table-column
             v-for="col in tab.columns"
             :key="col.key"
@@ -102,26 +100,19 @@
             :min-width="col.width"
             :align="col.type === 'number' || col.type === 'formula' ? 'right' : 'left'"
           >
-            <!-- 公式列表头带tooltip -->
             <template v-if="col.type === 'formula'" #header>
               <el-tooltip :content="col.tooltip" placement="top">
                 <span class="formula-col-header">{{ col.label }}</span>
               </el-tooltip>
             </template>
 
-            <!-- 单元格渲染 -->
             <template #default="{ row, $index }">
-              <!-- 公式列：虚线下划线 + 只读 -->
-              <span
-                v-if="col.type === 'formula'"
-                class="formula-value"
-              >
+              <span v-if="col.type === 'formula'" class="formula-value">
                 <el-tooltip :content="col.tooltip" placement="top">
                   <span>{{ fmtAmount((row as any)[col.key]) }}</span>
                 </el-tooltip>
               </span>
 
-              <!-- 数字可编辑列 -->
               <el-input-number
                 v-else-if="col.type === 'number' && col.editable && !isReadonly"
                 :model-value="(row as any)[col.key]"
@@ -132,7 +123,6 @@
                 @change="(val: number | undefined) => handleCellChange($index, col.key, val ?? 0)"
               />
 
-              <!-- 文本可编辑列 -->
               <el-input
                 v-else-if="col.type === 'text' && col.editable && !isReadonly"
                 :model-value="(row as any)[col.key]"
@@ -141,7 +131,6 @@
                 @change="(val: string) => handleCellChange($index, col.key, val)"
               />
 
-              <!-- 日期可编辑列 -->
               <el-date-picker
                 v-else-if="col.type === 'date' && col.editable && !isReadonly"
                 :model-value="(row as any)[col.key]"
@@ -150,50 +139,40 @@
                 value-format="YYYY-MM-DD"
                 placeholder="选择日期"
                 class="cell-date-picker"
-                @change="(val: string) => handleCellChange($index, col.key, val)"
+                @change="(val: string) => handleCellChange($index, col.key, val ?? '')"
               />
 
-              <!-- 下拉选择可编辑列 -->
               <el-select
                 v-else-if="col.type === 'select' && col.editable && !isReadonly"
                 :model-value="(row as any)[col.key]"
                 size="small"
                 class="cell-select"
-                @change="(val: string) => handleCellChange($index, col.key, val)"
+                clearable
+                @change="(val: string) => handleCellChange($index, col.key, val ?? '')"
               >
                 <el-option
                   v-for="opt in col.options"
-                  :key="opt"
-                  :label="opt"
+                  :key="String(opt)"
+                  :label="ynLabel(opt)"
                   :value="opt"
                 />
               </el-select>
 
-              <!-- 只读列（非公式） -->
               <span v-else class="cell-readonly">
-                {{ col.type === 'number' ? fmtAmount((row as any)[col.key]) : (row as any)[col.key] || '-' }}
+                {{ displayCell(row, col) }}
               </span>
             </template>
           </el-table-column>
 
-          <!-- 操作列 -->
-          <el-table-column v-if="!isReadonly" label="操作" width="100" align="center" fixed="right">
+          <el-table-column v-if="!isReadonly" label="操作" width="80" align="center" fixed="right">
             <template #default="{ $index }">
-              <el-button size="small" type="danger" text @click="handleRemoveRow($index)">
-                删除
-              </el-button>
+              <el-button size="small" type="danger" text @click="handleRemoveRow($index)">删除</el-button>
             </template>
           </el-table-column>
         </el-table>
 
-        <!-- 合计行（不可编辑） -->
         <div class="summary-section">
-          <el-table
-            :data="[summaryDisplayRow(tab.key)]"
-            border
-            size="small"
-            class="summary-table"
-          >
+          <el-table :data="[summaryDisplayRow(tab.key)]" border size="small" class="summary-table">
             <el-table-column label="#" width="50" align="center">
               <template #default>
                 <span class="summary-label">合计</span>
@@ -208,33 +187,57 @@
               :align="col.type === 'number' || col.type === 'formula' ? 'right' : 'left'"
             >
               <template #default="{ row }">
-                <span class="summary-value">
-                  {{ getSummaryValue(row, col) }}
-                </span>
+                <span class="summary-value">{{ getSummaryValue(row, col) }}</span>
               </template>
             </el-table-column>
-            <el-table-column v-if="!isReadonly" label="" width="100" />
+            <el-table-column v-if="!isReadonly" label="" width="80" />
           </el-table>
         </div>
       </el-tab-pane>
     </el-tabs>
 
-    <!-- 审计说明 -->
+    <!-- 按分类汇总（对齐 Excel 分类小计行） -->
+    <el-card v-if="categorySummary.length" shadow="never" class="category-card">
+      <template #header>
+        <div class="card-header"><span>按资产分类汇总</span></div>
+      </template>
+      <el-table :data="categorySummary" border size="small" class="category-table">
+        <el-table-column prop="category" label="分类" min-width="120" />
+        <el-table-column prop="count" label="项数" width="70" align="center" />
+        <el-table-column prop="costEnd" label="未审原值期末" min-width="120" align="right">
+          <template #default="{ row }">{{ fmtAmount(row.costEnd) }}</template>
+        </el-table-column>
+        <el-table-column prop="accAmortEnd" label="未审摊销期末" min-width="120" align="right">
+          <template #default="{ row }">{{ fmtAmount(row.accAmortEnd) }}</template>
+        </el-table-column>
+        <el-table-column prop="impairmentEnd" label="未审减值期末" min-width="120" align="right">
+          <template #default="{ row }">{{ fmtAmount(row.impairmentEnd) }}</template>
+        </el-table-column>
+        <el-table-column prop="netValue" label="未审净值" min-width="120" align="right">
+          <template #default="{ row }">{{ fmtAmount(row.netValue) }}</template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
     <el-card shadow="never" class="audit-note-card">
       <template #header><div class="card-header"><span>审计说明</span></div></template>
       <el-input
         type="textarea"
         :model-value="auditNote"
         :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="填写审计说明：明细取数与登记情况、与审定表勾稽核对结果、异常项处理等。"
+        :autosize="{ minRows: 4 }"
+        placeholder="填写审计说明：明细取数与登记、与总账/报表/上年底稿核对、增减方式抽查、与审定表勾稽等。"
         @change="saveAuditNote"
       />
     </el-card>
 
-    <!-- 审计结论 -->
     <el-card shadow="never" class="audit-note-card">
-      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <template #header>
+        <div class="card-header">
+          <span>审计结论</span>
+          <el-button v-if="!isReadonly" size="small" @click="fillDraft">填入结论模板</el-button>
+        </div>
+      </template>
       <el-input
         type="textarea"
         :model-value="auditConclusion"
@@ -249,11 +252,11 @@
 
 <script setup lang="ts">
 import { ref, computed, toRef, onMounted, watch, type Ref } from 'vue'
-import { ArrowDown, WarningFilled } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { WarningFilled } from '@element-plus/icons-vue'
 import { useI1Detail, type I1DetailTab, type I1DetailRow } from '../../composables/useI1Detail'
+import { useI1ImportExport } from '../../composables/useI1ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
-
-// ─── Props ───────────────────────────────────────────────────────────────────
 
 const props = defineProps<{
   wpId: string
@@ -265,14 +268,29 @@ const props = defineProps<{
   adjImpairSubtotal?: number
 }>()
 
-// ─── Emits ───────────────────────────────────────────────────────────────────
-
 const emit = defineEmits<{
   'navigate-sheet': [sheetName: string]
   'save': [itemId: string, value: any]
 }>()
 
-// ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────────
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const { importing, exporting, exportTemplate, exportData, importData } = useI1ImportExport({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+})
+const ieBusy = computed(() => importing.value || exporting.value)
+
+async function handleIeCommand(cmd: string) {
+  if (cmd === 'export-template') await exportTemplate('I1-2')
+  else if (cmd === 'export-data') await exportData('I1-2')
+  else if (cmd === 'import-data') fileInputRef.value?.click()
+}
+
+async function onFileSelected(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  ;(e.target as HTMLInputElement).value = ''
+  if (file) await importData('I1-2', file)
+}
 
 const NOTE_KEY = 'I1-2-audit-note'
 const CONCLUSION_KEY = 'I1-2-audit-conclusion'
@@ -301,20 +319,21 @@ function loadAuditText(): void {
 onMounted(loadAuditText)
 watch(() => props.allResponses, loadAuditText, { deep: true })
 
-// ─── Composable ──────────────────────────────────────────────────────────────
-
 const {
   rows,
   activeTab,
   activeRowIndex,
   summaryRow,
   crossValidation,
+  categorySummary,
+  needAnnualImpairmentCount,
   tabs,
   switchTab,
   setActiveRow,
   updateCell,
   addRow,
   removeRow,
+  fillConclusionDraft,
 } = useI1Detail(
   toRef(props, 'wpId') as Ref<string>,
   toRef(props, 'allResponses') as Ref<Map<string, any>>,
@@ -326,92 +345,125 @@ const {
   },
 )
 
-// ─── Computed ────────────────────────────────────────────────────────────────
-
-/** 当前选中行的rowKey（供el-table current-row-key） */
 const activeRowKey = computed(() => {
   if (activeRowIndex.value < 0 || activeRowIndex.value >= rows.value.length) return ''
   return rows.value[activeRowIndex.value]?.rowId ?? ''
 })
 
-// ─── Event Handlers ──────────────────────────────────────────────────────────
-
-/** Tab切换，保持行同步 */
 function onTabChange(tabKey: string | number): void {
   switchTab(tabKey as I1DetailTab)
 }
 
-/** 行点击同步（跨Tab高亮保持） */
 function onCurrentRowChange(row: I1DetailRow | null): void {
   if (!row) return
   const idx = rows.value.findIndex((r) => r.rowId === row.rowId)
   if (idx >= 0) setActiveRow(idx)
 }
 
-/** 单元格值变化 → 自动重算公式列 + 持久化 */
 function handleCellChange(rowIndex: number, field: string, value: string | number): void {
   updateCell(rowIndex, field as keyof I1DetailRow, value)
 }
 
-/** 新增行：弹ElMessageBox.prompt输入名称 */
 async function handleAddRow(): Promise<void> {
   await addRow()
 }
 
-/** 删除行 */
 function handleRemoveRow(index: number): void {
   removeRow(index)
 }
 
-/** 导出模板（委托useI1ImportExport） */
-function handleExportTemplate(): void {
-  console.log('[I1-Detail] Export template — 委托 useI1ImportExport')
+function fillDraft(): void {
+  const draft = fillConclusionDraft()
+  auditConclusion.value = draft
+  emit('save', CONCLUSION_KEY, draft)
+  ElMessage.success('已填入结论模板')
 }
-
-/** 导出数据（委托useI1ImportExport） */
-function handleExportData(): void {
-  console.log('[I1-Detail] Export data — 委托 useI1ImportExport')
-}
-
-/** 导入数据（委托useI1ImportExport） */
-function handleImportData(): void {
-  console.log('[I1-Detail] Import data — 委托 useI1ImportExport')
-}
-
-// ─── Row Class ───────────────────────────────────────────────────────────────
 
 function getRowClassName({ rowIndex }: { row: I1DetailRow; rowIndex: number }): string {
   return rowIndex === activeRowIndex.value ? 'active-synced-row' : ''
 }
 
-// ─── Summary Row Display ─────────────────────────────────────────────────────
+function ynLabel(opt: string): string {
+  if (opt === 'Y') return '是(Y)'
+  if (opt === 'N') return '否(N)'
+  if (opt === '') return '—'
+  return opt
+}
 
-/** 根据当前Tab返回合计行的展示数据对象 */
+function displayCell(row: I1DetailRow, col: { key: string; type: string }): string {
+  const val = (row as any)[col.key]
+  if (col.type === 'number') return fmtAmount(val)
+  if (col.key === 'hasTitleEvidence' || col.key === 'mortgageRestricted'
+    || col.key === 'indefiniteLife' || col.key === 'notReadyForUse') {
+    return ynLabel(String(val ?? ''))
+  }
+  return val ? String(val) : '-'
+}
+
 function summaryDisplayRow(tabKey: I1DetailTab): Record<string, any> {
   const s = summaryRow.value
   switch (tabKey) {
     case 'basic':
-      return { category: '—', name: '合计', acquisitionDate: '', usefulLifeMonths: '', salvageRate: '', amortizationMethod: '' }
+      return { category: '—', name: `合计(${rows.value.length})` }
     case 'cost':
-      return { name: '合计', costBegin: s.costBegin, costIncrease: s.costIncrease, costDecrease: s.costDecrease, costEnd: s.costEnd }
+      return {
+        name: '合计',
+        costBegin: s.costBegin,
+        costIncrease: s.costIncrease,
+        costDecrease: s.costDecrease,
+        costEnd: s.costEnd,
+        auditedCostBegin: s.auditedCostBegin,
+        auditedCostIncrease: s.auditedCostIncrease,
+        auditedCostDecrease: s.auditedCostDecrease,
+        auditedCostEnd: s.auditedCostEnd,
+      }
     case 'amort':
-      return { name: '合计', costEnd: s.costEnd, accAmortBegin: s.accAmortBegin, amortProvision: s.amortProvision, amortTransferOut: s.amortTransferOut, accAmortEnd: s.accAmortEnd, netValue: s.netValue }
+      return {
+        name: '合计',
+        accAmortBegin: s.accAmortBegin,
+        amortProvision: s.amortProvision,
+        amortOtherIncrease: s.amortOtherIncrease,
+        amortDisposal: s.amortDisposal,
+        amortOtherDecrease: s.amortOtherDecrease,
+        accAmortEnd: s.accAmortEnd,
+        auditedAccAmortBegin: s.auditedAccAmortBegin,
+        auditedAmortIncrease: s.auditedAmortIncrease,
+        auditedAmortDecrease: s.auditedAmortDecrease,
+        auditedAccAmortEnd: s.auditedAccAmortEnd,
+      }
     case 'impairment':
-      return { name: '合计', impairmentBegin: s.impairmentBegin, impairmentProvision: s.impairmentProvision, impairmentReversal: s.impairmentReversal, impairmentEnd: s.impairmentEnd }
+      return {
+        name: '合计',
+        impairmentBegin: s.impairmentBegin,
+        impairmentProvision: s.impairmentProvision,
+        impairOtherIncrease: s.impairOtherIncrease,
+        impairDisposal: s.impairDisposal,
+        impairOtherDecrease: s.impairOtherDecrease,
+        impairmentEnd: s.impairmentEnd,
+        auditedImpairmentBegin: s.auditedImpairmentBegin,
+        auditedImpairIncrease: s.auditedImpairIncrease,
+        auditedImpairDecrease: s.auditedImpairDecrease,
+        auditedImpairmentEnd: s.auditedImpairmentEnd,
+      }
+    case 'net':
+      return {
+        name: '合计',
+        netBegin: s.netBegin,
+        netValue: s.netValue,
+        auditedNetBegin: s.auditedNetBegin,
+        auditedNetEnd: s.auditedNetEnd,
+      }
     default:
-      return {}
+      return { name: '合计' }
   }
 }
 
-/** 获取合计行单元格显示值 */
 function getSummaryValue(row: Record<string, any>, col: { key: string; type: string }): string {
   const val = row[col.key]
   if (val == null || val === '') return '-'
   if (col.type === 'number' || col.type === 'formula') return fmtAmount(val as number)
   return String(val)
 }
-
-// ─── Formatters ──────────────────────────────────────────────────────────────
 
 function fmtAmount(value: number | null | undefined): string {
   if (value == null) return '-'
@@ -503,11 +555,24 @@ function fmtAmount(value: number | null | undefined): string {
   margin-left: auto;
 }
 .row-count {
+  margin-left: auto;
   color: var(--el-text-color-secondary);
   font-size: 12px;
 }
+.nav-chip {
+  cursor: pointer;
+}
+.nav-chip:hover {
+  opacity: 0.85;
+}
+.category-card {
+  margin-top: 16px;
+}
+.category-table {
+  font-size: var(--wp-font-size, 13px);
+}
 
-/* 4区段Tab */
+/* 5区段Tab */
 .segment-tabs {
   border-radius: 8px;
 }

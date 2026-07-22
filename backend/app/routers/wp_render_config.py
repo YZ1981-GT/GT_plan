@@ -525,7 +525,8 @@ async def _get_render_config_impl(
     from app.routers.wp_render_strategies import RENDERER_DISPATCH
     from app.routers.wp_render_strategies._context import RenderContext
     from app.routers.wp_render_strategies._context import CrossRefItem as _CRI
-    from app.services.wp_classification_service import _WP_CODE_OVERRIDE
+    from app.services.wp_classification_service import _WP_CODE_OVERRIDE, refresh_wp_code_overrides
+    refresh_wp_code_overrides()
 
     # Step 1~2: working_paper + wp_index
     working_paper = (await db.execute(sa.select(WorkingPaper).where(

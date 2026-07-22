@@ -23,6 +23,7 @@ vi.mock('@/services/apiProxy', () => ({
 }))
 
 import InventoryImpairmentDialog from '../InventoryImpairmentDialog.vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 beforeEach(() => {
   mockPost.mockReset()
@@ -98,22 +99,10 @@ describe('InventoryImpairmentDialog (F-F12)', () => {
     expect(vm.riskLabel('low')).toBe('低')
   })
 
-  it('formatAmount converts numeric string to zh-CN with 2 decimals', () => {
-    const wrapper = mount(InventoryImpairmentDialog, {
-      props: PROPS_BASE,
-      global: {
-        stubs: {
-          'el-dialog': true, 'el-form': true, 'el-form-item': true,
-          'el-radio-group': true, 'el-radio': true, 'el-input-number': true,
-          'el-input': true, 'el-divider': true, 'el-table': true,
-          'el-table-column': true, 'el-button': true, 'el-alert': true,
-          'el-tag': true,
-        },
-      },
-    })
-    const vm = wrapper.vm as any
+  it('displayPrefs.fmt converts numeric string to zh-CN with 2 decimals', () => {
+    const prefs = useDisplayPrefsStore()
     // 不同 locale 输出可能差异，校验关键特征：含逗号 + 2 位小数
-    const out = vm.formatAmount('1234567.89')
+    const out = prefs.fmt('1234567.89')
     expect(out).toMatch(/1.234.567/) // 千分位（CN 用 , 或 ,）
     expect(out).toMatch(/89$/)
   })

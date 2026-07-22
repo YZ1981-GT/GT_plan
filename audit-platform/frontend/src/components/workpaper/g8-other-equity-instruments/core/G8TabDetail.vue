@@ -157,13 +157,13 @@
     >
       <el-table-column prop="seq" label="#" width="44" align="center" fixed />
       <template v-if="detail.activeTab.value === 'basic'">
-        <el-table-column label="被投资单位" min-width="120" fixed>
+        <el-table-column label="被投资单位" :render-header="th('被投资单位')" min-width="120" fixed>
           <template #default="{ row }">
             <el-input v-if="!isReadonly" :model-value="row.investeeName" size="small" @update:model-value="(v: string) => detail.updateRow(row.rowId, { investeeName: v })" />
             <span v-else>{{ row.investeeName }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="投资比例%" width="96" align="right">
+        <el-table-column label="投资比例%" :render-header="th('投资比例%')" width="100" align="right">
           <template #default="{ row }">
             <el-input-number
               v-if="!isReadonly"
@@ -178,58 +178,58 @@
             <span v-else>{{ ratioPct(row.investmentRatio).toFixed(2) }}%</span>
           </template>
         </el-table-column>
-        <el-table-column label="期初余额" width="96" align="right">
+        <el-table-column label="期初余额" :render-header="th('期初余额')" width="100" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.openingBalance" size="small" :controls="false" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { openingBalance: v ?? 0 })" />
             <span v-else>{{ fmt(row.openingBalance) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期初调整" width="96" align="right">
+        <el-table-column label="期初调整" :render-header="th('期初调整')" width="100" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.openingAdjustment" size="small" :controls="false" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { openingAdjustment: v ?? 0 })" />
             <span v-else>{{ fmt(row.openingAdjustment) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期初审定" width="96" align="right">
+        <el-table-column label="期初审定" :render-header="th('期初审定')" width="100" align="right">
           <template #default="{ row }"><span class="formula-cell" title="期初余额+期初调整">{{ fmt(row.openingAdjusted) }}</span></template>
         </el-table-column>
-        <el-table-column label="增加" width="96" align="right">
+        <el-table-column label="增加" :render-header="th('增加')" width="96" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.increaseAmount" size="small" :controls="false" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { increaseAmount: v ?? 0 })" />
             <span v-else>{{ fmt(row.increaseAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="减少" width="96" align="right">
+        <el-table-column label="减少" :render-header="th('减少')" width="96" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.decreaseAmount" size="small" :controls="false" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { decreaseAmount: v ?? 0 })" />
             <span v-else>{{ fmt(row.decreaseAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="FV变动" width="96" align="right">
+        <el-table-column label="FV变动" :render-header="th('FV变动')" width="100" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.fvChangeAmount" size="small" :controls="false" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { fvChangeAmount: v ?? 0 })" />
             <span v-else>{{ fmt(row.fvChangeAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末余额" width="96" align="right">
+        <el-table-column label="期末余额" :render-header="th('期末余额')" width="100" align="right">
           <template #default="{ row }"><span class="formula-cell" title="期初审定+增加-减少+FV变动">{{ fmt(row.closingBalance) }}</span></template>
         </el-table-column>
-        <el-table-column label="调整数" width="96" align="right">
+        <el-table-column label="调整数" :render-header="th('调整数')" width="96" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.closingAdjustment" size="small" :controls="false" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { closingAdjustment: v ?? 0 })" />
             <span v-else>{{ fmt(row.closingAdjustment) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="审定数" width="96" align="right">
+        <el-table-column label="审定数" :render-header="th('审定数')" width="100" align="right">
           <template #default="{ row }"><span class="formula-cell" title="期末余额+调整数">{{ fmt(row.closingAdjusted) }}</span></template>
         </el-table-column>
-        <el-table-column label="指定OCI原因" min-width="130">
+        <el-table-column label="指定OCI原因" :render-header="th('指定OCI原因')" min-width="140">
           <template #default="{ row }">
             <el-input
               v-if="!isReadonly"
@@ -244,8 +244,8 @@
         </el-table-column>
       </template>
       <template v-else>
-        <el-table-column label="被投资单位" prop="investeeName" min-width="120" fixed />
-        <el-table-column label="期初OCI累计" width="108" align="right">
+        <el-table-column label="被投资单位" :render-header="th('被投资单位')" prop="investeeName" min-width="120" fixed />
+        <el-table-column label="期初OCI累计" :render-header="th('期初OCI累计')" width="120" align="right">
           <template #default="{ row }">
             <el-input-number
               v-if="!isReadonly"
@@ -258,7 +258,7 @@
             <span v-else>{{ fmt(row.ociOpeningCumulative) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期OCI" width="96" align="right">
+        <el-table-column label="本期OCI" :render-header="th('本期OCI')" width="100" align="right">
           <template #default="{ row }">
             <el-input-number
               v-if="!isReadonly"
@@ -272,14 +272,14 @@
             <span v-else :class="{ 'rate-warn': ociFvMismatch(row) }">{{ fmt(row.ociCurrentChange) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="OCI转留存" width="96" align="right">
+        <el-table-column label="OCI转留存" :render-header="th('OCI转留存')" width="110" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.ociToRetainedEarnings" size="small" :controls="false" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { ociToRetainedEarnings: v ?? 0 })" />
             <span v-else>{{ fmt(row.ociToRetainedEarnings) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末OCI累计" width="108" align="right">
+        <el-table-column label="期末OCI累计" :render-header="th('期末OCI累计')" width="120" align="right">
           <template #default="{ row }">
             <span
               class="formula-cell"
@@ -288,7 +288,7 @@
             >{{ fmt(row.ociCumulativeChange) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="转入原因" width="100">
+        <el-table-column label="转入原因" :render-header="th('转入原因')" width="110">
           <template #default="{ row }">
             <el-input
               v-if="!isReadonly"
@@ -300,7 +300,7 @@
             <span v-else>{{ row.transferReason }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="发函情况" width="120">
+        <el-table-column label="发函情况" :render-header="th('发函情况')" width="120">
           <template #default="{ row }">
             <el-select
               v-if="!isReadonly"
@@ -317,7 +317,7 @@
             <span v-else>{{ row.confirmationStatus }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="层次" width="96">
+        <el-table-column label="层次" :render-header="th('层次')" width="96">
           <template #default="{ row }">
             <el-select v-if="!isReadonly" :model-value="row.fairValueLevel" size="small"
               @update:model-value="(v: string) => detail.updateRow(row.rowId, { fairValueLevel: v })">
@@ -326,7 +326,7 @@
             <span v-else>{{ row.fairValueLevel }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="估值方法" width="110">
+        <el-table-column label="估值方法" :render-header="th('估值方法')" width="120">
           <template #default="{ row }">
             <el-select
               v-if="!isReadonly"
@@ -342,21 +342,21 @@
             <span v-else>{{ row.valuationMethod }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="持股数" width="88" align="right">
+        <el-table-column label="持股数" :render-header="th('持股数')" width="96" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.shareCount" size="small" :controls="false" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { shareCount: v ?? 0 })" />
             <span v-else>{{ row.shareCount }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="每股公允价值" width="108" align="right">
+        <el-table-column label="每股公允价值" :render-header="th('每股公允价值')" width="120" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.pricePerShare" size="small" :controls="false" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { pricePerShare: v ?? 0 })" />
             <span v-else>{{ fmt(row.pricePerShare) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="公允价值合计" width="108" align="right">
+        <el-table-column label="公允价值合计" :render-header="th('公允价值合计')" width="120" align="right">
           <template #default="{ row }">
             <el-input-number
               v-if="!isReadonly"
@@ -370,7 +370,7 @@
             <span v-else class="formula-cell" :title="fvHint(row)">{{ fmt(row.fairValueTotal) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="备注" min-width="100">
+        <el-table-column label="备注" :render-header="th('备注')" min-width="100">
           <template #default="{ row }">
             <el-input v-if="!isReadonly" :model-value="row.remark" size="small"
               @update:model-value="(v: string) => detail.updateRow(row.rowId, { remark: v })" />
@@ -386,32 +386,32 @@
     </el-table>
 
     <el-table v-if="detail.rows.value.length" :data="[detail.totals.value]" border size="small" class="totals-table" style="font-size:13px;margin-top:8px">
-      <el-table-column label="合计" width="80" />
-      <el-table-column label="期初审定" width="96" align="right">
+      <el-table-column label="合计" :render-header="th('合计')" width="80" />
+      <el-table-column label="期初审定" :render-header="th('期初审定')" width="100" align="right">
         <template #default="{ row }">{{ fmt(row.openingAdjusted) }}</template>
       </el-table-column>
-      <el-table-column label="增加" width="88" align="right">
+      <el-table-column label="增加" :render-header="th('增加')" width="96" align="right">
         <template #default="{ row }">{{ fmt(row.increaseAmount) }}</template>
       </el-table-column>
-      <el-table-column label="减少" width="88" align="right">
+      <el-table-column label="减少" :render-header="th('减少')" width="96" align="right">
         <template #default="{ row }">{{ fmt(row.decreaseAmount) }}</template>
       </el-table-column>
-      <el-table-column label="FV变动" width="88" align="right">
+      <el-table-column label="FV变动" :render-header="th('FV变动')" width="100" align="right">
         <template #default="{ row }">{{ fmt(row.fvChangeAmount) }}</template>
       </el-table-column>
-      <el-table-column label="期末余额" width="96" align="right">
+      <el-table-column label="期末余额" :render-header="th('期末余额')" width="100" align="right">
         <template #default="{ row }">{{ fmt(row.closingBalance) }}</template>
       </el-table-column>
-      <el-table-column label="审定数" width="96" align="right">
+      <el-table-column label="审定数" :render-header="th('审定数')" width="100" align="right">
         <template #default="{ row }"><strong>{{ fmt(row.closingAdjusted) }}</strong></template>
       </el-table-column>
-      <el-table-column label="本期OCI" width="96" align="right">
+      <el-table-column label="本期OCI" :render-header="th('本期OCI')" width="100" align="right">
         <template #default="{ row }">{{ fmt(row.ociCurrentChange) }}</template>
       </el-table-column>
-      <el-table-column label="期末OCI累计" width="108" align="right">
+      <el-table-column label="期末OCI累计" :render-header="th('期末OCI累计')" width="120" align="right">
         <template #default="{ row }">{{ fmt(row.ociCumulativeChange) }}</template>
       </el-table-column>
-      <el-table-column label="公允合计" width="96" align="right">
+      <el-table-column label="公允合计" :render-header="th('公允合计')" width="110" align="right">
         <template #default="{ row }"><strong>{{ fmt(row.fairValueTotal) }}</strong></template>
       </el-table-column>
     </el-table>
@@ -428,19 +428,19 @@
       conclusion-placeholder="填写审计结论：A、明细准确完整，与 G8-1 勾稽一致，指定与层次恰当。B、除已注明事项外未见异常。C、存在重大未决差异或范围受限，不可确认。"
       conclusion-hint="按 A/B/C 口径评价明细充分性。"
       :related-context="{
-        行数: detail.rows.value.length,
-        审定合计: detail.totals.value.closingAdjusted,
-        公允合计: detail.totals.value.fairValueTotal,
-        完整性提示: detail.integrityIssues.value.length,
-        与G8-1差异: detail.adjCrossVariance.value,
+        rowCount: detail.rows.value.length,
+        closingAdjustedTotal: detail.totals.value.closingAdjusted,
+        fairValueTotal: detail.totals.value.fairValueTotal,
+        integrityIssueCount: detail.integrityIssues.value.length,
+        adjCrossVariance: detail.adjCrossVariance.value,
       }"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, inject, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, inject, ref, watch, h } from 'vue'
+import { ElMessage, ElTooltip } from 'element-plus'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G8ImportExportDropdown from '../G8ImportExportDropdown.vue'
@@ -449,6 +449,16 @@ import { useG8Detail, type G8DetailRow } from '../../composables/useG8Detail'
 import { calcFairValueAmount, calcOciCumulativeEnding } from '../../composables/useG8FormulaEngine'
 import { jumpToG8Sheet } from '../../composables/g8CrossHelpers'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+
+/** 表头悬停显示完整列名（避免窄列截断） */
+function th(label: string) {
+  return () =>
+    h(
+      ElTooltip,
+      { content: label, placement: 'top', showAfter: 200, effect: 'dark' },
+      { default: () => h('span', { class: 'th-label' }, label) },
+    )
+}
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -471,12 +481,13 @@ const detail = useG8Detail({
 const AUDIT_NOTE_KEY = 'G8-2-audit-note'
 const AUDIT_CONCLUSION_KEY = 'G8-2-audit-conclusion'
 const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
-const auditConclusion = ref(props.allResponses.get(AUDIT_CONCLUSION_KEY)?.remark ?? '')
+const _detailConcl = props.allResponses.get(AUDIT_CONCLUSION_KEY)
+const auditConclusion = ref(String(_detailConcl?.conclusion ?? _detailConcl?.remark ?? ''))
 watch(auditNote, (v) => {
   if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
 })
 watch(auditConclusion, (v) => {
-  if (!props.isReadonly) props.debouncedSave(AUDIT_CONCLUSION_KEY, { conclusion: null, remark: v })
+  if (!props.isReadonly) props.debouncedSave(AUDIT_CONCLUSION_KEY, { conclusion: v, remark: null })
 })
 
 const tabOptions = [
@@ -642,4 +653,19 @@ function fvHint(row: G8DetailRow) {
 }
 .rate-warn { color: #e6a23c; font-weight: 600; }
 :deep(.row-warn) { background: #fdf6ec !important; }
+.th-label {
+  display: inline-block;
+  max-width: 100%;
+  line-height: 1.25;
+  white-space: normal;
+  word-break: keep-all;
+  vertical-align: middle;
+  cursor: help;
+}
+:deep(.el-table th.el-table__cell > .cell) {
+  white-space: normal;
+  line-height: 1.25;
+  overflow: visible;
+  text-overflow: unset;
+}
 </style>

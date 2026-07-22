@@ -30,6 +30,45 @@
       </el-button-group>
       <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加客户</el-button>
       <el-button size="small" :disabled="isReadonly" @click="onImportFromAuxBalance">从余额表导入</el-button>
+      <!-- ⚙ 列设置（宽表列自定义） -->
+      <el-popover placement="bottom-end" :width="360" trigger="click">
+        <template #reference>
+          <el-button size="small">⚙ 列设置（{{ visibleCount }}/{{ totalCount }}）</el-button>
+        </template>
+        <div class="col-prefs-panel">
+          <div class="col-prefs-presets">
+            <span class="col-prefs-label">预设：</span>
+            <el-radio-group :model-value="activePreset" size="small" @change="(v: any) => applyPreset(v)">
+              <el-radio-button v-for="p in colPresets" :key="p.name" :value="p.name" :title="p.description">
+                {{ p.label }}
+              </el-radio-button>
+            </el-radio-group>
+          </div>
+          <div class="col-prefs-actions">
+            <el-button size="small" @click="hideEmptyColumns">隐藏空列</el-button>
+            <el-button size="small" @click="applyPreset('all')">全部显示</el-button>
+          </div>
+          <el-scrollbar max-height="320px">
+            <div v-for="g in prefGroups" :key="g" class="col-prefs-group">
+              <el-checkbox
+                :model-value="isGroupVisible(g)"
+                :indeterminate="isGroupPartial(g)"
+                @change="(v: any) => toggleGroup(g, !!v)"
+              >
+                <strong>{{ g }}</strong>
+              </el-checkbox>
+              <div class="col-prefs-items">
+                <el-checkbox
+                  v-for="col in getGroupColumns(g)"
+                  :key="col.key"
+                  :model-value="isColumnVisible(col.key)"
+                  @change="(v: any) => toggleColumn(col.key, !!v)"
+                >{{ col.label }}</el-checkbox>
+              </div>
+            </div>
+          </el-scrollbar>
+        </div>
+      </el-popover>
     </div>
   </div>
 
@@ -75,7 +114,7 @@
       </template>
     </el-table-column>
     <!-- B: 公司代码 -->
-    <el-table-column prop="companyCode" label="公司代码" width="90" fixed>
+    <el-table-column v-if="isColumnVisible('companyCode')" prop="companyCode" label="公司代码" width="90" fixed>
       <template #default="{ row }">
         <el-input v-if="row.rowId !== '__subtotal__' && row.rowId !== '__verification__'"
           v-model="row.companyCode" size="small" :disabled="isReadonly"
@@ -83,7 +122,7 @@
       </template>
     </el-table-column>
     <!-- C: 款项性质 -->
-    <el-table-column label="款项性质" width="160">
+    <el-table-column v-if="isColumnVisible('nature')" label="款项性质" width="160">
       <template #default="{ row }">
         <el-select v-if="isDataRow(row)" v-model="row.nature" size="small" :disabled="isReadonly"
           @change="(val: string) => onCellChange(row.rowId, 'nature', val)">
@@ -95,7 +134,7 @@
       </template>
     </el-table-column>
     <!-- D: 关联方类型 -->
-    <el-table-column label="关联方类型" width="120">
+    <el-table-column v-if="isColumnVisible('relationType')" label="关联方类型" width="120">
       <template #default="{ row }">
         <el-select v-if="isDataRow(row)" v-model="row.relationType" size="small" :disabled="isReadonly"
           @change="(val: string) => onCellChange(row.rowId, 'relationType', val)">
@@ -109,7 +148,7 @@
       </template>
     </el-table-column>
     <!-- E: 期初未审 -->
-    <el-table-column label="期初未审(E)" width="110" align="right">
+    <el-table-column v-if="isColumnVisible('priorUnadjusted')" label="期初未审(E)" width="110" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.priorUnadjusted" size="small" :disabled="isReadonly"
@@ -119,7 +158,7 @@
       </template>
     </el-table-column>
     <!-- F: 期初账项调整 -->
-    <el-table-column label="期初调整(F)" width="100" align="right">
+    <el-table-column v-if="isColumnVisible('priorAdjustment')" label="期初调整(F)" width="100" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.priorAdjustment" size="small" :disabled="isReadonly"
@@ -129,7 +168,7 @@
       </template>
     </el-table-column>
     <!-- G: 期初重分类 -->
-    <el-table-column label="期初重分(G)" width="100" align="right">
+    <el-table-column v-if="isColumnVisible('priorReclass')" label="期初重分(G)" width="100" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.priorReclass" size="small" :disabled="isReadonly"
@@ -139,7 +178,7 @@
       </template>
     </el-table-column>
     <!-- H: 期初审定(自动) -->
-    <el-table-column label="期初审定(H)" width="110" align="right">
+    <el-table-column v-if="isColumnVisible('priorAudited')" label="期初审定(H)" width="110" align="right">
       <template #default="{ row }">
         <GtFormulaSourceTooltip
           :expression="D3_DETAIL_FORMULA_CELLS.priorAudited.expression"
@@ -150,8 +189,8 @@
         </GtFormulaSourceTooltip>
       </template>
     </el-table-column>
-    <!-- 期初账龄（动态） -->
-    <el-table-column v-for="band in bands" :key="'prior-' + band.key" :label="`${band.label}(期初)`" width="100" align="right">
+    <!-- 期初账龄（动态，按列设置过滤） -->
+    <el-table-column v-for="band in visiblePriorBands" :key="'prior-' + band.key" :label="`${band.label}(期初)`" width="100" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.agingPrior[band.key]" size="small" :disabled="isReadonly"
@@ -161,7 +200,7 @@
       </template>
     </el-table-column>
     <!-- M: 借方发生 -->
-    <el-table-column label="借方(M)" width="100" align="right">
+    <el-table-column v-if="isColumnVisible('debit')" label="借方(M)" width="100" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.debit" size="small" :disabled="isReadonly"
@@ -171,7 +210,7 @@
       </template>
     </el-table-column>
     <!-- N: 贷方发生 -->
-    <el-table-column label="贷方(N)" width="100" align="right">
+    <el-table-column v-if="isColumnVisible('credit')" label="贷方(N)" width="100" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.credit" size="small" :disabled="isReadonly"
@@ -181,7 +220,7 @@
       </template>
     </el-table-column>
     <!-- O: 期末余额(自动) -->
-    <el-table-column label="期末余额(O)" width="110" align="right">
+    <el-table-column v-if="isColumnVisible('endBalance')" label="期末余额(O)" width="110" align="right">
       <template #default="{ row }">
         <GtFormulaSourceTooltip
           :expression="D3_DETAIL_FORMULA_CELLS.endBalance.expression"
@@ -193,7 +232,7 @@
       </template>
     </el-table-column>
     <!-- P: 重分类调整 -->
-    <el-table-column label="重分类(P)" width="100" align="right">
+    <el-table-column v-if="isColumnVisible('entityReclass')" label="重分类(P)" width="100" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.entityReclass" size="small" :disabled="isReadonly"
@@ -203,7 +242,7 @@
       </template>
     </el-table-column>
     <!-- Q: 期末未审(自动) -->
-    <el-table-column label="期末未审(Q)" width="110" align="right">
+    <el-table-column v-if="isColumnVisible('endUnadjusted')" label="期末未审(Q)" width="110" align="right">
       <template #default="{ row }">
         <GtFormulaSourceTooltip
           :expression="D3_DETAIL_FORMULA_CELLS.endUnadjusted.expression"
@@ -215,7 +254,7 @@
       </template>
     </el-table-column>
     <!-- R: 期末AJE -->
-    <el-table-column label="期末AJE(R)" width="100" align="right">
+    <el-table-column v-if="isColumnVisible('endAje')" label="期末AJE(R)" width="100" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.endAje" size="small" :disabled="isReadonly"
@@ -225,7 +264,7 @@
       </template>
     </el-table-column>
     <!-- S: 期末RJE -->
-    <el-table-column label="期末RJE(S)" width="100" align="right">
+    <el-table-column v-if="isColumnVisible('endRje')" label="期末RJE(S)" width="100" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.endRje" size="small" :disabled="isReadonly"
@@ -235,7 +274,7 @@
       </template>
     </el-table-column>
     <!-- T: 期末审定(自动) -->
-    <el-table-column label="期末审定(T)" width="110" align="right">
+    <el-table-column v-if="isColumnVisible('endAudited')" label="期末审定(T)" width="110" align="right">
       <template #default="{ row }">
         <GtFormulaSourceTooltip
           :expression="D3_DETAIL_FORMULA_CELLS.endAudited.expression"
@@ -246,8 +285,8 @@
         </GtFormulaSourceTooltip>
       </template>
     </el-table-column>
-    <!-- 审定账龄（动态） -->
-    <el-table-column v-for="band in bands" :key="'audited-' + band.key" :label="`${band.label}(期末审定)`" width="100" align="right">
+    <!-- 审定账龄（动态，按列设置过滤） -->
+    <el-table-column v-for="band in visibleAuditedBands" :key="'audited-' + band.key" :label="`${band.label}(期末审定)`" width="100" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.agingAudited[band.key]" size="small" :disabled="isReadonly"
@@ -257,11 +296,11 @@
       </template>
     </el-table-column>
     <!-- Y: 是否发函 -->
-    <el-table-column label="发函(Y)" width="70" align="center">
+    <el-table-column v-if="isColumnVisible('isConfirmed')" label="发函(Y)" width="70" align="center">
       <template #default="{ row }">{{ row.isConfirmed || '-' }}</template>
     </el-table-column>
     <!-- Z: 期后结转 -->
-    <el-table-column label="期后结转(Z)" width="110" align="right">
+    <el-table-column v-if="isColumnVisible('postPeriodSettlement')" label="期后结转(Z)" width="110" align="right">
       <template #default="{ row }">
         <template v-if="isDataRow(row)">
           <el-input v-model.number="row.postPeriodSettlement" size="small" :disabled="isReadonly"
@@ -271,7 +310,7 @@
       </template>
     </el-table-column>
     <!-- AA: 备注 -->
-    <el-table-column label="备注" min-width="120">
+    <el-table-column v-if="isColumnVisible('remark')" label="备注" min-width="120">
       <template #default="{ row }">
         <el-input v-if="isDataRow(row)" v-model="row.remark" size="small" :disabled="isReadonly"
           @change="(val: string) => onCellChange(row.rowId, 'remark', val)" />
@@ -354,6 +393,7 @@
  */
 import { computed, ref, watch, toRef, type Ref } from 'vue'
 import { useD3Detail } from '../composables/useD3Detail'
+import { useD3DetailColumnPrefs } from '../composables/useD3DetailColumnPrefs'
 import { useD3TabImportExport } from '../composables/useD3TabImportExport'
 import { useD3AiGenerate } from '../composables/useD3AiGenerate'
 import { useWorkpaperWideTable } from '../composables/useWorkpaperWideTable'
@@ -423,6 +463,34 @@ const {
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
   relatedParties,
 })
+
+// ─── 列显示偏好（⚙ 列设置：>15 列宽表按平台铁律提供列自定义） ──────────────
+const colPrefs = useD3DetailColumnPrefs({
+  bands,
+  rows,
+  allResponses: allResponsesRef,
+  isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
+})
+const {
+  allColumns: prefColumns,
+  groups: prefGroups,
+  getGroupColumns,
+  isColumnVisible,
+  toggleColumn,
+  toggleGroup,
+  isGroupVisible,
+  isGroupPartial,
+  visibleCount,
+  totalCount,
+  activePreset,
+  applyPreset,
+  presets: colPresets,
+  hideEmptyColumns,
+} = colPrefs
+
+/** 账龄段可见列（避免 v-if 与 v-for 同元素：先过滤再渲染动态列） */
+const visiblePriorBands = computed(() => bands.value.filter(b => isColumnVisible(`aging-prior-${b.key}`)))
+const visibleAuditedBands = computed(() => bands.value.filter(b => isColumnVisible(`aging-audited-${b.key}`)))
 
 const columnCount = computed(() => 19 + bands.value.length * 2) // 19 non-aging cols + 2 groups × N bands
 const rowCount = computed(() => filteredRows.value.length)
@@ -532,7 +600,14 @@ const { onExportTemplate, onExportData, onImportFile, onImportFromAuxBalance } =
 .guidance-fold summary { cursor: pointer; font-weight: 600; color: #409eff; }
 .guidance-fold p { margin: 6px 0 0; line-height: 1.6; }
 .detail-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.toolbar-actions { display: flex; gap: 8px; }
+.toolbar-actions { display: flex; gap: 8px; align-items: center; }
+/* ⚙ 列设置面板 */
+.col-prefs-panel { font-size: 13px; }
+.col-prefs-presets { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+.col-prefs-label { color: #606266; }
+.col-prefs-actions { display: flex; gap: 8px; margin-bottom: 8px; }
+.col-prefs-group { padding: 6px 0; border-top: 1px solid #f0f0f0; }
+.col-prefs-items { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 4px 0 0 20px; }
 .virtual-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
 .virtual-hint { margin-bottom: 0; flex: 1; }
 .virtual-table { margin-bottom: 8px; }

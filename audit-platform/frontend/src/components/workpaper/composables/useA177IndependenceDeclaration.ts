@@ -341,6 +341,28 @@ export function useA177IndependenceDeclaration(
     }
   }
 
+  async function importPeriodsFromB3(overwrite = false): Promise<{ imported: number; message: string }> {
+    const pid = opts?.projectId?.value || projectContext.value.project_id
+    if (!pid || !wpId.value) {
+      ElMessage.warning('缺少项目或底稿信息')
+      return { imported: 0, message: '' }
+    }
+    try {
+      const res = await api.post<any>('/api/a17/independence/import-b3-periods', {
+        project_id: pid,
+        wp_id: wpId.value,
+        overwrite,
+      })
+      const data = res?.data ?? res
+      await loadData(wpId.value)
+      ElMessage.success(data?.message || '已导入')
+      return { imported: data?.imported || 0, message: data?.message || '' }
+    } catch (err: any) {
+      ElMessage.error(err?.response?.data?.detail || '从 B3 导入失败')
+      return { imported: 0, message: '' }
+    }
+  }
+
   // ─── AI 章节生成 ───
   async function aiGenerateChapter(chapterNum: number): Promise<string> {
     const chapter = chapters.value[String(chapterNum)]
@@ -384,6 +406,7 @@ export function useA177IndependenceDeclaration(
     updateThreatRow,
     updatePeriod,
     updatePartner,
+    importPeriodsFromB3,
     loadData,
     flushPendingSaves,
     initiateSigningBatch,

@@ -442,6 +442,52 @@ export async function exportData(options: ExportDataOptions): Promise<void> {
   ElMessage.success('数据已导出')
 }
 
+/** 多 sheet 导出：单个 sheet 定义 */
+export interface ExcelMultiSheetDef {
+  sheetName: string
+  columns: ExcelColumn[]
+  data: Record<string, any>[]
+  numericColumnKeys?: string[]
+}
+
+/**
+ * 导出多个 sheet 到同一个 Excel 文件（如 I2-5 构成/同行/人均同期/人均同行/说明）
+ */
+export async function exportMultiSheetData(options: {
+  sheets: ExcelMultiSheetDef[]
+  fileName: string
+  applyStyles?: boolean
+}): Promise<void> {
+  const XLSX = await _loadXlsxStyle()
+  const wb = XLSX.utils.book_new()
+  const { sheets, fileName, applyStyles = true } = options
+
+  for (const sheet of sheets) {
+    const { sheetName, columns, data, numericColumnKeys } = sheet
+    const headers = columns.map(c => c.header)
+    const dataRows = data.map(row => columns.map(c => row[c.key] ?? ''))
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
+
+    if (applyStyles) {
+      applyExcelStyleTemplate(ws, XLSX, {
+        headerRowIdx: 0,
+        dataStartRowIdx: 1,
+        dataEndRowIdx: dataRows.length,
+        columns,
+        dataMatrix: dataRows,
+        numericColumnKeys,
+      })
+    } else {
+      ws['!cols'] = headers.map(h => ({ wch: Math.max(h.length * 2.5, 14) }))
+    }
+
+    XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31))
+  }
+
+  XLSX.writeFile(wb, fileName)
+  ElMessage.success('数据已导出')
+}
+
 /**
  * 解析上传的 Excel 文件
  *
@@ -557,6 +603,7 @@ export function useExcelIO() {
   return {
     exportTemplate,
     exportData,
+    exportMultiSheetData,
     parseFile,
     onFileSelected,
   }

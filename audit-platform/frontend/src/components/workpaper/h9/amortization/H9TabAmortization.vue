@@ -195,8 +195,12 @@
         <div class="validation-header">与审定表(H9-1)交叉验证</div>
         <div class="validation-grid">
           <div class="vd-item">
-            <span class="vd-label">摊销表利息合计</span>
-            <span class="vd-value formula-cell" title="Σ 各期利息费用">{{ fmtAmt(validation.totalInterest) }}</span>
+            <span class="vd-label">摊销表本期利息</span>
+            <span class="vd-value formula-cell" title="前12期利息合计（年报口径）">{{ fmtAmt(validation.currentPeriodInterest) }}</span>
+          </div>
+          <div class="vd-item">
+            <span class="vd-label">全期利息（参考）</span>
+            <span class="vd-value">{{ fmtAmt(validation.totalInterest) }}</span>
           </div>
           <div class="vd-item">
             <span class="vd-label">H9-1本期利息费用</span>
@@ -320,14 +324,16 @@ const {
 
 /** H9-1 审定表本期利息费用（从allResponses提取） */
 const h9AuditedInterest = computed<number>(() => {
-  const item = props.allResponses.get('H9-1-interest-expense')
+  const item =
+    props.allResponses.get('H9-1-interest-expense-audited')
+    ?? props.allResponses.get('H9-1-interest-expense')
   if (!item) return 0
   const raw = item.remark ?? item.conclusion
   return Number(raw) || 0
 })
 
-/** 利息差额 = 摊销表合计 - 审定表金额 */
-const crossDiff = computed<number>(() => validation.value.totalInterest - h9AuditedInterest.value)
+/** 利息差额 = 摊销表本期利息 - 审定表金额 */
+const crossDiff = computed<number>(() => validation.value.currentPeriodInterest - h9AuditedInterest.value)
 
 /** 现值差额 */
 const pvDiff = computed<number>(() => {

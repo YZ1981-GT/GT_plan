@@ -121,7 +121,8 @@ describe('Feature: a8-1-other-info-representation, Property 3: 文件清单增�
     fc.assert(
       fc.property(
         fc.array(fc.string({ minLength: 1, maxLength: 30 }), { minLength: 0, maxLength: 10 }),
-        fc.string({ minLength: 1, maxLength: 30 }),
+        // 排除纯空白：addFile 会对 trim 后为空的名称忽略
+        fc.string({ minLength: 1, maxLength: 30 }).filter((s) => s.trim().length > 0),
         (initialFiles, newFile) => {
           const result = addFile(initialFiles, newFile)
           expect(result.length).toBe(initialFiles.length + 1)

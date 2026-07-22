@@ -84,9 +84,12 @@ class G10TradingFinancialLiabilitiesService:
             period_credit = self.parse_num(row.get("periodCredit"))
             period_debit = self.parse_num(row.get("periodDebit"))
             closing_unadj = self.parse_num(row.get("closingUnadjusted"))
-            closing_computed = self.calc_credit_balance(opening_computed, period_credit, period_debit)
+            if period_credit or period_debit:
+                closing_computed = self.calc_credit_balance(opening_computed, period_credit, period_debit)
+            else:
+                closing_computed = closing_unadj
             closing_var = closing_computed - closing_unadj
-            if closing_unadj and abs(closing_var) > self.TOLERANCE:
+            if (period_credit or period_debit) and abs(closing_var) > self.TOLERANCE:
                 errors.append(
                     FormulaError(key, "closingUnadjusted", "期末未审贷方公式不平衡", closing_var)
                 )
@@ -99,6 +102,33 @@ class G10TradingFinancialLiabilitiesService:
                 errors.append(
                     FormulaError(key, "closingAdjusted", "期末审定数公式不平衡", audited_var)
                 )
+        return errors
+
+    def validate_three_part_rows(self, rows: list[dict]) -> list[FormulaError]:
+        """(三)账面余额 = (一)初始金额 + (二)累计公允价值变动"""
+        errors: list[FormulaError] = []
+        for row in rows:
+            suffix = str(row.get("suffix") or "")
+            for field, init_key, fv_key, book_key in (
+                ("openingAdjusted", "initOpening", "fvOpening", "bookOpening"),
+                ("closingAdjusted", "initClosing", "fvClosing", "bookClosing"),
+            ):
+                init_v = self.parse_num(row.get(init_key))
+                fv_v = self.parse_num(row.get(fv_key))
+                book_v = self.parse_num(row.get(book_key))
+                if abs(init_v) < self.TOLERANCE and abs(fv_v) < self.TOLERANCE and abs(book_v) < self.TOLERANCE:
+                    continue
+                expected = init_v + fv_v
+                variance = expected - book_v
+                if abs(variance) > self.TOLERANCE:
+                    errors.append(
+                        FormulaError(
+                            f"book_{suffix}",
+                            field,
+                            f"(三)应等于(一)+(二)（{field}）",
+                            variance,
+                        )
+                    )
         return errors
 
     def validate_l3_rows(self, rows: list[dict]) -> list[FormulaError]:

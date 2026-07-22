@@ -97,56 +97,63 @@ sheets:
     class_code: F-审定表
     account_codes: ['1717']
     formula_count: 61
+    layout_sections:
+      - { id: lead, label: 期初/期末未审·调整·审定 + 变动比较 }
+      - { id: tb, label: 合计 / TB数据 / 差异 }
+      - { id: notes, label: 审计说明与结论 }
     columns:
-      - { field: item, label: 项目, type: text, width: 160, readonly: true }
-      - { field: opening_balance, label: 期初余额, type: number }
-      - { field: capitalized, label: 本期增加(资本化), type: number }
-      - { field: transfer_intangible, label: 本期减少(转无形), type: number }
-      - { field: transfer_expense, label: 本期减少(转费用), type: number }
-      - { field: closing_balance, label: 期末余额, type: number, formula: "opening + capitalized - transfer_intangible - transfer_expense" }
-      - { field: unadjusted_amount, label: 未审数, type: number, auto_source: trial_balance.unadjusted_amount }
-      - { field: aje_amount, label: AJE, type: number }
-      - { field: rje_amount, label: RJE, type: number }
-      - { field: audited_amount, label: 审定数, type: number, formula: "unadjusted_amount + aje_amount + rje_amount" }
+      - { field: project_name, label: 项目, type: text }
+      - { field: begin_unadj, label: 期初未审数, type: number }
+      - { field: begin_adj, label: 期初账项调整, type: number }
+      - { field: begin_audited, label: 期初审定数, type: number, formula: "begin_unadj + begin_adj" }
+      - { field: end_unadj, label: 期末未审数, type: number }
+      - { field: end_adj, label: 期末账项调整, type: number }
+      - { field: end_audited, label: 期末审定数, type: number, formula: "end_unadj + end_adj" }
+      - { field: change_amount, label: 变动额, type: number, formula: "end_audited - begin_audited" }
+      - { field: change_rate, label: 变动率, type: percent, formula: "change_amount / begin_audited", note: "分母为0显示N/A" }
+      - { field: reason_analysis, label: 原因分析, type: text }
     formulas:
-      - { name: calcAuditedAmount, target: audited_amount, expr: "unadjusted + aje + rje" }
-      - { name: calcAssetEndBalance, target: closing_balance, expr: "opening + capitalized - transferIntangible - transferExpense" }
-      - { name: calcTriangleReconciliation, target: reconciliation, expr: "closing - (opening + increase - decrease) === 0" }
+      - { name: calcBeginAudited, expr: "beginUnadj + beginAdj" }
+      - { name: calcEndAudited, expr: "endUnadj + endAdj" }
+      - { name: calcChangeAmount, expr: "endAudited - beginAudited" }
+      - { name: calcChangeRate, expr: "beginAudited==0 ? N/A : changeAmount/beginAudited" }
+      - { name: tbDiff, expr: "total.endAudited - tb.audited1717" }
     highlights:
-      - { condition: "triangle_diff != 0", style: red, tooltip: "期末≠期初+增加-减少" }
-      - { condition: "tb_variance != 0", style: red }
+      - { condition: "tb_diff != 0", style: red, tooltip: "合计审定≠TB" }
     writeback:
       target: trial_balance.audited_amount
       trigger: WORKPAPER_SAVED
       key_field: account_code
       value_field: audited_amount
       accounts: ['1717']
+    autofill_sources: [I2-2, I2-3, trial_balance]
     event_bus:
       publish:
         - { event: "substantive:adjudicated", payload: "{accountCode:'1717', adjudicatedAmount}" }
         - { event: "development:capitalized-to-intangible", payload: "{transferAmount}" }
     footer:
-      - { type: tb_comparison, accounts: ['1717'] }
+      - { type: total_row, label: 合计 }
+      - { type: tb_row, label: TB数据 }
+      - { type: diff_row, label: 差异 }
       - { type: audit_note, label: 审计说明 }
       - { type: audit_conclusion }
-      - { type: review_dialog }
     cross_refs:
       - ref_id: CW-I2-ADJ-001
         target_wp: I2-2
-        description: '审定表 ← I2-2 明细表合计'
+        description: '审定表 ← I2-2 明细表'
         direction: inbound
       - ref_id: CW-I2-ADJ-002
         target_wp: I2-3
-        description: '审定表AJE/RJE ← I2-3 调整分录'
+        description: '审定表期末调整 ← I2-3'
         direction: inbound
       - ref_id: CW-I2-ADJ-003
         target_wp: I1-5
-        description: '转无形资产列 → I1-5增加检查'
+        description: '转无形资产 → I1-5'
         direction: outbound
       - ref_id: CW-I2-ADJ-004
-        target_wp: I6
-        description: 'I2资本化 + I6费用化 = 研发总额(VR-I6-01)'
-        direction: bidirectional
+        target_wp: disclosure
+        description: '期末审定 → 附注披露（substantive:adjudicated）'
+        direction: outbound
 
   # ─────────────────────────────────────────────────────────────────────────
   # Sheet 4: 明细表I2-2 (51行×61列, 4区段Tab)
@@ -323,44 +330,60 @@ sheets:
     component: I2TabProjectDetail
     class_code: F-明细表
     dynamic_rows: true
-    formula_count: 8
+    formula_count: 199
+    layout_sections:
+      - { id: objectives, label: 一、审计目标 }
+      - { id: process, label: 二、审计过程 }
+      - { id: detail, label: 三、研发项目构成明细 }
+      - { id: notes, label: 四、审计说明 }
+      - { id: conclusion, label: 五、审计结论 }
+    # 按滚动阶段分 Tab（避免 73 列横向不可用），每段费用性质一致
     tab_sections:
-      - name: 基础信息
+      - name: 汇总
         tab_index: 0
         columns:
-          - { field: project_name, label: 项目名称, type: text, width: 150 }
-          - { field: project_code, label: 项目编号, type: text, width: 100 }
-          - { field: start_date, label: 起始日期, type: date, width: 100 }
-          - { field: expected_end, label: 预计完成, type: date, width: 100 }
-          - { field: project_leader, label: 负责人, type: text, width: 80 }
-      - name: 材料费
+          - { field: project_code, label: 项目编号, type: text }
+          - { field: project_name, label: 项目名称, type: text }
+          - { field: period_start, label: 研发周期起, type: date }
+          - { field: period_end, label: 研发周期止, type: date }
+          - { field: stage, label: 项目阶段, type: select, options: [研究, 开发, 完成] }
+          - { field: increase_total, label: 本期增加合计, type: number, formula: true }
+          - { field: increase_capitalized, label: 其中资本化, type: number, formula: true }
+          - { field: increase_expensed, label: 其中费用化, type: number, formula: true }
+          - { field: audited_total, label: 期末审定合计, type: number, formula: true }
+      - name: 账面期初余额
         tab_index: 1
-        columns:
-          - { field: material_direct, label: 直接材料, type: number, width: 90 }
-          - { field: material_auxiliary, label: 辅助材料, type: number, width: 90 }
-          - { field: material_total, label: 材料费合计, type: number, width: 100, formula: "direct + auxiliary" }
-      - name: 人工费
+        stage: begin
+      - name: 账面本期增加
         tab_index: 2
-        columns:
-          - { field: labor_salary, label: 工资薪金, type: number, width: 90 }
-          - { field: labor_social, label: 社保公积金, type: number, width: 90 }
-          - { field: labor_welfare, label: 福利费, type: number, width: 90 }
-          - { field: labor_total, label: 人工费合计, type: number, width: 100, formula: "salary + social + welfare" }
-      - name: 折旧摊销
+        stage: increase
+      - name: 账面本期减少
         tab_index: 3
-        columns:
-          - { field: dep_equipment, label: 设备折旧, type: number, width: 90 }
-          - { field: dep_building, label: 房屋折旧, type: number, width: 90 }
-          - { field: dep_software, label: 软件摊销, type: number, width: 90 }
-          - { field: dep_total, label: 折旧摊销合计, type: number, width: 100, formula: "equipment + building + software" }
-      - name: 其他费用
+        stage: decrease
+      - name: 账面期末余额
         tab_index: 4
-        columns:
-          - { field: design_cost, label: 设计费, type: number, width: 90 }
-          - { field: testing_cost, label: 试验费, type: number, width: 90 }
-          - { field: outsource_cost, label: 委外费, type: number, width: 90 }
-          - { field: other_misc, label: 其他杂费, type: number, width: 90 }
-          - { field: other_total, label: 其他费用合计, type: number, width: 100, formula: "design + testing + outsource + misc" }
+        stage: ending
+        formula: "begin + increase - decrease"
+      - name: 审计调整
+        tab_index: 5
+        stage: adjustment
+      - name: 期末审定金额
+        tab_index: 6
+        stage: audited
+        formula: "ending + adjustment"
+    cost_nature_columns:
+      - { field: material, label: 直接材料 }
+      - { field: labor, label: 直接人工 }
+      - { field: depreciation, label: 折旧与摊销 }
+      - { field: energy, label: 能耗 }
+      - { field: outsource, label: 委外研发费 }
+      - { field: other, label: 其他费用 }
+      - { field: capitalized, label: 资本化金额 }
+      - { field: expensed, label: 费用化金额 }
+    formulas:
+      - { name: ending, expr: "begin + increase - decrease" }
+      - { name: audited, expr: "ending + adjustment" }
+      - { name: treatment_check, expr: "nature_sum ≈ capitalized + expensed", tolerance: 0.01 }
     summary_rows:
       - { type: grand_total }
     import_export: true
@@ -368,16 +391,20 @@ sheets:
     cross_refs:
       - ref_id: CW-I2-7-001
         target_wp: I2-2
-        description: '项目构成合计 → I2-2 明细表'
+        description: '项目构成资本化合计 → I2-2 明细表'
         direction: outbound
       - ref_id: CW-I2-7-002
         target_wp: I2-8
-        description: '材料费明细 ← I2-8 材料投入检查'
-        direction: inbound
+        description: '本期增加.直接材料 → I2-8 检查比例分母'
+        direction: outbound
       - ref_id: CW-I2-7-003
-        target_wp: I2-9
-        description: '人工费 ← I2-9 人员认定'
+        target_wp: I2-6
+        description: '资本化/费用化划分 ← I2-6 资本化时点判断'
         direction: inbound
+      - ref_id: CW-I2-7-004
+        target_wp: I6
+        description: '费用化金额 ↔ I6 研发费用'
+        direction: bidirectional
 
   # ─────────────────────────────────────────────────────────────────────────
   # Sheet 10: 研发材料投入检查表I2-8
@@ -385,24 +412,45 @@ sheets:
   研发材料投入检查表I2-8:
     code: I2-8
     group: inspection
-    dimensions: "30×15"
+    dimensions: "38×18"
     component: I2TabMaterialCheck
     class_code: F-检查表
     dynamic_rows: true
+    layout_sections:
+      - { id: objectives, label: 一、审计目标 }
+      - { id: sampling, label: 二、样本选取标准与依据 }
+      - { id: process, label: 三、审计过程（账簿↔领料单） }
+      - { id: notes, label: 四、审计说明 }
+      - { id: conclusion, label: 五、审计结论 }
     columns:
-      - { field: seq, label: 序号, type: number, width: 50 }
-      - { field: material_name, label: 品名, type: text, width: 120 }
-      - { field: quantity, label: 数量, type: number, width: 70 }
-      - { field: unit_price, label: 单价, type: number, width: 80 }
-      - { field: amount, label: 金额, type: number, width: 100, formula: "quantity * unit_price" }
-      - { field: requisition_no, label: 领用单号, type: text, width: 100 }
-      - { field: project_name, label: 所属项目, type: text, width: 120 }
-      - { field: conclusion, label: 审核结论, type: select, width: 80, options: [合规, 不合规, 待确认] }
+      # 记账凭证资料
+      - { field: project_name, label: 项目名称, type: text, width: 120, group: book }
+      - { field: voucher_no, label: 凭证编号, type: text, width: 100, group: book }
+      - { field: business_desc, label: 业务内容, type: text, width: 120, group: book }
+      - { field: inventory_name, label: 存货名称, type: text, width: 110, group: book }
+      - { field: unit, label: 单位, type: text, width: 60, group: book }
+      - { field: quantity, label: 数量, type: number, width: 70, group: book }
+      - { field: debit_amount, label: 借方金额, type: number, width: 100, group: book }
+      - { field: counterpart_account, label: 对方科目, type: text, width: 100, group: book }
+      - { field: counterpart_detail, label: 对方明细科目, type: text, width: 100, group: book }
+      # 出库单/领料单资料
+      - { field: slip_date_no, label: 日期编号, type: text, width: 100, group: slip }
+      - { field: recipient, label: 领用人员, type: text, width: 90, group: slip }
+      - { field: recipient_dept, label: 领用部门, type: text, width: 100, group: slip }
+      - { field: slip_project, label: 研发项目, type: text, width: 120, group: slip }
+      - { field: slip_qty, label: 领料数量, type: number, width: 70, group: slip }
+      # 控制列
+      - { field: index_ref, label: 索引号, type: text, width: 90 }
+      - { field: is_abnormal, label: 是否异常, type: select, width: 100, options: [否, 是, 数量不符, 项目不符, 领用人非研发, 生产混入, 其他] }
+      - { field: conclusion, label: 审核结论, type: select, width: 80, options: [相符, 不符, 待查] }
       - { field: attachment, label: 📎附件, type: attachment, width: 50, ocr: true }
-      - { field: remark, label: 备注, type: text, width: 100 }
+    formulas:
+      - { name: coverage_ratio, expr: "checked_total / population_amount", note: "总体为0时显示N/A，避免#DIV/0!" }
+      - { name: population_amount, source: "I2-7.materialSubtotal合计", overridable: true }
     integrations:
       - voucher_sampling_engine: { mode: dialog }
       - ocr: { endpoint: "/d4/contract-ocr" }
+      - cross_sheet: { from: I2-7, field: material_total }
 
   # ─────────────────────────────────────────────────────────────────────────
   # Sheet 11: 研发人员认定检查表I2-9
@@ -589,11 +637,19 @@ sheets:
     component: I2TabDisclosureListed
     class_code: H-附注
     variant: listed
+    note_section: "五、27"
+    layout_sections:
+      - { id: nature, label: 研发投入按性质（费用化/资本化×本期上期） }
+      - { id: movement, label: 开发支出项目滚动 }
+      - { id: important, label: 重要的资本化研发项目 }
+      - { id: impairment, label: 开发支出减值准备 }
+    autofill_sources: [I2-2, I2-6, I2-7]
     event_bus:
       subscribe:
         - { event: "substantive:adjudicated", filter: "accountCode='1717'" }
       publish:
-        - { event: "disclosure:note-text-updated", payload: "{section:'i2', variant:'listed'}" }
+        - { event: "disclosure:note-text-updated", payload: "{section:'五、27', variant:'listed', wpCode:'I2'}" }
+    sync_api: "/api/projects/{projectId}/disclosure-notes/sync-from-workpaper"
     ai_assist:
       section: disclosure
       button_position: section_title_right
@@ -608,12 +664,17 @@ sheets:
     component: I2TabDisclosureSoe
     class_code: H-附注
     variant: soe
+    note_section: "八、28"
     formula_count: 41
+    layout_sections:
+      - { id: movement, label: 开发支出增减变动（含资本化时点/依据/进度） }
+    autofill_sources: [I2-2, I2-6]
     event_bus:
       subscribe:
         - { event: "substantive:adjudicated", filter: "accountCode='1717'" }
       publish:
-        - { event: "disclosure:note-text-updated", payload: "{section:'i2', variant:'soe'}" }
+        - { event: "disclosure:note-text-updated", payload: "{section:'八、28', variant:'soe', wpCode:'I2'}" }
+    sync_api: "/api/projects/{projectId}/disclosure-notes/sync-from-workpaper"
     ai_assist:
       section: disclosure
       button_position: section_title_right

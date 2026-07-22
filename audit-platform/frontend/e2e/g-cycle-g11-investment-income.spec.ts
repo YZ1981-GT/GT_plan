@@ -23,7 +23,7 @@ const SMOKE_CASES: SmokeCase[] = [
   { wpCode: 'G11A', bodyHint: /程序|投资收益|6111/ },
   { wpCode: 'G11-1', bodyHint: /审定|投资收益|变动率/, testId: 'g11-adjudication' },
   { wpCode: 'G11-2', bodyHint: /明细|被投资单位|本期/, testId: 'g11-detail-table' },
-  { wpCode: 'G11-3', bodyHint: /调整|借贷|AJE/ },
+  { wpCode: 'G11-3', bodyHint: /调整|借贷|账项调整|调整事项说明/, testId: 'g11-adjustment' },
   { wpCode: 'G11-4', bodyHint: /收益率|平均投资|期初/, testId: 'g11-return-rate-table' },
   { wpCode: 'G11-5', bodyHint: /凭证|核对|抽凭/ },
 ]
@@ -81,8 +81,8 @@ test.describe('G11 投资收益 — HTML 页面冒烟', () => {
         }
       })
 
-      await page.goto(`/projects/${PROJECT_ID}/workpapers/${wpResult.wpId}/edit`)
-      await page.waitForTimeout(4_000)
+      await page.goto(`/projects/${PROJECT_ID}/workpapers/${wpResult.wpId}/edit`, { waitUntil: 'domcontentloaded' })
+      await page.locator('.gt-wp-renderer, .workpaper-editor, [data-component-type]').first().waitFor({ state: 'visible', timeout: 30_000 })
       await clickWorkpaperSheetTab(page, c.wpCode)
       await page.waitForTimeout(2_500)
 
@@ -157,6 +157,42 @@ test.describe('G11 深度 — 列结构与指引', () => {
     for (const h of ['本期', '上期', '变动额', '变动率', '被投资单位']) {
       await expect(table.getByText(h, { exact: false }).first()).toBeVisible()
     }
+  })
+
+  test('G11-2 含 G7-14 带入入口', async ({ page, request }) => {
+    test.setTimeout(90_000)
+    await loginAs(page)
+    const token = await getToken(request)
+    const wpResult = await findWorkpaper(request, token, 'G11', PROJECT_ID)
+    test.skip(!wpResult.exists, 'G11 底稿不存在')
+    await page.goto(`/projects/${PROJECT_ID}/workpapers/${wpResult.wpId}/edit`)
+    await page.waitForTimeout(4_000)
+    await clickWorkpaperSheetTab(page, 'G11-2')
+    await page.waitForTimeout(2_000)
+    await expect(page.getByRole('button', { name: '从 G7-14 带入' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'G7-14 差异→G11-3' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '从 TB/序时账预填' })).toBeVisible()
+  })
+
+  test('G11-3 含 Excel 对齐列与集中模块同步', async ({ page, request }) => {
+    test.setTimeout(90_000)
+    await loginAs(page)
+    const token = await getToken(request)
+    const wpResult = await findWorkpaper(request, token, 'G11', PROJECT_ID)
+    test.skip(!wpResult.exists, 'G11 底稿不存在')
+    await page.goto(`/projects/${PROJECT_ID}/workpapers/${wpResult.wpId}/edit`)
+    await page.waitForTimeout(4_000)
+    await clickWorkpaperSheetTab(page, 'G11-3')
+    await page.waitForTimeout(2_000)
+    const panel = page.locator('[data-testid="g11-adjustment"]')
+    await expect(panel).toBeVisible()
+    const table = panel.locator('.el-table')
+    await expect(table).toBeVisible()
+    for (const h of ['调整事项说明', '类别', '回写行', '借方调整金额']) {
+      await expect(table.getByRole('columnheader', { name: h })).toBeVisible()
+    }
+    await expect(panel.getByRole('button', { name: '从调整分录模块同步' })).toBeVisible()
+    await expect(panel.getByRole('button', { name: '确认调整' })).toBeVisible()
   })
 
   test('G11-4 期初/期末余额列可见', async ({ page, request }) => {

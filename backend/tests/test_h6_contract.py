@@ -4,7 +4,7 @@ Spec: .kiro/specs/h6-asset-disposal-clearing/ Task 1.2
 Validates: Requirements 1.6, 1.7, 1.8
 
 验证 h6-asset-disposal-clearing componentType 在后端注册表中正确注册：
-1. wp_code_overrides（H6/H6A/H6-1~H6-4 共6个映射）
+1. wp_code_overrides（H6/H6A/H6-1~H6-4 + 附注编码，共10个映射）
 2. VALID_COMPONENT_TYPES
 3. RENDERER_DISPATCH（Phase 5创建后验证）
 4. schema_contract: checklist_responses 表结构验证
@@ -18,7 +18,7 @@ import pytest
 
 COMPONENT_TYPE = "h6-asset-disposal-clearing"
 
-# H6/H6A/H6-1~H6-4 共6个wp_code
+# H6/H6A/H6-1~H6-4 + 附注编码
 EXPECTED_WP_CODES = [
     "H6",
     "H6A",
@@ -26,6 +26,10 @@ EXPECTED_WP_CODES = [
     "H6-2",
     "H6-3",
     "H6-4",
+    "H6-disc-L",
+    "H6-disc-S",
+    "H6-附注披露信息（上市公司）",
+    "H6-附注披露信息（国有企业）",
 ]
 
 
@@ -45,17 +49,17 @@ def test_wp_code_override_mapping(wp_code: str):
 
 
 def test_wp_code_overrides_completeness():
-    """wp_code_overrides 中 h6-asset-disposal-clearing 映射覆盖完整（共6个）."""
+    """wp_code_overrides 中 h6-asset-disposal-clearing 映射覆盖完整（共10个）."""
     data = _load_overrides()
     h6_mappings = [k for k, v in data.items() if v == COMPONENT_TYPE]
     assert sorted(h6_mappings) == sorted(EXPECTED_WP_CODES)
 
 
 def test_wp_code_overrides_count():
-    """wp_code_overrides 中 h6-asset-disposal-clearing 映射数量正好6个."""
+    """wp_code_overrides 中 h6-asset-disposal-clearing 映射数量正好10个."""
     data = _load_overrides()
     h6_mappings = [k for k, v in data.items() if v == COMPONENT_TYPE]
-    assert len(h6_mappings) == 6
+    assert len(h6_mappings) == 10
 
 
 # ─── VALID_COMPONENT_TYPES ───────────────────────────────────────────────────

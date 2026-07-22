@@ -3,7 +3,7 @@
  *
  * 验证：
  *  1. htmlRendererRegistry 包含 componentType = 'a1-11-signing-form'
- *  2. wp_code_overrides.json 映射 A1-11 → a1-11-signing-form
+ *  2. wp_code_overrides.json 映射 A1-11 → skip（由 A1 Dashboard 内嵌渲染）
  */
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -22,10 +22,10 @@ describe('A1-11 签发流转控制表 — 注册契约', () => {
     expect(entry!.contextProps).toBe('standard')
   })
 
-  it('wp_code_overrides.json 映射 A1-11 → a1-11-signing-form', () => {
+  it('wp_code_overrides.json 映射 A1-11 → skip（A1 Dashboard 子底稿内嵌）', () => {
     const overridesPath = resolve(process.cwd(), '../../backend/app/data/wp_code_overrides.json')
     const overrides: Record<string, string> = JSON.parse(readFileSync(overridesPath, 'utf-8'))
-    expect(overrides['A1-11']).toBe('a1-11-signing-form')
+    expect(overrides['A1-11']).toBe('skip')
   })
 })
 

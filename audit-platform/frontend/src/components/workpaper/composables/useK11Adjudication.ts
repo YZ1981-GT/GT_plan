@@ -87,13 +87,14 @@ const ROWS_KEY = `${ITEM_PREFIX}-rows`
 const ACCOUNT_CODE_6701 = '6701'
 
 /** 来源底稿映射（sourceWp codes） */
-export const SOURCE_WP_CODES = ['F2', 'H1', 'I1', 'I3', 'H2', 'G7', 'H4', 'H8', 'H3'] as const
+export const SOURCE_WP_CODES = ['F2', 'H1', 'I1', 'I2', 'I3', 'H2', 'G7', 'H4', 'H8', 'H3'] as const
 
 /** 默认审定表资产类别行（37行典型分类） */
 const DEFAULT_PROJECTS: Array<{ name: string; sourceWp: string }> = [
   { name: '存货跌价准备', sourceWp: 'F2' },
   { name: '固定资产减值准备', sourceWp: 'H1' },
   { name: '无形资产减值准备', sourceWp: 'I1' },
+  { name: '开发支出减值准备', sourceWp: 'I2' },
   { name: '商誉减值准备', sourceWp: 'I3' },
   { name: '在建工程减值准备', sourceWp: 'H2' },
   { name: '长期股权投资减值准备', sourceWp: 'G7' },

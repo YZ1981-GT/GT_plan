@@ -117,5 +117,4 @@ export function useG11DualMode(options: {
   }
 }
 
-export { useG11DualMode as useG11InvIncDualMode }
 export default useG11DualMode

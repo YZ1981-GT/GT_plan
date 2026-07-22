@@ -138,7 +138,7 @@ const WP_FORMULA_ENGINES: string[] = [
   'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7',
   'E1',
   'F1', 'F2InvMai', 'F2InvSpe', 'F2InvVal', 'F2Special', 'F3', 'F3NotPay', 'F4AccPay', 'F5CosOf',
-  'G10', 'G10TraFin', 'G11', 'G11InvInc', 'G12', 'G12NetHed', 'G13FaiVal', 'G13', 'G14CreImp', 'G14',
+  'G10', 'G10TraFin', 'G11', 'G12', 'G13', 'G14',
   'G1TraFin', 'G2IntRec', 'G3DivRec', 'G4BonInv', 'G5LonTer', 'G6OthBon',
   'G7EquityMethod', 'G7', 'G7LonTer', 'G7Sub', 'G8', 'G9',
   'H10', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'H7', 'H8', 'H9',

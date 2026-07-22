@@ -541,6 +541,13 @@ async def _do_batch_save(
                 # G8 其他权益工具投资：审计说明/审计结论/明细行/审定数等自由格式
                 # （remark 存文本或 JSON，conclusion 恒为 null 或审定数字符串），跳过白名单校验
                 pass
+            elif item.item_id.startswith(("G9-", "G9A-")):
+                # G9 其他非流动金融资产：审定数/明细行/审计结论/G9A 回填标记等自由格式
+                # （如 G9-1-adjudicated-amount 存数字串、G9A-fv-complete 存 completed），跳过白名单
+                pass
+            elif item.item_id.startswith(("checkbox-", "input-", "select-", "textarea-", "date-")):
+                # 历史 Excel/HTML 控件 ID（如 checkbox-3c2），conclusion 常为 '0'/'1' 或自由文本
+                pass
             elif item.item_id.startswith(("G10-", "G10-adj")):
                 # G10 交易性金融负债：审计说明/审计结论/明细行/审定数/分类/衍生等自由格式
                 # （审定表 composable 将说明/结论/审定数存入 conclusion 字段[item_id 如
@@ -622,6 +629,13 @@ async def _do_batch_save(
                 # （递延所得税资产/应交税费/递延所得税负债/税金及附加/所得税费用）专属组件：
                 # 审定数/明细行/测算表/审计说明/审计结论/检查项等均以自由文本或 JSON 存入
                 # conclusion 或 remark，跳过白名单校验（与 G/K/S 循环同范式）。
+                pass
+            elif item.item_id.startswith((
+                "H1-", "H2-", "H3-", "H4-", "H5-", "H6-", "H7-", "H8-", "H9-", "H10-",
+                "H1A-", "H2A-", "H3A-", "H8A-", "H9A-", "H10A-",
+            )):
+                # H 固定资产循环（含 H8 使用权资产 / H9 租赁负债）：明细/审定/披露 JSON 与
+                # 审计说明均存 remark，conclusion 常为 null 或审定数字符串，跳过白名单。
                 pass
             else:
                 allowed = ("Y", "N", "X/I", "X/W", "N/A")

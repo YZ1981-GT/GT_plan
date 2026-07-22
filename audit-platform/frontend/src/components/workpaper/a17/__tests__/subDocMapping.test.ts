@@ -3,10 +3,6 @@
  *
  * Feature: a17-summary-enhancement
  * **Validates: Requirements 6.3, 6.4, 6.5**
- *
- * For any project wp_index containing a subset of A17-series wp_codes (A17-2 through A17-7),
- * the Sub_Doc_Navigator SHALL mark each sub-document as "已创建" (exists=true, navigable) if
- * its wp_code appears in wp_index, and "不适用/未创建" (exists=false, disabled) otherwise.
  */
 
 import { describe, it, expect } from 'vitest'
@@ -15,8 +11,8 @@ import { mapSubDocAvailability, SUB_DOC_DEFINITIONS } from '../subDocMapping'
 
 // ─── Generators ───
 
-/** A17 子文档 wp_code 集合 */
-const a17SubCodes = ['A17-2', 'A17-3', 'A17-4', 'A17-5', 'A17-6', 'A17-7']
+/** A17 子文档 wp_code 集合（KAM 实物为 A17-2-1；核对表可用 A17-5 或 A17-5-*） */
+const a17SubCodes = ['A17-2-1', 'A17-3', 'A17-4', 'A17-5', 'A17-5-1', 'A17-6', 'A17-7']
 
 /** 生成随机子集的 A17-x wp_codes 作为 wp_index */
 const wpIndexArb = fc.subarray(a17SubCodes).chain((codes) =>
@@ -39,6 +35,16 @@ const mixedWpIndexArb = fc.tuple(
   ),
 ).map(([a17Items, otherItems]) => [...a17Items, ...otherItems])
 
+function expectExists(
+  defCode: string,
+  wpIndex: Array<{ wp_code: string; wp_id: string }>,
+): boolean {
+  if (defCode === 'A17-5') {
+    return wpIndex.some((i) => i.wp_code === 'A17-5' || i.wp_code.startsWith('A17-5-'))
+  }
+  return wpIndex.some((i) => i.wp_code === defCode)
+}
+
 // ─── Property Tests ───
 
 describe('Property 12: 子文档导航可用性映射', () => {
@@ -47,7 +53,6 @@ describe('Property 12: 子文档导航可用性映射', () => {
       fc.property(wpIndexArb, (wpIndex) => {
         const result = mapSubDocAvailability(wpIndex)
         expect(result).toHaveLength(6)
-        // 验证顺序和 wp_code
         for (let i = 0; i < 6; i++) {
           expect(result[i].wp_code).toBe(SUB_DOC_DEFINITIONS[i].wp_code)
           expect(result[i].label).toBe(SUB_DOC_DEFINITIONS[i].label)
@@ -61,14 +66,13 @@ describe('Property 12: 子文档导航可用性映射', () => {
     fc.assert(
       fc.property(wpIndexArb, (wpIndex) => {
         const result = mapSubDocAvailability(wpIndex)
-        const existingCodes = new Set(wpIndex.map((item) => item.wp_code))
 
         for (const item of result) {
-          if (existingCodes.has(item.wp_code)) {
-            expect(item.exists).toBe(true)
+          const shouldExist = expectExists(item.wp_code, wpIndex)
+          expect(item.exists).toBe(shouldExist)
+          if (shouldExist) {
             expect(item.wp_id).not.toBeNull()
           } else {
-            expect(item.exists).toBe(false)
             expect(item.wp_id).toBeNull()
           }
         }
@@ -81,16 +85,8 @@ describe('Property 12: 子文档导航可用性映射', () => {
     fc.assert(
       fc.property(mixedWpIndexArb, (wpIndex) => {
         const result = mapSubDocAvailability(wpIndex)
-
-        // 只有 A17-2~A17-7 的条目影响 exists
-        const a17Codes = new Set(
-          wpIndex
-            .filter((item) => a17SubCodes.includes(item.wp_code))
-            .map((item) => item.wp_code)
-        )
-
         for (const item of result) {
-          expect(item.exists).toBe(a17Codes.has(item.wp_code))
+          expect(item.exists).toBe(expectExists(item.wp_code, wpIndex))
         }
       }),
       { numRuns: 100 }
@@ -103,5 +99,14 @@ describe('Property 12: 子文档导航可用性映射', () => {
       expect(item.exists).toBe(false)
       expect(item.wp_id).toBeNull()
     }
+  })
+
+  it('A17-5-1 存在时 A17-5 导航标记为可用', () => {
+    const result = mapSubDocAvailability([
+      { wp_code: 'A17-5-1', wp_id: 'wp-551' },
+    ])
+    const a175 = result.find((r) => r.wp_code === 'A17-5')
+    expect(a175?.exists).toBe(true)
+    expect(a175?.wp_id).toBe('wp-551')
   })
 })

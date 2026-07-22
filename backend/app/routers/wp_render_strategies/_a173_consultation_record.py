@@ -49,6 +49,8 @@ async def render(ctx: RenderContext) -> dict | None:
         "client_name": "",
         "consult_type": "",
         "period": "",
+        "consultation_id": "",
+        "not_applicable": "",
     }
 
     sections: dict = {

@@ -72,7 +72,7 @@ const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSectio
 
     <details class="methodology-hint">
       <summary>编制提示</summary>
-      <p>推荐工作流：G13A 程序表 → G13-1 审定 → G13-2 明细（按 G1/G8/G9/G10 汇总）→ G13-3 调整 → 附注披露（可从明细同步）。</p>
+      <p>推荐工作流：G13A 程序表 → G13-2 明细（按 G1/G8/G9/G10/H3 汇总）→ G13-3 调整 → G13-1 审定 → 附注披露（可从明细同步）。</p>
     </details>
   </div>
 </template>

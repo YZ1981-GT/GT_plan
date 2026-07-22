@@ -12,9 +12,9 @@
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>1. 汇总资产处置损益相关的审计调整（AJE）与重分类调整（RJE），每笔分录借贷必须平衡。</p>
-        <p>2. AJE 用于纠正错报（如处置损益漏记、时点错误、金额差错）；RJE 用于报表列报重分类（如误入营业外收支应重分类至资产处置损益 6115）。</p>
-        <p>3. 调整应有充分依据，注明摘要、科目、金额、日期与制单人，并与 H10-1 审定表的 AJE/RJE 列勾稽一致。</p>
+        <p>1. 汇总资产处置损益相关的审计调整（AJE）与重分类调整（RJE），每笔分录借贷必须平衡；6115 净额自动回写 H10-1。</p>
+        <p>2. AJE 用于纠正错报（漏记、时点、金额差错）；RJE 用于报表列报重分类（如误入营业外收支应重分类至 6115）。</p>
+        <p>3. 调整应注明摘要、科目代码/名称、金额、日期与制单人，并与 H10-2 账项/重分类调整列及 H10-1 勾稽一致。</p>
       </div>
     </details>
 
@@ -24,6 +24,17 @@
     <el-alert v-if="!adj.isBalanced.value" type="error" :closable="false" class="balance-alert">
       借贷不平衡，差额 {{ fmt(adj.balanceDiff.value) }}
     </el-alert>
+    <el-alert v-else-if="adj.rows.value.length" type="success" :closable="false" class="balance-alert">
+      借贷平衡
+    </el-alert>
+
+    <div class="stats-bar" data-testid="h10-adj-stats">
+      <span>借方合计 {{ fmt(debitTotal) }}</span>
+      <span>贷方合计 {{ fmt(creditTotal) }}</span>
+      <span>6115净额 {{ fmt(adj.adjustmentNet.value) }}</span>
+      <span>回写 AJE {{ fmt(adj.writebackPreview.value.currentAje) }} / RJE {{ fmt(adj.writebackPreview.value.currentRje) }}</span>
+    </div>
+
     <el-table :data="adj.rows.value" border size="small" style="font-size:13px" max-height="480">
       <el-table-column label="类型" width="72">
         <template #default="{ row }">
@@ -41,7 +52,14 @@
           <span v-else>{{ row.summary }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="科目" width="100">
+      <el-table-column label="科目代码" width="88">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.accountCode" size="small"
+            @update:model-value="(v: string) => adj.updateRow(row.rowId, { accountCode: v })" />
+          <span v-else>{{ row.accountCode }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="科目" width="110">
         <template #default="{ row }">
           <el-input v-if="!isReadonly" :model-value="row.accountName" size="small"
             @update:model-value="(v: string) => adj.updateRow(row.rowId, { accountName: v })" />
@@ -99,7 +117,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, onMounted } from 'vue'
+import { ref, computed, toRef, onMounted } from 'vue'
 import { useH10Adjustment } from '../../composables/useH10Adjustment'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import H10ImportExportDropdown from '../H10ImportExportDropdown.vue'
@@ -119,6 +137,9 @@ const adj = useH10Adjustment({
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
 })
+
+const debitTotal = computed(() => adj.rows.value.reduce((s, r) => s + (r.debitAmount || 0), 0))
+const creditTotal = computed(() => adj.rows.value.reduce((s, r) => s + (r.creditAmount || 0), 0))
 
 const NOTE_KEY = 'H10-3-adjustment-audit-note'
 const CONCLUSION_KEY = 'H10-3-adjustment-audit-conclusion'
@@ -156,6 +177,7 @@ function fmt(v: number) {
 .section-head { display: flex; justify-content: space-between; margin-bottom: 8px; }
 .sheet-title { margin: 0; font-size: 15px; }
 .balance-alert { margin-bottom: 8px; }
+.stats-bar { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 8px; font-size: 12px; color: #606266; }
 .guidance-details { margin-bottom: 8px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .guidance-details summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .guidance-content { margin-top: 8px; font-size: 12px; color: #606266; line-height: 1.6; }

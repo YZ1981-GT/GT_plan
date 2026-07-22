@@ -15,6 +15,8 @@
 import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
 import { getWpIndex, type WpIndexItem } from '@/services/workpaperApi'
 import {
   useA17BundleState,
@@ -146,12 +148,45 @@ const {
   isA17_7Locked,
   a17_6LockReason,
   a17_7LockReason,
+  consultationPairing,
+  disagreementClosure,
+  consistencyErrors,
   signOffPreconditions,
   signOffReady,
   kamReferences,
+  kamStale,
+  independenceDrift,
+  chapterStale,
+  agendaStale,
+  partnerSummary,
+  timeline,
+  crossAlerts,
+  signoffSelfCheck,
   refreshCompletionStatus,
+  refreshConsistencyCheck,
+  refreshKamStale,
+  refreshIndependenceDrift,
+  refreshChapterStale,
+  refreshAgendaStale,
+  refreshPartnerSummary,
+  refreshCrossAlerts,
+  refreshSignoffSelfCheck,
   loadKamReferences,
 } = bundleState
+
+// B/C 类：裁剪默认不选 A17；若底稿已存在则 soft 提示
+const businessCategory = ref('')
+const categorySoftWarning = computed(() => {
+  const prefix = (businessCategory.value || '').charAt(0).toUpperCase()
+  if (prefix === 'C') {
+    return '当前项目为 C 类：A17 默认不适用。若误开可忽略或联系项目经理裁剪。'
+  }
+  if (prefix === 'B') {
+    return '当前项目为 B 类：A17 非默认必备（A 类财报签发链路）。可按需编制，不作为签发强制闸门参考。'
+  }
+  return ''
+})
+
 
 // ─── Dashboard items ───
 interface DashboardItem {
@@ -184,11 +219,26 @@ watch(() => route.query.sheet as string | undefined, (v) => {
   }
 })
 
-// Tab switch → refresh completion when leaving A17-5
+// Tab switch → refresh completion / gates when leaving key tabs
 watch(active, (newTab, oldTab) => {
   prevTab.value = oldTab
-  if (oldTab === 'A17-5') {
+  if (oldTab === 'A17-5' || oldTab === 'A17-1' || oldTab === 'A17-7' || oldTab === 'A17-2-1' || oldTab === 'A17-4' || oldTab === 'A17-6') {
     refreshCompletionStatus()
+    refreshConsistencyCheck()
+    refreshKamStale()
+    refreshIndependenceDrift()
+    refreshChapterStale()
+    refreshAgendaStale()
+    refreshPartnerSummary()
+    refreshCrossAlerts()
+    refreshSignoffSelfCheck()
+  }
+})
+
+// 可签发 → 回写 A1-11 解锁
+watch(signOffReady, (ready) => {
+  if (ready && props.projectId) {
+    eventBus.emit('a17-audit-summary-completed', { projectId: props.projectId })
   }
 })
 
@@ -222,11 +272,18 @@ function getTabLockReason(tab: TabDef): string {
 function handleSignOffAttempt() {
   if (signOffReady.value) return // Allow normal flow
   const unmet = signOffPreconditions.value.filter(p => !p.satisfied)
-  const items = unmet.map(p => `• ${p.label}`).join('\n')
+  const items = unmet.map(p => `• ${p.label}${p.hint ? `（${p.hint}）` : ''}`).join('\n')
   ElMessage.warning({
     message: `签发前置条件未满足：\n${items}`,
     duration: 5000,
   })
+}
+
+function handleSignOffAction(cond: { actionTab?: string; satisfied: boolean }) {
+  if (cond.satisfied || !cond.actionTab) return
+  if (visibleTabs.value.some(t => t.id === cond.actionTab)) {
+    active.value = cond.actionTab
+  }
 }
 
 // ─── Dashboard click → switch tab ───
@@ -242,6 +299,12 @@ onMounted(async () => {
   try {
     if (props.projectId) {
       wpIndex.value = await getWpIndex(props.projectId)
+      try {
+        const proj = await api.get<any>(`/api/projects/${props.projectId}`, { _silent: true } as any)
+        businessCategory.value = proj?.business_category || proj?.data?.business_category || ''
+      } catch {
+        businessCategory.value = ''
+      }
     }
   } catch {
     wpIndex.value = []
@@ -255,14 +318,139 @@ onMounted(async () => {
     active.value = qs
   }
 
-  // Initialize bundle state
+  // Initialize bundle state（含签发闸门相关校验）
   await refreshCompletionStatus()
-  await loadKamReferences()
+  await Promise.all([
+    loadKamReferences(),
+    refreshConsistencyCheck(),
+    refreshKamStale(),
+    refreshIndependenceDrift(),
+    refreshChapterStale(),
+    refreshAgendaStale(),
+    refreshPartnerSummary(),
+    refreshCrossAlerts(),
+    refreshSignoffSelfCheck(),
+  ])
+  if (signOffReady.value && props.projectId) {
+    eventBus.emit('a17-audit-summary-completed', { projectId: props.projectId })
+  }
 })
 </script>
 
 <template>
   <div class="gt-a17-bundle" v-loading="loading">
+    <el-alert
+      v-if="categorySoftWarning"
+      type="info"
+      :title="categorySoftWarning"
+      :closable="true"
+      show-icon
+      class="gt-a17-bundle__lock-alert"
+      style="margin: 0 0 8px"
+    />
+
+    <!-- Partner / EQCR one-pager + timeline -->
+    <el-collapse v-if="partnerSummary || timeline" class="gt-a17-bundle__partner">
+      <el-collapse-item name="partner" title="合伙人 / EQCR 一页摘要">
+        <div v-if="timeline?.milestones?.length" class="gt-a17-bundle__timeline">
+          <div
+            v-for="m in timeline.milestones"
+            :key="m.id"
+            class="timeline-item"
+            :class="{ 'is-ok': m.ok, 'is-missing': !m.ok }"
+          >
+            <span class="timeline-item__label">{{ m.label }}</span>
+            <span class="timeline-item__date">{{ m.date || '未填' }}</span>
+          </div>
+        </div>
+        <el-alert
+          v-for="(w, i) in (timeline?.warnings || [])"
+          :key="'tw'+i"
+          type="error"
+          :title="w"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 6px"
+        />
+        <div v-if="partnerSummary" class="gt-a17-bundle__summary-grid">
+          <div class="summary-cell"><span class="k">KAM</span><span class="v">{{ partnerSummary.kam_count }} 条{{ partnerSummary.kam_stale ? ' · 过期' : '' }}</span></div>
+          <div class="summary-cell"><span class="k">咨询</span><span class="v">{{ partnerSummary.has_consultation ? '有' : '无' }}</span></div>
+          <div class="summary-cell"><span class="k">分歧</span><span class="v">{{ partnerSummary.has_disagreement ? (partnerSummary.disagreement_closed ? '已闭环' : '未闭环') : '无' }}</span></div>
+          <div class="summary-cell"><span class="k">独立性</span><span class="v">{{ partnerSummary.independence_drift ? '期间漂移' : '正常' }}</span></div>
+        </div>
+        <div v-if="partnerSummary?.opinion_preview" class="gt-a17-bundle__opinion">
+          <div class="opinion-label">意见预览（ch14）</div>
+          <div class="opinion-body">{{ partnerSummary.opinion_preview }}</div>
+        </div>
+        <el-alert
+          v-if="partnerSummary?.blockers?.length"
+          type="warning"
+          :title="`关注项：${partnerSummary.blockers.join('；')}`"
+          :closable="false"
+          show-icon
+          style="margin-top: 8px"
+        />
+      </el-collapse-item>
+    </el-collapse>
+
+    <!-- 跨底稿联动：A13 超重要性 / A10 未沟通 -->
+    <div v-if="crossAlerts.length" class="gt-a17-bundle__cross-alerts">
+      <el-alert
+        v-for="a in crossAlerts"
+        :key="a.id"
+        :type="a.severity === 'error' ? 'error' : 'warning'"
+        :title="a.title"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 6px"
+      >
+        <template #default>
+          <div>{{ a.message }}</div>
+          <div v-if="a.action_hint" style="margin-top: 4px; color: #606266">{{ a.action_hint }}</div>
+          <el-button
+            v-if="a.action_tab && visibleTabs.some(t => t.id === a.action_tab)"
+            size="small"
+            type="primary"
+            link
+            @click="active = a.action_tab!"
+          >前往 {{ a.action_tab }} →</el-button>
+        </template>
+      </el-alert>
+    </div>
+
+    <!-- 归档/签发自检 -->
+    <el-collapse v-if="signoffSelfCheck" class="gt-a17-bundle__self-check">
+      <el-collapse-item name="self-check">
+        <template #title>
+          <span>
+            归档包自检
+            <el-tag
+              size="small"
+              :type="signoffSelfCheck.ready ? 'success' : 'danger'"
+              style="margin-left: 8px"
+            >{{ signoffSelfCheck.ready ? '通过' : '未通过' }}</el-tag>
+          </span>
+        </template>
+        <div
+          v-for="it in signoffSelfCheck.items"
+          :key="it.id"
+          class="self-check-row"
+          :class="{ 'is-ok': it.ok, 'is-fail': !it.ok }"
+        >
+          <span class="self-check-icon">{{ it.ok ? '✓' : '✗' }}</span>
+          <span class="self-check-label">{{ it.label }}</span>
+          <span class="self-check-detail">{{ it.detail }}</span>
+          <el-button
+            v-if="!it.ok && it.action_tab && visibleTabs.some(t => t.id === it.action_tab)"
+            size="small"
+            type="primary"
+            link
+            @click="active = it.action_tab!"
+          >前往 →</el-button>
+        </div>
+      </el-collapse-item>
+    </el-collapse>
+
     <!-- Completion status dashboard -->
     <div class="gt-a17-bundle__dashboard">
       <div
@@ -279,6 +467,107 @@ onMounted(async () => {
         可签发
       </el-tag>
     </div>
+
+    <el-alert
+      v-if="chapterStale.length"
+      type="warning"
+      :title="`A17-1 有 ${chapterStale.length} 章相对上游可能过期`"
+      :closable="false"
+      show-icon
+      class="gt-a17-bundle__lock-alert"
+      style="margin: 0 0 8px"
+    >
+      <template #default>
+        <ul style="margin: 4px 0 0; padding-left: 18px">
+          <li v-for="c in chapterStale.slice(0, 5)" :key="c.chapter_id">第{{ c.chapter_num }}章：{{ c.message }}</li>
+        </ul>
+        <el-button size="small" type="primary" link @click="active = 'A17-1'">前往 A17-1 重新拉取 →</el-button>
+      </template>
+    </el-alert>
+
+    <el-alert
+      v-if="agendaStale.length"
+      type="warning"
+      :title="`A17-6 有 ${agendaStale.length} 项议程相对上游可能过期`"
+      :closable="false"
+      show-icon
+      class="gt-a17-bundle__lock-alert"
+      style="margin: 0 0 8px"
+    >
+      <template #default>
+        <el-button size="small" type="primary" link @click="active = 'A17-6'">前往总结会核对 →</el-button>
+      </template>
+    </el-alert>
+
+    <!-- A17-3 ↔ A17-3-1 pairing warning -->
+    <el-alert
+      v-if="consultationPairing.warning"
+      type="error"
+      :title="consultationPairing.warning"
+      :closable="false"
+      show-icon
+      class="gt-a17-bundle__lock-alert"
+      style="margin: 0 0 8px"
+    >
+      <template #default>
+        <el-button size="small" type="primary" link @click="active = 'A17-3-1'">前往 A17-3-1 →</el-button>
+      </template>
+    </el-alert>
+
+    <el-alert
+      v-if="consistencyErrors.length"
+      type="error"
+      :title="`一致性校验有 ${consistencyErrors.length} 项 error，阻断签发`"
+      :closable="false"
+      show-icon
+      class="gt-a17-bundle__lock-alert"
+      style="margin: 0 0 8px"
+    >
+      <template #default>
+        <ul style="margin: 4px 0 0; padding-left: 18px">
+          <li v-for="e in consistencyErrors.slice(0, 5)" :key="e.rule_id">{{ e.description }}</li>
+        </ul>
+        <el-button size="small" type="primary" link @click="active = 'A17-1'">前往 A17-1 →</el-button>
+      </template>
+    </el-alert>
+
+    <el-alert
+      v-if="disagreementClosure.warning"
+      type="error"
+      :title="disagreementClosure.warning"
+      :closable="false"
+      show-icon
+      class="gt-a17-bundle__lock-alert"
+      style="margin: 0 0 8px"
+    >
+      <template #default>
+        <el-button size="small" type="primary" link @click="active = 'A17-4'">前往 A17-4 →</el-button>
+      </template>
+    </el-alert>
+
+    <el-alert
+      v-if="kamStale"
+      type="warning"
+      title="A17-2-1 KAM 与审计报告不一致（已过期），请重新推送后再签发"
+      :closable="false"
+      show-icon
+      class="gt-a17-bundle__lock-alert"
+      style="margin: 0 0 8px"
+    >
+      <template #default>
+        <el-button size="small" type="primary" link @click="active = 'A17-2-1'">前往 KAM →</el-button>
+      </template>
+    </el-alert>
+
+    <el-alert
+      v-if="independenceDrift.hasDrift"
+      type="warning"
+      :title="independenceDrift.message || 'A17-7 与承接阶段 B3 独立性期间存在差异，请核对'"
+      :closable="true"
+      show-icon
+      class="gt-a17-bundle__lock-alert"
+      style="margin: 0 0 8px"
+    />
 
     <!-- Tab navigation -->
     <el-tabs v-model="active">
@@ -310,10 +599,21 @@ onMounted(async () => {
                 v-for="cond in signOffPreconditions"
                 :key="cond.id"
                 class="signoff-item"
-                :class="{ 'is-satisfied': cond.satisfied }"
+                :class="{ 'is-satisfied': cond.satisfied, 'is-actionable': !cond.satisfied && !!cond.actionTab }"
+                @click="handleSignOffAction(cond)"
               >
                 <span class="signoff-item__icon">{{ cond.satisfied ? '✓' : '✗' }}</span>
-                <span class="signoff-item__label">{{ cond.label }}</span>
+                <div class="signoff-item__body">
+                  <span class="signoff-item__label">{{ cond.label }}</span>
+                  <span v-if="!cond.satisfied && cond.hint" class="signoff-item__hint">{{ cond.hint }}</span>
+                </div>
+                <el-button
+                  v-if="!cond.satisfied && cond.actionTab"
+                  size="small"
+                  type="primary"
+                  link
+                  @click.stop="handleSignOffAction(cond)"
+                >{{ cond.actionLabel || '前往 →' }}</el-button>
               </div>
             </div>
             <el-button
@@ -339,23 +639,43 @@ onMounted(async () => {
 
         <!-- consultation tab (A17-3) -->
         <template v-else-if="tab.kind === 'consultation'">
+          <el-alert
+            v-if="consultationPairing.hasConsult && !consultationPairing.closed"
+            type="warning"
+            title="请同步完成 A17-3-1 咨询结果执行记录，或在 A17-3-1 勾选「无需执行」"
+            :closable="false"
+            show-icon
+            class="gt-a17-bundle__lock-alert"
+          >
+            <el-button size="small" type="primary" link @click="active = 'A17-3-1'">前往 A17-3-1 →</el-button>
+          </el-alert>
           <GtA173ConsultationRecord
             v-if="getTabWpId(tab)"
             :wp-id="getTabWpId(tab)"
             :project-id="props.projectId"
             :readonly="isTabReadonly(tab)"
+            @saved="refreshCompletionStatus"
           />
           <div v-else class="gt-a17-bundle__empty">该子底稿尚未生成，请先在底稿管理中生成底稿</div>
         </template>
 
         <!-- consultation-exec tab (A17-3-1) -->
         <template v-else-if="tab.kind === 'consultation-exec'">
+          <el-alert
+            v-if="!wpIdMap['A17-3']"
+            type="info"
+            title="当前项目无 A17-3 业务咨询记录；若无需咨询可忽略本页"
+            :closable="false"
+            show-icon
+            class="gt-a17-bundle__lock-alert"
+          />
           <GtA1731ConsultationExecution
             v-if="getTabWpId(tab)"
             :wp-id="getTabWpId(tab)"
             :project-id="props.projectId"
             :readonly="isTabReadonly(tab)"
             @switch-tab="(tabId: string) => { active = tabId }"
+            @saved="refreshCompletionStatus"
           />
           <div v-else class="gt-a17-bundle__empty">该子底稿尚未生成，请先在底稿管理中生成底稿</div>
         </template>
@@ -418,6 +738,7 @@ onMounted(async () => {
               :wp-id="activeA175WpId"
               :checklist-wp-code="activeA175Sub"
               :readonly="isTabReadonly(tab)"
+              @save="refreshCompletionStatus"
             />
           </div>
           <div v-else class="gt-a17-bundle__empty">该子底稿尚未生成，请先在底稿管理中生成底稿</div>
@@ -486,6 +807,82 @@ onMounted(async () => {
   margin-left: auto;
 }
 
+.gt-a17-bundle__partner {
+  margin-bottom: 10px;
+}
+.gt-a17-bundle__cross-alerts {
+  margin-bottom: 10px;
+}
+.gt-a17-bundle__self-check {
+  margin-bottom: 10px;
+}
+.self-check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+.self-check-row.is-ok .self-check-icon { color: var(--gt-color-success, #67c23a); }
+.self-check-row.is-fail .self-check-icon { color: var(--gt-color-danger, #f56c6c); }
+.self-check-label { font-weight: 500; min-width: 180px; }
+.self-check-detail { color: #606266; flex: 1; }
+.gt-a17-bundle__timeline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.timeline-item {
+  min-width: 120px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--gt-color-bg-elevated, #f5f7fa);
+  border: 1px solid var(--gt-color-border-light, #ebeef5);
+}
+.timeline-item.is-missing {
+  border-color: #f5c6cb;
+  background: #fef0f0;
+}
+.timeline-item__label {
+  display: block;
+  font-size: 12px;
+  color: var(--gt-color-text-secondary);
+}
+.timeline-item__date {
+  font-size: 13px;
+  font-weight: 600;
+}
+.gt-a17-bundle__summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.summary-cell {
+  padding: 6px 8px;
+  background: var(--gt-color-bg-elevated, #f5f7fa);
+  border-radius: 4px;
+  font-size: 12px;
+}
+.summary-cell .k {
+  color: var(--gt-color-text-secondary);
+  margin-right: 6px;
+}
+.gt-a17-bundle__opinion {
+  font-size: 12px;
+}
+.opinion-label {
+  color: var(--gt-color-text-secondary);
+  margin-bottom: 4px;
+}
+.opinion-body {
+  white-space: pre-wrap;
+  max-height: 80px;
+  overflow: auto;
+  line-height: 1.45;
+}
+
 /* ─── Lock alert ─── */
 .gt-a17-bundle__lock-alert {
   margin-bottom: var(--gt-space-3);
@@ -538,6 +935,26 @@ onMounted(async () => {
   gap: var(--gt-space-2);
   font-size: var(--gt-font-size-sm);
   color: var(--gt-color-text-secondary);
+  padding: 6px 8px;
+  border-radius: var(--gt-radius-xs);
+}
+.signoff-item.is-actionable {
+  cursor: pointer;
+}
+.signoff-item.is-actionable:hover {
+  background: var(--gt-color-primary-bg, #ecf5ff);
+}
+.signoff-item__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.signoff-item__hint {
+  font-size: 12px;
+  color: var(--gt-color-danger, #f56c6c);
+  line-height: 1.35;
 }
 
 .signoff-item.is-satisfied .signoff-item__icon {

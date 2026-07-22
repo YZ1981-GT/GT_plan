@@ -68,53 +68,93 @@ _H3_3_KEYS = [
     "noteItem", "summary", "debitAmount", "creditAmount", "contraAccount", "indexRef", "remark",
 ]
 
-# ─── H3-5 增减检查 ──────────────────────────────────────────────────────────
+# ─── H3-5 增减检查（成本模式 · 账→证） ─────────────────────────────────────
 
-_H3_5_HEADERS = [
-    "序号", "资产名称", "资产编号", "变动类型", "变动日期", "金额",
-    "合同/协议", "发票", "评估报告", "审批文件", "入账科目",
-    "计量模式", "公允价值", "差异", "审计结论", "备注",
+_H3_5_COST_HEADERS = [
+    "序号", "投资性房地产类别", "资产名称", "增减日期", "增减方式", "凭证号", "对方科目",
+    "原值", "累计折旧", "减值准备", "净值", "支持性文件",
+    "核对1", "核对2", "核对3", "核对4", "核对5",
+    "索引号", "是否异常", "备注说明",
 ]
-_H3_5_KEYS = [
-    "seq", "assetName", "assetCode", "changeType", "changeDate", "amount",
-    "contract", "invoice", "appraisalReport", "approvalDoc", "accountEntry",
-    "measurementModel", "fairValue", "difference", "conclusion", "remark",
+_H3_5_COST_KEYS = [
+    "seq", "category", "assetName", "date", "changeType", "voucherNo", "creditAccount",
+    "originalCost", "accDep", "impairment", "netValue", "supportingDocs",
+    "check1", "check2", "check3", "check4", "check5",
+    "indexRef", "isAbnormal", "remark",
+]
+
+# ─── H3-5 增减检查（公允模式 · 账→证） ─────────────────────────────────────
+
+_H3_5_FAIR_HEADERS = [
+    "序号", "投资性房地产类别", "资产名称", "增减日期", "增减方式", "凭证号", "对方科目",
+    "公允价值", "公允价值变动", "期末余额", "评估依据", "支持性文件",
+    "核对1", "核对2", "核对3", "核对4", "核对5",
+    "索引号", "是否异常", "备注说明",
+]
+_H3_5_FAIR_KEYS = [
+    "seq", "category", "assetName", "date", "changeType", "voucherNo", "creditAccount",
+    "fairValue", "fairValueChange", "endBalance", "appraisalBasis", "supportingDocs",
+    "check1", "check2", "check3", "check4", "check5",
+    "indexRef", "isAbnormal", "remark",
+]
+
+# ─── H3-5 证→账追查（完整性） ────────────────────────────────────────────────
+
+_H3_5_TRACE_HEADERS = [
+    "序号", "源文件类型", "源文件编号", "源文件日期", "对方名称", "源文件金额",
+    "已入账", "账面凭证号", "账面资产", "账面金额", "差额", "结果", "索引号", "备注",
+]
+_H3_5_TRACE_KEYS = [
+    "seq", "sourceType", "sourceRef", "sourceDate", "sourceParty", "sourceAmount",
+    "recordedInBooks", "bookVoucherNo", "bookAssetName", "bookAmount", "amountDiff", "checkResult", "indexRef", "linkedTitleRowId", "remark",
+]
+
+_H3_5_GUIDANCE_COMMON = [
+    "H3-5 投资性房地产增减检查 编制说明",
+    "",
+    "编制逻辑：审计目标 → 样本选取 → 账→证抽查 + 证→账追查 → 检查比例 → 说明/结论。",
+    "账→证支撑存在与计价；证→账追查支撑完整性认定。",
+    "检查比例=样本检查金额/本期新增合计；偏低时扩大样本或在审计说明中解释。",
+    "增减方式：外购/在建转入/自用转入/存货转入/后续支出/处置/转出/其他。",
 ]
 
 # ─── H3-9 盘点检查 ──────────────────────────────────────────────────────────
 
 _H3_9_HEADERS = [
-    "序号", "资产名称", "资产编号", "坐落位置", "面积(㎡)",
-    "使用状况", "出租状态", "承租方", "租赁期限", "月租金",
+    "序号", "抽盘方向", "资产名称", "资产编号", "坐落位置", "面积(㎡)",
+    "账面数量", "账面金额", "企业盘点数量", "抽盘数量",
+    "用途", "租赁状态", "租户", "产权证号", "品质状况",
     "盘点结果", "差异原因", "备注",
 ]
 _H3_9_KEYS = [
-    "seq", "assetName", "assetCode", "location", "area",
-    "usageStatus", "rentalStatus", "tenant", "leaseTerm", "monthlyRent",
-    "stocktakeResult", "diffReason", "remark",
+    "seq", "direction", "assetName", "assetNo", "location", "area",
+    "bookQty", "bookAmount", "clientCountQty", "sampleQty",
+    "purpose", "leaseStatus", "tenant", "titleCertNo", "qualityStatus",
+    "result", "diffReason", "remark",
 ]
 
 # ─── H3-12 产权核对 ─────────────────────────────────────────────────────────
 
 _H3_12_HEADERS = [
-    "序号", "资产名称", "账面原值", "产权证号", "证载面积",
-    "账面面积", "面积差异", "证载所有人", "是否被审计单位",
-    "抵押情况", "查封情况", "使用限制", "证载用途", "实际用途",
-    "用途是否一致", "备注",
+    "序号", "账面所有者", "资产编号", "资产名称", "坐落地点", "账面面积", "账面原值",
+    "办证状态", "证书名称", "产权证号", "证载面积", "面积差异", "证载所有人", "是否被审计单位",
+    "核对一致", "不一致原因", "预计办证日", "办证进度", "权属纠纷", "证载用途", "实际用途",
+    "是否权利受限", "抵押面积", "抵押价值", "抵押性质", "查封", "索引号", "来源", "备注",
 ]
 _H3_12_KEYS = [
-    "seq", "assetName", "bookValue", "titleNo", "certArea",
-    "bookArea", "areaDiff", "certOwner", "isAuditee",
-    "mortgage", "seizure", "restriction", "certPurpose", "actualPurpose",
-    "purposeConsistent", "remark",
+    "seq", "bookOwner", "assetCode", "assetName", "location", "bookArea", "bookValue",
+    "certStatus", "certName", "titleCertNo", "certArea", "areaDiff", "certOwner", "isAuditEntity",
+    "matchConsistent", "inconsistentReason", "expectedCertDate", "certProgressNote", "hasDispute",
+    "certPurpose", "actualPurpose",
+    "isRestricted", "mortgageArea", "mortgageValue", "mortgageNature", "seizure", "refIndex", "sourceTags", "remark",
 ]
 
 # ─── H3-13 关联交易 ─────────────────────────────────────────────────────────
 
 _H3_13_HEADERS = [
     "序号", "关联方", "关联关系", "交易类型", "金额",
-    "定价方式", "市场价参考", "差异率(%)", "审批文件",
-    "审计结论", "备注",
+    "定价政策", "市场价参考", "差异率(%)", "审批文件",
+    "是否存在异常", "备注/索引号",
 ]
 _H3_13_KEYS = [
     "seq", "relatedParty", "relationship", "transType", "amount",
@@ -200,52 +240,128 @@ _H3_SPECS: dict[str, dict[str, Any]] = {
             "借方合计应等于贷方合计（借贷平衡）。",
         ],
     },
-    "H3-5": {
-        "item_id": "H3-5-rows",
-        "title": "H3-5 增减检查表",
-        "headers": _H3_5_HEADERS,
-        "field_keys": _H3_5_KEYS,
-        "guidance": [
-            "H3-5 投资性房地产增减检查 编制说明",
-            "",
-            "变动类型：增加(购入/自建/转换转入)/减少(出售/转换转出/报废)。",
-            "公允价值模式需记录公允价值及差异。",
+    "H3-5-cost": {
+        "item_id": "H3-5-cost-rows",
+        "item_id_candidates": ["H3-5-cost-rows", "H3-5-rows"],
+        "title": "H3-5 增减检查表（成本模式）",
+        "headers": _H3_5_COST_HEADERS,
+        "field_keys": _H3_5_COST_KEYS,
+        "storage_field": "remark",
+        "dual_write": True,
+        "allow_missing_headers": True,
+        "header_aliases": {
+            "资产名称": ["投资性房地产名称", "名称"],
+            "增减日期": ["变动日期", "日期"],
+            "增减方式": ["变动类型", "增加方式"],
+            "凭证号": ["入账凭证号"],
+            "是否异常": ["异常"],
+            "备注说明": ["备注"],
+        },
+        "guidance": _H3_5_GUIDANCE_COMMON + [
+            "成本模式：净值=原值-累计折旧-减值准备。",
+            "外购追查合同/发票/验收/产权证；转入关注转换依据与审批。",
+        ],
+    },
+    "H3-5-fair": {
+        "item_id": "H3-5-fair-rows",
+        "item_id_candidates": ["H3-5-fair-rows", "H3-5-rows"],
+        "title": "H3-5 增减检查表（公允价值模式）",
+        "headers": _H3_5_FAIR_HEADERS,
+        "field_keys": _H3_5_FAIR_KEYS,
+        "storage_field": "remark",
+        "dual_write": True,
+        "allow_missing_headers": True,
+        "header_aliases": {
+            "资产名称": ["投资性房地产名称", "名称"],
+            "增减日期": ["变动日期", "日期"],
+            "增减方式": ["变动类型"],
+            "凭证号": ["入账凭证号"],
+            "是否异常": ["异常"],
+            "备注说明": ["备注"],
+        },
+        "guidance": _H3_5_GUIDANCE_COMMON + [
+            "公允价值模式：关注评估依据与公允价值变动列示。",
+            "可与 H3-8 公允价值复核交叉验证。",
+        ],
+    },
+    "H3-5-trace-cost": {
+        "item_id": "H3-5-cost-trace-rows",
+        "title": "H3-5 证→账追查（成本模式）",
+        "headers": _H3_5_TRACE_HEADERS,
+        "field_keys": _H3_5_TRACE_KEYS,
+        "storage_field": "remark",
+        "dual_write": True,
+        "allow_missing_headers": True,
+        "header_aliases": {
+            "源文件类型": ["文件类型"],
+            "源文件编号": ["文件编号", "编号"],
+            "已入账": ["是否入账"],
+            "结果": ["检查结果", "审计结论"],
+        },
+        "guidance": _H3_5_GUIDANCE_COMMON + [
+            "证→账追查：从合同/发票/验收报告等源文件追查至账面是否入账。",
+            "差额=源文件金额-账面金额；未入账或差额较大须跟进。",
+        ],
+    },
+    "H3-5-trace-fair": {
+        "item_id": "H3-5-fair-trace-rows",
+        "title": "H3-5 证→账追查（公允价值模式）",
+        "headers": _H3_5_TRACE_HEADERS,
+        "field_keys": _H3_5_TRACE_KEYS,
+        "storage_field": "remark",
+        "dual_write": True,
+        "allow_missing_headers": True,
+        "header_aliases": {
+            "源文件类型": ["文件类型"],
+            "源文件编号": ["文件编号", "编号"],
+            "已入账": ["是否入账"],
+            "结果": ["检查结果", "审计结论"],
+        },
+        "guidance": _H3_5_GUIDANCE_COMMON + [
+            "证→账追查：从评估报告/合同等源文件追查至公允价值入账。",
+            "差额=源文件金额-账面公允价值；未入账须关注完整性。",
         ],
     },
     "H3-9": {
-        "item_id": "H3-9-rows",
+        "item_id": "H3-9-stocktake-rows",
         "title": "H3-9 盘点检查表",
         "headers": _H3_9_HEADERS,
         "field_keys": _H3_9_KEYS,
         "guidance": [
             "H3-9 投资性房地产盘点 编制说明",
             "",
-            "出租状态：已出租/空置/部分出租。",
-            "重点关注空置资产的减值迹象。",
+            "抽盘方向：bookToFloor=账面→实物（存在性）；floorToBook=实物→账面（完整性）。",
+            "三数量勾稽：账面数量、企业盘点数量、审计抽盘数量应比对一致。",
+            "租赁状态：已出租/空置/到期/部分出租；空置率>20%需关注减值。",
+            "期末原值合计用于计算样本覆盖率，避免除零错误。",
         ],
     },
     "H3-12": {
-        "item_id": "H3-12-rows",
+        "item_id": "H3-12-title-rows",
         "title": "H3-12 产权核对表",
         "headers": _H3_12_HEADERS,
         "field_keys": _H3_12_KEYS,
         "guidance": [
             "H3-12 投资性房地产产权核对 编制说明",
             "",
-            "面积差异=证载面积-账面面积。",
-            "证载所有人非被审计单位时标记权属异常。",
+            "三段式核对：账面(登记簿) → 产权证明 → 抵押/权利限制。",
+            "面积差异=证载面积-账面面积；容差±1㎡或0.5%内为可接受差异。",
+            "办证中资产须填预计办证日与进度；抵押与 L1-8 交叉验证。",
+            "可从 H3-2/H3-9 联动带入，并同步附注「限制及担保」。",
         ],
     },
     "H3-13": {
-        "item_id": "H3-13-rows",
+        "item_id": "H3-13-rp-rows",
         "title": "H3-13 关联交易检查表",
         "headers": _H3_13_HEADERS,
         "field_keys": _H3_13_KEYS,
         "guidance": [
             "H3-13 投资性房地产关联交易 编制说明",
             "",
-            "差异率=(金额-市场价)/市场价×100%。",
-            "差异率>10%时需重点关注定价合理性。",
+            "一、审计目标：识别并核查关联方交易的完整性、定价公允性与披露恰当性。",
+            "二、审计过程：对于合并范围外关联交易，核对合同、发票等文件，了解交易目的、价格和条件。",
+            "三、差异率=(金额-市场价)/市场价×100%；差异率>10%时需重点关注定价合理性。",
+            "四、出租类交易应与 H3-14 租金收入测算表勾稽；结果与附注关联方披露一致。",
         ],
     },
     "H3-14": {

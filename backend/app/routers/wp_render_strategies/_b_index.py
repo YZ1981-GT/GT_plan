@@ -30,8 +30,18 @@ async def render(ctx: RenderContext) -> dict | None:
     # 历史脏数据（如 override 压平时期按 d-form-table 保存的 {rows, context, conclusion}）
     # 缺 navigation_rows，必须重新生成架构导航，否则前端架构树空白。
     _existing = ctx.sheet_html_data if isinstance(ctx.sheet_html_data, dict) else None
+    # 已有 architecture 导航时仍刷新 cycle_workpapers：
+    # G4/G6 等专属组件目录页 class_code=B- 走路由 b-index，历史持久化常缺跨底稿目录。
     if _existing and _existing.get("navigation_rows"):
-        return None
+        from app.services.wp_cycle_directory import build_cycle_workpapers
+
+        cycle_workpapers = await build_cycle_workpapers(
+            db=ctx.db,
+            project_id=ctx.project_id,
+            audit_cycle=ctx.audit_cycle,
+            current_wp_id=ctx.wp_id,
+        )
+        return {**_existing, "cycle_workpapers": cycle_workpapers}
 
     from app.services.wp_classification_service import derive_component_type
 

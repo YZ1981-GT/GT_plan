@@ -1,6 +1,6 @@
 /**
  * useG8ImportExport — G8 其他权益工具投资 导入导出
- * 5 张表 × 3 端点 = 15：G8-2 / G8-3 / G8-4 / G8-5 / G8-6
+ * G8-2~6 + 附注上市/国企
  */
 import { type Ref } from 'vue'
 import { useWorkpaperImportExport } from './useWorkpaperImportExport'
@@ -13,6 +13,9 @@ export const G8_API_PREFIX = 'g8'
 export { G8_IMPORTABLE_SHEETS }
 
 export function resolveG8ImportableSheet(sheetName: string): G8ImportableSheet | null {
+  if (/附注/.test(sheetName || '')) {
+    return /国企|国有/.test(sheetName) ? '附注国企' : '附注上市'
+  }
   const m = (sheetName || '').match(/G8-(\d+)/)
   if (!m) return null
   const code = `G8-${m[1]}` as G8ImportableSheet

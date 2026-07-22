@@ -48,14 +48,14 @@ describe('Feature: g14-credit-impairment-loss, Property 2: 净信用减值损失
   })
 })
 
-// Property 3: 坏账准备滚动恒等（转回带符号）
-describe('Feature: g14-credit-impairment-loss, Property 3: 坏账准备滚动=期初+计提+转回(带符号)-转销', () => {
-  it('calcProvisionRollForward === opening + provision + reversalSigned - writeoff', () => {
+// Property 3: 坏账准备滚动恒等（转回正数）
+describe('Feature: g14-credit-impairment-loss, Property 3: 坏账准备滚动=期初+计提-转回-转销+其他', () => {
+  it('calcProvisionRollForward === opening + provision - reversal - writeoff + other', () => {
     fc.assert(
-      fc.property(dbl(-1e8, 1e8), dbl(-1e8, 1e8), dbl(-1e8, 1e8), nonNeg(0, 1e8),
-        (opening, provision, reversalSigned, writeoff) => {
-          expect(calcProvisionRollForward(opening, provision, reversalSigned, writeoff)).toBeCloseTo(
-            opening + provision + reversalSigned - writeoff,
+      fc.property(dbl(-1e8, 1e8), dbl(-1e8, 1e8), nonNeg(0, 1e8), nonNeg(0, 1e8), dbl(-1e8, 1e8),
+        (opening, provision, reversal, writeoff, other) => {
+          expect(calcProvisionRollForward(opening, provision, reversal, writeoff, other)).toBeCloseTo(
+            opening + provision - reversal - writeoff + other,
             5,
           )
         }),
@@ -68,9 +68,9 @@ describe('Feature: g14-credit-impairment-loss, Property 3: 坏账准备滚动=�
 describe('Feature: g14-credit-impairment-loss, Property 4: 坏账准备滚动验证检测', () => {
   it('balanced when computed matches actual within tolerance', () => {
     fc.assert(
-      fc.property(dbl(-1e8, 1e8), dbl(-1e8, 1e8), dbl(-1e8, 1e8), nonNeg(0, 1e8), (opening, provision, reversalSigned, writeoff) => {
-        const closing = calcProvisionRollForward(opening, provision, reversalSigned, writeoff)
-        expect(isRollForwardBalanced(opening, provision, reversalSigned, writeoff, closing)).toBe(true)
+      fc.property(dbl(-1e8, 1e8), dbl(-1e8, 1e8), nonNeg(0, 1e8), nonNeg(0, 1e8), dbl(-1e8, 1e8), (opening, provision, reversal, writeoff, other) => {
+        const closing = calcProvisionRollForward(opening, provision, reversal, writeoff, other)
+        expect(isRollForwardBalanced(opening, provision, reversal, writeoff, closing, other)).toBe(true)
       }),
       { numRuns: 100 },
     )
@@ -78,9 +78,9 @@ describe('Feature: g14-credit-impairment-loss, Property 4: 坏账准备滚动验
 
   it('unbalanced when actual differs by more than tolerance', () => {
     fc.assert(
-      fc.property(dbl(-1e8, 1e8), dbl(-1e8, 1e8), dbl(-1e8, 1e8), nonNeg(0, 1e8), (opening, provision, reversalSigned, writeoff) => {
-        const closing = calcProvisionRollForward(opening, provision, reversalSigned, writeoff) + 1
-        expect(isRollForwardBalanced(opening, provision, reversalSigned, writeoff, closing)).toBe(false)
+      fc.property(dbl(-1e8, 1e8), dbl(-1e8, 1e8), nonNeg(0, 1e8), nonNeg(0, 1e8), dbl(-1e8, 1e8), (opening, provision, reversal, writeoff, other) => {
+        const closing = calcProvisionRollForward(opening, provision, reversal, writeoff, other) + 1
+        expect(isRollForwardBalanced(opening, provision, reversal, writeoff, closing, other)).toBe(false)
       }),
       { numRuns: 100 },
     )

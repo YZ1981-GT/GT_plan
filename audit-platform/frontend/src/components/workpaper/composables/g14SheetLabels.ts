@@ -1,6 +1,20 @@
 /** G14 sheet 编码 → render-config sheet_name 映射 */
 import type { GCycleIndexRowDef } from './g12SheetLabels'
 
+export interface G14AProcedureMark {
+  key: string
+  label: string
+}
+
+export function collectG14AProcedureMarks(m: Map<string, any>): G14AProcedureMark[] {
+  const marks: G14AProcedureMark[] = []
+  const voucher = m.get('G14A-voucher-complete')
+  if (voucher?.conclusion === 'completed' || voucher?.remark) {
+    marks.push({ key: 'voucher', label: '凭证/程序回填' })
+  }
+  return marks
+}
+
 export const G14_SHEET_LABEL_MAP: Record<string, string> = {
   G14: '底稿目录',
   'G14-目录': '底稿目录',
@@ -64,9 +78,10 @@ export function isG14SheetComplete(code: string, m: Map<string, any>): boolean {
     case 'G14-目录':
       return true
     case 'G14A':
-      return [...m.keys()].some(k => k.startsWith('G14-proc-') || k.startsWith('G14A-'))
+      return collectG14AProcedureMarks(m).length > 0
+        || [...m.keys()].some(k => k.startsWith('G14A-'))
     case 'G14-1':
-      return m.has('G14-adj-prior') || m.has('G14-adj-tb')
+      return m.has('G14-adj-prior') || m.has('G14-adj-tb') || m.has('G14-1-adjudicated-amount')
     case 'G14-2':
       return hasJsonRows(m, 'G14-detail-rows')
     case 'G14-3':

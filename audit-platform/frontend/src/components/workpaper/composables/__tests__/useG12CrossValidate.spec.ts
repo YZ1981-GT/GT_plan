@@ -115,7 +115,8 @@ describe('useG12CrossValidate', () => {
 
 describe('G12 voucher abnormal', () => {
   it('isVoucherAbnormal true when any check fails', () => {
-    expect(isVoucherAbnormal([true, true, false, true, true])).toBe(true)
-    expect(isVoucherAbnormal([true, true, true, true, true])).toBe(false)
+    expect(isVoucherAbnormal([true, true, false, true, true, true])).toBe(true)
+    expect(isVoucherAbnormal([true, true, true, true, true, true])).toBe(false)
+    expect(isVoucherAbnormal([null, true, true, null, true, true])).toBe(false)
   })
 })

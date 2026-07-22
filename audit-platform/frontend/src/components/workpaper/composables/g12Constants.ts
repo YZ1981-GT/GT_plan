@@ -69,28 +69,87 @@ export const G12_COMPLIANCE_OPTIONS = [
   { value: 'not_applicable', label: '不适用' },
 ] as const
 
-/** 附注披露行（上市 12 行 × 5 列） */
-export const G12_DISCLOSURE_LISTED_ROWS = [
-  { rowKey: 'net_hedge', label: '净敞口套期收益（损失）' },
-  { rowKey: 'fv_hedge_pl', label: '其中：公允价值套期计入损益' },
-  { rowKey: 'cf_hedge_pl', label: '其中：现金流量套期计入损益' },
-  { rowKey: 'ni_hedge_pl', label: '其中：净投资套期计入损益' },
-  { rowKey: 'instrument_fv', label: '套期工具公允价值变动' },
-  { rowKey: 'item_fv', label: '被套期项目公允价值变动' },
-  { rowKey: 'ineffectiveness', label: '套期无效部分' },
-  { rowKey: 'cf_reserve', label: '现金流量套期储备变动' },
-  { rowKey: 'ni_translation', label: '境外经营净投资折算差额' },
-  { rowKey: 'fair_value_level', label: '套期工具公允价值层次披露' },
-  { rowKey: 'risk_exposure', label: '被套期风险敞口' },
-  { rowKey: 'other', label: '其他' },
+/** G12-5 风险净敞口 — 常用币种 */
+export const G12_NET_EXPOSURE_CURRENCIES = [
+  { value: 'USD', label: '美元 USD' },
+  { value: 'EUR', label: '欧元 EUR' },
+  { value: 'GBP', label: '英镑 GBP' },
+  { value: 'JPY', label: '日元 JPY' },
+  { value: 'HKD', label: '港币 HKD' },
+  { value: 'CNY', label: '人民币 CNY' },
 ] as const
 
-/** 附注披露行（国企 11 行） */
-export const G12_DISCLOSURE_SOE_ROWS = G12_DISCLOSURE_LISTED_ROWS.filter(
-  (r) => r.rowKey !== 'fair_value_level',
-)
+/** G12-5 支持性证据类型（CAS24 净敞口套期常见证据） */
+export const G12_NET_EXPOSURE_EVIDENCE_TYPES = [
+  { value: 'sales_budget', label: '销售/采购预算' },
+  { value: 'order_contract', label: '订单/合同' },
+  { value: 'hedge_designation', label: '套期指定文件' },
+  { value: 'board_approval', label: '董事会/管理层决议' },
+  { value: 'valuation_doc', label: '公允价值估值资料' },
+  { value: 'bank_confirm', label: '银行确认/对账单' },
+  { value: 'other', label: '其他' },
+] as const
 
-export const G12_IMPORT_EXPORT_SHEETS = ['G12-2', 'G12-3', 'G12-4', 'G12-6'] as const
+export type G12NetExposureEvidenceType =
+  typeof G12_NET_EXPOSURE_EVIDENCE_TYPES[number]['value']
+
+export const G12_CURRENCY_UNIT_LABELS: Record<string, string> = {
+  USD: '美元',
+  EUR: '欧元',
+  GBP: '英镑',
+  JPY: '日元',
+  HKD: '港币',
+  CNY: '人民币',
+}
+
+/** 附注披露行（上市 — 对齐 Excel / note_template_listed.json） */
+export const G12_DISCLOSURE_LISTED_ROWS = [
+  { rowKey: 'net_hedge', label: '净敞口套期收益' },
+] as const
+
+/** 附注披露行（国企 — 对齐 Excel / note_template_soe.json） */
+export const G12_DISCLOSURE_SOE_ROWS = [
+  {
+    rowKey: 'hedged_fv_to_pl',
+    label: '净敞口套期下被套期项目累计公允价值变动转入当期损益的金额',
+  },
+  {
+    rowKey: 'cf_reserve_to_pl',
+    label: '净敞口套期下现金流量套期储备转入当期损益的金额',
+  },
+] as const
+
+/** 旧版附注 rowKey → 新版映射（加载历史数据时合并） */
+export const G12_DISCLOSURE_LEGACY_KEY_MAP: Record<string, string> = {
+  item_fv: 'hedged_fv_to_pl',
+  cf_reserve: 'cf_reserve_to_pl',
+  cf_hedge_pl: 'cf_reserve_to_pl',
+}
+
+/** 审计说明区 — 主要变动原因必填阈值（Excel 模板 30%） */
+export const G12_AUDIT_NOTE_REASON_THRESHOLD = 0.3
+
+/**
+ * G12 主闭环编制顺序（审定→附注）
+ * 配套程序/测试：G12A、G12-4/5/6 可并行穿插，但不替代本闭环。
+ */
+export const G12_CORE_WORKFLOW_STEPS = [
+  'G12-2 明细',
+  'G12-3 调整',
+  'G12-1 从TB取数',
+  '核对差异',
+  '填审计说明',
+  '发布审定数',
+  '附注从G12-1同步',
+  '勾稽绿条',
+  '编写附注说明',
+] as const
+
+export const G12_CORE_WORKFLOW_HINT =
+  '① 填 G12-2 明细 → G12-3 调整；② G12-1 点「从 TB 取数」→ 核对差异 → 填审计说明 → 发布审定数；③ 附注页点「从 G12-1 同步」→ 确认勾稽条为绿色 → 编写附注说明。'
+
+/** @deprecated 请使用 useG12ImportExport 中的同名常量（含 G12-5） */
+export { G12_IMPORT_EXPORT_SHEETS } from './useG12ImportExport'
 
 export const G12_DISCLOSURE_FORMULA_MAP = [
   { field: '附注合计-本期', source: 'G12-1审定表', formula: 'SUM(currentAudited) → substantive:adjudicated EventBus', account: '6103' },

@@ -9,25 +9,37 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+const mockK3Emit = vi.fn()
+const mockK3ApiPut = vi.fn().mockResolvedValue({})
+
+vi.mock('@/utils/eventBus', () => ({
+  eventBus: {
+    emit: (...args: unknown[]) => mockK3Emit(...args),
+    on: vi.fn(),
+    off: vi.fn(),
+  },
+}))
+
+vi.mock('@/services/apiProxy', () => ({
+  api: {
+    put: (...args: unknown[]) => mockK3ApiPut(...args),
+    get: vi.fn().mockResolvedValue({}),
+  },
+}))
+
+vi.mock('element-plus', () => ({
+  ElMessage: { warning: vi.fn(), success: vi.fn(), error: vi.fn() },
+}))
+
 // ═══ Task 6.1: EventBus TB回写(2241) + substantive:adjudicated → 附注 ═══
 
 describe('K3 Integration — Task 6.1: TB回写 + substantive:adjudicated', () => {
-  let eventBus: { emit: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn>; off: ReturnType<typeof vi.fn> }
-
   beforeEach(() => {
-    eventBus = { emit: vi.fn(), on: vi.fn(), off: vi.fn() }
-    vi.doMock('@/utils/eventBus', () => ({ eventBus }))
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
+    vi.clearAllMocks()
+    mockK3ApiPut.mockResolvedValue({})
   })
 
   it('writebackTB publishes substantive:adjudicated with correct payload', async () => {
-    // Mock api
-    const api = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
-    vi.doMock('@/services/apiProxy', () => ({ api }))
-
     const { useK3FormData } = await import('../composables/useK3FormData')
     const { ref } = await import('vue')
 
@@ -39,8 +51,7 @@ describe('K3 Integration — Task 6.1: TB回写 + substantive:adjudicated', () =
 
     await formData.writebackTB(500000)
 
-    // Verify TB writeback API call
-    expect(api.put).toHaveBeenCalledWith(
+    expect(mockK3ApiPut).toHaveBeenCalledWith(
       '/api/projects/test-proj-456/trial-balance/writeback',
       expect.objectContaining({
         account_code: '2241',
@@ -48,8 +59,7 @@ describe('K3 Integration — Task 6.1: TB回写 + substantive:adjudicated', () =
       }),
     )
 
-    // Verify EventBus emit
-    expect(eventBus.emit).toHaveBeenCalledWith(
+    expect(mockK3Emit).toHaveBeenCalledWith(
       'substantive:adjudicated',
       expect.objectContaining({
         accountCode: '2241',
@@ -212,21 +222,12 @@ describe('K3 Integration — Task 6.3: 抽凭 + OCR + GtIndexChip + 双模式', 
 // ─── 7.2-A: TB writeback flow: writebackTB(amount) → API call + EventBus emit ───
 
 describe('K3 Integration — Task 7.2-A: TB回写流程 (负债口径 2241)', () => {
-  let eventBus: { emit: ReturnType<typeof vi.fn>; on: ReturnType<typeof vi.fn>; off: ReturnType<typeof vi.fn> }
-
   beforeEach(() => {
-    eventBus = { emit: vi.fn(), on: vi.fn(), off: vi.fn() }
-    vi.doMock('@/utils/eventBus', () => ({ eventBus }))
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
+    vi.clearAllMocks()
+    mockK3ApiPut.mockResolvedValue({})
   })
 
   it('writebackTB calls PUT /trial-balance/writeback with 2241 + correct amount', async () => {
-    const api = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
-    vi.doMock('@/services/apiProxy', () => ({ api }))
-
     const { useK3FormData } = await import('../composables/useK3FormData')
     const { ref } = await import('vue')
 
@@ -238,16 +239,13 @@ describe('K3 Integration — Task 7.2-A: TB回写流程 (负债口径 2241)', ()
 
     await formData.writebackTB(1_500_000)
 
-    expect(api.put).toHaveBeenCalledWith(
+    expect(mockK3ApiPut).toHaveBeenCalledWith(
       '/api/projects/proj-001/trial-balance/writeback',
       { account_code: '2241', audited_amount: 1_500_000 },
     )
   })
 
   it('writebackTB emits substantive:adjudicated with 2241/K3 payload', async () => {
-    const api = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
-    vi.doMock('@/services/apiProxy', () => ({ api }))
-
     const { useK3FormData } = await import('../composables/useK3FormData')
     const { ref } = await import('vue')
 
@@ -259,7 +257,7 @@ describe('K3 Integration — Task 7.2-A: TB回写流程 (负债口径 2241)', ()
 
     await formData.writebackTB(2_000_000)
 
-    expect(eventBus.emit).toHaveBeenCalledWith(
+    expect(mockK3Emit).toHaveBeenCalledWith(
       'substantive:adjudicated',
       expect.objectContaining({
         accountCode: '2241',
@@ -288,9 +286,6 @@ describe('K3 Integration — Task 7.2-A: TB回写流程 (负债口径 2241)', ()
   })
 
   it('writebackTB zero amount is valid (全部清偿)', async () => {
-    const api = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
-    vi.doMock('@/services/apiProxy', () => ({ api }))
-
     const { useK3FormData } = await import('../composables/useK3FormData')
     const { ref } = await import('vue')
 
@@ -302,7 +297,7 @@ describe('K3 Integration — Task 7.2-A: TB回写流程 (负债口径 2241)', ()
 
     await formData.writebackTB(0)
 
-    expect(api.put).toHaveBeenCalledWith(
+    expect(mockK3ApiPut).toHaveBeenCalledWith(
       '/api/projects/proj-004/trial-balance/writeback',
       { account_code: '2241', audited_amount: 0 },
     )

@@ -1,6 +1,13 @@
 /**
  * 各循环审定表行配置 — F3~G14 及扩展
  */
+import { G8_ADJUDICATION_ITEMS, G8_ACCOUNT_CODE } from '../composables/g8Constants'
+import { G9_ADJUDICATION_ITEMS, G9_ACCOUNT_CODE } from '../composables/g9Constants'
+import { G11_ADJUDICATION_ITEMS } from '../composables/g11Constants'
+import { G12_ADJUDICATION_ITEMS, G12_ACCOUNT_CODE } from '../composables/g12Constants'
+import { G13_ADJUDICATION_ITEMS, G13_ACCOUNT_CODE } from '../composables/g13Constants'
+import { G14_LINE_ITEMS, G14_ACCOUNT_CODE } from '../composables/g14Constants'
+
 export type AccountDirection = 'debit' | 'credit'
 
 export interface CycleAdjudicationConfig {
@@ -92,20 +99,17 @@ export const CYCLE_ADJUDICATION_CONFIGS: Record<string, CycleAdjudicationConfig>
   },
   'G8-1': {
     sheetCode: 'G8-1',
-    accountCode: '1503',
+    accountCode: G8_ACCOUNT_CODE,
     accountLabel: '其他权益工具投资',
     direction: 'debit',
-    rows: [
-      { rowKey: 'listed', label: '上市公司' },
-      { rowKey: 'unlisted', label: '非上市公司' },
-    ],
+    rows: G8_ADJUDICATION_ITEMS.map(({ rowKey, label }) => ({ rowKey, label })),
   },
   'G9-1': {
     sheetCode: 'G9-1',
-    accountCode: '1504',
+    accountCode: G9_ACCOUNT_CODE,
     accountLabel: '其他非流动金融资产',
     direction: 'debit',
-    rows: [{ rowKey: 'total', label: '合计' }],
+    rows: G9_ADJUDICATION_ITEMS.map(({ rowKey, label }) => ({ rowKey, label })),
   },
   'G10-1': {
     sheetCode: 'G10-1',
@@ -122,40 +126,28 @@ export const CYCLE_ADJUDICATION_CONFIGS: Record<string, CycleAdjudicationConfig>
     accountCode: '6111',
     accountLabel: '投资收益',
     direction: 'credit',
-    rows: [
-      { rowKey: 'equity', label: '股权投资收益' },
-      { rowKey: 'debt', label: '债权投资收益' },
-      { rowKey: 'other', label: '其他' },
-    ],
+    rows: G11_ADJUDICATION_ITEMS.map(({ rowKey, label }) => ({ rowKey, label })),
   },
   'G12-1': {
     sheetCode: 'G12-1',
-    accountCode: '6101',
+    accountCode: G12_ACCOUNT_CODE,
     accountLabel: '净敞口套期收益',
     direction: 'credit',
-    rows: [{ rowKey: 'total', label: '合计' }],
+    rows: G12_ADJUDICATION_ITEMS.map(({ rowKey, label }) => ({ rowKey, label })),
   },
   'G13-1': {
     sheetCode: 'G13-1',
-    accountCode: '6102',
-    accountLabel: '公允价值变动损益',
+    accountCode: G13_ACCOUNT_CODE,
+    accountLabel: '公允价值变动收益',
     direction: 'credit',
-    rows: [
-      { rowKey: 'trading', label: '交易性金融资产' },
-      { rowKey: 'derivative', label: '衍生工具' },
-      { rowKey: 'other', label: '其他' },
-    ],
+    rows: G13_ADJUDICATION_ITEMS.map(({ rowKey, label }) => ({ rowKey, label })),
   },
   'G14-1': {
     sheetCode: 'G14-1',
-    accountCode: '6702',
+    accountCode: G14_ACCOUNT_CODE,
     accountLabel: '信用减值损失',
     direction: 'debit',
-    rows: [
-      { rowKey: 'receivable', label: '应收款项' },
-      { rowKey: 'debt', label: '债权投资' },
-      { rowKey: 'other', label: '其他' },
-    ],
+    rows: G14_LINE_ITEMS.map(({ rowKey, label }) => ({ rowKey, label })),
   },
 }
 

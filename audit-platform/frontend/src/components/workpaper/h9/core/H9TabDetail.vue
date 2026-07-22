@@ -205,6 +205,45 @@
           <span class="formula-value">{{ fmtAmt(row.finalAudited) }}</span>
         </template>
       </el-table-column>
+      <el-table-column prop="dueWithin1Y" label="O:1年以内" width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.dueWithin1Y" :controls="false" size="small"
+            @change="(v: number | undefined) => onCell(row.rowId, 'dueWithin1Y', v)" />
+          <span v-else>{{ fmtAmt(row.dueWithin1Y) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="due1To2Y" label="P:1-2年" width="100" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.due1To2Y" :controls="false" size="small"
+            @change="(v: number | undefined) => onCell(row.rowId, 'due1To2Y', v)" />
+          <span v-else>{{ fmtAmt(row.due1To2Y) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="due2To3Y" label="Q:2-3年" width="100" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.due2To3Y" :controls="false" size="small"
+            @change="(v: number | undefined) => onCell(row.rowId, 'due2To3Y', v)" />
+          <span v-else>{{ fmtAmt(row.due2To3Y) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="dueOver3Y" label="R:3年以上" width="100" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.dueOver3Y" :controls="false" size="small"
+            @change="(v: number | undefined) => onCell(row.rowId, 'dueOver3Y', v)" />
+          <span v-else>{{ fmtAmt(row.dueOver3Y) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="到期合计vs审定" width="120" align="right" class-name="formula-col">
+        <template #default="{ row }">
+          <span
+            class="formula-value"
+            :class="{ 'maturity-mismatch': Math.abs((row.dueWithin1Y + row.due1To2Y + row.due2To3Y + row.dueOver3Y) - row.finalAudited) > 1 }"
+            :title="'四档合计应等于最终审定 N'"
+          >
+            {{ fmtAmt(row.dueWithin1Y + row.due1To2Y + row.due2To3Y + row.dueOver3Y) }}
+          </span>
+        </template>
+      </el-table-column>
       <el-table-column prop="isRelatedParty" label="S:关联方" width="90" align="center">
         <template #default="{ row }">
           <el-tag v-if="!isReadonly" :type="row.isRelatedParty === '是' ? 'danger' : 'info'" size="small"
@@ -280,7 +319,9 @@
         <li>各合同应与 H8 使用权资产逐一对应（点 H8 索引跳转核对初始确认勾稽）</li>
         <li>本期利息费用应与 H9 摊销表 Σ 各期利息一致（±1 元容差）</li>
         <li>审定期末 L = 审定期初 I − 审定偿还 J + 审定利息 K；最终审定 N = L − 重分类 M</li>
+        <li>到期日分析 O~R 四档合计应等于最终审定 N（支撑附注流动性披露）</li>
         <li>关联方租赁需在 H9-6 单独评价公允性，并在附注中披露</li>
+        <li>初始确认及未确认融资费用摊销计算过程参见使用权资产底稿 H8-4/H8-5/H8-6/H8-7</li>
       </ul>
     </details>
 
@@ -299,7 +340,7 @@
  * Spec: .kiro/specs/h9-lease-liabilities/ Task 4.3
  * Requirements: 3.1-3.6
  */
-import { ref, toRef } from 'vue'
+import { ref, toRef, inject } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH9Detail, type H9DetailRow } from '../../composables/useH9Detail'
 import { useH9ImportExport } from '../../composables/useH9ImportExport'
@@ -334,13 +375,15 @@ const {
   onSave: (itemId, value) => emit('save', itemId, value),
 })
 
+const h9ReloadAll = inject<() => Promise<void>>('h9ReloadAll', async () => {})
+
 const {
   exportTemplate, exportData, importData,
 } = useH9ImportExport({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   sheetCode: 'H9-2',
-  onImported: () => { /* parent will reload */ },
+  onImported: async () => { await h9ReloadAll() },
 })
 
 // ─── 审计说明/结论 ───────────────────────────────────────────────────────────
@@ -468,6 +511,7 @@ function getSummaryAdjustment({ columns }: any) {
 .detail-table { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }
 .detail-table :deep(.formula-col) { background: #f0f9ff; }
 .formula-value { border-bottom: 1px dashed #409eff; cursor: help; color: #409eff; }
+.maturity-mismatch { color: #f56c6c !important; font-weight: 700; }
 
 .stat-bar {
   display: flex; gap: 24px; padding: 10px 0; font-size: 12px;

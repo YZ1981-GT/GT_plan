@@ -58,46 +58,55 @@
       },
       "layout": {
         "label_col": 1,
+        "note": "权威列结构以 H2 在建工程.xlsx 为准：期初/期末×未审/账项调整/审定 + 同期比较；增减/转固在 H2-2",
         "columns": {
-          "opening_balance": {
+          "project_name": {
+            "col": 1,
+            "label": "项目"
+          },
+          "begin_unadjusted": {
             "col": 2,
-            "label": "期初余额"
+            "label": "期初数-未审数"
           },
-          "increase_purchase": {
+          "begin_adjustment": {
             "col": 3,
-            "label": "本期增加-购置"
+            "label": "期初数-账项调整"
           },
-          "increase_transfer": {
+          "begin_audited": {
             "col": 4,
-            "label": "本期增加-在建转入"
+            "label": "期初数-审定数",
+            "formula": "begin_unadjusted + begin_adjustment"
           },
-          "increase_other": {
+          "end_unadjusted": {
             "col": 5,
-            "label": "本期增加-其他"
+            "label": "期末数-未审数"
           },
-          "decrease_disposal": {
+          "end_adjustment": {
             "col": 6,
-            "label": "本期减少-处置"
+            "label": "期末数-账项调整"
           },
-          "decrease_other": {
+          "end_audited": {
             "col": 7,
-            "label": "本期减少-其他"
+            "label": "期末数-审定数",
+            "formula": "end_unadjusted + end_adjustment"
           },
-          "closing_balance": {
+          "unadjusted_change": {
             "col": 8,
-            "label": "期末余额"
+            "label": "未审比较-变动额",
+            "formula": "end_unadjusted - begin_unadjusted"
           },
-          "audit_adjustment": {
+          "unadjusted_change_rate": {
             "col": 9,
-            "label": "审计调整"
+            "label": "未审比较-变动率"
           },
-          "closing_audited": {
+          "audited_change": {
             "col": 10,
-            "label": "期末审定数"
+            "label": "审定比较-变动额",
+            "formula": "end_audited - begin_audited"
           },
-          "index_ref": {
+          "audited_change_rate": {
             "col": 11,
-            "label": "索引"
+            "label": "审定比较-变动率"
           }
         }
       }
@@ -215,9 +224,15 @@
       "description": "转固金额 → 固定资产本期增加"
     },
     {
-      "from": "H2-10.资本化利息",
-      "to": "K3-1.利息资本化",
-      "description": "利息资本化金额 → 财务费用利息资本化"
+      "from": "H2-10/H2-11.资本化利息",
+      "to": "L8.利息资本化",
+      "event": "h2:interest-capitalized",
+      "description": "利息资本化金额 → 财务费用(L)借入端；EventBus: h2:interest-capitalized"
+    },
+    {
+      "from": "H2-2.三角勾稽",
+      "to": "H2-1.跨sheet差异警告",
+      "description": "期末=期初+增加-减少-转固 在 H2-2 实施；H2-1 仅展示差额警告"
     },
     {
       "from": "H2-15.减值",

@@ -14,6 +14,12 @@ import {
   calcSubtotal,
   calcPriceDiffRate,
   calcDiffRate,
+  calcRecoverableAmount,
+  calcRequiredProvision,
+  calcPeriodImpairmentAdjustment,
+  calcUnitPrice,
+  calcNetBookValue,
+  calcAuditedEndBalance,
 } from '../composables/useH4FormulaEngine'
 
 // ─── Property-Based Tests ───────────────────────────────────────────────────
@@ -321,6 +327,42 @@ describe('useH4FormulaEngine — 单元测试（边界）', () => {
     it('极小市场价格', () => {
       // (100 - 0.01) / 0.01 * 100 = 999900%
       expect(calcPriceDiffRate(100, 0.01)).toBeCloseTo(999900, 0)
+    })
+  })
+
+  // ─── H4-7 减值测算公式 ────────────────────────────────────────────────────
+
+  describe('H4-7 减值测算公式', () => {
+    it('calcRecoverableAmount = MAX(公允净额, 现值)', () => {
+      expect(calcRecoverableAmount(80, 100)).toBe(100)
+      expect(calcRecoverableAmount(120, 50)).toBe(120)
+    })
+
+    it('calcRequiredProvision = MAX(账面−可收回, 0)', () => {
+      expect(calcRequiredProvision(200, 150)).toBe(50)
+      expect(calcRequiredProvision(100, 150)).toBe(0)
+    })
+
+    it('calcPeriodImpairmentAdjustment = 应提 − 已提', () => {
+      expect(calcPeriodImpairmentAdjustment(50, 20)).toBe(30)
+      expect(calcPeriodImpairmentAdjustment(10, 40)).toBe(-30)
+    })
+  })
+
+  // ─── H4-2 单价 / 净值 ─────────────────────────────────────────────────────
+
+  describe('H4-2 单价与净值', () => {
+    it('calcUnitPrice 数量为0返回 null', () => {
+      expect(calcUnitPrice(100, 0)).toBeNull()
+      expect(calcUnitPrice(100, 4)).toBe(25)
+    })
+
+    it('calcNetBookValue = 原值 − 跌价', () => {
+      expect(calcNetBookValue(1000, 150)).toBe(850)
+    })
+
+    it('calcAuditedEndBalance = 审定期初 + 增 − 减', () => {
+      expect(calcAuditedEndBalance(100, 50, 20)).toBe(130)
     })
   })
 })

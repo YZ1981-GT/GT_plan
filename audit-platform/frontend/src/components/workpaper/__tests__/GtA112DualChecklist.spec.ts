@@ -53,10 +53,10 @@ describe('A1-12 重大事项决定程序核查表 — 注册契约 (7.1)', () =>
     expect(entry!.contextProps).toBe('standard')
   })
 
-  it('wp_code_overrides.json 映射 A1-12 → a1-12-dual-checklist', () => {
+  it('wp_code_overrides.json 映射 A1-12 → skip（A1 Dashboard 子底稿内嵌）', () => {
     const overridesPath = resolve(process.cwd(), '../../backend/app/data/wp_code_overrides.json')
     const overrides: Record<string, string> = JSON.parse(readFileSync(overridesPath, 'utf-8'))
-    expect(overrides['A1-12']).toBe('a1-12-dual-checklist')
+    expect(overrides['A1-12']).toBe('skip')
   })
 })
 

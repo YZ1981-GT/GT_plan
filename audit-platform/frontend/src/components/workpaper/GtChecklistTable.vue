@@ -212,6 +212,22 @@ const OBJECTIVE_PROGRAM_MAP: Record<number, { label: string; programs: number[] 
   },
 }
 const isA17_5 = computed(() => (template.value?.wp_code || '').startsWith('A17-5'))
+
+/** A17-5：「否」且无备注的开放项（签发阻断提示） */
+const openNoItems = computed(() => {
+  if (!isA17_5.value) return [] as ChecklistItem[]
+  const result: ChecklistItem[] = []
+  for (const sec of sections.value) {
+    for (const item of sec.items || []) {
+      if (item.type !== 'actionable') continue
+      const resp = responses.value[item.id]
+      const c = String(resp?.conclusion || '').trim()
+      const isNo = c === '否' || c === 'N' || c.toLowerCase() === 'no' || c === 'X/W'
+      if (isNo && !(resp?.remark || '').trim()) result.push(item)
+    }
+  }
+  return result
+})
 const activeObjective = ref<number | null>(null)
 
 /** 当前选中 section 是否为"审计目标" */
@@ -378,10 +394,19 @@ function markSectionAll(sectionId: string, conclusion: string) {
 function getConclusionClass(conclusion: string | null): string {
   if (!conclusion) return ''
   switch (conclusion) {
-    case 'Y': return 'conclusion-yes'
-    case 'X/I': return 'conclusion-xi'
-    case 'X/W': return 'conclusion-xw'
-    case 'N/A': return 'conclusion-na'
+    case 'Y':
+    case '是':
+      return 'conclusion-yes'
+    case 'X/I':
+      return 'conclusion-xi'
+    case 'X/W':
+    case '否':
+    case 'N':
+      return 'conclusion-xw'
+    case 'N/A':
+    case '不适用':
+    case 'NA':
+      return 'conclusion-na'
     default: return ''
   }
 }
@@ -580,13 +605,36 @@ onBeforeUnmount(() => {
           <el-button size="small" text>标识说明</el-button>
         </template>
         <div class="legend-content">
-          <div class="legend-item"><span class="legend-tag tag-y">Y</span> 适用于被审计单位财务报表并已在财务报表中披露</div>
-          <div class="legend-item"><span class="legend-tag tag-xi">X/I</span> 适用但不重大，未在财务报表中披露</div>
-          <div class="legend-item"><span class="legend-tag tag-xw">X/W</span> 适用且重大，未在财务报表中披露，已在另附工作底稿说明原因</div>
-          <div class="legend-item"><span class="legend-tag tag-na">N/A</span> 不适用于被审计单位财务报表</div>
+          <template v-if="isA17_5">
+            <div class="legend-item"><span class="legend-tag tag-y">是</span> 已完成 / 已确认</div>
+            <div class="legend-item"><span class="legend-tag tag-xw">否</span> 未完成 — 须备注说明，并可跳转上游底稿补做</div>
+            <div class="legend-item"><span class="legend-tag tag-na">不适用</span> 本项目不适用该项</div>
+          </template>
+          <template v-else>
+            <div class="legend-item"><span class="legend-tag tag-y">Y</span> 适用于被审计单位财务报表并已在财务报表中披露</div>
+            <div class="legend-item"><span class="legend-tag tag-xi">X/I</span> 适用但不重大，未在财务报表中披露</div>
+            <div class="legend-item"><span class="legend-tag tag-xw">X/W</span> 适用且重大，未在财务报表中披露，已在另附工作底稿说明原因</div>
+            <div class="legend-item"><span class="legend-tag tag-na">N/A</span> 不适用于被审计单位财务报表</div>
+          </template>
         </div>
       </el-popover>
     </div>
+
+    <el-alert
+      v-if="isA17_5 && openNoItems.length"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="gt-checklist-table__no-banner"
+      :title="`有 ${openNoItems.length} 项勾选「否」但未填备注，签发前须闭环`"
+    >
+      <ul class="gt-checklist-table__no-list">
+        <li v-for="it in openNoItems.slice(0, 8)" :key="it.id">
+          {{ it.standard_ref || it.id }} · {{ (it.content || '').slice(0, 48) }}{{ (it.content || '').length > 48 ? '…' : '' }}
+          <template v-if="it.preset_wp_ref"> → {{ it.preset_wp_ref }}</template>
+        </li>
+      </ul>
+    </el-alert>
 
     <!-- ─── 工具栏: 搜索 + 筛选 + 批量 ─── -->
     <div class="gt-checklist-table__toolbar">
@@ -717,6 +765,8 @@ onBeforeUnmount(() => {
         :readonly="readonly"
         :has-standard-ref="template?.has_standard_ref !== false"
         :allow-custom-items="!!template?.allow_custom_items"
+        :conclusion-mode="isA17_5 ? 'completion' : 'disclosure'"
+        :project-id="projectId"
         :get-response="getResponse"
         :get-conclusion-class="getConclusionClass"
         :sign-hint-for-item="signHintForItem"
@@ -990,4 +1040,14 @@ onBeforeUnmount(() => {
 .tag-xi { background: #fff8e6; color: #996b00; }
 .tag-xw { background: #fde8e8; color: #c53030; }
 .tag-na { background: #f5f5f5; color: #666; }
+
+.gt-checklist-table__no-banner {
+  margin: 0 12px 8px;
+}
+.gt-checklist-table__no-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.5;
+}
 </style>

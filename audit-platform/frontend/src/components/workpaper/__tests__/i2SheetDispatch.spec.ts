@@ -112,7 +112,7 @@ describe('I2 sheetName分发逻辑', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function makeConditions(results: Array<'yes' | 'no' | 'na'>): CAS6Condition[] {
-  const names = ['技术可行性', '完成意图', '使用或出售能力', '未来经济利益', '资源充足']
+  const names = ['技术可行性', '完成意图', '经济利益方式', '资源支持', '可靠计量']
   return results.map((r, i) => ({
     id: (i + 1) as 1 | 2 | 3 | 4 | 5,
     name: names[i],
@@ -165,12 +165,12 @@ describe('CAS6五条件面板交互逻辑', () => {
     })
   })
 
-  describe('混合场景：有yes和na（无no）', () => {
-    it('部分yes部分na → isMet=true', () => {
+  describe('混合场景：有yes和na（无no）— 须同时满足', () => {
+    it('部分yes部分na → isMet=false（CAS6须五条件同时为是）', () => {
       const conditions = makeConditions(['yes', 'yes', 'na', 'yes', 'na'])
       const result = evaluateCapitalization(conditions)
-      expect(result.isMet).toBe(true)
-      expect(result.missingConditions).toEqual([])
+      expect(result.isMet).toBe(false)
+      expect(result.missingConditions).toEqual([3, 5])
     })
   })
 })

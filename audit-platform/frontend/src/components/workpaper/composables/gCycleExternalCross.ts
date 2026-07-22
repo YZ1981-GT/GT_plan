@@ -2,12 +2,12 @@
  * G12/G13/G14 跨底稿勾稽 — 纯函数（EventBus + 缓存 item 驱动）
  */
 import { parseNum, calcSubtotal } from './useG13FormulaEngine'
-import { G13_BELONG_ACCOUNT_LABELS, G13_BELONG_TO_ADJ } from './g13Constants'
+import { G13_BELONG_ACCOUNT_LABELS, mapBelongToAdjRow } from './g13Constants'
 import { G14_LINE_ITEMS } from './g14Constants'
 
 const TOLERANCE = 0.01
 
-export const G13_FV_SOURCES = ['G1', 'G8', 'G9', 'G10'] as const
+export const G13_FV_SOURCES = ['G1', 'G8', 'G9', 'G10', 'H3'] as const
 export type G13FvSource = (typeof G13_FV_SOURCES)[number]
 
 export interface G13SourceFvMismatch {
@@ -73,6 +73,43 @@ export function findG13SourceFvMismatches(
   return out
 }
 
+/** 明细中实际出现的源科目（用于勾稽完整性判定，避免假绿） */
+export function activeG13FvSourcesFromDetail(detailRows: G13DetailRowLike[]): G13FvSource[] {
+  const set = new Set<G13FvSource>()
+  for (const r of detailRows) {
+    if (r.rowId === 'total') continue
+    const b = String(r.belongAccount || '').trim() as G13FvSource
+    if ((G13_FV_SOURCES as readonly string[]).includes(b)) set.add(b)
+  }
+  return G13_FV_SOURCES.filter((s) => set.has(s))
+}
+
+export function findG13PendingFvSources(
+  detailRows: G13DetailRowLike[],
+  externalBySource: Partial<Record<G13FvSource, number | null | undefined>>,
+): G13FvSource[] {
+  return activeG13FvSourcesFromDetail(detailRows).filter(
+    (s) => externalBySource[s] == null || Number.isNaN(externalBySource[s] as number),
+  )
+}
+
+/** 仅当「明细出现的源」均有外部数且无金额差异才算勾稽完成 */
+export function isG13SourceFvReconciled(
+  detailRows: G13DetailRowLike[],
+  externalBySource: Partial<Record<G13FvSource, number | null | undefined>>,
+): boolean {
+  const active = activeG13FvSourcesFromDetail(detailRows)
+  if (!active.length) return false
+  if (findG13PendingFvSources(detailRows, externalBySource).length) return false
+  return findG13SourceFvMismatches(detailRows, externalBySource).length === 0
+}
+
+export function formatG13PendingFvSourcesMessage(pending: G13FvSource[]): string | null {
+  if (!pending.length) return null
+  const labels = pending.map((s) => G13_BELONG_ACCOUNT_LABELS[s] ?? s)
+  return `待源科目发布 FV 变动后勾稽：${labels.join('、')}`
+}
+
 export function formatG13SourceFvCrossMessage(mismatches: G13SourceFvMismatch[]): string | null {
   if (!mismatches.length) return null
   const parts = mismatches.map(
@@ -88,7 +125,11 @@ export function sumG13AdjudicationBySourceKey(
 ): number {
   return calcSubtotal(
     detailRows
-      .filter((r) => r.rowId !== 'total' && (G13_BELONG_TO_ADJ[r.belongAccount] ?? 'other') === adjRowKey)
+      .filter((r) => {
+        if (r.rowId === 'total') return false
+        const type = (r as { instrumentType?: string }).instrumentType
+        return mapBelongToAdjRow(r.belongAccount, type) === adjRowKey
+      })
       .map((r) => r.currentAudited),
   )
 }

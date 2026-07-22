@@ -7,6 +7,7 @@
  * 3. HTML_SHEETS 12 项（G10A + G10-1..8 + 3 note/dir）
  * 4. 可导入导出 5 张表（G10-2 / G10-3 / G10-5 / G10-6 / G10-7）
  * 5. 科目代码 2101 / Event bus g10:save-items / AI 前缀 /g10/ai/
+ * 6. 跨表推送与 G10A 程序表（§5–§6 本文件；全链路见 g10FullChainRegression.spec.ts）
  *
  * **Validates: Requirements G10 integration**
  */
@@ -94,13 +95,16 @@ describe('G10 集成: HTML_SHEETS', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 3. 可导入导出 5 张表
+// 3. 可导入导出 8 张表
 // ---------------------------------------------------------------------------
 describe('G10 集成: 可导入导出', () => {
-  it('G10 支持5 张表动态行表格可导入导出', () => {
-    expect(G10_IMPORTABLE_SHEETS).toHaveLength(5)
+  it('G10 支持 10 张表可导入导出（含 G10-1~8 与附注上市/国企）', () => {
+    expect(G10_IMPORTABLE_SHEETS).toHaveLength(10)
     const codes = G10_IMPORTABLE_SHEETS.map((s) => s.code)
-    expect(codes).toEqual(['G10-2', 'G10-3', 'G10-5', 'G10-6', 'G10-7'])
+    expect(codes).toEqual([
+      'G10-1', 'G10-2', 'G10-3', 'G10-4', 'G10-5', 'G10-6', 'G10-7', 'G10-8',
+      '附注上市', '附注国企',
+    ])
   })
 })
 
@@ -141,6 +145,175 @@ describe('G10 集成: G10A 程序表', () => {
     const { G_CYCLE_PROCEDURE_SHEETS } = await import('../composables/cycleProcedureSheets')
     expect(G_CYCLE_PROCEDURE_SHEETS.G10A).toBeDefined()
     expect(G_CYCLE_PROCEDURE_SHEETS.G10A.sheetLabel).toBe('交易性金融负债实质性程序表G10A')
+  })
+
+  it('G10A 回填步骤号与底稿对应', async () => {
+    const {
+      G10A_FV_PROGRAM_NOS,
+      G10A_VOUCHER_PROGRAM_NOS,
+      G10A_DERIVATIVE_PROGRAM_NOS,
+      G10A_CLASSIFICATION_PROGRAM_NOS,
+      G10A_DISCLOSURE_PROGRAM_NOS,
+      G10A_ADJUSTMENT_PROGRAM_NOS,
+      collectG10AProcedureMarks,
+    } = await import('../composables/g10FvCrossHelpers')
+    expect([...G10A_FV_PROGRAM_NOS]).toEqual([9])
+    expect([...G10A_VOUCHER_PROGRAM_NOS]).toEqual([6, 7, 8])
+    expect([...G10A_DERIVATIVE_PROGRAM_NOS]).toEqual([10])
+    expect([...G10A_CLASSIFICATION_PROGRAM_NOS]).toEqual([5])
+    expect([...G10A_DISCLOSURE_PROGRAM_NOS]).toEqual([14])
+    expect([...G10A_ADJUSTMENT_PROGRAM_NOS]).toEqual([3, 4])
+
+    const m = new Map<string, { conclusion?: string }>()
+    m.set('G10A-fv-complete', { conclusion: 'completed' })
+    m.set('G10A-voucher-complete', { conclusion: 'completed' })
+    m.set('G10A-derivative-complete', { conclusion: 'completed' })
+    m.set('G10A-adjustment-complete', { conclusion: 'completed' })
+    const marks = collectG10AProcedureMarks(m)
+    expect(marks.map((x) => x.key)).toEqual(['adjustment', 'fv', 'derivative', 'voucher'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// 6. 跨表推送 G10-5/7/8 → G10-3 → G10-1 回写
+// ---------------------------------------------------------------------------
+describe('G10 集成: 跨表推送与回写', () => {
+  it('commitG10AdjustmentWriteback 更新 G10-1 审定合计', async () => {
+    const { commitG10AdjustmentWriteback } = await import('../composables/g10CrossHelpers')
+    const responses = new Map<string, any>()
+    const saves: Array<{ id: string; data: any }> = []
+    const store = commitG10AdjustmentWriteback(
+      responses,
+      (id, data) => saves.push({ id, data }),
+      { byRow: { book_derivative_liability: { closingAje: 50, closingRje: 0 } } },
+    )
+    expect(store.book_derivative_liability?.closingAJE).toBe(50)
+    expect(saves.find((s) => s.id === 'G10-1-adjudicated-amount')?.data.conclusion).toBe('50')
+  })
+
+  it('G10-5 公允差异推送并回写 G10-1 分项', async () => {
+    const { pushG10FvDiffToAdjustment } = await import('../composables/g10FvCrossHelpers')
+    const {
+      applyG10AdjustmentWritebacks,
+      defaultG10AdjStore,
+      parseG10AdjStore,
+    } = await import('../composables/g10AdjStorage')
+    const { G10_ADJ_ROWS_KEY } = await import('../composables/g10CrossHelpers')
+
+    const responses = new Map<string, { remark?: string }>()
+    const n = pushG10FvDiffToAdjustment(
+      responses as any,
+      (id, data) => responses.set(id, data as any),
+      [{
+        summary: 'G10-5 公允测试差异：利率互换',
+        amount: 80,
+        liabilityName: '利率互换',
+        liabilityType: '衍生金融负债',
+        indexRef: 'G10-5',
+      }],
+    )
+    expect(n).toBe(1)
+
+    const adjJson = responses.get('G10-aje-rows')?.remark
+    expect(adjJson).toBeTruthy()
+    const adjRows = JSON.parse(String(adjJson))
+    expect(adjRows).toHaveLength(2)
+
+    const wbJson = responses.get('G10-adj-writeback')?.remark
+    const wb = JSON.parse(String(wbJson))
+    const store = applyG10AdjustmentWritebacks(defaultG10AdjStore(), wb)
+    expect(store.book_derivative_liability?.closingAJE).toBe(80)
+
+    const roundTrip = parseG10AdjStore(JSON.stringify(store))
+    expect(roundTrip.book_derivative_liability?.closingAJE).toBe(80)
+    expect(responses.has(G10_ADJ_ROWS_KEY)).toBe(true)
+  })
+
+  it('G10-7 + G10-8 推送后 CHK-10 识别来源', async () => {
+    const { pushG10VoucherAbnormalToAdjustment } = await import('../composables/g10VoucherCross')
+    const { pushG10DerivativeIssuesToAdjustment } = await import('../composables/g10DerivativeCross')
+    const { enrichG10VoucherRow } = await import('../composables/useG10VoucherCheck')
+    const { summarizeG10CrossChecks } = await import('../composables/g10CrossChecks')
+
+    const responses = new Map<string, { remark?: string }>()
+    const save = (id: string, data: Partial<{ remark?: string }>) => responses.set(id, data as any)
+
+    pushG10VoucherAbnormalToAdjustment(
+      responses as any,
+      save,
+      [enrichG10VoucherRow({
+        id: 'v1',
+        isAbnormal: true,
+        check6FairValueCorrect: false,
+        creditAmount: 200,
+        voucherNo: '记-01',
+        businessContent: '卖空',
+      }, 1)],
+    )
+    pushG10DerivativeIssuesToAdjustment(
+      responses as any,
+      save,
+      [{
+        rowId: 'd1',
+        sectionNo: '2',
+        sectionTitle: '嵌入衍生',
+        checkItem: '拆分',
+        riskLevel: 'high',
+        auditConclusion: '应拆分',
+      }],
+    )
+
+    const chk10 = summarizeG10CrossChecks(responses as any).find((i) => i.code === 'G10-CHK-10')
+    expect(chk10?.status).toBe('warn')
+    expect(chk10?.detail).toContain('G10-7')
+    expect(chk10?.detail).toContain('G10-8')
+  })
+
+  it('G10-3 summarize 2101 净额 = 贷−借', async () => {
+    const { summarizeG10Adjustment } = await import('../composables/g10AdjStorage')
+    const s = summarizeG10Adjustment([
+      { entryType: 'AJE', accountCode: '6101', debitAmount: 30, creditAmount: 0 },
+      { entryType: 'AJE', accountCode: '2101', debitAmount: 0, creditAmount: 30 },
+    ])
+    expect(s.net2101).toBe(30)
+    expect(s.balanceDiff).toBe(0)
+    expect(s.fvPlNet).toBe(30)
+  })
+
+  it('全链路：G10-2 回写 → 附注带入 → CHK-01/03 通过', async () => {
+    const { pushG10DetailToAdjudication, seedG10DetailRowFromAux } = await import('../composables/g10CrossHelpers')
+    const { applyG10DisclosurePullToResponses } = await import('../composables/g10DisclosureFromAdj')
+    const { summarizeG10CrossChecks } = await import('../composables/g10CrossChecks')
+    const { enrichG10DetailRow } = await import('../composables/useG10Detail')
+
+    const responses = new Map<string, any>()
+    const save = (id: string, data: any) => responses.set(id, data)
+
+    const seeded = seedG10DetailRowFromAux({
+      liabilityName: '利率互换',
+      openingBalance: 100,
+      closingBalance: 180,
+      auxType: '项目',
+      auxCode: 'SWAP-001',
+    }, 1)
+    const detailRow = enrichG10DetailRow({
+      ...seeded,
+      liabilityType: '衍生金融负债',
+      isDerivative: true,
+    }, 1)
+
+    pushG10DetailToAdjudication(responses, save, [detailRow])
+    save('G10-adj-tb', { remark: '180' })
+    save('G10-detail-rows', { remark: JSON.stringify([detailRow]) })
+
+    const batch = applyG10DisclosurePullToResponses(responses, save, 2025)
+    expect(batch.summary.length).toBeGreaterThan(0)
+    expect(responses.has('G10-disclosure-listed')).toBe(true)
+    expect(responses.has('G10-disclosure-soe')).toBe(true)
+
+    const checks = summarizeG10CrossChecks(responses)
+    expect(checks.find((c) => c.code === 'G10-CHK-01')?.status).toBe('ok')
+    expect(checks.find((c) => c.code === 'G10-CHK-03')?.status).toBe('ok')
   })
 })
 

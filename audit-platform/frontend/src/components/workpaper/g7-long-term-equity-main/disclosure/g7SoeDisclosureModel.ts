@@ -410,7 +410,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         columns: subsidiaryBasicColumns,
         rows: blankRows(
           'subsidiary-basic',
-          10,
+          3,
           subsidiaryBasicColumns,
           index => `被投资单位基本信息G7-4 第${12 + index}行；投资额←明细表G7-2`,
         ),

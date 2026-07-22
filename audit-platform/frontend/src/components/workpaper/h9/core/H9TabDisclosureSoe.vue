@@ -1,93 +1,136 @@
 <template>
-  <div class="h9-tab-disclosure-soe">
-    <!-- 审计目标 -->
-    <el-alert
-      type="info"
-      :closable="false"
-      show-icon
-      class="objective-alert"
-      title="审计目标：核实国企附注中租赁负债（租赁付款额、未确认融资费用、一年内到期、净额）披露完整、准确，与 H9-1 审定表勾稽一致，符合国资委信息公开及 CAS21 要求。"
-    />
+  <div class="h9-disc-soe">
+    <el-alert type="info" :closable="false" show-icon class="objective">
+      审计目标：按国企附注格式编制租赁负债披露——租赁付款额、未确认融资费用、一年内重分类及净额，与 H9-1/H9-2 勾稽，并同步至附注「{{ noteSectionId }}」。
+    </el-alert>
 
-    <!-- 方法论上下文 -->
     <div class="methodology-context">
-      <p>附注披露（国企）：按国资委信息公开要求和CAS21准则，披露租赁负债明细（含租赁付款额、未确认融资费用、净额）。A1:F16，简单表格。</p>
+      <p>
+        编制逻辑（对齐致同 Excel + CAS21）：①租赁付款额（原值）− 未确认融资费用 − 一年内重分类 = 净额 →
+        ②与 H9-1 双区块及 H9-2 重分类勾稽 → ③同步附注八、52。
+      </p>
     </div>
 
-    <!-- 附注表格 -->
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <strong>附注披露信息（国企）</strong>
+        <el-tag size="small" type="warning" effect="plain">八、52 租赁负债</el-tag>
+      </div>
+      <div class="toolbar-right">
+        <el-button size="small" :disabled="isReadonly" data-testid="h9-soe-pull" @click="handlePull">
+          从审定/明细取数
+        </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="isSyncing"
+          :disabled="isReadonly || !projectId"
+          data-testid="h9-disclosure-soe-sync"
+          @click="syncToNotes"
+        >
+          同步到附注
+        </el-button>
+        <el-button size="small" type="primary" plain @click="emit('open-ai', 'disclosure-soe')">AI 辅助</el-button>
+        <el-button size="small" @click="emit('open-review', 'disclosure-soe')">复核</el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:H9-1" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:H9-2" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:H9-3" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip :value="`Note:${noteSectionId}`" :context-project-id="projectId" /></span>
+      </div>
+    </div>
+
     <el-card shadow="never" class="disclosure-card">
       <template #header>
-        <div class="section-title">
-          <span>49、租赁负债</span>
-          <div class="title-actions">
-            <el-button size="small" @click="$emit('open-review', 'disclosure-soe')">复核</el-button>
-          </div>
-        </div>
+        <div class="section-title"><span>49、租赁负债</span></div>
       </template>
 
-      <el-table :data="displayRows" border size="small" class="disclosure-table">
-        <el-table-column prop="item" label="项  目" min-width="200" />
-        <el-table-column prop="endBalance" label="期末余额" min-width="120" align="right">
+      <el-table :data="displayRows" border size="small" class="disclosure-table" :row-class-name="rowClass">
+        <el-table-column prop="item" label="项  目" min-width="240" />
+        <el-table-column label="期末余额" min-width="140" align="right">
           <template #default="{ row }">
             <el-input-number
-              v-if="!row.isSummary && !isReadonly"
-              v-model="row.endBalance"
+              v-if="row.kind === 'line' && !isReadonly"
+              :model-value="row.endBalance ?? undefined"
               :controls="false"
               :precision="2"
               size="small"
               class="num-input"
-              @change="onDataChange"
+              @update:model-value="(v: number | undefined) => updateLine(row.rowIndex!, 'endBalance', v ?? null)"
             />
-            <span v-else :class="{ 'summary-value': row.isSummary }">
-              {{ row.endBalance != null ? row.endBalance.toFixed(2) : '' }}
-            </span>
+            <span v-else class="formula-cell">{{ fmt(row.endBalance) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="beginBalance" label="期初余额" min-width="120" align="right">
+        <el-table-column label="期初余额" min-width="140" align="right">
           <template #default="{ row }">
             <el-input-number
-              v-if="!row.isSummary && !isReadonly"
-              v-model="row.beginBalance"
+              v-if="row.kind === 'line' && !isReadonly"
+              :model-value="row.beginBalance ?? undefined"
               :controls="false"
               :precision="2"
               size="small"
               class="num-input"
-              @change="onDataChange"
+              @update:model-value="(v: number | undefined) => updateLine(row.rowIndex!, 'beginBalance', v ?? null)"
             />
-            <span v-else :class="{ 'summary-value': row.isSummary }">
-              {{ row.beginBalance != null ? row.beginBalance.toFixed(2) : '' }}
-            </span>
+            <span v-else class="formula-cell">{{ fmt(row.beginBalance) }}</span>
           </template>
         </el-table-column>
       </el-table>
+      <p class="hint">净额 = 租赁付款额 − 未确认融资费用 − 重分类至一年内到期（公式列）。</p>
     </el-card>
 
-    <!-- CAS21准则提示 -->
-    <el-card shadow="never" class="supplement-card">
-      <template #header>
-        <div class="section-title">
-          <span>补充披露说明</span>
-        </div>
-      </template>
+    <section class="guidance-block">
+      <h4 class="sub-title">【提示】</h4>
+      <el-alert
+        v-for="(t, i) in H9_SOE_GUIDANCE.tips"
+        :key="i"
+        type="info"
+        :closable="false"
+        class="guide-alert"
+        :title="`${i + 1}、${t}`"
+      />
+      <div class="note-field">
+        <label>补充披露说明（可选，同步至附注文本）</label>
+        <el-input
+          v-model="state.supplementNote"
+          type="textarea"
+          :autosize="{ minRows: 2, maxRows: 6 }"
+          :disabled="isReadonly"
+          placeholder="如有额外披露事项可在此填写；CAS21 提示见上方，无需重复粘贴。"
+          @change="persist"
+        />
+      </div>
+    </section>
+
+    <el-card shadow="never" class="audit-card">
+      <template #header><span class="card-title">审计说明</span></template>
       <el-input
-        v-model="supplementNote"
+        v-model="state.auditNote"
         type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        :readonly="isReadonly"
-        placeholder="1、承租人根据《企业会计准则第21号——租赁》所确认的租赁负债发生的利息费用适用借款费用准则...&#10;2、承租人向出租人支付的租金等款项中包含应缴纳的增值税的..."
-        @change="saveSupplementNote"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="说明取数来源（H9-1/H9-2/H9-3）、与附注勾稽情况…"
+        @change="persist"
+      />
+    </el-card>
+    <el-card shadow="never" class="audit-card">
+      <template #header><span class="card-title">审计结论</span></template>
+      <el-input
+        v-model="state.auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 2 }"
+        :disabled="isReadonly"
+        placeholder="本表披露是否恰当、完整…"
+        @change="persist"
       />
     </el-card>
 
-    <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>国企附注需列示：租赁付款额、减未确认融资费用、重分类至一年内到期、租赁负债净额</li>
-        <li>净额=租赁付款额-未确认融资费用-一年内到期</li>
-        <li>CAS21利息费用不资本化（租赁期开始日便达到预定可使用状态）</li>
-        <li>增值税不属于租赁付款额范畴，不纳入计量</li>
-        <li>数据应与H9-1审定表一致（EventBus联动自动刷新）</li>
+        <li>「从审定/明细取数」：H9-1 原值→租赁付款额、未确认融资费用；H9-2 重分类→一年内到期</li>
+        <li>「同步到附注」写入附注「{{ noteSectionId }}」子表「租赁负债」</li>
+        <li>增值税不纳入租赁付款额计量；保证金单独作为资产/负债</li>
       </ul>
     </details>
   </div>
@@ -95,18 +138,28 @@
 
 <script setup lang="ts">
 /**
- * H9TabDisclosureSoe.vue — 附注披露信息（国企）
- * A1:F16 简单表格：项目|期末余额|期初余额 + 净额行
- * Subscribe EventBus 'substantive:adjudicated' auto-refresh
- * Spec: Task 4.6 | Requirements: 1.2
+ * H9TabDisclosureSoe — 租赁负债附注披露（国企）
+ * 对齐源模板 A1:F16 + note_template 八、52；同步附注模块
  */
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { computed, ref, toRef } from 'vue'
+import { ElMessage } from 'element-plus'
+import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
+import GtIndexChip from '../../GtIndexChip.vue'
+import { useH9SoeDisclosure } from '../../composables/useH9Disclosure'
+import {
+  buildSoeDisplayRows,
+  type H9SoeDisplayRow,
+} from '../../composables/h9DisclosureModel'
+import { buildH9SoeSyncPayloads } from '../../composables/h9DisclosureSyncPayload'
+import { H9_NOTE_SECTION, H9_SOE_GUIDANCE } from '../../composables/h9NoteSectionMap'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -115,121 +168,97 @@ const emit = defineEmits<{
   (e: 'open-review', section: string): void
 }>()
 
-// --- 数据模型 ---
-interface DisclosureRow {
-  item: string
-  endBalance: number | null
-  beginBalance: number | null
-  isSummary: boolean
-}
+const noteSectionId = H9_NOTE_SECTION.soe
+const isSyncing = ref(false)
 
-const editableRows = ref<DisclosureRow[]>([])
-const supplementNote = ref('')
-
-const defaultRows: DisclosureRow[] = [
-  { item: '租赁付款额', endBalance: null, beginBalance: null, isSummary: false },
-  { item: '减：未确认的融资费用', endBalance: null, beginBalance: null, isSummary: false },
-  { item: '重分类至一年内到期的非流动负债', endBalance: null, beginBalance: null, isSummary: false },
-]
-
-// 计算净额行
-const displayRows = computed(() => {
-  const rows = [...editableRows.value]
-  const paymentEnd = rows[0]?.endBalance || 0
-  const unrecEnd = rows[1]?.endBalance || 0
-  const withinEnd = rows[2]?.endBalance || 0
-  const paymentBegin = rows[0]?.beginBalance || 0
-  const unrecBegin = rows[1]?.beginBalance || 0
-  const withinBegin = rows[2]?.beginBalance || 0
-
-  rows.push({
-    item: '租赁负债净额',
-    endBalance: paymentEnd - unrecEnd - withinEnd,
-    beginBalance: paymentBegin - unrecBegin - withinBegin,
-    isSummary: true,
-  })
-  return rows
+const { state, persist, pullFromSources, updateLine } = useH9SoeDisclosure({
+  allResponses: toRef(props, 'allResponses'),
+  onSave: (id, v) => emit('save', id, v),
 })
 
-// --- 数据加载 ---
-function loadFromResponses() {
-  const data = props.allResponses.get('H9-disc-soe-rows')
-  if (data) {
-    try {
-      const parsed = typeof data === 'string' ? JSON.parse(data) : data
-      editableRows.value = parsed.rows || [...defaultRows]
-      supplementNote.value = parsed.supplementNote || ''
-    } catch { editableRows.value = [...defaultRows] }
-  } else {
-    editableRows.value = [...defaultRows]
+const displayRows = computed(() => buildSoeDisplayRows(state.value))
+
+function fmt(n: number | null | undefined): string {
+  if (n == null || n === ('' as any)) return ''
+  return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function rowClass({ row }: { row: H9SoeDisplayRow }) {
+  return row.kind === 'net' ? 'row-calc' : ''
+}
+
+function handlePull() {
+  const res = pullFromSources()
+  ElMessage.success(res.message)
+}
+
+async function syncToNotes() {
+  if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return
+  persist()
+  const payloads = buildH9SoeSyncPayloads(props.wpId, props.applicableStandards || [], state.value)
+  if (!payloads.length) {
+    ElMessage.warning('当前不适用国企附注同步')
+    return
   }
-  const noteItem = props.allResponses.get('H9-disc-soe-audit-note')
-  const conclusionItem = props.allResponses.get('H9-disc-soe-audit-conclusion')
-}
-
-// --- 保存 ---
-function onDataChange() {
-  saveAll()
-}
-
-function saveSupplementNote() {
-  saveAll()
-}
-
-function saveAll() {
-  const payload = {
-    rows: editableRows.value,
-    supplementNote: supplementNote.value,
-  }
-  emit('save', 'H9-disc-soe-rows', JSON.stringify(payload))
-}
-
-// --- EventBus: subscribe adjudicated to refresh ---
-let unsubscribe: (() => void) | null = null
-
-function subscribeEventBus() {
-  const bus = (window as any).__auditEventBus
-  if (bus?.on) {
-    const handler = (payload: any) => {
-      if (payload?.wpCode?.startsWith('H9')) loadFromResponses()
+  isSyncing.value = true
+  try {
+    let rows = 0
+    for (const payload of payloads) {
+      const result: any = await api.post(
+        `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+        payload,
+      )
+      const data = result?.data ?? result
+      rows += Number(data?.rows_synced ?? 0)
     }
-    bus.on('substantive:adjudicated', handler)
-    unsubscribe = () => bus.off('substantive:adjudicated', handler)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      projectId: props.projectId,
+      sectionIds: [noteSectionId],
+      wpId: props.wpId,
+      sheet: payloads[0].sheet_name,
+    })
+    ElMessage.success(`已同步 ${rows} 行到附注「${noteSectionId}」`)
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
   }
 }
-
-// --- Lifecycle ---
-onMounted(() => {
-  loadFromResponses()
-  subscribeEventBus()
-})
-
-onUnmounted(() => { unsubscribe?.() })
-
-watch(() => props.allResponses, loadFromResponses, { deep: true })
 </script>
 
 <style scoped>
-.h9-tab-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
-
-.objective-alert { margin-bottom: 12px; }
-
+.h9-disc-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective { margin-bottom: 12px; }
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
-  border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;
+  border-radius: 0 6px 6px 0; margin-bottom: 14px; font-size: 12px; color: #92400e;
 }
-
+.methodology-context p { margin: 0; }
+.toolbar {
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 14px;
+}
+.toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
-.title-actions { display: flex; gap: 6px; }
-
-.disclosure-card { margin-bottom: 16px; }
+.disclosure-card, .audit-card { margin-bottom: 14px; }
 .disclosure-table { width: 100%; }
 .num-input { width: 100%; }
-.summary-value { font-weight: 600; }
-
-.supplement-card { margin-bottom: 16px; }
-
-.compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
-.compile-hint summary { cursor: pointer; font-weight: 500; }
-.compile-hint ul { padding-left: 20px; margin-top: 8px; }
+.formula-cell {
+  border-bottom: 1px dashed #909399; font-variant-numeric: tabular-nums;
+  background: #fafafa; display: inline-block; min-width: 100%; text-align: right;
+}
+.hint { font-size: 12px; color: #909399; margin: 6px 0 0; }
+.guidance-block { background: #f8fafc; border-radius: 8px; padding: 12px; border: 1px solid #ebeef5; margin-bottom: 14px; }
+.sub-title { margin: 0 0 8px; font-size: 14px; }
+.guide-alert { margin-bottom: 8px; }
+.note-field { margin-top: 10px; }
+.note-field label { display: block; font-size: 12px; color: #606266; margin-bottom: 4px; font-weight: 500; }
+.card-title { font-weight: 600; }
+.compile-hint {
+  margin-top: 12px; border-left: 3px solid #409eff; background: #ecf5ff;
+  border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #606266;
+}
+.compile-hint summary { cursor: pointer; color: #409eff; margin-bottom: 6px; }
+:deep(.row-calc) { background: #fafafa; font-weight: 600; }
 </style>

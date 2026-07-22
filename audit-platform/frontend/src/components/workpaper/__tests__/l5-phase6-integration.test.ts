@@ -11,24 +11,28 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// ─── Mock eventBus ──────────────────────────────────────────────────────────
+const { mockEmit, mockOn, mockOff, mockPut, mockGet } = vi.hoisted(() => ({
+  mockEmit: vi.fn(),
+  mockOn: vi.fn(),
+  mockOff: vi.fn(),
+  mockPut: vi.fn().mockResolvedValue({}),
+  mockGet: vi.fn().mockResolvedValue([]),
+}))
 
-const mockEmit = vi.fn()
-const mockOn = vi.fn()
-const mockOff = vi.fn()
+// ─── Mock eventBus ──────────────────────────────────────────────────────────
 
 vi.mock('@/utils/eventBus', () => ({
   eventBus: {
-    emit: (...args: any[]) => mockEmit(...args),
-    on: (...args: any[]) => mockOn(...args),
-    off: (...args: any[]) => mockOff(...args),
+    emit: mockEmit,
+    on: mockOn,
+    off: mockOff,
   },
 }))
 
 vi.mock('@/services/apiProxy', () => ({
   api: {
-    get: vi.fn().mockResolvedValue([]),
-    put: vi.fn().mockResolvedValue({}),
+    get: mockGet,
+    put: mockPut,
   },
 }))
 
@@ -218,8 +222,7 @@ describe('Task 6.2: 跨底稿联动', () => {
 // ─── Task 6.3: 版本链 + 复核对话验证 ────────────────────────────────────────
 
 describe('Task 6.3: 版本链+复核对话集成', () => {
-  it('GtL5LongTermPayables provides openReviewDialog', async () => {
-    // Verify the main entry component source structure
+  it('GtL5LongTermPayables wires version trail via runtime boundary', async () => {
     const fs = await import('fs')
     const path = await import('path')
     const mainEntryPath = path.resolve(
@@ -228,12 +231,8 @@ describe('Task 6.3: 版本链+复核对话集成', () => {
     )
     const source = fs.readFileSync(mainEntryPath, 'utf-8')
 
-    // Check provide('openReviewDialog', ...) exists
-    expect(source).toContain("provide('openReviewDialog'")
-    // Check useVersionTrail is imported and used
     expect(source).toContain('useVersionTrail')
-    expect(source).toContain("provide('versionTrail'")
-    // Check GtReviewDialog is in template
+    expect(source).toContain("provide('scheduleAutoSnapshot'")
     expect(source).toContain('GtReviewDialog')
   })
 

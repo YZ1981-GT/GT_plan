@@ -31,10 +31,18 @@ import {
 } from '../composables/useH3FormulaEngine'
 import {
   calcSelfToInvestFair,
+  calcSelfToInvestCost,
   calcInvestToSelf,
+  calcInvestToSelfCost,
+  calcNetValue,
+  applyConversionRatio,
   calcCipToInvestCost,
   calcCipToInvestFair,
+  calcInventoryToInvestCost,
+  calcInventoryToInvestFair,
   calcTransferDiff,
+  isAboveMateriality,
+  calcTransferRatio,
   calcTitleDiff,
 } from '../composables/useH3TransferEngine'
 
@@ -93,7 +101,7 @@ describe('H3-1 审定表集成: 成本模式编辑→三角勾稽→TB回写', (
 // H3-6 互转集成测试
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('H3-6 互转集成: 三方向转换→转出=转入验证→联动H1/H2', () => {
+describe('H3-6 互转集成: 四方向转换→转出=转入验证→H3-5联动', () => {
   it('自用→投资(公允>账面): OCI记录增值', () => {
     const result = calcSelfToInvestFair(800_000, 1_200_000)
     expect(result.oci).toBe(400_000)
@@ -111,9 +119,21 @@ describe('H3-6 互转集成: 三方向转换→转出=转入验证→联动H1/H2
     expect(result.oci + result.pl).toBe(1_200_000 - 800_000)
   })
 
-  it('投资→自用: entry == fairValue', () => {
+  it('投资→自用(公允): entry == fairValue', () => {
     const result = calcInvestToSelf(1_500_000)
     expect(result).toBe(1_500_000)
+  })
+
+  it('投资→自用(成本): entry == bookValue', () => {
+    expect(calcInvestToSelfCost(1_200_000)).toBe(1_200_000)
+  })
+
+  it('自用→投资(成本): entry == bookValue, 无损益', () => {
+    expect(calcSelfToInvestCost(800_000)).toBe(800_000)
+  })
+
+  it('净值: ④=①-②-③', () => {
+    expect(calcNetValue(1_000_000, 200_000, 50_000)).toBe(750_000)
   })
 
   it('在建→投资(成本): entry == cipBookValue', () => {
@@ -135,6 +155,66 @@ describe('H3-6 互转集成: 三方向转换→转出=转入验证→联动H1/H2
   it('转出=转入验证: 不一致时差额非0', () => {
     const diff = calcTransferDiff(1_000_000, 900_000)
     expect(diff).toBe(100_000)
+  })
+
+  // ── 转换比例（问题三）──────────────────────────────────────────────────────
+  it('转换比例: applyConversionRatio 50%', () => {
+    expect(applyConversionRatio(1_000_000, 50)).toBe(500_000)
+  })
+
+  it('转换比例: 100%等于全额', () => {
+    expect(applyConversionRatio(800_000, 100)).toBe(800_000)
+  })
+
+  it('自用→投资(成本)50%部分转换: entry == netValue×50%', () => {
+    expect(calcSelfToInvestCost(1_000_000, 50)).toBe(500_000)
+  })
+
+  it('在建→投资(公允)50%部分转换: entryValue=fair×50%, diff=(fair-cip)×50%', () => {
+    const r = calcCipToInvestFair(2_000_000, 2_400_000, 50)
+    expect(r.entryValue).toBe(1_200_000)
+    expect(r.diff).toBe(200_000)
+  })
+
+  // ── 存货→投资 CAS3第14条（问题二）────────────────────────────────────────
+  it('存货→投资(成本): entry == inventoryBookValue', () => {
+    expect(calcInventoryToInvestCost(1_500_000)).toBe(1_500_000)
+  })
+
+  it('存货→投资(成本)50%: entry == 750_000', () => {
+    expect(calcInventoryToInvestCost(1_500_000, 50)).toBe(750_000)
+  })
+
+  it('存货→投资(公允): entryValue=fair, pl=fair-book, 无OCI', () => {
+    const r = calcInventoryToInvestFair(1_000_000, 1_300_000)
+    expect(r.entryValue).toBe(1_300_000)
+    expect(r.pl).toBe(300_000)
+  })
+
+  it('存货→投资(公允)公允<账面: pl为负，计当期损益', () => {
+    const r = calcInventoryToInvestFair(1_200_000, 900_000)
+    expect(r.pl).toBe(-300_000)
+  })
+
+  // ── 重要性预警（问题五）──────────────────────────────────────────────────
+  it('重要性预警: 金额超阈值返回true', () => {
+    expect(isAboveMateriality(600_000, 500_000)).toBe(true)
+  })
+
+  it('重要性预警: 金额低于阈值返回false', () => {
+    expect(isAboveMateriality(300_000, 500_000)).toBe(false)
+  })
+
+  it('重要性预警: 阈值为0时始终不预警', () => {
+    expect(isAboveMateriality(999_999_999, 0)).toBe(false)
+  })
+
+  it('转换比率: totalIn / assetTotal', () => {
+    expect(calcTransferRatio(1_000_000, 10_000_000)).toBeCloseTo(0.1, 6)
+  })
+
+  it('转换比率: assetTotal为0时返回0（避免除零）', () => {
+    expect(calcTransferRatio(1_000_000, 0)).toBe(0)
   })
 })
 
@@ -175,10 +255,20 @@ describe('H3-8 公允复核集成: 独立测算→范围判断→交叉验证', 
 // H3-14 租金收入测算集成测试
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('H3-14 租金收入集成: 月度计算→空置率→到期预警→收入验证', () => {
+describe('H3-14 租金收入集成: 应计vs已计→月度→到期预警→收入验证', () => {
   it('年租金 = 月租 × 12 × (1-空置率)', () => {
     const annual = calcRentalIncome(50_000, 12, 0.05)
     expect(annual).toBeCloseTo(570_000, 0)
+  })
+
+  it('应计③=月数×月租；差异⑤=应计−已计', () => {
+    const months = 10
+    const monthly = 50_000
+    const expected = months * monthly
+    const booked = 480_000
+    const diff = expected - booked
+    expect(expected).toBe(500_000)
+    expect(diff).toBe(20_000)
   })
 
   it('空置损失 = 月租 × 空置月数', () => {

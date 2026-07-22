@@ -1,0 +1,47 @@
+{
+  "wp_code": "B60",
+  "title": "总体审计策略 — 平台结构化字段",
+  "version": "2026-07-21-P3",
+  "description": "B60 家族数字化字段约定。不新建 schema 引擎：条件附件走 wp_account_mapping.trigger/applies_when；计划版本与重要性落在 AuditPlan；矩阵答案存 key_focus_areas.b60_attachment_flags。",
+  "audit_plan_bindings": {
+    "plan_version": "AuditPlan.plan_version — 第十五章重大更新时递增",
+    "plan_updated_at": "AuditPlan.updated_at",
+    "materiality_reference": "AuditPlan.materiality_reference — 对应 B19-1 结论索引，计算见 B15",
+    "strategy_reference": "AuditPlan / CW-60",
+    "b60_attachment_flags": "AuditPlan.key_focus_areas.b60_attachment_flags 或 Project.wizard_state.b60_attachment_flags"
+  },
+  "attachment_flags": {
+    "integrated_audit": { "wp_codes": ["B60A"], "default_from": "Project.audit_type contains integrated/内控/icfr" },
+    "listed_or_ipo": { "wp_codes": ["B60B"], "default_from": "template_type=listed or scenario in (ipo,listed)" },
+    "soe_annual": { "wp_codes": ["B60C"], "default_from": "template_type=soe" },
+    "needs_regulatory_filing": { "wp_codes": ["B60D"], "default_from": "listed_or_ipo; overridable" },
+    "needs_it_audit": { "wp_codes": ["B60-2-1"], "default_from": "wizard_state.has_it_audit / b60_attachment_flags" },
+    "it_team_executes": { "wp_codes": ["B60-2-2", "B60-2-3"], "default_from": "wizard_state; implies needs_it_audit" },
+    "uses_expert": { "wp_codes": ["B60-3"], "default_from": "wizard_state.uses_expert / b60_attachment_flags" }
+  },
+  "always_generate": ["B60", "B60-1"],
+  "row_fields": {
+    "risk_id": "第六章/第七章与 B50 行勾稽（CW-419）",
+    "scot_id": "第七章 SCOT+ 行标识，下游循环程序引用（CW-420）",
+    "cycle_code": "SCOT+ 循环代码列",
+    "procedure_wp_index": "拟用程序底稿索引列",
+    "rely_on_controls": "是否拟依赖控制（是/否/待测）"
+  },
+  "cross_refs": ["CW-60", "CW-417", "CW-418", "CW-419", "CW-420", "CW-421", "CW-422"],
+  "apis": {
+    "GET /api/projects/{id}/b60/attachment-flags": "读取矩阵 + 缺附件列表",
+    "PUT /api/projects/{id}/b60/attachment-flags": "写入 wizard_state.b60_attachment_flags",
+    "POST /api/projects/{id}/b60/plan-update": "第十五章更新并 bump AuditPlan.plan_version",
+    "GET /api/projects/{id}/b60/qc-status": "缺附件 / 重要性索引 / SCOT 行质控"
+  },
+  "gate_rules": ["B60-ATTACH-MATRIX", "B60-MATERIALITY-REF"],
+  "example_wizard_state": {
+    "b60_attachment_flags": {
+      "integrated_audit": true,
+      "needs_it_audit": true,
+      "it_team_executes": true,
+      "uses_expert": false,
+      "needs_regulatory_filing": true
+    }
+  }
+}

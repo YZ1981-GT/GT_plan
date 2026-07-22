@@ -1,5 +1,23 @@
 import type { GCycleIndexRowDef } from './g12SheetLabels'
 
+export interface G9AProcedureMark {
+  key: string
+  label: string
+}
+
+export function collectG9AProcedureMarks(m: Map<string, any>): G9AProcedureMark[] {
+  const marks: G9AProcedureMark[] = []
+  const voucher = m.get('G9A-voucher-complete')
+  if (voucher?.conclusion === 'completed' || voucher?.remark) {
+    marks.push({ key: 'voucher', label: '凭证/程序回填' })
+  }
+  const fv = m.get('G9A-fv-complete')
+  if (fv?.conclusion === 'completed' || fv?.remark) {
+    marks.push({ key: 'fv', label: '公允/L3 程序回填' })
+  }
+  return marks
+}
+
 export const G9_SHEET_LABEL_MAP: Record<string, string> = {
   G9: '底稿目录',
   'G9-目录': '底稿目录',
@@ -69,9 +87,10 @@ export function isG9SheetComplete(code: string, m: Map<string, any>): boolean {
     case 'G9-目录':
       return true
     case 'G9A':
-      return [...m.keys()].some(k => k.startsWith('G9-proc-') || k.startsWith('G9A-'))
+      return collectG9AProcedureMarks(m).length > 0
+        || [...m.keys()].some(k => k.startsWith('G9A-'))
     case 'G9-1':
-      return m.has('G9-adj-rows') || m.has('G9-adj-tb')
+      return m.has('G9-adj-rows') || m.has('G9-adj-tb') || m.has('G9-1-adjudicated-amount')
     case 'G9-2':
       return hasJsonRows(m, 'G9-detail-rows')
     case 'G9-3':

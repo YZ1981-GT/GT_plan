@@ -131,6 +131,35 @@ const ITEM_ID_ROWS = 'G8-voucher-rows'
 const ITEM_ID_CONCLUSION = 'G8-voucher-conclusion'
 export const ITEM_ID_G8_VC_PARAMS = 'G8-vc-params'
 
+export const G8_SAMPLING_METHOD_OPTIONS = [
+  { value: 'random', label: '随机抽样' },
+  { value: 'systematic', label: '系统抽样' },
+  { value: 'judgmental', label: '判断抽样' },
+  { value: 'mus', label: '货币单位抽样(MUS)' },
+  { value: 'full', label: '全部项目检查' },
+] as const
+
+export function formatG8SamplingMethodLabel(value: string): string {
+  const s = String(value ?? '').trim()
+  if (!s) return '—'
+  const hit = G8_SAMPLING_METHOD_OPTIONS.find((o) => o.value === s || o.label === s)
+  if (hit) return hit.label
+  return s
+}
+
+function normalizeG8SamplingMethod(raw: unknown): string {
+  const s = String(raw ?? '').trim()
+  if (!s) return ''
+  const exact = G8_SAMPLING_METHOD_OPTIONS.find((o) => o.value === s || o.label === s)
+  if (exact) return exact.value
+  if (/随机/.test(s)) return 'random'
+  if (/系统/.test(s)) return 'systematic'
+  if (/判断|特定/.test(s)) return 'judgmental'
+  if (/MUS|货币单位/i.test(s)) return 'mus'
+  if (/全部|全查/.test(s)) return 'full'
+  return s
+}
+
 function genId(): string {
   return `g8v-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`
 }
@@ -163,7 +192,7 @@ export function parseG8SamplingParams(json: string | null | undefined): G8Sampli
       testPopulation: String(raw.testPopulation ?? ''),
       specificSamples: String(raw.specificSamples ?? ''),
       samplingPopulation: String(raw.samplingPopulation ?? ''),
-      samplingMethod: String(raw.samplingMethod ?? ''),
+      samplingMethod: normalizeG8SamplingMethod(raw.samplingMethod),
       samplingProcess: String(raw.samplingProcess ?? ''),
       targetSampleSize: Number(raw.targetSampleSize) || 0,
       currentSampleSize: Number(raw.currentSampleSize) || 0,
@@ -341,7 +370,7 @@ export function buildG8VoucherSamplingMemo(input: {
   lines.push(`- 测试总体：${params.testPopulation || '—'}`)
   lines.push(`- 特定样本：${params.specificSamples || '—'}`)
   lines.push(`- 抽样总体：${params.samplingPopulation || '—'}`)
-  lines.push(`- 抽样方法：${params.samplingMethod || '—'}`)
+  lines.push(`- 抽样方法：${formatG8SamplingMethodLabel(params.samplingMethod)}`)
   lines.push(`- 目标样本量：${params.targetSampleSize || '—'} 笔`)
   lines.push(`- 当前样本量：${params.currentSampleSize || rows.filter((r) => r.source === '抽凭').length} 笔`)
   lines.push(`- 总体笔数：${params.populationCount || '—'}`)
@@ -861,7 +890,7 @@ export function useG8VoucherCheck(opts: {
             异常: abnormalCount.value,
             金额异常: quantitativeAbnormalCount.value,
             完成度: `${completion.value.pct}%`,
-            抽样方法: samplingParams.value.samplingMethod,
+            抽样方法: formatG8SamplingMethodLabel(samplingParams.value.samplingMethod),
             样本量: `${samplingParams.value.currentSampleSize}/${samplingParams.value.targetSampleSize}`,
           },
         },
@@ -962,7 +991,7 @@ export function useG8VoucherCheck(opts: {
         abnormal: abnormalCount.value,
         quantitative: quantitativeAbnormalCount.value,
         completionPct: completion.value.pct,
-        samplingMethod: samplingParams.value.samplingMethod,
+        samplingMethod: formatG8SamplingMethodLabel(samplingParams.value.samplingMethod),
       })
       const n = await markG8AProcedureSteps({
         projectId: pid,

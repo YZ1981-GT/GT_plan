@@ -1,164 +1,71 @@
 <template>
   <div class="h4-tab-related-party">
-    <!-- 方法论上下文 -->
-    <div class="methodology-context">
-      <p>H4-9关联交易检查：核查工程物资采购中的关联交易定价公允性。价差率=（交易金额-市场价格）/市场价格×100%，|价差率|>10%时红色高亮标记为异常。需评估关联采购的商业合理性、审批流程和信息披露完整性。</p>
-    </div>
+    <el-alert type="info" :closable="false" show-icon class="obj-alert">
+      <template #title>
+        审计目标：（1）资产负债表中记录的工程物资是存在的，且已记录于恰当的账户；
+        （2）所有应记录的工程物资均已记录，相关披露均已包括；
+        （3）记录的工程物资由被审计单位拥有或控制；
+        （4）工程物资以恰当金额包括在财务报表中，计价或分摊调整已恰当记录；
+        （5）工程物资已恰当汇总/分解且表述清楚，披露相关、可理解。
+      </template>
+    </el-alert>
 
-    <!-- 审计目标 -->
-    <el-alert type="info" :closable="false" class="objective-alert"
-      title="审计目标：核查工程物资采购中关联交易的定价公允性、审批合规性与披露完整性，评估价差率异常事项，符合关联方披露要求（CAS36）。" />
-
-    <!-- 工具栏 -->
     <div class="tab-toolbar">
-      <span class="chip-wrap"><GtIndexChip value="wp:H4-9" :context-project-id="props.projectId" /></span>
-      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      <GtIndexChip value="wp:H4-9" :context-project-id="projectId" />
+      <GtIndexChip value="wp:H4-4" :context-project-id="projectId" context="增加检查" />
+      <GtIndexChip value="wp:H4-5" :context-project-id="projectId" context="减少检查" />
+      <el-tag size="small" type="info">共 {{ state.summary.value.count }} 笔</el-tag>
+      <el-tag v-if="state.summary.value.abnormalCount > 0" size="small" type="danger">
+        价差/异常 {{ state.summary.value.abnormalCount }}
+      </el-tag>
+      <el-tag v-if="state.summary.value.entryRemarkMissingCount > 0" size="small" type="warning">
+        入账差异待备注 {{ state.summary.value.entryRemarkMissingCount }}
+      </el-tag>
+      <el-tag v-if="state.summary.value.sourceDriftCount > 0" size="small" type="danger">
+        源已变更 {{ state.summary.value.sourceDriftCount }}
+      </el-tag>
+      <el-tag v-if="state.summary.value.noTransaction" size="small" type="success">本期无此类交易</el-tag>
     </div>
 
-    <!-- Section Title -->
-    <div class="section-header">
-      <span>关联交易检查表 H4-9</span>
-      <div class="section-header-actions">
-        <el-button size="small" circle @click="openReview('H4-9-related-party')">💬</el-button>
-      </div>
+    <el-alert
+      v-if="state.summary.value.sourceDriftCount > 0 && !isReadonly"
+      type="warning"
+      show-icon
+      :closable="false"
+      class="obj-alert"
+      title="检测到 H4-4/H4-5 源数据已变更，与已带入行不一致。"
+    >
+      <el-button size="small" type="primary" @click="handleRefreshDrift">刷新已漂移行</el-button>
+    </el-alert>
+
+    <div class="methodology-context">
+      <p>
+        <b>编制范围：</b>仅登记<strong>合并范围外</strong>关联方工程物资购入/出售。
+        可从 H4-4/H4-5 带入（需源表标记关联方）。
+        购入入账差异=入账价值−购买价款；出售净值=原值−减值；价差率=(交易价−公允)/公允×100%。
+      </p>
     </div>
 
-    <!-- 16列表格 -->
-    <el-table :data="rows" border stripe size="small" class="check-table" row-key="rowId"
-      :row-class-name="getRowClassName" max-height="520">
-      <el-table-column prop="seq" label="序号" width="50" align="center" fixed="left" />
-      <el-table-column label="物资名称" min-width="110" fixed="left">
-        <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.name" size="small"
-            @change="updateCell(row.rowId, 'name', $event)" />
-          <span v-else>{{ row.name }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="交易对手" min-width="100">
-        <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.counterparty" size="small"
-            @change="updateCell(row.rowId, 'counterparty', $event)" />
-          <span v-else>{{ row.counterparty }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="关联关系" min-width="90">
-        <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.relationship" size="small"
-            @change="updateCell(row.rowId, 'relationship', $event)" />
-          <span v-else>{{ row.relationship }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="交易金额" width="110" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="!props.isReadonly" v-model="row.transAmount" :controls="false"
-            size="small" class="amt-input"
-            @change="updateCell(row.rowId, 'transAmount', $event)" />
-          <span v-else class="amt-cell">{{ fmtAmt(row.transAmount) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="市场价格" width="110" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="!props.isReadonly" v-model="row.marketPrice" :controls="false"
-            size="small" class="amt-input"
-            @change="updateCell(row.rowId, 'marketPrice', $event)" />
-          <span v-else class="amt-cell">{{ fmtAmt(row.marketPrice) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="价差率" width="80" align="right">
-        <template #default="{ row }">
-          <span class="formula-cell" :class="{ 'rate-abnormal': row.isAbnormal }"
-            title="价差率 = (交易金额-市场价格)/市场价格×100%">
-            {{ row.marketPrice ? row.priceDiffRate.toFixed(2) + '%' : '-' }}
-          </span>
-        </template>
-      </el-table-column>
-      <el-table-column label="合同日期" width="100">
-        <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.contractDate" size="small" placeholder="YYYY-MM-DD"
-            @change="updateCell(row.rowId, 'contractDate', $event)" />
-          <span v-else>{{ row.contractDate }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="合同编号" min-width="100">
-        <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.contractNo" size="small"
-            @change="updateCell(row.rowId, 'contractNo', $event)" />
-          <span v-else>{{ row.contractNo }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="定价依据" min-width="100">
-        <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.pricingBasis" size="small"
-            @change="updateCell(row.rowId, 'pricingBasis', $event)" />
-          <span v-else>{{ row.pricingBasis }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="审批流程" min-width="90">
-        <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.approvalProcess" size="small"
-            @change="updateCell(row.rowId, 'approvalProcess', $event)" />
-          <span v-else>{{ row.approvalProcess }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="是否公允" width="80" align="center">
-        <template #default="{ row }">
-          <el-select v-if="!props.isReadonly" v-model="row.isFair" size="small" style="width: 68px"
-            @change="updateCell(row.rowId, 'isFair', $event)">
-            <el-option label="是" value="是" />
-            <el-option label="否" value="否" />
-            <el-option label="待定" value="待定" />
-          </el-select>
-          <span v-else :class="{ 'rate-abnormal': row.isFair === '否' }">{{ row.isFair || '-' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="决策程序" min-width="90">
-        <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.decisionProcess" size="small"
-            @change="updateCell(row.rowId, 'decisionProcess', $event)" />
-          <span v-else>{{ row.decisionProcess }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="披露情况" min-width="90">
-        <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.disclosureStatus" size="small"
-            @change="updateCell(row.rowId, 'disclosureStatus', $event)" />
-          <span v-else>{{ row.disclosureStatus }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="核查结论" min-width="90">
-        <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.conclusion" size="small"
-            @change="updateCell(row.rowId, 'conclusion', $event)" />
-          <span v-else>{{ row.conclusion }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="备注" min-width="90">
-        <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.remark" size="small"
-            @change="updateCell(row.rowId, 'remark', $event)" />
-          <span v-else>{{ row.remark }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="" width="40" v-if="!props.isReadonly" fixed="right">
-        <template #default="{ row }">
-          <el-button size="small" type="danger" link @click="handleDeleteRow(row.rowId)">✕</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- 统计摘要 -->
-    <div class="stats-bar">
-      <span class="stats-item">关联交易笔数 <strong>{{ stats.transCount }}</strong></span>
-      <span class="stats-item">总金额 <strong>{{ fmtAmt(stats.totalAmount) }}</strong></span>
-      <span class="stats-item" :class="{ 'stats-warn': stats.abnormalCount > 0 }">
-        异常笔数 <strong>{{ stats.abnormalCount }}</strong>
+    <div class="action-bar" v-if="!isReadonly">
+      <el-button size="small" type="primary" @click="handleImportSources">从 H4-4/H4-5 带入</el-button>
+      <el-button size="small" @click="handleRecalcRatio">重算本表占比</el-button>
+      <el-button size="small" type="success" plain @click="handleNoTransaction">本期无此类交易</el-button>
+      <el-button
+        size="small"
+        type="warning"
+        plain
+        :disabled="state.summary.value.abnormalCount === 0"
+        @click="handlePushAje"
+      >
+        推送公允性调整→H4-3
+      </el-button>
+      <span class="threshold-wrap">
+        价差%
+        <el-input-number v-model="thresholdLocal" :controls="false" :min="1" :max="100" size="small" style="width:56px" @change="onThresholdChange" />
+        入账差异%
+        <el-input-number v-model="entryThLocal" :controls="false" :min="1" :max="100" size="small" style="width:56px" @change="onEntryThChange" />
       </span>
-    </div>
-
-    <!-- 操作栏 -->
-    <div class="action-bar" v-if="!props.isReadonly">
-      <el-button size="small" @click="handleAddRow">+ 添加关联交易</el-button>
-      <el-dropdown trigger="click" @command="handleImportExport" style="margin-left: 8px">
+      <el-dropdown trigger="click" @command="handleImportExport">
         <el-button size="small">导入导出 ▾</el-button>
         <template #dropdown>
           <el-dropdown-menu>
@@ -168,47 +75,345 @@
           </el-dropdown-menu>
         </template>
       </el-dropdown>
+      <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
     </div>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
+    <!-- (1) 购入 -->
+    <el-card shadow="never" class="block-card">
       <template #header>
-        <div class="section-header" style="margin-bottom:0">
-          <span>审计说明</span>
+        <div class="section-header">
+          <span>二、审计过程 — (1) 向合并范围外关联方采购工程物资</span>
           <div class="section-header-actions">
-            <el-button size="small" circle @click="openReview('H4-9-note')">💬</el-button>
+            <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAdd('购入')">+ 购入</el-button>
+            <el-button size="small" circle @click="openReview('H4-9')">💬</el-button>
           </div>
         </div>
       </template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请填写关联交易审计说明..." :disabled="props.isReadonly"
-        @blur="saveAuditNote" />
+      <el-table :data="state.purchaseRows.value" border stripe size="small" max-height="320" :row-class-name="rowClass">
+        <el-table-column type="index" width="40" fixed />
+        <el-table-column label="关联单位名称" min-width="130" fixed>
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              v-model="row.counterparty"
+              size="small"
+              filterable
+              allow-create
+              default-first-option
+              style="width:100%"
+              placeholder="选择或输入"
+              @change="onCell(row, 'counterparty')"
+            >
+              <el-option v-for="p in partyOptions" :key="p" :label="p" :value="p" />
+            </el-select>
+            <span v-else>{{ row.counterparty || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="关联方关系" width="130">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" v-model="row.relationship" size="small" filterable allow-create style="width:100%"
+              @change="onRelationChange(row)">
+              <el-option v-for="o in RELATION_OPTS" :key="o" :label="o" :value="o" />
+            </el-select>
+            <span v-else>{{ row.relationship || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="资产类别" width="90">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.assetCategory" size="small" @change="onCell(row, 'assetCategory')" />
+            <span v-else>{{ row.assetCategory || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="购买工程物资名称" min-width="130">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.name" size="small" @change="onCell(row, 'name')" />
+            <span v-else>{{ row.name || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="购买价款" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.transAmount" :controls="false" size="small" class="amt-input"
+              @change="onCell(row, 'transAmount')" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.transAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="工程物资入账价值" width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.bookValue" :controls="false" size="small" class="amt-input"
+              @change="onCell(row, 'bookValue')" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.bookValue) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="入账差异" width="90" align="right">
+          <template #default="{ row }">
+            <span
+              :class="['formula-cell', { 'warn-amount': Math.abs(row.entryDiff) > 0.01, 'error-amount': state.needsEntryDiffRemark(row) }]"
+              title="入账价值−购买价款；超阈且无备注标红"
+            >{{ fmtAmt(row.entryDiff) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="公允/评估价值" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.appraisedValue" :controls="false" size="small" class="amt-input"
+              @change="onCell(row, 'appraisedValue')" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.appraisedValue) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="差异率%" width="80" align="right">
+          <template #default="{ row }">
+            <span :class="['formula-cell', { 'error-amount': state.isUnfair(row) }]">
+              {{ row.appraisedValue > 0 ? row.priceDiffRate.toFixed(1) + '%' : '-' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="同类总额" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.categoryTotal" :controls="false" size="small" class="amt-input"
+              @change="onCell(row, 'categoryTotal')" />
+            <span v-else>{{ row.categoryTotal != null ? fmtAmt(row.categoryTotal) : '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="占同类%" width="80" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ row.similarRatio != null ? row.similarRatio.toFixed(1) + '%' : '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="购入时间" width="120">
+          <template #default="{ row }">
+            <el-date-picker v-if="!isReadonly" v-model="row.transDate" type="date" value-format="YYYY-MM-DD"
+              size="small" style="width:110px" @change="onCell(row, 'transDate')" />
+            <span v-else>{{ row.transDate || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="定价政策" min-width="90">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.pricingPolicy" size="small" @change="onCell(row, 'pricingPolicy')" />
+            <span v-else>{{ row.pricingPolicy || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="是否异常" width="90" align="center">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" v-model="row.hasAnomaly" size="small" style="width:80px" @change="onCell(row, 'hasAnomaly')">
+              <el-option label="否" value="否" />
+              <el-option label="是" value="是" />
+              <el-option label="待定" value="待定" />
+            </el-select>
+            <span v-else :class="{ 'error-amount': row.hasAnomaly === '是' }">{{ row.hasAnomaly || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="备注" min-width="100">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.remark" size="small"
+              :placeholder="state.needsEntryDiffRemark(row) ? '必填：说明入账差异' : ''"
+              @change="onCell(row, 'remark')" />
+            <span v-else>{{ row.remark || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="索引号" width="80">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.indexRef" size="small" @change="onCell(row, 'indexRef')" />
+            <span v-else>{{ row.indexRef || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="" width="50" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" type="danger" link @click="state.removeRow(row.rowId)">删</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="summary-bar">
+        <span>购入 {{ state.summary.value.purchaseCount }} 笔</span>
+        <span>价款合计 <b class="amt-cell">{{ fmtAmt(state.summary.value.purchaseTotal) }}</b></span>
+        <span v-if="state.summary.value.entryDiffCount">入账差异 <b class="warn-amount">{{ state.summary.value.entryDiffCount }}</b> 笔</span>
+      </div>
     </el-card>
 
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
+    <!-- (2) 出售 -->
+    <el-card shadow="never" class="block-card">
       <template #header>
-        <div class="section-header" style="margin-bottom:0">
-          <span>审计结论</span>
-          <div class="section-header-actions">
-            <el-button size="small" circle @click="openReview('H4-9-conclusion')">💬</el-button>
-          </div>
+        <div class="section-header">
+          <span>(2) 向合并范围外关联方出售工程物资</span>
+          <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAdd('出售')">+ 出售</el-button>
         </div>
       </template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
-        placeholder="请填写审计结论..." :disabled="props.isReadonly"
-        @blur="saveAuditConclusion" />
+      <el-table :data="state.saleRows.value" border stripe size="small" max-height="320" :row-class-name="rowClass">
+        <el-table-column type="index" width="40" fixed />
+        <el-table-column label="关联单位名称" min-width="130" fixed>
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              v-model="row.counterparty"
+              size="small"
+              filterable
+              allow-create
+              default-first-option
+              style="width:100%"
+              placeholder="选择或输入"
+              @change="onCell(row, 'counterparty')"
+            >
+              <el-option v-for="p in partyOptions" :key="p" :label="p" :value="p" />
+            </el-select>
+            <span v-else>{{ row.counterparty || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="关联方关系" width="130">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" v-model="row.relationship" size="small" filterable allow-create style="width:100%"
+              @change="onRelationChange(row)">
+              <el-option v-for="o in RELATION_OPTS" :key="o" :label="o" :value="o" />
+            </el-select>
+            <span v-else>{{ row.relationship || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="资产类别" width="90">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.assetCategory" size="small" @change="onCell(row, 'assetCategory')" />
+            <span v-else>{{ row.assetCategory || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="出售工程物资名称" min-width="130">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.name" size="small" @change="onCell(row, 'name')" />
+            <span v-else>{{ row.name || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="出售时原值" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.originalCost" :controls="false" size="small" class="amt-input"
+              @change="onCell(row, 'originalCost')" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.originalCost) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="减值准备" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.impairment" :controls="false" size="small" class="amt-input"
+              @change="onCell(row, 'impairment')" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.impairment) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="出售时净值" width="100" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell" title="原值−减值">{{ fmtAmt(row.netValue) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="销售价格(不含税)" width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.transAmount" :controls="false" size="small" class="amt-input"
+              @change="onCell(row, 'transAmount')" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.transAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="处置损益" width="100" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell" title="售价−净值">{{ fmtAmt(row.disposalGain) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="公允/评估价值" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.appraisedValue" :controls="false" size="small" class="amt-input"
+              @change="onCell(row, 'appraisedValue')" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.appraisedValue) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="差异率%" width="80" align="right">
+          <template #default="{ row }">
+            <span :class="['formula-cell', { 'error-amount': state.isUnfair(row) }]">
+              {{ row.appraisedValue > 0 ? row.priceDiffRate.toFixed(1) + '%' : '-' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="占同类%" width="80" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ row.similarRatio != null ? row.similarRatio.toFixed(1) + '%' : '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="出售时间" width="120">
+          <template #default="{ row }">
+            <el-date-picker v-if="!isReadonly" v-model="row.transDate" type="date" value-format="YYYY-MM-DD"
+              size="small" style="width:110px" @change="onCell(row, 'transDate')" />
+            <span v-else>{{ row.transDate || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="定价政策" min-width="90">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.pricingPolicy" size="small" @change="onCell(row, 'pricingPolicy')" />
+            <span v-else>{{ row.pricingPolicy || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="是否异常" width="90" align="center">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" v-model="row.hasAnomaly" size="small" style="width:80px" @change="onCell(row, 'hasAnomaly')">
+              <el-option label="否" value="否" />
+              <el-option label="是" value="是" />
+              <el-option label="待定" value="待定" />
+            </el-select>
+            <span v-else :class="{ 'error-amount': row.hasAnomaly === '是' }">{{ row.hasAnomaly || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="备注" min-width="90">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.remark" size="small" @change="onCell(row, 'remark')" />
+            <span v-else>{{ row.remark || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="索引号" width="80">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.indexRef" size="small" @change="onCell(row, 'indexRef')" />
+            <span v-else>{{ row.indexRef || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="" width="50" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" type="danger" link @click="state.removeRow(row.rowId)">删</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="summary-bar">
+        <span>出售 {{ state.summary.value.saleCount }} 笔</span>
+        <span>售价合计 <b class="amt-cell">{{ fmtAmt(state.summary.value.saleTotal) }}</b></span>
+      </div>
     </el-card>
 
-    <!-- 编制提示 -->
+    <!-- 三、审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header">
+          <span>三、审计说明</span>
+          <el-button size="small" :disabled="isReadonly" @click="fillNoteDraft">填入异常摘要</el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="state.auditNote.value"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="说明：合并范围外关联方识别、抽查范围、定价与评估、价差/入账差异异常及追加程序；无交易可点「本期无此类交易」。"
+        @blur="state.saveNote(state.auditNote.value)"
+      />
+    </el-card>
+
+    <!-- 四、审计结论 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span>四、审计结论</span></template>
+      <el-input
+        v-model="state.auditConclusion.value"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="结论示例：经检查，合并范围外关联方工程物资购销真实，定价差异未超阈值 / 异常已披露 / 本期无此类交易……"
+        @blur="state.saveConclusion(state.auditConclusion.value)"
+      />
+    </el-card>
+
     <details class="edit-tips">
       <summary>编制提示</summary>
       <ul>
-        <li>价差率=(交易金额-市场价格)/市场价格×100%，|价差率|>10%自动红色高亮</li>
-        <li>关联关系类型：母子公司/共同控制/重大影响/主要投资者/关键管理人员等</li>
-        <li>需评估定价依据（市场比较法/成本加成法/协商定价）的合理性</li>
-        <li>审批流程需检查是否经独立董事/审计委员会审批</li>
-        <li>核查披露是否符合CAS36关联方披露要求</li>
+        <li>范围：仅合并范围外；关系含「子公司」等会提示确认是否确属合并范围外</li>
+        <li>H4-4/H4-5 标记「关联方=是」并填名称后，可一键带入；源变更会提示刷新</li>
+        <li>购入：入账差异=入账价值−购买价款；超阈须备注（运杂/税费/折扣等）</li>
+        <li>出售：净值=原值−减值；处置损益=售价−净值（关注利益输送）</li>
+        <li>价差率&gt;阈值红色高亮；须取得评估报告/招投标/市场报价等公允性证据</li>
+        <li>旧版单表数据会自动迁移为「购入」行；交叉索引 H4-4 / H4-5 / CAS36 披露</li>
       </ul>
     </details>
   </div>
@@ -217,23 +422,24 @@
 <script setup lang="ts">
 /**
  * H4TabRelatedParty.vue — H4-9 关联交易检查表
- *
- * 16列: 序号|物资名称|交易对手|关联关系|交易金额|市场价格|价差率|合同日期|合同编号|
- *       定价依据|审批流程|是否公允|决策程序|披露情况|核查结论|备注
- *
- * 价差率: auto-calculated via calcPriceDiffRate, RED highlight when |rate| > 10%
- * 底部: 统计摘要 (关联交易笔数/总金额/异常笔数)
- *
- * Spec: .kiro/specs/h4-engineering-materials/
- * Task: 4.9
- * Requirements: 8.1-8.5
+ * 对齐致同 Excel：购入/出售双表 + 审计目标/说明/结论
+ * 增强：公允价差、入账差异、处置损益、H4-4/5 带入、导入导出
  */
-import { ref, computed, inject, toRef } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
-import { useH4RelatedParty, type H4RelatedPartyRow } from '../../composables/useH4RelatedParty'
+import { inject, toRef, computed, ref, watch, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  useH4RelatedParty,
+  type H4RelatedPartyRow,
+  type H4RpTransType,
+  H4_RELATIONSHIP_OPTIONS,
+  DEFAULT_PRICE_DIFF_THRESHOLD,
+  DEFAULT_ENTRY_DIFF_THRESHOLD,
+} from '../../composables/useH4RelatedParty'
 import { useH4ImportExport } from '../../composables/useH4ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
+import http from '@/utils/http'
+
+const RELATION_OPTS = [...H4_RELATIONSHIP_OPTIONS]
 
 const props = defineProps<{
   wpId: string
@@ -243,152 +449,196 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 
-// ─── Composable ──────────────────────────────────────────────────────────────
-const allResponsesRef = computed(() => props.allResponses)
-
-const {
-  rows, stats,
-  addRow, deleteRow, updateCell, save,
-} = useH4RelatedParty({
+const state = useH4RelatedParty({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
-  allResponses: allResponsesRef as any,
+  allResponses: computed(() => props.allResponses),
+  isReadonly: toRef(props, 'isReadonly'),
   onSave: (itemId: string, value: any) => {
     const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
     props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
+    saveResponse(itemId, value)
   },
 })
 
-const importExport = useH4ImportExport({
+const { exportTemplate, exportData, importData } = useH4ImportExport({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
+  onImported: () => state.initFromAllResponses(),
 })
 
-// ─── Audit Note / Conclusion（inject saveResponse 落库 + setup 恢复） ──────────
-const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', () => {})
-const auditNote = ref('')
-const auditConclusion = ref('')
-// Load audit note/conclusion from allResponses（子组件挂载晚于 entry selfLoad，setup 读取安全）
-const noteResp = props.allResponses.get('H4-9-note')
-if (noteResp?.remark) auditNote.value = noteResp.remark
-const conclusionResp = props.allResponses.get('H4-9-conclusion')
-if (conclusionResp?.remark) auditConclusion.value = conclusionResp.remark
+const thresholdLocal = ref(DEFAULT_PRICE_DIFF_THRESHOLD)
+const entryThLocal = ref(DEFAULT_ENTRY_DIFF_THRESHOLD)
+const partyOptions = ref<string[]>([])
+const fileInputRef = ref<HTMLInputElement | null>(null)
 
-function saveAuditNote() {
-  props.allResponses.set('H4-9-note', { item_id: 'H4-9-note', remark: auditNote.value, conclusion: null })
-  saveResponse('H4-9-note', auditNote.value)
-}
-function saveAuditConclusion() {
-  props.allResponses.set('H4-9-conclusion', { item_id: 'H4-9-conclusion', remark: auditConclusion.value, conclusion: null })
-  saveResponse('H4-9-conclusion', auditConclusion.value)
-}
+watch(() => state.settings.value, (s) => {
+  thresholdLocal.value = s.priceDiffThreshold
+  entryThLocal.value = s.entryDiffThreshold
+}, { immediate: true, deep: true })
 
-// ─── Actions ─────────────────────────────────────────────────────────────────
+onMounted(async () => {
+  await loadParties()
+})
 
-function getRowClassName({ row }: { row: H4RelatedPartyRow }) {
-  if (row.isAbnormal) return 'abnormal-row'
-  return ''
-}
-
-async function handleAddRow() {
+async function loadParties() {
+  if (!props.projectId) return
   try {
-    const { value } = await ElMessageBox.prompt('请输入物资名称', '添加关联交易', {
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      inputPattern: /\S+/,
-      inputErrorMessage: '名称不能为空',
-    })
-    if (value) addRow(value)
-  } catch { /* cancelled */ }
-}
-
-function handleDeleteRow(rowId: string) {
-  deleteRow(rowId)
-}
-
-function handleImportExport(command: string) {
-  if (command === 'export-template') importExport.exportTemplate('H4-9')
-  else if (command === 'export-data') importExport.exportData('H4-9')
-  else if (command === 'import-data') {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.xlsx,.xls,.csv'
-    input.onchange = (e: Event) => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (file) importExport.importData('H4-9', file)
+    const res = await http.get(`/api/projects/${props.projectId}/related-parties`, { _silent: true } as any)
+    const parties: any[] = Array.isArray(res.data) ? res.data : (res.data?.data ?? res.data?.registries ?? [])
+    const names = parties.map((p: any) => (typeof p === 'string' ? p : p.name || p.party_name || '')).filter(Boolean)
+    if (names.length) {
+      partyOptions.value = [...new Set(names)]
+      return
     }
-    input.click()
+  } catch { /* fallback */ }
+  try {
+    const res = await http.get(`/api/eqcr/projects/${props.projectId}/related-parties`, { _silent: true } as any)
+    const regs: any[] = res.data?.registries ?? res.data?.data?.registries ?? []
+    partyOptions.value = [...new Set(regs.map((p: any) => p.name || p.party_name).filter(Boolean))]
+  } catch {
+    partyOptions.value = []
   }
 }
 
+function onThresholdChange(v: number | undefined) {
+  state.updateSettings({ priceDiffThreshold: Number(v) || DEFAULT_PRICE_DIFF_THRESHOLD })
+}
+function onEntryThChange(v: number | undefined) {
+  state.updateSettings({ entryDiffThreshold: Number(v) || DEFAULT_ENTRY_DIFF_THRESHOLD })
+}
+
+function rowClass({ row }: { row: H4RelatedPartyRow }) {
+  if (state.isUnfair(row) || row.hasAnomaly === '是') return 'price-alert-row'
+  if (state.needsEntryDiffRemark(row)) return 'entry-warn-row'
+  return ''
+}
+
+function onCell(row: H4RelatedPartyRow, field: string) {
+  state.updateCell(row.rowId, field, (row as any)[field])
+}
+
+async function onRelationChange(row: H4RelatedPartyRow) {
+  onCell(row, 'relationship')
+  if (state.isLikelyInConsolidationScope(row.relationship)) {
+    try {
+      await ElMessageBox.confirm(
+        `「${row.relationship}」通常属于合并范围。本表仅登记合并范围外关联方交易，请确认是否确属合并范围外。`,
+        '合并范围提示',
+        { confirmButtonText: '确属范围外', cancelButtonText: '我再改', type: 'warning' },
+      )
+    } catch {
+      row.relationship = ''
+      onCell(row, 'relationship')
+    }
+  }
+}
+
+function handleAdd(transType: H4RpTransType) {
+  state.addRow(transType)
+}
+
+function handleRecalcRatio() {
+  state.recalcSimilarRatios()
+  ElMessage.success('已按本表各类型合计重算占同类%')
+}
+
+function handleNoTransaction() {
+  state.applyNoTransaction()
+  ElMessage.success('已标记本期无此类交易')
+}
+
+function handlePushAje() {
+  const res = state.pushAjeDraftToH43()
+  if (res.ok) ElMessage.success(res.message)
+  else ElMessage.warning(res.message)
+}
+
+function fillNoteDraft() {
+  const draft = state.buildNoteDraft()
+  state.auditNote.value = draft
+  state.saveNote(draft)
+  ElMessage.success('已填入异常摘要')
+}
+
+async function handleImportSources() {
+  const result = state.importFromH4H5()
+  if (result.added > 0) {
+    ElMessage.success(result.message)
+    if (result.inScopeCandidates.length) {
+      try {
+        await ElMessageBox.confirm(
+          `其中 ${result.inScopeCandidates.length} 笔关系疑似合并范围内。是否仍保留？`,
+          '合并范围确认',
+          { confirmButtonText: '仍保留', cancelButtonText: '删除这些行', type: 'warning' },
+        )
+      } catch {
+        for (const r of result.inScopeCandidates) state.removeRow(r.rowId)
+        ElMessage.info(`已删除 ${result.inScopeCandidates.length} 笔疑似合并范围内交易`)
+      }
+    }
+  } else {
+    ElMessage.warning(result.message)
+  }
+}
+
+function handleRefreshDrift() {
+  const n = state.refreshDriftedFromSource()
+  ElMessage.success(n > 0 ? `已刷新 ${n} 笔漂移行` : '无需刷新或源行已删除')
+}
+
+async function handleImportExport(cmd: string) {
+  if (cmd === 'export-template') await exportTemplate('H4-9')
+  else if (cmd === 'export-data') await exportData('H4-9')
+  else if (cmd === 'import-data') fileInputRef.value?.click()
+}
+
+async function onFileSelected(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  await importData('H4-9', file)
+}
 
 function openReview(id: string) {
   openReviewDialog(id)
 }
 
-// ─── 金额格式化 ──────────────────────────────────────────────────────────────
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'
-  if (val === 0) return '-'
-  if (val < 0) {
-    return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
-  }
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 </script>
 
 <style scoped>
 .h4-tab-related-party { padding: 16px; font-size: var(--wp-font-size, 13px); }
-
-.objective-alert { margin-bottom: 12px; }
-.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.chip-wrap { display: inline-flex; align-items: center; }
-
+.obj-alert { margin-bottom: 12px; }
+.tab-toolbar { display: flex; align-items: center; margin-bottom: 8px; gap: 8px; flex-wrap: wrap; }
 .methodology-context {
-  border-left: 4px solid #d97706;
-  background: #fffbeb;
-  padding: 10px 14px;
-  margin-bottom: 16px;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #92400e;
-  line-height: 1.6;
+  margin-bottom: 10px; padding: 8px 12px;
+  background: var(--el-fill-color-lighter); border-radius: 4px; font-size: 12px; color: var(--el-text-color-regular);
 }
-
-.section-header {
-  display: flex; align-items: center; justify-content: space-between;
-  font-size: 14px; font-weight: 600; margin-bottom: 12px;
-}
-.section-header-actions { display: flex; align-items: center; gap: 4px; }
-
-.check-table { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }
+.methodology-context p { margin: 0; line-height: 1.6; }
+.action-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.threshold-wrap { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--el-text-color-secondary); margin-left: 4px; }
+.block-card, .audit-note-card { margin-bottom: 16px; }
+.section-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.section-header-actions { display: flex; gap: 8px; align-items: center; }
+.amt-cell { font-variant-numeric: tabular-nums; }
 .amt-input { width: 100%; }
-.amt-cell { display: block; text-align: right; font-variant-numeric: tabular-nums; }
-
-.formula-cell {
-  display: inline-block; text-align: right;
-  border-bottom: 1px dashed #67c23a;
-  cursor: help;
+.formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
+.error-amount { color: var(--el-color-danger); font-weight: 600; }
+.warn-amount { color: var(--el-color-warning); font-weight: 600; }
+.summary-bar {
+  display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px;
+  font-size: 12px; color: var(--el-text-color-secondary);
 }
-.rate-abnormal { color: #f56c6c; font-weight: 600; border-bottom-color: #f56c6c; }
-
-:deep(.abnormal-row) { background-color: #fef0f0 !important; }
-
-.stats-bar {
-  display: flex; align-items: center; gap: 24px;
-  padding: 10px 14px; margin-bottom: 12px;
-  background: var(--el-fill-color-lighter);
-  border-radius: 6px;
-  font-size: var(--wp-font-size, 13px);
-}
-.stats-item { color: var(--el-text-color-secondary); }
-.stats-item strong { color: var(--el-text-color-primary); font-variant-numeric: tabular-nums; }
-.stats-warn strong { color: #f56c6c; }
-
-.action-bar { display: flex; align-items: center; margin-bottom: 12px; }
-.audit-note-card { margin-bottom: 12px; }
-.edit-tips { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
+.edit-tips { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }
 .edit-tips summary { cursor: pointer; font-weight: 500; }
 .edit-tips ul { padding-left: 20px; margin-top: 8px; }
+:deep(.price-alert-row) { background-color: #fef0f0 !important; }
+:deep(.entry-warn-row) { background-color: #fdf6ec !important; }
 </style>

@@ -122,6 +122,35 @@ async def test_b_index_render_normal_path():
 
 
 @pytest.mark.asyncio
+async def test_b_index_render_refresh_cycle_on_existing_navigation():
+    """已有 navigation_rows 时仍注入 cycle_workpapers（修复历史持久化缺跨底稿目录）。"""
+    ctx = _make_ctx(
+        component_type="b-index",
+        wp_code="G4",
+        sheet_name="底稿目录",
+        sheet_html_data={"navigation_rows": [{"seq": 1, "content": "审定表G4-1"}]},
+        audit_cycle="G",
+    )
+    mock_cycle = [
+        {"wp_code": "G4", "wp_name": "债权投资", "wp_id": str(ctx.wp_id), "status": "", "is_current": True},
+        {"wp_code": "G1", "wp_name": "交易性金融资产", "wp_id": None, "status": "", "is_current": False},
+    ]
+
+    with patch(
+        "app.services.wp_cycle_directory.build_cycle_workpapers",
+        new_callable=AsyncMock,
+        return_value=mock_cycle,
+    ):
+        from app.routers.wp_render_strategies._b_index import render
+
+        result = await render(ctx)
+
+    assert isinstance(result, dict)
+    assert result.get("cycle_workpapers") == mock_cycle
+    assert result.get("navigation_rows") == [{"seq": 1, "content": "审定表G4-1"}]
+
+
+@pytest.mark.asyncio
 async def test_b_index_render_degraded_path():
     """B-Index 策略：降级路径不抛异常"""
     ctx = _make_ctx(

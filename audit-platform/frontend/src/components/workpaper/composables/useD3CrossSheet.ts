@@ -12,16 +12,28 @@ import { computed, ref, type ComputedRef, type Ref } from 'vue'
 import {
   aggregateByNature,
   aggregateByAging,
+  aggregateAgingByKeys,
+  collectAgingKeys,
   parseNum,
   type DetailRowForFormula,
 } from './useD3FormulaEngine'
+import { PRESET_SEGMENTS, type AgingSegment } from '@/composables/useAgingConfig'
 import type { ChecklistResponse } from './useD3FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface UseD3CrossSheetOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
+  /**
+   * 项目账龄配置段（来自 useAgingConfig，subject='D3'）。
+   * 提供时账龄聚合/长期筛选严格按项目配置的段进行（支持 THREE_YEAR/FIVE_YEAR/CUSTOM）；
+   * 未提供时从明细数据中收集段 key 兜底，仍避免固定 4 段导致的取零。
+   */
+  segments?: Ref<AgingSegment[]>
 }
+
+/** ">1年" 段判定阈值（天）：dayFrom ≥ 366 视为账龄超过 1 年 */
+const OVER_ONE_YEAR_DAY_FROM = 366
 
 /** D3-2 明细行原始 JSON 结构（remark 中存储） */
 export interface D3DetailRowRaw {
@@ -115,7 +127,7 @@ function safeParseRows<T>(jsonStr: string | null | undefined): T[] {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD3CrossSheet(options: UseD3CrossSheetOptions) {
-  const { allResponses } = options
+  const { allResponses, segments } = options
 
   const crossSheetStatus = ref<'loaded' | 'loading' | 'error'>('loaded')
 
@@ -125,6 +137,37 @@ export function useD3CrossSheet(options: UseD3CrossSheetOptions) {
     const resp = allResponses.value.get('D3-det-rows')
     return safeParseRows<D3DetailRowRaw>(resp?.remark)
   })
+
+  // ─── 有效账龄段（项目配置优先，数据兜底，最终 THREE_YEAR 默认） ──────────
+
+  /**
+   * 有效账龄段：优先用项目账龄配置（segments），否则从明细数据收集 key 兜底，
+   * 再退到 THREE_YEAR 预设。保证账龄聚合/长期筛选覆盖项目实际使用的段。
+   */
+  const agingSegments: ComputedRef<AgingSegment[]> = computed(() => {
+    if (segments?.value?.length) return segments.value
+    const dataKeys = collectAgingKeys(
+      detailRows.value.map(r => ({
+        agingPrior: (r.agingPrior ?? null) as Record<string, number> | null,
+        agingAudited: (r.agingAudited ?? null) as Record<string, number> | null,
+      })),
+    )
+    if (!dataKeys.length) return PRESET_SEGMENTS.THREE_YEAR
+    // 数据兜底：无法获知天数边界，首段视为 1 年以内，其余视为 >1 年
+    return dataKeys.map((k, i) => ({
+      key: k,
+      label: k,
+      dayFrom: i === 0 ? 0 : OVER_ONE_YEAR_DAY_FROM,
+      dayTo: null,
+    }))
+  })
+
+  const agingSegmentKeys = computed<string[]>(() => agingSegments.value.map(s => s.key))
+
+  /** 账龄超 1 年的段 key（dayFrom ≥ 366） */
+  const overOneYearKeys = computed<string[]>(() =>
+    agingSegments.value.filter(s => s.dayFrom >= OVER_ONE_YEAR_DAY_FROM).map(s => s.key),
+  )
 
   /** 将原始行转为公式引擎所需的 DetailRowForFormula 结构 */
   const detailRowsForFormula = computed<DetailRowForFormula[]>(() => {
@@ -198,32 +241,49 @@ export function useD3CrossSheet(options: UseD3CrossSheetOptions) {
     }
   })
 
-  // ─── D3-2 → D3-5 筛选账龄>1年行 ─────────────────────────────────────
+  // ─── D3-2 → D3-1 按账龄聚合（segment-driven，替代固定 4 段） ────────────
 
   /**
-   * longTermRows: 筛选审定账龄中 y1to2 + y2to3 + over3 > 0 的行
-   * 用于 D3-5 长期检查表"从D3-2导入"功能
+   * agingByKey: 按项目账龄配置段聚合期末审定(current)与期初审定(prior)。
+   * 以段 key 为索引，供 D3-1 审定表「按账龄分类」与附注国企「按账龄」取数。
+   * 支持 THREE_YEAR/FIVE_YEAR/CUSTOM 任意段数，不再局限固定 within1/y1to2/y2to3/over3。
+   */
+  const agingByKey: ComputedRef<{ current: Record<string, number>; prior: Record<string, number> }> = computed(() => {
+    const rows = detailRows.value.map(r => ({
+      agingPrior: (r.agingPrior ?? null) as Record<string, number> | null,
+      agingAudited: (r.agingAudited ?? null) as Record<string, number> | null,
+    }))
+    return aggregateAgingByKeys(rows, agingSegmentKeys.value)
+  })
+
+  // ─── D3-2 → D3-5 筛选账龄>1年行（segment-driven） ───────────────────
+
+  /**
+   * longTermRows: 筛选审定账龄中「>1年段(dayFrom≥366)合计 > 0」的行。
+   * 用于 D3-5 长期检查表"从D3-2导入"功能。账龄描述由实际配置段标签拼接。
    */
   const longTermRows: ComputedRef<LongTermImportRow[]> = computed(() => {
+    const overKeys = overOneYearKeys.value
+    const segLabelByKey = new Map(agingSegments.value.map(s => [s.key, s.label]))
     return detailRows.value
       .filter(row => {
-        const y1to2 = parseNum(row.agingAudited?.y1to2)
-        const y2to3 = parseNum(row.agingAudited?.y2to3)
-        const over3 = parseNum(row.agingAudited?.over3)
-        return y1to2 + y2to3 + over3 > 0
+        const audited = (row.agingAudited ?? {}) as Record<string, number>
+        const overSum = overKeys.reduce((sum, k) => sum + parseNum(audited[k]), 0)
+        return overSum > 0
       })
       .map(row => {
+        const audited = (row.agingAudited ?? {}) as Record<string, number>
+        // 保留 4 段兼容字段供旧消费者读取（LongTermImportRow.agingAudited 类型）
         const aging = {
-          within1: parseNum(row.agingAudited?.within1),
-          y1to2: parseNum(row.agingAudited?.y1to2),
-          y2to3: parseNum(row.agingAudited?.y2to3),
-          over3: parseNum(row.agingAudited?.over3),
+          within1: parseNum(audited.within1),
+          y1to2: parseNum(audited.y1to2),
+          y2to3: parseNum(audited.y2to3),
+          over3: parseNum(audited.over3),
         }
-        // 构建账龄描述
-        const parts: string[] = []
-        if (aging.y1to2 > 0) parts.push('1-2年')
-        if (aging.y2to3 > 0) parts.push('2-3年')
-        if (aging.over3 > 0) parts.push('3年以上')
+        // 账龄描述：拼接有金额的 >1年 配置段标签
+        const parts = overKeys
+          .filter(k => parseNum(audited[k]) > 0)
+          .map(k => segLabelByKey.get(k) || k)
         return {
           customerName: row.customerName || '',
           endAudited: parseNum(row.endAudited),
@@ -327,6 +387,9 @@ export function useD3CrossSheet(options: UseD3CrossSheetOptions) {
     // D3-2 → D3-1 聚合
     natureAggregation,
     agingAggregation,
+    // segment-driven 账龄聚合 + 有效段（支持自定义账龄配置）
+    agingByKey,
+    agingSegments,
     // D3-2 → D3-5 筛选
     longTermRows,
     // D3-2 → D3-6 筛选

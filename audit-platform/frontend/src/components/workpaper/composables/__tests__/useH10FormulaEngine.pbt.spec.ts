@@ -51,11 +51,13 @@ describe('useH10FormulaEngine PBT', () => {
     ), { numRuns: 50 })
   })
 
-  it('Property P4: calcNetBookValue = cost - dep', () => {
+  it('Property P4: calcNetBookValue = cost - dep - impair', () => {
     fc.assert(fc.property(
       fc.float({ min: 0, max: 1e9, noNaN: true }),
       fc.float({ min: 0, max: 1e9, noNaN: true }),
-      (cost, dep) => {
+      fc.float({ min: 0, max: 1e9, noNaN: true }),
+      (cost, dep, impair) => {
+        expect(calcNetBookValue(cost, dep, impair)).toBeCloseTo(cost - dep - impair, 5)
         expect(calcNetBookValue(cost, dep)).toBeCloseTo(cost - dep, 5)
       },
     ), { numRuns: 50 })

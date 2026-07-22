@@ -1,289 +1,248 @@
 /**
- * useI2Disclosure — I2 开发支出附注披露 composable
- *
- * Variant 双版本（上市公司58×7 / 国有企业17×8），根据 projectContext.business_category 自动选择。
- * - 从审定表+明细表自动取数填入对应附注位置 (Req 12.2)
- * - AI辅助生成文字描述 (Req 12.3)
- * - EventBus: subscribe 'substantive:adjudicated' → refresh;
- *             publish 'disclosure:note-text-updated' (Req 12.3)
- *
- * 持久化：
- * - "I2-disc-listed" / "I2-disc-soe" item_ids
- *
- * Spec: .kiro/specs/i2-development-expenditure/
- * Task: 3.7
- * Requirements: 12.1-12.3
+ * useI2Disclosure — I2 开发支出附注披露
+ * 上市：按性质 + 项目滚动 + 重要资本化 + 减值；国企：项目滚动
+ * 取数：I2-2 / I2-6 / I2-7；同步附注：sync-from-workpaper + disclosure:note-text-updated
  */
-import { ref, computed, watch, onMounted, onUnmounted, type Ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { api } from '@/services/apiProxy'
+import { ref, computed, watch, type Ref } from 'vue'
+import {
+  I2_DISC_KEYS,
+  type I2NatureRow,
+  type I2MovementRow,
+  type I2ImportantCapRow,
+  type I2ImpairmentRow,
+  defaultNatureRows,
+  emptyNatureRow,
+  emptyMovementRow,
+  emptyImportantRow,
+  emptyImpairmentRow,
+  normalizeNatureRow,
+  normalizeMovementRow,
+  normalizeImportantRow,
+  normalizeImpairmentRow,
+  recalcMovementEnd,
+  summarizeNature,
+  summarizeMovement,
+  seedMovementFromI22,
+  enrichFromI26,
+  seedNatureCapitalizedFromI27,
+  applyNatureCapitalizedMap,
+  safeParseArray,
+  readText,
+} from './i2DisclosureModel'
+import {
+  resolveI2NoteSectionTarget,
+  type I2DisclosureVariant,
+} from './i2NoteSectionMap'
+import type { I2ListedSyncSnapshot, I2SoeSyncSnapshot } from './i2DisclosureSyncPayload'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-export type I2DisclosureVariant = 'listed' | 'soe'
-
-export interface ChecklistItem {
-  item_id: string
-  conclusion: string | null
-  remark: string | null
-}
-
-/** 上市公司附注行（58行×7列） */
-export interface I2DisclosureListedRow {
-  rowId: string
-  /** 项目名称 */
-  name: string
-  /** 期初余额 */
-  beginBalance: number
-  /** 本期增加 */
-  increase: number
-  /** 本期减少(转无形/转费用) */
-  decrease: number
-  /** 期末余额 */
-  endBalance: number
-  /** 摊销/减值 */
-  impairment: number
-  /** 备注 */
-  remark: string
-  /** 是否自动取数 */
-  isAutoFilled: boolean
-}
-
-/** 国企附注行（17行×8列） */
-export interface I2DisclosureSoeRow {
-  rowId: string
-  /** 项目名称 */
-  name: string
-  /** 期初余额 */
-  beginBalance: number
-  /** 本期增加-资本化 */
-  increaseCapitalized: number
-  /** 本期增加-费用化转入 */
-  increaseExpensed: number
-  /** 本期减少-转无形 */
-  decreaseToIntangible: number
-  /** 本期减少-转费用 */
-  decreaseToExpense: number
-  /** 期末余额 */
-  endBalance: number
-  /** 备注 */
-  remark: string
-  /** 是否自动取数 */
-  isAutoFilled: boolean
-}
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const ITEM_PREFIX_LISTED = 'I2-disc-listed'
-const ITEM_PREFIX_SOE = 'I2-disc-soe'
-
-// ─── Composable ──────────────────────────────────────────────────────────────
+export type { I2DisclosureVariant, I2NatureRow, I2MovementRow, I2ImportantCapRow, I2ImpairmentRow }
 
 export function useI2Disclosure(
-  wpId: Ref<string>,
-  projectId: Ref<string>,
-  allResponses: Ref<Map<string, ChecklistItem>>,
-  options?: {
-    variant?: Ref<I2DisclosureVariant>
-    crossSheetAutoFill?: Ref<Record<string, number>>
-    onSave?: (itemId: string, value: any) => void
+  allResponses: Ref<Map<string, any>>,
+  options: {
+    variant: I2DisclosureVariant
+    saveResponse?: (sheetCode: string, data: Record<string, any>) => Promise<void>
+    applicableStandards?: Ref<readonly string[] | null | undefined> | (() => readonly string[] | null | undefined)
   },
 ) {
-  // ─── State ─────────────────────────────────────────────────────────────────
+  const variant = options.variant
+  const sheetCode = variant === 'listed' ? 'disc-listed' : 'disc-soe'
 
-  const variant = computed<I2DisclosureVariant>(() => options?.variant?.value ?? 'listed')
-  const itemPrefix = computed(() => variant.value === 'listed' ? ITEM_PREFIX_LISTED : ITEM_PREFIX_SOE)
-  const isAiGenerating = ref(false)
-
-  /** 上市公司版本行（58行×7列） */
-  const listedRows = ref<I2DisclosureListedRow[]>([])
-
-  /** 国企版本行（17行×8列） */
-  const soeRows = ref<I2DisclosureSoeRow[]>([])
-
-  /** 附注文字说明 */
+  const natureRows = ref<I2NatureRow[]>(defaultNatureRows())
+  const movementRows = ref<I2MovementRow[]>([])
+  const importantRows = ref<I2ImportantCapRow[]>([])
+  const impairmentRows = ref<I2ImpairmentRow[]>([])
   const noteText = ref('')
+  const noteCap = ref('')
+  const noteImpairTest = ref('')
+  const notePurchased = ref('')
+  const auditNote = ref('')
+  const auditConclusion = ref('')
 
-  // ─── Load ──────────────────────────────────────────────────────────────────
-
-  function _loadData(): void {
-    // 上市公司行
-    const listedItem = allResponses.value.get(`${ITEM_PREFIX_LISTED}-rows`)
-    if (listedItem?.remark) {
-      try {
-        const parsed = JSON.parse(listedItem.remark)
-        listedRows.value = Array.isArray(parsed) ? parsed : []
-      } catch { listedRows.value = [] }
-    } else { listedRows.value = [] }
-
-    // 国企行
-    const soeItem = allResponses.value.get(`${ITEM_PREFIX_SOE}-rows`)
-    if (soeItem?.remark) {
-      try {
-        const parsed = JSON.parse(soeItem.remark)
-        soeRows.value = Array.isArray(parsed) ? parsed : []
-      } catch { soeRows.value = [] }
-    } else { soeRows.value = [] }
-
-    // 说明文本
-    const noteItem = allResponses.value.get(`${itemPrefix.value}-note`)
-    noteText.value = (noteItem?.remark ?? '') as string
+  function _standards(): readonly string[] | null | undefined {
+    const s = options.applicableStandards
+    if (!s) return undefined
+    return typeof s === 'function' ? s() : s.value
   }
 
-  // ─── Refresh from Adjudication (Req 12.2) ─────────────────────────────────
+  const noteTarget = computed(() => resolveI2NoteSectionTarget(variant, _standards()))
 
-  /**
-   * 从审定表+明细表自动取数刷新附注。
-   * 当收到 'substantive:adjudicated' 事件时自动调用。
-   */
-  function refreshFromAdjudication(): void {
-    const data = options?.crossSheetAutoFill?.value
-    if (!data || Object.keys(data).length === 0) return
+  function load() {
+    const map = allResponses.value
+    if (variant === 'listed') {
+      const natureRaw = safeParseArray(map.get(I2_DISC_KEYS.listedNature))
+      natureRows.value = natureRaw.length ? natureRaw.map(normalizeNatureRow) : defaultNatureRows()
 
-    // 如上市公司附注行为空，根据自动数据初始化
-    if (variant.value === 'listed' && listedRows.value.length === 0 && data['disc_end_total'] != null) {
-      listedRows.value = [{
-        rowId: 'auto-listed-total',
-        name: '开发支出合计',
-        beginBalance: data['disc_begin_total'] ?? 0,
-        increase: data['disc_increase_total'] ?? 0,
-        decrease: data['disc_decrease_total'] ?? 0,
-        endBalance: data['disc_end_total'] ?? 0,
-        impairment: data['disc_impairment_total'] ?? 0,
-        remark: '',
-        isAutoFilled: true,
-      }]
-    }
+      let mov = safeParseArray(map.get(I2_DISC_KEYS.listedMovement)).map(normalizeMovementRow)
+      if (!mov.length) {
+        mov = safeParseArray(map.get(I2_DISC_KEYS.listedLegacyRows)).map(normalizeMovementRow)
+      }
+      movementRows.value = mov
 
-    if (variant.value === 'soe' && soeRows.value.length === 0 && data['disc_end_total'] != null) {
-      soeRows.value = [{
-        rowId: 'auto-soe-total',
-        name: '开发支出合计',
-        beginBalance: data['disc_begin_total'] ?? 0,
-        increaseCapitalized: data['disc_increase_capitalized'] ?? 0,
-        increaseExpensed: data['disc_increase_expensed'] ?? 0,
-        decreaseToIntangible: data['disc_decrease_intangible'] ?? 0,
-        decreaseToExpense: data['disc_decrease_expense'] ?? 0,
-        endBalance: data['disc_end_total'] ?? 0,
-        remark: '',
-        isAutoFilled: true,
-      }]
+      importantRows.value = safeParseArray(map.get(I2_DISC_KEYS.listedImportant)).map(normalizeImportantRow)
+      impairmentRows.value = safeParseArray(map.get(I2_DISC_KEYS.listedImpairment)).map(normalizeImpairmentRow)
+      noteText.value = readText(map.get(I2_DISC_KEYS.listedNote))
+      noteCap.value = readText(map.get(I2_DISC_KEYS.listedNoteCap))
+      noteImpairTest.value = readText(map.get(I2_DISC_KEYS.listedNoteImpairTest))
+      notePurchased.value = readText(map.get(I2_DISC_KEYS.listedNotePurchased))
+      auditNote.value = readText(map.get(I2_DISC_KEYS.listedAuditNote))
+      auditConclusion.value = readText(map.get(I2_DISC_KEYS.listedAuditConclusion))
+    } else {
+      let mov = safeParseArray(map.get(I2_DISC_KEYS.soeMovement)).map(normalizeMovementRow)
+      if (!mov.length) {
+        mov = safeParseArray(map.get(I2_DISC_KEYS.soeLegacyRows)).map(normalizeMovementRow)
+      }
+      movementRows.value = mov
+      noteText.value = readText(map.get(I2_DISC_KEYS.soeNote))
+      auditNote.value = readText(map.get(I2_DISC_KEYS.soeAuditNote))
+      auditConclusion.value = readText(map.get(I2_DISC_KEYS.soeAuditConclusion))
     }
   }
 
-  // ─── AI 辅助 (Req 12.3) ───────────────────────────────────────────────────
+  watch(() => allResponses.value, () => load(), { immediate: true })
 
-  /**
-   * AI辅助生成附注文字描述。
-   * 调用 POST /api/workpapers/{wp_id}/ai/generate-text
-   */
-  async function generateWithAI(existingContent?: string): Promise<string | null> {
-    if (!wpId.value) return null
-    isAiGenerating.value = true
-    try {
-      const context = _buildAiContext()
-      const res = await api.post(`/api/workpapers/${wpId.value}/ai/generate-text`, {
-        section: `i2-disclosure-${variant.value}`,
-        prompt: `请为开发支出附注（${variant.value === 'listed' ? '上市公司' : '国有企业'}版本）生成披露文字描述`,
-        context,
-        existingContent: existingContent || noteText.value || '',
+  const natureSummary = computed(() => summarizeNature(natureRows.value))
+  const movementSummary = computed(() => summarizeMovement(movementRows.value))
+
+  /** 性质表资本化合计 vs 滚动内部开发增加 */
+  const natureVsMovementDiff = computed(() => {
+    if (variant !== 'listed') return null
+    return Math.round((natureSummary.value.currentCapitalized - movementSummary.value.increaseInternal) * 100) / 100
+  })
+
+  function addNatureRow() { natureRows.value.push(emptyNatureRow()) }
+  function addMovementRow() { movementRows.value.push(emptyMovementRow()) }
+  function addImportantRow() { importantRows.value.push(emptyImportantRow()) }
+  function addImpairmentRow() { impairmentRows.value.push(emptyImpairmentRow()) }
+
+  function onMovementChange(row: I2MovementRow) { recalcMovementEnd(row) }
+
+  function autoFillFromSources(): { ok: boolean; message: string } {
+    const map = allResponses.value
+    const detail = safeParseArray(map.get('I2-2-rows'))
+    const cap = safeParseArray(map.get('I2-6-rows'))
+    const project = safeParseArray(map.get('I2-7-rows'))
+
+    let seeded = seedMovementFromI22(detail)
+    if (!seeded.length) {
+      // 兜底：I2-7 项目名
+      seeded = project
+        .filter((r) => (r.projectName || '').trim())
+        .map((r) => emptyMovementRow({
+          name: r.projectName,
+          beginBalance: Number(r.begin?.capitalized) || 0,
+          increaseInternal: Number(r.increase?.capitalized) || Number(r.totalAmount) || 0,
+          isAutoFilled: true,
+        }))
+    }
+
+    const enriched = enrichFromI26(seeded, importantRows.value, cap)
+    movementRows.value = enriched.movement
+    if (variant === 'listed') {
+      importantRows.value = enriched.important
+      if (project.length) {
+        const cmap = seedNatureCapitalizedFromI27(project)
+        natureRows.value = applyNatureCapitalizedMap(
+          natureRows.value.length ? natureRows.value : defaultNatureRows(),
+          cmap,
+        )
+      }
+    }
+
+    if (!movementRows.value.length) {
+      return { ok: false, message: '暂无 I2-2/I2-7 项目数据可供自动取数' }
+    }
+    const parts = [`已取数 ${movementRows.value.length} 个项目`]
+    if (enriched.filled) parts.push(`补齐资本化信息 ${enriched.filled} 处`)
+    if (enriched.fuzzyMatched.length) {
+      parts.push(`模糊匹配 ${enriched.fuzzyMatched.length} 项（请核对项目名）`)
+    }
+    if (enriched.unmatched.length) {
+      parts.push(`⚠ 未匹配 I2-6：${enriched.unmatched.slice(0, 5).join('、')}${enriched.unmatched.length > 5 ? '…' : ''}`)
+    }
+    return {
+      ok: true,
+      message: parts.join('；'),
+      unmatched: enriched.unmatched,
+      fuzzyMatched: enriched.fuzzyMatched,
+    }
+  }
+
+  function getListedSnapshot(): I2ListedSyncSnapshot {
+    return {
+      natureRows: natureRows.value,
+      movementRows: movementRows.value,
+      importantRows: importantRows.value,
+      impairmentRows: impairmentRows.value,
+      noteText: noteText.value,
+      noteCap: noteCap.value,
+      noteImpairTest: noteImpairTest.value,
+      notePurchased: notePurchased.value,
+    }
+  }
+
+  function getSoeSnapshot(): I2SoeSyncSnapshot {
+    return {
+      movementRows: movementRows.value,
+      noteText: noteText.value,
+    }
+  }
+
+  async function persistAll() {
+    const save = options.saveResponse
+    if (!save) return
+    if (variant === 'listed') {
+      await save(sheetCode, {
+        [I2_DISC_KEYS.listedNature]: JSON.stringify(natureRows.value),
+        [I2_DISC_KEYS.listedMovement]: JSON.stringify(movementRows.value),
+        [I2_DISC_KEYS.listedImportant]: JSON.stringify(importantRows.value),
+        [I2_DISC_KEYS.listedImpairment]: JSON.stringify(impairmentRows.value),
+        [I2_DISC_KEYS.listedNote]: noteText.value,
+        [I2_DISC_KEYS.listedNoteCap]: noteCap.value,
+        [I2_DISC_KEYS.listedNoteImpairTest]: noteImpairTest.value,
+        [I2_DISC_KEYS.listedNotePurchased]: notePurchased.value,
+        [I2_DISC_KEYS.listedAuditNote]: auditNote.value,
+        [I2_DISC_KEYS.listedAuditConclusion]: auditConclusion.value,
+        // 兼容旧消费者
+        [I2_DISC_KEYS.listedLegacyRows]: JSON.stringify(movementRows.value),
       })
-
-      const data = res?.data ?? res
-      const generated = data?.content ?? data?.text ?? ''
-      if (generated) return generated
-      ElMessage.warning('AI未返回内容，请手工编写')
-      return null
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'AI生成失败'
-      ElMessage.error(msg)
-      return null
-    } finally {
-      isAiGenerating.value = false
+    } else {
+      await save(sheetCode, {
+        [I2_DISC_KEYS.soeMovement]: JSON.stringify(movementRows.value),
+        [I2_DISC_KEYS.soeNote]: noteText.value,
+        [I2_DISC_KEYS.soeAuditNote]: auditNote.value,
+        [I2_DISC_KEYS.soeAuditConclusion]: auditConclusion.value,
+        [I2_DISC_KEYS.soeLegacyRows]: JSON.stringify(movementRows.value),
+      })
     }
   }
-
-  // ─── Save ──────────────────────────────────────────────────────────────────
-
-  function save(): void {
-    options?.onSave?.(`${ITEM_PREFIX_LISTED}-rows`, listedRows.value)
-    options?.onSave?.(`${ITEM_PREFIX_SOE}-rows`, soeRows.value)
-    options?.onSave?.(`${itemPrefix.value}-note`, noteText.value)
-    _publishNoteEvent()
-  }
-
-  function saveNoteText(text: string): void {
-    noteText.value = text
-    options?.onSave?.(`${itemPrefix.value}-note`, text)
-    _publishNoteEvent()
-  }
-
-  // ─── EventBus: publish (Req 12.3) ─────────────────────────────────────────
-
-  function _publishNoteEvent(): void {
-    window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-      detail: {
-        wpCode: 'I2',
-        variant: variant.value,
-        sections: ['development-expenditure'],
-      },
-    }))
-  }
-
-  // ─── EventBus: subscribe 'substantive:adjudicated' ─────────────────────────
-
-  function _onAdjudicated(e: Event): void {
-    const detail = (e as CustomEvent)?.detail
-    if (!detail) return
-    // 只处理I2相关的审定事件
-    const wpCode = detail?.wpCode ?? detail?.wp_code ?? ''
-    if (wpCode && !String(wpCode).startsWith('I2')) return
-    refreshFromAdjudication()
-  }
-
-  onMounted(() => {
-    window.addEventListener('substantive:adjudicated', _onAdjudicated)
-  })
-
-  onUnmounted(() => {
-    window.removeEventListener('substantive:adjudicated', _onAdjudicated)
-  })
-
-  // ─── Helpers ───────────────────────────────────────────────────────────────
-
-  function _buildAiContext(): string {
-    const data = options?.crossSheetAutoFill?.value ?? {}
-    const parts: string[] = [
-      '科目: 开发支出(1717)',
-      `版本: ${variant.value === 'listed' ? '上市公司(58行×7列)' : '国有企业(17行×8列)'}`,
-    ]
-    if (data['disc_end_total'] != null) parts.push(`期末合计: ${data['disc_end_total']}`)
-    if (data['disc_begin_total'] != null) parts.push(`期初合计: ${data['disc_begin_total']}`)
-    if (data['disc_increase_total'] != null) parts.push(`本期增加: ${data['disc_increase_total']}`)
-    if (data['disc_decrease_total'] != null) parts.push(`本期减少: ${data['disc_decrease_total']}`)
-    if (data['disc_project_count'] != null) parts.push(`研发项目数: ${data['disc_project_count']}`)
-    return parts.join('; ')
-  }
-
-  // ─── Init ──────────────────────────────────────────────────────────────────
-
-  watch(allResponses, () => _loadData(), { immediate: true })
-  watch(variant, () => _loadData())
-
-  // ─── Return ────────────────────────────────────────────────────────────────
 
   return {
-    // State
     variant,
-    isAiGenerating,
-    listedRows,
-    soeRows,
+    natureRows,
+    movementRows,
+    importantRows,
+    impairmentRows,
     noteText,
-    // Actions
-    refreshFromAdjudication,
-    generateWithAI,
-    save,
-    saveNoteText,
+    noteCap,
+    noteImpairTest,
+    notePurchased,
+    auditNote,
+    auditConclusion,
+    natureSummary,
+    movementSummary,
+    natureVsMovementDiff,
+    noteTarget,
+    load,
+    addNatureRow,
+    addMovementRow,
+    addImportantRow,
+    addImpairmentRow,
+    onMovementChange,
+    autoFillFromSources,
+    getListedSnapshot,
+    getSoeSnapshot,
+    persistAll,
   }
 }
 

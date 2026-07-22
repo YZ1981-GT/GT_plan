@@ -216,4 +216,9 @@ describe('GtI1IntangibleAssets sheetName 分发', () => {
     const wrapper = await mountWithSheet('I1-1 审定表')
     expect(wrapper.find('[data-testid="I1TabAdjudication"]').exists()).toBe(true)
   })
+
+  it('xlsx「审定表I1」→ 渲染 I1TabAdjudication（勿误判为目录）', async () => {
+    const wrapper = await mountWithSheet('审定表I1')
+    expect(wrapper.find('[data-testid="I1TabAdjudication"]').exists()).toBe(true)
+  })
 })

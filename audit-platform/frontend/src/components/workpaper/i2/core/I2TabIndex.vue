@@ -32,6 +32,42 @@
       </div>
     </div>
 
+    <!-- 跨表一致性仪表盘 -->
+    <el-card v-if="consistency.items.length" shadow="never" class="consistency-card">
+      <template #header>
+        <div class="section-title">
+          <span>跨表一致性（I2-4 / I2-6 / I2-15·16 / I2-12）</span>
+          <span class="completion-text">
+            <el-tag v-if="consistency.errorCount" size="small" type="danger">错误 {{ consistency.errorCount }}</el-tag>
+            <el-tag v-if="consistency.warnCount" size="small" type="warning">警告 {{ consistency.warnCount }}</el-tag>
+            <el-tag v-if="consistency.okCount" size="small" type="success">正常 {{ consistency.okCount }}</el-tag>
+          </span>
+        </div>
+      </template>
+      <el-table :data="consistency.items" size="small" stripe class="index-table">
+        <el-table-column prop="area" label="领域" width="120" />
+        <el-table-column label="级别" width="72" align="center">
+          <template #default="{ row }">
+            <el-tag :type="consistencyTagType(row.level)" size="small">{{ consistencyLevelLabel(row.level) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="message" label="说明" min-width="260" />
+        <el-table-column label="" width="72" align="center">
+          <template #default="{ row }">
+            <el-button
+              v-if="row.sheetHint"
+              type="primary"
+              link
+              size="small"
+              @click="emit('navigate-sheet', row.sheetHint)"
+            >
+              进入
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
     <!-- 底稿目录表 -->
     <el-card shadow="never" class="index-card">
       <template #header>
@@ -87,10 +123,10 @@
       <ul>
         <li>建议编制顺序：审定表→明细表→CAS6五条件→检查表→截止测试→减值→附注</li>
         <li>审定表完成后自动回写TB科目1717(开发支出)，资产类期末=期初+借方-贷方</li>
-        <li>I2-6 CAS6五条件是审计重点：①技术可行性②完成意图③使用或出售能力④未来经济利益⑤资源充足</li>
+        <li>I2-6 CAS6五条件是审计重点：①技术可行性②完成意图③经济利益方式④资源支持⑤可靠计量（须同时满足）</li>
         <li>I6↔I2双向联动：研发费用(I6费用化)+开发支出(I2资本化)=研发总额</li>
         <li>I2审定表"本期减少-转无形资产"列联动I1增加检查</li>
-        <li>I2-7研发项目构成73列拆为5区段Tab(基础/材料/人工/折旧摊销/其他)</li>
+        <li>I2-7研发项目构成按滚动阶段分Tab(期初/增减/期末/调整/审定)+费用性质与资本化/费用化</li>
       </ul>
     </details>
   </div>
@@ -103,6 +139,10 @@
  * Spec: Task 4.1 | Requirements: 1.1-1.10
  */
 import { computed } from 'vue'
+import {
+  buildI2ConsistencyDashboard,
+  computeI2SheetCompletion,
+} from '../../composables/i2ConsistencyModel'
 
 const props = defineProps<{
   sheetName: string
@@ -134,7 +174,7 @@ const SHEET_DEFS: SheetDef[] = [
   // 检查组
   { seq: 7, code: 'I2-4', name: '会计政策检查', sheetName: 'Policy_Check_I2_4 会计政策检查', group: '检查', fields: ['I2-4-'] },
   { seq: 8, code: 'I2-6', name: '研发项目资本化时点判断', tag: 'CAS6核心', sheetName: 'Capitalization_I2_6 资本化时点判断', group: '检查', fields: ['I2-6-'] },
-  { seq: 9, code: 'I2-7', name: '研发项目构成明细表', tag: '73列', sheetName: 'Project_Detail_I2_7 项目构成', group: '检查', fields: ['I2-7-'] },
+  { seq: 9, code: 'I2-7', name: '研发项目构成明细表', tag: '滚动', sheetName: 'Project_Detail_I2_7 项目构成', group: '检查', fields: ['I2-7-'] },
   { seq: 10, code: 'I2-8', name: '研发材料投入检查表', sheetName: 'Material_Check_I2_8 材料投入', group: '检查', fields: ['I2-8-'] },
   { seq: 11, code: 'I2-9', name: '研发人员认定检查表', sheetName: 'Staff_Check_I2_9 人员认定', group: '检查', fields: ['I2-9-'] },
   { seq: 12, code: 'I2-10', name: '研发人员工时检查表', sheetName: 'WorkHour_Check_I2_10 工时检查', group: '检查', fields: ['I2-10-'] },
@@ -163,27 +203,7 @@ const sheetCount = SHEET_DEFS.length
 
 /** Determine per-sheet status from checklist_responses */
 function getSheetStatus(fields: string[]): { status: SheetStatus; progress: number } {
-  if (fields.length === 0) return { status: '未开始', progress: 0 }
-  const responses = props.allResponses
-  if (!responses || responses.size === 0) return { status: '未开始', progress: 0 }
-
-  let totalFields = 0
-  let filledFields = 0
-
-  for (const [key, value] of responses) {
-    for (const prefix of fields) {
-      if (key.startsWith(prefix)) {
-        totalFields++
-        if (value !== null && value !== undefined && value !== '') filledFields++
-      }
-    }
-  }
-
-  if (totalFields === 0) return { status: '未开始', progress: 0 }
-  const progress = Math.round((filledFields / totalFields) * 100)
-  if (progress >= 90) return { status: '已完成', progress: 100 }
-  if (filledFields > 0) return { status: '进行中', progress }
-  return { status: '未开始', progress: 0 }
+  return computeI2SheetCompletion(props.allResponses, fields)
 }
 
 const sheets = computed<SheetEntry[]>(() => {
@@ -192,6 +212,8 @@ const sheets = computed<SheetEntry[]>(() => {
     return { ...def, status, progress }
   })
 })
+
+const consistency = computed(() => buildI2ConsistencyDashboard(props.allResponses))
 
 const groupedSheets = computed(() => {
   return GROUP_META.map((g) => ({
@@ -215,6 +237,20 @@ const completionPct = computed(() => {
   const progressSum = sheets.value.reduce((sum, s) => sum + s.progress, 0)
   return Math.round(progressSum / total)
 })
+
+function consistencyTagType(level: string) {
+  if (level === 'error') return 'danger'
+  if (level === 'warn') return 'warning'
+  if (level === 'ok') return 'success'
+  return 'info'
+}
+
+function consistencyLevelLabel(level: string) {
+  if (level === 'error') return '错误'
+  if (level === 'warn') return '警告'
+  if (level === 'ok') return '正常'
+  return '提示'
+}
 
 function statusTagType(status: SheetStatus): 'success' | 'warning' | 'info' {
   switch (status) {
@@ -271,8 +307,9 @@ function handleNavigate(row: SheetEntry) {
   margin-bottom: 4px; border-radius: 2px;
 }
 .index-card { margin-bottom: 16px; }
-.section-title { display: flex; align-items: center; justify-content: space-between; }
-.completion-text { font-size: 12px; color: var(--el-text-color-secondary); }
+.consistency-card { margin-bottom: 16px; }
+.section-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.completion-text { font-size: 12px; color: var(--el-text-color-secondary); display: flex; gap: 6px; align-items: center; }
 .completion-bar { margin-bottom: 12px; }
 .index-table { font-size: var(--wp-font-size, 13px); cursor: pointer; }
 .sheet-link { color: var(--el-color-primary); }

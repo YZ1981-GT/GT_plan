@@ -21,6 +21,20 @@
         style="margin-bottom: 12px"
       />
 
+      <!-- CAS14 合同负债(2205)分类适当性勾稽 -->
+      <el-alert
+        v-if="contractLiabilityWarning"
+        type="warning"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 12px"
+      >
+        <template #title>
+          <span>{{ contractLiabilityWarning }}</span>
+          <GtIndexChip value="wp:D7" context="收入范围预收应重分类至合同负债(2205)底稿 D7" />
+        </template>
+      </el-alert>
+
       <!-- 双区块表格 -->
       <div v-for="section in sections" :key="section.sectionKey" class="adj-section">
         <h4 class="section-title">{{ section.sectionLabel }}</h4>
@@ -232,6 +246,7 @@ const {
   trialBalanceAmount,
   trialBalanceDiff,
   crossValidationWarning,
+  contractLiabilityWarning,
   auditNotes,
   updateCell,
 } = useD3Adjudication({

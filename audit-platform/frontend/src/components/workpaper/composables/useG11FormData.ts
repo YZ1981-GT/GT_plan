@@ -195,5 +195,3 @@ export function useG11FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     writebackTrialBalance,
   }
 }
-
-export { useG11FormData as useG11InvIncFormData }

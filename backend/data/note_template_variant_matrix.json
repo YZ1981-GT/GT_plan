@@ -812,8 +812,8 @@
       "variants": {
         "soe_standalone": "八、72",
         "soe_consolidated": "八、72",
-        "listed_standalone": null,
-        "listed_consolidated": null
+        "listed_standalone": "三、公允价值变动收益",
+        "listed_consolidated": "三、公允价值变动收益"
       },
       "legacy_aliases": {}
     },
@@ -823,8 +823,8 @@
       "variants": {
         "soe_standalone": "八、73",
         "soe_consolidated": "八、73",
-        "listed_standalone": null,
-        "listed_consolidated": null
+        "listed_standalone": "三、信用减值损失",
+        "listed_consolidated": "三、信用减值损失"
       },
       "legacy_aliases": {}
     },

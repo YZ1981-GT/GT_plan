@@ -56,7 +56,11 @@
           :all-responses="allResponses"
           :tb-data="tbData"
           :is-readonly="isReadonly"
+          :cross-sheet-cost-audited="adjudicationFromDetail.costAudited"
+          :cross-sheet-amort-audited="adjudicationFromDetail.amortAudited"
+          :cross-sheet-impair-audited="adjudicationFromDetail.impairAudited"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I1-2 明细表 -->
@@ -77,6 +81,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
@@ -89,6 +94,7 @@
           :all-responses="allResponses"
           :is-readonly="isReadonly"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I1-5 增加检查 -->
@@ -142,6 +148,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :amortization-by-asset="amortizationForAlloc.byAsset"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
@@ -248,10 +255,11 @@
  * Spec: .kiro/specs/i1-intangible-assets/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, provide, toRef, defineAsyncComponent, inject} from 'vue'
+import { ref, computed, watch, onMounted, provide, toRef, defineAsyncComponent, inject } from 'vue'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useI1DualMode } from './composables/useI1DualMode'
+import { useI1CrossSheet } from './composables/useI1CrossSheet'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
@@ -309,6 +317,9 @@ const tbData = ref({
 })
 const amortizationBranch = ref<'noImpair' | 'withImpair'>('noImpair')
 
+// ─── 跨Sheet：I1-10/11 → I1-9 摊销分配 ─────────────────────────────────────
+const { amortizationForAlloc, adjudicationFromDetail } = useI1CrossSheet(allResponses)
+
 // ─── 双模式 useI1DualMode (OO 健康检查 + el-segmented) ──────────────────────
 const wpIdRef = computed(() => props.wpId)
 const dualMode = useI1DualMode({
@@ -329,11 +340,15 @@ const currentSheet = computed(() => {
   if (/附注/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
   // 程序表 I1A
   if (/I1A/.test(name)) return 'I1A'
+  // 审定表（xlsx「审定表I1」/ Adjudication_I1）→ I1-1，勿误判为目录
+  if (/审定表|Adjudication_I1/.test(name)) return 'I1-1'
   // I1-N 编码（I1-1 到 I1-13）
   const m = name.match(/(I1-\d+)/)
   if (m) return m[1]
-  // 底稿目录 I1（无后缀）
-  if (/底稿目录/.test(name) || (/\bI1\b/.test(name) && !/I1-/.test(name) && !/I1A/.test(name))) return 'I1'
+  // 底稿目录
+  if (/底稿目录|Tab_Index/.test(name)) return 'I1'
+  // 裸 I1（无后缀）→ 目录
+  if (/\bI1\b/.test(name) && !/I1-/.test(name) && !/I1A/.test(name)) return 'I1'
   return ''
 })
 
@@ -415,12 +430,29 @@ async function selfLoad(): Promise<void> {
   }
 }
 
-// ─── 摊销分支联动：根据 sheetName 自动设置分支 ──────────────────────────────
+// ─── 摊销分支联动：根据 sheetName / 已存偏好设置分支 ────────────────────────
 function syncAmortizationBranch() {
   const sheet = currentSheet.value
-  if (sheet === 'I1-10') amortizationBranch.value = 'noImpair'
-  else if (sheet === 'I1-11') amortizationBranch.value = 'withImpair'
+  if (sheet === 'I1-10') {
+    amortizationBranch.value = 'noImpair'
+    return
+  }
+  if (sheet === 'I1-11') {
+    amortizationBranch.value = 'withImpair'
+    return
+  }
+  const br = allResponses.value.get('I1-amort-branch')?.remark
+  if (br === 'noImpair' || br === 'withImpair') amortizationBranch.value = br
 }
+
+// 用户在 I1-10/11 页切换分段时显式持久化（子 tab mount 不再副作用写分支）
+watch(amortizationBranch, (b) => {
+  if (currentSheet.value !== 'I1-10' && currentSheet.value !== 'I1-11') return
+  const cur = allResponses.value.get('I1-amort-branch')?.remark
+  if (cur !== b) void handleChildSave('I1-amort-branch', b)
+})
+
+watch(currentSheet, () => syncAmortizationBranch())
 
 // openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide（真实复核对话）
 

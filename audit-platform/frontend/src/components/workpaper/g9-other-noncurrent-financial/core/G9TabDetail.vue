@@ -440,12 +440,13 @@ function onFillOci() {
 const NOTE_KEY = 'G9-detail-audit-note'
 const CONCLUSION_KEY = 'G9-detail-audit-conclusion'
 const auditNote = ref(props.allResponses.get(NOTE_KEY)?.remark ?? '')
-const auditConclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.remark ?? '')
+const _detailConcl = props.allResponses.get(CONCLUSION_KEY)
+const auditConclusion = ref(String(_detailConcl?.conclusion ?? _detailConcl?.remark ?? ''))
 watch(auditNote, (v) => {
   if (!props.isReadonly) props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: v })
 })
 watch(auditConclusion, (v) => {
-  if (!props.isReadonly) props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: v })
+  if (!props.isReadonly) props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: v, remark: null })
 })
 
 function fmt(n: number) {

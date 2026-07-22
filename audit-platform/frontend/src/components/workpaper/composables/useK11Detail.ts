@@ -100,6 +100,8 @@ export const IMPAIRMENT_SOURCE_MAP: Record<string, string> = {
   '固定资产减值准备': 'H1',
   '无形资产减值': 'I1',
   '无形资产减值准备': 'I1',
+  '开发支出减值': 'I2',
+  '开发支出减值准备': 'I2',
   '商誉减值': 'I3',
   '商誉减值损失': 'I3',
   '商誉减值准备': 'I3',
@@ -300,6 +302,80 @@ export function useK11Detail(params: UseK11DetailParams) {
     _persist()
   }
 
+  /**
+   * 自 H1-14 拉取本期补提⑧写入固定资产行 sourceAmount，并刷新 CrossSheet 键。
+   */
+  async function pullH1SupplementAsSource(): Promise<{ ok: boolean; amount: number; message: string }> {
+    if (isReadonly?.value) return { ok: false, amount: 0, message: '只读模式' }
+    const pid = projectId.value
+    if (!pid) return { ok: false, amount: 0, message: '缺少 projectId' }
+    try {
+      const { api } = await import('@/services/apiProxy')
+      const idRes = await api.get<{ wp_id: string }>('/api/custom-query/wp-id-by-code', {
+        params: { project_id: pid, wp_code: 'H1' },
+        _silent: true,
+      } as any)
+      const h1WpId = (idRes as any)?.wp_id ?? (idRes as any)?.data?.wp_id
+      if (!h1WpId) return { ok: false, amount: 0, message: '项目中未找到 H1 底稿' }
+
+      const res = await api.get(`/api/workpapers/${h1WpId}/checklist-responses`, { _silent: true } as any)
+      const list: any[] = Array.isArray(res) ? res : (res?.data ?? [])
+      const readNum = (id: string): number | null => {
+        const item = list.find((r) => r.item_id === id)
+        if (!item) return null
+        const n = Number(item.remark ?? item.conclusion)
+        return Number.isFinite(n) ? n : null
+      }
+      let amount = readNum('H1-14-supplement-total')
+        ?? readNum('H1-14-本期减值合计')
+      if (amount == null) {
+        const calcItem = list.find((r) => r.item_id === 'H1-14-calc-rows')
+        const raw = calcItem?.remark
+        if (raw) {
+          try {
+            const rowsJson = typeof raw === 'string' ? JSON.parse(raw) : raw
+            if (Array.isArray(rowsJson)) {
+              amount = rowsJson.reduce(
+                (s: number, r: any) => s + Math.max((Number(r.impairmentAmount) || 0) - (Number(r.alreadyProvided) || 0), 0),
+                0,
+              )
+            }
+          } catch { /* ignore */ }
+        }
+      }
+      if (amount == null) return { ok: false, amount: 0, message: 'H1-14 尚无本期补提数据' }
+
+      // 写入 CrossSheet 键 + 明细行 sourceAmount
+      onSave?.('K11-2-fixed-asset-source-amount', amount)
+      onSave?.('K11-source-H1-amount', amount)
+      let touched = 0
+      for (const row of rows.value) {
+        const isFa = row.sourceWp === 'H1'
+          || String(row.assetCategory || '').includes('固定资产')
+        if (isFa) {
+          row.sourceAmount = amount
+          _recalcRow(row)
+          touched++
+        }
+      }
+      if (touched === 0) {
+        // 自动补一行固定资产核对行
+        addRow('固定资产减值准备', '自 H1-14 本期补提')
+        const last = rows.value[rows.value.length - 1]
+        if (last) {
+          last.sourceAmount = amount
+          last.sourceWp = 'H1'
+          _recalcRow(last)
+        }
+      }
+      isChanged.value = true
+      _persist()
+      return { ok: true, amount, message: `已自 H1-14 引入本期补提 ${amount.toFixed(2)}` }
+    } catch (e) {
+      return { ok: false, amount: 0, message: e instanceof Error ? e.message : String(e) }
+    }
+  }
+
   // ─── Watch init ────────────────────────────────────────────────────────────
 
   watch(allResponses, () => initFromResponses(), { immediate: true })
@@ -317,6 +393,7 @@ export function useK11Detail(params: UseK11DetailParams) {
     removeRow,
     setActiveTab,
     computeAll,
+    pullH1SupplementAsSource,
     initFromResponses,
   }
 }

@@ -25,7 +25,7 @@ import http from '@/utils/http'
 export type I2ImportableSheet =
   | 'I2-1'      // 审定表
   | 'I2-2'      // 明细表（61列4区段分sheet导出）
-  | 'I2-7'      // 项目构成明细表（73列5区段分sheet导出）
+  | 'I2-7'      // 项目构成明细表（滚动阶段+费用性质）
 
 export interface I2ImportResult {
   success: boolean
@@ -48,19 +48,21 @@ export const I2_DETAIL_SEGMENTS = [
   { key: 'summary', label: '期末汇总' },
 ] as const
 
-/** I2-7 的 5 区段定义 */
+/** I2-7 的滚动阶段定义（对齐源表期初→增减→期末→调整→审定） */
 export const I2_PROJECT_SEGMENTS = [
-  { key: 'basic', label: '基础信息' },
-  { key: 'material', label: '材料费' },
-  { key: 'labor', label: '人工费' },
-  { key: 'depreciation', label: '折旧摊销' },
-  { key: 'other', label: '其他费用' },
+  { key: 'overview', label: '汇总' },
+  { key: 'begin', label: '账面期初余额' },
+  { key: 'increase', label: '账面本期增加' },
+  { key: 'decrease', label: '账面本期减少' },
+  { key: 'ending', label: '账面期末余额' },
+  { key: 'adjustment', label: '审计调整' },
+  { key: 'audited', label: '期末审定金额' },
 ] as const
 
 export const I2_IMPORTABLE_SHEETS: { code: I2ImportableSheet; label: string }[] = [
   { code: 'I2-1', label: 'I2-1 审定表' },
   { code: 'I2-2', label: 'I2-2 明细表(61列4区段)' },
-  { code: 'I2-7', label: 'I2-7 项目构成(73列5区段)' },
+  { code: 'I2-7', label: 'I2-7 项目构成(滚动+费用性质)' },
 ]
 
 // ─── Composable ──────────────────────────────────────────────────────────────

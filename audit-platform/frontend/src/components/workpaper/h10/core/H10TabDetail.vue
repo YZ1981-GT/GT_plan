@@ -12,8 +12,8 @@
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>1. 逐项列示本期处置的各类非流动资产（固定资产/在建工程/使用权资产/生产性生物资产/油气资产等），来源底稿应可追溯至 H1~H8。</p>
-        <p>2. 处置损益 = 处置收入 − 账面净值 − 处置费用 − 相关税费；账面净值 = 原值 − 累计折旧（含减值）。</p>
+        <p>1. 逐项列示本期处置的各类非流动资产（固定资产/在建工程/使用权资产/生产性生物资产/油气资产/无形资产等），来源底稿应可追溯至 H1/H2/H5~H8/I1（投资性房地产、金融工具、长投处置不进 6115）。</p>
+        <p>2. 处置损益 = 处置收入 − 账面净值 − 处置费用 − 相关税费；账面净值 = 原值 − 累计折旧 − 减值准备。</p>
         <p>3. 依据财会〔2017〕30 号，资产处置损益（6115）核算处置非流动资产（不含金融工具、长期股权投资、投资性房地产）产生的利得或损失。</p>
         <p>4. 关注处置审批文件、评估报告、合同/发票等审计证据的完整性，损失项目重点核查减值计提是否充分（CAS 8 号资产减值）。</p>
       </div>
@@ -21,6 +21,16 @@
 
     <el-alert type="info" :closable="false" class="objective-alert"
       title="审计目标：核实各项资产处置的原值、累计折旧、账面净值、处置收入及处置损益计算的准确性与完整性，验证处置损益来源可追溯至各资产底稿。" />
+
+    <el-alert
+      v-if="detail.excludedClassWarning.value"
+      type="error"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      data-testid="h10-excluded-class-warn"
+      :title="detail.excludedClassWarning.value"
+    />
 
     <div class="tab-toolbar">
       <div class="toolbar-left"></div>
@@ -84,8 +94,15 @@
             <span v-else>{{ fmt(row.accumulatedDepreciation) }}</span>
           </template>
         </el-table-column>
+        <el-table-column label="减值准备" width="96" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.impairmentProvision" size="small" :controls="false" style="width:100%"
+              @update:model-value="(v: number) => detail.updateRow(row.id, { impairmentProvision: v ?? 0 })" />
+            <span v-else>{{ fmt(row.impairmentProvision) }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="净值" width="96" align="right">
-          <template #default="{ row }"><span class="formula-cell" title="原值-累计折旧">{{ fmt(row.netBookValue) }}</span></template>
+          <template #default="{ row }"><span class="formula-cell" title="原值−累计折旧−减值准备">{{ fmt(row.netBookValue) }}</span></template>
         </el-table-column>
       </template>
 

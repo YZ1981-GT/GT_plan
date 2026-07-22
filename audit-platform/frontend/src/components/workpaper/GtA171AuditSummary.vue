@@ -9,14 +9,34 @@
     <!-- Toolbar -->
     <div class="gt-a171__toolbar">
       <el-segmented v-model="mode" :options="modeOptions" size="small" />
-      <span class="gt-a171__save-status">
-        <template v-if="saveStatus === 'saving'">
-          <el-icon class="is-loading"><Loading /></el-icon> 保存中...
-        </template>
-        <template v-else-if="saveStatus === 'saved'">✓ 已保存</template>
-        <template v-else-if="saveStatus === 'unsaved'">○ 未保存</template>
-      </span>
+      <div class="gt-a171__toolbar-right">
+        <el-button
+          v-if="mode === '结构化视图'"
+          size="small"
+          type="warning"
+          :loading="consistencyLoading"
+          @click="handleConsistencyCheck"
+        >
+          一致性校验
+        </el-button>
+        <span class="gt-a171__save-status">
+          <template v-if="saveStatus === 'saving'">
+            <el-icon class="is-loading"><Loading /></el-icon> 保存中...
+          </template>
+          <template v-else-if="saveStatus === 'saved'">✓ 已保存</template>
+          <template v-else-if="saveStatus === 'unsaved'">○ 未保存</template>
+        </span>
+      </div>
     </div>
+
+    <!-- Consistency Panel -->
+    <ConsistencyPanel
+      :results="consistencyResults"
+      :loading="consistencyLoading"
+      :visible="consistencyPanelVisible"
+      @navigate-chapter="handleConsistencyNavigate"
+      @close="consistencyPanelVisible = false"
+    />
 
     <!-- Structured View -->
     <div v-if="mode === '结构化视图'" class="gt-a171__layout">
@@ -27,11 +47,12 @@
             v-for="n in 16"
             :key="n"
             class="gt-a171__nav-item"
-            :class="{ 'is-active': activeChapter === n }"
+            :class="{ 'is-active': activeChapter === n, 'is-stale': staleChapterNums.has(n) }"
             @click="scrollToChapter(n)"
           >
             <span class="gt-a171__nav-dot" :class="{ 'is-complete': completionStatus[n] }" />
             <span class="gt-a171__nav-title">{{ getNavLabel(n) }}</span>
+            <el-tag v-if="staleChapterNums.has(n)" size="small" type="warning" effect="plain" class="gt-a171__stale-tag">过期</el-tag>
           </li>
         </ul>
       </nav>
@@ -66,6 +87,7 @@
               <template #title>
                 <div class="gt-a171__chapter-header">
                   <span class="gt-a171__chapter-title">{{ chapters[String(n)]?.title }}</span>
+                  <el-tag v-if="staleChapterNums.has(n)" size="small" type="warning" effect="plain">上游已更新</el-tag>
                   <!-- Cross references -->
                   <GtIndexChip
                     v-if="n === 6 && crossReferences.b50_wp_id"
@@ -81,7 +103,6 @@
                     v-if="n === 14 && crossReferences.a115_wp_id"
                     :value="'A1-15'"
                     :context-project-id="props.projectId"
-                  />
                   />
                   <el-button text size="small" class="gt-a171__review-btn" @click.stop="openReview(n)">💬</el-button>
                 </div>
@@ -145,6 +166,14 @@
                   @input="(v: string) => updateTextarea(n, v)"
                 />
                 <div class="gt-a171__btn-group">
+                  <el-tooltip v-if="canPullChapter(n)" content="从关联底稿拉取摘要并填入本章" placement="top">
+                    <el-button
+                      size="small"
+                      type="primary"
+                      :loading="pullingChapter === n"
+                      @click.stop="handleChapterPull(n)"
+                    >⬇ 一键拉取</el-button>
+                  </el-tooltip>
                   <el-tooltip v-if="CHAPTER_TEMPLATE[n]" content="从源模板骨架预填（即时，无需网络）" placement="top">
                     <el-button size="small" class="gt-a171__prefill-btn" @click.stop="handleTemplatePrefill(n)">📝 模板预填</el-button>
                   </el-tooltip>
@@ -166,6 +195,14 @@
                   <GtIndexChip v-if="n === 10" value="A15" :context-project-id="props.projectId" />
                   <GtIndexChip v-if="n === 11" value="A11" :context-project-id="props.projectId" />
                   <GtIndexChip v-if="n === 12" value="A17-2-1" :context-project-id="props.projectId" />
+                  <el-button
+                    v-if="canPullChapter(n)"
+                    size="small"
+                    type="primary"
+                    text
+                    :loading="pullingChapter === n"
+                    @click.stop="handleChapterPull(n)"
+                  >⬇ 一键拉取</el-button>
                 </div>
                 <el-radio-group
                   :model-value="(chapters[String(n)] as any).answer"
@@ -232,6 +269,9 @@ import { useA171AuditSummary, CHAPTER_TEMPLATE, CHAPTER_GUIDANCE } from './compo
 import { useA171Navigation } from './composables/useA171Navigation'
 import type { A171RenderData } from './composables/useA171AuditSummary'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { api } from '@/services/apiProxy'
+import ConsistencyPanel from './a17/ConsistencyPanel.vue'
+import type { ConsistencyResult } from './a17/ConsistencyPanel.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtIndexChip = defineAsyncComponent(() => import('./GtIndexChip.vue'))
@@ -290,6 +330,117 @@ function scrollToChapter(n: number) {
 
 // ─── Collapse State: all collapsed by default ───
 const expandedChapters = ref<number[]>([])
+
+// ─── Consistency check ───
+const consistencyResults = ref<ConsistencyResult[]>([])
+const consistencyLoading = ref(false)
+const consistencyPanelVisible = ref(false)
+
+async function handleConsistencyCheck() {
+  if (!props.wpId || !props.projectId) {
+    ElMessage.warning('缺少项目或底稿信息，无法校验')
+    return
+  }
+  await flushPendingSaves()
+  consistencyLoading.value = true
+  consistencyPanelVisible.value = true
+  consistencyResults.value = []
+  try {
+    const result = await api.post<any>('/api/a17/consistency-check', {
+      project_id: props.projectId,
+      wp_id: props.wpId,
+    })
+    consistencyResults.value = result?.results || []
+    if ((result?.results || []).length === 0) {
+      ElMessage.success('一致性校验通过')
+    }
+  } catch {
+    ElMessage.error('一致性校验失败')
+    consistencyPanelVisible.value = false
+  } finally {
+    consistencyLoading.value = false
+  }
+}
+
+function handleConsistencyNavigate(chapterId: string) {
+  // A17-1-ch12 → 12；兼容 a171-ch12-content
+  const m = chapterId.match(/ch(\d{1,2})/i)
+  if (m) {
+    const n = parseInt(m[1], 10)
+    if (n >= 1 && n <= 16) {
+      scrollToChapter(n)
+      // 展开后聚焦章节内容区
+      import('vue').then(({ nextTick }) => {
+        nextTick(() => {
+          const el = document.getElementById(`a171-chapter-${n}`)
+          const focus = el?.querySelector('textarea, .el-textarea__inner, .el-input__inner') as HTMLElement | null
+          focus?.focus?.()
+          el?.classList.add('gt-a171__chapter-flash')
+          setTimeout(() => el?.classList.remove('gt-a171__chapter-flash'), 1600)
+        })
+      })
+    }
+  }
+}
+
+/** 支持后端 pull 的章节（与 a17_summary_service 对齐） */
+const PULLABLE_CHAPTERS = new Set([2, 5, 8, 9, 10, 11, 12, 13])
+const pullingChapter = ref<number | null>(null)
+const staleChapterNums = ref<Set<number>>(new Set())
+
+async function loadChapterStale() {
+  if (!props.wpId || !props.projectId) {
+    staleChapterNums.value = new Set()
+    return
+  }
+  try {
+    const data = await api.get<any>('/api/a17/chapters/stale-check', {
+      params: { project_id: props.projectId, wp_id: props.wpId },
+      _silent: true,
+    } as any)
+    const nums = new Set<number>()
+    for (const c of data?.stale_chapters || []) {
+      if (c.chapter_num) nums.add(Number(c.chapter_num))
+    }
+    staleChapterNums.value = nums
+  } catch {
+    staleChapterNums.value = new Set()
+  }
+}
+
+function canPullChapter(n: number): boolean {
+  return PULLABLE_CHAPTERS.has(n) && !!props.projectId && !!props.wpId
+}
+
+async function handleChapterPull(n: number) {
+  if (!canPullChapter(n)) return
+  const chapterId = `A17-1-ch${String(n).padStart(2, '0')}`
+  pullingChapter.value = n
+  try {
+    const result = await api.post<any>(`/api/a17/chapters/${chapterId}/pull`, {
+      project_id: props.projectId,
+      wp_id: props.wpId,
+    })
+    const content = (result?.content || '').trim()
+    if (!content) {
+      ElMessage.info(result?.message || '暂无可拉取的数据')
+      return
+    }
+    const ch = chapters.value[String(n)] as any
+    if (ch?.type === 'yn') {
+      const answer = ch.answer || 'Y'
+      updateYn(n, answer, content)
+    } else {
+      updateTextarea(n, content)
+    }
+    ElMessage.success(`第${n}章已拉取（来源：${result?.source_label || '关联底稿'}）`)
+    await loadChapterStale()
+  } catch (err: any) {
+    ElMessage.error('拉取失败: ' + (err?.message || ''))
+  } finally {
+    pullingChapter.value = null
+  }
+}
 
 // ─── Signature visibility by business_category ───
 const visibleSignatureRows = computed(() => {
@@ -487,7 +638,7 @@ async function handleAiChapterFill(chapterNum: number) {
   }
 }
 
-onMounted(() => { checkOOHealth(); selfLoad() })
+onMounted(() => { checkOOHealth(); selfLoad(); loadChapterStale() })
 onBeforeUnmount(() => { flushPendingSaves() })
 defineExpose({ reload: () => flushPendingSaves() })
 </script>
@@ -495,6 +646,7 @@ defineExpose({ reload: () => flushPendingSaves() })
 <style scoped>
 .gt-a171 { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .gt-a171__toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.gt-a171__toolbar-right { display: flex; align-items: center; gap: 12px; }
 .gt-a171__save-status { font-size: 12px; color: #909399; display: inline-flex; align-items: center; gap: 4px; }
 
 /* Layout: left nav + right content */
@@ -528,6 +680,8 @@ defineExpose({ reload: () => flushPendingSaves() })
 }
 .gt-a171__nav-item:hover { background-color: #f5f7fa; }
 .gt-a171__nav-item.is-active { background-color: #ecf5ff; color: #409eff; font-weight: 500; }
+.gt-a171__nav-item.is-stale .gt-a171__nav-title { color: #e6a23c; }
+.gt-a171__stale-tag { margin-left: 4px; flex-shrink: 0; }
 
 .gt-a171__nav-dot {
   width: 6px;
@@ -552,6 +706,11 @@ defineExpose({ reload: () => flushPendingSaves() })
 /* Chapters */
 .gt-a171__chapters { border: none; }
 .gt-a171__chapter-item { margin-bottom: 8px; }
+.gt-a171__chapter-item.gt-a171__chapter-flash :deep(.el-collapse-item__wrap) {
+  outline: 2px solid #e6a23c;
+  outline-offset: 2px;
+  transition: outline 0.3s;
+}
 .gt-a171__chapter-header { display: flex; align-items: center; gap: 8px; width: 100%; }
 .gt-a171__chapter-title { font-size: 14px; font-weight: 600; color: #303133; }
 

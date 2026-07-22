@@ -36,24 +36,6 @@
       <p v-if="hasWarnConclusions" class="board-hint">存在 B/C 口径或未填结论，请点击标签跳转补全说明。</p>
     </div>
 
-    <el-table :data="indexRows" border size="small" style="font-size:13px">
-      <el-table-column label="序号" prop="seq" width="56" align="center" />
-      <el-table-column label="索引" prop="code" width="100" />
-      <el-table-column label="底稿名称" min-width="220">
-        <template #default="{ row }">
-          <span>{{ row.name }}</span>
-          <GtIndexChip v-if="row.applicable && jumpToSection" :label="row.code" :prevent-navigate="true" :validate="false"
-            class="index-chip" @click="jumpToSection(row.sheetLabel)" />
-        </template>
-      </el-table-column>
-      <el-table-column label="状态" width="88" align="center">
-        <template #default="{ row }">
-          <el-tag v-if="row.applicable && row.done" size="small" type="success">已编</el-tag>
-          <el-tag v-else-if="row.applicable" size="small" type="info">待编</el-tag>
-          <span v-else>—</span>
-        </template>
-      </el-table-column>
-    </el-table>
     <details class="methodology-hint">
       <summary>编制提示</summary>
       <p>推荐工作流：G8A 程序表 → G8-2 明细 → G8-1「从明细带入未审」↔ TB → G8-4 公允测试（Level3 可查阅「参考中证协」；差异可推送 G8-3）→ G8-3 调整回写 G8-1 → G8-5 指定适当性 → G8-6 凭证 → 附注披露。勿重复推送同一公允差异至 G8-3。</p>
@@ -63,7 +45,6 @@
 
 <script setup lang="ts">
 import { computed, inject } from 'vue'
-import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import { G8_INDEX_ROWS, resolveG8SheetLabel, isG8SheetComplete } from '../../composables/g8SheetLabels'
 import { jumpToG8Sheet, G8A_DESIGNATION_MARK_KEY, G8A_FV_MARK_KEY, G8A_VOUCHER_MARK_KEY } from '../../composables/g8CrossHelpers'
@@ -149,7 +130,6 @@ function goSheet(code: string) {
 .index-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
 .title { margin: 0; }
 .progress-wrap { flex: 1; min-width: 200px; }
-.index-chip { margin-left: 8px; }
 .g8a-marks { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; font-size: 12px; }
 .marks-label { color: #909399; }
 .conclusion-board {

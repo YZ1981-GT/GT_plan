@@ -55,9 +55,19 @@ function _getNum(val: any): number {
  */
 function _getResponseNum(allResponses: Map<string, any>, itemId: string): number {
   const resp = allResponses.get(itemId)
-  if (!resp) return 0
-  const raw = resp.remark ?? resp.conclusion
+  if (resp == null) return 0
+  if (typeof resp === 'number' || typeof resp === 'string') return _getNum(resp)
+  const raw = resp.remark ?? resp.conclusion ?? resp.value
   return _getNum(raw)
+}
+
+/** 多键兜底（按优先级取第一个非零） */
+function _getResponseNumAny(allResponses: Map<string, any>, keys: string[]): number {
+  for (const k of keys) {
+    const n = _getResponseNum(allResponses, k)
+    if (n !== 0) return n
+  }
+  return 0
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -76,8 +86,14 @@ export function useH9CrossSheet(allResponses: Ref<Map<string, any>>) {
    */
   const adjudicationVsDetail: ComputedRef<CrossSheetCheck> = computed(() => {
     const map = allResponses.value
-    const adjudicationTotal = _getResponseNum(map, 'H9-1-liability-total-audited')
-    const detailTotal = _getResponseNum(map, 'H9-2-detail-total-audited')
+    const adjudicationTotal = _getResponseNumAny(map, [
+      'H9-1-liability-total-audited',
+      'H9-1-liability-audited',
+    ])
+    const detailTotal = _getResponseNumAny(map, [
+      'H9-2-detail-total-audited',
+      'H9-2-total-end',
+    ])
     const diff = adjudicationTotal - detailTotal
     return {
       diff,
@@ -98,18 +114,30 @@ export function useH9CrossSheet(allResponses: Ref<Map<string, any>>) {
    * diff = h9Initial - expected
    * isConsistent: |diff| ≤ 1（允许±1元尾差容差，四舍五入差异）
    *
-   * 数据源：
-   * - H9-initial-recognition: H9租赁负债初始确认金额
-   * - H9-h8-initial-measurement: H8初始计量（从H8-1或H8-2汇总跨底稿传入）
-   * - H9-h8-direct-cost: H8初始直接费用
-   * - H9-h8-incentive: H8租赁激励
+   * 数据源（多键兜底，与 H8 CrossSheet / H8-2 persist 别名对齐）：
+   * - H9：H9-1-initial-liability / H9-initial-recognition
+   * - H8→H9 镜像：H9-h8-*（由 h8:asset-updated 落库）
+   * - 同包兜底：H8-initial-measurement / H8-direct-cost-total / H8-incentive-total
    */
   const h9VsH8Linkage: ComputedRef<H9H8LinkageCheck> = computed(() => {
     const map = allResponses.value
-    const h9Initial = _getResponseNum(map, 'H9-initial-recognition')
-    const h8Initial = _getResponseNum(map, 'H9-h8-initial-measurement')
-    const directCost = _getResponseNum(map, 'H9-h8-direct-cost')
-    const incentive = _getResponseNum(map, 'H9-h8-incentive')
+    const h9Initial = _getResponseNumAny(map, [
+      'H9-1-initial-liability',
+      'H9-initial-recognition',
+    ])
+    const h8Initial = _getResponseNumAny(map, [
+      'H9-h8-initial-measurement',
+      'H8-initial-measurement',
+      'H8-2-initial-total',
+    ])
+    const directCost = _getResponseNumAny(map, [
+      'H9-h8-direct-cost',
+      'H8-direct-cost-total',
+    ])
+    const incentive = _getResponseNumAny(map, [
+      'H9-h8-incentive',
+      'H8-incentive-total',
+    ])
 
     // CAS21: H9初始确认 = H8初始 - 直接费用 + 激励
     const expected = h8Initial - directCost + incentive
@@ -136,17 +164,20 @@ export function useH9CrossSheet(allResponses: Ref<Map<string, any>>) {
   // ═══════════════════════════════════════════════════════════════════════════
 
   /**
-   * H9-4 摊销表全部期数利息费用合计 与 H9-1 审定表本期利息费用的交叉验证。
-   * 摊销表当期确认的利息费用应等于审定表中的利息支出审定数。
+   * H9 摊销表本期利息 与 H9-1 审定表本期利息费用的交叉验证。
+   * 优先读 H9-amort-current-interest；兼容旧键 H9-amort-total-interest。
    *
-   * 公式：diff = H9-4摊销表本期利息合计 - H9-1审定表本期利息
+   * 公式：diff = 摊销表本期利息 - H9-1审定表本期利息
    * isMatch: |diff| <= 1
    */
   const amortizationVsAdjudication: ComputedRef<CrossSheetCheck> = computed(() => {
     const map = allResponses.value
-    const amortTotalInterest = _getResponseNum(map, 'H9-amort-total-interest')
+    const hasCurrent = map.has('H9-amort-current-interest')
+    const amortInterest = hasCurrent
+      ? _getResponseNum(map, 'H9-amort-current-interest')
+      : _getResponseNum(map, 'H9-amort-total-interest')
     const adjInterestExpense = _getResponseNum(map, 'H9-1-interest-expense-audited')
-    const diff = amortTotalInterest - adjInterestExpense
+    const diff = amortInterest - adjInterestExpense
     return {
       diff,
       isMatch: Math.abs(diff) <= 1,
@@ -159,17 +190,27 @@ export function useH9CrossSheet(allResponses: Ref<Map<string, any>>) {
 
   /** H9-1 审定表租赁负债审定合计 */
   const adjudicationTotal = computed<number>(() => {
-    return _getResponseNum(allResponses.value, 'H9-1-liability-total-audited')
+    return _getResponseNumAny(allResponses.value, [
+      'H9-1-liability-total-audited',
+      'H9-1-liability-audited',
+    ])
   })
 
   /** H9-2 明细表审定合计 */
   const detailTotal = computed<number>(() => {
-    return _getResponseNum(allResponses.value, 'H9-2-detail-total-audited')
+    return _getResponseNumAny(allResponses.value, [
+      'H9-2-detail-total-audited',
+      'H9-2-total-end',
+    ])
   })
 
-  /** H9-4 摊销表本期利息合计 */
+  /** H9 摊销表本期利息 */
   const amortInterestTotal = computed<number>(() => {
-    return _getResponseNum(allResponses.value, 'H9-amort-total-interest')
+    const map = allResponses.value
+    if (map.has('H9-amort-current-interest')) {
+      return _getResponseNum(map, 'H9-amort-current-interest')
+    }
+    return _getResponseNum(map, 'H9-amort-total-interest')
   })
 
   /** H9-1 审定表本期利息费用审定数 */

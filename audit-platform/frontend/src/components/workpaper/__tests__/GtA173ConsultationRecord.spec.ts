@@ -126,10 +126,10 @@ describe('GtA173ConsultationRecord.vue', () => {
   // ─── Meta select ───
 
   describe('meta select', () => {
-    it('renders meta grid with 4 fields', async () => {
+    it('renders meta grid with 6 fields', async () => {
       const wrapper = await mountComponent()
       const metaItems = wrapper.findAll('.gt-a173__meta-item')
-      expect(metaItems.length).toBe(4)
+      expect(metaItems.length).toBe(6)
     })
 
     it('renders el-select for 咨询类型', async () => {

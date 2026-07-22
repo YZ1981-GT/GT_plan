@@ -1,33 +1,21 @@
 /**
- * useI2Detail — I2-2 开发支出明细表 composable
+ * useI2Detail — I2-2 开发支出明细表
  *
- * 61列宽表拆分为4区段Tab：
- *   Segment0 基础 (10 cols): 项目名/编号/立项日/阶段/负责人/起止日期/预算/进度/资本化起点/状态
- *   Segment1 本期投入 (15 cols): 材料/人工/折旧/摊销/其他/合计 × (本期/累计) + 投入验证
- *   Segment2 资本化 (12 cols): 资本化起点日期/金额期初/本期增加/本期减少/期末/转入I1/转入日期/摊销/减值/净值/完工比例/验收日
- *   Segment3 期末汇总 (10 cols): 审定期末/调整后余额/同比变动/预期值/差异/超标标记/结论/备注
+ * 对齐致同 Excel「开发支出明细表 I2-2」滚动勾稽：
+ *   未审数(期初/增加/减少转无形·转损益/期末)
+ *   → 期初调整 + 账项调整(增/减)
+ *   → 审定数(公式列) → 与无形资产/存货勾稽差异 + 研发进度
  *
- * 核心功能：
- * - Tab切换行同步（activeRowIndex跨4区段共享）
- * - 公式自动计算：
- *   · 投入合计(本期) = 材料+人工+折旧+摊销+其他
- *   · 投入合计(累计) = 材料累计+人工累计+折旧累计+摊销累计+其他累计
- *   · 资本化期末 = 期初 + 增加 - 减少 (calcAssetEndBalance)
- *   · 净值 = 期末 - 摊销 - 减值 (calcNetValue)
- *   · 差异 = 审定期末 - 预期值
- * - 合计行（不可编辑）：每列numeric SUM (calcSubtotal)
- * - 联动审定表I2-1（交叉验证）
- * - 动态行CRUD（ElMessageBox.prompt输入项目名称）
- * - 导入导出支持
- * - 持久化：rows JSON → checklist_responses item_id "I2-2-rows"
+ * Excel 公式：
+ *   G = B+C-E-F
+ *   L = B+H ; M = C+I ; N = E+J ; O = F+K ; P = L+M-N-O ; R = P-Q
  *
- * Spec: .kiro/specs/i2-development-expenditure/
- * Task: 3.4
- * Requirements: 3.1-3.4
+ * 联动：
+ *   - 从 I2-3 调整分录汇总同步账项调整列（按项目名匹配说明）
+ *   - 兼容旧字段 capBeginAmount/capIncrease/transferToI1/capEndAmount
+ *   - 附加「本期投入」「项目基础」区段供检查表引用
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import type { ChecklistItem } from './useI2FormData'
 import {
   calcAssetEndBalance,
   calcNetValue,
@@ -38,240 +26,397 @@ import {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** I2-2 明细行完整结构（61列拆分到4区段） */
+export const I2_INCREASE_METHODS = ['内部开发支出', '其他增加', ''] as const
+
 export interface I2DetailRow {
   rowId: string
 
-  // ── Segment0 基础 (10 cols) ──
-  projectName: string              // 项目名称
-  projectCode: string              // 项目编号
-  approvalDate: string             // 立项日期（YYYY-MM-DD）
-  phase: string                    // 阶段（研究/开发/已资本化）
-  manager: string                  // 负责人
-  startDate: string                // 起始日期
-  endDate: string                  // 终止日期
-  budget: number                   // 预算金额
-  progress: number                 // 进度（0~100%）
-  capitalizationStart: string      // 资本化起点日期
-  status: string                   // 状态（进行中/已完成/已暂停/已终止）
+  // ── Excel 主表：项目 ──
+  projectName: string
+  projectCode: string
+  /** 本期增加方式（内部开发支出/其他增加） */
+  increaseMethod: string
 
-  // ── Segment1 本期投入 (15 cols) ──
-  materialCurrent: number          // 材料投入-本期
-  materialAccum: number            // 材料投入-累计
-  laborCurrent: number             // 人工投入-本期
-  laborAccum: number               // 人工投入-累计
-  depreciationCurrent: number      // 折旧投入-本期
-  depreciationAccum: number        // 折旧投入-累计
-  amortizationCurrent: number      // 摊销投入-本期
-  amortizationAccum: number        // 摊销投入-累计
-  otherCurrent: number             // 其他投入-本期
-  otherAccum: number               // 其他投入-累计
-  totalCurrent: number             // 投入合计-本期（公式）
-  totalAccum: number               // 投入合计-累计（公式）
-  // 3 extra for alignment: investmentRemark + validationFlag + investmentSource
-  investmentRemark: string         // 投入说明
-  validationFlag: string           // 验证标记（✓/✗）
-  investmentSource: string         // 投入来源
+  // ── 未审数 B~G ──
+  unadjOpening: number
+  unadjIncrease: number
+  unadjDecToIA: number
+  unadjDecToPL: number
+  /** 公式 G = B+C-E-F */
+  unadjEnding: number
 
-  // ── Segment2 资本化 (12 cols) ──
-  capStartDate: string             // 资本化起点日期（联动I2-6）
-  capBeginAmount: number           // 资本化金额期初
-  capIncrease: number              // 本期增加
-  capDecrease: number              // 本期减少
-  capEndAmount: number             // 期末（公式：期初+增加-减少）
-  transferToI1: number             // 转入I1金额
-  transferDate: string             // 转入日期
-  capAmortization: number          // 摊销
-  capImpairment: number            // 减值
-  capNetValue: number              // 净值（公式：期末-摊销-减值）
-  completionRate: number           // 完工比例（0~100%）
-  acceptanceDate: string           // 验收日
+  // ── 期初调整 H + 账项调整 I~K ──
+  openingAdj: number
+  ajeIncrease: number
+  ajeDecToIA: number
+  ajeDecToPL: number
 
-  // ── Segment3 期末汇总 (10 cols) ──
-  auditedEnd: number               // 审定期末
-  adjustedBalance: number          // 调整后余额
-  yoyChange: number | null         // 同比变动率（公式）
-  expectedValue: number            // 预期值
-  variance: number                 // 差异（公式：审定期末-预期值）
-  exceedFlag: string               // 超标标记（✓/空）
-  conclusion: string               // 结论
-  priorEnd: number                 // 上期期末（计算同比用）
-  remark: string                   // 备注
-  adjReference: string             // 审定表引用编号
+  // ── 审定数 L~P（公式）──
+  auditedOpening: number
+  auditedIncrease: number
+  auditedDecToIA: number
+  auditedDecToPL: number
+  auditedEnding: number
+
+  // ── 核对 Q~T ──
+  relatedIAAuditedEnd: number
+  /** 公式 R = P-Q */
+  diffVsIA: number
+  rdProgress: string
+  remark: string
+
+  // ── 兼容旧字段 / 跨 sheet ──
+  approvalDate: string
+  phase: string
+  manager: string
+  startDate: string
+  endDate: string
+  budget: number
+  progress: number
+  capitalizationStart: string
+  status: string
+  materialCurrent: number
+  materialAccum: number
+  laborCurrent: number
+  laborAccum: number
+  depreciationCurrent: number
+  depreciationAccum: number
+  amortizationCurrent: number
+  amortizationAccum: number
+  otherCurrent: number
+  otherAccum: number
+  totalCurrent: number
+  totalAccum: number
+  investmentRemark: string
+  validationFlag: string
+  investmentSource: string
+  capStartDate: string
+  /** @deprecated alias → unadjOpening */
+  capBeginAmount: number
+  /** @deprecated alias → unadjIncrease */
+  capIncrease: number
+  /** @deprecated = unadjDecToIA + unadjDecToPL */
+  capDecrease: number
+  /** @deprecated alias → unadjEnding */
+  capEndAmount: number
+  /** @deprecated alias → auditedDecToIA / unadjDecToIA */
+  transferToI1: number
+  transferDate: string
+  transferAssetName: string
+  capAmortization: number
+  capImpairment: number
+  capNetValue: number
+  completionRate: number
+  acceptanceDate: string
+  /** @deprecated alias → auditedEnding */
+  auditedEnd: number
+  adjustedBalance: number
+  yoyChange: number | null
+  expectedValue: number
+  variance: number
+  exceedFlag: string
+  conclusion: string
+  priorEnd: number
+  adjReference: string
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+export interface I2AjeLinkage {
+  i23AjeNet: number
+  detailAjeNet: number
+  diff: number
+  hasWarning: boolean
+  i23RowCount: number
+}
+
+export type I2DetailColType = 'text' | 'number' | 'formula' | 'date' | 'select'
+
+export interface I2DetailColumn {
+  key: string
+  label: string
+  width: number
+  editable: boolean
+  type: I2DetailColType
+  tooltip?: string
+  options?: readonly string[]
+  group?: string
+  emphasis?: boolean
+}
 
 const ITEM_ID_ROWS = 'I2-2-rows'
-
+const I23_ROWS_KEY = 'I2-3-rows'
+const LEGACY_I23_KEY = 'I2-3-entries'
 const PHASE_OPTIONS = ['研究', '开发', '已资本化']
 const STATUS_OPTIONS = ['进行中', '已完成', '已暂停', '已终止']
+const TOL = 0.01
 
-// ─── Composable ──────────────────────────────────────────────────────────────
+function _num(v: unknown): number {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+
+function _str(v: unknown): string {
+  return v == null ? '' : String(v)
+}
+
+function generateRowId(): string {
+  return `i22-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
+}
+
+function emptyRow(partial?: Partial<I2DetailRow>): I2DetailRow {
+  const row: I2DetailRow = {
+    rowId: generateRowId(),
+    projectName: '',
+    projectCode: '',
+    increaseMethod: '内部开发支出',
+    unadjOpening: 0,
+    unadjIncrease: 0,
+    unadjDecToIA: 0,
+    unadjDecToPL: 0,
+    unadjEnding: 0,
+    openingAdj: 0,
+    ajeIncrease: 0,
+    ajeDecToIA: 0,
+    ajeDecToPL: 0,
+    auditedOpening: 0,
+    auditedIncrease: 0,
+    auditedDecToIA: 0,
+    auditedDecToPL: 0,
+    auditedEnding: 0,
+    relatedIAAuditedEnd: 0,
+    diffVsIA: 0,
+    rdProgress: '',
+    remark: '',
+    approvalDate: '',
+    phase: '',
+    manager: '',
+    startDate: '',
+    endDate: '',
+    budget: 0,
+    progress: 0,
+    capitalizationStart: '',
+    status: '进行中',
+    materialCurrent: 0,
+    materialAccum: 0,
+    laborCurrent: 0,
+    laborAccum: 0,
+    depreciationCurrent: 0,
+    depreciationAccum: 0,
+    amortizationCurrent: 0,
+    amortizationAccum: 0,
+    otherCurrent: 0,
+    otherAccum: 0,
+    totalCurrent: 0,
+    totalAccum: 0,
+    investmentRemark: '',
+    validationFlag: '',
+    investmentSource: '',
+    capStartDate: '',
+    capBeginAmount: 0,
+    capIncrease: 0,
+    capDecrease: 0,
+    capEndAmount: 0,
+    transferToI1: 0,
+    transferDate: '',
+    transferAssetName: '',
+    capAmortization: 0,
+    capImpairment: 0,
+    capNetValue: 0,
+    completionRate: 0,
+    acceptanceDate: '',
+    auditedEnd: 0,
+    adjustedBalance: 0,
+    yoyChange: null,
+    expectedValue: 0,
+    variance: 0,
+    exceedFlag: '',
+    conclusion: '',
+    priorEnd: 0,
+    adjReference: '',
+  }
+  Object.assign(row, partial)
+  return row
+}
+
+/** 导出纯函数供单测 */
+export function recalcI2DetailRow(row: I2DetailRow): void {
+  // 兼容：若只改了旧字段，回填 Excel 未审列
+  if (!row.unadjOpening && row.capBeginAmount) row.unadjOpening = row.capBeginAmount
+  if (!row.unadjIncrease && row.capIncrease) row.unadjIncrease = row.capIncrease
+  if (!row.unadjDecToIA && row.transferToI1) row.unadjDecToIA = row.transferToI1
+  if (!row.unadjDecToPL && row.capDecrease && !row.unadjDecToIA) {
+    // 旧版只有合计数：全部视为转损益以外的减少，优先保留 transfer
+    row.unadjDecToPL = Math.max(0, row.capDecrease - row.unadjDecToIA)
+  }
+
+  row.unadjEnding = calcAssetEndBalance(
+    row.unadjOpening,
+    row.unadjIncrease,
+    row.unadjDecToIA + row.unadjDecToPL,
+  )
+
+  row.auditedOpening = row.unadjOpening + row.openingAdj
+  row.auditedIncrease = row.unadjIncrease + row.ajeIncrease
+  row.auditedDecToIA = row.unadjDecToIA + row.ajeDecToIA
+  row.auditedDecToPL = row.unadjDecToPL + row.ajeDecToPL
+  row.auditedEnding = calcAssetEndBalance(
+    row.auditedOpening,
+    row.auditedIncrease,
+    row.auditedDecToIA + row.auditedDecToPL,
+  )
+  row.diffVsIA = row.auditedEnding - row.relatedIAAuditedEnd
+
+  // 回写别名供 I2-6/I2-7/跨 sheet（唯一写回点；新代码请读写 unadj*/audited*）
+  syncLegacyAliases(row)
+
+  row.totalCurrent = calcSubtotal([
+    row.materialCurrent, row.laborCurrent, row.depreciationCurrent,
+    row.amortizationCurrent, row.otherCurrent,
+  ])
+  row.totalAccum = calcSubtotal([
+    row.materialAccum, row.laborAccum, row.depreciationAccum,
+    row.amortizationAccum, row.otherAccum,
+  ])
+  row.capNetValue = calcNetValue(row.capEndAmount, row.capAmortization + row.capImpairment)
+  row.yoyChange = calcChangeRate(row.auditedEnd, row.priorEnd)
+  row.variance = calcVarianceFromExpected(row.auditedEnd, row.expectedValue)
+}
+
+/** 将规范字段同步到遗留别名，避免双轨手工维护 */
+export function syncLegacyAliases(row: I2DetailRow): void {
+  row.capBeginAmount = row.unadjOpening
+  row.capIncrease = row.unadjIncrease
+  row.capDecrease = row.unadjDecToIA + row.unadjDecToPL
+  row.capEndAmount = row.unadjEnding
+  row.transferToI1 = row.auditedDecToIA
+  row.auditedEnd = row.auditedEnding
+  row.adjustedBalance = row.auditedEnding
+  row.progress = row.progress || 0
+  if (row.rdProgress && !row.completionRate) {
+    const m = String(row.rdProgress).match(/(\d+(?:\.\d+)?)\s*%?/)
+    if (m) row.completionRate = Number(m[1])
+  }
+}
+
+export function normalizeI2DetailRow(raw: any): I2DetailRow {
+  const row = emptyRow({
+    rowId: _str(raw.rowId) || generateRowId(),
+    projectName: _str(raw.projectName),
+    projectCode: _str(raw.projectCode || raw.projectNo),
+    increaseMethod: _str(raw.increaseMethod) || '内部开发支出',
+    unadjOpening: _num(raw.unadjOpening ?? raw.capBeginAmount ?? raw.capitalizedBegin),
+    unadjIncrease: _num(raw.unadjIncrease ?? raw.capIncrease ?? raw.capitalizedIncrease),
+    unadjDecToIA: _num(raw.unadjDecToIA ?? raw.transferToI1 ?? raw.transferToIntangible),
+    unadjDecToPL: _num(raw.unadjDecToPL),
+    openingAdj: _num(raw.openingAdj),
+    ajeIncrease: _num(raw.ajeIncrease),
+    ajeDecToIA: _num(raw.ajeDecToIA),
+    ajeDecToPL: _num(raw.ajeDecToPL),
+    relatedIAAuditedEnd: _num(raw.relatedIAAuditedEnd),
+    rdProgress: _str(raw.rdProgress),
+    remark: _str(raw.remark),
+    approvalDate: _str(raw.approvalDate),
+    phase: _str(raw.phase),
+    manager: _str(raw.manager),
+    startDate: _str(raw.startDate),
+    endDate: _str(raw.endDate),
+    budget: _num(raw.budget),
+    progress: _num(raw.progress),
+    capitalizationStart: _str(raw.capitalizationStart || raw.capStartDate),
+    status: _str(raw.status) || '进行中',
+    materialCurrent: _num(raw.materialCurrent ?? raw.materialInput),
+    materialAccum: _num(raw.materialAccum),
+    laborCurrent: _num(raw.laborCurrent ?? raw.laborInput),
+    laborAccum: _num(raw.laborAccum),
+    depreciationCurrent: _num(raw.depreciationCurrent ?? raw.depreciationInput),
+    depreciationAccum: _num(raw.depreciationAccum),
+    amortizationCurrent: _num(raw.amortizationCurrent),
+    amortizationAccum: _num(raw.amortizationAccum),
+    otherCurrent: _num(raw.otherCurrent ?? raw.otherInput),
+    otherAccum: _num(raw.otherAccum),
+    investmentRemark: _str(raw.investmentRemark),
+    validationFlag: _str(raw.validationFlag),
+    investmentSource: _str(raw.investmentSource),
+    capStartDate: _str(raw.capStartDate || raw.capitalizationStart),
+    capBeginAmount: _num(raw.capBeginAmount),
+    capIncrease: _num(raw.capIncrease),
+    capDecrease: _num(raw.capDecrease ?? raw.capitalizedDecrease),
+    transferToI1: _num(raw.transferToI1 ?? raw.transferToIntangible),
+    transferDate: _str(raw.transferDate),
+    transferAssetName: _str(raw.transferAssetName),
+    capAmortization: _num(raw.capAmortization),
+    capImpairment: _num(raw.capImpairment),
+    completionRate: _num(raw.completionRate),
+    acceptanceDate: _str(raw.acceptanceDate),
+    expectedValue: _num(raw.expectedValue),
+    exceedFlag: _str(raw.exceedFlag),
+    conclusion: _str(raw.conclusion),
+    priorEnd: _num(raw.priorEnd),
+    adjReference: _str(raw.adjReference),
+  })
+  // 旧数据仅有 capDecrease：拆到转无形后剩余进转损益
+  if (!raw.unadjDecToPL && raw.capDecrease != null) {
+    const dec = _num(raw.capDecrease)
+    if (dec > row.unadjDecToIA) row.unadjDecToPL = dec - row.unadjDecToIA
+  }
+  recalcI2DetailRow(row)
+  return row
+}
+
+/** 行级账项调整净额（对 1717：增 - 减） */
+export function rowAjeNet(row: I2DetailRow): number {
+  return row.ajeIncrease - row.ajeDecToIA - row.ajeDecToPL
+}
 
 export function useI2Detail(params: {
-  allResponses: Ref<Map<string, ChecklistItem>>
+  allResponses: Ref<Map<string, any>>
   saveResponses: (sheetCode: string, data: Record<string, any>) => Promise<void>
-  /** 审定表期末合计（用于交叉验证） */
   adjEndSubtotal?: Ref<number>
 }) {
   const { allResponses, saveResponses } = params
 
-  // ─── State ─────────────────────────────────────────────────────────────────
-
-  /** 明细行数据 */
   const rows = ref<I2DetailRow[]>([])
+  const activeSegment = ref(0)
+  const activeRowIndex = ref(-1)
 
-  /** 当前激活的区段索引 0-3 */
-  const activeSegment = ref<number>(0)
-
-  /** 当前选中行索引（跨Tab同步） */
-  const activeRowIndex = ref<number>(-1)
-
-  // ─── Load from allResponses ────────────────────────────────────────────────
+  function _getJson(key: string): any {
+    const item = allResponses.value.get(key)
+    if (!item) return null
+    const raw = item.remark ?? item.conclusion ?? item
+    if (raw == null) return null
+    if (typeof raw === 'object') return raw
+    try { return JSON.parse(raw as string) } catch { return null }
+  }
 
   function _loadRows(): void {
-    const item = allResponses.value.get(ITEM_ID_ROWS)
-    const raw = item?.remark ?? item?.conclusion
-    if (!raw) {
-      rows.value = []
-      return
-    }
-    try {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        rows.value = parsed.map(_normalizeRow)
-      } else {
-        rows.value = []
-      }
-    } catch {
+    const parsed = _getJson(ITEM_ID_ROWS)
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      rows.value = parsed.map(normalizeI2DetailRow)
+    } else {
       rows.value = []
     }
   }
 
-  function _normalizeRow(raw: any): I2DetailRow {
-    return {
-      rowId: raw.rowId ?? `row-${Math.random().toString(36).slice(2, 10)}`,
-      // Segment0 基础
-      projectName: raw.projectName ?? '',
-      projectCode: raw.projectCode ?? '',
-      approvalDate: raw.approvalDate ?? '',
-      phase: raw.phase ?? '',
-      manager: raw.manager ?? '',
-      startDate: raw.startDate ?? '',
-      endDate: raw.endDate ?? '',
-      budget: Number(raw.budget) || 0,
-      progress: Number(raw.progress) || 0,
-      capitalizationStart: raw.capitalizationStart ?? '',
-      status: raw.status ?? '',
-      // Segment1 本期投入
-      materialCurrent: Number(raw.materialCurrent) || 0,
-      materialAccum: Number(raw.materialAccum) || 0,
-      laborCurrent: Number(raw.laborCurrent) || 0,
-      laborAccum: Number(raw.laborAccum) || 0,
-      depreciationCurrent: Number(raw.depreciationCurrent) || 0,
-      depreciationAccum: Number(raw.depreciationAccum) || 0,
-      amortizationCurrent: Number(raw.amortizationCurrent) || 0,
-      amortizationAccum: Number(raw.amortizationAccum) || 0,
-      otherCurrent: Number(raw.otherCurrent) || 0,
-      otherAccum: Number(raw.otherAccum) || 0,
-      totalCurrent: Number(raw.totalCurrent) || 0,
-      totalAccum: Number(raw.totalAccum) || 0,
-      investmentRemark: raw.investmentRemark ?? '',
-      validationFlag: raw.validationFlag ?? '',
-      investmentSource: raw.investmentSource ?? '',
-      // Segment2 资本化
-      capStartDate: raw.capStartDate ?? '',
-      capBeginAmount: Number(raw.capBeginAmount) || 0,
-      capIncrease: Number(raw.capIncrease) || 0,
-      capDecrease: Number(raw.capDecrease) || 0,
-      capEndAmount: Number(raw.capEndAmount) || 0,
-      transferToI1: Number(raw.transferToI1) || 0,
-      transferDate: raw.transferDate ?? '',
-      capAmortization: Number(raw.capAmortization) || 0,
-      capImpairment: Number(raw.capImpairment) || 0,
-      capNetValue: Number(raw.capNetValue) || 0,
-      completionRate: Number(raw.completionRate) || 0,
-      acceptanceDate: raw.acceptanceDate ?? '',
-      // Segment3 期末汇总
-      auditedEnd: Number(raw.auditedEnd) || 0,
-      adjustedBalance: Number(raw.adjustedBalance) || 0,
-      yoyChange: raw.yoyChange != null ? Number(raw.yoyChange) : null,
-      expectedValue: Number(raw.expectedValue) || 0,
-      variance: Number(raw.variance) || 0,
-      exceedFlag: raw.exceedFlag ?? '',
-      priorEnd: Number(raw.priorEnd) || 0,
-      conclusion: raw.conclusion ?? '',
-      remark: raw.remark ?? '',
-      adjReference: raw.adjReference ?? '',
-    }
-  }
-
-  // ─── Formula Recalculation ─────────────────────────────────────────────────
-
-  /**
-   * 对指定行重算所有公式列：
-   * - totalCurrent = 材料+人工+折旧+摊销+其他（本期）
-   * - totalAccum = 材料+人工+折旧+摊销+其他（累计）
-   * - capEndAmount = capBeginAmount + capIncrease - capDecrease（资产类借方1717）
-   * - capNetValue = capEndAmount - capAmortization - capImpairment
-   * - yoyChange = (auditedEnd - priorEnd) / priorEnd
-   * - variance = auditedEnd - expectedValue
-   */
-  function _recalcRow(row: I2DetailRow): void {
-    // 投入合计-本期
-    row.totalCurrent = calcSubtotal([
-      row.materialCurrent,
-      row.laborCurrent,
-      row.depreciationCurrent,
-      row.amortizationCurrent,
-      row.otherCurrent,
-    ])
-    // 投入合计-累计
-    row.totalAccum = calcSubtotal([
-      row.materialAccum,
-      row.laborAccum,
-      row.depreciationAccum,
-      row.amortizationAccum,
-      row.otherAccum,
-    ])
-    // 资本化期末 = 期初 + 增加 - 减少（资产类借方1717）
-    row.capEndAmount = calcAssetEndBalance(row.capBeginAmount, row.capIncrease, row.capDecrease)
-    // 净值 = 期末 - 摊销 - 减值
-    row.capNetValue = calcNetValue(row.capEndAmount, row.capAmortization + row.capImpairment)
-    // 同比变动率
-    row.yoyChange = calcChangeRate(row.auditedEnd, row.priorEnd)
-    // 差异 = 审定期末 - 预期值
-    row.variance = calcVarianceFromExpected(row.auditedEnd, row.expectedValue)
-  }
-
-  /** 对所有行重算公式 */
   function recalcAll(): void {
-    for (const row of rows.value) {
-      _recalcRow(row)
-    }
+    for (const row of rows.value) recalcI2DetailRow(row)
   }
 
-  // ─── Computed: 合计行（Req 3.2: 合计行）──────────────────────────────────
+  watch(allResponses, () => _loadRows(), { immediate: true })
 
-  /** 合计行：所有numeric列的SUM */
   const totalRow: ComputedRef<I2DetailRow> = computed(() => {
     const r = rows.value
-    return {
+    const t = emptyRow({
       rowId: '__total__',
-      // Segment0 基础（文本列置空，数值列合计）
       projectName: '合计',
-      projectCode: '',
-      approvalDate: '',
-      phase: '',
-      manager: '',
-      startDate: '',
-      endDate: '',
+      unadjOpening: calcSubtotal(r.map((x) => x.unadjOpening)),
+      unadjIncrease: calcSubtotal(r.map((x) => x.unadjIncrease)),
+      unadjDecToIA: calcSubtotal(r.map((x) => x.unadjDecToIA)),
+      unadjDecToPL: calcSubtotal(r.map((x) => x.unadjDecToPL)),
+      openingAdj: calcSubtotal(r.map((x) => x.openingAdj)),
+      ajeIncrease: calcSubtotal(r.map((x) => x.ajeIncrease)),
+      ajeDecToIA: calcSubtotal(r.map((x) => x.ajeDecToIA)),
+      ajeDecToPL: calcSubtotal(r.map((x) => x.ajeDecToPL)),
+      relatedIAAuditedEnd: calcSubtotal(r.map((x) => x.relatedIAAuditedEnd)),
       budget: calcSubtotal(r.map((x) => x.budget)),
-      progress: 0,
-      capitalizationStart: '',
-      status: '',
-      // Segment1 本期投入
       materialCurrent: calcSubtotal(r.map((x) => x.materialCurrent)),
       materialAccum: calcSubtotal(r.map((x) => x.materialAccum)),
       laborCurrent: calcSubtotal(r.map((x) => x.laborCurrent)),
@@ -282,318 +427,276 @@ export function useI2Detail(params: {
       amortizationAccum: calcSubtotal(r.map((x) => x.amortizationAccum)),
       otherCurrent: calcSubtotal(r.map((x) => x.otherCurrent)),
       otherAccum: calcSubtotal(r.map((x) => x.otherAccum)),
-      totalCurrent: calcSubtotal(r.map((x) => x.totalCurrent)),
-      totalAccum: calcSubtotal(r.map((x) => x.totalAccum)),
-      investmentRemark: '',
-      validationFlag: '',
-      investmentSource: '',
-      // Segment2 资本化
-      capStartDate: '',
-      capBeginAmount: calcSubtotal(r.map((x) => x.capBeginAmount)),
-      capIncrease: calcSubtotal(r.map((x) => x.capIncrease)),
-      capDecrease: calcSubtotal(r.map((x) => x.capDecrease)),
-      capEndAmount: calcSubtotal(r.map((x) => x.capEndAmount)),
       transferToI1: calcSubtotal(r.map((x) => x.transferToI1)),
-      transferDate: '',
-      capAmortization: calcSubtotal(r.map((x) => x.capAmortization)),
-      capImpairment: calcSubtotal(r.map((x) => x.capImpairment)),
-      capNetValue: calcSubtotal(r.map((x) => x.capNetValue)),
-      completionRate: 0,
-      acceptanceDate: '',
-      // Segment3 期末汇总
-      auditedEnd: calcSubtotal(r.map((x) => x.auditedEnd)),
-      adjustedBalance: calcSubtotal(r.map((x) => x.adjustedBalance)),
-      yoyChange: null,
-      expectedValue: calcSubtotal(r.map((x) => x.expectedValue)),
-      variance: calcSubtotal(r.map((x) => x.variance)),
-      exceedFlag: '',
       priorEnd: calcSubtotal(r.map((x) => x.priorEnd)),
-      conclusion: '',
-      remark: '',
-      adjReference: '',
-    }
+      expectedValue: calcSubtotal(r.map((x) => x.expectedValue)),
+    })
+    recalcI2DetailRow(t)
+    return t
   })
 
-  // ─── Cross Validation: vs I2-1 审定表 ──────────────────────────────────────
-
-  /** 交叉验证：明细表资本化期末合计 vs 审定表期末合计 */
   const crossValidation = computed(() => {
     const adjEnd = params.adjEndSubtotal?.value ?? 0
-    const detailEnd = totalRow.value.capEndAmount
+    const detailEnd = totalRow.value.auditedEnding
     const diff = detailEnd - adjEnd
     return {
       detailEndTotal: detailEnd,
       adjEndTotal: adjEnd,
       difference: diff,
-      hasWarning: Math.abs(diff) > 0.01,
+      hasWarning: adjEnd !== 0 && Math.abs(diff) > TOL,
     }
   })
 
-  // ─── Segment 切换 + 行同步（Req 3.2）──────────────────────────────────────
-
-  /** 切换区段（0-3），保持行同步 */
-  function switchSegment(segIndex: number): void {
-    if (segIndex >= 0 && segIndex <= 3) {
-      activeSegment.value = segIndex
+  /** I2-3 1717 账项净额 vs 明细账项调整合计 */
+  const ajeLinkage: ComputedRef<I2AjeLinkage> = computed(() => {
+    const i23 = _getJson(I23_ROWS_KEY) || _getJson(LEGACY_I23_KEY)
+    let i23AjeNet = 0
+    let i23RowCount = 0
+    if (Array.isArray(i23)) {
+      for (const line of i23) {
+        const code = _str(line.accountCode || line.account || '')
+        const name = _str(line.accountName || line.account || '')
+        const isDev = code.startsWith('1717') || name.includes('开发支出')
+        if (!isDev) continue
+        const cat = _str(line.category || line.entryType || '')
+        if (cat.includes('报表') || cat.toUpperCase() === 'RJE') continue
+        i23AjeNet += _num(line.debitAmount ?? line.debit) - _num(line.creditAmount ?? line.credit)
+        i23RowCount++
+      }
     }
+    const detailAjeNet = calcSubtotal(rows.value.map(rowAjeNet))
+    const diff = detailAjeNet - i23AjeNet
+    return {
+      i23AjeNet,
+      detailAjeNet,
+      diff,
+      hasWarning: i23RowCount > 0 && Math.abs(diff) > TOL,
+      i23RowCount,
+    }
+  })
+
+  function switchSegment(segIndex: number): void {
+    if (segIndex >= 0 && segIndex <= 3) activeSegment.value = segIndex
   }
 
-  /** 设置当前选中行 */
   function setActiveRow(index: number): void {
     activeRowIndex.value = index
   }
 
-  // ─── updateField: 编辑单元格 ───────────────────────────────────────────────
-
-  /**
-   * 更新明细表某行某字段值，自动重算公式列。
-   * Req 3.4: 联动审定表 — 修改资本化相关字段时重算。
-   */
   function updateField(rowIndex: number, field: string, value: any): void {
     const row = rows.value[rowIndex]
     if (!row) return
-
-    // 设置值
     ;(row as any)[field] = value
-
-    // 重算公式列
-    _recalcRow(row)
+    // 旧字段编辑时同步 Excel 列
+    if (field === 'capBeginAmount') row.unadjOpening = _num(value)
+    if (field === 'capIncrease') row.unadjIncrease = _num(value)
+    if (field === 'transferToI1') row.unadjDecToIA = _num(value)
+    recalcI2DetailRow(row)
   }
 
-  // ─── addRow: 动态行添加（Req 3.4: 动态行+导入导出）────────────────────────
-
-  /**
-   * 添加动态行：传入项目名称后创建。
-   * 调用方负责先通过 ElMessageBox.prompt 获取项目名称。
-   */
   function addRow(projectName: string): void {
     if (!projectName?.trim()) return
-
-    const newRow: I2DetailRow = {
-      rowId: `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      // Segment0 基础
-      projectName: projectName.trim(),
-      projectCode: '',
-      approvalDate: '',
-      phase: '',
-      manager: '',
-      startDate: '',
-      endDate: '',
-      budget: 0,
-      progress: 0,
-      capitalizationStart: '',
-      status: '进行中',
-      // Segment1 本期投入
-      materialCurrent: 0,
-      materialAccum: 0,
-      laborCurrent: 0,
-      laborAccum: 0,
-      depreciationCurrent: 0,
-      depreciationAccum: 0,
-      amortizationCurrent: 0,
-      amortizationAccum: 0,
-      otherCurrent: 0,
-      otherAccum: 0,
-      totalCurrent: 0,
-      totalAccum: 0,
-      investmentRemark: '',
-      validationFlag: '',
-      investmentSource: '',
-      // Segment2 资本化
-      capStartDate: '',
-      capBeginAmount: 0,
-      capIncrease: 0,
-      capDecrease: 0,
-      capEndAmount: 0,
-      transferToI1: 0,
-      transferDate: '',
-      capAmortization: 0,
-      capImpairment: 0,
-      capNetValue: 0,
-      completionRate: 0,
-      acceptanceDate: '',
-      // Segment3 期末汇总
-      auditedEnd: 0,
-      adjustedBalance: 0,
-      yoyChange: null,
-      expectedValue: 0,
-      variance: 0,
-      exceedFlag: '',
-      priorEnd: 0,
-      conclusion: '',
-      remark: '',
-      adjReference: '',
-    }
-
+    const newRow = emptyRow({ projectName: projectName.trim() })
+    recalcI2DetailRow(newRow)
     rows.value.push(newRow)
     activeRowIndex.value = rows.value.length - 1
   }
 
-  // ─── removeRow: 删除行 ─────────────────────────────────────────────────────
-
   function removeRow(index: number): void {
     if (index < 0 || index >= rows.value.length) return
     rows.value.splice(index, 1)
-    // 修正 activeRowIndex
     if (activeRowIndex.value >= rows.value.length) {
       activeRowIndex.value = rows.value.length - 1
     }
   }
 
-  // ─── importRows: 批量导入行数据（供 useI2ImportExport 调用）────────────────
-
-  /**
-   * 批量导入行数据（覆盖现有行），自动重算公式。
-   */
   function importRows(importedRows: Partial<I2DetailRow>[]): void {
-    rows.value = importedRows.map((raw) => {
-      const row = _normalizeRow(raw)
-      _recalcRow(row)
-      return row
-    })
+    rows.value = importedRows.map((raw) => normalizeI2DetailRow(raw))
     activeRowIndex.value = rows.value.length > 0 ? 0 : -1
   }
 
-  /** 获取当前行数据（供导出使用） */
   function exportRows(): I2DetailRow[] {
     return [...rows.value]
   }
 
-  // ─── save: 持久化到 checklist_responses ────────────────────────────────────
-
-  /**
-   * JSON打包保存到 'I2-2-rows' key（Req 3.4 持久化）。
-   * 遵循"禁止逐行存储大量数据"铁律，整体JSON打包。
-   */
   async function save(): Promise<void> {
-    const data: Record<string, any> = {
-      [ITEM_ID_ROWS]: JSON.stringify(rows.value),
-    }
-    await saveResponses('I2-2', data)
+    await saveResponses('I2-2', { [ITEM_ID_ROWS]: JSON.stringify(rows.value) })
   }
 
-  // ─── Segment 列配置（4区段）────────────────────────────────────────────────
+  /**
+   * 从 I2-3 同步账项调整：按「调整事项说明」包含项目名匹配；
+   * 借方→本期增加调整；贷方含「无形/存货」→转无形调整；否则→转损益调整。
+   * 未匹配行计入选中行（若有）或第一条项目行。
+   */
+  function syncAjeFromI23(): { applied: number; unmatched: number; message: string } {
+    const i23 = _getJson(I23_ROWS_KEY) || _getJson(LEGACY_I23_KEY)
+    if (!Array.isArray(i23) || i23.length === 0) {
+      return { applied: 0, unmatched: 0, message: 'I2-3 无调整分录可同步' }
+    }
+    if (!rows.value.length) {
+      return { applied: 0, unmatched: 0, message: '请先新增明细项目' }
+    }
 
-  /** Segment0 基础列定义 */
-  const segmentBasicColumns = [
-    { key: 'projectName', label: '项目名称', width: 180, editable: true, type: 'text' as const },
-    { key: 'projectCode', label: '项目编号', width: 120, editable: true, type: 'text' as const },
-    { key: 'approvalDate', label: '立项日期', width: 120, editable: true, type: 'date' as const },
-    { key: 'phase', label: '阶段', width: 100, editable: true, type: 'select' as const, options: PHASE_OPTIONS },
-    { key: 'manager', label: '负责人', width: 100, editable: true, type: 'text' as const },
-    { key: 'startDate', label: '起始日期', width: 120, editable: true, type: 'date' as const },
-    { key: 'endDate', label: '终止日期', width: 120, editable: true, type: 'date' as const },
-    { key: 'budget', label: '预算', width: 130, editable: true, type: 'number' as const },
-    { key: 'progress', label: '进度(%)', width: 90, editable: true, type: 'number' as const },
-    { key: 'capitalizationStart', label: '资本化起点', width: 120, editable: true, type: 'date' as const },
-    { key: 'status', label: '状态', width: 100, editable: true, type: 'select' as const, options: STATUS_OPTIONS },
+    // 清空现有 AJE，再重算
+    for (const r of rows.value) {
+      r.ajeIncrease = 0
+      r.ajeDecToIA = 0
+      r.ajeDecToPL = 0
+    }
+
+    let applied = 0
+    let unmatched = 0
+    const fallbackIdx = activeRowIndex.value >= 0 ? activeRowIndex.value : 0
+
+    for (const line of i23) {
+      const code = _str(line.accountCode || line.account || '')
+      const name = _str(line.accountName || line.account || '')
+      const isDev = code.startsWith('1717') || name.includes('开发支出')
+      if (!isDev) continue
+      const cat = _str(line.category || line.entryType || '')
+      if (cat.includes('报表') || cat.toUpperCase() === 'RJE') continue
+
+      const debit = _num(line.debitAmount ?? line.debit)
+      const credit = _num(line.creditAmount ?? line.credit)
+      if (Math.abs(debit) < 0.005 && Math.abs(credit) < 0.005) continue
+
+      const desc = _str(line.description || line.summary || '')
+      let idx = rows.value.findIndex(
+        (r) => r.projectName && desc.includes(r.projectName),
+      )
+      if (idx < 0) {
+        unmatched++
+        idx = fallbackIdx
+      }
+
+      const target = rows.value[idx]
+      if (debit > 0) {
+        target.ajeIncrease += debit
+        applied++
+      }
+      if (credit > 0) {
+        if (/无形|存货/.test(desc + _str(line.remark) + _str(line.noteItem))) {
+          target.ajeDecToIA += credit
+        } else {
+          target.ajeDecToPL += credit
+        }
+        applied++
+      }
+    }
+
+    recalcAll()
+    return {
+      applied,
+      unmatched,
+      message: applied
+        ? `已从 I2-3 同步 ${applied} 笔账项至明细${unmatched ? `（其中 ${unmatched} 笔未匹配项目名，已归入当前/首行）` : ''}`
+        : 'I2-3 中无 1717 开发支出账项调整行',
+    }
+  }
+
+  // ─── 列配置：0 审计过程(Excel) / 1 本期投入 / 2 项目基础 / 3 其他核对 ───
+
+  const segmentProcessColumns: I2DetailColumn[] = [
+    { key: 'projectName', label: '研究开发项目名称', width: 160, editable: true, type: 'text', group: '项目' },
+    { key: 'unadjOpening', label: '期初数', width: 110, editable: true, type: 'number', group: '未审数' },
+    { key: 'unadjIncrease', label: '本期增加-金额', width: 110, editable: true, type: 'number', group: '未审数', emphasis: true },
+    { key: 'increaseMethod', label: '增加方式', width: 120, editable: true, type: 'select', options: I2_INCREASE_METHODS, group: '未审数', emphasis: true },
+    { key: 'unadjDecToIA', label: '减少-转无形/存货', width: 120, editable: true, type: 'number', group: '未审数', emphasis: true },
+    { key: 'unadjDecToPL', label: '减少-转当期损益', width: 120, editable: true, type: 'number', group: '未审数' },
+    { key: 'unadjEnding', label: '期末数', width: 110, editable: false, type: 'formula', tooltip: '期初+增加-转无形-转损益', group: '未审数' },
+    { key: 'openingAdj', label: '期初调整', width: 100, editable: true, type: 'number', group: '调整' },
+    { key: 'ajeIncrease', label: '账项-本期增加', width: 110, editable: true, type: 'number', group: '账项调整' },
+    { key: 'ajeDecToIA', label: '账项-转无形/存货', width: 120, editable: true, type: 'number', group: '账项调整', emphasis: true },
+    { key: 'ajeDecToPL', label: '账项-转损益', width: 110, editable: true, type: 'number', group: '账项调整' },
+    { key: 'auditedOpening', label: '审定-期初', width: 110, editable: false, type: 'formula', tooltip: '未审期初+期初调整', group: '审定数' },
+    { key: 'auditedIncrease', label: '审定-本期增加', width: 110, editable: false, type: 'formula', tooltip: '未审增加+账项增加', group: '审定数' },
+    { key: 'auditedDecToIA', label: '审定-转无形/存货', width: 120, editable: false, type: 'formula', tooltip: '未审+账项', group: '审定数', emphasis: true },
+    { key: 'auditedDecToPL', label: '审定-转损益', width: 110, editable: false, type: 'formula', group: '审定数' },
+    { key: 'auditedEnding', label: '审定-期末', width: 110, editable: false, type: 'formula', tooltip: '审定期初+增加-转无形-转损益', group: '审定数' },
+    { key: 'relatedIAAuditedEnd', label: '无形/存货期末审定', width: 130, editable: true, type: 'number', group: '核对', emphasis: true },
+    { key: 'diffVsIA', label: '差异', width: 100, editable: false, type: 'formula', tooltip: '开发支出审定期末−无形/存货审定', group: '核对' },
+    { key: 'rdProgress', label: '截至期末研发进度', width: 120, editable: true, type: 'text', group: '核对' },
+    { key: 'remark', label: '备注', width: 120, editable: true, type: 'text', group: '核对' },
   ]
 
-  /** Segment1 本期投入列定义 */
-  const segmentInvestmentColumns = [
-    { key: 'projectName', label: '项目名称', width: 160, editable: false, type: 'text' as const },
-    { key: 'materialCurrent', label: '材料-本期', width: 110, editable: true, type: 'number' as const },
-    { key: 'materialAccum', label: '材料-累计', width: 110, editable: true, type: 'number' as const },
-    { key: 'laborCurrent', label: '人工-本期', width: 110, editable: true, type: 'number' as const },
-    { key: 'laborAccum', label: '人工-累计', width: 110, editable: true, type: 'number' as const },
-    { key: 'depreciationCurrent', label: '折旧-本期', width: 110, editable: true, type: 'number' as const },
-    { key: 'depreciationAccum', label: '折旧-累计', width: 110, editable: true, type: 'number' as const },
-    { key: 'amortizationCurrent', label: '摊销-本期', width: 110, editable: true, type: 'number' as const },
-    { key: 'amortizationAccum', label: '摊销-累计', width: 110, editable: true, type: 'number' as const },
-    { key: 'otherCurrent', label: '其他-本期', width: 110, editable: true, type: 'number' as const },
-    { key: 'otherAccum', label: '其他-累计', width: 110, editable: true, type: 'number' as const },
-    { key: 'totalCurrent', label: '合计-本期', width: 120, editable: false, type: 'formula' as const, tooltip: '材料+人工+折旧+摊销+其他(本期)' },
-    { key: 'totalAccum', label: '合计-累计', width: 120, editable: false, type: 'formula' as const, tooltip: '材料+人工+折旧+摊销+其他(累计)' },
-    { key: 'investmentRemark', label: '投入说明', width: 150, editable: true, type: 'text' as const },
-    { key: 'investmentSource', label: '投入来源', width: 120, editable: true, type: 'text' as const },
+  const segmentInvestmentColumns: I2DetailColumn[] = [
+    { key: 'projectName', label: '项目名称', width: 160, editable: false, type: 'text' },
+    { key: 'materialCurrent', label: '材料-本期', width: 110, editable: true, type: 'number' },
+    { key: 'materialAccum', label: '材料-累计', width: 110, editable: true, type: 'number' },
+    { key: 'laborCurrent', label: '人工-本期', width: 110, editable: true, type: 'number' },
+    { key: 'laborAccum', label: '人工-累计', width: 110, editable: true, type: 'number' },
+    { key: 'depreciationCurrent', label: '折旧-本期', width: 110, editable: true, type: 'number' },
+    { key: 'depreciationAccum', label: '折旧-累计', width: 110, editable: true, type: 'number' },
+    { key: 'amortizationCurrent', label: '摊销-本期', width: 110, editable: true, type: 'number' },
+    { key: 'amortizationAccum', label: '摊销-累计', width: 110, editable: true, type: 'number' },
+    { key: 'otherCurrent', label: '其他-本期', width: 110, editable: true, type: 'number' },
+    { key: 'otherAccum', label: '其他-累计', width: 110, editable: true, type: 'number' },
+    { key: 'totalCurrent', label: '合计-本期', width: 120, editable: false, type: 'formula', tooltip: '材料+人工+折旧+摊销+其他' },
+    { key: 'totalAccum', label: '合计-累计', width: 120, editable: false, type: 'formula' },
+    { key: 'investmentRemark', label: '投入说明', width: 140, editable: true, type: 'text' },
   ]
 
-  /** Segment2 资本化列定义 */
-  const segmentCapitalizationColumns = [
-    { key: 'projectName', label: '项目名称', width: 160, editable: false, type: 'text' as const },
-    { key: 'capStartDate', label: '资本化起点', width: 120, editable: true, type: 'date' as const },
-    { key: 'capBeginAmount', label: '期初', width: 130, editable: true, type: 'number' as const },
-    { key: 'capIncrease', label: '本期增加', width: 130, editable: true, type: 'number' as const },
-    { key: 'capDecrease', label: '本期减少', width: 130, editable: true, type: 'number' as const },
-    { key: 'capEndAmount', label: '期末', width: 130, editable: false, type: 'formula' as const, tooltip: '期末=期初+增加-减少' },
-    { key: 'transferToI1', label: '转入I1', width: 130, editable: true, type: 'number' as const },
-    { key: 'transferDate', label: '转入日期', width: 120, editable: true, type: 'date' as const },
-    { key: 'capAmortization', label: '摊销', width: 120, editable: true, type: 'number' as const },
-    { key: 'capImpairment', label: '减值', width: 120, editable: true, type: 'number' as const },
-    { key: 'capNetValue', label: '净值', width: 130, editable: false, type: 'formula' as const, tooltip: '净值=期末-摊销-减值' },
-    { key: 'completionRate', label: '完工比例(%)', width: 110, editable: true, type: 'number' as const },
-    { key: 'acceptanceDate', label: '验收日', width: 120, editable: true, type: 'date' as const },
+  const segmentBasicColumns: I2DetailColumn[] = [
+    { key: 'projectName', label: '项目名称', width: 160, editable: true, type: 'text' },
+    { key: 'projectCode', label: '项目编号', width: 110, editable: true, type: 'text' },
+    { key: 'approvalDate', label: '立项日期', width: 120, editable: true, type: 'date' },
+    { key: 'phase', label: '阶段', width: 100, editable: true, type: 'select', options: PHASE_OPTIONS },
+    { key: 'manager', label: '负责人', width: 100, editable: true, type: 'text' },
+    { key: 'startDate', label: '起始日期', width: 120, editable: true, type: 'date' },
+    { key: 'endDate', label: '终止日期', width: 120, editable: true, type: 'date' },
+    { key: 'budget', label: '预算', width: 120, editable: true, type: 'number' },
+    { key: 'capitalizationStart', label: '资本化起点', width: 120, editable: true, type: 'date' },
+    { key: 'capStartDate', label: '资本化起点(联动)', width: 120, editable: true, type: 'date' },
+    { key: 'transferDate', label: '转入无形日期', width: 120, editable: true, type: 'date' },
+    { key: 'transferAssetName', label: '转入资产名称', width: 130, editable: true, type: 'text' },
+    { key: 'status', label: '状态', width: 100, editable: true, type: 'select', options: STATUS_OPTIONS },
   ]
 
-  /** Segment3 期末汇总列定义 */
-  const segmentSummaryColumns = [
-    { key: 'projectName', label: '项目名称', width: 160, editable: false, type: 'text' as const },
-    { key: 'auditedEnd', label: '审定期末', width: 130, editable: true, type: 'number' as const },
-    { key: 'adjustedBalance', label: '调整后余额', width: 130, editable: true, type: 'number' as const },
-    { key: 'priorEnd', label: '上期期末', width: 130, editable: true, type: 'number' as const },
-    { key: 'yoyChange', label: '同比变动', width: 110, editable: false, type: 'formula' as const, tooltip: '(审定期末-上期)/上期' },
-    { key: 'expectedValue', label: '预期值', width: 130, editable: true, type: 'number' as const },
-    { key: 'variance', label: '差异', width: 130, editable: false, type: 'formula' as const, tooltip: '审定期末-预期值' },
-    { key: 'exceedFlag', label: '超标标记', width: 90, editable: true, type: 'text' as const },
-    { key: 'conclusion', label: '结论', width: 150, editable: true, type: 'text' as const },
-    { key: 'remark', label: '备注', width: 180, editable: true, type: 'text' as const },
+  const segmentSummaryColumns: I2DetailColumn[] = [
+    { key: 'projectName', label: '项目名称', width: 160, editable: false, type: 'text' },
+    { key: 'auditedEnding', label: '审定期末', width: 120, editable: false, type: 'formula' },
+    { key: 'priorEnd', label: '上期期末', width: 120, editable: true, type: 'number' },
+    { key: 'yoyChange', label: '同比变动', width: 100, editable: false, type: 'formula', tooltip: '(审定期末-上期)/上期' },
+    { key: 'expectedValue', label: '预期值', width: 120, editable: true, type: 'number' },
+    { key: 'variance', label: 'vs预期差异', width: 110, editable: false, type: 'formula' },
+    { key: 'conclusion', label: '结论', width: 140, editable: true, type: 'text' },
+    { key: 'adjReference', label: '索引', width: 100, editable: true, type: 'text' },
+    { key: 'remark', label: '备注', width: 140, editable: true, type: 'text' },
   ]
 
-  /** 4区段Tab定义 */
   const segments = [
-    { index: 0, key: 'basic', label: '基础', columns: segmentBasicColumns },
+    { index: 0, key: 'process', label: '审计过程(Excel)', columns: segmentProcessColumns },
     { index: 1, key: 'investment', label: '本期投入', columns: segmentInvestmentColumns },
-    { index: 2, key: 'capitalization', label: '资本化', columns: segmentCapitalizationColumns },
-    { index: 3, key: 'summary', label: '期末汇总', columns: segmentSummaryColumns },
+    { index: 2, key: 'basic', label: '项目基础', columns: segmentBasicColumns },
+    { index: 3, key: 'summary', label: '分析结论', columns: segmentSummaryColumns },
   ]
 
-  /** 当前Segment对应的列配置 */
-  const activeColumns = computed(() => {
-    return segments[activeSegment.value]?.columns ?? segmentBasicColumns
-  })
-
-  // ─── Init ──────────────────────────────────────────────────────────────────
-
-  watch(allResponses, () => _loadRows(), { immediate: true })
-
-  // ─── Return (Task spec interface) ──────────────────────────────────────────
+  const activeColumns = computed(() => segments[activeSegment.value]?.columns ?? segmentProcessColumns)
 
   return {
-    // State
     rows,
     activeSegment,
     activeRowIndex,
-
-    // Computed
     totalRow,
     crossValidation,
+    ajeLinkage,
     activeColumns,
-
-    // Segment定义
     segments,
+    segmentProcessColumns,
     segmentBasicColumns,
     segmentInvestmentColumns,
-    segmentCapitalizationColumns,
+    segmentCapitalizationColumns: segmentProcessColumns,
     segmentSummaryColumns,
-
-    // Actions — Segment & Row同步
     switchSegment,
     setActiveRow,
-
-    // Actions — Field编辑
     updateField,
     recalcAll,
-
-    // Actions — 动态行
     addRow,
     removeRow,
-
-    // Actions — 导入导出
     importRows,
     exportRows,
-
-    // Actions — 持久化
     save,
+    syncAjeFromI23,
   }
 }
 

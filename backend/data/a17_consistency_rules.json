@@ -1,7 +1,7 @@
 [
   {
     "rule_id": "gc_vs_opinion",
-    "description": "持续经营存疑但出具无保留意见需解释",
+    "description": "持续经营存疑但出具无保留意见需解释（ch10 vs ch14）",
     "severity": "warning",
     "source_chapter": "A17-1-ch10",
     "target_chapter": "A17-1-ch14",
@@ -11,17 +11,17 @@
   },
   {
     "rule_id": "kam_required_listed",
-    "description": "上市公司审计必须披露 KAM",
+    "description": "A 类/上市实体审计必须披露 KAM（ch12 不能为空）",
     "severity": "error",
     "source_chapter": "A17-1-ch12",
     "target_chapter": null,
     "source_pattern": null,
     "target_pattern": null,
-    "condition": "source_empty AND project.business_category == '上市公司'"
+    "condition": "source_empty AND is_a_class_or_listed"
   },
   {
     "rule_id": "fraud_vs_opinion",
-    "description": "舞弊线索未在审计结论中体现",
+    "description": "舞弊线索未在审计结论中体现（ch15 vs ch14）",
     "severity": "warning",
     "source_chapter": "A17-1-ch15",
     "target_chapter": "A17-1-ch14",
@@ -31,12 +31,52 @@
   },
   {
     "rule_id": "risk_vs_opinion",
-    "description": "未应对风险与审计结论不一致",
+    "description": "未应对风险与审计结论不一致（ch06 vs ch14）",
     "severity": "warning",
     "source_chapter": "A17-1-ch06",
     "target_chapter": "A17-1-ch14",
     "source_pattern": "未解决|遗留|未应对|未消除",
     "target_pattern": "标准无保留|无保留意见",
     "condition": "source_matches AND target_matches"
+  },
+  {
+    "rule_id": "independence_empty_a_class",
+    "description": "A 类项目独立性章节（ch02）不能为空，应说明并索引 A17-7",
+    "severity": "warning",
+    "source_chapter": "A17-1-ch02",
+    "target_chapter": null,
+    "source_pattern": null,
+    "target_pattern": null,
+    "condition": "source_empty AND is_a_class_or_listed"
+  },
+  {
+    "rule_id": "independence_vs_a177",
+    "description": "ch02 已填写但 A17-7 独立性声明尚未签署",
+    "severity": "warning",
+    "source_chapter": "A17-1-ch02",
+    "target_chapter": null,
+    "source_pattern": null,
+    "target_pattern": null,
+    "condition": "source_filled AND NOT context.a177_signed"
+  },
+  {
+    "rule_id": "consultation_without_execution",
+    "description": "存在业务咨询（A17-3）但未完成执行记录（A17-3-1），也未勾选「无需执行」",
+    "severity": "error",
+    "source_chapter": "A17-1-ch05",
+    "target_chapter": null,
+    "source_pattern": null,
+    "target_pattern": null,
+    "condition": "context.a173_has_content AND NOT context.a1731_closed"
+  },
+  {
+    "rule_id": "opinion_empty_a_class",
+    "description": "A 类项目财务报表审计结论（ch14）不能为空",
+    "severity": "error",
+    "source_chapter": "A17-1-ch14",
+    "target_chapter": null,
+    "source_pattern": null,
+    "target_pattern": null,
+    "condition": "source_empty AND is_a_class_or_listed"
   }
 ]

@@ -154,12 +154,16 @@ export function getMissingReversalFields(row: ReversalRow): string[] {
  *
  * Requirements: 6.1, 6.2
  */
+function isBlank(value: string | null | undefined): boolean {
+  return !value || !String(value).trim()
+}
+
 export function getMissingWriteoffFields(row: WriteoffRow): string[] {
   const missing: string[] = []
   if (row.writeoffAmount > 0) {
-    if (!row.writeoffReason.trim()) missing.push('writeoffReason')
-    if (!row.writeoffProcedure.trim()) missing.push('writeoffProcedure')
-    if (!row.reasonabilityAnalysis.trim()) missing.push('reasonabilityAnalysis')
+    if (isBlank(row.writeoffReason)) missing.push('writeoffReason')
+    if (isBlank(row.writeoffProcedure)) missing.push('writeoffProcedure')
+    if (isBlank(row.reasonabilityAnalysis)) missing.push('reasonabilityAnalysis')
   }
   return missing
 }

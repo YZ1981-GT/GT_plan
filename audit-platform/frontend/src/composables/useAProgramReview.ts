@@ -44,7 +44,7 @@ export function useAProgramReview(options: {
   }
 
   // ─── A17-5 核对表版本适用性 ───
-  const a17_5Versions = ref<Record<string, { applicable: boolean; mandatory: boolean }>>({})
+  const a17_5Versions = ref<Record<string, { applicable: boolean; mandatory: boolean; description?: string }>>({})
   const a17OtherExpanded = ref(false)
 
   // ─── A21~A25 复核子码解析（A1 seq15–17 父码 → 适用 -1/-2）───
@@ -114,6 +114,13 @@ export function useAProgramReview(options: {
     return info ? !info.applicable : false
   }
 
+  function a17_5DisabledReason(ref: string): string {
+    if (!isA17_5Ref(ref)) return ''
+    const info = a17_5Versions.value[ref]
+    if (!info || info.applicable) return ''
+    return info.description || `${ref} 与当前业务类型不匹配，默认不适用`
+  }
+
   function a17_5Badge(ref: string): string {
     const info = a17_5Versions.value[ref]
     if (!info || !info.applicable) return ''
@@ -151,12 +158,13 @@ export function useAProgramReview(options: {
         params: { project_id: projectId.value },
       })
       const list = Array.isArray(res) ? res : (res?.data ?? res ?? [])
-      const map: Record<string, { applicable: boolean; mandatory: boolean }> = {}
+      const map: Record<string, { applicable: boolean; mandatory: boolean; description?: string }> = {}
       for (const v of list) {
         if (v?.wp_code) {
           map[v.wp_code] = {
             applicable: !!v.applicable,
             mandatory: !!v.mandatory,
+            description: v.description || '',
           }
         }
       }
@@ -182,6 +190,7 @@ export function useAProgramReview(options: {
     isA17_5Ref,
     isA17_5ChipDisabled,
     a17_5Badge,
+    a17_5DisabledReason,
     a17Seq5Refs,
     isA17Seq5Row,
     a17ApplicableRefs,

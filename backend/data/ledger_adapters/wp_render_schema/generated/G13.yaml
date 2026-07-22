@@ -524,49 +524,51 @@ sheets:
       header_row: 5
       columns:
         A:
-          field: col_a
+          field: description
           type: text
           label: 调整事项说明
         B:
-          field: col_b
-          type: text
-          label: 类别（报表调整/账项调整/其他）
+          field: category
+          type: enum
+          label: 类别（账项调整/报表调整/其他）
+          enum_values: [账项调整, 报表调整, 其他]
         C:
-          field: col_c
+          field: report_item
           type: text
           label: 报表项目
         D:
-          field: col_d
+          field: account_name
           type: text
           label: 科目名称
         E:
-          field: col_e
+          field: note_item
           type: text
           label: 附注项目
         F:
-          field: col_f
+          field: spacer
           type: text
-          label: ……
+          label: ……（模板分隔列）
         G:
-          field: col_g
-          type: text
+          field: debit_amount
+          type: number
           label: 借方调整金额
         H:
-          field: col_h
-          type: text
+          field: credit_amount
+          type: number
           label: 贷方调整金额
         I:
-          field: col_i
+          field: index_ref
           type: text
           label: 索引
         J:
-          field: col_j
+          field: remark
           type: text
           label: 备注
+        # HTML 扩展：所属科目（G1/G8/G9/G10/H3）用于分项回写 G13-2，不占用 Excel 列位
     static_text:
       rows:
       - 1-2
-      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+      description: 表头与事务所标识
     formulas:
       preserve: true
       cells:
@@ -584,4 +586,10 @@ sheets:
       ranges_sample:
       - A1:J1
       - A2:J2
-    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+    cross_refs:
+      - from: G13-3.6101账项净额
+        to: G13-2.adjustment(by belongAccount)
+        description: 账项调整按所属科目回写明细调整数
+      - from: G13-2.合计
+        to: G13-1.审定合计
+        description: 明细审定合计驱动审定表

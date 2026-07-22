@@ -8,7 +8,7 @@
  * 4. 审定↔明细一致性（adjudicationVsDetail diff 校验）
  * 5. TB回写（writebackTrialBalance → 'substantive:adjudicated' event）
  * 6. useH6Adjudication transitCheck（endBalanceAudited≠0 → warning非空）
- * 7. useH6Check summary（存在'不合规'项 → hasNonCompliant=true）
+ * 7. useH6Check summary（检查比例/异常/挂账 warning）
  *
  * Spec: .kiro/specs/h6-asset-disposal-clearing/
  * Task: 7.2
@@ -16,22 +16,25 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref, nextTick } from 'vue'
+
+const { mockGet, mockPut } = vi.hoisted(() => ({
+  mockGet: vi.fn().mockResolvedValue([]),
+  mockPut: vi.fn().mockResolvedValue({}),
+}))
+
+// ─── Mock API ────────────────────────────────────────────────────────────────
+
+vi.mock('@/services/apiProxy', () => ({
+  api: {
+    get: mockGet,
+    put: mockPut,
+  },
+}))
+
 import { useH6CrossSheet } from '../composables/useH6CrossSheet'
 import { useH6Detail } from '../composables/useH6Detail'
 import { useH6Adjudication } from '../composables/useH6Adjudication'
 import { useH6Check } from '../composables/useH6Check'
-
-// ─── Mock API ────────────────────────────────────────────────────────────────
-
-const mockGet = vi.fn().mockResolvedValue([])
-const mockPut = vi.fn().mockResolvedValue({})
-
-vi.mock('@/services/apiProxy', () => ({
-  api: {
-    get: (...args: any[]) => mockGet(...args),
-    put: (...args: any[]) => mockPut(...args),
-  },
-}))
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -84,6 +87,7 @@ describe('H6 集成 — H1→H6事件链 (Req 5.3)', () => {
       assetName: '办公楼A栋',
       originalCost: 500000,
       accDep: 200000,
+      impairment: 50000,
       refH1Code: 'H1-8-row-01',
     })
 
@@ -91,7 +95,8 @@ describe('H6 集成 — H1→H6事件链 (Req 5.3)', () => {
     expect(rows.value[0].assetName).toBe('办公楼A栋')
     expect(rows.value[0].originalCost).toBe(500000)
     expect(rows.value[0].accumulatedDepreciation).toBe(200000)
-    expect(rows.value[0].netBookValue).toBe(300000) // 500000 - 200000
+    expect(rows.value[0].impairmentProvision).toBe(50000)
+    expect(rows.value[0].netBookValue).toBe(250000) // 500000 - 200000 - 50000
     expect(rows.value[0].refH1Code).toBe('H1-8-row-01')
     expect(rows.value[0].status).toBe('清理中')
   })
@@ -261,12 +266,35 @@ describe('H6 集成 — TB回写 (Req 2.8)', () => {
 // ─── 6. useH6Adjudication transitCheck ───────────────────────────────────────
 
 describe('H6 集成 — transitCheck 过渡科目期末校验 (Req 6.1-6.3)', () => {
-  it('endBalanceAudited ≠ 0 时 transitCheck.warning 非空', () => {
+  it('endBalanceAudited ≠ 0 时 transitCheck.warning 非空（新格式）', () => {
+    const allResponses = makeAllResponses({
+      'H6-1-rows': JSON.stringify([
+        {
+          name: '设备A清理',
+          beginUnadjusted: 5000,
+          beginAdjustment: 0,
+          endUnadjusted: 15000,
+          endAdjustment: 0,
+        },
+      ]),
+    })
+
+    const { transitCheck, endBalanceAudited } = useH6Adjudication({
+      wpId: ref('wp-1'),
+      projectId: ref('proj-1'),
+      allResponses,
+    })
+
+    expect(endBalanceAudited.value).toBe(15000)
+    expect(transitCheck.value.isZero).toBe(false)
+    expect(transitCheck.value.warning).toContain('过渡科目期末余额应为0')
+    expect(transitCheck.value.warning).toContain('15,000')
+  })
+
+  it('兼容旧「期末余额」行迁移', () => {
     const allResponses = makeAllResponses({
       'H6-1-rows': JSON.stringify([
         { name: '清理收入', category: 'income', beginBalance: 0, debitAmount: 100000, creditAmount: 0, unadjusted: 100000, aje: 0, rje: 0 },
-        { name: '清理支出—账面价值', category: 'expense', subCategory: 'bookValue', beginBalance: 0, debitAmount: 0, creditAmount: 60000, unadjusted: 60000, aje: 0, rje: 0 },
-        { name: '清理净损益', category: 'gainLoss', isSubtotal: true, beginBalance: 0, debitAmount: 0, creditAmount: 0, unadjusted: 0, aje: 0, rje: 0 },
         { name: '期末余额', category: 'balance', beginBalance: 5000, debitAmount: 20000, creditAmount: 10000, unadjusted: 15000, aje: 0, rje: 0 },
       ]),
     })
@@ -277,18 +305,20 @@ describe('H6 集成 — transitCheck 过渡科目期末校验 (Req 6.1-6.3)', ()
       allResponses,
     })
 
-    // 期末余额行 audited = 15000 + 0 + 0 = 15000
     expect(endBalanceAudited.value).toBe(15000)
     expect(transitCheck.value.isZero).toBe(false)
-    expect(transitCheck.value.warning).toContain('过渡科目期末余额应为0')
-    expect(transitCheck.value.warning).toContain('15000')
   })
 
   it('endBalanceAudited = 0 时 transitCheck.warning 为空', () => {
     const allResponses = makeAllResponses({
       'H6-1-rows': JSON.stringify([
-        { name: '清理收入', category: 'income', beginBalance: 0, debitAmount: 0, creditAmount: 0, unadjusted: 0, aje: 0, rje: 0 },
-        { name: '期末余额', category: 'balance', beginBalance: 0, debitAmount: 0, creditAmount: 0, unadjusted: 0, aje: 0, rje: 0 },
+        {
+          name: '已结转项目',
+          beginUnadjusted: 10000,
+          beginAdjustment: 0,
+          endUnadjusted: 0,
+          endAdjustment: 0,
+        },
       ]),
     })
 
@@ -303,10 +333,120 @@ describe('H6 集成 — transitCheck 过渡科目期末校验 (Req 6.1-6.3)', ()
   })
 })
 
-// ─── 7. useH6Check summary ──────────────────────────────────────────────────
+// ─── 7. useH6Check summary（凭证级检查表） ───────────────────────────────────
 
 describe('H6 集成 — useH6Check summary (Req 4.5)', () => {
-  it('存在"不合规"项时 summary.hasNonCompliant=true', () => {
+  it('样本净值合计与总体形成检查比例，异常/挂账触发 warning', () => {
+    const allResponses = makeAllResponses({
+      'H6-2-rows': JSON.stringify([
+        { rowId: 'd1', assetName: '设备A', originalCost: 100000, accumulatedDepreciation: 40000, netBookValue: 60000 },
+        { rowId: 'd2', assetName: '车辆B', originalCost: 80000, accumulatedDepreciation: 40000, netBookValue: 40000 },
+      ]),
+      'H6-4-rows': JSON.stringify([
+        {
+          rowId: 'chk-1',
+          linkedDetailRowId: 'd1',
+          assetName: '设备A',
+          originalCost: 100000,
+          accumulatedDepreciation: 40000,
+          impairment: 0,
+          clearingExpense: 1000,
+          clearingIncome: 50000,
+          toNonOperating: 0,
+          toDisposalGain: 9000,
+          endingBalance: 0,
+          isAbnormal: true,
+          checks: [true, true, true, true, false],
+          remark: '',
+        },
+        {
+          rowId: 'chk-2',
+          linkedDetailRowId: 'd2',
+          assetName: '车辆B',
+          originalCost: 80000,
+          accumulatedDepreciation: 40000,
+          impairment: 0,
+          clearingExpense: 0,
+          clearingIncome: 0,
+          endingBalance: 40000,
+          isAbnormal: false,
+          checks: [false, false, false, false, false],
+          remark: '挂账',
+        },
+      ]),
+      'H6-4-sampling': JSON.stringify({
+        totalPopulation: 100000,
+        samplingMethod: '货币单元抽样',
+        populationManual: true,
+      }),
+    })
+
+    const { summary, rows } = useH6Check({
+      wpId: ref('wp-1'),
+      projectId: ref('proj-1'),
+      allResponses,
+    })
+
+    expect(rows.value).toHaveLength(2)
+    // 净值 = 100000-40000 = 60000；80000-40000 = 40000
+    expect(rows.value[0].netValue).toBe(60000)
+    expect(rows.value[0].clearingGainLoss).toBe(50000 - 1000 - 60000) // -11000
+    expect(summary.value.netValueTotal).toBe(100000)
+    expect(summary.value.coverageRate).toBe(100)
+    expect(summary.value.anomalyCount).toBe(1)
+    expect(summary.value.nonZeroEndingCount).toBe(1)
+    expect(summary.value.warning).toContain('异常')
+    expect(summary.value.warning).toContain('未清零')
+  })
+
+  it('检查比例偏低时 hasLowCoverage=true', () => {
+    const allResponses = makeAllResponses({
+      'H6-4-rows': JSON.stringify([
+        {
+          rowId: 'chk-1',
+          assetName: '设备A',
+          originalCost: 10000,
+          accumulatedDepreciation: 0,
+          impairment: 0,
+          clearingExpense: 0,
+          clearingIncome: 0,
+          endingBalance: 0,
+        },
+      ]),
+      'H6-4-sampling': JSON.stringify({
+        totalPopulation: 100000,
+        samplingMethod: '判断抽样',
+        populationManual: true,
+      }),
+    })
+
+    const { summary } = useH6Check({
+      wpId: ref('wp-1'),
+      projectId: ref('proj-1'),
+      allResponses,
+    })
+
+    expect(summary.value.coverageRate).toBe(10)
+    expect(summary.value.hasLowCoverage).toBe(true)
+    expect(summary.value.warning).toContain('检查比例偏低')
+  })
+
+  it('空行列表时 coverageRate=0 且无 warning', () => {
+    const allResponses = makeAllResponses({})
+
+    const { summary } = useH6Check({
+      wpId: ref('wp-1'),
+      projectId: ref('proj-1'),
+      allResponses,
+    })
+
+    expect(summary.value.checkedCount).toBe(0)
+    expect(summary.value.coverageRate).toBe(0)
+    expect(summary.value.hasLowCoverage).toBe(false)
+    expect(summary.value.warning).toBe('')
+  })
+
+  it('旧版合规矩阵行可降级迁移（保留项目名+不合规标记）', () => {
     const allResponses = makeAllResponses({
       'H6-4-rows': JSON.stringify([
         {
@@ -323,76 +463,18 @@ describe('H6 集成 — useH6Check summary (Req 4.5)', () => {
           conclusion: '不合规',
           remark: '',
         },
-        {
-          rowId: 'chk-2',
-          linkedDetailRowId: 'r2',
-          projectName: '车辆B',
-          disposalApproval: '合规',
-          assetValuation: '合规',
-          taxTreatment: '合规',
-          accountingTreatment: '合规',
-          incomeRecognition: '合规',
-          expenseAllocation: '合规',
-          transferTiming: '合规',
-          conclusion: '合规',
-          remark: '',
-        },
       ]),
     })
 
-    const { summary } = useH6Check({
+    const { rows, summary } = useH6Check({
       wpId: ref('wp-1'),
       projectId: ref('proj-1'),
       allResponses,
     })
 
-    expect(summary.value.hasNonCompliant).toBe(true)
-    expect(summary.value.nonCompliantCount).toBe(2) // assetValuation + conclusion of row1
-    expect(summary.value.warning).toContain('不合规')
-  })
-
-  it('全部"合规"时 summary.hasNonCompliant=false', () => {
-    const allResponses = makeAllResponses({
-      'H6-4-rows': JSON.stringify([
-        {
-          rowId: 'chk-1',
-          linkedDetailRowId: 'r1',
-          projectName: '设备A',
-          disposalApproval: '合规',
-          assetValuation: '合规',
-          taxTreatment: '合规',
-          accountingTreatment: '合规',
-          incomeRecognition: '合规',
-          expenseAllocation: '合规',
-          transferTiming: '合规',
-          conclusion: '合规',
-          remark: '',
-        },
-      ]),
-    })
-
-    const { summary } = useH6Check({
-      wpId: ref('wp-1'),
-      projectId: ref('proj-1'),
-      allResponses,
-    })
-
-    expect(summary.value.hasNonCompliant).toBe(false)
-    expect(summary.value.nonCompliantCount).toBe(0)
-    expect(summary.value.warning).toBe('')
-    expect(summary.value.compliantCount).toBe(8)
-  })
-
-  it('空行列表时 totalChecks=0, hasNonCompliant=false', () => {
-    const allResponses = makeAllResponses({})
-
-    const { summary } = useH6Check({
-      wpId: ref('wp-1'),
-      projectId: ref('proj-1'),
-      allResponses,
-    })
-
-    expect(summary.value.totalChecks).toBe(0)
-    expect(summary.value.hasNonCompliant).toBe(false)
+    expect(rows.value[0].assetName).toBe('设备A')
+    expect(rows.value[0].isAbnormal).toBe(true)
+    expect(rows.value[0].remark).toContain('旧版合规')
+    expect(summary.value.anomalyCount).toBe(1)
   })
 })

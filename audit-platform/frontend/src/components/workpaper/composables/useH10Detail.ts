@@ -6,6 +6,10 @@ import { ElMessageBox } from 'element-plus'
 import { SOURCE_WP_OPTIONS, type H10SourceWp } from './h10Constants'
 import { parseNum } from './useH10FormulaEngine'
 import { calcDisposalGainLoss, calcNetBookValue } from './useH10DisposalCalcEngine'
+import {
+  scanH10ExcludedClassRows,
+  summarizeH10ExcludedHits,
+} from './h10ExcludedClassGuard'
 import type { ChecklistResponse } from './useF1FormData'
 
 export type H10DetailTab = 'basic' | 'disposal' | 'evidence'
@@ -20,6 +24,7 @@ export interface H10DetailRow {
   sourceRowRef: string
   originalCost: number
   accumulatedDepreciation: number
+  impairmentProvision: number
   netBookValue: number
   disposalReason: string
   disposalMethod: string
@@ -51,11 +56,17 @@ function resolveSourceIndex(sourceWp: string): string {
 function enrichRow(raw: Partial<H10DetailRow> & { id?: string }, seq: number): H10DetailRow {
   const originalCost = parseNum(raw.originalCost)
   const accumulatedDepreciation = parseNum(raw.accumulatedDepreciation)
-  const netBookValue = calcNetBookValue(originalCost, accumulatedDepreciation)
+  const impairmentProvision = parseNum(raw.impairmentProvision ?? (raw as any).impairment)
+  const netBookValue = calcNetBookValue(originalCost, accumulatedDepreciation, impairmentProvision)
   const disposalIncome = parseNum(raw.disposalIncome)
   const disposalExpenses = parseNum(raw.disposalExpenses)
   const disposalTax = parseNum(raw.disposalTax)
-  const disposalGainLoss = calcDisposalGainLoss(disposalIncome, netBookValue, disposalExpenses, disposalTax)
+  const formulaGain = calcDisposalGainLoss(disposalIncome, netBookValue, disposalExpenses, disposalTax)
+  // 跨底稿事件可能只给损益净额：无收入/原值时沿用传入值
+  const hasCalcInputs = Math.abs(disposalIncome) > 0.005 || Math.abs(originalCost) > 0.005
+  const disposalGainLoss = hasCalcInputs || raw.disposalGainLoss == null
+    ? formulaGain
+    : parseNum(raw.disposalGainLoss)
   const sourceWp = raw.sourceWp ?? 'OTHER'
   return {
     id: raw.id ?? generateId(),
@@ -67,6 +78,7 @@ function enrichRow(raw: Partial<H10DetailRow> & { id?: string }, seq: number): H
     sourceRowRef: raw.sourceRowRef ?? '',
     originalCost,
     accumulatedDepreciation,
+    impairmentProvision,
     netBookValue,
     disposalReason: raw.disposalReason ?? '',
     disposalMethod: raw.disposalMethod ?? '',
@@ -134,6 +146,9 @@ export function useH10Detail(opts: {
   })
 
   const sourceWpOptions = SOURCE_WP_OPTIONS
+
+  const excludedClassHits = computed(() => scanH10ExcludedClassRows(rows.value))
+  const excludedClassWarning = computed(() => summarizeH10ExcludedHits(excludedClassHits.value))
 
   function updateRow(id: string, patch: Partial<H10DetailRow>): void {
     if (opts.isReadonly.value) return
@@ -233,6 +248,8 @@ export function useH10Detail(opts: {
     tabOptions,
     statsSummary,
     sourceWpOptions,
+    excludedClassHits,
+    excludedClassWarning,
     updateRow,
     addRow,
     removeRow,

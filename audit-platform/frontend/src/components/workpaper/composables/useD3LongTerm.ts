@@ -29,9 +29,26 @@ export interface LongTermRow {
   businessDescription: string // 经济业务说明
   reason: string             // 未结转或未偿还的原因
   settlementAmount: number   // 至审计日结转或偿还金额
+  disposalConclusion: string // 处理结论（应确认收入/应退回/应转营业外收入/正常挂账/待确定）
   plan: string               // 处理计划
   remark: string             // 备注
 }
+
+/**
+ * 处理结论枚举（CAS14 视角，判断型字段点选）：
+ * - 应确认收入：履约义务已完成，应转收入（关注收入截止 D4）
+ * - 应退回：合同解除/多收，应退款（列示为其他应付款/其他流动负债）
+ * - 应转营业外收入：确实无需支付/对方已注销/超时效，转营业外收入（关联 K12）
+ * - 正常挂账：合理未结转（如长期合同尚在履约）
+ * - 待确定：需进一步取证
+ */
+export const DISPOSAL_CONCLUSIONS = [
+  '应确认收入',
+  '应退回',
+  '应转营业外收入',
+  '正常挂账',
+  '待确定',
+] as const
 
 export interface UseD3LongTermOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
@@ -73,6 +90,7 @@ function normalizeRow(raw: any): LongTermRow {
     businessDescription: raw.businessDescription || '',
     reason: raw.reason || '',
     settlementAmount: parseNum(raw.settlementAmount),
+    disposalConclusion: raw.disposalConclusion || '',
     plan: raw.plan || '',
     remark: raw.remark || '',
   }
@@ -87,6 +105,7 @@ function createEmptyRow(): LongTermRow {
     businessDescription: '',
     reason: '',
     settlementAmount: 0,
+    disposalConclusion: '',
     plan: '',
     remark: '',
   }
@@ -120,6 +139,37 @@ export function useD3LongTerm(options: UseD3LongTermOptions) {
       endBalance: calcSubtotal(rows.value.map(r => r.endBalance)),
       settlementAmount: calcSubtotal(rows.value.map(r => r.settlementAmount)),
     }
+  })
+
+  // ─── 处理结论汇总（供跨底稿联动提示：→D4收入 / →K12营业外收入） ──────────
+
+  /** 按处理结论分组的笔数与金额合计 */
+  const disposalSummary: ComputedRef<{
+    shouldRecognizeRevenue: { count: number; amount: number }
+    shouldTransferNonOperating: { count: number; amount: number }
+    shouldRefund: { count: number; amount: number }
+    pending: { count: number; amount: number }
+  }> = computed(() => {
+    const acc = {
+      shouldRecognizeRevenue: { count: 0, amount: 0 },
+      shouldTransferNonOperating: { count: 0, amount: 0 },
+      shouldRefund: { count: 0, amount: 0 },
+      pending: { count: 0, amount: 0 },
+    }
+    for (const r of rows.value) {
+      const amt = parseNum(r.endBalance)
+      switch (r.disposalConclusion) {
+        case '应确认收入':
+          acc.shouldRecognizeRevenue.count++; acc.shouldRecognizeRevenue.amount += amt; break
+        case '应转营业外收入':
+          acc.shouldTransferNonOperating.count++; acc.shouldTransferNonOperating.amount += amt; break
+        case '应退回':
+          acc.shouldRefund.count++; acc.shouldRefund.amount += amt; break
+        case '待确定':
+          acc.pending.count++; acc.pending.amount += amt; break
+      }
+    }
+    return acc
   })
 
   // ─── Import from crossSheet ──────────────────────────────────────────
@@ -201,6 +251,7 @@ export function useD3LongTerm(options: UseD3LongTermOptions) {
   return {
     rows,
     subtotalRow,
+    disposalSummary,
     auditNote,
     conclusion,
     addRow,

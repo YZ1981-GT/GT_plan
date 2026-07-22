@@ -3,7 +3,7 @@
     <!-- 顶部引导区 -->
     <div class="guide-area">
       <div class="guide-grid">
-        <div class="guide-step"><span class="step-num">①</span> 审定表(I1)确认TB取数→三科目三角勾稽→审定回写(1701+1702+1703)</div>
+        <div class="guide-step"><span class="step-num">①</span> 审定表(I1-1)确认TB取数→三科目三角勾稽→审定回写(1701+1702+1703)</div>
         <div class="guide-step"><span class="step-num">②</span> 明细表(I1-2)逐项登记56列→4区段Tab→交叉核对审定表</div>
         <div class="guide-step"><span class="step-num">③</span> 检查表(I1-4~8)政策/增加/减少/寿命/权属逐项核验</div>
         <div class="guide-step"><span class="step-num">④</span> 摊销(I1-9~11)分配分析+分支选择器(含/不含减值)</div>
@@ -31,6 +31,30 @@
         <span class="stat-label">总进度</span>
       </div>
     </div>
+
+    <!-- 编制校验汇总 -->
+    <el-card v-if="prepIssues.length" shadow="never" class="prep-card">
+      <template #header>
+        <div class="section-title">
+          <span>编制校验汇总</span>
+          <el-tag size="small" type="warning">{{ prepIssues.length }} 项待处理</el-tag>
+        </div>
+      </template>
+      <ul class="prep-list">
+        <li v-for="(issue, idx) in prepIssues" :key="idx">
+          <el-tag size="small" class="prep-code" @click="handleNavigateByCode(issue.code)">{{ issue.code }}</el-tag>
+          {{ issue.message }}
+        </li>
+      </ul>
+    </el-card>
+    <el-alert
+      v-else
+      type="success"
+      :closable="false"
+      show-icon
+      title="编制校验：暂无跨表阻断项（I1-1 重大变动说明 / I1-7 询问 / I1-9 配平）"
+      class="prep-ok"
+    />
 
     <!-- 底稿目录表 -->
     <el-card shadow="never" class="index-card">
@@ -126,7 +150,7 @@ interface SheetEntry {
 const SHEET_DEFS: { seq: number; code: string; name: string; sheetName: string; fields: string[] }[] = [
   { seq: 1, code: 'Tab_Index', name: '底稿目录', sheetName: 'Tab_Index 底稿目录', fields: [] },
   { seq: 2, code: 'I1A', name: '实质性程序表', sheetName: 'Procedure_Table_I1A 实质性程序表', fields: ['I1A-'] },
-  { seq: 3, code: 'I1', name: '审定表', sheetName: 'Adjudication_I1 审定表', fields: ['I1-adj-', 'I1-tb-'] },
+  { seq: 3, code: 'I1-1', name: '审定表', sheetName: 'Adjudication_I1 审定表', fields: ['I1-adj-', 'I1-tb-', 'I1-1-'] },
   { seq: 4, code: 'I1-2', name: '明细表', sheetName: 'Detail_I1_2 明细表', fields: ['I1-2-'] },
   { seq: 5, code: 'I1-3', name: '调整分录', sheetName: 'Adjustment_I1_3 调整分录', fields: ['I1-3-'] },
   { seq: 6, code: 'I1-4', name: '政策检查', sheetName: 'Policy_Check_I1_4 政策检查', fields: ['I1-4-'] },
@@ -205,6 +229,63 @@ const completionPct = computed(() => {
   return Math.round(progressSum / total)
 })
 
+function _parseJson(itemId: string): any {
+  const item = props.allResponses.get(itemId)
+  if (!item) return null
+  const raw = item.remark ?? item.conclusion
+  if (!raw) return null
+  try { return typeof raw === 'string' ? JSON.parse(raw) : raw } catch { return null }
+}
+
+/** 跨表编制校验：I1-1 重大变动未说明 / I1-7 询问 / I1-9 未配平 */
+const prepIssues = computed(() => {
+  const issues: Array<{ code: string; message: string }> = []
+
+  const qual = _parseJson('I1-adj-qual-notes')
+  const lifeRows = _parseJson('I1-7-rows')
+  const inquiry = _parseJson('I1-7-inquiry-rows')
+  if (Array.isArray(lifeRows)) {
+    const indef = lifeRows.filter((r: any) =>
+      r.isIndefinite === 'Y' || r.isIndefinite === true || Number(r.usefulLifeMonths) <= 0,
+    )
+    if (indef.length) {
+      const missingBasis = indef.filter((r: any) => !String(r.indefiniteJudgmentBasis || '').trim())
+      if (missingBasis.length) {
+        issues.push({ code: 'I1-7', message: `${missingBasis.length} 项不确定寿命缺少判断依据` })
+      }
+      const inquiryList = Array.isArray(inquiry) ? inquiry : []
+      const unanswered = indef.filter((r: any) => {
+        const q = inquiryList.find((x: any) => x.name === r.name)
+        return !q
+          || (!q.identifiedFiniteFactors && !q.continuedOriginalUse && !String(q.findings || '').trim())
+      })
+      if (unanswered.length) {
+        issues.push({ code: 'I1-7', message: `${unanswered.length} 项不确定寿命尚未完成管理层询问` })
+      }
+      if (!String(qual?.indefiniteLife || '').trim()) {
+        issues.push({ code: 'I1', message: `有 ${indef.length} 项不确定寿命，审定表说明事项(2)尚未填写` })
+      }
+    }
+  }
+
+  const allocRows = _parseJson('I1-9-rows')
+  if (Array.isArray(allocRows) && allocRows.length) {
+    let unbalanced = 0
+    for (const r of allocRows) {
+      const sum =
+        Number(r.productionCost || 0) + Number(r.manufacturingCost || 0)
+        + Number(r.sellingExpense || 0) + Number(r.managementExpense || 0)
+        + Number(r.rdExpense || 0) + Number(r.otherExpense || 0)
+      if (Math.abs(sum - Number(r.totalAmort || 0)) >= 0.01) unbalanced++
+    }
+    if (unbalanced) {
+      issues.push({ code: 'I1-9', message: `${unbalanced} 行摊销分配未配平` })
+    }
+  }
+
+  return issues
+})
+
 function statusTagType(status: SheetStatus): 'success' | 'warning' | 'info' {
   switch (status) {
     case '已复核': return 'success'
@@ -221,6 +302,12 @@ function progressColor(pct: number): string {
 
 function handleNavigate(row: SheetEntry) {
   emit('navigate-sheet', row.sheetName)
+}
+
+function handleNavigateByCode(code: string) {
+  const hit = sheets.value.find((s) => s.code === code || s.code.startsWith(code))
+  if (hit) emit('navigate-sheet', hit.sheetName)
+  else emit('navigate-sheet', code)
 }
 </script>
 
@@ -251,6 +338,12 @@ function handleNavigate(row: SheetEntry) {
 .stat-inprogress .stat-value { color: #e6a23c; }
 .stat-pending .stat-value { color: #909399; }
 .stat-total .stat-value { color: var(--el-color-primary); }
+
+.prep-card { margin-bottom: 16px; }
+.prep-ok { margin-bottom: 16px; }
+.prep-list { margin: 0; padding-left: 4px; list-style: none; }
+.prep-list li { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
+.prep-code { cursor: pointer; }
 
 /* 目录卡片 */
 .section-title { display: flex; align-items: center; justify-content: space-between; }

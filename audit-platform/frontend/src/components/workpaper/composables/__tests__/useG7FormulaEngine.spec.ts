@@ -236,7 +236,8 @@ describe('Feature: g7-long-term-equity-main, Property 8: parseNum健壮性', () 
       fc.property(
         fc.double({ noNaN: true, noDefaultInfinity: true }),
         (n) => {
-          expect(parseNum(n)).toBe(n)
+          const expected = Object.is(n, -0) ? 0 : n
+          expect(parseNum(n)).toBe(expected)
         },
       ),
       { numRuns: 100 },
@@ -248,7 +249,8 @@ describe('Feature: g7-long-term-equity-main, Property 8: parseNum健壮性', () 
       fc.property(
         fc.double({ noNaN: true, noDefaultInfinity: true }),
         (n) => {
-          expect(parseNum(String(n))).toBe(n)
+          const expected = Object.is(n, -0) ? 0 : n
+          expect(parseNum(String(n))).toBe(expected)
         },
       ),
       { numRuns: 100 },

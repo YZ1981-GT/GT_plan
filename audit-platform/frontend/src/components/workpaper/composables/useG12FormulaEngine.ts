@@ -49,6 +49,6 @@ export function calcSubtotal(values: number[]): number {
   return values.reduce((s, v) => s + parseNum(v), 0)
 }
 
-export function isVoucherAbnormal(checks: boolean[]): boolean {
+export function isVoucherAbnormal(checks: Array<boolean | null>): boolean {
   return checks.some((c) => c === false)
 }

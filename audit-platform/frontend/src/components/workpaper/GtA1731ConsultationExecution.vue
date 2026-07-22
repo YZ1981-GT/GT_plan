@@ -87,6 +87,25 @@
                 @change="(v: string) => updateMeta('execution_date', v || '')"
               />
             </div>
+            <div class="gt-a1731__meta-item">
+              <label>关联咨询事项编号</label>
+              <el-input
+                :model-value="metaInfo.consultation_id"
+                size="small"
+                :disabled="props.readonly"
+                placeholder="与 A17-3 咨询事项编号一致"
+                @change="(v: string) => updateMeta('consultation_id', v)"
+              />
+            </div>
+            <div class="gt-a1731__meta-item gt-a1731__meta-item--wide">
+              <el-checkbox
+                :model-value="metaInfo.not_required === '是' || metaInfo.not_required === '1' || metaInfo.not_required === 'true'"
+                :disabled="props.readonly"
+                @change="(v: boolean | string | number) => updateMeta('not_required', v ? '是' : '')"
+              >
+                无需执行（咨询结论无需落地执行时勾选，关闭 A17-3↔3-1 成对要求）
+              </el-checkbox>
+            </div>
           </div>
         </el-card>
 
@@ -256,7 +275,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { ref, onMounted, onBeforeUnmount, defineAsyncComponent, watch } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useA1731ConsultationExecution } from './composables/useA1731ConsultationExecution'
@@ -268,7 +287,10 @@ const GtOnlyOfficeSheet = defineAsyncComponent(
 
 defineOptions({ name: 'GtA1731ConsultationExecution' })
 
-const emit = defineEmits<{ 'switch-tab': [tabId: string] }>()
+const emit = defineEmits<{
+  'switch-tab': [tabId: string]
+  saved: []
+}>()
 
 const props = withDefaults(defineProps<{
   wpId: string
@@ -294,6 +316,10 @@ const {
   updateSection,
   flushPendingSaves,
 } = useA1731ConsultationExecution(wpIdRef)
+
+watch(saveStatus, (s) => {
+  if (s === 'saved') emit('saved')
+})
 
 // ─── Tab Switch (navigate to A17-3 within Bundle) ───
 function switchToA173Tab() {

@@ -15,7 +15,7 @@
       show-icon
       class="audit-objective"
       title="审计目标"
-      description="核实套期工具与被套期项目的公允价值变动计量恰当，评价套期有效性（前瞻性/回顾性），并与 G12-2 套期关系明细交叉验证公允价值变动一致。"
+      description="核实套期工具与被套期项目的公允价值变动计量恰当，评价套期有效性（前瞻性/回顾性），并与 G12-2 净敞口套期收益明细交叉验证公允价值变动一致。"
     />
 
     <div class="tab-toolbar">
@@ -202,7 +202,7 @@
 
     <details class="methodology-hint">
       <summary>📋 编制提示（CAS24 套期会计）</summary>
-      <p>公允价值测试分「套期工具侧」与「被套期项目侧」两区段，按套期关系编号关联。FV 变动 = 期末 FV − 期初 FV，须与 G12-2 套期关系明细一致。有效性测试方法含前瞻性（比率分析/回归分析）与回顾性；公允价值层次（Level 1/2/3）影响估值可靠性判断。</p>
+      <p>公允价值测试分「套期工具侧」与「被套期项目侧」两区段，按套期关系编号关联。FV 变动 = 期末 FV − 期初 FV，须与 G12-2 净敞口套期收益明细一致。有效性测试方法含前瞻性（比率分析/回归分析）与回顾性；公允价值层次（Level 1/2/3）影响估值可靠性判断。</p>
     </details>
   </div>
 </template>
@@ -210,7 +210,7 @@
 <script setup lang="ts">
 import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { useG12FairValueTest } from '../../composables/useG12FairValueTest'
-import { useG12HedgeDetail } from '../../composables/useG12HedgeDetail'
+import { useG12HedgeDetail, mapG12HedgeDetailForFvCross } from '../../composables/useG12HedgeDetail'
 import {
   findG12FvCrossMismatches,
   formatG12FvCrossSummaryMessage,
@@ -262,7 +262,7 @@ onMounted(() => {
 })
 
 const fvCrossMessage = computed(() => {
-  const mismatches = findG12FvCrossMismatches(hd.rows.value, props.allResponses)
+  const mismatches = findG12FvCrossMismatches(mapG12HedgeDetailForFvCross(hd.rows.value), props.allResponses)
   return formatG12FvCrossSummaryMessage(mismatches)
 })
 

@@ -21,9 +21,11 @@ import http from '@/utils/http'
 export type I1ImportableSheet =
   | 'I1'        // 审定表
   | 'I1-2'     // 明细表（4区段分sheet导出）
+  | 'I1-3'     // 调整分录
   | 'I1-9'     // 摊销分配
   | 'I1-10'    // 摊销测算（不含减值）
   | 'I1-11'    // 摊销测算（含减值）
+  | 'I1-12'    // 减值准备测试
 
 export interface I1ImportResult {
   success: boolean
@@ -49,9 +51,11 @@ export const I1_DETAIL_SEGMENTS = [
 export const I1_IMPORTABLE_SHEETS: { code: I1ImportableSheet; label: string }[] = [
   { code: 'I1', label: 'I1 审定表(93行9列)' },
   { code: 'I1-2', label: 'I1-2 明细表(56列4区段)' },
+  { code: 'I1-3', label: 'I1-3 调整分录' },
   { code: 'I1-9', label: 'I1-9 摊销分配(10列)' },
   { code: 'I1-10', label: 'I1-10 摊销测算(不含减值)' },
   { code: 'I1-11', label: 'I1-11 摊销测算(含减值)' },
+  { code: 'I1-12', label: 'I1-12 减值准备测试' },
 ]
 
 // ─── Composable ──────────────────────────────────────────────────────────────

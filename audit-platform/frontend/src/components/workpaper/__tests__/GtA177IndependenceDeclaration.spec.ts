@@ -191,12 +191,12 @@ describe('GtA177IndependenceDeclaration.vue', () => {
 
     it('renders team sign table section title', async () => {
       const wrapper = await mountComponent()
-      expect(wrapper.text()).toContain('团队成员签字')
+      expect(wrapper.text()).toContain('项目组成员签字确认')
     })
 
     it('renders partner declaration section', async () => {
       const wrapper = await mountComponent()
-      expect(wrapper.text()).toContain('合伙人及负责经理声明')
+      expect(wrapper.text()).toContain('合伙人及负责经理审查确认')
     })
 
     it('renders threat records section', async () => {
@@ -206,7 +206,7 @@ describe('GtA177IndependenceDeclaration.vue', () => {
 
     it('renders guidance notes section', async () => {
       const wrapper = await mountComponent()
-      expect(wrapper.text()).toContain('编制指导')
+      expect(wrapper.text()).toContain('编制提示')
     })
   })
 
@@ -266,7 +266,7 @@ describe('GtA177IndependenceDeclaration.vue', () => {
   describe('guidance collapse', () => {
     it('renders guidance section with badge', async () => {
       const wrapper = await mountComponent()
-      expect(wrapper.text()).toContain('编制指导')
+      expect(wrapper.text()).toContain('编制提示')
     })
   })
 })

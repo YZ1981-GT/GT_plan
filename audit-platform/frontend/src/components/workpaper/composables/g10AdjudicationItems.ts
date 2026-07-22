@@ -6,7 +6,20 @@ export interface G10AdjudicationLineDef {
   group?: string
 }
 
-const LIABILITY_LINE_TEMPLATES = [
+export const G10_LIABILITY_LINE_SUFFIXES = [
+  'trading_liability',
+  'trading_bond',
+  'derivative_liability',
+  'other',
+  'designated_fvtpl',
+  'designated_bond',
+  'hybrid_tool',
+  'other_designated',
+] as const
+
+export type G10LiabilityLineSuffix = (typeof G10_LIABILITY_LINE_SUFFIXES)[number]
+
+const LIABILITY_LINE_TEMPLATES: ReadonlyArray<{ suffix: G10LiabilityLineSuffix; label: string }> = [
   { suffix: 'trading_liability', label: '交易性金融负债' },
   { suffix: 'trading_bond', label: '其中：发行的交易性债券' },
   { suffix: 'derivative_liability', label: '衍生金融负债' },
@@ -15,7 +28,7 @@ const LIABILITY_LINE_TEMPLATES = [
   { suffix: 'designated_bond', label: '其中：债券' },
   { suffix: 'hybrid_tool', label: '混合工具' },
   { suffix: 'other_designated', label: '其他' },
-] as const
+]
 
 function buildGroupRows(group: G10AdjudicationLineDef['group'], prefix: string): G10AdjudicationLineDef[] {
   return LIABILITY_LINE_TEMPLATES.map((t) => ({
@@ -36,4 +49,11 @@ export const G10_GROUP_LABELS: Record<string, string> = {
   initial: '(一)初始金额',
   fv_accum: '(二)累计公允价值变动',
   book_fv: '(三)账面余额（公允价值）',
+}
+
+/** 各分组小计行标签（对齐 Excel G10-1 行 16 / 26 / 36） */
+export const G10_GROUP_SUBTOTAL_LABELS: Record<string, string> = {
+  initial: '初始成本小计',
+  fv_accum: '公允价值变动小计',
+  book_fv: '账面余额（公允价值）合计',
 }

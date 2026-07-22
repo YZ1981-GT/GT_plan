@@ -5,12 +5,15 @@
  * Task: 3.1
  * Requirements: 19.1-19.9
  *
- * 职责：
+ * 职责（历史）：
  * - allResponses Map 加载 + saveImmediate + debouncedSave(2s) + saveBatch
  * - writebackTrialBalance（科目1601借方+1602贷方）
  * - selfLoad逻辑（render-config?force_component_type=h1-fixed-assets）
  * - projectContext加载（含business_category/applicable_standards）
  * - TB自动取数 unadjusted_amount → 审定表未审数
+ *
+ * @deprecated 运行时由 GtH1FixedAssets.selfLoad + persistResponse 接管；
+ * 本文件仍导出 ChecklistItem 类型供各 H1 composable 使用。请勿在新入口调用 useH1FormData()。
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -42,6 +45,7 @@ const ACCOUNT_CODE_1602 = '1602'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
+/** @deprecated 见文件头；新代码请用 GtH1FixedAssets 的 persistResponse / selfLoad */
 export function useH1FormData(wpId: Ref<string>, projectId: Ref<string>) {
   // ─── Reactive state ────────────────────────────────────────────────────────
   const isLoading = ref(false)

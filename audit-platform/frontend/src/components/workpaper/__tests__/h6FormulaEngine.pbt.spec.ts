@@ -141,4 +141,20 @@ describe('Feature: h6-asset-disposal-clearing, Property P5: 净账面价值公�
       { numRuns: 100 },
     )
   })
+
+  it('calcNetBookValue(cost, dep, impair) === cost - dep - impair', () => {
+    fc.assert(
+      fc.property(
+        fc.double({ min: 0, max: 1e9, noNaN: true, noDefaultInfinity: true }),
+        fc.double({ min: 0, max: 1e9, noNaN: true, noDefaultInfinity: true }),
+        fc.double({ min: 0, max: 1e9, noNaN: true, noDefaultInfinity: true }),
+        (cost, dep, impair) => {
+          const result = calcNetBookValue(cost, dep, impair)
+          const expected = cost - dep - impair
+          expect(Math.abs(result - expected)).toBeLessThan(1e-6)
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
 })

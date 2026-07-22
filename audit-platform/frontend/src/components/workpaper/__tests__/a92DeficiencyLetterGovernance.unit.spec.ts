@@ -32,6 +32,14 @@ vi.mock('element-plus', async () => {
   }
 })
 
+vi.mock('../GtIndexChip.vue', () => ({
+  default: {
+    name: 'GtIndexChip',
+    props: ['value', 'contextProjectId', 'context', 'indexRef', 'label'],
+    template: '<span class="gt-index-chip-stub">{{ indexRef || value || label }}</span>',
+  },
+}))
+
 const governanceHtmlData = {
   variant: 'governance',
   section_data: {

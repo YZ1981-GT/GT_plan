@@ -105,9 +105,9 @@ describe('CNoteCell — 8 渲染分支', () => {
     })
     const span = wrapper.find('span.gt-cnt__cell-readonly')
     expect(span.exists()).toBe(true)
-    // formatPercent → "25.50%"
+    // formatPercent → "25.5%"
     expect(span.text()).toContain('%')
-    expect(span.text()).toContain('25.50')
+    expect(span.text()).toContain('25.5')
   })
 
   it('分支 4：boolean → ElCheckbox', () => {

@@ -35,8 +35,26 @@
       <el-skeleton v-if="loading" :rows="10" animated />
 
       <template v-else>
+        <el-alert
+          type="info"
+          :closable="false"
+          show-icon
+          class="gt-a174__na"
+          style="margin-bottom: 12px"
+        >
+          <template #title>
+            <el-checkbox
+              :model-value="notApplicable"
+              :disabled="readonly"
+              @change="(v: boolean | string | number) => setNotApplicable(!!v)"
+            >
+              本期无重大专业分歧（不适用）
+            </el-checkbox>
+          </template>
+        </el-alert>
+
         <!-- Personnel Table -->
-        <el-card class="gt-a174__card" shadow="never">
+        <el-card class="gt-a174__card" shadow="never" :class="{ 'is-na': notApplicable }">
           <template #header>
             <div class="gt-a174__card-header">
               <span class="gt-a174__card-title">存在专业意见分歧的人员</span>
@@ -219,12 +237,14 @@ const {
   signatureData,
   saveStatus,
   lastSavedAt,
+  notApplicable,
   loadData,
   addPersonnel,
   removePersonnel,
   updatePersonnel,
   updateSection,
   updateSignature,
+  setNotApplicable,
   flushPendingSaves,
 } = useA174DisagreementRecord(wpIdRef)
 
@@ -328,6 +348,11 @@ defineExpose({ reload: () => loadData(props.wpId) })
 
 .gt-a174__card {
   border-radius: 8px;
+}
+
+.gt-a174__card.is-na {
+  opacity: 0.55;
+  pointer-events: none;
 }
 
 .gt-a174__card-header {

@@ -21,6 +21,7 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
   relatedParties: string[]
+  bsDate?: string
 }>()
 
 const { onExportTemplate, onExportData, onImportFile } = useD2TabImportExport(
@@ -52,6 +53,7 @@ const {
   updateCell,
   useVirtualScroll,
   importFromAuxBalance,
+  importPostPaymentFromLedger,
   bands,
 } = useD2Detail({
   wpId: toRef(props, 'wpId') as Ref<string>,
@@ -59,10 +61,18 @@ const {
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
   relatedParties: toRef(props, 'relatedParties') as Ref<string[]>,
+  bsDate: toRef(props, 'bsDate') as Ref<string>,
 })
 
 const browseMode = ref(true)
 const tableWidth = ref(1200)
+const editPageSize = 50
+const editCurrentPage = ref(1)
+const pagedRows = computed(() => {
+  if (!useVirtualScroll.value || browseMode.value) return filteredRows.value
+  const start = (editCurrentPage.value - 1) * editPageSize
+  return filteredRows.value.slice(start, start + editPageSize)
+})
 
 const virtualColumns = computed<VirtualColumn[]>(() => {
   const fmt = (v: unknown) => displayPrefs.fmtAmount(Number(v) || 0)
@@ -127,6 +137,17 @@ async function handleImportFromAux(): Promise<void> {
   }
 }
 
+const fetchingPostPayment = ref(false)
+async function handleImportPostPayment(): Promise<void> {
+  if (props.isReadonly) return
+  fetchingPostPayment.value = true
+  try {
+    await importPostPaymentFromLedger()
+  } finally {
+    fetchingPostPayment.value = false
+  }
+}
+
 function saveDetailNote(): void {
   props.allResponses.set('D2-detail-audit-note', { item_id: 'D2-detail-audit-note', conclusion: null, remark: detailNote.value })
   window.dispatchEvent(new CustomEvent('d2:save-items', {
@@ -180,6 +201,11 @@ function handleEdit(row: DetailRow, field: string, value: any) {
         <el-button size="small" type="success" :disabled="isReadonly" :loading="importing" @click="handleImportFromAux">
           从余额表导入
         </el-button>
+        <el-tooltip content="从次年序时账取基准日后 1122 贷方收款，按客户归集填入期后回款（函证替代程序）" placement="top">
+          <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="fetchingPostPayment" @click="handleImportPostPayment">
+            取期后回款
+          </el-button>
+        </el-tooltip>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">
           添加客户
         </el-button>
@@ -221,7 +247,7 @@ function handleEdit(row: DetailRow, field: string, value: any) {
     <!-- 主表（编辑模式或 ≤30 行） -->
     <el-table
       v-else
-      :data="filteredRows"
+      :data="pagedRows"
       border
       stripe
       size="small"
@@ -380,9 +406,20 @@ function handleEdit(row: DetailRow, field: string, value: any) {
         </template>
       </el-table-column>
 
-      <!-- 期后回款 -->
-      <el-table-column label="期后回款" width="110" align="right">
-        <template #default="{ row }">{{ displayPrefs.fmtAmount(row.postPayment) }}</template>
+      <!-- 期后回款（可编辑 / 一键取数） -->
+      <el-table-column label="期后回款" width="130" align="right">
+        <template #default="{ row }">
+          <el-input-number
+            v-if="!isReadonly"
+            :model-value="row.postPayment"
+            :controls="false"
+            :precision="2"
+            size="small"
+            style="width: 118px"
+            @change="(v: number | undefined) => handleEdit(row, 'postPayment', v ?? 0)"
+          />
+          <span v-else>{{ displayPrefs.fmtAmount(row.postPayment) }}</span>
+        </template>
       </el-table-column>
 
       <!-- 备注 -->
@@ -397,6 +434,17 @@ function handleEdit(row: DetailRow, field: string, value: any) {
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- 编辑模式分页 -->
+    <div v-if="useVirtualScroll && !browseMode && filteredRows.length > editPageSize" class="edit-pagination">
+      <el-pagination
+        v-model:current-page="editCurrentPage"
+        :page-size="editPageSize"
+        :total="filteredRows.length"
+        layout="prev, pager, next, jumper, ->, total"
+        small
+      />
+    </div>
 
     <!-- 合计行 -->
     <div class="total-bar">
@@ -436,6 +484,7 @@ function handleEdit(row: DetailRow, field: string, value: any) {
 .virtual-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
 .virtual-hint { margin-bottom: 0; flex: 1; }
 .virtual-table { margin-bottom: 8px; }
+.edit-pagination { margin: 8px 0; display: flex; justify-content: center; }
 :deep(.related-party-row) { background-color: #fff7e6 !important; }
 .aging-input { width: 100%; }
 .total-bar {

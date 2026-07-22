@@ -259,6 +259,9 @@ md中描述的交叉引用：
 2. ⚠️ Spec Req 2.3公式修正为`审定=未审+账项调整`（非AJE+RJE分列）
 3. ⚠️ Spec Req 2.4/2.6三角勾稽应在H2-2上实施，H2-1仅展示跨sheet差异警告
 
+> **2026-07 已回写**：`requirements.md` Req 2/3、`wp_fine_rules/h2_construction_in_progress.json`、
+> `useH2CrossSheet` / `useH2FormulaEngine` / `wp_guidance/H2.json` 已按上表决议对齐。
+
 ### 开发影响：
 - H2-1组件(H2TabAdjudication.vue)按xlsx 12列布局实现，不含增减/转固列
 - 三角勾稽校验逻辑放在H2-2组件(H2TabDetail.vue)

@@ -31,8 +31,72 @@ export function calcNetValue(cost: number, accumulatedDepreciation: number, impa
   return safeNum(cost) - safeNum(accumulatedDepreciation) - safeNum(impairment)
 }
 
+/**
+ * H8-10 减值测算用账面价值② = 原值 − 累计折旧（不含减值准备）
+ * 勿与审定净值混淆（净值已扣减值）。
+ */
+export function calcImpairmentBookValue(cost: number, accumulatedDepreciation: number): number {
+  return safeNum(cost) - safeNum(accumulatedDepreciation)
+}
+
+/**
+ * 有迹象时⑤ = max(③,④)；无减值迹象时返回 0（CAS8：先迹象、后测试）。
+ * 注意：与 h8RecoverableModel.calcRecoverableAmount（无闸门）区分。
+ */
+export function calcImpairmentRecoverableAmount(
+  fairValueLessDisposal: number,
+  dcfPresentValue: number,
+  hasIndication: boolean,
+): number {
+  if (!hasIndication) return 0
+  return Math.max(safeNum(fairValueLessDisposal), safeNum(dcfPresentValue))
+}
+
+/**
+ * 期末应计提减值⑥ = max(② − ⑤, 0)；无迹象时为 0。
+ * （源模板表头曾误写⑥=⑤−②，已纠正）
+ */
+export function calcRequiredImpairment(
+  bookValue: number,
+  recoverableAmount: number,
+  hasIndication = true,
+): number {
+  if (!hasIndication) return 0
+  return Math.max(safeNum(bookValue) - safeNum(recoverableAmount), 0)
+}
+
+/**
+ * 本期应补提⑧ = max(⑥ − ⑦, 0)
+ * CAS8：减值一经确认不得转回，故结果不为负。
+ */
+export function calcImpairmentSupplement(required: number, alreadyProvided: number): number {
+  return Math.max(safeNum(required) - safeNum(alreadyProvided), 0)
+}
+
+/**
+ * 多提待查⑨ = max(⑦ − ⑥, 0)
+ * 仅提示调查（处置结转遗漏等），禁止做转回分录。
+ */
+export function calcImpairmentOverProvision(required: number, alreadyProvided: number): number {
+  return Math.max(safeNum(alreadyProvided) - safeNum(required), 0)
+}
+
 /** 合计行 = 数组求和；空数组返回0 */
 export function calcSubtotal(arr: number[]): number {
   if (!Array.isArray(arr) || arr.length === 0) return 0
   return arr.reduce((sum, v) => sum + safeNum(v), 0)
+}
+
+/**
+ * 审定变动率(%)：对齐致同 Excel
+ * - 期初审定=0 且变动=0 → 0
+ * - 期初审定=0 且变动≠0 → ±100
+ * - 否则 变动额 / |期初审定| × 100
+ */
+export function calcChangeRate(change: number, beginAudited: number): number | null {
+  const c = safeNum(change)
+  const b = safeNum(beginAudited)
+  if (b === 0 && c === 0) return 0
+  if (b === 0) return c > 0 ? 100 : c < 0 ? -100 : 0
+  return (c / Math.abs(b)) * 100
 }

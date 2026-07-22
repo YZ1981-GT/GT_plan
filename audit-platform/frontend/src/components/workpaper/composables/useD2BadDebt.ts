@@ -22,6 +22,7 @@ import {
   getAuditedAmount,
 } from './useD2FormulaEngine'
 import type { UseD2BaseOptions } from './useD2Adjudication'
+import { calcSourceEclProfitLoss, publishGCycleSourceEcl } from './gCycleSourceEcl'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -482,6 +483,13 @@ export function useD2BadDebt(options: UseD2BaseOptions & { eclTestTotal: Ref<num
   }
 
   // ─── Lifecycle ─────────────────────────────────────────────────────────
+
+  /** 向 G14 广播本期坏账净计提（计入损益） */
+  watch(
+    () => calcSourceEclProfitLoss(totalRow.value.currentProvision, totalRow.value.currentReversal),
+    (amount) => { publishGCycleSourceEcl('D2', amount) },
+    { immediate: true },
+  )
 
   onBeforeUnmount(() => {
     if (debounceTimer) {

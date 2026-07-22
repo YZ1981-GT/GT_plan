@@ -51,7 +51,7 @@ sheets:
         F:
           field: col_f
           type: text
-          label: B61-1
+          label: B60-1
         G:
           field: col_g
           type: text
@@ -66,7 +66,7 @@ sheets:
       - D5
       _total_count: 1
     cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
-  B61-1工时预算与控制表:
+  B60-1工时预算与控制表:
     component_type: univer
     class_code: F-数据表
     fixed_cells:
@@ -144,7 +144,7 @@ sheets:
       - F5:F6
       - B5:B6
     cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
-  B61-1工时预算与控制板（按阶段）:
+  B60-1工时预算与控制板（按阶段）:
     component_type: univer
     class_code: F-数据表
     fixed_cells:

@@ -58,8 +58,27 @@ const props = withDefaults(defineProps<Props>(), {
 
 // ─── Emits ────────────────────────────────────────────────────────────────────
 
+/** 回填时附带的方法学快照（供底稿「抽样过程」自动回填） */
+export interface SamplingFilledMethodology {
+  samplingMethod: SamplingMethod
+  samplingInterval: string | null
+  sampleSize: number
+  suggestedSampleSize: number | null
+  tolerableMisstatement: number | null
+  expectedMisstatement: number | null
+  confidenceLevel: number | null
+  accountCodes: string[]
+  randomSeed: string | null
+}
+
 const emit = defineEmits<{
-  (e: 'filled', payload: { samples: SampledVoucher[]; phase: Phase; fillMode: FillMode; method?: SamplingMethod }): void
+  (e: 'filled', payload: {
+    samples: SampledVoucher[]
+    phase: Phase
+    fillMode: FillMode
+    method?: SamplingMethod
+    methodology?: SamplingFilledMethodology
+  }): void
   (e: 'phase-changed', payload: { phase: Phase }): void
 }>()
 
@@ -176,11 +195,23 @@ function handleBatchMarkChecked() {
 async function handleConfirmFill() {
   const result = await confirmFill()
   if (result.length > 0) {
+    const methodology: SamplingFilledMethodology = {
+      samplingMethod: config.value.samplingMethod,
+      samplingInterval: samplingInterval.value ?? null,
+      sampleSize: result.length,
+      suggestedSampleSize: suggestedSampleSize.value ?? config.value.suggestedSampleSize ?? null,
+      tolerableMisstatement: config.value.tolerableMisstatement ?? null,
+      expectedMisstatement: config.value.expectedMisstatement ?? null,
+      confidenceLevel: config.value.confidenceLevel ?? null,
+      accountCodes: [...(config.value.accountCodes ?? [])],
+      randomSeed: seedUsed.value != null ? String(seedUsed.value) : (config.value.randomSeed != null ? String(config.value.randomSeed) : null),
+    }
     emit('filled', {
       samples: result,
       phase: props.phase,
       fillMode: isFillModeRestricted.value ? 'append' : fillMode.value,
       method: config.value.samplingMethod,
+      methodology,
     })
     // 检查合规性
     checkCompliance()

@@ -43,7 +43,7 @@ describe('GtA171AuditSummary PBT', () => {
             '16': { type: 'textarea', title: '十六', content: null },
           })
 
-          const { activeChapter } = useA171Navigation({ chapters })
+          const { activeChapter } = useA171Navigation(chapters)
 
           // Directly set activeChapter to simulate observer update
           activeChapter.value = chapterNum
@@ -96,7 +96,7 @@ describe('GtA171AuditSummary PBT', () => {
             }
           }
 
-          const { completionStatus } = useA171Navigation({ chapters })
+          const { completionStatus } = useA171Navigation(chapters)
 
           // Exactly 16 entries
           const keys = Object.keys(completionStatus.value)

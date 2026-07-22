@@ -1,96 +1,111 @@
 /**
- * useI2Impairment — I2-15 减值准备测试表 + I2-16 可收回金额测试(DCF)
+ * useI2Impairment — I2-15 减值准备测试表 + I2-16 可收回金额测试
  *
- * 核心功能：
- * 1. I2-15 减值准备测试表：
- *    - 列：项目|账面|可收回金额|应计提|已计提|差额 (Req 10.1)
- *    - 公式：应计提=MAX(账面-可收回,0); 差额=应计提-已计提
- *    - 差额≠0 红色高亮
- * 2. I2-16 可收回金额测试（DCF，复用I1-13模式）(Req 10.2)：
- *    - DCF模型：预测期现金流(5年) + 折现率 + 终值 + 现值合计
- *    - 公式：PV=Σ(CF_i/(1+r)^i) + TV/(1+r)^n
- *    - 可收回金额=MAX(公允价值-处置费用, DCF使用价值)
- * 3. I2-16 → I2-15 联动：可收回金额自动填入对应行
- * 4. 联动审定表减值准备列 (Req 10.3)
+ * I2-15 对齐 Excel：迹象① → 是否测试 → ②账面 → ③公允/④DCF → ⑤MAX → ⑥应提 → ⑧=⑥−⑦
+ * I2-16 对齐 Excel（复用 I1-13 / CAS8）：
+ *   一、公允净额（销售协议→活跃市场→估计 − 处置费用）
+ *   二、DCF + WACC/CAPM（默认税前折现率）
+ *   三、可收回金额 = MAX(①,②) → 回填 I2-15 ③④
  *
- * 持久化：
- * - I2-15 rows: "I2-15-rows"
- * - I2-16 DCF params: "I2-16-dcf-params"
- *
- * Spec: .kiro/specs/i2-development-expenditure/
- * Task: 3.7
- * Requirements: 10.1-10.3
+ * Spec: .kiro/specs/i2-development-expenditure/ Requirements: 10.1-10.3
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem } from './useI2FormData'
+import {
+  type I2ImpairmentTestRow,
+  type I2ImpairmentSummary,
+  type I2ImpPrepValidation,
+  emptyI2ImpairmentRow,
+  normalizeI2ImpairmentRow,
+  recomputeI2ImpairmentRow,
+  summarizeI2Impairment,
+  validateI2ImpairmentPrep,
+  seedRowsFromI2Detail,
+  suggestI2ImpairmentConclusion,
+  buildI2ImpairmentAdjustmentHint,
+  buildI2ImpairmentEventDetail,
+} from './i2ImpairmentModel'
+import {
+  DCF_FORECAST_YEARS,
+  defaultFvDisposal,
+  defaultWaccParams,
+  normalizeFvDisposal,
+  normalizeWaccParams,
+  calcI2RecoverableResult,
+  buildI2ConclusionDraft,
+  buildI216SyncChecks,
+  validateWaccParams,
+  compareI2Wacc,
+  buildI2SensitivityNote,
+  applyPreferValueInUse,
+  type I2FairValueDisposal,
+  type I2WaccParams,
+  type I216SyncCheck,
+  type I2WaccCompareResult,
+} from './i2RecoverableModel'
 
-// ─── Types: I2-15 减值准备测试 ───────────────────────────────────────────────
+export type { I2ImpairmentTestRow, I2ImpairmentSummary, I2ImpPrepValidation, I2FairValueDisposal, I2WaccParams, I216SyncCheck, I2WaccCompareResult }
+export { DCF_FORECAST_YEARS }
+export {
+  emptyI2ImpairmentRow,
+  normalizeI2ImpairmentRow,
+  recomputeI2ImpairmentRow,
+  summarizeI2Impairment,
+  validateI2ImpairmentPrep,
+  seedRowsFromI2Detail,
+  suggestI2ImpairmentConclusion,
+  buildI2ImpairmentAdjustmentHint,
+} from './i2ImpairmentModel'
 
-/** I2-15 减值准备测试行 (Req 10.1) */
-export interface I2ImpairmentTestRow {
-  rowId: string
-  /** 研发项目名称 */
-  name: string
-  /** 账面价值（开发支出净值） */
-  bookValue: number
-  /** 可收回金额（从 I2-16 联动填入，或手工输入）*/
-  recoverableAmount: number
-  /** 应计提减值 = MAX(账面 - 可收回, 0) */
-  shouldProvision: number
-  /** 已计提减值 */
-  alreadyProvided: number
-  /** 差额 = 应计提 - 已计提 */
-  difference: number
-  /** 审计结论 */
-  conclusion: string
-  /** 是否关联 I2-16 DCF 测试 */
-  linkedToDcf: boolean
-}
-
-// ─── Types: I2-16 可收回金额测试 (DCF) ──────────────────────────────────────
-
-/** DCF 预测期年数 */
-export const DCF_FORECAST_YEARS = 5
-
-/** I2-16 可收回金额测试行 (Req 10.2) */
+/** I2-16 可收回金额测试行（对齐 Excel 一/二/三节） */
 export interface I2RecoverableTestRow {
   rowId: string
-  /** 资产/项目名称（与 I2-15 对应） */
   name: string
-  /** 预测期现金流数组（5年） */
+  bookValue: number
   cashFlows: number[]
-  /** 折现率 (如 0.08=8%) */
   discountRate: number
-  /** 永续增长率 (如 0.02=2%) */
   growthRate: number
-  /** 终值 = perpetuityCF / (r - g) */
+  growthRateBasis: string
+  usePreTaxRate: boolean
+  fvDisposal: I2FairValueDisposal
+  waccParams: I2WaccParams
   terminalValue: number
-  /** DCF 使用价值 = PV(预测期) + PV(终值) */
   valueInUse: number
-  /** 公允价值减去处置费用 */
   fairValueLessDisposal: number
-  /** 可收回金额 = MAX(公允-处置费, DCF) */
   recoverableAmount: number
-  /** 各期折现现金流（明细展示） */
   discountedCashFlows: number[]
-  /** 终值折现值 */
+  discountFactors: number[]
   discountedTerminalValue: number
+  pvForecast: number
+  fairValueSource: string
+  disposalTotal: number
+  recoverableSource: string
+  costOfEquity: number
+  waccAfterTax: number
+  preTaxDiscountRate: number
+  effectiveDiscountRate: number
+  rateInvalid: boolean
+  /** 开发支出常无可观察市价：仅测使用价值 */
+  preferValueInUse: boolean
+  preferValueInUseReason: string
+  /** 上期 WACC（对比用，小数） */
+  priorWacc: number
+  /** 行业参考 WACC（对比用，小数） */
+  industryWacc: number
 }
 
-/** I2-15 合计行 */
-export interface I2ImpairmentSummary {
-  totalBookValue: number
-  totalShouldProvision: number
-  totalAlreadyProvided: number
-  totalDifference: number
+export interface SensitivityResult {
+  scenario: string
+  discountRate: number
+  growthRate: number
+  valueInUse: number
+  recoverableAmount: number
+  differenceFromBase: number
 }
-
-// ─── Constants ───────────────────────────────────────────────────────────────
 
 const ITEM_ID_15_ROWS = 'I2-15-rows'
 const ITEM_ID_16_DCF_PARAMS = 'I2-16-dcf-params'
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+const ITEM_ID_DETAIL_ROWS = 'I2-2-rows'
 
 function _getNum(val: any): number {
   if (val == null) return 0
@@ -102,67 +117,31 @@ function _genRowId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-function _safeParseRows<T>(raw: string | null | undefined): T[] {
+function _safeParseRows<T>(raw: string | null | undefined | any): T[] {
   if (!raw) return []
+  if (Array.isArray(raw)) return raw as T[]
   try {
-    const parsed = JSON.parse(raw)
+    const parsed = JSON.parse(String(raw))
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
   }
 }
 
-/** DCF: 各期折现现值合计 */
-function calcDcfPresentValue(cashFlows: number[], discountRate: number): number {
-  if (discountRate <= 0) return cashFlows.reduce((s, v) => s + v, 0)
-  let pv = 0
-  for (let i = 0; i < cashFlows.length; i++) {
-    pv += cashFlows[i] / Math.pow(1 + discountRate, i + 1)
-  }
-  return pv
-}
-
-/** DCF: 终值 (Gordon Growth Model) */
-function calcTerminalValue(perpetuityCF: number, discountRate: number, growthRate: number): number {
-  if (discountRate <= growthRate || discountRate <= 0) return 0
-  return perpetuityCF / (discountRate - growthRate)
-}
-
-/** 可收回金额 = MAX(公允-处置费, DCF使用价值) */
-function calcRecoverableAmount(fairValueLessDisposal: number, valueInUse: number): number {
-  return Math.max(fairValueLessDisposal, valueInUse)
-}
-
-/** 减值金额 = MAX(账面 - 可收回, 0) */
-function calcImpairmentAmount(bookValue: number, recoverableAmount: number): number {
-  return Math.max(bookValue - recoverableAmount, 0)
-}
-
-// ─── Composable ──────────────────────────────────────────────────────────────
-
 export function useI2Impairment(
   wpId: Ref<string>,
   allResponses: Ref<Map<string, ChecklistItem>>,
   options?: {
-    /** 保存回调（委托 useI2FormData.saveResponse） */
     onSave?: (itemId: string, value: any) => void
   },
 ) {
-
-  // ─── State: I2-15 减值准备测试 ─────────────────────────────────────────────
-
   const impairmentRows = ref<I2ImpairmentTestRow[]>([])
-
-  // ─── State: I2-16 可收回金额测试 ───────────────────────────────────────────
-
   const recoverableRows = ref<I2RecoverableTestRow[]>([])
-
-  // ─── Load from allResponses ────────────────────────────────────────────────
 
   function _loadImpairmentRows(): void {
     const resp = allResponses.value.get(ITEM_ID_15_ROWS)
     const raw = resp?.remark ?? resp?.conclusion
-    impairmentRows.value = _safeParseRows<any>(raw).map(_normalizeImpairmentRow)
+    impairmentRows.value = _safeParseRows<any>(raw).map(normalizeI2ImpairmentRow)
   }
 
   function _loadRecoverableRows(): void {
@@ -171,24 +150,45 @@ export function useI2Impairment(
     recoverableRows.value = _safeParseRows<any>(raw).map(_normalizeRecoverableRow)
   }
 
-  function _normalizeImpairmentRow(raw: any): I2ImpairmentTestRow {
-    const bookValue = _getNum(raw.bookValue)
-    const recoverableAmount = _getNum(raw.recoverableAmount)
-    const shouldProvision = calcImpairmentAmount(bookValue, recoverableAmount)
-    const alreadyProvided = _getNum(raw.alreadyProvided)
-    const difference = shouldProvision - alreadyProvided
+  function _calcRowResult(row: Pick<
+    I2RecoverableTestRow,
+    'cashFlows' | 'discountRate' | 'growthRate' | 'fvDisposal' | 'waccParams' | 'usePreTaxRate' | 'fairValueLessDisposal'
+  >) {
+    return calcI2RecoverableResult({
+      cashFlows: row.cashFlows,
+      manualDiscountRate: row.discountRate,
+      growthRate: row.growthRate,
+      fvDisposal: row.fvDisposal,
+      waccParams: row.waccParams,
+      usePreTaxRate: row.usePreTaxRate,
+      legacyFairValueNet: row.fairValueLessDisposal,
+    })
+  }
 
-    return {
-      rowId: raw.rowId ?? _genRowId('i2imp15'),
-      name: raw.name ?? '',
-      bookValue,
-      recoverableAmount,
-      shouldProvision,
-      alreadyProvided,
-      difference,
-      conclusion: raw.conclusion ?? '',
-      linkedToDcf: raw.linkedToDcf ?? false,
-    }
+  function _applyCalcToRow(row: I2RecoverableTestRow, calc: ReturnType<typeof calcI2RecoverableResult>): void {
+    row.terminalValue = calc.terminalValue
+    row.valueInUse = calc.valueInUse
+    row.discountedCashFlows = calc.discountedCashFlows
+    row.discountFactors = calc.discountFactors
+    row.discountedTerminalValue = calc.discountedTerminalValue
+    row.pvForecast = calc.pvForecast
+    row.fairValueLessDisposal = calc.fairValueLessDisposal
+    row.fairValueSource = calc.fairValueSource
+    row.disposalTotal = calc.disposalTotal
+    row.costOfEquity = calc.costOfEquity
+    row.waccAfterTax = calc.waccAfterTax
+    row.preTaxDiscountRate = calc.preTaxDiscountRate
+    row.effectiveDiscountRate = calc.effectiveDiscountRate
+    row.rateInvalid = calc.rateInvalid
+
+    const prefer = applyPreferValueInUse(
+      calc.fairValueLessDisposal,
+      calc.valueInUse,
+      !!row.preferValueInUse,
+      row.preferValueInUseReason || '',
+    )
+    row.recoverableAmount = prefer.recoverableAmount
+    row.recoverableSource = prefer.recoverableSource
   }
 
   function _normalizeRecoverableRow(raw: any): I2RecoverableTestRow {
@@ -197,73 +197,68 @@ export function useI2Impairment(
       : new Array(DCF_FORECAST_YEARS).fill(0)
     while (cashFlows.length < DCF_FORECAST_YEARS) cashFlows.push(0)
 
-    const discountRate = _getNum(raw.discountRate)
+    const fvDisposal = normalizeFvDisposal(raw.fvDisposal)
+    const waccParams = normalizeWaccParams(raw.waccParams)
+    const discountRate = _getNum(raw.discountRate) || 0.08
     const growthRate = _getNum(raw.growthRate)
-    const fairValueLessDisposal = _getNum(raw.fairValueLessDisposal)
+    const usePreTaxRate = raw.usePreTaxRate !== false
+    const legacyFairValueNet = _getNum(raw.fairValueLessDisposal)
 
-    const { terminalValue, valueInUse, recoverableAmount, discountedCashFlows, discountedTerminalValue } =
-      _calcDcfResult(cashFlows, discountRate, growthRate, fairValueLessDisposal)
+    const calc = calcI2RecoverableResult({
+      cashFlows,
+      manualDiscountRate: discountRate,
+      growthRate,
+      fvDisposal,
+      waccParams,
+      usePreTaxRate,
+      legacyFairValueNet,
+    })
+
+    const preferValueInUse = !!raw.preferValueInUse
+    const preferValueInUseReason = String(raw.preferValueInUseReason ?? '')
+    const prefer = applyPreferValueInUse(
+      calc.fairValueLessDisposal,
+      calc.valueInUse,
+      preferValueInUse,
+      preferValueInUseReason,
+    )
 
     return {
       rowId: raw.rowId ?? _genRowId('i2dcf16'),
       name: raw.name ?? '',
+      bookValue: _getNum(raw.bookValue),
       cashFlows,
       discountRate,
       growthRate,
-      terminalValue,
-      valueInUse,
-      fairValueLessDisposal,
-      recoverableAmount,
-      discountedCashFlows,
-      discountedTerminalValue,
+      growthRateBasis: String(raw.growthRateBasis ?? ''),
+      usePreTaxRate,
+      fvDisposal,
+      waccParams,
+      terminalValue: calc.terminalValue,
+      valueInUse: calc.valueInUse,
+      fairValueLessDisposal: calc.fairValueLessDisposal,
+      recoverableAmount: prefer.recoverableAmount,
+      discountedCashFlows: calc.discountedCashFlows,
+      discountFactors: calc.discountFactors,
+      discountedTerminalValue: calc.discountedTerminalValue,
+      pvForecast: calc.pvForecast,
+      fairValueSource: calc.fairValueSource,
+      disposalTotal: calc.disposalTotal,
+      recoverableSource: prefer.recoverableSource,
+      costOfEquity: calc.costOfEquity,
+      waccAfterTax: calc.waccAfterTax,
+      preTaxDiscountRate: calc.preTaxDiscountRate,
+      effectiveDiscountRate: calc.effectiveDiscountRate,
+      rateInvalid: calc.rateInvalid,
+      preferValueInUse,
+      preferValueInUseReason,
+      priorWacc: _getNum(raw.priorWacc),
+      industryWacc: _getNum(raw.industryWacc),
     }
   }
 
-  // ─── DCF Calculation Core (Req 10.2) ───────────────────────────────────────
-
-  function _calcDcfResult(
-    cashFlows: number[],
-    discountRate: number,
-    growthRate: number,
-    fairValueLessDisposal: number,
-  ): {
-    terminalValue: number
-    valueInUse: number
-    recoverableAmount: number
-    discountedCashFlows: number[]
-    discountedTerminalValue: number
-  } {
-    const discountedCashFlows: number[] = []
-    if (discountRate > 0) {
-      for (let i = 0; i < cashFlows.length; i++) {
-        discountedCashFlows.push(cashFlows[i] / Math.pow(1 + discountRate, i + 1))
-      }
-    } else {
-      for (const cf of cashFlows) discountedCashFlows.push(cf)
-    }
-
-    const pvForecast = calcDcfPresentValue(cashFlows, discountRate)
-
-    const lastCF = cashFlows.length > 0 ? cashFlows[cashFlows.length - 1] : 0
-    const perpetuityCF = lastCF * (1 + growthRate)
-    const terminalValue = calcTerminalValue(perpetuityCF, discountRate, growthRate)
-
-    const n = cashFlows.length
-    const discountedTerminalValue = discountRate > 0 && n > 0
-      ? terminalValue / Math.pow(1 + discountRate, n)
-      : terminalValue
-
-    const valueInUse = pvForecast + discountedTerminalValue
-    const recoverableAmount = calcRecoverableAmount(fairValueLessDisposal, valueInUse)
-
-    return { terminalValue, valueInUse, recoverableAmount, discountedCashFlows, discountedTerminalValue }
-  }
-
-  // ─── I2-15: Recalculation ──────────────────────────────────────────────────
-
-  function _recalcImpairmentRow(row: I2ImpairmentTestRow): void {
-    row.shouldProvision = calcImpairmentAmount(row.bookValue, row.recoverableAmount)
-    row.difference = row.shouldProvision - row.alreadyProvided
+  function _recalcImpairmentRow(row: I2ImpairmentTestRow, refreshConclusion = true): void {
+    Object.assign(row, recomputeI2ImpairmentRow(row, { refreshConclusion }))
   }
 
   function recalcAllImpairment(): void {
@@ -271,74 +266,162 @@ export function useI2Impairment(
     _persistImpairment()
   }
 
-  // ─── I2-16: Recalculation ──────────────────────────────────────────────────
-
   function _recalcRecoverableRow(row: I2RecoverableTestRow): void {
-    const result = _calcDcfResult(row.cashFlows, row.discountRate, row.growthRate, row.fairValueLessDisposal)
-    row.terminalValue = result.terminalValue
-    row.valueInUse = result.valueInUse
-    row.recoverableAmount = result.recoverableAmount
-    row.discountedCashFlows = result.discountedCashFlows
-    row.discountedTerminalValue = result.discountedTerminalValue
+    _applyCalcToRow(row, _calcRowResult(row))
   }
 
   function recalcAllRecoverable(): void {
     for (const row of recoverableRows.value) _recalcRecoverableRow(row)
     _persistRecoverable()
-    linkRecoverableToImpairment()
+    linkRecoverableToImpairment(true)
   }
 
-  // ─── I2-16 → I2-15 联动 (Req 10.3) ────────────────────────────────────────
+  function recalcRecoverableRow(rowIndex: number): void {
+    const row = recoverableRows.value[rowIndex]
+    if (!row) return
+    _recalcRecoverableRow(row)
+    _persistRecoverable()
+  }
 
-  function linkRecoverableToImpairment(): void {
-    const recoverableMap = new Map<string, number>()
+  /** I2-16 → I2-15：回填③公允 + ④DCF，重算⑤⑥⑧ */
+  function linkRecoverableToImpairment(onlyLinked = false): { ok: boolean; message: string; count: number } {
+    const recoverableMap = new Map<string, I2RecoverableTestRow>()
     for (const row of recoverableRows.value) {
-      if (row.name) recoverableMap.set(row.name, row.recoverableAmount)
+      const key = (row.name || '').trim()
+      if (key) recoverableMap.set(key, row)
     }
 
-    let changed = false
+    let count = 0
     for (const row of impairmentRows.value) {
-      if (row.linkedToDcf && row.name && recoverableMap.has(row.name)) {
-        const newVal = recoverableMap.get(row.name)!
-        if (row.recoverableAmount !== newVal) {
-          row.recoverableAmount = newVal
-          _recalcImpairmentRow(row)
-          changed = true
-        }
+      const key = (row.name || '').trim()
+      if (!key || !row.needTest) continue
+      if (onlyLinked && !row.linkedToDcf) continue
+      const src = recoverableMap.get(key)
+      if (!src) continue
+
+      row.fairValueLessDisposal = src.fairValueLessDisposal
+      row.dcfValue = src.valueInUse
+      row.linkedToDcf = true
+      if (!/I2-16/i.test(row.indexRef || '')) {
+        row.indexRef = row.indexRef ? `${row.indexRef};I2-16` : 'I2-16'
       }
+      _recalcImpairmentRow(row)
+      count++
     }
-    if (changed) _persistImpairment()
+    if (count > 0) _persistImpairment()
+    return {
+      ok: count > 0,
+      count,
+      message: count > 0 ? `已从 I2-16 回填 ${count} 行（③④→⑤）` : '无匹配行可回填（请确认项目名称一致且须测试）',
+    }
   }
 
   function linkSingleRecoverableToImpairment(recoverableRowIndex: number): void {
     const rcRow = recoverableRows.value[recoverableRowIndex]
     if (!rcRow?.name) return
+    const key = rcRow.name.trim()
     for (const impRow of impairmentRows.value) {
-      if (impRow.linkedToDcf && impRow.name === rcRow.name) {
-        impRow.recoverableAmount = rcRow.recoverableAmount
+      if ((impRow.name || '').trim() === key && (impRow.linkedToDcf || impRow.needTest)) {
+        impRow.fairValueLessDisposal = rcRow.fairValueLessDisposal
+        impRow.dcfValue = rcRow.valueInUse
+        impRow.linkedToDcf = true
+        if (!/I2-16/i.test(impRow.indexRef || '')) {
+          impRow.indexRef = impRow.indexRef ? `${impRow.indexRef};I2-16` : 'I2-16'
+        }
         _recalcImpairmentRow(impRow)
       }
     }
     _persistImpairment()
   }
 
-  // ─── Computed ──────────────────────────────────────────────────────────────
-
-  const impairmentSummary: ComputedRef<I2ImpairmentSummary> = computed(() => {
-    let totalBookValue = 0
-    let totalShouldProvision = 0
-    let totalAlreadyProvided = 0
-    let totalDifference = 0
+  function seedRecoverableFromImpairment(): { ok: boolean; message: string; count: number } {
+    const existing = new Set(recoverableRows.value.map((r) => (r.name || '').trim()).filter(Boolean))
+    let count = 0
     for (const row of impairmentRows.value) {
-      totalBookValue += row.bookValue
-      totalShouldProvision += row.shouldProvision
-      totalAlreadyProvided += row.alreadyProvided
-      totalDifference += row.difference
+      const name = (row.name || '').trim()
+      if (!name || !row.needTest || existing.has(name)) continue
+      addRecoverableRow({
+        name,
+        bookValue: row.bookValue,
+        fairValueLessDisposal: row.fairValueLessDisposal,
+      })
+      row.linkedToDcf = true
+      if (!/I2-16/i.test(row.indexRef || '')) {
+        row.indexRef = row.indexRef ? `${row.indexRef};I2-16` : 'I2-16'
+      }
+      existing.add(name)
+      count++
     }
-    return { totalBookValue, totalShouldProvision, totalAlreadyProvided, totalDifference }
-  })
+    if (count > 0) _persistImpairment()
+    return {
+      ok: count > 0,
+      count,
+      message: count > 0
+        ? `已从 I2-15 新建 ${count} 项 I2-16 测算`
+        : '无可新建项（须先标记减值迹象/须测试，且尚未建组）',
+    }
+  }
 
-  /** 差额≠0的行 rowId 集合（红色高亮用） */
+  /** alias：与 I1「从减值表建组」命名对齐 */
+  function seedFromImpairment() {
+    return seedRecoverableFromImpairment()
+  }
+
+  function seedFromDetail(): { ok: boolean; message: string; count: number } {
+    const resp = allResponses.value.get(ITEM_ID_DETAIL_ROWS)
+    const raw = resp?.remark ?? resp?.conclusion
+    const parsed = _safeParseRows<any>(raw)
+    const seeded = seedRowsFromI2Detail(parsed)
+    if (!seeded.length) {
+      return { ok: false, count: 0, message: 'I2-2 无明细行可带入' }
+    }
+
+    const byName = new Map(impairmentRows.value.map((r) => [(r.name || '').trim(), r]))
+    let count = 0
+    for (const s of seeded) {
+      const key = s.name.trim()
+      const prev = byName.get(key)
+      if (prev) {
+        prev.bookValue = s.bookValue
+        prev.alreadyProvided = s.alreadyProvided || prev.alreadyProvided
+        prev.sourceDetailRowId = s.sourceDetailRowId
+        if (!prev.remark) prev.remark = s.remark
+        _recalcImpairmentRow(prev)
+        count++
+      } else {
+        impairmentRows.value.push(s)
+        byName.set(key, s)
+        count++
+      }
+    }
+    if (count > 0) _persistImpairment()
+    return { ok: count > 0, count, message: `已从 I2-2 带入/更新 ${count} 行` }
+  }
+
+  const impairmentSummary: ComputedRef<I2ImpairmentSummary> = computed(() =>
+    summarizeI2Impairment(impairmentRows.value),
+  )
+
+  const prepValidation: ComputedRef<I2ImpPrepValidation> = computed(() =>
+    validateI2ImpairmentPrep(impairmentRows.value),
+  )
+
+  const syncChecks: ComputedRef<I216SyncCheck[]> = computed(() =>
+    buildI216SyncChecks(impairmentRows.value, recoverableRows.value),
+  )
+
+  const staleSyncCount = computed(() =>
+    syncChecks.value.filter((c) => c.status === 'stale' || c.status === 'missing-i16').length,
+  )
+
+  const missingRecoverableRows = computed(() =>
+    impairmentRows.value.filter((r) => {
+      if (!r.needTest || !r.name.trim()) return false
+      const hit = recoverableRows.value.find((x) => (x.name || '').trim() === r.name.trim())
+      return !hit || (hit.recoverableAmount <= 0 && r.recoverableAmount <= 0)
+    }),
+  )
+
   const highlightedRowIds: ComputedRef<Set<string>> = computed(() => {
     const ids = new Set<string>()
     for (const row of impairmentRows.value) {
@@ -347,31 +430,27 @@ export function useI2Impairment(
     return ids
   })
 
-  // ─── Row Management: I2-15 ─────────────────────────────────────────────────
-
   function addImpairmentRow(params: {
     name: string
-    bookValue: number
+    bookValue?: number
     recoverableAmount?: number
+    fairValueLessDisposal?: number
+    dcfValue?: number
     alreadyProvided?: number
+    hasIndication?: 'Y' | 'N' | ''
     linkedToDcf?: boolean
   }): I2ImpairmentTestRow {
-    const bookValue = params.bookValue
-    const recoverableAmount = params.recoverableAmount ?? 0
-    const shouldProvision = calcImpairmentAmount(bookValue, recoverableAmount)
-    const alreadyProvided = params.alreadyProvided ?? 0
-
-    const row: I2ImpairmentTestRow = {
-      rowId: _genRowId('i2imp15'),
+    const legacyRec = params.recoverableAmount ?? 0
+    const row = emptyI2ImpairmentRow({
       name: params.name,
-      bookValue,
-      recoverableAmount,
-      shouldProvision,
-      alreadyProvided,
-      difference: shouldProvision - alreadyProvided,
-      conclusion: '',
+      bookValue: params.bookValue ?? 0,
+      fairValueLessDisposal: params.fairValueLessDisposal ?? 0,
+      dcfValue: params.dcfValue ?? legacyRec,
+      alreadyProvided: params.alreadyProvided ?? 0,
+      hasIndication: params.hasIndication ?? '',
+      needTest: params.hasIndication === 'Y' || legacyRec > 0,
       linkedToDcf: params.linkedToDcf ?? false,
-    }
+    })
     impairmentRows.value.push(row)
     _persistImpairment()
     return row
@@ -391,14 +470,22 @@ export function useI2Impairment(
     const row = impairmentRows.value[rowIndex]
     if (!row) return
     ;(row as any)[field] = value
-    _recalcImpairmentRow(row)
+
+    if (field === 'hasIndication') {
+      if (value === 'Y') row.needTest = true
+      else if (value === 'N') row.needTest = false
+    }
+    if (field === 'needTest' && value === true && !row.hasIndication) {
+      row.hasIndication = 'Y'
+    }
+    const keepConclusion = field === 'conclusion' || field === 'remark' || field === 'indexRef' || field === 'name'
+    _recalcImpairmentRow(row, !keepConclusion)
     _persistImpairment()
   }
 
-  // ─── Row Management: I2-16 ─────────────────────────────────────────────────
-
   function addRecoverableRow(params: {
     name: string
+    bookValue?: number
     cashFlows?: number[]
     discountRate?: number
     growthRate?: number
@@ -408,20 +495,55 @@ export function useI2Impairment(
     while (cashFlows.length < DCF_FORECAST_YEARS) cashFlows.push(0)
 
     const discountRate = params.discountRate ?? 0.08
-    const growthRate = params.growthRate ?? 0.02
-    const fairValueLessDisposal = params.fairValueLessDisposal ?? 0
+    const growthRate = params.growthRate ?? 0
+    const fvDisposal = defaultFvDisposal()
+    const waccParams = defaultWaccParams()
+    const usePreTaxRate = true
+    const legacyFairValueNet = params.fairValueLessDisposal ?? 0
 
-    const result = _calcDcfResult(cashFlows, discountRate, growthRate, fairValueLessDisposal)
+    const calc = calcI2RecoverableResult({
+      cashFlows,
+      manualDiscountRate: discountRate,
+      growthRate,
+      fvDisposal,
+      waccParams,
+      usePreTaxRate,
+      legacyFairValueNet,
+    })
 
     const row: I2RecoverableTestRow = {
       rowId: _genRowId('i2dcf16'),
       name: params.name,
+      bookValue: params.bookValue ?? 0,
       cashFlows,
       discountRate,
       growthRate,
-      ...result,
-      fairValueLessDisposal,
+      growthRateBasis: '',
+      usePreTaxRate,
+      fvDisposal,
+      waccParams,
+      terminalValue: calc.terminalValue,
+      valueInUse: calc.valueInUse,
+      fairValueLessDisposal: calc.fairValueLessDisposal,
+      recoverableAmount: calc.recoverableAmount,
+      discountedCashFlows: calc.discountedCashFlows,
+      discountFactors: calc.discountFactors,
+      discountedTerminalValue: calc.discountedTerminalValue,
+      pvForecast: calc.pvForecast,
+      fairValueSource: calc.fairValueSource,
+      disposalTotal: calc.disposalTotal,
+      recoverableSource: calc.recoverableSource,
+      costOfEquity: calc.costOfEquity,
+      waccAfterTax: calc.waccAfterTax,
+      preTaxDiscountRate: calc.preTaxDiscountRate,
+      effectiveDiscountRate: calc.effectiveDiscountRate,
+      rateInvalid: calc.rateInvalid,
+      preferValueInUse: false,
+      preferValueInUseReason: '',
+      priorWacc: 0,
+      industryWacc: 0,
     }
+    _applyCalcToRow(row, calc)
     recoverableRows.value.push(row)
     _persistRecoverable()
     return row
@@ -444,18 +566,177 @@ export function useI2Impairment(
 
   function updateRecoverableField(
     rowIndex: number,
-    field: 'discountRate' | 'growthRate' | 'fairValueLessDisposal',
-    value: number,
+    field: 'discountRate' | 'growthRate' | 'growthRateBasis' | 'usePreTaxRate' | 'bookValue' | 'name'
+      | 'preferValueInUse' | 'preferValueInUseReason' | 'priorWacc' | 'industryWacc',
+    value: number | string | boolean,
   ): void {
     const row = recoverableRows.value[rowIndex]
     if (!row) return
-    row[field] = value
+    ;(row as any)[field] = value
+    if (field !== 'name') _recalcRecoverableRow(row)
+    _persistRecoverable()
+    linkSingleRecoverableToImpairment(rowIndex)
+  }
+
+  function updateFvField(
+    rowIndex: number,
+    field: keyof I2FairValueDisposal,
+    value: number | string,
+  ): void {
+    const row = recoverableRows.value[rowIndex]
+    if (!row) return
+    ;(row.fvDisposal as any)[field] = value
     _recalcRecoverableRow(row)
     _persistRecoverable()
     linkSingleRecoverableToImpairment(rowIndex)
   }
 
-  // ─── Persist ───────────────────────────────────────────────────────────────
+  function updateWaccField(
+    rowIndex: number,
+    field: keyof I2WaccParams,
+    value: number,
+  ): void {
+    const row = recoverableRows.value[rowIndex]
+    if (!row) return
+    row.waccParams[field] = value
+    _recalcRecoverableRow(row)
+    _persistRecoverable()
+    linkSingleRecoverableToImpairment(rowIndex)
+  }
+
+  function persistRecoverableRow(rowIndex?: number): void {
+    if (rowIndex != null) {
+      const row = recoverableRows.value[rowIndex]
+      if (row) _recalcRecoverableRow(row)
+    }
+    _persistRecoverable()
+  }
+
+  function getWaccWarnings(rowIndex: number): string[] {
+    const row = recoverableRows.value[rowIndex]
+    if (!row) return []
+    const warnings = [...validateWaccParams(row.waccParams)]
+    if (row.preferValueInUse && !(row.preferValueInUseReason || '').trim()) {
+      warnings.push('已勾选「仅使用价值」，须填写无法可靠确定公允净额的理由')
+    }
+    warnings.push(...compareI2Wacc({
+      currentWacc: row.waccAfterTax || row.effectiveDiscountRate,
+      priorWacc: row.priorWacc,
+      industryWacc: row.industryWacc,
+    }).warnings)
+    return warnings
+  }
+
+  function getWaccCompare(rowIndex: number): I2WaccCompareResult | null {
+    const row = recoverableRows.value[rowIndex]
+    if (!row) return null
+    return compareI2Wacc({
+      currentWacc: row.waccAfterTax || row.effectiveDiscountRate,
+      priorWacc: row.priorWacc,
+      industryWacc: row.industryWacc,
+    })
+  }
+
+  function calcSensitivity(recoverableRowIndex: number): SensitivityResult[] {
+    const row = recoverableRows.value[recoverableRowIndex]
+    if (!row) return []
+
+    const base = _calcRowResult(row)
+    const basePrefer = applyPreferValueInUse(
+      base.fairValueLessDisposal,
+      base.valueInUse,
+      !!row.preferValueInUse,
+      row.preferValueInUseReason || '',
+    )
+    const scenarios: Array<{ scenario: string; dr: number; gr: number }> = [
+      { scenario: '基准', dr: row.effectiveDiscountRate, gr: row.growthRate },
+      { scenario: '折现率 +1%', dr: row.effectiveDiscountRate + 0.01, gr: row.growthRate },
+      { scenario: '折现率 −1%', dr: Math.max(0.001, row.effectiveDiscountRate - 0.01), gr: row.growthRate },
+      { scenario: '增长率 +0.5%', dr: row.effectiveDiscountRate, gr: row.growthRate + 0.005 },
+      { scenario: '增长率 −0.5%', dr: row.effectiveDiscountRate, gr: row.growthRate - 0.005 },
+      {
+        scenario: '折现率+1% / 增长率−0.5%',
+        dr: row.effectiveDiscountRate + 0.01,
+        gr: row.growthRate - 0.005,
+      },
+    ]
+
+    return scenarios.map(({ scenario, dr, gr }) => {
+      const result = calcI2RecoverableResult({
+        cashFlows: row.cashFlows,
+        manualDiscountRate: dr,
+        growthRate: gr,
+        fvDisposal: row.fvDisposal,
+        waccParams: defaultWaccParams(),
+        usePreTaxRate: true,
+        legacyFairValueNet: row.fairValueLessDisposal,
+      })
+      const prefer = applyPreferValueInUse(
+        result.fairValueLessDisposal,
+        result.valueInUse,
+        !!row.preferValueInUse,
+        row.preferValueInUseReason || '',
+      )
+      return {
+        scenario,
+        discountRate: dr,
+        growthRate: gr,
+        valueInUse: result.valueInUse,
+        recoverableAmount: prefer.recoverableAmount,
+        differenceFromBase: prefer.recoverableAmount - basePrefer.recoverableAmount,
+      }
+    })
+  }
+
+  function buildConclusionDraft(rowIndex: number): string {
+    const row = recoverableRows.value[rowIndex]
+    if (!row) return ''
+    return buildI2ConclusionDraft({
+      assetName: row.name,
+      fairValueNet: row.fairValueLessDisposal,
+      valueInUse: row.valueInUse,
+      recoverableAmount: row.recoverableAmount,
+      recoverableSource: row.recoverableSource,
+      bookValue: row.bookValue,
+      effectiveDiscountRate: row.effectiveDiscountRate,
+      growthRate: row.growthRate,
+      fromWacc: row.waccAfterTax > 0,
+      preferValueInUse: row.preferValueInUse,
+      preferValueInUseReason: row.preferValueInUseReason,
+    })
+  }
+
+  function buildSensitivityNote(rowIndex: number): string {
+    const row = recoverableRows.value[rowIndex]
+    if (!row) return ''
+    return buildI2SensitivityNote({
+      assetName: row.name,
+      scenarios: calcSensitivity(rowIndex),
+    })
+  }
+
+  /**
+   * 推送本期补提⑧至父级（如 K11 资产减值损失汇总）：
+   * dispatch window CustomEvent('impairment:calculated') + 持久化 I2-15-supplement-total
+   */
+  function publishImpairmentToParent(): { ok: boolean; message: string; supplement: number } {
+    const supplement = impairmentSummary.value.totalSupplement
+    try {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('impairment:calculated', {
+          detail: buildI2ImpairmentEventDetail(impairmentSummary.value),
+        }))
+      }
+    } catch { /* silent */ }
+    options?.onSave?.('I2-15-supplement-total', supplement)
+    return {
+      ok: true,
+      supplement,
+      message: supplement > 0.005
+        ? `已推送本期补提 ${supplement.toFixed(2)} 元`
+        : '本期无需补提减值准备，已同步推送状态',
+    }
+  }
 
   function _persistImpairment(): void {
     options?.onSave?.(ITEM_ID_15_ROWS, impairmentRows.value)
@@ -465,38 +746,47 @@ export function useI2Impairment(
     options?.onSave?.(ITEM_ID_16_DCF_PARAMS, recoverableRows.value)
   }
 
-  // ─── Init ──────────────────────────────────────────────────────────────────
-
   watch(allResponses, () => {
     _loadImpairmentRows()
     _loadRecoverableRows()
   }, { immediate: true })
 
-  // ─── Return ────────────────────────────────────────────────────────────────
+  void wpId
 
   return {
-    // State
     impairmentRows,
     recoverableRows,
-    // Computed
     impairmentSummary,
+    prepValidation,
+    syncChecks,
+    staleSyncCount,
+    missingRecoverableRows,
     highlightedRowIds,
-    // Constants
     DCF_FORECAST_YEARS,
-    // Actions: I2-15
     recalcAllImpairment,
     addImpairmentRow,
     removeImpairmentRow,
     updateImpairmentField,
-    // Actions: I2-16 DCF
+    seedFromDetail,
+    seedRecoverableFromImpairment,
+    seedFromImpairment,
     recalcAllRecoverable,
+    recalcRecoverableRow,
     addRecoverableRow,
     removeRecoverableRow,
     updateCashFlow,
     updateRecoverableField,
-    // Actions: 联动
+    updateFvField,
+    updateWaccField,
+    persistRecoverableRow,
     linkRecoverableToImpairment,
     linkSingleRecoverableToImpairment,
+    calcSensitivity,
+    buildConclusionDraft,
+    buildSensitivityNote,
+    getWaccWarnings,
+    getWaccCompare,
+    publishImpairmentToParent,
   }
 }
 

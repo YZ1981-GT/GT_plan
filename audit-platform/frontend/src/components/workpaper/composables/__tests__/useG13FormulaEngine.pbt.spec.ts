@@ -14,6 +14,9 @@ import {
   isDebitCreditBalanced,
   isFvReconciled,
   calcVariance,
+  calcFairValueFromParts,
+  isBsFvReconciled,
+  isPlReconciled,
 } from '../useG13FormulaEngine'
 
 const dbl = (min: number, max: number) =>
@@ -95,6 +98,21 @@ describe('Feature: g13-fair-value-changes, Property 6: parseNum健壮性', () =>
     fc.assert(
       fc.property(dbl(-1e8, 1e8), (n) => {
         expect(parseNum(n)).toBeCloseTo(n, 5)
+      }),
+      { numRuns: 100 },
+    )
+  })
+})
+
+describe('Feature: g13-fair-value-changes, Property 7: 成本+累计FV=公允价值', () => {
+  it('isBsFvReconciled ↔ |cost+cum−fv|≤0.01；isPlReconciled ↔ |计入损益−审定|≤0.01', () => {
+    fc.assert(
+      fc.property(dbl(-1e8, 1e8), dbl(-1e8, 1e8), (cost, cum) => {
+        const fv = calcFairValueFromParts(cost, cum)
+        expect(isBsFvReconciled(cost, cum, fv)).toBe(true)
+        expect(isBsFvReconciled(cost, cum, fv + 1)).toBe(false)
+        expect(isPlReconciled(fv, fv)).toBe(true)
+        expect(isPlReconciled(fv, fv + 1)).toBe(false)
       }),
       { numRuns: 100 },
     )

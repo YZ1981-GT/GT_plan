@@ -35,10 +35,10 @@ H2在建工程底稿的专属HTML精美组件构建。将现有通用渲染升�
 
 - **Tab_Index**: 底稿目录，24行8列，sheet导航+进度统计
 - **Procedure_Table_H2A**: 在建工程实质性程序表H2A，36行12列，审计程序清单（复用a-program-console）
-- **Adjudication_H2_1**: 审定表H2-1，84行12列61公式，科目1604在建工程（借方/资产类）
+- **Adjudication_H2_1**: 审定表H2-1，84行12列，科目1604在建工程（借方/资产类）；列结构=期初/期末×未审/账项调整/审定+同期比较（以xlsx为准，见 h2_conflict_resolution.md）
 - **Disclosure_Listed**: 附注披露信息（上市公司），57行256列
 - **Disclosure_SOE**: 附注披露信息（国有企业），47行255列
-- **Detail_H2_2**: 明细表H2-2，48行50列12公式，宽表需拆分3区段
+- **Detail_H2_2**: 明细表H2-2，48行50列，宽表拆分4区段Tab（基本信息/账面原值/审定原值/减值与净值）；三角勾稽在本表实施
 - **Adjustment_H2_3**: 调整分录汇总H2-3，24行10列
 - **Analysis_H2_4**: 分析表H2-4，25行24列10公式，含完工率/资本化率/工期分析
 - **Transfer_Check_H2_5**: 转固时点检查表H2-5，28行15列，核心联动H1
@@ -54,10 +54,10 @@ H2在建工程底稿的专属HTML精美组件构建。将现有通用渲染升�
 - **Impairment_H2_15**: 减值测算表H2-15，34行28列15公式
 - **Recoverable_H2_16**: 可收回金额测试表H2-16，63行28列12公式
 - **Related_Party_H2_17**: 关联交易检查表H2-17，102行15列
-- **Cross_Sheet_Engine**: 跨sheet公式引擎，H2-1→H2-2/H2-4/H2-5/H2-10~11联动
-- **Formula_Engine**: 前端公式引擎composable，资产类借方科目公式（期末=期初+借方-贷方；审定=未审+AJE+RJE；三角勾稽期末=期初+增加-减少-转固）
+- **Cross_Sheet_Engine**: 跨sheet公式引擎，H2-2→H2-1/H2-4；H2-5转固交叉验证；H2-10~11→H2-2利息列
+- **Formula_Engine**: 前端公式引擎composable；H2-1审定=未审+账项调整；H2-2可拆AJE+RJE后合计为账项调整；三角勾稽期末=期初+增加-减少-转固（在H2-2）
 - **Interest_Cap_Engine**: 利息资本化计算引擎，2分支：无专门借款（加权资本化率×累计支出加权）/有专门借款（专门借款利息-闲置收益+一般借款补充资本化）
-- **Triangle_Reconciliation**: 三角勾稽，期末=期初+增加-减少-转固（比H1多一个"转固"扣减维度）
+- **Triangle_Reconciliation**: 三角勾稽，期末=期初+增加-减少-转固（在明细表H2-2实施；H2-1仅展示跨sheet差异警告）
 - **Branch_Selector**: 分支选择器，H2-10/H2-11利息资本化2版本切换（无/有专门借款）
 - **Dynamic_Row**: 动态行，用户可新增/删除的数据行
 - **Summary_Row**: 合计行，自动SUM对应明细行（不可编辑）
@@ -89,34 +89,38 @@ H2在建工程底稿的专属HTML精美组件构建。将现有通用渲染升�
 9. THE GtH2ConstructionInProgress.vue SHALL 支持selfLoad（当htmlData prop为null时自行调render-config?force_component_type=h2-construction-in-progress）
 10. THE H2 组件 SHALL 使用 checklist_responses 表存储数据，item_id前缀为"H2-{sheet编号}-{field}"格式
 
-### Requirement 2: 审定表H2-1（三角勾稽+含转固扣减）
+### Requirement 2: 审定表H2-1（期初/期末×未审/账项调整/审定 + 同期比较）
 
-**User Story:** As a 审计助理, I want to 在精美HTML表格中查看和编辑在建工程审定表, so that 我能清晰地看到各工程项目的审定数据并自动验证三角勾稽（含转固扣减）。
+**User Story:** As a 审计助理, I want to 在精美HTML表格中查看和编辑在建工程审定表, so that 我能清晰看到各工程原值/减值/净值的期初与期末审定，并与 H2-2、TB、H2-5 交叉验证。
+
+> **权威来源**：列名/列组以 `H2 在建工程.xlsx` 为准（见 `h2_conflict_resolution.md` 冲突#1~#3）。  
+> 增减/转固列属于 H2-2，**不**出现在 H2-1。三角勾稽在 H2-2 实施；H2-1 仅展示跨 sheet 差异警告。
 
 #### Acceptance Criteria
 
-1. THE Adjudication_H2_1 SHALL 渲染为固定结构：按工程项目分行（行数动态） + 小计行 + 合计行
-2. THE Adjudication_H2_1 SHALL 显示以下列：项目名称 | 期初余额 | 本期增加 | 本期减少 | 本期转固 | 期末余额 | 未审数 | AJE | RJE | 审定数 | 已计提减值 | 备注
-3. WHEN 用户编辑未审数/AJE/RJE单元格时, THE Formula_Engine SHALL 自动计算审定数（=未审+AJE+RJE）
-4. THE Formula_Engine SHALL 对每行自动校验：期末余额=期初余额+本期增加-本期减少-本期转固（资产类借方科目1604，含转固扣减）
-5. THE Adjudication_H2_1 SHALL 自动计算合计行（=SUM所有工程项目行各金额列），合计行不可编辑
-6. THE Adjudication_H2_1 SHALL 实施三角勾稽校验：期末=期初+增加-减少-转固，校验失败时红色高亮并显示差额
-7. THE Adjudication_H2_1 SHALL 在底部显示试算平衡表数行（自动从TB取数科目1604）和差异行（=审定数-试算表数），差异不为零时红色高亮
+1. THE Adjudication_H2_1 SHALL 渲染为三块结构：一、原值(1604) → 二、减值准备 → 三、净值(=原值−减值)；各块按工程项目分行（行数动态）+ 小计/合计行
+2. THE Adjudication_H2_1 SHALL 显示以下列（xlsx 12 列）：项目 | 期初数{未审数, 账项调整, 审定数} | 期末数{未审数, 账项调整, 审定数} | 本期未审与上期未审比较{变动额, 变动率} | 本期审定与上期审定比较{变动额, 变动率}
+3. WHEN 用户编辑未审数/账项调整单元格时, THE Formula_Engine SHALL 自动计算审定数（=未审+账项调整）；表单层可将 AJE/RJE 分录录入后合并写入「账项调整」单列
+4. THE Adjudication_H2_1 SHALL NOT 在本表对行实施三角勾稽（期末=期初+增加-减少-转固）；该校验由 Detail_H2_2 实施
+5. THE Adjudication_H2_1 SHALL 自动计算合计行（=SUM 所有工程项目行各金额列），合计行不可编辑；净值行按原值−减值派生
+6. WHEN H2-2 三角勾稽存在差额时, THE Adjudication_H2_1 SHALL 展示跨 sheet 差额警告（来自 H2-2），不得在本表假造增减/转固列做校验
+7. THE Adjudication_H2_1 SHALL 在底部显示试算平衡表核对（科目1604在建工程，并可核对1605工程物资）和差异行（=审定数-试算表数），差异不为零时红色高亮
 8. WHEN 审定数合计与H2-2合计行不一致时, THE Adjudication_H2_1 SHALL 显示黄色警告"审定数≠H2-2明细合计，差额：±xxx元"
-9. WHEN "本期转固"列合计与H2-5转固合计不一致时, THE Adjudication_H2_1 SHALL 显示黄色警告"转固数≠H2-5合计，差额：±xxx元"
-10. THE Adjudication_H2_1 SHALL 在底部显示"审计说明"区域（textarea + AI生成按钮 + GtIndexChip跳转H2-4分析结果）和"审计结论"区域
+9. WHEN H2-2/H2-5 转固合计与交叉验证口径不一致时, THE Adjudication_H2_1 SHALL 显示黄色警告"转固数≠H2-5合计，差额：±xxx元"（转固金额取自 H2-2/H2-5，非本表列）
+10. THE Adjudication_H2_1 SHALL 在底部显示结构化审计说明（含净值重大变动原因/本期转入固定资产情况等）+ AI生成 + GtIndexChip，以及审计结论区域
 11. WHEN 审定数计算完成且发生变化时, THE Adjudication_H2_1 SHALL 调用writebackTrialBalance将最新审定数回写trial_balance.audited_amount（科目1604）并通过EventBus发布'substantive:adjudicated'事件
 12. THE Adjudication_H2_1 SHALL 在审计说明/结论区域放置复核对话入口（💬图标）
+13. WHEN 净值变动率绝对值≥30%时, THE Adjudication_H2_1 SHALL 标红并要求在审计说明中解释重大变动原因
 
-### Requirement 3: 明细表H2-2（50列宽表拆分3区段Tab）
+### Requirement 3: 明细表H2-2（50列宽表拆分4区段Tab + 三角勾稽）
 
-**User Story:** As a 审计助理, I want to 在精美HTML宽表中管理在建工程明细, so that 我能通过3个区段Tab分别查看基本信息/本期增减/竣工结转而无需大量横滚。
+**User Story:** As a 审计助理, I want to 在精美HTML宽表中管理在建工程明细, so that 我能通过4个区段Tab分别查看基本信息/账面原值/审定原值/减值与净值，并自动验证三角勾稽。
 
 #### Acceptance Criteria
 
-1. THE Detail_H2_2 SHALL 将50列拆分为3个区段Tab：基本(工程名称/预算金额/开工日期/预计竣工日期/完工进度/累计投入) | 增减(期初余额/本期增加-材料/人工/机械/利息/其他/本期减少/转出) | 竣工结转(转固日期/转固金额/转入H1科目/剩余在建/期末余额)
-2. THE Detail_H2_2 SHALL 在3个区段Tab切换时保持行同步（选中行高亮跨Tab一致）
-3. THE Formula_Engine SHALL 自动计算每行：期末余额=期初+增加合计-减少-转固；增加合计=材料+人工+机械+利息+其他；完工进度=累计投入/预算×100%
+1. THE Detail_H2_2 SHALL 将宽表拆分为4个区段Tab：基本信息(工程名称/预算/进度/状态/资金来源等) | 账面原值(期初+增分项−转固−其他减=期末；利息子列) | 审定原值(期初/账项调整→审定；与H2-1交叉验证) | 减值与净值
+2. THE Detail_H2_2 SHALL 在4个区段Tab切换时保持行同步（选中行高亮跨Tab一致）
+3. THE Formula_Engine SHALL 自动计算每行：期末余额=期初+增加合计-减少-转固；增加合计=材料+人工+机械+利息+其他；完工进度=累计投入/预算×100%；并实施三角勾稽校验，失败时红色高亮差额
 4. THE Detail_H2_2 SHALL 在底部显示合计行（=SUM所有工程项目行各金额列），合计行不可编辑
 5. THE Detail_H2_2 SHALL 对合计行与H2-1审定表进行交叉验证：期末余额合计=H2-1审定数合计
 6. WHEN 用户点击"添加工程项目"按钮时, THE Detail_H2_2 SHALL 弹出ElMessageBox.prompt输入工程名称后新增一行
@@ -124,7 +128,7 @@ H2在建工程底稿的专属HTML精美组件构建。将现有通用渲染升�
 8. THE Detail_H2_2 SHALL 对所有金额列应用右对齐+金额格式化（千分位/负数红色括号/零值"-"）
 9. WHEN 完工进度>100%时, THE Detail_H2_2 SHALL 以红色高亮该行提示"超预算"
 10. THE Detail_H2_2 SHALL 在底部显示"审计说明"区域（textarea + AI生成按钮）和"审计结论"区域
-11. THE Detail_H2_2 SHALL 支持导入导出（el-dropdown三级：导出模板/导出数据/导入数据）
+11. THE Detail_H2_2 SHALL 支持导入导出（el-dropdown三级：导出模板/导出数据/导入数据；导出按4区段分sheet）
 12. THE Detail_H2_2 SHALL 在审计说明/结论区域放置复核对话入口（💬图标）
 
 ### Requirement 4: 调整分录H2-3
@@ -281,7 +285,7 @@ H2在建工程底稿的专属HTML精美组件构建。将现有通用渲染升�
 1. THE H2 组件 SHALL 支持双模式切换：HTML精美组件 ↔ OnlyOffice在线编辑（el-segmented + OO健康检查）
 2. THE H2 组件 SHALL 在切换到OnlyOffice前自动保存HTML数据
 3. THE H2 组件 SHALL 支持导入导出composable（useH2ImportExport.ts，axios请求三端点）
-4. THE H2 组件 SHALL 对H2-2宽表导出时按3区段分sheet
+4. THE H2 组件 SHALL 对H2-2宽表导出时按4区段分sheet
 5. THE H2 组件 SHALL 支持AI审计说明生成（/h2/ai-generate端点，6 section）
 6. THE H2 组件 SHALL 支持跨sheet联动：H2-2→H2-1审定表 / H2-5→H2-1转固列 / H2-10/11→H2-2利息列 / H2-4→分析取数
 7. THE H2 组件 SHALL 支持跨底稿联动：H2-5→H1(转固) / H2-10/11→L(财务费用借入端) / C7(前置控制测试)

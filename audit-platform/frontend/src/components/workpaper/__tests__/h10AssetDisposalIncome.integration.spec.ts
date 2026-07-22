@@ -34,10 +34,13 @@ describe('H10 集成 — sheetName 分发', () => {
 })
 
 describe('H10 集成 — 审定表行数与公式', () => {
-  it('H10-1 审定表 7 数据行', () => {
-    expect(H10_ADJUDICATION_ITEMS.length).toBe(7)
+  it('H10-1 审定表 10 数据行（含使用权/油气/试运行）', () => {
+    expect(H10_ADJUDICATION_ITEMS.length).toBe(10)
     expect(H10_ADJUDICATION_ITEMS[0].rowKey).toBe('hfs_disposal')
     expect(H10_ADJUDICATION_ITEMS[6].rowKey).toBe('non_monetary_exchange')
+    expect(H10_ADJUDICATION_ITEMS[7].rowKey).toBe('rou_disposal')
+    expect(H10_ADJUDICATION_ITEMS[8].rowKey).toBe('oil_gas_disposal')
+    expect(H10_ADJUDICATION_ITEMS[9].rowKey).toBe('trial_operation_sales')
   })
 
   it('审定数 = 未审 + AJE + RJE', () => {
@@ -58,8 +61,9 @@ describe('H10 集成 — 审定表行数与公式', () => {
 })
 
 describe('H10 集成 — 处置计算', () => {
-  it('净值 = 原值 − 累计折旧', () => {
+  it('净值 = 原值 − 累计折旧 − 减值', () => {
     expect(calcNetBookValue(1000, 400)).toBe(600)
+    expect(calcNetBookValue(1000, 400, 100)).toBe(500)
   })
 
   it('处置净损益 = 收入 − 净值 − 费用 − 税费', () => {
@@ -69,12 +73,18 @@ describe('H10 集成 — 处置计算', () => {
 })
 
 describe('H10 集成 — 附注披露行数', () => {
-  it('上市附注含 7 主行 + 2 明细展开', () => {
-    expect(H10_DISCLOSURE_LISTED_ROWS.length).toBe(9)
+  it('上市附注与审定同分项（含试运行）', () => {
+    expect(H10_DISCLOSURE_LISTED_ROWS.length).toBe(10)
+    expect(H10_DISCLOSURE_LISTED_ROWS.map((r) => r.rowKey)).toContain('trial_operation_sales')
+    expect(H10_DISCLOSURE_LISTED_ROWS.map((r) => r.rowKey)).toContain('rou_disposal')
+    expect(H10_DISCLOSURE_LISTED_ROWS.map((r) => r.rowKey)).not.toContain('listed_sub_dr')
   })
 
-  it('国企附注含 7 主行 + 1 展开', () => {
-    expect(H10_DISCLOSURE_SOE_ROWS.length).toBe(8)
+  it('国企附注与审定同分项（含试运行）', () => {
+    expect(H10_DISCLOSURE_SOE_ROWS.length).toBe(10)
+    expect(H10_DISCLOSURE_SOE_ROWS.map((r) => r.rowKey)).toContain('oil_gas_disposal')
+    expect(H10_DISCLOSURE_SOE_ROWS.map((r) => r.rowKey)).toContain('trial_operation_sales')
+    expect(H10_DISCLOSURE_SOE_ROWS.map((r) => r.rowKey)).not.toContain('soe_sub_dr')
   })
 })
 
@@ -124,9 +134,16 @@ describe('H10 集成 — 底稿目录追溯链', () => {
 })
 
 describe('H10 集成 — 跨底稿映射', () => {
-  it('SOURCE_WP_TO_ROW_KEY 覆盖 H1/H6', () => {
+  it('SOURCE_WP_TO_ROW_KEY：H8=使用权、I1=无形资产', () => {
     expect(H10_SOURCE_WP_TO_ROW_KEY.H1).toBe('fixed_asset_disposal')
+    expect(H10_SOURCE_WP_TO_ROW_KEY.H2).toBe('construction_disposal')
+    expect(H10_SOURCE_WP_TO_ROW_KEY.H5).toBe('oil_gas_disposal')
     expect(H10_SOURCE_WP_TO_ROW_KEY.H6).toBe('fixed_asset_disposal')
+    expect(H10_SOURCE_WP_TO_ROW_KEY.H7).toBe('productive_bio_disposal')
+    expect(H10_SOURCE_WP_TO_ROW_KEY.H8).toBe('rou_disposal')
+    expect(H10_SOURCE_WP_TO_ROW_KEY.I1).toBe('intangible_disposal')
+    expect(H10_SOURCE_WP_TO_ROW_KEY.DR).toBe('debt_restructuring_disposal')
+    expect(H10_SOURCE_WP_TO_ROW_KEY.NM).toBe('non_monetary_exchange')
   })
 })
 

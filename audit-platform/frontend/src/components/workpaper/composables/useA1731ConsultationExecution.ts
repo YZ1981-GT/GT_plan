@@ -21,6 +21,10 @@ export interface A1731MetaInfo {
   execution_date: string
   review_date: string
   reviewer: string
+  /** 勾选「无需执行」时关闭 A17-3↔3-1 成对要求 */
+  not_required: string
+  /** 关联的 A17-3 咨询事项编号 */
+  consultation_id: string
 }
 
 export interface A1731Sections {
@@ -33,6 +37,7 @@ export interface A1731Sections {
 export interface A1731A173Reference {
   overview: string
   background: string
+  reply: string
 }
 
 export interface A1731ProjectContext {
@@ -66,6 +71,8 @@ export function useA1731ConsultationExecution(wpId: Ref<string>): UseA1731Return
     execution_date: '',
     review_date: '',
     reviewer: '',
+    not_required: '',
+    consultation_id: '',
   })
 
   const sections = ref<A1731Sections>({
@@ -78,6 +85,7 @@ export function useA1731ConsultationExecution(wpId: Ref<string>): UseA1731Return
   const a173Reference = ref<A1731A173Reference>({
     overview: '',
     background: '',
+    reply: '',
   })
 
   const projectContext = ref<A1731ProjectContext>({
@@ -114,6 +122,7 @@ export function useA1731ConsultationExecution(wpId: Ref<string>): UseA1731Return
         a173Reference.value = {
           overview: htmlData.a173_reference.overview || '',
           background: htmlData.a173_reference.background || '',
+          reply: htmlData.a173_reference.reply || '',
         }
       }
       if (htmlData?.project_context) {

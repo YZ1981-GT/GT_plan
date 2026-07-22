@@ -19,20 +19,38 @@ ChecklistRow = namedtuple("ChecklistRow", ["item_id", "conclusion", "remark"])
 ProjectRow = namedtuple("ProjectRow", ["client_name", "audit_year"])
 
 
-def _make_ctx(wp_id="wp-001", project_id="proj-001", checklist_rows=None, ref_rows=None, project_row=None):
-    """Build a minimal mock RenderContext."""
+WpIndexRow = namedtuple("WpIndexRow", ["wp_id"])
+
+
+def _make_ctx(
+    wp_id="wp-001",
+    project_id="proj-001",
+    checklist_rows=None,
+    ref_rows=None,
+    project_row=None,
+    a173_wp_id="wp-a173",
+):
+    """Build a minimal mock RenderContext.
+
+    execute 顺序:
+    1. a1731 checklist_responses
+    2. wp_index 查 A17-3 wp_id
+    3. A17-3 checklist_responses（仅当 a173_wp_id 非空）
+    4. projects 上下文
+    """
     ctx = MagicMock()
     ctx.wp_id = wp_id
     ctx.project_id = project_id
 
     db = AsyncMock()
 
-    # Mock results for sequential execute calls:
-    # 1st = checklist_responses (a1731-%)
-    # 2nd = a173 reference (a173-sec1-%)
-    # 3rd = project context
     checklist_result = MagicMock()
     checklist_result.fetchall.return_value = checklist_rows or []
+
+    idx_result = MagicMock()
+    idx_result.fetchone.return_value = (
+        WpIndexRow(a173_wp_id) if a173_wp_id else None
+    )
 
     ref_result = MagicMock()
     ref_result.fetchall.return_value = ref_rows or []
@@ -40,7 +58,14 @@ def _make_ctx(wp_id="wp-001", project_id="proj-001", checklist_rows=None, ref_ro
     proj_result = MagicMock()
     proj_result.fetchone.return_value = project_row
 
-    db.execute = AsyncMock(side_effect=[checklist_result, ref_result, proj_result])
+    if a173_wp_id:
+        db.execute = AsyncMock(
+            side_effect=[checklist_result, idx_result, ref_result, proj_result]
+        )
+    else:
+        db.execute = AsyncMock(
+            side_effect=[checklist_result, idx_result, proj_result]
+        )
     ctx.db = db
 
     return ctx
@@ -95,10 +120,11 @@ class TestA1731RenderA173Reference:
 
     @pytest.mark.asyncio
     async def test_loads_a173_reference_data(self):
-        """A17-3 section 1 data is loaded into a173_reference."""
+        """A17-3 section 1 data is loaded into a173_reference（跨底稿）。"""
         ref_rows = [
             ChecklistRow("a173-sec1-overview", None, "客户从事制造业"),
             ChecklistRow("a173-sec1-background", None, "收入确认时点问题"),
+            ChecklistRow("a173-sec3-reply", None, "应按五步法确认收入"),
         ]
         ctx = _make_ctx(ref_rows=ref_rows, project_row=ProjectRow("测试公司", 2025))
 
@@ -106,6 +132,22 @@ class TestA1731RenderA173Reference:
 
         assert result["a173_reference"]["overview"] == "客户从事制造业"
         assert result["a173_reference"]["background"] == "收入确认时点问题"
+        assert result["a173_reference"]["reply"] == "应按五步法确认收入"
+
+    @pytest.mark.asyncio
+    async def test_no_a173_wp_skips_reference(self):
+        """项目无 A17-3 底稿时引用为空。"""
+        ctx = _make_ctx(
+            ref_rows=[],
+            project_row=ProjectRow("测试公司", 2025),
+            a173_wp_id=None,
+        )
+
+        result = await render(ctx)
+
+        assert result["a173_reference"]["overview"] == ""
+        assert result["a173_reference"]["background"] == ""
+        assert result["a173_reference"]["reply"] == ""
 
     @pytest.mark.asyncio
     async def test_no_a173_data_returns_empty_reference(self):
@@ -167,15 +209,14 @@ class TestA1731RenderStructure:
         assert set(result.keys()) == {"meta_info", "sections", "a173_reference", "project_context"}
 
     @pytest.mark.asyncio
-    async def test_meta_info_has_4_keys(self):
-        """meta_info always has exactly 4 keys."""
+    async def test_meta_info_has_expected_keys(self):
+        """meta_info 含执行字段 + not_required。"""
         ctx = _make_ctx(checklist_rows=[], ref_rows=[], project_row=None)
 
         result = await render(ctx)
 
-        assert len(result["meta_info"]) == 4
         assert set(result["meta_info"].keys()) == {
-            "executor", "execution_date", "review_date", "reviewer"
+            "executor", "execution_date", "review_date", "reviewer", "not_required",
         }
 
     @pytest.mark.asyncio
@@ -189,10 +230,12 @@ class TestA1731RenderStructure:
         assert set(result["sections"].keys()) == {"1", "2", "3", "4"}
 
     @pytest.mark.asyncio
-    async def test_a173_reference_has_2_keys(self):
-        """a173_reference always has exactly 2 keys."""
+    async def test_a173_reference_has_expected_keys(self):
+        """a173_reference 含 overview / background / reply。"""
         ctx = _make_ctx(checklist_rows=[], ref_rows=[], project_row=None)
 
         result = await render(ctx)
 
-        assert set(result["a173_reference"].keys()) == {"overview", "background"}
+        assert set(result["a173_reference"].keys()) == {
+            "overview", "background", "reply",
+        }

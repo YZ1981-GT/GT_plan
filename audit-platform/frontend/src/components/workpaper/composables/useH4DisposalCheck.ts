@@ -1,83 +1,59 @@
 /**
  * useH4DisposalCheck — H4-5 减少检查表 composable
  *
- * 29列分2区块：
- * 基础(序号/物资名/规格/数量/金额/减少原因/日期)
- * 证据(领料单号/领用部门/领用工程项目/审批人/对应H2编号/核查结论/备注/索引)
+ * 对齐致同「工程物资减少检查表」：
+ * 一、审计目标 → 二、样本选取 → 三、测试（原值/减值/净值/清理损益 + 核对1–5）
+ * → 检查比例（勾稽 H4-2，防 #DIV/0!）→ 四、审计说明 → 五、审计结论
  *
- * 功能：
- * - 减少原因 dropdown options
- * - H2联动: when reason='领用出库', require H2 ref
- * - Saves to "H4-5-rows"
- *
- * Spec: .kiro/specs/h4-engineering-materials/
- * Task: 3.4
- * Requirements: 6.1-6.6
+ * 平台增强：领用出库 → H2 编号必填；关联方预埋 → H4-9
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
-import { calcSubtotal } from './useH4FormulaEngine'
+import {
+  type H4DisposalCheckRow,
+  type H4DisposalSamplingParams,
+  type H4DisposalSummary,
+  type LinkedDisposalTotal,
+  normalizeDisposalRow,
+  normalizeSamplingParams,
+  createEmptySamplingParams,
+  recalcDisposalRow,
+  calcDisposalSummary,
+  sumDetailDecrease,
+  needsH2Ref,
+  buildNoteDraft,
+  buildConclusionDraft,
+  normalizeDisposalMethod,
+} from './h4DisposalCheckModel'
+import { H45_AJE_MARKER, pushDraftPairsToH43 } from './h4AdjustmentDraftPush'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+export type {
+  H4DisposalCheckRow,
+  H4DisposalSamplingParams,
+  H4DisposalSummary,
+  LinkedDisposalTotal,
+  DisposalMethod,
+  DisposalReason,
+} from './h4DisposalCheckModel'
 
-/** H4-5 减少检查行 */
-export interface H4DisposalCheckRow {
-  rowId: string
-  /** 序号 */
-  seq: number
-
-  // ═══ 区块1: 基础 ═══
-  /** 物资名称 */
-  name: string
-  /** 规格型号 */
-  spec: string
-  /** 数量 */
-  quantity: number
-  /** 金额 */
-  amount: number
-  /** 减少原因 */
-  reason: DisposalReason
-  /** 减少日期 */
-  disposalDate: string
-
-  // ═══ 区块2: 证据 ═══
-  /** 领料单号 */
-  pickingNo: string
-  /** 领用部门 */
-  department: string
-  /** 领用工程项目 */
-  projectName: string
-  /** 审批人 */
-  approver: string
-  /** 对应H2编号（领用出库时必填） */
-  h2Ref: string
-  /** 抽凭结果 */
-  voucherResult: string
-  /** 核查结论 */
-  conclusion: string
-  /** 备注 */
-  remark: string
-  /** 索引 */
-  refIndex: string
-}
-
-/** 减少原因枚举 */
-export type DisposalReason = '领用出库' | '退货' | '报废' | '盘亏' | '其他' | ''
-
-/** 减少原因下拉选项 */
-export const DISPOSAL_REASON_OPTIONS: DisposalReason[] = [
-  '领用出库',
-  '退货',
-  '报废',
-  '盘亏',
-  '其他',
-]
-
-// ─── Constants ───────────────────────────────────────────────────────────────
+export {
+  DISPOSAL_METHOD_OPTS,
+  DISPOSAL_REASON_OPTIONS,
+  SAMPLING_METHOD_OPTS,
+  H4_DISPOSAL_TEST_CONTENT_ITEMS,
+  getEvidenceHint,
+  calcNetValue,
+  calcDisposalNetPl,
+  calcCoverageRate,
+  needsH2Ref,
+} from './h4DisposalCheckModel'
 
 const ROWS_KEY = 'H4-5-rows'
 const DISPOSAL_TOTAL_KEY = 'H4-5-disposal-total'
-
-// ─── Composable ──────────────────────────────────────────────────────────────
+const PARAMS_KEY = 'H4-5-sampling-params'
+const NOTE_KEY = 'H4-5-note'
+const CONCLUSION_KEY = 'H4-5-conclusion'
+const DETAIL_ROWS_KEY = 'H4-2-rows'
+const POP_MANUAL_KEY = 'H4-5-population-manual'
 
 export function useH4DisposalCheck(params: {
   wpId: Ref<string>
@@ -87,11 +63,11 @@ export function useH4DisposalCheck(params: {
 }) {
   const { allResponses, onSave } = params
 
-  // ─── State ─────────────────────────────────────────────────────────────────
-
   const rows = ref<H4DisposalCheckRow[]>([])
-
-  // ─── Helpers ───────────────────────────────────────────────────────────────
+  const samplingParams = ref<H4DisposalSamplingParams>(createEmptySamplingParams())
+  const populationManual = ref(false)
+  const auditNote = ref('')
+  const auditConclusion = ref('')
 
   function _getJson(itemId: string): any {
     const item = allResponses.value.get(itemId)
@@ -101,60 +77,121 @@ export function useH4DisposalCheck(params: {
     try { return JSON.parse(raw) } catch { return raw }
   }
 
-  function _normalizeRow(raw: any, idx: number): H4DisposalCheckRow {
-    return {
-      rowId: raw.rowId ?? `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      seq: raw.seq ?? idx + 1,
-      name: raw.name ?? '',
-      spec: raw.spec ?? '',
-      quantity: Number(raw.quantity) || 0,
-      amount: Number(raw.amount) || 0,
-      reason: (DISPOSAL_REASON_OPTIONS.includes(raw.reason) ? raw.reason : '') as DisposalReason,
-      disposalDate: raw.disposalDate ?? '',
-      pickingNo: raw.pickingNo ?? '',
-      department: raw.department ?? '',
-      projectName: raw.projectName ?? '',
-      approver: raw.approver ?? '',
-      h2Ref: raw.h2Ref ?? '',
-      voucherResult: raw.voucherResult ?? '',
-      conclusion: raw.conclusion ?? '',
-      remark: raw.remark ?? '',
-      refIndex: raw.refIndex ?? '',
+  function _getString(itemId: string): string {
+    const item = allResponses.value.get(itemId)
+    if (!item) return ''
+    const raw = item.remark ?? item.conclusion
+    if (raw == null) return ''
+    if (typeof raw === 'string') {
+      try {
+        const p = JSON.parse(raw)
+        return typeof p === 'string' ? p : raw
+      } catch {
+        return raw
+      }
     }
+    return String(raw)
   }
-
-  // ─── Load ──────────────────────────────────────────────────────────────────
 
   function load(): void {
     const data = _getJson(ROWS_KEY)
-    if (Array.isArray(data) && data.length > 0) {
-      rows.value = data.map((r, i) => _normalizeRow(r, i))
-    } else {
-      rows.value = []
-    }
+    rows.value = Array.isArray(data) && data.length > 0
+      ? data.map((r, i) => normalizeDisposalRow(r, i))
+      : []
+
+    const sp = _getJson(PARAMS_KEY)
+    samplingParams.value = normalizeSamplingParams(sp)
+
+    const manual = _getJson(POP_MANUAL_KEY)
+    populationManual.value = manual === true || manual === 'true'
+
+    auditNote.value = _getString(NOTE_KEY)
+    auditConclusion.value = _getString(CONCLUSION_KEY)
   }
 
   watch(allResponses, () => load(), { immediate: true })
 
-  // ─── Computed ──────────────────────────────────────────────────────────────
+  const linkedDecrease: ComputedRef<LinkedDisposalTotal> = computed(() => {
+    const data = _getJson(DETAIL_ROWS_KEY)
+    return sumDetailDecrease(Array.isArray(data) ? data : [])
+  })
 
-  /** 减少合计金额（供CrossSheet使用） */
-  const disposalTotal: ComputedRef<number> = computed(() =>
-    calcSubtotal(rows.value.map(r => r.amount)),
+  const summary: ComputedRef<H4DisposalSummary> = computed(() =>
+    calcDisposalSummary(rows.value, samplingParams.value.populationAmount),
   )
 
-  /** 需要H2关联但未填写的行（领用出库且h2Ref为空） */
+  /** 减少合计金额（供 CrossSheet / 旧接口） */
+  const disposalTotal: ComputedRef<number> = computed(() => summary.value.checkedAmount)
+
   const missingH2Refs: ComputedRef<H4DisposalCheckRow[]> = computed(() =>
-    rows.value.filter(r => r.reason === '领用出库' && !r.h2Ref.trim()),
+    rows.value.filter(needsH2Ref),
   )
 
-  // ─── Actions ───────────────────────────────────────────────────────────────
+  const populationDrift: ComputedRef<boolean> = computed(() => {
+    const linked = linkedDecrease.value
+    const pop = samplingParams.value.populationAmount
+    return linked.source !== '' && linked.amount > 0 && Math.abs(pop - linked.amount) > 1
+  })
 
-  function addRow(name: string): void {
-    if (!name?.trim()) return
+  function _persistRows(): void {
+    if (!onSave) return
+    const toPersist = rows.value.map(r => {
+      recalcDisposalRow(r)
+      return {
+        rowId: r.rowId,
+        seq: r.seq,
+        category: r.category,
+        name: r.name,
+        spec: r.spec || r.category,
+        voucherNo: r.voucherNo,
+        disposalMethod: r.disposalMethod,
+        reason: r.disposalMethod,
+        oppositeAccount: r.oppositeAccount,
+        quantity: r.quantity,
+        originalCost: r.originalCost,
+        amount: r.originalCost,
+        impairment: r.impairment,
+        netValue: r.netValue,
+        disposalCost: r.disposalCost,
+        disposalIncome: r.disposalIncome,
+        disposalNetPl: r.disposalNetPl,
+        disposalDate: r.disposalDate,
+        supportingDocs: r.supportingDocs,
+        pickingNo: r.pickingNo,
+        department: r.department,
+        projectName: r.projectName,
+        approver: r.approver,
+        h2Ref: r.h2Ref,
+        checks: { ...r.checks },
+        check1: r.checks.check1,
+        check2: r.checks.check2,
+        check3: r.checks.check3,
+        check4: r.checks.check4,
+        check5: r.checks.check5,
+        indexRef: r.indexRef,
+        refIndex: r.indexRef,
+        isAbnormal: r.isAbnormal,
+        conclusion: r.conclusion,
+        remark: r.remark,
+        isRelatedParty: r.isRelatedParty,
+        relatedPartyName: r.relatedPartyName,
+        relationship: r.relationship,
+        voucherResult: r.voucherResult,
+      }
+    })
+    onSave(ROWS_KEY, toPersist)
+    onSave(DISPOSAL_TOTAL_KEY, disposalTotal.value)
+  }
+
+  function _persistParams(): void {
+    onSave?.(PARAMS_KEY, { ...samplingParams.value })
+    onSave?.(POP_MANUAL_KEY, populationManual.value)
+  }
+
+  function addRow(name = ''): void {
     const seq = rows.value.length + 1
-    rows.value.push(_normalizeRow({ name: name.trim(), seq }, seq - 1))
-    _persist()
+    rows.value.push(normalizeDisposalRow({ name: name.trim(), seq }, seq - 1))
+    _persistRows()
   }
 
   function deleteRow(rowId: string): void {
@@ -162,83 +199,177 @@ export function useH4DisposalCheck(params: {
     if (idx === -1) return
     rows.value.splice(idx, 1)
     rows.value.forEach((r, i) => { r.seq = i + 1 })
-    _persist()
+    _persistRows()
   }
 
   function updateCell(rowId: string, field: string, value: any): void {
     const row = rows.value.find(r => r.rowId === rowId)
     if (!row) return
 
-    // 文本字段
-    if (['name', 'spec', 'disposalDate', 'pickingNo', 'department', 'projectName', 'approver', 'h2Ref', 'voucherResult', 'conclusion', 'remark', 'refIndex'].includes(field)) {
+    if (field.startsWith('checks.')) {
+      const key = field.split('.')[1] as keyof typeof row.checks
+      row.checks[key] = Boolean(value)
+      _persistRows()
+      return
+    }
+
+    if (field === 'disposalMethod' || field === 'reason') {
+      row.disposalMethod = normalizeDisposalMethod(String(value ?? ''))
+      row.reason = row.disposalMethod
+      _persistRows()
+      return
+    }
+
+    if (field === 'isRelatedParty') {
+      row.isRelatedParty = String(value ?? '')
+      if (value !== '是') {
+        row.relatedPartyName = ''
+        row.relationship = ''
+      }
+      _persistRows()
+      return
+    }
+
+    const textFields = [
+      'category', 'name', 'spec', 'voucherNo', 'oppositeAccount', 'disposalDate',
+      'supportingDocs', 'pickingNo', 'department', 'projectName', 'approver',
+      'h2Ref', 'indexRef', 'isAbnormal', 'conclusion', 'remark',
+      'relatedPartyName', 'relationship', 'voucherResult',
+    ]
+    if (textFields.includes(field)) {
       ;(row as any)[field] = String(value ?? '')
-      _persist()
+      _persistRows()
       return
     }
 
-    // 减少原因（枚举）
-    if (field === 'reason') {
-      row.reason = (DISPOSAL_REASON_OPTIONS.includes(value as DisposalReason) ? value : '') as DisposalReason
-      _persist()
+    const numFields = ['quantity', 'originalCost', 'amount', 'impairment', 'disposalCost', 'disposalIncome']
+    if (numFields.includes(field)) {
+      const numVal = Number(value) || 0
+      if (field === 'amount') {
+        row.originalCost = numVal
+        row.amount = numVal
+      } else {
+        ;(row as any)[field] = numVal
+        if (field === 'originalCost') row.amount = numVal
+      }
+      recalcDisposalRow(row)
+      _persistRows()
       return
     }
+  }
 
-    // 数值字段
-    const numVal = Number(value) || 0
-    switch (field) {
-      case 'quantity': row.quantity = numVal; break
-      case 'amount': row.amount = numVal; break
-      default: return
+  function updateSamplingParams(patch: Partial<H4DisposalSamplingParams>): void {
+    samplingParams.value = { ...samplingParams.value, ...patch }
+    if (patch.populationAmount != null) populationManual.value = true
+    _persistParams()
+  }
+
+  function syncPopulationFromH42(): boolean {
+    const linked = linkedDecrease.value
+    if (!(linked.amount > 0)) return false
+    samplingParams.value = {
+      ...samplingParams.value,
+      populationAmount: linked.amount,
     }
-
-    _persist()
+    populationManual.value = false
+    _persistParams()
+    return true
   }
 
-  // ─── Save ──────────────────────────────────────────────────────────────────
-
-  function save(): void { _persist() }
-
-  function _persist(): void {
-    if (!onSave) return
-    const toPersist = rows.value.map(r => ({
-      rowId: r.rowId,
-      seq: r.seq,
-      name: r.name,
-      spec: r.spec,
-      quantity: r.quantity,
-      amount: r.amount,
-      reason: r.reason,
-      disposalDate: r.disposalDate,
-      pickingNo: r.pickingNo,
-      department: r.department,
-      projectName: r.projectName,
-      approver: r.approver,
-      h2Ref: r.h2Ref,
-      voucherResult: r.voucherResult,
-      conclusion: r.conclusion,
-      remark: r.remark,
-      refIndex: r.refIndex,
-    }))
-    onSave(ROWS_KEY, toPersist)
-    // 同步写入合计供CrossSheet
-    onSave(DISPOSAL_TOTAL_KEY, disposalTotal.value)
+  function saveNote(val: string): void {
+    auditNote.value = val
+    onSave?.(NOTE_KEY, val)
   }
 
-  // ─── Return ────────────────────────────────────────────────────────────────
+  function saveConclusion(val: string): void {
+    auditConclusion.value = val
+    onSave?.(CONCLUSION_KEY, val)
+  }
+
+  function draftNote(): void {
+    saveNote(buildNoteDraft(summary.value, samplingParams.value.populationAmount))
+  }
+
+  function draftConclusion(): void {
+    saveConclusion(buildConclusionDraft(summary.value))
+  }
+
+  /**
+   * 异常减少样本 → H4-3：借营业外支出 / 贷工程物资（按净值，无净值则用原值）
+   */
+  function pushAjeDraftToH43(): { ok: boolean; added: number; amount: number; message: string } {
+    const targets = rows.value.filter(
+      (r) => r.isAbnormal === '是' || r.isAbnormal === 'Y',
+    )
+    if (!targets.length) {
+      return { ok: false, added: 0, amount: 0, message: '无标记异常的减少行可推送' }
+    }
+    const pairs = targets.map((r) => {
+      const amt = Math.abs(r.netValue) > 0.01 ? Math.abs(r.netValue) : Math.abs(r.originalCost)
+      const name = (r.name || '工程物资').trim()
+      const method = r.disposalMethod || r.reason || '减少'
+      return {
+        description: `减少检查拟调整-${name}（${method}）`,
+        amount: amt,
+        debitCode: '5301',
+        debitName: '营业外支出',
+        creditCode: '1605',
+        creditName: '工程物资',
+        reportItemDebit: '营业外支出',
+        reportItemCredit: '工程物资',
+        indexRef: 'H4-5',
+        marker: H45_AJE_MARKER,
+      }
+    }).filter((p) => p.amount >= 0.005)
+    return pushDraftPairsToH43({
+      allResponses: allResponses.value,
+      marker: H45_AJE_MARKER,
+      pairs,
+      onSave,
+    })
+  }
+
+  function rowClassName({ row }: { row: H4DisposalCheckRow }): string {
+    if (needsH2Ref(row) || row.isAbnormal === '是' || row.isAbnormal === 'Y') return 'row-anomaly'
+    if (isCheckIncompleteSafe(row)) return 'row-warn'
+    return ''
+  }
+
+  function save(): void {
+    _persistRows()
+    _persistParams()
+  }
 
   return {
-    // State
     rows,
-    // Computed
+    samplingParams,
+    populationManual,
+    auditNote,
+    auditConclusion,
+    linkedDecrease,
+    summary,
     disposalTotal,
     missingH2Refs,
-    // Actions
+    populationDrift,
     addRow,
     deleteRow,
     updateCell,
+    updateSamplingParams,
+    syncPopulationFromH42,
+    saveNote,
+    saveConclusion,
+    draftNote,
+    draftConclusion,
+    pushAjeDraftToH43,
+    rowClassName,
     save,
     load,
   }
+}
+
+function isCheckIncompleteSafe(row: H4DisposalCheckRow): boolean {
+  const c = row.checks
+  return !c.check1 || !c.check2 || !c.check3 || !c.check4
 }
 
 export default useH4DisposalCheck

@@ -58,6 +58,9 @@ def is_numeric_field_key(key: str) -> bool:
         "estimatedAmount", "voucherAmount", "reportPeriodAmount",
         "auditedBalance", "auditedAgingLt1", "auditedAging1to2", "auditedAging2to3", "auditedAgingGt3",
         "h1Total", "h1Share", "h1Avg", "h2Total", "yearTotal", "priorTotal", "changeAmt", "changeRate",
+        # H1-12 折旧测算导入
+        "originalCost", "accDepBegin", "bookAccDepEnd", "bookDepreciation", "bookMonthly",
+        "usefulLife", "salvageRate", "impairmentBegin", "impairmentEnd", "impairmentProvision",
         "volCoef", "currentAmt", "priorAmt", "changeAmount", "changeRatePct", "expectedDiff",
         "hangDays", "hangAmount", "qtySold", "qtyCost", "qtyDiff", "qtyDiffRate", "openingStock",
         "production", "purchase", "availableQty", "closingStock", "theoreticalQty", "theoreticalDiff",
@@ -76,7 +79,7 @@ def is_numeric_field_key(key: str) -> bool:
         "marginChange", "relatedRevenue", "costRate",
         # G14 信用减值损失明细
         "currentUnadjusted", "currentAdjustment", "openingProvision", "currentProvision",
-        "currentReversal", "currentWriteoff", "closingProvision",
+        "currentReversal", "currentWriteoff", "otherMovement", "closingProvision",
         # G12 净敞口套期收益
         "instrumentOpeningFV", "instrumentClosingFV", "instrumentFVChange",
         "itemOpeningFV", "itemClosingFV", "itemFVChange",
@@ -692,11 +695,20 @@ def create_cycle_import_export_router(
         field = sp.get("storage_field", storage_field)
         build_wb = sp.get("build_workbook")
         if callable(build_wb):
-            payload = await _load_payload_fallback(db, wp_id, item_id, field)
+            export_loader = sp.get("export_loader")
+            if callable(export_loader):
+                payload = await export_loader(db, wp_id)
+            else:
+                payload = await _load_payload_fallback(db, wp_id, item_id, field)
             wb = build_wb(payload, template_only=False)
             return workbook_to_response(wb, f"{sheet}_数据.xlsx")
         keyed_by = sp.get("keyed_by")
-        rows = await _load_rows_fallback(db, wp_id, item_id, field, keyed_by)
+        item_ids = list(sp.get("item_id_candidates") or [sp.get("item_id", f"{sheet}-rows")])
+        rows: list = []
+        for iid in item_ids:
+            rows = await _load_rows_fallback(db, wp_id, iid, field, keyed_by)
+            if rows:
+                break
         headers = await _export_headers(sp, wp_id, db)
         prefill = sp.get("template_prefill")
         wb = build_workbook_template(
@@ -739,11 +751,15 @@ def create_cycle_import_export_router(
                 raise HTTPException(400, "无法解析xlsx文件")
             if errors and not imported_count:
                 return {"ok": False, "errors": errors, "imported_count": 0}
-            item_id = sp.get("item_id", f"{sheet}-rows")
-            field = sp.get("storage_field", storage_field)
-            await _upsert_payload_maybe_dual(
-                db, wp_id, item_id, payload, field,                 dual=bool(sp.get("dual_write")),
-            )
+            import_handler = sp.get("import_handler")
+            if callable(import_handler):
+                await import_handler(db, wp_id, payload)
+            else:
+                item_id = sp.get("item_id", f"{sheet}-rows")
+                field = sp.get("storage_field", storage_field)
+                await _upsert_payload_maybe_dual(
+                    db, wp_id, item_id, payload, field,                 dual=bool(sp.get("dual_write")),
+                )
             out_custom: dict[str, Any] = {
                 "ok": True,
                 "imported_count": imported_count,
@@ -831,6 +847,14 @@ def create_cycle_import_export_router(
             keyed_by=sp.get("keyed_by"),
             keep_keys=sp.get("keep_keys"),
         )
+        for mid in sp.get("mirror_item_ids") or []:
+            if mid and mid != item_id:
+                await _upsert_rows_maybe_dual(
+                    db, wp_id, mid, rows, field,
+                    dual=bool(sp.get("dual_write")),
+                    keyed_by=sp.get("keyed_by"),
+                    keep_keys=sp.get("keep_keys"),
+                )
         out2: dict[str, Any] = {"ok": True, "imported_count": len(rows), "errors": []}
         if truncated:
             out2["warning"] = f"数据行数超过{ROW_LIMIT}行限制，已截断"

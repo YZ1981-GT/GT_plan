@@ -1,59 +1,16 @@
 {
   "file": "wp_templates\\H\\H10 资产处置损益.xlsx",
+  "updated": "2026-07-22",
+  "note": "H10-1←H10-2←调整; 披露←H10-1; 含使用权/油气; H10-4防DIV0",
   "sheets": [
-    {
-      "name": "底稿目录",
-      "max_row": 20,
-      "max_col": 8,
-      "formula_cells": 6
-    },
-    {
-      "name": "资产处置损益实质性程序表H10A",
-      "max_row": 21,
-      "max_col": 21,
-      "formula_cells": 6
-    },
-    {
-      "name": "审定表H10-1",
-      "max_row": 20,
-      "max_col": 11,
-      "formula_cells": 97
-    },
-    {
-      "name": "附注披露信息（上市公司）",
-      "max_row": 30,
-      "max_col": 17,
-      "formula_cells": 6
-    },
-    {
-      "name": "附注披露信息（国企）",
-      "max_row": 22,
-      "max_col": 5,
-      "formula_cells": 6
-    },
-    {
-      "name": "明细表H10-2",
-      "max_row": 36,
-      "max_col": 26,
-      "formula_cells": 96
-    },
-    {
-      "name": "调整分录汇总H10-3",
-      "max_row": 22,
-      "max_col": 10,
-      "formula_cells": 6
-    },
-    {
-      "name": "检查表H10-4",
-      "max_row": 80,
-      "max_col": 20,
-      "formula_cells": 10
-    },
-    {
-      "name": "GT_Custom",
-      "max_row": 8,
-      "max_col": 2,
-      "formula_cells": 0
-    }
+    { "name": "底稿目录", "max_row": 20, "max_col": 8 },
+    { "name": "资产处置损益实质性程序表H10A", "max_row": 21, "max_col": 21 },
+    { "name": "审定表H10-1", "max_row": 20, "max_col": 11, "data_rows": 9 },
+    { "name": "附注披露信息（上市公司）", "max_row": 32, "max_col": 17, "linked_from": "H10-1 E/J" },
+    { "name": "附注披露信息（国企）", "max_row": 25, "max_col": 5, "linked_from": "H10-1 E/J" },
+    { "name": "明细表H10-2", "max_row": 36, "max_col": 26, "data_rows": 9 },
+    { "name": "调整分录汇总H10-3", "max_row": 22, "max_col": 10, "has_balance_check": true },
+    { "name": "检查表H10-4", "max_row": 80, "max_col": 20, "coverage_safe_div": true },
+    { "name": "GT_Custom", "max_row": 8, "max_col": 2 }
   ]
 }

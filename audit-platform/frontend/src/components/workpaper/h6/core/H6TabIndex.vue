@@ -13,11 +13,11 @@
     <div class="guide-area">
       <div class="guide-grid">
         <div class="guide-step"><span class="step-num">①</span> 程序表(H6A)确认审计程序清单</div>
-        <div class="guide-step"><span class="step-num">②</span> 审定表(H6-1)确认TB取数→过渡科目1606期末应为0</div>
+        <div class="guide-step"><span class="step-num">②</span> 审定表(H6-1)：从H6-2回填→核对期初/期末审定与变动率→过渡科目1606期末应为0→报表核对</div>
         <div class="guide-step"><span class="step-num">③</span> 明细表(H6-2)逐项登记清理项目→联动H1/H10</div>
         <div class="guide-step"><span class="step-num">④</span> 调整分录(H6-3)→借贷平衡→推送A13</div>
-        <div class="guide-step"><span class="step-num">⑤</span> 检查表(H6-4)逐项检查清理过程合规性</div>
-        <div class="guide-step"><span class="step-num">⑥</span> 附注披露→上市/国企双版本自动取数</div>
+        <div class="guide-step"><span class="step-num">⑤</span> 检查表(H6-4)凭证级测试清理样本+检查比例</div>
+        <div class="guide-step"><span class="step-num">⑥</span> 附注披露→上市/国企从H6-1/H6-2取数并同步附注「固定资产清理」</div>
       </div>
     </div>
 
@@ -61,8 +61,8 @@
         <li>H6-1审定表完成后自动回写TB科目1606（过渡科目借方：期末=期初+借-贷，期末应为0）</li>
         <li>H6-2明细表支持动态行新增，清理状态选项：清理中/已完成/已结转</li>
         <li>H6-2可通过GtIndexChip跳转H1-8减少检查和H10资产处置损益对应行</li>
-        <li>H6-4检查表每行对应H6-2的一个清理项目，验证清理过程合规性</li>
-        <li>附注有上市版/国企版，根据applicable_standards自动判断</li>
+        <li>H6-4检查表为凭证级实质性测试：从H6-2带入样本，核对净值/清理损益/结转分摊与检查比例</li>
+        <li>附注上市/国企版对齐源xlsx：汇总+清理明细；「同步到附注」推送五、15/八、22「固定资产清理」子表（与H1浅合并）</li>
       </ul>
     </details>
   </div>

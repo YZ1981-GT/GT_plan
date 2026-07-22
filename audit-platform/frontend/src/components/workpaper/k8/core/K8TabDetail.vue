@@ -34,6 +34,17 @@
         <el-button size="small" @click="handleReview">
           <el-icon><ChatDotSquare /></el-icon> 复核
         </el-button>
+        <el-button
+          size="small"
+          type="warning"
+          plain
+          :loading="pullingI1"
+          :disabled="isReadonly"
+          data-testid="k8-pull-i1-amort"
+          @click="handlePullI1Amort"
+        >
+          从 I1-9 取摊销
+        </el-button>
       </div>
     </div>
 
@@ -198,6 +209,7 @@
         <li>同比变动率=(本期−上期)/|上期|；占收入比=审定数/营业收入</li>
         <li>合计行应与K8-1审定表合计保持一致（交叉勾稽）</li>
         <li>变动率&gt;±30%需在"波动说明"列填写原因</li>
+        <li>可点「从 I1-9 取摊销」回填本表「无形资产摊销/折旧及摊销」行</li>
       </ul>
     </details>
   </div>
@@ -215,11 +227,12 @@
  * Requirements: 3.1-3.4
  */
 import { computed, inject, ref, toRef, type Ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, ChatDotSquare, ArrowDown, Plus, Delete } from '@element-plus/icons-vue'
 import { defineAsyncComponent } from 'vue'
 import { useK8Detail, DETAIL_TABS, type K8DetailTabKey } from '../../composables/useK8Detail'
 import { useK8ImportExport } from '../../composables/useK8ImportExport'
+import { pullI1AmortIntoExpenseDetail } from '../../composables/expenseWpI1AmortPull'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
@@ -242,13 +255,34 @@ const openReviewDialog = inject<(sectionId: string, label?: string) => void>('op
 const activeTab = ref<K8DetailTabKey>('basic')
 const tabOptions = DETAIL_TABS.map(t => ({ label: t.label, value: t.key }))
 
-const { rows, subtotal, updateCell, addRow, removeRow } = useK8Detail({
+const { rows, subtotal, updateCell, addRow, removeRow, applyI1AmortAmount } = useK8Detail({
   allResponses: allResponsesRef,
   projectId: toRef(props, 'projectId') as Ref<string>,
   wpId: toRef(props, 'wpId') as Ref<string>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
   onSave: (itemId: string, value: any) => emit('save', itemId, value),
 })
+
+const pullingI1 = ref(false)
+
+async function handlePullI1Amort() {
+  if (props.isReadonly) return
+  pullingI1.value = true
+  try {
+    const result = await pullI1AmortIntoExpenseDetail(props.projectId, 'K8')
+    if (!result.amount) {
+      ElMessage.warning(result.message || 'I1-9 摊销合计为 0')
+      return
+    }
+    const applied = applyI1AmortAmount(result.amount)
+    if (applied.ok) ElMessage.success(applied.message)
+    else ElMessage.warning(applied.message)
+  } catch (e: any) {
+    ElMessage.error(e?.message || '拉取 I1-9 失败')
+  } finally {
+    pullingI1.value = false
+  }
+}
 
 const { exportTemplate, exportData, importData } = useK8ImportExport({
   wpId: toRef(props, 'wpId') as Ref<string>,

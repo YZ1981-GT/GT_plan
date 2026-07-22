@@ -79,11 +79,21 @@ export function useD3DisclosureSoe(options: UseD3DisclosureSoeOptions) {
   // ─── Section 1: 按账龄（from crossSheet）────────────────────────────
 
   const section1Rows: ComputedRef<SoeDisclosureRow[]> = computed(() => {
-    const aging = crossSheet.agingAggregation.value
-    const within1End = aging.within1
-    const over1End = aging.y1to2 + aging.y2to3 + aging.over3
-    const within1Prior = aging.prior_within1
-    const over1Prior = aging.prior_y1to2 + aging.prior_y2to3 + aging.prior_over3
+    // segment-driven：按项目账龄配置段拆「1年以内 / 1年以上」（dayFrom≥366 视为超1年）
+    const segs = crossSheet.agingSegments.value
+    const { current, prior } = crossSheet.agingByKey.value
+    let within1End = 0, over1End = 0, within1Prior = 0, over1Prior = 0
+    for (const seg of segs) {
+      const cur = current[seg.key] ?? 0
+      const pri = prior[seg.key] ?? 0
+      if (seg.dayFrom >= 366) {
+        over1End += cur
+        over1Prior += pri
+      } else {
+        within1End += cur
+        within1Prior += pri
+      }
+    }
 
     return [
       { rowId: 'cs-aging-within1', label: '1年以内', endAmount: within1End, priorAmount: within1Prior },

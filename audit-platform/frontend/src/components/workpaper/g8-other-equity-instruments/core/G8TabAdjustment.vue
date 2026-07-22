@@ -324,13 +324,14 @@ const AUDIT_NOTE_KEY = 'G8-3-audit-note'
 const AUDIT_CONCLUSION_KEY = 'G8-3-audit-conclusion'
 const AUDIT_CONCLUSION_OPTION_KEY = 'G8-3-audit-conclusion-option'
 const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
-const auditConclusion = ref(props.allResponses.get(AUDIT_CONCLUSION_KEY)?.remark ?? '')
+const _adjConcl = props.allResponses.get(AUDIT_CONCLUSION_KEY)
+const auditConclusion = ref(String(_adjConcl?.conclusion ?? _adjConcl?.remark ?? ''))
 conclusionOption.value = props.allResponses.get(AUDIT_CONCLUSION_OPTION_KEY)?.conclusion ?? ''
 watch(auditNote, (v) => {
   if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
 })
 watch(auditConclusion, (v) => {
-  if (!props.isReadonly) props.debouncedSave(AUDIT_CONCLUSION_KEY, { conclusion: null, remark: v })
+  if (!props.isReadonly) props.debouncedSave(AUDIT_CONCLUSION_KEY, { conclusion: v, remark: null })
 })
 watch(conclusionOption, (v) => {
   if (!props.isReadonly) props.debouncedSave(AUDIT_CONCLUSION_OPTION_KEY, { conclusion: v || null, remark: null })

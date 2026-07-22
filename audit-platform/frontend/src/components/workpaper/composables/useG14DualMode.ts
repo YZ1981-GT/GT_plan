@@ -71,5 +71,3 @@ export function useG14DualMode(options: {
 
   return { currentMode, isOoAvailable, modeOptions, onModeChange, checkOOHealth }
 }
-
-export { useG14DualMode as useG14CreImpDualMode }

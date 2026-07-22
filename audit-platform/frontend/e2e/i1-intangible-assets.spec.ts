@@ -986,3 +986,58 @@ test.describe('I1 无形资产 — Scenario 8: 摊销分支切换→计算→分
     expect(criticalErrors, `严重错误:\n${criticalErrors.join('\n')}`).toHaveLength(0)
   })
 })
+
+// ─── Scenario: 复盘优化冒烟（路由 / I1-9 刷新按钮） ───────────────────────────
+
+test.describe('I1 无形资产 — 复盘优化冒烟', () => {
+  test('审定表可打开且含说明事项；I1-9 含刷新对方底稿', async ({ page, request }) => {
+    test.setTimeout(90_000)
+    await loginAs(page)
+    const token = await getToken(request)
+    const wpResult = await findWorkpaper(request, token, 'I1', PROJECT_ID)
+    test.skip(!wpResult.exists, 'I1 底稿不存在')
+
+    await page.goto(`/projects/${PROJECT_ID}/workpapers/${wpResult.wpId}/edit`)
+    await page.waitForTimeout(4_000)
+
+    try {
+      await clickWorkpaperSheetTab(page, '审定表')
+    } catch {
+      try {
+        await clickWorkpaperSheetTab(page, 'I1')
+      } catch {
+        const tabs = page.getByRole('tab')
+        const n = await tabs.count()
+        for (let i = 0; i < n; i++) {
+          const t = await tabs.nth(i).textContent()
+          if (t && /审定表|Adjudication/.test(t) && !/目录/.test(t)) {
+            await tabs.nth(i).click()
+            break
+          }
+        }
+      }
+    }
+    await page.waitForTimeout(2_500)
+    const adjBody = (await page.locator('body').textContent()) || ''
+    expect(/说明事项|使用寿命不确定|三角勾稽|净值/.test(adjBody)).toBeTruthy()
+    expect(/增减编制|Excel六列/.test(adjBody)).toBeTruthy()
+
+    try {
+      await clickWorkpaperSheetTab(page, 'I1-9')
+    } catch {
+      const tabs = page.getByRole('tab')
+      const n = await tabs.count()
+      for (let i = 0; i < n; i++) {
+        const t = await tabs.nth(i).textContent()
+        if (t && /I1-9|摊销分配/.test(t)) {
+          await tabs.nth(i).click()
+          break
+        }
+      }
+    }
+    await page.waitForTimeout(2_500)
+    await expect(page.getByTestId('i1-9-refresh-counterpart')).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByTestId('i1-9-push-expense')).toBeVisible({ timeout: 5_000 })
+  })
+})
+

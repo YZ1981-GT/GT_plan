@@ -23,6 +23,10 @@ export interface A173MetaInfo {
   client_name: string
   consult_type: string
   period: string
+  /** 咨询事项编号：多事项时与 A17-3-1.consultation_id 成对 */
+  consultation_id: string
+  /** 本项目无业务咨询 → 标不适用 */
+  not_applicable: string
 }
 
 export interface A173Sections {
@@ -75,6 +79,8 @@ export function useA173ConsultationRecord(wpId: Ref<string>): UseA173Return {
     client_name: '',
     consult_type: '',
     period: '',
+    consultation_id: '',
+    not_applicable: '',
   })
 
   const sections = ref<A173Sections>({

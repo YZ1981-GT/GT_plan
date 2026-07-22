@@ -585,7 +585,7 @@ describe('EventBus B50 — control:test-concluded 事件（Req 7.2）', () => {
     composable.updateCycleConclusion('控制有效运行')
     expect(emittedEvents.length).toBe(1)
     expect(emittedEvents[0].payload.wpCode).toBe('C7')
-    expect(emittedEvents[0].payload.cycleName).toBe('筹资循环')
+    expect(emittedEvents[0].payload.cycleName).toBe('在建工程循环')
     expect(emittedEvents[0].payload.conclusion).toBe('控制有效运行')
     expect(emittedEvents[0].payload.defectSummary).toBe('存在控制缺陷')
 

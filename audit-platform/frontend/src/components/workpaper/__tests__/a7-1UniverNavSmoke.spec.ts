@@ -27,10 +27,21 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mockPush }),
 }))
 
-// Mock apiProxy — resolveAndNavigateToWp calls /api/wp-index-resolve
-const mockApiGet = vi.fn()
-vi.mock('@/services/apiProxy', () => ({
-  api: { get: (...args: any[]) => mockApiGet(...args) },
+// Mock apiProxy — GtIndexChip 经 ACNR resolve_instance 跳转
+const mockResolveInstance = vi.fn()
+vi.mock('@/services/acnr', () => ({
+  useAcnr: () => ({
+    resolve: vi.fn(),
+    resolveInstance: (...args: unknown[]) => mockResolveInstance(...args),
+  }),
+}))
+
+vi.mock('@/composables/useWpNavigationHistory', () => ({
+  useWpNavigationHistory: () => ({ push: vi.fn() }),
+}))
+
+vi.mock('element-plus', () => ({
+  ElMessage: { warning: vi.fn(), info: vi.fn(), error: vi.fn() },
 }))
 
 // Element Plus stubs
@@ -72,6 +83,7 @@ const globalConfig = {
 describe('A7-1 Univer 跳转 smoke', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockResolveInstance.mockReset()
   })
 
   it('A7-1 不在 INLINE_POPUP_WP_CODES 中', () => {
@@ -88,7 +100,7 @@ describe('A7-1 Univer 跳转 smoke', () => {
   })
 
   it('GtIndexChip 点击 A7-1 触发导航（非弹窗）', async () => {
-    mockApiGet.mockResolvedValue({ exists: true, wp_id: 'wp-a7-1-uuid' })
+    mockResolveInstance.mockResolvedValue({ found: true, wp_id: 'wp-a7-1-uuid' })
 
     const wrapper = mount(GtIndexChip, {
       props: { value: 'A7-1', validate: false },
@@ -96,22 +108,19 @@ describe('A7-1 Univer 跳转 smoke', () => {
     })
     await flushPromises()
 
-    // chip 应该渲染为 tag（非纯文本）
     expect(wrapper.find('.el-tag-stub').exists()).toBe(true)
 
-    // 点击 chip
     await wrapper.find('.el-tag-stub').trigger('click')
     await flushPromises()
 
-    // 应该调用 resolveAndNavigateToWp → /api/wp-index-resolve
-    expect(mockApiGet).toHaveBeenCalledWith(
-      '/api/wp-index-resolve',
+    expect(mockResolveInstance).toHaveBeenCalledWith(
       expect.objectContaining({
-        params: expect.objectContaining({ ref: 'A7-1', project_id: 'proj-a7' }),
+        project_id: 'proj-a7',
+        parent: 'A7-1',
+        sheet_code: 'A7-1',
       }),
     )
 
-    // 应该导航到底稿编辑页
     expect(mockPush).toHaveBeenCalledWith({
       path: '/projects/proj-a7/workpapers/wp-a7-1-uuid/edit',
     })
@@ -125,7 +134,7 @@ describe('A7-1 Univer 跳转 smoke', () => {
   })
 
   it('A7-1 wp_code 不存在时显示警告而非弹窗', async () => {
-    mockApiGet.mockResolvedValue({ exists: false })
+    mockResolveInstance.mockResolvedValue({ found: false, error: 'not_found' })
 
     const wrapper = mount(GtIndexChip, {
       props: { value: 'A7-1', validate: false },

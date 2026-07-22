@@ -113,8 +113,7 @@ describe('L5 长期应付款 — 注册契约测试', () => {
   // ═══════════════════════════════════════════════════════════════════════════
 
   describe('RENDERER_DISPATCH 契约', () => {
-    // Phase 5 添加后端 renderer 时此测试将通过
-    it.fails('后端 wp_render_strategies/__init__.py 包含 l5-long-term-payables（Phase 5 添加）', () => {
+    it('后端 wp_render_strategies/__init__.py 包含 l5-long-term-payables', () => {
       const initPath = path.resolve(
         __dirname,
         '../../../../../../backend/app/routers/wp_render_strategies/__init__.py'

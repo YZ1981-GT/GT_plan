@@ -61,4 +61,85 @@ describe('useG13Adjudication', () => {
     expect(adj.detail.grandTotalAudited.value).toBe(520)
     expect(adj.detailCrossValidation.value).toBeNull()
   })
+
+  it('「其中」备忘行不计入审定合计', () => {
+    const allResponses = ref(new Map<string, any>([
+      ['G13-detail-rows', {
+        remark: JSON.stringify([{
+          rowId: 'r1',
+          seq: 1,
+          instrumentName: '交易性',
+          belongAccount: 'G1',
+          currentUnadjusted: 1000,
+          adjustment: 0,
+        }]),
+      }],
+      ['G13-adj-prior', {
+        remark: JSON.stringify({
+          designated_fv_assets: { currentUnadjusted: 200, currentAdjustment: 0 },
+        }),
+      }],
+    ]))
+    const adj = useG13Adjudication({
+      wpId: ref('wp-1'),
+      projectId: ref('proj-1'),
+      allResponses,
+      debouncedSave: vi.fn(),
+      isReadonly: ref(false),
+    })
+    const ofWhich = adj.dataRows.value.find((r) => r.rowKey === 'designated_fv_assets')
+    expect(ofWhich?.currentAudited).toBe(200)
+    expect(ofWhich?.kind).toBe('ofWhich')
+    expect(adj.totalRow.value.currentAudited).toBe(1000)
+  })
+
+  it('旧 priorStore key 迁移到新行键', () => {
+    const allResponses = ref(new Map<string, any>([
+      ['G13-adj-prior', {
+        remark: JSON.stringify({
+          designated_fv: { priorUnadjusted: 80, priorAdjustment: 0 },
+          derivatives: { priorUnadjusted: 40, priorAdjustment: 0 },
+        }),
+      }],
+    ]))
+    const adj = useG13Adjudication({
+      wpId: ref('wp-1'),
+      projectId: ref('proj-1'),
+      allResponses,
+      debouncedSave: vi.fn(),
+      isReadonly: ref(false),
+    })
+    expect(adj.dataRows.value.find((r) => r.rowKey === 'other_noncurrent')?.priorAudited).toBe(80)
+    expect(adj.dataRows.value.find((r) => r.rowKey === 'derivative_assets')?.priorAudited).toBe(40)
+  })
+
+  it('G13-3 overlay 优先作为本期调整数写入审定表', () => {
+    const allResponses = ref(new Map<string, any>([
+      ['G13-detail-rows', {
+        remark: JSON.stringify([{
+          rowId: 'r1',
+          seq: 1,
+          instrumentName: '房产',
+          belongAccount: 'H3',
+          currentUnadjusted: 1000,
+          adjustment: 0,
+        }]),
+      }],
+      ['G13-aje-adj-overlay', {
+        remark: JSON.stringify({ investment_property: 80, trading_assets: 0 }),
+      }],
+    ]))
+    const adj = useG13Adjudication({
+      wpId: ref('wp-1'),
+      projectId: ref('proj-1'),
+      allResponses,
+      debouncedSave: vi.fn(),
+      isReadonly: ref(false),
+    })
+    expect(adj.hasAjeOverlay.value).toBe(true)
+    const ip = adj.dataRows.value.find((r) => r.rowKey === 'investment_property')
+    expect(ip?.currentUnadjusted).toBe(1000)
+    expect(ip?.currentAdjustment).toBe(80)
+    expect(ip?.currentAudited).toBe(1080)
+  })
 })

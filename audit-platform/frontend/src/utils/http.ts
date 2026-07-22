@@ -153,7 +153,10 @@ async function extractErrorDetail(responseData: unknown): Promise<string> {
       // FastAPI 422 validation errors: [{msg: "...", loc: [...], ...}]
       return d.map((item: any) => item?.msg || item?.message || JSON.stringify(item)).join('；')
     }
-    if (d && typeof d === 'object') return d.message || d.msg || JSON.stringify(d)
+    if (d && typeof d === 'object') {
+      const base = d.message || d.msg || JSON.stringify(d)
+      return d.item_id ? `${base}（ID: ${d.item_id}）` : base
+    }
     return String(d || '')
   }
 
@@ -426,7 +429,9 @@ http.interceptors.response.use(
       return Promise.reject(error)
     }
 
-    const displayMsg = requestId ? `${msg}（ID: ${requestId}）` : msg
+    const displayMsg = requestId && !msg.includes('（ID:')
+      ? `${msg}（ID: ${requestId}）`
+      : msg
     if (status && status >= 500) {
       // R8-S1-05：5xx 最终失败用持续性通知卡片（重试已耗尽）
       const { feedback } = await import('./feedback')

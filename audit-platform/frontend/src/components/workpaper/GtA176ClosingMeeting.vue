@@ -19,6 +19,13 @@
         size="small"
       />
       <div class="gt-a176__toolbar-right">
+        <el-button
+          v-if="mode === '结构化视图' && !props.readonly"
+          size="small"
+          type="primary"
+          :loading="prefillLoading"
+          @click="handleAgendaPrefill"
+        >⬇ 议程预填</el-button>
         <span class="gt-a176__save-status">
           <template v-if="saveStatus === 'saving'">
             <el-icon class="is-loading"><Loading /></el-icon> 保存中...
@@ -64,6 +71,10 @@
               <label>记录员</label>
               <el-input :model-value="metaInfo.recorder" size="small" :disabled="props.readonly" placeholder="记录员" @change="(v: string) => updateMeta('recorder', v)" />
             </div>
+            <div class="gt-a176__meta-item gt-a176__meta-item--wide">
+              <label>参会人员</label>
+              <el-input :model-value="metaInfo.attendees" size="small" :disabled="props.readonly" placeholder="全体项目组成员（可列示姓名）" @change="(v: string) => updateMeta('attendees', v)" />
+            </div>
           </div>
         </el-card>
 
@@ -73,6 +84,7 @@
           <div class="gt-a176__guidance-banner-body">
             <p>1. 本会议纪要用于记录项目组总结会情况，可根据项目具体情况进行调整。</p>
             <p>2. 总结会要求全体项目组成员参加，并由现场负责人负责记录。</p>
+            <p>3. 建议在 A17-5 核对表完成后再召开；10 项议程与 A17-5 / A17-1 / A17-7 等底稿勾稽。</p>
           </div>
         </details>
 
@@ -86,6 +98,7 @@
           <template #header>
             <div class="gt-a176__section-header">
               <span class="gt-a176__card-title">{{ item.index }}. {{ item.title }}</span>
+              <el-tag v-if="staleAgendaIndexes.has(item.index)" size="small" type="warning" effect="plain">上游已更新</el-tag>
               <el-button size="small" :loading="aiLoading === item.index" @click="aiGenerate(item.index)">🤖 AI</el-button>
             </div>
           </template>
@@ -138,8 +151,8 @@ import GtIndexChip from './GtIndexChip.vue'
 
 /** 每项议题关联的底稿索引（用于GtIndexChip跳转） */
 const AGENDA_REFS: Record<number, string[]> = {
-  1: ['A17-1'],
-  2: ['B50'],
+  1: ['A17-1', 'A17-5'],
+  2: ['B50', 'A17-5'],
   3: ['B50'],
   4: ['B22A', 'B22B'],
   5: ['A13', 'B15'],
@@ -147,7 +160,7 @@ const AGENDA_REFS: Record<number, string[]> = {
   7: ['A17-7'],
   8: ['A17-1'],
   9: ['A17-2-1'],
-  10: [],
+  10: ['A17-5'],
 }
 
 const GtOnlyOfficeSheet = defineAsyncComponent(
@@ -200,6 +213,56 @@ watch(mode, async (newMode, oldMode) => {
 
 // ─── AI Generate ───
 const aiLoading = ref<number | null>(null)
+const prefillLoading = ref(false)
+const staleAgendaIndexes = ref<Set<number>>(new Set())
+
+async function loadAgendaStale() {
+  if (!props.wpId || !props.projectId) {
+    staleAgendaIndexes.value = new Set()
+    return
+  }
+  try {
+    const data = await api.get<any>('/api/a17/a176/agenda-stale-check', {
+      params: { project_id: props.projectId, wp_id: props.wpId },
+      _silent: true,
+    } as any)
+    const s = new Set<number>()
+    for (const it of data?.stale_items || []) {
+      if (it.agenda_index) s.add(Number(it.agenda_index))
+    }
+    staleAgendaIndexes.value = s
+  } catch {
+    staleAgendaIndexes.value = new Set()
+  }
+}
+
+async function handleAgendaPrefill() {
+  if (!props.projectId || props.readonly) return
+  prefillLoading.value = true
+  try {
+    const data = await api.get<any>('/api/a17/a176/agenda-prefill', {
+      params: { project_id: props.projectId },
+      _silent: true,
+    } as any)
+    const agendaMap = (data?.agenda || {}) as Record<string, string>
+    let filled = 0
+    for (let i = 1; i <= 10; i++) {
+      const text = (agendaMap[String(i)] || agendaMap[i as any] || '').trim()
+      if (!text) continue
+      const existing = (agenda.value[i] || '').trim()
+      if (existing) continue
+      updateAgenda(i, text)
+      filled += 1
+    }
+    if (filled > 0) ElMessage.success(`已预填 ${filled} 项空议程（已有内容未覆盖）`)
+    else ElMessage.info('暂无可预填内容，或议程已全部填写')
+    await loadAgendaStale()
+  } catch {
+    ElMessage.warning('议程预填失败')
+  } finally {
+    prefillLoading.value = false
+  }
+}
 
 async function aiGenerate(index: number) {
   const item = AGENDA_ITEMS.find(i => i.index === index)
@@ -242,7 +305,7 @@ function handleOOFallback() {
 }
 
 // ─── Lifecycle ───
-onMounted(() => { checkOOHealth(); loadData(props.wpId) })
+onMounted(() => { checkOOHealth(); loadData(props.wpId); loadAgendaStale() })
 onBeforeUnmount(() => { flushPendingSaves() })
 
 defineExpose({ reload: () => loadData(props.wpId) })

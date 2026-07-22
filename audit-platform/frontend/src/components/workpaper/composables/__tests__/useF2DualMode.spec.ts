@@ -39,11 +39,11 @@ describe('useF2DualMode', () => {
       },
     })
     mount(Comp)
-    // Immediately after mount, still html (async restore not done)
-    expect(api!.currentMode.value).toBe('html')
+    // Restores onlyoffice from localStorage immediately on mount
+    expect(api!.currentMode.value).toBe('onlyoffice')
     await nextTick()
     await new Promise((r) => setTimeout(r, 30))
-    // Health failed → stay html
+    // Health failed → fallback to html
     expect(api!.currentMode.value).toBe('html')
     expect(api!.isOoAvailable.value).toBe(false)
     expect(localStorage.getItem('f2-dual-mode:wp-1')).toBe('html')

@@ -18,11 +18,26 @@ import http from '@/utils/http'
 
 /** H3 支持导入导出的 sheet 编码 */
 export type H3ImportableSheet =
-  | 'H3-2'      // 明细表（成本49列/公允31列，按区段分sheet导出）
-  | 'H3-9'      // 盘点检查表
-  | 'H3-12'     // 产权核对表
-  | 'H3-13'     // 关联交易检查表
-  | 'H3-14'     // 租金收入测算表
+  | 'H3-2'              // 明细表（成本49列/公允31列，按区段分sheet导出）
+  | 'H3-5-cost'         // 增减检查（成本模式 · 账→证）
+  | 'H3-5-fair'         // 增减检查（公允模式 · 账→证）
+  | 'H3-5-trace-cost'   // 证→账追查（成本模式）
+  | 'H3-5-trace-fair'   // 证→账追查（公允模式）
+  | 'H3-9'              // 盘点检查表
+  | 'H3-12'             // 产权核对表
+  | 'H3-13'             // 关联交易检查表
+  | 'H3-14'             // 租金收入测算表
+
+/** 根据计量模式解析 H3-5 导入导出 sheet 编码 */
+export function resolveH35ImportSheet(
+  measurementModel: 'cost' | 'fair_value',
+  part: 'vouch' | 'trace',
+): H3ImportableSheet {
+  if (part === 'trace') {
+    return measurementModel === 'fair_value' ? 'H3-5-trace-fair' : 'H3-5-trace-cost'
+  }
+  return measurementModel === 'fair_value' ? 'H3-5-fair' : 'H3-5-cost'
+}
 
 export interface H3ImportResult {
   success: boolean
@@ -42,6 +57,10 @@ export interface UseH3ImportExportOptions {
 /** H3 可导入导出的 sheet 列表 */
 export const H3_IMPORTABLE_SHEETS: { code: H3ImportableSheet; label: string }[] = [
   { code: 'H3-2', label: 'H3-2 明细表' },
+  { code: 'H3-5-cost', label: 'H3-5 增减检查（成本）' },
+  { code: 'H3-5-fair', label: 'H3-5 增减检查（公允）' },
+  { code: 'H3-5-trace-cost', label: 'H3-5 证→账追查（成本）' },
+  { code: 'H3-5-trace-fair', label: 'H3-5 证→账追查（公允）' },
   { code: 'H3-9', label: 'H3-9 盘点检查表' },
   { code: 'H3-12', label: 'H3-12 产权核对表' },
   { code: 'H3-13', label: 'H3-13 关联交易检查表' },

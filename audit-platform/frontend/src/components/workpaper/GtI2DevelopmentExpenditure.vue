@@ -22,10 +22,22 @@
 
         <!-- 6.2: I6↔I2 联动状态指示 -->
         <span
-          v-if="!i6LinkageStatus.isBalanced && i6LinkageStatus.total > 0"
+          v-if="!i6LinkageStatus.ready"
+          class="linkage-info"
+        >
+          I6 费用化数据未同步
+        </span>
+        <span
+          v-else-if="!i6LinkageStatus.isBalanced"
           class="linkage-warn"
         >
           ⚠️ 费用化+资本化≠研发总额
+        </span>
+        <span
+          v-else
+          class="linkage-ok"
+        >
+          ✓ I6↔I2 已核对
         </span>
       </div>
 
@@ -71,9 +83,11 @@
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
         />
 
-        <!-- I2-2 明细表 -->
+        <!-- I2-2 明细表（Excel滚动勾稽 + I2-3账项同步） -->
         <I2TabDetail
           v-else-if="currentSheet === 'I2-2'"
           :sheet-name="props.sheetName || ''"
@@ -82,9 +96,11 @@
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
         />
 
-        <!-- I2-3 调整分录 -->
+        <!-- I2-3 调整分录（Excel列 + 调整分录模块双向联动 + A13） -->
         <I2TabAdjustment
           v-else-if="currentSheet === 'I2-3'"
           :sheet-name="props.sheetName || ''"
@@ -93,6 +109,9 @@
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          :year="props.year"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
         />
 
         <!-- I2-4 会计政策检查 -->
@@ -103,6 +122,8 @@
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
         />
 
         <!-- I2-5 实质性分析 -->
@@ -144,9 +165,12 @@
           :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
+          :year="props.year"
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
         />
 
         <!-- I2-9 研发人员认定检查 -->
@@ -155,9 +179,12 @@
           :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
+          :year="props.year"
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
         />
 
         <!-- I2-10 研发人员工时检查 -->
@@ -166,9 +193,12 @@
           :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
+          :year="props.year"
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
         />
 
         <!-- I2-11 委外研发检查 -->
@@ -177,9 +207,12 @@
           :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
+          :year="props.year"
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
         />
 
         <!-- I2-12 针对性检查 -->
@@ -188,6 +221,7 @@
           :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
+          :year="props.year"
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
@@ -199,9 +233,12 @@
           :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
+          :year="props.year"
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
         />
 
         <!-- I2-14 截止性测试（单据到账） -->
@@ -210,9 +247,12 @@
           :sheet-name="props.sheetName || ''"
           :wp-id="props.wpId"
           :project-id="props.projectId"
+          :year="props.year"
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
         />
 
         <!-- I2-15 减值准备测试 -->
@@ -246,6 +286,7 @@
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          :applicable-standards="applicableStandards"
         />
 
         <!-- 附注披露（国企） -->
@@ -257,6 +298,7 @@
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          :applicable-standards="applicableStandards"
         />
 
         <!-- 未匹配 → OnlyOffice fallback -->
@@ -344,6 +386,7 @@ const props = defineProps<{
   year?: number
   htmlData?: any
   readonly?: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navigate-sheet', sheetName: string): void }>()
@@ -455,6 +498,16 @@ async function selfLoad(): Promise<void> {
 
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
+const applicableStandards = computed<string[]>(() => {
+  const fromProp = props.applicableStandards
+  if (Array.isArray(fromProp) && fromProp.length) return fromProp
+  return (
+    runtime?.applicableStandards?.value
+    ?? props.htmlData?.applicable_standards
+    ?? props.htmlData?.applicableStandards
+    ?? []
+  )
+})
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
@@ -495,6 +548,18 @@ onMounted(() => {
 .linkage-warn {
   font-size: 12px;
   color: var(--el-color-danger);
+  font-weight: 500;
+}
+
+.linkage-info {
+  font-size: 12px;
+  color: var(--el-color-warning);
+  font-weight: 500;
+}
+
+.linkage-ok {
+  font-size: 12px;
+  color: var(--el-color-success);
   font-weight: 500;
 }
 </style>

@@ -1,35 +1,113 @@
 <template>
   <div class="i1-tab-amort-with-impair">
-    <!-- 方法论上下文 -->
     <div class="methodology-context">
-      <p><b>CAS6剩余年限法（含减值）：</b>减值后月摊销 = (原值 - 残值 - 累计摊销 - 减值准备) ÷ 剩余月数。在减值发生月重新计算摊销基数，减值后各月使用新的月摊销额。适用于已计提减值准备的无形资产。63公式。</p>
+      <p>
+        <b>CAS6 剩余年限法（含减值）：</b>
+        减值前月摊销＝原值÷摊销期限月；减值后月摊销＝(原值−残值−减值时累计摊销−减值准备)÷剩余月数。
+        本期摊销＝减值前月数×原月摊销＋减值后月数×新月摊销。对齐源表 I1-11 分段公式。
+      </p>
     </div>
 
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：核实含减值情形下无形资产摊销的重算基数与计算准确性，验证减值发生月后摊销基数调整的恰当性，确保摊销费用列报准确。"
+      show-icon
       class="objective-alert"
+      title="审计目标：检查无形资产本期计提的摊销是否合理；核实含减值情形下重算基数与分段月数，核对测算与账面差异。"
     />
 
-    <!-- 工具栏 -->
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <span class="period-label">期初日</span>
+        <el-date-picker
+          v-model="localPeriodBegin"
+          type="date"
+          value-format="YYYY-MM-DD"
+          size="small"
+          :disabled="isReadonly"
+          placeholder="期初"
+          style="width: 140px"
+          @change="onPeriodChange"
+        />
+        <span class="period-label">截止日</span>
+        <el-date-picker
+          v-model="localPeriodEnd"
+          type="date"
+          value-format="YYYY-MM-DD"
+          size="small"
+          :disabled="isReadonly"
+          placeholder="截止日"
+          style="width: 140px"
+          @change="onPeriodChange"
+        />
+        <el-button size="small" :disabled="isReadonly" @click="recalcAll">重新测算</el-button>
+      </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:I1-11" :context-project-id="projectId" /></span>
-        <el-tag size="small" type="info">共 {{ currentRows.length }} 行</el-tag>
+        <el-tag size="small" type="warning">含减值 · {{ currentRows.length }} 行</el-tag>
+        <el-tag v-if="significantDiffCount > 0" size="small" type="danger">
+          差异行 {{ significantDiffCount }}
+        </el-tag>
+        <el-tag size="small" type="info">减值合计 {{ fmtAmt(totalImpairment) }}</el-tag>
+        <el-tag
+          size="small"
+          :type="amortReconcile.matchedAdj ? 'success' : 'warning'"
+          class="nav-chip"
+          @click="emit('navigate-sheet', 'I1-1')"
+        >
+          {{ amortReconcile.matchedAdj ? 'I1-1本期计提已勾稽' : 'I1-1本期计提待勾稽' }}
+        </el-tag>
+        <el-tag
+          v-if="amortReconcile.allocTotal !== 0"
+          size="small"
+          :type="amortReconcile.matchedAlloc ? 'success' : 'warning'"
+          class="nav-chip"
+          @click="emit('navigate-sheet', 'I1-9')"
+        >
+          {{ amortReconcile.matchedAlloc ? 'I1-9分配已勾稽' : 'I1-9分配待勾稽' }}
+        </el-tag>
+        <el-tag size="small" class="nav-chip" @click="emit('navigate-sheet', 'I1-1')">← I1-1</el-tag>
+        <el-tag size="small" class="nav-chip" @click="emit('navigate-sheet', 'I1-9')">I1-9 →</el-tag>
       </div>
     </div>
+
+    <el-alert
+      v-if="!amortReconcile.matchedAdj && amortReconcile.periodAmortTotal !== 0"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="reconcile-alert"
+      :title="`测算本期合计 ${fmtAmt(amortReconcile.periodAmortTotal)} 与 I1-1 摊销本期增加 ${fmtAmt(amortReconcile.adjudicatedProvision)} 差异 ${fmtAmt(amortReconcile.vsAdjDiff)}`"
+    />
 
     <el-card shadow="never">
       <template #header>
         <div class="section-title">
-          <span>I1-11 摊销测算表（含减值）</span>
+          <span>I1-11 累计摊销测算表（含减值）</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" :disabled="isReadonly" @click="handleSyncFromDetail">
+            <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">
+              + 新增行
+            </el-button>
+            <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleSyncFromDetail">
               同步I1-2参数
             </el-button>
+            <el-button size="small" plain :disabled="isReadonly" data-testid="i1-11-sync-life" @click="handleSyncFromUsefulLife">
+              应用I1-7寿命
+            </el-button>
+            <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handleSyncFromI12">
+              联动I1-12
+            </el-button>
+            <el-dropdown v-if="!isReadonly" trigger="click" @command="handleExportCmd">
+              <el-button size="small">导入导出 ▾</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="export-template">导出模板</el-dropdown-item>
+                  <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
+                  <el-dropdown-item command="import-data" divided>导入数据</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
             <el-button size="small" type="default" link @click="handleReview">💬 复核</el-button>
           </div>
         </div>
@@ -42,12 +120,39 @@
         size="small"
         max-height="520"
         class="amort-matrix-table"
+        :row-class-name="getRowClass"
         show-summary
         :summary-method="getSummaryRow"
       >
-        <el-table-column type="index" label="#" width="35" fixed />
-        <el-table-column prop="name" label="资产名称" width="120" fixed show-overflow-tooltip />
-        <el-table-column label="原值" width="100" align="right" fixed>
+        <el-table-column type="index" label="#" width="40" fixed />
+        <el-table-column prop="category" label="无形资产类别" width="110" fixed>
+          <template #default="{ row, $index }">
+            <el-select
+              v-if="!isReadonly"
+              v-model="row.category"
+              size="small"
+              filterable
+              allow-create
+              clearable
+              @change="handleFieldChange($index, 'category', $event)"
+            >
+              <el-option v-for="c in CATEGORIES" :key="c" :label="c" :value="c" />
+            </el-select>
+            <span v-else>{{ row.category || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="name" label="明细项目" min-width="120" fixed show-overflow-tooltip>
+          <template #default="{ row, $index }">
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.name"
+              size="small"
+              @change="handleFieldChange($index, 'name', $event)"
+            />
+            <span v-else>{{ row.name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="原值" width="100" align="right">
           <template #default="{ row, $index }">
             <el-input-number
               v-if="!isReadonly"
@@ -62,37 +167,21 @@
             <span v-else class="amount-cell">{{ fmtAmt(row.cost) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="残值" width="90" align="right">
+        <el-table-column label="账面累计摊销" width="110" align="right">
           <template #default="{ row, $index }">
             <el-input-number
               v-if="!isReadonly"
-              v-model="row.salvage"
+              v-model="row.bookAccAmortEnd"
               :controls="false"
               size="small"
               :min="0"
               :precision="2"
               class="cell-input"
-              @change="handleFieldChange($index, 'salvage', $event)"
+              @change="handleFieldChange($index, 'bookAccAmortEnd', $event)"
             />
-            <span v-else class="amount-cell">{{ fmtAmt(row.salvage) }}</span>
+            <span v-else class="amount-cell">{{ fmtAmt(row.bookAccAmortEnd) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="累计摊销" width="100" align="right">
-          <template #default="{ row, $index }">
-            <el-input-number
-              v-if="!isReadonly"
-              v-model="row.accAmortBegin"
-              :controls="false"
-              size="small"
-              :min="0"
-              :precision="2"
-              class="cell-input"
-              @change="handleFieldChange($index, 'accAmortBegin', $event)"
-            />
-            <span v-else class="amount-cell">{{ fmtAmt(row.accAmortBegin) }}</span>
-          </template>
-        </el-table-column>
-        <!-- 减值准备列 -->
         <el-table-column label="减值准备" width="100" align="right">
           <template #default="{ row, $index }">
             <el-input-number
@@ -108,155 +197,239 @@
             <span v-else class="amount-cell">{{ fmtAmt(row.impairment) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="剩余月数" width="75" align="center">
+        <el-table-column label="计提减值准备日期" width="130">
           <template #default="{ row, $index }">
-            <el-input-number
+            <el-date-picker
               v-if="!isReadonly"
-              v-model="row.remainingMonths"
-              :controls="false"
+              v-model="row.impairmentDate"
+              type="date"
+              value-format="YYYY-MM-DD"
               size="small"
-              :min="0"
-              :max="600"
-              class="cell-input"
-              @change="handleRemainingChange($index, $event)"
+              style="width: 100%"
+              @change="handleFieldChange($index, 'impairmentDate', $event)"
             />
-            <span v-else>{{ row.remainingMonths }}</span>
+            <span v-else>{{ row.impairmentDate || '—' }}</span>
           </template>
         </el-table-column>
-        <!-- 减值发生月 -->
-        <el-table-column label="减值发生月" width="90" align="center">
+        <el-table-column label="开始使用日期" width="120">
           <template #default="{ row, $index }">
-            <el-input-number
+            <el-date-picker
               v-if="!isReadonly"
-              v-model="row.impairmentMonth"
-              :controls="false"
+              v-model="row.startDate"
+              type="date"
+              value-format="YYYY-MM-DD"
               size="small"
-              :min="0"
-              :max="28"
-              class="cell-input impair-month-input"
-              @change="handleImpairMonthChange($index, row.impairmentMonth, row.impairmentAmountAtMonth)"
+              style="width: 100%"
+              @change="handleFieldChange($index, 'startDate', $event)"
             />
-            <span v-else :class="{ 'impair-month-highlight': row.impairmentMonth > 0 }">
-              {{ row.impairmentMonth > 0 ? `第${row.impairmentMonth}月` : '-' }}
-            </span>
+            <span v-else>{{ row.startDate || '—' }}</span>
           </template>
         </el-table-column>
-        <!-- 减值金额 -->
-        <el-table-column label="减值金额" width="100" align="right">
+        <el-table-column label="使用期限(年)" width="90" align="right">
           <template #default="{ row, $index }">
             <el-input-number
               v-if="!isReadonly"
-              v-model="row.impairmentAmountAtMonth"
+              v-model="row.usefulLifeYears"
               :controls="false"
               size="small"
               :min="0"
               :precision="2"
               class="cell-input"
-              @change="handleImpairMonthChange($index, row.impairmentMonth, $event ?? 0)"
+              @change="handleUsefulLifeChange($index, $event)"
             />
-            <span v-else class="amount-cell">{{ fmtAmt(row.impairmentAmountAtMonth) }}</span>
+            <span v-else>{{ row.usefulLifeYears }}</span>
           </template>
         </el-table-column>
-        <!-- 月摊销额 -->
-        <el-table-column label="月摊销额" width="100" align="right">
+        <el-table-column label="账面月摊销额" width="110" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.bookMonthly"
+              :controls="false"
+              size="small"
+              :min="0"
+              :precision="2"
+              class="cell-input"
+              @change="handleFieldChange($index, 'bookMonthly', $event)"
+            />
+            <span v-else class="amount-cell">{{ fmtAmt(row.bookMonthly) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="摊销期限(月)" width="90" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell" title="使用期限×12">{{ row.usefulLifeMonths || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="测算到期日" width="100" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ row.fullAmortDate || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="已摊销月份" width="90" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ row.monthsAmortized }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="剩余摊销月份" width="100" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ row.remainingMonths }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="截止减值日累计摊销月" width="120" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell" :class="{ 'impair-month-highlight': row.monthsToImpairment > 0 }">
+              {{ row.monthsToImpairment || '—' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期摊销月份" width="100" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell" title="源表原「本期折旧月份」，已改为摊销">{{ row.periodMonths }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="减值前月数" width="90" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ row.monthsBeforeImpairment }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="减值后月数" width="90" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ row.monthsAfterImpairment }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="减值前月摊销额" width="110" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell" title="(原值−残值)÷摊销期限月">{{ fmtAmt(row.preMonthly) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="减值时测算累计摊销" width="120" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ fmtAmt(row.accAmortAtImpairment) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="减值后月摊销额" width="110" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span
+              class="formula-cell impair-recalc-cell"
+              title="(原值−残值−减值时累计摊销−减值)÷剩余月数"
+            >{{ fmtAmt(row.postMonthly) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="当期摊销费用" width="110" align="right" class-name="formula-col">
           <template #default="{ row }">
             <span
               class="formula-cell"
-              title="减值后月摊销=(原值-残值-累计摊销-减值)÷剩余月数"
-            >{{ fmtAmt(row.monthlyAmortAmount) }}</span>
-          </template>
-        </el-table-column>
-
-        <!-- 28个月列 -->
-        <el-table-column
-          v-for="m in MATRIX_COLUMNS"
-          :key="m"
-          :label="`第${m}月`"
-          width="78"
-          align="right"
-          :class-name="getMonthColumnClass(m)"
-        >
-          <template #default="{ row }">
-            <span
-              :class="[
-                'formula-cell',
-                { 'impair-recalc-cell': row.impairmentMonth === m }
-              ]"
-              :title="getMonthTooltip(row, m)"
-            >{{ fmtAmt(row.monthlyAmort[m - 1]) }}</span>
-          </template>
-        </el-table-column>
-
-        <!-- 本期合计 -->
-        <el-table-column label="本期合计" width="110" align="right">
-          <template #default="{ row }">
-            <span
-              class="formula-cell"
-              title="本期合计=SUM(第1月~第28月)"
+              title="减值前月数×原月摊销＋减值后月数×新月摊销"
             >{{ fmtAmt(row.periodAmortization) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="月摊销额差异" width="100" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span
+              class="formula-cell"
+              :class="{ 'text-danger': Math.abs(row.monthlyDiff) > 0.01 }"
+              title="账面月摊销−减值后月摊销"
+            >{{ fmtAmt(row.monthlyDiff) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="累计摊销(测算)" width="110" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ fmtAmt(row.calcAccAmort) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="累计摊销差异" width="100" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span
+              class="formula-cell"
+              :class="{ 'text-danger': Math.abs(row.accAmortDiff) > 0.01 }"
+              title="账面累计摊销−测算累计摊销"
+            >{{ fmtAmt(row.accAmortDiff) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="" width="50" align="center" fixed="right">
+          <template #default="{ $index }">
+            <el-button type="danger" link size="small" @click="handleRemoveRow($index)">删</el-button>
           </template>
         </el-table-column>
       </el-table>
 
-      <!-- 合计行独立展示 -->
       <div class="totals-bar">
-        <span>摊销合计: <b class="amount-cell">{{ fmtAmt(summaryRow.periodTotal) }}</b></span>
-        <span>减值合计: <b class="amount-cell impair-amount">{{ fmtAmt(totalImpairment) }}</b></span>
-        <span>资产数: <b>{{ currentRows.length }}</b> 项</span>
-        <span v-if="impairmentCount > 0" class="impair-badge">
-          含减值资产: {{ impairmentCount }} 项
+        <span>测算本期合计: <b class="amount-cell">{{ fmtAmt(summaryRow.periodTotal) }}</b></span>
+        <span>账面月摊销合计: <b class="amount-cell">{{ fmtAmt(totalBookMonthly) }}</b></span>
+        <span>
+          累计差异合计:
+          <b class="amount-cell" :class="{ 'text-danger': Math.abs(totalAccDiff) > 0.01 }">
+            {{ fmtAmt(totalAccDiff) }}
+          </b>
         </span>
+        <span>减值合计: <b class="amount-cell impair-amount">{{ fmtAmt(totalImpairment) }}</b></span>
+        <span v-if="impairmentCount > 0" class="impair-badge">含减值资产: {{ impairmentCount }} 项</span>
       </div>
     </el-card>
 
-    <!-- 审计说明 -->
     <el-card shadow="never" class="note-card">
-      <template #header><span>审计说明</span></template>
+      <template #header><span>三、审计说明</span></template>
       <el-input
         v-model="auditNote"
         type="textarea"
         :autosize="{ minRows: 5, maxRows: 10 }"
         :disabled="isReadonly"
-        placeholder="填写审计说明：减值对摊销测算的影响、减值发生月后重算基数核对情况、差异原因分析等。"
+        placeholder="填写审计说明：减值时点与金额来源（I1-12）、分段月数合理性、测算与账面差异原因等。"
         @blur="handleSaveNote"
       />
     </el-card>
 
-    <!-- 审计结论 -->
     <el-card shadow="never" class="note-card">
-      <template #header><span>审计结论</span></template>
+      <template #header><span>四、审计结论</span></template>
       <el-input
         v-model="auditConclusion"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly"
-        placeholder="填写审计结论：含减值情形下摊销重算基数与计算准确，减值后各月摊销额恰当，未见异常等。"
+        placeholder="A、含减值摊销测算准确，与账面无重大差异。B、除下列差异外未见异常。C、存在重大未调整差异，不可确认。"
         @blur="handleSaveConclusion"
       />
     </el-card>
 
-    <!-- 编制提示 -->
-    <details class="compile-hint">
+    <details class="compile-hint" open>
       <summary>编制提示</summary>
       <ul>
-        <li>含减值剩余年限法：月摊销 = (原值 - 残值 - 累计摊销 - 减值准备) ÷ 剩余月数</li>
-        <li>"减值发生月"：填写1~28之间的月份编号（0表示无减值）</li>
-        <li>"减值金额"：填写该月新增计提的减值准备金额</li>
-        <li>减值发生月之后的月份将使用新的摊销基数重算（红色高亮"重算基数"）</li>
-        <li>28列对应审计期间内每月的摊销额</li>
-        <li>若资产已摊销完毕（剩余月数≤0），该行摊销额显示为0</li>
-        <li>点击"同步I1-2参数"可从明细表自动导入资产信息（含减值期末余额）</li>
-        <li>如无减值情况请切换到"不含减值（I1-10）"分支</li>
+        <li>本表适用于<strong>已计提减值</strong>的无形资产；无减值请切换「不含减值（I1-10）」。</li>
+        <li>减值后月摊销＝(原值−残值−减值时累计摊销−减值准备)÷剩余月数。</li>
+        <li>当期摊销＝减值前月数×减值前月摊销＋减值后月数×减值后月摊销。</li>
+        <li>源表「本期折旧月份」已统一为「本期摊销月份」；期间起止日驱动月数推算（对齐 DATEDIF）。</li>
+        <li>行级「计提减值准备日期」优于源表全局减值日，便于逐项复核。</li>
+        <li>点击「同步I1-2参数」导入原值/累计摊销/减值/取得日期/使用寿命。</li>
+        <li>「联动I1-12」按名称回写⑦已计提；若有⑧补提则默认减值日=截止日。</li>
+        <li>差异列红色高亮时，应分析后决定调整或披露。</li>
       </ul>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
+/**
+ * I1TabAmortizationWithImpair.vue — I1-11 摊销测算表（含减值）
+ * 对齐源 xlsx「累计摊销测算表 I1-11」分段逻辑（Q~W + 月数 I~P）
+ */
 import { ref, computed, toRef, inject, watch } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI1Amortization, type I1AmortizationRow, type I1AssetParams } from '../../composables/useI1Amortization'
 import GtIndexChip from '../../GtIndexChip.vue'
+
+const CATEGORIES = [
+  '土地使用权',
+  '房屋使用权',
+  '专利权',
+  '非专利技术',
+  '商标权',
+  '著作权',
+  '特许权',
+  '软件',
+  '矿产权',
+  '数据资源',
+  '其他',
+]
 
 const props = defineProps<{
   wpId: string
@@ -272,30 +445,37 @@ const emit = defineEmits<{
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 
-// ─── Composable ──────────────────────────────────────────────────────────────
-
 const allResponsesRef = computed(() => props.allResponses)
 
 const {
   currentRows,
-  currentItemId,
   summaryRow,
-  MATRIX_COLUMNS,
+  periodBegin,
+  periodEnd,
+  amortReconcile,
   recalcAll,
-  recalcRow,
   syncFromDetail,
+  syncFromUsefulLife,
+  syncFromImpairment,
   updateRowField,
-  setImpairmentMonth,
+  setPeriod,
+  addRow,
+  removeRow,
+  switchBranch,
+  exportXlsx,
+  importXlsx,
 } = useI1Amortization(toRef(props, 'wpId'), allResponsesRef as any, {
   onSave: (itemId, value) => emit('save', itemId, value),
 })
 
-// ─── State ───────────────────────────────────────────────────────────────────
+switchBranch('withImpair', false)
 
 const auditNote = ref('')
 const auditConclusion = ref('')
+const localPeriodBegin = ref('')
+const localPeriodEnd = ref('')
+const fileInputRef = ref<HTMLInputElement | null>(null)
 
-// Load note / conclusion from allResponses
 watch(() => props.allResponses, (responses) => {
   const item = responses.get('I1-11-note')
   if (item) {
@@ -307,41 +487,62 @@ watch(() => props.allResponses, (responses) => {
   }
 }, { immediate: true })
 
-// ─── Computed ────────────────────────────────────────────────────────────────
+watch([periodBegin, periodEnd], ([b, e]) => {
+  localPeriodBegin.value = b || ''
+  localPeriodEnd.value = e || ''
+}, { immediate: true })
 
-/** 含减值的资产数量 */
-const impairmentCount = computed(() => {
-  return currentRows.value.filter(r => r.impairment > 0 || r.impairmentAmountAtMonth > 0).length
-})
+const impairmentCount = computed(() =>
+  currentRows.value.filter(r => (r.impairment ?? 0) > 0 || !!r.impairmentDate).length,
+)
 
-/** 减值准备总额 */
-const totalImpairment = computed(() => {
-  return currentRows.value.reduce((sum, r) => sum + (r.impairment ?? 0), 0)
-})
+const totalImpairment = computed(() =>
+  currentRows.value.reduce((sum, r) => sum + (r.impairment ?? 0), 0),
+)
 
-// ─── Handlers ────────────────────────────────────────────────────────────────
+const totalBookMonthly = computed(() =>
+  currentRows.value.reduce((sum, r) => sum + (r.bookMonthly ?? 0), 0),
+)
 
-function handleFieldChange(rowIndex: number, field: keyof I1AmortizationRow, value: number | null) {
-  updateRowField(rowIndex, field, value ?? 0)
+const totalAccDiff = computed(() =>
+  currentRows.value.reduce((sum, r) => sum + (r.accAmortDiff ?? 0), 0),
+)
+
+const significantDiffCount = computed(() =>
+  currentRows.value.filter(r => Math.abs(r.accAmortDiff ?? 0) > 0.01 || Math.abs(r.monthlyDiff ?? 0) > 0.01).length,
+)
+
+function handleFieldChange(rowIndex: number, field: keyof I1AmortizationRow, value: number | string | null) {
+  updateRowField(rowIndex, field, value ?? (typeof value === 'number' ? 0 : ''))
 }
 
-function handleRemainingChange(rowIndex: number, value: number | null) {
-  const rows = currentRows.value
-  const row = rows[rowIndex]
-  if (!row) return
-  row.remainingMonths = value ?? 0
-  row.usefulLifeMonths = row.usedMonths + (value ?? 0)
-  recalcRow(rowIndex)
+function handleUsefulLifeChange(rowIndex: number, value: number | null) {
+  const years = value ?? 0
+  updateRowField(rowIndex, 'usefulLifeYears', years)
+  updateRowField(rowIndex, 'usefulLifeMonths', Math.round(years * 12))
 }
 
-function handleImpairMonthChange(rowIndex: number, month: number, amount: number) {
-  setImpairmentMonth(rowIndex, month ?? 0, amount ?? 0)
+function onPeriodChange() {
+  setPeriod(localPeriodBegin.value || '', localPeriodEnd.value || '')
+}
+
+function handleAddRow() {
+  addRow({
+    name: '',
+    cost: 0,
+    salvage: 0,
+    usefulLifeMonths: 0,
+  })
+}
+
+function handleRemoveRow(index: number) {
+  removeRow(index)
 }
 
 async function handleSyncFromDetail() {
   try {
     await ElMessageBox.confirm(
-      '将从I1-2明细表同步资产参数（名称/原值/残值/使用寿命/减值准备），现有手工调整将被覆盖。是否继续？',
+      '将从I1-2明细表同步资产参数（类别/名称/原值/累计摊销/减值/取得日期/使用寿命），现有手工调整的日期与账面月摊销将被尽量保留。是否继续？',
       '同步I1-2参数',
       { confirmButtonText: '确定同步', cancelButtonText: '取消', type: 'warning' },
     )
@@ -349,7 +550,6 @@ async function handleSyncFromDetail() {
     return
   }
 
-  // Extract asset params from allResponses I1-2 detail data
   const detailData = props.allResponses.get('I1-2-rows')
   const raw = (detailData as any)?.remark ?? (detailData as any)?.conclusion
   if (!raw) {
@@ -366,16 +566,26 @@ async function handleSyncFromDetail() {
     const assetParams: I1AssetParams[] = parsed.map((item: any) => ({
       rowId: item.rowId ?? '',
       name: item.name ?? item.assetName ?? '',
-      cost: Number(item.cost ?? item.originalCost ?? 0),
+      category: item.category ?? '',
+      cost: Number(item.costEnd ?? item.cost ?? item.originalCost ?? 0),
       salvageRate: Number(item.salvageRate ?? 0),
       usefulLifeMonths: Number(item.usefulLifeMonths ?? item.usefulLife ?? 0),
       accAmortBegin: Number(item.accAmortBegin ?? item.accumulatedAmort ?? 0),
+      accAmortEnd: Number(item.accAmortEnd ?? item.accAmortBegin ?? 0),
       impairmentEnd: Number(item.impairmentEnd ?? item.impairment ?? 0),
+      acquisitionDate: item.acquisitionDate ?? item.startDate ?? '',
+      amortProvision: Number(item.amortProvision ?? 0),
     }))
     syncFromDetail(assetParams)
   } catch {
     ElMessageBox.alert('I1-2明细表数据解析失败。', '错误')
   }
+}
+
+function handleSyncFromUsefulLife() {
+  const r = syncFromUsefulLife()
+  if (r.updated > 0) ElMessage.success(r.message)
+  else ElMessage.warning(r.message)
 }
 
 function handleReview() {
@@ -390,68 +600,100 @@ function handleSaveConclusion() {
   emit('save', 'I1-11-conclusion', auditConclusion.value)
 }
 
-// ─── Month column helpers ────────────────────────────────────────────────────
-
-function getMonthColumnClass(month: number): string {
-  // Check if any row has impairment at this month
-  const hasImpair = currentRows.value.some(r => r.impairmentMonth === month)
-  return hasImpair ? 'impair-month-col' : ''
+async function handleSyncFromI12() {
+  const detailData = props.allResponses.get('I1-12-rows')
+  const raw = (detailData as any)?.remark ?? (detailData as any)?.conclusion
+  if (!raw) {
+    ElMessage.warning('未找到 I1-12 数据，请先完成减值测试。')
+    return
+  }
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (!Array.isArray(parsed) || !parsed.length) {
+      ElMessage.warning('I1-12 暂无行数据。')
+      return
+    }
+    const r = syncFromImpairment(
+      parsed.map((item: any) => ({
+        rowId: item.rowId ?? item.sourceDetailRowId,
+        name: item.name ?? '',
+        category: item.category ?? '',
+        cost: Number(item.cost ?? 0),
+        accAmort: Number(item.accAmort ?? 0),
+        alreadyProvided: Number(item.alreadyProvided ?? item.impairmentProvision ?? 0),
+        supplement: Number(item.supplement ?? 0),
+      })),
+      { defaultImpairmentDate: localPeriodEnd.value || periodEnd.value, createMissing: true },
+    )
+    ElMessage({ type: r.linked + r.added > 0 ? 'success' : 'warning', message: r.message })
+  } catch {
+    ElMessage.error('I1-12 数据解析失败')
+  }
 }
 
-function getMonthTooltip(row: I1AmortizationRow, month: number): string {
-  if (row.impairmentMonth === month) {
-    return `第${month}月 — 减值发生月，重算基数=(原值-残值-累计摊销-减值)÷剩余月数`
-  }
-  if (row.impairmentMonth > 0 && month > row.impairmentMonth) {
-    return `第${month}月 — 使用减值后新基数计算`
-  }
-  return `第${month}月摊销额`
+async function handleExportCmd(cmd: string) {
+  if (cmd === 'export-template') await exportXlsx('template')
+  else if (cmd === 'export-data') await exportXlsx('data')
+  else if (cmd === 'import-data') fileInputRef.value?.click()
 }
 
-// ─── Summary method for el-table ─────────────────────────────────────────────
+async function onFileSelected(ev: Event) {
+  const input = ev.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  try {
+    const r = await importXlsx(file, true)
+    ElMessage.success(`已导入 ${r.imported} 行`)
+  } catch (e: any) {
+    ElMessage.error(e?.message || '导入失败')
+  }
+}
+
+function getRowClass({ row }: { row: I1AmortizationRow }) {
+  if (Math.abs(row.accAmortDiff ?? 0) > 0.01 || Math.abs(row.monthlyDiff ?? 0) > 0.01) {
+    return 'diff-row'
+  }
+  if ((row.impairment ?? 0) > 0) return 'impair-row'
+  return ''
+}
 
 function getSummaryRow({ columns, data }: { columns: any[]; data: I1AmortizationRow[] }) {
-  const sums: string[] = []
-  // Column mapping for with-impair variant:
-  // 0: index, 1: name, 2: cost, 3: salvage, 4: accAmortBegin,
-  // 5: impairment, 6: remainingMonths, 7: impairmentMonth, 8: impairmentAmountAtMonth,
-  // 9: monthlyAmortAmount, 10~37: months, 38: periodAmortization
-  columns.forEach((col: any, index: number) => {
-    if (index === 0) { sums[index] = '合计'; return }
-    if (index === 1) { sums[index] = ''; return }
-    // cost
-    if (index === 2) { sums[index] = fmtAmt(data.reduce((s, r) => s + (r.cost ?? 0), 0)); return }
-    // salvage
-    if (index === 3) { sums[index] = fmtAmt(data.reduce((s, r) => s + (r.salvage ?? 0), 0)); return }
-    // accAmortBegin
-    if (index === 4) { sums[index] = fmtAmt(data.reduce((s, r) => s + (r.accAmortBegin ?? 0), 0)); return }
-    // impairment
-    if (index === 5) { sums[index] = fmtAmt(data.reduce((s, r) => s + (r.impairment ?? 0), 0)); return }
-    // remainingMonths — no sum
-    if (index === 6) { sums[index] = '-'; return }
-    // impairmentMonth — no sum
-    if (index === 7) { sums[index] = '-'; return }
-    // impairmentAmountAtMonth
-    if (index === 8) { sums[index] = fmtAmt(data.reduce((s, r) => s + (r.impairmentAmountAtMonth ?? 0), 0)); return }
-    // monthlyAmortAmount
-    if (index === 9) { sums[index] = fmtAmt(data.reduce((s, r) => s + (r.monthlyAmortAmount ?? 0), 0)); return }
-    // month columns (index 10 to 10+27=37)
-    const monthIdx = index - 10
-    if (monthIdx >= 0 && monthIdx < 28) {
-      sums[index] = fmtAmt(summaryRow.value.monthlyTotals[monthIdx] ?? 0)
-      return
-    }
-    // periodAmortization (index 38)
-    if (index === 38) {
-      sums[index] = fmtAmt(summaryRow.value.periodTotal)
-      return
-    }
-    sums[index] = ''
-  })
-  return sums
-}
+  const sumKeys: Partial<Record<string, keyof I1AmortizationRow>> = {
+    cost: 'cost',
+    bookAccAmortEnd: 'bookAccAmortEnd',
+    impairment: 'impairment',
+    bookMonthly: 'bookMonthly',
+    periodAmortization: 'periodAmortization',
+    monthlyDiff: 'monthlyDiff',
+    calcAccAmort: 'calcAccAmort',
+    accAmortDiff: 'accAmortDiff',
+    preMonthly: 'preMonthly',
+    postMonthly: 'postMonthly',
+    accAmortAtImpairment: 'accAmortAtImpairment',
+  }
+  const labelToKey: Record<string, keyof I1AmortizationRow> = {
+    原值: 'cost',
+    账面累计摊销: 'bookAccAmortEnd',
+    减值准备: 'impairment',
+    账面月摊销额: 'bookMonthly',
+    当期摊销费用: 'periodAmortization',
+    月摊销额差异: 'monthlyDiff',
+    '累计摊销(测算)': 'calcAccAmort',
+    累计摊销差异: 'accAmortDiff',
+    减值前月摊销额: 'preMonthly',
+    减值后月摊销额: 'postMonthly',
+    减值时测算累计摊销: 'accAmortAtImpairment',
+  }
 
-// ─── Util ────────────────────────────────────────────────────────────────────
+  return columns.map((col: any, index: number) => {
+    if (index === 0) return '合计'
+    const key = (col.property && sumKeys[col.property]) || labelToKey[col.label]
+    if (!key) return ''
+    const total = data.reduce((s, r) => s + Number((r as any)[key] ?? 0), 0)
+    return fmtAmt(total)
+  })
+}
 
 function fmtAmt(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
@@ -485,42 +727,43 @@ function fmtAmt(val: number | null | undefined): string {
   flex-wrap: wrap;
   gap: 8px;
 }
-.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
-.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
+.tab-toolbar .toolbar-left,
+.tab-toolbar .toolbar-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.nav-chip { cursor: pointer; }
+.reconcile-alert { margin-bottom: 12px; }
+.period-label { font-size: 12px; color: var(--el-text-color-secondary); }
 .chip-wrap { display: inline-flex; align-items: center; }
 
 .section-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
 }
-
 .title-actions {
   display: flex;
   gap: 8px;
   align-items: center;
 }
 
-.amort-matrix-table {
-  font-size: 12px;
-}
-
+.amort-matrix-table { font-size: 12px; }
 .amort-matrix-table :deep(.el-table__footer) {
   font-weight: 600;
   background: var(--el-fill-color-light);
 }
+.amort-matrix-table :deep(.diff-row) { background: var(--el-color-danger-light-9); }
+.amort-matrix-table :deep(.impair-row) { background: #fff7e6; }
 
-.cell-input {
-  width: 100%;
-}
-
+.cell-input { width: 100%; }
 .cell-input :deep(.el-input__inner) {
   text-align: right;
   font-size: 12px;
-}
-
-.impair-month-input :deep(.el-input__inner) {
-  text-align: center;
 }
 
 .amount-cell {
@@ -534,24 +777,10 @@ function fmtAmt(val: number | null | undefined): string {
   font-variant-numeric: tabular-nums;
 }
 
-/* 减值发生月红色高亮 */
 .impair-recalc-cell {
   color: var(--el-color-danger);
   font-weight: 600;
   border-bottom-color: var(--el-color-danger);
-  position: relative;
-}
-
-.impair-recalc-cell::after {
-  content: '重算';
-  position: absolute;
-  top: -14px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 9px;
-  color: var(--el-color-danger);
-  white-space: nowrap;
-  font-weight: 400;
 }
 
 .impair-month-highlight {
@@ -559,9 +788,8 @@ function fmtAmt(val: number | null | undefined): string {
   font-weight: 600;
 }
 
-.impair-amount {
-  color: var(--el-color-danger);
-}
+.impair-amount { color: var(--el-color-danger); }
+.text-danger { color: var(--el-color-danger); font-weight: 600; }
 
 .impair-badge {
   background: var(--el-color-danger-light-9);
@@ -574,30 +802,27 @@ function fmtAmt(val: number | null | undefined): string {
 
 .totals-bar {
   display: flex;
-  gap: 24px;
+  gap: 20px;
   padding: 10px 12px;
   margin-top: 12px;
   background: var(--el-fill-color-light);
   border-radius: 4px;
   font-size: var(--wp-font-size, 13px);
   align-items: center;
+  flex-wrap: wrap;
 }
 
-.note-card {
-  margin-top: 12px;
-}
+.note-card { margin-top: 12px; }
 
 .compile-hint {
   margin-top: 12px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
-
 .compile-hint summary {
   cursor: pointer;
   font-weight: 500;
 }
-
 .compile-hint ul {
   padding-left: 20px;
   margin-top: 8px;

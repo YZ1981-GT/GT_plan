@@ -54,13 +54,23 @@
         </div>
         <div class="param-item">
           <span class="param-label">抽样方法</span>
-          <el-input
+          <el-select
             :model-value="vc.samplingParams.value.samplingMethod"
             size="small"
+            clearable
+            filterable
             :disabled="isReadonly"
-            placeholder="随机/系统/MUS…"
-            @change="(val: string) => vc.updateSamplingParams('samplingMethod', val)"
-          />
+            placeholder="请选择抽样方法"
+            style="width: 100%"
+            @change="(val: string) => vc.updateSamplingParams('samplingMethod', val ?? '')"
+          >
+            <el-option
+              v-for="o in G9_SAMPLING_METHOD_OPTIONS"
+              :key="o.value"
+              :label="o.label"
+              :value="o.value"
+            />
+          </el-select>
         </div>
         <div class="param-item">
           <span class="param-label">目标样本量</span>
@@ -600,6 +610,7 @@ import {
   formatG9CheckState,
   formatG9AbnormalType,
   G9_CHECK_STATE_OPTIONS,
+  G9_SAMPLING_METHOD_OPTIONS,
   G9A_VOUCHER_PROGRAM_NOS,
   type G9VoucherRow,
   type G9CheckState,
@@ -913,12 +924,13 @@ function fmt(v: number) {
 const NOTE_KEY = 'G9-voucher-audit-note'
 const CONCLUSION_KEY = 'G9-voucher-audit-conclusion'
 const auditNote = ref(props.allResponses.get(NOTE_KEY)?.remark ?? '')
-const auditConclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.remark ?? '')
+const _voucherConcl = props.allResponses.get(CONCLUSION_KEY)
+const auditConclusion = ref(String(_voucherConcl?.conclusion ?? _voucherConcl?.remark ?? ''))
 watch(auditNote, (v) => {
   if (!props.isReadonly) props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: v })
 })
 watch(auditConclusion, (v) => {
-  if (!props.isReadonly) props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: v })
+  if (!props.isReadonly) props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: v, remark: null })
 })
 
 function onCutoffFilled(e: Event) {

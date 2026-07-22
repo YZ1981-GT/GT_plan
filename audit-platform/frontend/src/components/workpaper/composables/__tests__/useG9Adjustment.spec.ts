@@ -50,10 +50,13 @@ describe('g9AdjStorage 汇总', () => {
     expect(s.ociNet).toBe(30)
   })
 
-  it('calcG9AdjustmentNet 仅汇总 1504', () => {
+  it('calcG9AdjustmentNet 汇总 G9 科目别名', () => {
+    expect(calcG9AdjustmentNet([
+      { accountCode: '1519', debitAmount: 50, creditAmount: 10 },
+      { accountCode: '6101', debitAmount: 0, creditAmount: 40 },
+    ])).toBe(40)
     expect(calcG9AdjustmentNet([
       { accountCode: '1504', debitAmount: 50, creditAmount: 10 },
-      { accountCode: '6101', debitAmount: 0, creditAmount: 40 },
     ])).toBe(40)
   })
 
@@ -75,9 +78,9 @@ describe('useG9Adjustment', () => {
     vi.clearAllMocks()
   })
 
-  it('科目选项含 1504/6101/4002', () => {
+  it('科目选项含 1519/6101/4002', () => {
     const codes = G9_ADJ_ACCOUNT_OPTIONS.map((o) => o.code)
-    expect(codes).toContain('1504')
+    expect(codes).toContain('1519')
     expect(codes).toContain('6101')
     expect(codes).toContain('4002')
   })

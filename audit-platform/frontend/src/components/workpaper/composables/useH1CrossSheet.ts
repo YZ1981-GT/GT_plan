@@ -8,14 +8,17 @@
  * - H1-2 明细 → H1-1 审定（按分类聚合原值/折旧/减值合计）
  * - H1-3 调整 → H1-1 审定（AJE/RJE同步）
  * - H1-12 折旧 → H1-13 分配（按分类聚合折旧额）
- * - H1-4 闲置 → H1-14 减值（闲置资产列表供减值迹象引入）
- * - H1-1/H1-4/H1-19 → 附注（审定/闲置/经营租出自动取数）
+ *
+ * 注：H1-4 闲置→H1-14 减值改由 EventBus `h1:idle-impairment-sign` 主动预警 + H1-14
+ * 自身 parseIdleAssetsFromH4 拉取；附注自动取数改由上市/国企附注 tab 专用 seed。
+ * 原 idleAssetsForImpairment / disclosureAutoFill computed 已废弃删除（无消费者）。
  *
  * Spec: .kiro/specs/h1-fixed-assets/
  * Task: 3.2
  * Requirements: 17.1-17.9
  */
 import { computed, type ComputedRef, type Ref } from 'vue'
+import { readH12BranchRows } from './h1H12BranchKeys'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -45,36 +48,21 @@ export interface H1DetailRowRaw {
   netValue?: number
 }
 
-/** H1-3 调整分录行原始 JSON 结构 */
+/** H1-3 调整分录行原始 JSON 结构（对齐 Excel：类别=账项调整/报表调整/其他） */
 export interface H1AdjustmentRowRaw {
   rowId?: string
   description?: string       // 调整事项说明
-  entryType?: string         // AJE / RJE
+  category?: string          // 账项调整 / 报表调整 / 其他
+  entryType?: string         // AJE / RJE（可由 category 派生）
   reportItem?: string
   accountCode?: string
   accountName?: string
   noteItem?: string
   summary?: string
-  debitAmount?: number       // 借方金额
-  creditAmount?: number      // 贷方金额
+  debitAmount?: number       // 借方调整金额
+  creditAmount?: number      // 贷方调整金额
   counterAccount?: string
   indexRef?: string
-  remark?: string
-}
-
-/** H1-4 闲置资产行原始 JSON 结构 */
-export interface H1IdleAssetRowRaw {
-  rowId?: string
-  name?: string              // 资产名称
-  assetNo?: string
-  originalCost?: number
-  accDep?: number
-  netValue?: number          // 净值
-  idleReason?: string
-  idleStartDate?: string
-  hasImpairment?: string     // 是否计提减值
-  impairmentAmount?: number
-  disposalSuggestion?: string
   remark?: string
 }
 
@@ -86,29 +74,11 @@ export interface H1DepreciationRowRaw {
   salvageRate?: number
   usefulLife?: number
   annualDepreciation?: number
-  periodDepreciation?: number  // 本期折旧合计
+  periodDepreciation?: number  // 本期折旧合计（旧字段）
+  periodTotal?: number         // 本期折旧合计（H1-12 新引擎）
   accDepEnd?: number
   bookDepreciation?: number    // 账面折旧
   difference?: number
-}
-
-/** H1-19 经营租出行原始 JSON 结构 */
-export interface H1OperatingLeaseRowRaw {
-  rowId?: string
-  lessee?: string            // 承租方
-  assetName?: string
-  originalCost?: number
-  netValue?: number
-  leaseStart?: string
-  leaseEnd?: string
-  leaseTerm?: number
-  annualRent?: number
-  monthlyRent?: number
-  totalRentIncome?: number
-  depAlloc?: number
-  maintenanceCost?: number
-  netIncome?: number
-  returnRate?: number
 }
 
 /** 跨sheet详细合计结构 */
@@ -122,18 +92,13 @@ export interface DetailTotals {
 export interface AdjudicationFromDetail {
   costAudited: number
   depAudited: number
+  impairAudited: number
 }
 
 /** 折旧分配按分类结构 */
 export interface DepreciationForAlloc {
   byCategory: Record<string, number>
   total: number
-}
-
-/** 闲置资产供减值引入 */
-export interface IdleAssetForImpairment {
-  name: string
-  netValue: number
 }
 
 /** 调整分录同步结构 */
@@ -193,25 +158,10 @@ export function useH1CrossSheet(allResponses: Ref<Map<string, any>>) {
     return safeParseRows<H1AdjustmentRowRaw>(resp?.remark)
   })
 
-  // ─── 解析 H1-4 闲置资产行数据 ──────────────────────────────────────────
-
-  const idleRows = computed<H1IdleAssetRowRaw[]>(() => {
-    const resp = allResponses.value.get('H1-4-rows')
-    return safeParseRows<H1IdleAssetRowRaw>(resp?.remark)
-  })
-
-  // ─── 解析 H1-12 折旧测算行数据 ─────────────────────────────────────────
+  // ─── 解析 H1-12 折旧测算行数据（优先活动分支键，兼容旧 H1-12-rows）────
 
   const depreciationRows = computed<H1DepreciationRowRaw[]>(() => {
-    const resp = allResponses.value.get('H1-12-rows')
-    return safeParseRows<H1DepreciationRowRaw>(resp?.remark)
-  })
-
-  // ─── 解析 H1-19 经营租出行数据 ─────────────────────────────────────────
-
-  const operatingLeaseRows = computed<H1OperatingLeaseRowRaw[]>(() => {
-    const resp = allResponses.value.get('H1-19-rows')
-    return safeParseRows<H1OperatingLeaseRowRaw>(resp?.remark)
+    return readH12BranchRows(allResponses.value).rows as H1DepreciationRowRaw[]
   })
 
   // ─── detailTotals: H1-2 按分类聚合原值/折旧/减值（Req 17.1）───────────
@@ -228,9 +178,10 @@ export function useH1CrossSheet(allResponses: Ref<Map<string, any>>) {
     let impairment = 0
 
     for (const row of detailRows.value) {
-      originalCost += _getNum(row.originalCostEnd)
-      accDep += _getNum(row.accDepEnd)
-      impairment += _getNum(row.impairmentEnd)
+      // 优先审定口径（对齐源模板与 H1-1 勾稽）
+      originalCost += _getNum(row.costEndAud ?? row.originalCostEnd)
+      accDep += _getNum(row.depEndAud ?? row.accDepEnd)
+      impairment += _getNum(row.impairEndAud ?? row.impairmentEnd)
     }
 
     return { originalCost, accDep, impairment }
@@ -242,12 +193,14 @@ export function useH1CrossSheet(allResponses: Ref<Map<string, any>>) {
    * H1-2 明细合计供 H1-1 审定表交叉验证：
    * - costAudited: 原值合计（=H1-1原值小计审定数）
    * - depAudited: 折旧合计（=H1-1折旧小计审定数）
+   * - impairAudited: 减值合计（=H1-1减值小计审定数）
    */
   const adjudicationFromDetail: ComputedRef<AdjudicationFromDetail> = computed(() => {
     const totals = detailTotals.value
     return {
       costAudited: totals.originalCost,
       depAudited: totals.accDep,
+      impairAudited: totals.impairment,
     }
   })
 
@@ -264,7 +217,7 @@ export function useH1CrossSheet(allResponses: Ref<Map<string, any>>) {
 
     for (const row of depreciationRows.value) {
       const cat = row.category || '未分类'
-      const amount = _getNum(row.periodDepreciation)
+      const amount = _getNum(row.periodTotal ?? row.periodDepreciation)
       byCategory[cat] = (byCategory[cat] || 0) + amount
       total += amount
     }
@@ -272,118 +225,13 @@ export function useH1CrossSheet(allResponses: Ref<Map<string, any>>) {
     return { byCategory, total }
   })
 
-  // ─── idleAssetsForImpairment: H1-4 → H1-14（Req 17.1）─────────────────
-
-  /**
-   * 从 H1-4 闲置检查表提取有减值迹象的资产列表供 H1-14 引入。
-   * 筛选条件：净值 > 0 的闲置资产（不论是否已计提减值）。
-   */
-  const idleAssetsForImpairment: ComputedRef<IdleAssetForImpairment[]> = computed(() => {
-    const result: IdleAssetForImpairment[] = []
-
-    for (const row of idleRows.value) {
-      const netValue = _getNum(row.netValue)
-      if (netValue > 0) {
-        result.push({
-          name: row.name || '未命名资产',
-          netValue,
-        })
-      }
-    }
-
-    return result
-  })
-
-  // ─── disclosureAutoFill: H1-1/H1-4/H1-19 → 附注各子节（Req 17.6）────
-
-  /**
-   * 附注披露自动取数，从多个 sheet 聚合数据供附注子节引用：
-   * - disc_cost_begin / disc_cost_end: 原值期初/期末（从H1-2聚合）
-   * - disc_cost_increase / disc_cost_decrease: 原值增加/减少
-   * - disc_dep_begin / disc_dep_end: 折旧期初/期末
-   * - disc_dep_provision / disc_dep_reversal: 折旧计提/转回
-   * - disc_impairment_begin / disc_impairment_end: 减值期初/期末
-   * - disc_net_value: 净值合计
-   * - disc_idle_count: 闲置资产数量
-   * - disc_idle_net_value: 闲置净值合计
-   * - disc_lease_count: 经营租出数量
-   * - disc_lease_total_rent: 经营租出总租金
-   */
-  const disclosureAutoFill: ComputedRef<Record<string, number>> = computed(() => {
-    const result: Record<string, number> = {}
-
-    // ─ 从 H1-2 明细行聚合附注第(1)子节数据（原值/折旧/减值矩阵）
-    let costBegin = 0
-    let costIncrease = 0
-    let costDecrease = 0
-    let costEnd = 0
-    let depBegin = 0
-    let depProvision = 0
-    let depReversal = 0
-    let depEnd = 0
-    let impBegin = 0
-    let impProvision = 0
-    let impReversal = 0
-    let impEnd = 0
-
-    for (const row of detailRows.value) {
-      costBegin += _getNum(row.originalCostBegin)
-      costIncrease += _getNum(row.originalCostIncrease)
-      costDecrease += _getNum(row.originalCostDecrease)
-      costEnd += _getNum(row.originalCostEnd)
-      depBegin += _getNum(row.accDepBegin)
-      depProvision += _getNum(row.accDepProvision)
-      depReversal += _getNum(row.accDepReversal)
-      depEnd += _getNum(row.accDepEnd)
-      impBegin += _getNum(row.impairmentBegin)
-      impProvision += _getNum(row.impairmentProvision)
-      impReversal += _getNum(row.impairmentReversal)
-      impEnd += _getNum(row.impairmentEnd)
-    }
-
-    result['disc_cost_begin'] = costBegin
-    result['disc_cost_increase'] = costIncrease
-    result['disc_cost_decrease'] = costDecrease
-    result['disc_cost_end'] = costEnd
-    result['disc_dep_begin'] = depBegin
-    result['disc_dep_provision'] = depProvision
-    result['disc_dep_reversal'] = depReversal
-    result['disc_dep_end'] = depEnd
-    result['disc_impairment_begin'] = impBegin
-    result['disc_impairment_provision'] = impProvision
-    result['disc_impairment_reversal'] = impReversal
-    result['disc_impairment_end'] = impEnd
-    result['disc_net_value'] = costEnd - depEnd - impEnd
-
-    // ─ 从 H1-4 闲置检查表取附注第(2)子节数据
-    let idleCount = 0
-    let idleNetValue = 0
-    for (const row of idleRows.value) {
-      idleCount++
-      idleNetValue += _getNum(row.netValue)
-    }
-    result['disc_idle_count'] = idleCount
-    result['disc_idle_net_value'] = idleNetValue
-
-    // ─ 从 H1-19 经营租出取附注第(4)子节数据
-    let leaseCount = 0
-    let leaseTotalRent = 0
-    for (const row of operatingLeaseRows.value) {
-      leaseCount++
-      leaseTotalRent += _getNum(row.totalRentIncome)
-    }
-    result['disc_lease_count'] = leaseCount
-    result['disc_lease_total_rent'] = leaseTotalRent
-
-    return result
-  })
-
   // ─── adjustmentSync: H1-3 AJE/RJE → H1-1（Req 17.7）──────────────────
 
   /**
    * 从 H1-3 调整分录汇总 AJE/RJE 合计金额，同步到 H1-1 审定表对应列。
-   * - totalAje: 所有类别=AJE分录的净额（借方-贷方）之和
-   * - totalRje: 所有类别=RJE分录的净额之和
+   * - totalAje: 账项调整（或 entryType=AJE）净额（借方-贷方）之和
+   * - totalRje: 报表调整（或 entryType=RJE）净额之和
+   * 兼容 Excel「类别=账项调整/报表调整/其他」与旧存档 AJE/RJE。
    */
   const adjustmentSync: ComputedRef<AdjustmentSync> = computed(() => {
     let totalAje = 0
@@ -394,11 +242,16 @@ export function useH1CrossSheet(allResponses: Ref<Map<string, any>>) {
       const credit = _getNum(row.creditAmount)
       // 资产类借方科目：借方增加/贷方减少 → 净额 = 借方 - 贷方
       const netAmount = debit - credit
+      const cat = String(row.category || '').trim()
+      const isRje = cat === '报表调整' || row.entryType === 'RJE'
+      const isAje = !isRje && (
+        cat === '账项调整' || cat === '其他' || cat === '' || row.entryType === 'AJE' || !row.entryType
+      )
 
-      if (row.entryType === 'AJE') {
-        totalAje += netAmount
-      } else if (row.entryType === 'RJE') {
+      if (isRje) {
         totalRje += netAmount
+      } else if (isAje) {
+        totalAje += netAmount
       }
     }
 
@@ -414,10 +267,6 @@ export function useH1CrossSheet(allResponses: Ref<Map<string, any>>) {
     adjudicationFromDetail,
     // H1-12 → H1-13 折旧分配
     depreciationForAlloc,
-    // H1-4 → H1-14 闲置资产减值引入
-    idleAssetsForImpairment,
-    // H1-1/H1-4/H1-19 → 附注自动取数
-    disclosureAutoFill,
     // H1-3 → H1-1 AJE/RJE同步
     adjustmentSync,
   }

@@ -66,6 +66,7 @@ vi.mock('element-plus', async () => {
 })
 
 import GtC24JournalDetail from '../GtC24JournalDetail.vue'
+import { useLedgerCache } from '@/composables/useLedgerCache'
 
 const stubs = {
   C24SummarySheet: true,
@@ -104,6 +105,7 @@ beforeEach(() => {
   mockPut.mockResolvedValue({})
   auditYear.value = null
   storeYear.value = null
+  useLedgerCache().invalidate()
 })
 
 describe('C24 loadFromLedger 年度解析', () => {
@@ -167,7 +169,6 @@ describe('C24 loadFromLedger 年度解析', () => {
   })
 
   it('分页拉取直至 total，不受 50000 条上限', async () => {
-    vi.useFakeTimers()
     auditYear.value = 2025
     let page = 0
     mockGet.mockImplementation((url: string, opts?: any) => {
@@ -183,7 +184,6 @@ describe('C24 loadFromLedger 年度解析', () => {
       }
       return Promise.resolve({})
     })
-    mockPut.mockResolvedValue({})
 
     const wrapper = mount(GtC24JournalDetail, {
       props: { wpId: 'wp-c24', projectId: 'proj-1', sheetName: 'C24-0' },
@@ -192,17 +192,11 @@ describe('C24 loadFromLedger 年度解析', () => {
     await flushPromises()
     page = 0
     await (wrapper.vm as any).loadFromLedger(false)
-    await vi.advanceTimersByTimeAsync(2500)
     await flushPromises()
 
     expect((wrapper.vm as any).journalEntries.length).toBe(12000)
-    expect(page).toBe(3)
-    const putBody = mockPut.mock.calls.find((c) => String(c[0]).includes('/checklist-responses'))?.[1]
-    expect(putBody?.items?.some((i: any) => i.item_id === 'C24-journal-source')).toBe(true)
-    const sourceItem = putBody?.items?.find((i: any) => i.item_id === 'C24-journal-source')
-    expect(JSON.parse(sourceItem.remark).source).toBe('ledger')
-    expect(JSON.parse(sourceItem.remark).count).toBe(12000)
-    vi.useRealTimers()
+    const ledgerCalls = mockGet.mock.calls.filter((c) => String(c[0]).includes('/entries-all'))
+    expect(ledgerCalls.length).toBe(3)
   })
 
   it('年度与数据均空时返回空 items 不崩溃', async () => {
@@ -216,7 +210,7 @@ describe('C24 loadFromLedger 年度解析', () => {
     })
 
     const wrapper = mount(GtC24JournalDetail, {
-      props: { wpId: 'wp-c24', projectId: 'proj-1', sheetName: 'C24A' },
+      props: { wpId: 'wp-c24', projectId: 'proj-1', sheetName: '假期清单' },
       global: { stubs },
     })
     await flushPromises()

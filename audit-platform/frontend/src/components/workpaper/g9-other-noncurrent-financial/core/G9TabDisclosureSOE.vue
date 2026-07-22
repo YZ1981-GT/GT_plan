@@ -1,5 +1,5 @@
 <template>
-  <!-- 审计目标/编制提示/审计说明/结论 由 G9TabDisclosureBase 按 variant=soe 统一渲染 -->
+  <!-- 审计目标/编制提示/金额表 由 G9TabDisclosureBase 按 variant=soe 统一渲染 -->
   <G9TabDisclosureBase variant="soe" v-bind="$props" @imported="emit('imported')" />
 </template>
 

@@ -19,12 +19,16 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, effectScope } from 'vue'
-import { useM6CrossSheet, DIFF_THRESHOLD } from '../composables/useM6CrossSheet'
-import { calcRetainedEnd, calcDistributable, calcLinkageDiff } from '../composables/useM6DistributionEngine'
-import type { ChecklistResponse } from '../composables/useM6FormData'
+
+const onHandlers = new Map<string, Function[]>()
+
+const { mockPut, mockGet, mockPost } = vi.hoisted(() => ({
+  mockPut: vi.fn().mockResolvedValue({ code: 200 }),
+  mockGet: vi.fn().mockResolvedValue({ data: [] }),
+  mockPost: vi.fn().mockResolvedValue({ code: 200 }),
+}))
 
 // ─── Mock EventBus ───────────────────────────────────────────────────────────
-const onHandlers = new Map<string, Function[]>()
 vi.mock('@/utils/eventBus', () => ({
   eventBus: {
     emit: vi.fn((event: string, payload: any) => {
@@ -50,11 +54,15 @@ vi.mock('@/utils/eventBus', () => ({
 // Mock api for backend endpoint verification
 vi.mock('@/services/apiProxy', () => ({
   api: {
-    get: vi.fn().mockResolvedValue({ data: [] }),
-    put: vi.fn().mockResolvedValue({ code: 200 }),
-    post: vi.fn().mockResolvedValue({ code: 200 }),
+    get: mockGet,
+    put: mockPut,
+    post: mockPost,
   },
 }))
+
+import { useM6CrossSheet, DIFF_THRESHOLD } from '../composables/useM6CrossSheet'
+import { calcRetainedEnd, calcDistributable, calcLinkageDiff } from '../composables/useM6DistributionEngine'
+import type { ChecklistResponse } from '../composables/useM6FormData'
 
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'

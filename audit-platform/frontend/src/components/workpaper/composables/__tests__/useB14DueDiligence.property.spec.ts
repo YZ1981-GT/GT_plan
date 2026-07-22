@@ -46,7 +46,7 @@ const arbTableRows = fc.array(
     fc.string({ minLength: 1, maxLength: 10 }),
     fc.oneof(
       fc.string({ maxLength: 20 }),
-      fc.double({ min: -1e6, max: 1e6, noNaN: true, noDefaultInfinity: true }),
+      fc.double({ min: -1e6, max: 1e6, noNaN: true, noDefaultInfinity: true }).filter(n => !Object.is(n, -0)),
       fc.constant(null as string | number | null),
     ),
   ),
@@ -294,8 +294,8 @@ describe('Feature: b1-4-due-diligence-report, Property 2: Variant switch preserv
           expect(newCh.title).toBe(origCh.title)
           expect(newCh.type).toBe(origCh.type)
           expect(newCh.content).toEqual(origCh.content)
-          expect(newCh.rows).toEqual(origCh.rows)
-          expect(newCh.sections).toEqual(origCh.sections)
+          expect(JSON.stringify(newCh.rows)).toEqual(JSON.stringify(origCh.rows))
+          expect(JSON.stringify(newCh.sections)).toEqual(JSON.stringify(origCh.sections))
           expect(newCh.table_id).toEqual(origCh.table_id)
         }
       }),
@@ -547,7 +547,7 @@ describe('Feature: b1-4-due-diligence-report, Property 5: Table data JSON round-
   const arbJsonSafeValue = fc.oneof(
     fc.string({ maxLength: 50 }),
     fc.integer({ min: -1000000, max: 1000000 }),
-    fc.double({ min: -1e6, max: 1e6, noNaN: true, noDefaultInfinity: true }),
+    fc.double({ min: -1e6, max: 1e6, noNaN: true, noDefaultInfinity: true }).filter(n => !Object.is(n, -0)),
     fc.constant(null as string | number | null),
   )
 
@@ -567,7 +567,7 @@ describe('Feature: b1-4-due-diligence-report, Property 5: Table data JSON round-
         const serialized = JSON.stringify(rows)
         const deserialized = JSON.parse(serialized)
 
-        expect(deserialized).toEqual(rows)
+        expect(JSON.stringify(deserialized)).toEqual(JSON.stringify(rows))
       }),
       { numRuns: 100 },
     )
@@ -601,7 +601,12 @@ describe('Feature: b1-4-due-diligence-report, Property 5: Table data JSON round-
               expect(restored).toBe(value)
             } else if (typeof value === 'number') {
               expect(typeof restored).toBe('number')
-              expect(restored).toBe(value)
+              // JSON.stringify/parse normalizes -0 to 0
+              if (value === 0) {
+                expect(restored).toBe(0)
+              } else {
+                expect(Object.is(restored, value)).toBe(true)
+              }
             }
           }
         }

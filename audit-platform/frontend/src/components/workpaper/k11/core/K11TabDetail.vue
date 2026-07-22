@@ -48,6 +48,9 @@
       />
       <div class="tab-right">
         <span class="row-count">共 {{ rows.length }} 行</span>
+        <el-button size="small" plain :disabled="isReadonly" @click="handlePullH1">
+          自 H1-14 引入本期补提
+        </el-button>
         <el-button size="small" type="success" plain :disabled="isReadonly" @click="handleAddRow">
           <el-icon><Plus /></el-icon> 新增
         </el-button>
@@ -255,6 +258,7 @@
         <li><strong>差异 = 本期发生额 − 源底稿计提金额</strong>，差异非零行红色高亮</li>
         <li><strong>商誉减值不可转回</strong>（CAS8），商誉行"本期转回"列灰色禁用</li>
         <li>新增行需先输入<strong>资产类别名称</strong>（弹窗确认），系统自动关联来源底稿</li>
+        <li>固定资产：点击「自 H1-14 引入本期补提」将 H1-14 ⑧ 写入源底稿金额并核对差异</li>
         <li>合计行应与K11-1审定表合计保持一致（交叉勾稽）</li>
       </ul>
     </details>
@@ -279,7 +283,7 @@
  * Requirements: 3.1-3.5, 4.5
  */
 import { inject, ref, toRef, type Ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, ChatDotSquare, ArrowDown, Plus, Delete } from '@element-plus/icons-vue'
 import { useK11Detail, DETAIL_TABS, type K11DetailTabKey } from '../../composables/useK11Detail'
 import { useK11ImportExport } from '../../composables/useK11ImportExport'
@@ -311,6 +315,7 @@ const {
   updateCell,
   addRow,
   removeRow,
+  pullH1SupplementAsSource,
 } = useK11Detail({
   allResponses: allResponsesRef,
   projectId: toRef(props, 'projectId') as Ref<string>,
@@ -355,6 +360,12 @@ async function handleAddRow(): Promise<void> {
 
 function handleRemoveRow(rowKey: string): void {
   removeRow(rowKey)
+}
+
+async function handlePullH1(): Promise<void> {
+  const result = await pullH1SupplementAsSource()
+  if (result.ok) ElMessage.success(result.message)
+  else ElMessage.warning(result.message)
 }
 
 function handleImportExport(command: string): void {

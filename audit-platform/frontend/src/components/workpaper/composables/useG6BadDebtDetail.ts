@@ -16,6 +16,7 @@ import { ElMessageBox } from 'element-plus'
 import { parseNum } from '@/composables/useG6MainFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import { dispatchG6SaveItems } from './g6CrossHelpers'
+import { calcSourceEclProfitLoss, publishGCycleSourceEcl } from './gCycleSourceEcl'
 
 export type G6BadDebtCategory = 'individual' | 'portfolio'
 export type G6BadDebtRowKind = 'section_header' | 'leaf' | 'subtotal' | 'total'
@@ -453,6 +454,16 @@ export function useG6BadDebtDetail(opts: UseG6BadDebtDetailOptions) {
     })
     debounceFlush()
   })
+
+  /** 向 G14 广播其他债权投资相关减值净计提（计入损益） */
+  watch(
+    () => {
+      const t = sumG6BadDebtLeaves(leaves.value)
+      return calcSourceEclProfitLoss(t.provisionIncrease, t.reversal)
+    },
+    (amount) => { publishGCycleSourceEcl('G6', amount) },
+    { immediate: true },
+  )
 
   /** 回写 G6-1 减值准备单项/组合期末未审（不含 closingAdjustment） */
   function writebackToAdjudication(): void {

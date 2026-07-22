@@ -190,7 +190,7 @@ describe('useK11CrossSheet — 源底稿核对联动', () => {
     })
   })
 
-  it('返回所有7个减值来源类别', async () => {
+  it('返回所有8个减值来源类别', async () => {
     const allResponses = ref(new Map<string, any>())
     const cross = useK11CrossSheet(allResponses)
     await nextTick()
@@ -202,8 +202,9 @@ describe('useK11CrossSheet — 源底稿核对联动', () => {
     expect(categories).toContain('goodwill')
     expect(categories).toContain('construction')
     expect(categories).toContain('equity')
+    expect(categories).toContain('investment-property')
     expect(categories).toContain('other')
-    expect(categories.length).toBe(7)
+    expect(categories.length).toBe(8)
   })
 })
 

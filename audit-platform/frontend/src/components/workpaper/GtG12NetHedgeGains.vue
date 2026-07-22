@@ -53,6 +53,7 @@
         v-else-if="currentSheet === 'G12-3'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -73,6 +74,7 @@
         :wp-id="props.wpId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
       />
 
       <G12TabVoucherCheck
@@ -219,13 +221,6 @@ function onDebouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
   scheduleAutoSnapshot()
 }
 
-function handleG12Adjudicated(e: Event): void {
-  const detail = (e as CustomEvent<{ accountCode?: string; adjudicatedAmount?: number }>).detail
-  if (detail?.accountCode !== G12_ACCOUNT_CODE) return
-  const amount = parseNum(detail.adjudicatedAmount)
-  void formData.writebackTrialBalance(amount)
-}
-
 function handleG12Writeback(e: Event): void {
   const detail = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number }>).detail
   if (detail?.accountCode && detail.accountCode !== G12_ACCOUNT_CODE) return
@@ -259,14 +254,13 @@ useWorkpaperEntryInjections({
 })
 
 onMounted(async () => {
-  window.addEventListener('substantive:adjudicated', handleG12Adjudicated)
+  // TB 回写仅听 g12:writeback-trial-balance（substantive:adjudicated 供跨模块刷新，不重复写 TB）
   window.addEventListener('g12:writeback-trial-balance', handleG12Writeback)
   await formData.loadAll()
   isLoading.value = false
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('substantive:adjudicated', handleG12Adjudicated)
   window.removeEventListener('g12:writeback-trial-balance', handleG12Writeback)
   formData.flushPending()
 })

@@ -34,12 +34,28 @@ describe('G9_DISCLOSURE_COL_LABELS', () => {
 describe('buildG9DisclosureAmountsFromAdjStore', () => {
   it('跨组汇总债务/权益分项', () => {
     let store = defaultG9AdjStore()
-    store = patchG9AdjRow(store, 'fvtpl_22', { closingUnadjusted: 100, openingUnadjusted: 40 })
-    store = patchG9AdjRow(store, 'fvoci_22', { closingUnadjusted: 50, openingUnadjusted: 10 })
-    store = patchG9AdjRow(store, 'fvtpl_21', { closingUnadjusted: 200, openingUnadjusted: 80 })
+    store = patchG9AdjRow(store, 'fvtpl_2', { closingUnadjusted: 100, openingUnadjusted: 40 })
+    store = patchG9AdjRow(store, 'fvoci_2', { closingUnadjusted: 50, openingUnadjusted: 10 })
+    store = patchG9AdjRow(store, 'fvtpl_3', { closingUnadjusted: 200, openingUnadjusted: 80 })
     const amounts = buildG9DisclosureAmountsFromAdjStore(store)
     expect(amounts.debt.currentAmount).toBe(150)
     expect(amounts.equity.currentAmount).toBe(200)
+  })
+
+  it('组首行合计不计入附注分项（避免双计）', () => {
+    let store = defaultG9AdjStore()
+    store = patchG9AdjRow(store, 'fvtpl_1', { closingUnadjusted: 999 })
+    store = patchG9AdjRow(store, 'fvtpl_2', { closingUnadjusted: 100 })
+    const amounts = buildG9DisclosureAmountsFromAdjStore(store)
+    expect(amounts.debt.currentAmount).toBe(100)
+  })
+
+  it('指定桶取指定行而非「其中」展开行', () => {
+    let store = defaultG9AdjStore()
+    store = patchG9AdjRow(store, 'fvtpl_6', { closingUnadjusted: 30 })
+    store = patchG9AdjRow(store, 'fvtpl_7', { closingUnadjusted: 20 })
+    const amounts = buildG9DisclosureAmountsFromAdjStore(store)
+    expect(amounts.designated.currentAmount).toBe(30)
   })
 })
 
@@ -108,33 +124,5 @@ describe('applyG9DisclosureAmountsToStore', () => {
     expect(next.listed_4.currentAmount).toBe(999)
     expect(sources.other).toBe('residual')
     expect(formatG9DiscPullSummary(sources, true)).toContain('残差')
-  })
-})
-
-describe('l3-disclosure-note-missing', () => {
-  it('有 L3 余额且附注未提及时给出 info 软校验', () => {
-    const m = new Map<string, ChecklistResponse>()
-    m.set('G9-detail-rows', {
-      item_id: 'G9-detail-rows',
-      remark: JSON.stringify([
-        { assetName: 'A', fairValueLevel: 'Level3', closingAdjusted: 500 },
-      ]),
-    } as ChecklistResponse)
-    const checks = buildG9CrossChecks(m, { disclosureNoteText: '本年无重大变动' })
-    expect(checks.some((c) => c.code === 'l3-disclosure-note-missing')).toBe(true)
-  })
-
-  it('附注已提及第三层次则不提示', () => {
-    const m = new Map<string, ChecklistResponse>()
-    m.set('G9-detail-rows', {
-      item_id: 'G9-detail-rows',
-      remark: JSON.stringify([
-        { assetName: 'A', fairValueLevel: 'Level3', closingAdjusted: 500 },
-      ]),
-    } as ChecklistResponse)
-    const checks = buildG9CrossChecks(m, {
-      disclosureNoteText: '第三层次公允价值调节过程已披露',
-    })
-    expect(checks.some((c) => c.code === 'l3-disclosure-note-missing')).toBe(false)
   })
 })

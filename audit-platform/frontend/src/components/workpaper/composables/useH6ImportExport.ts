@@ -21,7 +21,7 @@ import http from '@/utils/http'
 export type H6ImportableSheet =
   | 'H6-2'      // 明细表（25列2区块）
   | 'H6-3'      // 调整分录
-  | 'H6-4'      // 检查表（18列）
+  | 'H6-4'      // 检查表（凭证级实质性测试）
 
 export interface H6ImportResult {
   success: boolean

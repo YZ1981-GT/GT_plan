@@ -41,15 +41,15 @@
           <span v-else>{{ row.description }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="类别" width="90" align="center">
+      <el-table-column label="类别" width="120" align="center">
         <template #default="{ row }">
           <el-select v-if="!props.isReadonly" v-model="row.category" size="small"
             @change="updateCell(row.rowId, 'category', $event)">
-            <el-option label="AJE" value="AJE" />
-            <el-option label="RJE" value="RJE" />
+            <el-option label="账项调整(AJE)" value="AJE" />
+            <el-option label="报表调整(RJE)" value="RJE" />
           </el-select>
           <el-tag v-else :type="row.category === 'AJE' ? 'danger' : 'warning'" size="small">
-            {{ row.category }}
+            {{ row.category === 'AJE' ? '账项调整' : '报表调整' }}
           </el-tag>
         </template>
       </el-table-column>
@@ -177,10 +177,11 @@
     <details class="edit-tips">
       <summary>编制提示</summary>
       <ul>
-        <li>AJE=审计调整分录，RJE=重分类调整分录</li>
+        <li>对齐 Excel：类别「账项调整」=AJE、「报表调整」=RJE（一年内到期重分类等）</li>
         <li>借方合计必须等于贷方合计（借贷平衡），不平衡时红色警告</li>
+        <li>本表仅列示与本报表项目相关的调整；项目组可按复杂程度选用</li>
         <li>保存后自动通过EventBus发布'adjustment:created'联动H9-1审定表</li>
-        <li>科目名称填写"租赁负债"(2205)或"未确认融资费用"等相关科目</li>
+        <li>科目名称填写「租赁负债」(2205)或「未确认融资费用」等相关科目</li>
         <li>H9为负债类贷方科目：增加记贷方，减少记借方</li>
       </ul>
     </details>
@@ -221,6 +222,7 @@ const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse'
   props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
 })
 const saving = ref(false)
+const h9ReloadAll = inject<() => Promise<void>>('h9ReloadAll', async () => {})
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 const allResponsesRef = computed(() => props.allResponses)
@@ -241,7 +243,8 @@ const {
 const importExport = useH9ImportExport({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
-  sheetCode: 'H9-5',
+  sheetCode: 'H9-4',
+  onImported: async () => { await h9ReloadAll() },
 })
 
 // ─── Audit Note / Conclusion ─────────────────────────────────────────────────
@@ -298,8 +301,8 @@ async function handleSave() {
 }
 
 function handleImportExport(command: string) {
-  if (command === 'export-template') importExport.exportTemplate(['H9-5'])
-  else if (command === 'export-data') importExport.exportData(['H9-5'])
+  if (command === 'export-template') importExport.exportTemplate(['H9-4'])
+  else if (command === 'export-data') importExport.exportData(['H9-4'])
   else if (command === 'import-data') {
     const input = document.createElement('input')
     input.type = 'file'

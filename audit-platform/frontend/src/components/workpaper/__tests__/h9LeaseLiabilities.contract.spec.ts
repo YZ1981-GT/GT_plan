@@ -101,17 +101,18 @@ describe('H9 租赁负债 — 注册契约测试', () => {
       expect(overrides['H9-4']).toBe('h9-lease-liabilities')
     })
 
-    // 完整性校验：共6个wp_code映射到h9-lease-liabilities
-    it('h9-lease-liabilities 共有6个wp_code映射', () => {
+    // 完整性校验：核心 6 码必映射；披露前缀等可多于 6
+    it('h9-lease-liabilities 至少含核心6码映射', () => {
       const expectedCodes = ['H9', 'H9A', 'H9-1', 'H9-2', 'H9-3', 'H9-4']
       for (const code of expectedCodes) {
         expect(overrides[code]).toBe('h9-lease-liabilities')
       }
-      // 验证映射总数
       const actualCount = Object.entries(overrides)
         .filter(([, v]) => v === 'h9-lease-liabilities')
         .length
-      expect(actualCount).toBe(expectedCodes.length)
+      expect(actualCount).toBeGreaterThanOrEqual(expectedCodes.length)
+      // 披露路由也应落到同一组件
+      expect(overrides['H9-disc-L'] || overrides['H9-附注披露信息（上市公司）']).toBe('h9-lease-liabilities')
     })
   })
 

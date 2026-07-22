@@ -14,49 +14,40 @@ vi.mock('@/utils/http', () => ({
 
 describe('useE1DualMode', () => {
   beforeEach(() => {
-    localStorage.clear()
     getMock.mockClear()
     getMock.mockResolvedValue({ data: { data: { healthy: true } } })
   })
 
-  it('persists mode per wpId+sheet', async () => {
+  it('defaults to structured mode', async () => {
     const { useE1DualMode } = await import('../useE1DualMode')
-    const wpId = ref('wp-1')
-    const sheetName = ref('E1-31')
-    const dm = useE1DualMode({ wpId, sheetName })
-    await dm.checkOoHealth()
-    expect(dm.isOoAvailable.value).toBe(true)
-    expect(dm.currentMode.value).toBe('html')
-
-    await dm.switchMode('onlyoffice')
-    expect(dm.currentMode.value).toBe('onlyoffice')
-    expect(localStorage.getItem('e1-dual-mode:wp-1:E1-31')).toBe('onlyoffice')
-
-    const dm2 = useE1DualMode({ wpId, sheetName })
-    expect(dm2.currentMode.value).toBe('onlyoffice')
-  })
-
-  it('maps legacy structured storage to html', async () => {
-    localStorage.setItem('e1-dual-mode:wp-2:E1-26', 'structured')
-    const { useE1DualMode } = await import('../useE1DualMode')
-    const dm = useE1DualMode({
-      wpId: ref('wp-2'),
-      sheetName: ref('E1-26'),
-    })
-    expect(dm.currentMode.value).toBe('html')
+    const dm = useE1DualMode({ wpId: ref('wp-1') })
+    expect(dm.currentMode.value).toBe('structured')
     expect(dm.isStructured.value).toBe(true)
   })
 
-  it('blocks onlyoffice when OO unhealthy', async () => {
+  it('checkOoHealth reflects health endpoint', async () => {
+    const { useE1DualMode } = await import('../useE1DualMode')
+    const dm = useE1DualMode({ wpId: ref('wp-2') })
+    await dm.checkOoHealth()
+    expect(dm.isOoAvailable.value).toBe(true)
+  })
+
+  it('allows online-edit when OO healthy', async () => {
+    const { useE1DualMode } = await import('../useE1DualMode')
+    const dm = useE1DualMode({ wpId: ref('wp-3') })
+    await dm.checkOoHealth()
+    dm.switchMode('online-edit')
+    expect(dm.currentMode.value).toBe('online-edit')
+    expect(dm.isOnlineEdit.value).toBe(true)
+  })
+
+  it('blocks online-edit when OO unhealthy', async () => {
     getMock.mockResolvedValue({ data: { data: { healthy: false } } })
     const { useE1DualMode } = await import('../useE1DualMode')
-    const dm = useE1DualMode({
-      wpId: ref('wp-3'),
-      sheetName: ref('E1-29'),
-    })
+    const dm = useE1DualMode({ wpId: ref('wp-4') })
     await dm.checkOoHealth()
     expect(dm.isOoAvailable.value).toBe(false)
-    await dm.switchMode('onlyoffice')
-    expect(dm.currentMode.value).toBe('html')
+    dm.switchMode('online-edit')
+    expect(dm.currentMode.value).toBe('structured')
   })
 })

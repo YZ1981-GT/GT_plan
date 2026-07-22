@@ -1,25 +1,34 @@
-"""a17_consistency_checker — 跨章节一致性校验引擎
+"""a17_consistency_checker — 跨章节/跨底稿一致性校验引擎
 
 加载 backend/data/a17_consistency_rules.json 中的规则，
-对 A17-1 的 16 章内容执行正则匹配逻辑校验，返回结构化结果。
+对 A17-1 的 16 章内容执行正则匹配逻辑校验，并可结合跨底稿上下文
+（A17-7 签署、A17-3/3-1 成对状态）。
 
 支持的 condition 模式:
 - source_matches AND target_matches
 - source_matches AND NOT target_matches
-- source_empty AND project.business_category == 'xxx'
+- source_empty AND project.business_category == 'xxx'   (兼容旧规则)
+- source_empty AND is_a_class_or_listed
+- source_filled AND NOT context.xxx
+- context.xxx AND NOT context.yyy
 """
+
+from __future__ import annotations
 
 import json
 import logging
 import re
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 logger = logging.getLogger(__name__)
 
 _DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 _RULES_PATH = _DATA_DIR / "a17_consistency_rules.json"
+
+# 中文「上市公司」及 A 类业务分类前缀均视为上市/A 类强制场景
+_LISTED_ALIASES = {"上市公司", "上市实体", "A股上市公司"}
 
 
 @dataclass
@@ -50,28 +59,43 @@ def _content_matches(content: str | None, pattern: str | None) -> bool:
 
 
 def _content_is_empty(content: str | None) -> bool:
-    """检查章节内容是否为空（None / 空白串）。"""
+    """检查章节内容是否为空（None / 空白串 / 空 HTML）。"""
     if content is None:
         return True
-    # 去除 HTML 标签后判断是否为纯空白
     stripped = re.sub(r"<[^>]*>", "", content).strip()
     return len(stripped) == 0
+
+
+def is_a_class_or_listed(business_category: Optional[str]) -> bool:
+    """A 类业务前缀或中文「上市公司」别名。"""
+    if not business_category:
+        return False
+    cat = business_category.strip()
+    if cat in _LISTED_ALIASES:
+        return True
+    if cat.upper().startswith("A"):
+        return True
+    return False
 
 
 def check_consistency(
     chapters: dict[str, str | None],
     business_category: Optional[str] = None,
+    context: Optional[dict[str, Any]] = None,
 ) -> list[ConsistencyResult]:
     """执行跨章节一致性校验。
 
     Args:
         chapters: 章节 ID → 内容 的映射 (e.g. {"A17-1-ch01": "...", ...})
-        business_category: 项目业务分类（可为 None）
+        business_category: 项目业务分类（可为 None；支持 A1/A2 或「上市公司」）
+        context: 跨底稿上下文，如
+            {"a177_signed": bool, "a173_has_content": bool, "a1731_closed": bool}
 
     Returns:
         触发的规则结果列表
     """
     rules = _load_rules()
+    ctx = context or {}
     results: list[ConsistencyResult] = []
 
     for rule in rules:
@@ -94,10 +118,16 @@ def check_consistency(
             source_pattern=source_pattern,
             target_pattern=target_pattern,
             business_category=business_category,
+            context=ctx,
         )
 
         if triggered:
             affected = [ch for ch in [source_chapter, target_chapter] if ch]
+            # 跨底稿规则补充受影响标识
+            if "a177" in rule_id:
+                affected = list(dict.fromkeys([*affected, "A17-7"]))
+            if "consultation" in rule_id:
+                affected = list(dict.fromkeys([*affected, "A17-3", "A17-3-1"]))
             results.append(
                 ConsistencyResult(
                     rule_id=rule_id,
@@ -110,6 +140,12 @@ def check_consistency(
     return results
 
 
+def _ctx_flag(context: dict[str, Any], key: str) -> bool:
+    """读取 context 布尔标志；缺失视为 False。"""
+    val = context.get(key)
+    return bool(val)
+
+
 def _evaluate_condition(
     condition: str,
     source_content: str | None,
@@ -117,6 +153,7 @@ def _evaluate_condition(
     source_pattern: str | None,
     target_pattern: str | None,
     business_category: Optional[str],
+    context: dict[str, Any],
 ) -> bool:
     """根据 condition 字符串评估规则是否触发。"""
 
@@ -130,16 +167,32 @@ def _evaluate_condition(
             target_content, target_pattern
         )
 
+    if condition == "source_empty AND is_a_class_or_listed":
+        return _content_is_empty(source_content) and is_a_class_or_listed(business_category)
+
+    if condition == "source_filled AND NOT context.a177_signed":
+        return (not _content_is_empty(source_content)) and (
+            not _ctx_flag(context, "a177_signed")
+        )
+
+    if condition == "context.a173_has_content AND NOT context.a1731_closed":
+        return _ctx_flag(context, "a173_has_content") and (
+            not _ctx_flag(context, "a1731_closed")
+        )
+
     if condition.startswith("source_empty AND project.business_category"):
-        # 解析期望的 business_category 值
-        # 格式: source_empty AND project.business_category == '上市公司'
+        # 兼容旧规则: source_empty AND project.business_category == '上市公司'
         if business_category is None:
-            # business_category 为 null → 跳过此规则
             return False
         match = re.search(r"==\s*'([^']+)'", condition)
         if not match:
             return False
         expected_category = match.group(1)
+        # 「上市公司」规则同时接受 A 类编码
+        if expected_category in _LISTED_ALIASES:
+            return _content_is_empty(source_content) and is_a_class_or_listed(
+                business_category
+            )
         return _content_is_empty(source_content) and business_category == expected_category
 
     logger.warning("Unknown condition format: %s", condition)

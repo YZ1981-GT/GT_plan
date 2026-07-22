@@ -4,7 +4,7 @@
  * 验证 'm3-treasury-stock' componentType 在四个注册表中正确注册：
  * 1. htmlRendererRegistry（前端组件映射）
  * 2. VALID_COMPONENT_TYPES（后端 wp_classification_service.py）
- * 3. wp_code_overrides（M3/M3-1~M3-5 共6个映射，M3A→a-program-console）
+ * 3. wp_code_overrides（M3/M3-1~M3-5/M3A 共7个映射）
  * 4. RENDERER_DISPATCH（后端渲染策略）
  *
  * Spec: .kiro/specs/m3-treasury-stock/
@@ -24,7 +24,7 @@ import {
 
 const COMPONENT_TYPE = 'm3-treasury-stock'
 
-// M3/M3-1~M3-5 共6个wp_code应映射到m3-treasury-stock
+// M3/M3-1~M3-5/M3A 共7个wp_code应映射到m3-treasury-stock
 const EXPECTED_WP_CODES = [
   'M3',
   'M3-1',
@@ -32,6 +32,7 @@ const EXPECTED_WP_CODES = [
   'M3-3',
   'M3-4',
   'M3-5',
+  'M3A',
 ]
 
 describe('M3 库存股 — 注册契约测试', () => {
@@ -97,11 +98,7 @@ describe('M3 库存股 — 注册契约测试', () => {
       expect(overrides[wpCode]).toBe(COMPONENT_TYPE)
     })
 
-    it('M3A 映射为 a-program-console（程序表独立）', () => {
-      expect(overrides['M3A']).toBe('a-program-console')
-    })
-
-    it('覆盖完整性：共6个映射无遗漏', () => {
+    it('覆盖完整性：共7个映射无遗漏', () => {
       const m3Mappings = Object.entries(overrides).filter(
         ([, v]) => v === COMPONENT_TYPE
       )

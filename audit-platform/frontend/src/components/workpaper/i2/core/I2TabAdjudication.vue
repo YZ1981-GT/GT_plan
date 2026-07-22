@@ -1,237 +1,245 @@
 <template>
-  <div class="i2-adjudication">
-    <!-- Section Header -->
+  <div class="i2-adjudication" data-testid="i2-adjudication">
     <div class="section-header">
-      <span class="section-title">I2-1 审定表 — 开发支出审定(61公式)</span>
+      <span class="section-title">I2-1 开发支出审定表</span>
       <div class="section-actions">
-        <el-button size="small" type="default" text @click="handleReview">
-          复核
-        </el-button>
+        <el-button size="small" type="default" text @click="handleReview">复核</el-button>
       </div>
     </div>
 
-    <!-- 审计目标 -->
-    <el-alert type="info" :closable="false" class="objective-alert"
-      title="审计目标：核查开发支出(科目1717)期末余额的真实性、完整性与计价准确性，确认资本化归集及审定调整恰当。" />
+    <el-alert type="info" :closable="false" show-icon class="objective-alert">
+      <template #title>审计目标</template>
+      核查开发支出(1717)期初/期末余额的真实性与完整性；审定数＝未审数＋账项调整；与 TB 勾稽一致后回写试算并驱动附注披露。
+    </el-alert>
 
-    <!-- 编制提示 -->
-    <details class="guidance-details">
-      <summary>📋 编制提示</summary>
-      <div class="guidance-content">
-        <p>1. 复核期末余额=期初+本期增加(资本化)-本期减少(转无形/转费用)三角勾稽是否成立；</p>
-        <p>2. 核对审定数=未审数+AJE+RJE，确认调整分录依据充分、过账准确；</p>
-        <p>3. 依据 CAS6《无形资产》开发阶段资本化条件复核归集金额。</p>
-      </div>
-    </details>
-
-    <!-- 索引工具栏 -->
-    <div class="tab-toolbar">
-      <div class="toolbar-right">
-        <GtIndexChip value="wp:I2" :context-project-id="props.projectId" />
-        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
-      </div>
-    </div>
-
-    <!-- 方法论上下文 -->
     <div class="methodology-context">
-      <p><strong>三角勾稽原理：</strong>科目1717开发支出（借方/资产类）。</p>
-      <p>期末余额 = 期初余额 + 本期增加(资本化) - 本期减少(转无形资产) - 本期减少(转费用)</p>
-      <p>审定数 = 未审数 + AJE + RJE。三角勾稽差额≠0将红色高亮。</p>
+      <p>
+        <b>编制逻辑（对齐源表）：</b>
+        期初/期末各列「未审数 → 账项调整 → 审定数」；变动额＝期末审定−期初审定；变动率分母为 0 时显示 N/A。
+        合计与 TB 数据差异须为 0。项目明细优先自 I2-2 带入，期末调整可自 I2-3 分摊。
+        保存后发布 substantive:adjudicated，供附注自动刷新。
+      </p>
     </div>
 
-    <!-- TB取数显示区 -->
+    <div class="tab-toolbar">
+      <GtIndexChip value="wp:I2-1" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:I2-2" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:I2-3" :context-project-id="props.projectId" />
+      <el-tag size="small" type="info">项目 {{ rows.length }}</el-tag>
+      <el-tag size="small" type="success">期末审定 {{ fmtAmount(summary.endAudited) }}</el-tag>
+      <el-tag v-if="hasTbDiff" size="small" type="danger">与TB差异 {{ fmtAmount(tbDiff) }}</el-tag>
+      <el-tag v-else size="small" type="success">✓ TB一致</el-tag>
+      <el-button size="small" @click="emit('navigate-sheet', 'I2-2')">I2-2 →</el-button>
+      <el-button size="small" @click="emit('navigate-sheet', '附注上市')">附注 →</el-button>
+    </div>
+
     <div class="tb-display">
       <el-descriptions :column="4" border size="small">
-        <el-descriptions-item label="TB未审数(1717)">
-          {{ fmtAmount(tbData.unadjusted1717) }}
-        </el-descriptions-item>
-        <el-descriptions-item label="TB审定数(1717)">
-          {{ fmtAmount(tbData.audited1717) }}
-        </el-descriptions-item>
-        <el-descriptions-item label="AJE(1717)">
-          {{ fmtAmount(tbData.aje1717) }}
-        </el-descriptions-item>
-        <el-descriptions-item label="RJE(1717)">
-          {{ fmtAmount(tbData.rje1717) }}
-        </el-descriptions-item>
+        <el-descriptions-item label="TB未审(1717)">{{ fmtAmount(tbData.unadjusted1717) }}</el-descriptions-item>
+        <el-descriptions-item label="TB审定(1717)">{{ fmtAmount(tbData.audited1717) }}</el-descriptions-item>
+        <el-descriptions-item label="AJE">{{ fmtAmount(tbData.aje1717) }}</el-descriptions-item>
+        <el-descriptions-item label="RJE">{{ fmtAmount(tbData.rje1717) }}</el-descriptions-item>
       </el-descriptions>
     </div>
 
-    <!-- 审定表 el-table -->
-    <el-table
-      :data="displayRows"
-      border
-      size="small"
-      :row-class-name="getRowClassName"
-      class="adjudication-table"
-    >
-      <el-table-column prop="projectName" label="项目" min-width="150" fixed>
+    <div class="action-bar">
+      <el-button size="small" type="primary" plain :disabled="isReadonly" data-testid="i2-1-seed-i22" @click="handleSeedI22">从 I2-2 带入</el-button>
+      <el-button size="small" plain :disabled="isReadonly" @click="handleSyncI23">从 I2-3 同步调整</el-button>
+      <el-button size="small" plain :disabled="isReadonly" @click="handleApplyTb">TB写入汇总行</el-button>
+      <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleAddRow">+ 新增项目</el-button>
+      <el-button size="small" type="success" :disabled="isReadonly" data-testid="i2-1-save" @click="handleSave">保存并回写</el-button>
+    </div>
+
+    <el-alert
+      v-if="hasAjeApprox"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="aje-approx-alert"
+      title="系统近似分摊：部分期末调整按期末未审占比分摊自 I2-3，请按项目人工复核后改数（改后自动清除「近似」标记）"
+    />
+
+    <el-table :data="displayRows" border size="small" class="adjudication-table" :row-class-name="rowClassName" max-height="520">
+      <el-table-column prop="projectName" label="项目" min-width="130" fixed>
         <template #default="{ row }">
-          <span :class="{ 'total-text': row._isTotal }">{{ row.projectName }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column prop="cipBegin" label="期初余额" min-width="120" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number
-            v-if="!row._isTotal"
-            :model-value="row.cipBegin"
-            size="small"
-            :controls="false"
-            @change="(v: number) => onFieldChange($index, 'cipBegin', v)"
-          />
-          <span v-else class="total-text">{{ fmtAmount(row.cipBegin) }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column prop="increaseCapitalized" label="本期增加(资本化)" min-width="140" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number
-            v-if="!row._isTotal"
-            :model-value="row.increaseCapitalized"
-            size="small"
-            :controls="false"
-            @change="(v: number) => onFieldChange($index, 'increaseCapitalized', v)"
-          />
-          <span v-else class="total-text">{{ fmtAmount(row.increaseCapitalized) }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column prop="decreaseTransfer" label="本期减少(转无形)" min-width="140" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number
-            v-if="!row._isTotal"
-            :model-value="row.decreaseTransfer"
-            size="small"
-            :controls="false"
-            @change="(v: number) => onFieldChange($index, 'decreaseTransfer', v)"
-          />
-          <span v-else class="total-text">{{ fmtAmount(row.decreaseTransfer) }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column prop="decreaseExpense" label="本期减少(转费用)" min-width="140" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number
-            v-if="!row._isTotal"
-            :model-value="row.decreaseExpense"
-            size="small"
-            :controls="false"
-            @change="(v: number) => onFieldChange($index, 'decreaseExpense', v)"
-          />
-          <span v-else class="total-text">{{ fmtAmount(row.decreaseExpense) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 公式列：期末余额 -->
-      <el-table-column label="期末余额(公式)" min-width="130" align="right">
-        <template #header>
-          <el-tooltip content="期末 = 期初 + 增加(资本化) - 减少(转无形) - 减少(转费用)" placement="top">
-            <span class="formula-col-header">期末余额</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <span :class="['formula-value', { 'total-text': row._isTotal }]">
-            {{ fmtAmount(row.cipEnd) }}
-          </span>
-        </template>
-      </el-table-column>
-
-      <el-table-column prop="unadjusted" label="未审数" min-width="120" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number
-            v-if="!row._isTotal"
-            :model-value="row.unadjusted"
-            size="small"
-            :controls="false"
-            @change="(v: number) => onFieldChange($index, 'unadjusted', v)"
-          />
-          <span v-else class="total-text">{{ fmtAmount(row.unadjusted) }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column prop="aje" label="AJE" min-width="100" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number
-            v-if="!row._isTotal"
-            :model-value="row.aje"
-            size="small"
-            :controls="false"
-            @change="(v: number) => onFieldChange($index, 'aje', v)"
-          />
-          <span v-else class="total-text">{{ fmtAmount(row.aje) }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column prop="rje" label="RJE" min-width="100" align="right">
-        <template #default="{ row, $index }">
-          <el-input-number
-            v-if="!row._isTotal"
-            :model-value="row.rje"
-            size="small"
-            :controls="false"
-            @change="(v: number) => onFieldChange($index, 'rje', v)"
-          />
-          <span v-else class="total-text">{{ fmtAmount(row.rje) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 公式列：审定数 -->
-      <el-table-column label="审定数(公式)" min-width="120" align="right">
-        <template #header>
-          <el-tooltip content="审定数 = 未审数 + AJE + RJE" placement="top">
-            <span class="formula-col-header">审定数</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <span :class="['formula-value', { 'total-text': row._isTotal }]">
-            {{ fmtAmount(row.audited) }}
-          </span>
-        </template>
-      </el-table-column>
-
-      <el-table-column prop="remark" label="备注" min-width="150">
-        <template #default="{ row, $index }">
           <el-input
-            v-if="!row._isTotal"
-            :model-value="row.remark"
+            v-if="!row._footer && !isReadonly"
+            :model-value="row.projectName"
             size="small"
-            @change="(v: string) => onFieldChange($index, 'remark', v)"
+            @change="(v: string) => updateRow(row.rowId, 'projectName', v)"
           />
+          <span v-else :class="{ 'footer-text': row._footer }">{{ row.projectName }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="期初数" align="center">
+        <el-table-column label="未审数" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!row._footer && !isReadonly"
+              :model-value="row.beginUnadj"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width:100%"
+              @change="(v: number) => updateRow(row.rowId, 'beginUnadj', v ?? 0)"
+            />
+            <span v-else :class="{ 'footer-text': row._footer }">{{ fmtAmount(row.beginUnadj) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账项调整" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!row._footer && !isReadonly"
+              :model-value="row.beginAdj"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width:100%"
+              @change="(v: number) => updateRow(row.rowId, 'beginAdj', v ?? 0)"
+            />
+            <span v-else :class="{ 'footer-text': row._footer }">{{ fmtAmount(row.beginAdj) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="审定数" width="110" align="right">
+          <template #default="{ row }">
+            <span class="formula-value">{{ fmtAmount(row.beginAudited) }}</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <el-table-column label="期末数" align="center">
+        <el-table-column label="未审数" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!row._footer && !isReadonly"
+              :model-value="row.endUnadj"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width:100%"
+              @change="(v: number) => updateRow(row.rowId, 'endUnadj', v ?? 0)"
+            />
+            <span v-else :class="{ 'footer-text': row._footer, 'warn-diff': row.projectName === '差异' && hasTbDiff }">
+              {{ row.projectName === '差异' ? fmtAmount(summary.endUnadj - (tbData.unadjusted1717 || 0)) : fmtAmount(row.endUnadj) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账项调整" width="130" align="right">
+          <template #default="{ row }">
+            <div v-if="!row._footer && !isReadonly" class="adj-cell">
+              <el-input-number
+                :model-value="row.endAdj"
+                size="small"
+                :controls="false"
+                :precision="2"
+                style="width:100%"
+                @change="(v: number) => updateRow(row.rowId, 'endAdj', v ?? 0)"
+              />
+              <el-tag v-if="row.ajeApprox" size="small" type="warning" effect="plain">近似</el-tag>
+            </div>
+            <template v-else>
+              <span :class="{ 'footer-text': row._footer }">{{ fmtAmount(row.endAdj) }}</span>
+              <el-tag v-if="row.ajeApprox" size="small" type="warning" effect="plain">近似</el-tag>
+            </template>
+          </template>
+        </el-table-column>
+        <el-table-column label="审定数" width="110" align="right">
+          <template #default="{ row }">
+            <span
+              class="formula-value"
+              :class="{ 'warn-diff': row.projectName === '差异' && hasTbDiff }"
+            >
+              {{ row.projectName === '差异' ? fmtAmount(tbDiff) : fmtAmount(row.endAudited) }}
+            </span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <el-table-column label="本期审定与上期比较" align="center">
+        <el-table-column label="变动额" width="110" align="right">
+          <template #header>
+            <el-tooltip content="变动额 = 期末审定 − 期初审定" placement="top">
+              <span class="formula-col-header">变动额</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <span class="formula-value">{{ fmtAmount(row.changeAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="变动率" width="90" align="right">
+          <template #header>
+            <el-tooltip content="变动率 = 变动额 ÷ 期初审定（期初为0时 N/A）" placement="top">
+              <span class="formula-col-header">变动率</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <span class="formula-value">{{ formatChangeRate(row.changeRate) }}</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <el-table-column label="原因分析" min-width="140">
+        <template #default="{ row }">
+          <el-input
+            v-if="!row._footer && !isReadonly"
+            :model-value="row.reasonAnalysis"
+            size="small"
+            placeholder="重大变动原因…"
+            @change="(v: string) => updateRow(row.rowId, 'reasonAnalysis', v)"
+          />
+          <span v-else>{{ row.reasonAnalysis || '' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column v-if="!isReadonly" label="" width="52" fixed="right" align="center">
+        <template #default="{ row }">
+          <el-button v-if="!row._footer" size="small" type="danger" text @click="removeRow(row.rowId)">删</el-button>
         </template>
       </el-table-column>
     </el-table>
 
-    <!-- 操作按钮 -->
-    <div class="table-actions">
-      <el-button size="small" type="primary" plain @click="handleAddRow">
-        + 新增项目
-      </el-button>
-      <el-button size="small" type="success" @click="handleSave">
-        保存
-      </el-button>
-    </div>
-
-    <!-- 审计说明 -->
     <el-card shadow="never" class="audit-note-card">
-      <template #header><span>审计说明</span></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly" :autosize="{ minRows: 5 }" placeholder="记录审计过程、发现的问题及处理..." @change="saveAuditNote" />
+      <template #header><span>1、审计说明</span></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 4 }"
+        placeholder="记录重大事项、特别风险、调整分录索引（CAS 1131）…"
+        @change="(v: string) => saveAuditField('note', v)"
+      />
+      <details class="tips">
+        <summary>提示（编制审计说明时可参考）</summary>
+        <ul>
+          <li>记录识别的特别风险、重大异常交易、关联方及会计估计相关事项；</li>
+          <li>逐项列示审计调整并交叉索引至 I2-3 / 支持性底稿；</li>
+          <li>说明与 TB、明细表、附注披露的勾稽结果。</li>
+        </ul>
+      </details>
     </el-card>
+
     <el-card shadow="never" class="audit-conclusion-card">
-      <template #header><span>审计结论</span></template>
-      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly" :autosize="{ minRows: 3 }" placeholder="填写审计结论..." @change="saveAuditConclusion" />
+      <template #header><span>2、审计结论</span></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="开发支出在重大方面是否公允反映…"
+        @change="(v: string) => saveAuditField('conclusion', v)"
+      />
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, onMounted, watch } from 'vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
-import { useI2Adjudication, type AdjudicationRow } from '../../composables/useI2Adjudication'
-import type { I2TbData } from '../../composables/useI2FormData'
+import { computed, inject } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
-
-// ─── Props & Emits ───────────────────────────────────────────────────────────
+import { useI2Adjudication, formatChangeRate } from '../../composables/useI2Adjudication'
+import type { I2TbData } from '../../composables/useI2FormData'
+import http from '@/utils/http'
 
 const props = defineProps<{
   sheetName: string
@@ -242,205 +250,143 @@ const props = defineProps<{
   isReadonly?: boolean
 }>()
 
-const emit = defineEmits<{
-  'save': []
-  'navigate-sheet': [sheetName: string]
-}>()
-
-// ─── Inject ──────────────────────────────────────────────────────────────────
-
+const emit = defineEmits<{ save: []; 'navigate-sheet': [sheetName: string] }>()
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
-
-// ─── TB Data (from parent via allResponses) ──────────────────────────────────
 
 const tbData = computed<I2TbData>(() => {
   const raw = props.allResponses.get('I2-tb-data')
-  return {
-    unadjusted1717: Number(raw?.unadjusted1717) || 0,
-    audited1717: Number(raw?.audited1717) || 0,
-    aje1717: Number(raw?.aje1717) || 0,
-    rje1717: Number(raw?.rje1717) || 0,
+  if (raw && typeof raw === 'object') {
+    const o = typeof (raw as any).remark === 'string'
+      ? (() => { try { return JSON.parse((raw as any).remark) } catch { return raw } })()
+      : raw
+    return {
+      unadjusted1717: Number((o as any).unadjusted1717) || 0,
+      audited1717: Number((o as any).audited1717) || 0,
+      aje1717: Number((o as any).aje1717) || 0,
+      rje1717: Number((o as any).rje1717) || 0,
+    }
   }
+  return { unadjusted1717: 0, audited1717: 0, aje1717: 0, rje1717: 0 }
 })
-
-// ─── Composable ──────────────────────────────────────────────────────────────
 
 const allResponsesRef = computed(() => props.allResponses)
 const tbDataRef = computed(() => tbData.value)
 
+async function writebackTb(auditedAmount: number) {
+  if (!props.wpId || !props.projectId) return
+  try {
+    await http.post(`/workpapers/${props.wpId}/writeback-trial-balance`, {
+      project_id: props.projectId,
+      account_code: '1717',
+      audited_amount: auditedAmount,
+    })
+  } catch {
+    // 部分环境无此接口：静默，仍保留本地审定事件
+  }
+}
+
 const {
-  rows,
-  totalRow,
-  reconciliationErrors,
-  hasErrors,
-  addRow,
-  removeRow,
-  updateRow,
-  save: saveData,
+  rows, auditNote, auditConclusion, summary,
+  totalRow, tbRow, diffRow, tbDiff, hasTbDiff, hasAjeApprox,
+  addRow, removeRow, updateRow,
+  seedFromDetail, syncAjeFromI23, applyTbToUnadj,
+  save, saveAuditField,
 } = useI2Adjudication({
   allResponses: allResponsesRef,
   tbData: tbDataRef,
   saveResponses: props.saveResponse,
+  onAfterSave: async (s) => { await writebackTb(s.endAudited) },
 })
 
-// ─── Display Rows (data + total) ─────────────────────────────────────────────
+const displayRows = computed(() => [
+  ...rows.value.map((r) => ({ ...r, _footer: false })),
+  { ...totalRow.value, _footer: true },
+  { ...tbRow.value, _footer: true },
+  { ...diffRow.value, _footer: true },
+])
 
-const displayRows = computed(() => {
-  const dataRows = rows.value.map((r) => ({ ...r, _isTotal: false }))
-  const total = { ...totalRow.value, _isTotal: true }
-  return [...dataRows, total]
-})
-
-// ─── 审计说明 / 审计结论 ───
-const AUDIT_NOTE_KEY = 'I2-1-audit-note'
-const AUDIT_CONCLUSION_KEY = 'I2-1-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-function readRemark(key: string): string { const raw = props.allResponses.get(key); if (raw == null) return ''; return typeof raw === 'string' ? raw : (raw.remark ?? '') }
-function hydrateAudit() { auditNote.value = readRemark(AUDIT_NOTE_KEY); auditConclusion.value = readRemark(AUDIT_CONCLUSION_KEY) }
-function saveAuditNote(val: string) { auditNote.value = val; void props.saveResponse('I2-1', { [AUDIT_NOTE_KEY]: val }) }
-function saveAuditConclusion(val: string) { auditConclusion.value = val; void props.saveResponse('I2-1', { [AUDIT_CONCLUSION_KEY]: val }) }
-watch(() => props.allResponses, () => hydrateAudit(), { immediate: true })
-onMounted(hydrateAudit)
-
-// ─── Row Styling ─────────────────────────────────────────────────────────────
-
-function getRowClassName({ row }: { row: any }): string {
-  if (row._isTotal) return 'total-row'
-  const errors = reconciliationErrors.value
-  const idx = rows.value.findIndex((r) => r.projectName === row.projectName)
-  if (errors.some((e) => e.rowIndex === idx)) return 'reconciliation-error-row'
+function rowClassName({ row }: { row: any }) {
+  if (row.projectName === '合计') return 'total-row'
+  if (row.projectName === 'TB数据') return 'tb-row'
+  if (row.projectName === '差异') return hasTbDiff.value ? 'diff-row-error' : 'diff-row'
   return ''
 }
-
-// ─── Cell Change ─────────────────────────────────────────────────────────────
-
-function onFieldChange(displayIndex: number, field: string, value: any) {
-  // displayIndex includes total row at end, skip if total
-  if (displayIndex >= rows.value.length) return
-  updateRow(displayIndex, field, value ?? 0)
-}
-
-// ─── Add Row ─────────────────────────────────────────────────────────────────
 
 async function handleAddRow() {
   try {
     const { value } = await ElMessageBox.prompt('请输入研发项目名称', '新增项目', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
-      inputPlaceholder: '例如：XX智能平台开发',
+      inputPlaceholder: '例如：课题1 / 数据资源',
     })
     if (value?.trim()) {
       addRow(value.trim())
       ElMessage.success('已添加项目')
     }
-  } catch {
-    // cancelled
+  } catch { /* cancelled */ }
+}
+
+function handleSeedI22() {
+  const r = seedFromDetail()
+  if (r.ok) ElMessage.success(r.message)
+  else ElMessage.info(r.message)
+}
+
+function handleSyncI23() {
+  const r = syncAjeFromI23()
+  if (r.ok) {
+    if (r.approx) ElMessage.warning(r.message)
+    else ElMessage.success(r.message)
+  } else {
+    ElMessage.info(r.message)
   }
 }
 
-// ─── Save ────────────────────────────────────────────────────────────────────
+function handleApplyTb() {
+  const r = applyTbToUnadj()
+  if (r.ok) ElMessage.success(r.message)
+  else ElMessage.info(r.message)
+}
 
 async function handleSave() {
-  await saveData()
+  await save()
   emit('save')
-  ElMessage.success('审定表已保存')
+  ElMessage.success('审定表已保存，已尝试回写 TB 并通知附注')
 }
 
-// ─── Review ──────────────────────────────────────────────────────────────────
-
-function handleReview() {
-  openReviewDialog('I2-1-审定表')
-}
-
-// ─── Formatter ───────────────────────────────────────────────────────────────
+function handleReview() { openReviewDialog('I2-1-审定表') }
 
 function fmtAmount(value: number | null | undefined): string {
-  if (value == null) return '-'
-  if (Math.abs(value) < 0.005) return '-'
+  if (value == null || Number.isNaN(value)) return '—'
+  if (Math.abs(value) < 0.005) return '—'
   return value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 </script>
 
 <style scoped>
-.i2-adjudication {
-  font-size: var(--wp-font-size, 13px);
-  padding: 16px;
-}
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.section-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #1f2937;
-}
-.section-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
+.i2-adjudication { font-size: var(--wp-font-size, 13px); padding: 16px; }
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.section-title { font-size: 15px; font-weight: 600; color: #1f2937; }
+.objective-alert { margin-bottom: 10px; }
 .methodology-context {
-  border-left: 4px solid #d97706;
-  background: #fffbeb;
-  padding: 10px 14px;
-  margin-bottom: 14px;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #92400e;
-  line-height: 1.7;
+  border-left: 4px solid #d97706; background: #fffbeb; padding: 10px 14px;
+  margin-bottom: 12px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.7;
 }
-.methodology-context p { margin: 0; }
-.methodology-context strong { color: #78350f; }
-.tb-display {
-  margin-bottom: 14px;
-}
-.adjudication-table {
-  font-size: var(--wp-font-size, 13px);
-  margin-bottom: 12px;
-}
-.formula-col-header {
-  border-bottom: 1px dashed #909399;
-  cursor: help;
-}
-.formula-value {
-  border-bottom: 1px dashed #c0c4cc;
-  cursor: help;
-  color: #409eff;
-}
-.total-text {
-  font-weight: 600;
-  color: #303133;
-}
-.table-actions {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.audit-note-card {
-  margin-top: 16px;
-}
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-:deep(.total-row) {
-  background-color: #f5f7fa !important;
-  font-weight: 600;
-}
-:deep(.reconciliation-error-row) {
-  background-color: #fef2f2 !important;
-}
-.objective-alert { margin-bottom: 12px; }
-.guidance-details { margin-bottom: 12px; font-size: 12px; color: var(--el-text-color-secondary); background: #f9fafb; border: 1px solid #ebeef5; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 600; color: #374151; }
-.guidance-details .guidance-content { margin-top: 8px; line-height: 1.7; }
-.guidance-details .guidance-content p { margin: 0 0 4px; }
-.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 10px; }
-.tab-toolbar .toolbar-right { display: flex; align-items: center; gap: 8px; }
-.audit-note-card, .audit-conclusion-card { margin-top: 16px; }
+.tab-toolbar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.tb-display { margin-bottom: 10px; }
+.action-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.aje-approx-alert { margin-bottom: 10px; }
+.adj-cell { display: flex; flex-direction: column; gap: 2px; align-items: stretch; }
+.adjudication-table { margin-bottom: 12px; }
+.formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
+.formula-value { color: #409eff; border-bottom: 1px dashed #c0c4cc; }
+.footer-text { font-weight: 600; }
+.warn-diff { color: #dc2626; font-weight: 700; }
+.audit-note-card, .audit-conclusion-card { margin-top: 14px; }
+.tips { margin-top: 8px; font-size: 12px; color: #1d4ed8; }
+.tips ul { margin: 4px 0 0; padding-left: 18px; }
+:deep(.total-row) { background: #f5f7fa !important; }
+:deep(.tb-row) { background: #eff6ff !important; }
+:deep(.diff-row) { background: #f0fdf4 !important; }
+:deep(.diff-row-error) { background: #fef2f2 !important; }
 </style>

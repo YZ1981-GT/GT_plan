@@ -1,83 +1,82 @@
 /**
  * useH2Stocktake — H2-12~14 监盘组 composable
  *
- * 计划/检查/小结三阶段共用状态
- * FixedAssetStocktakeDialog集成
- * 停工迹象自动标记 + 与H2-15减值联动
- *
- * Spec: .kiro/specs/h2-construction-in-progress/
- * Task: 3.13
- * Requirements: 11.1-11.6
+ * H2-12 对齐致同「在建工程监盘计划」并参照 H1-9：
+ * 风险 → 了解状况/内控/以前年度 → 胜任能力 → 计划安排 → 结论
+ * H2-13 对齐致同「在建工程盘点检查表」并参照 H1-10：
+ * 目标 → 样本 → 现场过程 → 双向抽盘 + 三数量差异 → 进度/转固/停工 → 说明/结论
+ * 停工线索与 H2-15 减值联动；账面金额可从 H2-2 带入
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import {
+  applyQtySideEffects,
+  calcDirectionCoverage,
+  calcRowDiffs,
+  createEmptyCheckMeta,
+  createEmptyCheckRow,
+  draftCheckSheetConclusion,
+  draftCheckSheetNote,
+  draftMetaFromPlan,
+  isStoppedCheckRow,
+  mapDetailRowsToCheckRows,
+  normalizeCheckMeta,
+  normalizeCheckRow,
+  sumDetailCipCost,
+  type H2StocktakeCheckMeta,
+  type H2StocktakeCheckRow,
+  type StocktakeDirection,
+} from './h2StocktakeCheckModel'
+import {
+  calcCategoryScopeTotals,
+  createEmptyPlanForm,
+  draftSampleQtyFromScopes,
+  newCategoryScopeRow,
+  newMajorProjectRow,
+  newSelectedProject,
+  normalizePlanForm,
+  recalcCategoryScopeRow,
+  recalcMajorProjectRow,
+  toLegacyPlan,
+  type H2LegacyStocktakePlan,
+  type H2StocktakePlanForm,
+  type PlanCategoryScopeRow,
+  type PlanMajorProjectRow,
+  type StocktakeProjectSelection,
+} from './h2StocktakePlanModel'
+import {
+  aggregateH22ToCategoryScopes,
+  applyRiskSuggestions,
+  calcPlanLogicWarningsEnhanced,
+  calcPlanVsCheckWarnings,
+  draftEndingBalanceNoteFromH22,
+  draftLocationScopeFromH22,
+  draftMajorProjectsFromH22,
+  draftPlanConclusion,
+  draftSelectedProjectsFromMajor,
+  extractPriorYearPlanHints,
+  getPlanGateBlockers,
+  isPlanReadyForCheck,
+  suggestCoverageByRisk,
+} from './h2StocktakePlanEnhance'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-/** H2-12 监盘计划 */
-export interface H2StocktakePlan {
-  /** 踏勘日期 */
-  inspectionDate: string
-  /** 工程地点 */
-  location: string
-  /** 参与人员 */
-  participants: string
-  /** 踏勘范围 */
-  scope: string
-  /** 选取的工程列表 */
-  selectedProjects: StocktakeProjectSelection[]
-  /** 时间安排 */
-  schedule: string
+export type {
+  H2StocktakeCheckMeta,
+  H2StocktakeCheckRow,
+  StocktakeDirection,
+  H2StocktakePlanForm,
+  StocktakeProjectSelection,
+  H2LegacyStocktakePlan,
 }
+export { isStoppedCheckRow }
 
-export interface StocktakeProjectSelection {
-  rowId: string
-  name: string
-  reason: string
-  plannedContent: string
-}
+/** @deprecated 兼容旧五字段；新逻辑请用 planForm */
+export type H2StocktakePlan = H2LegacyStocktakePlan
 
-/** H2-13 盘点检查表 */
-export interface H2StocktakeCheckRow {
-  rowId: string
-  /** 工程名称 */
-  name: string
-  /** 现场位置 */
-  siteLocation: string
-  /** 形象进度(%) */
-  visibleProgress: number | null
-  /** 施工状态 */
-  constructionStatus: '施工中' | '停工' | '完工' | ''
-  /** 施工人员情况 */
-  workers: string
-  /** 材料堆存 */
-  materialStorage: string
-  /** 设备状况 */
-  equipmentCondition: string
-  /** 安全措施 */
-  safetyMeasures: string
-  /** 工程质量观感 */
-  qualityAppearance: string
-  /** 照片附件 */
-  photos: string
-  /** 与账面进度差异 */
-  progressDifference: string
-  /** 审计结论 */
-  auditConclusion: string
-  /** 备注 */
-  remark: string
-}
-
-/** H2-14 监盘小结 */
 export interface H2StocktakeSummary {
-  /** 踏勘总体情况 */
   overallSituation: string
-  /** 异常工程清单 */
   abnormalProjects: StocktakeAbnormalItem[]
-  /** 监盘结论 */
   conclusion: string
-  /** 编制人 */
   preparedBy: string
-  /** 编制日期 */
   preparedDate: string
 }
 
@@ -93,8 +92,10 @@ export interface StocktakeAbnormalItem {
 
 const PLAN_KEY = 'H2-12-plan'
 const CHECK_ROWS_KEY = 'H2-13-rows'
+const CHECK_META_KEY = 'H2-13-meta'
 const SUMMARY_KEY = 'H2-14-summary'
 const NOTE_KEY = 'H2-stocktake-audit-note'
+const DETAIL_ROWS_KEY = 'H2-2-rows'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -103,22 +104,15 @@ export function useH2Stocktake(options: {
   projectId: Ref<string>
   allResponses: Ref<Map<string, any>>
   isReadonly: Ref<boolean>
-  /** 当前阶段（plan/check/summary），仅用于组件侧标识 */
   phase?: 'plan' | 'check' | 'summary'
   onSave?: (itemId: string, value: any) => void
 }) {
-  // ─── State ─────────────────────────────────────────────────────────────────
-
-  const plan = ref<H2StocktakePlan>({
-    inspectionDate: '',
-    location: '',
-    participants: '',
-    scope: '',
-    selectedProjects: [],
-    schedule: '',
-  })
+  const planForm = ref<H2StocktakePlanForm>(createEmptyPlanForm())
+  /** 兼容旧 UI / H2-13：由完整计划表推导 */
+  const plan = computed<H2LegacyStocktakePlan>(() => toLegacyPlan(planForm.value))
 
   const checkRows = ref<H2StocktakeCheckRow[]>([])
+  const checkMeta = ref<H2StocktakeCheckMeta>(createEmptyCheckMeta())
 
   const summary = ref<H2StocktakeSummary>({
     overallSituation: '',
@@ -130,13 +124,12 @@ export function useH2Stocktake(options: {
 
   const auditNote = ref('')
 
-  // ─── Helpers ───────────────────────────────────────────────────────────────
-
   function _getJson(itemId: string): any {
     const item = options.allResponses.value.get(itemId)
     if (!item) return null
     const raw = item.remark ?? item.conclusion
     if (!raw) return null
+    if (typeof raw === 'object') return raw
     try { return JSON.parse(raw) } catch { return null }
   }
 
@@ -145,53 +138,27 @@ export function useH2Stocktake(options: {
     return (item?.remark ?? item?.conclusion ?? '') as string
   }
 
-  // ─── Init ──────────────────────────────────────────────────────────────────
+  function _getDetailRows(): any[] {
+    const data = _getJson(DETAIL_ROWS_KEY)
+    return Array.isArray(data) ? data : []
+  }
 
   function initFromAllResponses(): void {
-    // H2-12 计划
     const planData = _getJson(PLAN_KEY)
     if (planData && typeof planData === 'object') {
-      plan.value = {
-        inspectionDate: planData.inspectionDate ?? '',
-        location: planData.location ?? '',
-        participants: planData.participants ?? '',
-        scope: planData.scope ?? '',
-        selectedProjects: Array.isArray(planData.selectedProjects)
-          ? planData.selectedProjects.map((p: any) => ({
-              rowId: p.rowId ?? `row-${Math.random().toString(36).slice(2, 10)}`,
-              name: p.name ?? '',
-              reason: p.reason ?? '',
-              plannedContent: p.plannedContent ?? '',
-            }))
-          : [],
-        schedule: planData.schedule ?? '',
-      }
+      planForm.value = normalizePlanForm(planData)
     }
 
-    // H2-13 检查表
     const checkData = _getJson(CHECK_ROWS_KEY)
     if (Array.isArray(checkData)) {
-      checkRows.value = checkData.map((r: any) => ({
-        rowId: r.rowId ?? `row-${Math.random().toString(36).slice(2, 10)}`,
-        name: r.name ?? '',
-        siteLocation: r.siteLocation ?? '',
-        visibleProgress: r.visibleProgress != null ? Number(r.visibleProgress) : null,
-        constructionStatus: r.constructionStatus ?? '',
-        workers: r.workers ?? '',
-        materialStorage: r.materialStorage ?? '',
-        equipmentCondition: r.equipmentCondition ?? '',
-        safetyMeasures: r.safetyMeasures ?? '',
-        qualityAppearance: r.qualityAppearance ?? '',
-        photos: r.photos ?? '',
-        progressDifference: r.progressDifference ?? '',
-        auditConclusion: r.auditConclusion ?? '',
-        remark: r.remark ?? '',
-      }))
+      checkRows.value = checkData.map((r: any, i: number) => normalizeCheckRow(r, i))
     } else {
       checkRows.value = []
     }
 
-    // H2-14 小结
+    const metaData = _getJson(CHECK_META_KEY)
+    checkMeta.value = normalizeCheckMeta(metaData)
+
     const summaryData = _getJson(SUMMARY_KEY)
     if (summaryData && typeof summaryData === 'object') {
       summary.value = {
@@ -218,90 +185,431 @@ export function useH2Stocktake(options: {
 
   // ─── Computed ──────────────────────────────────────────────────────────────
 
-  /** 停工工程列表（红色高亮,与H2-15减值联动） */
+  const bookToFloorRows = computed(() =>
+    checkRows.value.filter((r) => r.direction === 'bookToFloor'),
+  )
+  const floorToBookRows = computed(() =>
+    checkRows.value.filter((r) => r.direction === 'floorToBook'),
+  )
+
+  const bookToFloorCoverage = computed(() =>
+    calcDirectionCoverage(bookToFloorRows.value, checkMeta.value.totalBookCost),
+  )
+  const floorToBookCoverage = computed(() =>
+    calcDirectionCoverage(floorToBookRows.value, checkMeta.value.totalBookCost),
+  )
+
   const stoppedProjects: ComputedRef<H2StocktakeCheckRow[]> = computed(() =>
-    checkRows.value.filter(r => r.constructionStatus === '停工'),
+    checkRows.value.filter(isStoppedCheckRow),
   )
-
-  /** 停工工程名称列表（供H2-15取数） */
   const stoppedProjectNames: ComputedRef<string[]> = computed(() =>
-    stoppedProjects.value.map(r => r.name),
+    stoppedProjects.value.map((r) => r.name).filter(Boolean),
   )
 
-  /** 检查完成统计 */
-  const checkStats = computed(() => ({
-    total: checkRows.value.length,
-    inProgress: checkRows.value.filter(r => r.constructionStatus === '施工中').length,
-    stopped: stoppedProjects.value.length,
-    completed: checkRows.value.filter(r => r.constructionStatus === '完工').length,
-  }))
+  const readyForUseProjects = computed(() =>
+    checkRows.value.filter((r) => r.readyForUse === '是'),
+  )
+
+  const checkStats = computed(() => {
+    const total = checkRows.value.length
+    const matchCount = checkRows.value.filter((r) => r.result === '账实相符').length
+    const surplusCount = checkRows.value.filter((r) => r.result === '盘盈').length
+    const deficitCount = checkRows.value.filter((r) => r.result === '盘亏').length
+    const varianceCount = checkRows.value.filter((r) => calcRowDiffs(r).hasVariance).length
+    return {
+      total,
+      inProgress: checkRows.value.filter((r) => r.constructionStatus === '施工中').length,
+      stopped: stoppedProjects.value.length,
+      completed: checkRows.value.filter((r) => r.constructionStatus === '完工' || r.readyForUse === '是').length,
+      matchCount,
+      surplusCount,
+      deficitCount,
+      varianceCount,
+      matchRate: total > 0 ? (matchCount / total) * 100 : 0,
+      readyForUseCount: readyForUseProjects.value.length,
+    }
+  })
+
+  const planScopeTotals = computed(() => calcCategoryScopeTotals(planForm.value.categoryScopes))
+  const planLogicWarnings = computed(() => calcPlanLogicWarningsEnhanced(planForm.value))
+  const planGateBlockers = computed(() => getPlanGateBlockers(planForm.value))
+  const planReadyForCheck = computed(() => isPlanReadyForCheck(planForm.value))
+  const riskSuggestion = computed(() => suggestCoverageByRisk(planForm.value.existenceRiskLevel))
+  const planVsCheckWarnings = computed(() => {
+    const checkedAmount = checkRows.value.reduce((s, r) => s + (Number(r.bookAmount) || 0), 0)
+    return calcPlanVsCheckWarnings(planForm.value, {
+      bookToFloorCount: bookToFloorRows.value.length,
+      floorToBookCount: floorToBookRows.value.length,
+      checkedAmount,
+    })
+  })
+
+  // ─── Persist ───────────────────────────────────────────────────────────────
+
+  function _persistPlanForm(): void {
+    options.onSave?.(PLAN_KEY, planForm.value)
+  }
+
+  function _persistCheck(): void {
+    options.onSave?.(CHECK_ROWS_KEY, checkRows.value.map((r) => ({
+      rowId: r.rowId,
+      seq: r.seq,
+      direction: r.direction,
+      name: r.name,
+      projectName: r.name, // 兼容导入导出 / 减值旧键
+      assetNo: r.assetNo,
+      projectCode: r.assetNo,
+      location: r.location,
+      siteLocation: r.location,
+      unit: r.unit,
+      unitPrice: r.unitPrice,
+      bookQty: r.bookQty,
+      bookAmount: r.bookAmount,
+      bookValue: r.bookAmount,
+      clientCountQty: r.clientCountQty,
+      sampleQty: r.sampleQty,
+      result: r.result,
+      stocktakeResult: r.result,
+      diffReason: r.diffReason,
+      diffAmount: r.diffAmount,
+      progressDesc: r.progressDesc,
+      readyForUse: r.readyForUse,
+      stopDuration: r.stopDuration,
+      stopReason: r.stopReason,
+      constructionStatus: r.constructionStatus,
+      isStopped: isStoppedCheckRow(r) ? '是' : '否',
+      visibleProgress: r.visibleProgress,
+      remark: r.remark,
+      checker: r.checker,
+      photoUrl: r.photoUrl,
+      photos: r.photoUrl,
+      // 兼容旧 UI 残留字段（读时已归一，写回空串避免丢键）
+      progressDifference: r.progressDesc,
+      auditConclusion: r.result,
+    })))
+  }
+
+  function _persistMeta(): void {
+    options.onSave?.(CHECK_META_KEY, checkMeta.value)
+  }
 
   // ─── Actions: Plan ─────────────────────────────────────────────────────────
 
-  function updatePlan(field: keyof H2StocktakePlan, value: any): void {
+  function persistPlanForm(): void {
     if (options.isReadonly.value) return
-    if (field === 'selectedProjects') {
-      plan.value.selectedProjects = Array.isArray(value) ? value : []
-    } else {
-      ;(plan.value as any)[field] = String(value ?? '')
+    _persistPlanForm()
+  }
+
+  /** @deprecated 兼容旧调用；优先 persistPlanForm / 直接改 planForm */
+  function updatePlan(field: keyof H2LegacyStocktakePlan | keyof H2StocktakePlanForm, value: any): void {
+    if (options.isReadonly.value) return
+    const legacyMap: Record<string, keyof H2StocktakePlanForm> = {
+      inspectionDate: 'plannedDate',
+      location: 'locationScopeNote',
+      participants: 'plannedLead',
+      scope: 'methodDetail',
+      schedule: 'plannedTimeNote',
     }
-    options.onSave?.(PLAN_KEY, plan.value)
+    const key = (legacyMap[field as string] || field) as keyof H2StocktakePlanForm
+    if (key === 'selectedProjects') {
+      planForm.value.selectedProjects = Array.isArray(value) ? value : []
+    } else {
+      ;(planForm.value as any)[key] = value
+    }
+    _persistPlanForm()
   }
 
   function addPlanProject(name: string): void {
     if (options.isReadonly.value) return
-    plan.value.selectedProjects.push({
-      rowId: `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    planForm.value.selectedProjects.push(newSelectedProject({
       name: name || '',
-      reason: '',
-      plannedContent: '',
-    })
-    options.onSave?.(PLAN_KEY, plan.value)
+    }))
+    _persistPlanForm()
   }
 
   function removePlanProject(rowId: string): void {
     if (options.isReadonly.value) return
-    const idx = plan.value.selectedProjects.findIndex(p => p.rowId === rowId)
+    const idx = planForm.value.selectedProjects.findIndex((p) => p.rowId === rowId)
     if (idx !== -1) {
-      plan.value.selectedProjects.splice(idx, 1)
-      options.onSave?.(PLAN_KEY, plan.value)
+      planForm.value.selectedProjects.splice(idx, 1)
+      _persistPlanForm()
     }
   }
 
-  // ─── Actions: Check ────────────────────────────────────────────────────────
-
-  function addCheckRow(name: string): void {
+  function addCategoryScope(partial?: Partial<PlanCategoryScopeRow>): void {
     if (options.isReadonly.value) return
-    checkRows.value.push({
-      rowId: `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      name: name || '',
-      siteLocation: '', visibleProgress: null, constructionStatus: '',
-      workers: '', materialStorage: '', equipmentCondition: '',
-      safetyMeasures: '', qualityAppearance: '', photos: '',
-      progressDifference: '', auditConclusion: '', remark: '',
-    })
+    planForm.value.categoryScopes.push(
+      newCategoryScopeRow({ ...partial, seq: planForm.value.categoryScopes.length + 1 }),
+    )
+    _persistPlanForm()
+  }
+
+  function removeCategoryScope(rowId: string): void {
+    if (options.isReadonly.value) return
+    planForm.value.categoryScopes = planForm.value.categoryScopes
+      .filter((r) => r.rowId !== rowId)
+      .map((r, i) => ({ ...r, seq: i + 1 }))
+    _persistPlanForm()
+  }
+
+  function updateCategoryScope(rowId: string, patch: Partial<PlanCategoryScopeRow>): void {
+    if (options.isReadonly.value) return
+    const row = planForm.value.categoryScopes.find((r) => r.rowId === rowId)
+    if (!row) return
+    Object.assign(row, recalcCategoryScopeRow({ ...row, ...patch }))
+    _persistPlanForm()
+  }
+
+  function addMajorProject(partial?: Partial<PlanMajorProjectRow>): void {
+    if (options.isReadonly.value) return
+    planForm.value.majorProjects.push(
+      newMajorProjectRow({ ...partial, seq: planForm.value.majorProjects.length + 1 }),
+    )
+    _persistPlanForm()
+  }
+
+  function removeMajorProject(rowId: string): void {
+    if (options.isReadonly.value) return
+    planForm.value.majorProjects = planForm.value.majorProjects
+      .filter((r) => r.rowId !== rowId)
+      .map((r, i) => ({ ...r, seq: i + 1 }))
+    _persistPlanForm()
+  }
+
+  function updateMajorProject(rowId: string, patch: Partial<PlanMajorProjectRow>): void {
+    if (options.isReadonly.value) return
+    const row = planForm.value.majorProjects.find((r) => r.rowId === rowId)
+    if (!row) return
+    Object.assign(row, recalcMajorProjectRow({ ...row, ...patch }))
+    _persistPlanForm()
+  }
+
+  function draftPlanSampleQty(): void {
+    if (options.isReadonly.value) return
+    const d = draftSampleQtyFromScopes(planForm.value.categoryScopes)
+    if (planForm.value.sampleBookToFloorQty == null) {
+      planForm.value.sampleBookToFloorQty = d.sampleBookToFloorQty
+    }
+    if (planForm.value.sampleFloorToBookQty == null) {
+      planForm.value.sampleFloorToBookQty = d.sampleFloorToBookQty
+    }
+    _persistPlanForm()
+  }
+
+  function importFromH22(opts?: { seedSelected?: boolean }): {
+    categories: number
+    majors: number
+    locations: number
+  } {
+    if (options.isReadonly.value) return { categories: 0, majors: 0, locations: 0 }
+    const detail = _getDetailRows()
+    if (!detail.length) return { categories: 0, majors: 0, locations: 0 }
+
+    planForm.value.categoryScopes = aggregateH22ToCategoryScopes(detail, planForm.value.categoryScopes)
+    const majors = draftMajorProjectsFromH22(detail)
+    if (majors.length) planForm.value.majorProjects = majors
+
+    const note = draftEndingBalanceNoteFromH22(detail)
+    if (note && !planForm.value.endingBalanceNote) planForm.value.endingBalanceNote = note
+
+    const locNote = draftLocationScopeFromH22(detail)
+    if (locNote && !planForm.value.locationScopeNote) planForm.value.locationScopeNote = locNote
+
+    if (opts?.seedSelected !== false && !planForm.value.selectedProjects.length && majors.length) {
+      planForm.value.selectedProjects = draftSelectedProjectsFromMajor(majors)
+    }
+
+    _persistPlanForm()
+    return {
+      categories: planForm.value.categoryScopes.length,
+      majors: planForm.value.majorProjects.length,
+      locations: locNote ? locNote.split('、').length : 0,
+    }
+  }
+
+  function applyRiskSampleSuggestions(opts?: { overwrite?: boolean }): void {
+    if (options.isReadonly.value) return
+    planForm.value = applyRiskSuggestions(planForm.value, opts)
+    _persistPlanForm()
+  }
+
+  function fillPlanConclusionDraft(opts?: { overwrite?: boolean }): void {
+    if (options.isReadonly.value) return
+    const draft = draftPlanConclusion(planForm.value)
+    if (opts?.overwrite || !planForm.value.planConclusion) {
+      planForm.value.planConclusion = draft
+      _persistPlanForm()
+    }
+  }
+
+  function mergePriorYearHints(priorForm: Partial<H2StocktakePlanForm> | null | undefined): number {
+    if (options.isReadonly.value) return 0
+    const hints = extractPriorYearPlanHints(priorForm)
+    let n = 0
+    for (const [key, v] of Object.entries(hints) as [keyof H2StocktakePlanForm, any][]) {
+      if (v && !planForm.value[key]) {
+        ;(planForm.value as any)[key] = v
+        n++
+      }
+    }
+    if (n) _persistPlanForm()
+    return n
+  }
+
+  // ─── Actions: Check meta / rows ────────────────────────────────────────────
+
+  function updateCheckMeta(field: keyof H2StocktakeCheckMeta, value: any): void {
+    if (options.isReadonly.value) return
+    if (field === 'totalBookCost') {
+      checkMeta.value.totalBookCost = value == null || value === '' ? null : Number(value) || 0
+    } else {
+      ;(checkMeta.value as any)[field] = String(value ?? '')
+    }
+    _persistMeta()
+  }
+
+  function syncCheckMetaFromPlan(): void {
+    if (options.isReadonly.value) return
+    checkMeta.value = draftMetaFromPlan(checkMeta.value, plan.value)
+    _persistMeta()
+  }
+
+  function addCheckRow(name: string, direction: StocktakeDirection = 'bookToFloor'): void {
+    if (options.isReadonly.value) return
+    const seq = checkRows.value.filter((r) => r.direction === direction).length + 1
+    checkRows.value.push(createEmptyCheckRow(direction, seq, name || ''))
     _persistCheck()
   }
 
   function removeCheckRow(rowId: string): void {
     if (options.isReadonly.value) return
-    const idx = checkRows.value.findIndex(r => r.rowId === rowId)
+    const idx = checkRows.value.findIndex((r) => r.rowId === rowId)
     if (idx !== -1) {
       checkRows.value.splice(idx, 1)
       _persistCheck()
     }
   }
 
-  function updateCheckRow(rowId: string, field: string, value: any): void {
+  function updateCheckRow(rowId: string, patch: Partial<H2StocktakeCheckRow> | string, value?: any): void {
     if (options.isReadonly.value) return
-    const row = checkRows.value.find(r => r.rowId === rowId)
+    const row = checkRows.value.find((r) => r.rowId === rowId)
     if (!row) return
-    if (field === 'visibleProgress') {
-      row.visibleProgress = value != null ? Number(value) : null
+
+    // 兼容旧签名 updateCheckRow(rowId, field, value)
+    if (typeof patch === 'string') {
+      const field = patch
+      if (field === 'visibleProgress') {
+        row.visibleProgress = value != null && value !== '' ? Number(value) : null
+      } else if (['unitPrice', 'bookQty', 'bookAmount', 'clientCountQty', 'sampleQty', 'diffAmount'].includes(field)) {
+        ;(row as any)[field] = value != null && value !== '' ? Number(value) : 0
+      } else {
+        ;(row as any)[field] = value ?? ''
+      }
     } else {
-      ;(row as any)[field] = String(value ?? '')
+      Object.assign(row, patch)
     }
+
+    applyQtySideEffects(row)
     _persistCheck()
+  }
+
+  function importCheckRowsFromDetail(opts?: { maxRows?: number }): { imported: number } {
+    if (options.isReadonly.value) return { imported: 0 }
+    const detail = _getDetailRows().filter((d) => d && !String(d.name ?? '').includes('合计'))
+    const mapped = mapDetailRowsToCheckRows(detail, {
+      direction: 'bookToFloor',
+      maxRows: opts?.maxRows ?? 50,
+    })
+    const existing = new Set(checkRows.value.map((r) => r.name.trim()).filter(Boolean))
+    let imported = 0
+    for (const row of mapped) {
+      if (existing.has(row.name.trim())) continue
+      checkRows.value.push(row)
+      existing.add(row.name.trim())
+      imported++
+    }
+    if (imported) _persistCheck()
+    return { imported }
+  }
+
+  function importCheckRowsFromPlan(): { imported: number } {
+    if (options.isReadonly.value) return { imported: 0 }
+    const detail = _getDetailRows()
+    const detailByName = new Map(
+      detail.map((d) => [String(d.name ?? '').trim(), d]),
+    )
+    const existing = new Set(checkRows.value.map((r) => r.name.trim()).filter(Boolean))
+    let imported = 0
+    let seq = bookToFloorRows.value.length
+    for (const p of planForm.value.selectedProjects) {
+      const name = String(p.name ?? '').trim()
+      if (!name || existing.has(name)) continue
+      seq++
+      const row = createEmptyCheckRow('bookToFloor', seq, name)
+      const d = detailByName.get(name)
+      if (d) {
+        row.bookAmount = Number(d.cipEnd ?? d.endAudited ?? d.netValue ?? 0) || 0
+        row.bookQty = 1
+        row.unitPrice = row.bookAmount
+        row.assetNo = String(d.contractNo ?? '')
+        row.visibleProgress = d.completionRate != null ? Number(d.completionRate) : null
+        if (row.visibleProgress != null) {
+          row.progressDesc = `账面完工进度约 ${row.visibleProgress}%`
+        }
+        row.remark = `来源:H2-12；选取原因:${p.reason || '—'}`
+      } else {
+        row.remark = `来源:H2-12；选取原因:${p.reason || '—'}`
+      }
+      checkRows.value.push(row)
+      existing.add(name)
+      imported++
+    }
+    if (imported) _persistCheck()
+    return { imported }
+  }
+
+  function syncTotalBookCostFromDetail(): number {
+    if (options.isReadonly.value) return checkMeta.value.totalBookCost ?? 0
+    const detail = _getDetailRows().filter((d) => d && !String(d.name ?? '').includes('合计'))
+    const total = sumDetailCipCost(detail)
+    if (total <= 0) return checkMeta.value.totalBookCost ?? 0
+    checkMeta.value.totalBookCost = total
+    if (!checkMeta.value.testPopulation) {
+      checkMeta.value.testPopulation =
+        `期末在建工程共 ${detail.length} 项，成本合计 ${total.toLocaleString('zh-CN', { minimumFractionDigits: 2 })} 元（来源 H2-2）`
+    }
+    _persistMeta()
+    return total
+  }
+
+  function draftCheckNoteLocal(): string {
+    return draftCheckSheetNote({
+      location: checkMeta.value.location,
+      countTime: checkMeta.value.countTime,
+      samplingMethod: checkMeta.value.samplingMethod,
+      specificSample: checkMeta.value.specificSample,
+      varianceCount: checkStats.value.varianceCount,
+      stoppedCount: checkStats.value.stopped,
+      readyForUseCount: checkStats.value.readyForUseCount,
+    })
+  }
+
+  function draftCheckConclusionLocal(): string {
+    const cov = bookToFloorCoverage.value.ratioPct ?? floorToBookCoverage.value.ratioPct
+    return draftCheckSheetConclusion({
+      total: checkStats.value.total,
+      matchCount: checkStats.value.matchCount,
+      matchRate: checkStats.value.matchRate,
+      surplusCount: checkStats.value.surplusCount,
+      deficitCount: checkStats.value.deficitCount,
+      stoppedCount: checkStats.value.stopped,
+      readyForUseCount: checkStats.value.readyForUseCount,
+      bookToFloorCount: bookToFloorRows.value.length,
+      floorToBookCount: floorToBookRows.value.length,
+      coveragePct: cov,
+      location: checkMeta.value.location,
+      countTime: checkMeta.value.countTime,
+    })
   }
 
   // ─── Actions: Summary ──────────────────────────────────────────────────────
@@ -320,7 +628,10 @@ export function useH2Stocktake(options: {
     if (options.isReadonly.value) return
     summary.value.abnormalProjects.push({
       rowId: `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      name, abnormalType: '', description: '', suggestion: '',
+      name,
+      abnormalType: '',
+      description: '',
+      suggestion: '',
     })
     options.onSave?.(SUMMARY_KEY, summary.value)
   }
@@ -330,27 +641,56 @@ export function useH2Stocktake(options: {
     options.onSave?.(NOTE_KEY, note)
   }
 
-  function _persistCheck(): void {
-    options.onSave?.(CHECK_ROWS_KEY, checkRows.value.map(r => ({
-      rowId: r.rowId, name: r.name, siteLocation: r.siteLocation,
-      visibleProgress: r.visibleProgress, constructionStatus: r.constructionStatus,
-      workers: r.workers, materialStorage: r.materialStorage,
-      equipmentCondition: r.equipmentCondition, safetyMeasures: r.safetyMeasures,
-      qualityAppearance: r.qualityAppearance, photos: r.photos,
-      progressDifference: r.progressDifference, auditConclusion: r.auditConclusion,
-      remark: r.remark,
-    })))
-  }
-
-  // ─── Return ────────────────────────────────────────────────────────────────
-
   return {
-    plan, checkRows, summary, auditNote,
-    stoppedProjects, stoppedProjectNames, checkStats,
-    updatePlan, addPlanProject, removePlanProject,
-    addCheckRow, removeCheckRow, updateCheckRow,
-    updateSummary, addAbnormalProject,
-    saveNote, initFromAllResponses,
+    plan,
+    planForm,
+    planScopeTotals,
+    planLogicWarnings,
+    planGateBlockers,
+    planReadyForCheck,
+    riskSuggestion,
+    planVsCheckWarnings,
+    checkRows,
+    checkMeta,
+    summary,
+    auditNote,
+    bookToFloorRows,
+    floorToBookRows,
+    bookToFloorCoverage,
+    floorToBookCoverage,
+    stoppedProjects,
+    stoppedProjectNames,
+    readyForUseProjects,
+    checkStats,
+    updatePlan,
+    persistPlanForm,
+    addPlanProject,
+    removePlanProject,
+    addCategoryScope,
+    removeCategoryScope,
+    updateCategoryScope,
+    addMajorProject,
+    removeMajorProject,
+    updateMajorProject,
+    draftPlanSampleQty,
+    importFromH22,
+    applyRiskSampleSuggestions,
+    fillPlanConclusionDraft,
+    mergePriorYearHints,
+    updateCheckMeta,
+    syncCheckMetaFromPlan,
+    addCheckRow,
+    removeCheckRow,
+    updateCheckRow,
+    importCheckRowsFromDetail,
+    importCheckRowsFromPlan,
+    syncTotalBookCostFromDetail,
+    draftCheckNoteLocal,
+    draftCheckConclusionLocal,
+    updateSummary,
+    addAbnormalProject,
+    saveNote,
+    initFromAllResponses,
   }
 }
 

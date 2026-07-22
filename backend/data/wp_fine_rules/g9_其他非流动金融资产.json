@@ -2,9 +2,11 @@
   "wp_code": "G9",
   "name": "其他非流动金融资产",
   "version": "2025-R2",
-  "account_codes": [
-    "1510"
-  ],
+      "account_codes": [
+        "1519",
+        "1510",
+        "1504"
+      ],
   "source_files": [
     {
       "file": "其他非流动金融资产.xlsx",

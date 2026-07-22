@@ -84,17 +84,28 @@ describe('useA171AuditSummary — Unit', () => {
 
     it('ignores invalid chapter numbers', () => {
       const { composable } = setup()
-      composable.updateTextarea(6, 'table章节') // chapter 6 is table type
+      composable.updateTextarea(9, 'yn章节') // chapter 9 is yn type
       // should not crash, just no-op
-      expect((composable.chapters.value['6'] as any).rows).toEqual([])
+      expect((composable.chapters.value['9'] as any).answer).toBeNull()
     })
   })
 
   // ─── Table Chapter Add/Remove ───
 
   describe('table chapter add/remove', () => {
+    function withTableChapter(composable: ReturnType<typeof setup>['composable'], chapterNum: 6 | 8) {
+      composable.chapters.value[String(chapterNum)] = {
+        type: 'table',
+        title: chapterNum === 6
+          ? '六、对重大错报风险的应对措施执行情况'
+          : '八、已审财务报表分析',
+        rows: [],
+      } as any
+    }
+
     it('addTableRow adds correct row for chapter 6', () => {
       const { composable } = setup()
+      withTableChapter(composable, 6)
       composable.addTableRow(6)
       const ch6 = composable.chapters.value['6'] as any
       expect(ch6.rows.length).toBe(1)
@@ -103,6 +114,7 @@ describe('useA171AuditSummary — Unit', () => {
 
     it('addTableRow adds correct row for chapter 8', () => {
       const { composable } = setup()
+      withTableChapter(composable, 8)
       composable.addTableRow(8)
       const ch8 = composable.chapters.value['8'] as any
       expect(ch8.rows.length).toBe(1)
@@ -111,6 +123,7 @@ describe('useA171AuditSummary — Unit', () => {
 
     it('removeTableRow removes correct row', () => {
       const { composable } = setup()
+      withTableChapter(composable, 6)
       composable.addTableRow(6)
       composable.addTableRow(6)
       composable.removeTableRow(6, 0)
@@ -120,6 +133,7 @@ describe('useA171AuditSummary — Unit', () => {
 
     it('removeTableRow with invalid index does nothing', () => {
       const { composable } = setup()
+      withTableChapter(composable, 6)
       composable.addTableRow(6)
       composable.removeTableRow(6, -1)
       composable.removeTableRow(6, 5)
@@ -128,6 +142,7 @@ describe('useA171AuditSummary — Unit', () => {
 
     it('table save stores JSON in remark', async () => {
       const { composable } = setup()
+      withTableChapter(composable, 6)
       composable.addTableRow(6)
       await composable.flushPendingSaves()
 
@@ -213,7 +228,7 @@ describe('useA171AuditSummary — Unit', () => {
       const { composable } = setup()
       expect(composable.signatureTable.value.length).toBe(4)
       expect(composable.signatureTable.value[0].role).toBe('编制人（项目现场负责人）')
-      expect(composable.signatureTable.value[3].role).toBe('质量控制复核人（如适用）')
+      expect(composable.signatureTable.value[3].role).toBe('EQCR技术复核人')
     })
   })
 
@@ -375,7 +390,7 @@ describe('useA171AuditSummary PBT — Property 1: item_id format', () => {
           ynChapter: fc.constantFrom(9, 10, 11, 12),
           ynAnswer: fc.constantFrom('Y' as const, 'N' as const),
           ynExplanation: fc.string({ minLength: 1, maxLength: 30 }),
-          tableChapter: fc.constantFrom(6, 8),
+          tableChapter: fc.constantFrom(6, 8), // legacy table chapters via hydrated data in test body
           signRow: fc.integer({ min: 0, max: 3 }),
           signCol: fc.constantFrom('name' as const, 'date' as const),
           signValue: fc.string({ minLength: 1, maxLength: 10 }),
@@ -384,6 +399,11 @@ describe('useA171AuditSummary PBT — Property 1: item_id format', () => {
           mockPut.mockReset()
           mockPut.mockResolvedValue({})
           const { composable } = setup()
+          composable.chapters.value[String(data.tableChapter)] = {
+            type: 'table',
+            title: `Ch${data.tableChapter}`,
+            rows: [],
+          } as any
 
           // Perform various updates
           composable.updateTextarea(data.textareaChapter, data.textareaContent)

@@ -254,7 +254,7 @@ export function useD3Analysis(options: UseD3AnalysisOptions) {
       },
       {
         sectionKey: 'top5-debtors' as const,
-        sectionLabel: '(三) 期末主要债务人分析',
+        sectionLabel: '(三) 期末主要预收客户分析',
         rows: [],
         totalRow: undefined,
         diffRow: undefined,

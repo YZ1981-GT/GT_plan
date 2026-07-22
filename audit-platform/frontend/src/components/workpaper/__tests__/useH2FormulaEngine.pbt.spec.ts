@@ -29,10 +29,28 @@ import {
 // ============================================================
 describe('Feature: h2-construction-in-progress, Property P1: 审定数公式链正确性', () => {
   /**
-   * **Validates: Requirements 1.5, 2.3**
+   * **Validates: Requirements 2.3（冲突决议：H2-1 审定=未审+账项调整）**
+   * ∀ unadj, adj ∈ ℝ: calcAuditedAmount(unadj, adj) === unadj + adj
+   */
+  it('calcAuditedAmount(u, adj) === u + adj（H2-1 xlsx 两参数）', () => {
+    fc.assert(
+      fc.property(
+        fc.double({ min: -1e9, max: 1e9, noNaN: true, noDefaultInfinity: true }),
+        fc.double({ min: -1e9, max: 1e9, noNaN: true, noDefaultInfinity: true }),
+        (unadj, adj) => {
+          const result = calcAuditedAmount(unadj, adj)
+          expect(Math.abs(result - (unadj + adj))).toBeLessThan(1e-6)
+        },
+      ),
+      { numRuns: 100 },
+    )
+  })
+
+  /**
+   * H2-2 兼容：三参数等价于 adjustment = aje + rje
    * ∀ unadj, aje, rje ∈ ℝ: calcAuditedAmount(unadj, aje, rje) === unadj + aje + rje
    */
-  it('calcAuditedAmount(u, a, r) === u + a + r', () => {
+  it('calcAuditedAmount(u, a, r) === u + a + r（H2-2 AJE+RJE 兼容）', () => {
     fc.assert(
       fc.property(
         fc.double({ min: -1e9, max: 1e9, noNaN: true, noDefaultInfinity: true }),
@@ -201,7 +219,7 @@ describe('Feature: h2-construction-in-progress, Property P7: 专门借款利息�
         fc.double({ min: 0, max: 1e6, noNaN: true, noDefaultInfinity: true }),
         (interest, idleIncome) => {
           const result = calcSpecialLoanCap(interest, idleIncome)
-          const expected = interest - idleIncome
+          const expected = Math.max(0, interest - idleIncome)
           expect(Math.abs(result - expected)).toBeLessThan(1e-6)
         },
       ),

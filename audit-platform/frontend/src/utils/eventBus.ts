@@ -342,10 +342,27 @@ export type Events = {
 
   // D~N 实质性程序审定数变更（Adjudication → TB回写 + 附注刷新）
   'substantive:adjudicated': {
-    accountCode: string
-    auditedAmount: number
-    wpCode: string
-    timestamp: number
+    accountCode?: string
+    auditedAmount?: number
+    wpCode?: string
+    timestamp?: number
+    /** H2 兼容 / CIP 桥接扩展字段 */
+    wp_code?: string
+    account_codes?: string[]
+    audited_amount?: number
+    begin_audited?: number
+    end_audited?: number
+    impair_audited?: number
+    begin_impair_audited?: number
+    net_audited?: number
+    projectId?: string
+    cip?: {
+      endBook?: number
+      endImpairment?: number
+      beginBook?: number
+      beginImpairment?: number
+    }
+    [key: string]: any
   }
 
   /** G3-3 确认回写 → G3-1 账项调整汇总 */

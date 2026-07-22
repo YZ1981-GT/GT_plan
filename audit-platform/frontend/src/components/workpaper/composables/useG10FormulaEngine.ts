@@ -16,9 +16,9 @@ export function calcCreditBalance(opening: number, credit: number, debit: number
   return opening + credit - debit
 }
 
-/** 审定数 = 未审 + 账项调整 */
-export function calcAdjustedAmount(unadjusted: number, adjustment: number): number {
-  return unadjusted + adjustment
+/** 审定数 = 未审 + AJE + RJE */
+export function calcAdjustedAmount(unadjusted: number, aje: number, rje = 0): number {
+  return unadjusted + aje + rje
 }
 
 /** 变动额 = 期末审定 - 期初审定 */
@@ -68,4 +68,24 @@ export function isDebitCreditBalanced(debits: number[], credits: number[]): bool
 
 export function calcSubtotal(values: number[]): number {
   return values.reduce((s, v) => s + parseNum(v), 0)
+}
+
+/** (三)账面余额 = (一)初始金额 + (二)累计公允价值变动 */
+export function calcBookFromParts(initial: number, fvAccum: number): number {
+  return parseNum(initial) + parseNum(fvAccum)
+}
+
+/** G10-2 明细：期末余额 = 期初审定 + 本期初始确认 + FV变动 + 利息 − 本期减少 */
+export function calcG10DetailClosingBalance(
+  openingAdjusted: number,
+  movementInitial: number,
+  movementFvChange: number,
+  interestExpense: number,
+  currentDecrease: number,
+): number {
+  return calcCreditBalance(
+    openingAdjusted,
+    parseNum(movementInitial) + parseNum(movementFvChange) + parseNum(interestExpense),
+    currentDecrease,
+  )
 }

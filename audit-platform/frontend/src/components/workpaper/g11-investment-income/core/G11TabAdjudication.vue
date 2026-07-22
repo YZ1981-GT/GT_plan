@@ -188,6 +188,7 @@
 import { inject, toRef, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG11Adjudication } from '../../composables/useG11Adjudication'
+import { dispatchG11OfferDisclosurePull } from '../../composables/g11DisclosureSync'
 import { G11_AUDIT_GUIDANCE_ROWS } from '../../composables/g11Constants'
 import { resolveG11SheetLabel } from '../../composables/g11SheetLabels'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
@@ -230,6 +231,7 @@ async function onPublish(): Promise<void> {
     adj.publishAdjudicated()
     await adj.saveAdjudicationToBackend()
     ElMessage.success('审定数已发布')
+    dispatchG11OfferDisclosurePull('G11-1')
   } finally {
     publishLoading.value = false
   }

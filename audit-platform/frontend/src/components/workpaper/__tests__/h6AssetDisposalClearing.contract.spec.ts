@@ -95,13 +95,25 @@ describe('H6 固定资产清理 — 注册契约测试', () => {
       expect(overrides['H6-4']).toBe('h6-asset-disposal-clearing')
     })
 
-    // 完整性校验：共6个wp_code映射到h6-asset-disposal-clearing
-    it('h6-asset-disposal-clearing 共有6个wp_code映射', () => {
-      const expectedCodes = ['H6', 'H6A', 'H6-1', 'H6-2', 'H6-3', 'H6-4']
+    it('附注上市/国企映射为 h6-asset-disposal-clearing（H6- 前缀，禁止裸 sheet 名以免串 H8）', () => {
+      expect(overrides['H6-disc-L']).toBe('h6-asset-disposal-clearing')
+      expect(overrides['H6-disc-S']).toBe('h6-asset-disposal-clearing')
+      expect(overrides['H6-附注披露信息（上市公司）']).toBe('h6-asset-disposal-clearing')
+      expect(overrides['H6-附注披露信息（国有企业）']).toBe('h6-asset-disposal-clearing')
+      expect(overrides['附注披露信息（上市公司）']).toBeUndefined()
+      expect(overrides['附注披露信息（国有企业）']).toBeUndefined()
+    })
+
+    // 完整性校验：核心编码 + 附注编码
+    it('h6-asset-disposal-clearing 共有10个wp_code映射', () => {
+      const expectedCodes = [
+        'H6', 'H6A', 'H6-1', 'H6-2', 'H6-3', 'H6-4',
+        'H6-disc-L', 'H6-disc-S',
+        'H6-附注披露信息（上市公司）', 'H6-附注披露信息（国有企业）',
+      ]
       for (const code of expectedCodes) {
         expect(overrides[code]).toBe('h6-asset-disposal-clearing')
       }
-      // 验证映射总数
       const actualCount = Object.entries(overrides)
         .filter(([, v]) => v === 'h6-asset-disposal-clearing')
         .length

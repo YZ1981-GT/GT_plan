@@ -45,80 +45,108 @@ _ROW_LIMIT = 500
 
 _SUPPORTED_SHEETS: set[str] = {"H9-2", "H9-3", "H9-4"}
 
+# 列头与前端 useH9Detail / useH9FinanceCost / useH9Adjustment 字段对齐
 _SHEET_HEADERS: dict[str, list[str]] = {
     "H9-2": [
-        "合同号", "出租方", "承租资产", "租赁期起", "租赁期止",
-        "年租金", "利率(IBR)", "初始确认金额", "期初余额",
-        "本期偿还", "本期利息", "期末余额", "备注",
+        "出租方", "合同号", "承租资产", "IBR利率(%)", "租赁期(月)",
+        "期初余额", "本期偿还", "本期利息",
+        "期初AJE", "偿还AJE", "利息AJE", "重分类(一年内到期)",
+        "1年以内", "1-2年", "2-3年", "3年以上",
+        "是否关联方", "是否发函", "备注",
     ],
     "H9-3": [
-        "合同号", "出租方", "初始融资费用", "本期确认",
-        "累计确认", "未确认余额", "备注",
+        "出租方", "合同号", "期初余额", "本期增加(借)", "本期确认(贷)",
+        "期初AJE", "增加AJE", "确认AJE", "其他AJE", "重分类",
+        "1年以内", "1-2年", "2-3年", "3年以上",
+        "对应利息期", "是否关联方", "备注",
     ],
     "H9-4": [
-        "调整编号", "调整日期", "摘要", "科目编码", "科目名称",
-        "借方金额", "贷方金额", "调整类型", "关联底稿", "备注",
+        "调整事项说明", "类别", "报表项目", "科目名称", "附注项目",
+        "借方金额", "贷方金额", "索引", "备注",
     ],
 }
 
-# 中文列名 → JSON 字段名 映射表
+# 中文列名 → JSON 字段名（与前端 composable 一致）
 _FIELD_MAPS: dict[str, dict[str, str]] = {
     "H9-2": {
-        "合同号": "contractNo",
         "出租方": "lessor",
-        "承租资产": "leasedAsset",
-        "租赁期起": "leaseStart",
-        "租赁期止": "leaseEnd",
-        "年租金": "annualRent",
-        "利率(IBR)": "ibrRate",
-        "初始确认金额": "initialRecognition",
-        "期初余额": "openingBalance",
-        "本期偿还": "currentRepayment",
-        "本期利息": "currentInterest",
-        "期末余额": "endingBalance",
+        "合同号": "contractNo",
+        "承租资产": "assetDesc",
+        "IBR利率(%)": "ibrRate",
+        "租赁期(月)": "leaseTerm",
+        "期初余额": "beginBalance",
+        "本期偿还": "repayment",
+        "本期利息": "interestAccrued",
+        "期初AJE": "beginAje",
+        "偿还AJE": "repayAje",
+        "利息AJE": "interestAje",
+        "重分类(一年内到期)": "reclassification",
+        "1年以内": "dueWithin1Y",
+        "1-2年": "due1To2Y",
+        "2-3年": "due2To3Y",
+        "3年以上": "dueOver3Y",
+        "是否关联方": "isRelatedParty",
+        "是否发函": "isConfirmed",
         "备注": "remark",
     },
     "H9-3": {
-        "合同号": "contractNo",
         "出租方": "lessor",
-        "初始融资费用": "initialFinanceCost",
-        "本期确认": "currentRecognized",
-        "累计确认": "cumulativeRecognized",
-        "未确认余额": "unrecognizedBalance",
+        "合同号": "contractNo",
+        "期初余额": "beginBalance",
+        "本期增加(借)": "debitIncrease",
+        "本期确认(贷)": "creditDecrease",
+        "期初AJE": "beginAje",
+        "增加AJE": "increaseAje",
+        "确认AJE": "confirmAje",
+        "其他AJE": "otherAje",
+        "重分类": "reclassification",
+        "1年以内": "dueWithin1Y",
+        "1-2年": "due1To2Y",
+        "2-3年": "due2To3Y",
+        "3年以上": "dueOver3Y",
+        "对应利息期": "interestPeriod",
+        "是否关联方": "isRelatedParty",
         "备注": "remark",
     },
     "H9-4": {
-        "调整编号": "adjustNo",
-        "调整日期": "adjustDate",
-        "摘要": "summary",
-        "科目编码": "accountCode",
+        "调整事项说明": "description",
+        "类别": "category",
+        "报表项目": "reportItem",
         "科目名称": "accountName",
+        "附注项目": "noteItem",
         "借方金额": "debitAmount",
         "贷方金额": "creditAmount",
-        "调整类型": "adjustType",
-        "关联底稿": "relatedWp",
+        "索引": "indexRef",
         "备注": "remark",
     },
 }
 
-# 各sheet中应解析为数值的字段
 _NUMERIC_FIELDS: dict[str, set[str]] = {
     "H9-2": {
-        "annualRent", "ibrRate", "initialRecognition",
-        "openingBalance", "currentRepayment", "currentInterest", "endingBalance",
+        "ibrRate", "leaseTerm", "beginBalance", "repayment", "interestAccrued",
+        "beginAje", "repayAje", "interestAje", "reclassification",
+        "dueWithin1Y", "due1To2Y", "due2To3Y", "dueOver3Y",
     },
     "H9-3": {
-        "initialFinanceCost", "currentRecognized",
-        "cumulativeRecognized", "unrecognizedBalance",
+        "beginBalance", "debitIncrease", "creditDecrease",
+        "beginAje", "increaseAje", "confirmAje", "otherAje", "reclassification",
+        "dueWithin1Y", "due1To2Y", "due2To3Y", "dueOver3Y",
     },
     "H9-4": {"debitAmount", "creditAmount"},
 }
 
-# checklist_responses item_id 映射
+# checklist_responses item_id（与前端 useH9* 一致）
 _SHEET_ITEM_ID: dict[str, str] = {
-    "H9-2": "H9-detail-rows",
-    "H9-3": "H9-finance-cost-rows",
-    "H9-4": "H9-adjustment-rows",
+    "H9-2": "H9-2-rows",
+    "H9-3": "H9-3-rows",
+    "H9-4": "H9-4-rows",
+}
+
+# 历史/错误键别名（导出时兜底读取）
+_SHEET_ITEM_ID_ALIASES: dict[str, list[str]] = {
+    "H9-2": ["H9-detail-rows"],
+    "H9-3": ["H9-finance-cost-rows"],
+    "H9-4": ["H9-5-rows", "H9-adjustment-rows"],
 }
 
 
@@ -239,6 +267,15 @@ def _export_row(sheet_code: str, data: dict) -> list:
     for col_name in headers:
         field = field_map.get(col_name, col_name)
         val = data.get(field, "")
+        # H9-4 类别导出为中文，便于 Excel 模板阅读
+        if sheet_code == "H9-4" and field == "category":
+            cat = str(val or "").upper()
+            if cat in ("AJE", "账项调整"):
+                val = "账项调整"
+            elif cat in ("RJE", "报表调整"):
+                val = "报表调整"
+            else:
+                val = val or "账项调整"
         result.append(val if val is not None else "")
     return result
 
@@ -253,7 +290,49 @@ def _parse_row(sheet_code: str, row: tuple, actual_headers: list[str]) -> dict:
             result[field_name] = _safe_float(raw)
         else:
             result[field_name] = _safe_str(raw)
+
+    # H9-4 类别归一：账项调整/AJE → AJE；报表调整/RJE → RJE
+    if sheet_code == "H9-4":
+        cat = str(result.get("category") or "").strip().upper()
+        if "报表" in cat or cat == "RJE":
+            result["category"] = "RJE"
+        else:
+            result["category"] = "AJE"
+        result.setdefault("seq", 0)
+
+    # H9-2/H9-3 关联方默认
+    if sheet_code in ("H9-2", "H9-3"):
+        if not result.get("isRelatedParty"):
+            result["isRelatedParty"] = "否"
+    if sheet_code == "H9-2" and not result.get("isConfirmed"):
+        result["isConfirmed"] = "否"
+
     return result
+
+
+async def _load_sheet_rows(db: AsyncSession, wp_id: str, sheet: str) -> list[dict]:
+    """按主键再别名读取 checklist 行数据"""
+    import sqlalchemy as sa
+
+    item_ids = [_SHEET_ITEM_ID[sheet], *_SHEET_ITEM_ID_ALIASES.get(sheet, [])]
+    for item_id in item_ids:
+        result = await db.execute(
+            sa.text(
+                "SELECT remark FROM checklist_responses "
+                "WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"
+            ),
+            {"wp_id": wp_id, "item_id": item_id},
+        )
+        row = result.fetchone()
+        if not row or not row[0]:
+            continue
+        try:
+            data = json.loads(row[0])
+            if isinstance(data, list):
+                return data
+        except (json.JSONDecodeError, TypeError):
+            continue
+    return []
 
 
 def _generate_amortization_schedule(
@@ -342,24 +421,7 @@ async def h9_export_data(
     Requirements: 3.6
     """
     _validate_sheet(sheet)
-    import sqlalchemy as sa
-
-    item_id = _SHEET_ITEM_ID[sheet]
-    rows_data: list[dict] = []
-
-    result = await db.execute(
-        sa.text(
-            "SELECT remark FROM checklist_responses "
-            "WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"
-        ),
-        {"wp_id": wp_id, "item_id": item_id},
-    )
-    row = result.fetchone()
-    if row and row.remark:
-        try:
-            rows_data = json.loads(row.remark)
-        except (json.JSONDecodeError, TypeError):
-            pass
+    rows_data = await _load_sheet_rows(db, wp_id, sheet)
 
     # 生成 xlsx
     wb = _create_template_wb(sheet)

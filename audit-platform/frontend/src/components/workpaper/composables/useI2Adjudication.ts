@@ -1,340 +1,237 @@
 /**
- * useI2Adjudication — I2-1 审定表 composable（三角勾稽 + TB取数）
- *
- * 科目：1717开发支出（借方/资产类）
- *
- * 审定表列结构（Req 2.1）：
- * 项目 | 期初余额 | 本期增加-资本化 | 本期减少-转无形资产 | 本期减少-转费用 |
- * 期末余额 | 未审数 | AJE | RJE | 审定数 | 备注 | 三角勾稽差额
- *
- * 公式引擎接入：
- * - 期末余额 = 期初 + 增加(资本化) - 减少(转无形) - 减少(转费用)  [calcAssetEndBalance变体]
- * - 审定数 = 未审 + AJE + RJE                                   [calcAuditedAmount]
- * - 三角勾稽差额 = 期末 - (期初 + 增加 - 减少合计)               [calcTriangleReconciliation]
- * - 合计行 = SUM(各明细行)                                       [calcSubtotal]
- *
- * 数据持久化：以JSON存储到 allResponses，key='I2-1-rows'
- *
- * Spec: .kiro/specs/i2-development-expenditure/
- * Task: 3.3
- * Requirements: 2.1-2.7
+ * useI2Adjudication — I2-1 开发支出审定表
+ * 对齐源表期初/期末「未审·调整·审定」+ TB差异 + I2-2/I2-3 取数 + 事件发布
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
-import type { I2TbData } from './useI2FormData'
 import {
-  calcAuditedAmount,
-  calcAssetEndBalance,
-  calcTriangleReconciliation,
-  calcSubtotal,
-} from './useI2FormulaEngine'
+  type I2AdjudicationRow,
+  type I2AdjudicationSummary,
+  I2_ADJ_ROWS_KEY,
+  I2_ADJ_NOTE_KEY,
+  I2_ADJ_CONCLUSION_KEY,
+  emptyI2AdjudicationRow,
+  normalizeI2AdjudicationRow,
+  recalcI2AdjudicationRow,
+  summarizeI2Adjudication,
+  seedAdjudicationFromI22,
+  applyAjeFromI23,
+  serializeI2AdjudicationRow,
+  formatChangeRate,
+  safeParseArray,
+  readText,
+} from './i2AdjudicationModel'
+import type { I2TbData } from './useI2FormData'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-/** I2-1 审定表行 */
-export interface AdjudicationRow {
-  /** 项目名称（研发项目） */
-  projectName: string
-  /** 期初余额 */
-  cipBegin: number
-  /** 本期增加-资本化 */
-  increaseCapitalized: number
-  /** 本期减少-转无形资产 */
-  decreaseTransfer: number
-  /** 本期减少-转费用 */
-  decreaseExpense: number
-  /** 期末余额（公式列：期初 + 资本化增加 - 转无形 - 转费用） */
-  cipEnd: number
-  /** 未审数（from TB） */
-  unadjusted: number
-  /** AJE调整 */
-  aje: number
-  /** RJE重分类 */
-  rje: number
-  /** 审定数（公式列：未审 + AJE + RJE） */
-  audited: number
-  /** 备注 */
-  remark: string
-  /** 三角勾稽差额（公式列：期末 - (期初 + 增加 - 减少合计)） */
-  reconciliationDiff: number
-}
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const ROWS_KEY = 'I2-1-rows'
-
-// ─── Composable ──────────────────────────────────────────────────────────────
+export type { I2AdjudicationRow as AdjudicationRow, I2AdjudicationSummary }
+export { formatChangeRate }
 
 export function useI2Adjudication(params: {
   allResponses: Ref<Map<string, any>>
   tbData: Ref<I2TbData>
   saveResponses: (sheetCode: string, data: Record<string, any>) => Promise<void>
-}): {
-  rows: Ref<AdjudicationRow[]>
-  totalRow: ComputedRef<AdjudicationRow>
-  reconciliationErrors: ComputedRef<{ rowIndex: number; diff: number }[]>
-  hasErrors: ComputedRef<boolean>
-  addRow: (projectName: string) => void
-  removeRow: (index: number) => void
-  updateRow: (index: number, field: string, value: number | string) => void
-  recalcRow: (index: number) => void
-  save: () => Promise<void>
-} {
-  const { allResponses, tbData, saveResponses } = params
+  onAfterSave?: (summary: I2AdjudicationSummary) => void | Promise<void>
+}) {
+  const { allResponses, tbData, saveResponses, onAfterSave } = params
 
-  // ─── State ─────────────────────────────────────────────────────────────────
+  const rows = ref<I2AdjudicationRow[]>([])
+  const auditNote = ref('')
+  const auditConclusion = ref('')
 
-  const rows = ref<AdjudicationRow[]>([])
-
-  // ─── Helpers ───────────────────────────────────────────────────────────────
-
-  /** 从 allResponses 获取 JSON 数据 */
-  function _getJson(key: string): any {
-    const item = allResponses.value.get(key)
-    if (!item) return null
-    const raw = item.remark ?? item.conclusion ?? item
-    if (raw == null) return null
-    if (typeof raw === 'object') return raw
-    try { return JSON.parse(raw as string) } catch { return null }
+  function load() {
+    const map = allResponses.value
+    rows.value = safeParseArray(map.get(I2_ADJ_ROWS_KEY)).map(normalizeI2AdjudicationRow)
+    auditNote.value = readText(map.get(I2_ADJ_NOTE_KEY))
+    auditConclusion.value = readText(map.get(I2_ADJ_CONCLUSION_KEY))
   }
 
-  /** 创建空行 */
-  function _createEmptyRow(projectName: string): AdjudicationRow {
-    return {
-      projectName,
-      cipBegin: 0,
-      increaseCapitalized: 0,
-      decreaseTransfer: 0,
-      decreaseExpense: 0,
-      cipEnd: 0,
-      unadjusted: 0,
-      aje: 0,
-      rje: 0,
-      audited: 0,
-      remark: '',
-      reconciliationDiff: 0,
-    }
+  watch(allResponses, () => load(), { immediate: true })
+
+  const summary: ComputedRef<I2AdjudicationSummary> = computed(() => summarizeI2Adjudication(rows.value))
+
+  const totalRow = computed(() => emptyI2AdjudicationRow({
+    projectName: '合计',
+    beginUnadj: summary.value.beginUnadj,
+    beginAdj: summary.value.beginAdj,
+    endUnadj: summary.value.endUnadj,
+    endAdj: summary.value.endAdj,
+    increaseCapitalized: summary.value.increaseCapitalized,
+    decreaseTransfer: summary.value.decreaseTransfer,
+    decreaseExpense: summary.value.decreaseExpense,
+  }))
+
+  const tbRow = computed(() => emptyI2AdjudicationRow({
+    projectName: 'TB数据',
+    beginUnadj: 0,
+    endUnadj: tbData.value.unadjusted1717 || tbData.value.audited1717 || 0,
+    endAdj: (tbData.value.aje1717 || 0) + (tbData.value.rje1717 || 0),
+  }))
+
+  /** 差异 = 合计期末审定 − TB期末审定（或未审+调整） */
+  const tbDiff = computed(() => {
+    const tbAudited = Math.abs(tbData.value.audited1717) > 0.005
+      ? tbData.value.audited1717
+      : (tbData.value.unadjusted1717 + tbData.value.aje1717 + tbData.value.rje1717)
+    return Math.round((summary.value.endAudited - tbAudited) * 100) / 100
+  })
+
+  const diffRow = computed(() => emptyI2AdjudicationRow({
+    projectName: '差异',
+    endUnadj: Math.round((summary.value.endUnadj - (tbData.value.unadjusted1717 || 0)) * 100) / 100,
+    endAdj: 0,
+    beginUnadj: 0,
+  }))
+
+  // 覆盖 diffRow 的 endAudited 展示用
+  const displayDiffEndAudited = computed(() => tbDiff.value)
+
+  const hasTbDiff = computed(() => Math.abs(tbDiff.value) > 0.01)
+
+  function addRow(projectName: string) {
+    if (!projectName?.trim()) return
+    rows.value.push(emptyI2AdjudicationRow({ projectName: projectName.trim() }))
   }
 
-  /** 重算单行公式列 */
-  function _recalcRowFormulas(row: AdjudicationRow): void {
-    // 期末余额 = 期初 + 资本化增加 - 转无形 - 转费用
-    // 借方/资产类：期末 = 期初 + 借方(增加) - 贷方(减少)
-    // 此处 increase = increaseCapitalized; decrease = decreaseTransfer + decreaseExpense
-    const totalDecrease = row.decreaseTransfer + row.decreaseExpense
-    row.cipEnd = calcAssetEndBalance(row.cipBegin, row.increaseCapitalized, totalDecrease)
-
-    // 审定数 = 未审 + AJE + RJE
-    row.audited = calcAuditedAmount(row.unadjusted, row.aje, row.rje)
-
-    // 三角勾稽差额 = 期末 - (期初 + 增加 - 减少合计)
-    row.reconciliationDiff = calcTriangleReconciliation(
-      row.cipBegin,
-      row.increaseCapitalized,
-      totalDecrease,
-      row.cipEnd,
-    )
+  function removeRow(rowId: string) {
+    rows.value = rows.value.filter((r) => r.rowId !== rowId)
   }
 
-  // ─── Init / Load ───────────────────────────────────────────────────────────
-
-  function _loadFromResponses(): void {
-    const data = _getJson(ROWS_KEY)
-    if (Array.isArray(data) && data.length > 0) {
-      rows.value = data.map((raw: any) => {
-        const row: AdjudicationRow = {
-          projectName: String(raw.projectName ?? ''),
-          cipBegin: Number(raw.cipBegin) || 0,
-          increaseCapitalized: Number(raw.increaseCapitalized) || 0,
-          decreaseTransfer: Number(raw.decreaseTransfer) || 0,
-          decreaseExpense: Number(raw.decreaseExpense) || 0,
-          cipEnd: Number(raw.cipEnd) || 0,
-          unadjusted: Number(raw.unadjusted) || 0,
-          aje: Number(raw.aje) || 0,
-          rje: Number(raw.rje) || 0,
-          audited: Number(raw.audited) || 0,
-          remark: String(raw.remark ?? ''),
-          reconciliationDiff: Number(raw.reconciliationDiff) || 0,
-        }
-        // 重算公式列确保一致性
-        _recalcRowFormulas(row)
-        return row
-      })
+  function updateRow(rowId: string, field: keyof I2AdjudicationRow, value: number | string) {
+    const row = rows.value.find((r) => r.rowId === rowId)
+    if (!row) return
+    const numericFields = [
+      'beginUnadj', 'beginAdj', 'endUnadj', 'endAdj',
+      'increaseCapitalized', 'decreaseTransfer', 'decreaseExpense',
+    ]
+    if (numericFields.includes(field as string)) {
+      ;(row as any)[field] = Number(value) || 0
+      // 手工改期末调整 → 视为已复核，清除近似标记
+      if (field === 'endAdj') row.ajeApprox = false
+    } else if (field === 'projectName' || field === 'reasonAnalysis') {
+      ;(row as any)[field] = String(value ?? '')
     } else {
-      rows.value = []
+      return
     }
+    recalcI2AdjudicationRow(row)
   }
 
-  // 监听 allResponses 变化自动加载
-  watch(allResponses, () => _loadFromResponses(), { immediate: true })
+  const hasAjeApprox = computed(() => rows.value.some((r) => r.ajeApprox))
 
-  // ─── Computed: 合计行 ──────────────────────────────────────────────────────
-
-  /** 合计行 = SUM(所有明细行各数值列) */
-  const totalRow: ComputedRef<AdjudicationRow> = computed(() => {
-    const r = rows.value
-    const cipBegin = calcSubtotal(r.map(row => row.cipBegin))
-    const increaseCapitalized = calcSubtotal(r.map(row => row.increaseCapitalized))
-    const decreaseTransfer = calcSubtotal(r.map(row => row.decreaseTransfer))
-    const decreaseExpense = calcSubtotal(r.map(row => row.decreaseExpense))
-    const totalDecrease = decreaseTransfer + decreaseExpense
-    const cipEnd = calcAssetEndBalance(cipBegin, increaseCapitalized, totalDecrease)
-    const unadjusted = calcSubtotal(r.map(row => row.unadjusted))
-    const aje = calcSubtotal(r.map(row => row.aje))
-    const rje = calcSubtotal(r.map(row => row.rje))
-    const audited = calcAuditedAmount(unadjusted, aje, rje)
-    const reconciliationDiff = calcTriangleReconciliation(cipBegin, increaseCapitalized, totalDecrease, cipEnd)
-
-    return {
-      projectName: '合计',
-      cipBegin,
-      increaseCapitalized,
-      decreaseTransfer,
-      decreaseExpense,
-      cipEnd,
-      unadjusted,
-      aje,
-      rje,
-      audited,
-      remark: '',
-      reconciliationDiff,
-    }
-  })
-
-  // ─── Computed: 三角勾稽错误行列表 ─────────────────────────────────────────
-
-  /**
-   * 三角勾稽校验错误：diff !== 0 的行
-   * 差异行高亮（Req 2.4: 三角勾稽校验+红色高亮）
-   */
-  const reconciliationErrors: ComputedRef<{ rowIndex: number; diff: number }[]> = computed(() => {
-    const errors: { rowIndex: number; diff: number }[] = []
-    for (let i = 0; i < rows.value.length; i++) {
-      const diff = rows.value[i].reconciliationDiff
-      if (Math.abs(diff) > 0.01) {
-        errors.push({ rowIndex: i, diff })
+  function seedFromDetail(): { ok: boolean; message: string } {
+    const detail = safeParseArray(allResponses.value.get('I2-2-rows'))
+    const seeded = seedAdjudicationFromI22(detail)
+    if (!seeded.length) return { ok: false, message: '暂无 I2-2 明细可供带入' }
+    // 按项目名合并
+    const byName = new Map(rows.value.map((r) => [r.projectName.trim(), r]))
+    let n = 0
+    for (const s of seeded) {
+      const prev = byName.get(s.projectName.trim())
+      if (prev) {
+        prev.beginUnadj = s.beginUnadj
+        prev.endUnadj = s.endUnadj || prev.endUnadj
+        prev.increaseCapitalized = s.increaseCapitalized
+        prev.decreaseTransfer = s.decreaseTransfer
+        prev.decreaseExpense = s.decreaseExpense
+        recalcI2AdjudicationRow(prev)
+      } else {
+        rows.value.push(s)
+        byName.set(s.projectName.trim(), s)
       }
+      n++
     }
-    return errors
-  })
-
-  /** 是否存在三角勾稽错误 */
-  const hasErrors: ComputedRef<boolean> = computed(() => reconciliationErrors.value.length > 0)
-
-  // ─── Actions: addRow ───────────────────────────────────────────────────────
-
-  /**
-   * 新增项目行。
-   * 交互规范：需先弹 ElMessageBox.prompt 输入名称确认后再创建（由Vue组件层处理）。
-   */
-  function addRow(projectName: string): void {
-    if (!projectName || !projectName.trim()) return
-    const newRow = _createEmptyRow(projectName.trim())
-    rows.value.push(newRow)
+    return { ok: true, message: `已从 I2-2 带入/更新 ${n} 个项目` }
   }
 
-  // ─── Actions: removeRow ────────────────────────────────────────────────────
-
-  /** 删除指定索引的行 */
-  function removeRow(index: number): void {
-    if (index < 0 || index >= rows.value.length) return
-    rows.value.splice(index, 1)
+  function syncAjeFromI23(): { ok: boolean; message: string; approx?: boolean } {
+    const adj = safeParseArray(allResponses.value.get('I2-3-rows'))
+    if (!adj.length) return { ok: false, message: '暂无 I2-3 调整分录' }
+    if (!rows.value.length) return { ok: false, message: '请先维护项目行再同步调整' }
+    const { rows: next, applied, approx, matchedByName } = applyAjeFromI23(rows.value, adj)
+    rows.value = next
+    const parts = [`已写入期末调整至 ${applied} 行`]
+    if (matchedByName) parts.push(`其中按项目名精确匹配 ${matchedByName} 笔`)
+    if (approx) parts.push('其余按期末未审占比分摊（近似，须人工复核）')
+    return { ok: true, message: parts.join('；'), approx }
   }
 
-  // ─── Actions: updateRow ────────────────────────────────────────────────────
-
-  /**
-   * 更新指定行指定字段的值，自动重算公式列。
-   * 仅允许编辑输入字段：cipBegin / increaseCapitalized / decreaseTransfer / decreaseExpense /
-   *   unadjusted / aje / rje / remark / projectName
-   * 公式列（cipEnd / audited / reconciliationDiff）不可直接编辑。
-   */
-  function updateRow(index: number, field: string, value: number | string): void {
-    if (index < 0 || index >= rows.value.length) return
-    const row = rows.value[index]
-
-    switch (field) {
-      case 'projectName':
-        row.projectName = String(value ?? '')
-        break
-      case 'cipBegin':
-        row.cipBegin = Number(value) || 0
-        break
-      case 'increaseCapitalized':
-        row.increaseCapitalized = Number(value) || 0
-        break
-      case 'decreaseTransfer':
-        row.decreaseTransfer = Number(value) || 0
-        break
-      case 'decreaseExpense':
-        row.decreaseExpense = Number(value) || 0
-        break
-      case 'unadjusted':
-        row.unadjusted = Number(value) || 0
-        break
-      case 'aje':
-        row.aje = Number(value) || 0
-        break
-      case 'rje':
-        row.rje = Number(value) || 0
-        break
-      case 'remark':
-        row.remark = String(value ?? '')
-        break
-      default:
-        // 公式列不可直接编辑，忽略
-        return
+  function applyTbToUnadj() {
+    const tb = tbData.value.unadjusted1717
+    if (Math.abs(tb) < 0.005) return { ok: false, message: 'TB 未审数为 0' }
+    if (!rows.value.length) {
+      rows.value.push(emptyI2AdjudicationRow({
+        projectName: '开发支出',
+        endUnadj: tb,
+        endAdj: (tbData.value.aje1717 || 0) + (tbData.value.rje1717 || 0),
+      }))
+      return { ok: true, message: '已用 TB 创建开发支出汇总行' }
     }
-
-    // 重算公式列
-    _recalcRowFormulas(row)
+    if (rows.value.length === 1) {
+      rows.value[0].endUnadj = tb
+      rows.value[0].endAdj = (tbData.value.aje1717 || 0) + (tbData.value.rje1717 || 0)
+      recalcI2AdjudicationRow(rows.value[0])
+      return { ok: true, message: '已将 TB 未审/调整写入唯一项目行' }
+    }
+    return { ok: false, message: '多项目时请用「从 I2-2 带入」，TB 仅作合计勾稽' }
   }
 
-  // ─── Actions: recalcRow ────────────────────────────────────────────────────
-
-  /** 对指定行强制重算公式列（外部调用入口） */
-  function recalcRow(index: number): void {
-    if (index < 0 || index >= rows.value.length) return
-    _recalcRowFormulas(rows.value[index])
-  }
-
-  // ─── Actions: save ─────────────────────────────────────────────────────────
-
-  /**
-   * 持久化审定表行数据到 allResponses。
-   * key = 'I2-1-rows'（通过 saveResponses(sheetCode='1', { rows: [...] })）
-   * 铁律：>100行的动态数据必须JSON打包存1条
-   */
   async function save(): Promise<void> {
-    // 序列化仅保存输入字段（公式列运行时重算）
-    const toPersist = rows.value.map(row => ({
-      projectName: row.projectName,
-      cipBegin: row.cipBegin,
-      increaseCapitalized: row.increaseCapitalized,
-      decreaseTransfer: row.decreaseTransfer,
-      decreaseExpense: row.decreaseExpense,
-      unadjusted: row.unadjusted,
-      aje: row.aje,
-      rje: row.rje,
-      remark: row.remark,
-    }))
+    await saveResponses('I2-1', {
+      [I2_ADJ_ROWS_KEY]: JSON.stringify(rows.value.map(serializeI2AdjudicationRow)),
+      [I2_ADJ_NOTE_KEY]: auditNote.value,
+      [I2_ADJ_CONCLUSION_KEY]: auditConclusion.value,
+    })
+    await onAfterSave?.(summary.value)
 
-    // 使用 saveResponses 存储：sheetCode='1' → item_id = 'I2-1-rows'
-    // 直接操作 allResponses Map 并调用 saveResponses
-    await saveResponses('1', { rows: toPersist })
+    // 发布审定事件 → 附注/跨底稿
+    window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
+      detail: {
+        wpCode: 'I2',
+        accountCode: '1717',
+        adjudicatedAmount: summary.value.endAudited,
+        beginAudited: summary.value.beginAudited,
+        transferToIntangible: summary.value.decreaseTransfer,
+      },
+    }))
+    if (summary.value.decreaseTransfer > 0.005) {
+      window.dispatchEvent(new CustomEvent('development:capitalized-to-intangible', {
+        detail: {
+          wpCode: 'I2',
+          transferAmount: summary.value.decreaseTransfer,
+        },
+      }))
+    }
   }
 
-  // ─── Return ────────────────────────────────────────────────────────────────
+  async function saveAuditField(kind: 'note' | 'conclusion', val: string) {
+    if (kind === 'note') {
+      auditNote.value = val
+      await saveResponses('I2-1', { [I2_ADJ_NOTE_KEY]: val })
+    } else {
+      auditConclusion.value = val
+      await saveResponses('I2-1', { [I2_ADJ_CONCLUSION_KEY]: val })
+    }
+  }
 
   return {
     rows,
+    auditNote,
+    auditConclusion,
+    summary,
     totalRow,
-    reconciliationErrors,
-    hasErrors,
+    tbRow,
+    diffRow,
+    tbDiff,
+    displayDiffEndAudited,
+    hasTbDiff,
+    hasAjeApprox,
     addRow,
     removeRow,
     updateRow,
-    recalcRow,
+    seedFromDetail,
+    syncAjeFromI23,
+    applyTbToUnadj,
     save,
+    saveAuditField,
+    load,
   }
 }
 

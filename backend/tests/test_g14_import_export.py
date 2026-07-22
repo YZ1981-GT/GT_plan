@@ -1,4 +1,4 @@
-"""G14 导入导出 — 单元测试（storage_field=remark + 带符号转回字段）."""
+"""G14 导入导出 — 单元测试（storage_field=remark + 正数转回 / 其他变动）."""
 
 from __future__ import annotations
 
@@ -94,12 +94,15 @@ async def test_g14_import_empty_template_persists_remark(override_deps: AsyncMoc
     assert "payload" in captured
 
 
-def test_g14_2_numeric_reversal_signed():
-    """转回带符号字段应解析为浮点数."""
+def test_g14_2_numeric_reversal_and_other_movement():
+    """转回（正数）与其他变动字段应解析为浮点数."""
     from app.routers.wp_render_strategies._cycle_import_export_common import parse_row_by_headers
 
     sp = _G14_SPECS["G14-2"]
-    row = ("ar", "应收账款", "1231", 100, 0, 500, 100, -20, 10, 570, "")
+    # 行键 项目 对应科目 未审 调整 期初 计提 转回 转销 其他 期末 索引
+    row = ("ar", "应收账款", "1231", 100, 0, 500, 100, 20, 10, 0, 570, "")
     parsed = parse_row_by_headers(row, sp["headers"], sp["field_keys"])
-    assert parsed["currentReversal"] == -20.0
+    assert parsed["currentReversal"] == 20.0
     assert parsed["currentProvision"] == 100.0
+    assert parsed["otherMovement"] == 0.0
+    assert parsed["closingProvision"] == 570.0

@@ -4063,7 +4063,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "applicable_categories": [
+        "A"
+      ]
     },
     {
       "wp_code": "A18",
@@ -4575,7 +4578,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "applicable_categories": [
+        "A"
+      ]
     },
     {
       "wp_code": "A17-2-1",
@@ -4586,7 +4592,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "applicable_categories": [
+        "A"
+      ]
     },
     {
       "wp_code": "A17-3",
@@ -4597,7 +4606,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "applicable_categories": [
+        "A"
+      ]
     },
     {
       "wp_code": "A17-3-1",
@@ -4608,7 +4620,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "applicable_categories": [
+        "A"
+      ]
     },
     {
       "wp_code": "A17-4",
@@ -4619,7 +4634,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "applicable_categories": [
+        "A"
+      ]
     },
     {
       "wp_code": "A17-5-1",
@@ -4630,7 +4648,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "applicable_categories": [
+        "A"
+      ]
     },
     {
       "wp_code": "A17-5-2",
@@ -4641,7 +4662,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "applicable_categories": [
+        "A"
+      ]
     },
     {
       "wp_code": "A17-5-3",
@@ -4652,7 +4676,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "applicable_categories": [
+        "A"
+      ]
     },
     {
       "wp_code": "A17-5-4",
@@ -4663,7 +4690,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "applicable_categories": [
+        "A"
+      ]
     },
     {
       "wp_code": "A17-5-5",
@@ -4674,7 +4704,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "applicable_categories": [
+        "A"
+      ]
     },
     {
       "wp_code": "A17-6",
@@ -4685,7 +4718,38 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "applicable_categories": [
+        "A"
+      ]
+    },
+    {
+      "wp_code": "A17-7",
+      "cycle": "A",
+      "wp_name": "独立性声明书（项目组）",
+      "audit_stage": "completion",
+      "trigger": "optional",
+      "account_codes": [],
+      "account_name": "",
+      "report_row": null,
+      "note_section": null,
+      "applicable_categories": [
+        "A"
+      ]
+    },
+    {
+      "wp_code": "A17-7A",
+      "cycle": "A",
+      "wp_name": "独立性声明书（专业技术委员会）",
+      "audit_stage": "completion",
+      "trigger": "optional",
+      "account_codes": [],
+      "account_name": "",
+      "report_row": null,
+      "note_section": null,
+      "applicable_categories": [
+        "A"
+      ]
     },
     {
       "wp_code": "A18-1",
@@ -5128,7 +5192,18 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "platform_fields": "wp_platform_fields/B60.json",
+      "attachment_matrix": [
+        "integrated_audit->B60A",
+        "listed_or_ipo->B60B",
+        "soe_annual->B60C",
+        "needs_regulatory_filing->B60D",
+        "needs_it_audit->B60-2-1",
+        "it_team_executes->B60-2-2/B60-2-3",
+        "uses_expert->B60-3",
+        "B60-1 always"
+      ]
     },
     {
       "wp_code": "B1A",
@@ -6419,12 +6494,15 @@
       "cycle": "B",
       "wp_name": "审计项目工时预算与控制表",
       "audit_cycle": "B",
-      "must_have": false,
+      "must_have": true,
       "file_format": "xlsx",
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "trigger": "must_have",
+      "audit_stage": "risk_assessment",
+      "platform_note": "B60 chapter3 hours; index B60-1"
     },
     {
       "wp_code": "B60-2-1",
@@ -6436,7 +6514,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "trigger": "conditional",
+      "applies_when": "needs_it_audit",
+      "audit_stage": "risk_assessment"
     },
     {
       "wp_code": "B60-2-2",
@@ -6448,7 +6529,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "trigger": "conditional",
+      "applies_when": "it_team_executes",
+      "audit_stage": "risk_assessment"
     },
     {
       "wp_code": "B60-2-3",
@@ -6460,7 +6544,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "trigger": "conditional",
+      "applies_when": "it_team_executes",
+      "audit_stage": "risk_assessment"
     },
     {
       "wp_code": "B60-3",
@@ -6472,7 +6559,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "trigger": "conditional",
+      "applies_when": "uses_expert",
+      "audit_stage": "risk_assessment"
     },
     {
       "wp_code": "B60A",
@@ -6484,7 +6574,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "trigger": "conditional",
+      "applies_when": "integrated_audit",
+      "audit_stage": "risk_assessment"
     },
     {
       "wp_code": "B60B",
@@ -6496,7 +6589,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "trigger": "conditional",
+      "applies_when": "listed_or_ipo",
+      "audit_stage": "risk_assessment"
     },
     {
       "wp_code": "B60C",
@@ -6508,7 +6604,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "trigger": "conditional",
+      "applies_when": "soe_annual",
+      "audit_stage": "risk_assessment"
     },
     {
       "wp_code": "B60D",
@@ -6520,7 +6619,10 @@
       "account_codes": [],
       "account_name": "",
       "report_row": null,
-      "note_section": null
+      "note_section": null,
+      "trigger": "conditional",
+      "applies_when": "needs_regulatory_filing",
+      "audit_stage": "risk_assessment"
     },
     {
       "wp_code": "C1",
@@ -7978,8 +8080,8 @@
         "1503"
       ],
       "account_name": "其他权益工具投资",
-      "report_row": "BS-033",
-      "note_section": "五、16",
+      "report_row": "BS-034",
+      "note_section": "五、19",
       "is_primary": true
     },
     {
@@ -7990,8 +8092,8 @@
         "1503"
       ],
       "account_name": "其他权益工具投资",
-      "report_row": "BS-033",
-      "note_section": "五、16"
+      "report_row": "BS-034",
+      "note_section": "五、19"
     },
     {
       "wp_code": "G8-2",
@@ -8056,8 +8158,8 @@
         "1519"
       ],
       "account_name": "其他非流动金融资产",
-      "report_row": "BS-034",
-      "note_section": null,
+      "report_row": "BS-035",
+      "note_section": "五、20",
       "is_primary": true
     },
     {
@@ -8068,8 +8170,8 @@
         "1519"
       ],
       "account_name": "其他非流动金融资产",
-      "report_row": "BS-034",
-      "note_section": null
+      "report_row": "BS-035",
+      "note_section": "五、20"
     },
     {
       "wp_code": "G9-2",
@@ -8085,22 +8187,44 @@
     {
       "wp_code": "G9-3",
       "cycle": "G",
-      "wp_name": "其他非流动金融资产分析程序",
+      "wp_name": "其他非流动金融资产调整分录汇总",
       "account_codes": [
         "1519"
       ],
-      "account_name": "其他非流动金融资产分析",
+      "account_name": "其他非流动金融资产调整",
       "report_row": null,
       "note_section": null
     },
     {
       "wp_code": "G9-4",
       "cycle": "G",
-      "wp_name": "其他非流动金融资产调整分录",
+      "wp_name": "其他非流动金融资产公允价值测试",
       "account_codes": [
         "1519"
       ],
-      "account_name": "其他非流动金融资产调整",
+      "account_name": "其他非流动金融资产公允测试",
+      "report_row": null,
+      "note_section": null
+    },
+    {
+      "wp_code": "G9-5",
+      "cycle": "G",
+      "wp_name": "其他非流动金融资产第三层次调节",
+      "account_codes": [
+        "1519"
+      ],
+      "account_name": "其他非流动金融资产L3调节",
+      "report_row": null,
+      "note_section": null
+    },
+    {
+      "wp_code": "G9-6",
+      "cycle": "G",
+      "wp_name": "其他非流动金融资产凭证检查",
+      "account_codes": [
+        "1519"
+      ],
+      "account_name": "其他非流动金融资产凭证检查",
       "report_row": null,
       "note_section": null
     },
@@ -8169,7 +8293,7 @@
       ],
       "account_name": "投资收益",
       "report_row": "IS-009",
-      "note_section": "五、32",
+      "note_section": "五、69",
       "is_primary": true
     },
     {
@@ -8181,12 +8305,12 @@
       ],
       "account_name": "投资收益",
       "report_row": "IS-009",
-      "note_section": "五、32"
+      "note_section": "五、69"
     },
     {
       "wp_code": "G11-2",
       "cycle": "G",
-      "wp_name": "投资收益明细表",
+      "wp_name": "投资收益明细分析表",
       "account_codes": [
         "6111"
       ],
@@ -8197,18 +8321,7 @@
     {
       "wp_code": "G11-3",
       "cycle": "G",
-      "wp_name": "投资收益分析程序",
-      "account_codes": [
-        "6111"
-      ],
-      "account_name": "投资收益分析",
-      "report_row": null,
-      "note_section": null
-    },
-    {
-      "wp_code": "G11-4",
-      "cycle": "G",
-      "wp_name": "投资收益调整分录",
+      "wp_name": "投资收益调整分录汇总",
       "account_codes": [
         "6111"
       ],
@@ -8217,15 +8330,26 @@
       "note_section": null
     },
     {
+      "wp_code": "G11-4",
+      "cycle": "G",
+      "wp_name": "投资收益收益率分析表",
+      "account_codes": [
+        "6111"
+      ],
+      "account_name": "投资收益率分析",
+      "report_row": null,
+      "note_section": null
+    },
+    {
       "wp_code": "G12",
       "cycle": "G",
       "wp_name": "净敞口套期收益",
       "account_codes": [
-        "6115"
+        "6103"
       ],
       "account_name": "净敞口套期收益",
       "report_row": "IS-012",
-      "note_section": null,
+      "note_section": "五、70",
       "is_primary": true
     },
     {
@@ -8233,18 +8357,18 @@
       "cycle": "G",
       "wp_name": "净敞口套期收益审定表",
       "account_codes": [
-        "6115"
+        "6103"
       ],
       "account_name": "净敞口套期收益",
       "report_row": "IS-012",
-      "note_section": null
+      "note_section": "五、70"
     },
     {
       "wp_code": "G12-2",
       "cycle": "G",
       "wp_name": "净敞口套期收益明细表",
       "account_codes": [
-        "6115"
+        "6103"
       ],
       "account_name": "净敞口套期收益明细",
       "report_row": null,
@@ -8253,9 +8377,9 @@
     {
       "wp_code": "G12-3",
       "cycle": "G",
-      "wp_name": "净敞口套期收益调整分录",
+      "wp_name": "净敞口套期收益调整分录汇总",
       "account_codes": [
-        "6115"
+        "6103"
       ],
       "account_name": "净敞口套期收益调整",
       "report_row": null,
@@ -8270,7 +8394,7 @@
       ],
       "account_name": "公允价值变动收益",
       "report_row": "IS-010",
-      "note_section": null,
+      "note_section": "三、公允价值变动收益",
       "is_primary": true
     },
     {
@@ -8282,7 +8406,7 @@
       ],
       "account_name": "公允价值变动收益",
       "report_row": "IS-010",
-      "note_section": null
+      "note_section": "三、公允价值变动收益"
     },
     {
       "wp_code": "G13-2",
@@ -8298,22 +8422,11 @@
     {
       "wp_code": "G13-3",
       "cycle": "G",
-      "wp_name": "公允价值变动联动交易性金融资产",
+      "wp_name": "公允价值变动收益调整分录汇总",
       "account_codes": [
         "6101"
       ],
-      "account_name": "公允价值变动联动",
-      "report_row": null,
-      "note_section": null
-    },
-    {
-      "wp_code": "G13-4",
-      "cycle": "G",
-      "wp_name": "公允价值变动收益调整分录",
-      "account_codes": [
-        "6101"
-      ],
-      "account_name": "公允价值变动调整",
+      "account_name": "公允价值变动收益调整",
       "report_row": null,
       "note_section": null
     },
@@ -8322,11 +8435,11 @@
       "cycle": "G",
       "wp_name": "信用减值损失",
       "account_codes": [
-        "6701"
+        "6702"
       ],
       "account_name": "信用减值损失",
-      "report_row": "IS-011",
-      "note_section": null,
+      "report_row": "IS-014",
+      "note_section": "三、信用减值损失",
       "is_primary": true
     },
     {
@@ -8334,40 +8447,29 @@
       "cycle": "G",
       "wp_name": "信用减值损失审定表",
       "account_codes": [
-        "6701"
+        "6702"
       ],
       "account_name": "信用减值损失",
-      "report_row": "IS-011",
-      "note_section": null
+      "report_row": "IS-014",
+      "note_section": "三、信用减值损失"
     },
     {
       "wp_code": "G14-2",
       "cycle": "G",
-      "wp_name": "信用减值损失ECL计算明细",
+      "wp_name": "信用减值损失明细表",
       "account_codes": [
-        "6701"
+        "6702"
       ],
-      "account_name": "ECL计算明细",
+      "account_name": "信用减值损失明细",
       "report_row": null,
       "note_section": null
     },
     {
       "wp_code": "G14-3",
       "cycle": "G",
-      "wp_name": "信用减值损失分析程序",
+      "wp_name": "信用减值损失调整分录汇总",
       "account_codes": [
-        "6701"
-      ],
-      "account_name": "信用减值损失分析",
-      "report_row": null,
-      "note_section": null
-    },
-    {
-      "wp_code": "G14-4",
-      "cycle": "G",
-      "wp_name": "信用减值损失调整分录",
-      "account_codes": [
-        "6701"
+        "6702"
       ],
       "account_name": "信用减值损失调整",
       "report_row": null,

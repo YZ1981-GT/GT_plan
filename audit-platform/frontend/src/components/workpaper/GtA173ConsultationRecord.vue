@@ -90,6 +90,25 @@
                 @change="(v: string) => updateMeta('period', v)"
               />
             </div>
+            <div class="gt-a173__meta-item">
+              <label>咨询编号 consultation_id</label>
+              <el-input
+                :model-value="metaInfo.consultation_id"
+                size="small"
+                :disabled="props.readonly"
+                placeholder="多事项时与 A17-3-1 成对填写"
+                @change="(v: string) => updateMeta('consultation_id', v)"
+              />
+            </div>
+            <div class="gt-a173__meta-item gt-a173__meta-item--wide" style="grid-column: 1 / -1">
+              <el-checkbox
+                :model-value="metaInfo.not_applicable === '是' || metaInfo.not_applicable === '1'"
+                :disabled="props.readonly"
+                @change="(v: boolean | string | number) => updateMeta('not_applicable', v ? '是' : '')"
+              >
+                本项目无业务咨询（标不适用，关闭咨询成对要求）
+              </el-checkbox>
+            </div>
           </div>
         </el-card>
 
@@ -304,7 +323,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, watch } from 'vue'
 import { Loading, MagicStick, Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import {
@@ -345,6 +364,11 @@ const {
   removeFileTag,
   flushPendingSaves,
 } = useA173ConsultationRecord(wpIdRef)
+
+const emit = defineEmits<{ saved: [] }>()
+watch(saveStatus, (s) => {
+  if (s === 'saved') emit('saved')
+})
 
 // ─── File Tag Input ───
 const newFileTag = ref('')

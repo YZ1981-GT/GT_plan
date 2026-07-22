@@ -10,8 +10,10 @@
           v-model="currentMode"
           :options="modeOptions"
           size="small"
+          :disabled="ooChecking"
           @change="onModeChange"
         />
+        <el-tag v-if="!isOoAvailable && !ooChecking" size="small" type="info">OnlyOffice 不可用</el-tag>
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -52,6 +54,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :html-data="resolvedHtmlData"
         />
 
         <!-- H1-2 明细表 -->
@@ -106,6 +109,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="h1Year"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H1-8 减少检查 -->
@@ -115,6 +120,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="h1Year"
         />
 
         <!-- H1-9 监盘计划 -->
@@ -124,6 +130,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H1-10 盘点检查 -->
@@ -133,6 +140,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H1-11 监盘小结 -->
@@ -142,12 +150,24 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
-        <!-- H1-12 折旧测算 (3分支选择器) -->
+        <!-- H1-12 折旧测算 (3分支：不含减值/含减值/多次减值，导入时按减值联动推荐) -->
         <template v-else-if="currentSheet === 'H1-12'">
-          <div class="dep-branch-selector" style="margin-bottom:12px;padding:0 16px">
-            <el-segmented v-model="depreciationBranch" :options="[{label:'不含减值-直线法',value:'A'},{label:'含减值',value:'B'},{label:'多次减值',value:'C'}]" size="small" />
+          <div class="dep-branch-selector" style="margin-bottom:12px;padding:0 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <el-segmented
+              v-model="depreciationBranch"
+              :options="[
+                { label: '不含减值-直线法', value: 'A' },
+                { label: '含减值', value: 'B' },
+                { label: '多次减值', value: 'C' },
+              ]"
+              size="small"
+            />
+            <span style="font-size:12px;color:var(--el-text-color-secondary)">
+              三表联动：按资产减值余额/次数自动推荐分支；支持从 H1-2 或企业台账一键导入测算
+            </span>
           </div>
           <H1TabDepreciationStraight
             v-if="depreciationBranch === 'A'"
@@ -155,6 +175,8 @@
             :project-id="props.projectId"
             :all-responses="allResponses"
             :is-readonly="isReadonly"
+            :period-end="h1PeriodEnd"
+            @branch-change="onDepBranchChange"
           />
           <H1TabDepreciationImpair
             v-else-if="depreciationBranch === 'B'"
@@ -162,6 +184,8 @@
             :project-id="props.projectId"
             :all-responses="allResponses"
             :is-readonly="isReadonly"
+            :period-end="h1PeriodEnd"
+            @branch-change="onDepBranchChange"
           />
           <H1TabDepreciationMulti
             v-else
@@ -169,16 +193,20 @@
             :project-id="props.projectId"
             :all-responses="allResponses"
             :is-readonly="isReadonly"
+            :period-end="h1PeriodEnd"
+            @branch-change="onDepBranchChange"
           />
         </template>
 
-        <!-- H1-13 折旧分配 -->
+        <!-- H1-13 折旧分配（跨科目核对：类别×费用矩阵 → F5/D5/K8/K9/I6） -->
         <H1TabDepreciationAlloc
           v-else-if="currentSheet === 'H1-13'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :depreciation-by-category="depreciationForAlloc.byCategory"
+          :depreciation-total="depreciationForAlloc.total"
         />
 
         <!-- H1-14 减值测算 -->
@@ -215,6 +243,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :html-data="props.htmlData"
+          :period-end="h1PeriodEnd"
         />
 
         <!-- H1-18 关联交易 -->
@@ -290,10 +320,12 @@
  * Spec: .kiro/specs/h1-fixed-assets/ Task 6.1
  * Requirements: 1.2-1.3, 17.1
  */
-import { ref, computed, onMounted, onUnmounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onUnmounted, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { useH1CrossSheet } from './composables/useH1CrossSheet'
+import { useH1DualMode } from './composables/useH1DualMode'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
@@ -345,18 +377,61 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
-defineEmits<{ (e: 'save'): void; (e: 'completed'): void }>()
+const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navigate-sheet', sheetName: string): void }>()
+
+// 目录卡片跳转（H1TabIndex → GtWpRenderer）
+provide('jumpToSection', (sheetName: string) => emit('navigate-sheet', sheetName))
+
+// ─── Runtime Boundary（须早于 dual-mode，供 autoSave 快照）──────────────────
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
+provide('h1VersionTrailRef', versionTrailRef)
+provide('h1OpenVersionHistory', openVersionHistory)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
 const isLoading = ref(true)
 const allResponses = ref<Map<string, any>>(new Map())
-const currentMode = ref<'html' | 'onlyoffice'>('html')
-const modeOptions = [
-  { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
+/** 合并 props.htmlData 与 selfLoad 的 render 元数据（含 TB 分类预填） */
+const resolvedHtmlData = ref<any>(props.htmlData || null)
+
+/** H1-12 → H1-13 按分类折旧额（跨 sheet computed） */
+const { depreciationForAlloc } = useH1CrossSheet(allResponses)
 const depreciationBranch = ref<'A' | 'B' | 'C'>('A')
+
+const dual = useH1DualMode({
+  wpId: toRef(props, 'wpId'),
+  sheetName: computed(() => props.sheetName || ''),
+  autoSave: async () => { scheduleAutoSnapshot() },
+  reloadAll: async () => { await selfLoad() },
+})
+const currentMode = dual.currentMode
+const modeOptions = dual.modeOptions
+const onModeChange = dual.onModeChange
+const isOoAvailable = dual.isOoAvailable
+const ooChecking = dual.checking
+
+/** 资产负债表日：供 H1-17 年检过期判定等 */
+const h1PeriodEnd = computed(() => {
+  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
+  return (
+    ctx.period_end
+    || ctx.audit_period_end
+    || ctx.bs_date
+    || props.htmlData?.period_end
+    || ''
+  ) as string
+})
+
+/** 审计年度：优先 prop，其次从资产负债表日提取，最后回退当前年（供抽凭引擎） */
+const h1Year = computed(() => {
+  if (props.year) return props.year
+  const m = /^(\d{4})/.exec(h1PeriodEnd.value || '')
+  if (m) return Number(m[1])
+  return new Date().getFullYear()
+})
 
 /** 从 sheetName 提取编码 (H1/H1A/H1-1~H1-20/附注) */
 const currentSheet = computed(() => {
@@ -381,59 +456,76 @@ const showHtmlToolbar = computed(() => {
   return s !== '' && currentMode.value !== 'onlyoffice'
 })
 
-// ─── 双模式切换 ──────────────────────────────────────────────────────────────
-function onModeChange(mode: string | number) {
-  currentMode.value = mode as 'html' | 'onlyoffice'
-}
-
 // ─── selfLoad ────────────────────────────────────────────────────────────────
 /** 合并一个 responses 对象（{item_id: {...}}）到目标 Map */
 function _mergeResponses(map: Map<string, any>, src: any): void {
   if (!src || typeof src !== 'object') return
-  for (const [k, v] of Object.entries(src)) map.set(k, v)
+  // 注入权威 item_id：dict 值缺 item_id 时以键补齐（否则保存 items 缺 item_id 触发 422）；v 自带 item_id 则以其为准
+  for (const [k, v] of Object.entries(src)) map.set(k, (v && typeof v === 'object' && !Array.isArray(v)) ? { item_id: k, ...v } : { item_id: k, remark: v })
 }
 
 async function selfLoad(): Promise<void> {
   try {
     if (props.htmlData) {
-      // 从父级透传的 htmlData 中提取 responses
-      // 兼容两种键名：allResponses（历史）/ responses_snapshot（H1 render 策略实际输出）
+      resolvedHtmlData.value = props.htmlData
       const map = new Map<string, any>()
       _mergeResponses(map, props.htmlData.allResponses)
       _mergeResponses(map, props.htmlData.responses_snapshot)
       if (map.size > 0) allResponses.value = map
     } else {
-      // selfLoad: 自行调用 render-config
       const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
         params: { force_component_type: 'h1-fixed-assets' },
         _silent: true,
       } as any)
       const data = res.data?.data || res.data
+      // 顶层或首个 sheet 的 html_data 均可带 TB 预填
+      const topHd = data?.html_data || data
+      let mergedHd: any = topHd && typeof topHd === 'object' ? { ...topHd } : {}
       if (data?.sheets && Array.isArray(data.sheets)) {
         const map = new Map<string, any>()
         for (const sheet of data.sheets) {
           _mergeResponses(map, sheet.html_data?.allResponses)
           _mergeResponses(map, sheet.html_data?.responses_snapshot)
+          const hd = sheet.html_data
+          if (hd?.adjudication_category_prefill && !mergedHd.adjudication_category_prefill) {
+            mergedHd = { ...mergedHd, ...hd }
+          }
+          if (hd?.tb_values && !mergedHd.tb_values) {
+            mergedHd = { ...mergedHd, tb_values: hd.tb_values }
+          }
         }
         allResponses.value = map
       }
+      if (Object.keys(mergedHd).length) resolvedHtmlData.value = mergedHd
     }
   } catch (err) {
     console.warn('[GtH1FixedAssets] selfLoad failed:', err)
   } finally {
     isLoading.value = false
+    const br = allResponses.value.get('H1-12-branch')?.remark
+    if (br === 'A' || br === 'B' || br === 'C') depreciationBranch.value = br
   }
 }
 
 // ─── 子组件 save 持久化（H2/H7 范式：entry 未接持久化 → 补 persistResponse+provide） ──
-// 子组件契约：inject('saveResponse')(itemId, value)。value 为字符串或对象（对象序列化进 remark）。
-// 防抖 800ms 批量 PUT /checklist-responses，并乐观更新本地 Map 供 selfLoad/跨表读取；conclusion 恒 null。
+// 子组件契约：inject('saveResponse')(itemId, value, opts?)。value 为字符串或对象（对象序列化进 remark）。
+// 防抖 800ms 批量 PUT /checklist-responses，并乐观更新本地 Map；默认 conclusion=null，C6 等可显式传 conclusion。
 const _saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
-function persistResponse(itemId: string, value: any): void {
+function persistResponse(
+  itemId: string,
+  value: any,
+  opts?: { conclusion?: string | null },
+): void {
   if (!itemId || !props.wpId) return
   const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
   const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
-  const updated = { ...existing, item_id: itemId, remark: strVal }
+  const conclusion = opts?.conclusion !== undefined ? opts.conclusion : null
+  const updated = {
+    ...existing,
+    item_id: itemId,
+    remark: strVal,
+    ...(opts?.conclusion !== undefined ? { conclusion: opts.conclusion } : {}),
+  }
   allResponses.value.set(itemId, updated)
   if (isReadonly.value) return
   const prev = _saveTimers.get(itemId)
@@ -442,7 +534,7 @@ function persistResponse(itemId: string, value: any): void {
     _saveTimers.delete(itemId)
     http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
       project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion: null, remark: updated.remark ?? null }],
+      items: [{ item_id: itemId, conclusion, remark: updated.remark ?? null }],
     }).then(() => { scheduleAutoSnapshot() })
       .catch((err: unknown) => console.warn('[GtH1] persistResponse failed:', itemId, err))
   }, 800))
@@ -453,16 +545,19 @@ function persistResponse(itemId: string, value: any): void {
 provide('allResponses', allResponses)
 provide('saveResponse', persistResponse)
 
-// ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ──────────────
-const runtime = inject(WorkpaperRuntimeContextKey, null)
-const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
-const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
-const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
-provide('h1VersionTrailRef', versionTrailRef)
-provide('h1OpenVersionHistory', openVersionHistory)
+function onDepBranchChange(b: 'A' | 'B' | 'C') {
+  if (b === 'A' || b === 'B' || b === 'C') {
+    depreciationBranch.value = b
+    persistResponse('H1-12-branch', b)
+  }
+}
+
+watch(depreciationBranch, (b) => {
+  const cur = allResponses.value.get('H1-12-branch')?.remark
+  if (cur !== b) persistResponse('H1-12-branch', b)
+})
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
-let c6EventSource: EventSource | null = null
 
 // 审定数变更 / 试算表更新 → 刷新 allResponses（各子 tab 含附注据此重算跨 sheet 取数）。
 // 经 crossWpEventBridge 统一，无论源底稿走 window 还是 eventBus 都能命中。
@@ -480,34 +575,31 @@ onMounted(() => {
   eventBus.on('substantive:adjudicated', _handleAdjudicatedRefresh)
   eventBus.on('trial-balance:updated', _handleAdjudicatedRefresh)
 
-  // 6.9 — subscribe 'control:c6-completed' → 更新 H1A 前置状态
-  subscribeC6Completed()
+  // C6 前置控制完成 → 持久化 H1A 前置状态（eventBus + window 双活通道；
+  // 后端不广播 control:c6-completed topic，故不再订阅 SSE 死路径）
+  eventBus.on('control:c6-completed' as any, _handleC6Completed)
+  window.addEventListener('control:c6-completed', _handleC6CompletedWindow)
 })
 
-/** 6.9: 订阅 C6 前置控制完成事件，更新 H1A 程序表前置状态 */
-function subscribeC6Completed() {
-  try {
-    c6EventSource = new EventSource(`/api/projects/${props.projectId}/events?topic=control:c6-completed`)
-    c6EventSource.onmessage = (evt) => {
-      try {
-        const payload = JSON.parse(evt.data)
-        console.log('[H1] received control:c6-completed', payload)
-        // 更新 allResponses 中 H1A 前置完成状态
-        allResponses.value.set('H1A-c6-prerequisite', {
-          item_id: 'H1A-c6-prerequisite',
-          conclusion: 'Y',
-          remark: `C6完成于 ${new Date().toISOString()}`,
-        })
-      } catch { /* ignore parse error */ }
-    }
-  } catch { /* SSE not available */ }
+function _applyC6Prerequisite(payload?: any): void {
+  const remark = `C6完成于 ${payload?.timestamp || new Date().toISOString()}`
+  persistResponse('H1A-c6-prerequisite', remark, { conclusion: 'Y' })
+}
+
+function _handleC6Completed(payload?: any): void {
+  _applyC6Prerequisite(payload)
+}
+
+function _handleC6CompletedWindow(e: Event): void {
+  _applyC6Prerequisite((e as CustomEvent).detail)
 }
 
 onUnmounted(() => {
-  c6EventSource?.close()
   if (_refreshTimer) clearTimeout(_refreshTimer)
   eventBus.off('substantive:adjudicated', _handleAdjudicatedRefresh)
   eventBus.off('trial-balance:updated', _handleAdjudicatedRefresh)
+  eventBus.off('control:c6-completed' as any, _handleC6Completed)
+  window.removeEventListener('control:c6-completed', _handleC6CompletedWindow)
 })
 </script>
 

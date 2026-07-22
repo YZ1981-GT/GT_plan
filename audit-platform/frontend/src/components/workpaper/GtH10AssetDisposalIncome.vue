@@ -66,6 +66,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :year="runtime?.year?.value"
         :debounced-save="onDebouncedSave"
       />
 
@@ -74,6 +75,8 @@
         variant="listed"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :applicable-standards="applicableStandards"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
       />
@@ -83,6 +86,8 @@
         variant="soe"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :applicable-standards="applicableStandards"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
       />
@@ -99,6 +104,7 @@
           :wp-code="props.wpCode"
           :html-data="props.htmlData"
           :available-sheets="availableSheets"
+          :show-architecture="false"
         />
       </div>
 
@@ -156,6 +162,7 @@ const props = defineProps<{
   sheetName?: string
   htmlData?: any
   readonly?: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{ (e: 'jump-to-section', sheetName: string): void }>()
@@ -167,6 +174,18 @@ const formData = useH10FormData({ wpId: wpIdRef, projectId: projectIdRef })
 const isReadonly = computed(() => !!props.readonly)
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
+
+const applicableStandards = computed<string[]>(() => {
+  const fromProp = props.applicableStandards
+  if (Array.isArray(fromProp) && fromProp.length) return fromProp
+  return (
+    runtime?.applicableStandards?.value
+    ?? props.htmlData?.applicable_standards
+    ?? props.htmlData?.applicableStandards
+    ?? []
+  )
+})
+
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)

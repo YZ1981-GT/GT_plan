@@ -14,9 +14,9 @@
     <div class="guide-area">
       <div class="guide-grid">
         <div class="guide-step"><span class="step-num">①</span> 程序表(H8A)确认审计程序清单</div>
-        <div class="guide-step"><span class="step-num">②</span> 审定表(H8-1)确认TB取数→科目1901+累计折旧</div>
+        <div class="guide-step"><span class="step-num">②</span> 审定表(H8-1)四区块→H8-3账项回写→TB(1901/折旧/减值)</div>
         <div class="guide-step"><span class="step-num">③</span> 明细表(H8-2)逐笔租赁合同登记→初始计量=H9+直接-激励</div>
-        <div class="guide-step"><span class="step-num">④</span> 调整分录(H8-3)→借贷平衡→推送A13</div>
+        <div class="guide-step"><span class="step-num">④</span> 调整分录(H8-3)→借贷平衡→推送调整分录模块/A13</div>
         <div class="guide-step"><span class="step-num">⑤</span> 租赁判断(H8-4/5/7)识别+期限+变更三表</div>
         <div class="guide-step"><span class="step-num">⑥</span> 计量(H8-6)按年/按月分支+折旧(H8-8)双分支</div>
         <div class="guide-step"><span class="step-num">⑦</span> 减值(H8-10/11)+减少检查(H8-12)→H9终止同步</div>
@@ -66,11 +66,12 @@
       <summary>编制提示</summary>
       <ul>
         <li>CAS21核心：使用权资产=租赁负债初始确认+初始直接费用-租赁激励</li>
-        <li>H8-6初始及后续计量有2个分支：按年计量(59行)和按月计量(361行)</li>
+        <li>H8-6初始及后续计量有2个分支：按年（E9/L9动态期数，最多30年）/按月（日期与年租金参数驱动）</li>
         <li>H8-8折旧测算有2个分支：不含减值(62公式)和含减值(86公式)</li>
+        <li>H8-11可收回金额：公允净额与DCF/WACC现值孰高，测算后回写H8-10；折现率可用WACC税前或增量借款利率</li>
         <li>H8-1审定表完成后自动回写TB科目1901+累计折旧</li>
-        <li>H8-12减少检查(租赁终止)会同步通知H9终止确认</li>
-        <li>H8-13简化处理检查：短期(≤12月)/低价值(≤4万)租赁可豁免确认使用权资产</li>
+        <li>H8-12减少检查(五段式)含终止损益与H9同步终止确认</li>
+        <li>H8-13简化处理检查：短期(≤12月)/低价值(≤4万)资格判断 + 直线法费用重算（应计 vs 账面）</li>
         <li>建议先完成H9租赁负债，再编制H8使用权资产（数据联动）</li>
       </ul>
     </details>
@@ -114,18 +115,18 @@ const sheets = computed<SheetEntry[]>(() => {
     { seq: 2, code: 'H8A', name: '使用权资产实质性程序表 H8A', sheetName: '使用权资产实质性程序表H8A', tag: '程序表', tagType: 'info' },
     { seq: 3, code: 'H8-1', name: '审定表 H8-1（原值+累计折旧）', sheetName: '审定表H8-1', tag: '审定表', tagType: 'primary' },
     { seq: 4, code: 'H8-disc-L', name: '附注披露信息（上市公司）', sheetName: '附注披露信息（上市公司）', tag: '附注', tagType: 'success' },
-    { seq: 5, code: 'H8-disc-S', name: '附注披露信息（国有企业）', sheetName: '附注披露信息（国有企业）', tag: '附注', tagType: 'success' },
-    { seq: 6, code: 'H8-2', name: '明细表 H8-2（58列4区段）', sheetName: '明细表H8-2', tag: '明细', tagType: 'primary' },
-    { seq: 7, code: 'H8-3', name: '调整分录汇总 H8-3', sheetName: '调整分录汇总H8-3' },
+    { seq: 5, code: 'H8-disc-S', name: '附注披露信息（国企）', sheetName: '附注披露信息（国企）', tag: '附注', tagType: 'success' },
+    { seq: 6, code: 'H8-2', name: '明细表 H8-2（原值/折旧/减值·4区段）', sheetName: '明细表H8-2', tag: '明细', tagType: 'primary' },
+    { seq: 7, code: 'H8-3', name: '调整分录汇总 H8-3', sheetName: '调整分录汇总H8-3', tag: '联动', tagType: 'warning' },
     { seq: 8, code: 'H8-4', name: '租赁的识别 H8-4', sheetName: '租赁的识别H8-4', tag: '判断', tagType: 'warning' },
     { seq: 9, code: 'H8-5', name: '租赁期的确定 H8-5', sheetName: '租赁期的确定H8-5', tag: '判断', tagType: 'warning' },
-    { seq: 10, code: 'H8-6', name: '初始及后续计量 H8-6（按年/按月）', sheetName: '使用权资产初始及后续计量H8-6', tag: '分支', tagType: 'danger' },
+    { seq: 10, code: 'H8-6', name: '初始及后续计量 H8-6（按年/按月）', sheetName: '使用权资产 租赁负债初始及后续计量（按年）H8-6', tag: '分支', tagType: 'danger' },
     { seq: 11, code: 'H8-7', name: '租赁变更 H8-7', sheetName: '租赁变更H8-7', tag: '判断', tagType: 'warning' },
     { seq: 12, code: 'H8-8', name: '折旧测算表 H8-8（双分支）', sheetName: '折旧测算表H8-8', tag: '分支', tagType: 'danger' },
     { seq: 13, code: 'H8-9', name: '折旧分配分析表 H8-9', sheetName: '折旧分配分析表H8-9' },
     { seq: 14, code: 'H8-10', name: '减值测算表 H8-10', sheetName: '减值测算表H8-10' },
-    { seq: 15, code: 'H8-11', name: '可收回金额测试表 H8-11', sheetName: '可收回金额测试表H8-11' },
-    { seq: 16, code: 'H8-12', name: '减少检查表 H8-12（租赁终止）', sheetName: '减少检查表H8-12' },
+    { seq: 15, code: 'H8-11', name: '可收回金额 H8-11（公允净额+DCF/WACC）', sheetName: '可收回金额测试表H8-11' },
+    { seq: 16, code: 'H8-12', name: '减少检查表 H8-12（五段式+终止损益/H9）', sheetName: '减少检查表H8-12' },
     { seq: 17, code: 'H8-13', name: '简化处理检查表 H8-13', sheetName: '简化处理的租赁检查表H8-13' },
     { seq: 18, code: 'H8-14', name: '关联交易检查表 H8-14', sheetName: '关联交易检查表H8-14' },
   ]

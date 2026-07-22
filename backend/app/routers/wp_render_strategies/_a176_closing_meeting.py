@@ -38,6 +38,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "organizer": "",
         "convener": "",
         "recorder": "",
+        "attendees": "",
     }
     agenda: dict = {str(i): "" for i in range(1, 11)}
 

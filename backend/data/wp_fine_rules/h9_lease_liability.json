@@ -2,9 +2,10 @@
   "wp_code": "H9",
   "name": "租赁负债",
   "version": "2025-R5",
-  "_note": "此JSON配置为简化版本，实际底稿结构可能更复杂。实施时需根据yaml文件中的实际sheet结构进行详细配置。参考yaml文件：backend/data/ledger_adapters/wp_render_schema/generated/H9.yaml",
+  "_note": "科目：2205租赁负债 + 1802未确认融资费用（与 H8/useH9FormData 一致；勿用 2701）。物理 sheet：H9-1审定 / H9-2明细 / H9-3未确认融资费用 / H9-4调整分录。",
   "account_codes": [
-    "2701"
+    "2205",
+    "1802"
   ],
   "source_files": [
     {
@@ -16,9 +17,8 @@
         "附注披露信息（上市公司）",
         "附注披露信息（国有企业）",
         "明细表H9-2",
-        "调整分录汇总H9-3",
-        "租赁测算表H9-4",
-        "检查表H9-5"
+        "未确认融资费用明细表H9-3",
+        "调整分录汇总H9-4"
       ]
     }
   ],
@@ -91,19 +91,14 @@
       "type": "detail"
     },
     {
-      "exact_name": "调整分录汇总H9-3",
+      "exact_name": "未确认融资费用明细表H9-3",
       "code": "H9-3",
-      "type": "adjustment"
+      "type": "detail"
     },
     {
-      "exact_name": "租赁测算表H9-4",
+      "exact_name": "调整分录汇总H9-4",
       "code": "H9-4",
-      "type": "calculation"
-    },
-    {
-      "exact_name": "检查表H9-5",
-      "code": "H9-5",
-      "type": "check"
+      "type": "adjustment"
     }
   ]
 }

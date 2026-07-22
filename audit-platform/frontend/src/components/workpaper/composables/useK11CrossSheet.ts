@@ -42,9 +42,11 @@ export const IMPAIRMENT_SOURCE_CATEGORIES = [
   { key: 'inventory', label: '存货跌价损失', sourceWp: 'F2' },
   { key: 'fixed-asset', label: '固定资产减值损失', sourceWp: 'H1' },
   { key: 'intangible', label: '无形资产减值损失', sourceWp: 'I1' },
+  { key: 'development', label: '开发支出减值损失', sourceWp: 'I2' },
   { key: 'goodwill', label: '商誉减值损失', sourceWp: 'I3' },
   { key: 'construction', label: '在建工程减值损失', sourceWp: 'H2' },
   { key: 'equity', label: '长期股权投资减值损失', sourceWp: 'G7' },
+  { key: 'investment-property', label: '投资性房地产减值损失', sourceWp: 'H3' },
   { key: 'other', label: '其他资产减值损失', sourceWp: '' },
 ] as const
 
@@ -111,8 +113,11 @@ export function useK11CrossSheet(allResponses: Ref<Map<string, any>>): {
     return IMPAIRMENT_SOURCE_CATEGORIES.map((cat) => {
       // K11-2 中该类别的本期发生额
       const k11Amount = getNum(`K11-2-${cat.key}-occurrence`)
-      // 源底稿减值计提金额（通过 EventBus 接收后存入 allResponses）
-      const sourceAmount = getNum(`K11-2-${cat.key}-source-amount`)
+      // 源底稿减值计提金额：优先专用键，其次 K11-source-{WP}-amount（EventBus 写入）
+      let sourceAmount = getNum(`K11-2-${cat.key}-source-amount`)
+      if (sourceAmount === 0 && cat.sourceWp) {
+        sourceAmount = getNum(`K11-source-${cat.sourceWp}-amount`)
+      }
       const diff = k11Amount - sourceAmount
       return {
         category: cat.key,

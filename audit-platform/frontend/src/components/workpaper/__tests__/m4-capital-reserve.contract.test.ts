@@ -4,7 +4,7 @@
  * 验证 'm4-capital-reserve' componentType 在四个注册表中正确注册：
  * 1. htmlRendererRegistry（前端组件映射）
  * 2. VALID_COMPONENT_TYPES（后端 wp_classification_service.py）
- * 3. wp_code_overrides（M4/M4-1~M4-6 共7个映射，M4A→a-program-console）
+ * 3. wp_code_overrides（M4/M4-1~M4-6/M4A 共8个映射）
  * 4. RENDERER_DISPATCH（后端渲染策略）
  *
  * Spec: .kiro/specs/m4-capital-reserve/
@@ -24,7 +24,7 @@ import {
 
 const COMPONENT_TYPE = 'm4-capital-reserve'
 
-// M4/M4-1~M4-6 共7个wp_code应映射到m4-capital-reserve
+// M4/M4-1~M4-6/M4A 共8个wp_code应映射到m4-capital-reserve
 const EXPECTED_WP_CODES = [
   'M4',
   'M4-1',
@@ -33,6 +33,7 @@ const EXPECTED_WP_CODES = [
   'M4-4',
   'M4-5',
   'M4-6',
+  'M4A',
 ]
 
 describe('M4 资本公积 — 注册契约测试', () => {
@@ -98,11 +99,7 @@ describe('M4 资本公积 — 注册契约测试', () => {
       expect(overrides[wpCode]).toBe(COMPONENT_TYPE)
     })
 
-    it('M4A 映射为 a-program-console（程序表独立）', () => {
-      expect(overrides['M4A']).toBe('a-program-console')
-    })
-
-    it('覆盖完整性：共7个映射无遗漏', () => {
+    it('覆盖完整性：共8个映射无遗漏', () => {
       const m4Mappings = Object.entries(overrides).filter(
         ([, v]) => v === COMPONENT_TYPE
       )

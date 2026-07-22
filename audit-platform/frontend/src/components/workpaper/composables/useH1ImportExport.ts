@@ -20,6 +20,8 @@ import http from '@/utils/http'
 export type H1ImportableSheet =
   | 'H1-2'      // 明细表（4区段分sheet导出）
   | 'H1-10'     // 盘点检查表
+  | 'H1-12'     // 折旧测算（企业台账）
+  | 'H1-18'     // 关联交易检查表
 
 export interface H1ImportResult {
   success: boolean
@@ -45,6 +47,8 @@ export const H1_DETAIL_SEGMENTS = [
 export const H1_IMPORTABLE_SHEETS: { code: H1ImportableSheet; label: string }[] = [
   { code: 'H1-2', label: 'H1-2 明细表(54列4区段)' },
   { code: 'H1-10', label: 'H1-10 盘点检查表' },
+  { code: 'H1-12', label: 'H1-12 折旧测算(企业台账)' },
+  { code: 'H1-18', label: 'H1-18 关联交易检查表' },
 ]
 
 // ─── Composable ──────────────────────────────────────────────────────────────

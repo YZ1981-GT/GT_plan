@@ -155,12 +155,12 @@ SKIP_LIST: Set[str] = {
     'useG7EquMetFormData', # G7 权益法子表
     'useG7EquSubFormData', # G7 子公司投资子表
     'useG7LonTerFormData', # G7 长期股权子表: 独立 DualMode + FormulaEngine
-    'useG9OthNcfFormData', # G9 其他非流动子表
+    'useG9FormData',  # G9 其他非流动金融资产
     'useG10TraFinFormData',  # G10 交易性子表: 独立 DualMode + FormulaEngine
     'useG11InvIncFormData',  # G11 投资收益子表: 独立 DualMode + FormulaEngine
     'useG12NetHedFormData',  # G12 套期净敞口子表: 独立 DualMode + FormulaEngine
     'useG13FaiValFormData',  # G13 公允价值子表: 独立 DualMode + FormulaEngine
-    'useG14CreImpFormData',  # G14 信用减值子表: 独立 DualMode + FormulaEngine
+    'useG14FormData',  # G14 信用减值损失: 独立 DualMode + FormulaEngine
     'useG2IntRecFormData',   # G2 应收利息子表: 独立 DualMode + FormulaEngine
     'useG3DivRecFormData',   # G3 应收股利子表: 独立 DualMode + FormulaEngine
     # A/B 循环 — 非 D~N 实质性底稿

@@ -296,7 +296,7 @@ describe('覆盖率 / 完成度 / 备忘', () => {
     expect(memo).toContain('抽样参数')
     expect(memo).toContain('覆盖率')
     expect(memo).toContain('测试结论')
-    expect(memo).toContain('random')
+    expect(memo).toContain('随机抽样')
   })
 })
 

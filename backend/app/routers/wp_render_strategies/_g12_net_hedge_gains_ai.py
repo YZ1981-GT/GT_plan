@@ -44,7 +44,13 @@ _SYSTEM = """你是一位资深注册会计师，协助编制 G12《净敞口套
 _PROMPTS = {
     "adjudication-analysis": "请生成 G12-1 审定表审计说明，评价净敞口套期收益本期与上期变动及主要原因。",
     "hedge-effectiveness-conclusion": "请生成 G12-4 公允价值测试与套期有效性测试的审计结论说明。",
-    "net-position-conclusion": "请生成 G12-5 风险净敞口检查表的综合审计结论说明。",
+    "net-position-conclusion": (
+        "请生成 G12-5 风险净敞口检查表的审计结论。"
+        "需基于各测试项目的相对头寸、净头寸计算、支持性证据（类型与索引）及套期工具对应关系，"
+        "评价风险净敞口套期的合规性与证据充分性。"
+        "若相关上下文含交叉验证差异（如净头寸计算不符、币种不一致、与 G12-2/G12-4 勾稽缺失或金额偏差），"
+        "须在结论中点明差异性质及是否已解释/待跟进，勿忽略。"
+    ),
     "voucher-conclusion": "请生成 G12-6 凭证检查表的抽样与异常凭证审计结论说明。",
 }
 
@@ -77,10 +83,24 @@ async def generate_g12_ai(
     except Exception as e:  # noqa: BLE001
         logger.warning("G12 AI context load failed: %s", e)
 
+    context_parts: list[str] = []
+    if body.relatedContext:
+        try:
+            import json
+
+            context_parts.append(
+                "前端交叉/行摘要：\n"
+                + json.dumps(body.relatedContext, ensure_ascii=False, default=str)[:3500]
+            )
+        except Exception:  # noqa: BLE001
+            context_parts.append(f"前端交叉/行摘要：\n{body.relatedContext!s}"[:3500])
+    if context_snippet:
+        context_parts.append(f"底稿库片段：\n{context_snippet}")
+
     user_prompt = (
         f"{_PROMPTS[section]}\n\n"
         f"已有内容：\n{body.existingContent or '（无）'}\n\n"
-        f"相关上下文：\n{context_snippet or str(body.relatedContext)}"
+        f"相关上下文：\n{chr(10).join(context_parts) if context_parts else '（无）'}"
     )
 
     try:

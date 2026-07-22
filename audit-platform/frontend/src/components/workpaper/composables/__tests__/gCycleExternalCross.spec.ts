@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest'
 import {
   findG13SourceFvMismatches,
   findG14EclMismatches,
+  findG13PendingFvSources,
   formatG13SourceFvCrossMessage,
+  isG13SourceFvReconciled,
   calcG1FvChangeAuditedTotal,
   sumG13DetailAuditedBySource,
 } from '../gCycleExternalCross'
@@ -29,6 +31,18 @@ describe('gCycleExternalCross', () => {
   it('findG13SourceFvMismatches 一致时不报差异', () => {
     const rows = [{ rowId: 'a', belongAccount: 'G1', currentAudited: 100 }]
     expect(findG13SourceFvMismatches(rows, { G1: 100 })).toHaveLength(0)
+  })
+
+  it('仅有部分源数据时不判定整包已勾稽（防假绿）', () => {
+    const rows = [
+      { rowId: 'a', belongAccount: 'G1', currentAudited: 100 },
+      { rowId: 'b', belongAccount: 'G8', currentAudited: 50 },
+    ]
+    // 仅 G1 有外部数且一致，G8 缺失 → 未完成
+    expect(isG13SourceFvReconciled(rows, { G1: 100 })).toBe(false)
+    expect(findG13PendingFvSources(rows, { G1: 100 })).toEqual(['G8'])
+    // 两源齐全且一致 → 完成
+    expect(isG13SourceFvReconciled(rows, { G1: 100, G8: 50 })).toBe(true)
   })
 
   it('findG14EclMismatches 检测 ECL 差异', () => {

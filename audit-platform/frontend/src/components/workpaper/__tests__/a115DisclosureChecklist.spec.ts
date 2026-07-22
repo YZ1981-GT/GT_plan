@@ -139,10 +139,10 @@ describe('A1-15 披露核对表 — 注册契约 (8.1)', () => {
     expect(entry!.component).toBeDefined()
   })
 
-  it('wp_code_overrides.json 映射 A1-15 → a1-15-disclosure-checklist', () => {
+  it('wp_code_overrides.json 映射 A1-15 → skip（A1 Dashboard 子底稿内嵌）', () => {
     const overridesPath = resolve(process.cwd(), '../../backend/app/data/wp_code_overrides.json')
     const overrides: Record<string, string> = JSON.parse(readFileSync(overridesPath, 'utf-8'))
-    expect(overrides['A1-15']).toBe('a1-15-disclosure-checklist')
+    expect(overrides['A1-15']).toBe('skip')
   })
 })
 

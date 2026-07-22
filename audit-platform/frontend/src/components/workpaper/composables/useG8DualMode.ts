@@ -85,5 +85,4 @@ export function useG8DualMode(options: {
   }
 }
 
-export { useG8DualMode as useG8OthEquDualMode }
 export default useG8DualMode

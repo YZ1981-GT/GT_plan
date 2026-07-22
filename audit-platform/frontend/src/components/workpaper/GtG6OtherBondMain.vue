@@ -110,12 +110,16 @@
         <div class="g6-index-toolbar">
           <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         </div>
+        <G6TabDirectory
+          :all-responses="formData.allResponses.value"
+          :available-sheets="availableSheets"
+        />
         <GCycleBIndexExtras
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :sheet-name="props.sheetName"
           :wp-code="'G6'"
-          :html-data="resolvedHtmlData ?? undefined"
+          :html-data="directoryHtmlData"
           :available-sheets="availableSheets"
         />
       </template>
@@ -170,6 +174,9 @@ const G6TabDisclosureListed = defineAsyncComponent(
 )
 const G6TabDisclosureSOE = defineAsyncComponent(
   () => import('./g6-other-bond-investment-main/core/G6TabDisclosureSOE.vue'),
+)
+const G6TabDirectory = defineAsyncComponent(
+  () => import('./g6-other-bond-investment-main/core/G6TabDirectory.vue'),
 )
 const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
 
@@ -256,15 +263,32 @@ const dualMode = useG6MainDualMode({
 const availableSheets = computed(() => {
   const hd = resolvedHtmlData.value
   const fromHtml = hd?.sheets ?? hd?.render_config?.sheets
-  if (Array.isArray(fromHtml) && fromHtml.length) return fromHtml
-  // 对齐 G1：htmlData 无 sheets 时用自加载 render-config 的 sheetCache 兜底，
-  // 保证底稿目录架构树非空
+  if (Array.isArray(fromHtml) && fromHtml.length) {
+    // 统一为下划线格式（buildCycleArchitectureHtmlData 期望 sheet_name/component_type）
+    return fromHtml.map((s: any) => ({
+      sheet_name: s.sheet_name || s.sheetName || s.name || '',
+      component_type: s.component_type || s.componentType || 'audit-sheet',
+    }))
+  }
+  // 对齐 G1：htmlData 无 sheets 时用自加载 render-config 的 sheetCache 兜底
   return Object.keys(formData.sheetCache.value).map(sheet_name => ({ sheet_name }))
+})
+
+/** 目录页传给 GCycleBIndexExtras 的 htmlData：去除 navigation_rows 强制从 availableSheets 重建 */
+const directoryHtmlData = computed(() => {
+  const hd = resolvedHtmlData.value || props.htmlData
+  if (!hd) return undefined
+  const { navigation_rows: _, ...rest } = hd as any
+  return rest as Record<string, unknown>
 })
 
 provide('g6VersionTrailRef', versionTrailRef)
 provide('g6OpenVersionHistory', openVersionHistory)
 provide('reloadWorkpaperData', () => formData.loadAll())
+
+/** 目录页跳转：G6TabDirectory inject('jumpToSection') → navigate-sheet → GtWpRenderer */
+const emit = defineEmits<{ 'navigate-sheet': [sheetName: string] }>()
+provide('jumpToSection', (sheetName: string) => emit('navigate-sheet', sheetName))
 
 function onSheetImported(): void {
   void formData.loadAll()

@@ -106,7 +106,7 @@ describe('A13 mapping', () => {
     const q = selectG9QuantitativeAbnormals(rows)
     expect(q).toHaveLength(1)
     const body = mapG9VoucherToMisstatementBody(q[0] as any, 2025)
-    expect(body.affected_account_code).toBe('1504')
+    expect(body.affected_account_code).toBe('1519')
     expect(body.misstatement_amount).toBe('100')
     const item = mapG9VoucherToA13PushItem(q[0] as any)
     expect(item.wpCode).toBe('G9-6')

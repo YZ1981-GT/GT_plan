@@ -28,6 +28,14 @@ vi.mock('element-plus', async () => {
   }
 })
 
+vi.mock('../GtIndexChip.vue', () => ({
+  default: {
+    name: 'GtIndexChip',
+    props: ['value', 'contextProjectId', 'context', 'indexRef', 'label'],
+    template: '<span class="gt-index-chip-stub">{{ indexRef || value || label }}</span>',
+  },
+}))
+
 const htmlDataWithDeficiencies = {
   section_data: {
     addressee: { client_name: '测试公司', custom_text: null },

@@ -83,15 +83,48 @@ export function calcImpairmentValid(impairment: number, bookValue: number): bool
  */
 export function calcDateDiffDays(recordDate: Date, documentDate: Date): number {
   const MS_PER_DAY = 86400000
-  const diffMs = Math.abs(recordDate.getTime() - documentDate.getTime())
+  const a = recordDate?.getTime?.()
+  const b = documentDate?.getTime?.()
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return 0
+  const diffMs = Math.abs(a - b)
   return Math.floor(diffMs / MS_PER_DAY)
 }
 
 /**
- * 截止测试跨期判断：日期差 > 阈值天数则为跨期
+ * 滞后天数异常：日期差 > 抽样窗口阈值（用于样本异常提示，非会计跨期判定）
  */
 export function isCrossPeriod(recordDate: Date, documentDate: Date, thresholdDays: number): boolean {
   return calcDateDiffDays(recordDate, documentDate) > thresholdDays
+}
+
+/**
+ * 会计跨期判定（相对资产负债表日）：
+ * 单据日与记账日分处截止日两侧即为跨期。
+ * - 单据到账：单据≤截止 且 记账>截止 → 本期漏记
+ * - 账到单据：记账≤截止 且 单据>截止 → 本期多记
+ * 两侧任一方向跨过截止日均视为跨期。
+ */
+export function isCutoffPeriodCrossing(
+  documentDate: Date,
+  recordDate: Date,
+  cutoffDate: Date,
+): boolean {
+  const d = documentDate?.getTime?.()
+  const r = recordDate?.getTime?.()
+  const c = cutoffDate?.getTime?.()
+  if (!Number.isFinite(d) || !Number.isFinite(r) || !Number.isFinite(c)) return false
+  const docOnOrBefore = d <= c
+  const recOnOrBefore = r <= c
+  return docOnOrBefore !== recOnOrBefore
+}
+
+/**
+ * 跨期金额：跨期时取单据金额（单据到账）或记账金额（账到单据），否则 0
+ */
+export function calcCrossPeriodAmount(isCrossing: boolean, amount: number): number {
+  if (!isCrossing) return 0
+  const n = Number(amount)
+  return Number.isFinite(n) ? n : 0
 }
 
 /**

@@ -104,14 +104,34 @@ export function useG14FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     }
   }
 
+  /** 审定数回写试算表（科目 6702，损益类借方净额） */
   async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    await saveImmediate('G14-adj-tb-writeback', {
-      remark: JSON.stringify({ accountCode: G14_ACCOUNT_CODE, auditedAmount }),
-    })
+    if (!opts.projectId.value) return
+    try {
+      await api.put(`/api/projects/${opts.projectId.value}/trial-balance/writeback`, {
+        account_code: G14_ACCOUNT_CODE,
+        audited_amount: auditedAmount,
+      })
+      await saveImmediate('G14-adj-tb-writeback', {
+        remark: JSON.stringify({ accountCode: G14_ACCOUNT_CODE, auditedAmount }),
+      })
+      await saveImmediate('G14-1-adjudicated-amount', { conclusion: String(auditedAmount) })
+    } catch {
+      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
+    }
   }
 
   function getSheet(name: string) {
     return sheetCache.value[name] ?? { rows: [] }
+  }
+
+  function flushPending(): void {
+    for (const [itemId, timer] of _debounceTimers.entries()) {
+      clearTimeout(timer)
+      _debounceTimers.delete(itemId)
+      const data = allResponses.value.get(itemId)
+      if (data) void saveImmediate(itemId, data)
+    }
   }
 
   onScopeDispose(() => {
@@ -127,9 +147,8 @@ export function useG14FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     getSheet,
     saveImmediate,
     debouncedSave,
+    flushPending,
     fetchTrialBalanceAmount,
     writebackTrialBalance,
   }
 }
-
-export { useG14FormData as useG14CreImpFormData }

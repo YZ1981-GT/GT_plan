@@ -85,6 +85,26 @@ async def get_a16_recommended_version(
     return {"main": main, "supplement": supplement}
 
 
+@router.get("/{project_id}/completion-flags")
+async def get_completion_flags(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """项目级完成标记（供 A1-11 等签发入口解锁）。
+
+    a17_completed：A17 签发自检硬项全部通过。
+    """
+    from app.services.a17_signoff_self_check import get_signoff_self_check
+
+    check = await get_signoff_self_check(db, project_id)
+    return {
+        "a17_completed": bool(check.get("a17_completed")),
+        "ready": bool(check.get("ready")),
+        "checked_at": None,
+    }
+
+
 @router.get("/{project_id}/workpaper-summaries/{key}")
 async def get_workpaper_summary(
     project_id: UUID,

@@ -1,58 +1,55 @@
 /**
  * useH4Stocktake — H4-6 盘点检查表 composable
  *
- * 12列：序号 | 物资名称 | 规格 | 账面数量 | 账面金额 | 盘点数量 | 盘点金额
- *       | 差异数量 | 差异金额 | 存放位置 | 盘点日期 | 备注
- *
- * 功能：
- * - 差异计算: diffQty=countQty-bookQty; diffAmt=countAmt-bookAmt
- * - 差异高亮 flag（差异不为零时标记）
- * - Saves to "H4-6-rows"
- *
- * Spec: .kiro/specs/h4-engineering-materials/
- * Task: 3.4
- * Requirements: 7.1-7.3
+ * 致同五段式 + 双向抽盘 + 三数量勾稽 + H4-2 跨表联动 + H4-7 减值关注推送
+ * 兼容旧版「账面 vs 盘点」两数量行结构
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-/** H4-6 盘点检查行 */
-export interface H4StocktakeRow {
-  rowId: string
-  /** 序号 */
-  seq: number
-  /** 物资名称 */
-  name: string
-  /** 规格型号 */
-  spec: string
-  /** 账面数量 */
-  bookQty: number
-  /** 账面金额 */
-  bookAmt: number
-  /** 盘点数量 */
-  countQty: number
-  /** 盘点金额 */
-  countAmt: number
-  /** 差异数量（公式：=盘点数量-账面数量） */
-  diffQty: number
-  /** 差异金额（公式：=盘点金额-账面金额） */
-  diffAmt: number
-  /** 存放位置 */
-  location: string
-  /** 盘点日期 */
-  countDate: string
-  /** 备注 */
-  remark: string
-  /** 差异高亮标记（差异不为零时true） */
-  hasDiff: boolean
-}
-
-// ─── Constants ───────────────────────────────────────────────────────────────
+import { ref, computed, watch, inject, type Ref, type ComputedRef } from 'vue'
+import {
+  applyQtySideEffects,
+  calcDirectionCoverage,
+  calcStocktakeStats,
+  collectStocktakeImpairmentConcerns,
+  createEmptyCheckMeta,
+  createEmptyCheckRow,
+  draftCheckSheetConclusion,
+  draftCheckSheetNote,
+  ITEM_H47_STOCKTAKE_CONCERNS,
+  mapH42RowsToCheckRows,
+  normalizeCheckMeta,
+  normalizeCheckRow,
+  sumH42EndAmount,
+  type H4StocktakeCheckMeta,
+  type H4StocktakeCheckRow,
+  type StocktakeDirection,
+} from './h4StocktakeCheckModel'
+import { H46_AJE_MARKER, pushDraftPairsToH43 } from './h4AdjustmentDraftPush'
 
 const ROWS_KEY = 'H4-6-rows'
+const META_KEY = 'H4-6-stocktake-meta'
+const NOTE_KEY = 'H4-6-note'
+const CONCLUSION_KEY = 'H4-6-conclusion'
+const H42_ROWS_KEY = 'H4-2-rows'
 
-// ─── Composable ──────────────────────────────────────────────────────────────
+function _parseRows(raw: unknown): any[] {
+  if (Array.isArray(raw)) return raw
+  if (typeof raw === 'string') {
+    try {
+      const p = JSON.parse(raw)
+      return Array.isArray(p) ? p : []
+    } catch { return [] }
+  }
+  return []
+}
+
+function _getJson(map: Map<string, any>, itemId: string): any {
+  const item = map.get(itemId)
+  if (!item) return null
+  const raw = item.remark ?? item.conclusion
+  if (!raw) return null
+  if (typeof raw !== 'string') return raw
+  try { return JSON.parse(raw) } catch { return raw }
+}
 
 export function useH4Stocktake(params: {
   wpId: Ref<string>
@@ -61,153 +58,361 @@ export function useH4Stocktake(params: {
   onSave?: (itemId: string, value: any) => void
 }) {
   const { allResponses, onSave } = params
+  const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', () => {})
 
-  // ─── State ─────────────────────────────────────────────────────────────────
+  const rows = ref<H4StocktakeCheckRow[]>([])
+  const meta = ref<H4StocktakeCheckMeta>(createEmptyCheckMeta())
+  const auditNote = ref('')
+  const auditConclusion = ref('')
 
-  const rows = ref<H4StocktakeRow[]>([])
-
-  // ─── Helpers ───────────────────────────────────────────────────────────────
-
-  function _getJson(itemId: string): any {
-    const item = allResponses.value.get(itemId)
-    if (!item) return null
-    const raw = item.remark ?? item.conclusion
-    if (!raw) return null
-    try { return JSON.parse(raw) } catch { return raw }
+  function _persist(itemId: string, value: any): void {
+    const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+    allResponses.value.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
+    if (onSave) onSave(itemId, value)
+    else saveResponse(itemId, value)
   }
 
-  function _normalizeRow(raw: any, idx: number): H4StocktakeRow {
-    const bookQty = Number(raw.bookQty) || 0
-    const bookAmt = Number(raw.bookAmt) || 0
-    const countQty = Number(raw.countQty) || 0
-    const countAmt = Number(raw.countAmt) || 0
-    const diffQty = countQty - bookQty
-    const diffAmt = countAmt - bookAmt
-
-    return {
-      rowId: raw.rowId ?? `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      seq: raw.seq ?? idx + 1,
-      name: raw.name ?? '',
-      spec: raw.spec ?? '',
-      bookQty,
-      bookAmt,
-      countQty,
-      countAmt,
-      diffQty,
-      diffAmt,
-      location: raw.location ?? '',
-      countDate: raw.countDate ?? '',
-      remark: raw.remark ?? '',
-      hasDiff: Math.abs(diffQty) > 0 || Math.abs(diffAmt) > 0.01,
-    }
+  function loadAll(): void {
+    const data = _getJson(allResponses.value, ROWS_KEY)
+    rows.value = _parseRows(data).map((r, i) => {
+      const row = normalizeCheckRow(r, i)
+      applyQtySideEffects(row)
+      return row
+    })
+    meta.value = normalizeCheckMeta(_getJson(allResponses.value, META_KEY))
+    const n = allResponses.value.get(NOTE_KEY)
+    if (n?.remark != null) auditNote.value = String(n.remark)
+    const c = allResponses.value.get(CONCLUSION_KEY)
+    if (c?.remark != null) auditConclusion.value = String(c.remark)
   }
 
-  // ─── Load ──────────────────────────────────────────────────────────────────
-
-  function load(): void {
-    const data = _getJson(ROWS_KEY)
-    if (Array.isArray(data) && data.length > 0) {
-      rows.value = data.map((r, i) => _normalizeRow(r, i))
-    } else {
-      rows.value = []
-    }
-  }
-
-  watch(allResponses, () => load(), { immediate: true })
-
-  // ─── Computed ──────────────────────────────────────────────────────────────
-
-  /** 存在差异的行数 */
-  const diffRowCount: ComputedRef<number> = computed(() =>
-    rows.value.filter(r => r.hasDiff).length,
-  )
-
-  /** 总盘点笔数 */
-  const totalCount: ComputedRef<number> = computed(() => rows.value.length)
-
-  // ─── Actions ───────────────────────────────────────────────────────────────
-
-  function addRow(name: string): void {
-    if (!name?.trim()) return
-    const seq = rows.value.length + 1
-    rows.value.push(_normalizeRow({ name: name.trim(), seq }, seq - 1))
-    _persist()
-  }
-
-  function deleteRow(rowId: string): void {
-    const idx = rows.value.findIndex(r => r.rowId === rowId)
-    if (idx === -1) return
-    rows.value.splice(idx, 1)
-    rows.value.forEach((r, i) => { r.seq = i + 1 })
-    _persist()
-  }
-
-  function updateCell(rowId: string, field: string, value: any): void {
-    const row = rows.value.find(r => r.rowId === rowId)
-    if (!row) return
-
-    // 文本字段
-    if (['name', 'spec', 'location', 'countDate', 'remark'].includes(field)) {
-      ;(row as any)[field] = String(value ?? '')
-      _persist()
-      return
-    }
-
-    // 数值字段
-    const numVal = Number(value) || 0
-    switch (field) {
-      case 'bookQty': row.bookQty = numVal; break
-      case 'bookAmt': row.bookAmt = numVal; break
-      case 'countQty': row.countQty = numVal; break
-      case 'countAmt': row.countAmt = numVal; break
-      default: return
-    }
-
-    // 重算差异
-    row.diffQty = row.countQty - row.bookQty
-    row.diffAmt = row.countAmt - row.bookAmt
-    row.hasDiff = Math.abs(row.diffQty) > 0 || Math.abs(row.diffAmt) > 0.01
-
-    _persist()
-  }
-
-  // ─── Save ──────────────────────────────────────────────────────────────────
-
-  function save(): void { _persist() }
-
-  function _persist(): void {
-    if (!onSave) return
-    const toPersist = rows.value.map(r => ({
+  function _persistRows(): void {
+    _persist(ROWS_KEY, rows.value.map((r) => ({
       rowId: r.rowId,
       seq: r.seq,
+      direction: r.direction,
       name: r.name,
+      assetNo: r.assetNo,
       spec: r.spec,
-      bookQty: r.bookQty,
-      bookAmt: r.bookAmt,
-      countQty: r.countQty,
-      countAmt: r.countAmt,
+      unit: r.unit,
       location: r.location,
-      countDate: r.countDate,
+      unitPrice: r.unitPrice,
+      bookQty: r.bookQty,
+      bookAmount: r.bookAmount,
+      // 旧字段兼容写出，便于导入导出旧模板仍可读
+      bookAmt: r.bookAmount,
+      clientCountQty: r.clientCountQty,
+      sampleQty: r.sampleQty,
+      countQty: r.sampleQty,
+      countAmt: r.unitPrice && r.sampleQty ? r.unitPrice * r.sampleQty : undefined,
+      qualityStatus: r.qualityStatus,
+      result: r.result,
+      diffReason: r.diffReason,
+      diffAmount: r.diffAmount,
       remark: r.remark,
-    }))
-    onSave(ROWS_KEY, toPersist)
+      countDate: r.countDate,
+    })))
   }
 
-  // ─── Return ────────────────────────────────────────────────────────────────
+  function _persistMeta(): void {
+    _persist(META_KEY, meta.value)
+  }
+
+  function updateMeta<K extends keyof H4StocktakeCheckMeta>(
+    key: K,
+    value: H4StocktakeCheckMeta[K],
+  ): void {
+    meta.value = { ...meta.value, [key]: value }
+    _persistMeta()
+  }
+
+  function _renumber(): void {
+    let b = 0
+    let f = 0
+    for (const r of rows.value) {
+      if (r.direction === 'floorToBook') {
+        f++
+        r.seq = f
+      } else {
+        b++
+        r.seq = b
+      }
+    }
+  }
+
+  function addRow(direction: StocktakeDirection = 'bookToFloor', name = ''): void {
+    const dirRows = rows.value.filter((r) =>
+      direction === 'floorToBook' ? r.direction === 'floorToBook' : r.direction !== 'floorToBook',
+    )
+    rows.value.push(createEmptyCheckRow(direction, dirRows.length + 1, name))
+    _renumber()
+    _persistRows()
+  }
+
+  function removeRow(rowId: string): void {
+    const idx = rows.value.findIndex((r) => r.rowId === rowId)
+    if (idx < 0) return
+    rows.value.splice(idx, 1)
+    _renumber()
+    _persistRows()
+  }
+
+  /** @deprecated 兼容旧 API */
+  function deleteRow(rowId: string): void {
+    removeRow(rowId)
+  }
+
+  function updateRow(rowId: string, patch: Partial<H4StocktakeCheckRow>): void {
+    const row = rows.value.find((r) => r.rowId === rowId)
+    if (!row) return
+    Object.assign(row, patch)
+    applyQtySideEffects(row)
+    _persistRows()
+  }
+
+  /** @deprecated 兼容旧 API：按字段更新 */
+  function updateCell(rowId: string, field: string, value: any): void {
+    const map: Record<string, string> = {
+      bookAmt: 'bookAmount',
+      countQty: 'sampleQty',
+      countAmt: 'diffAmount',
+    }
+    const key = (map[field] ?? field) as keyof H4StocktakeCheckRow
+    updateRow(rowId, { [key]: value } as Partial<H4StocktakeCheckRow>)
+  }
+
+  function saveAuditNote(val?: string): void {
+    if (val != null) auditNote.value = val
+    _persist(NOTE_KEY, auditNote.value)
+  }
+
+  function saveAuditConclusion(val?: string): void {
+    if (val != null) auditConclusion.value = val
+    _persist(CONCLUSION_KEY, auditConclusion.value)
+  }
+
+  function _getH42Rows(): any[] {
+    return _parseRows(_getJson(allResponses.value, H42_ROWS_KEY))
+  }
+
+  function importFromH42(opts?: {
+    overwrite?: boolean
+    direction?: StocktakeDirection
+    maxRows?: number
+  }): { added: number; message: string } {
+    const detail = _getH42Rows()
+    if (!detail.length) {
+      return { added: 0, message: 'H4-2 明细暂无物资，请先编制明细表' }
+    }
+    const direction = opts?.direction ?? 'bookToFloor'
+    const incoming = mapH42RowsToCheckRows(detail, {
+      direction,
+      maxRows: opts?.maxRows ?? 50,
+    })
+    if (opts?.overwrite) {
+      const keep = rows.value.filter((r) =>
+        direction === 'floorToBook' ? r.direction !== 'floorToBook' : r.direction === 'floorToBook',
+      )
+      rows.value = [...keep, ...incoming]
+      _renumber()
+      _persistRows()
+      return {
+        added: incoming.length,
+        message: `已从 H4-2 覆盖带入 ${incoming.length} 项（${direction === 'floorToBook' ? '实物→账面' : '账面→实物'}）`,
+      }
+    }
+    const existing = new Set(
+      rows.value
+        .filter((r) =>
+          direction === 'floorToBook' ? r.direction === 'floorToBook' : r.direction !== 'floorToBook',
+        )
+        .map((r) => r.name.trim().toLowerCase()),
+    )
+    let added = 0
+    for (const row of incoming) {
+      const key = row.name.trim().toLowerCase()
+      if (!key || existing.has(key)) continue
+      rows.value.push(row)
+      existing.add(key)
+      added++
+    }
+    _renumber()
+    _persistRows()
+    return {
+      added,
+      message: added
+        ? `已从 H4-2 新增 ${added} 项（${direction === 'floorToBook' ? '实物→账面' : '账面→实物'}，大额优先）`
+        : 'H4-2 物资均已存在于本方向表，未新增',
+    }
+  }
+
+  function syncTotalBookCost(): { ok: boolean; amount: number; message: string } {
+    const detail = _getH42Rows()
+    const amount = sumH42EndAmount(detail)
+    if (amount <= 0) {
+      return { ok: false, amount: 0, message: 'H4-2 明细暂无可用期末余额' }
+    }
+    updateMeta('totalBookCost', amount)
+    if (!meta.value.testPopulation) {
+      updateMeta(
+        'testPopulation',
+        `期末工程物资共 ${detail.length} 项，余额合计 ${amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })} 元`,
+      )
+    }
+    return {
+      ok: true,
+      amount,
+      message: `已同步期末余额 ${amount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })} 元`,
+    }
+  }
+
+  const bookToFloorRows = computed(() =>
+    rows.value.filter((r) => r.direction !== 'floorToBook'),
+  )
+  const floorToBookRows = computed(() =>
+    rows.value.filter((r) => r.direction === 'floorToBook'),
+  )
+  const bookToFloorCoverage = computed(() =>
+    calcDirectionCoverage(bookToFloorRows.value as any, meta.value.totalBookCost),
+  )
+  const floorToBookCoverage = computed(() =>
+    calcDirectionCoverage(floorToBookRows.value as any, meta.value.totalBookCost),
+  )
+  const stats = computed(() => calcStocktakeStats(rows.value))
+
+  /** 兼容旧 UI：差异行数 / 总笔数 */
+  const diffRowCount: ComputedRef<number> = computed(() => stats.value.varianceCount)
+  const totalCount: ComputedRef<number> = computed(() => stats.value.total)
+
+  function draftNote(): void {
+    saveAuditNote(draftCheckSheetNote({
+      stats: stats.value,
+      meta: meta.value,
+      bookToFloorCoverage: bookToFloorCoverage.value,
+      floorToBookCoverage: floorToBookCoverage.value,
+    }))
+  }
+
+  function draftConclusion(): void {
+    saveAuditConclusion(draftCheckSheetConclusion({
+      stats: stats.value,
+      bookToFloorCoverage: bookToFloorCoverage.value,
+      floorToBookCoverage: floorToBookCoverage.value,
+      meta: meta.value,
+    }))
+  }
+
+  function concernCount(): number {
+    return stats.value.concernCount
+  }
+
+  function pushImpairmentConcernsToH47(): { concernCount: number; message: string } {
+    const concerns = collectStocktakeImpairmentConcerns(rows.value)
+    if (!concerns.length) {
+      return { concernCount: 0, message: '未发现需推送的减值关注（闲置/积压/毁损/盘亏）' }
+    }
+    _persist(ITEM_H47_STOCKTAKE_CONCERNS, {
+      updatedAt: new Date().toISOString(),
+      items: concerns,
+    })
+    return {
+      concernCount: concerns.length,
+      message: `已推送 ${concerns.length} 项减值关注至 H4-7`,
+    }
+  }
+
+  /**
+   * 盘盈/盘亏差异 → H4-3：
+   * 盘亏：借营业外支出 / 贷工程物资；盘盈：借工程物资 / 贷营业外收入
+   */
+  function pushAjeDraftToH43(): { ok: boolean; added: number; amount: number; message: string } {
+    const targets = rows.value.filter(
+      (r) => r.result === '盘盈' || r.result === '盘亏',
+    )
+    if (!targets.length) {
+      return { ok: false, added: 0, amount: 0, message: '无盘盈/盘亏行可推送' }
+    }
+    const pairs = targets.map((r) => {
+      const amt = Math.abs(r.diffAmount) > 0.01
+        ? Math.abs(r.diffAmount)
+        : Math.abs(r.bookAmount)
+      const name = (r.name || '工程物资').trim()
+      if (r.result === '盘亏') {
+        return {
+          description: `盘点盘亏拟调整-${name}`,
+          amount: amt,
+          debitCode: '5301',
+          debitName: '营业外支出',
+          creditCode: '1605',
+          creditName: '工程物资',
+          reportItemDebit: '营业外支出',
+          reportItemCredit: '工程物资',
+          indexRef: 'H4-6',
+          marker: H46_AJE_MARKER,
+        }
+      }
+      return {
+        description: `盘点盘盈拟调整-${name}`,
+        amount: amt,
+        debitCode: '1605',
+        debitName: '工程物资',
+        creditCode: '6301',
+        creditName: '营业外收入',
+        reportItemDebit: '工程物资',
+        reportItemCredit: '营业外收入',
+        indexRef: 'H4-6',
+        marker: H46_AJE_MARKER,
+      }
+    }).filter((p) => p.amount >= 0.005)
+    return pushDraftPairsToH43({
+      allResponses: allResponses.value,
+      marker: H46_AJE_MARKER,
+      pairs,
+      onSave: (itemId, value) => _persist(itemId, value),
+    })
+  }
+
+  function save(): void {
+    _persistRows()
+    _persistMeta()
+  }
+
+  watch(allResponses, () => loadAll(), { immediate: true })
 
   return {
-    // State
     rows,
-    // Computed
+    meta,
+    auditNote,
+    auditConclusion,
+    stats,
+    bookToFloorRows,
+    floorToBookRows,
+    bookToFloorCoverage,
+    floorToBookCoverage,
     diffRowCount,
     totalCount,
-    // Actions
     addRow,
+    removeRow,
     deleteRow,
+    updateRow,
     updateCell,
+    updateMeta,
+    saveAuditNote,
+    saveAuditConclusion,
+    importFromH42,
+    syncTotalBookCost,
+    draftNote,
+    draftConclusion,
+    concernCount,
+    pushImpairmentConcernsToH47,
+    pushAjeDraftToH43,
     save,
-    load,
+    load: loadAll,
+    loadAll,
   }
 }
+
+/** @deprecated 旧接口类型别名 */
+export type H4StocktakeRow = H4StocktakeCheckRow
 
 export default useH4Stocktake

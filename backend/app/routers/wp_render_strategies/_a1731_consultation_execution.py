@@ -30,6 +30,8 @@ async def render(ctx: RenderContext) -> dict | None:
         "execution_date": "",
         "review_date": "",
         "reviewer": "",
+        "not_required": "",
+        "consultation_id": "",
     }
 
     sections: dict = {
@@ -74,31 +76,67 @@ async def render(ctx: RenderContext) -> dict | None:
             elif item_id == "a1731-sec4-follow_up":
                 sections["4"]["follow_up"] = row.remark or ""
 
+            # Section 3 Y/N 状态（UI 附加字段）
+            elif item_id == "a1731-sec3-yn_state":
+                sections["3"]["yn_state"] = row.remark or ""
+
     except Exception as e:  # noqa: BLE001
         logger.warning("A17-3-1 checklist_responses 查询失败 wp_id=%s: %s", wp_id, e)
 
-    # ─── 加载 A17-3 引用数据 (a173-sec1-%) ───────────────────────────────
+    # ─── 加载 A17-3 引用（跨底稿：经 wp_index 解析 A17-3 的 wp_id）────────
     a173_reference: dict = {
         "overview": "",
         "background": "",
+        "reply": "",
     }
 
     try:
-        ref_result = await db.execute(
+        a173_wp_id: str | None = None
+        idx = await db.execute(
             sa.text(
-                "SELECT item_id, remark "
-                "FROM checklist_responses WHERE wp_id = :wp_id "
-                "AND item_id LIKE 'a173-sec1-%'"
+                "SELECT wp_id FROM wp_index "
+                "WHERE project_id = :pid AND wp_code = 'A17-3' "
+                "AND wp_id IS NOT NULL LIMIT 1"
             ),
-            {"wp_id": str(wp_id)},
+            {"pid": str(ctx.project_id)},
         )
-        for row in ref_result.fetchall():
-            if row.item_id == "a173-sec1-overview":
-                a173_reference["overview"] = row.remark or ""
-            elif row.item_id == "a173-sec1-background":
-                a173_reference["background"] = row.remark or ""
+        idx_row = idx.fetchone()
+        if idx_row and idx_row.wp_id:
+            a173_wp_id = str(idx_row.wp_id)
+
+        if a173_wp_id:
+            ref_result = await db.execute(
+                sa.text(
+                    "SELECT item_id, remark "
+                    "FROM checklist_responses WHERE wp_id = :wp_id "
+                    "AND ("
+                    "  item_id IN ("
+                    "    'a173-sec1-overview',"
+                    "    'a173-sec1-background',"
+                    "    'a173-sec3-reply'"
+                    "  )"
+                    ")"
+                ),
+                {"wp_id": a173_wp_id},
+            )
+            for row in ref_result.fetchall():
+                if row.item_id == "a173-sec1-overview":
+                    a173_reference["overview"] = row.remark or ""
+                elif row.item_id == "a173-sec1-background":
+                    a173_reference["background"] = row.remark or ""
+                elif row.item_id == "a173-sec3-reply":
+                    a173_reference["reply"] = row.remark or ""
+        else:
+            logger.info(
+                "A17-3-1: 项目 %s 无 A17-3 底稿，跳过引用",
+                ctx.project_id,
+            )
     except Exception as e:  # noqa: BLE001
-        logger.warning("A17-3-1 A17-3 引用查询失败 wp_id=%s: %s", wp_id, e)
+        logger.warning(
+            "A17-3-1 A17-3 跨底稿引用查询失败 project=%s: %s",
+            ctx.project_id,
+            e,
+        )
 
     # ─── 项目上下文（自动填充） ──────────────────────────────────────────
     project_context: dict = {

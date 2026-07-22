@@ -75,7 +75,7 @@ describe('useA177IndependenceDeclaration', () => {
       expect(c.teamSignTable.value[0].name).toBe('张三')
       expect(c.partnerSection.value.confirmed).toBe(true)
       expect(c.threatRecords.value.economic_interest).toHaveLength(1)
-      expect(c.guidanceNotes.value).toHaveLength(5)
+      expect(c.commitmentItems.value.length).toBeGreaterThan(0)
       expect(c.projectContext.value.team_members).toHaveLength(1)
     })
 

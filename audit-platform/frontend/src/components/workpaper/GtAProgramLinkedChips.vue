@@ -117,7 +117,13 @@
             :validate="true"
             :prevent-navigate="true"
             :disabled="true"
+            :title="naReason(ref)"
           />
+          <span
+            v-if="naReason(ref)"
+            class="gt-a-program-console__na-hint"
+            :title="naReason(ref)"
+          >不适用</span>
         </span>
       </template>
     </template>
@@ -169,7 +175,7 @@ interface LinkedChipRow {
   [key: string]: any
 }
 
-defineProps<{
+const props = defineProps<{
   /** 当前程序行 */
   row: LinkedChipRow
   /** 弹窗式子底稿 wp_code 集合（INLINE_POPUP_WP_CODES） */
@@ -196,9 +202,14 @@ defineProps<{
   isA17_5ChipDisabled: (ref: string) => boolean
   isReviewChipDisabled: (ref: string) => boolean
   a17_5Badge: (ref: string) => string
+  a17_5DisabledReason?: (ref: string) => string
   reviewChipBadge: (ref: string) => string
   chipCompletionKey: (ref: string) => string
 }>()
+
+function naReason(ref: string): string {
+  return props.a17_5DisabledReason?.(ref) || ''
+}
 
 const emit = defineEmits<{
   /** chip 点击：冒泡 ResolvedIndexRef，由父组件 handleIndexChipClick 处理（保 jump-to-workpaper 契约） */
@@ -281,5 +292,12 @@ const emit = defineEmits<{
 
 .gt-a-program-console__other-versions-toggle:hover {
   background: var(--gt-color-primary-bg, #f4f0fa);
+}
+
+.gt-a-program-console__na-hint {
+  font-size: 10px;
+  color: #909399;
+  margin-left: 2px;
+  white-space: nowrap;
 }
 </style>

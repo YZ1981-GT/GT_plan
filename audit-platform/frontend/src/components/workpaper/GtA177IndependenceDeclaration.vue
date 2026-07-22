@@ -49,6 +49,22 @@
               <el-input :model-value="declarationText" type="textarea" :autosize="{ minRows: 4, maxRows: 10 }" :disabled="props.readonly" @change="handleDeclarationChange" />
             </div>
             <div class="gt-a177__period-grid">
+              <div class="gt-a177__period-actions" style="grid-column: 1 / -1; margin-bottom: 8px">
+                <el-button
+                  size="small"
+                  type="primary"
+                  plain
+                  :loading="importingB3"
+                  :disabled="props.readonly"
+                  @click="handleImportB3Periods(false)"
+                >从 B3 导入期间</el-button>
+                <el-button
+                  size="small"
+                  text
+                  :disabled="props.readonly || importingB3"
+                  @click="handleImportB3Periods(true)"
+                >覆盖导入</el-button>
+              </div>
               <div class="gt-a177__period-item">
                 <label>业务期间</label>
                 <div class="gt-a177__date-range">
@@ -276,7 +292,26 @@ const {
   addThreatRow, removeThreatRow, updateThreatRow,
   updatePeriod, updatePartner, loadData, flushPendingSaves,
   initiateSigningBatch, refreshSigningProgress, aiGenerateChapter,
+  importPeriodsFromB3,
 } = useA177IndependenceDeclaration(wpIdRef, { projectId: projectIdRef })
+
+const importingB3 = ref(false)
+async function handleImportB3Periods(overwrite: boolean) {
+  if (props.readonly) return
+  if (overwrite) {
+    try {
+      await ElMessageBox.confirm('将覆盖当前已填写的期间字段，是否继续？', '覆盖导入', { type: 'warning' })
+    } catch {
+      return
+    }
+  }
+  importingB3.value = true
+  try {
+    await importPeriodsFromB3(overwrite)
+  } finally {
+    importingB3.value = false
+  }
+}
 
 // ─── Navigation ───
 const activeChapter = ref(1)

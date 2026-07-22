@@ -1,4 +1,5 @@
 import type { GCycleIndexRowDef } from './g12SheetLabels'
+import { collectG10AProcedureMarks } from './g10FvCrossHelpers'
 
 export const G10_SHEET_LABEL_MAP: Record<string, string> = {
   G10: '底稿目录',
@@ -58,7 +59,8 @@ export function resolveG10SheetLabel(
 }
 
 function hasJsonRows(m: Map<string, any>, key: string): boolean {
-  const raw = m.get(key)?.remark
+  const item = m.get(key)
+  const raw = item?.remark ?? item?.conclusion
   if (!raw) return false
   try {
     const parsed = JSON.parse(raw)
@@ -73,7 +75,8 @@ export function isG10SheetComplete(code: string, m: Map<string, any>): boolean {
     case 'G10-目录':
       return true
     case 'G10A':
-      return [...m.keys()].some(k => k.startsWith('G10-proc-') || k.startsWith('G10A-'))
+      return collectG10AProcedureMarks(m).length > 0
+        || [...m.keys()].some(k => k.startsWith('G10A-'))
     case 'G10-1':
       return m.has('G10-adj-rows') || m.has('G10-adj-tb')
     case 'G10-2':
@@ -81,7 +84,8 @@ export function isG10SheetComplete(code: string, m: Map<string, any>): boolean {
     case 'G10-3':
       return hasJsonRows(m, 'G10-aje-rows')
     case 'G10-4':
-      return m.has('G10-classification-rows') || !!m.get('G10-classification-conclusion')?.conclusion
+      return hasJsonRows(m, 'G10-classification-rows')
+        || !!m.get('G10-classification-conclusion')?.conclusion
     case 'G10-5':
       return hasJsonRows(m, 'G10-fv-test-rows')
     case 'G10-6':
@@ -89,7 +93,8 @@ export function isG10SheetComplete(code: string, m: Map<string, any>): boolean {
     case 'G10-7':
       return hasJsonRows(m, 'G10-voucher-rows')
     case 'G10-8':
-      return m.has('G10-derivative-rows') || !!m.get('G10-derivative-conclusion')?.conclusion
+      return hasJsonRows(m, 'G10-derivative-rows')
+        || !!m.get('G10-derivative-conclusion')?.conclusion
     case '附注上市':
       return m.has('G10-disclosure-listed')
     case '附注国企':
@@ -97,4 +102,16 @@ export function isG10SheetComplete(code: string, m: Map<string, any>): boolean {
     default:
       return false
   }
+}
+
+/** 解析 G10 sheet 显示名并跳转（依赖 inject jumpToSection） */
+export function jumpToG10Sheet(
+  code: string,
+  jumpFn: ((sheetLabel: string) => void) | null | undefined,
+  availableSheets?: Array<{ sheet_name?: string }>,
+): boolean {
+  if (!jumpFn) return false
+  const label = resolveG10SheetLabel(code, availableSheets) || G10_SHEET_LABEL_MAP[code] || code
+  jumpFn(label)
+  return true
 }

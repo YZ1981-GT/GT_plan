@@ -34,6 +34,34 @@ export interface CycleArchitectureSheet {
 }
 
 /** b-index html_data 无 navigation_rows 时，从 render-config sheets 构造架构树数据 */
+/** 从 render-config sheetCache 中取 cycle_workpapers（force 专属 renderer 时各 sheet 同源） */
+export function pickCycleWorkpapersFromCache(
+  sheetCache?: Record<string, unknown>,
+): unknown[] | undefined {
+  if (!sheetCache) return undefined
+  for (const sheetData of Object.values(sheetCache)) {
+    const list = (sheetData as Record<string, unknown> | null)?.cycle_workpapers
+    if (Array.isArray(list) && list.length > 0) return list
+  }
+  return undefined
+}
+
+/** 目录页 htmlData：去掉 navigation_rows（强制从 availableSheets 重建架构树），并补全 cycle_workpapers */
+export function buildDirectoryHtmlData(
+  htmlData: Record<string, unknown> | undefined,
+  sheetCache?: Record<string, unknown>,
+): Record<string, unknown> | undefined {
+  if (!htmlData && !sheetCache) return undefined
+  const base = htmlData ? { ...htmlData } : {}
+  delete (base as { navigation_rows?: unknown }).navigation_rows
+  const existing = base.cycle_workpapers
+  if (!Array.isArray(existing) || existing.length === 0) {
+    const fromCache = pickCycleWorkpapersFromCache(sheetCache)
+    if (fromCache) base.cycle_workpapers = fromCache
+  }
+  return Object.keys(base).length > 0 ? base : undefined
+}
+
 export function buildCycleArchitectureHtmlData(
   htmlData: Record<string, unknown> | undefined,
   availableSheets?: CycleArchitectureSheet[],

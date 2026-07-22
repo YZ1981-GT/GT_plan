@@ -152,23 +152,22 @@ describe('GtA174DisagreementRecord — component', () => {
   })
 
   describe('section cards', () => {
-    it('renders 6 section cards', async () => {
+    it('renders 5 section cards', async () => {
       const wrapper = await mountComponent()
-      // 1 personnel card + 6 section cards + 1 signature card = 8 cards
+      // 1 personnel card + 5 section cards + 1 signature card = 7 cards
       const cards = wrapper.findAll('.gt-a174__card')
-      expect(cards.length).toBe(8)
+      expect(cards.length).toBe(7)
     })
 
     it('section cards have correct titles', async () => {
       const wrapper = await mountComponent()
       const titles = wrapper.findAll('.gt-a174__card-title')
       const titleTexts = titles.map(t => t.text())
-      expect(titleTexts).toContain('一、分歧事项描述')
-      expect(titleTexts).toContain('二、各方意见')
-      expect(titleTexts).toContain('三、咨询/讨论过程')
-      expect(titleTexts).toContain('四、最终结论')
-      expect(titleTexts).toContain('五、后续措施')
-      expect(titleTexts).toContain('六、备注')
+      expect(titleTexts).toContain('二、专业意见分歧事由')
+      expect(titleTexts).toContain('三、已执行的审计程序')
+      expect(titleTexts).toContain('四、被审计单位和监管机构的意见')
+      expect(titleTexts).toContain('五、解决方式和结论')
+      expect(titleTexts).toContain('六、废弃事项落实情况')
     })
   })
 

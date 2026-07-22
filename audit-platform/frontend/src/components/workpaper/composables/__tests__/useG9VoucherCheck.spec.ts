@@ -160,14 +160,14 @@ describe('抽样参数与覆盖率', () => {
     expect(completion.pct).toBe(100)
   })
 
-  it('抽样备忘含科目 1504', () => {
+  it('抽样备忘含科目 1519', () => {
     const md = buildG9VoucherSamplingMemo({
       params: parseG9SamplingParams('{"samplingMethod":"随机"}'),
       rows: [allPass()],
       conclusion: 'ok',
       coverage: { countPct: 100, amountPct: 0, sampleAbsAmount: 0 },
     })
-    expect(md).toContain('1504')
+    expect(md).toContain('1519')
     expect(md).toContain('G9-6')
   })
 })

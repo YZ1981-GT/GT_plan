@@ -751,8 +751,8 @@
     {
       "account_package_id": "G8_other_equity_instrument_investment",
       "cycle": "G", "account_code": "1503", "account_name": "其他权益工具投资",
-      "report_row": null, "note_section": null,
-      "mapping_status": "pending_inventory_reconciliation", "industry": ["通用"],
+      "report_row": "BS-034", "note_section": "五、19",
+      "mapping_status": "mapped", "industry": ["通用"],
       "primary_wp_code": "G8", "control_panel_sheet": "G8A", "source_wp_codes": ["G0", "G8"],
       "schema_refs": [], "generated_inventory_refs": [],
       "sheets": [
@@ -770,9 +770,9 @@
     },
     {
       "account_package_id": "G9_other_noncurrent_financial_assets",
-      "cycle": "G", "account_code": "1541", "account_name": "其他非流动金融资产",
-      "report_row": null, "note_section": null,
-      "mapping_status": "pending_inventory_reconciliation", "industry": ["通用"],
+      "cycle": "G", "account_code": "1519", "account_name": "其他非流动金融资产",
+      "report_row": "BS-035", "note_section": "五、20",
+      "mapping_status": "mapped", "industry": ["通用"],
       "primary_wp_code": "G9", "control_panel_sheet": "G9A", "source_wp_codes": ["G0", "G9"],
       "schema_refs": [], "generated_inventory_refs": [],
       "sheets": [
@@ -831,9 +831,9 @@
     },
     {
       "account_package_id": "G12_net_exposure_hedging_income",
-      "cycle": "G", "account_code": "6113", "account_name": "净敞口套期收益",
-      "report_row": null, "note_section": null,
-      "mapping_status": "pending_inventory_reconciliation", "industry": ["通用"],
+      "cycle": "G", "account_code": "6103", "account_name": "净敞口套期收益",
+      "report_row": "IS-012", "note_section": "五、70",
+      "mapping_status": "mapped", "industry": ["通用"],
       "primary_wp_code": "G12", "control_panel_sheet": "G12A", "source_wp_codes": ["G12"],
       "schema_refs": [], "generated_inventory_refs": [],
       "sheets": [
@@ -852,8 +852,8 @@
     {
       "account_package_id": "G13_fair_value_change_income",
       "cycle": "G", "account_code": "6101", "account_name": "公允价值变动收益",
-      "report_row": null, "note_section": null,
-      "mapping_status": "pending_inventory_reconciliation", "industry": ["通用"],
+      "report_row": "IS-010", "note_section": "三、公允价值变动收益",
+      "mapping_status": "mapped", "industry": ["通用"],
       "primary_wp_code": "G13", "control_panel_sheet": "G13A", "source_wp_codes": ["G13"],
       "schema_refs": [], "generated_inventory_refs": [],
       "sheets": [
@@ -869,8 +869,8 @@
     {
       "account_package_id": "G14_credit_impairment_loss",
       "cycle": "G", "account_code": "6702", "account_name": "信用减值损失",
-      "report_row": null, "note_section": null,
-      "mapping_status": "pending_inventory_reconciliation", "industry": ["通用"],
+      "report_row": "IS-014", "note_section": "三、信用减值损失",
+      "mapping_status": "mapped", "industry": ["通用"],
       "primary_wp_code": "G14", "control_panel_sheet": "G14A", "source_wp_codes": ["G14"],
       "schema_refs": [], "generated_inventory_refs": [],
       "sheets": [

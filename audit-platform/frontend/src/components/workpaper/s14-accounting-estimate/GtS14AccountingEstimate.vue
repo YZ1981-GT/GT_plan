@@ -273,7 +273,8 @@ provide('openVersionHistory', openVersionHistory)
 /** 合并一个 responses 对象（{item_id: {...}}）到目标 Map */
 function _mergeResponses(map: Map<string, any>, src: any): void {
   if (!src || typeof src !== 'object') return
-  for (const [k, v] of Object.entries(src)) map.set(k, v)
+  // 注入权威 item_id：dict 值缺 item_id 时以键补齐（否则保存 items 缺 item_id 触发 422）；v 自带 item_id 则以其为准
+  for (const [k, v] of Object.entries(src)) map.set(k, (v && typeof v === 'object' && !Array.isArray(v)) ? { item_id: k, ...v } : { item_id: k, remark: v })
 }
 
 /**

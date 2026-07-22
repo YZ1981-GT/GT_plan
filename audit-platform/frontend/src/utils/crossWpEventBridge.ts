@@ -33,6 +33,15 @@ export const BRIDGED_EVENTS: ReadonlySet<string> = new Set<string>([
   // 调整分录联动：底稿 publishAdjustment 发出，集中式调整管理页及 A13 错报汇总订阅。
   'adjustment:created',
   'a13:push-misstatement',
+  // H1-8 处置完成 → H6 自动创建清理明细（H6 历史监听 window）
+  'h1:disposal-completed',
+  'disposal:completed',
+  'disposal:source-updated',
+  // C6 控制测试完成 → H1A 前置状态
+  'control:c6-completed',
+  // 减值计提（F2/H1/H3/H8/I1 → K11 资产减值损失）——历史 producer/consumer 均走 window，
+  // 纳入桥接后 eventBus 侧消费者亦可订阅，统一双通道。
+  'impairment:calculated',
 ])
 
 /** 再入守卫标记：源自 eventBus 转发到 window 的事件带此标记，window 监听器见此不回灌。 */
@@ -63,6 +72,19 @@ export function normalizeBridgedPayload(type: string, p: any): any {
   } else if (type === 'disclosure:note-text-updated') {
     if (p.timestamp === undefined) p.timestamp = Date.now()
   } else if (type === 'adjustment:created' || type === 'a13:push-misstatement') {
+    if (p.wpCode === undefined) p.wpCode = p.wp_code ?? ''
+    if (p.timestamp === undefined) p.timestamp = Date.now()
+  } else if (type === 'impairment:calculated') {
+    // 金额别名互填：totalRequiredProvision / amount / supplement（各源底稿命名不一）
+    const amt =
+      p.totalRequiredProvision ??
+      p.amount ??
+      p.supplement ??
+      undefined
+    if (amt !== undefined) {
+      p.totalRequiredProvision = amt
+      p.amount = amt
+    }
     if (p.wpCode === undefined) p.wpCode = p.wp_code ?? ''
     if (p.timestamp === undefined) p.timestamp = Date.now()
   }

@@ -35,7 +35,14 @@ export const G8_COMPLIANCE_OPTIONS = [
   { value: 'not_applicable', label: '不适用' },
 ] as const
 
-export type G8ImportableSheet = 'G8-2' | 'G8-3' | 'G8-4' | 'G8-5' | 'G8-6'
+export type G8ImportableSheet =
+  | 'G8-2'
+  | 'G8-3'
+  | 'G8-4'
+  | 'G8-5'
+  | 'G8-6'
+  | '附注上市'
+  | '附注国企'
 
 export const G8_IMPORTABLE_SHEETS: { code: G8ImportableSheet; label: string }[] = [
   { code: 'G8-2', label: 'G8-2 明细表' },
@@ -43,6 +50,8 @@ export const G8_IMPORTABLE_SHEETS: { code: G8ImportableSheet; label: string }[] 
   { code: 'G8-4', label: 'G8-4 公允价值测试' },
   { code: 'G8-5', label: 'G8-5 指定适当性' },
   { code: 'G8-6', label: 'G8-6 凭证检查' },
+  { code: '附注上市', label: '附注披露（上市公司）' },
+  { code: '附注国企', label: '附注披露（国企）' },
 ]
 
 export const G8_DISCLOSURE_LISTED_ROWS = G8_DISCLOSURE_LISTED_SCHEMA

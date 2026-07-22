@@ -9,7 +9,8 @@ import {
   G9_L3_KEY,
   matchG9AssetKey,
 } from './g9VoucherCross'
-import { G9_ACCOUNT_CODE } from './g9Constants'
+import { G9_ACCOUNT_ALIASES, G9_ACCOUNT_CODE } from './g9Constants'
+import { g9AccountLabel } from './g9AccountMatch'
 import { parseG9AdjStore, patchG9AdjRow } from './g9AdjStorage'
 import type { ChecklistResponse } from './useF1FormData'
 
@@ -20,7 +21,6 @@ export type G9CrossCheckCode =
   | 'disclosure-sum-vs-adj'
   | 'fv4-l3-total-vs-g95-reported'
   | 'detail-l3-vs-g95-reported'
-  | 'l3-disclosure-note-missing'
   | 'fv4-vs-g95-asset'
 
 export interface G9CrossCheck {
@@ -149,8 +149,6 @@ export function buildG9CrossChecks(
   opts?: {
     disclosureCurrentSum?: number | null
     adjudicatedAmount?: number | null
-    /** 附注汇总文本，用于 L3 披露软校验 */
-    disclosureNoteText?: string | null
   },
 ): G9CrossCheck[] {
   const checks: G9CrossCheck[] = []
@@ -206,21 +204,6 @@ export function buildG9CrossChecks(
     })
   }
 
-  // Level3 有余额但附注汇总未提及层次/调节 — 软提醒
-  const l3Balance = Math.max(Math.abs(detailL3), Math.abs(fv4), Math.abs(g95Reported))
-  const noteText = String(opts?.disclosureNoteText ?? '').trim()
-  const noteMentionsL3 = /第三层次|Level\s*3|L3|不可观察|层次调节/i.test(noteText)
-  if (l3Balance > G9_CROSS_TOLERANCE && !noteMentionsL3) {
-    checks.push({
-      code: 'l3-disclosure-note-missing',
-      level: 'info',
-      message: `存在 Level3 余额 ${fmt(l3Balance)}，建议在附注汇总中补充公允价值层次及第三层次调节过程披露说明`,
-      left: l3Balance,
-      right: 0,
-      diff: l3Balance,
-    })
-  }
-
   return checks
 }
 
@@ -247,11 +230,11 @@ export const G9_CLASSIFICATION_ROW_KEY: Record<string, string> = {
   摊余成本: 'amort_1',
 }
 
-/** 拉取科目 1504 辅助核算余额，按辅助名称汇总为资产种子 */
+/** 拉取 G9 科目辅助核算余额（按别名依次尝试），按辅助名称汇总为资产种子 */
 export async function fetchG9AuxAssetSeeds(
   projectId: string,
   year?: number,
-): Promise<{ seeds: G9AuxAssetSeed[]; dimType: string; error?: string }> {
+): Promise<{ seeds: G9AuxAssetSeed[]; dimType: string; error?: string; accountCode?: string }> {
   if (!projectId) return { seeds: [], dimType: '', error: '缺少项目 ID' }
   try {
     const http = (await import('@/utils/http')).default
@@ -260,17 +243,29 @@ export async function fetchG9AuxAssetSeeds(
       ?? resolveAuditYearNumber(undefined, new Date().getFullYear() - 1)
       ?? (new Date().getFullYear() - 1)
 
-    const { data } = await http.get(`/api/projects/${projectId}/ledger/aux-balance/${G9_ACCOUNT_CODE}`, {
-      params: { year: y },
-      _silent: true,
-    } as any)
-
-    const rows: any[] = Array.isArray(data)
-      ? data
-      : (data?.data ?? data?.items ?? data?.rows ?? [])
+    let rows: any[] = []
+    let usedCode = G9_ACCOUNT_CODE
+    for (const code of G9_ACCOUNT_ALIASES) {
+      const { data } = await http.get(`/api/projects/${projectId}/ledger/aux-balance/${code}`, {
+        params: { year: y },
+        _silent: true,
+      } as any)
+      const list: any[] = Array.isArray(data)
+        ? data
+        : (data?.data ?? data?.items ?? data?.rows ?? [])
+      if (list.length) {
+        rows = list
+        usedCode = code
+        break
+      }
+    }
 
     if (!rows.length) {
-      return { seeds: [], dimType: '', error: `科目 ${G9_ACCOUNT_CODE} 无辅助核算余额（年度 ${y}）` }
+      return {
+        seeds: [],
+        dimType: '',
+        error: `${g9AccountLabel()} 无辅助核算余额（年度 ${y}）`,
+      }
     }
 
     const byType = new Map<string, any[]>()
@@ -316,7 +311,7 @@ export async function fetchG9AuxAssetSeeds(
     if (!seeds.length) {
       return { seeds: [], dimType: bestType, error: `维度「${bestType}」无有效余额行` }
     }
-    return { seeds, dimType: bestType }
+    return { seeds, dimType: bestType, accountCode: usedCode }
   } catch (e: any) {
     return { seeds: [], dimType: '', error: e?.message || '辅助核算取数失败' }
   }

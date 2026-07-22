@@ -1,102 +1,98 @@
 /**
- * useI2Analysis — I2-5 实质性分析 composable（31公式）
- *
- * 科目：1717开发支出（借方/资产类）
- *
- * 分析表列结构（Req 4.1）：
- * 项目 | 期初 | 本期增加 | 本期减少 | 期末 | 上期期末 | 同比变动率 | 预期值 | 差异 | 超阈值标记 |
- * 分析结论 | 异常原因 | 审计应对 | 备注
- *
- * 公式引擎接入（Req 4.2）：
- * - 期末 = 期初 + 本期增加 - 本期减少              [calcAssetEndBalance]
- * - 同比变动率 = (期末 - 上期期末) / 上期期末       [calcChangeRate]
- * - 差异 = 期末 - 预期值                           [calcVarianceFromExpected]
- * - 超阈值标记 = |差异| > 重要性水平                [布尔判断]
- *
- * 超重要性水平差异红色标记（Req 4.3）
- * AI辅助分析异常原因（Req 4.4）
- *
- * 数据持久化：JSON-pack 到 'I2-5-rows' key
- *
- * Spec: .kiro/specs/i2-development-expenditure/
- * Task: 3.5
- * Requirements: 4.1-4.4
+ * useI2Analysis — I2-5 实质性分析
+ * 对齐 Excel：构成分析 / 同行指标 / 人均同期 / 人均同行 / 结构化说明
+ * 兼容 Spec Req4：开发支出项目波动分析（旧 I2-5-rows 数组）
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import http from '@/utils/http'
 import {
   calcAssetEndBalance,
   calcChangeRate,
   calcVarianceFromExpected,
   calcSubtotal,
 } from './useI2FormulaEngine'
+import {
+  type I2AnalysisBundle,
+  type I2CompositionRow,
+  type I2CompositionMeta,
+  type I2PeerIndicatorRow,
+  type I2PerCapitaYoY,
+  type I2PerCapitaPeerRow,
+  type I2AnalysisStructuredNotes,
+  normalizeBundle,
+  createDefaultBundle,
+  syncDerivedFromComposition,
+  recomputeAllComposition,
+  recomputePerCapitaYoY,
+  emptyCompositionRow,
+  emptyPeerIndicator,
+  emptyPerCapitaPeer,
+  compositionTotals,
+  summarizeAnalysisAnomalies,
+  buildAnalysisConclusionDraft,
+  seedCompositionFromI6Detail,
+  I2_ANALYSIS_GROWTH_THRESHOLD,
+  I2_ANALYSIS_REV_RATIO_DELTA_THRESHOLD,
+} from './i2AnalysisModel'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-/** I2-5 实质性分析行 */
+/** 旧版项目波动行（Spec Req4） */
 export interface AnalysisRow {
-  /** 项目名称（研发项目） */
   projectName: string
-  /** 期初金额 */
   beginAmount: number
-  /** 本期增加（资本化投入） */
   increaseAmount: number
-  /** 本期减少（转无形/转费用） */
   decreaseAmount: number
-  /** 期末金额（公式列：期初 + 增加 - 减少） */
   endAmount: number
-  /** 上期期末金额（同比基数） */
   priorEndAmount: number
-  /** 同比变动率（公式列：(期末 - 上期期末) / 上期期末；上期为0时null） */
   changeRate: number | null
-  /** 预期值（审计师预期金额） */
   expectedValue: number
-  /** 差异（公式列：期末 - 预期值） */
   variance: number
-  /** 超重要性水平标记（公式列：|差异| > materialityLevel） */
   exceedThreshold: boolean
-  /** 分析结论 */
   analysisConclusion: string
-  /** 异常原因 */
   anomalyReason: string
-  /** 审计应对 */
   auditResponse: string
-  /** 备注 */
   remark: string
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-/** 持久化 key（JSON打包存1条，铁律：>100行必须JSON打包） */
+const BUNDLE_KEY = 'I2-5-analysis-bundle'
 const ROWS_KEY = 'I2-5-rows'
-
-/** 默认重要性水平金额（元），通常由B15模块传入 */
 const DEFAULT_MATERIALITY = 0
 
-// ─── Composable ──────────────────────────────────────────────────────────────
+function _createEmptyProjectRow(projectName: string): AnalysisRow {
+  return {
+    projectName,
+    beginAmount: 0,
+    increaseAmount: 0,
+    decreaseAmount: 0,
+    endAmount: 0,
+    priorEndAmount: 0,
+    changeRate: null,
+    expectedValue: 0,
+    variance: 0,
+    exceedThreshold: false,
+    analysisConclusion: '',
+    anomalyReason: '',
+    auditResponse: '',
+    remark: '',
+  }
+}
+
+function _recalcProjectRow(row: AnalysisRow, materiality: number): void {
+  row.endAmount = calcAssetEndBalance(row.beginAmount, row.increaseAmount, row.decreaseAmount)
+  row.changeRate = calcChangeRate(row.endAmount, row.priorEndAmount)
+  row.variance = calcVarianceFromExpected(row.endAmount, row.expectedValue)
+  row.exceedThreshold = materiality > 0 && Math.abs(row.variance) > materiality
+}
 
 export function useI2Analysis(params: {
   allResponses: Ref<Map<string, any>>
   saveResponses: (sheetCode: string, data: Record<string, any>) => Promise<void>
   materialityLevel?: Ref<number>
-}): {
-  rows: Ref<AnalysisRow[]>
-  totalRow: ComputedRef<AnalysisRow>
-  anomalyRows: ComputedRef<{ rowIndex: number; variance: number }[]>
-  hasAnomalies: ComputedRef<boolean>
-  addRow: (projectName: string) => void
-  removeRow: (index: number) => void
-  updateField: (rowIndex: number, field: string, value: any) => void
-  save: () => Promise<void>
-} {
+}) {
   const { allResponses, saveResponses, materialityLevel } = params
 
-  // ─── State ─────────────────────────────────────────────────────────────────
-
+  const bundle = ref<I2AnalysisBundle>(createDefaultBundle())
   const rows = ref<AnalysisRow[]>([])
 
-  // ─── Helpers ───────────────────────────────────────────────────────────────
-
-  /** 从 allResponses 获取 JSON 数据 */
   function _getJson(key: string): any {
     const item = allResponses.value.get(key)
     if (!item) return null
@@ -106,110 +102,199 @@ export function useI2Analysis(params: {
     try { return JSON.parse(raw as string) } catch { return null }
   }
 
-  /** 获取当前重要性水平 */
   function _getMateriality(): number {
     return materialityLevel?.value ?? DEFAULT_MATERIALITY
   }
 
-  /** 创建空行 */
-  function _createEmptyRow(projectName: string): AnalysisRow {
-    return {
-      projectName,
-      beginAmount: 0,
-      increaseAmount: 0,
-      decreaseAmount: 0,
-      endAmount: 0,
-      priorEndAmount: 0,
-      changeRate: null,
-      expectedValue: 0,
-      variance: 0,
-      exceedThreshold: false,
-      analysisConclusion: '',
-      anomalyReason: '',
-      auditResponse: '',
-      remark: '',
-    }
-  }
-
-  /** 重算单行公式列 */
-  function _recalcRowFormulas(row: AnalysisRow): void {
-    // 期末 = 期初 + 增加 - 减少（资产类借方科目1717）
-    row.endAmount = calcAssetEndBalance(row.beginAmount, row.increaseAmount, row.decreaseAmount)
-
-    // 同比变动率 = (期末 - 上期期末) / 上期期末
-    row.changeRate = calcChangeRate(row.endAmount, row.priorEndAmount)
-
-    // 差异 = 期末 - 预期值
-    row.variance = calcVarianceFromExpected(row.endAmount, row.expectedValue)
-
-    // 超阈值标记 = |差异| > 重要性水平
-    const matLevel = _getMateriality()
-    row.exceedThreshold = matLevel > 0 && Math.abs(row.variance) > matLevel
-  }
-
-  // ─── Init / Load ───────────────────────────────────────────────────────────
-
-  function _loadFromResponses(): void {
-    const data = _getJson(ROWS_KEY)
-    if (Array.isArray(data) && data.length > 0) {
-      rows.value = data.map((raw: any) => {
-        const row: AnalysisRow = {
-          projectName: String(raw.projectName ?? ''),
-          beginAmount: Number(raw.beginAmount) || 0,
-          increaseAmount: Number(raw.increaseAmount) || 0,
-          decreaseAmount: Number(raw.decreaseAmount) || 0,
-          endAmount: Number(raw.endAmount) || 0,
-          priorEndAmount: Number(raw.priorEndAmount) || 0,
-          changeRate: null,
-          expectedValue: Number(raw.expectedValue) || 0,
-          variance: 0,
-          exceedThreshold: false,
-          analysisConclusion: String(raw.analysisConclusion ?? ''),
-          anomalyReason: String(raw.anomalyReason ?? ''),
-          auditResponse: String(raw.auditResponse ?? ''),
-          remark: String(raw.remark ?? ''),
-        }
-        // 重算公式列确保一致性
-        _recalcRowFormulas(row)
-        return row
-      })
+  function _load(): void {
+    const bundled = _getJson(BUNDLE_KEY)
+    const legacy = _getJson(ROWS_KEY)
+    if (bundled && typeof bundled === 'object' && !Array.isArray(bundled)) {
+      bundle.value = normalizeBundle(bundled)
+      if (Array.isArray(bundled.projectFluctuationRows)) {
+        rows.value = _normalizeProjectRows(bundled.projectFluctuationRows)
+      } else if (Array.isArray(legacy)) {
+        rows.value = _normalizeProjectRows(legacy)
+      } else {
+        rows.value = []
+      }
+    } else if (Array.isArray(legacy)) {
+      bundle.value = normalizeBundle(legacy)
+      rows.value = _normalizeProjectRows(legacy)
     } else {
+      bundle.value = createDefaultBundle()
       rows.value = []
     }
   }
 
-  // 监听 allResponses 变化自动加载
-  watch(allResponses, () => _loadFromResponses(), { immediate: true })
-
-  // 监听重要性水平变化，刷新所有行的超阈值标记
-  if (materialityLevel) {
-    watch(materialityLevel, () => {
-      for (const row of rows.value) {
-        const matLevel = _getMateriality()
-        row.exceedThreshold = matLevel > 0 && Math.abs(row.variance) > matLevel
-      }
+  function _normalizeProjectRows(data: any[]): AnalysisRow[] {
+    const mat = _getMateriality()
+    return data.map((raw) => {
+      const row = _createEmptyProjectRow(String(raw.projectName ?? ''))
+      row.beginAmount = Number(raw.beginAmount) || 0
+      row.increaseAmount = Number(raw.increaseAmount) || 0
+      row.decreaseAmount = Number(raw.decreaseAmount) || 0
+      row.priorEndAmount = Number(raw.priorEndAmount) || 0
+      row.expectedValue = Number(raw.expectedValue) || 0
+      row.analysisConclusion = String(raw.analysisConclusion ?? '')
+      row.anomalyReason = String(raw.anomalyReason ?? '')
+      row.auditResponse = String(raw.auditResponse ?? '')
+      row.remark = String(raw.remark ?? '')
+      _recalcProjectRow(row, mat)
+      return row
     })
   }
 
-  // ─── Computed: 合计行 ──────────────────────────────────────────────────────
+  watch(allResponses, () => _load(), { immediate: true })
+  if (materialityLevel) {
+    watch(materialityLevel, () => {
+      const mat = _getMateriality()
+      for (const row of rows.value) _recalcProjectRow(row, mat)
+    })
+  }
+
+  // ─── Bundle mutations ──────────────────────────────────────────────────────
+
+  function refreshDerived(): void {
+    bundle.value = syncDerivedFromComposition(bundle.value)
+  }
+
+  function updateCompositionMeta(field: keyof I2CompositionMeta, value: number): void {
+    bundle.value.compositionMeta[field] = Number(value) || 0
+    refreshDerived()
+  }
+
+  /** 更新可配置阈值（growthThreshold / revRatioDeltaThreshold），并重算构成异常判定 */
+  function updateThreshold(field: 'growthThreshold' | 'revRatioDeltaThreshold', value: number): void {
+    const n = Number(value)
+    const fallback = field === 'growthThreshold'
+      ? I2_ANALYSIS_GROWTH_THRESHOLD
+      : I2_ANALYSIS_REV_RATIO_DELTA_THRESHOLD
+    bundle.value.compositionMeta[field] = Number.isFinite(n) && n > 0 ? n : fallback
+    refreshDerived()
+  }
 
   /**
-   * 合计行 = SUM(所有明细行各数值列)
-   * CP-I2-06: 合计行=SUM(明细行)
+   * 从 TB 取主营业务收入（科目前缀 6001），带入构成分析表本期/上期主营业务收入。
    */
+  async function fetchRevenueFromTb(projectId: string): Promise<{ ok: boolean; message: string }> {
+    if (!projectId) return { ok: false, message: '缺少项目ID，无法从 TB 取数' }
+    try {
+      const res = await http.get(`/projects/${projectId}/trial-balance`, {
+        params: { account_prefix: '6001' },
+        _silent: true,
+      } as any)
+      const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
+      let current = 0
+      let prior = 0
+      let hit = false
+      for (const item of list) {
+        const code = String(item.standard_account_code ?? item.account_code ?? '')
+        if (!code.startsWith('6001')) continue
+        hit = true
+        current += Number(item.audited_amount ?? item.unadjusted_amount ?? item.current_amount ?? 0) || 0
+        prior += Number(
+          item.prior_amount ?? item.prior_audited_amount ?? item.prior_period_amount ?? item.last_year_amount ?? 0,
+        ) || 0
+      }
+      if (!hit) return { ok: false, message: '未从 TB 取得 6001 主营业务收入数据，请检查试算平衡表' }
+      // 主营业务收入为贷方性质，TB 未审/审定数通常已为正数余额；此处取绝对值防止符号方向差异
+      current = Math.abs(current)
+      prior = Math.abs(prior)
+      bundle.value.compositionMeta.revenueCurrent = current
+      if (prior > 0) bundle.value.compositionMeta.revenuePrior = prior
+      refreshDerived()
+      return {
+        ok: true,
+        message: prior > 0
+          ? `已从 TB 带入主营业务收入：本期 ${current.toFixed(2)}，上期 ${prior.toFixed(2)}`
+          : `已从 TB 带入主营业务收入：本期 ${current.toFixed(2)}（未取得上期数，请手工补充）`,
+      }
+    } catch {
+      return { ok: false, message: 'TB 取数失败，请检查网络或稍后重试' }
+    }
+  }
+
+  function updateCompositionField(index: number, field: keyof I2CompositionRow, value: any): void {
+    const row = bundle.value.compositionRows[index]
+    if (!row) return
+    ;(row as any)[field] = value
+    bundle.value.compositionRows = recomputeAllComposition(
+      bundle.value.compositionRows,
+      bundle.value.compositionMeta,
+    )
+    refreshDerived()
+  }
+
+  function addCompositionRow(itemName = ''): void {
+    bundle.value.compositionRows.push(emptyCompositionRow({ itemName }))
+    refreshDerived()
+  }
+
+  function removeCompositionRow(index: number): void {
+    if (index < 0 || index >= bundle.value.compositionRows.length) return
+    bundle.value.compositionRows.splice(index, 1)
+    refreshDerived()
+  }
+
+  function updatePeerIndicator(index: number, field: keyof I2PeerIndicatorRow, value: any): void {
+    const row = bundle.value.peerIndicators[index]
+    if (!row) return
+    if (field === 'peerA' || field === 'peerB' || field === 'peerC' || field === 'current') {
+      let n = value == null || value === '' ? null : Number(value)
+      if (n != null && Number.isFinite(n) && Math.abs(n) > 1) n = n / 100 // 兼容录入 8 表示 8%
+      ;(row as any)[field] = n
+      return
+    }
+    ;(row as any)[field] = value
+  }
+
+  function addPeerIndicator(): void {
+    bundle.value.peerIndicators.push(emptyPeerIndicator({ indicator: '' }))
+  }
+
+  function updatePerCapitaYoY(field: keyof I2PerCapitaYoY, value: any): void {
+    ;(bundle.value.perCapitaYoY as any)[field] = value
+    bundle.value.perCapitaYoY = recomputePerCapitaYoY(bundle.value.perCapitaYoY)
+    refreshDerived()
+  }
+
+  function updatePerCapitaPeer(index: number, field: keyof I2PerCapitaPeerRow, value: any): void {
+    const row = bundle.value.perCapitaPeers[index]
+    if (!row) return
+    ;(row as any)[field] = value
+  }
+
+  function addPerCapitaPeer(name = '可比公司'): void {
+    bundle.value.perCapitaPeers.push(emptyPerCapitaPeer({ companyName: name, isSelf: false }))
+  }
+
+  function updateStructuredNote(key: keyof I2AnalysisStructuredNotes, value: string): void {
+    bundle.value.structuredNotes[key] = value
+  }
+
+  function seedFromI6(): { ok: boolean; message: string } {
+    const detail = _getJson('I6-2-detail-rows')
+    const list = Array.isArray(detail) ? detail : []
+    if (!list.length) return { ok: false, message: '未找到 I6-2 明细数据，请先在研发费用底稿完成明细表' }
+    bundle.value.compositionRows = seedCompositionFromI6Detail(list)
+    refreshDerived()
+    return { ok: true, message: `已从 I6-2 带入 ${bundle.value.compositionRows.length} 个构成项目` }
+  }
+
+  // ─── Legacy project fluctuation ────────────────────────────────────────────
+
   const totalRow: ComputedRef<AnalysisRow> = computed(() => {
     const r = rows.value
-    const beginAmount = calcSubtotal(r.map(row => row.beginAmount))
-    const increaseAmount = calcSubtotal(r.map(row => row.increaseAmount))
-    const decreaseAmount = calcSubtotal(r.map(row => row.decreaseAmount))
+    const beginAmount = calcSubtotal(r.map((row) => row.beginAmount))
+    const increaseAmount = calcSubtotal(r.map((row) => row.increaseAmount))
+    const decreaseAmount = calcSubtotal(r.map((row) => row.decreaseAmount))
     const endAmount = calcAssetEndBalance(beginAmount, increaseAmount, decreaseAmount)
-    const priorEndAmount = calcSubtotal(r.map(row => row.priorEndAmount))
+    const priorEndAmount = calcSubtotal(r.map((row) => row.priorEndAmount))
     const changeRate = calcChangeRate(endAmount, priorEndAmount)
-    const expectedValue = calcSubtotal(r.map(row => row.expectedValue))
+    const expectedValue = calcSubtotal(r.map((row) => row.expectedValue))
     const variance = calcVarianceFromExpected(endAmount, expectedValue)
     const matLevel = _getMateriality()
-    const exceedThreshold = matLevel > 0 && Math.abs(variance) > matLevel
-
     return {
       projectName: '合计',
       beginAmount,
@@ -220,7 +305,7 @@ export function useI2Analysis(params: {
       changeRate,
       expectedValue,
       variance,
-      exceedThreshold,
+      exceedThreshold: matLevel > 0 && Math.abs(variance) > matLevel,
       analysisConclusion: '',
       anomalyReason: '',
       auditResponse: '',
@@ -228,109 +313,48 @@ export function useI2Analysis(params: {
     }
   })
 
-  // ─── Computed: 异常行列表（超重要性水平差异）────────────────────────────────
-
-  /**
-   * 超重要性水平差异的行列表（Req 4.3: 红色标记）
-   * 返回超阈值行的 index 和 variance 供 UI 红色高亮
-   */
-  const anomalyRows: ComputedRef<{ rowIndex: number; variance: number }[]> = computed(() => {
-    const anomalies: { rowIndex: number; variance: number }[] = []
-    for (let i = 0; i < rows.value.length; i++) {
-      if (rows.value[i].exceedThreshold) {
-        anomalies.push({ rowIndex: i, variance: rows.value[i].variance })
-      }
-    }
-    return anomalies
+  const anomalyRows = computed(() => {
+    const out: { rowIndex: number; variance: number }[] = []
+    rows.value.forEach((row, i) => {
+      if (row.exceedThreshold) out.push({ rowIndex: i, variance: row.variance })
+    })
+    return out
   })
 
-  /** 是否存在超阈值异常 */
-  const hasAnomalies: ComputedRef<boolean> = computed(() => anomalyRows.value.length > 0)
+  const hasAnomalies = computed(() => anomalyRows.value.length > 0)
 
-  // ─── Actions: addRow ───────────────────────────────────────────────────────
-
-  /**
-   * 新增分析行。
-   * 交互规范：需先弹 ElMessageBox.prompt 输入项目名称确认后再创建（由Vue组件层处理）。
-   */
   function addRow(projectName: string): void {
-    if (!projectName || !projectName.trim()) return
-    const newRow = _createEmptyRow(projectName.trim())
-    rows.value.push(newRow)
+    if (!projectName?.trim()) return
+    rows.value.push(_createEmptyProjectRow(projectName.trim()))
   }
 
-  // ─── Actions: removeRow ────────────────────────────────────────────────────
-
-  /** 删除指定索引的行 */
   function removeRow(index: number): void {
     if (index < 0 || index >= rows.value.length) return
     rows.value.splice(index, 1)
   }
 
-  // ─── Actions: updateField ──────────────────────────────────────────────────
-
-  /**
-   * 更新指定行指定字段的值，自动重算公式列。
-   *
-   * 可编辑字段：projectName / beginAmount / increaseAmount / decreaseAmount /
-   *   priorEndAmount / expectedValue / analysisConclusion / anomalyReason / auditResponse / remark
-   *
-   * 公式列（endAmount / changeRate / variance / exceedThreshold）不可直接编辑。
-   */
   function updateField(rowIndex: number, field: string, value: any): void {
     if (rowIndex < 0 || rowIndex >= rows.value.length) return
     const row = rows.value[rowIndex]
-
-    switch (field) {
-      case 'projectName':
-        row.projectName = String(value ?? '')
-        break
-      case 'beginAmount':
-        row.beginAmount = Number(value) || 0
-        break
-      case 'increaseAmount':
-        row.increaseAmount = Number(value) || 0
-        break
-      case 'decreaseAmount':
-        row.decreaseAmount = Number(value) || 0
-        break
-      case 'priorEndAmount':
-        row.priorEndAmount = Number(value) || 0
-        break
-      case 'expectedValue':
-        row.expectedValue = Number(value) || 0
-        break
-      case 'analysisConclusion':
-        row.analysisConclusion = String(value ?? '')
-        return // 文本字段不需要重算公式
-      case 'anomalyReason':
-        row.anomalyReason = String(value ?? '')
-        return
-      case 'auditResponse':
-        row.auditResponse = String(value ?? '')
-        return
-      case 'remark':
-        row.remark = String(value ?? '')
-        return
-      default:
-        // 公式列不可直接编辑，忽略
-        return
+    const textFields = ['projectName', 'analysisConclusion', 'anomalyReason', 'auditResponse', 'remark']
+    if (textFields.includes(field)) {
+      ;(row as any)[field] = String(value ?? '')
+      return
     }
-
-    // 重算公式列
-    _recalcRowFormulas(row)
+    const numFields = ['beginAmount', 'increaseAmount', 'decreaseAmount', 'priorEndAmount', 'expectedValue']
+    if (numFields.includes(field)) {
+      ;(row as any)[field] = Number(value) || 0
+      _recalcProjectRow(row, _getMateriality())
+    }
   }
 
-  // ─── Actions: save ─────────────────────────────────────────────────────────
+  const compositionSummary = computed(() =>
+    compositionTotals(bundle.value.compositionRows, bundle.value.compositionMeta),
+  )
+  const anomalySummary = computed(() => summarizeAnalysisAnomalies(bundle.value))
 
-  /**
-   * 持久化实质性分析行数据到 allResponses。
-   * key = 'I2-5-rows'（JSON打包存1条）
-   * 铁律：>100行的动态数据必须JSON打包存1条
-   */
   async function save(): Promise<void> {
-    // 序列化仅保存输入字段（公式列运行时重算）
-    const toPersist = rows.value.map(row => ({
+    const projectPersist = rows.value.map((row) => ({
       projectName: row.projectName,
       beginAmount: row.beginAmount,
       increaseAmount: row.increaseAmount,
@@ -343,13 +367,37 @@ export function useI2Analysis(params: {
       remark: row.remark,
     }))
 
-    // 使用 saveResponses 存储：sheetCode='5' → item_id = 'I2-5-rows'
-    await saveResponses('5', { [ROWS_KEY]: toPersist })
+    const toSave: I2AnalysisBundle = {
+      ...bundle.value,
+      projectFluctuationRows: projectPersist,
+    }
+
+    await saveResponses('I2-5', {
+      [BUNDLE_KEY]: JSON.stringify(toSave),
+      [ROWS_KEY]: JSON.stringify(projectPersist),
+    })
   }
 
-  // ─── Return ────────────────────────────────────────────────────────────────
-
   return {
+    bundle,
+    compositionSummary,
+    anomalySummary,
+    refreshDerived,
+    updateCompositionMeta,
+    updateThreshold,
+    fetchRevenueFromTb,
+    updateCompositionField,
+    addCompositionRow,
+    removeCompositionRow,
+    updatePeerIndicator,
+    addPeerIndicator,
+    updatePerCapitaYoY,
+    updatePerCapitaPeer,
+    addPerCapitaPeer,
+    updateStructuredNote,
+    seedFromI6,
+    buildConclusionDraft: () => buildAnalysisConclusionDraft(bundle.value),
+    // legacy
     rows,
     totalRow,
     anomalyRows,

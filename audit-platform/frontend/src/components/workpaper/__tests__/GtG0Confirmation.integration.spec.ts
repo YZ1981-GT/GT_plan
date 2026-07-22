@@ -442,7 +442,7 @@ describe('G0 集成: 版本快照 autoSnapshot 触发', () => {
     expect(mockPost).toHaveBeenCalledTimes(1)
     const [url, body] = mockPost.mock.calls[0]
     expect(url).toBe('/api/projects/proj-456/workpapers/wp-123/versions')
-    expect(body.snapshot_type).toBe('manual')
+    expect(body.snapshot_type).toBe('auto')
   })
 
   it('连续多次调度只触发一次（debounce 合并）', async () => {

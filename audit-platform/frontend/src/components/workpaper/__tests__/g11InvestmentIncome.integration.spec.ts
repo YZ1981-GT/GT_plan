@@ -90,6 +90,12 @@ describe('G11 集成 — G11-5 核对异常', () => {
     expect(row.isAbnormal).toBe(false)
   })
 
+  it('全部未测 → 非异常', () => {
+    const row = enrichG11VoucherRow({ creditAmount: 1 }, 1)
+    expect(row.check1).toBeNull()
+    expect(row.isAbnormal).toBe(false)
+  })
+
   it('借贷平衡检测', () => {
     expect(isDebitCreditBalanced([100, 50], [150])).toBe(true)
     expect(isDebitCreditBalanced([100], [90])).toBe(false)
@@ -97,9 +103,9 @@ describe('G11 集成 — G11-5 核对异常', () => {
 })
 
 describe('G11 集成 — 导入导出与指引', () => {
-  it('5 张表均可导入导出', () => {
+  it('7 张表均可导入导出（含附注上市/国企）', () => {
     expect(G11_IMPORTABLE_SHEETS.map((s) => s.code)).toEqual([
-      'G11-1', 'G11-2', 'G11-3', 'G11-4', 'G11-5',
+      'G11-1', 'G11-2', 'G11-3', 'G11-4', 'G11-5', '附注上市', '附注国企',
     ])
   })
 
@@ -139,6 +145,14 @@ describe('G11 集成 — G11-3 调整回写', () => {
     const net = calcG11AdjustmentNet([
       { accountCode: '6111', debitAmount: 0, creditAmount: 50 },
       { accountCode: '1001', debitAmount: 50, creditAmount: 0 },
+    ])
+    expect(net).toBe(50)
+  })
+
+  it('报表调整不计入回写净额', () => {
+    const net = calcG11AdjustmentNet([
+      { accountCode: '6111', debitAmount: 0, creditAmount: 50, category: '账项调整' },
+      { accountCode: '6111', debitAmount: 0, creditAmount: 20, category: '报表调整' },
     ])
     expect(net).toBe(50)
   })

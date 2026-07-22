@@ -36,6 +36,17 @@
           </template>
         </el-dropdown>
         <el-button size="small" type="default" text @click="handleReview">复核</el-button>
+        <el-button
+          size="small"
+          type="warning"
+          plain
+          :loading="pullingI1"
+          :disabled="isReadonly"
+          data-testid="i6-pull-i1-amort"
+          @click="handlePullI1Amort"
+        >
+          从 I1-9 取摊销
+        </el-button>
       </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:I6-2" :context-project-id="projectId" /></span>
@@ -138,6 +149,7 @@ import { ArrowDown } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import http from '@/utils/http'
+import { pullI1AmortIntoExpenseDetail } from '../../composables/expenseWpI1AmortPull'
 
 const props = defineProps<{
   wpId: string
@@ -276,6 +288,33 @@ async function handleImport(): Promise<void> {
 function onAuditNoteBlur(): void { if (props.isReadonly) return; emit('save', NOTE_KEY, auditNote.value) }
 function onAuditConclusionBlur(): void { if (props.isReadonly) return; emit('save', CONCLUSION_KEY, auditConclusion.value) }
 function handleReview(): void { openReviewDialog('I6-2 明细表') }
+
+const pullingI1 = ref(false)
+async function handlePullI1Amort(): Promise<void> {
+  if (props.isReadonly) return
+  pullingI1.value = true
+  try {
+    const result = await pullI1AmortIntoExpenseDetail(props.projectId, 'I6')
+    if (!result.amount) {
+      ElMessage.warning(result.message || 'I1-9 摊销合计为 0')
+      return
+    }
+    const hit = rows.value.find((r) => String(r.name || '').includes('无形资产摊销'))
+    if (!hit) {
+      ElMessage.warning('未找到「无形资产摊销」行')
+      return
+    }
+    hit.months = new Array(12).fill(0)
+    hit.months[11] = result.amount
+    hit.total = result.amount
+    _persist()
+    ElMessage.success(`已从 I1-9 回填无形资产摊销 ${result.amount.toFixed(2)}`)
+  } catch (e: any) {
+    ElMessage.error(e?.message || '拉取 I1-9 失败')
+  } finally {
+    pullingI1.value = false
+  }
+}
 
 // ─── Chart (lazy init) ───────────────────────────────────────────────────────
 onMounted(async () => {

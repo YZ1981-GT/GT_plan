@@ -1,4 +1,4 @@
-"""G11 投资收益 — 导入导出（G11-1 / G11-2 / G11-3 / G11-4 / G11-5 × 3 端点 = 15）."""
+"""G11 投资收益 — 导入导出（G11-1~5 + 附注上市/国企）."""
 
 from __future__ import annotations
 
@@ -26,13 +26,21 @@ from ._cycle_import_export_common import (
     export_row_by_keys,
     import_rows_generic,
     is_numeric_field_key,
+    load_json_payload,
     load_json_rows,
     parse_row_by_headers,
     parse_upload_xlsx,
     safe_float,
     safe_str,
+    upsert_json_payload,
     upsert_json_rows,
     workbook_to_response,
+)
+from ._g11_disclosure_io import (
+    build_listed_disclosure_workbook,
+    build_soe_disclosure_workbook,
+    parse_listed_disclosure_workbook,
+    parse_soe_disclosure_workbook,
 )
 
 _G11_1_HEADERS = [
@@ -47,32 +55,34 @@ _G11_1_KEYS = [
 ]
 
 _G11_2_HEADERS = [
-    "序号", "项目", "被投资单位",
+    "序号", "行键", "项目", "投资类型", "被投资单位", "处置子类",
     "本期未审数", "本期调整", "本期审定数", "本期占比",
     "上年未审数", "上期调整", "上年审定数", "上期占比",
     "变动额", "变动原因/索引号",
 ]
 _G11_2_KEYS = [
-    "seq", "itemName", "investeeName",
+    "seq", "rowKey", "itemName", "group", "investeeName", "tradingDisposeSubtype",
     "currentUnadjusted", "currentAdjustment", "currentAudited", "currentShare",
     "priorUnadjusted", "priorAdjustment", "priorAudited", "priorShare",
     "changeAmount", "reasonIndex",
 ]
 
 _G11_3_HEADERS = [
-    "分录类型", "日期", "摘要", "科目代码", "科目名称", "借方金额", "贷方金额", "编制人", "备注",
+    "调整事项说明", "类别", "报表项目", "科目代码", "科目名称", "附注项目",
+    "回写行", "借方调整金额", "贷方调整金额", "索引", "备注",
 ]
 _G11_3_KEYS = [
-    "entryType", "date", "summary", "accountCode", "accountName", "debitAmount", "creditAmount", "preparedBy", "remark",
+    "description", "category", "reportItem", "accountCode", "accountName", "noteItem",
+    "adjudicationRowKey", "debitAmount", "creditAmount", "indexRef", "remark",
 ]
 
 _G11_4_HEADERS = [
-    "项目名称", "本期发生额", "本期期初余额", "本期期末余额",
-    "上期审定数", "上期期初余额", "上期期末余额", "异常说明",
+    "行键", "项目名称", "本期发生额", "本期期初余额", "本期期末余额",
+    "上期审定数", "上期期初余额", "上期期末余额", "市场收益率", "异常说明",
 ]
 _G11_4_KEYS = [
-    "itemName", "currentIncome", "currentOpening", "currentClosing",
-    "priorAudited", "priorOpening", "priorClosing", "abnormalNote",
+    "rowKey", "itemName", "currentIncome", "currentOpening", "currentClosing",
+    "priorAudited", "priorOpening", "priorClosing", "marketYield", "abnormalNote",
 ]
 
 _G11_5_SEGMENTS: list[tuple[str, list[str], list[str]]] = [
@@ -113,10 +123,19 @@ _G11_SPECS: dict[str, dict[str, Any]] = {
         "title": "G11-2 投资收益明细分析表",
         "headers": _G11_2_HEADERS,
         "field_keys": _G11_2_KEYS,
+        "allow_missing_headers": True,
+        "header_aliases": {
+            "变动原因/索引号": ["变动原因索引号", "变动原因/索引", "reasonIndex"],
+            "行键": ["rowKey"],
+            "投资类型": ["分组", "group"],
+            "处置子类": ["tradingDisposeSubtype", "子类"],
+        },
         "guidance": [
             "G11-2 明细分析表 编制说明",
             "",
-            "审定数=未审+调整；占比导入后由前端按合计重算。",
+            "与 G11-1 同口径分项；审定数=未审+调整；占比/变动率导入后由前端重算。",
+            "|变动率|>20% 须填变动原因/索引。",
+            "处置子类（股票/债券/非套期衍生/套期衍生/其他）用于上市附注「处置交易性」明细灌数。",
         ],
     },
     "G11-3": {
@@ -124,7 +143,24 @@ _G11_SPECS: dict[str, dict[str, Any]] = {
         "title": "G11-3 调整分录汇总",
         "headers": _G11_3_HEADERS,
         "field_keys": _G11_3_KEYS,
-        "guidance": ["G11-3 调整分录", "", "分录类型 AJE/RJE；借贷须平衡。"],
+        "allow_missing_headers": True,
+        "header_aliases": {
+            "调整事项说明": ["摘要", "调整说明", "事项说明"],
+            "类别": ["分录类型", "类型", "entryType"],
+            "借方调整金额": ["借方金额", "借方"],
+            "贷方调整金额": ["贷方金额", "贷方"],
+            "索引": ["索引号", "indexRef"],
+            "回写行": ["审定表行", "adjudicationRowKey"],
+            "科目代码": ["科目编码"],
+        },
+        "guidance": [
+            "G11-3 调整分录汇总 编制说明",
+            "",
+            "列对齐 Excel：调整事项说明/类别/报表项目/科目/附注/借贷/索引/备注。",
+            "类别：账项调整（回写审定）/报表调整（仅列报）/其他。",
+            "仅 6111 贷−借净额按「回写行」分项写入 G11-1/G11-2；整表借贷须平衡。",
+            "兼容旧模板列名：分录类型→类别、摘要→调整事项说明。",
+        ],
     },
     "G11-4": {
         "item_id": "G11-return-rate-rows",
@@ -134,7 +170,8 @@ _G11_SPECS: dict[str, dict[str, Any]] = {
         "guidance": [
             "G11-4 收益率分析",
             "",
-            "平均投资=(期初+期末)/2；收益率=发生额/平均投资。",
+            "平均投资②=(期初+期末)/2；比率③=发生额①/平均投资；变动⑦=③−⑥；|变动|>5pp须填异常说明。",
+            "行键与 G11-1 对齐时可从前端「从 G11-1 带入」；市场收益率列可选填外部对标。",
         ],
     },
     "G11-5": {
@@ -145,7 +182,41 @@ _G11_SPECS: dict[str, dict[str, Any]] = {
         "guidance": [
             "G11-5 凭证检查",
             "",
-            "导出含3区段工作表；导入支持宽表或3区段。核对列填 ✓ 或 ✗。",
+            "导出含3区段工作表；导入支持宽表或3区段。核对列填 ✓ / ✗ / 未测（三态）。",
+            "样本选取参数存 G11-vc-params（测试总体/特定样本/抽样方法/本期发生额等）；",
+            "检查比例=已查贷方合计÷本期发生额；可从G11-1带入；金额/账务异常可推送 G11-3。",
+            "截止样本回填默认未测；跨期强制异常。",
+        ],
+    },
+    "附注上市": {
+        "item_id": "G11-disclosure-listed",
+        "title": "附注披露信息（上市公司）",
+        "storage_field": "remark",
+        "build_workbook": lambda payload, template_only=False: build_listed_disclosure_workbook(
+            payload, template_only=template_only,
+        ),
+        "parse_import": parse_listed_disclosure_workbook,
+        "guidance": [
+            "附注披露（上市公司）编制说明",
+            "",
+            "多工作表：主表（项目/本期/上期）+ 处置交易性明细 + 说明。",
+            "建议先在 G11-1/G11-2 维护分项，再在附注页「分项带入」。",
+            "主表合计应与 G11-1 审定（6111）勾稽。",
+        ],
+    },
+    "附注国企": {
+        "item_id": "G11-disclosure-soe",
+        "title": "附注披露信息（国企）",
+        "storage_field": "remark",
+        "build_workbook": lambda payload, template_only=False: build_soe_disclosure_workbook(
+            payload, template_only=template_only,
+        ),
+        "parse_import": parse_soe_disclosure_workbook,
+        "guidance": [
+            "附注披露（国企）编制说明",
+            "",
+            "多工作表：主表（项目/本期/上期）+ 说明（汇回重大限制）。",
+            "建议「分项带入」后按实际裁剪不存在项目。",
         ],
     },
 }
@@ -256,13 +327,28 @@ def _validate(sheet: str) -> None:
         raise HTTPException(400, f"不支持的sheet: {sheet}。支持: {sorted(_SUPPORTED)}")
 
 
-def _parse_check_val(raw: Any) -> str:
-    s = safe_str(raw).lower()
-    if s in {"✓", "是", "y", "yes", "true", "1"}:
+def _parse_check_val(raw: Any) -> Any:
+    """三态：✓/通过→True；✗/不通过→False；未测/空→None。"""
+    if raw is None:
+        return None
+    if isinstance(raw, bool):
+        return raw
+    s = safe_str(raw).strip().lower()
+    if not s or s in {"未测", "n/a", "na", "-", "—", "null"}:
+        return None
+    if s in {"✓", "√", "是", "y", "yes", "true", "1", "通过"}:
+        return True
+    if s in {"✗", "×", "否", "n", "no", "false", "0", "不通过"}:
+        return False
+    return None
+
+
+def _format_check_export(val: Any) -> str:
+    if val is True or val in ("✓", "是", "true", "1", True):
         return "✓"
-    if s in {"✗", "否", "n", "no", "false", "0"}:
+    if val is False or val in ("✗", "否", "false", "0", False):
         return "✗"
-    return safe_str(raw) or "✓"
+    return "未测"
 
 
 def _parse_g11_5_row(row: tuple, headers: list[str]) -> dict[str, Any]:
@@ -303,8 +389,8 @@ def _build_g11_5_workbook(rows: list[dict], *, template_only: bool = False) -> W
                 row_out = export_row_by_keys(merged, seg_keys)
                 if seg_name == "核对内容":
                     for j, k in enumerate(seg_keys):
-                        if k.startswith("check") and isinstance(row_out[j], bool):
-                            row_out[j] = "✓" if row_out[j] else "✗"
+                        if k.startswith("check"):
+                            row_out[j] = _format_check_export(row_out[j])
                 if seg_name == "结论" and "isAbnormal" in seg_keys:
                     idx = seg_keys.index("isAbnormal")
                     val = merged.get("isAbnormal")
@@ -369,6 +455,10 @@ async def export_template(
 ) -> StreamingResponse:
     _validate(sheet)
     sp = _G11_SPECS[sheet]
+    build_wb = sp.get("build_workbook")
+    if callable(build_wb):
+        wb = build_wb(None, template_only=True)
+        return workbook_to_response(wb, f"{sheet}_模板.xlsx")
     if sheet == "G11-5":
         wb = _build_g11_5_workbook([], template_only=True)
         return workbook_to_response(wb, "G11-5_模板.xlsx")
@@ -387,6 +477,11 @@ async def export_data(
 ) -> StreamingResponse:
     _validate(sheet)
     sp = _G11_SPECS[sheet]
+    build_wb = sp.get("build_workbook")
+    if callable(build_wb):
+        payload = await load_json_payload(db, wp_id, sp["item_id"], field=sp.get("storage_field", "remark"))
+        wb = build_wb(payload, template_only=False)
+        return workbook_to_response(wb, f"{sheet}_数据.xlsx")
     if sheet == "G11-1":
         store = await _load_g11_adj_remark(db, wp_id)
         wb = build_workbook_template(
@@ -428,6 +523,16 @@ async def import_data(
         raise HTTPException(400, "文件大小不能超过10MB")
 
     sp = _G11_SPECS[sheet]
+    parse_import = sp.get("parse_import")
+    if callable(parse_import):
+        payload, errors, imported_count = parse_import(content)
+        if errors and not imported_count:
+            return {"ok": False, "errors": errors, "imported_count": 0}
+        await upsert_json_payload(
+            db, wp_id, sp["item_id"], payload, field=sp.get("storage_field", "remark"),
+        )
+        return {"ok": True, "imported_count": imported_count, "errors": errors}
+
     if sheet == "G11-1":
         try:
             actual, raw = parse_upload_xlsx(content, sp["headers"], header_row=_HEADER_ROW)
@@ -450,13 +555,35 @@ async def import_data(
         return {"ok": True, "imported_count": len(rows), "errors": errors}
 
     try:
-        actual, raw = parse_upload_xlsx(content, sp["headers"], header_row=_HEADER_ROW)
+        actual, raw = parse_upload_xlsx(
+            content,
+            sp["headers"],
+            header_row=_HEADER_ROW,
+            header_aliases=sp.get("header_aliases"),
+            require_all_headers=not bool(sp.get("allow_missing_headers")),
+        )
     except ValueError as e:
         return {"ok": False, "errors": [str(e)], "imported_count": 0}
     keys = sp["field_keys"]
+    expected = list(sp["headers"])
     rows, truncated = import_rows_generic(
-        raw, actual, keys, parse_fn=lambda r, h: parse_row_by_headers(r, h, keys),
+        raw,
+        actual,
+        keys,
+        parse_fn=lambda r, h: parse_row_by_headers(r, h, keys, expected_headers=expected),
     )
+    # G11-3 旧值 AJE/RJE → 类别中文
+    if sheet == "G11-3":
+        for row in rows:
+            cat = str(row.get("category") or "")
+            if cat.upper() == "AJE":
+                row["category"] = "账项调整"
+            elif cat.upper() == "RJE":
+                row["category"] = "报表调整"
+            if not row.get("description") and row.get("summary"):
+                row["description"] = row["summary"]
+            if not row.get("indexRef") and row.get("index"):
+                row["indexRef"] = row["index"]
     await upsert_json_rows(db, wp_id, sp["item_id"], rows, field="remark")
     out: dict[str, Any] = {"ok": True, "imported_count": len(rows), "errors": []}
     if truncated:

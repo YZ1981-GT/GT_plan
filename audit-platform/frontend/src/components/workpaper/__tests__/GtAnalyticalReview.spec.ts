@@ -82,7 +82,7 @@ describe('GtAnalyticalReview', () => {
       props: { wpId: 'wp-1', htmlData: { analytical_review: mockData } },
       global: { stubs: globalStubs },
     })
-    expect(wrapper.find('.gt-analytical-review__title').text()).toContain('母公司')
+    expect(wrapper.text()).toContain('母公司')
     expect(wrapper.find('.gt-analytical-review__meta').text()).toContain('A1-13')
   })
 
@@ -130,7 +130,7 @@ describe('GtAnalyticalReview', () => {
       props: { wpId: 'wp-2', htmlData: { analytical_review: listedData } },
       global: { stubs: globalStubs },
     })
-    expect(wrapper.text()).toContain('合并')
+    expect(wrapper.text()).toContain('A1-14')
   })
 
   it('非上市公司不显示同行业和 EPS Tab', () => {

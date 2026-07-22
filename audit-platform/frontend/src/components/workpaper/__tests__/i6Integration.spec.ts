@@ -207,11 +207,10 @@ describe('6.2 EventBus: I6↔I2双向联动', () => {
 // ─── 6.3 cross_wp_references: I6↔I2双向引用 ────────────────────────────────
 
 describe('6.3 cross_wp_references: I6↔I2双向引用', () => {
-  it('cross_wp_references.json contains CW-406 (I2→I6 VR-I6-01)', async () => {
-    // 读取 cross_wp_references.json 并验证 I6 entries
+  it('cross_wp_references.json contains CW-409 (I2→I6 VR-I6-01)', async () => {
     const fs = await import('fs')
-    const path = await import('path')
-    const filePath = path.resolve(__dirname, '../../../../../../backend/data/cross_wp_references.json')
+    const pathMod = await import('path')
+    const filePath = pathMod.resolve(__dirname, '../../../../../backend/data/cross_wp_references.json')
 
     let fileExists = false
     try {
@@ -224,22 +223,20 @@ describe('6.3 cross_wp_references: I6↔I2双向引用', () => {
       const data = JSON.parse(content)
       const refs = data.references || []
 
-      // CW-406: I2↔I6双向联动
-      const cw406 = refs.find((r: any) => r.ref_id === 'CW-406')
-      expect(cw406).toBeDefined()
-      expect(cw406.source_wp).toBe('I2')
-      expect(cw406.targets.some((t: any) => t.wp_code === 'I6')).toBe(true)
-      expect(cw406.direction).toBe('bidirectional')
+      const cw409 = refs.find((r: any) => r.ref_id === 'CW-409')
+      expect(cw409).toBeDefined()
+      expect(cw409.source_wp).toBe('I2')
+      expect(cw409.targets.some((t: any) => t.wp_code === 'I6')).toBe(true)
+      expect(cw409.direction).toBe('bidirectional')
     } else {
-      // 如果文件不可访问（CI环境），验证YAML schema中已配置
       expect(true).toBe(true)
     }
   })
 
-  it('cross_wp_references.json contains CW-407 (I6→I2 反向)', async () => {
+  it('cross_wp_references.json contains CW-410 (I6→I2 反向)', async () => {
     const fs = await import('fs')
-    const path = await import('path')
-    const filePath = path.resolve(__dirname, '../../../../../../backend/data/cross_wp_references.json')
+    const pathMod = await import('path')
+    const filePath = pathMod.resolve(__dirname, '../../../../../backend/data/cross_wp_references.json')
 
     let fileExists = false
     try {
@@ -252,11 +249,10 @@ describe('6.3 cross_wp_references: I6↔I2双向引用', () => {
       const data = JSON.parse(content)
       const refs = data.references || []
 
-      // CW-407: I6→I2 反向联动
-      const cw407 = refs.find((r: any) => r.ref_id === 'CW-407')
-      expect(cw407).toBeDefined()
-      expect(cw407.source_wp).toBe('I6')
-      expect(cw407.targets.some((t: any) => t.wp_code === 'I2')).toBe(true)
+      const cw410 = refs.find((r: any) => r.ref_id === 'CW-410')
+      expect(cw410).toBeDefined()
+      expect(cw410.source_wp).toBe('I6')
+      expect(cw410.targets.some((t: any) => t.wp_code === 'I2')).toBe(true)
     } else {
       expect(true).toBe(true)
     }
@@ -264,8 +260,8 @@ describe('6.3 cross_wp_references: I6↔I2双向引用', () => {
 
   it('cross_wp_references.json contains I6→K8 管理费用引用', async () => {
     const fs = await import('fs')
-    const path = await import('path')
-    const filePath = path.resolve(__dirname, '../../../../../../backend/data/cross_wp_references.json')
+    const pathMod = await import('path')
+    const filePath = pathMod.resolve(__dirname, '../../../../../backend/data/cross_wp_references.json')
 
     let fileExists = false
     try {

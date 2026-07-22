@@ -15,6 +15,32 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, nextTick } from 'vue'
+
+const { mockPut, mockGet, mockEmit, mockOn, mockOff } = vi.hoisted(() => ({
+  mockPut: vi.fn().mockResolvedValue({ data: { code: 0 } }),
+  mockGet: vi.fn().mockResolvedValue({ data: [] }),
+  mockEmit: vi.fn(),
+  mockOn: vi.fn(),
+  mockOff: vi.fn(),
+}))
+
+// Mock eventBus
+vi.mock('@/utils/eventBus', () => ({
+  eventBus: {
+    emit: mockEmit,
+    on: mockOn,
+    off: mockOff,
+  },
+}))
+
+// Mock api
+vi.mock('@/services/apiProxy', () => ({
+  api: {
+    get: mockGet,
+    put: mockPut,
+  },
+}))
+
 import { useL7CrossSheet } from '../composables/useL7CrossSheet'
 import type { ChecklistResponse } from '../composables/useL7FormData'
 import {
@@ -25,23 +51,6 @@ import {
   calcLiabilityEndBalance,
   validateAdjudicationVsDetail,
 } from '../composables/useL7FormulaEngine'
-
-// Mock eventBus
-vi.mock('@/utils/eventBus', () => ({
-  eventBus: {
-    emit: vi.fn(),
-    on: vi.fn(),
-    off: vi.fn(),
-  },
-}))
-
-// Mock api
-vi.mock('@/services/apiProxy', () => ({
-  api: {
-    get: vi.fn().mockResolvedValue({ data: [] }),
-    put: vi.fn().mockResolvedValue({ data: { code: 0 } }),
-  },
-}))
 
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'

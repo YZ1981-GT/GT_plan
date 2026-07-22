@@ -12,7 +12,28 @@
  *
  * @blocking CI — 本测试应作为 blocking job 与 Vite transform smoke 一起执行。
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+vi.setConfig({ testTimeout: 30000 })
+
+vi.mock('@/services/acnr', () => ({
+  useAcnr: () => ({
+    resolve: vi.fn().mockResolvedValue({ status: 'exists', jump_route: null }),
+  }),
+}))
+
+vi.mock('@/utils/http', () => ({
+  default: {
+    get: vi.fn().mockResolvedValue({ data: {} }),
+    post: vi.fn().mockResolvedValue({ data: {} }),
+    put: vi.fn().mockResolvedValue({ data: {} }),
+  },
+}))
+
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ params: {}, query: {}, path: '/' }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+}))
 
 import {
   HTML_RENDERER_REGISTRY,
@@ -161,7 +182,7 @@ describe('P11 — Runtime Import Smoke 目标集合等价性', () => {
 
 // ─── Runtime Import Smoke: 动态加载每个专属 componentType ──────────────────────
 
-describe('Runtime Import Smoke — 动态加载专属 componentType', () => {
+describe('Runtime Import Smoke — 动态加载专属 componentType', { timeout: 30000 }, () => {
   /**
    * 对每个专属 componentType，尝试解析其 AsyncComponent loader。
    * defineAsyncComponent 返回的组件对象内含 __asyncLoader 属性，

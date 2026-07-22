@@ -1,7 +1,7 @@
 {
   "wp_code": "B60-1",
   "name": "审计项目工时预算与控制表",
-  "version": "2025-R1",
+  "version": "2025-R2",
   "cycle": "B",
   "cycle_name": "风险评估",
   "source_files": [
@@ -9,22 +9,22 @@
       "file": "审计项目工时预算与控制表.xlsx",
       "sheets": [
         "底稿目录",
-        "B61-1工时预算与控制表",
-        "B61-1工时预算与控制板（按阶段）",
+        "B60-1工时预算与控制表",
+        "B60-1工时预算与控制板（按阶段）",
         "GT_Custom"
       ]
     }
   ],
   "sheet_rules": [
     {
-      "exact_name": "B61-1工时预算与控制表",
+      "exact_name": "B60-1工时预算与控制表",
       "type": "control_test",
-      "code": "B61-1"
+      "code": "B60-1"
     },
     {
-      "exact_name": "B61-1工时预算与控制板（按阶段）",
+      "exact_name": "B60-1工时预算与控制板（按阶段）",
       "type": "control_test",
-      "code": "B61-1"
+      "code": "B60-1"
     },
     {
       "exact_name": "GT_Custom",
@@ -32,7 +32,18 @@
       "code": "GT_Custom"
     }
   ],
-  "cross_references": [],
+  "cross_references": [
+    {
+      "from": "B60-1",
+      "to": "B60",
+      "relation": "hours_budget_supports_strategy",
+      "note": "工时表支撑 B60 第三章；重大超支回写第十五章"
+    }
+  ],
+  "platform_fields": {
+    "plan_version_hook": "AuditPlan.plan_version",
+    "attachment_parent": "B60"
+  },
   "audit_checks": [
     {
       "code": "B60-1-CHK-01",
@@ -44,13 +55,13 @@
       "id": "B60-1-CHK-02",
       "type": "check",
       "severity": "warning",
-      "description": "风险等级已标注（高/中/低）"
+      "description": "预算与实际工时已填写；重大差异已说明"
     },
     {
       "id": "B60-1-CHK-03",
       "type": "check",
       "severity": "info",
-      "description": "应对措施已记录"
+      "description": "工时重大超支已评估是否更新 B60 第十五章"
     }
   ]
 }

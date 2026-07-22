@@ -1,163 +1,395 @@
 <template>
   <div class="i1-tab-useful-life-check">
-    <!-- 琥珀色方法论上下文（CAS6 §11-15 使用寿命规则） -->
     <div class="methodology-context">
-      <p><b>CAS6 §11-15 使用寿命规则</b>：无形资产使用寿命有限的，自可供使用时起在预计使用寿命内系统合理摊销；
-      使用寿命不确定的无形资产不应摊销，但应当在每个会计期间进行减值测试（CAS8）。
-      企业至少应于每年年度终了对使用寿命有限的无形资产的使用寿命及摊销方法进行复核，
-      寿命估计发生变更的，应当作为会计估计变更处理（CAS28）。使用寿命的确定应考虑：
-      ①法律规定的有效年限 ②合同约定的受益年限 ③技术更新换代周期 ④行业惯例及同类资产情况。</p>
+      <p>
+        <strong>编制逻辑（对齐 Excel I1-7 / CAS6 §11-15）：</strong>
+        按三路径判定使用寿命——①合同性权利或其他法定权利；②权利到期后续约；③没有法定使用年限时估计。
+        使用寿命不确定的不摊销，须记录管理层判断依据，并每年减值测试（CAS8）；有限寿命至少每年复核，变更按 CAS28 会计估计变更处理。
+      </p>
     </div>
 
-    <!-- 蓝色引导区 -->
-    <div class="guidance-area">
-      <div class="guidance-grid">
-        <div class="guidance-step"><span class="step-num">①</span> 逐项核查使用寿命估计：对照合同/法律有效期、技术更新周期、行业惯例，评估寿命估计的合理性</div>
-        <div class="guidance-step"><span class="step-num">②</span> 关注使用寿命不确定项：标注"不摊销"的资产须每期进行减值测试，跳转I1-12核实减值结论</div>
-      </div>
-    </div>
-
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：核实各项无形资产使用寿命估计的合理性，验证寿命依据充分、本期变更符合 CAS28 会计估计变更处理，使用寿命不确定项已进行减值测试。"
+      show-icon
       class="objective-alert"
+      title="审计目标：检查被审计单位确定无形资产使用寿命的依据，分析其合理性。"
     />
 
-    <!-- 工具栏 -->
+    <details class="procedure-details" open>
+      <summary>二、审计过程</summary>
+      <ol>
+        <li>逐项分析合同/法定年限、续约安排及无法定年限时的估计是否合理，填入下表。</li>
+        <li>
+          对使用寿命不确定的无形资产，询问管理层：是否识别出任何潜在因素导致该项资产拥有有限的使用寿命，
+          以及是否按照原定用途继续使用该资产。
+        </li>
+      </ol>
+    </details>
+
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <el-button size="small" :disabled="isReadonly" @click="handleSeedFromDetail">从 I1-2 带入</el-button>
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">+ 新增</el-button>
+        <el-button size="small" type="default" link @click="handleReview">💬 复核</el-button>
+        <el-tag size="small" :type="prepValidation.ok ? 'success' : 'danger'">
+          {{ prepValidation.ok ? '编制校验通过' : `待完善 ${prepValidation.messages.length}` }}
+        </el-tag>
+        <el-tag v-if="indefiniteCount > 0" size="small" type="warning">不摊销 {{ indefiniteCount }}</el-tag>
+        <el-tag v-if="changedCount > 0" size="small" type="warning">本期变更 {{ changedCount }}</el-tag>
+      </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:I1-7" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+        <el-tag size="small" class="nav-chip" @click="emit('navigate-sheet', 'I1-2')">← I1-2</el-tag>
       </div>
     </div>
 
-    <!-- 主检查表 -->
+    <el-alert
+      v-if="!prepValidation.ok"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="mb-8"
+      :title="prepValidation.messages[0]"
+      :description="prepValidation.messages.slice(1, 3).join('；') || undefined"
+    />
+
+    <!-- 主表：使用寿命判定（对齐 Excel 多级表头） -->
     <el-card shadow="never">
       <template #header>
         <div class="section-title">
-          <span>I1-7 使用寿命检查表（{{ rows.length }} 项）</span>
-          <div class="title-actions">
-            <el-button size="small" type="primary" @click="handleAddRow" :disabled="isReadonly">+ 新增</el-button>
-            <el-button size="small" type="default" link @click="handleReview('I1-7')">💬 复核</el-button>
-          </div>
+          <span>使用寿命确定分析</span>
+          <span class="hint">剩余年限 = 原始寿命(月)/12 − 已用年限；寿命月=0 表示不确定</span>
         </div>
       </template>
 
-      <el-table :data="rows" border stripe size="small" max-height="500" class="check-table">
-        <!-- 1. 序号 -->
-        <el-table-column type="index" label="序号" width="50" align="center" fixed />
-        <!-- 2. 名称 -->
-        <el-table-column prop="name" label="名称" min-width="130" fixed>
+      <el-table
+        :data="rows"
+        border
+        stripe
+        size="small"
+        max-height="480"
+        class="check-table"
+        :row-class-name="rowClassName"
+      >
+        <el-table-column type="index" label="序号" width="48" align="center" fixed />
+
+        <el-table-column prop="name" label="资产名称" min-width="120" fixed>
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.name" size="small" placeholder="无形资产名称" @change="handleChange" />
-            <span v-else>{{ row.name }}</span>
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.name"
+              size="small"
+              @change="(v: string) => updateField(row.rowId, 'name', v)"
+            />
+            <span v-else>{{ row.name || '—' }}</span>
           </template>
         </el-table-column>
-        <!-- 3. 原始寿命（月） -->
-        <el-table-column prop="usefulLifeMonths" label="原始寿命(月)" width="110" align="right">
-          <template #default="{ row }">
-            <template v-if="!isReadonly">
-              <el-input-number v-model="row.usefulLifeMonths" :controls="false" size="small" :min="0" :precision="0" placeholder="0=不确定" @change="handleChange" />
+
+        <!-- 合同性权利或其他法定权利 -->
+        <el-table-column label="合同性权利或其他法定权利" align="center">
+          <el-table-column label="是否适用" width="88" align="center">
+            <template #default="{ row }">
+              <el-select
+                v-if="!isReadonly"
+                :model-value="row.legalApplicable"
+                size="small"
+                placeholder="-"
+                @change="(v: string) => updateField(row.rowId, 'legalApplicable', v)"
+              >
+                <el-option label="是" value="Y" />
+                <el-option label="否" value="N" />
+              </el-select>
+              <span v-else>{{ ynLabel(row.legalApplicable) }}</span>
             </template>
-            <template v-else>
-              <span v-if="row.usefulLifeMonths === 0" class="indefinite-tag">不摊销</span>
-              <span v-else>{{ row.usefulLifeMonths }}</span>
+          </el-table-column>
+          <el-table-column label="规定年限" width="90" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.legalPrescribedYears ?? undefined"
+                :controls="false"
+                size="small"
+                :min="0"
+                :precision="1"
+                @change="(v: number | undefined) => updateField(row.rowId, 'legalPrescribedYears', v ?? null)"
+              />
+              <span v-else>{{ row.legalPrescribedYears ?? '—' }}</span>
             </template>
-          </template>
-        </el-table-column>
-        <!-- 4. 已用年限 -->
-        <el-table-column prop="usedYears" label="已用年限" width="90" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.usedYears" :controls="false" size="small" :min="0" :precision="1" @change="handleChange" />
-            <span v-else>{{ row.usedYears ?? '-' }}</span>
-          </template>
-        </el-table-column>
-        <!-- 5. 剩余年限（公式） -->
-        <el-table-column label="剩余年限" width="90" align="right">
-          <template #default="{ row }">
-            <template v-if="row.usefulLifeMonths === 0">
-              <span class="indefinite-tag">不确定</span>
+          </el-table-column>
+          <el-table-column label="已确定寿命" width="100">
+            <template #default="{ row }">
+              <el-input
+                v-if="!isReadonly"
+                :model-value="row.legalDeterminedLife"
+                size="small"
+                @change="(v: string) => updateField(row.rowId, 'legalDeterminedLife', v)"
+              />
+              <span v-else>{{ row.legalDeterminedLife || '—' }}</span>
             </template>
-            <template v-else>
-              <el-tooltip content="剩余年限 = 原始寿命(月)/12 - 已用年限" placement="top">
-                <span class="formula-cell">{{ fmtYears(calcRemainingYears(row)) }}</span>
-              </el-tooltip>
+          </el-table-column>
+        </el-table-column>
+
+        <!-- 权利到期后续约 -->
+        <el-table-column label="权利到期后续约的情况" align="center">
+          <el-table-column label="是否适用" width="88" align="center">
+            <template #default="{ row }">
+              <el-select
+                v-if="!isReadonly"
+                :model-value="row.renewalApplicable"
+                size="small"
+                placeholder="-"
+                @change="(v: string) => updateField(row.rowId, 'renewalApplicable', v)"
+              >
+                <el-option label="是" value="Y" />
+                <el-option label="否" value="N" />
+              </el-select>
+              <span v-else>{{ ynLabel(row.renewalApplicable) }}</span>
             </template>
+          </el-table-column>
+          <el-table-column label="续约计入年限" width="100" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!isReadonly"
+                :model-value="row.renewalYearsInLife ?? undefined"
+                :controls="false"
+                size="small"
+                :min="0"
+                :precision="1"
+                @change="(v: number | undefined) => updateField(row.rowId, 'renewalYearsInLife', v ?? null)"
+              />
+              <span v-else>{{ row.renewalYearsInLife ?? '—' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="已确定寿命" width="100">
+            <template #default="{ row }">
+              <el-input
+                v-if="!isReadonly"
+                :model-value="row.renewalDeterminedLife"
+                size="small"
+                @change="(v: string) => updateField(row.rowId, 'renewalDeterminedLife', v)"
+              />
+              <span v-else>{{ row.renewalDeterminedLife || '—' }}</span>
+            </template>
+          </el-table-column>
+        </el-table-column>
+
+        <!-- 没有法定使用年限 -->
+        <el-table-column label="没有法定使用年限" align="center">
+          <el-table-column label="是否估计寿命" width="100" align="center">
+            <template #default="{ row }">
+              <el-select
+                v-if="!isReadonly"
+                :model-value="row.noLegalEstimate"
+                size="small"
+                placeholder="-"
+                @change="(v: string) => updateField(row.rowId, 'noLegalEstimate', v)"
+              >
+                <el-option label="是" value="Y" />
+                <el-option label="否" value="N" />
+              </el-select>
+              <span v-else>{{ ynLabel(row.noLegalEstimate) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="是否合理" width="88" align="center">
+            <template #default="{ row }">
+              <el-select
+                v-if="!isReadonly"
+                :model-value="row.noLegalReasonable"
+                size="small"
+                placeholder="-"
+                @change="(v: string) => updateField(row.rowId, 'noLegalReasonable', v)"
+              >
+                <el-option label="是" value="Y" />
+                <el-option label="否" value="N" />
+              </el-select>
+              <span v-else>{{ ynLabel(row.noLegalReasonable) }}</span>
+            </template>
+          </el-table-column>
+        </el-table-column>
+
+        <el-table-column label="寿命不确定" width="96" align="center">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              :model-value="row.isIndefinite"
+              size="small"
+              @change="(v: string) => updateField(row.rowId, 'isIndefinite', v)"
+            >
+              <el-option label="是" value="Y" />
+              <el-option label="否" value="N" />
+            </el-select>
+            <el-tag v-else :type="row.isIndefinite === 'Y' ? 'warning' : 'info'" size="small">
+              {{ ynLabel(row.isIndefinite) }}
+            </el-tag>
           </template>
         </el-table-column>
-        <!-- 6. 寿命依据 -->
-        <el-table-column prop="lifeBasis" label="寿命依据" min-width="140">
+
+        <el-table-column label="不确定判断依据" min-width="140">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.lifeBasis" size="small" placeholder="如：合同约定/法律年限/技术周期" @change="handleChange" />
-            <span v-else>{{ row.lifeBasis || '-' }}</span>
+            <el-input
+              v-if="!isReadonly && isIndefiniteRow(row)"
+              type="textarea"
+              :autosize="{ minRows: 1, maxRows: 3 }"
+              :model-value="row.indefiniteJudgmentBasis"
+              size="small"
+              placeholder="管理层判断依据"
+              @change="(v: string) => updateField(row.rowId, 'indefiniteJudgmentBasis', v)"
+            />
+            <span v-else-if="isIndefiniteRow(row)">{{ row.indefiniteJudgmentBasis || '—' }}</span>
+            <span v-else class="na-cell">—</span>
           </template>
         </el-table-column>
-        <!-- 7. 本期是否变更 -->
-        <el-table-column prop="isChanged" label="本期是否变更" width="110" align="center">
+
+        <el-table-column label="原始寿命(月)" width="100" align="right">
+          <template #header>
+            <el-tooltip content="0 = 使用寿命不确定（不摊销）；联动 I1-10/11" placement="top">
+              <span class="formula-col-header">原始寿命(月)</span>
+            </el-tooltip>
+          </template>
           <template #default="{ row }">
-            <el-select v-if="!isReadonly" v-model="row.isChanged" size="small" placeholder="-" @change="onChangeToggle(row)">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.usefulLifeMonths"
+              :controls="false"
+              size="small"
+              :min="0"
+              :precision="0"
+              @change="(v: number | undefined) => updateField(row.rowId, 'usefulLifeMonths', v ?? 0)"
+            />
+            <span v-else-if="isIndefiniteRow(row)" class="indefinite-tag">不摊销</span>
+            <span v-else>{{ row.usefulLifeMonths }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="已用年限" width="88" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly && !isIndefiniteRow(row)"
+              :model-value="row.usedYears"
+              :controls="false"
+              size="small"
+              :min="0"
+              :precision="1"
+              @change="(v: number | undefined) => updateField(row.rowId, 'usedYears', v ?? 0)"
+            />
+            <span v-else-if="isIndefiniteRow(row)" class="na-cell">—</span>
+            <span v-else>{{ row.usedYears ?? '—' }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="剩余年限" width="88" align="right">
+          <template #header>
+            <el-tooltip content="剩余年限 = 原始寿命(月)/12 − 已用年限" placement="top">
+              <span class="formula-col-header">剩余年限</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <span v-if="isIndefiniteRow(row)" class="indefinite-tag">不确定</span>
+            <span v-else class="formula-cell">{{ fmtYears(calcRemainingYears(row)) }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="本期变更" width="88" align="center">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              :model-value="row.isChanged"
+              size="small"
+              @change="(v: string) => updateField(row.rowId, 'isChanged', v)"
+            >
               <el-option label="是" value="是" />
               <el-option label="否" value="否" />
             </el-select>
             <el-tag v-else :type="row.isChanged === '是' ? 'warning' : 'info'" size="small">
-              {{ row.isChanged || '-' }}
+              {{ row.isChanged || '—' }}
             </el-tag>
           </template>
         </el-table-column>
-        <!-- 8. 变更原因（仅当变更=是时显示） -->
-        <el-table-column prop="changeReason" label="变更原因" min-width="150">
+
+        <el-table-column label="变更原因" min-width="120">
           <template #default="{ row }">
-            <template v-if="row.isChanged === '是'">
-              <el-input
-                v-if="!isReadonly"
-                v-model="row.changeReason"
-                type="textarea"
-                :autosize="{ minRows: 1, maxRows: 3 }"
-                size="small"
-                placeholder="说明使用寿命变更原因..."
-                @change="handleChange"
-              />
-              <span v-else>{{ row.changeReason || '-' }}</span>
-            </template>
+            <el-input
+              v-if="!isReadonly && row.isChanged === '是'"
+              type="textarea"
+              :autosize="{ minRows: 1, maxRows: 3 }"
+              :model-value="row.changeReason"
+              size="small"
+              placeholder="CAS28 估计变更原因"
+              @change="(v: string) => updateField(row.rowId, 'changeReason', v)"
+            />
+            <span v-else-if="row.isChanged === '是'">{{ row.changeReason || '—' }}</span>
             <span v-else class="na-cell">—</span>
           </template>
         </el-table-column>
-        <!-- 9. 结论 -->
-        <el-table-column prop="conclusion" label="结论" width="100" align="center">
+
+        <el-table-column label="索引号" width="90">
           <template #default="{ row }">
-            <el-select v-if="!isReadonly" v-model="row.conclusion" size="small" placeholder="-" @change="handleChange">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.docIndex"
+              size="small"
+              placeholder="文件索引"
+              @change="(v: string) => updateField(row.rowId, 'docIndex', v)"
+            />
+            <span v-else>{{ row.docIndex || '—' }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="结论" width="96" align="center">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              :model-value="row.conclusion"
+              size="small"
+              placeholder="-"
+              @change="(v: string) => updateField(row.rowId, 'conclusion', v)"
+            >
               <el-option label="合理" value="合理" />
               <el-option label="需关注" value="需关注" />
               <el-option label="不合理" value="不合理" />
             </el-select>
             <el-tag v-else :type="conclusionTagType(row.conclusion)" size="small">
-              {{ row.conclusion || '-' }}
+              {{ row.conclusion || '—' }}
             </el-tag>
           </template>
         </el-table-column>
-        <!-- 10. 联动跳转 -->
-        <el-table-column label="联动" width="80" align="center">
+
+        <el-table-column label="备注" min-width="90">
           <template #default="{ row }">
-            <el-tooltip v-if="row.usefulLifeMonths === 0" content="跳转减值测试 I1-12" placement="top">
-              <GtIndexChip value="I1-12" @click="emit('navigate-sheet', '减值准备测试表I1-12')" />
-            </el-tooltip>
-            <el-tooltip v-else content="跳转摊销测算" placement="top">
-              <GtIndexChip value="I1-10" @click="emit('navigate-sheet', '摊销测算表（不含减值）I1-10')" />
-            </el-tooltip>
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.remark"
+              size="small"
+              @change="(v: string) => updateField(row.rowId, 'remark', v)"
+            />
+            <span v-else>{{ row.remark || '—' }}</span>
           </template>
         </el-table-column>
-        <!-- 操作列 -->
-        <el-table-column label="操作" width="50" v-if="!isReadonly" fixed="right">
-          <template #default="{ $index }">
-            <el-button size="small" type="danger" link @click="handleRemoveRow($index)">删</el-button>
+
+        <el-table-column label="联动" width="78" align="center">
+          <template #default="{ row }">
+            <GtIndexChip
+              v-if="isIndefiniteRow(row)"
+              value="wp:I1-12"
+              :context-project-id="projectId"
+            />
+            <GtIndexChip
+              v-else
+              value="wp:I1-10"
+              :context-project-id="projectId"
+            />
+          </template>
+        </el-table-column>
+
+        <el-table-column v-if="!isReadonly" label="操作" width="50" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" type="danger" link @click="removeRow(row.rowId)">删</el-button>
           </template>
         </el-table-column>
       </el-table>
 
-      <!-- 合计行 -->
       <div class="summary-bar">
         <span>资产总数: <b>{{ rows.length }}</b></span>
         <span>不摊销项: <b :class="{ 'warn-count': indefiniteCount > 0 }">{{ indefiniteCount }}</b></span>
@@ -165,59 +397,149 @@
         <span>合理: <b class="ok-count">{{ conclusionStats.reasonable }}</b></span>
         <span>需关注: <b class="warn-count">{{ conclusionStats.attention }}</b></span>
         <span>不合理: <b class="error-count">{{ conclusionStats.unreasonable }}</b></span>
-        <GtIndexChip value="审定表I1" @click="emit('navigate-sheet', '审定表I1')" />
-        <GtIndexChip value="I1-10" @click="emit('navigate-sheet', '摊销测算表（不含减值）I1-10')" />
-        <GtIndexChip value="I1-11" @click="emit('navigate-sheet', '摊销测算表（含减值）I1-11')" />
+        <GtIndexChip value="wp:I1-10" :context-project-id="projectId" />
+        <GtIndexChip value="wp:I1-11" :context-project-id="projectId" />
+        <GtIndexChip value="wp:I1-12" :context-project-id="projectId" />
       </div>
     </el-card>
 
-    <!-- 审计说明 -->
+    <!-- 管理层询问（Excel 下半表） -->
+    <el-card shadow="never" class="inquiry-card">
+      <template #header>
+        <div class="section-title">
+          <span>询问管理层（使用寿命不确定）</span>
+          <el-button size="small" :disabled="isReadonly || indefiniteCount === 0" @click="syncInquiryFromIndefinite">
+            同步不确定项
+          </el-button>
+        </div>
+      </template>
+      <p class="inquiry-hint">
+        对于使用寿命不确定的无形资产，询问管理层是否识别出任何潜在因素导致该项资产拥有有限的使用寿命，
+        以及是否按照原定用途继续使用该资产。
+      </p>
+      <el-table v-if="inquiryRows.length" :data="inquiryRows" border stripe size="small">
+        <el-table-column type="index" label="#" width="44" align="center" />
+        <el-table-column prop="name" label="资产名称" min-width="120" />
+        <el-table-column label="账面净值" width="120" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ fmtAmt(row.netBookValue) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="是否识别出有限寿命因素" min-width="160" align="center">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              :model-value="row.identifiedFiniteFactors"
+              size="small"
+              placeholder="-"
+              @change="(v: string) => updateInquiryField(row.rowId, 'identifiedFiniteFactors', v)"
+            >
+              <el-option label="是" value="Y" />
+              <el-option label="否" value="N" />
+            </el-select>
+            <span v-else>{{ ynLabel(row.identifiedFiniteFactors) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="是否按原定用途继续使用" min-width="160" align="center">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              :model-value="row.continuedOriginalUse"
+              size="small"
+              placeholder="-"
+              @change="(v: string) => updateInquiryField(row.rowId, 'continuedOriginalUse', v)"
+            >
+              <el-option label="是" value="Y" />
+              <el-option label="否" value="N" />
+            </el-select>
+            <span v-else>{{ ynLabel(row.continuedOriginalUse) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="备注（记录相关发现）" min-width="180">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.findings"
+              size="small"
+              @change="(v: string) => updateInquiryField(row.rowId, 'findings', v)"
+            />
+            <span v-else>{{ row.findings || '—' }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-else description="暂无使用寿命不确定的资产；在主表将「寿命不确定」标为「是」后自动同步" :image-size="64" />
+    </el-card>
+
     <el-card shadow="never" class="note-card">
-      <template #header><div class="section-title"><span>审计说明</span></div></template>
+      <template #header><div class="section-title"><span>三、审计说明</span></div></template>
       <el-input
-        v-model="auditNote"
+        :model-value="auditNote"
         type="textarea"
         :autosize="{ minRows: 5, maxRows: 10 }"
         :disabled="isReadonly"
-        placeholder="填写审计说明：使用寿命依据核对（合同/法律/技术周期）、不摊销项减值测试情况、本期变更事项处理等。"
+        placeholder="填写审计说明：三路径判定依据、合同/法律年限核对、续约安排、不确定项管理层询问及减值测试安排等。"
         @change="saveNote"
       />
     </el-card>
 
-    <!-- 审计结论 -->
     <el-card shadow="never" class="note-card">
-      <template #header><div class="section-title"><span>审计结论</span></div></template>
+      <template #header>
+        <div class="section-title">
+          <span>四、审计结论</span>
+          <div class="title-actions">
+            <el-button size="small" :disabled="isReadonly" @click="applyDraftConclusion">生成结论草稿</el-button>
+            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handlePublish">
+              📤 发布不确定清单
+            </el-button>
+          </div>
+        </div>
+      </template>
       <el-input
-        v-model="auditConclusion"
+        :model-value="auditConclusion"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly"
-        placeholder="对各项无形资产使用寿命估计合理性的审计结论：寿命估计合理、依据充分，变更处理恰当，未见异常..."
+        placeholder="对各项无形资产使用寿命估计合理性的审计结论…"
         @change="saveConclusion"
       />
     </el-card>
 
-    <!-- 编制提示 -->
+    <div class="jump-targets">
+      <span class="jump-label">跨底稿联动：</span>
+      <GtIndexChip value="wp:I1-2" :context-project-id="projectId" />
+      <GtIndexChip value="wp:I1-4" :context-project-id="projectId" />
+      <GtIndexChip value="wp:I1-10" :context-project-id="projectId" />
+      <GtIndexChip value="wp:I1-11" :context-project-id="projectId" />
+      <GtIndexChip value="wp:I1-12" :context-project-id="projectId" />
+    </div>
+
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>原始寿命填0表示使用寿命不确定（不摊销），需每期进行减值测试（CAS8）</li>
-        <li>剩余年限 = 原始寿命(月) ÷ 12 - 已用年限，剩余≤0表示已摊销完毕</li>
-        <li>寿命依据可填写：合同约定年限 / 法律保护期限 / 技术更新周期 / 行业惯例</li>
-        <li>本期变更=是时，需说明变更原因并按CAS28会计估计变更处理</li>
-        <li>使用寿命不确定的资产不摊销，但须链接减值测试表I1-12</li>
-        <li>摊销参数变更将影响I1-10/I1-11摊销测算结果</li>
+        <li>优先「从 I1-2 带入」名称/寿命月数/净值，再按 Excel 三路径补齐判定字段</li>
+        <li>法定权利适用时填规定年限与已确定寿命；续约适用时填续约计入年限</li>
+        <li>无法定年限时勾选是否估计及是否合理；不确定则填管理层判断依据并完成询问表</li>
+        <li>原始寿命填 0 或「寿命不确定=是」→ 不摊销，联动 I1-12 减值测试</li>
+        <li>本期变更=是须说明原因（CAS28）；发布不确定清单供 I1-12 取数</li>
       </ul>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, watch, onMounted } from 'vue'
-import { ElMessageBox } from 'element-plus'
+/**
+ * I1TabUsefulLifeCheck.vue — I1-7 使用寿命检查表
+ * 对齐 Excel：三路径判定 + 不确定寿命管理层询问 + 说明/结论
+ */
+import { toRef, inject } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
+import {
+  useI1UsefulLifeCheck,
+  type I1UsefulLifeRow,
+  type Yn,
+} from '../../composables/useI1UsefulLifeCheck'
 
-// ─── Props & Emits ────────────────────────────────────────────────────────────
 const props = defineProps<{
   wpId: string
   projectId: string
@@ -230,56 +552,53 @@ const emit = defineEmits<{
   'save': [itemId: string, value: any]
 }>()
 
-// ─── Inject ───────────────────────────────────────────────────────────────────
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 
-// ─── State ────────────────────────────────────────────────────────────────────
-interface UsefulLifeRow {
-  rowId: string
-  name: string
-  usefulLifeMonths: number
-  usedYears: number
-  lifeBasis: string
-  isChanged: string
-  changeReason: string
-  conclusion: string
-}
-
-const rows = ref<UsefulLifeRow[]>([])
-const auditConclusion = ref('')
-const auditNote = ref('')
-
-const STORAGE_KEY = 'I1-7-rows'
-const CONCLUSION_KEY = 'I1-7-conclusion'
-const NOTE_KEY = 'I1-7-audit-note'
-
-// ─── Computed Stats ───────────────────────────────────────────────────────────
-const indefiniteCount = computed(() => rows.value.filter(r => r.usefulLifeMonths === 0).length)
-const changedCount = computed(() => rows.value.filter(r => r.isChanged === '是').length)
-
-const conclusionStats = computed(() => {
-  const stats = { reasonable: 0, attention: 0, unreasonable: 0 }
-  for (const r of rows.value) {
-    if (r.conclusion === '合理') stats.reasonable++
-    else if (r.conclusion === '需关注') stats.attention++
-    else if (r.conclusion === '不合理') stats.unreasonable++
-  }
-  return stats
+const {
+  rows,
+  inquiryRows,
+  auditNote,
+  auditConclusion,
+  indefiniteCount,
+  changedCount,
+  conclusionStats,
+  prepValidation,
+  updateField,
+  updateInquiryField,
+  addRow,
+  removeRow,
+  seedFromDetail,
+  syncInquiryFromIndefinite,
+  saveNote,
+  saveConclusion,
+  publishIndefiniteList,
+  draftConclusion,
+  calcRemainingYears,
+  isIndefiniteRow,
+} = useI1UsefulLifeCheck({
+  allResponses: toRef(props, 'allResponses'),
+  onSave(itemId, value) {
+    emit('save', itemId, value)
+  },
 })
 
-// ─── Formula Helpers ──────────────────────────────────────────────────────────
-function calcRemainingYears(row: UsefulLifeRow): number {
-  if (row.usefulLifeMonths === 0) return 0
-  const totalYears = row.usefulLifeMonths / 12
-  return totalYears - (row.usedYears || 0)
+function ynLabel(v: Yn | string): string {
+  if (v === 'Y' || v === '是') return '是'
+  if (v === 'N' || v === '否') return '否'
+  return '—'
 }
 
-function fmtYears(val: number): string {
+function fmtYears(val: number | null): string {
+  if (val == null) return '—'
   if (val <= 0) return '已到期'
   return val.toFixed(1)
 }
 
-// ─── UI Helpers ───────────────────────────────────────────────────────────────
+function fmtAmt(val: number): string {
+  if (!val) return '—'
+  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 function conclusionTagType(conclusion: string): 'success' | 'warning' | 'danger' | 'info' {
   if (conclusion === '合理') return 'success'
   if (conclusion === '需关注') return 'warning'
@@ -287,18 +606,10 @@ function conclusionTagType(conclusion: string): 'success' | 'warning' | 'danger'
   return 'info'
 }
 
-// ─── Row Operations ───────────────────────────────────────────────────────────
-function createRow(name: string): UsefulLifeRow {
-  return {
-    rowId: `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    name,
-    usefulLifeMonths: 120,
-    usedYears: 0,
-    lifeBasis: '',
-    isChanged: '否',
-    changeReason: '',
-    conclusion: '',
-  }
+function rowClassName({ row }: { row: I1UsefulLifeRow }): string {
+  if (isIndefiniteRow(row)) return 'indefinite-row'
+  if (row.conclusion === '不合理') return 'error-row'
+  return ''
 }
 
 async function handleAddRow() {
@@ -309,128 +620,121 @@ async function handleAddRow() {
       inputPlaceholder: '如：XX专利/商标/软件著作权',
     })
     if (name?.trim()) {
-      rows.value.push(createRow(name.trim()))
-      handleChange()
+      addRow(name.trim())
+      ElMessage.success('已新增')
     }
   } catch { /* cancelled */ }
 }
 
-function handleRemoveRow(index: number) {
-  rows.value.splice(index, 1)
-  handleChange()
+function handleSeedFromDetail() {
+  const r = seedFromDetail()
+  if (r.ok) ElMessage.success(r.message)
+  else ElMessage.warning(r.message)
 }
 
-function onChangeToggle(row: UsefulLifeRow) {
-  if (row.isChanged !== '是') {
-    row.changeReason = ''
-  }
-  handleChange()
+function handleReview() {
+  openReviewDialog('I1-7')
 }
 
-// ─── Persistence ──────────────────────────────────────────────────────────────
-function handleChange() {
-  emit('save', STORAGE_KEY, JSON.stringify(rows.value))
+function applyDraftConclusion() {
+  saveConclusion(draftConclusion())
+  ElMessage.success('已生成结论草稿，请审阅后定稿')
 }
 
-function saveConclusion() {
-  emit('save', CONCLUSION_KEY, auditConclusion.value)
+function handlePublish() {
+  publishIndefiniteList()
+  ElMessage.success('已发布不确定寿命清单（I1-7-indefinite-list），可供 I1-12 取数')
 }
-
-function saveNote() {
-  if (props.isReadonly) return
-  emit('save', NOTE_KEY, auditNote.value)
-}
-
-function loadFromResponses() {
-  if (!props.allResponses) return
-  const raw = props.allResponses.get(STORAGE_KEY)
-  if (raw) {
-    try {
-      rows.value = JSON.parse(typeof raw === 'string' ? raw : raw.value || '[]')
-    } catch { rows.value = [] }
-  }
-  const concRaw = props.allResponses.get(CONCLUSION_KEY)
-  if (concRaw) {
-    auditConclusion.value = typeof concRaw === 'string' ? concRaw : concRaw.value || ''
-  }
-  const noteRaw = props.allResponses.get(NOTE_KEY)
-  if (noteRaw) {
-    auditNote.value = typeof noteRaw === 'string' ? noteRaw : (noteRaw.remark ?? noteRaw.value ?? '')
-  }
-}
-
-// ─── Review ───────────────────────────────────────────────────────────────────
-function handleReview(id: string) {
-  openReviewDialog(id)
-}
-
-// ─── Lifecycle ────────────────────────────────────────────────────────────────
-onMounted(() => {
-  loadFromResponses()
-})
-
-watch(() => props.allResponses, () => {
-  loadFromResponses()
-}, { deep: true })
 </script>
 
 <style scoped>
 .i1-tab-useful-life-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .methodology-context {
-  border-left: 3px solid var(--el-color-warning);
-  background: #fffbe6;
-  padding: 10px 14px;
+  border-left: 4px solid #d97706;
+  background: #fffbeb;
+  padding: 12px 16px;
   margin-bottom: 12px;
   border-radius: 4px;
   font-size: 12px;
-  color: #6b5900;
+  color: #92400e;
+  line-height: 1.8;
 }
+.methodology-context p { margin: 0; }
 
-.guidance-area {
-  background: linear-gradient(135deg, #e8f4fd 0%, #d6eaf8 100%);
-  border-radius: 6px;
-  padding: 12px 16px;
+.objective-alert { margin-bottom: 12px; }
+.mb-8 { margin-bottom: 8px; }
+
+.procedure-details {
   margin-bottom: 12px;
-}
-.guidance-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.guidance-step {
   font-size: 12px;
-  color: #1a5276;
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
+  color: var(--el-text-color-regular);
+  background: #f8fafc;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 4px;
+  padding: 8px 12px;
 }
-.step-num {
-  font-weight: 700;
-  color: #2980b9;
-  flex-shrink: 0;
-}
+.procedure-details summary { cursor: pointer; font-weight: 600; }
+.procedure-details ol { margin: 6px 0 0; padding-left: 20px; line-height: 1.8; }
 
-.section-title { display: flex; align-items: center; justify-content: space-between; }
+.tab-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.chip-wrap { display: inline-flex; }
+.nav-chip { cursor: pointer; }
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 500;
+}
+.section-title .hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--el-text-color-secondary);
+}
 .title-actions { display: flex; gap: 8px; align-items: center; }
 
 .check-table { font-size: var(--wp-font-size, 13px); }
+.check-table :deep(.el-table__header th) {
+  font-size: 11px;
+  font-weight: 600;
+  background: #f8fafc;
+}
+.check-table :deep(.el-input-number) { width: 100%; }
 
-.formula-cell {
+.formula-col-header {
   border-bottom: 1px dashed var(--el-border-color);
   cursor: help;
-  font-variant-numeric: tabular-nums;
 }
-
+.formula-cell {
+  font-variant-numeric: tabular-nums;
+  border-bottom: 1px dashed var(--el-border-color);
+  cursor: help;
+}
 .indefinite-tag {
   color: var(--el-color-warning-dark-2);
   font-weight: 600;
   font-size: 12px;
 }
+.na-cell { color: var(--el-text-color-placeholder); }
 
-.na-cell {
-  color: var(--el-text-color-placeholder);
-}
+:deep(.indefinite-row) td { background: #fffbeb !important; }
+:deep(.error-row) td { background: #fef2f2 !important; }
 
 .summary-bar {
   display: flex;
@@ -447,13 +751,31 @@ watch(() => props.allResponses, () => {
 .warn-count { color: var(--el-color-warning-dark-2); }
 .error-count { color: var(--el-color-danger); }
 
-.note-card { margin-top: 12px; }
+.inquiry-card,
+.note-card { margin-top: 16px; }
+.inquiry-hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin: 0 0 10px;
+  line-height: 1.6;
+}
+
+.jump-targets {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.jump-label { font-size: 12px; color: var(--el-text-color-secondary); }
 
 .compile-hint {
   margin-top: 12px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
+  border-top: 1px solid var(--el-border-color-lighter);
+  padding-top: 12px;
 }
 .compile-hint summary { cursor: pointer; font-weight: 500; }
-.compile-hint ul { padding-left: 20px; margin-top: 8px; }
+.compile-hint ul { padding-left: 20px; margin-top: 8px; line-height: 1.8; }
 </style>

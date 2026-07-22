@@ -1,7 +1,7 @@
 /**
  * useG9Disclosure — 附注披露（上市/国企）
  *
- * 结构对齐 Excel：种类/项目 | 期末 | 上年年末/期初 |（产品增强）附注文本 + 合计行
+ * 结构对齐 Excel：种类/项目 | 期末 | 上年年末/期初 + 合计行
  * 带入：G9-2 工具种类/指定优先，否则 G9-1 标签分项；无分项时残差进「其他」
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
@@ -129,7 +129,6 @@ export function useG9Disclosure(opts: {
     buildG9CrossChecks(opts.allResponses.value, {
       disclosureCurrentSum: disclosureCurrentSum.value,
       adjudicatedAmount: adjudicatedAmount.value,
-      disclosureNoteText: noteText.value,
     }),
   )
 

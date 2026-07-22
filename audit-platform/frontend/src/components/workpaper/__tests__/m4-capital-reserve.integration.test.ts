@@ -16,11 +16,16 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { ref, effectScope } from 'vue'
-import { useM4CrossSheet, DIFF_THRESHOLD } from '../composables/useM4CrossSheet'
-import type { ChecklistResponse } from '../composables/useM4FormData'
+
+const onHandlers = new Map<string, Function[]>()
+
+const { mockPut, mockGet, mockPost } = vi.hoisted(() => ({
+  mockPut: vi.fn().mockResolvedValue({ code: 200 }),
+  mockGet: vi.fn().mockResolvedValue([]),
+  mockPost: vi.fn().mockResolvedValue({ code: 200 }),
+}))
 
 // Mock eventBus — 保留 on/off/emit 函数引用以便测试中模拟事件触发
-const onHandlers = new Map<string, Function[]>()
 vi.mock('@/utils/eventBus', () => ({
   eventBus: {
     emit: vi.fn((event: string, payload: any) => {
@@ -46,11 +51,14 @@ vi.mock('@/utils/eventBus', () => ({
 // Mock api for writebackTB test
 vi.mock('@/services/apiProxy', () => ({
   api: {
-    get: vi.fn().mockResolvedValue([]),
-    put: vi.fn().mockResolvedValue({ code: 200 }),
-    post: vi.fn().mockResolvedValue({ code: 200 }),
+    get: mockGet,
+    put: mockPut,
+    post: mockPost,
   },
 }))
+
+import { useM4CrossSheet, DIFF_THRESHOLD } from '../composables/useM4CrossSheet'
+import type { ChecklistResponse } from '../composables/useM4FormData'
 
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'

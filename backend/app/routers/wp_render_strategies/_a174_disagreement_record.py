@@ -64,6 +64,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "5": {"considerations": ""},
         "6": {"conclusion": ""},
     }
+    not_applicable = ""
 
     signature_data: dict = {
         "preparer": "",
@@ -112,6 +113,9 @@ async def render(ctx: RenderContext) -> dict | None:
             elif item_id == "a174-signature-date":
                 signature_data["date"] = conclusion or remark
 
+            elif item_id == "a174-meta-not_applicable":
+                not_applicable = conclusion or remark
+
     except Exception as e:  # noqa: BLE001
         logger.warning("A17-4 checklist_responses 查询失败 wp_id=%s: %s", wp_id, e)
 
@@ -139,4 +143,5 @@ async def render(ctx: RenderContext) -> dict | None:
         "sections": sections,
         "signature_data": signature_data,
         "project_context": project_context,
+        "not_applicable": not_applicable,
     }

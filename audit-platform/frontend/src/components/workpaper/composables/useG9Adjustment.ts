@@ -44,7 +44,7 @@ export interface G9AdjustmentEntry {
 
 /** 其他非流动金融资产常用对方科目 */
 export const G9_ADJ_ACCOUNT_OPTIONS: { code: string; name: string }[] = [
-  { code: '1504', name: '其他非流动金融资产' },
+  { code: G9_ACCOUNT_CODE, name: '其他非流动金融资产' },
   { code: '6101', name: '公允价值变动损益' },
   { code: '4002', name: '其他综合收益' },
   { code: '6111', name: '投资收益' },
@@ -58,7 +58,7 @@ const ITEM_ID_ROWS = 'G9-adjustment-rows'
 const ITEM_ID_ADJ_ROWS = 'G9-adj-rows'
 export const G9_AJE_ADJ_OVERLAY_ID = 'G9-aje-adj-overlay'
 
-const G9_RELATED_PREFIXES = ['1504', '6101', '4002', '6111', '6701']
+const G9_RELATED_PREFIXES = [G9_ACCOUNT_CODE, '1510', '1504', '6101', '4002', '6111', '6701']
 
 function genId(): string {
   return `g9a-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`

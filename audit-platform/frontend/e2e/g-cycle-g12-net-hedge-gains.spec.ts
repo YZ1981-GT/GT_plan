@@ -25,7 +25,7 @@ const SMOKE_CASES = [
   { wpCode: 'G12-2', bodyHint: /套期关系|无效|套期明细/ },
   { wpCode: 'G12-3', bodyHint: /调整|同步至审定/ },
   { wpCode: 'G12-4', bodyHint: /公允价值|套期/ },
-  { wpCode: 'G12-5', bodyHint: /净敞口|CAS24/ },
+  { wpCode: 'G12-5', bodyHint: /净头寸|风险净敞口|测试目标/ },
   { wpCode: 'G12-6', bodyHint: /凭证|借贷/ },
 ]
 
@@ -78,7 +78,7 @@ test.describe('G12 — HTML 页面冒烟', () => {
 })
 
 test.describe('G12 — 附注披露行数', () => {
-  test('上市 12+合计=13 行', async ({ page, request }) => {
+  test('上市 1+合计=2 行', async ({ page, request }) => {
     test.setTimeout(90_000)
     await loginAs(page)
     const token = await getToken(request)
@@ -87,10 +87,10 @@ test.describe('G12 — 附注披露行数', () => {
     await page.goto(`/projects/${PROJECT_ID}/workpapers/${wpResult.wpId}/edit`)
     await page.waitForTimeout(4_000)
     await clickDisclosureSheetTab(page, 'listed')
-    await expectDisclosureTableRows(page, 'g12-disclosure-listed-table', 13)
+    await expectDisclosureTableRows(page, 'g12-disclosure-listed-table', 2)
   })
 
-  test('国企 11+合计=12 行', async ({ page, request }) => {
+  test('国企 2+合计=3 行', async ({ page, request }) => {
     test.setTimeout(90_000)
     await loginAs(page)
     const token = await getToken(request)
@@ -99,7 +99,7 @@ test.describe('G12 — 附注披露行数', () => {
     await page.goto(`/projects/${PROJECT_ID}/workpapers/${wpResult.wpId}/edit`)
     await page.waitForTimeout(4_000)
     await clickDisclosureSheetTab(page, 'soe')
-    await expectDisclosureTableRows(page, 'g12-disclosure-soe-table', 12)
+    await expectDisclosureTableRows(page, 'g12-disclosure-soe-table', 3)
   })
 })
 

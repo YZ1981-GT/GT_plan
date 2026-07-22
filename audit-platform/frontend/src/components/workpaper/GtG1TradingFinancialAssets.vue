@@ -68,6 +68,7 @@
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         @imported="onSheetImported"
       />
 

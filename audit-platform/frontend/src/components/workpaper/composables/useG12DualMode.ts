@@ -117,5 +117,4 @@ export function useG12DualMode(options: {
   }
 }
 
-export { useG12DualMode as useG12NetHedDualMode }
 export default useG12DualMode

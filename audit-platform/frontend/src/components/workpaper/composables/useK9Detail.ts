@@ -235,6 +235,29 @@ export function useK9Detail(params: UseK9DetailParams) {
     }
   }
 
+  /**
+   * 从 I1-9 摊销分配回填「无形资产摊销」行未审发生额（写入 12 月以保持 SUM(months)）。
+   */
+  function applyI1AmortAmount(amount: number, keywords: string[] = ['无形资产摊销']): {
+    ok: boolean
+    message: string
+  } {
+    if (isReadonly?.value) return { ok: false, message: '只读' }
+    const hit = rows.value.find((r) =>
+      keywords.some((k) => String(r.accountName || '').includes(k)),
+    )
+    if (!hit) {
+      return { ok: false, message: '未找到「无形资产摊销」明细行，请先新增该科目' }
+    }
+    const months = new Array(12).fill(0)
+    months[11] = amount
+    hit.months = months
+    _recalcRow(hit)
+    isChanged.value = true
+    _persist()
+    return { ok: true, message: `已回填「${hit.accountName}」= ${amount.toFixed(2)}` }
+  }
+
   // ─── Persist ───────────────────────────────────────────────────────────────
 
   function _persist(): void {
@@ -269,6 +292,7 @@ export function useK9Detail(params: UseK9DetailParams) {
     updateCell,
     addRow,
     removeRow,
+    applyI1AmortAmount,
     setActiveTab,
     computeAll,
     initFromResponses,

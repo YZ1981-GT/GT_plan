@@ -140,6 +140,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H5-11 监盘小结 -->
@@ -341,7 +342,7 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
-defineEmits<{ (e: 'save'): void; (e: 'completed'): void }>()
+const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navigate-sheet', sheetName: string): void }>()
 
 // ─── 行业适用性守卫 ──────────────────────────────────────────────────────────
 const projectContext = inject<any>('projectContext', null)
@@ -397,7 +398,8 @@ function onModeChange(mode: string | number) {
 /** 合并一个 responses 对象（{item_id: {...}}）到目标 Map */
 function _mergeResponses(map: Map<string, any>, src: any): void {
   if (!src || typeof src !== 'object') return
-  for (const [k, v] of Object.entries(src)) map.set(k, v)
+  // 注入权威 item_id：dict 值缺 item_id 时以键补齐（否则保存 items 缺 item_id 触发 422）；v 自带 item_id 则以其为准
+  for (const [k, v] of Object.entries(src)) map.set(k, (v && typeof v === 'object' && !Array.isArray(v)) ? { item_id: k, ...v } : { item_id: k, remark: v })
 }
 
 async function selfLoad(): Promise<void> {

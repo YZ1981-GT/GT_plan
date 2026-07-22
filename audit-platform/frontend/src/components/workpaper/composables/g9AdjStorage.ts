@@ -1,5 +1,6 @@
 /** G9-1 审定表 rowStore 读写辅助 */
-import { G9_ADJUDICATION_ITEMS, G9_ADJ_WRITEBACK_ROW_KEY } from './g9Constants'
+import { G9_ADJUDICATION_ITEMS, G9_ADJ_WRITEBACK_ROW_KEY, G9_ACCOUNT_CODE } from './g9Constants'
+import { isG9AccountCode } from './g9AccountMatch'
 import { parseNum } from './useG9FormulaEngine'
 
 export { G9_ADJ_WRITEBACK_ROW_KEY }
@@ -35,7 +36,7 @@ export interface G9AdjustmentSummary {
   totalDebits: number
   totalCredits: number
   balanceDiff: number
-  /** 1504 借−贷净额（回写口径） */
+  /** G9 科目借−贷净额（回写口径；字段名 net1504 保留兼容） */
   net1504: number
   ajeNet1504: number
   rjeNet1504: number
@@ -84,17 +85,17 @@ export function patchG9AdjRow(
 
 function accountNet(
   rows: Array<{ accountCode?: string; debitAmount?: number; creditAmount?: number }>,
-  prefix: string,
+  matcher: (code: string) => boolean,
 ): number {
   return rows
-    .filter((r) => String(r.accountCode ?? '').startsWith(prefix))
+    .filter((r) => matcher(String(r.accountCode ?? '')))
     .reduce((s, r) => s + parseNum(r.debitAmount) - parseNum(r.creditAmount), 0)
 }
 
 export function calcG9AdjustmentNet(
   rows: Array<{ accountCode?: string; debitAmount?: number; creditAmount?: number }>,
 ): number {
-  return accountNet(rows, '1504')
+  return accountNet(rows, isG9AccountCode)
 }
 
 export function summarizeG9Adjustment(
@@ -120,12 +121,12 @@ export function summarizeG9Adjustment(
     net1504: calcG9AdjustmentNet(list),
     ajeNet1504: calcG9AdjustmentNet(aje),
     rjeNet1504: calcG9AdjustmentNet(rje),
-    fvPlNet: accountNet(list, '6101'),
-    ociNet: accountNet(list, '4002'),
+    fvPlNet: accountNet(list, (c) => c.startsWith('6101')),
+    ociNet: accountNet(list, (c) => c.startsWith('4002')),
   }
 }
 
-/** 按 AJE/RJE 分别汇总 1504 科目净额（借方−贷方），用于回写 G9-1 */
+/** 按 AJE/RJE 分别汇总 G9 科目净额（借方−贷方），用于回写 G9-1 */
 export function aggregateG9AdjustmentAjeRje(
   rows: G9AdjustmentEntryLike[],
   rowKey = G9_ADJ_WRITEBACK_ROW_KEY,
@@ -133,7 +134,8 @@ export function aggregateG9AdjustmentAjeRje(
   let closingAje = 0
   let closingRje = 0
   for (const row of rows) {
-    if (!String(row.accountCode ?? '1504').startsWith('1504')) continue
+    const code = String(row.accountCode ?? G9_ACCOUNT_CODE)
+    if (!isG9AccountCode(code)) continue
     const net = parseNum(row.debitAmount) - parseNum(row.creditAmount)
     if (row.entryType === 'RJE') closingRje += net
     else closingAje += net

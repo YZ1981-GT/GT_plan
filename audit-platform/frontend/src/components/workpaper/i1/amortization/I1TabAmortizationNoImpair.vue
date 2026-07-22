@@ -1,35 +1,103 @@
 <template>
   <div class="i1-tab-amort-no-impair">
-    <!-- 方法论上下文 -->
     <div class="methodology-context">
-      <p><b>CAS6剩余年限法（不含减值）：</b>月摊销 = (原值 - 残值 - 累计摊销) ÷ 剩余月数。逐资产逐月计算1~28月摊销额横向矩阵，与账面核对差异。适用于不存在减值情况的无形资产。</p>
+      <p>
+        <b>CAS6 剩余年限法（不含减值）：</b>
+        期初净值 F＝原值−残值−累计摊销−期初减值；月摊销 K＝F÷剩余月数 J；
+        本期摊销 M＝K×本期月数。与账面本期摊销核对差异。适用于本期无新减值重算场景。
+      </p>
     </div>
 
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：核实无形资产本期摊销额（剩余年限法，不含减值）计算的准确性，验证摊销基数、剩余月数与账面一致，为费用列报及审定表提供依据。"
+      show-icon
       class="objective-alert"
+      title="审计目标：核实无形资产本期摊销额（剩余年限法，不含减值）计算准确性，验证摊销基数、剩余月数与账面一致。"
     />
 
-    <!-- 工具栏 -->
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <span class="period-label">期初日</span>
+        <el-date-picker
+          v-model="localPeriodBegin"
+          type="date"
+          value-format="YYYY-MM-DD"
+          size="small"
+          :disabled="isReadonly"
+          style="width: 140px"
+          @change="onPeriodChange"
+        />
+        <span class="period-label">截止日</span>
+        <el-date-picker
+          v-model="localPeriodEnd"
+          type="date"
+          value-format="YYYY-MM-DD"
+          size="small"
+          :disabled="isReadonly"
+          style="width: 140px"
+          @change="onPeriodChange"
+        />
+        <el-button size="small" :disabled="isReadonly" @click="recalcAll">重新测算</el-button>
+      </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:I1-10" :context-project-id="projectId" /></span>
-        <el-tag size="small" type="info">共 {{ currentRows.length }} 行</el-tag>
+        <el-tag size="small" type="info">不含减值 · {{ currentRows.length }} 行</el-tag>
+        <el-tag v-if="significantDiffCount > 0" size="small" type="danger">差异行 {{ significantDiffCount }}</el-tag>
+        <el-tag
+          size="small"
+          :type="amortReconcile.matchedAdj ? 'success' : 'warning'"
+          class="nav-chip"
+          @click="emit('navigate-sheet', 'I1-1')"
+        >
+          {{ amortReconcile.matchedAdj ? 'I1-1本期计提已勾稽' : 'I1-1本期计提待勾稽' }}
+        </el-tag>
+        <el-tag
+          v-if="amortReconcile.allocTotal !== 0"
+          size="small"
+          :type="amortReconcile.matchedAlloc ? 'success' : 'warning'"
+          class="nav-chip"
+          @click="emit('navigate-sheet', 'I1-9')"
+        >
+          {{ amortReconcile.matchedAlloc ? 'I1-9分配已勾稽' : 'I1-9分配待勾稽' }}
+        </el-tag>
+        <el-tag size="small" class="nav-chip" @click="emit('navigate-sheet', 'I1-1')">← I1-1</el-tag>
+        <el-tag size="small" class="nav-chip" @click="emit('navigate-sheet', 'I1-9')">I1-9 →</el-tag>
       </div>
     </div>
+
+    <el-alert
+      v-if="!amortReconcile.matchedAdj && amortReconcile.periodAmortTotal !== 0"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="reconcile-alert"
+      :title="`测算本期合计 ${fmtAmt(amortReconcile.periodAmortTotal)} 与 I1-1 摊销本期增加 ${fmtAmt(amortReconcile.adjudicatedProvision)} 差异 ${fmtAmt(amortReconcile.vsAdjDiff)}`"
+    />
 
     <el-card shadow="never">
       <template #header>
         <div class="section-title">
-          <span>I1-10 摊销测算表（不含减值）</span>
+          <span>I1-10 摊销测算表（不含减值·剩余年限法）</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" :disabled="isReadonly" @click="handleSyncFromDetail">
+            <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">+ 新增行</el-button>
+            <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleSyncFromDetail">
               同步I1-2参数
             </el-button>
+            <el-button size="small" plain :disabled="isReadonly" data-testid="i1-10-sync-life" @click="handleSyncFromUsefulLife">
+              应用I1-7寿命
+            </el-button>
+            <el-dropdown v-if="!isReadonly" trigger="click" @command="handleExportCmd">
+              <el-button size="small">导入导出 ▾</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="export-template">导出模板</el-dropdown-item>
+                  <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
+                  <el-dropdown-item command="import-data" divided>导入数据</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
             <el-button size="small" type="default" link @click="handleReview">💬 复核</el-button>
           </div>
         </div>
@@ -41,25 +109,106 @@
         stripe
         size="small"
         max-height="520"
-        class="amort-matrix-table"
+        class="amort-table"
+        :row-class-name="getRowClass"
         show-summary
         :summary-method="getSummaryRow"
       >
-        <el-table-column type="index" label="#" width="35" fixed />
-        <el-table-column prop="name" label="资产名称" width="120" fixed show-overflow-tooltip />
-        <el-table-column label="原值" width="100" align="right" fixed>
+        <el-table-column type="index" label="#" width="40" fixed />
+        <el-table-column prop="category" label="类别" width="100" fixed>
+          <template #default="{ row, $index }">
+            <el-input v-if="!isReadonly" v-model="row.category" size="small" @change="handleFieldChange($index, 'category', $event)" />
+            <span v-else>{{ row.category || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="name" label="明细项目" min-width="120" fixed show-overflow-tooltip>
+          <template #default="{ row, $index }">
+            <el-input v-if="!isReadonly" v-model="row.name" size="small" @change="handleFieldChange($index, 'name', $event)" />
+            <span v-else>{{ row.name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="原值" width="100" align="right">
           <template #default="{ row, $index }">
             <el-input-number
               v-if="!isReadonly"
               v-model="row.cost"
               :controls="false"
               size="small"
-              :min="0"
               :precision="2"
               class="cell-input"
               @change="handleFieldChange($index, 'cost', $event)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.cost) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="累计摊销期初" width="110" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.accAmortBegin"
+              :controls="false"
+              size="small"
+              :precision="2"
+              class="cell-input"
+              @change="handleFieldChange($index, 'accAmortBegin', $event)"
+            />
+            <span v-else class="amount-cell">{{ fmtAmt(row.accAmortBegin) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账面累计摊销期末" width="120" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.bookAccAmortEnd"
+              :controls="false"
+              size="small"
+              :precision="2"
+              class="cell-input"
+              @change="handleFieldChange($index, 'bookAccAmortEnd', $event)"
+            />
+            <span v-else class="amount-cell">{{ fmtAmt(row.bookAccAmortEnd) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账面本期摊销" width="110" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.bookPeriodAmort"
+              :controls="false"
+              size="small"
+              :precision="2"
+              class="cell-input"
+              @change="handleFieldChange($index, 'bookPeriodAmort', $event)"
+            />
+            <span v-else class="amount-cell">{{ fmtAmt(row.bookPeriodAmort) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="开始使用日期" width="120">
+          <template #default="{ row, $index }">
+            <el-date-picker
+              v-if="!isReadonly"
+              v-model="row.startDate"
+              type="date"
+              value-format="YYYY-MM-DD"
+              size="small"
+              style="width:100%"
+              @change="handleFieldChange($index, 'startDate', $event)"
+            />
+            <span v-else>{{ row.startDate || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="使用期限(年)" width="90" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.usefulLifeYears"
+              :controls="false"
+              size="small"
+              :precision="2"
+              class="cell-input"
+              @change="handleUsefulLifeChange($index, $event)"
+            />
+            <span v-else>{{ row.usefulLifeYears }}</span>
           </template>
         </el-table-column>
         <el-table-column label="残值" width="90" align="right">
@@ -69,7 +218,6 @@
               v-model="row.salvage"
               :controls="false"
               size="small"
-              :min="0"
               :precision="2"
               class="cell-input"
               @change="handleFieldChange($index, 'salvage', $event)"
@@ -77,122 +225,120 @@
             <span v-else class="amount-cell">{{ fmtAmt(row.salvage) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="累计摊销" width="100" align="right">
-          <template #default="{ row, $index }">
-            <el-input-number
-              v-if="!isReadonly"
-              v-model="row.accAmortBegin"
-              :controls="false"
-              size="small"
-              :min="0"
-              :precision="2"
-              class="cell-input"
-              @change="handleFieldChange($index, 'accAmortBegin', $event)"
-            />
-            <span v-else class="amount-cell">{{ fmtAmt(row.accAmortBegin) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="剩余月数" width="75" align="center">
-          <template #default="{ row, $index }">
-            <el-input-number
-              v-if="!isReadonly"
-              v-model="row.remainingMonths"
-              :controls="false"
-              size="small"
-              :min="0"
-              :max="600"
-              class="cell-input"
-              @change="handleRemainingChange($index, $event)"
-            />
-            <span v-else>{{ row.remainingMonths }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="月摊销额" width="100" align="right">
+        <el-table-column label="期初净值F" width="100" align="right" class-name="formula-col">
           <template #default="{ row }">
-            <span
-              class="formula-cell"
-              title="月摊销=(原值-残值-累计摊销)÷剩余月数"
-            >{{ fmtAmt(row.monthlyAmortAmount) }}</span>
+            <span class="formula-cell" title="原值−残值−累计摊销−减值">{{ fmtAmt(row.beginNbv) }}</span>
           </template>
         </el-table-column>
-
-        <!-- 28个月列 -->
-        <el-table-column
-          v-for="m in MATRIX_COLUMNS"
-          :key="m"
-          :label="`第${m}月`"
-          width="78"
-          align="right"
-        >
+        <el-table-column label="摊销期限(月)" width="90" align="right" class-name="formula-col">
           <template #default="{ row }">
-            <span
-              class="formula-cell"
-              :title="`第${m}月摊销额`"
-            >{{ fmtAmt(row.monthlyAmort[m - 1]) }}</span>
+            <span class="formula-cell">{{ row.usefulLifeMonths || '—' }}</span>
           </template>
         </el-table-column>
-
-        <!-- 本期合计 -->
-        <el-table-column label="本期合计" width="110" align="right">
+        <el-table-column label="测算到期日" width="100" class-name="formula-col">
           <template #default="{ row }">
-            <span
-              class="formula-cell"
-              title="本期合计=SUM(第1月~第28月)"
-            >{{ fmtAmt(row.periodAmortization) }}</span>
+            <span class="formula-cell">{{ row.fullAmortDate || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="剩余月数J" width="90" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ row.remainingMonths }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期月数" width="80" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell" title="期间四分支（已修正源表L虚增问题）">{{ row.periodMonths }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="月摊销额K" width="100" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell" title="F÷J">{{ fmtAmt(row.monthlyAmortAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期摊销M" width="110" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell" title="K×本期月数">{{ fmtAmt(row.periodAmortization) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期差异O" width="100" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell" :class="{ 'text-danger': Math.abs(row.periodDiff) > 0.01 }" title="测算−账面">
+              {{ fmtAmt(row.periodDiff) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="累计摊销(测算)" width="110" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ fmtAmt(row.calcAccAmort) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="累计差异" width="100" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-cell" :class="{ 'text-danger': Math.abs(row.accAmortDiff) > 0.01 }">
+              {{ fmtAmt(row.accAmortDiff) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="" width="50" align="center" fixed="right">
+          <template #default="{ $index }">
+            <el-button type="danger" link size="small" @click="removeRow($index)">删</el-button>
           </template>
         </el-table-column>
       </el-table>
 
-      <!-- 合计行独立展示 -->
       <div class="totals-bar">
-        <span>摊销合计: <b class="amount-cell">{{ fmtAmt(summaryRow.periodTotal) }}</b></span>
-        <span>资产数: <b>{{ currentRows.length }}</b> 项</span>
+        <span>测算本期合计: <b>{{ fmtAmt(summaryRow.periodTotal) }}</b></span>
+        <span>账面本期合计: <b>{{ fmtAmt(totalBookPeriod) }}</b></span>
+        <span>
+          本期差异合计:
+          <b :class="{ 'text-danger': Math.abs(totalPeriodDiff) > 0.01 }">{{ fmtAmt(totalPeriodDiff) }}</b>
+        </span>
       </div>
     </el-card>
 
-    <!-- 审计说明 -->
     <el-card shadow="never" class="note-card">
-      <template #header><span>审计说明</span></template>
+      <template #header><span>三、审计说明</span></template>
       <el-input
         v-model="auditNote"
         type="textarea"
-        :autosize="{ minRows: 5, maxRows: 10 }"
+        :autosize="{ minRows: 4, maxRows: 10 }"
         :disabled="isReadonly"
-        placeholder="填写审计说明：摊销测算方法、剩余月数与账面核对情况、差异原因分析等。"
+        placeholder="填写：剩余月数核对、本期月数合理性、测算与账面差异原因；如有减值请切换 I1-11。"
         @blur="handleSaveNote"
       />
     </el-card>
 
-    <!-- 审计结论 -->
     <el-card shadow="never" class="note-card">
-      <template #header><span>审计结论</span></template>
+      <template #header><span>四、审计结论</span></template>
       <el-input
         v-model="auditConclusion"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly"
-        placeholder="填写审计结论：本期摊销测算（剩余年限法，不含减值）准确，与账面核对一致，未见异常等。"
+        placeholder="A、剩余年限法摊销测算准确，与账面无重大差异。B、除下列差异外未见异常。C、存在重大未调整差异。"
         @blur="handleSaveConclusion"
       />
     </el-card>
 
-    <!-- 编制提示 -->
-    <details class="compile-hint">
+    <details class="compile-hint" open>
       <summary>编制提示</summary>
       <ul>
-        <li>剩余年限法：月摊销 = (原值 - 残值 - 累计摊销) ÷ 剩余月数</li>
-        <li>28列对应审计期间内每月的摊销额（通常恒定）</li>
-        <li>若资产已摊销完毕（剩余月数≤0），该行摊销额显示为0</li>
-        <li>点击"同步I1-2参数"可从明细表自动导入资产信息</li>
-        <li>如有减值情况请切换到"含减值（I1-11）"分支</li>
+        <li>本表适用于<strong>本期无新减值重算</strong>；有减值请切换「含减值（I1-11）」。</li>
+        <li>源表 L=DATEDIF(开始,截止)+1 会虚增已使用多年资产的「本期月数」，本表已改为期间四分支。</li>
+        <li>K=F/J，M=K×本期月数，O=M−账面本期摊销。</li>
+        <li>点击「同步I1-2」导入原值/累计摊销/取得日期/使用寿命/本期摊销。</li>
       </ul>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
+/**
+ * I1TabAmortizationNoImpair.vue — I1-10 摊销测算（不含减值·剩余年限法）
+ * 对齐源表 F~O，修正本期月数虚增
+ */
 import { ref, computed, toRef, inject, watch } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI1Amortization, type I1AmortizationRow, type I1AssetParams } from '../../composables/useI1Amortization'
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -209,163 +355,171 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
-
-// ─── Composable ──────────────────────────────────────────────────────────────
-
 const allResponsesRef = computed(() => props.allResponses)
 
 const {
   currentRows,
-  currentItemId,
   summaryRow,
-  MATRIX_COLUMNS,
+  periodBegin,
+  periodEnd,
+  amortReconcile,
   recalcAll,
-  recalcRow,
   syncFromDetail,
+  syncFromUsefulLife,
   updateRowField,
+  setPeriod,
+  addRow,
+  removeRow,
+  switchBranch,
+  exportXlsx,
+  importXlsx,
 } = useI1Amortization(toRef(props, 'wpId'), allResponsesRef as any, {
   onSave: (itemId, value) => emit('save', itemId, value),
 })
 
-// ─── State ───────────────────────────────────────────────────────────────────
+switchBranch('noImpair', false)
 
 const auditNote = ref('')
 const auditConclusion = ref('')
+const localPeriodBegin = ref('')
+const localPeriodEnd = ref('')
+const fileInputRef = ref<HTMLInputElement | null>(null)
 
-// Load note / conclusion from allResponses
 watch(() => props.allResponses, (responses) => {
   const item = responses.get('I1-10-note')
-  if (item) {
-    auditNote.value = (item as any).remark ?? (item as any).conclusion ?? ''
-  }
+  if (item) auditNote.value = (item as any).remark ?? (item as any).conclusion ?? ''
   const conc = responses.get('I1-10-conclusion')
-  if (conc) {
-    auditConclusion.value = (conc as any).remark ?? (conc as any).conclusion ?? ''
-  }
+  if (conc) auditConclusion.value = (conc as any).remark ?? (conc as any).conclusion ?? ''
 }, { immediate: true })
 
-// ─── Handlers ────────────────────────────────────────────────────────────────
+watch([periodBegin, periodEnd], ([b, e]) => {
+  localPeriodBegin.value = b || ''
+  localPeriodEnd.value = e || ''
+}, { immediate: true })
 
-function handleFieldChange(rowIndex: number, field: keyof I1AmortizationRow, value: number | null) {
-  updateRowField(rowIndex, field, value ?? 0)
+const totalBookPeriod = computed(() =>
+  currentRows.value.reduce((s, r) => s + (r.bookPeriodAmort ?? 0), 0),
+)
+const totalPeriodDiff = computed(() =>
+  currentRows.value.reduce((s, r) => s + (r.periodDiff ?? 0), 0),
+)
+const significantDiffCount = computed(() =>
+  currentRows.value.filter(r => Math.abs(r.periodDiff ?? 0) > 0.01 || Math.abs(r.accAmortDiff ?? 0) > 0.01).length,
+)
+
+function handleFieldChange(rowIndex: number, field: keyof I1AmortizationRow, value: number | string | null) {
+  updateRowField(rowIndex, field, value ?? (typeof value === 'number' ? 0 : ''))
 }
 
-function handleRemainingChange(rowIndex: number, value: number | null) {
-  const rows = currentRows.value
-  const row = rows[rowIndex]
-  if (!row) return
-  row.remainingMonths = value ?? 0
-  row.usefulLifeMonths = row.usedMonths + (value ?? 0)
-  recalcRow(rowIndex)
+function handleUsefulLifeChange(rowIndex: number, value: number | null) {
+  const years = value ?? 0
+  updateRowField(rowIndex, 'usefulLifeYears', years)
+  updateRowField(rowIndex, 'usefulLifeMonths', Math.round(years * 12))
+}
+
+function onPeriodChange() {
+  setPeriod(localPeriodBegin.value || '', localPeriodEnd.value || '')
+}
+
+function handleAddRow() {
+  addRow({ name: '', cost: 0, salvage: 0, usefulLifeMonths: 0 })
 }
 
 async function handleSyncFromDetail() {
   try {
     await ElMessageBox.confirm(
-      '将从I1-2明细表同步资产参数（名称/原值/残值/使用寿命），现有手工调整将被覆盖。是否继续？',
+      '将从I1-2同步资产参数，现有手工调整可能被覆盖。是否继续？',
       '同步I1-2参数',
-      { confirmButtonText: '确定同步', cancelButtonText: '取消', type: 'warning' },
+      { type: 'warning' },
     )
-  } catch {
-    return
-  }
+  } catch { return }
 
-  // Extract asset params from allResponses I1-2 detail data
   const detailData = props.allResponses.get('I1-2-rows')
   const raw = (detailData as any)?.remark ?? (detailData as any)?.conclusion
   if (!raw) {
-    ElMessageBox.alert('未找到I1-2明细表数据，请先完善明细表。', '提示')
+    ElMessageBox.alert('未找到I1-2明细表数据。', '提示')
     return
   }
-
   try {
     const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed) || parsed.length === 0) {
+    if (!Array.isArray(parsed) || !parsed.length) {
       ElMessageBox.alert('I1-2明细表暂无资产数据。', '提示')
       return
     }
     const assetParams: I1AssetParams[] = parsed.map((item: any) => ({
       rowId: item.rowId ?? '',
       name: item.name ?? item.assetName ?? '',
-      cost: Number(item.cost ?? item.originalCost ?? 0),
+      category: item.category ?? '',
+      cost: Number(item.costEnd ?? item.cost ?? 0),
       salvageRate: Number(item.salvageRate ?? 0),
-      usefulLifeMonths: Number(item.usefulLifeMonths ?? item.usefulLife ?? 0),
-      accAmortBegin: Number(item.accAmortBegin ?? item.accumulatedAmort ?? 0),
+      usefulLifeMonths: Number(item.usefulLifeMonths ?? 0),
+      accAmortBegin: Number(item.accAmortBegin ?? 0),
+      accAmortEnd: Number(item.accAmortEnd ?? item.accAmortBegin ?? 0),
       impairmentEnd: 0,
+      acquisitionDate: item.acquisitionDate ?? '',
+      amortProvision: Number(item.amortProvision ?? 0),
     }))
     syncFromDetail(assetParams)
+    ElMessage.success(`已同步 ${assetParams.length} 项`)
   } catch {
-    ElMessageBox.alert('I1-2明细表数据解析失败。', '错误')
+    ElMessageBox.alert('I1-2数据解析失败。', '错误')
   }
 }
 
-function handleReview() {
-  openReviewDialog('I1-10')
+function handleSyncFromUsefulLife() {
+  const r = syncFromUsefulLife()
+  if (r.updated > 0) ElMessage.success(r.message)
+  else ElMessage.warning(r.message)
 }
 
-function handleSaveNote() {
-  emit('save', 'I1-10-note', auditNote.value)
+function handleReview() { openReviewDialog('I1-10') }
+function handleSaveNote() { emit('save', 'I1-10-note', auditNote.value) }
+function handleSaveConclusion() { emit('save', 'I1-10-conclusion', auditConclusion.value) }
+
+async function handleExportCmd(cmd: string) {
+  if (cmd === 'export-template') await exportXlsx('template')
+  else if (cmd === 'export-data') await exportXlsx('data')
+  else if (cmd === 'import-data') fileInputRef.value?.click()
 }
 
-function handleSaveConclusion() {
-  emit('save', 'I1-10-conclusion', auditConclusion.value)
+async function onFileSelected(ev: Event) {
+  const input = ev.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  try {
+    const r = await importXlsx(file, true)
+    ElMessage.success(`已导入 ${r.imported} 行`)
+  } catch (e: any) {
+    ElMessage.error(e?.message || '导入失败')
+  }
 }
 
-// ─── Summary method for el-table ─────────────────────────────────────────────
+function getRowClass({ row }: { row: I1AmortizationRow }) {
+  return Math.abs(row.periodDiff ?? 0) > 0.01 || Math.abs(row.accAmortDiff ?? 0) > 0.01 ? 'diff-row' : ''
+}
 
 function getSummaryRow({ columns, data }: { columns: any[]; data: I1AmortizationRow[] }) {
-  const sums: string[] = []
-  columns.forEach((col: any, index: number) => {
-    if (index === 0) {
-      sums[index] = '合计'
-      return
-    }
-    if (index === 1) {
-      sums[index] = ''
-      return
-    }
-    // cost column (index 2)
-    if (index === 2) {
-      sums[index] = fmtAmt(data.reduce((s, r) => s + (r.cost ?? 0), 0))
-      return
-    }
-    // salvage column (index 3)
-    if (index === 3) {
-      sums[index] = fmtAmt(data.reduce((s, r) => s + (r.salvage ?? 0), 0))
-      return
-    }
-    // accAmortBegin (index 4)
-    if (index === 4) {
-      sums[index] = fmtAmt(data.reduce((s, r) => s + (r.accAmortBegin ?? 0), 0))
-      return
-    }
-    // remainingMonths (index 5) — no sum
-    if (index === 5) {
-      sums[index] = '-'
-      return
-    }
-    // monthlyAmortAmount (index 6)
-    if (index === 6) {
-      sums[index] = fmtAmt(data.reduce((s, r) => s + (r.monthlyAmortAmount ?? 0), 0))
-      return
-    }
-    // month columns (index 7 to 7+27=34)
-    const monthIdx = index - 7
-    if (monthIdx >= 0 && monthIdx < 28) {
-      sums[index] = fmtAmt(summaryRow.value.monthlyTotals[monthIdx] ?? 0)
-      return
-    }
-    // periodAmortization (last column, index 35)
-    if (index === 35) {
-      sums[index] = fmtAmt(summaryRow.value.periodTotal)
-      return
-    }
-    sums[index] = ''
+  const labelToKey: Record<string, keyof I1AmortizationRow> = {
+    原值: 'cost',
+    累计摊销期初: 'accAmortBegin',
+    账面累计摊销期末: 'bookAccAmortEnd',
+    账面本期摊销: 'bookPeriodAmort',
+    残值: 'salvage',
+    期初净值F: 'beginNbv',
+    月摊销额K: 'monthlyAmortAmount',
+    本期摊销M: 'periodAmortization',
+    本期差异O: 'periodDiff',
+    '累计摊销(测算)': 'calcAccAmort',
+    累计差异: 'accAmortDiff',
+  }
+  return columns.map((col: any, index: number) => {
+    if (index === 0) return '合计'
+    const key = labelToKey[col.label]
+    if (!key) return ''
+    return fmtAmt(data.reduce((s, r) => s + Number((r as any)[key] ?? 0), 0))
   })
-  return sums
 }
-
-// ─── Util ────────────────────────────────────────────────────────────────────
 
 function fmtAmt(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
@@ -374,23 +528,17 @@ function fmtAmt(val: number | null | undefined): string {
 </script>
 
 <style scoped>
-.i1-tab-amort-no-impair {
-  padding: 16px;
-  font-size: var(--wp-font-size, 13px);
-}
-
+.i1-tab-amort-no-impair { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .methodology-context {
-  border-left: 3px solid var(--el-color-warning);
-  background: #fffbe6;
+  border-left: 3px solid var(--el-color-primary);
+  background: #f0f7ff;
   padding: 10px 14px;
   margin-bottom: 12px;
   border-radius: 4px;
   font-size: 12px;
   line-height: 1.6;
 }
-
 .objective-alert { margin-bottom: 12px; }
-
 .tab-toolbar {
   display: flex;
   justify-content: space-between;
@@ -399,79 +547,26 @@ function fmtAmt(val: number | null | undefined): string {
   flex-wrap: wrap;
   gap: 8px;
 }
-.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
-.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
-.chip-wrap { display: inline-flex; align-items: center; }
-
-.section-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.title-actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.amort-matrix-table {
-  font-size: 12px;
-}
-
-.amort-matrix-table :deep(.el-table__footer) {
-  font-weight: 600;
-  background: var(--el-fill-color-light);
-}
-
-.cell-input {
-  width: 100%;
-}
-
-.cell-input :deep(.el-input__inner) {
-  text-align: right;
-  font-size: 12px;
-}
-
-.amount-cell {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.formula-cell {
-  border-bottom: 1px dashed var(--el-border-color);
-  cursor: help;
-  font-variant-numeric: tabular-nums;
-}
-
+.toolbar-left, .toolbar-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.nav-chip { cursor: pointer; }
+.reconcile-alert { margin-bottom: 12px; }
+.period-label { font-size: 12px; color: var(--el-text-color-secondary); }
+.chip-wrap { display: inline-flex; }
+.section-title { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.title-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.amort-table { font-size: 12px; }
+.amort-table :deep(.diff-row) { background: var(--el-color-danger-light-9); }
+.cell-input { width: 100%; }
+.cell-input :deep(.el-input__inner) { text-align: right; font-size: 12px; }
+.amount-cell, .formula-cell { font-variant-numeric: tabular-nums; }
+.formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; }
+.text-danger { color: var(--el-color-danger); font-weight: 600; }
 .totals-bar {
-  display: flex;
-  gap: 24px;
-  padding: 10px 12px;
-  margin-top: 12px;
-  background: var(--el-fill-color-light);
-  border-radius: 4px;
-  font-size: var(--wp-font-size, 13px);
+  display: flex; gap: 20px; padding: 10px 12px; margin-top: 12px;
+  background: var(--el-fill-color-light); border-radius: 4px; flex-wrap: wrap;
 }
-
-.note-card {
-  margin-top: 12px;
-}
-
-.compile-hint {
-  margin-top: 12px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.compile-hint summary {
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.compile-hint ul {
-  padding-left: 20px;
-  margin-top: 8px;
-  line-height: 1.8;
-}
+.note-card { margin-top: 12px; }
+.compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
+.compile-hint summary { cursor: pointer; font-weight: 500; }
+.compile-hint ul { padding-left: 20px; margin-top: 8px; line-height: 1.8; }
 </style>

@@ -521,6 +521,8 @@ export const B_DOCX_POPUP_CONFIGS: Record<string, DocxPopupConfig> = {
     relatedLinks: [
       { label: 'B50 汇总风险评估', wpCode: 'B50' },
       { label: 'B10 了解被审计单位', wpCode: 'B10' },
+      { label: 'B60A 内控特殊考虑', wpCode: 'B60A' },
+      { label: 'B60-1 工时预算', wpCode: 'B60-1' },
     ],
   },
   'B60-2-1': {

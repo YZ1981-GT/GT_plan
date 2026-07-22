@@ -254,6 +254,7 @@ def _register_phase_handlers() -> None:
     from app.services.gate_rules_eqcr import register_eqcr_gate_rules
     from app.services.gate_rules_cross_check import register_cross_check_rules
     import app.services.gate_rules_round6  # noqa: F401 — 模块级自动注册
+    import app.services.gate_rules_b60  # noqa: F401 — B60 矩阵/重要性门禁
     import app.services.gate_rules_ai_content  # noqa: F401 — R3 AI 内容确认规则自动注册
     import app.services.gate_rules_cross_module_conflict  # noqa: F401 — V3 7.6 跨模块冲突守门规则自动注册
     from app.services.task_event_handlers import (

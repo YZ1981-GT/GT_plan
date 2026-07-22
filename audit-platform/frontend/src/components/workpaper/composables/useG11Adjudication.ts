@@ -271,6 +271,7 @@ export function useG11Adjudication(opts: {
   function publishAdjudicated(): void {
     const amount = totalRow.value.currentAudited
     opts.debouncedSave('G11-1-adjudicated-amount', { conclusion: String(amount) })
+    // substantive:adjudicated → 跨模块刷新（附注等）；TB 回写走专用事件，避免父组件双次 writeback
     try {
       window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
         detail: { accountCode: G11_ACCOUNT_CODE, adjudicatedAmount: amount },

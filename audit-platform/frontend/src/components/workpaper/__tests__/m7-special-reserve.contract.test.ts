@@ -4,7 +4,7 @@
  * 验证 'm7-special-reserve' componentType 在四个注册表中正确注册：
  * 1. htmlRendererRegistry（前端组件映射）
  * 2. VALID_COMPONENT_TYPES（后端 wp_classification_service.py）
- * 3. wp_code_overrides（M7/M7-1~M7-5 共6个映射，M7A→a-program-console）
+ * 3. wp_code_overrides（M7/M7-1~M7-5/M7A 共7个映射）
  * 4. RENDERER_DISPATCH（后端渲染策略）
  *
  * Spec: .kiro/specs/m7-special-reserve/
@@ -24,7 +24,7 @@ import {
 
 const COMPONENT_TYPE = 'm7-special-reserve'
 
-// M7/M7-1~M7-5 共6个wp_code应映射到m7-special-reserve
+// M7/M7-1~M7-5/M7A 共7个wp_code应映射到m7-special-reserve
 const EXPECTED_WP_CODES = [
   'M7',
   'M7-1',
@@ -32,6 +32,7 @@ const EXPECTED_WP_CODES = [
   'M7-3',
   'M7-4',
   'M7-5',
+  'M7A',
 ]
 
 describe('M7 专项储备 — 注册契约测试', () => {
@@ -97,11 +98,7 @@ describe('M7 专项储备 — 注册契约测试', () => {
       expect(overrides[wpCode]).toBe(COMPONENT_TYPE)
     })
 
-    it('M7A 映射为 a-program-console（程序表独立）', () => {
-      expect(overrides['M7A']).toBe('a-program-console')
-    })
-
-    it('覆盖完整性：共6个映射无遗漏', () => {
+    it('覆盖完整性：共7个映射无遗漏', () => {
       const m7Mappings = Object.entries(overrides).filter(
         ([, v]) => v === COMPONENT_TYPE
       )

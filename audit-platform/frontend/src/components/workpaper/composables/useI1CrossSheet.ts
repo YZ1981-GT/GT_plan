@@ -76,14 +76,20 @@ export interface I1AmortizationRowRaw {
 export interface I1AdjustmentRowRaw {
   rowId?: string
   description?: string        // 调整事项
+  category?: string           // 账项调整 / 报表调整 / 其他
   entryType?: string          // AJE / RJE
+  reportItem?: string
   accountCode?: string        // 科目代码
   accountName?: string        // 科目名称
-  summary?: string            // 摘要
+  noteItem?: string
+  summary?: string            // 摘要（旧字段）
   debitAmount?: number        // 借方
   creditAmount?: number       // 贷方
+  debit?: number              // 兼容旧字段
+  credit?: number
   indexRef?: string           // 索引
   remark?: string
+  sourceGroupId?: string
 }
 
 /** I1-9 摊销分配行原始 JSON 结构 */
@@ -91,6 +97,7 @@ export interface I1AmortAllocRowRaw {
   rowId?: string
   name?: string               // 资产名称
   totalAmort?: number         // 摊销总额
+  productionCost?: number     // 生产成本（Excel 列）
   managementExpense?: number  // 管理费用
   sellingExpense?: number     // 销售费用
   manufacturingCost?: number  // 制造费用
@@ -150,7 +157,6 @@ export function useI1CrossSheet(allResponses: Ref<Map<string, any>>): {
   detailTotals: ComputedRef<I1DetailTotals>
   adjudicationFromDetail: ComputedRef<I1AdjudicationFromDetail>
   amortizationForAlloc: ComputedRef<I1AmortizationForAlloc>
-  disclosureAutoFill: ComputedRef<Record<string, number>>
 } {
   // ─── 解析 I1-2 明细行数据 ──────────────────────────────────────────────
 
@@ -176,6 +182,30 @@ export function useI1CrossSheet(allResponses: Ref<Map<string, any>>): {
   const adjustmentRows = computed<I1AdjustmentRowRaw[]>(() => {
     const resp = allResponses.value.get('I1-3-rows')
     return safeParseRows<I1AdjustmentRowRaw>(resp?.remark)
+  })
+
+  /** I1-3 → 审定表：按 1701/1702/1703 汇总 AJE/RJE 净额（借−贷） */
+  const adjustmentNets = computed(() => {
+    let costAje = 0, costRje = 0, amortAje = 0, amortRje = 0, impairAje = 0, impairRje = 0
+    for (const row of adjustmentRows.value) {
+      const debit = _getNum(row.debitAmount ?? row.debit)
+      const credit = _getNum(row.creditAmount ?? row.credit)
+      const net = debit - credit
+      const code = String(row.accountCode || '')
+      const cat = String(row.category || '')
+      const isRje = row.entryType === 'RJE' || cat.includes('报表') || cat.includes('重分类')
+      if (code === '1701' || code.startsWith('1701')) {
+        if (isRje) costRje += net
+        else costAje += net
+      } else if (code === '1702' || code.startsWith('1702')) {
+        if (isRje) amortRje += net
+        else amortAje += net
+      } else if (code === '1703' || code.startsWith('1703')) {
+        if (isRje) impairRje += net
+        else impairAje += net
+      }
+    }
+    return { costAje, costRje, amortAje, amortRje, impairAje, impairRje }
   })
 
   // ─── detailTotals: I1-2 明细聚合原值/摊销/减值合计（Req 2.4-2.7）──────
@@ -245,116 +275,8 @@ export function useI1CrossSheet(allResponses: Ref<Map<string, any>>): {
     return { byAsset, total }
   })
 
-  // ─── disclosureAutoFill: 多sheet → 附注自动取数（Req 2.4-2.9）─────────
-
-  /**
-   * 附注披露自动取数，从多个 sheet 聚合数据供附注子节引用：
-   *
-   * 第(1)子节 — 无形资产明细变动矩阵（从I1-2聚合）：
-   * - disc_cost_begin / disc_cost_increase / disc_cost_decrease / disc_cost_end
-   * - disc_amort_begin / disc_amort_provision / disc_amort_transfer / disc_amort_end
-   * - disc_impair_begin / disc_impair_provision / disc_impair_reversal / disc_impair_end
-   * - disc_net_value: 净值合计（原值-摊销-减值）
-   *
-   * 第(2)子节 — 摊销费用分配（从I1-9合计或amortizationForAlloc取）：
-   * - disc_amort_total: 本期摊销总额
-   * - disc_amort_mgmt: 管理费用
-   * - disc_amort_sell: 销售费用
-   * - disc_amort_mfg: 制造费用
-   * - disc_amort_rd: 研发费用
-   *
-   * 第(3)子节 — 统计：
-   * - disc_asset_count: 资产数量
-   * - disc_indefinite_count: 使用寿命不确定的资产数量
-   */
-  const disclosureAutoFill: ComputedRef<Record<string, number>> = computed(() => {
-    const result: Record<string, number> = {}
-
-    // ─ 第(1)子节：从 I1-2 明细行聚合附注原值/摊销/减值矩阵
-    let costBegin = 0
-    let costIncrease = 0
-    let costDecrease = 0
-    let costEnd = 0
-    let amortBegin = 0
-    let amortProvision = 0
-    let amortTransfer = 0
-    let amortEnd = 0
-    let impairBegin = 0
-    let impairProvision = 0
-    let impairReversal = 0
-    let impairEnd = 0
-    let assetCount = 0
-    let indefiniteCount = 0
-
-    for (const row of detailRows.value) {
-      costBegin += _getNum(row.costBegin)
-      costIncrease += _getNum(row.costIncrease)
-      costDecrease += _getNum(row.costDecrease)
-      costEnd += _getNum(row.costEnd)
-      amortBegin += _getNum(row.accAmortBegin)
-      amortProvision += _getNum(row.amortProvision)
-      amortTransfer += _getNum(row.amortTransferOut)
-      amortEnd += _getNum(row.accAmortEnd)
-      impairBegin += _getNum(row.impairmentBegin)
-      impairProvision += _getNum(row.impairmentProvision)
-      impairReversal += _getNum(row.impairmentReversal)
-      impairEnd += _getNum(row.impairmentEnd)
-      assetCount++
-
-      // 使用寿命不确定 = 0 或 undefined 表示不摊销
-      const life = _getNum(row.usefulLifeMonths)
-      if (life <= 0) {
-        indefiniteCount++
-      }
-    }
-
-    result['disc_cost_begin'] = costBegin
-    result['disc_cost_increase'] = costIncrease
-    result['disc_cost_decrease'] = costDecrease
-    result['disc_cost_end'] = costEnd
-    result['disc_amort_begin'] = amortBegin
-    result['disc_amort_provision'] = amortProvision
-    result['disc_amort_transfer'] = amortTransfer
-    result['disc_amort_end'] = amortEnd
-    result['disc_impair_begin'] = impairBegin
-    result['disc_impair_provision'] = impairProvision
-    result['disc_impair_reversal'] = impairReversal
-    result['disc_impair_end'] = impairEnd
-    result['disc_net_value'] = costEnd - amortEnd - impairEnd
-
-    // ─ 第(2)子节：摊销费用分配（从I1-9行读取或从amortizationForAlloc取合计）
-    const allocResp = allResponses.value.get('I1-9-rows')
-    const allocRows = safeParseRows<I1AmortAllocRowRaw>(allocResp?.remark)
-
-    let amortMgmt = 0
-    let amortSell = 0
-    let amortMfg = 0
-    let amortRd = 0
-    let amortOther = 0
-
-    if (allocRows.length > 0) {
-      for (const row of allocRows) {
-        amortMgmt += _getNum(row.managementExpense)
-        amortSell += _getNum(row.sellingExpense)
-        amortMfg += _getNum(row.manufacturingCost)
-        amortRd += _getNum(row.rdExpense)
-        amortOther += _getNum(row.otherExpense)
-      }
-    }
-
-    result['disc_amort_total'] = amortizationForAlloc.value.total
-    result['disc_amort_mgmt'] = amortMgmt
-    result['disc_amort_sell'] = amortSell
-    result['disc_amort_mfg'] = amortMfg
-    result['disc_amort_rd'] = amortRd
-    result['disc_amort_other'] = amortOther
-
-    // ─ 第(3)子节：统计
-    result['disc_asset_count'] = assetCount
-    result['disc_indefinite_count'] = indefiniteCount
-
-    return result
-  })
+  // 披露取数已迁至 useI1Listed/SoeDisclosure.pullFromSources（按分类 + 检查表）。
+  // 原 disclosureAutoFill 标量聚合无消费者，已按 H1 惯例删除。
 
   // ─── Return ────────────────────────────────────────────────────────────────
 
@@ -363,10 +285,11 @@ export function useI1CrossSheet(allResponses: Ref<Map<string, any>>): {
     detailTotals,
     // I1-2 合计 → I1 审定表三区块交叉验证
     adjudicationFromDetail,
+    // I1-3 → 审定 AJE/RJE 净额
+    adjustmentRows,
+    adjustmentNets,
     // I1-10/11 → I1-9 摊销分配
     amortizationForAlloc,
-    // 多sheet → 附注自动取数
-    disclosureAutoFill,
   }
 }
 

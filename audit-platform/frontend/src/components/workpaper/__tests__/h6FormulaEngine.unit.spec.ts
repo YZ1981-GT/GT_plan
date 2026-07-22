@@ -16,6 +16,7 @@ import {
   calcDisposalGainLoss,
   calcSubtotal,
   isTransitBalanceZero,
+  isClearingOverOneYear,
 } from '../composables/useH6FormulaEngine'
 
 // ============================================================
@@ -104,10 +105,36 @@ describe('calcNetBookValue — edge cases', () => {
   it('large asset value', () => {
     expect(calcNetBookValue(500_000_000, 125_000_000)).toBe(375_000_000)
   })
+  it('with impairment provision → cost - dep - impair', () => {
+    expect(calcNetBookValue(100000, 30000, 10000)).toBe(60000)
+  })
+
+  it('impairment defaults to 0 (两参数兼容)', () => {
+    expect(calcNetBookValue(100000, 30000)).toBe(70000)
+  })
 })
 
 // ============================================================
-// calcDisposalGainLoss — 清理净损益 = 收入 - 净值 - 费用 - 税费
+// isClearingOverOneYear — 超1年挂账判定
+// ============================================================
+describe('isClearingOverOneYear — edge cases', () => {
+  it('empty startDate → false', () => {
+    expect(isClearingOverOneYear('', '2025-12-31')).toBe(false)
+  })
+
+  it('within one year → false', () => {
+    expect(isClearingOverOneYear('2025-01-01', '2025-12-31')).toBe(false)
+  })
+
+  it('exactly one year → true', () => {
+    expect(isClearingOverOneYear('2024-12-31', '2025-12-31')).toBe(true)
+  })
+
+  it('over one year → true', () => {
+    expect(isClearingOverOneYear('2023-06-01', '2025-12-31')).toBe(true)
+  })
+})
+
 // ============================================================
 describe('calcDisposalGainLoss — edge cases', () => {
   it('all zero → 0 (无实质清理)', () => {

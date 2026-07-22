@@ -95,10 +95,11 @@ describe('G13 集成 — 变动率', () => {
     expect(calcChangeRate(0, 100)).toBeNull()
   })
 
-  it('|变动率|>20% 触发原因必填阈值', () => {
-    const rate = calcChangeRate(100, 130)
+  it('|变动率|>30% 触发原因必填阈值', () => {
+    const rate = calcChangeRate(100, 140)
     expect(rate).not.toBeNull()
     expect(Math.abs(rate!)).toBeGreaterThan(G13_CHANGE_RATE_THRESHOLD)
+    expect(Math.abs(calcChangeRate(100, 125)!)).toBeLessThanOrEqual(G13_CHANGE_RATE_THRESHOLD)
   })
 })
 
@@ -110,9 +111,22 @@ describe('G13 集成 — 借贷平衡', () => {
 })
 
 describe('G13 集成 — 审定表分组', () => {
-  it('5类分组 + 合计', () => {
-    expect(G13_ADJUDICATION_ITEMS.length).toBe(5)
-    expect(G13_ADJUDICATION_ITEMS.map((i) => i.rowKey)).toContain('trading_assets')
+  it('与 xlsx 一致：10 行分层（含其中/衍生/投资性房地产）', () => {
+    expect(G13_ADJUDICATION_ITEMS.length).toBe(10)
+    expect(G13_ADJUDICATION_ITEMS.map((i) => i.rowKey)).toEqual([
+      'trading_assets',
+      'designated_fv_assets',
+      'derivative_assets',
+      'trading_liabilities',
+      'designated_fv_liabilities',
+      'derivative_liabilities',
+      'other_noncurrent',
+      'designated_fv_other',
+      'investment_property',
+      'other',
+    ])
+    expect(G13_ADJUDICATION_ITEMS.filter((i) => i.kind === 'ofWhich')).toHaveLength(3)
+    expect(G13_CHANGE_RATE_THRESHOLD).toBe(0.3)
   })
 })
 

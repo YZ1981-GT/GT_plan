@@ -142,6 +142,7 @@
         :schema="activeSheetSchema"
         :html-data="activeSheetHtmlData"
         :readonly="readonly"
+        :wp-code="renderConfig?.wp_code ?? ''"
         v-bind="extraComponentProps"
         @save="onSave"
         @subtable-toggle="onSubtableToggle"

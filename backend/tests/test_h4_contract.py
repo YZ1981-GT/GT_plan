@@ -4,7 +4,7 @@ Spec: .kiro/specs/h4-engineering-materials/ Task 1.2
 Validates: Requirements 1.6, 1.7, 1.8
 
 验证 h4-engineering-materials componentType 在后端注册表中正确注册：
-1. wp_code_overrides（H4/H4A/H4-1~H4-9 共11个映射）
+1. wp_code_overrides（H4/H4A/H4-1~H4-9 及 H4-6A/H4-6B）
 2. VALID_COMPONENT_TYPES
 3. RENDERER_DISPATCH（Phase 5创建后验证）
 4. schema_contract: checklist_responses 表结构验证
@@ -18,7 +18,7 @@ import pytest
 
 COMPONENT_TYPE = "h4-engineering-materials"
 
-# H4/H4A/H4-1~H4-9 共11个wp_code
+# H4 族 wp_code（含监盘计划/小结）
 EXPECTED_WP_CODES = [
     "H4",
     "H4A",
@@ -27,7 +27,9 @@ EXPECTED_WP_CODES = [
     "H4-3",
     "H4-4",
     "H4-5",
+    "H4-6A",
     "H4-6",
+    "H4-6B",
     "H4-7",
     "H4-8",
     "H4-9",
@@ -50,17 +52,17 @@ def test_wp_code_override_mapping(wp_code: str):
 
 
 def test_wp_code_overrides_completeness():
-    """wp_code_overrides 中 h4-engineering-materials 映射覆盖完整（共11个）."""
+    """wp_code_overrides 中 h4-engineering-materials 映射覆盖完整."""
     data = _load_overrides()
     h4_mappings = [k for k, v in data.items() if v == COMPONENT_TYPE]
     assert sorted(h4_mappings) == sorted(EXPECTED_WP_CODES)
 
 
 def test_wp_code_overrides_count():
-    """wp_code_overrides 中 h4-engineering-materials 映射数量正好11个."""
+    """wp_code_overrides 中 h4-engineering-materials 映射数量与期望一致."""
     data = _load_overrides()
     h4_mappings = [k for k, v in data.items() if v == COMPONENT_TYPE]
-    assert len(h4_mappings) == 11
+    assert len(h4_mappings) == len(EXPECTED_WP_CODES)
 
 
 # ─── VALID_COMPONENT_TYPES ───────────────────────────────────────────────────

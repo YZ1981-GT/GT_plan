@@ -41,6 +41,17 @@ function createTestInstance() {
       within1: 0, y1to2: 0, y2to3: 0, over3: 0,
       prior_within1: 0, prior_y1to2: 0, prior_y2to3: 0, prior_over3: 0,
     }),
+    // segment-driven 账龄聚合 + 有效段（默认 THREE_YEAR，值全 0）
+    agingByKey: ref({
+      current: { within1: 0, y1to2: 0, y2to3: 0, over3: 0 },
+      prior: { within1: 0, y1to2: 0, y2to3: 0, over3: 0 },
+    }),
+    agingSegments: ref([
+      { key: 'within1', label: '1年以内', dayFrom: 0, dayTo: 365 },
+      { key: 'y1to2', label: '1-2年', dayFrom: 366, dayTo: 730 },
+      { key: 'y2to3', label: '2-3年', dayFrom: 731, dayTo: 1095 },
+      { key: 'over3', label: '3年以上', dayFrom: 1096, dayTo: null },
+    ]),
     longTermRows: ref([]),
     relatedPartyRows: ref([]),
     adjustmentTotals: ref({ ajeTotal: 0, rjeTotal: 0 }),

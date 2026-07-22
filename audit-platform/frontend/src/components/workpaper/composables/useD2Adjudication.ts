@@ -21,6 +21,7 @@ import {
   sumif,
 } from './useD2FormulaEngine'
 import { D2_WRITEBACK_KEY } from './d2InjectionKeys'
+import { eventBus } from '@/utils/eventBus'
 import type { ChecklistItem, ChecklistResponse } from './useD2FormData'
 
 const BALANCE_TOLERANCE = 0.01
@@ -435,7 +436,8 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
       changeRate: typeof total.changeRate === 'number' ? total.changeRate : null,
     }
     try {
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
+      // 统一走 eventBus（crossWpEventBridge 会带再入守卫转发到 window，旧 window 监听者不受影响）
+      eventBus.emit('substantive:adjudicated', payload as any)
     } catch {
       console.warn('[useD2Adjudication] EventBus publish substantive:adjudicated failed')
     }

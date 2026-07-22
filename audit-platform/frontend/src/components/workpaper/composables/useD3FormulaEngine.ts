@@ -187,6 +187,9 @@ export function aggregateByNature(
  * 按审定账龄聚合：从明细行按 U~X 列聚合
  *
  * 适用于 D3-1 "按账龄分类"区块自动取数。
+ *
+ * @deprecated 固定 4 段（THREE_YEAR）聚合，仅兼容旧调用与默认账龄配置。
+ * 项目自定义账龄段时请使用 `aggregateAgingByKeys`（segment-driven，见下）。
  */
 export function aggregateByAging(
   rows: DetailRowForFormula[]
@@ -199,6 +202,57 @@ export function aggregateByAging(
     result.over3 += row.agingAudited.over3
   }
   return result
+}
+
+// ─── 按动态账龄段聚合（aging-config-enhancement 对齐） ────────────────────────
+
+/** 仅需 aging 数据的最小行结构（key 为项目配置的动态账龄段） */
+export interface AgingRowForAggregate {
+  agingPrior?: Record<string, number> | null
+  agingAudited?: Record<string, number> | null
+}
+
+/**
+ * 收集明细行中出现过的账龄段 key（保序去重，audited 优先，其次 prior）。
+ *
+ * 当未传入项目账龄配置时用作兜底，确保聚合覆盖数据里实际存在的段。
+ */
+export function collectAgingKeys(rows: AgingRowForAggregate[]): string[] {
+  const seen = new Set<string>()
+  const keys: string[] = []
+  const push = (obj: Record<string, number> | null | undefined) => {
+    if (!obj || typeof obj !== 'object') return
+    for (const k of Object.keys(obj)) {
+      if (!seen.has(k)) { seen.add(k); keys.push(k) }
+    }
+  }
+  for (const row of rows) push(row.agingAudited)
+  for (const row of rows) push(row.agingPrior)
+  return keys
+}
+
+/**
+ * 按给定账龄段 key 列表聚合期末审定(current)与期初审定(prior)。
+ *
+ * 返回结构以 key 为索引，覆盖传入的全部 keys（缺失段计 0），
+ * 与项目账龄配置（THREE_YEAR/FIVE_YEAR/CUSTOM）严格对齐，替代固定 4 段聚合。
+ *
+ * 适用于 D3-1「按账龄分类」、附注国企「按账龄」等 segment-driven 取数。
+ */
+export function aggregateAgingByKeys(
+  rows: AgingRowForAggregate[],
+  keys: string[],
+): { current: Record<string, number>; prior: Record<string, number> } {
+  const current: Record<string, number> = {}
+  const prior: Record<string, number> = {}
+  for (const k of keys) { current[k] = 0; prior[k] = 0 }
+  for (const row of rows) {
+    for (const k of keys) {
+      current[k] += parseNum(row.agingAudited?.[k])
+      prior[k] += parseNum(row.agingPrior?.[k])
+    }
+  }
+  return { current, prior }
 }
 
 // ─── 公式单元描述（统一治理接入元数据，Task 13.2） ───────────────────────────

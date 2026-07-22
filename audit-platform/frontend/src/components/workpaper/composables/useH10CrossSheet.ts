@@ -1,19 +1,23 @@
 /**
  * useH10CrossSheet — H10 跨 sheet / 跨底稿联动
  */
-import { computed, type Ref, type ComputedRef } from 'vue'
+import { computed, ref, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal, calcAuditedAmount } from './useH10FormulaEngine'
 import { H10_ADJUDICATION_ITEMS } from './h10Constants'
 import type { ChecklistResponse } from './useF1FormData'
+import { pullH6ClearingNetForH10 } from './h10RelatedH6Pull'
 
-/** 明细来源底稿 → H10-1 审定行 rowKey */
+/** 明细来源底稿 → H10-1 审定行 rowKey（H8=使用权、I1=无形资产） */
 export const H10_SOURCE_WP_TO_ROW_KEY: Record<string, string> = {
   H1: 'fixed_asset_disposal',
-  H3: 'construction_disposal',
-  H5: 'productive_bio_disposal',
-  H7: 'productive_bio_disposal',
-  H8: 'intangible_disposal',
+  H2: 'construction_disposal',
+  H5: 'oil_gas_disposal',
   H6: 'fixed_asset_disposal',
+  H7: 'productive_bio_disposal',
+  H8: 'rou_disposal',
+  I1: 'intangible_disposal',
+  DR: 'debt_restructuring_disposal',
+  NM: 'non_monetary_exchange',
 }
 
 function safeParseArray(remark: string | null | undefined): any[] {
@@ -41,6 +45,21 @@ function readAdjRowAmount(storeRaw: string | null | undefined, rowKey: string): 
   }
 }
 
+function sumLocalH6Net(allResponses: Map<string, ChecklistResponse>): number | null {
+  for (const key of ['H6-2-rows', 'H6-detail-rows', 'H6-clearing-rows']) {
+    const raw = allResponses.get(key)?.remark
+    if (!raw) continue
+    try {
+      const rows = JSON.parse(raw)
+      if (!Array.isArray(rows) || !rows.length) continue
+      return calcSubtotal(rows.map((r: any) =>
+        parseNum(r.netGainLoss ?? r.gainLoss ?? r.disposalGainLoss ?? r.toDisposalGain),
+      ))
+    } catch { /* next */ }
+  }
+  return null
+}
+
 export interface H10CrossMatchResult {
   diff: number
   isMatch: boolean
@@ -54,6 +73,7 @@ export interface H10H6CrossResult {
   h10FixedAssetTotal: number
   h6NetGainLoss: number | null
   h6Available: boolean
+  h6Source: 'local' | 'remote' | 'none'
 }
 
 export interface H10SourceWpMismatch {
@@ -67,8 +87,13 @@ export interface H10SourceWpMismatch {
 
 export function useH10CrossSheet(opts: {
   allResponses: Ref<Map<string, ChecklistResponse>>
+  projectId?: Ref<string | undefined>
 }) {
   const storeRaw = computed(() => opts.allResponses.value.get('H10-adj-rows')?.remark)
+  /** 跨 WP 拉取的 H6 净损益（优先于本 WP 内偶然存在的 H6 键） */
+  const remoteH6Net = ref<number | null>(null)
+  const remoteH6Msg = ref('')
+  const h6PullLoading = ref(false)
 
   const adjudicationVsDetail: ComputedRef<H10CrossMatchResult> = computed(() => {
     let adjudicationTotal = 0
@@ -101,19 +126,10 @@ export function useH10CrossSheet(opts: {
 
   const h10VsH6: ComputedRef<H10H6CrossResult> = computed(() => {
     const h10FixedAssetTotal = readAdjRowAmount(storeRaw.value, 'fixed_asset_disposal')
-
-    const h6Raw = opts.allResponses.value.get('H6-detail-rows')?.remark
-      ?? opts.allResponses.value.get('H6-clearing-rows')?.remark
-    let h6NetGainLoss: number | null = null
-    if (h6Raw) {
-      try {
-        const rows = JSON.parse(h6Raw)
-        if (Array.isArray(rows)) {
-          h6NetGainLoss = calcSubtotal(rows.map((r: any) => parseNum(r.netGainLoss ?? r.disposalGainLoss)))
-        }
-      } catch { /* ignore */ }
-    }
-
+    const local = sumLocalH6Net(opts.allResponses.value)
+    const h6NetGainLoss = remoteH6Net.value != null ? remoteH6Net.value : local
+    const h6Source: H10H6CrossResult['h6Source'] =
+      remoteH6Net.value != null ? 'remote' : local != null ? 'local' : 'none'
     const h6Available = h6NetGainLoss != null
     const diff = h6Available ? h10FixedAssetTotal - (h6NetGainLoss ?? 0) : 0
     return {
@@ -122,8 +138,30 @@ export function useH10CrossSheet(opts: {
       h10FixedAssetTotal,
       h6NetGainLoss,
       h6Available,
+      h6Source,
     }
   })
+
+  async function refreshH6CrossCheck(): Promise<H10H6CrossResult> {
+    const pid = opts.projectId?.value || ''
+    if (!pid) {
+      remoteH6Msg.value = '缺少 projectId'
+      return h10VsH6.value
+    }
+    h6PullLoading.value = true
+    try {
+      const pull = await pullH6ClearingNetForH10(pid)
+      remoteH6Msg.value = pull.message
+      if (pull.status === 'ok' && pull.netGainLoss != null) {
+        remoteH6Net.value = pull.netGainLoss
+      } else if (pull.status === 'empty') {
+        remoteH6Net.value = 0
+      }
+    } finally {
+      h6PullLoading.value = false
+    }
+    return h10VsH6.value
+  }
 
   const sourceWpMismatches: ComputedRef<H10SourceWpMismatch[]> = computed(() => {
     const detailRows = safeParseArray(opts.allResponses.value.get('H10-detail-rows')?.remark)
@@ -184,5 +222,8 @@ export function useH10CrossSheet(opts: {
     h10VsSourceWps: sourceWpTotals,
     sourceWpMismatches,
     hasSourceWpMismatch,
+    refreshH6CrossCheck,
+    h6PullLoading,
+    remoteH6Msg,
   }
 }

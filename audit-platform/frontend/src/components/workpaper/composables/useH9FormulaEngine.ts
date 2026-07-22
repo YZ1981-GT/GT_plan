@@ -44,6 +44,46 @@ export function calcNetLiability(liability: number, unearnedFinanceCost: number)
 }
 
 /**
+ * 报表数 = 审定数 − 重分类至一年内到期
+ * Source: H9-1 F=D-E / K=I-J
+ */
+export function calcFsAmount(audited: number, reclassification: number): number {
+  return audited - reclassification
+}
+
+/**
+ * 本期审定 vs 上期审定：变动额 = 期末报表数 − 期初报表数
+ * Source: H9-1 L=K-F
+ */
+export function calcChangeAmount(endFs: number, beginFs: number): number {
+  return endFs - beginFs
+}
+
+/**
+ * 变动率：对齐 Excel H9-1 M列
+ * IF(期初=0且变动=0)→0；IF(期初=0且变动>0)→1；否则 变动/期初
+ * 返回小数（0.3 = 30%），UI 再格式化为百分比
+ */
+export function calcChangeRate(beginFs: number, changeAmt: number): number {
+  if (beginFs === 0 && changeAmt === 0) return 0
+  if (beginFs === 0 && changeAmt > 0) return 1
+  if (beginFs === 0) return changeAmt < 0 ? -1 : 1
+  return changeAmt / beginFs
+}
+
+/**
+ * 到期日分析四档合计应等于最终审定（±1 元容差）
+ */
+export function calcMaturityBucketsSum(
+  within1Y: number,
+  y1to2: number,
+  y2to3: number,
+  over3Y: number,
+): number {
+  return within1Y + y1to2 + y2to3 + over3Y
+}
+
+/**
  * 合计 = SUM(数组)；空数组返回0
  * Source: H9-1 row11=SUM(row8:row10), H9-2 row14=SUM(9:13), etc.
  */

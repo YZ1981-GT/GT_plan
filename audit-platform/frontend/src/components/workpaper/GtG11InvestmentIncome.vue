@@ -14,6 +14,30 @@
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
+      <el-alert
+        v-if="showCrossAlert && crossValidation.detailCrossValidation.value"
+        type="warning"
+        :closable="false"
+        class="g11-cross-alert"
+        data-testid="g11-page-cross-alert"
+      >
+        {{ crossValidation.detailCrossValidation.value }}
+        <span class="g11-cross-chips">
+          <GtIndexChip
+            label="G11-1"
+            :prevent-navigate="true"
+            :validate="false"
+            @click="jumpToG11Sheet('G11-1')"
+          />
+          <GtIndexChip
+            label="G11-2"
+            :prevent-navigate="true"
+            :validate="false"
+            @click="jumpToG11Sheet('G11-2')"
+          />
+        </span>
+      </el-alert>
+
       <GtOnlyOfficeSheet
         v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
@@ -45,6 +69,8 @@
         v-else-if="currentSheet === 'G11-2'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :html-data="props.htmlData"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -54,6 +80,8 @@
         v-else-if="currentSheet === 'G11-3'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :audit-year="auditYear"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -63,6 +91,7 @@
         v-else-if="currentSheet === 'G11-4'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -73,6 +102,7 @@
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
         :project-id="props.projectId"
+        :audit-year="auditYear"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -82,30 +112,39 @@
         v-else-if="currentSheet === '附注上市'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :applicable-standards="applicableStandards"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
       />
 
       <G11TabDisclosureSOE
         v-else-if="currentSheet === '附注国企'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :applicable-standards="applicableStandards"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
       />
 
       <template v-else-if="currentSheet === '底稿目录'">
-        <div class="g11-index-toolbar">
-          <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
+        <div class="g-cycle-tab-index-page">
+          <G11TabDirectory
+            :all-responses="formData.allResponses.value"
+            :available-sheets="availableSheets"
+          />
+          <GCycleBIndexExtras
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :sheet-name="props.sheetName"
+            :wp-code="props.wpCode"
+            :html-data="props.htmlData"
+            :available-sheets="availableSheets"
+          />
         </div>
-        <GCycleBIndexExtras
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :sheet-name="props.sheetName"
-          :wp-code="props.wpCode"
-          :html-data="props.htmlData"
-          :available-sheets="availableSheets"
-        />
       </template>
 
       <GtGridSheet
@@ -141,6 +180,10 @@ import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThrea
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
 import { G11_ACCOUNT_CODE } from './composables/g11Constants'
 import { parseNum } from './composables/useG11FormulaEngine'
+import { useG11CrossValidation } from './composables/useG11CrossValidation'
+import { resolveG11SheetLabel } from './composables/g11SheetLabels'
+import { offerG11DisclosurePull, G11_OFFER_DISCLOSURE_PULL_EVENT, promptForG11DisclosureSource } from './composables/g11DisclosureSync'
+import GtIndexChip from './GtIndexChip.vue'
 import type { ChecklistResponse } from './composables/useF1FormData'
 
 const G11TabProcedure = defineAsyncComponent(() => import('./g11-investment-income/core/G11TabProcedure.vue'))
@@ -151,6 +194,7 @@ const G11TabReturnRateAnalysis = defineAsyncComponent(() => import('./g11-invest
 const G11TabVoucherCheck = defineAsyncComponent(() => import('./g11-investment-income/voucher/G11TabVoucherCheck.vue'))
 const G11TabDisclosureListed = defineAsyncComponent(() => import('./g11-investment-income/core/G11TabDisclosureListed.vue'))
 const G11TabDisclosureSOE = defineAsyncComponent(() => import('./g11-investment-income/core/G11TabDisclosureSOE.vue'))
+const G11TabDirectory = defineAsyncComponent(() => import('./g11-investment-income/core/G11TabDirectory.vue'))
 const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -172,9 +216,27 @@ const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
 const formData = useG11FormData({ wpId: wpIdRef, projectId: projectIdRef })
+const crossValidation = useG11CrossValidation(formData.allResponses)
 const isReadonly = computed(() => !!props.readonly)
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
+const auditYear = computed(() => {
+  const y =
+    props.htmlData?.project_context?.audit_year
+    ?? props.htmlData?.projectContext?.audit_year
+    ?? props.htmlData?.audit_year
+    ?? runtime?.year?.value
+  const n = Number(y)
+  return Number.isFinite(n) && n > 0 ? n : null
+})
+const applicableStandards = computed<string[]>(() => {
+  const raw =
+    props.htmlData?.project_context?.applicable_standards
+    ?? props.htmlData?.projectContext?.applicable_standards
+    ?? props.htmlData?.applicable_standards
+    ?? runtime?.applicableStandards?.value
+  return Array.isArray(raw) ? raw.map(String) : []
+})
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
@@ -205,16 +267,17 @@ const useGridFallback = computed(() => {
   return !!code && !isHtmlSheet.value
 })
 
+const showCrossAlert = computed(() =>
+  ['G11-1', 'G11-2', 'G11-3', 'G11-4'].includes(currentSheet.value),
+)
+
+function jumpToG11Sheet(code: string): void {
+  emit('jump-to-section', resolveG11SheetLabel(code, availableSheets.value))
+}
+
 function onDebouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
   formData.debouncedSave(itemId, data)
   scheduleAutoSnapshot()
-}
-
-function handleG11Adjudicated(e: Event): void {
-  const detail = (e as CustomEvent<{ accountCode?: string; adjudicatedAmount?: number }>).detail
-  if (detail?.accountCode !== G11_ACCOUNT_CODE) return
-  const amount = parseNum(detail.adjudicatedAmount)
-  void formData.writebackTrialBalance(amount)
 }
 
 function handleG11Writeback(e: Event): void {
@@ -223,6 +286,15 @@ function handleG11Writeback(e: Event): void {
   const amount = parseNum(detail?.auditedAmount)
   if (!Number.isFinite(amount)) return
   void formData.writebackTrialBalance(amount)
+}
+
+function handleG11OfferDisclosurePull(e: Event): void {
+  const source = (e as CustomEvent<{ source?: string }>).detail?.source
+  void offerG11DisclosurePull(
+    formData.allResponses.value,
+    formData.debouncedSave,
+    promptForG11DisclosureSource(source),
+  )
 }
 
 async function reloadAll() {
@@ -250,15 +322,16 @@ useWorkpaperEntryInjections({
 })
 
 onMounted(async () => {
-  window.addEventListener('substantive:adjudicated', handleG11Adjudicated)
+  // TB 回写仅听 g11:writeback-trial-balance（substantive:adjudicated 供跨模块刷新，不重复写 TB）
   window.addEventListener('g11:writeback-trial-balance', handleG11Writeback)
+  window.addEventListener(G11_OFFER_DISCLOSURE_PULL_EVENT, handleG11OfferDisclosurePull)
   await formData.loadAll()
   isLoading.value = false
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('substantive:adjudicated', handleG11Adjudicated)
   window.removeEventListener('g11:writeback-trial-balance', handleG11Writeback)
+  window.removeEventListener(G11_OFFER_DISCLOSURE_PULL_EVENT, handleG11OfferDisclosurePull)
   formData.flushPending()
 })
 </script>
@@ -267,5 +340,7 @@ onBeforeUnmount(() => {
 .g11-investment-income { padding: 12px; }
 .loading-container { padding: 24px; }
 .g11-investment-income-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
-.g11-index-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.g11-cross-alert { margin-bottom: 8px; }
+.g11-cross-chips { margin-left: 8px; display: inline-flex; gap: 6px; }
+.g-cycle-tab-index-page { display: flex; flex-direction: column; gap: 12px; }
 </style>

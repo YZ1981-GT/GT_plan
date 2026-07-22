@@ -90,8 +90,13 @@ def calc_depreciation_with_impairment(
     useful_life_years: int,
     impairment: float,
     elapsed_months: int,
+    acc_dep_at_impairment: float | None = None,
 ) -> float:
-    """含减值直线法：减值后净值按剩余年限重新计算月折旧."""
+    """含减值直线法：减值后净值按剩余年限重新计算月折旧.
+
+    剩余可折旧额 = max(原值 - 减值时累计折旧 - 减值 - 残值, 0)
+    新月折旧 = 剩余可折旧额 / 剩余月数
+    """
     if useful_life_years <= 0:
         return 0.0
     total_months = useful_life_years * 12
@@ -99,13 +104,58 @@ def calc_depreciation_with_impairment(
     if remaining_months <= 0:
         return 0.0
     salvage = cost * salvage_rate
-    depreciable_base = cost - salvage - impairment
-    # 已计折旧 = 月折旧 × 已用月数（减值前直线法）
     pre_impairment_monthly = cost * (1 - salvage_rate) / total_months
-    accumulated_dep = pre_impairment_monthly * elapsed_months
-    # 减值后剩余可折旧额
-    remaining_depreciable = max(depreciable_base - accumulated_dep, 0.0)
+    if acc_dep_at_impairment is None:
+        accumulated_dep = pre_impairment_monthly * max(elapsed_months, 0)
+    else:
+        accumulated_dep = max(acc_dep_at_impairment, 0.0)
+    carrying = cost - accumulated_dep - max(impairment, 0.0)
+    remaining_depreciable = max(carrying - salvage, 0.0)
     return remaining_depreciable / remaining_months
+
+
+def calc_months_depreciated(start_date: str | None, as_of_date: str | None, useful_life_months: int) -> int:
+    """CAS惯例：投入使用次月起提，已提月数上限为使用月限."""
+    from datetime import date, datetime
+
+    def _parse(s: str | None) -> date | None:
+        if not s:
+            return None
+        try:
+            return datetime.strptime(str(s)[:10], "%Y-%m-%d").date()
+        except ValueError:
+            return None
+
+    start = _parse(start_date)
+    as_of = _parse(as_of_date)
+    if not start or not as_of or useful_life_months <= 0:
+        return 0
+    # 起提月 = 开始使用月的下一月
+    if start.month == 12:
+        first_y, first_m = start.year + 1, 1
+    else:
+        first_y, first_m = start.year, start.month + 1
+    months = (as_of.year - first_y) * 12 + (as_of.month - first_m) + 1
+    return min(max(months, 0), useful_life_months)
+
+
+def recommend_depreciation_branch(
+    impairment_begin: float = 0.0,
+    impairment_end: float = 0.0,
+    impairment_provision: float = 0.0,
+    impairment_event_count: int = 0,
+) -> str:
+    """按减值情况推荐 H1-12 分支 A/B/C."""
+    if impairment_event_count >= 2:
+        return "C"
+    if (
+        impairment_event_count == 1
+        or impairment_end > 0.005
+        or impairment_begin > 0.005
+        or impairment_provision > 0.005
+    ):
+        return "B"
+    return "A"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

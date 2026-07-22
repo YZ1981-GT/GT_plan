@@ -24,6 +24,7 @@ import {
   calcSubtotal,
   calcBadDebtEndBalance,
 } from './useD1FormulaEngine'
+import { calcSourceEclProfitLoss, publishGCycleSourceEcl } from './gCycleSourceEcl'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -463,6 +464,13 @@ export function useD1BadDebt(options: UseD1BadDebtOptions) {
   }
 
   // ─── Cleanup ─────────────────────────────────────────────────────────────
+
+  /** 向 G14 广播本期坏账净计提（计入损益） */
+  watch(
+    () => calcSourceEclProfitLoss(subtotalRow.value.currentProvision, subtotalRow.value.currentReversal),
+    (amount) => { publishGCycleSourceEcl('D1', amount) },
+    { immediate: true },
+  )
 
   onBeforeUnmount(() => {
     if (saveTimer) {

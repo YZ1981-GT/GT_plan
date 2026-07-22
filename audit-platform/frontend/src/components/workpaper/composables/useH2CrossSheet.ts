@@ -10,12 +10,14 @@
  * - H2-10/H2-11 利息资本化 → H2-2 利息列（资本化金额分摊）
  * - H2-2 明细 → H2-4 分析表（各工程期初/增加/期末/预算/工期）
  * - H2-1 审定 → 附注各子节（审定数自动取数）
+ * - H2-3 调整分录 → H2-1 账项调整（1604 AJE/RJE 净额）
  *
  * Spec: .kiro/specs/h2-construction-in-progress/
  * Task: 3.2
  * Requirements: 14.6-14.7
  */
 import { computed, type ComputedRef, type Ref } from 'vue'
+import { resolveActiveInterestCapResult } from './h2InterestCapBranch'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -46,6 +48,7 @@ export interface H2DetailRowRaw {
   transferDate?: string      // 转固日期
   transferAmount?: number    // 转固金额
   transferToH1?: string      // 转入H1科目
+  endAudited?: number        // 审定期末
   remainingCip?: number      // 剩余在建
   cipEnd?: number            // 期末余额
 }
@@ -78,27 +81,50 @@ export interface H2InterestCapResult {
   branch?: 'noBorrow' | 'withBorrow'  // 分支
 }
 
-/** H2-1 审定表行原始 JSON 结构 */
+/** H2-1 审定表行原始 JSON 结构（xlsx 12 列；兼容旧字段别名） */
 export interface H2AdjudicationRowRaw {
   rowId?: string
-  name?: string              // 项目名称
-  cipBegin?: number          // 期初余额
-  increase?: number          // 本期增加
-  decrease?: number          // 本期减少
-  transfer?: number          // 本期转固
-  cipEnd?: number            // 期末余额
-  unadjusted?: number        // 未审数
-  aje?: number               // AJE
-  rje?: number               // RJE
-  audited?: number           // 审定数
-  impairment?: number        // 已计提减值
+  name?: string
+  /** 期初未审 */
+  beginUnadjusted?: number
+  /** 期初账项调整 */
+  beginAdjustment?: number
+  /** 期初审定 = 未审 + 账项调整 */
+  beginAudited?: number
+  /** 期末未审 */
+  endUnadjusted?: number
+  /** 期末账项调整 */
+  endAdjustment?: number
+  /** 期末审定 */
+  endAudited?: number
+  unadjustedChange?: number
+  unadjustedChangeRate?: number | null
+  auditedChange?: number
+  auditedChangeRate?: number | null
+  /** @deprecated 旧字段：映射为 beginUnadjusted */
+  cipBegin?: number
+  /** @deprecated 旧字段：映射为 endUnadjusted */
+  cipEnd?: number
+  /** @deprecated 旧字段：映射为 endAudited */
+  audited?: number
+  /** @deprecated 旧增减列（属 H2-2，不应再写入 H2-1） */
+  increase?: number
+  decrease?: number
+  transfer?: number
+  unadjusted?: number
+  aje?: number
+  rje?: number
+  impairment?: number
   remark?: string
 }
 
 // ─── Return Types ────────────────────────────────────────────────────────────
 
 export interface DetailTotals {
+  /** 未审期末原值合计 */
   cipEnd: number
+  /** 审定期末原值合计（优先用于与 H2-1 勾稽） */
+  endAudited: number
   increase: number
   decrease: number
   transfer: number
@@ -116,6 +142,18 @@ export interface TransferSummary {
 export interface InterestCapForDetail {
   totalCap: number
   byProject: Record<string, number>
+}
+
+export interface AdjustmentSync {
+  /** 账项调整净额（全部分录借−贷；兼容旧口径） */
+  totalAje: number
+  /** 报表调整净额 */
+  totalRje: number
+  /** 科目 1604 账项净额（供 H2-1 期末账项调整回写） */
+  cipAjeNet: number
+  /** 科目 1604 报表调整净额 */
+  cipRjeNet: number
+  rowCount: number
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -155,6 +193,14 @@ function _getNum(val: any): number {
   return Number.isFinite(n) ? n : 0
 }
 
+/** 兼容旧 JSON：endAudited 缺失时用 未审+账项调整（或 aje+rje） */
+function _resolveEndAudited(row: H2AdjudicationRowRaw, endUnadj: number): number {
+  if (row.endAudited != null) return _getNum(row.endAudited)
+  if (row.audited != null) return _getNum(row.audited)
+  if (row.endAdjustment != null) return endUnadj + _getNum(row.endAdjustment)
+  return endUnadj + _getNum(row.aje) + _getNum(row.rje)
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useH2CrossSheet(allResponses: Ref<Map<string, any>>) {
@@ -172,16 +218,11 @@ export function useH2CrossSheet(allResponses: Ref<Map<string, any>>) {
     return safeParseRows<H2TransferRowRaw>(resp?.remark)
   })
 
-  // ─── 解析 H2-10/H2-11 利息资本化结果 ──────────────────────────────────
+  // ─── 解析 H2-10/H2-11 利息资本化结果（按互斥分支，避免串支） ──────────
 
   const interestCapResult = computed<H2InterestCapResult | null>(() => {
-    // 优先取 H2-10，若无则取 H2-11（2分支互斥，被审计单位仅适用其一）
-    const resp10 = allResponses.value.get('H2-10-cap-result')
-    const result10 = safeParseObject<H2InterestCapResult>(resp10?.remark)
-    if (result10 && _getNum(result10.totalCap) !== 0) return result10
-
-    const resp11 = allResponses.value.get('H2-11-cap-result')
-    return safeParseObject<H2InterestCapResult>(resp11?.remark)
+    const active = resolveActiveInterestCapResult(allResponses.value)
+    return active as H2InterestCapResult | null
   })
 
   // ─── 解析 H2-1 审定表行数据 ────────────────────────────────────────────
@@ -195,44 +236,41 @@ export function useH2CrossSheet(allResponses: Ref<Map<string, any>>) {
 
   /**
    * 从 H2-2 明细行聚合合计：
-   * - cipEnd: 所有工程项目的期末余额之和
-   * - increase: 所有工程项目的本期增加合计之和
-   * - decrease: 所有工程项目的本期减少之和
-   * - transfer: 所有工程项目的转固金额之和
-   *
-   * 用于与 H2-1 审定表交叉验证：审定数合计应 = cipEnd
+   * - cipEnd: 未审期末原值合计
+   * - endAudited: 审定期末原值合计（与 H2-1 勾稽优先口径）
+   * - increase / decrease / transfer: 增减与转固
    */
   const detailTotals: ComputedRef<DetailTotals> = computed(() => {
     let cipEnd = 0
+    let endAudited = 0
     let increase = 0
     let decrease = 0
     let transfer = 0
 
     for (const row of detailRows.value) {
       cipEnd += _getNum(row.cipEnd)
-      // 增加合计 = 材料+人工+机械+利息+其他 或直接取 increaseTotal
+      // 无审定字段时回退未审期末（旧数据兼容）
+      endAudited += _getNum(row.endAudited) || _getNum(row.cipEnd)
       const rowIncrease = _getNum(row.increaseTotal) ||
         (_getNum(row.increaseMaterial) + _getNum(row.increaseLabor) +
          _getNum(row.increaseMachinery) + _getNum(row.increaseInterest) +
          _getNum(row.increaseOther))
       increase += rowIncrease
-      decrease += _getNum(row.decrease)
+      decrease += _getNum(row.decrease) + _getNum(row.transferOut)
       transfer += _getNum(row.transferAmount)
     }
 
-    return { cipEnd, increase, decrease, transfer }
+    return { cipEnd, endAudited, increase, decrease, transfer }
   })
 
   // ─── adjudicationFromDetail: H2-2 合计 → H2-1 审定表（Req 14.6）───────
 
   /**
-   * H2-2 明细表的期末余额合计，供 H2-1 审定表交叉验证。
-   * auditedTotal = H2-2 所有工程项目 cipEnd 之和
-   * 当 H2-1 审定数合计 ≠ auditedTotal 时显示黄色警告。
+   * H2-2 明细表的审定期末合计，供 H2-1 审定表交叉验证。
    */
   const adjudicationFromDetail: ComputedRef<AdjudicationFromDetail> = computed(() => {
     return {
-      auditedTotal: detailTotals.value.cipEnd,
+      auditedTotal: detailTotals.value.endAudited,
     }
   })
 
@@ -350,16 +388,8 @@ export function useH2CrossSheet(allResponses: Ref<Map<string, any>>) {
   // ─── disclosureAutoFill: H2-1 审定数 → 附注各子节（Req 14.6）──────────
 
   /**
-   * 从 H2-1 审定表聚合数据供附注披露自动填充：
-   * - disc_cip_begin: 期初余额合计
-   * - disc_cip_end: 期末余额合计
-   * - disc_increase: 本期增加合计
-   * - disc_decrease: 本期减少合计
-   * - disc_transfer: 本期转固合计
-   * - disc_audited: 审定数合计
-   * - disc_impairment: 已计提减值合计
-   * - disc_interest_cap: 利息资本化金额（从H2-10/11取）
-   * - disc_project_count: 在建工程项目数
+   * 从 H2-1 审定表聚合数据供附注披露自动填充。
+   * 期初/期末/审定取自 H2-1；增减/转固取自 H2-2（H2-1 无增减列，见 conflict #2/#3）。
    */
   const disclosureAutoFill: ComputedRef<Record<string, number>> = computed(() => {
     const result: Record<string, number> = {
@@ -374,22 +404,79 @@ export function useH2CrossSheet(allResponses: Ref<Map<string, any>>) {
       disc_project_count: 0,
     }
 
-    // 从 H2-1 审定表行聚合
     for (const row of adjudicationRows.value) {
-      result['disc_cip_begin'] += _getNum(row.cipBegin)
-      result['disc_cip_end'] += _getNum(row.cipEnd)
-      result['disc_increase'] += _getNum(row.increase)
-      result['disc_decrease'] += _getNum(row.decrease)
-      result['disc_transfer'] += _getNum(row.transfer)
-      result['disc_audited'] += _getNum(row.audited)
+      const beginUnadj = _getNum(row.beginUnadjusted ?? row.cipBegin ?? row.unadjusted)
+      const endUnadj = _getNum(row.endUnadjusted ?? row.cipEnd)
+      const endAud = _resolveEndAudited(row, endUnadj)
+      result['disc_cip_begin'] += beginUnadj
+      result['disc_cip_end'] += endUnadj
+      result['disc_audited'] += endAud
       result['disc_impairment'] += _getNum(row.impairment)
       result['disc_project_count']++
+    }
+
+    // 增减/转固：权威来源为 H2-2（非 H2-1）
+    result['disc_increase'] = detailTotals.value.increase
+    result['disc_decrease'] = detailTotals.value.decrease
+    result['disc_transfer'] = detailTotals.value.transfer
+
+    // 减值准备合计优先取 H2-1-impair-rows 期末审定
+    const impairResp = allResponses.value.get('H2-1-impair-rows')
+    const impairRows = safeParseRows<H2AdjudicationRowRaw>(impairResp?.remark)
+    if (impairRows.length > 0) {
+      result['disc_impairment'] = impairRows.reduce((s, r) => {
+        const endUnadj = _getNum(r.endUnadjusted ?? r.cipEnd)
+        return s + _resolveEndAudited(r, endUnadj)
+      }, 0)
     }
 
     // 利息资本化金额从 H2-10/11 取
     result['disc_interest_cap'] = interestCapForDetail.value.totalCap
 
     return result
+  })
+
+  // ─── adjustmentSync: H2-3 AJE/RJE → H2-1（对齐 H1-3→H1-1）───────────────
+
+  /**
+   * 从 H2-3 调整分录汇总 AJE/RJE：
+   * - totalAje/totalRje：全表净额
+   * - cipAjeNet/cipRjeNet：仅科目 1604（含明细）的借−贷净额，供审定表期末账项调整回写
+   * 兼容 Excel「类别=账项调整/报表调整/其他」与旧存档 AJE/RJE、debit/credit。
+   */
+  const adjustmentSync: ComputedRef<AdjustmentSync> = computed(() => {
+    const resp = allResponses.value.get('H2-3-rows')
+    const adjRows = safeParseRows<Record<string, any>>(resp?.remark)
+    let totalAje = 0
+    let totalRje = 0
+    let cipAjeNet = 0
+    let cipRjeNet = 0
+
+    for (const row of adjRows) {
+      const debit = _getNum(row.debitAmount ?? row.debit)
+      const credit = _getNum(row.creditAmount ?? row.credit)
+      const netAmount = debit - credit
+      const cat = String(row.category || '').trim()
+      const isRje = cat === '报表调整' || row.entryType === 'RJE'
+      const code = String(row.accountCode || '')
+      const isCip = code === '1604' || code.startsWith('1604')
+
+      if (isRje) {
+        totalRje += netAmount
+        if (isCip) cipRjeNet += netAmount
+      } else {
+        totalAje += netAmount
+        if (isCip) cipAjeNet += netAmount
+      }
+    }
+
+    return {
+      totalAje,
+      totalRje,
+      cipAjeNet,
+      cipRjeNet,
+      rowCount: adjRows.length,
+    }
   })
 
   // ─── Return ────────────────────────────────────────────────────────────────
@@ -407,6 +494,8 @@ export function useH2CrossSheet(allResponses: Ref<Map<string, any>>) {
     analysisFromDetail,
     // H2-1 → 附注各子节自动取数
     disclosureAutoFill,
+    // H2-3 → H2-1 AJE/RJE 同步
+    adjustmentSync,
   }
 }
 

@@ -46,7 +46,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
-          :h9-linkage-status="h9LinkageStatus"
+          :h9-linkage-status="h9LinkageStatus.status"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
@@ -60,10 +60,11 @@
           :is-readonly="isReadonly"
         />
 
-        <!-- H8-1 审定表（双区块：使用权资产原值+累计折旧+净值） -->
+        <!-- H8-1 审定表（四区块：原值/折旧/减值/净额 + H8-3 账项回写） -->
         <H8TabAdjudication
           v-else-if="currentSheet === 'H8-1'"
           @save="persistResponse"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -90,7 +91,7 @@
           :is-readonly="isReadonly"
         />
 
-        <!-- H8-2 明细表（58列4区段Tab） -->
+        <!-- H8-2 明细表（源模板58列→原值/折旧/减值4区段） -->
         <H8TabDetail
           v-else-if="currentSheet === 'H8-2'"
           @save="persistResponse"
@@ -101,7 +102,7 @@
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
-        <!-- H8-3 调整分录汇总 -->
+        <!-- H8-3 调整分录汇总（Excel列+调整分录模块双向联动+A13/H8-1） -->
         <H8TabAdjustment
           v-else-if="currentSheet === 'H8-3'"
           @save="persistResponse"
@@ -109,9 +110,10 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
         />
 
-        <!-- H8-4 租赁的识别（段落型90行） -->
+        <!-- H8-4 租赁的识别（段落型90行：§1~5+提示抽屉） -->
         <H8TabLeaseIdentification
           v-else-if="currentSheet === 'H8-4'"
           @save="persistResponse"
@@ -119,6 +121,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H8-5 租赁期的确定（段落型52行） -->
@@ -129,6 +132,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H8-6 使用权资产初始及后续计量（按年/按月双分支） -->
@@ -147,6 +151,7 @@
             :project-id="props.projectId"
             :all-responses="allResponses"
             :is-readonly="isReadonly"
+            @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
           />
           <H8TabMeasurementMonthly
             v-else
@@ -155,6 +160,7 @@
             :project-id="props.projectId"
             :all-responses="allResponses"
             :is-readonly="isReadonly"
+            @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
           />
         </div>
 
@@ -166,6 +172,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H8-8 折旧测算表（不含减值/含减值双分支） -->
@@ -175,7 +182,9 @@
               v-model="depreciationBranch"
               :options="depreciationBranchOptions"
               size="default"
+              @change="onDepreciationBranchChange"
             />
+            <span class="branch-hint">{{ depreciationBranch === '含减值' ? '已计提减值：按减值日分段重算月折旧' : '未计提减值：直线法全期同率' }}</span>
           </div>
           <H8TabDepreciationNoImpair
             v-if="depreciationBranch === '不含减值'"
@@ -184,6 +193,8 @@
             :project-id="props.projectId"
             :all-responses="allResponses"
             :is-readonly="isReadonly"
+            :branch="depreciationBranch"
+            @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
           />
           <H8TabDepreciationWithImpair
             v-else
@@ -192,6 +203,8 @@
             :project-id="props.projectId"
             :all-responses="allResponses"
             :is-readonly="isReadonly"
+            :branch="depreciationBranch"
+            @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
           />
         </div>
 
@@ -203,6 +216,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H8-10 减值测算表 -->
@@ -213,6 +227,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H8-11 可收回金额测试表 -->
@@ -223,6 +238,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H8-12 减少检查表（租赁终止） -->
@@ -244,6 +260,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H8-14 关联交易检查表 -->
@@ -254,6 +271,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- 未匹配 → OnlyOffice fallback -->
@@ -291,9 +309,10 @@
  * Spec: .kiro/specs/h8-right-of-use-assets/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent, inject} from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent, inject} from 'vue'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { useH8CrossSheet } from './composables/useH8CrossSheet'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -361,30 +380,32 @@ const measurementBranchOptions = ['按年计量', '按月计量']
 const depreciationBranch = ref<string>('不含减值')
 const depreciationBranchOptions = ['不含减值', '含减值']
 
-// ─── H9联动状态 ──────────────────────────────────────────────────────────────
+function hydrateDepreciationBranch() {
+  const item = allResponses.value.get('H8-8-branch')
+  const raw = item?.remark ?? item?.conclusion
+  if (raw === '含减值' || raw === '不含减值') depreciationBranch.value = raw
+}
+watch(allResponses, hydrateDepreciationBranch, { immediate: true })
+
+function onDepreciationBranchChange(val: string | number | boolean) {
+  const b = val === '含减值' ? '含减值' : '不含减值'
+  depreciationBranch.value = b
+  persistResponse('H8-8-branch', b)
+}
+
+// ─── H9联动状态（与 useH8CrossSheet 统一多键兜底）────────────────────────────
+const { h8VsH9Linkage } = useH8CrossSheet(allResponses)
 const h9LinkageStatus = computed(() => {
-  // 从 allResponses 中获取 H8 初始计量 与 H9 初始确认比较
-  const h8Initial = parseFloat(allResponses.value.get('H8-6-initial-measurement') || '0') || 0
-  const h8DirectCost = parseFloat(allResponses.value.get('H8-6-direct-cost') || '0') || 0
-  const h8Incentive = parseFloat(allResponses.value.get('H8-6-incentive') || '0') || 0
-  const h9Initial = parseFloat(allResponses.value.get('H8-h9-initial-recognition') || '0') || 0
-
-  // CAS21: H8 = H9 + 直接费用 - 激励
-  // 如果没有数据，默认一致（初始空状态）
-  if (h8Initial === 0 && h9Initial === 0) {
-    return { isConsistent: true, diff: 0, message: '' }
+  const link = h8VsH9Linkage.value
+  // Index 用 consistent|inconsistent|unknown 三态
+  if (!link.isConsistent && /未加载/.test(link.message)) {
+    return { isConsistent: true, diff: 0, message: link.message, status: 'unknown' as const }
   }
-
-  const expectedH8 = h9Initial + h8DirectCost - h8Incentive
-  const diff = Math.abs(h8Initial - expectedH8)
-  const isConsistent = diff <= 1 // 允许尾差±1元
-
   return {
-    isConsistent,
-    diff,
-    message: isConsistent
-      ? ''
-      : `H8与H9不一致，差额：${diff.toFixed(2)}元，请检查`,
+    isConsistent: link.isConsistent,
+    diff: link.diff,
+    message: link.message,
+    status: (link.isConsistent ? 'consistent' : 'inconsistent') as 'consistent' | 'inconsistent',
   }
 })
 
@@ -412,48 +433,54 @@ const currentSheet = computed(() => {
   return ''
 })
 
-// ─── selfLoad ────────────────────────────────────────────────────────────────
+// ─── selfLoad / reloadFromServer ─────────────────────────────────────────────
+function _mergeResponses(map: Map<string, any>, src: any): void {
+  if (!src || typeof src !== 'object') return
+  // 注入权威 item_id：dict 值缺 item_id 时以键补齐（否则保存 items 缺 item_id 触发 422）；v 自带 item_id 则以其为准
+  for (const [k, v] of Object.entries(src)) map.set(k, (v && typeof v === 'object' && !Array.isArray(v)) ? { item_id: k, ...v } : { item_id: k, remark: v })
+}
+
+/** 强制从服务端拉最新 checklist（忽略父级 htmlData 快照）— IE 导入后必用 */
+async function fetchResponsesFromServer(): Promise<Map<string, any>> {
+  const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
+    params: { force_component_type: 'h8-right-of-use-assets' },
+    _silent: true,
+  } as any)
+  const data = res.data?.data || res.data
+  const map = new Map<string, any>()
+  if (data?.sheets && Array.isArray(data.sheets)) {
+    for (const sheet of data.sheets) {
+      _mergeResponses(map, sheet.html_data?.allResponses)
+      _mergeResponses(map, sheet.html_data?.responses_snapshot)
+    }
+  }
+  return map
+}
+
 async function selfLoad(): Promise<void> {
   try {
     if (props.htmlData) {
-      // 从父级透传的 htmlData 中提取 responses
-      // 兼容两种键名：allResponses（历史）/ responses_snapshot（H8 render 策略实际输出）
+      // 从父级透传的 htmlData 中提取 responses（首屏快路径）
       const map = new Map<string, any>()
-      if (props.htmlData.allResponses && typeof props.htmlData.allResponses === 'object') {
-        for (const [k, v] of Object.entries(props.htmlData.allResponses)) map.set(k, v)
-      }
-      if (props.htmlData.responses_snapshot && typeof props.htmlData.responses_snapshot === 'object') {
-        for (const [k, v] of Object.entries(props.htmlData.responses_snapshot)) map.set(k, v)
-      }
+      _mergeResponses(map, props.htmlData.allResponses)
+      _mergeResponses(map, props.htmlData.responses_snapshot)
       if (map.size > 0) allResponses.value = map
     } else {
-      // selfLoad: 自行调用 render-config
-      const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
-        params: { force_component_type: 'h8-right-of-use-assets' },
-        _silent: true,
-      } as any)
-      const data = res.data?.data || res.data
-      if (data?.sheets && Array.isArray(data.sheets)) {
-        const map = new Map<string, any>()
-        for (const sheet of data.sheets) {
-          if (sheet.html_data?.allResponses) {
-            for (const [k, v] of Object.entries(sheet.html_data.allResponses)) {
-              map.set(k, v)
-            }
-          }
-          if (sheet.html_data?.responses_snapshot) {
-            for (const [k, v] of Object.entries(sheet.html_data.responses_snapshot)) {
-              map.set(k, v)
-            }
-          }
-        }
-        allResponses.value = map
-      }
+      allResponses.value = await fetchResponsesFromServer()
     }
   } catch (err) {
     console.warn('[GtH8RightOfUseAssets] selfLoad failed:', err)
   } finally {
     isLoading.value = false
+  }
+}
+
+/** IE 导入 / 跨表事件后：必须打服务端，避免 htmlData 快照导致 UI 假旧 */
+async function reloadFromServer(): Promise<void> {
+  try {
+    allResponses.value = await fetchResponsesFromServer()
+  } catch (err) {
+    console.warn('[GtH8RightOfUseAssets] reloadFromServer failed:', err)
   }
 }
 
@@ -466,13 +493,16 @@ function persistResponse(itemId: string, value: any): void {
   const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
   const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
   const updated = { ...existing, item_id: itemId, remark: strVal }
-  allResponses.value.set(itemId, updated)
+  // 替换 Map 引用以触发依赖 allResponses 的 computed / watch
+  const next = new Map(allResponses.value)
+  next.set(itemId, updated)
+  allResponses.value = next
   if (isReadonly.value) return
   const prev = _saveTimers.get(itemId)
   if (prev) clearTimeout(prev)
   _saveTimers.set(itemId, setTimeout(() => {
     _saveTimers.delete(itemId)
-    http.put(`/workpapers/${props.wpId}/checklist-responses`, {
+    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
       project_id: props.projectId,
       items: [{ item_id: itemId, conclusion: updated.conclusion ?? null, remark: updated.remark ?? null }],
     }).catch((err: unknown) => console.warn('[GtH8] persistResponse failed:', itemId, err))
@@ -486,6 +516,7 @@ function openReviewDialog(sectionId: string, sectionLabel?: string): void {
 provide('openReviewDialog', openReviewDialog)
 provide('allResponses', allResponses)
 provide('saveResponse', persistResponse)
+provide('h8ReloadAll', reloadFromServer)
 
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
@@ -498,17 +529,17 @@ provide('h8OpenVersionHistory', openVersionHistory)
 // ─── EventBus: H9联动 ───────────────────────────────────────────────────────
 function _handleH9Updated(_e: Event): void {
   // H9租赁负债数据更新时刷新H8，保持联动数据同步
-  void selfLoad()
+  void reloadFromServer()
 }
 
 function _handleH9PaymentUpdated(_e: Event): void {
   // H9付款计划/摊销表变更时刷新H8（影响折旧测算和初始计量校验）
-  void selfLoad()
+  void reloadFromServer()
 }
 
 function _handleTbUpdated(_e: Event): void {
   // TB更新(科目1901相关)触发刷新
-  void selfLoad()
+  void reloadFromServer()
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
@@ -578,6 +609,13 @@ onBeforeUnmount(() => {
 .h8-branch-selector {
   display: flex;
   align-items: center;
+  gap: 12px;
   padding: 8px 0;
+  flex-wrap: wrap;
+}
+
+.branch-hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 </style>

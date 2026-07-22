@@ -1275,24 +1275,24 @@ sheets:
           label: 减值迹象描述
         D:
           field: col_d
-          type: text
-          label: 账面价值
+          type: number
+          label: 账面价值（原值−累计折旧，不含减值）
         E:
           field: col_e
-          type: text
+          type: number
           label: 可收回金额
         H:
           field: col_h
-          type: text
+          type: formula
           label: 期末应计提的减值金额（当⑤＜②）
         I:
           field: col_i
-          type: text
+          type: number
           label: 期末账面已计提的减值准备
         J:
           field: col_j
-          type: text
-          label: 本期应补提的减值准备（注：使用权资产减值准备一旦计提，不得转
+          type: formula
+          label: 本期应补提的减值准备（减值一经确认不得转回）
         K:
           field: col_k
           type: text
@@ -1301,6 +1301,10 @@ sheets:
           field: col_l
           type: text
           label: 备注
+        M:
+          field: col_m
+          type: formula
+          label: 多提待查金额（⑦＞⑥，不得转回）
     static_text:
       rows:
       - 1-2
@@ -1318,43 +1322,52 @@ sheets:
       - G10
       - H10
       - J10
+      - M10
       - G11
       - H11
       - J11
+      - M11
       - G12
       - H12
       - J12
+      - M12
       - G13
       - H13
       - J13
+      - M13
       - G14
       - H14
       - J14
+      - M14
       - G15
       - H15
       - J15
+      - M15
       - G16
       - H16
       - J16
+      - M16
       - G17
       - H17
       - J17
-      _total_count: 49
+      - M17
+      _total_count: 61
     merged_cells:
       preserve: true
-      count: 12
+      count: 13
       ranges_sample:
-      - A2:L2
+      - A2:M2
       - A7:A9
       - K7:K9
       - L7:L9
-      - A1:L1
+      - A1:M1
       - D7:D8
       - C7:C8
       - B7:B9
       - H7:H8
       - I7:I8
-    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+      - M7:M8
+    cross_refs: '# H8-11 可收回金额回填③④；H8-2/H8-1 勾稽②⑦；补提后切换 H8-8 含减值折旧'
   可收回金额测试表H8-11:
     component_type: univer
     class_code: G-测算
@@ -1667,70 +1680,70 @@ sheets:
       header_row: 10
       columns:
         A:
-          field: col_a
+          field: relatedPartyName
           type: text
           label: 关联单位名称
         B:
-          field: col_b
+          field: relationship
           type: text
           label: 关联方关系
         C:
-          field: col_c
+          field: leaseItem
           type: text
           label: 租赁项目
         D:
-          field: col_d
+          field: assetType
           type: text
           label: 租赁资产种类
         E:
-          field: col_e
+          field: leasePeriod
           type: text
           label: 租赁发生时间及到期日
         F:
-          field: col_f
-          type: text
+          field: costEnding
+          type: number
           label: 使用权资产原值期末审定数
         G:
-          field: col_g
-          type: text
+          field: accumDepEnding
+          type: number
           label: 使用权资产累计折旧期末审定数
         H:
-          field: col_h
-          type: text
+          field: impairmentEnding
+          type: number
           label: 使用权资产减值准备期末审定数
         I:
-          field: col_i
-          type: text
+          field: netValue
+          type: formula
           label: 使用权资产净值
         J:
-          field: col_j
-          type: text
+          field: additionsCost
+          type: number
           label: 本期新增使用权资产金额（原值）
         K:
-          field: col_k
-          type: text
+          field: periodDep
+          type: number
           label: 使用权资产本期折旧金额
         L:
-          field: col_l
+          field: pricingPolicy
           type: text
           label: 定价政策
         M:
-          field: col_m
+          field: isAbnormal
           type: text
           label: 关联交易是否存在异常
         N:
-          field: col_n
+          field: remark
           type: text
           label: 备注
         O:
-          field: col_o
+          field: indexNo
           type: text
           label: 索引号
     static_text:
       rows:
       - 1-2
       - 5-9
-      description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
+      description: '审计目标(使用权资产/租赁负债) + 审计过程双表 + 审计说明/结论'
     formulas:
       preserve: true
       cells:
@@ -1749,4 +1762,4 @@ sheets:
       - A7:O7
       - A2:O2
       - A6:O6
-    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+    cross_refs: 'H8-2 明细带入；H9 租赁负债勾稽；CAS36 关联方披露'

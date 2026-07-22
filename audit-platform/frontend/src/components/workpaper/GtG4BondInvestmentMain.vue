@@ -97,7 +97,7 @@
         :is-readonly="isReadonly"
       />
 
-      <template v-else-if="currentSheet === 'directory'">
+      <div v-else-if="currentSheet === 'directory'" class="g-cycle-tab-index-page">
         <div class="g4-index-toolbar">
           <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
             📖 编制手册
@@ -107,16 +107,19 @@
             版本历史
           </el-button>
         </div>
+        <G4TabDirectory
+          :all-responses="suiteResponses || new Map()"
+          :available-sheets="availableSheets"
+        />
         <GCycleBIndexExtras
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :sheet-name="props.sheetName"
           :wp-code="'G4'"
-          :html-data="resolvedHtmlData ?? undefined"
+          :html-data="directoryHtmlData"
           :available-sheets="availableSheets"
         />
-        <G4SheetStatusBar :all-responses="suiteResponses" />
-      </template>
+      </div>
 
       <GtOnlyOfficeSheet
         v-else
@@ -147,6 +150,7 @@ import type { ChecklistResponse } from './composables/useF1FormData'
 import { useG4MainAdjustment, type AdjustmentEntry } from './composables/useG4MainAdjustment'
 import { useG4PriorYearRollForward } from './composables/useG4PriorYearRollForward'
 import { fetchG4SuiteResponseMap } from './composables/g4CrossHelpers'
+import { buildDirectoryHtmlData } from './composables/gCycleIndexRouting'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 
@@ -159,7 +163,7 @@ const G4TabDisclosureListed = defineAsyncComponent(() => import('./g4-bond-inves
 const G4TabDisclosureSOE = defineAsyncComponent(() => import('./g4-bond-investment-main/core/G4TabDisclosureSOE.vue'))
 const G4TabInterestCalc = defineAsyncComponent(() => import('./g4-bond-investment-main/measurement/G4TabInterestCalc.vue'))
 const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
-const G4SheetStatusBar = defineAsyncComponent(() => import('./g4-bond-investment-main/G4SheetStatusBar.vue'))
+const G4TabDirectory = defineAsyncComponent(() => import('./g4-bond-investment-main/core/G4TabDirectory.vue'))
 const G4PreparationHandbookDialog = defineAsyncComponent(
   () => import('./g4-bond-investment-main/G4PreparationHandbookDialog.vue'),
 )
@@ -280,11 +284,50 @@ const dualMode = useG4MainDualMode({
 const availableSheets = computed(() => {
   const hd = resolvedHtmlData.value
   const fromHtml = hd?.sheets ?? hd?.render_config?.sheets
-  if (Array.isArray(fromHtml) && fromHtml.length) return fromHtml
-  // 对齐 G1：htmlData 无 sheets 时用自加载 render-config 的 sheetCache 兜底，
-  // 保证底稿目录架构树非空
-  return Object.keys(formData.sheetCache.value).map(sheet_name => ({ sheet_name }))
+  if (Array.isArray(fromHtml) && fromHtml.length) {
+    // 统一为下划线格式（buildCycleArchitectureHtmlData 期望 sheet_name/component_type）
+    return fromHtml.map((s: any) => ({
+      sheet_name: s.sheet_name || s.sheetName || s.name || '',
+      component_type: s.component_type || s.componentType || 'audit-sheet',
+    }))
+  }
+  // 从 formData sheetCache 取（loadAll 后填充），并从 fallback 表匹配 component_type
+  const cacheKeys = Object.keys(formData.sheetCache.value)
+  if (cacheKeys.length > 0) {
+    return cacheKeys.map(sheet_name => {
+      const match = G4_FALLBACK_SHEETS.find(f => sheet_name.includes(f.sheet_name) || f.sheet_name.includes(sheet_name))
+      return { sheet_name, component_type: match?.component_type || 'audit-sheet' }
+    })
+  }
+  // 硬编码 fallback 保证底稿架构树不为空
+  return G4_FALLBACK_SHEETS
 })
+
+/** 目录页传给 GCycleBIndexExtras 的 htmlData：去除 navigation_rows 强制从 availableSheets 重建，并补全 cycle_workpapers */
+const directoryHtmlData = computed(() =>
+  buildDirectoryHtmlData(resolvedHtmlData.value || props.htmlData, formData.sheetCache.value),
+)
+
+/** G4 底稿 sheet 列表（含 component_type 供 GtBArchitectureTree 分组） */
+const G4_FALLBACK_SHEETS: Array<{ sheet_name: string; component_type?: string }> = [
+  { sheet_name: '债权投资实质性程序表G4A', component_type: 'a-program-console' },
+  { sheet_name: '审定表G4-1', component_type: 'audit-sheet' },
+  { sheet_name: '明细表G4-2', component_type: 'audit-sheet' },
+  { sheet_name: '调整分录汇总G4-3', component_type: 'audit-sheet' },
+  { sheet_name: '利息测算表G4-4', component_type: 'audit-sheet' },
+  { sheet_name: '业务模式分析G4-5', component_type: 'audit-sheet' },
+  { sheet_name: '合同现金流量特征分析G4-6', component_type: 'audit-sheet' },
+  { sheet_name: '有价证券盘点表G4-7', component_type: 'audit-sheet' },
+  { sheet_name: '盘点倒轧表G4-8', component_type: 'audit-sheet' },
+  { sheet_name: '三阶段划分G4-9', component_type: 'audit-sheet' },
+  { sheet_name: '减值准备测算表G4-10', component_type: 'audit-sheet' },
+  { sheet_name: '预期信用损失计量G4-11', component_type: 'audit-sheet' },
+  { sheet_name: '转回核销检查G4-12', component_type: 'audit-sheet' },
+  { sheet_name: '凭证检查表G4-13', component_type: 'audit-sheet' },
+  { sheet_name: '附注披露信息（上市公司）', component_type: 'c-note-table' },
+  { sheet_name: '附注披露信息（国企）', component_type: 'c-note-table' },
+  { sheet_name: '底稿目录', component_type: 'b-index' },
+]
 
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
@@ -294,6 +337,10 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 provide('g4VersionTrailRef', versionTrailRef)
 provide('g4OpenVersionHistory', openVersionHistory)
 provide('reloadWorkpaperData', () => formData.loadAll())
+
+/** 目录页跳转：G4TabDirectory inject('jumpToSection') → navigate-sheet → GtWpRenderer */
+const emit = defineEmits<{ 'navigate-sheet': [sheetName: string] }>()
+provide('jumpToSection', (sheetName: string) => emit('navigate-sheet', sheetName))
 
 async function onSheetImported(): Promise<void> {
   await formData.loadAll()

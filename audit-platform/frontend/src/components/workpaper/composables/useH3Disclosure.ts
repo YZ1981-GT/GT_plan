@@ -8,6 +8,7 @@
  * Requirements: 15.1-15.7
  */
 import { ref, reactive, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { eventBus } from '@/utils/eventBus'
 import type { ChecklistItem } from './useH3FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -29,6 +30,32 @@ export interface DisclosureNoteRow {
   increase: number
   decrease: number
   usage: string
+}
+
+/** CAS39 公允价值层次披露行（公允价值模式适用） */
+export interface FvHierarchyRow {
+  rowId: string
+  category: string
+  level: '1' | '2' | '3'
+  fairValue: number
+  valuationTechnique: string
+  keyInputs: string
+  isObservable: string
+  remark: string
+}
+
+const DEFAULT_ROW_LABELS: Record<string, string[]> = {
+  'cost-original': ['房屋、建筑物', '土地使用权'],
+  'cost-dep': ['房屋、建筑物', '土地使用权'],
+  'cost-impair': ['房屋、建筑物', '土地使用权'],
+  'fair-change': ['房屋、建筑物', '土地使用权'],
+  'fair-value-amount': ['房屋、建筑物', '土地使用权'],
+  'soe-cost': ['房屋、建筑物', '土地使用权'],
+  'soe-cost-dep': ['房屋、建筑物', '土地使用权'],
+  'soe-cost-net': ['房屋、建筑物', '土地使用权'],
+  'soe-fair-value': ['房屋、建筑物', '土地使用权'],
+  'soe-fair-change': ['房屋、建筑物', '土地使用权'],
+  'unlicensed': ['请录入未办妥产权证书项目'],
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -98,9 +125,15 @@ export function useH3Disclosure(params: {
   }
 
   function _defaultNoteRows(key: string): DisclosureNoteRow[] {
-    return ['房屋及建筑物', '土地使用权', '其他'].map((cat, i) =>
+    const labels = DEFAULT_ROW_LABELS[key] ?? ['房屋、建筑物', '土地使用权']
+    return labels.map((cat, i) =>
       reactive(_normNoteRow({ category: cat }, i, key)),
     )
+  }
+
+  function createSectionRow(key: string, raw: Partial<DisclosureNoteRow> = {}): DisclosureNoteRow {
+    const rows = getSectionRows(key)
+    return reactive(_normNoteRow(raw, rows.length, key))
   }
 
   /** 组件 :data="getSectionRows(key)" —— 懒初始化并缓存 reactive 数组 */
@@ -115,6 +148,20 @@ export function useH3Disclosure(params: {
   function updateRow(key: string, _row?: any): void {
     if (!sectionRows[key]) return
     setValue(_rowsItemId(key), sectionRows[key])
+  }
+
+  function addSectionRow(key: string, raw: Partial<DisclosureNoteRow> = {}): void {
+    const row = createSectionRow(key, raw)
+    getSectionRows(key).push(row)
+    updateRow(key)
+  }
+
+  function removeSectionRow(key: string, rowId: string): void {
+    const rows = getSectionRows(key)
+    const idx = rows.findIndex((row) => row.rowId === rowId)
+    if (idx < 0) return
+    rows.splice(idx, 1)
+    updateRow(key)
   }
 
   /** 文本变更：持久化 */
@@ -141,6 +188,97 @@ export function useH3Disclosure(params: {
       }
     }
   }
+
+  // ─── CAS39 公允价值层次披露（仅公允价值模式）──────────────────────────────
+  const fvHierarchyRows = ref<FvHierarchyRow[]>([])
+
+  function _fvHierarchyItemId(): string {
+    return `${ITEM_PREFIX}-${variant.value}-fv-hierarchy`
+  }
+
+  function _normFvRow(raw: any, idx: number): FvHierarchyRow {
+    const lvl = String(raw?.level ?? '3')
+    return {
+      rowId: raw?.rowId ?? `fv-${idx}`,
+      category: raw?.category ?? '',
+      level: (lvl === '1' || lvl === '2' || lvl === '3' ? lvl : '3') as '1' | '2' | '3',
+      fairValue: Number(raw?.fairValue) || 0,
+      valuationTechnique: raw?.valuationTechnique ?? '',
+      keyInputs: raw?.keyInputs ?? '',
+      isObservable: raw?.isObservable ?? (lvl === '3' ? '否' : ''),
+      remark: raw?.remark ?? '',
+    }
+  }
+
+  function _loadFvHierarchy(): void {
+    const raw = getValue(_fvHierarchyItemId())
+    fvHierarchyRows.value = Array.isArray(raw) ? raw.map((r, i) => _normFvRow(r, i)) : []
+  }
+
+  function _persistFvHierarchy(): void {
+    setValue(_fvHierarchyItemId(), fvHierarchyRows.value)
+  }
+
+  function addFvHierarchyRow(raw: Partial<FvHierarchyRow> = {}): void {
+    fvHierarchyRows.value.push(_normFvRow({ rowId: `fv-${Date.now()}`, ...raw }, fvHierarchyRows.value.length))
+    _persistFvHierarchy()
+  }
+
+  function removeFvHierarchyRow(rowId: string): void {
+    const idx = fvHierarchyRows.value.findIndex((r) => r.rowId === rowId)
+    if (idx < 0) return
+    fvHierarchyRows.value.splice(idx, 1)
+    _persistFvHierarchy()
+  }
+
+  function updateFvHierarchyRow(index: number): void {
+    const r = fvHierarchyRows.value[index]
+    if (!r) return
+    r.fairValue = Number(r.fairValue) || 0
+    const lvl = String(r.level)
+    r.level = (lvl === '1' || lvl === '2' ? lvl : '3') as '1' | '2' | '3'
+    _persistFvHierarchy()
+  }
+
+  /** 从 H3-8 公允价值复核带入层次行（按资产名称，期末公允价值） */
+  function importFvHierarchyFromH38(): { added: number; message: string } {
+    const raw = getValue('H3-8-calc-rows')
+    const legacy = getValue('H3-8-review-rows')
+    const list = Array.isArray(raw) && raw.length ? raw : (Array.isArray(legacy) ? legacy : [])
+    if (!list.length) return { added: 0, message: 'H3-8 公允价值复核暂无数据' }
+    const existing = new Set(fvHierarchyRows.value.map((r) => (r.category || '').trim()).filter(Boolean))
+    let added = 0
+    for (const s of list) {
+      const name = String(s?.assetName ?? s?.category ?? '').trim()
+      if (!name || existing.has(name)) continue
+      const fv = Number(s?.endingBalance ?? s?.appraisalValue ?? s?.assessedValue ?? s?.bookValue) || 0
+      fvHierarchyRows.value.push(_normFvRow({
+        rowId: `fv-h38-${added}-${Date.now()}`,
+        category: name,
+        level: '3',
+        fairValue: fv,
+        valuationTechnique: s?.valuationTechnique ?? '收益法',
+        keyInputs: s?.keyInputs ?? '',
+        isObservable: '否',
+      }, fvHierarchyRows.value.length))
+      existing.add(name)
+      added++
+    }
+    if (added) _persistFvHierarchy()
+    return { added, message: added ? `已从 H3-8 带入 ${added} 项公允价值层次行` : 'H3-8 资产均已存在于层次表' }
+  }
+
+  const fvHierarchyTotalsByLevel = computed(() => {
+    const t = { level1: 0, level2: 0, level3: 0, total: 0 }
+    for (const r of fvHierarchyRows.value) {
+      const v = Number(r.fairValue) || 0
+      if (r.level === '1') t.level1 += v
+      else if (r.level === '2') t.level2 += v
+      else t.level3 += v
+      t.total += v
+    }
+    return t
+  })
 
   /** 根据variant选择段落结构 */
   const sectionDefs = computed(() =>
@@ -182,23 +320,26 @@ export function useH3Disclosure(params: {
     }
   }
 
-  /** 监听附注事件刷新 */
+  /** 监听附注事件刷新（走 eventBus，与主入口一致；crossWpEventBridge 已桥接 window 侧生产者） */
   function subscribeEvents(): void {
-    window.addEventListener('substantive:adjudicated', refreshAutoData)
+    eventBus.on('substantive:adjudicated', refreshAutoData)
   }
 
   function unsubscribeEvents(): void {
-    window.removeEventListener('substantive:adjudicated', refreshAutoData)
+    eventBus.off('substantive:adjudicated', refreshAutoData)
   }
 
-  watch(allResponses, () => { loadSections(); _hydrateKeyed() }, { immediate: true })
-  watch(variant, () => { loadSections(); _hydrateKeyed() })
+  watch(allResponses, () => { loadSections(); _hydrateKeyed(); _loadFvHierarchy() }, { immediate: true })
+  watch(variant, () => { loadSections(); _hydrateKeyed(); _loadFvHierarchy() })
 
   return {
     sections, sectionDefs, measurementDesc,
     updateSection, refreshAutoData, subscribeEvents, unsubscribeEvents, loadSections,
     // keyed API（H3TabDisclosureListed / H3TabDisclosureSoe 使用）
-    sectionRows, sectionTexts, getSectionRows, updateRow, updateText,
+    sectionRows, sectionTexts, getSectionRows, updateRow, updateText, addSectionRow, removeSectionRow, createSectionRow,
+    // CAS39 公允价值层次披露（公允价值模式）
+    fvHierarchyRows, fvHierarchyTotalsByLevel,
+    addFvHierarchyRow, removeFvHierarchyRow, updateFvHierarchyRow, importFvHierarchyFromH38,
   }
 }
 

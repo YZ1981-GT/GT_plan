@@ -32,6 +32,9 @@ export interface ProjectContext {
 export interface TbData {
   unadjusted_amount: number
   audited_amount: number
+  /** 工程物资 1605 */
+  materials_unadjusted?: number
+  materials_audited?: number
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -50,7 +53,12 @@ export function useH2FormData(wpId: Ref<string>, projectId: Ref<string>) {
   const lastSavedAt = ref<string | null>(null)
   const allResponses = ref<Map<string, ChecklistItem>>(new Map())
   const projectContext = ref<ProjectContext>({})
-  const tbData = ref<TbData>({ unadjusted_amount: 0, audited_amount: 0 })
+  const tbData = ref<TbData>({
+    unadjusted_amount: 0,
+    audited_amount: 0,
+    materials_unadjusted: 0,
+    materials_audited: 0,
+  })
   const renderMeta = ref<Record<string, any>>({})
   const sheetCache = ref<Record<string, any>>({})
 
@@ -330,44 +338,63 @@ export function useH2FormData(wpId: Ref<string>, projectId: Ref<string>) {
   async function _loadTbData(): Promise<void> {
     if (!projectId.value) return
 
-    // 优先从 render-config seed 取值（render策略已查好TB数据避免前端重复查询）
-    const seeded = renderMeta.value?.tb_values?.cip_1604_unadjusted
-    if (seeded != null) {
-      tbData.value = {
-        unadjusted_amount: Number(seeded) || 0,
-        audited_amount: Number(renderMeta.value?.tb_values?.cip_1604_audited ?? 0),
+    // 优先从 render-config seed 取值（兼容 cip_unadjusted / cip_1604_unadjusted）
+    const tv = renderMeta.value?.tb_values
+    if (tv && typeof tv === 'object') {
+      const cipUnadj = tv.cip_1604_unadjusted ?? tv.cip_unadjusted
+      if (cipUnadj != null || tv.cip_audited != null || tv.cip_1604_audited != null) {
+        tbData.value = {
+          unadjusted_amount: Number(cipUnadj ?? 0) || 0,
+          audited_amount: Number(tv.cip_1604_audited ?? tv.cip_audited ?? 0) || 0,
+          materials_unadjusted: Number(tv.eng_mat_1605_unadjusted ?? tv.eng_mat_unadjusted ?? 0) || 0,
+          materials_audited: Number(tv.eng_mat_1605_audited ?? tv.eng_mat_audited ?? 0) || 0,
+        }
+        return
       }
-      return
     }
 
     try {
       const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: ACCOUNT_CODE_1604 },
+        params: { account_prefix: '160' },
         _silent: true,
       } as any)
       const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
 
       let unadjusted = 0
       let audited = 0
-      let found = false
+      let matUnadj = 0
+      let matAud = 0
+      let foundCip = false
 
       for (const item of list) {
         const code = String(item.standard_account_code ?? item.account_code ?? '')
-        if (code.startsWith(ACCOUNT_CODE_1604)) {
-          unadjusted = Number(item.unadjusted_amount ?? 0)
-          audited = Number(item.audited_amount ?? 0)
-          found = true
-          break
+        if (code === '1604' || code.startsWith('1604')) {
+          unadjusted += Number(item.unadjusted_amount ?? 0)
+          audited += Number(item.audited_amount ?? 0)
+          foundCip = true
+        } else if (code === '1605' || code.startsWith('1605')) {
+          matUnadj += Number(item.unadjusted_amount ?? 0)
+          matAud += Number(item.audited_amount ?? 0)
         }
       }
 
-      tbData.value = { unadjusted_amount: unadjusted, audited_amount: audited }
+      tbData.value = {
+        unadjusted_amount: unadjusted,
+        audited_amount: audited,
+        materials_unadjusted: matUnadj,
+        materials_audited: matAud,
+      }
 
-      if (!found) {
+      if (!foundCip) {
         ElMessage.warning('科目1604在建工程未在试算表中找到，未审数显示为0')
       }
     } catch {
-      tbData.value = { unadjusted_amount: 0, audited_amount: 0 }
+      tbData.value = {
+        unadjusted_amount: 0,
+        audited_amount: 0,
+        materials_unadjusted: 0,
+        materials_audited: 0,
+      }
     }
   }
 

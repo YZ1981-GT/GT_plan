@@ -174,7 +174,10 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent, inject} from 'vue'
 import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { applyH8TerminationToH92Rows } from './composables/useH9Detail'
+import { useH9CrossSheet } from './composables/useH9CrossSheet'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -218,29 +221,18 @@ const isReadonly = computed(() => !!props.readonly)
 const isLoading = ref(true)
 const allResponses = ref<Map<string, any>>(new Map())
 
-// ─── H8联动状态（H9初始确认 ≈ H8初始 - 直接费用 + 激励） ──────────────────
+// ─── H8联动状态（与 useH9CrossSheet 统一多键兜底）──────────────────────────
+const { h9VsH8Linkage } = useH9CrossSheet(allResponses)
 const h8LinkageStatus = computed(() => {
-  const h9Initial = parseFloat(allResponses.value.get('H9-initial-recognition') || '0') || 0
-  const h8Initial = parseFloat(allResponses.value.get('H9-h8-initial-measurement') || '0') || 0
-  const h8DirectCost = parseFloat(allResponses.value.get('H9-h8-direct-cost') || '0') || 0
-  const h8Incentive = parseFloat(allResponses.value.get('H9-h8-incentive') || '0') || 0
-
-  // CAS21: H8 = H9 + 直接费用 - 激励
-  // => H9 = H8 - 直接费用 + 激励
-  if (h9Initial === 0 && h8Initial === 0) {
+  const link = h9VsH8Linkage.value
+  // 未加载时不刷红（与 H8 父栏一致）
+  if (!link.isConsistent && /未加载/.test(link.message)) {
     return { isConsistent: true, diff: 0, message: '' }
   }
-
-  const expectedH9 = h8Initial - h8DirectCost + h8Incentive
-  const diff = Math.abs(h9Initial - expectedH9)
-  const isConsistent = diff <= 1 // 允许尾差±1元
-
   return {
-    isConsistent,
-    diff,
-    message: isConsistent
-      ? ''
-      : `H9与H8不一致，差额：${diff.toFixed(2)}元，请检查`,
+    isConsistent: link.isConsistent,
+    diff: link.diff,
+    message: link.isConsistent ? '' : link.message,
   }
 })
 
@@ -277,48 +269,54 @@ const currentSheet = computed(() => {
   return ''
 })
 
-// ─── selfLoad ────────────────────────────────────────────────────────────────
+// ─── selfLoad / reloadFromServer ─────────────────────────────────────────────
+function _mergeResponses(map: Map<string, any>, src: any): void {
+  if (!src || typeof src !== 'object') return
+  // 注入权威 item_id：dict 值缺 item_id 时以键补齐（否则保存 items 缺 item_id 触发 422）；v 自带 item_id 则以其为准
+  for (const [k, v] of Object.entries(src)) map.set(k, (v && typeof v === 'object' && !Array.isArray(v)) ? { item_id: k, ...v } : { item_id: k, remark: v })
+}
+
+/** 强制从服务端拉最新 checklist（忽略父级 htmlData 快照）— IE 导入后必用 */
+async function fetchResponsesFromServer(): Promise<Map<string, any>> {
+  const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
+    params: { force_component_type: 'h9-lease-liabilities' },
+    _silent: true,
+  } as any)
+  const data = res.data?.data || res.data
+  const map = new Map<string, any>()
+  if (data?.sheets && Array.isArray(data.sheets)) {
+    for (const sheet of data.sheets) {
+      _mergeResponses(map, sheet.html_data?.allResponses)
+      _mergeResponses(map, sheet.html_data?.responses_snapshot)
+    }
+  }
+  return map
+}
+
 async function selfLoad(): Promise<void> {
   try {
     if (props.htmlData) {
-      // 从父级透传的 htmlData 中提取 responses
-      // 兼容两种键名：allResponses（历史）/ responses_snapshot（H9 render 策略实际输出）
+      // 从父级透传的 htmlData 中提取 responses（首屏快路径）
       const map = new Map<string, any>()
-      if (props.htmlData.allResponses && typeof props.htmlData.allResponses === 'object') {
-        for (const [k, v] of Object.entries(props.htmlData.allResponses)) map.set(k, v)
-      }
-      if (props.htmlData.responses_snapshot && typeof props.htmlData.responses_snapshot === 'object') {
-        for (const [k, v] of Object.entries(props.htmlData.responses_snapshot)) map.set(k, v)
-      }
+      _mergeResponses(map, props.htmlData.allResponses)
+      _mergeResponses(map, props.htmlData.responses_snapshot)
       if (map.size > 0) allResponses.value = map
     } else {
-      // selfLoad: 自行调用 render-config
-      const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
-        params: { force_component_type: 'h9-lease-liabilities' },
-        _silent: true,
-      } as any)
-      const data = res.data?.data || res.data
-      if (data?.sheets && Array.isArray(data.sheets)) {
-        const map = new Map<string, any>()
-        for (const sheet of data.sheets) {
-          if (sheet.html_data?.allResponses) {
-            for (const [k, v] of Object.entries(sheet.html_data.allResponses)) {
-              map.set(k, v)
-            }
-          }
-          if (sheet.html_data?.responses_snapshot) {
-            for (const [k, v] of Object.entries(sheet.html_data.responses_snapshot)) {
-              map.set(k, v)
-            }
-          }
-        }
-        allResponses.value = map
-      }
+      allResponses.value = await fetchResponsesFromServer()
     }
   } catch (err) {
     console.warn('[GtH9LeaseLiabilities] selfLoad failed:', err)
   } finally {
     isLoading.value = false
+  }
+}
+
+/** IE 导入 / 跨表事件后：必须打服务端，避免 htmlData 快照导致 UI 假旧 */
+async function reloadFromServer(): Promise<void> {
+  try {
+    allResponses.value = await fetchResponsesFromServer()
+  } catch (err) {
+    console.warn('[GtH9LeaseLiabilities] reloadFromServer failed:', err)
   }
 }
 
@@ -331,15 +329,23 @@ function persistResponse(itemId: string, value: any): void {
   const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
   const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
   const updated = { ...existing, item_id: itemId, remark: strVal }
-  allResponses.value.set(itemId, updated)
+  // 替换 Map 引用以触发依赖 allResponses 的 computed / watch（对齐 H8）
+  const next = new Map(allResponses.value)
+  next.set(itemId, updated)
+  allResponses.value = next
   if (isReadonly.value) return
   const prev = _saveTimers.get(itemId)
   if (prev) clearTimeout(prev)
   _saveTimers.set(itemId, setTimeout(() => {
     _saveTimers.delete(itemId)
-    http.put(`/workpapers/${props.wpId}/checklist-responses`, {
+    const conclusionRaw = updated.conclusion
+    const conclusion =
+      conclusionRaw == null || String(conclusionRaw).trim() === ''
+        ? null
+        : String(conclusionRaw)
+    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
       project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion: updated.conclusion ?? null, remark: updated.remark ?? null }],
+      items: [{ item_id: itemId, conclusion, remark: updated.remark ?? null }],
     }).catch((err: unknown) => console.warn('[GtH9] persistResponse failed:', itemId, err))
   }, 800))
 }
@@ -351,6 +357,7 @@ function openReviewDialog(sectionId: string, sectionLabel?: string): void {
 provide('openReviewDialog', openReviewDialog)
 provide('allResponses', allResponses)
 provide('saveResponse', persistResponse)
+provide('h9ReloadAll', reloadFromServer)
 
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
@@ -360,38 +367,64 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 provide('h9VersionTrailRef', versionTrailRef)
 provide('h9OpenVersionHistory', openVersionHistory)
 
-// ─── H8联动: 终止合同标记 ───────────────────────────────────────────────────
-/** 已终止合同ID集合（由H8终止事件推送） */
+// ─── H8联动: 终止合同标记 + 落库 H9-2 ───────────────────────────────────────
 const terminatedContractIds = ref<Set<string>>(new Set())
 provide('terminatedContractIds', terminatedContractIds)
 
 function _handleH8LeaseTerminated(e: Event): void {
-  // H8发布租赁终止事件时，标记已终止合同
-  const detail = (e as CustomEvent)?.detail
-  if (detail?.contractId) {
-    terminatedContractIds.value.add(detail.contractId)
+  const detail = (e as CustomEvent)?.detail || {}
+  const cn = String(detail.contractNo || detail.contractId || '').trim()
+  if (!cn) return
+  terminatedContractIds.value.add(cn)
+
+  // 直接落库 H9-2（不依赖明细 tab 是否挂载）
+  const item = allResponses.value.get('H9-2-rows')
+  let rawRows: any[] = []
+  try {
+    const raw = item?.remark ?? item?.conclusion
+    rawRows = typeof raw === 'string' ? JSON.parse(raw) : (Array.isArray(raw) ? raw : [])
+  } catch { rawRows = [] }
+  const { rows: next, matched } = applyH8TerminationToH92Rows(rawRows, {
+    contractNo: cn,
+    reductionDate: detail.reductionDate,
+    settle: true,
+  })
+  if (matched > 0) {
+    persistResponse('H9-2-rows', next)
   }
-  // 同时刷新数据
-  void selfLoad()
+  void reloadFromServer()
 }
 
-function _handleH8Updated(_e: Event): void {
-  // H8使用权资产数据更新时刷新H9，保持联动数据同步
-  void selfLoad()
+function _handleH8Updated(e: Event): void {
+  const detail = (e as CustomEvent)?.detail || {}
+  // H8-2 persist 推送的 CAS21 镜像键 → 落库 H9-h8-*，供本页勾稽
+  const h8Initial = Number(detail.h8InitialMeasurement)
+  const direct = Number(detail.h8DirectCost)
+  const incentive = Number(detail.h8Incentive)
+  if (Number.isFinite(h8Initial) && h8Initial !== 0) {
+    persistResponse('H9-h8-initial-measurement', h8Initial)
+  }
+  if (Number.isFinite(direct)) {
+    persistResponse('H9-h8-direct-cost', direct)
+  }
+  if (Number.isFinite(incentive)) {
+    persistResponse('H9-h8-incentive', incentive)
+  }
+  void reloadFromServer()
 }
 
-function _handleTbUpdated(_e: Event): void {
-  // TB更新(科目2205相关)触发刷新
-  void selfLoad()
+function _handleTbUpdated(_payload?: unknown): void {
+  void reloadFromServer()
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
   void selfLoad()
-  // Subscribe: TB updates
+  // Subscribe: TB / 审定更新（经 crossWpEventBridge 双通道）
   window.addEventListener('tb:updated', _handleTbUpdated)
-  // Subscribe: 审定数变更
   window.addEventListener('substantive:adjudicated', _handleTbUpdated)
+  eventBus.on('substantive:adjudicated', _handleTbUpdated)
+  eventBus.on('trial-balance:updated', _handleTbUpdated)
   // Subscribe: H8租赁终止 → 标记已终止合同
   window.addEventListener('h8:lease-terminated', _handleH8LeaseTerminated)
   // Subscribe: H8数据更新 → 刷新H9联动
@@ -401,6 +434,8 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('tb:updated', _handleTbUpdated)
   window.removeEventListener('substantive:adjudicated', _handleTbUpdated)
+  eventBus.off('substantive:adjudicated', _handleTbUpdated)
+  eventBus.off('trial-balance:updated', _handleTbUpdated)
   window.removeEventListener('h8:lease-terminated', _handleH8LeaseTerminated)
   window.removeEventListener('h8:asset-updated', _handleH8Updated)
   for (const t of _saveTimers.values()) clearTimeout(t)

@@ -2,12 +2,12 @@
 
 根据项目 business_category / scenario 判定哪些 A17-5 版本适用。
 
-Rules:
-- A17-5-1 (财报审计): 所有 A 类项目必做
-- A17-5-2 (内控审计): 整合审计项目（business_category 含 A 类 + 内控整合标识）
-- A17-5-3 (IPO 特别程序): IPO 项目 (A2 或 scenario='ipo')
-- A17-5-4 (新三板特别程序): 新三板项目 (B1)
-- A17-5-5 (函证程序): 所有项目推荐
+Rules（与 A17 程序表 applicable_categories=[A] 及 guidance 对齐）:
+- A17-5-1 (财报审计): A 类必做；B 类可选；C 类不适用
+- A17-5-2 (内控审计): 整合审计项目（A1/A5/A6 或 scenario 含 integrated）
+- A17-5-3 (IPO 特别程序): IPO 项目 (A2 或 scenario='ipo') 必做
+- A17-5-4 (新三板特别程序): 新三板项目 (B1) 必做
+- A17-5-5 (函证程序): A/B 类推荐（非强制）
 """
 
 from __future__ import annotations
@@ -28,27 +28,27 @@ _A17_5_VERSIONS: list[dict] = [
     {
         "wp_code": "A17-5-1",
         "title": "审计工作完成核对表（财报审计）",
-        "description": "所有 A 类项目必做",
+        "description": "A 类必做；B 类可选",
     },
     {
         "wp_code": "A17-5-2",
         "title": "审计工作完成核对表（内控审计）",
-        "description": "整合审计项目适用",
+        "description": "整合审计（A1/A5/A6 等）适用",
     },
     {
         "wp_code": "A17-5-3",
         "title": "审计工作完成核对表（IPO 特别程序）",
-        "description": "IPO 项目适用",
+        "description": "A 类 IPO（A2）必做",
     },
     {
         "wp_code": "A17-5-4",
         "title": "审计工作完成核对表（新三板特别程序）",
-        "description": "新三板/北交所项目适用",
+        "description": "新三板/北交所（B1）必做",
     },
     {
         "wp_code": "A17-5-5",
         "title": "审计工作完成核对表（函证程序）",
-        "description": "所有项目推荐",
+        "description": "A/B 类推荐",
     },
 ]
 

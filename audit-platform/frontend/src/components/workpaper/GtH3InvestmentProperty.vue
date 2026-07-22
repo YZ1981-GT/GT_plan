@@ -112,23 +112,17 @@
           :is-readonly="isReadonly"
         />
 
-        <!-- H3-5 增减检查表（双计量模式） -->
-        <template v-else-if="currentSheet === 'H3-5'">
-          <H3TabAdditionCost
-            v-if="measurementModel === 'cost'"
-            :wp-id="props.wpId"
-            :project-id="props.projectId"
-            :all-responses="allResponses"
-            :is-readonly="isReadonly"
-          />
-          <H3TabAdditionFair
-            v-else
-            :wp-id="props.wpId"
-            :project-id="props.projectId"
-            :all-responses="allResponses"
-            :is-readonly="isReadonly"
-          />
-        </template>
+        <!-- H3-5 增减检查表（双计量模式，统一组件） -->
+        <H3TabAdditionCheck
+          v-else-if="currentSheet === 'H3-5'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :measurement-model="measurementModel"
+          :is-readonly="isReadonly"
+          :year="props.year"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+        />
 
         <!-- H3-6 互转审核表 -->
         <H3TabTransferReview
@@ -161,6 +155,7 @@
               :project-id="props.projectId"
               :all-responses="allResponses"
               :is-readonly="isReadonly"
+              :audit-year="props.year"
             />
             <H3TabDepreciationWithImpair
               v-else
@@ -168,6 +163,7 @@
               :project-id="props.projectId"
               :all-responses="allResponses"
               :is-readonly="isReadonly"
+              :audit-year="props.year"
             />
           </template>
         </template>
@@ -188,7 +184,9 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :measurement-model="measurementModel"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H3-10 减值测算表（仅成本模式） -->
@@ -220,6 +218,7 @@
             :project-id="props.projectId"
             :all-responses="allResponses"
             :is-readonly="isReadonly"
+            @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
           />
         </template>
 
@@ -229,7 +228,10 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :measurement-model="measurementModel"
+          :html-data="effectiveHtmlData"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H3-13 关联交易检查表 -->
@@ -238,7 +240,9 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :measurement-model="measurementModel"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H3-14 租金收入测算表 -->
@@ -248,6 +252,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :measurement-model="measurementModel"
+          :html-data="props.htmlData"
           :is-readonly="isReadonly"
         />
 
@@ -310,7 +315,7 @@ import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useH3DualMode } from './composables/useH3DualMode'
 import { useH3FormData } from './composables/useH3FormData'
 import { useH3MeasurementModel } from './composables/useH3MeasurementModel'
-import CycleTabProcedure from './shared/CycleTabProcedure.vue'
+import { createH3RowNavigation, H3RowNavigationKey } from './composables/useH3RowNavigation'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -328,8 +333,7 @@ const H3TabDisclosureSoe = defineAsyncComponent(() => import('./h3/core/H3TabDis
 
 // inspection
 const H3TabPolicyCheck = defineAsyncComponent(() => import('./h3/inspection/H3TabPolicyCheck.vue'))
-const H3TabAdditionCost = defineAsyncComponent(() => import('./h3/inspection/H3TabAdditionCost.vue'))
-const H3TabAdditionFair = defineAsyncComponent(() => import('./h3/inspection/H3TabAdditionFair.vue'))
+const H3TabAdditionCheck = defineAsyncComponent(() => import('./h3/inspection/H3TabAdditionCheck.vue'))
 const H3TabTransferReview = defineAsyncComponent(() => import('./h3/inspection/H3TabTransferReview.vue'))
 const H3TabStocktakeCheck = defineAsyncComponent(() => import('./h3/inspection/H3TabStocktakeCheck.vue'))
 const H3TabTitleCheck = defineAsyncComponent(() => import('./h3/inspection/H3TabTitleCheck.vue'))
@@ -360,12 +364,22 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
-defineEmits<{ (e: 'save'): void; (e: 'completed'): void }>()
+const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navigate-sheet', sheetName: string): void }>()
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
 const isLoading = ref(true)
 const allResponses = ref<Map<string, any>>(new Map())
+/** selfLoad 时缓存 project_context（htmlData 未透传时供子表使用） */
+const selfLoadedProjectContext = ref<Record<string, unknown> | null>(null)
+
+const effectiveHtmlData = computed(() => {
+  if (props.htmlData) return props.htmlData
+  if (selfLoadedProjectContext.value) {
+    return { project_context: selfLoadedProjectContext.value }
+  }
+  return undefined
+})
 
 /** 折旧分支选择器（仅成本模式 H3-7） */
 const depreciationBranch = ref<'noImpair' | 'withImpair'>('noImpair')
@@ -429,7 +443,8 @@ const currentSheet = computed(() => {
 /** 合并一个 responses 对象（{item_id: {...}}）到目标 Map */
 function _mergeResponses(map: Map<string, any>, src: any): void {
   if (!src || typeof src !== 'object') return
-  for (const [k, v] of Object.entries(src)) map.set(k, v)
+  // 注入权威 item_id：dict 值缺 item_id 时以键补齐（否则保存 items 缺 item_id 触发 422）；v 自带 item_id 则以其为准
+  for (const [k, v] of Object.entries(src)) map.set(k, (v && typeof v === 'object' && !Array.isArray(v)) ? { item_id: k, ...v } : { item_id: k, remark: v })
 }
 
 async function selfLoad(): Promise<void> {
@@ -445,6 +460,9 @@ async function selfLoad(): Promise<void> {
       if (props.htmlData.measurement_model) {
         measurementModel.value = props.htmlData.measurement_model
       }
+      if (props.htmlData.project_context) {
+        selfLoadedProjectContext.value = props.htmlData.project_context
+      }
     } else {
       // selfLoad: 自行调用 render-config
       const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
@@ -452,6 +470,9 @@ async function selfLoad(): Promise<void> {
         _silent: true,
       } as any)
       const data = res.data?.data || res.data
+      if (data?.project_context) {
+        selfLoadedProjectContext.value = data.project_context
+      }
       if (data?.sheets && Array.isArray(data.sheets)) {
         const map = new Map<string, any>()
         for (const sheet of data.sheets) {
@@ -476,6 +497,9 @@ async function selfLoad(): Promise<void> {
 // openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
 provide('measurementModel', measurementModel)
 provide('allResponses', allResponses)
+
+const h3RowNav = createH3RowNavigation((sheetName) => emit('navigate-sheet', sheetName))
+provide(H3RowNavigationKey, h3RowNav)
 
 // ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
 const runtime = inject(WorkpaperRuntimeContextKey, null)

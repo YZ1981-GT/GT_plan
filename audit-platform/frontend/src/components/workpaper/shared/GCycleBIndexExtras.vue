@@ -25,8 +25,10 @@ const props = defineProps<{
   wpCode?: string
   htmlData?: Record<string, unknown>
   availableSheets?: CycleArchitectureSheet[]
+  showArchitecture?: boolean
 }>()
 
+const showArchitecture = computed(() => props.showArchitecture !== false)
 const route = useRoute()
 const router = useRouter()
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
@@ -61,7 +63,7 @@ function onCycleCardClick(wp: CycleWorkpaper) {
 
 <template>
   <div class="g-cycle-b-index-extras" data-testid="g-cycle-b-index-extras">
-    <div class="g-cycle-b-index-extras__navigation">
+    <div v-if="showArchitecture" class="g-cycle-b-index-extras__navigation">
       <div class="g-cycle-b-index-extras__navigation-header">
         <h4 class="g-cycle-b-index-extras__navigation-title">底稿架构</h4>
         <span class="g-cycle-b-index-extras__navigation-hint">点击程序卡片可跳转至对应底稿</span>

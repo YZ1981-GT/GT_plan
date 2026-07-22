@@ -21,6 +21,8 @@ import {
   calcAnomalyRate,
   aggregateByNature,
   aggregateByAging,
+  aggregateAgingByKeys,
+  collectAgingKeys,
 } from '../composables/useD3FormulaEngine'
 
 // ─── 单元测试 ────────────────────────────────────────────────────────────────
@@ -83,6 +85,54 @@ describe('useD3FormulaEngine - 单元测试', () => {
       expect(result.y1to2).toBe(50)
       expect(result.y2to3).toBe(15)
       expect(result.over3).toBe(3)
+    })
+  })
+
+  // ─── segment-driven 账龄聚合（aging-config-enhancement 修复回归守卫） ────────
+
+  describe('collectAgingKeys', () => {
+    it('collects unique keys (audited 优先) preserving order', () => {
+      const rows = [
+        { agingAudited: { within1: 1, y1to2: 2 }, agingPrior: { within1: 3, over3: 4 } },
+        { agingAudited: { y2to3: 5 } },
+      ]
+      expect(collectAgingKeys(rows)).toEqual(['within1', 'y1to2', 'y2to3', 'over3'])
+    })
+
+    it('returns empty for no aging data', () => {
+      expect(collectAgingKeys([{}, { agingAudited: null }])).toEqual([])
+    })
+  })
+
+  describe('aggregateAgingByKeys (FIVE_YEAR / 自定义段)', () => {
+    it('按任意段 key 正确聚合 current/prior（含固定 4 段外的段）', () => {
+      // FIVE_YEAR 6 段：修复前固定 4 段会把 y3to4/y4to5/over5 全部丢成 0
+      const keys = ['within1', 'y1to2', 'y2to3', 'y3to4', 'y4to5', 'over5']
+      const rows = [
+        {
+          agingAudited: { within1: 10, y1to2: 20, y2to3: 30, y3to4: 40, y4to5: 50, over5: 60 },
+          agingPrior: { within1: 1, y1to2: 2, y2to3: 3, y3to4: 4, y4to5: 5, over5: 6 },
+        },
+        {
+          agingAudited: { within1: 100, y3to4: 400, over5: 600 },
+          agingPrior: { y4to5: 50 },
+        },
+      ]
+      const { current, prior } = aggregateAgingByKeys(rows, keys)
+      expect(current.within1).toBe(110)
+      expect(current.y3to4).toBe(440)
+      expect(current.y4to5).toBe(50)
+      expect(current.over5).toBe(660)
+      expect(prior.y4to5).toBe(55)
+      expect(prior.over5).toBe(6)
+      // 覆盖全部传入 key（缺失段计 0）
+      expect(Object.keys(current).sort()).toEqual([...keys].sort())
+    })
+
+    it('空 keys → 空聚合；缺失段默认 0', () => {
+      expect(aggregateAgingByKeys([{ agingAudited: { within1: 5 } }], [])).toEqual({ current: {}, prior: {} })
+      const { current } = aggregateAgingByKeys([{}], ['within1', 'custom'])
+      expect(current).toEqual({ within1: 0, custom: 0 })
     })
   })
 })

@@ -15,12 +15,15 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       vue(),
+      // 不在 AutoImport 中挂 ElementPlusResolver：
+      // 与显式 `import { ElMessage } from 'element-plus'` 冲突时会生成不存在的 ElMessage2。
+      // ElMessage / ElMessageBox 由业务代码显式导入；样式已在 main.ts 全量引入。
       AutoImport({
-        resolvers: [ElementPlusResolver()],
+        imports: ['vue', 'vue-router', 'pinia'],
         dts: 'src/auto-imports.d.ts',
       }),
       Components({
-        resolvers: [ElementPlusResolver()],
+        resolvers: [ElementPlusResolver({ importStyle: false })],
         dts: 'src/components.d.ts',
       }),
     ],

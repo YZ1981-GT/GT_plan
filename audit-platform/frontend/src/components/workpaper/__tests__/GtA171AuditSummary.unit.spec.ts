@@ -45,9 +45,9 @@ function buildChaptersRef(overrides?: Partial<Record<string, Partial<ChapterData
     '3': { type: 'textarea', title: '三、对审计计划的更新和修改', content: null },
     '4': { type: 'textarea', title: '四、需合伙人关注事项', content: null },
     '5': { type: 'textarea', title: '五、业务咨询记录及专业意见分歧解决情况', content: null },
-    '6': { type: 'table', title: '六、对重大错报风险的应对措施执行情况', rows: [] },
+    '6': { type: 'textarea', title: '六、对重大错报风险的应对措施执行情况', content: null },
     '7': { type: 'textarea', title: '七、利用专家的工作', content: null },
-    '8': { type: 'table', title: '八、已审财务报表分析', rows: [] },
+    '8': { type: 'textarea', title: '八、已审财务报表分析', content: null },
     '9': { type: 'yn', title: '九、对关联方及关联方交易的结论', answer: null, explanation: null },
     '10': { type: 'yn', title: '十、基于持续经营假设的考虑', answer: null, explanation: null },
     '11': { type: 'yn', title: '十一、对期后事项形成的结论', answer: null, explanation: null },
@@ -96,28 +96,21 @@ describe('GtA171AuditSummary PBT — Property 4', () => {
   it('Property 4: completionStatus computed returns a record with exactly 16 boolean keys', () => {
     // Arbitrary for chapter content states
     const chapterContentArb = fc.record({
-      textareaFilled: fc.subarray([1, 2, 3, 4, 5, 7, 13, 14, 15, 16]),
-      tableFilled: fc.subarray([6, 8]),
+      textareaFilled: fc.subarray([1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 16]),
       ynAnswered: fc.subarray([9, 10, 11, 12]),
     })
 
     fc.assert(
-      fc.property(chapterContentArb, ({ textareaFilled, tableFilled, ynAnswered }) => {
+      fc.property(chapterContentArb, ({ textareaFilled, ynAnswered }) => {
         const chaptersData: Record<string, ChapterData> = {}
 
         for (let i = 1; i <= 16; i++) {
           const key = String(i)
-          if ([1, 2, 3, 4, 5, 7, 13, 14, 15, 16].includes(i)) {
+          if ([1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 16].includes(i)) {
             chaptersData[key] = {
               type: 'textarea',
               title: `Ch${i}`,
               content: textareaFilled.includes(i) ? '有内容' : null,
-            }
-          } else if ([6, 8].includes(i)) {
-            chaptersData[key] = {
-              type: 'table',
-              title: `Ch${i}`,
-              rows: tableFilled.includes(i) ? [{ item: 'data' }] : [],
             }
           } else {
             chaptersData[key] = {
@@ -144,9 +137,6 @@ describe('GtA171AuditSummary PBT — Property 4', () => {
 
         // Filled items are true, unfilled are false
         for (const n of textareaFilled) {
-          expect(completionStatus.value[n]).toBe(true)
-        }
-        for (const n of tableFilled) {
           expect(completionStatus.value[n]).toBe(true)
         }
         for (const n of ynAnswered) {
@@ -216,18 +206,18 @@ describe('GtA171AuditSummary — Unit', () => {
       }
     })
 
-    it('textarea chapters are 1,2,3,4,5,7,13,14,15,16', () => {
+    it('textarea chapters are 1–8,13–16', () => {
       const composable = setup()
-      const textareaKeys = [1, 2, 3, 4, 5, 7, 13, 14, 15, 16]
+      const textareaKeys = [1, 2, 3, 4, 5, 6, 7, 8, 13, 14, 15, 16]
       for (const k of textareaKeys) {
         expect(composable.chapters.value[String(k)].type).toBe('textarea')
       }
     })
 
-    it('table chapters are 6,8', () => {
+    it('chapters 6 and 8 are textarea (legacy table migrated)', () => {
       const composable = setup()
-      expect(composable.chapters.value['6'].type).toBe('table')
-      expect(composable.chapters.value['8'].type).toBe('table')
+      expect(composable.chapters.value['6'].type).toBe('textarea')
+      expect(composable.chapters.value['8'].type).toBe('textarea')
     })
 
     it('yn chapters are 9,10,11,12', () => {
@@ -275,7 +265,7 @@ describe('GtA171AuditSummary — Unit', () => {
 
     it('last row is 质量控制复核人（如适用）', () => {
       const composable = setup()
-      expect(composable.signatureTable.value[3].role).toBe('质量控制复核人（如适用）')
+      expect(composable.signatureTable.value[3].role).toBe('EQCR技术复核人')
     })
 
     it('all rows have name and date as null initially', () => {
@@ -312,9 +302,9 @@ describe('GtA171AuditSummary — Unit', () => {
       expect(completionStatus.value[1]).toBe(true)
     })
 
-    it('table chapter marked complete when rows exist', () => {
+    it('textarea chapter 6 marked complete when content is set', () => {
       const composable = setup()
-      composable.addTableRow(6)
+      composable.updateTextarea(6, '有内容')
       const { completionStatus } = useA171Navigation(composable.chapters as any)
       expect(completionStatus.value[6]).toBe(true)
     })

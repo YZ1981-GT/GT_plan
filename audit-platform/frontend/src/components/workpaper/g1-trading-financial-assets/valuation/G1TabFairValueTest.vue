@@ -26,6 +26,15 @@
           :disabled="isReadonly || balanceOk"
           @click="onPushAdj"
         >差异推送 G1-3</el-button>
+        <el-button
+          size="small"
+          type="warning"
+          plain
+          :disabled="isReadonly || balanceOk || !projectId || pushingG13"
+          :loading="pushingG13"
+          data-testid="g1-fv-push-g13"
+          @click="onPushG13"
+        >差异推送 G13-3</el-button>
         <el-button size="small" type="success" plain :disabled="isReadonly" @click="onPushL3">
           L3 推送 G1-7
         </el-button>
@@ -434,6 +443,7 @@
 import { ref, toRef, inject, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG1FairValueTest } from '../../composables/useG1FairValueTest'
+import { pushSourceFvDiffToG13, G13_FV_DIFF_THRESHOLD } from '../../composables/g13FvCrossHelpers'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G1AuditTextCards from '../G1AuditTextCards.vue'
@@ -444,9 +454,12 @@ const props = defineProps<{
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   wpId?: string
+  projectId?: string
 }>()
 
 const wpId = computed(() => props.wpId ?? '')
+const projectId = computed(() => props.projectId ?? '')
+const pushingG13 = ref(false)
 const emit = defineEmits<{ imported: [] }>()
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 
@@ -516,6 +529,37 @@ function onPushAdj() {
     return
   }
   ElMessage.success(`已推送 ${n} 条调整草稿至 G1-3`)
+}
+
+async function onPushG13() {
+  if (!projectId.value) {
+    ElMessage.warning('缺少项目 ID，无法推送 G13-3')
+    return
+  }
+  const targets = rows.value.filter((r) => Math.abs(r.activeDiff) > G13_FV_DIFF_THRESHOLD)
+  if (!targets.length) {
+    ElMessage.warning('无超阈值差异可推送')
+    return
+  }
+  pushingG13.value = true
+  try {
+    const result = await pushSourceFvDiffToG13({
+      projectId: projectId.value,
+      source: 'G1-6',
+      items: targets.map((r) => ({
+        description: `G1-6 公允测试差异：${r.securityName || '未命名'}`,
+        amount: r.activeDiff,
+        belongAccount: 'G1',
+        indexRef: 'G1-6',
+        nameKey: r.securityName || r.rowId,
+        remark: `Level ${r.fvLevel} 测试 ${r.testedValue} − 账面 ${r.bookValue}`,
+      })),
+    })
+    if (result.ok) ElMessage.success(result.message)
+    else ElMessage.warning(result.message)
+  } finally {
+    pushingG13.value = false
+  }
 }
 
 function onPushL3() {

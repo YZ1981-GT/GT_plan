@@ -16,7 +16,17 @@
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <el-dropdown v-if="!isReadonly" trigger="click" @command="handleFillFromDetail">
+          <el-button size="small" type="primary">从明细带入 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="book">写入未审（保留 AJE/RJE）</el-dropdown-item>
+              <el-dropdown-item command="full">按审定覆盖（清零 AJE/RJE）</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+      </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:H9-1" :context-project-id="props.projectId" /></span>
         <el-tag size="small" type="info">共 {{ liabilityRows.length + unearnedRows.length }} 行</el-tag>
@@ -91,6 +101,37 @@
         <el-table-column label="审定数" width="110" align="right" class-name="formula-col">
           <template #default="{ row }">
             <span class="formula-value" title="公式：未审+AJE+RJE">{{ fmtAmt(row.audited) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="reclassification" label="重分类(一年内到期)" width="130" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.reclassification" :controls="false" size="small"
+              @change="(v: number | undefined) => onCellChange(row.rowId, 'reclassification', v)" />
+            <span v-else>{{ fmtAmt(row.reclassification) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="报表数" width="110" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-value" title="公式：审定−重分类">{{ fmtAmt(row.fsAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="beginFsAmount" label="期初报表数" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.beginFsAmount" :controls="false" size="small"
+              @change="(v: number | undefined) => onCellChange(row.rowId, 'beginFsAmount', v)" />
+            <span v-else>{{ fmtAmt(row.beginFsAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="变动额" width="100" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-value">{{ fmtAmt(row.changeAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="变动率" width="90" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-value" :class="{ 'rate-warn': Math.abs(row.changeRate) > 0.3 }">
+              {{ fmtRate(row.changeRate) }}
+            </span>
           </template>
         </el-table-column>
         <el-table-column v-if="!isReadonly" label="" width="50" align="center">
@@ -171,6 +212,37 @@
             <span class="formula-value" title="公式：未审+AJE+RJE">{{ fmtAmt(row.audited) }}</span>
           </template>
         </el-table-column>
+        <el-table-column prop="reclassification" label="重分类(一年内到期)" width="130" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.reclassification" :controls="false" size="small"
+              @change="(v: number | undefined) => onCellChange(row.rowId, 'reclassification', v)" />
+            <span v-else>{{ fmtAmt(row.reclassification) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="报表数" width="110" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-value" title="公式：审定−重分类">{{ fmtAmt(row.fsAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="beginFsAmount" label="期初报表数" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" v-model="row.beginFsAmount" :controls="false" size="small"
+              @change="(v: number | undefined) => onCellChange(row.rowId, 'beginFsAmount', v)" />
+            <span v-else>{{ fmtAmt(row.beginFsAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="变动额" width="100" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-value">{{ fmtAmt(row.changeAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="变动率" width="90" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-value" :class="{ 'rate-warn': Math.abs(row.changeRate) > 0.3 }">
+              {{ fmtRate(row.changeRate) }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column v-if="!isReadonly" label="" width="50" align="center">
           <template #default="{ row }">
             <el-button type="danger" link size="small" @click="handleDeleteRow(row.rowId)">✕</el-button>
@@ -182,8 +254,29 @@
     <!-- 三、租赁负债净额 -->
     <el-card shadow="never" class="net-card">
       <div class="net-row">
-        <span class="net-label">三、租赁负债净额（原值 - 未确认融资费用）</span>
-        <span class="net-value">{{ fmtAmt(netAudited) }} 元</span>
+        <span class="net-label">三、租赁负债净额（原值 − 未确认融资费用）</span>
+        <div class="net-metrics">
+          <span class="net-value">审定 {{ fmtAmt(netAudited) }} 元</span>
+          <span class="net-fs">报表 {{ fmtAmt(netFsAmount) }} 元</span>
+          <el-tag v-if="Math.abs(netChangeRate) > 0.3" type="danger" size="small" effect="plain">
+            净额变动率 {{ fmtRate(netChangeRate) }}（&gt;30%，须说明主要原因）
+          </el-tag>
+          <el-tag v-else type="info" size="small" effect="plain">净额变动率 {{ fmtRate(netChangeRate) }}</el-tag>
+        </div>
+      </div>
+    </el-card>
+
+    <!-- 跨表勾稽：H9-1 vs H9-2 -->
+    <el-card shadow="never" class="linkage-card">
+      <template #header>
+        <div class="section-title"><span>H9-1 ↔ H9-2 勾稽</span></div>
+      </template>
+      <div class="linkage-status" :class="adjudicationVsDetail.isMatch ? 'linkage-ok' : 'linkage-error'">
+        <span v-if="adjudicationVsDetail.isMatch">✓ 审定合计与明细合计一致（±1 元）</span>
+        <span v-else>
+          ✗ 审定合计与明细不一致，差额 {{ adjudicationVsDetail.diff.toFixed(2) }} 元
+          （H9-1={{ adjudicationTotal.toFixed(2) }}，H9-2={{ detailTotal.toFixed(2) }}）
+        </span>
       </div>
     </el-card>
 
@@ -200,8 +293,6 @@
           <span>H9初始确认 ≈ H8初始计量 - 初始直接费用 + 租赁激励（±1元容差）</span>
         </div>
         <div class="linkage-status" :class="h8Linkage.isConsistent ? 'linkage-ok' : 'linkage-error'">
-          <el-icon v-if="h8Linkage.isConsistent" :size="14"><svg viewBox="0 0 1024 1024" width="14"><path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm193.5 301.7l-210.6 292a31.8 31.8 0 01-51.7 0l-109.8-152a8 8 0 016.5-12.7h46.2c10.3 0 19.9 5 25.9 13.3l63.5 87.8 164.4-228c6-8.3 15.6-13.3 25.9-13.3h46.2a8 8 0 016.5 12.7z" fill="currentColor"/></svg></el-icon>
-          <el-icon v-else :size="14"><svg viewBox="0 0 1024 1024" width="14"><path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm165.4 618.2l-66-.3L512 563.4l-99.3 118.4-66.1.3c-4.4 0-8-3.5-8-8 0-1.9.7-3.7 1.9-5.2l130.1-155L340.5 359a8.3 8.3 0 01-1.9-5.2c0-4.4 3.6-8 8-8l66.1.3L512 464.6l99.3-118.4 66-.3c4.4 0 8 3.5 8 8 0 1.9-.7 3.7-1.9 5.2L553.5 514l130 155c1.2 1.5 1.9 3.3 1.9 5.2 0 4.4-3.6 8-8 8z" fill="currentColor"/></svg></el-icon>
           <span>{{ h8Linkage.message }}</span>
           <span v-if="!h8Linkage.isConsistent && h8Linkage.diff !== 0" class="diff-badge">
             差额：{{ h8Linkage.diff > 0 ? '+' : '' }}{{ h8Linkage.diff.toFixed(2) }}元
@@ -243,11 +334,11 @@
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>租赁负债为贷方科目（负债类），期末=期初+贷方-借方</li>
-        <li>未确认融资费用为借方科目（负债备抵类），期末=期初+借方-贷方</li>
-        <li>净额=租赁负债原值-未确认融资费用</li>
-        <li>CAS21联动：H9初始确认≈H8初始计量-直接费用+激励（±1元容差）</li>
-        <li>审定数=未审数+AJE+RJE</li>
+        <li>编制顺序：先编 H9-2/H9-3 明细 →「从明细带入」→ 填 AJE/RJE 与一年内到期重分类 → 核变动率 → 回写 TB</li>
+        <li>租赁负债为贷方科目（负债类），期末=期初+贷方-借方；未确认融资费用为借方备抵，期末=期初+借方-贷方</li>
+        <li>报表数=审定数−重分类(一年一年内到期)；变动额/率对齐 Excel 本期审定与上期比较</li>
+        <li>净额变动率超过 30% 时须在审计说明中写明主要原因（模板红字要求）</li>
+        <li>CAS21：H9初始确认≈H8初始计量-直接费用+激励（±1元）；H9-1 审定合计应与 H9-2 明细合计勾稽</li>
         <li>回写TB后自动发布 substantive:adjudicated 事件</li>
       </ul>
     </details>
@@ -271,7 +362,7 @@
  * Task: 4.2
  * Requirements: 2.1-2.8, 8.1-8.4
  */
-import { ref, toRef, computed, watch } from 'vue'
+import { ref, toRef, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useH9Adjudication, type H9AdjudicationRow } from '../../composables/useH9Adjudication'
@@ -300,8 +391,8 @@ const allResponsesRef = toRef(props, 'allResponses')
 
 const {
   liabilityRows, unearnedRows,
-  liabilitySubtotal, unearnedSubtotal, netAudited,
-  updateCell, addRow, deleteRow,
+  liabilitySubtotal, unearnedSubtotal, netAudited, netFsAmount, netChangeRate,
+  updateCell, addRow, deleteRow, fillFromDetail, syncAjeRjeFromAdjustment,
   publishAdjudicated, saveNote, saveConclusion,
   auditNote, auditConclusion,
 } = useH9Adjudication({
@@ -315,8 +406,31 @@ const {
   },
 })
 
-const { h9VsH8Linkage } = useH9CrossSheet(allResponsesRef)
+const {
+  h9VsH8Linkage,
+  adjudicationVsDetail,
+  adjudicationTotal,
+  detailTotal,
+} = useH9CrossSheet(allResponsesRef)
 const h8Linkage = computed(() => h9VsH8Linkage.value)
+
+// H9-4 → H9-1 AJE/RJE 联动
+function _onAdjustmentCreated(e: Event): void {
+  const detail = (e as CustomEvent)?.detail || {}
+  if (detail.wpCode && detail.wpCode !== 'H9') return
+  const res = syncAjeRjeFromAdjustment(
+    Number(detail.ajeNet) || 0,
+    Number(detail.rjeNet) || 0,
+  )
+  if (res.applied) ElMessage.success(res.message)
+}
+
+onMounted(() => {
+  window.addEventListener('adjustment:created', _onAdjustmentCreated)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('adjustment:created', _onAdjustmentCreated)
+})
 
 // Sync local text refs
 watch(auditNote, (v) => { auditNoteLocal.value = v }, { immediate: true })
@@ -327,8 +441,22 @@ function fmtAmt(v: number): string {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+function fmtRate(v: number): string {
+  if (!Number.isFinite(v) || v === 0) return '0.00%'
+  return `${(v * 100).toFixed(2)}%`
+}
+
 function onCellChange(rowId: string, field: string, value: any) {
   updateCell(rowId, field, value)
+}
+
+function handleFillFromDetail(mode: 'book' | 'full') {
+  const res = fillFromDetail(mode)
+  if (!res.liabilityFilled && !res.unearnedFilled) {
+    ElMessage.warning(res.message)
+  } else {
+    ElMessage.success(res.message)
+  }
 }
 
 async function handleAddLiabilityRow() {
@@ -426,9 +554,12 @@ function getUnearnedSummary({ columns }: { columns: any[]; data: H9AdjudicationR
 .formula-value { border-bottom: 1px dashed #409eff; cursor: help; color: #409eff; }
 
 .net-card { margin-bottom: 16px; }
-.net-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; }
+.net-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; flex-wrap: wrap; gap: 8px; }
 .net-label { font-weight: 600; }
+.net-metrics { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .net-value { font-size: 18px; font-weight: 700; color: var(--el-color-primary); }
+.net-fs { font-size: 13px; color: var(--el-text-color-secondary); }
+.rate-warn { color: #f56c6c; font-weight: 700; }
 
 .linkage-card { margin-bottom: 16px; }
 .linkage-content { padding: 4px 0; }

@@ -38,12 +38,14 @@
         :project-id="props.projectId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
       />
 
       <G10TabDetail
         v-else-if="currentSheet === 'G10-2'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -54,6 +56,7 @@
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
         :project-id="props.projectId"
+        :audit-year="auditYear ?? undefined"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -63,14 +66,17 @@
         v-else-if="currentSheet === 'G10-4'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
       />
 
       <G10TabFairValueTest
         v-else-if="currentSheet === 'G10-5'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -80,6 +86,8 @@
         v-else-if="currentSheet === 'G10-6'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :audit-year="auditYear"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -90,6 +98,7 @@
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
         :project-id="props.projectId"
+        :audit-year="auditYear"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -99,24 +108,31 @@
         v-else-if="currentSheet === 'G10-8'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :audit-year="auditYear"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
       />
 
       <G10TabDisclosureListed
         v-else-if="currentSheet === '附注上市'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
       />
 
       <G10TabDisclosureSOE
         v-else-if="currentSheet === '附注国企'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
+        @imported="reloadAll"
       />
 
       <div v-else-if="currentSheet === '底稿目录'" class="g-cycle-tab-index-page">
@@ -159,6 +175,9 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject } from 'vue'
 import { useG10FormData } from './composables/useG10FormData'
+import { G10_ACCOUNT_CODE } from './composables/g10Constants'
+import { offerG10DisclosurePull, G10_OFFER_DISCLOSURE_PULL_EVENT } from './composables/g10DisclosureSync'
+import { parseNum } from './composables/useG10FormulaEngine'
 import { useG10DualMode } from './composables/useG10DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
@@ -207,6 +226,19 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 provide('g10VersionTrailRef', versionTrailRef)
 provide('g10OpenVersionHistory', openVersionHistory)
 
+/** 审计年度：供 G10-3 与中央调整分录模块同步 */
+const auditYear = computed(() => {
+  const raw =
+    props.htmlData?.project_context?.audit_year
+    ?? props.htmlData?.projectContext?.audit_year
+    ?? props.htmlData?.audit_year
+    ?? runtime?.year?.value
+    ?? null
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) && n >= 1900 ? Math.trunc(n) : null
+})
+
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''
   if (/G10-note-listed|附注披露.*上市|附注.*上市/.test(name)) return '附注上市'
@@ -251,8 +283,24 @@ async function handleG10SaveItems(e: Event): Promise<void> {
   }
 }
 
+function handleG10OfferDisclosurePull(): void {
+  void offerG10DisclosurePull(
+    formData.allResponses.value,
+    formData.debouncedSave,
+    auditYear.value,
+  )
+}
+
 async function reloadAll() {
   await formData.loadAll()
+}
+
+function handleG10Writeback(e: Event): void {
+  const detail = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number; forceToast?: boolean }>).detail
+  if (detail?.accountCode && detail.accountCode !== G10_ACCOUNT_CODE) return
+  const amount = parseNum(detail?.auditedAmount)
+  if (!Number.isFinite(amount)) return
+  void formData.writebackTB(amount, { forceToast: !!detail?.forceToast })
 }
 
 const availableSheets = computed(() => {
@@ -276,12 +324,17 @@ useWorkpaperEntryInjections({
 
 onMounted(async () => {
   window.addEventListener('g10:save-items', handleG10SaveItems)
+  window.addEventListener('g10:writeback-trial-balance', handleG10Writeback)
+  window.addEventListener(G10_OFFER_DISCLOSURE_PULL_EVENT, handleG10OfferDisclosurePull)
   await formData.loadAll()
   isLoading.value = false
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('g10:save-items', handleG10SaveItems)
+  window.removeEventListener('g10:writeback-trial-balance', handleG10Writeback)
+  window.removeEventListener(G10_OFFER_DISCLOSURE_PULL_EVENT, handleG10OfferDisclosurePull)
+  formData.flushPending()
 })
 </script>
 

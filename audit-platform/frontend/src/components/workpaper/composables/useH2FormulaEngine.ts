@@ -1,15 +1,23 @@
 /**
  * H2 在建工程 — 公式引擎（纯函数，无副作用）
  * 科目：1604在建工程（借方/资产类）
- * 核心特征：三角勾稽期末=期初+增加-减少-转固（比H1多"转固"扣减维度）
- * Spec: .kiro/specs/h2-construction-in-progress/
+ * 核心特征：
+ * - H2-1 审定（xlsx）：审定 = 未审 + 账项调整（单列；AJE/RJE 在表单层合并）
+ * - H2-2 明细可保留 AJE+RJE 分列，合计后写入账项调整
+ * - 三角勾稽：期末=期初+增加-减少-转固（在 H2-2 实施）
+ * Spec: .kiro/specs/h2-construction-in-progress/（列结构以 h2_conflict_resolution.md 为准）
  */
 
 // ---------- 基础公式 ----------
 
-/** 审定数 = 未审数 + AJE调整 + RJE重分类 */
-export function calcAuditedAmount(unadj: number, aje: number, rje: number): number {
-  return unadj + aje + rje
+/**
+ * 审定数 = 未审数 + 账项调整
+ *
+ * H2-1（xlsx）：两参数 `calcAuditedAmount(unadj, adjustment)`
+ * H2-2 / 兼容：三参数 `calcAuditedAmount(unadj, aje, rje)`，等价于 adjustment = aje + rje
+ */
+export function calcAuditedAmount(unadj: number, ajeOrAdj: number, rje: number = 0): number {
+  return unadj + ajeOrAdj + rje
 }
 
 /** 资产类期末余额（借方科目1604）：期末 = 期初 + 借方发生 - 贷方发生 */

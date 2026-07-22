@@ -11,7 +11,8 @@
  * - H4-1 审定数 → 附注各子节自动取数
  *
  * 科目：1605工程物资（借方/资产类）
- * 公式：期末=期初+借方-贷方；审定=未审+AJE+RJE
+ * 审定口径（xlsx/冲突决议）：审定 = 未审 + 账项调整（AJE/RJE 在 H4-3 分列，回写 H4-1 时合并）
+ * H4-4/5 vs H4-1 借/贷：以 H4-2 增减汇总为分母，检查表为样本覆盖率（非全量平衡）
  *
  * Spec: .kiro/specs/h4-engineering-materials/
  * Task: 3.2
@@ -42,7 +43,12 @@ export interface H4DetailRowRaw {
   returnAmount?: number    // 退货
   scrapAmount?: number     // 报废
   otherDecrease?: number   // 其他减少
-  endAmount?: number       // 期末余额
+  endAmount?: number       // 期末原值
+  endQty?: number          // 期末数量
+  quantity?: number        // 兼容旧字段（=endQty）
+  bookValueEnd?: number    // 未审净值
+  auditedBookValue?: number
+  impairEnd?: number
 }
 
 /** H4-4 增加检查行原始 JSON 结构 */
@@ -57,8 +63,10 @@ export interface H4AdditionRowRaw {
 export interface H4DisposalRowRaw {
   rowId?: string
   name?: string            // 物资名称
-  amount?: number          // 金额
-  reason?: string          // 减少原因
+  amount?: number          // 金额（兼容旧字段）
+  originalCost?: number    // 原值（致同列）
+  reason?: string          // 减少原因（兼容）
+  disposalMethod?: string  // 减少方式
   h2Ref?: string           // 对应H2编号
 }
 
@@ -69,6 +77,20 @@ export interface H4AdjudicationTotals {
   creditTotal: number        // 贷方发生合计（减少）
   beginTotal: number         // 期初余额合计
   endTotal: number           // 期末余额合计
+}
+
+/** H4-3 → H4-1 调整净额同步 */
+export interface H4AdjustmentSync {
+  totalAje: number
+  totalRje: number
+  /** 1605 原值相关账项净额（借−贷） */
+  emAjeNet: number
+  /** 1605 原值相关报表净额 */
+  emRjeNet: number
+  /** 1605 减值相关账项净额（对减值段：−(借−贷)，即贷方增加准备为正） */
+  impairAjeNet: number
+  impairRjeNet: number
+  rowCount: number
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -200,10 +222,10 @@ export function useH4CrossSheet(allResponses: Ref<Map<string, any>>) {
     const summaryVal = _getResponseNum(allResponses.value, 'H4-5-disposal-total')
     if (summaryVal !== 0) return summaryVal
 
-    // fallback：从行数据聚合
+    // fallback：从行数据聚合（优先 originalCost，兼容旧 amount）
     let total = 0
     for (const row of disposalRows.value) {
-      total += _getNum(row.amount)
+      total += _getNum(row.originalCost ?? row.amount)
     }
     return total
   })
@@ -268,17 +290,26 @@ export function useH4CrossSheet(allResponses: Ref<Map<string, any>>) {
 
   /**
    * 从 H4-1 审定表聚合数据供附注披露自动填充：
-   * - disc_audited: 审定数合计（科目1605期末）
-   * - disc_begin: 期初余额合计
-   * - disc_end: 期末余额合计
-   * - disc_debit: 借方发生合计（本期增加）
-   * - disc_credit: 贷方发生合计（本期减少）
-   * - disc_detail_total: H4-2明细合计
-   * - disc_addition_total: H4-4增加检查合计
-   * - disc_disposal_total: H4-5减少检查合计
+   * - disc_audited: 审定数合计（科目1605期末净值）
+   * - disc_begin / disc_end: 期初/期末审定净值
+   * - disc_debit / disc_credit: 本期增减（来自 H4-2 汇总）
+   * - disc_detail_total / disc_addition_total / disc_disposal_total
+   * - disc_significant_count: 净值变动≥30% 分类数
+   * - disc_significant_change: 重大变动额合计
    */
   const disclosureAutoFill: ComputedRef<Record<string, number>> = computed(() => {
     const adj = adjudicationTotals.value
+    const sigCount = _getResponseNum(allResponses.value, 'H4-1-significant-change-count')
+    let sigChange = 0
+    const sigRaw = allResponses.value.get('H4-1-significant-changes')?.remark
+    if (sigRaw) {
+      try {
+        const arr = typeof sigRaw === 'string' ? JSON.parse(sigRaw) : sigRaw
+        if (Array.isArray(arr)) {
+          for (const it of arr) sigChange += Number(it.auditedChange) || 0
+        }
+      } catch { /* ignore */ }
+    }
     return {
       disc_audited: adj.adjudicatedTotal,
       disc_begin: adj.beginTotal,
@@ -288,6 +319,82 @@ export function useH4CrossSheet(allResponses: Ref<Map<string, any>>) {
       disc_detail_total: detailTotal.value,
       disc_addition_total: additionTotal.value,
       disc_disposal_total: disposalTotal.value,
+      disc_significant_count: sigCount,
+      disc_significant_change: Math.round(sigChange * 100) / 100,
+    }
+  })
+
+  /** 重大变动明细列表（附注说明可直接引用） */
+  const significantChanges = computed(() => {
+    const raw = allResponses.value.get('H4-1-significant-changes')?.remark
+    if (!raw) return [] as Array<{
+      name: string
+      beginAudited: number
+      endAudited: number
+      auditedChange: number
+      auditedChangeRate: number | null
+    }>
+    try {
+      const arr = typeof raw === 'string' ? JSON.parse(raw) : raw
+      return Array.isArray(arr) ? arr : []
+    } catch {
+      return []
+    }
+  })
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 5. adjustmentSync — H4-3 AJE/RJE → H4-1
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * 从 H4-3 汇总：
+   * - emAjeNet/emRjeNet：1605 非减值行借−贷，回写原值段 AJE/RJE
+   * - impairAjeNet/impairRjeNet：1605 减值行 −(借−贷)，回写减值段（贷方补提为正）
+   */
+  const adjustmentSync: ComputedRef<H4AdjustmentSync> = computed(() => {
+    const resp = allResponses.value.get('H4-3-rows')
+    const adjRows = safeParseRows<Record<string, any>>(resp?.remark)
+    let totalAje = 0
+    let totalRje = 0
+    let emAjeNet = 0
+    let emRjeNet = 0
+    let impairAjeNet = 0
+    let impairRjeNet = 0
+
+    for (const row of adjRows) {
+      const debit = _getNum(row.debitAmount ?? row.debit)
+      const credit = _getNum(row.creditAmount ?? row.credit)
+      const netAmount = debit - credit
+      const cat = String(row.category || '').trim()
+      const isRje = cat === '报表调整' || row.entryType === 'RJE'
+      const code = String(row.accountCode || '')
+      const isEm = code === '1605' || code.startsWith('1605')
+      const blob = `${row.accountName || ''}${row.description || ''}${row.reportItem || ''}`
+      const isImpair = /减值/.test(blob)
+
+      if (isRje) {
+        totalRje += netAmount
+        if (isEm) {
+          if (isImpair) impairRjeNet += -netAmount
+          else emRjeNet += netAmount
+        }
+      } else {
+        totalAje += netAmount
+        if (isEm) {
+          if (isImpair) impairAjeNet += -netAmount
+          else emAjeNet += netAmount
+        }
+      }
+    }
+
+    return {
+      totalAje,
+      totalRje,
+      emAjeNet,
+      emRjeNet,
+      impairAjeNet,
+      impairRjeNet,
+      rowCount: adjRows.length,
     }
   })
 
@@ -304,6 +411,9 @@ export function useH4CrossSheet(allResponses: Ref<Map<string, any>>) {
     disposalVsAdjudication,
     // H4-1 → 附注自动取数
     disclosureAutoFill,
+    significantChanges,
+    // H4-3 → H4-1
+    adjustmentSync,
     // 中间computed（供子组件直接使用）
     adjudicationTotals,
     detailTotal,

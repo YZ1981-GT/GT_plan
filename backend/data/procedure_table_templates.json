@@ -1688,7 +1688,7 @@
         },
         {
           "seq": 2,
-          "content": "对于咨询的重大会计或审计事项咨询，确定咨询报告是否包括在审计工作底稿中。",
+          "content": "对于咨询的重大会计或审计事项咨询，确定咨询报告是否包括在审计工作底稿中；如有咨询结论，同步记录执行情况（A17-3-1）。",
           "ref_index": "A17-3",
           "auto_data_source": null,
           "applicable_default": "yes",
@@ -1708,8 +1708,8 @@
         },
         {
           "seq": 4,
-          "content": "确定在审计过程中识别的重大职业判断以及需合伙人关注事项是否包括在重大事项概要汇总表中：\n（1）引起特别风险的事项；\n（2）已更正或未更正的错报；\n（3）值得关注的缺陷和其他控制缺陷；\n（4）重大职业判断；\n（5）业务咨询和意见分歧；\n（6）导致注册会计师难以实施必要审计程序的情形；\n（7）可能导致出具非无保留意见审计报告的事项；\n（8）独立性威胁或利益冲突。",
-          "ref_index": "A17-2",
+          "content": "确定在审计过程中识别的重大职业判断以及需合伙人关注事项是否包括在重大事项概要汇总表中，并完成关键审计事项（KAM）专项底稿（上市实体或法规要求披露 KAM 时适用）：\n（1）引起特别风险的事项；\n（2）已更正或未更正的错报；\n（3）值得关注的缺陷和其他控制缺陷；\n（4）重大职业判断；\n（5）业务咨询和意见分歧；\n（6）导致注册会计师难以实施必要审计程序的情形；\n（7）可能导致出具非无保留意见审计报告的事项；\n（8）独立性威胁或利益冲突。",
+          "ref_index": "A17-2-1",
           "auto_data_source": null,
           "applicable_default": "yes",
           "applicable_categories": [
@@ -1720,6 +1720,26 @@
           "seq": 5,
           "content": "召开项目组总结会并将会议纪要记录于工作底稿。",
           "ref_index": "A17-6",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "applicable_categories": [
+            "A"
+          ]
+        },
+        {
+          "seq": 6,
+          "content": "完成审计工作完成核对表（按业务类型选用 A17-5-1~5-5：A 类财报必做 A17-5-1；整合审计追加 A17-5-2；IPO 追加 A17-5-3；新三板追加 A17-5-4；函证程序推荐 A17-5-5），确认所有「否」项已处理完毕。",
+          "ref_index": "A17-5",
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "applicable_categories": [
+            "A"
+          ]
+        },
+        {
+          "seq": 7,
+          "content": "审计项目团队成员签署独立性声明书（完成阶段）；专业技术委员会审核委员使用 A17-7A。签署日期不晚于审计报告日。",
+          "ref_index": "A17-7",
           "auto_data_source": null,
           "applicable_default": "yes",
           "applicable_categories": [

@@ -117,5 +117,4 @@ export function useG9DualMode(options: {
   }
 }
 
-export { useG9DualMode as useG9OthNonDualMode }
 export default useG9DualMode

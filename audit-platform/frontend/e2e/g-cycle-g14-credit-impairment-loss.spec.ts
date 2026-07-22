@@ -168,8 +168,37 @@ test.describe('G14 导入 round-trip（API）', () => {
   }
 })
 
-test.describe('G14 — 附注披露行数', () => {
-  test('上市 9+合计=10 行', async ({ page, request }) => {
+test.describe('G14 — 底稿目录与审定状态条', () => {
+  test('底稿目录显示编制进度与 10 类减值来源提示', async ({ page, request }) => {
+    test.setTimeout(90_000)
+    await loginAs(page)
+    const token = await getToken(request)
+    const wpResult = await findWorkpaper(request, token, 'G14', PROJECT_ID)
+    test.skip(!wpResult.exists, 'G14 底稿不存在')
+    await page.goto(`/projects/${PROJECT_ID}/workpapers/${wpResult.wpId}/edit`)
+    await page.waitForTimeout(4_000)
+    await clickWorkpaperSheetTab(page, '底稿目录')
+    await expect(page.getByTestId('g14-directory')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByText(/编制进度/)).toBeVisible()
+    await expect(page.getByText(/10 类减值来源/)).toBeVisible()
+  })
+
+  test('G14-1 显示状态条与试算勾稽区', async ({ page, request }) => {
+    test.setTimeout(90_000)
+    await loginAs(page)
+    const token = await getToken(request)
+    const wpResult = await findWorkpaper(request, token, 'G14', PROJECT_ID)
+    test.skip(!wpResult.exists, 'G14 底稿不存在')
+    await page.goto(`/projects/${PROJECT_ID}/workpapers/${wpResult.wpId}/edit`)
+    await page.waitForTimeout(4_000)
+    await clickWorkpaperSheetTab(page, 'G14-1')
+    await expect(page.getByTestId('g14-adj-status-strip')).toBeVisible({ timeout: 15_000 })
+    await expect(page.getByTestId('g14-adj-recon')).toBeVisible()
+    await expect(page.getByTestId('g14-adj-publish')).toBeVisible()
+  })
+})
+
+  test('上市 10+合计=11 行', async ({ page, request }) => {
     test.setTimeout(90_000)
     await loginAs(page)
     const token = await getToken(request)
@@ -178,7 +207,7 @@ test.describe('G14 — 附注披露行数', () => {
     await page.goto(`/projects/${PROJECT_ID}/workpapers/${wpResult.wpId}/edit`)
     await page.waitForTimeout(4_000)
     await clickDisclosureSheetTab(page, 'listed')
-    await expectDisclosureTableRows(page, 'g14-disclosure-listed-table', 10)
+    await expectDisclosureTableRows(page, 'g14-disclosure-listed-table', 11)
   })
 
   test('国企 4+合计=5 行', async ({ page, request }) => {
@@ -195,8 +224,8 @@ test.describe('G14 — 附注披露行数', () => {
   })
 })
 
-test.describe('G14-2 明细 13 列', () => {
-  test('固定 9 行 + 合计；两 Tab 列头', async ({ page, request }) => {
+test.describe('G14-2 明细全表勾稽', () => {
+  test('固定 10 行 + 合计；全表 / 分 Tab 列头', async ({ page, request }) => {
     test.setTimeout(90_000)
     await loginAs(page)
     const token = await getToken(request)
@@ -205,13 +234,21 @@ test.describe('G14-2 明细 13 列', () => {
     await page.goto(`/projects/${PROJECT_ID}/workpapers/${wpResult.wpId}/edit`)
     await page.waitForTimeout(4_000)
     await clickWorkpaperSheetTab(page, 'G14-2')
-    await expectDisclosureTableRows(page, 'g14-detail-table', 10)
+    await expectDisclosureTableRows(page, 'g14-detail-table', 11)
+    // 默认全表：损益侧 + 准备滚动同屏
+    await expectDetailColumnHeaders(page, 'g14-detail-table', [
+      '项目', '未审数', '调整数', '审定数', '对应科目',
+      '期初余额', '本期计提', '本期转回', '本期转销', '其他变动', '期末余额', '试算期末', '计入损益', '核对',
+    ])
+    await expect(page.getByText('合同资产减值损失')).toBeVisible()
+    await expect(page.getByTestId('g14-oci-tag').first()).toBeVisible()
+    await clickDetailSegmentTab(page, 'g14-detail-tab', '本期数')
     await expectDetailColumnHeaders(page, 'g14-detail-table', [
       '项目', '未审数', '调整数', '审定数', '对应科目', 'ECL来源', '索引号',
     ])
     await clickDetailSegmentTab(page, 'g14-detail-tab', '减值准备')
     await expectDetailColumnHeaders(page, 'g14-detail-table', [
-      '期初余额', '本期计提', '本期转回', '本期转销', '期末余额', '计入损益', '核对',
+      '期初余额', '本期计提', '本期转回', '本期转销', '其他变动', '期末余额', '试算期末', '计入损益', '核对',
     ])
   })
 })

@@ -5,7 +5,7 @@
  *
  * 验证：
  * 1. buildRequestBody 构造正确 API payload
- * 2. formatAmount 格式化数字（千分位 + 2 位小数）
+ * 2. displayPrefs.fmt 格式化数字（千分位 + 2 位小数）
  * 3. formatChange 添加 +/- 前缀
  * 4. dialog emits update:visible on close
  * 5. "采纳并写回" 按钮 disabled when no targetSheet
@@ -15,6 +15,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import EquityMovementDialog from '../EquityMovementDialog.vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 // Mock element-plus
 vi.mock('element-plus', () => ({
@@ -146,14 +147,10 @@ describe('EquityMovementDialog — buildRequestBody 逻辑', () => {
   })
 })
 
-describe('EquityMovementDialog — formatAmount', () => {
+describe('EquityMovementDialog — formatAmount (displayPrefs.fmt)', () => {
   it('正数格式化为千分位 + 2 位小数', () => {
-    const wrapper = mount(EquityMovementDialog, {
-      props: defaultProps,
-      global: globalStubs,
-    })
-    const vm = wrapper.vm as any
-    const result = vm.formatAmount('5000000.00')
+    const prefs = useDisplayPrefsStore()
+    const result = prefs.fmt('5000000.00')
     // 5,000,000.00 (zh-CN locale)
     expect(result).toContain('5')
     expect(result).toContain('000')
@@ -161,32 +158,20 @@ describe('EquityMovementDialog — formatAmount', () => {
   })
 
   it('零值格式化正确', () => {
-    const wrapper = mount(EquityMovementDialog, {
-      props: defaultProps,
-      global: globalStubs,
-    })
-    const vm = wrapper.vm as any
-    expect(vm.formatAmount('0')).toBe('0.00')
-    expect(vm.formatAmount(0)).toBe('0.00')
+    const prefs = useDisplayPrefsStore()
+    expect(prefs.fmt('0')).toBe('0.00')
+    expect(prefs.fmt(0)).toBe('0.00')
   })
 
-  it('非数字字符串原样返回', () => {
-    const wrapper = mount(EquityMovementDialog, {
-      props: defaultProps,
-      global: globalStubs,
-    })
-    const vm = wrapper.vm as any
-    expect(vm.formatAmount('N/A')).toBe('N/A')
-    expect(vm.formatAmount('--')).toBe('--')
+  it('非数字字符串返回 —', () => {
+    const prefs = useDisplayPrefsStore()
+    expect(prefs.fmt('N/A')).toBe('—')
+    expect(prefs.fmt('--')).toBe('—')
   })
 
   it('负数格式化正确', () => {
-    const wrapper = mount(EquityMovementDialog, {
-      props: defaultProps,
-      global: globalStubs,
-    })
-    const vm = wrapper.vm as any
-    const result = vm.formatAmount('-1234567.89')
+    const prefs = useDisplayPrefsStore()
+    const result = prefs.fmt('-1234567.89')
     expect(result).toContain('1,234,567.89') // negative sign + formatted
   })
 })

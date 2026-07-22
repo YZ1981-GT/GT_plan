@@ -1,17 +1,21 @@
 <template>
   <div class="h6-tab-detail">
-    <!-- 审计目标 -->
+    <!-- 审计目标（对齐致同模板三认定） -->
     <el-alert
       type="info"
       :closable="false"
       show-icon
       class="objective-alert"
-      title="审计目标：核实固定资产清理各项目原值、累计折旧及净损益计算准确，确认清理事项真实、结转及时，为 1606 过渡科目期末应清零及 H10 处置损益提供审定依据。"
+      title="审计目标：核实固定资产清理存在性与记录恰当性；确认应记清理均已入账且披露充分；验证金额准确、结转及时，关注长期挂账。"
     />
 
     <!-- 方法论上下文 -->
     <div class="methodology-context">
-      <p>H6-2明细表：逐项登记每笔固定资产清理项目的全过程。25列拆分为2区段Tab展示（基础信息/清理信息）。核心公式：净值=原值-累计折旧；净损益=处置收入-净值-清理费用-税费。过渡科目期末余额应为0。</p>
+      <p>
+        H6-2 明细表：逐项登记清理全过程 + 1606 余额变动（期初/增减/期末×未审·调整·审定）。
+        净值=原值−累计折旧−减值准备；净损益=处置收入−净值−清理费用−税费。
+        过渡科目期末应清零；转入清理超 1 年须说明进展（挂账关注）。
+      </p>
     </div>
 
     <!-- Section Title -->
@@ -24,10 +28,20 @@
 
     <!-- 工具栏：底稿索引 + 行数 -->
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <el-button
+          v-if="!props.isReadonly && rows.length"
+          size="small"
+          plain
+          @click="handleSyncBalanceFromNbv"
+        >
+          按净值同步余额增减
+        </el-button>
+      </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:H6-2" :context-project-id="props.projectId" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+        <el-tag size="small" type="info">截止日 {{ asOfDate }}</el-tag>
       </div>
     </div>
 
@@ -37,13 +51,18 @@
       <el-tag v-if="statusSummary.clearing > 0" size="small" type="warning">清理中 {{ statusSummary.clearing }}</el-tag>
       <el-tag v-if="statusSummary.completed > 0" size="small" type="success">已完成 {{ statusSummary.completed }}</el-tag>
       <el-tag v-if="statusSummary.transferred > 0" size="small" type="primary">已结转 {{ statusSummary.transferred }}</el-tag>
-      <!-- 已结转但净损益合计≠0警告 -->
-      <el-tag v-if="hasTransferWarning" size="small" type="danger">
-        ⚠ 存在已结转项目但净损益异常
+      <el-tag v-if="statusSummary.uncleared > 0" size="small" type="warning">
+        未结转 {{ statusSummary.uncleared }}
+      </el-tag>
+      <el-tag v-if="statusSummary.overOneYearUncleared > 0" size="small" type="danger">
+        超1年未结转 {{ statusSummary.overOneYearUncleared }}
+      </el-tag>
+      <el-tag v-if="hasCriticalWarning" size="small" type="danger">
+        ⚠ 存在挂账/结转缺陷，请关注
       </el-tag>
     </div>
 
-    <!-- 2区段Tab (el-segmented) -->
+    <!-- 3区段Tab -->
     <el-segmented v-model="activeTab" :options="segmentOptions" size="small" class="segment-bar" />
 
     <!-- 基础信息区段 -->
@@ -56,6 +75,7 @@
       class="detail-table"
       row-key="rowId"
       max-height="480"
+      :row-class-name="rowClassName"
     >
       <el-table-column type="index" label="序号" width="55" align="center" />
       <el-table-column prop="assetName" label="资产名称" min-width="140">
@@ -81,29 +101,187 @@
           <span v-else class="amt-cell">{{ fmtAmt(row.accumulatedDepreciation) }}</span>
         </template>
       </el-table-column>
+      <el-table-column prop="impairmentProvision" label="减值准备" min-width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!props.isReadonly" v-model="row.impairmentProvision" :controls="false"
+            size="small" class="amt-input"
+            @change="updateCell(row.rowId, 'impairmentProvision', $event)" />
+          <span v-else class="amt-cell">{{ fmtAmt(row.impairmentProvision) }}</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="netBookValue" label="净值" min-width="110" align="right">
         <template #default="{ row }">
-          <span class="formula-cell" title="净值 = 原值 - 累计折旧">{{ fmtAmt(row.netBookValue) }}</span>
+          <span class="formula-cell" title="净值 = 原值 − 累计折旧 − 减值准备">{{ fmtAmt(row.netBookValue) }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="disposalReason" label="清理原因" min-width="120">
+      <el-table-column prop="disposalReason" label="清理原因" min-width="140">
         <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.disposalReason" size="small"
-            @change="updateCell(row.rowId, 'disposalReason', $event)" />
-          <span v-else>{{ row.disposalReason }}</span>
+          <el-select
+            v-if="!props.isReadonly"
+            v-model="row.disposalReason"
+            size="small"
+            clearable
+            filterable
+            allow-create
+            placeholder="选择或输入"
+            @change="updateCell(row.rowId, 'disposalReason', $event)"
+          >
+            <el-option v-for="opt in reasonOptions" :key="opt" :value="opt" :label="opt" />
+          </el-select>
+          <span v-else>{{ row.disposalReason || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="startDate" label="开始日期" min-width="120">
+      <el-table-column prop="startDate" label="转入清理时间" min-width="130">
         <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.startDate" size="small"
-            placeholder="YYYY-MM-DD"
-            @change="updateCell(row.rowId, 'startDate', $event)" />
+          <el-date-picker
+            v-if="!props.isReadonly"
+            v-model="row.startDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            size="small"
+            style="width: 100%"
+            @change="updateCell(row.rowId, 'startDate', $event)"
+          />
           <span v-else>{{ row.startDate || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="" width="45" v-if="!props.isReadonly">
         <template #default="{ row }">
           <el-button size="small" type="danger" link @click="handleDeleteRow(row.rowId)">✕</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <!-- 余额变动区段（对齐 Excel H6-2 B–L） -->
+    <el-table
+      v-if="activeTab === 'balance'"
+      :data="rows"
+      border
+      stripe
+      size="small"
+      class="detail-table"
+      row-key="rowId"
+      max-height="480"
+      :row-class-name="rowClassName"
+    >
+      <el-table-column type="index" label="序号" width="55" align="center" />
+      <el-table-column prop="assetName" label="项目" min-width="120" fixed />
+      <el-table-column label="未审数" align="center">
+        <el-table-column label="期初数" min-width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!props.isReadonly"
+              v-model="row.beginUnadjusted"
+              :controls="false"
+              size="small"
+              class="amt-input"
+              @change="updateCell(row.rowId, 'beginUnadjusted', $event)"
+            />
+            <span v-else class="amt-cell">{{ fmtAmt(row.beginUnadjusted) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期增加" min-width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!props.isReadonly"
+              v-model="row.periodIncrease"
+              :controls="false"
+              size="small"
+              class="amt-input"
+              @change="updateCell(row.rowId, 'periodIncrease', $event)"
+            />
+            <span v-else class="amt-cell">{{ fmtAmt(row.periodIncrease) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期减少" min-width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!props.isReadonly"
+              v-model="row.periodDecrease"
+              :controls="false"
+              size="small"
+              class="amt-input"
+              @change="updateCell(row.rowId, 'periodDecrease', $event)"
+            />
+            <span v-else class="amt-cell">{{ fmtAmt(row.periodDecrease) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末数" min-width="100" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell" title="期末=期初+增加−减少">{{ fmtAmt(row.endUnadjusted) }}</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+      <el-table-column label="期初调整" min-width="100" align="right">
+        <template #default="{ row }">
+          <el-input-number
+            v-if="!props.isReadonly"
+            v-model="row.beginAdjustment"
+            :controls="false"
+            size="small"
+            class="amt-input"
+            @change="updateCell(row.rowId, 'beginAdjustment', $event)"
+          />
+          <span v-else class="amt-cell">{{ fmtAmt(row.beginAdjustment) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="账项调整" align="center">
+        <el-table-column label="本期增加" min-width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!props.isReadonly"
+              v-model="row.ajeIncrease"
+              :controls="false"
+              size="small"
+              class="amt-input"
+              @change="updateCell(row.rowId, 'ajeIncrease', $event)"
+            />
+            <span v-else class="amt-cell">{{ fmtAmt(row.ajeIncrease) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期减少" min-width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!props.isReadonly"
+              v-model="row.ajeDecrease"
+              :controls="false"
+              size="small"
+              class="amt-input"
+              @change="updateCell(row.rowId, 'ajeDecrease', $event)"
+            />
+            <span v-else class="amt-cell">{{ fmtAmt(row.ajeDecrease) }}</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+      <el-table-column label="审定数" align="center">
+        <el-table-column label="期初数" min-width="100" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell" title="审定期初=未审期初+期初调整">{{ fmtAmt(row.beginAudited) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期增加" min-width="100" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ fmtAmt(row.increaseAudited) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期减少" min-width="100" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ fmtAmt(row.decreaseAudited) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末数" min-width="100" align="right">
+          <template #default="{ row }">
+            <span
+              class="formula-cell"
+              :class="{ 'error-amount': row.status === '已结转' && Math.abs(row.endAudited) > 0.01 }"
+              title="审定期末=审定期初+审定增加−审定减少"
+            >{{ fmtAmt(row.endAudited) }}</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+      <el-table-column prop="status" label="状态" width="90" align="center">
+        <template #default="{ row }">
+          <el-tag :type="statusTagType(row.status)" size="small">{{ row.status }}</el-tag>
         </template>
       </el-table-column>
     </el-table>
@@ -118,6 +296,7 @@
       class="detail-table"
       row-key="rowId"
       max-height="480"
+      :row-class-name="rowClassName"
     >
       <el-table-column type="index" label="序号" width="55" align="center" />
       <el-table-column prop="assetName" label="资产名称" min-width="120" fixed />
@@ -147,23 +326,39 @@
       </el-table-column>
       <el-table-column prop="gainLoss" label="净损益" min-width="110" align="right">
         <template #default="{ row }">
-          <span class="formula-cell" title="净损益 = 处置收入 - 净值 - 清理费用 - 税费">
+          <span class="formula-cell" title="净损益 = 处置收入 − 净值 − 清理费用 − 税费">
             {{ fmtAmt(row.gainLoss) }}
           </span>
         </template>
       </el-table-column>
-      <el-table-column prop="transferAccount" label="结转科目" min-width="110">
+      <el-table-column prop="transferAccount" label="结转科目" min-width="140">
         <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.transferAccount" size="small"
-            @change="updateCell(row.rowId, 'transferAccount', $event)" />
+          <el-select
+            v-if="!props.isReadonly"
+            v-model="row.transferAccount"
+            size="small"
+            clearable
+            filterable
+            allow-create
+            placeholder="选择或输入"
+            @change="updateCell(row.rowId, 'transferAccount', $event)"
+          >
+            <el-option v-for="opt in transferAccountOptions" :key="opt" :value="opt" :label="opt" />
+          </el-select>
           <span v-else>{{ row.transferAccount || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="completionDate" label="完成日期" min-width="120">
+      <el-table-column prop="completionDate" label="完成日期" min-width="130">
         <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.completionDate" size="small"
-            placeholder="YYYY-MM-DD"
-            @change="updateCell(row.rowId, 'completionDate', $event)" />
+          <el-date-picker
+            v-if="!props.isReadonly"
+            v-model="row.completionDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            size="small"
+            style="width: 100%"
+            @change="updateCell(row.rowId, 'completionDate', $event)"
+          />
           <span v-else>{{ row.completionDate || '-' }}</span>
         </template>
       </el-table-column>
@@ -198,11 +393,82 @@
           <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
-      <!-- 已结转但期末余额≠0红色警告 -->
-      <el-table-column label="警告" width="60" align="center">
+      <el-table-column label="警告" width="70" align="center">
         <template #default="{ row }">
-          <el-tooltip v-if="row.status === '已结转' && row.gainLoss !== 0"
-            content="已结转但净损益≠0，请检查" placement="top">
+          <el-tooltip
+            v-if="criticalWarnings(row).length"
+            :content="criticalWarnings(row).map(w => w.message).join('；')"
+            placement="top"
+          >
+            <span class="warning-icon">⚠</span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
+      <el-table-column label="" width="45" v-if="!props.isReadonly">
+        <template #default="{ row }">
+          <el-button size="small" type="danger" link @click="handleDeleteRow(row.rowId)">✕</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <!-- 挂账关注区段（对齐 xlsx：超1年进展 / 备注） -->
+    <el-table
+      v-if="activeTab === 'aging'"
+      :data="rows"
+      border
+      stripe
+      size="small"
+      class="detail-table"
+      row-key="rowId"
+      max-height="480"
+      :row-class-name="rowClassName"
+    >
+      <el-table-column type="index" label="序号" width="55" align="center" />
+      <el-table-column prop="assetName" label="资产名称" min-width="120" fixed />
+      <el-table-column prop="startDate" label="转入清理时间" min-width="120" />
+      <el-table-column label="是否超1年" width="100" align="center">
+        <template #default="{ row }">
+          <el-tag v-if="isRowOverOneYear(row)" size="small" type="danger">是</el-tag>
+          <el-tag v-else size="small" type="info">否</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="status" label="状态" width="90" align="center">
+        <template #default="{ row }">
+          <el-tag :type="statusTagType(row.status)" size="small">{{ row.status }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column prop="overOneYearProgress" label="超1年清理进展情况" min-width="220">
+        <template #default="{ row }">
+          <el-input
+            v-if="!props.isReadonly"
+            v-model="row.overOneYearProgress"
+            type="textarea"
+            :autosize="{ minRows: 1, maxRows: 3 }"
+            size="small"
+            :placeholder="isRowOverOneYear(row) && row.status !== '已结转' ? '必填：说明长期挂账原因与预计结转安排' : '可选'"
+            @change="updateCell(row.rowId, 'overOneYearProgress', $event)"
+          />
+          <span v-else>{{ row.overOneYearProgress || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="remarks" label="备注" min-width="160">
+        <template #default="{ row }">
+          <el-input
+            v-if="!props.isReadonly"
+            v-model="row.remarks"
+            size="small"
+            @change="updateCell(row.rowId, 'remarks', $event)"
+          />
+          <span v-else>{{ row.remarks || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="警告" width="70" align="center">
+        <template #default="{ row }">
+          <el-tooltip
+            v-if="criticalWarnings(row).length"
+            :content="criticalWarnings(row).map(w => w.message).join('；')"
+            placement="top"
+          >
             <span class="warning-icon">⚠</span>
           </el-tooltip>
         </template>
@@ -226,8 +492,12 @@
           <span class="st-value">{{ fmtAmt(subtotalRow.accumulatedDepreciation) }}</span>
         </div>
         <div class="subtotal-item">
+          <span class="st-label">减值准备合计：</span>
+          <span class="st-value">{{ fmtAmt(subtotalRow.impairmentProvision) }}</span>
+        </div>
+        <div class="subtotal-item">
           <span class="st-label">净值合计：</span>
-          <span class="st-value formula-cell" title="Σ净值 = Σ原值 - Σ累计折旧">{{ fmtAmt(subtotalRow.netBookValue) }}</span>
+          <span class="st-value formula-cell" title="Σ净值 = Σ原值 − Σ累计折旧 − Σ减值">{{ fmtAmt(subtotalRow.netBookValue) }}</span>
         </div>
         <div class="subtotal-item">
           <span class="st-label">处置收入合计：</span>
@@ -239,7 +509,19 @@
         </div>
         <div class="subtotal-item">
           <span class="st-label">净损益合计：</span>
-          <span class="st-value formula-cell" title="Σ净损益 = Σ处置收入 - Σ净值 - Σ清理费用 - Σ税费">{{ fmtAmt(subtotalRow.gainLoss) }}</span>
+          <span class="st-value formula-cell" title="Σ净损益 = Σ处置收入 − Σ净值 − Σ清理费用 − Σ税费">{{ fmtAmt(subtotalRow.gainLoss) }}</span>
+        </div>
+        <div class="subtotal-item">
+          <span class="st-label">未审期初合计：</span>
+          <span class="st-value">{{ fmtAmt(subtotalRow.beginUnadjusted) }}</span>
+        </div>
+        <div class="subtotal-item">
+          <span class="st-label">未审期末合计：</span>
+          <span class="st-value formula-cell">{{ fmtAmt(subtotalRow.endUnadjusted) }}</span>
+        </div>
+        <div class="subtotal-item">
+          <span class="st-label">审定期末合计：</span>
+          <span class="st-value formula-cell" title="供 H6-1 回填 / 过渡科目校验">{{ fmtAmt(subtotalRow.endAudited) }}</span>
         </div>
       </div>
     </el-card>
@@ -270,7 +552,8 @@
         </div>
       </template>
       <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5, maxRows: 10 }"
-        placeholder="请填写审计说明..." :disabled="props.isReadonly"
+        placeholder="请填写审计说明（含超1年挂账原因、结转时点、与H6-1勾稽差异等）..."
+        :disabled="props.isReadonly"
         @blur="saveAuditNote" />
     </el-card>
 
@@ -293,14 +576,13 @@
     <details class="edit-tips">
       <summary>编制提示</summary>
       <ul>
-        <li>25列宽表拆分为2区段（基础信息/清理信息），切换后行数据同步不丢失</li>
-        <li>核心公式：净值=原值-累计折旧；净损益=处置收入-净值-清理费用-税费</li>
-        <li>状态字段选项：清理中→已完成→已结转（依次流转）</li>
-        <li>已结转状态但净损益≠0时触发红色警告，需检查是否有遗留差异</li>
-        <li>联动H1编号：填写后可跳转至H1-8减少检查对应行</li>
-        <li>联动H10编号：填写后可跳转至H10资产处置损益明细对应行</li>
-        <li>合计行自动汇总所有项目，与H6-1审定表交叉验证</li>
-        <li>公式列：虚线下划线+鼠标悬停显示公式来源（不可编辑）</li>
+        <li>编制思路：存在性/完整性/准确性 → 逐项清理过程 → 余额变动勾稽 → 挂账关注 → 说明与结论</li>
+        <li>四区段：基础信息 / 余额变动 / 清理结转 / 挂账关注；切换后行数据不丢失</li>
+        <li>余额变动对齐 Excel：期末未审=期初+增加−减少；审定期初=未审期初+期初调整；供 H6-1 回填</li>
+        <li>净值=原值−累计折旧−减值准备；净损益=处置收入−净值−清理费用−税费（结转后净损益≠0属正常）</li>
+        <li>状态：清理中→已完成→已结转；已结转须填写结转科目（资产处置损益/营业外收支等）</li>
+        <li>超1年未结转且无进展说明 → 红色警告（致同模板核心关注点）</li>
+        <li>联动H1/H10编号可追溯处置来源与损益去向；合计行与H6-1交叉验证</li>
       </ul>
     </details>
   </div>
@@ -308,27 +590,19 @@
 
 <script setup lang="ts">
 /**
- * H6TabDetail.vue — H6-2 明细表（25列2区块+净损益计算+GtIndexChip+动态行+导入导出）
+ * H6TabDetail.vue — H6-2 明细表
  *
- * 2区段Tab (el-segmented):
- *   基础信息: 序号/资产名称/原值/累计折旧/净值(公式)/清理原因/开始日期
- *   清理信息: 处置收入/清理费用/税费/净损益(公式)/结转科目/完成日期/状态/联动H1编号/联动H10编号
- *
- * 功能：
- * - useH6Detail composable (公式自动计算+动态行+合计行)
- * - useH6ImportExport composable (三级导入导出)
- * - GtIndexChip (H1-8减少检查 / H10明细跳转)
- * - 状态选择：清理中/已完成/已结转 (el-select)
- * - 已结转且期末余额≠0→红色警告
- * - 新增行必须先弹ElMessageBox.prompt输入资产名称
- *
- * Spec: .kiro/specs/h6-asset-disposal-clearing/
- * Task: 4.3
- * Requirements: 3.1-3.7
+ * 区段：基础信息 | 余额变动 | 清理结转 | 挂账关注
+ * 改进：Excel 期初/增减/调整列、减值入净值、原因枚举、超1年进展
  */
 import { ref, computed, inject, toRef, onMounted } from 'vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
-import { useH6Detail, type H6DetailTab } from '../../composables/useH6Detail'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  useH6Detail,
+  H6_DISPOSAL_REASON_OPTIONS,
+  type H6DetailRow,
+  type H6DetailRowWarning,
+} from '../../composables/useH6Detail'
 import { useH6ImportExport } from '../../composables/useH6ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -339,21 +613,21 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const emit = defineEmits<{ (e: 'navigate-sheet', sheetName: string): void }>()
+defineEmits<{ (e: 'navigate-sheet', sheetName: string): void }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
-// 父入口提供的持久化函数（更新共享 Map + 防抖 PUT checklist-responses）。Bug C 修复：此前仅写内存 Map。
 const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', (itemId, value) => {
   const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
   props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
 })
 
-// ─── Composable ──────────────────────────────────────────────────────────────
 const allResponsesRef = computed(() => props.allResponses)
 
 const {
-  rows, activeTab, subtotalRow, statusSummary,
-  addRow, deleteRow, updateCell, setActiveTab, save, createFromH1Disposal,
+  rows, activeTab, asOfDate, subtotalRow, statusSummary, hasCriticalWarning,
+  addRow, deleteRow, updateCell, save: _save, createFromH1Disposal,
+  syncBalanceFromNetBook,
+  rowWarnings, isRowOverOneYear,
 } = useH6Detail({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
@@ -361,13 +635,10 @@ const {
   onSave: (itemId: string, value: any) => saveResponse(itemId, value),
 })
 
-// ─── 注册 createFromH1Disposal 到主入口（EventBus联动） ──────────────────────
 const registerDetailCreateFn = inject<(fn: (payload: any) => void) => void>('registerDetailCreateFn', () => {})
 
 onMounted(() => {
-  // 注册创建函数到主入口，供EventBus subscription使用
   registerDetailCreateFn(createFromH1Disposal)
-  // 加载审计说明/结论
   const noteItem = props.allResponses.get('H6-2-note')
   if (noteItem?.remark) auditNote.value = noteItem.remark
   const concItem = props.allResponses.get('H6-2-conclusion')
@@ -377,23 +648,38 @@ onMounted(() => {
 const importExport = useH6ImportExport({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
-  onImported: () => {
-    // Reload data from allResponses after import
-  },
+  onImported: () => {},
 })
 
-// ─── Segment Options ─────────────────────────────────────────────────────────
 const segmentOptions = [
   { label: '基础信息', value: 'basic' },
-  { label: '清理信息', value: 'disposal' },
+  { label: '余额变动', value: 'balance' },
+  { label: '清理结转', value: 'disposal' },
+  { label: '挂账关注', value: 'aging' },
 ]
 
-// ─── 已结转+净损益≠0警告 ─────────────────────────────────────────────────────
-const hasTransferWarning = computed(() => {
-  return rows.value.some(r => r.status === '已结转' && r.gainLoss !== 0)
-})
+const reasonOptions = [...H6_DISPOSAL_REASON_OPTIONS]
 
-// ─── Audit Note / Conclusion ─────────────────────────────────────────────────
+/** 结转科目常见选项（CAS30：正常处置→资产处置损益；非正常→营业外） */
+const transferAccountOptions = [
+  '资产处置损益',
+  '营业外收入',
+  '营业外支出——处置非流动资产损失',
+  '营业外支出——非常损失',
+]
+
+function criticalWarnings(row: H6DetailRow): H6DetailRowWarning[] {
+  return rowWarnings(row).filter(
+    w => w.kind === 'over_one_year_no_progress' || w.kind === 'transferred_missing_account',
+  )
+}
+
+function rowClassName({ row }: { row: H6DetailRow }): string {
+  if (isRowOverOneYear(row) && row.status !== '已结转') return 'row-aging-risk'
+  if (row.status !== '已结转') return 'row-uncleared'
+  return ''
+}
+
 const auditNote = ref('')
 function saveAuditNote() {
   saveResponse('H6-2-note', auditNote.value)
@@ -402,8 +688,6 @@ const auditConclusion = ref('')
 function saveAuditConclusion() {
   saveResponse('H6-2-conclusion', auditConclusion.value)
 }
-
-// ─── Actions ─────────────────────────────────────────────────────────────────
 
 async function handleAddRow() {
   try {
@@ -415,6 +699,11 @@ async function handleAddRow() {
     })
     if (value) addRow(value)
   } catch { /* cancelled */ }
+}
+
+function handleSyncBalanceFromNbv() {
+  const { applied } = syncBalanceFromNetBook()
+  ElMessage.success(`已按净值同步 ${applied} 行余额增减`)
 }
 
 async function handleDeleteRow(rowId: string) {
@@ -447,7 +736,6 @@ function openReview(id: string) {
   openReviewDialog(id)
 }
 
-// ─── Status Tag Type ─────────────────────────────────────────────────────────
 function statusTagType(status: string): '' | 'success' | 'warning' | 'info' | 'danger' {
   switch (status) {
     case '清理中': return 'warning'
@@ -458,9 +746,8 @@ function statusTagType(status: string): '' | 'success' | 'warning' | 'info' | 'd
 }
 
 /**
- * 状态变更拦截：当明细行状态变为"已结转"时，
- * 发布 'disposal:completed' CustomEvent 通知 H10 记录处置损益。
- * Requirement 5.4: WHEN H6清理完成结转时, THE H6 SHALL publish 'disposal:completed'事件通知H10
+ * 状态变更为「已结转」时发布 disposal:completed → H10
+ * 注：净损益≠0 属正常（即结转到损益的金额），不告警
  */
 function handleStatusChange(rowId: string, newStatus: string): void {
   updateCell(rowId, 'status', newStatus)
@@ -468,7 +755,6 @@ function handleStatusChange(rowId: string, newStatus: string): void {
   if (newStatus === '已结转') {
     const row = rows.value.find(r => r.rowId === rowId)
     if (row) {
-      // 发布 disposal:completed → H10 资产处置损益
       window.dispatchEvent(new CustomEvent('disposal:completed', {
         detail: {
           wpCode: 'H6',
@@ -477,11 +763,13 @@ function handleStatusChange(rowId: string, newStatus: string): void {
           refH10Code: row.refH10Code || '',
           refH1Code: row.refH1Code || '',
           originalCost: row.originalCost,
+          impairmentProvision: row.impairmentProvision,
           netBookValue: row.netBookValue,
           disposalIncome: row.disposalIncome,
           disposalExpenses: row.disposalExpenses,
           taxAmount: row.taxAmount,
           completionDate: row.completionDate,
+          transferAccount: row.transferAccount,
           linkageId: `h6-${row.rowId}`,
         },
       }))
@@ -489,7 +777,6 @@ function handleStatusChange(rowId: string, newStatus: string): void {
   }
 }
 
-// ─── 金额格式化 ──────────────────────────────────────────────────────────────
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'
   if (val === 0) return '-'
@@ -530,6 +817,7 @@ function fmtAmt(val: number | null | undefined): string {
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px; margin-bottom: 10px;
 }
+.tab-toolbar .toolbar-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .tab-toolbar .toolbar-right { display: flex; align-items: center; gap: 8px; }
 .tab-toolbar .chip-wrap { display: inline-flex; align-items: center; }
 
@@ -542,6 +830,7 @@ function fmtAmt(val: number | null | undefined): string {
   cursor: help;
   color: #303133;
 }
+.error-amount { color: #f56c6c; font-weight: 600; }
 
 .amt-input { width: 100%; }
 .amt-cell { font-variant-numeric: tabular-nums; }
@@ -577,5 +866,12 @@ function fmtAmt(val: number | null | undefined): string {
   margin: 8px 0 0;
   padding-left: 20px;
   line-height: 1.8;
+}
+
+:deep(.row-aging-risk) > td {
+  background-color: #fef0f0 !important;
+}
+:deep(.row-uncleared) > td {
+  background-color: #fdf6ec !important;
 }
 </style>

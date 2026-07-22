@@ -1,140 +1,562 @@
 <template>
   <div class="h8-tab-related-party">
-    <!-- 审计目标 -->
-    <el-alert type="info" :closable="false" show-icon class="objective-alert"
-      title="审计目标：识别关联方租赁并评估租赁定价的公允性，确认关联租金与市场租金差异的合理性及关联交易披露的完整性。" />
+    <!-- 一、审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert">
+      <template #title>
+        <span class="objective-title">一、审计目标</span>
+      </template>
+      <div class="objective-body">
+        <p>
+          <b>使用权资产：</b>1. 资产负债表中记录的使用权资产是存在的，且已记录于恰当的账户；
+          2. 所有应记录的使用权资产均已记录，相关披露均已包括；
+          3. 记录的使用权资产由被审计单位拥有或控制；
+          4. 使用权资产以恰当金额包括在财务报表中，计价或分摊调整已恰当记录；
+          5. 使用权资产已恰当分类/列报，关联方租赁披露完整。
+        </p>
+        <p>
+          <b>租赁负债：</b>1. 资产负债表中记录的租赁负债是存在的，且已记录于恰当的账户；
+          2. 所有应记录的租赁负债均已记录，相关披露均已包括；
+          3. 记录的租赁负债是被审计单位应当履行的现时义务；
+          4. 租赁负债以恰当金额包括在财务报表中；
+          5. 租赁负债已恰当分类/列报，关联方交易披露完整。
+        </p>
+      </div>
+    </el-alert>
 
-    <!-- 方法论上下文 -->
+    <!-- 编制思路 -->
     <div class="methodology-context">
-      <p>H8-14关联交易检查：识别关联方租赁并评估公允性。价差率=(关联租金-市场租金)/市场租金×100%。价差率>10%需重点关注定价合理性。</p>
+      <p class="procedure-label">二、审计过程 — 编制思路</p>
+      <p>
+        识别合并范围外关联方租赁 → 分别登记使用权资产与租赁负债审定数 →
+        核对定价政策与市场租金（价差率=(年租金−市场租金)/市场租金×100%，绝对值&gt;10%重点关注）→
+        评估是否异常 → 与 H8-2/H9 及附注关联方披露勾稽 → 形成审计说明与结论。
+      </p>
     </div>
 
-    <!-- 索引 + 行数 -->
+    <!-- 工具栏 -->
     <div class="h8-tab-toolbar">
-      <GtIndexChip value="wp:H8-14" />
-      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      <GtIndexChip value="wp:H8-14" :context-project-id="projectId" />
+      <GtIndexChip value="wp:H8-2" :context-project-id="projectId" context="明细表" />
+      <GtIndexChip value="wp:H9" :context-project-id="projectId" context="租赁负债" />
+      <el-tag size="small" type="info">使用权资产 {{ summary.rouCount }} 笔</el-tag>
+      <el-tag size="small" type="info">租赁负债 {{ summary.liabCount }} 笔</el-tag>
+      <el-tag v-if="summary.highDiffCount" size="small" type="danger">
+        价差率&gt;10% {{ summary.highDiffCount }}
+      </el-tag>
+      <el-tag v-if="summary.abnormalCount" size="small" type="warning">
+        异常 {{ summary.abnormalCount }}
+      </el-tag>
     </div>
 
-    <!-- 关联租赁检查表 -->
+    <!-- 操作栏 -->
+    <div v-if="!isReadonly" class="action-bar">
+      <el-button size="small" type="primary" @click="onImportH82">从 H8-2 带入</el-button>
+      <el-button size="small" :disabled="!rouRows.length" @click="onDraftNote">生成审计说明</el-button>
+      <el-dropdown size="small" @command="handleExportCommand">
+        <el-button size="small" :loading="importing">导入导出 ▾</el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="export-template">导出模板</el-dropdown-item>
+            <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
+            <el-dropdown-item command="import-data">导入数据</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+      <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
+      <el-button size="small" type="primary" plain @click="$emit('open-ai', 'related-party')">AI 辅助</el-button>
+      <el-button size="small" @click="$emit('open-review', 'related-party')">复核</el-button>
+    </div>
+
+    <!-- 1. 使用权资产 -->
     <el-card shadow="never" class="table-card">
       <template #header>
         <div class="section-title">
-          <span>关联租赁检查（H8-14，45行15列）</span>
+          <span>1. 使用权资产（关联方租赁）</span>
           <div class="title-actions">
-            <el-button v-if="!isReadonly" size="small" @click="handleAddRow">+ 新增行</el-button>
-            <el-button size="small" type="primary" plain @click="$emit('open-ai', 'related-party')">AI 辅助</el-button>
-            <el-button size="small" @click="$emit('open-review', 'related-party')">复核</el-button>
+            <el-button v-if="!isReadonly" size="small" @click="addRouRow">+ 新增行</el-button>
           </div>
         </div>
       </template>
-      <el-table :data="rows" border size="small" class="formula-table"
-        :row-class-name="getRowClassName">
-        <el-table-column prop="contractNo" label="合同号" min-width="110">
+      <el-table
+        :data="rouRows"
+        border
+        size="small"
+        class="formula-table"
+        :row-class-name="rouRowClass"
+        show-summary
+        :summary-method="rouSummary"
+        max-height="420"
+      >
+        <el-table-column prop="seq" label="序号" width="50" align="center" fixed />
+        <el-table-column prop="relatedPartyName" label="关联单位名称" min-width="130" fixed>
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.contractNo" size="small"
-              @change="updateCell(row.rowId, 'contractNo', row.contractNo)" />
-            <span v-else>{{ row.contractNo }}</span>
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.relatedPartyName"
+              size="small"
+              @change="updateRouCell(row.rowId, 'relatedPartyName', row.relatedPartyName)"
+            />
+            <span v-else>{{ row.relatedPartyName || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="relatedParty" label="关联方" min-width="110">
+        <el-table-column prop="relationship" label="关联方关系" min-width="150">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.relatedParty" size="small"
-              @change="updateCell(row.rowId, 'relatedParty', row.relatedParty)" />
-            <span v-else>{{ row.relatedParty }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="relationship" label="关联关系" width="110">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" v-model="row.relationship" size="small"
-              @change="updateCell(row.rowId, 'relationship', row.relationship)">
-              <el-option label="母公司" value="母公司" />
-              <el-option label="子公司" value="子公司" />
-              <el-option label="联营企业" value="联营企业" />
-              <el-option label="合营企业" value="合营企业" />
-              <el-option label="关键管理人员" value="关键管理人员" />
-              <el-option label="其他" value="其他" />
+            <el-select
+              v-if="!isReadonly"
+              v-model="row.relationship"
+              size="small"
+              filterable
+              allow-create
+              default-first-option
+              placeholder="选择"
+              @change="updateRouCell(row.rowId, 'relationship', row.relationship)"
+            >
+              <el-option v-for="opt in relationshipOptions" :key="opt" :label="opt" :value="opt" />
             </el-select>
-            <span v-else>{{ row.relationship }}</span>
+            <span v-else>{{ row.relationship || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="assetName" label="承租资产" min-width="100">
+        <el-table-column prop="leaseItem" label="租赁项目" min-width="110">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.assetName" size="small"
-              @change="updateCell(row.rowId, 'assetName', row.assetName)" />
-            <span v-else>{{ row.assetName }}</span>
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.leaseItem"
+              size="small"
+              @change="updateRouCell(row.rowId, 'leaseItem', row.leaseItem)"
+            />
+            <span v-else>{{ row.leaseItem || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="relatedRental" label="关联租金(年)" width="120" align="right">
+        <el-table-column prop="assetType" label="租赁资产种类" width="120">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.relatedRental" :controls="false" size="small"
-              @change="(v: number | undefined) => updateCell(row.rowId, 'relatedRental', v)" />
-            <span v-else>{{ fmtAmt(row.relatedRental) }}</span>
+            <el-select
+              v-if="!isReadonly"
+              v-model="row.assetType"
+              size="small"
+              allow-create
+              filterable
+              @change="updateRouCell(row.rowId, 'assetType', row.assetType)"
+            >
+              <el-option v-for="t in assetTypeOptions" :key="t" :label="t" :value="t" />
+            </el-select>
+            <span v-else>{{ row.assetType || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="marketRental" label="市场租金(年)" width="120" align="right">
+        <el-table-column prop="leasePeriod" label="租赁发生时间及到期日" min-width="150">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.marketRental" :controls="false" size="small"
-              @change="(v: number | undefined) => updateCell(row.rowId, 'marketRental', v)" />
-            <span v-else>{{ fmtAmt(row.marketRental) }}</span>
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.leasePeriod"
+              size="small"
+              placeholder="起租日 ~ 到期日"
+              @change="updateRouCell(row.rowId, 'leasePeriod', row.leasePeriod)"
+            />
+            <span v-else>{{ row.leasePeriod || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="价差率(%)" width="100" align="right" class-name="formula-col">
+        <el-table-column prop="costEnding" label="原值期末审定" width="120" align="right">
           <template #default="{ row }">
-            <span class="formula-value" :class="Math.abs(row.priceDiffRate) > 10 ? 'abnormal' : ''"
-              title="公式：(关联租金-市场租金)/市场租金×100%">
-              {{ row.marketRental > 0 ? row.priceDiffRate.toFixed(2) + '%' : '-' }}
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.costEnding"
+              :controls="false"
+              size="small"
+              @change="(v: number | undefined) => updateRouCell(row.rowId, 'costEnding', v)"
+            />
+            <span v-else>{{ fmtAmt(row.costEnding) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="accumDepEnding" label="累计折旧期末" width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.accumDepEnding"
+              :controls="false"
+              size="small"
+              @change="(v: number | undefined) => updateRouCell(row.rowId, 'accumDepEnding', v)"
+            />
+            <span v-else>{{ fmtAmt(row.accumDepEnding) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="impairmentEnding" label="减值准备期末" width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.impairmentEnding"
+              :controls="false"
+              size="small"
+              @change="(v: number | undefined) => updateRouCell(row.rowId, 'impairmentEnding', v)"
+            />
+            <span v-else>{{ fmtAmt(row.impairmentEnding) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="净值" width="110" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-value" title="原值−累计折旧−减值准备">{{ fmtAmt(row.netValue) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="additionsCost" label="本期新增(原值)" width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.additionsCost"
+              :controls="false"
+              size="small"
+              @change="(v: number | undefined) => updateRouCell(row.rowId, 'additionsCost', v)"
+            />
+            <span v-else>{{ fmtAmt(row.additionsCost) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="periodDep" label="本期折旧" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.periodDep"
+              :controls="false"
+              size="small"
+              @change="(v: number | undefined) => updateRouCell(row.rowId, 'periodDep', v)"
+            />
+            <span v-else>{{ fmtAmt(row.periodDep) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="pricingPolicy" label="定价政策" min-width="100">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.pricingPolicy"
+              size="small"
+              placeholder="市场价/协议价"
+              @change="updateRouCell(row.rowId, 'pricingPolicy', row.pricingPolicy)"
+            />
+            <span v-else>{{ row.pricingPolicy || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="annualRent" label="年租金" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.annualRent"
+              :controls="false"
+              size="small"
+              @change="(v: number | undefined) => updateRouCell(row.rowId, 'annualRent', v)"
+            />
+            <span v-else>{{ fmtAmt(row.annualRent) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="marketRent" label="市场租金" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.marketRent"
+              :controls="false"
+              size="small"
+              @change="(v: number | undefined) => updateRouCell(row.rowId, 'marketRent', v)"
+            />
+            <span v-else>{{ fmtAmt(row.marketRent) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="价差率(%)" width="90" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span
+              class="formula-value"
+              :class="{ abnormal: Math.abs(row.priceDiffRate) > DIFF_WARN_THRESHOLD }"
+              title="(年租金−市场租金)/市场租金×100%"
+            >
+              {{ row.marketRent > 0 ? row.priceDiffRate.toFixed(1) + '%' : '-' }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="fairnessAssessment" label="公允性评价" min-width="120">
+        <el-table-column prop="isAbnormal" label="是否存在异常" width="110">
           <template #default="{ row }">
-            <el-select v-if="!isReadonly" v-model="row.fairnessAssessment" size="small"
-              @change="updateCell(row.rowId, 'fairnessAssessment', row.fairnessAssessment)">
-              <el-option label="公允" value="公允" />
-              <el-option label="基本公允" value="基本公允" />
-              <el-option label="存在异常" value="存在异常" />
-              <el-option label="待核实" value="待核实" />
+            <el-select
+              v-if="!isReadonly"
+              v-model="row.isAbnormal"
+              size="small"
+              @change="updateRouCell(row.rowId, 'isAbnormal', row.isAbnormal)"
+            >
+              <el-option v-for="o in abnormalOptions" :key="o" :label="o" :value="o" />
             </el-select>
-            <span v-else>{{ row.fairnessAssessment }}</span>
+            <span v-else>{{ row.isAbnormal || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="remark" label="备注" min-width="100">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.remark" size="small"
-              @change="updateCell(row.rowId, 'remark', row.remark)" />
-            <span v-else>{{ row.remark }}</span>
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.remark"
+              size="small"
+              @change="updateRouCell(row.rowId, 'remark', row.remark)"
+            />
+            <span v-else>{{ row.remark || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column v-if="!isReadonly" label="" width="50" align="center">
+        <el-table-column prop="indexNo" label="索引号" width="110">
           <template #default="{ row }">
-            <el-button type="danger" link size="small" @click="deleteRow(row.rowId)">✕</el-button>
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.indexNo"
+              size="small"
+              placeholder="合同号"
+              @change="updateRouCell(row.rowId, 'indexNo', row.indexNo)"
+            />
+            <span v-else>{{ row.indexNo || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="操作" width="100" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" link size="small" title="生成配对负债行" @click="pairLiabilityFromRou(row.rowId)">
+              配对负债
+            </el-button>
+            <el-button type="danger" link size="small" @click="removeRouRow(row.rowId)">✕</el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><span class="card-title">审计说明</span></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly"
-        :autosize="{ minRows: 5 }" placeholder="请输入审计说明..." @change="saveAuditNote" />
+    <!-- 2. 租赁负债 -->
+    <el-card shadow="never" class="table-card">
+      <template #header>
+        <div class="section-title">
+          <span>2. 租赁负债（关联方租赁）</span>
+          <div class="title-actions">
+            <el-button v-if="!isReadonly" size="small" @click="addLiabRow">+ 新增行</el-button>
+          </div>
+        </div>
+      </template>
+      <el-table
+        :data="liabRows"
+        border
+        size="small"
+        class="formula-table"
+        :row-class-name="liabRowClass"
+        show-summary
+        :summary-method="liabSummary"
+        max-height="360"
+      >
+        <el-table-column prop="seq" label="序号" width="50" align="center" fixed />
+        <el-table-column prop="relatedPartyName" label="关联方名称" min-width="130" fixed>
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.relatedPartyName"
+              size="small"
+              @change="updateLiabCell(row.rowId, 'relatedPartyName', row.relatedPartyName)"
+            />
+            <span v-else>{{ row.relatedPartyName || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="relationship" label="关联方关系" min-width="150">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              v-model="row.relationship"
+              size="small"
+              filterable
+              allow-create
+              default-first-option
+              @change="updateLiabCell(row.rowId, 'relationship', row.relationship)"
+            >
+              <el-option v-for="opt in relationshipOptions" :key="opt" :label="opt" :value="opt" />
+            </el-select>
+            <span v-else>{{ row.relationship || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="leaseItem" label="租赁项目" min-width="110">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.leaseItem"
+              size="small"
+              @change="updateLiabCell(row.rowId, 'leaseItem', row.leaseItem)"
+            />
+            <span v-else>{{ row.leaseItem || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="assetType" label="租赁资产种类" width="120">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              v-model="row.assetType"
+              size="small"
+              allow-create
+              filterable
+              @change="updateLiabCell(row.rowId, 'assetType', row.assetType)"
+            >
+              <el-option v-for="t in assetTypeOptions" :key="t" :label="t" :value="t" />
+            </el-select>
+            <span v-else>{{ row.assetType || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="leasePeriod" label="租赁发生时间及到期日" min-width="150">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.leasePeriod"
+              size="small"
+              @change="updateLiabCell(row.rowId, 'leasePeriod', row.leasePeriod)"
+            />
+            <span v-else>{{ row.leasePeriod || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="liabilityEnding" label="负债期末审定" width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.liabilityEnding"
+              :controls="false"
+              size="small"
+              @change="(v: number | undefined) => updateLiabCell(row.rowId, 'liabilityEnding', v)"
+            />
+            <span v-else>{{ fmtAmt(row.liabilityEnding) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="periodPayments" label="本期应支付租赁款" width="130" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.periodPayments"
+              :controls="false"
+              size="small"
+              @change="(v: number | undefined) => updateLiabCell(row.rowId, 'periodPayments', v)"
+            />
+            <span v-else>{{ fmtAmt(row.periodPayments) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="periodInterest" label="本期利息支出" width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.periodInterest"
+              :controls="false"
+              size="small"
+              @change="(v: number | undefined) => updateLiabCell(row.rowId, 'periodInterest', v)"
+            />
+            <span v-else>{{ fmtAmt(row.periodInterest) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="pricingPolicy" label="定价政策" min-width="100">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.pricingPolicy"
+              size="small"
+              @change="updateLiabCell(row.rowId, 'pricingPolicy', row.pricingPolicy)"
+            />
+            <span v-else>{{ row.pricingPolicy || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="annualRent" label="年租金" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.annualRent"
+              :controls="false"
+              size="small"
+              @change="(v: number | undefined) => updateLiabCell(row.rowId, 'annualRent', v)"
+            />
+            <span v-else>{{ fmtAmt(row.annualRent) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="marketRent" label="市场租金" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.marketRent"
+              :controls="false"
+              size="small"
+              @change="(v: number | undefined) => updateLiabCell(row.rowId, 'marketRent', v)"
+            />
+            <span v-else>{{ fmtAmt(row.marketRent) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="价差率(%)" width="90" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span
+              class="formula-value"
+              :class="{ abnormal: Math.abs(row.priceDiffRate) > DIFF_WARN_THRESHOLD }"
+            >
+              {{ row.marketRent > 0 ? row.priceDiffRate.toFixed(1) + '%' : '-' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="isAbnormal" label="是否存在异常" width="110">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              v-model="row.isAbnormal"
+              size="small"
+              @change="updateLiabCell(row.rowId, 'isAbnormal', row.isAbnormal)"
+            >
+              <el-option v-for="o in abnormalOptions" :key="o" :label="o" :value="o" />
+            </el-select>
+            <span v-else>{{ row.isAbnormal || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="remark" label="备注" min-width="100">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.remark"
+              size="small"
+              @change="updateLiabCell(row.rowId, 'remark', row.remark)"
+            />
+            <span v-else>{{ row.remark || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="indexNo" label="索引号" width="110">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.indexNo"
+              size="small"
+              @change="updateLiabCell(row.rowId, 'indexNo', row.indexNo)"
+            />
+            <span v-else>{{ row.indexNo || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="" width="50" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button type="danger" link size="small" @click="removeLiabRow(row.rowId)">✕</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
     </el-card>
 
-    <!-- 审计结论 -->
+    <!-- 三、审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span class="card-title">三、审计说明</span></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 5 }"
+        placeholder="请输入审计说明..."
+        @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- 四、审计结论 -->
     <el-card shadow="never" class="audit-conclusion-card">
-      <template #header><span class="card-title">审计结论</span></template>
-      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly"
-        :autosize="{ minRows: 3 }" placeholder="请输入审计结论..." @change="saveAuditConclusion" />
+      <template #header><span class="card-title">四、审计结论</span></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="请输入审计结论..."
+        @change="saveAuditConclusion"
+      />
     </el-card>
 
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>关联租赁必须披露：关联方名称、关系、租赁标的、金额</li>
-        <li>价差率>10%：需关注定价合理性，是否存在利益输送</li>
-        <li>关联租赁公允性评价：参照同地段市场租金水平</li>
-        <li>关联方租赁终止/变更需额外关注商业合理性</li>
+        <li>本表仅登记<strong>合并范围外</strong>关联方租赁；使用权资产与租赁负债宜成对核查。</li>
+        <li>净值 = 原值期末 − 累计折旧期末 − 减值准备期末；可与 H8-2 明细勾稽。</li>
+        <li>价差率&gt;10%：关注定价合理性，是否存在利益输送；异常项须在备注说明依据。</li>
+        <li>关联方关系选项对齐准则列举（母公司/实际控制人/控股股东/联营合营/关键管理人员等）。</li>
+        <li>租赁负债金额、利息支出应与 H9 租赁负债底稿交叉验证。</li>
       </ul>
     </details>
   </div>
@@ -143,25 +565,20 @@
 <script setup lang="ts">
 /**
  * H8TabRelatedParty.vue — H8-14 关联交易检查表
- * 45行15列，价差率计算+公允性评价
- * Spec: Task 4.10 | Requirements: 9.1
+ * 对齐 Excel 双表（使用权资产 + 租赁负债）+ 价差率数字化增强
  */
-import { ref, toRef, reactive, computed, watch } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { toRef, computed, ref, inject } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
-
-interface RelatedPartyRow {
-  rowId: string
-  contractNo: string
-  relatedParty: string
-  relationship: string
-  assetName: string
-  relatedRental: number
-  marketRental: number
-  priceDiffRate: number
-  fairnessAssessment: string
-  remark: string
-}
+import {
+  useH8RelatedParty,
+  RELATED_PARTY_RELATIONSHIPS,
+  ASSET_TYPE_OPTIONS,
+  ABNORMAL_OPTIONS,
+  type H8RelatedPartyRouRow,
+  type H8RelatedPartyLiabRow,
+} from '../../composables/useH8RelatedParty'
+import { useH8ImportExport } from '../../composables/useH8ImportExport'
 
 const props = defineProps<{
   wpId: string
@@ -174,116 +591,128 @@ const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'open-ai', section: string): void
   (e: 'open-review', section: string): void
+  (e: 'navigate-sheet', sheetName: string): void
 }>()
 
-const ROWS_KEY = 'H8-14-rows'
-const rows = ref<RelatedPartyRow[]>([])
+const allResponsesRef = toRef(props, 'allResponses')
+const wpIdRef = toRef(props, 'wpId')
+const projectIdRef = toRef(props, 'projectId')
 
-function _getJson(itemId: string): any {
-  const item = props.allResponses.get(itemId)
-  if (!item) return null
-  const raw = item.remark ?? item.conclusion
-  if (!raw) return null
-  try { return JSON.parse(raw) } catch { return raw }
+const {
+  rouRows,
+  liabRows,
+  auditNote,
+  auditConclusion,
+  summary,
+  addRouRow,
+  removeRouRow,
+  updateRouCell,
+  pairLiabilityFromRou,
+  addLiabRow,
+  removeLiabRow,
+  updateLiabCell,
+  importFromH82,
+  saveAuditNote,
+  saveAuditConclusion,
+  draftAuditNote,
+  load,
+  DIFF_WARN_THRESHOLD,
+} = useH8RelatedParty({
+  allResponses: allResponsesRef,
+  onSave: (itemId, value) => emit('save', itemId, value),
+})
+
+const relationshipOptions = RELATED_PARTY_RELATIONSHIPS
+const assetTypeOptions = ASSET_TYPE_OPTIONS
+const abnormalOptions = ABNORMAL_OPTIONS
+
+const h8ReloadAll = inject<() => Promise<void>>('h8ReloadAll', async () => {})
+const { isImporting, exportTemplate, exportData, importData } = useH8ImportExport({
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+  sheetCode: 'H8-14',
+  onImported: async () => {
+    await h8ReloadAll()
+    load()
+  },
+})
+const importing = computed(() => isImporting.value)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+function fmtAmt(v: number): string {
+  if (v == null || Number(v) === 0) return '-'
+  return Number(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function _normalizeRow(raw: any): RelatedPartyRow {
-  const related = Number(raw.relatedRental) || 0
-  const market = Number(raw.marketRental) || 0
-  const diffRate = market > 0 ? ((related - market) / market) * 100 : 0
-  return {
-    rowId: raw.rowId ?? `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-    contractNo: raw.contractNo ?? '',
-    relatedParty: raw.relatedParty ?? '',
-    relationship: raw.relationship ?? '',
-    assetName: raw.assetName ?? '',
-    relatedRental: related,
-    marketRental: market,
-    priceDiffRate: diffRate,
-    fairnessAssessment: raw.fairnessAssessment ?? '',
-    remark: raw.remark ?? '',
+function rouRowClass({ row }: { row: H8RelatedPartyRouRow }) {
+  if (row.isAbnormal === '是' || Math.abs(row.priceDiffRate) > DIFF_WARN_THRESHOLD) return 'abnormal-row'
+  return ''
+}
+
+function liabRowClass({ row }: { row: H8RelatedPartyLiabRow }) {
+  if (row.isAbnormal === '是' || Math.abs(row.priceDiffRate) > DIFF_WARN_THRESHOLD) return 'abnormal-row'
+  return ''
+}
+
+function rouSummary({ columns, data }: { columns: any[]; data: H8RelatedPartyRouRow[] }) {
+  return columns.map((col: any, idx: number) => {
+    if (idx === 0) return '合计'
+    const prop = col.property
+    if (['costEnding', 'accumDepEnding', 'impairmentEnding', 'netValue', 'additionsCost', 'periodDep', 'annualRent'].includes(prop)) {
+      const sum = data.reduce((s, r) => s + (Number((r as any)[prop]) || 0), 0)
+      return fmtAmt(sum)
+    }
+    if (col.label === '净值') {
+      return fmtAmt(data.reduce((s, r) => s + (r.netValue || 0), 0))
+    }
+    return ''
+  })
+}
+
+function liabSummary({ columns, data }: { columns: any[]; data: H8RelatedPartyLiabRow[] }) {
+  return columns.map((col: any, idx: number) => {
+    if (idx === 0) return '合计'
+    const prop = col.property
+    if (['liabilityEnding', 'periodPayments', 'periodInterest', 'annualRent'].includes(prop)) {
+      const sum = data.reduce((s, r) => s + (Number((r as any)[prop]) || 0), 0)
+      return fmtAmt(sum)
+    }
+    return ''
+  })
+}
+
+async function onImportH82() {
+  const result = importFromH82()
+  if (result.added === 0) {
+    ElMessage.info(result.total === 0 ? 'H8-2 暂无明细可带入' : `无可新增行（已存在 ${result.skipped} 笔）`)
+  } else {
+    ElMessage.success(`已从 H8-2 带入 ${result.added} 笔，请确认关联方关系与定价政策`)
   }
 }
 
-function load() {
-  const data = _getJson(ROWS_KEY)
-  rows.value = Array.isArray(data) ? data.map(_normalizeRow) : []
-}
-load()
-watch(() => props.allResponses, () => load())
-
-// ── 审计说明 / 审计结论（持久化 checklist_responses，conclusion:null）──
-const AUDIT_NOTE_KEY = 'H8-related-party-audit-note'
-const AUDIT_CONCLUSION_KEY = 'H8-related-party-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-function _hydrateAudit() {
-  const n = props.allResponses.get(AUDIT_NOTE_KEY)
-  if (n?.remark != null) auditNote.value = n.remark
-  const c = props.allResponses.get(AUDIT_CONCLUSION_KEY)
-  if (c?.remark != null) auditConclusion.value = c.remark
-}
-_hydrateAudit()
-watch(() => props.allResponses, _hydrateAudit)
-function saveAuditNote(val: string) {
-  if (props.isReadonly) return
-  auditNote.value = val
-  emit('save', AUDIT_NOTE_KEY, val)
-}
-function saveAuditConclusion(val: string) {
-  if (props.isReadonly) return
-  auditConclusion.value = val
-  emit('save', AUDIT_CONCLUSION_KEY, val)
+async function onDraftNote() {
+  const text = draftAuditNote()
+  if (auditNote.value?.trim()) {
+    try {
+      await ElMessageBox.confirm('将覆盖现有审计说明，是否继续？', '生成审计说明', { type: 'warning' })
+    } catch {
+      return
+    }
+  }
+  saveAuditNote(text)
+  ElMessage.success('已生成审计说明草稿')
 }
 
-function addRow(contractNo: string) {
-  if (!contractNo?.trim()) return
-  rows.value.push(_normalizeRow({ contractNo: contractNo.trim() }))
-  persist()
+async function handleExportCommand(cmd: string) {
+  if (cmd === 'export-template') await exportTemplate(['H8-14', 'H8-14L'])
+  else if (cmd === 'export-data') await exportData(['H8-14', 'H8-14L'])
+  else if (cmd === 'import-data') fileInputRef.value?.click()
 }
 
-function deleteRow(rowId: string) {
-  const idx = rows.value.findIndex(r => r.rowId === rowId)
-  if (idx !== -1) { rows.value.splice(idx, 1); persist() }
-}
-
-function updateCell(rowId: string, field: string, value: any) {
-  const row = rows.value.find(r => r.rowId === rowId)
-  if (!row) return
-  const textFields = ['contractNo', 'relatedParty', 'relationship', 'assetName', 'fairnessAssessment', 'remark']
-  if (textFields.includes(field)) { (row as any)[field] = String(value ?? ''); persist(); return }
-  const numVal = Number(value) || 0
-  if (field === 'relatedRental') row.relatedRental = numVal
-  else if (field === 'marketRental') row.marketRental = numVal
-  else return
-  row.priceDiffRate = row.marketRental > 0 ? ((row.relatedRental - row.marketRental) / row.marketRental) * 100 : 0
-  persist()
-}
-
-function persist() {
-  emit('save', ROWS_KEY, rows.value.map(r => ({
-    rowId: r.rowId, contractNo: r.contractNo, relatedParty: r.relatedParty,
-    relationship: r.relationship, assetName: r.assetName,
-    relatedRental: r.relatedRental, marketRental: r.marketRental,
-    fairnessAssessment: r.fairnessAssessment, remark: r.remark,
-  })))
-}
-
-function fmtAmt(v: number): string {
-  if (v === 0) return '-'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-async function handleAddRow() {
-  const { value } = await ElMessageBox.prompt('请输入合同号', '新增关联租赁行', {
-    confirmButtonText: '确认', cancelButtonText: '取消', inputPlaceholder: '如：LEASE-2024-RP-001',
-  })
-  if (value) addRow(value)
-}
-
-function getRowClassName({ row }: { row: RelatedPartyRow }) {
-  if (Math.abs(row.priceDiffRate) > 10) return 'abnormal-row'
-  return ''
+async function onFileSelected(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (file) await importData(file)
+  if (fileInputRef.value) fileInputRef.value.value = ''
 }
 </script>
 
@@ -291,15 +720,18 @@ function getRowClassName({ row }: { row: RelatedPartyRow }) {
 .h8-tab-related-party { padding: 16px; font-size: var(--wp-font-size, 13px); }
 
 .objective-alert { margin-bottom: 12px; }
-.audit-note-card, .audit-conclusion-card { margin-bottom: 16px; }
-.card-title { font-weight: 600; }
+.objective-title { font-weight: 600; }
+.objective-body { font-size: 12px; line-height: 1.6; margin: 0; }
+.objective-body p { margin: 4px 0; }
 
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
-  border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;
+  border-radius: 0 6px 6px 0; margin-bottom: 12px; font-size: 12px; color: #92400e;
 }
+.procedure-label { font-weight: 600; margin: 0 0 4px; }
 
-.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.h8-tab-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.action-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
 
 .section-title { display: flex; align-items: center; justify-content: space-between; }
 .title-actions { display: flex; gap: 6px; }
@@ -310,6 +742,9 @@ function getRowClassName({ row }: { row: RelatedPartyRow }) {
 .formula-table :deep(.abnormal-row) { background: #fef2f2 !important; }
 .formula-value { border-bottom: 1px dashed #d97706; cursor: help; color: #d97706; }
 .formula-value.abnormal { color: #dc2626; font-weight: 700; }
+
+.audit-note-card, .audit-conclusion-card { margin-bottom: 16px; }
+.card-title { font-weight: 600; }
 
 .compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
 .compile-hint summary { cursor: pointer; font-weight: 500; }

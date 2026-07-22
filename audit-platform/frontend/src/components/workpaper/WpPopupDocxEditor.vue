@@ -14,7 +14,8 @@ import { ElMessage } from 'element-plus'
 import { useRoute } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import { downloadFile } from '@/utils/http'
-import OnlyOfficeEditor from '@/components/deliverable/OnlyOfficeEditor.vue'
+import OnlyOfficeWordDialog from './OnlyOfficeWordDialog.vue'
+import B60AttachmentMatrixPanel from '@/components/workpaper/B60AttachmentMatrixPanel.vue'
 import { ALL_DOCX_POPUP_CONFIGS, type DocxPopupConfig } from './wpPopupDocxConfigs'
 import { useWorkpaperNavigation } from '@/composables/useWorkpaperNavigation'
 
@@ -36,6 +37,7 @@ const editorVisible = ref(false)
 const onlyofficeAvailable = ref(false)
 const documentUrl = ref('')
 const documentKey = ref('')
+const callbackUrl = ref('')
 
 const config = computed((): DocxPopupConfig | null => ALL_DOCX_POPUP_CONFIGS[props.wpCode] || null)
 
@@ -63,6 +65,7 @@ async function openEditor() {
         if (res?.document_url) {
           documentUrl.value = res.document_url
           documentKey.value = res.document_key
+          callbackUrl.value = res.callback_url || ''
           editorVisible.value = true
           return
         }
@@ -253,15 +256,20 @@ onMounted(() => {
         <el-radio-button value="signed">已签回</el-radio-button>
       </el-radio-group>
     </div>
-    <OnlyOfficeEditor
+    <B60AttachmentMatrixPanel
+      v-if="wpCode === 'B60' || wpCode.startsWith('B60')"
+      :wp-code="wpCode"
+      :project-id="projectId || (route.params.projectId as string)"
+    />
+    <OnlyOfficeWordDialog
       v-if="editorVisible"
       v-model:visible="editorVisible"
       :document-url="documentUrl"
       :document-key="documentKey"
+      :callback-url="callbackUrl"
       :title="config.title"
       mode="edit"
       @saved="onSaved"
-      @close="editorVisible = false"
     />
   </div>
   <div v-else class="popup-empty">

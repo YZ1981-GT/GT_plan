@@ -190,10 +190,18 @@ async def sync_from_workpaper(
     note = result.scalar_one_or_none()
 
     # 构建合并后的 table_data
-    # 约定：将 C sheet 的 sub_table_data 整体写入 table_data["sub_table_data"]，
+    # 约定：按子表 key 浅合并 sub_table_data（同名 key 覆盖，未推送的 key 保留），
+    #     便于 H4 仅推送「工程物资」子表而不清空 H2 已同步的在建工程明细。
     #     并保留 _source / _current_standard / _last_sync_wp / _last_sync_sheet 元数据
     new_table_data: dict[str, Any] = dict(note.table_data) if note and note.table_data else {}
-    new_table_data["sub_table_data"] = dict(clean_sub_table_data or {})
+    existing_sub = new_table_data.get("sub_table_data")
+    if isinstance(existing_sub, dict) and clean_sub_table_data:
+        merged_sub = dict(existing_sub)
+        for key, rows in clean_sub_table_data.items():
+            merged_sub[key] = rows
+        new_table_data["sub_table_data"] = merged_sub
+    else:
+        new_table_data["sub_table_data"] = dict(clean_sub_table_data or {})
     new_table_data["_source"] = "workpaper"
     new_table_data["_current_standard"] = current_standard
     new_table_data["_last_sync_wp_id"] = str(wp_id)

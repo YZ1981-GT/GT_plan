@@ -12,7 +12,7 @@ from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-_G9_ACCOUNT_PREFIX = "1504"
+_G9_ACCOUNT_PREFIXES = ("1519", "1510", "1504")
 _ADJUDICATED_ITEM_ID = "G9-1-adjudicated-amount"
 
 G9_SHEETS = [
@@ -30,12 +30,13 @@ G9_SHEETS = [
 
 
 async def _fetch_tb_closing_balance(ctx: RenderContext) -> dict:
-    """资产类 1504：期末余额 = 借方 - 贷方。"""
+    """资产类其他非流动金融资产：期末余额 = 借方 - 贷方（兼容 1504/1510/1519 及科目名称）。"""
     tb: dict[str, float] = {}
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
         )
+        # TbBalance 可能无 account_name；优先按编码匹配
         result = await ctx.db.execute(
             sa.select(
                 TbBalance.account_code,
@@ -46,9 +47,10 @@ async def _fetch_tb_closing_balance(ctx: RenderContext) -> dict:
         debit = 0.0
         credit = 0.0
         matched = False
-        for row in result.fetchall():
+        rows = result.fetchall()
+        for row in rows:
             code = (row.account_code or "").strip()
-            if code == _G9_ACCOUNT_PREFIX or code.startswith(_G9_ACCOUNT_PREFIX):
+            if any(code == p or code.startswith(p) for p in _G9_ACCOUNT_PREFIXES):
                 debit += float(row.debit_amount or 0)
                 credit += float(row.credit_amount or 0)
                 matched = True

@@ -36,7 +36,7 @@ describe('gCycleCutoffFill', () => {
     const row = mapCutoffToG13Adjustment(sample)
     expect(row.accountCode).toBe('6101')
     expect(row.debitAmount).toBe(1000)
-    expect(row.summary).toBe('公允价值变动')
+    expect(row.description).toBe('公允价值变动')
   })
 
   it('mergeByFillMode append adds rows', () => {

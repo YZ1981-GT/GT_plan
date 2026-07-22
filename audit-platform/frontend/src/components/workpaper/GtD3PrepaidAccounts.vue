@@ -170,6 +170,7 @@ import { useD3ReviewThreads } from './composables/useD3ReviewThreads'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useD3EventBus } from './composables/useD3EventBus'
 import { resolveD3SheetLabel } from './composables/d3SheetLabels'
+import { useAgingConfig } from '@/composables/useAgingConfig'
 import D3TabIndex from './d3/D3TabIndex.vue'
 import D3TabProcedure from './d3/D3TabProcedure.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
@@ -218,7 +219,9 @@ const {
   projectId: projectIdRef,
 })
 
-const crossSheet = useD3CrossSheet({ allResponses })
+// 项目账龄配置（subject='D3'）→ 供跨sheet账龄聚合 segment-driven（支持自定义账龄段）
+const { segments: agingSegments } = useAgingConfig(projectIdRef, 'D3')
+const crossSheet = useD3CrossSheet({ allResponses, segments: agingSegments })
 useD3EventBus(allResponses, debouncedSave)
 
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───

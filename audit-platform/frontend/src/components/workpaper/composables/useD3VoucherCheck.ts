@@ -83,6 +83,18 @@ const ITEM_ID_CURRENT_ROWS = 'D3-vc-current-rows'
 const ITEM_ID_POST_ROWS = 'D3-vc-post-rows'
 const ITEM_ID_CONCLUSION = 'D3-vc-conclusion'
 
+/**
+ * D3-7 检查表 5 项核对内容标签（对齐源模板「测试内容说明」R13）。
+ * checkItems[0..4] 与此一一对应。
+ */
+export const D3_VOUCHER_CHECK_ITEMS = [
+  '原始凭证是否齐全',
+  '记账凭证与原始凭证是否相符',
+  '账务处理是否正确',
+  '是否记录于恰当的会计期间',
+  '其他核对事项',
+] as const
+
 // ─── Pure Helpers (exported for PBT testability) ─────────────────────────────
 
 /**
@@ -633,6 +645,32 @@ export function useD3VoucherCheck(options: UseD3VoucherCheckOptions) {
     }
   }
 
+  // ─── updateRow：批量合并一行的多个字段并单次持久化（引导式弹窗保存用） ──────
+
+  /**
+   * 将 patch 合并到指定区块的某行并单次持久化（用于逐笔核对引导弹窗保存）。
+   * 避免逐字段 updateCell 触发多次防抖保存。
+   */
+  function updateRow(
+    section: 'current' | 'postPeriod',
+    rowId: string,
+    patch: Partial<VoucherCheckRow>,
+  ): void {
+    if (isReadonly.value) return
+    const list = section === 'current' ? currentChangeRows.value : postPeriodRows.value
+    const idx = list.findIndex(r => r.rowId === rowId)
+    if (idx === -1) return
+    const merged = [...list]
+    merged[idx] = { ...merged[idx], ...patch, rowId }
+    if (section === 'current') {
+      currentChangeRows.value = merged
+      persistCurrentRows()
+    } else {
+      postPeriodRows.value = merged
+      persistPostRows()
+    }
+  }
+
   // ─── 抽凭回填（Req 4/7/24：抽样弹窗结果 → 检查表行，来源=抽凭） ──────────
 
   /**
@@ -806,6 +844,7 @@ export function useD3VoucherCheck(options: UseD3VoucherCheckOptions) {
     addSample,
     removeSample,
     updateCell,
+    updateRow,
     updateSamplingParams,
     autoMarkCrossPeriod,
     // 检查结论（AI 辅助）

@@ -27,10 +27,13 @@ export function parseNum(v: unknown): number {
     const trimmed = v.trim()
     if (trimmed === '') return 0
     const n = Number(trimmed)
-    return Number.isFinite(n) ? n : 0
+    if (!Number.isFinite(n)) return 0
+    // 规范 -0 → 0，避免 Object.is(-0, 0) 在断言/序列化中踩坑
+    return Object.is(n, -0) ? 0 : n
   }
   const n = Number(v)
-  return Number.isFinite(n) ? n : 0
+  if (!Number.isFinite(n)) return 0
+  return Object.is(n, -0) ? 0 : n
 }
 
 // ═══ P1: 借方余额 = 期初审定 + 借方 - 贷方 ═══

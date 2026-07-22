@@ -1,5 +1,5 @@
 /**
- * useG14ExternalCross — G14-2 与 D1/D2/D5/G4/G5 等源科目 ECL 勾稽
+ * useG14ExternalCross — G14-2 与 D1/D2/D5/D6/F1/G4/G5/G6 源科目 ECL 勾稽
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import {
@@ -8,10 +8,13 @@ import {
   formatG14EclCrossMessage,
   parseExternalAmountCache,
 } from './gCycleExternalCross'
+import {
+  G_CYCLE_SOURCE_ECL_EVENT,
+  resolveG14EclRowKey,
+} from './gCycleSourceEcl'
 import type { ChecklistResponse } from './useF1FormData'
 
 const CACHE_ITEM_ID = 'G14-ext-source-ecl'
-const EVENT_NAME = 'g-cycle:source-ecl'
 
 export interface UseG14ExternalCrossOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
@@ -41,17 +44,18 @@ export function useG14ExternalCross(options: UseG14ExternalCrossOptions) {
   }
 
   function onSourceEclEvent(e: Event): void {
-    const d = (e as CustomEvent<{ rowKey?: string; amount?: number }>).detail
-    const rowKey = String(d?.rowKey ?? '').trim()
-    if (!rowKey || d?.amount == null) return
+    const d = (e as CustomEvent<{ rowKey?: string; source?: string; amount?: number }>).detail
+    if (d?.amount == null) return
+    const rowKey = resolveG14EclRowKey(String(d.rowKey || d.source || ''))
+    if (!rowKey) return
     applySourceAmount(rowKey, d.amount)
   }
 
   onMounted(() => {
-    window.addEventListener(EVENT_NAME, onSourceEclEvent)
+    window.addEventListener(G_CYCLE_SOURCE_ECL_EVENT, onSourceEclEvent)
   })
   onBeforeUnmount(() => {
-    window.removeEventListener(EVENT_NAME, onSourceEclEvent)
+    window.removeEventListener(G_CYCLE_SOURCE_ECL_EVENT, onSourceEclEvent)
   })
 
   const mismatches = computed(() =>

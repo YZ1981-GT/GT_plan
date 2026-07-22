@@ -94,7 +94,9 @@ export interface I6LinkageStatus {
   expense: number
   /** 研发总额 */
   total: number
-  /** 是否平衡：I6费用化 + I2资本化 = 研发总额 */
+  /** 是否已收到 I6 事件（未收到时勿当作「已核对」） */
+  ready: boolean
+  /** 是否平衡：I6费用化 + I2资本化 = 研发总额；未就绪时为 false */
   isBalanced: boolean
 }
 
@@ -126,13 +128,14 @@ function _getNum(val: any): number {
 
 export function useI2CrossSheet(allResponses: Ref<Map<string, any>>): {
   detailTotals: ComputedRef<{ capitalized: number; transferred: number }>
-  i6LinkageStatus: ComputedRef<{ expense: number; total: number; isBalanced: boolean }>
+  i6LinkageStatus: ComputedRef<I6LinkageStatus>
   i1TransferAmount: ComputedRef<number>
 } {
   // ─── I6 incoming state（响应式存储 EventBus 接收的 I6 数据）─────────────
 
   const _i6Expense = ref(0)
   const _i6Total = ref(0)
+  const _i6Ready = ref(false)
 
   // ─── 解析 I2-2 明细行数据 ──────────────────────────────────────────────
 
@@ -164,8 +167,14 @@ export function useI2CrossSheet(allResponses: Ref<Map<string, any>>): {
     let transferred = 0
 
     for (const row of detailRows.value) {
-      capitalized += _getNum(row.capitalizedEnd)
-      transferred += _getNum(row.transferToIntangible)
+      const r = row as any
+      // 优先审定期末 / 审定转无形；兼容旧字段与 Excel 新字段
+      capitalized += _getNum(
+        r.auditedEnding ?? r.auditedEnd ?? r.capEndAmount ?? r.capitalizedEnd ?? r.unadjEnding,
+      )
+      transferred += _getNum(
+        r.auditedDecToIA ?? r.transferToI1 ?? r.transferToIntangible ?? r.unadjDecToIA,
+      )
     }
 
     return { capitalized, transferred }
@@ -179,12 +188,17 @@ export function useI2CrossSheet(allResponses: Ref<Map<string, any>>): {
    *
    * CP-I2-10: 转入I1金额 = 审定表"转无形"列合计
    */
+  /**
+   * I2→I1 转入金额：优先 I2-1 审定表「转无形」列合计；
+   * 若审定表未填/为 0，兜底用 I2-2 明细转入合计（避免只填明细时事件不发）。
+   */
   const i1TransferAmount: ComputedRef<number> = computed(() => {
     let total = 0
     for (const row of adjudicationRows.value) {
       total += _getNum(row.decreaseTransfer)
     }
-    return total
+    if (Math.abs(total) >= 0.005) return total
+    return detailTotals.value.transferred
   })
 
   // ─── i2Capitalized: I2 资本化金额合计（供 I6 联动校验） ────────────────
@@ -230,17 +244,18 @@ export function useI2CrossSheet(allResponses: Ref<Map<string, any>>): {
     const expense = _i6Expense.value
     const total = _i6Total.value
     const capitalized = i2Capitalized.value
+    const ready = _i6Ready.value
 
-    // 总额为 0 且费用也为 0 → 未收到 I6 数据，视为平衡（待就绪）
-    if (total === 0 && expense === 0) {
-      return { expense: 0, total: 0, isBalanced: true }
+    // 未收到 I6 数据 → 非「已核对」，避免假平衡
+    if (!ready) {
+      return { expense: 0, total: 0, ready: false, isBalanced: false }
     }
 
     // VR-I6-01: expense + capitalized = total（允许±0.01精度）
     const diff = Math.abs((expense + capitalized) - total)
     const isBalanced = diff <= 0.01
 
-    return { expense, total, isBalanced }
+    return { expense, total, ready: true, isBalanced }
   })
 
   // ─── EventBus: Subscribe I6 'research:expense-updated'（I6→I2）─────────
@@ -254,6 +269,7 @@ export function useI2CrossSheet(allResponses: Ref<Map<string, any>>): {
     if (detail && typeof detail === 'object') {
       _i6Expense.value = _getNum(detail.expense)
       _i6Total.value = _getNum(detail.total)
+      _i6Ready.value = true
     }
   }
 
@@ -282,13 +298,33 @@ export function useI2CrossSheet(allResponses: Ref<Map<string, any>>): {
   watch(i1TransferAmount, (newVal) => {
     // 仅在有实际金额时发布（避免初始化 0 值噪音）
     if (newVal !== 0) {
-      // 构建转入明细（逐项目）
-      const items = adjudicationRows.value
-        .filter((r) => _getNum(r.decreaseTransfer) !== 0)
-        .map((r) => ({
-          projectName: r.projectName || '未命名项目',
-          amount: _getNum(r.decreaseTransfer),
-        }))
+      // 优先 I2-2 明细（含转入日/资产名），否则回退审定表行
+      const fromDetail = detailRows.value
+        .filter((r) => {
+          const row = r as any
+          return _getNum(row.auditedDecToIA ?? row.transferToI1 ?? row.transferToIntangible ?? row.unadjDecToIA) !== 0
+        })
+        .map((r) => {
+          const row = r as any
+          return {
+            projectName: row.projectName || '未命名项目',
+            amount: _getNum(row.auditedDecToIA ?? row.transferToI1 ?? row.transferToIntangible ?? row.unadjDecToIA),
+            transferDate: row.transferDate || '',
+            transferAssetName: row.transferAssetName || row.projectName || '',
+            sourceRowId: row.rowId,
+          }
+        })
+      const items = fromDetail.length
+        ? fromDetail
+        : adjudicationRows.value
+          .filter((r) => _getNum(r.decreaseTransfer) !== 0)
+          .map((r) => ({
+            projectName: r.projectName || '未命名项目',
+            amount: _getNum(r.decreaseTransfer),
+            transferDate: '',
+            transferAssetName: r.projectName || '',
+            sourceRowId: r.rowId,
+          }))
 
       window.dispatchEvent(new CustomEvent('development:capitalized-to-intangible', {
         detail: {

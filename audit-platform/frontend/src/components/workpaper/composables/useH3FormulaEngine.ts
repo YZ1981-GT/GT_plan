@@ -96,25 +96,44 @@ export function calcStraightLineDepreciation(cost: number, salvageRate: number, 
 }
 
 /**
- * 含减值月折旧
- * 减值后重新计算：(原值×(1-残值率) - 减值准备) / (使用年限 - 已用年数) / 12
- * elapsed 为已使用年数
+ * 含减值月折旧（对齐 H1-12 / Excel H3-7 含减值底稿）
+ * 减值后：剩余可折旧额 = 原值 − 减值时累计折旧 − 减值准备 − 残值
+ * 新月折旧 = 剩余可折旧额 / 剩余月数
  */
 export function calcDepreciationWithImpairment(
   cost: number,
   salvageRate: number,
   usefulLife: number,
   impairment: number,
-  elapsed: number,
+  elapsedMonths: number,
+  accDepAtImpairment?: number,
 ): number {
-  return (cost * (1 - salvageRate) - impairment) / (usefulLife - elapsed) / 12
+  const totalMonths = usefulLife * 12
+  const remainingMonths = totalMonths - elapsedMonths
+  if (remainingMonths <= 0 || usefulLife <= 0) return 0
+  const salvage = cost * salvageRate
+  const preMonthly = calcStraightLineDepreciation(cost, salvageRate, usefulLife)
+  const accDep = accDepAtImpairment != null
+    ? Math.max(accDepAtImpairment, 0)
+    : preMonthly * Math.max(elapsedMonths, 0)
+  const carrying = cost - accDep - Math.max(impairment, 0)
+  const remainingDepreciable = Math.max(carrying - salvage, 0)
+  return remainingDepreciable / remainingMonths
 }
 
 // ---------- DCF 现值（减值测试用） ----------
 
 /** DCF现值 = Σ(cf_i / (1+r)^(i+1))，i从0开始 */
 export function calcDcfPresentValue(cashFlows: number[], discountRate: number): number {
+  if (cashFlows.length === 0) return 0
+  if (discountRate <= -1) return 0
   return cashFlows.reduce((pv, cf, i) => pv + cf / Math.pow(1 + discountRate, i + 1), 0)
+}
+
+/** 终值（永续价值）= 永续现金流 / (折现率 − 增长率)；r≤g 时返回 0 */
+export function calcTerminalValue(perpetuityCF: number, discountRate: number, growthRate: number): number {
+  if (discountRate <= growthRate) return 0
+  return perpetuityCF / (discountRate - growthRate)
 }
 
 // ---------- 借贷平衡 ----------

@@ -39,10 +39,16 @@
           "description": "了解组成部分→审计范围→组成部分注册会计师"
         },
         {
+          "id": "B60_strategy",
+          "name": "总体审计策略",
+          "codes": ["B60", "B60A", "B60B", "B60C", "B60D", "B60-2-1", "B60-2-2", "B60-2-3", "B60-3"],
+          "description": "总体策略主稿 + 业态/IT/专家条件附件（由 attachment_flags 触发）"
+        },
+        {
           "id": "B60_budget",
           "name": "工时预算",
           "codes": ["B60-1"],
-          "description": "审计项目工时预算与控制"
+          "description": "审计项目工时预算与控制（B60 必挂）"
         }
       ]
     },

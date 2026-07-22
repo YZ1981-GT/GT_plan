@@ -1,225 +1,417 @@
 <template>
   <div class="i2-capitalization">
-    <!-- Section Header -->
     <div class="section-header">
-      <span class="section-title">I2-6 研发项目资本化时点判断（CAS6五条件核心）</span>
+      <span class="section-title">I2-6 研发项目资本化时点判断</span>
       <div class="section-actions">
-        <el-button size="small" type="default" text @click="handleReview">
-          复核
-        </el-button>
+        <el-button size="small" type="default" text @click="handleReview">复核</el-button>
       </div>
     </div>
 
-    <!-- 审计目标 -->
-    <el-alert type="info" :closable="false" class="objective-alert"
-      title="审计目标：判断各研发项目开发阶段支出资本化时点的恰当性，核查是否同时满足 CAS6 第9条规定的五个资本化条件，确认资本化起点与归集金额真实、合规。" />
+    <!-- 一、审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert">
+      <template #title>一、审计目标</template>
+      <ol class="obj-list">
+        <li v-for="(o, i) in CAS6_OBJECTIVES" :key="i">{{ o }}</li>
+      </ol>
+    </el-alert>
 
-    <!-- 编制提示 -->
-    <details class="guidance-details">
-      <summary>📋 编制提示</summary>
-      <div class="guidance-content">
-        <p>1. 逐研发项目对照 CAS6 第9条五个条件（技术可行性/完成意图/使用或出售能力/未来经济利益/资源充足）逐条判断；</p>
-        <p>2. 获取立项报告、可行性研究报告、董事会纪要、评审记录等支持性文件作为资本化依据；</p>
-        <p>3. 五条件须同时满足方可资本化，任一不满足则相关支出应费用化；确实无法区分研究/开发阶段的支出全部费用化；</p>
-        <p>4. 资本化时点日期联动 I2-2 明细表"资本化起点"列。</p>
-      </div>
-    </details>
+    <div class="methodology-context">
+      <p>
+        <b>编制逻辑（CAS6 §9）：</b>
+        研究阶段支出费用化 → 开发阶段支出仅当<strong>五条件同时满足</strong>方可资本化 →
+        记录资本化时点与依据 → 与无形资产明细勾稽 → 回写 I2-2「资本化起点」。
+        无法区分研究/开发阶段的支出全部费用化。
+      </p>
+    </div>
 
-    <!-- 索引工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-right">
-        <GtIndexChip value="wp:I2" :context-project-id="props.projectId" />
-        <el-tag size="small" type="info">共 {{ projectOptions.length }} 个项目</el-tag>
+        <GtIndexChip value="wp:I2-6" :context-project-id="projectId" />
+        <el-tag size="small" type="success">可资本化 {{ summary.metCount }}</el-tag>
+        <el-tag v-if="summary.notMetCount" size="small" type="danger">不满足 {{ summary.notMetCount }}</el-tag>
+        <el-tag v-if="summary.pendingCount" size="small" type="warning">待评 {{ summary.pendingCount }}</el-tag>
+        <el-tag v-if="gateBlocked" size="small" type="danger">闸门阻断</el-tag>
+        <el-tag v-if="amountReconciles.length" size="small" type="warning">勾稽差 {{ amountReconciles.length }}</el-tag>
+        <el-button size="small" @click="emit('navigate-sheet', 'I2-4')">← I2-4</el-button>
+        <el-button size="small" @click="emit('navigate-sheet', 'I2-2')">I2-2</el-button>
+        <el-button size="small" @click="emit('navigate-sheet', 'I2-7')">I2-7 →</el-button>
       </div>
     </div>
 
-    <!-- 蓝色引导面板：CAS6第9条原文 + 五条件解读 -->
-    <div class="cas6-guide-panel">
-      <div class="guide-header">
-        <el-icon><InfoFilled /></el-icon>
-        <span>CAS6第9条 — 企业内部研究开发项目开发阶段支出资本化条件</span>
-      </div>
-      <div class="guide-body">
-        <p class="guide-quote">
-          企业内部研究开发项目开发阶段的支出，同时满足下列条件的，才能确认为无形资产：
-        </p>
-        <div class="conditions-grid">
-          <div class="condition-item">
-            <span class="condition-num">①</span>
-            <span class="condition-text"><strong>技术可行性</strong> — 完成该无形资产使其能够使用或出售在技术上具有可行性</span>
-          </div>
-          <div class="condition-item">
-            <span class="condition-num">②</span>
-            <span class="condition-text"><strong>完成意图</strong> — 具有完成该无形资产并使用或出售的意图</span>
-          </div>
-          <div class="condition-item">
-            <span class="condition-num">③</span>
-            <span class="condition-text"><strong>使用或出售能力</strong> — 能够证明运用该无形资产生产的产品存在市场或无形资产自身存在市场</span>
-          </div>
-          <div class="condition-item">
-            <span class="condition-num">④</span>
-            <span class="condition-text"><strong>未来经济利益</strong> — 有足够的技术、财务资源和其他资源支持完成开发</span>
-          </div>
-          <div class="condition-item">
-            <span class="condition-num">⑤</span>
-            <span class="condition-text"><strong>资源充足</strong> — 归属于该无形资产开发阶段的支出能够可靠地计量</span>
+    <el-alert
+      v-if="gateIssues.length"
+      :type="gateBlocked ? 'error' : 'warning'"
+      :closable="false"
+      show-icon
+      class="gate-alert"
+    >
+      <template #title>资本化闸门（{{ gateIssues.length }}）</template>
+      <ul class="issue-list">
+        <li v-for="(g, i) in gateIssues" :key="i">【{{ g.projectName }}】{{ g.message }}</li>
+      </ul>
+    </el-alert>
+
+    <el-alert
+      v-if="amountReconciles.length"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="gate-alert"
+    >
+      <template #title>与 I2-2 / I2-7 金额勾稽（{{ amountReconciles.length }}）</template>
+      <ul class="issue-list">
+        <li v-for="(r, i) in amountReconciles" :key="i">
+          【{{ r.projectName }}】{{ r.messages.join('；') }}
+        </li>
+      </ul>
+    </el-alert>
+
+    <!-- CAS6 引导 + 示例 -->
+    <el-card shadow="never" class="guide-card">
+      <template #header>
+        <div class="block-title">
+          <span>CAS6 第9条 — 开发阶段资本化五条件（须同时满足）</span>
+          <el-button size="small" text type="primary" @click="showExamples = !showExamples">
+            {{ showExamples ? '收起示例' : '展开条件示例' }}
+          </el-button>
+        </div>
+      </template>
+      <div class="conditions-grid">
+        <div v-for="id in ([1, 2, 3, 4, 5] as const)" :key="id" class="condition-item">
+          <span class="condition-num">{{ ['①', '②', '③', '④', '⑤'][id - 1] }}</span>
+          <div>
+            <strong>{{ CAS6_CONDITION_NAMES[id] }}</strong>
+            <p class="cond-analysis">{{ CAS6_CONDITION_ANALYSIS[id] }}</p>
+            <p v-if="showExamples" class="cond-example">{{ CAS6_CONDITION_EXAMPLES[id] }}</p>
           </div>
         </div>
       </div>
-    </div>
+    </el-card>
 
-    <!-- 项目选择器 -->
-    <div class="project-selector">
-      <span class="selector-label">研发项目：</span>
-      <el-select
-        v-model="selectedProject"
-        placeholder="选择研发项目"
-        size="default"
-        style="width: 320px"
-        @change="onProjectChange"
-      >
-        <el-option
-          v-for="proj in projectOptions"
-          :key="proj"
-          :label="proj"
-          :value="proj"
-        />
-      </el-select>
-      <el-button
-        v-if="!selectedProject"
+    <!-- 二、审计过程 -->
+    <el-card shadow="never" class="block-card">
+      <template #header>
+        <div class="block-title">
+          <span>二、审计过程 — 按项目资本化时点判断</span>
+          <div class="title-actions">
+            <el-button size="small" :disabled="isReadonly" @click="handleSeed">从 I2-2 带入</el-button>
+            <el-button size="small" type="warning" :disabled="isReadonly" @click="handleLinkI22">回写时点→I2-2</el-button>
+            <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleAdd">+ 新增项目</el-button>
+            <el-button size="small" type="success" :disabled="isReadonly" @click="handleSave">保存</el-button>
+          </div>
+        </div>
+      </template>
+
+      <el-table
+        :data="rows"
+        border
+        stripe
         size="small"
-        type="primary"
-        plain
-        style="margin-left: 12px"
-        @click="handleAddProject"
+        max-height="420"
+        highlight-current-row
+        :row-class-name="rowClassName"
+        @current-change="onCurrentChange"
+        show-summary
+        :summary-method="getSummary"
       >
-        + 新增项目
-      </el-button>
-    </div>
+        <el-table-column type="index" label="#" width="40" align="center" fixed />
+        <el-table-column label="项目编号" width="90">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.projectNo" size="small" @update:model-value="(v: string) => updateField(row.rowId, 'projectNo', v)" />
+            <span v-else>{{ row.projectNo || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="研发项目名称" min-width="130" fixed>
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.projectName" size="small" placeholder="项目名称" @update:model-value="(v: string) => updateField(row.rowId, 'projectName', v)" />
+            <span v-else>{{ row.projectName || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="研究阶段" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.researchAmount" size="small" :controls="false" :precision="2" class="amt-input" @change="(v: number | undefined) => updateField(row.rowId, 'researchAmount', v ?? 0)" />
+            <span v-else class="amt">{{ fmtNum(row.researchAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="开发阶段" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.developmentAmount" size="small" :controls="false" :precision="2" class="amt-input" @change="(v: number | undefined) => updateField(row.rowId, 'developmentAmount', v ?? 0)" />
+            <span v-else class="amt">{{ fmtNum(row.developmentAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="资本化时点" width="128">
+          <template #default="{ row }">
+            <el-date-picker
+              v-if="!isReadonly"
+              :model-value="row.capStartDate"
+              type="date"
+              size="small"
+              value-format="YYYY-MM-DD"
+              style="width:100%"
+              :disabled="!getRowCapResult(row).isMet"
+              @update:model-value="(v: string) => updateField(row.rowId, 'capStartDate', v || '')"
+            />
+            <span v-else>{{ row.capStartDate || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="五条件" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag :type="capTagType(row)" size="small">{{ capTagLabel(row) }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="确认无形资产" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.recognizedIaAmount" size="small" :controls="false" :precision="2" class="amt-input" @change="(v: number | undefined) => updateField(row.rowId, 'recognizedIaAmount', v ?? 0)" />
+            <span v-else class="amt">{{ fmtNum(row.recognizedIaAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="与明细勾稽" width="100" align="center">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" :model-value="row.ledgerConsistent" size="small" clearable @change="(v: string) => updateField(row.rowId, 'ledgerConsistent', v || '')">
+              <el-option label="一致" value="Y" />
+              <el-option label="不一致" value="N" />
+            </el-select>
+            <span v-else>{{ row.ledgerConsistent === 'Y' ? '一致' : row.ledgerConsistent === 'N' ? '不一致' : '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末进度" min-width="90">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.progress" size="small" @update:model-value="(v: string) => updateField(row.rowId, 'progress', v)" />
+            <span v-else>{{ row.progress || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="索引" width="80">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small" @update:model-value="(v: string) => updateField(row.rowId, 'indexRef', v)" />
+            <span v-else>{{ row.indexRef || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="操作" width="56" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" type="danger" text @click="removeRow(row.rowId)">删</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <p class="table-hint">点击行可展开下方「五条件明细」；资本化时点仅在五条件全部为「是」时可编辑。</p>
+    </el-card>
 
-    <!-- 五条件矩阵（当选中项目时显示） -->
-    <div v-if="selectedProject" class="conditions-matrix">
+    <!-- 选中行：五条件明细 + 扩展字段 -->
+    <el-card v-if="activeRow" shadow="never" class="block-card detail-card">
+      <template #header>
+        <div class="block-title">
+          <span>五条件明细 — {{ activeRow.projectName || '未命名项目' }}</span>
+          <div class="title-actions">
+            <el-button
+              v-if="!isReadonly"
+              size="small"
+              type="primary"
+              plain
+              @click="handleAiSuggest"
+            >
+              AI 建议条件
+            </el-button>
+            <el-tag v-if="activeResult" :type="activeResult.isMet ? 'success' : 'danger'" size="small">
+              {{ activeResult.conclusion }}
+            </el-tag>
+          </div>
+        </div>
+      </template>
+
+      <el-alert
+        v-if="activeTimingIssues.length"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="gate-alert"
+        :title="activeTimingIssues.join('；')"
+      />
+
+      <el-form label-width="110px" size="small" class="meta-form">
+        <el-row :gutter="12">
+          <el-col :span="8">
+            <el-form-item label="立项开始日">
+              <el-date-picker
+                :model-value="activeRow.projectStartDate"
+                type="date"
+                size="small"
+                value-format="YYYY-MM-DD"
+                style="width:100%"
+                :disabled="isReadonly"
+                @update:model-value="(v: string) => updateField(activeRow!.rowId, 'projectStartDate', v || '')"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="验收日">
+              <el-date-picker
+                :model-value="activeRow.acceptanceDate"
+                type="date"
+                size="small"
+                value-format="YYYY-MM-DD"
+                style="width:100%"
+                :disabled="isReadonly"
+                @update:model-value="(v: string) => updateField(activeRow!.rowId, 'acceptanceDate', v || '')"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="转入无形资产日">
+              <el-date-picker
+                :model-value="activeRow.transferDate"
+                type="date"
+                size="small"
+                value-format="YYYY-MM-DD"
+                style="width:100%"
+                :disabled="isReadonly"
+                @update:model-value="(v: string) => updateField(activeRow!.rowId, 'transferDate', v || '')"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="项目具体内容">
+              <el-input :model-value="activeRow.projectContent" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly" @update:model-value="(v: string) => updateField(activeRow!.rowId, 'projectContent', v)" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="人员构成">
+              <el-input :model-value="activeRow.personnelComposition" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly" @update:model-value="(v: string) => updateField(activeRow!.rowId, 'personnelComposition', v)" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="预算-材料">
+              <el-input-number :model-value="activeRow.budgetMaterial" :controls="false" :precision="2" :disabled="isReadonly" @change="(v: number | undefined) => updateField(activeRow!.rowId, 'budgetMaterial', v ?? 0)" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="预算-人工">
+              <el-input-number :model-value="activeRow.budgetLabor" :controls="false" :precision="2" :disabled="isReadonly" @change="(v: number | undefined) => updateField(activeRow!.rowId, 'budgetLabor', v ?? 0)" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="预算-其他">
+              <el-input-number :model-value="activeRow.budgetOther" :controls="false" :precision="2" :disabled="isReadonly" @change="(v: number | undefined) => updateField(activeRow!.rowId, 'budgetOther', v ?? 0)" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="资本化依据">
+              <el-input :model-value="activeRow.capBasis" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly" placeholder="立项/可行性研究/决议等依据摘要…" @update:model-value="(v: string) => updateField(activeRow!.rowId, 'capBasis', v)" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="支持性证据">
+              <el-input :model-value="activeRow.supportingEvidence" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly" placeholder="查验的原始证据清单…" @update:model-value="(v: string) => updateField(activeRow!.rowId, 'supportingEvidence', v)" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+
       <div
-        v-for="(cond, idx) in currentConditions"
+        v-for="(cond, idx) in activeRow.conditions"
         :key="cond.id"
         class="condition-card"
       >
         <div class="condition-card-header">
-          <span class="condition-card-num">{{ conditionIcons[idx] }}</span>
+          <span class="condition-card-num">{{ ['①', '②', '③', '④', '⑤'][idx] }}</span>
           <span class="condition-card-title">{{ cond.name }}</span>
+          <el-tooltip :content="CAS6_CONDITION_EXAMPLES[cond.id]" placement="top">
+            <el-tag size="small" type="info">示例</el-tag>
+          </el-tooltip>
         </div>
-
         <div class="condition-card-body">
-          <!-- 是/否/NA 单选 -->
-          <div class="condition-radio-group">
-            <el-radio-group
-              :model-value="cond.result"
-              @change="(v: string) => onConditionResultChange(idx, v as 'yes' | 'no' | 'na')"
-            >
-              <el-radio-button value="yes">是</el-radio-button>
-              <el-radio-button value="no">否</el-radio-button>
-              <el-radio-button value="na">不适用</el-radio-button>
-            </el-radio-group>
-          </div>
-
-          <!-- 证据描述 -->
-          <div class="condition-evidence">
-            <el-input
-              :model-value="cond.evidence"
-              type="textarea"
-              :autosize="{ minRows: 2, maxRows: 5 }"
-              placeholder="请描述支撑证据..."
-              @change="(v: string) => onEvidenceChange(idx, v)"
-            />
-          </div>
-
-          <!-- 附件上传 -->
-          <div class="condition-attachment">
-            <el-button size="small" type="default" plain @click="handleAttachUpload(idx)">
-              📎 上传附件
-            </el-button>
-            <span v-if="attachments[idx]" class="attachment-name">{{ attachments[idx] }}</span>
-          </div>
+          <el-radio-group
+            :model-value="cond.result || undefined"
+            :disabled="isReadonly"
+            size="small"
+            @change="(v: string | number | boolean | undefined) => updateCondition(activeRow!.rowId, idx, { result: (v as any) || '' })"
+          >
+            <el-radio-button value="yes">是</el-radio-button>
+            <el-radio-button value="no">否</el-radio-button>
+            <el-radio-button value="na">不适用</el-radio-button>
+          </el-radio-group>
+          <el-input
+            :model-value="cond.evidence"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 4 }"
+            :disabled="isReadonly"
+            :placeholder="`证据描述…（${CAS6_CONDITION_ANALYSIS[cond.id]}）`"
+            class="mt-8"
+            @change="(v: string) => updateCondition(activeRow!.rowId, idx, { evidence: v })"
+          />
+          <el-input
+            :model-value="(cond.attachments || []).join('；')"
+            size="small"
+            :disabled="isReadonly"
+            placeholder="附件索引（多个用；分隔，如 立项批复.pdf；测试报告.docx）"
+            class="mt-8"
+            @change="(v: string) => updateCondition(activeRow!.rowId, idx, {
+              attachments: v.split(/[；;]/).map((s) => s.trim()).filter(Boolean),
+            })"
+          />
         </div>
       </div>
+    </el-card>
 
-      <!-- 结论自动计算 -->
-      <div :class="['conclusion-panel', conclusionClass]">
-        <div class="conclusion-icon">
-          {{ capitalizationResult.isMet ? '✅' : '❌' }}
-        </div>
-        <div class="conclusion-text">
-          <strong>{{ capitalizationResult.conclusion }}</strong>
-          <div v-if="!capitalizationResult.isMet && capitalizationResult.missingConditions.length > 0" class="missing-list">
-            缺失条件：
-            <el-tag
-              v-for="id in capitalizationResult.missingConditions"
-              :key="id"
-              type="danger"
-              size="small"
-              style="margin-left: 4px"
-            >
-              {{ CAS6_CONDITION_NAMES[id as 1|2|3|4|5] }}
-            </el-tag>
-          </div>
-        </div>
-      </div>
+    <el-empty v-else description="请从上方表格选择或新增研发项目，开始五条件判断" :image-size="64" />
 
-      <!-- 资本化时点日期 -->
-      <div class="capitalization-date-row">
-        <span class="date-label">资本化时点日期（联动I2-2"资本化起点"列）：</span>
-        <el-date-picker
-          v-model="capitalizationDate"
-          type="date"
-          size="default"
-          value-format="YYYY-MM-DD"
-          placeholder="选择资本化时点日期"
-          :disabled="!capitalizationResult.isMet"
-          @change="onCapDateChange"
-        />
-        <el-tag v-if="!capitalizationResult.isMet" type="info" size="small" style="margin-left: 8px">
-          未满足资本化条件，无法设置时点
-        </el-tag>
-      </div>
-
-      <!-- 保存按钮 -->
-      <div class="table-actions">
-        <el-button size="small" type="success" @click="handleSave">
-          保存
-        </el-button>
-      </div>
-    </div>
-
-    <!-- 无项目时提示 -->
-    <div v-else class="no-project-hint">
-      <el-empty description="请选择或新增研发项目以开始CAS6五条件检查" />
-    </div>
-
-    <!-- 审计说明 -->
+    <!-- 三、审计说明 -->
     <el-card shadow="never" class="audit-note-card">
-      <template #header><span>审计说明</span></template>
-      <el-input type="textarea" :model-value="auditNote" :autosize="{ minRows: 5 }" placeholder="记录资本化时点判断过程、支持性文件核查情况及发现的问题..." @change="saveAuditNote" />
+      <template #header><span>三、审计说明</span></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 4 }"
+        placeholder="记录阶段划分、时点依据、证据查验及异常处理…"
+        @change="(v: string) => saveNote(v)"
+      />
     </el-card>
+
+    <!-- 四、审计结论 -->
     <el-card shadow="never" class="audit-conclusion-card">
-      <template #header><span>审计结论</span></template>
-      <el-input type="textarea" :model-value="auditConclusion" :autosize="{ minRows: 3 }" placeholder="填写资本化时点判断总体结论..." @change="saveAuditConclusion" />
+      <template #header>
+        <div class="conclusion-header">
+          <span>四、审计结论</span>
+          <el-button v-if="!isReadonly" size="small" text type="primary" @click="handleFillDraft">生成草稿</el-button>
+        </div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="资本化时点判断是否恰当；政策是否一贯…"
+        @change="(v: string) => saveConclusion(v)"
+      />
     </el-card>
+
+    <details class="edit-tips">
+      <summary>编制说明（CAS6 / 建议程序）</summary>
+      <p>研究阶段支出应费用化；开发阶段支出须五条件<strong>同时</strong>满足方可资本化；无法区分阶段的全部费用化。</p>
+      <ol>
+        <li v-for="(h, i) in CAS6_PROCEDURE_HINTS" :key="i">{{ h }}</li>
+      </ol>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, inject, onMounted } from 'vue'
+/**
+ * I2TabCapitalization.vue — I2-6 研发项目资本化时点判断
+ * 对齐 Excel：项目宽表 + CAS6五条件明细 + 示例/程序指引
+ */
+import { ref, computed, inject, toRef } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
-import { InfoFilled } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import {
-  evaluateCapitalization,
+  useI2Capitalization,
+  getRowCapResult,
   CAS6_CONDITION_NAMES,
-  type CAS6Condition,
-  type CapitalizationResult,
-} from '../../composables/useI2CapitalizationEngine'
-
-// ─── Props & Emits ───────────────────────────────────────────────────────────
+  CAS6_CONDITION_ANALYSIS,
+  CAS6_CONDITION_EXAMPLES,
+  CAS6_OBJECTIVES,
+  CAS6_PROCEDURE_HINTS,
+  type I2CapitalizationProjectRow,
+} from '../../composables/useI2Capitalization'
 
 const props = defineProps<{
   sheetName: string
@@ -227,226 +419,132 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   saveResponse: (sheetCode: string, data: Record<string, any>) => Promise<void>
+  isReadonly?: boolean
 }>()
 
-const emit = defineEmits<{
-  'save': []
-  'navigate-sheet': [sheetName: string]
-}>()
-
-// ─── Inject ──────────────────────────────────────────────────────────────────
-
+const emit = defineEmits<{ 'save': []; 'navigate-sheet': [sheetName: string] }>()
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+const isReadonly = computed(() => Boolean(props.isReadonly))
+const projectId = computed(() => props.projectId)
+const showExamples = ref(false)
 
-const conditionIcons = ['①', '②', '③', '④', '⑤']
-
-const STORAGE_KEY = 'I2-6-capitalization'
-
-// ─── State ───────────────────────────────────────────────────────────────────
-
-const selectedProject = ref('')
-const capitalizationDate = ref('')
-const attachments = ref<string[]>(['', '', '', '', ''])
-
-/** All project data: Map<projectName, { conditions, date }> */
-const projectDataMap = ref<Map<string, { conditions: CAS6Condition[]; date: string }>>(new Map())
-
-// ─── Load from allResponses ──────────────────────────────────────────────────
-
-function loadData() {
-  const raw = props.allResponses.get(STORAGE_KEY)
-  if (raw) {
-    try {
-      const parsed = typeof raw === 'string' ? JSON.parse(raw) : (raw.remark ? JSON.parse(raw.remark) : raw)
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        const map = new Map<string, { conditions: CAS6Condition[]; date: string }>()
-        for (const [projName, projData] of Object.entries(parsed as Record<string, any>)) {
-          map.set(projName, {
-            conditions: Array.isArray(projData.conditions)
-              ? projData.conditions.map((c: any) => ({
-                  id: c.id,
-                  name: c.name || CAS6_CONDITION_NAMES[c.id as 1|2|3|4|5] || '',
-                  result: c.result || 'na',
-                  evidence: c.evidence || '',
-                }))
-              : createEmptyConditions(),
-            date: projData.date || '',
-          })
-        }
-        projectDataMap.value = map
-      }
-    } catch { /* ignore */ }
-  }
-}
-
-watch(() => props.allResponses, () => loadData(), { immediate: true })
-
-// ─── Project Options (from I2-2 detail rows or existing data) ────────────────
-
-const projectOptions = computed(() => {
-  const fromDetail = getDetailProjectNames()
-  const fromMap = Array.from(projectDataMap.value.keys())
-  const all = new Set([...fromDetail, ...fromMap])
-  return Array.from(all).filter(Boolean)
+const {
+  rows,
+  activeRowId,
+  activeRow,
+  activeResult,
+  summary,
+  gateIssues,
+  gateBlocked,
+  amountReconciles,
+  activeTimingIssues,
+  auditNote,
+  auditConclusion,
+  addRow,
+  removeRow,
+  updateField,
+  updateCondition,
+  applyAiSuggest,
+  seedFromDetail,
+  linkCapDateToDetail,
+  fillConclusionDraft,
+  persistAll,
+  saveNote,
+  saveConclusion,
+} = useI2Capitalization(toRef(props, 'allResponses'), {
+  saveResponse: props.saveResponse,
 })
 
-function getDetailProjectNames(): string[] {
-  const raw = props.allResponses.get('I2-2-rows')
-  if (!raw) return []
-  try {
-    const parsed = typeof raw === 'string' ? JSON.parse(raw) : (raw.remark ? JSON.parse(raw.remark) : raw)
-    if (Array.isArray(parsed)) {
-      return parsed.map((r: any) => r.projectName).filter(Boolean)
-    }
-  } catch { /* ignore */ }
-  return []
+function fmtNum(v: number): string {
+  return v == null || isNaN(v) ? '—' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-// ─── Current Project Conditions ──────────────────────────────────────────────
-
-const currentConditions = computed<CAS6Condition[]>(() => {
-  if (!selectedProject.value) return createEmptyConditions()
-  const data = projectDataMap.value.get(selectedProject.value)
-  return data?.conditions ?? createEmptyConditions()
-})
-
-const capitalizationResult = computed<CapitalizationResult>(() => {
-  return evaluateCapitalization(currentConditions.value)
-})
-
-const conclusionClass = computed(() => {
-  if (!selectedProject.value) return 'conclusion-neutral'
-  return capitalizationResult.value.isMet ? 'conclusion-met' : 'conclusion-not-met'
-})
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function createEmptyConditions(): CAS6Condition[] {
-  return [
-    { id: 1, name: '技术可行性', result: 'na', evidence: '' },
-    { id: 2, name: '完成意图', result: 'na', evidence: '' },
-    { id: 3, name: '使用或出售能力', result: 'na', evidence: '' },
-    { id: 4, name: '未来经济利益', result: 'na', evidence: '' },
-    { id: 5, name: '资源充足', result: 'na', evidence: '' },
-  ]
+function capTagType(row: I2CapitalizationProjectRow) {
+  const r = getRowCapResult(row)
+  if (r.isMet) return 'success'
+  const filled = row.conditions.some((c) => c.result === 'yes' || c.result === 'no')
+  return filled ? 'danger' : 'info'
 }
 
-function ensureProjectData(projName: string) {
-  if (!projectDataMap.value.has(projName)) {
-    projectDataMap.value.set(projName, {
-      conditions: createEmptyConditions(),
-      date: '',
-    })
-  }
+function capTagLabel(row: I2CapitalizationProjectRow) {
+  const r = getRowCapResult(row)
+  if (r.isMet) return '满足'
+  const filled = row.conditions.some((c) => c.result === 'yes' || c.result === 'no')
+  if (!filled) return '待评'
+  return `缺${r.missingConditions.length}`
 }
 
-// ─── Events ──────────────────────────────────────────────────────────────────
-
-function onProjectChange(projName: string) {
-  ensureProjectData(projName)
-  const data = projectDataMap.value.get(projName)!
-  capitalizationDate.value = data.date
-  attachments.value = ['', '', '', '', '']
+function rowClassName({ row }: { row: I2CapitalizationProjectRow }) {
+  const r = getRowCapResult(row)
+  if (r.isMet) return 'row-met'
+  if (row.conditions.some((c) => c.result === 'no')) return 'row-fail'
+  return ''
 }
 
-function onConditionResultChange(condIdx: number, result: 'yes' | 'no' | 'na') {
-  if (!selectedProject.value) return
-  ensureProjectData(selectedProject.value)
-  const data = projectDataMap.value.get(selectedProject.value)!
-  data.conditions[condIdx] = { ...data.conditions[condIdx], result }
-  // Force reactivity
-  projectDataMap.value = new Map(projectDataMap.value)
+function onCurrentChange(row: I2CapitalizationProjectRow | null) {
+  if (row) activeRowId.value = row.rowId
 }
 
-function onEvidenceChange(condIdx: number, evidence: string) {
-  if (!selectedProject.value) return
-  ensureProjectData(selectedProject.value)
-  const data = projectDataMap.value.get(selectedProject.value)!
-  data.conditions[condIdx] = { ...data.conditions[condIdx], evidence }
-  projectDataMap.value = new Map(projectDataMap.value)
+function getSummary({ columns }: { columns: any[] }) {
+  const s = summary.value
+  return columns.map((col, idx) => {
+    if (idx === 0) return '合计'
+    const label = String(col.label || '')
+    if (label.includes('研究')) return fmtNum(s.totalResearch)
+    if (label.includes('开发')) return fmtNum(s.totalDevelopment)
+    if (label.includes('无形资产')) return fmtNum(s.totalRecognizedIa)
+    return ''
+  })
 }
 
-function onCapDateChange(date: string) {
-  if (!selectedProject.value) return
-  ensureProjectData(selectedProject.value)
-  const data = projectDataMap.value.get(selectedProject.value)!
-  data.date = date || ''
-  projectDataMap.value = new Map(projectDataMap.value)
-}
-
-// ─── Add Project ─────────────────────────────────────────────────────────────
-
-async function handleAddProject() {
+async function handleAdd() {
   try {
     const { value } = await ElMessageBox.prompt('请输入研发项目名称', '新增项目', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
-      inputPlaceholder: '例如：XX智能平台研发项目',
     })
     if (value?.trim()) {
-      const name = value.trim()
-      ensureProjectData(name)
-      selectedProject.value = name
-      capitalizationDate.value = ''
-      ElMessage.success(`已添加项目：${name}`)
+      addRow({ projectName: value.trim() })
+      ElMessage.success(`已添加：${value.trim()}`)
     }
-  } catch {
-    // cancelled
-  }
+  } catch { /* cancelled */ }
 }
 
-// ─── Save ────────────────────────────────────────────────────────────────────
+function handleSeed() {
+  const r = seedFromDetail()
+  if (r.ok) ElMessage.success(r.message)
+  else ElMessage.warning(r.message)
+}
+
+function handleLinkI22() {
+  const r = linkCapDateToDetail()
+  if (r.ok) ElMessage.success(r.message)
+  else ElMessage.warning(r.message)
+}
+
+function handleAiSuggest() {
+  if (!activeRow.value) return
+  const r = applyAiSuggest(activeRow.value.rowId)
+  if (r.ok) ElMessage.success(r.message)
+  else ElMessage.warning(r.message)
+}
+
+function handleFillDraft() {
+  const r = fillConclusionDraft()
+  if (!r.ok) {
+    ElMessage.error(r.message)
+    return
+  }
+  void saveConclusion(auditConclusion.value)
+  ElMessage.success(r.message)
+}
 
 async function handleSave() {
-  // Serialize Map to JSON object
-  const obj: Record<string, any> = {}
-  for (const [projName, data] of projectDataMap.value.entries()) {
-    obj[projName] = {
-      conditions: data.conditions,
-      date: data.date,
-    }
-  }
-  await props.saveResponse('I2-6', { [STORAGE_KEY]: JSON.stringify(obj) })
+  await persistAll()
   emit('save')
   ElMessage.success('资本化时点判断已保存')
 }
-
-// ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────
-
-const AUDIT_NOTE_KEY = 'I2-6-audit-note'
-const AUDIT_CONCLUSION_KEY = 'I2-6-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-
-function readRemark(key: string): string {
-  const raw = props.allResponses.get(key)
-  if (raw == null) return ''
-  return typeof raw === 'string' ? raw : (raw.remark ?? '')
-}
-function hydrateAudit() {
-  auditNote.value = readRemark(AUDIT_NOTE_KEY)
-  auditConclusion.value = readRemark(AUDIT_CONCLUSION_KEY)
-}
-function saveAuditNote(val: string) {
-  auditNote.value = val
-  void props.saveResponse('I2-6', { [AUDIT_NOTE_KEY]: val })
-}
-function saveAuditConclusion(val: string) {
-  auditConclusion.value = val
-  void props.saveResponse('I2-6', { [AUDIT_CONCLUSION_KEY]: val })
-}
-watch(() => props.allResponses, () => hydrateAudit(), { immediate: true })
-onMounted(hydrateAudit)
-
-// ─── Attachment ──────────────────────────────────────────────────────────────
-
-function handleAttachUpload(condIdx: number) {
-  ElMessage.info('附件上传功能开发中')
-}
-
-// ─── Review ──────────────────────────────────────────────────────────────────
 
 function handleReview() {
   openReviewDialog('I2-6-资本化时点判断')
@@ -454,214 +552,46 @@ function handleReview() {
 </script>
 
 <style scoped>
-.i2-capitalization {
-  font-size: var(--wp-font-size, 13px);
-  padding: 16px;
-}
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-.section-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #1f2937;
-}
-.section-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* 蓝色引导面板 */
-.cas6-guide-panel {
-  background: linear-gradient(135deg, #eff6ff, #dbeafe);
-  border: 1px solid #93c5fd;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 20px;
-}
-.guide-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e40af;
-  margin-bottom: 12px;
-}
-.guide-body {
-  font-size: 12px;
-  color: #1e3a5f;
-  line-height: 1.6;
-}
-.guide-quote {
-  margin: 0 0 10px 0;
-  font-style: italic;
-  color: #1e40af;
-}
-.conditions-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.condition-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-}
-.condition-num {
-  color: #2563eb;
-  font-weight: 700;
-  font-size: 14px;
-  flex-shrink: 0;
-}
-.condition-text {
-  font-size: 12px;
-  color: #334155;
-}
-
-/* 项目选择器 */
-.project-selector {
-  display: flex;
-  align-items: center;
-  margin-bottom: 20px;
-  padding: 12px 16px;
-  background: #f9fafb;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-}
-.selector-label {
-  font-weight: 600;
-  color: #374151;
-  margin-right: 12px;
-  white-space: nowrap;
-}
-
-/* 五条件矩阵 */
-.conditions-matrix {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.condition-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  overflow: hidden;
-}
-.condition-card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
-  font-weight: 600;
-  color: #374151;
-}
-.condition-card-num {
-  color: #2563eb;
-  font-size: 16px;
-}
-.condition-card-title {
-  font-size: 14px;
-}
-.condition-card-body {
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.condition-radio-group {
-  display: flex;
-  align-items: center;
-}
-.condition-evidence {
-  flex: 1;
-}
-.condition-attachment {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.attachment-name {
-  font-size: 12px;
-  color: #6b7280;
-}
-
-/* 结论面板 */
-.conclusion-panel {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px;
-  border-radius: 8px;
-  margin-top: 8px;
-}
-.conclusion-met {
-  background: #ecfdf5;
-  border: 1px solid #6ee7b7;
-}
-.conclusion-not-met {
-  background: #fef2f2;
-  border: 1px solid #fca5a5;
-}
-.conclusion-neutral {
-  background: #f9fafb;
-  border: 1px solid #e5e7eb;
-}
-.conclusion-icon {
-  font-size: 24px;
-}
-.conclusion-text {
-  font-size: 14px;
-  color: #1f2937;
-}
-.missing-list {
-  margin-top: 6px;
-  font-size: 12px;
-  color: #dc2626;
-}
-
-/* 资本化时点日期 */
-.capitalization-date-row {
-  display: flex;
-  align-items: center;
-  margin-top: 16px;
-  padding: 12px 16px;
-  background: #fafbfc;
-  border-radius: 6px;
-  border: 1px solid #e5e7eb;
-}
-.date-label {
-  font-size: var(--wp-font-size, 13px);
-  font-weight: 500;
-  color: #374151;
-  margin-right: 12px;
-  white-space: nowrap;
-}
-
-/* 操作按钮 */
-.table-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-/* 无项目提示 */
-.no-project-hint {
-  margin-top: 40px;
-}
-
-/* 打磨要素 */
+.i2-capitalization { font-size: var(--wp-font-size, 13px); padding: 16px; }
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.section-title { font-size: 15px; font-weight: 600; color: #1f2937; }
 .objective-alert { margin-bottom: 12px; }
-.guidance-details { margin-bottom: 12px; font-size: 12px; color: var(--el-text-color-secondary); background: #f9fafb; border: 1px solid #ebeef5; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 600; color: #374151; }
-.guidance-details .guidance-content { margin-top: 8px; line-height: 1.7; }
-.guidance-details .guidance-content p { margin: 0 0 4px; }
-.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 10px; }
-.tab-toolbar .toolbar-right { display: flex; align-items: center; gap: 8px; }
-.audit-note-card, .audit-conclusion-card { margin-top: 16px; }
+.obj-list { margin: 4px 0 0; padding-left: 18px; line-height: 1.6; font-size: 12px; }
+.methodology-context {
+  background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
+  margin-bottom: 12px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.65;
+}
+.tab-toolbar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+.toolbar-right, .title-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.gate-alert { margin-bottom: 10px; }
+.issue-list { margin: 4px 0 0; padding-left: 18px; font-size: 12px; line-height: 1.55; }
+.guide-card, .block-card { margin-bottom: 12px; }
+.block-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-weight: 600; }
+.conditions-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.condition-item { display: flex; gap: 8px; font-size: 12px; color: #334155; line-height: 1.5; }
+.condition-num { color: #2563eb; font-weight: 700; flex-shrink: 0; }
+.cond-analysis { margin: 2px 0 0; color: #64748b; }
+.cond-example { margin: 4px 0 0; color: #1d4ed8; background: #eff6ff; padding: 4px 8px; border-radius: 4px; }
+.amt { font-variant-numeric: tabular-nums; }
+.amt-input { width: 100%; }
+.table-hint { margin: 8px 0 0; font-size: 12px; color: #9ca3af; }
+.detail-card .meta-form { margin-bottom: 12px; }
+.condition-card { border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+.condition-card-header {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px;
+  background: #f9fafb; border-bottom: 1px solid #e5e7eb; font-weight: 600;
+}
+.condition-card-num { color: #2563eb; }
+.condition-card-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.mt-8 { margin-top: 8px; }
+.audit-note-card, .audit-conclusion-card { margin-top: 12px; }
+.conclusion-header { display: flex; align-items: center; justify-content: space-between; }
+.edit-tips { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
+.edit-tips summary { cursor: pointer; font-weight: 500; }
+.edit-tips ol { padding-left: 18px; margin-top: 8px; line-height: 1.75; }
+:deep(.row-met) { background-color: #f0fdf4 !important; }
+:deep(.row-fail) { background-color: #fef2f2 !important; }
+@media (max-width: 900px) {
+  .conditions-grid { grid-template-columns: 1fr; }
+}
 </style>

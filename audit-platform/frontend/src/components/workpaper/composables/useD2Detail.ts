@@ -22,7 +22,7 @@
  * Requirements: 4.1, 4.2, 4.3, 4.5, 10.2, 10.3, 10.4
  */
 import { ref, computed, watch, inject, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   parseNum,
   getAuditedAmount,
@@ -162,7 +162,7 @@ function sumAgingData(dataList: AgingData[]): AgingData {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<string[]> }) {
-  const { allResponses, isReadonly, relatedParties, projectId } = options
+  const { allResponses, isReadonly, relatedParties, projectId, bsDate } = options
   const injectedSave = inject<D2SaveItemsFn | undefined>(D2_SAVE_ITEMS_KEY, undefined)
 
   // ─── 引入 useAgingConfig（subject='D2'） ───────────────────────────────
@@ -591,21 +591,189 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
     }
   }
 
+  // ─── Import Post-Period Collection (期后回款取数) ──────────────────────
+
+  /**
+   * 从序时账取期后回款（基准日后科目 1122 贷方发生额），按客户归集填入 postPayment。
+   *
+   * 数据源：GET /ledger/entries/1122?year={bsYear+1}&date_from&date_to（贷方=应收减少=收款）
+   * 归集：按客户名规范化匹配分录摘要(summary)/对方科目(counterpart_account)，仅精确包含才计入。
+   * 交互：预览"匹配 N 户合计 X / 未匹配 M 笔合计 Y"→确认后合并填入（不覆盖已手工填写的非零值）。
+   *
+   * 期后回款是函证的核心替代程序，也是 ECL 可回收性信号；无法精确归集的由审计师手工分配。
+   * @param monthsAfter 取数窗口月数（默认 6，覆盖典型审计报告日）
+   */
+  async function importPostPaymentFromLedger(monthsAfter = 6): Promise<{ matched: number; filledAmount: number; unmatchedCount: number; unmatchedAmount: number }> {
+    const empty = { matched: 0, filledAmount: 0, unmatchedCount: 0, unmatchedAmount: 0 }
+    if (isReadonly.value) return empty
+    if (rows.value.length === 0) {
+      ElMessage.info('请先录入或导入明细客户后再取期后回款')
+      return empty
+    }
+    const pid = projectId?.value
+    if (!pid) {
+      ElMessage.warning('缺少项目信息，无法取数')
+      return empty
+    }
+
+    // 解析基准日 → 期后窗口
+    let bs = (bsDate?.value || '').trim()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(bs)) {
+      ElMessage.warning('资产负债表日无效，无法确定期后回款窗口')
+      return empty
+    }
+    const bsYear = Number(bs.slice(0, 4))
+    const start = new Date(`${bs}T00:00:00`)
+    start.setDate(start.getDate() + 1)
+    const end = new Date(start)
+    end.setMonth(end.getMonth() + monthsAfter)
+    const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const dateFrom = fmt(start)
+    const dateTo = fmt(end)
+    const postYear = start.getFullYear() // 期后回款通常发生在基准日次年
+
+    try {
+      const token = sessionStorage.getItem('token') || ''
+      const authHeaders = { Authorization: `Bearer ${token}` }
+      const url = `/api/projects/${pid}/ledger/entries/1122?year=${postYear}`
+        + `&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}&limit=1000`
+      const resp = await fetch(url, { headers: authHeaders })
+      if (!resp.ok) {
+        ElMessage.info(`期后（${postYear}年）序时账无数据或未导入`)
+        return empty
+      }
+      const result = await resp.json()
+      const payload = result?.data ?? result
+      const items: any[] = Array.isArray(payload) ? payload
+        : Array.isArray(payload?.items) ? payload.items
+        : Array.isArray(payload?.ledger?.items) ? payload.ledger.items
+        : []
+
+      if (items.length === 0) {
+        ElMessage.info(`期后（${dateFrom} 至 ${dateTo}）无 1122 收款分录`)
+        return empty
+      }
+
+      // 贷方发生额 = 收款；按客户名归集
+      const rowSums = new Map<string, number>() // rowId → 归集金额
+      let unmatchedCount = 0
+      let unmatchedAmount = 0
+
+      for (const it of items) {
+        const credit = Number(it.credit_amount) || 0
+        if (credit <= 0) continue // 只取贷方收款
+        const text = normalizeName(`${it.summary ?? ''} ${it.counterpart_account ?? ''} ${it.aux_name ?? ''}`)
+        let hit: DetailRow | null = null
+        for (const row of rows.value) {
+          const name = normalizeName(row.customerName)
+          if (name.length >= 2 && text.includes(name)) { hit = row; break }
+        }
+        if (hit) {
+          rowSums.set(hit.rowId, (rowSums.get(hit.rowId) || 0) + credit)
+        } else {
+          unmatchedCount++
+          unmatchedAmount += credit
+        }
+      }
+
+      const matched = rowSums.size
+      const filledAmount = Array.from(rowSums.values()).reduce((s, v) => s + v, 0)
+
+      if (matched === 0 && unmatchedCount === 0) {
+        ElMessage.info('期后窗口内无收款分录')
+        return empty
+      }
+
+      const fmtAmt = (v: number) => v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      try {
+        await ElMessageBox.confirm(
+          `期后窗口 ${dateFrom} 至 ${dateTo}（${postYear}年）：\n`
+          + `可归集 ${matched} 户，合计回款 ${fmtAmt(filledAmount)} 元；\n`
+          + `未匹配 ${unmatchedCount} 笔，合计 ${fmtAmt(unmatchedAmount)} 元（需手工分配）。\n`
+          + `确认后将按客户填入"期后回款"列（覆盖同客户原值），是否继续？`,
+          '期后回款取数确认',
+          { confirmButtonText: '填入', cancelButtonText: '取消', type: 'warning', dangerouslyUseHTMLString: false },
+        )
+      } catch {
+        return empty // 用户取消
+      }
+
+      for (const [rowId, amt] of rowSums) {
+        const row = rows.value.find(r => r.rowId === rowId)
+        if (row) row.postPayment = amt
+      }
+      if (matched > 0) debounceSave()
+
+      ElMessage.success(`期后回款取数完成：填入 ${matched} 户，合计 ${fmtAmt(filledAmount)} 元`)
+      return { matched, filledAmount, unmatchedCount, unmatchedAmount }
+    } catch {
+      ElMessage.error('期后回款取数失败')
+      return empty
+    }
+  }
+
   // ─── Lifecycle ─────────────────────────────────────────────────────────
 
-  /** EventBus listener for confirmation:completed (Task 44.1) */
+  /** 名称规范化：去首尾/中间空白 + 全角空格 + 小写，用于稳健匹配 */
+  function normalizeName(v: unknown): string {
+    return String(v ?? '')
+      .replace(/[\s\u3000]+/g, '')
+      .trim()
+      .toLowerCase()
+  }
+
+  /**
+   * EventBus listener for confirmation:completed (Task 44.1)
+   *
+   * 匹配策略（稳健化，替代原单向子串 includes）：
+   * 1. 若 payload 带稳定键（companyCode/counterpartyCode）→ 优先按 companyCode 精确匹配
+   * 2. 否则按规范化名称：精确相等优先；无精确命中再退双向包含（规避同名简称误配）
+   * 3. 忽略汇总占位 '__summary__' 与空名称
+   */
   function onConfirmationCompleted(e: Event): void {
     const detail = (e as CustomEvent).detail
     if (!detail || !detail.customerName) return
+    if (detail.customerName === '__summary__') return
 
-    const targetName = (detail.customerName as string).toLowerCase()
+    const targetCode = normalizeName(detail.companyCode ?? detail.counterpartyCode)
+    const targetName = normalizeName(detail.customerName)
+    if (!targetName && !targetCode) return
+
+    function markRow(row: DetailRow): void {
+      row.isConfirmation = true
+      ;(row as any)._confirmationAutoMarked = true
+    }
+
     let matched = false
 
-    for (const row of rows.value) {
-      if (row.customerName && row.customerName.toLowerCase().includes(targetName)) {
-        row.isConfirmation = true
-        ;(row as any)._confirmationAutoMarked = true
-        matched = true
+    // 1. 稳定键（companyCode）精确匹配优先
+    if (targetCode) {
+      for (const row of rows.value) {
+        if (normalizeName(row.companyCode) === targetCode) {
+          markRow(row)
+          matched = true
+        }
+      }
+    }
+
+    // 2. 名称精确相等
+    if (!matched) {
+      for (const row of rows.value) {
+        if (normalizeName(row.customerName) === targetName) {
+          markRow(row)
+          matched = true
+        }
+      }
+    }
+
+    // 3. 双向包含兜底（仅在无精确命中时）
+    if (!matched) {
+      for (const row of rows.value) {
+        const rowName = normalizeName(row.customerName)
+        if (rowName && (rowName.includes(targetName) || targetName.includes(rowName))) {
+          markRow(row)
+          matched = true
+        }
       }
     }
 
@@ -651,6 +819,7 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
 
     // 导入
     importFromAuxBalance,
+    importPostPaymentFromLedger,
 
     // 账龄配置（供模板/视图渲染使用）
     segments,

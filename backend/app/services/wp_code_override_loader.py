@@ -51,12 +51,14 @@ def load_wp_code_overrides() -> dict[str, str]:
     if current_mtime == _mtime:
         return _cache
 
-    # mtime 变化 → 尝试热重载
+    # mtime 变化 → 尝试热重载（原地更新，保持外部持有的 dict 引用有效）
     try:
         data = _read_json()
         validate_overrides(data)
-        _cache = data
+        _cache.clear()
+        _cache.update(data)
         _mtime = current_mtime
+        logger.info("已热重载 wp_code_overrides.json（%d 条）", len(_cache))
     except (json.JSONDecodeError, OSError) as exc:
         logger.warning(
             "热重载 %s 失败（%s），保留旧缓存",

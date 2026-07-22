@@ -35,16 +35,38 @@ def test_p2_net_impairment(provision: float, reversal: float) -> None:
 @given(
     opening=st.floats(min_value=-1e8, max_value=1e8, allow_nan=False, allow_infinity=False),
     provision=st.floats(min_value=-1e8, max_value=1e8, allow_nan=False, allow_infinity=False),
-    reversal_signed=st.floats(min_value=-1e8, max_value=1e8, allow_nan=False, allow_infinity=False),
+    reversal=st.floats(min_value=0, max_value=1e8, allow_nan=False, allow_infinity=False),
     writeoff=st.floats(min_value=0, max_value=1e8, allow_nan=False, allow_infinity=False),
+    other=st.floats(min_value=-1e8, max_value=1e8, allow_nan=False, allow_infinity=False),
 )
 @settings(max_examples=50)
-def test_p3_roll_forward(opening: float, provision: float, reversal_signed: float, writeoff: float) -> None:
-    expected = opening + provision + reversal_signed - writeoff
-    assert svc.calc_roll_forward(opening, provision, reversal_signed, writeoff) == pytest.approx(expected)
+def test_p3_roll_forward(
+    opening: float, provision: float, reversal: float, writeoff: float, other: float
+) -> None:
+    expected = opening + provision - reversal - writeoff + other
+    assert svc.calc_roll_forward(opening, provision, reversal, writeoff, other) == pytest.approx(
+        expected
+    )
 
 
 def test_validate_roll_forward_balanced() -> None:
+    # 100 + 30 - 5 - 2 + 0 = 123
+    rows = [
+        {
+            "rowKey": "ar",
+            "openingProvision": 100,
+            "currentProvision": 30,
+            "currentReversal": 5,
+            "currentWriteoff": 2,
+            "otherMovement": 0,
+            "closingProvision": 123,
+        }
+    ]
+    assert svc.validate_roll_forward_rows(rows) == []
+
+
+def test_validate_roll_forward_migrates_legacy_signed_reversal() -> None:
+    # 旧数据转回=-5 → 迁移为正数 5；100+30-5-2=123
     rows = [
         {
             "rowKey": "ar",
@@ -64,7 +86,7 @@ def test_validate_roll_forward_unbalanced() -> None:
             "rowKey": "ar",
             "openingProvision": 100,
             "currentProvision": 30,
-            "currentReversal": -5,
+            "currentReversal": 5,
             "currentWriteoff": 2,
             "closingProvision": 200,
         }

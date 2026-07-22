@@ -33,6 +33,25 @@ export const G11_ADJUDICATION_ITEMS: G11LineDef[] = [
 /** G11-4 收益率分析默认项目（与审定表主行一致） */
 export const G11_RETURN_RATE_ITEMS = G11_ADJUDICATION_ITEMS
 
+/** G11-4 审计结论模板（对齐源模板「四、审计结论」） */
+export const G11_RETURN_RATE_CONCLUSION_TEMPLATES = [
+  {
+    key: 'no_abnormal',
+    label: '未见异常',
+    text: '经对各类投资收益收益率进行分析，本期收益率与上期比较未见重大异常波动（变动未超过5个百分点），投资收益总体合理。',
+  },
+  {
+    key: 'abnormal_explained',
+    label: '异常已追查',
+    text: '经分析，部分项目收益率变动超过5个百分点，已逐项追查原因并记录于异常说明及审计说明，未发现重大错报迹象。',
+  },
+  {
+    key: 'need_further',
+    label: '需进一步程序',
+    text: '收益率分析识别出异常波动，建议结合 G11-5 凭证检查及投资合同/分红决议进一步核实相关投资收益的确认依据与期间归属。',
+  },
+] as const
+
 /** 附注披露（上市）主表行 + 明细展开至 33 行（+合计=34） */
 const _LISTED_SUB_ROWS: G11LineDef[] = [
   { rowKey: 'listed_sub_1', label: '其中：权益法确认的投资收益' },

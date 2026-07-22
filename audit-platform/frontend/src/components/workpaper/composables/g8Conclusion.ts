@@ -56,18 +56,18 @@ const G8_CONCLUSION_SOURCES: Array<{
     name: '审定表',
     textKeys: [
       { key: 'G8-adj-conclusion', field: 'conclusion' },
-      { key: 'G8-1-audit-conclusion', field: 'remark' },
+      { key: 'G8-1-audit-conclusion', field: 'conclusion' },
     ],
   },
   {
     code: 'G8-2',
     name: '明细表',
-    textKeys: [{ key: 'G8-2-audit-conclusion', field: 'remark' }],
+    textKeys: [{ key: 'G8-2-audit-conclusion', field: 'conclusion' }],
   },
   {
     code: 'G8-3',
     name: '调整分录',
-    textKeys: [{ key: 'G8-3-audit-conclusion', field: 'remark' }],
+    textKeys: [{ key: 'G8-3-audit-conclusion', field: 'conclusion' }],
     optionKey: 'G8-3-audit-conclusion-option',
   },
   {
@@ -85,7 +85,7 @@ const G8_CONCLUSION_SOURCES: Array<{
     name: '凭证检查',
     textKeys: [
       { key: 'G8-voucher-conclusion', field: 'conclusion' },
-      { key: 'G8-6-audit-conclusion', field: 'remark' },
+      { key: 'G8-6-audit-conclusion', field: 'conclusion' },
     ],
   },
 ]
@@ -97,7 +97,10 @@ function readResponseText(
 ): string {
   const row = m.get(key)
   if (!row) return ''
-  return String(row[field] ?? '').trim()
+  const primary = String(row[field] ?? '').trim()
+  if (primary) return primary
+  const fallback = field === 'conclusion' ? row.remark : row.conclusion
+  return String(fallback ?? '').trim()
 }
 
 /** 汇总各子表 A/B/C 结论，供底稿目录看板使用 */

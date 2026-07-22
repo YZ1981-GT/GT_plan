@@ -1,56 +1,61 @@
 /**
- * useH8DisposalCheck — H8-12 减少检查表 composable（39行28列）
+ * useH8DisposalCheck — H8-12 减少检查表 composable
  *
- * 核心公式：终止损益 = 租赁负债余额 - 使用权资产净值
+ * 对齐致同「使用权资产/租赁负债减少检查表」：
+ * 一、审计目标 → 二、样本选取 → 三、测试（原值/累计折旧/减值/净值 + 终止损益 + 核对1–5）
+ * → 检查比例（勾稽 H8-1/H8-2，防 #DIV/0!）→ 四、审计说明 → 五、审计结论
  *
- * 28列含：合同号/终止原因/终止日/剩余期/使用权净值/租赁负债余额/终止损益/审批
- * H9同步：终止时租赁负债也应终止确认
- *
- * Spec: .kiro/specs/h8-right-of-use-assets/
- * Task: 3.4
- * Requirements: 7.3-7.5
+ * 平台增强：终止损益 CAS21；H9 同步终止；提前退租违约金提示
  */
-import { ref, computed, watch, type Ref } from 'vue'
-import { calcTerminationGainLoss } from './useH8CAS21Engine'
-import { calcSubtotal } from './useH8FormulaEngine'
+import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import {
+  type H8DisposalCheckRow,
+  type H8DisposalSamplingParams,
+  type H8DisposalSummary,
+  type LinkedRouDecrease,
+  normalizeDisposalRow,
+  normalizeSamplingParams,
+  createEmptySamplingParams,
+  recalcDisposalRow,
+  calcDisposalSummary,
+  sumLinkedRouDecrease,
+  seedDisposalRowsFromH82,
+  mapLiabilityFromH9,
+  mergeSeededDisposalRows,
+  buildNoteDraft,
+  buildConclusionDraft,
+  isCheckIncomplete,
+} from './h8DisposalCheckModel'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+export type {
+  H8DisposalCheckRow,
+  H8DisposalSamplingParams,
+  H8DisposalSummary,
+  LinkedRouDecrease,
+  ReductionMethod,
+} from './h8DisposalCheckModel'
 
-/** H8-12 减少检查行 */
-export interface H8DisposalCheckRow {
-  rowId: string
-  /** 合同号 */
-  contractNo: string
-  /** 承租资产 */
-  assetName: string
-  /** 终止原因 */
-  terminationReason: string
-  /** 终止日期 */
-  terminationDate: string
-  /** 剩余租赁期（月） */
-  remainingMonths: number
-  /** 使用权资产净值 */
-  rouNetValue: number
-  /** 租赁负债余额 */
-  liabilityBalance: number
-  /** 终止损益（公式：=负债余额-净值） */
-  gainLoss: number
-  /** 是否已通知H9同步终止 */
-  h9Synced: boolean
-  /** 审批状态 */
-  approvalStatus: '已审批' | '待审批' | ''
-  /** 审批人 */
-  approver: string
-  /** 备注 */
-  remark: string
-}
-
-// ─── Constants ───────────────────────────────────────────────────────────────
+export {
+  REDUCTION_METHOD_OPTS,
+  SAMPLING_METHOD_OPTS,
+  H8_DISPOSAL_TEST_CONTENT_ITEMS,
+  getEvidenceHint,
+  calcRouNetValue,
+  calcCoverageRate,
+  isEarlyTermWithoutPenaltyNote,
+  isMaturityNearZeroAnomaly,
+} from './h8DisposalCheckModel'
 
 const ROWS_KEY = 'H8-12-rows'
 const GAIN_LOSS_TOTAL_KEY = 'H8-12-gain-loss-total'
-
-// ─── Composable ──────────────────────────────────────────────────────────────
+const CHECKED_AMOUNT_KEY = 'H8-12-checked-amount'
+const PARAMS_KEY = 'H8-12-sampling-params'
+const NOTE_KEY = 'H8-disposal-audit-note'
+const CONCLUSION_KEY = 'H8-disposal-audit-conclusion'
+const DETAIL_ROWS_KEY = 'H8-2-rows'
+const COST_CREDIT_KEY = 'H8-1-cost-credit-total'
+const H9_ROWS_KEY = 'H9-2-rows'
+const POP_MANUAL_KEY = 'H8-12-population-manual'
 
 export function useH8DisposalCheck(params: {
   wpId: Ref<string>
@@ -61,11 +66,11 @@ export function useH8DisposalCheck(params: {
 }) {
   const { allResponses, onSave, onSyncH9 } = params
 
-  // ─── State ─────────────────────────────────────────────────────────────────
-
   const rows = ref<H8DisposalCheckRow[]>([])
-
-  // ─── Helpers ───────────────────────────────────────────────────────────────
+  const samplingParams = ref<H8DisposalSamplingParams>(createEmptySamplingParams())
+  const populationManual = ref(false)
+  const auditNote = ref('')
+  const auditConclusion = ref('')
 
   function _getJson(itemId: string): any {
     const item = allResponses.value.get(itemId)
@@ -75,136 +80,334 @@ export function useH8DisposalCheck(params: {
     try { return JSON.parse(raw) } catch { return raw }
   }
 
-  function _normalizeRow(raw: any): H8DisposalCheckRow {
-    const netValue = Number(raw.rouNetValue) || 0
-    const liability = Number(raw.liabilityBalance) || 0
-    return {
-      rowId: raw.rowId ?? `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-      contractNo: raw.contractNo ?? '',
-      assetName: raw.assetName ?? '',
-      terminationReason: raw.terminationReason ?? '',
-      terminationDate: raw.terminationDate ?? '',
-      remainingMonths: Number(raw.remainingMonths) || 0,
-      rouNetValue: netValue,
-      liabilityBalance: liability,
-      gainLoss: calcTerminationGainLoss(liability, netValue),
-      h9Synced: raw.h9Synced ?? false,
-      approvalStatus: raw.approvalStatus ?? '',
-      approver: raw.approver ?? '',
-      remark: raw.remark ?? '',
+  function _getString(itemId: string): string {
+    const item = allResponses.value.get(itemId)
+    if (!item) return ''
+    const raw = item.remark ?? item.conclusion
+    if (raw == null) return ''
+    if (typeof raw === 'string') {
+      try {
+        const p = JSON.parse(raw)
+        return typeof p === 'string' ? p : raw
+      } catch {
+        return raw
+      }
     }
+    return String(raw)
   }
 
-  // ─── Load ──────────────────────────────────────────────────────────────────
+  function _getNum(itemId: string): number {
+    const item = allResponses.value.get(itemId)
+    if (!item) return 0
+    const raw = item.remark ?? item.conclusion
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : 0
+  }
 
   function load(): void {
     const data = _getJson(ROWS_KEY)
-    if (Array.isArray(data) && data.length > 0) {
-      rows.value = data.map(_normalizeRow)
-    } else {
-      rows.value = []
+    rows.value = Array.isArray(data) && data.length > 0
+      ? data.map((r, i) => normalizeDisposalRow(r, i))
+      : []
+
+    samplingParams.value = normalizeSamplingParams(_getJson(PARAMS_KEY))
+    const manual = _getJson(POP_MANUAL_KEY)
+    populationManual.value = manual === true || manual === 'true'
+
+    auditNote.value = _getString(NOTE_KEY)
+    auditConclusion.value = _getString(CONCLUSION_KEY)
+
+    // 未手工锁定时自动带入总体
+    if (!populationManual.value) {
+      const linked = linkedDecrease.value
+      if (linked.amount > 0 && samplingParams.value.populationAmount <= 0) {
+        samplingParams.value = {
+          ...samplingParams.value,
+          populationAmount: linked.amount,
+        }
+      }
     }
   }
 
   watch(allResponses, () => load(), { immediate: true })
 
-  // ─── Computed ──────────────────────────────────────────────────────────────
+  const linkedDecrease: ComputedRef<LinkedRouDecrease> = computed(() => {
+    const detail = _getJson(DETAIL_ROWS_KEY)
+    const credit = _getNum(COST_CREDIT_KEY)
+    return sumLinkedRouDecrease(credit, Array.isArray(detail) ? detail : [])
+  })
 
-  /** 终止损益合计 */
-  const gainLossTotal = computed(() =>
-    calcSubtotal(rows.value.map(r => r.gainLoss)),
+  const summary: ComputedRef<H8DisposalSummary> = computed(() =>
+    calcDisposalSummary(
+      rows.value,
+      samplingParams.value.populationAmount,
+      samplingParams.value.materialityLevel,
+    ),
   )
 
-  /** 收益笔数 */
-  const gainCount = computed(() =>
-    rows.value.filter(r => r.gainLoss > 0).length,
-  )
+  const unsyncedRows = computed(() => rows.value.filter(r => !r.h9Synced))
+  const incompleteCheckRows = computed(() => rows.value.filter(isCheckIncomplete))
 
-  /** 损失笔数 */
-  const lossCount = computed(() =>
-    rows.value.filter(r => r.gainLoss < 0).length,
-  )
+  const populationDrift: ComputedRef<boolean> = computed(() => {
+    const linked = linkedDecrease.value
+    const pop = samplingParams.value.populationAmount
+    if (!linked.amount || !pop) return false
+    return Math.abs(linked.amount - pop) >= 0.01
+  })
 
-  /** 未同步H9的行 */
-  const unsyncedRows = computed(() =>
-    rows.value.filter(r => !r.h9Synced),
-  )
+  // 兼容旧 API
+  const gainLossTotal = computed(() => summary.value.gainLossTotal)
+  const gainCount = computed(() => summary.value.gainCount)
+  const lossCount = computed(() => summary.value.lossCount)
 
-  // ─── Actions ───────────────────────────────────────────────────────────────
+  function _persistRows(): void {
+    if (!onSave) return
+    onSave(ROWS_KEY, rows.value.map((r, i) => ({
+      rowId: r.rowId,
+      seq: i + 1,
+      assetCategory: r.assetCategory,
+      contractNo: r.contractNo,
+      assetName: r.assetName,
+      reductionMethod: r.reductionMethod,
+      terminationReason: r.reductionMethod,
+      reductionDate: r.reductionDate,
+      terminationDate: r.reductionDate,
+      voucherNo: r.voucherNo,
+      oppositeAccount: r.oppositeAccount,
+      quantity: r.quantity,
+      rouCost: r.rouCost,
+      accDepreciation: r.accDepreciation,
+      impairmentProvision: r.impairmentProvision,
+      rouNetValue: r.rouNetValue,
+      liabilityBalance: r.liabilityBalance,
+      gainLoss: r.gainLoss,
+      remainingMonths: r.remainingMonths,
+      earlyTermPenalty: r.earlyTermPenalty,
+      supportingDocs: r.supportingDocs,
+      checks: { ...r.checks },
+      indexRef: r.indexRef,
+      isAbnormal: r.isAbnormal,
+      isRelatedParty: r.isRelatedParty,
+      relatedPartyName: r.relatedPartyName,
+      h9Synced: r.h9Synced,
+      approvalStatus: r.approvalStatus,
+      approver: r.approver,
+      remark: r.remark,
+    })))
+    onSave(GAIN_LOSS_TOTAL_KEY, summary.value.gainLossTotal)
+    onSave(CHECKED_AMOUNT_KEY, summary.value.checkedAmount)
+  }
 
-  function addRow(contractNo: string): void {
-    if (!contractNo?.trim()) return
-    rows.value.push(_normalizeRow({ contractNo: contractNo.trim() }))
-    _persist()
+  function _persistParams(): void {
+    onSave?.(PARAMS_KEY, { ...samplingParams.value })
+    onSave?.(POP_MANUAL_KEY, populationManual.value)
+  }
+
+  function addRow(contractNo = ''): void {
+    rows.value.push(normalizeDisposalRow({
+      contractNo: contractNo.trim(),
+      seq: rows.value.length + 1,
+    }, rows.value.length))
+    _persistRows()
   }
 
   function deleteRow(rowId: string): void {
     const idx = rows.value.findIndex(r => r.rowId === rowId)
     if (idx === -1) return
     rows.value.splice(idx, 1)
-    _persist()
+    rows.value.forEach((r, i) => { r.seq = i + 1 })
+    _persistRows()
   }
 
   function updateCell(rowId: string, field: string, value: any): void {
     const row = rows.value.find(r => r.rowId === rowId)
     if (!row) return
 
-    const textFields = ['contractNo', 'assetName', 'terminationReason', 'terminationDate', 'approvalStatus', 'approver', 'remark']
-    if (textFields.includes(field)) {
-      ;(row as any)[field] = String(value ?? '')
-      _persist()
+    if (field.startsWith('checks.')) {
+      const key = field.slice(7) as keyof typeof row.checks
+      if (key in row.checks) {
+        row.checks[key] = Boolean(value)
+        _persistRows()
+      }
       return
     }
 
     if (field === 'h9Synced') {
       row.h9Synced = Boolean(value)
-      _persist()
+      _persistRows()
       return
     }
 
-    const numVal = Number(value) || 0
-    if (field === 'rouNetValue') row.rouNetValue = numVal
-    else if (field === 'liabilityBalance') row.liabilityBalance = numVal
-    else if (field === 'remainingMonths') { row.remainingMonths = numVal; _persist(); return }
-    else return
+    const textFields = [
+      'assetCategory', 'contractNo', 'assetName', 'reductionMethod', 'terminationReason',
+      'reductionDate', 'voucherNo', 'oppositeAccount', 'supportingDocs', 'indexRef',
+      'isAbnormal', 'isRelatedParty', 'relatedPartyName', 'approvalStatus', 'approver', 'remark',
+    ]
+    if (textFields.includes(field)) {
+      ;(row as any)[field] = String(value ?? '')
+      if (field === 'reductionMethod' || field === 'terminationReason') {
+        row.reductionMethod = (field === 'reductionMethod' ? value : row.reductionMethod) as any
+        row.terminationReason = row.reductionMethod
+      }
+      recalcDisposalRow(row)
+      _persistRows()
+      return
+    }
 
-    // 重算终止损益
-    row.gainLoss = calcTerminationGainLoss(row.liabilityBalance, row.rouNetValue)
-    _persist()
+    const numFields = [
+      'quantity', 'rouCost', 'accDepreciation', 'impairmentProvision',
+      'liabilityBalance', 'remainingMonths', 'earlyTermPenalty',
+    ]
+    if (numFields.includes(field)) {
+      ;(row as any)[field] = Number(value) || 0
+      recalcDisposalRow(row)
+      _persistRows()
+    }
   }
 
-  /** 同步终止到H9（通知H9也应终止确认该笔租赁负债） */
+  function updateSamplingParams(patch: Partial<H8DisposalSamplingParams>): void {
+    samplingParams.value = { ...samplingParams.value, ...patch }
+    if (patch.populationAmount != null) populationManual.value = true
+    _persistParams()
+  }
+
+  function syncPopulationFromLinked(): void {
+    const linked = linkedDecrease.value
+    if (!(linked.amount > 0)) return
+    samplingParams.value = {
+      ...samplingParams.value,
+      populationAmount: linked.amount,
+    }
+    populationManual.value = false
+    _persistParams()
+  }
+
+  /** 从 H8-2 已终止行批量带入样本（按合同号合并，保留已有核对勾选） */
+  function importFromH82(): { imported: number; totalTerminated: number } {
+    const detail = _getJson(DETAIL_ROWS_KEY)
+    const seeded = seedDisposalRowsFromH82(Array.isArray(detail) ? detail : [])
+    if (seeded.length === 0) return { imported: 0, totalTerminated: 0 }
+    rows.value = mergeSeededDisposalRows(rows.value, seeded)
+    _persistRows()
+    // 同步刷新总体（未手工锁定时）
+    if (!populationManual.value) {
+      const linked = linkedDecrease.value
+      if (linked.amount > 0) {
+        samplingParams.value = {
+          ...samplingParams.value,
+          populationAmount: linked.amount,
+        }
+        _persistParams()
+      }
+    }
+    return { imported: seeded.length, totalTerminated: seeded.length }
+  }
+
+  /** 按合同号从 H9-2 填充⑦租赁负债余额 */
+  function fillLiabilityFromH9(): { matched: number } {
+    const h9 = _getJson(H9_ROWS_KEY)
+    const { rows: next, matched } = mapLiabilityFromH9(
+      rows.value,
+      Array.isArray(h9) ? h9 : [],
+    )
+    if (matched > 0) {
+      rows.value = next
+      _persistRows()
+    }
+    return { matched }
+  }
+
+  /** 同步终止到 H9（通知租赁负债也应终止确认） */
   function syncToH9(rowId: string): void {
     const row = rows.value.find(r => r.rowId === rowId)
     if (!row) return
     row.h9Synced = true
+    if (!row.checks.check5) row.checks.check5 = true
     onSyncH9?.(row.contractNo, row.liabilityBalance)
-    // EventBus通知H9
     window.dispatchEvent(new CustomEvent('h8:lease-terminated', {
-      detail: { contractNo: row.contractNo, liabilityBalance: row.liabilityBalance },
+      detail: {
+        contractNo: row.contractNo,
+        /** 兼容旧 H9 监听字段 */
+        contractId: row.contractNo,
+        liabilityBalance: row.liabilityBalance,
+        rouNetValue: row.rouNetValue,
+        gainLoss: row.gainLoss,
+        reductionDate: row.reductionDate,
+      },
     }))
-    _persist()
+    _persistRows()
   }
 
-  function save(): void { _persist() }
-
-  function _persist(): void {
-    if (!onSave) return
-    onSave(ROWS_KEY, rows.value.map(r => ({
-      rowId: r.rowId, contractNo: r.contractNo, assetName: r.assetName,
-      terminationReason: r.terminationReason, terminationDate: r.terminationDate,
-      remainingMonths: r.remainingMonths, rouNetValue: r.rouNetValue,
-      liabilityBalance: r.liabilityBalance, h9Synced: r.h9Synced,
-      approvalStatus: r.approvalStatus, approver: r.approver, remark: r.remark,
-    })))
-    onSave(GAIN_LOSS_TOTAL_KEY, gainLossTotal.value)
+  /** 批量同步尚未标记的样本到 H9 */
+  function syncAllToH9(): number {
+    const targets = rows.value.filter(r => !r.h9Synced && r.contractNo.trim())
+    for (const row of targets) {
+      syncToH9(row.rowId)
+    }
+    return targets.length
   }
 
-  // ─── Return ────────────────────────────────────────────────────────────────
+  function saveNote(val: string): void {
+    auditNote.value = val
+    onSave?.(NOTE_KEY, val)
+  }
+
+  function saveConclusion(val: string): void {
+    auditConclusion.value = val
+    onSave?.(CONCLUSION_KEY, val)
+  }
+
+  function draftNote(): void {
+    saveNote(buildNoteDraft(summary.value, samplingParams.value.populationAmount))
+  }
+
+  function draftConclusion(): void {
+    saveConclusion(buildConclusionDraft(summary.value))
+  }
+
+  function rowClassName({ row }: { row: H8DisposalCheckRow }): string {
+    const classes: string[] = []
+    if (row.isAbnormal === '是' || row.isAbnormal === 'Y') classes.push('row-abnormal')
+    if (!row.h9Synced) classes.push('row-unsynced')
+    if (isCheckIncomplete(row)) classes.push('row-incomplete')
+    return classes.join(' ')
+  }
+
+  function save(): void {
+    _persistRows()
+    _persistParams()
+  }
 
   return {
-    rows, gainLossTotal, gainCount, lossCount, unsyncedRows,
-    addRow, deleteRow, updateCell, syncToH9, save, load,
+    rows,
+    samplingParams,
+    populationManual,
+    auditNote,
+    auditConclusion,
+    linkedDecrease,
+    summary,
+    unsyncedRows,
+    incompleteCheckRows,
+    populationDrift,
+    gainLossTotal,
+    gainCount,
+    lossCount,
+    addRow,
+    deleteRow,
+    updateCell,
+    updateSamplingParams,
+    syncPopulationFromLinked,
+    importFromH82,
+    fillLiabilityFromH9,
+    syncToH9,
+    syncAllToH9,
+    saveNote,
+    saveConclusion,
+    draftNote,
+    draftConclusion,
+    rowClassName,
+    save,
+    load,
   }
 }
 

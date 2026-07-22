@@ -21,8 +21,11 @@ import {
   calcSubtotal,
 } from './useH10FormulaEngine'
 import { useH10Detail } from './useH10Detail'
+import { applyH10DetailToAdjStore } from './h10FillFromDetail'
 import type { ChecklistResponse } from './useF1FormData'
 import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
+import { ElMessage } from 'element-plus'
 
 export interface H10AdjudicationRow {
   rowKey: string
@@ -230,6 +233,31 @@ export function useH10Adjudication(opts: {
     publishAdjudicatedDebounced()
   }
 
+  /** H10-2 明细按来源汇总 → 未审；试运行取披露明细净额 */
+  function fillFromDetail(): { filled: number } {
+    if (opts.isReadonly.value) return { filled: 0 }
+    const detailRows = detail.rows.value
+    let trialRows: Array<{ currentIncome: number; currentCost: number; priorIncome: number; priorCost: number }> = []
+    const trialRaw = opts.allResponses.value.get('H10-disclosure-listed-trial')?.remark
+    if (trialRaw) {
+      try {
+        const parsed = JSON.parse(trialRaw)
+        if (Array.isArray(parsed)) trialRows = parsed
+      } catch { /* ignore */ }
+    }
+    const result = applyH10DetailToAdjStore(rowStore.value, detailRows, trialRows)
+    rowStore.value = result.nextStore
+    persistRows()
+    publishAdjudicatedDebounced()
+    const n = result.filledKeys.length
+    if (n > 0) {
+      ElMessage.success(`已从 H10-2 带入 ${n} 个审定分项${result.trialCurrent || result.trialPrior ? '（含试运行）' : ''}`)
+    } else {
+      ElMessage.warning('H10-2 明细暂无可汇总金额（请先填来源底稿与处置损益）')
+    }
+    return { filled: n }
+  }
+
   function toggleGroup(groupName: string): void {
     collapsedGroups.value = {
       ...collapsedGroups.value,
@@ -290,10 +318,19 @@ export function useH10Adjudication(opts: {
     opts.debouncedSave('H10-1-adjudicated-amount', { conclusion: String(amount) })
     const wb = writebackFn()
     if (wb) await wb(amount)
+    const payload = {
+      accountCode: H10_ACCOUNT_CODE,
+      adjudicatedAmount: amount,
+      auditedAmount: amount,
+      wpCode: 'H10',
+      projectId: opts.projectId.value,
+      timestamp: Date.now(),
+    }
     try {
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-        detail: { accountCode: H10_ACCOUNT_CODE, adjudicatedAmount: amount },
-      }))
+      eventBus.emit('substantive:adjudicated', payload as any)
+    } catch { /* silent */ }
+    try {
+      window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
     } catch { /* silent */ }
   }
 
@@ -351,6 +388,7 @@ export function useH10Adjudication(opts: {
     toggleGroup,
     publishAdjudicated,
     applyAdjustmentWriteback,
+    fillFromDetail,
     validateFormulasRemote,
     validateWithBackend,
     saveAdjudicationToBackend,

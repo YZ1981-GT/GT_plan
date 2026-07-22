@@ -79,8 +79,8 @@ def calc_cap_amount_no_borrow(weighted_exp: float, cap_rate: float) -> float:
 
 
 def calc_special_loan_cap(interest: float, idle_income: float) -> float:
-    """专门借款资本化金额 = 专门借款利息 - 闲置资金收益."""
-    return interest - idle_income
+    """专门借款资本化金额 = max(专门借款利息 - 闲置资金收益, 0)."""
+    return max(0.0, interest - idle_income)
 
 
 def calc_general_loan_supp(excess_weighted_exp: float, general_cap_rate: float) -> float:
@@ -88,9 +88,21 @@ def calc_general_loan_supp(excess_weighted_exp: float, general_cap_rate: float) 
 
     excess_weighted_exp: 累计资产支出超过专门借款部分的加权平均数
     """
-    if excess_weighted_exp <= 0:
+    if excess_weighted_exp <= 0 or general_cap_rate == 0:
         return 0.0
     return excess_weighted_exp * general_cap_rate
+
+
+def calc_excess_weighted_exp(weighted_exp: float, special_loan_amount: float) -> float:
+    """累计支出加权超过专门借款的部分（一般借款资本化基数）."""
+    return max(0.0, weighted_exp - special_loan_amount)
+
+
+def calc_cap_diff_rate(difference: float, total_cap: float) -> float | None:
+    """差异率；分母为 0 时返回 None（避免 #DIV/0!）."""
+    if abs(total_cap) < 1e-9:
+        return None
+    return difference / total_cap
 
 
 def calc_total_cap_with_borrow(special_cap: float, general_supp: float) -> float:
@@ -214,8 +226,7 @@ def _calculate_with_borrow(data: WithBorrowInput) -> CalculateResult:
     if data.general_loans and data.expenditures:
         exp_dict = [{"amount": e.amount, "days": e.days} for e in data.expenditures]
         weighted_exp = calc_weighted_expenditure(exp_dict, data.total_days)
-        # 超出专门借款部分
-        excess = max(weighted_exp - data.special_loan_total, 0.0)
+        excess = calc_excess_weighted_exp(weighted_exp, data.special_loan_total)
         if excess > 0 and data.general_loans:
             general_loans_dict = [{"principal": l.principal, "rate": l.rate, "days": l.days} for l in data.general_loans]
             general_cap_rate = calc_weighted_cap_rate(general_loans_dict)

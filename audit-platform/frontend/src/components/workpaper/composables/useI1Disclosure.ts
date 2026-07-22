@@ -1,470 +1,649 @@
 /**
- * useI1Disclosure — I1 无形资产附注披露 composable
+ * useI1Disclosure — I1 上市/国企附注披露取数与持久化
  *
- * Variant 双版本（上市公司64×22 / 国有企业67×14），根据 projectContext.business_category 自动选择。
- * - 从审定表/明细表/摊销表自动取数填入对应附注位置 (Req 14.2)
- * - AI 辅助生成文字描述 (Req 14.3)
- * - EventBus 发布 'disclosure:note-text-updated' (Req 14.4)
- * - Persistence: "I1-disc-listed-*" / "I1-disc-soe-*" item_ids
- *
- * Spec: .kiro/specs/i1-intangible-assets/
- * Task: 3.7
- * Requirements: 14.1-14.4
+ * 从 I1-2 / I1-9 / I1-6 / I1-8 / I1-12 带入；金额覆盖、文字保留；
+ * 审定勾稽 + 同步前校验；数据资源子表；分类精简/全量。
  */
-import { ref, computed, watch, type Ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { api } from '@/services/apiProxy'
-import { calcSubtotal } from './useI1FormulaEngine'
+import { computed, ref, watch, type Ref } from 'vue'
+import {
+  I1_LISTED_DEFAULT_CATEGORIES,
+  I1_LISTED_KEYS,
+  mapCostDecreaseMethod,
+  mapCostIncreaseMethod,
+  mapToI1ListedCategoryKey,
+  num,
+  setCell,
+  type I1ImportantItemRow,
+  type I1ListedCategory,
+  type I1TitleCertRow,
+  type MovementCellMap,
+} from './i1ListedDisclosureModel'
+import {
+  I1_SOE_CATEGORIES,
+  I1_SOE_KEYS,
+  createDefaultI1SoeLayers,
+  mapToI1SoeCategoryKey,
+  recomputeI1SoeDerivedLayers,
+  type I1SoeCategoryMove,
+  type I1SoeLayerBlock,
+} from './i1SoeDisclosureModel'
+import {
+  I1_LISTED_COMPACT_CATEGORIES,
+  aggregateI19AmortAlloc,
+  buildI1ListedCrossCheck,
+  buildI1SoeCrossCheck,
+  draftImpairmentNoteFromI112,
+  draftMortgageNoteFromI18,
+  draftSaleNoteFromI16,
+  draftTitleRowsFromI18,
+  emptyDataResourceMove,
+  fillNoteIfEmpty,
+  formatAmortAllocNote,
+  preferAuditedAmount,
+  pullDataResourceFromListedMovement,
+  readI1AdjAudited,
+  validateI1ListedPrep,
+  validateI1SoePrep,
+  type I1AmortAllocSummary,
+  type I1DataResourceMove,
+  type I1ListedCategoryPreset,
+} from './i1DisclosureEnhance'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-export type I1DisclosureVariant = 'listed' | 'soe'
-
-export interface ChecklistItem {
-  item_id: string
-  conclusion: string | null
-  remark: string | null
+function _parseJson(raw: unknown): any {
+  if (raw == null) return null
+  if (typeof raw === 'object') return raw
+  try { return JSON.parse(String(raw)) } catch { return null }
 }
 
-/** 附注子节定义 */
-export interface I1DisclosureSection {
-  key: string
-  title: string
-  hasTable: boolean
-  hasDynamicRows: boolean
-  hasNoteText: boolean          // 是否含文字描述区域（AI可生成）
+function _getRemark(map: Map<string, any>, key: string): string | null {
+  const item = map.get(key)
+  if (!item) return null
+  const raw = item.remark ?? item.conclusion
+  return raw != null ? String(raw) : null
 }
 
-/** 附注矩阵行（无形资产原值/摊销/减值变动） */
-export interface I1DisclosureMatrixRow {
-  rowId: string
-  category: string              // 资产分类（专利/商标/著作权/土地使用权/软件等）
-  beginBalance: number          // 期初余额
-  increase: number              // 本期增加
-  decrease: number              // 本期减少
-  endBalance: number            // 期末余额
-  isAutoFilled: boolean         // 是否跨sheet自动取数
+function _loadRows(map: Map<string, any>, key: string): any[] {
+  const raw = _parseJson(_getRemark(map, key))
+  return Array.isArray(raw) ? raw : []
 }
 
-/** 附注动态行（通用） */
-export interface I1DisclosureDynamicRow {
-  rowId: string
-  name: string
-  amount: number
-  description: string
-  remark: string
-}
+const DATA_RESOURCE_KEY = 'I1-listed-data-resource'
+const CATEGORY_PRESET_KEY = 'I1-listed-category-preset'
+const AMORT_ALLOC_KEY = 'I1-listed-amort-alloc'
+const SOE_AMORT_ALLOC_KEY = 'I1-soe-amort-alloc'
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// ─── Listed ──────────────────────────────────────────────────────────────────
 
-const ITEM_PREFIX_LISTED = 'I1-disc-listed'
-const ITEM_PREFIX_SOE = 'I1-disc-soe'
+export function useI1ListedDisclosure(params: {
+  allResponses: Ref<Map<string, any>>
+  onSave?: (itemId: string, value: any) => void
+}) {
+  const { allResponses, onSave } = params
+  const categoryPreset = ref<I1ListedCategoryPreset>('full')
+  const categories = ref<I1ListedCategory[]>([...I1_LISTED_DEFAULT_CATEGORIES])
+  const movement = ref<MovementCellMap>({})
+  const noteRdRatio = ref('')
+  const noteIndefinite = ref('')
+  const noteMortgage = ref('')
+  const noteImpairment = ref('')
+  const noteSale = ref('')
+  const noteImportant = ref('')
+  const noteDataResource = ref('')
+  const titleCertRows = ref<I1TitleCertRow[]>([])
+  const importantRows = ref<I1ImportantItemRow[]>([])
+  const dataResource = ref<I1DataResourceMove>(emptyDataResourceMove())
+  const amortAlloc = ref<I1AmortAllocSummary>(aggregateI19AmortAlloc([]))
+  const auditNote = ref('')
+  const auditConclusion = ref('')
 
-/** 上市公司版本子节（64×22） */
-export const LISTED_SECTIONS: I1DisclosureSection[] = [
-  { key: 'cost_overview', title: '(1) 无形资产情况—原值', hasTable: true, hasDynamicRows: false, hasNoteText: false },
-  { key: 'amort_overview', title: '(2) 无形资产情况—累计摊销', hasTable: true, hasDynamicRows: false, hasNoteText: false },
-  { key: 'impairment_overview', title: '(3) 无形资产情况—减值准备', hasTable: true, hasDynamicRows: false, hasNoteText: false },
-  { key: 'net_value', title: '(4) 无形资产账面价值', hasTable: true, hasDynamicRows: false, hasNoteText: false },
-  { key: 'indefinite_life', title: '(5) 使用寿命不确定的无形资产', hasTable: true, hasDynamicRows: true, hasNoteText: true },
-  { key: 'rd_expenditure', title: '(6) 研究阶段支出说明', hasTable: false, hasDynamicRows: false, hasNoteText: true },
-  { key: 'restricted', title: '(7) 所有权受限的无形资产', hasTable: true, hasDynamicRows: true, hasNoteText: true },
-  { key: 'amort_expense', title: '(8) 本期摊销费用', hasTable: true, hasDynamicRows: false, hasNoteText: false },
-]
+  function load(): void {
+    const preset = (_getRemark(allResponses.value, CATEGORY_PRESET_KEY) || 'full') as I1ListedCategoryPreset
+    categoryPreset.value = preset === 'compact' ? 'compact' : 'full'
+    const catRaw = _parseJson(_getRemark(allResponses.value, I1_LISTED_KEYS.categories))
+    if (Array.isArray(catRaw) && catRaw.length) {
+      categories.value = catRaw.map((c: any) => ({
+        key: String(c.key || ''),
+        label: String(c.label || c.key || ''),
+      })).filter((c: I1ListedCategory) => c.key)
+    } else {
+      categories.value = categoryPreset.value === 'compact'
+        ? [...I1_LISTED_COMPACT_CATEGORIES]
+        : [...I1_LISTED_DEFAULT_CATEGORIES]
+    }
+    const mov = _parseJson(_getRemark(allResponses.value, I1_LISTED_KEYS.movement))
+    movement.value = mov && typeof mov === 'object' ? mov : {}
+    noteRdRatio.value = _getRemark(allResponses.value, I1_LISTED_KEYS.noteRdRatio) || ''
+    noteIndefinite.value = _getRemark(allResponses.value, I1_LISTED_KEYS.noteIndefinite) || ''
+    noteMortgage.value = _getRemark(allResponses.value, I1_LISTED_KEYS.noteMortgage) || ''
+    noteImpairment.value = _getRemark(allResponses.value, I1_LISTED_KEYS.noteImpairment) || ''
+    noteSale.value = _getRemark(allResponses.value, I1_LISTED_KEYS.noteSale) || ''
+    noteImportant.value = _getRemark(allResponses.value, I1_LISTED_KEYS.noteImportant) || ''
+    const titleRaw = _parseJson(_getRemark(allResponses.value, I1_LISTED_KEYS.titleCertRows))
+    titleCertRows.value = Array.isArray(titleRaw) ? titleRaw : []
+    const impRaw = _parseJson(_getRemark(allResponses.value, I1_LISTED_KEYS.importantRows))
+    importantRows.value = Array.isArray(impRaw) ? impRaw : []
+    const dr = _parseJson(_getRemark(allResponses.value, DATA_RESOURCE_KEY))
+    dataResource.value = dr && typeof dr === 'object' ? { ...emptyDataResourceMove(), ...dr } : emptyDataResourceMove()
+    noteDataResource.value = String(dataResource.value.note || '')
+    const aa = _parseJson(_getRemark(allResponses.value, AMORT_ALLOC_KEY))
+    amortAlloc.value = aa && typeof aa === 'object' ? { ...aggregateI19AmortAlloc([]), ...aa } : aggregateI19AmortAlloc([])
+    auditNote.value = _getRemark(allResponses.value, I1_LISTED_KEYS.auditNote) || ''
+    auditConclusion.value = _getRemark(allResponses.value, I1_LISTED_KEYS.auditConclusion) || ''
+  }
 
-/** 国企版本子节（67×14） */
-export const SOE_SECTIONS: I1DisclosureSection[] = [
-  { key: 'cost_overview', title: '(一) 无形资产情况—原值', hasTable: true, hasDynamicRows: false, hasNoteText: false },
-  { key: 'amort_overview', title: '(二) 无形资产情况—累计摊销', hasTable: true, hasDynamicRows: false, hasNoteText: false },
-  { key: 'impairment_overview', title: '(三) 无形资产情况—减值准备', hasTable: true, hasDynamicRows: false, hasNoteText: false },
-  { key: 'net_value', title: '(四) 无形资产账面价值', hasTable: true, hasDynamicRows: false, hasNoteText: false },
-  { key: 'indefinite_life', title: '(五) 使用寿命不确定的无形资产', hasTable: true, hasDynamicRows: true, hasNoteText: true },
-  { key: 'restricted', title: '(六) 所有权受限的无形资产', hasTable: true, hasDynamicRows: true, hasNoteText: true },
-  { key: 'amort_expense', title: '(七) 本期摊销费用分配', hasTable: true, hasDynamicRows: false, hasNoteText: false },
-]
+  watch(allResponses, () => load(), { immediate: true })
 
-// ─── Composable ──────────────────────────────────────────────────────────────
+  function persist(): void {
+    if (!onSave) return
+    dataResource.value = { ...dataResource.value, note: noteDataResource.value }
+    onSave(CATEGORY_PRESET_KEY, categoryPreset.value)
+    onSave(I1_LISTED_KEYS.categories, categories.value)
+    onSave(I1_LISTED_KEYS.movement, movement.value)
+    onSave(I1_LISTED_KEYS.noteRdRatio, noteRdRatio.value)
+    onSave(I1_LISTED_KEYS.noteIndefinite, noteIndefinite.value)
+    onSave(I1_LISTED_KEYS.noteMortgage, noteMortgage.value)
+    onSave(I1_LISTED_KEYS.noteImpairment, noteImpairment.value)
+    onSave(I1_LISTED_KEYS.noteSale, noteSale.value)
+    onSave(I1_LISTED_KEYS.noteImportant, noteImportant.value)
+    onSave(I1_LISTED_KEYS.titleCertRows, titleCertRows.value)
+    onSave(I1_LISTED_KEYS.importantRows, importantRows.value)
+    onSave(DATA_RESOURCE_KEY, dataResource.value)
+    onSave(AMORT_ALLOC_KEY, amortAlloc.value)
+    onSave(I1_LISTED_KEYS.auditNote, auditNote.value)
+    onSave(I1_LISTED_KEYS.auditConclusion, auditConclusion.value)
+  }
 
-export function useI1Disclosure(
-  wpId: Ref<string>,
-  projectId: Ref<string>,
-  allResponses: Ref<Map<string, ChecklistItem>>,
-  options?: {
-    variant?: Ref<I1DisclosureVariant>
-    crossSheetAutoFill?: Ref<Record<string, number>>
-    onSave?: (itemId: string, value: any) => void
-  },
-) {
-  // ─── State ─────────────────────────────────────────────────────────────────
-
-  const variant = computed<I1DisclosureVariant>(() => options?.variant?.value ?? 'listed')
-  const itemPrefix = computed(() => variant.value === 'listed' ? ITEM_PREFIX_LISTED : ITEM_PREFIX_SOE)
-  const isAiGenerating = ref(false)
-
-  /** 子节1~3: 无形资产原值/摊销/减值矩阵 */
-  const costMatrixRows = ref<I1DisclosureMatrixRow[]>([])
-  const amortMatrixRows = ref<I1DisclosureMatrixRow[]>([])
-  const impairmentMatrixRows = ref<I1DisclosureMatrixRow[]>([])
-
-  /** 动态行子节 */
-  const sectionRows = ref<Record<string, I1DisclosureDynamicRow[]>>({
-    indefinite_life: [],
-    restricted: [],
-  })
-
-  /** 各子节说明文本（AI生成/手工填写） */
-  const sectionNotes = ref<Record<string, string>>({})
-
-  // ─── Computed: 子节列表 ────────────────────────────────────────────────────
-
-  const sections = computed(() =>
-    variant.value === 'listed' ? LISTED_SECTIONS : SOE_SECTIONS,
+  const crossCheck = computed(() =>
+    buildI1ListedCrossCheck(movement.value, categories.value, readI1AdjAudited(allResponses.value)),
   )
 
-  // ─── Computed: 跨sheet自动取数 (Req 14.2) ─────────────────────────────────
-
-  const autoFilledData = computed(() => options?.crossSheetAutoFill?.value ?? {})
-
-  // ─── Computed: 合计行 ──────────────────────────────────────────────────────
-
-  const costTotal = computed(() => ({
-    beginBalance: calcSubtotal(costMatrixRows.value.map((r) => r.beginBalance)),
-    increase: calcSubtotal(costMatrixRows.value.map((r) => r.increase)),
-    decrease: calcSubtotal(costMatrixRows.value.map((r) => r.decrease)),
-    endBalance: calcSubtotal(costMatrixRows.value.map((r) => r.endBalance)),
-  }))
-
-  const amortTotal = computed(() => ({
-    beginBalance: calcSubtotal(amortMatrixRows.value.map((r) => r.beginBalance)),
-    increase: calcSubtotal(amortMatrixRows.value.map((r) => r.increase)),
-    decrease: calcSubtotal(amortMatrixRows.value.map((r) => r.decrease)),
-    endBalance: calcSubtotal(amortMatrixRows.value.map((r) => r.endBalance)),
-  }))
-
-  const impairmentTotal = computed(() => ({
-    beginBalance: calcSubtotal(impairmentMatrixRows.value.map((r) => r.beginBalance)),
-    increase: calcSubtotal(impairmentMatrixRows.value.map((r) => r.increase)),
-    decrease: calcSubtotal(impairmentMatrixRows.value.map((r) => r.decrease)),
-    endBalance: calcSubtotal(impairmentMatrixRows.value.map((r) => r.endBalance)),
-  }))
-
-  /** 净值合计 = 原值期末 - 摊销期末 - 减值期末 */
-  const netValueTotal = computed(() =>
-    costTotal.value.endBalance - amortTotal.value.endBalance - impairmentTotal.value.endBalance,
+  const prepValidation = computed(() =>
+    validateI1ListedPrep({
+      movement: movement.value,
+      categories: categories.value,
+      titleCertRows: titleCertRows.value,
+      cross: crossCheck.value,
+    }),
   )
 
-  // ─── Load ──────────────────────────────────────────────────────────────────
-
-  function _loadData(): void {
-    const prefix = itemPrefix.value
-
-    // 矩阵行
-    costMatrixRows.value = _loadMatrixRows(`${prefix}-cost-matrix`)
-    amortMatrixRows.value = _loadMatrixRows(`${prefix}-amort-matrix`)
-    impairmentMatrixRows.value = _loadMatrixRows(`${prefix}-impairment-matrix`)
-
-    // 动态行
-    for (const key of Object.keys(sectionRows.value)) {
-      const item = allResponses.value.get(`${prefix}-${key}-rows`)
-      if (item?.remark) {
-        try {
-          const parsed = JSON.parse(item.remark)
-          sectionRows.value[key] = Array.isArray(parsed) ? parsed : []
-        } catch { sectionRows.value[key] = [] }
-      } else {
-        sectionRows.value[key] = []
-      }
-    }
-
-    // 说明文本
-    for (const sect of sections.value) {
-      if (sect.hasNoteText) {
-        const noteItem = allResponses.value.get(`${prefix}-${sect.key}-note`)
-        sectionNotes.value[sect.key] = (noteItem?.remark ?? '') as string
-      }
-    }
+  function updateMovement(rowKey: string, catKey: string, value: number): void {
+    movement.value = setCell(movement.value, rowKey, catKey, value)
+    persist()
   }
 
-  function _loadMatrixRows(itemId: string): I1DisclosureMatrixRow[] {
-    const item = allResponses.value.get(itemId)
-    if (!item?.remark) return []
-    try {
-      const parsed = JSON.parse(item.remark)
-      return Array.isArray(parsed) ? parsed : []
-    } catch { return [] }
+  function addCategory(label: string): void {
+    const key = `cat_${Date.now().toString(36)}`
+    categories.value = [...categories.value, { key, label: label.trim() || '其他' }]
+    persist()
   }
 
-  // ─── Auto-fill from cross-sheet (Req 14.2) ────────────────────────────────
-
-  /**
-   * 从审定表/明细表/摊销表自动取数填入附注对应位置。
-   * 用户可手工覆盖自动值。
-   */
-  function applyAutoFill(): void {
-    const data = autoFilledData.value
-    if (!data || Object.keys(data).length === 0) return
-
-    // 如果矩阵行为空，根据自动数据初始化默认行
-    if (costMatrixRows.value.length === 0 && data['disc_cost_end'] != null) {
-      costMatrixRows.value = [{
-        rowId: 'auto-cost-total',
-        category: '合计',
-        beginBalance: data['disc_cost_begin'] ?? 0,
-        increase: data['disc_cost_increase'] ?? 0,
-        decrease: data['disc_cost_decrease'] ?? 0,
-        endBalance: data['disc_cost_end'] ?? 0,
-        isAutoFilled: true,
-      }]
-    }
-
-    if (amortMatrixRows.value.length === 0 && data['disc_amort_end'] != null) {
-      amortMatrixRows.value = [{
-        rowId: 'auto-amort-total',
-        category: '合计',
-        beginBalance: data['disc_amort_begin'] ?? 0,
-        increase: data['disc_amort_provision'] ?? 0,
-        decrease: data['disc_amort_transfer'] ?? 0,
-        endBalance: data['disc_amort_end'] ?? 0,
-        isAutoFilled: true,
-      }]
-    }
-
-    if (impairmentMatrixRows.value.length === 0 && data['disc_impair_end'] != null) {
-      impairmentMatrixRows.value = [{
-        rowId: 'auto-impair-total',
-        category: '合计',
-        beginBalance: data['disc_impair_begin'] ?? 0,
-        increase: data['disc_impair_provision'] ?? 0,
-        decrease: data['disc_impair_reversal'] ?? 0,
-        endBalance: data['disc_impair_end'] ?? 0,
-        isAutoFilled: true,
-      }]
-    }
+  function removeCategory(key: string): void {
+    const defaults = categoryPreset.value === 'compact' ? I1_LISTED_COMPACT_CATEGORIES : I1_LISTED_DEFAULT_CATEGORIES
+    if (defaults.some((c) => c.key === key)) return
+    categories.value = categories.value.filter((c) => c.key !== key)
+    persist()
   }
 
-  // ─── CRUD: 动态行 ─────────────────────────────────────────────────────────
-
-  function addDynamicRow(sectionKey: string, name: string): void {
-    const rows = sectionRows.value[sectionKey]
-    if (!rows) return
-    rows.push({
-      rowId: `i1disc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      name,
-      amount: 0,
-      description: '',
-      remark: '',
-    })
-    _persistSection(sectionKey)
+  function setCategoryPreset(preset: I1ListedCategoryPreset): void {
+    categoryPreset.value = preset
+    categories.value = preset === 'compact'
+      ? [...I1_LISTED_COMPACT_CATEGORIES]
+      : [...I1_LISTED_DEFAULT_CATEGORIES]
+    persist()
   }
 
-  function removeDynamicRow(sectionKey: string, rowId: string): void {
-    const rows = sectionRows.value[sectionKey]
-    if (!rows) return
-    const idx = rows.findIndex((r) => r.rowId === rowId)
-    if (idx >= 0) {
-      rows.splice(idx, 1)
-      _persistSection(sectionKey)
-    }
-  }
-
-  function updateDynamicRow(sectionKey: string, rowId: string, field: keyof I1DisclosureDynamicRow, value: any): void {
-    const rows = sectionRows.value[sectionKey]
-    if (!rows) return
-    const row = rows.find((r) => r.rowId === rowId)
-    if (!row) return
-    ;(row as any)[field] = value
-    _persistSection(sectionKey)
-  }
-
-  // ─── Update: 矩阵行 ───────────────────────────────────────────────────────
-
-  function updateMatrixCell(
-    layer: 'cost' | 'amort' | 'impairment',
-    rowId: string,
-    field: keyof I1DisclosureMatrixRow,
-    value: any,
-  ): void {
-    const target = layer === 'cost'
-      ? costMatrixRows
-      : layer === 'amort'
-        ? amortMatrixRows
-        : impairmentMatrixRows
-    const row = target.value.find((r) => r.rowId === rowId)
-    if (!row) return
-    ;(row as any)[field] = value
-    row.isAutoFilled = false // 手工修改后取消自动标记
-    _persistMatrix(layer)
-  }
-
-  // ─── Section Note (手工编辑) ───────────────────────────────────────────────
-
-  function saveSectionNote(sectionKey: string, note: string): void {
-    sectionNotes.value[sectionKey] = note
-    const prefix = itemPrefix.value
-    options?.onSave?.(`${prefix}-${sectionKey}-note`, note)
-
-    // EventBus发布 'disclosure:note-text-updated' (Req 14.4)
-    _publishNoteEvent(sectionKey, note)
-  }
-
-  // ─── AI辅助生成文字描述 (Req 14.3) ────────────────────────────────────────
-
-  /**
-   * 调用AI端点生成附注文字描述。
-   * 后端 POST /api/workpapers/{wp_id}/ai/generate-text
-   */
-  async function generateNoteText(sectionKey: string, existingContent?: string): Promise<string | null> {
-    if (!wpId.value) return null
-    isAiGenerating.value = true
-    try {
-      const context = _buildAiContext(sectionKey)
-      const res = await api.post(`/api/workpapers/${wpId.value}/ai/generate-text`, {
-        section: `i1-disclosure-${variant.value}-${sectionKey}`,
-        prompt: `请为无形资产附注"${_getSectionTitle(sectionKey)}"生成披露文字描述`,
-        context,
-        existingContent: existingContent || sectionNotes.value[sectionKey] || '',
-      })
-
-      const data = res?.data ?? res
-      const generated = data?.content ?? data?.text ?? ''
-      if (generated) {
-        return generated
-      }
-      ElMessage.warning('AI未返回内容，请手工编写')
-      return null
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'AI生成失败'
-      ElMessage.error(msg)
-      return null
-    } finally {
-      isAiGenerating.value = false
-    }
-  }
-
-  /**
-   * AI生成并确认后写入（弹确认预览再填入模式）
-   */
-  async function applyAiGeneratedNote(sectionKey: string, text: string): Promise<void> {
-    sectionNotes.value[sectionKey] = text
-    const prefix = itemPrefix.value
-    options?.onSave?.(`${prefix}-${sectionKey}-note`, text)
-    _publishNoteEvent(sectionKey, text)
-  }
-
-  // ─── EventBus 发布 (Req 14.4) ─────────────────────────────────────────────
-
-  /** 已变更的section集合（用于批量事件通知） */
-  const changedSections = ref<Set<string>>(new Set())
-  let publishTimer: ReturnType<typeof setTimeout> | null = null
-
-  function _publishNoteEvent(sectionKey: string, _text: string): void {
-    changedSections.value.add(sectionKey)
-
-    // 防抖：300ms内的多次变更合并为一次事件
-    if (publishTimer) clearTimeout(publishTimer)
-    publishTimer = setTimeout(() => {
-      const sectionsArr = Array.from(changedSections.value)
-      changedSections.value.clear()
-
-      const payload = {
-        wpCode: 'I1',
-        variant: variant.value,
-        sections: sectionsArr,
-      }
-
-      // 全局 CustomEvent（标准D~N附注EventBus模式）
-      window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-        detail: payload,
-      }))
-    }, 300)
-  }
-
-  // ─── Helpers ───────────────────────────────────────────────────────────────
-
-  function _buildAiContext(sectionKey: string): string {
-    const data = autoFilledData.value
-    const parts: string[] = [
-      `科目: 无形资产(1701)+累计摊销(1702)+减值准备(1703)`,
-      `版本: ${variant.value === 'listed' ? '上市公司' : '国有企业'}`,
+  function addTitleCertRow(): void {
+    titleCertRows.value = [
+      ...titleCertRows.value,
+      { rowId: `tc-${Date.now()}`, name: '', bookValue: 0, reason: '' },
     ]
-    if (data['disc_cost_end'] != null) parts.push(`原值期末: ${data['disc_cost_end']}`)
-    if (data['disc_amort_end'] != null) parts.push(`摊销期末: ${data['disc_amort_end']}`)
-    if (data['disc_impair_end'] != null) parts.push(`减值期末: ${data['disc_impair_end']}`)
-    if (data['disc_net_value'] != null) parts.push(`净值: ${data['disc_net_value']}`)
-    if (data['disc_amort_total'] != null) parts.push(`本期摊销总额: ${data['disc_amort_total']}`)
-    if (data['disc_asset_count'] != null) parts.push(`资产数: ${data['disc_asset_count']}`)
-    if (data['disc_indefinite_count'] != null) parts.push(`使用寿命不确定: ${data['disc_indefinite_count']}`)
-    return parts.join('; ')
+    persist()
   }
 
-  function _getSectionTitle(sectionKey: string): string {
-    const sect = sections.value.find((s) => s.key === sectionKey)
-    return sect?.title ?? sectionKey
+  function removeTitleCertRow(idx: number): void {
+    titleCertRows.value = titleCertRows.value.filter((_, i) => i !== idx)
+    persist()
   }
 
-  // ─── Persist ───────────────────────────────────────────────────────────────
-
-  function _persistSection(sectionKey: string): void {
-    const prefix = itemPrefix.value
-    options?.onSave?.(`${prefix}-${sectionKey}-rows`, sectionRows.value[sectionKey])
+  function addImportantRow(): void {
+    importantRows.value = [
+      ...importantRows.value,
+      { rowId: `imp-${Date.now()}`, name: '', bookValue: 0, remainingAmortMonths: 0 },
+    ]
+    persist()
   }
 
-  function _persistMatrix(layer: string): void {
-    const prefix = itemPrefix.value
-    const target = layer === 'cost'
-      ? costMatrixRows
-      : layer === 'amort'
-        ? amortMatrixRows
-        : impairmentMatrixRows
-    options?.onSave?.(`${prefix}-${layer}-matrix`, target.value)
+  function removeImportantRow(idx: number): void {
+    importantRows.value = importantRows.value.filter((_, i) => i !== idx)
+    persist()
   }
 
-  // ─── Init ──────────────────────────────────────────────────────────────────
+  function updateDataResource(field: keyof I1DataResourceMove, value: number | string): void {
+    dataResource.value = { ...dataResource.value, [field]: value }
+    persist()
+  }
 
-  watch(allResponses, () => _loadData(), { immediate: true })
-  watch(variant, () => _loadData())
-
-  // ─── Cleanup ───────────────────────────────────────────────────────────────
-
-  function dispose(): void {
-    if (publishTimer) {
-      clearTimeout(publishTimer)
-      publishTimer = null
+  /**
+   * 从 I1-2/6/8/9/12 带入。
+   * 默认：金额覆盖；已填文字说明保留（仅空位补草稿）。
+   */
+  function pullFromSources(opts?: { overwriteNotes?: boolean }): { message: string; count: number } {
+    const overwriteNotes = opts?.overwriteNotes === true
+    const detail = _loadRows(allResponses.value, 'I1-2-rows')
+    if (!detail.length) {
+      return { message: 'I1-2 明细无数据，请先编制明细表', count: 0 }
     }
-    changedSections.value.clear()
-  }
 
-  // ─── Return ────────────────────────────────────────────────────────────────
+    const kept = {
+      noteRdRatio: noteRdRatio.value,
+      noteIndefinite: noteIndefinite.value,
+      noteMortgage: noteMortgage.value,
+      noteImpairment: noteImpairment.value,
+      noteSale: noteSale.value,
+      noteImportant: noteImportant.value,
+      noteDataResource: noteDataResource.value,
+    }
+
+    type Agg = Record<string, number>
+    const make = (): Agg => ({})
+    const add = (bag: Agg, key: string, v: number) => { bag[key] = (bag[key] || 0) + v }
+
+    const costBegin = make()
+    const costInc: Record<string, Agg> = {}
+    const costDec: Record<string, Agg> = {}
+    const amortBegin = make()
+    const amortProv = make()
+    const amortOtherInc = make()
+    const amortDisp = make()
+    const amortOtherDec = make()
+    const impBegin = make()
+    const impProv = make()
+    const impOtherInc = make()
+    const impDisp = make()
+    const impOtherDec = make()
+
+    let rdCostEnd = 0
+    let totalCostEnd = 0
+    let mortgaged = 0
+    const indefiniteNames: string[] = []
+    const titleSeed: I1TitleCertRow[] = []
+
+    for (const r of detail) {
+      const cat = mapToI1ListedCategoryKey(String(r.category || r.name || ''))
+      if (!categories.value.some((c) => c.key === cat)) continue
+
+      const cBegin = preferAuditedAmount(r, 'auditedCostBegin', 'costBegin')
+      const cInc = preferAuditedAmount(r, 'auditedCostIncrease', 'costIncrease')
+      const cDec = preferAuditedAmount(r, 'auditedCostDecrease', 'costDecrease')
+      const cEnd = preferAuditedAmount(r, 'auditedCostEnd', 'costEnd')
+      add(costBegin, cat, cBegin)
+      const incKey = mapCostIncreaseMethod(String(r.costIncreaseMethod || ''))
+      if (!costInc[incKey]) costInc[incKey] = make()
+      add(costInc[incKey], cat, cInc)
+      const decKey = mapCostDecreaseMethod(String(r.costDecreaseMethod || ''))
+      if (!costDec[decKey]) costDec[decKey] = make()
+      add(costDec[decKey], cat, cDec)
+      totalCostEnd += cEnd
+      if (/内部研发|自行研发/.test(String(r.costIncreaseMethod || '')) || /研发/i.test(String(r.name || ''))) {
+        rdCostEnd += cEnd
+      }
+
+      add(amortBegin, cat, preferAuditedAmount(r, 'auditedAccAmortBegin', 'accAmortBegin'))
+      add(amortProv, cat, num(r.amortProvision))
+      add(amortOtherInc, cat, num(r.amortOtherIncrease))
+      if (num(r.amortDisposal) || num(r.amortOtherDecrease)) {
+        add(amortDisp, cat, num(r.amortDisposal))
+        add(amortOtherDec, cat, num(r.amortOtherDecrease))
+      } else {
+        add(amortDisp, cat, num(r.amortTransferOut))
+      }
+
+      add(impBegin, cat, preferAuditedAmount(r, 'auditedImpairmentBegin', 'impairmentBegin'))
+      add(impProv, cat, num(r.impairmentProvision))
+      add(impOtherInc, cat, num(r.impairOtherIncrease))
+      if (num(r.impairDisposal) || num(r.impairOtherDecrease)) {
+        add(impDisp, cat, num(r.impairDisposal))
+        add(impOtherDec, cat, num(r.impairOtherDecrease))
+      } else {
+        add(impDisp, cat, num(r.impairmentReversal))
+      }
+
+      if (r.indefiniteLife === 'Y' || num(r.usefulLifeMonths) <= 0) {
+        indefiniteNames.push(String(r.name || cat))
+      }
+      if (r.mortgageRestricted === 'Y') mortgaged++
+      if (r.hasTitleEvidence === 'N') {
+        titleSeed.push({
+          rowId: `tc-${r.rowId || Date.now()}`,
+          name: String(r.name || ''),
+          bookValue: preferAuditedAmount(r, 'auditedNetEnd', 'netValue'),
+          reason: '',
+        })
+      }
+    }
+
+    let map: MovementCellMap = {}
+    const putAll = (rowKey: string, bag: Agg) => {
+      for (const [k, v] of Object.entries(bag)) map = setCell(map, rowKey, k, v)
+    }
+    putAll('cost_begin', costBegin)
+    for (const [rowKey, bag] of Object.entries(costInc)) putAll(rowKey, bag)
+    for (const [rowKey, bag] of Object.entries(costDec)) putAll(rowKey, bag)
+    putAll('amort_begin', amortBegin)
+    putAll('amort_inc_provision', amortProv)
+    putAll('amort_inc_other', amortOtherInc)
+    putAll('amort_dec_dispose', amortDisp)
+    putAll('amort_dec_other', amortOtherDec)
+    putAll('imp_begin', impBegin)
+    putAll('imp_inc_provision', impProv)
+    putAll('imp_inc_other', impOtherInc)
+    putAll('imp_dec_dispose', impDisp)
+    putAll('imp_dec_other', impOtherDec)
+    movement.value = map
+
+    // 数据资源子表：从 data 列回填
+    dataResource.value = {
+      ...pullDataResourceFromListedMovement(map),
+      note: overwriteNotes ? '' : kept.noteDataResource,
+    }
+
+    // I1-9 摊销归属
+    amortAlloc.value = aggregateI19AmortAlloc(_loadRows(allResponses.value, 'I1-9-rows'))
+
+    // 文字：空位补草稿；overwriteNotes 时强制覆盖自动草稿
+    const applyNote = (cur: string, draft: string) =>
+      overwriteNotes ? (draft || cur) : fillNoteIfEmpty(cur, draft)
+
+    let rdDraft = ''
+    if (totalCostEnd > 0) {
+      rdDraft = `本期通过公司内部研发形成的无形资产占无形资产期末账面价值的比例为 ${((rdCostEnd / totalCostEnd) * 100).toFixed(2)}%。`
+    }
+    noteRdRatio.value = applyNote(kept.noteRdRatio, rdDraft)
+
+    noteIndefinite.value = applyNote(
+      kept.noteIndefinite,
+      indefiniteNames.length
+        ? `使用寿命不确定的无形资产共 ${indefiniteNames.length} 项（${indefiniteNames.slice(0, 5).join('、')}${indefiniteNames.length > 5 ? '等' : ''}），判断依据详见 I1-4/I1-7。`
+        : '',
+    )
+
+    const i18 = _loadRows(allResponses.value, 'I1-8-rows')
+    const mortgageDraft = draftMortgageNoteFromI18(i18)
+      || (mortgaged > 0
+        ? `明细表中标记抵押受限的无形资产共 ${mortgaged} 项，具体情况见 I1-8 权属检查。`
+        : '')
+    noteMortgage.value = applyNote(kept.noteMortgage, mortgageDraft)
+
+    noteImpairment.value = applyNote(
+      kept.noteImpairment,
+      draftImpairmentNoteFromI112(_loadRows(allResponses.value, 'I1-12-rows')),
+    )
+    noteSale.value = applyNote(
+      kept.noteSale,
+      draftSaleNoteFromI16(_loadRows(allResponses.value, 'I1-6-rows')),
+    )
+
+    const titleFrom8 = draftTitleRowsFromI18(i18)
+    if (!titleCertRows.value.length) {
+      titleCertRows.value = titleFrom8.length ? titleFrom8 : titleSeed
+    } else if (overwriteNotes && titleFrom8.length) {
+      titleCertRows.value = titleFrom8
+    }
+
+    noteDataResource.value = applyNote(
+      kept.noteDataResource,
+      Math.abs(dataResource.value.costBegin) + Math.abs(dataResourceCostInc(dataResource.value)) > 0.005
+        ? '确认为无形资产的数据资源变动见上表；使用寿命、摊销方法、减值及受限情况按《企业数据资源相关会计处理暂行规定》披露（可索引会计政策）。'
+        : '',
+    )
+
+    persist()
+    return { message: `已从 I1-2/检查表带入 ${detail.length} 项（金额已更新，文字说明${overwriteNotes ? '已覆盖' : '已保留'}）`, count: detail.length }
+  }
 
   return {
-    // State
-    variant,
-    isAiGenerating,
-    costMatrixRows,
-    amortMatrixRows,
-    impairmentMatrixRows,
-    sectionRows,
-    sectionNotes,
-    // Computed
-    sections,
-    autoFilledData,
-    costTotal,
-    amortTotal,
-    impairmentTotal,
-    netValueTotal,
-    // Actions
-    applyAutoFill,
-    addDynamicRow,
-    removeDynamicRow,
-    updateDynamicRow,
-    updateMatrixCell,
-    saveSectionNote,
-    // AI
-    generateNoteText,
-    applyAiGeneratedNote,
-    // Lifecycle
-    dispose,
+    categoryPreset,
+    categories,
+    movement,
+    noteRdRatio,
+    noteIndefinite,
+    noteMortgage,
+    noteImpairment,
+    noteSale,
+    noteImportant,
+    noteDataResource,
+    titleCertRows,
+    importantRows,
+    dataResource,
+    amortAlloc,
+    auditNote,
+    auditConclusion,
+    crossCheck,
+    prepValidation,
+    persist,
+    updateMovement,
+    addCategory,
+    removeCategory,
+    setCategoryPreset,
+    addTitleCertRow,
+    removeTitleCertRow,
+    addImportantRow,
+    removeImportantRow,
+    updateDataResource,
+    pullFromSources,
   }
 }
 
-export default useI1Disclosure
+function dataResourceCostInc(m: I1DataResourceMove): number {
+  return num(m.costIncPurchase) + num(m.costIncRd) + num(m.costIncOther)
+}
+
+// ─── SOE ─────────────────────────────────────────────────────────────────────
+
+export function useI1SoeDisclosure(params: {
+  allResponses: Ref<Map<string, any>>
+  onSave?: (itemId: string, value: any) => void
+}) {
+  const { allResponses, onSave } = params
+  const layers = ref<I1SoeLayerBlock[]>(createDefaultI1SoeLayers())
+  const noteIndefinite = ref('')
+  const noteMortgage = ref('')
+  const noteValuation = ref('')
+  const noteImpairment = ref('')
+  const noteNotReady = ref('')
+  const noteSale = ref('')
+  const noteTitle = ref('')
+  const amortAlloc = ref<I1AmortAllocSummary>(aggregateI19AmortAlloc([]))
+  const auditNote = ref('')
+  const auditConclusion = ref('')
+
+  function load(): void {
+    const raw = _parseJson(_getRemark(allResponses.value, I1_SOE_KEYS.layers))
+    if (Array.isArray(raw) && raw.length) {
+      layers.value = recomputeI1SoeDerivedLayers(raw)
+    } else {
+      layers.value = createDefaultI1SoeLayers()
+    }
+    noteIndefinite.value = _getRemark(allResponses.value, I1_SOE_KEYS.noteIndefinite) || ''
+    noteMortgage.value = _getRemark(allResponses.value, I1_SOE_KEYS.noteMortgage) || ''
+    noteValuation.value = _getRemark(allResponses.value, I1_SOE_KEYS.noteValuation) || ''
+    noteImpairment.value = _getRemark(allResponses.value, I1_SOE_KEYS.noteImpairment) || ''
+    noteNotReady.value = _getRemark(allResponses.value, I1_SOE_KEYS.noteNotReady) || ''
+    noteSale.value = _getRemark(allResponses.value, I1_SOE_KEYS.noteSale) || ''
+    noteTitle.value = _getRemark(allResponses.value, I1_SOE_KEYS.noteTitle) || ''
+    const aa = _parseJson(_getRemark(allResponses.value, SOE_AMORT_ALLOC_KEY))
+    amortAlloc.value = aa && typeof aa === 'object' ? { ...aggregateI19AmortAlloc([]), ...aa } : aggregateI19AmortAlloc([])
+    auditNote.value = _getRemark(allResponses.value, I1_SOE_KEYS.auditNote) || ''
+    auditConclusion.value = _getRemark(allResponses.value, I1_SOE_KEYS.auditConclusion) || ''
+  }
+
+  watch(allResponses, () => load(), { immediate: true })
+
+  function persist(): void {
+    if (!onSave) return
+    onSave(I1_SOE_KEYS.layers, layers.value)
+    onSave(I1_SOE_KEYS.noteIndefinite, noteIndefinite.value)
+    onSave(I1_SOE_KEYS.noteMortgage, noteMortgage.value)
+    onSave(I1_SOE_KEYS.noteValuation, noteValuation.value)
+    onSave(I1_SOE_KEYS.noteImpairment, noteImpairment.value)
+    onSave(I1_SOE_KEYS.noteNotReady, noteNotReady.value)
+    onSave(I1_SOE_KEYS.noteSale, noteSale.value)
+    onSave(I1_SOE_KEYS.noteTitle, noteTitle.value)
+    onSave(SOE_AMORT_ALLOC_KEY, amortAlloc.value)
+    onSave(I1_SOE_KEYS.auditNote, auditNote.value)
+    onSave(I1_SOE_KEYS.auditConclusion, auditConclusion.value)
+  }
+
+  const crossCheck = computed(() =>
+    buildI1SoeCrossCheck(layers.value, readI1AdjAudited(allResponses.value)),
+  )
+
+  const prepValidation = computed(() =>
+    validateI1SoePrep({ layers: layers.value, cross: crossCheck.value }),
+  )
+
+  function updateCategory(
+    layer: I1SoeLayerBlock['layer'],
+    catKey: string,
+    field: keyof I1SoeCategoryMove,
+    value: number,
+  ): void {
+    if (field === 'key') return
+    layers.value = recomputeI1SoeDerivedLayers(layers.value.map((block) => {
+      if (block.layer !== layer) return block
+      return {
+        ...block,
+        categories: block.categories.map((c) =>
+          c.key === catKey ? { ...c, [field]: value } : c,
+        ),
+      }
+    }))
+    persist()
+  }
+
+  function pullFromSources(opts?: { overwriteNotes?: boolean }): { message: string; count: number } {
+    const overwriteNotes = opts?.overwriteNotes === true
+    const detail = _loadRows(allResponses.value, 'I1-2-rows')
+    if (!detail.length) {
+      return { message: 'I1-2 明细无数据，请先编制明细表', count: 0 }
+    }
+
+    const kept = {
+      noteIndefinite: noteIndefinite.value,
+      noteMortgage: noteMortgage.value,
+      noteImpairment: noteImpairment.value,
+      noteNotReady: noteNotReady.value,
+      noteSale: noteSale.value,
+      noteTitle: noteTitle.value,
+    }
+
+    const emptyCats = (): I1SoeCategoryMove[] =>
+      I1_SOE_CATEGORIES.map((c) => ({ key: c.key, begin: 0, increase: 0, decrease: 0, end: 0 }))
+
+    const costCats = emptyCats()
+    const amortCats = emptyCats()
+    const impairCats = emptyCats()
+    const find = (arr: I1SoeCategoryMove[], key: string) => arr.find((c) => c.key === key)!
+
+    let notReady = 0
+    let noTitle = 0
+    const indefiniteNames: string[] = []
+
+    for (const r of detail) {
+      const key = mapToI1SoeCategoryKey(String(r.category || r.name || ''))
+      const cc = find(costCats, key)
+      const ac = find(amortCats, key)
+      const ic = find(impairCats, key)
+
+      cc.begin += preferAuditedAmount(r, 'auditedCostBegin', 'costBegin')
+      cc.increase += preferAuditedAmount(r, 'auditedCostIncrease', 'costIncrease')
+      cc.decrease += preferAuditedAmount(r, 'auditedCostDecrease', 'costDecrease')
+
+      ac.begin += preferAuditedAmount(r, 'auditedAccAmortBegin', 'accAmortBegin')
+      ac.increase += num(r.amortProvision) + num(r.amortOtherIncrease)
+      {
+        const split = num(r.amortDisposal) + num(r.amortOtherDecrease)
+        ac.decrease += split > 0 ? split : num(r.amortTransferOut)
+      }
+
+      ic.begin += preferAuditedAmount(r, 'auditedImpairmentBegin', 'impairmentBegin')
+      ic.increase += num(r.impairmentProvision) + num(r.impairOtherIncrease)
+      {
+        const split = num(r.impairDisposal) + num(r.impairOtherDecrease)
+        ic.decrease += split > 0 ? split : num(r.impairmentReversal)
+      }
+
+      if (r.indefiniteLife === 'Y' || num(r.usefulLifeMonths) <= 0) {
+        indefiniteNames.push(String(r.name || key))
+      }
+      if (r.notReadyForUse === 'Y') notReady++
+      if (r.hasTitleEvidence === 'N') noTitle++
+    }
+
+    layers.value = recomputeI1SoeDerivedLayers([
+      { layer: 'cost', categories: costCats },
+      { layer: 'amort', categories: amortCats },
+      { layer: 'impair', categories: impairCats },
+      { layer: 'carrying', categories: emptyCats() },
+    ])
+
+    amortAlloc.value = aggregateI19AmortAlloc(_loadRows(allResponses.value, 'I1-9-rows'))
+
+    const applyNote = (cur: string, draft: string) =>
+      overwriteNotes ? (draft || cur) : fillNoteIfEmpty(cur, draft)
+
+    noteIndefinite.value = applyNote(
+      kept.noteIndefinite,
+      indefiniteNames.length
+        ? `使用寿命不确定的无形资产共 ${indefiniteNames.length} 项，判断依据详见 I1-4/I1-7。`
+        : '',
+    )
+    const i18 = _loadRows(allResponses.value, 'I1-8-rows')
+    noteMortgage.value = applyNote(kept.noteMortgage, draftMortgageNoteFromI18(i18))
+    noteImpairment.value = applyNote(
+      kept.noteImpairment,
+      draftImpairmentNoteFromI112(_loadRows(allResponses.value, 'I1-12-rows')),
+    )
+    noteNotReady.value = applyNote(
+      kept.noteNotReady,
+      notReady > 0
+        ? `尚未达到可使用状态的无形资产 ${notReady} 项，已按要求执行减值测试，详见 I1-12/I1-13。`
+        : '',
+    )
+    noteSale.value = applyNote(
+      kept.noteSale,
+      draftSaleNoteFromI16(_loadRows(allResponses.value, 'I1-6-rows')),
+    )
+    noteTitle.value = applyNote(
+      kept.noteTitle,
+      noTitle > 0
+        ? `未办妥权属证书的土地使用权/无形资产 ${noTitle} 项，账面价值及原因详见 I1-8。`
+        : '',
+    )
+
+    persist()
+    return { message: `已从 I1-2/检查表带入 ${detail.length} 项（金额已更新，文字说明${overwriteNotes ? '已覆盖' : '已保留'}）`, count: detail.length }
+  }
+
+  return {
+    layers,
+    noteIndefinite,
+    noteMortgage,
+    noteValuation,
+    noteImpairment,
+    noteNotReady,
+    noteSale,
+    noteTitle,
+    amortAlloc,
+    auditNote,
+    auditConclusion,
+    crossCheck,
+    prepValidation,
+    persist,
+    updateCategory,
+    pullFromSources,
+  }
+}
+
+export { formatAmortAllocNote }
+export default { useI1ListedDisclosure, useI1SoeDisclosure }

@@ -1,202 +1,386 @@
 <template>
   <div class="h4-tab-stocktake-check">
-    <!-- 方法论上下文 -->
-    <div class="methodology-context">
-      <p>H4-6盘点检查：逐项核对工程物资实物盘点结果与账面记录。差异数量=盘点数量-账面数量；差异金额=盘点金额-账面金额。差异不为零的行黄色高亮，提示需追查原因。</p>
-    </div>
-
-    <!-- 审计目标 -->
-    <el-alert type="info" :closable="false" class="objective-alert"
-      title="审计目标：通过实物盘点核实工程物资的存在与数量准确，核对盘点结果与账面记录差异并追查原因，为期末余额的存在认定提供证据。" />
-
-    <!-- 工具栏 -->
-    <div class="tab-toolbar">
-      <span class="chip-wrap"><GtIndexChip value="wp:H4-6" :context-project-id="props.projectId" /></span>
-      <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
-    </div>
-
-    <!-- Section Title -->
-    <div class="section-header">
-      <span>盘点检查表 H4-6</span>
-      <div class="section-header-actions">
-        <el-button size="small" circle @click="openReview('H4-6-stocktake')">💬</el-button>
+    <header class="chk-hero">
+      <div class="chk-hero-main">
+        <div class="chk-kicker">H4-6 · 双向抽盘</div>
+        <h2 class="chk-title">工程物资盘点检查表</h2>
+        <p class="chk-objective">
+          从账面追查至实物（存在性），并从实物追查至账面（完整性）；
+          比对账面、企业盘点与审计抽盘三数量，记录品质状况并联动减值关注。
+        </p>
       </div>
+      <div class="chk-hero-actions">
+        <GtIndexChip value="wp:H4-6" :context-project-id="projectId" />
+        <el-tag size="small" type="info">共 {{ rows.length }} 项</el-tag>
+        <el-button size="small" @click="emit('navigate-sheet', 'H4-6A')">← H4-6A</el-button>
+        <el-button size="small" @click="emit('navigate-sheet', 'H4-6B')">H4-6B →</el-button>
+        <el-button size="small" @click="emit('navigate-sheet', 'H4-7')">H4-7 →</el-button>
+        <el-dropdown v-if="!isReadonly" trigger="click" @command="handleExportCmd">
+          <el-button size="small" :loading="importing">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="export-template">导出模板</el-dropdown-item>
+              <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
+              <el-dropdown-item command="import-data">导入数据</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
+        <el-button size="small" type="default" link @click="openReview('H4-6')">💬 复核</el-button>
+      </div>
+    </header>
+
+    <div v-if="!isReadonly" class="action-bar">
+      <el-button size="small" type="primary" @click="onImportFromH42('bookToFloor')">从 H4-2 带入（存在）</el-button>
+      <el-button size="small" @click="onImportFromH42('floorToBook')">从 H4-2 带入（完整）</el-button>
+      <el-button size="small" @click="onSyncTotalCost">期末余额←H4-2</el-button>
+      <el-button size="small" type="warning" plain :disabled="!concernN" @click="onPushConcernsToH47">
+        推送减值关注→H4-7（{{ concernN }}）
+      </el-button>
+      <el-button
+        size="small"
+        type="warning"
+        plain
+        :disabled="!(stats.surplusCount + stats.deficitCount)"
+        @click="onPushAje"
+      >
+        推送盘盈盘亏→H4-3
+      </el-button>
+      <el-button size="small" @click="onDraftNote">起草说明</el-button>
+      <el-button size="small" @click="onDraftConclusion">起草结论</el-button>
     </div>
 
-    <!-- 12列表格 -->
-    <el-table :data="rows" border stripe size="small" class="check-table" row-key="rowId"
-      :row-class-name="getRowClassName">
-      <el-table-column prop="seq" label="序号" width="50" align="center" />
-      <el-table-column label="物资名称" min-width="110">
-        <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.name" size="small"
-            @change="updateCell(row.rowId, 'name', $event)" />
-          <span v-else>{{ row.name }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="规格" min-width="90">
-        <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.spec" size="small"
-            @change="updateCell(row.rowId, 'spec', $event)" />
-          <span v-else>{{ row.spec }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="账面数量" width="90" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="!props.isReadonly" v-model="row.bookQty" :controls="false"
-            size="small" class="amt-input"
-            @change="updateCell(row.rowId, 'bookQty', $event)" />
-          <span v-else>{{ row.bookQty || '-' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="账面金额" width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="!props.isReadonly" v-model="row.bookAmt" :controls="false"
-            size="small" class="amt-input"
-            @change="updateCell(row.rowId, 'bookAmt', $event)" />
-          <span v-else class="amt-cell">{{ fmtAmt(row.bookAmt) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="盘点数量" width="90" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="!props.isReadonly" v-model="row.countQty" :controls="false"
-            size="small" class="amt-input"
-            @change="updateCell(row.rowId, 'countQty', $event)" />
-          <span v-else>{{ row.countQty || '-' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="盘点金额" width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="!props.isReadonly" v-model="row.countAmt" :controls="false"
-            size="small" class="amt-input"
-            @change="updateCell(row.rowId, 'countAmt', $event)" />
-          <span v-else class="amt-cell">{{ fmtAmt(row.countAmt) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="差异数量" width="90" align="right">
-        <template #default="{ row }">
-          <span class="formula-cell" :class="{ 'diff-warn': row.hasDiff }"
-            title="差异数量 = 盘点数量 - 账面数量">{{ row.diffQty || '-' }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="差异金额" width="100" align="right">
-        <template #default="{ row }">
-          <span class="formula-cell" :class="{ 'diff-warn': row.hasDiff }"
-            title="差异金额 = 盘点金额 - 账面金额">{{ fmtAmt(row.diffAmt) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="存放位置" min-width="100">
-        <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.location" size="small"
-            @change="updateCell(row.rowId, 'location', $event)" />
-          <span v-else>{{ row.location }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="盘点日期" width="100">
-        <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.countDate" size="small" placeholder="YYYY-MM-DD"
-            @change="updateCell(row.rowId, 'countDate', $event)" />
-          <span v-else>{{ row.countDate }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="备注" min-width="100">
-        <template #default="{ row }">
-          <el-input v-if="!props.isReadonly" v-model="row.remark" size="small"
-            @change="updateCell(row.rowId, 'remark', $event)" />
-          <span v-else>{{ row.remark }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="" width="40" v-if="!props.isReadonly">
-        <template #default="{ row }">
-          <el-button size="small" type="danger" link @click="handleDeleteRow(row.rowId)">✕</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <ItemAttachment
+      v-if="projectId && wpId"
+      :project-id="projectId"
+      :wp-id="wpId"
+      sheet-key="H4-6"
+      :item-index="0"
+      accept=".pdf,.png,.jpg,.jpeg,.xlsx,.xls,.mp4,.mov"
+    />
 
-    <!-- 统计摘要 -->
-    <div class="stats-bar">
-      <span class="stats-item">盘点总笔数 <strong>{{ totalCount }}</strong></span>
-      <span class="stats-item" :class="{ 'stats-warn': diffRowCount > 0 }">
-        存在差异 <strong>{{ diffRowCount }}</strong> 笔
-      </span>
-    </div>
+    <el-alert
+      v-if="stats.varianceCount > 0"
+      type="error"
+      :closable="false"
+      show-icon
+      style="margin-bottom:6px"
+      :title="`发现 ${stats.varianceCount} 项三数量差异，须在差异原因列说明并追查`"
+    />
+    <el-alert
+      v-if="stats.concernCount > 0"
+      type="warning"
+      :closable="false"
+      show-icon
+      style="margin-bottom:6px"
+      :title="`发现 ${stats.concernCount} 项品质/盘亏关注（闲置·积压·毁损·盘亏），建议推送至 H4-7`"
+    />
+    <el-alert
+      v-if="stats.bookToFloorCount > 0 && stats.floorToBookCount === 0"
+      type="warning"
+      :closable="false"
+      show-icon
+      style="margin-bottom:6px"
+      title="已做账面→实物存在性抽盘，但尚未记录实物→账面完整性测试，建议补充"
+    />
 
-    <!-- 操作栏 -->
-    <div class="action-bar" v-if="!props.isReadonly">
-      <el-button size="small" @click="handleAddRow">+ 添加盘点行</el-button>
-      <el-dropdown trigger="click" @command="handleImportExport" style="margin-left: 8px">
-        <el-button size="small">导入导出 ▾</el-button>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item command="export-template">导出模板</el-dropdown-item>
-            <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
-            <el-dropdown-item command="import-data">导入数据</el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
-    </div>
+    <nav class="st-sec-nav" aria-label="分区导航">
+      <button
+        v-for="item in navItems"
+        :key="item.id"
+        type="button"
+        class="st-sec-btn"
+        :class="{ active: activeId === item.id }"
+        @click="scrollTo(item.id)"
+      >{{ item.label }}</button>
+    </nav>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>
-        <div class="section-header" style="margin-bottom:0">
-          <span>审计说明</span>
-          <div class="section-header-actions">
-            <el-button size="small" circle @click="openReview('H4-6-note')">💬</el-button>
-          </div>
+    <section id="sec-obj" class="chk-card">
+      <header class="chk-card-head">
+        <div>
+          <h3>一、审计目标</h3>
+          <p>存在 · 完整性 · 计价和分摊 / 列报</p>
         </div>
-      </template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请填写审计说明..." :disabled="props.isReadonly"
-        @blur="saveAuditNote" />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header>
-        <div class="section-header" style="margin-bottom:0">
-          <span>审计结论</span>
-          <div class="section-header-actions">
-            <el-button size="small" circle @click="openReview('H4-6-conclusion')">💬</el-button>
-          </div>
-        </div>
-      </template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
-        placeholder="请填写审计结论..." :disabled="props.isReadonly"
-        @blur="saveAuditConclusion" />
-    </el-card>
-
-    <!-- 编制提示 -->
-    <details class="edit-tips">
-      <summary>编制提示</summary>
-      <ul>
-        <li>逐项核对物资实物盘点数量/金额与账面记录</li>
-        <li>差异数量=盘点数量-账面数量；差异金额=盘点金额-账面金额</li>
-        <li>差异不为零的行自动黄色高亮，需在备注中说明原因</li>
-        <li>盘点日期填写实际盘点日（YYYY-MM-DD格式）</li>
-        <li>存放位置记录物资实际存放地点以便复盘</li>
+      </header>
+      <ul class="obj-list">
+        <li>资产负债表中记录的工程物资是存在的，并由被审计单位拥有或控制</li>
+        <li>所有应当记录的工程物资均已记录</li>
+        <li>工程物资以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述</li>
       </ul>
+    </section>
+
+    <section id="sec-sample" class="chk-card">
+      <header class="chk-card-head">
+        <div>
+          <h3>二、样本选取标准与规模</h3>
+          <p>测试总体 → 特定样本 → 抽样总体 / 方法</p>
+        </div>
+        <el-button v-if="!isReadonly" size="small" plain @click="onSyncTotalCost">余额←H4-2</el-button>
+      </header>
+      <el-form label-width="120px" size="small" class="meta-form">
+        <el-form-item label="测试总体">
+          <el-input
+            :model-value="meta.testPopulation"
+            type="textarea"
+            :rows="2"
+            :disabled="isReadonly"
+            placeholder="如：期末工程物资数量 XX、余额合计 XX"
+            @update:model-value="(v: string) => updateMeta('testPopulation', v)"
+          />
+        </el-form-item>
+        <el-row :gutter="12">
+          <el-col :span="12">
+            <el-form-item label="特定样本">
+              <el-input
+                :model-value="meta.specificSample"
+                type="textarea"
+                :rows="2"
+                :disabled="isReadonly"
+                placeholder="大额、关联方、长期积压、异常规格等"
+                @update:model-value="(v: string) => updateMeta('specificSample', v)"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="抽样总体">
+              <el-input
+                :model-value="meta.samplingPopulation"
+                type="textarea"
+                :rows="2"
+                :disabled="isReadonly"
+                placeholder="测试总体剔除特定样本后的剩余项目"
+                @update:model-value="(v: string) => updateMeta('samplingPopulation', v)"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="12">
+          <el-col :span="12">
+            <el-form-item label="抽样方法">
+              <el-select
+                :model-value="meta.samplingMethod"
+                :disabled="isReadonly"
+                style="width:100%"
+                allow-create
+                filterable
+                @update:model-value="(v: string) => updateMeta('samplingMethod', v)"
+              >
+                <el-option v-for="m in SAMPLING_METHOD_OPTS" :key="m" :label="m" :value="m" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="期末余额合计">
+              <el-input-number
+                :model-value="meta.totalBookCost ?? undefined"
+                :disabled="isReadonly"
+                :controls="false"
+                :precision="2"
+                style="width:100%"
+                placeholder="覆盖率分母，避免除零"
+                @update:model-value="(v: number | undefined) => updateMeta('totalBookCost', v ?? null)"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="抽样过程">
+          <el-input
+            :model-value="meta.samplingProcess"
+            type="textarea"
+            :rows="2"
+            :disabled="isReadonly"
+            placeholder="如：使用 IDEA 等审计软件选取样本…"
+            @update:model-value="(v: string) => updateMeta('samplingProcess', v)"
+          />
+        </el-form-item>
+      </el-form>
+    </section>
+
+    <section id="sec-process" class="chk-card">
+      <header class="chk-card-head">
+        <div>
+          <h3>三、审计过程</h3>
+          <p>地点 · 人员 · 时间</p>
+        </div>
+      </header>
+      <el-form label-width="120px" size="small" class="meta-form">
+        <el-row :gutter="12">
+          <el-col :span="12">
+            <el-form-item label="抽盘地点">
+              <el-input
+                :model-value="meta.location"
+                :disabled="isReadonly"
+                placeholder="仓库/工地堆场等"
+                @update:model-value="(v: string) => updateMeta('location', v)"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="盘点时间">
+              <el-input
+                :model-value="meta.countTime"
+                :disabled="isReadonly"
+                placeholder="现场盘点起止时间"
+                @update:model-value="(v: string) => updateMeta('countTime', v)"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="12">
+          <el-col :span="12">
+            <el-form-item label="企业盘点人员">
+              <el-input
+                :model-value="meta.clientStaff"
+                :disabled="isReadonly"
+                placeholder="仓管/工程/财务陪同人员"
+                @update:model-value="(v: string) => updateMeta('clientStaff', v)"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="监盘人员">
+              <el-input
+                :model-value="meta.auditors"
+                :disabled="isReadonly"
+                placeholder="项目组签字人"
+                @update:model-value="(v: string) => updateMeta('auditors', v)"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+    </section>
+
+    <section id="sec-exist" class="chk-card">
+      <header class="chk-card-head">
+        <div>
+          <h3>（一）从工程物资账面追查至实物</h3>
+          <p>测存在性 · 账面 / 企业盘点 / 审计抽盘</p>
+        </div>
+        <div class="chk-card-actions">
+          <el-tag v-if="b2fCov.varianceCount > 0" size="small" type="danger">{{ b2fCov.varianceCount }} 行差异</el-tag>
+          <el-tag v-else-if="b2fRows.length" size="small" type="success">无差异</el-tag>
+          <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow('bookToFloor')">+ 明细行</el-button>
+        </div>
+      </header>
+      <H4CheckDirectionTable
+        :rows="b2fRows"
+        :is-readonly="isReadonly"
+        empty-text="暂无「账面→实物」明细；可从 H4-2 带入或新增"
+        @update="onRowUpdate"
+        @remove="removeRow"
+      />
+      <div v-if="b2fRows.length" class="coverage-bar">
+        <span>抽盘账面金额合计 <b>{{ fmtAmt(b2fCov.sampleAmount) }}</b></span>
+        <span>期末余额合计 <b>{{ meta.totalBookCost != null ? fmtAmt(meta.totalBookCost) : '—' }}</b></span>
+        <span>
+          覆盖率
+          <b :class="{ 'warn-text': b2fCov.ratioPct != null && b2fCov.ratioPct < 5 }">
+            {{ b2fCov.ratioPct != null ? `${b2fCov.ratioPct.toFixed(2)}%` : '—（请填期末余额合计）' }}
+          </b>
+        </span>
+      </div>
+    </section>
+
+    <section id="sec-floor" class="chk-card">
+      <header class="chk-card-head">
+        <div>
+          <h3>（二）从工程物资实物追查至账面</h3>
+          <p>测完整性 · 列结构与上表相同</p>
+        </div>
+        <div class="chk-card-actions">
+          <el-tag v-if="f2bCov.varianceCount > 0" size="small" type="danger">{{ f2bCov.varianceCount }} 行差异</el-tag>
+          <el-tag v-else-if="f2bRows.length" size="small" type="success">无差异</el-tag>
+          <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow('floorToBook')">+ 明细行</el-button>
+        </div>
+      </header>
+      <H4CheckDirectionTable
+        :rows="f2bRows"
+        :is-readonly="isReadonly"
+        empty-text="暂无「实物→账面」明细；完整性测试不可省略"
+        @update="onRowUpdate"
+        @remove="removeRow"
+      />
+      <div v-if="f2bRows.length" class="coverage-bar">
+        <span>抽盘账面金额合计 <b>{{ fmtAmt(f2bCov.sampleAmount) }}</b></span>
+        <span>期末余额合计 <b>{{ meta.totalBookCost != null ? fmtAmt(meta.totalBookCost) : '—' }}</b></span>
+        <span>
+          覆盖率
+          <b :class="{ 'warn-text': f2bCov.ratioPct != null && f2bCov.ratioPct < 5 }">
+            {{ f2bCov.ratioPct != null ? `${f2bCov.ratioPct.toFixed(2)}%` : '—（请填期末余额合计）' }}
+          </b>
+        </span>
+      </div>
+    </section>
+
+    <div class="summary-bar">
+      <span>账实相符 <b>{{ stats.matchCount }}</b></span>
+      <span>盘盈 <b>{{ stats.surplusCount }}</b></span>
+      <span>盘亏 <b :class="{ 'error-amount': stats.deficitCount > 0 }">{{ stats.deficitCount }}</b></span>
+      <span>相符率 <b>{{ stats.matchRate.toFixed(1) }}%</b></span>
+      <span>闲置/积压 <b :class="{ 'warn-text': stats.idleCount > 0 }">{{ stats.idleCount }}</b></span>
+      <span>毁损/待报废 <b :class="{ 'warn-text': stats.damagedCount > 0 }">{{ stats.damagedCount }}</b></span>
+      <span v-if="stats.deficitAmount > 0">盘亏金额 <b class="error-amount">{{ fmtAmt(stats.deficitAmount) }}</b></span>
+    </div>
+
+    <section id="sec-note" class="chk-card">
+      <header class="chk-card-head">
+        <div><h3>四、盘点情况说明</h3></div>
+        <el-button size="small" @click="generateAI('H4-6')">AI</el-button>
+      </header>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="填写：双向抽盘执行情况、三数量差异及原因、闲置/毁损/积压处理；监盘计划与小结可参考固定资产做法。"
+        @change="saveAuditNote"
+      />
+    </section>
+
+    <section id="sec-conclusion" class="chk-card">
+      <header class="chk-card-head"><div><h3>五、审计结论</h3></div></header>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="就本节审计目标是否实现发表结论…"
+        @change="saveAuditConclusion"
+      />
+    </section>
+
+    <details class="compile-hint">
+      <summary>编制提示</summary>
+      <ol>
+        <li>本表对齐致同「工程物资盘点检查表」：目标→样本→过程→三数量明细→说明→结论。</li>
+        <li>三数量：账面 / 企业盘点 / 审计抽盘；差异列自动计算（抽盘−账面、抽盘−企业、企业−账面）。</li>
+        <li>期末余额合计须先填（或自 H4-2 同步），否则覆盖率显示「—」而非除零错误。</li>
+        <li>品质为闲置/积压/毁损或盘亏时，推送减值关注至 H4-7。</li>
+        <li>完整性测试（实物→账面）不可省略，避免仅测存在性。</li>
+        <li>监盘计划见 H4-6A，监盘小结见 H4-6B（参照固定资产范式）。</li>
+      </ol>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * H4TabStocktakeCheck.vue — H4-6 盘点检查表
- *
- * 12列: 序号|物资名称|规格|账面数量|账面金额|盘点数量|盘点金额|差异数量|差异金额|存放位置|盘点日期|备注
- * 差异列: auto-calculated, YELLOW highlight when diff != 0 (row-level)
- *
- * Spec: .kiro/specs/h4-engineering-materials/
- * Task: 4.7
- * Requirements: 7.1-7.3
+ * H4TabStocktakeCheck.vue — H4-6 盘点检查表（致同五段式 + 双向抽盘 + 三数量）
  */
-import { ref, computed, inject, toRef, onMounted } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
-import { useH4Stocktake, type H4StocktakeRow } from '../../composables/useH4Stocktake'
+import { ref, computed, toRef, inject } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useH4Stocktake } from '../../composables/useH4Stocktake'
 import { useH4ImportExport } from '../../composables/useH4ImportExport'
+import {
+  SAMPLING_METHOD_OPTS,
+  type StocktakeDirection,
+  type H4StocktakeCheckRow,
+} from '../../composables/h4StocktakeCheckModel'
+import { useStickySectionNav } from '../../composables/useStickySectionNav'
 import GtIndexChip from '../../GtIndexChip.vue'
+import ItemAttachment from '../../ItemAttachment.vue'
+import H4CheckDirectionTable from './H4CheckDirectionTable.vue'
 
 const props = defineProps<{
   wpId: string
@@ -205,151 +389,246 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const emit = defineEmits<{
+  (e: 'navigate-sheet', sheetName: string): void
+}>()
 
-// ─── Composable ──────────────────────────────────────────────────────────────
-const allResponsesRef = computed(() => props.allResponses)
+const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
 
 const {
-  rows, diffRowCount, totalCount,
-  addRow, deleteRow, updateCell, save,
+  rows, meta, auditNote, auditConclusion, stats,
+  bookToFloorRows, floorToBookRows, bookToFloorCoverage, floorToBookCoverage,
+  addRow, removeRow, updateRow, updateMeta,
+  saveAuditNote, saveAuditConclusion,
+  importFromH42, syncTotalBookCost, draftNote, draftConclusion, concernCount,
+  pushImpairmentConcernsToH47, pushAjeDraftToH43, loadAll,
 } = useH4Stocktake({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
-  allResponses: allResponsesRef as any,
-  onSave: (itemId: string, value: any) => {
-    const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-    props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
-  },
+  allResponses: toRef(props, 'allResponses') as any,
 })
 
-const importExport = useH4ImportExport({
+const { exportTemplate, exportData, importData, isImporting: importing } = useH4ImportExport({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
+  onImported: () => loadAll(),
 })
 
-// ─── Audit Note / Conclusion（inject saveResponse 落库 + onMounted 恢复） ──────
-const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', () => {})
-const auditNote = ref('')
-const auditConclusion = ref('')
-function saveAuditNote() {
-  props.allResponses.set('H4-6-note', { item_id: 'H4-6-note', remark: auditNote.value, conclusion: null })
-  saveResponse('H4-6-note', auditNote.value)
-}
-function saveAuditConclusion() {
-  props.allResponses.set('H4-6-conclusion', { item_id: 'H4-6-conclusion', remark: auditConclusion.value, conclusion: null })
-  saveResponse('H4-6-conclusion', auditConclusion.value)
-}
-onMounted(() => {
-  const n = props.allResponses.get('H4-6-note'); if (n?.remark) auditNote.value = n.remark
-  const c = props.allResponses.get('H4-6-conclusion'); if (c?.remark) auditConclusion.value = c.remark
-})
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const b2fRows = bookToFloorRows
+const f2bRows = floorToBookRows
+const b2fCov = bookToFloorCoverage
+const f2bCov = floorToBookCoverage
+const concernN = computed(() => concernCount())
+const isReadonly = computed(() => props.isReadonly)
+const projectId = computed(() => props.projectId)
+const wpId = computed(() => props.wpId)
 
-// ─── Actions ─────────────────────────────────────────────────────────────────
+const navItems = [
+  { id: 'sec-obj', label: '一·目标' },
+  { id: 'sec-sample', label: '二·样本' },
+  { id: 'sec-process', label: '三·过程' },
+  { id: 'sec-exist', label: '账面→实物' },
+  { id: 'sec-floor', label: '实物→账面' },
+  { id: 'sec-note', label: '四·说明' },
+  { id: 'sec-conclusion', label: '五·结论' },
+]
+const { activeId, scrollTo } = useStickySectionNav(navItems)
 
-function getRowClassName({ row }: { row: H4StocktakeRow }) {
-  if (row.hasDiff) return 'diff-row'
-  return ''
-}
-
-async function handleAddRow() {
-  try {
-    const { value } = await ElMessageBox.prompt('请输入物资名称', '添加盘点行', {
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
-      inputPattern: /\S+/,
-      inputErrorMessage: '名称不能为空',
-    })
-    if (value) addRow(value)
-  } catch { /* cancelled */ }
+function onRowUpdate(rowId: string, patch: Partial<H4StocktakeCheckRow>) {
+  updateRow(rowId, patch)
 }
 
-function handleDeleteRow(rowId: string) {
-  deleteRow(rowId)
+function onImportFromH42(direction: StocktakeDirection) {
+  const r = importFromH42({ direction, maxRows: 50 })
+  ElMessage[r.added ? 'success' : 'info'](r.message)
 }
 
-function handleImportExport(command: string) {
-  if (command === 'export-template') importExport.exportTemplate('H4-6')
-  else if (command === 'export-data') importExport.exportData('H4-6')
-  else if (command === 'import-data') {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.xlsx,.xls,.csv'
-    input.onchange = (e: Event) => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (file) importExport.importData('H4-6', file)
-    }
-    input.click()
-  }
+function onSyncTotalCost() {
+  const r = syncTotalBookCost()
+  ElMessage[r.ok ? 'success' : 'warning'](r.message)
 }
 
-
-function openReview(id: string) {
-  openReviewDialog(id)
+function onPushConcernsToH47() {
+  const r = pushImpairmentConcernsToH47()
+  ElMessage[r.concernCount > 0 ? 'success' : 'info'](r.message)
+  if (r.concernCount > 0) emit('navigate-sheet', 'H4-7')
 }
 
-// ─── 金额格式化 ──────────────────────────────────────────────────────────────
-function fmtAmt(val: number | null | undefined): string {
-  if (val == null) return '-'
-  if (val === 0) return '-'
-  if (val < 0) {
-    return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
-  }
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+function onPushAje() {
+  const res = pushAjeDraftToH43()
+  if (res.ok) ElMessage.success(res.message)
+  else ElMessage.warning(res.message)
+}
+
+function onDraftNote() {
+  draftNote()
+  ElMessage.success('已起草盘点情况说明，可继续编辑')
+}
+
+function onDraftConclusion() {
+  draftConclusion()
+  ElMessage.success('已起草审计结论，可继续编辑')
+}
+
+async function handleExportCmd(cmd: string) {
+  if (cmd === 'export-template') await exportTemplate('H4-6')
+  else if (cmd === 'export-data') await exportData('H4-6')
+  else if (cmd === 'import-data') fileInputRef.value?.click()
+}
+
+async function onFileSelected(ev: Event) {
+  const file = (ev.target as HTMLInputElement).files?.[0]
+  ;(ev.target as HTMLInputElement).value = ''
+  if (!file) return
+  await importData('H4-6', file)
+  loadAll()
+  ElMessageBox.alert('导入完成。若页面未刷新，请切换 sheet 后返回查看。', '提示')
+}
+
+function generateAI(section: string) {
+  window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section, wpId: props.wpId } }))
+}
+function openReview(section: string) { openReviewDialog(section) }
+
+function fmtAmt(n: number | null | undefined): string {
+  if (n == null) return '-'
+  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 </script>
 
 <style scoped>
-.h4-tab-stocktake-check { padding: 16px; font-size: var(--wp-font-size, 13px); }
-
-.objective-alert { margin-bottom: 12px; }
-.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.chip-wrap { display: inline-flex; align-items: center; }
-
-.methodology-context {
-  border-left: 4px solid #d97706;
-  background: #fffbeb;
-  padding: 10px 14px;
-  margin-bottom: 16px;
+.h4-tab-stocktake-check {
+  padding: 16px;
+  font-size: var(--wp-font-size, 13px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.chk-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, var(--el-fill-color-lighter), var(--el-bg-color));
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+}
+.chk-kicker {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--el-color-primary);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.chk-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 650;
+  color: var(--el-text-color-primary);
+}
+.chk-objective {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--el-text-color-secondary);
+  max-width: 640px;
+}
+.chk-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.st-sec-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding: 6px 0;
+  background: var(--el-bg-color);
+}
+.st-sec-btn {
+  border: 1px solid var(--el-border-color);
+  background: var(--el-fill-color-blank);
+  color: var(--el-text-color-regular);
+  border-radius: 14px;
+  padding: 3px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.st-sec-btn.active,
+.st-sec-btn:hover {
+  border-color: var(--el-color-primary);
+  color: var(--el-color-primary);
+}
+.chk-card {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: var(--el-bg-color);
+}
+.chk-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.chk-card-head h3 {
+  margin: 0 0 2px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.chk-card-head p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.chk-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.obj-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-regular);
+}
+.meta-form :deep(.el-form-item) { margin-bottom: 10px; }
+.coverage-bar,
+.summary-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 10px 12px;
+  margin-top: 10px;
+  background: var(--el-fill-color-light);
   border-radius: 4px;
   font-size: 12px;
-  color: #92400e;
-  line-height: 1.6;
 }
-
-.section-header {
-  display: flex; align-items: center; justify-content: space-between;
-  font-size: 14px; font-weight: 600; margin-bottom: 12px;
+.warn-text,
+.error-amount { color: var(--el-color-danger); }
+.compile-hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
-.section-header-actions { display: flex; align-items: center; gap: 4px; }
-
-.check-table { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }
-.amt-input { width: 100%; }
-.amt-cell { display: block; text-align: right; }
-
-.formula-cell {
-  display: inline-block; text-align: right;
-  border-bottom: 1px dashed #67c23a;
-  cursor: help;
+.compile-hint summary { cursor: pointer; font-weight: 500; }
+.compile-hint ol { padding-left: 20px; margin: 8px 0 0; line-height: 1.7; }
+@media (max-width: 900px) {
+  .chk-hero { flex-direction: column; }
 }
-.diff-warn { color: #e6a23c; font-weight: 600; border-bottom-color: #e6a23c; }
-
-:deep(.diff-row) { background-color: #fdf6ec !important; }
-
-.stats-bar {
-  display: flex; align-items: center; gap: 24px;
-  padding: 10px 14px; margin-bottom: 12px;
-  background: var(--el-fill-color-lighter);
-  border-radius: 6px;
-  font-size: var(--wp-font-size, 13px);
-}
-.stats-item { color: var(--el-text-color-secondary); }
-.stats-item strong { color: var(--el-text-color-primary); font-variant-numeric: tabular-nums; }
-.stats-warn strong { color: #e6a23c; }
-
-.action-bar { display: flex; align-items: center; margin-bottom: 12px; }
-.audit-note-card { margin-bottom: 12px; }
-.edit-tips { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
-.edit-tips summary { cursor: pointer; font-weight: 500; }
-.edit-tips ul { padding-left: 20px; margin-top: 8px; }
 </style>

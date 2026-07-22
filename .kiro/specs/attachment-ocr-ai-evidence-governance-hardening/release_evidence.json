@@ -2,11 +2,11 @@
   "feature": "attachment-ocr-ai-evidence-governance-hardening",
   "task": "11.4",
   "artifact": "release_evidence",
-  "generated_at": "2026-07-16T17:07:06.590537+00:00",
+  "generated_at": "2026-07-22T03:05:30.043800+00:00",
   "collect_only": false,
   "test_profile": {
     "hypothesis_profile": "fast",
-    "hypothesis_max_examples_env": "1"
+    "hypothesis_max_examples_env": null
   },
   "release_gate_policy": "design §14: R1–R15 验收 + P1–P29 全绿 + UAT-01~15 全绿 + 真实 PG 约束/并发/trigger + AI coverage gap=0 + 跨项目泄露=0 + offline manifest 验签 + 6000VU 错误率<1% + health/rollback 全绿; 全绿方可 release-ready 并发起归档评审, 否则 BLOCKED 且阻断发布。",
   "overall": {
@@ -228,8 +228,8 @@
       ],
       "command": "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe scripts/check/check_evidence_governance_traceability.py --strict",
       "detail": "====================================================================\nattachment-ocr-ai-evidence-governance-hardening 三件套追溯与完成守卫\n====================================================================\n\n[1/6] R1–R16 定义 / 任务引用 / design 追溯表...\n[2/6] P1–P30 requirements 属性表 / design 同步表...\n[3/6] UAT-01～15 requirements / design matrix / Wave 9 覆盖...\n[4/6] 任务计数 (55 叶子 / 11 wave / 11 顶层)...\n[5/6] Task Dependency Graph (missing/extra/duplicate + wave 依赖)...\n[6/6] 无 optional / ask-user / checkpoint...\n\n检查明细:\n  [OK] R1–R16 全部定义、被 16 任务引用集覆盖、并在 design 追溯表 (16 行)\n  [OK] P1–P30 全部在 requirements 属性表 (30) 与 design 同步表 (30 行)\n  [OK] UAT-01～15 全部在 requirements §6、design §12、Wave 9 任务覆盖\n  [OK] 叶子任务数 = 55\n  [OK] 顶层任务数 = 11 (1–11)\n  [OK] 依赖图 wave = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]\n  [OK] 依赖图叶子 = 55，与 tasks.md 叶子集合一致 (无 missing/extra/duplicate)\n  [OK] 依赖图 wave 依赖只引用更早 wave 的叶子\n  [OK] 无 optional / ask-user / checkpoint 任务 (全部 55 叶子为必做项)\n\n====================================================================\n结论: PASS — 三件套追溯与完成检查全部通过",
-      "duration_s": 0.06,
-      "timestamp": "2026-07-16T17:03:24.510734+00:00"
+      "duration_s": 0.07,
+      "timestamp": "2026-07-22T03:01:50.107109+00:00"
     },
     {
       "id": "pbt_p1_p29",
@@ -263,9 +263,9 @@
         "tests/test_evidence_governance_migration_quality_properties_wave8_9_6.py"
       ],
       "command": "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m pytest tests/attachment_ocr_ai_evidence_governance_hardening/test_security_attachment_ref_property_group_pbt.py tests/test_evidence_governance_ocr_properties_wave8_9_2.py tests/test_evidence_governance_rag_ai_properties_wave8_9_3.py tests/test_evidence_governance_stale_review_properties_wave8_9_4.py tests/test_evidence_governance_archive_hold_properties_wave8_9_5.py tests/test_evidence_governance_migration_quality_properties_wave8_9_6.py -q --no-header -p no:cacheprovider -m not release_gate_p30",
-      "detail": "86 passed in 122.75s (0:02:02)",
-      "duration_s": 124.92,
-      "timestamp": "2026-07-16T17:05:29.429171+00:00"
+      "detail": "83 passed, 3 skipped in 118.83s (0:01:58)",
+      "duration_s": 121.47,
+      "timestamp": "2026-07-22T03:03:51.575391+00:00"
     },
     {
       "id": "p30_snapshot",
@@ -280,9 +280,9 @@
         "tests/test_evidence_governance_release_gate_p30_fixed_snapshot_task_11_3.py"
       ],
       "command": "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m pytest tests/test_evidence_governance_release_gate_p30_fixed_snapshot_task_11_3.py -q --no-header -p no:cacheprovider -m release_gate_p30",
-      "detail": "7 passed in 0.42s",
-      "duration_s": 2.42,
-      "timestamp": "2026-07-16T17:05:31.845292+00:00"
+      "detail": "7 passed in 0.44s",
+      "duration_s": 2.8,
+      "timestamp": "2026-07-22T03:03:54.378960+00:00"
     },
     {
       "id": "uat_01_15",
@@ -310,8 +310,8 @@
       ],
       "command": "",
       "detail": "Playwright 结果: {'startTime': '2026-07-16T15:38:37.630Z', 'duration': 14666.224, 'expected': 36, 'unexpected': 0, 'skipped': 4, 'flaky': 0}",
-      "duration_s": 0.01,
-      "timestamp": "2026-07-16T17:05:31.850393+00:00"
+      "duration_s": 0.0,
+      "timestamp": "2026-07-22T03:03:54.380959+00:00"
     },
     {
       "id": "pg16_contracts",
@@ -334,9 +334,9 @@
         "tests/evidence_governance/test_unified_graph_stale_closure_pbt.py"
       ],
       "command": "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m pytest tests/evidence_governance/test_citation_snapshot_pg16_contract.py tests/test_evidence_governance_wave1_capstone_v2_5.py tests/evidence_governance/test_unified_graph_stale_closure_pbt.py -q --no-header -p no:cacheprovider",
-      "detail": "28 passed in 45.27s",
-      "duration_s": 47.17,
-      "timestamp": "2026-07-16T17:06:19.022490+00:00"
+      "detail": "28 passed in 43.84s",
+      "duration_s": 45.76,
+      "timestamp": "2026-07-22T03:04:40.144921+00:00"
     },
     {
       "id": "adapter_contracts",
@@ -355,9 +355,9 @@
         "tests/evidence_governance/test_engine_adapter_contracts.py"
       ],
       "command": "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m pytest tests/evidence_governance/test_engine_adapter_contracts.py -q --no-header -p no:cacheprovider",
-      "detail": "30 passed, 1 warning in 5.41s",
-      "duration_s": 8.93,
-      "timestamp": "2026-07-16T17:06:27.952644+00:00"
+      "detail": "30 passed, 1 warning in 7.85s",
+      "duration_s": 11.39,
+      "timestamp": "2026-07-22T03:04:51.530915+00:00"
     },
     {
       "id": "ai_coverage",
@@ -373,8 +373,8 @@
       ],
       "command": "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe scripts/check/check_ai_entry_coverage.py --strict",
       "detail": "[AI Entry Coverage] Scanning: D:\\GT_plan\\backend\n[AI Entry Coverage] Declared entries: 12\n[AI Entry Coverage] Discovered entries: 2\n[OK] P18 holds: all discovered AI entry points are declared in gate registry\n\n[INFO] 10 declared entries not found in scan:\n  - ai_assist_ocr_field (declared but not discovered)\n  - complete_content (declared but not discovered)\n  - generate_audit_opinion (declared but not discovered)\n  - generate_conclusion (declared but not discovered)\n  - generate_derecognition_judge (declared but not discovered)\n  - generate_disclosure_note (declared but not discovered)\n  - generate_review_response (declared but not discovered)\n  - generate_text (declared but not discovered)\n  - rewrite_content (declared but not discovered)\n  - summarize_content (declared but not discovered)",
-      "duration_s": 3.55,
-      "timestamp": "2026-07-16T17:06:31.504771+00:00"
+      "duration_s": 2.99,
+      "timestamp": "2026-07-22T03:04:54.525467+00:00"
     },
     {
       "id": "offline_manifest",
@@ -389,9 +389,9 @@
         "tests/evidence_governance/test_archive_adapter_offline_verifier.py"
       ],
       "command": "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m pytest tests/evidence_governance/test_archive_adapter_offline_verifier.py -q --no-header -p no:cacheprovider",
-      "detail": "29 passed in 0.66s",
-      "duration_s": 2.8,
-      "timestamp": "2026-07-16T17:06:34.301275+00:00"
+      "detail": "29 passed in 0.79s",
+      "duration_s": 3.56,
+      "timestamp": "2026-07-22T03:04:58.086130+00:00"
     },
     {
       "id": "capacity_6000vu",
@@ -409,8 +409,8 @@
       ],
       "command": "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m pytest tests/load/evidence_governance_capacity/test_capacity_tooling.py -q --no-header -p no:cacheprovider",
       "detail": "计划契约通过 (target_virtual_users=6000, max_error_rate_pct=1.0, max_cross_project_leakage=0); 但未发现 live 6000VU run 报告。6000VU 需专用容量/chaos 环境执行 (locustfile_evidence_capacity + run_capacity.py), 此处仅取到 plan/contract 级证据, 未 live-verified — 不伪造 live run。",
-      "duration_s": 2.42,
-      "timestamp": "2026-07-16T17:06:36.716522+00:00"
+      "duration_s": 2.88,
+      "timestamp": "2026-07-22T03:05:00.962004+00:00"
     },
     {
       "id": "health_rollback",
@@ -429,9 +429,9 @@
         "tests/attachment_ocr_ai_evidence_governance_hardening/test_migration_health_gate_rollback_rehearsal_pg.py"
       ],
       "command": "C:\\Users\\Administrator\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m pytest tests/attachment_ocr_ai_evidence_governance_hardening/test_migration_health_gate_rollback_rehearsal_pg.py -q --no-header -p no:cacheprovider",
-      "detail": "19 passed in 28.13s",
-      "duration_s": 29.87,
-      "timestamp": "2026-07-16T17:07:06.590537+00:00"
+      "detail": "19 passed in 27.21s",
+      "duration_s": 29.08,
+      "timestamp": "2026-07-22T03:05:30.043800+00:00"
     }
   ]
 }

@@ -111,9 +111,8 @@
                 class="table-block"
               >
                 <header class="block-head">
-                  <div>
+                  <div class="block-head-main">
                     <h4>{{ table.title }}</h4>
-                    <span>源区域：{{ table.sourceRows }}</span>
                   </div>
                   <div v-if="table.dynamic" class="add-row-actions">
                     <template v-if="table.id === 'lte-movement' || table.id === 'unrecognized-losses'">
@@ -147,6 +146,21 @@
                   {{ table.description }}
                 </p>
 
+                <div class="table-meta">
+                  <span class="table-meta-label">数据来源</span>
+                  <el-tag size="small" type="info" effect="plain">
+                    Excel {{ table.sourceRows }}
+                  </el-tag>
+                  <el-tag
+                    v-for="src in tableMeta(table).unique"
+                    :key="src"
+                    size="small"
+                    effect="plain"
+                  >
+                    {{ src }}
+                  </el-tag>
+                </div>
+
                 <div class="table-scroll">
                   <el-table
                     :data="tableRows(table)"
@@ -154,7 +168,7 @@
                     :row-class-name="tableRowClass"
                     class="disclosure-table"
                   >
-                    <el-table-column label="项目/企业名称" fixed width="230">
+                    <el-table-column label="项目/企业名称" fixed width="190">
                       <template #default="{ row }">
                         <template v-if="row.kind === 'subtotal' || row.kind === 'total' || row.kind === 'group'">
                           <strong>{{ row.label }}</strong>
@@ -167,9 +181,6 @@
                             placeholder="名称/项目"
                             @change="scheduleSave"
                           />
-                          <span v-if="row.source" class="cell-source" :title="row.source">
-                            来源：{{ row.source }}
-                          </span>
                         </template>
                       </template>
                     </el-table-column>
@@ -179,7 +190,7 @@
                       :key="column.key"
                       :label="column.label"
                       :width="column.width"
-                      min-width="120"
+                      min-width="118"
                       :align="column.type === 'text' ? 'left' : 'right'"
                     >
                       <template #default="{ row }">
@@ -230,6 +241,22 @@
                     </el-table-column>
                   </el-table>
                 </div>
+
+                <details
+                  v-if="tableMeta(table).showDetail"
+                  class="table-source-detail"
+                >
+                  <summary>各行取数明细（{{ tableMeta(table).labeled.length }}）</summary>
+                  <ul class="source-detail-list">
+                    <li
+                      v-for="item in tableMeta(table).labeled"
+                      :key="`${item.label}-${item.source}`"
+                    >
+                      <span class="source-detail-label">{{ item.label }}</span>
+                      <span class="source-detail-value">{{ item.source }}</span>
+                    </li>
+                  </ul>
+                </details>
               </article>
 
               <article
@@ -238,9 +265,14 @@
                 class="narrative-block"
               >
                 <header class="block-head">
-                  <div>
+                  <div class="block-head-main">
                     <h4>{{ narrative.title }}</h4>
-                    <span>源区域：{{ narrative.sourceRows }}</span>
+                    <div class="table-meta table-meta--compact">
+                      <span class="table-meta-label">数据来源</span>
+                      <el-tag size="small" type="info" effect="plain">
+                        Excel {{ narrative.sourceRows }}
+                      </el-tag>
+                    </div>
                   </div>
                   <el-button
                     size="small"
@@ -310,6 +342,7 @@ import {
   type G7DisclosureValue,
   type G7SoeDisclosureState,
 } from './g7SoeDisclosureModel'
+import { tableMetaSources } from './g7DisclosureTableMeta'
 
 const ACCOUNT_CODE = '1511'
 const RESPONSE_KEY = 'G7-main-disclosure-soe-v2'
@@ -408,6 +441,10 @@ const reconciliationDiff = computed(() => {
 
 function tableRows(table: G7DisclosureTable): G7DisclosureRow[] {
   return state.tables[table.id] ?? []
+}
+
+function tableMeta(table: G7DisclosureTable) {
+  return tableMetaSources(table, tableRows(table))
 }
 
 function tableRowClass({ row }: { row: G7DisclosureRow }): string {
@@ -967,11 +1004,16 @@ onBeforeUnmount(() => {
 }
 
 .block-head {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   display: flex;
   justify-content: space-between;
   gap: 8px;
   align-items: flex-start;
+}
+
+.block-head-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .add-row-actions {
@@ -979,24 +1021,83 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   gap: 6px;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .block-head h4 {
-  margin: 0 0 2px;
+  margin: 0;
   font-size: 13px;
   font-weight: 600;
   color: var(--el-text-color-primary);
 }
 
-.block-head span,
-.table-description,
-.cell-source {
-  color: var(--el-text-color-secondary);
-  font-size: 11px;
-}
-
 .table-description {
   margin: 0 0 8px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.table-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--el-fill-color-lighter);
+  border: 1px solid var(--el-border-color-extra-light);
+}
+
+.table-meta--compact {
+  margin: 6px 0 0;
+  padding: 6px 8px;
+}
+
+.table-meta-label {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--el-text-color-secondary);
+}
+
+.table-source-detail {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--el-fill-color-blank);
+  border: 1px dashed var(--el-border-color-lighter);
+  font-size: 11px;
+  color: var(--el-text-color-secondary);
+}
+
+.table-source-detail summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--el-text-color-regular);
+}
+
+.source-detail-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.source-detail-list li {
+  display: flex;
+  gap: 8px;
+  padding: 3px 0;
+  line-height: 1.5;
+}
+
+.source-detail-label {
+  flex-shrink: 0;
+  min-width: 88px;
+  color: var(--el-text-color-regular);
+}
+
+.source-detail-value {
+  color: var(--el-text-color-secondary);
 }
 
 .table-scroll {
@@ -1051,14 +1152,6 @@ onBeforeUnmount(() => {
 .disclosure-table :deep(.row-total td) {
   background: var(--el-color-primary-light-9);
   font-weight: 700;
-}
-
-.cell-source {
-  display: block;
-  margin-top: 3px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .computed-value {

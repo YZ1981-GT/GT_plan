@@ -16,26 +16,46 @@
       :closable="false"
       show-icon
       class="audit-objective"
-      title="审计目标：确认其他非流动金融资产（1504）期末余额真实存在、完整、计价准确，混合计量分类与附注列报恰当。"
+      :title="`审计目标：确认${accountLabel}期末余额真实存在、完整、计价准确，混合计量分类与附注列报恰当。`"
     />
 
-    <details class="guidance-details">
-      <summary>📋 编制提示</summary>
+    <details class="guidance-details" open>
+      <summary>📋 编制提示（对齐 Excel 审定表 G9-1）</summary>
       <div class="guidance-content">
-        <p>科目 1504 其他非流动金融资产（借方/资产类），含 FVTPL、FVOCI、摊余成本混合计量。</p>
-        <p>审定数 = 未审 + AJE + RJE；|变动率|&gt;20% 时原因分析必填。</p>
+        <p><b>编制思路：</b>未审 → 账项调整(AJE) / 重分类(RJE) → 审定；审定数与试算表、G9-2 明细合计勾稽。</p>
+        <p><b>行结构：</b>按 FVTPL / FVOCI / 摊余成本分组；组首行为回写合计，其下按债务/权益/衍生·其他/指定展开（与附注四类一致）。投资成本与累计公允价值变动在 G9-2 明细展开，本表列报账面余额（公允价值）审定过程。</p>
+        <p><b>公式：</b>审定数 = 未审 + AJE + RJE；变动额 = 期末审定 − 期初审定；变动率 = 变动额 / 期初审定。</p>
+        <p><b>分析要求：</b>|变动率|&gt;20% 时原因分析必填；审计说明中对 |变动率|&gt;30% 的项目重点说明增减原因（对齐模板「审计说明」）。</p>
+        <p><b>交易性判定（编制说明）：</b>近期出售或回购、集中管理且存在短期获利模式、衍生工具（财务担保合同及有效套期工具除外）。持有方判断权益工具投资时遵循 CAS 22 / CAS 37。</p>
       </div>
     </details>
 
-    <div v-if="adj.hasVarianceHighlight.value" class="tb-bar tb-warn">
-      试算表取数(1504): {{ fmt(adj.trialBalanceAmount.value) }}
+    <el-alert
+      v-if="adj.hasTbMissing.value"
+      type="info"
+      :closable="false"
+      class="reason-alert"
+      data-testid="g9-adj-tb-missing"
+      :title="`试算表未取到 ${accountLabel}（已试 ${aliasHint}）。若本年无此科目可忽略；有余额请检查科目映射后点「刷新TB」`"
+    />
+
+    <div
+      v-else-if="adj.hasVarianceHighlight.value"
+      class="tb-bar tb-warn"
+      data-testid="g9-tb-bar"
+    >
+      试算表 {{ tbBarLabel }}: {{ fmt(adj.trialBalanceAmount.value) }}
       | 差异: {{ fmt(adj.variance.value) }}
-      <el-button v-if="!isReadonly" size="small" link @click="adj.loadTrialBalanceFromApi()">刷新TB</el-button>
+      <el-button v-if="!isReadonly" size="small" link @click="refreshTb">刷新TB</el-button>
     </div>
-    <div v-else class="tb-bar">
-      试算表取数(1504): {{ fmt(adj.trialBalanceAmount.value) }}
-      | 差异: {{ fmt(adj.variance.value) }}
-      <el-button v-if="!isReadonly" size="small" link @click="adj.loadTrialBalanceFromApi()">刷新TB</el-button>
+    <div v-else-if="adj.tbFetchStatus.value === 'found'" class="tb-bar tb-ok" data-testid="g9-tb-bar">
+      试算表 {{ tbBarLabel }}: {{ fmt(adj.trialBalanceAmount.value) }}
+      | 差异: {{ fmt(adj.variance.value) }} ✓
+      <el-button v-if="!isReadonly" size="small" link @click="refreshTb">刷新TB</el-button>
+    </div>
+    <div v-else class="tb-bar" data-testid="g9-tb-bar">
+      试算表 {{ tbBarLabel }}: 待刷新
+      <el-button v-if="!isReadonly" size="small" link @click="refreshTb">刷新TB</el-button>
     </div>
 
     <el-alert
@@ -47,100 +67,111 @@
       :title="`有 ${adj.missingReasonCount.value} 行 |变动率|>20%，请填写原因分析`"
     />
 
-    <div v-if="useVirtualScroll" class="virtual-toolbar" data-testid="g9-adj-virtual-toolbar">
-      <el-button size="small" @click="toggleBrowseMode">{{ browseMode ? '切换编辑模式' : '切换浏览模式' }}</el-button>
-      <span class="hint">74 行数据 — 双击行进入编辑</span>
-    </div>
-
-    <el-table-v2
-      v-if="useVirtualScroll && browseMode"
-      :columns="virtualColumns"
-      :data="browseRows"
-      :width="tableWidth"
-      :height="tableHeight"
-      :row-event-handlers="rowEventHandlers"
-      fixed
-      style="margin-bottom:12px"
-      data-testid="g9-adj-virtual-table"
+    <el-alert
+      v-if="adj.hasGroupBreakdownMismatch.value"
+      type="warning"
+      :closable="false"
+      class="reason-alert"
+      data-testid="g9-adj-breakdown-warn"
+      :title="breakdownWarnTitle"
     />
 
-    <template v-if="!useVirtualScroll || !browseMode">
     <div v-for="group in adj.groupedRows.value" :key="group.groupKey" class="group-block">
       <div class="group-head" @click="adj.toggleGroup(group.groupKey)">
         <span>{{ group.collapsed ? '▶' : '▼' }}</span>
         <strong>{{ group.groupName }}</strong>
-        <span class="group-sub">期末 {{ fmt(group.subtotal.closingAdjusted) }}</span>
+        <span class="group-sub">期末审定 {{ fmt(group.subtotal.closingAdjusted) }} · 变动 {{ fmt(group.subtotal.changeAmount) }}</span>
       </div>
       <el-table
         v-show="!group.collapsed"
-        :data="group.rows"
+        :data="[...group.rows, group.subtotal]"
         border size="small"
         style="font-size:13px"
         :max-height="480"
-        :row-class-name="rowClassName"
+        :row-class-name="({ row }) => rowClassName(row)"
       >
-        <el-table-column label="项目" prop="label" min-width="160" fixed>
+        <el-table-column label="项目" prop="label" min-width="200" fixed>
           <template #default="{ row }">
-            <GtReviewDot row-prefix="G9-adj" :row-key="row.rowKey" />
-            {{ row.label }}
+            <GtReviewDot v-if="!row.rowKey?.endsWith('_subtotal')" row-prefix="G9-adj" :row-key="row.rowKey" />
+            <span :class="{ 'is-subtotal': row.rowKey?.endsWith('_subtotal'), 'is-group-total': isGroupTotalKey(row.rowKey) }">{{ row.label }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期初未审" width="88" align="right">
+
+        <el-table-column label="期初数" align="center">
+          <el-table-column label="未审数" width="88" align="right">
+            <template #default="{ row }">
+              <template v-if="row.rowKey?.endsWith('_subtotal')"><span class="formula-cell">{{ fmt(row.openingUnadjusted) }}</span></template>
+              <el-input-number v-else-if="!isReadonly" :model-value="row.openingUnadjusted" size="small" :controls="false" style="width:100%"
+                @update:model-value="(v: number) => adj.updateField(row.rowKey, 'openingUnadjusted', v ?? 0)" />
+              <span v-else>{{ fmt(row.openingUnadjusted) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="账项调整" width="80" align="right">
+            <template #default="{ row }">
+              <template v-if="row.rowKey?.endsWith('_subtotal')"><span class="formula-cell">{{ fmt(row.openingAJE) }}</span></template>
+              <el-input-number v-else-if="!isReadonly" :model-value="row.openingAJE" size="small" :controls="false" style="width:100%"
+                @update:model-value="(v: number) => adj.updateField(row.rowKey, 'openingAJE', v ?? 0)" />
+              <span v-else>{{ fmt(row.openingAJE) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="重分类" width="80" align="right">
+            <template #default="{ row }">
+              <template v-if="row.rowKey?.endsWith('_subtotal')"><span class="formula-cell">{{ fmt(row.openingRJE) }}</span></template>
+              <el-input-number v-else-if="!isReadonly" :model-value="row.openingRJE" size="small" :controls="false" style="width:100%"
+                @update:model-value="(v: number) => adj.updateField(row.rowKey, 'openingRJE', v ?? 0)" />
+              <span v-else>{{ fmt(row.openingRJE) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="审定数" width="92" align="right">
+            <template #default="{ row }"><span class="formula-cell" title="期初审定 = 未审 + 账项调整 + 重分类">{{ fmt(row.openingAdjusted) }}</span></template>
+          </el-table-column>
+        </el-table-column>
+
+        <el-table-column label="期末数" align="center">
+          <el-table-column label="未审数" width="88" align="right">
+            <template #default="{ row }">
+              <template v-if="row.rowKey?.endsWith('_subtotal')"><span class="formula-cell">{{ fmt(row.closingUnadjusted) }}</span></template>
+              <el-input-number v-else-if="!isReadonly" :model-value="row.closingUnadjusted" size="small" :controls="false" style="width:100%"
+                @update:model-value="(v: number) => adj.updateField(row.rowKey, 'closingUnadjusted', v ?? 0)" />
+              <span v-else>{{ fmt(row.closingUnadjusted) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="账项调整" width="80" align="right">
+            <template #default="{ row }">
+              <template v-if="row.rowKey?.endsWith('_subtotal')"><span class="formula-cell">{{ fmt(row.closingAJE) }}</span></template>
+              <el-input-number v-else-if="!isReadonly" :model-value="row.closingAJE" size="small" :controls="false" style="width:100%"
+                @update:model-value="(v: number) => adj.updateField(row.rowKey, 'closingAJE', v ?? 0)" />
+              <span v-else>{{ fmt(row.closingAJE) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="重分类" width="80" align="right">
+            <template #default="{ row }">
+              <template v-if="row.rowKey?.endsWith('_subtotal')"><span class="formula-cell">{{ fmt(row.closingRJE) }}</span></template>
+              <el-input-number v-else-if="!isReadonly" :model-value="row.closingRJE" size="small" :controls="false" style="width:100%"
+                @update:model-value="(v: number) => adj.updateField(row.rowKey, 'closingRJE', v ?? 0)" />
+              <span v-else>{{ fmt(row.closingRJE) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="审定数" width="92" align="right">
+            <template #default="{ row }"><span class="formula-cell" title="期末审定 = 未审 + 账项调整 + 重分类">{{ fmt(row.closingAdjusted) }}</span></template>
+          </el-table-column>
+        </el-table-column>
+
+        <el-table-column label="本期与上期审定数比较" align="center">
+          <el-table-column label="变动额" width="88" align="right">
+            <template #default="{ row }"><span class="formula-cell">{{ fmt(row.changeAmount) }}</span></template>
+          </el-table-column>
+          <el-table-column label="变动率" width="72" align="right">
+            <template #default="{ row }">
+              <span :class="{ 'rate-warn': row.changeRateHighlight }">{{ fmtRate(row.changeRate) }}</span>
+            </template>
+          </el-table-column>
+        </el-table-column>
+
+        <el-table-column label="原因分析" min-width="110">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.openingUnadjusted" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => adj.updateField(row.rowKey, 'openingUnadjusted', v ?? 0)" />
-            <span v-else>{{ fmt(row.openingUnadjusted) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="AJE" width="80" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.openingAJE" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => adj.updateField(row.rowKey, 'openingAJE', v ?? 0)" />
-            <span v-else>{{ fmt(row.openingAJE) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="RJE" width="80" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.openingRJE" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => adj.updateField(row.rowKey, 'openingRJE', v ?? 0)" />
-            <span v-else>{{ fmt(row.openingRJE) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="期初审定" width="92" align="right">
-          <template #default="{ row }"><span class="formula-cell" title="期初审定 = 期初未审 + AJE + RJE">{{ fmt(row.openingAdjusted) }}</span></template>
-        </el-table-column>
-        <el-table-column label="期末未审" width="88" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.closingUnadjusted" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => adj.updateField(row.rowKey, 'closingUnadjusted', v ?? 0)" />
-            <span v-else>{{ fmt(row.closingUnadjusted) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="AJE" width="80" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.closingAJE" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => adj.updateField(row.rowKey, 'closingAJE', v ?? 0)" />
-            <span v-else>{{ fmt(row.closingAJE) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="RJE" width="80" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.closingRJE" size="small" :controls="false" style="width:100%"
-              @update:model-value="(v: number) => adj.updateField(row.rowKey, 'closingRJE', v ?? 0)" />
-            <span v-else>{{ fmt(row.closingRJE) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="期末审定" width="92" align="right">
-          <template #default="{ row }"><span class="formula-cell" title="期末审定 = 期末未审 + AJE + RJE">{{ fmt(row.closingAdjusted) }}</span></template>
-        </el-table-column>
-        <el-table-column label="变动率" width="72" align="right">
-          <template #default="{ row }">
-            <span :class="{ 'rate-warn': row.changeRateHighlight }">{{ fmtRate(row.changeRate) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="原因分析" min-width="100">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.reasonAnalysis" size="small"
+            <template v-if="row.rowKey?.endsWith('_subtotal')">—</template>
+            <el-input v-else-if="!isReadonly" :model-value="row.reasonAnalysis" size="small"
               :class="{ 'reason-required': row.reasonRequired && !row.reasonAnalysis?.trim() }"
               placeholder="|变动率|>20%时必填"
               @update:model-value="(v: string) => adj.updateField(row.rowKey, 'reasonAnalysis', v)" />
@@ -149,17 +180,20 @@
         </el-table-column>
         <el-table-column label="索引" width="72">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small"
+            <template v-if="row.rowKey?.endsWith('_subtotal')">—</template>
+            <el-input v-else-if="!isReadonly" :model-value="row.indexRef" size="small"
               @update:model-value="(v: string) => adj.updateField(row.rowKey, 'indexRef', v)" />
             <GtIndexChip v-else-if="row.indexRef" :value="row.indexRef" />
           </template>
         </el-table-column>
       </el-table>
     </div>
-    </template>
 
     <div class="total-row">
-      <strong>合计</strong> 期末审定 {{ fmt(adj.totalRow.value.closingAdjusted) }}
+      <strong>账面余额（公允价值）合计</strong>
+      期末审定 {{ fmt(adj.totalRow.value.closingAdjusted) }}
+      · 变动额 {{ fmt(adj.totalRow.value.changeAmount) }}
+      · 变动率 {{ fmtRate(adj.totalRow.value.changeRate) }}
     </div>
 
     <div v-if="adj.hasDetailCrossMismatch.value" class="cross-warn" data-testid="g9-detail-cross-warn">
@@ -168,19 +202,25 @@
     </div>
 
     <div class="fine-checks" data-testid="g9-fine-checks">
-      <el-tag size="small" :type="adj.hasVarianceHighlight.value ? 'danger' : 'success'">G9-CHK-01 试算表勾稽</el-tag>
+      <el-tag size="small" :type="chk01Type">G9-CHK-01 试算表勾稽</el-tag>
       <el-tag size="small" :type="adj.hasDetailCrossMismatch.value ? 'warning' : 'success'">G9-CHK-02 明细表勾稽</el-tag>
       <el-tag size="small" :type="adj.hasMissingReasons.value ? 'warning' : 'success'">G9-CHK-03 变动率原因</el-tag>
+      <el-tag size="small" :type="adj.hasGroupBreakdownMismatch.value ? 'warning' : 'success'">G9-CHK-04 组内合计=分项</el-tag>
     </div>
 
     <div class="g9-tb-row">
-      <span>试算平衡表数（1504）：</span>
-      <el-input-number v-if="!isReadonly" :model-value="adj.trialBalanceAmount.value" size="small" :controls="false"
-        style="width:140px" @update:model-value="(v: number) => adj.updateTrialBalance(v ?? 0)" />
-      <span v-else>{{ fmt(adj.trialBalanceAmount.value) }}</span>
-      <span :class="['variance', { 'is-error': adj.hasVarianceHighlight.value }]">差异：{{ fmt(adj.variance.value) }}</span>
-      <el-button v-if="!isReadonly" size="small" link @click="adj.loadTrialBalanceFromApi()">刷新TB</el-button>
-      <el-button size="small" type="primary" :disabled="isReadonly" data-testid="g9-publish-adj" @click="adj.publishAdjudicated()">发布审定数</el-button>
+      <span>试算平衡表数（{{ tbBarLabel }}）：</span>
+      <template v-if="adj.hasTbMissing.value">
+        <span class="tb-missing">未取到</span>
+      </template>
+      <template v-else>
+        <el-input-number v-if="!isReadonly" :model-value="adj.trialBalanceAmount.value" size="small" :controls="false"
+          style="width:140px" @update:model-value="(v: number) => adj.updateTrialBalance(v ?? 0)" />
+        <span v-else>{{ fmt(adj.trialBalanceAmount.value) }}</span>
+        <span :class="['variance', { 'is-error': adj.hasVarianceHighlight.value }]">差异数：{{ fmt(adj.variance.value) }}</span>
+      </template>
+      <el-button v-if="!isReadonly" size="small" link @click="refreshTb">刷新TB</el-button>
+      <el-button size="small" type="primary" :disabled="isReadonly" data-testid="g9-publish-adj" @click="onPublish">发布审定数</el-button>
     </div>
 
     <G9AuditTextCards
@@ -190,9 +230,9 @@
       v-model:conclusion="auditConclusion"
       note-ai-section="adjudication-analysis"
       conclusion-ai-section="adjudication-conclusion"
-      note-placeholder="填写审定分析说明：可按 FVTPL/FVOCI/摊余成本分组概述期初期末变动、与 TB 差异及拟调整事项。"
-      note-hint="覆盖分组审定、TB 勾稽及 AJE/RJE 影响。"
-      :related-context="{ 行数: adjRowCount, TB差异: adj.variance.value }"
+      note-placeholder="审计说明：(1) 较上年增减变动原因（|变动率|>30% 须重点说明）；(2) 分类计量、与 TB/明细勾稽及拟调整事项。"
+      note-hint="覆盖分组审定、TB 勾稽、AJE/RJE 影响及重大波动原因。"
+      :related-context="{ 行数: adjRowCount, TB差异: adj.variance.value, 变动额: adj.totalRow.value.changeAmount }"
     />
   </div>
 </template>
@@ -205,9 +245,8 @@ import GtReviewDot from '../../GtReviewDot.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G9AuditTextCards from '../G9AuditTextCards.vue'
 import { useG9Adjudication } from '../../composables/useG9Adjudication'
-import { useWorkpaperBrowseMode } from '../../composables/useWorkpaperBrowseMode'
-import { virtualTextCol, virtualNumCol } from '../../composables/virtualColumnHelpers'
-import type { VirtualColumn } from '@/composables/useVirtualTable'
+import { G9_ADJUDICATION_ITEMS, G9_GROUP_LABELS, G9_ACCOUNT_ALIASES } from '../../composables/g9Constants'
+import { g9AccountLabel } from '../../composables/g9AccountMatch'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
 const props = defineProps<{
@@ -234,10 +273,11 @@ const noteProxy = computed({
 })
 
 const CONCLUSION_KEY = 'G9-adjudication-audit-conclusion'
-const auditConclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.remark ?? '')
+const _conclResp = props.allResponses.get(CONCLUSION_KEY)
+const auditConclusion = ref(String(_conclResp?.conclusion ?? _conclResp?.remark ?? ''))
 watch(auditConclusion, (v) => {
   if (!props.isReadonly) {
-    props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: v })
+    props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: v, remark: null })
   }
 })
 
@@ -245,43 +285,53 @@ const adjRowCount = computed(() =>
   adj.groupedRows.value.reduce((n, g) => n + g.rows.length, 0),
 )
 
-const browseRows = computed(() =>
-  adj.groupedRows.value.flatMap((g) =>
-    g.rows.map((r) => ({
-      groupName: g.groupName,
-      label: r.label,
-      openingAdjusted: r.openingAdjusted,
-      closingAdjusted: r.closingAdjusted,
-      closingAJE: r.closingAJE,
-      closingRJE: r.closingRJE,
-      changeRate: r.changeRate,
-    })),
-  ),
+const groupTotalKeys = new Set(
+  G9_ADJUDICATION_ITEMS.filter((d) => d.isGroupTotal).map((d) => d.rowKey),
+)
+function isGroupTotalKey(rowKey?: string): boolean {
+  return !!rowKey && groupTotalKeys.has(rowKey)
+}
+
+const accountLabel = computed(() => g9AccountLabel(adj.tbResolvedCode.value))
+const aliasHint = G9_ACCOUNT_ALIASES.join('/')
+const tbBarLabel = computed(() =>
+  adj.tbResolvedCode.value ? `(${adj.tbResolvedCode.value})` : `(${aliasHint})`,
 )
 
-const virtualColumns = computed<VirtualColumn[]>(() => [
-  virtualTextCol('groupName', '分组', 200),
-  virtualTextCol('label', '项目', 180),
-  virtualNumCol('openingAdjusted', '期初审定', 100, (v) => fmt(Number(v) || 0)),
-  virtualNumCol('closingAJE', '期末AJE', 88, (v) => fmt(Number(v) || 0)),
-  virtualNumCol('closingRJE', '期末RJE', 88, (v) => fmt(Number(v) || 0)),
-  virtualNumCol('closingAdjusted', '期末审定', 100, (v) => fmt(Number(v) || 0)),
-])
-
-const {
-  browseMode,
-  useVirtualScroll,
-  rowEventHandlers,
-  tableWidth,
-  tableHeight,
-  toggleBrowseMode,
-} = useWorkpaperBrowseMode({
-  rows: browseRows,
-  virtualColumns,
-  threshold: 30,
-  tableWidth: 1100,
-  tableHeight: 520,
+const chk01Type = computed(() => {
+  if (adj.hasTbMissing.value) return 'info'
+  if (adj.hasVarianceHighlight.value) return 'danger'
+  if (adj.tbFetchStatus.value === 'found') return 'success'
+  return 'info'
 })
+
+const breakdownWarnTitle = computed(() => {
+  const parts = adj.groupBreakdownMismatches.value.map((m) => {
+    const name = G9_GROUP_LABELS[m.category] ?? m.category
+    return `${name}：合计 ${fmt(m.groupTotal)} ≠ 分项 ${fmt(m.detailSum)}（差 ${fmt(m.diff)}）`
+  })
+  return `组内合计与分项不一致：${parts.join('；')}`
+})
+
+async function refreshTb() {
+  const ok = await adj.loadTrialBalanceFromApi()
+  if (!ok && adj.hasTbMissing.value) {
+    ElMessage.info(`试算表未找到 ${accountLabel.value}，若本年无此科目可忽略`)
+  }
+}
+
+function onPublish() {
+  if (adj.hasMissingReasons.value) {
+    ElMessage.warning('存在 |变动率|>20% 未填原因分析，请先补充或确认无重大波动')
+    return
+  }
+  if (adj.hasVarianceHighlight.value) {
+    ElMessage.warning('试算表与审定合计存在差异，请核对后再发布')
+    return
+  }
+  adj.publishAdjudicated()
+  ElMessage.success(`已发布审定数 ${fmt(adj.totalRow.value.closingAdjusted)}`)
+}
 
 async function runValidate() {
   validateLoading.value = true
@@ -297,12 +347,14 @@ async function runValidate() {
 function fmt(n: number): string {
   return Number(n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
-function fmtRate(r: number | null): string {
-  if (r === null) return '—'
+function fmtRate(r: number | null | undefined): string {
+  if (r === null || r === undefined) return '—'
   return `${(r * 100).toFixed(1)}%`
 }
 
-function rowClassName({ row }: { row: { reasonRequired?: boolean; reasonAnalysis?: string } }): string {
+function rowClassName(row: { reasonRequired?: boolean; reasonAnalysis?: string; rowKey?: string }): string {
+  if (row.rowKey?.endsWith('_subtotal')) return 'row-subtotal'
+  if (isGroupTotalKey(row.rowKey)) return 'row-group-total'
   if (row.reasonRequired && !row.reasonAnalysis?.trim()) return 'row-warn'
   return ''
 }
@@ -315,22 +367,24 @@ function rowClassName({ row }: { row: { reasonRequired?: boolean; reasonAnalysis
 .g9-title { margin: 0; font-size: 15px; }
 .tb-bar { margin-bottom: 10px; padding: 8px; background: #f5f7fa; border-radius: 4px; }
 .tb-warn { color: #f56c6c; background: #fef0f0; }
+.tb-ok { background: #f0f9eb; }
+.tb-missing { color: #909399; font-style: italic; }
 .group-head { cursor: pointer; padding: 8px; background: #fafafa; border: 1px solid #ebeef5; margin-top: 8px; display: flex; gap: 8px; align-items: center; }
-.group-sub { margin-left: auto; color: #606266; }
+.group-sub { margin-left: auto; color: #606266; font-size: 12px; }
 .formula-cell { border-bottom: 1px dashed #909399; cursor: help; background: #f5f7fa; display: inline-block; width: 100%; }
 .audit-objective { margin-bottom: 10px; }
 .rate-warn { color: #e6a23c; font-weight: 600; }
 .reason-alert { margin-bottom: 8px; }
 :deep(.reason-required .el-input__wrapper) { box-shadow: 0 0 0 1px #e6a23c inset; }
 :deep(.row-warn) { background: #fdf6ec !important; }
+:deep(.row-subtotal) { background: #ecf5ff !important; font-weight: 600; }
+:deep(.row-group-total) { background: #f0f9eb !important; font-weight: 600; }
+.is-subtotal, .is-group-total { font-weight: 600; }
 .total-row { margin-top: 12px; padding: 10px; background: #ecf5ff; font-weight: 600; }
 .cross-warn { margin-top: 8px; padding: 8px 12px; background: #fdf6ec; color: #e6a23c; border-radius: 4px; font-size: 12px; }
-.virtual-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-.virtual-toolbar .hint { color: #909399; font-size: 12px; }
 .guidance-details { margin-bottom: 10px; font-size: 12px; color: #606266; }
+.guidance-content p { margin: 4px 0; line-height: 1.5; }
 .g9-tb-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 10px 0; }
 .variance.is-error { color: #f56c6c; font-weight: 600; }
-.g9-note-card { margin-top: 8px; }
-.note-text { margin: 0; white-space: pre-wrap; }
 .fine-checks { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
 </style>

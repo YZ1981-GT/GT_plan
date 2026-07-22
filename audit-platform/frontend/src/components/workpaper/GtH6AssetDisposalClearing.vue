@@ -106,6 +106,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
         />
 
         <!-- H6-4 检查表（清理过程检查） -->
@@ -115,6 +116,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
@@ -154,6 +156,8 @@ import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defi
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { useH6DualMode } from './composables/useH6DualMode'
+import { useH6CrossSheet } from './composables/useH6CrossSheet'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -189,28 +193,87 @@ const isReadonly = computed(() => !!props.readonly)
 const isLoading = ref(true)
 const allResponses = ref<Map<string, any>>(new Map())
 
-// ─── 过渡科目状态（期末余额应为0） ──────────────────────────────────────────
-const transitAccountStatus = computed(() => {
-  // 从 allResponses 中提取 H6-1 审定表期末余额
-  const endBalanceStr = allResponses.value.get('H6-1-end-balance-audited')
-  const balance = parseFloat(endBalanceStr) || 0
-  return {
-    isZero: balance === 0,
-    balance,
-  }
-})
+// ─── 版本追踪（须在 persist 之前初始化，供写盘回调引用） ─────────────────────
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
+const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
+const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
-// ─── 双模式切换 ──────────────────────────────────────────────────────────────
-const currentMode = ref<'html' | 'onlyoffice'>('html')
-const isOoAvailable = ref(true)
-const modeOptions = [
-  { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
+// ─── 过渡科目状态（期末余额应为0）—— 走跨表引擎，正确读 remark 数值 ──────────
+const { transitAccountStatus } = useH6CrossSheet(allResponses)
 
-function onModeChange(_val: string | number): void {
-  // Phase 3 will integrate useH6DualMode with OO health check
+// ─── 子组件 save 持久化（Bug C 修复：子 tab 此前仅写内存 Map，从不落库 → 刷新丢数据） ──
+// 子组件通过 inject('saveResponse') 调用；防抖 800ms 批量 PUT /checklist-responses。
+const _saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const _pendingFlush = new Map<string, () => void>()
+
+function persistResponse(itemId: string, value: any): void {
+  if (!itemId || !props.wpId) return
+  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+  const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
+  const updated = { ...existing, item_id: itemId, remark: strVal }
+  allResponses.value.set(itemId, updated)
+  if (isReadonly.value) return
+  const prev = _saveTimers.get(itemId)
+  if (prev) clearTimeout(prev)
+  _saveTimers.set(itemId, setTimeout(() => {
+    _saveTimers.delete(itemId)
+    const resolve = _pendingFlush.get(itemId)
+    _pendingFlush.delete(itemId)
+    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items: [{ item_id: itemId, conclusion: updated.conclusion ?? null, remark: updated.remark ?? null }],
+    }).then(() => {
+      try { scheduleAutoSnapshot() } catch { /* optional */ }
+      resolve?.()
+    }).catch((err: unknown) => {
+      console.warn('[GtH6] persistResponse failed:', itemId, err)
+      resolve?.()
+    })
+  }, 800))
 }
+
+/** 切换双模前冲刷所有待写盘条目 */
+async function flushPending(): Promise<void> {
+  const ids = [..._saveTimers.keys()]
+  if (!ids.length) return
+  await Promise.all(ids.map((itemId) => new Promise<void>((resolve) => {
+    const t = _saveTimers.get(itemId)
+    if (t) {
+      clearTimeout(t)
+      _saveTimers.delete(itemId)
+    }
+    const existing = allResponses.value.get(itemId)
+    if (!existing || isReadonly.value) {
+      resolve()
+      return
+    }
+    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items: [{
+        item_id: itemId,
+        conclusion: existing.conclusion ?? null,
+        remark: existing.remark ?? null,
+      }],
+    }).then(() => {
+      try { scheduleAutoSnapshot() } catch { /* optional */ }
+    }).catch((err: unknown) => console.warn('[GtH6] flushPending failed:', itemId, err))
+      .finally(() => resolve())
+  })))
+}
+
+// ─── 双模式 HTML ↔ OnlyOffice（OO 健康检查 + 切换前保存 + 回切重载） ──────────
+const {
+  currentMode,
+  isOoAvailable,
+  modeOptions,
+  onModeChange,
+} = useH6DualMode({
+  wpId: toRef(props, 'wpId'),
+  sheetName: toRef(props, 'sheetName'),
+  autoSave: flushPending,
+  reloadAll: async () => { await selfLoad() },
+})
 
 /** 从 sheetName 提取编码 (H6/H6A/H6-1~H6-4/附注) */
 const currentSheet = computed(() => {
@@ -233,7 +296,8 @@ const currentSheet = computed(() => {
 /** 合并一个 responses 对象（{item_id: {...}}）到目标 Map */
 function _mergeResponses(map: Map<string, any>, src: any): void {
   if (!src || typeof src !== 'object') return
-  for (const [k, v] of Object.entries(src)) map.set(k, v)
+  // 注入权威 item_id：dict 值缺 item_id 时以键补齐（否则保存 items 缺 item_id 触发 422）；v 自带 item_id 则以其为准
+  for (const [k, v] of Object.entries(src)) map.set(k, (v && typeof v === 'object' && !Array.isArray(v)) ? { item_id: k, ...v } : { item_id: k, remark: v })
 }
 
 async function selfLoad(): Promise<void> {
@@ -247,7 +311,7 @@ async function selfLoad(): Promise<void> {
       if (map.size > 0) allResponses.value = map
     } else {
       // selfLoad: 自行调用 render-config
-      const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
+      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
         params: { force_component_type: 'h6-asset-disposal-clearing' },
         _silent: true,
       } as any)
@@ -268,37 +332,10 @@ async function selfLoad(): Promise<void> {
   }
 }
 
-// ─── 子组件 save 持久化（Bug C 修复：子 tab 此前仅写内存 Map，从不落库 → 刷新丢数据） ──
-// 子组件通过 inject('saveResponse') 调用；防抖 800ms 批量 PUT /checklist-responses。
-const _saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
-function persistResponse(itemId: string, value: any): void {
-  if (!itemId || !props.wpId) return
-  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-  const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
-  const updated = { ...existing, item_id: itemId, remark: strVal }
-  allResponses.value.set(itemId, updated)
-  if (isReadonly.value) return
-  const prev = _saveTimers.get(itemId)
-  if (prev) clearTimeout(prev)
-  _saveTimers.set(itemId, setTimeout(() => {
-    _saveTimers.delete(itemId)
-    http.put(`/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion: updated.conclusion ?? null, remark: updated.remark ?? null }],
-    }).catch((err: unknown) => console.warn('[GtH6] persistResponse failed:', itemId, err))
-  }, 800))
-}
-
 // ─── provide for child components ────────────────────────────────────────────
 // openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
 provide('allResponses', allResponses)
 provide('saveResponse', persistResponse)
-
-// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
-const runtime = inject(WorkpaperRuntimeContextKey, null)
-const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
-const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
-const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 provide('h6VersionTrailRef', versionTrailRef)
 provide('h6OpenVersionHistory', openVersionHistory)
 
@@ -308,10 +345,26 @@ provide('h6OpenVersionHistory', openVersionHistory)
  * 由 H6TabDetail 组件在 mounted 时通过 provide/inject 或直接 expose 注册。
  * 这里用一个函数引用来实现主入口对H6-2 composable的间接调用。
  */
-const _h6DetailCreateFn = ref<((payload: { assetName: string; originalCost: number; accDep: number; refH1Code: string }) => void) | null>(null)
+const _h6DetailCreateFn = ref<((payload: {
+  assetName: string
+  originalCost: number
+  accDep: number
+  impairment?: number
+  refH1Code: string
+  disposalReason?: string
+  startDate?: string
+}) => void) | null>(null)
 
 /** 注册 H6-2 的 createFromH1Disposal 函数（由子组件调用） */
-function registerDetailCreateFn(fn: (payload: { assetName: string; originalCost: number; accDep: number; refH1Code: string }) => void): void {
+function registerDetailCreateFn(fn: (payload: {
+  assetName: string
+  originalCost: number
+  accDep: number
+  impairment?: number
+  refH1Code: string
+  disposalReason?: string
+  startDate?: string
+}) => void): void {
   _h6DetailCreateFn.value = fn
 }
 provide('registerDetailCreateFn', registerDetailCreateFn)
@@ -320,7 +373,7 @@ provide('registerDetailCreateFn', registerDetailCreateFn)
 /**
  * 当H1-8减少检查发布 'h1:disposal-completed' 事件时，
  * H6自动为每个处置项创建H6-2明细行。
- * 事件payload: { rows: [{name, originalCost, netValue, ...}], totalGainLoss }
+ * 事件payload: { rows: [{name, originalCost, accDep, impairment, netValue, ...}], totalGainLoss }
  * Requirement 5.3
  */
 function _handleDisposalInitiated(e: Event): void {
@@ -330,16 +383,31 @@ function _handleDisposalInitiated(e: Event): void {
   const rows: any[] = detail.rows ?? []
   if (rows.length === 0) return
 
-  // 逐行创建 H6-2 明细
+  // 逐行创建 H6-2 明细（含减值准备，与 H1-8 净值口径一致）
   let created = 0
   for (const row of rows) {
     const assetName = row.name || row.assetName || '未命名资产'
     const originalCost = Number(row.originalCost) || 0
-    const accDep = Number(row.accDep ?? row.accumulatedDepreciation ?? (originalCost - (Number(row.netValue) || 0))) || 0
+    const impairment = Number(row.impairment ?? row.impairmentProvision) || 0
+    const accDep = Number(
+      row.accDep
+      ?? row.accumulatedDepreciation
+      ?? (originalCost - impairment - (Number(row.netValue) || 0)),
+    ) || 0
     const refH1Code = row.assetNo ? `H1-8-${row.assetNo}` : (row.refH1Code || '')
+    const disposalReason = row.disposalReason || row.decreaseType || row.method || ''
+    const startDate = row.startDate || row.disposalDate || row.transferDate || ''
 
     if (_h6DetailCreateFn.value) {
-      _h6DetailCreateFn.value({ assetName, originalCost, accDep, refH1Code })
+      _h6DetailCreateFn.value({
+        assetName,
+        originalCost,
+        accDep,
+        impairment,
+        refH1Code,
+        disposalReason,
+        startDate,
+      })
       created++
     }
   }

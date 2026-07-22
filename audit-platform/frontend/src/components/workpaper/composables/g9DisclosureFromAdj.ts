@@ -70,15 +70,20 @@ function adjustedPair(raw: G9AdjRowStore[string] | undefined): G9DiscAmountPair 
   return { currentAmount: closing, priorAmount: opening }
 }
 
-/** 从 G9-1 rowStore 按标签汇总 */
+/** 从 G9-1 rowStore 按 discBucket / 标签汇总（组首行合计不计入，避免双计） */
 export function buildG9DisclosureAmountsFromAdjStore(store: G9AdjRowStore): G9DiscAmountMap {
   const out = emptyMap()
   for (const def of G9_ADJUDICATION_ITEMS) {
-    let bucket: G9DiscBucket | null = null
-    for (const [key, re] of Object.entries(BUCKET_MATCHERS) as Array<[G9DiscBucket, RegExp]>) {
-      if (re.test(def.label)) {
-        bucket = key
-        break
+    if (def.isGroupTotal) continue
+    let bucket: G9DiscBucket | null = def.discBucket ?? null
+    if (!bucket) {
+      // 指定优先于债务/权益，避免「指定—债务」误入债务桶
+      const order: G9DiscBucket[] = ['designated', 'debt', 'equity', 'other']
+      for (const key of order) {
+        if (BUCKET_MATCHERS[key].test(def.label)) {
+          bucket = key
+          break
+        }
       }
     }
     if (!bucket) continue

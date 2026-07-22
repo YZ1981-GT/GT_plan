@@ -23,6 +23,17 @@
       <el-tag size="small" type="warning">按月计量</el-tag>
     </div>
 
+    <H8LeaseTermSyncBar
+      :options="h85TermOptions"
+      :mismatch="h85TermMismatch"
+      :source-contract="measurementParams.leaseTermSourceContract"
+      :synced-from="measurementParams.leaseTermSyncedFrom"
+      :lease-term-months="measurementParams.leaseTermMonths"
+      :is-readonly="isReadonly"
+      @pull="handlePullH85"
+      @navigate="(s) => emit('navigate-sheet', s)"
+    />
+
     <!-- 计量参数（与Annual共用） -->
     <el-card shadow="never" class="params-card">
       <template #header>
@@ -105,38 +116,33 @@
           <span class="result-value">{{ measurementParams.leaseTermMonths }}月</span>
         </div>
         <div class="result-item">
-          <span class="result-label">总行数</span>
-          <span class="result-value">{{ Math.min(measurementParams.leaseTermMonths, 361) }}行</span>
+          <span class="result-label">摊销期数</span>
+          <span class="result-value">{{ amortSchedule.rows.length }}期</span>
         </div>
       </div>
     </el-card>
 
-    <!-- OO渲染区域（361行16列按月逐期） -->
+    <H8AmortSchedulePanel :schedule="amortSchedule" mode="monthly" />
+
     <el-card shadow="never" class="oo-card">
       <template #header>
         <div class="section-title">
-          <span>按月计量明细（361行16列）</span>
-          <el-tag type="warning" size="small">OnlyOffice 渲染（大表格）</el-tag>
+          <span>OnlyOffice 源表（兜底精编 · 最多361行）</span>
+          <el-button size="small" link type="primary" @click="showOO = !showOO">
+            {{ showOO ? '收起' : '展开' }}
+          </el-button>
         </div>
       </template>
-      <div class="oo-placeholder">
+      <div v-if="showOO" class="oo-placeholder">
         <GtOnlyOfficeSheet
-          v-if="wpId && showOO"
+          v-if="wpId"
           :wp-id="wpId"
-          :sheet-name="'使用权资产初始及后续计量H8-6'"
+          :sheet-name="'使用权资产 租赁负债初始及后续计量（按月）H8-6'"
           :project-id="projectId"
           :readonly="isReadonly"
         />
-        <div v-else class="oo-fallback">
-          <el-empty description="按月计量表格较大（最多361行×16列），使用OnlyOffice渲染">
-            <template #image><span style="font-size:40px">📊</span></template>
-          </el-empty>
-          <div class="oo-info">
-            <p>列含：月份 | 期初余额 | 租金 | 利息费用 | 本期折旧 | 减值 | 变更调整 | 期末余额 ...</p>
-            <p>推荐使用OnlyOffice查看逐月摊销明细</p>
-          </div>
-        </div>
       </div>
+      <el-empty v-else description="已收起 OnlyOffice；上方 HTML 按月摊销表可滚动查看" :image-size="48" />
     </el-card>
 
     <!-- 审计说明 -->
@@ -157,11 +163,11 @@
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>按月计量适用于复杂租赁（递增租金、多次变更、长期合同）</li>
-        <li>表格最多361行（30年×12月+1表头行），16列包含逐月摊销明细</li>
-        <li>如租赁简单（固定租金、≤5年），建议切换"按年计量"简化展示</li>
-        <li>每月利息费用 = 期初租赁负债余额 × 月利率（折现率/12）</li>
-        <li>每月折旧 = 使用权资产入账值 / 折旧期（月数）</li>
+        <li>编制流程：H8-5填C22/E22 → 按月C15/C16自动带入；J20/O20勾稽按年L9/Q9</li>
+        <li>O20期初/期末切换预付与首笔租金时点；C20年租金、E20支付月、G20初始直接费用</li>
+        <li>租期外租金/利息/折旧为0；折旧按MIN(C18,L20)次月起折尽</li>
+        <li>租赁期优先从 H8-5「回写/带入」；与来源合同不一致时顶部会告警</li>
+        <li>与按年表勾稽看年数一致+期末≈0（年月复利允许尾差）</li>
       </ul>
     </details>
   </div>
@@ -173,9 +179,16 @@
  * 361行16列，按月逐期
  * Spec: Task 4.5 | Requirements: 5.1-5.6
  */
-import { ref, toRef, watch, defineAsyncComponent } from 'vue'
-import { useH8Measurement, type H8MeasurementParams } from '../../composables/useH8Measurement'
+import { ref, computed, toRef, watch, defineAsyncComponent } from 'vue'
+import { ElMessage } from 'element-plus'
+import {
+  useH8Measurement,
+  buildH86AmortSchedule,
+  type H8MeasurementParams,
+} from '../../composables/useH8Measurement'
 import GtIndexChip from '../../GtIndexChip.vue'
+import H8LeaseTermSyncBar from './H8LeaseTermSyncBar.vue'
+import H8AmortSchedulePanel from './H8AmortSchedulePanel.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() =>
   import('../../GtOnlyOfficeSheet.vue').catch(() => ({ template: '<div>OO不可用</div>' })),
@@ -192,9 +205,10 @@ const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'open-ai', section: string): void
   (e: 'open-review', section: string): void
+  (e: 'navigate-sheet', sheetName: string): void
 }>()
 
-const showOO = ref(true)
+const showOO = ref(false)
 
 // ── 审计说明 / 审计结论（持久化 checklist_responses，conclusion:null）──
 const AUDIT_NOTE_KEY = 'H8-measurement-monthly-audit-note'
@@ -222,13 +236,24 @@ function saveAuditConclusion(val: string) {
 
 const {
   measurementParams, initialMeasurement, formulaText, annualRental,
-  updateParam,
+  h85TermOptions, h85TermMismatch,
+  updateParam, pullLeaseTermFromH85,
 } = useH8Measurement({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   allResponses: toRef(props, 'allResponses'),
   onSave: (itemId, value) => emit('save', itemId, value),
 })
+
+const amortSchedule = computed(() =>
+  buildH86AmortSchedule({
+    leaseLiabilityInitial: measurementParams.value.leaseLiabilityInitial,
+    discountRate: measurementParams.value.discountRate,
+    leaseTermMonths: measurementParams.value.leaseTermMonths,
+    rentalPerPeriod: measurementParams.value.rentalPerPeriod,
+    branch: '按月计量',
+  }),
+)
 
 function fmtAmt(v: number): string {
   if (v === 0) return '-'
@@ -237,6 +262,19 @@ function fmtAmt(v: number): string {
 
 function handleParamChange(field: keyof H8MeasurementParams, value: any) {
   updateParam(field, value)
+}
+
+function handlePullH85(contractNo?: string) {
+  if (props.isReadonly) return
+  const r = pullLeaseTermFromH85(contractNo)
+  if (!r.ok) {
+    ElMessage.warning(r.reason || '带入失败')
+    return
+  }
+  ElMessage.success(`已从 H8-5 带入：${r.contractNo} → ${r.months} 月`)
+  if (r.shortTermHint) {
+    ElMessage.info('租赁期≤12个月，请关注是否适用 H8-13 短期租赁简化处理')
+  }
 }
 </script>
 

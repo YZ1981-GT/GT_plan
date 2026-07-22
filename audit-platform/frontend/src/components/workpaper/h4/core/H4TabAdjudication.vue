@@ -1,258 +1,221 @@
 <template>
   <div class="h4-tab-adjudication">
-    <!-- 方法论上下文 -->
-    <div class="methodology-context">
-      <p>科目1605工程物资（借方/资产类）：期末余额 = 期初 + 借方发生(增加) - 贷方发生(减少)；审定数 = 未审数 + AJE + RJE。三段结构：原值 - 减值准备 = 净值。</p>
-    </div>
+    <details class="guidance-details">
+      <summary>📋 编制提示（对齐致同 Excel 审定表 H4-1）</summary>
+      <div class="guidance-content">
+        <p>1. 结构：一、工程物资原值 → 二、减值准备 → 三、净值；列组为期初/期末×未审·账项调整·审定 + 审定变动额/率。</p>
+        <p>2. 审定数=未审数+账项调整；净值=原值−减值；期初审定应与上年末审定数一致。</p>
+        <p>3. 优先「从 H4-2 回填分类」带入未审/调整；H4-3 确认后「回写期末账项调整」（1605 净额按未审权重分摊）。</p>
+        <p>4. 净值变动率≥{{ state.CHANGE_RATE_THRESHOLD }}% 须在审计说明(1)解释；与报表核对填入(3)。在建工程可「带入(H2/TB)」，重大变动可一键写入说明/附注。</p>
+      </div>
+    </details>
 
-    <!-- 审计目标 -->
-    <el-alert type="info" :closable="false" class="objective-alert"
-      title="审计目标：核实工程物资（科目1605）期末余额的存在、完整与计价准确，验证三段结构（原值-减值准备=净值）与三角勾稽（期末=期初+借-贷）成立，为报表列报提供审定依据。" />
+    <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：核实工程物资（科目1605）原值及减值准备期末余额的存在、完整与计价；审定净值=原值−减值；与 H4-2/TB/报表勾稽，为列报提供审定依据。"
+    />
 
-    <!-- 工具栏 -->
     <div class="tab-toolbar">
-      <span class="chip-wrap"><GtIndexChip value="wp:H4-1" :context-project-id="props.projectId" /></span>
-      <el-tag size="small" type="info">共 {{ originalDisplayRows.length + impairmentDisplayRows.length }} 行</el-tag>
+      <div class="toolbar-left">
+        <el-button
+          v-if="!props.isReadonly"
+          size="small"
+          type="primary"
+          plain
+          @click="handleSyncFromH42"
+        >
+          从 H4-2 回填分类
+        </el-button>
+        <el-button
+          v-if="!props.isReadonly && (Math.abs(state.h43EmAjeNet.value) > 0.005 || Math.abs(state.h43ImpairAjeNet.value) > 0.005)"
+          size="small"
+          plain
+          @click="handleSyncFromH43"
+        >
+          从 H4-3 回写期末账项调整
+        </el-button>
+        <el-button
+          v-if="!props.isReadonly"
+          size="small"
+          plain
+          :loading="seedingCip"
+          @click="handleSeedCip"
+        >
+          带入在建工程(H2/TB)
+        </el-button>
+        <el-button
+          v-if="!props.isReadonly && state.significantChangeItems.value.length"
+          size="small"
+          plain
+          @click="handleApplySignificantNote"
+        >
+          重大变动→说明(1)
+        </el-button>
+        <el-tag size="small" type="info" effect="plain">
+          TB·1605 未审 {{ fmtAmt(state.tbUnadjusted.value) }} / 审定 {{ fmtAmt(state.tbAudited.value) }}
+        </el-tag>
+        <el-tag
+          v-if="Math.abs(state.unadjustedVsTbDiff.value) > 0.01 && state.originalRows.value.length"
+          size="small"
+          type="warning"
+          effect="plain"
+        >
+          净值未审 vs TB差 {{ fmtAmt(state.unadjustedVsTbDiff.value) }}
+        </el-tag>
+        <el-tag
+          v-if="Math.abs(state.h43EmAjeNet.value) > 0.005"
+          size="small"
+          type="info"
+          effect="plain"
+        >
+          H4-3：1605原值账项 {{ fmtAmt(state.h43EmAjeNet.value) }}
+        </el-tag>
+        <el-tag
+          v-if="Math.abs(state.h43ImpairAjeNet.value) > 0.005"
+          size="small"
+          type="warning"
+          effect="plain"
+        >
+          H4-3：减值账项 {{ fmtAmt(state.h43ImpairAjeNet.value) }}
+        </el-tag>
+        <el-tag
+          v-if="state.significantNetChanges.value.length"
+          size="small"
+          type="danger"
+          effect="plain"
+        >
+          净值变动≥{{ state.CHANGE_RATE_THRESHOLD }}%：{{ state.significantNetChanges.value.length }} 项
+        </el-tag>
+        <el-tag
+          v-if="cipSeedNeeded"
+          size="small"
+          type="warning"
+          effect="plain"
+        >
+          报表核对·在建工程未填 — 请点「带入在建工程(H2/TB)」
+        </el-tag>
+      </div>
+      <div class="toolbar-right">
+        <span class="chip-wrap"><GtIndexChip value="wp:H4-1" :context-project-id="props.projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:H4-2" :validate="false" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:H4-3" :validate="false" /></span>
+        <el-tag size="small" type="info">分类 {{ state.originalRows.value.length }} 项</el-tag>
+        <el-button size="small" link type="default" @click="openReview('H4-1')">💬 复核</el-button>
+      </div>
     </div>
 
-    <!-- Section 1: 原值（Original Cost） -->
+    <!-- 一、原值 -->
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-header">
-          <span>一、原值（Original Cost）</span>
-          <div class="section-header-actions">
-            <el-button size="small" circle @click="openReview('H4-1-original')">💬</el-button>
-          </div>
+          <span>一、工程物资原值（科目1605）</span>
+          <el-button size="small" circle @click="openReview('H4-1-original')">💬</el-button>
         </div>
       </template>
-
-      <el-table :data="originalDisplayRows" border stripe size="small" class="adj-table"
-        :row-class-name="rowClassName">
-        <el-table-column prop="name" label="项目" min-width="140" fixed>
-          <template #default="{ row }">
-            <span :class="{ 'subtotal-label': row.isSubtotal }">{{ row.name }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="期初余额" min-width="110" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!row.isSubtotal && !props.isReadonly" v-model="row.beginBalance"
-              :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'beginBalance', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.beginBalance) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="本期借方发生(增加)" min-width="130" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!row.isSubtotal && !props.isReadonly" v-model="row.debitAmount"
-              :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'debitAmount', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.debitAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="本期贷方发生(减少)" min-width="130" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!row.isSubtotal && !props.isReadonly" v-model="row.creditAmount"
-              :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'creditAmount', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.creditAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="期末余额" min-width="120" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="期末 = 期初 + 借方 - 贷方">{{ fmtAmt(row.endBalance) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="未审数" min-width="110" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!row.isSubtotal && !props.isReadonly" v-model="row.unadjusted"
-              :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'unadjusted', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.unadjusted) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="AJE" min-width="100" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!row.isSubtotal && !props.isReadonly" v-model="row.aje"
-              :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'aje', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.aje) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="RJE" min-width="100" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!row.isSubtotal && !props.isReadonly" v-model="row.rje"
-              :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'rje', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.rje) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="审定数" min-width="120" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="审定 = 未审 + AJE + RJE">{{ fmtAmt(row.audited) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="" width="45" v-if="!props.isReadonly">
-          <template #default="{ row }">
-            <el-button v-if="!row.isSubtotal" size="small" type="danger" link
-              @click="handleDeleteRow(row.rowId)">✕</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <div class="add-row-bar" v-if="!props.isReadonly">
+      <AdjAmountTable
+        :rows="originalDisplayRows"
+        :is-readonly="props.isReadonly"
+        @cell-change="onCellChange"
+        @remove="handleDeleteRow"
+      />
+      <div v-if="!props.isReadonly" class="add-row-bar">
         <el-button size="small" @click="handleAddRow('original')">+ 新增原值分类</el-button>
       </div>
     </el-card>
 
-    <!-- Section 2: 减值准备（Impairment） -->
+    <!-- 二、减值准备 -->
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-header">
-          <span>二、减值准备（Impairment）</span>
-          <div class="section-header-actions">
-            <el-button size="small" circle @click="openReview('H4-1-impairment')">💬</el-button>
-          </div>
+          <span>二、减值准备</span>
+          <span class="section-hint">可与 H4-7/H4-8 勾稽</span>
         </div>
       </template>
-
-      <el-table :data="impairmentDisplayRows" border stripe size="small" class="adj-table"
-        :row-class-name="rowClassName">
-        <el-table-column prop="name" label="项目" min-width="140" fixed>
-          <template #default="{ row }">
-            <span :class="{ 'subtotal-label': row.isSubtotal }">{{ row.name }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="期初余额" min-width="110" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!row.isSubtotal && !props.isReadonly" v-model="row.beginBalance"
-              :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'beginBalance', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.beginBalance) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="本期借方发生(增加)" min-width="130" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!row.isSubtotal && !props.isReadonly" v-model="row.debitAmount"
-              :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'debitAmount', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.debitAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="本期贷方发生(减少)" min-width="130" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!row.isSubtotal && !props.isReadonly" v-model="row.creditAmount"
-              :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'creditAmount', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.creditAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="期末余额" min-width="120" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="期末 = 期初 + 借方 - 贷方">{{ fmtAmt(row.endBalance) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="未审数" min-width="110" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!row.isSubtotal && !props.isReadonly" v-model="row.unadjusted"
-              :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'unadjusted', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.unadjusted) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="AJE" min-width="100" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!row.isSubtotal && !props.isReadonly" v-model="row.aje"
-              :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'aje', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.aje) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="RJE" min-width="100" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!row.isSubtotal && !props.isReadonly" v-model="row.rje"
-              :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'rje', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.rje) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="审定数" min-width="120" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="审定 = 未审 + AJE + RJE">{{ fmtAmt(row.audited) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="" width="45" v-if="!props.isReadonly">
-          <template #default="{ row }">
-            <el-button v-if="!row.isSubtotal" size="small" type="danger" link
-              @click="handleDeleteRow(row.rowId)">✕</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      <div class="add-row-bar" v-if="!props.isReadonly">
+      <AdjAmountTable
+        :rows="impairmentDisplayRows"
+        :is-readonly="props.isReadonly"
+        @cell-change="onCellChange"
+        @remove="handleDeleteRow"
+      />
+      <div v-if="!props.isReadonly" class="add-row-bar">
         <el-button size="small" @click="handleAddRow('impairment')">+ 新增减值分类</el-button>
       </div>
     </el-card>
 
-    <!-- Section 3: 净值（Net Value = 原值 - 减值） -->
+    <!-- 三、净值 -->
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-header">
-          <span>三、净值（Net Value = 原值 - 减值准备）</span>
+          <span>三、净值（=原值−减值）</span>
+          <el-tag
+            v-if="Math.abs(state.netIdentityDiff.value) > 0.01"
+            size="small"
+            type="danger"
+          >
+            身份校验差 {{ fmtAmt(state.netIdentityDiff.value) }}
+          </el-tag>
+          <el-tag v-else size="small" type="success" effect="plain">身份校验通过</el-tag>
         </div>
       </template>
-      <el-table :data="[netTotalRow]" border size="small" class="adj-table net-table">
-        <el-table-column prop="name" label="项目" min-width="140" fixed>
-          <template #default><span class="subtotal-label">工程物资净值</span></template>
-        </el-table-column>
-        <el-table-column label="期初余额" min-width="110" align="right">
-          <template #default>
-            <span class="formula-cell" title="原值期初 - 减值期初">{{ fmtAmt(state.netTotal.value.beginBalance) }}</span>
+      <el-table
+        :data="[...state.netRows.value, state.netTotalRow.value]"
+        border
+        stripe
+        size="small"
+        class="adj-table"
+        :row-class-name="netRowClass"
+      >
+        <el-table-column prop="name" label="项目" min-width="140" fixed />
+        <el-table-column label="期初未审" min-width="110" align="right">
+          <template #default="{ row }">
+            <span class="amt-cell">{{ fmtAmt(row.beginUnadjusted) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期借方发生(增加)" min-width="130" align="right">
-          <template #default>
-            <span class="formula-cell">{{ fmtAmt(state.netTotal.value.debitAmount) }}</span>
+        <el-table-column label="期初审定" min-width="110" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell" title="原值期初审定−减值期初审定">{{ fmtAmt(row.beginAudited) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期贷方发生(减少)" min-width="130" align="right">
-          <template #default>
-            <span class="formula-cell">{{ fmtAmt(state.netTotal.value.creditAmount) }}</span>
+        <el-table-column label="期末未审" min-width="110" align="right">
+          <template #default="{ row }">
+            <span class="amt-cell">{{ fmtAmt(row.endUnadjusted) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末余额" min-width="120" align="right">
-          <template #default>
-            <span class="formula-cell" title="原值期末 - 减值期末">{{ fmtAmt(state.netTotal.value.endBalance) }}</span>
+        <el-table-column label="期末审定" min-width="110" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell" title="原值期末审定−减值期末审定">{{ fmtAmt(row.endAudited) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="未审数" min-width="110" align="right">
-          <template #default>
-            <span class="formula-cell">{{ fmtAmt(state.netTotal.value.unadjusted) }}</span>
+        <el-table-column label="审定变动额" min-width="110" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ fmtAmt(row.auditedChange) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="AJE" min-width="100" align="right">
-          <template #default>
-            <span class="formula-cell">{{ fmtAmt(state.netTotal.value.aje) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="RJE" min-width="100" align="right">
-          <template #default>
-            <span class="formula-cell">{{ fmtAmt(state.netTotal.value.rje) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="审定数" min-width="120" align="right">
-          <template #default>
-            <span class="formula-cell" title="净值审定 = 原值审定 - 减值审定">{{ fmtAmt(state.netTotal.value.audited) }}</span>
+        <el-table-column label="审定变动率" min-width="100" align="right">
+          <template #default="{ row }">
+            <span :class="{ 'rate-significant': row.isSignificant }">
+              {{ fmtRate(row.auditedChangeRate) }}
+            </span>
           </template>
         </el-table-column>
       </el-table>
+      <p class="net-hint">
+        审定净值合计 <b>{{ fmtAmt(state.netTotalRow.value.endAudited) }}</b>
+        （期初 {{ fmtAmt(state.netTotalRow.value.beginAudited) }}）。
+        变动率绝对值≥{{ state.CHANGE_RATE_THRESHOLD }}% 须在下方说明(1)解释原因。
+      </p>
     </el-card>
 
-    <!-- TB取数 + 差异核对 -->
+    <!-- TB 核对 -->
     <el-card shadow="never" class="block-card">
       <template #header>
-        <div class="section-header"><span>TB取数核对（科目1605）</span></div>
+        <div class="section-header"><span>与试算平衡表核对（科目1605）</span></div>
       </template>
       <div class="tb-compare">
         <div class="tb-row">
-          <span class="tb-label">审定合计(净值)：</span>
+          <span class="tb-label">审定净值合计：</span>
           <span class="tb-value">{{ fmtAmt(state.adjudicatedTotal.value) }}</span>
         </div>
         <div class="tb-row">
@@ -264,7 +227,7 @@
           <span class="tb-value">{{ fmtAmt(state.tbAudited.value) }}</span>
         </div>
         <div class="tb-row">
-          <span class="tb-label">差异(审定-TB审定)：</span>
+          <span class="tb-label">差异(审定−TB审定)：</span>
           <span class="tb-value" :class="{ 'error-amount': !state.isTbMatch.value }">
             {{ fmtAmt(state.tbDiff.value) }}
           </span>
@@ -272,92 +235,158 @@
       </div>
     </el-card>
 
-    <!-- 跨sheet校验警告 -->
-    <el-alert v-if="crossSheetWarning" type="warning" :closable="false" show-icon
-      style="margin-bottom: 12px">
-      <template #title>{{ crossSheetWarning }}</template>
-    </el-alert>
-
-    <!-- 三角勾稽校验 -->
-    <el-alert v-if="triangleErrors.length > 0" type="error" :closable="false" show-icon
-      style="margin-bottom: 12px">
-      <template #title>三角勾稽异常：{{ triangleErrors.length }}项差额非零</template>
-      <template #default>
-        <div v-for="e in triangleErrors" :key="e.name" class="triangle-err">
-          {{ e.name }}：差额 {{ fmtAmt(e.diff) }}
+    <!-- (3) 与经审计的财务报表核对 -->
+    <el-card shadow="never" class="block-card">
+      <template #header>
+        <div class="section-header">
+          <span>(3) 与经审计的财务报表核对</span>
+          <span class="section-hint">在建工程 + 工程物资 ↔ 报表「在建工程」列报</span>
         </div>
       </template>
-    </el-alert>
+      <el-table :data="state.fsCompareRows.value" size="small" border>
+        <el-table-column prop="label" label="项目" min-width="200" />
+        <el-table-column label="期末审定" align="right" min-width="130">
+          <template #default="{ row }">
+            <template v-if="row.editable && !props.isReadonly">
+              <el-input-number
+                :model-value="row.label.startsWith('在建') ? state.fsReconcile.value.cipEndAudited : state.fsReconcile.value.fsEndAmount"
+                :controls="false"
+                size="small"
+                class="amt-input"
+                @change="(v: number) => onFsChange(row.label, 'end', v ?? 0)"
+              />
+            </template>
+            <span v-else :class="{ 'error-amount': row.label === '差异' && Math.abs(row.endAudited) > 0.01 }">
+              {{ fmtAmt(row.endAudited) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期初审定" align="right" min-width="130">
+          <template #default="{ row }">
+            <template v-if="row.editable && !props.isReadonly">
+              <el-input-number
+                :model-value="row.label.startsWith('在建') ? state.fsReconcile.value.cipBeginAudited : state.fsReconcile.value.fsBeginAmount"
+                :controls="false"
+                size="small"
+                class="amt-input"
+                @change="(v: number) => onFsChange(row.label, 'begin', v ?? 0)"
+              />
+            </template>
+            <span v-else :class="{ 'error-amount': row.label === '差异' && Math.abs(row.beginAudited) > 0.01 }">
+              {{ fmtAmt(row.beginAudited) }}
+            </span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-alert
+      v-if="crossSheetWarning"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="cross-alert"
+      :title="crossSheetWarning"
+    />
+    <el-alert
+      v-if="Math.abs(state.detailDiff.value) > 0.01"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="cross-alert"
+      :title="`交叉验证：原值审定合计 vs H4-2 差异 ${fmtAmt(state.detailDiff.value)}`"
+    />
 
     <!-- 审计说明 -->
     <el-card shadow="never" class="audit-note-card">
       <template #header>
         <div class="section-header">
-          <span>审计说明</span>
-          <div class="section-header-actions">
-            <el-button size="small" circle @click="openReview('H4-1-note')">💬</el-button>
-          </div>
+          <span>1、审计说明</span>
+          <el-button size="small" circle @click="openReview('H4-1-note')">💬</el-button>
         </div>
       </template>
-      <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请填写审计说明..." :disabled="props.isReadonly"
-        @blur="state.saveNote(state.auditNote.value)" />
+      <div class="qual-grid">
+        <div class="qual-item">
+          <label>
+            (1) 净值重大变动原因
+            <span class="req-hint">（变动率≥{{ state.CHANGE_RATE_THRESHOLD }}%须说明）</span>
+          </label>
+          <el-input
+            v-model="state.qualitativeNotes.value.fluctuation"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 5 }"
+            :disabled="props.isReadonly"
+            :placeholder="fluctuationPlaceholder"
+            @blur="state.saveQualitativeNotes()"
+          />
+        </div>
+        <div class="qual-item">
+          <label>(2) 情况说明</label>
+          <el-input
+            v-model="state.qualitativeNotes.value.situation"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 4 }"
+            :disabled="props.isReadonly"
+            placeholder="减值迹象、积压呆滞、与 H4-4/H4-5/H4-6/H4-7 相关说明…"
+            @blur="state.saveQualitativeNotes()"
+          />
+        </div>
+      </div>
+      <el-divider content-position="left">综合说明</el-divider>
+      <el-input
+        v-model="state.auditNote.value"
+        type="textarea"
+        :autosize="{ minRows: 2, maxRows: 6 }"
+        placeholder="概述取数来源、勾稽结果、重大调整及风险应对…"
+        :disabled="props.isReadonly"
+        @blur="state.saveNote(state.auditNote.value)"
+      />
     </el-card>
 
     <!-- 审计结论 -->
     <el-card shadow="never" class="audit-note-card">
       <template #header>
         <div class="section-header">
-          <span>审计结论</span>
-          <div class="section-header-actions">
-            <el-button size="small" circle @click="openReview('H4-1-conclusion')">💬</el-button>
+          <span>2、审计结论</span>
+          <div v-if="!props.isReadonly" class="conclusion-actions">
+            <el-button size="small" @click="state.applyConclusionTemplate('A')">套用 A</el-button>
+            <el-button size="small" @click="state.applyConclusionTemplate('B')">套用 B</el-button>
+            <el-button size="small" type="warning" @click="state.applyConclusionTemplate('C')">套用 C</el-button>
           </div>
         </div>
       </template>
-      <el-input v-model="state.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
-        placeholder="请填写审计结论..." :disabled="props.isReadonly"
-        @blur="state.saveConclusion(state.auditConclusion.value)" />
+      <el-input
+        v-model="state.auditConclusion.value"
+        type="textarea"
+        :autosize="{ minRows: 2, maxRows: 6 }"
+        placeholder="参考：A、未见异常。 B、除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。 C、由于存在重大未调整事项或范围限制，不可确认。"
+        :disabled="props.isReadonly"
+        @blur="state.saveConclusion(state.auditConclusion.value)"
+      />
     </el-card>
 
-    <!-- 操作按钮 -->
-    <div class="action-bar" v-if="!props.isReadonly">
-      <el-button type="primary" @click="handlePublish" :loading="publishing">
+    <div v-if="!props.isReadonly" class="action-bar">
+      <el-button type="primary" :loading="publishing" @click="handlePublish">
         确认审定 → 回写TB(1605)
       </el-button>
     </div>
-
-    <!-- 编制提示 -->
-    <details class="edit-tips">
-      <summary>编制提示</summary>
-      <ul>
-        <li>科目1605工程物资（资产类/借方）：期末=期初+借方-贷方</li>
-        <li>三段结构：原值分类行 → 减值准备分类行 → 净值=原值-减值</li>
-        <li>审定数=未审数+AJE+RJE；合计行/净值行自动汇总不可编辑</li>
-        <li>审定数与H4-2明细合计交叉验证（不一致显示黄色警告）</li>
-        <li>"确认审定"将回写trial_balance并发布EventBus事件通知附注/报表</li>
-      </ul>
-    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * H4TabAdjudication.vue — H4-1 审定表（51公式）
- *
- * 三段结构：原值(5分类+小计) / 减值准备(5分类+小计) / 净值合计
- * 列：项目 | 期初余额 | 本期借方发生(增加) | 本期贷方发生(减少) | 期末余额 | 未审数 | AJE | RJE | 审定数
- * 公式：期末=期初+借-贷 | 审定=未审+AJE+RJE | 合计=SUM | 三角勾稽=0
- *
- * Spec: .kiro/specs/h4-engineering-materials/
- * Task: 4.2
- * Requirements: 2.1-2.10
+ * H4TabAdjudication.vue — H4-1 工程物资及减值准备审定表
+ * 对齐致同 Excel：期初/期末×未审·账项调整·审定 + 变动额/率；三段+报表核对+结构化说明
  */
-import { ref, computed, inject, toRef, type Ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
-import { useH4Adjudication, type H4AdjudicationRow } from '../../composables/useH4Adjudication'
+import { ref, computed, inject, toRef, defineComponent, h, onMounted, onUnmounted, type Ref } from 'vue'
+import { ElMessage, ElMessageBox, ElTable, ElTableColumn, ElInputNumber, ElButton } from 'element-plus'
+import http from '@/utils/http'
+import { useAcnr } from '@/services/acnr/useAcnr'
+import {
+  useH4Adjudication,
+  type H4AdjudicationRow,
+} from '../../composables/useH4Adjudication'
 import { useH4CrossSheet } from '../../composables/useH4CrossSheet'
-import { calcTriangleReconciliation } from '../../composables/useH4FormulaEngine'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -368,16 +397,23 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const saveResponse = inject<(itemId: string, value: any) => void>('saveResponse', () => {})
 const publishing = ref(false)
+const seedingCip = ref(false)
+const { resolveInstance } = useAcnr()
 
-// ─── Composable: useH4Adjudication ──────────────────────────────────────────
 const allResponsesRef = computed(() => props.allResponses)
-
-// TB 取数种子（科目1605）：主入口 provide 的 render 策略 tb_values，供审定表只读核对
 const tbValues = inject<Ref<Record<string, number>>>('h4TbValues', ref({}))
+
 const tbData = computed(() => ({
   unadjusted1605: Number(tbValues.value?.eng_mat_1605_unadjusted) || 0,
   audited1605: Number(tbValues.value?.eng_mat_1605_audited) || 0,
+  unadjusted1604:
+    Number(tbValues.value?.cip_1604_unadjusted ?? tbValues.value?.cip_unadjusted) || 0,
+  audited1604:
+    Number(tbValues.value?.cip_1604_audited ?? tbValues.value?.cip_audited) || 0,
+  opening1604:
+    Number(tbValues.value?.cip_1604_unadjusted_opening) || 0,
 }))
 
 const state = useH4Adjudication({
@@ -386,93 +422,29 @@ const state = useH4Adjudication({
   allResponses: allResponsesRef as any,
   tbData,
   onSave: (itemId: string, value: any) => {
-    const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-    props.allResponses.set(itemId, { item_id: itemId, remark: strVal, conclusion: null })
+    // 与 H4-2/H4-3/H4-4 一致：走主入口 persistResponse 落库
+    saveResponse(itemId, value)
   },
   onWritebackTB: async (amount: number) => {
     window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
       detail: { wpCode: 'H4', accountCode: '1605', auditedAmount: amount },
     }))
+    ElMessage.success(`已回写 TB 科目1605 审定数 ${fmtAmt(amount)}`)
   },
 })
 
-// ─── Composable: useH4CrossSheet ────────────────────────────────────────────
 const crossSheet = useH4CrossSheet(allResponsesRef as any)
 
-// ─── Display Rows ────────────────────────────────────────────────────────────
+const originalDisplayRows = computed(() => [
+  ...state.originalRows.value,
+  state.originalTotal.value,
+])
+const impairmentDisplayRows = computed(() => [
+  ...state.impairmentRows.value,
+  state.impairmentTotal.value,
+])
 
-interface DisplayRow extends H4AdjudicationRow {
-  isSubtotal: boolean
-}
-
-const originalDisplayRows = computed<DisplayRow[]>(() => {
-  const rows: DisplayRow[] = state.originalRows.value.map(r => ({ ...r, isSubtotal: false }))
-  const sub = state.originalSubtotal.value
-  rows.push({
-    rowId: 'original-subtotal',
-    name: '原值小计',
-    section: 'original',
-    beginBalance: sub.beginBalance,
-    debitAmount: sub.debitAmount,
-    creditAmount: sub.creditAmount,
-    endBalance: sub.endBalance,
-    unadjusted: sub.unadjusted,
-    aje: sub.aje,
-    rje: sub.rje,
-    audited: sub.audited,
-    isSubtotal: true,
-  })
-  return rows
-})
-
-const impairmentDisplayRows = computed<DisplayRow[]>(() => {
-  const rows: DisplayRow[] = state.impairmentRows.value.map(r => ({ ...r, isSubtotal: false }))
-  const sub = state.impairmentSubtotal.value
-  rows.push({
-    rowId: 'impairment-subtotal',
-    name: '减值小计',
-    section: 'impairment',
-    beginBalance: sub.beginBalance,
-    debitAmount: sub.debitAmount,
-    creditAmount: sub.creditAmount,
-    endBalance: sub.endBalance,
-    unadjusted: sub.unadjusted,
-    aje: sub.aje,
-    rje: sub.rje,
-    audited: sub.audited,
-    isSubtotal: true,
-  })
-  return rows
-})
-
-const netTotalRow = computed(() => ({
-  rowId: 'net-total',
-  name: '工程物资净值',
-  section: 'net' as const,
-  ...state.netTotal.value,
-  isSubtotal: true,
-}))
-
-// ─── 三角勾稽校验 ────────────────────────────────────────────────────────────
-const triangleErrors = computed(() => {
-  const errors: { name: string; diff: number }[] = []
-  for (const row of state.originalRows.value) {
-    const diff = calcTriangleReconciliation(row.beginBalance, row.debitAmount, row.creditAmount, row.endBalance)
-    if (Math.abs(diff) > 0.01) {
-      errors.push({ name: `原值-${row.name}`, diff })
-    }
-  }
-  for (const row of state.impairmentRows.value) {
-    const diff = calcTriangleReconciliation(row.beginBalance, row.debitAmount, row.creditAmount, row.endBalance)
-    if (Math.abs(diff) > 0.01) {
-      errors.push({ name: `减值-${row.name}`, diff })
-    }
-  }
-  return errors
-})
-
-// ─── 跨sheet校验警告 ─────────────────────────────────────────────────────────
-const crossSheetWarning = computed<string>(() => {
+const crossSheetWarning = computed(() => {
   const check = crossSheet.adjudicationVsDetail.value
   if (!check.isMatch && (check.diff !== 0 || state.adjudicatedTotal.value !== 0)) {
     const sign = check.diff > 0 ? '+' : ''
@@ -481,15 +453,34 @@ const crossSheetWarning = computed<string>(() => {
   return ''
 })
 
-// ─── Actions ─────────────────────────────────────────────────────────────────
+const fluctuationPlaceholder = computed(() => {
+  const items = state.significantNetChanges.value
+  if (!items.length) return '本期净值变动率均未超过阈值，如有其他重大变动说明可填写…'
+  return `请说明：${items.map((r) => `${r.name}(${fmtRate(r.auditedChangeRate)})`).join('、')}`
+})
 
-function rowClassName({ row }: { row: DisplayRow }) {
-  if (row.isSubtotal) return 'subtotal-row'
+/** 冷启动提示：报表核对在建工程为空且有 TB/可带入线索时提示 */
+const cipSeedNeeded = computed(() => {
+  const fs = state.fsReconcile.value
+  return fs.cipEndAudited === 0 && fs.cipBeginAudited === 0
+})
+
+function netRowClass({ row }: { row: { isTotal?: boolean; isSignificant?: boolean } }) {
+  if (row.isTotal) return 'total-row'
+  if (row.isSignificant) return 'significant-row'
   return ''
 }
 
 function onCellChange(rowId: string, field: string, value: number | null) {
   state.updateCell(rowId, field, value ?? 0)
+}
+
+function onFsChange(label: string, side: 'end' | 'begin', value: number) {
+  if (label.startsWith('在建')) {
+    state.updateFsField(side === 'end' ? 'cipEndAudited' : 'cipBeginAudited', value)
+  } else if (label === '报表数') {
+    state.updateFsField(side === 'end' ? 'fsEndAmount' : 'fsBeginAmount', value)
+  }
 }
 
 async function handleAddRow(section: 'original' | 'impairment') {
@@ -509,6 +500,88 @@ function handleDeleteRow(rowId: string) {
   state.deleteRow(rowId)
 }
 
+function handleSyncFromH42() {
+  const r = state.syncFromH42('overwrite')
+  if (r.applied) ElMessage.success(r.message)
+  else ElMessage.warning(r.message)
+}
+
+function handleSyncFromH43() {
+  const r = state.syncEndAdjFromH43()
+  if (r.applied) ElMessage.success(r.message)
+  else ElMessage.warning(r.message)
+}
+
+async function fetchH21CostRows(): Promise<any[] | null> {
+  if (!props.projectId) return null
+  try {
+    const inst = await resolveInstance(props.projectId, 'H2', 'H2-1')
+    const wpId = inst?.found ? inst.wp_id : undefined
+    if (!wpId) {
+      const inst2 = await resolveInstance(props.projectId, 'H2', 'H2')
+      if (!inst2?.found || !inst2.wp_id) return null
+      const { data } = await http.get(`/api/workpapers/${inst2.wp_id}/checklist-responses`, { _silent: true } as any)
+      const list: any[] = Array.isArray(data) ? data : (data?.data ?? data?.items ?? [])
+      const item = list.find((x: any) => x.item_id === 'H2-1-rows' || x.itemId === 'H2-1-rows')
+      const raw = item?.remark ?? item?.conclusion
+      if (!raw) return null
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+      return Array.isArray(parsed) ? parsed : null
+    }
+    const { data } = await http.get(`/api/workpapers/${wpId}/checklist-responses`, { _silent: true } as any)
+    const list: any[] = Array.isArray(data) ? data : (data?.data ?? data?.items ?? [])
+    const item = list.find((x: any) => x.item_id === 'H2-1-rows' || x.itemId === 'H2-1-rows')
+    const raw = item?.remark ?? item?.conclusion
+    if (!raw) return null
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return Array.isArray(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+async function handleSeedCip() {
+  seedingCip.value = true
+  try {
+    const rows = await fetchH21CostRows()
+    const r = rows?.length
+      ? state.seedCipFromH21Rows(rows, 'overwrite')
+      : state.seedCipFromTb('overwrite')
+    if (r.applied) ElMessage.success(r.message)
+    else ElMessage.warning(r.message)
+  } finally {
+    seedingCip.value = false
+  }
+}
+
+function handleApplySignificantNote() {
+  const r = state.applySignificantNoteDraft(false)
+  if (r.applied) ElMessage.success(r.message)
+  else ElMessage.warning(r.message)
+}
+
+function onH2Adjudicated(ev: Event) {
+  const detail = (ev as CustomEvent).detail || {}
+  const wp = String(detail.wpCode ?? detail.wp_code ?? '')
+  if (wp !== 'H2') return
+  const end = Number(detail.end_audited ?? detail.audited_amount ?? detail.auditedAmount) || 0
+  const begin = Number(detail.begin_audited ?? detail.beginAudited) || 0
+  if (!end && !begin) return
+  // 仅空值时自动同步，避免覆盖手工修改
+  const r = state.seedCipFromExternal(
+    { endAudited: end, beginAudited: begin || end, source: 'event' },
+    'fillEmpty',
+  )
+  if (r.applied) ElMessage.info(r.message)
+}
+
+onMounted(() => {
+  window.addEventListener('substantive:adjudicated', onH2Adjudicated)
+})
+onUnmounted(() => {
+  window.removeEventListener('substantive:adjudicated', onH2Adjudicated)
+})
+
 async function handlePublish() {
   publishing.value = true
   try {
@@ -518,12 +591,10 @@ async function handlePublish() {
   }
 }
 
-
 function openReview(id: string) {
   openReviewDialog(id)
 }
 
-// ─── 金额格式化 ──────────────────────────────────────────────────────────────
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'
   if (val === 0) return '-'
@@ -532,60 +603,184 @@ function fmtAmt(val: number | null | undefined): string {
   }
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+function fmtRate(val: number | null | undefined): string {
+  if (val == null) return '-'
+  return `${val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+}
+
+/** 嵌套金额表：期初/期末 × 未审·账项调整·审定 + 变动 */
+const AdjAmountTable = defineComponent({
+  name: 'H4AdjAmountTable',
+  props: {
+    rows: { type: Array as () => H4AdjudicationRow[], required: true },
+    isReadonly: { type: Boolean, default: false },
+  },
+  emits: ['cell-change', 'remove'],
+  setup(p, { emit }) {
+    function rowClass({ row }: { row: H4AdjudicationRow }) {
+      if (row.isTotal) return 'total-row'
+      if (row.isSignificant) return 'significant-row'
+      return ''
+    }
+    function cell(
+      row: H4AdjudicationRow,
+      field: keyof H4AdjudicationRow,
+      editable: boolean,
+    ) {
+      if (editable && !row.isTotal && !p.isReadonly) {
+        return h(ElInputNumber, {
+          modelValue: row[field] as number,
+          controls: false,
+          size: 'small',
+          class: 'amt-input',
+          onChange: (v: number | undefined) =>
+            emit('cell-change', row.rowId, field, v ?? 0),
+        })
+      }
+      const isFormula =
+        field === 'beginAudited' || field === 'endAudited' || field === 'auditedChange'
+      return h(
+        'span',
+        {
+          class: isFormula ? 'formula-cell amt-cell' : 'amt-cell',
+          title: isFormula ? '审定=未审+账项调整' : undefined,
+        },
+        fmtAmt(row[field] as number),
+      )
+    }
+    function rateCell(row: H4AdjudicationRow) {
+      return h(
+        'span',
+        { class: { 'rate-significant': row.isSignificant } },
+        fmtRate(row.auditedChangeRate),
+      )
+    }
+
+    return () =>
+      h(
+        ElTable,
+        {
+          data: p.rows,
+          border: true,
+          stripe: true,
+          size: 'small',
+          class: 'adj-table',
+          rowClassName: rowClass,
+        },
+        {
+          default: () => [
+            h(ElTableColumn, { prop: 'name', label: '项目', minWidth: 140, fixed: true }),
+            h(ElTableColumn, { label: '期初数', align: 'center' }, {
+              default: () => [
+                h(ElTableColumn, { label: '未审数', minWidth: 110, align: 'right' }, {
+                  default: ({ row }: { row: H4AdjudicationRow }) =>
+                    cell(row, 'beginUnadjusted', true),
+                }),
+                h(ElTableColumn, { label: '账项调整', minWidth: 110, align: 'right' }, {
+                  default: ({ row }: { row: H4AdjudicationRow }) =>
+                    cell(row, 'beginAdjustment', true),
+                }),
+                h(ElTableColumn, { label: '审定数', minWidth: 110, align: 'right' }, {
+                  default: ({ row }: { row: H4AdjudicationRow }) =>
+                    cell(row, 'beginAudited', false),
+                }),
+              ],
+            }),
+            h(ElTableColumn, { label: '期末数', align: 'center' }, {
+              default: () => [
+                h(ElTableColumn, { label: '未审数', minWidth: 110, align: 'right' }, {
+                  default: ({ row }: { row: H4AdjudicationRow }) =>
+                    cell(row, 'endUnadjusted', true),
+                }),
+                h(ElTableColumn, { label: '账项调整', minWidth: 110, align: 'right' }, {
+                  default: ({ row }: { row: H4AdjudicationRow }) =>
+                    cell(row, 'endAdjustment', true),
+                }),
+                h(ElTableColumn, { label: '审定数', minWidth: 110, align: 'right' }, {
+                  default: ({ row }: { row: H4AdjudicationRow }) =>
+                    cell(row, 'endAudited', false),
+                }),
+              ],
+            }),
+            h(ElTableColumn, { label: '本期审定数与上期审定数的比较', align: 'center' }, {
+              default: () => [
+                h(ElTableColumn, { label: '变动额', minWidth: 110, align: 'right' }, {
+                  default: ({ row }: { row: H4AdjudicationRow }) =>
+                    cell(row, 'auditedChange', false),
+                }),
+                h(ElTableColumn, { label: '变动率', minWidth: 90, align: 'right' }, {
+                  default: ({ row }: { row: H4AdjudicationRow }) => rateCell(row),
+                }),
+              ],
+            }),
+            !p.isReadonly
+              ? h(ElTableColumn, { label: '', width: 50 }, {
+                  default: ({ row }: { row: H4AdjudicationRow }) =>
+                    !row.isTotal
+                      ? h(
+                          ElButton,
+                          {
+                            size: 'small',
+                            type: 'danger',
+                            link: true,
+                            onClick: () => emit('remove', row.rowId),
+                          },
+                          () => '✕',
+                        )
+                      : null,
+                })
+              : null,
+          ],
+        },
+      )
+  },
+})
 </script>
 
 <style scoped>
 .h4-tab-adjudication { padding: 16px; font-size: var(--wp-font-size, 13px); }
-
-.objective-alert { margin-bottom: 12px; }
-.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.chip-wrap { display: inline-flex; align-items: center; }
-
-.methodology-context {
-  border-left: 4px solid #d97706;
-  background: #fffbeb;
-  padding: 10px 14px;
-  margin-bottom: 16px;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #92400e;
-  line-height: 1.6;
+.guidance-details {
+  margin-bottom: 12px; font-size: 12px; color: var(--el-text-color-secondary);
+  border: 1px solid var(--el-border-color-lighter); border-radius: 4px; padding: 8px 12px;
 }
-
+.guidance-details summary { cursor: pointer; font-weight: 500; color: var(--el-text-color-primary); }
+.guidance-content p { margin: 6px 0 0; line-height: 1.5; }
+.objective-alert { margin-bottom: 12px; }
+.tab-toolbar {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px; gap: 8px; flex-wrap: wrap;
+}
+.toolbar-left, .toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .block-card { margin-bottom: 16px; }
 .section-header {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
   font-size: 14px; font-weight: 600;
 }
-.section-header-actions { display: flex; align-items: center; gap: 4px; }
-
+.section-hint { font-size: 12px; color: var(--el-text-color-secondary); font-weight: 400; }
 .adj-table { font-size: var(--wp-font-size, 13px); }
+.amt-cell { font-variant-numeric: tabular-nums; }
 .amt-input { width: 100%; }
-.amt-cell { display: block; text-align: right; }
-
 .formula-cell {
-  display: block; text-align: right;
-  border-bottom: 1px dashed #67c23a;
-  cursor: help;
-  color: var(--el-text-color-primary);
+  border-bottom: 1px dashed var(--el-border-color); cursor: help;
+  font-variant-numeric: tabular-nums;
 }
-
-.subtotal-label { font-weight: 700; }
-:deep(.subtotal-row) { background-color: #f0f9eb !important; font-weight: 600; }
-.net-table :deep(tr) { background-color: #ecf5ff !important; font-weight: 700; }
-
+.error-amount { color: var(--el-color-danger); font-weight: 600; }
+.rate-significant { color: var(--el-color-danger); font-weight: 600; }
+:deep(.total-row) { background-color: #f0f9eb !important; font-weight: 600; }
+:deep(.significant-row) { background-color: #fef0f0 !important; }
 .add-row-bar { margin-top: 8px; }
-
 .tb-compare { display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 0; }
 .tb-row { display: flex; align-items: center; gap: 8px; }
-.tb-label { color: var(--el-text-color-secondary); min-width: 130px; }
+.tb-label { color: var(--el-text-color-secondary); min-width: 140px; }
 .tb-value { font-weight: 500; font-variant-numeric: tabular-nums; }
-
-.error-amount { color: #f56c6c; font-weight: 600; }
-.triangle-err { font-size: 12px; margin-top: 4px; color: #f56c6c; }
+.cross-alert { margin-bottom: 12px; }
+.net-hint { margin: 8px 0 0; font-size: 12px; color: var(--el-text-color-secondary); }
 .audit-note-card { margin-bottom: 12px; }
+.qual-grid { display: flex; flex-direction: column; gap: 12px; }
+.qual-item label { display: block; margin-bottom: 4px; font-size: 13px; font-weight: 500; }
+.req-hint { color: var(--el-color-danger); font-weight: 400; font-size: 12px; }
+.conclusion-actions { display: flex; gap: 4px; }
 .action-bar { display: flex; justify-content: flex-end; margin-bottom: 12px; padding-top: 8px; }
-.edit-tips { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
-.edit-tips summary { cursor: pointer; font-weight: 500; }
-.edit-tips ul { padding-left: 20px; margin-top: 8px; }
 </style>

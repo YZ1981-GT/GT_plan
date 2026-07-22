@@ -14,7 +14,7 @@ import {
   isVoucherAbnormal,
   calcSubtotal,
 } from '../composables/useG12FormulaEngine'
-import { G12_ACCOUNT_CODE, G12_CHANGE_RATE_THRESHOLD, G12_ADJUDICATION_ITEMS, G12_VIRTUAL_SCROLL_THRESHOLD } from '../composables/g12Constants'
+import { G12_ACCOUNT_CODE, G12_CHANGE_RATE_THRESHOLD, G12_ADJUDICATION_ITEMS } from '../composables/g12Constants'
 import { G12_IMPORT_EXPORT_SHEETS } from '../composables/useG12ImportExport'
 import { G12_NET_EXPOSURE_SEED } from '../composables/g12NetExposureSeed'
 
@@ -40,7 +40,7 @@ describe('G12 集成 — sheetName 分发', () => {
   it('9个有效 sheet 正确分发', () => {
     expect(extractSheet('净敞口套期收益审计程序表G12A')).toBe('G12A')
     expect(extractSheet('审定表G12-1')).toBe('G12-1')
-    expect(extractSheet('套期关系明细G12-2')).toBe('G12-2')
+    expect(extractSheet('净敞口套期收益明细表G12-2')).toBe('G12-2')
     expect(extractSheet('调整分录汇总G12-3')).toBe('G12-3')
     expect(extractSheet('公允价值测试G12-4')).toBe('G12-4')
     expect(extractSheet('风险净敞口检查G12-5')).toBe('G12-5')
@@ -113,14 +113,14 @@ describe('G12 集成 — 凭证异常检测', () => {
 })
 
 describe('G12 集成 — G12-5 净敞口种子', () => {
-  it('79行 + 虚拟滚动阈值', () => {
-    expect(G12_NET_EXPOSURE_SEED.length).toBe(79)
-    expect(G12_NET_EXPOSURE_SEED.length).toBeGreaterThan(G12_VIRTUAL_SCROLL_THRESHOLD)
-  })
-
-  it('5 section 分组', () => {
-    const sections = new Set(G12_NET_EXPOSURE_SEED.map((r) => r.sectionTitle))
-    expect(sections.size).toBe(5)
+  it('对齐源模板头寸表结构', () => {
+    expect(G12_NET_EXPOSURE_SEED.length).toBeGreaterThanOrEqual(1)
+    const row = G12_NET_EXPOSURE_SEED[0]
+    expect(row.item).toContain('外汇净头寸')
+    expect(row.currency).toBe('USD')
+    expect(row.position1Desc).toBeTruthy()
+    expect(row.position2Desc).toBeTruthy()
+    expect(row.netPosition).toBeTruthy()
   })
 })
 
@@ -132,8 +132,8 @@ describe('G12 集成 — 审定表分组', () => {
 })
 
 describe('G12 集成 — 导入导出', () => {
-  it('4张表 G12-2/3/4/6', () => {
-    expect(G12_IMPORT_EXPORT_SHEETS).toEqual(['G12-2', 'G12-3', 'G12-4', 'G12-6'])
+  it('5张表 G12-2/3/4/5/6', () => {
+    expect(G12_IMPORT_EXPORT_SHEETS).toEqual(['G12-2', 'G12-3', 'G12-4', 'G12-5', 'G12-6'])
   })
 })
 

@@ -203,6 +203,10 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.aging_config import router as aging_config_router
     app.include_router(aging_config_router, tags=["aging-config"])
 
+    # ═══ §53c. B60 适用性矩阵 / 计划更新 / 质控 ═══
+    from app.routers.b60_plan import router as b60_plan_router
+    app.include_router(b60_plan_router, tags=["b60-plan"])
+
     # ═══ §54. template-library-coordination：模板库管理 ═══
     from app.routers.template_library_mgmt import router as template_library_mgmt_router
     app.include_router(template_library_mgmt_router, tags=["template-library-mgmt"])

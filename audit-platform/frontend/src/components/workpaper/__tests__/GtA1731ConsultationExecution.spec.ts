@@ -16,7 +16,14 @@ vi.mock('@/services/apiProxy', () => ({
     get: vi.fn().mockResolvedValue({
       sheets: [{
         html_data: {
-          meta_info: { executor: '张三', execution_date: '2026-06-20', review_date: '2026-06-25', reviewer: '李四' },
+          meta_info: {
+            executor: '张三',
+            execution_date: '2026-06-20',
+            review_date: '2026-06-25',
+            reviewer: '李四',
+            consultation_id: 'A17-3-001',
+            not_required: '',
+          },
           sections: {
             '1': { supplementary: '补充说明' },
             '2': { execution_details: '执行详情' },
@@ -45,13 +52,13 @@ vi.mock('../GtOnlyOfficeSheet.vue', () => ({
   default: defineComponent({ name: 'GtOnlyOfficeSheet', template: '<div class="oo-stub" />' }),
 }))
 
-// Stub GtIndexChip
+// Stub GtIndexChip — avoid ACNR resolve on mount in full suite
 vi.mock('../GtIndexChip.vue', () => ({
-  default: defineComponent({
+  default: {
     name: 'GtIndexChip',
-    props: ['wpCode', 'label'],
-    template: '<span class="gt-index-chip-stub">{{ label }}</span>',
-  }),
+    props: ['value', 'contextProjectId', 'context', 'wpCode', 'label'],
+    template: '<span class="gt-index-chip-stub">{{ value || label }}</span>',
+  },
 }))
 
 describe('GtA1731ConsultationExecution.vue', () => {
@@ -81,6 +88,22 @@ describe('GtA1731ConsultationExecution.vue', () => {
             props: ['modelValue', 'type', 'disabled'],
             template: '<div class="el-date-picker-stub" />',
           }),
+          ElInput: defineComponent({
+            props: ['modelValue', 'disabled', 'placeholder', 'size'],
+            template: '<input class="el-input-stub" />',
+          }),
+          ElCard: defineComponent({
+            template: '<div class="el-card-stub"><slot name="header" /><slot /></div>',
+          }),
+          ElCheckbox: defineComponent({
+            props: ['modelValue', 'disabled'],
+            template: '<label class="el-checkbox-stub"><slot /></label>',
+          }),
+          ElIcon: defineComponent({ template: '<span class="el-icon-stub" />' }),
+          ElButton: defineComponent({
+            props: ['type', 'size', 'loading', 'text', 'disabled'],
+            template: '<button class="el-button-stub"><slot /></button>',
+          }),
         },
       },
     })
@@ -96,10 +119,10 @@ describe('GtA1731ConsultationExecution.vue', () => {
       expect(wrapper.find('.gt-a1731__content').exists()).toBe(true)
     })
 
-    it('renders meta info card with 4 fields', async () => {
+    it('renders meta info card with 6 fields', async () => {
       const wrapper = await mountComponent()
       const metaItems = wrapper.findAll('.gt-a1731__meta-item')
-      expect(metaItems.length).toBe(4)
+      expect(metaItems.length).toBe(6)
     })
 
     it('renders 5 cards total (meta + 4 sections)', async () => {
@@ -166,7 +189,8 @@ describe('GtA1731ConsultationExecution.vue', () => {
       const wrapper = await mountComponent()
       // Meta section rendered with labels
       expect(wrapper.text()).toContain('执行人')
-      expect(wrapper.text()).toContain('复核人')
+      expect(wrapper.text()).toContain('复核日期')
+      expect(wrapper.text()).toContain('关联咨询事项编号')
     })
   })
 

@@ -97,6 +97,20 @@ const NATURE_LABEL_TO_KEY: Record<string, string> = {
   '其他': 'other',
 }
 
+/**
+ * 默认 THREE_YEAR 账龄段 key → 旧 rowKey 映射。
+ *
+ * 账龄区块改为按项目账龄配置段动态生成后，对默认 THREE_YEAR 段沿用旧 rowKey，
+ * 以保留既有项目已保存的手工数据（reasonAnalysis / 手工 currentUnadjusted 等
+ * item_id `D3-adj-aging-{rowKey}-{field}`）不被孤立；自定义段则直接用段 key。
+ */
+const LEGACY_AGING_ROWKEY: Record<string, string> = {
+  within1: 'within-1-year',
+  y1to2: '1-to-2-years',
+  y2to3: '2-to-3-years',
+  over3: 'over-3-years',
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function makeItemId(section: string, rowKey: string, field: string): string {
@@ -207,7 +221,9 @@ export function useD3Adjudication(options: UseD3AdjudicationOptions) {
   const sections: ComputedRef<AdjudicationSection[]> = computed(() => {
     const responses = allResponses.value
     const natureAgg = crossSheet.natureAggregation.value
-    const agingAgg = crossSheet.agingAggregation.value
+    // segment-driven 账龄聚合 + 有效账龄段（支持自定义账龄配置）
+    const agingByKey = crossSheet.agingByKey.value
+    const agingSegs = crossSheet.agingSegments.value
 
     // === 区块一：按性质分类 ===
     const natureRows: AdjudicationRow[] = NATURE_ROWS.map(({ rowKey, label }) => {
@@ -217,29 +233,12 @@ export function useD3Adjudication(options: UseD3AdjudicationOptions) {
 
     const natureSubtotal = buildSubtotalRow(natureRows, '合计')
 
-    // === 区块二：按账龄分类 ===
-    const agingRows: AdjudicationRow[] = AGING_ROWS.map(({ rowKey, label }) => {
-      let crossCurrent = 0
-      let crossPrior = 0
-      switch (rowKey) {
-        case 'within-1-year':
-          crossCurrent = agingAgg.within1
-          crossPrior = agingAgg.prior_within1
-          break
-        case '1-to-2-years':
-          crossCurrent = agingAgg.y1to2
-          crossPrior = agingAgg.prior_y1to2
-          break
-        case '2-to-3-years':
-          crossCurrent = agingAgg.y2to3
-          crossPrior = agingAgg.prior_y2to3
-          break
-        case 'over-3-years':
-          crossCurrent = agingAgg.over3
-          crossPrior = agingAgg.prior_over3
-          break
-      }
-      return buildRow('aging', rowKey, label, responses, crossCurrent, crossPrior, eventAjeAccum.value, eventRjeAccum.value)
+    // === 区块二：按账龄分类（按项目账龄配置段动态生成） ===
+    const agingRows: AdjudicationRow[] = agingSegs.map((seg) => {
+      const rowKey = LEGACY_AGING_ROWKEY[seg.key] ?? seg.key
+      const crossCurrent = agingByKey.current[seg.key] ?? 0
+      const crossPrior = agingByKey.prior[seg.key] ?? 0
+      return buildRow('aging', rowKey, seg.label, responses, crossCurrent, crossPrior, eventAjeAccum.value, eventRjeAccum.value)
     })
 
     const agingSubtotal = buildSubtotalRow(agingRows, '合计')
@@ -294,6 +293,22 @@ export function useD3Adjudication(options: UseD3AdjudicationOptions) {
     if (diff === 0) return null
     const sign = diff > 0 ? '+' : ''
     return `性质分类合计≠账龄分类合计，差额：${sign}${diff}元`
+  })
+
+  // ─── 合同负债(2205)分类适当性勾稽（CAS14） ──────────────────────────────
+
+  /**
+   * contractLiabilityWarning: CAS14 下 2203 预收账款仅应保留非收入范围预收
+   * （预收销售固定资产款/土地使用权款/合同不成立时已收取的对价）。
+   * 「其他」类金额 > 0 时提示评估是否属于合同负债范围，应重分类至 2205。
+   * 基于按性质分类聚合的「其他」类当期审定额判断，不臆造披露内容。
+   */
+  const contractLiabilityWarning: ComputedRef<string | null> = computed(() => {
+    const other = crossSheet.natureAggregation.value['其他']
+    const amt = other?.current ?? 0
+    if (amt <= 0) return null
+    const fmt = amt.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+    return `「其他」类预收账款期末审定 ${fmt} 元：CAS14 下 2203 仅应保留非收入范围预收（固定资产/土地使用权/合同不成立对价），请评估「其他」是否属于收入范围的合同负债，如是应重分类至「合同负债(2205)」并在附注区分列示。`
   })
 
   // ─── Audit Notes ─────────────────────────────────────────────────────
@@ -416,6 +431,8 @@ export function useD3Adjudication(options: UseD3AdjudicationOptions) {
     // 交叉验证
     crossValidationDiff,
     crossValidationWarning,
+    // CAS14 合同负债分类适当性
+    contractLiabilityWarning,
     // 审计说明
     auditNotes,
     // 操作

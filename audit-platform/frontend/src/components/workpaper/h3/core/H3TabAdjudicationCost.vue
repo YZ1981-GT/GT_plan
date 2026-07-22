@@ -21,9 +21,59 @@
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
+      <el-button size="small" type="primary" :disabled="isReadonly" @click="openFillDialog">从 H3-2 回填</el-button>
+      <el-button
+        size="small"
+        type="warning"
+        :disabled="isReadonly || (!hasDetailCostDiff && !hasDetailDepDiff)"
+        @click="alignFromH32"
+      >
+        {{ hasDetailCostDiff || hasDetailDepDiff ? '一键对齐 H3-2' : '已与 H3-2 勾稽' }}
+      </el-button>
+      <el-button
+        size="small"
+        :disabled="isReadonly || !hasTransferDiff"
+        @click="onFillTransferFromH36"
+      >
+        {{ hasTransferDiff ? '从 H3-6 回填转换' : '转换已勾稽' }}
+      </el-button>
       <span class="chip-wrap"><GtIndexChip value="wp:H3-1" :context-project-id="projectId" /></span>
       <el-tag size="small" type="info">共 {{ originalRows.length }} 行</el-tag>
+      <el-tag v-if="h32CategoryMatch.unmatchedCount > 0" size="small" type="warning">
+        H3-2 非标准类别 {{ h32CategoryMatch.unmatchedCount }} 行
+      </el-tag>
     </div>
+
+    <!-- 回填预览对话框 -->
+    <el-dialog v-model="fillDialogVisible" title="从 H3-2 回填 H3-1" width="720px" destroy-on-close>
+      <el-radio-group v-model="fillMode" class="fill-mode-group">
+        <el-radio value="book">仅账面+未审（保留 AJE/RJE，推荐）</el-radio>
+        <el-radio value="full">完整覆盖（含明细 AJE/RJE）</el-radio>
+      </el-radio-group>
+      <p v-if="fillPreview.unmatchedCount" class="fill-warn">
+        注意：H3-2 有 {{ fillPreview.unmatchedCount }} 行非标准类别，金额 {{ fmtNum(fillPreview.unmatchedEnd) }} 将归入归一后类别。
+      </p>
+      <el-table :data="fillPreview.diffs" border size="small" max-height="360" empty-text="无差异（已与 H3-2 一致）">
+        <el-table-column prop="category" label="类别" width="110" />
+        <el-table-column prop="block" label="区块" width="70" />
+        <el-table-column prop="field" label="字段" width="80" />
+        <el-table-column prop="before" label="回填前" align="right" min-width="100">
+          <template #default="{ row }">{{ fmtNum(row.before) }}</template>
+        </el-table-column>
+        <el-table-column prop="after" label="回填后" align="right" min-width="100">
+          <template #default="{ row }">{{ fmtNum(row.after) }}</template>
+        </el-table-column>
+        <el-table-column prop="delta" label="差异" align="right" min-width="100">
+          <template #default="{ row }">
+            <span :class="{ 'text-danger': Math.abs(row.delta) >= 0.01 }">{{ fmtNum(row.delta) }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="fillDialogVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="fillPreview.empty" @click="confirmFillFromH32">确认回填</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 一、投资性房地产 — 原值 -->
     <el-card shadow="never" class="section-card">
@@ -138,11 +188,117 @@
       </el-table>
     </el-card>
 
+    <!-- 三、减值准备 -->
+    <el-card shadow="never" class="section-card">
+      <template #header>
+        <span>三、减值准备</span>
+      </template>
+      <el-table :data="impairRows" border size="small" class="audit-table" show-summary :summary-method="getImpairSummary">
+        <el-table-column prop="category" label="项目" min-width="120" fixed />
+        <el-table-column prop="beginBalance" label="期初" min-width="100" align="right">
+          <template #default="{ row }">
+            <el-input v-model.number="row.beginBalance" size="small" :disabled="isReadonly" @change="onImpairCellChange(row, 'beginBalance')" />
+          </template>
+        </el-table-column>
+        <el-table-column prop="provision" label="计提" min-width="100" align="right">
+          <template #default="{ row }">
+            <el-input v-model.number="row.provision" size="small" :disabled="isReadonly" @change="onImpairCellChange(row, 'provision')" />
+          </template>
+        </el-table-column>
+        <el-table-column prop="reversal" label="转回" min-width="100" align="right">
+          <template #default="{ row }">
+            <el-input v-model.number="row.reversal" size="small" :disabled="isReadonly" @change="onImpairCellChange(row, 'reversal')" />
+          </template>
+        </el-table-column>
+        <el-table-column prop="transferImp" label="转换减值" min-width="100" align="right">
+          <template #default="{ row }">
+            <el-input v-model.number="row.transferImp" size="small" :disabled="isReadonly" @change="onImpairCellChange(row, 'transferImp')" />
+          </template>
+        </el-table-column>
+        <el-table-column label="期末" min-width="100" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-value" title="期初+计提-转回±转换">{{ fmtNum(row.endBalance) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="unadjusted" label="未审数" min-width="100" align="right">
+          <template #default="{ row }">
+            <el-input v-model.number="row.unadjusted" size="small" :disabled="isReadonly" @change="onImpairCellChange(row, 'unadjusted')" />
+          </template>
+        </el-table-column>
+        <el-table-column prop="aje" label="AJE" min-width="90" align="right">
+          <template #default="{ row }">
+            <el-input v-model.number="row.aje" size="small" :disabled="isReadonly" @change="onImpairCellChange(row, 'aje')" />
+          </template>
+        </el-table-column>
+        <el-table-column prop="rje" label="RJE" min-width="90" align="right">
+          <template #default="{ row }">
+            <el-input v-model.number="row.rje" size="small" :disabled="isReadonly" @change="onImpairCellChange(row, 'rje')" />
+          </template>
+        </el-table-column>
+        <el-table-column label="审定数" min-width="100" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span class="formula-value" title="未审+AJE+RJE">{{ fmtNum(row.audited) }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
     <!-- 净值合计 -->
     <el-card shadow="never" class="net-value-card">
       <div class="net-value-row">
-        <span class="net-label">净值合计（原值期末 - 折旧期末）</span>
+        <span class="net-label">净值合计（原值期末 − 折旧期末 − 减值期末）</span>
         <span class="net-amount">{{ fmtNum(netValueTotal) }}</span>
+      </div>
+    </el-card>
+
+    <!-- 跨表勾稽面板：H3-2 明细 / H3-6 互转 -->
+    <el-card shadow="never" class="reconcile-card">
+      <template #header>
+        <div class="section-title">
+          <span>跨表勾稽（H3-2 明细 / H3-6 互转）</span>
+          <div class="chip-row-inline">
+            <el-tag size="small" class="nav-chip" @click="emit('navigate-sheet', 'H3-2')">打开 H3-2</el-tag>
+            <el-tag size="small" class="nav-chip" @click="emit('navigate-sheet', 'H3-6 互转审核')">打开 H3-6</el-tag>
+          </div>
+        </div>
+      </template>
+      <el-descriptions :column="3" border size="small">
+        <el-descriptions-item label="H3-1 原值审定">{{ fmtNum(originalTotal.audited) }}</el-descriptions-item>
+        <el-descriptions-item label="H3-2 原值期末">
+          <span :class="{ 'text-danger': hasDetailCostDiff }">{{ fmtNum(detailCostAudited) }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="原值差异">
+          <el-tag :type="hasDetailCostDiff ? 'danger' : 'success'" size="small">{{ fmtNum(detailCostDiff) }}</el-tag>
+        </el-descriptions-item>
+
+        <el-descriptions-item label="H3-1 折旧审定">{{ fmtNum(depTotal.audited) }}</el-descriptions-item>
+        <el-descriptions-item label="H3-2 折旧期末">
+          <span :class="{ 'text-danger': hasDetailDepDiff }">{{ fmtNum(detailDepAudited) }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="折旧差异">
+          <el-tag :type="hasDetailDepDiff ? 'danger' : 'success'" size="small">{{ fmtNum(detailDepDiff) }}</el-tag>
+        </el-descriptions-item>
+
+        <el-descriptions-item label="H3-1 转换列合计">{{ fmtNum(originalTotal.transfer) }}</el-descriptions-item>
+        <el-descriptions-item label="H3-6 净转入">
+          <span :class="{ 'text-danger': hasTransferDiff }">{{ fmtNum(transferNet) }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="转换差异">
+          <el-tag :type="hasTransferDiff ? 'danger' : 'success'" size="small">{{ fmtNum(transferDiff) }}</el-tag>
+        </el-descriptions-item>
+
+        <el-descriptions-item label="H3-6 自用→投资(H1)" :span="1">{{ fmtNum(transferSummary.fromH1) }}</el-descriptions-item>
+        <el-descriptions-item label="H3-6 投资→自用(H1)" :span="1">{{ fmtNum(transferSummary.toH1) }}</el-descriptions-item>
+        <el-descriptions-item label="H3-6 在建→投资(H2)" :span="1">{{ fmtNum(transferSummary.fromH2) }}</el-descriptions-item>
+
+        <el-descriptions-item label="H3-3 AJE(1503)">{{ fmtNum(adjustmentSync.aje1503) }}</el-descriptions-item>
+        <el-descriptions-item label="H3-3 RJE(1503)">{{ fmtNum(adjustmentSync.rje1503) }}</el-descriptions-item>
+        <el-descriptions-item label="H3-3 折旧AJE/RJE">{{ fmtNum(adjustmentSync.aje1504) }} / {{ fmtNum(adjustmentSync.rje1504) }}</el-descriptions-item>
+        <el-descriptions-item label="H3-3 减值AJE/RJE" :span="3">{{ fmtNum(adjustmentSync.aje1505) }} / {{ fmtNum(adjustmentSync.rje1505) }}</el-descriptions-item>
+      </el-descriptions>
+      <p class="reconcile-note">{{ crossSheetNote }}</p>
+      <div v-if="hasDetailCostDiff || hasDetailDepDiff" class="align-row">
+        <el-button size="small" type="warning" :disabled="isReadonly" @click="alignFromH32">差异一键对齐（账面模式）</el-button>
       </div>
     </el-card>
 
@@ -179,10 +335,13 @@
  * H3TabAdjudicationCost.vue — H3-1 审定表（成本模式）
  * 双区块(原值+折旧)+三角勾稽+TB回写+AI+💬复核+GtIndexChip→H3-6
  */
-import { ref, computed, inject, toRef, onMounted } from 'vue'
+import { ref, computed, inject, toRef, onMounted, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useH3AdjudicationCost } from '../../composables/useH3AdjudicationCost'
-import type { H3CostOriginalRow, H3CostDepRow } from '../../composables/useH3AdjudicationCost'
+import type { H3CostOriginalRow, H3CostDepRow, H3CostImpairRow } from '../../composables/useH3AdjudicationCost'
+import type { H3FillDiffRow, H3FillMode } from '../../composables/h3FillFromDetail'
 import { useH3FormData } from '../../composables/useH3FormData'
+import { useH3CrossSheet } from '../../composables/useH3CrossSheet'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -205,13 +364,90 @@ const { getValue, setValue, saveImmediate } = useH3FormData({
 })
 
 const {
-  originalRows, depRows, originalTotal, depTotal, netValueTotal,
-  isTriangleBalanced, updateOriginalCell, updateDepCell,
+  originalRows, depRows, impairRows, originalTotal, depTotal, impairTotal, netValueTotal,
+  isTriangleBalanced, h32CategoryMatch,
+  updateOriginalCell, updateDepCell, updateImpairCell,
+  previewFillFromH32, fillFromH32Detail, fillTransferFromH36,
 } = useH3AdjudicationCost({
   allResponses: computed(() => props.allResponses) as any,
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   getValue, setValue, saveImmediate,
+})
+
+const fillDialogVisible = ref(false)
+const fillMode = ref<H3FillMode>('book')
+const fillPreview = ref<{ diffs: H3FillDiffRow[]; unmatchedCount: number; unmatchedEnd: number; empty: boolean }>({
+  diffs: [], unmatchedCount: 0, unmatchedEnd: 0, empty: true,
+})
+
+function refreshFillPreview() {
+  fillPreview.value = previewFillFromH32(fillMode.value)
+}
+function openFillDialog() {
+  refreshFillPreview()
+  if (fillPreview.value.empty) {
+    ElMessage.warning('H3-2 成本明细尚无数据，请先编制 H3-2')
+    return
+  }
+  fillDialogVisible.value = true
+}
+watch(fillMode, () => { if (fillDialogVisible.value) refreshFillPreview() })
+
+function confirmFillFromH32() {
+  const r = fillFromH32Detail(fillMode.value)
+  fillDialogVisible.value = false
+  ElMessage.success(
+    `已按类别回填原值 ${r.originalFilled} / 折旧 ${r.depFilled} / 减值 ${r.impairFilled} 行（${fillMode.value === 'book' ? '保留AJE/RJE' : '完整覆盖'}）`,
+  )
+}
+function alignFromH32() {
+  const r = fillFromH32Detail('book')
+  if (!r.originalFilled) {
+    ElMessage.warning('H3-2 成本明细尚无数据')
+    return
+  }
+  ElMessage.success('已按账面模式对齐 H3-2（保留 AJE/RJE）')
+}
+function onFillTransferFromH36() {
+  const r = fillTransferFromH36(transferNet.value)
+  ElMessage.success(`已按权重分摊 H3-6 净转入至转换列（${r.filled} 行）`)
+}
+
+const measurementModel = ref('cost')
+const { adjudicationFromDetail, transferSummary, detailTotals, adjustmentSync } = useH3CrossSheet(
+  computed(() => props.allResponses) as any,
+  measurementModel,
+)
+
+const detailCostAudited = computed(() => {
+  const v = adjudicationFromDetail.value
+  return 'costAudited' in v ? v.costAudited : detailTotals.value.assetEnd
+})
+const detailDepAudited = computed(() => {
+  const v = adjudicationFromDetail.value
+  return 'depAudited' in v ? v.depAudited : detailTotals.value.depEnd
+})
+const detailCostDiff = computed(() => originalTotal.value.audited - detailCostAudited.value)
+const detailDepDiff = computed(() => depTotal.value.audited - detailDepAudited.value)
+const hasDetailCostDiff = computed(() => Math.abs(detailCostDiff.value) >= 0.01)
+const hasDetailDepDiff = computed(() => Math.abs(detailDepDiff.value) >= 0.01)
+
+const transferNet = computed(
+  () => transferSummary.value.fromH1 + transferSummary.value.fromH2 - transferSummary.value.toH1,
+)
+const transferDiff = computed(() => originalTotal.value.transfer - transferNet.value)
+const hasTransferDiff = computed(() => Math.abs(transferDiff.value) >= 0.01)
+
+const crossSheetNote = computed(() => {
+  if (!hasDetailCostDiff.value && !hasDetailDepDiff.value && !hasTransferDiff.value) {
+    return 'H3-1 与 H3-2 明细、H3-6 互转勾稽一致。'
+  }
+  const parts: string[] = []
+  if (hasDetailCostDiff.value) parts.push(`原值差 ${detailCostDiff.value.toLocaleString('zh-CN')}`)
+  if (hasDetailDepDiff.value) parts.push(`折旧差 ${detailDepDiff.value.toLocaleString('zh-CN')}`)
+  if (hasTransferDiff.value) parts.push(`转换差 ${transferDiff.value.toLocaleString('zh-CN')}`)
+  return `存在勾稽差异：${parts.join('；')}。请核对明细编制、互转审核或审定调整。`
 })
 
 // ─── 审计说明 / 审计结论（标准 checklist_responses 持久化） ───────────────────
@@ -244,6 +480,9 @@ function onOrigCellChange(row: H3CostOriginalRow, field: keyof H3CostOriginalRow
 function onDepCellChange(row: H3CostDepRow, field: keyof H3CostDepRow) {
   updateDepCell(row.rowId, field, (row as any)[field])
 }
+function onImpairCellChange(row: H3CostImpairRow, field: keyof H3CostImpairRow) {
+  updateImpairCell(row.rowId, field, (row as any)[field])
+}
 
 function fmtNum(v: number): string {
   return v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -263,6 +502,13 @@ function getDepSummary({ columns }: { columns: any[] }) {
     return key ? fmtNum((depTotal.value as any)[key] ?? 0) : ''
   })
 }
+function getImpairSummary({ columns }: { columns: any[] }) {
+  return columns.map((_, idx) => {
+    if (idx === 0) return '小计'
+    const key = ['', 'beginBalance', 'provision', 'reversal', 'transferImp', 'endBalance', 'unadjusted', 'aje', 'rje', 'audited'][idx]
+    return key ? fmtNum((impairTotal.value as any)[key] ?? 0) : ''
+  })
+}
 
 function generateAI(section: string) {
   window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section, wpId: props.wpId } }))
@@ -277,7 +523,8 @@ function openReview(section: string) { openReviewDialog(section) }
 .guidance-content { margin-top: 8px; font-size: var(--wp-font-size, 13px); color: #606266; line-height: 1.6; }
 .guidance-content p { margin: 2px 0; }
 .objective-alert { margin-bottom: 12px; }
-.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
+.tab-toolbar { display: flex; justify-content: flex-start; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.tab-toolbar .chip-wrap { margin-left: auto; }
 .chip-wrap { display: inline-flex; align-items: center; }
 .audit-note-card { margin-top: 16px; }
 .audit-note-card .card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
@@ -296,4 +543,11 @@ function openReview(section: string) { openReviewDialog(section) }
 .chip-row { margin-top: 12px; display: flex; align-items: center; gap: 8px; }
 .chip-label { font-size: 12px; color: var(--el-text-color-secondary); }
 .nav-chip { cursor: pointer; }
+.reconcile-card { margin-bottom: 16px; }
+.chip-row-inline { display: flex; gap: 8px; }
+.reconcile-note { margin: 8px 0 0; font-size: 12px; color: #909399; line-height: 1.5; }
+.align-row { margin-top: 8px; }
+.fill-mode-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.fill-warn { color: var(--el-color-warning); font-size: 12px; margin: 0 0 8px; }
+.text-danger { color: var(--el-color-danger); font-weight: 500; }
 </style>

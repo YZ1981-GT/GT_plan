@@ -4,7 +4,7 @@
  * 验证 'm2-paid-in-capital' componentType 在四个注册表中正确注册：
  * 1. htmlRendererRegistry（前端组件映射）
  * 2. VALID_COMPONENT_TYPES（后端 wp_classification_service.py）
- * 3. wp_code_overrides（M2/M2-1~M2-5 共6个映射，M2A→a-program-console）
+ * 3. wp_code_overrides（M2/M2-1~M2-5/M2A 共7个映射）
  * 4. RENDERER_DISPATCH（后端渲染策略）
  *
  * Spec: .kiro/specs/m2-paid-in-capital/
@@ -24,7 +24,7 @@ import {
 
 const COMPONENT_TYPE = 'm2-paid-in-capital'
 
-// M2/M2-1~M2-5 共6个wp_code应映射到m2-paid-in-capital
+// M2/M2-1~M2-5/M2A 共7个wp_code应映射到m2-paid-in-capital
 const EXPECTED_WP_CODES = [
   'M2',
   'M2-1',
@@ -32,6 +32,7 @@ const EXPECTED_WP_CODES = [
   'M2-3',
   'M2-4',
   'M2-5',
+  'M2A',
 ]
 
 describe('M2 实收资本（股本）— 注册契约测试', () => {
@@ -97,11 +98,7 @@ describe('M2 实收资本（股本）— 注册契约测试', () => {
       expect(overrides[wpCode]).toBe(COMPONENT_TYPE)
     })
 
-    it('M2A 映射为 a-program-console（程序表独立）', () => {
-      expect(overrides['M2A']).toBe('a-program-console')
-    })
-
-    it('覆盖完整性：共6个映射无遗漏', () => {
+    it('覆盖完整性：共7个映射无遗漏', () => {
       const m2Mappings = Object.entries(overrides).filter(
         ([, v]) => v === COMPONENT_TYPE
       )

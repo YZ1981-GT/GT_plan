@@ -1,7 +1,7 @@
 """G11 投资收益 — AI 辅助端点.
 
 POST /api/workpapers/{wp_id}/g11/ai/{section}
-sections: adjudication-analysis / return-rate-conclusion / voucher-conclusion
+sections: adjudication-analysis / return-rate-conclusion / voucher-conclusion / disclosure-note
 """
 
 from __future__ import annotations
@@ -46,6 +46,11 @@ _PROMPTS = {
     "adjudication-analysis": "请生成 G11-1 审定表审计说明，分析各投资类型本期与上期变动及主要原因。",
     "return-rate-conclusion": "请根据收益率分析表中异常波动项目，生成 G11-4 审计结论。",
     "voucher-conclusion": "请根据凭证检查表异常样本，生成投资收益凭证测试结论。",
+    "disclosure-note": (
+        "请根据 G11 附注披露核对结果（6111 投资收益分项发生额、与 G11-1 审定勾稽、"
+        "上市处置交易性子表或国企汇回限制说明），生成附注披露的审计说明："
+        "概述披露完整性、列报格式及与审定数/明细表勾稽。"
+    ),
 }
 
 

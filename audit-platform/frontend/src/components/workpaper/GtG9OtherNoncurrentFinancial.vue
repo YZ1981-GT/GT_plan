@@ -236,19 +236,12 @@ function onDebouncedSave(id: string, d: Partial<ChecklistResponse>) {
   scheduleAutoSnapshot()
 }
 
-function handleG9Adjudicated(e: Event): void {
-  const detail = (e as CustomEvent<{ accountCode?: string; adjudicatedAmount?: number }>).detail
-  if (detail?.accountCode !== G9_ACCOUNT_CODE) return
-  const amount = parseNum(detail.adjudicatedAmount)
-  void formData.writebackTB(amount)
-}
-
 function handleG9Writeback(e: Event): void {
-  const detail = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number }>).detail
+  const detail = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number; forceToast?: boolean }>).detail
   if (detail?.accountCode && detail.accountCode !== G9_ACCOUNT_CODE) return
   const amount = parseNum(detail?.auditedAmount)
   if (!Number.isFinite(amount)) return
-  void formData.writebackTB(amount)
+  void formData.writebackTB(amount, { forceToast: !!detail?.forceToast })
 }
 
 async function reloadAll() {
@@ -256,14 +249,13 @@ async function reloadAll() {
 }
 
 onMounted(async () => {
-  window.addEventListener('substantive:adjudicated', handleG9Adjudicated)
+  // TB 回写仅听 g9:writeback-trial-balance（substantive:adjudicated 供跨模块刷新，不重复写 TB）
   window.addEventListener('g9:writeback-trial-balance', handleG9Writeback)
   await formData.loadAll()
   isLoading.value = false
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('substantive:adjudicated', handleG9Adjudicated)
   window.removeEventListener('g9:writeback-trial-balance', handleG9Writeback)
   formData.flushPending()
 })

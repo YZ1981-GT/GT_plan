@@ -10,7 +10,28 @@
  * Spec: .kiro/specs/k4-other-current-liabilities/
  * Requirements: 1.2, 2.5, 2.6, 3.2
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+const { mockPut, mockGet, mockEmit } = vi.hoisted(() => ({
+  mockPut: vi.fn().mockResolvedValue({}),
+  mockGet: vi.fn().mockResolvedValue({}),
+  mockEmit: vi.fn(),
+}))
+
+vi.mock('@/services/apiProxy', () => ({
+  api: {
+    get: mockGet,
+    put: mockPut,
+  },
+}))
+
+vi.mock('@/utils/eventBus', () => ({
+  eventBus: {
+    emit: mockEmit,
+    on: vi.fn(),
+    off: vi.fn(),
+  },
+}))
 
 // ═══ 7.2-A: sheetName regex extraction → component routing ═══
 
@@ -81,19 +102,12 @@ describe('K4 Integration — sheetName分发路由', () => {
 
 describe('K4 Integration — TB回写(2245负债类) + EventBus', () => {
   beforeEach(() => {
-    vi.resetModules()
-  })
-
-  afterEach(() => {
-    vi.restoreAllMocks()
+    vi.clearAllMocks()
+    mockPut.mockResolvedValue({})
+    mockGet.mockResolvedValue({})
   })
 
   it('writebackTB calls PUT with account_code=2245 + correct amount', async () => {
-    const api = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
-    const eventBus = { emit: vi.fn(), on: vi.fn(), off: vi.fn() }
-    vi.doMock('@/services/apiProxy', () => ({ api }))
-    vi.doMock('@/utils/eventBus', () => ({ eventBus }))
-
     const { useK4FormData } = await import('../composables/useK4FormData')
     const { ref } = await import('vue')
 
@@ -105,18 +119,13 @@ describe('K4 Integration — TB回写(2245负债类) + EventBus', () => {
 
     await formData.writebackTB(800_000)
 
-    expect(api.put).toHaveBeenCalledWith(
+    expect(mockPut).toHaveBeenCalledWith(
       '/api/projects/proj-001/trial-balance/writeback',
       { account_code: '2245', audited_amount: 800_000 },
     )
   })
 
   it('writebackTB emits substantive:adjudicated with 2245/K4 payload', async () => {
-    const api = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
-    const eventBus = { emit: vi.fn(), on: vi.fn(), off: vi.fn() }
-    vi.doMock('@/services/apiProxy', () => ({ api }))
-    vi.doMock('@/utils/eventBus', () => ({ eventBus }))
-
     const { useK4FormData } = await import('../composables/useK4FormData')
     const { ref } = await import('vue')
 
@@ -128,7 +137,7 @@ describe('K4 Integration — TB回写(2245负债类) + EventBus', () => {
 
     await formData.writebackTB(1_200_000)
 
-    expect(eventBus.emit).toHaveBeenCalledWith(
+    expect(mockEmit).toHaveBeenCalledWith(
       'substantive:adjudicated',
       expect.objectContaining({
         accountCode: '2245',
@@ -139,11 +148,6 @@ describe('K4 Integration — TB回写(2245负债类) + EventBus', () => {
   })
 
   it('writebackTB updates local tbData.audited2245', async () => {
-    const api = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
-    const eventBus = { emit: vi.fn(), on: vi.fn(), off: vi.fn() }
-    vi.doMock('@/services/apiProxy', () => ({ api }))
-    vi.doMock('@/utils/eventBus', () => ({ eventBus }))
-
     const { useK4FormData } = await import('../composables/useK4FormData')
     const { ref } = await import('vue')
 
@@ -159,11 +163,6 @@ describe('K4 Integration — TB回写(2245负债类) + EventBus', () => {
   })
 
   it('writebackTB zero amount is valid (全部清偿)', async () => {
-    const api = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
-    const eventBus = { emit: vi.fn(), on: vi.fn(), off: vi.fn() }
-    vi.doMock('@/services/apiProxy', () => ({ api }))
-    vi.doMock('@/utils/eventBus', () => ({ eventBus }))
-
     const { useK4FormData } = await import('../composables/useK4FormData')
     const { ref } = await import('vue')
 
@@ -175,7 +174,7 @@ describe('K4 Integration — TB回写(2245负债类) + EventBus', () => {
 
     await formData.writebackTB(0)
 
-    expect(api.put).toHaveBeenCalledWith(
+    expect(mockPut).toHaveBeenCalledWith(
       '/api/projects/proj-004/trial-balance/writeback',
       { account_code: '2245', audited_amount: 0 },
     )
@@ -183,11 +182,6 @@ describe('K4 Integration — TB回写(2245负债类) + EventBus', () => {
   })
 
   it('writebackTB negative amount (负债转出) still calls API', async () => {
-    const api = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
-    const eventBus = { emit: vi.fn(), on: vi.fn(), off: vi.fn() }
-    vi.doMock('@/services/apiProxy', () => ({ api }))
-    vi.doMock('@/utils/eventBus', () => ({ eventBus }))
-
     const { useK4FormData } = await import('../composables/useK4FormData')
     const { ref } = await import('vue')
 
@@ -199,7 +193,7 @@ describe('K4 Integration — TB回写(2245负债类) + EventBus', () => {
 
     await formData.writebackTB(-100_000)
 
-    expect(api.put).toHaveBeenCalledWith(
+    expect(mockPut).toHaveBeenCalledWith(
       '/api/projects/proj-005/trial-balance/writeback',
       { account_code: '2245', audited_amount: -100_000 },
     )

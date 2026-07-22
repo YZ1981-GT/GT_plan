@@ -3,6 +3,8 @@
     <div class="h10-toolbar">
       <h3 class="h10-title">H10-1 资产处置损益审定表</h3>
       <div class="h10-actions">
+        <el-button size="small" :disabled="isReadonly" data-testid="h10-fill-from-detail" @click="onFillFromDetail">从明细带入</el-button>
+        <el-button size="small" :loading="cross.h6PullLoading.value" data-testid="h10-h6-cross-btn" @click="onRefreshH6">勾稽 H6</el-button>
         <GtReviewTrigger section-id="H10-1-adjudication" />
         <el-button size="small" :loading="adj.aiLoading.value" :disabled="isReadonly" data-testid="h10-adj-ai-btn" @click="adj.generateAiAnalysis()">🤖 AI</el-button>
         <el-button size="small" :loading="validateLoading" :disabled="isReadonly" data-testid="h10-validate-btn" @click="runValidate">校验公式</el-button>
@@ -34,7 +36,8 @@
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
         <p>科目 6115 资产处置损益（损益类/贷方），取<strong>发生额</strong>（贷方-借方），非期末余额。</p>
-        <p>审定数 = 未审数 + AJE + RJE；|变动率|&gt;20% 时原因分析必填。</p>
+        <p>推荐：先编 H10-2 明细 → 点「从明细带入」汇总至未审数（保留 AJE/RJE）→ 核对 TB。</p>
+        <p>审定数 = 未审数 + AJE + RJE；|变动率|&gt;20% 时原因分析必填。分类含试运行销售损益。</p>
       </div>
     </details>
 
@@ -117,16 +120,31 @@
       <el-tag size="small" :type="adj.hasVarianceHighlight.value ? 'danger' : 'success'">H10-CHK-01 试算表勾稽（6115发生额）</el-tag>
       <el-tag size="small" :type="adj.detailMismatch.value ? 'warning' : 'success'">H10-CHK-02 明细勾稽</el-tag>
       <el-tag size="small" :type="cross.h10VsH6.value.h6Available && !cross.h10VsH6.value.isMatch ? 'warning' : 'success'">
-        H10-CHK-03 H6清理勾稽{{ cross.h10VsH6.value.h6Available ? '' : '（无H6数据）' }}
+        H10-CHK-03 H6清理勾稽{{
+          cross.h10VsH6.value.h6Available
+            ? (cross.h10VsH6.value.h6Source === 'remote' ? '（已拉H6）' : '（本WP）')
+            : '（无H6数据）'
+        }}
       </el-tag>
       <el-tag size="small" :type="cross.hasSourceWpMismatch.value ? 'warning' : 'success'">H10-CHK-04 源底稿分类型勾稽</el-tag>
     </div>
+    <el-alert v-if="cross.remoteH6Msg.value" type="info" :closable="true" class="cross-alert" @close="cross.remoteH6Msg.value = ''">
+      {{ cross.remoteH6Msg.value }}
+    </el-alert>
     <el-alert v-if="cross.h10VsH6.value.h6Available && !cross.h10VsH6.value.isMatch" type="warning" :closable="false" class="cross-alert">
       固定资产处置审定 {{ cross.h10VsH6.value.h10FixedAssetTotal.toFixed(2) }} 与 H6 清理净损益 {{ cross.h10VsH6.value.h6NetGainLoss?.toFixed(2) }} 差异 {{ cross.h10VsH6.value.diff.toFixed(2) }}
     </el-alert>
     <el-alert v-if="cross.hasSourceWpMismatch.value" type="warning" :closable="false" class="cross-alert">
       源底稿明细与审定行不一致：{{ cross.sourceWpMismatches.value.filter(m => !m.isMatch).map(m => m.sourceWp).join('、') }}
     </el-alert>
+    <el-alert
+      v-if="trialAuditedAbs > 0.005"
+      type="warning"
+      :closable="false"
+      class="cross-alert"
+      data-testid="h10-adj-ie15-hint"
+      title="解释第15号：试运行若与日常活动相关，相关收入/成本应列报营业收入（D4），勿与 6115 双计。"
+    />
 
     <div class="h10-tb-row">
       <span>试算平衡表数（6115 发生额）：</span>
@@ -152,7 +170,7 @@
 </template>
 
 <script setup lang="ts">
-import { inject, toRef, ref } from 'vue'
+import { inject, toRef, ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useH10Adjudication } from '../../composables/useH10Adjudication'
 import { useH10CrossSheet } from '../../composables/useH10CrossSheet'
@@ -186,7 +204,39 @@ const adj = useH10Adjudication({
   writebackTrialBalance: props.writebackTrialBalance,
 })
 
-const cross = useH10CrossSheet({ allResponses: toRef(props, 'allResponses') })
+const cross = useH10CrossSheet({
+  allResponses: toRef(props, 'allResponses'),
+  projectId: toRef(props, 'projectId'),
+})
+
+const trialAuditedAbs = computed(() => {
+  for (const g of adj.groupedRows.value) {
+    const row = g.rows.find((r: any) => r.rowKey === 'trial_operation_sales')
+    if (row) return Math.abs(Number(row.currentAudited) || 0)
+  }
+  return 0
+})
+
+function onFillFromDetail(): void {
+  adj.fillFromDetail()
+}
+
+async function onRefreshH6(): Promise<void> {
+  const result = await cross.refreshH6CrossCheck()
+  if (!result.h6Available) {
+    ElMessage.warning(cross.remoteH6Msg.value || '未取得 H6 清理数据')
+    return
+  }
+  if (result.isMatch) {
+    ElMessage.success(`H6 勾稽一致（净损益 ${result.h6NetGainLoss?.toFixed(2)}）`)
+  } else {
+    ElMessage.warning(`H6 勾稽差异 ${result.diff.toFixed(2)}`)
+  }
+}
+
+onMounted(() => {
+  if (props.projectId) void cross.refreshH6CrossCheck()
+})
 
 async function runValidate(): Promise<void> {
   validateLoading.value = true

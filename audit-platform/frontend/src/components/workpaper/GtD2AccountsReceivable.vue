@@ -15,8 +15,6 @@
         <el-button
           v-if="canStartAiReview && props.sheetName"
           size="small"
-          type="success"
-          plain
           @click="onCurrentSheetAiReview"
         >
           本页AI复核
@@ -24,8 +22,6 @@
         <el-button
           v-if="canStartAiReview"
           size="small"
-          type="primary"
-          plain
           @click="reviewDialogVisible = true"
         >
           批量AI复核
@@ -58,6 +54,21 @@
           D2-2明细表合计({{ fmtAmt(crossSheet.detailVsTbDiff.value.detailTotal) }})
           与TB科目1122审定额({{ fmtAmt(crossSheet.detailVsTbDiff.value.tbAmount) }})
           差异 {{ fmtAmt(crossSheet.detailVsTbDiff.value.diff) }} 元，请核实
+        </template>
+      </el-alert>
+      <!-- ECL↔坏账准备期末勾稽（全局提示；ECL tab 内已单独展示，此处避免重复） -->
+      <el-alert
+        v-if="currentSheet !== 'D2-9' && currentSheet !== 'D2-10'
+          && crossSheet.eclVsBadDebtDiff.value && !crossSheet.eclVsBadDebtDiff.value.isBalanced"
+        type="warning"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 8px"
+      >
+        <template #title>
+          D2-10 ECL单项合计({{ fmtAmt(crossSheet.eclVsBadDebtDiff.value.eclTotal) }})
+          与D2-3坏账准备期末({{ fmtAmt(crossSheet.eclVsBadDebtDiff.value.badDebtCurrent) }})
+          差异 {{ fmtAmt(crossSheet.eclVsBadDebtDiff.value.diff) }} 元，请核实
         </template>
       </el-alert>
 
@@ -107,6 +118,7 @@
         :all-responses="allResponses"
         :is-readonly="isReadonly"
         :related-parties="relatedParties"
+        :bs-date="bsDate"
       />
       <D2TabBadDebt
         v-else-if="currentSheet === 'D2-3'"

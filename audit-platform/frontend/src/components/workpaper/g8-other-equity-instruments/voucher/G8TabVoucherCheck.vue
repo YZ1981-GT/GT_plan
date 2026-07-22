@@ -55,13 +55,23 @@
         </div>
         <div class="param-item">
           <span class="param-label">抽样方法</span>
-          <el-input
+          <el-select
             :model-value="vc.samplingParams.value.samplingMethod"
             size="small"
+            clearable
+            filterable
             :disabled="isReadonly"
-            placeholder="随机/系统/MUS…"
-            @change="(val: string) => vc.updateSamplingParams('samplingMethod', val)"
-          />
+            placeholder="请选择抽样方法"
+            style="width: 100%"
+            @change="(val: string) => vc.updateSamplingParams('samplingMethod', val ?? '')"
+          >
+            <el-option
+              v-for="o in G8_SAMPLING_METHOD_OPTIONS"
+              :key="o.value"
+              :label="o.label"
+              :value="o.value"
+            />
+          </el-select>
         </div>
         <div class="param-item">
           <span class="param-label">目标样本量</span>
@@ -694,6 +704,7 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import G8ImportExportDropdown from '../G8ImportExportDropdown.vue'
 import G8AuditTextCards from '../G8AuditTextCards.vue'
 import { useG8VoucherCheck, type G8VoucherRow, type G8CheckState, formatG8CheckState,
+  G8_SAMPLING_METHOD_OPTIONS,
   mapG8OcrToVoucherFields,
   computeG8OcrMergePatch,
   renderG8OcrPreview,
@@ -800,12 +811,13 @@ const { aiAvailable } = useG8AiGenerate(wpIdRef)
 const AUDIT_NOTE_KEY = 'G8-6-audit-note'
 const AUDIT_CONCLUSION_KEY = 'G8-6-audit-conclusion'
 const auditNote = ref(props.allResponses.get(AUDIT_NOTE_KEY)?.remark ?? '')
-const auditConclusion = ref(props.allResponses.get(AUDIT_CONCLUSION_KEY)?.remark ?? '')
+const _voucherConcl = props.allResponses.get(AUDIT_CONCLUSION_KEY)
+const auditConclusion = ref(String(_voucherConcl?.conclusion ?? _voucherConcl?.remark ?? ''))
 watch(auditNote, (v) => {
   if (!props.isReadonly) props.debouncedSave(AUDIT_NOTE_KEY, { conclusion: null, remark: v })
 })
 watch(auditConclusion, (v) => {
-  if (!props.isReadonly) props.debouncedSave(AUDIT_CONCLUSION_KEY, { conclusion: null, remark: v })
+  if (!props.isReadonly) props.debouncedSave(AUDIT_CONCLUSION_KEY, { conclusion: v, remark: null })
 })
 
 const tableWidth = 1000

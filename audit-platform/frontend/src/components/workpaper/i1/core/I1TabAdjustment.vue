@@ -1,569 +1,460 @@
 <template>
   <div class="i1-tab-adjustment">
-    <!-- 方法论上下文（琥珀色左边线） -->
-    <div class="methodology-block">
-      <p><strong>调整分录编制规则：</strong></p>
-      <ul>
-        <li>AJE（审计调整分录）：影响报表金额，改变审定数</li>
-        <li>RJE（重分类调整分录）：仅重分类列报，不改变损益总额</li>
-        <li>每笔分录借贷方合计必须相等（借贷平衡原则）</li>
-        <li>科目代码应与试算平衡表科目编码一致（1701/1702/1703）</li>
-        <li>保存后自动同步至审定表I1，推送A13错报汇总</li>
-      </ul>
-    </div>
+    <details class="compile-hint" open>
+      <summary>📋 编制提示（对齐 Excel 无形资产调整分录汇总表 I1-3）</summary>
+      <div class="hint-content">
+        <p>1. 列：调整事项说明 / 类别 / 报表项目 / 科目 / 附注项目 / 借方调整金额 / 贷方调整金额 / 索引 / 备注。</p>
+        <p>2. 「账项调整」影响审定数（AJE）；「报表调整」为重分类（RJE）；「其他」按账项调整。</p>
+        <p>3. 仅列示与无形资产相关的审计调整；完整分录通常多行（1701/1702/1703 + 对方科目）且整表借贷平衡。</p>
+        <p>4. 可「从调整分录模块同步 / 推送至调整分录模块」与集中台账双向联动；「推送 A13」将账项调整送入未更正错报汇总。</p>
+        <p>5. 1701/1702/1703 账项净额可回写 I1 审定表 AJE/RJE；借贷须平衡后方可推送中央模块。</p>
+        <p class="excel-tip">提示：本底稿适用于调整分录较多、较复杂的项目，且仅列示与本报表项目相关的审计调整。项目组可根据实际情况选择是否使用。</p>
+      </div>
+    </details>
 
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：核实无形资产审计调整分录(AJE/RJE)的恰当性与借贷平衡，确认调整已同步审定表 I1 并推送 A13 错报汇总。"
+      show-icon
       class="objective-alert"
+      title="审计目标：复核无形资产相关账项调整（AJE）与报表重分类（RJE）依据充分、借贷平衡，同步至调整分录模块与 I1 审定，并可推送 A13 错报汇总。"
     />
 
-    <!-- 工具栏 -->
-    <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+    <el-alert
+      v-if="!state.isBalanced.value && state.rows.value.length > 0"
+      type="error"
+      :closable="false"
+      class="balance-alert"
+    >
+      借贷不平衡：借方 {{ fmtAmt(state.debitTotal.value) }} ≠ 贷方 {{ fmtAmt(state.creditTotal.value) }}，差额
+      {{ fmtAmt(Math.abs(state.balanceDiff.value)) }}
+    </el-alert>
+    <el-alert
+      v-else-if="state.groupBalanceIssues.value.length"
+      type="warning"
+      :closable="false"
+      class="balance-alert"
+    >
+      整表借贷平衡，但有 {{ state.groupBalanceIssues.value.length }} 组「调整事项」组内不平（推送时将跳过）：
+      <span v-for="(g, i) in state.groupBalanceIssues.value.slice(0, 3)" :key="g.key">
+        {{ i ? '；' : '' }}{{ g.entryType }}「{{ g.description }}」差额 {{ fmtAmt(g.diff) }}
+      </span>
+      <span v-if="state.groupBalanceIssues.value.length > 3">…</span>
+    </el-alert>
+    <el-alert
+      v-else-if="hasAnyNet"
+      type="success"
+      :closable="false"
+      class="balance-alert"
+    >
+      1701账项净额 {{ fmtAmt(state.costAjeNet.value) }}；1702账项净额 {{ fmtAmt(state.amortAjeNet.value) }}；1703账项净额 {{ fmtAmt(state.impairAjeNet.value) }}
+    </el-alert>
+
+    <div class="adj-toolbar">
+      <div class="toolbar-left">
+        <el-button size="small" type="primary" :disabled="isReadonly" @click="state.addRow()">
+          + 新增调整分录
+        </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          :loading="state.syncing.value"
+          :disabled="!projectId"
+          @click="onSyncFromModule"
+        >
+          从调整分录模块同步
+        </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="success"
+          plain
+          :disabled="!state.isBalanced.value || !projectId || state.rows.value.length === 0"
+          @click="onPushToModule"
+        >
+          推送至调整分录模块
+        </el-button>
+        <el-button
+          size="small"
+          :disabled="isReadonly || selectedRowIds.length === 0"
+          @click="handlePushSelected"
+        >
+          推送至A13（{{ selectedRowIds.length }}条）
+        </el-button>
+        <el-button
+          size="small"
+          :disabled="isReadonly || state.rows.value.length === 0"
+          @click="handlePushAll"
+        >
+          推送账项调整→A13
+        </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="primary"
+          plain
+          :disabled="state.rows.value.length === 0"
+          @click="handleSaveAndSync"
+        >
+          保存并回写 I1
+        </el-button>
+        <el-dropdown
+          v-if="!isReadonly"
+          size="small"
+          :disabled="ieBusy"
+          @command="handleExportCommand"
+        >
+          <el-button size="small" :loading="ieBusy">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="export-template">导出模板</el-dropdown-item>
+              <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
+              <el-dropdown-item command="import-data" divided>导入数据</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
+      </div>
       <div class="toolbar-right">
-        <span class="chip-wrap"><GtIndexChip value="wp:I1-3" :context-project-id="projectId" /></span>
-        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
-      </div>
-    </div>
-
-    <!-- 操作栏 -->
-    <el-card shadow="never">
-      <template #header>
-        <div class="section-title">
-          <span>I1-3 调整分录汇总（AJE / RJE）</span>
-          <div class="title-actions">
-            <el-button size="small" type="primary" @click="handleAddRow" :disabled="isReadonly">
-              + 新增
-            </el-button>
-            <el-dropdown size="small" :disabled="isReadonly" @command="handleImportExport">
-              <el-button size="small">
-                导入导出 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-              </el-button>
-              <template #dropdown>
-                <el-dropdown-menu>
-                  <el-dropdown-item command="export-template">导出模板</el-dropdown-item>
-                  <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
-                  <el-dropdown-item command="import-data" divided>导入数据</el-dropdown-item>
-                </el-dropdown-menu>
-              </template>
-            </el-dropdown>
-            <el-button size="small" @click="handleSave" :disabled="isReadonly" type="success">
-              保存
-            </el-button>
-            <el-button size="small" link @click="handlePushA13" :disabled="isReadonly || rows.length === 0">
-              推送A13错报汇总
-            </el-button>
-          </div>
-        </div>
-      </template>
-
-      <!-- 调整分录表格：10列 -->
-      <el-table :data="rows" border stripe size="small" class="adj-table" show-summary :summary-method="getSummary">
-        <!-- 1. 序号 -->
-        <el-table-column type="index" label="序号" width="50" align="center" />
-
-        <!-- 2. 调整事项 -->
-        <el-table-column prop="description" label="调整事项" min-width="140">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.description" size="small" placeholder="调整事项说明" />
-            <span v-else>{{ row.description }}</span>
-          </template>
-        </el-table-column>
-
-        <!-- 3. 类别(AJE/RJE) -->
-        <el-table-column prop="entryType" label="类别" width="90" align="center">
-          <template #default="{ row }">
-            <el-select v-if="!isReadonly" v-model="row.entryType" size="small" style="width:72px">
-              <el-option label="AJE" value="AJE" />
-              <el-option label="RJE" value="RJE" />
-            </el-select>
-            <el-tag v-else :type="row.entryType === 'AJE' ? 'danger' : 'warning'" size="small">
-              {{ row.entryType }}
-            </el-tag>
-          </template>
-        </el-table-column>
-
-        <!-- 4. 科目代码 -->
-        <el-table-column prop="accountCode" label="科目代码" width="100">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.accountCode" size="small" placeholder="如1701" />
-            <span v-else>{{ row.accountCode }}</span>
-          </template>
-        </el-table-column>
-
-        <!-- 5. 科目名称 -->
-        <el-table-column prop="accountName" label="科目名称" min-width="120">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.accountName" size="small" placeholder="科目名称" />
-            <span v-else>{{ row.accountName }}</span>
-          </template>
-        </el-table-column>
-
-        <!-- 6. 摘要 -->
-        <el-table-column prop="summary" label="摘要" min-width="150">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.summary" size="small" placeholder="分录摘要" />
-            <span v-else>{{ row.summary }}</span>
-          </template>
-        </el-table-column>
-
-        <!-- 7. 借方 -->
-        <el-table-column prop="debit" label="借方" width="120" align="right" header-align="center">
-          <template #default="{ row }">
-            <el-input-number
-              v-if="!isReadonly"
-              v-model="row.debit"
-              :controls="false"
-              :min="0"
-              :precision="2"
-              size="small"
-              style="width:100%"
-            />
-            <span v-else class="amount-cell">{{ fmtAmt(row.debit) }}</span>
-          </template>
-        </el-table-column>
-
-        <!-- 8. 贷方 -->
-        <el-table-column prop="credit" label="贷方" width="120" align="right" header-align="center">
-          <template #default="{ row }">
-            <el-input-number
-              v-if="!isReadonly"
-              v-model="row.credit"
-              :controls="false"
-              :min="0"
-              :precision="2"
-              size="small"
-              style="width:100%"
-            />
-            <span v-else class="amount-cell">{{ fmtAmt(row.credit) }}</span>
-          </template>
-        </el-table-column>
-
-        <!-- 9. 索引 -->
-        <el-table-column prop="indexRef" label="索引" width="90">
-          <template #default="{ row }">
-            <GtIndexChip v-if="row.indexRef" :value="row.indexRef" @click="$emit('navigate-sheet', row.indexRef)" />
-            <el-input v-if="!isReadonly && !row.indexRef" v-model="row.indexRef" size="small" placeholder="A13" />
-          </template>
-        </el-table-column>
-
-        <!-- 10. 备注 -->
-        <el-table-column prop="remark" label="备注" min-width="100">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" v-model="row.remark" size="small" placeholder="备注" />
-            <span v-else>{{ row.remark }}</span>
-          </template>
-        </el-table-column>
-
-        <!-- 操作列 -->
-        <el-table-column v-if="!isReadonly" label="操作" width="60" align="center" fixed="right">
-          <template #default="{ row }">
-            <el-button size="small" type="danger" link @click="handleRemove(row.rowId)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <!-- 借贷平衡校验栏 -->
-      <div class="balance-bar" :class="{ 'balance-ok': isBalanced, 'balance-err': !isBalanced }">
-        <span>借方合计：<strong>{{ fmtAmt(debitTotal) }}</strong></span>
-        <span>贷方合计：<strong>{{ fmtAmt(creditTotal) }}</strong></span>
-        <span v-if="!isBalanced" class="diff-warn">
-          差额：{{ fmtAmt(Math.abs(debitTotal - creditTotal)) }}
-        </span>
-        <el-tag :type="isBalanced ? 'success' : 'danger'" size="small">
-          {{ isBalanced ? '✓ 借贷平衡' : '✗ 借贷不平' }}
+        <el-tag size="small" type="info" effect="plain">审计年度 {{ auditYearDisplay }}</el-tag>
+        <el-tag size="small" type="info" effect="plain">共 {{ state.rows.value.length }} 行</el-tag>
+        <el-tag :type="state.isBalanced.value ? 'success' : 'danger'" size="small">
+          {{ state.isBalanced.value ? '✓ 借贷平衡' : '✗ 借贷不平' }}
         </el-tag>
+        <span class="chip-wrap"><GtIndexChip value="wp:I1-3" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:I1" :validate="false" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:A13" :context-project-id="projectId" /></span>
+        <el-button size="small" type="default" link @click="openReview('I1-3')">💬 复核</el-button>
       </div>
-    </el-card>
-
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="note-card">
-      <template #header><span>审计说明</span></template>
-      <el-input
-        v-model="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }"
-        :disabled="isReadonly"
-        placeholder="记录调整事项的审计判断、与管理层沟通情况..."
-      />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="note-card">
-      <template #header><span>审计结论</span></template>
-      <el-input
-        v-model="auditConclusion"
-        type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }"
-        :disabled="isReadonly"
-        placeholder="填写调整分录审计结论：如已就调整事项与管理层沟通并取得认可、调整后借贷平衡、已推送A13等（保存后与审计说明一并落库）。"
-      />
-    </el-card>
-
-    <!-- 跨底稿跳转 -->
-    <div class="cross-ref-bar">
-      <span class="cross-ref-label">跨底稿联动：</span>
-      <GtIndexChip value="A13" @click="navigateTo('A13')" />
-      <span class="cross-ref-desc">错报汇总表（推送AJE/RJE）</span>
     </div>
 
-    <!-- 编制提示 -->
-    <details class="compile-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>AJE=审计调整分录，影响报表审定数；RJE=重分类调整，仅影响列报位置</li>
-        <li>科目代码：1701无形资产(借方/资产) / 1702累计摊销(贷方/备抵) / 1703无形资产减值准备(贷方/备抵)</li>
-        <li>每笔分录借贷合计必须平衡，整表借贷合计也须平衡</li>
-        <li>保存后自动发布 adjustment:created 事件同步至审定表</li>
-        <li>"推送A13"将分录同步到调整分录汇总表（错报汇总）</li>
-        <li>索引列可输入底稿编号，自动生成跳转链接</li>
-      </ul>
-    </details>
+    <div v-if="state.lastSyncMsg.value || state.lastPushMsg.value" class="push-msg">
+      {{ state.lastSyncMsg.value || state.lastPushMsg.value }}
+    </div>
 
-    <!-- 隐藏的文件输入（导入用） -->
-    <input
-      ref="fileInputRef"
-      type="file"
-      accept=".xlsx,.xls"
-      style="display:none"
-      @change="handleFileSelected"
-    />
+    <el-table
+      :data="state.rows.value"
+      border
+      stripe
+      size="small"
+      class="adj-table"
+      empty-text="暂无调整分录。可「新增」或「从调整分录模块同步」。"
+      @selection-change="onSelectionChange"
+      :row-class-name="rowClassName"
+      show-summary
+      :summary-method="getSummary"
+    >
+      <el-table-column type="selection" width="40" :selectable="() => !isReadonly" />
+      <el-table-column type="index" label="序" width="44" align="center" />
+
+      <el-table-column label="调整事项说明" min-width="160">
+        <template #default="{ row }">
+          <div class="desc-cell">
+            <el-tag v-if="row.sourceGroupId" size="small" type="info" class="src-tag">模块</el-tag>
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.description"
+              size="small"
+              placeholder="如：补记无形资产 / 摊销差异 / 减值补提"
+              @update:model-value="(v: string) => state.updateCell(row.rowId, 'description', v)"
+            />
+            <span v-else>{{ row.description || '—' }}</span>
+          </div>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="类别" width="118">
+        <template #default="{ row }">
+          <el-select
+            v-if="!isReadonly"
+            :model-value="row.category"
+            size="small"
+            @change="(v: string) => state.updateCell(row.rowId, 'category', v)"
+          >
+            <el-option v-for="opt in state.categoryOptions" :key="opt" :label="opt" :value="opt" />
+          </el-select>
+          <span v-else>{{ row.category }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="报表项目" width="110">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.reportItem"
+            size="small"
+            @update:model-value="(v: string) => state.updateCell(row.rowId, 'reportItem', v)"
+          />
+          <span v-else>{{ row.reportItem || '—' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="科目" width="200">
+        <template #default="{ row }">
+          <el-select
+            v-if="!isReadonly"
+            :model-value="row.accountCode"
+            size="small"
+            filterable
+            allow-create
+            default-first-option
+            placeholder="科目"
+            @change="(v: string) => state.updateRow(row.rowId, { accountCode: v })"
+          >
+            <el-option
+              v-for="opt in state.accountOptions"
+              :key="opt.code"
+              :label="`${opt.code} ${opt.name}`"
+              :value="opt.code"
+            />
+          </el-select>
+          <span v-else>{{ row.accountCode }} {{ row.accountName }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="附注项目" width="100">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.noteItem"
+            size="small"
+            @update:model-value="(v: string) => state.updateCell(row.rowId, 'noteItem', v)"
+          />
+          <span v-else>{{ row.noteItem || '—' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="借方调整金额" width="120" align="right">
+        <template #default="{ row }">
+          <el-input-number
+            v-if="!isReadonly"
+            :model-value="row.debitAmount"
+            size="small"
+            :controls="false"
+            :min="0"
+            style="width:100%"
+            @update:model-value="(v: number | undefined) => state.updateCell(row.rowId, 'debitAmount', v ?? 0)"
+          />
+          <span v-else class="amount-cell">{{ fmtAmt(row.debitAmount) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="贷方调整金额" width="120" align="right">
+        <template #default="{ row }">
+          <el-input-number
+            v-if="!isReadonly"
+            :model-value="row.creditAmount"
+            size="small"
+            :controls="false"
+            :min="0"
+            style="width:100%"
+            @update:model-value="(v: number | undefined) => state.updateCell(row.rowId, 'creditAmount', v ?? 0)"
+          />
+          <span v-else class="amount-cell">{{ fmtAmt(row.creditAmount) }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="索引" width="100">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.indexRef"
+            size="small"
+            placeholder="I1-5"
+            @update:model-value="(v: string) => state.updateCell(row.rowId, 'indexRef', v)"
+          />
+          <GtIndexChip
+            v-else-if="row.indexRef"
+            :value="row.indexRef"
+            @click="emit('navigate-sheet', row.indexRef)"
+          />
+          <span v-else>—</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="备注" min-width="100">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.remark"
+            size="small"
+            @update:model-value="(v: string) => state.updateCell(row.rowId, 'remark', v)"
+          />
+          <span v-else>{{ row.remark || '—' }}</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column v-if="!isReadonly" label="" width="52" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button size="small" type="danger" link @click="state.removeRow(row.rowId)">删</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <el-card shadow="never" class="note-card">
+      <template #header><span>三、审计说明</span></template>
+      <el-input
+        v-model="state.auditNote.value"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="记录调整依据、与管理层沟通、与 I1-5/I1-6/I1-10 勾稽等情况…"
+        @blur="state.saveNote(state.auditNote.value)"
+      />
+    </el-card>
+
+    <el-card shadow="never" class="note-card">
+      <template #header><span>四、审计结论</span></template>
+      <el-input
+        v-model="state.auditConclusion.value"
+        type="textarea"
+        :autosize="{ minRows: 2, maxRows: 6 }"
+        :disabled="isReadonly"
+        placeholder="A、调整恰当且已同步审定/模块。B、除下列事项外未见异常。C、存在未解决调整差异。"
+        @blur="state.saveConclusion(state.auditConclusion.value)"
+      />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+/**
+ * I1TabAdjustment.vue — I1-3 调整分录汇总
+ * 对齐源 xlsx + H8-3 范式：中央调整模块双向联动 + EventBus + A13
+ */
+import { computed, inject, ref, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowDown } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
-import http from '@/utils/http'
-
-// ─── Props & Emits ─────────────────────────────────────────────────────────
+import { useI1Adjustment, resolveI1AuditYear } from '../../composables/useI1Adjustment'
+import { useI1ImportExport } from '../../composables/useI1ImportExport'
+import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  year?: number
 }>()
 
 const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
-  (e: 'save'): void
+  (e: 'save', itemId: string, value: any): void
 }>()
 
-// ─── Types ─────────────────────────────────────────────────────────────────
+const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const runtime = inject(WorkpaperRuntimeContextKey, null)
 
-interface AdjustmentRow {
-  rowId: string
-  description: string
-  entryType: 'AJE' | 'RJE'
-  accountCode: string
-  accountName: string
-  summary: string
-  debit: number
-  credit: number
-  indexRef: string
-  remark: string
-}
+const allResponsesRef = computed(() => props.allResponses)
 
-// ─── State ─────────────────────────────────────────────────────────────────
+/** props.year → scaffold → 摊销期间截止日年份 → 日历年 */
+const auditYear = computed(() =>
+  resolveI1AuditYear({
+    propYear: props.year,
+    runtimeYear: runtime?.year?.value,
+    allResponses: props.allResponses,
+  }),
+)
+const auditYearDisplay = computed(() => auditYear.value)
 
-const ITEM_ID = 'I1-3-rows'
-const rows = ref<AdjustmentRow[]>([])
-const auditNote = ref('')
-const auditConclusion = ref('')
+const state = useI1Adjustment({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  allResponses: allResponsesRef as any,
+  isReadonly: toRef(props, 'isReadonly'),
+  auditYear,
+  onSave: (itemId, value) => emit('save', itemId, value),
+})
+
+const { importing, exporting, exportTemplate, exportData, importData } = useI1ImportExport({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  onImported: () => state.load(),
+})
+const ieBusy = computed(() => importing.value || exporting.value)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
-// ─── Load from allResponses ────────────────────────────────────────────────
-
-function loadRows(): void {
-  const item = props.allResponses.get(ITEM_ID)
-  const raw = item?.remark ?? item?.value
-  if (!raw) { rows.value = []; return }
-  try {
-    const parsed = JSON.parse(typeof raw === 'string' ? raw : JSON.stringify(raw))
-    rows.value = Array.isArray(parsed) ? parsed.map(normalizeRow) : []
-  } catch { rows.value = [] }
-
-  // Load audit note
-  const noteItem = props.allResponses.get('I1-3-audit-note')
-  auditNote.value = noteItem?.remark ?? noteItem?.value ?? ''
-  // Load audit conclusion
-  const conclItem = props.allResponses.get('I1-3-audit-conclusion')
-  auditConclusion.value = conclItem?.remark ?? conclItem?.value ?? ''
+async function handleExportCommand(cmd: string) {
+  if (cmd === 'export-template') await exportTemplate('I1-3')
+  else if (cmd === 'export-data') await exportData('I1-3')
+  else if (cmd === 'import-data') fileInputRef.value?.click()
 }
 
-function normalizeRow(raw: any): AdjustmentRow {
-  return {
-    rowId: raw.rowId ?? `adj-${Math.random().toString(36).slice(2, 10)}`,
-    description: raw.description ?? '',
-    entryType: raw.entryType === 'RJE' ? 'RJE' : 'AJE',
-    accountCode: raw.accountCode ?? '',
-    accountName: raw.accountName ?? '',
-    summary: raw.summary ?? '',
-    debit: Number(raw.debit) || 0,
-    credit: Number(raw.credit) || 0,
-    indexRef: raw.indexRef ?? '',
-    remark: raw.remark ?? '',
-  }
+async function onFileSelected(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (file) await importData('I1-3', file)
+  ;(e.target as HTMLInputElement).value = ''
 }
 
-watch(() => props.allResponses, () => loadRows(), { immediate: true })
+const selectedRowIds = ref<string[]>([])
 
-// ─── Computed: 借贷平衡 ────────────────────────────────────────────────────
+const hasAnyNet = computed(() =>
+  Math.abs(state.costAjeNet.value) > 0.01
+  || Math.abs(state.amortAjeNet.value) > 0.01
+  || Math.abs(state.impairAjeNet.value) > 0.01
+  || Math.abs(state.costRjeNet.value) > 0.01,
+)
 
-const debitTotal = computed(() => rows.value.reduce((sum, r) => sum + (r.debit || 0), 0))
-const creditTotal = computed(() => rows.value.reduce((sum, r) => sum + (r.credit || 0), 0))
-const isBalanced = computed(() => Math.abs(debitTotal.value - creditTotal.value) < 0.005)
+function openReview(id: string) {
+  openReviewDialog(id)
+}
 
-// ─── 合计行 ────────────────────────────────────────────────────────────────
+function onSelectionChange(sel: Array<{ rowId: string }>) {
+  selectedRowIds.value = sel.map((r) => r.rowId)
+}
 
-function getSummary({ columns }: { columns: any[] }): string[] {
-  return columns.map((col, idx) => {
-    if (idx === 0) return ''
-    if (idx === 1) return '合计'
-    if (col.property === 'debit') return fmtAmt(debitTotal.value)
-    if (col.property === 'credit') return fmtAmt(creditTotal.value)
+function rowClassName({ row }: { row: { category?: string } }) {
+  return row.category === '报表调整' ? 'rje-row' : ''
+}
+
+function getSummary({ columns }: { columns: any[] }) {
+  return columns.map((col: any, idx: number) => {
+    if (idx <= 1) return idx === 1 ? '合计' : ''
+    if (col.label === '借方调整金额') return fmtAmt(state.debitTotal.value)
+    if (col.label === '贷方调整金额') return fmtAmt(state.creditTotal.value)
     return ''
   })
 }
 
-// ─── CRUD ──────────────────────────────────────────────────────────────────
-
-function handleAddRow(): void {
-  const newRow: AdjustmentRow = {
-    rowId: `adj-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    description: '',
-    entryType: 'AJE',
-    accountCode: '',
-    accountName: '',
-    summary: '',
-    debit: 0,
-    credit: 0,
-    indexRef: '',
-    remark: '',
-  }
-  rows.value.push(newRow)
+async function onSyncFromModule() {
+  const n = await state.syncFromAdjustmentModule()
+  if (n > 0) ElMessage.success(`已从调整分录模块同步 ${n} 行`)
+  else if (state.lastSyncMsg.value) ElMessage.info(state.lastSyncMsg.value)
 }
 
-function handleRemove(rowId: string): void {
-  const idx = rows.value.findIndex((r) => r.rowId === rowId)
-  if (idx >= 0) rows.value.splice(idx, 1)
-}
-
-// ─── Save → EventBus publish ───────────────────────────────────────────────
-
-async function handleSave(): Promise<void> {
-  try {
-    // 保存行数据到 checklist_responses
-    await http.post(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      items: [
-        { item_id: ITEM_ID, remark: JSON.stringify(rows.value) },
-        { item_id: 'I1-3-audit-note', remark: auditNote.value },
-        { item_id: 'I1-3-audit-conclusion', remark: auditConclusion.value },
-      ],
-    })
-
-    // Client-side EventBus: window.dispatchEvent adjustment:created → I1审定表/A13同步
-    publishAdjustmentCreated()
-
-    // Server-side EventBus publish（降级：失败不阻塞保存）
-    await http.post(`/api/projects/${props.projectId}/events/publish`, {
-      event_type: 'adjustment:created',
-      payload: {
-        wp_code: 'I1',
-        source: 'I1-3',
-        rows: rows.value,
-        debitTotal: debitTotal.value,
-        creditTotal: creditTotal.value,
-        isBalanced: isBalanced.value,
-      },
-    }).catch(() => { /* EventBus发布失败不阻塞保存 */ })
-
-    ElMessage.success('调整分录已保存')
-    emit('save')
-  } catch (err: any) {
-    ElMessage.error(err?.response?.data?.message || '保存失败')
-  }
-}
-
-// ─── publishAdjustmentCreated（CustomEvent on window → A13同步）──────────────
-
-/**
- * 发布 'adjustment:created' CustomEvent 至 window。
- * Payload:
- *   - wpCode: 'I1'
- *   - entries: 调整分录行数组（含借贷/科目/摘要等）
- *   - adjustmentType: 'AJE' | 'RJE' | 'MIXED'（多笔类别不同时为MIXED）
- *   - debitTotal / creditTotal / isBalanced
- *
- * 消费方：I1审定表（同步AJE/RJE累计）、A13错报汇总
- */
-function publishAdjustmentCreated(): void {
-  if (rows.value.length === 0) return
-
-  // 判定 adjustmentType：全AJE/全RJE/混合
-  const types = new Set(rows.value.map((r) => r.entryType))
-  const adjustmentType: 'AJE' | 'RJE' | 'MIXED' =
-    types.size === 1 ? (types.has('RJE') ? 'RJE' : 'AJE') : 'MIXED'
-
-  const event = new CustomEvent('adjustment:created', {
-    detail: {
-      wpCode: 'I1',
-      adjustmentType,
-      entries: rows.value.map((r) => ({
-        rowId: r.rowId,
-        description: r.description,
-        entryType: r.entryType,
-        accountCode: r.accountCode,
-        accountName: r.accountName,
-        summary: r.summary,
-        debit: r.debit,
-        credit: r.credit,
-      })),
-      debitTotal: debitTotal.value,
-      creditTotal: creditTotal.value,
-      isBalanced: isBalanced.value,
-    },
-  })
-  window.dispatchEvent(event)
-}
-
-// ─── Push to A13 错报汇总 ──────────────────────────────────────────────────
-
-async function handlePushA13(): Promise<void> {
-  if (rows.value.length === 0) {
-    ElMessage.warning('暂无分录可推送')
+async function onPushToModule() {
+  if (!state.isBalanced.value) {
+    ElMessage.error('借贷不平衡，无法推送')
     return
   }
   try {
     await ElMessageBox.confirm(
-      `将 ${rows.value.length} 笔调整分录推送至A13错报汇总，确认？`,
-      '推送确认',
-      { confirmButtonText: '确认推送', cancelButtonText: '取消', type: 'info' },
+      '将本表未同步分录按「调整事项」分组推送至中央调整分录模块，确认？',
+      '推送至调整分录模块',
+      { type: 'warning', confirmButtonText: '确认推送', cancelButtonText: '取消' },
     )
-
-    // Client-side EventBus: a13:push-misstatement
-    window.dispatchEvent(new CustomEvent('a13:push-misstatement', {
-      detail: {
-        wpCode: 'I1',
-        source: 'I1-3',
-        entries: rows.value.map((r) => ({
-          description: r.description,
-          entryType: r.entryType,
-          accountCode: r.accountCode,
-          accountName: r.accountName,
-          summary: r.summary,
-          debit: r.debit,
-          credit: r.credit,
-        })),
-      },
-    }))
-
-    // Server-side EventBus（降级：失败不阻塞）
-    await http.post(`/api/projects/${props.projectId}/events/publish`, {
-      event_type: 'adjustment:push-to-a13',
-      payload: {
-        wp_code: 'I1',
-        source: 'I1-3',
-        entries: rows.value.map((r) => ({
-          description: r.description,
-          entryType: r.entryType,
-          accountCode: r.accountCode,
-          accountName: r.accountName,
-          summary: r.summary,
-          debit: r.debit,
-          credit: r.credit,
-        })),
-      },
-    }).catch(() => { /* silent */ })
-
-    ElMessage.success('已推送至A13错报汇总')
-  } catch (err: any) {
-    if (err === 'cancel' || err?.toString?.().includes('cancel')) return
-    ElMessage.error('推送失败')
+  } catch {
+    return
   }
+  const n = await state.pushToAdjustmentModule()
+  if (n > 0) ElMessage.success(`已推送 ${n} 笔至调整分录模块`)
+  else if (state.lastSyncMsg.value) ElMessage.warning(state.lastSyncMsg.value)
 }
 
-// ─── Navigation ───────────────────────────────────────────────────────────
-
-function navigateTo(wpCode: string): void {
-  emit('navigate-sheet', wpCode)
+function handlePushSelected() {
+  state.pushToA13(selectedRowIds.value)
+  ElMessage.success(state.lastPushMsg.value || '已推送')
 }
 
-// ─── Import/Export ─────────────────────────────────────────────────────────
-
-function handleImportExport(command: string): void {
-  switch (command) {
-    case 'export-template':
-      doExport('template')
-      break
-    case 'export-data':
-      doExport('data')
-      break
-    case 'import-data':
-      fileInputRef.value?.click()
-      break
-  }
+function handlePushAll() {
+  state.pushToA13()
+  ElMessage.success(state.lastPushMsg.value || '已推送')
 }
 
-async function doExport(type: 'template' | 'data'): Promise<void> {
-  try {
-    const endpoint = type === 'template' ? 'export-template' : 'export-data'
-    const response = await http.post(
-      `/api/workpapers/${props.wpId}/i1/${endpoint}`,
-      null,
-      { params: { sheet: 'I1-3' }, responseType: 'blob' },
-    )
-    const timestamp = new Date().toISOString().slice(0, 10)
-    const filename = type === 'template'
-      ? 'I1-3_调整分录_模板.xlsx'
-      : `I1-3_调整分录_数据_${timestamp}.xlsx`
-    const url = URL.createObjectURL(new Blob([response.data]))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    a.click()
-    URL.revokeObjectURL(url)
-    ElMessage.success(`${type === 'template' ? '模板' : '数据'}导出成功`)
-  } catch (err: any) {
-    ElMessage.error(err?.response?.data?.message || '导出失败')
-  }
+function handleSaveAndSync() {
+  state.saveAndPublish()
+  ElMessage.success('已保存并发布至审定表联动')
 }
-
-async function handleFileSelected(event: Event): Promise<void> {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-  input.value = '' // reset for re-select
-
-  try {
-    await ElMessageBox.confirm(
-      `即将导入文件「${file.name}」到 I1-3 调整分录，已有数据将被覆盖。确认？`,
-      '导入确认',
-      { confirmButtonText: '确认导入', cancelButtonText: '取消', type: 'warning' },
-    )
-    const formData = new FormData()
-    formData.append('file', file)
-    const response = await http.post(
-      `/api/workpapers/${props.wpId}/i1/import-data`,
-      formData,
-      { params: { sheet: 'I1-3' }, headers: { 'Content-Type': 'multipart/form-data' } },
-    )
-    const data = response.data?.data ?? response.data
-    ElMessage.success(`成功导入 ${data?.imported_count ?? 0} 行`)
-    loadRows()
-  } catch (err: any) {
-    if (err === 'cancel' || err?.toString?.().includes('cancel')) return
-    ElMessage.error(err?.response?.data?.message || '导入失败')
-  }
-}
-
-// ─── 格式化金额 ───────────────────────────────────────────────────────────
 
 function fmtAmt(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
@@ -577,123 +468,41 @@ function fmtAmt(val: number | null | undefined): string {
   font-size: var(--wp-font-size, 13px);
 }
 
-/* 方法论上下文 - 琥珀色左边线 */
-.methodology-block {
-  border-left: 4px solid #f59e0b;
-  background: #fffbeb;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #92400e;
-}
-.methodology-block p { margin: 0 0 6px; }
-.methodology-block ul {
-  margin: 0;
-  padding-left: 18px;
-  line-height: 1.8;
-}
-
-/* 审计目标 alert */
-.objective-alert { margin-bottom: 12px; }
-
-/* 工具栏 */
-.tab-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.tab-toolbar .toolbar-left { display: flex; gap: 8px; align-items: center; }
-.tab-toolbar .toolbar-right { display: flex; gap: 6px; align-items: center; }
-.chip-wrap { display: inline-flex; align-items: center; }
-
-/* section标题栏 */
-.section-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-weight: 600;
-}
-.title-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* 表格 */
-.adj-table {
-  font-size: var(--wp-font-size, 13px);
-}
-.adj-table :deep(.el-table__footer) {
-  font-weight: 600;
-}
-.amount-cell {
-  font-variant-numeric: tabular-nums;
-}
-
-/* 借贷平衡栏 */
-.balance-bar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 10px 14px;
-  margin-top: 12px;
-  border-radius: 4px;
-  font-size: var(--wp-font-size, 13px);
-}
-.balance-ok {
-  background: var(--el-color-success-light-9, #f0f9eb);
-}
-.balance-err {
-  background: var(--el-color-danger-light-9, #fef0f0);
-}
-.diff-warn {
-  color: var(--el-color-danger);
-  font-weight: 600;
-}
-
-/* 审计说明卡片 */
-.note-card {
-  margin-top: 12px;
-}
-
-/* 编制提示 */
 .compile-hint {
-  margin-top: 12px;
+  margin-bottom: 12px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
-.compile-hint summary {
-  cursor: pointer;
-  font-weight: 500;
-}
-.compile-hint ul {
-  padding-left: 20px;
-  margin-top: 8px;
-  line-height: 1.8;
-}
+.compile-hint summary { cursor: pointer; font-weight: 500; }
+.hint-content { padding: 8px 4px 0; line-height: 1.7; }
+.excel-tip { color: var(--el-color-primary); }
 
-/* 跨底稿联动栏 */
-.cross-ref-bar {
+.objective-alert, .balance-alert { margin-bottom: 10px; }
+
+.adj-toolbar {
   display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
-  margin-top: 12px;
-  margin-bottom: 4px;
-  background: var(--el-fill-color-lighter);
-  border-radius: 4px;
-  border: 1px dashed var(--el-border-color);
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.toolbar-left, .toolbar-right { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; }
+
+.push-msg {
+  margin-bottom: 8px;
   font-size: 12px;
+  color: var(--el-color-primary);
 }
-.cross-ref-label {
-  color: var(--el-text-color-secondary);
-  font-weight: 500;
-}
-.cross-ref-desc {
-  color: var(--el-text-color-regular);
-}
+
+.adj-table { font-size: 12px; }
+.adj-table :deep(.rje-row) { background: #fdf6ec; }
+.adj-table :deep(.el-table__footer) { font-weight: 600; }
+
+.desc-cell { display: flex; align-items: center; gap: 4px; }
+.src-tag { flex-shrink: 0; }
+.amount-cell { font-variant-numeric: tabular-nums; }
+
+.note-card { margin-top: 12px; }
 </style>

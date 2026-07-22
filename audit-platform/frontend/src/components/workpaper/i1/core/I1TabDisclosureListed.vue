@@ -1,439 +1,514 @@
 <template>
-  <div class="i1-tab-disclosure-listed">
-    <!-- 蓝色渐变引导区 -->
-    <div class="guide-area">
-      <div class="guide-grid">
-        <div class="guide-step"><span class="step-num">①</span> 原值/摊销/减值三层矩阵（跨sheet自动取数I1-1/I1-2）</div>
-        <div class="guide-step"><span class="step-num">②</span> 净值合计=原值期末-摊销期末-减值期末</div>
-        <div class="guide-step"><span class="step-num">③</span> 使用寿命不确定/所有权受限 动态行补充</div>
-        <div class="guide-step"><span class="step-num">④</span> 研究阶段支出/摊销费用 文字说明+AI辅助</div>
+  <div class="i1-disc-listed">
+    <el-alert type="info" :closable="false" show-icon class="objective">
+      审计目标：按上市公司附注格式编制无形资产披露——原值/累计摊销/减值/账面价值分类变动，与 I1-2 勾稽，并同步至附注「{{ noteSectionId }}」。
+    </el-alert>
+
+    <div class="methodology-context">
+      <p>
+        编制逻辑（对齐致同 Excel + CAS6/CAS30）：①分类列 × 变动行 → ②期末=期初+增−减、账面价值=原值−摊销−减值 →
+        ③补充研发占比/寿命不确定/抵押/减值/高价出售/重要单项 → ④同步附注五、26。
+      </p>
+    </div>
+
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <strong>附注披露信息（上市公司）</strong>
+        <el-tag size="small" type="success" effect="plain">五、26 无形资产</el-tag>
+        <el-radio-group v-if="!isReadonly" v-model="presetLocal" size="small" @change="onPresetChange">
+          <el-radio-button value="full">全量列</el-radio-button>
+          <el-radio-button value="compact">模板精简</el-radio-button>
+        </el-radio-group>
+      </div>
+      <div class="toolbar-right">
+        <el-button size="small" :disabled="isReadonly" @click="handlePull(false)">从 I1-2/检查表取数</el-button>
+        <el-button size="small" :disabled="isReadonly" @click="handlePull(true)">取数并覆盖文字</el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="isSyncing"
+          :disabled="isReadonly || !projectId"
+          data-testid="i1-disclosure-listed-sync"
+          @click="syncToNotes"
+        >
+          同步到附注
+        </el-button>
+        <el-button size="small" type="primary" plain @click="emit('open-ai', 'disclosure-listed')">AI 辅助</el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:I1-2" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:I1-9" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip :value="`Note:${noteSectionId}`" :context-project-id="projectId" /></span>
       </div>
     </div>
 
-    <!-- 琥珀色方法论块 CAS30 -->
-    <div class="methodology-block">
-      <div class="methodology-title">CAS30 无形资产披露要求</div>
-      <div class="methodology-content">
-        按《企业会计准则第6号——无形资产》及应用指南，上市公司应披露：各类无形资产原值/累计摊销/减值准备的期初、增减变动及期末余额；使用寿命不确定的无形资产名称及判断依据；研究阶段支出在当期确认为费用的金额；所有权受限的无形资产情况；当期摊销费用的归属。
-      </div>
+    <div v-if="crossCheck.hasAnyWarning" class="cross-warning">
+      披露合计与 I1 审定表差异：原值 {{ fmt(crossCheck.costDiff) }} / 摊销 {{ fmt(crossCheck.amortDiff) }} / 减值 {{ fmt(crossCheck.impairDiff) }}
+    </div>
+    <div v-if="prepValidation.blocking.length || prepValidation.warnings.length" class="prep-box">
+      <div v-for="(m, i) in prepValidation.blocking" :key="'b'+i" class="prep-block">⛔ {{ m }}</div>
+      <div v-for="(m, i) in prepValidation.warnings" :key="'w'+i" class="prep-warn">⚠ {{ m }}</div>
     </div>
 
-    <!-- 审计目标 -->
-    <el-alert
-      type="info"
-      :closable="false"
-      title="审计目标：核实无形资产附注披露（上市公司版）各项目原值/摊销/减值变动、使用寿命不确定项、受限资产及摊销费用归属披露的完整、准确，与审定表及明细表勾稽一致。"
-      class="objective-alert"
-    />
-
-    <!-- 8子节卡片 -->
-    <template v-for="section in sections" :key="section.key">
-      <el-card shadow="never" class="disclosure-card">
-        <template #header>
-          <div class="section-title">
-            <span>{{ section.title }}</span>
-            <div class="title-actions">
-              <el-button size="small" type="default" link @click="handleReview(`disc-listed-${section.key}`)">💬</el-button>
-            </div>
-          </div>
-        </template>
-
-        <!-- 矩阵表子节 -->
-        <template v-if="section.hasTable">
-          <el-table
-            :data="getMatrixRows(section.key)"
-            border
-            stripe
-            size="small"
-            class="matrix-table"
-          >
-            <el-table-column prop="category" label="项目" min-width="140" fixed />
-            <el-table-column label="期初余额" width="130" align="right">
-              <template #default="{ row }">
-                <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number
-                    :model-value="row.beginBalance"
-                    :controls="false"
-                    size="small"
-                    @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'beginBalance', v)"
-                  />
-                </template>
-                <span v-else :class="['amount-cell', { 'auto-fill': row.isAutoFilled }]">{{ fmtAmt(row.beginBalance) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="本期增加" width="130" align="right">
-              <template #default="{ row }">
-                <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number
-                    :model-value="row.increase"
-                    :controls="false"
-                    size="small"
-                    @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'increase', v)"
-                  />
-                </template>
-                <span v-else :class="['amount-cell', { 'auto-fill': row.isAutoFilled }]">{{ fmtAmt(row.increase) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="本期减少" width="130" align="right">
-              <template #default="{ row }">
-                <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number
-                    :model-value="row.decrease"
-                    :controls="false"
-                    size="small"
-                    @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'decrease', v)"
-                  />
-                </template>
-                <span v-else :class="['amount-cell', { 'auto-fill': row.isAutoFilled }]">{{ fmtAmt(row.decrease) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="期末余额" width="130" align="right">
-              <template #default="{ row }">
-                <span class="formula-cell" title="期末=期初+增加-减少">{{ fmtAmt(row.endBalance) }}</span>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <!-- 合计行 -->
-          <div class="matrix-subtotal" v-if="section.key === 'cost_overview'">
-            合计: 期初 <span class="amount-cell">{{ fmtAmt(costTotal.beginBalance) }}</span>
-            | 增加 <span class="amount-cell">{{ fmtAmt(costTotal.increase) }}</span>
-            | 减少 <span class="amount-cell">{{ fmtAmt(costTotal.decrease) }}</span>
-            | 期末 <span class="amount-cell formula-cell">{{ fmtAmt(costTotal.endBalance) }}</span>
-          </div>
-          <div class="matrix-subtotal" v-else-if="section.key === 'amort_overview'">
-            合计: 期初 <span class="amount-cell">{{ fmtAmt(amortTotal.beginBalance) }}</span>
-            | 计提 <span class="amount-cell">{{ fmtAmt(amortTotal.increase) }}</span>
-            | 转出 <span class="amount-cell">{{ fmtAmt(amortTotal.decrease) }}</span>
-            | 期末 <span class="amount-cell formula-cell">{{ fmtAmt(amortTotal.endBalance) }}</span>
-          </div>
-          <div class="matrix-subtotal" v-else-if="section.key === 'impairment_overview'">
-            合计: 期初 <span class="amount-cell">{{ fmtAmt(impairmentTotal.beginBalance) }}</span>
-            | 计提 <span class="amount-cell">{{ fmtAmt(impairmentTotal.increase) }}</span>
-            | 转回 <span class="amount-cell">{{ fmtAmt(impairmentTotal.decrease) }}</span>
-            | 期末 <span class="amount-cell formula-cell">{{ fmtAmt(impairmentTotal.endBalance) }}</span>
-          </div>
-
-          <div class="auto-fill-hint" v-if="['cost_overview','amort_overview','impairment_overview'].includes(section.key)">
-            💡 数据自动从审定表I1/明细表I1-2取入（浅蓝色=跨sheet自动取数）
-          </div>
-        </template>
-
-        <!-- 动态行子节 -->
-        <template v-if="section.hasDynamicRows">
-          <el-divider v-if="section.hasTable" content-position="left">明细项</el-divider>
-          <el-table :data="getDynamicRows(section.key)" border stripe size="small">
-            <el-table-column type="index" width="40" />
-            <el-table-column prop="name" label="名称/项目" min-width="160">
-              <template #default="{ row }">
-                <el-input v-if="!isReadonly" v-model="row.name" size="small" @change="handleDynamicChange(section.key, row.rowId, 'name', row.name)" />
-                <span v-else>{{ row.name }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="amount" label="账面价值" width="130" align="right">
-              <template #default="{ row }">
-                <el-input-number v-if="!isReadonly" v-model="row.amount" :controls="false" size="small" @change="(v: number) => handleDynamicChange(section.key, row.rowId, 'amount', v)" />
-                <span v-else class="amount-cell">{{ fmtAmt(row.amount) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="description" label="说明/依据" min-width="200">
-              <template #default="{ row }">
-                <el-input v-if="!isReadonly" v-model="row.description" size="small" @change="handleDynamicChange(section.key, row.rowId, 'description', row.description)" />
-                <span v-else>{{ row.description }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="60" align="center" v-if="!isReadonly">
-              <template #default="{ row }">
-                <el-button type="danger" link size="small" @click="handleRemoveDynamic(section.key, row.rowId)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <div class="dynamic-actions" v-if="!isReadonly">
-            <el-button size="small" @click="handleAddDynamic(section.key)">+ 新增行</el-button>
-          </div>
-        </template>
-
-        <!-- 文字说明区（AI可生成） -->
-        <template v-if="section.hasNoteText">
-          <el-divider v-if="section.hasTable || section.hasDynamicRows" content-position="left">文字说明</el-divider>
-          <el-input
-            v-model="sectionNotes[section.key]"
-            type="textarea"
-            :autosize="{ minRows: 2, maxRows: 8 }"
-            :disabled="isReadonly"
-            :placeholder="`请填写${section.title}的文字说明...`"
-            @change="handleNoteChange(section.key)"
-          />
-        </template>
-      </el-card>
-    </template>
-
-    <!-- 净值合计汇总 -->
-    <el-card shadow="never" class="summary-card">
-      <template #header><span class="summary-title">无形资产账面净值合计</span></template>
-      <div class="summary-content">
-        <div class="summary-formula">
-          净值 = 原值期末 <span class="amount-cell">{{ fmtAmt(costTotal.endBalance) }}</span>
-          − 摊销期末 <span class="amount-cell">{{ fmtAmt(amortTotal.endBalance) }}</span>
-          − 减值期末 <span class="amount-cell">{{ fmtAmt(impairmentTotal.endBalance) }}</span>
-          = <span class="amount-cell net-value">{{ fmtAmt(netValueTotal) }}</span>
+    <section class="block">
+      <div class="block-head">
+        <h3 class="block-title">无形资产情况</h3>
+        <div v-if="!isReadonly" class="cat-bar">
+          <el-button size="small" @click="handleAddCat">+ 增加资产类别列</el-button>
+          <span class="hint">源模板「……」列：按被审计单位实际类别扩展</span>
         </div>
       </div>
-    </el-card>
+      <div class="movement-wrap">
+        <el-table
+          :data="movementRowDefs"
+          border
+          size="small"
+          class="wp-table movement-table"
+          :row-class-name="movementRowClass"
+        >
+          <el-table-column label="项  目" min-width="220" fixed>
+            <template #default="{ row }">
+              <span :style="{ paddingLeft: `${row.indent * 12}px` }" :class="`kind-${row.kind}`">{{ row.label }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column
+            v-for="cat in categories"
+            :key="cat.key"
+            :label="cat.label"
+            min-width="110"
+            align="right"
+          >
+            <template #header>
+              <div class="cat-header">
+                <span>{{ cat.label }}</span>
+                <el-button
+                  v-if="!isReadonly && !isDefaultCat(cat.key)"
+                  link
+                  size="small"
+                  type="danger"
+                  @click="removeCategory(cat.key)"
+                >
+                  删
+                </el-button>
+              </div>
+            </template>
+            <template #default="{ row }">
+              <template v-if="row.kind === 'section'">—</template>
+              <el-input-number
+                v-else-if="row.editable && !isReadonly"
+                :model-value="rawCell(movement, row.key, cat.key)"
+                :controls="false"
+                size="small"
+                style="width:100%"
+                @update:model-value="(v: number | undefined) => updateMovement(row.key, cat.key, v ?? 0)"
+              />
+              <span v-else class="formula-cell">{{ fmt(cellOf(row, cat.key)) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="合  计" min-width="110" align="right" fixed="right">
+            <template #default="{ row }">
+              <span v-if="row.kind === 'section'">—</span>
+              <span v-else class="formula-cell">{{ fmt(totalOf(row)) }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </section>
 
-    <!-- 编制提示 -->
-    <details class="compile-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>（1）~（3）三层矩阵数据自动从审定表I1/明细表I1-2取入，如需修改请在源底稿调整</li>
-        <li>（4）净值=原值−摊销−减值，自动计算不可编辑</li>
-        <li>（5）使用寿命不确定的无形资产需逐项列示，并说明判断依据</li>
-        <li>（6）研究阶段支出确认为当期费用的金额说明</li>
-        <li>（7）所有权受限（如抵押/质押）的无形资产需逐项列示</li>
-        <li>（8）本期摊销费用按归属科目列示（管理费用/销售费用/研发费用等）</li>
-        <li>适用上市公司年报附注披露要求（CAS6/CAS8/CAS30）</li>
-      </ul>
-    </details>
+    <section class="block notes-block">
+      <h3 class="block-title">文字说明（同步至附注）</h3>
+      <div class="note-item">
+        <label>① 内部研发占比</label>
+        <el-input v-model="noteRdRatio" type="textarea" :rows="2" :disabled="isReadonly" :placeholder="GUIDANCE.rdRatio" @change="persist" />
+      </div>
+      <div class="note-item">
+        <label>② 寿命不确定判断依据</label>
+        <el-input v-model="noteIndefinite" type="textarea" :rows="2" :disabled="isReadonly" :placeholder="GUIDANCE.indefinite" @change="persist" />
+      </div>
+      <div class="note-item">
+        <label>③ 抵押担保</label>
+        <el-input v-model="noteMortgage" type="textarea" :rows="2" :disabled="isReadonly" :placeholder="GUIDANCE.mortgage" @change="persist" />
+      </div>
+      <div class="note-item">
+        <label>④ 减值测试</label>
+        <el-input v-model="noteImpairment" type="textarea" :rows="3" :disabled="isReadonly" :placeholder="GUIDANCE.impairment" @change="persist" />
+      </div>
+      <div class="note-item">
+        <label>⑤ 高价出售</label>
+        <el-input v-model="noteSale" type="textarea" :rows="2" :disabled="isReadonly" :placeholder="GUIDANCE.sale" @change="persist" />
+      </div>
+      <div class="note-item">
+        <label>⑥ 重要单项说明</label>
+        <el-input v-model="noteImportant" type="textarea" :rows="2" :disabled="isReadonly" :placeholder="GUIDANCE.important" @change="persist" />
+      </div>
+    </section>
+
+    <section class="block">
+      <h3 class="block-title">本期摊销费用归属（I1-9）</h3>
+      <el-descriptions :column="3" border size="small">
+        <el-descriptions-item label="生产成本">{{ fmt(amortAlloc.productionCost) }}</el-descriptions-item>
+        <el-descriptions-item label="制造费用">{{ fmt(amortAlloc.manufacturing) }}</el-descriptions-item>
+        <el-descriptions-item label="销售费用">{{ fmt(amortAlloc.selling) }}</el-descriptions-item>
+        <el-descriptions-item label="管理费用">{{ fmt(amortAlloc.management) }}</el-descriptions-item>
+        <el-descriptions-item label="研发费用">{{ fmt(amortAlloc.rd) }}</el-descriptions-item>
+        <el-descriptions-item label="其他">{{ fmt(amortAlloc.other) }}</el-descriptions-item>
+        <el-descriptions-item label="合计">{{ fmt(amortAlloc.total) }}</el-descriptions-item>
+      </el-descriptions>
+    </section>
+
+    <section class="block">
+      <h3 class="block-title">确认为无形资产的数据资源</h3>
+      <el-table :data="dataResourceRows" border size="small">
+        <el-table-column prop="label" label="项目" min-width="160" />
+        <el-table-column label="金额" min-width="140" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.field && !isReadonly"
+              :model-value="(dataResource as any)[row.field]"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @update:model-value="(v: number | undefined) => updateDataResource(row.field, v ?? 0)"
+            />
+            <span v-else class="formula-cell">{{ fmt(row.value) }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-input
+        v-model="noteDataResource"
+        class="mt8"
+        type="textarea"
+        :rows="2"
+        :disabled="isReadonly"
+        placeholder="数据资源寿命/摊销/减值/受限等补充说明"
+        @change="persist"
+      />
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h3 class="block-title">重要单项无形资产</h3>
+        <el-button v-if="!isReadonly" size="small" @click="addImportantRow">+ 行</el-button>
+      </div>
+      <el-table :data="importantRows" border size="small">
+        <el-table-column label="项目" min-width="160">
+          <template #default="{ row }">
+            <el-input v-model="row.name" size="small" :disabled="isReadonly" @change="persist" />
+          </template>
+        </el-table-column>
+        <el-table-column label="账面价值" width="140" align="right">
+          <template #default="{ row }">
+            <el-input-number v-model="row.bookValue" :controls="false" size="small" :disabled="isReadonly" style="width:100%" @change="persist" />
+          </template>
+        </el-table-column>
+        <el-table-column label="剩余摊销期限(月)" width="140" align="right">
+          <template #default="{ row }">
+            <el-input-number v-model="row.remainingAmortMonths" :controls="false" size="small" :disabled="isReadonly" style="width:100%" @change="persist" />
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="" width="70">
+          <template #default="{ $index }">
+            <el-button link type="danger" size="small" @click="removeImportantRow($index)">删</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h3 class="block-title">未办妥权属证书</h3>
+        <el-button v-if="!isReadonly" size="small" @click="addTitleCertRow">+ 行</el-button>
+      </div>
+      <p class="hint">{{ GUIDANCE.titleCert }}</p>
+      <el-table :data="titleCertRows" border size="small">
+        <el-table-column label="项目" min-width="160">
+          <template #default="{ row }">
+            <el-input v-model="row.name" size="small" :disabled="isReadonly" @change="persist" />
+          </template>
+        </el-table-column>
+        <el-table-column label="账面价值" width="140" align="right">
+          <template #default="{ row }">
+            <el-input-number v-model="row.bookValue" :controls="false" size="small" :disabled="isReadonly" style="width:100%" @change="persist" />
+          </template>
+        </el-table-column>
+        <el-table-column label="原因" min-width="180">
+          <template #default="{ row }">
+            <el-input v-model="row.reason" size="small" :disabled="isReadonly" @change="persist" />
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="" width="70">
+          <template #default="{ $index }">
+            <el-button link type="danger" size="small" @click="removeTitleCertRow($index)">删</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </section>
+
+    <el-card shadow="never" class="audit-card">
+      <template #header><span>审计说明</span></template>
+      <el-input v-model="auditNote" type="textarea" :rows="3" :disabled="isReadonly" @change="persist" />
+    </el-card>
+    <el-card shadow="never" class="audit-card">
+      <template #header><span>审计结论</span></template>
+      <el-input v-model="auditConclusion" type="textarea" :rows="2" :disabled="isReadonly" @change="persist" />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-/**
- * I1TabDisclosureListed.vue — 附注披露信息（上市公司版）
- * 64行×22列，34公式 (Req 14.1-14.4)
- *
- * 8 sections:
- *   cost_overview / amort_overview / impairment_overview / net_value
- *   indefinite_life / rd_expenditure / restricted / amort_expense
- *
- * - 从审定表/明细表/摊销表自动取数 (Req 14.2)
- * - AI辅助生成文字描述 (Req 14.3)
- * - EventBus publish 'disclosure:note-text-updated' (Req 14.4)
- */
-import { ref, computed, inject, toRef, onMounted, onUnmounted } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { useI1Disclosure, LISTED_SECTIONS, type I1DisclosureMatrixRow } from '../../composables/useI1Disclosure'
+import { computed, ref, toRef, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
+import GtIndexChip from '../../GtIndexChip.vue'
+import { useI1ListedDisclosure } from '../../composables/useI1Disclosure'
+import {
+  I1_LISTED_DEFAULT_CATEGORIES,
+  I1_LISTED_GUIDANCE,
+  I1_LISTED_MOVEMENT_ROWS,
+  i1ListedCellValue,
+  i1ListedTotalCellValue,
+  rawCell,
+  type MovementRowDef,
+} from '../../composables/i1ListedDisclosureModel'
+import {
+  dataResourceAmortEnd,
+  dataResourceBookEnd,
+  dataResourceCostEnd,
+  dataResourceImpairEnd,
+  type I1ListedCategoryPreset,
+} from '../../composables/i1DisclosureEnhance'
+import { buildI1ListedSyncPayloads } from '../../composables/i1DisclosureSyncPayload'
+import { I1_NOTE_SECTION } from '../../composables/i1NoteSectionMap'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
-  crossSheetAutoFill?: Record<string, number>
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{
-  save: [itemId: string, value: any]
+  (e: 'save', itemId: string, value: any): void
+  (e: 'open-ai', section: string): void
 }>()
 
-const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
-const allResponsesRef = computed(() => props.allResponses)
-
-const sections = LISTED_SECTIONS
-
-// ─── Composable ──────────────────────────────────────────────────────────────
+const GUIDANCE = I1_LISTED_GUIDANCE
+const noteSectionId = I1_NOTE_SECTION.listed
+const isSyncing = ref(false)
+const movementRowDefs = I1_LISTED_MOVEMENT_ROWS
 
 const {
-  costMatrixRows,
-  amortMatrixRows,
-  impairmentMatrixRows,
-  sectionRows,
-  sectionNotes,
-  costTotal,
-  amortTotal,
-  impairmentTotal,
-  netValueTotal,
-  applyAutoFill,
-  addDynamicRow,
-  removeDynamicRow,
-  updateDynamicRow,
-  updateMatrixCell,
-  saveSectionNote,
-  dispose: disposeDisclosure,
-} = useI1Disclosure(
-  toRef(props, 'wpId'),
-  toRef(props, 'projectId'),
-  allResponsesRef as any,
-  {
-    variant: ref('listed') as any,
-    crossSheetAutoFill: computed(() => props.crossSheetAutoFill ?? {}),
-    onSave(itemId: string, value: any) {
-      emit('save', itemId, value)
-    },
-  },
-)
-
-// ─── EventBus: subscribe 'substantive:adjudicated' → auto-refresh (Req 14.2) ─
-function handleAdjudicated(e: Event): void {
-  const detail = (e as CustomEvent).detail
-  // 仅响应I1相关科目(1701/1702/1703)或无过滤条件的全局广播
-  if (!detail || detail.wpCode === 'I1' || ['1701', '1702', '1703'].includes(detail.accountCode)) {
-    applyAutoFill()
-  }
-}
-
-onMounted(() => {
-  applyAutoFill()
-  window.addEventListener('substantive:adjudicated', handleAdjudicated)
-})
-onUnmounted(() => {
-  window.removeEventListener('substantive:adjudicated', handleAdjudicated)
-  disposeDisclosure()
+  categoryPreset,
+  categories,
+  movement,
+  noteRdRatio,
+  noteIndefinite,
+  noteMortgage,
+  noteImpairment,
+  noteSale,
+  noteImportant,
+  noteDataResource,
+  titleCertRows,
+  importantRows,
+  dataResource,
+  amortAlloc,
+  auditNote,
+  auditConclusion,
+  crossCheck,
+  prepValidation,
+  persist,
+  updateMovement,
+  addCategory,
+  removeCategory,
+  setCategoryPreset,
+  addTitleCertRow,
+  removeTitleCertRow,
+  addImportantRow,
+  removeImportantRow,
+  updateDataResource,
+  pullFromSources,
+} = useI1ListedDisclosure({
+  allResponses: toRef(props, 'allResponses'),
+  onSave: (id, v) => emit('save', id, v),
 })
 
-// ─── Matrix rows by section ──────────────────────────────────────────────────
+const presetLocal = ref<I1ListedCategoryPreset>(categoryPreset.value)
+watch(categoryPreset, (v) => { presetLocal.value = v })
 
-function getMatrixRows(sectionKey: string): I1DisclosureMatrixRow[] {
-  switch (sectionKey) {
-    case 'cost_overview': return costMatrixRows.value
-    case 'amort_overview': return amortMatrixRows.value
-    case 'impairment_overview': return impairmentMatrixRows.value
-    case 'net_value': return _buildNetValueRows()
-    case 'amort_expense': return _buildAmortExpenseRows()
-    default: return []
-  }
+function onPresetChange(v: string | number | boolean | undefined) {
+  setCategoryPreset((v === 'compact' ? 'compact' : 'full') as I1ListedCategoryPreset)
 }
 
-function _buildNetValueRows(): I1DisclosureMatrixRow[] {
-  // 净值表 = 对应各行原值-摊销-减值
-  return costMatrixRows.value.map((costRow) => {
-    const amortRow = amortMatrixRows.value.find((r) => r.category === costRow.category)
-    const impairRow = impairmentMatrixRows.value.find((r) => r.category === costRow.category)
-    return {
-      rowId: `net-${costRow.rowId}`,
-      category: costRow.category,
-      beginBalance: costRow.beginBalance - (amortRow?.beginBalance ?? 0) - (impairRow?.beginBalance ?? 0),
-      increase: 0,
-      decrease: 0,
-      endBalance: costRow.endBalance - (amortRow?.endBalance ?? 0) - (impairRow?.endBalance ?? 0),
-      isAutoFilled: true,
-    }
-  })
+const dataResourceRows = computed(() => {
+  const m = dataResource.value
+  return [
+    { label: '原值期初', field: 'costBegin', value: m.costBegin },
+    { label: '原值增加-外购', field: 'costIncPurchase', value: m.costIncPurchase },
+    { label: '原值增加-内部研发', field: 'costIncRd', value: m.costIncRd },
+    { label: '原值增加-其他', field: 'costIncOther', value: m.costIncOther },
+    { label: '原值减少', field: 'costDec', value: m.costDec },
+    { label: '原值期末', field: '', value: dataResourceCostEnd(m) },
+    { label: '摊销期初', field: 'amortBegin', value: m.amortBegin },
+    { label: '摊销增加', field: 'amortInc', value: m.amortInc },
+    { label: '摊销减少', field: 'amortDec', value: m.amortDec },
+    { label: '摊销期末', field: '', value: dataResourceAmortEnd(m) },
+    { label: '减值期初', field: 'impairBegin', value: m.impairBegin },
+    { label: '减值增加', field: 'impairInc', value: m.impairInc },
+    { label: '减值减少', field: 'impairDec', value: m.impairDec },
+    { label: '减值期末', field: '', value: dataResourceImpairEnd(m) },
+    { label: '账面价值期末', field: '', value: dataResourceBookEnd(m) },
+  ]
+})
+
+function fmt(n: number): string {
+  const x = Number(n) || 0
+  if (Math.abs(x) < 0.005) return '-'
+  return x.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function isDefaultCat(key: string) {
+  return I1_LISTED_DEFAULT_CATEGORIES.some((c) => c.key === key) || key === 'land' || key === 'patent' || key === 'knowhow' || key === 'data'
+}
+function cellOf(row: MovementRowDef, catKey: string) {
+  return i1ListedCellValue(movement.value, row, catKey)
+}
+function totalOf(row: MovementRowDef) {
+  return i1ListedTotalCellValue(movement.value, row, categories.value)
+}
+function movementRowClass({ row }: { row: MovementRowDef }) {
+  if (row.kind === 'section') return 'row-section'
+  if (row.kind === 'calc' || row.kind === 'book' || row.kind === 'subtotal') return 'row-calc'
+  return ''
 }
 
-function _buildAmortExpenseRows(): I1DisclosureMatrixRow[] {
-  // 摊销费用分配表 — 从crossSheetAutoFill获取
-  const data = props.crossSheetAutoFill ?? {}
-  const rows: I1DisclosureMatrixRow[] = []
-  const categories = ['管理费用', '销售费用', '制造费用', '研发费用']
-  for (const cat of categories) {
-    const key = `disc_amort_${cat}`
-    const amount = data[key] ?? 0
-    if (amount !== 0 || costMatrixRows.value.length > 0) {
-      rows.push({
-        rowId: `amort-exp-${cat}`,
-        category: cat,
-        beginBalance: 0,
-        increase: amount,
-        decrease: 0,
-        endBalance: amount,
-        isAutoFilled: true,
-      })
-    }
-  }
-  return rows
-}
-
-// ─── Dynamic rows ────────────────────────────────────────────────────────────
-
-function getDynamicRows(key: string) {
-  return sectionRows.value[key] ?? []
-}
-
-async function handleAddDynamic(sectionKey: string) {
+async function handleAddCat() {
   try {
-    const { value } = await ElMessageBox.prompt('请输入项目名称', '新增行', {
-      confirmButtonText: '确定',
+    const { value } = await ElMessageBox.prompt('资产类别名称', '增加类别列', {
+      confirmButtonText: '确认',
       cancelButtonText: '取消',
-      inputPlaceholder: '如：土地使用权（xx地块）',
+      inputPlaceholder: '如：域名',
     })
-    if (value?.trim()) {
-      addDynamicRow(sectionKey, value.trim())
-    }
+    if (value) addCategory(value)
   } catch { /* cancelled */ }
 }
 
-function handleRemoveDynamic(sectionKey: string, rowId: string) {
-  removeDynamicRow(sectionKey, rowId)
+function handlePull(overwriteNotes: boolean) {
+  const res = pullFromSources({ overwriteNotes })
+  ElMessage({ type: res.count ? 'success' : 'warning', message: res.message })
 }
 
-function handleDynamicChange(sectionKey: string, rowId: string, field: string, value: any) {
-  updateDynamicRow(sectionKey, rowId, field as any, value)
-}
-
-// ─── Matrix edit ─────────────────────────────────────────────────────────────
-
-function handleMatrixEdit(sectionKey: string, rowId: string, field: string, value: number) {
-  const layer = sectionKey === 'cost_overview' ? 'cost'
-    : sectionKey === 'amort_overview' ? 'amort'
-    : 'impairment'
-  updateMatrixCell(layer, rowId, field as keyof I1DisclosureMatrixRow, value ?? 0)
-}
-
-// ─── Note text ───────────────────────────────────────────────────────────────
-
-function handleNoteChange(sectionKey: string) {
-  saveSectionNote(sectionKey, sectionNotes.value[sectionKey] ?? '')
-}
-
-// ─── Review dialog ───────────────────────────────────────────────────────────
-
-function handleReview(id: string) {
-  openReviewDialog(id)
-}
-
-// ─── Format ──────────────────────────────────────────────────────────────────
-
-function fmtAmt(val: number | null | undefined): string {
-  if (val == null) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+async function syncToNotes() {
+  if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return
+  if (prepValidation.value.blocking.length) {
+    ElMessage.error(prepValidation.value.blocking[0])
+    return
+  }
+  if (prepValidation.value.warnings.length) {
+    try {
+      await ElMessageBox.confirm(
+        `存在 ${prepValidation.value.warnings.length} 项编制提示，是否仍同步到附注？\n` + prepValidation.value.warnings.slice(0, 3).join('\n'),
+        '同步确认',
+        { type: 'warning', confirmButtonText: '仍要同步', cancelButtonText: '取消' },
+      )
+    } catch {
+      return
+    }
+  }
+  persist()
+  const payloads = buildI1ListedSyncPayloads(props.wpId, props.applicableStandards || [], {
+    categories: categories.value,
+    movement: movement.value,
+    noteRdRatio: noteRdRatio.value,
+    noteIndefinite: noteIndefinite.value,
+    noteMortgage: noteMortgage.value,
+    noteImpairment: noteImpairment.value,
+    noteSale: noteSale.value,
+    noteImportant: noteImportant.value,
+    titleCertRows: titleCertRows.value,
+    importantRows: importantRows.value,
+    dataResource: dataResource.value,
+    noteDataResource: noteDataResource.value,
+    amortAlloc: amortAlloc.value,
+  })
+  if (!payloads.length) {
+    ElMessage.warning('当前不适用上市附注同步')
+    return
+  }
+  isSyncing.value = true
+  try {
+    let rows = 0
+    for (const payload of payloads) {
+      const result: any = await api.post(
+        `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+        payload,
+      )
+      const data = result?.data ?? result
+      rows += Number(data?.rows_synced ?? 0)
+    }
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      projectId: props.projectId,
+      sectionIds: [noteSectionId],
+      wpId: props.wpId,
+      sheet: '附注披露信息（上市公司）',
+    })
+    ElMessage.success(`已同步至附注 ${noteSectionId}（${rows} 行）`)
+  } catch (e: any) {
+    ElMessage.error(e?.message || '同步失败')
+  } finally {
+    isSyncing.value = false
+  }
 }
 </script>
 
 <style scoped>
-.i1-tab-disclosure-listed { padding: 16px; font-size: var(--wp-font-size, 13px); }
-
-/* 蓝色渐变引导区 */
-.guide-area { background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
-.guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.guide-step { display: flex; align-items: center; gap: 6px; font-size: 12px; }
-.step-num { font-weight: 700; color: var(--el-color-primary); }
-
-/* 琥珀色方法论 */
-.methodology-block { border-left: 4px solid #f59e0b; background: #fffbeb; border-radius: 4px; padding: 12px 16px; margin-bottom: 12px; }
-.methodology-title { font-weight: 600; color: #92400e; margin-bottom: 4px; font-size: 12px; }
-.methodology-content { font-size: 12px; color: #78350f; line-height: 1.6; }
-
-/* 卡片 */
-.disclosure-card { margin-bottom: 12px; }
-.section-title { display: flex; align-items: center; justify-content: space-between; }
-.title-actions { display: flex; gap: 8px; align-items: center; }
-
-/* 金额 */
-.amount-cell { text-align: right; font-variant-numeric: tabular-nums; }
-.auto-fill { color: var(--el-color-primary); }
-.formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
-.auto-fill-hint { font-size: 11px; color: var(--el-text-color-secondary); margin-top: 8px; }
-
-/* 合计 */
-.matrix-subtotal { margin-top: 8px; font-weight: 500; text-align: right; padding-right: 12px; font-size: 12px; }
-.dynamic-actions { margin-top: 8px; }
-
-/* 净值汇总 */
-.summary-card { margin-bottom: 12px; border: 2px solid var(--el-color-primary-light-5); }
-.summary-title { font-weight: 600; color: var(--el-color-primary); }
-.summary-content { padding: 8px 0; }
-.summary-formula { font-size: 14px; line-height: 2; }
-.net-value { font-weight: 700; font-size: 16px; color: var(--el-color-primary); }
-
-/* 矩阵表 */
-.matrix-table { font-size: var(--wp-font-size, 13px); }
-
-/* 审计目标 alert */
-.objective-alert { margin-bottom: 12px; }
-
-/* 编制提示 */
-.compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
-.compile-hint summary { cursor: pointer; font-weight: 500; }
-.compile-hint ul { padding-left: 20px; margin-top: 8px; line-height: 1.8; }
+.i1-disc-listed { padding: 12px 16px; font-size: 13px; }
+.objective { margin-bottom: 10px; }
+.methodology-context {
+  border-left: 4px solid #d97706;
+  background: #fffbeb;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #92400e;
+  line-height: 1.7;
+}
+.methodology-context p { margin: 0; }
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; }
+.block { margin-bottom: 16px; }
+.block-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; gap: 8px; }
+.block-title { margin: 0; font-size: 14px; font-weight: 600; }
+.cat-bar { display: flex; align-items: center; gap: 8px; }
+.hint { font-size: 12px; color: #64748b; }
+.movement-wrap { overflow-x: auto; }
+.movement-table :deep(.row-section) { background: #f1f5f9; font-weight: 600; }
+.movement-table :deep(.row-calc) { background: #f0fdf4; }
+.formula-cell { border-bottom: 1px dashed #94a3b8; cursor: help; }
+.kind-section { font-weight: 700; }
+.cat-header { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.notes-block .note-item { margin-bottom: 10px; }
+.notes-block label { display: block; font-size: 12px; color: #475569; margin-bottom: 4px; }
+.audit-card { margin-top: 12px; }
+.cross-warning {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  background: #fefce8;
+  border: 1px solid #fde047;
+  border-radius: 6px;
+  color: #854d0e;
+  font-size: 12px;
+}
+.prep-box { margin-bottom: 10px; font-size: 12px; }
+.prep-block { color: #b91c1c; margin-bottom: 2px; }
+.prep-warn { color: #a16207; margin-bottom: 2px; }
+.mt8 { margin-top: 8px; }
 </style>

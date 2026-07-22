@@ -72,7 +72,7 @@ const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSectio
 
     <details class="methodology-hint">
       <summary>📋 编制提示</summary>
-      <p>推荐工作流：G14A 程序表 → G14-1 审定（9行）↔ G14-2 明细（ECL交叉验证）→ G14-3 调整 → 附注披露。</p>
+      <p>推荐工作流：G14A 程序表 → G14-1 审定（10 类减值来源）↔ G14-2 明细（ECL交叉验证）→ G14-3 调整 → 附注披露。</p>
       <p>CAS 22 预期信用损失（ECL）：信用减值损失（6702）为损益类，取本期发生额（借方计提−贷方转回）。</p>
     </details>
   </div>

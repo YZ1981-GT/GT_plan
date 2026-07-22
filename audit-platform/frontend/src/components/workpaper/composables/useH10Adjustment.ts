@@ -3,6 +3,7 @@
  */
 import { computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
+import { eventBus } from '@/utils/eventBus'
 import { H10_ACCOUNT_CODE } from './h10Constants'
 import {
   aggregateH10AdjustmentAjeRje,
@@ -104,28 +105,25 @@ export function useH10Adjustment(opts: {
 
   function publishAdjustmentEvents(list: H10AdjustmentEntry[]): void {
     const wb = aggregateH10AdjustmentAjeRje(list)
-    try {
-      if (Math.abs(wb.currentAje) > 0.001) {
-        window.dispatchEvent(new CustomEvent('adjustment:created', {
-          detail: {
-            wpCode: 'H10',
-            entryType: 'AJE',
-            amount: wb.currentAje,
-            accountCode: H10_ACCOUNT_CODE,
-          },
-        }))
+    const emitOne = (entryType: 'AJE' | 'RJE', amount: number) => {
+      if (Math.abs(amount) <= 0.001) return
+      const payload = {
+        wpCode: 'H10',
+        entryType,
+        amount,
+        accountCode: H10_ACCOUNT_CODE,
+        accountName: '资产处置损益',
+        description: `H10-3 ${entryType} 净额 ${amount}`,
       }
-      if (Math.abs(wb.currentRje) > 0.001) {
-        window.dispatchEvent(new CustomEvent('adjustment:created', {
-          detail: {
-            wpCode: 'H10',
-            entryType: 'RJE',
-            amount: wb.currentRje,
-            accountCode: H10_ACCOUNT_CODE,
-          },
-        }))
-      }
-    } catch { /* silent */ }
+      try {
+        eventBus.emit('adjustment:created', payload as any)
+      } catch { /* silent */ }
+      try {
+        window.dispatchEvent(new CustomEvent('adjustment:created', { detail: payload }))
+      } catch { /* silent */ }
+    }
+    emitOne('AJE', wb.currentAje)
+    emitOne('RJE', wb.currentRje)
   }
 
   function updateRow(rowId: string, patch: Partial<H10AdjustmentEntry>): void {

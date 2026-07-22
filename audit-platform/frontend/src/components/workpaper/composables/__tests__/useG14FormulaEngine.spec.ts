@@ -7,6 +7,7 @@ import {
   calcChangeRate,
   isDebitCreditBalanced,
   isRollForwardBalanced,
+  migrateReversalToPositive,
 } from '../useG14FormulaEngine'
 
 describe('useG14FormulaEngine', () => {
@@ -14,12 +15,13 @@ describe('useG14FormulaEngine', () => {
     expect(calcAdjustedAmount(100, 20)).toBe(120)
   })
 
-  it('calcNetImpairmentLoss', () => {
+  it('calcNetImpairmentLoss（转回正数）', () => {
     expect(calcNetImpairmentLoss(50, 10)).toBe(40)
   })
 
-  it('calcProvisionRollForward（转回带符号）', () => {
-    expect(calcProvisionRollForward(100, 30, -5, 10)).toBe(115)
+  it('calcProvisionRollForward（转回正数 + 其他变动）', () => {
+    // 100 + 30 - 5 - 10 + 2 = 117
+    expect(calcProvisionRollForward(100, 30, 5, 10, 2)).toBe(117)
   })
 
   it('calcChangeRate null when prior zero', () => {
@@ -36,16 +38,21 @@ describe('useG14FormulaEngine', () => {
   })
 
   it('isRollForwardBalanced', () => {
-    expect(isRollForwardBalanced(100, 30, -5, 10, 115)).toBe(true)
-    expect(isRollForwardBalanced(100, 30, -5, 10, 200)).toBe(false)
+    expect(isRollForwardBalanced(100, 30, 5, 10, 117, 2)).toBe(true)
+    expect(isRollForwardBalanced(100, 30, 5, 10, 200, 2)).toBe(false)
   })
 
-  it('计入损益与滚动在转回为负时一致', () => {
+  it('计入损益与滚动在转回为正时一致', () => {
     const provision = 100
-    const reversalSigned = -20
-    const profitLoss = provision + reversalSigned
-    const closing = calcProvisionRollForward(500, provision, reversalSigned, 10)
+    const reversal = 20
+    const profitLoss = calcNetImpairmentLoss(provision, reversal)
+    const closing = calcProvisionRollForward(500, provision, reversal, 10)
     expect(profitLoss).toBe(80)
     expect(closing).toBe(570)
+  })
+
+  it('migrateReversalToPositive 兼容旧带符号数据', () => {
+    expect(migrateReversalToPositive(-20)).toBe(20)
+    expect(migrateReversalToPositive(15)).toBe(15)
   })
 })

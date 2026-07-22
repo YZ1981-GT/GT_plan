@@ -21,6 +21,12 @@ import {
   mapG9VoucherToA13PushItem,
   type G9VoucherLinkHint,
 } from './g9VoucherCross'
+import {
+  G9A_VOUCHER_MARK_KEY,
+  G9A_PROCEDURE_SHEET,
+} from './g9FvCrossHelpers'
+
+export { G9A_VOUCHER_MARK_KEY, G9A_PROCEDURE_SHEET }
 
 export type { G9VoucherLinkHint }
 export type G9VoucherTab = 'basic' | 'check' | 'conclusion'
@@ -107,8 +113,35 @@ export const ITEM_ID_G9_VC_PARAMS = 'G9-vc-params'
 
 /** 完整 G9A 模板：新增(6)/处置(7) 追查原始凭证；关联方(12) 常依赖凭证检查 */
 export const G9A_VOUCHER_PROGRAM_NOS = [6, 7, 12] as const
-export const G9A_VOUCHER_MARK_KEY = 'G9A-voucher-complete'
-export const G9A_PROCEDURE_SHEET = '其他非流动金融资产实质性程序表G9A'
+
+export const G9_SAMPLING_METHOD_OPTIONS = [
+  { value: 'random', label: '随机抽样' },
+  { value: 'systematic', label: '系统抽样' },
+  { value: 'judgmental', label: '判断抽样' },
+  { value: 'mus', label: '货币单位抽样(MUS)' },
+  { value: 'full', label: '全部项目检查' },
+] as const
+
+export function formatG9SamplingMethodLabel(value: string): string {
+  const s = String(value ?? '').trim()
+  if (!s) return '—'
+  const hit = G9_SAMPLING_METHOD_OPTIONS.find((o) => o.value === s || o.label === s)
+  if (hit) return hit.label
+  return s
+}
+
+function normalizeG9SamplingMethod(raw: unknown): string {
+  const s = String(raw ?? '').trim()
+  if (!s) return ''
+  const exact = G9_SAMPLING_METHOD_OPTIONS.find((o) => o.value === s || o.label === s)
+  if (exact) return exact.value
+  if (/随机/.test(s)) return 'random'
+  if (/系统/.test(s)) return 'systematic'
+  if (/判断|特定/.test(s)) return 'judgmental'
+  if (/MUS|货币单位/i.test(s)) return 'mus'
+  if (/全部|全查/.test(s)) return 'full'
+  return s
+}
 
 function genId(): string {
   return `g9v-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`
@@ -138,7 +171,7 @@ export function parseG9SamplingParams(json: string | null | undefined): G9Sampli
       testPopulation: String(raw.testPopulation ?? ''),
       specificSamples: String(raw.specificSamples ?? ''),
       samplingPopulation: String(raw.samplingPopulation ?? ''),
-      samplingMethod: String(raw.samplingMethod ?? ''),
+      samplingMethod: normalizeG9SamplingMethod(raw.samplingMethod),
       samplingProcess: String(raw.samplingProcess ?? ''),
       targetSampleSize: Number(raw.targetSampleSize) || 0,
       currentSampleSize: Number(raw.currentSampleSize) || 0,
@@ -347,7 +380,7 @@ export function buildG9VoucherSamplingMemo(input: {
   lines.push(`- 测试总体：${params.testPopulation || '—'}`)
   lines.push(`- 特定样本：${params.specificSamples || '—'}`)
   lines.push(`- 抽样总体：${params.samplingPopulation || '—'}`)
-  lines.push(`- 抽样方法：${params.samplingMethod || '—'}`)
+  lines.push(`- 抽样方法：${formatG9SamplingMethodLabel(params.samplingMethod)}`)
   lines.push(`- 目标样本量：${params.targetSampleSize || '—'} 笔`)
   lines.push(`- 当前样本量：${params.currentSampleSize || rows.filter((r) => r.source === '抽凭').length} 笔`)
   lines.push(`- 总体笔数：${params.populationCount || '—'}`)
@@ -418,7 +451,7 @@ export function buildG9VoucherProcedureSummary(input: {
     `未测 ${input.untested}`,
     `异常 ${input.abnormal}（金额类 ${input.quantitative}）`,
   ]
-  if (input.samplingMethod) parts.push(`方法 ${input.samplingMethod}`)
+  if (input.samplingMethod) parts.push(`方法 ${formatG9SamplingMethodLabel(input.samplingMethod)}`)
   return parts.join('；')
 }
 

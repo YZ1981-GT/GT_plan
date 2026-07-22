@@ -1,144 +1,229 @@
 <template>
-  <div class="g4-directory">
-    <h3 class="sheet-title">底稿目录</h3>
-
-    <div class="directory-layout">
-      <!-- 左侧: 编制信息区 -->
-      <div class="entity-info">
-        <el-descriptions :column="1" border size="small" class="info-desc">
-          <el-descriptions-item label="被审计单位">{{ entityName || '——' }}</el-descriptions-item>
-          <el-descriptions-item label="截止日">{{ balanceSheetDate || '——' }}</el-descriptions-item>
-          <el-descriptions-item label="编制人">{{ preparer || '——' }}</el-descriptions-item>
-          <el-descriptions-item label="复核人">{{ reviewer || '——' }}</el-descriptions-item>
-        </el-descriptions>
-
-        <!-- 方法论上下文 -->
-        <div class="methodology-context">
-          <div class="methodology-bar" />
-          <div class="methodology-content">
-            <strong>关于工作底稿与审计程序索引号对应的说明</strong>
-            <p>本底稿目录涵盖G4债权投资全部底稿。索引号G4A为程序表，G4-1至G4-4为实质性程序底稿，G4-5至G4-13为SPPI/ECL/盘点等专项底稿，G0-1至G0-8为投资循环函证底稿。各底稿通过索引号实现交叉引用与跳转。</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- 右侧: 目录表 -->
-      <div class="directory-table">
-        <el-table :data="directoryRows" border stripe style="width: 100%; font-size: 13px">
-          <el-table-column prop="seq" label="序号" width="55" align="center" />
-          <el-table-column prop="content" label="内容" min-width="220" />
-          <el-table-column label="索引号" width="100">
-            <template #default="{ row }">
-              <GtIndexChip v-if="row.indexCode" :value="row.indexCode" @click="emit('jump', row.indexCode)" />
-              <span v-else>-</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="pages" label="页数" width="60" align="center">
-            <template #default="{ row }">{{ row.pages || '-' }}</template>
-          </el-table-column>
-          <el-table-column prop="preparer" label="编制人" width="80" />
-          <el-table-column prop="reviewer" label="复核人" width="80" />
-          <el-table-column prop="date" label="日期" width="100" />
-          <el-table-column label="备注" min-width="80">
-            <template #default="{ row }">
-              <span v-if="row.status === 'done'" class="status-done">✓ 已完成</span>
-              <span v-else-if="row.status === 'pending'" class="status-pending">○ 待完成</span>
-              <span v-else>{{ row.remark || '-' }}</span>
-            </template>
-          </el-table-column>
-        </el-table>
+  <div class="g4-dir" data-testid="g4-directory">
+    <div class="index-header">
+      <h3 class="title">G4 底稿目录</h3>
+      <GtReviewTrigger section-id="G4-index-directory" />
+      <div class="progress-wrap">
+        <span>编制进度 {{ completedCount }}/{{ applicableRows.length }}</span>
+        <el-progress :percentage="progressPct" :stroke-width="10" />
       </div>
     </div>
+
+    <div v-if="g4aMarks.length" class="g4a-marks">
+      <span class="marks-label">G4A 回填：</span>
+      <el-tag v-for="m in g4aMarks" :key="m.key" size="small" type="success" effect="plain">{{ m.label }}</el-tag>
+    </div>
+
+    <div class="conclusion-board" data-testid="g4-conclusion-board">
+      <div class="board-head">
+        <strong>跨表结论口径</strong>
+        <el-tag size="small" :type="worstTagType">{{ worstLabel }}</el-tag>
+        <span class="board-meta">已填 {{ filledCount }}/{{ conclusionSheets.length }}</span>
+      </div>
+      <div class="board-tags">
+        <el-tag
+          v-for="c in conclusionSheets"
+          :key="c.code"
+          size="small"
+          class="concl-tag"
+          :type="optionTagType(c.option)"
+          effect="plain"
+          :class="{ clickable: !!jumpToSection }"
+          @click="goSheet(c.code)"
+        >
+          {{ c.code }} {{ c.option || '未填' }}
+        </el-tag>
+      </div>
+      <p v-if="hasWarnConclusions" class="board-hint">存在 B/C 口径或未填结论，请点击标签跳转补全说明。</p>
+    </div>
+
+    <details class="methodology-hint">
+      <summary>编制提示</summary>
+      <p>推荐工作流：G4A 程序表 → G4-1 审定 → G4-2 明细 → G4-4 利息测算 → G4-5 业务模式 → G4-6 SPPI → G4-7/8 盘点 → G4-9~12 ECL → G4-13 凭证 → G0 函证 → G4-3 调整 → 附注披露。利息差异可推送至 G4-3。</p>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * G4TabDirectory.vue — 底稿目录
+ * G4TabDirectory.vue — G4 底稿目录
  *
- * Spec: .kiro/specs/g4-bond-investment-main/ Req 1.8, 1.9, 12.1~12.4
- * 27行×8列目录页渲染
- * 静态展示为主，支持GtIndexChip索引跳转
- * Left panel: entity info (被审计单位/截止日/编制人/复核人)
- * Right panel: directory table (序号/内容/索引号/备注)
+ * 完全对齐 G8TabDirectory 标准结构：
+ * - 进度条（allResponses 驱动）
+ * - 跨表结论口径看板（tag 网格 + 最差结论 + 跳转）
+ * - G4A 程序表回填标记
+ * - 编制提示（details 折叠）
+ * - inject('jumpToSection') 跳转
  */
-import { ref } from 'vue'
-import GtIndexChip from '../../GtIndexChip.vue'
+import { computed, inject } from 'vue'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const props = defineProps<{
-  htmlData: Record<string, any> | null
-  wpId: string
-  projectId: string
-  isReadonly: boolean
+  allResponses: Map<string, any>
+  availableSheets?: Array<{ sheet_name?: string }>
 }>()
 
-const emit = defineEmits<{ jump: [code: string] }>()
-
-// ═══ 编制信息（从htmlData加载） ═══
-const entityName = ref(props.htmlData?.entityName || '')
-const balanceSheetDate = ref(props.htmlData?.balanceSheetDate || '')
-const preparer = ref(props.htmlData?.preparer || '')
-const reviewer = ref(props.htmlData?.reviewer || '')
-
-// ═══ 27行目录数据 ═══
-interface DirectoryRow {
-  seq: number
-  content: string
-  indexCode: string
-  pages: string
-  preparer: string
-  reviewer: string
-  date: string
-  remark: string
-  status?: 'done' | 'pending' | ''
+// ═══ 底稿清单（适用性全 true，G4 无条件裁剪） ═══
+interface IndexRow {
+  code: string
+  name: string
+  applicable: boolean
 }
 
-const directoryRows = ref<DirectoryRow[]>([
-  // 顺序/文案对齐 Excel《底稿目录》
-  { seq: 0, content: '债权投资实质性程序表', indexCode: 'G4A', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 1, content: '审定表', indexCode: 'G4-1', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 2, content: '附注披露信息（上市公司）', indexCode: '', pages: '', preparer: '', reviewer: '', date: '', remark: '无需打印', status: '' },
-  { seq: 3, content: '附注披露信息（国企）', indexCode: '', pages: '', preparer: '', reviewer: '', date: '', remark: '无需打印', status: '' },
-  { seq: 4, content: '明细表', indexCode: 'G4-2', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 5, content: '调整分录汇总', indexCode: 'G4-3', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 6, content: '利息测算表', indexCode: 'G4-4', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 7, content: '业务模式分析', indexCode: 'G4-5', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 8, content: '合同现金流量特征分析', indexCode: 'G4-6', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 9, content: '有价证券盘点表', indexCode: 'G4-7', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 10, content: '盘点倒轧表', indexCode: 'G4-8', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 11, content: '函证结果汇总表', indexCode: 'G0-1', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 12, content: '核实被函证单位信息', indexCode: 'G0-2', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 13, content: '跟函函证过程控制', indexCode: 'G0-3', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 14, content: '函证差异核对表（证券投资）', indexCode: 'G0-4', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 15, content: '函证差异核对表(非证券投资)', indexCode: 'G0-5', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 16, content: '替代程序检查表', indexCode: 'G0-6', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 17, content: '邮件传真回函可靠性验证', indexCode: 'G0-7', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 18, content: '函证程序舞弊风险评价表', indexCode: 'G0-8', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 19, content: '债权投资三阶段划分', indexCode: 'G4-9', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 20, content: '债权投资减值准备测算表', indexCode: 'G4-10', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 21, content: '预期信用损失的计量测试', indexCode: 'G4-11', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 22, content: '减值准备转回（收回）、核销检查表', indexCode: 'G4-12', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-  { seq: 23, content: '凭证检查表', indexCode: 'G4-13', pages: '', preparer: '', reviewer: '', date: '', remark: '', status: '' },
-])
+const G4_INDEX_ROWS: IndexRow[] = [
+  { code: 'G4A', name: '实质性程序表', applicable: true },
+  { code: 'G4-1', name: '审定表', applicable: true },
+  { code: 'G4-2', name: '明细表', applicable: true },
+  { code: 'G4-3', name: '调整分录汇总', applicable: true },
+  { code: 'G4-4', name: '利息测算表', applicable: true },
+  { code: 'G4-5', name: '业务模式分析', applicable: true },
+  { code: 'G4-6', name: '合同现金流量特征分析', applicable: true },
+  { code: 'G4-7', name: '有价证券盘点表', applicable: true },
+  { code: 'G4-8', name: '盘点倒轧表', applicable: true },
+  { code: 'G4-9', name: '三阶段划分', applicable: true },
+  { code: 'G4-10', name: '减值准备测算表', applicable: true },
+  { code: 'G4-11', name: '预期信用损失计量', applicable: true },
+  { code: 'G4-12', name: '转回核销检查', applicable: true },
+  { code: 'G4-13', name: '凭证检查表', applicable: true },
+]
+
+// ═══ 进度 ═══
+function isSheetComplete(code: string): boolean {
+  if (!props.allResponses || !props.allResponses.entries) return false
+  for (const [key, val] of props.allResponses.entries()) {
+    if (key.startsWith(code) && (val?.conclusion || val?.remark)) return true
+  }
+  return false
+}
+
+const applicableRows = computed(() => G4_INDEX_ROWS.filter(r => r.applicable))
+const completedCount = computed(() => applicableRows.value.filter(r => isSheetComplete(r.code)).length)
+const progressPct = computed(() => {
+  const total = applicableRows.value.length
+  return total > 0 ? Math.round((completedCount.value / total) * 100) : 0
+})
+
+// ═══ G4A 回填标记 ═══
+const g4aMarks = computed(() => {
+  const marks: { key: string; label: string }[] = []
+  const get = (id: string) => props.allResponses?.get?.(id)
+  if (get('G4A-seq2')?.conclusion === 'completed' || get('G4A-seq2')?.remark) {
+    marks.push({ key: 'adjudication', label: '审定表 seq2' })
+  }
+  if (get('G4A-seq4')?.conclusion === 'completed' || get('G4A-seq4')?.remark) {
+    marks.push({ key: 'interest', label: '利息测算 seq4' })
+  }
+  if (get('G4A-seq6')?.conclusion === 'completed' || get('G4A-seq6')?.remark) {
+    marks.push({ key: 'sppi', label: 'SPPI测试 seq6' })
+  }
+  if (get('G4A-seq8')?.conclusion === 'completed' || get('G4A-seq8')?.remark) {
+    marks.push({ key: 'ecl', label: 'ECL减值 seq8' })
+  }
+  if (get('G4A-seq10')?.conclusion === 'completed' || get('G4A-seq10')?.remark) {
+    marks.push({ key: 'voucher', label: '凭证检查 seq10' })
+  }
+  return marks
+})
+
+// ═══ 跨表结论口径看板 ═══
+type ConclusionOption = '' | 'A' | 'B' | 'C'
+
+interface ConclusionSheet {
+  code: string
+  option: ConclusionOption
+  filled: boolean
+}
+
+const CONCLUSION_KEYS: { code: string; itemId: string }[] = [
+  { code: 'G4-1', itemId: 'G4-1-conclusion' },
+  { code: 'G4-2', itemId: 'G4-2-conclusion' },
+  { code: 'G4-4', itemId: 'G4-4-conclusion' },
+  { code: 'G4-5', itemId: 'G4-5-conclusion' },
+  { code: 'G4-6', itemId: 'G4-6-conclusion' },
+  { code: 'G4-9', itemId: 'G4-9-conclusion' },
+  { code: 'G4-10', itemId: 'G4-10-conclusion' },
+  { code: 'G4-11', itemId: 'G4-11-conclusion' },
+  { code: 'G4-13', itemId: 'G4-13-conclusion' },
+]
+
+const conclusionSheets = computed<ConclusionSheet[]>(() => {
+  const map = props.allResponses
+  return CONCLUSION_KEYS.map(({ code, itemId }) => {
+    const raw = map?.get?.(itemId)
+    const text = raw?.conclusion || raw?.remark || ''
+    const option: ConclusionOption = text.startsWith('A') ? 'A'
+      : text.startsWith('B') ? 'B'
+        : text.startsWith('C') ? 'C'
+          : ''
+    return { code, option, filled: !!option }
+  })
+})
+
+const filledCount = computed(() => conclusionSheets.value.filter(c => c.filled).length)
+const hasWarnConclusions = computed(() =>
+  conclusionSheets.value.some(c => !c.filled || c.option === 'B' || c.option === 'C'),
+)
+
+const worstLabel = computed(() => {
+  const opts = conclusionSheets.value.map(c => c.option).filter(Boolean)
+  if (opts.includes('C')) return '存在 C'
+  if (opts.includes('B')) return '存在 B'
+  if (opts.length === conclusionSheets.value.length) return '总体 A'
+  return '结论未齐'
+})
+
+const worstTagType = computed<'success' | 'warning' | 'danger' | 'info'>(() => {
+  const opts = conclusionSheets.value.map(c => c.option).filter(Boolean)
+  if (opts.includes('C')) return 'danger'
+  if (opts.includes('B')) return 'warning'
+  if (opts.length === conclusionSheets.value.length) return 'success'
+  return 'info'
+})
+
+function optionTagType(opt: ConclusionOption): 'success' | 'warning' | 'danger' | 'info' {
+  if (opt === 'A') return 'success'
+  if (opt === 'B') return 'warning'
+  if (opt === 'C') return 'danger'
+  return 'info'
+}
+
+// ═══ 跳转 ═══
+const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
+
+function resolveSheetLabel(code: string): string {
+  if (props.availableSheets?.length) {
+    const hit = props.availableSheets.find(s =>
+      s.sheet_name && s.sheet_name.includes(code),
+    )
+    if (hit?.sheet_name) return hit.sheet_name
+  }
+  return code
+}
+
+function goSheet(code: string) {
+  if (!jumpToSection) return
+  jumpToSection(resolveSheetLabel(code))
+}
 </script>
 
 <style scoped>
-.g4-directory { padding: 12px; font-size: var(--wp-font-size, 13px); }
-.sheet-title { margin: 0 0 16px; font-size: 15px; font-weight: 600; }
-
-.directory-layout { display: grid; grid-template-columns: 280px 1fr; gap: 16px; }
-@media (max-width: 900px) { .directory-layout { grid-template-columns: 1fr; } }
-
-.entity-info { display: flex; flex-direction: column; gap: 12px; }
-.info-desc { width: 100%; }
-
-.methodology-context { position: relative; padding: 12px 12px 12px 16px; background: #fffbe6; border-radius: 4px; }
-.methodology-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: #d48806; border-radius: 4px 0 0 4px; }
-.methodology-content { font-size: 12px; color: #614700; }
-.methodology-content strong { display: block; margin-bottom: 4px; font-size: var(--wp-font-size, 13px); }
-.methodology-content p { margin: 0; line-height: 1.6; }
-
-.directory-table { overflow: auto; }
-.status-done { color: #52c41a; font-size: 12px; }
-.status-pending { color: #909399; font-size: 12px; }
+.g4-dir { font-size: var(--wp-font-size, 13px); }
+.index-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.title { margin: 0; }
+.progress-wrap { flex: 1; min-width: 200px; }
+.g4a-marks { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; font-size: 12px; }
+.marks-label { color: #909399; }
+.conclusion-board {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  border-left: 3px solid #409eff;
+}
+.board-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.board-meta { font-size: 12px; color: #909399; }
+.board-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.concl-tag.clickable { cursor: pointer; }
+.board-hint { margin: 8px 0 0; font-size: 12px; color: #e6a23c; }
+.methodology-hint { margin-top: 12px; font-size: 12px; color: #606266; }
 </style>

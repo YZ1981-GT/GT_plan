@@ -18,13 +18,6 @@
           data-testid="g9-disclosure-pull-adj"
           @click="disc.pullFromAdjudication()"
         >↓ 从 G9-1/G9-2 分项带入</el-button>
-        <el-button
-          size="small"
-          :loading="disc.aiLoading.value"
-          :disabled="isReadonly"
-          :data-testid="variant === 'listed' ? 'g9-disclosure-listed-ai' : 'g9-disclosure-soe-ai'"
-          @click="disc.generateAiConclusion()"
-        >🤖 AI</el-button>
         <GtReviewTrigger :section-id="variant === 'listed' ? 'G9-disclosure-listed' : 'G9-disclosure-soe'" />
       </div>
     </div>
@@ -43,7 +36,7 @@
       :closable="false"
       class="sync-hint"
     >
-      已同步审定数（1504）：{{ fmt(disc.adjudicatedAmount.value) }}；附注{{ disc.colLabels.value.current }}合计
+      已同步审定数（{{ accountLabel }}）：{{ fmt(disc.adjudicatedAmount.value) }}；附注{{ disc.colLabels.value.current }}合计
       {{ fmt(disc.disclosureCurrentSum.value) }} 勾稽一致。
       <el-button link size="small" @click="disc.pullLatestAdjudicated(false)">刷新</el-button>
     </el-alert>
@@ -153,43 +146,7 @@
           <span v-else>{{ fmt(row.priorAmount) }}</span>
         </template>
       </el-table-column>
-
-      <el-table-column label="附注文本" min-width="200">
-        <template #default="{ row }">
-          <div v-if="!row.isTotal" class="note-cell">
-            <el-input
-              v-if="!isReadonly"
-              :model-value="row.noteText"
-              size="small"
-              type="textarea"
-              :rows="1"
-              @update:model-value="(v: string) => disc.updateField(row.rowKey, 'noteText', v)"
-            />
-            <span v-else>{{ row.noteText }}</span>
-            <el-button
-              v-if="!isReadonly"
-              size="small"
-              link
-              :loading="disc.sectionAiLoading.value[row.rowKey]"
-              :data-testid="`g9-disclosure-section-ai-${row.rowKey}`"
-              @click="disc.generateSectionAi(row.rowKey)"
-            >🤖</el-button>
-          </div>
-        </template>
-      </el-table-column>
     </el-table>
-
-    <el-card shadow="never" class="note-card">
-      <template #header>附注汇总</template>
-      <el-input
-        :model-value="disc.noteText.value"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        :disabled="isReadonly"
-        placeholder="附注披露汇总说明…"
-        @update:model-value="disc.updateNoteText"
-      />
-    </el-card>
 
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
@@ -197,31 +154,19 @@
         <p>结构与 Excel 底稿一致：{{ disc.colLabels.value.item }} / {{ disc.colLabels.value.current }} / {{ disc.colLabels.value.prior }} + 合计行。</p>
         <p>建议在 G9-2 填写「工具种类」与「指定 FVTPL」，再点「分项带入」（明细优先于 G9-1 标签汇总）。</p>
         <p>无分项时审定数会写入「其他」——请按种类手工分拆；审定数变更后不会自动覆盖，需点「重新分项带入」。</p>
-        <p>按 CAS 37：有 Level3 余额时应在附注汇总说明公允价值层次及调节过程。</p>
+        <p>有 Level3 余额时，公允价值层次及调节过程见 G9-5。</p>
       </div>
     </details>
-
-    <G9AuditTextCards
-      :wp-id="wpId"
-      :is-readonly="isReadonly"
-      v-model:note="auditNote"
-      v-model:conclusion="auditConclusion"
-      note-ai-section="disclosure-note"
-      conclusion-ai-section="disclosure-conclusion"
-      note-placeholder="填写审计说明：可概述（1）披露项完整性与列报格式合规性核对情况；（2）与审定数勾稽、拟调整事项及其影响。"
-      note-hint="覆盖披露完整性、列报格式及与 G9-1 / G9-5 勾稽。"
-      :related-context="{ variant }"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, toRef, ref, watch } from 'vue'
+import { computed, toRef } from 'vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
-import G9AuditTextCards from '../G9AuditTextCards.vue'
 import G9ImportExportDropdown from '../G9ImportExportDropdown.vue'
 import { useG9Disclosure } from '../../composables/useG9Disclosure'
+import { g9AccountLabel } from '../../composables/g9AccountMatch'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
 const props = defineProps<{
@@ -248,21 +193,11 @@ const objectiveTitle = computed(() =>
     : '审计目标：确认其他非流动金融资产附注（国企格式：项目 / 期末公允价值 / 期初公允价值）披露充分恰当，并与 G9-1 审定勾稽。',
 )
 
-const NOTE_KEY = `G9-disclosure-${props.variant}-audit-note`
-const CONCLUSION_KEY = `G9-disclosure-${props.variant}-audit-conclusion`
-const auditNote = ref(props.allResponses.get(NOTE_KEY)?.remark ?? '')
-const auditConclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.remark ?? '')
-
-watch(auditNote, (v) => {
-  if (!props.isReadonly) props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: v })
-})
-watch(auditConclusion, (v) => {
-  if (!props.isReadonly) props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: v })
-})
-
 function onImported(): void {
   emit('imported')
 }
+
+const accountLabel = computed(() => g9AccountLabel())
 
 function fmt(n: number): string {
   return Number(n || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -282,8 +217,6 @@ function rowClass({ row }: { row: { isTotal?: boolean } }): string {
 .audit-objective { margin-bottom: 8px; }
 .guidance-details { margin-top: 10px; font-size: 12px; color: #606266; }
 .guidance-content p { margin: 4px 0; }
-.note-cell { display: flex; align-items: flex-start; gap: 4px; }
-.note-card { margin-top: 12px; }
 .total-label { font-weight: 600; }
 .formula-cell { font-weight: 600; font-variant-numeric: tabular-nums; }
 :deep(.is-total-row) { background: var(--el-fill-color-light); }

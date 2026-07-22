@@ -279,7 +279,7 @@
                 建议在底稿披露表维护，避免双源不一致。
               </span>
               <span v-else>
-                可跳转至 G7「{{ disclosureJumpTarget?.sheet }}」编辑后点「同步到附注」。
+                可跳转至 {{ disclosureJumpTarget?.wpCode ?? 'G7' }}「{{ disclosureJumpTarget?.sheet }}」编辑后点「同步到附注」。
               </span>
               <span v-if="(currentNote as any)?.last_sync_at" class="gt-de-sync-time">
                 · 最近同步：{{ formatSyncTime((currentNote as any).last_sync_at) }}
@@ -1621,11 +1621,12 @@ function jumpToLastSyncWorkpaper(): void {
   })
 }
 
-/** 附注 → G7 披露表（上市/国企 sheet）；优先同步 wp_id，否则 ACNR 解析 G7 */
+/** 附注 → G7/G10 披露表（上市/国企 sheet）；优先同步 wp_id，否则 ACNR 解析 */
 async function jumpToDisclosureSheet(): Promise<void> {
   const target = disclosureJumpTarget.value
+  const wpFamily = target?.wpCode ?? 'G7'
   if (!target || !projectId.value) {
-    ElMessage.warning('当前章节未关联长期股权投资披露表')
+    ElMessage.warning(`当前章节未关联${wpFamily === 'G10' ? '交易性金融负债' : '长期股权投资'}披露表`)
     return
   }
   jumpingDisclosure.value = true
@@ -1634,15 +1635,15 @@ async function jumpToDisclosureSheet(): Promise<void> {
     if (!wpId) {
       const res = await acnrResolveInstance({
         project_id: projectId.value,
-        parent: 'G7',
-        sheet_code: 'G7',
+        parent: wpFamily,
+        sheet_code: wpFamily,
       })
       if (res?.found && res.wp_id) {
         wpId = res.wp_id
       }
     }
     if (!wpId) {
-      ElMessage.warning('未找到 G7 长期股权投资底稿，请先在项目中生成')
+      ElMessage.warning(`未找到 ${wpFamily} 底稿，请先在项目中生成`)
       return
     }
     router.push({
@@ -1650,7 +1651,7 @@ async function jumpToDisclosureSheet(): Promise<void> {
       query: { sheet: target.sheet },
     })
   } catch {
-    ElMessage.warning('跳转披露表失败，请手动打开 G7 底稿')
+    ElMessage.warning(`跳转披露表失败，请手动打开 ${wpFamily} 底稿`)
   } finally {
     jumpingDisclosure.value = false
   }

@@ -104,13 +104,13 @@ describe('G8 集成: HTML_SHEETS', () => {
 })
 
 // ---------------------------------------------------------------------------
-// 3. 可导入导出 5 张表
+// 3. 可导入导出 G8-2~6 + 附注
 // ---------------------------------------------------------------------------
 describe('G8 集成: 可导入导出', () => {
-  it('G8 支持5 张表动态行表格可导入导出', () => {
-    expect(G8_IMPORTABLE_SHEETS).toHaveLength(5)
+  it('G8 支持 G8-2~6 与附注导入导出', () => {
+    expect(G8_IMPORTABLE_SHEETS).toHaveLength(7)
     const codes = G8_IMPORTABLE_SHEETS.map((s) => s.code)
-    expect(codes).toEqual(['G8-2', 'G8-3', 'G8-4', 'G8-5', 'G8-6'])
+    expect(codes).toEqual(['G8-2', 'G8-3', 'G8-4', 'G8-5', 'G8-6', '附注上市', '附注国企'])
   })
 })
 

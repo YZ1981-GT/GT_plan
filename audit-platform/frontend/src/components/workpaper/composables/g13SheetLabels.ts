@@ -1,6 +1,20 @@
 /** G13 sheet 编码 → render-config sheet_name 映射 */
 import type { GCycleIndexRowDef } from './g12SheetLabels'
 
+export interface G13AProcedureMark {
+  key: string
+  label: string
+}
+
+export function collectG13AProcedureMarks(m: Map<string, any>): G13AProcedureMark[] {
+  const marks: G13AProcedureMark[] = []
+  const voucher = m.get('G13A-voucher-complete')
+  if (voucher?.conclusion === 'completed' || voucher?.remark) {
+    marks.push({ key: 'voucher', label: '凭证/程序回填' })
+  }
+  return marks
+}
+
 export const G13_SHEET_LABEL_MAP: Record<string, string> = {
   G13: '底稿目录',
   'G13-目录': '底稿目录',
@@ -64,7 +78,8 @@ export function isG13SheetComplete(code: string, m: Map<string, any>): boolean {
     case 'G13-目录':
       return true
     case 'G13A':
-      return [...m.keys()].some(k => k.startsWith('G13-proc-') || k.startsWith('G13A-'))
+      return collectG13AProcedureMarks(m).length > 0
+        || [...m.keys()].some(k => k.startsWith('G13A-'))
     case 'G13-1':
       return m.has('G13-adj-prior') || m.has('G13-1-adjudicated-amount')
     case 'G13-2':

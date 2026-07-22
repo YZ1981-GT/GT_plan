@@ -5,6 +5,11 @@ import {
   calcContraEndBalance,
   calcNetValue,
   calcSubtotal,
+  calcImpairmentBookValue,
+  calcImpairmentRecoverableAmount,
+  calcRequiredImpairment,
+  calcImpairmentSupplement,
+  calcImpairmentOverProvision,
 } from './useH8FormulaEngine'
 
 describe('useH8FormulaEngine', () => {
@@ -51,6 +56,27 @@ describe('useH8FormulaEngine', () => {
     })
     it('handles NaN in array → treated as 0', () => {
       expect(calcSubtotal([100, NaN, 200])).toBe(300)
+    })
+  })
+
+  describe('H8-10 impairment formulas', () => {
+    it('账面价值② = 原值 − 累计折旧（不含减值）', () => {
+      expect(calcImpairmentBookValue(10000, 3000)).toBe(7000)
+    })
+    it('无迹象时⑤⑥为 0', () => {
+      expect(calcImpairmentRecoverableAmount(100, 200, false)).toBe(0)
+      expect(calcRequiredImpairment(1000, 100, false)).toBe(0)
+    })
+    it('有迹象时⑤ = max(③,④)，⑥ = max(②−⑤,0)', () => {
+      expect(calcImpairmentRecoverableAmount(80, 120, true)).toBe(120)
+      expect(calcRequiredImpairment(1000, 120, true)).toBe(880)
+      expect(calcRequiredImpairment(100, 120, true)).toBe(0)
+    })
+    it('⑧不得为负；⑨记录多提待查', () => {
+      expect(calcImpairmentSupplement(500, 200)).toBe(300)
+      expect(calcImpairmentSupplement(200, 500)).toBe(0)
+      expect(calcImpairmentOverProvision(200, 500)).toBe(300)
+      expect(calcImpairmentOverProvision(500, 200)).toBe(0)
     })
   })
 })

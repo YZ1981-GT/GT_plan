@@ -280,7 +280,7 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         columns: subsidiaryBasicColumns,
         rows: blankRows(
           'subsidiary',
-          10,
+          3,
           subsidiaryBasicColumns,
           index => `被投资单位基本信息G7-4 第${12 + index}行`,
         ),

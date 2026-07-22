@@ -1,237 +1,306 @@
 <template>
   <div class="i2-project-detail">
-    <!-- Section Header -->
     <div class="section-header">
-      <span class="section-title">I2-7 研发项目构成明细表（73列5区段）</span>
+      <span class="section-title">I2-7 研发项目构成明细表</span>
       <div class="section-actions">
-        <el-button size="small" type="default" text @click="handleReview">
-          复核
-        </el-button>
+        <el-button size="small" type="default" text @click="handleReview">复核</el-button>
       </div>
     </div>
 
-    <!-- 审计目标 -->
-    <el-alert type="info" :closable="false" class="objective-alert"
-      title="审计目标：核查各研发项目费用构成的完整性与归集准确性，确认材料费、人工费、折旧摊销及其他费用按项目准确归集并与明细表勾稽一致。" />
+    <!-- 一、审计目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert">
+      <template #title>一、审计目标</template>
+      <ol class="obj-list">
+        <li>确认所有应当记录的研发支出均已记录，相关披露均已包括（完整性）。</li>
+        <li>确认与研发支出有关的金额及其他数据已恰当记录，相关披露已得到恰当计量和描述（准确性、计价和分摊、分类和可理解性）。</li>
+      </ol>
+    </el-alert>
 
-    <!-- 编制提示 -->
-    <details class="guidance-details">
-      <summary>📋 编制提示</summary>
-      <div class="guidance-content">
-        <p>1. 按研发项目分行归集各费用性质（材料/人工/折旧摊销/其他），核对各区段小计与合计计算准确；</p>
-        <p>2. 将本表费用合计与 I2-2 研发支出明细表交叉验证，差异为零方可通过；</p>
-        <p>3. 依据 CAS6《无形资产》及研发费用相关规定。</p>
-      </div>
-    </details>
+    <div class="methodology-context">
+      <p>
+        <b>编制逻辑：</b>
+        按项目分行，按「期初 → 本期增加 → 本期减少 → 期末 → 审计调整 → 审定」滚动；
+        每段拆费用性质（材料/人工/折旧摊销/能耗/委外/其他），并区分资本化与费用化。
+        勾稽：期末＝期初＋增加－减少；审定＝期末＋调整；费用性质合计≈资本化＋费用化。
+        本期增加直接材料合计可供 I2-8 检查比例分母取数。
+      </p>
+    </div>
 
-    <!-- 索引工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-right">
         <GtIndexChip value="wp:I2" :context-project-id="props.projectId" />
-        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+        <GtIndexChip value="wp:I2-2" :context-project-id="props.projectId" />
+        <GtIndexChip value="wp:I2-6" :context-project-id="props.projectId" />
+        <GtIndexChip value="wp:I2-8" :context-project-id="props.projectId" />
+        <el-tag size="small" type="info">项目 {{ summary.rowCount }}</el-tag>
+        <el-tag size="small" type="success">本期增加 {{ fmtNum(summary.increaseTotal) }}</el-tag>
+        <el-tag size="small">其中资本化 {{ fmtNum(summary.increaseCapitalized) }}</el-tag>
+        <el-tag size="small">费用化 {{ fmtNum(summary.increaseExpensed) }}</el-tag>
+        <el-tag v-if="!i6ExpenseCross.ready" size="small" type="info">I6费用化未同步</el-tag>
+        <el-tag
+          v-else-if="i6ExpenseCross.diff != null && Math.abs(i6ExpenseCross.diff) > 0.01"
+          size="small"
+          type="danger"
+        >
+          vs I6费用化差 {{ fmtNum(i6ExpenseCross.diff) }}
+        </el-tag>
+        <el-tag v-else-if="i6ExpenseCross.ready" size="small" type="success">
+          ✓ I6费用化 {{ fmtNum(i6ExpenseCross.i6) }}
+        </el-tag>
+        <el-tag v-if="summary.treatmentMismatchCount > 0" size="small" type="danger">
+          性质≠处理 {{ summary.treatmentMismatchCount }}
+        </el-tag>
+        <el-tag
+          v-if="crossValidateI22Diff != null && crossValidateI22Diff !== 0"
+          size="small"
+          type="danger"
+        >
+          与I2-2差异 {{ fmtNum(crossValidateI22Diff) }}
+        </el-tag>
+        <el-tag v-else-if="crossValidateI22Diff === 0" size="small" type="success">✓ I2-2一致</el-tag>
+        <el-button size="small" @click="emit('navigate-sheet', 'I2-6')">← I2-6</el-button>
+        <el-button size="small" @click="emit('navigate-sheet', 'I2-8')">I2-8 →</el-button>
       </div>
     </div>
 
-    <!-- 方法论上下文 -->
-    <div class="methodology-context">
-      <p>本表按研发项目分行，按费用性质分5区段（基础/材料费/人工费/折旧摊销/其他费用），合计应与I2-2明细表交叉验证一致。</p>
-    </div>
-
-    <!-- 5区段 Tabs -->
-    <el-tabs v-model="activeSegment" type="border-card" class="segment-tabs">
-      <el-tab-pane label="基础信息" name="basic">
-        <el-table :data="rows" border size="small" class="detail-table" max-height="520">
-          <el-table-column type="index" label="#" width="40" fixed />
-          <el-table-column prop="projectName" label="项目名称" min-width="180" fixed>
-            <template #default="{ row }">
-              <el-input v-model="row.projectName" size="small" placeholder="项目名称" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="projectCode" label="项目编号" min-width="120">
-            <template #default="{ row }">
-              <el-input v-model="row.projectCode" size="small" placeholder="编号" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="startDate" label="立项日期" min-width="130">
-            <template #default="{ row }">
-              <el-date-picker v-model="row.startDate" type="date" size="small" value-format="YYYY-MM-DD" placeholder="立项日" style="width:100%" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="stage" label="阶段" min-width="100">
-            <template #default="{ row }">
-              <el-select v-model="row.stage" size="small" placeholder="阶段" style="width:100%">
-                <el-option label="研究" value="研究" />
-                <el-option label="开发" value="开发" />
-                <el-option label="完成" value="完成" />
-              </el-select>
-            </template>
-          </el-table-column>
-          <el-table-column prop="totalAmount" label="费用合计" min-width="120" align="right">
-            <template #default="{ row }">
-              <span class="formula-cell">{{ fmtNum(row.totalAmount) }}</span>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-tab-pane>
-
-      <el-tab-pane label="材料费" name="material">
-        <el-table :data="rows" border size="small" class="detail-table" max-height="520">
-          <el-table-column type="index" label="#" width="40" fixed />
-          <el-table-column prop="projectName" label="项目名称" min-width="160" fixed />
-          <el-table-column prop="materialDirect" label="直接材料" min-width="110" align="right">
-            <template #default="{ row }">
-              <el-input-number v-model="row.materialDirect" size="small" :controls="false" :precision="2" @change="recalcRow(row)" style="width:100%" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="materialAux" label="辅助材料" min-width="110" align="right">
-            <template #default="{ row }">
-              <el-input-number v-model="row.materialAux" size="small" :controls="false" :precision="2" @change="recalcRow(row)" style="width:100%" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="materialFuel" label="燃料动力" min-width="110" align="right">
-            <template #default="{ row }">
-              <el-input-number v-model="row.materialFuel" size="small" :controls="false" :precision="2" @change="recalcRow(row)" style="width:100%" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="materialSubtotal" label="材料费小计" min-width="120" align="right">
-            <template #default="{ row }">
-              <span class="formula-cell">{{ fmtNum(row.materialSubtotal) }}</span>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-tab-pane>
-
-      <el-tab-pane label="人工费" name="labor">
-        <el-table :data="rows" border size="small" class="detail-table" max-height="520">
-          <el-table-column type="index" label="#" width="40" fixed />
-          <el-table-column prop="projectName" label="项目名称" min-width="160" fixed />
-          <el-table-column prop="laborSalary" label="工资薪金" min-width="110" align="right">
-            <template #default="{ row }">
-              <el-input-number v-model="row.laborSalary" size="small" :controls="false" :precision="2" @change="recalcRow(row)" style="width:100%" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="laborBonus" label="奖金津贴" min-width="110" align="right">
-            <template #default="{ row }">
-              <el-input-number v-model="row.laborBonus" size="small" :controls="false" :precision="2" @change="recalcRow(row)" style="width:100%" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="laborInsurance" label="五险一金" min-width="110" align="right">
-            <template #default="{ row }">
-              <el-input-number v-model="row.laborInsurance" size="small" :controls="false" :precision="2" @change="recalcRow(row)" style="width:100%" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="laborSubtotal" label="人工费小计" min-width="120" align="right">
-            <template #default="{ row }">
-              <span class="formula-cell">{{ fmtNum(row.laborSubtotal) }}</span>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-tab-pane>
-
-      <el-tab-pane label="折旧摊销" name="depreciation">
-        <el-table :data="rows" border size="small" class="detail-table" max-height="520">
-          <el-table-column type="index" label="#" width="40" fixed />
-          <el-table-column prop="projectName" label="项目名称" min-width="160" fixed />
-          <el-table-column prop="depEquipment" label="设备折旧" min-width="110" align="right">
-            <template #default="{ row }">
-              <el-input-number v-model="row.depEquipment" size="small" :controls="false" :precision="2" @change="recalcRow(row)" style="width:100%" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="depBuilding" label="房屋折旧" min-width="110" align="right">
-            <template #default="{ row }">
-              <el-input-number v-model="row.depBuilding" size="small" :controls="false" :precision="2" @change="recalcRow(row)" style="width:100%" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="depIntangible" label="无形摊销" min-width="110" align="right">
-            <template #default="{ row }">
-              <el-input-number v-model="row.depIntangible" size="small" :controls="false" :precision="2" @change="recalcRow(row)" style="width:100%" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="depSubtotal" label="折旧摊销小计" min-width="130" align="right">
-            <template #default="{ row }">
-              <span class="formula-cell">{{ fmtNum(row.depSubtotal) }}</span>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-tab-pane>
-
-      <el-tab-pane label="其他费用" name="other">
-        <el-table :data="rows" border size="small" class="detail-table" max-height="520">
-          <el-table-column type="index" label="#" width="40" fixed />
-          <el-table-column prop="projectName" label="项目名称" min-width="160" fixed />
-          <el-table-column prop="otherDesign" label="设计费" min-width="110" align="right">
-            <template #default="{ row }">
-              <el-input-number v-model="row.otherDesign" size="small" :controls="false" :precision="2" @change="recalcRow(row)" style="width:100%" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="otherTest" label="检测费" min-width="110" align="right">
-            <template #default="{ row }">
-              <el-input-number v-model="row.otherTest" size="small" :controls="false" :precision="2" @change="recalcRow(row)" style="width:100%" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="otherTravel" label="差旅费" min-width="110" align="right">
-            <template #default="{ row }">
-              <el-input-number v-model="row.otherTravel" size="small" :controls="false" :precision="2" @change="recalcRow(row)" style="width:100%" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="otherMisc" label="其他" min-width="110" align="right">
-            <template #default="{ row }">
-              <el-input-number v-model="row.otherMisc" size="small" :controls="false" :precision="2" @change="recalcRow(row)" style="width:100%" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="otherSubtotal" label="其他费用小计" min-width="130" align="right">
-            <template #default="{ row }">
-              <span class="formula-cell">{{ fmtNum(row.otherSubtotal) }}</span>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-tab-pane>
-    </el-tabs>
-
-    <!-- 合计行 -->
-    <div class="totals-bar">
-      <span class="totals-label">合计：</span>
-      <el-tag type="info" size="small">材料费 {{ fmtNum(totals.material) }}</el-tag>
-      <el-tag type="info" size="small">人工费 {{ fmtNum(totals.labor) }}</el-tag>
-      <el-tag type="info" size="small">折旧摊销 {{ fmtNum(totals.depreciation) }}</el-tag>
-      <el-tag type="info" size="small">其他费用 {{ fmtNum(totals.other) }}</el-tag>
-      <el-tag type="primary" size="small">总计 {{ fmtNum(totals.total) }}</el-tag>
-      <!-- 交叉验证 I2-2 -->
-      <el-tag v-if="crossValidateI2_2Diff !== 0" type="danger" size="small">
-        ⚠ 与I2-2差异 {{ fmtNum(crossValidateI2_2Diff) }}
-      </el-tag>
-      <el-tag v-else type="success" size="small">✓ I2-2一致</el-tag>
-    </div>
-
-    <!-- 行操作 -->
-    <div class="table-actions">
-      <el-button size="small" type="primary" plain @click="handleAddRow">+ 新增行</el-button>
-      <el-button size="small" type="success" @click="handleSave">保存</el-button>
-    </div>
-
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
-      <template #header><span>审计说明</span></template>
-      <el-input type="textarea" :model-value="auditNote" :disabled="isReadonly"
-        :autosize="{ minRows: 5 }" placeholder="记录检查过程、发现的问题及处理..." @change="saveAuditNote" />
+    <!-- 二、审计过程 -->
+    <el-card shadow="never" class="block-card">
+      <template #header><span>二、审计过程</span></template>
+      <el-input
+        type="textarea"
+        :model-value="auditProcess"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="简述项目清单来源、费用归集方法、资本化/费用化划分依据（可索引 I2-6）、与 I2-2/I6 勾稽步骤…"
+        @change="(v: string) => saveField(STORAGE_PROCESS, v)"
+      />
     </el-card>
 
-    <!-- 审计结论 -->
+    <!-- 三、构成明细（按滚动阶段分 Tab，避免 73 列横向不可用） -->
+    <el-card shadow="never" class="block-card">
+      <template #header>
+        <div class="block-title">
+          <span>三、研发项目构成明细</span>
+          <div class="title-actions">
+            <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleAddRow">+ 新增项目</el-button>
+            <el-button size="small" type="success" :disabled="isReadonly" @click="handleSave">保存</el-button>
+          </div>
+        </div>
+      </template>
+
+      <el-tabs v-model="activeStage" type="border-card" class="stage-tabs">
+        <el-tab-pane label="汇总" name="overview">
+          <el-table :data="rows" border size="small" max-height="480" show-summary :summary-method="overviewSummary">
+            <el-table-column type="index" label="#" width="40" fixed />
+            <el-table-column prop="projectCode" label="项目编号" min-width="100" fixed>
+              <template #default="{ row }">
+                <el-input v-if="!isReadonly" v-model="row.projectCode" size="small" />
+                <span v-else>{{ row.projectCode || '—' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="projectName" label="项目名称" min-width="140" fixed>
+              <template #default="{ row }">
+                <el-input v-if="!isReadonly" v-model="row.projectName" size="small" />
+                <span v-else>{{ row.projectName || '—' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="研发周期" min-width="200">
+              <template #default="{ row }">
+                <div class="period-cell">
+                  <el-date-picker
+                    v-if="!isReadonly"
+                    v-model="row.periodStart"
+                    type="date"
+                    size="small"
+                    value-format="YYYY-MM-DD"
+                    placeholder="起"
+                    style="width:110px"
+                  />
+                  <span v-else>{{ row.periodStart || '—' }}</span>
+                  <span class="tilde">~</span>
+                  <el-date-picker
+                    v-if="!isReadonly"
+                    v-model="row.periodEnd"
+                    type="date"
+                    size="small"
+                    value-format="YYYY-MM-DD"
+                    placeholder="止"
+                    style="width:110px"
+                  />
+                  <span v-else>{{ row.periodEnd || '—' }}</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="stage" label="项目阶段" width="100">
+              <template #default="{ row }">
+                <el-select v-if="!isReadonly" v-model="row.stage" size="small" style="width:100%">
+                  <el-option label="研究" value="研究" />
+                  <el-option label="开发" value="开发" />
+                  <el-option label="完成" value="完成" />
+                </el-select>
+                <span v-else>{{ row.stage || '—' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="本期增加合计" width="120" align="right">
+              <template #default="{ row }">
+                <span class="formula-cell">{{ fmtNum(blockTotal(row.increase)) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="其中资本化" width="110" align="right">
+              <template #default="{ row }">
+                <span class="formula-cell">{{ fmtNum(row.increase.capitalized) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="其中费用化" width="110" align="right">
+              <template #default="{ row }">
+                <span class="formula-cell">{{ fmtNum(row.increase.expensed) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="期末审定合计" width="120" align="right">
+              <template #default="{ row }">
+                <span class="formula-cell">{{ fmtNum(blockTotal(row.audited)) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="直接材料(增)" width="110" align="right">
+              <template #default="{ row }">
+                <span>{{ fmtNum(row.increase.material) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column v-if="!isReadonly" label="" width="56" fixed="right" align="center">
+              <template #default="{ row }">
+                <el-button size="small" type="danger" text @click="removeRow(row.rowId)">删</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+
+        <el-tab-pane
+          v-for="sk in stageTabs"
+          :key="sk"
+          :label="I2_PROJECT_STAGE_LABELS[sk]"
+          :name="sk"
+        >
+          <el-alert
+            v-if="!isStageEditable(sk)"
+            type="info"
+            :closable="false"
+            show-icon
+            class="formula-tip"
+            :title="sk === 'ending'
+              ? '账面期末余额 = 期初 + 本期增加 − 本期减少（自动计算）'
+              : '期末审定金额 = 账面期末余额 + 审计调整（自动计算）'"
+          />
+          <el-table
+            :data="rows"
+            border
+            size="small"
+            max-height="480"
+            :row-class-name="({ row }) => rowClassForStage(row, sk)"
+            show-summary
+            :summary-method="(p) => stageSummary(p, sk)"
+          >
+            <el-table-column type="index" label="#" width="40" fixed />
+            <el-table-column prop="projectName" label="项目名称" min-width="130" fixed>
+              <template #default="{ row }">{{ row.projectName || '—' }}</template>
+            </el-table-column>
+            <el-table-column
+              v-for="ck in I2_PROJECT_COST_KEYS"
+              :key="ck"
+              :label="I2_PROJECT_COST_LABELS[ck]"
+              :min-width="ck === 'depreciation' || ck === 'capitalized' || ck === 'expensed' ? 110 : 100"
+              align="right"
+            >
+              <template #default="{ row }">
+                <el-input-number
+                  v-if="!isReadonly && isStageEditable(sk)"
+                  v-model="row[sk][ck]"
+                  size="small"
+                  :controls="false"
+                  :precision="2"
+                  style="width:100%"
+                  @change="onCostChange(row)"
+                />
+                <span
+                  v-else
+                  :class="{
+                    'formula-cell': !isStageEditable(sk),
+                    'mismatch-text': isTreatmentKey(ck) && hasTreatmentMismatch(row[sk]),
+                  }"
+                >{{ fmtNum(row[sk][ck]) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="性质合计" width="100" align="right">
+              <template #default="{ row }">
+                <span :class="{ 'mismatch-text': hasTreatmentMismatch(row[sk]) }">
+                  {{ fmtNum(costNatureSum(row[sk])) }}
+                </span>
+              </template>
+            </el-table-column>
+            <el-table-column label="处理合计" width="100" align="right">
+              <template #default="{ row }">
+                <span :class="{ 'mismatch-text': hasTreatmentMismatch(row[sk]) }">
+                  {{ fmtNum(costTreatmentSum(row[sk])) }}
+                </span>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+      </el-tabs>
+
+      <div class="totals-bar">
+        <span>本期增加：<b>{{ fmtNum(summary.increaseTotal) }}</b></span>
+        <span>资本化：<b>{{ fmtNum(summary.increaseCapitalized) }}</b></span>
+        <span>费用化：<b>{{ fmtNum(summary.increaseExpensed) }}</b></span>
+        <span>期末审定：<b>{{ fmtNum(summary.auditedTotal) }}</b></span>
+        <span>材料(增)→I2-8：<b>{{ fmtNum(summary.materialIncreaseTotal) }}</b></span>
+      </div>
+    </el-card>
+
+    <!-- 四、审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><span>四、审计说明</span></template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 4 }"
+        placeholder="记录费用归集异常、资本化/费用化划分差异、与 I2-2/I6 勾稽差异及处理…"
+        @change="(v: string) => saveField(STORAGE_NOTE, v)"
+      />
+    </el-card>
+
+    <!-- 五、审计结论 -->
     <el-card shadow="never" class="audit-conclusion-card">
-      <template #header><span>审计结论</span></template>
-      <el-input type="textarea" :model-value="auditConclusion" :disabled="isReadonly"
-        :autosize="{ minRows: 3 }" placeholder="填写审计结论..." @change="saveAuditConclusion" />
+      <template #header><span>五、审计结论</span></template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="基于构成明细与滚动勾稽结果，对研发支出完整性与计量准确性给出结论…"
+        @change="(v: string) => saveField(STORAGE_CONCLUSION, v)"
+      />
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, inject, onMounted } from 'vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { toRef, inject } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
-import { calcSubtotal } from '../../composables/useI2FormulaEngine'
-
-// ─── Props & Emits ───────────────────────────────────────────────────────────
+import {
+  useI2ProjectDetail,
+  I2_PROJECT_COST_KEYS,
+  I2_PROJECT_COST_LABELS,
+  I2_PROJECT_STAGE_LABELS,
+  costNatureSum,
+  costTreatmentSum,
+  hasTreatmentMismatch,
+  type I2ProjectDetailRow,
+  type I2ProjectStageKey,
+  type I2ProjectCostKey,
+  type I2ProjectCostBlock,
+} from '../../composables/useI2ProjectDetail'
 
 const props = defineProps<{
   sheetName: string
@@ -242,147 +311,51 @@ const props = defineProps<{
   isReadonly?: boolean
 }>()
 
-const emit = defineEmits<{
-  'save': []
-  'navigate-sheet': [sheetName: string]
-}>()
-
+const emit = defineEmits<{ save: []; 'navigate-sheet': [sheetName: string] }>()
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+const allResponsesRef = toRef(props, 'allResponses')
+const {
+  rows,
+  auditProcess,
+  auditNote,
+  auditConclusion,
+  activeStage,
+  summary,
+  crossValidateI22Diff,
+  i6ExpenseCross,
+  addRow,
+  removeRow,
+  onCostChange,
+  isStageEditable,
+  persistAll,
+  saveField,
+  STORAGE_PROCESS,
+  STORAGE_NOTE,
+  STORAGE_CONCLUSION,
+} = useI2ProjectDetail(allResponsesRef, { saveResponse: props.saveResponse })
 
-interface ProjectDetailRow {
-  rowId: string
-  projectName: string
-  projectCode: string
-  startDate: string
-  stage: string
-  // 材料费
-  materialDirect: number
-  materialAux: number
-  materialFuel: number
-  materialSubtotal: number
-  // 人工费
-  laborSalary: number
-  laborBonus: number
-  laborInsurance: number
-  laborSubtotal: number
-  // 折旧摊销
-  depEquipment: number
-  depBuilding: number
-  depIntangible: number
-  depSubtotal: number
-  // 其他费用
-  otherDesign: number
-  otherTest: number
-  otherTravel: number
-  otherMisc: number
-  otherSubtotal: number
-  // 合计
-  totalAmount: number
+const stageTabs: I2ProjectStageKey[] = [
+  'begin',
+  'increase',
+  'decrease',
+  'ending',
+  'adjustment',
+  'audited',
+]
+
+function blockTotal(block: I2ProjectCostBlock): number {
+  const t = costTreatmentSum(block)
+  return t || costNatureSum(block)
 }
 
-// ─── State ───────────────────────────────────────────────────────────────────
-
-const STORAGE_KEY = 'I2-7-rows'
-const activeSegment = ref('basic')
-const rows = ref<ProjectDetailRow[]>([])
-
-// ─── Load ────────────────────────────────────────────────────────────────────
-
-function loadData() {
-  const raw = props.allResponses.get(STORAGE_KEY)
-  if (!raw) { rows.value = []; return }
-  try {
-    const parsed = typeof raw === 'string' ? JSON.parse(raw) : (raw.remark ? JSON.parse(raw.remark) : raw)
-    if (Array.isArray(parsed)) {
-      rows.value = parsed.map(normalizeRow)
-    }
-  } catch { rows.value = [] }
+function isTreatmentKey(ck: I2ProjectCostKey): boolean {
+  return ck === 'capitalized' || ck === 'expensed'
 }
 
-// ─── 审计说明 / 审计结论 ───
-const AUDIT_NOTE_KEY = 'I2-7-audit-note'
-const AUDIT_CONCLUSION_KEY = 'I2-7-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-function readRemark(key: string): string {
-  const raw = props.allResponses.get(key)
-  if (raw == null) return ''
-  return typeof raw === 'string' ? raw : (raw.remark ?? '')
+function rowClassForStage(row: I2ProjectDetailRow, sk: I2ProjectStageKey) {
+  return hasTreatmentMismatch(row[sk]) ? 'row-mismatch' : ''
 }
-function hydrateAudit() { auditNote.value = readRemark(AUDIT_NOTE_KEY); auditConclusion.value = readRemark(AUDIT_CONCLUSION_KEY) }
-function saveAuditNote(val: string) { auditNote.value = val; void props.saveResponse('I2-7', { [AUDIT_NOTE_KEY]: val }) }
-function saveAuditConclusion(val: string) { auditConclusion.value = val; void props.saveResponse('I2-7', { [AUDIT_CONCLUSION_KEY]: val }) }
-
-watch(() => props.allResponses, () => { loadData(); hydrateAudit() }, { immediate: true })
-onMounted(hydrateAudit)
-
-function normalizeRow(r: any): ProjectDetailRow {
-  const row: ProjectDetailRow = {
-    rowId: r.rowId || `r-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    projectName: r.projectName || '',
-    projectCode: r.projectCode || '',
-    startDate: r.startDate || '',
-    stage: r.stage || '',
-    materialDirect: Number(r.materialDirect) || 0,
-    materialAux: Number(r.materialAux) || 0,
-    materialFuel: Number(r.materialFuel) || 0,
-    materialSubtotal: 0,
-    laborSalary: Number(r.laborSalary) || 0,
-    laborBonus: Number(r.laborBonus) || 0,
-    laborInsurance: Number(r.laborInsurance) || 0,
-    laborSubtotal: 0,
-    depEquipment: Number(r.depEquipment) || 0,
-    depBuilding: Number(r.depBuilding) || 0,
-    depIntangible: Number(r.depIntangible) || 0,
-    depSubtotal: 0,
-    otherDesign: Number(r.otherDesign) || 0,
-    otherTest: Number(r.otherTest) || 0,
-    otherTravel: Number(r.otherTravel) || 0,
-    otherMisc: Number(r.otherMisc) || 0,
-    otherSubtotal: 0,
-    totalAmount: 0,
-  }
-  recalcRow(row)
-  return row
-}
-
-// ─── Formulas ────────────────────────────────────────────────────────────────
-
-function recalcRow(row: ProjectDetailRow) {
-  row.materialSubtotal = calcSubtotal([row.materialDirect, row.materialAux, row.materialFuel])
-  row.laborSubtotal = calcSubtotal([row.laborSalary, row.laborBonus, row.laborInsurance])
-  row.depSubtotal = calcSubtotal([row.depEquipment, row.depBuilding, row.depIntangible])
-  row.otherSubtotal = calcSubtotal([row.otherDesign, row.otherTest, row.otherTravel, row.otherMisc])
-  row.totalAmount = calcSubtotal([row.materialSubtotal, row.laborSubtotal, row.depSubtotal, row.otherSubtotal])
-}
-
-// ─── Computed: Totals ────────────────────────────────────────────────────────
-
-const totals = computed(() => ({
-  material: calcSubtotal(rows.value.map(r => r.materialSubtotal)),
-  labor: calcSubtotal(rows.value.map(r => r.laborSubtotal)),
-  depreciation: calcSubtotal(rows.value.map(r => r.depSubtotal)),
-  other: calcSubtotal(rows.value.map(r => r.otherSubtotal)),
-  total: calcSubtotal(rows.value.map(r => r.totalAmount)),
-}))
-
-// Cross-validate with I2-2
-const crossValidateI2_2Diff = computed(() => {
-  const i2_2Raw = props.allResponses.get('I2-2-rows')
-  if (!i2_2Raw) return 0
-  try {
-    const parsed = typeof i2_2Raw === 'string' ? JSON.parse(i2_2Raw) : (i2_2Raw.remark ? JSON.parse(i2_2Raw.remark) : i2_2Raw)
-    if (Array.isArray(parsed)) {
-      const i2_2Total = parsed.reduce((sum: number, r: any) => sum + (Number(r.totalInvestment) || 0), 0)
-      return Math.round((totals.value.total - i2_2Total) * 100) / 100
-    }
-  } catch { /* ignore */ }
-  return 0
-})
-
-// ─── Actions ─────────────────────────────────────────────────────────────────
 
 async function handleAddRow() {
   try {
@@ -391,32 +364,61 @@ async function handleAddRow() {
       cancelButtonText: '取消',
     })
     if (value?.trim()) {
-      const newRow = normalizeRow({ projectName: value.trim() })
-      rows.value.push(newRow)
+      addRow({ projectName: value.trim() })
       ElMessage.success(`已添加：${value.trim()}`)
     }
   } catch { /* cancelled */ }
 }
 
 async function handleSave() {
-  const persistData = rows.value.map(r => ({
-    rowId: r.rowId, projectName: r.projectName, projectCode: r.projectCode,
-    startDate: r.startDate, stage: r.stage,
-    materialDirect: r.materialDirect, materialAux: r.materialAux, materialFuel: r.materialFuel,
-    laborSalary: r.laborSalary, laborBonus: r.laborBonus, laborInsurance: r.laborInsurance,
-    depEquipment: r.depEquipment, depBuilding: r.depBuilding, depIntangible: r.depIntangible,
-    otherDesign: r.otherDesign, otherTest: r.otherTest, otherTravel: r.otherTravel, otherMisc: r.otherMisc,
-  }))
-  await props.saveResponse('I2-7', { [STORAGE_KEY]: JSON.stringify(persistData) })
+  await persistAll()
   emit('save')
   ElMessage.success('研发项目构成明细表已保存')
 }
 
-function handleReview() { openReviewDialog('I2-7-研发项目构成明细') }
+function handleReview() {
+  openReviewDialog('I2-7-研发项目构成明细')
+}
 
 function fmtNum(v: number): string {
-  if (v == null || isNaN(v)) return '—'
+  if (v == null || Number.isNaN(v)) return '—'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function overviewSummary({ columns }: { columns: { property?: string; label?: string }[] }) {
+  return columns.map((col, i) => {
+    if (i === 0) return '合计'
+    const label = col.label || ''
+    if (label.includes('本期增加合计')) return fmtNum(summary.value.increaseTotal)
+    if (label.includes('其中资本化')) return fmtNum(summary.value.increaseCapitalized)
+    if (label.includes('其中费用化')) return fmtNum(summary.value.increaseExpensed)
+    if (label.includes('期末审定')) return fmtNum(summary.value.auditedTotal)
+    if (label.includes('直接材料')) return fmtNum(summary.value.materialIncreaseTotal)
+    return ''
+  })
+}
+
+function stageSummary(
+  { columns }: { columns: { property?: string; label?: string }[] },
+  sk: I2ProjectStageKey,
+) {
+  return columns.map((col, i) => {
+    if (i === 0) return '合计'
+    const label = col.label || ''
+    for (const ck of I2_PROJECT_COST_KEYS) {
+      if (label === I2_PROJECT_COST_LABELS[ck]) {
+        const sum = rows.value.reduce((s, r) => s + (Number(r[sk][ck]) || 0), 0)
+        return fmtNum(sum)
+      }
+    }
+    if (label === '性质合计') {
+      return fmtNum(rows.value.reduce((s, r) => s + costNatureSum(r[sk]), 0))
+    }
+    if (label === '处理合计') {
+      return fmtNum(rows.value.reduce((s, r) => s + costTreatmentSum(r[sk]), 0))
+    }
+    return ''
+  })
 }
 </script>
 
@@ -424,20 +426,27 @@ function fmtNum(v: number): string {
 .i2-project-detail { font-size: var(--wp-font-size, 13px); padding: 16px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { font-size: 15px; font-weight: 600; color: #1f2937; }
-.section-actions { display: flex; align-items: center; gap: 4px; }
-.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 16px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.6; }
-.segment-tabs { margin-bottom: 12px; }
-.detail-table { font-size: var(--wp-font-size, 13px); }
-.formula-cell { color: #6366f1; font-weight: 500; border-bottom: 1px dashed #a5b4fc; cursor: help; }
-.totals-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid #e5e7eb; margin-top: 8px; }
-.totals-label { font-weight: 600; color: #374151; }
-.table-actions { display: flex; gap: 8px; margin-top: 12px; }
 .objective-alert { margin-bottom: 12px; }
-.guidance-details { margin-bottom: 12px; font-size: 12px; color: var(--el-text-color-secondary); background: #f9fafb; border: 1px solid #ebeef5; border-radius: 4px; padding: 8px 12px; }
-.guidance-details summary { cursor: pointer; font-weight: 600; color: #374151; }
-.guidance-details .guidance-content { margin-top: 8px; line-height: 1.7; }
-.guidance-details .guidance-content p { margin: 0 0 4px; }
-.tab-toolbar { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 10px; }
-.tab-toolbar .toolbar-right { display: flex; align-items: center; gap: 8px; }
-.audit-note-card, .audit-conclusion-card { margin-top: 16px; }
+.obj-list { margin: 4px 0 0; padding-left: 18px; line-height: 1.6; font-size: 12px; }
+.methodology-context {
+  background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
+  margin-bottom: 12px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.6;
+}
+.tab-toolbar { margin-bottom: 10px; }
+.toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.block-card { margin-bottom: 14px; }
+.block-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.title-actions { display: flex; gap: 8px; }
+.stage-tabs { margin-top: 4px; }
+.formula-tip { margin-bottom: 8px; }
+.formula-cell { color: #6366f1; font-weight: 500; border-bottom: 1px dashed #a5b4fc; }
+.mismatch-text { color: #dc2626; font-weight: 600; }
+.period-cell { display: flex; align-items: center; gap: 4px; }
+.tilde { color: #94a3b8; }
+.totals-bar {
+  display: flex; gap: 20px; flex-wrap: wrap; margin-top: 10px;
+  padding: 8px 12px; background: #f8fafc; border-radius: 4px; font-size: 12px; color: #334155;
+}
+.audit-note-card, .audit-conclusion-card { margin-top: 14px; }
+:deep(.row-mismatch) { background: #fef2f2 !important; }
 </style>

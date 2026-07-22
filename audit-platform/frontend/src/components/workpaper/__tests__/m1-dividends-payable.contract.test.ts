@@ -4,7 +4,7 @@
  * 验证 'm1-dividends-payable' componentType 在四个注册表中正确注册：
  * 1. htmlRendererRegistry（前端组件映射）
  * 2. VALID_COMPONENT_TYPES（后端 wp_classification_service.py）
- * 3. wp_code_overrides（M1/M1-1~M1-6 共7个映射，M1A→a-program-console）
+ * 3. wp_code_overrides（M1/M1-1~M1-6/M1A 共8个映射）
  * 4. RENDERER_DISPATCH（后端渲染策略，Phase 5完成后生效）
  *
  * Spec: .kiro/specs/m1-dividends-payable/
@@ -24,7 +24,7 @@ import {
 
 const COMPONENT_TYPE = 'm1-dividends-payable'
 
-// M1/M1-1~M1-6 共7个wp_code应映射到m1-dividends-payable
+// M1/M1-1~M1-6/M1A 共8个wp_code应映射到m1-dividends-payable
 const EXPECTED_WP_CODES = [
   'M1',
   'M1-1',
@@ -33,6 +33,7 @@ const EXPECTED_WP_CODES = [
   'M1-4',
   'M1-5',
   'M1-6',
+  'M1A',
 ]
 
 describe('M1 应付股利（利润）— 注册契约测试', () => {
@@ -98,11 +99,7 @@ describe('M1 应付股利（利润）— 注册契约测试', () => {
       expect(overrides[wpCode]).toBe(COMPONENT_TYPE)
     })
 
-    it('M1A 映射为 a-program-console（程序表独立）', () => {
-      expect(overrides['M1A']).toBe('a-program-console')
-    })
-
-    it('覆盖完整性：共7个映射无遗漏', () => {
+    it('覆盖完整性：共8个映射无遗漏', () => {
       const m1Mappings = Object.entries(overrides).filter(
         ([, v]) => v === COMPONENT_TYPE
       )

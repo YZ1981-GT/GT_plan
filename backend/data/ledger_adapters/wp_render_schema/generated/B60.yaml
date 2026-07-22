@@ -51,7 +51,7 @@ sheets:
         F:
           field: col_f
           type: text
-          label: B61-1
+          label: B60-1
         G:
           field: col_g
           type: text
@@ -65,8 +65,16 @@ sheets:
       cells:
       - D5
       _total_count: 1
-    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
-  B61-1工时预算与控制表:
+    cross_refs:
+    - CW-60
+    - CW-417
+    - CW-418
+    - CW-419
+    - CW-420
+    - CW-421
+    _note: B60 P3 — materiality/risk/plan_version bindings; see wp_platform_fields/B60.json
+
+  B60-1工时预算与控制表:
     component_type: univer
     class_code: F-数据表
     fixed_cells:
@@ -143,8 +151,16 @@ sheets:
       - G5:H5
       - F5:F6
       - B5:B6
-    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
-  B61-1工时预算与控制板（按阶段）:
+    cross_refs:
+    - CW-60
+    - CW-417
+    - CW-418
+    - CW-419
+    - CW-420
+    - CW-421
+    _note: B60 P3 — materiality/risk/plan_version bindings; see wp_platform_fields/B60.json
+
+  B60-1工时预算与控制板（按阶段）:
     component_type: univer
     class_code: F-数据表
     fixed_cells:
@@ -198,7 +214,15 @@ sheets:
       ranges_sample:
       - A2:G2
       - A1:G1
-    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+    cross_refs:
+    - CW-60
+    - CW-417
+    - CW-418
+    - CW-419
+    - CW-420
+    - CW-421
+    _note: B60 P3 — materiality/risk/plan_version bindings; see wp_platform_fields/B60.json
+
   GT_Custom:
     component_type: skip
     class_code: I-占位
@@ -211,4 +235,12 @@ sheets:
       rows:
       - 1-8
       description: '# TODO: 人工审核 — 自动检测的静态文本行范围'
-    cross_refs: '# TODO: 人工审核 — 跨底稿引用关系需查 cross_wp_references.json 后手工补充'
+    cross_refs:
+    - CW-60
+    - CW-417
+    - CW-418
+    - CW-419
+    - CW-420
+    - CW-421
+    _note: B60 P3 — materiality/risk/plan_version bindings; see wp_platform_fields/B60.json
+

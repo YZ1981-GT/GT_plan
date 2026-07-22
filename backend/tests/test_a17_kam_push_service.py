@@ -211,3 +211,6 @@ async def test_push_success():
     assert len(kam_section["items"]) == 1
     assert "收入确认" in kam_section["items"][0]["matter"]
     assert kam_section["items"][0]["response"] == "执行截止测试"
+    assert kam_section["pushed_from"] == "A17-2-1"
+    assert "source_hash" in kam_section
+    assert "pushed_at" in kam_section

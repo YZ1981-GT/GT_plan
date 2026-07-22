@@ -1,22 +1,21 @@
 <template>
   <div class="h2-tab-cost-comparison">
-    <!-- 审计目标 -->
     <el-alert type="info" :closable="false" class="objective-alert"
-      title="审计目标：比较在建工程的合同预算、调整预算与实际造价构成，评估超支/节余的合理性与预算执行情况，识别成本异常并追溯至 H2-2 明细。" />
+      title="审计目标：（1）在建工程存在且记入恰当账户；（2）单方造价与可比价无重大异常；（3）本期增加与现金流量表购建固定资产等支付的现金勾稽一致或差异可解释。" />
 
-    <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:H2-7" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ state.rows.value.length }} 行</el-tag>
+        <el-tag size="small" type="warning" v-if="alertCount > 0">关注 {{ alertCount }} 项</el-tag>
       </div>
     </div>
 
-    <!-- 造价比较表 -->
+    <!-- （一）单方造价比较 + 项目层现金流勾稽 -->
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-header">
-          <span>工程造价比较（H2-7）</span>
+          <span>工程造价比较分析表（H2-7）</span>
           <div class="section-header-actions">
             <GtIndexChip value="H2-2" label="→ H2-2明细" />
             <el-button size="small" circle @click="openReview('H2-7')">💬</el-button>
@@ -25,106 +24,135 @@
       </template>
 
       <el-table :data="displayRows" border stripe size="small" class="cost-table"
-        :row-class-name="costRowClass">
-        <el-table-column prop="name" label="工程项目" min-width="130" fixed />
-        <el-table-column prop="contractBudget" label="合同预算" min-width="110" align="right">
+        :row-class-name="costRowClass" max-height="480">
+        <el-table-column type="index" label="序号" width="50" align="center" fixed />
+        <el-table-column prop="name" label="项目" min-width="120" fixed>
           <template #default="{ row }">
-            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.contractBudget"
+            <span :class="{ 'total-name': row.isTotal }">{{ row.name }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="工程项目总造价" min-width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.totalCost"
               :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'contractBudget', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.contractBudget) }}</span>
+              @change="onCellChange(row.rowId, 'totalCost', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.totalCost) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="adjustedBudget" label="调整预算" min-width="110" align="right">
+
+        <el-table-column label="建筑面积(㎡)" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.adjustedBudget"
+            <el-input-number v-if="!row.isTotal && !isReadonly" :model-value="row.buildingArea ?? undefined"
               :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'adjustedBudget', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.adjustedBudget) }}</span>
+              @change="onCellChange(row.rowId, 'buildingArea', $event)" />
+            <span v-else class="amt-cell">{{ row.buildingArea != null ? fmtAmt(row.buildingArea) : '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="actualMaterial" label="实际-材料" min-width="100" align="right">
+
+        <el-table-column label="单方造价" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.actualMaterial"
+            <span class="formula-cell" title="=总造价/建筑面积（面积为空则不计算）">{{ fmtAmt(row.unitCost) }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="可比价1" min-width="95" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!row.isTotal && !isReadonly" :model-value="row.comparable1 ?? undefined"
               :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'actualMaterial', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.actualMaterial) }}</span>
+              @change="onCellChange(row.rowId, 'comparable1', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.comparable1) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="actualLabor" label="实际-人工" min-width="100" align="right">
+        <el-table-column label="可比价2" min-width="95" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.actualLabor"
+            <el-input-number v-if="!row.isTotal && !isReadonly" :model-value="row.comparable2 ?? undefined"
               :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'actualLabor', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.actualLabor) }}</span>
+              @change="onCellChange(row.rowId, 'comparable2', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.comparable2) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="actualMachinery" label="实际-机械" min-width="100" align="right">
+        <el-table-column label="可比价3" min-width="95" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.actualMachinery"
+            <el-input-number v-if="!row.isTotal && !isReadonly" :model-value="row.comparable3 ?? undefined"
               :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'actualMachinery', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.actualMachinery) }}</span>
+              @change="onCellChange(row.rowId, 'comparable3', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.comparable3) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="actualOther" label="实际-其他" min-width="100" align="right">
+
+        <el-table-column label="可比价均值" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.actualOther"
-              :controls="false" size="small" class="amt-input"
-              @change="onCellChange(row.rowId, 'actualOther', $event)" />
-            <span v-else class="amt-cell">{{ fmtAmt(row.actualOther) }}</span>
+            <span v-if="row.isTotal">-</span>
+            <span v-else class="formula-cell" title="=AVERAGE(可比价1~3中有值项)">{{ fmtAmt(row.comparableAvg) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="实际合计" min-width="110" align="right">
+        <el-table-column label="与可比价差异" min-width="110" align="right">
           <template #default="{ row }">
-            <span class="formula-cell" title="=材料+人工+机械+其他">{{ fmtAmt(row.actualTotal) }}</span>
+            <span v-if="row.isTotal">-</span>
+            <span v-else class="formula-cell" title="=单方造价-可比价均值">{{ fmtAmt(row.unitCostDiff) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="超支金额" min-width="100" align="right">
+        <el-table-column label="差异率(%)" min-width="100" align="right">
           <template #default="{ row }">
-            <span class="formula-cell" title="=max(实际合计-调整预算, 0)">{{ fmtAmt(row.overspendAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="超支率(%)" min-width="100" align="right">
-          <template #default="{ row }">
-            <span :class="['formula-cell', { 'error-amount': (row.overspendRate ?? 0) > 10 }]"
-              :title="`=超支金额/调整预算×100`">
-              {{ row.overspendRate != null ? row.overspendRate.toFixed(1) + '%' : '-' }}
+            <span v-if="row.isTotal">-</span>
+            <span v-else
+              :class="['formula-cell', { 'error-amount': isUnitDiffAlert(row) }]"
+              title="=与可比价差异/可比价均值×100；|差异率|>15%红色关注">
+              {{ row.unitCostDiffRate != null ? row.unitCostDiffRate.toFixed(1) + '%' : '-' }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="节余金额" min-width="100" align="right">
+
+        <el-table-column label="可比价来源索引" min-width="120">
           <template #default="{ row }">
-            <span class="formula-cell" title="=max(调整预算-实际合计, 0)">{{ fmtAmt(row.savingAmount) }}</span>
+            <el-input v-if="!row.isTotal && !isReadonly" v-model="row.comparableSourceIndex" size="small"
+              @change="onCellChange(row.rowId, 'comparableSourceIndex', $event)" />
+            <span v-else>{{ row.comparableSourceIndex || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="预算执行率(%)" min-width="110" align="right">
+
+        <el-table-column label="本期增加额" min-width="110" align="right">
           <template #default="{ row }">
-            <span :class="['formula-cell', { 'warning-value': (row.executionRate ?? 0) > 100 }]"
-              :title="`=实际合计/调整预算×100`">
-              {{ row.executionRate != null ? row.executionRate.toFixed(1) + '%' : '-' }}
+            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.periodIncrease"
+              :controls="false" size="small" class="amt-input"
+              @change="onCellChange(row.rowId, 'periodIncrease', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.periodIncrease) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期计入现金流量金额" min-width="140" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.cashFlowAmount"
+              :controls="false" size="small" class="amt-input"
+              @change="onCellChange(row.rowId, 'cashFlowAmount', $event)" />
+            <span v-else class="amt-cell">{{ fmtAmt(row.cashFlowAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="勾稽差异" min-width="100" align="right">
+          <template #default="{ row }">
+            <span :class="['formula-cell', { 'error-amount': row.cashDiff != null && Math.abs(row.cashDiff) > 0.005 }]"
+              title="=本期增加额-本期计入现金流量金额">
+              {{ fmtAmt(row.cashDiff) }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="deviationReason" label="偏差原因" min-width="140">
+
+        <el-table-column label="差异原因/关注事项" min-width="150">
           <template #default="{ row }">
-            <el-input v-if="!row.isTotal && !isReadonly" v-model="row.deviationReason" size="small"
-              @change="onCellChange(row.rowId, 'deviationReason', $event)" />
-            <span v-else>{{ row.deviationReason || '-' }}</span>
+            <el-input v-if="!row.isTotal && !isReadonly" v-model="row.diffReason" size="small"
+              @change="onCellChange(row.rowId, 'diffReason', $event)" />
+            <span v-else>{{ row.diffReason || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="remark" label="备注" min-width="130">
+
+        <el-table-column label="标记" width="72" align="center">
           <template #default="{ row }">
-            <el-input v-if="!row.isTotal && !isReadonly" v-model="row.remark" size="small"
-              @change="onCellChange(row.rowId, 'remark', $event)" />
-            <span v-else>{{ row.remark || '-' }}</span>
+            <el-tag v-if="!row.isTotal && isUnitDiffAlert(row)" type="danger" size="small">造价</el-tag>
+            <el-tag v-else-if="!row.isTotal && row.cashDiff != null && Math.abs(row.cashDiff) > 0.005"
+              type="warning" size="small">勾稽</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="超支标记" width="80" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="!row.isTotal && (row.overspendRate ?? 0) > 10" type="danger" size="small">超支</el-tag>
-          </template>
-        </el-table-column>
+
         <el-table-column label="" width="50" v-if="!isReadonly">
           <template #default="{ row }">
             <el-button v-if="!row.isTotal" size="small" type="danger" link
@@ -138,36 +166,59 @@
       </div>
     </el-card>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
+    <!-- （二）主体层现金流勾稽 -->
+    <el-card shadow="never" class="block-card">
       <template #header>
-        <div class="section-header">
-          <span>审计说明</span>
-        </div>
+        <span>与现金流量表勾稽汇总（主体层面）</span>
       </template>
+      <el-descriptions :column="1" border size="small" class="recon-desc">
+        <el-descriptions-item label="① 本期在建工程增加额合计">
+          <span class="amt-cell formula-cell" title="=上表本期增加额合计">{{ fmtAmt(state.totalRow.value.periodIncrease) }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="② 现金流量表：购置固定资产、无形资产和其他长期资产支付的现金">
+          <el-input-number v-if="!isReadonly"
+            :model-value="state.cashFlowRecon.value.cfsCapexAmount ?? undefined"
+            :controls="false" size="small" class="amt-input recon-input"
+            @change="onReconChange('cfsCapexAmount', $event)" />
+          <span v-else class="amt-cell">{{ fmtAmt(state.cashFlowRecon.value.cfsCapexAmount) }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="③ 勾稽差异（①−②）">
+          <span :class="['amt-cell', 'formula-cell', { 'error-amount': hasEntityCashDiff }]">
+            {{ fmtAmt(state.entityCashDiff.value) }}
+          </span>
+        </el-descriptions-item>
+        <el-descriptions-item label="勾稽说明">
+          <el-input v-if="!isReadonly" v-model="state.cashFlowRecon.value.reconNote" type="textarea"
+            :autosize="{ minRows: 2, maxRows: 4 }"
+            placeholder="说明口径差异：应付/预付工程款、购入不经CIP的固定资产、无形资产、非现金投入、资本化利息等…"
+            @blur="onReconChange('reconNote', state.cashFlowRecon.value.reconNote)" />
+          <span v-else>{{ state.cashFlowRecon.value.reconNote || '-' }}</span>
+        </el-descriptions-item>
+      </el-descriptions>
+    </el-card>
+
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="section-header"><span>审计说明</span></div></template>
       <el-input v-model="state.auditNote.value" type="textarea" :autosize="{ minRows: 5 }"
-        placeholder="请填写造价比较分析说明..." :disabled="isReadonly"
-        @blur="state.saveNote(state.auditNote.value)" />
+        placeholder="说明可比价选取口径、重大单方造价差异原因、主体层现金流勾稽结果及已执行的追加程序…"
+        :disabled="isReadonly" @blur="state.saveNote(state.auditNote.value)" />
     </el-card>
 
-    <!-- 审计结论 -->
     <el-card shadow="never" class="audit-note-card">
-      <template #header>
-        <div class="section-header"><span>审计结论</span></div>
-      </template>
+      <template #header><div class="section-header"><span>审计结论</span></div></template>
       <el-input v-model="state.auditConclusion.value" type="textarea" :autosize="{ minRows: 3 }"
-        placeholder="填写审计结论：如各工程造价构成合理、超支率在预算范围内、偏差原因已核实，未见异常；或说明重大超支事项及其处理。" :disabled="isReadonly"
-        @blur="state.saveConclusion(state.auditConclusion.value)" />
+        placeholder="结论示例：经比较，各工程单方造价与可比价差异均在可接受范围；本期增加与现金流量表勾稽差异已合理解释，未见重大异常。"
+        :disabled="isReadonly" @blur="state.saveConclusion(state.auditConclusion.value)" />
     </el-card>
 
-    <!-- 编制提示 -->
     <details class="edit-tips">
       <summary>编制提示</summary>
       <ul>
-        <li>16列中14列为公式自动计算（差异/差异率/占比等）</li>
-        <li>预算差异率>10%红色高亮标记为"超支"</li>
-        <li>数据从H2-2明细表自动取入(可手动覆盖)</li>
-        <li>合计行自动SUM所有工程项目</li>
+        <li>从可研/概预算取总造价与建筑面积，计算单方造价并与可比价比较；填列来源索引便于复核。</li>
+        <li>|单方造价差异率|＞15%（或项目组自定阈值）须说明原因，评估是否追加程序。</li>
+        <li>无建筑面积的装置/管网类工程：面积留空，改用单位产能/长度等口径在备注说明。</li>
+        <li>现金流勾稽优先做主体层汇总；项目层分摊仅在可可靠归集时填写。</li>
+        <li>数据可从 H2-2 自动带入（预算→总造价、面积、增加合计），可比价与现金流需手工补录。</li>
       </ul>
     </details>
   </div>
@@ -175,14 +226,16 @@
 
 <script setup lang="ts">
 /**
- * H2TabCostComparison.vue — H2-7 造价比较
- * el-table 16列(14公式) + 超支红色高亮 + GtIndexChip→H2-2
- * Spec: Task 4.9 | Requirements: 8.1-8.7
+ * H2TabCostComparison.vue — H2-7 工程造价比较分析表
+ * 对齐致同：单方造价vs可比价 + 本期增加vs现金流量勾稽
  */
 import { inject, toRef, computed } from 'vue'
 import { ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
-import { useH2CostComparison } from '../../composables/useH2CostComparison'
+import {
+  useH2CostComparison,
+  UNIT_DIFF_THRESHOLD,
+  type H2CostComparisonRow,
+} from '../../composables/useH2CostComparison'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -205,17 +258,37 @@ const state = useH2CostComparison({
 
 const displayRows = computed(() => [
   ...state.rows.value,
-  { ...state.totalRow.value, isTotal: true, rowId: 'row-total', name: '合计' },
+  { ...state.totalRow.value, isTotal: true, rowId: 'row-total' },
 ])
+
+const alertCount = computed(() =>
+  state.rows.value.filter(r =>
+    isUnitDiffAlert(r) || (r.cashDiff != null && Math.abs(r.cashDiff) > 0.005),
+  ).length,
+)
+
+const hasEntityCashDiff = computed(() => {
+  const d = state.entityCashDiff.value
+  return d != null && Math.abs(d) > 0.005
+})
+
+function isUnitDiffAlert(row: Partial<H2CostComparisonRow>): boolean {
+  return row.unitCostDiffRate != null && Math.abs(row.unitCostDiffRate) > UNIT_DIFF_THRESHOLD
+}
 
 function costRowClass({ row }: any) {
   if (row.isTotal) return 'total-row'
-  if ((row.overspendRate ?? 0) > 10) return 'over-budget-row'
+  if (isUnitDiffAlert(row)) return 'alert-unit-row'
+  if (row.cashDiff != null && Math.abs(row.cashDiff) > 0.005) return 'alert-cash-row'
   return ''
 }
 
 function onCellChange(rowId: string, field: string, value: any) {
   state.updateCell(rowId, field, value)
+}
+
+function onReconChange(field: 'cfsCapexAmount' | 'reconNote', value: any) {
+  state.updateRecon({ [field]: value })
 }
 
 async function handleAddRow() {
@@ -231,7 +304,6 @@ async function handleAddRow() {
 function handleRemove(rowId: string) {
   state.removeRow(rowId)
 }
-
 
 function openReview(id: string) {
   openReviewDialog(id)
@@ -255,14 +327,17 @@ function fmtAmt(val: number | null | undefined): string {
 .cost-table { font-size: var(--wp-font-size, 13px); }
 .amt-cell { font-variant-numeric: tabular-nums; }
 .amt-input { width: 100%; }
+.recon-input { width: 220px; }
 .formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
 .error-amount { color: var(--el-color-danger); font-weight: 600; }
-.warning-value { color: var(--el-color-warning); font-weight: 600; }
+.total-name { font-weight: 600; }
 .add-row-bar { margin-top: 12px; }
 .audit-note-card { margin-bottom: 12px; }
+.recon-desc { max-width: 960px; }
 .edit-tips { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }
 .edit-tips summary { cursor: pointer; font-weight: 500; }
 .edit-tips ul { padding-left: 20px; margin-top: 8px; }
 :deep(.total-row) { font-weight: 600; background-color: var(--el-fill-color-light) !important; }
-:deep(.over-budget-row) { background-color: #fef0f0 !important; }
+:deep(.alert-unit-row) { background-color: #fef0f0 !important; }
+:deep(.alert-cash-row) { background-color: #fdf6ec !important; }
 </style>

@@ -1,17 +1,14 @@
 /**
- * useH2Detail — H2-2 明细表 composable（50列宽表，3区段Tab）
+ * useH2Detail — H2-2 在建工程明细表
  *
- * 职责：
- * - H2DetailRow 接口：50列完整定义
- * - 3区段分组配置（基本/增减/竣工结转）
- * - 行内公式（期末=期初+增加-减少-转固；增加合计=材料+人工+机械+利息+其他；完工进度=累计投入/预算×100%）
- * - subtotalRow（computed SUM所有numeric列）
- * - crossValidation（vs H2-1审定表）
- * - addRow(弹窗命名) / removeRow / updateCell
+ * 对齐致同源模板 + H1-2 编制逻辑：
+ * - 基本信息（进度/权属风险标志）
+ * - 账面原值未审 roll-forward（期初+增−转固−其他减=期末；利息资本化子列）
+ * - 期初调整 / 账项调整 → 审定自动勾稽
+ * - 减值准备未审→调整→审定；净值=原值−减值；是否抵押
  *
- * Spec: .kiro/specs/h2-construction-in-progress/
- * Task: 3.4
- * Requirements: 3.1-3.12
+ * 后向兼容：保留 cipBegin / decrease / transferAmount / cipEnd / endAudited 等字段名，
+ * 供 H2-4/H2-5/H2-6 等下游取数。
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import {
@@ -22,225 +19,226 @@ import {
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/**
- * H2-2 明细表行（50列）
- * 按3区段逻辑分组：基本信息(~10) / 增减(~20) / 竣工结转(~20)
- */
 export interface H2DetailRow {
-  /** 行唯一标识 */
   rowId: string
 
-  // ═══════ 区段1: 基本信息 (10列) ═══════
-  /** 工程项目名称 */
+  // ── 基本信息 ──
   name: string
-  /** 预算金额 */
+  projectCode: string
   budget: number
-  /** 开工日期 */
   startDate: string
-  /** 预计竣工日期 */
   plannedEndDate: string
-  /** 实际竣工日期 */
   actualEndDate: string
-  /** 完工进度(%)（公式列：=累计投入/预算×100） */
+  /** 完工进度(%) = 累计投入/预算×100 */
   completionRate: number | null
-  /** 累计投入 */
   accumulatedInput: number
-  /** 资金来源 */
   fundSource: string
-  /** 资本化率(%) */
+  /** 利息资本化率(%) */
   capRate: number | null
-  /** 工程类别 */
   category: string
-
-  // ═══════ 区段2: 增减 (20列) ═══════
-  /** 期初余额 */
-  cipBegin: number
-  /** 本期增加-材料 */
-  increaseMaterial: number
-  /** 本期增加-人工 */
-  increaseLabor: number
-  /** 本期增加-机械 */
-  increaseMachinery: number
-  /** 本期增加-利息（资本化利息） */
-  increaseInterest: number
-  /** 本期增加-其他 */
-  increaseOther: number
-  /** 本期增加合计（公式列：=材料+人工+机械+利息+其他） */
-  increaseTotal: number
-  /** 本期减少 */
-  decrease: number
-  /** 转出（非转固减少，如报废/损失） */
-  transferOut: number
-  /** 未调整期末余额 */
-  unadjustedEnd: number
-  /** 审定期初余额 */
-  beginAudited: number
-  /** 期初调整 */
-  adjustBegin: number
-  /** 期末调整 */
-  adjustEnd: number
-  /** 减少调整 */
-  decreaseAdj: number
-  /** 转固调整 */
-  transferAdj: number
-  /** 审定期末余额 */
-  endAudited: number
-  /** 增加合计调整 */
-  increaseAdj: number
-  /** AJE调整额 */
-  aje: number
-  /** RJE重分类额 */
-  rje: number
-
-  // ═══════ 区段3: 竣工结转 (20列) ═══════
-  /** 转固日期 */
-  transferDate: string
-  /** 转固金额 */
-  transferAmount: number
-  /** 转入H1科目 */
-  transferToH1: string
-  /** 剩余在建金额 */
-  remainingCip: number
-  /** 期末余额（公式列：=期初+增加合计-减少-转固金额） */
-  cipEnd: number
-  /** 减值准备-期初 */
-  impairmentBegin: number
-  /** 减值准备-本期增加 */
-  impairmentIncrease: number
-  /** 减值准备-本期减少(转回) */
-  impairmentDecrease: number
-  /** 减值准备-期末 */
-  impairmentEnd: number
-  /** 账面净值 */
-  netValue: number
-  /** 合同编号 */
+  /** 工程状态：在建/停工/缓建/已完工待转固/已转固 */
+  projectStatus: string
+  approvalDocNo: string
   contractNo: string
-  /** 施工单位 */
   contractor: string
-  /** 监理单位 */
   supervisor: string
-  /** 建筑面积(m²)或工程量 */
   area: number | null
-  /** 单位造价 */
   unitCost: number | null
-  /** 工程进度说明 */
   progressNote: string
-  /** 审计标记（异常标记） */
+  /** 是否抵押/受限 Y/N */
+  isMortgaged: string
   auditFlag: string
-  /** 索引号 */
   indexRef: string
-  /** 备注 */
   remark: string
-}
 
-// ─── Segment Column Configs ──────────────────────────────────────────────────
+  // ── 账面原值·未审（对齐致同 J–R）──
+  cipBegin: number
+  /** 期初累计资本化利息 */
+  interestBegin: number
+  increaseMaterial: number
+  increaseLabor: number
+  increaseMachinery: number
+  increaseInterest: number
+  increaseOther: number
+  /** 增加合计（公式） */
+  increaseTotal: number
+  /** 本期转入固定资产 */
+  transferAmount: number
+  /** 其他减少（报废/转让等，非转固） */
+  decrease: number
+  /** @deprecated 并入 decrease；读取时兼容累加 */
+  transferOut: number
+  /** 转出累计资本化利息 */
+  interestDec: number
+  /** 未审期末原值（公式） */
+  cipEnd: number
+  /** 未审期末累计资本化利息（公式） */
+  interestEnd: number
+
+  // ── 调整 → 审定原值（对齐致同 S–AH / H1 原值区）──
+  adjustBegin: number
+  increaseAdj: number
+  transferAdj: number
+  decreaseAdj: number
+  interestOpenAdj: number
+  interestIncAdj: number
+  interestDecAdj: number
+  /** @deprecated 保留兼容；审定公式不再单独使用 */
+  adjustEnd: number
+  aje: number
+  rje: number
+  unadjustedEnd: number
+
+  beginAudited: number
+  increaseAudited: number
+  transferAudited: number
+  decreaseAudited: number
+  endAudited: number
+  interestBeginAud: number
+  interestIncAud: number
+  interestDecAud: number
+  interestEndAud: number
+
+  // ── 竣工结转辅助 ──
+  transferDate: string
+  transferToH1: string
+  /** 兼容旧字段名 */
+  transferTo: string
+  remainingCip: number
+
+  // ── 减值准备（对齐致同 AI–AS / H1 减值区）──
+  impairmentBegin: number
+  impairmentIncrease: number
+  impairmentDecrease: number
+  /** 减值未审期末（公式） */
+  impairmentEnd: number
+  impairOpenAdj: number
+  impairIncAdj: number
+  impairDecAdj: number
+  impairBeginAud: number
+  impairIncAud: number
+  impairDecAud: number
+  impairEndAud: number
+
+  // ── 净值 ──
+  netBeginUnadj: number
+  netBeginAud: number
+  netEndUnadj: number
+  netEndAud: number
+  /** @deprecated 等同 netEndAud，下游兼容 */
+  netValue: number
+}
 
 export interface SegmentColumn {
   field: keyof H2DetailRow
   label: string
   width?: number
-  /** 是否为公式列（不可编辑） */
   formula?: boolean
-  /** 是否为金额列（右对齐+格式化） */
   isAmount?: boolean
-  /** 是否为日期列 */
   isDate?: boolean
 }
 
-/** 3区段分组配置 */
 export const SEGMENT_CONFIGS = {
-  /** 区段1: 基本信息 (~10列) */
   basic: [
     { field: 'name', label: '工程名称', width: 180 },
     { field: 'budget', label: '预算金额', isAmount: true, width: 130 },
     { field: 'category', label: '工程类别', width: 100 },
+    { field: 'projectStatus', label: '工程状态', width: 110 },
     { field: 'startDate', label: '开工日期', isDate: true, width: 110 },
-    { field: 'plannedEndDate', label: '预计竣工日期', isDate: true, width: 120 },
-    { field: 'actualEndDate', label: '实际竣工日期', isDate: true, width: 120 },
+    { field: 'plannedEndDate', label: '预计竣工', isDate: true, width: 110 },
+    { field: 'actualEndDate', label: '实际竣工', isDate: true, width: 110 },
     { field: 'completionRate', label: '完工进度(%)', formula: true, width: 110 },
-    { field: 'accumulatedInput', label: '累计投入', isAmount: true, width: 130 },
+    { field: 'accumulatedInput', label: '累计投入', isAmount: true, width: 120 },
     { field: 'fundSource', label: '资金来源', width: 100 },
     { field: 'capRate', label: '资本化率(%)', width: 100 },
+    { field: 'isMortgaged', label: '是否抵押', width: 90 },
   ] as SegmentColumn[],
-
-  /** 区段2: 增减 (~20列) */
-  movement: [
-    { field: 'name', label: '工程名称', width: 180 },
-    { field: 'budget', label: '预算金额', isAmount: true, width: 130 },
-    { field: 'cipBegin', label: '期初余额', isAmount: true, width: 130 },
-    { field: 'increaseMaterial', label: '增加-材料', isAmount: true, width: 110 },
-    { field: 'increaseLabor', label: '增加-人工', isAmount: true, width: 110 },
-    { field: 'increaseMachinery', label: '增加-机械', isAmount: true, width: 110 },
-    { field: 'increaseInterest', label: '增加-利息', isAmount: true, width: 110 },
-    { field: 'increaseOther', label: '增加-其他', isAmount: true, width: 110 },
-    { field: 'increaseTotal', label: '增加合计', isAmount: true, formula: true, width: 120 },
-    { field: 'decrease', label: '本期减少', isAmount: true, width: 110 },
-    { field: 'transferOut', label: '转出(非转固)', isAmount: true, width: 120 },
-    { field: 'unadjustedEnd', label: '未调整期末', isAmount: true, width: 120 },
-    { field: 'beginAudited', label: '审定期初', isAmount: true, width: 120 },
+  costUnadj: [
+    { field: 'name', label: '工程名称', width: 160 },
+    { field: 'cipBegin', label: '期初余额', isAmount: true, width: 120 },
+    { field: 'interestBegin', label: '其中:累计资本化', isAmount: true, width: 120 },
+    { field: 'increaseTotal', label: '本期增加', isAmount: true, formula: true, width: 110 },
+    { field: 'increaseInterest', label: '其中:本期利息资本化', isAmount: true, width: 130 },
+    { field: 'transferAmount', label: '转入固定资产', isAmount: true, width: 120 },
+    { field: 'decrease', label: '其他减少', isAmount: true, width: 110 },
+    { field: 'interestDec', label: '其中:资本化转出', isAmount: true, width: 120 },
+    { field: 'cipEnd', label: '期末余额', isAmount: true, formula: true, width: 120 },
+    { field: 'interestEnd', label: '其中:累计资本化', isAmount: true, formula: true, width: 120 },
+  ] as SegmentColumn[],
+  costAud: [
+    { field: 'name', label: '工程名称', width: 160 },
     { field: 'adjustBegin', label: '期初调整', isAmount: true, width: 100 },
-    { field: 'adjustEnd', label: '期末调整', isAmount: true, width: 100 },
     { field: 'increaseAdj', label: '增加调整', isAmount: true, width: 100 },
-    { field: 'decreaseAdj', label: '减少调整', isAmount: true, width: 100 },
     { field: 'transferAdj', label: '转固调整', isAmount: true, width: 100 },
-    { field: 'aje', label: 'AJE', isAmount: true, width: 100 },
-    { field: 'rje', label: 'RJE', isAmount: true, width: 100 },
+    { field: 'decreaseAdj', label: '其他减少调整', isAmount: true, width: 110 },
+    { field: 'beginAudited', label: '审定期初', isAmount: true, formula: true, width: 110 },
+    { field: 'increaseAudited', label: '审定增加', isAmount: true, formula: true, width: 110 },
+    { field: 'transferAudited', label: '审定转固', isAmount: true, formula: true, width: 110 },
+    { field: 'decreaseAudited', label: '审定其他减少', isAmount: true, formula: true, width: 120 },
+    { field: 'endAudited', label: '审定期末', isAmount: true, formula: true, width: 110 },
+    { field: 'interestEndAud', label: '审定累计资本化', isAmount: true, formula: true, width: 120 },
   ] as SegmentColumn[],
-
-  /** 区段3: 竣工结转 (~20列) */
-  completion: [
-    { field: 'name', label: '工程名称', width: 180 },
-    { field: 'budget', label: '预算金额', isAmount: true, width: 130 },
-    { field: 'transferDate', label: '转固日期', isDate: true, width: 110 },
-    { field: 'transferAmount', label: '转固金额', isAmount: true, width: 130 },
-    { field: 'transferToH1', label: '转入H1科目', width: 120 },
-    { field: 'remainingCip', label: '剩余在建', isAmount: true, width: 120 },
-    { field: 'cipEnd', label: '期末余额', isAmount: true, formula: true, width: 130 },
-    { field: 'impairmentBegin', label: '减值-期初', isAmount: true, width: 110 },
-    { field: 'impairmentIncrease', label: '减值-增加', isAmount: true, width: 110 },
-    { field: 'impairmentDecrease', label: '减值-减少', isAmount: true, width: 110 },
-    { field: 'impairmentEnd', label: '减值-期末', isAmount: true, formula: true, width: 110 },
-    { field: 'netValue', label: '账面净值', isAmount: true, formula: true, width: 120 },
-    { field: 'contractNo', label: '合同编号', width: 120 },
-    { field: 'contractor', label: '施工单位', width: 120 },
-    { field: 'supervisor', label: '监理单位', width: 120 },
-    { field: 'area', label: '建筑面积(m²)', width: 110 },
-    { field: 'unitCost', label: '单位造价', isAmount: true, formula: true, width: 110 },
-    { field: 'progressNote', label: '进度说明', width: 150 },
-    { field: 'auditFlag', label: '审计标记', width: 80 },
-    { field: 'indexRef', label: '索引号', width: 80 },
-    { field: 'remark', label: '备注', width: 150 },
+  impair: [
+    { field: 'name', label: '工程名称', width: 160 },
+    { field: 'impairmentBegin', label: '减值期初', isAmount: true, width: 100 },
+    { field: 'impairmentIncrease', label: '减值增加', isAmount: true, width: 100 },
+    { field: 'impairmentDecrease', label: '减值减少', isAmount: true, width: 100 },
+    { field: 'impairmentEnd', label: '减值未审期末', isAmount: true, formula: true, width: 110 },
+    { field: 'impairEndAud', label: '减值审定期末', isAmount: true, formula: true, width: 110 },
+    { field: 'netBeginAud', label: '期初净值(审定)', isAmount: true, formula: true, width: 120 },
+    { field: 'netEndAud', label: '期末净值(审定)', isAmount: true, formula: true, width: 120 },
+    { field: 'isMortgaged', label: '是否抵押', width: 90 },
   ] as SegmentColumn[],
 } as const
 
+export const H2_2_CONCLUSION_TEMPLATES = {
+  A: '未见异常。',
+  B: '除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。',
+  C: '由于存在以下重大未调整事项（或审计范围受到限制无法获取充分、适当证据），不可确认。',
+} as const
 
-/** 固定列（跨区段Tab始终显示，用于行辨识） */
-export const FIXED_COLUMNS: SegmentColumn[] = [
-  { field: 'name', label: '工程名称', width: 180 },
-  { field: 'budget', label: '预算金额', isAmount: true, width: 130 },
-]
-
-// ─── Constants ───────────────────────────────────────────────────────────────
+export const H2_2_PROJECT_STATUS_OPTIONS = [
+  '在建', '停工', '缓建', '已完工待转固', '已转固',
+] as const
 
 const ROWS_KEY = 'H2-2-rows'
 const NOTE_KEY = 'H2-2-audit-note'
 const CONCLUSION_KEY = 'H2-2-audit-conclusion'
 
-/** 金额列字段列表（用于合计行SUM） */
+const FORMULA_FIELDS = new Set<string>([
+  'completionRate', 'increaseTotal', 'cipEnd', 'interestEnd',
+  'beginAudited', 'increaseAudited', 'transferAudited', 'decreaseAudited', 'endAudited',
+  'interestBeginAud', 'interestIncAud', 'interestDecAud', 'interestEndAud',
+  'impairmentEnd', 'impairBeginAud', 'impairIncAud', 'impairDecAud', 'impairEndAud',
+  'netBeginUnadj', 'netBeginAud', 'netEndUnadj', 'netEndAud', 'netValue', 'unitCost',
+  'remainingCip', 'unadjustedEnd',
+])
+
+const TEXT_FIELDS = new Set<string>([
+  'name', 'projectCode', 'startDate', 'plannedEndDate', 'actualEndDate',
+  'fundSource', 'category', 'projectStatus', 'approvalDocNo',
+  'transferDate', 'transferToH1', 'transferTo',
+  'contractNo', 'contractor', 'supervisor', 'progressNote',
+  'isMortgaged', 'auditFlag', 'indexRef', 'remark',
+])
+
 const NUMERIC_FIELDS: (keyof H2DetailRow)[] = [
-  'budget', 'accumulatedInput', 'cipBegin',
+  'budget', 'accumulatedInput', 'cipBegin', 'interestBegin',
   'increaseMaterial', 'increaseLabor', 'increaseMachinery',
   'increaseInterest', 'increaseOther', 'increaseTotal',
-  'decrease', 'transferOut', 'unadjustedEnd',
-  'beginAudited', 'adjustBegin', 'adjustEnd',
-  'increaseAdj', 'decreaseAdj', 'transferAdj',
-  'aje', 'rje', 'endAudited',
-  'transferAmount', 'remainingCip', 'cipEnd',
-  'impairmentBegin', 'impairmentIncrease', 'impairmentDecrease',
-  'impairmentEnd', 'netValue',
+  'transferAmount', 'decrease', 'transferOut', 'interestDec',
+  'cipEnd', 'interestEnd',
+  'adjustBegin', 'increaseAdj', 'transferAdj', 'decreaseAdj',
+  'interestOpenAdj', 'interestIncAdj', 'interestDecAdj',
+  'adjustEnd', 'aje', 'rje', 'unadjustedEnd',
+  'beginAudited', 'increaseAudited', 'transferAudited', 'decreaseAudited', 'endAudited',
+  'interestBeginAud', 'interestIncAud', 'interestDecAud', 'interestEndAud',
+  'remainingCip',
+  'impairmentBegin', 'impairmentIncrease', 'impairmentDecrease', 'impairmentEnd',
+  'impairOpenAdj', 'impairIncAdj', 'impairDecAdj',
+  'impairBeginAud', 'impairIncAud', 'impairDecAud', 'impairEndAud',
+  'netBeginUnadj', 'netBeginAud', 'netEndUnadj', 'netEndAud', 'netValue',
 ]
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function _getNum(val: any): number {
   if (val == null) return 0
@@ -248,12 +246,20 @@ function _getNum(val: any): number {
   return Number.isFinite(n) ? n : 0
 }
 
-/** 创建一个空白行（全部默认值） */
+function _str(val: any): string {
+  return val == null ? '' : String(val)
+}
+
+/** 其他减少口径：decrease + 旧字段 transferOut */
+function _otherDecrease(row: Pick<H2DetailRow, 'decrease' | 'transferOut'>): number {
+  return _getNum(row.decrease) + _getNum(row.transferOut)
+}
+
 function _createEmptyRow(name: string): H2DetailRow {
-  return {
+  const row: H2DetailRow = {
     rowId: `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-    // 基本信息
     name,
+    projectCode: '',
     budget: 0,
     startDate: '',
     plannedEndDate: '',
@@ -263,60 +269,85 @@ function _createEmptyRow(name: string): H2DetailRow {
     fundSource: '',
     capRate: null,
     category: '',
-    // 增减
-    cipBegin: 0,
-    increaseMaterial: 0,
-    increaseLabor: 0,
-    increaseMachinery: 0,
-    increaseInterest: 0,
-    increaseOther: 0,
-    increaseTotal: 0,
-    decrease: 0,
-    transferOut: 0,
-    unadjustedEnd: 0,
-    beginAudited: 0,
-    adjustBegin: 0,
-    adjustEnd: 0,
-    decreaseAdj: 0,
-    transferAdj: 0,
-    endAudited: 0,
-    increaseAdj: 0,
-    aje: 0,
-    rje: 0,
-    // 竣工结转
-    transferDate: '',
-    transferAmount: 0,
-    transferToH1: '',
-    remainingCip: 0,
-    cipEnd: 0,
-    impairmentBegin: 0,
-    impairmentIncrease: 0,
-    impairmentDecrease: 0,
-    impairmentEnd: 0,
-    netValue: 0,
+    projectStatus: '在建',
+    approvalDocNo: '',
     contractNo: '',
     contractor: '',
     supervisor: '',
     area: null,
     unitCost: null,
     progressNote: '',
+    isMortgaged: '',
     auditFlag: '',
     indexRef: '',
     remark: '',
+    cipBegin: 0,
+    interestBegin: 0,
+    increaseMaterial: 0,
+    increaseLabor: 0,
+    increaseMachinery: 0,
+    increaseInterest: 0,
+    increaseOther: 0,
+    increaseTotal: 0,
+    transferAmount: 0,
+    decrease: 0,
+    transferOut: 0,
+    interestDec: 0,
+    cipEnd: 0,
+    interestEnd: 0,
+    adjustBegin: 0,
+    increaseAdj: 0,
+    transferAdj: 0,
+    decreaseAdj: 0,
+    interestOpenAdj: 0,
+    interestIncAdj: 0,
+    interestDecAdj: 0,
+    adjustEnd: 0,
+    aje: 0,
+    rje: 0,
+    unadjustedEnd: 0,
+    beginAudited: 0,
+    increaseAudited: 0,
+    transferAudited: 0,
+    decreaseAudited: 0,
+    endAudited: 0,
+    interestBeginAud: 0,
+    interestIncAud: 0,
+    interestDecAud: 0,
+    interestEndAud: 0,
+    transferDate: '',
+    transferToH1: '',
+    transferTo: '',
+    remainingCip: 0,
+    impairmentBegin: 0,
+    impairmentIncrease: 0,
+    impairmentDecrease: 0,
+    impairmentEnd: 0,
+    impairOpenAdj: 0,
+    impairIncAdj: 0,
+    impairDecAdj: 0,
+    impairBeginAud: 0,
+    impairIncAud: 0,
+    impairDecAud: 0,
+    impairEndAud: 0,
+    netBeginUnadj: 0,
+    netBeginAud: 0,
+    netEndUnadj: 0,
+    netEndAud: 0,
+    netValue: 0,
   }
+  _recalcFormulas(row)
+  return row
 }
 
 /**
- * 重算行内公式列：
- * - increaseTotal = 材料+人工+机械+利息+其他
- * - cipEnd = 期初+增加合计-减少-转固金额
- * - completionRate = 累计投入/预算×100
- * - impairmentEnd = 减值期初+减值增加-减值减少
- * - netValue = cipEnd - impairmentEnd
- * - unitCost = 累计投入/面积 (area>0时)
+ * 致同公式对齐：
+ * Q = J+L−N−O；R = K+M−P
+ * Z = J+S … AG = Z+AB−AD−AE；AH = AA+AC−AF
+ * AL = AI+AJ−AK；AS = AP+AQ−AR
+ * AT/AU/AV/AW 净值
  */
 function _recalcFormulas(row: H2DetailRow): void {
-  // 增加合计
   row.increaseTotal =
     _getNum(row.increaseMaterial) +
     _getNum(row.increaseLabor) +
@@ -324,93 +355,142 @@ function _recalcFormulas(row: H2DetailRow): void {
     _getNum(row.increaseInterest) +
     _getNum(row.increaseOther)
 
-  // 期末余额 = 期初 + 增加合计 - 减少 - 转固金额
+  const otherDec = _otherDecrease(row)
+
+  // 未审期末原值 = 期初 + 增加 − 转固 − 其他减少
   row.cipEnd = calcCipEndBalance(
     _getNum(row.cipBegin),
     row.increaseTotal,
-    _getNum(row.decrease),
+    otherDec,
     _getNum(row.transferAmount),
   )
+  row.unadjustedEnd = row.cipEnd
+  row.remainingCip = row.cipEnd
 
-  // 完工进度
+  row.interestEnd =
+    _getNum(row.interestBegin) +
+    _getNum(row.increaseInterest) -
+    _getNum(row.interestDec)
+
+  // 审定原值
+  row.beginAudited = _getNum(row.cipBegin) + _getNum(row.adjustBegin)
+  row.increaseAudited = row.increaseTotal + _getNum(row.increaseAdj)
+  row.transferAudited = _getNum(row.transferAmount) + _getNum(row.transferAdj)
+  row.decreaseAudited = otherDec + _getNum(row.decreaseAdj)
+  row.endAudited = calcCipEndBalance(
+    row.beginAudited,
+    row.increaseAudited,
+    row.decreaseAudited,
+    row.transferAudited,
+  )
+
+  row.interestBeginAud = _getNum(row.interestBegin) + _getNum(row.interestOpenAdj)
+  row.interestIncAud = _getNum(row.increaseInterest) + _getNum(row.interestIncAdj)
+  row.interestDecAud = _getNum(row.interestDec) + _getNum(row.interestDecAdj)
+  row.interestEndAud = row.interestBeginAud + row.interestIncAud - row.interestDecAud
+
+  // 减值
+  row.impairmentEnd =
+    _getNum(row.impairmentBegin) +
+    _getNum(row.impairmentIncrease) -
+    _getNum(row.impairmentDecrease)
+  row.impairBeginAud = _getNum(row.impairmentBegin) + _getNum(row.impairOpenAdj)
+  row.impairIncAud = _getNum(row.impairmentIncrease) + _getNum(row.impairIncAdj)
+  row.impairDecAud = _getNum(row.impairmentDecrease) + _getNum(row.impairDecAdj)
+  row.impairEndAud = row.impairBeginAud + row.impairIncAud - row.impairDecAud
+
+  // 净值
+  row.netBeginUnadj = _getNum(row.cipBegin) - _getNum(row.impairmentBegin)
+  row.netBeginAud = row.beginAudited - row.impairBeginAud
+  row.netEndUnadj = row.cipEnd - row.impairmentEnd
+  row.netEndAud = row.endAudited - row.impairEndAud
+  row.netValue = row.netEndAud
+
   row.completionRate = calcCompletionRate(
     _getNum(row.accumulatedInput),
     _getNum(row.budget),
   )
 
-  // 减值期末
-  row.impairmentEnd =
-    _getNum(row.impairmentBegin) +
-    _getNum(row.impairmentIncrease) -
-    _getNum(row.impairmentDecrease)
-
-  // 账面净值
-  row.netValue = row.cipEnd - row.impairmentEnd
-
-  // 单位造价
   const area = _getNum(row.area)
-  row.unitCost = area > 0
-    ? _getNum(row.accumulatedInput) / area
-    : null
+  row.unitCost = area > 0 ? _getNum(row.accumulatedInput) / area : null
+
+  // 同步旧字段 transferTo
+  if (row.transferToH1 && !row.transferTo) row.transferTo = row.transferToH1
+  if (row.transferTo && !row.transferToH1) row.transferToH1 = row.transferTo
 }
 
-/** 从持久化JSON规范化行（补全缺失字段+重算公式） */
 function _normalizeRow(raw: any): H2DetailRow {
-  const row: H2DetailRow = {
-    rowId: raw.rowId ?? `row-${Math.random().toString(36).slice(2, 10)}`,
-    // 基本信息
-    name: raw.name ?? '',
-    budget: _getNum(raw.budget),
-    startDate: raw.startDate ?? '',
-    plannedEndDate: raw.plannedEndDate ?? '',
-    actualEndDate: raw.actualEndDate ?? '',
-    completionRate: null,
-    accumulatedInput: _getNum(raw.accumulatedInput),
-    fundSource: raw.fundSource ?? '',
-    capRate: raw.capRate != null ? Number(raw.capRate) : null,
-    category: raw.category ?? '',
-    // 增减
-    cipBegin: _getNum(raw.cipBegin),
-    increaseMaterial: _getNum(raw.increaseMaterial),
-    increaseLabor: _getNum(raw.increaseLabor),
-    increaseMachinery: _getNum(raw.increaseMachinery),
-    increaseInterest: _getNum(raw.increaseInterest),
-    increaseOther: _getNum(raw.increaseOther),
-    increaseTotal: 0,
-    decrease: _getNum(raw.decrease),
-    transferOut: _getNum(raw.transferOut),
-    unadjustedEnd: _getNum(raw.unadjustedEnd),
-    beginAudited: _getNum(raw.beginAudited),
-    adjustBegin: _getNum(raw.adjustBegin),
-    adjustEnd: _getNum(raw.adjustEnd),
-    decreaseAdj: _getNum(raw.decreaseAdj),
-    transferAdj: _getNum(raw.transferAdj),
-    endAudited: _getNum(raw.endAudited),
-    increaseAdj: _getNum(raw.increaseAdj),
-    aje: _getNum(raw.aje),
-    rje: _getNum(raw.rje),
-    // 竣工结转
-    transferDate: raw.transferDate ?? '',
-    transferAmount: _getNum(raw.transferAmount),
-    transferToH1: raw.transferToH1 ?? '',
-    remainingCip: _getNum(raw.remainingCip),
-    cipEnd: 0,
-    impairmentBegin: _getNum(raw.impairmentBegin),
-    impairmentIncrease: _getNum(raw.impairmentIncrease),
-    impairmentDecrease: _getNum(raw.impairmentDecrease),
-    impairmentEnd: 0,
-    netValue: 0,
-    contractNo: raw.contractNo ?? '',
-    contractor: raw.contractor ?? '',
-    supervisor: raw.supervisor ?? '',
-    area: raw.area != null ? Number(raw.area) || null : null,
-    unitCost: null,
-    progressNote: raw.progressNote ?? '',
-    auditFlag: raw.auditFlag ?? '',
-    indexRef: raw.indexRef ?? '',
-    remark: raw.remark ?? '',
+  const row = _createEmptyRow(_str(raw.name))
+  row.rowId = raw.rowId ?? row.rowId
+  row.projectCode = _str(raw.projectCode)
+  row.budget = _getNum(raw.budget)
+  row.startDate = _str(raw.startDate)
+  row.plannedEndDate = _str(raw.plannedEndDate)
+  row.actualEndDate = _str(raw.actualEndDate)
+  row.accumulatedInput = _getNum(raw.accumulatedInput)
+  row.fundSource = _str(raw.fundSource)
+  row.capRate = raw.capRate != null && raw.capRate !== '' ? Number(raw.capRate) : null
+  row.category = _str(raw.category)
+  row.projectStatus = _str(raw.projectStatus) || '在建'
+  row.approvalDocNo = _str(raw.approvalDocNo)
+  row.contractNo = _str(raw.contractNo)
+  row.contractor = _str(raw.contractor)
+  row.supervisor = _str(raw.supervisor)
+  row.area = raw.area != null && raw.area !== '' ? Number(raw.area) || null : null
+  row.progressNote = _str(raw.progressNote)
+  row.isMortgaged = _str(raw.isMortgaged)
+  row.auditFlag = _str(raw.auditFlag)
+  row.indexRef = _str(raw.indexRef)
+  row.remark = _str(raw.remark)
+
+  row.cipBegin = _getNum(raw.cipBegin)
+  row.interestBegin = _getNum(raw.interestBegin)
+  row.increaseMaterial = _getNum(raw.increaseMaterial)
+  row.increaseLabor = _getNum(raw.increaseLabor)
+  row.increaseMachinery = _getNum(raw.increaseMachinery ?? raw.increaseExpense)
+  row.increaseInterest = _getNum(raw.increaseInterest)
+  row.increaseOther = _getNum(raw.increaseOther)
+  row.transferAmount = _getNum(raw.transferAmount ?? raw.decreaseTransfer)
+  row.decrease = _getNum(raw.decrease ?? raw.decreaseOther ?? raw.decreaseDisposal)
+  row.transferOut = _getNum(raw.transferOut)
+  row.interestDec = _getNum(raw.interestDec)
+
+  row.adjustBegin = _getNum(raw.adjustBegin)
+  row.increaseAdj = _getNum(raw.increaseAdj)
+  row.transferAdj = _getNum(raw.transferAdj)
+  row.decreaseAdj = _getNum(raw.decreaseAdj)
+  row.interestOpenAdj = _getNum(raw.interestOpenAdj)
+  row.interestIncAdj = _getNum(raw.interestIncAdj)
+  row.interestDecAdj = _getNum(raw.interestDecAdj)
+  row.adjustEnd = _getNum(raw.adjustEnd)
+  row.aje = _getNum(raw.aje)
+  row.rje = _getNum(raw.rje)
+
+  row.transferDate = _str(raw.transferDate)
+  row.transferToH1 = _str(raw.transferToH1 || raw.transferTo)
+  row.transferTo = _str(raw.transferTo || raw.transferToH1)
+
+  row.impairmentBegin = _getNum(raw.impairmentBegin)
+  row.impairmentIncrease = _getNum(raw.impairmentIncrease)
+  row.impairmentDecrease = _getNum(raw.impairmentDecrease)
+  row.impairOpenAdj = _getNum(raw.impairOpenAdj)
+  row.impairIncAdj = _getNum(raw.impairIncAdj)
+  row.impairDecAdj = _getNum(raw.impairDecAdj)
+
+  // 旧数据若只存了 beginAudited/endAudited，尽量反推调整额（仅当调整为空）
+  if (!_getNum(raw.adjustBegin) && raw.beginAudited != null) {
+    const implied = _getNum(raw.beginAudited) - row.cipBegin
+    if (Math.abs(implied) > 0.005) row.adjustBegin = implied
   }
+
   _recalcFormulas(row)
+  return row
+}
+
+function _emptySubtotal(): H2DetailRow {
+  const row = _createEmptyRow('合计')
+  row.rowId = 'row-subtotal'
+  row.projectStatus = ''
   return row
 }
 
@@ -421,18 +501,12 @@ export function useH2Detail(options: {
   projectId: Ref<string>
   allResponses: Ref<Map<string, any>>
   isReadonly: Ref<boolean>
-  /** 保存回调（调用useH2FormData.setValue） */
   onSave?: (itemId: string, value: any) => void
 }) {
-  // ─── State ─────────────────────────────────────────────────────────────────
-
   const rows = ref<H2DetailRow[]>([])
   const auditNote = ref('')
   const auditConclusion = ref('')
-  /** 当前选中行的rowId（跨区段Tab同步高亮） */
   const selectedRowId = ref<string | null>(null)
-
-  // ─── Helpers ───────────────────────────────────────────────────────────────
 
   function _getJson(itemId: string): any {
     const item = options.allResponses.value.get(itemId)
@@ -447,8 +521,6 @@ export function useH2Detail(options: {
     return (item?.remark ?? item?.conclusion ?? '') as string
   }
 
-  // ─── Init / Load ───────────────────────────────────────────────────────────
-
   function initFromAllResponses(): void {
     const data = _getJson(ROWS_KEY)
     if (Array.isArray(data) && data.length > 0) {
@@ -460,200 +532,95 @@ export function useH2Detail(options: {
     auditConclusion.value = _getString(CONCLUSION_KEY)
   }
 
-  // Watch allResponses for reloads (selfLoad完成后触发)
   watch(options.allResponses, () => initFromAllResponses(), { immediate: true })
 
-  // ─── Computed: subtotalRow (SUM所有numeric列，不可编辑) ─────────────────
-
-  /**
-   * Req 3.4: 合计行 = SUM所有工程项目行各金额列
-   * 合计行不可编辑，仅用于展示。
-   */
   const subtotalRow: ComputedRef<H2DetailRow> = computed(() => {
-    const sums: Record<string, number> = {}
+    const subtotal = _emptySubtotal()
     for (const field of NUMERIC_FIELDS) {
-      sums[field] = calcSubtotal(rows.value.map(r => _getNum(r[field])))
+      ;(subtotal as any)[field] = calcSubtotal(rows.value.map(r => _getNum(r[field])))
     }
-
-    const subtotal: H2DetailRow = {
-      rowId: 'row-subtotal',
-      name: '合计',
-      budget: sums['budget'] ?? 0,
-      startDate: '',
-      plannedEndDate: '',
-      actualEndDate: '',
-      completionRate: null,
-      accumulatedInput: sums['accumulatedInput'] ?? 0,
-      fundSource: '',
-      capRate: null,
-      category: '',
-      cipBegin: sums['cipBegin'] ?? 0,
-      increaseMaterial: sums['increaseMaterial'] ?? 0,
-      increaseLabor: sums['increaseLabor'] ?? 0,
-      increaseMachinery: sums['increaseMachinery'] ?? 0,
-      increaseInterest: sums['increaseInterest'] ?? 0,
-      increaseOther: sums['increaseOther'] ?? 0,
-      increaseTotal: sums['increaseTotal'] ?? 0,
-      decrease: sums['decrease'] ?? 0,
-      transferOut: sums['transferOut'] ?? 0,
-      unadjustedEnd: sums['unadjustedEnd'] ?? 0,
-      beginAudited: sums['beginAudited'] ?? 0,
-      adjustBegin: sums['adjustBegin'] ?? 0,
-      adjustEnd: sums['adjustEnd'] ?? 0,
-      decreaseAdj: sums['decreaseAdj'] ?? 0,
-      transferAdj: sums['transferAdj'] ?? 0,
-      endAudited: sums['endAudited'] ?? 0,
-      increaseAdj: sums['increaseAdj'] ?? 0,
-      aje: sums['aje'] ?? 0,
-      rje: sums['rje'] ?? 0,
-      transferDate: '',
-      transferAmount: sums['transferAmount'] ?? 0,
-      transferToH1: '',
-      remainingCip: sums['remainingCip'] ?? 0,
-      cipEnd: sums['cipEnd'] ?? 0,
-      impairmentBegin: sums['impairmentBegin'] ?? 0,
-      impairmentIncrease: sums['impairmentIncrease'] ?? 0,
-      impairmentDecrease: sums['impairmentDecrease'] ?? 0,
-      impairmentEnd: sums['impairmentEnd'] ?? 0,
-      netValue: sums['netValue'] ?? 0,
-      contractNo: '',
-      contractor: '',
-      supervisor: '',
-      area: null,
-      unitCost: null,
-      progressNote: '',
-      auditFlag: '',
-      indexRef: '',
-      remark: '',
-    }
+    subtotal.name = '合计'
+    // 进度/单位造价不按 SUM 展示
+    subtotal.completionRate = null
+    subtotal.unitCost = null
+    subtotal.capRate = null
     return subtotal
   })
 
-  // ─── Computed: crossValidation vs H2-1 ────────────────────────────────────
-
-  /**
-   * Req 3.5: 合计行与H2-1审定表交叉验证
-   * 期末余额合计 = H2-1审定数合计
-   * diff > 0.01 时 isMatch=false
-   */
-  const crossValidationH1: ComputedRef<{ diff: number; isMatch: boolean }> = computed(() => {
-    // 读取H2-1审定表行数据中的期末审定数合计
+  /** 与 H2-1 交叉验证：优先用审定期末 */
+  const crossValidationH1: ComputedRef<{
+    diff: number
+    isMatch: boolean
+    detailTotal: number
+    h1Total: number
+  }> = computed(() => {
     const resp = options.allResponses.value.get('H2-1-rows')
     const raw = resp?.remark ?? resp?.conclusion
     let h1AuditedTotal = 0
-
     if (raw) {
       try {
         const h1Rows = JSON.parse(raw)
         if (Array.isArray(h1Rows)) {
           for (const r of h1Rows) {
-            h1AuditedTotal += _getNum(r.endAudited)
+            h1AuditedTotal += _getNum(r.endAudited) || (_getNum(r.endUnadjusted) + _getNum(r.endAdjustment))
           }
         }
-      } catch { /* 静默处理 */ }
+      } catch { /* ignore */ }
     }
-
-    const detailCipEnd = subtotalRow.value.cipEnd
-    const diff = detailCipEnd - h1AuditedTotal
+    const detailTotal = subtotalRow.value.endAudited
+    const diff = detailTotal - h1AuditedTotal
     return {
       diff,
       isMatch: Math.abs(diff) < 0.01,
+      detailTotal,
+      h1Total: h1AuditedTotal,
     }
   })
 
-  // ─── Computed: 超预算行标记 ────────────────────────────────────────────────
-
-  /**
-   * Req 3.9: 完工进度>100%时红色高亮该行"超预算"
-   */
   const overBudgetRowIds: ComputedRef<Set<string>> = computed(() => {
     const ids = new Set<string>()
     for (const row of rows.value) {
-      if (row.completionRate != null && row.completionRate > 100) {
-        ids.add(row.rowId)
-      }
+      if (row.completionRate != null && row.completionRate > 100) ids.add(row.rowId)
     }
     return ids
   })
 
-  // ─── Actions: addRow ───────────────────────────────────────────────────────
-
-  /**
-   * Req 3.6: 添加工程项目行
-   * 交互层调用 ElMessageBox.prompt 获取名称后回调此方法
-   */
   function addRow(name: string): void {
     if (options.isReadonly.value) return
     if (!name || !name.trim()) return
-
-    const newRow = _createEmptyRow(name.trim())
-    rows.value.push(newRow)
+    rows.value.push(_createEmptyRow(name.trim()))
     _persist()
   }
 
-  // ─── Actions: removeRow ────────────────────────────────────────────────────
-
-  /**
-   * 删除指定行（按rowId）
-   */
   function removeRow(rowId: string): void {
     if (options.isReadonly.value) return
-
     const idx = rows.value.findIndex(r => r.rowId === rowId)
     if (idx === -1) return
     rows.value.splice(idx, 1)
-
-    // 清除选中状态
-    if (selectedRowId.value === rowId) {
-      selectedRowId.value = null
-    }
+    if (selectedRowId.value === rowId) selectedRowId.value = null
     _persist()
   }
 
-  // ─── Actions: updateCell ───────────────────────────────────────────────────
-
-  /**
-   * Req 3.3: 编辑单元格后自动重算公式列
-   * 公式列（increaseTotal/cipEnd/completionRate/impairmentEnd/netValue/unitCost）不可直接修改
-   */
   function updateCell(rowId: string, field: string, value: any): void {
     if (options.isReadonly.value) return
-
     const row = rows.value.find(r => r.rowId === rowId)
     if (!row) return
+    if (FORMULA_FIELDS.has(field)) return
 
-    // 公式列拒绝直接修改
-    const formulaFields = ['increaseTotal', 'cipEnd', 'completionRate', 'impairmentEnd', 'netValue', 'unitCost']
-    if (formulaFields.includes(field)) return
-
-    // 日期/文本字段直接赋值
-    const textFields = [
-      'name', 'startDate', 'plannedEndDate', 'actualEndDate', 'fundSource',
-      'category', 'transferDate', 'transferToH1', 'contractNo', 'contractor',
-      'supervisor', 'progressNote', 'auditFlag', 'indexRef', 'remark',
-    ]
-    if (textFields.includes(field)) {
+    if (TEXT_FIELDS.has(field)) {
       ;(row as any)[field] = String(value ?? '')
+      if (field === 'transferTo') row.transferToH1 = row.transferTo
+      if (field === 'transferToH1') row.transferTo = row.transferToH1
     } else {
-      // 数值字段
       ;(row as any)[field] = _getNum(value)
     }
-
-    // 重算公式列
     _recalcFormulas(row)
     _persist()
   }
 
-  // ─── Actions: selectRow (跨Tab行同步高亮) ──────────────────────────────────
-
-  /**
-   * Req 3.2: 3个区段Tab切换时保持行同步（选中行高亮跨Tab一致）
-   */
   function selectRow(rowId: string | null): void {
     selectedRowId.value = rowId
   }
-
-  // ─── Actions: saveNote / saveConclusion ────────────────────────────────────
 
   function saveNote(note: string): void {
     auditNote.value = note
@@ -665,18 +632,17 @@ export function useH2Detail(options: {
     options.onSave?.(CONCLUSION_KEY, conclusion)
   }
 
-  // ─── Persist (rows → allResponses) ─────────────────────────────────────────
+  function applyConclusionTemplate(key: 'A' | 'B' | 'C'): void {
+    if (options.isReadonly.value) return
+    saveConclusion(H2_2_CONCLUSION_TEMPLATES[key])
+  }
 
-  /**
-   * 持久化行数据到 allResponses（去掉公式列，运行时重算）
-   */
   function _persist(): void {
     if (!options.onSave) return
-
     const toPersist = rows.value.map(r => ({
       rowId: r.rowId,
-      // 基本信息
       name: r.name,
+      projectCode: r.projectCode,
       budget: r.budget,
       startDate: r.startDate,
       plannedEndDate: r.plannedEndDate,
@@ -685,69 +651,71 @@ export function useH2Detail(options: {
       fundSource: r.fundSource,
       capRate: r.capRate,
       category: r.category,
-      // 增减
-      cipBegin: r.cipBegin,
-      increaseMaterial: r.increaseMaterial,
-      increaseLabor: r.increaseLabor,
-      increaseMachinery: r.increaseMachinery,
-      increaseInterest: r.increaseInterest,
-      increaseOther: r.increaseOther,
-      decrease: r.decrease,
-      transferOut: r.transferOut,
-      unadjustedEnd: r.unadjustedEnd,
-      beginAudited: r.beginAudited,
-      adjustBegin: r.adjustBegin,
-      adjustEnd: r.adjustEnd,
-      decreaseAdj: r.decreaseAdj,
-      transferAdj: r.transferAdj,
-      endAudited: r.endAudited,
-      increaseAdj: r.increaseAdj,
-      aje: r.aje,
-      rje: r.rje,
-      // 竣工结转
-      transferDate: r.transferDate,
-      transferAmount: r.transferAmount,
-      transferToH1: r.transferToH1,
-      remainingCip: r.remainingCip,
-      impairmentBegin: r.impairmentBegin,
-      impairmentIncrease: r.impairmentIncrease,
-      impairmentDecrease: r.impairmentDecrease,
+      projectStatus: r.projectStatus,
+      approvalDocNo: r.approvalDocNo,
       contractNo: r.contractNo,
       contractor: r.contractor,
       supervisor: r.supervisor,
       area: r.area,
       progressNote: r.progressNote,
+      isMortgaged: r.isMortgaged,
       auditFlag: r.auditFlag,
       indexRef: r.indexRef,
       remark: r.remark,
+      cipBegin: r.cipBegin,
+      interestBegin: r.interestBegin,
+      increaseMaterial: r.increaseMaterial,
+      increaseLabor: r.increaseLabor,
+      increaseMachinery: r.increaseMachinery,
+      increaseInterest: r.increaseInterest,
+      increaseOther: r.increaseOther,
+      transferAmount: r.transferAmount,
+      decrease: r.decrease,
+      transferOut: r.transferOut,
+      interestDec: r.interestDec,
+      adjustBegin: r.adjustBegin,
+      increaseAdj: r.increaseAdj,
+      transferAdj: r.transferAdj,
+      decreaseAdj: r.decreaseAdj,
+      interestOpenAdj: r.interestOpenAdj,
+      interestIncAdj: r.interestIncAdj,
+      interestDecAdj: r.interestDecAdj,
+      adjustEnd: r.adjustEnd,
+      aje: r.aje,
+      rje: r.rje,
+      // 持久化审定结果，便于下游直接读取
+      beginAudited: r.beginAudited,
+      endAudited: r.endAudited,
+      transferDate: r.transferDate,
+      transferToH1: r.transferToH1,
+      transferTo: r.transferTo || r.transferToH1,
+      impairmentBegin: r.impairmentBegin,
+      impairmentIncrease: r.impairmentIncrease,
+      impairmentDecrease: r.impairmentDecrease,
+      impairOpenAdj: r.impairOpenAdj,
+      impairIncAdj: r.impairIncAdj,
+      impairDecAdj: r.impairDecAdj,
+      impairEndAud: r.impairEndAud,
+      netEndAud: r.netEndAud,
     }))
-
     options.onSave(ROWS_KEY, toPersist)
   }
 
-  // ─── Return ────────────────────────────────────────────────────────────────
-
   return {
-    // State
     rows,
     auditNote,
     auditConclusion,
     selectedRowId,
-
-    // Computed
     subtotalRow,
     crossValidationH1,
     overBudgetRowIds,
-
-    // Actions
     addRow,
     removeRow,
     updateCell,
     selectRow,
     saveNote,
     saveConclusion,
-
-    // Init (外部可显式调用)
+    applyConclusionTemplate,
     initFromAllResponses,
   }
 }

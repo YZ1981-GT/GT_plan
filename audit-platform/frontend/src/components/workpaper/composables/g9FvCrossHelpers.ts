@@ -21,6 +21,8 @@ export const G9_AJE_ADJ_OVERLAY_ID = 'G9-aje-adj-overlay'
 /** G9A seq8：公允价值计量 / L3 调节 */
 export const G9A_FV_PROGRAM_NOS = [8] as const
 export const G9A_FV_MARK_KEY = 'G9A-fv-complete'
+/** G9A 凭证检查回填标记 */
+export const G9A_VOUCHER_MARK_KEY = 'G9A-voucher-complete'
 export const G9A_PROCEDURE_SHEET = '其他非流动金融资产实质性程序表G9A'
 
 export const G9_FV_DIFF_THRESHOLD = 0.01

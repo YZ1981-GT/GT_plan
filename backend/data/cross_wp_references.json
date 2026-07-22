@@ -333,11 +333,11 @@
       "targets": [
         {
           "wp_code": "G11",
-          "sheet": "投资收益实质性程序表G11A-修订前",
+          "sheet": "投资收益实质性程序表G11A",
           "cell": "A6",
           "formula": "=WP('G7','审定表','投资收益')",
           "cell_label": "长期股权投资收益行",
-          "address": "G11:投资收益实质性程序表G11A-修订前:A6"
+          "address": "G11:投资收益实质性程序表G11A:A6"
         }
       ],
       "category": "other",
@@ -2140,21 +2140,21 @@
     },
     {
       "ref_id": "CW-96",
-      "description": "H1 折旧政策→B60 总体审计策略",
+      "description": "H1 depreciation policy -> B60 overall strategy",
       "source_wp": "H1",
       "source_sheet": "审定表H1-1",
       "source_cell": "D1",
       "targets": [
         {
           "wp_code": "B60",
-          "sheet": "B61-1工时预算与控制板（按阶段）",
-          "cell": "A17",
+          "sheet": "总体审计策略",
+          "cell": "重大会计实务_固定资产折旧政策",
           "formula": null,
           "cell_label": "固定资产折旧政策",
-          "address": "B60:B61-1工时预算与控制板（按阶段）:A17"
+          "address": "B60:总体审计策略:重大会计实务_固定资产折旧政策"
         }
       ],
-      "category": "internal",
+      "category": "cross_module",
       "severity": "warning",
       "source_cell_label": "折旧政策说明",
       "source_file": "H1 固定资产.xlsx",
@@ -4664,7 +4664,7 @@
       "ref_id": "CW-225"
     },
     {
-      "description": "H2 在建工程审定数→附注 5.11",
+      "description": "H2 在建工程审定数→附注 五、23 / 八、23",
       "source_wp": "H2",
       "source_sheet": "审定表H2-1",
       "source_cell": "在建工程净值",
@@ -4672,12 +4672,22 @@
         {
           "wp_code": "NOTE",
           "sheet": "附注",
-          "cell": "5.11 在建工程合计",
+          "cell": "五、23 在建工程合计",
           "formula": null,
           "target_type": "note_section",
-          "target_label": "→ 附注 5.11 在建工程",
-          "target_route": "/projects/{pid}/disclosure-notes?section=5.11",
-          "note_section_code": "5.11"
+          "target_label": "→ 附注 五、23 在建工程（上市）",
+          "target_route": "/projects/{pid}/disclosure-notes?section=五、23",
+          "note_section_code": "五、23"
+        },
+        {
+          "wp_code": "NOTE",
+          "sheet": "附注",
+          "cell": "八、23 在建工程合计",
+          "formula": null,
+          "target_type": "note_section",
+          "target_label": "→ 附注 八、23 在建工程（国企）",
+          "target_route": "/projects/{pid}/disclosure-notes?section=八、23",
+          "note_section_code": "八、23"
         }
       ],
       "category": "disclosure_reference",
@@ -5550,7 +5560,7 @@
       "ref_id": "CW-273"
     },
     {
-      "description": "G13 公允价值变动收益审定数→报表 IS-008 公允价值变动收益",
+      "description": "G13 公允价值变动收益审定数→报表 IS-010 公允价值变动收益",
       "source_wp": "G13",
       "source_sheet": "审定表G13-1",
       "source_cell": "本期公允价值变动",
@@ -5561,9 +5571,9 @@
           "cell": "公允价值变动收益行",
           "formula": null,
           "target_type": "report_row",
-          "target_label": "→ 报表 IS-008 公允价值变动收益",
-          "target_route": "/projects/{pid}/reports?type=income_statement&row=IS-008",
-          "report_row_code": "IS-008",
+          "target_label": "→ 报表 IS-010 公允价值变动收益",
+          "target_route": "/projects/{pid}/reports?type=income_statement&row=IS-010",
+          "report_row_code": "IS-010",
           "cell_label": "公允价值变动收益行",
           "address": "REPORT:利润表:公允价值变动收益行"
         }
@@ -5825,7 +5835,7 @@
       "ref_id": "CW-284"
     },
     {
-      "description": "G8 其他权益工具投资审定数→报表 BS-010 其他权益工具投资",
+      "description": "G8 其他权益工具投资审定数→报表 BS-034 其他权益工具投资",
       "source_wp": "G8",
       "source_sheet": "审定表G8-1",
       "source_cell": "期末审定数",
@@ -5836,9 +5846,9 @@
           "cell": "其他权益工具投资行",
           "formula": null,
           "target_type": "report_row",
-          "target_label": "→ 报表 BS-010 其他权益工具投资",
-          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-010",
-          "report_row_code": "BS-010",
+          "target_label": "→ 报表 BS-034 其他权益工具投资",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-034",
+          "report_row_code": "BS-034",
           "cell_label": "其他权益工具投资行",
           "address": "REPORT:资产负债表:其他权益工具投资行"
         }
@@ -5848,6 +5858,31 @@
       "source_cell_label": "审定数",
       "source_address": "G8:审定表G8-1:期末审定数",
       "ref_id": "CW-285"
+    },
+    {
+      "description": "G9 其他非流动金融资产审定数→报表 BS-035 其他非流动金融资产",
+      "source_wp": "G9",
+      "source_sheet": "审定表G9-1",
+      "source_cell": "期末审定数",
+      "targets": [
+        {
+          "wp_code": "REPORT",
+          "sheet": "资产负债表",
+          "cell": "其他非流动金融资产行",
+          "formula": null,
+          "target_type": "report_row",
+          "target_label": "→ 报表 BS-035 其他非流动金融资产",
+          "target_route": "/projects/{pid}/reports?type=balance_sheet&row=BS-035",
+          "report_row_code": "BS-035",
+          "cell_label": "其他非流动金融资产行",
+          "address": "REPORT:资产负债表:其他非流动金融资产行"
+        }
+      ],
+      "category": "investment_cycle",
+      "severity": "warning",
+      "source_cell_label": "审定数",
+      "source_address": "G9:审定表G9-1:期末审定数",
+      "ref_id": "CW-450"
     },
     {
       "description": "G1 交易性金融资产收益→G11 投资收益汇总",
@@ -8251,10 +8286,160 @@
       "source_address": "J1:分配情况检查表J1-7:分配数据汇总",
       "direction": "source_to_target",
       "note": "EventBus: J1 publish 'compensation:adjusted' { sellingExpenseSalary→K8, adminExpenseSalary→K9 }"
+    },
+    {
+      "ref_id": "CW-416",
+      "description": "H1-13 折旧分配→I6 研发费用 折旧费行",
+      "source_wp": "H1",
+      "source_sheet": "折旧分配分析表H1-13",
+      "source_cell": "研发费用折旧",
+      "targets": [
+        {
+          "wp_code": "I6",
+          "sheet": "明细表I6-2",
+          "cell": "折旧费",
+          "formula": "=WP('H1','折旧分配分析表H1-13','研发费用折旧')",
+          "cell_label": "折旧费行",
+          "address": "I6:明细表I6-2:折旧费"
+        }
+      ],
+      "category": "depreciation",
+      "severity": "warning",
+      "source_cell_label": "研发费用折旧",
+      "source_file": "H1 固定资产.xlsx",
+      "source_address": "H1:折旧分配分析表H1-13:研发费用折旧"
+    },
+    {
+      "ref_id": "CW-417",
+      "description": "B60 ch5 materiality conclusion -> B19-1",
+      "source_wp": "B60",
+      "source_sheet": "总体审计策略",
+      "source_cell": "重要性水平结论",
+      "targets": [
+        {
+          "wp_code": "B19-1",
+          "sheet": "重要性水平确定表",
+          "cell": "PM_TE_AMPT",
+          "formula": null,
+          "cell_label": "PM/TE/AMPT",
+          "address": "B19-1:重要性水平确定表:PM_TE_AMPT"
+        }
+      ],
+      "category": "materiality_linkage",
+      "severity": "warning",
+      "source_address": "B60:总体审计策略:重要性水平结论"
+    },
+    {
+      "ref_id": "CW-418",
+      "description": "B60 ch5 materiality calc -> B15",
+      "source_wp": "B60",
+      "source_sheet": "总体审计策略",
+      "source_cell": "重要性水平计算过程",
+      "targets": [
+        {
+          "wp_code": "B15",
+          "sheet": "重要性计算表",
+          "cell": "计算过程",
+          "formula": null,
+          "cell_label": "重要性计算过程",
+          "address": "B15:重要性计算表:计算过程"
+        }
+      ],
+      "category": "materiality_linkage",
+      "severity": "recommended",
+      "source_address": "B60:总体审计策略:重要性水平计算过程"
+    },
+    {
+      "ref_id": "CW-419",
+      "description": "B60 ch6 risk summary <-> B50 risk_id",
+      "source_wp": "B60",
+      "source_sheet": "总体审计策略",
+      "source_cell": "风险ID/B50行号",
+      "targets": [
+        {
+          "wp_code": "B50",
+          "sheet": "风险汇总",
+          "cell": "risk_id",
+          "formula": null,
+          "cell_label": "risk_id",
+          "address": "B50:风险汇总:risk_id"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "warning",
+      "source_address": "B60:总体审计策略:风险ID/B50行号",
+      "note": "Row fields risk_id/scot_id on SCOT+ link to B50"
+    },
+    {
+      "ref_id": "CW-420",
+      "description": "B60 ch7 SCOT+ -> cycle procedures (scot_id)",
+      "source_wp": "B60",
+      "source_sheet": "总体审计策略",
+      "source_cell": "SCOT+_循环代码_程序索引",
+      "targets": [
+        {
+          "target_module": "cycle_procedures",
+          "target_field": "scot_id",
+          "link_type": "plan_to_procedure"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "recommended",
+      "source_address": "B60:总体审计策略:SCOT+_循环代码_程序索引"
+    },
+    {
+      "ref_id": "CW-421",
+      "description": "B60 -> AuditPlan plan_version/materiality_reference/attachment_flags",
+      "source_wp": "B60",
+      "source_sheet": "总体审计策略",
+      "source_cell": "计划版本与适用性矩阵",
+      "targets": [
+        {
+          "target_module": "audit_plan",
+          "target_field": "plan_version",
+          "link_type": "data_source"
+        },
+        {
+          "target_module": "audit_plan",
+          "target_field": "materiality_reference",
+          "link_type": "data_source"
+        },
+        {
+          "target_module": "audit_plan",
+          "target_field": "key_focus_areas.b60_attachment_flags",
+          "link_type": "data_source"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "recommended",
+      "source_address": "B60:总体审计策略:计划版本与适用性矩阵",
+      "note": "Store matrix on AuditPlan.key_focus_areas.b60_attachment_flags; bump plan_version on ch15"
+    },
+    {
+      "ref_id": "CW-422",
+      "description": "B60D filing archive <-> AuditPlan.plan_version",
+      "source_wp": "B60D",
+      "source_sheet": "报送函",
+      "source_cell": "对应B60版本日期",
+      "targets": [
+        {
+          "target_module": "audit_plan",
+          "target_field": "plan_version",
+          "link_type": "consistency_check"
+        },
+        {
+          "target_module": "audit_plan",
+          "target_field": "updated_at",
+          "link_type": "consistency_check"
+        }
+      ],
+      "category": "cross_module",
+      "severity": "warning",
+      "source_address": "B60D:报送函:对应B60版本日期"
     }
   ],
   "stats": {
-    "total_references": 415,
+    "total_references": 416,
     "by_category": {
       "internal": 61,
       "revenue_cycle": 35,
@@ -8264,7 +8449,7 @@
       "review_traceback": 17,
       "ipe_reference": 16,
       "investment_cycle": 15,
-      "depreciation": 14,
+      "depreciation": 15,
       "inventory_cycle": 14,
       "fixed_asset_cycle": 10,
       "intangible_cycle": 10,
@@ -8294,11 +8479,11 @@
       "materiality_linkage": 10,
       "control_test_linkage": 9
     },
-    "coverage_note": "覆盖 D-N 实质性程序(CW-01~CW-58) + B/C/A/S 计划/控制/完成/特定项目跨模块引用(CW-59~CW-88) + E1 货币资金优化扩展(CW-89~CW-107 + CW-108~CW-135) + D 销售循环反向回填(CW-136) + D 销售循环跨底稿引用(CW-137~CW-175) 共 175 条。 + F 采购存货循环跨底稿引用(CW-176~CW-210, 共 35 条) + H 固定资产循环跨底稿引用(CW-211~CW-242, 共 32 条) + I 无形资产循环跨底稿引用(共 29 条) + G 投资循环跨底稿引用（CW-267~CW-292, 共 26 条，含 G0→G7 反向回填 1 条） + J 职工薪酬循环跨底稿引用(CW-293~CW-312, 共 20 条) + K 管理循环跨底稿引用(CW-313~CW-332, 共 20 条) + L 筹资循环跨底稿引用(CW-333~CW-352, 共 20 条) + M 权益循环跨底稿引用(CW-353~CW-369, 共 17 条) + N 税金循环跨底稿引用(CW-370~CW-381, 共 12 条) + B/C→各循环联动(CW-382~CW-400, 共 19 条: B15 重要性水平→10 循环抽样范围 + C 控制测试结论→9 循环实质性程序范围) + G8/J2→M9 OCI核对联动(CW-403~CW-404, 共 2 条) + I1摊销分配→K8/K9/I6(本地合并新增) + I2开发支出联动(本地合并新增) + J循环EventBus联动(本地合并新增)",
+    "coverage_note": "覆盖 D-N 实质性程序(CW-01~CW-58) + B/C/A/S 计划/控制/完成/特定项目跨模块引用(CW-59~CW-88) + E1 货币资金优化扩展(CW-89~CW-107 + CW-108~CW-135) + D 销售循环反向回填(CW-136) + D 销售循环跨底稿引用(CW-137~CW-175) 共 175 条。 + F 采购存货循环跨底稿引用(CW-176~CW-210, 共 35 条) + H 固定资产循环跨底稿引用(CW-211~CW-242, 共 32 条) + I 无形资产循环跨底稿引用(共 29 条) + G 投资循环跨底稿引用（CW-267~CW-292, 共 26 条，含 G0→G7 反向回填 1 条） + J 职工薪酬循环跨底稿引用(CW-293~CW-312, 共 20 条) + K 管理循环跨底稿引用(CW-313~CW-332, 共 20 条) + L 筹资循环跨底稿引用(CW-333~CW-352, 共 20 条) + M 权益循环跨底稿引用(CW-353~CW-369, 共 17 条) + N 税金循环跨底稿引用(CW-370~CW-381, 共 12 条) + B/C→各循环联动(CW-382~CW-400, 共 19 条: B15 重要性水平→10 循环抽样范围 + C 控制测试结论→9 循环实质性程序范围) + G8/J2→M9 OCI核对联动(CW-403~CW-404, 共 2 条) + I1摊销分配→K8/K9/I6(本地合并新增) + I2开发支出联动(本地合并新增) + J循环EventBus联动(本地合并新增) + B60 P3 (CW-417~CW-422)",
     "naming_resolved": 81,
     "naming_unresolved": 26,
     "naming_rate": "75.7%",
-    "total": 415
+    "total": 422
   },
   "naming_rule": {
     "format": "{wp_code}:{sheet_name}:{cell_coordinate}",

@@ -52,7 +52,7 @@ def test_g12_import_export_router_import():
     )
 
     assert router is not None
-    assert set(_G12_SPECS.keys()) == {"G12-2", "G12-3", "G12-4", "G12-6"}
+    assert set(_G12_SPECS.keys()) == {"G12-2", "G12-3", "G12-4", "G12-5", "G12-6"}
 
 
 def test_g12_ai_sections():

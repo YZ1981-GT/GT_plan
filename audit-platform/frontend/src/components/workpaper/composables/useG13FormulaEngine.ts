@@ -50,6 +50,29 @@ export function isFvReconciled(fvChange: number, adjustedAmount: number, toleran
   return Math.abs(fvChange - adjustedAmount) <= tolerance
 }
 
+/**
+ * 对应科目公允价值恒等式（对齐致同 G13-2）：
+ * 公允价值 = 成本 + 累计公允价值变动
+ */
+export function calcFairValueFromParts(cost: number, cumulativeFvChange: number): number {
+  return parseNum(cost) + parseNum(cumulativeFvChange)
+}
+
+/** 核对：成本 + 累计公允价值变动 = 公允价值 */
+export function isBsFvReconciled(
+  cost: number,
+  cumulativeFvChange: number,
+  fairValue: number,
+  tolerance = 0.01,
+): boolean {
+  return Math.abs(calcFairValueFromParts(cost, cumulativeFvChange) - parseNum(fairValue)) <= tolerance
+}
+
+/** 计入损益 ↔ 损益科目审定数勾稽 */
+export function isPlReconciled(amountInPl: number, audited: number, tolerance = 0.01): boolean {
+  return Math.abs(parseNum(amountInPl) - parseNum(audited)) <= tolerance
+}
+
 export function calcSubtotal(values: number[]): number {
   return values.reduce((s, v) => s + parseNum(v), 0)
 }

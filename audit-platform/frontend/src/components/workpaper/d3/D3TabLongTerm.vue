@@ -21,7 +21,24 @@
     </el-button-group>
   </div>
 
-  <!-- 8列表格 -->
+  <!-- 处理结论跨底稿联动提示（CAS14：应确认收入→D4 / 应转营业外收入→K12） -->
+  <div v-if="disposalLinkageHints.length" class="disposal-hints">
+    <el-alert
+      v-for="hint in disposalLinkageHints"
+      :key="hint.key"
+      :type="hint.type"
+      :closable="false"
+      show-icon
+      class="disposal-hint"
+    >
+      <template #title>
+        <span>{{ hint.text }}</span>
+        <GtIndexChip v-if="hint.target" :value="hint.target" :context="hint.context" />
+      </template>
+    </el-alert>
+  </div>
+
+  <!-- 明细表 -->
   <el-table :data="tableData" size="small" border stripe>
     <el-table-column label="对方单位名称" width="160">
       <template #default="{ row }">
@@ -83,6 +100,16 @@
         <template v-else>
           <el-input v-model.number="row.settlementAmount" size="small" :disabled="isReadonly"
             @change="(val: any) => updateCell(row.rowId, 'settlementAmount', val)" />
+        </template>
+      </template>
+    </el-table-column>
+    <el-table-column label="处理结论" width="150">
+      <template #default="{ row }">
+        <template v-if="row.rowId !== '__subtotal__'">
+          <el-select v-model="row.disposalConclusion" size="small" clearable :disabled="isReadonly"
+            placeholder="判断结论" @change="(val: any) => updateCell(row.rowId, 'disposalConclusion', val || '')">
+            <el-option v-for="c in DISPOSAL_CONCLUSIONS" :key="c" :value="c" :label="c" />
+          </el-select>
         </template>
       </template>
     </el-table-column>
@@ -152,7 +179,7 @@
  * 8列表 + 从D3-2导入 + AI建议 + GtIndexChip
  */
 import { computed, toRef, type Ref } from 'vue'
-import { useD3LongTerm } from '../composables/useD3LongTerm'
+import { useD3LongTerm, DISPOSAL_CONCLUSIONS } from '../composables/useD3LongTerm'
 import { useD3TabImportExport } from '../composables/useD3TabImportExport'
 import { useD3AiGenerate } from '../composables/useD3AiGenerate'
 import type { useD3CrossSheet } from '../composables/useD3CrossSheet'
@@ -181,6 +208,7 @@ const projectIdRef = toRef(props, 'projectId') as Ref<string>
 const {
   rows,
   subtotalRow,
+  disposalSummary,
   auditNote,
   conclusion,
   addRow,
@@ -220,8 +248,50 @@ async function genAuditNote() {
 // Append subtotal row for display
 const tableData = computed(() => [
   ...rows.value,
-  { rowId: '__subtotal__', customerName: '合计', endBalance: 0, aging: '', businessDescription: '', reason: '', settlementAmount: 0, plan: '', remark: '' },
+  { rowId: '__subtotal__', customerName: '合计', endBalance: 0, aging: '', businessDescription: '', reason: '', settlementAmount: 0, disposalConclusion: '', plan: '', remark: '' },
 ])
+
+// 处理结论跨底稿联动提示（基于 disposalSummary）
+function fmtAmt(v: number): string {
+  return v.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+}
+const disposalLinkageHints = computed(() => {
+  const s = disposalSummary.value
+  const hints: Array<{ key: string; type: 'warning' | 'info'; text: string; target?: string; context?: string }> = []
+  if (s.shouldRecognizeRevenue.count > 0) {
+    hints.push({
+      key: 'revenue',
+      type: 'warning',
+      text: `${s.shouldRecognizeRevenue.count} 笔判断为「应确认收入」（合计 ${fmtAmt(s.shouldRecognizeRevenue.amount)} 元），履约义务或已完成，请核对收入截止（D4）并考虑调整分录。`,
+      target: 'wp:D4',
+      context: '应确认收入的长期预收关联收入截止测试底稿 D4',
+    })
+  }
+  if (s.shouldTransferNonOperating.count > 0) {
+    hints.push({
+      key: 'non-operating',
+      type: 'warning',
+      text: `${s.shouldTransferNonOperating.count} 笔判断为「应转营业外收入」（合计 ${fmtAmt(s.shouldTransferNonOperating.amount)} 元），确无需支付/对方注销/超时效，关注营业外收入（K12）与披露。`,
+      target: 'wp:K12',
+      context: '应转营业外收入的长期挂账预收关联营业外收入底稿 K12',
+    })
+  }
+  if (s.shouldRefund.count > 0) {
+    hints.push({
+      key: 'refund',
+      type: 'info',
+      text: `${s.shouldRefund.count} 笔判断为「应退回」（合计 ${fmtAmt(s.shouldRefund.amount)} 元），关注列报是否应重分类至其他应付款/其他流动负债。`,
+    })
+  }
+  if (s.pending.count > 0) {
+    hints.push({
+      key: 'pending',
+      type: 'info',
+      text: `${s.pending.count} 笔处理结论「待确定」（合计 ${fmtAmt(s.pending.amount)} 元），需进一步取证后明确处理方向。`,
+    })
+  }
+  return hints
+})
 
 function doImport() {
   const longTermRows = props.crossSheet.longTermRows.value
@@ -244,6 +314,8 @@ const { onExportTemplate, onExportData, onImportFile } = useD3TabImportExport(wp
 .guidance-fold summary { cursor: pointer; font-weight: 600; color: #409eff; }
 .guidance-fold p { margin: 6px 0 0; line-height: 1.6; }
 .lt-toolbar { display: flex; gap: 8px; margin-bottom: 12px; }
+.disposal-hints { margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
+.disposal-hint :deep(.el-alert__title) { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .subtotal-label { font-weight: 700; }
 .subtotal-val { font-weight: 700; }
 .reason-cell { display: flex; gap: 4px; align-items: center; }

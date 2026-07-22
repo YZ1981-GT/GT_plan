@@ -35,6 +35,14 @@
             @change="(v: boolean) => toggleApplicability(v)"
           />
         </div>
+        <el-alert
+          v-if="!applicability.noKam && (!candidates || candidates.length === 0) && (!kams || kams.length === 0)"
+          type="info"
+          :closable="false"
+          show-icon
+          style="margin-top: 8px"
+          title="若本项目无关键审计事项，请打开上方开关标为「不适用」，避免空壳底稿干扰签发观感"
+        />
         <div v-if="applicability.noKam" class="gt-a1721__reason-wrap">
           <el-input
             :model-value="applicability.reason || ''"

@@ -1,5 +1,8 @@
 # I2.yaml
-# 由 backend/scripts/generate_wp_render_schema.py 自动生成
+# ⚠️ ARCHIVED / 中间产物 — 请勿作为生产渲染 schema 使用
+# 生产真源：backend/data/ledger_adapters/wp_render_schema/i2-development-expenditure.yaml
+# 本文件由 backend/scripts/generate_wp_render_schema.py 自动生成，仅供对照源 Excel 结构；
+# 内含大量 `# TODO: 人工审核` 占位，若误用于 regenerate 会带入陈旧字段。
 # 生成时间: 2026-05-29T01:11:20
 # Requirements: 2.2 原则 2（配置驱动）
 # ⚠️  此文件为草稿，关键字段需人工审核：

@@ -337,12 +337,13 @@ async function onPushToModule() {
 const NOTE_KEY = 'G9-adjustment-audit-note'
 const CONCLUSION_KEY = 'G9-adjustment-audit-conclusion'
 const auditNote = ref(props.allResponses.get(NOTE_KEY)?.remark ?? '')
-const auditConclusion = ref(props.allResponses.get(CONCLUSION_KEY)?.remark ?? '')
+const _adjConcl = props.allResponses.get(CONCLUSION_KEY)
+const auditConclusion = ref(String(_adjConcl?.conclusion ?? _adjConcl?.remark ?? ''))
 watch(auditNote, (v) => {
   if (!props.isReadonly) props.debouncedSave(NOTE_KEY, { item_id: NOTE_KEY, conclusion: null, remark: v })
 })
 watch(auditConclusion, (v) => {
-  if (!props.isReadonly) props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: null, remark: v })
+  if (!props.isReadonly) props.debouncedSave(CONCLUSION_KEY, { item_id: CONCLUSION_KEY, conclusion: v, remark: null })
 })
 
 function fmt(n: number) {

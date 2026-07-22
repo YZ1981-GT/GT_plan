@@ -193,6 +193,16 @@ async def render(ctx: RenderContext) -> dict | None:
 
     tb_values = await _fetch_tb_values(ctx)
 
+    # ─── 同循环底稿目录（G 循环全部底稿，跨底稿跳转） ──────────────────
+    from app.services.wp_cycle_directory import build_cycle_workpapers
+
+    cycle_workpapers = await build_cycle_workpapers(
+        db=ctx.db,
+        project_id=ctx.project_id,
+        audit_cycle="G",
+        current_wp_id=ctx.wp_id,
+    )
+
     return {
         "component_type": "g6-other-bond-investment-main",
         # 8 个 sheet 配置（componentType / sheetName / columns / rows）
@@ -205,4 +215,6 @@ async def render(ctx: RenderContext) -> dict | None:
         "tb_values": tb_values,
         # 审定数回读 seed（EventBus 持久化后刷新不丢失）
         "adjudicated_amount": adjudicated_amount,
+        # 同循环底稿目录（G0/G1/.../G14 跨底稿跳转）
+        "cycle_workpapers": cycle_workpapers,
     }

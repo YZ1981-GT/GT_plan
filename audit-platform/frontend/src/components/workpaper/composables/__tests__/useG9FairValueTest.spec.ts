@@ -180,7 +180,7 @@ describe('跨表联动', () => {
     expect(n).toBe(1)
     const adj = JSON.parse(String(saves.find((s) => s.id === 'G9-adjustment-rows')?.data.remark))
     expect(adj).toHaveLength(2)
-    expect(adj[0].accountCode).toBe('1504')
+    expect(adj[0].accountCode).toBe('1519')
     expect(adj[0].debitAmount).toBe(200)
     expect(adj[1].accountCode).toBe('6101')
     expect(adj[1].creditAmount).toBe(200)

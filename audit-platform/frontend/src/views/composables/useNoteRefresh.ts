@@ -173,7 +173,18 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
     // 1511 长期股权投资：上市五、18 / 国企八、18 及合并范围「七」
     const isG7Lte = String(payload.accountCode || '') === '1511'
       && (current.includes('18') || current.startsWith('七'))
-    if (!matched && !isG7Lte) return
+    // 2101 交易性金融负债：五、34/35 / 八、34/35
+    const isG10Tfl = String(payload.accountCode || '') === '2101'
+      && (current.includes('34') || current.includes('35'))
+    // 6101 公允价值变动收益：三、公允价值变动收益 / 八、72
+    const isG13Fvc = String(payload.accountCode || '') === '6101'
+      && (
+        current.includes('公允价值变动')
+        || current.startsWith('三、公允')
+        || current.startsWith('八、72')
+        || current === '八、72'
+      )
+    if (!matched && !isG7Lte && !isG10Tfl && !isG13Fvc) return
 
     if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
     syncDebounceTimer = setTimeout(async () => {

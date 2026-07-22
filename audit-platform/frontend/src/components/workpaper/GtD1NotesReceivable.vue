@@ -770,7 +770,8 @@ async function selfLoad(): Promise<void> {
 
     for (const [k, v] of Object.entries(props.htmlData.responses_snapshot)) {
 
-      map.set(k, v)
+      // 以 Map 键为权威 item_id 注入（snapshot 值不含 item_id → 否则保存时 items 缺 item_id 触发 422）
+      map.set(k, (v && typeof v === 'object') ? { item_id: k, ...v } : { item_id: k, remark: v })
 
     }
 

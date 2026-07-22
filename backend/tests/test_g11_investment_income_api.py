@@ -69,7 +69,12 @@ async def test_g11_ai_sections(monkeypatch):
     )
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        for section in ("adjudication-analysis", "return-rate-conclusion", "voucher-conclusion"):
+        for section in (
+            "adjudication-analysis",
+            "return-rate-conclusion",
+            "voucher-conclusion",
+            "disclosure-note",
+        ):
             resp = await client.post(
                 f"/api/workpapers/test-wp/g11/ai/{section}",
                 json={"existingContent": "", "rows": []},

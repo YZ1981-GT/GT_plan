@@ -8,7 +8,7 @@
  * N-tax-cycle N-F5 Task 2.5: 加 N 循环路由 N1→n1a / N2→n2a / N3→n3a / N4→n4a / N5→n5a
  *
  * 路由映射：
- * - G 循环：G1→g1a / G4→g4a / G7→g7a (G14 优先于 G1 避免误匹配)
+ * - G 循环：G1→g1a / G4→g4a / G7→g7a / G8→g8a / G9→g9a / G10→g10a / G11→g11a / G12→g12a / G13→g13a / G14→g14a (G10+ 优先于 G1)
  * - H 循环：H1→h1a / H2→h2a / H3→h3a / H8→h8a / H9→h9a
  * - F 循环：F2→f2a / F1→f1a / F3→f3a / F4→f4a / F5→f5a
  * - D 循环：D4→d4a / D2→d2a
@@ -22,16 +22,17 @@
 export function resolveProcedureSheetKey(wpCode: string): string {
   const upper = (wpCode || '').toUpperCase()
   // G 循环路由（G10/G11/G12/G13/G14 必须在 G1 之前判断，避免 startsWith('G1') 误匹配多位编号）
-  if (upper.startsWith('G14')) return 'e1a' // G14 信用减值，无专属程序表 fallback
-  if (upper.startsWith('G13')) return 'e1a' // G13 公允价值变动收益，fallback
-  if (upper.startsWith('G12')) return 'e1a' // G12 净敞口套期，fallback
+  if (upper.startsWith('G14')) return 'g14a' // G14 信用减值损失审计程序表G14A
+  if (upper.startsWith('G13')) return 'g13a' // G13 公允价值变动收益审计程序表G13A
+  if (upper.startsWith('G12')) return 'g12a' // G12 净敞口套期收益审计程序表G12A
   if (upper.startsWith('G11')) return 'g11a' // G11 投资收益汇总专属
-  if (upper.startsWith('G10')) return 'e1a' // G10 交易性金融负债，fallback
+  if (upper.startsWith('G10')) return 'g10a' // G10 交易性金融负债实质性程序表G10A
   if (upper.startsWith('G1')) return 'g1a' // G1 交易性金融资产
   if (upper.startsWith('G4')) return 'g4a' // G4 债权投资
   if (upper.startsWith('G6')) return 'g6a' // G6 其他债权投资
   if (upper.startsWith('G7')) return 'g7a' // G7 长期股权投资
   if (upper.startsWith('G8')) return 'g8a' // G8 其他权益工具投资
+  if (upper.startsWith('G9')) return 'g9a' // G9 其他非流动金融资产实质性程序表G9A
   // H 循环路由（H10 必须在 H1 之前判断，避免 startsWith('H1') 误匹配 H10）
   if (upper.startsWith('H10')) return 'e1a' // H10 无专属程序表，fallback
   if (upper.startsWith('H1')) return 'h1a'

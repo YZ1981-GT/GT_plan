@@ -242,6 +242,106 @@ describe('useH8CrossSheet — depreciationVsAdjudication', () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Section 3b: useH8CrossSheet — allocationVsDepreciation
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('useH8CrossSheet — allocationVsDepreciation', () => {
+  it('H8-9分配合计与H8-8折旧一致时 isMatch=true', async () => {
+    const allResponses = ref(createMockResponses({
+      'H8-8-depreciation-total': '10000',
+      'H8-9-alloc-total': '10000',
+      'H8-1-cost-audited-total': '0',
+      'H8-2-detail-total': '0',
+      'H8-1-dep-audited-total': '0',
+      'H8-1-cost-begin-total': '0',
+      'H8-1-cost-debit-total': '0',
+      'H8-1-cost-credit-total': '0',
+      'H8-1-dep-begin-total': '0',
+      'H8-1-dep-debit-total': '0',
+      'H8-1-dep-credit-total': '0',
+      'H8-1-dep-current-provision': '0',
+    }))
+
+    const { allocationVsDepreciation } = useH8CrossSheet(allResponses)
+    await nextTick()
+
+    expect(allocationVsDepreciation.value.isMatch).toBe(true)
+    expect(allocationVsDepreciation.value.diff).toBeCloseTo(0, 2)
+  })
+
+  it('可从矩阵行聚合分配合计（无汇总 item）', async () => {
+    const allResponses = ref(createMockResponses({
+      'H8-8-depreciation-total': '1500',
+      'H8-9-alloc-rows': JSON.stringify([
+        { category: '房屋及建筑物', admin: 1000, operatingCost: 0, manufacturing: 0, selling: 0, rd: 0, other: 0 },
+        { category: '机器设备', operatingCost: 500, manufacturing: 0, selling: 0, admin: 0, rd: 0, other: 0 },
+      ]),
+      'H8-1-cost-audited-total': '0',
+      'H8-2-detail-total': '0',
+      'H8-1-dep-audited-total': '0',
+      'H8-1-cost-begin-total': '0',
+      'H8-1-cost-debit-total': '0',
+      'H8-1-cost-credit-total': '0',
+      'H8-1-dep-begin-total': '0',
+      'H8-1-dep-debit-total': '0',
+      'H8-1-dep-credit-total': '0',
+      'H8-1-dep-current-provision': '0',
+    }))
+
+    const { allocationTotal, allocationVsDepreciation } = useH8CrossSheet(allResponses)
+    await nextTick()
+
+    expect(allocationTotal.value).toBeCloseTo(1500, 2)
+    expect(allocationVsDepreciation.value.isMatch).toBe(true)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Section 3c: h83AdjustmentSync — H8-3 → H8-1 AJE/RJE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('useH8CrossSheet — h83AdjustmentSync', () => {
+  it('从 H8-3-rows 汇总 1901/1902 账项与报表净额', async () => {
+    const rows = [
+      { category: '账项调整', accountCode: '1901', debitAmount: 500, creditAmount: 0 },
+      { category: '账项调整', accountCode: '2205', debitAmount: 0, creditAmount: 500 },
+      { category: '账项调整', accountCode: '1902', debitAmount: 0, creditAmount: 80 },
+      { category: '账项调整', accountCode: '6603', debitAmount: 80, creditAmount: 0 },
+      { category: '报表调整', accountCode: '1901', debitAmount: 100, creditAmount: 0 },
+      { category: '报表调整', accountCode: '1601', debitAmount: 0, creditAmount: 100 },
+    ]
+    const map = createMockResponses({})
+    map.set('H8-3-rows', {
+      item_id: 'H8-3-rows',
+      conclusion: null,
+      remark: JSON.stringify(rows),
+    })
+    const allResponses = ref(map)
+    const { h83AdjustmentSync } = useH8CrossSheet(allResponses)
+    await nextTick()
+    expect(h83AdjustmentSync.value.rowCount).toBe(6)
+    expect(h83AdjustmentSync.value.rouCostAjeNet).toBeCloseTo(500, 2)
+    expect(h83AdjustmentSync.value.rouCostRjeNet).toBeCloseTo(100, 2)
+    expect(h83AdjustmentSync.value.rouDepAjeNet).toBeCloseTo(-80, 2)
+  })
+
+  it('无行时回退 H8-3-aje-net / H8-3-rje-net', async () => {
+    const allResponses = ref(createMockResponses({
+      'H8-3-aje-net': '1200',
+      'H8-3-rje-net': '-50',
+      'H8-3-dep-aje-net': '-30',
+      'H8-3-dep-rje-net': '0',
+    }))
+    const { h83AdjustmentSync } = useH8CrossSheet(allResponses)
+    await nextTick()
+    expect(h83AdjustmentSync.value.rowCount).toBe(0)
+    expect(h83AdjustmentSync.value.rouCostAjeNet).toBeCloseTo(1200, 2)
+    expect(h83AdjustmentSync.value.rouCostRjeNet).toBeCloseTo(-50, 2)
+    expect(h83AdjustmentSync.value.rouDepAjeNet).toBeCloseTo(-30, 2)
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Section 4: disclosureAutoFill — 附注自动取数
 // ═══════════════════════════════════════════════════════════════════════════════
 

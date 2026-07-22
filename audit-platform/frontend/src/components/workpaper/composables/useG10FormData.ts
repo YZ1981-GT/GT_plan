@@ -5,7 +5,8 @@ import { useWorkpaperAuditYear } from './workpaperAuditYear'
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { G10_ACCOUNT_CODE } from './g10Constants'
+import { G10_ACCOUNT_ALIASES, G10_ACCOUNT_CODE, G10_ACCOUNT_NAME } from './g10Constants'
+import { resolveG10TbRow, g10TbResolvedCode, resolveG10TbBalanceFromList } from './g10TbResolve'
 import type { ChecklistResponse } from './useF1FormData'
 
 const DRAFT_PREFIX = 'g10-draft'
@@ -125,39 +126,91 @@ export function useG10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     const _year = _auditYearRef.value
     if (_year == null) return null
     const seeded = renderMeta.value?.tb_values?.current_amount
+      ?? renderMeta.value?.trial_balance?.current_amount
     if (seeded != null && seeded !== '') return Number(seeded)
     if (!opts.projectId.value) return null
     try {
       const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
-        params: { year: _year, account_prefix: G10_ACCOUNT_CODE  },
+        params: { year: _year, account_prefix: G10_ACCOUNT_CODE },
         _silent: true,
       } as any)
       const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
-      const hit = list.find((r: any) =>
-        String(r.standard_account_code ?? r.account_code ?? '').startsWith(G10_ACCOUNT_CODE),
-      )
-      if (!hit) return null
-      const credit = Number(hit.credit_amount ?? hit.period_credit ?? 0)
-      const debit = Number(hit.debit_amount ?? hit.period_debit ?? 0)
-      return credit - debit
+      return resolveG10TbBalanceFromList(list)
     } catch {
       return null
     }
   }
 
+  let _tbMissingWarned = false
+
+  /**
+   * 审定数回写试算表（对标 G9）。
+   * 按别名/科目名称解析实际 TB 行；科目缺失时仅提示一次。
+   */
+  async function writebackTB(auditedAmount: number, optsWrite?: { forceToast?: boolean }): Promise<boolean> {
+    if (!opts.projectId.value) return false
+    const _year = _auditYearRef.value
+    let accountCode = G10_ACCOUNT_CODE
+    try {
+      if (_year != null) {
+        const res = await api.get(`/api/projects/${opts.projectId.value}/trial-balance`, {
+          params: { year: _year, account_prefix: G10_ACCOUNT_CODE },
+          _silent: true,
+        } as any)
+        const list = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+        const hit = resolveG10TbRow(list)
+        if (!hit) {
+          if (optsWrite?.forceToast || !_tbMissingWarned) {
+            _tbMissingWarned = true
+            ElMessage.info(
+              `试算表未找到「${G10_ACCOUNT_NAME}」（已试 ${G10_ACCOUNT_ALIASES.join('/')}）。`
+              + '若本年无此科目可忽略；有余额请检查科目映射后重试发布。',
+            )
+          }
+          await saveImmediate('G10-1-adjudicated-amount', { conclusion: String(auditedAmount) })
+          return false
+        }
+        accountCode = g10TbResolvedCode(hit)
+      }
+      await api.put(`/api/projects/${opts.projectId.value}/trial-balance/writeback`, {
+        account_code: accountCode,
+        audited_amount: auditedAmount,
+      }, { _silent: true } as any)
+      await saveImmediate('G10-adj-tb-writeback', {
+        remark: JSON.stringify({ accountCode, auditedAmount }),
+      })
+      await saveImmediate('G10-1-adjudicated-amount', { conclusion: String(auditedAmount) })
+      return true
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail || e?.message || ''
+      ElMessage.warning(
+        detail
+          ? `审定数回写失败：${detail}`
+          : '审定数回写失败，请手动确认试算表数据',
+      )
+      return false
+    }
+  }
+
   async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    await saveImmediate('G10-adj-tb-writeback', {
-      remark: JSON.stringify({ accountCode: G10_ACCOUNT_CODE, auditedAmount }),
-    })
-    await saveImmediate('G10-1-adjudicated-amount', { conclusion: String(auditedAmount) })
+    await writebackTB(auditedAmount, { forceToast: true })
   }
 
   function getSheet(name: string) {
     return sheetCache.value[name] ?? { rows: [] }
   }
 
+  function flushPending(): void {
+    for (const [itemId, timer] of _debounceTimers.entries()) {
+      clearTimeout(timer)
+      const resp = allResponses.value.get(itemId)
+      if (resp) void saveImmediate(itemId, resp, 1)
+    }
+    _debounceTimers.clear()
+  }
+
   onScopeDispose(() => {
-    for (const t of _debounceTimers.values()) clearTimeout(t)
+    flushPending()
   })
 
   return {
@@ -169,7 +222,9 @@ export function useG10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     getSheet,
     saveImmediate,
     debouncedSave,
+    flushPending,
     fetchTrialBalanceAmount,
+    writebackTB,
     writebackTrialBalance,
   }
 }

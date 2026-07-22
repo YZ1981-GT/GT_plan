@@ -1,6 +1,26 @@
 import type { GCycleIndexRowDef } from './g12SheetLabels'
 import { isG8DisclosureSheetComplete } from './g8SchemaRows'
 
+export interface G8AProcedureMark {
+  key: string
+  label: string
+}
+
+export function collectG8AProcedureMarks(m: Map<string, any>): G8AProcedureMark[] {
+  const marks: G8AProcedureMark[] = []
+  for (const [key, label] of [
+    ['G8A-voucher-complete', '凭证/程序回填'],
+    ['G8A-fv-complete', '公允测试程序回填'],
+    ['G8A-designation-complete', '指定适当性程序回填'],
+  ] as const) {
+    const row = m.get(key)
+    if (row?.conclusion === 'completed' || row?.remark) {
+      marks.push({ key, label })
+    }
+  }
+  return marks
+}
+
 export const G8_SHEET_LABEL_MAP: Record<string, string> = {
   G8: '底稿目录',
   'G8-目录': '底稿目录',
@@ -83,9 +103,10 @@ export function isG8SheetComplete(code: string, m: Map<string, any>): boolean {
     case 'G8-目录':
       return true
     case 'G8A':
-      return [...m.keys()].some(k => k.startsWith('G8-proc-') || k.startsWith('G8A-'))
+      return collectG8AProcedureMarks(m).length > 0
+        || [...m.keys()].some(k => k.startsWith('G8A-'))
     case 'G8-1':
-      return m.has('G8-adj-rows') || m.has('G8-adj-tb')
+      return m.has('G8-adj-rows') || m.has('G8-adj-tb') || m.has('G8-1-adjudicated-amount')
     case 'G8-2':
       return hasJsonRows(m, 'G8-detail-rows')
     case 'G8-3':

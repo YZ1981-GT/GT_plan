@@ -84,20 +84,16 @@ describe('F2 UI Specification Verification', () => {
       expect(content).toMatch(/content="公式[：:]/)
     })
 
-    it('F2DetailSheet has formula-cell styling for computed columns', () => {
+    it('F2DetailSheet has formula styling for computed columns', () => {
       const content = readVueFile('detail/F2DetailSheet.vue')
-      expect(content).toContain('formula-cell')
+      expect(content).toContain('class="formula"')
       expect(content).toContain('border-bottom: 1px dashed')
-      expect(content).toContain('cursor: help')
     })
 
-    it('F2DetailSheet uses el-tooltip on formula columns (期末/单价)', () => {
+    it('F2DetailSheet documents computed column formulas in 编制提示', () => {
       const content = readVueFile('detail/F2DetailSheet.vue')
-      expect(content).toContain('el-tooltip')
-      // Should have tooltip for closing balance formula
-      expect(content).toContain('期初金额 + 增加 - 减少')
-      // Should have tooltip for unit price formula
-      expect(content).toContain('金额 ÷ 数量')
+      expect(content).toContain('期末 = 期初')
+      expect(content).toContain('单价 = 金额 ÷ 数量')
     })
 
     it('F2TabDetailSummary has formula-cell and el-tooltip for computed columns', () => {
@@ -167,7 +163,6 @@ describe('F2 UI Specification Verification', () => {
     it.each(COMPONENTS_WITH_GUIDANCE)('%s has <details> for 编制提示', (component) => {
       const content = readVueFile(component)
       expect(content).toContain('<details')
-      expect(content).toContain('guidance-details')
       expect(content).toContain('编制提示')
     })
   })

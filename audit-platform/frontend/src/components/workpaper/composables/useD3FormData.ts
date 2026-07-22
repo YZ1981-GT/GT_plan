@@ -140,6 +140,7 @@ export function useD3FormData(options: UseD3FormDataOptions) {
     const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
     const updated: ChecklistResponse = {
       ...existing,
+      item_id: itemId,  // 以 Map 键为权威 item_id（防 responses_snapshot 载入值缺 item_id 致 422）
       ...(data.conclusion !== undefined ? { conclusion: data.conclusion } : {}),
       ...(data.remark !== undefined ? { remark: data.remark } : {}),
     }
@@ -163,6 +164,7 @@ export function useD3FormData(options: UseD3FormDataOptions) {
       const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
       const updated: ChecklistResponse = {
         ...existing,
+        item_id: itemId,  // 以 Map 键为权威 item_id（防 responses_snapshot 载入值缺 item_id 致 422）
         ...(data.conclusion !== undefined ? { conclusion: data.conclusion } : {}),
         ...(data.remark !== undefined ? { remark: data.remark } : {}),
       }
@@ -179,6 +181,7 @@ export function useD3FormData(options: UseD3FormDataOptions) {
     const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
     const updated: ChecklistResponse = {
       ...existing,
+      item_id: itemId,  // 以 Map 键为权威 item_id（防 responses_snapshot 载入值缺 item_id 致 422）
       ...(data.conclusion !== undefined ? { conclusion: data.conclusion } : {}),
       ...(data.remark !== undefined ? { remark: data.remark } : {}),
     }

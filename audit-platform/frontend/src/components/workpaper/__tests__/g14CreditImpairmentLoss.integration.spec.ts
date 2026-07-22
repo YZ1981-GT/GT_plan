@@ -5,6 +5,34 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
+
+const { mockGet, mockPut, mockPost } = vi.hoisted(() => ({
+  mockGet: vi.fn(),
+  mockPut: vi.fn().mockResolvedValue({}),
+  mockPost: vi.fn().mockResolvedValue({}),
+}))
+
+vi.mock('vue', async () => {
+  const actual = await vi.importActual('vue')
+  return { ...actual as object, onBeforeUnmount: vi.fn(), onMounted: vi.fn() }
+})
+
+vi.mock('../composables/workpaperAuditYear', () => ({
+  useWorkpaperAuditYear: () => ({ value: 2025 }),
+}))
+
+vi.mock('@/utils/eventBus', () => ({
+  eventBus: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
+}))
+
+vi.mock('@/services/apiProxy', () => ({
+  api: {
+    get: mockGet,
+    put: mockPut,
+    post: mockPost,
+  },
+}))
+
 import {
   calcAdjustedAmount,
   calcNetImpairmentLoss,
@@ -17,11 +45,6 @@ import {
 } from '../composables/useG14FormulaEngine'
 import { G14_LINE_ITEMS, G14_CHANGE_RATE_THRESHOLD, G14_ECL_CROSS_REF } from '../composables/g14Constants'
 import { G14_IMPORT_EXPORT_SHEETS } from '../composables/useG14ImportExport'
-
-vi.mock('vue', async () => {
-  const actual = await vi.importActual('vue')
-  return { ...actual as object, onBeforeUnmount: vi.fn(), onMounted: vi.fn() }
-})
 
 function extractSheet(sheetName: string): string {
   if (/底稿目录/.test(sheetName)) return '底稿目录'
@@ -86,17 +109,18 @@ describe('G14 集成 — 损益类公式链', () => {
 })
 
 describe('G14 集成 — 坏账准备滚动验证', () => {
-  it('期初+计提+转回(带符号)-转销=期末 → 平衡', () => {
+  it('期初+计提-转回-转销+其他=期末 → 平衡', () => {
     const opening = 100_000
     const provision = 30_000
-    const reversalSigned = -5_000
+    const reversal = 5_000
     const writeoff = 2_000
-    const closing = calcProvisionRollForward(opening, provision, reversalSigned, writeoff)
-    expect(isRollForwardBalanced(opening, provision, reversalSigned, writeoff, closing)).toBe(true)
+    const other = 0
+    const closing = calcProvisionRollForward(opening, provision, reversal, writeoff, other)
+    expect(isRollForwardBalanced(opening, provision, reversal, writeoff, closing, other)).toBe(true)
   })
 
   it('不平衡时检测失败', () => {
-    expect(isRollForwardBalanced(100, 30, -5, 2, 200)).toBe(false)
+    expect(isRollForwardBalanced(100, 30, 5, 2, 200)).toBe(false)
   })
 
   it('净减值=计提-转回', () => {
@@ -139,11 +163,13 @@ describe('G14 集成 — 调整分录借贷平衡', () => {
   })
 })
 
-describe('G14 集成 — 固定9类行', () => {
-  it('G14_LINE_ITEMS 与 xlsx 一致为 9 类', () => {
-    expect(G14_LINE_ITEMS).toHaveLength(9)
+describe('G14 集成 — 固定10类行', () => {
+  it('G14_LINE_ITEMS 含合同资产共 10 类', () => {
+    expect(G14_LINE_ITEMS).toHaveLength(10)
     expect(G14_LINE_ITEMS.map((r) => r.label)).toContain('应收账款坏账损失')
+    expect(G14_LINE_ITEMS.map((r) => r.label)).toContain('合同资产减值损失')
     expect(G14_LINE_ITEMS.map((r) => r.label)).toContain('财务担保预计损失')
+    expect(G14_LINE_ITEMS.find((r) => r.rowKey === 'othdebt')?.counterpartKind).toBe('oci')
   })
 })
 
@@ -170,7 +196,7 @@ describe('G14 集成 — useG14Detail 持久化', () => {
     })
 
     detail.updateCell('ar', 'currentProvision', 100)
-    detail.updateCell('ar', 'currentReversal', -20)
+    detail.updateCell('ar', 'currentReversal', 20)
     detail.updateCell('ar', 'openingProvision', 500)
     detail.updateCell('ar', 'currentWriteoff', 10)
     detail.updateCell('ar', 'closingProvision', 570)
@@ -181,28 +207,78 @@ describe('G14 集成 — useG14Detail 持久化', () => {
     expect(ar?.reconciled).toBe(ar?.currentAudited === ar?.profitLoss)
     expect(saved.some((s) => s.id === 'G14-detail-rows')).toBe(true)
   })
+
+  it('旧版负数转回自动迁移为正数', async () => {
+    const { useG14Detail } = await import('../composables/useG14Detail')
+    const allResponses = ref(new Map([
+      ['G14-detail-rows', {
+        item_id: 'G14-detail-rows',
+        remark: JSON.stringify([{
+          rowKey: 'ar',
+          currentProvision: 100,
+          currentReversal: -20,
+          openingProvision: 500,
+          currentWriteoff: 10,
+          closingProvision: 570,
+        }]),
+      }],
+    ]))
+    const detail = useG14Detail({
+      allResponses,
+      isReadonly: ref(false),
+      debouncedSave: () => {},
+    })
+    const ar = detail.rows.value.find((r) => r.rowKey === 'ar')
+    expect(ar?.currentReversal).toBe(20)
+    expect(ar?.profitLoss).toBe(80)
+    expect(ar?.rollForwardBalanced).toBe(true)
+  })
+
+  it('回填未审与推算期末', async () => {
+    const { useG14Detail } = await import('../composables/useG14Detail')
+    const allResponses = ref(new Map())
+    const detail = useG14Detail({
+      allResponses,
+      isReadonly: ref(false),
+      debouncedSave: () => {},
+    })
+    detail.updateCell('ar', 'currentProvision', 100)
+    detail.updateCell('ar', 'currentReversal', 20)
+    detail.updateCell('ar', 'openingProvision', 500)
+    detail.updateCell('ar', 'currentWriteoff', 10)
+    detail.fillClosingFromRollForward()
+    detail.fillUnauditedFromProfitLoss()
+    const ar = detail.rows.value.find((r) => r.rowKey === 'ar')
+    expect(ar?.closingProvision).toBe(570)
+    expect(ar?.currentUnadjusted).toBe(80)
+    expect(ar?.reconciled).toBe(true)
+  })
 })
 
 describe('G14 集成 — useG14Adjustment 同步', () => {
-  it('syncToDetail 将账项调整净额回写', async () => {
+  it('syncToDetail 将账项调整净额按回写行回写', async () => {
     const { useG14Adjustment } = await import('../composables/useG14Adjustment')
     const allResponses = ref(new Map())
-    let applied = 0
+    let applied: Record<string, number> | null = null
     const adj = useG14Adjustment({
       allResponses,
       isReadonly: ref(false),
       debouncedSave: () => {},
-      applyAdjustmentToDetail: (net) => { applied = net },
+      applyAdjustmentToDetail: (byRow) => { applied = byRow },
     })
 
     adj.addRow()
     const rowId = adj.rows.value[0].rowId
-    adj.updateCell(rowId, 'category', '账项调整')
-    adj.updateCell(rowId, 'debitAmount', 5000)
-    adj.updateCell(rowId, 'creditAmount', 1000)
+    adj.updateRow(rowId, {
+      category: '账项调整',
+      accountCode: '6702',
+      adjudicationRowKey: 'other',
+      debitAmount: 5000,
+      creditAmount: 1000,
+    })
     adj.syncToDetail()
 
-    expect(applied).toBe(4000)
+    expect(applied?.other).toBe(4000)
   })
 })
 

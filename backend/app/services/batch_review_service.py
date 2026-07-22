@@ -26,6 +26,41 @@ logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# 占位 wp_name 回退显示名映射（覆盖 D~N 常见 sheet）
+# ---------------------------------------------------------------------------
+
+_WP_CODE_DISPLAY_NAMES: dict[str, str] = {
+    # D 循环
+    "D2-1": "应收账款审定表", "D2-2": "应收账款明细表", "D2-3": "应收账款坏账准备明细表",
+    "D2-4": "应收账款调整分录汇总表", "D2-5": "应收账款分析", "D2-6": "应收账款质押检查",
+    "D2-7": "应收账款凭证检查表", "D2-8": "应收账款坏账政策检查", "D2-9": "应收账款迁徙率",
+    "D2-10": "应收账款ECL减值测算",
+    "D3-1": "预付账款审定表", "D3-2": "预付账款明细表", "D3-3": "预付账款调整分录汇总表",
+    "D3-4": "预付账款大额检查", "D3-5": "预付账款长期挂账检查", "D3-6": "预付账款关联方检查",
+    "D3-7": "预付账款凭证检查表",
+    "D4-1": "主营业务收入审定表", "D4-2": "主营业务收入明细表", "D4-3": "收入调整分录汇总表",
+    "D4-4": "收入截止测试", "D4-5": "收入分析", "D4-6": "合同检查",
+    "D5-1": "应收票据审定表", "D5-2": "应收票据明细表",
+    "D6-1": "合同资产审定表", "D6-2": "合同资产明细表",
+    "D7-1": "合同负债审定表", "D7-2": "合同负债明细表",
+    "D1-1": "应收票据审定表", "D1-2": "应收票据明细表",
+    # E 循环
+    "E1-1": "货币资金审定表",
+    # F 循环
+    "F1-1": "应付账款审定表", "F2-1": "存货审定表", "F3-1": "应付票据审定表",
+    # G 循环
+    "G4-1": "债券投资审定表", "G4-2": "债券投资明细表",
+    "G7-1": "长期股权投资审定表", "G8-1": "其他权益工具审定表",
+    "G11-1": "投资收益审定表", "G11-2": "投资收益明细表", "G11-3": "投资收益调整分录",
+    "G12-1": "套期净损益审定表",
+    # H 循环
+    "H1-1": "固定资产审定表", "H3-1": "投资性房地产审定表",
+    # K 循环
+    "K1-1": "其他应收款审定表", "K2-1": "其他流动资产审定表", "K3-1": "其他应付款审定表",
+}
+
+
+# ---------------------------------------------------------------------------
 # 数据类
 # ---------------------------------------------------------------------------
 
@@ -240,7 +275,7 @@ class BatchReviewService:
                                 "data_sources": json.dumps(
                                     data_sources, ensure_ascii=False
                                 ),
-                                "now": datetime.now(timezone.utc),
+                                "now": datetime.utcnow(),
                             },
                         )
 
@@ -278,7 +313,7 @@ class BatchReviewService:
                             "remark": json.dumps(
                                 session_stats, ensure_ascii=False
                             ),
-                            "now": datetime.now(timezone.utc),
+                            "now": datetime.utcnow(),
                         },
                     )
 
@@ -330,10 +365,23 @@ class BatchReviewService:
                 {
                     "wp_id": str(row[0]),
                     "wp_code": row[1],
-                    "sheet_name": row[2] or "",
+                    "sheet_name": self._resolve_sheet_display_name(row[1], row[2] or ""),
                 }
                 for row in rows
             ]
+
+    @staticmethod
+    def _resolve_sheet_display_name(wp_code: str, wp_name: str) -> str:
+        """将占位格式 '底稿X-N' 解析为有意义的中文显示名。
+
+        若 wp_name 不是占位格式则原样返回。
+        """
+        import re
+        # 占位格式: "底稿D2-1" / "底稿G4" 等
+        if not re.match(r"^底稿[A-Z]\d", wp_name):
+            return wp_name
+        # 从 wp_code 推导默认中文名
+        return _WP_CODE_DISPLAY_NAMES.get(wp_code, wp_name)
 
     async def _review_single_sheet(
         self, sheet: dict, session_id: str, model_used: str

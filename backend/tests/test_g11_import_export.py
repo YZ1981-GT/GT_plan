@@ -74,7 +74,18 @@ def test_g11_2_headers_match_xlsx():
     sp = _G11_SPECS["G11-2"]
     assert "本期未审数" in sp["headers"]
     assert "变动原因/索引号" in sp["headers"]
+    assert "行键" in sp["headers"]
     assert len(sp["headers"]) == len(sp["field_keys"])
+
+
+def test_g11_3_headers_align_excel():
+    sp = _G11_SPECS["G11-3"]
+    assert "调整事项说明" in sp["headers"]
+    assert "类别" in sp["headers"]
+    assert "回写行" in sp["headers"]
+    assert "借方调整金额" in sp["headers"]
+    assert len(sp["headers"]) == len(sp["field_keys"])
+    assert "摘要" in (sp.get("header_aliases") or {}).get("调整事项说明", [])
 
 
 def test_g11_5_workbook_has_three_segments():

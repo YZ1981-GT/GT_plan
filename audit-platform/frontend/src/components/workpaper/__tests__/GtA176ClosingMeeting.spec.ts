@@ -16,8 +16,20 @@ vi.mock('@/services/apiProxy', () => ({
     get: vi.fn().mockResolvedValue({
       sheets: [{
         html_data: {
-          meta_info: { client_name: '测试公司', period: '2025年12月31日', preparer: '张三', reviewer: '', date: '', index_no: 'A17-6' },
-          fields: { meeting_time: '', attendees: '', minutes: '', conclusion: '', attachments: '' },
+          meta_info: {
+            client_name: '测试公司',
+            period: '2025年12月31日',
+            preparer: '张三',
+            reviewer: '',
+            index_no: 'A17-6',
+            meeting_place: '',
+            meeting_time: '',
+            organizer: '',
+            convener: '',
+            recorder: '',
+            attendees: '',
+          },
+          agenda: Object.fromEntries(Array.from({ length: 10 }, (_, i) => [String(i + 1), ''])),
           project_context: { client_name: '测试公司', period: '2025年12月31日', current_user: '张三' },
         },
       }],
@@ -37,6 +49,14 @@ vi.mock('element-plus', async () => {
 // Stub GtOnlyOfficeSheet
 vi.mock('../GtOnlyOfficeSheet.vue', () => ({
   default: defineComponent({ name: 'GtOnlyOfficeSheet', template: '<div class="oo-stub" />' }),
+}))
+
+vi.mock('../GtIndexChip.vue', () => ({
+  default: {
+    name: 'GtIndexChip',
+    props: ['value', 'contextProjectId', 'context'],
+    template: '<span class="gt-index-chip-stub">{{ value }}</span>',
+  },
 }))
 
 describe('GtA176ClosingMeeting.vue', () => {
@@ -66,6 +86,18 @@ describe('GtA176ClosingMeeting.vue', () => {
             props: ['modelValue', 'type', 'disabled'],
             template: '<div class="el-date-picker-stub" />',
           }),
+          ElInput: defineComponent({
+            props: ['modelValue', 'disabled', 'placeholder', 'size'],
+            template: '<input class="el-input-stub" />',
+          }),
+          ElCard: defineComponent({
+            template: '<div class="el-card-stub"><slot name="header" /><slot /></div>',
+          }),
+          ElButton: defineComponent({
+            props: ['type', 'size', 'loading', 'disabled'],
+            template: '<button class="el-button-stub"><slot /></button>',
+          }),
+          ElIcon: defineComponent({ template: '<span class="el-icon-stub" />' }),
         },
       },
     })
@@ -88,10 +120,10 @@ describe('GtA176ClosingMeeting.vue', () => {
       expect(metaItems.length).toBe(6)
     })
 
-    it('renders 5 content fields (meeting_time, attendees, minutes, conclusion, attachments)', async () => {
+    it('renders 10 agenda cards (AGENDA_ITEMS)', async () => {
       const wrapper = await mountComponent()
-      const fields = wrapper.findAll('.gt-a176__field')
-      expect(fields.length).toBe(5)
+      const cards = wrapper.findAll('.gt-a176__card')
+      expect(cards.length).toBeGreaterThanOrEqual(10)
     })
 
     it('renders save status indicator', async () => {

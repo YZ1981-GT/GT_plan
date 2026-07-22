@@ -4,6 +4,18 @@ import {
   calcDepreciationPeriod,
   calcTerminationGainLoss,
   calcRemeasurement,
+  calcDiscountFactor,
+  calcLeasePaymentsPV,
+  calcAnnuityPV,
+  calcAnnuityDuePV,
+  calcLiabilityAdjustment,
+  calcScopeReduction,
+  buildEqualPaymentSchedule,
+  buildDiscountPeriods,
+  deriveModificationType,
+  isSeparateLease,
+  suggestAccountingTreatment,
+  estimateLiabilityAtDate,
   isShortTermLease,
   isLowValueLease,
 } from './useH8CAS21Engine'
@@ -111,6 +123,99 @@ describe('useH8CAS21Engine', () => {
     })
     it('handles NaN → treated as 0 → true (0 ≤ 40000)', () => {
       expect(isLowValueLease(NaN)).toBe(true)
+    })
+  })
+
+  describe('H8-7 折现与变更重计量', () => {
+    it('折现系数 1/(1+r)^n 对齐 xlsx H8-7', () => {
+      expect(calcDiscountFactor(0.05, 0)).toBeCloseTo(1, 6)
+      expect(calcDiscountFactor(0.05, 1)).toBeCloseTo(0.9524, 4)
+      expect(calcDiscountFactor(0.05, 9)).toBeCloseTo(0.6446, 4)
+    })
+
+    it('租赁付款额现值 Σ(付款×折现系数) — 样例约 355,391', () => {
+      const payments = Array.from({ length: 9 }, (_, i) => ({
+        amount: 50_000,
+        periods: i + 1,
+      }))
+      const pv = calcLeasePaymentsPV(payments, 0.05)
+      expect(pv).toBeCloseTo(355_391.08, 0)
+    })
+
+    it('等额年金现值（期末 / 期初）', () => {
+      expect(calcAnnuityPV(50_000, 0.05, 9)).toBeCloseTo(355_391.08, 0)
+      expect(calcAnnuityPV(50_000, 0, 4)).toBe(200_000)
+      const due = calcAnnuityDuePV(50_000, 0.05, 9)
+      expect(due).toBeCloseTo(355_391.08 * 1.05, 0)
+    })
+
+    it('期初折现期 0..n-1，期末 1..n', () => {
+      expect(buildDiscountPeriods(3, '期初')).toEqual([0, 1, 2])
+      expect(buildDiscountPeriods(3, '期末')).toEqual([1, 2, 3])
+    })
+
+    it('等额折现表合计等于年金 PV', () => {
+      const { rows, totalPV } = buildEqualPaymentSchedule(50_000, 0.05, 9, '期末')
+      expect(rows).toHaveLength(9)
+      expect(totalPV).toBeCloseTo(calcAnnuityPV(50_000, 0.05, 9), 4)
+    })
+
+    it('负债调整额 = 新PV − 账面负债；ROU 重计量 = 旧ROU + 调整额', () => {
+      const adj = calcLiabilityAdjustment(378_173.6, 350_000)
+      expect(adj).toBeCloseTo(28_173.6, 2)
+      expect(calcRemeasurement(340_000, adj)).toBeCloseTo(368_173.6, 2)
+    })
+
+    it('范围减少按比例终止并计算损益', () => {
+      const sr = calcScopeReduction(100_000, 80_000, 0.25)
+      expect(sr.terminatedLiability).toBe(25_000)
+      expect(sr.terminatedROU).toBe(20_000)
+      expect(sr.gainLoss).toBe(5_000)
+      expect(sr.remainingROU).toBe(60_000)
+      expect(sr.rouAdjustment).toBe(-20_000)
+    })
+
+    it('H8-6 参数滚动估算变更日负债', () => {
+      // 初始 100000，5%，年付 20000，过 1 年：100000*1.05-20000=85000
+      const est = estimateLiabilityAtDate({
+        leaseLiabilityInitial: 100_000,
+        discountRatePct: 5,
+        rentalPerPeriod: 20_000,
+        leaseTermMonths: 60,
+        yearsElapsed: 1.2,
+      })
+      expect(est).toBeCloseTo(85_000, 0)
+    })
+  })
+
+  describe('H8-7 判定树 deriveModificationType', () => {
+    it('扩大范围+对价相当 → 单独租赁', () => {
+      expect(deriveModificationType('是', '是', '')).toBe('单独租赁')
+      expect(isSeparateLease('是', '是')).toBe(true)
+      // 即使误勾范围减少，单独租赁优先
+      expect(deriveModificationType('是', '是', '是')).toBe('单独租赁')
+    })
+
+    it('非单独租赁 + 范围减少 → 范围减少', () => {
+      expect(deriveModificationType('是', '否', '是')).toBe('范围减少')
+      expect(deriveModificationType('否', '否', '是')).toBe('范围减少')
+    })
+
+    it('非单独租赁 + 非范围减少 → 其他变更', () => {
+      expect(deriveModificationType('否', '是', '否')).toBe('其他变更')
+      expect(deriveModificationType('是', '否', '否')).toBe('其他变更')
+    })
+
+    it('1.2 未答 → 待定空串（避免与 1.1 同时显示「是」）', () => {
+      expect(deriveModificationType('否', '否', '')).toBe('')
+      expect(isSeparateLease('是', '否')).toBe(false)
+    })
+
+    it('会计处理建议文案非空', () => {
+      expect(suggestAccountingTreatment('单独租赁')).toContain('单独租赁')
+      expect(suggestAccountingTreatment('范围减少')).toContain('损益')
+      expect(suggestAccountingTreatment('其他变更')).toContain('重新计量')
+      expect(suggestAccountingTreatment('')).toBe('')
     })
   })
 })

@@ -29,7 +29,7 @@ describe('G7 listed disclosure source model', () => {
 
     state.texts['impairment-method'] = '按预计未来现金流量现值确定可收回金额。'
     const syncData = buildG7ListedSyncData(state)
-    expect(syncData['（1）企业集团的构成']).toHaveLength(10)
+    expect(syncData['（1）企业集团的构成']).toHaveLength(3)
     expect(syncData['长期股权投资']).toBeTruthy()
     expect(syncData._note_texts).toEqual([
       {

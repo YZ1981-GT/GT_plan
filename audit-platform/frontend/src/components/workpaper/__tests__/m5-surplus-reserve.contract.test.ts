@@ -4,7 +4,7 @@
  * 验证 'm5-surplus-reserve' componentType 在四个注册表中正确注册：
  * 1. htmlRendererRegistry（前端组件映射）
  * 2. VALID_COMPONENT_TYPES（后端 wp_classification_service.py）
- * 3. wp_code_overrides（M5/M5-1~M5-5 共6个映射，M5A→a-program-console）
+ * 3. wp_code_overrides（M5/M5-1~M5-5/M5A 共7个映射）
  * 4. RENDERER_DISPATCH（后端渲染策略）
  *
  * Spec: .kiro/specs/m5-surplus-reserve/
@@ -24,7 +24,7 @@ import {
 
 const COMPONENT_TYPE = 'm5-surplus-reserve'
 
-// M5/M5-1~M5-5 共6个wp_code应映射到m5-surplus-reserve
+// M5/M5-1~M5-5/M5A 共7个wp_code应映射到m5-surplus-reserve
 const EXPECTED_WP_CODES = [
   'M5',
   'M5-1',
@@ -32,6 +32,7 @@ const EXPECTED_WP_CODES = [
   'M5-3',
   'M5-4',
   'M5-5',
+  'M5A',
 ]
 
 describe('M5 盈余公积 — 注册契约测试', () => {
@@ -97,11 +98,7 @@ describe('M5 盈余公积 — 注册契约测试', () => {
       expect(overrides[wpCode]).toBe(COMPONENT_TYPE)
     })
 
-    it('M5A 映射为 a-program-console（程序表独立）', () => {
-      expect(overrides['M5A']).toBe('a-program-console')
-    })
-
-    it('覆盖完整性：共6个映射无遗漏', () => {
+    it('覆盖完整性：共7个映射无遗漏', () => {
       const m5Mappings = Object.entries(overrides).filter(
         ([, v]) => v === COMPONENT_TYPE
       )

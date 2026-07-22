@@ -3,7 +3,9 @@
 POST /api/workpapers/{wp_id}/h2/ai-generate
 
 sections: adj-note / adj-conclusion / analysis-progress /
-          cost-comparison-note / interest-cap-summary / impairment-conclusion
+          analysis-conclusion / analysis-indicator-suggest / analysis-reason /
+          cost-comparison-note / interest-cap-summary / impairment-conclusion /
+          stocktake-plan / transfer-note / transfer-conclusion
 """
 
 from __future__ import annotations
@@ -42,9 +44,15 @@ _SUPPORTED_SECTIONS = {
     "adj-note",
     "adj-conclusion",
     "analysis-progress",
+    "analysis-conclusion",
+    "analysis-indicator-suggest",
+    "analysis-reason",
     "cost-comparison-note",
     "interest-cap-summary",
     "impairment-conclusion",
+    "stocktake-plan",
+    "transfer-note",
+    "transfer-conclusion",
 }
 
 _SYSTEM_PROMPT = """你是一位资深注册会计师（CPA），正在协助编制审计底稿 H2《在建工程》。
@@ -67,12 +75,38 @@ _SECTION_PROMPTS: dict[str, str] = {
         "说明转固时点是否恰当、是否发现需要调整的重大事项。"
     ),
     "analysis-progress": (
-        "请生成H2-4在建工程分析表的工程进度分析说明，对各工程项目的完工率、"
-        "超期情况、资本化率合理性、工程进度与预算的匹配程度进行分析评价。"
+        "请生成H2-4在建工程分析表的审计说明：覆盖指标分析性程序（本期vs上期）、"
+        "异常变动指标、以及各工程项目的完工率/超期/资本化率合理性评价；"
+        "说明数据来源（H2-1/H2-2）及拟跟进的细节测试索引。"
+    ),
+    "analysis-conclusion": (
+        "请生成H2-4在建工程分析表的审计结论（分析性程序总体结论，2~6句）："
+        "评价指标变动与工程进度/资本化/工期是否合理，是否需追加细节测试，"
+        "对存在与完整性认定的初步结论。"
+    ),
+    "analysis-indicator-suggest": (
+        "你正在协助编制H2-4在建工程分析表。模板已有6项基础指标："
+        "①在建工程/资产总额 ②期末余额 ③减值准备÷原值 ④实际支出与预算差异 "
+        "⑤利息资本化率 ⑥产能利用率。"
+        "relatedContext.availableSuggestions 列出尚未添加的候选指标（含 id、name、scenario）。"
+        "请根据行业、aggregates（超期项目数、转固、利息等）与已有异常，"
+        "建议还应当新增哪些分析指标（优先从 availableSuggestions 中选，也可提出自定义指标名）。"
+        "输出格式：先用3~6条简洁中文说明「为何建议、关注什么风险」，"
+        "文中务必点名候选指标的 id（如 transfer_ratio）和中文名称，便于前端一键添加。"
+        "若现有指标已足够，明确说明「暂无需新增」并简述理由。"
+    ),
+    "analysis-reason": (
+        "请为H2-4指标分析表的每一项指标生成「变动原因及合理性解释」。"
+        "输入见 relatedContext.indicators（含 name/current/prior/changePct/abnormal/explanation）。"
+        "严格按JSON数组输出，每项含 id（与输入一致）、name、explanation（1~2句审计用语）。"
+        "变动不大（|changePct|<20或为空）可写「变动不大，属于正常波动」；"
+        "异常项须指出可能原因与建议跟进程序（如→H2-7/H2-10/H2-15），勿虚构未提供的具体事实。"
+        "只输出JSON数组，不要markdown代码块包裹以外的废话。"
     ),
     "cost-comparison-note": (
-        "请生成H2-7工程造价比较表的审计说明，分析各工程实际成本与预算/合同金额的差异原因、"
-        "超预算项目的合理性评价、变更签证和索赔对造价的影响。"
+        "请生成H2-7工程造价比较分析表的审计说明：评价各工程单方造价与可比价均值的差异及原因、"
+        "可比价来源是否充分；说明本期在建工程增加与现金流量表「购置固定资产、无形资产和其他长期资产"
+        "支付的现金」的主体层勾稽结果及重大差异解释；指出是否需补充审计程序。"
     ),
     "interest-cap-summary": (
         "请生成H2-10/H2-11利息资本化测算的汇总说明，分析利息资本化金额的合理性、"
@@ -82,6 +116,22 @@ _SECTION_PROMPTS: dict[str, str] = {
     "impairment-conclusion": (
         "请生成H2-15/H2-16减值测算的审计结论，评价在建工程减值迹象判断的充分性（特别是停工项目）、"
         "可收回金额计算方法（DCF/市场法）及关键假设的合理性、减值计提是否充分。"
+    ),
+    "stocktake-plan": (
+        "请生成H2-12在建工程监盘计划结论（直接输出正文，2~8句）："
+        "概括存在性认定风险应对、监盘时间/地点/范围与覆盖率、拟抽盘工程选取、双向抽查与复盘安排，"
+        "说明是否可进入H2-13执行盘点检查。"
+    ),
+    "transfer-note": (
+        "请生成H2-5转固时点检查表的审计说明（对齐致同双表逻辑）："
+        "说明表一样本（期末仍挂列在建）是否存在已达预定可使用状态未转固及原因/期后转固；"
+        "说明表二已转固项目转固时点与验收/试生产/正式投产证据的比对、CAS4五条件判定、"
+        "延迟天数关注事项，以及与H2-2转固合计、H1入账金额的勾稽结果。"
+    ),
+    "transfer-conclusion": (
+        "请生成H2-5转固时点检查表的审计结论（2~6句）："
+        "评价重大项目转固时点是否恰当，是否存在延迟转固少计折旧或提前转固，"
+        "是否需调整（→H2-3）及对折旧的影响；结论应可直接写入底稿。"
     ),
 }
 

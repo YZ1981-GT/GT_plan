@@ -2,12 +2,12 @@
 
 component_type = "h4-engineering-materials"
 
-科目1605工程物资（借方/资产类）
-返回 allResponses + projectContext + TB数据(1605) + sheets元数据
-资产类公式：期末=期初+借方-贷方；审定=未审+AJE+RJE
-联动H2在建工程：H4减少→H2物资消耗
+科目1605工程物资（借方/资产类）+ 1604在建工程（报表核对带入）
+返回 allResponses + projectContext + TB数据(1605/1604) + sheets元数据
+资产类公式：期末=期初+借方-贷方；审定=未审+账项调整
+联动H2在建工程：H4减少→H2物资消耗；H4-1报表核对←TB·1604/H2-1
 
-Requirements: 1.6
+    Requirements: 1.6
 """
 from __future__ import annotations
 
@@ -22,9 +22,10 @@ from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-# 科目前缀：1605工程物资（借方/资产类）
+# 科目前缀：1605工程物资 + 1604在建工程（H4-1 与报表核对带入）
 _H4_ACCOUNT_PREFIXES = {
     "1605": ("eng_mat_1605_unadjusted", "eng_mat_1605_audited"),
+    "1604": ("cip_1604_unadjusted", "cip_1604_audited"),
 }
 
 H4_SHEETS = [
@@ -35,7 +36,9 @@ H4_SHEETS = [
     {"sheet_name": "调整分录汇总H4-3", "component_type": "h4-engineering-materials"},
     {"sheet_name": "增加检查表H4-4", "component_type": "h4-engineering-materials"},
     {"sheet_name": "减少检查表H4-5", "component_type": "h4-engineering-materials"},
+    {"sheet_name": "监盘计划H4-6A", "component_type": "h4-engineering-materials"},
     {"sheet_name": "盘点检查表H4-6", "component_type": "h4-engineering-materials"},
+    {"sheet_name": "监盘小结H4-6B", "component_type": "h4-engineering-materials"},
     {"sheet_name": "减值测算表H4-7", "component_type": "h4-engineering-materials"},
     {"sheet_name": "可收回金额测试表H4-8", "component_type": "h4-engineering-materials"},
     {"sheet_name": "关联交易检查表H4-9", "component_type": "h4-engineering-materials"},
@@ -45,7 +48,7 @@ H4_SHEETS = [
 
 
 async def _fetch_tb_data(ctx: RenderContext) -> dict:
-    """取科目1605的期初/期末余额及未审数/审定数."""
+    """取科目1605/1604的期初/期末余额及未审数/审定数."""
     tb: dict[str, float] = {}
 
     # 从 tb_balance 取余额数据（使用 get_active_filter）
@@ -74,14 +77,17 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
     except Exception as e:  # noqa: BLE001
         logger.warning("H4 TB balance fetch failed: %s", e)
 
-    # 从 trial_balance 取未审数+审定数
+    # 从 trial_balance 取未审数+审定数（1605 工程物资 + 1604 在建工程）
     try:
         result = await ctx.db.execute(
             sa.text("""
                 SELECT standard_account_code, unadjusted_amount, audited_amount
                 FROM trial_balance
                 WHERE project_id = :pid AND year = :year AND is_deleted = false
-                  AND standard_account_code LIKE '1605%'
+                  AND (
+                    standard_account_code LIKE '1605%'
+                    OR standard_account_code LIKE '1604%'
+                  )
             """),
             {"pid": str(ctx.project_id), "year": ctx.year},
         )
@@ -94,6 +100,10 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
                     break
     except Exception as e:  # noqa: BLE001
         logger.warning("H4 trial_balance fetch failed: %s", e)
+
+    # 别名：与 H2 渲染键对齐，便于前端统一读取
+    tb.setdefault("cip_unadjusted", tb.get("cip_1604_unadjusted", 0.0))
+    tb.setdefault("cip_audited", tb.get("cip_1604_audited", 0.0))
 
     return tb
 
@@ -146,11 +156,11 @@ async def render(ctx: RenderContext) -> dict | None:
 
     return {
         "component_type": "h4-engineering-materials",
-        "account_codes": ["1605"],
+        "account_codes": ["1605", "1604"],
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
         "project_context": project_context,
         "prefix": "H4",
         "sheets": H4_SHEETS,
-        "meta": {"sheet_count": 13, "wp_code": "H4"},
+        "meta": {"sheet_count": 15, "wp_code": "H4"},
     }

@@ -30,7 +30,10 @@ export interface H3DetailCostRowRaw {
   rowId?: string
   assetName?: string       // 资产名称
   category?: string        // 资产分类
+  assetType?: string       // 资产分类（当前前端键名）
   originalCostEnd?: number // 原值期末
+  costEnd?: number         // 原值期末（当前前端明细键名）
+  originalCost?: number    // 入账原值/兼容旧键
   accDepEnd?: number       // 累计折旧期末
   impairmentEnd?: number   // 减值准备期末
   netValue?: number        // 净值 = 原值 - 折旧 - 减值
@@ -41,6 +44,7 @@ export interface H3DetailFairRowRaw {
   rowId?: string
   assetName?: string         // 资产名称
   category?: string          // 资产分类
+  assetType?: string         // 资产分类（当前前端键名）
   fairValueEnd?: number      // 期末公允价值
   fairValueChange?: number   // 公允价值变动
 }
@@ -56,33 +60,44 @@ export interface H3TransferRowRaw {
   fairValue?: number       // 公允价值（公允模式下）
 }
 
-/** H3-14 租金收入行 JSON 结构 */
+/** H3-14 租金收入行 JSON 结构（对齐 Excel 应计/已计 + 日后收款） */
 export interface H3RentalRowRaw {
   rowId?: string
   assetName?: string       // 资产名称
+  category?: string        // building | land
   monthlyRent?: number     // 月租金
+  monthsThisYear?: number  // 本期租赁月数
+  expectedRent?: number    // 应计租金
+  bookedRent?: number      // 已计租金
+  incomeDiff?: number      // 应计−已计
   annualRent?: number      // 年租金
   vacancyRate?: number     // 空置率
-  actualIncome?: number    // 实际收入
+  actualIncome?: number    // 实际收入（旧字段兼容）
+  futureTotal?: number     // 日后未折现收款合计
 }
 
 /** H3-8 公允价值复核行 JSON 结构 */
 export interface H3FairValueReviewRowRaw {
   rowId?: string
   assetName?: string
-  assessedValue?: number   // 评估值
-  bookValue?: number       // 账面值
-  difference?: number      // 差异 = 评估 - 账面
-  fairValueChange?: number // 公允价值变动
+  endingBalance?: number
+  openingFairValue?: number
+  assessedValue?: number
+  appraisalValue?: number
+  bookValue?: number
+  difference?: number
+  fairValueChange?: number
 }
 
 // ─── Return Types ────────────────────────────────────────────────────────────
 
-/** H3-2 明细合计（成本模式） */
+/** H3-2 明细合计 */
 export interface DetailTotals {
-  assetEnd: number   // 原值期末合计
-  depEnd: number     // 累计折旧期末合计
-  netValue: number   // 净值合计 = assetEnd - depEnd
+  assetEnd: number        // 原值/公允期末合计
+  depEnd: number          // 累计折旧期末合计（公允模式=0）
+  impairmentEnd: number   // 减值准备期末合计（公允模式=0）
+  netValue: number        // 净值合计
+  fairValueChange: number // 公允变动合计（成本模式=0）
 }
 
 /** H3-2 合计 → H3-1 审定表交叉验证 */
@@ -95,6 +110,18 @@ export interface TransferSummary {
   fromH1: number   // 从 H1 固定资产转入金额
   toH1: number     // 转出到 H1 固定资产金额
   fromH2: number   // 从 H2 在建工程转入金额
+}
+
+/** H3-3 调整分录 → H3-1 AJE/RJE */
+export interface AdjustmentSync {
+  totalAje: number
+  totalRje: number
+  aje1503: number
+  rje1503: number
+  aje1504: number
+  rje1504: number
+  aje1505: number
+  rje1505: number
 }
 
 /** H3-14 租金收入 → 附注 */
@@ -155,16 +182,34 @@ export function useH3CrossSheet(
     return safeParseRows<H3TransferRowRaw>(resp?.remark)
   })
 
-  /** H3-14 租金收入行 */
-  const rentalRows = computed<H3RentalRowRaw[]>(() => {
-    const resp = allResponses.value.get('H3-14-rental-rows')
-    return safeParseRows<H3RentalRowRaw>(resp?.remark)
+  /** H3-3 调整分录行 */
+  const adjustmentRows = computed(() => {
+    const resp = allResponses.value.get('H3-3-adj-rows')
+    return safeParseRows<{
+      entryType?: string
+      accountCode?: string
+      accountName?: string
+      debitAmount?: number
+      creditAmount?: number
+    }>(resp?.remark)
   })
 
-  /** H3-8 公允价值复核行 */
+  /** H3-14 租金收入行（主键 contract-rows，兼容旧键 rental-rows） */
+  const rentalRows = computed<H3RentalRowRaw[]>(() => {
+    const primary = allResponses.value.get('H3-14-contract-rows')
+    const legacy = allResponses.value.get('H3-14-rental-rows')
+    const fromPrimary = safeParseRows<H3RentalRowRaw>(primary?.remark)
+    if (fromPrimary.length) return fromPrimary
+    return safeParseRows<H3RentalRowRaw>(legacy?.remark)
+  })
+
+  /** H3-8 公允价值复核行（主键 H3-8-calc-rows，兼容旧键 H3-8-review-rows） */
   const fairValueReviewRows = computed<H3FairValueReviewRowRaw[]>(() => {
-    const resp = allResponses.value.get('H3-8-review-rows')
-    return safeParseRows<H3FairValueReviewRowRaw>(resp?.remark)
+    const primary = allResponses.value.get('H3-8-calc-rows')
+    const legacy = allResponses.value.get('H3-8-review-rows')
+    const fromPrimary = safeParseRows<H3FairValueReviewRowRaw>(primary?.remark)
+    if (fromPrimary.length) return fromPrimary
+    return safeParseRows<H3FairValueReviewRowRaw>(legacy?.remark)
   })
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -180,29 +225,42 @@ export function useH3CrossSheet(
     if (measurementModel.value === 'cost') {
       let assetEnd = 0
       let depEnd = 0
+      let impairmentEnd = 0
+      let netValue = 0
 
       for (const row of detailCostRows.value) {
-        assetEnd += _getNum(row.originalCostEnd)
-        depEnd += _getNum(row.accDepEnd)
+        const cost = _getNum(row.originalCostEnd ?? row.costEnd ?? row.originalCost)
+        const dep = _getNum(row.accDepEnd)
+        const impair = _getNum(row.impairmentEnd)
+        assetEnd += cost
+        depEnd += dep
+        impairmentEnd += impair
+        netValue += _getNum(row.netValue) || (cost - dep - impair)
       }
 
       return {
         assetEnd,
         depEnd,
-        netValue: assetEnd - depEnd,
+        impairmentEnd,
+        netValue,
+        fairValueChange: 0,
       }
     }
 
     // 公允价值模式：公允期末合计
     let fairEnd = 0
+    let fairChange = 0
     for (const row of detailFairRows.value) {
       fairEnd += _getNum(row.fairValueEnd)
+      fairChange += _getNum(row.fairValueChange)
     }
 
     return {
       assetEnd: fairEnd,
-      depEnd: 0,       // 公允模式不计提折旧
+      depEnd: 0,
+      impairmentEnd: 0,
       netValue: fairEnd,
+      fairValueChange: fairChange,
     }
   })
 
@@ -251,7 +309,7 @@ export function useH3CrossSheet(
     let fromH2 = 0
 
     for (const row of transferRows.value) {
-      const amount = _getNum(row.transferAmount)
+      const amount = _getNum(row.transferAmount) || _getNum((row as any).transferIn) || _getNum((row as any).transferOut)
       switch (row.direction) {
         case 'selfToInvest':
           fromH1 += amount
@@ -285,11 +343,11 @@ export function useH3CrossSheet(
     const byAsset: Record<string, number> = {}
 
     for (const row of rentalRows.value) {
-      // 优先使用 annualRent，否则 monthlyRent×12（已扣空置率则直接取 actualIncome）
-      let rent = _getNum(row.annualRent)
-      if (rent === 0) {
-        rent = _getNum(row.monthlyRent) * 12
-      }
+      // 优先应计/年租金；否则月租×12；再否则已计/实际收入
+      let rent = _getNum(row.expectedRent)
+      if (rent === 0) rent = _getNum(row.annualRent)
+      if (rent === 0) rent = _getNum(row.monthlyRent) * 12
+      if (rent === 0) rent = _getNum(row.bookedRent) || _getNum(row.actualIncome)
 
       const name = row.assetName || '未命名资产'
       annualTotal += rent
@@ -311,7 +369,14 @@ export function useH3CrossSheet(
   const fairValueChangeTotal: ComputedRef<number> = computed(() => {
     let total = 0
     for (const row of fairValueReviewRows.value) {
-      total += _getNum(row.fairValueChange)
+      const explicit = _getNum(row.fairValueChange)
+      if (explicit) {
+        total += explicit
+        continue
+      }
+      const ending = _getNum(row.endingBalance ?? row.appraisalValue ?? row.assessedValue ?? row.bookValue)
+      const opening = _getNum(row.openingFairValue)
+      total += ending - opening
     }
     return total
   })
@@ -338,7 +403,9 @@ export function useH3CrossSheet(
     const totals = detailTotals.value
     result['disc_asset_end'] = totals.assetEnd
     result['disc_dep_end'] = totals.depEnd
+    result['disc_impairment_end'] = totals.impairmentEnd
     result['disc_net_value'] = totals.netValue
+    result['disc_fair_value_change'] = totals.fairValueChange
 
     // ─── 从 H3-2 明细行聚合期初/增减数据 ────────────────────────────────────
     if (measurementModel.value === 'cost') {
@@ -350,17 +417,24 @@ export function useH3CrossSheet(
       let depDecrease = 0
 
       for (const row of detailCostRows.value) {
-        // 读取更多字段（成本模式明细行包含期初/增减）
+        // 优先直接从明细行聚合（当前前端键名）；兼容旧单行详情 item
+        costBegin += _getNum((row as any).costBegin ?? (row as any).originalCostBegin)
+        costIncrease += _getNum((row as any).costIncrease ?? (row as any).originalCostIncrease)
+        costDecrease += _getNum((row as any).costDecrease ?? (row as any).originalCostDecrease)
+        depBegin += _getNum((row as any).accDepBegin)
+        depIncrease += _getNum((row as any).depProvision ?? (row as any).accDepProvision)
+        depDecrease += _getNum((row as any).depReversal ?? (row as any).accDepReversal)
+
         const resp = allResponses.value.get(`H3-2-cost-row-${row.rowId}`)
         if (resp?.remark) {
           try {
             const detail = JSON.parse(resp.remark)
-            costBegin += _getNum(detail.originalCostBegin)
-            costIncrease += _getNum(detail.originalCostIncrease)
-            costDecrease += _getNum(detail.originalCostDecrease)
-            depBegin += _getNum(detail.accDepBegin)
-            depIncrease += _getNum(detail.accDepProvision)
-            depDecrease += _getNum(detail.accDepReversal)
+            if (!costBegin) costBegin += _getNum(detail.originalCostBegin ?? detail.costBegin)
+            if (!costIncrease) costIncrease += _getNum(detail.originalCostIncrease ?? detail.costIncrease)
+            if (!costDecrease) costDecrease += _getNum(detail.originalCostDecrease ?? detail.costDecrease)
+            if (!depBegin) depBegin += _getNum(detail.accDepBegin)
+            if (!depIncrease) depIncrease += _getNum(detail.accDepProvision ?? detail.depProvision)
+            if (!depDecrease) depDecrease += _getNum(detail.accDepReversal ?? detail.depReversal)
           } catch { /* 静默 */ }
         }
       }
@@ -390,14 +464,19 @@ export function useH3CrossSheet(
       let fairChange = 0
 
       for (const row of detailFairRows.value) {
+        fairBegin += _getNum((row as any).fairValueBegin)
+        fairIncrease += _getNum((row as any).fairIncrease ?? (row as any).fairValueIncrease)
+        fairDecrease += _getNum((row as any).fairDecrease ?? (row as any).fairValueDecrease)
+        fairChange += _getNum(row.fairValueChange)
+
         const resp = allResponses.value.get(`H3-2-fair-row-${row.rowId}`)
         if (resp?.remark) {
           try {
             const detail = JSON.parse(resp.remark)
-            fairBegin += _getNum(detail.fairValueBegin)
-            fairIncrease += _getNum(detail.fairValueIncrease)
-            fairDecrease += _getNum(detail.fairValueDecrease)
-            fairChange += _getNum(detail.fairValueChange)
+            if (!fairBegin) fairBegin += _getNum(detail.fairValueBegin)
+            if (!fairIncrease) fairIncrease += _getNum(detail.fairValueIncrease ?? detail.fairIncrease)
+            if (!fairDecrease) fairDecrease += _getNum(detail.fairValueDecrease ?? detail.fairDecrease)
+            if (!fairChange) fairChange += _getNum(detail.fairValueChange)
           } catch { /* 静默 */ }
         }
       }
@@ -450,6 +529,45 @@ export function useH3CrossSheet(
   })
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // 7. adjustmentSync — H3-3 → H3-1 AJE/RJE（Req 4.4）
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const adjustmentSync: ComputedRef<AdjustmentSync> = computed(() => {
+    let totalAje = 0
+    let totalRje = 0
+    let aje1503 = 0
+    let rje1503 = 0
+    let aje1504 = 0
+    let rje1504 = 0
+    let aje1505 = 0
+    let rje1505 = 0
+
+    for (const row of adjustmentRows.value) {
+      const net = _getNum(row.debitAmount) - _getNum(row.creditAmount)
+      const code = String(row.accountCode || '')
+      const name = String(row.accountName || '')
+      const is1505 = code.startsWith('1505') || /减值准备/.test(name)
+      const is1504 = code.startsWith('1504') || /累计折旧|累计摊销/.test(name)
+      const is1503 = code.startsWith('1503') || /投资性房地产/.test(name)
+      const isRje = row.entryType === 'RJE'
+
+      if (isRje) {
+        totalRje += net
+        if (is1505) rje1505 += net
+        else if (is1504) rje1504 += net
+        else if (is1503 || (!is1504 && !is1505 && code)) rje1503 += net
+      } else {
+        totalAje += net
+        if (is1505) aje1505 += net
+        else if (is1504) aje1504 += net
+        else if (is1503 || (!is1504 && !is1505 && code)) aje1503 += net
+      }
+    }
+
+    return { totalAje, totalRje, aje1503, rje1503, aje1504, rje1504, aje1505, rje1505 }
+  })
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // Return
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -464,6 +582,8 @@ export function useH3CrossSheet(
     rentalForDisclosure,
     // H3-8 → H3-1 公允价值变动总额
     fairValueChangeTotal,
+    // H3-3 → H3-1 AJE/RJE
+    adjustmentSync,
     // 多源 → 附注自动取数
     disclosureAutoFill,
   }

@@ -56,26 +56,38 @@
           {
             "row": 7,
             "seq": "2",
-            "procedure_preview": "对于咨询的重大会计或审计事项咨询，确定咨询报告是否包括在审计工作底稿中。",
+            "procedure_preview": "对于咨询的重大会计或审计事项咨询，确定咨询报告是否包括在审计工作底稿中；如有咨询结论，同步记录执行情况（A17-3-1）。",
             "ref_index": "A17-3"
           },
           {
             "row": 8,
             "seq": "3",
-            "procedure_preview": "对于项目组的专业意见分歧，确认己经得到解决。并将解决方式、解决过程、解决结论等记录于工作底稿。",
+            "procedure_preview": "对于项目组的专业意见分歧，确认已经得到解决，并将解决方式、解决过程、解决结论等记录于工作底稿。",
             "ref_index": "A17-4"
           },
           {
             "row": 9,
             "seq": "4",
-            "procedure_preview": "确定在审计过程中识别的重大职业判断以及需合伙人关注事项是否包括在重大事项概要汇总表中：\n（1）引起特别风险的事项；\n（2）已更正或未更正的错报；\n（3）值得关注的缺陷和其他控制缺陷；\n（4）重大职业判断；\n（5）业务咨询和意见分歧；\n（6）导致注册会计师难以实施必要审计程序的情形；\n（7）可能导致出",
-            "ref_index": "A17-2"
+            "procedure_preview": "确定重大职业判断是否纳入概要汇总，并完成 KAM 专项（上市实体适用）。",
+            "ref_index": "A17-2-1"
           },
           {
             "row": 10,
             "seq": "5",
             "procedure_preview": "召开项目组总结会并将会议纪要记录于工作底稿。",
             "ref_index": "A17-6"
+          },
+          {
+            "row": 11,
+            "seq": "6",
+            "procedure_preview": "完成审计工作完成核对表（A17-5-1~5-5，按业务类型选用）。",
+            "ref_index": "A17-5"
+          },
+          {
+            "row": 12,
+            "seq": "7",
+            "procedure_preview": "审计项目团队成员签署独立性声明书（完成阶段）；专委会用 A17-7A。",
+            "ref_index": "A17-7"
           }
         ]
       },
@@ -85,7 +97,7 @@
       }
     ],
     "parser_ready": true,
-    "notes": "A17 重大事项概要程序表，5 步：seq1→A17-1 / seq2→A17-3 / seq3→A17-4 / seq4→A17-2 / seq5→A17-6。A17-5 核对表不在程序表内（独立底稿）。",
+    "notes": "A17 重大事项概要程序表，7 步（A 类适用）：seq1→A17-1 / seq2→A17-3 / seq3→A17-4 / seq4→A17-2-1 / seq5→A17-6 / seq6→A17-5 / seq7→A17-7。",
     "procedure_table_diff": {
       "wp_code": "A17",
       "json_count": 2,
@@ -238,7 +250,7 @@
               "row": 17,
               "seq_no": 5,
               "item_id": "A17-5-1-005",
-              "seq_label": "6",
+              "seq_label": "5",
               "content_preview": "是否召开项目组会议，内部讨论了包含舞弊和关联方在内的事项？",
               "preset_index_reference": "B40"
             },
@@ -246,7 +258,7 @@
               "row": 18,
               "seq_no": 6,
               "item_id": "A17-5-1-006",
-              "seq_label": "7",
+              "seq_label": "6",
               "content_preview": "总体审计策略和具体审计计划是否经适当人员批准？",
               "preset_index_reference": "B60"
             },
@@ -254,7 +266,7 @@
               "row": 19,
               "seq_no": 7,
               "item_id": "A17-5-1-007",
-              "seq_label": "8",
+              "seq_label": "7",
               "content_preview": "是否与被审计单位治理层就审计计划的审计范围、时间安排的总体情况、重大事项（包括识别出的关键审计事项）、内控缺陷、拟出具审计报告的形式和内容进行了沟通？",
               "preset_index_reference": "B12B"
             },
@@ -262,7 +274,7 @@
               "row": 20,
               "seq_no": 8,
               "item_id": "A17-5-1-008",
-              "seq_label": "9",
+              "seq_label": "8",
               "content_preview": "计划的审计程序是否得到有效执行，在审计过程中是否根据具体情况对总体审计策略和具体审计计划作出必要的更新和修改，并记录修改理由？",
               "preset_index_reference": "B60"
             },
@@ -270,7 +282,7 @@
               "row": 21,
               "seq_no": 9,
               "item_id": "A17-5-1-009",
-              "seq_label": "10",
+              "seq_label": "9",
               "content_preview": "是否已获取所有必要的来自银行、律师、债权人、债务人、持有存货的第三方等外部机构的询证函回函或确认函？",
               "preset_index_reference": "A12及相应实质性底稿函证程序"
             },
@@ -278,7 +290,7 @@
               "row": 22,
               "seq_no": 10,
               "item_id": "A17-5-1-010",
-              "seq_label": "11",
+              "seq_label": "10",
               "content_preview": "所有重要实物资产（如存货、固定资产）是否均已实施了监盘？",
               "preset_index_reference": "索引至实质性程序底稿监盘程序"
             },
@@ -286,7 +298,7 @@
               "row": 23,
               "seq_no": 11,
               "item_id": "A17-5-1-011",
-              "seq_label": "12",
+              "seq_label": "11",
               "content_preview": "当涉及利用组成部分注册会计师的工作时，对组成部分注册会计师的工作结果是否满意？",
               "preset_index_reference": "B30/A6"
             },
@@ -294,14 +306,14 @@
               "row": 24,
               "seq_no": 12,
               "item_id": "A17-5-1-012",
-              "seq_label": "13",
+              "seq_label": "12",
               "content_preview": "各项审计程序是否全部完成，未能执行的审计程序是否实施了替代程序 ？"
             },
             {
               "row": 25,
               "seq_no": 13,
               "item_id": "A17-5-1-013",
-              "seq_label": "14",
+              "seq_label": "13",
               "content_preview": "审计范围是否未受到限制？",
               "preset_index_reference": "A17"
             },
@@ -309,7 +321,7 @@
               "row": 26,
               "seq_no": 14,
               "item_id": "A17-5-1-014",
-              "seq_label": "15",
+              "seq_label": "14",
               "content_preview": "计划阶段确定的审计风险，包括舞弊、管理层偏向导致的重大错报风险是否仍旧恰当，是否需要追加审计程序？",
               "preset_index_reference": "B60/A17"
             },
@@ -317,7 +329,7 @@
               "row": 27,
               "seq_no": 15,
               "item_id": "A17-5-1-015",
-              "seq_label": "16",
+              "seq_label": "15",
               "content_preview": "是否恰当应对在审计过程中识别的舞弊迹象导致的重大错报风险？",
               "preset_index_reference": "B50/A17"
             },
@@ -325,7 +337,7 @@
               "row": 28,
               "seq_no": 16,
               "item_id": "A17-5-1-016",
-              "seq_label": "17",
+              "seq_label": "16",
               "content_preview": "是否对被审计单位政府补助的核算方法的适当性进行了审查，并确认同一交易事项采用了同一种会计处理方法？",
               "preset_index_reference": "B10/政府补助实质性底稿"
             },
@@ -333,7 +345,7 @@
               "row": 29,
               "seq_no": 17,
               "item_id": "A17-5-1-017",
-              "seq_label": "18",
+              "seq_label": "17",
               "content_preview": "是否复核了被审计单位对终止经营的列报？如果报告期处置或划分为持有待售具有一定规模的能够单独区分的组成部分，则该等组成部分的当期损益应在利润表列报为终止经营损益，同时重述可比期间财务报表。",
               "preset_index_reference": "A5-4"
             },
@@ -341,7 +353,7 @@
               "row": 30,
               "seq_no": 18,
               "item_id": "A17-5-1-018",
-              "seq_label": "19",
+              "seq_label": "18",
               "content_preview": "是否检查期后事项，并考虑对财务报表的影响？",
               "preset_index_reference": "A11"
             },
@@ -349,7 +361,7 @@
               "row": 31,
               "seq_no": 19,
               "item_id": "A17-5-1-019",
-              "seq_label": "20",
+              "seq_label": "19",
               "content_preview": "是否检查或有事项，并考虑对财务报表的影响？",
               "preset_index_reference": "A5-3"
             },
@@ -357,7 +369,7 @@
               "row": 32,
               "seq_no": 20,
               "item_id": "A17-5-1-020",
-              "seq_label": "21",
+              "seq_label": "20",
               "content_preview": "是否检查承诺事项，并考虑对财务报表的影响？",
               "preset_index_reference": "A5-2"
             },
@@ -365,7 +377,7 @@
               "row": 33,
               "seq_no": 21,
               "item_id": "A17-5-1-021",
-              "seq_label": "22",
+              "seq_label": "21",
               "content_preview": "是否检查关联方及关联方交易，并考虑对财务报表的影响？",
               "preset_index_reference": "A7"
             },
@@ -373,7 +385,7 @@
               "row": 34,
               "seq_no": 22,
               "item_id": "A17-5-1-022",
-              "seq_label": "23",
+              "seq_label": "22",
               "content_preview": "是否检查对被审计单位持续经营能力具有重大影响的事项或情况？",
               "preset_index_reference": "A15"
             },
@@ -381,7 +393,7 @@
               "row": 35,
               "seq_no": 23,
               "item_id": "A17-5-1-023",
-              "seq_label": "24",
+              "seq_label": "23",
               "content_preview": "是否获取并阅读其他信息，并充分考虑了其他信息中是否存在重大错报、重大不一致以及需要对被审计单位及其环境的了解更新的情形？是否将最终版的年度报告归档？",
               "preset_index_reference": "A8"
             },
@@ -389,7 +401,7 @@
               "row": 36,
               "seq_no": 24,
               "item_id": "A17-5-1-024",
-              "seq_label": "25",
+              "seq_label": "24",
               "content_preview": "对财务报表中的会计估计和相关披露在适用的财务报告编制基础下的合理性，是否已经取得了充分、适当的审计证据？",
               "preset_index_reference": "S14"
             },
@@ -397,7 +409,7 @@
               "row": 37,
               "seq_no": 25,
               "item_id": "A17-5-1-025",
-              "seq_label": "26",
+              "seq_label": "25",
               "content_preview": "是否已就审计中发现的重大错报及其他对财务报表产生重大影响的重大事项与适当层次的管理层或治理层沟通？",
               "preset_index_reference": "A13"
             },
@@ -405,7 +417,7 @@
               "row": 38,
               "seq_no": 26,
               "item_id": "A17-5-1-026",
-              "seq_label": "27",
+              "seq_label": "26",
               "content_preview": "是否在审计结束时或临近结束时对财务报表进行总体复核？",
               "preset_index_reference": "A1-13/A1-14"
             },
@@ -413,7 +425,7 @@
               "row": 39,
               "seq_no": 27,
               "item_id": "A17-5-1-027",
-              "seq_label": "28",
+              "seq_label": "27",
               "content_preview": "是否召开项目组会议，并确定建议调整事项和试算平衡表草表？",
               "preset_index_reference": "A17-6"
             },
@@ -421,7 +433,7 @@
               "row": 40,
               "seq_no": 28,
               "item_id": "A17-5-1-028",
-              "seq_label": "29",
+              "seq_label": "28",
               "content_preview": "就关键审计事项，是否：（适用于上市实体以及法律法规要求或项目组决定在审计报告中沟通关键审计事项的其他情形）",
               "preset_index_reference": "A1/A17-2-1/A17-3"
             },
@@ -450,7 +462,7 @@
               "row": 44,
               "seq_no": 32,
               "item_id": "A17-5-1-032",
-              "seq_label": "30",
+              "seq_label": "29",
               "content_preview": "是否与被审计单位召开总结会，就建议调整事项进行沟通，形成总结会会议纪要，并经被审计单位确认？",
               "preset_index_reference": "A13"
             },
@@ -458,7 +470,7 @@
               "row": 45,
               "seq_no": 33,
               "item_id": "A17-5-1-033",
-              "seq_label": "31",
+              "seq_label": "30",
               "content_preview": "是否累积出识别出的所有错报，并确定是否需要修改总体审计策略和具体审计计划？",
               "preset_index_reference": "A13"
             },
@@ -466,7 +478,7 @@
               "row": 46,
               "seq_no": 34,
               "item_id": "A17-5-1-034",
-              "seq_label": "32",
+              "seq_label": "31",
               "content_preview": "是否获取被审计单位对所有调整事项的确认？",
               "preset_index_reference": "A13"
             },
@@ -474,7 +486,7 @@
               "row": 47,
               "seq_no": 35,
               "item_id": "A17-5-1-035",
-              "seq_label": "33",
+              "seq_label": "32",
               "content_preview": "是否累计所有未更正错报的审计差异，包括错误和推断差异，并评估未更正错报对财务报表的影响？",
               "preset_index_reference": "A13"
             },
@@ -482,7 +494,7 @@
               "row": 48,
               "seq_no": 36,
               "item_id": "A17-5-1-036",
-              "seq_label": "34",
+              "seq_label": "33",
               "content_preview": "是否将累积的所有错报与管理层进行及时沟通？",
               "preset_index_reference": "A13"
             },
@@ -490,7 +502,7 @@
               "row": 49,
               "seq_no": 37,
               "item_id": "A17-5-1-037",
-              "seq_label": "35",
+              "seq_label": "34",
               "content_preview": "未更正错报汇总表是否与被审计单位治理层沟通并签章确认？",
               "preset_index_reference": "A13/A10"
             },
@@ -498,7 +510,7 @@
               "row": 50,
               "seq_no": 38,
               "item_id": "A17-5-1-038",
-              "seq_label": "36",
+              "seq_label": "35",
               "content_preview": "董事会或管理层是否接受已审计财务报表？",
               "preset_index_reference": "A13/A16"
             },
@@ -506,7 +518,7 @@
               "row": 51,
               "seq_no": 39,
               "item_id": "A17-5-1-039",
-              "seq_label": "37",
+              "seq_label": "36",
               "content_preview": "项目负责经理是否已复核工作底稿？",
               "preset_index_reference": "A22"
             },
@@ -514,7 +526,7 @@
               "row": 52,
               "seq_no": 40,
               "item_id": "A17-5-1-040",
-              "seq_label": "38",
+              "seq_label": "37",
               "content_preview": "项目合伙人是否已复核工作底稿？",
               "preset_index_reference": "A23"
             },
@@ -522,7 +534,7 @@
               "row": 53,
               "seq_no": 41,
               "item_id": "A17-5-1-041",
-              "seq_label": "39",
+              "seq_label": "38",
               "content_preview": "是否已完成项目质量复核合伙人复核（适用时）？",
               "preset_index_reference": "A24"
             },
@@ -530,7 +542,7 @@
               "row": 54,
               "seq_no": 42,
               "item_id": "A17-5-1-042",
-              "seq_label": "40",
+              "seq_label": "39",
               "content_preview": "是否已完成质量控制复核人复核（适用时）？",
               "preset_index_reference": "A25"
             },
@@ -538,7 +550,7 @@
               "row": 55,
               "seq_no": 43,
               "item_id": "A17-5-1-043",
-              "seq_label": "41",
+              "seq_label": "40",
               "content_preview": "是否已完成专业技术复核及所内质量管理制度要求的其他复核流程（必要时）？",
               "preset_index_reference": "A26"
             },
@@ -546,7 +558,7 @@
               "row": 56,
               "seq_no": 44,
               "item_id": "A17-5-1-044",
-              "seq_label": "42",
+              "seq_label": "41",
               "content_preview": "是否已取得经被审计单位签署的管理层书面声明原件并确定其签署日期不晚于财务报表批准报出日及审计报告日期？",
               "preset_index_reference": "A16"
             },
@@ -554,7 +566,7 @@
               "row": 57,
               "seq_no": 45,
               "item_id": "A17-5-1-045",
-              "seq_label": "43",
+              "seq_label": "42",
               "content_preview": "是否完成《财务报表列报披露核对表》？",
               "preset_index_reference": "A1-15或A1-16"
             },
@@ -562,14 +574,14 @@
               "row": 58,
               "seq_no": 46,
               "item_id": "A17-5-1-046",
-              "seq_label": "44",
+              "seq_label": "43",
               "content_preview": "上年度审计结转事项是否全部处理 ？"
             },
             {
               "row": 59,
               "seq_no": 47,
               "item_id": "A17-5-1-047",
-              "seq_label": "45",
+              "seq_label": "44",
               "content_preview": "下年度审计时需考虑的重要事项的备忘录是否整理完毕？",
               "preset_index_reference": "A17"
             },
@@ -577,7 +589,7 @@
               "row": 60,
               "seq_no": 48,
               "item_id": "A17-5-1-048",
-              "seq_label": "46",
+              "seq_label": "45",
               "content_preview": "所有审计工作底稿 、复核意见中的追查事项是否都已满意地解决？",
               "preset_index_reference": "A22-A28"
             },
@@ -585,7 +597,7 @@
               "row": 61,
               "seq_no": 49,
               "item_id": "A17-5-1-049",
-              "seq_label": "47",
+              "seq_label": "46",
               "content_preview": "是否完成了重大事项概要汇总？",
               "preset_index_reference": "A17"
             },
@@ -1743,7 +1755,7 @@
     "runtime": "checklist-table",
     "sheets": [
       {
-        "name": "A17-5-3 审计工作完成核对表 ",
+        "name": "A17-5-5 审计工作完成核对表",
         "component_type": "checklist-table",
         "max_row": 80,
         "max_col": 8,

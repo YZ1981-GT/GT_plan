@@ -22,6 +22,7 @@ import {
 } from './useG8FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import { api } from '@/services/apiProxy'
+import { publishGCycleSourceFv, sumFvFromChecklistRemark } from './gCycleSourceFv'
 
 export interface G8AdjudicationRow {
   rowKey: string
@@ -293,11 +294,12 @@ export function useG8Adjudication(opts: {
     if (_pubTimer) clearTimeout(_pubTimer)
     _pubTimer = setTimeout(() => {
       _pubTimer = null
-      publishAdjudicated()
+      notifyAdjudicated()
     }, 1500)
   }
 
-  function publishAdjudicated(): void {
+  /** 同步审定数到 checklist + EventBus（附注联动），不回写 TB */
+  function notifyAdjudicated(): void {
     const amount = totalRow.value.closingAdjusted
     opts.debouncedSave('G8-1-adjudicated-amount', { conclusion: String(amount) })
     try {
@@ -305,7 +307,33 @@ export function useG8Adjudication(opts: {
         detail: { accountCode: G8_ACCOUNT_CODE, adjudicatedAmount: amount },
       }))
     } catch { /* silent */ }
+    publishFvChangeForCross()
   }
+
+  /** 显式发布：附注联动 + 回写试算表 */
+  function publishAdjudicated(): void {
+    notifyAdjudicated()
+    const amount = totalRow.value.closingAdjusted
+    try {
+      window.dispatchEvent(new CustomEvent('g8:writeback-trial-balance', {
+        detail: { accountCode: G8_ACCOUNT_CODE, auditedAmount: amount, forceToast: true },
+      }))
+    } catch { /* silent */ }
+  }
+
+  /** 发布 G8 明细 FV 变动合计，供 G13 跨底稿勾稽 */
+  function publishFvChangeForCross(): void {
+    const fv = sumFvFromChecklistRemark(
+      opts.allResponses.value.get(G8_DETAIL_KEY)?.remark,
+      'G8',
+    )
+    publishGCycleSourceFv('G8', fv)
+  }
+
+  watch(
+    () => opts.allResponses.value.get(G8_DETAIL_KEY)?.remark,
+    () => { publishFvChangeForCross() },
+  )
 
   async function loadTrialBalanceFromApi(): Promise<void> {
     const _year = _auditYearRef.value
@@ -409,10 +437,12 @@ export function useG8Adjudication(opts: {
     if (!trialBalanceAmount.value) void loadTrialBalanceFromApi()
     syncWritebackFromOverlay()
     publishAdjudicated()
+    publishFvChangeForCross()
     window.addEventListener('g8:adjustment-writeback', onAdjustmentWriteback)
   })
 
   onBeforeUnmount(() => {
+    if (_pubTimer) clearTimeout(_pubTimer)
     window.removeEventListener('g8:adjustment-writeback', onAdjustmentWriteback)
   })
 

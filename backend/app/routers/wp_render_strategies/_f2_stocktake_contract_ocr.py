@@ -44,6 +44,19 @@ _SHEET_SCHEMAS: dict[str, dict[str, str]] = {
         "qualityStatus": "品质状况(正常/毁损/呆滞/过期等)",
         "varianceReason": "差异原因",
     },
+    "H1-10": {
+        "itemName": "固定资产名称",
+        "itemCode": "资产编号",
+        "spec": "规格型号",
+        "unit": "单位",
+        "unitPrice": "单价(数字)",
+        "bookQty": "账面数量(数字)",
+        "bookAmount": "账面金额/原值(数字)",
+        "clientCountQty": "企业盘点数量(数字)",
+        "sampleQty": "审计抽盘数量(数字)",
+        "qualityStatus": "品质状况(正常/闲置/毁损/待报废)",
+        "varianceReason": "差异原因",
+    },
     "F2-26": {
         "category": "存货类别",
         "itemCode": "存货编码",
@@ -87,7 +100,7 @@ def _empty_fields(sheet: str) -> dict:
 async def f2_stocktake_contract_ocr(
     wp_id: str,
     file: UploadFile = File(...),
-    sheet: str = Query(..., description="F2-24|F2-25|F2-26"),
+    sheet: str = Query(..., description="F2-24|F2-25|F2-26|H1-10"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> F2StocktakeOcrResponse:

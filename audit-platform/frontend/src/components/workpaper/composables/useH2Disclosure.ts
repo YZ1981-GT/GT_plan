@@ -1,9 +1,10 @@
 /**
- * useH2Disclosure — 附注 composable
+ * useH2Disclosure — 附注 composable（历史实现）
  *
- * variant参数（listed/soe）双版本共用
- * 多子节结构 + 跨sheet自动取数 + 动态行
- * EventBus 'disclosure:note-text-updated'
+ * @deprecated 上市/国企附注 UI 已迁至 H2TabDisclosureListed / H2TabDisclosureSoe，
+ * 数据模型见 h2ListedDisclosureModel / h2SoeDisclosureModel，
+ * 附注联动见 h2NoteSectionMap + h2DisclosureSyncPayload。
+ * 请勿在新代码中调用本 composable。
  *
  * Spec: .kiro/specs/h2-construction-in-progress/
  * Task: 3.16

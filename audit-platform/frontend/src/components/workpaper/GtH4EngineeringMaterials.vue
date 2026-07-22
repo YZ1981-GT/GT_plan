@@ -100,11 +100,22 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H4-5 减少检查表 -->
         <H4TabDisposalCheck
           v-else-if="currentSheet === 'H4-5'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+        />
+
+        <!-- H4-6A 监盘计划 -->
+        <H4TabStocktakePlan
+          v-else-if="currentSheet === 'H4-6A'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
@@ -119,9 +130,20 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
-        <!-- H4-7 减值测算表（OO为主） -->
+        <!-- H4-6B 监盘小结 -->
+        <H4TabStocktakeSummary
+          v-else-if="currentSheet === 'H4-6B'"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+        />
+
+        <!-- H4-7 减值测算表 -->
         <H4TabImpairment
           v-else-if="currentSheet === 'H4-7'"
           :wp-id="props.wpId"
@@ -129,9 +151,10 @@
           :all-responses="allResponses"
           :is-readonly="isReadonly"
           :sheet-name="props.sheetName || ''"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
-        <!-- H4-8 可收回金额测试表（OO为主） -->
+        <!-- H4-8 可收回金额测试表（HTML测算为主，OO对照） -->
         <H4TabRecoverable
           v-else-if="currentSheet === 'H4-8'"
           :wp-id="props.wpId"
@@ -139,6 +162,7 @@
           :all-responses="allResponses"
           :is-readonly="isReadonly"
           :sheet-name="props.sheetName || ''"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- H4-9 关联交易检查表 -->
@@ -180,8 +204,9 @@
  * Requirements: 1.1, 1.2, 1.6, 1.7, 1.8, 1.9
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
-import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { useH4FormData } from './composables/useH4FormData'
+import { useH4DualMode } from './composables/useH4DualMode'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -200,6 +225,8 @@ const H4TabDisclosureSoe = defineAsyncComponent(() => import('./h4/core/H4TabDis
 const H4TabAdditionCheck = defineAsyncComponent(() => import('./h4/inspection/H4TabAdditionCheck.vue'))
 const H4TabDisposalCheck = defineAsyncComponent(() => import('./h4/inspection/H4TabDisposalCheck.vue'))
 const H4TabStocktakeCheck = defineAsyncComponent(() => import('./h4/inspection/H4TabStocktakeCheck.vue'))
+const H4TabStocktakePlan = defineAsyncComponent(() => import('./h4/inspection/H4TabStocktakePlan.vue'))
+const H4TabStocktakeSummary = defineAsyncComponent(() => import('./h4/inspection/H4TabStocktakeSummary.vue'))
 const H4TabRelatedParty = defineAsyncComponent(() => import('./h4/inspection/H4TabRelatedParty.vue'))
 
 // impairment
@@ -219,92 +246,79 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navigate-sheet', sheetName: string): void }>()
 
-// ─── State ───────────────────────────────────────────────────────────────────
+// ─── FormData（加载/保存/TB/回写） ────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
-const isLoading = ref(true)
-const allResponses = ref<Map<string, any>>(new Map())
-/** TB 取数 (科目1605) 种子值：来自 render 策略 tb_values（供 H4-1 审定表只读核对） */
-const tbValues = ref<Record<string, number>>({})
+const formData = useH4FormData({
+  wpId: toRef(props, 'wpId') as any,
+  projectId: toRef(props, 'projectId') as any,
+})
+const {
+  isLoading,
+  allResponses,
+  tbValues,
+  saveResponse,
+  flushPending,
+  writebackTrialBalance,
+  mergeHtmlData,
+  selfLoad: formSelfLoad,
+  loadAllResponses,
+} = formData
 
-// ─── 双模式切换（简化版，Phase 3 替换为 useH4DualMode） ──────────────────────
-const currentMode = ref<'html' | 'onlyoffice'>('html')
-const isOoAvailable = ref(true)
-const modeOptions = [
-  { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
-
-function onModeChange(_val: string | number): void {
-  // Phase 3 will integrate useH4DualMode with OO health check
-}
+// ─── 双模式 HTML ↔ OnlyOffice ────────────────────────────────────────────────
+const {
+  currentMode,
+  isOoAvailable,
+  modeOptions,
+  onModeChange,
+} = useH4DualMode({
+  wpId: toRef(props, 'wpId') as any,
+  sheetName: toRef(props, 'sheetName') as any,
+  autoSave: async () => { await flushPending() },
+  reloadAll: async () => { await bootstrapLoad() },
+})
 
 /** 从 sheetName 提取编码 (H4/H4A/H4-1~H4-9/附注) */
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''
-  // 附注匹配
   if (/附注.*上市/.test(name)) return '附注上市'
   if (/附注.*国企|附注.*国有/.test(name)) return '附注国企'
   if (/附注/.test(name)) return name.includes('国企') || name.includes('国有') ? '附注国企' : '附注上市'
-  // 程序表
   if (/H4A/.test(name)) return 'H4A'
-  // H4-N 编码（H4-1 到 H4-9）
-  const m = name.match(/(H4-\d+)/)
+  const m = name.match(/(H4-\d+[A-Z]?)/)
   if (m) return m[1]
-  // 底稿目录 H4（无后缀）
   if (/底稿目录/.test(name) || (/\bH4\b/.test(name) && !/H4-/.test(name) && !/H4A/.test(name))) return 'H4'
   return ''
 })
 
-// ─── selfLoad ────────────────────────────────────────────────────────────────
-/** 合并一个 responses 对象（{item_id: {conclusion, remark}}）到目标 Map */
-function _mergeResponses(map: Map<string, any>, src: any): void {
-  if (!src || typeof src !== 'object') return
-  for (const [k, v] of Object.entries(src)) map.set(k, v)
-}
-
-async function selfLoad(): Promise<void> {
+/** 合并 htmlData 或走 FormData selfLoad */
+async function bootstrapLoad(): Promise<void> {
   try {
     if (props.htmlData) {
-      // 从父级透传的 htmlData 中提取 responses
-      // 兼容两种键名：allResponses（历史）/ responses_snapshot（H4 render 策略实际输出）
-      const map = new Map<string, any>()
-      _mergeResponses(map, props.htmlData.allResponses)
-      _mergeResponses(map, props.htmlData.responses_snapshot)
-      if (map.size > 0) allResponses.value = map
-      if (props.htmlData.tb_values) tbValues.value = props.htmlData.tb_values
-    } else {
-      // selfLoad: 自行调用 render-config
-      const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
-        params: { force_component_type: 'h4-engineering-materials' },
-        _silent: true,
-      } as any)
-      const data = res.data?.data || res.data
-      if (data?.sheets && Array.isArray(data.sheets)) {
-        const map = new Map<string, any>()
-        for (const sheet of data.sheets) {
-          _mergeResponses(map, sheet.html_data?.allResponses)
-          _mergeResponses(map, sheet.html_data?.responses_snapshot)
-          if (sheet.html_data?.tb_values) {
-            tbValues.value = { ...tbValues.value, ...sheet.html_data.tb_values }
-          }
+      mergeHtmlData(props.htmlData)
+      // sheets 数组中的 tb_values 一并合并
+      if (Array.isArray(props.htmlData.sheets)) {
+        for (const sheet of props.htmlData.sheets) {
+          if (sheet.html_data?.tb_values) mergeHtmlData(sheet.html_data)
+          if (sheet.html_data?.responses_snapshot) mergeHtmlData(sheet.html_data)
         }
-        allResponses.value = map
       }
+      // 补充 checklist 全量（覆盖 snapshot 可能不全）
+      try { await loadAllResponses() } catch { /* ignore */ }
+      formData.isLoading.value = false
+    } else {
+      await formSelfLoad()
     }
   } catch (err) {
-    console.warn('[GtH4EngineeringMaterials] selfLoad failed:', err)
-  } finally {
-    isLoading.value = false
+    console.warn('[GtH4EngineeringMaterials] bootstrapLoad failed:', err)
+    formData.isLoading.value = false
   }
 }
 
 // ─── provide for child components ────────────────────────────────────────────
-// openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
 provide('allResponses', allResponses)
-// TB 取数种子（H4-1 审定表 inject 消费，科目1605 未审数/审定数只读核对）
 provide('h4TbValues', tbValues)
+provide('h4WritebackTB', writebackTrialBalance)
 
-// ─── 版本追踪 useWorkpaperVersionToolbar (autoSnapshot on save) ──────────────
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
@@ -312,34 +326,21 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 provide('h4VersionTrailRef', versionTrailRef)
 provide('h4OpenVersionHistory', openVersionHistory)
 
-// ─── 子组件 save 持久化（entry 此前未接持久化 → 补 H2/H7 范式 persistResponse+provide） ──
-// 子组件契约：inject('saveResponse')(itemId, value)。value 为字符串或对象（对象序列化进 remark）。
-// 防抖 800ms 批量 PUT /checklist-responses，并乐观更新本地 Map 供 selfLoad/跨表读取。
-const _saveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+/** 子组件 save：走 FormData，落库后触发版本快照 */
 function persistResponse(itemId: string, value: any): void {
-  if (!itemId || !props.wpId) return
-  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-  const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
-  const updated = { ...existing, item_id: itemId, remark: strVal }
-  allResponses.value.set(itemId, updated)
-  if (isReadonly.value) return
-  const prev = _saveTimers.get(itemId)
-  if (prev) clearTimeout(prev)
-  _saveTimers.set(itemId, setTimeout(() => {
-    _saveTimers.delete(itemId)
-    http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion: updated.conclusion ?? null, remark: updated.remark ?? null }],
-    }).then(() => { scheduleAutoSnapshot() })
-      .catch((err: unknown) => console.warn('[GtH4] persistResponse failed:', itemId, err))
-  }, 800))
+  if (!itemId) return
+  if (isReadonly.value) {
+    const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
+    const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }
+    allResponses.value.set(itemId, { ...existing, item_id: itemId, remark: strVal })
+    return
+  }
+  void saveResponse(itemId, value).then(() => { scheduleAutoSnapshot() })
 }
 provide('saveResponse', persistResponse)
 
-// ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
-  void selfLoad()
-  // Subscribe to TB updates: refresh H4-1 取数 when trial_balance changes externally
+  void bootstrapLoad()
   window.addEventListener('tb:updated', _handleTbUpdated)
   window.addEventListener('substantive:adjudicated', _handleTbUpdated)
 })
@@ -347,17 +348,20 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('tb:updated', _handleTbUpdated)
   window.removeEventListener('substantive:adjudicated', _handleTbUpdated)
+  void flushPending()
 })
 
-/**
- * TB更新事件处理：当试算表外部更新时（如其他底稿回写），刷新H4数据。
- * 过滤：仅科目1605相关的更新触发刷新（避免无关科目刷新噪音）。
- */
 function _handleTbUpdated(e: Event) {
   const detail = (e as CustomEvent).detail
-  // 仅在科目1605相关或无明确科目信息时刷新
-  if (!detail || !detail.accountCode || detail.accountCode === '1605' || detail.wpCode === 'H4') {
-    void selfLoad()
+  if (
+    !detail
+    || !detail.accountCode
+    || detail.accountCode === '1605'
+    || detail.accountCode === '1604'
+    || detail.wpCode === 'H4'
+    || detail.wpCode === 'H2'
+  ) {
+    void bootstrapLoad()
   }
 }
 </script>

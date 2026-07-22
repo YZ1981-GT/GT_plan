@@ -250,11 +250,12 @@ async function handleG8SaveItems(e: Event): Promise<void> {
   }
 }
 
-function handleG8Adjudicated(e: Event): void {
-  const detail = (e as CustomEvent<{ accountCode?: string; adjudicatedAmount?: number }>).detail
-  if (detail?.accountCode !== G8_ACCOUNT_CODE) return
-  const amount = parseNum(detail.adjudicatedAmount)
-  void formData.writebackTB(amount)
+function handleG8Writeback(e: Event): void {
+  const detail = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number; forceToast?: boolean }>).detail
+  if (detail?.accountCode && detail.accountCode !== G8_ACCOUNT_CODE) return
+  const amount = parseNum(detail?.auditedAmount)
+  if (!Number.isFinite(amount)) return
+  void formData.writebackTB(amount, { forceToast: !!detail?.forceToast })
 }
 
 async function reloadAll() {
@@ -263,14 +264,16 @@ async function reloadAll() {
 
 onMounted(async () => {
   window.addEventListener('g8:save-items', handleG8SaveItems)
-  window.addEventListener('substantive:adjudicated', handleG8Adjudicated)
+  // TB 回写仅听 g8:writeback-trial-balance（substantive:adjudicated 供跨模块刷新，不重复写 TB）
+  window.addEventListener('g8:writeback-trial-balance', handleG8Writeback)
   await formData.loadAll()
   isLoading.value = false
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('g8:save-items', handleG8SaveItems)
-  window.removeEventListener('substantive:adjudicated', handleG8Adjudicated)
+  window.removeEventListener('g8:writeback-trial-balance', handleG8Writeback)
+  formData.flushPending()
 })
 </script>
 

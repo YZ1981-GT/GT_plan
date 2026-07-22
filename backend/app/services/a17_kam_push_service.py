@@ -10,8 +10,10 @@ audit_report.report_body_json 的 KAM 段落（section_id="kam"）。
   - P4+ 可选: 报告修订 → A17-2-1 stale 标记（本期不实现双向）
 """
 
+import hashlib
 import json
 import logging
+from datetime import datetime, timezone
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -58,8 +60,10 @@ async def push_kam_to_report(
             "message": "该项目尚未创建审计报告，请先在报告模块中初始化审计报告",
         }
 
-    # 4. Write KAM section into report_body_json
-    _write_kam_to_report_body(report, kam_items)
+    # 4. Write KAM section into report_body_json (with content hash for stale detection)
+    source_hash = compute_kam_source_hash(kam_items)
+    pushed_at = datetime.now(timezone.utc).isoformat()
+    _write_kam_to_report_body(report, kam_items, source_hash=source_hash, pushed_at=pushed_at)
     await db.flush()
 
     pushed = len(kam_items)
@@ -71,6 +75,67 @@ async def push_kam_to_report(
         "success": True,
         "pushed_count": pushed,
         "message": f"已成功推送 {pushed} 条关键审计事项至审计报告",
+    }
+
+
+def compute_kam_source_hash(kam_items: list[dict]) -> str:
+    """Stable sha256 of formatted KAM items for stale detection."""
+    payload = json.dumps(kam_items, ensure_ascii=False, sort_keys=True)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+async def check_kam_stale(
+    db: AsyncSession, project_id: UUID, wp_id: UUID
+) -> dict:
+    """Detect whether audit report KAM section is out of sync with A17-2-1."""
+    entries = await _load_kam_entries(db, wp_id)
+    if not entries:
+        return {
+            "stale": False,
+            "message": "A17-2-1 无 KAM 条目，无需检测",
+        }
+
+    kam_items = _format_kam_for_report(entries)
+    source_hash = compute_kam_source_hash(kam_items)
+
+    report = await _get_audit_report(db, project_id)
+    if report is None:
+        return {
+            "stale": True,
+            "message": "A17-2-1 已有 KAM 条目，但项目尚未创建审计报告",
+            "source_hash": source_hash,
+        }
+
+    kam_section = _find_kam_section(report.report_body_json)
+    if kam_section is None:
+        return {
+            "stale": True,
+            "message": "A17-2-1 已有 KAM 条目，但审计报告尚无 KAM 段落",
+            "source_hash": source_hash,
+        }
+
+    report_hash = kam_section.get("source_hash")
+    if not kam_section.get("pushed_from"):
+        return {
+            "stale": True,
+            "message": "审计报告 KAM 段落未标记推送来源，建议重新推送",
+            "source_hash": source_hash,
+            "report_hash": report_hash,
+        }
+
+    if report_hash != source_hash:
+        return {
+            "stale": True,
+            "message": "A17-2-1 KAM 已变更，审计报告 KAM 段落未同步",
+            "source_hash": source_hash,
+            "report_hash": report_hash,
+        }
+
+    return {
+        "stale": False,
+        "message": "审计报告 KAM 段落与 A17-2-1 一致",
+        "source_hash": source_hash,
+        "report_hash": report_hash,
     }
 
 
@@ -151,7 +216,23 @@ async def _get_audit_report(
     return result.scalar_one_or_none()
 
 
-def _write_kam_to_report_body(report: AuditReport, kam_items: list[dict]) -> None:
+def _find_kam_section(body: dict | None) -> dict | None:
+    """Return the KAM section dict from report_body_json, if present."""
+    if not body:
+        return None
+    for section in body.get("sections", []):
+        if section.get("section_id") == "kam" or section.get("section_name") == "关键审计事项段":
+            return section
+    return None
+
+
+def _write_kam_to_report_body(
+    report: AuditReport,
+    kam_items: list[dict],
+    *,
+    source_hash: str | None = None,
+    pushed_at: str | None = None,
+) -> None:
     """Overwrite the KAM section in report_body_json with new items.
 
     If report_body_json is None or has no sections, initialize it.
@@ -175,6 +256,10 @@ def _write_kam_to_report_body(report: AuditReport, kam_items: list[dict]) -> Non
         "content": "",
         "pushed_from": "A17-2-1",
     }
+    if source_hash is not None:
+        new_kam_section["source_hash"] = source_hash
+    if pushed_at is not None:
+        new_kam_section["pushed_at"] = pushed_at
 
     if kam_section_idx is not None:
         sections[kam_section_idx] = new_kam_section

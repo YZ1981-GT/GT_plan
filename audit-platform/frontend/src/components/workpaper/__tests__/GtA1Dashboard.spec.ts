@@ -66,6 +66,15 @@ const globalStubs = {
   'el-dropdown': { template: '<div><slot /><slot name="dropdown" /></div>' },
   'el-dropdown-menu': { template: '<div><slot /></div>' },
   'el-dropdown-item': { template: '<div @click="$emit(\'click\')"><slot /></div>' },
+  'el-autocomplete': {
+    template: '<div class="el-autocomplete"><slot :item="{ value: \'B10\', label: \'了解被审计单位\' }" /></div>',
+    props: ['modelValue', 'fetchSuggestions', 'placeholder', 'triggerOnFocus', 'clearable'],
+  },
+  'el-form': { template: '<div><slot /></div>' },
+  'el-form-item': { template: '<div><slot /></div>', props: ['label'] },
+  'el-select': { template: '<div><slot /></div>', props: ['modelValue'] },
+  'el-option': { template: '<div />', props: ['label', 'value'] },
+  'el-dialog': { template: '<div v-if="modelValue"><slot /><slot name="footer" /></div>', props: ['modelValue', 'title', 'width'] },
 }
 
 describe('GtA1Dashboard', () => {

@@ -44,6 +44,7 @@
         v-else-if="currentSheet === 'G14-2'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -53,6 +54,7 @@
         v-else-if="currentSheet === 'G14-3'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -62,6 +64,8 @@
         v-else-if="currentSheet === '附注上市'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :applicable-standards="applicableStandards"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
       />
@@ -70,6 +74,8 @@
         v-else-if="currentSheet === '附注国企'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :applicable-standards="applicableStandards"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
       />
@@ -78,14 +84,20 @@
         <div class="g14-index-toolbar">
           <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         </div>
-        <GCycleBIndexExtras
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :sheet-name="props.sheetName"
-          :wp-code="props.wpCode"
-          :html-data="props.htmlData"
-          :available-sheets="availableSheets"
-        />
+        <div class="g-cycle-tab-index-page">
+          <G14TabDirectory
+            :all-responses="formData.allResponses.value"
+            :available-sheets="availableSheets"
+          />
+          <GCycleBIndexExtras
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :sheet-name="props.sheetName"
+            :wp-code="props.wpCode"
+            :html-data="props.htmlData"
+            :available-sheets="availableSheets"
+          />
+        </div>
       </template>
 
       <GtGridSheet
@@ -109,12 +121,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, defineAsyncComponent, provide, inject } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject } from 'vue'
 import { useG14FormData } from './composables/useG14FormData'
 import { useG14DualMode } from './composables/useG14DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
+import { G14_ACCOUNT_CODE } from './composables/g14Constants'
+import { parseNum } from './composables/useG14FormulaEngine'
 import type { ChecklistResponse } from './composables/useF1FormData'
 
 const G14TabProcedure = defineAsyncComponent(() => import('./g14-credit-impairment-loss/G14TabProcedure.vue'))
@@ -123,6 +137,7 @@ const G14TabDetail = defineAsyncComponent(() => import('./g14-credit-impairment-
 const G14TabAdjustment = defineAsyncComponent(() => import('./g14-credit-impairment-loss/G14TabAdjustment.vue'))
 const G14TabDisclosureListed = defineAsyncComponent(() => import('./g14-credit-impairment-loss/G14TabDisclosureListed.vue'))
 const G14TabDisclosureSOE = defineAsyncComponent(() => import('./g14-credit-impairment-loss/G14TabDisclosureSOE.vue'))
+const G14TabDirectory = defineAsyncComponent(() => import('./g14-credit-impairment-loss/G14TabDirectory.vue'))
 const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -134,6 +149,7 @@ const props = defineProps<{
   sheetName?: string
   htmlData?: any
   readonly?: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -147,6 +163,18 @@ const formData = useG14FormData({ wpId: wpIdRef, projectId: projectIdRef })
 const isReadonly = computed(() => !!props.readonly)
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
+
+const applicableStandards = computed<string[]>(() => {
+  const fromProp = props.applicableStandards
+  if (Array.isArray(fromProp) && fromProp.length) return fromProp
+  return (
+    runtime?.applicableStandards?.value
+    ?? props.htmlData?.applicable_standards
+    ?? props.htmlData?.applicableStandards
+    ?? []
+  )
+})
+
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
@@ -181,6 +209,14 @@ function onDebouncedSave(itemId: string, data: Partial<ChecklistResponse>) {
   scheduleAutoSnapshot()
 }
 
+function handleG14Writeback(e: Event): void {
+  const detail = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number }>).detail
+  if (detail?.accountCode && detail.accountCode !== G14_ACCOUNT_CODE) return
+  const amount = parseNum(detail?.auditedAmount)
+  if (!Number.isFinite(amount)) return
+  void formData.writebackTrialBalance(amount)
+}
+
 async function reloadAll() {
   await formData.loadAll()
 }
@@ -206,8 +242,15 @@ useWorkpaperEntryInjections({
 })
 
 onMounted(async () => {
+  // TB 回写仅听 g14:writeback-trial-balance（substantive:adjudicated 供跨模块刷新，不重复写 TB）
+  window.addEventListener('g14:writeback-trial-balance', handleG14Writeback)
   await formData.loadAll()
   isLoading.value = false
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('g14:writeback-trial-balance', handleG14Writeback)
+  formData.flushPending()
 })
 </script>
 

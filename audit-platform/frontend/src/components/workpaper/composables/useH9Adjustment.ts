@@ -1,21 +1,15 @@
 /**
- * useH9Adjustment — H9-5 调整分录 composable（10列+借贷平衡+EventBus）
+ * useH9Adjustment — H9-4 调整分录汇总 composable（10列+借贷平衡+EventBus）
  *
- * 10列：序号 | 调整事项说明 | 类别(AJE/RJE) | 报表项目 | 科目名称
+ * 物理 sheet 编码以 Excel 为准：调整分录汇总H9-4。
+ * 历史存储键 H9-5-rows 仍兼容读取；新写入同时落 H9-4 / H9-5 别名。
+ *
+ * 10列：序号 | 调整事项说明 | 类别(AJE账项/RJE报表) | 报表项目 | 科目名称
  *       | 附注项目 | 借方金额 | 贷方金额 | 索引 | 备注
- *
- * 功能：
- * - 动态行CRUD
- * - 借贷平衡校验（Σ借方 === Σ贷方）
- * - EventBus publish 'adjustment:created'
- * - 双向同步H9-1审定表AJE/RJE
- *
- * Spec: .kiro/specs/h9-lease-liabilities/
- * Task: 3.4
- * Requirements: 5.1
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { calcSubtotal } from './useH9FormulaEngine'
+import { eventBus } from '@/utils/eventBus'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -56,6 +50,7 @@ export interface H9BalanceCheck {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const ROWS_KEY = 'H9-5-rows'
+const ROWS_KEY_ALIAS = 'H9-4-rows'
 const AJE_NET_KEY = 'H9-5-aje-net'
 const RJE_NET_KEY = 'H9-5-rje-net'
 
@@ -103,7 +98,7 @@ export function useH9Adjustment(params: {
   // ─── Load ──────────────────────────────────────────────────────────────────
 
   function load(): void {
-    const data = _getJson(ROWS_KEY)
+    const data = _getJson(ROWS_KEY) ?? _getJson(ROWS_KEY_ALIAS)
     if (Array.isArray(data) && data.length > 0) {
       rows.value = data.map((r: any, i: number) => _normalizeRow(r, i))
     } else {
@@ -192,9 +187,11 @@ export function useH9Adjustment(params: {
   /** 发布调整事件（通知H9-1同步AJE/RJE） */
   function publishAdjustment(): void {
     onPublishAdjustment?.(ajeNet.value, rjeNet.value)
-    window.dispatchEvent(new CustomEvent('adjustment:created', {
-      detail: { wpCode: 'H9', ajeNet: ajeNet.value, rjeNet: rjeNet.value },
-    }))
+    const payload = { wpCode: 'H9', ajeNet: ajeNet.value, rjeNet: rjeNet.value }
+    try {
+      eventBus.emit('adjustment:created', payload)
+    } catch { /* silent */ }
+    window.dispatchEvent(new CustomEvent('adjustment:created', { detail: payload }))
   }
 
   function save(): void { _persist() }
@@ -208,8 +205,11 @@ export function useH9Adjustment(params: {
       indexRef: r.indexRef, remark: r.remark,
     }))
     onSave(ROWS_KEY, toPersist)
+    onSave(ROWS_KEY_ALIAS, toPersist)
     onSave(AJE_NET_KEY, ajeNet.value)
     onSave(RJE_NET_KEY, rjeNet.value)
+    onSave('H9-4-aje-net', ajeNet.value)
+    onSave('H9-4-rje-net', rjeNet.value)
   }
 
   // ─── Return ────────────────────────────────────────────────────────────────

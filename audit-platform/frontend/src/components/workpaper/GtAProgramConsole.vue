@@ -302,6 +302,7 @@
             :is-a17_5-chip-disabled="isA17_5ChipDisabled"
             :is-review-chip-disabled="isReviewChipDisabled"
             :a17_5-badge="a17_5Badge"
+            :a17_5-disabled-reason="a17_5DisabledReason"
             :review-chip-badge="reviewChipBadge"
             :chip-completion-key="chipCompletionKey"
             @chip-click="handleIndexChipClick"
@@ -399,11 +400,15 @@
         </template>
       </el-table-column>
 
-      <!-- 裁剪理由（仅裁剪状态显示） -->
-      <el-table-column label="裁剪理由" min-width="120">
+      <!-- 裁剪理由（仅裁剪状态显示；无理由时给 A17 灰显人话） -->
+      <el-table-column label="裁剪/灰显说明" min-width="160">
         <template #default="{ row }">
-          <span v-if="row.status === 'not_applicable'" class="gt-a-program-console__trim-reason">
-            {{ row.trim_reason || '—' }}
+          <span
+            v-if="row.status === 'not_applicable' || isA17_5ChipDisabledHint(row)"
+            class="gt-a-program-console__trim-reason"
+            :title="rowApplicabilityHint(row)"
+          >
+            {{ rowApplicabilityHint(row) }}
           </span>
         </template>
       </el-table-column>
@@ -789,6 +794,7 @@ const {
   isA17_5Ref,
   isA17_5ChipDisabled,
   a17_5Badge,
+  a17_5DisabledReason,
   isA17Seq5Row,
   a17ApplicableRefs,
   a17InapplicableRefs,
@@ -802,6 +808,27 @@ const {
 
 function isRowChipDisabled(row: ProgramRow): boolean {
   return row.status === 'not_applicable'
+}
+
+/** 灰显/裁剪人话：裁剪理由优先；A17 无理由时说明业务类别；含不适用 A17-5 版本时提示 */
+function rowApplicabilityHint(row: ProgramRow): string {
+  if (row.trim_reason && row.trim_reason.trim()) return row.trim_reason
+  if (row.status === 'not_applicable' && isA17Table.value) {
+    return '当前业务类别不适用本步骤（A17 默认仅 A 类强制；B/C 类可裁剪）'
+  }
+  if (row.status === 'not_applicable') {
+    return '本步骤已标为不适用'
+  }
+  // A17-5 行：若有不适用版本折叠，给一句说明
+  if (isA17Seq5Row(row) && a17InapplicableRefs(row).length > 0) {
+    const codes = a17InapplicableRefs(row).join('、')
+    return `不适用版本已灰显：${codes}（展开「不适用版本」可查看；与当前业务类型不匹配）`
+  }
+  return '—'
+}
+
+function isA17_5ChipDisabledHint(row: ProgramRow): boolean {
+  return isA17Seq5Row(row) && a17InapplicableRefs(row).length > 0 && row.status !== 'not_applicable'
 }
 
 onMounted(() => {

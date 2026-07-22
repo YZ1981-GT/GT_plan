@@ -11,6 +11,8 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
+const emit = defineEmits<{ (e: 'save'): void }>()
+
 const route = useRoute()
 const htmlData = ref<{ template: unknown; responses: Record<string, unknown> } | null>(null)
 const loading = ref(false)
@@ -38,6 +40,7 @@ onMounted(load)
       :wp-id="wpId"
       :html-data="htmlData as any"
       :readonly="readonly"
+      @save="emit('save')"
     />
   </div>
 </template>

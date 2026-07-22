@@ -76,8 +76,11 @@ describe('G9 集成 — 借方公式', () => {
 })
 
 describe('G9 集成 — 种子行数', () => {
-  it('审定表 74 行', () => {
-    expect(G9_ADJUDICATION_ITEMS.length).toBe(74)
+  it('审定表按 Excel 分类口径（FVTPL8+FVOCI4+摊余3）', () => {
+    expect(G9_ADJUDICATION_ITEMS.length).toBe(15)
+    expect(G9_ADJUDICATION_ITEMS.filter((r) => r.category === 'FVTPL').length).toBe(8)
+    expect(G9_ADJUDICATION_ITEMS.some((r) => r.isGroupTotal && r.rowKey === 'fvtpl_1')).toBe(true)
+    expect(G9_ADJUDICATION_ITEMS.some((r) => r.label.includes('指定为以公允价值计量'))).toBe(true)
   })
 
   it('上市附注 4 行（xlsx schema）', () => {
@@ -95,8 +98,8 @@ describe('G9 集成 — 种子行数', () => {
     ])
   })
 
-  it('科目代码 1504', () => {
-    expect(G9_ACCOUNT_CODE).toBe('1504')
+  it('科目代码 1519', () => {
+    expect(G9_ACCOUNT_CODE).toBe('1519')
   })
 })
 

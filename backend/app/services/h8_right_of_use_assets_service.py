@@ -357,9 +357,17 @@ class H8RightOfUseAssetsService:
 
         for row in simplified_rows:
             contract_no = row.get("contractNo", "")
-            term_months = int(_safe_float(row.get("termMonths", 0)))
+            term_months = int(_safe_float(
+                row.get("leaseTermMonths", row.get("termMonths", 0))
+            ))
             new_value = _safe_float(row.get("newAssetValue", 0))
-            annual_rent = _safe_float(row.get("annualRent", 0))
+            annual_rent = _safe_float(
+                row.get("annualRental", row.get("annualRent", 0))
+            )
+            if annual_rent <= 0:
+                monthly = _safe_float(row.get("monthlyRent", 0))
+                if monthly > 0:
+                    annual_rent = monthly * 12
 
             total_annual_rent += annual_rent
 
@@ -451,22 +459,29 @@ class H8RightOfUseAssetsService:
         self, db: AsyncSession, wp_id: str
     ) -> list[dict]:
         """从 checklist_responses 加载H8-13简化处理检查表行"""
-        item_id = "H8-13-simplified-rows"
-        try:
-            result = await db.execute(
-                sa.text(
-                    "SELECT remark FROM checklist_responses "
-                    "WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"
-                ),
-                {"wp_id": wp_id, "item_id": item_id},
-            )
-            row = result.fetchone()
-            if row and row.remark:
-                return json.loads(row.remark)
-        except (json.JSONDecodeError, TypeError) as e:
-            logger.warning("H8 service: 解析简化处理JSON失败 wp_id=%s: %s", wp_id, e)
-        except Exception as e:  # noqa: BLE001
-            logger.warning("H8 service: 加载简化处理失败 wp_id=%s: %s", wp_id, e)
+        # 主 key 与前端/导入导出一致；兼容旧 item_id
+        for item_id in ("H8-13-rows", "H8-13-simplified-rows"):
+            try:
+                result = await db.execute(
+                    sa.text(
+                        "SELECT remark FROM checklist_responses "
+                        "WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"
+                    ),
+                    {"wp_id": wp_id, "item_id": item_id},
+                )
+                row = result.fetchone()
+                if row and row.remark:
+                    return json.loads(row.remark)
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.warning(
+                    "H8 service: 解析简化处理JSON失败 wp_id=%s item=%s: %s",
+                    wp_id, item_id, e,
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning(
+                    "H8 service: 加载简化处理失败 wp_id=%s item=%s: %s",
+                    wp_id, item_id, e,
+                )
         return []
 
 

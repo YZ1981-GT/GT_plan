@@ -19,6 +19,7 @@ export interface A176MetaInfo {
   organizer: string
   convener: string
   recorder: string
+  attendees: string
 }
 
 export interface A176Agenda { [key: number]: string }
@@ -79,6 +80,7 @@ export function useA176ClosingMeeting(wpId: Ref<string>): UseA176Return {
     client_name: '', period: '', preparer: '', preparer_date: '',
     reviewer: '', reviewer_date: '', index_no: 'A17-6',
     meeting_place: '', meeting_time: '', organizer: '', convener: '', recorder: '',
+    attendees: '',
   })
 
   const agenda = ref<A176Agenda>({ 1: '', 2: '', 3: '', 4: '', 5: '', 6: '', 7: '', 8: '', 9: '', 10: '' })

@@ -3,7 +3,7 @@
   <!-- 审计目标 -->
   <el-alert type="info" :closable="false" show-icon class="audit-objective">
     <template #title>
-      <strong>审计目标</strong>：通过借贷方发生额分析与 Top5 债务人集中度分析，识别预收账款的异常波动、大额集中与舞弊风险，为实质性程序提供方向（CAS 1231 分析程序）。
+      <strong>审计目标</strong>：通过借贷方发生额分析与 Top5 预收客户集中度分析，识别预收账款的异常波动、大额集中与舞弊风险，为实质性程序提供方向（CAS 1231 分析程序）。
     </template>
   </el-alert>
 
@@ -69,12 +69,12 @@
     </el-table>
   </div>
 
-  <!-- 区块三：Top5债务人 -->
+  <!-- 区块三：Top5预收客户 -->
   <div class="analysis-card">
-    <h4 class="card-title">(三) 期末主要债务人分析</h4>
+    <h4 class="card-title">(三) 期末主要预收客户分析</h4>
     <el-table :data="top5Debtors" size="small" border stripe>
       <el-table-column type="index" label="序号" width="50" />
-      <el-table-column prop="customerName" label="债务人名称" width="160">
+      <el-table-column prop="customerName" label="预收客户名称" width="160">
         <template #default="{ row }">
           <span>{{ row.customerName }}</span>
           <GtIndexChip target="D3-2" :label="row.customerName" />
@@ -128,8 +128,8 @@
     <details class="guidance-fold">
       <summary>📋 编制提示（CAS 1231 分析程序）</summary>
       <p>1. 借/贷方发生额分析：与序时账发生额、收入确认（D4）勾稽，差额行标红须查明原因；</p>
-      <p>2. Top5 债务人集中度超阈值时，关注大额预收的商业实质与后续履约能力；</p>
-      <p>3. 变动比例超 30% 的债务人应结合合同与业务背景分析，异常波动纳入进一步检查范围。</p>
+      <p>2. Top5 预收客户集中度超阈值时，关注大额预收的商业实质与后续履约能力；</p>
+      <p>3. 变动比例超 30% 的预收客户应结合合同与业务背景分析，异常波动纳入进一步检查范围。</p>
     </details>
   </div>
 </div>

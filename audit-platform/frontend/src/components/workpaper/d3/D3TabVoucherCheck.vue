@@ -216,8 +216,9 @@
           </el-upload>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="50" v-if="!isReadonly">
+      <el-table-column label="操作" width="90" v-if="!isReadonly">
         <template #default="{ row }">
+          <el-button size="small" type="primary" link @click="openCheckDialog('current', row)">核对</el-button>
           <el-popconfirm title="删除？" @confirm="removeSample('current', row.rowId)">
             <template #reference><el-button size="small" type="danger" link>删</el-button></template>
           </el-popconfirm>
@@ -352,8 +353,9 @@
           </el-upload>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="50" v-if="!isReadonly">
+      <el-table-column label="操作" width="90" v-if="!isReadonly">
         <template #default="{ row }">
+          <el-button size="small" type="primary" link @click="openCheckDialog('postPeriod', row)">核对</el-button>
           <el-popconfirm title="删除？" @confirm="removeSample('postPeriod', row.rowId)">
             <template #reference><el-button size="small" type="danger" link>删</el-button></template>
           </el-popconfirm>
@@ -441,7 +443,13 @@
           跨期疑点 {{ crossPeriodCount }} 笔
         </el-tag>
         <GtIndexChip value="wp:D4" context="跨期疑点关联收入截止测试底稿 D4" />
-        <span class="trace-hint">跨期疑点行保留与收入截止测试底稿 D4 的可追溯关联</span>
+        <el-button
+          size="small"
+          :disabled="isReadonly || !year"
+          :title="year ? `按资产负债表日 ${year}-12-31 标记期后结转跨期疑点` : '缺少审计年度'"
+          @click="handleAutoMarkCrossPeriod"
+        >自动标记跨期</el-button>
+        <span class="trace-hint">期后结转凭证日期早于资产负债表日→本应期内确认，一键标记并关联 D4 收入截止</span>
       </div>
       <div v-if="anomalyTypeEntries.length" class="trace-line trace-line--types">
         <span class="trace-label">异常类型分布：</span>
@@ -527,6 +535,16 @@
     @applied="onReviewApplied"
   />
 
+  <!-- 逐笔核对引导弹窗（分组卡片 + 5 项核对内容 + 实时完成度 + OCR + 结论） -->
+  <D3VoucherCheckDialog
+    v-model="checkDialogVisible"
+    :row="checkDialogRow"
+    :section="checkDialogSection"
+    :is-readonly="isReadonly"
+    :wp-id="wpId"
+    @save="handleCheckDialogSave"
+  />
+
 </div>
 </template>
 
@@ -537,7 +555,7 @@
  */
 import { computed, ref, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useD3VoucherCheck, isAllowedAttachment, CROSS_PERIOD_ANOMALY } from '../composables/useD3VoucherCheck'
+import { useD3VoucherCheck, isAllowedAttachment, CROSS_PERIOD_ANOMALY, type VoucherCheckRow } from '../composables/useD3VoucherCheck'
 import { useD3AiGenerate } from '../composables/useD3AiGenerate'
 import { useD3TabImportExport } from '../composables/useD3TabImportExport'
 import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
@@ -551,6 +569,7 @@ import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 import PostFillAiReviewDialog, { type PostFillReviewRow } from '../voucher-sampling/PostFillAiReviewDialog.vue'
+import D3VoucherCheckDialog from './D3VoucherCheckDialog.vue'
 
 const props = withDefaults(defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -590,6 +609,8 @@ const {
   conclusion,
   updateConclusion,
   fillFromSampling,
+  autoMarkCrossPeriod,
+  updateRow,
 } = useD3VoucherCheck({
   allResponses: allResponsesRef,
   wpId: wpIdRef,
@@ -608,6 +629,39 @@ const progressPct = computed(() => {
 const anomalyTypeEntries = computed<[string, number][]>(() =>
   Object.entries(anomalySummary.value.byType),
 )
+
+/**
+ * 一键按资产负债表日（审计年度末）自动标记期后结转跨期疑点。
+ * 期后结转凭证日期早于资产负债表日 → 收入本应在期内确认 → 标「跨期疑点」（关联 D4 收入截止）。
+ */
+function handleAutoMarkCrossPeriod() {
+  if (props.isReadonly) return
+  if (!props.year) {
+    ElMessage.warning('缺少审计年度，无法确定资产负债表日')
+    return
+  }
+  const yearEnd = `${props.year}-12-31`
+  autoMarkCrossPeriod(yearEnd)
+  ElMessage.success(`已按资产负债表日 ${yearEnd} 自动标记期后结转跨期疑点`)
+}
+
+// ─── 逐笔核对引导弹窗 ────────────────────────────────────────────────────────
+
+const checkDialogVisible = ref(false)
+const checkDialogRow = ref<VoucherCheckRow | null>(null)
+const checkDialogSection = ref<'current' | 'postPeriod'>('current')
+
+function openCheckDialog(section: 'current' | 'postPeriod', row: VoucherCheckRow): void {
+  checkDialogSection.value = section
+  checkDialogRow.value = row
+  checkDialogVisible.value = true
+}
+
+function handleCheckDialogSave(patch: VoucherCheckRow): void {
+  if (!patch?.rowId) return
+  updateRow(checkDialogSection.value, patch.rowId, patch)
+  ElMessage.success('已保存核对结果')
+}
 
 /** 异常标记常用枚举（可点选 + 允许自定义输入） */
 const ABNORMAL_OPTIONS = ['跨期疑点', '金额异常', '无原始凭证', '对方科目异常', '重复入账', '其他异常']

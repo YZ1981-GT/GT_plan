@@ -191,14 +191,10 @@ describe('H5 油气资产 — 注册契约测试', () => {
   })
 
   describe('RENDERER_DISPATCH 注册（Task 5.1 前置验证）', () => {
-    it('h5-oil-gas-assets 在 _ONLYOFFICE_HTML_WHITELIST 中（render策略待Task 5.1）', () => {
-      const renderConfigPath = path.resolve(
-        __dirname,
-        '../../../../../../backend/app/routers/wp_render_config.py'
-      )
-      const content = fs.readFileSync(renderConfigPath, 'utf-8')
-      // 在白名单中注册（RENDERER_DISPATCH 注册在 Task 5.1 完成）
-      expect(content).toContain('"h5-oil-gas-assets"')
+    it('h5-oil-gas-assets 已注册于 htmlRendererRegistry', () => {
+      const entry = HTML_RENDERER_REGISTRY.get('h5-oil-gas-assets')
+      expect(entry).toBeDefined()
+      expect(entry!.componentType).toBe('h5-oil-gas-assets')
     })
   })
 })

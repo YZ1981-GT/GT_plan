@@ -14,9 +14,9 @@ export function calcDisposalGainLoss(
   return parseNum(income) - parseNum(netValue) - parseNum(expenses) - parseNum(tax)
 }
 
-/** 净账面值 = 原值 − 累计折旧 */
-export function calcNetBookValue(cost: number, accDep: number): number {
-  return parseNum(cost) - parseNum(accDep)
+/** 净账面值 = 原值 − 累计折旧 − 减值准备 */
+export function calcNetBookValue(cost: number, accDep: number, impairment = 0): number {
+  return parseNum(cost) - parseNum(accDep) - parseNum(impairment)
 }
 
 /** 处置损益率 = 损益 / 原值 × 100；原值为 0 或非有限数时 null */

@@ -34,4 +34,16 @@ export const H10_ADJUDICATION_ITEMS: H10AdjudicationLineDef[] = [
     rowKey: 'non_monetary_exchange',
     label: '非货币性资产交换产生的利得（损失以"-"填列）',
   },
+  {
+    rowKey: 'rou_disposal',
+    label: '使用权资产处置利得（损失以"-"填列）',
+  },
+  {
+    rowKey: 'oil_gas_disposal',
+    label: '油气资产处置利得（损失以"-"填列）',
+  },
+  {
+    rowKey: 'trial_operation_sales',
+    label: '试运行销售损益（损失以"-"填列）',
+  },
 ]

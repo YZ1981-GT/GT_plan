@@ -27,6 +27,7 @@
     <div class="segment-bar">
       <el-segmented v-model="activeTab" :options="tabOptions" size="default" />
       <div class="bar-actions">
+        <el-button v-if="!isReadonly" size="small" @click="handleSyncFromH92">从 H9-2 同步出租方</el-button>
         <el-dropdown v-if="!isReadonly" trigger="click" @command="handleImportExport">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -192,6 +193,34 @@
           <span class="formula-value">{{ fmtAmt(row.finalAudited) }}</span>
         </template>
       </el-table-column>
+      <el-table-column prop="dueWithin1Y" label="P:1年以内" width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.dueWithin1Y" :controls="false" size="small"
+            @change="(v: number | undefined) => onCell(row.rowId, 'dueWithin1Y', v)" />
+          <span v-else>{{ fmtAmt(row.dueWithin1Y) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="due1To2Y" label="1-2年" width="100" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.due1To2Y" :controls="false" size="small"
+            @change="(v: number | undefined) => onCell(row.rowId, 'due1To2Y', v)" />
+          <span v-else>{{ fmtAmt(row.due1To2Y) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="due2To3Y" label="2-3年" width="100" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.due2To3Y" :controls="false" size="small"
+            @change="(v: number | undefined) => onCell(row.rowId, 'due2To3Y', v)" />
+          <span v-else>{{ fmtAmt(row.due2To3Y) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="dueOver3Y" label="3年以上" width="100" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" v-model="row.dueOver3Y" :controls="false" size="small"
+            @change="(v: number | undefined) => onCell(row.rowId, 'dueOver3Y', v)" />
+          <span v-else>{{ fmtAmt(row.dueOver3Y) }}</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="isRelatedParty" label="T:关联方" width="90" align="center">
         <template #default="{ row }">
           <el-tag v-if="!isReadonly" :type="row.isRelatedParty === '是' ? 'danger' : 'info'" size="small"
@@ -260,9 +289,11 @@
       <ul>
         <li>未确认融资费用为负债备抵科目（借方余额）：期末 E = 期初 B + 本期增加 C（借）− 本期确认 D（贷）</li>
         <li>本期确认（转入利息费用）按实际利率法计算，应与 H9 摊销表各期利息一致</li>
-        <li>出租方名称自 H9-2 明细表联动，保持合同口径一致</li>
+        <li>出租方名称自 H9-2 明细表联动（点「从 H9-2 同步出租方」），保持合同口径一致</li>
         <li>审定期末 M = 审定期初 J + 审定增加 K − 审定确认 L；最终审定 O = M − 重分类 N</li>
-        <li>CAS21 下租赁利息费用一般不资本化（租赁期开始日已达预定可使用状态）</li>
+        <li>到期日分析应与 H9-2 流动性拆分口径一致，支撑附注披露</li>
+        <li>初始确认及摊销计算参见使用权资产底稿 H8-4/H8-5/H8-6/H8-7</li>
+        <li>本科目核算企业应分期摊入利息费用的未确认融资费用</li>
       </ul>
     </details>
 
@@ -282,8 +313,8 @@
  * Spec: .kiro/specs/h9-lease-liabilities/ Task 4.3
  * Requirements: 3.4-3.6
  */
-import { ref, toRef } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ref, toRef, inject } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useH9FinanceCost, type H9FinanceCostRow } from '../../composables/useH9FinanceCost'
 import { useH9ImportExport } from '../../composables/useH9ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -308,7 +339,7 @@ const activeTab = ref('融资费用变动')
 // ─── Composable ──────────────────────────────────────────────────────────────
 const {
   rows, totalRow,
-  addRow, deleteRow, updateCell,
+  addRow, deleteRow, updateCell, syncLessorsFromH92,
 } = useH9FinanceCost({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
@@ -316,13 +347,15 @@ const {
   onSave: (itemId, value) => emit('save', itemId, value),
 })
 
+const h9ReloadAll = inject<() => Promise<void>>('h9ReloadAll', async () => {})
+
 const {
   exportTemplate, exportData, importData,
 } = useH9ImportExport({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   sheetCode: 'H9-3',
-  onImported: () => { /* parent will reload */ },
+  onImported: async () => { await h9ReloadAll() },
 })
 
 // ─── 审计说明/结论 ───────────────────────────────────────────────────────────
@@ -356,6 +389,12 @@ async function handleAddRow() {
     confirmButtonText: '确认', cancelButtonText: '取消', inputPlaceholder: '如：XX房地产开发有限公司',
   })
   if (value) addRow(value)
+}
+
+function handleSyncFromH92() {
+  const res = syncLessorsFromH92()
+  if (!res.added && !res.updated) ElMessage.warning(res.message)
+  else ElMessage.success(res.message)
 }
 
 function handleDelete(rowId: string) {

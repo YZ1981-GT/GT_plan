@@ -164,5 +164,3 @@ export function useG12FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
     writebackTrialBalance,
   }
 }
-
-export { useG12FormData as useG12NetHedFormData }

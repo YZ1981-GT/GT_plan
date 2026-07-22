@@ -245,5 +245,23 @@ describe('useH4CrossSheet — 集成测试（跨sheet数据流）', () => {
       expect(disclosureAutoFill.value.disc_addition_total).toBe(3000)
       expect(disclosureAutoFill.value.disc_disposal_total).toBe(1000)
     })
+
+    it('消费 H4-1 重大变动附注键', () => {
+      const responses = buildResponses({
+        'H4-1-adjudicated-total': 10000,
+        'H4-1-significant-change-count': 2,
+        'H4-1-significant-changes': JSON.stringify([
+          { name: '专用材料', auditedChange: 500, auditedChangeRate: 40 },
+          { name: '专用设备', auditedChange: -200, auditedChangeRate: -35 },
+        ]),
+      })
+      const allResponses = ref(responses)
+      const { disclosureAutoFill, significantChanges } = useH4CrossSheet(allResponses)
+
+      expect(disclosureAutoFill.value.disc_significant_count).toBe(2)
+      expect(disclosureAutoFill.value.disc_significant_change).toBe(300)
+      expect(significantChanges.value).toHaveLength(2)
+      expect(significantChanges.value[0].name).toBe('专用材料')
+    })
   })
 })

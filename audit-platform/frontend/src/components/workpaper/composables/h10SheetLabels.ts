@@ -124,11 +124,8 @@ export function getH10SourceTraceStatus(m: Map<string, any>): H10SourceTraceRow[
     return { wpCode: o.value, label: o.label, status }
   })
 
-  rows.push({
-    wpCode: 'H6',
-    label: 'H6 固定资产清理',
-    status: h6Linked ? 'done' : 'pending',
-  })
+  const h6 = rows.find((r) => r.wpCode === 'H6')
+  if (h6 && h6Linked) h6.status = 'done'
 
   return rows
 }

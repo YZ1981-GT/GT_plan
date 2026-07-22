@@ -330,7 +330,7 @@ async def writeback_audited_amount(
     from decimal import Decimal
     from app.models.audit_platform_models import TrialBalance
 
-    # 查找匹配行（取最新年度）
+    # 查找匹配行（取最新年度）— 先精确码匹配，再 LIKE 子科目回退求和
     stmt = (
         sa.select(TrialBalance)
         .where(
@@ -343,6 +343,21 @@ async def writeback_audited_amount(
     )
     result = await db.execute(stmt)
     row = result.scalar_one_or_none()
+
+    if not row:
+        # 回退：查 LIKE 前缀匹配（部分项目 TB 仅有子科目无父行）
+        like_stmt = (
+            sa.select(TrialBalance)
+            .where(
+                TrialBalance.project_id == project_id,
+                TrialBalance.standard_account_code.like(f"{body.account_code}%"),
+                TrialBalance.is_deleted == sa.false(),
+            )
+            .order_by(TrialBalance.year.desc())
+            .limit(1)
+        )
+        like_result = await db.execute(like_stmt)
+        row = like_result.scalar_one_or_none()
 
     if not row:
         raise HTTPException(

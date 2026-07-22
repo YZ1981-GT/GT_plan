@@ -53,12 +53,14 @@ export interface UseA174Return {
   projectContext: Ref<A174ProjectContext>
   saveStatus: Ref<'saved' | 'saving' | 'unsaved'>
   lastSavedAt: Ref<Date | null>
+  notApplicable: Ref<boolean>
   loadData: (wpId?: string) => Promise<void>
   addPersonnel: () => void
   removePersonnel: (index: number) => void
   updatePersonnel: (index: number, field: keyof PersonnelRow, value: string) => void
   updateSection: (secNum: number, value: string) => void
   updateSignature: (field: keyof A174SignatureData, value: string) => void
+  setNotApplicable: (v: boolean) => void
   flushPendingSaves: () => Promise<void>
 }
 
@@ -102,6 +104,8 @@ export function useA174DisagreementRecord(wpId: Ref<string>): UseA174Return {
     current_user: '',
   })
 
+  const notApplicable = ref(false)
+
   // ─── Pending saves ───
   const pendingItems = new Map<string, { item_id: string; conclusion: string | null; remark: string | null }>()
   let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -138,6 +142,9 @@ export function useA174DisagreementRecord(wpId: Ref<string>): UseA174Return {
       }
       if (htmlData?.project_context) {
         Object.assign(projectContext.value, htmlData.project_context)
+      }
+      if (htmlData?.not_applicable) {
+        notApplicable.value = ['是', '1', 'true', 'yes'].includes(String(htmlData.not_applicable).toLowerCase())
       }
       // Auto-fill preparer from current user if not set
       if (!signatureData.value.preparer && projectContext.value.current_user) {
@@ -201,6 +208,16 @@ export function useA174DisagreementRecord(wpId: Ref<string>): UseA174Return {
     scheduleSave()
   }
 
+  function setNotApplicable(v: boolean) {
+    notApplicable.value = v
+    pendingItems.set('a174-meta-not_applicable', {
+      item_id: 'a174-meta-not_applicable',
+      conclusion: v ? '是' : '',
+      remark: null,
+    })
+    scheduleSave()
+  }
+
   // ─── Debounce Save ───
   function scheduleSave() {
     saveStatus.value = 'unsaved'
@@ -246,12 +263,14 @@ export function useA174DisagreementRecord(wpId: Ref<string>): UseA174Return {
     projectContext,
     saveStatus,
     lastSavedAt,
+    notApplicable,
     loadData,
     addPersonnel,
     removePersonnel,
     updatePersonnel,
     updateSection,
     updateSignature,
+    setNotApplicable,
     flushPendingSaves,
   }
 }

@@ -266,14 +266,14 @@ onBeforeUnmount(() => { void persistence.flush().catch(() => undefined) })
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 /**
- * 源底稿减值计提事件处理器（F2/H1/I1/I3/H2/G7）
+ * 源底稿减值计提事件处理器（F2/H1/H3/I1/I2/I3/H2/G7）
  * 源底稿通过 window.dispatchEvent(CustomEvent) 发布 'substantive:adjudicated'
  * K11 subscribe 这些事件以更新 K11-2 明细表的 sourceAmount
  *
- * Task 6.2: subscribe各减值源底稿(F2/H1/I1/I3)减值计提
+ * Task 6.2: subscribe各减值源底稿(F2/H1/I1/I2/I3)减值计提
  * Requirements: 6.2, 4.2
  */
-const SOURCE_WP_CODES = ['F2', 'H1', 'I1', 'I3', 'H2', 'G7'] as const
+const SOURCE_WP_CODES = ['F2', 'H1', 'H3', 'I1', 'I2', 'I3', 'H2', 'G7'] as const
 
 function handleSourceAdjudicated(e: Event): void {
   const detail = (e as CustomEvent).detail
@@ -297,26 +297,49 @@ function handleSourceAdjudicated(e: Event): void {
   }
 }
 
-/** 处理 'impairment:calculated' 事件（F2 存货跌价等） */
+/** 处理 'impairment:calculated' 事件（F2 存货跌价 / H1 固定资产减值等） */
 function handleImpairmentCalculated(e: Event): void {
   const detail = (e as CustomEvent).detail
   if (!detail) return
-  const wpCode = detail.wpCode ?? ''
+  const wpCode = detail.wpCode ?? detail.wp_code ?? ''
   if (!SOURCE_WP_CODES.includes(wpCode as any)) return
 
   const amount = Number(detail.totalRequiredProvision ?? detail.amount ?? 0)
-  if (amount !== 0) {
-    allResponses.value.set(`K11-source-${wpCode}-amount`, {
-      item_id: `K11-source-${wpCode}-amount`,
+  // 允许 0（本期无补提也要刷新源金额，避免沿用旧数）
+  if (!Number.isFinite(amount)) return
+
+  allResponses.value.set(`K11-source-${wpCode}-amount`, {
+    item_id: `K11-source-${wpCode}-amount`,
+    conclusion: null,
+    remark: String(amount),
+  })
+  allResponses.value.set(`K11-source-${wpCode}-status`, {
+    item_id: `K11-source-${wpCode}-status`,
+    conclusion: null,
+    remark: 'done',
+  })
+
+  // 对齐 useK11CrossSheet 键名
+  const catKey = WP_TO_CATEGORY_KEY[wpCode]
+  if (catKey) {
+    allResponses.value.set(`K11-2-${catKey}-source-amount`, {
+      item_id: `K11-2-${catKey}-source-amount`,
       conclusion: null,
       remark: String(amount),
     })
-    allResponses.value.set(`K11-source-${wpCode}-status`, {
-      item_id: `K11-source-${wpCode}-status`,
-      conclusion: null,
-      remark: 'done',
-    })
   }
+}
+
+/** 源底稿编码 → K11-2 CrossSheet category key */
+const WP_TO_CATEGORY_KEY: Record<string, string> = {
+  F2: 'inventory',
+  H1: 'fixed-asset',
+  I1: 'intangible',
+  I2: 'development',
+  I3: 'goodwill',
+  H2: 'construction',
+  G7: 'equity',
+  H3: 'investment-property',
 }
 
 onMounted(() => {

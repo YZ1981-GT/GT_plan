@@ -458,22 +458,71 @@ entries:
     storage_mode: row_json
     import_order: 40
     depends_on_sheets: [G8-2]
+  - sheet_code: 附注上市
+    api_prefix: g8
+    item_id: G8-disclosure-listed
+    storage_field: remark
+    storage_mode: payload_json
+    import_order: 60
+    depends_on_sheets: [G8-1, G8-2]
+  - sheet_code: 附注国企
+    api_prefix: g8
+    item_id: G8-disclosure-soe
+    storage_field: remark
+    storage_mode: payload_json
+    import_order: 70
+    depends_on_sheets: [G8-1, G8-2]
 
   # ───────────────────────── G9 其他非流动金融资产（api_prefix: g9） ─────────────────────────
   - sheet_code: G9-2
     api_prefix: g9
-    item_id: G9-2-rows
+    item_id: G9-detail-rows
     storage_field: remark
     storage_mode: row_json
     import_order: 10
     depends_on_sheets: []
   - sheet_code: G9-3
     api_prefix: g9
-    item_id: G9-3-rows
+    item_id: G9-adjustment-rows
     storage_field: remark
     storage_mode: row_json
     import_order: 20
     depends_on_sheets: [G9-2]
+  - sheet_code: G9-4
+    api_prefix: g9
+    item_id: G9-fv-test-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [G9-2]
+  - sheet_code: G9-5
+    api_prefix: g9
+    item_id: G9-l3-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [G9-2, G9-4]
+  - sheet_code: G9-6
+    api_prefix: g9
+    item_id: G9-voucher-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [G9-2]
+  - sheet_code: 附注上市
+    api_prefix: g9
+    item_id: G9-disclosure-listed
+    storage_field: remark
+    storage_mode: payload_json
+    import_order: 60
+    depends_on_sheets: [G9-1, G9-2]
+  - sheet_code: 附注国企
+    api_prefix: g9
+    item_id: G9-disclosure-soe
+    storage_field: remark
+    storage_mode: payload_json
+    import_order: 70
+    depends_on_sheets: [G9-1, G9-2]
 
   # ───────────────────────── G10 交易性金融负债（api_prefix: g10） ─────────────────────────
   - sheet_code: G10-2
@@ -485,38 +534,108 @@ entries:
     depends_on_sheets: []
 
   # ───────────────────────── G11 投资收益（api_prefix: g11） ─────────────────────────
+  - sheet_code: G11-1
+    api_prefix: g11
+    item_id: G11-adj-rows
+    storage_field: remark
+    storage_mode: keyed_json
+    import_order: 5
+    depends_on_sheets: []
   - sheet_code: G11-2
     api_prefix: g11
-    item_id: G11-2-rows
+    item_id: G11-detail-rows
     storage_field: remark
     storage_mode: row_json
     import_order: 10
     depends_on_sheets: []
   - sheet_code: G11-3
     api_prefix: g11
-    item_id: G11-3-rows
+    item_id: G11-aje-rows
     storage_field: remark
     storage_mode: row_json
     import_order: 20
     depends_on_sheets: [G11-2]
+  - sheet_code: G11-4
+    api_prefix: g11
+    item_id: G11-return-rate-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [G11-1, G11-2]
+  - sheet_code: G11-5
+    api_prefix: g11
+    item_id: G11-voucher-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [G11-2]
+  - sheet_code: 附注上市
+    api_prefix: g11
+    item_id: G11-disclosure-listed
+    storage_field: remark
+    storage_mode: payload_json
+    import_order: 50
+    depends_on_sheets: [G11-1, G11-2]
+  - sheet_code: 附注国企
+    api_prefix: g11
+    item_id: G11-disclosure-soe
+    storage_field: remark
+    storage_mode: payload_json
+    import_order: 55
+    depends_on_sheets: [G11-1, G11-2]
 
   # ───────────────────────── G12 净敞口套期收益（api_prefix: g12） ─────────────────────────
   - sheet_code: G12-2
     api_prefix: g12
-    item_id: G12-2-rows
+    item_id: G12-hedge-detail-rows
     storage_field: remark
     storage_mode: row_json
     import_order: 10
     depends_on_sheets: []
   - sheet_code: G12-3
     api_prefix: g12
-    item_id: G12-3-rows
+    item_id: G12-aje-rows
     storage_field: remark
     storage_mode: row_json
     import_order: 20
     depends_on_sheets: [G12-2]
+  - sheet_code: G12-4
+    api_prefix: g12
+    item_id: G12-fv-test-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 30
+    depends_on_sheets: [G12-2]
+  - sheet_code: G12-5
+    api_prefix: g12
+    item_id: G12-net-exposure-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 40
+    depends_on_sheets: [G12-2]
+  - sheet_code: G12-6
+    api_prefix: g12
+    item_id: G12-voucher-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 50
+    depends_on_sheets: [G12-2]
+  - sheet_code: 附注上市
+    api_prefix: g12
+    item_id: G12-disclosure-listed
+    storage_field: remark
+    storage_mode: payload_json
+    import_order: 60
+    depends_on_sheets: [G12-1, G12-2]
+  - sheet_code: 附注国企
+    api_prefix: g12
+    item_id: G12-disclosure-soe
+    storage_field: remark
+    storage_mode: payload_json
+    import_order: 70
+    depends_on_sheets: [G12-1, G12-2]
 
-  # ───────────────────────── G13 公允价值变动损益（api_prefix: g13） ─────────────────────────
+  # ───────────────────────── G13 公允价值变动收益（api_prefix: g13） ─────────────────────────
   - sheet_code: G13-2
     api_prefix: g13
     item_id: G13-detail-rows
@@ -524,19 +643,54 @@ entries:
     storage_mode: row_json
     import_order: 10
     depends_on_sheets: []
+  - sheet_code: G13-3
+    api_prefix: g13
+    item_id: G13-aje-rows
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 20
+    depends_on_sheets: [G13-2]
+  - sheet_code: 附注上市
+    api_prefix: g13
+    item_id: G13-disclosure-listed
+    storage_field: remark
+    storage_mode: payload_json
+    import_order: 60
+    depends_on_sheets: [G13-1, G13-2]
+  - sheet_code: 附注国企
+    api_prefix: g13
+    item_id: G13-disclosure-soe
+    storage_field: remark
+    storage_mode: payload_json
+    import_order: 70
+    depends_on_sheets: [G13-1, G13-2]
 
   # ───────────────────────── G14 信用减值损失（api_prefix: g14） ─────────────────────────
   - sheet_code: G14-2
     api_prefix: g14
-    item_id: G14-2-rows
+    item_id: G14-detail-rows
     storage_field: remark
     storage_mode: row_json
     import_order: 10
     depends_on_sheets: []
   - sheet_code: G14-3
     api_prefix: g14
-    item_id: G14-3-rows
+    item_id: G14-aje-rows
     storage_field: remark
     storage_mode: row_json
     import_order: 20
     depends_on_sheets: [G14-2]
+  - sheet_code: 附注上市
+    api_prefix: g14
+    item_id: G14-disclosure-listed
+    storage_field: remark
+    storage_mode: payload_json
+    import_order: 60
+    depends_on_sheets: [G14-1, G14-2]
+  - sheet_code: 附注国企
+    api_prefix: g14
+    item_id: G14-disclosure-soe
+    storage_field: remark
+    storage_mode: payload_json
+    import_order: 70
+    depends_on_sheets: [G14-1, G14-2]

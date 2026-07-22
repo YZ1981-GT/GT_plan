@@ -135,7 +135,7 @@ _SHEET_HEADERS: dict[str, list[str]] = {
     ],
     "D3-5": [
         "对方单位名称", "期末余额", "账龄", "经济业务说明",
-        "未结转或未偿还的原因", "至审计日结转或偿还金额", "处理计划", "备注",
+        "未结转或未偿还的原因", "至审计日结转或偿还金额", "处理结论", "处理计划", "备注",
     ],
     "D3-6": [
         "关联方名称", "关联关系", "期初余额", "借方发生", "贷方发生",
@@ -587,13 +587,16 @@ def _export_d3_2_row(data: dict) -> list:
 
 
 def _export_d3_5_row(data: dict) -> list:
+    # 键对齐前端 LongTermRow（reason/settlementAmount/disposalConclusion）；
+    # 兼容历史键 unsettledReason/settledAmount。
     return [
         _safe_str(data.get("customerName")),
         _safe_float(data.get("endBalance")),
         _safe_str(data.get("aging")),
         _safe_str(data.get("businessDescription")),
-        _safe_str(data.get("unsettledReason")),
-        _safe_float(data.get("settledAmount")),
+        _safe_str(data.get("reason", data.get("unsettledReason"))),
+        _safe_float(data.get("settlementAmount", data.get("settledAmount"))),
+        _safe_str(data.get("disposalConclusion")),
         _safe_str(data.get("plan")),
         _safe_str(data.get("remark")),
     ]
@@ -699,14 +702,16 @@ def _parse_d3_2_row(
 
 
 def _parse_d3_5_row(row: tuple, actual_headers: list[str]) -> dict:
+    # 键对齐前端 LongTermRow（reason/settlementAmount/disposalConclusion）
     return {
         "rowId": str(uuid4()),
         "customerName": _safe_str(_col_val(row, actual_headers, "对方单位名称")),
         "endBalance": _safe_float(_col_val(row, actual_headers, "期末余额")),
         "aging": _safe_str(_col_val(row, actual_headers, "账龄")),
         "businessDescription": _safe_str(_col_val(row, actual_headers, "经济业务说明")),
-        "unsettledReason": _safe_str(_col_val(row, actual_headers, "未结转或未偿还的原因")),
-        "settledAmount": _safe_float(_col_val(row, actual_headers, "至审计日结转或偿还金额")),
+        "reason": _safe_str(_col_val(row, actual_headers, "未结转或未偿还的原因")),
+        "settlementAmount": _safe_float(_col_val(row, actual_headers, "至审计日结转或偿还金额")),
+        "disposalConclusion": _safe_str(_col_val(row, actual_headers, "处理结论")),
         "plan": _safe_str(_col_val(row, actual_headers, "处理计划")),
         "remark": _safe_str(_col_val(row, actual_headers, "备注")),
     }

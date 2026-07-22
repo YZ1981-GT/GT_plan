@@ -1,11 +1,18 @@
 /**
  * useG11ImportExport — G11 投资收益 导入导出
- * 5 张表 × 3 端点 = 15：G11-1 / G11-2 / G11-3 / G11-4 / G11-5
+ * G11-1~5 + 附注上市/国企
  */
 import { type Ref } from 'vue'
 import { useWorkpaperImportExport } from './useWorkpaperImportExport'
 
-export type G11ImportableSheet = 'G11-1' | 'G11-2' | 'G11-3' | 'G11-4' | 'G11-5'
+export type G11ImportableSheet =
+  | 'G11-1'
+  | 'G11-2'
+  | 'G11-3'
+  | 'G11-4'
+  | 'G11-5'
+  | '附注上市'
+  | '附注国企'
 
 export const G11_API_PREFIX = 'g11'
 
@@ -15,9 +22,14 @@ export const G11_IMPORTABLE_SHEETS: { code: G11ImportableSheet; label: string }[
   { code: 'G11-3', label: 'G11-3 调整分录' },
   { code: 'G11-4', label: 'G11-4 收益率分析' },
   { code: 'G11-5', label: 'G11-5 凭证检查' },
+  { code: '附注上市', label: '附注披露（上市公司）' },
+  { code: '附注国企', label: '附注披露（国企）' },
 ]
 
 export function resolveG11ImportableSheet(sheetName: string): G11ImportableSheet | null {
+  if (/附注/.test(sheetName || '')) {
+    return /国企|国有/.test(sheetName) ? '附注国企' : '附注上市'
+  }
   const m = (sheetName || '').match(/G11-(\d+)/)
   if (!m) return null
   const code = `G11-${m[1]}` as G11ImportableSheet

@@ -1,67 +1,146 @@
 <template>
-  <div class="h8-tab-disclosure-soe">
-    <!-- 审计目标 -->
-    <el-alert type="info" :closable="false" show-icon class="objective-alert"
-      title="审计目标：确认使用权资产附注披露（国有企业）的租赁分类及变动明细完整、准确，符合 CAS21 及国资监管信息公开要求。" />
+  <div class="h8-disc-soe">
+    <el-alert type="info" :closable="false" show-icon class="objective">
+      审计目标：按国有企业附注格式编制使用权资产披露——原值/累计折旧/净值/减值/账面价值分类增减，与 H8-1/H8-2/H8-10 勾稽，并同步至附注「{{ noteSectionId }}」。
+    </el-alert>
 
-    <!-- 方法论上下文 -->
     <div class="methodology-context">
-      <p>附注披露（国企）：按国资委信息公开要求和CAS21准则，披露使用权资产明细及变动。国企版含更详细的租赁分类信息。32行255列。</p>
+      <p>
+        编制逻辑：横向 期初+增−减=期末；纵向 净值=原值−折旧、账面价值=净值−减值。
+        净值与账面价值层增减列不适用（——）。同步目标附注八、26。
+      </p>
     </div>
 
-    <!-- 索引 -->
-    <div class="h8-tab-toolbar">
-      <GtIndexChip value="wp:H8-disc-S" />
-    </div>
-
-    <!-- 披露摘要 -->
-    <el-card shadow="never" class="summary-card">
-      <template #header>
-        <div class="section-title">
-          <span>使用权资产附注披露（国企版，32行255列）</span>
-          <div class="title-actions">
-            <el-button size="small" type="primary" plain @click="$emit('open-ai', 'disclosure-soe')">AI 辅助</el-button>
-            <el-button size="small" @click="$emit('open-review', 'disclosure-soe')">复核</el-button>
-          </div>
-        </div>
-      </template>
-      <div class="disclosure-info">
-        <p>国企版含：详细租赁分类（房屋/设备/车辆/其他）× 变动明细（原值/折旧/减值）× 多期对比。数据量大建议使用OO编辑。</p>
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <strong>附注披露信息（国企）</strong>
+        <el-tag size="small" type="success" effect="plain">八、26 使用权资产</el-tag>
       </div>
-    </el-card>
+      <div class="toolbar-right">
+        <el-button size="small" :disabled="isReadonly" @click="handlePull">从审定/明细/减值取数</el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="isSyncing"
+          :disabled="isReadonly || !projectId"
+          data-testid="h8-disclosure-soe-sync"
+          @click="syncToNotes"
+        >
+          同步到附注
+        </el-button>
+        <el-button size="small" type="primary" plain @click="emit('open-ai', 'disclosure-soe')">AI 辅助</el-button>
+        <el-button size="small" @click="emit('open-review', 'disclosure-soe')">复核</el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:H8-1" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:H8-2" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:H8-10" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip :value="`Note:${noteSectionId}`" :context-project-id="projectId" /></span>
+      </div>
+    </div>
 
-    <!-- OO渲染区域 -->
-    <el-card shadow="never" class="oo-card">
-      <template #header>
-        <div class="section-title">
-          <span>附注格式（32行255列）</span>
-          <el-tag type="info" size="small">OnlyOffice 渲染</el-tag>
-        </div>
-      </template>
-      <div class="oo-placeholder">
-        <GtOnlyOfficeSheet
-          v-if="wpId && showOO"
-          :wp-id="wpId"
-          :sheet-name="'附注披露信息（国企）'"
-          :project-id="projectId"
-          :readonly="isReadonly"
+    <section v-for="block in layers" :key="block.layer" class="block">
+      <h3 class="block-title">{{ layerTitle(block.layer) }}</h3>
+      <el-table :data="blockRows(block)" border size="small" class="wp-table">
+        <el-table-column label="项  目" min-width="200">
+          <template #default="{ row }">
+            <span :class="{ 'is-total': row.isTotal }">{{ row.label }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期初余额" width="130" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!row.isTotal && row.editable && !isReadonly"
+              :model-value="row.begin"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @update:model-value="(v: number | undefined) => updateCell(block.layer, row.key, 'begin', v ?? 0)"
+            />
+            <span v-else :class="{ 'formula-cell': row.isTotal || !row.editable }">{{ fmt(row.begin) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期增加" width="130" align="right">
+          <template #default="{ row }">
+            <span v-if="movementNa(block.layer)">——</span>
+            <el-input-number
+              v-else-if="!row.isTotal && row.editable && !isReadonly"
+              :model-value="row.increase"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @update:model-value="(v: number | undefined) => updateCell(block.layer, row.key, 'increase', v ?? 0)"
+            />
+            <span v-else :class="{ 'formula-cell': row.isTotal }">{{ fmt(row.increase) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期减少" width="130" align="right">
+          <template #default="{ row }">
+            <span v-if="movementNa(block.layer)">——</span>
+            <el-input-number
+              v-else-if="!row.isTotal && row.editable && !isReadonly"
+              :model-value="row.decrease"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @update:model-value="(v: number | undefined) => updateCell(block.layer, row.key, 'decrease', v ?? 0)"
+            />
+            <span v-else :class="{ 'formula-cell': row.isTotal }">{{ fmt(row.decrease) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末余额" width="130" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell">{{ fmt(row.end) }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </section>
+
+    <section class="block guidance-block">
+      <h4 class="sub-title">披露提示</h4>
+      <el-alert type="info" :closable="false" class="guide-alert">{{ H8_SOE_GUIDANCE.impairment }}</el-alert>
+      <div class="note-field">
+        <label>减值测试披露说明</label>
+        <el-input
+          v-model="noteImpairment"
+          type="textarea"
+          :autosize="{ minRows: 3, maxRows: 8 }"
+          :disabled="isReadonly"
+          :placeholder="H8_SOE_GUIDANCE.impairment"
+          @change="persist"
         />
-        <div v-else class="oo-fallback">
-          <el-empty description="OnlyOffice未加载">
-            <template #image><span style="font-size:40px">📋</span></template>
-          </el-empty>
-        </div>
       </div>
+    </section>
+
+    <el-card shadow="never" class="audit-card">
+      <template #header><span class="card-title">审计说明</span></template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 4 }"
+        :disabled="isReadonly"
+        placeholder="说明分类口径、取数来源及与附注勾稽…"
+        @change="persist"
+      />
+    </el-card>
+    <el-card shadow="never" class="audit-card">
+      <template #header><span class="card-title">审计结论</span></template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 2 }"
+        :disabled="isReadonly"
+        placeholder="本表披露是否恰当、完整…"
+        @change="persist"
+      />
     </el-card>
 
-    <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>国企版附注需分类更细（房屋/设备/车辆/其他各自列示）</li>
-        <li>含多期对比数据（当期/上期）</li>
-        <li>255列宽表建议直接在OO中操作</li>
-        <li>数据应与H8-1审定表保持一致</li>
+        <li>减值层优先取 H8-10（⑦已提→期初，⑧补提→本期增加），覆盖明细上的减值字段</li>
+        <li>净值/账面价值层增减列固定为「——」，由原值−折旧、净值−减值自动推导</li>
+        <li>「同步到附注」写入「{{ noteSectionId }}」子表「使用权资产」</li>
+        <li>分类：土地 / 房屋建筑物 / 机器运输办公设备 / 其他（对齐源模板）</li>
       </ul>
     </details>
   </div>
@@ -69,22 +148,32 @@
 
 <script setup lang="ts">
 /**
- * H8TabDisclosureSoe.vue — 附注披露（国企）
- * 32行255列，OO渲染wrapper（宽表）
- * Spec: Task 4.10 | Requirements: 1.2
+ * H8TabDisclosureSoe — 使用权资产附注披露（国企）
  */
-import { ref, defineAsyncComponent } from 'vue'
+import { ref, toRef } from 'vue'
+import { ElMessage } from 'element-plus'
+import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
 import GtIndexChip from '../../GtIndexChip.vue'
-
-const GtOnlyOfficeSheet = defineAsyncComponent(() =>
-  import('../../GtOnlyOfficeSheet.vue').catch(() => ({ template: '<div>OO不可用</div>' })),
-)
+import { useH8SoeDisclosure } from '../../composables/useH8Disclosure'
+import {
+  H8_SOE_CATEGORIES,
+  H8_SOE_GUIDANCE,
+  H8_SOE_LAYER_META,
+  layerTotal,
+  resolveCategoryEnd,
+  type H8SoeLayer,
+  type H8SoeLayerBlock,
+} from '../../composables/h8SoeDisclosureModel'
+import { buildH8SoeSyncPayloads } from '../../composables/h8DisclosureSyncPayload'
+import { H8_NOTE_SECTION } from '../../composables/h8NoteSectionMap'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -93,34 +182,138 @@ const emit = defineEmits<{
   (e: 'open-review', section: string): void
 }>()
 
-const showOO = ref(true)
+const noteSectionId = H8_NOTE_SECTION.soe
+const isSyncing = ref(false)
 
+const {
+  layers,
+  noteImpairment,
+  auditNote,
+  auditConclusion,
+  persist,
+  updateCell,
+  pullFromSources,
+} = useH8SoeDisclosure({
+  allResponses: toRef(props, 'allResponses'),
+  onSave: (id, v) => emit('save', id, v),
+})
+
+function fmt(n: number): string {
+  return (Number(n) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function layerTitle(layer: H8SoeLayer) {
+  return H8_SOE_LAYER_META[layer].title
+}
+function movementNa(layer: H8SoeLayer) {
+  return H8_SOE_LAYER_META[layer].movementNa
+}
+
+function blockRows(block: H8SoeLayerBlock) {
+  const meta = H8_SOE_LAYER_META[block.layer]
+  const tot = layerTotal(block)
+  const derived = meta.movementNa || block.layer === 'cost' || block.layer === 'dep' || block.layer === 'impair'
+  const editable = !meta.movementNa
+  const rows = [
+    {
+      key: '__total__',
+      label: meta.title,
+      isTotal: true,
+      editable: false,
+      begin: tot.begin,
+      increase: tot.increase,
+      decrease: tot.decrease,
+      end: tot.end,
+    },
+    ...H8_SOE_CATEGORIES.map((c) => {
+      const m = block.categories.find((x) => x.key === c.key)
+      return {
+        key: c.key,
+        label: c.label,
+        isTotal: false,
+        editable,
+        begin: m?.begin ?? 0,
+        increase: m?.increase ?? 0,
+        decrease: m?.decrease ?? 0,
+        end: m ? resolveCategoryEnd(m, meta.movementNa) : 0,
+      }
+    }),
+  ]
+  void derived
+  return rows
+}
+
+function handlePull() {
+  ElMessage.success(pullFromSources().message)
+}
+
+async function syncToNotes() {
+  if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return
+  persist()
+  const payloads = buildH8SoeSyncPayloads(props.wpId, props.applicableStandards || [], {
+    layers: layers.value,
+    noteImpairment: noteImpairment.value,
+  })
+  if (!payloads.length) {
+    ElMessage.warning('当前不适用国企附注同步')
+    return
+  }
+  isSyncing.value = true
+  try {
+    let rows = 0
+    for (const payload of payloads) {
+      const result: any = await api.post(
+        `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+        payload,
+      )
+      const data = result?.data ?? result
+      rows += Number(data?.rows_synced ?? 0)
+    }
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      projectId: props.projectId,
+      sectionIds: [noteSectionId],
+      wpId: props.wpId,
+      sheet: payloads[0].sheet_name,
+    })
+    ElMessage.success(`已同步 ${rows} 行到附注「${noteSectionId}」`)
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
 </script>
 
 <style scoped>
-.h8-tab-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
-
-.objective-alert { margin-bottom: 12px; }
-.card-title { font-weight: 600; }
-
-.h8-tab-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-
+.h8-disc-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.objective { margin-bottom: 12px; }
 .methodology-context {
   background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
-  border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #92400e;
+  border-radius: 0 6px 6px 0; margin-bottom: 14px; font-size: 12px; color: #92400e;
 }
-
-.section-title { display: flex; align-items: center; justify-content: space-between; }
-.title-actions { display: flex; gap: 6px; }
-
-.summary-card { margin-bottom: 16px; }
-.disclosure-info { font-size: 12px; color: var(--el-text-color-secondary); }
-
-.oo-card { margin-bottom: 16px; }
-.oo-placeholder { min-height: 500px; }
-.oo-fallback { padding: 40px 0; }
-
-.compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
-.compile-hint summary { cursor: pointer; font-weight: 500; }
-.compile-hint ul { padding-left: 20px; margin-top: 8px; }
+.methodology-context p { margin: 0; }
+.toolbar {
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 14px;
+}
+.toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.chip-wrap { display: inline-flex; }
+.block { margin-bottom: 18px; }
+.block-title { margin: 0 0 8px; font-size: 14px; }
+.sub-title { margin: 0 0 8px; font-size: 14px; }
+.is-total { font-weight: 700; }
+.formula-cell {
+  border-bottom: 1px dashed #909399; font-variant-numeric: tabular-nums;
+  background: #fafafa; display: inline-block; min-width: 100%; text-align: right;
+}
+.guidance-block { background: #f8fafc; border-radius: 8px; padding: 12px; border: 1px solid #ebeef5; }
+.guide-alert { margin-bottom: 8px; }
+.note-field { margin: 8px 0 0; }
+.note-field label { display: block; font-size: 12px; color: #606266; margin-bottom: 4px; font-weight: 500; }
+.audit-card { margin-bottom: 12px; }
+.card-title { font-weight: 600; }
+.compile-hint {
+  margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff;
+  border-radius: 4px; padding: 8px 12px; font-size: 12px; color: #606266;
+}
+.compile-hint summary { cursor: pointer; color: #409eff; margin-bottom: 6px; }
 </style>

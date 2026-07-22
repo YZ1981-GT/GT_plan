@@ -22,7 +22,7 @@ const props = withDefaults(defineProps<{
 
   accountCode: string
 
-  cycle: 'g8' | 'g9' | 'g12' | 'g13' | 'g14'
+  cycle: 'g8' | 'g9' | 'g11' | 'g12' | 'g13' | 'g14'
 
   isReadonly?: boolean
 
@@ -52,11 +52,13 @@ const auditYear = computed(() => props.year ?? new Date().getFullYear())
 
 
 
-const defaultFillHint: Record<'g8' | 'g9' | 'g12' | 'g13' | 'g14', string> = {
+const defaultFillHint: Record<'g8' | 'g9' | 'g11' | 'g12' | 'g13' | 'g14', string> = {
 
   g8: '样本将回填至 G8-3 调整分录与 G8-6 凭证检查表',
 
   g9: '样本将回填至 G9-3 调整分录与 G9-6 凭证检查表',
+
+  g11: '样本将回填至 G11-5 投资收益凭证检查表',
 
   g12: '样本将回填至 G12-6 凭证检查表',
 

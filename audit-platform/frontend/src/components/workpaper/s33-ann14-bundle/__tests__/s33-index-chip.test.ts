@@ -11,26 +11,31 @@
  * 4. GtAProgramLinkedChips 正确传递 :value="ref" 给 GtIndexChip
  */
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { BUNDLE_SHEET_ALIASES } from '../../bundleSheetAliases'
 import { S33_WP_CODES } from '../S33_TAB_CONFIG'
+
+const gtIndexChipSource = readFileSync(
+  resolve(__dirname, '../../GtIndexChip.vue'),
+  'utf-8',
+)
+const linkedChipsSource = readFileSync(
+  resolve(__dirname, '../../GtAProgramLinkedChips.vue'),
+  'utf-8',
+)
 
 describe('Task 5.1: 索引列 GtIndexChip（prop `value`）+ 灰态兜底', () => {
   // ─── Req 6.1: GtIndexChip prop 名为 value ───
   describe('Req 6.1: GtIndexChip prop 名为 value', () => {
-    it('GtIndexChip 组件 props 接口包含 value（静态验证）', async () => {
-      // 验证 GtIndexChip 导出的组件存在 value prop
-      const mod = await import('../../GtIndexChip.vue')
-      const component = mod.default
-      expect(component).toBeDefined()
-      // Vue SFC 编译后 props 定义在 __props 或 props 中
-      // 直接验证组件导入成功即可，prop 名由 TypeScript 类型系统保证
+    it('GtIndexChip 组件 props 接口包含 value（静态验证）', () => {
+      expect(gtIndexChipSource).toContain('value?: string')
+      expect(gtIndexChipSource).toContain('contextProjectId?: string')
     })
 
-    it('GtAProgramLinkedChips 中 GtIndexChip 使用 :value="..." 绑定', async () => {
-      // 静态验证：GtAProgramLinkedChips 源码引用了 GtIndexChip 并使用 value prop
-      // 此测试通过编译时保证——如果 prop 名错误 TypeScript 会报错
-      const mod = await import('../../GtAProgramLinkedChips.vue')
-      expect(mod.default).toBeDefined()
+    it('GtAProgramLinkedChips 中 GtIndexChip 使用 :value="..." 绑定', () => {
+      expect(linkedChipsSource).toContain('GtIndexChip')
+      expect(linkedChipsSource).toMatch(/:value=/)
     })
   })
 

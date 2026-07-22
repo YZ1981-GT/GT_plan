@@ -159,6 +159,11 @@ export const FH_CYCLE_PROCEDURE_SHEETS: Record<string, CycleProcedureSheetConfig
     sheetLabel: '营业成本实质性程序表F5A',
     reviewSectionId: 'F5A-procedure',
   },
+  H1A: {
+    sheetCode: 'H1A',
+    sheetLabel: '固定资产审计程序表H1A',
+    reviewSectionId: 'H1A-procedure',
+  },
   H10A: {
     sheetCode: 'H10A',
     sheetLabel: '资产处置损益实质性程序表H10A',

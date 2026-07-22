@@ -45,7 +45,7 @@ async def test_g10_render_dispatch_registered():
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("sheet", ["G10-2", "G10-3", "G10-5", "G10-6", "G10-7"])
+@pytest.mark.parametrize("sheet", ["G10-1", "G10-2", "G10-3", "G10-5", "G10-6", "G10-7"])
 async def test_g10_export_template_all_sheets(sheet: str):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -54,8 +54,28 @@ async def test_g10_export_template_all_sheets(sheet: str):
 
 
 @pytest.mark.asyncio
-async def test_g10_specs_cover_five_sheets():
-    assert set(_G10_SPECS.keys()) == {"G10-2", "G10-3", "G10-5", "G10-6", "G10-7"}
+async def test_g10_specs_cover_eight_sheets():
+    assert set(_G10_SPECS.keys()) == {
+        "G10-1", "G10-2", "G10-3", "G10-5", "G10-6", "G10-7", "附注上市", "附注国企",
+    }
+
+
+@pytest.mark.asyncio
+async def test_g10_1_template_prefill_has_24_rows():
+    spec = _G10_SPECS["G10-1"]
+    prefill = spec["template_prefill"]
+    assert len(prefill) == 24
+    assert prefill[0][0] == "init_trading_liability"
+    assert prefill[-1][0] == "book_other_designated"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("sheet", ["附注上市", "附注国企"])
+async def test_g10_export_disclosure_template(sheet: str):
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(f"/api/workpapers/test-wp/g10/export-template?sheet={sheet}")
+    assert resp.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -114,6 +134,14 @@ async def test_g10_validate_formulas_mismatch():
     data = body.get("data", body)
     assert data["ok"] is False
     assert len(data["errors"]) >= 1
+
+
+@pytest.mark.asyncio
+async def test_g10_g106_spec_includes_reported_closing():
+    spec = _G10_SPECS["G10-6"]
+    assert "reportedClosing" in spec["field_keys"]
+    assert "企业报告期末" in spec["headers"]
+    assert spec.get("header_aliases", {}).get("企业报告期末")
 
 
 @pytest.mark.asyncio

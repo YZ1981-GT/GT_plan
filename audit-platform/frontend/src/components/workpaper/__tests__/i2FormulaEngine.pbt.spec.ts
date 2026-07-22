@@ -14,6 +14,8 @@ import {
   calcImpairmentValid,
   calcDateDiffDays,
   isCrossPeriod,
+  isCutoffPeriodCrossing,
+  calcCrossPeriodAmount,
   calcTransferConsistency,
 } from '../composables/useI2FormulaEngine'
 import {
@@ -80,12 +82,11 @@ describe('I2 FormulaEngine PBT', () => {
 
   /**
    * Property P4: CAS6五条件逻辑正确性
-   * **Validates: Requirements 5.1**
+   * **Validates: Requirements 5.1 / CAS6「同时满足」**
    * - 全yes → isMet=true
-   * - 任一no → isMet=false
-   * - na不影响判断结果
+   * - 任一非yes（含 no / na / 空）→ isMet=false
    */
-  it('P4: CAS6五条件 — 全yes满足/任一no不满足/na不影响', () => {
+  it('P4: CAS6五条件 — 须五条件同时为yes方可资本化', () => {
     const conditionResult = fc.constantFrom('yes' as const, 'no' as const, 'na' as const)
 
     fc.assert(
@@ -95,26 +96,21 @@ describe('I2 FormulaEngine PBT', () => {
           const conditions: CAS6Condition[] = [
             { id: 1, name: '技术可行性', result: r1, evidence: '' },
             { id: 2, name: '完成意图', result: r2, evidence: '' },
-            { id: 3, name: '使用或出售能力', result: r3, evidence: '' },
-            { id: 4, name: '未来经济利益', result: r4, evidence: '' },
-            { id: 5, name: '资源充足', result: r5, evidence: '' },
+            { id: 3, name: '经济利益方式', result: r3, evidence: '' },
+            { id: 4, name: '资源支持', result: r4, evidence: '' },
+            { id: 5, name: '可靠计量', result: r5, evidence: '' },
           ]
 
           const result = evaluateCapitalization(conditions)
           const results = [r1, r2, r3, r4, r5]
-          const hasNo = results.some(r => r === 'no')
-          const hasYes = results.some(r => r === 'yes')
-          const allNa = results.every(r => r === 'na')
+          const allYes = results.every(r => r === 'yes')
 
-          if (hasNo) {
-            // 任一no → 不满足
-            expect(result.isMet).toBe(false)
-          } else if (allNa) {
-            // 全na → 不满足（无正面证据）
-            expect(result.isMet).toBe(false)
-          } else if (hasYes && !hasNo) {
-            // 有yes无no → 满足
+          if (allYes) {
             expect(result.isMet).toBe(true)
+            expect(result.missingConditions).toEqual([])
+          } else {
+            expect(result.isMet).toBe(false)
+            expect(result.missingConditions.length).toBeGreaterThan(0)
           }
         }
       )
@@ -230,14 +226,15 @@ describe('I2 FormulaEngine PBT', () => {
    * **Validates: Requirements 7.3**
    * |recordDate - documentDate| ≤ threshold → 不跨期
    */
-  it('P9: 日期差≤阈值 → 不跨期', () => {
+  it('P9: 日期差≤阈值 → 不跨期（滞后天数异常）', () => {
     fc.assert(
       fc.property(
-        fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') }),
+        // noInvalidDate：避免 Invalid Date(NaN) 导致 diff 为 NaN
+        fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31'), noInvalidDate: true }),
         fc.integer({ min: 0, max: 30 }),
         fc.integer({ min: 1, max: 30 }),
         (baseDate, offsetDays, threshold) => {
-          // documentDate = baseDate ± offsetDays
+          if (Number.isNaN(baseDate.getTime())) return
           const documentDate = new Date(baseDate.getTime() + offsetDays * 86400000)
           const diffDays = calcDateDiffDays(baseDate, documentDate)
 
@@ -251,6 +248,39 @@ describe('I2 FormulaEngine PBT', () => {
         }
       )
     )
+  })
+
+  /**
+   * Property P9b: 会计跨期 = 单据日与记账日分处截止日两侧
+   */
+  it('P9b: 相对截止日两侧 → 会计跨期；同侧 → 不跨期', () => {
+    const cutoff = new Date('2025-12-31T00:00:00')
+    // 单据≤截止、记账>截止 → 跨期漏记
+    expect(isCutoffPeriodCrossing(
+      new Date('2025-12-28T00:00:00'),
+      new Date('2026-01-05T00:00:00'),
+      cutoff,
+    )).toBe(true)
+    // 单据>截止、记账≤截止 → 跨期多记
+    expect(isCutoffPeriodCrossing(
+      new Date('2026-01-03T00:00:00'),
+      new Date('2025-12-30T00:00:00'),
+      cutoff,
+    )).toBe(true)
+    // 两侧均在截止前 → 不跨期
+    expect(isCutoffPeriodCrossing(
+      new Date('2025-12-20T00:00:00'),
+      new Date('2025-12-25T00:00:00'),
+      cutoff,
+    )).toBe(false)
+    // 两侧均在截止后 → 不跨期
+    expect(isCutoffPeriodCrossing(
+      new Date('2026-01-02T00:00:00'),
+      new Date('2026-01-08T00:00:00'),
+      cutoff,
+    )).toBe(false)
+    expect(calcCrossPeriodAmount(true, 12345.67)).toBeCloseTo(12345.67, 5)
+    expect(calcCrossPeriodAmount(false, 12345.67)).toBe(0)
   })
 
   /**

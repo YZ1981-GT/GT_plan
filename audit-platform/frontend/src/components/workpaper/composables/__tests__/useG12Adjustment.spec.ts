@@ -13,14 +13,14 @@ describe('useG12Adjustment.syncToAdjudication', () => {
     })
     adj.rows.value = [
       {
-        rowId: 'r1', entryType: 'AJE', date: '', summary: 'test',
-        accountCode: '6103', accountName: '净敞口套期', debitAmount: 100, creditAmount: 0,
-        preparedBy: '', remark: '',
+        rowId: 'r1', seq: 1, adjustmentDesc: 'test', category: 'account',
+        fsItem: '净敞口套期收益', accountCode: '6103', accountName: '净敞口套期收益',
+        noteItem: '净敞口套期收益', debitAmount: 100, creditAmount: 0, indexRef: '', remark: '',
       },
       {
-        rowId: 'r2', entryType: 'AJE', date: '', summary: 'offset',
-        accountCode: '2203', accountName: '应付', debitAmount: 0, creditAmount: 100,
-        preparedBy: '', remark: '',
+        rowId: 'r2', seq: 2, adjustmentDesc: 'offset', category: 'account',
+        fsItem: '未分配利润', accountCode: '4104', accountName: '利润分配',
+        noteItem: '', debitAmount: 0, creditAmount: 100, indexRef: '', remark: '',
       },
     ]
     adj.syncToAdjudication()
@@ -38,11 +38,29 @@ describe('useG12Adjustment.syncToAdjudication', () => {
       debouncedSave: (id) => { saves.push({ id }) },
     })
     adj.rows.value = [{
-      rowId: 'r1', entryType: 'AJE', date: '', summary: '',
-      accountCode: '6103', accountName: '', debitAmount: 100, creditAmount: 50,
-      preparedBy: '', remark: '',
+      rowId: 'r1', seq: 1, adjustmentDesc: '', category: 'account',
+      fsItem: '', accountCode: '6103', accountName: '', noteItem: '',
+      debitAmount: 100, creditAmount: 50, indexRef: '', remark: '',
     }]
     adj.syncToAdjudication()
     expect(saves.some((s) => s.id === G12_AJE_ADJ_OVERLAY_ID)).toBe(false)
+  })
+
+  it('migrates legacy AJE rows with summary field', () => {
+    const allResponses = ref(new Map([
+      ['G12-aje-rows', {
+        remark: JSON.stringify([{
+          rowId: 'legacy', entryType: 'AJE', summary: '旧格式', accountCode: '6103',
+          debitAmount: 50, creditAmount: 0,
+        }]),
+      }],
+    ]))
+    const adj = useG12Adjustment({
+      allResponses,
+      isReadonly: ref(false),
+      debouncedSave: vi.fn(),
+    })
+    expect(adj.rows.value[0].adjustmentDesc).toBe('旧格式')
+    expect(adj.rows.value[0].category).toBe('account')
   })
 })

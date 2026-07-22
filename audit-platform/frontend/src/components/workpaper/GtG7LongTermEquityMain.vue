@@ -93,10 +93,8 @@
           <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         </div>
         <G7TabDirectory
-          :html-data="resolvedHtmlData"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :is-readonly="isReadonly"
+          :all-responses="g7AllResponses"
+          :available-sheets="availableSheets"
         />
         <GCycleBIndexExtras
           :wp-id="props.wpId"
@@ -261,12 +259,19 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 provide('g7VersionTrailRef', versionTrailRef)
 provide('g7OpenVersionHistory', openVersionHistory)
 
+/** 目录页跳转：G7TabDirectory inject('jumpToSection') → emit('navigate-sheet') → GtWpRenderer */
+const emit = defineEmits<{ 'navigate-sheet': [sheetName: string] }>()
+provide('jumpToSection', (sheetName: string) => emit('navigate-sheet', sheetName))
+
 const formData = useG7FormData({
   wpId: wpIdRef,
   projectId: projectIdRef,
   onAfterSave: () => scheduleAutoSnapshot(),
 })
 // openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一提供，子组件 inject 命中祖先
+
+/** G7 allResponses Map 供目录页进度/结论看板使用 */
+const g7AllResponses = computed(() => formData.data.value)
 
 // ─── 双模式切换 (HTML ↔ OnlyOffice) ─────────────────────────────────────────
 const dualMode = useG7DualMode({

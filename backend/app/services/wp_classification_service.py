@@ -237,6 +237,11 @@ from app.services.wp_code_override_loader import load_wp_code_overrides
 
 _WP_CODE_OVERRIDE: dict[str, str] = load_wp_code_overrides()
 
+
+def refresh_wp_code_overrides() -> dict[str, str]:
+    """触发 mtime 热重载（原地更新 _WP_CODE_OVERRIDE 指向的 dict）。"""
+    return load_wp_code_overrides()
+
 # ─── sheet 名级专用路由（优先于 class_code 派生） ────────────────────────────
 # 坏账准备明细表（D2-3 等）的 class_code 是共享的 "F-明细表"，无法靠 class_code
 # 区分。但坏账准备明细表是两层嵌套结构专用底稿（计提类别父行 → 明细子行 → 合计），

@@ -8,7 +8,9 @@ import { describe, it, expect } from 'vitest'
 import {
   calcStraightLineAmort,
   calcRemainingLifeAmort,
+  calcRemainingLifeAmortTest,
   calcAmortWithImpairment,
+  calcAmortWithImpairmentTest,
   calcDcfPresentValue,
   calcTerminalValue,
   calcRecoverableAmount,
@@ -70,6 +72,99 @@ describe('useI1AmortizationEngine', () => {
     })
   })
 
+  // ─── calcRemainingLifeAmortTest（I1-10 源表对齐）──────────────────────────
+
+  describe('calcRemainingLifeAmortTest', () => {
+    it('期初前已投入使用：本期月数=12 且不超过剩余月数（改进源表L）', () => {
+      // 2015-01 起、10年寿命 → 至 2025-01 已用 120 月，剩余 0
+      // 改用 2020-01 起、10年：至 2025-01 已用 60，剩余 60；本期 12
+      const r = calcRemainingLifeAmortTest({
+        cost: 120000,
+        accAmortBegin: 60000,
+        usefulLifeYears: 10,
+        startDate: '2020-01-01',
+        periodBegin: '2025-01-01',
+        periodEnd: '2025-12-31',
+        bookPeriodAmort: 12000,
+        bookAccAmortEnd: 72000,
+      })
+      expect(r.lifeMonths).toBe(120)
+      expect(r.monthsElapsedAtBegin).toBe(60)
+      expect(r.remainingMonths).toBe(60)
+      expect(r.beginNbv).toBe(60000)
+      expect(r.monthlyAmort).toBe(1000)
+      expect(r.periodMonths).toBe(12)
+      expect(r.periodAmortization).toBe(12000)
+      expect(r.periodDiff).toBe(0)
+      expect(r.calcAccAmort).toBe(72000)
+      expect(r.accAmortDiff).toBe(0)
+    })
+
+    it('源表L若用DATEDIF(开始,截止)+1会对老资产虚增；本实现不虚增', () => {
+      const r = calcRemainingLifeAmortTest({
+        cost: 60000,
+        accAmortBegin: 12000,
+        usefulLifeYears: 5,
+        startDate: '2020-01-01',
+        periodBegin: '2022-01-01',
+        periodEnd: '2022-12-31',
+        bookPeriodAmort: 12000,
+      })
+      // 源表L = DATEDIF(2020-01,2022-12)+1 = 36，会虚增；本表本期月数应为 12
+      expect(r.periodMonths).toBe(12)
+      expect(r.remainingMonths).toBe(36) // 60 - 24
+      expect(r.monthlyAmort).toBeCloseTo(48000 / 36, 4)
+      expect(r.periodAmortization).toBeCloseTo((48000 / 36) * 12, 2)
+      expect(r.periodDiff).toBeCloseTo((48000 / 36) * 12 - 12000, 2)
+    })
+
+    it('本年新购入：本期月数自开始日至截止日', () => {
+      const r = calcRemainingLifeAmortTest({
+        cost: 36000,
+        accAmortBegin: 0,
+        usefulLifeYears: 3,
+        startDate: '2025-07-01',
+        periodBegin: '2025-01-01',
+        periodEnd: '2025-12-31',
+      })
+      expect(r.monthsElapsedAtBegin).toBe(0) // 开始晚于期初 → 夹紧为 0
+      expect(r.remainingMonths).toBe(36)
+      expect(r.periodMonths).toBe(6) // 7~12月
+      expect(r.monthlyAmort).toBe(1000)
+      expect(r.periodAmortization).toBe(6000)
+    })
+
+    it('剩余月数不足一年时本期月数封顶为剩余月数', () => {
+      const r = calcRemainingLifeAmortTest({
+        cost: 10000,
+        accAmortBegin: 9000,
+        usefulLifeYears: 5,
+        startDate: '2021-01-01',
+        periodBegin: '2025-07-01',
+        periodEnd: '2025-12-31',
+      })
+      // 已用 (2025-07 - 2021-01)=54 月，寿命60，剩余6；期间内最多6月
+      expect(r.remainingMonths).toBe(6)
+      expect(r.periodMonths).toBe(6)
+      expect(r.monthlyAmort).toBeCloseTo(1000 / 6, 4)
+    })
+
+    it('无开始日期时默认本期12月（手工剩余寿命场景）', () => {
+      const r = calcRemainingLifeAmortTest({
+        cost: 24000,
+        accAmortBegin: 0,
+        usefulLifeYears: 2,
+        periodBegin: '2025-01-01',
+        periodEnd: '2025-12-31',
+        bookPeriodAmort: 12000,
+      })
+      expect(r.remainingMonths).toBe(24)
+      expect(r.periodMonths).toBe(12)
+      expect(r.monthlyAmort).toBe(1000)
+      expect(r.periodAmortization).toBe(12000)
+    })
+  })
+
   // ─── calcAmortWithImpairment ────────────────────────────────────────────────
 
   describe('calcAmortWithImpairment', () => {
@@ -95,6 +190,79 @@ describe('useI1AmortizationEngine', () => {
     it('全部已摊销完（基数=0）', () => {
       // (100000 - 0 - 80000 - 20000) / 12 = 0
       expect(calcAmortWithImpairment(100000, 0, 80000, 20000, 12)).toBe(0)
+    })
+  })
+
+  // ─── calcAmortWithImpairmentTest（I1-11 源表对齐）──────────────────────────
+
+  describe('calcAmortWithImpairmentTest', () => {
+    it('本期跨减值日：分段月数与费用 = Q×O + S×P', () => {
+      const r = calcAmortWithImpairmentTest({
+        cost: 120000,
+        salvage: 0,
+        usefulLifeYears: 10,
+        startDate: '2018-01-01',
+        periodBegin: '2022-01-01',
+        periodEnd: '2022-12-31',
+        impairmentDate: '2022-07-01',
+        impairmentAmount: 12000,
+        bookMonthly: 900,
+        bookAccAmortEnd: 60000,
+      })
+      // life=120月；Q=120000/120=1000
+      expect(r.lifeMonths).toBe(120)
+      expect(r.preMonthly).toBe(1000)
+      expect(r.periodMonths).toBe(12)
+      expect(r.monthsBeforeImpairment + r.monthsAfterImpairment).toBe(r.periodMonths)
+      expect(r.periodAmortization).toBeCloseTo(
+        r.preMonthly * r.monthsBeforeImpairment + r.postMonthly * r.monthsAfterImpairment,
+        2,
+      )
+      expect(r.postMonthly).toBeLessThan(r.preMonthly)
+      expect(r.monthlyDiff).toBeCloseTo(900 - r.postMonthly, 2)
+    })
+
+    it('减值日早于本期初 → 本期全为减值后月数', () => {
+      const r = calcAmortWithImpairmentTest({
+        cost: 60000,
+        usefulLifeYears: 5,
+        startDate: '2020-01-01',
+        periodBegin: '2022-01-01',
+        periodEnd: '2022-12-31',
+        impairmentDate: '2021-06-01',
+        impairmentAmount: 6000,
+      })
+      expect(r.monthsBeforeImpairment).toBe(0)
+      expect(r.monthsAfterImpairment).toBe(r.periodMonths)
+      expect(r.periodAmortization).toBeCloseTo(r.postMonthly * r.periodMonths, 2)
+    })
+
+    it('无减值金额 → 全期按减值前率', () => {
+      const r = calcAmortWithImpairmentTest({
+        cost: 120000,
+        usefulLifeYears: 10,
+        startDate: '2020-01-01',
+        periodBegin: '2022-01-01',
+        periodEnd: '2022-12-31',
+        impairmentDate: '2022-06-01',
+        impairmentAmount: 0,
+      })
+      expect(r.monthsAfterImpairment).toBe(0)
+      expect(r.monthsBeforeImpairment).toBe(r.periodMonths)
+      expect(r.preMonthly).toBe(1000)
+      expect(r.periodAmortization).toBeCloseTo(1000 * r.periodMonths, 2)
+    })
+
+    it('「10年」文本寿命可解析', () => {
+      const r = calcAmortWithImpairmentTest({
+        cost: 120000,
+        usefulLifeYears: '10年',
+        startDate: '2020-01-01',
+        periodBegin: '2022-01-01',
+        periodEnd: '2022-12-31',
+      })
+      expect(r.lifeMonths).toBe(120)
+      expect(r.preMonthly).toBe(1000)
     })
   })
 

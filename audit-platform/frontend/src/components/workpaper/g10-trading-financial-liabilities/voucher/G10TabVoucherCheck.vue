@@ -5,24 +5,223 @@
       <div class="head-actions">
         <GtVoucherSamplingEngine :project-id="projectId" :account-codes="[G10_ACCOUNT_CODE]" dialog-mode @filled="onSampleFilled" />
         <G10ImportExportDropdown :wp-id="wpId" sheet="G10-7" @imported="onImported" />
+        <el-button size="small" :disabled="isReadonly" data-testid="g10-export-memo" @click="exportMemo">
+          📄 抽样备忘
+        </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="warning"
+          plain
+          :disabled="vc.quantitativeAbnormalCount.value <= 0"
+          data-testid="g10-vc-push-adj"
+          @click="onPushAbnormal"
+        >
+          推送异常→G10-3
+          <template v-if="vc.quantitativeAbnormalCount.value">（{{ vc.quantitativeAbnormalCount.value }}）</template>
+        </el-button>
+        <span class="chip-wrap"><GtIndexChip value="wp:G10-3" /></span>
+        <el-button
+          v-if="!isReadonly && projectId"
+          size="small"
+          type="success"
+          plain
+          :loading="vc.procedureMarking.value"
+          :disabled="!vc.rows.value.length"
+          data-testid="g10-vc-mark-procedure"
+          @click="onMarkProcedure"
+        >
+          {{ vc.procedureMarked.value ? '已回填 G10A（可重写）' : '回填 G10A 凭证程序' }}
+        </el-button>
         <GtReviewTrigger section-id="G10-7-voucher" />
         <el-button size="small" type="primary" plain :disabled="isReadonly" @click="vc.addRow()">+ 新增</el-button>
       </div>
     </div>
 
     <el-alert type="info" :closable="false" class="objective-alert"
-      title="审计目标：通过凭证抽查核实交易性金融负债相关业务的真实性、完整性与准确性，验证原始凭证完整、授权恰当、账务处理及公允价值计量正确。" />
+      title="审计目标：通过凭证抽查核实交易性金融负债相关业务的真实性、完整性与准确性，验证原始凭证完整、授权恰当、账务处理、初始成本、利息及公允价值计量正确。" />
+
+    <div class="sampling-params-card" data-testid="g10-vc-params">
+      <h4 class="card-title">样本选取（{{ activeScopeLabel }}）</h4>
+      <div class="params-grid">
+        <div class="param-item param-item-wide">
+          <span class="param-label">测试总体</span>
+          <el-input
+            :model-value="vc.activeScopeParams.value.testPopulation"
+            size="small"
+            :disabled="isReadonly"
+            placeholder="如：科目2101本期发生额共XX笔、金额XX"
+            @change="(v: string) => vc.updateScopeSampling(vc.activeScope.value, 'testPopulation', v)"
+          />
+        </div>
+        <div class="param-item param-item-wide">
+          <span class="param-label">特定样本</span>
+          <el-input
+            :model-value="vc.activeScopeParams.value.specificSamples"
+            size="small"
+            :disabled="isReadonly"
+            placeholder="大额/异常/关联方等必选样本说明"
+            @change="(v: string) => vc.updateScopeSampling(vc.activeScope.value, 'specificSamples', v)"
+          />
+        </div>
+        <div class="param-item">
+          <span class="param-label">抽样方法</span>
+          <el-select
+            :model-value="vc.activeScopeParams.value.samplingMethod"
+            size="small"
+            clearable
+            :disabled="isReadonly"
+            style="width:100%"
+            @change="(v: string) => vc.updateScopeSampling(vc.activeScope.value, 'samplingMethod', v ?? '')"
+          >
+            <el-option v-for="o in G10_SAMPLING_METHOD_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
+          </el-select>
+        </div>
+        <div class="param-item">
+          <span class="param-label">目标样本量</span>
+          <el-input-number
+            :model-value="vc.activeScopeParams.value.targetSampleSize"
+            size="small"
+            :min="0"
+            :controls="false"
+            :disabled="isReadonly"
+            style="width:100%"
+            @change="(v: number | undefined) => vc.updateScopeSampling(vc.activeScope.value, 'targetSampleSize', v ?? 0)"
+          />
+        </div>
+        <div class="param-item">
+          <span class="param-label">总体金额</span>
+          <el-input-number
+            :model-value="vc.activeScopeParams.value.populationAmount"
+            size="small"
+            :min="0"
+            :controls="false"
+            :disabled="isReadonly"
+            style="width:100%"
+            @change="(v: number | undefined) => vc.updateScopeSampling(vc.activeScope.value, 'populationAmount', v ?? 0)"
+          />
+        </div>
+        <div class="param-item">
+          <span class="param-label">账面价值</span>
+          <el-input-number
+            :model-value="vc.activeScopeParams.value.bookValue"
+            size="small"
+            :min="0"
+            :controls="false"
+            :disabled="isReadonly"
+            style="width:100%"
+            @change="(v: number | undefined) => vc.updateScopeSampling(vc.activeScope.value, 'bookValue', v ?? 0)"
+          />
+        </div>
+        <div class="param-item">
+          <span class="param-label">可容忍错报</span>
+          <el-input-number
+            :model-value="vc.activeScopeParams.value.tolerableMisstatement"
+            size="small"
+            :min="0"
+            :controls="false"
+            :disabled="isReadonly"
+            style="width:100%"
+            @change="(v: number | undefined) => vc.updateScopeSampling(vc.activeScope.value, 'tolerableMisstatement', v ?? 0)"
+          />
+        </div>
+        <div class="param-item">
+          <span class="param-label">预计错报</span>
+          <el-input-number
+            :model-value="vc.activeScopeParams.value.expectedMisstatement"
+            size="small"
+            :min="0"
+            :controls="false"
+            :disabled="isReadonly"
+            style="width:100%"
+            @change="(v: number | undefined) => vc.updateScopeSampling(vc.activeScope.value, 'expectedMisstatement', v ?? 0)"
+          />
+        </div>
+        <div class="param-item">
+          <span class="param-label">误受风险</span>
+          <el-select
+            :model-value="vc.activeScopeParams.value.riskOfIncorrectAcceptance"
+            size="small"
+            :disabled="isReadonly"
+            style="width:100%"
+            @change="(v: 1 | 5 | 10) => vc.updateScopeSampling(vc.activeScope.value, 'riskOfIncorrectAcceptance', v)"
+          >
+            <el-option :value="1" label="1%（扩展 1.9）" />
+            <el-option :value="5" label="5%（扩展 1.6）" />
+            <el-option :value="10" label="10%（扩展 1.5）" />
+          </el-select>
+        </div>
+        <div class="param-item">
+          <span class="param-label">风险系数</span>
+          <el-input-number
+            :model-value="vc.activeScopeParams.value.riskFactor"
+            size="small"
+            :min="0"
+            :step="0.1"
+            :controls="false"
+            :disabled="isReadonly"
+            style="width:100%"
+            @change="(v: number | undefined) => vc.updateScopeSampling(vc.activeScope.value, 'riskFactor', v ?? 1)"
+          />
+        </div>
+      </div>
+      <div class="sampling-calc-row">
+        <span v-if="vc.suggestedSampleSize.value != null">
+          公式样本量：<b>{{ vc.suggestedSampleSize.value }}</b>
+        </span>
+        <span v-else class="muted">填写账面价值与可容忍错报后可计算样本量</span>
+        <el-button
+          v-if="!isReadonly && vc.suggestedSampleSize.value"
+          size="small"
+          link
+          type="primary"
+          @click="onApplySuggested"
+        >采用公式样本量</el-button>
+        <span class="sep">|</span>
+        <span>进度 {{ vc.currentSampleSize.value }} / {{ vc.activeScopeParams.value.targetSampleSize || '—' }}</span>
+        <el-progress
+          :percentage="vc.progressPct.value"
+          :stroke-width="8"
+          style="flex:1;max-width:200px;margin-left:8px"
+        />
+      </div>
+      <div class="ratio-row" data-testid="g10-vc-ratio">
+        <span>已查金额 {{ fmt(vc.sampleAbsAmount.value) }}</span>
+        <span>
+          检查比例
+          <b>{{ vc.inspectionRatioPct.value == null ? '—' : `${vc.inspectionRatioPct.value.toFixed(1)}%` }}</b>
+        </span>
+      </div>
+      <el-alert
+        v-if="vc.lowInspectionRatio.value"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="ratio-alert"
+        title="检查比例低于 30%，请扩大样本量或在审计说明中解释原因。"
+      />
+    </div>
 
     <div class="tab-toolbar">
       <div class="toolbar-left"></div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:G10-7" /></span>
-        <el-tag size="small" type="info">共 {{ vc.rows.value.length }} 行</el-tag>
+        <el-tag size="small" type="info">当前 {{ vc.scopedRows.value.length }} 行</el-tag>
       </div>
     </div>
 
     <div class="summary-bar" :class="{ 'summary-error': !vc.isBalanced.value }">
-      借方 {{ fmt(vc.debitTotal.value) }} · 贷方 {{ fmt(vc.creditTotal.value) }} · 差额 {{ fmt(vc.balanceDiff.value) }} · 异常 {{ vc.abnormalCount.value }} 条
+      借方 {{ fmt(vc.debitTotal.value) }} · 贷方 {{ fmt(vc.creditTotal.value) }} · 差额 {{ fmt(vc.balanceDiff.value) }}
+      · 异常 {{ vc.abnormalCount.value }} 条
+      · 金额类异常 {{ vc.quantitativeAbnormalCount.value }}
+    </div>
+    <div class="scope-tabs">
+      <el-segmented
+        :model-value="vc.activeScope.value"
+        :options="scopeOptions"
+        size="small"
+        @update:model-value="(v: any) => vc.setPeriodScope(v)"
+      />
     </div>
     <div class="segment-tabs">
       <el-segmented v-model="vc.activeTab.value" :options="tabOptions" size="small" />
@@ -31,7 +230,7 @@
     <el-table-v2
       v-if="vc.useVirtualScroll.value"
       :columns="virtualColumns"
-      :data="vc.rows.value"
+      :data="vc.scopedRows.value"
       :width="tableWidth"
       :height="440"
       :row-height="36"
@@ -41,7 +240,7 @@
       data-testid="g10-voucher-virtual-table"
     />
 
-    <el-table v-else :data="vc.rows.value" border stripe style="width:100%;font-size:13px" max-height="480"
+    <el-table v-else :data="vc.scopedRows.value" border stripe style="width:100%;font-size:13px" max-height="480"
       highlight-current-row :row-class-name="({ row }) => row.isAbnormal ? 'abnormal-row' : ''"
       @current-change="onRowChange">
       <el-table-column prop="seq" label="序号" width="52" align="center" fixed />
@@ -173,14 +372,21 @@
       note-placeholder="填写审计说明：可概述凭证抽查的样本范围、抽样方法、逐笔核对结果、发现的异常凭证及其处理。"
       note-hint="覆盖抽样范围、核对程序与异常事项。"
       conclusion-placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。"
-      :related-context="{ 行数: vc.rows.value.length, 异常条数: vc.abnormalCount.value }"
+      :related-context="{
+        当前分段: activeScopeLabel,
+        行数: vc.scopedRows.value.length,
+        异常条数: vc.abnormalCount.value,
+        检查比例: vc.inspectionRatioPct.value == null ? '—' : `${vc.inspectionRatioPct.value.toFixed(1)}%`,
+      }"
     />
 
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>可用抽凭引擎按科目 2101 抽取样本自动填入；「核对内容」区段逐笔核对原始凭证完整性、授权、账务处理及公允价值计量是否正确。</p>
-        <p>借贷合计不平衡或存在异常凭证时汇总栏标红；异常凭证须填写异常说明并评定风险等级。</p>
+        <p>可用抽凭引擎按科目 2101 抽取样本自动填入；「核对内容」逐笔核对 6 项（齐全/授权/账务/成本/利息/公允）。</p>
+        <p>本期与期后分表编制；检查比例 = 已查样本金额 ÷ 总体金额，低于 30% 须扩样或说明。</p>
+        <p>异常凭证须填写异常说明并评定风险等级；金额类异常（成本/利息/公允未通过）可「推送异常→G10-3」生成 AJE 草稿并回写 G10-1。</p>
+        <p>编制完成后可「回填 G10A 凭证程序」（步骤 6/7/8：新增/处置/截止）。</p>
         <p>抽查结论应覆盖样本范围、发现的异常事项及拟采取的后续审计程序。</p>
       </div>
     </details>
@@ -188,12 +394,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, toRef, watch, h } from 'vue'
+import { ref, computed, toRef, watch, h, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { Column } from 'element-plus'
 import http from '@/utils/http'
 import { useG10VoucherCheck, type G10VoucherCheckRow } from '../../composables/useG10VoucherCheck'
+import {
+  confirmNavigateToSheet,
+  dispatchProcedureFocus,
+} from '../../composables/g8CrossHelpers'
+import { G10A_PROCEDURE_SHEET, G10A_VOUCHER_PROGRAM_NOS } from '../../composables/g10FvCrossHelpers'
 import { G10_ACCOUNT_CODE, G10_RISK_LEVEL_OPTIONS } from '../../composables/g10Constants'
+import { G10_VOUCHER_CHECK_DEFS, G10_VOUCHER_PERIOD_OPTIONS, G10_SAMPLING_METHOD_OPTIONS } from '../../composables/g10VoucherConstants'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import G10ImportExportDropdown from '../G10ImportExportDropdown.vue'
 import G10AuditTextCards from '../G10AuditTextCards.vue'
@@ -205,14 +417,19 @@ const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   wpId: string
   projectId: string
+  auditYear?: number | null
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
 
 const emit = defineEmits<{ imported: [] }>()
 
+const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
+
 const vc = useG10VoucherCheck({
   wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  year: computed(() => props.auditYear ?? null),
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
@@ -234,7 +451,12 @@ const tabOptions = [
   { label: '核对内容', value: 'check' },
   { label: '结论', value: 'conclusion' },
 ]
-const checkLabels = ['完整', '授权', '账务正确', '公允价值正确']
+const scopeOptions = G10_VOUCHER_PERIOD_OPTIONS
+const activeScopeLabel = computed(() =>
+  scopeOptions.find((o) => o.value === vc.activeScope.value)?.label ?? '本期发生额检查',
+)
+const checkLabels = G10_VOUCHER_CHECK_DEFS.map((d) => d.label)
+const checkKeys = G10_VOUCHER_CHECK_DEFS.map((d) => d.key)
 const tableWidth = 960
 
 const virtualColumns = computed<Column<any>[]>(() => [
@@ -248,13 +470,63 @@ const virtualColumns = computed<Column<any>[]>(() => [
 ])
 
 function checkValue(row: G10VoucherCheckRow, idx: number): boolean {
-  const keys = ['check1OriginalComplete', 'check2Authorization', 'check3Accounting', 'check4FairValueCorrect'] as const
-  return row[keys[idx]]
+  return row[checkKeys[idx] as keyof G10VoucherCheckRow] as boolean
 }
 
 function setCheck(row: G10VoucherCheckRow, idx: number, v: boolean) {
-  const keys = ['check1OriginalComplete', 'check2Authorization', 'check3Accounting', 'check4FairValueCorrect'] as const
-  vc.updateRow(row.id, { [keys[idx]]: v })
+  const key = checkKeys[idx]
+  vc.updateRow(row.id, { [key]: v })
+}
+
+async function onMarkProcedure() {
+  const res = await vc.markProcedureComplete()
+  if (!res.ok) {
+    ElMessage.warning(res.message)
+    return
+  }
+  ElMessage.success(res.message)
+  dispatchProcedureFocus({
+    programNos: [...G10A_VOUCHER_PROGRAM_NOS],
+    sheetCode: 'G10A',
+    sheetName: G10A_PROCEDURE_SHEET,
+  })
+  const go = await confirmNavigateToSheet({
+    title: '已回填 G10A',
+    message: `凭证检查程序（步骤 ${[...G10A_VOUCHER_PROGRAM_NOS].join('/')}）已标记完成。是否前往 G10A 程序表查看？`,
+    confirmText: '前往 G10A',
+  })
+  if (go && jumpToSection) {
+    jumpToSection('G10A')
+    setTimeout(() => {
+      dispatchProcedureFocus({
+        programNos: [...G10A_VOUCHER_PROGRAM_NOS],
+        sheetCode: 'G10A',
+        sheetName: G10A_PROCEDURE_SHEET,
+      })
+    }, 400)
+  }
+}
+
+function onApplySuggested() {
+  const n = vc.applySuggestedSampleSize(vc.activeScope.value)
+  if (n) ElMessage.success(`已采用公式样本量 ${n}`)
+}
+
+function exportMemo() {
+  const md = vc.buildMemo()
+  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `G10-7-抽样备忘-${new Date().toISOString().slice(0, 10)}.md`
+  a.click()
+  URL.revokeObjectURL(url)
+  if (!props.isReadonly) {
+    auditNote.value = auditNote.value
+      ? `${auditNote.value}\n\n---\n${md}`
+      : md
+  }
+  ElMessage.success('抽样备忘已导出')
 }
 
 async function onImported() {
@@ -262,9 +534,13 @@ async function onImported() {
   vc.reloadFromStore()
 }
 
+async function onPushAbnormal() {
+  await vc.pushAbnormalToAdjustment()
+}
+
 function onRowChange(row: G10VoucherCheckRow | undefined) {
   if (!row) return
-  const idx = vc.rows.value.findIndex(r => r.id === row.id)
+  const idx = vc.scopedRows.value.findIndex(r => r.id === row.id)
   if (idx >= 0) vc.setActiveRowIndex(idx)
 }
 
@@ -319,6 +595,23 @@ function fmt(v: number) { return v.toLocaleString('zh-CN', { minimumFractionDigi
 .summary-bar { padding: 8px 12px; background: #f5f7fa; font-size: 12px; margin-bottom: 8px; border-radius: 4px; }
 .summary-error { background: #fef0f0; color: #f56c6c; }
 .segment-tabs { margin-bottom: 8px; }
+.scope-tabs { margin-bottom: 8px; }
+.sampling-params-card {
+  margin-bottom: 10px; padding: 10px 12px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 4px;
+}
+.card-title { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
+.params-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px 12px;
+}
+.param-item-wide { grid-column: 1 / -1; }
+.param-label { display: block; font-size: 11px; color: #909399; margin-bottom: 4px; }
+.sampling-calc-row {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px;
+}
+.ratio-row { margin-top: 6px; font-size: 12px; display: flex; gap: 16px; }
+.ratio-alert { margin-top: 8px; }
+.muted { color: #909399; }
+.sep { color: #dcdfe6; }
 :deep(.abnormal-row) { background-color: #fdf6ec !important; }
 .conclusion-panel { margin-top: 12px; padding: 12px; background: #fafafa; border-radius: 4px; }
 .conclusion-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-weight: 600; }

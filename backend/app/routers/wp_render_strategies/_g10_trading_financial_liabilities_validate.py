@@ -21,6 +21,7 @@ _svc = G10TradingFinancialLiabilitiesService()
 
 class G10ValidateRequest(BaseModel):
     adjudication_rows: list[dict[str, Any]] = Field(default_factory=list)
+    three_part_rows: list[dict[str, Any]] = Field(default_factory=list)
     l3_rows: list[dict[str, Any]] = Field(default_factory=list)
     adjustment_debits: list[float] = Field(default_factory=list)
     adjustment_credits: list[float] = Field(default_factory=list)
@@ -42,6 +43,14 @@ async def validate_g10_formulas(
     adj_rows = body.adjudication_rows
 
     for err in _svc.validate_adjudication_rows(adj_rows):
+        errors.append({
+            "rowKey": err.row_key,
+            "field": err.field,
+            "message": err.message,
+            "variance": err.variance,
+        })
+
+    for err in _svc.validate_three_part_rows(body.three_part_rows):
         errors.append({
             "rowKey": err.row_key,
             "field": err.field,
