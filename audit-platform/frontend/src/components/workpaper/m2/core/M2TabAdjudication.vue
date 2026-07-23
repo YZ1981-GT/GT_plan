@@ -261,11 +261,36 @@
             </el-tooltip>
           </template>
           <template #default="{ row }">
-            <span class="formula-value">{{ fmtPercent(row.varianceRate) }}</span>
+            <span class="formula-value" :class="{ 'variance-alert': Math.abs(row.varianceRate) > 0.3 }">
+              {{ fmtPercent(row.varianceRate) }}
+            </span>
           </template>
         </el-table-column>
 
-        <!-- N列: 备注 -->
+        <!-- N列: 原因分析（源模板L列，变动率>30%时必填） -->
+        <el-table-column label="原因分析" min-width="160">
+          <template #header>
+            <el-tooltip content="变动率超过30%时须说明主要原因" placement="top">
+              <span class="formula-col-header">原因分析</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row, $index }">
+            <template v-if="isEditableRow($index) && !isReadonly">
+              <el-input
+                :model-value="row.reasonAnalysis || ''"
+                size="small"
+                :placeholder="Math.abs(row.varianceRate) > 0.3 ? '⚠ 变动>30%，请说明原因' : '原因分析'"
+                :class="{ 'reason-required': Math.abs(row.varianceRate) > 0.3 && !row.reasonAnalysis }"
+                @change="(val: string) => updateRow($index, 'reasonAnalysis', val)"
+              />
+            </template>
+            <span v-else :class="{ 'reason-missing': Math.abs(row.varianceRate) > 0.3 && !row.reasonAnalysis }">
+              {{ row.reasonAnalysis || (Math.abs(row.varianceRate) > 0.3 ? '⚠ 未填写' : '') }}
+            </span>
+          </template>
+        </el-table-column>
+
+        <!-- O列: 备注 -->
         <el-table-column label="备注" min-width="120">
           <template #default="{ row, $index }">
             <template v-if="isEditableRow($index) && !isReadonly">
@@ -314,6 +339,23 @@
           </template>
         </el-tag>
       </div>
+
+      <!-- 试算平衡表勾稽（源模板R18-R19） -->
+      <div class="tb-reconciliation">
+        <el-table :data="tbReconcileRows" border size="small" class="tb-table">
+          <el-table-column label="" width="140" prop="label" />
+          <el-table-column label="期初审定" align="right">
+            <template #default="{ row }">
+              <span :class="{ 'formula-value': row.isFormula }">{{ fmtAmount(row.beginAudited) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="期末审定" align="right">
+            <template #default="{ row }">
+              <span :class="{ 'formula-value': row.isFormula, 'negative-value': row.isDiff && row.endAudited !== 0 }">{{ fmtAmount(row.endAudited) }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
     </div>
 
     <!-- ═══ 审计说明（el-card包裹） ═══ -->
@@ -326,11 +368,15 @@
           </el-button>
         </div>
       </template>
+      <div class="audit-note-hint">
+        <p class="note-hint-item">（1）期末余额较期初余额增加（负数为减少）：<strong>{{ fmtAmount(totalRow.varianceAmount) }}</strong></p>
+        <p class="note-hint-item">（2）主要原因（比例超过30%的）：</p>
+      </div>
       <el-input
         v-model="auditNote"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请填写审定表审计说明..."
+        :placeholder="auditNotePlaceholder"
         :disabled="isReadonly"
         @change="saveAuditNote"
       />
@@ -438,11 +484,45 @@ const {
 
 const remarks = ref<Map<number, string>>(new Map())
 
+// ─── 试算平衡表勾稽（源模板R18-R19: 试算平衡表数 + 差异数） ──────────────────
+
+interface TbReconcileRow {
+  label: string
+  beginAudited: number
+  endAudited: number
+  isFormula?: boolean
+  isDiff?: boolean
+}
+
+/** TB对账数据（从formData中读取TB值） */
+const tbBeginBalance = ref(0)
+const tbEndBalance = ref(0)
+
+const tbReconcileRows = computed<TbReconcileRow[]>(() => {
+  const total = totalRow.value
+  return [
+    { label: '审定表合计', beginAudited: total.beginAudited, endAudited: total.endAudited, isFormula: true },
+    { label: '试算平衡表数', beginAudited: tbBeginBalance.value, endAudited: tbEndBalance.value },
+    { label: '差异数', beginAudited: total.beginAudited - tbBeginBalance.value, endAudited: total.endAudited - tbEndBalance.value, isFormula: true, isDiff: true },
+  ]
+})
+
+// ─── 审计说明预填提示 ──────────────────────────────────────────────────────────
+
+const auditNotePlaceholder = computed(() => {
+  const rate = totalRow.value.varianceRate
+  if (Math.abs(rate) > 0.3) {
+    return `期末余额较期初增加${fmtAmount(totalRow.value.varianceAmount)}元（变动率${fmtPercent(rate)}，超过30%），主要原因：……`
+  }
+  return '概述测试情况、结果；情况说明等'
+})
+
 // ─── 合计行 → 拼装为表格数据 ────────────────────────────────────────────────
 
 interface TableRow extends M2AdjudicationRow {
   _rowType?: 'data' | 'total'
   remark?: string
+  reasonAnalysis?: string
 }
 
 /** 全部表格行 = 动态出资人行 + 小计行 */
@@ -592,6 +672,8 @@ onMounted(async () => {
   if (noteResp?.remark) {
     auditNote.value = noteResp.remark
   }
+  // 加载TB数据用于勾稽
+  _loadTbData()
   // 订阅调整分录创建事件
   eventBus.on('adjustment:created' as any, handleAdjustmentCreated)
   eventBus.on('substantive:adjudicated' as any, handleAdjustmentCreated)
@@ -648,6 +730,24 @@ function _restoreRemarks(): void {
         }
       }
     }
+  }
+}
+
+/** 从TB取4001科目余额用于勾稽 */
+async function _loadTbData(): Promise<void> {
+  try {
+    const resp = await import('@/utils/http').then(m => m.default.get(
+      `/api/projects/${props.projectId}/trial-balance`,
+      { params: { account_code: '4001' }, _silent: true } as any,
+    ))
+    const data = resp?.data?.data ?? resp?.data
+    if (data) {
+      // TB返回的是审定数(正数)
+      tbBeginBalance.value = Number(data.opening_balance ?? data.begin_audited ?? 0)
+      tbEndBalance.value = Number(data.audited_amount ?? data.end_audited ?? 0)
+    }
+  } catch {
+    // TB取数失败静默降级
   }
 }
 </script>
@@ -765,8 +865,41 @@ function _restoreRemarks(): void {
   flex-wrap: wrap;
 }
 
+.tb-reconciliation {
+  margin-top: 12px;
+}
+
+.tb-table {
+  max-width: 500px;
+}
+
+.variance-alert {
+  color: #e6a23c !important;
+  font-weight: 700;
+}
+
+.reason-required :deep(.el-input__wrapper) {
+  box-shadow: 0 0 0 1px #e6a23c inset;
+}
+
+.reason-missing {
+  color: #e6a23c;
+  font-size: 12px;
+}
+
 .audit-note-card {
   margin-top: 16px;
+}
+
+.audit-note-hint {
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.6;
+}
+
+.note-hint-item {
+  margin: 2px 0;
 }
 
 .card-title {
