@@ -267,6 +267,8 @@ async function handleFieldUpdate(catKey: string, rowIndex: number, field: string
       rows[rowIndex].taxRelief = rows[rowIndex].amount
     }
     await formData.setField('6', `benefit-${catKey}`, [...rows])
+    // 自动同步减免税额合计（跨会话不丢失）
+    await formData.setField('6', 'tax-relief-total', totalRelief.value)
   }
 }
 

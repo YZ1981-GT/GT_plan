@@ -243,6 +243,9 @@ export function useN5TaxAdjustment(options: UseN5TaxAdjustmentOptions) {
       remark: null,
     })
     await saveField('5', 'adjustment-rows', data)
+    // 自动同步调增/调减合计（跨会话不丢失）
+    await saveField('5', 'add-back-total', addBackTotal.value)
+    await saveField('5', 'deduct-total', deductTotal.value)
   }
 
   /**

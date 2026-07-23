@@ -232,6 +232,25 @@ async function handleEntryChange(_row: JournalEntry) {
 
 async function saveEntries() {
   await formData.setField('3', 'entries', entries.value)
+  // 汇总6801 AJE/RJE回填N5-1 + 发布A13事件
+  const ajeNet = ajeEntries.value
+    .filter((e: any) => e.accountCode === '6801' || e.accountName === '所得税费用')
+    .reduce((s: number, e: any) => s + (e.debit || 0) - (e.credit || 0), 0)
+  const rjeNet = rjeEntries.value
+    .filter((e: any) => e.accountCode === '6801' || e.accountName === '所得税费用')
+    .reduce((s: number, e: any) => s + (e.debit || 0) - (e.credit || 0), 0)
+  const currentRow = formData.getField('1', 'current-row')
+  if (currentRow && typeof currentRow === 'object') {
+    await formData.setField('1', 'current-row', { ...currentRow, aje: ajeNet, rje: rjeNet })
+  }
+  // 发布调整分录更新→A13审计差异汇总
+  eventBus.emit('adjustment:entries-updated' as any, {
+    wpCode: 'N5', accountCode: '6801',
+    ajeCount: ajeEntries.value.length, rjeCount: rjeEntries.value.length,
+    ajeNet, rjeNet,
+    totalDebit: totalDebit.value, totalCredit: totalCredit.value,
+    timestamp: Date.now(),
+  })
 }
 
 // ─── 保存 ────────────────────────────────────────────────────────────────────

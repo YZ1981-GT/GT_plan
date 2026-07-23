@@ -209,6 +209,15 @@ onMounted(async () => {
   selectedTaxRate.value = calc.taxRate.value || 0.25
   auditNotes.value = formData.getField('4', 'audit-notes') ?? ''
   auditConclusion.value = formData.getField('4', 'audit-conclusion') ?? ''
+
+  // 高新认定→税率自动联动（未手动设税率时读N5-6-2结论）
+  if (!formData.getField('4', 'tax-rate')) {
+    const highTechApproved = formData.getField('6', 'high-tech-approved')
+    if (highTechApproved === true || highTechApproved === 'true') {
+      selectedTaxRate.value = 0.15
+      await calc.setTaxRate(0.15)
+    }
+  }
 })
 
 // ─── 事件处理 ────────────────────────────────────────────────────────────────

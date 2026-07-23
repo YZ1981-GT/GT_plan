@@ -238,6 +238,7 @@ const props = defineProps<{
   sheetName?: string
   htmlData?: any
   readonly?: boolean
+  year?: number
 }>()
 
 const emit = defineEmits<{
@@ -259,6 +260,7 @@ function handleNavigate(sheetName: string): void {
 const isLoading = ref(true)
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
+const yearRef = computed(() => props.year || new Date().getFullYear())
 const allResponses = ref<Map<string, any>>(new Map())
 const allResponsesRef = computed(() => allResponses.value)
 const isReadonly = computed(() => !!props.readonly)
@@ -333,15 +335,24 @@ async function selfLoad(): Promise<void> {
       _mergeResponses(map, sheet?.html_data?.allResponses)
     }
     if (map.size > 0) allResponses.value = map
+    // 提取审定表预填
+    for (const sheet of sheets) {
+      if (sheet?.html_data?.adjudication_prefill && !adjudicationPrefill.value) {
+        adjudicationPrefill.value = sheet.html_data.adjudication_prefill
+      }
+    }
   } catch (e) {
     console.error('[N5] selfLoad failed:', e)
   }
 }
 
-// 复核对话由 Runtime Boundary 统一 provide('openReviewDialog') + 挂真实 Host（删除 console 桩）。
 provide('reloadWorkpaperData', selfLoad)
+provide('n5Year', yearRef)
 
-// ─── 生命周期 ────────────────────────────────────────────────────────────────
+// ─── 审定表预填 + 版本快照 ──────────────────────────────────────────────────
+const adjudicationPrefill = ref<any>(null)
+provide('n5AdjudicationPrefill', adjudicationPrefill)
+provide('scheduleAutoSnapshot', () => runtime?.version.scheduleAutoSnapshot())
 onMounted(async () => {
   // 如果 htmlData 为 null（selfLoad 场景），自行加载
   if (!props.htmlData) {

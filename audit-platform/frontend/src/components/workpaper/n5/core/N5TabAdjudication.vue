@@ -176,12 +176,15 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<((section: string) => void) | undefined>('openReviewDialog', undefined)
+const scheduleAutoSnapshot = inject<(() => void) | undefined>('scheduleAutoSnapshot', undefined)
+const n5AdjudicationPrefill = inject<any>('n5AdjudicationPrefill', null)
+const n5Year = inject<Ref<number> | undefined>('n5Year', undefined)
 
 const wpIdRef = computed(() => props.wpId) as Ref<string>
 const projectIdRef = computed(() => props.projectId) as Ref<string>
 const allResponsesRef = computed(() => props.allResponses)
 
-const formData = useN5FormData({ wpId: wpIdRef, projectId: projectIdRef })
+const formData = useN5FormData({ wpId: wpIdRef, projectId: projectIdRef, year: n5Year })
 const { adjudicationVsCalc, effectiveTaxRate } = useN5CrossSheet(allResponsesRef, { wpId: wpIdRef, projectId: projectIdRef })
 
 const etr = effectiveTaxRate
@@ -242,6 +245,12 @@ onMounted(async () => {
   if (formData.tbOccurrence.value.net !== 0) {
     currentRow.value.periodAmount = formData.tbOccurrence.value.net
   }
+  // TB预填（仅无已保存数据 + 有后端预填数据时seed）
+  if (!cData && !dData && n5AdjudicationPrefill?.value) {
+    const prefill = n5AdjudicationPrefill.value
+    if (prefill.current) Object.assign(currentRow.value, prefill.current)
+    if (prefill.deferred) Object.assign(deferredRow.value, prefill.deferred)
+  }
 })
 
 // ─── 保存 ────────────────────────────────────────────────────────────────────
@@ -250,6 +259,7 @@ async function handleCellChange(row: AdjRow) {
   row.audited = calcAuditedAmount(row.unadjusted, row.aje, row.rje)
   if (row.key === 'current') await formData.setField('1', 'current-row', { ...currentRow.value })
   if (row.key === 'deferred') await formData.setField('1', 'deferred-row', { ...deferredRow.value })
+  scheduleAutoSnapshot?.()
 }
 
 async function handleWritebackTB() {

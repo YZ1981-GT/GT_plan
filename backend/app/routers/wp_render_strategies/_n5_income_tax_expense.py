@@ -111,6 +111,68 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
 # ─── 主渲染函数 ───────────────────────────────────────────────────────────────
 
 
+async def _build_adjudication_prefill(ctx: RenderContext) -> dict[str, Any] | None:
+    """从 tb_balance 子科目预填审定表 N5-1.
+
+    科目6801所得税费用为损益类借方科目。
+    查 tb_balance 6801% 子科目按名称分类为当期/递延，仅无持久化时注入。
+    """
+    from app.models.audit_platform_models import TbBalance
+    from app.services.dataset_query import get_active_filter as _get_af
+
+    try:
+        af = _get_af(ctx.project_id)
+        stmt = (
+            sa.select(
+                TbBalance.account_code,
+                TbBalance.account_name,
+                sa.func.coalesce(TbBalance.debit_amount, 0).label("debit_amount"),
+                sa.func.coalesce(TbBalance.credit_amount, 0).label("credit_amount"),
+            )
+            .where(
+                TbBalance.project_id == str(ctx.project_id),
+                TbBalance.account_code.startswith(_N5_ACCOUNT_CODE),
+                af,
+            )
+            .order_by(TbBalance.account_code)
+        )
+        rows = (await ctx.db.execute(stmt)).fetchall()
+        if not rows:
+            return None
+
+        current_period = 0.0
+        deferred_period = 0.0
+        total_period = 0.0
+
+        for r in rows:
+            code = r.account_code or ""
+            name = (r.account_name or "").lower()
+            debit = _parse_num(r.debit_amount)
+            credit = _parse_num(r.credit_amount)
+            period = debit - credit
+
+            if code == _N5_ACCOUNT_CODE:
+                total_period = period
+                continue
+
+            if "递延" in name or code.startswith("6801.02") or code.startswith("680102"):
+                deferred_period += period
+            else:
+                current_period += period
+
+        if current_period == 0 and deferred_period == 0 and total_period != 0:
+            current_period = total_period
+
+        return {
+            "current": {"key": "current", "category": "一、当期所得税费用", "periodAmount": round(current_period, 2), "unadjusted": round(current_period, 2), "aje": 0, "rje": 0, "audited": round(current_period, 2), "priorPeriod": 0, "isTotal": False},
+            "deferred": {"key": "deferred", "category": "二、递延所得税费用", "periodAmount": round(deferred_period, 2), "unadjusted": round(deferred_period, 2), "aje": 0, "rje": 0, "audited": round(deferred_period, 2), "priorPeriod": 0, "isTotal": False},
+            "total_period": round(total_period if total_period != 0 else current_period + deferred_period, 2),
+        }
+    except Exception as e:  # noqa: BLE001
+        logger.warning("N5 render: adjudication prefill failed: %s", e)
+        return None
+
+
 async def render(ctx: RenderContext) -> dict[str, Any]:
     """N5 所得税费用专属渲染策略.
 
@@ -173,6 +235,11 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
     # ─── TB 取数（科目6801所得税费用，损益类，本期发生额！）────────────────
     tb = await _fetch_tb_data(ctx)
 
+    # ─── 审定表预填（仅无已保存数据时） ─────────────────────────────────
+    adjudication_prefill: dict[str, Any] | None = None
+    if "N5-1-current-row" not in responses_snapshot:
+        adjudication_prefill = await _build_adjudication_prefill(ctx)
+
     return {
         "account_code": _N5_ACCOUNT_CODE,
         "sheet_name": ctx.classification.sheet_name if ctx.classification else "",
@@ -210,4 +277,5 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
         # sheet 列表元数据
         "sheets": N5_SHEETS,
         "component_type": "n5-income-tax-expense",
+        "adjudication_prefill": adjudication_prefill,
     }
