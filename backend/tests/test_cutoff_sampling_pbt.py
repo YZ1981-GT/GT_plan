@@ -60,7 +60,18 @@ st_threshold = st.decimals(
 )
 
 # Strategy for summary keyword
-st_keyword = st.one_of(st.just(""), st.text(min_size=1, max_size=10))
+# 关键词取真实搜索字符集：断言 #4 校验关键词逐字出现在 literal_binds 渲染的 SQL 中，
+# 而反斜杠会被 PostgreSQL 字面量渲染转义为双反斜杠、单引号会被转义为两个单引号，
+# 使「逐字子串」判定对这两类字符不成立（属断言前提而非产品缺陷）。故排除 \ 与 '。
+# 说明：`summary.ilike('%<kw>%')` 未转义 LIKE 元字符(%/_/\)是独立的既有产品加固项。
+st_keyword = st.one_of(
+    st.just(""),
+    st.text(
+        alphabet="abcdeABCDE01234 -采购付款销售转账费用工程往来",
+        min_size=1,
+        max_size=10,
+    ),
+)
 
 # Strategy for voucher type filter
 st_voucher_types = st.lists(

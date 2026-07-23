@@ -174,3 +174,25 @@ describe('buildSamplingMemo（可选数据缺失时不臆造、以占位符呈�
     expect(memo).toContain('## 三、样本量推导依据')
   })
 })
+
+describe('buildSamplingMemo（Task 14 归档留痕：批次标识 + 算法版本）', () => {
+  it('附段落展示批次标识与方法学算法版本', () => {
+    const memo = buildSamplingMemo(
+      makeInput({ batchId: 'batch-abc-123', algoVersion: 'cas1314-mus-v1' }),
+    )
+    expect(memo).toContain('批次标识：batch-abc-123')
+    expect(memo).toContain('方法学算法版本：cas1314-mus-v1')
+  })
+
+  it('批次标识/算法版本缺失时以占位符呈现，不臆造', () => {
+    const memo = buildSamplingMemo(makeInput())
+    expect(memo).toContain('批次标识：—')
+    expect(memo).toContain('方法学算法版本：—')
+  })
+
+  it('空字符串批次标识/算法版本按缺失处理', () => {
+    const memo = buildSamplingMemo(makeInput({ batchId: '', algoVersion: '' }))
+    expect(memo).toContain('批次标识：—')
+    expect(memo).toContain('方法学算法版本：—')
+  })
+})

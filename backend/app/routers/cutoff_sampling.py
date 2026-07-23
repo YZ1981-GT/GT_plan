@@ -139,9 +139,11 @@ async def cutoff_history(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """获取指定底稿的提取历史列表（按时间倒序）"""
+    """获取指定底稿的提取历史列表（按时间倒序，仅截止测试类型）"""
     try:
-        history = await LedgerSamplingService.get_extraction_history(db, wp_id)
+        history = await LedgerSamplingService.get_extraction_history(
+            db, wp_id, extraction_type="cutoff"
+        )
         return history
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -158,9 +160,11 @@ async def cutoff_undo(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """撤销指定提取记录，返回 before_data"""
+    """撤销指定提取记录，返回 before_data（仅截止测试类型范围内判定最新）"""
     try:
-        result = await LedgerSamplingService.undo_extraction(db, log_id, wp_id)
+        result = await LedgerSamplingService.undo_extraction(
+            db, log_id, wp_id, extraction_type="cutoff"
+        )
         await db.commit()
         return result
     except ValueError as e:
@@ -239,6 +243,7 @@ async def _get_extracted_voucher_nos(
         WorkpaperExtractionLog.extraction_criteria
     ).where(
         WorkpaperExtractionLog.workpaper_id == workpaper_id,
+        WorkpaperExtractionLog.extraction_type == "cutoff",
         WorkpaperExtractionLog.is_undone == False,  # noqa: E712
     )
     result = await db.execute(stmt)

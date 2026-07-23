@@ -63,6 +63,8 @@ export interface SamplingConfig {
   voucherTypeFilter: string[]
   summaryKeyword: string
   excludeExtracted: boolean
+  /** 抽样单位：分录行（默认）或整张凭证（按凭证号聚合，抽中带出完整分录） */
+  samplingUnit?: 'ledger_line' | 'voucher'
   // ─── 方法学增强（可选，向后兼容）─────────────────────────────────
   /** 置信度/信赖水平，如 0.95（R20）；驱动可信赖度系数与样本量推导 */
   confidenceLevel?: number
@@ -85,6 +87,8 @@ export interface EditTrailEntry {
 }
 
 export interface SampledVoucher {
+  /** 序时账分录行 id（ledger id）；用于 ledger_line 单位的行级排除（P3），后端返回时映射 */
+  id?: string
   voucherNo: string
   voucherDate: string
   summary: string | null
@@ -847,6 +851,10 @@ export interface SamplingMemoInput {
   seedUsed: number | null
   /** 已回填/勾选的样本笔数 */
   sampleCount: number
+  /** 本批次归档标识（Req14.2 版本链绑定），无则 null */
+  batchId?: string | null
+  /** 方法学算法版本（后端权威快照 algo_version，Req14.2 留痕），无则 null */
+  algoVersion?: string | null
   /** 备忘生成时间（ISO 字符串）；缺省时由函数内取当前时间 */
   generatedAt?: string
 }
@@ -882,6 +890,8 @@ export function buildSamplingMemo(input: SamplingMemoInput): string {
     samplingConclusion,
     seedUsed,
     sampleCount,
+    batchId,
+    algoVersion,
   } = input
 
   const generatedAt = input.generatedAt ?? new Date().toISOString()
@@ -958,8 +968,10 @@ export function buildSamplingMemo(input: SamplingMemoInput): string {
   }
   lines.push('')
 
-  // 附：可复现与重抽治理（R22 留痕）
+  // 附：可复现与重抽治理（R22 留痕 + R14.2 批次/算法版本归档）
   lines.push('## 附：可复现与重抽治理')
+  lines.push(`- 批次标识：${batchId != null && batchId !== '' ? batchId : '—'}`)
+  lines.push(`- 方法学算法版本：${algoVersion != null && algoVersion !== '' ? algoVersion : '—'}`)
   lines.push(`- 随机种子：${seedUsed != null ? String(seedUsed) : '—'}`)
   lines.push(`- 重抽原因：${config.resampleReason && config.resampleReason !== '' ? config.resampleReason : '—'}`)
   lines.push('')
@@ -1026,7 +1038,11 @@ export function computeAttributeSampleSize(
   const rf = reliabilityFactor(confidenceLevel, 0)
   if (rf <= 0) return 0
 
-  return Math.ceil(rf / precisionGap)
+  const n = Math.ceil(rf / precisionGap)
+  // 极小精度余量（denormalized float）会使 rf/gap 溢出为 Infinity → 非有效样本量，
+  // 视同无法推导返回 0（与 gap ≤ 0 一致），确保恒返回非负整数。
+  if (!Number.isFinite(n)) return 0
+  return n
 }
 
 /**

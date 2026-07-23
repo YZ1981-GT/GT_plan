@@ -24,6 +24,7 @@
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { useAuthStore } from '@/stores/auth'
 import {
   validateSamplingConfig,
   checkCAS1314Compliance,
@@ -57,6 +58,8 @@ export interface VoucherSamplingOptions {
   defaultMethod?: SamplingMethod
   /** 初始期间月份 1-12（如期后默认 [1,2,3]） */
   initialPeriodRange?: number[]
+  /** 打开引擎时合并进默认配置（如 I4-5 按测试原因预填关键词/方向） */
+  initialConfigPatch?: Partial<SamplingConfig>
 }
 
 export interface ExtractionLogEntry {
@@ -142,6 +145,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     phase,
     defaultMethod,
     initialPeriodRange,
+    initialConfigPatch,
   } = options
 
   // ─── Config 初始化 ──────────────────────────────────────────────────────
@@ -156,7 +160,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       ? initialPeriodRange.filter((m) => m >= 1 && m <= 12)
       : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
 
-    return {
+    const base: SamplingConfig = {
       samplingMethod: defaultMethod ?? 'random',
       sampleSize: 30,
       accountCodes: codes,
@@ -165,6 +169,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       voucherTypeFilter: [],
       summaryKeyword: '',
       excludeExtracted: true,
+      samplingUnit: 'ledger_line',
       randomSeed: null,
       // ─── 方法学增强参数（可选，向后兼容）────────────────────────────
       confidenceLevel: undefined,
@@ -172,6 +177,20 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       expectedMisstatement: undefined,
       suggestedSampleSize: undefined,
       resampleReason: undefined,
+    }
+    if (!initialConfigPatch) return base
+    return {
+      ...base,
+      ...initialConfigPatch,
+      // 嵌套数组避免被 patch 意外覆盖为空
+      accountCodes: initialConfigPatch.accountCodes?.length
+        ? initialConfigPatch.accountCodes
+        : base.accountCodes,
+      periodRange: initialConfigPatch.periodRange?.length
+        ? initialConfigPatch.periodRange
+        : base.periodRange,
+      voucherTypeFilter: initialConfigPatch.voucherTypeFilter
+        ?? base.voucherTypeFilter,
     }
   }
 
@@ -201,6 +220,33 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
   const samplingConclusion = ref<SamplingConclusion | null>(null)
   /** 可容忍错报是否由重要性/B15 自动带入（R16；用于 UI 提示可覆盖） */
   const tolerableFromMateriality = ref(false)
+  /**
+   * 总体完整性核对信息（后端独立账面来源）：
+   * - available=false → 无独立数据源，UI 显示"未执行核对"，不得以序时账总体自身比对。
+   * - bookAmount → trial_balance 审定等独立账面；basis → 来源标识。
+   */
+  const reconcileInfo = ref<{
+    available: boolean
+    bookAmount: string | null
+    basis: string | null
+  } | null>(null)
+  /** 后端方法学权威快照（含 algo_version）；抽样后由 triggerSampling 填充，回填时留痕 */
+  const methodologySnapshot = ref<Record<string, any> | null>(null)
+
+  // ─── 真实操作者解析（Req9）──────────────────────────────────────────────
+  // edit_trail 本地 actor 用当前登录用户（乐观展示）；权威 actor 由后端持久化时以
+  // current_user 记录。无 Pinia 的纯逻辑测试环境下 graceful 回退占位符。
+  let _actorCache: string | null = null
+  function resolveActor(): string {
+    if (_actorCache) return _actorCache
+    try {
+      const store = useAuthStore()
+      _actorCache = store.userId || store.username || 'current_user'
+    } catch {
+      _actorCache = 'current_user'
+    }
+    return _actorCache
+  }
 
   // ─── Version Trail（延迟实例化）───────────────────────────────────────────
   // useVersionTrail 内部依赖 Pinia store（useAuthStore/useRoleContextStore），
@@ -320,8 +366,10 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     const cl = config.value.confidenceLevel ?? 0.95
     const interval = samplingInterval.value ?? '0'
     const popAmount = coverageStats.value?.populationAmount ?? '0'
-    // 仅纳入已检查（含实际错报录入）的样本
-    const samples = sampledVouchers.value
+    // R18：仅纳入已检查（checkResult 非空：Y/N/异常）的样本参与推断。
+    // 未检查样本的 actualMisstatement 为空会被当作“零错报”，若计入将系统性低估
+    // 推断错报与错报上限（UML），故此处显式排除，未检查数量由 uncheckedSampleCount 暴露给 UI 提示。
+    const samples = sampledVouchers.value.filter(v => v.checkResult !== '')
 
     const result = projectMisstatement(
       samples,
@@ -355,7 +403,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     voucher.actualMisstatement = newValue
 
     voucher.editTrail.push({
-      userId: 'current_user',
+      userId: resolveActor(),
       timestamp: new Date().toISOString(),
       field: 'actualMisstatement',
       oldValue,
@@ -409,6 +457,16 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     }, 0)
   })
 
+  /** 已检查样本数（checkResult 非空），参与错报推断的样本集合大小 */
+  const checkedSampleCount: ComputedRef<number> = computed(() => {
+    return sampledVouchers.value.filter(v => v.checkResult !== '').length
+  })
+
+  /** 未检查样本数（checkResult 为空），不参与错报推断，UI 据此提示审计师补录核查结果 */
+  const uncheckedSampleCount: ComputedRef<number> = computed(() => {
+    return sampledVouchers.value.filter(v => v.checkResult === '').length
+  })
+
   // ─── triggerSampling ────────────────────────────────────────────────────
 
   /**
@@ -422,7 +480,13 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       // 构建请求体
       const body: Record<string, unknown> = {
         sampling_method: config.value.samplingMethod,
-        sampling_params: buildSamplingParams(),
+        // 方法学参数随请求发送，供后端 CAS1314 权威口径计算间隔/样本量（单一真源）
+        sampling_params: {
+          ...buildSamplingParams(),
+          confidence_level: config.value.confidenceLevel ?? null,
+          tolerable_misstatement: config.value.tolerableMisstatement ?? null,
+          expected_misstatement: config.value.expectedMisstatement ?? null,
+        },
         random_seed: config.value.randomSeed ?? null,
         phase: phase.value,
         workpaper_id: workpaperId.value,
@@ -436,6 +500,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
           voucher_type_filter: config.value.voucherTypeFilter,
           summary_keyword: config.value.summaryKeyword,
           exclude_extracted: config.value.excludeExtracted,
+          sampling_unit: config.value.samplingUnit ?? 'ledger_line',
         },
       }
 
@@ -460,6 +525,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
 
       // 映射为 SampledVoucher（默认全选、phase取当前阶段）
       sampledVouchers.value = items.map((item: any) => ({
+        id: item.id != null ? String(item.id) : undefined,  // 序时账行 id（P3 行级排除）
         voucherNo: item.voucher_no ?? item.voucherNo ?? '',
         voucherDate: item.voucher_date ?? item.voucherDate ?? '',
         summary: item.summary ?? null,
@@ -488,15 +554,35 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
         amountCoverageRate: String(statsData.amount_coverage_rate ?? statsData.amountCoverageRate ?? '0.00'),
       }
 
-      // ─── 方法学增强：MUS 抽样间隔 + 高值必选 + 建议样本量留痕 ───────────
-      // 仅当 MUS 且已提供置信度/可容忍错报时生效；其他方法保持原行为不变。
+      // 总体完整性核对信息（独立账面来源）
+      reconcileInfo.value = {
+        available: statsData.reconcile_available === true,
+        bookAmount:
+          statsData.book_amount != null ? String(statsData.book_amount) : null,
+        basis: statsData.reconcile_basis ?? null,
+      }
+
+      // ─── 方法学单一真源：优先消费后端权威快照（interval/suggested/algo_version）───
+      // 后端以 CAS1314 权威口径计算；前端 computeSuggestedSampleSize 仅作即时预览兜底。
+      const methodologyData = data?.methodology ?? null
+      methodologySnapshot.value = methodologyData
       samplingInterval.value = null
-      if (
+      const backendInterval = methodologyData?.sampling_interval
+      if (backendInterval != null && backendInterval !== '' && backendInterval !== '0.00') {
+        // 后端权威间隔
+        samplingInterval.value = String(backendInterval)
+        const backendSuggested = methodologyData?.suggested_sample_size
+        if (backendSuggested != null) {
+          suggestedSampleSize.value = Number(backendSuggested)
+          config.value.suggestedSampleSize = Number(backendSuggested)
+        }
+        sampledVouchers.value = markHighValueItems(sampledVouchers.value, samplingInterval.value)
+      } else if (
         config.value.samplingMethod === 'mus' &&
         config.value.tolerableMisstatement &&
         config.value.confidenceLevel != null
       ) {
-        // 推导间隔与建议样本量（留痕），并标注高值必选项（金额 ≥ 间隔 → 100% 必选）
+        // 后端未返回间隔时，前端即时预览兜底（保持原行为）
         computeSuggestedSampleSize(coverageStats.value.populationAmount)
         if (samplingInterval.value) {
           sampledVouchers.value = markHighValueItems(sampledVouchers.value, samplingInterval.value)
@@ -607,6 +693,16 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
             sampling_params: buildSamplingParams(),
             random_seed: seedUsed.value,
             phase: phase.value,
+            // 本次实际回填的凭证号清单：后端据此排除已抽凭证、预审转年审排重、
+            // 版本比较（此前从不发送 → 排重/比较链路空转）。去空去重保持稳定。
+            filled_voucher_nos: Array.from(
+              new Set(selected.map(v => v.voucherNo).filter(Boolean)),
+            ),
+            // 本次回填的分录行 id 清单（P3 行级排除）：ledger_line 单位下后端据此按行排除，
+            // 避免"同一凭证号跨不同科目"被整张误排。有 id 才发送（向后兼容旧样本无 id）。
+            filled_unit_ids: Array.from(
+              new Set(selected.map(v => v.id).filter((x): x is string => !!x)),
+            ),
             // ─── 方法学增强字段（后端未就绪时作为冗余 JSON 留存，向后兼容）───
             confidence_level: config.value.confidenceLevel ?? null,
             tolerable_misstatement: config.value.tolerableMisstatement ?? null,
@@ -615,6 +711,8 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
             sampling_interval: samplingInterval.value ?? null,
             resample_reason: config.value.resampleReason ?? null,
             conclusion: samplingConclusion.value?.message ?? null,
+            // 方法学算法版本留痕（后端权威快照），支持未来漂移追溯（Req6.3）
+            algo_version: methodologySnapshot.value?.algo_version ?? null,
             coverage_stats: coverageStats.value
               ? {
                   count_rate: coverageStats.value.countCoverageRate,
@@ -795,7 +893,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
 
     // 追加 edit_trail entry
     const trailEntry: EditTrailEntry = {
-      userId: 'current_user',
+      userId: resolveActor(),
       timestamp: new Date().toISOString(),
       field,
       oldValue,
@@ -820,7 +918,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       voucher.checkResult = 'Y'
 
       const trailEntry: EditTrailEntry = {
-        userId: 'current_user',
+        userId: resolveActor(),
         timestamp: new Date().toISOString(),
         field: 'checkResult',
         oldValue,
@@ -872,12 +970,16 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     misstatementResult,
     samplingConclusion,
     tolerableFromMateriality,
+    reconcileInfo,
+    methodologySnapshot,
 
     // 计算属性
     selectedVouchers,
     selectedCount,
     selectedDebitTotal,
     selectedCreditTotal,
+    checkedSampleCount,
+    uncheckedSampleCount,
 
     // 操作
     triggerSampling,

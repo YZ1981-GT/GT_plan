@@ -7,7 +7,7 @@ import logging
 from collections.abc import Callable
 from uuid import UUID
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Query, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy import select
@@ -115,6 +115,36 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="用户不存在或已被禁用")
 
     return user
+
+
+# ---------------------------------------------------------------------------
+# get_current_user_sse — SSE (EventSource) 鉴权：header 优先 + query token 回退
+# ---------------------------------------------------------------------------
+
+
+async def get_current_user_sse(
+    request: Request,
+    token: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db),
+) -> User:
+    """SSE / EventSource 专用鉴权（acnr-invalidation-overlay-hardening R1.2/R3.1）。
+
+    `EventSource` 无法设置 Authorization 头，故鉴权 token 经 query `?token=` 传递。
+    优先读 Authorization header（普通 fetch/SSE polyfill），回退 query token（原生 EventSource）。
+    复用 `get_current_user` 的完整校验（黑名单 / SoD / decode / 用户查库 / RLS），不重复实现。
+    """
+    raw: str | None = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.lower().startswith("bearer "):
+        raw = auth_header[7:]
+    elif token:
+        raw = token
+
+    if not raw:
+        raise HTTPException(status_code=401, detail="未认证")
+
+    creds = HTTPAuthorizationCredentials(scheme="Bearer", credentials=raw)
+    return await get_current_user(credentials=creds, db=db)
 
 
 # ---------------------------------------------------------------------------
@@ -269,54 +299,72 @@ def require_wp_edit_permission() -> Callable:
         current_user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db),
     ) -> User:
-        from app.models.workpaper_models import WorkingPaper
-        from app.services.permission_service import Permission, check_permission
-
-        role = current_user.role.value
-
-        # ① 角色级 WORKPAPER_WRITE 能力（qc/readonly 无 → 403）
-        if not check_permission(role, Permission.WORKPAPER_WRITE):
-            raise HTTPException(status_code=403, detail="无底稿编辑权限")
-
-        # ② admin/partner 全局放行
-        if role in ("admin", "partner"):
-            return current_user
-
-        # ③ 解析目标底稿所属项目
-        project_id = (
-            await db.execute(
-                select(WorkingPaper.project_id).where(
-                    WorkingPaper.id == wp_id,
-                    WorkingPaper.is_deleted == False,  # noqa: E712
-                )
-            )
-        ).scalar_one_or_none()
-        if project_id is None:
-            raise HTTPException(status_code=404, detail="底稿不存在")
-
-        # ④ 项目成员编辑权（project_users edit 级；复用权限缓存）
-        cached_level = await _get_cached_permission(current_user.id, project_id)
-        if cached_level is None:
-            project_user = (
-                await db.execute(
-                    select(ProjectUser).where(
-                        ProjectUser.project_id == project_id,
-                        ProjectUser.user_id == current_user.id,
-                        ProjectUser.is_deleted == False,  # noqa: E712
-                    )
-                )
-            ).scalar_one_or_none()
-            if project_user is None:
-                raise HTTPException(status_code=403, detail="无底稿编辑权限")
-            cached_level = project_user.permission_level.value
-            await _set_cached_permission(current_user.id, project_id, cached_level)
-
-        if PERMISSION_HIERARCHY.get(cached_level, 0) < PERMISSION_HIERARCHY["edit"]:
-            raise HTTPException(status_code=403, detail="无底稿编辑权限")
-
+        await authorize_wp_edit(db, current_user, wp_id)
         return current_user
 
     return dependency
+
+
+async def authorize_wp_edit(db: AsyncSession, current_user: User, wp_id: UUID) -> UUID:
+    """底稿编辑权校验（可复用；供路径依赖 require_wp_edit_permission 与 body-wp_id 端点调用）。
+
+    判定口径同 require_wp_edit_permission：
+    1. 角色须具 WORKPAPER_WRITE（qc/readonly → 403）。
+    2. admin/partner 全局放行。
+    3. 其余角色须为目标底稿所属项目成员且具 edit 权（project_users）。
+
+    Returns:
+        目标底稿所属 project_id（供调用方进一步校验归属）。
+
+    Raises:
+        HTTPException 403（无编辑权）/ 404（底稿不存在）。
+    """
+    from app.models.workpaper_models import WorkingPaper
+    from app.services.permission_service import Permission, check_permission
+
+    role = current_user.role.value
+
+    # ① 角色级 WORKPAPER_WRITE 能力
+    if not check_permission(role, Permission.WORKPAPER_WRITE):
+        raise HTTPException(status_code=403, detail="无底稿编辑权限")
+
+    # ③ 解析目标底稿所属项目
+    project_id = (
+        await db.execute(
+            select(WorkingPaper.project_id).where(
+                WorkingPaper.id == wp_id,
+                WorkingPaper.is_deleted == False,  # noqa: E712
+            )
+        )
+    ).scalar_one_or_none()
+    if project_id is None:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    # ② admin/partner 全局放行（在确认底稿存在后返回其 project_id）
+    if role in ("admin", "partner"):
+        return project_id
+
+    # ④ 项目成员编辑权（project_users edit 级；复用权限缓存）
+    cached_level = await _get_cached_permission(current_user.id, project_id)
+    if cached_level is None:
+        project_user = (
+            await db.execute(
+                select(ProjectUser).where(
+                    ProjectUser.project_id == project_id,
+                    ProjectUser.user_id == current_user.id,
+                    ProjectUser.is_deleted == False,  # noqa: E712
+                )
+            )
+        ).scalar_one_or_none()
+        if project_user is None:
+            raise HTTPException(status_code=403, detail="无底稿编辑权限")
+        cached_level = project_user.permission_level.value
+        await _set_cached_permission(current_user.id, project_id, cached_level)
+
+    if PERMISSION_HIERARCHY.get(cached_level, 0) < PERMISSION_HIERARCHY["edit"]:
+        raise HTTPException(status_code=403, detail="无底稿编辑权限")
+
+    return project_id
 
 
 # ---------------------------------------------------------------------------

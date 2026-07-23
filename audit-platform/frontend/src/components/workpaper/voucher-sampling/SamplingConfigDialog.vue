@@ -505,6 +505,18 @@ function hasError(key: string): boolean {
               </el-radio-group>
             </div>
 
+            <!-- 抽样单位 -->
+            <div class="filter-item">
+              <label class="filter-label">抽样单位</label>
+              <el-radio-group v-model="config.samplingUnit" size="small">
+                <el-radio value="ledger_line">分录行</el-radio>
+                <el-radio value="voucher">整张凭证</el-radio>
+              </el-radio-group>
+              <span class="hint-text" style="margin-left: 8px">
+                整张凭证：按凭证号聚合抽样，抽中带出完整借贷分录
+              </span>
+            </div>
+
             <!-- 凭证类型 -->
             <div class="filter-item">
               <label class="filter-label">凭证类型</label>

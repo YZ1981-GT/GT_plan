@@ -22,10 +22,30 @@ import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
+import app.routers.voucher_sampling as _vs_module
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.base import UserRole
 from app.routers.voucher_sampling import router
+from app.services.ledger_sampling_service import StatsResult
+
+
+@pytest.fixture(autouse=True)
+def _bridge_exclusions_to_legacy(monkeypatch):
+    """P3：新增的 `_get_voucher_sampling_exclusions`（ledger_line 单位行级排除入口）委托到
+    各测试已 mock 的 legacy 收集器（`_get_voucher_sampling_extracted_nos` /
+    `_get_preliminary_voucher_nos`），使既有排除/阶段隔离/去重测试意图不变——测试数据无
+    `filled_unit_ids`，行级拆分退化为 legacy voucher_no 口径，行为等价。行级拆分本身由
+    test_voucher_sampling_row_exclusion.py 独立覆盖。"""
+
+    async def _delegate(db, wp, preliminary_only=False):
+        if preliminary_only:
+            nos = await _vs_module._get_preliminary_voucher_nos(db, wp)
+        else:
+            nos = await _vs_module._get_voucher_sampling_extracted_nos(db, wp)
+        return list(nos), []
+
+    monkeypatch.setattr(_vs_module, "_get_voucher_sampling_exclusions", _delegate)
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -35,6 +55,16 @@ _PROJECT_B_ID = uuid.uuid4()
 _WORKPAPER_ID = uuid.uuid4()
 _LOG_ID_1 = uuid.uuid4()
 _LOG_ID_2 = uuid.uuid4()
+
+
+@pytest.fixture(autouse=True)
+def _bypass_extract_auth():
+    """抽凭端点服务端授权（Req8）在这些流程测试中默认放行；授权本身由 test_voucher_sampling_auth 覆盖。"""
+    with patch(
+        "app.routers.voucher_sampling._authorize_and_validate_extract",
+        new=AsyncMock(return_value=None),
+    ):
+        yield
 
 
 # ─── Fake User ────────────────────────────────────────────────────────────────
@@ -103,6 +133,34 @@ def _make_ledger_rows(
     return items
 
 
+def _make_stats(rows: list[dict]) -> StatsResult:
+    """Build a realistic StatsResult matching execute_with_stats full-population aggregates.
+
+    P0 修复后 voucher-extract 以 stats（全量聚合）为总体口径，测试须提供真实
+    StatsResult 而非 MagicMock，否则 population_count / 覆盖率断言会取到 MagicMock。
+    """
+    def _num(v: object) -> Decimal:
+        return Decimal(str(v)) if v is not None else Decimal("0")
+
+    debit = sum((_num(r.get("debit_amount")) for r in rows), Decimal("0"))
+    credit = sum((_num(r.get("credit_amount")) for r in rows), Decimal("0"))
+    amount = sum(
+        (
+            max(abs(_num(r.get("debit_amount"))), abs(_num(r.get("credit_amount"))))
+            for r in rows
+        ),
+        Decimal("0"),
+    )
+    return StatsResult(
+        total_count=len(rows),
+        debit_total=debit,
+        credit_total=credit,
+        amount_total=amount,
+        by_voucher_type={},
+        truncated=False,
+    )
+
+
 def _make_extract_request(
     workpaper_id: uuid.UUID = _WORKPAPER_ID,
     method: str = "random",
@@ -167,7 +225,7 @@ class TestVoucherSamplingFullFlow:
         ):
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
-                return_value=(population, MagicMock())
+                return_value=(population, _make_stats(population))
             )
 
             transport = ASGITransport(app=app)
@@ -206,7 +264,7 @@ class TestVoucherSamplingFullFlow:
         ):
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
-                return_value=(population, MagicMock())
+                return_value=(population, _make_stats(population))
             )
 
             transport = ASGITransport(app=app)
@@ -246,7 +304,7 @@ class TestVoucherSamplingFullFlow:
         ):
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
-                return_value=(population, MagicMock())
+                return_value=(population, _make_stats(population))
             )
 
             transport = ASGITransport(app=app)
@@ -283,7 +341,7 @@ class TestVoucherSamplingFullFlow:
         ):
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
-                return_value=(population, MagicMock())
+                return_value=(population, _make_stats(population))
             )
 
             transport = ASGITransport(app=app)
@@ -318,7 +376,7 @@ class TestVoucherSamplingFullFlow:
         ):
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
-                return_value=(population, MagicMock())
+                return_value=(population, _make_stats(population))
             )
 
             transport = ASGITransport(app=app)
@@ -500,7 +558,7 @@ class TestVoucherSamplingPhaseIsolation:
         ):
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
-                return_value=(population, MagicMock())
+                return_value=(population, _make_stats(population))
             )
 
             transport = ASGITransport(app=app)
@@ -535,7 +593,7 @@ class TestVoucherSamplingPhaseIsolation:
         ) as mock_get_prelim:
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
-                return_value=(population, MagicMock())
+                return_value=(population, _make_stats(population))
             )
 
             transport = ASGITransport(app=app)
@@ -574,7 +632,7 @@ class TestVoucherSamplingPhaseIsolation:
             ]
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
-                return_value=(final_population, MagicMock())
+                return_value=(final_population, _make_stats(final_population))
             )
 
             transport = ASGITransport(app=app)
@@ -743,7 +801,7 @@ class TestVoucherSamplingSeedReproducibility:
         ):
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
-                return_value=(population, MagicMock())
+                return_value=(population, _make_stats(population))
             )
 
             transport = ASGITransport(app=app)
@@ -792,7 +850,7 @@ class TestVoucherSamplingSeedReproducibility:
         ):
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
-                return_value=(population, MagicMock())
+                return_value=(population, _make_stats(population))
             )
 
             transport = ASGITransport(app=app)
@@ -854,7 +912,7 @@ class TestVoucherSamplingExcludeDedup:
         ):
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
-                return_value=(population, MagicMock())
+                return_value=(population, _make_stats(population))
             )
 
             transport = ASGITransport(app=app)
@@ -888,7 +946,7 @@ class TestVoucherSamplingExcludeDedup:
         ):
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
-                return_value=(population, MagicMock())
+                return_value=(population, _make_stats(population))
             )
 
             transport = ASGITransport(app=app)
@@ -929,7 +987,7 @@ class TestVoucherSamplingExcludeDedup:
         ):
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
-                return_value=(population, MagicMock())
+                return_value=(population, _make_stats(population))
             )
 
             transport = ASGITransport(app=app)
@@ -983,7 +1041,7 @@ class TestVoucherSamplingSecurityIsolation:
         ):
             MockService.build_ledger_query = AsyncMock(return_value=MagicMock())
             MockService.execute_with_stats = AsyncMock(
-                return_value=(items_a, MagicMock())
+                return_value=(items_a, _make_stats(items_a))
             )
 
             transport = ASGITransport(app=app)
@@ -1004,7 +1062,7 @@ class TestVoucherSamplingSecurityIsolation:
                 MockService.build_ledger_query.reset_mock()
                 items_b = _make_ledger_rows(0)
                 MockService.execute_with_stats = AsyncMock(
-                    return_value=(items_b, MagicMock())
+                    return_value=(items_b, _make_stats(items_b))
                 )
 
                 resp_b = await client.post(

@@ -37,8 +37,18 @@ class WpSamplingEngine:
         sample_size: int = 25,
         amount_threshold: float | None = None,
         sampling_interval: float | None = None,
+        random_seed: int | None = None,
     ) -> dict[str, Any]:
-        """执行抽样并返回结果"""
+        """执行抽样并返回结果
+
+        random_seed：随机种子（P0-2 可复现）；None 时自动生成并回传，
+        供复核/重跑时以相同种子复现同一抽样结果（合规留痕要求）。
+        """
+        # 种子可复现：确定性方法（top_n）不依赖种子，随机类方法用 rng.Random(seed)
+        if random_seed is None:
+            random_seed = random.randrange(1, 2**31 - 1)
+        rng = random.Random(random_seed)
+
         # 查询候选凭证
         entries = await self._fetch_candidates(db, project_id, year, account_codes)
 
@@ -48,25 +58,27 @@ class WpSamplingEngine:
                 "total_population": 0,
                 "sample_size": 0,
                 "entries": [],
+                "random_seed": random_seed,
             }
 
         # 按方式抽样
         if method == "random":
-            sampled = self._random_sample(entries, sample_size)
+            sampled = self._random_sample(entries, sample_size, rng)
         elif method == "stratified":
-            sampled = self._stratified_sample(entries, sample_size)
+            sampled = self._stratified_sample(entries, sample_size, rng)
         elif method == "top_n":
             sampled = self._top_n_sample(entries, amount_threshold or 100000)
         elif method == "mus":
-            sampled = self._mus_sample(entries, sampling_interval or 50000, sample_size)
+            sampled = self._mus_sample(entries, sampling_interval or 50000, sample_size, rng)
         else:
-            sampled = self._random_sample(entries, sample_size)
+            sampled = self._random_sample(entries, sample_size, rng)
 
         return {
             "method": method,
             "total_population": len(entries),
             "sample_size": len(sampled),
             "entries": sampled,
+            "random_seed": random_seed,
         }
 
     async def _fetch_candidates(
@@ -104,14 +116,15 @@ class WpSamplingEngine:
         return entries
 
     def _random_sample(
-        self, entries: list[dict], sample_size: int
+        self, entries: list[dict], sample_size: int, rng: random.Random | None = None
     ) -> list[dict]:
-        """随机抽样"""
+        """随机抽样（rng 可复现；缺省回退模块 random 向后兼容）"""
+        r = rng or random
         n = min(sample_size, len(entries))
-        return random.sample(entries, n)
+        return r.sample(entries, n)
 
     def _stratified_sample(
-        self, entries: list[dict], sample_size: int
+        self, entries: list[dict], sample_size: int, rng: random.Random | None = None
     ) -> list[dict]:
         """分层抽样 — 按金额区间分 3 层，每层按比例抽取"""
         if not entries:
@@ -133,12 +146,13 @@ class WpSamplingEngine:
                 layers[2].append(e)
 
         # 按比例分配样本量（高层多抽）
+        r = rng or random
         weights = [0.2, 0.3, 0.5]
         sampled = []
         for i, layer in enumerate(layers):
             n = max(1, int(sample_size * weights[i]))
             n = min(n, len(layer))
-            sampled.extend(random.sample(layer, n))
+            sampled.extend(r.sample(layer, n))
 
         return sampled[:sample_size]
 
@@ -149,14 +163,16 @@ class WpSamplingEngine:
         return [e for e in entries if e["amount"] >= threshold]
 
     def _mus_sample(
-        self, entries: list[dict], interval: float, max_samples: int
+        self, entries: list[dict], interval: float, max_samples: int,
+        rng: random.Random | None = None,
     ) -> list[dict]:
-        """货币单位抽样 — 固定间距从累计金额中抽取"""
+        """货币单位抽样 — 固定间距从累计金额中抽取（rng 可复现）"""
         if not entries or interval <= 0:
             return []
 
-        # 随机起点
-        start = random.uniform(0, interval)
+        # 随机起点（rng 可复现）
+        r = rng or random
+        start = r.uniform(0, interval)
         cumulative = 0.0
         next_hit = start
         sampled = []

@@ -8,7 +8,7 @@
  * 通用组件：通过 props 配置适配 D2-7/D4-14/D4-15/E2-7 等所有抽凭底稿
  * Requirements: 5.4, 8.3, 9.1, 9.3, 10.1, 10.3, 10.4, 10.5, 12.3
  */
-import { defineAsyncComponent, toRef, computed, ref } from 'vue'
+import { defineAsyncComponent, toRef, computed, ref, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useVoucherSampling } from '../composables/useVoucherSampling'
 import { useSamplingPhase, type ViewMode } from '../composables/useSamplingPhase'
@@ -21,6 +21,7 @@ import type {
   FillMode,
   SampledVoucher,
   CheckResult,
+  SamplingConfig,
 } from '../composables/useSamplingAlgorithms'
 
 // ─── 异步加载子组件（后续任务实现） ──────────────────────────────────────────
@@ -49,11 +50,23 @@ interface Props {
   year: number
   /** 初始期间月份（1-12），用于期后抽凭默认 Q1 等 */
   initialPeriodRange?: number[]
+  /** 合并进默认抽样配置（如底稿按测试原因预填关键词/方向/方法） */
+  initialConfigPatch?: Partial<SamplingConfig>
+  /** 顶部提示（如「已按测试原因预填：大额」） */
+  configHint?: string
+  /**
+   * 父底稿当前已有的全量样本（含所有 phase）。用于生成 before_data 快照与
+   * append/replace/merge 的真实前态；不传则视为空前态（向后兼容）。
+   */
+  existingSamples?: SampledVoucher[]
 }
 
 const props = withDefaults(defineProps<Props>(), {
   defaultMethod: 'random',
   initialPeriodRange: undefined,
+  initialConfigPatch: undefined,
+  configHint: '',
+  existingSamples: undefined,
 })
 
 // ─── Emits ────────────────────────────────────────────────────────────────────
@@ -117,6 +130,9 @@ const {
   misstatementResult,
   samplingConclusion,
   tolerableFromMateriality,
+  uncheckedSampleCount,
+  reconcileInfo,
+  methodologySnapshot,
   // ─── 方法学增强操作（R15/R16/R18/R22）───
   loadTolerableMisstatement,
   computeSuggestedSampleSize,
@@ -132,6 +148,7 @@ const {
   phase: toRef(props, 'phase'),
   defaultMethod: props.defaultMethod,
   initialPeriodRange: props.initialPeriodRange,
+  initialConfigPatch: props.initialConfigPatch,
 })
 
 // ─── Composable: useSamplingPhase ─────────────────────────────────────────────
@@ -193,7 +210,14 @@ function handleBatchMarkChecked() {
 
 /** 确认填充后 emit */
 async function handleConfirmFill() {
-  const result = await confirmFill()
+  // R18.7 结论确认门禁：已推断出总体结论但未经审计师确认时，不得定稿回填。
+  // 未做错报推断（无可容忍错报 → samplingConclusion 为 null）的简单抽凭不受此门禁约束。
+  if (samplingConclusion.value && !conclusionConfirmed.value) {
+    ElMessage.warning('已生成抽样结论建议，请先在下方「错报推断与总体结论」区确认结论后再填入底稿')
+    return
+  }
+  // 传入父底稿真实前态，供 before_data 快照与 append/replace/merge 基于真实底稿状态
+  const result = await confirmFill(props.existingSamples)
   if (result.length > 0) {
     const methodology: SamplingFilledMethodology = {
       samplingMethod: config.value.samplingMethod,
@@ -317,15 +341,31 @@ const samplingPopulationCount = computed(
   () => coverageStats.value?.populationCount ?? 0,
 )
 
-/** 总体完整性校验结果（纯函数 reconcilePopulation） */
+/**
+ * 有效账面金额：手工录入优先（Req2.4）；否则用后端独立账面（trial_balance 审定）；
+ * 二者皆无 → null（不以序时账总体自身比对，避免自身比对假绿，Req2.2）。
+ */
+const effectiveBookAmount = computed<string | null>(() => {
+  if (bookAmountInput.value && bookAmountInput.value !== '') {
+    return bookAmountInput.value
+  }
+  if (reconcileInfo.value?.available && reconcileInfo.value.bookAmount != null) {
+    return reconcileInfo.value.bookAmount
+  }
+  return null
+})
+
+/** 是否可执行总体完整性核对（有独立账面或手工录入） */
+const reconcileAvailable = computed(
+  () => coverageStats.value != null && effectiveBookAmount.value != null,
+)
+
+/** 总体完整性校验结果（纯函数 reconcilePopulation）；无独立账面时返回 null → UI 显示"未执行核对" */
 const populationReconcile = computed(() => {
-  if (!coverageStats.value) return null
-  const book = bookAmountInput.value && bookAmountInput.value !== ''
-    ? bookAmountInput.value
-    : samplingPopulationAmount.value
+  if (!coverageStats.value || effectiveBookAmount.value == null) return null
   return reconcilePopulation(
     samplingPopulationAmount.value,
-    book,
+    effectiveBookAmount.value,
     reconcileThresholdPct.value,
   )
 })
@@ -341,6 +381,9 @@ function handleActualMisstatementChange(row: SampledVoucher, val: string) {
 /** 手动触发错报推断（若尚未自动计算） */
 function handleInferMisstatement() {
   const { conclusion } = inferMisstatement()
+  if (uncheckedSampleCount.value > 0) {
+    ElMessage.warning(`有 ${uncheckedSampleCount.value} 笔样本尚未填写核查结果，未纳入错报推断`)
+  }
   if (!conclusion) {
     ElMessage.warning('请先在抽样参数中填写可容忍错报')
   }
@@ -348,6 +391,11 @@ function handleInferMisstatement() {
 
 /** 结论人工确认标识（R18.7：确认前不定稿） */
 const conclusionConfirmed = ref(false)
+// 任一次错报推断/结论重算（录入实际错报、重新推断、重抽、重新抽样清空）都会使
+// 上一次的人工确认失效，强制审计师对最新结论重新确认后方可定稿。
+watch(samplingConclusion, () => {
+  conclusionConfirmed.value = false
+})
 function handleConfirmConclusion() {
   conclusionConfirmed.value = true
   ElMessage.success('已确认抽样结论')
@@ -370,6 +418,9 @@ function handleExportMemo() {
     samplingConclusion: samplingConclusion.value,
     seedUsed: seedUsed.value,
     sampleCount: sampledVouchers.value.length,
+    // R14.2 归档留痕：方法学算法版本（后端权威快照）；batchId 待 Task 7 前端 wiring 后接入
+    algoVersion: methodologySnapshot.value?.algo_version ?? null,
+    batchId: (methodologySnapshot.value?.batch_id as string | undefined) ?? null,
   })
   const stamp = new Date().toISOString().slice(0, 10)
   const account = config.value.accountCodes[0] ?? '抽样'
@@ -403,6 +454,14 @@ async function handleResample() {
 
 <template>
   <div class="gt-voucher-sampling-engine">
+    <el-alert
+      v-if="props.configHint"
+      type="info"
+      :closable="false"
+      show-icon
+      :title="props.configHint"
+      style="margin-bottom: 12px"
+    />
     <!-- ═══ 覆盖率统计卡片 ═══ -->
     <div class="coverage-stats-bar">
       <div class="stat-card">
@@ -446,15 +505,18 @@ async function handleResample() {
           <span class="reconcile-value">{{ samplingPopulationCount }} 笔</span>
         </div>
         <div class="reconcile-item">
-          <span class="reconcile-label">账面金额</span>
+          <span class="reconcile-label">账面金额（独立来源）</span>
           <el-input
             v-model="bookAmountInput"
             size="small"
-            placeholder="默认同抽样总体，可手工录入核对"
-            style="width: 180px"
+            :placeholder="reconcileInfo?.available ? '已取独立账面，可手工覆盖' : '无独立账面，请手工录入核对'"
+            style="width: 200px"
           >
             <template #suffix>元</template>
           </el-input>
+          <el-tag v-if="reconcileInfo?.available" size="small" type="success" effect="plain">
+            {{ reconcileInfo?.basis && reconcileInfo.basis.startsWith('trial_balance_audited') ? '试算表审定发生额' : '独立来源' }}
+          </el-tag>
         </div>
         <div class="reconcile-item">
           <span class="reconcile-label">可容忍差异</span>
@@ -471,11 +533,19 @@ async function handleResample() {
         </div>
       </div>
       <el-alert
-        v-if="populationReconcile && !populationReconcile.withinThreshold"
+        v-if="!reconcileAvailable"
+        type="info"
+        :closable="false"
+        show-icon
+        title="未执行总体完整性核对：无独立账面数据源，请手工录入账面金额（不以序时账总体自身比对）"
+        style="margin-top: 8px"
+      />
+      <el-alert
+        v-else-if="populationReconcile && !populationReconcile.withinThreshold"
         type="warning"
         :closable="false"
         show-icon
-        title="总体可能不完整，抽样结论受限：抽样总体与账面差异超过可容忍阈值，请核实总体来源"
+        title="总体可能不完整，抽样结论受限：抽样总体与独立账面差异超过可容忍阈值，请核实总体来源"
         style="margin-top: 8px"
       />
     </el-card>

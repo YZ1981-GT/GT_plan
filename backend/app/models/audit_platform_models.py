@@ -1127,6 +1127,17 @@ class WorkpaperExtractionLog(Base):
     is_undone: Mapped[bool] = mapped_column(
         sa.Boolean, server_default=text("false"), nullable=False
     )
+    # ─── 抽样批次治理（V123）─────────────────────────────────────────────
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
+    row_version: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("1"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(
+        Text, server_default=text("'filled'"), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(
         sa.DateTime, server_default=func.now(), nullable=False
     )
