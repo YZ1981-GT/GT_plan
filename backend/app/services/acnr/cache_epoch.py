@@ -111,82 +111,150 @@ EPOCH_KEY_PREFIX = "acnr:epoch:"
 INVALIDATE_CHANNEL_PREFIX = "acnr:invalidate:"
 
 
-async def increment_epoch(project_id: str) -> int:
-    """递增 project_epoch 并通过 pub-sub 通知其他 worker。
+# ─── DB-backed Durable_Epoch helpers (R11.4) ────────────────────────────────
+
+_INCR_DB_SQL = (
+    "INSERT INTO acnr_invalidation_epoch (project_id, epoch, updated_at) "
+    "VALUES (CAST(:pid AS uuid), 1, now()) "
+    "ON CONFLICT (project_id) DO UPDATE "
+    "SET epoch = acnr_invalidation_epoch.epoch + 1, updated_at = now() "
+    "RETURNING epoch"
+)
+_READ_DB_SQL = "SELECT epoch FROM acnr_invalidation_epoch WHERE project_id = CAST(:pid AS uuid)"
+
+
+async def _increment_db_epoch(project_id: str, session=None) -> int:
+    """DB 权威单调递增（单语句原子 ON CONFLICT）。
+
+    session 提供 → 在该事务内递增（与业务变更同事务，供 outbox dispatcher/受控入口用）。
+    session 为 None → 开短事务自提交。
+    """
+    import sqlalchemy as sa
+
+    if session is not None:
+        val = (await session.execute(sa.text(_INCR_DB_SQL), {"pid": project_id})).scalar_one()
+        await session.flush()
+        return int(val)
+
+    from app.core.database import async_session
+    async with async_session() as s:
+        val = (await s.execute(sa.text(_INCR_DB_SQL), {"pid": project_id})).scalar_one()
+        await s.commit()
+        return int(val)
+
+
+async def _read_db_epoch(project_id: str, session=None) -> int | None:
+    """读 DB Durable_Epoch；行不存在返回 0，异常上抛给调用方兜底。"""
+    import sqlalchemy as sa
+
+    if session is not None:
+        val = (await session.execute(sa.text(_READ_DB_SQL), {"pid": project_id})).scalar_one_or_none()
+        return int(val) if val is not None else 0
+
+    from app.core.database import async_session
+    async with async_session() as s:
+        val = (await s.execute(sa.text(_READ_DB_SQL), {"pid": project_id})).scalar_one_or_none()
+        return int(val) if val is not None else 0
+
+
+async def increment_epoch(project_id: str, session=None) -> int:
+    """递增 project_epoch（DB 权威 + Redis fan-out）并通知其他 worker。
+
+    R11.4：DB-first 单调递增 —— Redis 不可用时 DB 仍递增（不丢失跨 worker 失效）；
+    Redis 仅作 commit 后 fan-out。DB 不可用时回退旧 Redis-only 路径（不回归既有能力）。
+
+    Args:
+        project_id: 项目 ID
+        session: 可选业务事务 session（提供则 epoch 递增与业务变更同事务）
 
     Returns:
-        递增后的 epoch 值；Redis 不可用时返回 0（降级）。
+        递增后的 epoch 值；DB 与 Redis 均不可用时返回 0（降级，TTL/poll 兜底）。
     """
     if not project_id:
         return 0
 
+    # 1) DB-first 权威递增（Redis 不可用仍递增）
+    try:
+        new_epoch = await _increment_db_epoch(project_id, session)
+        # best-effort Redis 镜像 + fan-out（失败仅告警，不影响 DB 权威值）
+        redis = get_redis_client()
+        if redis is not None:
+            try:
+                await redis.set(f"{EPOCH_KEY_PREFIX}{project_id}", new_epoch)
+                await redis.publish(f"{INVALIDATE_CHANNEL_PREFIX}{project_id}", str(new_epoch))
+            except Exception as exc:
+                logger.warning(
+                    "cache_epoch.increment_epoch: Redis fan-out failed (DB epoch=%d, project=%s): %s",
+                    new_epoch, project_id, exc,
+                )
+                _record_fallback_metric(f"increment_epoch redis fan-out: {exc}")
+        set_local_epoch(project_id, new_epoch)
+        logger.debug("cache_epoch.increment_epoch: project=%s epoch=%d (DB)", project_id, new_epoch)
+        return new_epoch
+    except Exception as db_exc:
+        logger.warning(
+            "cache_epoch.increment_epoch: DB-first failed, fallback to Redis-only (project=%s): %s",
+            project_id, db_exc,
+        )
+        _record_fallback_metric(f"increment_epoch DB: {db_exc}")
+
+    # 2) DB 不可用 → 退回旧 Redis-only 路径（不回归既有能力）
     redis = get_redis_client()
     if redis is None:
-        logger.warning(
-            "cache_epoch.increment_epoch: Redis unavailable, fallback epoch=0 "
-            "(project=%s)", project_id,
-        )
-        _record_fallback_metric("increment_epoch: Redis unavailable")
+        _record_fallback_metric("increment_epoch: DB+Redis both unavailable")
         return 0
-
     try:
-        key = f"{EPOCH_KEY_PREFIX}{project_id}"
-        new_epoch = await redis.incr(key)
-
-        # Pub-sub 通知其他 worker
-        channel = f"{INVALIDATE_CHANNEL_PREFIX}{project_id}"
-        await redis.publish(channel, str(new_epoch))
-
-        # 更新本地 epoch
+        new_epoch = await redis.incr(f"{EPOCH_KEY_PREFIX}{project_id}")
+        await redis.publish(f"{INVALIDATE_CHANNEL_PREFIX}{project_id}", str(new_epoch))
         set_local_epoch(project_id, int(new_epoch))
-
-        logger.debug(
-            "cache_epoch.increment_epoch: project=%s epoch=%d",
-            project_id, new_epoch,
-        )
         return int(new_epoch)
-
     except Exception as exc:
         logger.warning(
-            "cache_epoch.increment_epoch: Redis error, fallback epoch=0 "
-            "(project=%s): %s", project_id, exc,
+            "cache_epoch.increment_epoch: Redis-only fallback error (project=%s): %s",
+            project_id, exc,
         )
-        _record_fallback_metric(f"increment_epoch: {exc}")
+        _record_fallback_metric(f"increment_epoch redis fallback: {exc}")
         return 0
 
 
-async def get_epoch(project_id: str) -> int:
-    """获取当前 project_epoch。
+async def get_epoch(project_id: str, session=None) -> int:
+    """获取当前 project_epoch（DB 权威，Redis 回退）。
 
     Returns:
-        当前 epoch 值；Redis 不可用或 key 不存在时返回 0。
+        当前 epoch 值；DB 与 Redis 均不可用或 key 不存在时返回 0。
     """
     if not project_id:
         return 0
 
+    # DB-first 权威读
+    try:
+        val = await _read_db_epoch(project_id, session)
+        if val is not None:
+            set_local_epoch(project_id, val)
+            return val
+    except Exception as exc:
+        logger.warning(
+            "cache_epoch.get_epoch: DB read failed, fallback to Redis (project=%s): %s",
+            project_id, exc,
+        )
+        _record_fallback_metric(f"get_epoch DB: {exc}")
+
+    # 回退 Redis
     redis = get_redis_client()
     if redis is None:
-        logger.warning(
-            "cache_epoch.get_epoch: Redis unavailable, fallback epoch=0 "
-            "(project=%s)", project_id,
-        )
-        _record_fallback_metric("get_epoch: Redis unavailable")
+        _record_fallback_metric("get_epoch: DB+Redis both unavailable")
         return 0
-
     try:
-        key = f"{EPOCH_KEY_PREFIX}{project_id}"
-        val = await redis.get(key)
+        val = await redis.get(f"{EPOCH_KEY_PREFIX}{project_id}")
         epoch = int(val) if val is not None else 0
-        # 更新本地 epoch
         set_local_epoch(project_id, epoch)
         return epoch
-
     except Exception as exc:
         logger.warning(
-            "cache_epoch.get_epoch: Redis error, fallback epoch=0 "
-            "(project=%s): %s", project_id, exc,
+            "cache_epoch.get_epoch: Redis error, fallback epoch=0 (project=%s): %s",
+            project_id, exc,
         )
-        _record_fallback_metric(f"get_epoch: {exc}")
+        _record_fallback_metric(f"get_epoch redis: {exc}")
         return 0
 
 
@@ -223,15 +291,22 @@ async def start_epoch_subscriber() -> None:
     """
     global _subscriber_task, _poll_task
 
+    # R11.5: DB 轮询兜底任务始终启动（不依赖 Redis）
+    if _poll_task is None or _poll_task.done():
+        _poll_task = asyncio.create_task(_epoch_poll_task())
+    # R11.5: subscriber 重连循环始终启动；Redis 不可用时其内部指数退避自愈
+    if _subscriber_task is None or _subscriber_task.done():
+        _subscriber_task = asyncio.create_task(_reconnect_loop())
+
     redis = get_redis_client()
     if redis is None:
-        logger.warning("cache_epoch.start_epoch_subscriber: Redis unavailable, skip")
+        logger.warning(
+            "cache_epoch.start_epoch_subscriber: Redis unavailable at startup; "
+            "DB poll fallback started, subscriber will self-heal on Redis recovery"
+        )
         _record_fallback_metric("start_epoch_subscriber: Redis unavailable at startup")
-        return
-
-    _subscriber_task = asyncio.create_task(_reconnect_loop())
-    _poll_task = asyncio.create_task(_epoch_poll_task())
-    logger.info("cache_epoch: started subscriber + poll tasks")
+    else:
+        logger.info("cache_epoch: started subscriber + poll tasks")
 
 
 async def stop_epoch_subscriber() -> None:
@@ -331,20 +406,16 @@ async def _epoch_poll_task() -> None:
         try:
             await asyncio.sleep(EPOCH_POLL_INTERVAL)
 
-            redis = get_redis_client()
-            if redis is None:
-                _record_fallback_metric("epoch_poll: Redis unavailable")
-                continue
-
             project_ids = get_all_local_project_ids()
             if not project_ids:
                 continue
 
             for project_id in project_ids:
                 try:
-                    key = f"{EPOCH_KEY_PREFIX}{project_id}"
-                    remote_val = await redis.get(key)
-                    remote_epoch = int(remote_val) if remote_val is not None else 0
+                    # R11.4: 对比 DB 权威 Durable_Epoch（不依赖 Redis）
+                    remote_epoch = await _read_db_epoch(project_id)
+                    if remote_epoch is None:
+                        continue
                     local_epoch = get_local_epoch(project_id)
 
                     if remote_epoch != local_epoch:

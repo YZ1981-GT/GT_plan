@@ -51,36 +51,21 @@ vi.mock('@/services/apiProxy', () => ({
   },
 }))
 
-// Mock EventSource（useSSEReconnect 用 es.onmessage/onerror）
-class MockEventSource {
-  url: string
-  onopen: (() => void) | null = null
-  onmessage: ((e: any) => void) | null = null
-  onerror: (() => void) | null = null
-  readyState = 1
-
-  constructor(url: string) {
-    this.url = url
-    MockEventSource.instances.push(this)
-  }
-
-  addEventListener() {}
-
-  close() {
-    this.readyState = 2
-  }
-
-  // 模拟服务端推送一条 message
-  _emit(data: any) {
-    this.onmessage?.({ data: JSON.stringify(data) })
-  }
-
-  static instances: MockEventSource[] = []
-  static reset() {
-    MockEventSource.instances = []
-  }
+// Mock 项目事件流单例总线（LineagePanel 迁移后订阅共享连接的 LINKAGE_STALE_CHANGED）
+interface MockSub {
+  projectId: string
+  eventName: string
+  handler: (data: any, event?: string) => void
+  close: ReturnType<typeof vi.fn>
 }
-;(global as any).EventSource = MockEventSource
+const mockSubs: MockSub[] = []
+vi.mock('@/services/sse/projectEventStream', () => ({
+  subscribeProjectEvent: (projectId: string, eventName: string, handler: any) => {
+    const close = vi.fn()
+    mockSubs.push({ projectId, eventName, handler, close })
+    return { close }
+  },
+}))
 
 // 默认 trace 响应（stale 章节）
 const STALE_TRACE = {
@@ -113,14 +98,14 @@ describe('LineagePanel.vue — 刷新功能（Task 10.1/10.2）', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    MockEventSource.reset()
+    mockSubs.length = 0
     // Default: trace endpoint returns stale section
     mockApiGet.mockResolvedValue(STALE_TRACE)
     mockApiPost.mockResolvedValue({ version_no: 2, refreshed: ['八、1'] })
   })
 
   afterEach(() => {
-    MockEventSource.reset()
+    mockSubs.length = 0
   })
 
   /**
@@ -274,14 +259,13 @@ describe('LineagePanel.vue — 刷新功能（Task 10.1/10.2）', () => {
     })
   })
 
-  describe('SSE LINKAGE_STALE_CHANGED 实时更新', () => {
-    it('组件挂载时连接项目级事件流 /events/stream', async () => {
+  describe('SSE LINKAGE_STALE_CHANGED 实时更新（迁移到项目事件流单例总线）', () => {
+    it('组件挂载时订阅项目级 LINKAGE_STALE_CHANGED 事件', async () => {
       mount(LineagePanel, { props: baseProps })
       await nextTick()
-      expect(MockEventSource.instances.length).toBeGreaterThanOrEqual(1)
-      expect(MockEventSource.instances[0].url).toContain(
-        `/api/projects/proj-001/events/stream`,
-      )
+      expect(mockSubs.length).toBeGreaterThanOrEqual(1)
+      expect(mockSubs[0].projectId).toBe('proj-001')
+      expect(mockSubs[0].eventName).toBe('LINKAGE_STALE_CHANGED')
     })
 
     it('收到 LINKAGE_STALE_CHANGED 事件时重新拉取溯源（更新 stale 状态）', async () => {
@@ -299,8 +283,8 @@ describe('LineagePanel.vue — 刷新功能（Task 10.1/10.2）', () => {
           anchor_name: 'sec_八_1',
         },
       })
-      const sse = MockEventSource.instances[0]
-      sse._emit({ event_type: 'LINKAGE_STALE_CHANGED', section_code: '八、1', is_stale: false })
+      // 经总线分发 LINKAGE_STALE_CHANGED（createSSE 已 JSON.parse，handler 收对象 + event 名）
+      mockSubs[0].handler({ section_code: '八、1', is_stale: false }, 'LINKAGE_STALE_CHANGED')
       await nextTick()
       await flushPromises()
       await nextTick()
@@ -308,14 +292,13 @@ describe('LineagePanel.vue — 刷新功能（Task 10.1/10.2）', () => {
       expect(wrapper.find('.lineage-panel__stale-badge').exists()).toBe(false)
     })
 
-    it('组件卸载时关闭 SSE 连接', async () => {
+    it('组件卸载时关闭 SSE 订阅', async () => {
       const wrapper = mount(LineagePanel, { props: baseProps })
       await nextTick()
-      const sse = MockEventSource.instances[0]
-      expect(sse.readyState).toBe(1)
+      const sub = mockSubs[0]
 
       wrapper.unmount()
-      expect(sse.readyState).toBe(2) // closed
+      expect(sub.close).toHaveBeenCalled()
     })
   })
 })

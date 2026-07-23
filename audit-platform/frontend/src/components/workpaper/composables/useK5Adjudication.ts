@@ -23,6 +23,7 @@ import {
   calcLiabilityEndBalance,
   calcSubtotal,
 } from './useK5FormulaEngine'
+import { eventBus } from '@/utils/eventBus'
 import type { K5TbData } from './useK5FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -184,6 +185,23 @@ export function useK5Adjudication(params: UseK5AdjudicationParams) {
     await saveResponse('1-audited-total', { remark: String(subtotalRow.value.audited) })
   }
 
+  // ─── 发布审定数事件（对齐 F4/D2 范式，通知附注/A13/下游） ───────────────────
+
+  function publishAdjudicated(): void {
+    const auditedAmount = subtotalRow.value.audited
+    try {
+      eventBus.emit('substantive:adjudicated', {
+        wpCode: 'K5',
+        accountCode: '2701',
+        auditedAmount,
+        adjudicatedAmount: auditedAmount,
+        timestamp: Date.now(),
+      } as any)
+    } catch {
+      console.warn('[useK5Adjudication] EventBus publish substantive:adjudicated failed')
+    }
+  }
+
   // ─── 获取审定数合计（供TB回写 + CrossSheet） ───────────────────────────────
 
   function getAuditedTotal(): number {
@@ -225,6 +243,7 @@ export function useK5Adjudication(params: UseK5AdjudicationParams) {
     tbReconciliation,
     initFromResponses,
     saveAll,
+    publishAdjudicated,
     getAuditedTotal,
     getRowAudited,
     getWarrantyAudited,

@@ -90,6 +90,7 @@
             <template #default="{ row }">
               <span class="sheet-link">{{ row.name }}</span>
               <span v-if="row.tag" class="sheet-tag">{{ row.tag }}</span>
+              <GtIndexChip v-if="row.crossRef" :value="row.crossRef" class="cross-ref-chip" />
             </template>
           </el-table-column>
           <el-table-column label="状态" width="80" align="center">
@@ -139,6 +140,7 @@
  * Spec: Task 4.1 | Requirements: 1.1-1.10
  */
 import { computed } from 'vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import {
   buildI2ConsistencyDashboard,
   computeI2SheetCompletion,
@@ -160,6 +162,7 @@ type SheetStatus = '未开始' | '进行中' | '已完成'
 interface SheetDef {
   seq: number; code: string; name: string; tag?: string
   sheetName: string; group: string; fields: string[]
+  crossRef?: string
 }
 type SheetEntry = SheetDef & { status: SheetStatus; progress: number }
 
@@ -181,14 +184,14 @@ const SHEET_DEFS: SheetDef[] = [
   { seq: 13, code: 'I2-11', name: '委外研发检查表', sheetName: 'Outsource_Check_I2_11 委外研发', group: '检查', fields: ['I2-11-'] },
   { seq: 14, code: 'I2-12', name: '针对性检查表', sheetName: 'Targeted_Check_I2_12 针对性检查', group: '检查', fields: ['I2-12-'] },
   // 截止组
-  { seq: 15, code: 'I2-13', name: '截止性测试（账到单据）', sheetName: 'Cutoff_Forward_I2_13 截止账到单据', group: '截止', fields: ['I2-13-'] },
-  { seq: 16, code: 'I2-14', name: '截止性测试（单据到账）', sheetName: 'Cutoff_Backward_I2_14 截止单据到账', group: '截止', fields: ['I2-14-'] },
+  { seq: 15, code: 'I2-13', name: '截止性测试（账到单据）', sheetName: 'Cutoff_Forward_I2_13 截止账到单据', group: '截止', fields: ['I2-13-'], crossRef: 'I2-14' },
+  { seq: 16, code: 'I2-14', name: '截止性测试（单据到账）', sheetName: 'Cutoff_Backward_I2_14 截止单据到账', group: '截止', fields: ['I2-14-'], crossRef: 'I2-13' },
   // 减值组
   { seq: 17, code: 'I2-15', name: '减值准备测试表', sheetName: 'Impairment_I2_15 减值测试', group: '减值', fields: ['I2-15-'] },
   { seq: 18, code: 'I2-16', name: '可收回金额测试', sheetName: 'Recoverable_I2_16 可收回金额', group: '减值', fields: ['I2-16-'] },
   // 附注组
-  { seq: 19, code: '附注-L', name: '附注（上市公司）', sheetName: 'Disclosure_Listed 附注上市', group: '附注', fields: ['I2-disc-L-'] },
-  { seq: 20, code: '附注-S', name: '附注（国企）', sheetName: 'Disclosure_SOE 附注国企', group: '附注', fields: ['I2-disc-S-'] },
+  { seq: 19, code: '附注-L', name: '附注（上市公司）', sheetName: 'Disclosure_Listed 附注上市', group: '附注', fields: ['I2-disc-listed-'] },
+  { seq: 20, code: '附注-S', name: '附注（国企）', sheetName: 'Disclosure_SOE 附注国企', group: '附注', fields: ['I2-disc-soe-'] },
 ]
 
 const GROUP_META: { label: string; color: string }[] = [
@@ -318,6 +321,7 @@ function handleNavigate(row: SheetEntry) {
   margin-left: 6px; font-size: 11px; padding: 1px 5px;
   background: #ecf5ff; color: #409eff; border-radius: 3px;
 }
+.cross-ref-chip { margin-left: 6px; vertical-align: middle; }
 
 /* 编制提示 */
 .compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }

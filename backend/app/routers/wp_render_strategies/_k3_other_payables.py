@@ -95,7 +95,7 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
 
 
 async def _load_project_context(ctx: RenderContext) -> dict:
-    """加载项目上下文（客户名/审计年度）."""
+    """加载项目上下文（客户名/审计年度/资产负债表日/关联方清单）."""
     project_ctx: dict = {}
     try:
         result = await ctx.db.execute(
@@ -112,8 +112,35 @@ async def _load_project_context(ctx: RenderContext) -> dict:
             project_ctx["client_name"] = row.client_name or ""
             project_ctx["audit_year"] = str(row.audit_year) if row.audit_year else ""
             project_ctx["business_category"] = row.business_category or ""
+            # bs_date: 资产负债表日（用于截止测试窗口判断）
+            year_str = str(row.audit_year) if row.audit_year else ""
+            project_ctx["bs_date"] = f"{year_str}-12-31" if year_str else ""
     except Exception as e:  # noqa: BLE001
         logger.warning("K3 project context load failed: %s", e)
+
+    # 加载关联方清单（供K3-6关联方完整性核对）
+    try:
+        rp_result = await ctx.db.execute(
+            sa.text("""
+                SELECT name, relation_type, is_controlled_by_same_party
+                FROM related_party_registry
+                WHERE project_id = :pid AND is_deleted = false
+                ORDER BY name
+            """),
+            {"pid": str(ctx.project_id)},
+        )
+        related_parties = []
+        for rp_row in rp_result.fetchall():
+            related_parties.append({
+                "name": rp_row.name or "",
+                "relation_type": rp_row.relation_type or "",
+                "is_controlled_by_same_party": bool(rp_row.is_controlled_by_same_party),
+            })
+        project_ctx["related_parties"] = related_parties
+    except Exception as e:  # noqa: BLE001
+        logger.warning("K3 related_party_registry load failed (table may not exist): %s", e)
+        project_ctx["related_parties"] = []
+
     return project_ctx
 
 
@@ -146,6 +173,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
         "project_context": project_context,
+        "tb_amount": tb_values.get("payable_unadjusted", 0),  # 供前端K3-1 TB预填seed
         "prefix": "K3",
         "sheets": K3_SHEETS,
     }

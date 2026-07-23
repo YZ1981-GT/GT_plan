@@ -12,6 +12,7 @@
  * Requirements: 9.1-9.7
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { eventBus } from '@/utils/eventBus'
 import { parseNum, calcSubtotal } from './useD6FormulaEngine'
 import type { ChecklistResponse } from './useD6FormData'
 
@@ -177,7 +178,7 @@ export function useD6Adjustment(options: UseD6AdjustmentOptions) {
         description: row.description,
       }
       try {
-        window.dispatchEvent(new CustomEvent('adjustment:created', { detail: payload }))
+        eventBus.emit('adjustment:created' as any, payload)
       } catch { /* silent */ }
     }
   }
@@ -201,9 +202,7 @@ export function useD6Adjustment(options: UseD6AdjustmentOptions) {
     }))
 
     try {
-      window.dispatchEvent(new CustomEvent('a13:push-misstatement', {
-        detail: { items: misstatements },
-      }))
+      eventBus.emit('a13:push-misstatement' as any, { items: misstatements })
     } catch { /* silent */ }
   }
 

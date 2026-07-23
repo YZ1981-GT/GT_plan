@@ -13,7 +13,7 @@
     <div class="section-header">
       <span class="section-title">K9-6 截止性测试（记账凭证→原始凭证）</span>
       <div class="section-actions">
-        <el-button size="small" type="primary" text @click="handleAiAssist"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
+        <el-button size="small" type="primary" text :loading="aiLoading" @click="handleAiAssist"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
         <el-button size="small" text @click="openReviewDialog?.('K9-6-cutoff-v2s')">💬 复核</el-button>
       </div>
     </div>
@@ -28,7 +28,18 @@
       <div class="stat-item"><span class="stat-label">总样本数</span><span class="stat-value">{{ summary.totalSamples }}</span></div>
       <div class="stat-item"><span class="stat-label">跨期笔数</span><span class="stat-value stat-danger">{{ summary.crossPeriodCount }}</span></div>
       <div class="stat-item"><span class="stat-label">正常笔数</span><span class="stat-value stat-success">{{ summary.normalCount }}</span></div>
+      <div class="stat-item"><span class="stat-label">证据不完整</span><span class="stat-value" :class="{ 'stat-danger': summary.incompleteCount > 0 }">{{ summary.incompleteCount }}</span></div>
     </div>
+
+    <!-- ═══ 跨期错报联动（提前/多记本期费用 → A13） ═══ -->
+    <el-alert v-if="adjustableRows.length > 0" type="warning" :closable="false" show-icon style="margin-bottom:12px">
+      <template #title>
+        <div class="cross-alert">
+          <span>发现 {{ adjustableRows.length }} 笔跨期/需调整凭证（费用提前或多记，可能构成本期费用多计错报）</span>
+          <el-button v-if="!isReadonly" size="small" type="danger" plain @click="pushToA13">推送跨期至 A13 错报</el-button>
+        </div>
+      </template>
+    </el-alert>
 
     <!-- ═══ 截止样本表格 ═══ -->
     <el-table
@@ -125,6 +136,7 @@
         <li>跨期判定：原始凭证日期与记账日期分属不同会计期间</li>
         <li>"自动从序时账提取"从期末±5天采样（6602管理费用）</li>
         <li>跨期行红色高亮，需填写调整建议</li>
+        <li>跨期（费用提前/多记）可一键「推送跨期至 A13 错报」，纳入错报汇总</li>
         <li>底部统计：跨期N条 / 正常M条</li>
       </ul>
     </details>
@@ -145,10 +157,12 @@
  * - 行级抽凭 + 手动新增行
  * - 汇总统计（总样本/跨期/正常）
  */
-import { toRef, inject } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
+import { toRef, inject, computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { MagicStick } from '@element-plus/icons-vue'
+import { eventBus } from '@/utils/eventBus'
 import { useK9Cutoff } from '@/components/workpaper/composables/useK9Cutoff'
+import { generateK9AiText } from '@/components/workpaper/composables/useK9AiText'
 import type { Ref } from 'vue'
 import type { K9CutoffRow } from '@/components/workpaper/composables/useK9Cutoff'
 
@@ -157,10 +171,14 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  /** 会计期间截止日（YYYY-MM-DD），由主入口按审计年度传入 */
+  periodEnd?: string
 }>()
 
 const emit = defineEmits<{ (e: 'save', itemId: string, value: any): void }>()
 const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', () => {})
+
+const periodEndRef = computed(() => props.periodEnd || `${new Date().getFullYear()}-12-31`)
 
 // ═══ Composable ═══
 const {
@@ -178,9 +196,37 @@ const {
   allResponses: toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>,
   projectId: toRef(props, 'projectId'),
   wpId: toRef(props, 'wpId'),
+  periodEnd: periodEndRef,
   isReadonly: toRef(props, 'isReadonly'),
   onSave: (itemId, value) => emit('save', itemId, typeof value === 'string' ? { remark: value } : { remark: JSON.stringify(value) }),
 })
+
+// ═══ 跨期 → A13 错报联动（真实性方向：提前/多记本期费用 = 错报） ═══
+const adjustableRows = computed<K9CutoffRow[]>(() =>
+  samples.value.filter((r) => r.isCross || r.conclusion === '跨期' || r.conclusion === '需调整'),
+)
+function pushToA13(): void {
+  const rows = adjustableRows.value
+  if (rows.length === 0) { ElMessage.info('无跨期/需调整凭证'); return }
+  try {
+    eventBus.emit('a13:push-misstatement' as any, {
+      wpCode: 'K9',
+      accountCode: '6602',
+      projectId: props.projectId,
+      source: 'K9-6',
+      items: rows.map((r) => ({
+        voucherNo: r.voucherNo || '',
+        amount: Number(r.amount || 0),
+        description: `截止跨期（记账${r.bookDate || '-'}/原始${r.sourceDate || '-'}）${r.summary || '管理费用截止性异常'}`.trim(),
+        indexRef: 'K9-6',
+      })),
+      timestamp: Date.now(),
+    })
+    ElMessage.success(`已推送 ${rows.length} 笔跨期凭证至 A13 错报汇总`)
+  } catch {
+    ElMessage.warning('推送失败，请稍后重试')
+  }
+}
 
 // ═══ UI Helpers ═══
 function rowClassName({ row }: { row: K9CutoffRow }): string {
@@ -192,8 +238,28 @@ function fmtAmt(v: number | null | undefined): string {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function handleAiAssist(): void {
-  ElMessage.info('AI辅助分析截止测试结论...')
+const aiLoading = ref(false)
+async function handleAiAssist(): Promise<void> {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const content = await generateK9AiText(props.wpId, {
+      prompt: '请根据管理费用正向截止测试（记账凭证→原始凭证）结果，生成截止测试结论（概述抽样范围、跨期情况及是否需要调整）。',
+      section: 'K9-6-cutoff-conclusion',
+      context: {
+        科目: '6602 管理费用',
+        截止日: periodEndRef.value,
+        总样本数: summary.value.totalSamples,
+        跨期笔数: summary.value.crossPeriodCount,
+      },
+      existingContent: conclusion.value || '',
+    })
+    if (content) {
+      saveConclusion(conclusion.value ? `${conclusion.value}\n\n${content}` : content)
+    }
+  } finally {
+    aiLoading.value = false
+  }
 }
 </script>
 
@@ -202,13 +268,14 @@ function handleAiAssist(): void {
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { font-size: 15px; font-weight: 600; color: #303133; }
 .section-actions { display: flex; align-items: center; gap: 4px; }
-.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 16px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.6; }
+.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 16px; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6; }
 .stats-card { display: flex; gap: 24px; padding: 12px 16px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; margin-bottom: 14px; }
 .stat-item { display: flex; flex-direction: column; align-items: center; }
 .stat-label { font-size: 12px; color: #6b7280; }
 .stat-value { font-size: 18px; font-weight: 700; color: #1f2937; }
 .stat-danger { color: #dc2626; }
 .stat-success { color: #16a34a; }
+.cross-alert { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
 .cutoff-table { font-size: var(--wp-font-size, 13px); }
 .table-actions { display: flex; gap: 8px; margin-top: 12px; }
 .summary-card { margin-top: 16px; }

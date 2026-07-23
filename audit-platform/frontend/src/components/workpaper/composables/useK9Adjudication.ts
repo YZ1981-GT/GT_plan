@@ -17,7 +17,7 @@
  *
  * Item IDs: "K9-1-row-{idx}-{field}"
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, nextTick, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import {
@@ -26,6 +26,7 @@ import {
   calcIncomeStatementOccurrence,
   calcSubtotal,
 } from './useK9FormulaEngine'
+import { K9_FEE_NATURES } from './k9FeeNatures'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -70,11 +71,19 @@ export interface K9AdjSubtotalRow {
   yoyChangeRate: number | null
 }
 
+export interface K9AdjPrefillRow {
+  name: string
+  unadjustedDebit: number
+  unadjustedCredit: number
+}
+
 export interface UseK9AdjudicationParams {
   allResponses: Ref<Map<string, any>>
   projectId: Ref<string>
   wpId: Ref<string>
   isReadonly?: Ref<boolean>
+  /** tb_balance 6602 明细子科目预填（无持久化行时据此建行，对齐 J1 审定表预填铁律） */
+  prefill?: Ref<K9AdjPrefillRow[]>
   onSave?: (itemId: string, value: any) => void
 }
 
@@ -84,14 +93,8 @@ const ITEM_PREFIX = 'K9-1'
 const ROWS_KEY = `${ITEM_PREFIX}-rows`
 const ACCOUNT_CODE_6602 = '6602'
 
-/** 默认费用明细项目（管理费用典型44行中的重要项目） */
-const DEFAULT_PROJECTS = [
-  '职工薪酬', '办公费', '折旧费', '无形资产摊销', '长期待摊费用摊销',
-  '中介机构费', '研发费用', '税金', '差旅费', '业务招待费',
-  '租赁费', '通讯费', '物业管理费', '修理费', '保险费',
-  '水电费', '会议费', '培训费', '劳动保护费', '运输费',
-  '低值易耗品', '绿化费', '聘请专家费', '诉讼费', '其他',
-]
+/** 默认费用明细项目 — 统一使用单一枚举源，与附注命名一致（精确匹配） */
+const DEFAULT_PROJECTS = [...K9_FEE_NATURES]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -104,7 +107,7 @@ function calcChangeRate(current: number, prior: number): number | null {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useK9Adjudication(params: UseK9AdjudicationParams) {
-  const { allResponses, projectId, wpId, isReadonly, onSave } = params
+  const { allResponses, projectId, wpId, isReadonly, prefill, onSave } = params
 
   // ─── State ─────────────────────────────────────────────────────────────────
 
@@ -112,6 +115,8 @@ export function useK9Adjudication(params: UseK9AdjudicationParams) {
   const auditNote = ref('')
   const auditConclusion = ref('')
   const isChanged = ref(false)
+  /** 是否已从预填 seed 并落库一次（避免重复/循环 persist） */
+  const hasSeededPrefill = ref(false)
 
   // ─── Load ──────────────────────────────────────────────────────────────────
 
@@ -119,6 +124,23 @@ export function useK9Adjudication(params: UseK9AdjudicationParams) {
     const raw = _getJson(ROWS_KEY)
     if (Array.isArray(raw) && raw.length > 0) {
       rows.value = raw.map(_normalizeRow)
+    } else if (prefill?.value && prefill.value.length > 0) {
+      // 无持久化行 → 从 tb_balance 6602 明细子科目预填
+      rows.value = prefill.value.map((p) => _normalizeRow({
+        projectName: p.name,
+        unadjustedDebit: p.unadjustedDebit,
+        unadjustedCredit: p.unadjustedCredit,
+        isEditable: true,
+      }))
+      // 预填落库：首次 seed 后一次性持久化行 + 审定合计 + by-item，
+      // 让附注自动取数/TB 勾稽在用户动手前即有数（seed 的是 TB 真实发生额，非臆造）。
+      if (!hasSeededPrefill.value && onSave && !isReadonly?.value) {
+        hasSeededPrefill.value = true
+        void nextTick(() => {
+          _persist()
+          onSave(`${ITEM_PREFIX}-audited-total`, totalRow.value.audited)
+        })
+      }
     } else {
       rows.value = _buildDefaultRows()
     }
@@ -209,6 +231,26 @@ export function useK9Adjudication(params: UseK9AdjudicationParams) {
     return { diff, isBalanced: Math.abs(diff) < 0.01 }
   })
 
+  // ─── 与K9-3调整分录汇总勾稽（读 K9-3 写入的 aje/rje 合计） ──────────────────
+  // K9-3(K9TabAdjustment) 保存回写时写 K9-1-aje-total / K9-1-rje-total，
+  // 此处与 K9-1 逐行 AJE/RJE 合计对比，surface 差异（不双加，仅勾稽提示）。
+  const adjustmentReconcile: ComputedRef<{
+    k93Aje: number; k93Rje: number; rowAje: number; rowRje: number
+    ajeDiff: number; rjeDiff: number; hasK93: boolean; isBalanced: boolean
+  }> = computed(() => {
+    const k93Aje = parseNum(_getString('K9-1-aje-total'))
+    const k93Rje = parseNum(_getString('K9-1-rje-total'))
+    const rowAje = totalRow.value.aje
+    const rowRje = totalRow.value.rje
+    const ajeDiff = rowAje - k93Aje
+    const rjeDiff = rowRje - k93Rje
+    return {
+      k93Aje, k93Rje, rowAje, rowRje, ajeDiff, rjeDiff,
+      hasK93: Math.abs(k93Aje) > 0.005 || Math.abs(k93Rje) > 0.005,
+      isBalanced: Math.abs(ajeDiff) < 0.01 && Math.abs(rjeDiff) < 0.01,
+    }
+  })
+
   // ─── Cell Update ───────────────────────────────────────────────────────────
 
   function updateCell(rowKey: string, field: keyof K9AdjRow, value: number | string): void {
@@ -254,6 +296,45 @@ export function useK9Adjudication(params: UseK9AdjudicationParams) {
     }
   }
 
+  // ─── 从K9-2明细表带入（按明细科目建行，保留已编辑的AJE/RJE） ────────────────
+  function fillFromDetail(): { ok: boolean; message: string } {
+    if (isReadonly?.value) return { ok: false, message: '只读模式，无法带入' }
+    const item = allResponses.value.get('K9-2-detail-rows')
+    const raw = item?.remark ?? item?.conclusion
+    if (!raw) return { ok: false, message: '未找到 K9-2 明细数据，请先在 K9-2 登记明细' }
+    let detail: any[]
+    try {
+      detail = typeof raw === 'string' ? JSON.parse(raw) : raw
+    } catch {
+      return { ok: false, message: 'K9-2 明细数据解析失败' }
+    }
+    if (!Array.isArray(detail) || detail.length === 0) {
+      return { ok: false, message: 'K9-2 明细为空' }
+    }
+    const existingByName = new Map(rows.value.map(r => [r.projectName, r]))
+    rows.value = detail
+      .filter((d: any) => (d.accountName ?? d.projectName ?? '').trim())
+      .map((d: any) => {
+        const name = String(d.accountName ?? d.projectName ?? '').trim()
+        const ex = existingByName.get(name)
+        return _normalizeRow({
+          rowKey: ex?.rowKey ?? `row-${name}`,
+          projectName: name,
+          // K9-2 本期发生额（unadjTotal）→ K9-1 未审借方；保留已编辑 AJE/RJE
+          unadjustedDebit: parseNum(d.unadjTotal ?? d.unadjusted ?? 0),
+          unadjustedCredit: 0,
+          aje: ex?.aje ?? parseNum(d.aje ?? 0),
+          rje: ex?.rje ?? parseNum(d.rje ?? 0),
+          priorAmount: parseNum(d.priorAmount ?? ex?.priorAmount ?? 0),
+          remark: ex?.remark ?? '',
+          isEditable: true,
+        })
+      })
+    isChanged.value = true
+    _persist()
+    return { ok: true, message: `已从 K9-2 带入 ${rows.value.length} 项明细` }
+  }
+
   // ─── TB回写 + EventBus（损益类发生额！）────────────────────────────────────
 
   async function writeback(): Promise<void> {
@@ -262,6 +343,8 @@ export function useK9Adjudication(params: UseK9AdjudicationParams) {
 
     // 持久化审定合计（独立item_id，供CrossSheet+render策略回读）
     onSave?.(`${ITEM_PREFIX}-audited-total`, auditedTotal)
+    // 同步 by-item 供附注自动取数（确保发事件前已写入）
+    _persistAuditedByItem()
 
     // TB回写（科目6602，**发生额！**）
     if (projectId.value) {
@@ -294,6 +377,27 @@ export function useK9Adjudication(params: UseK9AdjudicationParams) {
   function _persist(): void {
     if (!onSave) return
     onSave(ROWS_KEY, rows.value)
+    _persistAuditedByItem()
+  }
+
+  /**
+   * 写 K9-1-audited-by-item（按 projectName keyed）供附注上市/国企 applyAutoFill 消费。
+   * 修复原「附注读 K9-1-audited-by-item 但无人写」死链。
+   */
+  function _persistAuditedByItem(): void {
+    if (!onSave) return
+    const map: Record<string, { currentAmount: number; priorAmount: number; audited: number; prior: number }> = {}
+    for (const r of computedRows.value) {
+      if (!r.projectName) continue
+      // 同时提供 currentAmount/priorAmount 与 audited/prior 两组别名，兼容附注两种读法
+      map[r.projectName] = {
+        currentAmount: r.audited,
+        priorAmount: r.priorAmount,
+        audited: r.audited,
+        prior: r.priorAmount,
+      }
+    }
+    onSave(`${ITEM_PREFIX}-audited-by-item`, map)
   }
 
   function saveNote(note: string): void {
@@ -311,8 +415,12 @@ export function useK9Adjudication(params: UseK9AdjudicationParams) {
   }
 
   // ─── Watch init ────────────────────────────────────────────────────────────
-
-  watch(allResponses, () => initFromResponses(), { immediate: true })
+  // 同时监听 prefill（防御：htmlData 异步到达时也能重新 seed；有持久化行时 prefill 被忽略）
+  watch(
+    [allResponses, () => prefill?.value],
+    () => initFromResponses(),
+    { immediate: true },
+  )
 
   // ─── Return ────────────────────────────────────────────────────────────────
 
@@ -323,9 +431,11 @@ export function useK9Adjudication(params: UseK9AdjudicationParams) {
     auditConclusion,
     isChanged,
     detailCrossValidation,
+    adjustmentReconcile,
     updateCell,
     addRow,
     removeRow,
+    fillFromDetail,
     writeback,
     saveNote,
     saveConclusion,

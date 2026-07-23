@@ -44,6 +44,7 @@
           :save-immediate="saveImmediate"
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
+          :tb-amount-seed="f1TbAmountSeed"
         />
 
         <F1TabDetail
@@ -75,6 +76,7 @@
           :save-immediate="saveImmediate"
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
+          :tb-context="f1TbContext"
         />
 
         <F1TabLongTerm
@@ -97,6 +99,7 @@
           :save-immediate="saveImmediate"
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
+          :related-parties="f1RelatedParties"
         />
 
         <F1TabComprehensiveCheck
@@ -169,6 +172,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useF1FormData } from './composables/useF1FormData'
 import { useF1CrossSheet } from './composables/useF1CrossSheet'
+import { useAgingConfig } from '@/composables/useAgingConfig'
 import { useF1DualMode } from './composables/useF1DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
@@ -222,6 +226,28 @@ const showHtmlToolbar = computed(() => {
   return s.startsWith('F1-') || s === 'F1A' || s.startsWith('附注') || s === 'F1-CONF'
 })
 
+/** F1-4 跨循环锚点余额：后端 render 注入的 tb_balance 存货/应付期末数 */
+const f1TbContext = computed(() => {
+  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
+  return {
+    inventoryBalance: Number(ctx.inventory_balance_current ?? 0) || 0,
+    payableBalance: Number(ctx.payable_balance_current ?? 0) || 0,
+  }
+})
+
+/** 关联方清单：后端 render 注入，供 F1-6 完整性校验 */
+const f1RelatedParties = computed<string[]>(() => {
+  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
+  const raw = ctx.related_parties
+  return Array.isArray(raw) ? raw.map(String).filter(Boolean) : []
+})
+
+/** F1-1 试算核对 1123 数：后端 render 注入，只读回退 seed */
+const f1TbAmountSeed = computed(() => {
+  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
+  return Number(ctx.prepaid_tb_amount ?? 0) || 0
+})
+
 /** 适用准则：htmlData / project_context 可能是数组或逗号分隔字符串 */
 const applicableStandards = computed<string[]>(() => {
   const raw =
@@ -264,7 +290,8 @@ const saveImmediate = versionToolbar.wrapSaveImmediate(rawSaveImmediate)
 provide('f1VersionTrailRef', versionTrailRef)
 provide('f1OpenVersionHistory', openVersionHistory)
 
-const crossSheet = useF1CrossSheet({ allResponses })
+const { segments: f1AgingSegments } = useAgingConfig(projectIdRef, 'F1')
+const crossSheet = useF1CrossSheet({ allResponses, segments: f1AgingSegments })
 
 const dualMode = useF1DualMode({
   wpId: wpIdRef,

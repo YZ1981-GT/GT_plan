@@ -16,6 +16,30 @@
         <el-tag size="small" type="info" effect="plain">{{ detail.rows.value.length }} 行</el-tag>
       </div>
       <div class="header-actions">
+        <el-popover placement="bottom-end" trigger="click" :width="240">
+          <template #reference>
+            <el-button size="small">⚙ 列设置</el-button>
+          </template>
+          <div class="col-prefs">
+            <div class="col-prefs-presets">
+              <el-button size="small" text @click="colPrefs.applyPreset('full')">全部</el-button>
+              <el-button size="small" text @click="colPrefs.applyPreset('core')">核心</el-button>
+              <el-button size="small" text @click="colPrefs.applyPreset('audited')">审定</el-button>
+              <el-button size="small" text @click="colPrefs.hideEmptyColumns()">隐藏空列</el-button>
+              <el-button size="small" text @click="colPrefs.resetDefault()">重置</el-button>
+            </div>
+            <el-divider style="margin:8px 0" />
+            <div class="col-prefs-list">
+              <el-checkbox
+                v-for="c in colPrefs.columns"
+                :key="c.key"
+                :model-value="colPrefs.isVisible(c.key)"
+                size="small"
+                @change="(v: any) => (colPrefs.visible.value[c.key] = !!v)"
+              >{{ c.label }}</el-checkbox>
+            </div>
+          </div>
+        </el-popover>
         <el-dropdown size="small" trigger="click" @command="handleImportExport">
           <el-button size="small" type="info" plain>
             导入导出 ▾
@@ -31,7 +55,7 @@
         <el-button size="small" type="primary" text @click="handleAiAssist">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
-        <el-button size="small" text @click="openReviewDialog?.('K10-2-detail', '其他收益明细')">💬 复核</el-button>
+        <GtReviewTrigger section-id="K10-2-detail" label="💬 复核" />
       </div>
     </div>
 
@@ -69,7 +93,7 @@
       </el-table-column>
 
       <!-- 类型（dropdown） -->
-      <el-table-column prop="grantType" label="类型" width="110">
+      <el-table-column v-if="colPrefs.isVisible('grantType')" prop="grantType" label="类型" width="110">
         <template #default="{ row }">
           <el-select
             v-if="!isReadonly && row.isEditable"
@@ -85,7 +109,7 @@
       </el-table-column>
 
       <!-- 判断依据 -->
-      <el-table-column prop="judgmentBasis" label="判断依据" min-width="130">
+      <el-table-column v-if="colPrefs.isVisible('judgmentBasis')" prop="judgmentBasis" label="判断依据" min-width="130">
         <template #default="{ row }">
           <el-input
             v-if="!isReadonly && row.isEditable"
@@ -98,7 +122,7 @@
       </el-table-column>
 
       <!-- 本期未审 -->
-      <el-table-column prop="unadjusted" label="本期未审" width="110" align="right">
+      <el-table-column v-if="colPrefs.isVisible('unadjusted')" prop="unadjusted" label="本期未审" width="110" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!isReadonly && row.isEditable"
@@ -114,7 +138,7 @@
       </el-table-column>
 
       <!-- AJE -->
-      <el-table-column prop="aje" label="AJE" width="100" align="right">
+      <el-table-column v-if="colPrefs.isVisible('aje')" prop="aje" label="AJE" width="100" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!isReadonly && row.isEditable"
@@ -130,7 +154,7 @@
       </el-table-column>
 
       <!-- 重分类 -->
-      <el-table-column prop="rje" label="重分类" width="100" align="right">
+      <el-table-column v-if="colPrefs.isVisible('rje')" prop="rje" label="重分类" width="100" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!isReadonly && row.isEditable"
@@ -158,7 +182,7 @@
       </el-table-column>
 
       <!-- 上年未审 -->
-      <el-table-column prop="priorUnadj" label="上年未审" width="100" align="right">
+      <el-table-column v-if="colPrefs.isVisible('priorUnadj')" prop="priorUnadj" label="上年未审" width="100" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!isReadonly && row.isEditable"
@@ -174,7 +198,7 @@
       </el-table-column>
 
       <!-- 上年AJE -->
-      <el-table-column prop="priorAje" label="上年AJE" width="100" align="right">
+      <el-table-column v-if="colPrefs.isVisible('priorAje')" prop="priorAje" label="上年AJE" width="100" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!isReadonly && row.isEditable"
@@ -202,7 +226,7 @@
       </el-table-column>
 
       <!-- 文件索引号 -->
-      <el-table-column prop="fileRef" label="文件索引号" width="100">
+      <el-table-column v-if="colPrefs.isVisible('fileRef')" prop="fileRef" label="文件索引号" width="100">
         <template #default="{ row }">
           <el-input
             v-if="!isReadonly && row.isEditable"
@@ -237,6 +261,14 @@
     <!-- ═══ 操作栏 ═══ -->
     <div class="table-actions">
       <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleAddRow">+ 新增补助项目</el-button>
+      <el-button
+        v-if="detail.rows.value.length === 0"
+        size="small"
+        type="warning"
+        plain
+        :disabled="isReadonly"
+        @click="handleSeedCommon"
+      >预置常见项目</el-button>
     </div>
 
     <!-- ═══ 底部统计面板 ═══ -->
@@ -261,6 +293,26 @@
 
     <!-- 导入 file input (隐藏) -->
     <input ref="importFileInput" type="file" accept=".xlsx,.xls" style="display:none" @change="handleImportFileSelected" />
+
+    <!-- ═══ 明细分析说明（AI辅助） ═══ -->
+    <el-card shadow="never" class="note-card">
+      <template #header>
+        <div class="note-card-header">
+          <span>明细分析说明</span>
+          <el-button size="small" type="primary" text :loading="aiLoading" @click="handleAiAssist">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="noteText"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="填写其他收益明细分析说明（补助类型分布、金额构成、同比变动及异常项）..."
+        @change="handleNoteSave"
+      />
+    </el-card>
 
     <!-- ═══ 编制提示 ═══ -->
     <details class="compile-hint">
@@ -293,11 +345,15 @@
  * - max-height 560（>43行虚拟区域）
  * - GtIndexChip跨底稿引用（K10-1 / K10-4）
  */
-import { ref, computed, inject, toRef, defineAsyncComponent } from 'vue'
+import { ref, computed, inject, toRef, onMounted, defineAsyncComponent } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { api } from '@/services/apiProxy'
 import { useK10Detail, GRANT_TYPE_OPTIONS } from '../../composables/useK10Detail'
+import { K10_INCOME_SOURCES } from '../../composables/k10IncomeSources'
 import { useK10ImportExport } from '../../composables/useK10ImportExport'
+import { useK10DetailColumnPrefs } from '../../composables/useK10DetailColumnPrefs'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
@@ -315,6 +371,7 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const reloadResponses = inject<(() => Promise<void>) | null>('k10ReloadResponses', null)
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -331,6 +388,9 @@ const importExport = useK10ImportExport({
   projectId: toRef(props, 'projectId'),
   sheetCode: 'K10-2',
 })
+
+// ─── 列显隐偏好（⚙列设置，12 列） ──────────────────────────────────────────────
+const colPrefs = useK10DetailColumnPrefs(computed(() => detail.rows.value))
 
 // ─── 导入导出 ────────────────────────────────────────────────────────────────
 
@@ -358,7 +418,10 @@ async function handleImportFileSelected(event: Event): Promise<void> {
 
   const result = await importExport.importData(file)
   if (result && result.rowCount > 0) {
-    // 重新从后端加载或提示刷新
+    // 导入后从服务器重新加载 checklist_responses → 明细行刷新（避免旧态）
+    if (reloadResponses) {
+      try { await reloadResponses() } catch { /* best effort */ }
+    }
     ElMessage.success(`已导入 ${result.rowCount} 行明细`)
   }
 }
@@ -372,7 +435,7 @@ async function handleAddRow(): Promise<void> {
     const { value } = await ElMessageBox.prompt('请输入补助项目名称', '新增补助项目', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
-      inputPlaceholder: '如：XX研发补助/XX财政贴息...',
+      inputPlaceholder: '如：总额法政府补助/增值税进项加计抵减/个税手续费返还...',
     })
     if (value?.trim()) {
       detail.addRow(value.trim())
@@ -382,6 +445,20 @@ async function handleAddRow(): Promise<void> {
 
 function handleRemoveRow(rowKey: string): void {
   detail.removeRow(rowKey)
+}
+
+/** 预置源模板常见其他收益项目（仅空表时，给出编制起点） */
+async function handleSeedCommon(): Promise<void> {
+  if (detail.rows.value.length > 0) return
+  try {
+    await ElMessageBox.confirm(
+      `将预置 ${K10_INCOME_SOURCES.length} 个源模板常见其他收益项目作为编制起点（金额留空待填）。是否继续？`,
+      '预置常见项目',
+      { confirmButtonText: '确认预置', cancelButtonText: '取消', type: 'info' },
+    )
+    K10_INCOME_SOURCES.forEach((name) => detail.addRow(name))
+    ElMessage.success(`已预置 ${K10_INCOME_SOURCES.length} 个常见项目`)
+  } catch { /* cancelled */ }
 }
 
 // ─── 统计 ────────────────────────────────────────────────────────────────────
@@ -400,9 +477,44 @@ function fmtAmt(v: number | null | undefined): string {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function handleAiAssist(): void {
-  ElMessage.info('AI辅助明细分析...')
+// ─── 明细分析说明 + AI ─────────────────────────────────────────────────────────
+const noteText = ref('')
+const aiLoading = ref(false)
+
+function loadNote(): void {
+  const saved = props.allResponses.get('K10-2-note')
+  if (saved) noteText.value = (saved.remark ?? saved.conclusion ?? '') as string
 }
+
+function handleNoteSave(): void {
+  emit('save', 'K10-2-note', { remark: noteText.value })
+}
+
+async function handleAiAssist(): Promise<void> {
+  if (!props.wpId) return
+  aiLoading.value = true
+  try {
+    const st = detail.subtotal.value
+    const ctx = {
+      明细行数: String(detail.rows.value.length),
+      本期审定合计: String(st.audited),
+      上年审定合计: String(st.priorAudited),
+      类型分布: typeDistribution.value,
+      明细: detail.rows.value.map(r => `${r.projectName}(${r.grantType}):审定${r.audited}`).join('；'),
+    }
+    const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'K10-2-note',
+      prompt: '为K10其他收益明细表生成分析说明：补助类型分布、金额构成、本期与上年同比变动、异常项关注点。',
+      existingContent: noteText.value,
+      context: ctx,
+    })
+    const content = (res?.data?.content ?? res?.content ?? '') as string
+    if (content) { noteText.value = content; handleNoteSave(); ElMessage.success('AI生成完成') }
+    else ElMessage.warning('AI未返回内容，请手动填写')
+  } catch { ElMessage.warning('AI生成失败，请手动填写') } finally { aiLoading.value = false }
+}
+
+onMounted(() => { loadNote() })
 </script>
 
 <style scoped>
@@ -474,4 +586,11 @@ function handleAiAssist(): void {
 .compile-hint summary { cursor: pointer; font-weight: 500; color: #303133; }
 .compile-hint ul { padding-left: 20px; margin-top: 8px; }
 .compile-hint li { margin-bottom: 4px; }
+
+.note-card { margin-top: 16px; }
+.note-card-header { display: flex; justify-content: space-between; align-items: center; }
+.note-card-header span { font-weight: 600; font-size: 14px; }
+
+.col-prefs-presets { display: flex; flex-wrap: wrap; gap: 4px; }
+.col-prefs-list { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto; }
 </style>

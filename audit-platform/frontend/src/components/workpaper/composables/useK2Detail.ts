@@ -219,6 +219,28 @@ export function useK2Detail(
     }
   }
 
+  /** 直接带入行数据（无弹窗，供序时账导入使用） */
+  function addRowDirect(data: { name: string; beginBalance?: number; increase?: number; decrease?: number; nature?: string }): void {
+    const newRow: K2DetailRow = {
+      rowId: `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      seqNo: rows.value.length + 1,
+      name: data.name,
+      nature: data.nature ?? '',
+      beginBalance: data.beginBalance ?? 0,
+      increase: data.increase ?? 0,
+      decrease: data.decrease ?? 0,
+      endBalance: 0,
+      increaseReason: '',
+      voucherRef: '',
+      checkConclusion: '',
+      remark: '',
+    }
+    _recalcRow(newRow)
+    rows.value.push(newRow)
+    activeRowIndex.value = rows.value.length - 1
+    _persist()
+  }
+
   // ─── Remove Row ────────────────────────────────────────────────────────────
 
   function removeRow(rowId: string): void {
@@ -275,6 +297,7 @@ export function useK2Detail(
     updateCell,
     recalcAll,
     addRow,
+    addRowDirect,
     removeRow,
     importRows,
     exportRows,

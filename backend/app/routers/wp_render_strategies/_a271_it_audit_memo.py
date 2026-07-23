@@ -41,7 +41,7 @@ CROSS_REF_WP_CODES = ["B22A-4-3", "C22", "C21-1", "B23-15"]
 async def _load_it_cross_references(project_id, db) -> dict:
     """查找 B22A-4-3, C22, C21-1, B23-15 底稿的 wp_id.
 
-    通过 wp_index JOIN working_papers 定位同项目下的目标底稿。
+    通过 wp_index JOIN working_paper 定位同项目下的目标底稿。
     返回 dict: {b22a_4_3_wp_id, c22_wp_id, c21_1_wp_id, b23_15_wp_id}，
     缺失时对应值为 None。
     """
@@ -64,7 +64,7 @@ async def _load_it_cross_references(project_id, db) -> dict:
             sa.text(
                 "SELECT wi.wp_code, wp.id AS wp_id "
                 "FROM wp_index wi "
-                "JOIN working_papers wp ON wp.wp_index_id = wi.id "
+                "JOIN working_paper wp ON wp.wp_index_id = wi.id "
                 "WHERE wi.wp_code IN :codes AND wp.project_id = :project_id"
             ),
             {"codes": tuple(CROSS_REF_WP_CODES), "project_id": str(project_id)},

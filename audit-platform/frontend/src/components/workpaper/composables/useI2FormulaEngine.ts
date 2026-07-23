@@ -3,7 +3,11 @@
  * 科目：1717开发支出（借方/资产类）
  * 核心特征：CAS6五条件资本化 + I6↔I2双向联动 + I1转入 + 三角勾稽
  * Spec: .kiro/specs/i2-development-expenditure/
+ *
+ * 收敛（cutoff-test-architecture-convergence Wave1）：isCutoffPeriodCrossing 委托
+ * cutoffCanonical.crossesByCutoffBoundary 单一真源（截止日两侧 XOR），行为等价（P8 已锁定）。
  */
+import { crossesByCutoffBoundary } from './cutoffCanonical'
 
 // ---------- 基础公式 ----------
 
@@ -109,13 +113,18 @@ export function isCutoffPeriodCrossing(
   recordDate: Date,
   cutoffDate: Date,
 ): boolean {
-  const d = documentDate?.getTime?.()
-  const r = recordDate?.getTime?.()
-  const c = cutoffDate?.getTime?.()
-  if (!Number.isFinite(d) || !Number.isFinite(r) || !Number.isFinite(c)) return false
-  const docOnOrBefore = d <= c
-  const recOnOrBefore = r <= c
-  return docOnOrBefore !== recOnOrBefore
+  // 薄封装：委托 cutoffCanonical.crossesByCutoffBoundary（截止日两侧 XOR 单一真源）。
+  // Date → 本地 YYYY-MM-DD（与 canonical parseDate 的本地 0 点口径一致，避免 UTC 偏移）；
+  // 非法 Date → 空串 → canonical 解析为 null → false（等价原 finite 校验）。
+  const fmt = (dt: Date): string => {
+    const t = dt?.getTime?.()
+    if (!Number.isFinite(t)) return ''
+    const y = dt.getFullYear()
+    const m = String(dt.getMonth() + 1).padStart(2, '0')
+    const d = String(dt.getDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+  return crossesByCutoffBoundary(fmt(recordDate), fmt(documentDate), fmt(cutoffDate))
 }
 
 /**

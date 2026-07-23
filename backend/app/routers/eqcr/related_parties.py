@@ -72,6 +72,7 @@ def _serialize_registry(r: RelatedPartyRegistry) -> dict[str, Any]:
         "name": r.name,
         "relation_type": r.relation_type,
         "is_controlled_by_same_party": r.is_controlled_by_same_party,
+        "detail": r.detail or {},
         "created_at": r.created_at.isoformat() if r.created_at else None,
         "updated_at": r.updated_at.isoformat() if r.updated_at else None,
     }
@@ -117,6 +118,7 @@ async def create_related_party(
         name=payload.name.strip(),
         relation_type=payload.relation_type,
         is_controlled_by_same_party=payload.is_controlled_by_same_party,
+        detail=payload.detail or None,
     )
     db.add(record)
     await db.commit()
@@ -158,6 +160,9 @@ async def update_related_party(
         record.relation_type = payload.relation_type
     if payload.is_controlled_by_same_party is not None:
         record.is_controlled_by_same_party = payload.is_controlled_by_same_party
+    if payload.detail is not None:
+        # JSONB 就地改不触发脏标记 → 重新赋新对象
+        record.detail = {**payload.detail} if payload.detail else None
 
     await db.commit()
     await db.refresh(record)

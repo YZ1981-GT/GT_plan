@@ -15,7 +15,7 @@
  *
  * Requirements: 3.1-3.10
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, inject, type Ref, type ComputedRef } from 'vue'
 import {
   parseNum,
   calcMonthlyTotal,
@@ -114,8 +114,15 @@ function computeRow(stored: StoredRevenueRow): RevenueDetailRow {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD4RevenueDetail(options: UseD4BaseOptions) {
-  const { allResponses, isReadonly } = options
+  const { allResponses, isReadonly, projectId } = options
   const readonly = isReadonly ?? ref(false)
+
+  // 审计年度（主入口 provide('d4AuditYear')），回退"当前年-1"
+  const injectedAuditYear = inject<Ref<number> | null>('d4AuditYear', null)
+  function resolveAuditYear(): number {
+    const y = injectedAuditYear?.value
+    return y && y > 0 ? y : new Date().getFullYear() - 1
+  }
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -236,12 +243,60 @@ export function useD4RevenueDetail(options: UseD4BaseOptions) {
     debounceSave()
   }
 
-  // ─── Import From Ledger (stub) ───────────────────────────────────────
+  // ─── Import From Ledger（从序时账按产品×月导入6001发生额） ──────────────
 
   async function importFromLedger(): Promise<void> {
-    // Stub: actual implementation imports from tb_ledger 6001 monthly data
-    // via API endpoint POST /api/workpapers/{wpId}/d4/import-from-ledger
-    // which parses ledger entries into monthly sums per product/service line
+    if (readonly.value) return
+    if (!projectId?.value) return
+    const [{ default: http }, { ElMessage, ElMessageBox }] = await Promise.all([
+      import('@/utils/http'),
+      import('element-plus'),
+    ])
+    const year = resolveAuditYear()
+    let ledgerRows: Array<{ product: string; months: number[] }> = []
+    try {
+      const res = await http.get(
+        `/api/projects/${projectId.value}/auto-data/d4_ledger_monthly_by_product`,
+        { params: { year }, _silent: true } as any,
+      )
+      const data = res.data?.data ?? res.data
+      ledgerRows = Array.isArray(data?.rows) ? data.rows : []
+    } catch {
+      ElMessage.error('从序时账取数失败，请稍后重试')
+      return
+    }
+
+    if (ledgerRows.length === 0) {
+      ElMessage.warning(`序时账中未找到 ${year} 年度科目6001的发生额`)
+      return
+    }
+
+    try {
+      await ElMessageBox.confirm(
+        `将从序时账导入 ${ledgerRows.length} 个产品的 ${year} 年度月度收入（现有行保留，导入行以"序时账导入"标注）。是否继续？`,
+        '从序时账导入',
+        { type: 'info', confirmButtonText: '导入', cancelButtonText: '取消' },
+      )
+    } catch {
+      return // 用户取消
+    }
+
+    for (const lr of ledgerRows) {
+      const months = Array.isArray(lr.months) && lr.months.length === 12
+        ? lr.months.map(parseNum)
+        : [...EMPTY_MONTHS]
+      storedData.value.push({
+        rowId: generateRowId(),
+        product: String(lr.product || '未命名'),
+        months,
+        auditAdjustment: 0,
+        priorUnadjusted: 0,
+        priorAdjustment: 0,
+        remark: '序时账导入',
+      })
+    }
+    persistRows()
+    ElMessage.success(`已导入 ${ledgerRows.length} 行主营业务收入明细`)
   }
 
   // ─── Persist / Save ──────────────────────────────────────────────────

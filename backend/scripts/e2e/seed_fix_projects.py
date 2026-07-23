@@ -1,4 +1,4 @@
-"""E2E 夹具项目种子脚本 — FIX-A / FIX-B / FIX-INT / FIX-RP / FIX-F
+"""E2E 夹具项目种子脚本 — FIX-A / FIX-B / FIX-INT / FIX-RP / FIX-F / FIX-I6
 
 构造或校验 completion-phase E2E 所需的最小项目数据，输出 manifest JSON 供 Playwright 使用。
 
@@ -8,7 +8,7 @@
     python scripts/e2e/seed_fix_projects.py --fix --output data/e2e_fix_projects.json
 
 环境变量（可选，覆盖默认项目）:
-    TEST_PROJECT_ID_FIX_A / FIX_B / FIX_INT / FIX_RP / FIX_F
+    TEST_PROJECT_ID_FIX_A / FIX_B / FIX_INT / FIX_RP / FIX_F / FIX_I6
 
 Spec: completion-phase-infra e2e-matrix.md E-FIX
 """
@@ -75,6 +75,9 @@ F2_E2E_WP_CODES = [
     "F2-70",
 ]
 
+# I 循环 HTML E2E（I6-4 针对性检查 + I6↔I2 VR-I6-01）
+I6_E2E_WP_CODES = ["I6", "I2"]
+
 # wp_code → backend/wp_templates/F 下源 xlsx（同码多底稿共用 bundle 文件）
 F2_WP_TEMPLATE_FILES: dict[str, str] = {
     "F2-1": "F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
@@ -104,6 +107,7 @@ class FixtureSpec:
     scenario: str | None = None
     seed_a17_ch01: bool = False
     seed_related_party: bool = False
+    seed_i6_e2e: bool = False
     needs_integrated_signal: bool = False
 
 
@@ -146,6 +150,14 @@ FIXTURES: list[FixtureSpec] = [
         default_project_id=DEFAULT_FIX_B,
         business_category="IPO",
     ),
+    FixtureSpec(
+        fixture_id="FIX-I6",
+        description="I6 研发费用 HTML E2E — I6-4 针对性检查 + I6↔I2 VR-I6-01",
+        required_wp_codes=I6_E2E_WP_CODES,
+        env_var="TEST_PROJECT_ID_FIX_I6",
+        default_project_id=DEFAULT_FIX_B,
+        seed_i6_e2e=True,
+    ),
 ]
 
 
@@ -159,6 +171,7 @@ class FixtureResult:
     missing_wp_codes: list[str] = field(default_factory=list)
     actions: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    i6_wp_id: str | None = None
 
 
 def _parse_uuid(value: str | None) -> UUID | None:
@@ -521,6 +534,63 @@ async def _seed_related_party_row(db: AsyncSession, project_id: UUID) -> list[st
     return ["写入 A7-1 关联交易样例行（A16-7 推荐信号）"]
 
 
+async def _seed_i6_e2e_data(db: AsyncSession, project_id: UUID) -> tuple[list[str], str | None]:
+    """I6-2 明细样例 + VR-I6-01 联动种子（供 Playwright I6-4 / linkage E2E）。"""
+    wp_id = await _get_wp_id(db, project_id, "I6")
+    if not wp_id:
+        return ["跳过 I6 E2E seed：无 I6 底稿"], None
+
+    existing = await db.execute(
+        sa.text(
+            "SELECT 1 FROM checklist_responses WHERE wp_id = :wp AND item_id = 'I6-2-detail-rows' LIMIT 1"
+        ),
+        {"wp": str(wp_id)},
+    )
+    if existing.scalar_one_or_none():
+        return ["I6 E2E checklist 已存在"], str(wp_id)
+
+    detail_rows = json.dumps(
+        [
+            {
+                "category": "智能平台研发",
+                "months": [500_000] + [0] * 11,
+                "aje": 0,
+                "rje": 0,
+            },
+            {
+                "category": "新品临床试验",
+                "months": [300_000] + [0] * 11,
+                "aje": 0,
+                "rje": 0,
+            },
+        ],
+        ensure_ascii=False,
+    )
+    seed_items: list[tuple[str, str]] = [
+        ("I6-2-detail-rows", detail_rows),
+        ("I6-adj-audited-total", "800000"),
+        ("I6-adj-capitalized-i2", "200000"),
+        ("I6-adj-expected-total", "1000000"),
+    ]
+    for item_id, remark in seed_items:
+        await db.execute(
+            sa.text(
+                """
+                INSERT INTO checklist_responses (id, project_id, wp_id, item_id, remark, created_at, updated_at)
+                VALUES (:id, :pid, :wp_id, :item_id, :remark, NOW(), NOW())
+                """
+            ),
+            {
+                "id": str(uuid.uuid4()),
+                "pid": str(project_id),
+                "wp_id": str(wp_id),
+                "item_id": item_id,
+                "remark": remark,
+            },
+        )
+    return ["写入 I6 E2E 样例（I6-2 项目 + VR-I6-01 联动种子）"], str(wp_id)
+
+
 async def _resolve_fix_b_id(db: AsyncSession) -> UUID | None:
     env_id = _parse_uuid(os.environ.get("TEST_PROJECT_ID_FIX_B"))
     if env_id and await _get_project_row(db, env_id):
@@ -561,6 +631,9 @@ async def _resolve_project_id(
         return fix_b_id
 
     if spec.fixture_id == "FIX-F":
+        return fix_b_id
+
+    if spec.fixture_id == "FIX-I6":
         return fix_b_id
 
     return fix_b_id
@@ -612,6 +685,11 @@ async def _process_fixture(
             result.actions.extend(await _seed_a17_ch01(db, project_id))
         if spec.seed_related_party:
             result.actions.extend(await _seed_related_party_row(db, project_id))
+        if spec.seed_i6_e2e:
+            actions, i6_wp_id = await _seed_i6_e2e_data(db, project_id)
+            result.actions.extend(actions)
+            if i6_wp_id:
+                result.i6_wp_id = i6_wp_id
         if spec.needs_integrated_signal and "B60" in result.missing_wp_codes:
             result.warnings.append("整合审计信号仍缺 B60 底稿")
 
@@ -627,6 +705,10 @@ async def _process_fixture(
         )
 
     result.ready = len(result.missing_wp_codes) == 0 and prefix_ok
+    if spec.fixture_id == "FIX-I6":
+        wp_id = await _get_wp_id(db, project_id, "I6")
+        if wp_id:
+            result.i6_wp_id = str(wp_id)
     if spec.fixture_id == "FIX-A" and result.business_category and not result.business_category.upper().startswith("A"):
         result.warnings.append(
             f"business_category={result.business_category} 非 A 类；请 --fix 或手动设为 A1/A2"
@@ -661,9 +743,11 @@ def _build_manifest(results: list[FixtureResult]) -> dict:
     fix_a = by_id.get("FIX-A")
     fix_b = by_id.get("FIX-B")
     fix_f = by_id.get("FIX-F")
+    fix_i6 = by_id.get("FIX-I6")
     return {
         "year": DEFAULT_YEAR,
         "f2_e2e_wp_codes": F2_E2E_WP_CODES,
+        "i6_e2e_wp_codes": I6_E2E_WP_CODES,
         "fixtures": {
             r.fixture_id: {
                 "project_id": r.project_id,
@@ -689,6 +773,11 @@ def _build_manifest(results: list[FixtureResult]) -> dict:
                 (fix_f.project_id if fix_f and fix_f.project_id else "")
                 or (fix_b.project_id if fix_b and fix_b.project_id else "")
             ),
+            "TEST_PROJECT_ID_FIX_I6": (
+                (fix_i6.project_id if fix_i6 and fix_i6.project_id else "")
+                or (fix_b.project_id if fix_b and fix_b.project_id else "")
+            ),
+            "I6_E2E_WP_ID": (fix_i6.i6_wp_id if fix_i6 and fix_i6.i6_wp_id else ""),
             "RUN_FULL_E2E": "1",
         },
         "playwright_hint": (

@@ -23,13 +23,25 @@ import {
   type G13DisclosureVariant,
 } from './g13NoteSectionMap'
 
+import type { ColumnDef } from './disclosureColumnDefs'
+
 export interface G13SyncFromWorkpaperPayload {
   wp_id: string
   sheet_name: string
   section_id: string
   current_standard: string
   sub_table_data: Record<string, Record<string, unknown>[]>
+  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 G13TabDisclosure el-table-column */
+  columns?: Record<string, ColumnDef[]>
 }
+
+// 公允价值变动收益列头：逐字取自 G13TabDisclosureListed/SOE
+const G13_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '产生公允价值变动收益的来源', is_label: true },
+  { key: 'current_amount', label: '本期发生额', format: 'amount' },
+  { key: 'prior_amount', label: '上期发生额', format: 'amount' },
+  { key: 'remark', label: '备注' },
+]
 
 export interface G13SyncRow extends G13DisclosureAmountRow {
   label: string
@@ -183,5 +195,6 @@ export function buildG13SyncPayloads(
     section_id: G13_NOTE_SECTION[variant],
     current_standard: resolveG13CurrentStandard(variant, applicableStandards),
     sub_table_data: buildG13SubTableData(snap, variant),
+    columns: { [G13_MAIN_SUBTABLE]: G13_COLUMNS },
   }]
 }

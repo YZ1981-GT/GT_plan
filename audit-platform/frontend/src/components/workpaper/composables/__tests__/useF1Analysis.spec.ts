@@ -106,3 +106,47 @@ describe('useF1Analysis pure helpers', () => {
     expect(turnoverHints.some(h => h.includes('应付'))).toBe(true)
   })
 })
+
+describe('useF1Analysis.fillCrossCycleFromTb（从试算表带入锚点余额）', () => {
+  async function setup(isReadonlyVal = false) {
+    const { ref } = await import('vue')
+    const { useF1Analysis } = await import('../useF1Analysis')
+    const allResponses = ref(new Map())
+    const api = useF1Analysis({
+      allResponses: allResponses as any,
+      wpId: ref('wp1') as any,
+      projectId: ref('p1') as any,
+      saveImmediate: async () => {},
+      debouncedSave: () => {},
+      crossSheet: {} as any,
+      isReadonly: ref(isReadonlyVal) as any,
+    })
+    return api
+  }
+
+  it('锚点为空时填入存货/应付余额', async () => {
+    const api = await setup()
+    const r = api.fillCrossCycleFromTb({ inventoryBalance: 1000, payableBalance: 500 })
+    expect(r.inventoryFilled).toBe(true)
+    expect(r.payableFilled).toBe(true)
+    expect(api.payableBalance.value.current).toBe(500)
+    const inv = api.balanceRows.value.find((x: any) => x.rowKey === 'inventoryBalance')
+    expect(inv?.current).toBe(1000)
+  })
+
+  it('已有数值时不覆盖', async () => {
+    const api = await setup()
+    api.updateInventoryBalance('current', 888)
+    const r = api.fillCrossCycleFromTb({ inventoryBalance: 1000, payableBalance: 0 })
+    expect(r.inventoryFilled).toBe(false)
+    const inv = api.balanceRows.value.find((x: any) => x.rowKey === 'inventoryBalance')
+    expect(inv?.current).toBe(888)
+  })
+
+  it('只读模式不填入', async () => {
+    const api = await setup(true)
+    const r = api.fillCrossCycleFromTb({ inventoryBalance: 1000, payableBalance: 500 })
+    expect(r.inventoryFilled).toBe(false)
+    expect(r.payableFilled).toBe(false)
+  })
+})

@@ -39,18 +39,32 @@
           <span v-else>{{ row.summary || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="类别" width="85">
+      <el-table-column label="类别" width="110">
         <template #default="{ row }">
-          <el-select v-if="!isReadonly" :model-value="row.entryType" size="small" @change="(v: string) => updateCell(row.id, 'entryType', v)">
-            <el-option value="AJE" label="AJE" /><el-option value="RJE" label="RJE" />
+          <el-select v-if="!isReadonly" :model-value="row.category" size="small" @change="(v: string) => updateCell(row.id, 'category', v)">
+            <el-option value="报表调整" label="报表调整" />
+            <el-option value="账项调整" label="账项调整" />
+            <el-option value="其他" label="其他" />
           </el-select>
-          <el-tag v-else :type="row.entryType === 'AJE' ? 'danger' : 'warning'" size="small">{{ row.entryType }}</el-tag>
+          <el-tag v-else :type="row.category === '报表调整' ? 'warning' : row.category === '其他' ? 'info' : 'danger'" size="small">{{ row.category }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="科目" min-width="120">
+      <el-table-column label="报表项目" min-width="110">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.reportItem" size="small" @change="(v: string) => updateCell(row.id, 'reportItem', v)" />
+          <span v-else>{{ row.reportItem || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="科目名称" min-width="120">
         <template #default="{ row }">
           <el-input v-if="!isReadonly" :model-value="row.accountName" size="small" @change="(v: string) => updateCell(row.id, 'accountName', v)" />
           <span v-else>{{ row.accountName || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="附注项目" min-width="110">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.noteItem" size="small" @change="(v: string) => updateCell(row.id, 'noteItem', v)" />
+          <span v-else>{{ row.noteItem || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="借方" width="120" align="right">
@@ -63,6 +77,12 @@
         <template #default="{ row }">
           <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" size="small" :controls="false" :precision="2" :min="0" style="width:100%" @change="(v: number | undefined) => updateCell(row.id, 'creditAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.creditAmount) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="索引" min-width="90">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.indexRef" size="small" @change="(v: string) => updateCell(row.id, 'indexRef', v)" />
+          <span v-else>{{ row.indexRef || '-' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="备注" min-width="100">
@@ -91,11 +111,11 @@
     <details class="compile-hint">
       <summary>📋 编制提示</summary>
       <ul>
-        <li>AJE：更正被审计单位财务报表中的错报</li>
-        <li>RJE：分析性归类调整（不影响报表净额）</li>
+        <li>类别（对齐源模板）：<strong>账项调整</strong>（更正错报，计入 K8-1 审定表账项调整列）/<strong>报表调整</strong>（重分类，计入重分类调整列）/<strong>其他</strong></li>
         <li>损益类6601销售费用：借方=增加费用，贷方=冲减费用</li>
+        <li>填写报表项目/科目名称/附注项目/索引，便于追溯与附注联动</li>
         <li>借贷必须平衡后方可保存回写</li>
-        <li>保存后自动发布 adjustment:created 事件联动A13</li>
+        <li>保存后自动发布 adjustment:created 事件联动A13，并同步 K8-1 审定表账项/重分类调整</li>
       </ul>
     </details>
   </div>
@@ -139,16 +159,39 @@ const emit = defineEmits<{
 
 const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', () => {})
 
-// ═══ 数据模型 ═══
+// ═══ 数据模型（对齐源模板 K8-3：调整事项说明/类别/报表项目/科目名称/附注项目/借方/贷方/索引/备注）═══
+type AdjCategory = '报表调整' | '账项调整' | '其他'
+
 interface AdjustmentEntry {
   id: string
   seq: number
-  entryType: 'AJE' | 'RJE'
+  /** 类别（对齐源模板：报表调整/账项调整/其他） */
+  category: AdjCategory
+  /** 调整事项说明 */
   summary: string
+  /** 报表项目 */
+  reportItem: string
+  /** 科目名称 */
   accountName: string
+  /** 附注项目 */
+  noteItem: string
   debitAmount: number
   creditAmount: number
+  /** 索引 */
+  indexRef: string
   remark: string
+}
+
+/** 类别 → K8-1 审定表 AJE/RJE 桶映射：账项调整/其他→AJE，报表调整→RJE(重分类) */
+function categoryToBucket(cat: AdjCategory): 'aje' | 'rje' {
+  return cat === '报表调整' ? 'rje' : 'aje'
+}
+
+/** legacy entryType(AJE/RJE) → category 兼容迁移 */
+function legacyTypeToCategory(t: string): AdjCategory {
+  if (t === 'RJE') return '报表调整'
+  if (t === 'AJE') return '账项调整'
+  return '账项调整'
 }
 
 const entries = ref<AdjustmentEntry[]>([])
@@ -173,11 +216,15 @@ function loadFromResponses(): void {
       entries.value = parsed.map((e: any, idx: number) => ({
         id: e.id || `entry-${++nextId}`,
         seq: idx + 1,
-        entryType: e.entryType || 'AJE',
+        // 兼容旧数据：无 category 时从 entryType 迁移
+        category: (e.category as AdjCategory) || legacyTypeToCategory(e.entryType || 'AJE'),
         summary: e.summary || '',
+        reportItem: e.reportItem || '销售费用',
         accountName: e.accountName || '销售费用',
+        noteItem: e.noteItem || '',
         debitAmount: Number(e.debitAmount) || 0,
         creditAmount: Number(e.creditAmount) || 0,
+        indexRef: e.indexRef || '',
         remark: e.remark || '',
       }))
       nextId = entries.value.length + 1
@@ -197,11 +244,14 @@ async function handleAddEntry(): Promise<void> {
       entries.value.push({
         id: `entry-${++nextId}`,
         seq: entries.value.length + 1,
-        entryType: 'AJE',
+        category: '账项调整',
         summary: value.trim(),
+        reportItem: '销售费用',
         accountName: '销售费用',
+        noteItem: '',
         debitAmount: 0,
         creditAmount: 0,
+        indexRef: '',
         remark: '',
       })
       persistEntries()
@@ -238,12 +288,13 @@ function handleSaveWriteback(): void {
     return
   }
 
-  // 损益类6601: AJE对科目影响 = 借方(增加费用) - 贷方(冲减费用)
+  // 损益类6601: 对科目影响 = 借方(增加费用) - 贷方(冲减费用)
+  // 类别→桶：账项调整/其他→AJE(账项调整)，报表调整→RJE(重分类调整)
   const ajeTotal = entries.value
-    .filter(e => e.entryType === 'AJE')
+    .filter(e => categoryToBucket(e.category) === 'aje')
     .reduce((sum, e) => sum + (e.debitAmount - e.creditAmount), 0)
   const rjeTotal = entries.value
-    .filter(e => e.entryType === 'RJE')
+    .filter(e => categoryToBucket(e.category) === 'rje')
     .reduce((sum, e) => sum + (e.debitAmount - e.creditAmount), 0)
 
   // 双向同步到allResponses供K8-1审定表读取
@@ -271,6 +322,23 @@ function handleSaveWriteback(): void {
         timestamp: Date.now(),
       })
     }
+    // 推送错报至 A13（对齐 K10-3；crossWpEventBridge 白名单事件）
+    eventBus.emit('a13:push-misstatement' as any, {
+      wpCode: 'K8',
+      accountCode: K8_ACCOUNT_CODE,
+      ajeTotal,
+      rjeTotal,
+      entries: entries.value.map(e => ({
+        summary: e.summary,
+        category: e.category,
+        reportItem: e.reportItem,
+        accountName: e.accountName,
+        debit: e.debitAmount,
+        credit: e.creditAmount,
+        indexRef: e.indexRef,
+      })),
+      timestamp: Date.now(),
+    })
   } catch { /* silent */ }
 
   ElMessage.success('已保存并回写K8-1审定表，已通知A13')
@@ -283,7 +351,7 @@ function fmtAmt(v: number | null | undefined): string {
 }
 
 function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
-  return row.entryType === 'RJE' ? 'rje-row' : ''
+  return categoryToBucket(row.category) === 'rje' ? 'rje-row' : ''
 }
 </script>
 

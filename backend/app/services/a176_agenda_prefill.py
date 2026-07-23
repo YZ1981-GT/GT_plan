@@ -138,29 +138,26 @@ async def _prefill_kam_titles(db: AsyncSession, project_id: UUID) -> str:
 
 
 async def _prefill_b50_risks(db: AsyncSession, project_id: UUID) -> tuple[str, str]:
-    """Return (agenda 2 text, agenda 3 text) from B50 risk assessment."""
-    try:
-        year = await _get_project_year(db, project_id)
-        if year is None:
-            return "", ""
-        from app.services.field_override_service import FieldOverrideService
+    """Return (agenda 2 text, agenda 3 text) from B50 risk assessment.
 
-        svc = FieldOverrideService(db)
-        data = await svc.get_batch(project_id, year, scope="risk_assessment")
-        if not data:
+    数据来源: checklist_responses（B50 底稿 B50-T3-* 单一真源，经 b50_risk_reader）。
+    """
+    try:
+        from app.services.b50_risk_reader import load_b50_risks
+
+        risks = await load_b50_risks(db, project_id)
+        if not risks:
             return "", ""
 
         high_lines: list[str] = []
         special_lines: list[str] = []
-        for _key, fields in data.items():
-            desc = (fields.get("description") or "").strip()
+        for r in risks:
+            desc = (r.get("description") or "").strip()
             if not desc:
                 continue
-            level = (fields.get("risk_level") or "").strip()
-            is_special = fields.get("is_special_risk") == "true"
-            if is_special:
+            if r.get("is_special_risk"):
                 special_lines.append(desc)
-            elif level in ("高", "high", "High", "HIGH"):
+            elif r.get("risk_level") == "H":
                 high_lines.append(desc)
 
         agenda2 = ""

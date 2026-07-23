@@ -60,9 +60,7 @@
             <el-button size="small" @click="handleAI('adjudication')">
               <el-icon><MagicStick /></el-icon> AI辅助
             </el-button>
-            <el-button size="small" @click="handleReview">
-              <el-icon><ChatDotSquare /></el-icon> 复核
-            </el-button>
+            <GtReviewTrigger section-id="K13-1-adjudication" label="💬 复核" />
           </div>
         </div>
       </template>
@@ -240,6 +238,40 @@
       </el-table>
     </el-card>
 
+    <!-- ═══ K13-3 调整分录勾稽告警 ═══ -->
+    <el-alert
+      v-if="adjudication.adjustmentReconcile.value.hasK13_3 && !adjudication.adjustmentReconcile.value.isBalanced"
+      type="warning"
+      :closable="false"
+      show-icon
+      style="margin-bottom:0"
+    >
+      <template #title>
+        K13-3 调整分录净影响与本审定表 AJE/RJE 列合计不一致，请核对并将 K13-3 调整反映到对应行：
+        <template v-if="Math.abs(adjudication.adjustmentReconcile.value.ajeDiff) >= 0.01">
+          AJE 差异 {{ fmtAmt(adjudication.adjustmentReconcile.value.ajeDiff) }}
+          （K13-3净额 {{ fmtAmt(adjudication.adjustmentReconcile.value.k13_3AjeTotal) }} vs 审定表 {{ fmtAmt(adjudication.adjustmentReconcile.value.tableAjeTotal) }}）
+        </template>
+        <template v-if="Math.abs(adjudication.adjustmentReconcile.value.rjeDiff) >= 0.01">
+          ；RJE 差异 {{ fmtAmt(adjudication.adjustmentReconcile.value.rjeDiff) }}
+          （K13-3净额 {{ fmtAmt(adjudication.adjustmentReconcile.value.k13_3RjeTotal) }} vs 审定表 {{ fmtAmt(adjudication.adjustmentReconcile.value.tableRjeTotal) }}）
+        </template>
+      </template>
+    </el-alert>
+
+    <!-- ═══ 与试算表(6711)勾稽告警 ═══ -->
+    <el-alert
+      v-if="tbReconcile.hasTb && !tbReconcile.isBalanced"
+      type="warning"
+      :closable="false"
+      show-icon
+      style="margin-bottom:0"
+    >
+      <template #title>
+        审定合计与试算表科目6711审定发生额不一致：审定合计 {{ fmtAmt(tbReconcile.auditedTotal) }} vs TB {{ fmtAmt(tbReconcile.tbAudited) }}（差异 {{ fmtAmt(tbReconcile.diff) }}），请核对后回写。
+      </template>
+    </el-alert>
+
     <!-- ═══ TB回写操作栏 ═══ -->
     <div class="k13-action-bar">
       <el-button
@@ -327,12 +359,15 @@
  * Requirements: 2.1-2.7
  */
 import { ref, inject, defineAsyncComponent, watch, toRef, computed } from 'vue'
-import { ElMessage } from 'element-plus'
-import { MagicStick, ChatDotSquare } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { MagicStick } from '@element-plus/icons-vue'
+import http from '@/utils/http'
 import { useK13Adjudication } from '../../composables/useK13Adjudication'
+import { generateK13AiText } from '../../composables/useK13AiText'
 import { eventBus } from '@/utils/eventBus'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
+const GtReviewTrigger = defineAsyncComponent(() => import('../../GtReviewTrigger.vue'))
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 
@@ -348,10 +383,6 @@ const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'navigate-sheet', sheetName: string): void
 }>()
-
-// ─── Inject 复核对话 ─────────────────────────────────────────────────────────
-
-const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -418,7 +449,18 @@ function getSummaries({ columns }: any) {
 // ─── TB回写 ──────────────────────────────────────────────────────────────────
 
 async function handleWritebackTBInternal(auditedAmount: number): Promise<void> {
-  // 发布 EventBus 'substantive:adjudicated'
+  // 真实回写试算表（科目6711发生额），端点已存在，LIKE 前缀回退
+  if (props.projectId) {
+    try {
+      await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
+        account_code: '6711',
+        audited_amount: auditedAmount,
+      })
+    } catch (err: any) {
+      ElMessage.warning('TB 回写请求失败，已发布联动事件：' + (err?.response?.data?.detail || err?.message || ''))
+    }
+  }
+  // 发布 EventBus 'substantive:adjudicated'（供 K13 附注/A 报表等下游刷新）
   eventBus.emit('substantive:adjudicated', {
     accountCode: '6711',
     auditedAmount,
@@ -452,15 +494,69 @@ function handleConclusionSave(): void {
 
 // ─── AI辅助 ──────────────────────────────────────────────────────────────────
 
-function handleAI(section: string): void {
-  ElMessage.info(`AI辅助分析营业外支出${section}数据...`)
+const AI_SECTION_CFG: Record<string, { section: string; prompt: string; target?: 'note' | 'conclusion' }> = {
+  adjudication: {
+    section: 'k13-1-analysis',
+    prompt: '你是审计师，请针对以下营业外支出（科目6711，损益类借方，取发生额）审定表数据，分析各去向金额及同比变动的合理性、是否存在异常波动、关注税前扣除性（捐赠限额/罚款不可扣除），给出简要复核意见。',
+  },
+  note: {
+    section: 'k13-1-audit-note',
+    prompt: '你是审计师，请基于以下营业外支出审定表数据，撰写审计说明（变动原因分析、特殊事项、税前扣除性关注等）。',
+    target: 'note',
+  },
+  conclusion: {
+    section: 'k13-1-audit-conclusion',
+    prompt: '你是审计师，请基于以下营业外支出审定表数据，撰写审计结论（是否恰当、是否存在重大错报）。',
+    target: 'conclusion',
+  },
 }
 
-// ─── 复核 ────────────────────────────────────────────────────────────────────
+// ─── TB 勾稽（审定合计 ↔ TB 6711 审定发生额） ─────────────────────────────────
 
-function handleReview(): void {
-  openReviewDialog?.('K13-1-adjudication', '营业外支出审定表')
+const tbReconcile = computed(() => {
+  const auditedTotal = adjudication.totalRow.value.audited
+  const tbAudited = Number(props.tbData.audited6711 || 0)
+  const hasTb = Math.abs(tbAudited) > 0.001
+  const diff = auditedTotal - tbAudited
+  return { hasTb, auditedTotal, tbAudited, diff, isBalanced: Math.abs(diff) < 0.01 }
+})
+
+async function handleAI(section: string): Promise<void> {
+  const cfg = AI_SECTION_CFG[section] ?? AI_SECTION_CFG.adjudication
+  const t = adjudication.totalRow.value
+  const lines = adjudication.rows.value
+    .filter(r => r.unadjusted || r.audited)
+    .map(r => `${r.name}：未审${r.unadjusted}｜审定${r.audited}｜同比${r.yoyChange == null ? '—' : (r.yoyChange * 100).toFixed(2) + '%'}`)
+    .join('\n')
+  const content = await generateK13AiText(props.wpId, {
+    section: cfg.section,
+    prompt: cfg.prompt,
+    existingContent: cfg.target === 'note'
+      ? adjudication.auditNote.value
+      : cfg.target === 'conclusion'
+        ? adjudication.auditConclusion.value
+        : '',
+    context: {
+      科目: '6711 营业外支出（损益类借方·发生额）',
+      各去向明细: lines || '（暂无数据）',
+      未审合计: t.unadjusted,
+      审定合计: t.audited,
+      同比变动: t.yoyChange == null ? '—' : (t.yoyChange * 100).toFixed(2) + '%',
+      与K13_2差异: adjudication.detailCrossValidation.value.diff,
+    },
+  })
+  if (!content) return
+  if (cfg.target === 'note') {
+    adjudication.auditNote.value = content
+    adjudication.saveNote(content)
+  } else if (cfg.target === 'conclusion') {
+    adjudication.auditConclusion.value = content
+    adjudication.saveConclusion(content)
+  } else {
+    await ElMessageBox.alert(content, 'AI 审定表分析（仅供参考）', { confirmButtonText: '知道了' })
+  }
 }
+
 </script>
 
 <style scoped>
@@ -490,11 +586,11 @@ function handleReview(): void {
 /* ─── 方法论上下文（琥珀色左边线+浅黄背景） ─── */
 .k13-methodology-ctx {
   padding: 10px 14px;
-  background: #fffbe6;
-  border-left: 4px solid #e6a23c;
+  background: #fffbeb;
+  border-left: 4px solid #f59e0b;
   border-radius: 4px;
   font-size: var(--wp-font-size, 13px);
-  color: #606266;
+  color: #78350f;
   line-height: 1.7;
 }
 .k13-methodology-ctx p {

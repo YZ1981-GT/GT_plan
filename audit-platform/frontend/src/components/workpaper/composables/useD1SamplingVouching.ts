@@ -478,6 +478,53 @@ export function useD1SamplingVouching(options: UseD1SamplingVouchingOptions) {
     scheduleVouchingSave()
   }
 
+  /**
+   * 从抽凭引擎回填样本 → 凭证核对明细行（P0-4 抽凭引擎联动）。
+   * 按票号(noteNo)+摘要去重，仅追加未存在的样本；金额取借方优先贷方。
+   * 抽凭引擎的 SampledVoucher 字段映射到 D1-13 票据核对行：
+   *   voucherNo → noteNo，counterpartAccount → drawer(出票人)，
+   *   voucherDate → maturityDate 兜底，debit/credit → amount，
+   *   abnormal → 预置例外提示（存在性未核实）。
+   */
+  function fillFromSampledVouchers(samples: Array<{
+    voucherNo?: string
+    voucherDate?: string
+    summary?: string | null
+    debitAmount?: string | null
+    creditAmount?: string | null
+    counterpartAccount?: string | null
+    abnormal?: boolean
+    selectionReason?: string
+  }>): number {
+    if (isReadonly.value || !Array.isArray(samples) || samples.length === 0) return 0
+    const existingKeys = new Set(
+      vouchingRows.value.map((r) => `${r.noteNo}||${r.remark}`.trim()),
+    )
+    const additions: VouchingRow[] = []
+    let seq = vouchingRows.value.length
+    for (const s of samples) {
+      const noteNo = String(s.voucherNo ?? '').trim()
+      const summary = String(s.summary ?? '').trim()
+      const key = `${noteNo}||${summary}`.trim()
+      if (noteNo && existingKeys.has(key)) continue
+      existingKeys.add(key)
+      seq += 1
+      const row = emptyVouchingRow(seq)
+      row.noteNo = noteNo
+      row.drawer = String(s.counterpartAccount ?? '').trim()
+      row.maturityDate = String(s.voucherDate ?? '').trim()
+      row.amount = parseNum(s.debitAmount ?? s.creditAmount ?? 0)
+      row.remark = String(s.selectionReason ?? summary ?? '').trim()
+      // 抽凭引擎标记异常 → 预置存在性例外，待审计师核实
+      if (s.abnormal) row.existenceCheck = '未核实'
+      additions.push(row)
+    }
+    if (additions.length === 0) return 0
+    vouchingRows.value = [...vouchingRows.value, ...additions]
+    persistVouchingRowsImmediate()
+    return additions.length
+  }
+
   /** 删除凭证核对行并重新编号 */
   function removeVouchingRow(id: string): void {
     if (isReadonly.value) return
@@ -724,6 +771,7 @@ export function useD1SamplingVouching(options: UseD1SamplingVouchingOptions) {
     addVouchingRow,
     removeVouchingRow,
     updateVouchingRow,
+    fillFromSampledVouchers,
 
     // 核对结果统计
     checkedCount,

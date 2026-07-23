@@ -41,6 +41,7 @@ export function useF3FormData(options: UseF3FormDataOptions) {
   const isLoading = ref(false)
   const projectContext = ref<ProjectContext>({})
   const sheetCache = ref<Record<string, any>>({})
+  const tbValues = ref<Record<string, number>>({})
 
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const _pendingItems = new Set<string>()
@@ -94,17 +95,39 @@ export function useF3FormData(options: UseF3FormDataOptions) {
       const data = res?.data ?? res
       const sheets = data?.sheets ?? data?.data?.sheets ?? []
       for (const s of sheets) {
-        sheetCache.value[s.sheet_name || s.name || 'default'] = s.html_data ?? s
+        const html = s.html_data ?? s
+        sheetCache.value[s.sheet_name || s.name || 'default'] = html
+        // P0-4：捕获 tb_values（可能在 sheet.html_data 或顶层）
+        if (html?.tb_values && typeof html.tb_values === 'object') {
+          tbValues.value = { ...tbValues.value, ...html.tb_values }
+        }
+      }
+      const topTb = data?.tb_values ?? data?.data?.tb_values
+      if (topTb && typeof topTb === 'object') {
+        tbValues.value = { ...tbValues.value, ...topTb }
       }
     } catch {
       // selfLoad 失败不阻塞
     }
   }
 
+  /** P0-4：F3-1 审定表试算核对数(2201) 预填——仅无持久化时 seed，不覆盖手工录入。 */
+  function seedTrialBalance(): void {
+    const v = tbValues.value['2201']
+    if (v == null) return
+    if (allResponses.value.has('F3-1-adj-tb-2201')) return
+    allResponses.value.set('F3-1-adj-tb-2201', {
+      item_id: 'F3-1-adj-tb-2201',
+      conclusion: null,
+      remark: String(v),
+    })
+  }
+
   async function loadAll(): Promise<void> {
     isLoading.value = true
     try {
       await Promise.all([loadResponses(), loadProjectContext(), selfLoad()])
+      seedTrialBalance()
     } finally {
       isLoading.value = false
     }

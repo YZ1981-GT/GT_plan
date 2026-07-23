@@ -15,11 +15,27 @@
     <div class="section-header">
       <h3>K5-1 预计负债审定表</h3>
       <div class="header-actions">
+        <el-button size="small" :disabled="isReadonly" @click="prefillFromTbSubAccounts">
+          📊 从TB预填未审
+        </el-button>
+        <el-button size="small" :disabled="isReadonly" @click="syncFromSpecialSheets">
+          📥 从专项表带入
+        </el-button>
         <el-button size="small" type="primary" plain @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI审计说明
         </el-button>
         <el-button size="small" @click="$emit('navigate-sheet', '预计负债检查表K5-7')">复核</el-button>
       </div>
+    </div>
+
+    <!-- ═══ 跨底稿引用 ═══ -->
+    <div class="cross-refs">
+      <span class="cross-refs-label">关联底稿：</span>
+      <GtIndexChip value="wp:K5-2" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K5-4" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K5-5" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K5-6" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K5-7" :context-project-id="props.projectId" />
     </div>
 
     <!-- ═══ 方法论上下文（琥珀色块） ═══ -->
@@ -32,6 +48,17 @@
       <el-alert type="error" :closable="false" show-icon>
         <template #title>
           TB勾稽不平：审定合计 {{ fmtNum(subtotalRow.audited) }} vs TB审定(2701) {{ fmtNum(tbData.audited2701) }}，差异 {{ fmtNum(tbReconciliation.diff) }}
+        </template>
+      </el-alert>
+    </div>
+
+    <!-- ═══ K5-2明细勾稽 ═══ -->
+    <div v-if="detailCrossCheckDiff !== 0" class="detail-cross-check">
+      <el-alert :type="Math.abs(detailCrossCheckDiff) > 0.01 ? 'warning' : 'success'" :closable="false" show-icon>
+        <template #title>
+          K5-1审定合计 {{ fmtNum(subtotalRow.audited) }} vs K5-2明细期末合计 {{ fmtNum(detailEndTotal) }}
+          <span v-if="Math.abs(detailCrossCheckDiff) > 0.01" style="color:#e6a23c;font-weight:600">  差异 {{ fmtNum(detailCrossCheckDiff) }}</span>
+          <span v-else style="color:#67c23a">  ✓ 一致</span>
         </template>
       </el-alert>
     </div>
@@ -144,6 +171,24 @@
       </span>
     </div>
 
+    <!-- ═══ 报表数核对 ═══ -->
+    <div class="report-reconciliation">
+      <el-table :data="reportReconciliationRows" border size="small" style="max-width:600px" :show-header="true">
+        <el-table-column prop="label" label="核对项目" width="200" />
+        <el-table-column label="金额" width="140" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell" :class="{ 'diff-highlight': row.isDiff && Math.abs(row.amount) > 0.01 }">{{ fmtNum(row.amount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.isOk" type="success" size="small">✓</el-tag>
+            <el-tag v-else-if="row.isDiff" type="danger" size="small">差异</el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+    </div>
+
     <!-- ═══ 审计说明+结论 ═══ -->
     <el-card shadow="never" class="conclusion-card">
       <template #header>
@@ -187,7 +232,10 @@
  */
 import { computed, toRef } from 'vue'
 import { MagicStick, CircleCheckFilled, WarningFilled } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useK5Adjudication } from '../../composables/useK5Adjudication'
+import GtIndexChip from '../../shared/GtIndexChip.vue'
+import http from '@/utils/http'
 import type { K5TbData } from '../../composables/useK5FormData'
 import type { Ref } from 'vue'
 
@@ -218,6 +266,7 @@ const {
   auditConclusion,
   tbReconciliation,
   saveAll,
+  publishAdjudicated,
 } = useK5Adjudication({
   allResponses: allResponsesRef,
   tbData: tbDataRef as Ref<K5TbData>,
@@ -238,14 +287,186 @@ function handleCellChange(rowKey: string, field: string, value: any) {
 
 function handleTbWriteback() {
   emit('save', 'K5-1-audited-total', { remark: String(subtotalRow.value.audited) })
+  // 发布审定数事件通知附注/A13/下游
+  publishAdjudicated()
+  ElMessage.success('已回写TB(2701)并发布审定数')
 }
 
 function handleSaveConclusion() { saveAll() }
 
 function handleAiGenerate() {
-  // AI生成结论 - 调用通用AI端点
   emit('save', 'K5-1-ai-trigger', { remark: 'generate' })
 }
+
+// ─── K5-2明细勾稽 ────────────────────────────────────────────────────────────
+
+const detailEndTotal = computed(() => {
+  const item = props.allResponses.get('K5-2-detail-end-total')
+  return Number(item?.remark ?? 0) || 0
+})
+
+const detailCrossCheckDiff = computed(() => {
+  if (!detailEndTotal.value && !subtotalRow.value.audited) return 0
+  return subtotalRow.value.audited - detailEndTotal.value
+})
+
+// ─── 从专项检查表带入 ────────────────────────────────────────────────────────
+
+const ROW_LABELS = ['产品质量保证', '未决诉讼', '亏损合同', '重组义务', '弃置义务', '其他']
+const CROSS_SHEET_KEYS: Record<string, string> = {
+  '产品质量保证': 'K5-4-warranty-end-total',
+  '未决诉讼': 'K5-6-litigation-loss-total',
+  '弃置义务': 'K5-5-decommission-end-total',
+}
+
+async function syncFromSpecialSheets(): Promise<void> {
+  const updates: Array<{ label: string; rowKey: string; value: number }> = []
+
+  for (let i = 0; i < ROW_LABELS.length; i++) {
+    const label = ROW_LABELS[i]
+    const crossKey = CROSS_SHEET_KEYS[label]
+    if (!crossKey) continue
+    const item = props.allResponses.get(crossKey)
+    const val = Number(item?.remark ?? 0) || 0
+    if (val > 0) {
+      updates.push({ label, rowKey: `r${i}`, value: val })
+    }
+  }
+
+  if (updates.length === 0) {
+    ElMessage.warning('专项检查表(K5-4/K5-5/K5-6)暂无数据')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `从专项检查表带入以下审定数（填入"未审"列，仅填空值不覆盖）：\n${updates.map(u => `• ${u.label}：${u.value.toLocaleString()} 元`).join('\n')}`,
+      '从专项表带入',
+      { confirmButtonText: '带入', cancelButtonText: '取消', type: 'info' }
+    )
+
+    let filled = 0
+    for (const u of updates) {
+      const existingItem = props.allResponses.get(`K5-1-${u.rowKey}-unadj`)
+      const existingVal = Number(existingItem?.remark ?? 0) || 0
+      if (!existingVal) {
+        emit('save', `K5-1-${u.rowKey}-unadj`, { remark: String(u.value) })
+        filled++
+      }
+    }
+
+    if (filled > 0) {
+      ElMessage.success(`已带入 ${filled} 行未审数`)
+    } else {
+      ElMessage.info('所有行已有数据，未覆盖')
+    }
+  } catch { /* 用户取消 */ }
+}
+
+// ─── 从TB 2701子科目预填未审数 ───────────────────────────────────────────────
+
+/**
+ * 从 tb_balance 查询 2701 子科目，按科目名称关键词映射到审定表类型行。
+ * 映射规则：质量/保修/保证→产品质量保证 | 诉讼/仲裁/赔偿→未决诉讼 |
+ *           亏损/合同→亏损合同 | 重组/搬迁→重组义务 | 弃置/复垦/环保→弃置义务 | 其余→其他
+ */
+const TB_TYPE_KEYWORDS: Array<{ keywords: string[]; typeIndex: number }> = [
+  { keywords: ['质量', '保修', '保证', '三包'], typeIndex: 0 },
+  { keywords: ['诉讼', '仲裁', '赔偿', '官司'], typeIndex: 1 },
+  { keywords: ['亏损', '合同'], typeIndex: 2 },
+  { keywords: ['重组', '搬迁', '裁员'], typeIndex: 3 },
+  { keywords: ['弃置', '复垦', '环保', '退役'], typeIndex: 4 },
+]
+
+function classifySubAccount(name: string): number {
+  const lower = name.toLowerCase()
+  for (const rule of TB_TYPE_KEYWORDS) {
+    if (rule.keywords.some(kw => lower.includes(kw))) return rule.typeIndex
+  }
+  return 5 // 其他
+}
+
+async function prefillFromTbSubAccounts(): Promise<void> {
+  try {
+    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
+      params: { account_prefix: '2701' },
+      _silent: true,
+    } as any)
+    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
+    if (list.length === 0) {
+      ElMessage.warning('未查到2701子科目数据')
+      return
+    }
+
+    // 按类型归集
+    const grouped: Record<number, number> = {}
+    const details: string[] = []
+    for (const item of list) {
+      const code = String(item.standard_account_code ?? item.account_code ?? '')
+      if (!code.startsWith('2701')) continue
+      const name = String(item.account_name ?? item.standard_account_name ?? code)
+      const amt = Math.abs(Number(item.unadjusted_amount ?? item.closing_balance ?? 0))
+      if (amt <= 0) continue
+      const typeIdx = classifySubAccount(name)
+      grouped[typeIdx] = (grouped[typeIdx] || 0) + amt
+      details.push(`${name}: ${amt.toLocaleString()}`)
+    }
+
+    if (Object.keys(grouped).length === 0) {
+      ElMessage.warning('2701子科目余额全部为0')
+      return
+    }
+
+    const preview = Object.entries(grouped)
+      .map(([idx, amt]) => `• ${ROW_LABELS[Number(idx)]}：${Number(amt).toLocaleString()} 元`)
+      .join('\n')
+
+    await ElMessageBox.confirm(
+      `从TB(2701)子科目预填未审数（仅填空值不覆盖）：\n${preview}\n\n明细（${details.length}个子科目）：\n${details.slice(0, 8).join('\n')}${details.length > 8 ? '\n...' : ''}`,
+      '从TB预填未审数',
+      { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }
+    )
+
+    let filled = 0
+    for (const [idx, amt] of Object.entries(grouped)) {
+      const rowKey = `r${idx}`
+      const existingItem = props.allResponses.get(`K5-1-${rowKey}-unadj`)
+      const existingVal = Number(existingItem?.remark ?? 0) || 0
+      if (!existingVal && Number(amt) > 0) {
+        emit('save', `K5-1-${rowKey}-unadj`, { remark: String(amt) })
+        filled++
+      }
+    }
+
+    if (filled > 0) {
+      ElMessage.success(`已从TB预填 ${filled} 行未审数`)
+    } else {
+      ElMessage.info('所有行已有未审数，未覆盖')
+    }
+  } catch (err: any) {
+    if (err !== 'cancel' && err?.toString() !== 'cancel') {
+      ElMessage.warning('从TB预填失败')
+    }
+  }
+}
+
+// ─── 报表数核对（审定合计 vs TB vs 明细）─────────────────────────────────────
+
+const reportReconciliationRows = computed(() => {
+  const audited = subtotalRow.value.audited
+  const tbAudited = props.tbData.audited2701
+  const detailTotal = detailEndTotal.value
+  const tbDiff = audited - tbAudited
+  const detailDiff = detailTotal ? (audited - detailTotal) : 0
+
+  return [
+    { label: 'K5-1 审定合计', amount: audited, isOk: true, isDiff: false },
+    { label: 'TB(2701) 审定数', amount: tbAudited, isOk: Math.abs(tbDiff) < 0.01, isDiff: Math.abs(tbDiff) > 0.01 },
+    { label: 'K5-2 明细期末合计', amount: detailTotal || 0, isOk: !detailTotal || Math.abs(detailDiff) < 0.01, isDiff: detailTotal > 0 && Math.abs(detailDiff) > 0.01 },
+    { label: '审定 vs TB 差异', amount: tbDiff, isOk: Math.abs(tbDiff) < 0.01, isDiff: Math.abs(tbDiff) > 0.01 },
+    { label: '审定 vs 明细差异', amount: detailDiff, isOk: !detailTotal || Math.abs(detailDiff) < 0.01, isDiff: detailTotal > 0 && Math.abs(detailDiff) > 0.01 },
+  ]
+})
 
 // ─── Row class（差异行+勾稽不平红色高亮） ────────────────────────────────────
 
@@ -265,10 +486,13 @@ function fmtNum(v: number): string {
 
 <style scoped>
 .k5-tab-adjudication { padding: 12px; font-size: var(--wp-font-size, 13px); }
-.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
 .section-header h3 { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .section-header.compact { margin-bottom: 0; }
-.header-actions { display: flex; gap: 8px; }
+.header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.cross-refs { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 12px; flex-wrap: wrap; }
+.cross-refs-label { color: #909399; }
+.detail-cross-check { margin-bottom: 12px; }
 .methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6; }
 .reconciliation-alert { margin-bottom: 12px; }
 .formula-cell { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #303133; }
@@ -279,6 +503,8 @@ function fmtNum(v: number): string {
 .match-indicator { color: #67c23a; }
 .mismatch-indicator { color: #f56c6c; }
 .conclusion-card { margin-top: 16px; }
+.report-reconciliation { margin: 12px 0; }
+.report-reconciliation :deep(.el-table) { font-size: 12px; }
 :deep(.subtotal-row) { background-color: #f0f9eb !important; font-weight: 600; }
 :deep(.diff-row) { background-color: #f5f7fa !important; }
 :deep(.diff-row-error) { background-color: #fef0f0 !important; }

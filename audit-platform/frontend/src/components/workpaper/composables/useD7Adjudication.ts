@@ -1,21 +1,19 @@
 /**
  * useD7Adjudication — D7-1 审定表（双区块：按性质+按账龄，含扣减行）
  *
- * 双区块固定行结构：
- *   一、按性质分类：预收货款/开发项目预收款/预收工程款/其他/小计/减：计入其他非流动负债的合同负债/合同负债合计
- *   二、按账龄分类：1年以内/1~2年/2~3年/3年以上/合计/试算平衡表数/差异数
+ * 双区块结构：
+ *   一、按性质分类（固定 4 行）：预收货款/开发项目预收款/预收工程款/其他/小计/减：非流动负债/合同负债合计
+ *   二、按账龄分类（按项目账龄配置段动态生成）：各段明细行/合计/试算平衡表数/差异数
  *
  * 公式关系：
- *   - 审定数 = 未审 + AJE + RJE
- *   - 小计 = SUM(明细行)
- *   - 合同负债合计 = 小计 - 非流动负债扣减
- *   - 账龄合计 = SUM(4段)
- *   - 差异 = 账龄合计 - 试算平衡表数
- *   - 交叉验证：合同负债合计(性质) === 账龄合计(账龄)
+ *   - 审定数 = 未审 + AJE + RJE（AJE/RJE 纯 computed 从 crossSheet.adjustmentTotals 双分组派生）
+ *   - 小计 = SUM(明细行)；合同负债合计 = 小计 - 非流动负债扣减
+ *   - 账龄合计 = SUM(各段)；差异 = 账龄合计 - 试算平衡表数
+ *   - 交叉验证：性质区块调整合计 === 账龄区块调整合计；两区块合计不相加计入总额
  *
- * Spec: .kiro/specs/d7-contract-liabilities/
- * Task: 6.1
- * Requirements: 2.1-2.9, 3.1-3.7, 4.1-4.7, 17.1, 18.1, 23.1
+ * Spec: .kiro/specs/d7-contract-liabilities-enhancement/
+ * Task: 6
+ * Requirements: 3.1-3.5, 10.3, 10.4, 10.5, 10.6, 11.1, 11.2
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import {
@@ -25,8 +23,8 @@ import {
   calcChangeRate,
   calcSubtotal,
   calcContractLiabilityTotal,
-  isChangeRateExceeding,
 } from './useD7FormulaEngine'
+import { eventBus } from '@/utils/eventBus'
 import type { ChecklistResponse } from './useD7FormData'
 import type useD7CrossSheet from './useD7CrossSheet'
 
@@ -59,6 +57,9 @@ export interface UseD7AdjudicationOptions {
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   wpId: Ref<string>
   projectId: Ref<string>
+  /** TB 预填种子（科目2205期末审定数，来自后端 project_context.tb_amount）；仅在用户未手工保存试算平衡表数时回退使用 */
+  tbSeedAmount?: Ref<number>
+  isReadonly?: Ref<boolean>
 }
 
 // ─── Block Configuration ─────────────────────────────────────────────────────
@@ -66,6 +67,7 @@ export interface UseD7AdjudicationOptions {
 interface NatureBlockRowConfig {
   rowKey: string
   label: string
+  natureKey: 'revenue' | 'development' | 'engineering' | 'other' | ''
   isFromCrossSheet: boolean
   isEditable: boolean
   isDeductionRow: boolean
@@ -73,32 +75,25 @@ interface NatureBlockRowConfig {
 }
 
 const NATURE_BLOCK_CONFIG: NatureBlockRowConfig[] = [
-  { rowKey: 'revenue', label: '预收货款', isFromCrossSheet: true, isEditable: true, isDeductionRow: false, rowType: 'detail' },
-  { rowKey: 'development', label: '开发项目预收款', isFromCrossSheet: true, isEditable: true, isDeductionRow: false, rowType: 'detail' },
-  { rowKey: 'engineering', label: '预收工程款', isFromCrossSheet: true, isEditable: true, isDeductionRow: false, rowType: 'detail' },
-  { rowKey: 'other', label: '其他', isFromCrossSheet: true, isEditable: true, isDeductionRow: false, rowType: 'detail' },
-  { rowKey: 'nature-subtotal', label: '小计', isFromCrossSheet: false, isEditable: false, isDeductionRow: false, rowType: 'subtotal' },
-  { rowKey: 'non-current-deduction', label: '减：计入其他非流动负债的合同负债', isFromCrossSheet: false, isEditable: true, isDeductionRow: true, rowType: 'deduction' },
-  { rowKey: 'contract-liability-total', label: '合同负债合计', isFromCrossSheet: false, isEditable: false, isDeductionRow: false, rowType: 'total' },
+  { rowKey: 'revenue', label: '预收货款', natureKey: 'revenue', isFromCrossSheet: true, isEditable: true, isDeductionRow: false, rowType: 'detail' },
+  { rowKey: 'development', label: '开发项目预收款', natureKey: 'development', isFromCrossSheet: true, isEditable: true, isDeductionRow: false, rowType: 'detail' },
+  { rowKey: 'engineering', label: '预收工程款', natureKey: 'engineering', isFromCrossSheet: true, isEditable: true, isDeductionRow: false, rowType: 'detail' },
+  { rowKey: 'other', label: '其他', natureKey: 'other', isFromCrossSheet: true, isEditable: true, isDeductionRow: false, rowType: 'detail' },
 ]
 
-interface AgingBlockRowConfig {
-  rowKey: string
-  label: string
-  isFromCrossSheet: boolean
-  isEditable: boolean
-  rowType: AdjudicationRow['rowType']
+/**
+ * 默认 THREE_YEAR 账龄段 key → 旧 rowKey 映射。
+ *
+ * 账龄区块改为按项目账龄配置段动态生成后，对默认 THREE_YEAR 段沿用旧 rowKey，
+ * 以保留既有项目已保存的手工数据（item_id `D7-1-adj-aging-{rowKey}-{field}`）不被孤立；
+ * 自定义段则直接用段 key。
+ */
+const LEGACY_AGING_ROWKEY: Record<string, string> = {
+  within1: 'within-1-year',
+  y1to2: '1-to-2-years',
+  y2to3: '2-to-3-years',
+  over3: 'over-3-years',
 }
-
-const AGING_BLOCK_CONFIG: AgingBlockRowConfig[] = [
-  { rowKey: 'within-1-year', label: '1年以内(含1年)', isFromCrossSheet: true, isEditable: true, rowType: 'detail' },
-  { rowKey: '1-to-2-years', label: '1至2年(含2年)', isFromCrossSheet: true, isEditable: true, rowType: 'detail' },
-  { rowKey: '2-to-3-years', label: '2至3年(含3年)', isFromCrossSheet: true, isEditable: true, rowType: 'detail' },
-  { rowKey: 'over-3-years', label: '3年以上', isFromCrossSheet: true, isEditable: true, rowType: 'detail' },
-  { rowKey: 'aging-total', label: '合计', isFromCrossSheet: false, isEditable: false, rowType: 'subtotal' },
-  { rowKey: 'trial-balance', label: '试算平衡表数', isFromCrossSheet: false, isEditable: false, rowType: 'tb' },
-  { rowKey: 'difference', label: '差异数', isFromCrossSheet: false, isEditable: false, rowType: 'diff' },
-]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -124,45 +119,35 @@ function buildRow(params: {
   }
 }
 
-// ─── Cross Sheet → Row Key Mapping ──────────────────────────────────────────
-
-const NATURE_KEY_MAP: Record<string, string> = {
-  revenue: 'revenue',
-  development: 'development',
-  engineering: 'engineering',
-  other: 'other',
-}
-
-const AGING_KEY_MAP: Record<string, string> = {
-  within1Year: 'within-1-year',
-  year1to2: '1-to-2-years',
-  year2to3: '2-to-3-years',
-  over3Years: 'over-3-years',
-}
-
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD7Adjudication(options: UseD7AdjudicationOptions) {
-  const { allResponses, crossSheet, saveImmediate, debouncedSave } = options
+  const { allResponses, crossSheet, debouncedSave, tbSeedAmount } = options
+  const isReadonly = options.isReadonly ?? ref(false)
 
   // ─── Trial Balance ─────────────────────────────────────────────────────
 
-  const trialBalanceAmount = computed<number>(() => {
-    return getNumFromResponse(allResponses.value, 'D7-1-adj-aging-trial-balance-currentAudited')
-  })
+  function resolveTbCurrentAudited(): number {
+    const saved = allResponses.value.get('D7-1-adj-aging-trial-balance-currentAudited')?.remark
+    if (saved != null && String(saved).trim() !== '') return parseNum(saved)
+    return tbSeedAmount?.value ?? 0
+  }
+
+  const trialBalanceAmount = computed<number>(() => resolveTbCurrentAudited())
 
   // ─── Nature Rows ───────────────────────────────────────────────────────
 
   const natureRows: ComputedRef<AdjudicationRow[]> = computed(() => {
     const map = allResponses.value
     const natAgg = crossSheet.natureAggregation.value
-    const adjTotals = crossSheet.adjustmentTotals.value
+    const adjByNature = crossSheet.adjustmentTotals.value.byNature
 
-    const detailRows: AdjudicationRow[] = NATURE_BLOCK_CONFIG.filter(c => c.rowType === 'detail')
+    const detailRows: AdjudicationRow[] = NATURE_BLOCK_CONFIG
       .map(config => {
         const prefix = `D7-1-adj-nature-${config.rowKey}`
-        const aggKey = Object.entries(NATURE_KEY_MAP).find(([, v]) => v === config.rowKey)?.[0] || ''
-        const agg = (natAgg as any)[aggKey]
+        const agg = config.natureKey ? (natAgg as any)[config.natureKey] : null
+        // 调整数（AJE/RJE）纯 computed 从按性质分组的 adjustmentTotals 派生（Req 10.3, 11.2）
+        const adj = config.natureKey ? adjByNature[config.natureKey] : { aje: 0, rje: 0 }
 
         return buildRow({
           rowKey: config.rowKey,
@@ -171,8 +156,8 @@ export function useD7Adjudication(options: UseD7AdjudicationOptions) {
           priorAje: getNumFromResponse(map, `${prefix}-priorAje`),
           priorRje: getNumFromResponse(map, `${prefix}-priorRje`),
           currentUnadjusted: agg ? agg.current : getNumFromResponse(map, `${prefix}-currentUnadjusted`),
-          currentAje: getNumFromResponse(map, `${prefix}-currentAje`),
-          currentRje: getNumFromResponse(map, `${prefix}-currentRje`),
+          currentAje: adj.aje,
+          currentRje: adj.rje,
           reasonAnalysis: map.get(`${prefix}-reasonAnalysis`)?.remark || '',
           isFromCrossSheet: config.isFromCrossSheet,
           isEditable: config.isEditable,
@@ -236,36 +221,41 @@ export function useD7Adjudication(options: UseD7AdjudicationOptions) {
     return [...detailRows, subtotalRow, deductionRow, totalRow]
   })
 
-  // ─── Aging Rows ────────────────────────────────────────────────────────
+  // ─── Aging Rows（按项目账龄配置段动态生成） ────────────────────────────
 
   const agingRows: ComputedRef<AdjudicationRow[]> = computed(() => {
     const map = allResponses.value
-    const agingAgg = crossSheet.agingAggregation.value
+    const agingByKey = crossSheet.agingByKey.value
+    const adjByAging = crossSheet.adjustmentTotals.value.byAging
+    const agingSegs = crossSheet.agingSegments.value
 
-    const detailRows: AdjudicationRow[] = AGING_BLOCK_CONFIG.filter(c => c.rowType === 'detail')
-      .map(config => {
-        const prefix = `D7-1-adj-aging-${config.rowKey}`
-        const aggKey = Object.entries(AGING_KEY_MAP).find(([, v]) => v === config.rowKey)?.[0] || ''
-        const agg = (agingAgg as any)[aggKey]
+    const detailRows: AdjudicationRow[] = agingSegs.map(seg => {
+      const rowKey = LEGACY_AGING_ROWKEY[seg.key] ?? seg.key
+      const prefix = `D7-1-adj-aging-${rowKey}`
+      const crossCurrent = agingByKey.current[seg.key] ?? 0
+      const crossPrior = agingByKey.prior[seg.key] ?? 0
+      // 调整数纯 computed 从按账龄分组的 adjustmentTotals 派生（Req 10.4, 11.2）
+      const adj = adjByAging[seg.key] ?? { aje: 0, rje: 0 }
+      const isFromCrossSheet = crossCurrent !== 0 || crossPrior !== 0
 
-        return buildRow({
-          rowKey: config.rowKey,
-          label: config.label,
-          priorUnadjusted: agg ? agg.prior : getNumFromResponse(map, `${prefix}-priorUnadjusted`),
-          priorAje: getNumFromResponse(map, `${prefix}-priorAje`),
-          priorRje: getNumFromResponse(map, `${prefix}-priorRje`),
-          currentUnadjusted: agg ? agg.current : getNumFromResponse(map, `${prefix}-currentUnadjusted`),
-          currentAje: getNumFromResponse(map, `${prefix}-currentAje`),
-          currentRje: getNumFromResponse(map, `${prefix}-currentRje`),
-          reasonAnalysis: map.get(`${prefix}-reasonAnalysis`)?.remark || '',
-          isFromCrossSheet: config.isFromCrossSheet,
-          isEditable: config.isEditable,
-          isDeductionRow: false,
-          rowType: config.rowType,
-        })
+      return buildRow({
+        rowKey,
+        label: seg.label,
+        priorUnadjusted: isFromCrossSheet ? crossPrior : getNumFromResponse(map, `${prefix}-priorUnadjusted`),
+        priorAje: getNumFromResponse(map, `${prefix}-priorAje`),
+        priorRje: getNumFromResponse(map, `${prefix}-priorRje`),
+        currentUnadjusted: isFromCrossSheet ? crossCurrent : getNumFromResponse(map, `${prefix}-currentUnadjusted`),
+        currentAje: adj.aje,
+        currentRje: adj.rje,
+        reasonAnalysis: map.get(`${prefix}-reasonAnalysis`)?.remark || '',
+        isFromCrossSheet: true,
+        isEditable: true,
+        isDeductionRow: false,
+        rowType: 'detail',
       })
+    })
 
-    // 合计 = SUM(4段)
+    // 合计 = SUM(各段)
     const agingTotalRow = buildRow({
       rowKey: 'aging-total',
       label: '合计',
@@ -282,14 +272,14 @@ export function useD7Adjudication(options: UseD7AdjudicationOptions) {
       rowType: 'subtotal',
     })
 
-    // 试算平衡表数
+    // 试算平衡表数（期末回退到 project_context.tb_amount 种子）
     const tbRow: AdjudicationRow = {
       rowKey: 'trial-balance',
       label: '试算平衡表数',
       priorUnadjusted: 0, priorAje: 0, priorRje: 0,
       priorAudited: getNumFromResponse(map, 'D7-1-adj-aging-trial-balance-priorAudited'),
       currentUnadjusted: 0, currentAje: 0, currentRje: 0,
-      currentAudited: getNumFromResponse(map, 'D7-1-adj-aging-trial-balance-currentAudited'),
+      currentAudited: resolveTbCurrentAudited(),
       changeAmount: 0, changeRate: '', reasonAnalysis: '',
       isFromCrossSheet: false, isEditable: false, isDeductionRow: false, rowType: 'tb',
     }
@@ -345,8 +335,10 @@ export function useD7Adjudication(options: UseD7AdjudicationOptions) {
   // ─── updateCell ────────────────────────────────────────────────────────
 
   function updateCell(rowKey: string, field: string, value: number | string): void {
-    // Determine block (nature vs aging)
+    if (isReadonly.value) return
+    // Determine block (nature vs aging): nature rowKeys 为固定 4 类 + 扣减
     const isNature = NATURE_BLOCK_CONFIG.some(c => c.rowKey === rowKey)
+      || rowKey === 'non-current-deduction'
     const block = isNature ? 'nature' : 'aging'
     const itemId = `D7-1-adj-${block}-${rowKey}-${field}`
     const remarkValue = typeof value === 'number' ? String(value) : value
@@ -364,27 +356,14 @@ export function useD7Adjudication(options: UseD7AdjudicationOptions) {
     const totalRow = natureRows.value.find(r => r.rowKey === 'contract-liability-total')
     if (!totalRow) return
     try {
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-        detail: { wpCode: 'D7', accountCode: '2205', auditedAmount: totalRow.currentAudited },
-      }))
+      eventBus.emit('substantive:adjudicated', {
+        wpCode: 'D7',
+        accountCode: '2205',
+        auditedAmount: totalRow.currentAudited,
+        adjudicatedAmount: totalRow.currentAudited,
+        timestamp: Date.now(),
+      })
     } catch { /* EventBus failure non-blocking */ }
-  }
-
-  // ─── onAdjustmentCreated ───────────────────────────────────────────────
-
-  function onAdjustmentCreated(payload: any): void {
-    if (!payload || payload.wpCode !== 'D7') return
-    const { entryType, amount } = payload
-    if (!entryType || !amount) return
-
-    // Apply to nature block subtotal level AJE/RJE
-    const field = entryType === 'AJE' ? 'currentAje' : 'currentRje'
-    // Accumulate to the 'other' row for simplicity (user can redistribute)
-    const itemId = `D7-1-adj-nature-other-${field}`
-    const map = allResponses.value
-    const currentVal = getNumFromResponse(map, itemId)
-    const newVal = currentVal + parseNum(amount)
-    updateCell('other', field, newVal)
   }
 
   // ─── Return ────────────────────────────────────────────────────────────
@@ -398,7 +377,6 @@ export function useD7Adjudication(options: UseD7AdjudicationOptions) {
     auditNotes,
     updateCell,
     publishAdjudicated,
-    onAdjustmentCreated,
   }
 }
 

@@ -21,6 +21,7 @@ import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useE1AiGenerate } from '../composables/useE1AiGenerate'
+import { eventBus } from '@/utils/eventBus'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -529,6 +530,15 @@ function persistAll(): void {
   props.allResponses.set(fcKey, items[items.length - 1])
 
   props.saveImmediate(items).catch(() => {})
+
+  // P2-14: 发布附注数据变化事件，供 DisclosureEditor 订阅刷新
+  eventBus.emit('disclosure:note-text-updated', {
+    wpCode: 'E1',
+    variant: variant.value,
+    projectId: props.projectId,
+    sectionIds: items.map((it: any) => it.item_id),
+    timestamp: Date.now(),
+  })
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────

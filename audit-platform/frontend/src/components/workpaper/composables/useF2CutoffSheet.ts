@@ -502,6 +502,36 @@ export function useF2CutoffSheet(opts: {
     () => reloadRows(),
   )
 
+  /** 三流日期差异 > N 天的行（Task 12: 截止三流日期 + 跨期勾稽面板）
+   *  三日期 = bookDate / docDate / inspectDate
+   *  差异超阈值行应 row-class 标红
+   */
+  const dateGapThresholdDays = computed(() => Number(meta.value.sampleDaysAfter) || 5)
+
+  const dateGapFlaggedRows = computed(() => {
+    const thDays = dateGapThresholdDays.value
+    return visibleRows.value.filter((r) => {
+      const dates = [r.bookDate, r.docDate, r.inspectDate].filter(Boolean)
+      if (dates.length < 2) return false
+      const timestamps = dates.map((d) => new Date(d).getTime()).filter((t) => !isNaN(t))
+      if (timestamps.length < 2) return false
+      const maxGap = Math.max(...timestamps) - Math.min(...timestamps)
+      const gapDays = maxGap / (24 * 60 * 60 * 1000)
+      return gapDays > thDays
+    })
+  })
+
+  /** 跨期勾稽面板数据（笔数/金额汇总） */
+  const crossPeriodPanel = computed(() => {
+    const crossRows = visibleRows.value.filter((r) => r.isCrossPeriod)
+    return {
+      count: crossRows.length,
+      amount: calcSubtotal(crossRows.map((r) => r.amount)),
+      flaggedCount: dateGapFlaggedRows.value.length,
+      flaggedAmount: calcSubtotal(dateGapFlaggedRows.value.map((r) => r.amount)),
+    }
+  })
+
   return {
     rows,
     visibleRows,
@@ -522,5 +552,8 @@ export function useF2CutoffSheet(opts: {
     fillFromExtracted,
     effectiveCutoff,
     reloadRows,
+    dateGapThresholdDays,
+    dateGapFlaggedRows,
+    crossPeriodPanel,
   }
 }

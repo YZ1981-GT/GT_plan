@@ -1015,6 +1015,7 @@ import { useNoteDetail } from '@/views/composables/useNoteDetail'
 import { useNotePersist } from '@/views/composables/useNotePersist'
 import { useNoteRefresh } from '@/views/composables/useNoteRefresh'
 import { resolveNoteDisclosureJumpTarget } from '@/views/composables/noteDisclosureJump'
+import { projectSubTablesClient } from '@/components/workpaper/composables/disclosureColumnDefs'
 import { useAcnr } from '@/services/acnr'
 import { useNoteTemplate } from '@/views/composables/useNoteTemplate'
 import { useNoteExport } from '@/views/composables/useNoteExport'
@@ -1426,9 +1427,15 @@ const activeTableTab = ref('0')
 const currentNoteTables = computed(() => {
   if (!currentNote.value?.table_data) return []
   const td = currentNote.value.table_data
-  // 新格式：_tables 数组
+  // 新格式：_tables 数组（后端已为 workpaper 来源注入投影表）
   if (td._tables && Array.isArray(td._tables) && td._tables.length > 0) {
     return td._tables
+  }
+  // 客户端兜底投影：workpaper 来源的 sub_table_data + _sub_table_columns（后端未注入 _tables 时，
+  // 用与后端一致的规则投影，保证过渡期渲染一致）— spec disclosure-table-sync-convergence Task 6.1
+  const clientProjected = projectSubTablesClient(td)
+  if (clientProjected && clientProjected.length > 0) {
+    return clientProjected
   }
   // 旧格式：单表格
   if (td.headers && td.rows) {

@@ -17,6 +17,12 @@ describe('useF1DisclosureSoe', () => {
   function makeCrossSheet(aging: Record<string, number>, longTerm: any[] = []) {
     return {
       agingAggregation: computed(() => aging),
+      agingSegments: computed(() => [
+        { key: 'within1', label: '1年以内', dayFrom: 0, dayTo: 365 },
+        { key: 'y1to2', label: '1-2年', dayFrom: 366, dayTo: 730 },
+        { key: 'y2to3', label: '2-3年', dayFrom: 731, dayTo: 1095 },
+        { key: 'over3', label: '3年以上', dayFrom: 1096, dayTo: null },
+      ]),
       longTermRows: computed(() => longTerm),
       natureAggregation: computed(() => ({})),
       adjudicationForDisclosure: computed(() => ({

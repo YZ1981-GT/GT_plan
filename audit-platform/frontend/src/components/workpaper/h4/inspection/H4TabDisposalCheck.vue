@@ -512,8 +512,10 @@
       <GtVoucherSamplingEngine
         v-if="showSampling && wpId && projectId"
         :project-id="projectId"
-        :account-codes="['1605']"
-        dialog-mode
+        :workpaper-id="wpId"
+        account-code="1605"
+        phase="final"
+        :year="year ?? new Date().getFullYear()"
         @filled="onSampleFilled"
       />
     </el-dialog>
@@ -543,6 +545,7 @@ import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEng
 const props = defineProps<{
   wpId: string
   projectId: string
+  year?: number
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()
@@ -664,11 +667,15 @@ function onRowSample(row: H4DisposalCheckRow) {
 }
 
 function onSampleFilled(payload: any) {
-  const list = Array.isArray(payload) ? payload : (payload?.rows || [])
+  // 抽凭引擎 emit 结构为 { samples, phase, fillMode, ... }；样本字段为 SampledVoucher
+  // （voucherNo/debitAmount/creditAmount/summary）。兼容历史数组/rows 结构。
+  const list = Array.isArray(payload) ? payload : (payload?.samples || payload?.rows || [])
   if (!list.length) {
     showSampling.value = false
     return
   }
+  const amountOf = (v: any): number =>
+    Number(v.amount ?? v.debitAmount ?? v.creditAmount ?? v.credit ?? v.debit) || 0
   if (samplingRowId.value) {
     const first = list[0]
     const row = rows.value.find(r => r.rowId === samplingRowId.value)
@@ -676,7 +683,7 @@ function onSampleFilled(payload: any) {
       if (first.voucherNo || first.voucher_no) {
         updateCell(row.rowId, 'voucherNo', first.voucherNo || first.voucher_no)
       }
-      const amt = Number(first.amount ?? first.credit ?? first.debit) || 0
+      const amt = amountOf(first)
       if (amt) updateCell(row.rowId, 'originalCost', Math.abs(amt))
       if (first.summary || first.abstract) {
         updateCell(row.rowId, 'supportingDocs', first.summary || first.abstract)
@@ -691,7 +698,7 @@ function onSampleFilled(payload: any) {
       if (item.voucherNo || item.voucher_no) {
         updateCell(last.rowId, 'voucherNo', item.voucherNo || item.voucher_no)
       }
-      const amt = Number(item.amount ?? item.credit ?? item.debit) || 0
+      const amt = amountOf(item)
       if (amt) updateCell(last.rowId, 'originalCost', Math.abs(amt))
     }
   }

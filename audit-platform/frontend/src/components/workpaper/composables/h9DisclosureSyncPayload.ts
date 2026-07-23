@@ -21,13 +21,29 @@ import {
   type H9SoeDisclosureState,
 } from './h9DisclosureModel'
 
+import type { ColumnDef } from './disclosureColumnDefs'
+
 export interface H9SyncFromWorkpaperPayload {
   wp_id: string
   sheet_name: string
   section_id: string
   current_standard: string
   sub_table_data: Record<string, Record<string, unknown>[]>
+  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 H9 披露组件 el-table-column */
+  columns?: Record<string, ColumnDef[]>
 }
+
+// 租赁负债子表列头：逐字取自 H9TabDisclosureListed/Soe el-table-column（源对齐）
+const H9_LISTED_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '项目', is_label: true },
+  { key: 'end_balance', label: '期末余额', format: 'amount' },
+  { key: 'prior_balance', label: '上年年末余额', format: 'amount' },
+]
+const H9_SOE_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '项目', is_label: true },
+  { key: 'end_balance', label: '期末余额', format: 'amount' },
+  { key: 'begin_balance', label: '期初余额', format: 'amount' },
+]
 
 export function buildH9ListedSubTableData(
   state: H9ListedDisclosureState,
@@ -100,6 +116,7 @@ export function buildH9ListedSyncPayloads(
     section_id: H9_NOTE_SECTION.listed,
     current_standard: resolveH9CurrentStandard(variant, applicableStandards),
     sub_table_data: buildH9ListedSubTableData(state),
+    columns: { [H9_LISTED_SUBTABLE.main]: H9_LISTED_COLUMNS },
   }]
 }
 
@@ -116,5 +133,6 @@ export function buildH9SoeSyncPayloads(
     section_id: H9_NOTE_SECTION.soe,
     current_standard: resolveH9CurrentStandard(variant, applicableStandards),
     sub_table_data: buildH9SoeSubTableData(state),
+    columns: { [H9_SOE_SUBTABLE.main]: H9_SOE_COLUMNS },
   }]
 }

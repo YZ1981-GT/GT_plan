@@ -17,9 +17,14 @@
       <h3>K8-1 销售费用审定表</h3>
       <div class="header-actions">
         <GtIndexChip value="K8-2" :context-project-id="props.projectId" />
-        <el-button size="small" type="primary" plain @click="handleAiGenerate">
-          <el-icon><MagicStick /></el-icon> AI审计说明
+        <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handlePullFromDetail">
+          从 K8-2 带入
         </el-button>
+        <el-tooltip :content="aiAvailable ? 'AI 辅助生成' : 'AI 服务暂不可用'" placement="top">
+          <el-button size="small" type="primary" plain :loading="aiLoading" :disabled="isReadonly || !aiAvailable" @click="handleAiGenerate">
+            <el-icon><MagicStick /></el-icon> AI审计说明
+          </el-button>
+        </el-tooltip>
         <el-button size="small" @click="handleReview">
           <el-icon><ChatDotSquare /></el-icon> 复核
         </el-button>
@@ -36,6 +41,15 @@
       <el-alert type="warning" :closable="false" show-icon>
         <template #title>
           审定表合计 {{ fmtNum(totalRow.audited) }} vs K8-2明细合计差异 {{ fmtNum(detailCrossValidation.diff) }}
+        </template>
+      </el-alert>
+    </div>
+
+    <!-- ═══ TB(6601)核对指示器（源模板 TB数据/差异 行）═══ -->
+    <div v-if="tbReconcile.hasTb && !tbReconcile.isBalanced" class="reconciliation-alert">
+      <el-alert type="warning" :closable="false" show-icon>
+        <template #title>
+          审定合计 {{ fmtNum(totalRow.audited) }} 与试算平衡表(6601)审定发生额 {{ fmtNum(tbReconcile.tbAudited) }} 差异 {{ fmtNum(tbReconcile.diff) }}，请核对
         </template>
       </el-alert>
     </div>
@@ -185,15 +199,16 @@
         </template>
       </el-table-column>
 
-      <!-- 备注 -->
-      <el-table-column label="备注" min-width="140">
+      <!-- 原因分析（源模板：变动率超阈值须说明原因）-->
+      <el-table-column label="原因分析" min-width="150">
         <template #default="{ row }">
           <el-input
             v-if="row.isEditable"
             :model-value="row.remark"
             :disabled="isReadonly"
             size="small"
-            placeholder="备注"
+            :placeholder="isAbnormal(row.yoyChangeRate) ? '变动率超30%，请说明原因' : '原因分析'"
+            :class="{ 'required-field': isAbnormal(row.yoyChangeRate) && !row.remark }"
             @blur="(e: FocusEvent) => handleCellChange(row.rowKey, 'remark', (e.target as HTMLInputElement)?.value ?? '')"
           />
         </template>
@@ -226,6 +241,9 @@
       </span>
       <span class="tb-value">
         TB(6601): 未审 {{ fmtNum(tbData.unadjusted6601) }} / 审定 {{ fmtNum(tbData.audited6601) }}
+        <template v-if="tbReconcile.hasTb">
+          · 差异 <strong :class="tbReconcile.isBalanced ? 'tb-diff-ok' : 'tb-diff-warn'">{{ fmtNum(tbReconcile.diff) }}</strong>
+        </template>
       </span>
     </div>
 
@@ -234,9 +252,11 @@
       <template #header>
         <div class="section-header compact">
           <span>审计说明与结论</span>
-          <el-button size="small" type="primary" plain @click="handleAiGenerate">
-            <el-icon><MagicStick /></el-icon> AI生成
-          </el-button>
+          <el-tooltip :content="aiAvailable ? 'AI 辅助生成' : 'AI 服务暂不可用'" placement="top">
+            <el-button size="small" type="primary" plain :loading="aiLoading" :disabled="isReadonly || !aiAvailable" @click="handleAiGenerate">
+              <el-icon><MagicStick /></el-icon> AI生成
+            </el-button>
+          </el-tooltip>
         </div>
       </template>
       <el-input
@@ -287,8 +307,10 @@
  * Requirements: 2.1-2.7
  */
 import { computed, inject, toRef, defineAsyncComponent, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, CircleCheckFilled, WarningFilled, ChatDotSquare } from '@element-plus/icons-vue'
 import { useK8Adjudication, type K8AdjRow } from '../../composables/useK8Adjudication'
+import { useK8AiGenerate } from '../../composables/useK8AiGenerate'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
@@ -320,6 +342,7 @@ const {
   auditConclusion,
   detailCrossValidation,
   updateCell,
+  pullFromDetail,
   writeback,
   saveNote,
   saveConclusion,
@@ -345,6 +368,18 @@ function isAbnormal(rate: number | null): boolean {
   return Math.abs(rate) > CHANGE_RATE_THRESHOLD
 }
 
+/** 审定合计 vs 试算平衡表(6601)审定发生额核对（源模板 TB数据/差异 行）；仅 TB 已取数时判定，避免误报 */
+const tbReconcile = computed(() => {
+  const tbAudited = props.tbData?.audited6601 ?? 0
+  const diff = totalRow.value.audited - tbAudited
+  return {
+    tbAudited,
+    diff,
+    hasTb: Math.abs(tbAudited) > 0.005,
+    isBalanced: Math.abs(diff) < 0.01,
+  }
+})
+
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
 function handleCellChange(rowKey: string, field: keyof K8AdjRow, value: number | string): void {
@@ -355,6 +390,22 @@ function handleTbWriteback(): void {
   writeback()
 }
 
+async function handlePullFromDetail(): Promise<void> {
+  if (props.isReadonly) return
+  try {
+    await ElMessageBox.confirm(
+      '将按 K8-2 明细科目重建审定表各行（未审=月度合计、账项调整、重分类、上期审定），此操作会覆盖当前审定表已填内容。是否继续？',
+      '从 K8-2 带入确认',
+      { confirmButtonText: '带入并覆盖', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return // 用户取消
+  }
+  const r = pullFromDetail()
+  if (r.ok) ElMessage.success(r.message)
+  else ElMessage.warning(r.message)
+}
+
 function handleSaveNote(): void {
   saveNote(auditNote.value)
 }
@@ -363,8 +414,26 @@ function handleSaveConclusion(): void {
   saveConclusion(auditConclusion.value)
 }
 
-function handleAiGenerate(): void {
-  emit('save', 'K8-1-ai-trigger', { remark: 'generate' })
+// ─── AI 辅助（统一 /ai/generate-text 端点）─────────────────────────────────
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useK8AiGenerate({
+  wpId: toRef(props, 'wpId') as Ref<string>,
+})
+
+async function handleAiGenerate(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'k8-adjudication-note',
+    auditNote.value || '',
+    {
+      审定合计: totalRow.value.audited,
+      未审合计: totalRow.value.unadjusted,
+      同比变动率: totalRow.value.yoyChangeRate == null ? '—' : (totalRow.value.yoyChangeRate * 100).toFixed(2) + '%',
+      明细勾稽: detailCrossValidation.value.isBalanced ? '平衡' : `差异${detailCrossValidation.value.diff.toFixed(2)}`,
+      任务: '请为销售费用审定表生成审计说明（执行的审计程序、发生额审定依据、同比波动、与明细表勾稽情况）',
+    },
+    'AI 生成 · 审计说明',
+  )
+  if (text) saveNote(text)
 }
 
 function handleReview(): void {
@@ -445,6 +514,9 @@ function fmtRate(v: number | null | undefined): string {
 .match-indicator { color: #67c23a; }
 .mismatch-indicator { color: #f56c6c; }
 .tb-value { margin-left: auto; font-size: 12px; color: #909399; font-family: 'JetBrains Mono', monospace; }
+.tb-diff-ok { color: #67c23a; }
+.tb-diff-warn { color: #f56c6c; }
+.required-field :deep(.el-input__wrapper) { box-shadow: 0 0 0 1px #f56c6c inset; }
 
 /* ─── 审计说明+结论 ─── */
 .conclusion-card { margin-top: 16px; }

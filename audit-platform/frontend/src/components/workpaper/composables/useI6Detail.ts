@@ -32,7 +32,7 @@
  * Task: 3.4
  * Requirements: 3.1-3.7, 9.1-9.2
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref, type ComputedRef } from 'vue'
 import {
   parseNum,
   calcSubtotal,
@@ -40,14 +40,22 @@ import {
   calcAuditedAmount,
   calcChangeRate,
 } from './useI6FormulaEngine'
+import {
+  applyAjeToI62Detail,
+  aggregateI63Nets,
+  buildI63DraftsFromDetail,
+} from './i6AdjustmentModel'
+import { mergeI63LinesSkippingExisting } from './i6AdjDraftHelpers'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 /** 明细行存储结构（仅原始输入字段） */
 export interface I6DetailStoredRow {
   id: string
-  /** A列：研发项目/费用类别 */
+  /** A列：项目类别（研发项目/明细行标识，供 I6-1 审定表引用） */
   category: string
+  /** X列：费用性质（人工费/材料费等，供附注披露 SUMIF） */
+  expenseNature: string
   /** B~M列：1月~12月金额 */
   months: number[]
   /** O列：账项调整 AJE */
@@ -142,15 +150,52 @@ export interface I6DetailColumnDef {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = 'I6-2-detail-rows'
+const I63_ROWS_KEY = 'I6-3-rows'
+/** 旧版 I6TabDetail 使用的存储键（迁移后不再写入） */
+const LEGACY_STORAGE_KEY = 'I6-2-rows'
+export const NOTE_KEY = 'I6-2-audit-note'
+export const CONCLUSION_KEY = 'I6-2-audit-conclusion'
 const MONTH_LABELS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']
 /** 月度变动率异常阈值（±30%） */
 const ANOMALY_THRESHOLD = 30
+
+/** 对齐致同 Excel：A列=项目类别，X列=费用性质；默认各一行对应一种费用性质 */
+export const I6_DETAIL_DEFAULT_CATEGORIES = [
+  '人工费',
+  '材料费',
+  '制造费用分摊',
+  '无形资产摊销',
+  '设计费',
+  '装备调试费',
+  '委外研发费',
+  '其他',
+] as const
+
+/** 区段 Tab（宽表拆段，提升可操作性） */
+export type I6DetailTabKey = 'monthly' | 'audit' | 'linkage'
+export const DETAIL_TABS: Array<{ key: I6DetailTabKey; label: string }> = [
+  { key: 'monthly', label: '月度明细' },
+  { key: 'audit', label: '调整审定' },
+  { key: 'linkage', label: '分析勾稽' },
+]
+
+/** 审计说明编制指引（对齐 Excel 第三节） */
+export const I6_DETAIL_AUDIT_PROCEDURES = [
+  '研发支出与研发费用区分：研发支出为资产负债类科目，研发费用为损益类科目；期末结转后形成本期研发费用。',
+  '（1）检查会计政策运用是否一贯，参见 I3-4 会计政策检查表。',
+  '（2）执行分析性复核：研发变动、占收入比、人均费用、预算对比等，参见 I2-5 分析表。',
+  '（3）检查资本化时点支持性文件，参见 I3-6 资本化检查表。',
+  '（4）获取/编制研发项目明细，参见 I2-7 项目明细表。',
+  '（5）检查材料投入：I2-8；检查研发人员工时：I2-9、I2-10。',
+  '（6）检查委外研发：I2-11。',
+] as const
 
 // ─── Column Definitions ──────────────────────────────────────────────────────
 
 /** 固定列定义（左侧固定不滚动） */
 export const FIXED_COLUMNS: I6DetailColumnDef[] = [
-  { key: 'category', label: '类别/项目', editable: true, type: 'text', width: 180, fixed: 'left' },
+  { key: 'category', label: '项目类别(A)', editable: true, type: 'text', width: 140, fixed: 'left' },
+  { key: 'expenseNature', label: '费用性质(X)', editable: true, type: 'text', width: 120, fixed: 'left' },
 ]
 
 /** 月度12列定义（可横向滚动） */
@@ -199,6 +244,54 @@ function safeParse(jsonStr: string | null | undefined): I6DetailStoredRow[] {
   }
 }
 
+function makeDefaultRow(category: string, expenseNature?: string): I6DetailStoredRow {
+  const nature = expenseNature || category
+  return {
+    id: `detail-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    category: category || nature,
+    expenseNature: nature,
+    months: new Array(12).fill(0),
+    aje: 0,
+    rje: 0,
+    reconciliation: '',
+    priorUnadj: 0,
+    priorAje: 0,
+    priorRje: 0,
+    individualReclass: 0,
+    consolidatedReclass: 0,
+    remark: '',
+  }
+}
+
+function makeDefaultRows(): I6DetailStoredRow[] {
+  return I6_DETAIL_DEFAULT_CATEGORIES.map((c) => makeDefaultRow(c, c))
+}
+
+/** 旧版 I6-2-rows（按研发项目）→ 新版 I6-2-detail-rows（按费用类别） */
+function migrateLegacyRows(raw: any[]): I6DetailStoredRow[] {
+  return raw.map((r) => {
+    const months = Array.isArray(r.months)
+      ? r.months.slice(0, 12).map(parseNum)
+      : new Array(12).fill(0)
+    while (months.length < 12) months.push(0)
+    return {
+      id: r.rowId ?? r.id ?? `row-${Math.random().toString(36).slice(2, 8)}`,
+      category: String(r.category ?? r.name ?? r.projectName ?? '').trim(),
+      expenseNature: String(r.expenseNature ?? r.col_x ?? r.category ?? r.name ?? '').trim(),
+      months,
+      aje: parseNum(r.aje),
+      rje: parseNum(r.rje),
+      reconciliation: String(r.reconciliation ?? ''),
+      priorUnadj: parseNum(r.priorUnadj ?? r.priorAmount),
+      priorAje: parseNum(r.priorAje),
+      priorRje: parseNum(r.priorRje),
+      individualReclass: parseNum(r.individualReclass),
+      consolidatedReclass: parseNum(r.consolidatedReclass),
+      remark: String(r.remark ?? r.code ?? ''),
+    }
+  }).filter((r) => r.category && r.category !== '合计')
+}
+
 function normalizeStoredRow(raw: any): I6DetailStoredRow {
   const months = Array.isArray(raw.months)
     ? raw.months.slice(0, 12).map(parseNum)
@@ -207,8 +300,9 @@ function normalizeStoredRow(raw: any): I6DetailStoredRow {
   while (months.length < 12) months.push(0)
 
   return {
-    id: raw.id ?? `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    category: String(raw.category ?? ''),
+    id: raw.id ?? raw.rowId ?? `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    category: String(raw.category ?? raw.name ?? raw.projectName ?? ''),
+    expenseNature: String(raw.expenseNature ?? raw.col_x ?? raw.category ?? '').trim(),
     months,
     aje: parseNum(raw.aje),
     rje: parseNum(raw.rje),
@@ -222,8 +316,7 @@ function normalizeStoredRow(raw: any): I6DetailStoredRow {
   }
 }
 
-/**
- * 检测月度异常：某月与前月变动率超阈值
+/** 检测月度异常：某月与前月变动率超阈值
  * 返回异常月份索引数组（0-based, 0=1月）
  */
 function detectAnomalyMonthsForRow(months: number[]): number[] {
@@ -239,14 +332,60 @@ function detectAnomalyMonthsForRow(months: number[]): number[] {
   return anomalies
 }
 
+/**
+ * 将 TB 6602 未审发生额分配至各行（写入 12 月列，与 I1-9 摊销回填一致）
+ * 多行时按上期审定占比分配；上期为 0 时平均分配
+ */
+export function allocateTbNetToDetailRows(
+  rows: I6DetailStoredRow[],
+  tbNet: number,
+): { rows: I6DetailStoredRow[]; allocated: number[] } {
+  if (!rows.length || !Number.isFinite(tbNet)) return { rows, allocated: [] }
+
+  const priorBases = rows.map((r) => Math.abs(calcAuditedAmount(r.priorUnadj, r.priorAje, r.priorRje)))
+  const totalPrior = priorBases.reduce((a, b) => a + b, 0)
+  const allocated = new Array<number>(rows.length).fill(0)
+
+  if (rows.length === 1) {
+    allocated[0] = Math.round(tbNet * 100) / 100
+  } else if (totalPrior > 0.005) {
+    let remain = tbNet
+    for (let i = 0; i < rows.length; i++) {
+      const isLast = i === rows.length - 1
+      const amt = isLast
+        ? Math.round(remain * 100) / 100
+        : Math.round((tbNet * priorBases[i] / totalPrior) * 100) / 100
+      allocated[i] = amt
+      remain -= amt
+    }
+  } else {
+    const avg = tbNet / rows.length
+    let remain = tbNet
+    for (let i = 0; i < rows.length; i++) {
+      const isLast = i === rows.length - 1
+      const amt = isLast ? Math.round(remain * 100) / 100 : Math.round(avg * 100) / 100
+      allocated[i] = amt
+      remain -= amt
+    }
+  }
+
+  const next = rows.map((row, i) => {
+    const months = new Array(12).fill(0)
+    months[11] = allocated[i]
+    return { ...row, months }
+  })
+  return { rows: next, allocated }
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useI6Detail(options: {
   allResponses: Ref<Map<string, any>>
   onSave?: (itemId: string, value: any) => void
   isReadonly?: Ref<boolean>
+  tbData?: Ref<{ unadjusted6602: number; audited6602?: number }>
 }) {
-  const { allResponses, onSave, isReadonly } = options
+  const { allResponses, onSave, isReadonly, tbData } = options
   const readonly = isReadonly ?? computed(() => false)
 
   // ─── Internal State ────────────────────────────────────────────────────────
@@ -258,7 +397,20 @@ export function useI6Detail(options: {
   function _load(): void {
     const item = allResponses.value.get(STORAGE_KEY)
     const raw = item?.remark ?? item?.conclusion ?? (typeof item === 'string' ? item : null)
-    storedRows.value = safeParse(raw)
+    const parsed = safeParse(raw)
+    if (parsed.length > 0) {
+      storedRows.value = parsed
+      return
+    }
+    const legacyItem = allResponses.value.get(LEGACY_STORAGE_KEY)
+    const legacyRaw = legacyItem?.remark ?? (typeof legacyItem === 'string' ? legacyItem : null)
+    const legacyParsed = legacyRaw ? safeParse(legacyRaw) : []
+    if (legacyParsed.length > 0) {
+      storedRows.value = migrateLegacyRows(legacyParsed)
+      _persist()
+      return
+    }
+    storedRows.value = makeDefaultRows()
   }
 
   watch(allResponses, () => _load(), { immediate: true })
@@ -344,6 +496,172 @@ export function useI6Detail(options: {
 
   const monthlyTotals: ComputedRef<number[]> = computed(() => totalRow.value.months)
 
+  /** 各月比例行：各月合计 / 全年审定合计 × 100（%） */
+  const monthlyRatios: ComputedRef<(number | null)[]> = computed(() => {
+    const annual = totalRow.value.auditedAmount
+    if (annual === 0) return new Array(12).fill(null)
+    return totalRow.value.months.map((m) => (m / annual) * 100)
+  })
+
+  /** 与 I6-1 审定表合计勾稽（允许 ±0.01） */
+  const adjudicationCrossCheck = computed(() => {
+    const detailAudited = totalRow.value.auditedAmount
+    const adjItem = allResponses.value.get('I6-1-rows') || allResponses.value.get('I6-adj-rows')
+    const adjRaw = adjItem?.remark
+    if (!adjRaw) return { hasData: false, detailAudited, adjudicationTotal: 0, diff: 0, isBalanced: true }
+    try {
+      const rows = JSON.parse(adjRaw)
+      if (!Array.isArray(rows)) return { hasData: false, detailAudited, adjudicationTotal: 0, diff: 0, isBalanced: true }
+      const adjudicationTotal = rows
+        .filter((r: any) => !r.isTotal && String(r.类别 || r.category || '') !== '合计')
+        .reduce((s: number, r: any) => s + parseNum(r.本期审定 ?? r.auditedAmount), 0)
+      const diff = detailAudited - adjudicationTotal
+      return {
+        hasData: adjudicationTotal !== 0 || detailAudited !== 0,
+        detailAudited,
+        adjudicationTotal,
+        diff,
+        isBalanced: Math.abs(diff) <= 0.01,
+      }
+    } catch {
+      return { hasData: false, detailAudited, adjudicationTotal: 0, diff: 0, isBalanced: true }
+    }
+  })
+
+  /** 与 TB 6602 未审发生额勾稽 */
+  const tbCrossCheck = computed(() => {
+    const tbNet = tbData?.value?.unadjusted6602 ?? 0
+    const detailUnadj = totalRow.value.unadjTotal
+    const diff = detailUnadj - tbNet
+    return {
+      hasData: Math.abs(tbNet) > 0.005 || Math.abs(detailUnadj) > 0.005,
+      tbNet,
+      detailUnadj,
+      diff,
+      isBalanced: Math.abs(diff) <= 0.01,
+    }
+  })
+
+  /** 与 I6-3 调整分录 AJE/RJE 勾稽 */
+  const i63CrossCheck = computed(() => {
+    const item = allResponses.value.get(I63_ROWS_KEY)
+    const raw = item?.remark
+    let adjRows: any[] = []
+    try { adjRows = raw ? JSON.parse(raw) : [] } catch { adjRows = [] }
+    if (!Array.isArray(adjRows) || !adjRows.length) {
+      return { hasData: false, isBalanced: true, detailAje: totalRow.value.aje, detailRje: totalRow.value.rje, i63Aje: 0, i63Rje: 0, diffAje: 0, diffRje: 0 }
+    }
+    const nets = aggregateI63Nets(adjRows)
+    const diffAje = totalRow.value.aje - nets.ajeNet
+    const diffRje = totalRow.value.rje - nets.rjeNet
+    return {
+      hasData: true,
+      isBalanced: Math.abs(diffAje) <= 0.01 && Math.abs(diffRje) <= 0.01,
+      detailAje: totalRow.value.aje,
+      detailRje: totalRow.value.rje,
+      i63Aje: nets.ajeNet,
+      i63Rje: nets.rjeNet,
+      diffAje,
+      diffRje,
+    }
+  })
+
+  function _parseI63Rows(): any[] {
+    const item = allResponses.value.get(I63_ROWS_KEY)
+    const raw = item?.remark
+    if (!raw) return []
+    try {
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+
+  /** 从 I6-3 同步 AJE/RJE 至明细行 */
+  function syncAjeFromI63(adjRows?: any[]): {
+    ok: boolean
+    message: string
+    approx?: boolean
+  } {
+    if (readonly.value) return { ok: false, message: '只读' }
+    const source = adjRows?.length ? adjRows : _parseI63Rows()
+    if (!source.length) return { ok: false, message: 'I6-3 无调整分录可同步' }
+    const result = applyAjeToI62Detail(storedRows.value, source)
+    storedRows.value = result.rows as I6DetailStoredRow[]
+    _persist()
+    if (!result.applied && Math.abs(result.totalAje) < 0.005 && Math.abs(result.totalRje) < 0.005) {
+      return { ok: false, message: 'I6-3 中无 6602 研发费用相关调整' }
+    }
+    return {
+      ok: true,
+      approx: result.approx,
+      message: result.approx
+        ? `已同步 AJE ${result.totalAje} / RJE ${result.totalRje}（含近似分摊，请复核附注项目）`
+        : `已同步 AJE ${result.totalAje} / RJE ${result.totalRje}`,
+    }
+  }
+
+  /** 将 I6-2 明细 AJE/RJE 推送为 I6-3 平衡分录 */
+  function pushAjeToI63(): { ok: boolean; message: string; added: number } {
+    if (readonly.value) return { ok: false, message: '只读', added: 0 }
+    const drafts = buildI63DraftsFromDetail(storedRows.value)
+    if (!drafts.length) return { ok: false, message: '明细表无 AJE/RJE 可推送', added: 0 }
+    const existing = _parseI63Rows()
+    const { merged, added } = mergeI63LinesSkippingExisting(existing, drafts)
+    if (!added) return { ok: false, message: '对应分录已存在于 I6-3', added: 0 }
+    if (onSave) onSave(I63_ROWS_KEY, merged)
+    const existingResp = allResponses.value.get(I63_ROWS_KEY) || { item_id: I63_ROWS_KEY }
+    allResponses.value.set(I63_ROWS_KEY, { ...existingResp, item_id: I63_ROWS_KEY, remark: JSON.stringify(merged) })
+    try {
+      window.dispatchEvent(new CustomEvent('i6:adjustment-writeback', {
+        detail: { source: 'I6-2', rows: merged, entries: merged },
+      }))
+    } catch { /* ignore */ }
+    return {
+      ok: true,
+      message: `已向 I6-3 推送 ${added} 行平衡分录（借贷已配对，请复核对方科目）`,
+      added,
+    }
+  }
+
+  /**
+   * 从 TB 6602 写入各行未审发生额（12 月列）
+   * @param tbUnadjustedNet 未审净发生额；缺省时取 tbData.unadjusted6602
+   */
+  function applyTbData(tbUnadjustedNet?: number): { ok: boolean; message: string } {
+    if (readonly.value) return { ok: false, message: '只读' }
+    const tbNet = tbUnadjustedNet ?? tbData?.value?.unadjusted6602 ?? 0
+    if (!Number.isFinite(tbNet)) return { ok: false, message: 'TB 发生额无效' }
+    if (!storedRows.value.length) return { ok: false, message: '明细表无行可写入' }
+    const { rows: next, allocated } = allocateTbNetToDetailRows(storedRows.value, tbNet)
+    storedRows.value = next
+    _persist()
+    const mode = storedRows.value.length === 1
+      ? '单行'
+      : (storedRows.value.some((r) => calcAuditedAmount(r.priorUnadj, r.priorAje, r.priorRje) !== 0)
+        ? '按上期审定占比'
+        : '平均分配')
+    return {
+      ok: true,
+      message: `已从 TB 6602 写入未审合计 ${tbNet.toLocaleString('zh-CN')}（${mode}，${allocated.length} 行，计入 12 月）`,
+    }
+  }
+
+  function onAdjustmentWriteback(): void {
+    if (readonly.value) return
+    syncAjeFromI63()
+  }
+
+  if (getCurrentInstance()) {
+    onMounted(() => {
+      window.addEventListener('i6:adjustment-writeback', onAdjustmentWriteback)
+    })
+    onBeforeUnmount(() => {
+      window.removeEventListener('i6:adjustment-writeback', onAdjustmentWriteback)
+    })
+  }
+
   // ─── Computed: 趋势折线图数据（ECharts）───────────────────────────────────
 
   const trendChartData: ComputedRef<I6TrendChartData> = computed(() => {
@@ -355,7 +673,7 @@ export function useI6Detail(options: {
     // 每个研发项目一条线
     for (const row of storedRows.value) {
       series.push({
-        name: row.category || '未命名',
+        name: row.expenseNature || row.category || '未命名',
         data: [...row.months],
         type: 'line',
       })
@@ -407,6 +725,8 @@ export function useI6Detail(options: {
       }
     } else if (key === 'category') {
       row.category = String(value ?? '')
+    } else if (key === 'expenseNature') {
+      row.expenseNature = String(value ?? '')
     } else if (key === 'aje') {
       row.aje = parseNum(value)
     } else if (key === 'rje') {
@@ -434,11 +754,13 @@ export function useI6Detail(options: {
 
   // ─── Actions: 动态行增删 ──────────────────────────────────────────────────
 
-  function addRow(category: string): void {
+  function addRow(category: string, expenseNature?: string): void {
     if (readonly.value || !category) return
+    const nature = (expenseNature || category).trim()
     const newRow: I6DetailStoredRow = {
       id: `detail-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      category,
+      category: category.trim(),
+      expenseNature: nature,
       months: new Array(12).fill(0),
       aje: 0,
       rje: 0,
@@ -460,6 +782,13 @@ export function useI6Detail(options: {
     _persist()
   }
 
+  /** 导入后批量替换行 */
+  function replaceRows(next: I6DetailStoredRow[]): void {
+    if (readonly.value) return
+    storedRows.value = next.map(normalizeStoredRow)
+    _persist()
+  }
+
   /** 从 I1-9 回填「无形资产摊销」行 */
   function applyI1AmortAmount(amount: number, keywords: string[] = ['无形资产摊销']): {
     ok: boolean
@@ -467,7 +796,7 @@ export function useI6Detail(options: {
   } {
     if (readonly.value) return { ok: false, message: '只读' }
     const hit = storedRows.value.find((r) =>
-      keywords.some((k) => String(r.category || '').includes(k)),
+      keywords.some((k) => String(r.expenseNature || r.category || '').includes(k)),
     )
     if (!hit) {
       return { ok: false, message: '未找到「无形资产摊销」明细行' }
@@ -498,10 +827,26 @@ export function useI6Detail(options: {
     trendChartData,
     /** 月度合计数组（12个月） */
     monthlyTotals,
+    /** 各月占全年审定比（%） */
+    monthlyRatios,
+    /** 与 I6-1 审定合计勾稽 */
+    adjudicationCrossCheck,
+    /** 与 TB 6602 未审发生额勾稽 */
+    tbCrossCheck,
+    /** 与 I6-3 AJE/RJE 勾稽 */
+    i63CrossCheck,
+    /** 从 TB 6602 写入未审发生额 */
+    applyTbData,
+    /** 从 I6-3 同步 AJE/RJE */
+    syncAjeFromI63,
+    /** 推送明细 AJE/RJE 至 I6-3 草稿 */
+    pushAjeToI63,
     /** 动态行添加 */
     addRow,
     /** 动态行删除 */
     removeRow,
+    /** 导入批量替换 */
+    replaceRows,
     /** 从 I1-9 回填无形资产摊销 */
     applyI1AmortAmount,
     /** 更新单元格 */
@@ -515,6 +860,8 @@ export function useI6Detail(options: {
     allColumns: ALL_COLUMNS,
     /** 月份标签 */
     monthLabels: MONTH_LABELS,
+    /** 存储键 */
+    storageKey: STORAGE_KEY,
   }
 }
 

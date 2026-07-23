@@ -182,20 +182,35 @@ export function useN3Adjudication(options: UseN3AdjudicationOptions) {
       })
     }
 
-    // 默认空行
-    return DEFAULT_CATEGORIES.map(category => ({
-      category,
-      beginning: 0,
-      creditAmount: 0,
-      debitAmount: 0,
-      endBalance: 0,
-      unadjusted: 0,
-      aje: 0,
-      rje: 0,
-      audited: 0,
-      change: 0,
-      changeRate: 0,
-    }))
+    // 默认空行 — TB prefill seed from N3-1-tb-prefill
+    const prefill = getFieldFromResponses(allResponses.value, '1', 'tb-prefill')
+    const seedBeginning = prefill ? parseNum(prefill.beginning) : 0
+    const seedCredit = prefill ? parseNum(prefill.creditAmount) : 0
+    const seedDebit = prefill ? parseNum(prefill.debitAmount) : 0
+    const seedUnadjusted = prefill ? parseNum(prefill.unadjusted) : 0
+
+    return DEFAULT_CATEGORIES.map(category => {
+      const isOtherRow = category === '其他'
+      const beginning = isOtherRow ? seedBeginning : 0
+      const creditAmount = isOtherRow ? seedCredit : 0
+      const debitAmount = isOtherRow ? seedDebit : 0
+      const unadjusted = isOtherRow ? seedUnadjusted : 0
+      const endBalance = calcLiabilityEndBalance(beginning, creditAmount, debitAmount)
+      const change = calcChange(endBalance, beginning)
+      return {
+        category,
+        beginning,
+        creditAmount,
+        debitAmount,
+        endBalance,
+        unadjusted,
+        aje: 0,
+        rje: 0,
+        audited: calcAuditedAmount(unadjusted, 0, 0),
+        change,
+        changeRate: calcChangeRate(beginning, change),
+      }
+    })
   })
 
   // ─── 2. 合计行 ────────────────────────────────────────────────────────────

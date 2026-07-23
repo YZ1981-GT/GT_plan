@@ -52,6 +52,8 @@ import {
 
 
 
+import type { ColumnDef } from './disclosureColumnDefs'
+
 export interface G11SyncFromWorkpaperPayload {
 
   wp_id: string
@@ -64,7 +66,35 @@ export interface G11SyncFromWorkpaperPayload {
 
   sub_table_data: Record<string, Record<string, unknown>[]>
 
+  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 G11_DISCLOSURE_COL_LABELS/组件 */
+
+  columns?: Record<string, ColumnDef[]>
+
 }
+
+// 投资收益列头：项目/本期发生额/上期发生额/备注（对齐 G11_DISCLOSURE_COL_LABELS + 组件）
+
+const G11_MAIN_COLUMNS: ColumnDef[] = [
+
+  { key: 'label', label: '项目', is_label: true },
+
+  { key: 'current_amount', label: '本期发生额', format: 'amount' },
+
+  { key: 'prior_amount', label: '上期发生额', format: 'amount' },
+
+  { key: 'remark', label: '备注' },
+
+]
+
+const G11_TRADING_COLUMNS: ColumnDef[] = [
+
+  { key: 'label', label: '项目', is_label: true },
+
+  { key: 'current_amount', label: '本期发生额', format: 'amount' },
+
+  { key: 'prior_amount', label: '上期发生额', format: 'amount' },
+
+]
 
 
 
@@ -356,6 +386,8 @@ export function buildG11ListedSyncPayloads(
 
     sub_table_data: buildG11ListedSubTableData(snap),
 
+    columns: { [G11_MAIN_SUBTABLE]: G11_MAIN_COLUMNS, [G11_LISTED_TRADING_SUBTABLE]: G11_TRADING_COLUMNS },
+
   }]
 
 }
@@ -387,6 +419,8 @@ export function buildG11SoeSyncPayloads(
     current_standard: resolveG11CurrentStandard(variant, applicableStandards),
 
     sub_table_data: buildG11SoeSubTableData(snap),
+
+    columns: { [G11_MAIN_SUBTABLE]: G11_MAIN_COLUMNS },
 
   }]
 

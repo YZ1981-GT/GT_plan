@@ -1,23 +1,23 @@
 /**
  * I3 商誉 — DCF纯函数引擎（无副作用，无Vue响应式依赖）
  *
- * 5个纯函数，支持 fast-check PBT 验证。
- *
- * 核心公式：
- * - 现值(PV) = Σ(FCF_i / (1+WACC)^(i+1)) + TV / (1+WACC)^n
- * - 终值(TV) = FCF_n × (1+g) / (WACC - g)  （永续增长模型 / Gordon Growth Model）
- * - WACC = E/V × Re + D/V × Rd × (1-T)
- * - 可收回金额 = MAX(公允价值-处置费用, 使用价值DCF)
- * - 敏感性 = 重新计算PV（调整折现率后）
- *
- * 错误处理：
- * - 折现率 ≤ 0 → 返回0（无法折现）
- * - 折现率 ≤ 增长率 → 阻止终值计算，返回0
- * - 空现金流数组 → 返回0
+ * 核心公式（对齐致同 I3-7 Excel）：
+ * - 现值(PV) = Σ(FCF_i / (1+r)^(i+1)) + TV / (1+r)^n
+ * - 终值(TV) = FCF_n × (1+g) / (r - g)  （Gordon）
+ * - Ke = Rf + β×(Rm−Rf)（CAPM）
+ * - WACC(税后) = (D×Kd×(1−t) + E×Ke) / (D+E)
+ * - 税前折现率 ≈ WACC税后 / (1−t)（CAS8 与税前现金流口径一致）
+ * - 可收回金额 = MAX(公允价值−处置费用, 使用价值DCF) → N23=MAX(N11,N20)
  *
  * Spec: .kiro/specs/i3-goodwill/
  * Requirements: 6.2-6.5
  */
+
+export {
+  calcCostOfEquity,
+  calcWaccAfterTax,
+  calcPreTaxDiscountRate,
+} from './h4RecoverableModel'
 
 // ═══ P5: DCF现值 = Σ(CF_i / (1+r)^(i+1)) ═══
 
@@ -56,7 +56,8 @@ export function calcTerminalValue(fcf: number, growthRate: number, discountRate:
 // ═══ WACC = E/V × Re + D/V × Rd × (1-T) ═══
 
 /**
- * 加权平均资本成本(WACC)计算
+ * 加权平均资本成本(WACC) — 比例口径（小数 0~1）
+ * 保留供旧调用/PBT；新表请用 calcWaccAfterTax(D,E,Ke,Kd,t%)。
  *
  * @param equityRatio - 权益占比 E/V（如0.6表示60%）
  * @param debtRatio - 负债占比 D/V（如0.4表示40%）

@@ -23,6 +23,7 @@ import {
   flattenSoeMovement,
   type H8SoeSyncSnapshot,
 } from './h8SoeDisclosureModel'
+import type { ColumnDef } from './disclosureColumnDefs'
 
 export interface H8SyncFromWorkpaperPayload {
   wp_id: string
@@ -30,6 +31,31 @@ export interface H8SyncFromWorkpaperPayload {
   section_id: string
   current_standard: string
   sub_table_data: Record<string, Record<string, unknown>[]>
+  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 H8TabDisclosure 使用权资产变动表 */
+  columns?: Record<string, ColumnDef[]>
+}
+
+/** 上市变动表列头随类别动态（项目 + 类别 + 合计），键对齐 buildH8ListedSubTableData */
+export function buildH8ListedColumns(state: H8ListedSyncSnapshot): Record<string, ColumnDef[]> {
+  const cats = state.categories || []
+  return {
+    [H8_LISTED_SUBTABLE.movement]: [
+      { key: 'label', label: '项目', is_label: true },
+      ...cats.map((c) => ({ key: c.label, label: c.label, format: 'amount' as const })),
+      { key: '合计', label: '合计', format: 'amount' },
+    ],
+  }
+}
+
+/** 国企变动表列头（项目/期初余额/本期增加/本期减少/期末余额），键对齐 flattenSoeMovement */
+const H8_SOE_COLUMNS: Record<string, ColumnDef[]> = {
+  [H8_SOE_SUBTABLE.movement]: [
+    { key: 'label', label: '项目', is_label: true },
+    { key: 'begin', label: '期初余额', format: 'amount' },
+    { key: 'increase', label: '本期增加', format: 'amount' },
+    { key: 'decrease', label: '本期减少', format: 'amount' },
+    { key: 'end', label: '期末余额', format: 'amount' },
+  ],
 }
 
 export function buildH8ListedSubTableData(state: H8ListedSyncSnapshot): Record<string, Record<string, unknown>[]> {
@@ -95,6 +121,7 @@ export function buildH8ListedSyncPayloads(
     section_id: H8_NOTE_SECTION.listed,
     current_standard: resolveH8CurrentStandard(variant, applicableStandards),
     sub_table_data: buildH8ListedSubTableData(state),
+    columns: buildH8ListedColumns(state),
   }]
 }
 
@@ -111,5 +138,6 @@ export function buildH8SoeSyncPayloads(
     section_id: H8_NOTE_SECTION.soe,
     current_standard: resolveH8CurrentStandard(variant, applicableStandards),
     sub_table_data: buildH8SoeSubTableData(state),
+    columns: H8_SOE_COLUMNS,
   }]
 }

@@ -5,10 +5,10 @@
  * Task: 3.3
  * Requirements: 3.3, 8.2
  *
- * 动态行表格 × 3端点：
- *   GET  /api/workpapers/{wpId}/k9-export-template?sheet_code={code}
- *   GET  /api/workpapers/{wpId}/k9-export-data?sheet_code={code}
- *   POST /api/workpapers/{wpId}/k9-import-data  (multipart/form-data, sheet_code={code})
+ * 动态行表格 × 3端点（POST + query param sheet，对齐 create_cycle_import_export_router）：
+ *   POST /api/workpapers/{wpId}/k9/export-template?sheet={code}
+ *   POST /api/workpapers/{wpId}/k9/export-data?sheet={code}
+ *   POST /api/workpapers/{wpId}/k9/import-data  (multipart/form-data, sheet={code})
  *
  * sheet codes: K9-2 / K9-3
  *   K9-2 明细表（25列3区段，55行动态行）
@@ -143,18 +143,18 @@ export function useK9ImportExport(params: UseK9ImportExportOptions): UseK9Import
   const lastError = ref<string | null>(null)
 
   function apiBase(): string {
-    return `/api/workpapers/${wpId.value}`
+    return `/api/workpapers/${wpId.value}/${K9_API_PREFIX}`
   }
 
   /**
-   * 导出模板 — GET /api/workpapers/{wpId}/k9-export-template?sheet_code={code}
+   * 导出模板 — POST /api/workpapers/{wpId}/k9/export-template?sheet={code}
    */
   async function exportTemplate(): Promise<void> {
     lastError.value = null
     isExporting.value = true
     try {
-      const response = await http.get(`${apiBase()}/k9-export-template`, {
-        params: { sheet_code: sheetCode },
+      const response = await http.post(`${apiBase()}/export-template`, null, {
+        params: { sheet: sheetCode },
         responseType: 'blob',
       })
       const contentDisposition = response.headers?.['content-disposition']
@@ -174,14 +174,14 @@ export function useK9ImportExport(params: UseK9ImportExportOptions): UseK9Import
   }
 
   /**
-   * 导出数据 — GET /api/workpapers/{wpId}/k9-export-data?sheet_code={code}
+   * 导出数据 — POST /api/workpapers/{wpId}/k9/export-data?sheet={code}
    */
   async function exportData(): Promise<void> {
     lastError.value = null
     isExporting.value = true
     try {
-      const response = await http.get(`${apiBase()}/k9-export-data`, {
-        params: { sheet_code: sheetCode },
+      const response = await http.post(`${apiBase()}/export-data`, null, {
+        params: { sheet: sheetCode },
         responseType: 'blob',
       })
       const contentDisposition = response.headers?.['content-disposition']
@@ -201,8 +201,8 @@ export function useK9ImportExport(params: UseK9ImportExportOptions): UseK9Import
   }
 
   /**
-   * 导入数据 — POST /api/workpapers/{wpId}/k9-import-data
-   * multipart/form-data 上传 xlsx 文件, query param sheet_code={code}
+   * 导入数据 — POST /api/workpapers/{wpId}/k9/import-data
+   * multipart/form-data 上传 xlsx 文件, query param sheet={code}
    */
   async function importData(file: File): Promise<K9ImportResult | null> {
     lastError.value = null
@@ -211,8 +211,8 @@ export function useK9ImportExport(params: UseK9ImportExportOptions): UseK9Import
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await http.post(`${apiBase()}/k9-import-data`, formData, {
-        params: { sheet_code: sheetCode },
+      const response = await http.post(`${apiBase()}/import-data`, formData, {
+        params: { sheet: sheetCode },
         headers: { 'Content-Type': 'multipart/form-data' },
       })
 

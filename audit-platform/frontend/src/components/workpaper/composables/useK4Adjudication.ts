@@ -164,6 +164,9 @@ export function useK4Adjudication(params: UseK4AdjudicationParams) {
     await saveResponse('K4-1-audit-conclusion', { remark: auditConclusion.value })
     // 保存审定数合计供跨sheet使用
     await saveResponse('K4-1-audited-total', { remark: String(subtotalRow.value.audited) })
+    // 保存本期借方/贷方合计供 K4-4 检查比例联动
+    await saveResponse('K4-1-subtotal-debit', { remark: String(subtotalRow.value.debit) })
+    await saveResponse('K4-1-subtotal-credit', { remark: String(subtotalRow.value.credit) })
   }
 
   // ─── 获取审定数合计（供TB回写） ────────────────────────────────────────────

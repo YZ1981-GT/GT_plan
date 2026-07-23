@@ -21,6 +21,17 @@
       />
 
       <template v-else>
+        <!-- 全局勾稽告警 -->
+        <el-alert
+          v-for="(alert, idx) in filteredGlobalAlerts"
+          :key="idx"
+          :type="alert.type"
+          :title="alert.message"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 8px"
+        />
+
         <D6TabIndex
           v-if="currentSheet === 'D6' || currentSheet === 'skip'"
           :wp-id="props.wpId"
@@ -98,6 +109,7 @@
           :all-responses="allResponses"
           :save-immediate="saveImmediateWithSnapshot"
           :debounced-save="debouncedSave"
+          :year="props.year"
         />
 
         <D6TabPolicyCheck
@@ -177,12 +189,13 @@
 /**
  * GtD6ContractAssets.vue — D6 合同资产底稿主入口（比照 D5）
  */
-import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import { useD6FormData } from './composables/useD6FormData'
 import { useD6CrossSheet } from './composables/useD6CrossSheet'
 import { useD6EntryDualMode, type D6RenderMode } from './composables/useD6EntryDualMode'
 import { resolveD6SheetCode } from './composables/useD6SheetRouting'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
+import { eventBus } from '@/utils/eventBus'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -234,6 +247,39 @@ const {
 })
 
 const crossSheet = useD6CrossSheet({ allResponses })
+
+// ─── 全局勾稽告警 ───────────────────────────────────────────────────────
+const globalAlerts = computed(() => {
+  const alerts: Array<{ type: 'warning' | 'info' | 'success'; message: string; excludeSheets: string[] }> = []
+
+  // D6-1审定合计↔TB 1402差异
+  const tbAmount = crossSheet.blockTotals.value.block3.total
+  const tbStored = allResponses.value.get('D6-1-tb-amount')?.remark
+  const tbRef = tbStored ? parseFloat(tbStored) : 0
+  if (tbRef > 0 && Math.abs(tbAmount - tbRef) > 1) {
+    alerts.push({
+      type: 'warning',
+      message: `D6-1审定净值合计(${tbAmount.toLocaleString()}) ↔ 试算平衡表1402(${tbRef.toLocaleString()}) 差异 ${(tbAmount - tbRef).toLocaleString()}`,
+      excludeSheets: ['D6-1'],
+    })
+  }
+
+  // D6-8 ECL应计提 vs D6-3账面坏账差异
+  const eclDiff = crossSheet.eclVsImpairmentDiff.value
+  if (eclDiff.isSignificant) {
+    alerts.push({
+      type: 'warning',
+      message: `D6-8 ECL应计提 ↔ D6-3账面坏账差异 ${eclDiff.diff.toLocaleString()} 元`,
+      excludeSheets: ['D6-8', 'D6-3'],
+    })
+  }
+
+  return alerts
+})
+
+const filteredGlobalAlerts = computed(() => {
+  return globalAlerts.value.filter(a => !a.excludeSheets.includes(currentSheet.value))
+})
 
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
@@ -314,8 +360,20 @@ async function saveImmediateBatch(
   scheduleAutoSnapshot()
 }
 
+// ─── D6-4 调整分录 → D6-1 审定表联动 ───
+function handleAdjustmentCreated(payload: any) {
+  if (!payload || payload.wpCode !== 'D6') return
+  // Trigger allResponses refresh to pick up new adjustment values
+  loadAll()
+}
+
 onMounted(async () => {
   await loadAll()
+  eventBus.on('adjustment:created' as any, handleAdjustmentCreated)
+})
+
+onBeforeUnmount(() => {
+  eventBus.off('adjustment:created' as any, handleAdjustmentCreated)
 })
 </script>
 

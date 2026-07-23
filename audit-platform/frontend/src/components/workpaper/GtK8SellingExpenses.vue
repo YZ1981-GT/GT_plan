@@ -7,13 +7,39 @@
     <template v-else>
       <div v-if="isHtmlSheet" class="k8-header-toolbar">
         <el-segmented
-          v-if="dualMode.isOoAvailable.value"
           :model-value="dualMode.currentMode.value"
-          :options="dualMode.modeOptions"
+          :options="dualMode.modeOptions.value"
           size="small"
           @change="dualMode.onModeChange"
         />
-        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value && !dualMode.checking.value" size="small" type="info">仅结构化视图</el-tag>
+        <!-- OnlyOffice 拉取状态（对齐 D4「拉取成功才可以」）：就绪/检测中/不可用 -->
+        <el-tag
+          v-if="dualMode.healthStatus.value === 'ready'"
+          size="small"
+          type="success"
+          effect="light"
+        >
+          OnlyOffice 就绪（拉取成功）
+        </el-tag>
+        <el-tag
+          v-else-if="dualMode.healthStatus.value === 'fetching'"
+          size="small"
+          type="warning"
+          effect="light"
+        >
+          正在拉取 OnlyOffice 文档…
+        </el-tag>
+        <el-tag
+          v-else-if="dualMode.healthStatus.value === 'checking'"
+          size="small"
+          type="info"
+          effect="light"
+        >
+          检测 OnlyOffice…
+        </el-tag>
+        <el-tag v-else size="small" type="info" effect="light">
+          OnlyOffice 不可用 · 仅结构化视图
+        </el-tag>
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -24,6 +50,7 @@
         :sheet-name="props.sheetName || ''"
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
+        @fallback="dualMode.onOoLoadFailed"
       />
 
       <!-- HTML 结构化视图 -->
@@ -67,6 +94,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
           @save="handleChildSave"
         />
 
@@ -108,6 +136,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
           @save="handleChildSave"
         />
 
@@ -118,6 +147,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
           @save="handleChildSave"
         />
 

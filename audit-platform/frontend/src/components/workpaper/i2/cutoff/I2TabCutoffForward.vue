@@ -63,6 +63,13 @@
             @change="(v: number | undefined) => updateForwardCriteria({ amountThreshold: Number(v) || 0 })"
           />
           <span>元的开发支出记账凭证，与支出凭单核对。</span>
+          <el-button v-if="suggestedThreshold" size="small" type="primary" link :disabled="isReadonly" @click="applyMaterialityThreshold">
+            采用建议门槛 {{ fmtAmount(suggestedThreshold) }}（约 PM×5%）
+          </el-button>
+        </div>
+        <div v-if="criteria.firstYearClient && priorPeriodCutoffDate" class="sample-row first-year">
+          <el-alert type="error" :closable="false" show-icon
+            :title="`首年承接：请对上期期末（${priorPeriodCutoffDate}）执行截止测试，可在 I2-14 扩大窗口或复制本期标准后测试。`" />
         </div>
         <div class="sample-row first-year">
           <el-checkbox
@@ -87,10 +94,18 @@
         <span class="flow-hint">编制流程：①设截止日 → ②抽期末记账凭证 → ③追查支出凭单 → ④判断跨期 → ⑤填说明结论</span>
       </div>
       <div class="toolbar-right">
-        <GtIndexChip value="wp:I2-13" :context-project-id="props.projectId" />
+        <GtIndexChip value="wp:I2-13" :context-project-id="projectId" />
         <el-tag size="small" type="info">共 {{ forwardRows.length }} 行</el-tag>
+        <GtIndexChip value="I6-5" @click="emit('navigate-sheet', 'I6-5')" />
       </div>
     </div>
+
+    <CutoffCrossCheck
+      title="双表交叉核对（I2-13 ↔ I2-14）"
+      forward-label="I2-13"
+      backward-label="I2-14"
+      :summary="crossCheckSummary"
+    />
 
     <div class="stats-card">
       <div class="stat-item">
@@ -111,7 +126,24 @@
           {{ forwardRows.length > 0 ? ((forwardCrossPeriodCount / forwardRows.length) * 100).toFixed(1) + '%' : '—' }}
         </span>
       </div>
+      <div class="stat-item">
+        <span class="stat-label">金额不一致</span>
+        <span class="stat-value" :class="{ 'stat-warn': amountMismatchCount > 0 }">{{ amountMismatchCount }}</span>
+      </div>
+      <div class="stat-item">
+        <span class="stat-label">滞后异常</span>
+        <span class="stat-value" :class="{ 'stat-warn': lagAnomalyCount > 0 }">{{ lagAnomalyCount }}</span>
+      </div>
     </div>
+
+    <el-alert
+      v-if="expenseHints.length > 0"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="cap-alert"
+      :title="`有 ${expenseHints.length} 笔摘要涉及费用化/6602，建议同步查阅 I6-5/I6-6 截止底稿。`"
+    />
 
     <div class="test-block">
       <div class="block-header">
@@ -122,6 +154,7 @@
         direction="forward"
         :rows="forwardBeforeRows"
         :is-readonly="isReadonly"
+        show-extended
         @update="onUpdate"
         @remove="onRemove"
       />
@@ -138,6 +171,7 @@
         direction="forward"
         :rows="forwardAfterRows"
         :is-readonly="isReadonly"
+        show-extended
         @update="onUpdate"
         @remove="onRemove"
       />
@@ -152,6 +186,7 @@
         direction="forward"
         :rows="forwardUnsortedRows"
         :is-readonly="isReadonly"
+        show-extended
         @update="onUpdate"
         @remove="onRemove"
       />
@@ -159,13 +194,45 @@
 
     <div class="table-actions">
       <el-button size="small" type="primary" plain :disabled="isReadonly" @click="addForwardRow()">+ 新增行</el-button>
-      <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handleAutoSampling">自动提取</el-button>
+      <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handleAutoSampling">序时账自动提取</el-button>
+      <el-button size="small" type="success" plain :disabled="isReadonly" @click="showCutoffPanel = !showCutoffPanel">截止模块取数</el-button>
+      <el-button size="small" plain :disabled="isReadonly" @click="showSamplingDialog = true">抽凭引擎</el-button>
+      <el-button size="small" plain :disabled="isReadonly" @click="syncCriteriaToPeer('forward')">同步标准→I2-14</el-button>
+      <el-button size="small" plain :disabled="isReadonly || isExporting" @click="exportData('I2-13')">导出</el-button>
+      <el-button size="small" plain :disabled="isReadonly" @click="triggerImport">导入</el-button>
       <el-button size="small" :disabled="isReadonly" @click="syncCutoffDateFromProject()">同步截止日</el-button>
       <el-button size="small" type="danger" plain :disabled="isReadonly || forwardCrossPeriodCount === 0" @click="expandTestWindow('forward', 30)">扩大窗口至±30天</el-button>
       <el-button size="small" type="danger" plain :disabled="isReadonly || forwardCrossPeriodCount === 0" @click="handleDraftAje">跨期→I2-3草稿</el-button>
       <el-button size="small" @click="emit('navigate-sheet', 'I2-14')">对照 I2-14 →</el-button>
       <el-button size="small" type="success" :disabled="isReadonly" @click="handleSave">保存</el-button>
     </div>
+
+    <GtCutoffAutoSampling
+      v-if="showCutoffPanel"
+      account-code="1717"
+      cutoff-direction="post_cutoff"
+      :default-conditions="cutoffPanelDefaults"
+      :workpaper-id="wpId"
+      :project-id="projectId"
+      :year="currentYear"
+      :readonly="isReadonly"
+      @filled="handleCutoffFilled"
+      @applied="saveAuditNote"
+    />
+
+    <el-dialog v-model="showSamplingDialog" title="抽凭引擎（1717 开发支出 · I2-13）" width="720px" destroy-on-close>
+      <GtVoucherSamplingEngine
+        v-if="showSamplingDialog"
+        :project-id="projectId"
+        :workpaper-id="wpId"
+        account-code="1717"
+        phase="final"
+        :year="currentYear"
+        @filled="handleVoucherFilled"
+      />
+    </el-dialog>
+
+    <input ref="importInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onImportFile" />
 
     <el-alert
       v-if="forwardCrossPeriodCount > 0"
@@ -186,23 +253,32 @@
     </el-card>
 
     <details class="guidance-details">
-      <summary>📋 编制提示</summary>
+      <summary>编制提示</summary>
       <div class="guidance-content">
         <p>1. 本表为「账簿→单据」方向：从期末前后开发支出记账凭证出发，追查支出凭单真实性与期间归属。</p>
-        <p>2. 跨期判定：记账日期与支出凭单日期分处截止日两侧即为跨期；跨期金额取记账/单据金额。</p>
-        <p>3. 本期入账但单据属下期 → 跨期多记；下期入账但单据属本期 → 本期少计。</p>
-        <p>4. 发现跨期时应与 I2-14（单据→账）综合评价，并考虑扩大样本；依据 CAS6《无形资产》。</p>
+        <p>2. 跨期判定：支出凭单日期与记账日期分处截止日两侧即为跨期；跨期金额取记账/单据金额。</p>
+        <p>3. 自动取数后须查原件补填单据日期；金额不一致行需追查原因。</p>
+        <p>4. 发现跨期时应与 I2-14 交叉评价，并与 I6-5/I6-6 研发费用截止底稿联动。</p>
       </div>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
-import { inject, toRef, ref, onMounted, watch, computed } from 'vue'
+import { inject, toRef, ref, watch, computed, defineAsyncComponent, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 import I2CutoffSampleTable from './I2CutoffSampleTable.vue'
-import { useI2Cutoff, type CutoffRow } from '../../composables/useI2Cutoff'
+import CutoffCrossCheck from '../../shared/CutoffCrossCheck.vue'
+import { useI2Cutoff } from '../../composables/useI2Cutoff'
+import type { CutoffRow } from '../../composables/useCycleCutoff'
+import type { ExtractedVoucher, FillMode } from '../../composables/useCutoffAutoSampling'
+import { useCutoffMaterialityHint } from '../../composables/useCutoffMaterialityHint'
+import { useI2ImportExport } from '../../composables/useI2ImportExport'
+import { suggestsRdExpense } from '../../composables/cutoffRowHelpers'
+
+const GtCutoffAutoSampling = defineAsyncComponent(() => import('../../cutoff/GtCutoffAutoSampling.vue'))
+const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
 const props = defineProps<{
   sheetName: string
@@ -214,7 +290,7 @@ const props = defineProps<{
   isReadonly?: boolean
 }>()
 
-const emit = defineEmits<{ 'save': []; 'navigate-sheet': [sheetName: string] }>()
+const emit = defineEmits<{ save: []; 'navigate-sheet': [sheetName: string] }>()
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
 
 const {
@@ -225,16 +301,23 @@ const {
   forwardUnsortedRows,
   forwardCrossPeriodCount,
   forwardCrossPeriodAmount,
+  amountMismatchCount,
+  lagAnomalyCount,
+  crossCheckSummary,
+  priorPeriodCutoffDate,
   updateForwardCriteria,
   addForwardRow,
   removeForwardRow,
   updateForwardRow,
   loadFromAutoSampling,
+  importExtractedVouchers,
   save: saveCutoff,
   syncCutoffDateFromProject,
   expandTestWindow,
   draftAjeFromCrossPeriod,
   persistCompletion,
+  syncCriteriaToPeer,
+  flushAutoSave,
 } = useI2Cutoff({
   allResponses: toRef(props, 'allResponses'),
   saveResponses: props.saveResponse,
@@ -243,6 +326,24 @@ const {
 })
 
 const criteria = computed(() => forwardCriteria.value)
+const showCutoffPanel = ref(false)
+const showSamplingDialog = ref(false)
+const importInputRef = ref<HTMLInputElement | null>(null)
+const currentYear = computed(() => props.year ?? new Date().getFullYear())
+const { suggestedThreshold, fetchHint } = useCutoffMaterialityHint(toRef(props, 'projectId'))
+const { exportData, importData, isExporting } = useI2ImportExport({
+  wpId: toRef(props, 'wpId'),
+  onImported: () => emit('save'),
+})
+const expenseHints = computed(() =>
+  forwardRows.value.filter((r) => suggestsRdExpense(r.description)),
+)
+const cutoffPanelDefaults = computed(() => ({
+  cutoffDate: criteria.value.cutoffDate,
+  daysBefore: criteria.value.daysBefore,
+  daysAfter: criteria.value.daysAfter,
+  amountThreshold: criteria.value.amountThreshold,
+}))
 
 const AUDIT_NOTE_KEY = 'I2-13-audit-note'
 const AUDIT_CONCLUSION_KEY = 'I2-13-audit-conclusion'
@@ -267,7 +368,27 @@ function saveAuditConclusion(val: string) {
   void props.saveResponse('I2-13', { [AUDIT_CONCLUSION_KEY]: val })
 }
 watch(() => props.allResponses, () => hydrateAudit(), { immediate: true })
-onMounted(hydrateAudit)
+onMounted(() => {
+  hydrateAudit()
+  void fetchHint()
+})
+onBeforeUnmount(() => { void flushAutoSave() })
+
+function applyMaterialityThreshold() {
+  if (suggestedThreshold.value == null) return
+  updateForwardCriteria({ amountThreshold: suggestedThreshold.value })
+  ElMessage.success(`已采用建议金额门槛 ${suggestedThreshold.value}`)
+}
+
+function triggerImport() {
+  importInputRef.value?.click()
+}
+async function onImportFile(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  await importData(file, 'I2-13')
+  ;(e.target as HTMLInputElement).value = ''
+}
 
 function rowIndex(row: CutoffRow): number {
   return forwardRows.value.indexOf(row)
@@ -284,6 +405,28 @@ function onRemove(row: CutoffRow) {
 }
 async function handleAutoSampling() {
   await loadFromAutoSampling('forward')
+}
+function handleCutoffFilled(payload: { samples: ExtractedVoucher[]; fillMode: FillMode }) {
+  const items = payload.samples.map((v) => ({
+    voucher_date: v.voucherDate,
+    voucher_no: v.voucherNo,
+    summary: v.summary,
+    amount: v.debitAmount ? parseFloat(v.debitAmount) : (v.creditAmount ? parseFloat(v.creditAmount) : 0),
+  }))
+  importExtractedVouchers('forward', items, { fillDocumentDate: false })
+  showCutoffPanel.value = false
+  ElMessage.success(`截止模块已填入 ${items.length} 笔样本（单据日期请查原件后补填）`)
+}
+function handleVoucherFilled(payload: any) {
+  const vouchers = payload?.samples ?? []
+  importExtractedVouchers('forward', vouchers.map((v: any) => ({
+    voucher_date: v.voucherDate ?? v.voucher_date,
+    voucher_no: v.voucherNo ?? v.voucher_no,
+    summary: v.summary,
+    amount: Number(v.debitAmount ?? v.debit_amount ?? 0),
+  })), { fillDocumentDate: false })
+  showSamplingDialog.value = false
+  if (vouchers.length) ElMessage.success(`抽凭已填入 ${vouchers.length} 笔`)
 }
 async function handleDraftAje() {
   await draftAjeFromCrossPeriod('forward')
@@ -324,6 +467,8 @@ function fmtAmount(v: number | null | undefined): string {
 .stat-label { font-size: 12px; color: #6b7280; }
 .stat-value { font-size: 18px; font-weight: 700; color: #1f2937; }
 .stat-danger { color: #dc2626; }
+.stat-warn { color: #d97706; }
+.cap-alert { margin-bottom: 12px; }
 .test-block { margin-bottom: 8px; }
 .block-header { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
 .block-title { font-size: 14px; font-weight: 600; color: #1f2937; }

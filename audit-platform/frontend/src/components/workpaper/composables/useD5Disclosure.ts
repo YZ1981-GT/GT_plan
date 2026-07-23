@@ -18,6 +18,7 @@ import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } fro
 import { calcImpairmentEnd, parseNum, calcSubtotal } from './useD5FormulaEngine'
 import type { ChecklistResponse } from './useD5FormData'
 import type { D5DisclosureSourceData } from './useD5CrossSheet'
+import { eventBus } from '@/utils/eventBus'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -391,14 +392,24 @@ export function useD5Disclosure(options: UseD5DisclosureOptions) {
   )
 
   function _dispatchNoteEvent(section: string, text: string): void {
-    try {
-      window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-        detail: { wpCode: 'D5', section, text },
-      }))
-    } catch { /* EventBus publish失败不阻塞 */ }
+    // 统一 eventBus (crossWpEventBridge 双向桥接 window)
+    eventBus.emit('disclosure:note-text-updated', {
+      wpCode: 'D5',
+      section,
+      text,
+      timestamp: Date.now(),
+    })
   }
 
-  // ─── EventBus: 监听附注模块更新（双向同步）───────────────────────────
+  // ─── EventBus: 监听审定表发布 + 附注模块更新（双向同步）────────────
+
+  // 订阅审定表发布事件（crossSheet computed 自动响应 allResponses 变化）
+  eventBus.on('substantive:adjudicated', (payload: any) => {
+    if (payload?.wpCode === 'D5') {
+      // crossSheet 是 computed，allResponses 变化时自动重算
+      // 此处可用于触发 stale 检查或附注一致性提示
+    }
+  })
 
   const noteUpdateHandler = (e: Event) => {
     const detail = (e as CustomEvent).detail
@@ -418,6 +429,7 @@ export function useD5Disclosure(options: UseD5DisclosureOptions) {
     for (const { event, handler } of eventListeners) {
       window.removeEventListener(event, handler)
     }
+    eventBus.off('substantive:adjudicated')
   })
 
   // ─── Return ──────────────────────────────────────────────────────────

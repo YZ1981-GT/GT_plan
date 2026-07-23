@@ -321,7 +321,6 @@ onMounted(() => {
             :workpaper-id="wpId"
             :project-id="projectId"
             :year="year"
-            dialog-mode
             @filled="onSamplingFilled"
           />
           <!-- 导入导出 -->

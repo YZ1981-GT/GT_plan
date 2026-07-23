@@ -1,6 +1,12 @@
 /**
  * F2-29~32 截止细判：同侧/跨期方向、证据缺口、金额勾稽
+ *
+ * 收敛（cutoff-test-architecture-convergence 第三模式）：跨期方向判定委托
+ * cutoffCanonical.classifyCutoffBoundary（XOR 算术单一真源），F2 仅做 early_book/late_book
+ * 等业务子类映射与证据/金额勾稽（F2 独有的更丰富语义）。
  */
+import { classifyCutoffBoundary } from './cutoffCanonical'
+
 export type CutoffTimingKind =
   | 'ok'
   | 'early_book'   // 记账在截止日前（或当日），单据在截止日后 → 提前入账
@@ -29,24 +35,28 @@ function parseDay(s: string): number | null {
   return Number.isNaN(t) ? null : t
 }
 
-/** 跨期方向细判（需单据日、记账日、截止日齐全） */
+/** 跨期方向细判（需单据日、记账日、截止日齐全）——委托 canonical 第三模式基座 */
 export function classifyCutoffTiming(
   docDate: string,
   bookDate: string,
   periodEnd: string,
 ): CutoffTimingKind {
-  const doc = parseDay(docDate)
-  const book = parseDay(bookDate)
-  const end = parseDay(periodEnd)
-  if (doc == null || book == null || end == null) return 'incomplete'
-  const docOnOrBefore = doc <= end
-  const bookOnOrBefore = book <= end
-  if (docOnOrBefore === bookOnOrBefore) return 'ok'
-  // 账在期内、单在期后 → 提前入账（多记当期）
-  if (bookOnOrBefore && !docOnOrBefore) return 'early_book'
-  // 单在期内、账在期后 → 推迟入账（漏记当期）
-  if (docOnOrBefore && !bookOnOrBefore) return 'late_book'
-  return 'cross_other'
+  // 跨期方向判定收敛到 cutoffCanonical.classifyCutoffBoundary（XOR 算术单一真源）
+  const cls = classifyCutoffBoundary(bookDate, docDate, periodEnd)
+  switch (cls) {
+    case 'incomplete':
+      return 'incomplete'
+    case 'same':
+      return 'ok'
+    case 'book-before-doc-after':
+      // 账在期内、单在期后 → 提前入账（多记当期）
+      return 'early_book'
+    case 'doc-before-book-after':
+      // 单在期内、账在期后 → 推迟入账（漏记当期）
+      return 'late_book'
+    default:
+      return 'cross_other'
+  }
 }
 
 export function detectEvidenceGap(opts: {

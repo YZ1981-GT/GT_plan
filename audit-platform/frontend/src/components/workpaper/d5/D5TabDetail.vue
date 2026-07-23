@@ -26,6 +26,8 @@
         <el-button size="small" :disabled="isReadonly" @click="importFromD1">从D1导入(出售模式票据)</el-button>
         <el-button size="small" :disabled="isReadonly" @click="importFromD2">从D2导入(出售模式账款)</el-button>
         <el-button size="small" :disabled="isReadonly" @click="importFromAuxBalance">从余额表导入</el-button>
+        <el-button size="small" :disabled="isReadonly" @click="doImportPostRealized" type="warning" plain>取期后兑现</el-button>
+        <el-button size="small" type="primary" plain :disabled="isReadonly" @click="showSamplingDialog = true">🎲 抽凭引擎</el-button>
       </div>
       <div class="toolbar-right">
         <el-dropdown size="small" trigger="click" :disabled="isReadonly">
@@ -77,6 +79,18 @@
     </div>
 
     <!-- 勾稽校验提示 -->
+    <!-- 抽凭引擎 Dialog -->
+    <GtVoucherSamplingEngine
+      v-if="showSamplingDialog"
+      account-code="1124"
+      phase="final"
+      :workpaper-id="props.wpId"
+      :project-id="props.projectId"
+      :year="samplingYear"
+      @filled="onSampleFilled"
+      @close="showSamplingDialog = false"
+    />
+
     <el-alert
       v-if="crossCheckInfo"
       :type="crossCheckInfo.type"
@@ -465,17 +479,20 @@
  */
 import { ref, computed, inject, watch, toRef, type Ref } from 'vue'
 import { Setting } from '@element-plus/icons-vue'
-import { useD5Detail } from '../composables/useD5Detail'
+import { useD5Detail, createEmptyRow, recalcRow } from '../composables/useD5Detail'
 import { useD5DetailColumnPrefs } from '../composables/useD5DetailColumnPrefs'
 import type { ChecklistResponse } from '../composables/useD5FormData'
 import { useD5ImportExport } from '../composables/useD5ImportExport'
 import { useD5AiGenerate } from '../composables/useD5AiGenerate'
+import { parseNum } from '../composables/useD5FormulaEngine'
 import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
 import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpers'
 import type { VirtualColumn } from '@/composables/useVirtualTable'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
+// @ts-ignore
+import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -486,6 +503,8 @@ const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  year?: number
+  bsDate?: string
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
@@ -532,6 +551,7 @@ const {
   importFromD1,
   importFromD2,
   importFromAuxBalance,
+  importPostRealizedFromLedger,
 } = useD5Detail({
   allResponses: allResponsesRef,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,
@@ -540,6 +560,37 @@ const {
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
+
+// ─── 抽凭引擎 ───────────────────────────────────────────────────────────────
+
+const showSamplingDialog = ref(false)
+const samplingYear = computed(() => props.year || new Date().getFullYear())
+
+function onSampleFilled(payload: any) {
+  const samples = payload?.samples
+  if (!Array.isArray(samples) || samples.length === 0) return
+
+  const imported = samples.map((s: any) => {
+    const row = createEmptyRow()
+    row.category = '应收票据'
+    row.itemName = s.counterpartAccount || s.summary || ''
+    row.periodIncrease = parseNum(s.debitAmount)
+    row.periodDecrease = parseNum(s.creditAmount)
+    row.remark = `抽凭: ${s.voucherNo || ''}`
+    return recalcRow(row)
+  })
+
+  rows.value = [...rows.value, ...imported]
+  props.debouncedSave('D5-2-rows', { remark: JSON.stringify(rows.value) })
+  showSamplingDialog.value = false
+}
+
+// ─── 期后兑现取数 ────────────────────────────────────────────────────────────
+
+function doImportPostRealized() {
+  const bsDate = props.bsDate || (props.year ? `${props.year}-12-31` : `${new Date().getFullYear()}-12-31`)
+  importPostRealizedFromLedger(bsDate)
+}
 
 const crossCheckInfo = computed(() => {
   const d5NotesTotal = subtotalByCategory.value['应收票据']?.endAudited ?? 0

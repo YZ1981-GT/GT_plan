@@ -376,6 +376,12 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
             section: key,
             text: newTexts[key],
           })
+          // sync-from-workpaper signal for DisclosureEditor subscription
+          eventBus.emit('sync-from-workpaper' as any, {
+            wpCode: 'D6',
+            sourceSection: key,
+            timestamp: Date.now(),
+          })
         }
       }
     },

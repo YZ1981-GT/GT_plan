@@ -113,11 +113,28 @@
       </el-table>
     </el-card>
 
-    <!-- Section 3: 附注叙述文字 -->
+    <!-- Section 3: 预计负债确认条件说明 -->
     <el-card shadow="never" class="disclosure-section">
       <template #header>
         <div class="section-card-header">
-          <span>三、补充说明</span>
+          <span>三、预计负债确认条件及计量方法说明</span>
+        </div>
+      </template>
+      <el-input
+        v-model="policyNarrative"
+        :disabled="isReadonly"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :placeholder="policyPlaceholder"
+        @blur="handlePolicySave"
+      />
+    </el-card>
+
+    <!-- Section 4: 附注叙述文字 -->
+    <el-card shadow="never" class="disclosure-section">
+      <template #header>
+        <div class="section-card-header">
+          <span>四、补充说明</span>
           <el-button size="small" type="primary" plain @click="handleAiGenerate">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
@@ -207,7 +224,12 @@ interface ContingentItem {
 const provisionTable = ref<ProvisionRow[]>([])
 const contingentItems = ref<ContingentItem[]>([])
 const narrativeText = ref('')
+const policyNarrative = ref('')
 const hasAutoData = ref(false)
+
+const policyPlaceholder = `企业对预计负债的确认条件和计量方法：
+（1）确认条件：当与或有事项相关的义务同时满足以下条件时确认为预计负债：该义务是企业承担的现时义务；履行该义务很可能导致经济利益流出企业；该义务的金额能够可靠地计量。
+（2）计量方法：预计负债按照履行相关现时义务所需支出的最佳估计数进行初始计量。最佳估计数的确定：如所需支出存在一个连续范围，且该范围内各种结果发生的可能性相同，则按照该范围内的中间值确定；如涉及多个项目，按照各种可能结果及相关概率计算确定。`
 
 // ─── Computed ────────────────────────────────────────────────────────────────
 
@@ -236,6 +258,11 @@ function loadSavedData(): void {
   const savedNarrative = props.allResponses.get('K5-disclosure-listed-narrative')
   if (savedNarrative?.remark) {
     narrativeText.value = savedNarrative.remark
+  }
+
+  const savedPolicy = props.allResponses.get('K5-disclosure-listed-policy')
+  if (savedPolicy?.remark) {
+    policyNarrative.value = savedPolicy.remark
   }
 }
 
@@ -348,6 +375,10 @@ function handleNarrativeSave(): void {
     variant: 'listed',
     text: narrativeText.value,
   })
+}
+
+function handlePolicySave(): void {
+  emit('save', 'K5-disclosure-listed-policy', { remark: policyNarrative.value })
 }
 
 function handleAiGenerate(): void {

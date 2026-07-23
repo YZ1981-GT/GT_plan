@@ -76,8 +76,10 @@ export interface UseK8AnalysisParams {
   allResponses: Ref<Map<string, any>>
   projectId: Ref<string>
   wpId: Ref<string>
-  /** 营业收入（从CrossSheet或外部） */
+  /** 本期营业收入（占收入比分母，从CrossSheet或外部录入） */
   revenue?: Ref<number>
+  /** 上期营业收入（上期占收入比分母，缺省回退本期收入以兼容旧行为） */
+  priorRevenue?: Ref<number>
   isReadonly?: Ref<boolean>
   onSave?: (itemId: string, value: any) => void
 }
@@ -92,7 +94,7 @@ const DEFAULT_THRESHOLD = 0.3
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useK8Analysis(params: UseK8AnalysisParams) {
-  const { allResponses, projectId, wpId, revenue, isReadonly, onSave } = params
+  const { allResponses, projectId, wpId, revenue, priorRevenue, isReadonly, onSave } = params
 
   // ─── State ─────────────────────────────────────────────────────────────────
 
@@ -133,7 +135,7 @@ export function useK8Analysis(params: UseK8AnalysisParams) {
     const changeAmount = currentAmount - priorAmount
     const changeRate = calcYoYChange(currentAmount, priorAmount)
     const ratioToRevenue = calcRatioToRevenue(currentAmount, rev)
-    const priorRev = rev // 简化：上期收入使用同一值（实际应从参数传入）
+    const priorRev = priorRevenue?.value ?? (parseNum(raw.priorRevenue) || rev) // 上期收入优先，缺省回退本期
     const priorRatioToRevenue = calcRatioToRevenue(priorAmount, priorRev)
     const ratioDeviation = (ratioToRevenue !== null && priorRatioToRevenue !== null)
       ? ratioToRevenue - priorRatioToRevenue : null
@@ -163,13 +165,14 @@ export function useK8Analysis(params: UseK8AnalysisParams) {
 
   const computedRows: ComputedRef<K8AnalysisRow[]> = computed(() => {
     const rev = revenue?.value ?? 0
+    const priorRev = priorRevenue?.value ?? rev // 上期收入优先，缺省回退本期收入
     const totalAmount = calcSubtotal(rows.value.map(r => r.currentAmount))
 
     return rows.value.map((row) => {
       const changeAmount = row.currentAmount - row.priorAmount
       const changeRate = calcYoYChange(row.currentAmount, row.priorAmount)
       const ratioToRevenue = calcRatioToRevenue(row.currentAmount, rev)
-      const priorRatioToRevenue = calcRatioToRevenue(row.priorAmount, rev)
+      const priorRatioToRevenue = calcRatioToRevenue(row.priorAmount, priorRev)
       const ratioDeviation = (ratioToRevenue !== null && priorRatioToRevenue !== null)
         ? ratioToRevenue - priorRatioToRevenue : null
       const structureRatio = calcStructureRatio(row.currentAmount, totalAmount)

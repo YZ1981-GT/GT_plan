@@ -6,9 +6,9 @@
         <div class="guide-step"><span class="step-num">①</span> 审定表(I6-1)确认TB取数(6602发生额)→损益类审定→I2联动VR-I6-01</div>
         <div class="guide-step"><span class="step-num">②</span> 明细表(I6-2)月度12列横向矩阵→异常月份±30%红色标记</div>
         <div class="guide-step"><span class="step-num">③</span> 调整分录(I6-3)AJE/RJE录入→借贷平衡→推送A13</div>
-        <div class="guide-step"><span class="step-num">④</span> 针对性检查(I6-4)费用归集完整性/人员分摊/I2划分一致性</div>
+        <div class="guide-step"><span class="step-num">④</span> 针对性检查(I6-4)抽凭核对1~5项，检查比例联动I6-2</div>
         <div class="guide-step"><span class="step-num">⑤</span> 截止测试(I6-5/I6-6)双向截止→跨期红色高亮</div>
-        <div class="guide-step"><span class="step-num">⑥</span> 附注披露：上市版19×7 / 国企版16×6</div>
+        <div class="guide-step"><span class="step-num">⑥</span> 附注披露：按准则显示上市/国企版本</div>
       </div>
     </div>
 
@@ -104,12 +104,14 @@
  */
 import { computed } from 'vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import { resolveI6DisclosureVisibility } from '../../composables/i6ApplicableSheets'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -128,21 +130,46 @@ interface SheetEntry {
   crossRef?: string
 }
 
-const SHEET_DEFS: { seq: number; code: string; name: string; sheetName: string; fields: string[]; crossRef?: string }[] = [
+const SHEET_DEFS: {
+  seq: number; code: string; name: string; sheetName: string; fields: string[]; crossRef?: string
+  disclosureVariant?: 'listed' | 'soe'
+}[] = [
   { seq: 1, code: '目录', name: '研发费用（底稿目录）', sheetName: '底稿目录', fields: [] },
   { seq: 2, code: 'I6A', name: '研发费用实质性程序表', sheetName: 'I6A', fields: ['I6A-'] },
   { seq: 3, code: 'I6-1', name: '研发费用审定表（损益类发生额）', sheetName: 'I6-1', fields: ['I6-1-'] },
   { seq: 4, code: 'I6-2', name: '研发费用明细表（月度12列）', sheetName: 'I6-2', fields: ['I6-2-'] },
   { seq: 5, code: 'I6-3', name: '研发费用调整分录', sheetName: 'I6-3', fields: ['I6-3-'], crossRef: 'A13' },
-  { seq: 6, code: 'I6-4', name: '针对性检查（费用归集/分摊/I2划分）', sheetName: 'I6-4', fields: ['I6-4-'] },
-  { seq: 7, code: 'I6-5', name: '截止测试（账→单据）', sheetName: 'I6-5', fields: ['I6-5-'] },
-  { seq: 8, code: 'I6-6', name: '截止测试（单据→账）', sheetName: 'I6-6', fields: ['I6-6-'] },
-  { seq: 9, code: '附注(上市)', name: '附注-上市公司（19×7）', sheetName: '附注上市', fields: ['I6-disc-L-'] },
-  { seq: 10, code: '附注(国企)', name: '附注-国有企业（16×6）', sheetName: '附注国企', fields: ['I6-disc-S-'] },
+  { seq: 6, code: 'I6-4', name: '针对性检查表（抽凭核对）', sheetName: 'I6-4', fields: ['I6-4-'] },
+  { seq: 7, code: 'I6-5', name: '截止测试（账→单据）', sheetName: 'I6-5', fields: ['I6-5-'], crossRef: 'I6-6' },
+  { seq: 8, code: 'I6-6', name: '截止测试（单据→账）', sheetName: 'I6-6', fields: ['I6-6-'], crossRef: 'I6-5' },
+  { seq: 9, code: '附注(上市)', name: '附注-上市公司', sheetName: '附注上市', fields: ['I6-disc-L-', 'I6-disc-listed-'], disclosureVariant: 'listed' },
+  { seq: 10, code: '附注(国企)', name: '附注-国有企业', sheetName: '附注国企', fields: ['I6-disc-S-', 'I6-disc-soe-'], disclosureVariant: 'soe' },
   { seq: 11, code: 'I6-全', name: '底稿全览(OO)', sheetName: 'Full_Workbook', fields: [] },
 ]
 
-function _getSheetStatus(fields: string[]): { status: SheetStatus; progress: number } {
+function _parseRows(key: string): any[] {
+  const raw = props.allResponses.get(key)?.remark
+  if (!raw) return []
+  try { const p = JSON.parse(raw); return Array.isArray(p) ? p : [] } catch { return [] }
+}
+
+function _getCutoffSheetProgress(code: 'I6-5' | 'I6-6'): { status: SheetStatus; progress: number } {
+  const progressKey = `${code}-completion-progress`
+  const stored = props.allResponses.get(progressKey)?.remark
+  if (stored != null && stored !== '') {
+    const progress = Math.min(100, Number(stored) || 0)
+    const ok = props.allResponses.get(`${code}-completion-ok`)?.remark === 'Y'
+    return { progress, status: ok ? '已复核' : progress >= 90 ? '编制中' : '编制中' }
+  }
+  const rows = _parseRows(`${code}-rows`)
+  const hasConclusion = Boolean(props.allResponses.get(`${code}-audit-conclusion`)?.remark)
+  if (rows.length === 0) return { status: '未编制', progress: 0 }
+  const progress = hasConclusion ? 90 : Math.min(75, 25 + rows.length * 5)
+  return { status: '编制中', progress }
+}
+
+function _getSheetStatus(fields: string[], code?: string): { status: SheetStatus; progress: number } {
+  if (code === 'I6-5' || code === 'I6-6') return _getCutoffSheetProgress(code)
   if (fields.length === 0) return { status: '未编制', progress: 0 }
   let totalFields = 0
   let filledFields = 0
@@ -163,11 +190,23 @@ function _getSheetStatus(fields: string[]): { status: SheetStatus; progress: num
   return { status: '未编制', progress: 0 }
 }
 
+const disclosureVis = computed(() => resolveI6DisclosureVisibility(props.applicableStandards))
+
 const sheets = computed<SheetEntry[]>(() => {
-  return SHEET_DEFS.map((def) => {
-    const { status, progress } = _getSheetStatus(def.fields)
-    return { seq: def.seq, code: def.code, name: def.name, status, progress, sheetName: def.sheetName, crossRef: def.crossRef }
-  })
+  return SHEET_DEFS
+    .filter((def) => !def.disclosureVariant || disclosureVis.value[def.disclosureVariant])
+    .map((def, idx) => {
+      const { status, progress } = _getSheetStatus(def.fields, def.code)
+      return {
+        seq: idx + 1,
+        code: def.code,
+        name: def.name,
+        status,
+        progress,
+        sheetName: def.sheetName,
+        crossRef: def.crossRef,
+      }
+    })
 })
 
 const stats = computed(() => {

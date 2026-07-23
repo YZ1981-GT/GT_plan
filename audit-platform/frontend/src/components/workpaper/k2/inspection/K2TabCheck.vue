@@ -195,7 +195,10 @@
     </el-card>
 
     <div v-if="abnormalRows.length > 0" class="abnormal-summary">
-      <div class="as-header">⚠️ 异常凭证摘要（{{ abnormalRows.length }} 笔）</div>
+      <div class="as-header">
+        ⚠️ 异常凭证摘要（{{ abnormalRows.length }} 笔）
+        <el-button v-if="!isReadonly" size="small" type="danger" plain style="margin-left:12px" @click="handlePushAbnormalToK23">推送至K2-3</el-button>
+      </div>
       <ul class="as-list">
         <li v-for="r in abnormalRows" :key="r.id"><b>{{ r.debtorName || '（未填明细项目）' }}</b> — 凭证 {{ r.voucherNo || '-' }}：{{ r.remark || '未说明' }}</li>
       </ul>
@@ -224,7 +227,7 @@
     </details>
 
     <el-dialog v-model="samplingVisible" title="抽凭引擎 — 其他流动资产(1231)" width="90%" top="5vh" destroy-on-close>
-      <GtVoucherSamplingEngine v-if="samplingVisible" account-code="1231" phase="current" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
+      <GtVoucherSamplingEngine v-if="samplingVisible" account-code="1231" phase="final" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
     </el-dialog>
   </div>
 </template>
@@ -237,7 +240,10 @@
  * 源模板无"期后检查"段，但保留完整样本选取功能、抽凭引擎、核对内容、结论模板。
  */
 import { ref, computed, inject, onMounted, defineAsyncComponent } from 'vue'
+import { ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
+import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
@@ -270,7 +276,10 @@ const {
 // 源模板 K2-6 检查比例仅 本期借方/本期贷方（无期末余额行）
 const k2CheckRatios = computed(() => checkRatios.value.filter(r => r.direction !== '期末余额'))
 
-onMounted(() => load())
+onMounted(() => {
+  load()
+  applyBookAmountsFromK21()
+})
 
 function checkedValues(row: K1VoucherRow): number[] {
   return row.checks.map((c, i) => (c ? i : -1)).filter(i => i >= 0)
@@ -307,8 +316,102 @@ function fmtAmt(val: number | null | undefined): string {
   return Number(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 function abnormalRowClass({ row }: { row: K1VoucherRow }): string { return row.abnormal ? 'abnormal-row' : '' }
-function handleAiGenerate() { emit('save', 'K2-6-ai-trigger', { remark: 'voucher-check' }) }
+
+/** AI辅助——真正调用AI端点生成审计说明 */
+async function handleAiGenerate() {
+  try {
+    const context: Record<string, string> = {
+      accountCode: '1231',
+      accountName: '其他流动资产',
+      sheet: 'K2-6',
+      sampleCount: String(occurrenceRows.value.length),
+      abnormalCount: String(abnormalRows.value.length),
+      debitChecked: String(occurrenceDebitChecked.value),
+      creditChecked: String(occurrenceCreditChecked.value),
+      checkRatioSummary: k2CheckRatios.value.map(r => `${r.direction}:${r.ratio != null ? (r.ratio * 100).toFixed(1) + '%' : '未计算'}`).join('; '),
+    }
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      prompt: '请根据其他流动资产(1231)凭证检查表的测试结果，生成审计说明：概述抽样过程、核对结果、异常事项及结论建议',
+      context,
+      existingContent: auditNote.value,
+      section: 'K2-6-voucher-note',
+    })
+    const generated = res?.data?.data?.content || res?.data?.content || ''
+    if (generated) {
+      auditNote.value = generated
+      persist()
+      ElMessage.success('AI审计说明已生成')
+    } else {
+      ElMessage.warning('AI未生成内容')
+    }
+  } catch {
+    ElMessage.warning('AI生成失败')
+  }
+}
+
 function handleReview() { openReviewDialog('K2-6-check') }
+
+/** 从K2-1审定表带入账面借贷方发生额（填充检查比例分母） */
+function applyBookAmountsFromK21(): void {
+  // 读K2-1审定表的本期借方/贷方合计
+  const adjRows = props.allResponses.get('K2-1-adj-rows')
+  const raw = adjRows?.remark ?? adjRows?.value ?? null
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        const totalRow = parsed.find((r: any) => r.rowKey === 'subtotal')
+        if (totalRow) {
+          if (!criteria.value.bookDebitOccurrence && totalRow.debit) {
+            criteria.value.bookDebitOccurrence = Number(totalRow.debit)
+          }
+          if (!criteria.value.bookCreditOccurrence && totalRow.credit) {
+            criteria.value.bookCreditOccurrence = Number(totalRow.credit)
+          }
+          if (!criteria.value.populationDebitAmount && totalRow.debit) {
+            criteria.value.populationDebitAmount = Number(totalRow.debit)
+          }
+          if (!criteria.value.populationCreditAmount && totalRow.credit) {
+            criteria.value.populationCreditAmount = Number(totalRow.credit)
+          }
+        }
+      }
+    } catch { /* silent */ }
+  }
+  // 尝试从TB自动取入
+  const tbDebit = props.allResponses.get('K2-tb-period-debit')
+  const tbCredit = props.allResponses.get('K2-tb-period-credit')
+  if (tbDebit?.remark && !criteria.value.bookDebitOccurrence) {
+    criteria.value.bookDebitOccurrence = Number(tbDebit.remark) || 0
+  }
+  if (tbCredit?.remark && !criteria.value.bookCreditOccurrence) {
+    criteria.value.bookCreditOccurrence = Number(tbCredit.remark) || 0
+  }
+}
+
+/** 推送异常凭证至K2-3调整分录 */
+function handlePushAbnormalToK23(): void {
+  if (abnormalRows.value.length === 0) return
+  const entries = abnormalRows.value.map(r => ({
+    summary: `凭证检查异常-${r.debtorName || r.voucherNo}：${r.remark || '待说明'}`,
+    debitAccount: r.offsetAccount || '待确认',
+    debitAmount: r.debitAmount || 0,
+    creditAccount: '其他流动资产',
+    creditAmount: r.creditAmount || 0,
+    source: 'K2-6',
+  }))
+  try {
+    eventBus.emit('adjustment:created', {
+      wpCode: 'K2',
+      accountCode: '1231',
+      source: 'K2-6-abnormal',
+      suggestedEntries: entries,
+    })
+    ElMessage.success(`已推送 ${entries.length} 笔异常凭证至K2-3`)
+  } catch {
+    ElMessage.warning('推送失败')
+  }
+}
 </script>
 
 <style scoped>

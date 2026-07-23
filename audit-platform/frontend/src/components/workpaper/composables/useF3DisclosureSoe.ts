@@ -3,7 +3,8 @@
  * Spec: .kiro/specs/f3-notes-payable/ Task 9.2
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
-import { parseNum, calcSubtotal, calcCreditBalance, calcAdjustedAmount } from './useF3FormulaEngine'
+import { calcSubtotal } from './useF3FormulaEngine'
+import { buildF3DisclosureClassRows } from './useF3CrossSheet'
 import type { ChecklistResponse } from './useF3FormData'
 
 export interface F3SoeDisclosureRow {
@@ -16,6 +17,7 @@ export interface F3SoeDisclosureRow {
 const PREFIX = 'F3-note-soe-'
 const ITEM_ROWS = `${PREFIX}rows`
 const ADJ_KEY = 'F3-1-adj-rows'
+const DETAIL_KEY = 'F3-2-rows'
 
 function generateRowId(): string {
   return `f3ns-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
@@ -29,16 +31,6 @@ function safeParseRows(jsonStr: string | null | undefined): F3SoeDisclosureRow[]
   } catch {
     return []
   }
-}
-
-function parseAdjClosing(row: any): number {
-  const openingAdj = calcAdjustedAmount(
-    parseNum(row.openingUnadjusted),
-    parseNum(row.openingAje),
-    parseNum(row.openingRje),
-  )
-  const closingUnadj = calcCreditBalance(openingAdj, parseNum(row.periodCredit), parseNum(row.periodDebit))
-  return calcAdjustedAmount(closingUnadj, parseNum(row.closingAje), parseNum(row.closingRje))
 }
 
 export function useF3DisclosureSoe(options: {
@@ -60,36 +52,18 @@ export function useF3DisclosureSoe(options: {
     })
   })
 
-  /** 审定表尚无数据时的模板固定两行（与附注章节「八、36 应付票据」行结构一致）。 */
-  function defaultClassRows(): F3SoeDisclosureRow[] {
-    return [
-      { rowId: 'cs-bank', label: '银行承兑汇票', endAmount: 0, priorAmount: 0 },
-      { rowId: 'cs-commercial', label: '商业承兑汇票', endAmount: 0, priorAmount: 0 },
-    ]
-  }
-
   const section1Rows: ComputedRef<F3SoeDisclosureRow[]> = computed(() => {
     void adjudicatedRefreshKey.value
-    const raw = allResponses.value.get(ADJ_KEY)?.remark
-    if (!raw) return defaultClassRows()
-    try {
-      const stored = JSON.parse(raw) as any[]
-      const rows = stored
-        .filter((r) => r.rowKey === 'bank' || r.rowKey === 'commercial')
-        .map((r) => ({
-          rowId: `cs-${r.rowKey}`,
-          label: r.label || (r.rowKey === 'bank' ? '银行承兑汇票' : '商业承兑汇票'),
-          endAmount: parseAdjClosing(r),
-          priorAmount: calcAdjustedAmount(
-            parseNum(r.openingUnadjusted),
-            parseNum(r.openingAje),
-            parseNum(r.openingRje),
-          ),
-        }))
-      return rows.length ? rows : defaultClassRows()
-    } catch {
-      return defaultClassRows()
-    }
+    // P0-1：按类别（银行/商业/供应链/其他）从审定表+明细表组装分类行
+    return buildF3DisclosureClassRows(
+      allResponses.value.get(ADJ_KEY)?.remark,
+      allResponses.value.get(DETAIL_KEY)?.remark,
+    ).map((r) => ({
+      rowId: `cs-${r.rowKey}`,
+      label: r.label,
+      endAmount: r.endAmount,
+      priorAmount: r.priorAmount,
+    }))
   })
 
   const section1Subtotal = computed(() => ({

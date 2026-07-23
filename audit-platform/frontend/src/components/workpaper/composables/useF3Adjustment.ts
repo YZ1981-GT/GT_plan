@@ -20,6 +20,8 @@ export interface F3AdjustmentRow {
   creditAmount: number
   preparer: string
   remark: string
+  /** 来源标识（overdue-reclass/interest-accrual 等自动生成分录），供幂等替换 */
+  sourceKind?: string
 }
 
 const STORAGE_KEY = 'F3-3-rows'
@@ -63,6 +65,7 @@ function safeParseRows(jsonStr: string | null | undefined): F3AdjustmentRow[] {
       creditAmount: parseNum(raw.creditAmount),
       preparer: raw.preparer || '',
       remark: raw.remark || '',
+      ...(raw.sourceKind ? { sourceKind: String(raw.sourceKind) } : {}),
     }))
   } catch {
     return []

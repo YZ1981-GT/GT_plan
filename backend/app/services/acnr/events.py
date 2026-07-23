@@ -103,7 +103,8 @@ async def invalidate(
             "acnr.invalidate address_registry delegate failed: %s", exc
         )
 
-    # ── Step 5: 递增 project_epoch + pub-sub 通知其他 worker (Req-7) ────
+    # ── Step 5: 递增 project_epoch + pub-sub 通知其他 worker (Req-7 / R11) ────
+    new_epoch = 0
     try:
         from app.services.acnr.cache_epoch import increment_epoch
 
@@ -115,6 +116,26 @@ async def invalidate(
             )
     except Exception as exc:
         logger.warning("acnr.invalidate epoch increment failed: %s", exc)
+
+    # ── Step 6: 前端 SSE 实时广播 acnr:invalidate（best-effort，R2）──────
+    # broadcast_raw 只推同 worker 的 SSE 队列（跨 worker 由 Durable_Epoch 兜底）。
+    # project_id 已在函数入口非空校验；异常仅告警不阻断（R2.5）。
+    #
+    # 🔴 与 acnr-consumer-wiring Req 10.4 调和：`touch_wp_registry` 是渲染期高频热路径
+    # （invalidate_domain('wp') → trigger="touch_wp_registry"），不得向前端 SSE fan-out
+    # （避免 SSE 风暴）。仅 WORKPAPER_SAVED 等真实失效触发广播；热路径由 Durable_Epoch/TTL 兜底。
+    if trigger != "touch_wp_registry":
+        try:
+            from app.services.event_bus import event_bus
+
+            payload: dict[str, Any] = {"project_id": str(project_id)}
+            if wp_id:
+                payload["wp_id"] = str(wp_id)
+            if new_epoch > 0:
+                payload["epoch"] = new_epoch
+            event_bus.broadcast_raw("acnr:invalidate", payload)
+        except Exception as exc:
+            logger.warning("acnr.invalidate broadcast_raw failed: %s", exc)
 
 
 async def invalidate_domain(

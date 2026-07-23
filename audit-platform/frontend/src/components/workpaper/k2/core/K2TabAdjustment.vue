@@ -111,6 +111,34 @@
       <span v-else class="footer-status err">✗ 不平衡 | 差额：{{ fmtAmt(Math.abs(balanceDiff)) }}</span>
     </div>
 
+    <!-- 索引跳转 -->
+    <div style="display:flex;gap:8px;margin:12px 0;align-items:center">
+      <span style="font-size:12px;color:#909399">关联底稿：</span>
+      <el-tag size="small" type="primary" effect="plain" style="cursor:pointer" @click="emit('navigate-sheet', 'K2-1')">→ K2-1 审定表</el-tag>
+      <el-tag size="small" type="warning" effect="plain" style="cursor:pointer" @click="emit('navigate-sheet', 'A13')">→ A13 错报汇总</el-tag>
+    </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" style="margin-bottom:12px">
+      <template #header>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-weight:600">审计说明</span>
+        </div>
+      </template>
+      <el-input v-model="adjAuditNote" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="概述调整分录编制原因、重大调整事项说明..." @blur="persistAdjNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" style="margin-bottom:12px">
+      <template #header>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-weight:600">审计结论</span>
+          <el-button size="small" type="default" link @click="openReview">💬 复核</el-button>
+        </div>
+      </template>
+      <el-input v-model="adjAuditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" :disabled="isReadonly" placeholder="调整分录综合结论..." @blur="persistAdjConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="k2-guide-details">
       <summary>📋 编制提示</summary>
@@ -119,6 +147,7 @@
         <p>2. 借贷必须平衡后方可保存回写。点击"保存&amp;回写"将汇总AJE/RJE数据回写K2-1审定表。</p>
         <p>3. 保存后自动发布 adjustment:created 事件联动 A13 错报汇总底稿。</p>
         <p>4. 其他流动资产科目代码 1231，资产类借方，期末=期初+借-贷。</p>
+        <p>5. K2-5摊销测算差异超重要性水平时会推送建议AJE，本表自动接收。</p>
       </div>
     </details>
   </div>
@@ -139,9 +168,10 @@
  * - EventBus publish 'adjustment:created' → A13
  * - 动态行新增(ElMessageBox.prompt) + 导入导出
  */
-import { ref, computed, inject, onMounted } from 'vue'
+import { ref, computed, inject, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
+import http from '@/utils/http'
 
 const K2_ACCOUNT_CODE = '1231'
 const ITEM_PREFIX = 'K2-3-adj'
@@ -185,29 +215,87 @@ const isBalanced = computed(() => Math.abs(balanceDiff.value) < 0.005)
 // ═══ 初始化加载 ═══
 onMounted(() => {
   loadFromResponses()
+  loadAuditNoteConclusion()
+  // 订阅K2-5/K2-6推送的建议AJE
+  eventBus.on('adjustment:created', handleSuggestedAjeFromUpstream)
 })
+
+onBeforeUnmount(() => {
+  eventBus.off('adjustment:created', handleSuggestedAjeFromUpstream)
+})
+
+/** 接收上游(K2-5/K2-6)推送的建议AJE */
+function handleSuggestedAjeFromUpstream(payload: any): void {
+  if (!payload || payload.wpCode !== 'K2' || !payload.suggestedEntries) return
+  if (payload.source === 'K2-5-amort-variance' || payload.source === 'K2-6-abnormal') {
+    const suggested = payload.suggestedEntries as any[]
+    let added = 0
+    for (const item of suggested) {
+      // 按摘要去重
+      const exists = entries.value.some(e => e.summary === item.summary)
+      if (!exists) {
+        entries.value.push({
+          id: `entry-${++nextId}`,
+          seq: entries.value.length + 1,
+          entryType: 'AJE',
+          summary: item.summary || `${payload.source}建议调整`,
+          debitAccount: item.debitAccount || '其他流动资产',
+          debitAmount: Math.abs(item.debitAmount || item.variance || 0),
+          creditAccount: item.creditAccount || '销售费用',
+          creditAmount: Math.abs(item.creditAmount || item.variance || 0),
+          preparedBy: '',
+        })
+        added++
+      }
+    }
+    if (added > 0) {
+      reSequence()
+      persistEntries()
+      ElMessage.info(`已自动接收 ${added} 笔来自${payload.source === 'K2-5-amort-variance' ? 'K2-5摊销差异' : 'K2-6异常凭证'}的建议AJE`)
+    }
+  }
+}
+
+// ═══ 审计说明/结论 ═══
+const adjAuditNote = ref('')
+const adjAuditConclusion = ref('')
+
+function loadAuditNoteConclusion(): void {
+  const noteItem = props.allResponses.get('K2-3-audit-note')
+  adjAuditNote.value = noteItem?.remark ?? ''
+  const conclItem = props.allResponses.get('K2-3-audit-conclusion')
+  adjAuditConclusion.value = conclItem?.remark ?? ''
+}
+
+function persistAdjNote(): void {
+  emit('save', 'K2-3-audit-note', { remark: adjAuditNote.value })
+}
+function persistAdjConclusion(): void {
+  emit('save', 'K2-3-audit-conclusion', { remark: adjAuditConclusion.value })
+}
 
 function loadFromResponses(): void {
   const saved = props.allResponses.get(`${ITEM_PREFIX}-entries`)
-  if (saved?.value) {
-    try {
-      const parsed = typeof saved.value === 'string' ? JSON.parse(saved.value) : saved.value
-      if (Array.isArray(parsed)) {
-        entries.value = parsed.map((e: any, idx: number) => ({
-          id: e.id || `entry-${++nextId}`,
-          seq: idx + 1,
-          entryType: e.entryType || 'AJE',
-          summary: e.summary || '',
-          debitAccount: e.debitAccount || '',
-          debitAmount: e.debitAmount || 0,
-          creditAccount: e.creditAccount || '',
-          creditAmount: e.creditAmount || 0,
-          preparedBy: e.preparedBy || '',
-        }))
-        nextId = entries.value.length + 1
-      }
-    } catch { /* ignore parse error */ }
-  }
+  if (!saved) return
+  const raw = saved.remark ?? saved.value ?? (typeof saved === 'string' ? saved : null)
+  if (!raw) return
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (Array.isArray(parsed)) {
+      entries.value = parsed.map((e: any, idx: number) => ({
+        id: e.id || `entry-${++nextId}`,
+        seq: idx + 1,
+        entryType: e.entryType || 'AJE',
+        summary: e.summary || '',
+        debitAccount: e.debitAccount || '',
+        debitAmount: e.debitAmount || 0,
+        creditAccount: e.creditAccount || '',
+        creditAmount: e.creditAmount || 0,
+        preparedBy: e.preparedBy || '',
+      }))
+      nextId = entries.value.length + 1
+    }
+  } catch { /* ignore parse error */ }
 }
 
 // ═══ 行操作 ═══
@@ -263,7 +351,7 @@ function reSequence(): void {
 
 // ═══ 持久化 ═══
 function persistEntries(): void {
-  emit('save', `${ITEM_PREFIX}-entries`, JSON.stringify(entries.value))
+  emit('save', `${ITEM_PREFIX}-entries`, { remark: JSON.stringify(entries.value) })
 }
 
 // ═══ 保存回写K2-1 + EventBus ═══
@@ -286,8 +374,8 @@ function handleSaveWriteback(): void {
   props.allResponses.set('K2-1-rje-total', { item_id: 'K2-1-rje-total', value: rjeTotal })
 
   // 持久化
-  emit('save', 'K2-1-aje-total', ajeTotal)
-  emit('save', 'K2-1-rje-total', rjeTotal)
+  emit('save', 'K2-1-aje-total', { remark: String(ajeTotal) })
+  emit('save', 'K2-1-rje-total', { remark: String(rjeTotal) })
   persistEntries()
 
   // EventBus publish adjustment:created → A13
@@ -308,12 +396,57 @@ function handleSaveWriteback(): void {
 // ═══ 导入导出 ═══
 function handleIECommand(cmd: string): void {
   if (cmd === 'template') {
-    ElMessage.info('导出模板功能待后端端点就绪')
+    handleExportTemplate()
   } else if (cmd === 'export') {
-    ElMessage.info('导出数据功能待后端端点就绪')
+    handleExportData()
   } else if (cmd === 'import') {
-    ElMessage.info('导入数据功能待后端端点就绪')
+    handleImportFile()
   }
+}
+
+async function handleExportTemplate(): Promise<void> {
+  try {
+    const res = await http.get(`/api/workpapers/${props.wpId}/k2/export-template?sheet=K2-3`, { responseType: 'blob' } as any)
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'K2-3_调整分录模板.xlsx'; a.click()
+    URL.revokeObjectURL(url)
+  } catch { ElMessage.warning('导出模板失败（端点可能未就绪）') }
+}
+
+async function handleExportData(): Promise<void> {
+  try {
+    const res = await http.get(`/api/workpapers/${props.wpId}/k2/export-data?sheet=K2-3`, { responseType: 'blob' } as any)
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'K2-3_调整分录数据.xlsx'; a.click()
+    URL.revokeObjectURL(url)
+  } catch { ElMessage.warning('导出数据失败（端点可能未就绪）') }
+}
+
+function handleImportFile(): void {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls'
+  input.onchange = async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file) return
+    const formData = new FormData()
+    formData.append('file', file)
+    try {
+      const res = await http.post(`/api/workpapers/${props.wpId}/k2/import-data?sheet=K2-3`, formData)
+      const count = res?.data?.data?.rowCount ?? res?.data?.rowCount ?? 0
+      if (count > 0) {
+        loadFromResponses()
+        ElMessage.success(`成功导入 ${count} 条调整分录`)
+      } else {
+        ElMessage.info('导入完成，无新数据')
+      }
+    } catch { ElMessage.warning('导入失败（端点可能未就绪）') }
+  }
+  input.click()
 }
 
 // ═══ 复核 ═══

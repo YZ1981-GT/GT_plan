@@ -43,11 +43,23 @@
     </div>
 
     <div class="action-bar">
+      <el-button size="small" plain :disabled="isReadonly" :loading="isLoadingTb" data-testid="i2-1-load-tb" @click="handleLoadTb()">从 TB 带入</el-button>
       <el-button size="small" type="primary" plain :disabled="isReadonly" data-testid="i2-1-seed-i22" @click="handleSeedI22">从 I2-2 带入</el-button>
       <el-button size="small" plain :disabled="isReadonly" @click="handleSyncI23">从 I2-3 同步调整</el-button>
       <el-button size="small" plain :disabled="isReadonly" @click="handleApplyTb">TB写入汇总行</el-button>
       <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleAddRow">+ 新增项目</el-button>
       <el-button size="small" type="success" :disabled="isReadonly" data-testid="i2-1-save" @click="handleSave">保存并回写</el-button>
+      <el-dropdown v-if="!isReadonly" size="small" :disabled="ieBusy" @command="handleIeCommand">
+        <el-button size="small" :loading="ieBusy">导入导出 ▾</el-button>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="export-template">导出模板</el-dropdown-item>
+            <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
+            <el-dropdown-item command="import-data" divided>导入数据</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+      <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
     </div>
 
     <el-alert
@@ -234,11 +246,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject } from 'vue'
+import { computed, inject, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useI2Adjudication, formatChangeRate } from '../../composables/useI2Adjudication'
-import type { I2TbData } from '../../composables/useI2FormData'
+import { fetchI2TbData, persistI2TbData, type I2TbData } from '../../composables/useI2FormData'
+import { useI2ImportExport } from '../../composables/useI2ImportExport'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -250,7 +263,7 @@ const props = defineProps<{
   isReadonly?: boolean
 }>()
 
-const emit = defineEmits<{ save: []; 'navigate-sheet': [sheetName: string] }>()
+const emit = defineEmits<{ save: []; 'navigate-sheet': [sheetName: string]; imported: [] }>()
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
 
 const tbData = computed<I2TbData>(() => {
@@ -271,6 +284,20 @@ const tbData = computed<I2TbData>(() => {
 
 const allResponsesRef = computed(() => props.allResponses)
 const tbDataRef = computed(() => tbData.value)
+
+// ─── TB 带入（I2-tb-data）：科目1717未审/审定/AJE/RJE，供上方 el-descriptions 展示与差异校验 ──
+const isLoadingTb = ref(false)
+async function handleLoadTb(silent = false): Promise<void> {
+  if (!props.projectId) return
+  isLoadingTb.value = true
+  try {
+    const tb: I2TbData = await fetchI2TbData(http, props.projectId)
+    await persistI2TbData(props.saveResponse, tb)
+    if (!silent) ElMessage.success('已从 TB 带入科目1717数据')
+  } finally {
+    isLoadingTb.value = false
+  }
+}
 
 async function writebackTb(auditedAmount: number) {
   if (!props.wpId || !props.projectId) return
@@ -355,6 +382,31 @@ async function handleSave() {
 }
 
 function handleReview() { openReviewDialog('I2-1-审定表') }
+
+// ─── 导入导出（I2-1 审定表） ────────────────────────────────────────────────
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const { isImporting, isExporting, exportTemplate, exportData, importData } = useI2ImportExport({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+  onImported: () => emit('imported'),
+})
+const ieBusy = computed(() => isImporting.value || isExporting.value)
+
+async function handleIeCommand(cmd: string) {
+  if (cmd === 'export-template') await exportTemplate('I2-1')
+  else if (cmd === 'export-data') await exportData('I2-1')
+  else if (cmd === 'import-data') fileInputRef.value?.click()
+}
+
+async function onFileSelected(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  ;(e.target as HTMLInputElement).value = ''
+  if (file) await importData(file, 'I2-1')
+}
+
+onMounted(() => {
+  if (!(props.allResponses.get('I2-tb-data'))) void handleLoadTb(true)
+})
 
 function fmtAmount(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return '—'

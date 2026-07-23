@@ -224,6 +224,18 @@ const tbData = ref({
   audited1231: 0,
 })
 
+// ─── 版本链 + 复核对话 provide（供子组件inject使用）────────────────────────
+import { provide } from 'vue'
+
+const scheduleAutoSnapshot = () => runtime?.version?.scheduleAutoSnapshot?.()
+
+// 复核对话：从runtime获取或创建no-op fallback
+const openReviewDialog = (sectionId: string) => {
+  runtime?.review?.openReviewDialog?.(sectionId)
+}
+provide('openReviewDialog', openReviewDialog)
+provide('scheduleAutoSnapshot', scheduleAutoSnapshot)
+
 // ─── 双模式 (OO 健康检查 + el-segmented) ────────────────────────────────────
 const dualMode = (() => {
   const currentMode = ref<'html' | 'onlyoffice'>('html')
@@ -321,6 +333,13 @@ async function _loadTbData(): Promise<void> {
     }
     tbData.value.unadjusted1231 = u1231
     tbData.value.audited1231 = a1231
+
+    // Seed K2-1审定表合计未审数（仅首次无持久化数据时预填）
+    const existingUnadj = allResponses.get('K2-1-subtotal-unadj')
+    if (!existingUnadj?.remark && u1231 > 0) {
+      // 写入allResponses供K2-1 buildRow读取(不覆盖已有手工值)
+      allResponses.set('K2-1-subtotal-unadj', { item_id: 'K2-1-subtotal-unadj', remark: String(u1231) })
+    }
   } catch {
     // TB取数失败静默处理
   }

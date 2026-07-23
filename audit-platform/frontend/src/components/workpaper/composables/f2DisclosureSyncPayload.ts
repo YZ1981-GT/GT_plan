@@ -10,12 +10,114 @@ import {
   resolveF2NoteSectionTarget,
 } from './f2NoteSectionMap'
 
+import type { ColumnDef } from './disclosureColumnDefs'
+
 export interface F2SyncFromWorkpaperPayload {
   wp_id: string
   sheet_name: string
   section_id: string
   current_standard: string
   sub_table_data: Record<string, Record<string, unknown>[]>
+  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 F2 披露组件既有 el-table-column */
+  columns?: Record<string, ColumnDef[]>
+}
+
+// ── 列头元数据：label 逐字取自 F2TabDisclosureListed/Soe 的 el-table-column（源对齐，禁止杜撰）──
+// 两级表头（如「期末数 > 账面余额」）在扁平投影中合并为「期末账面余额」，保留源语义。
+
+export function buildF2ListedColumns(): Record<string, ColumnDef[]> {
+  return {
+    存货分类: [
+      { key: 'label', label: '存货种类', is_label: true },
+      { key: 'end_gross', label: '期末账面余额', format: 'amount' },
+      { key: 'end_impairment', label: '期末跌价准备/合同履约成本减值准备', format: 'amount' },
+      { key: 'end_net', label: '期末账面价值', format: 'amount' },
+      { key: 'prior_gross', label: '上年年末账面余额', format: 'amount' },
+      { key: 'prior_impairment', label: '上年年末跌价准备/合同履约成本减值准备', format: 'amount' },
+      { key: 'prior_net', label: '上年年末账面价值', format: 'amount' },
+    ],
+    存货跌价准备及合同履约成本减值准备: [
+      { key: 'label', label: '存货种类', is_label: true },
+      { key: 'opening', label: '期初余额', format: 'amount' },
+      { key: 'increase_provision', label: '本期增加-计提', format: 'amount' },
+      { key: 'increase_other', label: '本期增加-其他', format: 'amount' },
+      { key: 'decrease_reversal', label: '本期减少-转回或转销', format: 'amount' },
+      { key: 'decrease_other', label: '本期减少-其他', format: 'amount' },
+      { key: 'ending', label: '期末余额', format: 'amount' },
+    ],
+    '存货跌价准备及合同履约成本减值准备（续）': [
+      { key: 'label', label: '存货种类', is_label: true },
+      { key: 'nrv_basis', label: '确定可变现净值/剩余对价与将要发生的成本的具体依据' },
+      { key: 'reversal_reason', label: '本期转回或转销存货跌价准备/合同履约成本减值准备的原因' },
+    ],
+    按组合计提存货跌价准备: [
+      { key: 'group_name', label: '组合', is_label: true },
+      { key: 'balance', label: '账面余额-金额', format: 'amount' },
+      { key: 'balance_pct', label: '账面余额-比例(%)', format: 'percent' },
+      { key: 'impairment', label: '存货跌价准备-金额', format: 'amount' },
+      { key: 'provision_standard', label: '存货跌价准备-计提标准' },
+      { key: 'impairment_pct', label: '存货跌价准备-比例(%)', format: 'percent' },
+      { key: 'net_value', label: '账面价值', format: 'amount' },
+    ],
+    '按组合计提存货跌价准备（续）': [
+      { key: 'group_name', label: '组合', is_label: true },
+      { key: 'balance', label: '账面余额-金额', format: 'amount' },
+      { key: 'balance_pct', label: '账面余额-比例(%)', format: 'percent' },
+      { key: 'impairment', label: '存货跌价准备-金额', format: 'amount' },
+      { key: 'provision_standard', label: '存货跌价准备-计提标准' },
+      { key: 'impairment_pct', label: '存货跌价准备-比例(%)', format: 'percent' },
+      { key: 'net_value', label: '账面价值', format: 'amount' },
+    ],
+    开发成本: [
+      { key: 'project_name', label: '项目名称', is_label: true },
+      { key: 'start_date', label: '开工时间' },
+      { key: 'expected_complete_date', label: '预计竣工时间' },
+      { key: 'estimated_investment', label: '预计总投资', format: 'amount' },
+      { key: 'end_balance', label: '期末数', format: 'amount' },
+      { key: 'prior_balance', label: '上年年末数', format: 'amount' },
+      { key: 'end_impairment', label: '期末跌价准备', format: 'amount' },
+    ],
+    开发产品: [
+      { key: 'project_name', label: '项目名称', is_label: true },
+      { key: 'complete_date', label: '竣工时间' },
+      { key: 'opening', label: '期初余额', format: 'amount' },
+      { key: 'increase', label: '本期增加', format: 'amount' },
+      { key: 'decrease', label: '本期减少', format: 'amount' },
+      { key: 'ending', label: '期末余额', format: 'amount' },
+      { key: 'end_impairment', label: '期末跌价准备', format: 'amount' },
+    ],
+    周转房: [
+      { key: 'project_name', label: '项目名称', is_label: true },
+      { key: 'opening', label: '期初余额', format: 'amount' },
+      { key: 'increase', label: '本期增加', format: 'amount' },
+      { key: 'decrease', label: '本期减少', format: 'amount' },
+      { key: 'ending', label: '期末余额', format: 'amount' },
+    ],
+  }
+}
+
+export function buildF2SoeColumns(): Record<string, ColumnDef[]> {
+  return {
+    存货分类: [
+      { key: 'label', label: '项目', is_label: true },
+      { key: 'end_gross', label: '期末账面余额', format: 'amount' },
+      { key: 'end_impairment', label: '期末跌价准备/合同履约成本减值准备', format: 'amount' },
+      { key: 'end_net', label: '期末账面价值', format: 'amount' },
+      { key: 'prior_gross', label: '期初账面余额', format: 'amount' },
+      { key: 'prior_impairment', label: '期初跌价准备/合同履约成本减值准备', format: 'amount' },
+      { key: 'prior_net', label: '期初账面价值', format: 'amount' },
+    ],
+    存货跌价准备及合同履约成本减值准备: [
+      { key: 'label', label: '存货种类', is_label: true },
+      { key: 'opening', label: '期初数', format: 'amount' },
+      { key: 'increase_provision', label: '本期增加-计提', format: 'amount' },
+      { key: 'increase_other', label: '本期增加-其他', format: 'amount' },
+      { key: 'decrease_reversal', label: '本期减少-转回', format: 'amount' },
+      { key: 'decrease_writeoff', label: '本期减少-转销', format: 'amount' },
+      { key: 'decrease_other', label: '本期减少-其他', format: 'amount' },
+      { key: 'ending', label: '期末数', format: 'amount' },
+    ],
+  }
 }
 
 export interface F2ListedSyncSnapshot {
@@ -331,5 +433,6 @@ export function buildF2SyncPayload(
     section_id: target.sectionId,
     current_standard: resolveF2CurrentStandard(variant, applicableStandards),
     sub_table_data: subTableData,
+    columns: variant === 'listed' ? buildF2ListedColumns() : buildF2SoeColumns(),
   }
 }

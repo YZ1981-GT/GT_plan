@@ -1,31 +1,15 @@
 /**
  * useI3CrossSheet — I3 商誉跨Sheet联动 computed 引擎
  *
- * 通过 allResponses Map 实现跨 sheet 数据流（纯 computed 响应式链，不走 API）。
- * 数据读取模式：allResponses.get('I3-{sheet}-{field}')?.remark 存 JSON/数值。
- *
- * 跨Sheet映射（数据流图）：
- * - I3-2 明细表 → 按CGU聚合 → I3-1 审定表（商誉原值/减值/净额小计）
- * - I3-3 调整分录 → AJE/RJE → I3-1 审定表
- * - I3-6 减值测试 → 按CGU减值金额 → I3-1 审定表"本期减少(减值)"
- * - I3-7 DCF测试 → 可收回金额 → I3-6 减值测试
- * - I3-8 复核过程 → 公司测试评价 → I3-6 辅助判断
- * - I3-4 入账测算 → 初始确认 → I3-2 明细表
- * - I3-1 审定表 → 审定数回写 → TB 1711
- * - I3-1 + I3-6 → 附注披露（审定数 + 减值明细）
- *
- * 科目方向：
- * - 1711 商誉（借方/资产类）：期末=期初+借-贷
- * - 商誉不摊销！仅年度减值测试（期末=期初+新并购-减值）
- * - 商誉减值不可转回
- *
- * Spec: .kiro/specs/i3-goodwill/
- * Task: 3.2
- * Requirements: 2.1-2.8, 3.3, 5.1-5.5, 9.2-9.3, 10.1-10.2
+ * 数据流：
+ * - I3-2 明细 → I3-1 审定小计（原值/减值/净值；兼容 costAudited 滚动字段）
+ * - I3-6 减值测试 → I3-1「本期减少(减值)」：使用 consolidatedGwImpairment（母公司份额）
+ * - I3-7 DCF → I3-6 可收回金额
+ * - I3-3 调整 → I3-1 AJE/RJE；按被投资单位拆分供 I3-2 回写
+ * - I3-4 入账测算 → 供 I3-2 勾稽
+ * - I3-6 按 CGU → 供 I3-2 本期计提回写
  */
 import { computed, type ComputedRef, type Ref } from 'vue'
-
-// ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface ChecklistItem {
   item_id: string
@@ -33,81 +17,102 @@ export interface ChecklistItem {
   remark: string | null
 }
 
-/** I3-2 明细行原始 JSON 结构（30列3区段） */
+/** I3-2 明细行（兼容旧字段 + 滚动字段） */
 export interface I3DetailRowRaw {
   rowId?: string
-  investee?: string             // 被投资单位名称
-  acquisitionDate?: string      // 并购日期
-  consideration?: number        // 对价
-
-  // 入账区段
-  mergerCost?: number           // 合并成本
-  netAssetFairValue?: number    // 可辨认净资产公允价值
-  goodwillOriginal?: number     // 商誉原值(=合并成本-净资产公允)
-
-  // 减值区段
-  accImpairmentBegin?: number   // 累计减值期初
-  currentImpairment?: number    // 本期减值
-  accImpairmentEnd?: number     // 累计减值期末
-  netValueEnd?: number          // 期末净额(=原值-累计减值)
-
-  // CGU分配
-  cguName?: string              // 所属资产组(CGU)名称
+  investee?: string
+  acquisitionDate?: string
+  consideration?: number
+  mergerCost?: number
+  netAssetFairValue?: number
+  goodwillOriginal?: number
+  costAudited?: number
+  accImpairmentBegin?: number
+  currentImpairment?: number
+  accImpairmentEnd?: number
+  impIncrease?: number
+  impAudited?: number
+  netValueEnd?: number
+  goodwillNetValue?: number
+  cguName?: string
+  costAje?: number
+  impAje?: number
+  costIncrease?: number
+  entryGoodwillCalc?: number
 }
 
-/** I3-3 调整分录行原始 JSON 结构 */
 export interface I3AdjustmentRowRaw {
   rowId?: string
-  description?: string          // 调整事项
-  entryType?: string            // AJE / RJE
-  accountCode?: string          // 科目代码
-  accountName?: string          // 科目名称
-  summary?: string              // 摘要
-  debitAmount?: number          // 借方
-  creditAmount?: number         // 贷方
-  indexRef?: string             // 索引
+  description?: string
+  category?: string
+  entryType?: string
+  reportItem?: string
+  accountCode?: string
+  accountName?: string
+  noteItem?: string
+  summary?: string
+  debitAmount?: number
+  creditAmount?: number
+  debit?: number
+  credit?: number
+  indexRef?: string
   remark?: string
+  /** 可选：匹配 I3-2 被投资单位 */
+  investee?: string
 }
 
-/** I3-6 减值测试行原始 JSON 结构（按CGU） */
 export interface I3ImpairmentTestRowRaw {
   rowId?: string
-  cguName?: string              // 资产组(CGU)名称
-  goodwillAmount?: number       // 包含商誉金额
-  cguBookValue?: number         // 资产组账面(含商誉)
-  recoverableAmount?: number    // 可收回金额(来自I3-7 DCF)
-  impairmentAmount?: number     // 减值金额 = MAX(账面-可收回, 0)
-  goodwillImpairment?: number   // 商誉分摊减值(先冲商誉)
-  otherAssetImpairment?: number // 其他资产分摊减值
+  cguName?: string
+  goodwillAmount?: number
+  goodwillB1?: number
+  minorityB2?: number
+  cguBookValue?: number
+  recoverableAmount?: number
+  impairmentAmount?: number
+  goodwillImpairment?: number
+  /** 合并报表确认（母公司份额）— 优先用于 I3-1 / I3-2 */
+  consolidatedGwImpairment?: number
+  otherAssetImpairment?: number
+  otherAllocations?: { name: string; amount: number }[]
 }
 
-/** I3-7 DCF可收回金额测试结果 */
 export interface I3RecoverableResultRaw {
   rowId?: string
-  cguName?: string              // 资产组(CGU)名称
-  fairValueLessDisposal?: number // 公允价值-处置费用
-  valueInUse?: number           // 使用价值(DCF)
-  recoverableAmount?: number    // 可收回金额=MAX(公允-处置, DCF)
+  cguName?: string
+  name?: string
+  fairValueLessDisposal?: number
+  fairValueLessCost?: number
+  valueInUse?: number
+  recoverableAmount?: number
 }
 
-/** I3-4 入账测算结果 */
+/** I3-7 → I3-6 可收回明细（公允净额 + 使用价值） */
+export interface I3RecoverableDetail {
+  fairValueLessDisposal?: number
+  valueInUse?: number
+  recoverableAmount: number
+}
+
 export interface I3InitialValueRowRaw {
   rowId?: string
-  investee?: string             // 被投资单位
-  mergerCost?: number           // 合并成本
-  netAssetFairValue?: number    // 可辨认净资产公允价值份额
-  goodwillAmount?: number       // 商誉=合并成本-净资产公允
+  investee?: string
+  projectName?: string
+  mergerCost?: number
+  netAssetFairValue?: number
+  netAssetFV?: number
+  equityRatio?: number
+  goodwillAmount?: number
+  bookedAmount?: number
+  sameControl?: string
 }
 
-// ─── Return Types ────────────────────────────────────────────────────────────
-
-/** I3-2 明细合计 → I3-1 审定表交叉验证 */
 export interface I3DetailTotals {
-  goodwillOriginalTotal: number   // 商誉原值合计
-  accImpairmentTotal: number      // 累计减值合计
-  netValueTotal: number           // 期末净额合计
-  currentImpairmentTotal: number  // 本期减值合计
-  byCgu: Record<string, {         // 按CGU聚合
+  goodwillOriginalTotal: number
+  accImpairmentTotal: number
+  netValueTotal: number
+  currentImpairmentTotal: number
+  byCgu: Record<string, {
     goodwillOriginal: number
     accImpairment: number
     netValue: number
@@ -115,33 +120,50 @@ export interface I3DetailTotals {
   }>
 }
 
-/** I3-6 减值测试结果 → I3-1 审定表 */
 export interface I3ImpairmentResult {
-  totalImpairment: number         // 本期减值总额（所有CGU）
+  totalImpairment: number
   byCgu: Record<string, {
-    impairmentAmount: number       // 减值金额
-    goodwillImpairment: number     // 商誉承担
-    otherImpairment: number        // 其他资产承担
-    recoverableAmount: number      // 可收回金额
+    impairmentAmount: number
+    goodwillImpairment: number
+    consolidatedGwImpairment: number
+    otherImpairment: number
+    recoverableAmount: number
   }>
 }
 
-/** I3-3 调整分录 → I3-1 审定表 AJE/RJE */
 export interface I3AdjustmentSync {
-  totalAje: number                // AJE调整净额
-  totalRje: number                // RJE重分类净额
+  totalAje: number
+  totalRje: number
+  /** 按被投资单位拆分的商誉科目 AJE 净额（借-贷），供 I3-2 costAje/impAje */
+  byInvestee: Record<string, { costAje: number; impAje: number; net: number }>
 }
 
-/** 附注披露自动取数 */
 export interface I3DisclosureData {
   [key: string]: number
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+export interface I3EntryVariance {
+  investee: string
+  entryCalc: number
+  costIncrease: number
+  costAudited: number
+  diffVsIncrease: number
+  diffVsAudited: number
+}
 
-/**
- * 安全解析 JSON 数组字符串，失败回退空数组
- */
+/** I3-3 与 I3-2 账项调整列差异 */
+export interface I3AjeVariance {
+  investee: string
+  detailCostAje: number
+  detailImpAje: number
+  adjCostAje: number
+  adjImpAje: number
+  costDiff: number
+  impDiff: number
+  /** I3-3 有金额但 I3-2 无该被投资单位行 */
+  missingOnDetail: boolean
+}
+
 function safeParseRows<T>(jsonStr: string | null | undefined): T[] {
   if (!jsonStr) return []
   try {
@@ -152,16 +174,76 @@ function safeParseRows<T>(jsonStr: string | null | undefined): T[] {
   }
 }
 
-/**
- * 安全提取数值，NaN/null/undefined → 0
- */
 function _getNum(val: any): number {
   if (val == null) return 0
   const n = Number(val)
   return Number.isFinite(n) ? n : 0
 }
 
-// ─── Composable ──────────────────────────────────────────────────────────────
+function _normName(s: string | undefined | null): string {
+  return String(s || '').trim()
+}
+
+/**
+ * 解析分录说明中的被投资单位：优先 investee 字段，否则从 description 匹配已知名称 / CGU
+ */
+export function resolveAdjustmentInvestee(
+  row: I3AdjustmentRowRaw,
+  knownInvestees: string[],
+  cguToInvestees?: Record<string, string[]>,
+): string {
+  if (row.investee && _normName(row.investee)) return _normName(row.investee)
+  const text = `${row.description || ''} ${row.summary || ''} ${row.remark || ''}`
+  for (const name of knownInvestees) {
+    if (name && text.includes(name)) return name
+  }
+  // 计提商誉减值-CGU名 → 若该 CGU 仅对应一家被投资单位则自动解析
+  const m = text.match(/商誉减值[-—:：\s]*([^\s,，；;]+)/)
+    || text.match(/商誉[-—:：\s]*([^\s,，；;]+)/)
+  if (m) {
+    const token = m[1].trim()
+    if (cguToInvestees?.[token]?.length === 1) return cguToInvestees[token][0]
+    if (knownInvestees.includes(token)) return token
+    return token
+  }
+  return ''
+}
+
+/** 从 I3-3 分录汇总商誉科目 AJE（供回写 I3-2） */
+export function aggregateGoodwillAjeByInvestee(
+  rows: I3AdjustmentRowRaw[],
+  knownInvestees: string[],
+  cguToInvestees?: Record<string, string[]>,
+): I3AdjustmentSync {
+  let totalAje = 0
+  let totalRje = 0
+  const byInvestee: I3AdjustmentSync['byInvestee'] = {}
+
+  for (const row of rows) {
+    const debit = _getNum(row.debitAmount ?? row.debit)
+    const credit = _getNum(row.creditAmount ?? row.credit)
+    const netAmount = debit - credit
+    const et = row.entryType || (row.category === '报表调整' ? 'RJE' : 'AJE')
+    const code = String(row.accountCode || '')
+    const name = String(row.accountName || '')
+    const isGoodwill = code.startsWith('1711') || name.includes('商誉')
+    if (!isGoodwill) continue
+
+    if (et === 'AJE') totalAje += netAmount
+    else if (et === 'RJE') totalRje += netAmount
+
+    const inv = resolveAdjustmentInvestee(row, knownInvestees, cguToInvestees) || '未指定'
+    if (!byInvestee[inv]) byInvestee[inv] = { costAje: 0, impAje: 0, net: 0 }
+    byInvestee[inv].net += netAmount
+    if (netAmount >= 0) {
+      byInvestee[inv].costAje += netAmount
+    } else {
+      byInvestee[inv].impAje += Math.abs(netAmount)
+    }
+  }
+
+  return { totalAje, totalRje, byInvestee }
+}
 
 export function useI3CrossSheet(allResponses: Ref<Map<string, any>>): {
   detailTotals: ComputedRef<I3DetailTotals>
@@ -169,75 +251,74 @@ export function useI3CrossSheet(allResponses: Ref<Map<string, any>>): {
   adjustmentSync: ComputedRef<I3AdjustmentSync>
   disclosureAutoFill: ComputedRef<I3DisclosureData>
   recoverableByCgu: ComputedRef<Record<string, number>>
+  recoverableDetailByCgu: ComputedRef<Record<string, I3RecoverableDetail>>
   initialValueRows: ComputedRef<I3InitialValueRowRaw[]>
+  impairmentByCgu: ComputedRef<Record<string, number>>
+  cguNameOptions: ComputedRef<string[]>
+  entryVariances: ComputedRef<I3EntryVariance[]>
+  ajeVariances: ComputedRef<I3AjeVariance[]>
+  detailRows: ComputedRef<I3DetailRowRaw[]>
 } {
-  // ─── 解析 I3-2 明细行数据 ──────────────────────────────────────────────
-
   const detailRows = computed<I3DetailRowRaw[]>(() => {
     const resp = allResponses.value.get('I3-2-rows')
     return safeParseRows<I3DetailRowRaw>(resp?.remark)
   })
-
-  // ─── 解析 I3-3 调整分录行数据 ──────────────────────────────────────────
 
   const adjustmentRows = computed<I3AdjustmentRowRaw[]>(() => {
     const resp = allResponses.value.get('I3-3-rows')
     return safeParseRows<I3AdjustmentRowRaw>(resp?.remark)
   })
 
-  // ─── 解析 I3-6 减值测试行数据 ──────────────────────────────────────────
-
   const impairmentTestRows = computed<I3ImpairmentTestRowRaw[]>(() => {
     const resp = allResponses.value.get('I3-6-rows')
     return safeParseRows<I3ImpairmentTestRowRaw>(resp?.remark)
   })
-
-  // ─── 解析 I3-7 DCF可收回金额结果 ──────────────────────────────────────
 
   const recoverableRows = computed<I3RecoverableResultRaw[]>(() => {
     const resp = allResponses.value.get('I3-7-rows')
     return safeParseRows<I3RecoverableResultRaw>(resp?.remark)
   })
 
-  // ─── 解析 I3-4 入账测算行数据 ──────────────────────────────────────────
-
   const initialValueRows = computed<I3InitialValueRowRaw[]>(() => {
     const resp = allResponses.value.get('I3-4-rows')
     return safeParseRows<I3InitialValueRowRaw>(resp?.remark)
   })
 
-  // ═══ aggregateDetailTotals: I3-2 明细 → 按CGU聚合 → I3-1 审定（Req 3.3）══
+  const knownInvestees = computed(() =>
+    detailRows.value.map(r => _normName(r.investee)).filter(Boolean),
+  )
 
-  /**
-   * 从 I3-2 明细行聚合商誉合计+按CGU分组：
-   * - goodwillOriginalTotal: 所有行商誉原值合计
-   * - accImpairmentTotal: 所有行累计减值合计
-   * - netValueTotal: 所有行期末净额合计
-   * - currentImpairmentTotal: 所有行本期减值合计
-   * - byCgu: 按CGU名称分组聚合
-   *
-   * 用于与 I3-1 审定表小计交叉验证。
-   * 商誉特殊：无摊销项，净额=原值-累计减值。
-   */
+  const cguToInvestees = computed(() => {
+    const map: Record<string, string[]> = {}
+    for (const r of detailRows.value) {
+      const cgu = _normName(r.cguName)
+      const inv = _normName(r.investee)
+      if (!cgu || !inv) continue
+      if (!map[cgu]) map[cgu] = []
+      if (!map[cgu].includes(inv)) map[cgu].push(inv)
+    }
+    return map
+  })
+
   const detailTotals: ComputedRef<I3DetailTotals> = computed(() => {
     let goodwillOriginalTotal = 0
     let accImpairmentTotal = 0
     let netValueTotal = 0
     let currentImpairmentTotal = 0
-    const byCgu: Record<string, { goodwillOriginal: number; accImpairment: number; netValue: number; currentImpairment: number }> = {}
+    const byCgu: I3DetailTotals['byCgu'] = {}
 
     for (const row of detailRows.value) {
-      const original = _getNum(row.goodwillOriginal)
-      const accImp = _getNum(row.accImpairmentEnd)
-      const netVal = _getNum(row.netValueEnd)
-      const curImp = _getNum(row.currentImpairment)
+      const original = _getNum(row.costAudited ?? row.goodwillOriginal)
+      const accImp = _getNum(row.impAudited ?? row.accImpairmentEnd ?? (row as any).accImpairment)
+      const netRaw = row.goodwillNetValue ?? row.netValueEnd
+      const netVal = netRaw != null && netRaw !== '' ? _getNum(netRaw) : (original - accImp)
+      const curImp = _getNum(row.impIncrease ?? row.currentImpairment)
 
       goodwillOriginalTotal += original
       accImpairmentTotal += accImp
       netValueTotal += netVal
       currentImpairmentTotal += curImp
 
-      // 按CGU聚合
       const cgu = row.cguName || '未分配CGU'
       if (!byCgu[cgu]) {
         byCgu[cgu] = { goodwillOriginal: 0, accImpairment: 0, netValue: 0, currentImpairment: 0 }
@@ -251,35 +332,30 @@ export function useI3CrossSheet(allResponses: Ref<Map<string, any>>): {
     return { goodwillOriginalTotal, accImpairmentTotal, netValueTotal, currentImpairmentTotal, byCgu }
   })
 
-  // ═══ getImpairmentFromTest: I3-6/I3-7 → I3-1 减值列（Req 5.1-5.5）════
-
-  /**
-   * 从 I3-6 减值测试结果聚合本期减值金额（按CGU），供 I3-1 审定表"本期减少(减值)"列：
-   * - totalImpairment: 所有CGU本期减值总额
-   * - byCgu: 每个CGU的减值详情（减值金额/商誉承担/其他资产承担/可收回金额）
-   *
-   * 联动关系：
-   * - I3-7 DCF结果 → I3-6 可收回金额列
-   * - I3-6 减值金额 = MAX(资产组账面 - 可收回金额, 0)
-   * - I3-6 分摊规则：先冲商誉（至零为止），剩余按比例分摊
-   * - I3-6 减值总额 → I3-1 "本期减少(减值)"列
-   */
   const impairmentResult: ComputedRef<I3ImpairmentResult> = computed(() => {
     let totalImpairment = 0
-    const byCgu: Record<string, { impairmentAmount: number; goodwillImpairment: number; otherImpairment: number; recoverableAmount: number }> = {}
+    const byCgu: I3ImpairmentResult['byCgu'] = {}
 
     for (const row of impairmentTestRows.value) {
       const cgu = row.cguName || '未命名CGU'
       const impairment = _getNum(row.impairmentAmount)
       const gwImpairment = _getNum(row.goodwillImpairment)
-      const otherImpairment = _getNum(row.otherAssetImpairment)
+      // 优先合并确认；无 B2 时与全额商誉分摊相等
+      const consol = row.consolidatedGwImpairment != null
+        ? _getNum(row.consolidatedGwImpairment)
+        : gwImpairment
+      const otherFromAlloc = Array.isArray(row.otherAllocations)
+        ? row.otherAllocations.reduce((s, a) => s + _getNum(a.amount), 0)
+        : 0
+      const otherImpairment = _getNum(row.otherAssetImpairment) || otherFromAlloc
       const recoverable = _getNum(row.recoverableAmount)
 
-      totalImpairment += gwImpairment  // 商誉承担的减值才流入I3-1
+      totalImpairment += consol
 
       byCgu[cgu] = {
         impairmentAmount: impairment,
         goodwillImpairment: gwImpairment,
+        consolidatedGwImpairment: consol,
         otherImpairment,
         recoverableAmount: recoverable,
       }
@@ -288,94 +364,147 @@ export function useI3CrossSheet(allResponses: Ref<Map<string, any>>): {
     return { totalImpairment, byCgu }
   })
 
-  // ═══ recoverableByCgu: I3-7 DCF → I3-6 可收回金额（Req 6.4）══════════
-
-  /**
-   * 从 I3-7 可收回金额测试结果按CGU映射，供 I3-6 减值测试"可收回金额"列读取：
-   * { 'CGU-A': 12000000, 'CGU-B': 8500000, ... }
-   *
-   * I3-7 每行的 recoverableAmount = MAX(公允价值-处置费用, DCF使用价值)
-   */
-  const recoverableByCgu: ComputedRef<Record<string, number>> = computed(() => {
-    const result: Record<string, number> = {}
-
-    for (const row of recoverableRows.value) {
-      const cgu = row.cguName || '未命名CGU'
-      result[cgu] = _getNum(row.recoverableAmount)
+  /** I3-6 → I3-2：按 CGU 的合并确认商誉减值 */
+  const impairmentByCgu: ComputedRef<Record<string, number>> = computed(() => {
+    const map: Record<string, number> = {}
+    for (const [cgu, v] of Object.entries(impairmentResult.value.byCgu)) {
+      map[cgu] = v.consolidatedGwImpairment
     }
+    return map
+  })
 
+  const recoverableDetailByCgu: ComputedRef<Record<string, I3RecoverableDetail>> = computed(() => {
+    const result: Record<string, I3RecoverableDetail> = {}
+    for (const row of recoverableRows.value) {
+      const cgu = row.cguName || row.name || '未命名CGU'
+      const fv = _getNum(row.fairValueLessDisposal ?? row.fairValueLessCost)
+      const viu = _getNum(row.valueInUse)
+      const rec = _getNum(row.recoverableAmount) || Math.max(fv, viu)
+      result[cgu] = {
+        fairValueLessDisposal: fv,
+        valueInUse: viu,
+        recoverableAmount: rec,
+      }
+    }
     return result
   })
 
-  // ═══ getAjeRjeFromAdjustment: I3-3 → I3-1 AJE/RJE（Req 10.1-10.2）════
-
-  /**
-   * 从 I3-3 调整分录汇总 AJE/RJE 合计金额，同步到 I3-1 审定表对应列：
-   * - totalAje: 所有类型=AJE分录的净额（借方-贷方）之和
-   * - totalRje: 所有类型=RJE分录的净额之和
-   *
-   * 科目方向（1711商誉为借方/资产类）：
-   * - 借方增加 → 净额正数 → 审定数增加
-   * - 贷方减少(减值) → 净额负数 → 审定数减少
-   */
-  const adjustmentSync: ComputedRef<I3AdjustmentSync> = computed(() => {
-    let totalAje = 0
-    let totalRje = 0
-
-    for (const row of adjustmentRows.value) {
-      const debit = _getNum(row.debitAmount)
-      const credit = _getNum(row.creditAmount)
-      // 资产类借方科目：净额 = 借方 - 贷方
-      const netAmount = debit - credit
-
-      if (row.entryType === 'AJE') {
-        totalAje += netAmount
-      } else if (row.entryType === 'RJE') {
-        totalRje += netAmount
-      }
+  const recoverableByCgu: ComputedRef<Record<string, number>> = computed(() => {
+    const result: Record<string, number> = {}
+    for (const [cgu, d] of Object.entries(recoverableDetailByCgu.value)) {
+      result[cgu] = d.recoverableAmount
     }
-
-    return { totalAje, totalRje }
+    return result
   })
 
-  // ═══ publishAuditedToDisclosure: I3-1 + I3-6 → 附注（Req 9.2-9.3）════
+  const cguNameOptions: ComputedRef<string[]> = computed(() => {
+    const set = new Set<string>()
+    for (const r of detailRows.value) {
+      if (_normName(r.cguName)) set.add(_normName(r.cguName))
+    }
+    for (const r of impairmentTestRows.value) {
+      if (_normName(r.cguName)) set.add(_normName(r.cguName))
+    }
+    for (const r of recoverableRows.value) {
+      const n = _normName(r.cguName || r.name)
+      if (n) set.add(n)
+    }
+    return [...set].sort()
+  })
 
-  /**
-   * 附注披露自动取数，从多个 sheet 聚合数据供附注上市/国企引用：
-   *
-   * 第(1)子节 — 商誉账面价值（从I3-2明细聚合）：
-   * - disc_goodwill_original: 商誉原值合计
-   * - disc_goodwill_impairment: 累计减值合计
-   * - disc_goodwill_net: 净额合计（原值-累计减值，无摊销！）
-   * - disc_goodwill_current_impairment: 本期减值合计
-   *
-   * 第(2)子节 — 减值测试明细（从I3-6按CGU）：
-   * - disc_cgu_count: 资产组(CGU)数量
-   * - disc_total_impairment: 本期商誉减值总额
-   * - disc_total_recoverable: 所有CGU可收回金额合计
-   * - disc_total_book_value: 所有CGU资产组账面合计
-   *
-   * 第(3)子节 — 调整分录影响：
-   * - disc_aje_amount: AJE调整净额
-   * - disc_rje_amount: RJE重分类净额
-   *
-   * 第(4)子节 — 投资统计（从I3-2明细）：
-   * - disc_investee_count: 被投资单位数量
-   */
+  const adjustmentSync: ComputedRef<I3AdjustmentSync> = computed(() =>
+    aggregateGoodwillAjeByInvestee(
+      adjustmentRows.value,
+      knownInvestees.value,
+      cguToInvestees.value,
+    ),
+  )
+
+  const entryVariances: ComputedRef<I3EntryVariance[]> = computed(() => {
+    const list: I3EntryVariance[] = []
+    const i4ByName = new Map<string, I3InitialValueRowRaw>()
+    for (const r of initialValueRows.value) {
+      const key = _normName(r.investee || r.projectName)
+      if (key) i4ByName.set(key, r)
+    }
+
+    for (const row of detailRows.value) {
+      const inv = _normName(row.investee)
+      if (!inv) continue
+      const i4 = i4ByName.get(inv)
+      const entryCalc = i4
+        ? _getNum(i4.goodwillAmount)
+        : _getNum(row.entryGoodwillCalc)
+      if (entryCalc === 0 && !i4) continue
+      const costIncrease = _getNum(row.costIncrease)
+      const costAudited = _getNum(row.costAudited ?? row.goodwillOriginal)
+      list.push({
+        investee: inv,
+        entryCalc,
+        costIncrease,
+        costAudited,
+        diffVsIncrease: entryCalc - costIncrease,
+        diffVsAudited: entryCalc - costAudited,
+      })
+    }
+    return list
+  })
+
+  /** I3-2 明细账项调整列 vs I3-3 商誉科目汇总 */
+  const ajeVariances: ComputedRef<I3AjeVariance[]> = computed(() => {
+    const list: I3AjeVariance[] = []
+    const detailByInv = new Map<string, I3DetailRowRaw>()
+    for (const row of detailRows.value) {
+      const inv = _normName(row.investee)
+      if (inv) detailByInv.set(inv, row)
+    }
+    for (const [inv, src] of Object.entries(adjustmentSync.value.byInvestee)) {
+      if (inv === '未指定') {
+        if (Math.abs(src.costAje) > 0.01 || Math.abs(src.impAje) > 0.01) {
+          list.push({
+            investee: '未指定',
+            detailCostAje: 0,
+            detailImpAje: 0,
+            adjCostAje: src.costAje,
+            adjImpAje: src.impAje,
+            costDiff: src.costAje,
+            impDiff: src.impAje,
+            missingOnDetail: true,
+          })
+        }
+        continue
+      }
+      const detail = detailByInv.get(inv)
+      const dCost = detail ? _getNum(detail.costAje) : 0
+      const dImp = detail ? _getNum(detail.impAje) : 0
+      const costDiff = src.costAje - dCost
+      const impDiff = src.impAje - dImp
+      if (!detail || Math.abs(costDiff) > 0.01 || Math.abs(impDiff) > 0.01) {
+        list.push({
+          investee: inv,
+          detailCostAje: dCost,
+          detailImpAje: dImp,
+          adjCostAje: src.costAje,
+          adjImpAje: src.impAje,
+          costDiff,
+          impDiff,
+          missingOnDetail: !detail,
+        })
+      }
+    }
+    return list
+  })
+
   const disclosureAutoFill: ComputedRef<I3DisclosureData> = computed(() => {
     const result: I3DisclosureData = {}
-
-    // ─ 第(1)子节：从 I3-2 明细聚合商誉账面价值
     const totals = detailTotals.value
     result['disc_goodwill_original'] = totals.goodwillOriginalTotal
     result['disc_goodwill_impairment'] = totals.accImpairmentTotal
     result['disc_goodwill_net'] = totals.netValueTotal
     result['disc_goodwill_current_impairment'] = totals.currentImpairmentTotal
 
-    // ─ 第(2)子节：从 I3-6 减值测试按CGU聚合
     const impResult = impairmentResult.value
-    const cguNames = Object.keys(impResult.byCgu)
-    result['disc_cgu_count'] = cguNames.length
+    result['disc_cgu_count'] = Object.keys(impResult.byCgu).length
     result['disc_total_impairment'] = impResult.totalImpairment
 
     let totalRecoverable = 0
@@ -387,32 +516,27 @@ export function useI3CrossSheet(allResponses: Ref<Map<string, any>>): {
     result['disc_total_recoverable'] = totalRecoverable
     result['disc_total_book_value'] = totalBookValue
 
-    // ─ 第(3)子节：调整分录影响
     const adjSync = adjustmentSync.value
     result['disc_aje_amount'] = adjSync.totalAje
     result['disc_rje_amount'] = adjSync.totalRje
-
-    // ─ 第(4)子节：投资统计
     result['disc_investee_count'] = detailRows.value.length
 
     return result
   })
 
-  // ─── Return ────────────────────────────────────────────────────────────────
-
   return {
-    // I3-2 → I3-1 明细按CGU聚合（商誉原值/减值/净额）
     detailTotals,
-    // I3-6/I3-7 → I3-1 减值结果（先冲商誉再分摊）
     impairmentResult,
-    // I3-3 → I3-1 AJE/RJE同步
     adjustmentSync,
-    // I3-1 + I3-6 → 附注自动取数
     disclosureAutoFill,
-    // I3-7 → I3-6 可收回金额按CGU映射
     recoverableByCgu,
-    // I3-4 入账测算行（供I3-2初始确认引用）
+    recoverableDetailByCgu,
     initialValueRows,
+    impairmentByCgu,
+    cguNameOptions,
+    entryVariances,
+    ajeVariances,
+    detailRows,
   }
 }
 

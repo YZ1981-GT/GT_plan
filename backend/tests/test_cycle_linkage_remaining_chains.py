@@ -313,84 +313,51 @@ class TestOnB50Saved:
         assert _get_b50_handler() is not None
 
     @pytest.mark.asyncio
-    async def test_b50_writes_risk_assessment(
-        self, monkeypatch, cap_session, cap_svc, sample_project_id
-    ):
-        """B50-3 保存 → 每条带 cycle_code 的风险写入 risk_assessment scope."""
+    async def test_b50_invalidates_auto_cache(self, sample_project_id):
+        """B50 保存（wp_code='B50'）→ 失效本项目 auto_data 缓存，使 D~N 立即反映。
+
+        新架构：认定层次风险单一真源是 checklist_responses（B50-T3-*），下游经
+        b50_risk_reader 直接读取，此 handler 仅负责失效 auto_data 缓存。
+        """
         handler = _get_b50_handler()
         assert handler is not None
 
-        @asynccontextmanager
-        async def _fake_factory(*a, **k):
-            yield cap_session
+        from app.services import procedure_table_auto_service as pts
 
-        # B50 handler 在 event_handlers 模块命名空间引用 async_session_factory（模块级）。
-        # invalidate_auto_cache 是 register_event_handlers() 内局部 import，无法 monkeypatch，
-        # 真实函数仅清进程内缓存（无 DB 副作用），直接让其真实执行。
-        monkeypatch.setattr(
-            "app.services.event_handlers.async_session_factory", _fake_factory
-        )
-        monkeypatch.setattr(
-            "app.services.field_override_service.FieldOverrideService",
-            lambda session: cap_svc,
-        )
+        # 预置一条本项目缓存
+        pts._set_cached(sample_project_id, 2025, "risk_for_cycle", {"summary": "旧值"})
+        assert pts._get_cached(sample_project_id, 2025, "risk_for_cycle") is not None
 
         payload = EventPayload(
             event_type=EventType.WORKPAPER_SAVED,
             project_id=sample_project_id,
             year=2025,
-            extra={
-                "wp_code": "B50-3",
-                "parsed_data": {
-                    "rows": [
-                        {"risk_id": "R1", "cycle_code": "D", "description": "收入舞弊",
-                         "assertion": "发生", "risk_level": "高", "is_special_risk": True},
-                    ]
-                },
-            },
+            extra={"wp_code": "B50", "trigger": "checklist_response_save"},
         )
         await handler(payload)
 
-        # 1 行 × 5 字段(cycle_code/description/assertion/risk_level/is_special_risk)
-        assert len(cap_svc.calls) == 5
-        assert all(c["scope"] == "risk_assessment" for c in cap_svc.calls)
-        assert all(c["item_key"] == "R1" for c in cap_svc.calls)
-        fields = {c["field"]: c["value"] for c in cap_svc.calls}
-        assert fields["cycle_code"] == "D"
-        assert fields["risk_level"] == "高"
-        assert cap_session.committed is True
+        # 缓存已失效
+        assert pts._get_cached(sample_project_id, 2025, "risk_for_cycle") is None
 
     @pytest.mark.asyncio
-    async def test_b50_row_without_cycle_code_skipped(
-        self, monkeypatch, cap_session, cap_svc, sample_project_id
-    ):
-        """无 cycle_code 的行被跳过（不写入）."""
+    async def test_b50_ignores_other_wp_code(self, sample_project_id):
+        """非 B50 的 WORKPAPER_SAVED（如 B50-3 旧编码/其它底稿）→ 不失效缓存（no-op）."""
         handler = _get_b50_handler()
         assert handler is not None
 
-        @asynccontextmanager
-        async def _fake_factory(*a, **k):
-            yield cap_session
+        from app.services import procedure_table_auto_service as pts
 
-        monkeypatch.setattr(
-            "app.services.event_handlers.async_session_factory", _fake_factory
-        )
-        monkeypatch.setattr(
-            "app.services.field_override_service.FieldOverrideService",
-            lambda session: cap_svc,
-        )
+        pts._set_cached(sample_project_id, 2025, "risk_for_cycle", {"summary": "保留"})
 
         payload = EventPayload(
             event_type=EventType.WORKPAPER_SAVED,
             project_id=sample_project_id,
             year=2025,
-            extra={
-                "wp_code": "B50-3",
-                "parsed_data": {"rows": [{"risk_id": "R1", "description": "无循环"}]},
-            },
+            extra={"wp_code": "B50-3"},
         )
         await handler(payload)
 
-        assert len(cap_svc.calls) == 0
-        # 无有效行仍会 commit（空提交），但不报错
-        assert cap_session.rolled_back is False
+        # 非 B50 → 缓存保留
+        assert pts._get_cached(sample_project_id, 2025, "risk_for_cycle") is not None
+        # 清理
+        pts.invalidate_auto_cache(sample_project_id, 2025)

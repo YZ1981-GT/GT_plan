@@ -14,6 +14,22 @@
     <div class="section-header">
       <h3>K5-4 产品质量保修检查表</h3>
       <div class="header-actions">
+        <el-button size="small" :disabled="isReadonly" @click="pullD4Revenue">
+          <el-icon><Download /></el-icon> 从D4带入收入
+        </el-button>
+        <el-button size="small" :disabled="isReadonly" @click="applyHistoryRateToCalc">
+          📊 带入历史保修率
+        </el-button>
+        <el-dropdown size="small" :disabled="isReadonly">
+          <el-button size="small">导入导出 <el-icon><ArrowDown /></el-icon></el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
+              <el-dropdown-item @click="handleImportData">导入数据</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-button size="small" type="primary" plain @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI结论
         </el-button>
@@ -202,6 +218,12 @@
         <el-table-column label="1年以上" width="130" align="right">
           <template #default="{ row }"><el-input-number v-model="row.over1Year" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="hnum" @change="(v: number) => updateTimingCell(row.rowId, 'over1Year', v)" /></template>
         </el-table-column>
+        <el-table-column label="校验" width="70" align="center">
+          <template #default="{ row }">
+            <el-icon v-if="row.endBalance > 0 && Math.abs(row.endBalance - (row.within1Year || 0) - (row.over1Year || 0)) > 0.01" color="#f56c6c"><WarningFilled /></el-icon>
+            <el-icon v-else-if="row.endBalance > 0" color="#67c23a"><CircleCheckFilled /></el-icon>
+          </template>
+        </el-table-column>
         <el-table-column v-if="!isReadonly" label="" width="46" align="center">
           <template #default="{ $index }"><el-button link type="danger" size="small" @click="removeTimingRow($index)"><el-icon><Delete /></el-icon></el-button></template>
         </el-table-column>
@@ -209,6 +231,62 @@
           <div class="table-total">合计　期末：{{ fmtNum(timingSubtotals.endBalance) }}　1年内：{{ fmtNum(timingSubtotals.within1Year) }}　1年上：{{ fmtNum(timingSubtotals.over1Year) }}</div>
         </template>
       </el-table>
+      <el-alert v-if="timingMismatchCount > 0" type="warning" :closable="false" show-icon style="margin-top:8px">
+        <template #title>{{ timingMismatchCount }} 行的"期末数 ≠ 1年内 + 1年上"，请检查划分</template>
+      </el-alert>
+    </el-card>
+
+    <!-- ═══（五）保修率异常预警 + 行业参考 ═══ -->
+    <el-card v-if="rateAnomalies.length > 0 || showIndustryRef" shadow="never" class="k5-section-card">
+      <template #header>
+        <div class="card-header-row">
+          <span class="card-title">（五）保修率合理性评价</span>
+          <el-button size="small" link @click="showIndustryRef = !showIndustryRef">
+            {{ showIndustryRef ? '收起参考' : '📊 行业参考' }}
+          </el-button>
+        </div>
+      </template>
+      <!-- 异常预警 -->
+      <div v-if="rateAnomalies.length > 0" class="rate-anomaly-list">
+        <div v-for="a in rateAnomalies" :key="a.product" class="anomaly-item">
+          <el-icon color="#e6a23c"><WarningFilled /></el-icon>
+          <span><b>{{ a.product }}</b>：本期保修率 {{ (a.currentRate * 100).toFixed(3) }}% {{ a.direction }}3年均值 {{ (a.avgRate * 100).toFixed(3) }}%（偏离{{ (a.deviation * 100).toFixed(1) }}%），应关注原因</span>
+        </div>
+      </div>
+      <!-- 行业参考 -->
+      <div v-if="showIndustryRef" class="industry-ref">
+        <div class="ir-title">常见行业产品保修率参考区间</div>
+        <el-table :data="industryRateRef" size="small" border style="width:100%;max-width:500px">
+          <el-table-column prop="industry" label="行业" width="140" />
+          <el-table-column prop="range" label="保修率参考区间" width="140" />
+          <el-table-column prop="note" label="备注" min-width="160" />
+        </el-table>
+        <div class="ir-note">以上为公开数据参考区间，具体应结合企业产品特点、保修政策和历史数据综合判断。</div>
+      </div>
+    </el-card>
+
+    <!-- ═══ 审计说明与结论 ═══ -->
+    <el-card shadow="never" class="k5-section-card">
+      <template #header>
+        <div class="card-header-row">
+          <span class="card-title">审计说明与结论</span>
+          <el-button size="small" type="primary" plain @click="handleAiGenerate">
+            <el-icon><MagicStick /></el-icon> AI
+          </el-button>
+        </div>
+      </template>
+      <div style="margin-bottom:10px">
+        <label style="font-size:12px;color:#909399;display:block;margin-bottom:4px">审计说明</label>
+        <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+          placeholder="概述产品质量保修检查情况：保修政策/历史保修率趋势/测算差异/差异处理/流动非流动划分合理性等"
+          @change="persistNote" />
+      </div>
+      <div>
+        <label style="font-size:12px;color:#909399;display:block;margin-bottom:4px">审计结论</label>
+        <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly"
+          placeholder="基于上述检查，对预计负债-产品质量保证的完整性、计量合理性和披露形成结论..."
+          @change="persistNote" />
+      </div>
     </el-card>
 
     <!-- ═══ 编制提示 ═══ -->
@@ -234,9 +312,11 @@
  * Spec: .kiro/specs/k5-provisions/ | Task: 4.4（源模板对齐增强）
  * Requirements: 6.1-6.4
  */
-import { toRef } from 'vue'
-import { Plus, Delete, MagicStick } from '@element-plus/icons-vue'
+import { ref, toRef, computed, onMounted } from 'vue'
+import { Plus, Delete, MagicStick, Download, ArrowDown, WarningFilled, CircleCheckFilled } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useK5Warranty } from '../../composables/useK5Warranty'
+import http from '@/utils/http'
 import type { Ref } from 'vue'
 
 const props = defineProps<{
@@ -284,10 +364,196 @@ function save(rowId: string, field: string, value: any) { updateCell(rowId, fiel
 function handleAddRow() { addRow() }
 function handleAiGenerate() { emit('save', 'K5-4-ai-trigger', { remark: 'warranty-conclusion' }) }
 
+/** 从(二)历史保修率表自动带入到(三)测算表的计提比例（仅填空值） */
+function applyHistoryRateToCalc(): void {
+  if (!historyRows.value.length) {
+    ElMessage.warning('请先填写(二)历史质量保修情况')
+    return
+  }
+  const avgRate = historySubtotals.value.avgRate
+  if (avgRate <= 0) {
+    ElMessage.warning('历史保修率为0，无法带入')
+    return
+  }
+  let filled = 0
+  for (const row of warrantyRows.value) {
+    if (!row.warrantyRate || row.warrantyRate === 0) {
+      updateCell(row.rowId, 'warrantyRate', avgRate)
+      filled++
+    }
+  }
+  if (filled > 0) {
+    ElMessage.success(`已将3年平均保修率 ${(avgRate * 100).toFixed(3)}% 填入 ${filled} 行（仅填空值）`)
+  } else {
+    ElMessage.info('所有行已有计提比例，未覆盖')
+  }
+}
+
+/** 从 D4 营业收入审定数带入计提基数（仅填空值不覆盖） */
+async function pullD4Revenue(): Promise<void> {
+  try {
+    // 经 custom-query 端点取 D4 收入审定数
+    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
+      params: { account_prefix: '6001' },
+      _silent: true,
+    } as any)
+    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
+    let totalRevenue = 0
+    for (const item of list) {
+      const code = String(item.standard_account_code ?? item.account_code ?? '')
+      if (code.startsWith('6001')) {
+        // 损益类取发生额：贷方-借方（收入正数）
+        const creditAmt = Number(item.credit_amount ?? 0)
+        const debitAmt = Number(item.debit_amount ?? 0)
+        totalRevenue += (creditAmt - debitAmt)
+      }
+    }
+    if (totalRevenue <= 0) {
+      // 回退取 audited_amount
+      totalRevenue = list
+        .filter((item: any) => String(item.standard_account_code ?? '').startsWith('6001'))
+        .reduce((s: number, item: any) => s + Math.abs(Number(item.audited_amount ?? 0)), 0)
+    }
+    if (totalRevenue <= 0) {
+      ElMessage.warning('未取到D4营业收入数据（科目6001）')
+      return
+    }
+    await ElMessageBox.confirm(
+      `D4 营业收入审定合计：${fmtNum(totalRevenue)} 元\n\n是否将此金额填入测算表各行"计提基数(收入)"字段？（仅填空值不覆盖）`,
+      '从D4带入收入',
+      { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }
+    )
+    // 填入到测算表各行（仅空值）
+    let filled = 0
+    for (const row of warrantyRows.value) {
+      if (!row.revenue || row.revenue === 0) {
+        updateCell(row.rowId, 'revenue', totalRevenue)
+        filled++
+      }
+    }
+    if (filled > 0) {
+      ElMessage.success(`已填入 ${filled} 行，收入 ${fmtNum(totalRevenue)} 元`)
+    } else {
+      ElMessage.info('所有行已有收入数据，未覆盖')
+    }
+  } catch (err: any) {
+    if (err !== 'cancel' && err?.toString() !== 'cancel') {
+      ElMessage.warning('从D4带入收入失败')
+    }
+  }
+}
+
 function fmtNum(v: number): string {
   if (!v && v !== 0) return '-'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+// ─── 保修率异常预警 ──────────────────────────────────────────────────────────
+
+interface RateAnomaly {
+  product: string
+  currentRate: number
+  avgRate: number
+  deviation: number
+  direction: string
+}
+
+const rateAnomalies = computed<RateAnomaly[]>(() => {
+  const anomalies: RateAnomaly[] = []
+  for (const row of historyRows.value) {
+    if (!row.currentRevenue || row.currentRevenue <= 0) continue
+    const currentRate = (row.currentActual || 0) / row.currentRevenue
+    const avgRate = row.avgRate || 0
+    if (avgRate <= 0) continue
+    const deviation = Math.abs(currentRate - avgRate) / avgRate
+    if (deviation > 0.5) { // 偏离50%以上
+      anomalies.push({
+        product: row.productName || '未命名',
+        currentRate,
+        avgRate,
+        deviation,
+        direction: currentRate > avgRate ? '高于' : '低于',
+      })
+    }
+  }
+  return anomalies
+})
+
+// ─── 行业保修率参考 ──────────────────────────────────────────────────────────
+
+const showIndustryRef = ref(false)
+
+const industryRateRef = [
+  { industry: '汽车制造', range: '1.0% - 3.0%', note: '含三包政策延保' },
+  { industry: '家用电器', range: '0.5% - 2.0%', note: '白色家电偏低/小家电偏高' },
+  { industry: '建筑施工', range: '2.0% - 5.0%', note: '质保期通常2-5年' },
+  { industry: '电子产品', range: '1.0% - 3.5%', note: '消费电子退换率较高' },
+  { industry: '机械设备', range: '0.5% - 2.5%', note: '大型设备质保期长' },
+  { industry: '医疗器械', range: '1.0% - 4.0%', note: '三类器械要求严格' },
+  { industry: '软件/IT', range: '0.2% - 1.0%', note: '主要为服务承诺' },
+]
+
+// ─── 预计发生时间校验 ────────────────────────────────────────────────────────
+
+const timingMismatchCount = computed(() => {
+  return timingRows.value.filter((r: any) =>
+    r.endBalance > 0 && Math.abs(r.endBalance - (r.within1Year || 0) - (r.over1Year || 0)) > 0.01
+  ).length
+})
+
+// ─── 审计说明与结论 ──────────────────────────────────────────────────────────
+
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function loadNote(): void {
+  const noteItem = props.allResponses.get('K5-4-audit-note')
+  if (noteItem?.remark) auditNote.value = noteItem.remark
+  const conclItem = props.allResponses.get('K5-4-audit-conclusion')
+  if (conclItem?.remark) auditConclusion.value = conclItem.remark
+}
+
+function persistNote(): void {
+  emit('save', 'K5-4-audit-note', { remark: auditNote.value })
+  emit('save', 'K5-4-audit-conclusion', { remark: auditConclusion.value })
+}
+
+// ─── 导入导出 ────────────────────────────────────────────────────────────────
+
+async function handleExportTemplate(): Promise<void> {
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/k5/export-template`, null, { params: { sheet: 'K5-4' }, responseType: 'blob', _silent: true } as any)
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'K5-4_产品质保_模板.xlsx'; a.click(); URL.revokeObjectURL(url)
+    ElMessage.success('模板已下载')
+  } catch { ElMessage.error('导出模板失败') }
+}
+
+async function handleExportData(): Promise<void> {
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/k5/export-data`, null, { params: { sheet: 'K5-4' }, responseType: 'blob', _silent: true } as any)
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'K5-4_产品质保_数据.xlsx'; a.click(); URL.revokeObjectURL(url)
+    ElMessage.success('数据已导出')
+  } catch { ElMessage.error('导出数据失败') }
+}
+
+async function handleImportData(): Promise<void> {
+  const input = document.createElement('input'); input.type = 'file'; input.accept = '.xlsx,.xls'
+  input.onchange = async () => {
+    const file = input.files?.[0]; if (!file) return
+    const formData = new FormData(); formData.append('file', file)
+    try {
+      const res = await http.post(`/api/workpapers/${props.wpId}/k5/import-data`, formData, { params: { sheet: 'K5-4' }, headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any)
+      ElMessage.success(`导入成功，共 ${res?.data?.imported_count ?? res?.data?.data?.rowCount ?? 0} 条`)
+    } catch (err: any) { ElMessage.error('导入失败：' + (err?.response?.data?.message || err?.response?.data?.detail || '文件格式错误')) }
+  }
+  input.click()
+}
+
+// ─── Lifecycle ───────────────────────────────────────────────────────────────
+
+onMounted(() => { loadNote() })
 </script>
 
 <style scoped>
@@ -312,4 +578,11 @@ function fmtNum(v: number): string {
 .k5-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .k5-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .k5-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
+/* 保修率异常 */
+.rate-anomaly-list { margin-bottom: 10px; }
+.anomaly-item { display: flex; align-items: flex-start; gap: 6px; padding: 4px 0; font-size: 12px; color: #78350f; line-height: 1.5; }
+/* 行业参考 */
+.industry-ref { margin-top: 10px; }
+.ir-title { font-weight: 600; font-size: 12px; color: #303133; margin-bottom: 6px; }
+.ir-note { margin-top: 6px; font-size: 11px; color: #909399; font-style: italic; }
 </style>

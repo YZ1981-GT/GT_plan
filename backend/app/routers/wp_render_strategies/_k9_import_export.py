@@ -117,7 +117,10 @@ _K9_SPECS: dict[str, dict[str, Any]] = {
         ],
     },
     "K9-3": {
-        "item_id": "K9-3-rows",
+        # item_id/storage_field 与前端 K9TabAdjustment 持久化严格一致（K9-3-adj-entries / remark），
+        # 否则 IE 导入写入孤儿键导致前端读不到（K11-3 同款修复）。
+        "item_id": "K9-3-adj-entries",
+        "storage_field": "remark",
         "title": "调整分录汇总K9-3（标准借贷平衡）",
         "headers": _K9_3_HEADERS,
         "field_keys": _K9_3_KEYS,

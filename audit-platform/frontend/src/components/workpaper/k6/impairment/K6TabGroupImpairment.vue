@@ -300,8 +300,28 @@
           </template>
           <template #default="{ row }">
             <el-tooltip content="= 账面价值 - 分摊减值" placement="top">
-              <span class="formula-cell">{{ fmtAmt(row.bookAfterImpairment) }}</span>
+              <span :class="['formula-cell', { 'below-floor-warning': row.belowFloor }]">{{ fmtAmt(row.bookAfterImpairment) }}</span>
             </el-tooltip>
+          </template>
+        </el-table-column>
+
+        <!-- 减值下限（CAS42：分摊后账面不得低于此） -->
+        <el-table-column label="减值下限" min-width="120" align="right">
+          <template #header>
+            <el-tooltip content="MAX(公允价值减出售费用净额, 使用价值, 0)；分摊后账面不得低于此下限" placement="top">
+              <span class="hint-header">减值下限</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly && !row.isGoodwill"
+              :model-value="row.impairmentFloor"
+              :controls="false"
+              size="small"
+              class="amt-input"
+              @change="(v: number | null) => updateCell(row.rowId, 'impairmentFloor', v ?? 0)"
+            />
+            <span v-else class="amt-cell">{{ row.isGoodwill ? '—' : fmtAmt(row.impairmentFloor) }}</span>
           </template>
         </el-table-column>
 
@@ -330,14 +350,35 @@
       <!-- 新增按钮 -->
       <div v-if="!isReadonly" class="add-row-bar">
         <el-button size="small" @click="addRow()">+ 新增</el-button>
+        <el-button size="small" type="success" plain @click="importFromK6_4">从K6-4估值表带入组内资产</el-button>
       </div>
     </el-card>
+
+    <!-- ═══ 分摊后下限校验告警 ═══ -->
+    <el-alert
+      v-if="floorViolations.length > 0"
+      type="error"
+      :closable="false"
+      show-icon
+      class="floor-alert"
+    >
+      <template #title>
+        ⚠ {{ floorViolations.length }} 项资产分摊后账面<strong>低于下限</strong>（CAS42：不应低于公允净额/使用价值/0中最高者）：
+        {{ floorViolations.map(v => v.assetName).join('、') }}
+      </template>
+    </el-alert>
 
     <!-- ═══ 审计结论 ═══ -->
     <el-card shadow="never" class="audit-note-card">
       <template #header>
         <div class="section-header">
           <span>审计说明与结论</span>
+          <div class="section-header-actions">
+            <el-button size="small" type="primary" plain :loading="aiLoading" @click="handleAiGenerate">
+              <el-icon><MagicStick /></el-icon> AI辅助
+            </el-button>
+            <el-button size="small" circle @click="openReview('K6-6-conclusion')">💬</el-button>
+          </div>
         </div>
       </template>
       <el-input
@@ -356,10 +397,12 @@
       <ul>
         <li>处置组减值分摊两步法：第一步抵减商誉（至零为止），第二步余额按比例分摊</li>
         <li>分摊比例 = 该非流动资产账面 / 组内全部非流动资产账面合计（不含商誉）</li>
-        <li>各资产减值后账面价值下限：MAX(公允净额, 使用价值, 0)</li>
-        <li>商誉减值不可转回</li>
-        <li>组整体减值金额可从K6-5联动取得，也可手工录入</li>
+        <li><strong>下限校验</strong>：各资产减值后账面价值 ≥ MAX(公允价值减出售费用净额, 使用价值, 0)；违反下限的行将红色高亮+顶部告警</li>
+        <li>商誉减值不可转回；非流动资产减值视CAS8规定可部分转回</li>
+        <li>组整体减值金额可从K6-5联动取得、从Part(一)测算联动、或手工录入</li>
         <li>"是否商誉"标记的资产参与第一步抵减，其余参与第二步按比例分摊</li>
+        <li>"从K6-4带入组内资产"：读取K6-4估值表处置组资产行，按名称去重填入分摊表</li>
+        <li>Part(一)↔Part(二)勾稽：Part(一)应计提减值合计 应= Part(二)已分摊合计</li>
       </ul>
     </details>
   </div>
@@ -375,9 +418,12 @@
  * Spec: .kiro/specs/k6-held-for-sale/ Task 4.5
  * Requirements: 6.1-6.4
  */
-import { computed, inject } from 'vue'
+import { ref, computed, inject, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
+import { MagicStick } from '@element-plus/icons-vue'
 import { useK6GroupImpairment } from '../../composables/useK6GroupImpairment'
+import { useK6ImportExport } from '../../composables/useK6ImportExport'
+import http from '@/utils/http'
 
 const props = defineProps<{
   wpId: string
@@ -442,6 +488,118 @@ function syncFromK6_5() {
 
 function handleGroupImpairmentChange(v: number | null) {
   setGroupImpairment(v ?? 0)
+}
+
+// ─── 导入导出 ────────────────────────────────────────────────────────────────
+
+const { exportTemplate, exportData, importData } = useK6ImportExport({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetCode: 'K6-6',
+})
+
+// ─── 分摊后下限校验（CAS42：分摊后账面 ≥ MAX(公允净额, 使用价值, 0)）────────
+
+const floorViolations = computed(() => {
+  // CAS42：非商誉资产分摊后账面 < 减值下限(公允净额/使用价值孰高) 即违规
+  return groupRows.value.filter(row => !row.isGoodwill && row.belowFloor)
+})
+
+// ─── 从K6-4估值表带入组内资产 ────────────────────────────────────────────────
+
+function importFromK6_4(): void {
+  const k6_4_item = props.allResponses.get('K6-4-valuation-rows')
+  const raw = k6_4_item?.remark ?? k6_4_item?.conclusion ?? (typeof k6_4_item === 'string' ? k6_4_item : null)
+  if (!raw) {
+    ElMessage.info('K6-4估值表暂无数据，请先编制K6-4初始确认检查表')
+    return
+  }
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      ElMessage.info('K6-4估值表暂无行数据')
+      return
+    }
+    // 按名称去重
+    const existingNames = new Set(groupRows.value.map(r => r.assetName))
+    const candidates = parsed.filter((r: any) => {
+      const name = r.itemName || r.assetName || ''
+      return name && !existingNames.has(name)
+    })
+    if (candidates.length === 0) {
+      ElMessage.info('K6-4中所有项目已在分摊表中')
+      return
+    }
+    // 带入：处置组名/资产名/账面/是否商誉(默认否)
+    let importCount = 0
+    for (const r of candidates) {
+      const name = r.itemName || r.assetName || ''
+      const newRow = {
+        rowId: `row-${Date.now()}-${importCount}`,
+        seqNo: groupRows.value.length + 1,
+        groupName: r.groupName || groupRows.value[0]?.groupName || '',
+        assetName: name,
+        isGoodwill: false,
+        bookValue: Number(r.bookValue) || 0,
+        allocationRatio: 0,
+        allocatedImpairment: 0,
+        bookAfterImpairment: 0,
+        conclusion: '',
+        remark: '从K6-4带入',
+      }
+      groupRows.value.push(newRow as any)
+      importCount++
+    }
+    // 重算分摊
+    groupRows.value.forEach((r, i) => { r.seqNo = i + 1 })
+    // 触发 composable recalcAll (通过 updateCell 任一行触发)
+    if (groupRows.value.length > 0) {
+      updateCell(groupRows.value[0].rowId, 'bookValue', groupRows.value[0].bookValue)
+    }
+    ElMessage.success(`已从K6-4带入 ${importCount} 项资产（按名称去重），分摊比例已重算`)
+  } catch {
+    ElMessage.error('K6-4数据解析失败')
+  }
+}
+
+// ─── AI辅助结论 ──────────────────────────────────────────────────────────────
+
+const aiLoading = ref(false)
+
+async function handleAiGenerate(): Promise<void> {
+  if (props.isReadonly || aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const summary = groupSummary.value
+    const context: Record<string, string> = {
+      '组整体减值金额': String(summary.groupImpairment),
+      '商誉账面': String(summary.goodwillBook),
+      '商誉抵减': String(summary.goodwillDeduction),
+      '余额分摊至非流动资产': String(summary.remainingAllocation),
+      '已分摊合计': String(allocatedTotal.value),
+      '组内资产数': String(groupRows.value.length),
+      '勾稽是否一致': reconciliation.value.isBalanced ? '一致' : `不一致(差异${reconciliation.value.diff})`,
+      '下限违反项数': String(floorViolations.value.length),
+      'Part一应计提减值合计': String(measurementSubtotals.value.impairmentProvision),
+      'Part一应补提合计': String(measurementSubtotals.value.additionalProvision),
+    }
+    const resp = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'k6-group-impairment-conclusion',
+      context,
+      prompt: '根据CAS42处置组减值分摊结果（先抵商誉→余额按比例），生成审计结论（包括：分摊计算是否准确、商誉抵减是否恰当、各资产分摊后账面是否超下限、Part一测算与Part二分摊是否勾稽一致）',
+      existingContent: auditConclusion.value,
+    })
+    const text = resp?.data?.content || resp?.data?.text || resp?.content || ''
+    if (text) {
+      auditConclusion.value = text
+      saveConclusion()
+      ElMessage.success('AI结论已生成')
+    }
+  } catch (e: any) {
+    ElMessage.error('AI生成失败: ' + (e?.message || '未知错误'))
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -563,6 +721,7 @@ function fmtPercent(val: number | null | undefined): string {
 
 /* 勾稽提示 */
 .reconciliation-alert { margin-bottom: 16px; }
+.floor-alert { margin-bottom: 16px; }
 
 /* 合计行 */
 .summary-row {
@@ -625,6 +784,13 @@ function fmtPercent(val: number | null | undefined): string {
 .impaired-amount {
   color: #dc2626;
   font-weight: 600;
+}
+.below-floor-warning {
+  color: #dc2626;
+  font-weight: 600;
+  background: #fef2f2;
+  padding: 1px 4px;
+  border-radius: 2px;
 }
 
 /* 新增按钮 */

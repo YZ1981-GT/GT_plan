@@ -13,6 +13,19 @@
     <div class="section-header">
       <h3>K9-2 管理费用明细表</h3>
       <div class="header-actions">
+        <el-popover v-if="activeTab === 'basic'" placement="bottom-end" :width="220" trigger="click">
+          <template #reference>
+            <el-button size="small">⚙ 列设置</el-button>
+          </template>
+          <div class="col-prefs">
+            <div class="col-prefs-title">显示/隐藏列（基础区段）</div>
+            <el-checkbox v-for="col in columnDefs" :key="col.key" v-model="col.visible" size="small" @change="persistColumnPrefs">
+              {{ col.label }}
+            </el-checkbox>
+            <el-divider style="margin:8px 0" />
+            <el-button size="small" link @click="resetColumnPrefs">重置默认</el-button>
+          </div>
+        </el-popover>
         <el-dropdown size="small" trigger="click" @command="handleImportExport">
           <el-button size="small">
             导入导出 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
@@ -25,7 +38,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" type="primary" plain @click="handleAiGenerate">
+        <el-button size="small" type="primary" plain :loading="aiLoading" @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI波动分析
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -78,7 +91,7 @@
 
       <!-- ═══ 基础区段 ═══ -->
       <template v-if="activeTab === 'basic'">
-        <el-table-column prop="accountCode" label="科目编码" width="100" align="center">
+        <el-table-column v-if="isColVisible('accountCode')" prop="accountCode" label="科目编码" width="100" align="center">
           <template #default="{ row }">
             <el-input
               v-if="row.isEditable"
@@ -97,14 +110,14 @@
             <span class="account-name">{{ row.accountName }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期发生额" width="120" align="right">
+        <el-table-column v-if="isColVisible('unadjTotal')" label="本期发生额" width="120" align="right">
           <template #default="{ row }">
             <el-tooltip content="公式：SUM(1~12月)" placement="top">
               <span class="formula-cell formula-underline">{{ fmtNum(row.unadjTotal) }}</span>
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column label="AJE" width="100" align="right">
+        <el-table-column v-if="isColVisible('aje')" label="AJE" width="100" align="right">
           <template #default="{ row }">
             <el-input-number
               v-if="row.isEditable"
@@ -119,7 +132,7 @@
             <span v-else class="formula-cell">{{ fmtNum(row.aje) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="RJE" width="100" align="right">
+        <el-table-column v-if="isColVisible('rje')" label="RJE" width="100" align="right">
           <template #default="{ row }">
             <el-input-number
               v-if="row.isEditable"
@@ -134,14 +147,14 @@
             <span v-else class="formula-cell">{{ fmtNum(row.rje) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="审定数" width="120" align="right">
+        <el-table-column v-if="isColVisible('audited')" label="审定数" width="120" align="right">
           <template #default="{ row }">
             <el-tooltip content="公式：未审+AJE+RJE" placement="top">
               <span class="formula-cell formula-underline">{{ fmtNum(row.audited) }}</span>
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column label="上期发生额" width="120" align="right">
+        <el-table-column v-if="isColVisible('priorAmount')" label="上期发生额" width="120" align="right">
           <template #default="{ row }">
             <el-input-number
               v-if="row.isEditable"
@@ -276,6 +289,26 @@
       <span class="total-item">共 <strong>{{ tableData.length }}</strong> 行</span>
     </div>
 
+    <!-- ═══ 波动分析说明（AI落点 + 持久化） ═══ -->
+    <el-card shadow="never" class="fluctuation-card">
+      <template #header>
+        <div class="card-head">
+          <span>波动分析说明</span>
+          <el-button size="small" type="primary" plain :loading="aiLoading" @click="handleAiGenerate">
+            <el-icon><MagicStick /></el-icon> AI波动分析
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="fluctuationSummary"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="对超阈值波动的明细科目逐项说明原因（可点「AI波动分析」生成草稿后编辑）"
+        @blur="saveFluctuationSummary"
+      />
+    </el-card>
+
     <!-- ═══ 编制提示（折叠） ═══ -->
     <details class="k9-details-tip">
       <summary>编制提示</summary>
@@ -305,12 +338,13 @@
  * Spec: .kiro/specs/k9-admin-expenses/ | Task: 4.3
  * Requirements: 3.1-3.4
  */
-import { computed, inject, ref, toRef, type Ref } from 'vue'
+import { computed, inject, ref, reactive, toRef, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, ChatDotSquare, ArrowDown, Plus, Delete } from '@element-plus/icons-vue'
 import { useK9Detail, DETAIL_TABS, type K9DetailTabKey } from '../../composables/useK9Detail'
 import { useK9ImportExport } from '../../composables/useK9ImportExport'
 import { pullI1AmortIntoExpenseDetail } from '../../composables/expenseWpI1AmortPull'
+import { generateK9AiText } from '../../composables/useK9AiText'
 
 const props = defineProps<{
   wpId: string
@@ -443,13 +477,82 @@ function triggerImport(): void {
   input.click()
 }
 
-function handleAiGenerate(): void {
-  emit('save', 'K9-2-ai-trigger', { remark: 'generate' })
+// ─── 波动分析说明（sheet 级，AI 落点 + 持久化） ─────────────────────────────
+const fluctuationSummary = ref('')
+function loadFluctuationSummary(): void {
+  const item = props.allResponses.get('K9-2-fluctuation-summary')
+  const raw = item?.remark ?? (typeof item === 'string' ? item : '')
+  if (raw) fluctuationSummary.value = String(raw)
+}
+function saveFluctuationSummary(): void {
+  emit('save', 'K9-2-fluctuation-summary', { remark: fluctuationSummary.value })
+}
+
+const aiLoading = ref(false)
+async function handleAiGenerate(): Promise<void> {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const abnormal = tableData.value
+      .filter((r: any) => isAbnormalRate(r.yoyChangeRate))
+      .map((r: any) => `${r.accountName}同比${r.yoyChangeRate != null ? (r.yoyChangeRate * 100).toFixed(0) + '%' : '—'}`)
+    const content = await generateK9AiText(props.wpId, {
+      prompt: '请根据管理费用明细表各明细科目的本期/上期发生额与同比变动，生成波动分析建议（逐项说明超阈值波动的可能原因与需追加的审计关注点）。',
+      section: 'K9-2-fluctuation-analysis',
+      context: {
+        科目: '6602 管理费用明细',
+        明细行数: tableData.value.length,
+        审定合计: subtotal.value.audited,
+        上期合计: subtotal.value.priorAmount,
+        异常波动项: abnormal.join('；') || '无超阈值波动',
+      },
+      existingContent: fluctuationSummary.value || '',
+    })
+    if (content) {
+      fluctuationSummary.value = fluctuationSummary.value ? `${fluctuationSummary.value}\n\n${content}` : content
+      saveFluctuationSummary()
+    }
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 function handleReview(): void {
   openReviewDialog('K9-2', '管理费用明细表复核')
 }
+
+// ─── 列设置（basic 区段可选列显隐，localStorage 持久化；明细科目/操作恒显） ────
+const COLUMN_PREFS_KEY = 'K9-2-column-prefs'
+interface ColDef { key: string; label: string; visible: boolean }
+const columnDefs = reactive<ColDef[]>([
+  { key: 'accountCode', label: '科目编码', visible: true },
+  { key: 'unadjTotal', label: '本期发生额', visible: true },
+  { key: 'aje', label: 'AJE', visible: true },
+  { key: 'rje', label: 'RJE', visible: true },
+  { key: 'audited', label: '审定数', visible: true },
+  { key: 'priorAmount', label: '上期发生额', visible: true },
+])
+function isColVisible(key: string): boolean { return columnDefs.find(c => c.key === key)?.visible ?? true }
+function persistColumnPrefs(): void {
+  try { localStorage.setItem(COLUMN_PREFS_KEY, JSON.stringify(columnDefs.map(c => ({ key: c.key, visible: c.visible })))) } catch { /* */ }
+}
+function loadColumnPrefs(): void {
+  try {
+    const saved = localStorage.getItem(COLUMN_PREFS_KEY)
+    if (!saved) return
+    const prefs: Array<{ key: string; visible: boolean }> = JSON.parse(saved)
+    for (const p of prefs) { const col = columnDefs.find(c => c.key === p.key); if (col) col.visible = p.visible }
+  } catch { /* */ }
+}
+function resetColumnPrefs(): void {
+  for (const col of columnDefs) col.visible = true
+  persistColumnPrefs()
+}
+
+onMounted(() => {
+  loadFluctuationSummary()
+  loadColumnPrefs()
+})
 
 // ─── Row class ───────────────────────────────────────────────────────────────
 
@@ -505,6 +608,16 @@ function fmtRate(v: number | null | undefined): string {
 .total-label { font-weight: 700; color: #303133; min-width: 50px; }
 .total-item { color: #606266; }
 .total-item strong { color: #303133; font-family: 'JetBrains Mono', monospace; }
+
+/* ─── 波动分析说明卡片 ─── */
+.fluctuation-card { margin-top: 14px; }
+.fluctuation-card :deep(.el-card__header) { padding: 10px 16px; }
+.card-head { display: flex; align-items: center; justify-content: space-between; }
+
+/* ─── 列设置 popover ─── */
+.col-prefs { max-height: 300px; overflow-y: auto; }
+.col-prefs-title { font-weight: 600; margin-bottom: 8px; font-size: 13px; }
+.col-prefs :deep(.el-checkbox) { display: block; margin-bottom: 4px; }
 
 /* ─── 编制提示 ─── */
 .k9-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }

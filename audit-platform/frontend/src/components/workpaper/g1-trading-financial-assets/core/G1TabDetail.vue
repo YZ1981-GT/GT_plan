@@ -132,6 +132,30 @@
     <div class="tab-toolbar">
       <el-segmented v-model="segment" :options="segmentOptions" size="small" class="segment-bar" />
       <el-tag size="small" type="info" effect="plain">共 {{ rows.length }} 行</el-tag>
+      <el-popover placement="bottom-end" :width="260" trigger="click">
+        <template #reference>
+          <el-button size="small" :icon="Setting" plain>列设置</el-button>
+        </template>
+        <div class="col-prefs">
+          <div class="col-prefs-head">
+            <span>当前区段列显隐</span>
+            <div>
+              <el-button size="small" link @click="colPrefs.hideEmptyColumns()">隐藏空列</el-button>
+              <el-button size="small" link @click="colPrefs.resetCurrentSegment()">全部显示</el-button>
+            </div>
+          </div>
+          <div class="col-prefs-list">
+            <el-checkbox
+              v-for="col in colPrefs.configurableColumns.value"
+              :key="String(col.prop)"
+              :model-value="colPrefs.isVisible(String(col.prop))"
+              @change="(v: boolean | string | number) => colPrefs.setColumnVisible(String(col.prop), !!v)"
+            >
+              {{ col.label }}
+            </el-checkbox>
+          </div>
+        </div>
+      </el-popover>
     </div>
     <p v-if="currentSegmentHint" class="segment-hint">{{ currentSegmentHint }}</p>
 
@@ -286,7 +310,9 @@ import {
   G1_ACCT_CLASS_OPTIONS,
   type TradingDetailRow,
 } from '../../composables/useG1Detail'
+import { useG1DetailColumnPrefs } from '../../composables/useG1DetailColumnPrefs'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import { Setting } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G1ImportExportDropdown from '../G1ImportExportDropdown.vue'
 import G1AuditTextCards from '../G1AuditTextCards.vue'
@@ -348,10 +374,13 @@ const investOptions = G1_INVEST_TYPE_OPTIONS
 const acctOptions = G1_ACCT_CLASS_OPTIONS
 const segmentOptions = segments.map((s) => ({ label: s.label, value: s.key }))
 
-const currentColumns = computed(() => {
-  const seg = segments.find((s) => s.key === segment.value)
-  return (seg?.columns ?? []).filter((c) => c.prop !== 'securityName')
+// 列显隐偏好（⚙ 列设置）
+const colPrefs = useG1DetailColumnPrefs({
+  segments,
+  currentSegmentKey: segment,
+  rows,
 })
+const currentColumns = colPrefs.visibleColumns
 
 const currentSegmentHint = computed(
   () => segments.find((s) => s.key === segment.value)?.hint ?? '',
@@ -551,6 +580,22 @@ function onImported() {
   color: #86909c;
 }
 .chip-wrap { display: inline-flex; align-items: center; }
+.col-prefs-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #303133;
+}
+.col-prefs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+}
 
 .detail-table { width: 100%; border-radius: 6px; overflow: hidden; }
 .formula-cell {

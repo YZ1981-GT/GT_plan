@@ -4,10 +4,12 @@
       <h3 class="sheet-title">G7-18 凭证检查表</h3>
       <div class="head-actions">
         <GtVoucherSamplingEngine
-          v-if="!isReadonly"
+          v-if="!isReadonly && wpId && projectId"
           :project-id="projectId"
-          :account-codes="['1511']"
-          dialog-mode
+          :workpaper-id="wpId"
+          account-code="1511"
+          phase="final"
+          :year="auditYear"
           @filled="onSampleFilled"
         />
         <el-button v-if="!isReadonly" size="small" type="primary" plain @click="handleAddRow">+ 新增</el-button>
@@ -447,6 +449,15 @@ const props = defineProps<{
 }>()
 
 const isReadonly = computed(() => !!props.readonly)
+/** 审计年度：从 htmlData.project_context 派生（audit_year → bs_date 年份 → 当前年），供抽凭引擎按年度查询序时账 */
+const auditYear = computed<number>(() => {
+  const ctx = (props.htmlData?.project_context ?? {}) as Record<string, any>
+  const y = ctx.audit_year ?? ctx.auditYear
+  if (y) return Number(y)
+  const bs = ctx.bs_date ?? ctx.bsDate
+  if (typeof bs === 'string' && bs.length >= 4) return Number(bs.slice(0, 4))
+  return new Date().getFullYear()
+})
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const scheduleAutoSnapshot = runtime?.version?.scheduleAutoSnapshot ?? (() => undefined)

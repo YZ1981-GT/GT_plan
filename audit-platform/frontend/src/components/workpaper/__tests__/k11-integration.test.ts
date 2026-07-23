@@ -48,8 +48,7 @@ vi.mock('@/services/apiProxy', () => ({
 }))
 
 import { useK11FormData } from '../composables/useK11FormData'
-import { useK11CrossSheet } from '../composables/useK11CrossSheet'
-import { useK11Adjudication } from '../composables/useK11Adjudication'
+import { useK11Adjudication, normalizeImpairmentCategory } from '../composables/useK11Adjudication'
 import { useK11Detail } from '../composables/useK11Detail'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
@@ -130,81 +129,6 @@ describe('useK11FormData — 损益取数(发生额)', () => {
     expect(formData.tbData.value.unadjustedCredit).toBe(0)
     expect(formData.tbData.value.unadjustedNet).toBe(0)
     expect(formData.tbData.value.auditedAmount).toBe(0)
-  })
-})
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// 2. 源底稿核对联动: useK11CrossSheet computed results (Req 4.2)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-describe('useK11CrossSheet — 源底稿核对联动', () => {
-  it('各来源差异为0 → 全部isMatch=true', async () => {
-    const allResponses = ref(new Map<string, any>([
-      ['K11-2-inventory-occurrence', { remark: '5000' }],
-      ['K11-2-inventory-source-amount', { remark: '5000' }],
-      ['K11-2-fixed-asset-occurrence', { remark: '3000' }],
-      ['K11-2-fixed-asset-source-amount', { remark: '3000' }],
-      ['K11-2-intangible-occurrence', { remark: '1000' }],
-      ['K11-2-intangible-source-amount', { remark: '1000' }],
-      ['K11-2-goodwill-occurrence', { remark: '2000' }],
-      ['K11-2-goodwill-source-amount', { remark: '2000' }],
-    ]))
-
-    const cross = useK11CrossSheet(allResponses)
-    await nextTick()
-
-    const reconcile = cross.sourceReconcile.value
-    const inventoryItem = reconcile.find(r => r.category === 'inventory')!
-    expect(inventoryItem.diff).toBeCloseTo(0)
-    expect(inventoryItem.isMatch).toBe(true)
-
-    const fixedItem = reconcile.find(r => r.category === 'fixed-asset')!
-    expect(fixedItem.diff).toBeCloseTo(0)
-    expect(fixedItem.isMatch).toBe(true)
-  })
-
-  it('来源差异非零 → isMatch=false', async () => {
-    const allResponses = ref(new Map<string, any>([
-      ['K11-2-inventory-occurrence', { remark: '5000' }],
-      ['K11-2-inventory-source-amount', { remark: '4500' }], // 差异500
-    ]))
-
-    const cross = useK11CrossSheet(allResponses)
-    await nextTick()
-
-    const reconcile = cross.sourceReconcile.value
-    const inventoryItem = reconcile.find(r => r.category === 'inventory')!
-    expect(inventoryItem.diff).toBeCloseTo(500)
-    expect(inventoryItem.isMatch).toBe(false)
-  })
-
-  it('allResponses为空 → sourceReconcile全部diff=0', async () => {
-    const allResponses = ref(new Map<string, any>())
-    const cross = useK11CrossSheet(allResponses)
-    await nextTick()
-
-    const reconcile = cross.sourceReconcile.value
-    reconcile.forEach((item) => {
-      expect(item.diff).toBe(0)
-      expect(item.isMatch).toBe(true)
-    })
-  })
-
-  it('返回所有8个减值来源类别', async () => {
-    const allResponses = ref(new Map<string, any>())
-    const cross = useK11CrossSheet(allResponses)
-    await nextTick()
-
-    const categories = cross.sourceReconcile.value.map(r => r.category)
-    expect(categories).toContain('inventory')
-    expect(categories).toContain('fixed-asset')
-    expect(categories).toContain('intangible')
-    expect(categories).toContain('goodwill')
-    expect(categories).toContain('construction')
-    expect(categories).toContain('equity')
-    expect(categories).toContain('investment-property')
-    expect(categories).toContain('other')
-    expect(categories.length).toBe(8)
   })
 })
 
@@ -299,53 +223,85 @@ describe('useK11Adjudication — 审定回写(发生额)', () => {
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 4. K11-2 → K11-1 交叉验证: adjudicationVsDetail (Req 2.5)
+// 4. K11-2 → K11-1 交叉验证 + 附注取数 + K11-3勾稽（live wired 逻辑）
 // ═══════════════════════════════════════════════════════════════════════════════
 
-describe('useK11CrossSheet — K11-1↔K11-2 交叉验证', () => {
-  it('两端一致 → isMatch=true', async () => {
+describe('useK11Adjudication — detailCrossValidation（K11-1↔K11-2）', () => {
+  it('审定合计与K11-2明细合计一致 → isBalanced=true', async () => {
     const allResponses = ref(new Map<string, any>([
-      ['K11-1-audited-total', { remark: '15000' }],
-      ['K11-2-total-occurrence', { remark: '15000' }],
-    ]))
-    const cross = useK11CrossSheet(allResponses)
-    await nextTick()
-
-    expect(cross.adjudicationVsDetail.value.isMatch).toBe(true)
-    expect(cross.adjudicationVsDetail.value.diff).toBeCloseTo(0)
-  })
-
-  it('两端不一致 → isMatch=false, diff有值', async () => {
-    const allResponses = ref(new Map<string, any>([
-      ['K11-1-audited-total', { remark: '15000' }],
-      ['K11-2-total-occurrence', { remark: '14200' }],
-    ]))
-    const cross = useK11CrossSheet(allResponses)
-    await nextTick()
-
-    expect(cross.adjudicationVsDetail.value.isMatch).toBe(false)
-    expect(cross.adjudicationVsDetail.value.diff).toBeCloseTo(800)
-  })
-
-  it('allResponses为空 → diff=0, isMatch=true', async () => {
-    const allResponses = ref(new Map<string, any>())
-    const cross = useK11CrossSheet(allResponses)
-    await nextTick()
-
-    expect(cross.adjudicationVsDetail.value.diff).toBe(0)
-    expect(cross.adjudicationVsDetail.value.isMatch).toBe(true)
-  })
-
-  it('微小差异(分以内) → isMatch=true', async () => {
-    const allResponses = ref(new Map<string, any>([
-      ['K11-1-audited-total', { remark: '10000.005' }],
       ['K11-2-total-occurrence', { remark: '10000' }],
     ]))
-    const cross = useK11CrossSheet(allResponses)
+    const adj = useK11Adjudication({
+      allResponses, projectId: ref('proj-1'), wpId: ref('wp-k11'), onSave: vi.fn(),
+    })
+    const row0 = adj.rows.value[0]
+    adj.updateCell(row0.rowKey, 'currentOccurrence', 10000)
+    await nextTick()
+    expect(adj.detailCrossValidation.value.isBalanced).toBe(true)
+    expect(adj.detailCrossValidation.value.diff).toBeCloseTo(0)
+  })
+
+  it('审定合计与K11-2明细不一致 → diff有值', async () => {
+    const allResponses = ref(new Map<string, any>([
+      ['K11-2-total-occurrence', { remark: '9200' }],
+    ]))
+    const adj = useK11Adjudication({
+      allResponses, projectId: ref('proj-1'), wpId: ref('wp-k11'), onSave: vi.fn(),
+    })
+    const row0 = adj.rows.value[0]
+    adj.updateCell(row0.rowKey, 'currentOccurrence', 10000)
+    await nextTick()
+    expect(adj.detailCrossValidation.value.isBalanced).toBe(false)
+    expect(adj.detailCrossValidation.value.diff).toBeCloseTo(800)
+  })
+})
+
+describe('useK11Adjudication — 附注取数键 audited-by-category（修复死链）', () => {
+  it('_persist 写 K11-1-audited-by-category（归一化类别键）', async () => {
+    const allResponses = ref(new Map<string, any>())
+    const saveSpy = vi.fn()
+    const adj = useK11Adjudication({
+      allResponses, projectId: ref('proj-1'), wpId: ref('wp-k11'), onSave: saveSpy,
+    })
+    const row0 = adj.rows.value[0]
+    // 归一化键随 DEFAULT_PROJECTS 内容而变（由审定表类别清单维护），不硬编码具体类别
+    const expectedKey = normalizeImpairmentCategory(row0.projectName)
+    adj.updateCell(row0.rowKey, 'currentOccurrence', 5000)
     await nextTick()
 
-    // |0.005| < 0.01 → match
-    expect(cross.adjudicationVsDetail.value.isMatch).toBe(true)
+    const byCatCall = saveSpy.mock.calls.find((c: any[]) => c[0] === 'K11-1-audited-by-category')
+    expect(byCatCall).toBeDefined()
+    const payload = byCatCall[1] as Record<string, any>
+    expect(payload[expectedKey]).toBeDefined()
+    expect(payload[expectedKey].currentProvision).toBe(5000)
+  })
+})
+
+describe('useK11Adjudication — adjustmentReconcile（K11-3→K11-1 联动）', () => {
+  it('K11-3合计与审定表逐行合计不一致 → 提示差异', async () => {
+    const allResponses = ref(new Map<string, any>([
+      ['K11-1-aje-total', { remark: '3000' }],
+      ['K11-1-rje-total', { remark: '0' }],
+    ]))
+    const adj = useK11Adjudication({
+      allResponses, projectId: ref('proj-1'), wpId: ref('wp-k11'), onSave: vi.fn(),
+    })
+    const row0 = adj.rows.value[0]
+    adj.updateCell(row0.rowKey, 'aje', 1000) // 表内 AJE=1000，K11-3=3000 → 差异
+    await nextTick()
+    expect(adj.adjustmentReconcile.value.hasK113).toBe(true)
+    expect(adj.adjustmentReconcile.value.ajeFromEntries).toBe(3000)
+    expect(adj.adjustmentReconcile.value.ajeInTable).toBe(1000)
+    expect(adj.adjustmentReconcile.value.isMatch).toBe(false)
+  })
+
+  it('无K11-3数据 → hasK113=false', async () => {
+    const allResponses = ref(new Map<string, any>())
+    const adj = useK11Adjudication({
+      allResponses, projectId: ref('proj-1'), wpId: ref('wp-k11'), onSave: vi.fn(),
+    })
+    await nextTick()
+    expect(adj.adjustmentReconcile.value.hasK113).toBe(false)
   })
 })
 

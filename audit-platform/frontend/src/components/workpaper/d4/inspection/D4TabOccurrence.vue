@@ -8,7 +8,7 @@
  *
  * Spec: .kiro/specs/d4-14-walkthrough-test/ Phase 4
  */
-import { ref, computed, inject, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, onBeforeUnmount, defineAsyncComponent, type Ref } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import useD4WalkthroughTest, {
   type TransactionItem,
@@ -25,6 +25,11 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { Plus, Download } from '@element-plus/icons-vue'
 
+// 抽凭引擎（懒加载，避免首屏体积）
+const GtVoucherSamplingEngine = defineAsyncComponent(
+  () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),
+)
+
 // ─── Props ───────────────────────────────────────────────────────────
 const props = defineProps<{
   wpId: string
@@ -34,6 +39,10 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+
+// 审计年度（D4 主入口 provide）→ 抽凭引擎所需 year
+const auditYear = inject<Ref<number> | null>('d4AuditYear', null)
+const samplingYear = computed(() => auditYear?.value ?? new Date().getFullYear() - 1)
 
 // ─── Composables ─────────────────────────────────────────────────────
 const {
@@ -177,6 +186,65 @@ function confirmLedgerImport() {
   ElMessage.success(`成功导入 ${selectedLedgerEntries.value.length} 笔凭证`)
   selectedLedgerEntries.value = []
   ensureActiveTab()
+}
+
+// ─── 抽凭引擎（科目 6001 营业收入）────────────────────────────────────
+const samplingDialogVisible = ref(false)
+
+function openSampling() {
+  if (props.isReadonly) return
+  samplingDialogVisible.value = true
+}
+
+/** 安全数值解析（SampledVoucher 金额为 string | null） */
+function toAmount(v: string | null | undefined): number {
+  const n = parseFloat(String(v ?? ''))
+  return Number.isFinite(n) ? n : 0
+}
+
+/**
+ * 抽凭引擎回填：payload 是对象，需解构 payload.samples（SampledVoucher[]）。
+ * 每笔样本映射为 D4-14 发生测试行（记账凭证维度 + 异常标记），
+ * 通过 composable 既有 addTransaction/updateDimension 追加并持久化。
+ * 收入类以 creditAmount（贷方发生额）为发生额优先。
+ */
+function onSampleFilled(payload: {
+  samples?: Array<{
+    voucherNo?: string
+    voucherDate?: string
+    summary?: string | null
+    debitAmount?: string | null
+    creditAmount?: string | null
+    counterpartAccount?: string | null
+    abnormal?: boolean
+  }>
+}) {
+  const samples = payload?.samples ?? []
+  if (!samples.length) {
+    ElMessage.info('未选择任何凭证')
+    return
+  }
+  let added = 0
+  for (const s of samples) {
+    const amount = toAmount(s.creditAmount) || toAmount(s.debitAmount)
+    const label = s.voucherNo || s.summary || '抽样凭证'
+    // addTransaction 创建空行并持久化，返回行引用
+    const item = addTransaction(label)
+    // isAnomalous 非维度字段，直接置于行引用（后续 updateDimension 的 persistAll 会一并序列化）
+    item.isAnomalous = !!s.abnormal
+    // 回填「记账凭证」维度（updateDimension 内部触发一致性重算 + 持久化）
+    updateDimension(item.id, 'voucher', 'number', s.voucherNo || '')
+    updateDimension(item.id, 'voucher', 'date', s.voucherDate || '')
+    if (s.counterpartAccount) {
+      updateDimension(item.id, 'other', 'description', `对方科目：${s.counterpartAccount}`)
+    }
+    // 金额放到最后，确保这次 persistAll 序列化包含 isAnomalous 等直接改动
+    updateDimension(item.id, 'voucher', 'amount', amount)
+    added++
+  }
+  samplingDialogVisible.value = false
+  activeTab.value = transactions.value[transactions.value.length - 1]?.id ?? activeTab.value
+  ElMessage.success(`已从抽凭引擎回填 ${added} 笔凭证`)
 }
 
 // ─── OCR handling ────────────────────────────────────────────────────
@@ -339,6 +407,9 @@ ensureActiveTab()
             </el-dropdown-menu>
           </template>
         </el-dropdown>
+        <el-button size="small" type="primary" plain :disabled="isReadonly" @click="openSampling">
+          🎲 抽凭引擎
+        </el-button>
         <GtIndexChip value="wp:D4-1" :context-project-id="projectId" />
         <GtIndexChip value="wp:D4-12" :context-project-id="projectId" />
         <GtIndexChip value="wp:D4-4" :context-project-id="projectId" />
@@ -654,6 +725,20 @@ ensureActiveTab()
           导入 {{ selectedLedgerEntries.length }} 笔
         </el-button>
       </template>
+    </el-dialog>
+
+    <!-- 抽凭引擎弹窗（科目 6001 营业收入） -->
+    <el-dialog v-model="samplingDialogVisible" title="🎲 抽凭引擎 — 营业收入(6001)"
+      width="90%" top="5vh" destroy-on-close>
+      <GtVoucherSamplingEngine
+        v-if="samplingDialogVisible"
+        account-code="6001"
+        phase="final"
+        :workpaper-id="wpId"
+        :project-id="projectId"
+        :year="samplingYear"
+        @filled="onSampleFilled"
+      />
     </el-dialog>
   </div>
 </template>

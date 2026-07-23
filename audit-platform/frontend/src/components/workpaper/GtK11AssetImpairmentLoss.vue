@@ -6,14 +6,23 @@
 
     <template v-else>
       <div v-if="isHtmlSheet" class="k11-header-toolbar">
+        <!-- 🔴 :model-value 单向绑定（禁用 v-model，避免 @change 前值已被改导致 switchMode 短路） -->
         <el-segmented
           v-if="dualMode.isOoAvailable.value"
-          v-model="dualMode.currentMode.value"
+          :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions"
           size="small"
           @change="dualMode.onModeChange"
         />
-        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value && !dualMode.checking.value" size="small" type="info">仅结构化视图</el-tag>
+        <!-- 双模式状态提示（"拉取成功才可以"） -->
+        <el-tag v-if="dualMode.checking.value" size="small" type="info">OnlyOffice 检测中…</el-tag>
+        <el-tag v-else-if="dualMode.fetchingConfig.value" size="small" type="warning">拉取配置中…</el-tag>
+        <el-tag
+          v-else-if="dualMode.isOoAvailable.value && dualMode.currentMode.value === 'onlyoffice' && dualMode.ooConfigReady.value"
+          size="small"
+          type="success"
+        >OnlyOffice 就绪（拉取成功）</el-tag>
+        <el-tag v-else-if="!dualMode.isOoAvailable.value" size="small" type="info">仅结构化视图</el-tag>
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -120,7 +129,7 @@
  * Spec: .kiro/specs/k11-asset-impairment-loss/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, inject, provide, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
@@ -130,6 +139,7 @@ import {
   type WorkpaperRuntimeContext,
 } from './composables/useWorkpaperScaffold'
 import { useK11DualMode } from './composables/useK11DualMode'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -167,6 +177,11 @@ const projectIdRef = computed<string | undefined>(() => props.projectId || undef
 const persistence = useChecklistPersistence({ wpId: wpIdRef, projectId: projectIdRef })
 const allResponses = persistence.responses
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
+
+// ─── 复核线程蓝/红点（GtReviewTrigger/GtReviewDot 消费） ─────────────────────
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 const tbData = ref({
   /** 6701 未审发生额 */
   unadjusted6701: 0,
@@ -178,6 +193,7 @@ const tbData = ref({
 const dualMode = useK11DualMode({
   wpId: computed(() => props.wpId) as any,
   sheetName: computed(() => props.sheetName || '') as any,
+  projectId: computed(() => props.projectId || '') as any,
   reloadAll: async () => { await selfLoad() },
 })
 
@@ -273,7 +289,7 @@ onBeforeUnmount(() => { void persistence.flush().catch(() => undefined) })
  * Task 6.2: subscribe各减值源底稿(F2/H1/I1/I2/I3)减值计提
  * Requirements: 6.2, 4.2
  */
-const SOURCE_WP_CODES = ['F2', 'H1', 'H3', 'I1', 'I2', 'I3', 'H2', 'G7'] as const
+const SOURCE_WP_CODES = ['D6', 'F2', 'K6', 'G7', 'H3', 'H1', 'H4', 'H2', 'H5', 'H7', 'H8', 'I1', 'I2', 'I3'] as const
 
 function handleSourceAdjudicated(e: Event): void {
   const detail = (e as CustomEvent).detail
@@ -332,14 +348,20 @@ function handleImpairmentCalculated(e: Event): void {
 
 /** 源底稿编码 → K11-2 CrossSheet category key */
 const WP_TO_CATEGORY_KEY: Record<string, string> = {
+  D6: 'contract-asset',
   F2: 'inventory',
+  K6: 'held-for-sale',
+  G7: 'equity',
+  H3: 'investment-property',
   H1: 'fixed-asset',
+  H4: 'construction-material',
+  H2: 'construction',
+  H5: 'productive-biological',
+  H7: 'oil-gas',
+  H8: 'right-of-use',
   I1: 'intangible',
   I2: 'development',
   I3: 'goodwill',
-  H2: 'construction',
-  G7: 'equity',
-  H3: 'investment-property',
 }
 
 onMounted(() => {

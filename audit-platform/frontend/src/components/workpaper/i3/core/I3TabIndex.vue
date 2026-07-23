@@ -4,11 +4,12 @@
     <div class="guide-area">
       <div class="guide-grid">
         <div class="guide-step"><span class="step-num">①</span> 审定表(I3-1)确认TB取数→商誉不摊销→审定回写(1711)</div>
-        <div class="guide-step"><span class="step-num">②</span> 明细表(I3-2)按被投资单位逐项→30列3区段Tab</div>
+        <div class="guide-step"><span class="step-num">②</span> 明细表(I3-2)按被投资单位→原值/减值双表滚动</div>
         <div class="guide-step"><span class="step-num">③</span> 入账测算(I3-4)合并成本-净资产公允=商誉</div>
         <div class="guide-step"><span class="step-num">④</span> 减值测试(I3-6)按CGU测试→先冲商誉再分摊</div>
         <div class="guide-step"><span class="step-num">⑤</span> DCF测算(I3-7)折现现金流→可收回金额→敏感性分析</div>
         <div class="guide-step"><span class="step-num">⑥</span> 附注披露(上市/国企)自动取数+AI辅助生成</div>
+        <div class="guide-step"><span class="step-num">⑦</span> I3A 实质性程序表目前为 OO 模板（HTML 目录不统计其进度）</div>
       </div>
     </div>
 
@@ -31,6 +32,38 @@
         <span class="stat-label">总进度</span>
       </div>
     </div>
+
+    <!-- 编制校验汇总 -->
+    <el-card v-if="prepIssues.length" shadow="never" class="prep-card">
+      <template #header>
+        <div class="section-title">
+          <span>编制校验汇总</span>
+          <el-tag size="small" :type="prepErrorCount ? 'danger' : 'warning'">
+            {{ prepIssues.length }} 项待处理
+          </el-tag>
+        </div>
+      </template>
+      <p class="prep-order">建议顺序：I3-2 → I3-4 → I3-1 带入 → I3-3 → I3-5 → I3-6~8 → 附注</p>
+      <ul class="prep-list">
+        <li v-for="(issue, idx) in prepIssues" :key="idx">
+          <el-tag
+            size="small"
+            :type="issue.level === 'error' ? 'danger' : 'warning'"
+            class="prep-code"
+            @click="handleNavigateByCode(issue.code)"
+          >{{ issue.code }}</el-tag>
+          {{ issue.message }}
+        </li>
+      </ul>
+    </el-card>
+    <el-alert
+      v-else
+      type="success"
+      :closable="false"
+      show-icon
+      title="编制校验：暂无跨表阻断/告警项"
+      class="prep-ok"
+    />
 
     <!-- 底稿目录表 -->
     <el-card shadow="never" class="index-card">
@@ -108,6 +141,7 @@
  */
 import { computed } from 'vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import { buildI3ConsistencyDashboard } from '../../composables/i3ConsistencyModel'
 
 const props = defineProps<{
   wpId: string
@@ -134,9 +168,9 @@ interface SheetEntry {
 
 /** 11 sheets from the I3 goodwill workpaper */
 const SHEET_DEFS: { seq: number; code: string; name: string; sheetName: string; fields: string[]; crossRef?: string }[] = [
-  { seq: 1, code: 'I3A', name: '商誉实质性程序表', sheetName: 'Procedure_Table_I3A 商誉实质性程序表', fields: ['I3A-'] },
+  { seq: 1, code: 'I3A', name: '商誉实质性程序表（OO）', sheetName: 'Procedure_Table_I3A 商誉实质性程序表', fields: ['I3A-'] },
   { seq: 2, code: 'I3-1', name: '审定表', sheetName: 'Adjudication_I3_1 审定表', fields: ['I3-1-', 'I3-adj-', 'I3-tb-'] },
-  { seq: 3, code: 'I3-2', name: '明细表（30列）', sheetName: 'Detail_I3_2 明细表', fields: ['I3-2-'] },
+  { seq: 3, code: 'I3-2', name: '明细表（原值/减值滚动）', sheetName: 'Detail_I3_2 明细表', fields: ['I3-2-'] },
   { seq: 4, code: 'I3-3', name: '调整分录汇总', sheetName: 'Adjustment_I3_3 调整分录汇总', fields: ['I3-3-'] },
   { seq: 5, code: 'I3-4', name: '入账价值测算表', sheetName: 'InitialValue_I3_4 入账价值测算表', fields: ['I3-4-'] },
   { seq: 6, code: 'I3-5', name: '针对性检查表', sheetName: 'Targeted_Check_I3_5 针对性检查表', fields: ['I3-5-'] },
@@ -209,6 +243,10 @@ const completionPct = computed(() => {
   return Math.round(progressSum / total)
 })
 
+const consistency = computed(() => buildI3ConsistencyDashboard(props.allResponses))
+const prepIssues = computed(() => consistency.value.issues)
+const prepErrorCount = computed(() => consistency.value.errorCount)
+
 function statusTagType(status: SheetStatus): 'success' | 'warning' | 'info' {
   switch (status) {
     case '已复核': return 'success'
@@ -225,6 +263,12 @@ function progressColor(pct: number): string {
 
 function handleNavigate(row: SheetEntry) {
   emit('navigate-sheet', row.sheetName)
+}
+
+function handleNavigateByCode(code: string) {
+  const found = sheets.value.find((s) => s.code === code || s.code.startsWith(code))
+  if (found) emit('navigate-sheet', found.sheetName)
+  else emit('navigate-sheet', code)
 }
 </script>
 
@@ -255,6 +299,13 @@ function handleNavigate(row: SheetEntry) {
 .stat-inprogress .stat-value { color: #e6a23c; }
 .stat-pending .stat-value { color: #909399; }
 .stat-total .stat-value { color: var(--el-color-primary); }
+
+/* 编制校验 */
+.prep-card { margin-bottom: 16px; }
+.prep-ok { margin-bottom: 16px; }
+.prep-order { margin: 0 0 8px; font-size: 12px; color: var(--el-text-color-secondary); }
+.prep-list { margin: 0; padding-left: 4px; list-style: none; line-height: 1.9; }
+.prep-code { margin-right: 8px; cursor: pointer; }
 
 /* 目录卡片 */
 .section-title { display: flex; align-items: center; justify-content: space-between; }

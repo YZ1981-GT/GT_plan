@@ -85,6 +85,7 @@
           :is-readonly="isReadonly"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
           @save="() => { emit('save'); scheduleAutoSnapshot() }"
+          @imported="() => void selfLoad()"
         />
 
         <!-- I2-2 明细表（Excel滚动勾稽 + I2-3账项同步） -->
@@ -98,6 +99,7 @@
           :is-readonly="isReadonly"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
           @save="() => { emit('save'); scheduleAutoSnapshot() }"
+          @imported="() => void selfLoad()"
         />
 
         <!-- I2-3 调整分录（Excel列 + 调整分录模块双向联动 + A13） -->
@@ -135,6 +137,8 @@
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
         />
 
         <!-- I2-6 资本化时点判断（CAS6五条件核心） -->
@@ -146,6 +150,8 @@
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
         />
 
         <!-- I2-7 研发项目构成明细表 -->
@@ -157,6 +163,9 @@
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
+          @imported="() => void selfLoad()"
         />
 
         <!-- I2-8 研发材料投入检查 -->
@@ -225,6 +234,8 @@
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
         />
 
         <!-- I2-13 截止性测试（账到单据） -->
@@ -264,6 +275,8 @@
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
         />
 
         <!-- I2-16 可收回金额测试 -->
@@ -275,6 +288,8 @@
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
         />
 
         <!-- 附注披露（上市公司） -->
@@ -287,6 +302,8 @@
           :save-response="saveResponse"
           :is-readonly="isReadonly"
           :applicable-standards="applicableStandards"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
         />
 
         <!-- 附注披露（国企） -->
@@ -299,6 +316,8 @@
           :save-response="saveResponse"
           :is-readonly="isReadonly"
           :applicable-standards="applicableStandards"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @save="() => { emit('save'); scheduleAutoSnapshot() }"
         />
 
         <!-- 未匹配 → OnlyOffice fallback -->
@@ -343,6 +362,7 @@ import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useI2CrossSheet } from './composables/useI2CrossSheet'
 import { useI2DualMode } from './composables/useI2DualMode'
+import { fetchI2TbData, persistI2TbData } from './composables/useI2FormData'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
@@ -491,6 +511,15 @@ async function selfLoad(): Promise<void> {
     console.warn('[GtI2DevelopmentExpenditure] selfLoad failed:', err)
   } finally {
     isLoading.value = false
+  }
+  // 预热 TB(1717) 数据：I2-1 打开前已就位，避免首次进入审定表时的空白闪烁
+  if (!allResponses.value.get('I2-tb-data')) {
+    try {
+      const tb = await fetchI2TbData(http, props.projectId)
+      await persistI2TbData(saveResponse, tb)
+    } catch {
+      // 静默：I2-1 自身 onMounted 会重试
+    }
   }
 }
 

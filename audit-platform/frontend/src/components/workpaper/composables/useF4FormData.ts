@@ -96,6 +96,20 @@ export function useF4FormData(options: UseF4FormDataOptions) {
       for (const s of sheets) {
         sheetCache.value[s.sheet_name || s.name || 'default'] = s.html_data ?? s
       }
+      // 从 render-config 合并项目上下文（含 tb_amount / bs_date / related_parties）
+      const renderCtx = data?.project_context ?? data?.data?.project_context
+      if (renderCtx && typeof renderCtx === 'object') {
+        projectContext.value = { ...projectContext.value, ...renderCtx }
+      }
+      // 合并 responses_snapshot 到 allResponses（兼容 selfLoad 场景）
+      const snapshot = data?.responses_snapshot ?? data?.data?.responses_snapshot
+      if (snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot)) {
+        for (const [k, v] of Object.entries(snapshot)) {
+          if (!allResponses.value.has(k) && v && typeof v === 'object') {
+            allResponses.value.set(k, { item_id: k, ...(v as any) })
+          }
+        }
+      }
     } catch {
       // selfLoad 失败不阻塞
     }

@@ -25,6 +25,7 @@ import {
   calcYoYChange,
   calcSubtotal,
 } from './useK10FormulaEngine'
+import { K10_INCOME_SOURCES } from './k10IncomeSources'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -84,14 +85,12 @@ export interface UseK10AdjudicationParams {
 const ITEM_PREFIX = 'K10-1'
 const ROWS_KEY = `${ITEM_PREFIX}-rows`
 
-/** 默认审定表收益来源行（其他收益5大类：政府补助细分） */
-const DEFAULT_INCOME_SOURCES: Array<{ name: string }> = [
-  { name: '政府补助-即征即退' },
-  { name: '政府补助-财政贴息' },
-  { name: '政府补助-研发补助' },
-  { name: '政府补助-稳岗补贴' },
-  { name: '其他' },
-]
+/** 默认审定表收益来源行（对齐源模板明细表 K10-2 示例项目，统一命名源）
+ *  源模板 K10-1 每行实为 ='明细表K10-2'!A11 从 K10-2 带入，默认行仅作空态占位，
+ *  真实编制应「从K10-2带入」（pullFromDetail）。 */
+const DEFAULT_INCOME_SOURCES: Array<{ name: string }> = K10_INCOME_SOURCES.map(
+  (name) => ({ name }),
+)
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -265,6 +264,57 @@ export function useK10Adjudication(params: UseK10AdjudicationParams) {
     }
   }
 
+  // ─── 从 K10-2 明细表带入（复现源模板 ='明细表K10-2'!A11/D11/E11/F11 联动）──────
+
+  /**
+   * 复现源模板审定表 K10-1 的 SUMIF 联动：逐行从 K10-2 明细表带入。
+   * 源模板 R6~R11：项目=A11 / 未审=D11 / 账项调整(AJE)=E11 / 重分类(RJE)=F11 /
+   *              本期审定=B+C+D；上期未审=H11 / 上期AJE=I11 / 上期RJE=J11。
+   *
+   * 明细表 K10-2 无 priorRje 列（上期审定=上期未审+上期AJE），故 priorRje 取 0。
+   * @returns 带入的行数（0=K10-2 无明细）
+   */
+  function pullFromDetail(): number {
+    if (isReadonly?.value) return 0
+    const item = allResponses.value.get('K10-2-detail-rows')
+    const rawStr = item?.remark ?? item?.conclusion
+    if (!rawStr) return 0
+    let detailRows: any[]
+    try {
+      const parsed = typeof rawStr === 'string' ? JSON.parse(rawStr) : rawStr
+      detailRows = Array.isArray(parsed) ? parsed : []
+    } catch { return 0 }
+    const usable = detailRows.filter(r => String(r?.projectName ?? '').trim())
+    if (usable.length === 0) return 0
+
+    rows.value = usable.map((r) => {
+      const unadjusted = parseNum(r.unadjusted)
+      const aje = parseNum(r.aje)
+      const rje = parseNum(r.rje)
+      const priorUnadj = parseNum(r.priorUnadj)
+      const priorAje = parseNum(r.priorAje)
+      const priorRje = 0 // 明细表无上期重分类列
+      return {
+        rowKey: `row-${String(r.projectName).trim()}`,
+        name: String(r.projectName).trim(),
+        unadjusted,
+        aje,
+        rje,
+        audited: calcAuditedAmount(unadjusted, aje, rje),
+        priorUnadj,
+        priorAje,
+        priorRje,
+        priorAudited: calcAuditedAmount(priorUnadj, priorAje, priorRje),
+        yoyChange: null,
+        remark: String(r.judgmentBasis ?? '').trim(),
+        isEditable: true,
+      } as K10AdjRow
+    })
+    isChanged.value = true
+    _persist()
+    return rows.value.length
+  }
+
   // ─── TB回写 + EventBus（损益类发生额！6117）────────────────────────────────
 
   async function writeback(): Promise<void> {
@@ -319,6 +369,7 @@ export function useK10Adjudication(params: UseK10AdjudicationParams) {
     updateCell,
     addRow,
     removeRow,
+    pullFromDetail,
     writeback,
     saveNote,
     saveConclusion,

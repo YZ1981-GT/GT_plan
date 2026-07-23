@@ -107,6 +107,73 @@ async def _fetch_tb_income_statement(ctx: RenderContext) -> dict:
     return tb
 
 
+async def _build_adjudication_prefill(ctx: RenderContext) -> list[dict]:
+    """从 tb_balance 6602 明细子科目预填 K9-1 审定表行（损益类取发生额）.
+
+    对齐 J1 审定表预填铁律：审定表未审数应从 tb_balance 明细子科目取，
+    而非全 0 手填。仅取 6602 下的明细子科目（account_code != '6602'），
+    按明细科目名汇总本期借/贷发生额；净发生额 = 借方 - 贷方。
+
+    返回 [{name, unadjustedDebit, unadjustedCredit}]，前端在无持久化行时据此建行。
+    子科目不存在时返回 []（前端回退默认项目）。
+    """
+    rows: list[dict] = []
+    try:
+        active_filter = await get_active_filter(
+            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
+        )
+        # 按 account_code 汇总（保留 code 以做叶子判定），避免中间级 rollup 双算
+        result = await ctx.db.execute(
+            sa.select(
+                TbBalance.account_code.label("code"),
+                TbBalance.account_name.label("name"),
+                sa.func.sum(TbBalance.debit_amount).label("debit"),
+                sa.func.sum(TbBalance.credit_amount).label("credit"),
+            )
+            .where(
+                active_filter,
+                TbBalance.account_code.startswith(_K9_ACCOUNT_PREFIX),
+                TbBalance.account_code != _K9_ACCOUNT_PREFIX,
+            )
+            .group_by(TbBalance.account_code, TbBalance.account_name)
+        )
+        raw = [
+            {
+                "code": (r.code or "").strip(),
+                "name": (r.name or "").strip(),
+                "debit": float(r.debit or 0),
+                "credit": float(r.credit or 0),
+            }
+            for r in result.fetchall()
+        ]
+        # 只取叶子科目（其 code 不是任何其它 code 的前缀）——铁律「只汇总叶子」，
+        # 防止 tb_balance 中间级 rollup 与其子科目同时计入导致双算。
+        all_codes = [x["code"] for x in raw if x["code"]]
+
+        def _is_leaf(code: str) -> bool:
+            if not code:
+                return True
+            return not any(c != code and c.startswith(code) for c in all_codes)
+
+        leaves = [x for x in raw if _is_leaf(x["code"])]
+        leaves.sort(key=lambda x: x["debit"], reverse=True)
+        for x in leaves:
+            name = x["name"]
+            debit = x["debit"]
+            credit = x["credit"]
+            # 跳过无名称或零发生额子科目
+            if not name or (abs(debit) < 0.005 and abs(credit) < 0.005):
+                continue
+            rows.append({
+                "name": name,
+                "unadjustedDebit": debit,
+                "unadjustedCredit": credit,
+            })
+    except Exception as e:  # noqa: BLE001
+        logger.warning("K9 adjudication prefill build failed: %s", e)
+    return rows
+
+
 async def _load_project_context(ctx: RenderContext) -> dict:
     """加载项目上下文."""
     project_ctx: dict = {}
@@ -164,12 +231,16 @@ async def render(ctx: RenderContext) -> dict | None:
     # 3. 加载项目上下文
     project_context = await _load_project_context(ctx)
 
+    # 4. 审定表明细子科目预填（J1 铁律：从 tb_balance 6602 明细取发生额）
+    adjudication_prefill = await _build_adjudication_prefill(ctx)
+
     return {
         "component_type": "k9-admin-expenses",
         "account_codes": ["6602"],
         "income_statement": True,  # 标识损益类
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
+        "adjudication_prefill": adjudication_prefill,
         "project_context": project_context,
         "prefix": "K9",
         "sheets": K9_SHEETS,

@@ -19,6 +19,11 @@ import {
 } from './useF2InvMaiFormulaEngine'
 import { readRowJson, type ChecklistResponse } from './useF2FormData'
 import {
+  pullPostPeriodOutbound,
+  normalizeInvName,
+  type PostPeriodOutboundResult,
+} from './f2LedgerPostOutbound'
+import {
   PRESET_SEGMENTS,
   type AgingPreset,
   type AgingSegment,
@@ -280,6 +285,8 @@ export function useF2DetailSheet(opts: {
   config: Ref<F2DetailSheetConfig>
   allResponses: Ref<Map<string, ChecklistResponse>>
   isReadonly: Ref<boolean>
+  projectId?: Ref<string>
+  year?: Ref<number>
 }) {
   const activeView = ref<F2DetailView>('movement')
   /** @deprecated 旧分段 Tab；保留别名以免外部引用断裂 */
@@ -530,6 +537,103 @@ export function useF2DetailSheet(opts: {
     return true
   }
 
+  /**
+   * 期后出库一键取数（Task 7）：
+   * 调用 pullPostPeriodOutbound 取次年序时账存货科目贷方，
+   * 按名称匹配填入 postPeriodQty / postPeriodAmt。
+   * - 不覆盖已有非零值（除非用户确认）
+   * - ElMessageBox 预览匹配/未匹配条数
+   */
+  async function importPostPeriodOutbound(): Promise<void> {
+    if (opts.isReadonly.value) {
+      ElMessage.warning('只读模式，无法取数')
+      return
+    }
+    const projectId = opts.projectId?.value
+    const year = opts.year?.value
+    if (!projectId || !year) {
+      ElMessage.warning('缺少项目ID或审计年度，无法取期后出库')
+      return
+    }
+    const accountCode = opts.config.value.accountCode || '1405'
+    const result: PostPeriodOutboundResult = await pullPostPeriodOutbound(
+      projectId,
+      year,
+      accountCode,
+    )
+    if (result.status === 'error') {
+      ElMessage.error(result.message || '期后出库取数失败')
+      return
+    }
+    if (result.status === 'empty') {
+      ElMessage.info(result.message || '期后无出库数据')
+      return
+    }
+    // 按名称匹配行
+    const byName = result.byName
+    let matchedCount = 0
+    let skippedCount = 0
+    const matchedNames: string[] = []
+    for (const row of rows.value) {
+      const key = normalizeInvName(row.itemName)
+      if (!key) continue
+      const agg = byName[key]
+      if (!agg) continue
+      // 不覆盖已有非零值
+      if (row.postPeriodAmt !== 0 || row.postPeriodQty !== 0) {
+        skippedCount++
+        continue
+      }
+      matchedCount++
+      matchedNames.push(row.itemName)
+    }
+    const unmatchedCount = result.unmatchedCount
+    const totalNames = Object.keys(byName).length
+    const unmatchedNames = totalNames - matchedCount - (byName['未匹配存货'] ? 1 : 0)
+
+    // 确认弹窗
+    const confirmMsg = [
+      `期后出库共归集 ${totalNames} 项，合计 ${result.totalAmount.toLocaleString('zh-CN')} 元`,
+      `可匹配明细行 ${matchedCount} 项`,
+      skippedCount > 0 ? `已有期后数据跳过 ${skippedCount} 项` : '',
+      unmatchedNames > 0 ? `未匹配名称 ${unmatchedNames} 项` : '',
+      unmatchedCount > 0 ? `无法归集分录 ${unmatchedCount} 笔` : '',
+    ].filter(Boolean).join('\n')
+
+    if (matchedCount === 0) {
+      ElMessage.info(`期后出库数据与明细行名称无匹配（共 ${totalNames} 项）`)
+      return
+    }
+
+    try {
+      await ElMessageBox.confirm(confirmMsg, '期后出库取数预览', {
+        confirmButtonText: '确认填入',
+        cancelButtonText: '取消',
+        type: 'info',
+      })
+    } catch {
+      return // 用户取消
+    }
+
+    // 执行填入
+    const hq = opts.config.value.hasQuantity
+    const segs = segments.value
+    rows.value = rows.value.map((r) => {
+      const key = normalizeInvName(r.itemName)
+      if (!key) return r
+      const agg = byName[key]
+      if (!agg) return r
+      if (r.postPeriodAmt !== 0 || r.postPeriodQty !== 0) return r
+      return enrichRow(
+        { ...r, postPeriodQty: agg.qty, postPeriodAmt: agg.amount },
+        hq,
+        segs,
+      )
+    })
+    persistRows()
+    ElMessage.success(`已填入 ${matchedCount} 项期后出库数据`)
+  }
+
   return {
     activeView,
     activeSegment,
@@ -558,5 +662,6 @@ export function useF2DetailSheet(opts: {
     persistNotePack,
     persistConclusion,
     applyAgingPreset,
+    importPostPeriodOutbound,
   }
 }

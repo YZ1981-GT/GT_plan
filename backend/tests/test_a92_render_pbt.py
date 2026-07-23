@@ -72,14 +72,23 @@ def a92_ctx_strategy(draw: st.DrawFn):
     b22b_cr_result = MagicMock()
     b22b_cr_result.fetchall.return_value = b22b_rows
 
+    # B22C lookup — Wave3 repoint 优先 B22C；本 PBT 不提供 B22C 数据（返回 None → 回退 B22B）
+    b22c_wp_result = MagicMock()
+    b22c_wp_result.fetchone.return_value = None
+
     # Project context
     proj_result = MagicMock()
     proj_result.fetchone.return_value = ProjectRow(client_name, audit_year)
 
+    # 查询顺序：a92 → B22C wp lookup(None) → B22B wp lookup → [B22B checklist] → project
     if has_b22b:
-        db.execute = AsyncMock(side_effect=[a92_result, b22b_wp_result, b22b_cr_result, proj_result])
+        db.execute = AsyncMock(
+            side_effect=[a92_result, b22c_wp_result, b22b_wp_result, b22b_cr_result, proj_result]
+        )
     else:
-        db.execute = AsyncMock(side_effect=[a92_result, b22b_wp_result, proj_result])
+        db.execute = AsyncMock(
+            side_effect=[a92_result, b22c_wp_result, b22b_wp_result, proj_result]
+        )
 
     ctx.db = db
     return ctx

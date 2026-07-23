@@ -300,6 +300,7 @@ import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpe
 import type { VirtualColumn } from '@/composables/useVirtualTable'
 import type { ChecklistResponse } from '../composables/useD6FormData'
 import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
@@ -455,6 +456,12 @@ function onConclusionTemplateSelect(val: string) {
   if (val) {
     auditNotes.value = { ...auditNotes.value, conclusion: val }
     selectedConclusionTemplate.value = ''
+    // D6-9→D6-3 联动提示：核销/转回结论确认后通知D6-3订阅方刷新减值余额
+    eventBus.emit('d6:writeoff-confirmed', {
+      reversalTotal: reversalTotal.value,
+      writeoffTotal: writeoffTotal.value,
+      wpId: props.wpId,
+    })
   }
 }
 

@@ -256,6 +256,19 @@ jobs:
       - name: Version Trail Integration Guard
         run: python backend/scripts/check/check_wp_version_trail.py --strict
 
+  disclosure-columns-coverage:
+    # 披露表 _columns 覆盖守卫（disclosure-table-sync-convergence Task 13/15.1）
+    # 扫描 sync-from-workpaper 调用点是否携带 columns 列头元数据（供附注模块投影渲染）。
+    # 严格模式：全部 43 调用点已迁移覆盖，此后新增未覆盖同步调用点将阻断 CI。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check disclosure _columns coverage (strict)
+        run: python backend/scripts/check/check_disclosure_columns_coverage.py --strict
+
   procedure-delegation-architecture:
     # procedure-delegation-notification Wave1 Task1: exact architecture debt guard.
     # The scanner is stdlib-only; its self-tests cover Python AST, Vue/TS structure,

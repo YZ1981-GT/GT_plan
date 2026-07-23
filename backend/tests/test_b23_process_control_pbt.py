@@ -38,20 +38,26 @@ B23_CTRL_FIELDS = [
 ]
 B23_WT_FIELDS = ["sample", "path", "finding", "reference"]
 
-# Valid conclusion values for B23- prefix (from checklist_responses.py)
+# Valid conclusion values for B23- prefix (from checklist_responses.py，14 循环重做后扩展)
 VALID_CONCLUSIONS = [
-    "设计有效且已实施", "设计有效但未有效实施", "设计无效", "不适用",  # ProcessConclusion
-    "控制有效运行", "控制未有效运行", "未执行穿行",                  # WalkthroughConclusion
-    "每笔", "每日", "每周", "每月", "每季", "每年", "不定期",       # ControlFrequency
-    "Y", "N",                                                        # 签字/适用性标记
+    "设计有效且已实施", "设计有效但未有效实施", "设计无效", "不适用",  # 循环/流程结论
+    "控制有效运行", "控制未有效运行", "未执行穿行",                  # 穿行结论（旧）
+    "有效", "无效",                                                  # 控制测试运行有效性
+    "每笔", "每日", "每周", "每月", "每季", "每年", "不定期", "定期", # 控制频率
+    "存在", "发生", "完整性", "准确性", "计价分摊", "权利义务", "列报",  # 认定
+    "预防性", "检查性",                                              # 预防性/检查性
+    "授权和审批", "监督控制", "信息处理", "实物控制", "职责分离", "绩效评价复核",  # 控制类型
+    "有权人员批准", "安全访问控制", "复核其他控制的执行情况",         # 控制类型二级
+    "缺乏控制", "设计不合理", "未执行",                              # 缺陷类型
+    "重大缺陷", "重要缺陷", "一般缺陷",                              # 缺陷严重程度(A14-4)
+    "是", "否", "Y", "N",                                            # 是否/签字/适用性
 ]
 
 # Invalid conclusion values (not in B23 whitelist)
 INVALID_CONCLUSIONS = [
     "INVALID", "yes", "no", "maybe", "H", "M", "L",
-    "HIGH", "有效", "部分有效", "无效", "abc123",
+    "HIGH", "部分有效", "abc123",
     "设计有效", "已实施", "未实施", "XX", "TRUE",
-    "重大缺陷", "重要缺陷", "一般缺陷",
 ]
 
 # Sample remark/wp_ref values

@@ -175,6 +175,53 @@
       </div>
     </section>
 
+    <!-- G11 投资收益跨底稿勾稽 -->
+    <section class="recon-card g11-recon-card">
+      <header class="recon-head">
+        <h4>↔ G11 投资收益勾稽</h4>
+        <el-button size="small" :loading="g11Loading" @click="pullG11">刷新G11数据</el-button>
+        <GtIndexChip value="wp:G11" />
+        <el-tag
+          v-if="g11Source !== 'unavailable'"
+          :type="g11Reconcile.isConsistent ? 'success' : 'warning'"
+          size="small"
+          effect="plain"
+        >
+          {{ g11Reconcile.isConsistent ? '勾稽一致' : '存在差异' }}
+        </el-tag>
+        <el-tag v-else size="small" type="info" effect="plain">G11数据不可用</el-tag>
+      </header>
+      <div v-if="g11Source !== 'unavailable'" class="recon-grid">
+        <div class="recon-field">
+          <label>G1-5 利息合计</label>
+          <div class="recon-readonly">{{ fmtNum(g11Reconcile.g1InterestTotal) }}</div>
+        </div>
+        <div class="recon-field">
+          <label>G1-5 股利合计</label>
+          <div class="recon-readonly">{{ fmtNum(g11Reconcile.g1DividendTotal) }}</div>
+        </div>
+        <div class="recon-field">
+          <label>G1-5 处置净损益</label>
+          <div class="recon-readonly">{{ fmtNum(g11Reconcile.g1DisposalTotal) }}</div>
+        </div>
+        <div class="recon-field">
+          <label>G1-5 测算合计</label>
+          <div class="recon-readonly"><b>{{ fmtNum(g11Reconcile.g1Total) }}</b></div>
+        </div>
+        <div class="recon-field">
+          <label>G11 投资收益审定</label>
+          <div class="recon-readonly"><b>{{ fmtNum(g11Reconcile.g11Audited) }}</b></div>
+        </div>
+        <div class="recon-field" :class="{ 'diff-warn': !g11Reconcile.isConsistent }">
+          <label>差异（G1 − G11）</label>
+          <div class="recon-readonly">{{ fmtNum(g11Reconcile.difference) }}</div>
+        </div>
+      </div>
+      <p v-if="g11Source !== 'unavailable' && !g11Reconcile.isConsistent" class="g11-hint">
+        差异常见原因：G11含权益法核算收益(G7-14)、债务重组损益、其他非G1循环投资收益。
+      </p>
+    </section>
+
     <div class="tab-toolbar">
       <el-segmented v-model="calc.segment.value" :options="segmentOptions" size="small" />
       <el-tag size="small" type="info" effect="plain">共 {{ currentRowCount }} 行</el-tag>
@@ -482,9 +529,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, computed, inject, watch } from 'vue'
+import { ref, toRef, computed, inject, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG1IncomeCalc } from '../../composables/useG1IncomeCalc'
+import { pullG11AuditedForG1, buildG1G11Reconcile } from '../../composables/g1G11IncomePull'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G1AuditTextCards from '../G1AuditTextCards.vue'
@@ -495,6 +543,7 @@ const props = defineProps<{
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   wpId?: string
+  projectId?: string
 }>()
 
 const wpId = computed(() => props.wpId ?? '')
@@ -505,6 +554,35 @@ const calc = useG1IncomeCalc({
   allResponses: toRef(props, 'allResponses'),
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
+})
+
+// ─── G11 投资收益跨底稿勾稽 ───────────────────────────────────────────────────
+const g11Audited = ref(0)
+const g11Source = ref<'audited' | 'unadjusted' | 'unavailable'>('unavailable')
+const g11Loading = ref(false)
+
+const g11Reconcile = computed(() => buildG1G11Reconcile({
+  g1InterestTotal: calc.interestTotal.value,
+  g1DividendTotal: calc.dividendReceivableTotal.value,
+  g1DisposalTotal: calc.disposalNetTotal.value,
+  g11Audited: g11Audited.value,
+  g11Source: g11Source.value,
+}))
+
+async function pullG11() {
+  if (!props.projectId) return
+  g11Loading.value = true
+  try {
+    const result = await pullG11AuditedForG1(props.projectId)
+    g11Audited.value = result.audited
+    g11Source.value = result.source
+  } finally {
+    g11Loading.value = false
+  }
+}
+
+onMounted(() => {
+  if (props.projectId) void pullG11()
 })
 
 const AUDIT_NOTE_KEY = 'G1-5-audit-note'
@@ -758,4 +836,6 @@ function onImported() {
   font-weight: 600;
   color: #303133;
 }
+.g11-recon-card { border-left: 3px solid var(--el-color-primary-light-5); }
+.g11-hint { font-size: 12px; color: #909399; margin: 6px 0 0 4px; }
 </style>

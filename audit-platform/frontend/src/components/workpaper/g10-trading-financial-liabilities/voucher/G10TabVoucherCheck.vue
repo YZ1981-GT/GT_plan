@@ -3,7 +3,7 @@
     <div class="section-head">
       <h3 class="sheet-title">G10-7 交易性金融负债凭证检查表</h3>
       <div class="head-actions">
-        <GtVoucherSamplingEngine :project-id="projectId" :account-codes="[G10_ACCOUNT_CODE]" dialog-mode @filled="onSampleFilled" />
+        <GtVoucherSamplingEngine v-if="!isReadonly && wpId && projectId" :project-id="projectId" :workpaper-id="wpId" :account-code="G10_ACCOUNT_CODE" phase="final" :year="auditYear ?? new Date().getFullYear()" @filled="onSampleFilled" />
         <G10ImportExportDropdown :wp-id="wpId" sheet="G10-7" @imported="onImported" />
         <el-button size="small" :disabled="isReadonly" data-testid="g10-export-memo" @click="exportMemo">
           📄 抽样备忘

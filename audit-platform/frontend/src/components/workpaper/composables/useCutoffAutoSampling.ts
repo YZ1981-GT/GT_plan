@@ -23,6 +23,7 @@ import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { determineCutoffStatus, computeDateRange, type CutoffDirection, type CutoffStatus } from './cutoffJudgment'
+import { inWindow as canonicalInWindow, judgeCrossPeriod as canonicalJudge } from './cutoffCanonical'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -123,12 +124,6 @@ export function applyFillMode(
 // spec: voucher-check-sampling-integration, Task 10 基座（Task 3 先行落地以供属性测试）
 // 纯函数、无 Vue 依赖，泛型保持调用方凭证结构不变。
 
-/** 解析 YYYY-MM-DD 为毫秒时间戳（本地 0 点，避免时区偏移）；非法返回 NaN。 */
-function parseDateMs(dateStr: string | null | undefined): number {
-  if (!dateStr) return NaN
-  return new Date(dateStr + 'T00:00:00').getTime()
-}
-
 /**
  * 基准日 ±N 天窗口过滤（纯函数）。
  *
@@ -143,15 +138,9 @@ export function filterByCutoffWindow<T extends { voucherDate: string }>(
   daysBefore: number,
   daysAfter: number,
 ): T[] {
+  // 薄封装：委托 cutoffCanonical.inWindow（单一真源）。行为等价（P10 已锁定）。
   const list = Array.isArray(vouchers) ? vouchers : []
-  const { start, end } = computeDateRange(cutoffDate, daysBefore, daysAfter)
-  const startMs = parseDateMs(start)
-  const endMs = parseDateMs(end)
-  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return []
-  return list.filter((v) => {
-    const d = parseDateMs(v?.voucherDate)
-    return Number.isFinite(d) && d >= startMs && d <= endMs
-  })
+  return list.filter((v) => canonicalInWindow(v?.voucherDate, cutoffDate, daysBefore, daysAfter))
 }
 
 /**
@@ -168,21 +157,15 @@ export function markCutoffCrossPeriod(
   v: { voucherDate: string; businessDate?: string | null },
   cutoffDate: string,
 ): boolean {
-  const cutoffMs = parseDateMs(cutoffDate)
-  const bookMs = parseDateMs(v?.voucherDate)
-  if (!Number.isFinite(cutoffMs) || !Number.isFinite(bookMs)) return false
-
-  const bookAfter = bookMs > cutoffMs
-  const bizStr = v?.businessDate
-  if (!bizStr) {
-    // 单日期降级：记账日期落在基准日之后 → 跨期疑点
-    return bookAfter
-  }
-  const bizMs = parseDateMs(bizStr)
-  if (!Number.isFinite(bizMs)) return bookAfter
-  const bizAfter = bizMs > cutoffMs
-  // 分居两侧 → 跨期
-  return bookAfter !== bizAfter
+  // 薄封装：委托 cutoffCanonical.judgeCrossPeriod（cutoff-boundary 模式）。
+  // 双侧齐全→XOR；仅单侧(或另一侧非法)→单日期降级(晚于截止日为疑点)；均缺→false。
+  // 行为等价 legacy（P8/P9 已锁定，含非法 businessDate 降级）。
+  const verdict = canonicalJudge(
+    { bookDate: v?.voucherDate ?? '', documentDate: v?.businessDate ?? '' },
+    cutoffDate,
+    'cutoff-boundary',
+  )
+  return verdict === 'crossing' || verdict === 'suspect'
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -527,18 +510,10 @@ export function useCutoffAutoSampling(options: CutoffAutoSamplingOptions) {
     // 应用填充策略
     const result = applyFillMode(existing, selected, mode)
 
-    // 创建版本链快照（fire-and-forget，失败不阻塞主流程）
-    http.post(
-      `/api/projects/${projectId.value}/workpapers/${workpaperId.value}/versions`,
-      {
-        snapshot_type: 'auto_sampling',
-        description: `截止测试自动提取：${config.value.accountCodes.join(',')} ${config.value.cutoffDate}`,
-      },
-    ).catch(() => {
-      // fire-and-forget: 版本链快照失败仅静默忽略
-    })
+    // 版本链快照由后端 cutoff-fill 统一创建（VersionTrailService），
+    // 前端不再重复创建，避免一次填充产生两份快照。
 
-    // 记录填充日志（含 before_data 快照 — 向后兼容）
+    // 记录填充日志（含 before_data 快照 + filled_voucher_nos 供排除已提取）
     try {
       await http.post(
         `/api/projects/${projectId.value}/sampling/cutoff-fill`,
@@ -551,6 +526,9 @@ export function useCutoffAutoSampling(options: CutoffAutoSamplingOptions) {
           filled_count: selected.length,
           fill_mode: mode,
           before_data: existing,
+          // 已填充凭证号 → 后端存入 extraction_criteria.filled_voucher_nos，
+          // 供下次 exclude_extracted 排除，避免重复抽取
+          filled_voucher_nos: selected.map(v => v.voucherNo).filter(Boolean),
         },
       )
     } catch {
@@ -614,7 +592,9 @@ export function useCutoffAutoSampling(options: CutoffAutoSamplingOptions) {
       const res = await http.post(
         `/api/projects/${projectId.value}/sampling/cutoff-undo`,
         null,
-        { params: { log_id: logId } },
+        // 后端 cutoff-undo 强制要求 log_id + wp_id 两个 Query 参数，
+        // 漏传 wp_id 会 422；wp_id 亦作归属安全校验。
+        { params: { log_id: logId, wp_id: workpaperId.value } },
       )
 
       const data = res.data as any

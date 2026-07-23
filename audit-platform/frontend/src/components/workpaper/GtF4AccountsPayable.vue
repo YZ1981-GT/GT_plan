@@ -22,6 +22,19 @@
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
+      <!-- 全局勾稽告警 -->
+      <el-alert
+        v-if="tbAmount > 0 && f4AuditedTotal > 0 && Math.abs(f4AuditedTotal - tbAmount) > 1"
+        type="warning"
+        :closable="false"
+        style="margin-bottom: 8px"
+      >
+        <template #title>
+          F4-1审定合计 {{ f4AuditedTotal.toLocaleString() }} 与试算平衡表(2202)
+          {{ tbAmount.toLocaleString() }} 差异 {{ Math.round(f4AuditedTotal - tbAmount).toLocaleString() }}
+        </template>
+      </el-alert>
+
       <GtOnlyOfficeSheet
         v-if="dualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
@@ -55,6 +68,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :bs-date="bsDate"
         />
 
         <F4TabAdjustment
@@ -95,6 +109,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :bs-date="bsDate"
         />
 
         <F4TabVoucherCheck
@@ -192,7 +207,31 @@ const auditYear = computed(() => {
   if (props.year) return props.year
   const bs = formData.projectContext.value?.bs_date
   if (bs && String(bs).length >= 4) return parseInt(String(bs).slice(0, 4), 10)
+  const yr = formData.projectContext.value?.audit_year
+  if (yr) return parseInt(String(yr), 10)
   return new Date().getFullYear() - 1
+})
+const bsDate = computed(() => formData.projectContext.value?.bs_date || '')
+const tbAmount = computed(() => {
+  const ctx = formData.projectContext.value
+  return ctx?.tb_amount ?? ctx?.tb_amount_audited ?? 0
+})
+
+// 从 allResponses 解析 F4-1 审定合计（用于全局勾稽告警）
+const f4AuditedTotal = computed(() => {
+  try {
+    const raw = allResponses.value.get('F4-1-adj-nature-rows')?.remark
+    if (!raw) return 0
+    const rows = JSON.parse(raw)
+    if (!Array.isArray(rows)) return 0
+    // 找到合计行或逐行累加期末审定数
+    let total = 0
+    for (const r of rows) {
+      if (r.label === '合计') return parseFloat(r.closingAdjusted ?? r.closingUnadjusted ?? 0) || 0
+      total += parseFloat(r.closingAdjusted ?? 0) || 0
+    }
+    return total
+  } catch { return 0 }
 })
 
 const runtime = inject(WorkpaperRuntimeContextKey, null)
@@ -206,6 +245,8 @@ const { versionTrailRef, openVersionHistory } = versionToolbar
 
 provide('f4VersionTrailRef', versionTrailRef)
 provide('f4OpenVersionHistory', openVersionHistory)
+provide('f4BsDate', bsDate)
+provide('f4TbAmount', tbAmount)
 
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''

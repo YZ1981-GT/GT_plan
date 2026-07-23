@@ -172,11 +172,20 @@ export interface CNoteTableHtmlData {
   [key: string]: any
 }
 
+export interface SyncColumnDef {
+  key: string
+  label: string
+  is_label?: boolean
+  format?: string
+}
+
 export interface SyncPayload {
   wp_id: string
   sheet_name: string
   section_id: string
   sub_table_data: Record<string, RowData[]>
+  /** 列头元数据（disclosure-table-sync-convergence）：sub_table_id → 源对齐列头定义 */
+  columns?: Record<string, SyncColumnDef[]>
   current_standard: string
 }
 

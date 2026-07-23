@@ -103,8 +103,9 @@ export function useB22BFormData(wpId: Ref<string>, projectId: Ref<string>) {
     if (!wpId.value || items.length === 0) return
     saving.value = true
     try {
+      // 注意：不要传 project_id（wpId 不是 project_id，传错会触发 422 project_mismatch）。
+      // 省略后端会从 wp_id 反查真实 project_id。
       await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
-        project_id: wpId.value,
         items: items.map((item) => ({
           item_id: item.item_id,
           conclusion: item.conclusion || null,

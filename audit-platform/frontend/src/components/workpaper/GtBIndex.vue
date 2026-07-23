@@ -61,13 +61,13 @@
       </el-descriptions>
     </div>
 
-    <!-- ─── B60 系列底稿面板（B60 专属：10 个系列底稿完整清单） ─── -->
-    <B60SeriesPanel
+    <!-- ─── B60 总体审计策略专属组件（章节结构化 + 子底稿双模式/结构化 + 工时表切页） ─── -->
+    <GtB60Bundle
       v-if="isB60Series"
       :project-id="projectId"
       :wp-id="wpId"
-      :worktime-sheet-name="worktimeSheetName"
-      @jump-to-sheet="handleNavigate"
+      :sub-wp-id-map="b60SubWpIdMap"
+      @navigate-sheet="handleB60Navigate"
     />
 
     <!-- ─── 底稿架构导航（流程图，取代表格式索引导航） ─── -->
@@ -124,7 +124,7 @@ import { ref, computed, watch, onBeforeUnmount, defineAsyncComponent } from 'vue
 import { useRoute, useRouter } from 'vue-router'
 import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
 
-const B60SeriesPanel = defineAsyncComponent(() => import('./B60SeriesPanel.vue'))
+const GtB60Bundle = defineAsyncComponent(() => import('./b60/GtB60Bundle.vue'))
 
 // ─── Types ───
 interface NavigationRow {
@@ -196,7 +196,18 @@ const currentWpCode = computed<string>(() => {
 })
 // B60「总体审计策略及具体审计计划」是多文件底稿（1 xlsx + 9 docx）
 const isB60Series = computed<boolean>(() => currentWpCode.value === 'B60')
-// 从 navigation_rows 提取工时表（B60-1）真实 sheet 名，供 B60SeriesPanel 切换页签
+// B60-* 子底稿 wp_id 映射（从 cycle_workpapers 派生，供 GtB60Bundle 在线编辑取子底稿 wp）
+const b60SubWpIdMap = computed<Record<string, string>>(() => {
+  const map: Record<string, string> = {}
+  for (const wp of cycleWorkpapers.value) {
+    const code = wp.wp_code || ''
+    if (wp.wp_id && (code.startsWith('B60-') || /^B60[A-D]$/.test(code))) {
+      map[code] = wp.wp_id
+    }
+  }
+  return map
+})
+// 从 navigation_rows 提取工时表（B60-1）真实 sheet 名，供 GtB60Bundle 工时表切页
 const worktimeSheetName = computed<string>(() => {
   const rows = props.htmlData?.navigation_rows ?? []
   const hit = rows.find(
@@ -247,6 +258,15 @@ watch(() => props.htmlData, () => {
 function handleNavigate(sheetName: string) {
   // 架构图节点点击 → 冒泡给父组件切换 sheet
   emit('jump-to-section', sheetName)
+}
+
+// GtB60Bundle 的工时表切页：B60-1 → 映射到 render-config 已渲染的真实工时表 sheet 名
+function handleB60Navigate(sheetName: string) {
+  if (sheetName && sheetName.startsWith('B60-1') && worktimeSheetName.value) {
+    handleNavigate(worktimeSheetName.value)
+  } else {
+    handleNavigate(sheetName)
+  }
 }
 
 function onCycleCardClick(wp: CycleWorkpaper) {

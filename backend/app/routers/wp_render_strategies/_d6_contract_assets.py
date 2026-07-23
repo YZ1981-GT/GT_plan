@@ -165,6 +165,50 @@ async def render(ctx: RenderContext) -> dict | None:
         "soe": "soe" in standards,
     }
 
+    # bs_date for cutoff / post-period usage
+    project_context["bs_date"] = f"{project_context['audit_year']}-12-31" if project_context["audit_year"] else ""
+
+    # ─── TB预填: 科目1402合同资产期末审定/未审 ──────────────────────────
+    tb_amount = 0
+    try:
+        tb_result = await db.execute(
+            sa.text(
+                "SELECT COALESCE(SUM(ABS(audited_amount)), SUM(ABS(unadjusted_amount)), 0) AS amount "
+                "FROM trial_balance "
+                "WHERE project_id = :pid AND standard_account_code LIKE '1402%' "
+                "AND is_deleted = false"
+            ),
+            {"pid": str(ctx.project_id)},
+        )
+        tb_row = tb_result.fetchone()
+        if tb_row and tb_row.amount:
+            tb_amount = float(tb_row.amount)
+    except Exception as e:
+        logger.warning("D6 render: trial_balance 1402 查询失败: %s", e)
+
+    project_context["tb_amount"] = tb_amount
+
+    # ─── 关联方注册表 ────────────────────────────────────────────────────
+    related_parties: list = []
+    try:
+        rp_result = await db.execute(
+            sa.text(
+                "SELECT name, relation_type "
+                "FROM related_party_registry "
+                "WHERE project_id = :pid AND is_deleted = false"
+            ),
+            {"pid": str(ctx.project_id)},
+        )
+        for rp_row in rp_result.fetchall():
+            related_parties.append({
+                "name": rp_row.name or "",
+                "type": rp_row.relation_type or "",
+            })
+    except Exception as e:
+        logger.warning("D6 render: related_party_registry 查询失败: %s", e)
+
+    project_context["related_parties"] = related_parties
+
     return {
         "sections": sections,
         "adjudication_config": adjudication_config,

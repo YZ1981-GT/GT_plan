@@ -27,7 +27,9 @@
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <el-button v-if="!isReadonly" size="small" type="primary" @click="importFromLedger">从序时账导入</el-button>
+      </div>
       <div class="toolbar-right">
         <el-dropdown size="small" trigger="click">
           <el-button size="small">导入导出 ▾</el-button>
@@ -50,6 +52,45 @@
 
     <!-- TB 勾稽校验 -->
     <el-alert v-if="tbCrossCheck" :type="tbCrossCheck.type" :title="tbCrossCheck.message" :closable="false" show-icon style="margin-bottom: 8px" />
+
+    <!-- D7↔D4 收入确认勾稽 -->
+    <div class="analysis-card reconcile-card">
+      <h4 class="card-title">D7 合同负债减少 ↔ D4 收入确认勾稽</h4>
+      <p class="reconcile-hint">CAS14：合同负债借方减少通常对应履约义务完成后确认的收入，两者应大体匹配（差异需说明退款/取消或直接收入确认等原因）。</p>
+      <div class="reconcile-grid">
+        <div class="reconcile-item">
+          <span class="reconcile-label">D7 本期借方减少合计</span>
+          <span class="reconcile-value">{{ fmtAmt(reconcileResult.d7DebitTotal) }}</span>
+        </div>
+        <div class="reconcile-item">
+          <span class="reconcile-label">D4 收入审定数</span>
+          <el-input-number
+            v-if="!isReadonly"
+            :model-value="reconcileResult.d4RevenueAudited"
+            :controls="false"
+            size="small"
+            style="width:160px"
+            @change="(v: number) => onSetD4Revenue(v ?? 0)"
+          />
+          <span v-else class="reconcile-value">{{ fmtAmt(reconcileResult.d4RevenueAudited) }}</span>
+          <GtIndexChip value="wp:D4-1" :context-project-id="projectId" style="margin-left:6px" />
+        </div>
+        <div class="reconcile-item">
+          <span class="reconcile-label">差异</span>
+          <span class="reconcile-value" :class="{ 'diff-red': !reconcileResult.isConsistent }">{{ fmtAmt(reconcileResult.difference) }}</span>
+          <el-tag v-if="reconcileResult.isConsistent" type="success" size="small">勾稽一致</el-tag>
+          <el-tag v-else type="warning" size="small">存在差异</el-tag>
+        </div>
+      </div>
+      <el-alert
+        v-if="!reconcileResult.isConsistent && reconcileResult.warningMessage"
+        type="warning"
+        :closable="false"
+        show-icon
+        :title="reconcileResult.warningMessage"
+        style="margin-top:8px"
+      />
+    </div>
 
     <!-- (一) 借方发生额分析 -->
     <div class="analysis-card">
@@ -226,8 +267,9 @@
  * Task: 19.1
  * Requirements: 9.1-9.10, 19.2, 20.1
  */
-import { computed, inject, toRef, type Ref } from 'vue'
+import { computed, inject, toRef, onBeforeUnmount, type Ref } from 'vue'
 import { useD7Analysis } from '../composables/useD7Analysis'
+import { useD7D4Reconcile } from '../composables/useD7D4Reconcile'
 import { useD7ImportExport } from '../composables/useD7ImportExport'
 import { useD7AiGenerate } from '../composables/useD7AiGenerate'
 import { isChangeRateExceeding } from '../composables/useD7FormulaEngine'
@@ -253,6 +295,7 @@ const {
   creditRows, creditTotal, creditDiff,
   top10Rows, top10Concentration, isHighConcentration,
   auditNotes,
+  importFromLedger,
   addDebitRow, addCreditRow,
   removeDebitRow, removeCreditRow,
   updateDebitCell, updateCreditCell,
@@ -262,6 +305,22 @@ const {
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
+})
+
+// D7↔D4 收入确认勾稽
+const { reconcileResult, setD4RevenueAudited, dispose: disposeReconcile } = useD7D4Reconcile({
+  allResponses: allResponsesRef,
+  projectId: computed(() => props.projectId) as unknown as Ref<string>,
+})
+
+function onSetD4Revenue(amount: number): void {
+  setD4RevenueAudited(amount)
+  // 持久化手工填入的 D4 收入审定数
+  props.debouncedSave('D7-d4-revenue-audited', { remark: String(amount) })
+}
+
+onBeforeUnmount(() => {
+  disposeReconcile()
 })
 
 const tbCrossCheck = computed<{ type: 'info' | 'success' | 'warning'; message: string } | null>(() => {
@@ -400,6 +459,13 @@ function isRateExceed(rate: number | '' | 'N/A'): boolean {
 
 .analysis-card { margin-bottom: 20px; padding: 16px; border: 1px solid #ebeef5; border-radius: 8px; }
 .card-title { font-size: 14px; font-weight: 600; margin: 0 0 12px; color: #303133; }
+
+.reconcile-card { background: #fcfdff; }
+.reconcile-hint { font-size: 12px; color: #909399; margin: 0 0 12px; line-height: 1.5; }
+.reconcile-grid { display: flex; gap: 32px; flex-wrap: wrap; align-items: center; }
+.reconcile-item { display: flex; align-items: center; gap: 8px; }
+.reconcile-label { font-size: var(--wp-font-size, 13px); color: #606266; }
+.reconcile-value { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #303133; }
 .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
 .diff-line { display: flex; gap: 12px; align-items: center; font-size: var(--wp-font-size, 13px); }
 .diff-red { color: #f56c6c; font-weight: 600; }

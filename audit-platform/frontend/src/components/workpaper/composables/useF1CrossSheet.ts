@@ -17,6 +17,8 @@ import {
   type DetailRowForFormula,
 } from './useF1FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
+import { PRESET_SEGMENTS, type AgingSegment } from '@/composables/useAgingConfig'
+import { resolveAgingLabel, formatAgingAmountHint } from './agingPresets'
 
 function collectAgingKeys(rows: F1DetailRowRaw[]): string[] {
   const keys = new Set<string>()
@@ -36,10 +38,14 @@ function sumAgingMap(aging: Record<string, number> | undefined, keys: string[]):
   return result
 }
 
+const OVER_ONE_YEAR_DAY_FROM = 366
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface UseF1CrossSheetOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
+  /** 项目账龄段（可选）；有则优先用于超1年筛选与标签 */
+  segments?: Ref<AgingSegment[]>
 }
 
 /** F1-2 明细行原始 JSON 结构（remark 中存储） */
@@ -136,7 +142,7 @@ function safeParseRows<T>(jsonStr: string | null | undefined): T[] {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useF1CrossSheet(options: UseF1CrossSheetOptions) {
-  const { allResponses } = options
+  const { allResponses, segments } = options
 
   const crossSheetStatus = ref<'loaded' | 'loading' | 'error'>('loaded')
 
@@ -145,6 +151,32 @@ export function useF1CrossSheet(options: UseF1CrossSheetOptions) {
   const detailRows = computed<F1DetailRowRaw[]>(() => {
     const resp = allResponses.value.get('F1-det-rows')
     return safeParseRows<F1DetailRowRaw>(resp?.remark)
+  })
+
+  /**
+   * 有效账龄段：优先项目配置，否则从明细 key 兜底，再兜底 THREE_YEAR
+   */
+  const agingSegments: ComputedRef<AgingSegment[]> = computed(() => {
+    if (segments?.value?.length) return segments.value
+    const keys = collectAgingKeys(detailRows.value)
+    if (keys.length) {
+      const fromPreset = PRESET_SEGMENTS.FIVE_YEAR.concat(PRESET_SEGMENTS.THREE_YEAR)
+      const byKey = new Map(fromPreset.map(s => [s.key, s]))
+      return keys.map((k) => byKey.get(k) || {
+        key: k,
+        label: resolveAgingLabel(k),
+        dayFrom: k === 'within1' ? 0 : OVER_ONE_YEAR_DAY_FROM,
+        dayTo: null,
+      })
+    }
+    return PRESET_SEGMENTS.THREE_YEAR
+  })
+
+  const overOneYearKeys = computed(() => {
+    const segs = agingSegments.value
+    const byDay = segs.filter(s => s.dayFrom >= OVER_ONE_YEAR_DAY_FROM).map(s => s.key)
+    if (byDay.length) return byDay
+    return segs.filter(s => s.key !== 'within1').map(s => s.key)
   })
 
   /** 将原始行转为公式引擎所需的 DetailRowForFormula 结构 */
@@ -206,12 +238,13 @@ export function useF1CrossSheet(options: UseF1CrossSheetOptions) {
   // ─── F1-2 → F1-5 筛选账龄>1年行 ─────────────────────────────────────
 
   /**
-   * longTermRows: 筛选审定账龄中非「1年以内」段合计 > 0 的行
-   * 用于 F1-5 长期检查表"从F1-2导入"功能
+   * longTermRows: 筛选审定账龄中「>1年段」合计 > 0 的行
+   * 用于 F1-5 长期检查表"从F1-2导入"功能；描述用枚举 label
    */
   const longTermRows: ComputedRef<LongTermImportRow[]> = computed(() => {
-    const keys = collectAgingKeys(detailRows.value)
-    const over1Keys = keys.filter(k => k !== 'within1')
+    const keys = agingSegments.value.map(s => s.key)
+    const over1Keys = overOneYearKeys.value
+    const segs = agingSegments.value
     return detailRows.value
       .filter(row => {
         const over1 = over1Keys.reduce((s, k) => s + parseNum(row.agingAudited?.[k]), 0)
@@ -221,15 +254,7 @@ export function useF1CrossSheet(options: UseF1CrossSheetOptions) {
         const aging = sumAgingMap(row.agingAudited, keys)
         const parts: string[] = []
         for (const k of over1Keys) {
-          if (aging[k] > 0) {
-            if (k === 'y1to2') parts.push('1-2年')
-            else if (k === 'y2to3') parts.push('2-3年')
-            else if (k === 'over3') parts.push('3年以上')
-            else if (k === 'y3to4') parts.push('3-4年')
-            else if (k === 'y4to5') parts.push('4-5年')
-            else if (k === 'over5') parts.push('5年以上')
-            else parts.push(k)
-          }
+          if (aging[k] > 0) parts.push(resolveAgingLabel(k, segs))
         }
         return {
           customerName: row.customerName || '',
@@ -247,26 +272,20 @@ export function useF1CrossSheet(options: UseF1CrossSheetOptions) {
    * 用于 F1-6 关联方检查表"从F1-2导入"功能
    */
   const relatedPartyRows: ComputedRef<RelatedPartyImportRow[]> = computed(() => {
+    const segs = agingSegments.value
     return detailRows.value
       .filter(row => row.relationType !== '非关联方' && row.relationType !== '')
-      .map(row => {
-        const aging = row.agingAudited || {}
-        const agingParts: string[] = []
-        for (const [k, v] of Object.entries(aging)) {
-          if (parseNum(v) !== 0) agingParts.push(`${k}:${parseNum(v)}`)
-        }
-        return {
-          customerName: row.customerName || '',
-          relationType: row.relationType,
-          priorAudited: parseNum(row.priorAudited),
-          endAudited: parseNum(row.endAudited),
-          debit: parseNum(row.debit),
-          credit: parseNum(row.credit),
-          nature: row.nature || '',
-          agingDescription: agingParts.join('; '),
-          postPeriodSettlement: parseNum(row.postPeriodSettlement),
-        }
-      })
+      .map(row => ({
+        customerName: row.customerName || '',
+        relationType: row.relationType,
+        priorAudited: parseNum(row.priorAudited),
+        endAudited: parseNum(row.endAudited),
+        debit: parseNum(row.debit),
+        credit: parseNum(row.credit),
+        nature: row.nature || '',
+        agingDescription: formatAgingAmountHint(row.agingAudited, segs),
+        postPeriodSettlement: parseNum(row.postPeriodSettlement),
+      }))
   })
 
   // ─── F1-3 → F1-1 AJE/RJE 汇总 ───────────────────────────────────────
@@ -344,6 +363,7 @@ export function useF1CrossSheet(options: UseF1CrossSheetOptions) {
     // F1-2 → F1-1 聚合
     natureAggregation,
     agingAggregation,
+    agingSegments,
     // F1-2 → F1-5 筛选
     longTermRows,
     // F1-2 → F1-6 筛选

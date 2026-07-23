@@ -14,6 +14,7 @@
         <el-tag v-if="imp.agingMismatchCount.value" type="danger" size="small">
           库龄合计异常 {{ imp.agingMismatchCount.value }} 项
         </el-tag>
+        <el-button size="small" :disabled="isReadonly || pullPriceLoading" :loading="pullPriceLoading" @click="handlePullRecentPrice">参考近期售价</el-button>
       </div>
     </header>
 
@@ -410,6 +411,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, toRef, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useF2ImpairmentTest } from '../../composables/useF2ImpairmentTest'
 import { useF2ImpairmentOcr } from '../../composables/useF2ImpairmentOcr'
 import { useF2ValuationAiGenerate, type F2ValAiSection } from '../../composables/useF2ValuationAiGenerate'
@@ -427,6 +429,8 @@ import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
 
 const props = defineProps<{
   wpId?: string
+  projectId?: string
+  year?: number
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()
@@ -459,6 +463,32 @@ function saveAuditNote(): void {
   window.dispatchEvent(new CustomEvent('f2-val:save-items', { detail: { items: [item] } }))
 }
 watch(auditNote, () => saveAuditNote())
+
+const pullPriceLoading = ref(false)
+async function handlePullRecentPrice(): Promise<void> {
+  if (props.isReadonly || pullPriceLoading.value) return
+  const pid = props.projectId || ''
+  const yr = props.year || new Date().getFullYear() - 1
+  if (!pid) {
+    ElMessage.info('无近期售价参考（缺少项目信息）')
+    return
+  }
+  pullPriceLoading.value = true
+  try {
+    const result = await imp.pullRecentPrice(pid, yr)
+    if (result.filled === 0 && result.skipped === 0) {
+      ElMessage.info('无近期售价参考')
+    } else if (result.filled > 0 && result.skipped > 0) {
+      ElMessage.success(`参考带入 ${result.filled} 项（${result.skipped} 项已有手录未覆盖）`)
+    } else if (result.filled > 0) {
+      ElMessage.success(`参考带入 ${result.filled} 项售价`)
+    } else {
+      ElMessage.info(`${result.skipped} 项已有手录售价，未覆盖`)
+    }
+  } finally {
+    pullPriceLoading.value = false
+  }
+}
 
 const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
 const { ocrLoadingId, uploadAndMerge } = useF2ImpairmentOcr(wpIdRef)

@@ -209,6 +209,25 @@ export function useB22BDeficiency(
     persistAll()
   }
 
+  /**
+   * 从完整缺陷快照同步（B22A emit control:deficiency-changed 载荷 { total, deficiencies }）。
+   * 内部按 source key 计算 added/removed，复用 syncFromEvent 逻辑，实现 B22A→B22B 实时同步。
+   */
+  function syncFromFullList(deficiencies: DeficiencyItem[]): void {
+    const keyOf = (d: { tab: number; subPanel: string | null; index: number }) =>
+      `${d.tab}|${d.subPanel ?? ''}|${d.index}`
+    const incomingKeys = new Set(deficiencies.map(keyOf))
+    const currentKeys = new Set(deficiencyItems.value.map((i) => keyOf(i.source)))
+
+    const added = deficiencies.filter((d) => !currentKeys.has(keyOf(d)))
+    const removed = deficiencyItems.value
+      .filter((i) => !incomingKeys.has(keyOf(i.source)))
+      .map((i) => i.source)
+
+    if (added.length === 0 && removed.length === 0) return
+    syncFromEvent({ added, removed, total: deficiencies.length })
+  }
+
   /** 从 B22A checklist_responses 加载现有缺陷 */
   function loadFromB22A(b22aResponses: ChecklistResponse[]): void {
     // Extract deficiency items from B22A responses
@@ -277,11 +296,12 @@ export function useB22BDeficiency(
     const TAB_NAMES: Record<number, string> = {
       1: '控制环境',
       2: '风险评估过程',
-      3: '信息系统与沟通',
-      4: '控制活动',
+      3: '信息与沟通',
+      4: '控制活动与IT',
       5: '监督',
     }
     const base = TAB_NAMES[tab] || `要素${tab}`
+    if (subPanel === 'mo') return `${base} - 管理层凌驾于控制之上`
     if (subPanel) return `${base} - ${subPanel}`
     return base
   }
@@ -665,6 +685,7 @@ export function useB22BDeficiency(
     eliminatedItems,
     // 同步
     syncFromEvent,
+    syncFromFullList,
     loadFromB22A,
     // 评价操作
     setCategory,

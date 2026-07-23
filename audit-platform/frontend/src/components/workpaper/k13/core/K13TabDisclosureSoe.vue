@@ -19,7 +19,7 @@
         <div class="section-header">
           <span class="section-title">营业外支出披露明细（国有企业）</span>
           <div class="section-actions">
-            <el-button size="small" type="primary" link @click="applyAutoFill">
+            <el-button size="small" type="primary" link @click="applyAutoFill()">
               <el-icon><Refresh /></el-icon>从审定表取数
             </el-button>
             <el-button size="small" type="primary" link @click="generateAI('disclosure-soe')">
@@ -137,7 +137,7 @@ import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue
 import { ElMessage } from 'element-plus'
 import { Refresh, MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
-import { api } from '@/services/apiProxy'
+import { generateK13AiText } from '../../composables/useK13AiText'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
@@ -158,6 +158,7 @@ const emit = defineEmits<{
 
 const ACCOUNT_CODE = '6711'
 const ABNORMAL_THRESHOLD = 0.5
+const DYN_PREFIX = 'K13-disc-soe-dyn-'
 
 /** 营业外支出标准去向分类（国企版，精简分类） */
 const CATEGORIES = [
@@ -217,25 +218,97 @@ function loadSavedData(): void {
   }
 }
 
-// ─── Auto-fill from K13-1 adjudicated data ───────────────────────────────────
+// ─── Auto-fill from K13-1（P0 修复：原读 `K13-1-row-${i}-audited` 死键，
+//     useK13Adjudication 从不写 → 恒 no-op；改读 `K13-1-rows` 按 name 匹配） ─────
 
-function applyAutoFill(): void {
-  for (let i = 0; i < CATEGORIES.length; i++) {
-    const adjKey = `K13-1-row-${i}-audited`
-    const adjSaved = props.allResponses.get(adjKey)
-    if (adjSaved) {
-      const val = Number(adjSaved.remark ?? adjSaved.conclusion ?? 0)
-      if (val !== 0) {
-        disclosureRows.value[i].currentAmount = val
+function buildAdjAuditedMap(): Map<string, number> {
+  const map = new Map<string, number>()
+  const raw = props.allResponses.get('K13-1-rows')
+  if (!raw) return map
+  try {
+    const parsed = typeof raw.remark === 'string' ? JSON.parse(raw.remark) : (raw.remark ?? raw.conclusion)
+    if (Array.isArray(parsed)) {
+      for (const r of parsed) {
+        const name = String(r?.name ?? '').trim()
+        if (!name) continue
+        const audited = Number(r?.audited ?? 0)
+          || (Number(r?.unadjusted ?? 0) + Number(r?.aje ?? 0) + Number(r?.rje ?? 0))
+        map.set(name, audited)
       }
     }
-  }
+  } catch { /* ignore */ }
+  return map
+}
 
-  const totalKey = 'K13-1-adjudicated-amount'
-  const totalSaved = props.allResponses.get(totalKey)
-  if (totalSaved) {
-    totalAdjudicated.value = Number(totalSaved.remark ?? totalSaved.conclusion ?? 0)
+function loadDynamicRows(): void {
+  for (const [key, val] of props.allResponses) {
+    if (!key.startsWith(DYN_PREFIX)) continue
+    try {
+      const parsed = typeof val.remark === 'string' ? JSON.parse(val.remark) : val.remark
+      if (parsed && parsed.category && !disclosureRows.value.some(r => r.category === parsed.category)) {
+        disclosureRows.value.push({
+          category: parsed.category,
+          currentAmount: Number(parsed.currentAmount || 0),
+          priorAmount: Number(parsed.priorAmount || 0),
+          nonRecurring: Number(parsed.nonRecurring || 0),
+          remark: parsed.remark || '',
+        })
+      }
+    } catch { /* ignore */ }
   }
+}
+
+function persistDynamicRow(row: DisclosureRow): void {
+  const safeKey = DYN_PREFIX + row.category.replace(/[^\w\u4e00-\u9fa5]/g, '_')
+  emit('save', safeKey, JSON.stringify({
+    category: row.category,
+    currentAmount: row.currentAmount,
+    priorAmount: row.priorAmount,
+    nonRecurring: row.nonRecurring,
+    remark: row.remark,
+  }))
+}
+
+function applyAutoFill(silent = false): void {
+  const adjMap = buildAdjAuditedMap()
+  if (adjMap.size === 0) {
+    if (!silent) ElMessage.warning('未找到 K13-1 审定表数据，请先编制审定表')
+    return
+  }
+  const matchedNames = new Set<string>()
+  let matched = 0
+  for (let i = 0; i < CATEGORIES.length; i++) {
+    let val = adjMap.get(CATEGORIES[i])
+    let hitName = CATEGORIES[i]
+    if (val == null) {
+      for (const [name, amt] of adjMap) {
+        if (CATEGORIES[i].includes(name) || name.includes(CATEGORIES[i])) { val = amt; hitName = name; break }
+      }
+    }
+    if (val != null && val !== 0) {
+      disclosureRows.value[i].currentAmount = val
+      handleRowChange(disclosureRows.value[i])
+      matchedNames.add(hitName)
+      matched++
+    }
+  }
+  totalAdjudicated.value = Array.from(adjMap.values()).reduce((s, v) => s + v, 0)
+
+  loadDynamicRows()
+  for (const [name, amt] of adjMap) {
+    if (matchedNames.has(name) || amt === 0) continue
+    const existing = disclosureRows.value.find(r => r.category === name)
+    if (existing) {
+      existing.currentAmount = amt
+      persistDynamicRow(existing)
+    } else {
+      const row: DisclosureRow = { category: name, currentAmount: amt, priorAmount: 0, nonRecurring: 0, remark: '' }
+      disclosureRows.value.push(row)
+      persistDynamicRow(row)
+    }
+    matched++
+  }
+  if (!silent) ElMessage.success(matched > 0 ? `已从审定表取数（匹配 ${matched} 项）` : '审定表暂无可匹配去向金额')
 }
 
 // ─── EventBus: subscribe 'substantive:adjudicated' + 'adjustment:created' ────
@@ -246,7 +319,7 @@ function handleAdjudicated(payload: any): void {
     if (payload.auditedAmount != null) {
       totalAdjudicated.value = Number(payload.auditedAmount)
     }
-    applyAutoFill()
+    applyAutoFill(true)
   }
 }
 
@@ -254,7 +327,7 @@ function handleAdjustmentCreated(payload: any): void {
   if (!payload) return
   // 调整分录变化时刷新附注数据（K13-3 → A13 + 附注刷新）
   if (payload.wpCode === 'K13') {
-    applyAutoFill()
+    applyAutoFill(true)
   }
 }
 
@@ -278,6 +351,9 @@ function handleNarrativeSave(): void {
     noteId: 'non_operating_expense',
     wpCode: 'K13',
     variant: 'soe',
+    accountCode: ACCOUNT_CODE,
+    projectId: props.projectId,
+    sectionIds: ['营业外支出', '五、营业外支出'],
     text: narrativeText.value,
   })
 }
@@ -286,20 +362,25 @@ function handleNarrativeSave(): void {
 
 async function generateAI(section: string): Promise<void> {
   if (!props.wpId) return
-  try {
-    const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section,
-      prompt: `为K13营业外支出底稿生成国有企业附注披露文本。去向分类：${CATEGORIES.join('/')}。审定发生额合计：${totalAdjudicated.value}。`,
-      context: JSON.stringify(disclosureRows.value),
-    })
-    const content = res?.data?.content || res?.content || ''
-    if (content && section === 'narrative') {
-      narrativeText.value = content
-      handleNarrativeSave()
-    }
-    ElMessage.success('AI生成完成')
-  } catch {
-    ElMessage.warning('AI生成失败，请手动填写')
+  // context 必须是 dict[str,str]（原 JSON.stringify 整个数组 → 后端 422 静默失败）
+  const lines = disclosureRows.value
+    .filter(r => r.currentAmount || r.priorAmount)
+    .map(r => `${r.category}：本期${r.currentAmount}｜上期${r.priorAmount}`)
+    .join('；')
+  const content = await generateK13AiText(props.wpId, {
+    section,
+    prompt: '为 K13 营业外支出底稿生成国有企业附注披露文本，需包含各去向分类的本期/上期发生额及重大变动说明。',
+    context: {
+      科目: '6711 营业外支出（国有企业版）',
+      去向分类: CATEGORIES.join('/'),
+      披露明细: lines || '（暂无数据）',
+      审定发生额合计: totalAdjudicated.value,
+    },
+    existingContent: section === 'narrative' ? narrativeText.value : '',
+  })
+  if (content && section === 'narrative') {
+    narrativeText.value = content
+    handleNarrativeSave()
   }
 }
 
@@ -344,7 +425,8 @@ function fmtAmt(val: number | null | undefined): string {
 
 onMounted(() => {
   loadSavedData()
-  applyAutoFill()
+  loadDynamicRows()
+  applyAutoFill(true)
   eventBus.on('substantive:adjudicated' as any, handleAdjudicated)
   eventBus.on('adjustment:created' as any, handleAdjustmentCreated)
 })
@@ -364,12 +446,12 @@ onUnmounted(() => {
 }
 
 .methodology-context {
-  border-left: 4px solid #e6a23c;
-  background: #fdf6ec;
-  padding: 12px 16px;
+  border-left: 4px solid #f59e0b;
+  background: #fffbeb;
+  padding: 10px 14px;
   border-radius: 4px;
   font-size: var(--wp-font-size, 13px);
-  color: #6b5900;
+  color: #78350f;
 }
 
 .cross-ref-bar {

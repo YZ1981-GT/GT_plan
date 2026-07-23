@@ -24,24 +24,27 @@ from ._cycle_import_export_common import create_cycle_import_export_router
 
 # ─── K11-2 明细表（按资产类别减值损失明细） ────────────────────────────────────
 
+# 列/键与前端 K11DetailRow（useK11Detail）严格一致，item_id=K11-2-detail-rows，存 remark。
 _K11_2_HEADERS = [
     "序号", "资产类别", "减值项目",
     "本期计提", "本期转回", "本期发生额",
     "来源底稿", "源底稿计提金额", "差异",
     "凭证", "结论", "备注",
+    "对应科目", "期初金额", "本期转销", "期末金额",
 ]
 _K11_2_KEYS = [
     "seq", "assetCategory", "impairmentItem",
-    "currentProvision", "currentReversal", "currentAmount",
+    "currentProvision", "currentReversal", "currentOccurrence",
     "sourceWp", "sourceAmount", "variance",
     "voucherRef", "conclusion", "remark",
+    "correspondingAccount", "allowanceOpening", "allowanceWriteoff", "allowanceEnding",
 ]
 
-# ─── K11-3 调整分录汇总（10列） ──────────────────────────────────────────────
-
+# ─── K11-3 调整分录汇总（源模板10列） ────────────────────────────────────────
+# 列/键与前端 AdjustmentEntry（K11TabAdjustment）严格一致，item_id=K11-3-adj-entries，存 remark。
 _K11_3_HEADERS = [
     "调整事项说明", "类别", "报表项目", "科目名称", "附注项目",
-    "摘要", "借方调整金额", "贷方调整金额", "索引", "备注",
+    "……", "借方调整金额", "贷方调整金额", "索引", "备注",
 ]
 _K11_3_KEYS = [
     "description", "category", "reportItem", "accountName", "noteItem",
@@ -52,7 +55,7 @@ _K11_3_KEYS = [
 
 _K11_SPECS: dict[str, dict[str, Any]] = {
     "K11-2": {
-        "item_id": "K11-2-rows",
+        "item_id": "K11-2-detail-rows",
         "title": "明细表K11-2（资产减值损失明细）",
         "headers": _K11_2_HEADERS,
         "field_keys": _K11_2_KEYS,
@@ -70,22 +73,23 @@ _K11_SPECS: dict[str, dict[str, Any]] = {
         ],
     },
     "K11-3": {
-        "item_id": "K11-3-rows",
+        "item_id": "K11-3-adj-entries",
         "title": "调整分录汇总K11-3（标准借贷平衡）",
         "headers": _K11_3_HEADERS,
         "field_keys": _K11_3_KEYS,
         "guidance": [
             "K11-3 资产减值损失调整分录汇总 编制说明",
             "",
-            "记录本期所有审计调整分录（AJE）和重分类分录（RJE）。",
-            "类别：报表调整/账项调整/其他。",
+            "记录本期所有调整分录，对齐源模板10列。",
+            "类别：报表调整（重分类，计入RJE）/ 账项调整（计入AJE）/ 其他（计入AJE）。",
             "借贷平衡：Σ借方调整金额 = Σ贷方调整金额。",
-            "调整分录联动审定表K11-1的AJE/RJE列。",
-            "注意：6701为损益类科目，调整借方=增加减值，贷方=减少减值。",
+            "调整分录按类别分桶联动审定表K11-1的AJE/RJE合计。",
+            "注意：6701为损益类科目，借方=增加减值，贷方=减少减值。",
         ],
     },
 }
 
+# storage_field=remark：与前端持久化字段一致（K11-2-detail-rows / K11-3-adj-entries 均存 remark）
 router = create_cycle_import_export_router(
-    tag="k11-import-export", api_prefix="k11", specs=_K11_SPECS
+    tag="k11-import-export", api_prefix="k11", specs=_K11_SPECS, storage_field="remark"
 )

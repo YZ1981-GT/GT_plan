@@ -287,6 +287,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, ChatDotSquare } from '@element-plus/icons-vue'
 import { useN3FormData } from '../../composables/useN3FormData'
 import { eventBus } from '@/utils/eventBus'
+// @ts-ignore
+import GtIndexChip from '../../GtIndexChip.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -303,6 +305,22 @@ const openReviewDialog = inject<((section: string) => void) | undefined>(
   'openReviewDialog',
   undefined,
 )
+
+const scheduleAutoSnapshot = inject<(() => void) | undefined>('scheduleAutoSnapshot', undefined)
+
+// ─── Constants: report item / account options ────────────────────────────────
+
+const REPORT_ITEM_OPTIONS = [
+  '递延所得税负债',
+  '所得税费用',
+  '其他综合收益',
+]
+
+const ACCOUNT_OPTIONS = [
+  '递延所得税负债',
+  '所得税费用——递延所得税费用',
+  '其他综合收益——递延税影响',
+]
 
 // ─── FormData ────────────────────────────────────────────────────────────────
 
@@ -484,19 +502,37 @@ async function handleSaveAndPublish() {
     timestamp: Date.now(),
   })
 
+  // 4. 通知附注刷新
+  eventBus.emit('disclosure:refresh', { wpCode: 'N3', source: 'adjustment' })
+
+  // 5. 版本快照
+  scheduleAutoSnapshot?.()
+
   ElMessage.success('调整分录已保存并发布')
 }
 
 // ─── AI辅助 / 复核 ──────────────────────────────────────────────────────────
 
-function handleAiAssist() {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+// ─── AI辅助 / 复核 ──────────────────────────────────────────────────────────
+
+const aiLoading = ref(false)
+
+async function handleAiAssist() {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const { default: http } = await import('@/utils/http')
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       section: 'n3-adjustment',
-      prompt: '请基于递延所得税负债底稿数据，给出审计分析建议',
-      context: { wpId: props.wpId },
-    }).catch(() => {})
-  })
+      prompt: '请基于递延所得税负债调整分录数据，给出审计分析建议',
+      context: { wpId: String(props.wpId) },
+    })
+    const text = res?.data?.content || res?.data?.data?.content || ''
+    if (text) {
+      ElMessage.success('AI分析完成')
+    }
+  } catch { /* 降级静默 */ }
+  finally { aiLoading.value = false }
 }
 
 function handleReview() {

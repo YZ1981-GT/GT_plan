@@ -133,8 +133,8 @@
  * IPO/舞弊组可见性由 business_category 字段控制。
  * selfLoad: 当 htmlData 为 null 时自行调 render-config 加载数据。
  */
-import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
-import { useD4FormData } from './composables/useD4FormData'
+import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
+import { useD4FormData, type ChecklistResponse } from './composables/useD4FormData'
 import { useD4CrossSheet } from './composables/useD4CrossSheet'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import GtWpReviewRail from './GtWpReviewRail.vue'
@@ -279,6 +279,18 @@ provide('getRowDot', getRowDot)
 provide('d4VersionTrailRef', versionTrailRef)
 provide('d4OpenVersionHistory', openVersionHistory)
 
+// ─── 审计年度：供子表取数（序时账导入/附注TB刷新）统一使用，避免硬编码"当前年-1" ───
+const d4AuditYear = computed<number>(() => {
+  if (props.year && props.year > 0) return props.year
+  const end = formData.projectContext.value?.audit_period_end
+  if (end) {
+    const y = parseInt(String(end).slice(0, 4), 10)
+    if (y > 0) return y
+  }
+  return new Date().getFullYear() - 1
+})
+provide('d4AuditYear', d4AuditYear)
+
 useWorkpaperEntryInjections({
   onJumpToSection: (sheetLabel) => emit('jump-to-section', sheetLabel),
   reloadFn: () => formData.loadAll(),
@@ -358,10 +370,43 @@ async function selfLoad() {
   }
 }
 
+// ─── 子表持久化：监听 d4:save-items → 经 formData 直接 PUT 落库 ────────────────
+// 修复：此前主入口无监听器，所有经 window event 保存的子表数据从不落库。
+// 各子 composable flushSave 发 CustomEvent('d4:save-items', {items:[{item_id,conclusion,remark}]})。
+
+function handleD4SaveItems(e: Event): void {
+  const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
+  if (!Array.isArray(items) || items.length === 0) return
+  void formData.saveBatch(
+    items
+      .filter(it => it && it.item_id)
+      .map(it => ({
+        itemId: it.item_id,
+        data: { conclusion: it.conclusion ?? null, remark: it.remark ?? null },
+      })),
+  )
+  scheduleAutoSnapshot()
+}
+
+// ─── 审定表 TB 回写：监听 d4:writeback-trial-balance → 落库 trial_balance ──────
+function handleD4Writeback(e: Event): void {
+  const d = (e as CustomEvent<{ accountCode: string; auditedAmount: number }>).detail
+  if (d?.accountCode != null && d.auditedAmount != null) {
+    void formData.writebackTrialBalance(d.accountCode, d.auditedAmount)
+  }
+}
+
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 onMounted(() => {
+  window.addEventListener('d4:save-items', handleD4SaveItems)
+  window.addEventListener('d4:writeback-trial-balance', handleD4Writeback)
   selfLoad()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('d4:save-items', handleD4SaveItems)
+  window.removeEventListener('d4:writeback-trial-balance', handleD4Writeback)
 })
 </script>
 

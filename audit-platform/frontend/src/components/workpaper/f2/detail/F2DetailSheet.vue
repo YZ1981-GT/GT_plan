@@ -77,6 +77,14 @@
         </el-radio-group>
       </div>
       <div class="toolbar-right">
+        <el-button
+          v-if="hasPostPeriod"
+          size="small"
+          type="warning"
+          plain
+          :disabled="isReadonly"
+          @click="detail.importPostPeriodOutbound()"
+        >取期后出库</el-button>
         <el-tag v-if="detail.totals.value.agingOk" type="success" size="small" effect="dark">库龄 OK</el-tag>
         <el-tag v-else type="danger" size="small">库龄与期末不匹配</el-tag>
         <el-tag v-if="detail.agingMismatch.value.length" type="warning" size="small">
@@ -529,6 +537,7 @@ const props = defineProps<{
   config: F2DetailSheetConfig
   wpId: string
   projectId?: string
+  year?: number
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
 }>()
@@ -586,6 +595,8 @@ const detail = useF2DetailSheet({
   config: configRef,
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
+  projectId: computed(() => props.projectId || ''),
+  year: computed(() => props.year || 0),
 })
 
 const showMove = computed(() => detail.activeView.value === 'movement' || detail.activeView.value === 'full')

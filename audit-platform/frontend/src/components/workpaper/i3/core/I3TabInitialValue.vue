@@ -1,524 +1,346 @@
 <!--
-  I3TabInitialValue.vue — I3-4 入账价值测算表（22行13列12公式）
-  
-  结构：Form-style table per investee
-  Row Group 1: 合并成本 = 对价 + 或有对价 + 交易费用 (subtotal formula)
-  Row Group 2: 被购方可辨认净资产公允价值 (breakdown rows)
-  Row Group 3: 商誉 = 合并成本 - 可辨认净资产公允 (formula result, highlighted)
-  
-  Features:
-  - 12 formula cells (dashed underline + tooltip)
-  - Dynamic investee rows (+新增 button with ElMessageBox prompt)
-  - Blue gradient guidance area (初始确认规则)
-  - 琥珀色方法论 block: CAS20企业合并规则
-  - GtIndexChip links to I3-2 明细表
-  - Table font 13px
+  I3TabInitialValue.vue — I3-4 商誉入账价值测算表
+
+  对齐致同 Excel「入账价值测算表I3-4」：
+  一、审计目标 → 二、审计过程（横向测算表）→ 三、审计说明 → 四、审计结论
+  公式：④应占份额=②×③；⑤商誉=①−④（非同一控制）；合计行 SUM
+  改进：同一控制门禁、入账金额↔⑤勾稽、CAS20 交易费用不计入合并成本、持久化 I3-4-rows
 
   Spec: .kiro/specs/i3-goodwill/ Task 4.5
   Requirements: 4.1~4.3
 -->
 <template>
   <div class="i3-initial-value">
-    <!-- Section Header -->
     <div class="section-header">
-      <span class="section-title">I3-4 入账价值测算表</span>
+      <span class="section-title">I3-4 商誉入账价值测算表</span>
       <div class="section-actions">
-        <el-button size="small" type="default" text @click="handleReview">
-          💬复核
-        </el-button>
+        <el-button size="small" type="default" text @click="handleReview">💬复核</el-button>
       </div>
     </div>
 
-    <!-- 蓝色渐变引导区：初始确认规则说明 -->
     <div class="guide-panel">
-      <div class="guide-header">
-        <el-icon><InfoFilled /></el-icon>
-        <span>商誉初始确认规则（CAS20非同一控制下企业合并）</span>
-      </div>
-      <div class="guide-body">
-        <div class="guide-grid">
-          <div class="guide-step">
-            <span class="step-num">①</span>
-            <span class="step-text"><strong>确定合并成本</strong> — 对价 + 或有对价 + 直接交易费用</span>
-          </div>
-          <div class="guide-step">
-            <span class="step-num">②</span>
-            <span class="step-text"><strong>确定可辨认净资产公允价值</strong> — 被购方可辨认资产、负债的公允价值之差 × 持股比例</span>
-          </div>
-          <div class="guide-step">
-            <span class="step-num">③</span>
-            <span class="step-text"><strong>计算商誉</strong> — 合并成本 − 可辨认净资产公允价值份额 = 商誉（正数）</span>
-          </div>
-          <div class="guide-step">
-            <span class="step-num">④</span>
-            <span class="step-text"><strong>核对入账</strong> — 比较初始确认金额与I3-2明细表的一致性</span>
-          </div>
-        </div>
+      <div class="guide-header">编制逻辑（CAS20）</div>
+      <div class="guide-grid">
+        <div class="guide-step"><span class="step-num">①</span>判断是否同一控制 — 是则不确认商誉</div>
+        <div class="guide-step"><span class="step-num">②</span>核定购买日是否符合控制权转移条件</div>
+        <div class="guide-step"><span class="step-num">③</span>确定合并成本与可辨认净资产公允价值</div>
+        <div class="guide-step"><span class="step-num">④</span>⑤商誉=①−④（④=②×③），并与入账金额勾稽</div>
       </div>
     </div>
 
-    <!-- 琥珀色方法论区块：CAS20企业合并规则 -->
     <div class="methodology-block">
-      <div class="methodology-content">
-        <strong>CAS20企业合并 — 非同一控制下合并商誉确认</strong><br>
-        合并成本：购买方在购买日为取得对被购买方的控制权而付出的资产、发生或承担的负债以及发行的权益性证券的公允价值之和。<br>
-        商誉 = 合并成本 &gt; 被购买方可辨认净资产公允价值中属于购买方份额的差额。<br>
-        若合并成本 &lt; 净资产公允价值份额，差额计入当期损益（负商誉/营业外收入）。
-      </div>
+      <strong>CAS20 — 非同一控制下企业合并：</strong>
+      商誉 = 合并成本 − 被购买方可辨认净资产公允价值×股权比例。
+      合并成本为购买日付出对价的公允价值（含或有对价）；
+      <em>购买相关费用（审计/法律/评估中介费等）计入当期损益，不计入合并成本。</em>
+      同一控制下企业合并不产生商誉。若①&lt;④，差额计入当期损益（负商誉），表头「⑤&gt;0」为正常情形提示而非强制截断。
     </div>
 
-    <!-- 审计目标 -->
+    <!-- 一、审计目标 -->
     <el-alert
       type="info"
       :closable="false"
       show-icon
       class="objective-alert"
-      title="审计目标：验证商誉初始入账价值的准确性——合并成本（对价+或有对价+交易费用）与被购方可辨认净资产公允价值份额的计量是否恰当；商誉 = 合并成本 − 净资产公允价值份额；与 I3-2 明细表入账金额勾稽一致（CAS20 非同一控制下企业合并）。"
+      title="一、审计目标：确定商誉是否存在，计价是否准确（CAS20）。"
     />
 
-    <!-- 被投资单位动态选择 + 新增 -->
-    <div class="investee-toolbar tab-toolbar">
-      <span class="toolbar-label">被投资单位：</span>
-      <el-select
-        v-model="selectedInvestee"
-        placeholder="选择被投资单位"
-        size="default"
-        style="width: 280px"
-        @change="onInvesteeChange"
-      >
-        <el-option
-          v-for="inv in investeeList"
-          :key="inv"
-          :label="inv"
-          :value="inv"
+    <details class="guidance-details">
+      <summary>📋 编制提示</summary>
+      <ul>
+        <li>「是否属于同一控制」选「是」时，⑤商誉强制为 0，不得确认商誉。</li>
+        <li>④应占份额 = ②可辨认净资产公允价值 × ③股权比例；⑤商誉 = ①合并成本 − ④。</li>
+        <li>入账金额应与⑤商誉一致（非同一控制）；差异须在备注说明。</li>
+        <li>合并成本勿计入中介等购买费用；费用可记在备注或审计说明中复核费用化。</li>
+        <li>本表结果写入 I3-4-rows，供 I3-2 明细初始确认勾稽。</li>
+      </ul>
+    </details>
+
+    <!-- 二、审计过程：测算表 -->
+    <div class="process-header">
+      <span class="process-title">二、审计过程 — 入账价值测算</span>
+      <div class="toolbar-right">
+        <GtIndexChip value="wp:I3-2" :context-project-id="projectId" @click="emit('navigate-sheet', '明细表I3-2')" />
+        <GtIndexChip value="wp:I3-4" :context-project-id="projectId" />
+        <I3SheetImportExport
+          v-if="!isReadonly"
+          sheet="I3-4"
+          :wp-id="wpId"
+          :project-id="projectId"
         />
-      </el-select>
-      <el-button size="small" type="primary" plain @click="handleAddInvestee">
-        + 新增
-      </el-button>
-      <el-button size="small" type="danger" plain :disabled="!selectedInvestee" @click="handleRemoveInvestee">
-        删除
-      </el-button>
-      <GtIndexChip value="I3-2" style="margin-left: 12px" @click="emit('navigate-sheet', 'I3-2 明细表')" />
-      <GtIndexChip value="wp:I3-4" :context-project-id="projectId" style="margin-left: 8px" />
-      <el-tag size="small" type="info" style="margin-left: 8px">共 {{ investeeList.length }} 项</el-tag>
+        <el-button v-if="!isReadonly" type="primary" size="small" @click="addRow">+ 新增</el-button>
+        <span class="row-count">共 {{ dataRows.length }} 行</span>
+      </div>
     </div>
 
-    <!-- 入账测算主表（当选中被投资单位时） -->
-    <div v-if="selectedInvestee && currentData" class="calc-table-wrapper">
-      <table class="calc-table">
-        <thead>
-          <tr>
-            <th class="col-label">项目</th>
-            <th class="col-value">金额（元）</th>
-            <th class="col-note">备注</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- ═══ Row Group 1: 合并成本 ═══ -->
-          <tr class="group-header-row">
-            <td colspan="3" class="group-header">一、合并成本</td>
-          </tr>
-          <tr>
-            <td class="row-label indent-1">1. 支付对价（公允价值）</td>
-            <td class="row-value">
-              <el-input-number
-                :model-value="currentData.consideration"
-                :controls="false"
-                size="small"
-                :disabled="isReadonly"
-                style="width: 100%"
-                @update:model-value="(v) => updateField('consideration', v ?? 0)"
-              />
-            </td>
-            <td class="row-note">
-              <el-input
-                :model-value="currentData.considerationNote"
-                size="small"
-                :disabled="isReadonly"
-                placeholder="现金/股权/资产对价"
-                @change="(v: string) => updateField('considerationNote', v)"
-              />
-            </td>
-          </tr>
-          <tr>
-            <td class="row-label indent-1">2. 或有对价（公允价值）</td>
-            <td class="row-value">
-              <el-input-number
-                :model-value="currentData.contingentConsideration"
-                :controls="false"
-                size="small"
-                :disabled="isReadonly"
-                style="width: 100%"
-                @update:model-value="(v) => updateField('contingentConsideration', v ?? 0)"
-              />
-            </td>
-            <td class="row-note">
-              <el-input
-                :model-value="currentData.contingentNote"
-                size="small"
-                :disabled="isReadonly"
-                placeholder="业绩承诺/对赌安排等"
-                @change="(v: string) => updateField('contingentNote', v)"
-              />
-            </td>
-          </tr>
-          <tr>
-            <td class="row-label indent-1">3. 直接交易费用</td>
-            <td class="row-value">
-              <el-input-number
-                :model-value="currentData.transactionCost"
-                :controls="false"
-                size="small"
-                :disabled="isReadonly"
-                style="width: 100%"
-                @update:model-value="(v) => updateField('transactionCost', v ?? 0)"
-              />
-            </td>
-            <td class="row-note">
-              <el-input
-                :model-value="currentData.transactionCostNote"
-                size="small"
-                :disabled="isReadonly"
-                placeholder="审计/评估/法律费用等"
-                @change="(v: string) => updateField('transactionCostNote', v)"
-              />
-            </td>
-          </tr>
-          <!-- F1: 合并成本小计 -->
-          <tr class="subtotal-row">
-            <td class="row-label indent-0"><strong>合并成本合计</strong></td>
-            <td class="row-value">
-              <span class="formula-cell" :title="formulaTooltips.mergerCost">
-                {{ fmtNum(mergerCost) }}
-              </span>
-            </td>
-            <td class="row-note formula-note">= 对价 + 或有对价 + 交易费用</td>
-          </tr>
+    <el-alert
+      v-if="gateWarnings.length"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="gate-alert"
+    >
+      <div v-for="(w, i) in gateWarnings" :key="i">{{ w }}</div>
+    </el-alert>
 
-          <!-- ═══ Row Group 2: 被购方可辨认净资产公允价值 ═══ -->
-          <tr class="group-header-row">
-            <td colspan="3" class="group-header">二、被购方可辨认净资产公允价值</td>
-          </tr>
-          <tr>
-            <td class="row-label indent-1">1. 资产公允价值合计</td>
-            <td class="row-value">
+    <el-table
+      :data="rows"
+      border
+      size="small"
+      class="calc-table"
+      max-height="520"
+      row-key="rowId"
+      :row-class-name="rowClassName"
+      show-summary
+      :summary-method="summaryMethod"
+    >
+      <el-table-column type="index" label="#" width="42" align="center" fixed="left" />
+
+      <el-table-column prop="projectName" label="项目名称" min-width="140" fixed="left">
+        <template #default="{ row }">
+          <el-input
+            v-model="row.projectName"
+            size="small"
+            :disabled="isReadonly"
+            placeholder="被购买方/项目"
+            @change="persist"
+          />
+        </template>
+      </el-table-column>
+
+      <el-table-column prop="bookedAmount" label="入账金额" width="110" align="right">
+        <template #default="{ row }">
+          <el-input-number
+            v-model="row.bookedAmount"
+            :controls="false"
+            size="small"
+            :disabled="isReadonly"
+            style="width:100%"
+            @change="persist"
+          />
+        </template>
+      </el-table-column>
+
+      <el-table-column prop="sameControl" label="是否属于同一控制" width="120" align="center">
+        <template #default="{ row }">
+          <el-select
+            v-model="row.sameControl"
+            size="small"
+            :disabled="isReadonly"
+            placeholder="—"
+            style="width:100%"
+            @change="() => onSameControlChange(row)"
+          >
+            <el-option label="否" value="否" />
+            <el-option label="是" value="是" />
+          </el-select>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="购买日的确定" align="center">
+        <el-table-column label="具体日期" width="130">
+          <template #default="{ row }">
+            <el-date-picker
+              v-model="row.acquisitionDate"
+              type="date"
+              size="small"
+              value-format="YYYY-MM-DD"
+              :disabled="isReadonly"
+              style="width:100%"
+              @change="persist"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="是否符合规定" width="110" align="center">
+          <template #default="{ row }">
+            <el-select
+              v-model="row.dateCompliant"
+              size="small"
+              :disabled="isReadonly"
+              placeholder="—"
+              style="width:100%"
+              @change="persist"
+            >
+              <el-option label="是" value="是" />
+              <el-option label="否" value="否" />
+              <el-option label="待确认" value="待确认" />
+            </el-select>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <el-table-column label="商誉的确定" align="center">
+        <el-table-column prop="mergerCost" label="①合并成本" width="110" align="right">
+          <template #header>
+            <el-tooltip content="购买日付出对价的公允价值（可含或有对价）；不含购买相关费用" placement="top">
+              <span class="formula-hdr">①合并成本</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <el-input-number
+              v-model="row.mergerCost"
+              :controls="false"
+              size="small"
+              :disabled="isReadonly || row.sameControl === '是'"
+              style="width:100%"
+              @change="persist"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column prop="netAssetFV" label="②净资产公允价值" width="120" align="right">
+          <template #header>
+            <el-tooltip content="被购买方可辨认净资产公允价值（100%口径）" placement="top">
+              <span class="formula-hdr">②净资产公允</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <el-input-number
+              v-model="row.netAssetFV"
+              :controls="false"
+              size="small"
+              :disabled="isReadonly || row.sameControl === '是'"
+              style="width:100%"
+              @change="persist"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column prop="equityRatio" label="③股权比例" width="100" align="right">
+          <template #default="{ row }">
+            <div class="ratio-cell">
               <el-input-number
-                :model-value="currentData.totalAssetsFV"
-                :controls="false"
-                size="small"
-                :disabled="isReadonly"
-                style="width: 100%"
-                @update:model-value="(v) => updateField('totalAssetsFV', v ?? 0)"
-              />
-            </td>
-            <td class="row-note">
-              <el-input
-                :model-value="currentData.totalAssetsFVNote"
-                size="small"
-                :disabled="isReadonly"
-                placeholder="被购方全部可辨认资产FV"
-                @change="(v: string) => updateField('totalAssetsFVNote', v)"
-              />
-            </td>
-          </tr>
-          <tr>
-            <td class="row-label indent-1">2. 负债公允价值合计</td>
-            <td class="row-value">
-              <el-input-number
-                :model-value="currentData.totalLiabilitiesFV"
-                :controls="false"
-                size="small"
-                :disabled="isReadonly"
-                style="width: 100%"
-                @update:model-value="(v) => updateField('totalLiabilitiesFV', v ?? 0)"
-              />
-            </td>
-            <td class="row-note">
-              <el-input
-                :model-value="currentData.totalLiabilitiesFVNote"
-                size="small"
-                :disabled="isReadonly"
-                placeholder="被购方全部可辨认负债FV"
-                @change="(v: string) => updateField('totalLiabilitiesFVNote', v)"
-              />
-            </td>
-          </tr>
-          <!-- F2: 可辨认净资产公允价值 = 资产FV - 负债FV -->
-          <tr class="subtotal-row">
-            <td class="row-label indent-0"><strong>可辨认净资产公允价值</strong></td>
-            <td class="row-value">
-              <span class="formula-cell" :title="formulaTooltips.netAssetFV">
-                {{ fmtNum(netAssetFV) }}
-              </span>
-            </td>
-            <td class="row-note formula-note">= 资产FV - 负债FV</td>
-          </tr>
-          <tr>
-            <td class="row-label indent-1">3. 持股比例(%)</td>
-            <td class="row-value">
-              <el-input-number
-                :model-value="currentData.equityRatio"
+                v-model="row.equityRatio"
                 :controls="false"
                 :precision="2"
                 :min="0"
                 :max="100"
                 size="small"
-                :disabled="isReadonly"
-                style="width: 100%"
-                @update:model-value="(v) => updateField('equityRatio', v ?? 0)"
+                :disabled="isReadonly || row.sameControl === '是'"
+                style="width:72px"
+                @change="persist"
               />
-            </td>
-            <td class="row-note">
-              <el-input
-                :model-value="currentData.equityRatioNote"
-                size="small"
-                :disabled="isReadonly"
-                placeholder="购买方持股比例"
-                @change="(v: string) => updateField('equityRatioNote', v)"
-              />
-            </td>
-          </tr>
-          <!-- F3: 净资产公允价值份额 = 净资产FV × 持股比例 -->
-          <tr class="subtotal-row">
-            <td class="row-label indent-0"><strong>可辨认净资产公允价值份额</strong></td>
-            <td class="row-value">
-              <span class="formula-cell" :title="formulaTooltips.netAssetFVShare">
-                {{ fmtNum(netAssetFVShare) }}
-              </span>
-            </td>
-            <td class="row-note formula-note">= 净资产FV × 持股比例</td>
-          </tr>
+              <span class="pct">%</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="shareAmount" label="④应占份额" width="110" align="right">
+          <template #header>
+            <el-tooltip content="④ = ② × ③" placement="top">
+              <span class="formula-hdr">④应占份额</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <span class="formula-cell">{{ fmt(rowShare(row)) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="goodwillAmount" label="⑤商誉(⑤>0)" width="110" align="right">
+          <template #header>
+            <el-tooltip content="⑤ = ① − ④；同一控制强制为 0；负值提示负商誉" placement="top">
+              <span class="formula-hdr">⑤商誉</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <span
+              class="formula-cell"
+              :class="{
+                'gw-ok': rowGoodwill(row) > 0 && row.sameControl !== '是',
+                'gw-zero': rowGoodwill(row) === 0,
+                'gw-neg': rowGoodwill(row) < 0,
+              }"
+            >{{ fmt(rowGoodwill(row)) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="商誉确定是否符合规定" width="130" align="center">
+          <template #default="{ row }">
+            <el-select
+              v-model="row.goodwillCompliant"
+              size="small"
+              :disabled="isReadonly"
+              placeholder="—"
+              style="width:100%"
+              @change="persist"
+            >
+              <el-option label="是" value="是" />
+              <el-option label="否" value="否" />
+              <el-option label="不适用" value="不适用" />
+              <el-option label="待确认" value="待确认" />
+            </el-select>
+          </template>
+        </el-table-column>
+      </el-table-column>
 
-          <!-- ═══ Row Group 3: 商誉 ═══ -->
-          <tr class="group-header-row">
-            <td colspan="3" class="group-header">三、商誉（初始确认）</td>
-          </tr>
-          <!-- F4: 商誉 = 合并成本 - 净资产公允价值份额 -->
-          <tr class="goodwill-result-row">
-            <td class="row-label indent-0"><strong>商誉</strong></td>
-            <td class="row-value">
-              <span class="formula-cell goodwill-value" :title="formulaTooltips.goodwill">
-                {{ fmtNum(goodwillAmount) }}
-              </span>
-            </td>
-            <td class="row-note formula-note">= 合并成本 − 净资产公允价值份额</td>
-          </tr>
-          <!-- 负商誉告警 -->
-          <tr v-if="goodwillAmount < 0" class="warning-row">
-            <td colspan="3" class="negative-goodwill-warning">
-              ⚠️ 合并成本 &lt; 净资产公允价值份额，产生"负商誉"（计入营业外收入，需重点关注评估报告公允性）
-            </td>
-          </tr>
+      <el-table-column label="备注" min-width="140">
+        <template #default="{ row }">
+          <el-input
+            v-model="row.remark"
+            size="small"
+            :disabled="isReadonly"
+            placeholder="或有对价/费用化中介费/差异说明"
+            @change="persist"
+          />
+        </template>
+      </el-table-column>
 
-          <!-- ═══ 补充信息行 ═══ -->
-          <tr class="group-header-row">
-            <td colspan="3" class="group-header">四、补充信息</td>
-          </tr>
-          <tr>
-            <td class="row-label indent-1">购买日期</td>
-            <td class="row-value">
-              <el-date-picker
-                :model-value="currentData.acquisitionDate"
-                type="date"
-                size="small"
-                value-format="YYYY-MM-DD"
-                :disabled="isReadonly"
-                style="width: 100%"
-                @update:model-value="(v) => updateField('acquisitionDate', v ?? '')"
-              />
-            </td>
-            <td class="row-note">
-              <el-input
-                :model-value="currentData.acquisitionDateNote"
-                size="small"
-                :disabled="isReadonly"
-                placeholder="合并协议生效日"
-                @change="(v: string) => updateField('acquisitionDateNote', v)"
-              />
-            </td>
-          </tr>
-          <tr>
-            <td class="row-label indent-1">评估机构</td>
-            <td class="row-value" colspan="1">
-              <el-input
-                :model-value="currentData.appraiser"
-                size="small"
-                :disabled="isReadonly"
-                placeholder="评估机构名称"
-                @change="(v: string) => updateField('appraiser', v)"
-              />
-            </td>
-            <td class="row-note">
-              <el-input
-                :model-value="currentData.appraiserNote"
-                size="small"
-                :disabled="isReadonly"
-                placeholder="评估报告编号"
-                @change="(v: string) => updateField('appraiserNote', v)"
-              />
-            </td>
-          </tr>
-          <tr>
-            <td class="row-label indent-1">评估方法</td>
-            <td class="row-value" colspan="1">
-              <el-select
-                :model-value="currentData.valuationMethod"
-                size="small"
-                :disabled="isReadonly"
-                placeholder="选择评估方法"
-                style="width: 100%"
-                @change="(v: string) => updateField('valuationMethod', v)"
-              >
-                <el-option label="收益法" value="income" />
-                <el-option label="市场法" value="market" />
-                <el-option label="资产基础法" value="asset" />
-                <el-option label="收益法+市场法" value="income_market" />
-              </el-select>
-            </td>
-            <td class="row-note">
-              <el-input
-                :model-value="currentData.valuationMethodNote"
-                size="small"
-                :disabled="isReadonly"
-                placeholder="评估方法说明"
-                @change="(v: string) => updateField('valuationMethodNote', v)"
-              />
-            </td>
-          </tr>
+      <el-table-column v-if="!isReadonly" label="操作" width="70" align="center" fixed="right">
+        <template #default="{ $index }">
+          <el-button type="danger" link size="small" @click="removeRow($index)">删</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
 
-          <!-- ═══ 勾稽验证 ═══ -->
-          <tr class="group-header-row">
-            <td colspan="3" class="group-header">五、勾稽验证</td>
-          </tr>
-          <!-- F5: 与I3-2明细表一致性 -->
-          <tr>
-            <td class="row-label indent-1">I3-2明细表商誉原值</td>
-            <td class="row-value">
-              <span class="formula-cell" :title="formulaTooltips.detailGoodwill">
-                {{ fmtNum(currentData.detailGoodwillAmount) }}
-              </span>
-            </td>
-            <td class="row-note">
-              <GtIndexChip value="I3-2" @click="emit('navigate-sheet', 'I3-2 明细表')" />
-              <span class="formula-note" style="margin-left: 8px">从I3-2取数</span>
-            </td>
-          </tr>
-          <!-- F6: 差异 = 本表商誉 - 明细表商誉 -->
-          <tr>
-            <td class="row-label indent-1">差异（本表 − I3-2）</td>
-            <td class="row-value">
-              <span
-                :class="['formula-cell', reconciliationDiff !== 0 ? 'diff-warning' : 'diff-ok']"
-                :title="formulaTooltips.reconciliationDiff"
-              >
-                {{ fmtNum(reconciliationDiff) }}
-              </span>
-            </td>
-            <td class="row-note formula-note">
-              {{ reconciliationDiff === 0 ? '✅ 一致' : '⚠️ 存在差异' }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div class="recon-bar">
+      <span>勾稽：入账金额合计 {{ fmt(totals.bookedAmount) }}</span>
+      <span>｜ ⑤商誉合计 {{ fmt(totals.goodwill) }}</span>
+      <span :class="Math.abs(totals.bookedAmount - totals.goodwill) < 0.01 ? 'ok' : 'bad'">
+        ｜ 差异 {{ fmt(totals.bookedAmount - totals.goodwill) }}
+        {{ Math.abs(totals.bookedAmount - totals.goodwill) < 0.01 ? '✓' : '⚠ 须说明' }}
+      </span>
+      <el-button size="small" text type="primary" @click="emit('navigate-sheet', '明细表I3-2')">→ I3-2 明细表</el-button>
     </div>
 
-    <!-- 无选中被投资单位时 -->
-    <div v-else class="no-investee-hint">
-      <el-empty description="请选择或新增被投资单位以查看入账价值测算" />
-    </div>
+    <!-- 三、审计说明 -->
+    <el-card class="note-card" shadow="never">
+      <template #header><span class="card-title">三、审计说明</span></template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 4 }"
+        :disabled="isReadonly"
+        placeholder="记录购买日判断依据、合并成本构成（含或有对价）、可辨认净资产评估来源、同一控制判断、购买费用费用化复核、与 I3-2 勾稽情况等…"
+        @change="persistMeta"
+      />
+    </el-card>
 
-    <!-- 审计说明 -->
-    <el-card class="conclusion-card" shadow="never" style="margin-top: 16px">
-      <template #header>
-        <div class="conclusion-header">
-          <span>审计说明</span>
-        </div>
-      </template>
+    <!-- 四、审计结论（模板原文无，补齐以闭环底稿） -->
+    <el-card class="note-card" shadow="never">
+      <template #header><span class="card-title">四、审计结论</span></template>
       <el-input
         v-model="auditConclusion"
         type="textarea"
-        :autosize="{ minRows: 5 }"
-        :disabled="isReadonly"
-        placeholder="对入账价值测算过程的审计说明（合并成本构成、净资产公允价值评估、持股比例等）..."
-        @change="persistConclusion"
-      />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card class="conclusion-card" shadow="never" style="margin-top: 16px">
-      <template #header>
-        <div class="conclusion-header">
-          <span>审计结论</span>
-        </div>
-      </template>
-      <el-input
-        v-model="auditConclusionText"
-        type="textarea"
         :autosize="{ minRows: 3 }"
         :disabled="isReadonly"
-        placeholder="对入账价值测算的审计结论（如：商誉初始确认金额计量准确，与明细表勾稽一致）..."
-        @change="persistAuditConclusion"
+        placeholder="如：经测算，非同一控制下商誉初始确认准确，入账金额与⑤勾稽一致；同一控制项目未确认商誉…"
+        @change="persistMeta"
       />
     </el-card>
-
-    <!-- 编制提示 -->
-    <details class="prep-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>合并成本 = 支付对价(FV) + 或有对价(FV) + 直接交易费用</li>
-        <li>可辨认净资产FV = 被购方全部可辨认资产FV − 全部可辨认负债FV</li>
-        <li>净资产FV份额 = 可辨认净资产FV × 持股比例</li>
-        <li>商誉 = 合并成本 − 净资产FV份额（CP-I3-03）</li>
-        <li>若商誉&lt;0（负商誉），需重新审阅被购方资产评估是否充分</li>
-        <li>与I3-2明细表勾稽确认入账金额一致</li>
-      </ul>
-    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, inject } from 'vue'
-import { ElMessageBox, ElMessage } from 'element-plus'
-import { InfoFilled } from '@element-plus/icons-vue'
-import { calcInitialGoodwill, calcSubtotal } from '../../composables/useI3FormulaEngine'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  type I3InitialValueRow as InitialValueRow,
+  emptyI3InitialValueRow,
+  calcI34Share,
+  calcI34Goodwill,
+  normalizeI3InitialValueRow,
+  buildI34GateWarnings,
+  toI34CrossSheetPayload,
+  summarizeI34,
+} from '../../composables/i3InitialValueModel'
+import { calcInitialGoodwill } from '../../composables/useI3FormulaEngine'
 import GtIndexChip from '../../GtIndexChip.vue'
-
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface InvesteeData {
-  /** 支付对价 */
-  consideration: number
-  considerationNote: string
-  /** 或有对价 */
-  contingentConsideration: number
-  contingentNote: string
-  /** 直接交易费用 */
-  transactionCost: number
-  transactionCostNote: string
-  /** 资产公允价值合计 */
-  totalAssetsFV: number
-  totalAssetsFVNote: string
-  /** 负债公允价值合计 */
-  totalLiabilitiesFV: number
-  totalLiabilitiesFVNote: string
-  /** 持股比例(%) */
-  equityRatio: number
-  equityRatioNote: string
-  /** 购买日期 */
-  acquisitionDate: string
-  acquisitionDateNote: string
-  /** 评估机构 */
-  appraiser: string
-  appraiserNote: string
-  /** 评估方法 */
-  valuationMethod: string
-  valuationMethodNote: string
-  /** I3-2明细表商誉原值（跨sheet取数） */
-  detailGoodwillAmount: number
-}
-
-// ─── Props & Emits ───────────────────────────────────────────────────────────
+import I3SheetImportExport from '../shared/I3SheetImportExport.vue'
 
 const props = defineProps<{
   wpId: string
@@ -528,235 +350,202 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'save': [itemId: string, value: any]
-  'navigate-sheet': [sheetName: string]
+  (e: 'save', itemId: string, value: any): void
+  (e: 'navigate-sheet', sheetName: string): void
 }>()
-
-// ─── Inject ──────────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+const ROWS_KEY = 'I3-4-rows'
+const META_KEY = 'I3-4-meta'
+const LEGACY_KEY = 'I3-4-initial-value'
+const LEGACY_NOTE = 'I3-4-conclusion'
+const LEGACY_CONC = 'I3-4-audit-conclusion'
 
-const STORAGE_KEY = 'I3-4-initial-value'
-const CONCLUSION_KEY = 'I3-4-conclusion'
-const AUDIT_CONCLUSION_KEY = 'I3-4-audit-conclusion'
+const rows = ref<InitialValueRow[]>([])
+const auditNote = ref('')
+const auditConclusion = ref('')
 
-const formulaTooltips = {
-  mergerCost: '合并成本 = 对价 + 或有对价 + 交易费用 [F1]',
-  netAssetFV: '可辨认净资产FV = 资产FV − 负债FV [F2]',
-  netAssetFVShare: '净资产FV份额 = 净资产FV × 持股比例 [F3]',
-  goodwill: '商誉 = 合并成本 − 净资产FV份额 (calcInitialGoodwill) [F4]',
-  detailGoodwill: '从I3-2明细表取数 [F5]',
-  reconciliationDiff: '差异 = 本表商誉 − I3-2明细表商誉 [F6]',
+function newId(): string {
+  return emptyI3InitialValueRow().rowId
 }
 
-// ─── State ───────────────────────────────────────────────────────────────────
+function emptyRow(): InitialValueRow {
+  return emptyI3InitialValueRow()
+}
 
-const selectedInvestee = ref('')
-const auditConclusion = ref('')
-const auditConclusionText = ref('')
+function rowShare(row: InitialValueRow): number {
+  return calcI34Share(row)
+}
 
-/** All investee data: Map<investeeName, InvesteeData> */
-const dataMap = ref<Map<string, InvesteeData>>(new Map())
+function rowGoodwill(row: InitialValueRow): number {
+  return calcI34Goodwill(row)
+}
 
-// ─── Load from allResponses ──────────────────────────────────────────────────
+const dataRows = computed(() => rows.value)
+
+const totals = computed(() => summarizeI34(rows.value))
+
+const gateWarnings = computed(() => buildI34GateWarnings(rows.value))
+
+function fmt(v: number): string {
+  const n = Number(v) || 0
+  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function rowClassName({ row }: { row: InitialValueRow }): string {
+  if (row.sameControl === '是') return 'row-same-control'
+  if (rowGoodwill(row) < 0) return 'row-neg-gw'
+  const booked = Number(row.bookedAmount) || 0
+  if (Math.abs(booked - rowGoodwill(row)) >= 0.01 && (booked !== 0 || rowGoodwill(row) !== 0)) {
+    return 'row-diff'
+  }
+  return ''
+}
+
+function summaryMethod(param: { columns: { property?: string }[] }): string[] {
+  const t = totals.value
+  return param.columns.map((col, idx) => {
+    if (idx === 0) return '合计'
+    switch (col.property) {
+      case 'bookedAmount': return fmt(t.bookedAmount)
+      case 'mergerCost': return fmt(t.mergerCost)
+      case 'netAssetFV': return fmt(t.netAssetFV)
+      case 'shareAmount': return fmt(t.share)
+      case 'goodwillAmount': return fmt(t.goodwill)
+      default: return ''
+    }
+  })
+}
+
+function onSameControlChange(row: InitialValueRow) {
+  if (row.sameControl === '是') {
+    row.goodwillCompliant = '不适用'
+    if (!row.remark.includes('同一控制')) {
+      row.remark = [row.remark, '同一控制下企业合并不确认商誉'].filter(Boolean).join('；')
+    }
+  }
+  persist()
+}
+
+function addRow() {
+  rows.value.push(emptyRow())
+  persist()
+}
+
+async function removeRow(index: number) {
+  try {
+    await ElMessageBox.confirm('确认删除该行？', '删除', { type: 'warning' })
+    rows.value.splice(index, 1)
+    persist()
+  } catch { /* cancel */ }
+}
+
+function toCrossSheetPayload() {
+  return toI34CrossSheetPayload(rows.value)
+}
+
+function persist() {
+  if (props.isReadonly) return
+  emit('save', ROWS_KEY, JSON.stringify(toCrossSheetPayload()))
+}
+
+function persistMeta() {
+  if (props.isReadonly) return
+  emit('save', META_KEY, JSON.stringify({
+    auditNote: auditNote.value,
+    auditConclusion: auditConclusion.value,
+  }))
+}
+
+function normalizeRow(raw: any): InitialValueRow {
+  return normalizeI3InitialValueRow(raw)
+}
+
+/** 从旧版「按被投资单位纵表」Map 迁移 */
+function migrateLegacyMap(parsed: Record<string, any>): InitialValueRow[] {
+  const out: InitialValueRow[] = []
+  for (const [name, data] of Object.entries(parsed)) {
+    const consideration = Number(data?.consideration) || 0
+    const contingent = Number(data?.contingentConsideration) || 0
+    // CAS20：交易费用不计入合并成本
+    const mergerCost = consideration + contingent
+    const assets = Number(data?.totalAssetsFV) || 0
+    const liab = Number(data?.totalLiabilitiesFV) || 0
+    const netAssetFV = assets - liab
+    const equityRatio = Number(data?.equityRatio) || 100
+    const share = netAssetFV * (equityRatio / 100)
+    const gw = calcInitialGoodwill(mergerCost, share)
+    const tx = Number(data?.transactionCost) || 0
+    out.push({
+      rowId: newId(),
+      projectName: name,
+      bookedAmount: Number(data?.detailGoodwillAmount) || gw,
+      sameControl: '否',
+      acquisitionDate: String(data?.acquisitionDate || ''),
+      dateCompliant: '',
+      mergerCost,
+      netAssetFV,
+      equityRatio,
+      goodwillCompliant: '',
+      remark: [
+        tx > 0 ? `购买费用${tx}已费用化未计入合并成本` : '',
+        data?.considerationNote,
+        data?.contingentNote,
+        data?.appraiser ? `评估：${data.appraiser}` : '',
+      ].filter(Boolean).join('；'),
+    })
+  }
+  return out
+}
+
+function readRemark(raw: any): any {
+  if (raw == null) return null
+  if (typeof raw === 'string') {
+    try { return JSON.parse(raw) } catch { return raw }
+  }
+  if (raw.remark != null) {
+    if (typeof raw.remark === 'string') {
+      try { return JSON.parse(raw.remark) } catch { return raw.remark }
+    }
+    return raw.remark
+  }
+  return raw
+}
 
 function loadData() {
-  const raw = props.allResponses.get(STORAGE_KEY)
-  if (raw) {
-    try {
-      const parsed = typeof raw === 'string'
-        ? JSON.parse(raw)
-        : (raw.remark ? JSON.parse(raw.remark) : raw)
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        const map = new Map<string, InvesteeData>()
-        for (const [name, data] of Object.entries(parsed as Record<string, any>)) {
-          map.set(name, normalizeInvesteeData(data))
-        }
-        dataMap.value = map
+  const rowsRaw = readRemark(props.allResponses.get(ROWS_KEY))
+  if (Array.isArray(rowsRaw) && rowsRaw.length) {
+    rows.value = rowsRaw.map(normalizeRow)
+  } else if (!rows.value.length) {
+    const legacy = readRemark(props.allResponses.get(LEGACY_KEY))
+    if (legacy && typeof legacy === 'object' && !Array.isArray(legacy)) {
+      const migrated = migrateLegacyMap(legacy as Record<string, any>)
+      if (migrated.length) {
+        rows.value = migrated
+        persist()
+        ElMessage.info('已将旧版入账测算数据迁移为横向测算表（交易费用已从合并成本剔除）')
+      } else {
+        rows.value = [emptyRow()]
       }
-    } catch { /* ignore parse errors */ }
+    } else {
+      rows.value = [emptyRow()]
+    }
   }
-  // Load conclusion
-  const concRaw = props.allResponses.get(CONCLUSION_KEY)
-  if (concRaw) {
-    auditConclusion.value = typeof concRaw === 'string'
-      ? concRaw
-      : (concRaw.conclusion ?? concRaw.remark ?? '')
-  }
-  // Load audit conclusion (审计结论)
-  const auditConcRaw = props.allResponses.get(AUDIT_CONCLUSION_KEY)
-  if (auditConcRaw) {
-    auditConclusionText.value = typeof auditConcRaw === 'string'
-      ? auditConcRaw
-      : (auditConcRaw.remark ?? auditConcRaw.conclusion ?? '')
+
+  const meta = readRemark(props.allResponses.get(META_KEY))
+  if (meta && typeof meta === 'object') {
+    auditNote.value = meta.auditNote || ''
+    auditConclusion.value = meta.auditConclusion || ''
+  } else if (!auditNote.value && !auditConclusion.value) {
+    const n = props.allResponses.get(LEGACY_NOTE)
+    const c = props.allResponses.get(LEGACY_CONC)
+    if (n) auditNote.value = typeof n === 'string' ? n : (n.remark ?? n.conclusion ?? '')
+    if (c) auditConclusion.value = typeof c === 'string' ? c : (c.remark ?? c.conclusion ?? '')
   }
 }
 
 watch(() => props.allResponses, () => loadData(), { immediate: true })
-
-// ─── Computed ────────────────────────────────────────────────────────────────
-
-const investeeList = computed(() => Array.from(dataMap.value.keys()))
-
-const currentData = computed<InvesteeData | null>(() => {
-  if (!selectedInvestee.value) return null
-  return dataMap.value.get(selectedInvestee.value) ?? null
-})
-
-/** F1: 合并成本 = 对价 + 或有对价 + 交易费用 */
-const mergerCost = computed(() => {
-  if (!currentData.value) return 0
-  const d = currentData.value
-  return calcSubtotal([d.consideration, d.contingentConsideration, d.transactionCost])
-})
-
-/** F2: 可辨认净资产FV = 资产FV - 负债FV */
-const netAssetFV = computed(() => {
-  if (!currentData.value) return 0
-  return currentData.value.totalAssetsFV - currentData.value.totalLiabilitiesFV
-})
-
-/** F3: 净资产FV份额 = 净资产FV × 持股比例 */
-const netAssetFVShare = computed(() => {
-  if (!currentData.value) return 0
-  return netAssetFV.value * (currentData.value.equityRatio / 100)
-})
-
-/** F4: 商誉 = 合并成本 - 净资产FV份额 (核心公式 CP-I3-03) */
-const goodwillAmount = computed(() => {
-  return calcInitialGoodwill(mergerCost.value, netAssetFVShare.value)
-})
-
-/** F6: 勾稽差异 = 本表商誉 - I3-2明细表商誉 */
-const reconciliationDiff = computed(() => {
-  if (!currentData.value) return 0
-  return goodwillAmount.value - (currentData.value.detailGoodwillAmount || 0)
-})
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function normalizeInvesteeData(raw: any): InvesteeData {
-  return {
-    consideration: Number(raw?.consideration) || 0,
-    considerationNote: raw?.considerationNote ?? '',
-    contingentConsideration: Number(raw?.contingentConsideration) || 0,
-    contingentNote: raw?.contingentNote ?? '',
-    transactionCost: Number(raw?.transactionCost) || 0,
-    transactionCostNote: raw?.transactionCostNote ?? '',
-    totalAssetsFV: Number(raw?.totalAssetsFV) || 0,
-    totalAssetsFVNote: raw?.totalAssetsFVNote ?? '',
-    totalLiabilitiesFV: Number(raw?.totalLiabilitiesFV) || 0,
-    totalLiabilitiesFVNote: raw?.totalLiabilitiesFVNote ?? '',
-    equityRatio: Number(raw?.equityRatio) || 100,
-    equityRatioNote: raw?.equityRatioNote ?? '',
-    acquisitionDate: raw?.acquisitionDate ?? '',
-    acquisitionDateNote: raw?.acquisitionDateNote ?? '',
-    appraiser: raw?.appraiser ?? '',
-    appraiserNote: raw?.appraiserNote ?? '',
-    valuationMethod: raw?.valuationMethod ?? '',
-    valuationMethodNote: raw?.valuationMethodNote ?? '',
-    detailGoodwillAmount: Number(raw?.detailGoodwillAmount) || 0,
-  }
-}
-
-function createEmptyInvesteeData(): InvesteeData {
-  return normalizeInvesteeData({})
-}
-
-function fmtNum(v: unknown): string {
-  if (v === 0) return '0.00'
-  if (typeof v === 'number') {
-    return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  }
-  return String(v ?? '')
-}
-
-// ─── Events ──────────────────────────────────────────────────────────────────
-
-function onInvesteeChange(_name: string) {
-  // Selection changed, computed will auto-update
-}
-
-function updateField(field: keyof InvesteeData, value: any) {
-  if (!selectedInvestee.value || props.isReadonly) return
-  const current = dataMap.value.get(selectedInvestee.value)
-  if (!current) return
-  ;(current as any)[field] = value
-  // Force reactivity
-  dataMap.value = new Map(dataMap.value)
-  persistData()
-}
-
-// ─── Add / Remove Investee ───────────────────────────────────────────────────
-
-async function handleAddInvestee() {
-  try {
-    const { value } = await ElMessageBox.prompt(
-      '请输入被投资单位名称',
-      '新增被投资单位',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        inputPlaceholder: '例如：XX科技有限公司',
-        inputValidator: (v) => {
-          if (!v?.trim()) return '名称不能为空'
-          if (dataMap.value.has(v.trim())) return '该被投资单位已存在'
-          return true
-        },
-      }
-    )
-    if (value?.trim()) {
-      const name = value.trim()
-      dataMap.value.set(name, createEmptyInvesteeData())
-      dataMap.value = new Map(dataMap.value)
-      selectedInvestee.value = name
-      persistData()
-      ElMessage.success(`已添加：${name}`)
-    }
-  } catch {
-    // cancelled
-  }
-}
-
-async function handleRemoveInvestee() {
-  if (!selectedInvestee.value) return
-  try {
-    await ElMessageBox.confirm(
-      `确认删除"${selectedInvestee.value}"的入账测算数据？`,
-      '删除确认',
-      { type: 'warning' }
-    )
-    dataMap.value.delete(selectedInvestee.value)
-    dataMap.value = new Map(dataMap.value)
-    selectedInvestee.value = investeeList.value[0] ?? ''
-    persistData()
-    ElMessage.success('已删除')
-  } catch {
-    // cancelled
-  }
-}
-
-// ─── Persistence ─────────────────────────────────────────────────────────────
-
-function persistData() {
-  const obj: Record<string, InvesteeData> = {}
-  for (const [name, data] of dataMap.value.entries()) {
-    obj[name] = { ...data }
-  }
-  emit('save', STORAGE_KEY, JSON.stringify(obj))
-}
-
-function persistConclusion() {
-  emit('save', CONCLUSION_KEY, auditConclusion.value)
-}
-
-function persistAuditConclusion() {
-  emit('save', AUDIT_CONCLUSION_KEY, auditConclusionText.value)
-}
-
-// ─── Review ──────────────────────────────────────────────────────────────────
 
 function handleReview() {
   openReviewDialog('I3-4-入账价值测算')
@@ -769,242 +558,155 @@ function handleReview() {
   padding: 16px;
 }
 
-/* Section Header */
 .section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 .section-title {
   font-size: 15px;
   font-weight: 600;
   color: #1f2937;
 }
-.section-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
 
-/* 蓝色渐变引导面板 */
 .guide-panel {
   background: linear-gradient(135deg, #eff6ff, #dbeafe);
   border: 1px solid #93c5fd;
   border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 16px;
-}
-.guide-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #1e40af;
+  padding: 12px 14px;
   margin-bottom: 12px;
 }
-.guide-body {
-  font-size: 12px;
-  color: #1e3a5f;
-  line-height: 1.6;
+.guide-header {
+  font-weight: 600;
+  color: #1e40af;
+  margin-bottom: 8px;
+  font-size: 13px;
 }
 .guide-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 6px 16px;
+  font-size: 12px;
+  color: #1e3a5f;
 }
 .guide-step {
   display: flex;
-  align-items: flex-start;
   gap: 6px;
+  align-items: flex-start;
 }
 .step-num {
   color: #2563eb;
   font-weight: 700;
-  font-size: 14px;
-  flex-shrink: 0;
-}
-.step-text {
-  font-size: 12px;
-  color: #334155;
 }
 
-/* 琥珀色方法论区块 */
 .methodology-block {
   border-left: 4px solid #f59e0b;
   background: #fffbeb;
-  padding: 12px 16px;
+  padding: 10px 14px;
   border-radius: 0 6px 6px 0;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   font-size: 12px;
   line-height: 1.7;
   color: #78350f;
 }
-.methodology-content strong {
-  color: #92400e;
-  font-size: var(--wp-font-size, 13px);
+
+.objective-alert,
+.gate-alert {
+  margin-bottom: 12px;
 }
 
-/* 被投资单位工具栏 */
-.investee-toolbar {
+.guidance-details {
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #6b7280;
+}
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+.guidance-details ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  line-height: 1.8;
+}
+
+.process-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.process-title {
+  font-weight: 600;
+  color: #1f2937;
+}
+.toolbar-right {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  background: #f9fafb;
-  border-radius: 8px;
-  border: 1px solid #e5e7eb;
-  flex-wrap: wrap;
 }
-.toolbar-label {
-  font-weight: 600;
-  color: #374151;
-  white-space: nowrap;
-}
-
-/* 审计目标 alert */
-.objective-alert {
-  margin-bottom: 16px;
-}
-
-/* 入账测算主表 */
-.calc-table-wrapper {
-  overflow-x: auto;
-  margin-bottom: 16px;
-}
-.calc-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--wp-font-size, 13px);
-}
-.calc-table th,
-.calc-table td {
-  border: 1px solid #e5e7eb;
-  padding: 8px 12px;
-  text-align: left;
-  vertical-align: middle;
-}
-.calc-table thead th {
-  background: #f3f4f6;
-  font-weight: 600;
-  color: #374151;
-  text-align: center;
-}
-.col-label { width: 220px; }
-.col-value { width: 240px; text-align: right; }
-.col-note { min-width: 200px; }
-
-/* 行分组标题 */
-.group-header-row td {
-  background: #f9fafb;
-}
-.group-header {
-  font-weight: 700;
-  font-size: var(--wp-font-size, 13px);
-  color: #1f2937;
-  padding: 10px 12px;
-}
-
-/* 缩进 */
-.indent-0 { padding-left: 12px; }
-.indent-1 { padding-left: 28px; }
-
-/* 行值列 */
-.row-value {
-  text-align: right;
-}
-.row-note {
+.row-count {
   font-size: 12px;
   color: #6b7280;
 }
 
-/* 小计行 */
-.subtotal-row td {
-  background: #fafafa;
-  border-top: 1px solid #d1d5db;
+.calc-table {
+  width: 100%;
+  margin-bottom: 8px;
 }
-
-/* 公式列：虚线下划线 + cursor:help */
+.formula-hdr {
+  border-bottom: 1px dashed #909399;
+  cursor: help;
+}
 .formula-cell {
+  font-weight: 600;
   border-bottom: 1px dashed #909399;
   cursor: help;
   display: inline-block;
-  min-width: 80px;
+  min-width: 64px;
   text-align: right;
+}
+.gw-ok { color: #92400e; }
+.gw-zero { color: #6b7280; }
+.gw-neg { color: #dc2626; }
+.num { font-weight: 600; }
+.ratio-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.pct { font-size: 12px; color: #6b7280; }
+
+.recon-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #374151;
+  padding: 8px 0 12px;
+}
+.recon-bar .ok { color: #16a34a; font-weight: 600; }
+.recon-bar .bad { color: #dc2626; font-weight: 600; }
+
+.note-card {
+  margin-top: 12px;
+}
+.card-title {
   font-weight: 600;
-  color: #1f2937;
-  padding: 2px 4px;
-}
-.formula-note {
-  font-size: 11px;
-  color: #9ca3af;
-  font-style: italic;
 }
 
-/* 商誉结果行高亮 */
-.goodwill-result-row td {
-  background: linear-gradient(135deg, #fef3c7, #fde68a);
-  border-top: 2px solid #f59e0b;
-  border-bottom: 2px solid #f59e0b;
+:deep(.row-same-control) {
+  background: #f3f4f6;
 }
-.goodwill-value {
-  font-size: 15px;
-  font-weight: 700;
-  color: #92400e;
-  border-bottom-color: #92400e;
-}
-
-/* 差异样式 */
-.diff-warning {
-  color: #dc2626;
-  border-bottom-color: #dc2626;
-}
-.diff-ok {
-  color: #16a34a;
-  border-bottom-color: #16a34a;
-}
-
-/* 负商誉告警 */
-.warning-row td {
+:deep(.row-neg-gw) {
   background: #fef2f2;
 }
-.negative-goodwill-warning {
-  color: #dc2626;
-  font-weight: 600;
-  text-align: center;
-  padding: 10px;
-}
-
-/* 无选中提示 */
-.no-investee-hint {
-  margin-top: 40px;
-}
-
-/* 审计结论 */
-.conclusion-card {
-  margin-top: 16px;
-}
-.conclusion-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-/* 编制提示 */
-.prep-hint {
-  margin-top: 12px;
-  font-size: 12px;
-  color: #909399;
-}
-.prep-hint summary {
-  cursor: pointer;
-  font-weight: 500;
-}
-.prep-hint ul {
-  margin: 8px 0 0;
-  padding-left: 18px;
-  line-height: 1.8;
+:deep(.row-diff) {
+  background: #fff7ed;
 }
 </style>

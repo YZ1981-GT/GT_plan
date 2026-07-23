@@ -80,8 +80,13 @@ const BALANCE_THRESHOLD = 0.01
 const ACCOUNT_CODE = '6711'
 /** 底稿编码 */
 const WP_CODE = 'K13'
-/** item_id 前缀 */
+/** item_id 前缀（legacy verbose 迁移用） */
 const ITEM_PREFIX = 'K13-3'
+/** 单一 JSON 持久化键（与后端 _k13_import_export._K13_SPECS["K13-3"].item_id 一致） */
+const ITEM_KEY = 'K13-3-adj-entries'
+/** K13-1 审定表 AJE/RJE 汇总回写键（K13-1 reconcile 消费） */
+const K13_1_AJE_TOTAL = 'K13-1-aje-total'
+const K13_1_RJE_TOTAL = 'K13-1-rje-total'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -243,24 +248,13 @@ export function useK13Adjustment(formData: ReturnType<typeof useK13FormData>) {
       return // 不平衡时不允许发布
     }
 
-    // 批量保存到 checklist_responses
-    const items = entries.value.map((entry, i) => {
-      const n = i + 1
-      return [
-        { itemId: `${ITEM_PREFIX}-entry-${n}-type`, value: entry.type },
-        { itemId: `${ITEM_PREFIX}-entry-${n}-category`, value: entry.category || null },
-        { itemId: `${ITEM_PREFIX}-entry-${n}-desc`, value: entry.description || null },
-        { itemId: `${ITEM_PREFIX}-entry-${n}-reportItem`, value: entry.reportItem || null },
-        { itemId: `${ITEM_PREFIX}-entry-${n}-accountName`, value: entry.accountName || null },
-        { itemId: `${ITEM_PREFIX}-entry-${n}-noteItem`, value: entry.noteItem || null },
-        { itemId: `${ITEM_PREFIX}-entry-${n}-debit`, value: entry.debitAmount ? String(entry.debitAmount) : null },
-        { itemId: `${ITEM_PREFIX}-entry-${n}-credit`, value: entry.creditAmount ? String(entry.creditAmount) : null },
-        { itemId: `${ITEM_PREFIX}-entry-${n}-ref`, value: entry.refIndex || null },
-        { itemId: `${ITEM_PREFIX}-entry-${n}-remark`, value: entry.remark || null },
-      ]
-    }).flat()
-
-    await saveBatch(items)
+    // 单一 JSON 数组持久化（与后端 IE item_id=K13-3-adj-entries 一致）
+    // 同时回写 K13-1 审定表 AJE/RJE 汇总列（K13-1 reconcile 消费，修复回写死链）
+    await saveBatch([
+      { itemId: ITEM_KEY, value: _serializeEntries() },
+      { itemId: K13_1_AJE_TOTAL, value: String(ajeNet6711.value) },
+      { itemId: K13_1_RJE_TOTAL, value: String(rjeNet6711.value) },
+    ])
 
     // EventBus publish 'adjustment:created'
     // ⚠️ 此事件触发两个下游：
@@ -275,15 +269,92 @@ export function useK13Adjustment(formData: ReturnType<typeof useK13FormData>) {
       rjeNet: rjeNet6711.value,
       timestamp: Date.now(),
     })
+
+    // 补发 a13:push-misstatement（K10-3/K9-3 范式）→ A13 错报汇总表拾取当前分录明细
+    eventBus.emit('a13:push-misstatement', {
+      wpCode: WP_CODE,
+      accountCode: ACCOUNT_CODE,
+      entryType: activeType.value,
+      entries: _serializeEntries().filter(e => e.debitAmount || e.creditAmount),
+      totalDebit: balance.totalDebit,
+      totalCredit: balance.totalCredit,
+      ajeNet: ajeNet6711.value,
+      rjeNet: rjeNet6711.value,
+      timestamp: Date.now(),
+    })
+  }
+
+  /** 序列化分录为纯对象数组（剥离响应式代理，供持久化/事件载荷） */
+  function _serializeEntries(): K13AdjustmentEntry[] {
+    return entries.value.map((e, i) => ({
+      index: i + 1,
+      type: e.type,
+      category: e.category,
+      description: e.description,
+      reportItem: e.reportItem,
+      accountName: e.accountName,
+      noteItem: e.noteItem,
+      debitAmount: Number(e.debitAmount) || 0,
+      creditAmount: Number(e.creditAmount) || 0,
+      refIndex: e.refIndex,
+      remark: e.remark,
+    }))
   }
 
   // ─── 5. 恢复已保存分录 ────────────────────────────────────────────────
 
   /**
-   * 从 checklist_responses 恢复已保存的分录行
-   * item_id 格式: K13-3-entry-{n}-{field}
+   * 从 checklist_responses 恢复已保存的分录行。
+   *
+   * 优先读单一 JSON 数组键 `K13-3-adj-entries`（当前格式，与后端 IE 一致）；
+   * 若不存在则回退旧 verbose per-field 键 `K13-3-entry-{n}-{field}`（legacy 迁移，不丢数据）。
    */
   function restoreEntries(): void {
+    entries.value = []
+
+    // 1. 优先：单一 JSON 数组键
+    const jsonItem = formData.allResponses.value.get(ITEM_KEY)
+    const rawJson = jsonItem?.remark ?? jsonItem?.conclusion
+    if (rawJson) {
+      try {
+        const parsed = JSON.parse(rawJson)
+        const arr: any[] = Array.isArray(parsed)
+          ? parsed
+          : Array.isArray(parsed?.rows)
+            ? parsed.rows
+            : []
+        if (arr.length > 0) {
+          entries.value = arr.map((e, i) => _normalizeEntry(e, i))
+          return
+        }
+      } catch {
+        // JSON 解析失败 → 回退 legacy
+      }
+    }
+
+    // 2. 回退：legacy verbose per-field 键
+    _restoreLegacyEntries()
+  }
+
+  /** 归一化导入/加载的原始对象为 K13AdjustmentEntry */
+  function _normalizeEntry(e: any, i: number): K13AdjustmentEntry {
+    return {
+      index: i + 1,
+      type: (e?.type === 'RJE' ? 'RJE' : 'AJE') as K13AdjustmentType,
+      category: (e?.category || '') as K13AdjustmentCategory | '',
+      description: String(e?.description ?? ''),
+      reportItem: String(e?.reportItem ?? ''),
+      accountName: String(e?.accountName ?? ''),
+      noteItem: String(e?.noteItem ?? ''),
+      debitAmount: Number(e?.debitAmount) || 0,
+      creditAmount: Number(e?.creditAmount) || 0,
+      refIndex: String(e?.refIndex ?? ''),
+      remark: String(e?.remark ?? ''),
+    }
+  }
+
+  /** legacy 迁移：读旧 K13-3-entry-{n}-{field} verbose 键 */
+  function _restoreLegacyEntries(): void {
     const prefix = `${ITEM_PREFIX}-entry-`
     let maxIdx = 0
 
@@ -333,40 +404,20 @@ export function useK13Adjustment(formData: ReturnType<typeof useK13FormData>) {
 
   /** 从导入数据恢复分录（覆盖现有） */
   function importEntries(importedEntries: K13AdjustmentEntry[]): void {
-    entries.value = importedEntries.map((e, i) => ({
-      ...e,
-      index: i + 1,
-    }))
+    entries.value = importedEntries.map((e, i) => _normalizeEntry(e, i))
     _triggerSaveAll()
   }
 
-  // ─── 7. 保存触发 ──────────────────────────────────────────────────────
+  // ─── 7. 保存触发（单一 JSON 数组键，debounce 2s） ─────────────────────────
 
-  function _triggerSave(rowIndex: number): void {
-    const entry = entries.value[rowIndex]
-    if (!entry) return
-    const n = rowIndex + 1
-    const pairs: [string, string | null][] = [
-      [`${ITEM_PREFIX}-entry-${n}-type`, entry.type],
-      [`${ITEM_PREFIX}-entry-${n}-category`, entry.category || null],
-      [`${ITEM_PREFIX}-entry-${n}-desc`, entry.description || null],
-      [`${ITEM_PREFIX}-entry-${n}-reportItem`, entry.reportItem || null],
-      [`${ITEM_PREFIX}-entry-${n}-accountName`, entry.accountName || null],
-      [`${ITEM_PREFIX}-entry-${n}-noteItem`, entry.noteItem || null],
-      [`${ITEM_PREFIX}-entry-${n}-debit`, entry.debitAmount ? String(entry.debitAmount) : null],
-      [`${ITEM_PREFIX}-entry-${n}-credit`, entry.creditAmount ? String(entry.creditAmount) : null],
-      [`${ITEM_PREFIX}-entry-${n}-ref`, entry.refIndex || null],
-      [`${ITEM_PREFIX}-entry-${n}-remark`, entry.remark || null],
-    ]
-    for (const [itemId, remark] of pairs) {
-      debouncedSave(itemId, { item_id: itemId, conclusion: null, remark })
-    }
+  /** 逐行编辑后触发保存：整表 JSON 序列化写入 ITEM_KEY（不再 per-field 展开） */
+  function _triggerSave(_rowIndex?: number): void {
+    const remark = JSON.stringify(_serializeEntries())
+    debouncedSave(ITEM_KEY, { item_id: ITEM_KEY, conclusion: null, remark })
   }
 
   function _triggerSaveAll(): void {
-    for (let i = 0; i < entries.value.length; i++) {
-      _triggerSave(i)
-    }
+    _triggerSave()
   }
 
   // ─── Return ────────────────────────────────────────────────────────────

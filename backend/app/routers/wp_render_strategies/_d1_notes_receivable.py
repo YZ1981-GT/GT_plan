@@ -56,6 +56,8 @@ async def render(ctx: RenderContext) -> dict | None:
         "client_name": "",
         "audit_year": "",
         "business_category": ctx.business_category or "",
+        "bs_date": "",
+        "related_parties": [],
     }
     try:
         proj_row = (
@@ -73,8 +75,52 @@ async def render(ctx: RenderContext) -> dict | None:
             project_context["business_category"] = (
                 proj_row.business_category or ctx.business_category or ""
             )
+            # bs_date（资产负债表日）：审计年度 → {year}-12-31，供 D1-3 期后回款/抽凭/截止取数使用
+            if proj_row.audit_year:
+                project_context["bs_date"] = f"{proj_row.audit_year}-12-31"
     except Exception as e:  # noqa: BLE001
         logger.warning("D1 render: project context 查询失败: %s", e)
+
+    # 关联方清单：从关联方登记表（RelatedPartyRegistry）取项目级名单，供 D1-3 客户明细表关联方识别
+    try:
+        rp_rows = (
+            await db.execute(
+                sa.text(
+                    "SELECT name FROM related_party_registry "
+                    "WHERE project_id = :pid AND is_deleted = false "
+                    "AND name IS NOT NULL AND name <> ''"
+                ),
+                {"pid": str(ctx.project_id)},
+            )
+        ).fetchall()
+        project_context["related_parties"] = [r.name for r in rp_rows if r.name]
+    except Exception as e:  # noqa: BLE001
+        logger.warning("D1 render: related_parties 查询失败: %s", e)
+
+    # 试算平衡表应收票据（科目 1121）未审/审定合计：供 D1-1 审定表试算平衡差异行预填 tb_amount，
+    # 使审计师无需手工录入即可看到与 TB 的勾稽差异（审定行仍由 D1-2 明细带入，此处仅锚定 TB 数）。
+    try:
+        tb_row = (
+            await db.execute(
+                sa.text(
+                    "SELECT COALESCE(SUM(unadjusted_amount), 0) AS unadjusted, "
+                    "COALESCE(SUM(audited_amount), 0) AS audited "
+                    "FROM trial_balance "
+                    "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                    "AND standard_account_code LIKE '1121%'"
+                ),
+                {"pid": str(ctx.project_id), "year": ctx.year},
+            )
+        ).fetchone()
+        if tb_row:
+            audited = float(tb_row.audited or 0)
+            unadjusted = float(tb_row.unadjusted or 0)
+            # 审定优先；审定为 0 时回退未审（TB 尚未回写审定数的场景）
+            project_context["tb_amount"] = audited if audited else unadjusted
+            project_context["tb_amount_unadjusted"] = unadjusted
+            project_context["tb_amount_audited"] = audited
+    except Exception as e:  # noqa: BLE001
+        logger.warning("D1 render: trial_balance(1121) 查询失败: %s", e)
 
     return {
         "sheet_name": ctx.classification.sheet_name if ctx.classification else "",

@@ -6,6 +6,7 @@
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
 import { calcOverdueDays, calcTermDays, calcSubtotal, parseNum } from './useF3FormulaEngine'
 import type { UseF3BaseOptions } from './useF3Adjudication'
+import { injectF3Adjustments, type F3InjectAdjustmentRow } from './f3AdjustmentInject'
 
 export const F3_OVERDUE_NOTE_TYPES = ['银行承兑汇票', '商业承兑汇票', '供应链票据', '其他'] as const
 export const F3_YES_NO_OPTIONS = ['是', '否', '不适用'] as const
@@ -248,6 +249,67 @@ export function useF3OverdueCheck(options: UseF3BaseOptions) {
     return ''
   }
 
+  /**
+   * P0-2：逾期票据重分类。
+   * 源审定表提示：逾期银行承兑汇票转入短期借款(2001)，逾期商业承兑汇票转入应付账款(2202)。
+   * 对每笔逾期且未调整的票据生成一对 RJE（借 2201 应付票据 / 贷 目标科目），
+   * 幂等写入 F3-3-rows，并发信号供 L1/F4 联动感知。
+   */
+  const pendingReclassRows = computed<F3OverdueNoteRow[]>(() =>
+    rows.value.filter((r) => r.overdueDays > 0 && r.isAdjusted !== '是'
+      && (r.unpaidAmount > 0 ? r.unpaidAmount : r.faceValue) > 0),
+  )
+
+  function reclassTarget(noteType: string): { code: string; name: string } {
+    return noteType.includes('银行')
+      ? { code: '2001', name: '短期借款' }
+      : { code: '2202', name: '应付账款' }
+  }
+
+  const reclassPreview = computed(() =>
+    pendingReclassRows.value.map((r) => {
+      const amount = r.unpaidAmount > 0 ? r.unpaidAmount : r.faceValue
+      const target = reclassTarget(r.noteType || '')
+      return {
+        ticketNo: r.ticketNo,
+        noteType: r.noteType,
+        amount,
+        targetCode: target.code,
+        targetName: target.name,
+        overdueDays: r.overdueDays,
+      }
+    }),
+  )
+
+  function pushReclassToAdjustment(): { count: number; total: number } {
+    if (readonly.value) return { count: 0, total: 0 }
+    const targets = pendingReclassRows.value
+    const injectRows: F3InjectAdjustmentRow[] = []
+    let total = 0
+    for (const r of targets) {
+      const amount = r.unpaidAmount > 0 ? r.unpaidAmount : r.faceValue
+      const target = reclassTarget(r.noteType || '')
+      const summary = `逾期${r.noteType || '票据'}${r.ticketNo ? `(${r.ticketNo})` : ''}重分类至${target.name}`
+      const remark = `到期日${r.dueDate || '-'}，逾期${r.overdueDays}天`
+      injectRows.push({
+        entryType: 'RJE', summary, accountCode: '2201', accountName: '应付票据',
+        debitAmount: amount, creditAmount: 0, remark,
+      })
+      injectRows.push({
+        entryType: 'RJE', summary, accountCode: target.code, accountName: target.name,
+        debitAmount: 0, creditAmount: amount, remark,
+      })
+      total += amount
+    }
+    injectF3Adjustments(allResponses.value, injectRows, 'overdue-reclass')
+    try {
+      window.dispatchEvent(new CustomEvent('f3:overdue-reclassified', {
+        detail: { count: targets.length, total },
+      }))
+    } catch { /* silent */ }
+    return { count: targets.length, total }
+  }
+
   onBeforeUnmount(() => {
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; flushSave() }
   })
@@ -255,6 +317,7 @@ export function useF3OverdueCheck(options: UseF3BaseOptions) {
   return {
     rows, summary, filledCount, auditConclusion, addRow, removeRow, updateCell,
     mergeOcrFields, rowClassName,
+    pendingReclassRows, reclassPreview, pushReclassToAdjustment,
   }
 }
 

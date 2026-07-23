@@ -38,6 +38,13 @@ router = APIRouter(
     tags=["wp-disclosure-sync"],
 )
 
+# HTML 渲染器路径（US-3）使用独立前缀，避免叠加到 ``/api/projects`` 造成
+# ``/api/projects/api/wp-disclosure-sync/...`` 死链（历史前缀 bug 修复）。
+html_sync_router = APIRouter(
+    prefix="/api/wp-disclosure-sync",
+    tags=["wp-disclosure-sync"],
+)
+
 
 # ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -55,6 +62,10 @@ class SyncFromWorkpaperRequest(BaseModel):
     sub_table_data: dict[str, list[dict]] = Field(
         default_factory=dict,
         description="子表数据：sub_table_id → 行列表",
+    )
+    columns: dict[str, list[dict]] | None = Field(
+        None,
+        description="列头元数据：sub_table_id → ColumnDef[]（{key,label,is_label?,align?,format?}），供附注模块投影渲染源模板表样",
     )
     current_standard: str = Field(
         ...,
@@ -87,6 +98,7 @@ class SyncBatchItem(BaseModel):
     sheet_name: str = Field(..., min_length=1)
     section_id: str = Field(..., min_length=1)
     sub_table_data: dict[str, list[dict]] = Field(default_factory=dict)
+    columns: dict[str, list[dict]] | None = Field(None, description="列头元数据 sub_table_id → ColumnDef[]")
 
 
 class SyncBatchFromWorkpaperRequest(BaseModel):
@@ -141,6 +153,7 @@ async def sync_disclosure_from_workpaper(
             current_standard=body.current_standard,
             user=current_user,
             year=body.year,
+            sub_table_columns=body.columns,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -206,6 +219,7 @@ class SyncFromHtmlRequest(BaseModel):
         default_factory=dict,
         description="子表数据",
     )
+    columns: dict | None = Field(None, description="列头元数据 sub_table_id → ColumnDef[]")
 
 
 class SyncFromHtmlResponse(BaseModel):
@@ -228,8 +242,8 @@ class ConflictDetail(BaseModel):
     last_sync_at: str | None = None
 
 
-@router.post(
-    "/api/wp-disclosure-sync/{wp_id}/sync-html",
+@html_sync_router.post(
+    "/{wp_id}/sync-html",
     response_model=SyncFromHtmlResponse,
     responses={
         409: {"model": ConflictDetail, "description": "附注侧有更新的手动编辑"},
@@ -268,6 +282,7 @@ async def sync_html_to_disclosure(
             sub_table_data=body.sub_table_data,
             project_id=project_id,
             user=current_user,
+            sub_table_columns=body.columns,
             force=force,
         )
     except ConflictError as exc:

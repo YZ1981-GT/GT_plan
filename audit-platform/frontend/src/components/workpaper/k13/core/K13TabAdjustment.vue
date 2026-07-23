@@ -16,12 +16,20 @@
           size="small"
           @change="(val: any) => adjustment.switchType(val)"
         />
-        <el-button size="small" @click="handleAI('adjustment')">
+        <el-dropdown v-if="!props.isReadonly" trigger="click" @command="handleIECommand">
+          <el-button size="small" plain>导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="template">导出模板</el-dropdown-item>
+              <el-dropdown-item command="export">导出数据</el-dropdown-item>
+              <el-dropdown-item command="import">导入数据</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <el-button size="small" :loading="isAiLoading" @click="handleAI">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
-        <el-button size="small" @click="handleReview">
-          <el-icon><Check /></el-icon> 复核
-        </el-button>
+        <GtReviewTrigger section-id="K13-3-adjustment" label="💬 复核" />
         <el-button
           type="primary"
           size="small"
@@ -286,12 +294,14 @@
  *   Backend: _on_adjustment_created handler picks up K13-3 entries (regex ^[D-N]\d+-3$ matches K13-3)
  *   Disclosure refresh: INDIRECT via K13-1 recalc → writebackTB → substantive:adjudicated
  */
-import { computed, inject, onMounted, ref, defineAsyncComponent } from 'vue'
+import { computed, onMounted, ref, defineAsyncComponent } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick, Check } from '@element-plus/icons-vue'
+import { MagicStick } from '@element-plus/icons-vue'
 import { useK13FormData } from '../../composables/useK13FormData'
 import { useK13Adjustment } from '../../composables/useK13Adjustment'
-import { eventBus } from '@/utils/eventBus'
+import { useK13ImportExport } from '../../composables/useK13ImportExport'
+import { generateK13AiText } from '../../composables/useK13AiText'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
@@ -309,9 +319,6 @@ const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
 }>()
 
-// ─── Inject复核对话 ──────────────────────────────────────────────────────────
-const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
-
 // ─── Composables ─────────────────────────────────────────────────────────────
 
 const formData = useK13FormData({
@@ -322,9 +329,16 @@ const formData = useK13FormData({
 
 const adjustment = useK13Adjustment(formData)
 
+const importExport = useK13ImportExport({
+  wpId: computed(() => props.wpId) as any,
+  projectId: computed(() => props.projectId) as any,
+  sheetCode: 'K13-3',
+})
+
 // ─── UI State ────────────────────────────────────────────────────────────────
 
 const isSaving = ref(false)
+const isAiLoading = ref(false)
 
 const typeOptions = [
   { label: 'AJE 审计调整', value: 'AJE' },
@@ -399,12 +413,67 @@ async function handleSave(): Promise<void> {
   }
 }
 
-function handleAI(_section: string): void {
-  // AI辅助钩子（通用端点 /api/workpapers/{wp_id}/ai/generate-text）
+/** AI 辅助：基于当前分录汇总，生成调整事项分析/复核意见（顾问式弹窗，不覆盖表格） */
+async function handleAI(): Promise<void> {
+  const entries = adjustment.entries.value
+  if (entries.length === 0) {
+    ElMessage.info('暂无调整分录，请先录入后再生成 AI 分析')
+    return
+  }
+  isAiLoading.value = true
+  try {
+    const bal = adjustment.currentBalance.value
+    const lines = entries
+      .filter(e => e.debitAmount || e.creditAmount)
+      .map(e => `[${e.type}] ${e.description || '(未填说明)'}｜借${e.debitAmount || 0}｜贷${e.creditAmount || 0}｜${e.category || '未分类'}`)
+      .join('\n')
+    const content = await generateK13AiText(props.wpId, {
+      section: 'k13-3-adjustment-analysis',
+      prompt: '你是审计师，请针对以下营业外支出（科目6711，借方增加=调增支出）调整分录汇总，简要分析调整事项的合理性、方向是否正确、是否影响税前扣除，并给出复核意见。',
+      context: {
+        科目: '6711 营业外支出（损益类借方）',
+        当前类型: adjustment.activeType.value,
+        分录明细: lines || '（无金额分录）',
+        借方合计: bal.totalDebit,
+        贷方合计: bal.totalCredit,
+        是否平衡: bal.isBalanced ? '是' : `否，差额${bal.diff}`,
+        AJE净影响6711: adjustment.ajeNet6711.value,
+        RJE净影响6711: adjustment.rjeNet6711.value,
+      },
+    })
+    if (content) {
+      await ElMessageBox.alert(content, 'AI 调整分录分析（仅供参考）', {
+        confirmButtonText: '知道了',
+        customClass: 'k13-ai-alert',
+      })
+    }
+  } finally {
+    isAiLoading.value = false
+  }
 }
 
-function handleReview(): void {
-  openReviewDialog?.('K13-3-adjustment', '营业外支出调整分录汇总')
+/** 导入导出（K13-3 调整分录，单一 JSON 数组 round-trip） */
+function handleIECommand(cmd: string): void {
+  if (cmd === 'template') {
+    void importExport.exportTemplate()
+  } else if (cmd === 'export') {
+    void importExport.exportData()
+  } else if (cmd === 'import') {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.xlsx,.xls'
+    input.onchange = async (event: Event) => {
+      const file = (event.target as HTMLInputElement).files?.[0]
+      if (!file) return
+      const result = await importExport.importData(file)
+      if (result) {
+        // 重新加载 checklist_responses 后恢复分录（导入后刷新）
+        await formData.selfLoad()
+        adjustment.restoreEntries()
+      }
+    }
+    input.click()
+  }
 }
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
@@ -429,10 +498,10 @@ onMounted(async () => {
 
 /* 方法论上下文（琥珀色左边线+浅黄背景） */
 .methodology-context {
-  background: linear-gradient(135deg, #fffbe6 0%, #fff8e1 100%);
-  border-left: 3px solid #e6a23c;
-  padding: 8px 12px; margin-bottom: 12px;
-  border-radius: 0 4px 4px 0; font-size: 12px; color: #8b6914;
+  background: #fffbeb;
+  border-left: 4px solid #f59e0b;
+  padding: 10px 14px; margin-bottom: 12px;
+  border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6;
 }
 
 /* 跨底稿引用 */

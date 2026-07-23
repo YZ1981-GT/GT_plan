@@ -80,6 +80,13 @@
           type="primary"
           @click="handleAddRow"
         >+ 新增行</el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="warning"
+          plain
+          @click="handleImportFromK24"
+        >从K2-4带入</el-button>
       </div>
 
       <!-- 表格 -->
@@ -374,6 +381,100 @@
         </span>
       </div>
     </el-card>
+
+    <!-- 到期/已摊完预警 -->
+    <el-alert v-if="expiredContracts.length > 0" type="warning" :closable="false" style="margin-bottom:12px">
+      <template #title>⚠️ {{ expiredContracts.length }} 个合同已摊销完毕（摊余成本≤0）</template>
+      <div style="font-size:12px;margin-top:4px">
+        {{ expiredContracts.map(r => r.contractNo || '(未命名)').join('、') }}
+        —— 请确认是否应转出其他流动资产
+      </div>
+    </el-alert>
+
+    <!-- 差异超重要性 → 建议AJE -->
+    <el-card v-if="varianceExceedRows.size > 0 && !isReadonly" shadow="never" class="suggest-aje-card">
+      <template #header>
+        <div class="section-title">
+          <span>建议调整分录（{{ varianceExceedRows.size }} 笔差异超重要性水平）</span>
+          <el-button size="small" type="primary" @click="handlePushSuggestedAJE">一键推送至K2-3</el-button>
+        </div>
+      </template>
+      <el-table :data="suggestedAjeRows" border size="small" style="font-size:13px">
+        <el-table-column label="合同" prop="contractNo" width="130" />
+        <el-table-column label="差异方向" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.variance > 0 ? 'danger' : 'warning'" size="small">{{ row.variance > 0 ? '少摊' : '多摊' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="差异金额" width="130" align="right">
+          <template #default="{ row }"><span class="amount-cell">{{ fmtAmt(Math.abs(row.variance)) }}</span></template>
+        </el-table-column>
+        <el-table-column label="建议分录" min-width="200">
+          <template #default="{ row }">
+            <span v-if="row.variance > 0">借：销售费用/管理费用 {{ fmtAmt(row.variance) }}　贷：其他流动资产 {{ fmtAmt(row.variance) }}</span>
+            <span v-else>借：其他流动资产 {{ fmtAmt(Math.abs(row.variance)) }}　贷：销售费用/管理费用 {{ fmtAmt(Math.abs(row.variance)) }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" style="margin-bottom:12px">
+      <template #header>
+        <div class="section-title">
+          <span>审计说明</span>
+          <div class="title-actions">
+            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleAiNote">
+              🤖 AI生成
+            </el-button>
+          </div>
+        </div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 10 }"
+        :disabled="isReadonly"
+        placeholder="概述摊销测算过程与结果：方法选择依据、差异原因分析、是否需要调整..."
+        @blur="persistNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" style="margin-bottom:12px">
+      <template #header>
+        <div class="section-title">
+          <span>审计结论</span>
+          <div class="title-actions">
+            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleAiConclusion">
+              🤖 AI生成
+            </el-button>
+            <el-button size="small" type="default" link @click="handleReview">💬 复核</el-button>
+          </div>
+        </div>
+      </template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 2, maxRows: 6 }"
+        :disabled="isReadonly"
+        placeholder="基于上述摊销测算，形成审计结论..."
+        @blur="persistConclusion"
+      />
+    </el-card>
+
+    <!-- 编制提示 -->
+    <details class="compile-hint">
+      <summary>编制提示（CAS14 / CAS15）</summary>
+      <ul>
+        <li>直线法：cost ÷ 摊销期总月数 × 本期月数（适用于均匀受益的合同取得成本）</li>
+        <li>进度法：cost × (本期累计履约进度 - 上期累计履约进度)（适用于产出法/投入法确定进度的合同）</li>
+        <li>差异 = 测算应摊销 - 企业账面摊销，正值=企业少摊（需补提），负值=企业多摊（需冲回）</li>
+        <li>差异超过重要性水平 → 红色高亮 + 建议AJE，可一键推送至K2-3调整分录</li>
+        <li>摊余成本≤0表示已摊销完毕，应关注是否仍有对应合同义务或应转出</li>
+        <li>摊销方法变更视为会计估计变更，应有充分依据并披露</li>
+      </ul>
+    </details>
   </div>
 </template>
 
@@ -390,10 +491,12 @@
  * Task: 4.5
  * Requirements: 5.1-5.7
  */
-import { ref, computed, toRef, watch } from 'vue'
+import { ref, computed, toRef, watch, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { fmtAmount } from '@/utils/formatters'
+import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 import {
   useK2Amortization,
   K2_AMORT_SECTION_LABELS,
@@ -487,6 +590,46 @@ async function handleAddRow(): Promise<void> {
   recalcAll()
 }
 
+/** 从K2-4合同取得成本明细带入（自动填入合同编号、取得成本、摊销方法、摊销期） */
+function handleImportFromK24(): void {
+  const k24Data = props.allResponses.get('K2-4-contract-cost-rows')
+  if (!k24Data?.remark) {
+    ElMessage.warning('K2-4合同取得成本明细暂无数据，请先编制K2-4')
+    return
+  }
+  try {
+    const parsed = JSON.parse(k24Data.remark)
+    const contractRows = (Array.isArray(parsed) ? parsed : [])
+      .filter((r: any) => r.contractNo && r.isCapitalized)
+    if (contractRows.length === 0) {
+      ElMessage.info('K2-4中未找到已资本化的合同（仅带入isCapitalized=true的行）')
+      return
+    }
+    let importedCount = 0
+    for (const item of contractRows) {
+      const existing = rows.value.find((r) => r.contractNo === item.contractNo)
+      if (!existing) {
+        addRow(item.contractNo)
+        const newRow = rows.value[rows.value.length - 1]
+        if (newRow) {
+          updateCell(newRow.rowId, 'cost', Number(item.beginBalance ?? 0) + Number(item.periodIncrease ?? 0))
+          if (item.amortMethod) updateCell(newRow.rowId, 'method', item.amortMethod)
+          if (item.amortPeriod) updateCell(newRow.rowId, 'totalPeriods', Number(item.amortPeriod))
+        }
+        importedCount++
+      }
+    }
+    recalcAll()
+    if (importedCount > 0) {
+      ElMessage.success(`已从K2-4带入 ${importedCount} 个合同`)
+    } else {
+      ElMessage.info('所有合同已存在，无需带入')
+    }
+  } catch {
+    ElMessage.warning('解析K2-4数据失败')
+  }
+}
+
 function handleRemoveRow(rowId: string): void {
   removeRow(rowId)
 }
@@ -520,6 +663,111 @@ async function handleImportExport(command: string): Promise<void> {
     ElMessage.error(err?.message || '导入导出失败')
   }
 }
+
+// ─── Audit Note / Conclusion / Expired / Suggested AJE ───────────────────────
+
+const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+// 加载审计说明/结论
+watch(allResponsesRef, () => {
+  const noteItem = props.allResponses.get('K2-5-audit-note')
+  auditNote.value = noteItem?.remark ?? ''
+  const conclItem = props.allResponses.get('K2-5-audit-conclusion')
+  auditConclusion.value = conclItem?.remark ?? ''
+}, { immediate: true })
+
+function persistNote(): void {
+  emit('save', 'K2-5-audit-note', { remark: auditNote.value })
+}
+function persistConclusion(): void {
+  emit('save', 'K2-5-audit-conclusion', { remark: auditConclusion.value })
+}
+
+/** 已摊销完毕（摊余成本≤0）的合同 */
+const expiredContracts = computed(() =>
+  rows.value.filter(r => r.cost > 0 && r.amortizedBalance <= 0),
+)
+
+/** 建议AJE行（差异超重要性） */
+const suggestedAjeRows = computed(() =>
+  rows.value.filter(r => varianceExceedRows.value.has(r.rowId)),
+)
+
+/** 一键推送建议AJE至K2-3 */
+function handlePushSuggestedAJE(): void {
+  const ajeItems = suggestedAjeRows.value.map(r => ({
+    contractNo: r.contractNo,
+    variance: r.variance,
+    direction: r.variance > 0 ? '少摊-补提' : '多摊-冲回',
+  }))
+  // 通过 eventBus 发布建议，K2-3可订阅消费
+  try {
+    eventBus.emit('adjustment:created', {
+      wpCode: 'K2',
+      accountCode: '1231',
+      source: 'K2-5-amort-variance',
+      suggestedEntries: ajeItems,
+      totalVariance: subtotals.value.variance,
+    })
+    ElMessage.success(`已推送 ${ajeItems.length} 笔建议AJE至K2-3`)
+  } catch {
+    ElMessage.warning('推送失败')
+  }
+}
+
+/** AI生成审计说明 */
+async function handleAiNote(): Promise<void> {
+  try {
+    const context: Record<string, string> = {
+      accountCode: '1231',
+      sheet: 'K2-5',
+      rowCount: String(rows.value.length),
+      totalCost: String(subtotals.value.cost),
+      totalCalculated: String(subtotals.value.calculatedAmort),
+      totalBooked: String(subtotals.value.bookedAmort),
+      totalVariance: String(subtotals.value.variance),
+      materiality: String(materiality.value),
+      exceedCount: String(varianceExceedRows.value.size),
+      expiredCount: String(expiredContracts.value.length),
+    }
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      prompt: '请生成合同取得成本(1231)摊销测算审计说明，概述摊销方法选择依据、测算结果与企业差异分析、是否需要调整',
+      context,
+      existingContent: auditNote.value,
+      section: 'K2-5-amort-note',
+    })
+    const generated = res?.data?.data?.content || res?.data?.content || ''
+    if (generated) { auditNote.value = generated; persistNote(); ElMessage.success('AI内容已填入') }
+    else ElMessage.warning('AI未生成内容')
+  } catch { ElMessage.warning('AI生成失败') }
+}
+
+/** AI生成审计结论 */
+async function handleAiConclusion(): Promise<void> {
+  try {
+    const context: Record<string, string> = {
+      accountCode: '1231',
+      sheet: 'K2-5',
+      totalVariance: String(subtotals.value.variance),
+      materiality: String(materiality.value),
+      exceedCount: String(varianceExceedRows.value.size),
+    }
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      prompt: '请生成合同取得成本摊销测算的审计结论',
+      context,
+      existingContent: auditConclusion.value,
+      section: 'K2-5-amort-conclusion',
+    })
+    const generated = res?.data?.data?.content || res?.data?.content || ''
+    if (generated) { auditConclusion.value = generated; persistConclusion(); ElMessage.success('AI内容已填入') }
+    else ElMessage.warning('AI未生成内容')
+  } catch { ElMessage.warning('AI生成失败') }
+}
+
+function handleReview(): void { openReviewDialog('K2-5-conclusion') }
 
 // ─── Variance Check ──────────────────────────────────────────────────────────
 

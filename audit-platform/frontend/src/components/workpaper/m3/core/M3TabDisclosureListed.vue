@@ -32,9 +32,14 @@
       <template #header>
         <div class="card-header">
           <span>库存股变动明细</span>
-          <el-button size="small" @click="handleAI('section-treasury-change')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
+          <div style="display:flex;align-items:center;gap:8px">
+            <el-button size="small" type="primary" :disabled="isReadonly" @click="handlePullFromAdjudication">
+              从审定表/明细表带入
+            </el-button>
+            <el-button size="small" @click="handleAI('section-treasury-change')">
+              <el-icon><MagicStick /></el-icon> AI
+            </el-button>
+          </div>
         </div>
       </template>
       <el-table :data="treasuryChangeRows" border size="small" style="width: 100%">
@@ -250,6 +255,71 @@ function updateTreasuryRow(index: number, field: 'beginAmount' | 'repurchaseIncr
 
 function handleNoteChange(section: string, value: string) {
   formData.debouncedSave(`M3-disclosure-listed-${section}`, { remark: value || null })
+}
+
+/**
+ * 从审定表(M3-1)和明细表(M3-2)主动拉取数据填入附注变动明细。
+ * 读取 allResponses 中已持久化的 M3-1/M3-2 审定合计值填充库存股合计行。
+ * 仅在合计行全0时自动seed，否则让审计师确认覆盖。
+ */
+async function handlePullFromAdjudication() {
+  // 重新加载确保最新数据
+  await formData.loadData()
+
+  // 从M3-1审定表取期初/期末审定合计
+  const adjTotalAudited = _parseNum(formData.allResponses.value.get('M3-M3-1-total-audited')?.remark)
+
+  // 从M3-2明细表取回购/注销合计
+  // 尝试遍历明细行求和
+  let totalRepurchase = 0
+  let totalCancel = 0
+  let totalBegin = 0
+  for (const [key, resp] of formData.allResponses.value) {
+    if (key.startsWith('M3-M3-2-row-') && key.endsWith('-data') && resp.remark) {
+      try {
+        const row = JSON.parse(resp.remark)
+        totalRepurchase += _parseNum(row.repurchaseAmount)
+        totalCancel += _parseNum(row.cancelAmount)
+        totalBegin += _parseNum(row.beginAmount)
+      } catch { /* skip */ }
+    }
+  }
+
+  // 填入合计行(index 0)
+  const sumRow = treasuryChangeRows.value[0]
+  if (sumRow) {
+    const hasExisting = sumRow.beginAmount !== 0 || sumRow.repurchaseIncrease !== 0 || sumRow.cancelDecrease !== 0
+    if (hasExisting) {
+      // 有旧值，确认覆盖
+      try {
+        await import('element-plus').then(({ ElMessageBox }) =>
+          ElMessageBox.confirm(
+            `将覆盖合计行现有数据：期初${fmtAmount(sumRow.beginAmount)}→${fmtAmount(totalBegin)}，回购${fmtAmount(sumRow.repurchaseIncrease)}→${fmtAmount(totalRepurchase)}，注销${fmtAmount(sumRow.cancelDecrease)}→${fmtAmount(totalCancel)}`,
+            '确认从底稿带入',
+            { confirmButtonText: '确认覆盖', cancelButtonText: '取消', type: 'warning' },
+          ),
+        )
+      } catch {
+        return // 取消
+      }
+    }
+    sumRow.beginAmount = totalBegin
+    sumRow.repurchaseIncrease = totalRepurchase
+    sumRow.cancelDecrease = totalCancel
+    recalcEnd()
+    formData.debouncedSave('M3-disclosure-listed-treasury-rows', {
+      remark: JSON.stringify(treasuryChangeRows.value),
+    })
+    import('element-plus').then(({ ElMessage }) => {
+      ElMessage.success(`已从审定表/明细表带入：期初${fmtAmount(totalBegin)}，回购+${fmtAmount(totalRepurchase)}，注销-${fmtAmount(totalCancel)}`)
+    })
+  }
+}
+
+function _parseNum(v: any): number {
+  if (v == null) return 0
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
 }
 
 function handleAI(_section: string) { /* AI辅助待集成 */ }

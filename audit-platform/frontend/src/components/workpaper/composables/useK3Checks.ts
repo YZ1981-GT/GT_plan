@@ -21,6 +21,14 @@ import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 
 export type ComplianceState = '合规' | '不合规' | '不适用' | '需处理'
 
+/** K3-5 处理结论枚举（对齐D3-5/F4-5范式） */
+export type K3DisposalConclusion = '应确认收入' | '应退回' | '应转营业外收入' | '正常挂账' | '待确定'
+
+/** K3 处理结论枚举常量 */
+export const K3_DISPOSAL_CONCLUSIONS: K3DisposalConclusion[] = [
+  '应确认收入', '应退回', '应转营业外收入', '正常挂账', '待确定',
+]
+
 /** K3-5 长期挂账行 */
 export interface K3LongOutstandingRow {
   rowId: string
@@ -32,6 +40,7 @@ export interface K3LongOutstandingRow {
   formationReason: string      // 形成原因
   repaymentPlan: string        // 偿付计划
   needTransfer: '是' | '否' | '待评估'  // 是否需转营业外收入
+  disposalConclusion?: K3DisposalConclusion // 处理结论（P1新增：应确认收入/应退回/应转营业外收入/正常挂账/待确定）
   conclusion: ComplianceState | null
   voucherRef: string           // 抽凭引用
   remark: string
@@ -177,16 +186,29 @@ export function useK3Checks(params: UseK3ChecksParams) {
   }
 
   function _normalizeRelatedParty(raw: any, idx: number): K3RelatedPartyRow {
+    const beginBalance = Number(raw.beginBalance) || 0
+    const debitAmount = Number(raw.debitAmount) || Number(raw.decrease) || 0
+    const creditAmount = Number(raw.creditAmount) || Number(raw.increase) || 0
+    // 负债类：期末=期初+贷方-借方
+    const endBalance = Number(raw.endBalance) || (beginBalance + creditAmount - debitAmount)
     return {
       rowId: raw.rowId ?? `rp-${Math.random().toString(36).slice(2, 10)}`,
       seqNo: raw.seqNo ?? idx + 1,
       counterparty: raw.counterparty ?? '',
       relationship: raw.relationship ?? '',
-      amount: Number(raw.amount) || 0,
+      beginBalance,
+      debitAmount,
+      creditAmount,
+      endBalance,
+      amount: endBalance,
+      transactionTime: raw.transactionTime ?? '',
+      transactionReason: raw.transactionReason ?? '',
+      postPayment: Number(raw.postPayment) || 0,
       isFair: raw.isFair ?? '待评估',
       isDisclosed: raw.isDisclosed ?? '不适用',
       capitalOccupation: raw.capitalOccupation ?? '否',
       conclusion: raw.conclusion ?? null,
+      indexNo: raw.indexNo ?? '',
       remark: raw.remark ?? '',
     }
   }
@@ -302,6 +324,103 @@ export function useK3Checks(params: UseK3ChecksParams) {
     return nonComplianceSummary.value.count
   }
 
+  // ─── K3-5 从K3-2带入长期挂账候选 (P1修复) ─────────────────────────────────
+
+  /**
+   * 从K3-2明细表中3年以上账龄行一键创建K3-5长期挂账行。
+   * 仅带入当前K3-5尚未覆盖的往来对象（按counterparty去重）。
+   * @param detailRows K3-2明细行（from useK3Detail.detailRows）
+   */
+  function initLongOutstandingFromDetail(detailRows: Array<{
+    rowId: string; counterparty: string; endBalance: number;
+    formationReason: string; repaymentDate: string;
+    agingAudited: Record<string, number>
+  }>): number {
+    const over3Keys = ['y3to4', 'y4to5', 'over5', 'over3']
+    // 筛选3年以上有余额的行
+    const candidates = detailRows.filter(r => {
+      for (const k of over3Keys) {
+        if (k in r.agingAudited && Number(r.agingAudited[k]) > 0) return true
+      }
+      return false
+    })
+    // 按 counterparty 去重（已存在的不重复带入）
+    const existingNames = new Set(longOutstandingRows.value.map(r => r.counterparty))
+    let added = 0
+    for (const d of candidates) {
+      if (existingNames.has(d.counterparty)) continue
+      // 计算3年以上金额
+      let over3Amount = 0
+      for (const k of over3Keys) {
+        if (k in d.agingAudited) over3Amount += Number(d.agingAudited[k]) || 0
+      }
+      // 推算账龄文字
+      let agingLabel = '3年以上'
+      if (d.agingAudited['over5'] > 0) agingLabel = '5年以上'
+      else if (d.agingAudited['y4to5'] > 0) agingLabel = '4-5年'
+      else if (d.agingAudited['y3to4'] > 0 || d.agingAudited['over3'] > 0) agingLabel = '3-4年'
+
+      longOutstandingRows.value.push({
+        rowId: `lo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        seqNo: longOutstandingRows.value.length + 1,
+        counterparty: d.counterparty,
+        amount: over3Amount,
+        outstandingDate: '',
+        aging: agingLabel,
+        formationReason: d.formationReason || '',
+        repaymentPlan: '',
+        needTransfer: '待评估',
+        conclusion: null,
+        voucherRef: '',
+        remark: '',
+      })
+      existingNames.add(d.counterparty)
+      added++
+    }
+    return added
+  }
+
+  // ─── K3-6 从K3-2关联方行带入候选 (P2修复) ─────────────────────────────────
+
+  /**
+   * 从K3-2明细表中非"非关联"的行一键创建K3-6关联方行。
+   * 仅带入当前K3-6尚未覆盖的往来对象（按counterparty去重）。
+   */
+  function initRelatedPartyFromDetail(detailRows: Array<{
+    rowId: string; counterparty: string; relatedParty: string;
+    beginBalance: number; increase: number; decrease: number; endBalance: number
+  }>): number {
+    const candidates = detailRows.filter(r => r.relatedParty && r.relatedParty !== '非关联')
+    const existingNames = new Set(relatedPartyRows.value.map(r => r.counterparty))
+    let added = 0
+    for (const d of candidates) {
+      if (existingNames.has(d.counterparty)) continue
+      relatedPartyRows.value.push({
+        rowId: `rp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        seqNo: relatedPartyRows.value.length + 1,
+        counterparty: d.counterparty,
+        relationship: d.relatedParty,
+        beginBalance: d.beginBalance,
+        debitAmount: d.decrease,
+        creditAmount: d.increase,
+        endBalance: d.endBalance,
+        amount: d.endBalance,
+        transactionTime: '',
+        transactionReason: '',
+        postPayment: 0,
+        isFair: '待评估',
+        isDisclosed: '不适用',
+        capitalOccupation: '否',
+        conclusion: null,
+        indexNo: '',
+        remark: '',
+      })
+      existingNames.add(d.counterparty)
+      added++
+    }
+    return added
+  }
+
   // ─── 序列化保存 ────────────────────────────────────────────────────────────
 
   function saveAll(): void {
@@ -325,6 +444,8 @@ export function useK3Checks(params: UseK3ChecksParams) {
     nonComplianceSummary,
     initFromResponses,
     getIncompliantCount,
+    initLongOutstandingFromDetail,
+    initRelatedPartyFromDetail,
     updateLongOutstandingConclusion,
     updateRelatedPartyConclusion,
     updateCheckCompliance,

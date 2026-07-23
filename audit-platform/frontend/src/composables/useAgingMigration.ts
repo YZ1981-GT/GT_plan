@@ -190,6 +190,95 @@ export function migrateD3F1Keys(raw: any, segments: AgingSegment[]): D3F1DetailR
   return result as D3F1DetailRowV2
 }
 
+// ─── D7 扁平→nested 迁移函数（2-period，8 字段） ──────────────────────────────
+
+/**
+ * D7 旧固定 4 段扁平字段 → { period, segmentKey } 映射（2-period，8 字段）。
+ *
+ * D7 合同负债明细历史数据以 priorAging1~4 / endAging1~4 扁平字段存储，
+ * 映射到 THREE_YEAR 默认段 key（within1/y1to2/y2to3/over3）。
+ */
+export const D7_FLAT_TO_SEGMENT: Record<string, { period: 'prior' | 'audited'; segmentKey: string }> = {
+  // ── prior (期初审定账龄) ──
+  priorAging1: { period: 'prior', segmentKey: 'within1' },
+  priorAging2: { period: 'prior', segmentKey: 'y1to2' },
+  priorAging3: { period: 'prior', segmentKey: 'y2to3' },
+  priorAging4: { period: 'prior', segmentKey: 'over3' },
+  // ── audited (期末审定账龄) ──
+  endAging1: { period: 'audited', segmentKey: 'within1' },
+  endAging2: { period: 'audited', segmentKey: 'y1to2' },
+  endAging3: { period: 'audited', segmentKey: 'y2to3' },
+  endAging4: { period: 'audited', segmentKey: 'over3' },
+}
+
+/** 所有 D7 旧扁平字段名集合（用于检测与清理） */
+export const D7_FLAT_KEYS = new Set(Object.keys(D7_FLAT_TO_SEGMENT))
+
+/**
+ * 检测一行是否为 D7 旧扁平格式（存在任意 priorAging1~4 / endAging1~4 字段）。
+ */
+export function isLegacyD7Format(raw: any): boolean {
+  if (!raw || typeof raw !== 'object') return false
+  for (const key of D7_FLAT_KEYS) {
+    if (key in raw) return true
+  }
+  return false
+}
+
+/**
+ * 将 D7 旧扁平格式行迁移为 nested keyed 结构（agingPrior / agingAudited）。
+ *
+ * 规则（Requirements 8.1-8.4）：
+ * - 行已含 nested agingPrior/agingAudited（非空对象）→ 以 nested 为准，忽略扁平字段（8.4）
+ * - 仅含扁平字段 → 映射到 THREE_YEAR 默认段 key（priorAging1→agingPrior.within1 等，8.1/8.2）
+ * - 输出不再含扁平字段 key（8.3）
+ *
+ * 迁移后应再经 migrateD3F1Keys(_, segments) 对齐当前项目账龄配置段。
+ */
+export function migrateD7FlatToNested(raw: any): D3F1DetailRowV2 {
+  const result: any = {}
+
+  // 复制所有非扁平 aging 字段
+  for (const key of Object.keys(raw)) {
+    if (!D7_FLAT_KEYS.has(key)) {
+      result[key] = raw[key]
+    }
+  }
+
+  const nestedPrior = (raw.agingPrior && typeof raw.agingPrior === 'object') ? raw.agingPrior : null
+  const nestedAudited = (raw.agingAudited && typeof raw.agingAudited === 'object') ? raw.agingAudited : null
+  const hasNested = (nestedPrior && Object.keys(nestedPrior).length > 0)
+    || (nestedAudited && Object.keys(nestedAudited).length > 0)
+
+  const agingPrior: AgingData = {}
+  const agingAudited: AgingData = {}
+
+  if (hasNested) {
+    // 以 nested 为准，忽略扁平字段（Req 8.4）
+    if (nestedPrior) {
+      for (const [k, v] of Object.entries(nestedPrior)) agingPrior[k] = _toNumber(v)
+    }
+    if (nestedAudited) {
+      for (const [k, v] of Object.entries(nestedAudited)) agingAudited[k] = _toNumber(v)
+    }
+  } else {
+    // 从扁平字段迁移（Req 8.1/8.2）
+    for (const [flatKey, mapping] of Object.entries(D7_FLAT_TO_SEGMENT)) {
+      const value = _toNumber(raw[flatKey])
+      if (mapping.period === 'prior') {
+        agingPrior[mapping.segmentKey] = value
+      } else {
+        agingAudited[mapping.segmentKey] = value
+      }
+    }
+  }
+
+  result.agingPrior = agingPrior
+  result.agingAudited = agingAudited
+
+  return result as D3F1DetailRowV2
+}
+
 // ─── 配置变更数据保留逻辑 ─────────────────────────────────────────────────────
 
 /**

@@ -23,8 +23,8 @@ import http from '@/utils/http'
 
 // ═══ 类型定义 ═══
 
-/** K13 支持导入导出的 sheet 编码（仅 K13-2 明细表，动态行） */
-export type K13ImportableSheet = 'K13-2'
+/** K13 支持导入导出的 sheet 编码（K13-2 明细表 / K13-3 调整分录，均动态行） */
+export type K13ImportableSheet = 'K13-2' | 'K13-3'
 
 /** 导入结果 */
 export interface K13ImportResult {
@@ -44,9 +44,10 @@ export interface K13SheetMeta {
 
 export const K13_API_PREFIX = 'k13'
 
-/** 可导入导出 sheet 的中文标签（仅 K13-2 明细表） */
+/** 可导入导出 sheet 的中文标签（K13-2 明细表 / K13-3 调整分录汇总） */
 export const K13_IMPORT_EXPORT_SHEETS: K13SheetMeta[] = [
   { code: 'K13-2', label: 'K13-2 明细表' },
+  { code: 'K13-3', label: 'K13-3 调整分录汇总' },
 ]
 
 // ═══ 工具函数 ═══
@@ -150,8 +151,8 @@ export function useK13ImportExport(params: UseK13ImportExportOptions): UseK13Imp
     try {
       const response = await http.post(
         `${apiBase()}/k13/export-template`,
-        { sheet_code: sheetCode },
-        { responseType: 'blob' },
+        null,
+        { params: { sheet: sheetCode }, responseType: 'blob' },
       )
       const contentDisposition = response.headers?.['content-disposition']
       const filename = parseFilenameFromHeader(contentDisposition) || `${sheetCode}-模板.xlsx`
@@ -178,8 +179,8 @@ export function useK13ImportExport(params: UseK13ImportExportOptions): UseK13Imp
     try {
       const response = await http.post(
         `${apiBase()}/k13/export-data`,
-        { sheet_code: sheetCode },
-        { responseType: 'blob' },
+        null,
+        { params: { sheet: sheetCode }, responseType: 'blob' },
       )
       const contentDisposition = response.headers?.['content-disposition']
       const filename = parseFilenameFromHeader(contentDisposition) || `${sheetCode}-数据.xlsx`
@@ -207,9 +208,10 @@ export function useK13ImportExport(params: UseK13ImportExportOptions): UseK13Imp
     try {
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('sheet_code', sheetCode)
 
+      // 工厂端点 import_data 的 sheet 为 Query(...) 参数，file 为 multipart。
       const response = await http.post(`${apiBase()}/k13/import-data`, formData, {
+        params: { sheet: sheetCode },
         headers: { 'Content-Type': 'multipart/form-data' },
       })
 

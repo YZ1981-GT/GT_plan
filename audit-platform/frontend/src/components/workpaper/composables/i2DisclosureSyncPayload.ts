@@ -21,6 +21,7 @@ import {
   summarizeMovement,
   recalcMovementEnd,
 } from './i2DisclosureModel'
+import type { ColumnDef } from './disclosureColumnDefs'
 
 export interface I2SyncFromWorkpaperPayload {
   wp_id: string
@@ -28,7 +29,66 @@ export interface I2SyncFromWorkpaperPayload {
   section_id: string
   current_standard: string
   sub_table_data: Record<string, Record<string, unknown>[]>
+  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 I2TabDisclosure el-table-column（两级表头扁平合并） */
+  columns?: Record<string, ColumnDef[]>
 }
+
+// 研发投入按性质表（本期/上期 × 费用化/资本化），label 取自 I2TabDisclosureListed
+const I2_NATURE_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '项目', is_label: true },
+  { key: '本期费用化金额', label: '本期费用化', format: 'amount' },
+  { key: '本期资本化金额', label: '本期资本化', format: 'amount' },
+  { key: '上期费用化金额', label: '上期费用化', format: 'amount' },
+  { key: '上期资本化金额', label: '上期资本化', format: 'amount' },
+]
+
+// 上市开发支出滚动表（两级表头扁平合并）
+const I2_LISTED_MOVEMENT_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '项目', is_label: true },
+  { key: '期初余额', label: '期初数', format: 'amount' },
+  { key: '本期增加_内部开发支出', label: '本期增加-内部开发', format: 'amount' },
+  { key: '本期增加_其他', label: '本期增加-其他', format: 'amount' },
+  { key: '本期减少_确认为无形资产', label: '本期减少-转无形资产', format: 'amount' },
+  { key: '本期减少_计入当期损益', label: '本期减少-计入损益', format: 'amount' },
+  { key: '期末余额', label: '期末数', format: 'amount' },
+  { key: '资本化开始时点', label: '资本化开始时点' },
+  { key: '资本化的具体依据', label: '资本化依据' },
+  { key: '截至期末的研发进度', label: '研发进度' },
+]
+
+// 重要资本化研发项目表
+const I2_IMPORTANT_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '项目', is_label: true },
+  { key: '研发进度', label: '研发进度' },
+  { key: '预计完成时间', label: '预计完成时间' },
+  { key: '预计经济利益产生方式', label: '预计经济利益产生方式' },
+  { key: '开始资本化的时点', label: '开始资本化时点' },
+  { key: '开始资本化的具体依据', label: '资本化具体依据' },
+]
+
+// 减值准备分项表
+const I2_IMPAIRMENT_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '项目', is_label: true },
+  { key: '期初余额', label: '期初余额', format: 'amount' },
+  { key: '本期计提', label: '本期计提', format: 'amount' },
+  { key: '本期减少', label: '本期减少', format: 'amount' },
+  { key: '期末余额', label: '期末余额', format: 'amount' },
+]
+
+// 国企开发支出滚动表（本期减少三分列：转无形资产/转入当期损益/其他）
+const I2_SOE_MOVEMENT_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '项目', is_label: true },
+  { key: '期初余额', label: '期初数', format: 'amount' },
+  { key: '本期增加_内部开发支出', label: '本期增加-内部开发', format: 'amount' },
+  { key: '本期增加_其他', label: '本期增加-其他', format: 'amount' },
+  { key: '本期减少_确认为无形资产', label: '本期减少-转无形资产', format: 'amount' },
+  { key: '本期减少_转入当期损益', label: '本期减少-转入当期损益', format: 'amount' },
+  { key: '本期减少_其他', label: '本期减少-其他', format: 'amount' },
+  { key: '期末余额', label: '期末数', format: 'amount' },
+  { key: '资本化开始时点', label: '资本化开始时点' },
+  { key: '资本化的具体依据', label: '资本化依据' },
+  { key: '截至期末的研发进度', label: '研发进度' },
+]
 
 export interface I2ListedSyncSnapshot {
   natureRows: I2NatureRow[]
@@ -233,6 +293,12 @@ export function buildI2ListedSyncPayloads(
     section_id: I2_NOTE_SECTION.listed,
     current_standard: resolveI2CurrentStandard('listed', applicableStandards),
     sub_table_data: buildI2ListedSubTableData(snap),
+    columns: {
+      [I2_LISTED_SUBTABLE.nature]: I2_NATURE_COLUMNS,
+      [I2_LISTED_SUBTABLE.movement]: I2_LISTED_MOVEMENT_COLUMNS,
+      [I2_LISTED_SUBTABLE.important]: I2_IMPORTANT_COLUMNS,
+      [I2_LISTED_SUBTABLE.impairment]: I2_IMPAIRMENT_COLUMNS,
+    },
   }]
 }
 
@@ -248,5 +314,6 @@ export function buildI2SoeSyncPayloads(
     section_id: I2_NOTE_SECTION.soe,
     current_standard: resolveI2CurrentStandard('soe', applicableStandards),
     sub_table_data: buildI2SoeSubTableData(snap),
+    columns: { [I2_SOE_SUBTABLE.movement]: I2_SOE_MOVEMENT_COLUMNS },
   }]
 }

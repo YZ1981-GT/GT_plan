@@ -10,16 +10,22 @@
  * - resolveAddr(addrId) — addr_id 解析
  * - resolveIndex(indexRef) — 索引 ns:target 解析
  * - resolveInstance(projectId|params, ...) — wp_id 解析
+ * - subscribeInvalidation(projectId) — 项目级 SSE 实时失效订阅（acnr-invalidation-overlay-hardening R1）
  *
  * 与 useAddressRegistry 的区别：
  *   useAddressRegistry 是旧 V1 运行时目录（动态 build），面向五域全搜索。
  *   useAcnr 是新 ACNR 统一出口（L1 静态 catalog），面向 catalog 树 + resolve。
  *   消费者应逐步迁移至 useAcnr（M2 消费者切换）。
  *
- * Requirements: 14.1, 14.2, 15.3
+ * Requirements: 14.1, 14.2, 15.3；acnr-invalidation-overlay-hardening R1/R4
  */
 import { ref, shallowRef, onUnmounted } from 'vue'
 import http from '@/utils/http'
+import {
+  subscribeProjectEvent,
+  isProjectStreamDegraded,
+  type ProjectEventSubscription,
+} from '@/services/sse/projectEventStream'
 import { isValidUri, isValidIndexRef } from './resolveUri'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -156,10 +162,19 @@ const _resolveCache = new Map<string, _ResolveCacheEntry>()
 
 /**
  * LRU 缓存读取：命中时将条目移到 Map 尾部（最新位置）
+ *
+ * TTL 兜底 (Req-15.1 / Req-20)：命中后先判断是否超过 MAX_AGE。
+ * 过期条目直接删除并视为 miss，避免 SSE 降级为 TTL-only 或漏收失效
+ * 消息时长期返回陈旧 resolve 结果。
  */
 function _resolveCacheGet(key: string): AcnrResolveResult | undefined {
   const entry = _resolveCache.get(key)
   if (!entry) return undefined
+  // TTL 过期检查：超时条目删除并返回 miss（触发重新请求）
+  if (Date.now() - entry.timestamp > MAX_AGE) {
+    _resolveCache.delete(key)
+    return undefined
+  }
   // 移到尾部（LRU: 最近使用排最后）
   _resolveCache.delete(key)
   _resolveCache.set(key, entry)
@@ -194,16 +209,21 @@ function _resolveCacheSet(key: string, result: AcnrResolveResult): void {
 /** 缓存纪元：每次失效递增，用于判断缓存是否已过期 */
 let _cacheEpoch = 0
 
-/** SSE 连接（模块单例，仅建立一次） */
-let _sseConnection: EventSource | null = null
-let _sseListenerCount = 0
+// ─── 项目级 SSE 订阅（acnr-invalidation-overlay-hardening R1 + 连接去重）──────
+// 迁移到项目事件流单例总线（frontend-sse-connection-consolidation）：订阅共享连接的
+// `acnr:invalidate` 事件，不再自建 SSE 连接（每项目仅一条共享连接，token 经 Authorization
+// header 不入 URL）。断线重连 / 退避 / 降级由总线（createSSE）统一负责；本层做 acnr:invalidate
+// 精细失效 + 重连后清项目缓存（onReconnect hook）+ 降级观测（isProjectStreamDegraded）。
 
-/** SSE 重连状态 */
-let _sseReconnectTimer: ReturnType<typeof setTimeout> | null = null
-let _sseReconnectAttempts = 0
-const _SSE_MAX_RECONNECT_ATTEMPTS = 5
-const _SSE_BACKOFF_SCHEDULE = [5000, 10000, 20000, 30000] // 5s/10s/20s/30s max
-let _sseDegradedToTTL = false
+/** useAcnr 侧 acnr:invalidate 订阅句柄（每 projectId 一个，引用计数复用总线连接，R1.4） */
+interface _AcnrSub {
+  sub: ProjectEventSubscription
+  refCount: number
+}
+const _acnrSubByProject = new Map<string, _AcnrSub>()
+
+/** 已知 catalog 版本（用于判断 acnr:invalidate 是否需全局目录失效，R4.2） */
+let _knownCatalogVersion: string | null = null
 
 /**
  * 获取当前缓存纪元（用于外部判断缓存新旧）
@@ -224,142 +244,107 @@ export function invalidateModuleCache(): void {
 }
 
 /**
- * 查询当前 SSE 是否已降级为 TTL-only 模式
+ * 清除属于指定项目的 resolve 缓存条目（项目隔离失效，R4.1）。
+ * Resolve_Cache key 形如 `resolve:{"index_ref":...,"project_id":"<uuid>"}`。
  */
-export function isSSEDegraded(): boolean {
-  return _sseDegradedToTTL
-}
-
-/**
- * 计算重连延迟（指数退避 5s/10s/20s/30s max）
- */
-function _getReconnectDelay(attempt: number): number {
-  const idx = Math.min(attempt, _SSE_BACKOFF_SCHEDULE.length - 1)
-  return _SSE_BACKOFF_SCHEDULE[idx]
-}
-
-/**
- * 建立 SSE 连接并绑定事件处理器。
- * 抽取为独立函数以便重连时复用。
- */
-function _createSSEConnection(): void {
-  try {
-    const sseUrl = '/api/projects/events?topic=acnr:invalidate'
-    _sseConnection = new EventSource(sseUrl)
-
-    _sseConnection.addEventListener('acnr:invalidate', () => {
-      invalidateModuleCache()
-    })
-
-    // 也监听通用 message 事件（部分后端用 event: message）
-    _sseConnection.onmessage = (event) => {
-      try {
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
-        if (data?.type === 'acnr:invalidate' || data?.event === 'acnr:invalidate') {
-          invalidateModuleCache()
-        }
-      } catch {
-        // 非 JSON 消息忽略
-      }
+function _clearResolveCacheForProject(projectId: string): void {
+  if (!projectId) return
+  const needle = `"project_id":"${projectId}"`
+  for (const key of Array.from(_resolveCache.keys())) {
+    if (key.includes(needle)) {
+      _resolveCache.delete(key)
     }
-
-    // 连接成功打开时重置重连计数
-    _sseConnection.onopen = () => {
-      if (_sseReconnectAttempts > 0) {
-        // 重建成功：断连期间可能错过消息，立即清缓存
-        console.warn('[useAcnr] SSE 重连成功，清除缓存以同步断连期间可能遗漏的失效消息')
-        invalidateModuleCache()
-      }
-      _sseReconnectAttempts = 0
-    }
-
-    _sseConnection.onerror = () => {
-      // 关闭旧连接
-      _sseConnection?.close()
-      _sseConnection = null
-
-      console.warn('[useAcnr] SSE 连接断开')
-
-      // 如果已降级或无监听者，不重连
-      if (_sseDegradedToTTL || _sseListenerCount <= 0) return
-
-      // 启动重建定时器（指数退避）
-      _scheduleReconnect()
-    }
-  } catch {
-    // SSE 不可用时降级（不建连接，靠手动 invalidate 或过期机制）
   }
 }
 
 /**
- * 安排下次重连尝试
+ * 查询项目 SSE 是否已降级为 TTL-only 模式。
+ * 传 projectId → 该项目状态；不传 → 存在任一降级连接则 true。
  */
-function _scheduleReconnect(): void {
-  // 清理旧定时器（防重入）
-  if (_sseReconnectTimer !== null) {
-    clearTimeout(_sseReconnectTimer)
-    _sseReconnectTimer = null
+export function isSSEDegraded(projectId?: string): boolean {
+  if (projectId) return isProjectStreamDegraded(projectId)
+  for (const pid of _acnrSubByProject.keys()) {
+    if (isProjectStreamDegraded(pid)) return true
   }
+  return false
+}
 
-  if (_sseReconnectAttempts >= _SSE_MAX_RECONNECT_ATTEMPTS) {
-    // 超过最大重试次数 → 降级为 TTL-only
-    _sseDegradedToTTL = true
-    console.warn(
-      `[useAcnr] SSE 重连失败 ${_SSE_MAX_RECONNECT_ATTEMPTS} 次，降级为 TTL-only 模式（停止重试）`,
-    )
+/**
+ * acnr:invalidate 精细失效（R4）：
+ * - 携带变化的 catalog_version → 全局目录缓存失效 + epoch 递增（R4.2）
+ * - 仅 project_id → 只清该项目 resolve 缓存（R4.3，避免过度失效）
+ */
+function _onAcnrInvalidate(projectId: string, payload: Record<string, unknown>): void {
+  const cv = payload?.catalog_version as string | undefined
+  if (cv && cv !== _knownCatalogVersion) {
+    _knownCatalogVersion = cv
+    invalidateModuleCache()
     return
   }
+  _clearResolveCacheForProject(projectId)
+}
 
-  const delay = _getReconnectDelay(_sseReconnectAttempts)
-  console.warn(`[useAcnr] SSE 将在 ${delay / 1000}s 后尝试重连 (第 ${_sseReconnectAttempts + 1} 次)`)
-
-  _sseReconnectTimer = setTimeout(() => {
-    _sseReconnectTimer = null
-    _sseReconnectAttempts++
-    _createSSEConnection()
-  }, delay)
+/** 处理来自总线的 acnr:invalidate 事件负载（createSSE 已 JSON.parse；字符串兜底解析）。 */
+function _handleAcnrInvalidate(projectId: string, data: unknown): void {
+  let payload: Record<string, unknown> = {}
+  if (data && typeof data === 'object') {
+    payload = data as Record<string, unknown>
+  } else if (typeof data === 'string') {
+    try {
+      payload = JSON.parse(data)
+    } catch {
+      payload = {}
+    }
+  }
+  _onAcnrInvalidate(projectId, payload)
 }
 
 /**
- * 启动 SSE 监听 `acnr:invalidate` 事件。
- * 模块级单例——首次调用建连接，后续调用仅增引用计数。
- * 断连后自动以指数退避重建（5s/10s/20s/30s max，最多 5 次）。
- * 返回 cleanup 函数，所有引用释放后关闭连接。
+ * 订阅项目失效（R1）。委托项目事件流单例总线订阅 `acnr:invalidate`；按 projectId 引用计数
+ * 复用单一共享连接（同项目多次订阅只建一个总线订阅），返回 cleanup。
+ * 无 projectId → no-op（R1.3，全局目录浏览不建项目级连接）。
+ * onReconnect（断线重连成功）→ 清该项目 resolve 缓存（R4.5）。
  */
-function _connectSSE(): () => void {
-  _sseListenerCount++
-
-  if (!_sseConnection && !_sseDegradedToTTL) {
-    _createSSEConnection()
+export function subscribeInvalidation(projectId: string): () => void {
+  if (!projectId) return () => {}
+  let entry = _acnrSubByProject.get(projectId)
+  if (!entry) {
+    const sub = subscribeProjectEvent(
+      projectId,
+      'acnr:invalidate',
+      (data) => _handleAcnrInvalidate(projectId, data),
+      { onReconnect: () => _clearResolveCacheForProject(projectId) },
+    )
+    entry = { sub, refCount: 0 }
+    _acnrSubByProject.set(projectId, entry)
   }
-
-  // 返回 cleanup 函数
+  entry.refCount++
   return () => {
-    _sseListenerCount--
-    if (_sseListenerCount <= 0) {
-      _sseListenerCount = 0
-      _sseConnection?.close()
-      _sseConnection = null
-      if (_sseReconnectTimer !== null) {
-        clearTimeout(_sseReconnectTimer)
-        _sseReconnectTimer = null
-      }
+    const e = _acnrSubByProject.get(projectId)
+    if (!e) return
+    e.refCount--
+    if (e.refCount <= 0) {
+      e.sub.close()
+      _acnrSubByProject.delete(projectId)
     }
   }
 }
 
 // ─── Composable ───────────────────────────────────────────────────────────────
 
-export function useAcnr() {
+export function useAcnr(projectId?: string) {
   // 使用模块级缓存引用（所有实例共享）
   const sheetsCache = _sheetsCache
   const cellsCache = _cellsCache
 
-  // 订阅 SSE 失效通知（composable 生命周期管理）
-  const _cleanupSSE = _connectSSE()
-  onUnmounted(() => {
-    _cleanupSSE()
-  })
+  // R1: 有项目上下文时订阅项目级 SSE 实时失效（引用计数复用）；
+  // 无 projectId → 不建连接，仅靠 TTL_Fallback（R1.3）。
+  if (projectId) {
+    const _cleanupSSE = subscribeInvalidation(projectId)
+    onUnmounted(() => {
+      _cleanupSSE()
+    })
+  }
 
   // 记录实例创建时的 epoch，用于后续检测缓存是否已被外部失效
   let _localEpoch = _cacheEpoch
@@ -544,12 +529,13 @@ export function useAcnr() {
    * @param indexRef - 如 cell:D2-2!E100, TB:1001
    * @param projectId - 可选项目 UUID（触发 L2/L3）
    */
-  async function resolveIndex(indexRef: string, projectId?: string): Promise<AcnrResolveResult> {
+  async function resolveIndex(indexRef: string, projectIdArg?: string): Promise<AcnrResolveResult> {
     if (!indexRef || !isValidIndexRef(indexRef)) {
       return { found: false, error: 'invalid_index_ref' }
     }
+    const pid = projectIdArg ?? projectId
     // Req-20: resolve 缓存
-    const cacheKey = `resolve:${JSON.stringify({ index_ref: indexRef, project_id: projectId })}`
+    const cacheKey = `resolve:${JSON.stringify({ index_ref: indexRef, project_id: pid })}`
     const cached = _resolveCacheGet(cacheKey)
     if (cached) return cached
 
@@ -557,7 +543,7 @@ export function useAcnr() {
       const { data } = await http.get(ACNR_PATHS.resolve, {
         params: {
           index_ref: indexRef,
-          ...(projectId ? { project_id: projectId } : {}),
+          ...(pid ? { project_id: pid } : {}),
         },
         _silent: true,
       } as any)
@@ -603,7 +589,7 @@ export function useAcnr() {
     sheetCode?: string,
     wpId?: string,
   ): Promise<AcnrInstanceResult> {
-    const projectId = typeof projectIdOrParams === 'string'
+    const pid = typeof projectIdOrParams === 'string'
       ? projectIdOrParams
       : projectIdOrParams.project_id
     const parentCode = typeof projectIdOrParams === 'string'
@@ -616,13 +602,13 @@ export function useAcnr() {
       ? wpId
       : projectIdOrParams.wp_id
 
-    if (!projectId || !parentCode || !sheet) {
+    if (!pid || !parentCode || !sheet) {
       return { found: false, error: 'missing_params' }
     }
     try {
       const { data } = await http.get(ACNR_PATHS.resolveInstance, {
         params: {
-          project_id: projectId,
+          project_id: pid,
           parent: parentCode,
           sheet_code: sheet,
           ...(instanceWpId ? { wp_id: instanceWpId } : {}),
@@ -644,17 +630,18 @@ export function useAcnr() {
    * 后端限制 items ≤ 50。
    *
    * @param inputs - 每项可含 uri / formula_ref / addr_id / index_ref 之一
-   * @param projectId - 可选项目 UUID（触发 L2/L3）
+   * @param projectIdArg - 可选项目 UUID（触发 L2/L3）
    */
   async function batchResolve(
     inputs: Array<{ uri?: string; formula_ref?: string; addr_id?: string; index_ref?: string }>,
-    projectId?: string,
+    projectIdArg?: string,
   ): Promise<AcnrResolveResult[]> {
     if (!inputs || inputs.length === 0) return []
+    const pid = projectIdArg ?? projectId
     try {
       const { data } = await http.post(ACNR_PATHS.resolveBatch, {
         items: inputs,
-        ...(projectId ? { project_id: projectId } : {}),
+        ...(pid ? { project_id: pid } : {}),
       })
       const results: AcnrResolveResult[] = Array.isArray(data) ? data : (data?.results ?? [])
       return results
@@ -758,5 +745,7 @@ export function useAcnr() {
     // 缓存管理
     clearCache,
     getEpoch,
+    // SSE 订阅（R1）
+    subscribeInvalidation,
   }
 }

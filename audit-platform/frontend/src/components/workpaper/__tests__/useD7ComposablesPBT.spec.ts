@@ -127,16 +127,18 @@ describe('Property 7: 动态行添加保持结构不变量', () => {
           // Assertion 2: new row all numeric fields are 0
           const numericFields: (keyof DetailRow)[] = [
             'priorUnadjusted', 'priorAje', 'priorRje', 'priorAudited',
-            'priorAging1', 'priorAging2', 'priorAging3', 'priorAging4',
             'debitAmount', 'creditAmount', 'endBalance',
             'entityReclass', 'endUnadjusted', 'endAje', 'endRje', 'endAudited',
-            'endAging1', 'endAging2', 'endAging3', 'endAging4',
             'postTransfer',
           ]
 
           for (const field of numericFields) {
             expect(newRow[field]).toBe(0)
           }
+
+          // 账龄现为 nested keyed（createEmptyRow() 无段 → 空对象）
+          expect(typeof newRow.agingPrior).toBe('object')
+          expect(typeof newRow.agingAudited).toBe('object')
 
           // Assertion 3: new row string fields are empty (except rowId)
           expect(newRow.contractName).toBe('')

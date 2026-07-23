@@ -81,6 +81,22 @@
           <span v-else>{{ row.noteItem }}</span>
         </template>
       </el-table-column>
+      <el-table-column label="款项性质" width="130">
+        <template #default="{ row }">
+          <el-select v-if="!isReadonly" :model-value="row.natureType" size="small" clearable placeholder="路由至审定表" @change="(v: string) => updateCell(row.rowId, 'natureType', v ?? '')">
+            <el-option v-for="t in NATURE_TYPES" :key="t" :label="t" :value="t" />
+          </el-select>
+          <span v-else>{{ row.natureType || '其他' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="账龄段" width="120">
+        <template #default="{ row }">
+          <el-select v-if="!isReadonly" :model-value="row.agingBand" size="small" clearable placeholder="按账龄路由" @change="(v: string) => updateCell(row.rowId, 'agingBand', v ?? '')">
+            <el-option v-for="seg in agingSegments" :key="seg.key" :label="seg.label" :value="seg.key" />
+          </el-select>
+          <span v-else>{{ agingBandLabel(row.agingBand) }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="借方金额" width="120" align="right">
         <template #default="{ row }">
           <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'debitAmount', v ?? 0)" />
@@ -133,9 +149,10 @@
  * Requirements: 8.1-8.7, 20.1
  */
 import { ref, computed, inject, toRef, type Ref } from 'vue'
-import { useD7Adjustment, ADJUSTMENT_CATEGORIES, type AdjustmentRow } from '../composables/useD7Adjustment'
+import { useD7Adjustment, ADJUSTMENT_CATEGORIES, NATURE_TYPES, type AdjustmentRow } from '../composables/useD7Adjustment'
 import { useD7ImportExport } from '../composables/useD7ImportExport'
 import type { ChecklistResponse } from '../composables/useD7FormData'
+import { useAgingConfig } from '@/composables/useAgingConfig'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
@@ -166,6 +183,12 @@ async function onImportFile(file: File) {
   return false
 }
 
+// 账龄段（subject='D7', 2-period）供账龄段下拉与只读展示 label
+const { segments: agingSegments } = useAgingConfig(computed(() => props.projectId) as unknown as Ref<string>, 'D7')
+function agingBandLabel(key: string): string {
+  return agingSegments.value.find(s => s.key === key)?.label || ''
+}
+
 const {
   rows, debitTotal, creditTotal, isBalanced, balanceDiff,
   addRow, removeRow, updateCell, pushToA13,
@@ -175,6 +198,7 @@ const {
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
+  isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
 
 function onSelectionChange(selection: AdjustmentRow[]) {

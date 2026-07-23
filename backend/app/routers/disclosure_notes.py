@@ -252,7 +252,23 @@ async def get_note_detail(
     note = await engine.get_note_detail(project_id, year, note_section)
     if note is None:
         raise HTTPException(status_code=404, detail="附注章节不存在")
-    return DisclosureNoteDetail.model_validate(note)
+    detail = DisclosureNoteDetail.model_validate(note)
+    # 读时投影（不写库）：workpaper 来源记录把 sub_table_data + _sub_table_columns 投影为
+    # 可渲染 _tables，供附注模块/Word 忠实呈现源模板表样（spec disclosure-table-sync-convergence
+    # Req6.1，Property7）。非 workpaper 来源返回 None → 不投影，沿用既有 _tables/rows（Req6.2）。
+    try:
+        from app.services.note_sub_table_projector import project_sub_tables
+
+        projected = project_sub_tables(detail.table_data)
+        if projected and detail.table_data is not None:
+            detail.table_data = {**detail.table_data, "_tables": projected}
+    except Exception:  # pragma: no cover - 投影失败降级不阻断读取
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "get_note_detail: sub_table projection failed section=%s", note_section,
+            exc_info=True,
+        )
+    return detail
 
 
 @router.put("/{note_id}")

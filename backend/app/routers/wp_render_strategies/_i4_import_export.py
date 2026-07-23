@@ -9,8 +9,8 @@ POST /i4/import-data → 解析xlsx→验证→写入checklist_responses
 
 长期待摊费用特殊：
 - 明细表25列3区段：基础/摊销/余额
-- I4-6 直线法：月摊销=原始金额÷总月数，横向12月矩阵
-- I4-7 工作量法：月摊销=原始金额×(本月量÷总量)，横向12月矩阵
+- I4-6 直线法：对齐源表测算vs账面（月限/到期日/本期月数四分支/月摊差异/累计差异）
+- I4-7 工作量法：对齐源表测算vs账面vs差异（摊销标准=原值/工作标准）
 """
 
 from __future__ import annotations
@@ -32,34 +32,34 @@ _I4_2_KEYS = [
     "openingBalance", "currentIncrease", "currentDecrease", "closingBalance", "remainingMonths",
 ]
 
-# ─── I4-6 摊销测算表直线法（65行×28列，39公式） ─────────────────────────────────
+# ─── I4-6 摊销测算表直线法（对齐源表：测算 vs 账面 vs 差异） ─────────────────
 
 _I4_6_HEADERS = [
-    "项目名称", "原始金额", "摊销期限(月)", "已摊月数", "月摊销额",
-    "1月", "2月", "3月", "4月", "5月", "6月",
-    "7月", "8月", "9月", "10月", "11月", "12月",
-    "本年摊销合计", "累计已摊", "剩余月数", "期末余额",
+    "类别名称", "明细项目", "原值", "累计摊销", "开始使用日期", "使用年限", "账面月摊销额",
+    "使用月限", "测算到期日", "已摊销月份", "剩余摊销月份", "本期摊销月份",
+    "测算月摊销额", "当期摊销", "月摊销额差异", "累计摊销费用", "累计摊销额差异", "备注",
 ]
 _I4_6_KEYS = [
-    "projectName", "originalAmount", "totalMonths", "elapsedMonths", "monthlyAmort",
-    "month01", "month02", "month03", "month04", "month05", "month06",
-    "month07", "month08", "month09", "month10", "month11", "month12",
-    "yearTotal", "accAmortization", "remainingMonths", "endingBalance",
+    "category", "itemName", "originalAmount", "bookAccumAmort", "startDate", "usefulLife", "bookMonthlyAmort",
+    "lifeMonths", "fullAmortDate", "monthsAmortized", "remainingMonths", "periodMonths",
+    "calcMonthlyAmort", "periodAmortization", "monthlyDiff", "calcAccumAmort", "accumDiff", "remark",
 ]
 
-# ─── I4-7 摊销测算表工作量法（65行×28列，21公式） ─────────────────────────────
+# ─── I4-7 摊销测算表工作量法（对齐源表：测算 vs 账面 vs 差异） ─────────────────
 
 _I4_7_HEADERS = [
-    "项目名称", "原始金额", "总预计工作量", "已完成工作量", "本月工作量",
-    "1月", "2月", "3月", "4月", "5月", "6月",
-    "7月", "8月", "9月", "10月", "11月", "12月",
-    "本年摊销合计", "累计已摊", "剩余工作量", "期末余额",
+    "类别名称", "明细项目", "原值", "开始使用日期", "工作标准", "摊销标准",
+    "本期工作量", "累计工作量",
+    "测算本年摊销额", "测算累计摊销额",
+    "账面本期摊销额", "账面累计摊销额",
+    "本期摊销差异", "累计摊销差异", "备注",
 ]
 _I4_7_KEYS = [
-    "projectName", "originalAmount", "totalUnits", "completedUnits", "currentUnits",
-    "month01", "month02", "month03", "month04", "month05", "month06",
-    "month07", "month08", "month09", "month10", "month11", "month12",
-    "yearTotal", "accAmortization", "remainingUnits", "endingBalance",
+    "category", "itemName", "originalAmount", "startDate", "workStandard", "amortStandard",
+    "periodUnits", "accumUnits",
+    "calcPeriodAmort", "calcAccumAmort",
+    "bookPeriodAmort", "bookAccumAmort",
+    "periodDiff", "accumDiff", "remark",
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -81,32 +81,32 @@ _I4_SPECS: dict[str, dict[str, Any]] = {
     },
     "I4-6": {
         "item_id": "I4-6-rows",
-        "title": "摊销测算表I4-6直线法（横向12月矩阵）",
+        "title": "摊销测算表I4-6直线法（测算vs账面vs差异）",
         "headers": _I4_6_HEADERS,
         "field_keys": _I4_6_KEYS,
         "guidance": [
             "I4-6 直线法摊销测算 编制说明",
             "",
-            "直线法：月摊销额=原始金额÷摊销总月数（按月平均摊销）。",
-            "横向12月矩阵逐月填列摊销金额。",
-            "本年摊销合计=Σ(1月~12月)。",
-            "期末余额=原始金额-累计已摊。",
-            "剩余月数=摊销期限-已摊月数。",
+            "测算月摊=原值÷使用月限；当期摊销=测算月摊×本期月数。",
+            "本期月数按摊销期初/期末与项目起止四分支计算，不超过剩余月数。",
+            "月摊差异=账面月摊−测算月摊；累计差异=账面累计−测算累计。",
+            "开始日为空时不推算到期日（避免1900-1-0）。",
+            "本表仅用于长期待摊费用，不得套用无形资产寿命规则。",
         ],
     },
     "I4-7": {
         "item_id": "I4-7-rows",
-        "title": "摊销测算表I4-7工作量法（横向12月矩阵）",
+        "title": "摊销测算表I4-7工作量法（测算vs账面vs差异）",
         "headers": _I4_7_HEADERS,
         "field_keys": _I4_7_KEYS,
         "guidance": [
             "I4-7 工作量法摊销测算 编制说明",
             "",
-            "工作量法：月摊销=原始金额×(本月工作量÷总预计工作量)。",
-            "适用于按产量/工作量摊销的项目（如模具费按产品产量摊销）。",
-            "横向12月矩阵逐月按实际工作量计算摊销。",
-            "本年摊销合计=Σ(1月~12月)。",
-            "期末余额=原始金额-累计已摊。",
+            "摊销标准=原值÷工作标准；测算本年=本期工作量×摊销标准；测算累计=累计工作量×摊销标准。",
+            "差异=测算−账面；本期/累计差异重大时追查工作量数据或政策适用性。",
+            "适用于受益与产出相关的长期待摊费用（如模具费按产量、矿权按采矿量）。",
+            "工作标准/实际工作量须有生产统计或合同依据；不得套用无形资产寿命判断规则。",
+            "合计行与「其中」类别小计应勾稽 I4-1 本期摊销。",
         ],
     },
 }

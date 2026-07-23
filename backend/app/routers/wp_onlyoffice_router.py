@@ -99,7 +99,7 @@ async def _gate_editor(
     except ExternalNotFound:
         if settings.ONLYOFFICE_JWT_ENFORCE:
             raise HTTPException(status_code=404, detail=EXTERNAL_NOT_FOUND_DETAIL)
-        logger.warning(
+        logger.debug(
             "editor gate deny (enforce off, dev passthrough) entrypoint=%s wp_id=%s action=%s",
             entrypoint, wp_id, action,
         )

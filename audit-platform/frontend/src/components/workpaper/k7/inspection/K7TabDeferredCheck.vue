@@ -218,7 +218,7 @@
     </details>
 
     <el-dialog v-model="samplingVisible" title="抽凭引擎 — 递延收益(2401)" width="90%" top="5vh" destroy-on-close>
-      <GtVoucherSamplingEngine v-if="samplingVisible" account-code="2401" phase="current" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
+      <GtVoucherSamplingEngine v-if="samplingVisible" account-code="2401" phase="final" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
     </el-dialog>
   </div>
 </template>

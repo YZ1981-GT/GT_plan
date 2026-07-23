@@ -213,8 +213,36 @@
       />
     </el-card>
 
+    <!-- 与TB核对区 -->
+    <el-card shadow="never" class="block-card" style="margin-top:12px">
+      <template #header>
+        <div class="section-title">
+          <span>与试算平衡表核对</span>
+        </div>
+      </template>
+      <div class="tb-reconcile-grid">
+        <div class="tb-row">
+          <span class="tb-label">K2-1 审定合计</span>
+          <span class="tb-value">{{ fmtAmt(subtotalRow.audited) }}</span>
+        </div>
+        <div class="tb-row">
+          <span class="tb-label">试算平衡表数(1231)</span>
+          <span class="tb-value tb-auto">{{ fmtAmt(props.tbData.audited1231) }}</span>
+        </div>
+        <div class="tb-row" :class="{ 'tb-diff-warn': Math.abs(subtotalRow.audited - props.tbData.audited1231) > 0.01 }">
+          <span class="tb-label">差异</span>
+          <span class="tb-value">{{ fmtAmt(subtotalRow.audited - props.tbData.audited1231) }}</span>
+          <el-tag v-if="Math.abs(subtotalRow.audited - props.tbData.audited1231) < 0.01" type="success" size="small" effect="plain" style="margin-left:8px">✓ 核对一致</el-tag>
+          <el-tag v-else type="danger" size="small" effect="plain" style="margin-left:8px">✗ 差异需排查</el-tag>
+        </div>
+      </div>
+    </el-card>
+
     <!-- 操作按钮 -->
     <div class="action-bar" v-if="!isReadonly">
+      <el-button type="warning" plain @click="handleFillFromDetail">
+        从K2-2明细带入
+      </el-button>
       <el-button type="primary" @click="handleWritebackTB" :loading="publishing">
         确认审定 → 回写TB(1231)
       </el-button>
@@ -257,6 +285,8 @@
 import { ref, computed, inject, toRef } from 'vue'
 import { MagicStick, CircleCheck, WarningFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 import { useK2Adjudication, type K2AdjRow } from '../../composables/useK2Adjudication'
 import { useK2CrossSheet } from '../../composables/useK2CrossSheet'
 
@@ -336,14 +366,27 @@ function saveConclusion() {
   emit('save', 'K2-1-audit-conclusion', { remark: auditConclusion.value })
 }
 
-/** 确认审定 → 回写TB(1231) */
+/** 确认审定 → 回写TB(1231) + EventBus 通知 */
 async function handleWritebackTB() {
   publishing.value = true
   try {
     const auditedTotal = subtotalRow.value.audited
-    // 通过 useK2FormData 的 writebackTB 回写（在父组件中调用）
-    emit('save', 'K2-1-writeback-trigger', { remark: String(auditedTotal) })
-    ElMessage.success('审定数已提交回写TB（1231其他流动资产）')
+    // 1. 调用TB回写端点
+    await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
+      account_code: '1231',
+      audited_amount: auditedTotal,
+    })
+    // 2. 持久化审定合计
+    emit('save', 'K2-1-audited-total', { remark: String(auditedTotal) })
+    // 3. EventBus发布审定事件（通知附注/其他底稿刷新）
+    eventBus.emit('substantive:adjudicated', {
+      wpCode: 'K2',
+      accountCode: '1231',
+      auditedAmount: auditedTotal,
+      adjudicatedAmount: auditedTotal,
+      timestamp: Date.now(),
+    })
+    ElMessage.success('审定数已回写TB（1231其他流动资产）')
   } catch {
     ElMessage.error('TB回写失败')
   } finally {
@@ -351,8 +394,84 @@ async function handleWritebackTB() {
   }
 }
 
-function handleAiGenerate(section: string) {
-  console.log('[K2-1] AI generate:', section)
+/** 从K2-2明细表按性质汇总带入审定表各分类行 */
+function handleFillFromDetail(): void {
+  const detailData = props.allResponses.get('K2-2-detail-rows')
+  const raw = detailData?.remark ?? detailData?.value ?? (typeof detailData === 'string' ? detailData : null)
+  if (!raw) {
+    ElMessage.warning('K2-2明细表暂无数据，请先编制明细表')
+    return
+  }
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      ElMessage.info('K2-2明细表为空')
+      return
+    }
+    // 按性质汇总期末余额
+    const byNature: Record<string, number> = {}
+    for (const row of parsed) {
+      const nature = row.nature || '其他'
+      const endBal = Number(row.endBalance ?? 0)
+      byNature[nature] = (byNature[nature] || 0) + endBal
+    }
+    // 映射到审定表行（通过rowKey匹配）
+    let filled = 0
+    for (const [nature, amount] of Object.entries(byNature)) {
+      if (amount === 0) continue
+      // 尝试按性质名关键词匹配审定表行
+      const matchRow = rows.value.find(r =>
+        r.label?.includes(nature) || nature.includes(r.label || ''),
+      )
+      if (matchRow) {
+        updateField(matchRow.rowKey, 'unadjusted', amount)
+        filled++
+      }
+    }
+    if (filled > 0) {
+      ElMessage.success(`已从K2-2明细按性质汇总带入 ${filled} 行未审数`)
+    } else {
+      ElMessage.info('未找到匹配的审定表行（性质名称不一致）')
+    }
+  } catch {
+    ElMessage.warning('解析K2-2数据失败')
+  }
+}
+
+async function handleAiGenerate(section: string) {
+  try {
+    const context: Record<string, string> = {
+      accountCode: '1231',
+      accountName: '其他流动资产',
+      sheet: 'K2-1',
+      section,
+      auditedTotal: String(subtotalRow.value.audited ?? 0),
+      unadjustedTotal: String(subtotalRow.value.unadjusted ?? 0),
+      reconciliationStatus: reconciliation.value.isBalanced ? '三角勾稽平衡' : `不平衡，差额${reconciliation.value.diff}`,
+    }
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      prompt: section === 'adj-note'
+        ? '请生成其他流动资产(1231)审定表的审计说明，概述审定过程与结果'
+        : section === 'adj-conclusion'
+          ? '请生成其他流动资产(1231)审定表的审计结论'
+          : '请生成其他流动资产(1231)审定表的综合分析说明',
+      context,
+      existingContent: section === 'adj-note' ? auditNote.value : auditConclusion.value,
+      section,
+    })
+    const generated = res?.data?.data?.content || res?.data?.content || ''
+    if (!generated) { ElMessage.warning('AI未生成内容'); return }
+    if (section === 'adj-note' || section === 'adj-overall') {
+      auditNote.value = generated
+      saveNote()
+    } else if (section === 'adj-conclusion') {
+      auditConclusion.value = generated
+      saveConclusion()
+    }
+    ElMessage.success('AI内容已填入')
+  } catch {
+    ElMessage.warning('AI生成失败或已取消')
+  }
 }
 
 function handleReview(id: string) {
@@ -515,5 +634,33 @@ function getRowClassName({ row }: { row: K2AdjRow }): string {
   padding-left: 20px;
   margin-top: 8px;
   line-height: 1.8;
+}
+
+/* TB核对区 */
+.tb-reconcile-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tb-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  border-radius: 4px;
+}
+.tb-label {
+  min-width: 160px;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+}
+.tb-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 13px;
+}
+.tb-diff-warn {
+  background: #fef0f0;
+  border: 1px solid #fde2e2;
 }
 </style>

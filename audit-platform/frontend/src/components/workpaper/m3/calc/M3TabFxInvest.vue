@@ -21,6 +21,9 @@
         <el-button size="small" :disabled="isReadonly" type="primary" @click="handleAddRow">
           <el-icon><Plus /></el-icon> 新增批次
         </el-button>
+        <el-button size="small" :disabled="isReadonly" @click="handlePullFromDetail">
+          从M3-2带入
+        </el-button>
         <el-button size="small" @click="handleAI('fx-invest')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -46,6 +49,21 @@
       <el-table-column label="回购批次" min-width="140">
         <template #default="{ row }">
           <span class="batch-name">{{ row.batchName || '—' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="回购日期" width="130">
+        <template #default="{ row, $index }">
+          <el-date-picker
+            v-if="!isReadonly"
+            :model-value="row.repurchaseDate"
+            type="date"
+            size="small"
+            value-format="YYYY-MM-DD"
+            placeholder="回购日"
+            style="width:100%"
+            @change="(val: string) => updateFxRow($index, 'repurchaseDate', val || '')"
+          />
+          <span v-else>{{ row.repurchaseDate || '—' }}</span>
         </template>
       </el-table-column>
       <el-table-column label="原币回购额" min-width="130" align="right">
@@ -127,8 +145,20 @@
           </el-tooltip>
         </template>
         <template #default="{ row }">
-          <span :class="['formula-value', isOverThreshold(row.diff) ? 'diff-warning' : '']">
+          <span :class="['formula-value', isOverThreshold(row.diff, row.diffRate) ? 'diff-warning' : '']">
             {{ fmtAmount(row.diff) }}
+          </span>
+        </template>
+      </el-table-column>
+      <el-table-column label="差异率" width="90" align="right">
+        <template #header>
+          <el-tooltip content="|折算差异| ÷ 账面本位币 × 100%" placement="top">
+            <span class="formula-col-header">差异率</span>
+          </el-tooltip>
+        </template>
+        <template #default="{ row }">
+          <span :class="['formula-value', row.diffRate > FX_DIFF_RATE_THRESHOLD ? 'diff-warning' : '']">
+            {{ row.bookedAmount ? (row.diffRate * 100).toFixed(2) + '%' : '—' }}
           </span>
         </template>
       </el-table-column>
@@ -155,7 +185,7 @@
     <div class="total-bar">
       <span>折算本位币合计：<strong class="formula-value">{{ fmtAmount(totalConverted) }}</strong></span>
       <span>差异合计：<strong :class="isOverThreshold(totalDiff) ? 'diff-warning' : ''">{{ fmtAmount(totalDiff) }}</strong></span>
-      <span class="threshold-hint">高亮阈值：|差异| > {{ FX_DIFF_THRESHOLD }}</span>
+      <span class="threshold-hint">高亮阈值：|差异| > {{ FX_DIFF_THRESHOLD }}元 或 差异率 > 1%</span>
     </div>
 
     <!-- ═══ 编制提示 ═══ -->
@@ -164,7 +194,9 @@
       <ul>
         <li>折算本位币 = 原币回购额 × 回购日即期汇率（1外币=X人民币）</li>
         <li>折算差异 = 折算本位币 − 账面本位币（被审计单位已入账金额）</li>
-        <li>差异超阈值（绝对值 > {{ FX_DIFF_THRESHOLD }}）红色高亮提醒</li>
+        <li>差异率 = |折算差异| ÷ 账面本位币 × 100%</li>
+        <li>差异超阈值（|差异| > {{ FX_DIFF_THRESHOLD }}元 或 差异率 > 1%）红色高亮提醒</li>
+        <li>可从M3-2明细表一键带入外币回购批次（筛选币种≠CNY）</li>
         <li>所有公式前端实时计算，无需后端参与</li>
         <li>汇率来源：中国人民银行官网/中国外汇交易中心公布的即期汇率</li>
       </ul>
@@ -211,6 +243,8 @@ const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => v
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const FX_DIFF_THRESHOLD = 100 // 折算差异高亮阈值（元）
+/** 差异率高亮阈值（1%以上红色） */
+const FX_DIFF_RATE_THRESHOLD = 0.01
 
 // ─── FormData + Composables ──────────────────────────────────────────────────
 
@@ -229,6 +263,8 @@ const { exportTemplate, exportData, importData } = useM3ImportExport({
 interface FxRow {
   key: string
   batchName: string
+  /** 回购日期 */
+  repurchaseDate: string
   foreignAmount: number
   currency: string
   exchangeRate: number
@@ -239,6 +275,8 @@ interface FxRow {
 interface ComputedFxRow extends FxRow {
   convertedAmount: number
   diff: number
+  /** 差异率=|差异|/账面（账面为0时为0） */
+  diffRate: number
 }
 
 const fxRows = ref<FxRow[]>([])
@@ -249,7 +287,8 @@ const computedFxRows = computed<ComputedFxRow[]>(() => {
   return fxRows.value.map(row => {
     const convertedAmount = calcFxConverted(row.foreignAmount, row.exchangeRate)
     const diff = calcFxDiff(convertedAmount, row.bookedAmount)
-    return { ...row, convertedAmount, diff }
+    const diffRate = row.bookedAmount !== 0 ? Math.abs(diff) / Math.abs(row.bookedAmount) : 0
+    return { ...row, convertedAmount, diff, diffRate }
   })
 })
 
@@ -283,6 +322,7 @@ async function handleAddRow() {
     fxRows.value.push({
       key,
       batchName: batchName?.trim() || '',
+      repurchaseDate: '',
       foreignAmount: 0,
       currency: 'USD',
       exchangeRate: 0,
@@ -306,8 +346,55 @@ function updateFxRow(index: number, field: keyof FxRow, value: string | number) 
   _saveFxRows()
 }
 
-function isOverThreshold(diff: number): boolean {
-  return Math.abs(diff) > FX_DIFF_THRESHOLD
+function isOverThreshold(diff: number, diffRate?: number): boolean {
+  // 绝对值>阈值 OR 差异率>1%
+  return Math.abs(diff) > FX_DIFF_THRESHOLD || (diffRate !== undefined && diffRate > FX_DIFF_RATE_THRESHOLD)
+}
+
+/**
+ * 从M3-2明细表带入外币回购批次。
+ * 读取allResponses中M3-2行数据,筛选currency!='CNY'的行,填入M3-4。
+ */
+async function handlePullFromDetail() {
+  await formData.loadData()
+  const newRows: FxRow[] = []
+  for (const [key, resp] of formData.allResponses.value) {
+    if (key.startsWith('M3-M3-2-row-') && key.endsWith('-data') && resp.remark) {
+      try {
+        const row = JSON.parse(resp.remark)
+        // 仅带入非人民币（外币）回购批次
+        if (row.currency && row.currency !== 'CNY') {
+          newRows.push({
+            key: `m3-fx-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            batchName: row.batchName || '',
+            repurchaseDate: row.repurchaseDate || '',
+            foreignAmount: Number(row.repurchaseAmount) || 0,
+            currency: row.currency || 'USD',
+            exchangeRate: 0,
+            bookedAmount: 0,
+            remark: '',
+          })
+        }
+      } catch { /* skip */ }
+    }
+  }
+  if (newRows.length === 0) {
+    ElMessage.info('M3-2明细表中无外币（非CNY）回购批次')
+    return
+  }
+  // 有既有行时确认
+  if (fxRows.value.length > 0) {
+    try {
+      await ElMessageBox.confirm(
+        `将从M3-2带入${newRows.length}个外币批次（替换现有${fxRows.value.length}行），是否继续？`,
+        '从明细表带入',
+        { confirmButtonText: '确认替换', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch { return }
+  }
+  fxRows.value = newRows
+  _saveFxRows()
+  ElMessage.success(`已从M3-2带入${newRows.length}个外币回购批次`)
 }
 
 // ─── Import/Export ───────────────────────────────────────────────────────────

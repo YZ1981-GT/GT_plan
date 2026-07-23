@@ -1,37 +1,103 @@
 <template>
   <div class="i6-tab-detail">
-    <!-- 方法论上下文 -->
+    <!-- 一、审计目标 -->
+    <el-alert type="info" :closable="false" class="objective-alert">
+      <template #title><span class="obj-title">一、审计目标</span></template>
+      <ol class="obj-list">
+        <li>确认所有应当记录的研发费用均已记录，所有已记录的研发费用均已包括在财务报表中（发生与完整性）。</li>
+        <li>确认与研发费用有关的金额及其他数据已恰当记录，相关披露已得到恰当计量和描述（准确性、计价和分摊、分类和可理解性）。</li>
+      </ol>
+    </el-alert>
+
+    <!-- 编制逻辑说明 -->
     <div class="methodology-context">
-      <p><strong>I6-2 研发费用明细表 — 月度12列横向矩阵：</strong></p>
-      <p>固定列(项目名称/研发项目编号) + 1月~12月 + 合计列。异常月份(±30%均值)红色标记。</p>
-      <p>顶部ECharts折线图(可折叠)显示月度趋势。动态行(新增研发项目)需先弹窗输入名称。</p>
+      <p>
+        <strong>I6-2 编制逻辑（对齐致同 Excel）：</strong>
+        <strong>项目类别(A列)</strong>标识明细行，供 I6-1 审定表引用；
+        <strong>费用性质(X列)</strong>用于附注披露 SUMIF（人工费/材料费等）。
+        逐月归集未审发生额 → AJE/RJE → 本期审定数。
+      </p>
     </div>
 
-    <!-- 审计目标 -->
+    <!-- TB 勾稽警告 -->
     <el-alert
-      type="info"
+      v-if="tbCrossCheck.hasData && !tbCrossCheck.isBalanced"
+      type="warning"
       :closable="false"
-      title="审计目标：核实研发费用各项目按 6 类费用（人工/材料/折旧/摊销/设计/委外/其他）逐月归集的完整性与准确性，识别异常月度波动，为审定表 I6-1 提供明细支撑。"
-      class="objective-alert"
+      show-icon
+      class="cross-alert"
+      :title="`明细未审合计 ${fmtAmount(tbCrossCheck.detailUnadj)} 与 TB 6602 发生额 ${fmtAmount(tbCrossCheck.tbNet)} 不一致，差额 ${fmtAmount(tbCrossCheck.diff)}`"
     />
 
-    <!-- ECharts月度趋势图(可折叠) -->
+    <!-- I6-1 勾稽警告 -->
+    <el-alert
+      v-if="adjudicationCrossCheck.hasData && !adjudicationCrossCheck.isBalanced"
+      type="error"
+      :closable="false"
+      show-icon
+      class="cross-alert"
+      :title="`明细审定合计 ${fmtAmount(adjudicationCrossCheck.detailAudited)} 与 I6-1 审定合计 ${fmtAmount(adjudicationCrossCheck.adjudicationTotal)} 不一致，差额 ${fmtAmount(adjudicationCrossCheck.diff)}`"
+    />
+
+    <!-- I6-3 勾稽警告 -->
+    <el-alert
+      v-if="i63CrossCheck.hasData && !i63CrossCheck.isBalanced"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="cross-alert"
+      :title="`明细 AJE/RJE（${fmtAmount(i63CrossCheck.detailAje)}/${fmtAmount(i63CrossCheck.detailRje)}）与 I6-3 净额（${fmtAmount(i63CrossCheck.i63Aje)}/${fmtAmount(i63CrossCheck.i63Rje)}）不一致`"
+    />
+
+    <!-- 月度趋势图 -->
     <details class="chart-details" open>
-      <summary>月度趋势图</summary>
-      <div ref="chartRef" class="trend-chart"></div>
+      <summary>月度趋势图（合计行）</summary>
+      <div ref="chartRef" class="trend-chart" />
     </details>
 
-    <!-- 操作栏 -->
-    <div class="tab-toolbar">
-      <div class="toolbar-left">
-        <el-button v-if="!isReadonly" type="primary" size="small" @click="handleAddRow">+ 新增项目</el-button>
-        <el-dropdown v-if="!isReadonly" trigger="click">
-          <el-button size="small">导入导出 <el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+    <!-- 工具栏 -->
+    <div class="section-header">
+      <div class="section-header-left">
+        <h3>二、审计过程 — 研发费用明细表</h3>
+        <GtIndexChip value="wp:I6-2" :context-project-id="projectId" />
+        <GtIndexChip value="I6-1" @click="emit('navigate-sheet', 'I6-1')" />
+        <GtIndexChip value="I6-3" @click="emit('navigate-sheet', 'I6-3')" />
+      </div>
+      <div class="header-actions">
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          plain
+          @click="handleApplyTb"
+        >
+          TB写入未审
+        </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          plain
+          @click="handleSyncFromI63"
+        >
+          从 I6-3 同步调整
+        </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="warning"
+          plain
+          @click="handlePushToI63"
+        >
+          推送至 I6-3
+        </el-button>
+        <el-dropdown v-if="!isReadonly" size="small" trigger="click" @command="handleImportExport">
+          <el-button size="small">
+            导入导出 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+          </el-button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item @click="handleExport('template')">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="handleExport('data')">导出数据</el-dropdown-item>
-              <el-dropdown-item @click="handleImport">导入数据</el-dropdown-item>
+              <el-dropdown-item command="export-template">导出模板</el-dropdown-item>
+              <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
+              <el-dropdown-item command="import-data">导入数据</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -48,84 +114,344 @@
           从 I1-9 取摊销
         </el-button>
       </div>
-      <div class="toolbar-right">
-        <span class="chip-wrap"><GtIndexChip value="wp:I6-2" :context-project-id="projectId" /></span>
-        <el-tag size="small" type="info">共 {{ rows.length }} 个研发项目</el-tag>
+    </div>
+
+    <!-- 区段 Tab -->
+    <div class="tab-bar">
+      <el-segmented v-model="activeTab" :options="tabOptions" size="small" />
+      <div class="tab-right">
+        <el-button v-if="!isReadonly" size="small" type="success" plain @click="handleAddRow">
+          + 新增明细行
+        </el-button>
+        <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       </div>
     </div>
 
-    <!-- 月度明细表(固定前2列 + 12月横滚 + 合计) -->
-    <el-table :data="rows" border size="small" class="detail-table" max-height="520" scrollbar-always-on :row-class-name="getRowClassName">
-      <!-- 固定列: 项目名称 -->
-      <el-table-column prop="name" label="研发项目" min-width="140" fixed>
+    <!-- 主表 -->
+    <el-table
+      :data="rows"
+      border
+      size="small"
+      class="detail-table"
+      max-height="520"
+      scrollbar-always-on
+      :row-class-name="getRowClassName"
+    >
+      <el-table-column type="index" label="#" width="45" align="center" fixed="left" />
+
+      <!-- 项目类别 A列 -->
+      <el-table-column prop="category" label="项目类别(A)" min-width="120" fixed="left">
         <template #default="{ row }">
-          <span :class="{ 'subtotal-text': row.isSubtotal }">{{ row.name }}</span>
-          <el-button v-if="row.isEditable && !isReadonly" size="small" type="danger" text class="row-del" @click="handleRemoveRow(row.rowId)">✕</el-button>
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.category"
+            size="small"
+            placeholder="如：XX研发项目"
+            @change="(v: string) => onCellChange(row.id, 'category', v)"
+          />
+          <span v-else>{{ row.category }}</span>
         </template>
       </el-table-column>
-      <!-- 固定列: 编号 -->
-      <el-table-column prop="code" label="编号" width="80" fixed>
+
+      <!-- 费用性质 X列 -->
+      <el-table-column prop="expenseNature" label="费用性质(X)" min-width="120" fixed="left">
         <template #default="{ row }">
-          <el-input v-if="row.isEditable && !isReadonly" v-model="row.code" size="small" @change="onFieldChange" />
-          <span v-else>{{ row.code || '-' }}</span>
+          <el-select
+            v-if="!isReadonly"
+            :model-value="row.expenseNature"
+            size="small"
+            filterable
+            allow-create
+            default-first-option
+            placeholder="人工费/材料费…"
+            class="nature-select"
+            @change="(v: string) => onCellChange(row.id, 'expenseNature', v)"
+          >
+            <el-option v-for="opt in expenseNatureOptions" :key="opt" :label="opt" :value="opt" />
+          </el-select>
+          <span v-else>{{ row.expenseNature || row.category }}</span>
+          <el-button
+            v-if="!isReadonly"
+            size="small"
+            type="danger"
+            text
+            class="row-del"
+            @click="handleRemoveRow(row.id)"
+          >✕</el-button>
         </template>
       </el-table-column>
-      <!-- 12月份列 -->
-      <el-table-column v-for="m in 12" :key="m" :label="`${m}月`" min-width="95" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.months[m-1]" size="small" :controls="false" @change="onMonthChange(row)" />
-          <span v-else :class="{ 'anomaly-cell': isAnomalyMonth(row, m-1) }">{{ fmtAmount(row.months[m-1]) }}</span>
-        </template>
-      </el-table-column>
-      <!-- 合计(公式列) -->
-      <el-table-column label="合计" min-width="110" align="right">
-        <template #header>
-          <el-tooltip content="合计 = SUM(1月~12月)" placement="top">
-            <span class="formula-col-header">合计</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <el-tooltip content="= SUM(1月~12月)" placement="top">
-            <span class="formula-value">{{ fmtAmount(row.total) }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-      <!-- 操作列 -->
-      <el-table-column v-if="!isReadonly" label="操作" width="55" align="center" fixed="right">
-        <template #default="{ row }">
-          <el-button v-if="row.isEditable" type="danger" link size="small" @click="handleRemoveRow(row.rowId)">删</el-button>
-        </template>
-      </el-table-column>
+
+      <!-- 月度明细区段 -->
+      <template v-if="activeTab === 'monthly'">
+        <el-table-column
+          v-for="(label, idx) in monthLabels"
+          :key="`m-${idx}`"
+          :label="label"
+          min-width="95"
+          align="right"
+        >
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.months[idx]"
+              size="small"
+              :controls="false"
+              :precision="2"
+              class="amt-input"
+              @change="(v: number | null) => onCellChange(row.id, `month_${idx}`, v ?? 0)"
+            />
+            <span v-else :class="{ 'anomaly-cell': isAnomalyMonth(row, idx) }">
+              {{ fmtAmount(row.months[idx]) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期未审合计" min-width="120" align="right">
+          <template #header>
+            <el-tooltip content="= SUM(1月~12月)" placement="top">
+              <span class="formula-col-header">本期未审合计</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <span class="formula-value">{{ fmtAmount(row.unadjTotal) }}</span>
+          </template>
+        </el-table-column>
+      </template>
+
+      <!-- 调整审定区段 -->
+      <template v-if="activeTab === 'audit'">
+        <el-table-column label="本期未审合计" min-width="120" align="right">
+          <template #default="{ row }"><span class="formula-value">{{ fmtAmount(row.unadjTotal) }}</span></template>
+        </el-table-column>
+        <el-table-column label="账项调整AJE" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.aje"
+              size="small"
+              :controls="false"
+              :precision="2"
+              @change="(v: number | null) => onCellChange(row.id, 'aje', v ?? 0)"
+            />
+            <span v-else>{{ fmtAmount(row.aje) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="重分类RJE" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.rje"
+              size="small"
+              :controls="false"
+              :precision="2"
+              @change="(v: number | null) => onCellChange(row.id, 'rje', v ?? 0)"
+            />
+            <span v-else>{{ fmtAmount(row.rje) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期审定数" min-width="120" align="right">
+          <template #header>
+            <el-tooltip content="= 未审合计 + AJE + RJE" placement="top">
+              <span class="formula-col-header">本期审定数</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <span class="formula-value">{{ fmtAmount(row.auditedAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="占比(%)" min-width="80" align="right">
+          <template #default="{ row }">
+            <span>{{ fmtPercent(row.ratio) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="上期未审" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.priorUnadj"
+              size="small"
+              :controls="false"
+              :precision="2"
+              @change="(v: number | null) => onCellChange(row.id, 'priorUnadj', v ?? 0)"
+            />
+            <span v-else>{{ fmtAmount(row.priorUnadj) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="上期AJE" min-width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.priorAje"
+              size="small"
+              :controls="false"
+              :precision="2"
+              @change="(v: number | null) => onCellChange(row.id, 'priorAje', v ?? 0)"
+            />
+            <span v-else>{{ fmtAmount(row.priorAje) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="上期RJE" min-width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.priorRje"
+              size="small"
+              :controls="false"
+              :precision="2"
+              @change="(v: number | null) => onCellChange(row.id, 'priorRje', v ?? 0)"
+            />
+            <span v-else>{{ fmtAmount(row.priorRje) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="上期审定" min-width="110" align="right">
+          <template #header>
+            <el-tooltip content="= 上期未审 + 上期AJE + 上期RJE" placement="top">
+              <span class="formula-col-header">上期审定</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <span class="formula-value">{{ fmtAmount(row.priorAudited) }}</span>
+          </template>
+        </el-table-column>
+      </template>
+
+      <!-- 分析勾稽区段 -->
+      <template v-if="activeTab === 'linkage'">
+        <el-table-column label="本期审定数" min-width="120" align="right">
+          <template #default="{ row }"><span class="formula-value">{{ fmtAmount(row.auditedAmount) }}</span></template>
+        </el-table-column>
+        <el-table-column label="与相关科目勾稽" min-width="160">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.reconciliation"
+              size="small"
+              placeholder="如：研发支出-结转"
+              @change="(v: string) => onCellChange(row.id, 'reconciliation', v)"
+            />
+            <span v-else>{{ row.reconciliation || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="个别重分类" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.individualReclass"
+              size="small"
+              :controls="false"
+              :precision="2"
+              @change="(v: number | null) => onCellChange(row.id, 'individualReclass', v ?? 0)"
+            />
+            <span v-else>{{ fmtAmount(row.individualReclass) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="合并重分类" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.consolidatedReclass"
+              size="small"
+              :controls="false"
+              :precision="2"
+              @change="(v: number | null) => onCellChange(row.id, 'consolidatedReclass', v ?? 0)"
+            />
+            <span v-else>{{ fmtAmount(row.consolidatedReclass) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="备注" min-width="140">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.remark"
+              size="small"
+              @change="(v: string) => onCellChange(row.id, 'remark', v)"
+            />
+            <span v-else>{{ row.remark || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="操作" width="55" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button type="danger" link size="small" @click="handleRemoveRow(row.id)">删</el-button>
+          </template>
+        </el-table-column>
+      </template>
     </el-table>
 
-    <!-- 合计行摘要 -->
+    <!-- 表尾：合计行 + 各月比例行 -->
     <div class="subtotals-bar">
-      <span class="subtotal-label">年度合计：</span>
-      <span v-for="m in 12" :key="m" class="subtotal-item">{{ m }}月: {{ fmtAmount(monthlyTotals[m-1]) }}</span>
-      <span class="subtotal-item subtotal-total">全年: {{ fmtAmount(grandTotal) }}</span>
+      <div class="subtotal-row">
+        <span class="subtotal-label">合计</span>
+        <span class="subtotal-item">未审 {{ fmtAmount(totalRow.unadjTotal) }}</span>
+        <span class="subtotal-item">AJE {{ fmtAmount(totalRow.aje) }}</span>
+        <span class="subtotal-item">RJE {{ fmtAmount(totalRow.rje) }}</span>
+        <span class="subtotal-item emphasize">审定 {{ fmtAmount(totalRow.auditedAmount) }}</span>
+        <span class="subtotal-item">上期审定 {{ fmtAmount(totalRow.priorAudited) }}</span>
+      </div>
+      <div class="subtotal-row ratio-row">
+        <span class="subtotal-label">各月比例</span>
+        <span
+          v-for="(ratio, idx) in monthlyRatios"
+          :key="idx"
+          class="subtotal-item"
+          :class="{ 'anomaly-cell': anomalyMonths.includes(idx) }"
+        >
+          {{ monthLabels[idx] }}: {{ fmtPercent(ratio) }}
+        </span>
+      </div>
     </div>
 
-    <!-- 审计说明 -->
+    <!-- 三、审计说明 -->
     <el-card shadow="never" class="audit-note-card">
-      <template #header><span>审计说明</span></template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }" :disabled="isReadonly" placeholder="请填写审计说明（研发费用各项目月度归集情况、异常月份分析等）..." @blur="onAuditNoteBlur" />
+      <template #header>
+        <div class="card-header">
+          <span>三、审计说明</span>
+          <div class="cross-ref-bar">
+            <span class="cross-ref-label">关联底稿：</span>
+            <GtIndexChip value="I3-4" @click="emit('navigate-sheet', 'I3-4')" />
+            <GtIndexChip value="I2-5" @click="emit('navigate-sheet', 'I2-5')" />
+            <GtIndexChip value="I2-7" @click="emit('navigate-sheet', 'I2-7')" />
+            <GtIndexChip value="I2-8" @click="emit('navigate-sheet', 'I2-8')" />
+            <GtIndexChip value="I2-9" @click="emit('navigate-sheet', 'I2-9')" />
+            <GtIndexChip value="I2-11" @click="emit('navigate-sheet', 'I2-11')" />
+          </div>
+        </div>
+      </template>
+      <ul class="procedure-list">
+        <li v-for="(p, i) in auditProcedures" :key="i">{{ p }}</li>
+      </ul>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 4 }"
+        :disabled="isReadonly"
+        placeholder="补充说明：各费用类别月度归集情况、异常月份分析、与 I6-1 审定表勾稽结果等…"
+        @blur="onAuditNoteBlur"
+      />
     </el-card>
 
-    <!-- 审计结论 -->
+    <!-- 四、审计结论 -->
     <el-card shadow="never" class="audit-note-card">
-      <template #header><span>审计结论</span></template>
-      <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="请填写审计结论（明细归集完整、准确、与审定表一致）..." @blur="onAuditConclusionBlur" />
+      <template #header><span>四、审计结论</span></template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="研发费用明细归集完整、准确，与审定表 I6-1 一致，列报恰当…"
+        @blur="onAuditConclusionBlur"
+      />
     </el-card>
 
-    <!-- 编制提示 -->
-    <details class="guidance-details compile-hint">
+    <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>固定前2列(项目名称/编号)+12月横滚+合计列，44行×65列</li>
-        <li>合计=SUM(1月~12月)，自动计算</li>
-        <li>异常月份(偏离均值±30%)红色标记</li>
-        <li>新增研发项目需先输入项目名称</li>
-        <li>年度合计联动审定表I6-1</li>
+        <li>行维度：<strong>项目类别(A)</strong>供 I6-1 引用；<strong>费用性质(X)</strong>供附注 SUMIF</li>
+        <li>同一费用性质可对应多行项目类别，附注披露按 X 列汇总</li>
+        <li>本期未审合计 = SUM(1月~12月)；本期审定 = 未审 + AJE + RJE</li>
+        <li>底部合计行应与 I6-1 审定表一致；各月比例 = 各月合计 / 全年审定 × 100%</li>
+        <li>月度环比变动超 ±30% 红色标记，需在审计说明中解释</li>
+        <li>无形资产摊销可点「从 I1-9 取摊销」自动回填</li>
+        <li>AJE/RJE 可与 I6-3 双向联动：「从 I6-3 同步」或「推送至 I6-3」</li>
+        <li>构成数据可推送至 I2-5「从 I6-2 带入构成」</li>
       </ul>
     </details>
   </div>
@@ -133,163 +459,208 @@
 
 <script setup lang="ts">
 /**
- * I6TabDetail.vue — I6-2 研发费用明细表（月度12列横向矩阵）
+ * I6TabDetail.vue — I6-2 研发费用明细表（对齐致同 Excel 65列宽表）
  *
- * 固定列(项目/编号) + 12月份列 + 合计列
- * - 异常月份(±30%均值)红色标记
- * - ECharts折线图(顶部可折叠)
- * - 动态行(新增研发项目) ElMessageBox.prompt输入名称
- * - 导入导出 el-dropdown
+ * 行维度：费用性质（人工费/材料费/…）× 12月横向矩阵
+ * 列分组：月度明细 | 调整审定 | 分析勾稽（el-segmented 切换）
+ * 表尾：合计行 + 各月比例行
  *
- * Spec: .kiro/specs/i6-research-development-expense/
- * Task: 4.3
+ * Spec: .kiro/specs/i6-research-development-expense/ Task 4.3
  */
-import { ref, computed, watch, onMounted, inject, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, inject, nextTick, toRef, type Ref } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
-import http from '@/utils/http'
+import {
+  useI6Detail,
+  DETAIL_TABS,
+  NOTE_KEY,
+  CONCLUSION_KEY,
+  I6_DETAIL_AUDIT_PROCEDURES,
+  I6_DETAIL_DEFAULT_CATEGORIES,
+  type I6DetailRow,
+  type I6DetailTabKey,
+} from '../../composables/useI6Detail'
+import { useI6ImportExport } from '../../composables/useI6ImportExport'
 import { pullI1AmortIntoExpenseDetail } from '../../composables/expenseWpI1AmortPull'
+import http from '@/utils/http'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
+  tbData?: { unadjusted6602: number; audited6602?: number }
   isReadonly: boolean
 }>()
 
-const emit = defineEmits<{ 'save': [itemId: string, value: any] }>()
+const emit = defineEmits<{
+  save: [itemId: string, value: any]
+  'navigate-sheet': [sheetName: string]
+}>()
+
 const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', () => {})
+const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>
+const isReadonlyRef = toRef(props, 'isReadonly') as Ref<boolean>
+const tbDataRef = computed(() => props.tbData ?? { unadjusted6602: 0, audited6602: 0 })
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-interface DetailRow {
-  rowId: string
-  name: string
-  code: string
-  months: number[]  // 12 elements
-  total: number
-  isSubtotal: boolean
-  isEditable: boolean
-}
+const activeTab = ref<I6DetailTabKey>('monthly')
+const tabOptions = DETAIL_TABS.map((t) => ({ label: t.label, value: t.key }))
+const auditProcedures = I6_DETAIL_AUDIT_PROCEDURES
+const expenseNatureOptions = [...I6_DETAIL_DEFAULT_CATEGORIES]
 
-// ─── State ───────────────────────────────────────────────────────────────────
-const ITEM_ID = 'I6-2-rows'
-const NOTE_KEY = 'I6-2-audit-note'
-const CONCLUSION_KEY = 'I6-2-audit-conclusion'
-const rows = ref<DetailRow[]>([])
 const auditNote = ref('')
 const auditConclusion = ref('')
 const chartRef = ref<HTMLElement>()
+const pullingI1 = ref(false)
 
-const monthlyTotals = computed(() => {
-  const totals = new Array(12).fill(0)
-  for (const row of rows.value.filter((r) => r.isEditable)) {
-    for (let i = 0; i < 12; i++) totals[i] += row.months[i] || 0
-  }
-  return totals
-})
+function _str(id: string): string {
+  const it = props.allResponses.get(id)
+  return (it?.remark ?? (typeof it === 'string' ? it : '')) as string
+}
 
-const grandTotal = computed(() => monthlyTotals.value.reduce((s, v) => s + v, 0))
-
-// ─── Load / Save ─────────────────────────────────────────────────────────────
-function _str(id: string): string { const it = props.allResponses.get(id); return (it?.remark ?? (typeof it === 'string' ? it : '')) as string }
-
-function _load(): void {
+watch(() => props.allResponses, () => {
   auditNote.value = _str(NOTE_KEY)
   auditConclusion.value = _str(CONCLUSION_KEY)
-  const item = props.allResponses.get(ITEM_ID)
-  const raw = item?.remark ?? (typeof item === 'string' ? item : null)
-  if (raw) {
-    try { const parsed = JSON.parse(raw); if (Array.isArray(parsed)) { rows.value = parsed; _recalc(); return } } catch { /* */ }
-  }
-  rows.value = [
-    _makeRow('人工费', 'RD-01'), _makeRow('材料费', 'RD-02'),
-    _makeRow('折旧费', 'RD-03'), _makeRow('无形资产摊销', 'RD-04'),
-    _makeRow('设计费', 'RD-05'), _makeRow('装备调试费', 'RD-06'),
-    _makeRow('委外研发费', 'RD-07'), _makeRow('其他', 'RD-08'),
-  ]
-  _recalc()
+}, { immediate: true })
+
+const {
+  rows,
+  totalRow,
+  monthlyTotals,
+  monthlyRatios,
+  anomalyMonths,
+  adjudicationCrossCheck,
+  tbCrossCheck,
+  i63CrossCheck,
+  monthLabels,
+  updateCell,
+  addRow,
+  removeRow,
+  replaceRows,
+  applyI1AmortAmount,
+  applyTbData,
+  syncAjeFromI63,
+  pushAjeToI63,
+} = useI6Detail({
+  allResponses: allResponsesRef,
+  isReadonly: isReadonlyRef,
+  tbData: tbDataRef,
+  onSave: (itemId, value) => emit('save', itemId, value),
+})
+
+const { exportTemplate, exportData, importData } = useI6ImportExport({
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  onImported: async () => { /* rows reload via allResponses watch */ },
+})
+
+function onCellChange(id: string, key: string, value: number | string): void {
+  updateCell(id, key, value)
 }
 
-function _makeRow(name: string, code: string): DetailRow {
-  return { rowId: `row-${Math.random().toString(36).slice(2, 10)}`, name, code, months: new Array(12).fill(0), total: 0, isSubtotal: false, isEditable: true }
+function isAnomalyMonth(row: I6DetailRow, monthIdx: number): boolean {
+  if (monthIdx < 1) return false
+  const prior = row.months[monthIdx - 1] || 0
+  const current = row.months[monthIdx] || 0
+  if (prior === 0) return false
+  return Math.abs((current - prior) / Math.abs(prior)) > 0.3
 }
 
-function _recalc(): void {
-  for (const row of rows.value) { row.total = row.months.reduce((s, v) => s + (v || 0), 0) }
+function getRowClassName({ row }: { row: I6DetailRow }): string {
+  return row.anomalyHighlight ? 'row-anomaly' : ''
 }
 
-function _persist(): void { emit('save', ITEM_ID, JSON.stringify(rows.value)) }
-
-watch(() => props.allResponses, () => _load(), { immediate: true })
-
-function onMonthChange(row: DetailRow): void { row.total = row.months.reduce((s, v) => s + (v || 0), 0); _persist() }
-function onFieldChange(): void { _persist() }
-
-// ─── Anomaly detection ───────────────────────────────────────────────────────
-function isAnomalyMonth(row: DetailRow, monthIdx: number): boolean {
-  const val = row.months[monthIdx] || 0
-  const nonZero = row.months.filter((v) => v !== 0)
-  if (nonZero.length < 3) return false
-  const avg = nonZero.reduce((s, v) => s + v, 0) / nonZero.length
-  if (avg === 0) return false
-  return Math.abs(val - avg) / Math.abs(avg) > 0.3
-}
-
-function getRowClassName({ row }: { row: DetailRow }): string {
-  return row.isSubtotal ? 'row-subtotal' : ''
-}
-
-// ─── Dynamic rows ────────────────────────────────────────────────────────────
 async function handleAddRow(): Promise<void> {
   try {
-    const { value: name } = await ElMessageBox.prompt('请输入研发项目名称', '新增研发项目', {
-      confirmButtonText: '确定', cancelButtonText: '取消', inputPattern: /\S+/, inputErrorMessage: '名称不能为空',
+    const { value: category } = await ElMessageBox.prompt('请输入项目类别（A列）', '新增明细行', {
+      confirmButtonText: '下一步',
+      cancelButtonText: '取消',
+      inputPattern: /\S+/,
+      inputErrorMessage: '名称不能为空',
+      inputPlaceholder: '如：芯片研发项目A',
     })
-    if (!name) return
-    rows.value.push(_makeRow(name.trim(), `RD-${String(rows.value.length + 1).padStart(2, '0')}`))
-    _persist()
+    const { value: nature } = await ElMessageBox.prompt('请选择/输入费用性质（X列）', '费用性质', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputValue: category?.trim() || '',
+      inputPlaceholder: '如：人工费、材料费',
+    })
+    if (category?.trim()) addRow(category.trim(), (nature || category).trim())
   } catch { /* cancelled */ }
 }
 
-function handleRemoveRow(rowId: string): void {
-  const idx = rows.value.findIndex((r) => r.rowId === rowId)
-  if (idx >= 0) { rows.value.splice(idx, 1); _persist() }
+function handleRemoveRow(id: string): void { removeRow(id) }
+
+function handleImportExport(command: string): void {
+  switch (command) {
+    case 'export-template': exportTemplate('I6-2'); break
+    case 'export-data': exportData('I6-2'); break
+    case 'import-data': triggerImport(); break
+  }
 }
 
-// ─── Import/Export ───────────────────────────────────────────────────────────
-async function handleExport(type: 'template' | 'data'): Promise<void> {
-  try {
-    const endpoint = type === 'template' ? 'export-template' : 'export-data'
-    const res = await http.get(`/api/workpapers/${props.wpId}/i6/${endpoint}`, { params: { sheet: 'I6-2' }, responseType: 'blob' })
-    const blob = res.data instanceof Blob ? res.data : new Blob([res.data])
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = `I6-2_明细表${type === 'template' ? '模板' : '数据'}.xlsx`; a.click()
-    URL.revokeObjectURL(url)
-  } catch { ElMessage.error(`导出${type === 'template' ? '模板' : '数据'}失败`) }
-}
-
-async function handleImport(): Promise<void> {
-  const input = document.createElement('input'); input.type = 'file'; input.accept = '.xlsx,.xls,.csv'
+function triggerImport(): void {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.xlsx,.xls,.csv'
   input.onchange = async (e: Event) => {
-    const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
-    const formData = new FormData(); formData.append('file', file)
+    const file = (e.target as HTMLInputElement).files?.[0]
+    if (!file) return
+    const formData = new FormData()
+    formData.append('file', file)
     try {
-      const res = await http.post(`/api/workpapers/${props.wpId}/i6/import-data`, formData, { params: { sheet: 'I6-2' }, headers: { 'Content-Type': 'multipart/form-data' } })
+      const res = await http.post(
+        `/api/workpapers/${props.wpId}/i6/import-data`,
+        formData,
+        { params: { sheet: 'I6-2' }, headers: { 'Content-Type': 'multipart/form-data' } },
+      )
       const data = res.data?.data ?? res.data
-      if (Array.isArray(data?.rows)) { rows.value = data.rows; _recalc(); _persist() }
-      ElMessage.success('导入成功')
-    } catch { ElMessage.error('导入失败') }
+      if (Array.isArray(data?.rows)) {
+        replaceRows(data.rows)
+        ElMessage.success('导入成功')
+      } else {
+        await importData(file, 'I6-2')
+      }
+    } catch {
+      ElMessage.error('导入失败')
+    }
   }
   input.click()
 }
 
-// ─── Audit note / conclusion / Review ────────────────────────────────────────
-function onAuditNoteBlur(): void { if (props.isReadonly) return; emit('save', NOTE_KEY, auditNote.value) }
-function onAuditConclusionBlur(): void { if (props.isReadonly) return; emit('save', CONCLUSION_KEY, auditConclusion.value) }
+function onAuditNoteBlur(): void {
+  if (props.isReadonly) return
+  emit('save', NOTE_KEY, auditNote.value)
+}
+
+function onAuditConclusionBlur(): void {
+  if (props.isReadonly) return
+  emit('save', CONCLUSION_KEY, auditConclusion.value)
+}
+
 function handleReview(): void { openReviewDialog('I6-2 明细表') }
 
-const pullingI1 = ref(false)
+function handleSyncFromI63(): void {
+  const result = syncAjeFromI63()
+  if (result.ok) ElMessage.success(result.message)
+  else ElMessage.info(result.message)
+}
+
+function handleApplyTb(): void {
+  const result = applyTbData()
+  if (result.ok) ElMessage.success(result.message)
+  else ElMessage.warning(result.message)
+}
+
+function handlePushToI63(): void {
+  const result = pushAjeToI63()
+  if (result.ok) {
+    ElMessage.success(result.message)
+    emit('navigate-sheet', 'I6-3')
+  } else {
+    ElMessage.info(result.message)
+  }
+}
+
 async function handlePullI1Amort(): Promise<void> {
   if (props.isReadonly) return
   pullingI1.value = true
@@ -299,16 +670,9 @@ async function handlePullI1Amort(): Promise<void> {
       ElMessage.warning(result.message || 'I1-9 摊销合计为 0')
       return
     }
-    const hit = rows.value.find((r) => String(r.name || '').includes('无形资产摊销'))
-    if (!hit) {
-      ElMessage.warning('未找到「无形资产摊销」行')
-      return
-    }
-    hit.months = new Array(12).fill(0)
-    hit.months[11] = result.amount
-    hit.total = result.amount
-    _persist()
-    ElMessage.success(`已从 I1-9 回填无形资产摊销 ${result.amount.toFixed(2)}`)
+    const applied = applyI1AmortAmount(result.amount)
+    if (applied.ok) ElMessage.success(applied.message)
+    else ElMessage.warning(applied.message)
   } catch (e: any) {
     ElMessage.error(e?.message || '拉取 I1-9 失败')
   } finally {
@@ -316,7 +680,6 @@ async function handlePullI1Amort(): Promise<void> {
   }
 }
 
-// ─── Chart (lazy init) ───────────────────────────────────────────────────────
 onMounted(async () => {
   await nextTick()
   if (!chartRef.value) return
@@ -326,51 +689,76 @@ onMounted(async () => {
     watch(monthlyTotals, (totals) => {
       chart.setOption({
         tooltip: { trigger: 'axis' },
-        xAxis: { type: 'category', data: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'] },
+        xAxis: { type: 'category', data: [...monthLabels] },
         yAxis: { type: 'value', name: '金额(元)' },
-        series: [{ type: 'line', data: totals, smooth: true, areaStyle: { opacity: 0.15 } }],
+        series: [{
+          type: 'line',
+          name: '合计',
+          data: totals,
+          smooth: true,
+          areaStyle: { opacity: 0.15 },
+          markPoint: anomalyMonths.value.length
+            ? { data: anomalyMonths.value.map((idx) => ({ xAxis: idx, yAxis: totals[idx], symbolSize: 10 })) }
+            : undefined,
+        }],
         grid: { left: 60, right: 20, top: 30, bottom: 30 },
       })
     }, { immediate: true })
-  } catch { /* echarts not available */ }
+  } catch { /* echarts unavailable */ }
 })
 
 function fmtAmount(v: number | null | undefined): string {
   if (v == null || Math.abs(v) < 0.005) return '-'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+function fmtPercent(v: number | null | undefined): string {
+  if (v == null) return '—'
+  return `${v.toFixed(2)}%`
+}
 </script>
 
 <style scoped>
 .i6-tab-detail { padding: 16px; font-size: var(--wp-font-size, 13px); }
 .objective-alert { margin-bottom: 12px; }
-.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
-.toolbar-left { display: flex; gap: 8px; align-items: center; }
-.chip-wrap { display: inline-flex; align-items: center; }
-.audit-note-card { margin-bottom: 16px; }
-.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
+.obj-title { font-weight: 600; }
+.obj-list { margin: 4px 0 0; padding-left: 18px; line-height: 1.6; font-size: 12px; }
 .methodology-context { border-left: 4px solid #d97706; background: #fffbeb; padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.8; }
 .methodology-context p { margin: 0; }
 .methodology-context strong { color: #78350f; }
+.cross-alert { margin-bottom: 12px; }
 .chart-details { margin-bottom: 16px; }
-.chart-details summary { cursor: pointer; font-weight: 500; font-size: var(--wp-font-size, 13px); color: var(--el-text-color-regular); }
+.chart-details summary { cursor: pointer; font-weight: 500; font-size: var(--wp-font-size, 13px); }
 .trend-chart { width: 100%; height: 220px; margin-top: 8px; }
-.toolbar-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
-.toolbar-right { display: flex; align-items: center; gap: 8px; }
-.row-count { font-size: 12px; color: var(--el-text-color-secondary); }
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.section-header-left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.section-header h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.tab-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.tab-right { display: flex; gap: 8px; align-items: center; }
 .detail-table { font-size: var(--wp-font-size, 13px); }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; padding-bottom: 2px; }
 .formula-value { border-bottom: 1px dashed #c0c4cc; cursor: help; padding-bottom: 1px; color: #303133; font-weight: 500; }
-.subtotal-text { font-weight: 600; }
 .row-del { margin-left: 4px; font-size: 11px; padding: 2px 4px; }
+.nature-select { width: 100%; min-width: 100px; }
 .anomaly-cell { color: #dc2626; font-weight: 600; background: #fef2f2; padding: 1px 4px; border-radius: 2px; }
-.detail-table :deep(.row-subtotal td) { font-weight: 600; background: #f0f9ff !important; }
-.subtotals-bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-top: 12px; background: #f0f9ff; border-radius: 6px; font-size: 12px; flex-wrap: wrap; }
-.subtotal-label { font-weight: 600; color: #303133; }
+.detail-table :deep(.row-anomaly td) { background: #fef2f2 !important; }
+.subtotals-bar { margin-top: 12px; padding: 10px 12px; background: #f0f9ff; border-radius: 6px; font-size: 12px; }
+.subtotal-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.subtotal-row:last-child { margin-bottom: 0; }
+.ratio-row { padding-top: 6px; border-top: 1px dashed #bfdbfe; }
+.subtotal-label { font-weight: 600; color: #303133; min-width: 64px; }
 .subtotal-item { color: #606266; }
-.subtotal-total { font-weight: 600; color: var(--el-color-primary); }
+.subtotal-item.emphasize { font-weight: 600; color: var(--el-color-primary); }
+.audit-note-card { margin-bottom: 16px; }
+.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
+.card-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.cross-ref-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cross-ref-label { font-size: 12px; color: #909399; }
+.procedure-list { margin: 0 0 12px; padding-left: 20px; font-size: 12px; color: #606266; line-height: 1.7; }
 .compile-hint { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }
 .compile-hint summary { cursor: pointer; font-weight: 500; }
 .compile-hint ul { padding-left: 20px; margin-top: 8px; }
 .compile-hint li { margin-bottom: 4px; }
+.amt-input { width: 100%; }
 </style>

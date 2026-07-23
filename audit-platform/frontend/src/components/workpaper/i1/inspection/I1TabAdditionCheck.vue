@@ -665,8 +665,10 @@
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && wpId && projectId"
         :project-id="projectId"
-        :account-codes="['1701']"
-        dialog-mode
+        :workpaper-id="wpId"
+        account-code="1701"
+        phase="final"
+        :year="year ?? new Date().getFullYear()"
         @filled="onSampleFilled"
       />
     </el-dialog>
@@ -723,6 +725,7 @@ const YnSelect = defineComponent({
 const props = defineProps<{
   wpId: string
   projectId: string
+  year?: number
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()

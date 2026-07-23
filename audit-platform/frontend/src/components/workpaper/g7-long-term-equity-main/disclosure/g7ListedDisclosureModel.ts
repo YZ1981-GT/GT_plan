@@ -739,6 +739,29 @@ export function materializeG7ListedRows(
   })
 }
 
+/**
+ * 列头元数据（disclosure-table-sync-convergence）：与 buildG7ListedSyncData 同键，
+ * 从各表 columns 配置派生 ColumnDef（label 逐字取自源配置，标签列承载 row.label → '项目'）。
+ */
+export function buildG7ListedColumns(): Record<string, import('../../composables/disclosureColumnDefs').ColumnDef[]> {
+  const result: Record<string, import('../../composables/disclosureColumnDefs').ColumnDef[]> = {}
+  for (const section of G7_LISTED_DISCLOSURE_SECTIONS) {
+    for (const table of section.tables ?? []) {
+      const key = table.templateTableKey ?? table.title
+      result[key] = [
+        { key: '项目', label: '项目', is_label: true },
+        ...table.columns.map((c) => ({
+          key: c.key,
+          label: c.label,
+          format: (c.type === 'number' ? 'amount' : c.type === 'percent' ? 'percent' : 'text') as
+            'amount' | 'percent' | 'text',
+        })),
+      ]
+    }
+  }
+  return result
+}
+
 export function buildG7ListedSyncData(
   state: G7ListedDisclosureState,
 ): Record<string, Record<string, unknown>[]> {

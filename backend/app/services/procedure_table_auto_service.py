@@ -151,7 +151,7 @@ class ProcedureTableService:
 
         # 并行解析所有 item 的自动值（程序表通常 5~25 步，并行可减少 DB 往返等待）
         auto_tasks = [
-            self._resolve_auto_values(project_id, year, item, business_category)
+            self._resolve_auto_values(project_id, year, item, business_category, table_code)
             for item in template["items"]
         ]
         auto_results = await asyncio.gather(*auto_tasks, return_exceptions=True)
@@ -188,6 +188,7 @@ class ProcedureTableService:
         year: int,
         item: dict[str, Any],
         business_category: str,
+        table_code: str = "",
     ) -> dict[str, Any]:
         """按 auto_data_source 解析自动值"""
         source = item.get("auto_data_source")
@@ -232,8 +233,24 @@ class ProcedureTableService:
                     _logger.error("auto_data_source %s inner error: %s", source, inner_e)
                     result["summary"] = "见内控缺陷汇总"
             else:
-                # 未实现的 data_source 保留空
-                _logger.debug("auto_data_source '%s' 未实现，跳过", source)
+                # 委托注册式 resolver（auto_data_resolvers._REGISTRY）：
+                # b1_risk_assessment_conclusion / b2_communication_status /
+                # b3_independence_status / b15/b19/b22/b23/b50 等均在此解析。
+                from app.services.auto_data_resolvers import resolve_auto_data_source
+                # cycle 优先取模板项显式 cycle，否则从 table_code 首字母推断
+                # （D~N 程序表 table_code 如 'D2A'/'E1A' → 循环代号 D/E，用于 risk_for_cycle 路由）
+                cycle_hint = item.get("cycle")
+                if not cycle_hint and table_code:
+                    first = table_code[0:1].upper()
+                    if first in "DEFGHIJKLMN":
+                        cycle_hint = first
+                resolved = await resolve_auto_data_source(
+                    self.db, project_id, year, source, cycle=cycle_hint,
+                )
+                if resolved and resolved.get("summary"):
+                    result["summary"] = resolved["summary"]
+                else:
+                    _logger.debug("auto_data_source '%s' 未注册，跳过", source)
         except Exception as e:
             _logger.error("auto_data_source '%s' failed [project=%s year=%s]: %s", source, project_id, year, e, exc_info=True)
 

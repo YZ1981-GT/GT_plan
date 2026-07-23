@@ -93,26 +93,33 @@ sheets:
     class_code: F-审定表
     account_codes: ['1711']
     formula_count: 66
+    # 对齐致同 Excel：未审(期初/增/减/期末)→账项调整→审定；行自 I3-2；调整自 I3-3
+    layout_type: adjudication_matrix
     columns:
-      - { field: investee, label: 被投资单位, type: text, width: 150, readonly: true }
-      - { field: initial_recognition, label: 初始确认, type: number, width: 100 }
-      - { field: opening_balance, label: 期初余额, type: number, width: 100 }
-      - { field: new_acquisition, label: 本期增加(新并购), type: number, width: 120 }
+      - { field: investee, label: 被投资单位, type: text, width: 150 }
+      - { field: beginBalance, label: 期初, type: number, width: 100 }
+      - { field: newAcquisition, label: 本期增加(新并购), type: number, width: 120 }
       - { field: impairment, label: 本期减少(减值), type: number, width: 120 }
-      - { field: closing_balance, label: 期末余额, type: number, width: 100, formula: "opening + new_acquisition - impairment" }
-      - { field: unadjusted_amount, label: 未审数, type: number, auto_source: trial_balance.unadjusted_amount }
-      - { field: aje_amount, label: AJE, type: number, width: 80 }
-      - { field: rje_amount, label: RJE, type: number, width: 80 }
-      - { field: audited_amount, label: 审定数, type: number, formula: "unadjusted + aje + rje" }
-      - { field: impairment_reserve, label: 减值准备, type: number, width: 100 }
-      - { field: net_value, label: 净额, type: number, width: 100, formula: "closing_balance - impairment_reserve" }
+      - { field: endBalance, label: 期末, type: number, width: 100, formula: "begin + newAcquisition - impairment" }
+      - { field: unadjusted, label: 未审数, type: number, auto_source: trial_balance.unadjusted_amount }
+      - { field: aje, label: AJE, type: number, width: 80 }
+      - { field: rje, label: RJE, type: number, width: 80 }
+      - { field: audited, label: 审定数, type: number, formula: "unadjusted + aje + rje" }
+      - { field: initialRecognition, label: 原值, type: number, width: 100 }
+      - { field: accImpairment, label: 累计减值, type: number, width: 100 }
+      - { field: netValue, label: 净额, type: number, width: 100, formula: "initialRecognition - accImpairment" }
     formulas:
-      - { name: calcGoodwillEndBalance, target: closing_balance, expr: "opening + newAcquisition - impairment" }
-      - { name: calcAuditedAmount, target: audited_amount, expr: "unadjusted + aje + rje" }
-      - { name: calcNetValue, target: net_value, expr: "closingBalance - impairmentReserve" }
+      - { name: calcGoodwillEndBalance, target: endBalance, expr: "begin + newAcquisition - impairment" }
+      - { name: calcAuditedAmount, target: audited, expr: "unadjusted + aje + rje" }
+      - { name: calcNetValue, target: netValue, expr: "initialRecognition - accImpairment" }
     highlights:
-      - { condition: "new_acquisition != 0", style: yellow, tooltip: "本期有新并购商誉确认" }
+      - { condition: "newAcquisition != 0", style: yellow, tooltip: "本期有新并购商誉确认" }
+      - { condition: "endBalance != netValue", style: orange, tooltip: "期末与净额应勾稽一致" }
       - { condition: "tb_variance != 0", style: red }
+    cross_refs:
+      - { ref_id: CW-I3-1-001, target_wp: I3-2, description: '明细带入 ← I3-2', direction: inbound }
+      - { ref_id: CW-I3-1-002, target_wp: I3-3, description: 'AJE/RJE ← I3-3', direction: inbound }
+      - { ref_id: CW-I3-1-003, target_wp: I3-6, description: '本期减值 ← I3-6', direction: inbound }
     writeback:
       target: trial_balance.audited_amount
       trigger: WORKPAPER_SAVED
@@ -250,20 +257,53 @@ sheets:
   针对性检查表I3-5:
     code: I3-5
     group: core
-    dimensions: "35×12"
+    dimensions: "28×17"
     component: I3TabTargetedCheck
-    class_code: D-段落检查
-    layout_type: paragraph
+    class_code: C-抽凭检查
+    layout_type: voucher_matrix
     standards_ref: [CAS8, CAS20]
-    check_items:
-      - { id: impairment_indicator, label: 减值迹象识别是否充分, type: conclusion, options: [是, 否, 不适用] }
-      - { id: cgu_division, label: CGU划分是否合理一致, type: conclusion, options: [是, 否, 不适用] }
-      - { id: goodwill_allocation, label: 商誉分摊至CGU是否恰当, type: conclusion, options: [是, 否, 不适用] }
-      - { id: test_frequency, label: 年度减值测试是否按时执行, type: conclusion, options: [是, 否, 不适用] }
-      - { id: no_reversal, label: 是否存在减值转回(不允许!), type: conclusion, options: [无转回, 发现转回] }
+    # 对齐致同 Excel：凭证抽查主路径；减值迹象/CGU 段落为可选补充（主程序 I3-6~8）
+    test_objectives:
+      - 通过针对性测试，验证商誉的存在/发生、计价和分摊
+    test_reasons: [大额, 关联方, 大额交易频繁, 异常, 其他]
+    test_content:
+      - 原始凭证是否齐全
+      - 记账凭证与原始凭证是否相符
+      - 账务处理是否正确（初始确认/后续计量）
+      - 是否记录于恰当的会计期间
+      - 入账价值与 I3-4 一致，且商誉分摊至 CGU 恰当
+    columns:
+      - { field: projectName, label: 商誉项目明细, type: text }
+      - { field: voucherDate, label: 日期, type: date }
+      - { field: voucherNo, label: 凭证编号, type: text }
+      - { field: businessDesc, label: 业务内容, type: text }
+      - { field: counterpartAccount, label: 对方科目, type: text }
+      - { field: counterpartDetail, label: 对方明细科目, type: text }
+      - { field: debitAmount, label: 借方金额, type: number }
+      - { field: creditAmount, label: 贷方金额, type: number }
+      - { field: supportingDocs, label: 支持性文件, type: text }
+      - { field: check1, label: 核对1, type: select, options: [√, ×, N/A] }
+      - { field: check2, label: 核对2, type: select, options: [√, ×, N/A] }
+      - { field: check3, label: 核对3, type: select, options: [√, ×, N/A] }
+      - { field: check4, label: 核对4, type: select, options: [√, ×, N/A] }
+      - { field: check5, label: 核对5, type: select, options: [√, ×, N/A] }
+      - { field: indexRef, label: 索引号, type: text }
+      - { field: isAbnormal, label: 是否异常, type: select }
+      - { field: remark, label: 备注说明, type: text }
+    formulas:
+      - { name: sumDebit, target: checkedDebitTotal, expr: "SUM(debitAmount)" }
+      - { name: sumCredit, target: checkedCreditTotal, expr: "SUM(creditAmount)" }
+      - { name: coverageRate, target: coverageRate, expr: "IF(periodDebit>0, checkedDebit/periodDebit, N/A)" }
+    cross_refs:
+      - { ref_id: CW-I3-5-001, target_wp: I3-2, description: '本期发生额 ← I3-2', direction: inbound }
+      - { ref_id: CW-I3-5-002, target_wp: I3-4, description: '入账价值勾稽', direction: inbound }
+      - { ref_id: CW-I3-5-003, target_wp: I3-6, description: '减值/CGU 详细程序 →', direction: outbound }
     guidance:
-      top_area: blue_gradient_steps
       methodology_context: amber_left_border
+      optional_risk_focus: [减值迹象识别, CGU分摊合理性, CGU划分一致性]
+    sampling:
+      account_code: "1711"
+      engine: GtVoucherSamplingEngine
 
   # ─────────────────────────────────────────────────────────────────────────
   # Sheet 8: 商誉减值测试I3-6（70行×12列，CGU分摊）

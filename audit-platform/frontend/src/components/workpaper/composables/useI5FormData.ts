@@ -15,6 +15,7 @@
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -40,14 +41,31 @@ export interface TbUnadjusted {
 const DEBOUNCE_MS = 2000
 const ACCOUNT_CODE_1911 = '1911'
 
+/** TB 数据（bundle 子组件契约） */
+export interface I5TbData {
+  unadjusted1911: number
+  audited1911: number
+  priorAudited1911: number
+}
+
+export interface UseI5FormDataOptions {
+  /** GtWpRenderer 透传 htmlData 时优先使用 */
+  htmlData?: Ref<any>
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-export function useI5FormData(wpId: Ref<string>, projectId: Ref<string>) {
+export function useI5FormData(
+  wpId: Ref<string>,
+  projectId: Ref<string>,
+  options?: UseI5FormDataOptions,
+) {
   // ─── Reactive state ────────────────────────────────────────────────────────
   const isLoading = ref(false)
   const allResponses = ref<Map<string, ChecklistItem>>(new Map())
   const projectContext = ref<ProjectContext>({})
   const tbUnadjusted = ref<TbUnadjusted>({ otherNoncurrent1911: 0 })
+  const tbData = ref<I5TbData>({ unadjusted1911: 0, audited1911: 0, priorAudited1911: 0 })
   const renderMeta = ref<Record<string, any>>({})
 
   // Per-item debounce timers
@@ -88,7 +106,7 @@ export function useI5FormData(wpId: Ref<string>, projectId: Ref<string>) {
   async function _doSave(items: ChecklistItem[]): Promise<boolean> {
     if (!wpId.value || items.length === 0) return true
     try {
-      await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
+      await http.put(`/workpapers/${wpId.value}/checklist-responses`, {
         project_id: projectId.value,
         items: items.map((item) => ({
           item_id: item.item_id,
@@ -220,40 +238,66 @@ export function useI5FormData(wpId: Ref<string>, projectId: Ref<string>) {
    * 当 htmlData prop 为 null 时（bundle内嵌场景）自行调用。
    * 404 静默处理（_silent:true）。
    */
+  function _applyTbFromList(list: any[]): void {
+    let u1911 = 0
+    let a1911 = 0
+    let p1911 = 0
+    for (const item of list) {
+      const code = String(item.standard_account_code ?? item.account_code ?? '')
+      if (code.startsWith(ACCOUNT_CODE_1911)) {
+        u1911 += Number(item.unadjusted_amount ?? 0)
+        a1911 += Number(item.audited_amount ?? 0)
+        p1911 += Number(
+          item.prior_amount
+          ?? item.prior_audited_amount
+          ?? item.prior_period_amount
+          ?? item.last_year_amount
+          ?? item.opening_audited_amount
+          ?? 0,
+        )
+      }
+    }
+    tbData.value = { unadjusted1911: u1911, audited1911: a1911, priorAudited1911: p1911 }
+    tbUnadjusted.value = { otherNoncurrent1911: u1911 }
+  }
+
   async function selfLoad(): Promise<void> {
-    if (!wpId.value) return
+    if (!wpId.value) {
+      isLoading.value = false
+      return
+    }
     isLoading.value = true
     try {
-      // 1. 加载 render-config
-      const configRes = await api.get(`/api/workpapers/${wpId.value}/render-config`, {
-        params: { force_component_type: 'i5-other-noncurrent-assets' },
-        _silent: true,
-      } as any)
-      const configData = configRes?.data ?? configRes
-      renderMeta.value = configData?.html_data ?? configData ?? {}
-
-      // 2. 加载 checklist_responses
-      const res = await api.get(`/api/workpapers/${wpId.value}/checklist-responses`)
-      const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
-      const map = new Map<string, ChecklistItem>()
-      for (const r of responses) {
-        if (r.item_id?.startsWith('I5-') || r.item_id?.startsWith('I5A-')) {
-          map.set(r.item_id, {
-            item_id: r.item_id,
-            conclusion: r.conclusion ?? null,
-            remark: r.remark ?? null,
-          })
+      const html = options?.htmlData?.value
+      if (html?.allResponses) {
+        const map = new Map<string, ChecklistItem>()
+        for (const [k, v] of Object.entries(html.allResponses)) {
+          map.set(k, v as ChecklistItem)
         }
+        allResponses.value = map
+        renderMeta.value = html
+      } else {
+        const res = await http.get(`/workpapers/${wpId.value}/render-config`, {
+          params: { force_component_type: 'i5-other-noncurrent-assets' },
+          _silent: true,
+        } as any)
+        const data = res.data?.data || res.data
+        renderMeta.value = data?.html_data ?? data ?? {}
+        const map = new Map<string, ChecklistItem>()
+        if (data?.sheets && Array.isArray(data.sheets)) {
+          for (const sheet of data.sheets) {
+            if (sheet.html_data?.allResponses) {
+              for (const [k, v] of Object.entries(sheet.html_data.allResponses)) {
+                map.set(k, v as ChecklistItem)
+              }
+            }
+          }
+        }
+        allResponses.value = map
       }
-      allResponses.value = map
-
-      // 3. 并行加载 projectContext + TB取数
-      await Promise.all([
-        _loadProjectContext(),
-        _loadTbUnadjusted(),
-      ])
+      await Promise.all([_loadProjectContext(), _loadTbData()])
     } catch {
-      // selfLoad 404 静默处理，显示空状态
+      // selfLoad 404 静默处理
     } finally {
       isLoading.value = false
     }
@@ -294,45 +338,35 @@ export function useI5FormData(wpId: Ref<string>, projectId: Ref<string>) {
    * 从 trial_balance 自动获取科目 1911 的未审数。
    * 填入审定表"未审数"列。科目不存在时显示0+黄色warning。
    */
-  async function _loadTbUnadjusted(): Promise<void> {
+  async function _loadTbData(): Promise<void> {
     if (!projectId.value) return
 
-    // 优先从 render-config seed 取值
     const seeded1911 = renderMeta.value?.tb_values?.other_noncurrent_1911_unadjusted
     if (seeded1911 != null) {
-      tbUnadjusted.value = {
-        otherNoncurrent1911: Number(seeded1911) || 0,
-      }
+      const u = Number(seeded1911) || 0
+      tbData.value = { unadjusted1911: u, audited1911: 0, priorAudited1911: 0 }
+      tbUnadjusted.value = { otherNoncurrent1911: u }
       return
     }
 
     try {
-      const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
+      const res = await http.get(`/projects/${projectId.value}/trial-balance`, {
         params: { account_prefix: '1911' },
         _silent: true,
       } as any)
-      const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
-
-      let otherNoncurrent1911 = 0
-      let found1911 = false
-
-      for (const item of list) {
-        const code = String(item.standard_account_code ?? item.account_code ?? '')
-        if (code.startsWith(ACCOUNT_CODE_1911)) {
-          otherNoncurrent1911 = Number(item.unadjusted_amount ?? 0)
-          found1911 = true
-        }
-      }
-
-      tbUnadjusted.value = { otherNoncurrent1911 }
-
-      // 科目未找到时黄色提示
-      if (!found1911) {
-        ElMessage.warning('科目1911其他非流动资产未在试算表中找到，未审数显示为0')
-      }
+      const list: any[] = Array.isArray(res?.data?.data ?? res?.data)
+        ? (res?.data?.data ?? res?.data)
+        : []
+      _applyTbFromList(list)
     } catch {
+      tbData.value = { unadjusted1911: 0, audited1911: 0, priorAudited1911: 0 }
       tbUnadjusted.value = { otherNoncurrent1911: 0 }
     }
+  }
+
+  /** @deprecated 使用 _loadTbData */
+  async function _loadTbUnadjusted(): Promise<void> {
+    await _loadTbData()
   }
 
   // ─── Flush (组件卸载时确保无数据丢失) ──────────────────────────────────────
@@ -370,6 +404,7 @@ export function useI5FormData(wpId: Ref<string>, projectId: Ref<string>) {
     allResponses,
     projectContext,
     tbUnadjusted,
+    tbData,
     renderMeta,
     // Accessors
     getValue,

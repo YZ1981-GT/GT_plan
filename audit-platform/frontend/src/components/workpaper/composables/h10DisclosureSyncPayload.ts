@@ -20,12 +20,49 @@ import {
 } from './h10NoteSectionMap'
 import type { H10DisclosureRow, H10TrialDetailRow } from './useH10Disclosure'
 
+import type { ColumnDef } from './disclosureColumnDefs'
+
 export interface H10SyncFromWorkpaperPayload {
   wp_id: string
   sheet_name: string
   section_id: string
   current_standard: string
   sub_table_data: Record<string, Record<string, unknown>[]>
+  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 H10TabDisclosureBase el-table-column */
+  columns?: Record<string, ColumnDef[]>
+}
+
+// 资产处置收益列头：逐字取自 H10TabDisclosureBase（项目/本期发生额/上期发生额[/非经常性损益]）
+const H10_MAIN_BASE_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '项目', is_label: true },
+  { key: 'current_amount', label: '本期发生额', format: 'amount' },
+  { key: 'prior_amount', label: '上期发生额', format: 'amount' },
+]
+const H10_SOE_NONRECURRING: ColumnDef = {
+  key: 'non_recurring_amount', label: '计入当期非经常性损益的金额', format: 'amount',
+}
+// 试运行销售明细（推送净额，本期/上期）
+const H10_TRIAL_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '项目', is_label: true },
+  { key: 'current_amount', label: '本期发生额', format: 'amount' },
+  { key: 'prior_amount', label: '上期发生额', format: 'amount' },
+]
+
+/** 按 variant 构造 H10 各子表列头（键与 buildH10SubTableData 输出一致）。 */
+export function buildH10SubTableColumns(
+  variant: H10DisclosureVariant,
+): Record<string, ColumnDef[]> {
+  const mainCols = variant === 'soe'
+    ? [...H10_MAIN_BASE_COLUMNS, H10_SOE_NONRECURRING]
+    : [...H10_MAIN_BASE_COLUMNS]
+  const cols: Record<string, ColumnDef[]> = {
+    [H10_MAIN_SUBTABLE[variant]]: mainCols,
+  }
+  if (variant === 'listed') {
+    // 第二张试运行明细表键 `项  目__trial`（_trial_detail 为 `_` 前缀元数据，投影器自动跳过）
+    cols[`${H10_TRIAL_SUBTABLE}__trial`] = H10_TRIAL_COLUMNS
+  }
+  return cols
 }
 
 export interface H10SyncSnapshot {
@@ -244,6 +281,7 @@ export function buildH10SyncPayloads(
     section_id: H10_NOTE_SECTION[variant],
     current_standard: resolveH10CurrentStandard(variant, applicableStandards),
     sub_table_data: buildH10SubTableData(snap, variant),
+    columns: buildH10SubTableColumns(variant),
   }]
 }
 

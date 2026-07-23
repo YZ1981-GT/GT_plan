@@ -4,7 +4,9 @@
     <div class="section-header">
       <h3>附注披露信息（国企）</h3>
       <div class="header-actions">
-        <el-button size="small" type="primary" plain @click="handleAiGenerate"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
+        <el-tooltip :content="aiAvailable ? 'AI 辅助生成' : 'AI 服务暂不可用'" placement="top">
+          <el-button size="small" type="primary" plain :loading="aiLoading" :disabled="isReadonly || !aiAvailable" @click="handleAiGenerate"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
+        </el-tooltip>
         <el-button size="small" @click="openReviewDialog?.('K8-disclosure-soe')">💬 复核</el-button>
       </div>
     </div>
@@ -17,6 +19,13 @@
     <!-- ═══ 自动取数提示 ═══ -->
     <el-alert v-if="hasAutoData" type="success" :closable="true" style="margin-bottom:10px" show-icon>
       <template #title>已从K8-1审定表自动取数填充附注数据</template>
+    </el-alert>
+
+    <!-- ═══ 披露合计 ↔ K8-1审定合计 勾稽（附注销售费用须等于审定数）═══ -->
+    <el-alert v-if="disclosureReconcile.hasData && !disclosureReconcile.isBalanced" type="warning" :closable="false" style="margin-bottom:10px" show-icon>
+      <template #title>
+        披露本期合计 {{ fmtAmt(disclosureCurrentTotal) }} 与 K8-1 审定合计 {{ fmtAmt(k81AuditedTotal) }} 差异 {{ fmtAmt(disclosureReconcile.diff) }}，请核对披露口径
+      </template>
     </el-alert>
 
     <!-- ═══ 费用披露表格 ═══ -->
@@ -51,7 +60,9 @@
       <template #header>
         <div class="card-head">
           <span class="card-title">附注说明</span>
-          <el-button size="small" type="primary" plain @click="handleAiNarrative"><el-icon><MagicStick /></el-icon> AI生成</el-button>
+          <el-tooltip :content="aiAvailable ? 'AI 辅助生成' : 'AI 服务暂不可用'" placement="top">
+            <el-button size="small" type="primary" plain :loading="aiLoading" :disabled="isReadonly || !aiAvailable" @click="handleAiNarrative"><el-icon><MagicStick /></el-icon> AI生成</el-button>
+          </el-tooltip>
         </div>
       </template>
       <el-input v-model="narrativeText" type="textarea" :autosize="{ minRows: 3, maxRows: 6 }" :disabled="isReadonly" placeholder="附注说明文本（可AI辅助生成）" @blur="handleNarrativeSave" />
@@ -85,10 +96,10 @@
  * - subscribe EventBus 'adjustment:created' (accountCode=6601) 刷新
  * - AI辅助
  */
-import { ref, onMounted, onUnmounted, inject } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
+import { useK8AiGenerate } from '../../composables/useK8AiGenerate'
 import type { Ref } from 'vue'
 
 const K8_ACCOUNT_CODE = '6601'
@@ -138,12 +149,37 @@ function initDefaultRows(): void {
 
 // ─── 加载已保存数据 ──────────────────────────────────────────────────────────
 
+/** 读 K8-1-audited-by-item（{项目名:{audited,prior}}） */
+function _readK81Map(): Record<string, { audited?: number; prior?: number }> {
+  const adjData = props.allResponses.get('K8-1-audited-by-item')
+  if (!adjData?.remark) return {}
+  try {
+    const m = JSON.parse(adjData.remark)
+    return m && typeof m === 'object' ? m : {}
+  } catch { return {} }
+}
+
+/** 从 K8-1 审定表项目动态构建披露行 */
+function buildRowsFromK81(): DisclosureRow[] | null {
+  const map = _readK81Map()
+  const names = Object.keys(map)
+  if (!names.length) return null
+  return names.map((name, idx) => ({
+    id: `k81-${idx}`,
+    project: name,
+    currentAmount: Number(map[name].audited ?? 0),
+    priorAmount: Number(map[name].prior ?? 0),
+  }))
+}
+
 function loadSavedData(): void {
   const saved = props.allResponses.get('K8-disclosure-soe-rows')
   if (saved?.remark) {
     try { disclosureRows.value = JSON.parse(saved.remark) } catch { initDefaultRows() }
   } else {
-    initDefaultRows()
+    const fromK81 = buildRowsFromK81()
+    if (fromK81) { disclosureRows.value = fromK81; hasAutoData.value = true }
+    else initDefaultRows()
   }
   const savedNarrative = props.allResponses.get('K8-disclosure-soe-narrative')
   if (savedNarrative?.remark) { narrativeText.value = savedNarrative.remark }
@@ -152,22 +188,31 @@ function loadSavedData(): void {
 // ─── 自动取数 ────────────────────────────────────────────────────────────────
 
 function applyAutoFill(): void {
-  const adjData = props.allResponses.get('K8-1-audited-by-item')
-  if (adjData?.remark) {
-    hasAutoData.value = true
-    try {
-      const data = JSON.parse(adjData.remark)
-      if (data && typeof data === 'object') {
-        for (const row of disclosureRows.value) {
-          const src = data[row.project]
-          if (src) {
-            row.currentAmount = Number(src.currentAmount ?? src.audited ?? 0)
-            row.priorAmount = Number(src.priorAmount ?? src.prior ?? 0)
-          }
-        }
-      }
-    } catch { /* silent */ }
+  const data = _readK81Map()
+  const names = Object.keys(data)
+  if (!names.length) return
+  hasAutoData.value = true
+  const existing = new Set(disclosureRows.value.map(r => r.project))
+  for (const row of disclosureRows.value) {
+    const src = (data as any)[row.project]
+    if (src) {
+      row.currentAmount = Number(src.currentAmount ?? src.audited ?? 0)
+      row.priorAmount = Number(src.priorAmount ?? src.prior ?? 0)
+    }
   }
+  let idx = disclosureRows.value.length
+  for (const name of names) {
+    if (!existing.has(name)) {
+      const src = (data as any)[name]
+      disclosureRows.value.push({
+        id: `k81-${idx++}`,
+        project: name,
+        currentAmount: Number(src.audited ?? 0),
+        priorAmount: Number(src.prior ?? 0),
+      })
+    }
+  }
+  persistRows()
 }
 
 // ─── 字段更新 + 持久化 ──────────────────────────────────────────────────────
@@ -232,6 +277,17 @@ onUnmounted(() => {
 
 // ─── UI Helpers ──────────────────────────────────────────────────────────────
 
+// ─── 披露合计 ↔ K8-1审定合计 勾稽 ──────────────────────────────────────────
+const disclosureCurrentTotal = computed(() => disclosureRows.value.reduce((s, r) => s + (r.currentAmount || 0), 0))
+const k81AuditedTotal = computed(() => {
+  const m = _readK81Map()
+  return Object.values(m).reduce((s: number, v: any) => s + Number(v?.audited ?? 0), 0)
+})
+const disclosureReconcile = computed(() => {
+  const diff = disclosureCurrentTotal.value - k81AuditedTotal.value
+  return { diff, hasData: Math.abs(k81AuditedTotal.value) > 0.005, isBalanced: Math.abs(diff) < 0.01 }
+})
+
 function isAbnormal(row: DisclosureRow): boolean {
   if (!row.priorAmount || row.priorAmount === 0) return false
   return Math.abs((row.currentAmount - row.priorAmount) / row.priorAmount) > ABNORMAL_THRESHOLD
@@ -248,8 +304,42 @@ function fmtAmt(val: number | null | undefined): string {
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function handleAiGenerate(): void { ElMessage.info('AI辅助生成附注披露...') }
-function handleAiNarrative(): void { ElMessage.info('AI生成附注说明文本...') }
+// ─── AI 辅助（统一 /ai/generate-text 端点）─────────────────────────────────
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useK8AiGenerate({
+  wpId: computed(() => props.wpId),
+})
+
+function _disclosureContext(): Record<string, unknown> {
+  const totalCur = disclosureRows.value.reduce((s, r) => s + (r.currentAmount || 0), 0)
+  const totalPri = disclosureRows.value.reduce((s, r) => s + (r.priorAmount || 0), 0)
+  return {
+    本期合计: totalCur,
+    上期合计: totalPri,
+    披露口径: '国有企业按费用性质简化披露销售费用',
+  }
+}
+
+async function handleAiGenerate(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'k8-disclosure-soe-note',
+    narrativeText.value || '',
+    { ..._disclosureContext(), 任务: '请生成销售费用附注披露说明（费用性质构成概述、本期较上期主要变动及原因）' },
+    'AI 生成 · 附注披露说明',
+  )
+  if (text) { narrativeText.value = text; handleNarrativeSave() }
+}
+
+async function handleAiNarrative(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'k8-disclosure-soe-narrative',
+    narrativeText.value || '',
+    { ..._disclosureContext(), 任务: '请生成销售费用附注说明文本（重大变动分析、异常波动解释）' },
+    'AI 生成 · 附注说明',
+  )
+  if (text) { narrativeText.value = text; handleNarrativeSave() }
+}
 </script>
 
 <style scoped>

@@ -10,6 +10,7 @@
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcInterest, calcTermDays, calcSubtotal } from './useF3FormulaEngine'
 import type { UseF3BaseOptions } from './useF3Adjudication'
+import { injectF3Adjustments, type F3InjectAdjustmentRow } from './f3AdjustmentInject'
 
 export const F3_INTEREST_NOTE_TYPES = ['银行承兑汇票', '商业承兑汇票', '供应链票据', '其他'] as const
 
@@ -240,6 +241,54 @@ export function useF3InterestCalc(options: UseF3BaseOptions) {
     persistRows()
   }
 
+  /**
+   * P1-5：带息应付票据补提/冲回利息。
+   * 差异 = 应计利息 − 账面已计利息。
+   *   差异 > 阈值：补提 借 财务费用(6603) / 贷 应付利息(2231)，金额 = 差异；
+   *   差异 < -阈值：冲回 借 应付利息(2231) / 贷 财务费用(6603)，金额 = |差异|。
+   * 幂等写入 F3-3-rows（sourceKind = interest-accrual）。
+   */
+  const pendingAccrualRows = computed<F3InterestCalcRow[]>(() =>
+    storedData.value.filter((r) => Math.abs(r.variance) > VARIANCE_WARN),
+  )
+
+  function pushInterestAccrualToAdjustment(): { count: number; total: number } {
+    if (readonly.value) return { count: 0, total: 0 }
+    const targets = pendingAccrualRows.value
+    const injectRows: F3InjectAdjustmentRow[] = []
+    let total = 0
+    for (const r of targets) {
+      const diff = round2(r.variance)
+      if (diff === 0) continue
+      const amount = Math.abs(diff)
+      const label = `${r.noteType || '带息票据'}${r.ticketNo ? `(${r.ticketNo})` : ''}`
+      if (diff > 0) {
+        // 补提
+        injectRows.push({
+          entryType: 'AJE', summary: `补提${label}利息`, accountCode: '6603', accountName: '财务费用',
+          debitAmount: amount, creditAmount: 0, remark: `应计${r.payableInterest} − 账面${r.bookInterest}`,
+        })
+        injectRows.push({
+          entryType: 'AJE', summary: `补提${label}利息`, accountCode: '2231', accountName: '应付利息',
+          debitAmount: 0, creditAmount: amount, remark: '',
+        })
+      } else {
+        // 冲回
+        injectRows.push({
+          entryType: 'AJE', summary: `冲回${label}多计利息`, accountCode: '2231', accountName: '应付利息',
+          debitAmount: amount, creditAmount: 0, remark: `账面${r.bookInterest} − 应计${r.payableInterest}`,
+        })
+        injectRows.push({
+          entryType: 'AJE', summary: `冲回${label}多计利息`, accountCode: '6603', accountName: '财务费用',
+          debitAmount: 0, creditAmount: amount, remark: '',
+        })
+      }
+      total += diff
+    }
+    injectF3Adjustments(allResponses.value, injectRows, 'interest-accrual')
+    return { count: targets.length, total: round2(total) }
+  }
+
   onBeforeUnmount(() => {
     if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; flushSave() }
   })
@@ -248,6 +297,7 @@ export function useF3InterestCalc(options: UseF3BaseOptions) {
     rows, totals, filledCount, abnormalCount, auditConclusion,
     addRow, removeRow, updateCell, rowClassName, mergeOcrFields,
     varianceWarn: VARIANCE_WARN,
+    pendingAccrualRows, pushInterestAccrualToAdjustment,
   }
 }
 

@@ -149,7 +149,7 @@ export function resolveDefaultCutoffDate(opts?: {
 
   const map = opts?.allResponses
   if (map) {
-    for (const key of ['I2-cutoff-date', 'I2-bs-date', 'project-bs-date']) {
+    for (const key of ['I6-cutoff-date', 'I2-cutoff-date', 'I2-bs-date', 'project-bs-date']) {
       const raw = map.get(key)
       const text = typeof raw === 'string' ? raw : _str(raw?.remark ?? raw?.conclusion)
       if (/^\d{4}-\d{2}-\d{2}/.test(text)) return text.slice(0, 10)

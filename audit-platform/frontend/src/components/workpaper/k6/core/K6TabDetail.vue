@@ -17,6 +17,19 @@
       </ol>
     </el-alert>
 
+    <!-- ═══ K6-2↔K6-1 交叉验证告警 ═══ -->
+    <el-alert
+      v-if="crossValidationDiff !== 0"
+      :type="Math.abs(crossValidationDiff) > 1 ? 'warning' : 'info'"
+      :closable="false"
+      show-icon
+      style="margin-bottom:12px"
+    >
+      <template #title>
+        K6-2明细账面价值合计 {{ fmtAmt(subtotals.bookValue) }} 与 K6-1审定表差异 {{ fmtAmt(crossValidationDiff) }} 元，请核对
+      </template>
+    </el-alert>
+
     <!-- ═══ 操作栏：新增 + 导入导出 + AI + 复核 ═══ -->
     <div class="detail-toolbar">
       <div class="toolbar-left">
@@ -37,6 +50,24 @@
         </el-dropdown>
       </div>
       <div class="toolbar-right">
+        <el-popover trigger="click" placement="bottom-end" width="280">
+          <template #reference>
+            <el-button size="small" text>
+              <el-icon><Setting /></el-icon> 列设置
+            </el-button>
+          </template>
+          <div class="col-prefs-panel">
+            <div class="col-prefs-header">
+              <span>显示列</span>
+              <el-button size="small" link type="primary" @click="resetColumnPrefs">重置默认</el-button>
+            </div>
+            <el-checkbox-group v-model="visibleColumns" @change="saveColumnPrefs">
+              <div v-for="col in toggleableColumns" :key="col.key" class="col-prefs-item">
+                <el-checkbox :value="col.key" :label="col.label" />
+              </div>
+            </el-checkbox-group>
+          </div>
+        </el-popover>
         <el-button size="small" text type="primary" @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -61,7 +92,7 @@
           <span class="asset-name">{{ row.assetName }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="类别" min-width="110">
+      <el-table-column label="类别" min-width="110" v-if="isColVisible('category')">
         <template #default="{ row }">
           <el-select
             v-if="!isReadonly"
@@ -160,7 +191,7 @@
           <span class="formula-value">{{ fmtAmt(row.fairValueNet) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="确认日" min-width="120">
+      <el-table-column label="确认日" min-width="120" v-if="isColVisible('recognitionDate')">
         <template #default="{ row }">
           <el-date-picker
             v-if="!isReadonly"
@@ -175,7 +206,7 @@
           <span v-else>{{ row.recognitionDate || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="预计出售日" min-width="120">
+      <el-table-column label="预计出售日" min-width="120" v-if="isColVisible('expectedSaleDate')">
         <template #default="{ row }">
           <el-date-picker
             v-if="!isReadonly"
@@ -190,7 +221,7 @@
           <span v-else>{{ row.expectedSaleDate || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="凭证" min-width="90">
+      <el-table-column label="凭证" min-width="90" v-if="isColVisible('voucherRef')">
         <template #default="{ row }">
           <el-input
             v-if="!isReadonly"
@@ -257,6 +288,13 @@
         <span class="stat-label">减值合计：</span>
         <span class="stat-value">{{ fmtAmt(subtotals.impairmentProvision) }}</span>
       </div>
+      <div v-if="anomalyRows.length > 0" class="stat-item stat-anomaly">
+        <span class="stat-label">异常项：</span>
+        <span class="stat-value">{{ anomalyRows.length }}</span>
+        <el-button size="small" type="danger" link :disabled="isReadonly" @click="pushAnomaliesToA13">
+          推送异常至A13
+        </el-button>
+      </div>
     </div>
 
     <!-- ═══ 明细分析说明（AI辅助） ═══ -->
@@ -322,9 +360,10 @@
  */
 import { ref, computed, inject } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Plus, ArrowDown, MagicStick, View, Delete, QuestionFilled } from '@element-plus/icons-vue'
+import { Plus, ArrowDown, MagicStick, View, Delete, QuestionFilled, Setting } from '@element-plus/icons-vue'
 import { useK6Detail } from '../../composables/useK6Detail'
 import { useK6ImportExport } from '../../composables/useK6ImportExport'
+import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -372,6 +411,104 @@ const {
     emit('save', field, value)
   },
 })
+
+// ─── K6-2 ↔ K6-1 交叉验证 ─────────────────────────────────────────────────
+const crossValidationDiff = computed(() => {
+  // 读取 K6-1 审定资产合计
+  const k6_1_asset = props.allResponses.get('K6-1-audited-asset')
+  const assetAudited = Number(k6_1_asset?.remark ?? k6_1_asset?.value ?? 0) || 0
+  // 明细表账面合计 vs 审定表（当审定表有值时才比较）
+  if (assetAudited === 0) return 0
+  return subtotals.value.bookValue - assetAudited
+})
+
+// ─── 列设置（⚙ 显隐控制 + localStorage 持久化） ──────────────────────────────
+
+const STORAGE_KEY = 'k6-detail-column-prefs'
+
+interface ToggleableCol {
+  key: string
+  label: string
+}
+
+const toggleableColumns: ToggleableCol[] = [
+  { key: 'category', label: '类别' },
+  { key: 'costValue', label: '账面原值' },
+  { key: 'accumulatedDep', label: '累计折旧摊销' },
+  { key: 'impairmentProvision', label: '减值准备' },
+  { key: 'bookValue', label: '账面价值(公式)' },
+  { key: 'fairValue', label: '公允价值' },
+  { key: 'sellingCost', label: '出售费用' },
+  { key: 'fairValueNet', label: '公允净额(公式)' },
+  { key: 'recognitionDate', label: '确认日' },
+  { key: 'expectedSaleDate', label: '预计出售日' },
+  { key: 'voucherRef', label: '凭证' },
+  { key: 'conclusion', label: '结论' },
+  { key: 'remark', label: '备注' },
+]
+
+const DEFAULT_VISIBLE = toggleableColumns.map(c => c.key)
+
+const visibleColumns = ref<string[]>([...DEFAULT_VISIBLE])
+
+function _loadColumnPrefs(): void {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      const parsed = JSON.parse(saved)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        visibleColumns.value = parsed
+      }
+    }
+  } catch { /* ignore */ }
+}
+
+function saveColumnPrefs(): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(visibleColumns.value))
+  } catch { /* ignore */ }
+}
+
+function resetColumnPrefs(): void {
+  visibleColumns.value = [...DEFAULT_VISIBLE]
+  saveColumnPrefs()
+}
+
+function isColVisible(key: string): boolean {
+  return visibleColumns.value.includes(key)
+}
+
+_loadColumnPrefs()
+
+// ─── 异常行 → A13 推送 ───────────────────────────────────────────────────────
+
+const anomalyRows = computed(() => detailRows.value.filter((r: any) => r.conclusion === '存在异常'))
+
+function pushAnomaliesToA13(): void {
+  if (anomalyRows.value.length === 0) {
+    ElMessage.info('当前无异常项')
+    return
+  }
+  const items = anomalyRows.value.map((r: any) => ({
+    assetName: r.assetName,
+    category: r.category,
+    bookValue: r.bookValue,
+    remark: r.remark,
+  }))
+  const payload = {
+    wpCode: 'K6',
+    source: 'K6-2-detail',
+    projectId: props.projectId,
+    misstatementType: 'held_for_sale_detail_anomaly',
+    summary: `持有待售明细存在 ${items.length} 项异常：${items.map(i => i.assetName).join('、')}`,
+    items,
+  }
+  // 持久化 + eventBus 通知 A13
+  props.allResponses.set('K6-2-anomaly-push', { item_id: 'K6-2-anomaly-push', remark: JSON.stringify(payload) })
+  emit('save', 'K6-2-anomaly-push', { remark: JSON.stringify(payload) })
+  eventBus.emit('a13:push-misstatement', payload)
+  ElMessage.success(`已推送 ${items.length} 项异常至A13错报汇总`)
+}
 
 const {
   isExporting,
@@ -494,7 +631,15 @@ function fmtAmt(val: number | null | undefined): string {
   margin-bottom: 12px;
 }
 .toolbar-left { display: flex; gap: 8px; align-items: center; }
-.toolbar-right { display: flex; gap: 4px; }
+.toolbar-right { display: flex; gap: 4px; align-items: center; }
+
+/* ─── 列设置面板 ─── */
+.col-prefs-panel { max-height: 320px; overflow-y: auto; }
+.col-prefs-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px; font-size: 13px; font-weight: 500;
+}
+.col-prefs-item { padding: 2px 0; }
 
 /* ─── 表格样式 ─── */
 :deep(.el-table) { font-size: var(--wp-font-size, 13px); }
@@ -525,6 +670,7 @@ function fmtAmt(val: number | null | undefined): string {
 .stat-item { display: flex; align-items: center; gap: 4px; }
 .stat-label { font-size: var(--wp-font-size, 13px); color: #909399; }
 .stat-value { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #303133; }
+.stat-anomaly .stat-value { color: #f56c6c; }
 
 /* ─── 明细分析说明卡 ─── */
 .analysis-card { margin-top: 14px; }

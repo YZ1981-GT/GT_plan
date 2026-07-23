@@ -75,6 +75,8 @@ async def render(ctx: RenderContext) -> dict | None:
         {"key": "endRje", "label": "期末RJE", "width": 90, "editable": True, "type": "number"},
         {"key": "endAudited", "label": "期末审定", "width": 100, "editable": False, "formula": "L+M+N"},
         {"key": "endOciImpairment", "label": "期末OCI减值", "width": 100, "editable": True, "type": "number"},
+        {"key": "postRealized", "label": "期后兑现金额", "width": 110, "editable": True, "type": "number"},
+        {"key": "eclStage", "label": "ECL阶段", "width": 90, "editable": True, "type": "select", "options": ["阶段一", "阶段二", "阶段三"]},
         {"key": "remark", "label": "备注", "width": 120, "editable": True},
     ]
 
@@ -146,6 +148,45 @@ async def render(ctx: RenderContext) -> dict | None:
                 project_context["applicable_standards"] = ""
     except Exception as e:  # noqa: BLE001
         logger.warning("D5 render: project context 查询失败: %s", e)
+
+    # ─── TB 自动取数（科目 1124）──────────────────────────────────────────
+    tb_amount = 0
+    try:
+        tb_result = await db.execute(
+            sa.text(
+                "SELECT COALESCE(audited_amount, unadjusted_amount, 0) AS amount "
+                "FROM trial_balance "
+                "WHERE project_id = :pid AND standard_account_code LIKE '1124%' "
+                "ORDER BY standard_account_code "
+                "LIMIT 1"
+            ),
+            {"pid": str(ctx.project_id)},
+        )
+        tb_row = tb_result.fetchone()
+        if tb_row:
+            tb_amount = float(tb_row.amount or 0)
+    except Exception as e:
+        logger.warning("D5 render: trial_balance 1124 查询失败: %s", e)
+
+    project_context["tb_amount"] = tb_amount
+
+    project_context["bs_date"] = f"{project_context['audit_year']}-12-31" if project_context['audit_year'] else ""
+
+    # 关联方
+    related_parties: list[str] = []
+    try:
+        rp_result = await db.execute(
+            sa.text(
+                "SELECT name FROM related_party_registry "
+                "WHERE project_id = :pid AND is_deleted = false"
+            ),
+            {"pid": str(ctx.project_id)},
+        )
+        related_parties = [r.name for r in rp_result.fetchall() if r.name]
+    except Exception as e:
+        logger.warning("D5 render: related_party_registry 查询失败: %s", e)
+
+    project_context["related_parties"] = related_parties
 
     # 附注适用性
     raw_std = project_context["applicable_standards"]

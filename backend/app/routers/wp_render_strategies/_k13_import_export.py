@@ -53,14 +53,16 @@ _K13_2_KEYS = [
 ]
 
 # ─── K13-3 调整分录汇总（10列，标准借贷平衡） ────────────────────────────────
+# ⚠️ 列/键必须与前端 useK13Adjustment.K13AdjustmentEntry 严格一致，否则导入数据前端读不到
+#    （类型 AJE/RJE 决定分录归属哪个 Tab；索引=refIndex；无 summary 字段）
 
 _K13_3_HEADERS = [
-    "调整事项说明", "类别", "报表项目", "科目名称", "附注项目",
-    "摘要", "借方调整金额", "贷方调整金额", "索引", "备注",
+    "类型", "调整事项说明", "类别", "报表项目", "科目名称", "附注项目",
+    "借方调整金额", "贷方调整金额", "索引", "备注",
 ]
 _K13_3_KEYS = [
-    "description", "category", "reportItem", "accountName", "noteItem",
-    "summary", "debitAmount", "creditAmount", "indexRef", "remark",
+    "type", "description", "category", "reportItem", "accountName", "noteItem",
+    "debitAmount", "creditAmount", "refIndex", "remark",
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -99,7 +101,10 @@ _K13_SPECS: dict[str, dict[str, Any]] = {
         ],
     },
     "K13-3": {
-        "item_id": "K13-3-rows",
+        # ⚠️ item_id / storage_field 必须与前端 useK13Adjustment 持久化键一致
+        #    （前端存单一 JSON 数组于 remark，2026-07 由 verbose per-field 迁移而来）
+        "item_id": "K13-3-adj-entries",
+        "storage_field": "remark",
         "title": "调整分录汇总K13-3（标准借贷平衡）",
         "headers": _K13_3_HEADERS,
         "field_keys": _K13_3_KEYS,

@@ -80,6 +80,12 @@ describe('f3NoteSectionMap', () => {
     expect(rows[1].label).toBe('银行承兑汇票')
     expect(rows[2]).toMatchObject({ label: '合计', end_amount: 150, prior_amount: 120, is_total: true })
     expect(payload.sub_table_data['_note_texts'][0].text).toContain('已到期未支付')
+    // disclosure-table-sync-convergence: 携带源对齐 columns（种类/期末余额/上年年末余额）
+    expect(payload.columns).toBeDefined()
+    const cols = payload.columns!['应付票据']
+    expect(cols[0]).toMatchObject({ key: 'label', label: '种类', is_label: true })
+    expect(cols.find((c) => c.key === 'end_amount')?.label).toBe('期末余额')
+    expect(cols.find((c) => c.key === 'prior_amount')?.label).toBe('上年年末余额')
   })
 })
 

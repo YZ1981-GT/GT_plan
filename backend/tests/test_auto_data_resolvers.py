@@ -288,86 +288,81 @@ class TestB23WalkthroughForCycle:
 class TestRiskForCycle:
     """risk_for_cycle resolver 测试。"""
 
+    # 新数据源：checklist_responses（B50-T3-*，经 b50_risk_reader.load_b50_risks）
+    _B50_RISKS = [
+        {"risk_id": "收入确认-existence", "account": "收入确认", "assertion": "existence",
+         "assertion_cn": "存在", "risk_level": "H", "is_special_risk": True, "cycle": "D",
+         "description": "【高风险】收入确认 - 存在认定（特别风险）"},
+        {"risk_id": "收入确认-completeness", "account": "收入确认", "assertion": "completeness",
+         "assertion_cn": "完整性", "risk_level": "M", "is_special_risk": False, "cycle": "D",
+         "description": "【中风险】收入确认 - 完整性认定"},
+        {"risk_id": "货币资金-existence", "account": "货币资金", "assertion": "existence",
+         "assertion_cn": "存在", "risk_level": "H", "is_special_risk": True, "cycle": "E",
+         "description": "【高风险】货币资金 - 存在认定（特别风险）"},
+    ]
+
     @pytest.mark.anyio
     async def test_returns_risks_for_matching_cycle(self):
         """匹配循环代号时返回对应风险列表。"""
         pid = uuid.uuid4()
-
-        with patch("app.services.field_override_service.FieldOverrideService") as MockSvc:
-            mock_svc = AsyncMock()
-            MockSvc.return_value = mock_svc
-            mock_svc.get_batch = AsyncMock(return_value={
-                "risk_1": {
-                    "cycle_code": "D",
-                    "description": "收入确认时点不当",
-                    "assertion": "存在",
-                    "risk_level": "high",
-                    "is_special_risk": "true",
-                },
-                "risk_2": {
-                    "cycle_code": "D",
-                    "description": "销售退回低估",
-                    "assertion": "完整性",
-                    "risk_level": "medium",
-                    "is_special_risk": "false",
-                },
-                "risk_3": {
-                    "cycle_code": "E",
-                    "description": "现金舞弊",
-                    "assertion": "存在",
-                    "risk_level": "high",
-                    "is_special_risk": "true",
-                },
-            })
-
+        with patch("app.services.b50_risk_reader.load_b50_risks",
+                   AsyncMock(return_value=list(self._B50_RISKS))):
             result = await resolve_auto_data_source(
                 AsyncMock(), pid, 2025, "risk_for_cycle", cycle="D"
             )
         assert result is not None
         assert len(result["risks"]) == 2
-        assert "2项风险" in result["summary"]
+        assert "2项认定层次风险" in result["summary"]
         assert "1项特别风险" in result["summary"]
+
+    @pytest.mark.anyio
+    async def test_matches_by_table_code_first_letter(self):
+        """cycle 传完整 table_code（如 D2A）时按首字母匹配。"""
+        pid = uuid.uuid4()
+        with patch("app.services.b50_risk_reader.load_b50_risks",
+                   AsyncMock(return_value=list(self._B50_RISKS))):
+            result = await resolve_auto_data_source(
+                AsyncMock(), pid, 2025, "risk_for_cycle", cycle="D2A"
+            )
+        assert result is not None
+        assert len(result["risks"]) == 2
 
     @pytest.mark.anyio
     async def test_returns_empty_when_no_matching_risks(self):
         """循环无风险条目时返回暂无。"""
         pid = uuid.uuid4()
-
-        with patch("app.services.field_override_service.FieldOverrideService") as MockSvc:
-            mock_svc = AsyncMock()
-            MockSvc.return_value = mock_svc
-            mock_svc.get_batch = AsyncMock(return_value={
-                "risk_1": {"cycle_code": "D", "description": "test"},
-            })
-
+        with patch("app.services.b50_risk_reader.load_b50_risks",
+                   AsyncMock(return_value=[
+                       {"risk_id": "收入确认-existence", "account": "收入确认",
+                        "assertion": "existence", "assertion_cn": "存在", "risk_level": "H",
+                        "is_special_risk": True, "cycle": "D", "description": "x"},
+                   ])):
             result = await resolve_auto_data_source(
-                AsyncMock(), pid, 2025, "risk_for_cycle", cycle="E"
+                AsyncMock(), pid, 2025, "risk_for_cycle", cycle="L"
             )
         assert result is not None
         assert result["risks"] == []
         assert "暂无" in result["summary"]
 
     @pytest.mark.anyio
-    async def test_returns_empty_without_cycle_param(self):
-        """未指定循环参数时返回未指定。"""
+    async def test_returns_all_without_cycle_param(self):
+        """未指定循环参数时返回全部风险（避免模板未传 cycle 导致恒空）。"""
         pid = uuid.uuid4()
-        result = await resolve_auto_data_source(
-            AsyncMock(), pid, 2025, "risk_for_cycle"
-        )
+        with patch("app.services.b50_risk_reader.load_b50_risks",
+                   AsyncMock(return_value=list(self._B50_RISKS))):
+            result = await resolve_auto_data_source(
+                AsyncMock(), pid, 2025, "risk_for_cycle"
+            )
         assert result is not None
-        assert result["risks"] == []
-        assert "未指定" in result["summary"]
+        assert len(result["risks"]) == 3
+        assert "全部已识别3项" in result["summary"]
 
     @pytest.mark.anyio
     async def test_returns_empty_when_no_risk_data(self):
         """无风险数据时返回未完成。"""
         pid = uuid.uuid4()
-
-        with patch("app.services.field_override_service.FieldOverrideService") as MockSvc:
-            mock_svc = AsyncMock()
-            MockSvc.return_value = mock_svc
-            mock_svc.get_batch = AsyncMock(return_value={})
-
+        with patch("app.services.b50_risk_reader.load_b50_risks",
+                   AsyncMock(return_value=[])):
             result = await resolve_auto_data_source(
                 AsyncMock(), pid, 2025, "risk_for_cycle", cycle="D"
             )

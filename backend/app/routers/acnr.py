@@ -153,6 +153,9 @@ async def acnr_resolve(
         addr_id=body.addr_id,
         index_ref=body.index_ref,
         project_id=body.project_id,
+        # Req-1.3: 透传显式 wp_id（binding 已在上方 verify_wp_binding 校验）→
+        # 多实例消歧按调用方指定实例解析 wp_id/jump_route
+        explicit_wp_id=body.wp_id if (body.wp_id and body.project_id) else None,
         db=db,
     )
 

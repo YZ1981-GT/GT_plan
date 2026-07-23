@@ -17,7 +17,7 @@
  */
 import { computed, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useB23FormData'
-import type { ProcessCard } from './useB23ProcessControl'
+import type { B23CycleCard } from './useB23ProcessControl'
 
 export type SaveFn = (items: ChecklistItem[]) => Promise<void>
 
@@ -26,7 +26,7 @@ export type SaveFn = (items: ChecklistItem[]) => Promise<void>
 export function useB23Review(
   wpId: Ref<string>,
   allResponses: Ref<Map<string, ChecklistResponse>>,
-  processes: ComputedRef<ProcessCard[]>,
+  cycles: ComputedRef<B23CycleCard[]>,
   externalReadonly: Ref<boolean>,
   saveImmediate: SaveFn
 ) {
@@ -46,16 +46,20 @@ export function useB23Review(
   // ─── canReview ─────────────────────────────────────────────────────────
 
   const canReview: ComputedRef<boolean> = computed(() => {
-    const cards = processes.value
+    const cards = cycles.value
     for (const card of cards) {
       if (!card.applicable) continue
 
-      // All applicable processes must have a conclusion
+      // 所有适用循环必须有循环结论
       if (!card.conclusion) return false
 
-      // All control points with "穿行测试" method must have a walkthrough conclusion
+      // 关键控制点必须有穿行测试（验设计）结论
       for (const cp of card.controlPoints) {
-        if (cp.methods.includes('穿行测试') && cp.conclusion === null) {
+        if (cp.isKeyControl === '是' && card.walkthroughs[cp.index - 1]?.asDesigned == null) {
+          return false
+        }
+        // 拟测试的控制点必须有控制测试（验运行）结论
+        if (cp.doControlTest === '是' && card.controlTests[cp.index - 1]?.operatingEffective == null) {
           return false
         }
       }
@@ -67,19 +71,22 @@ export function useB23Review(
 
   const pendingItems: ComputedRef<string[]> = computed(() => {
     const items: string[] = []
-    const cards = processes.value
+    const cards = cycles.value
 
     for (const card of cards) {
       if (!card.applicable) continue
 
       if (!card.conclusion) {
-        items.push(`${card.name}：未选择流程结论`)
+        items.push(`${card.name}：未选择循环结论`)
       }
 
       for (const cp of card.controlPoints) {
-        if (cp.methods.includes('穿行测试') && cp.conclusion === null) {
-          const label = cp.objective || `控制点 ${cp.index}`
+        const label = cp.ctrlName || cp.ctrlNo || `控制点 ${cp.index}`
+        if (cp.isKeyControl === '是' && card.walkthroughs[cp.index - 1]?.asDesigned == null) {
           items.push(`${card.name} - ${label}：缺穿行测试结论`)
+        }
+        if (cp.doControlTest === '是' && card.controlTests[cp.index - 1]?.operatingEffective == null) {
+          items.push(`${card.name} - ${label}：缺控制测试结论`)
         }
       }
     }

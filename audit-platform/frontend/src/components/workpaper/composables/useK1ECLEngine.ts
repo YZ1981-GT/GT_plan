@@ -23,3 +23,19 @@ export function determineStage(isImpaired: boolean, significantIncrease: boolean
   if (significantIncrease) return 2
   return 1
 }
+
+/**
+ * 含较低信用风险豁免的阶段判定（对齐 K1-7 Excel / CAS 22）：
+ * - 已减值 → Stage 3
+ * - 显著增加且不满足低风险豁免 → Stage 2
+ * - 其余（含显著增加但满足低风险豁免）→ Stage 1
+ */
+export function determineStageWithExemption(
+  hasCreditImpairment: boolean,
+  hasSignificantIncrease: boolean,
+  hasLowCreditRisk: boolean,
+): 1 | 2 | 3 {
+  if (hasCreditImpairment) return 3
+  if (hasSignificantIncrease && !hasLowCreditRisk) return 2
+  return 1
+}

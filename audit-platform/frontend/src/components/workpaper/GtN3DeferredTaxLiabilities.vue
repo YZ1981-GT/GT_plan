@@ -4,17 +4,21 @@
     <template v-else>
       <div v-if="isHtmlSheet" class="n3-deferred-tax-liabilities-toolbar">
         <el-segmented
-          v-model="dualMode.currentMode.value"
-          :options="dualMode.modeOptions"
+          v-model="renderMode"
+          :options="modeOptions"
           size="small"
-          @change="dualMode.onModeChange"
+          @change="onModeChange"
         />
-        <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="ooChecking" size="small" type="info">
+          <el-icon class="is-loading"><Loading /></el-icon> OnlyOffice 检测中…
+        </el-tag>
+        <el-tag v-else-if="ooHealthy" size="small" type="success">✓ OnlyOffice 已连接</el-tag>
+        <el-tag v-else size="small" type="warning">OnlyOffice 不可用（仅结构化视图）</el-tag>
       </div>
 
-      <!-- 双模式：HTML sheet 切到 OnlyOffice -->
+      <!-- 双模式：HTML sheet 切到 OnlyOffice（仅健康检查通过才渲染） -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
+        v-if="isHtmlSheet && renderMode === 'onlyoffice' && ooHealthy"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -111,6 +115,7 @@
  * EventBus：substantive:adjudicated(2901) / deferred-tax:liability-updated → N5
  */
 import { ref, computed, inject, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
+import { Loading } from '@element-plus/icons-vue'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
@@ -157,15 +162,32 @@ const isReadonly = computed(() => !!props.readonly)
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI + 挂真实 Host） ───
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 
-// ─── 双模式 ──────────────────────────────────────────────────────────────────
-const dualMode = {
-  currentMode: ref<'html' | 'onlyoffice'>('html'),
-  modeOptions: [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
-  ],
-  isOoAvailable: ref(true),
-  onModeChange: () => {},
+// ─── 双模式（结构化视图 / OnlyOffice，参照 D4 gold 标准）───────────────────────
+const renderMode = ref<'html' | 'onlyoffice'>('html')
+const ooHealthy = ref(false)
+const ooChecking = ref(false)
+
+const modeOptions = computed(() => [
+  { label: 'HTML', value: 'html' },
+  { label: 'OnlyOffice', value: 'onlyoffice', disabled: !ooHealthy.value },
+])
+
+async function checkOoHealth(): Promise<void> {
+  ooChecking.value = true
+  try {
+    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
+    ooHealthy.value = res.data?.data?.healthy ?? res.data?.healthy ?? false
+  } catch {
+    ooHealthy.value = false
+  } finally {
+    ooChecking.value = false
+  }
+}
+
+function onModeChange(val: string | number | boolean): void {
+  if (val === 'html') {
+    selfLoad()
+  }
 }
 
 // ─── sheetName 正则提取编码 ──────────────────────────────────────────────────
@@ -238,6 +260,9 @@ onMounted(async () => {
     allResponses.value = map
   }
   isLoading.value = false
+
+  // ─── OnlyOffice 健康检查 ────────────────────────────────────────────
+  checkOoHealth()
 
   // ─── EventBus 订阅 'disclosure:refresh' → 刷新数据 ────────────────────
   eventBus.on('disclosure:refresh' as any, onDisclosureRefresh)

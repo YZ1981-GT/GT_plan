@@ -7,13 +7,17 @@
     <template v-else>
       <div v-if="isHtmlSheet" class="k9-header-toolbar">
         <el-segmented
-          v-if="dualMode.isOoAvailable.value"
           v-model="dualMode.currentMode.value"
-          :options="dualMode.modeOptions"
+          :options="dualMode.modeOptions.value"
           size="small"
           @change="dualMode.onModeChange"
         />
-        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value && !dualMode.checking.value" size="small" type="info">仅结构化视图</el-tag>
+        <!-- OnlyOffice 状态：必须「拉取成功」才进入在线编辑（对齐 D4 范式） -->
+        <el-tag v-if="dualMode.currentMode.value === 'onlyoffice'" size="small" type="success">OnlyOffice 拉取成功</el-tag>
+        <el-tag v-else-if="dualMode.fetchingConfig.value" size="small" type="warning">OnlyOffice 拉取中…</el-tag>
+        <el-tag v-else-if="dualMode.checking.value" size="small" type="info">OnlyOffice 检测中…</el-tag>
+        <el-tag v-else-if="!dualMode.isOoAvailable.value" size="small" type="info">OnlyOffice 不可用（仅结构化视图）</el-tag>
+        <el-tag v-else size="small" type="success">OnlyOffice 就绪</el-tag>
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -24,10 +28,25 @@
         :sheet-name="props.sheetName || ''"
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
+        @fallback="dualMode.onOoLoadFailed"
       />
 
       <!-- HTML 结构化视图 -->
       <template v-else-if="dualMode.currentMode.value === 'html'">
+        <!-- 跨表勾稽提示（仅失衡时显示；K9-1 自带详细勾稽故排除） -->
+        <el-alert
+          v-if="crossSheetAlerts.length > 0 && currentSheet !== 'K9-1'"
+          type="warning"
+          :closable="false"
+          show-icon
+          style="margin: 8px 12px"
+        >
+          <template #title>跨表勾稽提示</template>
+          <ul style="margin: 4px 0 0; padding-left: 18px; line-height: 1.6">
+            <li v-for="(m, i) in crossSheetAlerts" :key="i">{{ m }}</li>
+          </ul>
+        </el-alert>
+
         <!-- 底稿目录 -->
         <K9TabIndex
           v-if="currentSheet === 'K9'"
@@ -55,6 +74,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :tb-data="tbData"
+          :prefill="adjudicationPrefill"
           :is-readonly="isReadonly"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
@@ -107,6 +127,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :period-end="periodEnd"
           :is-readonly="isReadonly"
           @save="handleChildSave"
         />
@@ -117,6 +138,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :period-end="periodEnd"
           :is-readonly="isReadonly"
           @save="handleChildSave"
         />
@@ -192,6 +214,7 @@ import {
   type WorkpaperRuntimeContext,
 } from './composables/useWorkpaperScaffold'
 import { useK9DualMode } from './composables/useK9DualMode'
+import { useK9CrossSheet } from './composables/useK9CrossSheet'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
@@ -246,6 +269,22 @@ const tbData = ref({
   unadjusted6602: 0,
   /** 6602 审定发生额 */
   audited6602: 0,
+})
+/** 会计期间截止日（按审计年度），供 K9-6/K9-7 截止测试抽样使用 */
+const periodEnd = computed(() => `${props.year ?? new Date().getFullYear()}-12-31`)
+/** K9-1 审定表明细子科目预填（来自后端 render adjudication_prefill） */
+const adjudicationPrefill = computed<Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>>(
+  () => (Array.isArray(props.htmlData?.adjudication_prefill) ? props.htmlData.adjudication_prefill : []),
+)
+
+// ─── 跨表勾稽（K9-1↔K9-2 / K9-4↔K9-2）：仅失衡时提示，K9-1 有自己的详细勾稽故排除 ───
+const crossSheet = useK9CrossSheet(allResponses as any)
+const crossSheetAlerts = computed<string[]>(() => {
+  const out: string[] = []
+  const adj = crossSheet.adjudicationVsDetail.value
+  if (!adj.isMatch) out.push(`K9-1 审定合计 与 K9-2 明细合计差异 ${adj.diff.toFixed(2)}`)
+  if (!crossSheet.analysisVsDetail.value.isMatch) out.push('K9-4 实质性分析合计 与 K9-2 明细合计不一致')
+  return out
 })
 
 // ─── 双模式 (OO 健康检查 + el-segmented) ─────────────────────────────────────

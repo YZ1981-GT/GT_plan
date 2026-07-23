@@ -5,7 +5,7 @@
  * 企业账面侧 = bookBalance + 银行已收企业未收 - 银行已付企业未付
  * 银行对账单侧 = statementBalance + 企业已收银行未收 - 企业已付银行未付
  */
-import { ref, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
 import { parseNum } from './useE1FormulaEngine'
 
@@ -361,6 +361,40 @@ export function useE1Reconciliation(options: UseE1BaseOptions) {
     try { loadFromResponses() } finally { isLoading.value = false }
   }
 
+  // ─── P1-6: E1-6 余额调节 ↔ E1-3 银行明细交叉校验 ─────────────────────────
+
+  /**
+   * 检查调节表中每个银行账户的对账单余额(statementBalance)是否与 E1-3 同账号行一致。
+   * 返回不一致的账户列表(含账号、调节表值、明细表值)。
+   */
+  const reconciliationCrossCheck = computed<Array<{ accountNo: string; reconBalance: number; bankDetailBalance: number; diff: number }>>(() => {
+    const bankDetailRaw = allResponses.value.get('E1-bank-detail-rows')?.remark
+    if (!bankDetailRaw) return []
+    try {
+      const bankRows = JSON.parse(bankDetailRaw)
+      if (!Array.isArray(bankRows)) return []
+      // Build map: accountNo → E1-3 statementBalance
+      const bankMap = new Map<string, number>()
+      for (const r of bankRows) {
+        const no = String(r.accountNo || '').trim()
+        if (no) bankMap.set(no, parseNum(r.statementBalance))
+      }
+      // Compare with reconciliation rows
+      const mismatches: Array<{ accountNo: string; reconBalance: number; bankDetailBalance: number; diff: number }> = []
+      for (const row of rows.value) {
+        const no = row.accountNo?.trim()
+        if (!no || !bankMap.has(no)) continue
+        const bankBalance = bankMap.get(no) || 0
+        const reconBalance = row.statementBalance
+        const diff = Math.abs(reconBalance - bankBalance)
+        if (diff > 0.01) {
+          mismatches.push({ accountNo: no, reconBalance, bankDetailBalance: bankBalance, diff })
+        }
+      }
+      return mismatches
+    } catch { return [] }
+  })
+
   onBeforeUnmount(() => {
     if (!saveTimer) return
     clearTimeout(saveTimer)
@@ -376,6 +410,7 @@ export function useE1Reconciliation(options: UseE1BaseOptions) {
     categoryTotal,
     getRiskAlerts,
     getOutstandingItemRiskTags,
+    reconciliationCrossCheck,
     addRow,
     removeRow,
     updateCell,

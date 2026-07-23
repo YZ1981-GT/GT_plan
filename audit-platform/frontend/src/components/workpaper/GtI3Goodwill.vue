@@ -57,9 +57,10 @@
           :tb-data="tbData"
           :is-readonly="isReadonly"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
-        <!-- I3-2 明细表（30列3区段） -->
+        <!-- I3-2 明细表（原值/减值双表滚动） -->
         <I3TabDetail
           v-else-if="currentSheet === 'I3-2'"
           :wp-id="props.wpId"
@@ -77,6 +78,7 @@
           :all-responses="allResponses"
           :is-readonly="isReadonly"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I3-4 入账价值测算表 -->
@@ -98,6 +100,7 @@
           :all-responses="allResponses"
           :is-readonly="isReadonly"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I3-6 商誉减值测试（CGU分摊） -->
@@ -111,7 +114,7 @@
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
-        <!-- I3-7 可收回金额测试（DCF核心100×16超大表） -->
+        <!-- I3-7 可收回金额测试（对齐致同 Excel：公允净额 + DCF/CAPM） -->
         <I3TabRecoverableTest
           v-else-if="currentSheet === 'I3-7'"
           :wp-id="props.wpId"
@@ -119,9 +122,10 @@
           :all-responses="allResponses"
           :is-readonly="isReadonly"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
-        <!-- I3-8 复核公司减值测试过程及结论（153行大表） -->
+        <!-- I3-8 复核公司减值测试过程及结论（对齐 Excel 1~11 + 二） -->
         <I3TabReviewProcess
           v-else-if="currentSheet === 'I3-8'"
           :wp-id="props.wpId"
@@ -129,6 +133,7 @@
           :all-responses="allResponses"
           :is-readonly="isReadonly"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- 附注披露（上市公司） -->
@@ -138,7 +143,10 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :applicable-standards="applicableStandards"
+          :cross-sheet-auto-fill="crossSheet.disclosureAutoFill.value"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- 附注披露（国有企业） -->
@@ -148,7 +156,10 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :applicable-standards="applicableStandards"
+          :cross-sheet-auto-fill="crossSheet.disclosureAutoFill.value"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- 市场平均收益率参考数据 → OO fallback -->
@@ -195,9 +206,11 @@
  * Requirements: 1.1-1.10
  */
 import { ref, computed, onMounted, provide, toRef, defineAsyncComponent, inject} from 'vue'
+import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useI3DualMode } from './composables/useI3DualMode'
+import { useI3CrossSheet } from './composables/useI3CrossSheet'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -227,9 +240,20 @@ const props = defineProps<{
   year?: number
   htmlData?: any
   readonly?: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navigate-sheet', sheetName: string): void }>()
+
+const runtimeCtx = inject(WorkpaperRuntimeContextKey, null)
+const applicableStandards = computed<string[]>(() => {
+  const fromProp = props.applicableStandards
+  if (Array.isArray(fromProp) && fromProp.length) return fromProp
+  const fromRuntime = (runtimeCtx as any)?.applicableStandards?.value
+  if (Array.isArray(fromRuntime) && fromRuntime.length) return fromRuntime
+  const fromHtml = props.htmlData?.applicableStandards
+  return Array.isArray(fromHtml) ? fromHtml : []
+})
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
@@ -239,6 +263,11 @@ const tbData = ref({
   unadjusted1711: 0,
   audited1711: 0,
 })
+
+// 跨 sheet 联动（供子页 inject）
+const crossSheet = useI3CrossSheet(allResponses)
+provide('i3CrossSheet', crossSheet)
+provide('i3AllResponses', allResponses)
 
 // ─── 双模式 useI3DualMode (OO 健康检查 + el-segmented) ──────────────────────
 const wpIdRef = computed(() => props.wpId)
@@ -281,8 +310,10 @@ async function handleChildSave(itemId: string, value: any): Promise<void> {
       project_id: props.projectId,
       items: [{ item_id: itemId, conclusion: null, remark: strVal }],
     })
-  } catch {
-    // 静默失败，数据保留在本地
+  } catch (err: any) {
+    const msg = err?.response?.data?.detail || err?.response?.data?.message || err?.message || '保存失败'
+    console.error('[GtI3Goodwill] save failed:', itemId, err)
+    ElMessage.error(`底稿保存失败（${itemId}）：${msg}`)
   }
 }
 

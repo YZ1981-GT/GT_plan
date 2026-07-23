@@ -24,7 +24,8 @@
  * Requirements: 3.1-3.5 (月度明细), 4.1-4.7 (I6↔I2联动), 5.1-5.4 (截止测试)
  */
 import { computed, ref, watch, onScopeDispose, type ComputedRef, type Ref } from 'vue'
-import { validateVRI601, calcMonthlyTotal, isCutoffCrossover } from './useI6FormulaEngine'
+import { validateVRI601, calcMonthlyTotal } from './useI6FormulaEngine'
+import { isCutoffPeriodCrossing } from './useI2FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -54,33 +55,50 @@ export interface I6DetailRowRaw {
   total?: number              // 年度合计
 }
 
-/** I6-5/I6-6 截止测试行原始 JSON 结构 */
+/** I6-5/I6-6 截止测试行原始 JSON 结构（兼容新旧字段） */
 export interface I6CutoffRowRaw {
   rowId?: string
-  bookingDate?: string        // 记账日期
-  documentDate?: string       // 单据日期
-  amount?: number             // 金额
-  expenseType?: string        // 费用类型
-  period?: string             // 记账期间
-  belongPeriod?: string       // 归属期间
-  conclusion?: string         // 结论
+  recordDate?: string
+  bookingDate?: string
+  documentDate?: string
+  amount?: number
+  documentAmount?: number
+  expenseType?: string
+  description?: string
+  period?: string
+  recordPeriod?: string
+  belongPeriod?: string
+  isCrossPeriod?: boolean
+  conclusion?: string
 }
 
 /** I2 incoming event payload */
 export interface I2CapitalizedEventDetail {
   /** I2 资本化金额 */
-  capitalized: number
+  capitalized?: number
+  /** 兼容 useI6Adjudication 旧字段名 */
+  capitalizedAmount?: number
+  /** I2 侧认定的研发总额（优先作为 VR-I6-01 期望值） */
+  total?: number
 }
 
 // ─── Return Types ────────────────────────────────────────────────────────────
 
 export interface I2LinkageStatus {
+  /** I6 费用化金额（审定发生额） */
+  expense: number
   /** I2 资本化金额（从 EventBus 接收） */
   capitalized: number
-  /** 研发总额（费用化 + 资本化） */
+  /** 实际合计（费用化 + 资本化） */
   total: number
+  /** VR-I6-01 期望值（手工 / I2 事件 / 回退为 actual） */
+  expectedTotal: number
+  /** 是否已收到 I2 资本化数据（或从持久化恢复） */
+  ready: boolean
   /** 是否平衡：I6费用化 + I2资本化 = 研发总额（允许±0.01精度） */
   isBalanced: boolean
+  /** 差额（正=超出，负=不足） */
+  difference: number
 }
 
 export interface CutoffSample {
@@ -117,18 +135,42 @@ function _getNum(val: any): number {
 
 export function useI6CrossSheet(allResponses: Ref<Map<string, any>>): {
   detailMonthlyTotals: ComputedRef<number[]>
-  i2LinkageStatus: ComputedRef<{ capitalized: number; total: number; isBalanced: boolean }>
+  i2LinkageStatus: ComputedRef<I2LinkageStatus>
   cutoffSamples: ComputedRef<Array<{ date: string; amount: number; isCrossover: boolean }>>
 } {
   // ─── I2 incoming state（响应式存储 EventBus 接收的 I2 数据）─────────────
 
   const _i2Capitalized = ref(0)
+  const _i2PublishedTotal = ref(0)
+  const _expectedResearchTotal = ref(0)
+  const _i2Ready = ref(false)
 
   // ─── 解析 I6-2 明细行数据 ──────────────────────────────────────────────
 
   const detailRows = computed<I6DetailRowRaw[]>(() => {
-    const resp = allResponses.value.get('I6-2-rows')
-    return safeParseRows<I6DetailRowRaw>(resp?.remark)
+    const resp = allResponses.value.get('I6-2-detail-rows') ?? allResponses.value.get('I6-2-rows')
+    const raw = resp?.remark
+    if (!raw) return []
+    try {
+      const parsed = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return []
+      return parsed.map((r: any) => {
+        if (Array.isArray(r.months)) {
+          const m = r.months
+          return {
+            category: r.category ?? r.name ?? r.projectName,
+            month1: _getNum(m[0]), month2: _getNum(m[1]), month3: _getNum(m[2]),
+            month4: _getNum(m[3]), month5: _getNum(m[4]), month6: _getNum(m[5]),
+            month7: _getNum(m[6]), month8: _getNum(m[7]), month9: _getNum(m[8]),
+            month10: _getNum(m[9]), month11: _getNum(m[10]), month12: _getNum(m[11]),
+            total: _getNum(r.unadjTotal ?? r.total ?? calcMonthlyTotal(m)),
+          }
+        }
+        return r as I6DetailRowRaw
+      })
+    } catch {
+      return []
+    }
   })
 
   // ─── 解析 I6-5 截止测试行（账→单据）────────────────────────────────────
@@ -192,13 +234,30 @@ export function useI6CrossSheet(allResponses: Ref<Map<string, any>>): {
    */
   const i6ExpenseAmount = computed<number>(() => {
     // 优先从 I6-1 审定表取审定数
-    const adjResp = allResponses.value.get('I6-1-audited')
+    const adjResp = allResponses.value.get('I6-adj-audited-total')
+      ?? allResponses.value.get('I6-1-audited')
     const adjVal = _getNum(adjResp?.remark)
     if (adjVal !== 0) return adjVal
 
     // fallback: 12个月合计之和
     return calcMonthlyTotal(detailMonthlyTotals.value)
   })
+
+  function _hydrateLinkageFromResponses(): void {
+    const capResp = allResponses.value.get('I6-adj-capitalized-i2')
+    if (capResp?.remark != null && capResp.remark !== '') {
+      _i2Capitalized.value = _getNum(capResp.remark)
+      _i2Ready.value = true
+    }
+    const expectedResp = allResponses.value.get('I6-adj-expected-total')
+    if (expectedResp?.remark != null && expectedResp.remark !== '') {
+      _expectedResearchTotal.value = _getNum(expectedResp.remark)
+    }
+  }
+
+  watch(allResponses, () => {
+    _hydrateLinkageFromResponses()
+  }, { immediate: true, deep: true })
 
   // ═══ i2LinkageStatus: I6↔I2 校验状态（VR-I6-01）════════════════════════
 
@@ -215,21 +274,33 @@ export function useI6CrossSheet(allResponses: Ref<Map<string, any>>): {
   const i2LinkageStatus: ComputedRef<I2LinkageStatus> = computed(() => {
     const expense = i6ExpenseAmount.value
     const capitalized = _i2Capitalized.value
-    const total = expense + capitalized
+    const actualTotal = expense + capitalized
 
-    // 总额为 0 且费用也为 0 → 未收到数据，视为平衡（待就绪）
-    if (total === 0 && expense === 0) {
-      return { capitalized: 0, total: 0, isBalanced: true }
+    if (!_i2Ready.value) {
+      return {
+        expense,
+        capitalized,
+        total: actualTotal,
+        expectedTotal: 0,
+        ready: false,
+        isBalanced: false,
+        difference: 0,
+      }
     }
 
-    // VR-I6-01: 费用化 + 资本化 = 研发总额
-    // 使用 validateVRI601 纯函数做校验
-    const validation = validateVRI601(expense, capitalized, total)
+    const expectedTotal = _expectedResearchTotal.value
+      || _i2PublishedTotal.value
+      || actualTotal
+    const validation = validateVRI601(expense, capitalized, expectedTotal)
 
     return {
+      expense,
       capitalized,
-      total,
+      total: actualTotal,
+      expectedTotal,
+      ready: true,
       isBalanced: validation.isValid,
+      difference: validation.difference,
     }
   })
 
@@ -237,45 +308,47 @@ export function useI6CrossSheet(allResponses: Ref<Map<string, any>>): {
 
   /**
    * 聚合 I6-5（账→单据）和 I6-6（单据→账）的截止测试样本。
-   * 对每条样本标记是否跨期（isCrossover）。
-   *
-   * 跨期判断：|记账日 - 单据日| > 5天
-   *
-   * Req 5.1: 从账簿→单据（期末±5天）
-   * Req 5.2: 从单据→账簿（期末±5天）
-   * Req 5.4: 显示日期|金额|是否跨期
+   * 跨期判断：单据日与记账日分处截止日两侧；无截止日则降级为记账期间≠归属期间。
    */
   const cutoffSamples: ComputedRef<CutoffSample[]> = computed(() => {
     const samples: CutoffSample[] = []
+    const criteriaRaw = allResponses.value.get('I6-5-sample-criteria')?.remark
+      ?? allResponses.value.get('I6-6-sample-criteria')?.remark
+    let cutoffDateStr = ''
+    try {
+      const parsed = typeof criteriaRaw === 'string' ? JSON.parse(criteriaRaw) : criteriaRaw
+      cutoffDateStr = String(parsed?.cutoffDate ?? '')
+    } catch { /* ignore */ }
+    const cutoffDate = cutoffDateStr ? new Date(`${cutoffDateStr}T00:00:00`) : null
 
-    // I6-5 正向截止（账→单据）
-    for (const row of cutoffForwardRows.value) {
-      const bookingDate = row.bookingDate ? new Date(row.bookingDate) : null
-      const documentDate = row.documentDate ? new Date(row.documentDate) : null
-      const amount = _getNum(row.amount)
-      const date = row.bookingDate || ''
-
-      let crossover = false
-      if (bookingDate && documentDate && !isNaN(bookingDate.getTime()) && !isNaN(documentDate.getTime())) {
-        crossover = isCutoffCrossover(bookingDate, documentDate, 5)
+    function _crossover(row: I6CutoffRowRaw): boolean {
+      if (row.isCrossPeriod != null) return Boolean(row.isCrossPeriod)
+      const rec = row.recordDate ?? row.bookingDate ?? ''
+      const doc = row.documentDate ?? ''
+      const rd = rec ? new Date(`${rec}T00:00:00`) : null
+      const dd = doc ? new Date(`${doc}T00:00:00`) : null
+      if (rd && dd && cutoffDate && !Number.isNaN(rd.getTime()) && !Number.isNaN(dd.getTime())) {
+        return isCutoffPeriodCrossing(dd, rd, cutoffDate)
       }
-
-      samples.push({ date, amount, isCrossover: crossover })
+      const rp = row.recordPeriod ?? row.period ?? ''
+      const bp = row.belongPeriod ?? ''
+      return !!(rp && bp && rp !== bp)
     }
 
-    // I6-6 反向截止（单据→账）
+    for (const row of cutoffForwardRows.value) {
+      samples.push({
+        date: row.recordDate ?? row.bookingDate ?? '',
+        amount: _getNum(row.amount ?? row.documentAmount),
+        isCrossover: _crossover(row),
+      })
+    }
+
     for (const row of cutoffBackwardRows.value) {
-      const bookingDate = row.bookingDate ? new Date(row.bookingDate) : null
-      const documentDate = row.documentDate ? new Date(row.documentDate) : null
-      const amount = _getNum(row.amount)
-      const date = row.documentDate || ''
-
-      let crossover = false
-      if (bookingDate && documentDate && !isNaN(bookingDate.getTime()) && !isNaN(documentDate.getTime())) {
-        crossover = isCutoffCrossover(bookingDate, documentDate, 5)
-      }
-
-      samples.push({ date, amount, isCrossover: crossover })
+      samples.push({
+        date: row.documentDate ?? '',
+        amount: _getNum(row.documentAmount ?? row.amount),
+        isCrossover: _crossover(row),
+      })
     }
 
     return samples
@@ -290,7 +363,14 @@ export function useI6CrossSheet(allResponses: Ref<Map<string, any>>): {
   function _onI2CapitalizedUpdated(event: Event): void {
     const detail = (event as CustomEvent<I2CapitalizedEventDetail>).detail
     if (detail && typeof detail === 'object') {
-      _i2Capitalized.value = _getNum(detail.capitalized)
+      const cap = detail.capitalized ?? detail.capitalizedAmount
+      if (cap != null) {
+        _i2Capitalized.value = _getNum(cap)
+        _i2Ready.value = true
+      }
+      if (detail.total != null) {
+        _i2PublishedTotal.value = _getNum(detail.total)
+      }
     }
   }
 

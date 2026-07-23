@@ -17,6 +17,27 @@
     class="objective-alert"
   />
 
+  <!-- 完整性校验：登记表关联方未在本表识别 -->
+  <el-alert
+    v-if="missingRelatedParties.length > 0"
+    type="warning"
+    :closable="false"
+    show-icon
+    style="margin-bottom: 12px"
+  >
+    <template #title>
+      <span>关联方清单中有 {{ missingRelatedParties.length }} 个未在本表识别（防漏列）：{{ missingRelatedParties.slice(0, 6).join('、') }}{{ missingRelatedParties.length > 6 ? '…' : '' }}</span>
+      <el-button
+        v-if="!isReadonly"
+        size="small"
+        type="warning"
+        plain
+        style="margin-left: 8px"
+        @click="doAddMissing"
+      >补充漏列（{{ missingRelatedParties.length }}）</el-button>
+    </template>
+  </el-alert>
+
   <div class="tab-toolbar">
     <div class="toolbar-left">
       <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加关联方</el-button>
@@ -105,10 +126,21 @@
         <span class="amt auto">{{ fmtAmount(row.rowId === '__subtotal__' ? subtotalRow.bookValue : row.bookValue) }}</span>
       </template>
     </el-table-column>
-    <el-table-column label="发生时间及账龄" width="140">
+    <el-table-column label="发生时间及账龄" width="160">
       <template #default="{ row }">
-        <el-input v-if="row.rowId !== '__subtotal__'" :model-value="row.agingDescription" size="small" :disabled="isReadonly"
-          @change="(val: string) => updateCell(row.rowId, 'agingDescription', val)" />
+        <el-select
+          v-if="row.rowId !== '__subtotal__'"
+          :model-value="row.agingDescription"
+          size="small"
+          :disabled="isReadonly"
+          filterable
+          allow-create
+          clearable
+          placeholder="选择账龄"
+          @change="(val: string) => updateCell(row.rowId, 'agingDescription', val ?? '')"
+        >
+          <el-option v-for="opt in agingOptions" :key="opt" :label="opt" :value="opt" />
+        </el-select>
       </template>
     </el-table-column>
     <el-table-column label="发生原因（款项性质）" width="140">
@@ -190,6 +222,7 @@
  * F1TabRelatedParty.vue — F1-6 关联方及交易检查表（13列，对齐 Excel）
  */
 import { computed, inject, toRef, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import {
   useF1RelatedParty,
   F1_RELATED_PARTY_RELATIONSHIP_OPTIONS,
@@ -199,6 +232,8 @@ import { useF1AiGenerate } from '../composables/useF1AiGenerate'
 import { useF1ImportExport, type F1ImportSheet } from '../composables/useWorkpaperImportExport'
 import type { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import type { ChecklistResponse } from '../composables/useF1FormData'
+import { useAgingConfig } from '@/composables/useAgingConfig'
+import { ADJUDICATION_LABEL_BY_SEGMENT_KEY } from '../composables/agingPresets'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
@@ -212,17 +247,28 @@ const props = defineProps<{
   crossSheet: ReturnType<typeof useF1CrossSheet>
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  /** 项目关联方清单（来自后端 render 登记表），用于完整性校验 */
+  relatedParties?: string[]
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const projectIdRef = toRef(props, 'projectId') as Ref<string>
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+
+const { bands } = useAgingConfig(projectIdRef, 'F1')
+const agingOptions = computed(() => {
+  const labels = bands.value.map((b) => ADJUDICATION_LABEL_BY_SEGMENT_KEY[b.key] || b.label)
+  return labels.length ? labels : ['1年以内(含1年)', '1至2年(含2年)', '2至3年(含3年)', '3年以上']
+})
 
 const {
   rows,
   subtotalRow,
   auditNote,
   conclusion,
+  missingRelatedParties,
+  addMissingRelatedParties,
   addRow,
   removeRow,
   updateCell,
@@ -234,9 +280,16 @@ const {
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
+  relatedParties: computed(() => props.relatedParties ?? []) as unknown as Ref<string[]>,
 })
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(wpIdRef)
+
+function doAddMissing() {
+  const n = addMissingRelatedParties()
+  if (n > 0) ElMessage.success(`已补充 ${n} 个疑似漏列关联方（请核对余额与关系）`)
+  else ElMessage.info('无漏列关联方')
+}
 
 const tableData = computed(() => [
   ...rows.value,

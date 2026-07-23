@@ -43,6 +43,7 @@ const {
   categoryTotal,
   getRiskAlerts,
   getOutstandingItemRiskTags,
+  reconciliationCrossCheck,
   addRow,
   removeRow,
   updateCell,
@@ -156,6 +157,22 @@ function updateItem(
       title="审计目标：验证银行存款账面余额与银行对账单余额的一致性，识别截止错报、长期挂账及异常调节事项。"
       class="objective-alert"
     />
+
+    <!-- 与 E1-3 银行明细对账单余额交叉核对 -->
+    <el-alert
+      v-if="reconciliationCrossCheck.length"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="crosscheck-alert"
+      title="调节表对账单余额与 E1-3 银行明细不一致，请核实："
+    >
+      <ul class="crosscheck-list">
+        <li v-for="m in reconciliationCrossCheck" :key="m.accountNo">
+          账号 {{ m.accountNo }}：调节表 {{ displayPrefs.fmtAmount(m.reconBalance) }} vs E1-3 明细 {{ displayPrefs.fmtAmount(m.bankDetailBalance) }}（差异 {{ displayPrefs.fmtAmount(m.diff) }}）
+        </li>
+      </ul>
+    </el-alert>
 
     <el-skeleton :loading="isLoading" :rows="8" animated>
       <template #default>
@@ -400,6 +417,8 @@ function updateItem(
 .guidance-content p { margin: 2px 0; }
 .methodology-context { margin-bottom: 12px; padding: 9px 12px; border-left: 3px solid #e6a23c; background: #fdf6ec; color: #7a4d00; line-height: 1.55; }
 .objective-alert { margin-bottom: 12px; }
+.crosscheck-alert { margin-bottom: 12px; }
+.crosscheck-list { margin: 2px 0; padding-left: 18px; line-height: 1.6; }
 .tab-toolbar, .recon-header, .card-header, .section-heading, .item-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .tab-toolbar { margin-bottom: 12px; flex-wrap: wrap; }
 .toolbar-right, .recon-bank-info, .risk-tags { display: flex; gap: 6px; align-items: center; }

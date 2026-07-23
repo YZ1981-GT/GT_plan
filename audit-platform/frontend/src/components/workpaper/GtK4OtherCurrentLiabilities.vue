@@ -28,6 +28,20 @@
 
       <!-- HTML 结构化视图 -->
       <template v-else-if="dualMode.currentMode.value === 'html'">
+        <!-- 全局告警区（非目录/程序表页显示） -->
+        <div v-if="currentSheet !== 'K4' && currentSheet !== 'K4A' && globalAlerts.length > 0" class="k4-global-alerts">
+          <el-alert
+            v-for="(alert, aIdx) in globalAlerts"
+            :key="aIdx"
+            :type="alert.type"
+            :closable="false"
+            show-icon
+            style="margin-bottom:6px"
+          >
+            <template #title>{{ alert.message }}</template>
+          </el-alert>
+        </div>
+
         <!-- 底稿目录 -->
         <K4TabIndex
           v-if="currentSheet === 'K4'"
@@ -197,6 +211,41 @@ const tbData = ref({
   audited2245: 0,
 })
 
+// ─── 全局告警区（跨sheet汇总） ──────────────────────────────────────────────
+const globalAlerts = computed(() => {
+  const alerts: Array<{ type: 'warning' | 'error' | 'info' | 'success'; message: string }> = []
+
+  // K4-1 审定合计 vs TB(2245)
+  const k41Audited = getResponseNum('K4-1-audited-total')
+  if (k41Audited > 0 && tbData.value.audited2245 > 0) {
+    const diff = Math.abs(k41Audited - tbData.value.audited2245)
+    if (diff > 1) {
+      alerts.push({ type: 'warning', message: `K4-1 审定合计（${fmtAmtGlobal(k41Audited)}）与 TB 2245 审定数（${fmtAmtGlobal(tbData.value.audited2245)}）差异 ${fmtAmtGlobal(diff)} 元` })
+    }
+  }
+
+  // K4-2 明细合计 vs K4-1 审定合计
+  const k42Total = getResponseNum('K4-2-detail-total')
+  if (k42Total > 0 && k41Audited > 0) {
+    const diff2 = Math.abs(k41Audited - k42Total)
+    if (diff2 > 1) {
+      alerts.push({ type: 'warning', message: `K4-2 明细审定合计（${fmtAmtGlobal(k42Total)}）与 K4-1 审定合计（${fmtAmtGlobal(k41Audited)}）差异 ${fmtAmtGlobal(diff2)} 元` })
+    }
+  }
+
+  return alerts
+})
+
+function getResponseNum(key: string): number {
+  const item = allResponses.value.get(key)
+  const v = item?.remark ?? item?.value ?? item
+  return Number(v) || 0
+}
+
+function fmtAmtGlobal(v: number): string {
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 // ─── 双模式 (OO 健康检查 + el-segmented + localStorage 持久化) ────────────────
 const DUAL_MODE_STORAGE_PREFIX = 'k4-dual-mode:'
 
@@ -357,5 +406,8 @@ onMounted(() => {
   gap: 12px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.k4-global-alerts {
+  padding: 8px 16px 0;
 }
 </style>

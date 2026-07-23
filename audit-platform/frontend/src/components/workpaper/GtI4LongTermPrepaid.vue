@@ -67,6 +67,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- 附注披露（国企） -->
@@ -76,8 +78,9 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
-
         <!-- I4-2 明细表 -->
         <I4TabDetail
           v-else-if="currentSheet === 'I4-2'"
@@ -94,6 +97,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
@@ -105,6 +109,9 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :project-context="projectContext"
+          @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I4-5 针对性检查 -->
@@ -114,6 +121,9 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
+          @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I4-6 / I4-7 摊销测算 (2分支选择器: 直线法/工作量法) -->
@@ -170,10 +180,12 @@
  * 摊销分支选择器: 直线法(I4-6) vs 工作量法(I4-7)
  * checklist_responses 前缀: "I4-{sheet}-{field}"
  *
- * Spec: .kiro/specs/i4-long-term-prepaid/ Task 1.1
+ * Spec（归档）: .kiro/specs/_archive/05-business-features/i4-long-term-prepaid/ Task 1.1
  * Requirements: 1.1-1.10
+ *
+ * 数据加载/保存：本壳层自管 selfLoad + handleChildSave（勿再用孤儿 useI4FormData）。
  */
-import { ref, computed, onMounted, provide, toRef, defineAsyncComponent, inject} from 'vue'
+import { ref, computed, onMounted, watch, provide, toRef, defineAsyncComponent, inject } from 'vue'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useI4DualMode } from './composables/useI4DualMode'
@@ -217,6 +229,7 @@ const allResponses = ref<Map<string, any>>(new Map())
 const tbData = ref({
   unadjusted1801: 0,
   audited1801: 0,
+  priorAudited1801: 0,
 })
 const amortizationMethod = ref<'straight' | 'units'>('straight')
 
@@ -248,16 +261,29 @@ const currentSheet = computed(() => {
   return ''
 })
 
+/** 项目上下文（行业推荐等） */
+const projectContext = computed(() =>
+  props.htmlData?.project_context
+  ?? props.htmlData?.projectContext
+  ?? null,
+)
+
 // ─── 子组件 save 回调（持久化 checklist_responses） ────────────────────────────
 async function handleChildSave(itemId: string, value: any): Promise<void> {
   if (!props.wpId) return
   const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-  // 乐观更新本地 Map
-  allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: strVal })
+  // 完成度标记：conclusion 需可被目录扫描（I4-4-completion / -ok）
+  const isStatusMarker = /-(completion|completion-ok)$/.test(itemId)
+  const payload = {
+    item_id: itemId,
+    conclusion: isStatusMarker ? strVal : null,
+    remark: strVal,
+  }
+  allResponses.value.set(itemId, payload)
   try {
     await http.put(`/workpapers/${props.wpId}/checklist-responses`, {
       project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion: null, remark: strVal }],
+      items: [payload],
     })
   } catch {
     // 静默失败，数据保留在本地
@@ -273,12 +299,23 @@ async function _loadTbData(): Promise<void> {
       _silent: true,
     } as any)
     const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
-    let u1801 = 0, a1801 = 0
+    let u1801 = 0, a1801 = 0, p1801 = 0
     for (const item of list) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (code.startsWith('1801')) { u1801 += Number(item.unadjusted_amount ?? 0); a1801 += Number(item.audited_amount ?? 0) }
+      if (code.startsWith('1801')) {
+        u1801 += Number(item.unadjusted_amount ?? 0)
+        a1801 += Number(item.audited_amount ?? 0)
+        p1801 += Number(
+          item.prior_amount
+          ?? item.prior_audited_amount
+          ?? item.prior_period_amount
+          ?? item.last_year_amount
+          ?? item.opening_audited_amount
+          ?? 0,
+        )
+      }
     }
-    tbData.value = { unadjusted1801: u1801, audited1801: a1801 }
+    tbData.value = { unadjusted1801: u1801, audited1801: a1801, priorAudited1801: p1801 }
   } catch {
     // TB取数失败静默处理
   }
@@ -340,6 +377,7 @@ provide('i4VersionTrailRef', versionTrailRef)
 provide('i4OpenVersionHistory', openVersionHistory)
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
+watch(currentSheet, () => syncAmortizationBranch())
 onMounted(() => {
   syncAmortizationBranch()
   void selfLoad()

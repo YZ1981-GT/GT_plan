@@ -67,7 +67,8 @@ _SHEET_HEADERS: dict[str, list[str]] = {
     "D5-2": [
         "类别", "明细项目", "期初未审", "期初AJE", "期初RJE", "期初审定",
         "OCI减值", "本期增加", "本期减少", "期末余额", "重分类",
-        "期末未审", "期末AJE", "期末RJE", "期末审定", "期末OCI减值", "备注",
+        "期末未审", "期末AJE", "期末RJE", "期末审定", "期末OCI减值",
+        "期后兑现金额", "ECL阶段", "备注",
     ],
     "D5-4": [
         "类别", "明细项目", "票据号", "票面金额", "计量日", "到期日",
@@ -456,6 +457,8 @@ def _export_d5_2_row(data: dict) -> list:
         _safe_float(data.get("endRje")),
         _safe_float(data.get("endAudited")),
         _safe_float(data.get("endOciImpairment")),
+        _safe_float(data.get("postRealized")),
+        _safe_str(data.get("eclStage")),
         _safe_str(data.get("remark")),
     ]
 
@@ -525,6 +528,8 @@ def _parse_d5_2_row(row: tuple, actual_headers: list[str]) -> dict:
         "endRje": end_rje,
         "endAudited": end_audited,
         "endOciImpairment": _safe_float(_col_val(row, actual_headers, "期末OCI减值")),
+        "postRealized": _safe_float(_col_val(row, actual_headers, "期后兑现金额")),
+        "eclStage": _safe_str(_col_val(row, actual_headers, "ECL阶段")),
         "remark": _safe_str(_col_val(row, actual_headers, "备注")),
     }
 

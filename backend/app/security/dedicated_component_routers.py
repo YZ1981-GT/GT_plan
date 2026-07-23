@@ -124,6 +124,7 @@ DEDICATED_COMPONENT_ROUTER_MODULES: frozenset[str] = frozenset(
         'app.routers.wp_render_strategies._g12_net_hedge_gains_ai',
         'app.routers.wp_render_strategies._g13_fair_value_changes_ai',
         'app.routers.wp_render_strategies._g14_credit_impairment_loss_ai',
+        'app.routers.wp_render_strategies._g1_contract_ocr',
         'app.routers.wp_render_strategies._g1_trading_financial_assets_ai',
         'app.routers.wp_render_strategies._g2_interest_receivable_ai',
         'app.routers.wp_render_strategies._g3_dividend_receivable_ai',
@@ -176,6 +177,7 @@ DEDICATED_COMPONENT_ROUTER_MODULES: frozenset[str] = frozenset(
         'app.routers.wp_render_strategies._i3_ai_generate',
         'app.routers.wp_render_strategies._i3_dcf_engine',
         'app.routers.wp_render_strategies._i4_ai_generate',
+        'app.routers.wp_render_strategies._i4_peer_policies',
         'app.routers.wp_render_strategies._i5_ai_generate',
         'app.routers.wp_render_strategies._i6_ai_generate',
         'app.routers.wp_render_strategies._j1_ai_generate',
@@ -201,6 +203,8 @@ DEDICATED_COMPONENT_ROUTER_MODULES: frozenset[str] = frozenset(
         'app.routers.wp_render_strategies._k9_ai_generate',
         'app.routers.wp_render_strategies._l0_confirmation_ai',
         'app.routers.wp_render_strategies._l0_confirmation_import_export',
+        'app.routers.b60_chapters',
+        'app.routers.b60_data_pull',
     }
 )
 

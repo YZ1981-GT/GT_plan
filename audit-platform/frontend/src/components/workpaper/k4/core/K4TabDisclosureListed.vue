@@ -20,12 +20,20 @@
       </div>
     </div>
 
+    <!-- 汇总 vs K4-1 审定差异告警 -->
+    <el-alert v-if="hasSummaryK41Mismatch" type="warning" :closable="false" style="margin-bottom:10px" show-icon>
+      ⚠️ 汇总表期末合计（{{ fmtAmt(summaryEndTotal) }}）与 K4-1 审定合计（{{ fmtAmt(k41AuditedTotal) }}）差异 {{ fmtAmt(summaryVsK41Diff) }} 元，请核实。
+    </el-alert>
+
     <!-- （一）汇总表 -->
     <el-card shadow="never" class="disclosure-card">
       <template #header>
         <div class="section-title-row">
           <span class="section-title">（一）其他流动负债汇总</span>
-          <el-button size="small" type="default" link @click="handleReview('disc-listed-summary')">💬</el-button>
+          <div class="title-actions">
+            <el-button v-if="!isReadonly" size="small" type="warning" plain @click="seedSummaryFromK41">从K4-1预填</el-button>
+            <el-button size="small" type="default" link @click="handleReview('disc-listed-summary')">💬</el-button>
+          </div>
         </div>
       </template>
       <el-table :data="summaryRows" border stripe size="small" class="disclosure-table">
@@ -95,7 +103,10 @@
       <template #header>
         <div class="section-title-row">
           <span class="section-title">（三）短期应付债券（续）</span>
-          <el-button v-if="!isReadonly" size="small" @click="addBondContRow()">＋ 新增</el-button>
+          <div class="title-actions">
+            <el-button v-if="!isReadonly" size="small" type="primary" plain @click="addBondContFromDetail()">从明细带入</el-button>
+            <el-button v-if="!isReadonly" size="small" @click="addBondContRow()">＋ 新增</el-button>
+          </div>
         </div>
       </template>
       <el-table :data="bondContRows" border size="small" class="disclosure-table">
@@ -219,10 +230,13 @@
  * 科目：2245 其他流动负债（负债类）
  */
 import { ref, reactive, computed, inject, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, inject, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { MagicStick, Delete } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
+import type { WorkpaperRuntimeContext } from '../../composables/useWorkpaperScaffold'
+import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 
 const K4_ACCOUNT_CODE = '2245'
 
@@ -238,6 +252,7 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 
 // ─── 数据模型 ─────────────────────────────────────────────────────────────────
 interface SummaryRow { item: string; endBalance: number; beginBalance: number; remark: string; isTotal?: boolean }
@@ -290,15 +305,75 @@ function getResponseNumber(key: string): number {
   return Number.isFinite(n) ? n : 0
 }
 
+// ─── 汇总表 vs K4-1 审定合计 差异告警 (修复建议#5) ─────────────────────────────
+const summaryEndTotal = computed(() => summaryRows.filter(r => !r.isTotal).reduce((s, r) => s + (r.endBalance || 0), 0))
+const k41AuditedTotal = computed(() => getResponseNumber('K4-1-audited-total'))
+const summaryVsK41Diff = computed(() => Math.abs(summaryEndTotal.value - k41AuditedTotal.value))
+const hasSummaryK41Mismatch = computed(() => summaryVsK41Diff.value > 1 && k41AuditedTotal.value > 0)
+
+// ─── 债券名称联动: (二) 明细→ (三) 续表自动建议 (修复建议#5) ─────────────────────
+function addBondContFromDetail(): void {
+  const existingNames = new Set(bondContRows.value.map(r => r.name))
+  const missingBonds = bondRows.value.filter(b => b.name && !existingNames.has(b.name))
+  if (missingBonds.length === 0) {
+    ElMessage.info('续表已包含所有债券明细项，无需补充')
+    return
+  }
+  for (const b of missingBonds) {
+    bondContRows.value.push({
+      name: b.name,
+      beginBalance: 0,
+      issued: b.issueAmount || 0,
+      interestAccrued: 0,
+      premiumAmort: 0,
+      repaid: 0,
+      defaulted: '否',
+    })
+  }
+  persistBondCont()
+  ElMessage.success(`已从债券明细带入 ${missingBonds.length} 条到续表`)
+}
+
 // ─── 持久化 ───────────────────────────────────────────────────────────────────
 function persistSummary(): void {
   recalcSummaryTotal()
   emit('save', 'K4-disc-listed-summary', { remark: JSON.stringify(summaryRows) })
+  scheduleAutoSnapshot()
 }
-function persistBonds(): void { emit('save', 'K4-disc-listed-bonds', { remark: JSON.stringify(bondRows.value) }) }
-function persistBondCont(): void { emit('save', 'K4-disc-listed-bond-cont', { remark: JSON.stringify(bondContRows.value) }) }
-function persistGrants(): void { emit('save', 'K4-disc-listed-grants', { remark: JSON.stringify(grantRows.value) }) }
+function persistBonds(): void { emit('save', 'K4-disc-listed-bonds', { remark: JSON.stringify(bondRows.value) }); scheduleAutoSnapshot() }
+function persistBondCont(): void { emit('save', 'K4-disc-listed-bond-cont', { remark: JSON.stringify(bondContRows.value) }); scheduleAutoSnapshot() }
+function persistGrants(): void { emit('save', 'K4-disc-listed-grants', { remark: JSON.stringify(grantRows.value) }); scheduleAutoSnapshot() }
 function persistNote(): void { emit('save', 'K4-disc-listed-note', { remark: noteText.value }) }
+
+function scheduleAutoSnapshot(): void {
+  try { runtime?.version?.scheduleAutoSnapshot?.() } catch { /* silent */ }
+}
+
+// ─── 从 K4-1 审定表按行预填汇总表（仅空时） ──────────────────────────────────
+function seedSummaryFromK41(): void {
+  const ROW_LABELS = ['短期应付债券', '政府补助', '待转销项税额', '应付退货款']
+  let seeded = 0
+  for (let i = 0; i < ROW_LABELS.length; i++) {
+    const label = ROW_LABELS[i]
+    const target = summaryRows.find(r => r.item === label)
+    if (!target || target.endBalance !== 0) continue
+    // 从 K4-1 读该行审定数
+    const audited = getResponseNumber(`K4-1-r${i}-audited`) || getResponseNumber(`K4-1-r${i}-unadj`)
+    const begin = getResponseNumber(`K4-1-r${i}-begin`)
+    if (audited > 0 || begin > 0) {
+      target.endBalance = audited
+      target.beginBalance = begin
+      seeded++
+    }
+  }
+  if (seeded > 0) {
+    recalcSummaryTotal()
+    persistSummary()
+    ElMessage.success(`已从K4-1审定表预填 ${seeded} 个项目`)
+  } else {
+    ElMessage.info('K4-1无可预填数据（各行均为0或已填）')
+  }
+}
 
 function onSummaryEdit(row: SummaryRow, field: string, value: any): void {
   ;(row as any)[field] = value ?? (field === 'remark' ? '' : 0)
@@ -324,7 +399,14 @@ async function handleAiGenerate(): Promise<void> {
   try {
     const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       prompt: '请生成其他流动负债附注（上市公司格式）中递延收益-政府补助及债券情况的披露文字说明',
-      context: '科目:其他流动负债(2245) 负债类 含短期应付债券/政府补助/待转销项税额/应付退货款 关注完整性认定',
+      context: {
+        科目: '2245 其他流动负债（负债类）',
+        汇总表期末合计: String(summaryEndTotal.value),
+        债券数量: String(bondRows.value.length),
+        是否存在违约: hasDefault.value ? '是' : '否',
+        政府补助笔数: String(grantRows.value.length),
+        政府补助期末合计: String(grantEndTotal.value),
+      },
       existingContent: noteText.value || '',
       section: 'k4-disc-listed',
     })

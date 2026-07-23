@@ -15,6 +15,7 @@
  * Requirements: 1.1~1.8, 2.1~2.5, 3.1~3.4, 8.1, 8.5, 8.6
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { eventBus } from '@/utils/eventBus'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import {
   parseNum,
@@ -68,6 +69,8 @@ export interface UseD1AdjudicationOptions {
   loadSubWorkpaperData: (subWpCode: string) => Promise<Record<string, string | number>>
   isReadonly: Ref<boolean>
   openReviewDialog?: (params: { sectionId: string; sectionLabel: string; relatedData?: Record<string, unknown> }) => void
+  /** 试算平衡表应收票据(1121)数：由 render 提供，用于 TB 差异行预填（手工录入优先） */
+  tbSeedAmount?: Ref<number>
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -96,7 +99,7 @@ const NET_VALUE_ROWS: RowConfig[] = [
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD1Adjudication(options: UseD1AdjudicationOptions) {
-  const { allResponses, wpId, projectId, saveImmediate, isReadonly, openReviewDialog } = options
+  const { allResponses, wpId, projectId, saveImmediate, isReadonly, openReviewDialog, tbSeedAmount } = options
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
 
@@ -289,7 +292,11 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
   // ─── Trial Balance Diff ──────────────────────────────────────────────────
 
   const trialBalanceDiff: ComputedRef<TrialBalanceDiffRow> = computed(() => {
-    const tbAmount = parseNum(getVal('D1-adj-tb-amount').remark)
+    // 手工录入的 D1-adj-tb-amount 优先；未录入时回退 render 预填的 TB(1121) 数
+    const manual = getVal('D1-adj-tb-amount').remark
+    const tbAmount = (manual !== null && manual !== '')
+      ? parseNum(manual)
+      : (tbSeedAmount?.value ?? 0)
     const netSection = adjudicationSections.value.find(s => s.sectionKey === 'net-value')
     const auditedAmount = netSection?.subtotalRow.currentAudited ?? 0
     return { tbAmount, auditedAmount, diff: auditedAmount - tbAmount }
@@ -412,11 +419,14 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
       wpCode: 'D1',
       accountCode: '1121',
       auditedAmount,
+      adjudicatedAmount: auditedAmount,
       priorAmount,
       changeRate: typeof rate === 'number' ? rate : null,
     }
     try {
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
+      // 经 eventBus.emit 发布（crossWpEventBridge 双向转发到 window），
+      // 使 eventBus.on 与 window.addEventListener 两侧消费者均可收到。
+      eventBus.emit('substantive:adjudicated' as any, payload as any)
     } catch {
       console.warn('[D1Adjudication] EventBus publish substantive:adjudicated failed')
     }

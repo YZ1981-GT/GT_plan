@@ -228,7 +228,7 @@
         </el-table-column>
       </el-table>
 
-      <!-- 权益备抵期末校验 + TB回写状态 -->
+      <!-- 权益备抵期末校验 + TB回写状态 + M3-2勾稽 -->
       <div class="adjudication-footer">
         <el-tag type="warning" size="small" effect="plain">
           TB回写: 科目4002 库存股（借方/权益备抵）
@@ -245,6 +245,22 @@
             （差异: {{ fmtAmount(contraEquityCheck.diff) }}）
           </template>
         </el-tag>
+        <el-tag
+          :type="crossSheetMatch ? 'success' : 'warning'"
+          size="small"
+          effect="plain"
+        >
+          M3-1↔M3-2勾稽:
+          {{ crossSheetMatch ? '一致 ✓' : `差异${fmtAmount(crossSheetDiff)}` }}
+        </el-tag>
+      </div>
+
+      <!-- 从M3-2明细表带入按钮 -->
+      <div v-if="!isReadonly" class="pull-from-detail-area">
+        <el-button size="small" @click="handlePullFromDetail">
+          从M3-2明细表带入（按批次汇总）
+        </el-button>
+        <span class="pull-hint">将M3-2各回购批次的期初/借方/贷方/未审数汇总填入审定表</span>
       </div>
     </div>
 
@@ -265,6 +281,26 @@
         placeholder="请填写库存股审定表审计说明..."
         :disabled="isReadonly"
         @change="saveAuditNote"
+      />
+    </el-card>
+
+    <!-- ═══ 审计结论（el-card包裹） ═══ -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="section-header">
+          <span class="card-title">审计结论</span>
+          <el-button size="small" @click="handleAI('auditConclusion')">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 2, maxRows: 6 }"
+        placeholder="请填写库存股审定表审计结论..."
+        :disabled="isReadonly"
+        @change="saveAuditConclusion"
       />
     </el-card>
 
@@ -515,6 +551,83 @@ function handleRemoveRow(tableIndex: number): void {
 
 const isSaving = ref(false)
 const auditNote = ref('')
+const auditConclusion = ref('')
+
+// ─── M3-1↔M3-2 交叉勾稽 ─────────────────────────────────────────────────────
+
+/** M3-1审定合计 vs M3-2明细合计 差额 */
+const crossSheetDiff = computed(() => {
+  // M3-1 审定合计来自 totalRow
+  const adjTotal = totalRow.value.audited
+  // M3-2 明细表合计从 allResponses 取
+  let detailTotal = 0
+  for (const [key, resp] of formData.allResponses.value) {
+    if (key.startsWith('M3-M3-2-row-') && key.endsWith('-data') && resp.remark) {
+      try {
+        const row = JSON.parse(resp.remark)
+        // 期末金额 = 期初 + 回购 - 注销（在useM3Detail中计算，这里近似重算）
+        const beginAmt = Number(row.beginAmount) || 0
+        const repAmt = Number(row.repurchaseAmount) || 0
+        const cancelAmt = Number(row.cancelAmount) || 0
+        detailTotal += beginAmt + repAmt - cancelAmt
+      } catch { /* skip */ }
+    }
+  }
+  return parseFloat((adjTotal - detailTotal).toFixed(2))
+})
+
+const crossSheetMatch = computed(() => Math.abs(crossSheetDiff.value) < 1)
+
+// ─── 从M3-2明细表带入 ──────────────────────────────────────────────────────
+
+async function handlePullFromDetail() {
+  await formData.loadData()
+  const detailRows: Array<{ batchName: string; beginAmount: number; repurchaseAmount: number; cancelAmount: number }> = []
+  for (const [key, resp] of formData.allResponses.value) {
+    if (key.startsWith('M3-M3-2-row-') && key.endsWith('-data') && resp.remark) {
+      try {
+        const row = JSON.parse(resp.remark)
+        detailRows.push({
+          batchName: row.batchName || '',
+          beginAmount: Number(row.beginAmount) || 0,
+          repurchaseAmount: Number(row.repurchaseAmount) || 0,
+          cancelAmount: Number(row.cancelAmount) || 0,
+        })
+      } catch { /* skip */ }
+    }
+  }
+  if (detailRows.length === 0) {
+    const { ElMessage } = await import('element-plus')
+    ElMessage.info('M3-2明细表暂无数据')
+    return
+  }
+  // 有既有行时确认覆盖
+  if (rows.value.length > 0) {
+    try {
+      await ElMessageBox.confirm(
+        `将从M3-2带入${detailRows.length}个回购批次（替换当前${rows.value.length}行），确认？`,
+        '从明细表带入',
+        { confirmButtonText: '确认替换', cancelButtonText: '取消', type: 'warning' },
+      )
+    } catch { return }
+  }
+  // 映射到审定表行
+  rows.value = detailRows.map(d => ({
+    key: `m3-adj-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    batchName: d.batchName,
+    beginning: d.beginAmount,
+    debitAmount: d.repurchaseAmount,
+    creditAmount: d.cancelAmount,
+    endBalance: 0,
+    unadjusted: d.beginAmount + d.repurchaseAmount - d.cancelAmount, // 期末未审=期初+借-贷
+    aje: 0,
+    rje: 0,
+    audited: 0,
+    category: '',
+  }))
+  const { ElMessage } = await import('element-plus')
+  ElMessage.success(`已从M3-2带入${detailRows.length}个回购批次`)
+}
 
 // ─── 格式化 ──────────────────────────────────────────────────────────────────
 
@@ -537,6 +650,10 @@ async function handleSave() {
 
 function saveAuditNote() {
   formData.debouncedSave('M3-M3-1-auditNote', { remark: auditNote.value || null })
+}
+
+function saveAuditConclusion() {
+  formData.debouncedSave('M3-M3-1-auditConclusion', { remark: auditConclusion.value || null })
 }
 
 function handleAI(_section: string) {
@@ -564,10 +681,14 @@ onMounted(async () => {
       rows.value = restored
     }
   }
-  // 恢复审计说明
+  // 恢复审计说明+结论
   const noteResp = formData.allResponses.value.get('M3-M3-1-auditNote')
   if (noteResp?.remark) {
     auditNote.value = noteResp.remark
+  }
+  const conclusionResp = formData.allResponses.value.get('M3-M3-1-auditConclusion')
+  if (conclusionResp?.remark) {
+    auditConclusion.value = conclusionResp.remark
   }
   // 订阅调整分录创建事件
   eventBus.on('adjustment:created' as any, handleAdjustmentCreated)
@@ -730,6 +851,18 @@ function _restoreRows(): M3AdjudicationRow[] {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.pull-from-detail-area {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pull-hint {
+  font-size: 12px;
+  color: #909399;
 }
 
 .audit-note-card {

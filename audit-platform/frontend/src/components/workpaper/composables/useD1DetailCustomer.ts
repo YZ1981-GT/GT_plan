@@ -26,6 +26,7 @@
  *   期末审定 = 期末未审 + 期末AJE + 期末RJE
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import {
   parseNum,
@@ -54,6 +55,7 @@ export interface CustomerRow {
   currentAje: number
   currentRje: number
   currentAudited: number  // = currentUnadjusted + aje + rje (自动计算)
+  postSettlement: number  // 期后兑付/回款（资产负债表日后票据承兑收款，函证替代程序/存在性证据）
 }
 
 export interface UseD1DetailCustomerOptions {
@@ -63,6 +65,7 @@ export interface UseD1DetailCustomerOptions {
   saveImmediate: SaveFn
   isReadonly: Ref<boolean>
   relatedParties: Ref<string[]>  // 项目关联方名单
+  bsDate?: Ref<string>           // 资产负债表日（YYYY-MM-DD），用于期后兑付取数窗口
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -117,13 +120,14 @@ function createEmptyRow(): CustomerRow {
     currentAje: 0,
     currentRje: 0,
     currentAudited: 0,
+    postSettlement: 0,
   })
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD1DetailCustomer(options: UseD1DetailCustomerOptions) {
-  const { allResponses, saveImmediate, isReadonly, relatedParties } = options
+  const { allResponses, projectId, saveImmediate, isReadonly, relatedParties, bsDate } = options
 
   // ─── State ───────────────────────────────────────────────────────────────
 
@@ -185,6 +189,7 @@ export function useD1DetailCustomer(options: UseD1DetailCustomerOptions) {
         currentAje: parseNum(r.currentAje),
         currentRje: parseNum(r.currentRje),
         currentAudited: 0, // will be recalculated
+        postSettlement: parseNum(r.postSettlement),
       }))
 
       rows.value = loadedRows
@@ -243,6 +248,7 @@ export function useD1DetailCustomer(options: UseD1DetailCustomerOptions) {
       reclassification: r.reclassification,
       currentAje: r.currentAje,
       currentRje: r.currentRje,
+      postSettlement: r.postSettlement,
     }))
     return JSON.stringify(data)
   }
@@ -325,6 +331,7 @@ export function useD1DetailCustomer(options: UseD1DetailCustomerOptions) {
       currentAje: calcSubtotal(source.map(r => r.currentAje)),
       currentRje: calcSubtotal(source.map(r => r.currentRje)),
       currentAudited: calcSubtotal(source.map(r => r.currentAudited)),
+      postSettlement: calcSubtotal(source.map(r => r.postSettlement)),
     }
   }
 
@@ -379,6 +386,7 @@ export function useD1DetailCustomer(options: UseD1DetailCustomerOptions) {
         'currentIncrease', 'currentDecrease',
         'reclassification',
         'currentAje', 'currentRje',
+        'postSettlement',
       ]
       if (numericFields.includes(field as keyof CustomerRow)) {
         ;(row as any)[field] = parseNum(value)
@@ -394,6 +402,125 @@ export function useD1DetailCustomer(options: UseD1DetailCustomerOptions) {
     rows.value = newRows
 
     scheduleSave()
+  }
+
+  // ─── 期后兑付一键取数（P1-6）─────────────────────────────────────────────
+
+  /** 归一化名称（去空白/全角空格，小写）供分录摘要模糊匹配 */
+  function normalizeName(s: string): string {
+    return String(s ?? '').replace(/[\s\u3000]+/g, '').toLowerCase()
+  }
+
+  /**
+   * 从序时账取期后兑付/回款（资产负债表日后科目 1121 贷方发生额），按客户归集填入 postSettlement。
+   *
+   * 数据源：GET /projects/{pid}/ledger/entries/1121?year={bsYear+1}&date_from&date_to（贷方=票据减少=承兑收款）
+   * 归集：按客户名规范化匹配分录摘要/对方科目/辅助核算名；仅精确包含才计入。
+   * 交互：预览"匹配 N 户合计 X / 未匹配 M 笔 Y"→确认后填入 postSettlement（覆盖同客户原值）。
+   *
+   * 期后兑付是应收票据存在性与可回收性的关键证据（票据到期承兑）。
+   * @param monthsAfter 取数窗口月数（默认 6，覆盖典型审计报告日）
+   */
+  async function importPostSettlementFromLedger(monthsAfter = 6): Promise<{ matched: number; filledAmount: number; unmatchedCount: number; unmatchedAmount: number }> {
+    const empty = { matched: 0, filledAmount: 0, unmatchedCount: 0, unmatchedAmount: 0 }
+    if (isReadonly.value) return empty
+    if (rows.value.length === 0) {
+      ElMessage.info('请先录入或导入客户明细后再取期后兑付')
+      return empty
+    }
+    const pid = projectId?.value
+    if (!pid) {
+      ElMessage.warning('缺少项目信息，无法取数')
+      return empty
+    }
+    const bs = (bsDate?.value || '').trim()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(bs)) {
+      ElMessage.warning('资产负债表日无效，无法确定期后兑付窗口')
+      return empty
+    }
+    const start = new Date(`${bs}T00:00:00`)
+    start.setDate(start.getDate() + 1)
+    const end = new Date(start)
+    end.setMonth(end.getMonth() + monthsAfter)
+    const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const dateFrom = fmt(start)
+    const dateTo = fmt(end)
+    const postYear = start.getFullYear()
+
+    try {
+      const token = sessionStorage.getItem('token') || ''
+      const url = `/api/projects/${pid}/ledger/entries/1121?year=${postYear}`
+        + `&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}&limit=1000`
+      const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      if (!resp.ok) {
+        ElMessage.info(`期后（${postYear}年）序时账无数据或未导入`)
+        return empty
+      }
+      const result = await resp.json()
+      const payload = result?.data ?? result
+      const items: any[] = Array.isArray(payload) ? payload
+        : Array.isArray(payload?.items) ? payload.items
+        : Array.isArray(payload?.ledger?.items) ? payload.ledger.items
+        : []
+      if (items.length === 0) {
+        ElMessage.info(`期后（${dateFrom} 至 ${dateTo}）无 1121 兑付分录`)
+        return empty
+      }
+
+      const rowSums = new Map<string, number>()
+      let unmatchedCount = 0
+      let unmatchedAmount = 0
+      for (const it of items) {
+        const credit = Number(it.credit_amount) || 0
+        if (credit <= 0) continue // 只取贷方（票据减少=承兑收款）
+        const text = normalizeName(`${it.summary ?? ''} ${it.counterpart_account ?? ''} ${it.aux_name ?? ''}`)
+        let hitId: string | null = null
+        for (const row of rows.value) {
+          const name = normalizeName(row.customerName)
+          if (name.length >= 2 && text.includes(name)) { hitId = row.rowId; break }
+        }
+        if (hitId) {
+          rowSums.set(hitId, (rowSums.get(hitId) || 0) + credit)
+        } else {
+          unmatchedCount++
+          unmatchedAmount += credit
+        }
+      }
+
+      const matched = rowSums.size
+      const filledAmount = Array.from(rowSums.values()).reduce((s, v) => s + v, 0)
+      if (matched === 0 && unmatchedCount === 0) {
+        ElMessage.info('期后窗口内无兑付分录')
+        return empty
+      }
+
+      const fmtAmt = (v: number) => v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      try {
+        await ElMessageBox.confirm(
+          `期后窗口 ${dateFrom} 至 ${dateTo}（${postYear}年）：\n`
+          + `可归集 ${matched} 户，合计兑付 ${fmtAmt(filledAmount)} 元；\n`
+          + `未匹配 ${unmatchedCount} 笔，合计 ${fmtAmt(unmatchedAmount)} 元（需手工分配）。\n`
+          + `确认后将按客户填入"期后兑付"列（覆盖同客户原值），是否继续？`,
+          '期后兑付取数确认',
+          { confirmButtonText: '填入', cancelButtonText: '取消', type: 'warning' },
+        )
+      } catch {
+        return empty // 用户取消
+      }
+
+      const newRows = rows.value.map(r => {
+        const amt = rowSums.get(r.rowId)
+        return amt !== undefined ? { ...r, postSettlement: amt } : r
+      })
+      rows.value = newRows
+      if (matched > 0) scheduleSave()
+
+      ElMessage.success(`期后兑付取数完成：填入 ${matched} 户，合计 ${fmtAmt(filledAmount)} 元`)
+      return { matched, filledAmount, unmatchedCount, unmatchedAmount }
+    } catch {
+      ElMessage.error('期后兑付取数失败')
+      return empty
+    }
   }
 
   // ─── Audit meta save ─────────────────────────────────────────────────────
@@ -443,6 +570,7 @@ export function useD1DetailCustomer(options: UseD1DetailCustomerOptions) {
     removeRow,
     updateCell,
     matchRelatedParty,
+    importPostSettlementFromLedger,
     saveAuditProcedures,
     saveAuditNote,
     saveAuditConclusion,

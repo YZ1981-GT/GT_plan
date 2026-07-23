@@ -370,6 +370,7 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import { useN3FormData } from '../../composables/useN3FormData'
 import { useN3Adjudication, type N3DiffCategory } from '../../composables/useN3Adjudication'
 import { useN3CrossSheet } from '../../composables/useN3CrossSheet'
+import { eventBus } from '@/utils/eventBus'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -386,6 +387,8 @@ const openReviewDialog = inject<((section: string) => void) | undefined>(
   'openReviewDialog',
   undefined,
 )
+
+const scheduleAutoSnapshot = inject<(() => void) | undefined>('scheduleAutoSnapshot', undefined)
 
 // ─── Refs ────────────────────────────────────────────────────────────────────
 
@@ -407,7 +410,6 @@ const allResponsesRef = computed(() => props.allResponses)
 const {
   rows,
   total,
-  rowValidations,
   crossValidation,
   updateRow,
   saveAndSync,
@@ -498,35 +500,35 @@ async function handleReasonChange(category: N3DiffCategory, reason: string) {
 
 function getSummaries({ columns }: { columns: any[] }) {
   const sums: string[] = []
-  columns.forEach((_col: any, idx: number) => {
+  const LABEL_MAP: Record<string, number | undefined> = {
+    '应纳税暂时性差异项目': undefined,
+    '期初余额': total.value.beginning,
+    '本期贷方(确认)': total.value.credit,
+    '本期借方(转回)': total.value.debit,
+    '期末余额': total.value.endBalance,
+    '未审数': total.value.unadjusted,
+    'AJE': total.value.aje,
+    'RJE': total.value.rje,
+    '审定数': total.value.audited,
+    '变动额': total.value.change,
+  }
+  columns.forEach((col: any, idx: number) => {
     if (idx === 0) {
       sums[idx] = '合计'
       return
     }
-    const t = total.value
-    const map: Record<number, number | undefined> = {
-      1: t.beginning,
-      2: t.credit,
-      3: t.debit,
-      4: t.endBalance,
-      5: t.unadjusted,
-      6: t.aje,
-      7: t.rje,
-      8: t.audited,
-      9: t.change,
-    }
-    const val = map[idx]
-    if (idx === 10) {
-      // 变动率：合计行变动率
-      const beginTotal = t.beginning
-      const changeTotal = t.change
+    const label = col.label || ''
+    if (label === '变动率') {
+      const beginTotal = total.value.beginning
+      const changeTotal = total.value.change
       if (beginTotal === 0 && changeTotal === 0) { sums[idx] = '—'; return }
       if (beginTotal === 0 && changeTotal > 0) { sums[idx] = '100.00%'; return }
       if (beginTotal === 0) { sums[idx] = '—'; return }
       sums[idx] = ((changeTotal / beginTotal) * 100).toFixed(2) + '%'
       return
     }
-    if (idx === 11) { sums[idx] = ''; return } // 原因分析列无合计
+    if (label === '原因分析') { sums[idx] = ''; return }
+    const val = LABEL_MAP[label]
     sums[idx] = val != null ? fmtAmount(val) : ''
   })
   return sums
@@ -535,8 +537,7 @@ function getSummaries({ columns }: { columns: any[] }) {
 // ─── 行样式（校验失败红色） ──────────────────────────────────────────────────
 
 function getRowClassName({ row }: { row: any }): string {
-  const validation = rowValidations.value.find(v => v.category === row.category)
-  if (validation && !validation.isValid) return 'row-validation-error'
+  if (row && row.endBalance < 0) return 'row-validation-error'
   return ''
 }
 
@@ -547,6 +548,7 @@ async function handleWritebackTB() {
   try {
     await saveAndSync()
     publishDeferredTaxLiabilityUpdated()
+    scheduleAutoSnapshot?.()
     ElMessage.success('审定数已回写试算表（科目2901期末余额）')
   } catch (err: any) {
     ElMessage.error(`回写失败：${err.message || '未知错误'}`)
@@ -554,6 +556,41 @@ async function handleWritebackTB() {
     writebackLoading.value = false
   }
 }
+
+// ─── readField 辅助 + N3-3 净影响合并 ───────────────────────────────────────
+
+function readField(sheet: string, field: string): any {
+  const itemId = `N3-${sheet}-${field}`
+  const resp = allResponsesRef.value.get(itemId)
+  if (!resp?.conclusion) return null
+  try { return JSON.parse(resp.conclusion) } catch { return resp.conclusion }
+}
+
+/** N3-3 AJE/RJE 净影响（从 N3-3-entries 实时解析） */
+const n3AjeNet = computed(() => {
+  const val = readField('1', 'aje-net')
+  return typeof val === 'number' ? val : 0
+})
+
+const n3RjeNet = computed(() => {
+  const val = readField('1', 'rje-net')
+  return typeof val === 'number' ? val : 0
+})
+
+// ─── 监听 allResponses 变化刷新 N3-3 影响 ───────────────────────────────────
+
+watch(allResponsesRef, () => {
+  // N3-3 调整分录净影响变化时通知联动
+  if (n3AjeNet.value !== 0 || n3RjeNet.value !== 0) {
+    eventBus.emit('substantive:adjudicated', {
+      wpCode: 'N3',
+      accountCode: '2901',
+      auditedAmount: total.value.audited,
+      adjudicatedAmount: total.value.audited,
+      timestamp: Date.now(),
+    })
+  }
+}, { deep: false })
 
 // ─── 审计说明/结论保存 ───────────────────────────────────────────────────────
 
@@ -567,34 +604,38 @@ async function handleConclusionSave() {
 
 // ─── AI辅助 ──────────────────────────────────────────────────────────────────
 
+const aiLoading = ref(false)
+
+async function callAiGenerateText(section: string, prompt: string, target: 'notes' | 'conclusion' | 'reason') {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const { default: http } = await import('@/utils/http')
+    const res = await http.post(`/api/workpapers/${wpIdRef.value}/ai/generate-text`, {
+      section,
+      prompt,
+      context: { wpId: wpIdRef.value },
+      existingContent: target === 'notes' ? auditNotes.value : target === 'conclusion' ? auditConclusion.value : '',
+    })
+    const text = res?.data?.content || res?.data?.data?.content || ''
+    if (text) {
+      if (target === 'notes') { auditNotes.value = text; await handleNotesSave() }
+      else if (target === 'conclusion') { auditConclusion.value = text; await handleConclusionSave() }
+    }
+  } catch { /* 降级静默 */ }
+  finally { aiLoading.value = false }
+}
+
 function handleAiAssist() {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: 'n3-adjudication',
-      prompt: '请基于递延所得税负债底稿数据，给出审计分析建议',
-      context: { wpId: props.wpId },
-    }).catch(() => {})
-  })
+  callAiGenerateText('n3-adjudication', '请基于递延所得税负债底稿数据，给出审计分析建议', 'notes')
 }
 
 function handleNotesAi() {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: 'n3-adjudication',
-      prompt: '请基于递延所得税负债底稿数据，给出审计分析建议',
-      context: { wpId: props.wpId },
-    }).catch(() => {})
-  })
+  callAiGenerateText('n3-adjudication-notes', '请基于递延所得税负债审定表数据，生成审计说明', 'notes')
 }
 
 function handleReasonAi() {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: 'n3-adjudication',
-      prompt: '请基于递延所得税负债底稿数据，给出审计分析建议',
-      context: { wpId: props.wpId },
-    }).catch(() => {})
-  })
+  callAiGenerateText('n3-adjudication-reason', '请基于递延所得税负债审定表各项目变动情况，给出变动原因分析', 'notes')
 }
 
 // ─── 复核对话 ────────────────────────────────────────────────────────────────

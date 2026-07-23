@@ -1,377 +1,647 @@
 <!--
-  I3TabTargetedCheck.vue — I3-5 针对性检查表
+  I3TabTargetedCheck.vue — I3-5 商誉针对性检查表
 
-  段落型检查（非表格）：减值迹象识别 / 商誉分摊合理性 / CGU划分一致性
-  - 逐项结论(合理/不合理/需调整/待确认) + 琥珀色方法论
-  - Section headers with AI buttons aligned right
-  - 复核对话 button (inject openReviewDialog)
-  - Font 13px
-
-  3 Main Check Sections:
-  1. 减值迹象识别 — 外部迹象(市场/技术/经济/利率) + 内部迹象(经营/报告/重组/决策)
-  2. 商誉分摊至资产组(CGU)合理性 — 合并对价分配/协同效应/管理层考虑
-  3. CGU划分一致性 — 与上年一致性/与管理层内部报告一致性/是否变更
-
-  Spec: .kiro/specs/i3-goodwill/ Task 4.6
-  Requirements: 8.1~8.2
+  对齐致同 Excel：一目标 / 二抽样(测试原因) / 三凭证核对 / 四说明 / 五结论
+  原段落型减值迹象·CGU 检查保留为可选「专项风险关注」（主程序见 I3-6~8）
 -->
 <template>
   <div class="i3-targeted-check">
-    <!-- Section Header -->
     <div class="section-header">
-      <span class="section-title">I3-5 针对性检查表</span>
+      <span class="section-title">I3-5 商誉针对性检查表</span>
       <div class="section-actions">
-        <el-button size="small" type="default" text @click="handleReview">
-          💬复核
-        </el-button>
+        <el-button size="small" type="default" text @click="handleReview">复核</el-button>
       </div>
     </div>
 
-    <!-- 工具栏：索引 chip -->
+    <!-- 一、测试目标 -->
+    <el-alert type="info" :closable="false" show-icon class="objective-alert">
+      <template #title>一、测试目标</template>
+      <ol class="obj-list">
+        <li v-for="(o, i) in I3_5_OBJECTIVES" :key="i">{{ o }}</li>
+      </ol>
+    </el-alert>
+
+    <div class="methodology-context">
+      <p>
+        <b>编制逻辑：</b>
+        勾选测试原因 → 界定测试总体与特定样本 → 抽样 → 逐笔核对凭证与支持性文件（核对内容 1~5）→
+        异常标注 → 形成说明与结论。检查比例＝样本借方合计 ÷ 本期借方发生额（总体为 0 时显示 N/A，避免 #DIV/0!）。
+        减值迹象识别与 CGU 划分的详细程序见 I3-6~I3-8；本表侧重商誉相关交易的综合抽凭。
+      </p>
+    </div>
+
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
       <div class="toolbar-right">
         <GtIndexChip value="wp:I3-5" :context-project-id="projectId" />
+        <el-tag size="small" type="info">样本 {{ summary.sampleCount }} 笔</el-tag>
+        <el-tag v-if="summary.specificCount" size="small" type="warning">特定 {{ summary.specificCount }}</el-tag>
+        <el-tag v-if="summary.anomalyCount > 0" size="small" type="danger">异常 {{ summary.anomalyCount }}</el-tag>
+        <el-tag v-if="summary.failCheckCount > 0" size="small" type="danger">核对× {{ summary.failCheckCount }}</el-tag>
+        <el-tag v-if="summary.pendingCount > 0" size="small" type="warning">未完成 {{ summary.pendingCount }}</el-tag>
+        <el-tag size="small" :type="coverageTagType">检查比例 {{ coverageLabel }}</el-tag>
+        <el-button size="small" @click="emit('navigate-sheet', 'I3-4')">← I3-4</el-button>
+        <el-button size="small" @click="emit('navigate-sheet', 'I3-6')">I3-6 →</el-button>
       </div>
     </div>
 
-    <!-- 审计目标 -->
     <el-alert
-      type="info"
+      v-if="coverageLow"
+      type="warning"
       :closable="false"
       show-icon
-      class="objective-alert"
-      title="审计目标：识别商誉是否存在减值迹象（外部+内部）；评价商誉分摊至资产组(CGU)的合理性；核实 CGU 划分与上年、与管理层内部报告的一致性（CAS8 第六条、第十八条）。"
+      class="check-alert"
+      title="检查比例偏低：请扩大样本量，或在四、审计说明中解释原因。"
     />
 
-    <!-- 编制提示 -->
-    <details class="guidance-details">
-      <summary>📋 编制提示</summary>
-      <div class="guidance-content">
-        <ul>
-          <li>因企业合并形成的商誉，无论是否存在减值迹象，每年均须进行减值测试（CAS8 第十八条）。</li>
-          <li>减值迹象包括外部（市价大幅下跌、经济/技术/法律环境不利、市场利率提高等）与内部（资产闲置、经营绩效低于预期、重组处置计划等）。</li>
-          <li>商誉须分摊至预期受益的资产组(CGU)，分摊层级为内部监控商誉的最低层级、且不大于经营分部。</li>
-          <li>CGU 划分应与上年、与管理层内部报告口径保持一致，变更须有合理依据并充分披露。</li>
-          <li>逐项检查后给出结论（合理/不合理/需调整/待确认），并综合形成检查结论。</li>
-        </ul>
+    <!-- 二、样本选取标准与规模 -->
+    <el-card shadow="never" class="block-card">
+      <template #header>
+        <div class="block-title">
+          <span>二、测试 — 样本选取标准与规模</span>
+          <div class="title-actions">
+            <el-button
+              size="small"
+              :disabled="isReadonly || !(linkedPeriod.debitTotal > 0 || linkedPeriod.creditTotal > 0)"
+              @click="handleSyncPopulation('period')"
+            >
+              从 I3-2 带入本期发生额
+            </el-button>
+            <el-button
+              size="small"
+              :disabled="isReadonly || !(linkedPeriod.originalTotal > 0)"
+              @click="handleSyncPopulation('original')"
+            >
+              带入原值合计
+            </el-button>
+            <el-button size="small" type="primary" :disabled="isReadonly" @click="handleSampling">
+              抽凭引擎
+            </el-button>
+          </div>
+        </div>
+      </template>
+
+      <div class="test-content-hint">
+        <p>测试原因（Excel 勾选）：</p>
+        <el-checkbox-group
+          v-model="sampleMeta.testReasons"
+          :disabled="isReadonly"
+          class="reason-group"
+        >
+          <el-checkbox v-for="r in I3_5_TEST_REASONS" :key="r" :label="r" />
+        </el-checkbox-group>
       </div>
+
+      <div class="test-content-hint">
+        <p>测试内容说明（第三节「核对内容」列）：</p>
+        <ol>
+          <li v-for="(item, i) in I3_5_TEST_CONTENT" :key="i">{{ i + 1 }}. {{ item }}</li>
+        </ol>
+      </div>
+
+      <el-descriptions :column="2" border size="small" class="sample-desc">
+        <el-descriptions-item label="测试总体">
+          <el-input
+            v-if="!isReadonly"
+            v-model="sampleMeta.populationDesc"
+            size="small"
+            placeholder="账面商誉借方发生额总体"
+          />
+          <span v-else>{{ sampleMeta.populationDesc }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="总体笔数 / 借方金额">
+          <div class="pop-cell">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="sampleMeta.populationCount"
+              :controls="false"
+              size="small"
+              :min="0"
+              style="width:80px"
+            />
+            <span v-else>{{ sampleMeta.populationCount || '—' }}</span>
+            <span class="sep">笔 /</span>
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="sampleMeta.populationAmount"
+              :controls="false"
+              size="small"
+              :precision="2"
+              @change="(v: number | undefined) => setPopulationAmount(v ?? 0, true)"
+            />
+            <span v-else class="amt">{{ fmtNum(sampleMeta.populationAmount) }}</span>
+            <el-tag v-if="linkedPeriod.source" size="small" type="info">
+              源 {{ linkedPeriod.source }}
+            </el-tag>
+            <el-tag v-if="sampleMeta.populationManual" size="small" type="warning">手工</el-tag>
+          </div>
+        </el-descriptions-item>
+        <el-descriptions-item label="本期贷方发生额">
+          <el-input-number
+            v-if="!isReadonly"
+            v-model="sampleMeta.populationCreditAmount"
+            :controls="false"
+            size="small"
+            :precision="2"
+          />
+          <span v-else class="amt">{{ fmtNum(sampleMeta.populationCreditAmount) }}</span>
+          <span class="hint">（减值等；贷方检查比例 {{ creditCoverageLabel }}）</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="特定样本（100%检查）">
+          <el-input
+            v-if="!isReadonly"
+            v-model="sampleMeta.specificSample"
+            size="small"
+            type="textarea"
+            :autosize="{ minRows: 1, maxRows: 3 }"
+            placeholder="大额并购、关联方、异常减值…"
+          />
+          <span v-else>{{ sampleMeta.specificSample }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="特定样本金额">
+          <el-input-number
+            v-if="!isReadonly"
+            v-model="sampleMeta.specificAmount"
+            :controls="false"
+            size="small"
+            :precision="2"
+          />
+          <span v-else class="amt">{{ fmtNum(sampleMeta.specificAmount) }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="抽样总体">
+          <el-input
+            v-if="!isReadonly"
+            v-model="sampleMeta.samplingPopulationDesc"
+            size="small"
+            placeholder="剔除特定样本后的剩余总体"
+          />
+          <span v-else>{{ sampleMeta.samplingPopulationDesc }}</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="抽样样本量">
+          <el-input-number
+            v-if="!isReadonly"
+            v-model="sampleMeta.sampleSize"
+            :controls="false"
+            size="small"
+            :min="0"
+          />
+          <span v-else>{{ sampleMeta.sampleSize || summary.sampleCount }}</span>
+          <span class="hint">（表内样本 {{ summary.sampleCount }} 笔）</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="抽样方法 / 过程">
+          <div class="method-cell">
+            <el-select
+              v-if="!isReadonly"
+              v-model="sampleMeta.sampleMethod"
+              size="small"
+              filterable
+              allow-create
+              style="width: 140px"
+            >
+              <el-option v-for="m in I3_5_SAMPLE_METHODS" :key="m" :label="m" :value="m" />
+            </el-select>
+            <span v-else>{{ sampleMeta.sampleMethod }}</span>
+            <el-input
+              v-if="!isReadonly"
+              v-model="sampleMeta.sampleProcess"
+              size="small"
+              placeholder="抽样过程说明或索引其他底稿…"
+              style="flex:1"
+            />
+            <span v-else>{{ sampleMeta.sampleProcess || '—' }}</span>
+          </div>
+        </el-descriptions-item>
+        <el-descriptions-item label="检查合计 / 比例">
+          <span class="amt">借 {{ fmtNum(summary.checkedDebitTotal) }}</span>
+          <span class="sep">/</span>
+          <span :class="{ 'warn-coverage': coverageLow }">{{ coverageLabel }}</span>
+          <span class="sep">贷 {{ fmtNum(summary.checkedCreditTotal) }}</span>
+          <span class="sep">阈值</span>
+          <el-input-number
+            v-if="!isReadonly"
+            v-model="sampleMeta.coverageThreshold"
+            :min="1"
+            :max="100"
+            :controls="false"
+            size="small"
+            style="width:72px"
+          />
+          <span v-else>{{ sampleMeta.coverageThreshold }}%</span>
+        </el-descriptions-item>
+      </el-descriptions>
+    </el-card>
+
+    <!-- 三、测试 -->
+    <el-card shadow="never" class="block-card">
+      <template #header>
+        <div class="block-title">
+          <span>三、测试 — 记账凭证核对</span>
+          <div class="title-actions">
+            <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleAddRow">+ 新增行</el-button>
+            <el-button size="small" type="success" :disabled="isReadonly" @click="handleSave">保存</el-button>
+          </div>
+        </div>
+      </template>
+
+      <el-table
+        :data="rows"
+        border
+        stripe
+        size="small"
+        class="check-table"
+        max-height="520"
+        :row-class-name="rowClassName"
+        show-summary
+        :summary-method="getSummary"
+      >
+        <el-table-column type="index" label="#" width="40" align="center" fixed />
+        <el-table-column label="层" width="56" align="center" fixed>
+          <template #default="{ row }">
+            <el-tag v-if="row.isSpecific || row.selectionReason" size="small" type="warning">特定</el-tag>
+            <el-tag v-else size="small" type="info">抽样</el-tag>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="商誉项目明细" min-width="120" fixed>
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.projectName"
+              size="small"
+              placeholder="被投资单位/CGU"
+              @update:model-value="(v: string) => updateRow(row.rowId, 'projectName', v)"
+            />
+            <span v-else>{{ row.projectName || '—' }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="凭证日期" width="118">
+          <template #default="{ row }">
+            <el-date-picker
+              v-if="!isReadonly"
+              :model-value="row.voucherDate"
+              type="date"
+              size="small"
+              value-format="YYYY-MM-DD"
+              style="width:100%"
+              @update:model-value="(v: string) => updateRow(row.rowId, 'voucherDate', v || '')"
+            />
+            <span v-else>{{ row.voucherDate || '—' }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="凭证号" min-width="90">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.voucherNo"
+              size="small"
+              @update:model-value="(v: string) => updateRow(row.rowId, 'voucherNo', v)"
+            />
+            <span v-else>{{ row.voucherNo || '—' }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="业务内容" min-width="120">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.businessDesc"
+              size="small"
+              @update:model-value="(v: string) => updateRow(row.rowId, 'businessDesc', v)"
+            />
+            <span v-else>{{ row.businessDesc || '—' }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="对方科目" min-width="100">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.counterpartAccount"
+              size="small"
+              @update:model-value="(v: string) => updateRow(row.rowId, 'counterpartAccount', v)"
+            />
+            <span v-else>{{ row.counterpartAccount || '—' }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="对方明细" min-width="90">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.counterpartDetail"
+              size="small"
+              @update:model-value="(v: string) => updateRow(row.rowId, 'counterpartDetail', v)"
+            />
+            <span v-else>{{ row.counterpartDetail || '—' }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="借方金额" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.debitAmount"
+              size="small"
+              :controls="false"
+              :precision="2"
+              class="amt-input"
+              @change="(v: number | undefined) => updateRow(row.rowId, 'debitAmount', v ?? 0)"
+            />
+            <span v-else class="amt">{{ fmtNum(row.debitAmount) }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="贷方金额" width="100" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.creditAmount"
+              size="small"
+              :controls="false"
+              :precision="2"
+              class="amt-input"
+              @change="(v: number | undefined) => updateRow(row.rowId, 'creditAmount', v ?? 0)"
+            />
+            <span v-else class="amt">{{ fmtNum(row.creditAmount) }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="支持性文件" min-width="110">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.supportingDocs"
+              size="small"
+              placeholder="并购协议/评估报告…"
+              @update:model-value="(v: string) => updateRow(row.rowId, 'supportingDocs', v)"
+            />
+            <span v-else>{{ row.supportingDocs || '—' }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column
+          v-for="ci in 5"
+          :key="ci"
+          :label="`核对${ci}`"
+          width="72"
+          align="center"
+        >
+          <template #header>
+            <el-tooltip :content="I3_5_TEST_CONTENT[ci - 1]" placement="top">
+              <span class="check-h">{{ ci }}</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              :model-value="row[`check${ci}` as keyof typeof row]"
+              size="small"
+              clearable
+              @change="(v: string) => updateRow(row.rowId, `check${ci}` as any, v || '')"
+            >
+              <el-option v-for="o in checkOpts" :key="o || 'empty'" :label="o || '—'" :value="o" />
+            </el-select>
+            <span v-else :class="checkClass(String(row[`check${ci}` as keyof typeof row] || ''))">
+              {{ row[`check${ci}` as keyof typeof row] || '—' }}
+            </span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="索引号" min-width="80">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.indexRef"
+              size="small"
+              @update:model-value="(v: string) => updateRow(row.rowId, 'indexRef', v)"
+            />
+            <span v-else>{{ row.indexRef || '—' }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="是否异常" width="100">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              :model-value="row.isAbnormal"
+              size="small"
+              clearable
+              filterable
+              allow-create
+              :class="{ 'abnormal-cell': isAbnormalFlag(row.isAbnormal) }"
+              @change="(v: string) => updateRow(row.rowId, 'isAbnormal', v || '')"
+            >
+              <el-option label="否" value="否" />
+              <el-option label="是" value="是" />
+              <el-option label="入账差异" value="入账差异" />
+              <el-option label="分摊不当" value="分摊不当" />
+              <el-option label="跨期" value="跨期" />
+              <el-option label="其他" value="其他" />
+            </el-select>
+            <span v-else :class="{ 'abnormal-cell': isAbnormalFlag(row.isAbnormal) }">{{ row.isAbnormal || '—' }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="备注" min-width="100">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.remark"
+              size="small"
+              @update:model-value="(v: string) => updateRow(row.rowId, 'remark', v)"
+            />
+            <span v-else>{{ row.remark || '—' }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column v-if="!isReadonly" label="操作" width="56" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" type="danger" text @click="removeRow(row.rowId)">删</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- 专项风险关注（兼容原段落型） -->
+    <el-card shadow="never" class="block-card risk-card">
+      <template #header>
+        <div class="block-title">
+          <span>专项风险关注（可选）</span>
+          <el-tag size="small" type="info">减值迹象 / CGU 分摊 / 划分一致性 → 详见 I3-6~8</el-tag>
+        </div>
+      </template>
+      <el-row :gutter="12">
+        <el-col :span="8">
+          <div class="risk-block">
+            <div class="risk-title">减值迹象识别</div>
+            <el-input
+              v-model="riskFocus.externalIndicators"
+              type="textarea"
+              :autosize="{ minRows: 2, maxRows: 5 }"
+              :disabled="isReadonly"
+              placeholder="外部迹象：市价/环境/利率…"
+            />
+            <el-input
+              v-model="riskFocus.internalIndicators"
+              type="textarea"
+              :autosize="{ minRows: 2, maxRows: 5 }"
+              :disabled="isReadonly"
+              placeholder="内部迹象：经营/重组/绩效…"
+              class="mt-6"
+            />
+            <el-select v-model="riskFocus.externalConclusion" size="small" :disabled="isReadonly" clearable placeholder="外部结论" class="mt-6">
+              <el-option label="无减值迹象" value="无减值迹象" />
+              <el-option label="存在减值迹象" value="存在减值迹象" />
+              <el-option label="需进一步判断" value="需进一步判断" />
+              <el-option label="待确认" value="待确认" />
+            </el-select>
+            <el-select v-model="riskFocus.internalConclusion" size="small" :disabled="isReadonly" clearable placeholder="内部结论" class="mt-6">
+              <el-option label="无减值迹象" value="无减值迹象" />
+              <el-option label="存在减值迹象" value="存在减值迹象" />
+              <el-option label="需进一步判断" value="需进一步判断" />
+              <el-option label="待确认" value="待确认" />
+            </el-select>
+          </div>
+        </el-col>
+        <el-col :span="8">
+          <div class="risk-block">
+            <div class="risk-title">商誉分摊至 CGU</div>
+            <el-input
+              v-model="riskFocus.cguAllocation"
+              type="textarea"
+              :autosize="{ minRows: 4, maxRows: 8 }"
+              :disabled="isReadonly"
+              placeholder="合并对价分摊、协同效应、管理层监控层级…"
+            />
+            <el-select v-model="riskFocus.allocationConclusion" size="small" :disabled="isReadonly" clearable placeholder="结论" class="mt-6">
+              <el-option label="合理" value="合理" />
+              <el-option label="不合理" value="不合理" />
+              <el-option label="需调整" value="需调整" />
+              <el-option label="待确认" value="待确认" />
+            </el-select>
+          </div>
+        </el-col>
+        <el-col :span="8">
+          <div class="risk-block">
+            <div class="risk-title">CGU 划分一致性</div>
+            <el-input
+              v-model="riskFocus.cguConsistency"
+              type="textarea"
+              :autosize="{ minRows: 4, maxRows: 8 }"
+              :disabled="isReadonly"
+              placeholder="与上年一致、与内部报告一致、变更情况…"
+            />
+            <el-select v-model="riskFocus.consistencyConclusion" size="small" :disabled="isReadonly" clearable placeholder="结论" class="mt-6">
+              <el-option label="一致" value="一致" />
+              <el-option label="不一致但合理" value="不一致但合理" />
+              <el-option label="不一致且不合理" value="不一致且不合理" />
+              <el-option label="待确认" value="待确认" />
+            </el-select>
+          </div>
+        </el-col>
+      </el-row>
+    </el-card>
+
+    <!-- 四、审计说明 -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header>
+        <div class="conclusion-header">
+          <span>四、审计说明</span>
+          <el-button
+            v-if="!isReadonly && adjDrafts.length"
+            size="small"
+            text
+            type="danger"
+            @click="handleAdjDraft"
+          >
+            写入调整草稿（×{{ adjDrafts.length }}）
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditNote"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 4 }"
+        placeholder="记录抽样过程、异常处理、与 I3-4 / I3-6~8 交叉印证情况…"
+        @change="(v: string) => saveNote(v)"
+      />
+    </el-card>
+
+    <!-- 五、审计结论 -->
+    <el-card shadow="never" class="audit-conclusion-card">
+      <template #header>
+        <div class="conclusion-header">
+          <span>五、审计结论</span>
+          <el-button v-if="!isReadonly" size="small" text type="primary" @click="handleFillDraft">生成草稿</el-button>
+        </div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="auditConclusion"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="针对性检查是否达成测试目标；商誉在重大方面是否恰当…"
+        @change="(v: string) => saveConclusion(v)"
+      />
+    </el-card>
+
+    <details class="edit-tips">
+      <summary>编制提示（对齐 Excel I3-5）</summary>
+      <ol>
+        <li>先勾选测试原因并填第二节总体，再抽样本填入第三节；检查比例=样本借方÷本期借方（总体为 0 显示 N/A）。</li>
+        <li>无新并购时本期借方可为 0，可改用「带入原值合计」作存在性测试总体，并在说明中解释。</li>
+        <li>核对 1~5 对应测试内容说明；选「×」时自动标记异常，并可写入调整建议草稿。</li>
+        <li>入账价值测算见 I3-4；减值测试见 I3-6~8。专项风险关注区可记载迹象/CGU 段落结论。</li>
+      </ol>
     </details>
 
-    <!-- 琥珀色方法论上下文 -->
-    <div class="methodology-context">
-      <p><strong>CAS8第六条 减值迹象规定：</strong>企业应当在资产负债表日判断资产是否存在可能发生减值的迹象。
-      因企业合并所形成的商誉，无论是否存在减值迹象，每年都应当进行减值测试。
-      减值迹象包括外部信息来源（市价大幅下跌、经济技术法律环境不利变化、市场利率提高、
-      净资产账面价值大于市值）和内部信息来源（资产闲置终止或提前处置、经济绩效低于预期、
-      资产组重组或业务处置计划）。含商誉的资产组应按CAS8第十八条进行年度减值测试，
-      商誉不摊销，减值后不可转回。</p>
-    </div>
-
-    <!-- Section 1: 减值迹象识别 -->
-    <el-card class="check-section" shadow="never">
-      <template #header>
-        <div class="check-section-header">
-          <span class="check-section-title">一、减值迹象识别</span>
-        </div>
-      </template>
-      <div class="check-section-body">
-        <!-- 1.1 外部迹象 -->
-        <div class="check-item">
-          <div class="check-item-title">1.1 外部迹象检查（市场/技术/经济/利率）</div>
-          <el-input
-            v-model="sections.externalIndicators"
-            type="textarea"
-            :autosize="{ minRows: 4, maxRows: 12 }"
-            :disabled="isReadonly"
-            placeholder="请逐条检查以下外部减值迹象：&#10;① 资产的市价在当期是否大幅下跌，其跌幅明显高于因时间推移或正常使用而预计的下跌&#10;② 企业经营所处的经济、技术或法律等环境以及资产所处的市场在当期或将在近期发生重大变化，从而对企业产生不利影响&#10;③ 市场利率或者其他市场投资报酬率在当期已经提高，从而影响折现率，导致资产可收回金额大幅降低&#10;④ 有证据表明资产已经陈旧过时或其实体已经损坏&#10;⑤ 被收购方所在行业是否发生重大不利变化"
-          />
-          <div class="conclusion-row">
-            <span class="conclusion-label">结论：</span>
-            <el-select v-model="conclusions.externalIndicators" size="small" :disabled="isReadonly" placeholder="选择结论" style="width:180px">
-              <el-option label="无减值迹象" value="无减值迹象" />
-              <el-option label="存在减值迹象" value="存在减值迹象" />
-              <el-option label="需进一步判断" value="需进一步判断" />
-              <el-option label="待确认" value="待确认" />
-            </el-select>
-            <el-input
-              v-model="remarks.externalIndicators"
-              size="small"
-              :disabled="isReadonly"
-              placeholder="备注"
-              style="flex:1;margin-left:12px"
-            />
-          </div>
-        </div>
-        <!-- 1.2 内部迹象 -->
-        <div class="check-item">
-          <div class="check-item-title">1.2 内部迹象检查（经营/报告/重组/决策）</div>
-          <el-input
-            v-model="sections.internalIndicators"
-            type="textarea"
-            :autosize="{ minRows: 4, maxRows: 12 }"
-            :disabled="isReadonly"
-            placeholder="请逐条检查以下内部减值迹象：&#10;① 有证据表明资产已经或将被闲置、终止使用或者计划提前处置&#10;② 企业内部报告的证据表明资产的经济绩效已经低于或者将低于预期（如经营现金流量或营业利润远低于预算）&#10;③ 资产所属的资产组或资产组组合存在重组或业务处置计划&#10;④ 被收购业务实际经营利润是否持续低于并购时的预期&#10;⑤ 管理层是否有证据表明即将出现的变化将对商誉产生不利影响"
-          />
-          <div class="conclusion-row">
-            <span class="conclusion-label">结论：</span>
-            <el-select v-model="conclusions.internalIndicators" size="small" :disabled="isReadonly" placeholder="选择结论" style="width:180px">
-              <el-option label="无减值迹象" value="无减值迹象" />
-              <el-option label="存在减值迹象" value="存在减值迹象" />
-              <el-option label="需进一步判断" value="需进一步判断" />
-              <el-option label="待确认" value="待确认" />
-            </el-select>
-            <el-input
-              v-model="remarks.internalIndicators"
-              size="small"
-              :disabled="isReadonly"
-              placeholder="备注"
-              style="flex:1;margin-left:12px"
-            />
-          </div>
-        </div>
-      </div>
-    </el-card>
-
-    <!-- Section 2: 商誉分摊至资产组(CGU)合理性 -->
-    <el-card class="check-section" shadow="never">
-      <template #header>
-        <div class="check-section-header">
-          <span class="check-section-title">二、商誉分摊至资产组(CGU)合理性</span>
-        </div>
-      </template>
-      <div class="check-section-body">
-        <!-- 2.1 合并对价分摊 -->
-        <div class="check-item">
-          <div class="check-item-title">2.1 合并对价与商誉初始分摊</div>
-          <el-input
-            v-model="sections.mergerCostAllocation"
-            type="textarea"
-            :autosize="{ minRows: 3, maxRows: 10 }"
-            :disabled="isReadonly"
-            placeholder="请检查：&#10;① 商誉是否已在购买日分摊至预期从企业合并中受益的资产组或资产组组合&#10;② 分摊商誉的资产组或组合是否为企业内部管理目的监控商誉的最低水平&#10;③ 分摊商誉的资产组或组合是否不大于CAS35确定的经营分部&#10;④ 合并对价中可辨认净资产公允价值的计量是否充分"
-          />
-          <div class="conclusion-row">
-            <span class="conclusion-label">结论：</span>
-            <el-select v-model="conclusions.mergerCostAllocation" size="small" :disabled="isReadonly" placeholder="选择结论" style="width:180px">
-              <el-option label="合理" value="合理" />
-              <el-option label="不合理" value="不合理" />
-              <el-option label="需调整" value="需调整" />
-              <el-option label="待确认" value="待确认" />
-            </el-select>
-            <el-input
-              v-model="remarks.mergerCostAllocation"
-              size="small"
-              :disabled="isReadonly"
-              placeholder="备注"
-              style="flex:1;margin-left:12px"
-            />
-          </div>
-        </div>
-        <!-- 2.2 协同效应 -->
-        <div class="check-item">
-          <div class="check-item-title">2.2 协同效应考虑</div>
-          <el-input
-            v-model="sections.synergyEffect"
-            type="textarea"
-            :autosize="{ minRows: 3, maxRows: 10 }"
-            :disabled="isReadonly"
-            placeholder="请检查：&#10;① 商誉分摊是否反映了企业合并所产生的协同效应归属于哪些资产组&#10;② 预期协同效应是否合理、有据可查（收入协同/成本协同/管理协同）&#10;③ 管理层对协同效应的量化是否在合理范围内&#10;④ 协同效应是否已在DCF预测中充分反映"
-          />
-          <div class="conclusion-row">
-            <span class="conclusion-label">结论：</span>
-            <el-select v-model="conclusions.synergyEffect" size="small" :disabled="isReadonly" placeholder="选择结论" style="width:180px">
-              <el-option label="合理" value="合理" />
-              <el-option label="不合理" value="不合理" />
-              <el-option label="需调整" value="需调整" />
-              <el-option label="待确认" value="待确认" />
-            </el-select>
-            <el-input
-              v-model="remarks.synergyEffect"
-              size="small"
-              :disabled="isReadonly"
-              placeholder="备注"
-              style="flex:1;margin-left:12px"
-            />
-          </div>
-        </div>
-        <!-- 2.3 管理层考虑 -->
-        <div class="check-item">
-          <div class="check-item-title">2.3 管理层内部监控依据</div>
-          <el-input
-            v-model="sections.managementBasis"
-            type="textarea"
-            :autosize="{ minRows: 3, maxRows: 10 }"
-            :disabled="isReadonly"
-            placeholder="请检查：&#10;① 管理层内部报告是否按对应资产组/组合监控商誉绩效&#10;② 分摊层级是否与管理层监控商誉的最低层级一致&#10;③ 是否存在未分摊至资产组的商誉（若有需说明原因和后续计划）&#10;④ 管理层监控频率和方式是否适当"
-          />
-          <div class="conclusion-row">
-            <span class="conclusion-label">结论：</span>
-            <el-select v-model="conclusions.managementBasis" size="small" :disabled="isReadonly" placeholder="选择结论" style="width:180px">
-              <el-option label="合理" value="合理" />
-              <el-option label="不合理" value="不合理" />
-              <el-option label="需调整" value="需调整" />
-              <el-option label="待确认" value="待确认" />
-            </el-select>
-            <el-input
-              v-model="remarks.managementBasis"
-              size="small"
-              :disabled="isReadonly"
-              placeholder="备注"
-              style="flex:1;margin-left:12px"
-            />
-          </div>
-        </div>
-      </div>
-    </el-card>
-
-    <!-- Section 3: CGU划分一致性 -->
-    <el-card class="check-section" shadow="never">
-      <template #header>
-        <div class="check-section-header">
-          <span class="check-section-title">三、CGU划分一致性</span>
-        </div>
-      </template>
-      <div class="check-section-body">
-        <!-- 3.1 与上年一致性 -->
-        <div class="check-item">
-          <div class="check-item-title">3.1 与上年CGU划分一致性</div>
-          <el-input
-            v-model="sections.priorYearConsistency"
-            type="textarea"
-            :autosize="{ minRows: 3, maxRows: 10 }"
-            :disabled="isReadonly"
-            placeholder="请检查：&#10;① 本年CGU划分是否与上年保持一致&#10;② 若发生变化，变化原因是否合理（业务重组/资产处置/新并购整合）&#10;③ 变化是否已按CAS8第十九条要求进行了追溯调整和充分披露&#10;④ 变更前后减值测试结论是否存在重大差异"
-          />
-          <div class="conclusion-row">
-            <span class="conclusion-label">结论：</span>
-            <el-select v-model="conclusions.priorYearConsistency" size="small" :disabled="isReadonly" placeholder="选择结论" style="width:180px">
-              <el-option label="一致" value="一致" />
-              <el-option label="不一致但合理" value="不一致但合理" />
-              <el-option label="不一致且不合理" value="不一致且不合理" />
-              <el-option label="待确认" value="待确认" />
-            </el-select>
-            <el-input
-              v-model="remarks.priorYearConsistency"
-              size="small"
-              :disabled="isReadonly"
-              placeholder="备注"
-              style="flex:1;margin-left:12px"
-            />
-          </div>
-        </div>
-        <!-- 3.2 与管理层内部报告一致性 -->
-        <div class="check-item">
-          <div class="check-item-title">3.2 与管理层内部报告一致性</div>
-          <el-input
-            v-model="sections.internalReportConsistency"
-            type="textarea"
-            :autosize="{ minRows: 3, maxRows: 10 }"
-            :disabled="isReadonly"
-            placeholder="请检查：&#10;① CGU划分是否与管理层内部报告/绩效评价的报告单元一致&#10;② 是否存在CGU跨经营分部的情况（若有需特别说明合理性）&#10;③ 合并报告层面与子公司层面的CGU划分是否协调一致&#10;④ 管理层内部KPI考核单元是否与CGU划分逻辑吻合"
-          />
-          <div class="conclusion-row">
-            <span class="conclusion-label">结论：</span>
-            <el-select v-model="conclusions.internalReportConsistency" size="small" :disabled="isReadonly" placeholder="选择结论" style="width:180px">
-              <el-option label="一致" value="一致" />
-              <el-option label="不一致但合理" value="不一致但合理" />
-              <el-option label="不一致且不合理" value="不一致且不合理" />
-              <el-option label="待确认" value="待确认" />
-            </el-select>
-            <el-input
-              v-model="remarks.internalReportConsistency"
-              size="small"
-              :disabled="isReadonly"
-              placeholder="备注"
-              style="flex:1;margin-left:12px"
-            />
-          </div>
-        </div>
-        <!-- 3.3 是否变更 -->
-        <div class="check-item">
-          <div class="check-item-title">3.3 CGU划分变更情况</div>
-          <el-input
-            v-model="sections.cguChangeStatus"
-            type="textarea"
-            :autosize="{ minRows: 3, maxRows: 10 }"
-            :disabled="isReadonly"
-            placeholder="请检查：&#10;① 本年是否存在CGU划分的变更&#10;② 变更原因是否经管理层正式批准并有书面依据&#10;③ 变更对商誉减值测试结论的影响程度（敏感性分析）&#10;④ 变更是否在财务报表附注中充分披露"
-          />
-          <div class="conclusion-row">
-            <span class="conclusion-label">结论：</span>
-            <el-select v-model="conclusions.cguChangeStatus" size="small" :disabled="isReadonly" placeholder="选择结论" style="width:180px">
-              <el-option label="无变更" value="无变更" />
-              <el-option label="有变更且合理" value="有变更且合理" />
-              <el-option label="有变更但不合理" value="有变更但不合理" />
-              <el-option label="待确认" value="待确认" />
-            </el-select>
-            <el-input
-              v-model="remarks.cguChangeStatus"
-              size="small"
-              :disabled="isReadonly"
-              placeholder="备注"
-              style="flex:1;margin-left:12px"
-            />
-          </div>
-        </div>
-      </div>
-    </el-card>
-
-    <!-- 综合检查结论 -->
-    <el-card class="overall-conclusion" shadow="never">
-      <template #header>
-        <span style="font-weight:600">综合检查结论</span>
-      </template>
-      <el-input
-        v-model="overallConclusion"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        :disabled="isReadonly"
-        placeholder="综合以上针对性检查结果，说明：&#10;1. 是否存在减值迹象（结合I3-6减值测试结果）&#10;2. 商誉分摊至CGU是否合理&#10;3. CGU划分是否一致、合规&#10;4. 后续跟进事项（若有）"
+    <el-dialog
+      v-model="samplingVisible"
+      title="抽凭引擎 — 商誉(1711) 针对性检查"
+      width="90%"
+      top="5vh"
+      destroy-on-close
+    >
+      <GtVoucherSamplingEngine
+        v-if="samplingVisible && props.wpId && props.projectId"
+        account-code="1711"
+        phase="final"
+        :workpaper-id="props.wpId"
+        :project-id="props.projectId"
+        :year="samplingYear"
+        @filled="onSamplesFilled"
       />
-    </el-card>
-
-    <!-- 审计说明 -->
-    <el-card class="audit-note-card" shadow="never">
-      <template #header><span style="font-weight:600">审计说明</span></template>
-      <el-input
-        v-model="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 5 }"
-        :disabled="isReadonly"
-        placeholder="记录针对性检查执行过程的审计说明（如减值迹象识别依据、CGU 划分核对的证据来源等）..."
-      />
-    </el-card>
-
-    <!-- 审计结论 -->
-    <el-card class="audit-note-card" shadow="never">
-      <template #header><span style="font-weight:600">审计结论</span></template>
-      <el-input
-        v-model="auditConclusion"
-        type="textarea"
-        :autosize="{ minRows: 3 }"
-        :disabled="isReadonly"
-        placeholder="针对性检查的审计结论（如：未发现减值迹象/商誉分摊与CGU划分合理，减值测试结论可依赖）..."
-      />
-    </el-card>
-
-    <!-- 保存 -->
-    <div class="table-actions" v-if="!isReadonly">
-      <el-button size="small" type="success" @click="handleSave">保存</el-button>
-    </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, inject, reactive } from 'vue'
+import { computed, inject, ref, toRef, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
+import {
+  useI3TargetedCheck,
+  I3_5_OBJECTIVES,
+  I3_5_TEST_CONTENT,
+  I3_5_TEST_REASONS,
+  I3_5_SAMPLE_METHODS,
+  I3_5_CHECK_OPTIONS,
+  isAbnormalFlag,
+  hasFailedCheck,
+} from '../../composables/useI3TargetedCheck'
+
+const GtVoucherSamplingEngine = defineAsyncComponent(
+  () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),
+)
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  year?: number
 }>()
 
 const emit = defineEmits<{
@@ -381,231 +651,173 @@ const emit = defineEmits<{
 
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
 
-const STORAGE_KEY = 'I3-5-targeted'
+const isReadonly = computed(() => Boolean(props.isReadonly))
+const projectId = computed(() => props.projectId)
+const checkOpts = I3_5_CHECK_OPTIONS.filter((o) => o !== '') as string[]
+const samplingVisible = ref(false)
+const samplingYear = computed(() => props.year || new Date().getFullYear())
+const asOfYear = computed(() => props.year || new Date().getFullYear())
 
-// --- Sections: textarea内容 ---
-const sections = reactive({
-  externalIndicators: '',
-  internalIndicators: '',
-  mergerCostAllocation: '',
-  synergyEffect: '',
-  managementBasis: '',
-  priorYearConsistency: '',
-  internalReportConsistency: '',
-  cguChangeStatus: '',
+const allResponsesRef = toRef(props, 'allResponses')
+
+const {
+  rows,
+  sampleMeta,
+  riskFocus,
+  auditNote,
+  auditConclusion,
+  summary,
+  coverageLow,
+  coverageLabel,
+  creditCoverageLabel,
+  coverageTagType,
+  linkedPeriod,
+  adjDrafts,
+  addRow,
+  removeRow,
+  updateRow,
+  fillFromSampledVouchers,
+  setPopulationAmount,
+  syncPopulationFromI32,
+  appendAdjDraftsToNote,
+  fillConclusionDraft,
+  persistAll,
+  saveNote,
+  saveConclusion,
+} = useI3TargetedCheck(allResponsesRef, {
+  onSave: (itemId, value) => emit('save', itemId, value),
+  asOfYear,
 })
 
-// --- Conclusions: 逐项结论 ---
-const conclusions = reactive({
-  externalIndicators: '',
-  internalIndicators: '',
-  mergerCostAllocation: '',
-  synergyEffect: '',
-  managementBasis: '',
-  priorYearConsistency: '',
-  internalReportConsistency: '',
-  cguChangeStatus: '',
-})
-
-// --- Remarks: 备注 ---
-const remarks = reactive({
-  externalIndicators: '',
-  internalIndicators: '',
-  mergerCostAllocation: '',
-  synergyEffect: '',
-  managementBasis: '',
-  priorYearConsistency: '',
-  internalReportConsistency: '',
-  cguChangeStatus: '',
-})
-
-const overallConclusion = ref('')
-const auditNote = ref('')
-const auditConclusion = ref('')
-
-// --- Load/Save ---
-function loadData() {
-  const raw = props.allResponses.get(STORAGE_KEY)
-  if (!raw) return
-  try {
-    const parsed = typeof raw === 'string' ? JSON.parse(raw) : (raw.remark ? JSON.parse(raw.remark) : raw)
-    if (parsed) {
-      Object.keys(sections).forEach((k) => {
-        if (parsed.sections?.[k]) (sections as any)[k] = parsed.sections[k]
-      })
-      Object.keys(conclusions).forEach((k) => {
-        if (parsed.conclusions?.[k]) (conclusions as any)[k] = parsed.conclusions[k]
-      })
-      Object.keys(remarks).forEach((k) => {
-        if (parsed.remarks?.[k]) (remarks as any)[k] = parsed.remarks[k]
-      })
-      overallConclusion.value = parsed.overallConclusion || ''
-      auditNote.value = parsed.auditNote || ''
-      auditConclusion.value = parsed.auditConclusion || ''
-    }
-  } catch { /* ignore parse errors */ }
+function fmtNum(v: number): string {
+  return v == null || isNaN(v) ? '—' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-watch(() => props.allResponses, () => loadData(), { immediate: true })
+function checkClass(v: string) {
+  if (v === '×') return 'check-fail'
+  if (v === '√') return 'check-ok'
+  return ''
+}
+
+function rowClassName({ row }: { row: any }) {
+  if (isAbnormalFlag(row.isAbnormal) || hasFailedCheck(row)) return 'anomaly-row'
+  return ''
+}
+
+function getSummary({ columns }: { columns: any[] }) {
+  const s = summary.value
+  return columns.map((col, idx) => {
+    if (idx === 0) return '合计'
+    const label = String(col.label || '')
+    if (label.includes('借方')) return fmtNum(s.checkedDebitTotal)
+    if (label.includes('贷方')) return fmtNum(s.checkedCreditTotal)
+    return ''
+  })
+}
+
+function handleAddRow() {
+  addRow()
+}
+
+function handleSyncPopulation(mode: 'period' | 'original') {
+  const r = syncPopulationFromI32(mode)
+  if (r.ok) ElMessage.success(r.message)
+  else ElMessage.warning(r.message)
+}
+
+function handleSampling() {
+  if (!props.wpId || !props.projectId) {
+    ElMessage.warning('缺少工作底稿或项目上下文，无法打开抽凭引擎')
+    return
+  }
+  samplingVisible.value = true
+}
+
+function onSamplesFilled(payload: { samples?: any[]; methodology?: any }) {
+  const n = fillFromSampledVouchers(payload?.samples ?? [])
+  const method = payload?.methodology?.samplingMethod
+  if (method) sampleMeta.value.sampleMethod = String(method)
+  if (payload?.methodology?.sampleSize) {
+    sampleMeta.value.sampleSize = Number(payload.methodology.sampleSize) || sampleMeta.value.sampleSize
+  }
+  sampleMeta.value.sampleProcess = [
+    sampleMeta.value.sampleProcess,
+    `抽凭引擎回填 ${n} 笔（${new Date().toISOString().slice(0, 10)}）`,
+  ].filter(Boolean).join('；')
+  samplingVisible.value = false
+  if (n > 0) ElMessage.success(`已回填 ${n} 笔样本`)
+  else ElMessage.info('无新增样本（可能均已存在）')
+}
+
+function handleAdjDraft() {
+  const r = appendAdjDraftsToNote()
+  if (r.ok) {
+    void saveNote(auditNote.value)
+    ElMessage.success(r.message)
+  } else {
+    ElMessage.warning(r.message)
+  }
+}
+
+function handleFillDraft() {
+  fillConclusionDraft()
+  void saveConclusion(auditConclusion.value)
+  ElMessage.success('已生成审计结论草稿')
+}
 
 async function handleSave() {
-  const payload = {
-    sections: { ...sections },
-    conclusions: { ...conclusions },
-    remarks: { ...remarks },
-    overallConclusion: overallConclusion.value,
-    auditNote: auditNote.value,
-    auditConclusion: auditConclusion.value,
+  if (coverageLow.value && !String(auditNote.value || '').trim()) {
+    ElMessage.warning('检查比例偏低：请先扩大样本量，或在「四、审计说明」中解释原因后再保存')
+    return
   }
-  emit('save', STORAGE_KEY, JSON.stringify(payload))
+  await persistAll()
   ElMessage.success('针对性检查表已保存')
 }
 
-// --- 复核对话 ---
 function handleReview() {
   openReviewDialog('I3-5-针对性检查')
 }
 </script>
 
 <style scoped>
-.i3-targeted-check {
-  font-size: var(--wp-font-size, 13px);
-  padding: 16px;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-
-.section-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #1f2937;
-}
-
-.section-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* 琥珀色方法论上下文 — CAS8第六条 */
+.i3-targeted-check { font-size: var(--wp-font-size, 13px); padding: 16px; }
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.section-title { font-size: 15px; font-weight: 600; color: #1f2937; }
+.section-actions { display: flex; align-items: center; gap: 4px; }
+.objective-alert { margin-bottom: 12px; }
+.obj-list { margin: 4px 0 0; padding-left: 18px; line-height: 1.6; font-size: 12px; }
 .methodology-context {
-  background: #fffbeb;
-  border-left: 4px solid #f59e0b;
-  padding: 10px 14px;
-  margin-bottom: 16px;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #92400e;
-  line-height: 1.7;
+  background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px;
+  margin-bottom: 12px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.65;
 }
-
-.methodology-context p {
-  margin: 0;
-}
-
-/* 检查卡片 */
-.check-section {
-  margin-bottom: 16px;
-}
-
-.check-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.check-section-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #374151;
-}
-
-.check-section-body {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* 检查项 */
-.check-item {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.check-item-title {
-  font-size: var(--wp-font-size, 13px);
-  font-weight: 500;
-  color: #4b5563;
-}
-
-.conclusion-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.conclusion-label {
-  font-weight: 500;
-  color: #374151;
-  white-space: nowrap;
-  font-size: 12px;
-}
-
-/* 综合结论 */
-.overall-conclusion {
-  margin-top: 8px;
-}
-
-/* 审计说明/结论卡片 */
-.audit-note-card {
-  margin-top: 12px;
-}
-
-/* 审计目标 alert */
-.objective-alert {
-  margin-bottom: 12px;
-}
-
-/* 编制提示 details */
-.guidance-details {
-  margin-bottom: 16px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-.guidance-details summary {
-  cursor: pointer;
-  font-weight: 500;
-}
-.guidance-details .guidance-content ul {
-  padding-left: 20px;
-  margin-top: 8px;
-  line-height: 1.8;
-}
-
-/* 工具栏 */
-.tab-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.tab-toolbar .toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* 保存 */
-.table-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 16px;
-}
+.tab-toolbar { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+.toolbar-right, .title-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.block-card { margin-bottom: 12px; }
+.block-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-weight: 600; }
+.check-alert { margin-bottom: 10px; }
+.test-content-hint { font-size: 12px; color: #4b5563; margin-bottom: 10px; line-height: 1.6; }
+.test-content-hint p { margin: 0 0 4px; font-weight: 600; }
+.test-content-hint ol { margin: 0; padding-left: 18px; }
+.reason-group { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 8px; }
+.sample-desc { margin-top: 4px; }
+.pop-cell, .method-cell { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; }
+.sep { color: #9ca3af; margin: 0 2px; }
+.hint { font-size: 11px; color: #9ca3af; margin-left: 4px; }
+.amt { font-variant-numeric: tabular-nums; }
+.amt-input { width: 100%; }
+.warn-coverage { color: #dc2626; font-weight: 600; }
+.check-h { border-bottom: 1px dashed #a5b4fc; cursor: help; font-weight: 600; }
+.check-ok { color: #059669; font-weight: 600; }
+.check-fail { color: #dc2626; font-weight: 700; }
+.abnormal-cell { color: #dc2626; font-weight: 600; }
+.risk-card .risk-block { display: flex; flex-direction: column; gap: 6px; }
+.risk-title { font-size: 13px; font-weight: 600; color: #374151; }
+.mt-6 { margin-top: 6px; width: 100%; }
+.audit-note-card, .audit-conclusion-card { margin-top: 12px; }
+.conclusion-header { display: flex; align-items: center; justify-content: space-between; }
+.edit-tips { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
+.edit-tips summary { cursor: pointer; font-weight: 500; }
+.edit-tips ol { padding-left: 18px; margin-top: 8px; line-height: 1.8; }
+:deep(.anomaly-row) { background-color: #fef2f2 !important; }
+:deep(.anomaly-row:hover > td) { background-color: #fee2e2 !important; }
 </style>

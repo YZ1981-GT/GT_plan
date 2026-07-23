@@ -209,11 +209,21 @@ async def render(ctx: RenderContext) -> dict | None:
     # ─── 5. 加载项目上下文 ──────────────────────────────────────────────
     project_context = await _load_project_context(project_id, db)
 
+    # ─── 6. 财务指标预填（ch6 用） ──────────────────────────────────────────
+    financial_indicators = await _load_financial_indicators(project_id, db, project_context)
+
+    # ─── 7. 关联方清单预填（ch10 用） ────────────────────────────────────────
+    related_parties = await _load_related_parties(project_id, db)
+
     return {
+        # 供前端「在线编辑」双模式定位 OnlyOffice tab（须与源 xlsx tab 名一致）
+        "source_sheet": (getattr(ctx.classification, "sheet_name", "") or "尽职调查报告B1-4"),
         "chapters": chapters,
         "variant": variant,
         "signature": signature,
         "project_context": project_context,
+        "financial_indicators": financial_indicators,
+        "related_parties": related_parties,
     }
 
 
@@ -244,3 +254,109 @@ async def _load_project_context(project_id, db) -> dict:
     except Exception as e:  # noqa: BLE001
         logger.warning("B1-4 project context 查询失败: %s", e)
     return project_context
+
+
+async def _load_financial_indicators(project_id, db, project_context: dict) -> dict:
+    """从 trial_balance 取关键财务指标，供 ch6（财务信息分析）预填.
+
+    返回: {
+        "total_assets": float,       # 资产总计 (1xxx 期末)
+        "total_liabilities": float,  # 负债总计 (2xxx 期末)
+        "equity": float,             # 所有者权益 (资产-负债)
+        "revenue": float,            # 营业收入 (6001)
+        "cost_of_sales": float,      # 营业成本 (6401)
+        "net_profit": float,         # 净利润 (近似: 收入-成本, 粗算)
+        "cash": float,               # 货币资金 (1001+1002+1012)
+        "receivables": float,        # 应收账款 (1122)
+        "inventory": float,          # 存货 (1401+1402+1403+1405)
+        "fixed_assets": float,       # 固定资产 (1601-1602)
+    }
+    """
+    indicators: dict = {}
+    try:
+        year = None
+        period = project_context.get("audit_period", "")
+        if period:
+            try:
+                year = int(period.replace("年度", "").strip())
+            except (ValueError, TypeError):
+                pass
+        if not year:
+            return indicators
+
+        # 一次查询取全部需要的科目大类
+        result = await db.execute(
+            sa.text("""
+                SELECT standard_account_code,
+                       COALESCE(audited_amount, unadjusted_amount, 0) AS amount
+                FROM trial_balance
+                WHERE project_id = :pid AND year = :year AND is_deleted = false
+            """),
+            {"pid": str(project_id), "year": year},
+        )
+        rows = result.fetchall()
+
+        # 按科目前缀汇总
+        sums: dict[str, float] = {}
+        for row in rows:
+            code = row.standard_account_code or ""
+            amt = float(row.amount or 0)
+            for prefix in ("1001", "1002", "1012", "1122", "1401", "1402", "1403", "1405",
+                           "1601", "1602", "6001", "6401"):
+                if code.startswith(prefix):
+                    sums[prefix] = sums.get(prefix, 0) + amt
+            # 资产大类(1xxx) / 负债大类(2xxx)
+            if code and code[0] == "1":
+                sums["assets"] = sums.get("assets", 0) + amt
+            elif code and code[0] == "2":
+                sums["liabilities"] = sums.get("liabilities", 0) + amt
+
+        indicators["total_assets"] = round(sums.get("assets", 0), 2)
+        indicators["total_liabilities"] = round(abs(sums.get("liabilities", 0)), 2)
+        indicators["equity"] = round(indicators["total_assets"] - indicators["total_liabilities"], 2)
+        indicators["revenue"] = round(sums.get("6001", 0), 2)
+        indicators["cost_of_sales"] = round(sums.get("6401", 0), 2)
+        indicators["net_profit"] = round(indicators["revenue"] - indicators["cost_of_sales"], 2)
+        indicators["cash"] = round(
+            sums.get("1001", 0) + sums.get("1002", 0) + sums.get("1012", 0), 2
+        )
+        indicators["receivables"] = round(sums.get("1122", 0), 2)
+        indicators["inventory"] = round(
+            sums.get("1401", 0) + sums.get("1402", 0)
+            + sums.get("1403", 0) + sums.get("1405", 0),
+            2,
+        )
+        indicators["fixed_assets"] = round(
+            sums.get("1601", 0) - abs(sums.get("1602", 0)), 2
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("B1-4 财务指标查询失败: %s", e)
+    return indicators
+
+
+async def _load_related_parties(project_id, db) -> list[dict]:
+    """从 related_party_registry 加载关联方清单，供 ch10（关联方关系及交易）预填.
+
+    返回: [{"name": "...", "relation_type": "..."}, ...]
+    """
+    parties: list[dict] = []
+    try:
+        result = await db.execute(
+            sa.text(
+                "SELECT name, relation_type, detail "
+                "FROM related_party_registry "
+                "WHERE project_id = :pid AND is_deleted = false "
+                "AND name IS NOT NULL AND name <> '' "
+                "ORDER BY name"
+            ),
+            {"pid": str(project_id)},
+        )
+        for row in result.fetchall():
+            parties.append({
+                "name": row.name or "",
+                "relation_type": row.relation_type or "",
+                "detail": row.detail if hasattr(row, "detail") else None,
+            })
+    except Exception as e:  # noqa: BLE001
+        logger.warning("B1-4 关联方清单查询失败: %s", e)
+    return parties

@@ -20,12 +20,39 @@ import {
   type G2SoeOverdueRow,
 } from './g2SoeDisclosureRows'
 
+import type { ColumnDef } from './disclosureColumnDefs'
+
 export interface G2SyncFromWorkpaperPayload {
   wp_id: string
   sheet_name: string
   section_id: string
   current_standard: string
   sub_table_data: Record<string, Record<string, unknown>[]>
+  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 G2TabDisclosure el-table-column */
+  columns?: Record<string, ColumnDef[]>
+}
+
+// G2 三张子表列头：逐字取自 G2TabDisclosureSOE/Listed el-table-column（源对齐）
+const G2_COLUMNS: Record<string, ColumnDef[]> = {
+  应收利息分类: [
+    { key: 'label', label: '项目', is_label: true },
+    { key: 'end_balance', label: '期末余额', format: 'amount' },
+    { key: 'prior_balance', label: '期初余额', format: 'amount' },
+  ],
+  重要逾期利息: [
+    { key: 'borrower', label: '借款单位', is_label: true },
+    { key: 'end_balance', label: '期末余额', format: 'amount' },
+    { key: 'overdue_months', label: '逾期时间（月）' },
+    { key: 'overdue_reason', label: '逾期原因' },
+    { key: 'impairment_basis', label: '是否发生减值及判断依据' },
+  ],
+  坏账准备计提情况: [
+    { key: 'label', label: '坏账准备', is_label: true },
+    { key: 'stage1', label: '第一阶段', format: 'amount' },
+    { key: 'stage2', label: '第二阶段', format: 'amount' },
+    { key: 'stage3', label: '第三阶段', format: 'amount' },
+    { key: 'total', label: '合计', format: 'amount' },
+  ],
 }
 
 export interface G2SoeSyncSnapshot {
@@ -94,6 +121,7 @@ export function buildG2SoeSyncPayloads(
       section_id: G2_NOTE_SECTION.soe,
       current_standard: resolveG2CurrentStandard(variant, applicableStandards),
       sub_table_data: buildG2SoeSubTableData(snap),
+      columns: G2_COLUMNS,
     },
   ]
 }
@@ -123,6 +151,7 @@ export function buildG2ListedSyncPayloads(
       section_id: G2_NOTE_SECTION.listed,
       current_standard: resolveG2CurrentStandard(variant, applicableStandards),
       sub_table_data: buildG2ListedSubTableData(snap),
+      columns: G2_COLUMNS,
     },
   ]
 }

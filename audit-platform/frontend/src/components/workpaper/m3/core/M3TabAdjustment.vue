@@ -220,10 +220,11 @@
  *
  * 科目：4002 库存股（**借方/权益备抵类！**）
  */
-import { computed, inject, onMounted } from 'vue'
+import { computed, inject, onMounted, onUnmounted } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { useM3FormData } from '../../composables/useM3FormData'
 import { useM3Adjustment, type M3AdjustmentEntry } from '../../composables/useM3Adjustment'
+import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{
   wpId: string
@@ -244,6 +245,8 @@ const formData = useM3FormData({
   projectId: computed(() => props.projectId),
 })
 
+const useM3AdjustmentObj = useM3Adjustment(formData)
+
 const {
   activeType,
   filteredEntries,
@@ -254,7 +257,7 @@ const {
   removeEntry,
   updateEntry,
   saveAndPublish,
-} = useM3Adjustment(formData)
+} = useM3AdjustmentObj
 
 const typeOptions = [
   { label: 'AJE 审计调整', value: 'AJE' },
@@ -264,9 +267,19 @@ const typeOptions = [
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
 function handleAddEntry() { addEntry() }
-function handleRemoveEntry(index: number) { removeEntry(index) }
+function handleRemoveEntry(index: number) {
+  // filteredEntries index → entries 真实 index
+  const entry = filteredEntries.value[index]
+  if (!entry) return
+  const realIndex = useM3AdjustmentObj.entries.value.findIndex(e => e === entry)
+  if (realIndex >= 0) removeEntry(realIndex)
+}
 function handleUpdateEntry(index: number, field: keyof M3AdjustmentEntry, value: string | number) {
-  updateEntry(index, field, value)
+  // filteredEntries index → entries 真实 index
+  const entry = filteredEntries.value[index]
+  if (!entry) return
+  const realIndex = useM3AdjustmentObj.entries.value.findIndex(e => e === entry)
+  if (realIndex >= 0) updateEntry(realIndex, field, value)
 }
 async function handleSaveAndPublish() { await saveAndPublish() }
 function handleAI(_section: string) { /* AI辅助待集成 */ }
@@ -281,7 +294,75 @@ function fmtAmount(val: number): string {
 
 onMounted(async () => {
   await formData.loadData()
+  _restoreEntries()
+  // 订阅M3-5推送的建议AJE
+  eventBus.on('adjustment:created' as any, _handleIncomingAje)
 })
+
+onUnmounted(() => {
+  eventBus.off('adjustment:created' as any, _handleIncomingAje)
+})
+
+/**
+ * 从 checklist_responses 恢复已保存的调整分录
+ */
+function _restoreEntries() {
+  const prefix = 'M3-M3-3-entry-'
+  const restored: M3AdjustmentEntry[] = []
+  for (const [key, resp] of formData.allResponses.value.entries()) {
+    if (key.startsWith(prefix) && key.endsWith('-data') && resp.remark) {
+      try {
+        const data = JSON.parse(resp.remark)
+        restored.push({
+          index: Number(data.index) || restored.length + 1,
+          description: data.description || '',
+          category: data.category || '',
+          reportItem: data.reportItem || '',
+          accountName: data.accountName || '',
+          noteItem: data.noteItem || '',
+          type: data.type === 'RJE' ? 'RJE' : 'AJE',
+          debitAmount: Number(data.debitAmount) || 0,
+          creditAmount: Number(data.creditAmount) || 0,
+          refIndex: data.refIndex || '',
+          remark: data.remark || '',
+        })
+      } catch { /* skip */ }
+    }
+  }
+  if (restored.length > 0) {
+    // 按index排序
+    restored.sort((a, b) => a.index - b.index)
+    useM3AdjustmentObj.entries.value = restored
+  }
+}
+
+/**
+ * 接收M3-5推送的建议AJE（adjustment:created事件）
+ * 仅接收 source='M3-5-cancel-diff' 的推送，自动追加到entries
+ */
+function _handleIncomingAje(payload: any) {
+  if (!payload || payload.wpCode !== 'M3' || payload.source !== 'M3-5-cancel-diff') return
+  const incomingEntries = payload.entries
+  if (!Array.isArray(incomingEntries) || incomingEntries.length === 0) return
+  for (const e of incomingEntries) {
+    useM3AdjustmentObj.entries.value.push({
+      index: useM3AdjustmentObj.entries.value.length + 1,
+      description: e.description || '',
+      category: e.category || '账项调整',
+      reportItem: '',
+      accountName: e.accountName || '',
+      noteItem: '',
+      type: 'AJE',
+      debitAmount: Number(e.debit) || 0,
+      creditAmount: Number(e.credit) || 0,
+      refIndex: 'M3-5',
+      remark: '由M3-5注销冲减差额自动推送',
+    })
+  }
+  import('element-plus').then(({ ElMessage }) => {
+    ElMessage.success(`已接收M3-5推送的${incomingEntries.length}条建议AJE`)
+  })
+}
 </script>
 
 <style scoped>

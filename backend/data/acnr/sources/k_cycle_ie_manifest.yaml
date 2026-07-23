@@ -76,6 +76,20 @@ entries:
     storage_mode: row_json
     import_order: 40
     depends_on_sheets: [K1-2]
+  - sheet_code: K1-4
+    api_prefix: k1
+    item_id: K1-4-adj-entries
+    storage_field: remark
+    storage_mode: row_json
+    import_order: 15
+    depends_on_sheets: []
+  - sheet_code: K1-11
+    api_prefix: k1
+    item_id: K1-11-related-party
+    storage_field: remark
+    storage_mode: bundle_json
+    import_order: 50
+    depends_on_sheets: [K1-2]
 
   # ───────────────────────── K2 其他流动资产（api_prefix: k2） ─────────────────────────
   - sheet_code: K2-2

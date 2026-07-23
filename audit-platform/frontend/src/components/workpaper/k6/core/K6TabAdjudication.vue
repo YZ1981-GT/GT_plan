@@ -193,7 +193,7 @@
       </el-table>
     </div>
 
-    <!-- ═══ TB回写按钮 ═══ -->
+    <!-- ═══ TB回写按钮 + K6-3调整带入 ═══ -->
     <div class="tb-writeback-section">
       <el-button
         type="primary"
@@ -204,11 +204,34 @@
         <el-icon><Upload /></el-icon>
         审定数回写TB（1481资产 + 2605负债）
       </el-button>
+      <el-button
+        size="small"
+        type="success"
+        plain
+        :disabled="isReadonly"
+        @click="importAjeFromK6_3"
+      >
+        从K6-3带入AJE/RJE
+      </el-button>
       <span class="tb-hint">
         资产审定合计: {{ fmtAmt(getAssetAuditedTotal()) }} |
         负债审定合计: {{ fmtAmt(getLiabilityAuditedTotal()) }}
       </span>
     </div>
+
+    <!-- TB预填种子提示（首次加载时如有TB数据但未审数为0） -->
+    <el-alert
+      v-if="showTbSeedHint"
+      type="info"
+      :closable="true"
+      show-icon
+      style="margin-bottom:12px"
+    >
+      <template #title>
+        已从试算平衡表获取：资产(1481)未审 {{ fmtAmt(props.tbData.unadjustedAsset) }}，负债(2605)未审 {{ fmtAmt(props.tbData.unadjustedLiability) }}。
+        <el-button size="small" type="primary" link @click="seedFromTb">一键填入未审数</el-button>
+      </template>
+    </el-alert>
 
     <!-- ═══ 审计说明 + 结论 ═══ -->
     <el-card shadow="never" class="audit-note-card">
@@ -314,6 +337,7 @@ const {
   adjudicationSections,
   assetReconciliation,
   liabilityReconciliation,
+  assetSubtotal,
   auditNote,
   auditConclusion,
   getAssetAuditedTotal,
@@ -352,6 +376,18 @@ function onFieldChange(sectionKey: string, rowKey: string, field: string, value:
   const itemId = `${prefix}-${rowKey}-${field}`
   props.allResponses.set(itemId, { item_id: itemId, conclusion: null, remark: String(v) })
   emit('save', itemId, { remark: String(v) })
+  // 减值列变化时同步减值合计（供K6-5交叉验证读取 K6-1-impairment-total）
+  if (sectionKey === 'asset' && field === 'impairment') {
+    persistImpairmentTotal()
+  }
+}
+
+// ─── 减值合计持久化（供K6-5减值测试交叉验证） ─────────────────────────────────
+
+function persistImpairmentTotal() {
+  const total = assetSubtotal.value.impairment
+  props.allResponses.set('K6-1-impairment-total', { item_id: 'K6-1-impairment-total', remark: String(total) })
+  emit('save', 'K6-1-impairment-total', { remark: String(total) })
 }
 
 function onRemarkChange(sectionKey: string, rowKey: string, value: string) {
@@ -380,6 +416,8 @@ async function handleWritebackTB() {
     // 保存合计到 responses 供后续回写使用
     emit('save', 'K6-1-audited-asset', { remark: String(assetAudited) })
     emit('save', 'K6-1-audited-liability', { remark: String(liabilityAudited) })
+    // 同步减值合计（供K6-5交叉验证）
+    persistImpairmentTotal()
     ElMessage.success(`审定数已回写TB：资产(1481)=${fmtAmt(assetAudited)}，负债(2605)=${fmtAmt(liabilityAudited)}`)
   } catch {
     ElMessage.error('TB回写失败')
@@ -424,6 +462,68 @@ async function handleAiGenerate(section: string) {
 
 function handleReview(id: string) {
   openReviewDialog(id)
+}
+
+// ─── 从K6-3带入AJE/RJE ──────────────────────────────────────────────────────
+
+function importAjeFromK6_3(): void {
+  // K6-3 写了 K6-1-aje-asset / K6-1-rje-asset / K6-1-aje-liab / K6-1-rje-liab（汇总值）
+  const ajeAsset = Number(props.allResponses.get('K6-1-aje-asset')?.value ?? props.allResponses.get('K6-1-aje-asset')?.remark ?? 0) || 0
+  const rjeAsset = Number(props.allResponses.get('K6-1-rje-asset')?.value ?? props.allResponses.get('K6-1-rje-asset')?.remark ?? 0) || 0
+  const ajeLiab = Number(props.allResponses.get('K6-1-aje-liab')?.value ?? props.allResponses.get('K6-1-aje-liab')?.remark ?? 0) || 0
+  const rjeLiab = Number(props.allResponses.get('K6-1-rje-liab')?.value ?? props.allResponses.get('K6-1-rje-liab')?.remark ?? 0) || 0
+
+  if (ajeAsset === 0 && rjeAsset === 0 && ajeLiab === 0 && rjeLiab === 0) {
+    // 也检查 suggested-aje (来自K6-5/K6-7)
+    const k6_5_aje = props.allResponses.get('K6-5-suggested-aje')
+    const k6_7_aje = props.allResponses.get('K6-7-suggested-aje')
+    if (!k6_5_aje && !k6_7_aje) {
+      ElMessage.info('K6-3暂无调整分录数据（请先在K6-3编制并保存回写）')
+      return
+    }
+  }
+
+  // 资产AJE/RJE填入第一行（r0）
+  if (ajeAsset !== 0 || rjeAsset !== 0) {
+    onFieldChange('asset', 'r0', 'aje', ajeAsset)
+    onFieldChange('asset', 'r0', 'rje', rjeAsset)
+  }
+  // 负债AJE/RJE填入第一行（r0）
+  if (ajeLiab !== 0 || rjeLiab !== 0) {
+    onFieldChange('liability', 'r0', 'aje', ajeLiab)
+    onFieldChange('liability', 'r0', 'rje', rjeLiab)
+  }
+
+  const total = ajeAsset + rjeAsset + ajeLiab + rjeLiab
+  if (total !== 0) {
+    ElMessage.success(`已从K6-3带入：资产AJE ${fmtAmt(ajeAsset)}/RJE ${fmtAmt(rjeAsset)}，负债AJE ${fmtAmt(ajeLiab)}/RJE ${fmtAmt(rjeLiab)}（填入首行）`)
+  } else {
+    ElMessage.info('K6-3调整合计为0')
+  }
+}
+
+// ─── TB预填种子（未审数从试算表带入） ─────────────────────────────────────────
+
+const showTbSeedHint = computed(() => {
+  // 有TB数据且当前资产/负债首行未审数为0时显示
+  const hasTbData = (props.tbData.unadjustedAsset > 0 || props.tbData.unadjustedLiability > 0)
+  if (!hasTbData) return false
+  // 检查首行是否已有未审数
+  const assetUnadj = Number(props.allResponses.get('K6-1-asset-r0-unadj')?.remark ?? 0) || 0
+  const liabUnadj = Number(props.allResponses.get('K6-1-liab-r0-unadj')?.remark ?? 0) || 0
+  return assetUnadj === 0 && liabUnadj === 0
+})
+
+function seedFromTb(): void {
+  // 资产未审数填入首行
+  if (props.tbData.unadjustedAsset > 0) {
+    onFieldChange('asset', 'r0', 'unadj', props.tbData.unadjustedAsset)
+  }
+  // 负债未审数填入首行
+  if (props.tbData.unadjustedLiability > 0) {
+    onFieldChange('liability', 'r0', 'unadj', props.tbData.unadjustedLiability)
+  }
+  ElMessage.success(`已从TB预填：资产未审 ${fmtAmt(props.tbData.unadjustedAsset)}，负债未审 ${fmtAmt(props.tbData.unadjustedLiability)}`)
 }
 
 // ─── 金额格式化 ─────────────────────────────────────────────────────────────

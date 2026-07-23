@@ -1,0 +1,87 @@
+{
+  "source_sheet": "业务评价表",
+  "sections": [
+    {
+      "key": "basic",
+      "title": "一、业务基本信息",
+      "fields": [
+        { "field": "client_name", "label": "客户名称（中/英文）", "type": "text" },
+        { "field": "reg_address", "label": "注册地址", "type": "text" },
+        { "field": "office_address", "label": "办公地址", "type": "text" },
+        { "field": "project_name", "label": "项目名称", "type": "text" },
+        { "field": "business_class", "label": "业务分类", "type": "choice", "options": ["A类", "B类", "C类"] },
+        { "field": "industry", "label": "客户所属行业、业务性质与主要业务", "type": "textarea" },
+        { "field": "controller", "label": "控股股东及实际控制人名称", "type": "text" },
+        { "field": "subsidiaries", "label": "重要分、子公司名称、地址、主营业务及持股比例", "type": "textarea" },
+        { "field": "associates", "label": "重要联营/合营企业名称、地址、主营业务及持股比例", "type": "textarea" },
+        { "field": "key_mgmt", "label": "管理层、治理层关键成员", "type": "textarea" },
+        { "field": "finance_staff", "label": "主要财务人员（姓名与职位）", "type": "textarea" },
+        { "field": "accounting_standard", "label": "客户适用的会计准则", "type": "text" },
+        { "field": "audit_purpose", "label": "审计服务的目的及出具审计报告的日期", "type": "textarea" },
+        { "field": "prelim_fee", "label": "初步商谈的业务收费", "type": "text" },
+        { "field": "is_kaa", "label": "是否属于KAA业务", "type": "choice", "options": ["是", "否"] },
+        { "field": "predecessor_comm", "label": "与前任注册会计师的沟通情况，变更原因及近三年变更频率（业务承接时填写）", "type": "textarea" },
+        { "field": "acquisition_channel", "label": "业务承接渠道（业务承接时填写）", "type": "choice", "options": ["朋友、同学等引荐", "事务所离职员工引荐", "现有客户新业务或其引荐", "其他"] }
+      ]
+    },
+    {
+      "key": "client_eval",
+      "title": "二、对客户的评价",
+      "rows": [
+        { "id": "integrity_desc", "label": "（一）客户诚信情况", "type": "textarea" },
+        { "id": "integrity_risk", "label": "对客户诚信的风险评价", "type": "risk" },
+        { "id": "operation_desc", "label": "（二）客户经营情况", "type": "textarea" },
+        { "id": "operation_risk", "label": "对客户经营的风险评价", "type": "risk" },
+        { "id": "financial_desc", "label": "（三）客户财务状况", "type": "textarea" },
+        { "id": "financial_risk", "label": "对客户财务状况的风险评价", "type": "risk" },
+        { "id": "overall_client_risk", "label": "（四）来源于客户方面的业务承接与保持风险评价结果", "type": "risk" }
+      ]
+    },
+    {
+      "key": "precondition",
+      "title": "三、确定审计的前提条件是否存在",
+      "items": [
+        { "id": "reporting_framework", "label": "管理层编制财务报表采用的财务报告编制基础是否可以接受" },
+        { "id": "mgmt_responsibility", "label": "就管理层认可并理解其责任与管理层达成一致意见" },
+        { "id": "internal_control_std", "label": "确定被审计单位采用的内部控制标准是否适当【内控审计适用】" }
+      ]
+    },
+    {
+      "key": "independence",
+      "title": "四、项目组的独立性及胜任能力",
+      "methodology": "1、独立性方面的问题考虑因素包括自身利益、自我评价、过度推介、密切关系、外部压力等。2、时间和资源方面的问题考虑因素包括：根据事务所目前的人力资源情况，是否拥有足够的具有必要素质和专业胜任能力的人员，是否能够在提交报告的最后期限内完成业务。3、专业胜任能力方面的问题考虑因素包括但不限于：项目组关键人员是否熟悉相关行业或业务对象；是否了解相关监管要求或报告要求；在需要时是否能得到专家的帮助；如需项目质量控制复核，是否具备符合资格的复核人员。",
+      "items": [
+        { "id": "has_independence_issue", "label": "是否存在独立性方面的问题" },
+        { "id": "partner_time", "label": "项目合伙人能否投入足够时间" },
+        { "id": "team_competence", "label": "项目团队是否具有胜任能力，或是否有足够的人力资源" },
+        { "id": "firm_resource", "label": "对特殊或重要会计审计事项，是否有可利用的事务所资源" }
+      ]
+    },
+    {
+      "key": "fee",
+      "title": "五、预计收取的费用及可收回比率",
+      "note": "说明预计审计收费、预计成本（包括计算过程）、可收回比率等内容。",
+      "type": "textarea"
+    },
+    {
+      "key": "conclusion",
+      "title": "六、业务评价结论",
+      "key_elements": [
+        { "id": "elem_client_risk", "label": "客户业务风险评价结论" },
+        { "id": "elem_precondition", "label": "审计前提条件是否满足" },
+        { "id": "elem_independence", "label": "独立性与专业胜任能力是否满足" },
+        { "id": "elem_ethics", "label": "是否不存在因管理层诚信问题影响承接的事项" }
+      ]
+    }
+  ],
+  "opinion_options": [
+    { "value": "accept", "label": "可以承接", "class": "success" },
+    { "value": "retain", "label": "可以保持", "class": "success" },
+    { "value": "reject", "label": "不予承接/保持", "class": "danger" }
+  ],
+  "risk_options": [
+    { "value": "high", "label": "高", "class": "danger" },
+    { "value": "medium", "label": "中", "class": "warning" },
+    { "value": "low", "label": "低", "class": "success" }
+  ]
+}

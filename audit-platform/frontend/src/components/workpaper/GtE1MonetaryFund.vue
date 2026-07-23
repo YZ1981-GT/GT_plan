@@ -7,6 +7,18 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
+      <!-- P2#13: 全局告警面板 -->
+      <template v-if="globalAlerts.length">
+        <el-alert
+          v-for="(alert, idx) in globalAlerts"
+          :key="idx"
+          :type="alert.type"
+          :title="alert.message"
+          :closable="false"
+          style="margin-bottom: 8px"
+          show-icon
+        />
+      </template>
       <div v-if="isProcedureSheet" class="e1-mode-toolbar">
         <el-segmented
           v-model="procedureDualMode.currentMode.value"
@@ -167,6 +179,43 @@ const wpIdRef = computed(() => props.wpId)
 const bsDate = ref('')
 const allResponses: Ref<Map<string, any>> = ref(new Map())
 
+// ─── P2#13: 全局告警面板 ─────────────────────────────────────────────────────
+
+const globalAlerts = computed(() => {
+  const alerts: Array<{ type: 'warning' | 'info' | 'success'; message: string }> = []
+
+  // ① 审定合计 vs TB 差异
+  const totalAudited = parseFloat(allResponses.value.get('E1-adj-total-1001')?.remark || '0')
+    + parseFloat(allResponses.value.get('E1-adj-total-1002')?.remark || '0')
+    + parseFloat(allResponses.value.get('E1-adj-total-1012')?.remark || '0')
+  const tbAmount = parseFloat(allResponses.value.get('E1-adj-tb-amount-ending')?.remark || '0')
+  if (tbAmount && Math.abs(totalAudited - tbAmount) > 1) {
+    alerts.push({ type: 'warning', message: `E1-1 审定合计 ${totalAudited.toFixed(2)} ≠ TB数 ${tbAmount.toFixed(2)}，差异 ${(totalAudited - tbAmount).toFixed(2)}` })
+  } else if (tbAmount && totalAudited) {
+    alerts.push({ type: 'success', message: 'E1-1 审定合计与试算平衡表核对一致' })
+  }
+
+  // ② 账户清单疑似账外账户
+  const accountListRaw = allResponses.value.get('E1-account-list-rows')?.remark
+  if (accountListRaw) {
+    try {
+      const accountRows = JSON.parse(accountListRaw)
+      const offBookCount = accountRows.filter((r: any) => r.hasBookRecord === 'N').length
+      if (offBookCount > 0) {
+        alerts.push({ type: 'warning', message: `E1-10 存在 ${offBookCount} 个疑似账外账户（清单有/账面无），需关注完整性认定` })
+      }
+    } catch { /* silent */ }
+  }
+
+  // ③ P1-9: 审定合计 vs 现金流量表期末现金勾稽提示(info级)
+  // 注：E1-20(期末应计利息存量) 与 E1-15(全年利息收入流量) 属不同维度，不做直接等式勾稽以免误报。
+  if (totalAudited > 0) {
+    alerts.push({ type: 'info', message: `货币资金审定合计 ${totalAudited.toFixed(2)}，应与现金流量表"期末现金及现金等价物余额"勾稽（差额=受限资金+非等价物存款）` })
+  }
+
+  return alerts
+})
+
 // Save functions (passed to children; children call these for persistence + auto snapshot)
 async function saveImmediate(items: any[]) {
   if (!items?.length) return
@@ -239,6 +288,15 @@ const ipoSheetCode = computed<string | null>(() => {
 onMounted(() => {
   if (props.htmlData?.projectContext) {
     bsDate.value = props.htmlData.projectContext.bs_date || ''
+    // P0#1: Seed TB amount from render strategy into allResponses for E1-1 consumption
+    const tbAmount = props.htmlData.projectContext.tb_amount
+    if (tbAmount && !allResponses.value.has('E1-adj-tb-amount-ending')) {
+      allResponses.value.set('E1-adj-tb-amount-ending', {
+        item_id: 'E1-adj-tb-amount-ending',
+        conclusion: null,
+        remark: String(tbAmount),
+      })
+    }
   }
   // 从 render-config 返回的 responses_snapshot 加载已持久化数据
   const snapshot = props.htmlData?.responses_snapshot

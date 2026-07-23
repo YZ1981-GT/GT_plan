@@ -36,9 +36,11 @@
             <el-button size="small" link @click="resetColumnPrefs">重置默认</el-button>
           </div>
         </el-popover>
-        <el-button size="small" type="primary" link @click="handleAiGenerate">
-          <el-icon><MagicStick /></el-icon> AI辅助
-        </el-button>
+        <el-tooltip :content="aiAvailable ? 'AI 辅助生成' : 'AI 服务暂不可用'" placement="top">
+          <el-button size="small" type="primary" link :loading="aiLoading" :disabled="isReadonly || !aiAvailable" @click="handleAiGenerate">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </el-tooltip>
         <el-button size="small" @click="handleReview">💬 复核</el-button>
       </div>
     </div>
@@ -146,6 +148,26 @@
         <el-table-column v-if="isColVisible('debitAmount')" label="借方金额" min-width="110" align="right">
           <template #default="{ row }"><el-input-number v-if="!isReadonly" v-model="row.debitAmount" :controls="false" size="small" class="amount-input" @change="persist" /><span v-else class="amount-cell">{{ fmtAmt(row.debitAmount) }}</span></template>
         </el-table-column>
+        <el-table-column v-if="isColVisible('supportingDoc')" label="支持性文件" min-width="180">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              :model-value="splitDocs(row.supportingDoc)"
+              multiple
+              filterable
+              allow-create
+              collapse-tags
+              collapse-tags-tooltip
+              size="small"
+              placeholder="付款审批单/发票/合同…"
+              style="width:100%"
+              @update:model-value="(v: any) => setDocs(row, v as string[])"
+            >
+              <el-option v-for="opt in SUPPORTING_DOC_OPTIONS" :key="opt" :label="opt" :value="opt" />
+            </el-select>
+            <span v-else>{{ row.supportingDoc || '-' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column v-if="isColVisible('checks')" label="核对内容" width="180" align="center">
           <template #header>
             <el-tooltip placement="top">
@@ -168,6 +190,12 @@
         <el-table-column v-if="isColVisible('remark')" label="备注说明" min-width="120">
           <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.remark" size="small" @change="persist" /><span v-else>{{ row.remark || '-' }}</span></template>
         </el-table-column>
+        <el-table-column v-if="isColVisible('ocr')" label="附件OCR" width="80" align="center">
+          <template #default="{ row }">
+            <el-button link size="small" :disabled="isReadonly" @click="triggerOcr(row.id)">📎</el-button>
+            <span v-if="row.ocrAttachment" class="ocr-indicator" :title="row.ocrAttachment">✓</span>
+          </template>
+        </el-table-column>
         <el-table-column v-if="!isReadonly" label="操作" width="56" align="center" fixed="right">
           <template #default="{ row }"><el-button size="small" type="danger" link @click="removeOccurrenceRow(row.id); persist()">删除</el-button></template>
         </el-table-column>
@@ -177,7 +205,12 @@
 
     <!-- 四、审计说明（检查比例：仅借方 — 损益科目）-->
     <el-card shadow="never" class="section-card">
-      <template #header><span class="card-title">四、审计说明 — 检查比例</span></template>
+      <template #header>
+        <div class="card-header-row">
+          <span class="card-title">四、审计说明 — 检查比例</span>
+          <el-button v-if="!isReadonly" size="small" type="warning" plain @click="pullBookAmountFromK82">从 K8-2 带入本期发生额</el-button>
+        </div>
+      </template>
       <el-table :data="k8CheckRatios" border size="small" class="ratio-table">
         <el-table-column label="方向" prop="direction" width="140" />
         <el-table-column label="本期发生额" align="right"><template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.bookAmount) }}</span></template></el-table-column>
@@ -207,13 +240,11 @@
 
     <el-card shadow="never" class="conclusion-card">
       <template #header><span class="card-title">五、审计结论</span></template>
-      <el-select v-model="conclusionOption" :disabled="isReadonly" size="small" class="concl-select" placeholder="选择结论模板" @change="onConclusionOption">
-        <el-option label="A、未见异常" value="A" />
-        <el-option label="B、除上述重大不符事项作为调整事项予以调整外，其余未见异常" value="B" />
-        <el-option label="C、由于存在重大未调整事项（或审计范围受限），不可确认" value="C" />
-      </el-select>
-      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly" placeholder="基于上述检查情况，形成综合审计结论..." @change="persist" />
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="基于上述检查情况，形成综合审计结论（可点上方 AI辅助 生成草稿）..." @change="persist" />
     </el-card>
+
+    <!-- OCR 隐藏文件输入 -->
+    <input ref="ocrFileInput" type="file" accept="image/*,.pdf" style="display:none" @change="handleOcrFile" />
 
     <details class="compile-hint">
       <summary>编制提示（参照 D4 收入底稿）</summary>
@@ -228,7 +259,7 @@
     </details>
 
     <el-dialog v-model="samplingVisible" title="抽凭引擎 — 销售费用(6601)" width="90%" top="5vh" destroy-on-close>
-      <GtVoucherSamplingEngine v-if="samplingVisible" account-code="6601" phase="current" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
+      <GtVoucherSamplingEngine v-if="samplingVisible" account-code="6601" phase="final" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
     </el-dialog>
   </div>
 </template>
@@ -240,8 +271,11 @@
  * 参照 D4 收入底稿规格。
  */
 import { ref, reactive, computed, inject, onMounted, defineAsyncComponent } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
+import http from '@/utils/http'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
+import { useK8AiGenerate } from '../../composables/useK8AiGenerate'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
@@ -263,7 +297,7 @@ const allResponsesRef = computed(() => props.allResponses)
 
 const {
   itemId, checkLabels,
-  criteria, occurrenceRows, auditNote, conclusion, conclusionOption,
+  criteria, occurrenceRows, auditNote, conclusion,
   checkRatios, lowRatioWarnings, abnormalRows,
   occurrenceDebitChecked,
   load, addOccurrenceRow, removeOccurrenceRow,
@@ -286,11 +320,22 @@ const columnDefs = reactive<ColDef[]>([
   { key: 'offsetAccount', label: '对方科目', visible: true },
   { key: 'offsetSubAccount', label: '对方明细科目', visible: false },
   { key: 'debitAmount', label: '借方金额', visible: true },
+  { key: 'supportingDoc', label: '支持性文件', visible: true },
   { key: 'checks', label: '核对内容', visible: true },
   { key: 'abnormal', label: '是否异常', visible: true },
   { key: 'indexNo', label: '索引号', visible: true },
   { key: 'remark', label: '备注说明', visible: true },
+  { key: 'ocr', label: '附件OCR', visible: true },
 ])
+/** 支持性文件预置选项（源模板 H17） */
+const SUPPORTING_DOC_OPTIONS = ['付款审批单', '费用报销单', '支出凭单', '银行回单', '合同', '发票', '其他']
+function splitDocs(v: string | undefined): string[] {
+  return (v || '').split(/[、,，]/).map(s => s.trim()).filter(Boolean)
+}
+function setDocs(row: K1VoucherRow, vals: string[]): void {
+  row.supportingDoc = (vals || []).join('、')
+  persist()
+}
 function isColVisible(key: string): boolean { return columnDefs.find(c => c.key === key)?.visible ?? true }
 function persistColumnPrefs(): void {
   try { localStorage.setItem(COLUMN_PREFS_KEY, JSON.stringify(columnDefs.map(c => ({ key: c.key, visible: c.visible })))) } catch { /* */ }
@@ -320,8 +365,17 @@ function setChecks(row: K1VoucherRow, vals: number[]): void {
 
 const samplingVisible = ref(false)
 function openSampling() { samplingVisible.value = true }
-function onSamplesFilled(payload: { samples: any[] }) {
+function onSamplesFilled(payload: { samples: any[]; methodology?: any }) {
   fillFromSamples('occurrence', payload?.samples ?? [])
+  // ⑤ 抽凭引擎回填抽样参数（方法学快照 → criteria），减少重复录入
+  const m = payload?.methodology
+  if (m) {
+    if (m.samplingMethod) criteria.value.samplingMethod = m.samplingMethod
+    if (Number(m.sampleSize) > 0) criteria.value.sampleSize = Number(m.sampleSize)
+    if (m.samplingInterval && !criteria.value.samplingProcess) {
+      criteria.value.samplingProcess = `货币单元抽样间隔 ${m.samplingInterval}${m.suggestedSampleSize ? `，建议样本量 ${m.suggestedSampleSize}` : ''}`
+    }
+  }
   samplingVisible.value = false
   persist()
 }
@@ -331,21 +385,85 @@ function persist() {
   props.allResponses.set(itemId, { item_id: itemId, conclusion: null, remark: data })
   emit('save', itemId, { remark: data })
 }
-function onConclusionOption(val: string) {
-  const map: Record<string, string> = {
-    A: '未见异常。',
-    B: '除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。',
-    C: '由于存在重大未调整事项（或审计范围受到限制无法获取充分、适当证据），不可确认。',
+
+// ① 检查比例分母「本期发生额」从 K8-2 带入（源模板 G35='明细表K8-2'!Q25）
+function pullBookAmountFromK82(): void {
+  if (props.isReadonly) return
+  const raw = props.allResponses.get('K8-2-detail-audited-total')
+  const amt = Number(raw?.remark ?? raw?.conclusion ?? 0)
+  if (!Number.isFinite(amt) || amt === 0) {
+    ElMessage.warning('K8-2 明细表暂无审定合计，请先在 K8-2 录入/取数')
+    return
   }
-  if (map[val] && !conclusion.value) conclusion.value = map[val]
+  criteria.value.bookDebitOccurrence = amt
   persist()
+  ElMessage.success(`已从 K8-2 带入本期发生额 ${amt.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+}
+
+// ④ 行级附件 OCR（上传原始凭证 → /d4/contract-ocr → 确认 → 回填业务内容+标记附件）
+const ocrFileInput = ref<HTMLInputElement | null>(null)
+let currentOcrRowId = ''
+function triggerOcr(rowId: string): void {
+  currentOcrRowId = rowId
+  ocrFileInput.value?.click()
+}
+async function handleOcrFile(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  input.value = ''
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    ElMessage.info('正在OCR识别...')
+    const res = await http.post('/api/d4/contract-ocr', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    const ocrText = res.data?.data?.text || res.data?.text || ''
+    if (!ocrText) { ElMessage.warning('OCR未识别到文字内容'); return }
+    await ElMessageBox.confirm(
+      `OCR识别结果：\n\n${ocrText.slice(0, 500)}${ocrText.length > 500 ? '...' : ''}`,
+      'OCR识别确认',
+      { confirmButtonText: '填入业务内容', cancelButtonText: '取消', type: 'info' },
+    )
+    const row = occurrenceRows.value.find((r: K1VoucherRow) => r.id === currentOcrRowId)
+    if (row) {
+      row.businessContent = row.businessContent ? `${row.businessContent}\n[OCR] ${ocrText}` : `[OCR] ${ocrText}`
+      row.ocrAttachment = file.name
+      persist()
+      ElMessage.success('OCR内容已填入业务内容')
+    }
+  } catch (err: any) {
+    if (err !== 'cancel' && err?.message !== 'cancel') {
+      ElMessage.error('OCR识别失败：' + (err?.response?.data?.detail || err?.message || '未知错误'))
+    }
+  }
 }
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'
   return Number(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 function abnormalRowClass({ row }: { row: K1VoucherRow }): string { return row.abnormal ? 'abnormal-row' : '' }
-function handleAiGenerate() { emit('save', 'K8-8-ai-trigger', { remark: 'selling-voucher-check' }) }
+
+// ─── AI 辅助（统一 /ai/generate-text 端点）─────────────────────────────────
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useK8AiGenerate({
+  wpId: computed(() => props.wpId),
+})
+async function handleAiGenerate() {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'k8-selling-check-note',
+    auditNote.value || '',
+    {
+      检查凭证笔数: occurrenceRows.value.length,
+      异常笔数: abnormalRows.value.length,
+      检查比例偏低: lowRatioWarnings.value.length > 0 ? '是' : '否',
+      任务: '请为销售费用凭证检查表生成审计说明（检查范围、发现的异常/不符事项、检查比例是否充分、是否需扩大样本）',
+    },
+    'AI 生成 · 审计说明',
+  )
+  if (text) { auditNote.value = text; persist() }
+}
 function handleReview() { openReviewDialog('K8-8-check') }
 </script>
 
@@ -389,6 +507,7 @@ function handleReview() { openReviewDialog('K8-8-check') }
 .ratio-table { max-width: 640px; }
 .ratio-warn { margin-top: 12px; }
 .muted { color: var(--el-text-color-placeholder); }
+.ocr-indicator { color: var(--el-color-success); font-size: 11px; margin-left: 2px; }
 .note-block { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
 .note-block label { font-size: 12px; color: var(--el-text-color-secondary); }
 .abnormal-summary { margin-bottom: 10px; padding: 10px 12px; border-radius: 6px; background: #fef2f2; border: 1px solid #fecaca; }

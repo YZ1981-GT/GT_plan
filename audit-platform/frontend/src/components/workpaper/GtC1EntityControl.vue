@@ -25,6 +25,27 @@
         </div>
       </div>
 
+      <!-- B22A 拟测试的企业层面控制（只读参考） -->
+      <el-alert
+        v-if="b22aToTestControls.length > 0"
+        type="info"
+        :closable="false"
+        show-icon
+        class="c1-b22a-totest"
+      >
+        <template #title>
+          来自 B22A 的拟测试企业层面控制（{{ b22aToTestControls.length }} 项）—— 请确保下列控制在本表测试中得到覆盖
+        </template>
+        <ul class="c1-totest-list">
+          <li v-for="(ctl, i) in b22aToTestControls" :key="i">
+            <span class="c1-totest-el">[{{ ctl.element || '—' }}]</span>
+            {{ ctl.controlPoint || '（未命名控制）' }}
+            <el-tag v-if="ctl.testMethod" size="small" effect="plain">{{ ctl.testMethod }}</el-tag>
+            <el-tag v-if="ctl.isAntiFraud" size="small" type="danger" effect="plain">反舞弊</el-tag>
+          </li>
+        </ul>
+      </el-alert>
+
       <!-- 总体完成度看板 -->
       <div class="c1-overall-progress-bar">
         <span class="c1-overall-progress-label">总体进度</span>
@@ -1163,7 +1184,7 @@
  * 保留所有 composable 调用、数据持久化逻辑、props 接口不变。
  * sheetName prop 仅控制初始焦点/滚动位置，不再切换渲染模式。
  */
-import { ref, computed, onMounted, toRef, nextTick, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, toRef, nextTick, defineAsyncComponent } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, InfoFilled, Paperclip, Select, CloseBold } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
@@ -2309,16 +2330,58 @@ function applyInitialFocus(): void {
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────
 
+// ─── B22A 拟测试的企业层面控制（只读参考，来自 B22A 控制矩阵）─────────────
+
+interface B22AToTestControl {
+  element?: string
+  controlPoint?: string
+  testMethod?: string | null
+  isAntiFraud?: boolean
+}
+const b22aToTestControls = ref<B22AToTestControl[]>([])
+
+async function loadB22AToTest(): Promise<void> {
+  if (!props.projectId) return
+  try {
+    const res: any = await api.get(`/api/projects/${props.projectId}/workpapers`, {
+      params: { wp_code: 'B22A' }, _silent: true,
+    } as any)
+    const wps: any[] = Array.isArray(res) ? res : res?.data ?? []
+    const b22aWpId = wps[0]?.id || wps[0]?.wp_id
+    if (!b22aWpId) return
+    const r: any = await api.get(`/api/workpapers/${b22aWpId}/checklist-responses`, { _silent: true } as any)
+    const rows: any[] = Array.isArray(r) ? r : r?.data ?? []
+    const summary = rows.find((x) => x.item_id === 'B22A-to-test-summary')
+    if (summary?.remark) {
+      const parsed = JSON.parse(summary.remark)
+      if (Array.isArray(parsed)) b22aToTestControls.value = parsed
+    }
+  } catch {
+    // B22A 不可用时静默降级
+  }
+}
+
+function onToTestChanged(payload: any) {
+  if (payload && Array.isArray(payload.controls)) {
+    b22aToTestControls.value = payload.controls
+  }
+}
+
 onMounted(async () => {
   isLoading.value = true
   try {
-    await Promise.all([selfLoad(), c1data.loadAll(), loadPrograms(), checkAiHealth()])
+    await Promise.all([selfLoad(), c1data.loadAll(), loadPrograms(), checkAiHealth(), loadB22AToTest()])
     buildSampleRows()
     buildDefectRows()
     applyInitialFocus()
   } finally {
     isLoading.value = false
   }
+  eventBus.on('control:to-test-changed' as any, onToTestChanged)
+})
+
+onBeforeUnmount(() => {
+  eventBus.off('control:to-test-changed' as any, onToTestChanged)
 })
 
 // ─── Expose ──────────────────────────────────────────────────────────────

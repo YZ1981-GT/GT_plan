@@ -158,6 +158,33 @@
       </el-table-column>
     </el-table>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" style="margin-top:12px; margin-bottom:12px">
+      <template #header>
+        <div class="section-head" style="margin-bottom:0">
+          <span style="font-weight:600">审计说明</span>
+          <el-button size="small" type="primary" link @click="handleAiGenerate('large-amount-note')">
+            <el-icon><MagicStick /></el-icon> AI生成
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 10 }"
+        :disabled="isReadonly"
+        placeholder="请填写大额其他应付款分析审计说明：大额款项形成原因、偿付计划合理性、长期挂账风险评估、审计结论..."
+        @change="persistNote"
+      />
+    </el-card>
+
+    <!-- 阈值参考提示 -->
+    <el-alert type="info" :closable="true" style="margin-bottom:12px" v-if="detailTotal > 0">
+      <template #title>
+        阈值参考：审定合计×5% = {{ fmtAmt(detailTotal * 0.05) }}；审定合计×10% = {{ fmtAmt(detailTotal * 0.1) }}。建议结合项目重要性水平(B15)设定阈值。
+      </template>
+    </el-alert>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -177,11 +204,12 @@
  * Spec: .kiro/specs/k3-other-payables/ | Task: 4.4
  * Requirements: 4.1-4.4
  */
-import { computed, inject, onMounted } from 'vue'
+import { computed, inject, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useK3LargeAmount, type K3LargeAmountRow } from '../../composables/useK3LargeAmount'
 import { calcSubtotal } from '../../composables/useK3FormulaEngine'
+import http from '@/utils/http'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -229,7 +257,20 @@ const {
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
-onMounted(() => { initFromResponses() })
+const auditNote = ref('')
+const ITEM_NOTE = 'K3-4-note'
+
+function loadNote() {
+  const item = props.allResponses.get(ITEM_NOTE)
+  auditNote.value = item?.remark ?? ''
+}
+
+function persistNote() {
+  props.allResponses.set(ITEM_NOTE, { item_id: ITEM_NOTE, remark: auditNote.value })
+  emit('save', ITEM_NOTE, { remark: auditNote.value })
+}
+
+onMounted(() => { initFromResponses(); loadNote() })
 
 // ─── 行操作 ──────────────────────────────────────────────────────────────────
 
@@ -252,8 +293,10 @@ async function handleAddRow() {
       repaymentDate: '',
       isLongOutstanding: false,
       followUpAction: '',
+      contractIndex: '',
+      postPayment: 0,
       sourceRowId: '',
-    })
+    } as any)
     persistRows()
     ElMessage.success(`已新增：${value.trim()}`)
   } catch { /* cancelled */ }
@@ -320,7 +363,26 @@ function fmtPct(val: number | null | undefined): string {
 }
 
 function handleAiGenerate(section: string) {
-  console.log('[K3-4] AI generate:', section)
+  http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+    prompt: '请生成其他应付款(2241)大额款项分析审计说明，包含：大额款项形成原因分析、偿付计划合理性、长期挂账风险、审计结论',
+    context: JSON.stringify({
+      科目: '2241其他应付款',
+      方向: '贷方/负债类',
+      大额阈值: String(threshold.value),
+      大额笔数: String(largeRows.value.length),
+      大额合计: String(largeTotal.value),
+      总占比: largeTotalProportion.value != null ? `${(largeTotalProportion.value * 100).toFixed(1)}%` : '—',
+      长期挂账笔数: String(largeRows.value.filter(r => r.isLongOutstanding).length),
+    }),
+    existingContent: auditNote.value || '',
+    section: 'K3-4-large-amount',
+  }).then((res: any) => {
+    const content = res?.data?.data?.content || res?.data?.content || ''
+    if (content) {
+      auditNote.value = auditNote.value ? `${auditNote.value}\n${content}` : content
+      persistNote()
+    }
+  }).catch(() => { /* AI不可用静默降级 */ })
 }
 
 function handleReview(id: string) { openReviewDialog(id) }

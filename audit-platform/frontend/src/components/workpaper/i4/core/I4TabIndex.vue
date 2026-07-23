@@ -1,14 +1,14 @@
 <template>
   <div class="i4-tab-index">
-    <!-- 顶部蓝色渐变引导区 -->
+    <!-- 顶部蓝色渐变引导区（建议顺序与编制校验一致） -->
     <div class="guide-area">
       <div class="guide-grid">
-        <div class="guide-step"><span class="step-num">①</span> 审定表(I4-1)确认TB取数→期末=期初+增加-摊销-减少→审定回写(1801)</div>
-        <div class="guide-step"><span class="step-num">②</span> 明细表(I4-2)逐项追踪→25列3区段Tab(基础|摊销|余额)</div>
+        <div class="guide-step"><span class="step-num">①</span> 明细表(I4-2)滚转编制→未审/调整/审定→摊销与基础信息</div>
+        <div class="guide-step"><span class="step-num">②</span> 审定表(I4-1)自明细带入→三角勾稽→TB回写(1801)</div>
         <div class="guide-step"><span class="step-num">③</span> 调整分录(I4-3)AJE/RJE录入→借贷平衡→推送A13</div>
-        <div class="guide-step"><span class="step-num">④</span> 摊销政策检查(I4-4)段落型：方法/受益期/变更</div>
-        <div class="guide-step"><span class="step-num">⑤</span> 针对性检查(I4-5)大额新增/受益期变更/提前终止</div>
-        <div class="guide-step"><span class="step-num">⑥</span> 摊销测算(I4-6/I4-7)分支选择器：直线法 vs 工作量法</div>
+        <div class="guide-step"><span class="step-num">④</span> 摊销政策检查(I4-4)表A/B/C + CAS + 同业/租赁交叉</div>
+        <div class="guide-step"><span class="step-num">⑤</span> 针对性检查(I4-5)抽凭核对1~5 + 覆盖率闸门 + 与I4-4交叉</div>
+        <div class="guide-step"><span class="step-num">⑥</span> 摊销测算(I4-6/I4-7)二选一：直线法 vs 工作量法 → 回写审定</div>
       </div>
     </div>
 
@@ -31,6 +31,38 @@
         <span class="stat-label">总进度</span>
       </div>
     </div>
+
+    <!-- 编制校验汇总 -->
+    <el-card v-if="prepIssues.length" shadow="never" class="prep-card">
+      <template #header>
+        <div class="section-title">
+          <span>编制校验汇总</span>
+          <el-tag size="small" :type="prepErrorCount ? 'danger' : 'warning'">
+            {{ prepIssues.length }} 项待处理
+          </el-tag>
+        </div>
+      </template>
+      <p class="prep-order">建议顺序：I4-2 → I4-1 带入 → I4-3 → I4-4 → I4-5 → I4-6/7 → 附注</p>
+      <ul class="prep-list">
+        <li v-for="(issue, idx) in prepIssues" :key="idx">
+          <el-tag
+            size="small"
+            :type="issue.level === 'error' ? 'danger' : 'warning'"
+            class="prep-code"
+            @click="handleNavigateByCode(issue.code)"
+          >{{ issue.code }}</el-tag>
+          {{ issue.message }}
+        </li>
+      </ul>
+    </el-card>
+    <el-alert
+      v-else
+      type="success"
+      :closable="false"
+      show-icon
+      title="编制校验：暂无跨表阻断/告警项"
+      class="prep-ok"
+    />
 
     <!-- 底稿目录表 -->
     <el-card shadow="never" class="index-card">
@@ -82,12 +114,12 @@
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>建议按序号顺序编制：程序表→审定表→明细表→调整分录→政策检查→针对性检查→摊销测算→附注</li>
-        <li>科目1801长期待摊费用（借方/资产类）：期末=期初+借-贷</li>
-        <li>摊销方法通常为直线法（月平均），少数用工作量法</li>
-        <li>审定表完成后自动回写TB科目1801</li>
-        <li>摊销测算有两种方法分支(I4-6直线法/I4-7工作量法)，根据项目性质选择</li>
-        <li>附注有上市版/国企版，根据projectContext.business_category自动判断</li>
+        <li>建议顺序：程序表 → I4-2 明细 → I4-1 审定带入 → I4-3 调整 → I4-4 政策 → I4-5 抽凭 → I4-6/7 测算 → 附注</li>
+        <li>科目1801长期待摊费用（借方/资产类）：期末=期初+增−摊−减</li>
+        <li>I4-2 为滚转明细（未审滚动 | 调整与审定 | 摊销信息 | 基础信息），非旧版 25 列分区</li>
+        <li>审定表完成后可回写 TB 科目 1801</li>
+        <li>摊销测算 I4-6/I4-7 二选一；两表同时有数据时目录会告警并以 I4-6 为准</li>
+        <li>附注有上市版/国企版，根据 projectContext.business_category 判断</li>
       </ul>
     </details>
   </div>
@@ -100,12 +132,13 @@
  * 列出所有12个sheet，显示完成状态，点击跳转。
  * 科目1801长期待摊费用（借方/资产类）。
  *
- * Spec: .kiro/specs/i4-long-term-prepaid/
+ * Spec（归档）: .kiro/specs/_archive/05-business-features/i4-long-term-prepaid/
  * Task: 4.1
  * Requirements: Glossary Tab_Index
  */
 import { computed } from 'vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import { buildI4ConsistencyDashboard } from '../../composables/i4ConsistencyModel'
 
 const props = defineProps<{
   wpId: string
@@ -134,17 +167,21 @@ interface SheetEntry {
 const SHEET_DEFS: { seq: number; code: string; name: string; sheetName: string; fields: string[]; crossRef?: string }[] = [
   { seq: 1, code: 'I4A', name: '长期待摊费用实质性程序表', sheetName: 'Procedure_Table_I4A 长期待摊费用实质性程序表', fields: ['I4A-'] },
   { seq: 2, code: 'I4-1', name: '审定表', sheetName: 'Adjudication_I4_1 审定表', fields: ['I4-adj-'] },
-  { seq: 3, code: 'I4-2', name: '明细表（25列3区段）', sheetName: 'Detail_I4_2 明细表', fields: ['I4-2-'] },
+  { seq: 3, code: 'I4-2', name: '明细表（滚转四区段）', sheetName: 'Detail_I4_2 明细表', fields: ['I4-2-'] },
   { seq: 4, code: 'I4-3', name: '调整分录汇总', sheetName: 'Adjustment_I4_3 调整分录汇总', fields: ['I4-3-'], crossRef: 'A13' },
-  { seq: 5, code: 'I4-4', name: '摊销政策检查表', sheetName: 'Policy_Check_I4_4 摊销政策检查表', fields: ['I4-4-'] },
-  { seq: 6, code: 'I4-5', name: '针对性检查表', sheetName: 'Targeted_Check_I4_5 针对性检查表', fields: ['I4-5-'] },
+  { seq: 5, code: 'I4-4', name: '摊销政策检查表（表A/B/C）', sheetName: 'Policy_Check_I4_4 摊销政策检查表', fields: ['I4-4-'] },
+  { seq: 6, code: 'I4-5', name: '针对性检查表（抽凭）', sheetName: 'Targeted_Check_I4_5 针对性检查表', fields: ['I4-5-'] },
   { seq: 7, code: 'I4-6', name: '摊销测算-直线法', sheetName: 'Amortization_Straight_I4_6 摊销测算直线法', fields: ['I4-6-'], crossRef: 'I4-7' },
   { seq: 8, code: 'I4-7', name: '摊销测算-工作量法', sheetName: 'Amortization_Units_I4_7 摊销测算工作量法', fields: ['I4-7-'], crossRef: 'I4-6' },
-  { seq: 9, code: '附注(上市)', name: '附注上市公司版', sheetName: 'Disclosure_Listed 附注上市', fields: ['I4-disc-L-'] },
-  { seq: 10, code: '附注(国企)', name: '附注国企版', sheetName: 'Disclosure_SOE 附注国企', fields: ['I4-disc-S-'] },
+  { seq: 9, code: '附注(上市)', name: '附注上市公司版', sheetName: 'Disclosure_Listed 附注上市', fields: ['I4-disc-L-', 'I4-disc-listed-'] },
+  { seq: 10, code: '附注(国企)', name: '附注国企版', sheetName: 'Disclosure_SOE 附注国企', fields: ['I4-disc-S-', 'I4-disc-soe-'] },
   { seq: 11, code: '目录', name: '底稿目录', sheetName: 'Tab_Index 底稿目录', fields: [] },
   { seq: 12, code: 'I4-全', name: '底稿全览(OO)', sheetName: 'Full_Workbook', fields: [] },
 ]
+
+const consistency = computed(() => buildI4ConsistencyDashboard(props.allResponses))
+const prepIssues = computed(() => consistency.value.issues)
+const prepErrorCount = computed(() => consistency.value.errorCount)
 
 /** Determine per-sheet status from checklist_responses */
 function _getSheetStatus(fields: string[]): { status: SheetStatus; progress: number } {
@@ -225,6 +262,13 @@ function progressColor(pct: number): string {
 function handleNavigate(row: SheetEntry) {
   emit('navigate-sheet', row.sheetName)
 }
+
+function handleNavigateByCode(code: string) {
+  const found = sheets.value.find((s) => s.code === code || s.code.startsWith(code) || s.name.includes(code))
+  if (found) emit('navigate-sheet', found.sheetName)
+  else if (code.includes('附注')) emit('navigate-sheet', 'Disclosure_Listed 附注上市')
+  else emit('navigate-sheet', code)
+}
 </script>
 
 <style scoped>
@@ -254,6 +298,13 @@ function handleNavigate(row: SheetEntry) {
 .stat-inprogress .stat-value { color: #e6a23c; }
 .stat-pending .stat-value { color: #909399; }
 .stat-total .stat-value { color: var(--el-color-primary); }
+
+/* 编制校验 */
+.prep-card { margin-bottom: 16px; }
+.prep-ok { margin-bottom: 16px; }
+.prep-order { margin: 0 0 8px; font-size: 12px; color: var(--el-text-color-secondary); }
+.prep-list { margin: 0; padding-left: 4px; list-style: none; line-height: 1.9; }
+.prep-code { margin-right: 8px; cursor: pointer; }
 
 /* 目录卡片 */
 .section-title { display: flex; align-items: center; justify-content: space-between; }

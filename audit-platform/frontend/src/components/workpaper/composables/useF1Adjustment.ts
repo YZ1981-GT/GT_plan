@@ -16,6 +16,7 @@
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal } from './useF1FormulaEngine'
+import { eventBus } from '@/utils/eventBus'
 import type { ChecklistResponse } from './useF1FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -203,47 +204,46 @@ export function useF1Adjustment(options: UseF1AdjustmentOptions) {
   // ─── publishAdjustment ───────────────────────────────────────────────
 
   /**
-   * 发布 adjustment:created 事件至 EventBus（CustomEvent on window）。
+   * 发布 adjustment:created 事件至 EventBus（经 crossWpEventBridge 双通道桥接）。
    * payload: { wpCode:'F1', entryType:'AJE'|'RJE', amount, accountCode:'1123' }
+   * 供中央调整分录模块及其它跨底稿消费者使用；F1-1 审定表通过 crossSheet.adjustmentTotals
+   * 纯 computed 消费 F1-3 汇总，不依赖本事件（避免事件时序/重复累加问题）。
    */
   function publishAdjustment(row: AdjustmentRow): void {
     const entryType = row.category === '账项调整' ? 'AJE' : 'RJE'
-    const event = new CustomEvent('adjustment:created', {
-      detail: {
-        wpCode: 'F1',
-        entryType,
-        amount: row.debitAmount,
-        accountCode: '1123',
-      },
-    })
-    window.dispatchEvent(event)
+    eventBus.emit('adjustment:created', {
+      wpCode: 'F1',
+      entryType,
+      amount: parseNum(row.debitAmount),
+      accountCode: '1123',
+      timestamp: Date.now(),
+    } as any)
   }
 
   // ─── pushToA13 ──────────────────────────────────────────────────────
 
   /**
-   * 推送选中分录至 A13 错报汇总（CustomEvent 'misstatement:push'）。
-   * payload: { wpCode:'F1', rows: selected AdjustmentRow[] }
+   * 推送选中分录至 A13 错报汇总。
+   * 发布 'a13:push-misstatement' 事件（经 crossWpEventBridge 双通道桥接，
+   * 中央调整管理页 / A13 错报汇总订阅）。
    */
   function pushToA13(rowIds: string[]): void {
     const selectedRows = rows.value.filter(r => rowIds.includes(r.rowId))
     if (selectedRows.length === 0) return
 
-    const event = new CustomEvent('misstatement:push', {
-      detail: {
-        wpCode: 'F1',
-        rows: selectedRows.map(r => ({
-          description: r.description,
-          category: r.category,
-          reportItem: r.reportItem,
-          accountName: r.accountName,
-          debitAmount: r.debitAmount,
-          creditAmount: r.creditAmount,
-          indexRef: r.indexRef,
-        })),
-      },
-    })
-    window.dispatchEvent(event)
+    const items = selectedRows.map(r => ({
+      wpCode: 'F1',
+      entryType: r.category === '账项调整' ? 'AJE' : 'RJE',
+      description: r.description,
+      category: r.category,
+      reportItem: r.reportItem,
+      accountName: r.accountName,
+      debitAmount: r.debitAmount,
+      creditAmount: r.creditAmount,
+      indexRef: r.indexRef,
+    }))
+
+    eventBus.emit('a13:push-misstatement', { items, wpCode: 'F1', timestamp: Date.now() } as any)
   }
 
   // ─── Lifecycle ───────────────────────────────────────────────────────

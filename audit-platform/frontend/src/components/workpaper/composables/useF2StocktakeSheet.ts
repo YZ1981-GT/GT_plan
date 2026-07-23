@@ -157,7 +157,58 @@ export function useF2StocktakeRows<T extends { id: string }>(opts: {
   _fieldFlushers.add(flushNow)
   onScopeDispose(() => { _fieldFlushers.delete(flushNow) })
 
-  return { rows, auditNote, updateRow, addRow, removeRow, genId, flushNow }
+  /**
+   * Task 11: fillActualFromSample — 读 F2-25 抽盘结果，按名称匹配填入 F2-24 实盘数。
+   * 适用于 rowsKey = 'F2-24-rows' 的场景（账面核对表）。
+   * 返回 { matched, unmatched } 便于 UI 提示。
+   */
+  function fillActualFromSample(
+    sampleRowsKey = 'F2-25-rows',
+  ): { matched: number; unmatched: number } {
+    if (readonly.value) return { matched: 0, unmatched: 0 }
+    const sampleRaw = opts.allResponses.value.get(sampleRowsKey)?.remark
+    if (!sampleRaw) return { matched: 0, unmatched: 0 }
+    let sampleRows: Array<{ itemName?: string; sampleQty?: number; id?: string }>
+    try {
+      const parsed = JSON.parse(sampleRaw)
+      sampleRows = Array.isArray(parsed) ? parsed : []
+    } catch {
+      return { matched: 0, unmatched: 0 }
+    }
+    if (!sampleRows.length) return { matched: 0, unmatched: 0 }
+
+    // 按名称(小写去空白)索引抽盘数据
+    const normalize = (s: string) => String(s ?? '').replace(/[\s\u3000]+/g, '').toLowerCase()
+    const sampleByName: Map<string, number> = new Map()
+    for (const sr of sampleRows) {
+      const key = normalize(sr.itemName || '')
+      if (!key) continue
+      const qty = Number(sr.sampleQty) || 0
+      sampleByName.set(key, (sampleByName.get(key) || 0) + qty)
+    }
+
+    let matched = 0
+    let unmatched = 0
+    const updated = rows.value.map((r: any) => {
+      const key = normalize(r.itemName || '')
+      if (!key) return r
+      const actualQty = sampleByName.get(key)
+      if (actualQty == null) {
+        unmatched++
+        return r
+      }
+      matched++
+      // 填入 actualQty 并计算差异（不覆盖 varianceReason）
+      const variance = actualQty - (Number(r.bookQty ?? r.erpQty) || 0)
+      return { ...r, actualQty: actualQty, variance }
+    })
+    rows.value = updated as T[]
+    persist()
+    unmatched = sampleByName.size - matched
+    return { matched, unmatched: Math.max(unmatched, 0) }
+  }
+
+  return { rows, auditNote, updateRow, addRow, removeRow, genId, flushNow, fillActualFromSample }
 }
 
 export function useF2StocktakeFields(opts: {

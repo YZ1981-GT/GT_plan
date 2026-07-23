@@ -80,11 +80,16 @@ def _run_path_and_collect(coro_factory):
     publish_spy = AsyncMock()
     publish_immediate_spy = AsyncMock()
     broadcast_raw_spy = MagicMock()
+    # Step 5 Durable_Epoch 是正交副作用（DB-first），本测试聚焦 4 缓存层收敛 —— 打桩避免
+    # 在 asyncio.run per-example loop 中开真实 DB 连接（跨 loop 清理 RuntimeWarning）。
+    epoch_spy = AsyncMock(return_value=0)
 
     with patch(_L3_TARGET, l3_spy), patch(_L3_WP_TARGET, l3_wp_spy), patch(
         _L2_TARGET, l2_spy
     ), patch(
         _REV_TARGET, rev_spy
+    ), patch(
+        "app.services.acnr.cache_epoch.increment_epoch", epoch_spy
     ), patch.object(address_registry, "invalidate_async", legacy_spy), patch.object(
         event_bus, "publish", publish_spy
     ), patch.object(

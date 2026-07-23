@@ -25,6 +25,7 @@ from app.services.acnr.cache_epoch import (
     _clear_all_local_caches,
     _epoch_poll_task,
     _local_epoch_store,
+    _read_db_epoch,
     _reconnect_loop,
     get_epoch,
     get_redis_client,
@@ -82,16 +83,14 @@ async def test_epoch_poll_detects_mismatch_and_clears_cache():
         # 1. 设置本地 epoch=5
         set_local_epoch(project_id, 5)
 
-        # 2. 模拟远程 INCR（另一个 worker 直接写 Redis）
-        key = f"{EPOCH_KEY_PREFIX}{project_id}"
-        await redis.set(key, "6")
+        # 2. 模拟远程 INCR（另一个 worker 写 DB Durable_Epoch → 6）
+        #    R11.4: poll 现对比 DB 权威 epoch（非 Redis）→ patch _read_db_epoch 返回 6
+        async def _fake_db_epoch(pid, session=None):
+            return 6 if pid == project_id else 0
 
         # 3. 直接运行一次 poll 逻辑（不等 60s）
-        # 使用 monkeypatch 把 EPOCH_POLL_INTERVAL 设为 0 并只运行一轮
-        with patch(
-            "app.services.acnr.cache_epoch.EPOCH_POLL_INTERVAL", 0
-        ):
-            # 创建 poll task 并让它跑一轮
+        with patch("app.services.acnr.cache_epoch.EPOCH_POLL_INTERVAL", 0), \
+             patch("app.services.acnr.cache_epoch._read_db_epoch", new=_fake_db_epoch):
             task = asyncio.create_task(_epoch_poll_task())
             await asyncio.sleep(0.1)  # 让 poll 运行一次
             task.cancel()
@@ -104,7 +103,7 @@ async def test_epoch_poll_detects_mismatch_and_clears_cache():
         assert project_id in cleared_projects, (
             f"Expected {project_id} in cleared list, got {cleared_projects}"
         )
-        # 本地 epoch 应更新为远程值
+        # 本地 epoch 应更新为远程 DB 值
         assert _local_epoch_store.get(project_id) == 6
 
     finally:
@@ -127,14 +126,14 @@ async def test_epoch_poll_no_action_when_consistent():
     register_local_cache_clear(on_clear)
 
     try:
-        # 本地和远程都是 epoch=3
+        # 本地和远程 DB epoch 都是 3（一致）
         set_local_epoch(project_id, 3)
-        key = f"{EPOCH_KEY_PREFIX}{project_id}"
-        await redis.set(key, "3")
 
-        with patch(
-            "app.services.acnr.cache_epoch.EPOCH_POLL_INTERVAL", 0
-        ):
+        async def _fake_db_epoch(pid, session=None):
+            return 3 if pid == project_id else 0
+
+        with patch("app.services.acnr.cache_epoch.EPOCH_POLL_INTERVAL", 0), \
+             patch("app.services.acnr.cache_epoch._read_db_epoch", new=_fake_db_epoch):
             task = asyncio.create_task(_epoch_poll_task())
             await asyncio.sleep(0.1)
             task.cancel()
@@ -246,13 +245,20 @@ async def test_reconnect_loop_retries_on_failure():
 
 
 @pytest.mark.asyncio
-async def test_redis_unavailable_records_fallback_metric():
-    """Redis 完全不可用 → epoch=0 + fallback metric [Req-14.4]。"""
+async def test_redis_and_db_unavailable_records_fallback_metric():
+    """DB 与 Redis 均不可用 → epoch=0 + fallback metric（R11.4/R12.1 最终降级）。
+
+    R11.4 后 increment_epoch 是 DB-first：仅当 DB 也不可用（patch _increment_db_epoch 抛异常）
+    且 Redis 不可用时才返回 0。此为最坏降级路径，由 TTL/poll 最终兜底。
+    """
     set_redis_client(None)
 
-    with patch(
-        "app.services.acnr.cache_epoch._record_fallback_metric"
-    ) as mock_metric:
+    async def _db_down(pid, session=None):
+        raise RuntimeError("DB unavailable")
+
+    with patch("app.services.acnr.cache_epoch._record_fallback_metric") as mock_metric, \
+         patch("app.services.acnr.cache_epoch._increment_db_epoch", new=_db_down), \
+         patch("app.services.acnr.cache_epoch._read_db_epoch", new=_db_down):
         epoch = await increment_epoch("some-project")
         assert epoch == 0
         mock_metric.assert_called()
@@ -292,15 +298,22 @@ async def test_start_stop_epoch_subscriber():
 
 
 @pytest.mark.asyncio
-async def test_start_subscriber_without_redis_skips():
-    """Redis 不可用时 start_epoch_subscriber 跳过（不崩溃）。"""
+async def test_start_subscriber_without_redis_still_starts_fallback():
+    """R11.5: Redis 不可用时 start_epoch_subscriber 仍启动 DB 轮询兜底 + subscriber 自愈任务
+    （不再早退 skip）。subscriber 内部指数退避在 Redis 恢复时重连。"""
     set_redis_client(None)
 
     await start_epoch_subscriber()  # 不应抛异常
 
     from app.services.acnr import cache_epoch
-    assert cache_epoch._subscriber_task is None
-    assert cache_epoch._poll_task is None
+    try:
+        # R11.5：两个任务都应启动（poll 兜底 + subscriber 自愈），而非 None
+        assert cache_epoch._subscriber_task is not None
+        assert cache_epoch._poll_task is not None
+    finally:
+        await stop_epoch_subscriber()
+        assert cache_epoch._subscriber_task is None
+        assert cache_epoch._poll_task is None
 
 
 # ─── Test: 完整场景 — 断开 → 远程 INCR → poll 修复 [P16] ────────────────────
@@ -327,23 +340,20 @@ async def test_full_scenario_disconnect_incr_poll_fix():
     register_local_cache_clear(on_clear)
 
     try:
-        # 1. 正常 increment → 本地 epoch=1
-        epoch = await increment_epoch(project_id)
-        assert epoch == 1
-        assert _local_epoch_store[project_id] == 1
-        cleared_projects.clear()  # 清除 increment 时触发的本地通知
-
-        # 2 + 3. 模拟断连期间另一个 worker INCR（直接操作 Redis）
-        key = f"{EPOCH_KEY_PREFIX}{project_id}"
-        await redis.incr(key)  # Redis epoch 变为 2
-
-        # 4. 本地 epoch 仍为 1
+        # 1. 本 worker 本地 epoch=1
+        set_local_epoch(project_id, 1)
         assert _local_epoch_store[project_id] == 1
 
-        # 5. Poll 检测到不一致 → 清缓存
-        with patch(
-            "app.services.acnr.cache_epoch.EPOCH_POLL_INTERVAL", 0
-        ):
+        # 2 + 3. 模拟断连期间另一个 worker 写 DB Durable_Epoch → 2
+        async def _fake_db_epoch(pid, session=None):
+            return 2 if pid == project_id else 0
+
+        # 4. 本地 epoch 仍为 1（因断连未收到 pub-sub 通知）
+        assert _local_epoch_store[project_id] == 1
+
+        # 5. Poll 对比 DB 权威 epoch 检测到不一致 → 清缓存（R11.4）
+        with patch("app.services.acnr.cache_epoch.EPOCH_POLL_INTERVAL", 0), \
+             patch("app.services.acnr.cache_epoch._read_db_epoch", new=_fake_db_epoch):
             task = asyncio.create_task(_epoch_poll_task())
             await asyncio.sleep(0.1)
             task.cancel()
@@ -352,7 +362,7 @@ async def test_full_scenario_disconnect_incr_poll_fix():
             except asyncio.CancelledError:
                 pass
 
-        # 验证：缓存被清除 + 本地 epoch 更新
+        # 验证：缓存被清除 + 本地 epoch 更新为 DB 值
         assert project_id in cleared_projects
         assert _local_epoch_store[project_id] == 2
 

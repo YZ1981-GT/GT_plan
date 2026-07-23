@@ -295,6 +295,22 @@
       </el-table-column>
     </el-table>
 
+    <!-- K3-1审定勾稽告警 -->
+    <el-alert
+      v-if="adjudicationDiff !== 0"
+      :type="Math.abs(adjudicationDiff) > 1 ? 'warning' : 'success'"
+      :closable="false"
+      show-icon
+      style="margin-top:12px; margin-bottom:8px"
+    >
+      <template #title>
+        <template v-if="Math.abs(adjudicationDiff) > 1">
+          明细合计({{ fmtAmt(detail.subtotals.value.endBalance) }}) ≠ K3-1审定合计({{ fmtAmt(k3AuditedTotal) }})，差额 {{ fmtAmt(adjudicationDiff) }}
+        </template>
+        <template v-else>✓ 明细合计与K3-1审定表核对一致</template>
+      </template>
+    </el-alert>
+
     <!-- 底部统计卡片 -->
     <div class="stats-bar">
       <el-tag type="info" effect="plain">往来笔数: {{ detail.subtotals.value.count }}</el-tag>
@@ -336,6 +352,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useK3Detail, type K3DetailRow } from '../../composables/useK3Detail'
 import { useK3ImportExport } from '../../composables/useK3ImportExport'
+import http from '@/utils/http'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -410,6 +427,23 @@ const agingOver3YPercent = computed(() => {
     return sum + rowSum
   }, 0)
   return Math.round((over3y / endTotal) * 10000) / 100
+})
+
+// ─── K3-1审定勾稽 ────────────────────────────────────────────────────────────
+
+const k3AuditedTotal = computed(() => {
+  const item = props.allResponses.get('K3-1-audited-total')
+  const v = Number(item?.remark ?? 0)
+  return Number.isFinite(v) ? v : 0
+})
+
+const adjudicationDiff = computed(() => {
+  const detailEnd = detail.subtotals.value.endBalance
+  const audited = k3AuditedTotal.value
+  // 只有两者都非0时才比较（避免审定表未编制时误报）
+  if (audited === 0 && detailEnd === 0) return 0
+  if (audited === 0) return 0 // 审定表未编制，不报差异
+  return Math.round((detailEnd - audited) * 100) / 100
 })
 
 // ─── 行样式：3年以上>0橙色背景（Req 3.5） ────────────────────────────────────
@@ -497,7 +531,28 @@ function handleImportData() {
 // ─── AI / 复核 ───────────────────────────────────────────────────────────────
 
 function handleAiGenerate() {
-  console.log('[K3-2] AI generate: detail')
+  http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+    prompt: '请生成其他应付款(2241)明细表审计说明，包含：往来对象分布分析、账龄结构分析、3年以上长期挂账风险提示、明细合计与审定表勾稽情况',
+    context: JSON.stringify({
+      科目: '2241其他应付款',
+      方向: '贷方/负债类',
+      往来笔数: String(detail.subtotals.value.count),
+      期末合计: String(detail.subtotals.value.endBalance),
+      '3年以上占比': `${agingOver3YPercent.value.toFixed(1)}%`,
+      '3年以上笔数': String(detail.detailRows.value.filter((r: K3DetailRow) => {
+        const over3Keys = ['y3to4', 'y4to5', 'over5', 'over3']
+        return over3Keys.some(k => k in r.agingAudited && (r.agingAudited[k] || 0) > 0)
+      }).length),
+    }),
+    existingContent: '',
+    section: 'K3-2-detail',
+  }).then((res: any) => {
+    const content = res?.data?.data?.content || res?.data?.content || ''
+    if (content) {
+      ElMessage.success('AI已生成分析建议，请查看控制台')
+      console.log('[K3-2 AI]', content)
+    }
+  }).catch(() => { /* AI不可用静默降级 */ })
 }
 function handleReview() { openReviewDialog('K3-2-detail') }
 

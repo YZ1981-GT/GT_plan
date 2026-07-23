@@ -518,6 +518,13 @@ export function useK3Detail(params: {
     saveResponse('K3-2-detail-total', { remark: String(getDetailTotal()) })
     saveResponse('K3-2-aging-over3y-count', { remark: String(getAgingOver3YCount()) })
     saveResponse('K3-2-aging-over3y-total', { remark: String(getAgingOver3YTotal()) })
+    // 大额款项count/total（供useK3CrossSheet.largeAmountVsDetail→主入口全局告警③消费）
+    // 阈值取K3-4-threshold（若已设），否则默认10万
+    const thItem = allResponses.value.get('K3-4-threshold')
+    const threshold = Number(thItem?.remark) || 100000
+    const largeItems = getLargeAmountItems(threshold)
+    saveResponse('K3-2-large-amount-count', { remark: String(largeItems.length) })
+    saveResponse('K3-2-large-amount-total', { remark: String(calcSubtotal(largeItems.map(r => r.endBalance))) })
   }
 
   // ─── Init ──────────────────────────────────────────────────────────────────

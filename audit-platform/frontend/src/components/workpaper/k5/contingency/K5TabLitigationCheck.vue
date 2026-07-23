@@ -17,6 +17,16 @@
         <el-button size="small" :disabled="isReadonly" @click="handleAddRow">
           <el-icon><Plus /></el-icon> 新增行
         </el-button>
+        <el-dropdown size="small" :disabled="isReadonly">
+          <el-button size="small">导入导出 <el-icon><ArrowDown /></el-icon></el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
+              <el-dropdown-item @click="handleImportData">导入数据</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-button size="small" type="primary" plain @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI评估
         </el-button>
@@ -50,11 +60,27 @@
           <el-input-number v-model="row.amount" :disabled="isReadonly" size="small" :controls="false" :precision="2" style="width:95px" @change="(v:number) => save(row.rowId, 'amount', v)" />
         </template>
       </el-table-column>
+      <el-table-column label="我方角色" width="85">
+        <template #default="{ row }">
+          <el-select v-model="row.partyRole" :disabled="isReadonly" size="small" placeholder="—" @change="(v:string) => save(row.rowId, 'partyRole', v)">
+            <el-option label="被告" value="defendant" />
+            <el-option label="原告" value="plaintiff" />
+            <el-option label="第三人" value="third_party" />
+          </el-select>
+        </template>
+      </el-table-column>
       <el-table-column label="诉讼阶段" width="100">
         <template #default="{ row }">
-          <el-select v-model="row.stage" :disabled="isReadonly" size="small" placeholder="阶段" @change="(v:string) => save(row.rowId, 'stage', v)">
+          <el-select v-model="row.stage" :disabled="isReadonly" size="small" placeholder="阶段" @change="(v:string) => handleStageChange(row, v)">
             <el-option v-for="s in stageOptions" :key="s" :label="s" :value="s" />
           </el-select>
+        </template>
+      </el-table-column>
+      <el-table-column label="律师函" width="80" align="center">
+        <template #default="{ row }">
+          <el-tag v-if="row.lawyerLetterStatus === 'replied'" type="success" size="small">已回函</el-tag>
+          <el-tag v-else-if="row.lawyerLetterStatus === 'sent'" type="warning" size="small">已发函</el-tag>
+          <el-tag v-else type="info" size="small">未发</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="律师意见" min-width="140">
@@ -125,6 +151,7 @@
       <span>涉案金额: {{ fmtNum(subtotals.totalAmount) }}</span>
       <span>已确认损失: <strong class="text-danger">{{ fmtNum(subtotals.recognizedLoss) }}</strong></span>
       <span>需披露损失: <strong class="text-warning">{{ fmtNum(subtotals.disclosedLoss) }}</strong></span>
+      <el-button v-if="totalVariance > 0.01 && !isReadonly" size="small" type="warning" style="margin-left: auto" @click="suggestAjeFromVariance">💡 建议补提AJE</el-button>
       <el-button size="small" style="margin-left: auto" @click="openVoucherSampling">⚡ 抽凭</el-button>
     </div>
 
@@ -132,12 +159,53 @@
     <el-dialog v-model="showSamplingDialog" title="⚡ 抽凭引擎（科目 2701 预计负债-诉讼）" width="720px" :close-on-click-modal="false" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && props.wpId && props.projectId"
+        account-code="2701"
+        phase="final"
+        :workpaper-id="props.wpId"
         :project-id="props.projectId"
-        :account-codes="['2701']"
-        dialog-mode
+        :year="samplingYear"
         @filled="onSampleFilled"
       />
     </el-dialog>
+
+    <!-- ═══ 一审判决败诉提级警告（证监会监管报告第1点） ═══ -->
+    <el-alert v-if="firstInstanceLossWarnings.length > 0" type="error" :closable="false" show-icon style="margin-top:10px">
+      <template #title>
+        <span>⚠️ 一审判决败诉应确认预计负债（{{ firstInstanceLossWarnings.length }} 件）</span>
+      </template>
+      <template #default>
+        <div style="font-size:12px;line-height:1.6;margin-top:4px">
+          <div v-for="w in firstInstanceLossWarnings" :key="w.rowId" style="margin-bottom:2px">
+            <b>{{ w.caseName }}</b>：阶段=一审/二审，但可能性未标"很可能"。证监会明确：一审判决败诉仍以上诉为由未确认预计负债缺乏合理性。
+            <el-button v-if="!isReadonly" size="small" type="danger" link @click="upgradeToVeryLikely(w.rowId)">→ 提级为"很可能"</el-button>
+          </div>
+        </div>
+      </template>
+    </el-alert>
+
+    <!-- ═══ 审计说明与结论 ═══ -->
+    <el-card shadow="never" class="conclusion-card" style="margin-top:12px">
+      <template #header>
+        <div class="card-header-row">
+          <span class="card-title">审计说明与结论</span>
+          <el-button size="small" type="primary" plain @click="handleAiGenerate">
+            <el-icon><MagicStick /></el-icon> AI
+          </el-button>
+        </div>
+      </template>
+      <div style="margin-bottom:10px">
+        <label style="font-size:12px;color:#909399;display:block;margin-bottom:4px">审计说明</label>
+        <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+          placeholder="概述未决诉讼检查情况：已识别案件数量/涉案总额/已确认预计负债金额/差异处理/律师函取得情况等"
+          @change="persistNote" />
+      </div>
+      <div>
+        <label style="font-size:12px;color:#909399;display:block;margin-bottom:4px">审计结论</label>
+        <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly"
+          placeholder="基于上述检查，对预计负债-未决诉讼的完整性、计价和披露形成结论..."
+          @change="persistNote" />
+      </div>
+    </el-card>
 
     <!-- ═══ 证监会监管报告提示（方法论上下文）═══ -->
     <div class="csrc-hint">
@@ -173,8 +241,8 @@
  * Spec: .kiro/specs/k5-provisions/ | Task: 4.5, 6.3
  * Requirements: 8.1-8.4
  */
-import { ref, toRef, defineAsyncComponent } from 'vue'
-import { Plus, Delete, MagicStick } from '@element-plus/icons-vue'
+import { ref, toRef, computed, defineAsyncComponent, onMounted } from 'vue'
+import { Plus, Delete, MagicStick, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useK5Litigation } from '../../composables/useK5Litigation'
 import http from '@/utils/http'
@@ -189,6 +257,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  year?: number
 }>()
 
 const emit = defineEmits<{
@@ -198,6 +267,8 @@ const emit = defineEmits<{
 
 // 父组件模板绑定会自动解包 ref → 子组件收到纯 Map；重新包成 ref 供 composable 使用
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>
+
+const samplingYear = computed(() => props.year ?? new Date().getFullYear())
 
 const {
   litigationRows,
@@ -218,6 +289,103 @@ const {
 function save(rowId: string, field: string, value: any) { updateCell(rowId, field, value) }
 function handleAddRow() { addRow() }
 function handleAiGenerate() { emit('save', 'K5-6-ai-trigger', { remark: 'litigation-eval' }) }
+
+// ─── 审计说明与结论 ──────────────────────────────────────────────────────────
+
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function loadNote(): void {
+  const noteItem = props.allResponses.get('K5-6-audit-note')
+  if (noteItem?.remark) auditNote.value = noteItem.remark
+  const conclItem = props.allResponses.get('K5-6-audit-conclusion')
+  if (conclItem?.remark) auditConclusion.value = conclItem.remark
+}
+
+function persistNote(): void {
+  emit('save', 'K5-6-audit-note', { remark: auditNote.value })
+  emit('save', 'K5-6-audit-conclusion', { remark: auditConclusion.value })
+}
+
+// ─── 一审判决自动提级（证监会监管报告第1点） ─────────────────────────────────
+
+/**
+ * 一审/二审判决败诉但可能性未标"很可能"的案件 → 提级警告
+ * 证监会明确：一审判决败诉仍以上诉为由未确认预计负债缺乏合理性。
+ */
+const firstInstanceLossWarnings = computed(() => {
+  return litigationRows.value.filter((r: any) =>
+    (r.stage === '一审' || r.stage === '二审') &&
+    r.partyRole === 'defendant' &&
+    r.lossLikelihood !== 'very_likely' &&
+    r.amount > 0
+  )
+})
+
+function upgradeToVeryLikely(rowId: string): void {
+  updateCell(rowId, 'lossLikelihood', 'very_likely')
+  ElMessage.success('已将可能性提级为"很可能"，请确认预计损失金额')
+}
+
+// ─── 诉讼阶段变更联动 ───────────────────────────────────────────────────────
+
+function handleStageChange(row: any, newStage: string): void {
+  save(row.rowId, 'stage', newStage)
+  // 一审/二审 + 被告 + 可能性非"很可能" → 弹提示
+  if ((newStage === '一审' || newStage === '二审') && row.partyRole === 'defendant' && row.lossLikelihood !== 'very_likely') {
+    ElMessage.warning({
+      message: `案件"${row.caseName || '未命名'}"已进入${newStage}阶段，建议评估是否应将败诉可能性提升为"很可能"`,
+      duration: 5000,
+    })
+  }
+}
+
+// ─── 导入导出 ────────────────────────────────────────────────────────────────
+
+async function handleExportTemplate(): Promise<void> {
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/k5/export-template`, null, { params: { sheet: 'K5-6' }, responseType: 'blob', _silent: true } as any)
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'K5-6_未决诉讼_模板.xlsx'; a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('模板已下载')
+  } catch { ElMessage.error('导出模板失败') }
+}
+
+async function handleExportData(): Promise<void> {
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/k5/export-data`, null, { params: { sheet: 'K5-6' }, responseType: 'blob', _silent: true } as any)
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'K5-6_未决诉讼_数据.xlsx'; a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('数据已导出')
+  } catch { ElMessage.error('导出数据失败') }
+}
+
+async function handleImportData(): Promise<void> {
+  const input = document.createElement('input')
+  input.type = 'file'; input.accept = '.xlsx,.xls'
+  input.onchange = async () => {
+    const file = input.files?.[0]
+    if (!file) return
+    const formData = new FormData()
+    formData.append('file', file)
+    try {
+      const res = await http.post(`/api/workpapers/${props.wpId}/k5/import-data`, formData, {
+        params: { sheet: 'K5-6' },
+        headers: { 'Content-Type': 'multipart/form-data' }, _silent: true,
+      } as any)
+      ElMessage.success(`导入成功，共 ${res?.data?.imported_count ?? res?.data?.data?.rowCount ?? 0} 条`)
+    } catch (err: any) {
+      ElMessage.error('导入失败：' + (err?.response?.data?.message || err?.response?.data?.detail || '文件格式错误'))
+    }
+  }
+  input.click()
+}
 
 function handleLawyerLetter(rowId: string) {
   // 触发律师函上传+OCR流程（行级OCR: POST contract-ocr → 确认弹窗 → 填入律师意见）
@@ -264,15 +432,60 @@ function openVoucherSampling() {
   showSamplingDialog.value = true
 }
 
-function onSampleFilled(sample: any) {
+// ─── 差异 → 建议 AJE（推送 K5-3）────────────────────────────────────────────
+
+/** 未补提差额合计（应确认的预计损失 − 已计提，仅>0部分） */
+const totalVariance = computed(() => {
+  return litigationRows.value
+    .filter((r: any) => r.recognition === 'recognize' && (r.variance ?? 0) > 0.01)
+    .reduce((sum: number, r: any) => sum + (r.variance ?? 0), 0)
+})
+
+async function suggestAjeFromVariance(): Promise<void> {
+  if (totalVariance.value <= 0.01) return
+  const amt = totalVariance.value
+  try {
+    await ElMessageBox.confirm(
+      `检测到未决诉讼应确认但未计提差异合计 ${fmtNum(amt)} 元。\n\n建议生成调整分录：\n  借：营业外支出 6711  ${fmtNum(amt)}\n  贷：预计负债 2701  ${fmtNum(amt)}\n\n是否推送至 K5-3 调整分录汇总？`,
+      '建议补提预计负债',
+      { confirmButtonText: '推送至K5-3', cancelButtonText: '取消', type: 'warning' }
+    )
+    // 推送 AJE 至 K5-3（通过 allResponses 写入 K5-3-entries）
+    emit('save', 'K5-3-suggested-aje', {
+      remark: JSON.stringify({
+        source: 'K5-6-litigation-variance',
+        entryType: 'AJE',
+        summary: `补提未决诉讼预计负债（差异 ${fmtNum(amt)}）`,
+        debitAccountCode: '6711',
+        debitAccountName: '营业外支出',
+        creditAccountCode: '2701',
+        creditAccountName: '预计负债',
+        amount: amt,
+      }),
+    })
+    ElMessage.success('已推送补提建议至K5-3调整分录')
+  } catch {
+    // 用户取消
+  }
+}
+
+function onSampleFilled(payload: any) {
   showSamplingDialog.value = false
-  ElMessage.success('抽凭样本已填入')
+  const samples = payload?.samples ?? []
+  if (samples.length > 0) {
+    ElMessage.success(`抽凭样本已填入 ${samples.length} 笔`)
+  } else {
+    ElMessage.info('未获取到样本数据')
+  }
 }
 
 function fmtNum(v: number): string {
   if (!v && v !== 0) return '-'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+// ─── Lifecycle ───────────────────────────────────────────────────────────────
+onMounted(() => { loadNote() })
 </script>
 
 <style scoped>
@@ -292,7 +505,11 @@ function fmtNum(v: number): string {
 .text-muted { color: #c0c4cc; font-size: 12px; }
 .text-danger { color: #f56c6c; }
 .text-warning { color: #e6a23c; }
-.summary-bar { display: flex; gap: 24px; margin-top: 10px; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
+.summary-bar { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; align-items: center; }
+.conclusion-card :deep(.el-card__header) { padding: 8px 14px; }
+.conclusion-card :deep(.el-card__body) { padding: 12px 14px; }
+.card-header-row { display: flex; align-items: center; justify-content: space-between; }
+.card-title { font-weight: 600; }
 :deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 .k5-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .k5-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }

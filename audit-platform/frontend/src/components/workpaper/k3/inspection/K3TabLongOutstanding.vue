@@ -25,6 +25,7 @@
         <el-button size="small" type="primary" link @click="handleAiGenerate('long-outstanding-eval')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
+        <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handleImportFromDetail">从K3-2带入</el-button>
         <el-button size="small" :disabled="isReadonly" @click="handleAddRow">＋ 新增</el-button>
         <el-button size="small" @click="handleReview('K3-5-outstanding')">💬 复核</el-button>
       </div>
@@ -160,6 +161,29 @@
         </template>
       </el-table-column>
 
+      <el-table-column label="处理结论" min-width="140" align="center">
+        <template #default="{ row }">
+          <el-select v-if="!isReadonly" v-model="row.disposalConclusion" size="small" clearable placeholder="请选择"
+            @change="handleRowChange(row)">
+            <el-option v-for="opt in K3_DISPOSAL_CONCLUSIONS" :key="opt" :label="opt" :value="opt" />
+          </el-select>
+          <template v-else>
+            <el-tag v-if="row.disposalConclusion" :type="disposalTagType(row.disposalConclusion)" size="small">{{ row.disposalConclusion }}</el-tag>
+            <span v-else class="muted">—</span>
+          </template>
+        </template>
+      </el-table-column>
+
+      <!-- 跨底稿联动提示 -->
+      <el-table-column label="联动" width="70" align="center">
+        <template #default="{ row }">
+          <template v-if="row.disposalConclusion === '应确认收入'"><el-button size="small" link type="primary" @click="emit('navigate-sheet', 'D4')">→D4</el-button></template>
+          <template v-else-if="row.disposalConclusion === '应转营业外收入'"><el-button size="small" link type="primary" @click="navigateToK12(row)">→K12</el-button></template>
+          <template v-else-if="row.disposalConclusion === '应退回'"><el-button size="small" link type="primary" @click="emit('navigate-sheet', 'F4')">→F4</el-button></template>
+          <span v-else>—</span>
+        </template>
+      </el-table-column>
+
       <el-table-column label="核查结论" min-width="120" align="center">
         <template #default="{ row }">
           <el-select v-if="!isReadonly" v-model="row.conclusion" size="small" clearable placeholder="请选择"
@@ -189,6 +213,26 @@
       </el-table-column>
     </el-table>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" style="margin-top:12px; margin-bottom:12px">
+      <template #header>
+        <div class="section-head" style="margin-bottom:0">
+          <span style="font-weight:600">审计说明</span>
+          <el-button size="small" type="primary" link @click="handleAiGenerate('long-outstanding-note')">
+            <el-icon><MagicStick /></el-icon> AI生成
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 10 }"
+        :disabled="isReadonly"
+        placeholder="请填写长期挂账检查审计说明：挂账原因评估、CAS16转销条件判断、偿付计划合理性、跨底稿联动（K12营业外收入/D4收入/F4应付）..."
+        @change="persistNote"
+      />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -206,8 +250,10 @@
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && props.wpId && props.projectId"
         :project-id="props.projectId"
-        :wp-id="props.wpId"
+        :workpaper-id="props.wpId"
         account-code="2241"
+        phase="final"
+        :year="year"
         @filled="onSampleFilled"
       />
     </el-dialog>
@@ -220,11 +266,13 @@
  * Spec: .kiro/specs/k3-other-payables/ | Task: 4.4
  * Requirements: 5.1-5.4
  */
-import { computed, inject, onMounted, ref } from 'vue'
+import { computed, inject, onMounted, ref, defineAsyncComponent } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
-import { useK3Checks, type K3LongOutstandingRow, type ComplianceState } from '../../composables/useK3Checks'
-import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import { useK3Checks, type K3LongOutstandingRow, type ComplianceState, K3_DISPOSAL_CONCLUSIONS, type K3DisposalConclusion } from '../../composables/useK3Checks'
+import http from '@/utils/http'
+
+const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -233,6 +281,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  year?: number
 }>()
 
 const emit = defineEmits<{
@@ -243,6 +292,10 @@ const emit = defineEmits<{
 // ─── Injections ──────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+
+// ─── Year ────────────────────────────────────────────────────────────────────
+
+const year = computed(() => props.year ?? new Date().getFullYear())
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 
@@ -256,18 +309,60 @@ function saveResponse(itemId: string, payload: any) {
 const {
   longOutstandingRows,
   updateLongOutstandingConclusion,
+  initLongOutstandingFromDetail,
   saveAll,
 } = useK3Checks({ allResponses: allResponsesRef as any, saveResponse })
 
+// ─── 审计说明 ────────────────────────────────────────────────────────────────
+
+const auditNote = ref('')
+const ITEM_NOTE = 'K3-5-note'
+
+function loadNote() {
+  const item = props.allResponses.get(ITEM_NOTE)
+  auditNote.value = item?.remark ?? ''
+}
+
+function persistNote() {
+  saveResponse(ITEM_NOTE, { remark: auditNote.value })
+}
+
+onMounted(() => loadNote())
+
+// ─── 从K3-2带入长期挂账候选 ──────────────────────────────────────────────────
+
+function handleImportFromDetail() {
+  const item = props.allResponses.get('K3-2-rows')
+  const raw = item?.remark ?? null
+  if (!raw) { ElMessage.warning('K3-2明细表无数据，请先编制明细表'); return }
+  try {
+    const rows = JSON.parse(raw)
+    if (!Array.isArray(rows) || rows.length === 0) { ElMessage.warning('K3-2明细表无数据'); return }
+    const added = initLongOutstandingFromDetail(rows)
+    if (added > 0) {
+      persistRows()
+      ElMessage.success(`已从K3-2带入 ${added} 笔3年以上长期挂账`)
+    } else {
+      ElMessage.info('K3-2中无新增3年以上挂账行（已有的不重复带入）')
+    }
+  } catch { ElMessage.warning('K3-2明细数据解析失败') }
+}
+
 // ─── Computed ────────────────────────────────────────────────────────────────
 
+/** 3年以上判定（兼容动态账龄标签：3年以上/3-4年/4-5年/5年以上） */
+function isOver3Y(aging: string): boolean {
+  if (!aging) return false
+  return /3年|4年|5年|3-4|4-5|over3|over5|y3to4|y4to5/.test(aging)
+}
+
 const over3YCount = computed(() =>
-  longOutstandingRows.value.filter(r => r.aging === '3年以上' || r.aging?.includes('3年')).length
+  longOutstandingRows.value.filter(r => isOver3Y(r.aging)).length
 )
 
 const over3YTotal = computed(() =>
   longOutstandingRows.value
-    .filter(r => r.aging === '3年以上' || r.aging?.includes('3年'))
+    .filter(r => isOver3Y(r.aging))
     .reduce((sum, r) => sum + (r.amount || 0), 0)
 )
 
@@ -297,10 +392,11 @@ async function handleAddRow() {
       formationReason: '',
       repaymentPlan: '',
       needTransfer: '待评估',
+      disposalConclusion: undefined,
       conclusion: null,
       voucherRef: '',
       remark: '',
-    })
+    } as any)
     persistRows()
     ElMessage.success(`已新增：${value.trim()}`)
   } catch { /* cancelled */ }
@@ -352,7 +448,7 @@ function onSampleFilled(payload: any): void {
 // ─── UI Helpers ──────────────────────────────────────────────────────────────
 
 function tableRowStyle({ row }: { row: K3LongOutstandingRow }): Record<string, string> {
-  if (row.aging === '3年以上' || row.aging?.includes('3年')) return { 'background-color': '#fff7ed' }
+  if (isOver3Y(row.aging)) return { 'background-color': '#fff7ed' }
   return {}
 }
 
@@ -375,13 +471,40 @@ function conclusionTagType(val: string | null): 'success' | 'danger' | 'info' | 
   return 'warning'
 }
 
+function disposalTagType(val: string): 'success' | 'danger' | 'warning' | 'info' {
+  if (val === '正常挂账') return 'success'
+  if (val === '应转营业外收入' || val === '应确认收入') return 'danger'
+  if (val === '应退回') return 'warning'
+  return 'info' // 待确定
+}
+
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function handleAiGenerate(section: string) {
-  console.log('[K3-5] AI generate:', section)
+  http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+    prompt: '请生成其他应付款(2241)长期挂账检查审计说明，包含：长期挂账原因分析、是否满足CAS16转销条件评估、偿付计划合理性、跨底稿联动情况',
+    context: JSON.stringify({
+      科目: '2241其他应付款',
+      方向: '贷方/负债类',
+      审计重点: '长期挂账转销评估(CAS16)',
+      长期挂账笔数: String(longOutstandingRows.value.length),
+      '3年以上笔数': String(over3YCount.value),
+      '3年以上合计': String(over3YTotal.value),
+      需转营业外收入笔数: String(longOutstandingRows.value.filter(r => r.needTransfer === '是').length),
+      无法支付笔数: String(longOutstandingRows.value.filter((r: any) => r.cannotPay === '是').length),
+    }),
+    existingContent: auditNote.value || '',
+    section: 'K3-5-long-outstanding',
+  }).then((res: any) => {
+    const content = res?.data?.data?.content || res?.data?.content || ''
+    if (content) {
+      auditNote.value = auditNote.value ? `${auditNote.value}\n${content}` : content
+      persistNote()
+    }
+  }).catch(() => { /* AI不可用静默降级 */ })
 }
 
 function handleReview(id: string) { openReviewDialog(id) }

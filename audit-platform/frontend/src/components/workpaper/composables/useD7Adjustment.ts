@@ -7,7 +7,10 @@
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal } from './useD7FormulaEngine'
+import { eventBus } from '@/utils/eventBus'
 import type { ChecklistResponse } from './useD7FormData'
+// 款项性质枚举单一来源：D7-2 明细 composable（禁止平行实现）
+import { NATURE_TYPES } from './useD7Detail'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -23,7 +26,12 @@ export interface AdjustmentRow {
   creditAmount: number    // 贷方调整金额
   indexRef: string        // 索引
   remark: string          // 备注
+  natureType: string      // 款项性质（缺省视为"其他"）— 路由到 D7-1 性质区块
+  agingBand: string       // 账龄段 key（可空）— 路由到 D7-1 账龄区块
 }
+
+/** 款项性质枚举（单一来源 useD7Detail，此处再导出供 D7-3 组件复用） */
+export { NATURE_TYPES }
 
 export interface UseD7AdjustmentOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
@@ -31,6 +39,7 @@ export interface UseD7AdjustmentOptions {
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   wpId: Ref<string>
   projectId: Ref<string>
+  isReadonly?: Ref<boolean>
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -68,6 +77,8 @@ function normalizeRow(raw: any): AdjustmentRow {
     creditAmount: parseNum(raw.creditAmount),
     indexRef: raw.indexRef || '',
     remark: raw.remark || '',
+    natureType: raw.natureType || '',
+    agingBand: raw.agingBand || '',
   }
 }
 
@@ -78,6 +89,7 @@ function createEmptyRow(): AdjustmentRow {
     accountName: '', noteItem: '', placeholder: '',
     debitAmount: 0, creditAmount: 0,
     indexRef: '', remark: '',
+    natureType: '', agingBand: '',
   }
 }
 
@@ -85,6 +97,7 @@ function createEmptyRow(): AdjustmentRow {
 
 export function useD7Adjustment(options: UseD7AdjustmentOptions) {
   const { allResponses, debouncedSave } = options
+  const isReadonly = options.isReadonly ?? ref(false)
 
   // ─── Reactive rows ───────────────────────────────────────────────────
 
@@ -123,16 +136,19 @@ export function useD7Adjustment(options: UseD7AdjustmentOptions) {
   // ─── Add/Remove/Update ───────────────────────────────────────────────
 
   function addRow(): void {
+    if (isReadonly.value) return
     rows.value = [...rows.value, createEmptyRow()]
     persistRows()
   }
 
   function removeRow(rowId: string): void {
+    if (isReadonly.value) return
     rows.value = rows.value.filter(r => r.rowId !== rowId)
     persistRows()
   }
 
   function updateCell(rowId: string, field: string, value: any): void {
+    if (isReadonly.value) return
     rows.value = rows.value.map(r => {
       if (r.rowId !== rowId) return r
       const updated = { ...r }
@@ -152,9 +168,13 @@ export function useD7Adjustment(options: UseD7AdjustmentOptions) {
     const entryType = row.debitAmount > 0 ? 'AJE' : 'RJE'
     const amount = row.debitAmount > 0 ? row.debitAmount : row.creditAmount
     try {
-      window.dispatchEvent(new CustomEvent('adjustment:created', {
-        detail: { wpCode: 'D7', entryType, amount, accountCode: '2205' },
-      }))
+      eventBus.emit('adjustment:created', {
+        wpCode: 'D7',
+        entryType,
+        amount,
+        accountCode: '2205',
+        timestamp: Date.now(),
+      })
     } catch { /* EventBus failure non-blocking */ }
   }
 
@@ -164,18 +184,17 @@ export function useD7Adjustment(options: UseD7AdjustmentOptions) {
     const selectedRows = rows.value.filter(r => rowIds.includes(r.rowId))
     if (selectedRows.length === 0) return
     try {
-      window.dispatchEvent(new CustomEvent('misstatement:push', {
-        detail: {
-          wpCode: 'D7',
-          accountCode: '2205',
-          entries: selectedRows.map(r => ({
-            description: r.description,
-            debitAmount: r.debitAmount,
-            creditAmount: r.creditAmount,
-            category: r.category,
-          })),
-        },
-      }))
+      eventBus.emit('a13:push-misstatement', {
+        wpCode: 'D7',
+        accountCode: '2205',
+        entries: selectedRows.map(r => ({
+          description: r.description,
+          debitAmount: r.debitAmount,
+          creditAmount: r.creditAmount,
+          category: r.category,
+        })),
+        timestamp: Date.now(),
+      })
     } catch { /* EventBus failure non-blocking */ }
   }
 

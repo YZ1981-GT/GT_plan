@@ -21,7 +21,7 @@ describe('calcPercentage / collapseAgingForListedDisclosure', () => {
     expect(calcPercentage(50, 200)).toBe(25)
   })
 
-  it('折叠为四档账龄（含 prior_）', () => {
+  it('按枚举段生成账龄行（含 prior_）', () => {
     const buckets = collapseAgingForListedDisclosure({
       within1: 700,
       y1to2: 200,
@@ -38,7 +38,7 @@ describe('calcPercentage / collapseAgingForListedDisclosure', () => {
     expect(buckets.map((b) => b.endAmount).reduce((a, b) => a + b, 0)).toBe(1000)
   })
 
-  it('5年段并入「3年以上」', () => {
+  it('5年段保留全部 6 档（不再折入 3年以上）', () => {
     const buckets = collapseAgingForListedDisclosure(
       {
         within1: 500,
@@ -63,7 +63,10 @@ describe('calcPercentage / collapseAgingForListedDisclosure', () => {
         { key: 'over5', label: '5年以上', dayFrom: 1826, dayTo: null },
       ],
     )
-    expect(buckets[3].endAmount).toBe(200)
+    expect(buckets).toHaveLength(6)
+    expect(buckets.find((b) => b.key === 'y3to4')?.endAmount).toBe(50)
+    expect(buckets.find((b) => b.key === 'over5')?.endAmount).toBe(100)
+    expect(buckets.map((b) => b.endAmount).reduce((a, b) => a + b, 0)).toBe(900)
   })
 })
 
@@ -77,6 +80,12 @@ describe('useF1DisclosureListed integration', () => {
   function makeCrossSheet(aging: Record<string, number>, longTerm: any[] = []) {
     return {
       agingAggregation: computed(() => aging),
+      agingSegments: computed(() => [
+        { key: 'within1', label: '1年以内', dayFrom: 0, dayTo: 365 },
+        { key: 'y1to2', label: '1-2年', dayFrom: 366, dayTo: 730 },
+        { key: 'y2to3', label: '2-3年', dayFrom: 731, dayTo: 1095 },
+        { key: 'over3', label: '3年以上', dayFrom: 1096, dayTo: null },
+      ]),
       longTermRows: computed(() => longTerm),
       natureAggregation: computed(() => ({})),
       adjudicationForDisclosure: computed(() => ({

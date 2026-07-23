@@ -14,13 +14,13 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" @click="handleReview">💬 复核</el-button>
+        <GtReviewTrigger section-id="K11-3-adjustment" label="💬 复核" />
       </div>
     </div>
 
     <!-- ═══ 方法论上下文（琥珀色块） ═══ -->
     <div class="methodology-context">
-      <p>资产减值损失（6701损益类借方科目）调整分录。借方增加减值、贷方冲减/转回。借贷平衡后回写K11-1审定表，同时发布 adjustment:created → A13。</p>
+      <p>资产减值损失（6701损益类借方科目）调整分录，对齐源模板 10 列。<strong>类别</strong>：报表调整（重分类，计入 RJE）/ 账项调整（计入 AJE）/ 其他（计入 AJE）。借方=增加减值、贷方=冲减/转回。借贷平衡后回写 K11-1 审定表 AJE/RJE 合计，同时发布 adjustment:created → A13。</p>
     </div>
 
     <!-- ═══ 操作按钮区 ═══ -->
@@ -36,9 +36,12 @@
       >
         💾 保存并回写K11-1
       </el-button>
+      <span class="bucket-hint">
+        AJE 合计：<strong>{{ fmtAmt(ajeTotal) }}</strong>　RJE 合计：<strong>{{ fmtAmt(rjeTotal) }}</strong>
+      </span>
     </div>
 
-    <!-- ═══ 分录表格 ═══ -->
+    <!-- ═══ 分录表格（对齐源模板10列） ═══ -->
     <el-table
       :data="entries"
       border
@@ -47,25 +50,53 @@
       :row-class-name="tableRowClassName"
       empty-text="暂无调整分录，点击上方按钮新增"
     >
-      <el-table-column label="序号" width="56" align="center">
+      <el-table-column label="序号" width="50" align="center" fixed>
         <template #default="{ row }">{{ row.seq }}</template>
       </el-table-column>
-      <el-table-column label="调整方向" width="100" align="center">
+      <el-table-column label="调整事项说明" min-width="150" fixed>
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.description"
+            size="small"
+            placeholder="调整事项说明"
+            @change="(v: string) => updateCell(row.id, 'description', v)"
+          />
+          <span v-else>{{ row.description || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="类别" width="120" align="center">
+        <template #header>
+          <el-tooltip content="报表调整→重分类(RJE)；账项调整/其他→审计调整(AJE)" placement="top">
+            <span class="formula-header">类别</span>
+          </el-tooltip>
+        </template>
         <template #default="{ row }">
           <el-select
             v-if="!isReadonly"
-            :model-value="row.entryType"
+            :model-value="row.category"
             size="small"
-            style="width: 80px"
-            @change="(v: string) => updateCell(row.id, 'entryType', v)"
+            style="width: 100px"
+            @change="(v: string) => updateCell(row.id, 'category', v)"
           >
-            <el-option label="AJE" value="AJE" />
-            <el-option label="RJE" value="RJE" />
+            <el-option v-for="c in CATEGORY_OPTIONS" :key="c" :label="c" :value="c" />
           </el-select>
-          <el-tag v-else :type="row.entryType === 'RJE' ? 'warning' : 'primary'" size="small">{{ row.entryType }}</el-tag>
+          <el-tag v-else :type="row.category === '报表调整' ? 'warning' : 'primary'" size="small">{{ row.category }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="科目" min-width="140">
+      <el-table-column label="报表项目" min-width="130">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.reportItem"
+            size="small"
+            placeholder="报表项目"
+            @change="(v: string) => updateCell(row.id, 'reportItem', v)"
+          />
+          <span v-else>{{ row.reportItem || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="科目名称" min-width="140">
         <template #default="{ row }">
           <el-input
             v-if="!isReadonly"
@@ -77,7 +108,19 @@
           <span v-else>{{ row.accountName || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="借方金额" width="130" align="right">
+      <el-table-column label="附注项目" min-width="120">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.noteItem"
+            size="small"
+            placeholder="附注项目"
+            @change="(v: string) => updateCell(row.id, 'noteItem', v)"
+          />
+          <span v-else>{{ row.noteItem || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="借方调整金额" width="120" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!isReadonly"
@@ -91,7 +134,7 @@
           <span v-else>{{ fmtAmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="贷方金额" width="130" align="right">
+      <el-table-column label="贷方调整金额" width="120" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!isReadonly"
@@ -105,19 +148,31 @@
           <span v-else>{{ fmtAmt(row.creditAmount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="摘要" min-width="160">
+      <el-table-column label="索引" min-width="90">
         <template #default="{ row }">
           <el-input
             v-if="!isReadonly"
-            :model-value="row.summary"
+            :model-value="row.indexRef"
             size="small"
-            placeholder="调整事项说明"
-            @change="(v: string) => updateCell(row.id, 'summary', v)"
+            placeholder="索引"
+            @change="(v: string) => updateCell(row.id, 'indexRef', v)"
           />
-          <span v-else>{{ row.summary || '-' }}</span>
+          <span v-else>{{ row.indexRef || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="60" align="center" v-if="!isReadonly">
+      <el-table-column label="备注" min-width="120">
+        <template #default="{ row }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.remark"
+            size="small"
+            placeholder="备注"
+            @change="(v: string) => updateCell(row.id, 'remark', v)"
+          />
+          <span v-else>{{ row.remark || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="60" align="center" fixed="right" v-if="!isReadonly">
         <template #default="{ row }">
           <el-button type="danger" link size="small" @click="handleRemoveEntry(row.id)">删除</el-button>
         </template>
@@ -148,8 +203,9 @@
       <summary>📋 编制提示</summary>
       <ul>
         <li>资产减值损失（6701）为损益类借方科目：借方=减值增加（计提），贷方=减值冲回</li>
-        <li>AJE = 审计调整分录 / RJE = 重分类调整分录</li>
-        <li>借贷必须平衡后才能回写K11-1审定表</li>
+        <li>对齐源模板 10 列：调整事项说明/类别/报表项目/科目名称/附注项目/……/借方/贷方/索引/备注</li>
+        <li><strong>类别</strong>：报表调整=重分类（计入 RJE）；账项调整、其他=审计调整（计入 AJE）</li>
+        <li>借贷必须平衡后才能回写K11-1审定表（AJE/RJE 分桶合计）</li>
         <li>保存后自动发布 adjustment:created → 联动A13</li>
         <li>商誉减值不可转回，若出现商誉贷方(转回)请核查</li>
       </ul>
@@ -173,10 +229,11 @@
  * - 每行：序号/调整方向/科目/借方/贷方/摘要
  * - 底部显示借贷差额提示
  */
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { useK11ImportExport } from '../../composables/useK11ImportExport'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const K11_ACCOUNT_CODE = '6701'
 const ITEM_PREFIX = 'K11-3-adj'
@@ -193,8 +250,6 @@ const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
 }>()
 
-const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', () => {})
-
 // ─── 导入导出 ────────────────────────────────────────────────────────────────
 const importExport = useK11ImportExport({
   wpId: computed(() => props.wpId) as any,
@@ -202,15 +257,34 @@ const importExport = useK11ImportExport({
   sheetCode: 'K11-3',
 })
 
-// ═══ 数据模型 ═══
+// ═══ 数据模型（对齐源模板10列） ═══
+type AdjCategory = '报表调整' | '账项调整' | '其他'
+
 interface AdjustmentEntry {
   id: string
   seq: number
-  entryType: 'AJE' | 'RJE'
-  accountName: string
+  description: string   // 调整事项说明
+  category: AdjCategory // 类别（报表调整/账项调整/其他）
+  reportItem: string    // 报表项目
+  accountName: string   // 科目名称
+  noteItem: string      // 附注项目
+  summary: string       // …… 摘要（源模板保留列）
   debitAmount: number
   creditAmount: number
-  summary: string
+  indexRef: string      // 索引
+  remark: string        // 备注
+}
+
+const CATEGORY_OPTIONS: AdjCategory[] = ['报表调整', '账项调整', '其他']
+
+/** 类别 → K11-1 审定表调整桶：报表调整=重分类(RJE)，账项调整/其他=审计调整(AJE) */
+function categoryToBucket(category: AdjCategory): 'AJE' | 'RJE' {
+  return category === '报表调整' ? 'RJE' : 'AJE'
+}
+
+/** legacy entryType(AJE/RJE) → category（向后兼容旧数据） */
+function legacyEntryTypeToCategory(entryType: unknown): AdjCategory {
+  return entryType === 'RJE' ? '报表调整' : '账项调整'
 }
 
 const entries = ref<AdjustmentEntry[]>([])
@@ -221,6 +295,18 @@ const totalDebits = computed(() => entries.value.reduce((sum, e) => sum + (e.deb
 const totalCredits = computed(() => entries.value.reduce((sum, e) => sum + (e.creditAmount || 0), 0))
 const balanceDiff = computed(() => totalDebits.value - totalCredits.value)
 const isBalanced = computed(() => Math.abs(balanceDiff.value) < 0.005)
+
+// ═══ AJE/RJE 桶合计（供顶部展示 + 回写K11-1） ═══
+const ajeTotal = computed(() =>
+  entries.value
+    .filter(e => categoryToBucket(e.category) === 'AJE')
+    .reduce((sum, e) => sum + ((e.debitAmount || 0) - (e.creditAmount || 0)), 0),
+)
+const rjeTotal = computed(() =>
+  entries.value
+    .filter(e => categoryToBucket(e.category) === 'RJE')
+    .reduce((sum, e) => sum + ((e.debitAmount || 0) - (e.creditAmount || 0)), 0),
+)
 
 // ═══ 初始化加载 ═══
 onMounted(() => { loadFromResponses() })
@@ -235,11 +321,17 @@ function loadFromResponses(): void {
       entries.value = parsed.map((e: any, idx: number) => ({
         id: e.id || `entry-${++nextId}`,
         seq: idx + 1,
-        entryType: e.entryType || 'AJE',
+        description: e.description ?? '',
+        // 优先用 category；缺失时从 legacy entryType 迁移
+        category: (CATEGORY_OPTIONS.includes(e.category) ? e.category : legacyEntryTypeToCategory(e.entryType)) as AdjCategory,
+        reportItem: e.reportItem ?? '',
         accountName: e.accountName || '资产减值损失',
+        noteItem: e.noteItem ?? '',
+        summary: e.summary ?? '',
         debitAmount: Number(e.debitAmount) || 0,
         creditAmount: Number(e.creditAmount) || 0,
-        summary: e.summary || '',
+        indexRef: e.indexRef ?? '',
+        remark: e.remark ?? '',
       }))
       nextId = entries.value.length + 1
     }
@@ -249,20 +341,25 @@ function loadFromResponses(): void {
 // ═══ 行操作 ═══
 async function handleAddEntry(): Promise<void> {
   try {
-    const { value } = await ElMessageBox.prompt('请输入科目名称', '新增调整分录', {
+    const { value } = await ElMessageBox.prompt('请输入调整事项说明', '新增调整分录', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
-      inputPlaceholder: '如：存货跌价准备 / 固定资产减值准备',
+      inputPlaceholder: '如：补提存货跌价准备 / 重分类至流动负债',
     })
     if (value?.trim()) {
       entries.value.push({
         id: `entry-${++nextId}`,
         seq: entries.value.length + 1,
-        entryType: 'AJE',
-        accountName: value.trim(),
+        description: value.trim(),
+        category: '账项调整',
+        reportItem: '',
+        accountName: '资产减值损失',
+        noteItem: '',
+        summary: '',
         debitAmount: 0,
         creditAmount: 0,
-        summary: '',
+        indexRef: '',
+        remark: '',
       })
       persistEntries()
     }
@@ -298,17 +395,13 @@ function handleSaveWriteback(): void {
     return
   }
 
-  // 损益类6701: AJE对科目影响 = 借方(增加减值) - 贷方(冲减减值)
-  const ajeTotal = entries.value
-    .filter(e => e.entryType === 'AJE')
-    .reduce((sum, e) => sum + (e.debitAmount - e.creditAmount), 0)
-  const rjeTotal = entries.value
-    .filter(e => e.entryType === 'RJE')
-    .reduce((sum, e) => sum + (e.debitAmount - e.creditAmount), 0)
+  // 损益类6701: 桶影响 = 借方(增加减值) - 贷方(冲减减值)；类别→桶(报表调整=RJE,账项/其他=AJE)
+  const aje = ajeTotal.value
+  const rje = rjeTotal.value
 
   // 双向同步到allResponses供K11-1审定表读取
-  emit('save', 'K11-1-aje-total', { remark: String(ajeTotal) })
-  emit('save', 'K11-1-rje-total', { remark: String(rjeTotal) })
+  emit('save', 'K11-1-aje-total', { remark: String(aje) })
+  emit('save', 'K11-1-rje-total', { remark: String(rje) })
   persistEntries()
 
   // EventBus publish adjustment:created → A13
@@ -317,8 +410,8 @@ function handleSaveWriteback(): void {
       wpCode: 'K11',
       accountCode: K11_ACCOUNT_CODE,
       projectId: props.projectId,
-      ajeTotal,
-      rjeTotal,
+      ajeTotal: aje,
+      rjeTotal: rje,
       entryCount: entries.value.length,
     })
   } catch { /* silent */ }
@@ -351,11 +444,6 @@ function handleIECommand(cmd: string): void {
   }
 }
 
-// ═══ 复核 ═══
-function handleReview(): void {
-  openReviewDialog?.('K11-3-adjustment')
-}
-
 // ═══ 格式化 ═══
 function fmtAmt(v: number | null | undefined): string {
   if (v == null || v === 0) return '-'
@@ -363,7 +451,7 @@ function fmtAmt(v: number | null | undefined): string {
 }
 
 function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
-  return row.entryType === 'RJE' ? 'rje-row' : ''
+  return row.category === '报表调整' ? 'rje-row' : ''
 }
 </script>
 
@@ -382,16 +470,19 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
 .methodology-context {
   margin-bottom: 12px;
   padding: 10px 14px;
-  background: #fffbf0;
-  border-left: 3px solid #e6a23c;
+  background: #fffbeb;
+  border-left: 4px solid #f59e0b;
   border-radius: 4px;
-  font-size: 12px;
-  color: #606266;
+  font-size: var(--wp-font-size, 13px);
+  color: #78350f;
   line-height: 1.6;
 }
 .methodology-context p { margin: 0; }
 
-.action-bar { display: flex; gap: 8px; align-items: center; }
+.action-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.bucket-hint { margin-left: auto; font-size: 12px; color: #909399; }
+.bucket-hint strong { color: #303133; font-family: 'JetBrains Mono', monospace; }
+.formula-header { border-bottom: 1px dashed #909399; cursor: help; }
 
 .balance-section {
   margin-top: 12px;

@@ -86,6 +86,10 @@ async def lifespan(app: FastAPI):
     # ACNR Redis pub-sub 订阅 + epoch 轮询兜底 [Req-14]
     await start_epoch_subscriber()
 
+    # ACNR invalidation outbox dispatcher（至少一次投递 durable 失效）[R11]
+    from app.services.acnr.invalidation_outbox import get_dispatcher as _get_acnr_dispatcher
+    _get_acnr_dispatcher().start()
+
     stop_event = asyncio.Event()
     tasks = _start_workers(stop_event)
 
@@ -118,6 +122,10 @@ async def lifespan(app: FastAPI):
     # 停止 ACNR epoch subscriber + poll [Req-14]
     from app.services.acnr.cache_epoch import stop_epoch_subscriber
     await stop_epoch_subscriber()
+
+    # 停止 ACNR invalidation outbox dispatcher [R11]
+    from app.services.acnr.invalidation_outbox import get_dispatcher as _get_acnr_dispatcher
+    await _get_acnr_dispatcher().stop()
 
     for t in tasks:
         t.cancel()

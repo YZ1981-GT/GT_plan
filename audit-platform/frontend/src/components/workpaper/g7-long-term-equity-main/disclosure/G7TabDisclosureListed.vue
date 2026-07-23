@@ -319,6 +319,7 @@ import {
 } from '../../composables/g7DisclosureCrossSheet'
 import {
   G7_LISTED_DISCLOSURE_SECTIONS,
+  buildG7ListedColumns,
   buildG7ListedSyncData,
   createG7ListedDisclosureState,
   type G7DisclosureColumnType,
@@ -737,6 +738,7 @@ async function syncToDisclosureNotes(): Promise<void> {
         current_standard: 'listed',
         year: resolveAuditYear(props.htmlData as Record<string, any> | null),
         sub_table_data: buildG7ListedSyncData(serialisableState()),
+        columns: buildG7ListedColumns(),
       },
     )
     const data = result?.data ?? result

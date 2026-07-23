@@ -26,10 +26,10 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" type="primary" text @click="handleAiAssist">
+        <el-button size="small" type="primary" text :loading="aiLoading" @click="handleAiAssist">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
-        <el-button size="small" text @click="openReviewDialog?.('K13-2-detail', '营业外支出明细')">💬 复核</el-button>
+        <GtReviewTrigger section-id="K13-2-detail" label="💬 复核" />
       </div>
     </div>
 
@@ -244,6 +244,7 @@
     <!-- ═══ 操作栏 ═══ -->
     <div class="table-actions">
       <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleAddRow">+ 新增明细</el-button>
+      <el-button size="small" plain :disabled="isReadonly" :loading="ledgerLoading" @click="handlePullLedger">📥 从序时账取数</el-button>
     </div>
 
     <!-- 隐藏的文件导入input -->
@@ -282,13 +283,16 @@
  *
  * 科目：6711营业外支出（损益类借方科目，取发生额）
  */
-import { ref, computed, inject, defineAsyncComponent, toRef } from 'vue'
+import { ref, computed, defineAsyncComponent, toRef } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useK13Detail, EXPENSE_TYPE_OPTIONS, DETAIL_TABS } from '../../composables/useK13Detail'
 import { useK13ImportExport } from '../../composables/useK13ImportExport'
+import { generateK13AiText } from '../../composables/useK13AiText'
+import { pullExpenseLedgerMonthly } from '../../composables/expenseLedgerMonthlyPull'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
+const GtReviewTrigger = defineAsyncComponent(() => import('../../GtReviewTrigger.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -296,14 +300,13 @@ const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
+  year?: number
   isReadonly: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
 }>()
-
-const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
 
 // ─── Composable: useK13Detail ────────────────────────────────────────────────
 
@@ -315,6 +318,7 @@ const {
   updateMonthAmount,
   addRow,
   removeRow,
+  applyMonthlyRows,
 } = useK13Detail({
   allResponses: toRef(props, 'allResponses'),
   projectId: toRef(props, 'projectId'),
@@ -416,8 +420,62 @@ function fmtAmt(v: number | null | undefined): string {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function handleAiAssist(): void {
-  ElMessage.info('AI辅助明细分析...')
+// ─── 从序时账取数（6711 按明细科目×月聚合借-贷 → 回填基础区段月度列） ─────────
+
+const ledgerLoading = ref(false)
+
+async function handlePullLedger(): Promise<void> {
+  if (ledgerLoading.value) return
+  const year = props.year ?? new Date().getFullYear()
+  ledgerLoading.value = true
+  try {
+    const result = await pullExpenseLedgerMonthly(props.projectId, '6711', year)
+    if (!result.ok) {
+      ElMessage.warning(result.message)
+      return
+    }
+    await ElMessageBox.confirm(
+      `将从序时账导入 ${result.rows.length} 个明细科目的 ${year} 年度月度发生额（同名科目覆盖月度列，缺失则新增行；AJE/RJE/上期/备注等人工列保留）。合计发生额 ${result.total.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}。`,
+      '从序时账取数确认',
+      { confirmButtonText: '导入', cancelButtonText: '取消', type: 'info' },
+    )
+    const affected = applyMonthlyRows(result.rows)
+    currentTab.value = '基础信息'
+    ElMessage.success(`已回填 ${affected} 行月度发生额`)
+  } catch (err) {
+    if (err !== 'cancel') ElMessage.warning('序时账取数已取消或失败')
+  } finally {
+    ledgerLoading.value = false
+  }
+}
+
+const aiLoading = ref(false)
+
+async function handleAiAssist(): Promise<void> {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const lines = rows.value
+      .filter(r => r.monthTotal || r.audited)
+      .map(r => `${r.project || '未命名'}｜类型${r.expenseType || '—'}｜本期${r.monthTotal}｜审定${r.audited}｜同比${r.yoyChange == null ? '—' : (r.yoyChange * 100).toFixed(1) + '%'}`)
+      .join('\n')
+    const content = await generateK13AiText(props.wpId, {
+      section: 'K13-2-detail-analysis',
+      prompt: '你是审计师，请针对以下营业外支出（科目6711，损益类借方，取发生额）明细数据，分析各去向金额及同比变动的合理性、是否存在异常波动（>±30%）、关注分类正确性（与日常活动无关计入6711）与税前扣除性（捐赠12%限额/罚款滞纳金不可扣），给出简要复核意见与建议进一步核查的明细项。',
+      context: {
+        科目: '6711 营业外支出（损益类借方·发生额）',
+        明细行数: rows.value.length,
+        明细摘要: lines || '（暂无数据）',
+        本期合计: subtotal.value.monthTotal,
+        审定合计: subtotal.value.audited,
+      },
+    })
+    if (content) {
+      await ElMessageBox.alert(content, 'AI 明细分析（仅供参考）', { confirmButtonText: '知道了' })
+    }
+  } finally {
+    aiLoading.value = false
+  }
 }
 </script>
 

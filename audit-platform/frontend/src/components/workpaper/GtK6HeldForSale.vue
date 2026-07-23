@@ -384,14 +384,14 @@ async function writebackTB(assetAudited: number, liabilityAudited: number): Prom
 async function _loadTbData(): Promise<void> {
   if (!props.projectId || !props.year) return
   try {
-    // 持有待售资产科目 1481 / 持有待售负债科目（报表列报，通常自定义）
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
+    // 持有待售资产科目 1481
+    const resAsset = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
       params: { account_prefix: '1481', year: props.year },
       _silent: true,
     } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
+    const listAsset: any[] = Array.isArray(resAsset?.data?.data ?? resAsset?.data) ? (resAsset?.data?.data ?? resAsset?.data) : []
     let uAsset = 0, aAsset = 0
-    for (const item of list) {
+    for (const item of listAsset) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')
       if (code.startsWith('1481')) {
         uAsset += Number(item.unadjusted_amount ?? 0)
@@ -400,6 +400,23 @@ async function _loadTbData(): Promise<void> {
     }
     tbData.value.unadjustedAsset = uAsset
     tbData.value.auditedAsset = aAsset
+
+    // 持有待售负债科目 2605
+    const resLiab = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
+      params: { account_prefix: '2605', year: props.year },
+      _silent: true,
+    } as any)
+    const listLiab: any[] = Array.isArray(resLiab?.data?.data ?? resLiab?.data) ? (resLiab?.data?.data ?? resLiab?.data) : []
+    let uLiab = 0, aLiab = 0
+    for (const item of listLiab) {
+      const code = String(item.standard_account_code ?? item.account_code ?? '')
+      if (code.startsWith('2605')) {
+        uLiab += Math.abs(Number(item.unadjusted_amount ?? 0))
+        aLiab += Math.abs(Number(item.audited_amount ?? 0))
+      }
+    }
+    tbData.value.unadjustedLiability = uLiab
+    tbData.value.auditedLiability = aLiab
   } catch {
     // TB取数失败静默处理
   }

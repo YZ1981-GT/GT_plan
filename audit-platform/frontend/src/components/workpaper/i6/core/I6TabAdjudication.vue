@@ -1,50 +1,119 @@
 <template>
   <div class="i6-adjudication">
-    <!-- 方法论上下文 -->
     <div class="methodology-context">
-      <p><strong>研发费用审定原理：</strong>科目6602（损益类/借方科目）。取发生额非余额！</p>
-      <p>审定数=未审数+AJE+RJE。上期审定=B+C+D，本期审定=F+G+H，变动额=I-E，变动率=(I-E)/E。</p>
-      <p>I6↔I2联动：费用化(I6)+资本化(I2)=研发总额(VR-I6-01)。变动率超±30%黄色高亮。</p>
+      <p><strong>研发费用审定原理：</strong>科目6602（损益类/借方）。取发生额非余额。</p>
+      <p>审定数=未审数+AJE+RJE。数据优先自 I6-2 明细引用；TB数据行用于与试算表勾稽。</p>
+      <p>I6↔I2联动：费用化(I6)+资本化(I2)=研发总额(VR-I6-01)。变动率超±30%需补充说明。</p>
     </div>
 
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：核实研发费用（6602）本期发生额的完整性与准确性，验证费用化与资本化划分（VR-I6-01）恰当，为研发费用列报及后续加计扣除税务处理提供审定依据。"
+      title="审计目标：核实研发费用（6602）本期发生额的完整性与准确性，验证费用化与资本化划分（VR-I6-01）恰当，为附注披露及加计扣除提供审定依据。"
       class="objective-alert"
     />
 
-    <!-- VR-I6-01 校验警告 -->
     <el-alert
-      v-if="vrStatus && !vrStatus.isBalanced"
+      v-if="linkagePanel.i2DataReady && !linkagePanel.vrI601Status.isValid"
       type="error"
-      :title="`VR-I6-01不平：费用化(${fmtAmount(vrStatus.expense)}) + 资本化(${fmtAmount(vrStatus.capitalized)}) ≠ 研发总额，差额 ${fmtAmount(vrStatus.difference)}`"
+      :title="`VR-I6-01不平：费用化(${fmtAmount(linkagePanel.expenseI6)}) + 资本化(${fmtAmount(linkagePanel.capitalizedI2)}) ≠ 研发总额，差额 ${fmtAmount(linkagePanel.vrI601Status.difference)}`"
       show-icon
       :closable="false"
       class="adj-warning"
     />
 
-    <!-- 主审定表（27行×11列） -->
+    <el-alert
+      v-if="detailCrossValidation"
+      type="warning"
+      :title="detailCrossValidation"
+      show-icon
+      :closable="false"
+      class="adj-warning"
+    />
+
+    <el-alert
+      v-if="Math.abs(tbDifference) > 0.01"
+      type="warning"
+      :title="`TB差异：审定合计 ${fmtAmount(totalRow.本期审定)} − TB未审 ${fmtAmount(tbUnadjusted)} = ${fmtAmount(tbDifference)}`"
+      show-icon
+      :closable="false"
+      class="adj-warning"
+    />
+
+    <el-alert
+      v-if="adj.needsAuditNoteDraft.value"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="adj-warning"
+    >
+      <template #title>
+        变动率超30%的类别共 {{ adj.highChangeRateRows.value.length }} 项，须在审计说明中披露主要原因
+      </template>
+      <template #default>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="primary"
+          plain
+          class="draft-btn"
+          @click="handleApplyNoteDraft"
+        >
+          生成变动说明草稿
+        </el-button>
+      </template>
+    </el-alert>
+
     <div class="table-section">
       <div class="block-header">
         <span class="block-title">研发费用审定表（I6-1）</span>
         <div class="block-actions">
+          <el-button size="small" type="primary" plain :disabled="isReadonly" @click="adj.syncFromDetail(false)">
+            从 I6-2 取数
+          </el-button>
+          <el-button size="small" plain :disabled="isReadonly" @click="handleSyncFromI63">
+            从 I6-3 同步调整
+          </el-button>
+          <el-button size="small" :disabled="isReadonly" @click="adj.syncFromDetail(true)">强制覆盖</el-button>
+          <el-button size="small" type="success" :disabled="isReadonly" @click="adj.writeback()">
+            回写TB(6602)
+          </el-button>
           <el-button size="small" type="default" text @click="handleReview">复核</el-button>
         </div>
       </div>
 
-      <!-- 工具栏 -->
       <div class="tab-toolbar">
-        <div class="toolbar-left"></div>
+        <div class="toolbar-left">
+          <GtIndexChip v-if="discVis.listed" value="Note:五、66" :context-project-id="projectId" />
+          <GtIndexChip v-if="discVis.soe" value="Note:八、67" :context-project-id="projectId" />
+        </div>
         <div class="toolbar-right">
           <span class="chip-wrap"><GtIndexChip value="wp:I6-1" :context-project-id="projectId" /></span>
-          <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+          <span
+            v-if="!linkagePanel.i2DataReady"
+            class="linkage-info"
+          >
+            I2 资本化数据未同步
+          </span>
+          <span
+            v-else-if="!linkagePanel.vrI601Status.isValid"
+            class="linkage-warn"
+          >
+            VR-I6-01 不平衡（差额 {{ fmtAmount(linkagePanel.vrI601Status.difference) }}）
+          </span>
+          <span
+            v-else
+            class="linkage-ok"
+          >
+            ✓ VR-I6-01 已核对
+          </span>
+          <GtIndexChip value="I2" @click="navigateTo('I2')" />
+          <el-tag size="small" type="info">共 {{ displayRows.length }} 行</el-tag>
         </div>
       </div>
 
       <el-table
-        :data="rows"
+        :data="displayRows"
         border
         size="small"
         :row-class-name="getRowClassName"
@@ -52,128 +121,85 @@
         max-height="560"
         scrollbar-always-on
       >
-        <!-- 1. 项目 -->
-        <el-table-column prop="项目" label="项目" min-width="140" fixed>
+        <el-table-column prop="类别" label="类别" min-width="140" fixed>
           <template #default="{ row }">
-            <span :class="{ 'subtotal-text': row.isSubtotal }">{{ row.项目 }}</span>
+            <span :class="{ 'subtotal-text': row.isTotal, 'control-text': row.isControl }">{{ row.类别 }}</span>
           </template>
         </el-table-column>
-        <!-- 2. 上期未审B -->
-        <el-table-column prop="上期未审" label="上期未审(B)" min-width="110" align="right">
+        <el-table-column label="上期未审(B)" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.上期未审" size="small" :controls="false" @change="onCellChange(row)" />
+            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.上期未审" size="small" :controls="false" @change="(v: number) => onCellChange(row, '上期未审', v)" />
             <span v-else>{{ fmtAmount(row.上期未审) }}</span>
           </template>
         </el-table-column>
-        <!-- 3. 上期AJE(C) -->
-        <el-table-column prop="上期AJE" label="上期AJE(C)" min-width="100" align="right">
+        <el-table-column label="上期AJE(C)" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.上期AJE" size="small" :controls="false" @change="onCellChange(row)" />
+            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.上期AJE" size="small" :controls="false" @change="(v: number) => onCellChange(row, '上期AJE', v)" />
             <span v-else>{{ fmtAmount(row.上期AJE) }}</span>
           </template>
         </el-table-column>
-        <!-- 4. 上期RJE(D) -->
-        <el-table-column prop="上期RJE" label="上期RJE(D)" min-width="100" align="right">
+        <el-table-column label="上期RJE(D)" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.上期RJE" size="small" :controls="false" @change="onCellChange(row)" />
+            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.上期RJE" size="small" :controls="false" @change="(v: number) => onCellChange(row, '上期RJE', v)" />
             <span v-else>{{ fmtAmount(row.上期RJE) }}</span>
           </template>
         </el-table-column>
-        <!-- 5. 上期审定(E)=B+C+D 公式列 -->
         <el-table-column label="上期审定(E)" min-width="110" align="right">
-          <template #header>
-            <el-tooltip content="上期审定 = B + C + D" placement="top">
-              <span class="formula-col-header">上期审定(E)</span>
-            </el-tooltip>
-          </template>
           <template #default="{ row }">
-            <el-tooltip content="= 上期未审 + 上期AJE + 上期RJE" placement="top">
-              <span class="formula-value">{{ fmtAmount(row.上期审定) }}</span>
-            </el-tooltip>
+            <span class="formula-value">{{ fmtAmount(row.上期审定) }}</span>
           </template>
         </el-table-column>
-        <!-- 6. 本期未审(F) -->
-        <el-table-column prop="本期未审" label="本期未审(F)" min-width="110" align="right">
+        <el-table-column label="本期未审(F)" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.本期未审" size="small" :controls="false" @change="onCellChange(row)" />
+            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.本期未审" size="small" :controls="false" @change="(v: number) => onCellChange(row, '本期未审', v)" />
             <span v-else>{{ fmtAmount(row.本期未审) }}</span>
           </template>
         </el-table-column>
-        <!-- 7. 本期AJE(G) -->
-        <el-table-column prop="本期AJE" label="本期AJE(G)" min-width="100" align="right">
+        <el-table-column label="本期AJE(G)" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.本期AJE" size="small" :controls="false" @change="onCellChange(row)" />
+            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.本期AJE" size="small" :controls="false" @change="(v: number) => onCellChange(row, '本期AJE', v)" />
             <span v-else>{{ fmtAmount(row.本期AJE) }}</span>
           </template>
         </el-table-column>
-        <!-- 8. 本期RJE(H) -->
-        <el-table-column prop="本期RJE" label="本期RJE(H)" min-width="100" align="right">
+        <el-table-column label="本期RJE(H)" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.本期RJE" size="small" :controls="false" @change="onCellChange(row)" />
+            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.本期RJE" size="small" :controls="false" @change="(v: number) => onCellChange(row, '本期RJE', v)" />
             <span v-else>{{ fmtAmount(row.本期RJE) }}</span>
           </template>
         </el-table-column>
-        <!-- 9. 本期审定(I)=F+G+H 公式列 -->
         <el-table-column label="本期审定(I)" min-width="110" align="right">
-          <template #header>
-            <el-tooltip content="本期审定 = F + G + H" placement="top">
-              <span class="formula-col-header">本期审定(I)</span>
-            </el-tooltip>
-          </template>
           <template #default="{ row }">
-            <el-tooltip content="= 本期未审 + 本期AJE + 本期RJE" placement="top">
-              <span class="formula-value">{{ fmtAmount(row.本期审定) }}</span>
-            </el-tooltip>
+            <span class="formula-value">{{ fmtAmount(row.本期审定) }}</span>
           </template>
         </el-table-column>
-        <!-- 10. 变动额(J)=I-E 公式列 -->
         <el-table-column label="变动额(J)" min-width="110" align="right">
-          <template #header>
-            <el-tooltip content="变动额 = 本期审定(I) - 上期审定(E)" placement="top">
-              <span class="formula-col-header">变动额(J)</span>
-            </el-tooltip>
-          </template>
           <template #default="{ row }">
-            <el-tooltip content="= 本期审定 - 上期审定" placement="top">
-              <span class="formula-value">{{ fmtAmount(row.变动额) }}</span>
-            </el-tooltip>
+            <span class="formula-value">{{ fmtAmount(row.变动额) }}</span>
           </template>
         </el-table-column>
-        <!-- 11. 变动率 公式列 -->
         <el-table-column label="变动率" min-width="90" align="right">
-          <template #header>
-            <el-tooltip content="变动率 = (I - E) / E" placement="top">
-              <span class="formula-col-header">变动率</span>
-            </el-tooltip>
-          </template>
           <template #default="{ row }">
-            <el-tooltip content="= 变动额 / 上期审定" placement="top">
-              <span class="formula-value" :class="{ 'rate-warn': isHighChangeRate(row.变动率) }">
-                {{ fmtRate(row.变动率) }}
-              </span>
-            </el-tooltip>
+            <span class="formula-value" :class="{ 'rate-warn': row.changeRateHighlight }">
+              {{ fmtRate(row.变动率) }}
+            </span>
           </template>
         </el-table-column>
       </el-table>
     </div>
 
-    <!-- I2联动面板 -->
     <el-card shadow="never" class="linkage-card">
       <template #header>
         <div class="card-header">
           <span>I6↔I2 联动面板（VR-I6-01）</span>
-          <el-button size="small" type="success" @click="handleWritebackTB" :disabled="isReadonly">
-            回写TB(6602发生额)
-          </el-button>
         </div>
       </template>
       <el-descriptions :column="4" border size="small">
-        <el-descriptions-item label="费用化(I6)">{{ fmtAmount(linkageData.expense) }}</el-descriptions-item>
-        <el-descriptions-item label="资本化(I2)">{{ fmtAmount(linkageData.capitalized) }}</el-descriptions-item>
-        <el-descriptions-item label="研发总额">{{ fmtAmount(linkageData.total) }}</el-descriptions-item>
+        <el-descriptions-item label="费用化(I6)">{{ fmtAmount(linkagePanel.expenseI6) }}</el-descriptions-item>
+        <el-descriptions-item label="资本化(I2)">{{ fmtAmount(linkagePanel.capitalizedI2) }}</el-descriptions-item>
+        <el-descriptions-item label="研发总额">{{ fmtAmount(linkagePanel.researchTotal) }}</el-descriptions-item>
         <el-descriptions-item label="VR-I6-01">
-          <el-tag :type="vrStatus?.isBalanced ? 'success' : 'danger'" size="small">
-            {{ vrStatus?.isBalanced ? '✓ 平衡' : '✗ 不平衡' }}
+          <el-tag :type="linkagePanel.vrI601Status.isValid ? 'success' : 'danger'" size="small">
+            {{ linkagePanel.vrI601Status.isValid ? '✓ 平衡' : '✗ 不平衡' }}
           </el-tag>
         </el-descriptions-item>
       </el-descriptions>
@@ -182,73 +208,61 @@
         <GtIndexChip value="I2" @click="navigateTo('I2')" />
         <GtIndexChip value="I6-2" @click="navigateTo('I6-2')" />
         <GtIndexChip value="I6-3" @click="navigateTo('I6-3')" />
-        <GtIndexChip value="A13" @click="navigateTo('A13')" />
+        <GtIndexChip v-if="discVis.listed" value="附注上市" @click="navigateTo('附注上市')" />
+        <GtIndexChip v-if="discVis.soe" value="附注国企" @click="navigateTo('附注国企')" />
       </div>
     </el-card>
 
-    <!-- 审计说明 -->
     <el-card class="audit-note-card" shadow="never">
-      <template #header>
-        <div class="card-header">
-          <span>审计说明</span>
-        </div>
-      </template>
-      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 5 }"
-        placeholder="请填写审计说明（研发费用归集完整性、与I2划分一致性等）..."
-        :disabled="isReadonly" @blur="onNoteBlur" />
+      <template #header><div class="card-header"><span>审计说明</span></div></template>
+      <el-input
+        :model-value="adj.auditNote.value"
+        type="textarea"
+        :autosize="{ minRows: 4 }"
+        placeholder="说明研发费用增减变动主要原因（变动率超30%须重点说明）、与I2划分一致性等…"
+        :disabled="isReadonly"
+        @change="adj.saveNote"
+      />
+      <div v-if="!isReadonly && adj.needsAuditNoteDraft.value" class="note-draft-hint">
+        <el-button size="small" type="warning" plain @click="handleApplyNoteDraft">
+          一键填入变动率超30%说明草稿
+        </el-button>
+      </div>
     </el-card>
 
-    <!-- 审计结论 -->
     <el-card class="audit-note-card" shadow="never">
-      <template #header>
-        <div class="card-header">
-          <span>审计结论</span>
-        </div>
-      </template>
-      <el-select v-model="auditConclusion" placeholder="请选择审计结论" :disabled="isReadonly" class="conclusion-select" @change="onConclusionChange">
+      <template #header><div class="card-header"><span>审计结论</span></div></template>
+      <el-select
+        :model-value="adj.auditConclusion.value"
+        placeholder="请选择审计结论"
+        :disabled="isReadonly"
+        class="conclusion-select"
+        @change="adj.saveConclusion"
+      >
         <el-option value="研发费用发生额列报恰当，费用化与资本化划分正确" label="研发费用发生额列报恰当，费用化与资本化划分正确" />
         <el-option value="经审计调整后，研发费用列报恰当" label="经审计调整后，研发费用列报恰当" />
         <el-option value="需进一步关注" label="需进一步关注" />
       </el-select>
     </el-card>
 
-    <!-- 编制提示 -->
-    <details class="compile-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>6602研发费用（损益类/借方科目）：取发生额非余额</li>
-        <li>公式列：上期审定=B+C+D，本期审定=F+G+H，变动额=I-E，变动率=(I-E)/E</li>
-        <li>变动率超±30%黄色高亮需补充原因说明</li>
-        <li>"回写TB"将审定发生额回写6602</li>
-        <li>VR-I6-01：费用化(I6)+资本化(I2)必须等于研发总额</li>
-      </ul>
+    <details class="compile-hint" open>
+      <summary>编制说明</summary>
+      <ol>
+        <li>类别行数据引用 I6-2 明细（未审/AJE/RJE/审定），公式：审定=未审+AJE+RJE。</li>
+        <li>合计行为各类别加总；TB数据行为试算表6602未审发生额；差异=合计本期审定−TB数据。</li>
+        <li>回写TB后发布 <code>substantive:adjudicated</code>，驱动附注披露表自动刷新。</li>
+        <li>附注同步目标：上市 §五、66 / 国企 §八、67「研发费用（按费用性质列示）」。</li>
+      </ol>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
-/**
- * I6TabAdjudication.vue — I6-1 研发费用审定表（27行×11列，损益类发生额）
- *
- * 列结构（11列）：
- *   项目 | 上期未审(B) | 上期AJE(C) | 上期RJE(D) | 上期审定(E=B+C+D)
- *        | 本期未审(F) | 本期AJE(G) | 本期RJE(H) | 本期审定(I=F+G+H)
- *        | 变动额(J=I-E) | 变动率
- *
- * I2联动面板：费用化(I6)|资本化(I2)|合计|VR-I6-01校验
- * TB回写：writebackTB发生额(6602)
- *
- * Spec: .kiro/specs/i6-research-development-expense/
- * Task: 4.2
- */
-import { ref, reactive, computed, watch, inject } from 'vue'
+import { computed, inject } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
-import http from '@/utils/http'
-import {
-  calcAuditedAmount,
-  calcChangeRate,
-} from '../../composables/useI6FormulaEngine'
+import { useI6Adjudication, type I6AdjudicationRow } from '../../composables/useI6Adjudication'
+import { resolveI6DisclosureVisibility } from '../../composables/i6ApplicableSheets'
 
 const props = defineProps<{
   wpId: string
@@ -256,6 +270,7 @@ const props = defineProps<{
   allResponses: Map<string, any>
   tbData: { unadjusted6602: number; audited6602: number }
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -265,158 +280,84 @@ const emit = defineEmits<{
 
 const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', () => {})
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-interface AdjRow {
-  rowId: string
-  项目: string
-  上期未审: number; 上期AJE: number; 上期RJE: number; 上期审定: number
-  本期未审: number; 本期AJE: number; 本期RJE: number; 本期审定: number
-  变动额: number; 变动率: number | null
-  isSubtotal: boolean; isEditable: boolean
-}
-
-// ─── State ───────────────────────────────────────────────────────────────────
-const ITEM_ID = 'I6-1-rows'
-const rows = ref<AdjRow[]>([])
-const auditNote = ref('')
-const auditConclusion = ref('')
-
-const linkageData = reactive({ expense: 0, capitalized: 0, total: 0 })
-
-// ─── VR-I6-01 ────────────────────────────────────────────────────────────────
-const vrStatus = computed(() => {
-  const diff = linkageData.expense + linkageData.capitalized - linkageData.total
-  return {
-    expense: linkageData.expense,
-    capitalized: linkageData.capitalized,
-    total: linkageData.total,
-    difference: diff,
-    isBalanced: Math.abs(diff) < 0.01,
-  }
+const adj = useI6Adjudication({
+  allResponses: computed(() => props.allResponses),
+  tbData: computed(() => props.tbData),
+  projectId: computed(() => props.projectId),
+  isReadonly: computed(() => props.isReadonly),
+  onSave: (itemId, value) => emit('save', itemId, value),
 })
 
-// ─── Default rows ────────────────────────────────────────────────────────────
-const DEFAULT_ITEMS = [
-  '人工费', '材料费', '折旧费', '无形资产摊销', '设计费',
-  '装备调试费', '委外研发费', '其他费用', '小计',
-]
+const totalRow = adj.totalRow
+const linkagePanel = adj.linkagePanel
+const tbUnadjusted = adj.tbUnadjusted
+const tbDifference = adj.tbDifference
+const detailCrossValidation = adj.detailCrossValidation
 
-function _makeRow(name: string, isSubtotal = false): AdjRow {
-  return {
-    rowId: `row-${Math.random().toString(36).slice(2, 10)}`,
-    项目: name, 上期未审: 0, 上期AJE: 0, 上期RJE: 0, 上期审定: 0,
-    本期未审: 0, 本期AJE: 0, 本期RJE: 0, 本期审定: 0,
-    变动额: 0, 变动率: null,
-    isSubtotal, isEditable: !isSubtotal,
+const discVis = computed(() => resolveI6DisclosureVisibility(props.applicableStandards))
+
+interface DisplayRow extends I6AdjudicationRow {
+  isControl?: boolean
+}
+
+const displayRows = computed<DisplayRow[]>(() => {
+  const detail = adj.rows.value
+  const total = totalRow.value
+  const tbRow: DisplayRow = {
+    rowId: 'row-tb',
+    类别: 'TB数据',
+    上期未审: 0, 上期AJE: 0, 上期RJE: 0, 上期审定: 0,
+    本期未审: tbUnadjusted.value, 本期AJE: 0, 本期RJE: 0,
+    本期审定: tbUnadjusted.value,
+    变动额: 0, 变动率: null, 备注: '', changeRateHighlight: false,
+    isEditable: false, isTotal: false, isControl: true,
   }
-}
-
-function _recalcFormulas(): void {
-  for (const row of rows.value) {
-    row.上期审定 = calcAuditedAmount(row.上期未审, row.上期AJE, row.上期RJE)
-    row.本期审定 = calcAuditedAmount(row.本期未审, row.本期AJE, row.本期RJE)
-    row.变动额 = row.本期审定 - row.上期审定
-    row.变动率 = calcChangeRate(row.本期审定, row.上期审定)
+  const diffRow: DisplayRow = {
+    rowId: 'row-diff',
+    类别: '差异',
+    上期未审: 0, 上期AJE: 0, 上期RJE: 0, 上期审定: 0,
+    本期未审: 0, 本期AJE: 0, 本期RJE: 0,
+    本期审定: tbDifference.value,
+    变动额: 0, 变动率: null, 备注: '', changeRateHighlight: Math.abs(tbDifference.value) > 0.01,
+    isEditable: false, isTotal: false, isControl: true,
   }
-  // Update subtotal rows
-  const editableRows = rows.value.filter((r) => r.isEditable)
-  const subtotalRow = rows.value.find((r) => r.项目 === '小计')
-  if (subtotalRow) {
-    subtotalRow.上期未审 = editableRows.reduce((s, r) => s + r.上期未审, 0)
-    subtotalRow.上期AJE = editableRows.reduce((s, r) => s + r.上期AJE, 0)
-    subtotalRow.上期RJE = editableRows.reduce((s, r) => s + r.上期RJE, 0)
-    subtotalRow.上期审定 = calcAuditedAmount(subtotalRow.上期未审, subtotalRow.上期AJE, subtotalRow.上期RJE)
-    subtotalRow.本期未审 = editableRows.reduce((s, r) => s + r.本期未审, 0)
-    subtotalRow.本期AJE = editableRows.reduce((s, r) => s + r.本期AJE, 0)
-    subtotalRow.本期RJE = editableRows.reduce((s, r) => s + r.本期RJE, 0)
-    subtotalRow.本期审定 = calcAuditedAmount(subtotalRow.本期未审, subtotalRow.本期AJE, subtotalRow.本期RJE)
-    subtotalRow.变动额 = subtotalRow.本期审定 - subtotalRow.上期审定
-    subtotalRow.变动率 = calcChangeRate(subtotalRow.本期审定, subtotalRow.上期审定)
-  }
-  // Linkage
-  linkageData.expense = subtotalRow?.本期审定 ?? 0
+  return [...detail, total, tbRow, diffRow]
+})
+
+function onCellChange(row: I6AdjudicationRow, field: keyof I6AdjudicationRow, value: number): void {
+  adj.updateCell(row.rowId, field, value)
 }
 
-// ─── Load / Save ─────────────────────────────────────────────────────────────
-function _load(): void {
-  const item = props.allResponses.get(ITEM_ID)
-  const raw = item?.remark ?? (typeof item === 'string' ? item : null)
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed)) { rows.value = parsed; _recalcFormulas(); return }
-    } catch { /* ignore */ }
-  }
-  rows.value = DEFAULT_ITEMS.map((n) => _makeRow(n, n === '小计'))
-  _recalcFormulas()
-  // Load note/conclusion
-  auditNote.value = _getString('I6-1-note')
-  auditConclusion.value = _getString('I6-1-conclusion')
-  // Load I2 capitalized from allResponses (cross-sheet)
-  const i2Cap = props.allResponses.get('I2-capitalized-total')
-  linkageData.capitalized = Number(typeof i2Cap === 'string' ? i2Cap : i2Cap?.remark ?? 0) || 0
-  linkageData.total = linkageData.expense + linkageData.capitalized
-}
-
-function _getString(id: string): string {
-  const item = props.allResponses.get(id)
-  return (item?.remark ?? item?.conclusion ?? (typeof item === 'string' ? item : '')) as string
-}
-
-watch(() => props.allResponses, () => _load(), { immediate: true })
-
-function _persist(): void {
-  emit('save', ITEM_ID, JSON.stringify(rows.value))
-}
-
-function onCellChange(_row: AdjRow): void {
-  _recalcFormulas()
-  _persist()
-}
-
-function onNoteBlur(): void { emit('save', 'I6-1-note', auditNote.value) }
-function onConclusionChange(val: string): void { emit('save', 'I6-1-conclusion', val) }
-
-// ─── Row styling ─────────────────────────────────────────────────────────────
-function getRowClassName({ row }: { row: AdjRow }): string {
-  if (row.isSubtotal) return 'row-subtotal'
+function getRowClassName({ row }: { row: DisplayRow }): string {
+  if (row.isTotal) return 'row-subtotal'
+  if (row.isControl) return 'row-control'
   return ''
 }
 
-function isHighChangeRate(rate: number | null | undefined): boolean {
-  if (rate == null) return false
-  return Math.abs(rate) > 30  // calcChangeRate returns percentage (e.g. 50 = 50%)
-}
-
-// ─── Writeback TB(6602) ──────────────────────────────────────────────────────
-async function handleWritebackTB(): Promise<void> {
-  try {
-    const subtotal = rows.value.find((r) => r.项目 === '小计')
-    await http.put(`/projects/${props.projectId}/trial-balance/writeback`, {
-      account_code: '6602', audited_amount: subtotal?.本期审定 ?? 0,
-      source_wp_code: 'I6-1', type: 'income_statement',
-    })
-    // Publish EventBus
-    window.dispatchEvent(new CustomEvent('research:expense-updated', {
-      detail: { wpCode: 'I6-1', expense: subtotal?.本期审定 ?? 0 },
-    }))
-    ElMessage.success('已回写TB(6602发生额)')
-  } catch { ElMessage.error('TB回写失败') }
-}
-
-// ─── Review / Navigation ─────────────────────────────────────────────────────
 function handleReview(): void { openReviewDialog('I6-1 审定表') }
 function navigateTo(code: string): void { emit('navigate-sheet', code) }
 
-// ─── Formatters ──────────────────────────────────────────────────────────────
+function handleSyncFromI63(): void {
+  adj.syncFromI63()
+}
+
+function handleApplyNoteDraft(): void {
+  if (adj.applyAuditNoteDraft()) {
+    ElMessage.success('已生成变动说明草稿，请补充具体原因后保存')
+  } else {
+    ElMessage.info('当前无变动率超30%的类别')
+  }
+}
+
 function fmtAmount(v: number | null | undefined): string {
   if (v == null) return '-'
   if (Math.abs(v) < 0.005) return '-'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
 function fmtRate(rate: number | null | undefined): string {
   if (rate == null) return '-'
-  return rate.toFixed(1) + '%'  // calcChangeRate already returns percentage
+  return (rate * 100).toFixed(1) + '%'
 }
 </script>
 
@@ -424,17 +365,20 @@ function fmtRate(rate: number | null | undefined): string {
 .i6-adjudication { font-size: var(--wp-font-size, 13px); padding: 16px; }
 .methodology-context { border-left: 4px solid #d97706; background: #fffbeb; padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.8; }
 .methodology-context p { margin: 0; }
-.methodology-context strong { color: #78350f; }
-.adj-warning { margin-bottom: 12px; }
+.objective-alert, .adj-warning { margin-bottom: 12px; }
 .table-section { margin-bottom: 20px; }
-.block-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; font-weight: 600; font-size: 14px; }
-.block-actions { display: flex; align-items: center; gap: 4px; }
-.block-title { font-size: 14px; }
+.block-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; font-weight: 600; font-size: 14px; flex-wrap: wrap; gap: 8px; }
+.block-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tab-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.linkage-warn { font-size: 12px; color: #e6a23c; font-weight: 500; }
+.linkage-info { font-size: 12px; color: var(--el-text-color-secondary); }
+.linkage-ok { font-size: 12px; color: #67c23a; font-weight: 500; }
 .adjudication-table { font-size: var(--wp-font-size, 13px); }
-.formula-col-header { border-bottom: 1px dashed #909399; cursor: help; padding-bottom: 2px; }
-.formula-value { border-bottom: 1px dashed #c0c4cc; cursor: help; padding-bottom: 1px; color: #303133; font-weight: 500; }
+.formula-value { border-bottom: 1px dashed #c0c4cc; cursor: help; font-weight: 500; }
 .adjudication-table :deep(.row-subtotal td) { font-weight: 600; background: #f0f9ff !important; }
-.subtotal-text { font-weight: 600; }
+.adjudication-table :deep(.row-control td) { font-weight: 600; background: #fefce8 !important; }
+.subtotal-text, .control-text { font-weight: 600; }
 .rate-warn { color: #d97706; font-weight: 600; background: #fefce8; padding: 1px 4px; border-radius: 2px; }
 .linkage-card { margin-bottom: 16px; }
 .card-header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 500; }
@@ -444,7 +388,9 @@ function fmtRate(rate: number | null | undefined): string {
 .audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
 .conclusion-select { width: 100%; }
 .compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
-.compile-hint summary { cursor: pointer; font-weight: 500; }
-.compile-hint ul { padding-left: 20px; margin-top: 8px; }
-.compile-hint li { margin-bottom: 4px; }
+.compile-hint summary { cursor: pointer; font-weight: 500; color: var(--el-text-color-primary); }
+.compile-hint ol { padding-left: 20px; margin: 8px 0 0; }
+.compile-hint li { margin-bottom: 4px; line-height: 1.5; }
+.draft-btn { margin-top: 6px; }
+.note-draft-hint { margin-top: 8px; }
 </style>

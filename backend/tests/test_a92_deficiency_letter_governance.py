@@ -28,41 +28,52 @@ def _make_ctx(
     project_row=None,
     b22b_wp_id=None,
     b22b_checklist_rows=None,
+    b22c_wp_id=None,
+    b22c_checklist_rows=None,
 ):
-    """Build a minimal mock RenderContext for A9-2."""
+    """Build a minimal mock RenderContext for A9-2.
+
+    Query sequence (Wave3 repoint: B22C preferred, B22B fallback):
+      1. A9-2 checklist_responses (prefix a92-)
+      2. B22C wp_index JOIN lookup       ← 新增（优先 B22C 单一真源）
+      3. B22C checklist_responses         (仅当 b22c_wp_id 存在)
+      4. B22B wp_index JOIN lookup        (向后兼容回退)
+      5. B22B checklist_responses         (仅当 b22b_wp_id 存在)
+      6. project context
+    """
     ctx = MagicMock()
     ctx.wp_id = wp_id
     ctx.project_id = project_id
 
     db = AsyncMock()
 
-    # Build sequential execute results:
-    # 1st call: A9-2 checklist_responses (prefix a92-)
-    # 2nd call: B22B wp_index JOIN query
-    # 3rd call (if b22b exists): B22B checklist_responses
-    # 4th call: project context
     a92_result = MagicMock()
     a92_result.fetchall.return_value = checklist_rows or []
+
+    b22c_wp_result = MagicMock()
+    b22c_wp_result.fetchone.return_value = B22BRow(b22c_wp_id) if b22c_wp_id else None
+    b22c_cr_result = MagicMock()
+    b22c_cr_result.fetchall.return_value = b22c_checklist_rows or []
 
     b22b_wp_result = MagicMock()
     b22b_wp_result.fetchone.return_value = (
         B22BRow(b22b_wp_id) if b22b_wp_id else None
     )
-
     b22b_cr_result = MagicMock()
     b22b_cr_result.fetchall.return_value = b22b_checklist_rows or []
 
     proj_result = MagicMock()
     proj_result.fetchone.return_value = project_row
 
+    results = [a92_result, b22c_wp_result]
+    if b22c_wp_id:
+        results.append(b22c_cr_result)
+    results.append(b22b_wp_result)
     if b22b_wp_id:
-        db.execute = AsyncMock(
-            side_effect=[a92_result, b22b_wp_result, b22b_cr_result, proj_result]
-        )
-    else:
-        db.execute = AsyncMock(
-            side_effect=[a92_result, b22b_wp_result, proj_result]
-        )
+        results.append(b22b_cr_result)
+    results.append(proj_result)
+
+    db.execute = AsyncMock(side_effect=results)
 
     ctx.db = db
     return ctx

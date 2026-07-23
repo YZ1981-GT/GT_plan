@@ -19,6 +19,7 @@
 import { ref, computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
 import { parseNum, sumField, isBalanced } from './useE1FormulaEngine'
+import { eventBus } from '@/utils/eventBus'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -255,45 +256,37 @@ export function useE1Adjustment(options: UseE1BaseOptions) {
   // ─── EventBus: dispatch adjustment:created ───────────────────────────────
 
   function dispatchAdjustmentCreated(): void {
-    try {
-      window.dispatchEvent(new CustomEvent('adjustment:created', {
-        detail: {
-          wpCode: 'E1',
-          source: 'E1-5',
-          totalDebit: totalDebit.value,
-          totalCredit: totalCredit.value,
-          balanced: balanced.value,
-          rowCount: rows.value.length,
-        },
-      }))
-    } catch { /* silent */ }
+    eventBus.emit('adjustment:created', {
+      wpCode: 'E1',
+      source: 'E1-5',
+      totalDebit: totalDebit.value,
+      totalCredit: totalCredit.value,
+      balanced: balanced.value,
+      rowCount: rows.value.length,
+    })
   }
 
-  // ─── 推送A2: dispatch e1:push-to-a2 ─────────────────────────────────────
+  // ─── 推送A13: dispatch a13:push-misstatement ────────────────────────────
 
   function pushToA2(): void {
-    try {
-      window.dispatchEvent(new CustomEvent('e1:push-to-a2', {
-        detail: {
-          wpCode: 'E1',
-          source: 'E1-5',
-          rows: rows.value.map(r => ({
-            description: r.description,
-            category: r.category,
-            reportItem: r.reportItem,
-            accountName: r.accountName,
-            noteItem: r.noteItem,
-            debit: r.debit,
-            credit: r.credit,
-            indexNo: r.indexNo,
-            note: r.note,
-          })),
-          totalDebit: totalDebit.value,
-          totalCredit: totalCredit.value,
-          balanced: balanced.value,
-        },
-      }))
-    } catch { /* silent */ }
+    eventBus.emit('a13:push-misstatement', {
+      wpCode: 'E1',
+      source: 'E1-5',
+      rows: rows.value.map(r => ({
+        description: r.description,
+        category: r.category,
+        reportItem: r.reportItem,
+        accountName: r.accountName,
+        noteItem: r.noteItem,
+        debit: r.debit,
+        credit: r.credit,
+        indexNo: r.indexNo,
+        note: r.note,
+      })),
+      totalDebit: totalDebit.value,
+      totalCredit: totalCredit.value,
+      balanced: balanced.value,
+    })
   }
 
   // ─── Row CRUD ────────────────────────────────────────────────────────────

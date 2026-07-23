@@ -72,6 +72,11 @@ describe('buildG14SyncPayloads', () => {
       '合计',
     ])
     expect(main.find((r) => r.is_total)?.current_amount).toBe(125)
+    // disclosure-table-sync-convergence: 携带源对齐 columns（项目/本期发生额/上期发生额/备注）
+    expect(payloads[0].columns).toBeDefined()
+    const cols = payloads[0].columns![G14_MAIN_SUBTABLE.listed]
+    expect(cols[0]).toMatchObject({ key: 'label', is_label: true })
+    expect(cols.find((c) => c.key === 'current_amount')?.label).toBe('本期发生额')
     expect(payloads[0].sub_table_data._note_texts?.[0]).toMatchObject({
       section: 'disclosure-note',
       text: '测试叙述',

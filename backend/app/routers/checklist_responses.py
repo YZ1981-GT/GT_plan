@@ -406,6 +406,7 @@ async def _do_batch_save(
                     "Y", "N", "NA",
                     "B22A", "B23", "industry", "discussion",
                     "prior_audit", "management_interview", "other",
+                    "b2_predecessor",
                     "control_env", "management_integrity",
                     "economic_env", "industry_factor",
                 )
@@ -418,6 +419,7 @@ async def _do_batch_save(
                 allowed = (
                     "设计有效", "设计无效", "已实施", "未实施", "不适用",
                     "Y", "N", "NA",
+                    "是", "否",
                     "有效", "部分有效", "无效",
                     "高", "中", "低",
                 )
@@ -426,6 +428,10 @@ async def _do_batch_save(
                         status_code=422,
                         detail=f"B22A conclusion 值无效，收到: '{item.conclusion}'",
                     )
+            elif item.item_id.startswith("B22C-"):
+                # B22C 评价设计有效性缺陷汇总：两级缺陷判断（控制缺陷/值得关注的缺陷）+ 要素结论 +
+                # 结构化 JSON（缺陷明细存 remark），conclusion 存判断标记或恒 null，跳过严格白名单。
+                pass
             elif item.item_id.startswith("B22B-"):
                 allowed = (
                     "重大缺陷", "重要缺陷", "一般缺陷",
@@ -439,12 +445,29 @@ async def _do_batch_save(
                         detail=f"B22B conclusion 值无效，收到: '{item.conclusion}'",
                     )
             elif item.item_id.startswith("B23-"):
-                # B23 业务流程控制：流程结论 + 穿行测试结论 + 控制频率 + 签字/适用性标记
+                # B23 业务层面控制（14 循环重做）：流程/循环结论 + 穿行/控制测试结论 +
+                # 控制矩阵枚举（认定/预防检查/控制类型/频率/是否类）+ 缺陷分级 + 签字/适用性。
                 allowed = (
+                    # 流程/循环级结论
                     "设计有效且已实施", "设计有效但未有效实施", "设计无效", "不适用",
+                    # 穿行测试结论（旧）+ 穿行是否按设计执行（新）
                     "控制有效运行", "控制未有效运行", "未执行穿行",
-                    "每笔", "每日", "每周", "每月", "每季", "每年", "不定期",
-                    "Y", "N",
+                    # 控制测试运行有效性结论
+                    "有效", "无效",
+                    # 控制频率
+                    "每笔", "每日", "每周", "每月", "每季", "每年", "不定期", "定期",
+                    # 认定
+                    "存在", "发生", "完整性", "准确性", "计价分摊", "权利义务", "列报",
+                    # 预防性/检查性
+                    "预防性", "检查性",
+                    # 控制类型（一级/二级常见值）
+                    "授权和审批", "监督控制", "信息处理", "实物控制", "职责分离", "绩效评价复核",
+                    "有权人员批准", "安全访问控制", "复核其他控制的执行情况",
+                    # 缺陷类型 + 严重程度（A14-4）
+                    "缺乏控制", "设计不合理", "未执行",
+                    "重大缺陷", "重要缺陷", "一般缺陷",
+                    # 是否类通用值 + 签字/适用性标记
+                    "是", "否", "Y", "N",
                 )
                 if item.conclusion not in allowed:
                     raise HTTPException(
@@ -466,6 +489,11 @@ async def _do_batch_save(
                         status_code=422,
                         detail=f"B30 conclusion 值无效，收到: '{item.conclusion}'",
                     )
+            elif item.item_id.startswith("B2-"):
+                # B2 前任-后任 CPA 沟通：前任基础信息/适用性/B2-12 评价(9步+7点判断矩阵)/
+                # B2-5 决策向导等均自由格式（JSON 或文本存 remark，conclusion 常为 null 或
+                # 是/否/不适用等判断值），跳过白名单校验。注：不匹配 B22A-/B23-/B30-/B50- 等。
+                pass
             elif item.item_id.startswith("a171-"):
                 # A17-1 重大事项概要汇总：签字=任意字符串(姓名/日期)，章节=null(存remark)
                 pass  # no validation — conclusion is freeform (name/date for signature, null for chapters)
@@ -473,9 +501,11 @@ async def _do_batch_save(
                 "a101-", "a121-", "a1721-", "a271-", "a91-", "a92-",
                 "a117-", "a176-", "a181-", "a182-", "a81-", "a111-",
                 "a173-", "a1731-", "a174-", "a177-", "a51-",
-                "b14-", "wt-",
+                "b14-", "b1risk-", "b1eval-", "b1kaa-", "wt-",
+                "b19u-",
             )):
                 # 专属组件自由格式：签字/日期/长文本均存 conclusion，跳过白名单校验
+                # b19u- = B19-1 识别未披露关联方关系及异常关联交易扫描（存在=是/否/不适用，来源/程序存 remark）
                 pass
             elif item.item_id.startswith("C1-"):
                 # C1 企业层面控制测试：适用性 Y/N + 段/整体结论 + 测试方法 + 控制频率 + 段裁剪
@@ -547,6 +577,12 @@ async def _do_batch_save(
                 pass
             elif item.item_id.startswith(("checkbox-", "input-", "select-", "textarea-", "date-")):
                 # 历史 Excel/HTML 控件 ID（如 checkbox-3c2），conclusion 常为 '0'/'1' 或自由文本
+                pass
+            elif item.item_id.startswith(("B60-", "B60A", "B60B", "B60C", "B60D")):
+                # B60 总体审计策略（主底稿章节 B60-CH-* + 适用性矩阵 B60-applicability +
+                # 结构化子底稿 B60-2-1-*/B60-3-*/B60A-*/B60B-*/B60C-*/B60D-* 等）：
+                # 结构化数据（问卷/表格/字段）按 section 打包为 JSON 存 remark，conclusion 恒为 null，
+                # 跳过白名单校验。
                 pass
             elif item.item_id.startswith(("G10-", "G10-adj")):
                 # G10 交易性金融负债：审计说明/审计结论/明细行/审定数/分类/衍生等自由格式

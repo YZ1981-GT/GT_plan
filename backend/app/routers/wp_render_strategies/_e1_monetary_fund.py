@@ -56,6 +56,9 @@ async def render(ctx: RenderContext) -> dict | None:
         "client_name": "",
         "audit_year": "",
         "business_category": ctx.business_category or "",
+        "bs_date": "",
+        "tb_amount": 0,
+        "related_parties": [],
     }
     try:
         proj_row = (
@@ -73,8 +76,52 @@ async def render(ctx: RenderContext) -> dict | None:
             project_context["business_category"] = (
                 proj_row.business_category or ctx.business_category or ""
             )
+            # bs_date（资产负债表日）
+            if proj_row.audit_year:
+                project_context["bs_date"] = f"{proj_row.audit_year}-12-31"
     except Exception as e:  # noqa: BLE001
         logger.warning("E1 render: project context 查询失败: %s", e)
+
+    # ─── 试算平衡表 1001+1002+1012 货币资金（资产借方）─────────────────
+    year = project_context.get("audit_year")
+    if year:
+        try:
+            tb_row = (
+                await db.execute(
+                    sa.text(
+                        "SELECT COALESCE(SUM(audited_amount), 0) AS audited, "
+                        "COALESCE(SUM(unadjusted_amount), 0) AS unadjusted "
+                        "FROM trial_balance "
+                        "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                        "AND (standard_account_code LIKE '1001%' "
+                        "OR standard_account_code LIKE '1002%' "
+                        "OR standard_account_code LIKE '1012%')"
+                    ),
+                    {"pid": str(ctx.project_id), "year": int(year)},
+                )
+            ).fetchone()
+            if tb_row:
+                audited = float(tb_row.audited or 0)
+                unadjusted = float(tb_row.unadjusted or 0)
+                project_context["tb_amount"] = audited if audited else unadjusted
+        except Exception as e:  # noqa: BLE001
+            logger.warning("E1 render: trial_balance(1001/1002/1012) 查询失败: %s", e)
+
+    # ─── 关联方清单 ──────────────────────────────────────────────────────
+    try:
+        rp_rows = (
+            await db.execute(
+                sa.text(
+                    "SELECT name FROM related_party_registry "
+                    "WHERE project_id = :pid AND is_deleted = false "
+                    "AND name IS NOT NULL AND name <> ''"
+                ),
+                {"pid": str(ctx.project_id)},
+            )
+        ).fetchall()
+        project_context["related_parties"] = [r.name for r in rp_rows if r.name]
+    except Exception as e:  # noqa: BLE001
+        logger.warning("E1 render: related_parties 查询失败: %s", e)
 
     return {
         "sheet_name": ctx.classification.sheet_name if ctx.classification else "",

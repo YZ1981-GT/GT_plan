@@ -4,120 +4,172 @@
     <el-alert type="info" :closable="false" style="margin-bottom:12px">
       <template #title><span style="font-weight:600">审计目标（认定）</span></template>
       <ol style="margin:4px 0 0;padding-left:18px;line-height:1.55;font-size:12px">
-        <li><b>发生与准确性：</b>合同项下销售费用（广告/促销/服务等）真实发生、金额与合同一致；</li>
-        <li><b>截止与分类：</b>按合同履行期间恰当确认与分摊，记入正确期间与账户。</li>
+        <li><b>发生与准确性：</b>合同项下销售费用（律师费/咨询费/租赁费/保险费/物业费等）真实发生、金额与合同一致；</li>
+        <li><b>截止与分类：</b>按合同履行期间恰当摊销确认，本期应计损益计入正确期间与账户。</li>
       </ol>
     </el-alert>
 
     <!-- ═══ Section标题 + AI + 复核 ═══ -->
     <div class="section-header">
-      <h3>K8-5 合同检查表</h3>
+      <h3>K8-5 合同费用摊销核对表</h3>
       <div class="header-actions">
-        <el-button size="small" type="primary" text @click="handleAiAssist"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
+        <el-tooltip :content="aiAvailable ? 'AI 辅助生成' : 'AI 服务暂不可用'" placement="top">
+          <el-button size="small" type="primary" text :loading="aiLoading" :disabled="isReadonly || !aiAvailable" @click="handleAiAssist"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
+        </el-tooltip>
         <el-button size="small" text @click="openReviewDialog?.('K8-5-contract-check')">💬 复核</el-button>
       </div>
     </div>
 
     <!-- ═══ 方法论上下文（琥珀色块） ═══ -->
     <div class="methodology-context">
-      <p>检查重大销售费用合同（广告/推广/运输等），核实合同真实性、金额匹配、审批完整性及合规性。不合规项红色标记。金额匹配容差±100元。</p>
+      <p>检查按合同期摊销的销售费用合同（律师/咨询/租赁/保险/物业等）：核对合同金额、摊销期间及本期<strong>应计损益</strong>与账面<strong>已计损益</strong>是否一致。<br/><strong>合同总月份</strong>=合同期跨月数（含首尾月）；<strong>本期应计月份</strong>=合同期∩摊销期跨月数；<strong>本期应计损益</strong>=合同金额÷合同总月份×本期应计月份；<strong>差异</strong>=应计−已计（|差异|&gt;1元 红色高亮需查明）。</p>
     </div>
 
-    <!-- ═══ 不合规摘要（有不合规项时显示） ═══ -->
-    <el-alert v-if="nonComplianceSummary.count > 0" type="error" :closable="false" show-icon style="margin-bottom:10px">
-      <template #title>⚠️ 发现 {{ nonComplianceSummary.count }} 项不合规</template>
+    <!-- ═══ 摊销期设置 ═══ -->
+    <div class="amort-period-bar">
+      <span class="ap-label">摊销期间：</span>
+      <el-date-picker :model-value="amortStart" type="date" size="small" value-format="YYYY-MM-DD" :disabled="isReadonly" placeholder="期初" style="width:150px" @change="(v: string) => handlePeriodChange(v, amortEnd)" />
+      <span class="ap-sep">至</span>
+      <el-date-picker :model-value="amortEnd" type="date" size="small" value-format="YYYY-MM-DD" :disabled="isReadonly" placeholder="期末" style="width:150px" @change="(v: string) => handlePeriodChange(amortStart, v)" />
+    </div>
+
+    <!-- ═══ 差异摘要 ═══ -->
+    <el-alert v-if="diffWarnings.length > 0" type="error" :closable="false" show-icon style="margin-bottom:10px">
+      <template #title>⚠️ {{ diffWarnings.length }} 项应计损益与账面已计存在差异（&gt;1元）</template>
       <template #default>
-        <ul class="non-compliance-list">
-          <li v-for="item in nonComplianceSummary.items.filter(i => i.sheetId === 'K8-5')" :key="item.label">{{ item.label }}：{{ item.evidence || '未说明' }}</li>
-        </ul>
+        <span v-for="(r, i) in diffWarnings" :key="r.rowKey" class="diff-tag">{{ r.projectName || `合同${i + 1}` }}(差异{{ fmtAmt(r.diff) }}){{ i < diffWarnings.length - 1 ? '、' : '' }}</span>
       </template>
     </el-alert>
 
-    <!-- ═══ 合同检查表格 ═══ -->
-    <el-table :data="contractRows" border size="small" style="width:100%;font-size:13px" max-height="450" :row-class-name="contractRowClassName">
-      <el-table-column type="index" label="#" width="42" align="center" />
-      <el-table-column prop="contractName" label="合同名称" min-width="140">
+    <!-- ═══ 合同摊销核对表格 ═══ -->
+    <el-table :data="rows" border size="small" style="width:100%;font-size:13px" max-height="480" :row-class-name="rowClassName">
+      <el-table-column type="index" label="#" width="42" align="center" fixed />
+      <el-table-column label="项目" min-width="110" fixed>
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.contractName" size="small" @change="(v: string) => updateContractCell(row.rowKey, 'contractName', v)" />
-          <span v-else>{{ row.contractName || '-' }}</span>
+          <el-input v-if="!isReadonly" :model-value="row.projectName" size="small" placeholder="如 律师费" @change="(v: string) => updateCell(row.rowKey, 'projectName', v)" />
+          <span v-else>{{ row.projectName || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="contractType" label="类型" width="100">
+      <el-table-column label="对方单位" min-width="120">
         <template #default="{ row }">
-          <el-select v-if="!isReadonly" :model-value="row.contractType" size="small" @change="(v: string) => updateContractCell(row.rowKey, 'contractType', v)">
-            <el-option value="广告" label="广告" />
-            <el-option value="推广" label="推广" />
-            <el-option value="运输" label="运输" />
-            <el-option value="咨询" label="咨询" />
-            <el-option value="其他" label="其他" />
-          </el-select>
-          <span v-else>{{ row.contractType || '-' }}</span>
+          <el-input v-if="!isReadonly" :model-value="row.counterparty" size="small" @change="(v: string) => updateCell(row.rowKey, 'counterparty', v)" />
+          <span v-else>{{ row.counterparty || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="contractAmount" label="合同金额" width="120" align="right">
+      <el-table-column label="合同内容" min-width="130">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.contractAmount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateContractCell(row.rowKey, 'contractAmount', v ?? 0)" />
+          <el-input v-if="!isReadonly" :model-value="row.contractContent" size="small" @change="(v: string) => updateCell(row.rowKey, 'contractContent', v)" />
+          <span v-else>{{ row.contractContent || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="合同金额" width="120" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" :model-value="row.contractAmount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowKey, 'contractAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.contractAmount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="paidAmount" label="实付金额" width="120" align="right">
+      <el-table-column label="实际开票方" min-width="110">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.paidAmount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateContractCell(row.rowKey, 'paidAmount', v ?? 0)" />
-          <span v-else>{{ fmtAmt(row.paidAmount) }}</span>
+          <el-input v-if="!isReadonly" :model-value="row.invoiceParty" size="small" @change="(v: string) => updateCell(row.rowKey, 'invoiceParty', v)" />
+          <span v-else>{{ row.invoiceParty || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="匹配" width="65" align="center">
+      <el-table-column label="支付条件" min-width="100">
         <template #default="{ row }">
-          <el-tag :type="row.amountMatched ? 'success' : 'danger'" size="small">{{ row.amountMatched ? '✓' : '✗' }}</el-tag>
+          <el-input v-if="!isReadonly" :model-value="row.paymentTerm" size="small" @change="(v: string) => updateCell(row.rowKey, 'paymentTerm', v)" />
+          <span v-else>{{ row.paymentTerm || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="approvalComplete" label="审批" width="95">
+      <el-table-column label="合同开始" width="130">
         <template #default="{ row }">
-          <el-select v-if="!isReadonly" :model-value="row.approvalComplete" size="small" placeholder="—" @change="(v: string) => updateContractCell(row.rowKey, 'approvalComplete', v)">
-            <el-option value="合规" label="合规" /><el-option value="不合规" label="不合规" /><el-option value="不适用" label="不适用" />
-          </el-select>
-          <span v-else :class="{ 'non-comply': row.approvalComplete === '不合规' }">{{ row.approvalComplete || '-' }}</span>
+          <el-date-picker v-if="!isReadonly" :model-value="row.startDate" type="date" size="small" value-format="YYYY-MM-DD" style="width:100%" @change="(v: string) => updateCell(row.rowKey, 'startDate', v)" />
+          <span v-else>{{ row.startDate || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="authenticity" label="真实性" width="95">
+      <el-table-column label="合同结束" width="130">
         <template #default="{ row }">
-          <el-select v-if="!isReadonly" :model-value="row.authenticity" size="small" placeholder="—" @change="(v: string) => updateContractCell(row.rowKey, 'authenticity', v)">
-            <el-option value="合规" label="合规" /><el-option value="不合规" label="不合规" /><el-option value="不适用" label="不适用" />
-          </el-select>
-          <span v-else :class="{ 'non-comply': row.authenticity === '不合规' }">{{ row.authenticity || '-' }}</span>
+          <el-date-picker v-if="!isReadonly" :model-value="row.endDate" type="date" size="small" value-format="YYYY-MM-DD" style="width:100%" @change="(v: string) => updateCell(row.rowKey, 'endDate', v)" />
+          <span v-else>{{ row.endDate || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="compliance" label="综合合规" width="95">
+      <el-table-column label="合同总月份" width="90" align="right">
         <template #default="{ row }">
-          <el-select v-if="!isReadonly" :model-value="row.compliance" size="small" placeholder="—" @change="(v: string) => updateContractCell(row.rowKey, 'compliance', v)">
-            <el-option value="合规" label="合规" /><el-option value="不合规" label="不合规" /><el-option value="不适用" label="不适用" />
-          </el-select>
-          <span v-else :class="{ 'non-comply': row.compliance === '不合规' }">{{ row.compliance || '-' }}</span>
+          <el-tooltip content="公式：合同期跨月数（含首尾月）" placement="top">
+            <span class="formula-cell formula-underline">{{ row.totalMonths }}</span>
+          </el-tooltip>
         </template>
       </el-table-column>
-      <el-table-column prop="evidence" label="证据" min-width="120">
+      <el-table-column label="本期应计月份" width="105" align="right">
         <template #default="{ row }">
-          <el-input v-if="!isReadonly" :model-value="row.evidence" size="small" @change="(v: string) => updateContractCell(row.rowKey, 'evidence', v)" />
-          <span v-else>{{ row.evidence || '-' }}</span>
+          <el-tooltip content="公式：合同期∩摊销期跨月数（可手工覆盖）" placement="top">
+            <el-input-number v-if="!isReadonly" :model-value="row.accrualMonths" size="small" :controls="false" :precision="0" :min="0" style="width:80px" @change="(v: number | undefined) => updateCell(row.rowKey, 'accrualMonths', v ?? 0)" />
+            <span v-else class="formula-cell">{{ row.accrualMonths }}</span>
+          </el-tooltip>
         </template>
       </el-table-column>
-      <el-table-column label="📎" width="75" align="center">
+      <el-table-column label="本期应计损益" width="120" align="right">
+        <template #default="{ row }">
+          <el-tooltip content="公式：合同金额÷总月份×应计月份" placement="top">
+            <span class="formula-cell formula-underline">{{ fmtAmt(row.accruedPL) }}</span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
+      <el-table-column label="本期已计损益" width="120" align="right">
+        <template #default="{ row }">
+          <el-input-number v-if="!isReadonly" :model-value="row.bookedPL" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowKey, 'bookedPL', v ?? 0)" />
+          <span v-else>{{ fmtAmt(row.bookedPL) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="差异" width="110" align="right">
+        <template #default="{ row }">
+          <el-tooltip content="公式：应计−已计" placement="top">
+            <span class="formula-cell formula-underline" :class="{ 'abnormal-highlight': Math.abs(row.diff) > 1 }">{{ fmtAmt(row.diff) }}</span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
+      <el-table-column label="合同索引" min-width="90">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.contractIndex" size="small" @change="(v: string) => updateCell(row.rowKey, 'contractIndex', v)" />
+          <span v-else>{{ row.contractIndex || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="凭证索引" min-width="90">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.voucherIndex" size="small" @change="(v: string) => updateCell(row.rowKey, 'voucherIndex', v)" />
+          <span v-else>{{ row.voucherIndex || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="审计结论" min-width="120">
+        <template #default="{ row }">
+          <el-input v-if="!isReadonly" :model-value="row.conclusion" size="small" @change="(v: string) => updateCell(row.rowKey, 'conclusion', v)" />
+          <span v-else>{{ row.conclusion || '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="📎" width="70" align="center">
         <template #default="{ row }">
           <el-button link size="small" :disabled="isReadonly" @click="handleOcrUpload(row.rowKey)">📎</el-button>
           <span v-if="row.ocrAttachment" class="ocr-indicator">✓</span>
         </template>
       </el-table-column>
-      <el-table-column v-if="!isReadonly" label="" width="55" align="center">
+      <el-table-column v-if="!isReadonly" label="操作" width="88" align="center" fixed="right">
         <template #default="{ row }">
-          <el-button link size="small" type="danger" @click="removeContractRow(row.rowKey)">删</el-button>
+          <el-button link size="small" type="primary" @click="openAmortDialog(row)">编辑</el-button>
+          <el-button link size="small" type="danger" @click="removeRow(row.rowKey)">删</el-button>
         </template>
       </el-table-column>
+      <template #append>
+        <div class="table-total">
+          合计　合同金额：{{ fmtAmt(totals.contractAmount) }}　应计损益：{{ fmtAmt(totals.accruedPL) }}　已计损益：{{ fmtAmt(totals.bookedPL) }}　差异：{{ fmtAmt(totals.diff) }}
+        </div>
+      </template>
     </el-table>
 
     <!-- ═══ 操作栏 ═══ -->
     <div class="table-actions">
+      <el-button size="small" type="primary" @click="openAmortDialog(null)">✏️ 引导录入</el-button>
       <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleAddContract">+ 新增合同</el-button>
       <el-button size="small" plain :disabled="isReadonly" @click="showSamplingDialog = true">🎲 抽凭</el-button>
+      <el-button v-if="diffWarnings.length > 0" size="small" type="danger" plain :disabled="isReadonly" @click="pushDiffToK83">推送差异至 K8-3（{{ diffWarnings.length }}）</el-button>
     </div>
 
     <!-- ═══ 抽凭引擎 Dialog ═══ -->
@@ -127,7 +179,7 @@
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
         account-code="6601"
-        phase="substantive"
+        phase="final"
         :year="currentYear"
         @filled="handleVoucherFilled"
       />
@@ -136,16 +188,26 @@
     <!-- OCR file input (隐藏) -->
     <input ref="ocrFileInput" type="file" accept="image/*,.pdf" style="display:none" @change="handleOcrFileSelected" />
 
+    <!-- ═══ 引导式录入弹窗 ═══ -->
+    <K8ContractAmortDialog
+      v-model:visible="amortDialogVisible"
+      :row="editingRow"
+      :amort-start="amortStart"
+      :amort-end="amortEnd"
+      :is-readonly="isReadonly"
+      @save="onAmortDialogSave"
+    />
+
     <!-- ═══ 检查结论 ═══ -->
     <el-card shadow="never" class="conclusion-card">
       <template #header><span>合同检查结论</span></template>
       <el-input
-        :model-value="contractConclusion"
+        :model-value="conclusion"
         type="textarea"
         :autosize="{ minRows: 2, maxRows: 6 }"
         :disabled="isReadonly"
-        placeholder="请填写合同检查结论..."
-        @blur="(e: FocusEvent) => saveContractConclusion((e.target as HTMLTextAreaElement)?.value ?? '')"
+        placeholder="请填写合同费用摊销核对结论（应计与已计是否一致、差异原因及调整建议）..."
+        @blur="(e: FocusEvent) => saveConclusion((e.target as HTMLTextAreaElement)?.value ?? '')"
       />
     </el-card>
 
@@ -153,11 +215,11 @@
     <details class="compile-hint">
       <summary>📋 编制提示</summary>
       <ul>
-        <li>检查重大费用合同：广告/推广/运输/咨询等</li>
-        <li>核实合同金额与实际支付匹配（容差±100元）</li>
-        <li>检查审批流程完整性、合同真实性</li>
-        <li>不合规项红色标记并填写审计证据</li>
-        <li>支持行级抽凭📎核查原始合同</li>
+        <li>适用按合同期摊销的费用：律师费/咨询费/租赁费/保险费/物业费等</li>
+        <li>本期应计损益=合同金额÷合同总月份×本期应计月份（直线摊销）</li>
+        <li>本期应计月份默认取合同期∩摊销期跨月数，可手工覆盖</li>
+        <li>差异=应计−已计，|差异|&gt;1元红色标记并查明原因（多计/少计/未及时摊销）</li>
+        <li>支持行级📎OCR核查原始合同，抽凭引擎（科目6601）核查凭证</li>
       </ul>
     </details>
   </div>
@@ -165,98 +227,169 @@
 
 <script setup lang="ts">
 /**
- * K8TabContractCheck.vue — K8-5 合同检查表
+ * K8TabContractCheck.vue — K8-5 销售费用合同费用摊销核对表
  *
- * Spec: .kiro/specs/k8-selling-expenses/ | Task: 4.6
- * Requirements: 6.1-6.4
- *
- * 功能：
- * - 检查重大费用合同（广告/推广/运输）的真实性/金额匹配/审批
- * - 合规判断三态（合规/不合规/不适用）
- * - 不合规项红色摘要
- * - 行级抽凭+OCR
+ * 🔴 重建：原用通用「合规检查」模型（金额匹配/审批/真实性），与致同源模板不符。
+ * 源模板 K8-5 为合同费用摊销核对表（合同总月份/本期应计月份/应计损益 vs 已计/差异）。
+ * 复用 useK8ContractAmortization（纯摊销计算）。
  */
 import { ref, toRef, inject, computed, defineAsyncComponent } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { useK8Checks } from '@/components/workpaper/composables/useK8Checks'
+import { useK8ContractAmortization, type K8AmortRow } from '@/components/workpaper/composables/useK8ContractAmortization'
+import { useK8AiGenerate } from '@/components/workpaper/composables/useK8AiGenerate'
 import http from '@/utils/http'
 import type { Ref } from 'vue'
-import type { K8ContractCheckRow } from '@/components/workpaper/composables/useK8Checks'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),
 )
+const K8ContractAmortDialog = defineAsyncComponent(() => import('./K8ContractAmortDialog.vue'))
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  year?: number
 }>()
 
 const emit = defineEmits<{ (e: 'save', itemId: string, value: any): void }>()
 const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', () => {})
 
+const currentYear = computed(() => props.year ?? new Date().getFullYear())
+
 // ═══ Composable ═══
 const {
-  contractRows,
-  contractConclusion,
-  nonComplianceSummary,
-  addContractRow,
-  removeContractRow,
-  updateContractCell,
-  saveContractConclusion,
-} = useK8Checks({
+  rows,
+  conclusion,
+  amortStart,
+  amortEnd,
+  diffWarnings,
+  diffAdjustmentDrafts,
+  totals,
+  addRow,
+  addRowReturnKey,
+  applyRowPatch,
+  removeRow,
+  updateCell,
+  setAmortPeriod,
+  saveConclusion,
+} = useK8ContractAmortization({
   allResponses: toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>,
   projectId: toRef(props, 'projectId'),
   wpId: toRef(props, 'wpId'),
+  year: toRef(props, 'year') as Ref<number | undefined>,
   isReadonly: toRef(props, 'isReadonly'),
   onSave: (itemId, value) => emit('save', itemId, typeof value === 'string' ? { remark: value } : { remark: JSON.stringify(value) }),
 })
 
+// ═══ AI 辅助 ═══
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useK8AiGenerate({
+  wpId: toRef(props, 'wpId'),
+})
+async function handleAiAssist(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateAndConfirm(
+    'k8-contract-amort-conclusion',
+    conclusion.value || '',
+    {
+      合同笔数: rows.value.length,
+      差异笔数: diffWarnings.value.length,
+      应计损益合计: totals.value.accruedPL,
+      已计损益合计: totals.value.bookedPL,
+      任务: '请为销售费用合同费用摊销核对表形成检查结论（应计损益与账面已计是否一致、差异原因及是否需调整）',
+    },
+    'AI 生成 · 合同摊销核对结论',
+  )
+  if (text) saveConclusion(text)
+}
+
+// ═══ 摊销期变更 ═══
+function handlePeriodChange(start: string, end: string): void {
+  setAmortPeriod(start || amortStart.value, end || amortEnd.value)
+}
+
 // ═══ 新增合同（弹窗输入名称） ═══
 async function handleAddContract(): Promise<void> {
   try {
-    const { value } = await ElMessageBox.prompt('请输入合同名称', '新增合同检查', {
+    const { value } = await ElMessageBox.prompt('请输入合同费用项目名称', '新增合同', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
-      inputPlaceholder: '如：XX广告推广合同',
+      inputPlaceholder: '如：律师费 / 咨询费 / 租赁费',
     })
-    if (value?.trim()) {
-      addContractRow(value.trim())
-    }
+    if (value?.trim()) addRow(value.trim())
   } catch { /* cancelled */ }
 }
 
+// ═══ 引导式录入弹窗（点点点，17列宽表）═══
+const amortDialogVisible = ref(false)
+const editingRow = ref<K8AmortRow | null>(null)
+function openAmortDialog(row: K8AmortRow | null): void {
+  editingRow.value = row
+  amortDialogVisible.value = true
+}
+function onAmortDialogSave(rowKey: string | null, patch: any): void {
+  const key = rowKey ?? addRowReturnKey(patch.projectName || '')
+  if (key) applyRowPatch(key, patch)
+}
+
+// ═══ 差异 → K8-3 调整分录推送（append + 去重标记）═══
+function pushDiffToK83(): void {
+  if (props.isReadonly) return
+  const drafts = diffAdjustmentDrafts.value
+  if (!drafts.length) { ElMessage.info('无摊销差异，无需推送'); return }
+  // 读现有 K8-3 分录，按摘要去重后追加
+  let existing: any[] = []
+  const raw = props.allResponses.get('K8-3-adj-entries')?.remark
+  try { const p = typeof raw === 'string' ? JSON.parse(raw) : raw; if (Array.isArray(p)) existing = p } catch { /* ignore */ }
+  const existSummaries = new Set(existing.map((e: any) => e.summary))
+  let added = 0
+  let nextId = existing.length + 1
+  for (const d of drafts) {
+    if (existSummaries.has(d.summary)) continue
+    existing.push({
+      id: `entry-k85-${Date.now()}-${nextId++}`,
+      seq: existing.length + 1,
+      category: d.category,
+      summary: d.summary,
+      reportItem: d.reportItem,
+      accountName: d.accountName,
+      noteItem: d.noteItem,
+      debitAmount: d.debitAmount,
+      creditAmount: d.creditAmount,
+      indexRef: d.indexRef,
+      remark: d.remark,
+    })
+    added++
+  }
+  existing.forEach((e: any, i: number) => { e.seq = i + 1 })
+  emit('save', 'K8-3-adj-entries', { remark: JSON.stringify(existing) })
+  ElMessage.success(added > 0 ? `已推送 ${added} 条摊销差异至 K8-3 调整分录（可去 K8-3 复核借贷）` : '差异分录已存在于 K8-3，未重复推送')
+}
+
 // ═══ UI Helpers ═══
-function contractRowClassName({ row }: { row: K8ContractCheckRow }): string {
-  return row.compliance === '不合规' ? 'non-compliance-row' : ''
+function rowClassName({ row }: { row: K8AmortRow }): string {
+  return Math.abs(row.diff) > 1 ? 'diff-row' : ''
 }
 
 function fmtAmt(v: number | null | undefined): string {
-  if (v == null || v === 0) return '-'
+  if (v == null || Math.abs(v) < 0.005) return '-'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function handleAiAssist(): void {
-  ElMessage.info('AI辅助合同检查评估...')
 }
 
 // ═══ 抽凭引擎 ═══
 const showSamplingDialog = ref(false)
-const currentYear = computed(() => new Date().getFullYear())
-
 function handleVoucherFilled(payload: any): void {
   const vouchers = payload?.samples ?? []
   for (const v of vouchers) {
-    addContractRow(v.summary || v.voucherNo || '抽凭样本')
+    addRow(v.summary || v.voucherNo || '抽凭样本')
   }
   showSamplingDialog.value = false
   if (vouchers.length) ElMessage.success(`已填入${vouchers.length}笔凭证样本`)
 }
 
-// ═══ 行级OCR (📎附件列 → POST /d4/contract-ocr → 确认 → merge) ═══
+// ═══ 行级OCR ═══
 const ocrFileInput = ref<HTMLInputElement | null>(null)
 let currentOcrRowKey = ''
 
@@ -269,37 +402,27 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
-  input.value = '' // reset
-
+  input.value = ''
   try {
     const formData = new FormData()
     formData.append('file', file)
-
     ElMessage.info('正在OCR识别...')
     const res = await http.post('/api/d4/contract-ocr', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     const ocrText = res.data?.data?.text || res.data?.text || ''
-
-    if (!ocrText) {
-      ElMessage.warning('OCR未识别到文字内容')
-      return
-    }
-
-    // ElMessageBox 确认弹窗
+    if (!ocrText) { ElMessage.warning('OCR未识别到文字内容'); return }
     await ElMessageBox.confirm(
       `OCR识别结果：\n\n${ocrText.slice(0, 500)}${ocrText.length > 500 ? '...' : ''}`,
       'OCR识别确认',
-      { confirmButtonText: '填入证据', cancelButtonText: '取消', type: 'info' },
+      { confirmButtonText: '填入合同内容', cancelButtonText: '取消', type: 'info' },
     )
-
-    // merge到evidence字段
-    const row = contractRows.value.find((r: K8ContractCheckRow) => r.rowKey === currentOcrRowKey)
+    const row = rows.value.find((r: K8AmortRow) => r.rowKey === currentOcrRowKey)
     if (row) {
-      const merged = row.evidence ? `${row.evidence}\n[OCR] ${ocrText}` : `[OCR] ${ocrText}`
-      updateContractCell(currentOcrRowKey, 'evidence', merged)
-      updateContractCell(currentOcrRowKey, 'ocrAttachment' as any, file.name)
-      ElMessage.success('OCR内容已填入审计证据')
+      const merged = row.contractContent ? `${row.contractContent}\n[OCR] ${ocrText}` : `[OCR] ${ocrText}`
+      updateCell(currentOcrRowKey, 'contractContent', merged)
+      updateCell(currentOcrRowKey, 'ocrAttachment', file.name)
+      ElMessage.success('OCR内容已填入合同内容')
     }
   } catch (err: any) {
     if (err !== 'cancel' && err?.message !== 'cancel') {
@@ -315,13 +438,19 @@ async function handleOcrFileSelected(event: Event): Promise<void> {
 .section-header h3 { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 .header-actions { display: flex; gap: 8px; align-items: center; }
 .methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 12px; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6; }
-.non-compliance-list { margin: 4px 0 0; padding-left: 16px; font-size: 12px; }
-.non-comply { color: #f56c6c; font-weight: 600; }
+.amort-period-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 8px 12px; background: #f5f7fa; border-radius: 6px; }
+.ap-label { font-size: var(--wp-font-size, 13px); color: #606266; }
+.ap-sep { color: #909399; }
+.diff-tag { font-size: 12px; color: #f56c6c; }
+.formula-cell { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #303133; }
+.formula-underline { border-bottom: 1px dashed #909399; cursor: help; }
+.abnormal-highlight { color: #f56c6c !important; font-weight: 600; }
 .ocr-indicator { color: #67c23a; font-size: 11px; margin-left: 2px; }
 .table-actions { display: flex; gap: 8px; margin-top: 12px; }
+.table-total { padding: 6px 12px; text-align: right; font-size: 12px; color: var(--el-text-color-regular); font-weight: 600; }
 .conclusion-card { margin-top: 16px; }
-:deep(.non-compliance-row) { background-color: #fef2f2 !important; }
-:deep(.non-compliance-row:hover > td) { background-color: #fee2e2 !important; }
+:deep(.diff-row) { background-color: #fef2f2 !important; }
+:deep(.diff-row:hover > td) { background-color: #fee2e2 !important; }
 :deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 .compile-hint { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; }
 .compile-hint summary { cursor: pointer; font-weight: 500; color: #303133; }

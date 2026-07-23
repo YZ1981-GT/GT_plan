@@ -19,6 +19,7 @@
  * Requirements: 6.1-6.10
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ElMessage } from 'element-plus'
 import {
   parseNum,
   calcRemainingDays,
@@ -363,6 +364,128 @@ export function useD5FairValue(options: UseD5FairValueOptions) {
     },
   )
 
+  // ─── rateReasonabilityWarnings（贴现利率合理性预警）──────────────────
+
+  /** 贴现利率合理性预警：差异超过200bp(2%)的行标记warning */
+  const rateReasonabilityWarnings: ComputedRef<Array<{ rowId: string; itemName: string; rate: number; deviation: number }>> = computed(() => {
+    const warnings: Array<{ rowId: string; itemName: string; rate: number; deviation: number }> = []
+    if (rows.value.length === 0) return warnings
+
+    // 计算当前所有行的加权平均利率作为基准
+    let totalFace = 0
+    let weightedRate = 0
+    for (const row of rows.value) {
+      if (row.faceValue > 0 && row.discountRate > 0) {
+        totalFace += row.faceValue
+        weightedRate += row.faceValue * row.discountRate
+      }
+    }
+    const avgRate = totalFace > 0 ? weightedRate / totalFace : 0
+    if (avgRate === 0) return warnings
+
+    // 差异超过200bp(0.02即2个百分点)
+    const threshold = 0.02
+    for (const row of rows.value) {
+      if (row.discountRate > 0) {
+        const deviation = Math.abs(row.discountRate - avgRate)
+        if (deviation > threshold) {
+          warnings.push({
+            rowId: row.rowId,
+            itemName: row.itemName || row.billNo || '未命名',
+            rate: row.discountRate,
+            deviation,
+          })
+        }
+      }
+    }
+    return warnings
+  })
+
+  // ─── maturityWarnings（到期日预警）────────────────────────────────────
+
+  /** 到期日预警统计：已逾期(remainingDays≤0)和即将到期(1-30天) */
+  const maturityWarnings: ComputedRef<{
+    overdue: Array<{ rowId: string; itemName: string; days: number; faceValue: number }>
+    nearMaturity: Array<{ rowId: string; itemName: string; days: number; faceValue: number }>
+    overdueTotal: number
+    nearMaturityTotal: number
+  }> = computed(() => {
+    const overdue: Array<{ rowId: string; itemName: string; days: number; faceValue: number }> = []
+    const nearMaturity: Array<{ rowId: string; itemName: string; days: number; faceValue: number }> = []
+
+    for (const row of rows.value) {
+      if (!row.maturityDate) continue
+      const days = row.remainingDays
+      const info = { rowId: row.rowId, itemName: row.itemName || row.billNo || '未命名', days, faceValue: row.faceValue }
+
+      if (days <= 0 && row.maturityDate) {
+        overdue.push(info)
+      } else if (days > 0 && days <= 30) {
+        nearMaturity.push(info)
+      }
+    }
+
+    return {
+      overdue,
+      nearMaturity,
+      overdueTotal: calcSubtotal(overdue.map(r => r.faceValue)),
+      nearMaturityTotal: calcSubtotal(nearMaturity.map(r => r.faceValue)),
+    }
+  })
+
+  // ─── importFromDetail（从D5-2带入候选行）──────────────────────────────
+
+  /**
+   * 从D5-2明细表带入类别=应收票据的行作为公允价值测算候选
+   * 去重: billNo 或 itemName 已存在则跳过
+   */
+  function importFromDetail(): void {
+    if (isReadonly.value) return
+
+    const d52Resp = allResponses.value.get('D5-2-rows')
+    if (!d52Resp?.remark) {
+      ElMessage.info('D5-2明细表暂无数据')
+      return
+    }
+
+    let d52Rows: any[] = []
+    try {
+      d52Rows = JSON.parse(d52Resp.remark)
+      if (!Array.isArray(d52Rows)) d52Rows = []
+    } catch {
+      ElMessage.error('D5-2数据解析失败')
+      return
+    }
+
+    // 筛选应收票据类
+    const candidates = d52Rows.filter((r: any) => r.category === '应收票据' && parseNum(r.endAudited) > 0)
+    if (candidates.length === 0) {
+      ElMessage.info('D5-2中无应收票据类明细（或期末审定为0）')
+      return
+    }
+
+    // 去重(已存在的itemName不重复添加)
+    const existingNames = new Set(rows.value.map(r => r.itemName).filter(Boolean))
+    const newCandidates = candidates.filter((c: any) => !existingNames.has(c.itemName || ''))
+
+    if (newCandidates.length === 0) {
+      ElMessage.info('D5-2所有应收票据已在公允价值测算表中')
+      return
+    }
+
+    const imported = newCandidates.map((c: any) => {
+      const row = createEmptyFairValueRow(periodEnd.value, defaultDiscountRate.value)
+      row.category = '应收票据'
+      row.itemName = c.itemName || ''
+      row.faceValue = parseNum(c.endAudited) // 票面金额=期末审定数
+      return recalcFairValueRow(row)
+    })
+
+    rows.value = [...rows.value, ...imported]
+    persistRows()
+    ElMessage.success(`从D5-2带入${imported.length}笔应收票据候选`)
+  }
+
   // ─── Return ──────────────────────────────────────────────────────────
 
   return {
@@ -374,6 +497,9 @@ export function useD5FairValue(options: UseD5FairValueOptions) {
     updateCell,
     setDefaultRate,
     auditNotes,
+    rateReasonabilityWarnings,
+    maturityWarnings,
+    importFromDetail,
   }
 }
 

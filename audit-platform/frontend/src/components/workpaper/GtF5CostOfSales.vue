@@ -2,6 +2,17 @@
   <div class="f5-cost-of-sales">
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
+      <!-- 全局勾稽告警 -->
+      <template v-for="alert in visibleAlerts" :key="alert.message">
+        <el-alert
+          :title="alert.message"
+          :type="alert.type"
+          show-icon
+          :closable="false"
+          style="margin-bottom: 6px; font-size: 12px;"
+        />
+      </template>
+
       <div class="f5-cost-of-sales-toolbar">
         <el-segmented
           v-if="isHtmlSheet"
@@ -110,6 +121,7 @@
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
         :project-id="props.projectId"
+        :year="auditYear"
         :is-readonly="isReadonly"
         @imported="onImported"
       />
@@ -141,6 +153,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useF5CosSalFormData } from './composables/useF5CosSalFormData'
 import { useF5CosOfDualMode } from './composables/useF5CosOfDualMode'
+import { useF5CrossSheet } from './composables/useF5CrossSheet'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import type { ChecklistResponse } from './composables/useF1FormData'
@@ -170,6 +183,25 @@ const projectIdRef = computed(() => props.projectId)
 const formData = useF5CosSalFormData({ wpId: wpIdRef, projectId: projectIdRef })
 const allResponsesRef = computed(() => formData.allResponses.value)
 const isReadonly = computed(() => !!props.readonly)
+
+/** 审计年度：优先 project_context.audit_year，回退 bs_date 年份，最后取当前年（供 F5-8 抽凭引擎按年度查询序时账） */
+const auditYear = computed<number>(() => {
+  const ctx = (formData.projectContext.value || {}) as Record<string, any>
+  const y = ctx.audit_year ?? ctx.auditYear
+  if (y) return Number(y)
+  const bs = ctx.bs_date ?? ctx.bsDate
+  if (typeof bs === 'string' && bs.length >= 4) return Number(bs.slice(0, 4))
+  return new Date().getFullYear()
+})
+
+// ─── 跨表勾稽引擎 ───────────────────────────────────────────────────────
+const crossSheet = useF5CrossSheet({
+  allResponses: formData.allResponses,
+  projectId: projectIdRef,
+  projectContext: formData.projectContext,
+  adjudicatedCOGS: computed(() => adjudicatedCOGS.value),
+})
+
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionToolbar = runtime?.version ?? {
@@ -185,6 +217,13 @@ provide('f5OpenVersionHistory', openVersionHistory)
 
 /** F5-7 校验区消费的审定营业成本（来自 F5-1 EventBus publish） */
 const adjudicatedCOGS = ref(0)
+
+/** 当前 sheet 对应的全局告警（排除当前 sheet 的专属告警） */
+const visibleAlerts = computed(() =>
+  crossSheet.globalAlerts.value.filter(
+    (a) => !a.excludeSheets?.includes(currentSheet.value),
+  ),
+)
 
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''
@@ -260,6 +299,8 @@ onMounted(async () => {
   window.addEventListener('f5:writeback-trial-balance', handleF5Writeback)
   await formData.loadAll()
   seedAdjudicatedFromStore()
+  // 异步拉取 D4 收入数据（供毛利率分析，不阻塞首屏）
+  void crossSheet.pullD4Revenue()
   isLoading.value = false
 })
 

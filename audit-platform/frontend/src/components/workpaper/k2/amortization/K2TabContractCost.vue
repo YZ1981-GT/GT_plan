@@ -54,6 +54,7 @@
           {{ crossValidation.isMatch ? '✓ K2-1一致' : `✗ K2-1差异 ${fmtAmt(crossValidation.diff)}` }}
         </el-tag>
         <el-button size="small" :disabled="isReadonly" @click="handleAddRow">＋ 新增</el-button>
+        <el-button size="small" :disabled="isReadonly" type="warning" plain @click="handleImportFromDetail">从K2-2带入</el-button>
         <el-dropdown trigger="click" size="small">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -199,23 +200,41 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="增量成本" width="80" align="center">
+        <el-table-column label="增量成本" width="90" align="center">
           <template #default="{ row }">
-            <el-icon :color="row.isIncremental ? '#67c23a' : '#909399'">
+            <el-switch
+              v-if="!isReadonly"
+              :model-value="row.isIncremental"
+              size="small"
+              @change="(v: boolean) => { updateCell(row.rowId, 'isIncremental', v); autoUpdateCapitalized(row.rowId) }"
+            />
+            <el-icon v-else :color="row.isIncremental ? '#67c23a' : '#909399'">
               <component :is="row.isIncremental ? 'CircleCheckFilled' : 'CircleCloseFilled'" />
             </el-icon>
           </template>
         </el-table-column>
-        <el-table-column label="可收回" width="80" align="center">
+        <el-table-column label="可收回" width="90" align="center">
           <template #default="{ row }">
-            <el-icon :color="row.isRecoverable ? '#67c23a' : '#909399'">
+            <el-switch
+              v-if="!isReadonly"
+              :model-value="row.isRecoverable"
+              size="small"
+              @change="(v: boolean) => { updateCell(row.rowId, 'isRecoverable', v); autoUpdateCapitalized(row.rowId) }"
+            />
+            <el-icon v-else :color="row.isRecoverable ? '#67c23a' : '#909399'">
               <component :is="row.isRecoverable ? 'CircleCheckFilled' : 'CircleCloseFilled'" />
             </el-icon>
           </template>
         </el-table-column>
-        <el-table-column label="直接相关" width="80" align="center">
+        <el-table-column label="直接相关" width="90" align="center">
           <template #default="{ row }">
-            <el-icon :color="row.isDirectlyRelated ? '#67c23a' : '#909399'">
+            <el-switch
+              v-if="!isReadonly"
+              :model-value="row.isDirectlyRelated"
+              size="small"
+              @change="(v: boolean) => { updateCell(row.rowId, 'isDirectlyRelated', v); autoUpdateCapitalized(row.rowId) }"
+            />
+            <el-icon v-else :color="row.isDirectlyRelated ? '#67c23a' : '#909399'">
               <component :is="row.isDirectlyRelated ? 'CircleCheckFilled' : 'CircleCloseFilled'" />
             </el-icon>
           </template>
@@ -287,6 +306,13 @@
           <template #default="{ row }">
             <el-tooltip content="期末=期初+增加-摊销" placement="top">
               <span class="formula-cell">{{ fmtAmt(row.endBalance) }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column label="成本率" width="90" align="center">
+          <template #default="{ row }">
+            <el-tooltip :content="`取得成本率 = 期末余额 / 合同金额 = ${costRatio(row)}`" placement="top">
+              <span :class="['formula-cell', { 'rate-warn': costRatioNum(row) > 50 }]">{{ costRatio(row) }}</span>
             </el-tooltip>
           </template>
         </el-table-column>
@@ -380,6 +406,9 @@
       <el-tag type="success" effect="plain">增加合计: {{ fmtAmt(subtotals.periodIncrease) }}</el-tag>
       <el-tag type="warning" effect="plain">摊销合计: {{ fmtAmt(subtotals.periodAmort) }}</el-tag>
       <el-tag type="primary" effect="dark">期末合计: {{ fmtAmt(subtotals.endBalance) }}</el-tag>
+      <el-button v-if="!isReadonly && capitalizedWithAmortRows.length > 0" size="small" type="success" plain style="margin-left:auto" @click="handlePushToK25">
+        推送至K2-5（{{ capitalizedWithAmortRows.length }}笔）
+      </el-button>
     </div>
 
     <!-- 隐藏的文件上传 -->
@@ -390,6 +419,74 @@
       style="display: none"
       @change="handleFileSelected"
     />
+
+    <!-- 费用化提示（有不满足资本化条件的行） -->
+    <el-alert v-if="nonCapitalizedRows.length > 0" type="warning" :closable="false" style="margin:12px 0">
+      <template #title>⚠️ {{ nonCapitalizedRows.length }} 个合同不满足CAS14资本化条件（建议费用化）</template>
+      <div style="font-size:12px;margin-top:4px">
+        {{ nonCapitalizedRows.map(r => r.contractNo || '(未命名)').join('、') }}
+        —— 不满足"增量+可收回+直接相关"三条件，应在发生时计入费用（销售费用/管理费用），不应列示为其他流动资产
+      </div>
+    </el-alert>
+
+    <!-- 编制提示 -->
+    <details class="compile-hint">
+      <summary>编制提示（CAS14 / CAS15）</summary>
+      <ul>
+        <li>CAS14§95：企业为取得合同发生的增量成本预期能够收回的，作为合同取得成本确认为一项资产</li>
+        <li>增量成本=企业不取得合同就不会发生的成本（典型：销售佣金、投标费）；差旅费通常不满足增量条件</li>
+        <li>资本化三条件全满足→确认资产（本表列示）；任一不满足→发生时费用化（不应在本表）</li>
+        <li>摊销方法选择：合同履约进度可靠计量→进度法；无法可靠计量→直线法（按合同期限均摊）</li>
+        <li>期末余额(公式)=期初+增加-摊销；合计应与K2-1审定表"合同取得成本"行一致</li>
+        <li>区段2"检查"核对摊销方法/期限是否与合同条款一致、计算是否准确（与K2-5测算对比）</li>
+        <li>合同金额远大于取得成本属正常（佣金率通常1%~5%）；取得成本率异常高应关注</li>
+      </ul>
+    </details>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" style="margin-bottom:12px">
+      <template #header>
+        <div class="section-title-row">
+          <span class="card-title">审计说明</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleAiNote">
+              🤖 AI生成
+            </el-button>
+          </div>
+        </div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 10 }"
+        :disabled="isReadonly"
+        placeholder="概述合同取得成本资本化判断过程、摊销方法选择依据、与K2-5测算核对情况..."
+        @blur="persistNote"
+      />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" style="margin-bottom:12px">
+      <template #header>
+        <div class="section-title-row">
+          <span class="card-title">审计结论</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleAiConclusion">
+              🤖 AI生成
+            </el-button>
+            <el-button size="small" type="default" link @click="handleReview">💬 复核</el-button>
+          </div>
+        </div>
+      </template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 2, maxRows: 6 }"
+        :disabled="isReadonly"
+        placeholder="基于上述分析，形成合同取得成本审计结论..."
+        @blur="persistConclusion"
+      />
+    </el-card>
   </div>
 </template>
 
@@ -407,8 +504,10 @@
  * Task: 4.4
  * Requirements: 4.1-4.6
  */
-import { ref, computed, toRef } from 'vue'
+import { ref, computed, toRef, inject, watch } from 'vue'
 import { CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import http from '@/utils/http'
 import {
   useK2ContractCost,
   type K2ContractCostRow,
@@ -480,6 +579,16 @@ function handleRowSelect(row: K2ContractCostRow | null): void {
 
 // ─── CAS14 Condition Toggle ──────────────────────────────────────────────────
 
+/** 行内直接toggle后自动更新isCapitalized（三条件均满足=资本化） */
+function autoUpdateCapitalized(rowId: string): void {
+  const row = rows.value.find(r => r.rowId === rowId)
+  if (!row) return
+  const allMet = row.isIncremental && row.isRecoverable && row.isDirectlyRelated
+  if (row.isCapitalized !== allMet) {
+    updateCell(rowId, 'isCapitalized', allMet)
+  }
+}
+
 function handleConditionChange(field: 'isIncremental' | 'isRecoverable' | 'isDirectlyRelated', value: boolean): void {
   if (!selectedRow.value) return
   updateCell(selectedRow.value.rowId, field, value)
@@ -504,8 +613,67 @@ const costTypeOptions = ['佣金', '手续费', '差旅费', '投标费', '其�
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
 
-function handleAddRow(): void {
-  addRow()
+async function handleAddRow(): Promise<void> {
+  // composable的addRow内含ElMessageBox.prompt弹窗，直接调用即可
+  await addRow()
+}
+
+/** 从K2-2明细表带入"合同取得成本"性质行（无弹窗批量） */
+function handleImportFromDetail(): void {
+  const detailRows = props.allResponses.get('K2-2-detail-rows')
+  if (!detailRows?.remark) {
+    ElMessage.warning('K2-2明细表暂无数据，请先编制明细表')
+    return
+  }
+  try {
+    const parsed = JSON.parse(detailRows.remark)
+    const contractRows = (Array.isArray(parsed) ? parsed : [])
+      .filter((r: any) => r.nature === '合同取得成本' && r.name)
+    if (contractRows.length === 0) {
+      ElMessage.info('K2-2中未找到"合同取得成本"性质的项目')
+      return
+    }
+    let importedCount = 0
+    for (const item of contractRows) {
+      const existing = rows.value.find((r) => r.contractNo === item.name || r.customer === item.name)
+      if (!existing) {
+        // 直接push行数据，不走addRow弹窗
+        const newRow: K2ContractCostRow = {
+          rowId: `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${importedCount}`,
+          contractNo: item.name,
+          customer: '',
+          contractAmount: 0,
+          costType: '',
+          isCapitalized: false,
+          isIncremental: false,
+          isRecoverable: false,
+          isDirectlyRelated: false,
+          beginBalance: Number(item.beginBalance ?? 0),
+          periodIncrease: Number(item.increase ?? 0),
+          periodAmort: Number(item.decrease ?? 0),
+          endBalance: 0,
+          amortMethod: '直线法',
+          amortPeriod: 0,
+          voucherRef: '',
+          conclusion: '',
+          remark: '从K2-2带入',
+        }
+        // 计算期末
+        newRow.endBalance = newRow.beginBalance + newRow.periodIncrease - newRow.periodAmort
+        rows.value.push(newRow)
+        importedCount++
+      }
+    }
+    if (importedCount > 0) {
+      recalcAll()
+      emit('save', 'K2-4-rows', { remark: JSON.stringify(rows.value) })
+      ElMessage.success(`已从K2-2带入 ${importedCount} 个合同取得成本项目`)
+    } else {
+      ElMessage.info('所有项目已存在，无需带入')
+    }
+  } catch {
+    ElMessage.warning('解析K2-2数据失败')
+  }
 }
 
 function handleRemoveRow(rowId: string): void {
@@ -548,6 +716,17 @@ function fmtAmt(val: number | null | undefined): string {
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+function costRatio(row: K2ContractCostRow): string {
+  if (!row.contractAmount || row.contractAmount === 0) return '-'
+  const ratio = (row.endBalance / row.contractAmount) * 100
+  return `${ratio.toFixed(1)}%`
+}
+
+function costRatioNum(row: K2ContractCostRow): number {
+  if (!row.contractAmount || row.contractAmount === 0) return 0
+  return (row.endBalance / row.contractAmount) * 100
+}
+
 function conclusionType(conclusion: string): 'success' | 'danger' | 'warning' | 'info' {
   switch (conclusion) {
     case '正常': return 'success'
@@ -555,6 +734,99 @@ function conclusionType(conclusion: string): 'success' | 'danger' | 'warning' | 
     case '待确认': return 'warning'
     default: return 'info'
   }
+}
+
+// ─── 审计说明 / 结论 / AI / 复核 / 费用化提示 ────────────────────────────────
+
+const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+// 不满足资本化条件的行（CAS14三条件至少一个为false且beginBalance>0或periodIncrease>0）
+const nonCapitalizedRows = computed(() =>
+  rows.value.filter(r => !r.isCapitalized && (r.beginBalance > 0 || r.periodIncrease > 0)),
+)
+
+// 加载审计说明/结论
+watch(allResponsesRef, () => {
+  const noteItem = props.allResponses.get('K2-4-audit-note')
+  auditNote.value = noteItem?.remark ?? ''
+  const conclItem = props.allResponses.get('K2-4-audit-conclusion')
+  auditConclusion.value = conclItem?.remark ?? ''
+}, { immediate: true })
+
+function persistNote(): void {
+  emit('save', 'K2-4-audit-note', { remark: auditNote.value })
+}
+function persistConclusion(): void {
+  emit('save', 'K2-4-audit-conclusion', { remark: auditConclusion.value })
+}
+
+async function handleAiNote(): Promise<void> {
+  try {
+    const context: Record<string, string> = {
+      accountCode: '1231',
+      sheet: 'K2-4',
+      contractCount: String(rows.value.length),
+      capitalizedCount: String(rows.value.filter(r => r.isCapitalized).length),
+      nonCapitalizedCount: String(nonCapitalizedRows.value.length),
+      endBalanceTotal: String(subtotals.value.endBalance),
+      crossValidation: crossValidation.value ? (crossValidation.value.isMatch ? '与K2-1一致' : `与K2-1差异${crossValidation.value.diff}`) : '未计算',
+    }
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      prompt: '请生成合同取得成本(CAS14)明细表审计说明，概述资本化判断过程、摊销方法选择依据、与K2-5测算核对情况',
+      context,
+      existingContent: auditNote.value,
+      section: 'K2-4-contract-cost-note',
+    })
+    const generated = res?.data?.data?.content || res?.data?.content || ''
+    if (generated) { auditNote.value = generated; persistNote(); ElMessage.success('AI内容已填入') }
+    else ElMessage.warning('AI未生成内容')
+  } catch { ElMessage.warning('AI生成失败') }
+}
+
+async function handleAiConclusion(): Promise<void> {
+  try {
+    const context: Record<string, string> = {
+      accountCode: '1231',
+      sheet: 'K2-4',
+      capitalizedCount: String(rows.value.filter(r => r.isCapitalized).length),
+      nonCapitalizedCount: String(nonCapitalizedRows.value.length),
+      endBalanceTotal: String(subtotals.value.endBalance),
+    }
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      prompt: '请生成合同取得成本明细表审计结论',
+      context,
+      existingContent: auditConclusion.value,
+      section: 'K2-4-contract-cost-conclusion',
+    })
+    const generated = res?.data?.data?.content || res?.data?.content || ''
+    if (generated) { auditConclusion.value = generated; persistConclusion(); ElMessage.success('AI内容已填入') }
+    else ElMessage.warning('AI未生成内容')
+  } catch { ElMessage.warning('AI生成失败') }
+}
+
+function handleReview(): void { openReviewDialog('K2-4-conclusion') }
+
+/** 已资本化且有摊销参数的行（可推送K2-5） */
+const capitalizedWithAmortRows = computed(() =>
+  rows.value.filter(r => r.isCapitalized && r.amortMethod && r.amortPeriod > 0),
+)
+
+/** 推送已资本化合同至K2-5（持久化到allResponses供K2-5"从K2-4带入"读取） */
+function handlePushToK25(): void {
+  const data = capitalizedWithAmortRows.value.map(r => ({
+    contractNo: r.contractNo,
+    beginBalance: r.beginBalance,
+    periodIncrease: r.periodIncrease,
+    amortMethod: r.amortMethod,
+    amortPeriod: r.amortPeriod,
+    isCapitalized: true,
+  }))
+  // 持久化到K2-4-contract-cost-rows供K2-5的handleImportFromK24读取
+  emit('save', 'K2-4-contract-cost-rows', { remark: JSON.stringify(data) })
+  ElMessage.success(`已推送 ${data.length} 笔已资本化合同数据，切换到K2-5可一键带入`)
 }
 </script>
 
@@ -683,5 +955,38 @@ function conclusionType(conclusion: string): 'success' | 'danger' | 'warning' | 
   gap: 10px;
   padding: 10px 0;
   border-top: 1px solid #ebeef5;
+  align-items: center;
+}
+
+/* ═══ 编制提示 ═══ */
+.compile-hint {
+  margin: 12px 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.compile-hint summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+.compile-hint ul {
+  padding-left: 18px;
+  margin-top: 8px;
+  line-height: 1.8;
+}
+
+/* ═══ section-title-row ═══ */
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card-title {
+  font-weight: 600;
+}
+
+/* ═══ 成本率异常高亮 ═══ */
+.rate-warn {
+  color: #f56c6c;
+  font-weight: 600;
 }
 </style>

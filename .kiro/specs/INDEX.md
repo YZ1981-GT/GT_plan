@@ -2,8 +2,8 @@
 
 **最后更新**：2026-07-19
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active 0 / Archived 409 = 总计 409
-**最高迁移**：**V119**（以 `migration_status` 实测为准）
+**统计**：Active 1 / Archived 409 = 总计 410
+**最高迁移**：**V122**（以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---
@@ -24,11 +24,15 @@
 
 ---
 
-## 一、Active Specs（0个）
+## 一、Active Specs
+
+> 注：本表随会话增量登记，统计数可能滞后；以 `.kiro/specs/` 目录实际为准。
 
 | Spec | 说明 | 状态 |
 |------|------|------|
-| (无) | | |
+| `acnr-invalidation-overlay-hardening` | ACNR SSE 实时失效三重断链 + Overlay 持久化并发治理（唯一约束/原子upsert/治理字段持久化/revision-CAS/cache-after-commit/受控入口）+ durable epoch/outbox 跨worker失效抗Redis故障 | **全部完成 8/8 波**（V122 已应用/drift=0；后端 424+9 测试、前端 41 vitest、Playwright 全栈 round-trip 实测通过）；待 commit 后归档 |
+| `voucher-sampling-hardening` | 抽凭引擎第二/三批：DB级全量抽样框（消除总体前1万条选择偏差）+总体完整性独立数据源+抽样单位显式化+回填日志原子化+批次状态机(batch_id/幂等/乐观锁/撤销唯一/CHECK/FK迁移)+后端方法学单一真源+voucher-extract·sampling-execute收敛+服务端授权校验+真实操作者+核心算法权威向量PBT+LIKE元字符转义 | 三件套完成（requirements-first），tasks 全 `[ ]` 未执行；14需求(2可选)+22正确性属性+8波依赖图；新迁移取号前查 migration_status；边界：不碰截止路径(归 cutoff-test-architecture-convergence) |
+| `frontend-sse-connection-consolidation` | 前端 `/events/stream` 连接去重：单例 Project_Event_Stream_Bus（每项目一条共享 SSE，按事件名 fan-out）；ThreeColumnLayout/useAcnr/ConsolidationIndex/LineagePanel 从各自建连接迁为订阅总线；鉴权统一 Authorization header（附带修复 LineagePanel 预存在 401）；纯前端不改后端 | **全部完成 8/8 波**（Playwright 实测连接 2→1；前端 78 测试绿+守卫 2；纯前端无迁移）；待 commit 后归档 |
 
 ---
 

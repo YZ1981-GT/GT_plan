@@ -114,6 +114,19 @@ function subtotalRow(rows: F2AdjudicationRow[], label: string): F2AdjudicationRo
   }
 }
 
+/**
+ * 存货净额 = 余额合计(审定) − 跌价准备(1471 审定)
+ * 纯函数，便于单测 (Property P6)
+ */
+export function calcNetInventory(totalBalance: number, impairmentProvision: number): number {
+  return totalBalance - impairmentProvision
+}
+
+export interface TbValuesEntry {
+  opening?: number
+  closing?: number
+}
+
 export interface UseF2AdjudicationOptions {
   wpId: Ref<string>
   projectId: Ref<string>
@@ -121,13 +134,96 @@ export interface UseF2AdjudicationOptions {
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   isReadonly: Ref<boolean>
   crossSheet?: ReturnType<typeof import('./useF2CrossSheet').useF2CrossSheet>
+  /** 后端 render 输出的 tb_values（各 rowKey 期初/期末未审） */
+  tbValues?: Ref<Record<string, TbValuesEntry> | null | undefined>
 }
 
 export function useF2Adjudication(opts: UseF2AdjudicationOptions) {
   let metaDebounceTimer: ReturnType<typeof setTimeout> | null = null
+  let seeded = false
 
   const auditNote = ref('')
   const conclusion = ref('')
+
+  // ─── 预填 seed 逻辑（Req 1 — 消费后端 tb_values） ─────────────────────
+  // 若 allResponses 中无 F2-adjudication-data 且 tbValues 存在 → seed 各行 beginUnadj/endUnadj
+  function seedFromTbValues(): void {
+    if (seeded) return
+    const map = opts.allResponses.value
+    // 检查是否已有持久化数据 → 不覆盖（Req 1.3 幂等）
+    if (map.has('F2-adjudication-data')) return
+    // 检查是否有任何 F2-1 区块数据已写入（用户曾编辑过）
+    for (const [key] of map) {
+      if (key.startsWith('F2-1-gross-') || key.startsWith('F2-1-impairment-')) return
+    }
+    const tbVals = opts.tbValues?.value
+    if (!tbVals || Object.keys(tbVals).length === 0) return
+    seeded = true
+    // 将 tb_values 各 rowKey 的 opening/closing 填入对应行的 beginUnadj(opening)/endUnadj 相关字段
+    for (const cat of F2_CATEGORIES) {
+      const entry = tbVals[cat.rowKey]
+      if (!entry) continue
+      const opening = entry.opening ?? 0
+      const closing = entry.closing ?? 0
+      if (opening !== 0) {
+        const id = itemId('gross', cat.rowKey, 'opening')
+        if (!map.has(id)) {
+          map.set(id, { item_id: id, conclusion: String(opening), remark: null })
+        }
+      }
+      // closing 填入的是"期末未审"= opening + increase - decrease
+      // 后端已算好期末，直接做差：increase = closing - opening（粗略 seed，仅预填参考）
+      // 但更正确的 seed：不拆 increase/decrease，只填 opening 和通过 endUnadjusted 推算
+      // 实际审计场景：opening 直接填 opening 字段；若无 crossSheet 带入 increase/decrease 则
+      // 用户需手工补填。但为了让"期末未审"列有初始值，这里 seed increase = closing - opening
+      if (closing !== opening) {
+        const incId = itemId('gross', cat.rowKey, 'increase')
+        if (!map.has(incId)) {
+          const inc = closing - opening
+          if (inc > 0) {
+            map.set(incId, { item_id: incId, conclusion: String(inc), remark: null })
+          } else if (inc < 0) {
+            const decId = itemId('gross', cat.rowKey, 'decrease')
+            if (!map.has(decId)) {
+              map.set(decId, { item_id: decId, conclusion: String(Math.abs(inc)), remark: null })
+            }
+          }
+        }
+      }
+    }
+    // 跌价准备(1471) seed — rowKey = 'impairment-provision'
+    const impEntry = tbVals['impairment-provision']
+    if (impEntry) {
+      const impOpening = impEntry.opening ?? 0
+      const impClosing = impEntry.closing ?? 0
+      if (impOpening !== 0) {
+        const id = itemId('impairment', 'impairment-provision', 'opening')
+        if (!map.has(id)) {
+          map.set(id, { item_id: id, conclusion: String(impOpening), remark: null })
+        }
+      }
+      if (impClosing !== impOpening) {
+        const inc = impClosing - impOpening
+        if (inc > 0) {
+          const incId = itemId('impairment', 'impairment-provision', 'increase')
+          if (!map.has(incId)) {
+            map.set(incId, { item_id: incId, conclusion: String(inc), remark: null })
+          }
+        } else if (inc < 0) {
+          const decId = itemId('impairment', 'impairment-provision', 'decrease')
+          if (!map.has(decId)) {
+            map.set(decId, { item_id: decId, conclusion: String(Math.abs(inc)), remark: null })
+          }
+        }
+      }
+    }
+  }
+  // 立即尝试 seed（加载后第一次调用）
+  seedFromTbValues()
+  // watch tbValues 变化再尝试（lazy load 场景）
+  if (opts.tbValues) {
+    watch(opts.tbValues, () => seedFromTbValues(), { immediate: true })
+  }
 
   const grossRows = computed(() => buildBlockRows('gross', opts.allResponses.value, opts.crossSheet))
   const impairmentRows = computed(() => buildBlockRows('impairment', opts.allResponses.value))
@@ -154,6 +250,20 @@ export function useF2Adjudication(opts: UseF2AdjudicationOptions) {
   )
 
   const netSubtotal = computed(() => subtotalRow(netRows.value, '净值合计'))
+
+  // ─── 存货净额行（Req 5 — 净额 = 余额合计 − 跌价准备1471）─────────────
+  const inventoryNetRow = computed(() => {
+    const totalBalance = grossSubtotal.value.endAudited
+    const impairmentProvision = impairmentRows.value.find(
+      (r) => r.rowKey === 'impairment-provision',
+    )?.endAudited ?? impairmentSubtotal.value.endAudited
+    return {
+      label: '存货净额',
+      totalBalance,
+      impairmentProvision,
+      netAmount: calcNetInventory(totalBalance, impairmentProvision),
+    }
+  })
 
   const trialBalanceAmount = computed(() =>
     parseNum(opts.allResponses.value.get('F2-1-tb-total')?.remark),
@@ -301,6 +411,7 @@ export function useF2Adjudication(opts: UseF2AdjudicationOptions) {
     grossSubtotal,
     impairmentSubtotal,
     netSubtotal,
+    inventoryNetRow,
     trialBalanceAmount,
     trialBalanceDiff,
     detailCrossValidation,

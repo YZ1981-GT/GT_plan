@@ -168,6 +168,17 @@ async function runAi(section: F3AiSection): Promise<void> {
 function resetColumns(): void {
   visibleColumnProps.value = allColumns.map((col) => String(col.prop))
 }
+
+// P1-6 保证金联动 / P1-7 函证提示
+const depositTotal = computed(() => subtotalRow.value.depositAmount)
+const confirmSummary = computed(() => {
+  const filled = filteredRows.value.filter((r) => r.ticketNo || r.faceValue)
+  const confirmed = filled.filter((r) => r.isConfirmed === '是').length
+  const bankUnconfirmed = filled.filter(
+    (r) => (r.noteType || '').includes('银行') && r.isConfirmed !== '是',
+  ).length
+  return { total: filled.length, confirmed, bankUnconfirmed }
+})
 </script>
 
 <template>
@@ -191,6 +202,15 @@ function resetColumns(): void {
       title="审计目标：应付票据明细真实存在、记录完整，票据种类与到期状态分类准确，为审定表与逾期检查提供明细支撑。"
       class="objective-alert"
     />
+
+    <!-- P1-6 保证金受限联动提示 -->
+    <el-alert v-if="depositTotal > 0" type="warning" :closable="false" class="link-alert">
+      票据保证金合计 {{ fmtAmount(depositTotal) }} 元属受限货币资金，应重分类至"其他货币资金"，并在货币资金(E1)受限资产及附注中披露。
+    </el-alert>
+    <!-- P1-7 银行承兑函证提示 -->
+    <el-alert v-if="confirmSummary.bankUnconfirmed > 0" type="info" :closable="false" class="link-alert">
+      {{ confirmSummary.bankUnconfirmed }} 张银行承兑汇票尚未函证，建议纳入银行询证函(E 货币资金/银行函证)核对承兑额度与保证金。（已函证 {{ confirmSummary.confirmed }}/{{ confirmSummary.total }}）
+    </el-alert>
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
@@ -401,6 +421,9 @@ function resetColumns(): void {
 }
 .objective-alert {
   margin-bottom: 12px;
+}
+.link-alert {
+  margin-bottom: 8px;
 }
 .tab-toolbar {
   display: flex;

@@ -15,9 +15,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
-from app.deps import get_current_user
+from app.core.database import get_db
+from app.deps import get_current_user, get_current_user_sse
 from app.models.core import User
+from app.services.acnr.auth import check_project_access
 from app.services.event_bus import event_bus
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +34,18 @@ router = APIRouter(
 async def sse_stream(
     project_id: UUID,
     year: int = Query(default=None),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_sse),
+    db: AsyncSession = Depends(get_db),
 ):
     """SSE 事件流：客户端订阅后接收试算表更新等事件通知
 
-    前端使用 EventSource 连接此端点，收到事件后刷新试算表数据。
+    前端使用 EventSource 连接此端点（`?token=` 传鉴权），收到事件后刷新数据。
     已接入 sse_registry 实现 graceful drain（滚动更新零断流）。
+
+    R3：流式推送前校验项目访问权（越权返回 403，不建流）。
     """
+    # R3.1/R3.2: 项目授权（admin/partner 放行；无权 403 脱敏）
+    await check_project_access(current_user, project_id, db)
 
     async def event_generator():
         queue = event_bus.create_sse_queue()
@@ -135,6 +143,7 @@ async def get_events_since(
     last_event_id: str | None = Query(default=None),
     since_timestamp: float | None = Query(default=None),
     current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ) -> list[dict]:
     """增量事件拉取 — 供前端 SSE 重连后拉取遗漏事件。
 
@@ -144,8 +153,11 @@ async def get_events_since(
 
     返回断连期间的事件列表（最多 100 条），按时间 ASC 排序。
 
-    Validates: Requirements 1.7, 11.3
+    Validates: Requirements 1.7, 11.3；R3（项目授权）
     """
+    # R3: 项目授权（与 /stream 一致，越权 403 脱敏）
+    await check_project_access(current_user, project_id, db)
+
     from app.core.redis import redis_client
 
     events: list[dict] = []

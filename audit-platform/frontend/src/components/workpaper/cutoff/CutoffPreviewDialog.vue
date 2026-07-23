@@ -20,6 +20,13 @@
  */
 import { computed } from 'vue'
 import type { ExtractedVoucher, ExtractStats, FillMode } from '../composables/useCutoffAutoSampling'
+import { mapLegacyConclusion } from '../composables/cutoffCanonical'
+
+/** 预览"跨期判定"显示归一到统一 6 态词汇（可能跨期→跨期 / 待检查→待追查 / 正常）。
+ *  仅统一显示文案，行高亮等逻辑仍基于原始 cutoffStatus，行为不变。 */
+function displayCutoffStatus(status: string): string {
+  return mapLegacyConclusion(status)
+}
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -235,7 +242,7 @@ function handleFillModeChange(val: FillMode) {
       <el-table-column label="跨期判定" width="90" align="center">
         <template #default="{ row }">
           <span :class="{ 'cutoff-error-text': row.cutoffStatus === '可能跨期' }">
-            {{ row.cutoffStatus }}
+            {{ displayCutoffStatus(row.cutoffStatus) }}
           </span>
         </template>
       </el-table-column>

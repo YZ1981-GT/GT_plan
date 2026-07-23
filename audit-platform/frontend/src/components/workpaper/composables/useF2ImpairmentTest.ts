@@ -119,11 +119,14 @@ export function useF2ImpairmentTest(options: {
 
   function publishImpairmentCalculated(): void {
     const total = columnTotals.value.requiredProvision
+    if (total === 0) return // 金额 0 不发（Task 9: P7）
     try {
       window.dispatchEvent(new CustomEvent('impairment:calculated', {
         detail: {
           wpCode: 'F2',
           sheetCode: 'F2-47',
+          accountCode: '1471',
+          amount: total,
           totalRequiredProvision: total,
           rows: enrichedProducts.value.map((r) => ({
             itemName: r.itemName,
@@ -132,6 +135,51 @@ export function useF2ImpairmentTest(options: {
         },
       }))
     } catch { /* silent */ }
+  }
+
+  /**
+   * Task 13: 从 D4/收入序时账 pull 近期售价参考（调 f2NrvPricePull）。
+   * 不覆盖用户已手录的售价列。
+   * @param projectId 项目 ID
+   * @param year 审计年度
+   */
+  async function pullRecentPrice(projectId: string, year: number): Promise<{ filled: number; skipped: number }> {
+    if (readonly.value) return { filled: 0, skipped: 0 }
+    if (!projectId || !year) return { filled: 0, skipped: 0 }
+    let pullRecentSalesPrice: typeof import('./f2NrvPricePull').pullRecentSalesPrice
+    try {
+      const mod = await import('./f2NrvPricePull')
+      pullRecentSalesPrice = mod.pullRecentSalesPrice
+    } catch {
+      return { filled: 0, skipped: 0 }
+    }
+    const result = await pullRecentSalesPrice(projectId, year)
+    if (result.status !== 'ok' || !result.prices.length) return { filled: 0, skipped: 0 }
+    // 按名称建 lookup（规范化）
+    const normalize = (s: string) => String(s ?? '').replace(/[\s\u3000]+/g, '').toLowerCase()
+    const priceMap = new Map<string, number>()
+    for (const p of result.prices) {
+      const key = normalize(p.name)
+      if (key && p.unitPrice > 0) priceMap.set(key, p.unitPrice)
+    }
+    let filled = 0
+    let skipped = 0
+    const updated = sheet.value.products.map((p) => {
+      const key = normalize(p.itemName)
+      if (!key) return p
+      const refPrice = priceMap.get(key)
+      if (!refPrice) return p
+      // 不覆盖手录
+      if (p.pricePreContract && Number(p.pricePreContract) > 0) {
+        skipped++
+        return p
+      }
+      filled++
+      return { ...p, pricePreContract: refPrice }
+    })
+    sheet.value = { ...sheet.value, products: updated }
+    persist()
+    return { filled, skipped }
   }
 
   function persist(): void {
@@ -263,6 +311,7 @@ export function useF2ImpairmentTest(options: {
     removeProduct,
     removeRow,
     publishImpairmentCalculated,
+    pullRecentPrice,
   }
 }
 

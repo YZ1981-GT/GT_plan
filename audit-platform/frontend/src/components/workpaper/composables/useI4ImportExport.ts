@@ -1,12 +1,12 @@
 /**
  * useI4ImportExport — I4 长期待摊费用 导入导出 composable
  *
- * Spec: .kiro/specs/i4-long-term-prepaid/ Task 3.5
+ * Spec（归档）: .kiro/specs/_archive/05-business-features/i4-long-term-prepaid/ Task 3.5
  * Requirements: 导入导出统一规范 (memory)
  *
  * - el-dropdown 三级 UI（导出模板 / 导出数据 / 导入数据）
  * - axios 请求（NOT fetch）— 自动带 Authorization header
- * - 仅动态行表格需要导入导出：I4-2明细表 / I4-6直线法摊销 / I4-7工作量法摊销
+ * - 动态行：I4-2 明细滚转 / I4-6 直线 / I4-7 工作量（后端 `_I4_SPECS` 仅此三表）
  * - 多区块分sheet导出
  * - StreamingResponse + RFC5987 编码中文文件名
  * - Follow useI3ImportExport pattern
@@ -17,11 +17,11 @@ import http from '@/utils/http'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** I4 支持导入导出的 sheet 编码 */
+/** I4 支持导入导出的 sheet 编码（与后端 `_I4_SPECS` 对齐：仅 2/6/7） */
 export type I4ImportableSheet =
-  | 'I4-2'      // 明细表（25列，动态行）
-  | 'I4-6'      // 摊销测算-直线法（65行28列，动态行）
-  | 'I4-7'      // 摊销测算-工作量法（65行28列，动态行）
+  | 'I4-2'      // 明细表（滚转动态行）
+  | 'I4-6'      // 摊销测算-直线法
+  | 'I4-7'      // 摊销测算-工作量法
 
 export interface I4ImportResult {
   success: boolean
@@ -36,17 +36,18 @@ export interface UseI4ImportExportOptions {
   onImported?: () => void | Promise<void>
 }
 
-/** I4-2 的 3 区段定义 */
+/** I4-2 滚转区段（导入模板分 sheet 标签） */
 export const I4_DETAIL_SEGMENTS = [
+  { key: 'unadj', label: '未审滚动(期初/增加/摊销/其他减少/期末)' },
+  { key: 'aje', label: '调整与审定(AJE/审定滚转)' },
+  { key: 'amortization', label: '摊销信息(方法/期限/已摊月数)' },
   { key: 'basic', label: '基础信息(项目名/发生日/类型/原始金额)' },
-  { key: 'amortization', label: '摊销信息(摊销方法/期限/已摊月数/累计摊销/本期摊销)' },
-  { key: 'balance', label: '余额信息(期初/变动/期末/剩余月数)' },
 ] as const
 
 export const I4_IMPORTABLE_SHEETS: { code: I4ImportableSheet; label: string }[] = [
-  { code: 'I4-2', label: 'I4-2 明细表(25列3区段)' },
-  { code: 'I4-6', label: 'I4-6 摊销测算-直线法(28列)' },
-  { code: 'I4-7', label: 'I4-7 摊销测算-工作量法(28列)' },
+  { code: 'I4-2', label: 'I4-2 明细表(滚转四区段)' },
+  { code: 'I4-6', label: 'I4-6 摊销测算-直线法(测算vs账面)' },
+  { code: 'I4-7', label: 'I4-7 摊销测算-工作量法(测算vs账面)' },
 ]
 
 // ─── Composable ──────────────────────────────────────────────────────────────

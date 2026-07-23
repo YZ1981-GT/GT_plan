@@ -18,6 +18,7 @@ import type {
   G1DiscInputRow,
   G1DiscL3RollRow,
 } from './g1DisclosureItems'
+import type { ColumnDef } from './disclosureColumnDefs'
 
 export interface G1SyncFromWorkpaperPayload {
   wp_id: string
@@ -25,6 +26,76 @@ export interface G1SyncFromWorkpaperPayload {
   section_id: string
   current_standard: string
   sub_table_data: Record<string, Record<string, unknown>[]>
+  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 G1TabDisclosure el-table-column */
+  columns?: Record<string, ColumnDef[]>
+}
+
+// SOE 子表英文键 → 源对齐列头（取自 G1TabDisclosureSOE）
+const G1_SOE_TRADING_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '项目', is_label: true },
+  { key: 'end_fair_value', label: '期末公允价值', format: 'amount' },
+  { key: 'prior_fair_value', label: '期初公允价值', format: 'amount' },
+]
+const G1_SOE_DERIVATIVE_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '项目', is_label: true },
+  { key: 'end_balance', label: '期末余额', format: 'amount' },
+  { key: 'prior_balance', label: '期初余额', format: 'amount' },
+  { key: 'reason', label: '产生原因 / 备注' },
+]
+
+// 上市子表：行键即中文列名（项目/内容/说明为标签列），逐字对齐 buildG1ListedSubTableData
+const G1_LISTED_COLUMNS: Record<string, ColumnDef[]> = {
+  交易性金融资产分类: [
+    { key: '项目', label: '项目', is_label: true },
+    { key: '期末余额', label: '期末余额', format: 'amount' },
+    { key: '上年年末余额', label: '上年年末余额', format: 'amount' },
+    { key: '备注', label: '备注' },
+  ],
+  指定理由: [{ key: '说明', label: '说明', is_label: true }],
+  衍生金融资产: [
+    { key: '项目', label: '项目', is_label: true },
+    { key: '期末余额', label: '期末余额', format: 'amount' },
+    { key: '上年年末余额', label: '上年年末余额', format: 'amount' },
+  ],
+  衍生说明: [{ key: '说明', label: '说明', is_label: true }],
+  公允价值层次: [
+    { key: '项目', label: '项目', is_label: true },
+    { key: '第一层次', label: '第一层次', format: 'amount' },
+    { key: '第二层次', label: '第二层次', format: 'amount' },
+    { key: '第三层次', label: '第三层次', format: 'amount' },
+    { key: '合计', label: '合计', format: 'amount' },
+  ],
+  估值输入值: [
+    { key: '内容', label: '内容', is_label: true },
+    { key: '期末公允价值', label: '期末公允价值', format: 'amount' },
+    { key: '估值技术', label: '估值技术' },
+    { key: '输入值', label: '输入值' },
+    { key: '范围', label: '范围' },
+    { key: '层次', label: '层次' },
+  ],
+  第三层次调节: [
+    { key: '项目', label: '项目', is_label: true },
+    { key: '期初余额', label: '期初余额', format: 'amount' },
+    { key: '转入', label: '转入', format: 'amount' },
+    { key: '转出', label: '转出', format: 'amount' },
+    { key: '计入损益', label: '计入损益', format: 'amount' },
+    { key: '计入OCI', label: '计入OCI', format: 'amount' },
+    { key: '购买', label: '购买', format: 'amount' },
+    { key: '发行', label: '发行', format: 'amount' },
+    { key: '出售', label: '出售', format: 'amount' },
+    { key: '结算', label: '结算', format: 'amount' },
+    { key: '期末余额', label: '期末余额', format: 'amount' },
+    { key: '仍持有未实现损益', label: '仍持有未实现损益', format: 'amount' },
+  ],
+  非以公允价值计量项目: [
+    { key: '项目', label: '项目', is_label: true },
+    { key: '账面价值', label: '账面价值', format: 'amount' },
+    { key: '第一层次', label: '第一层次', format: 'amount' },
+    { key: '第二层次', label: '第二层次', format: 'amount' },
+    { key: '第三层次', label: '第三层次', format: 'amount' },
+    { key: '备注', label: '备注' },
+  ],
+  附注说明: [{ key: '说明', label: '说明', is_label: true }],
 }
 
 export interface G1SoeSyncSnapshot {
@@ -104,6 +175,7 @@ export function buildG1SoeSyncPayloads(
       section_id: sections.trading,
       current_standard: standard,
       sub_table_data: buildG1SoeTradingSubTableData(snap),
+      columns: { 交易性金融资产: G1_SOE_TRADING_COLUMNS },
     },
     {
       wp_id: wpId,
@@ -111,6 +183,7 @@ export function buildG1SoeSyncPayloads(
       section_id: sections.derivative,
       current_standard: standard,
       sub_table_data: buildG1SoeDerivativeSubTableData(snap),
+      columns: { 衍生金融资产: G1_SOE_DERIVATIVE_COLUMNS },
     },
   ]
 }
@@ -211,6 +284,7 @@ export function buildG1SyncPayload(
     section_id: G1_NOTE_SECTION.listed.trading,
     current_standard: resolveG1CurrentStandard('listed', applicableStandards),
     sub_table_data: subTableData,
+    columns: G1_LISTED_COLUMNS,
   }
 }
 

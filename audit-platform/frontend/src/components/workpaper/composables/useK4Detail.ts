@@ -44,6 +44,9 @@ export interface K4DetailRow {
   auditedIncrease: number      // 审定本期增加
   auditedDecrease: number      // 审定本期减少
   auditedEnd: number           // 审定期末
+  // 期后偿付（完整性验证核心证据）
+  postPayment: number          // 期后偿付金额（次年序时账2245借方按项目归集）
+  postPaymentDate: string      // 期后偿付日期
   // 区段1 检查
   increaseReason: string       // 增减原因
   voucherRef: string           // 凭证号
@@ -84,7 +87,7 @@ export interface K4DetailColumn {
 const ITEM_ID_ROWS = 'K4-2-rows'
 
 const NATURE_OPTIONS = ['预提费用', '待转销项税额', '代扣代缴', '短期融资', '其他']
-const CONCLUSION_OPTIONS = ['正常', '异常', '需关注', '待确认']
+const CONCLUSION_OPTIONS = ['正常', '异常', '需关注', '待确认', '确认属流动负债', '已跨期应重分类', '计提依据不充分']
 
 /** 区段0 基础列 */
 const BASIC_COLUMNS: K4DetailColumn[] = [
@@ -102,6 +105,8 @@ const CHECK_COLUMNS: K4DetailColumn[] = [
   { key: 'projectName', label: '项目', width: 200, editable: false, type: 'text' },
   { key: 'increaseReason', label: '增减原因', width: 220, editable: true, type: 'text' },
   { key: 'voucherRef', label: '凭证号', width: 120, editable: true, type: 'text' },
+  { key: 'postPayment', label: '期后偿付金额', width: 130, editable: true, type: 'number', tooltip: '次年序时账2245借方按项目归集' },
+  { key: 'postPaymentDate', label: '偿付日期', width: 120, editable: true, type: 'text' },
   { key: 'checkConclusion', label: '核查结论', width: 120, editable: true, type: 'select', options: CONCLUSION_OPTIONS },
   { key: 'remark', label: '备注', width: 200, editable: true, type: 'text' },
 ]
@@ -156,6 +161,8 @@ export function useK4Detail(params: {
       auditedIncrease: 0,
       auditedDecrease: 0,
       auditedEnd: 0,
+      postPayment: Number(raw.postPayment) || 0,
+      postPaymentDate: raw.postPaymentDate ?? '',
       increaseReason: raw.increaseReason ?? '',
       voucherRef: raw.voucherRef ?? '',
       checkConclusion: raw.checkConclusion ?? '',

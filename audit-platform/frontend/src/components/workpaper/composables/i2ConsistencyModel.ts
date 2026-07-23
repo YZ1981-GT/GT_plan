@@ -212,6 +212,8 @@ export function computeI2SheetCompletion(
     'I2-16-': ['I2-16-dcf-params', 'I2-16-audit-conclusion'],
     'I2-2-': ['I2-2-rows'],
     'I2-7-': ['I2-7-rows'],
+    'I2-13-': ['I2-13-rows', 'I2-13-audit-conclusion'],
+    'I2-14-': ['I2-14-rows', 'I2-14-audit-conclusion'],
   }
 
   let filled = 0

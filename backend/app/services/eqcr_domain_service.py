@@ -253,6 +253,7 @@ class EqcrDomainService:
                 "name": r.name,
                 "relation_type": r.relation_type,
                 "is_controlled_by_same_party": bool(r.is_controlled_by_same_party),
+                "detail": r.detail or {},
                 "created_at": r.created_at.isoformat() if r.created_at else None,
             }
             for r in registries

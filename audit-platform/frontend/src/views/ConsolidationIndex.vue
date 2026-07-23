@@ -493,8 +493,8 @@ import {
 } from '@/services/consolidationApi'
 import { listChildProjects } from '@/services/commonApi'
 import { api } from '@/services/apiProxy'
-import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm, consolNoteSections as P_cn, reports, consolidation as P_consol, events as P_events } from '@/services/apiPaths'
-import { createSSE, type SSEConnection } from '@/utils/sse'
+import { projects as P_proj, reportConfig as P_rc, reportMapping as P_rm, consolNoteSections as P_cn, reports, consolidation as P_consol } from '@/services/apiPaths'
+import { subscribeProjectEvent, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import ConsolWorksheetTabs from '@/components/consolidation/worksheets/ConsolWorksheetTabs.vue'
 import ConsolNoteTab from '@/components/consolidation/ConsolNoteTab.vue'
 import ConsolTrialBalanceTab from '@/components/consolidation/ConsolTrialBalanceTab.vue'
@@ -548,12 +548,13 @@ const reaggregateLoading = ref(false)
 const refreshProgress = reactive({ visible: false, step: '', current: 0, total: 0, node: '' })
 // 一键刷新进度 SSE 连接（用 createSSE 直接订阅 events/stream，按 project_id/year 过滤 consol.refresh.* 事件；
 // 全局 ThreeColumnLayout 的 SSE 处理器会丢弃 broadcast_raw 的无 event_type 裸事件，故此处独立订阅）
-let refreshSSE: SSEConnection | null = null
+let refreshSubs: ProjectEventSubscription[] = []
 let refreshPollTimer: ReturnType<typeof setTimeout> | null = null
 
-/** 关闭一键刷新进度 SSE + 轮询兜底连接 */
+/** 关闭一键刷新进度 SSE 订阅 + 轮询兜底 */
 function _stopRefreshTracking() {
-  if (refreshSSE) { refreshSSE.close(); refreshSSE = null }
+  for (const s of refreshSubs) s.close()
+  refreshSubs = []
   if (refreshPollTimer) { clearTimeout(refreshPollTimer); refreshPollTimer = null }
 }
 
@@ -602,10 +603,11 @@ function _startRefreshTracking(jobId: string) {
     }
   }
 
-  // SSE 进度订阅（按 project_id/year 过滤 consol.refresh.* 事件）
+  // SSE 进度订阅：迁移到项目事件流单例总线（frontend-sse-connection-consolidation）；
+  // 订阅共享连接的 consol.refresh.* 事件，按 job_id 客户端过滤（不再自建连接；
+  // 原 URL 的 ?year= 服务端过滤由 job_id 唯一性替代）。
   try {
-    refreshSSE = createSSE(`${P_events.stream(projectId.value)}?year=${year.value}`)
-    refreshSSE.onMessage((data: any, event?: string) => {
+    const onConsolEvent = (data: any, event?: string) => {
       if (!data || (data.job_id && jobId && data.job_id !== jobId)) return
       if (event === 'consol.refresh.progress') {
         refreshProgress.step = data.step || ''
@@ -618,9 +620,12 @@ function _startRefreshTracking(jobId: string) {
       } else if (event === 'consol.refresh.error') {
         finish(false, `一键刷新失败：${data.error || '未知错误'}`)
       }
-    })
+    }
+    for (const ev of ['consol.refresh.progress', 'consol.refresh.completed', 'consol.refresh.error']) {
+      refreshSubs.push(subscribeProjectEvent(projectId.value, ev, onConsolEvent))
+    }
   } catch {
-    // SSE 创建失败不致命，靠轮询兜底
+    // 订阅失败不致命，靠轮询兜底
   }
 
   // 轮询兜底（EH6）：SSE 断开也能感知最终状态

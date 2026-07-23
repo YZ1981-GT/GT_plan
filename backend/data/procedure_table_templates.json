@@ -1806,7 +1806,7 @@
           "seq": 4,
           "content": "评价是否具备执行该项审计业务所需要的独立性和能力",
           "ref_index": "B1-3",
-          "auto_data_source": "b3_independence_status",
+          "auto_data_source": "b1_3_evaluation_conclusion",
           "applicable_default": "yes",
           "phase": "planning"
         },
@@ -1821,7 +1821,8 @@
             {
               "seq": "5.1",
               "content": "完成风险评价表（适用于承接）或业务评价表，附必要支持文件",
-              "ref_index": "B1-1"
+              "ref_index": "B1-1",
+              "auto_data_source": "b1_risk_assessment_conclusion"
             },
             {
               "seq": "5.2",
@@ -1832,12 +1833,14 @@
             {
               "seq": "5.3",
               "content": "确定风险评价表或业务评价表已按照事务所规定获得批准",
-              "ref_index": "B1-1"
+              "ref_index": "B1-1",
+              "auto_data_source": "b1_risk_assessment_conclusion"
             },
             {
               "seq": "5.4",
               "content": "如业务达到KAA标准，确定是否已执行事务所业务承接程序",
-              "ref_index": "B1-5"
+              "ref_index": "B1-5",
+              "auto_data_source": "b1_5_kaa_status"
             },
             {
               "seq": "5.5",
@@ -1886,7 +1889,7 @@
           "seq": 4,
           "content": "评价是否具备执行该项审计业务所需要的独立性和能力",
           "ref_index": "B1-3",
-          "auto_data_source": "b3_independence_status",
+          "auto_data_source": "b1_3_evaluation_conclusion",
           "applicable_default": "yes",
           "phase": "planning"
         },
@@ -1901,7 +1904,8 @@
             {
               "seq": "5.1",
               "content": "完成风险评价表（适用于保持）或业务评价表，并已获得批准",
-              "ref_index": "B1-2"
+              "ref_index": "B1-2",
+              "auto_data_source": "b1_risk_assessment_conclusion"
             },
             {
               "seq": "5.2",
@@ -3734,7 +3738,7 @@
           "seq": 17,
           "content": "针对评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -3879,7 +3883,7 @@
           "seq": 19,
           "content": "针对评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -3968,7 +3972,7 @@
           "seq": 11,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -4092,7 +4096,7 @@
           "seq": 16,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "D4-22A",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -4188,7 +4192,7 @@
           "seq": 6,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -4284,7 +4288,7 @@
           "seq": 12,
           "content": "针对评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -4834,7 +4838,7 @@
           "seq": 14,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -5063,7 +5067,7 @@
           "seq": 31,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "F2-61A",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -5360,7 +5364,7 @@
           "seq": 13,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -5512,7 +5516,7 @@
           "seq": 20,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -5608,7 +5612,7 @@
           "seq": 11,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -5779,7 +5783,7 @@
           "seq": 12,
           "content": "考虑是否存在超出正常经营活动的重大异常交易等，根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes",
           "applicable_note": "IPO/上市/新三板/重组/舞弊应对"
         },
@@ -5855,7 +5859,7 @@
           "seq": 9,
           "content": "考虑是否存在超出正常经营活动的重大异常交易等，根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes",
           "applicable_note": "IPO/上市/新三板/重组/舞弊应对"
         },
@@ -5938,7 +5942,7 @@
           "seq": 10,
           "content": "考虑是否存在超出正常经营活动的重大异常交易等，根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes",
           "applicable_note": "IPO/上市/新三板/重组/舞弊应对"
         },
@@ -6000,7 +6004,7 @@
           "seq": 7,
           "content": "考虑是否存在超出正常经营活动的重大异常交易等，根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes",
           "applicable_note": "IPO/上市/新三板/重组/舞弊应对"
         },
@@ -6104,7 +6108,7 @@
           "seq": 13,
           "content": "考虑是否存在超出正常经营活动的重大异常交易等，根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes",
           "applicable_note": "IPO/上市/新三板/重组/舞弊应对"
         },
@@ -6166,7 +6170,7 @@
           "seq": 7,
           "content": "考虑是否存在超出正常经营活动的重大异常交易等，根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes",
           "applicable_note": "IPO/上市/新三板/重组/舞弊应对"
         },
@@ -6242,7 +6246,7 @@
           "seq": 9,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes",
           "applicable_note": "IPO/上市/新三板/重组/舞弊应对"
         },
@@ -6348,7 +6352,7 @@
           "seq": 13,
           "content": "考虑是否存在超出正常经营活动的重大异常交易等，根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes",
           "applicable_note": "IPO/上市/新三板/重组/舞弊应对"
         },
@@ -6453,7 +6457,7 @@
           "seq": 13,
           "content": "考虑是否存在超出正常经营活动的重大异常交易等，根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes",
           "applicable_note": "IPO/上市/新三板/重组/舞弊应对"
         },
@@ -6529,7 +6533,7 @@
           "seq": 9,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes",
           "applicable_note": "IPO/上市/新三板/重组/舞弊应对"
         },
@@ -6577,7 +6581,7 @@
           "seq": 5,
           "content": "考虑是否存在超出正常经营活动的重大异常交易等，根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes",
           "applicable_note": "IPO/上市/新三板/重组/舞弊应对"
         },
@@ -6639,7 +6643,7 @@
           "seq": 7,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes",
           "applicable_note": "IPO/上市/新三板/重组/舞弊应对"
         },
@@ -6701,7 +6705,7 @@
           "seq": 7,
           "content": "考虑是否存在超出正常经营活动的重大异常交易等，根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": null,
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes",
           "applicable_note": "IPO/上市/新三板/重组/舞弊应对"
         },
@@ -7073,7 +7077,7 @@
           "seq": 17,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -7176,7 +7180,7 @@
           "seq": 13,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -7223,7 +7227,7 @@
           "seq": 6,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -7312,7 +7316,7 @@
           "seq": 10,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -7366,7 +7370,7 @@
           "seq": 6,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -7413,7 +7417,7 @@
           "seq": 5,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -7502,7 +7506,7 @@
           "seq": 11,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -7577,7 +7581,7 @@
           "seq": 10,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -7701,7 +7705,7 @@
           "seq": 16,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -7811,7 +7815,7 @@
           "seq": 14,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -7942,7 +7946,7 @@
           "seq": 17,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -8059,7 +8063,7 @@
           "seq": 15,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -8162,7 +8166,7 @@
           "seq": 13,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -8265,7 +8269,7 @@
           "seq": 13,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -8506,7 +8510,7 @@
           "seq": 21,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -8670,7 +8674,7 @@
           "seq": 16,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -8808,7 +8812,7 @@
           "seq": 17,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -8904,7 +8908,7 @@
           "seq": 12,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -9042,7 +9046,7 @@
           "seq": 18,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -9096,7 +9100,7 @@
           "seq": 6,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -9234,7 +9238,7 @@
           "seq": 18,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -9344,7 +9348,7 @@
           "seq": 14,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -9412,7 +9416,7 @@
           "seq": 8,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -9501,7 +9505,7 @@
           "seq": 11,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -9632,7 +9636,7 @@
           "seq": 17,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -9700,7 +9704,7 @@
           "seq": 8,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -9761,7 +9765,7 @@
           "seq": 7,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -9829,7 +9833,7 @@
           "seq": 8,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -9946,7 +9950,7 @@
           "seq": 15,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -10077,7 +10081,7 @@
           "seq": 17,
           "content": "针对识别的其他舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -10152,7 +10156,7 @@
           "seq": 9,
           "content": "针对识别的其他舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -10220,7 +10224,7 @@
           "seq": 8,
           "content": "针对识别的其他舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -10295,7 +10299,7 @@
           "seq": 9,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -10349,7 +10353,7 @@
           "seq": 6,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -10424,7 +10428,7 @@
           "seq": 9,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -10506,7 +10510,7 @@
           "seq": 11,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -10588,7 +10592,7 @@
           "seq": 10,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -10675,7 +10679,7 @@
           "seq": 5,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -10778,7 +10782,7 @@
           "seq": 13,
           "content": "考虑是否存在超出被审计单位正常经营活动的重大、异常交易等，根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -10839,7 +10843,7 @@
           "seq": 7,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -10996,7 +11000,7 @@
           "seq": 12,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -11050,7 +11054,7 @@
           "seq": 6,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -11111,7 +11115,7 @@
           "seq": 7,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -11165,7 +11169,7 @@
           "seq": 6,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -11414,7 +11418,7 @@
           "seq": 8,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -11552,7 +11556,7 @@
           "seq": 18,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -11599,7 +11603,7 @@
           "seq": 5,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -11639,7 +11643,7 @@
           "seq": 4,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {
@@ -11728,7 +11732,7 @@
           "seq": 11,
           "content": "根据评估的舞弊风险等因素增加的审计程序。",
           "ref_index": "",
-          "auto_data_source": null,
+          "auto_data_source": "risk_for_cycle",
           "applicable_default": "yes"
         },
         {

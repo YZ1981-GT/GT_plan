@@ -220,12 +220,172 @@ def _parse_row(
 _parse_a91_row = _parse_row
 
 
-async def _load_b22b_deficiencies(project_id, db) -> dict:
-    """从 B22B 底稿的 checklist_responses 中提取已评价缺陷.
+# 中文严重程度 → 英文分组键（B22B / B22C 共用，保持 P5 分组等价映射）
+_SEVERITY_MAP = {"重大缺陷": "major", "重要缺陷": "significant", "一般缺陷": "general"}
 
-    1. 通过 wp_index JOIN working_papers 找到同项目的 B22B 底稿
-    2. 从 checklist_responses (item_id LIKE 'b22b-deficiency-%') 读取缺陷列表
-    3. 按 severity 字段分组
+# B22C 5 个要素区块 key → 中文区块名（用于 index_ref 定位）
+_B22C_BLOCK_KEYS = ("env", "risk", "info", "monitor", "itgc")
+_B22C_BLOCK_NAMES = {
+    "env": "控制环境",
+    "risk": "风险评估过程",
+    "info": "信息与沟通",
+    "monitor": "监督",
+    "itgc": "IT一般控制",
+}
+
+
+async def _load_b22c_deficiencies(project_id, db) -> dict[str, list["DeficiencyItem"]]:
+    """从 B22C 底稿（设计有效性评价·缺陷汇总表）读取缺陷 + 严重程度并分组.
+
+    B22C 为缺陷严重程度的**单一真源**（Wave3 收敛）。
+    持久化结构（前端 useB22CDesignEffectiveness.buildItems）：
+      B22C-{key}-def-count           remark=该区块缺陷条目数
+      B22C-{key}-def-{n}-desc        remark=缺陷描述
+      B22C-{key}-def-{n}-severity    conclusion=重大缺陷/重要缺陷/一般缺陷
+      B22C-{key}-def-{n}-flags       remark=JSON {cd, sig}
+      B22C-{key}-def-{n}-judgment    remark=重要职业判断
+    其中 key ∈ {env, risk, info, monitor, itgc}。
+
+    severity 中文经 _SEVERITY_MAP 映射 major/significant/general（与 B22B 同一映射，保持 P5 等价）。
+    返回按严重程度分组的 DeficiencyItem 列表（无数据时三组均空）。
+    """
+    grouped: dict[str, list[DeficiencyItem]] = {"major": [], "significant": [], "general": []}
+
+    # 1. 找同项目 B22C 底稿
+    try:
+        b22c_result = await db.execute(
+            sa.text(
+                "SELECT wp.id AS wp_id "
+                "FROM wp_index wi "
+                "JOIN working_paper wp ON wp.wp_index_id = wi.id "
+                "WHERE wi.wp_code = 'B22C' AND wp.project_id = :project_id "
+                "LIMIT 1"
+            ),
+            {"project_id": str(project_id)},
+        )
+        b22c_row = b22c_result.fetchone()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("A9 B22C 底稿查询失败 project_id=%s: %s", project_id, e)
+        return grouped
+
+    if not b22c_row:
+        return grouped
+
+    # 2. 读取 B22C checklist_responses
+    try:
+        cr_result = await db.execute(
+            sa.text(
+                "SELECT item_id, conclusion, remark "
+                "FROM checklist_responses WHERE wp_id = :wp_id "
+                "AND item_id LIKE 'B22C-%'"
+            ),
+            {"wp_id": str(b22c_row.wp_id)},
+        )
+        by_id: dict[str, tuple] = {
+            row.item_id: (row.conclusion, row.remark) for row in cr_result.fetchall()
+        }
+    except Exception as e:  # noqa: BLE001
+        logger.warning("A9 B22C checklist_responses 查询失败: %s", e)
+        return grouped
+
+    # 3. 逐区块逐条重建缺陷
+    for key in _B22C_BLOCK_KEYS:
+        count_raw = (by_id.get(f"B22C-{key}-def-count") or (None, "0"))[1] or "0"
+        try:
+            count = int(count_raw)
+        except (TypeError, ValueError):
+            count = 0
+
+        for n in range(1, count + 1):
+            desc = (by_id.get(f"B22C-{key}-def-{n}-desc") or (None, None))[1] or ""
+            desc = desc.strip()
+            if not desc:
+                continue  # 空占位条目不计入缺陷函
+
+            sev_cn = (by_id.get(f"B22C-{key}-def-{n}-severity") or (None, None))[0]
+            severity = _SEVERITY_MAP.get(sev_cn or "", None)
+            if severity is None:
+                # 未评定严重程度：回退按 flags.sig 判定（值得关注→significant，否则→general）
+                sig = False
+                flags_raw = (by_id.get(f"B22C-{key}-def-{n}-flags") or (None, None))[1]
+                if flags_raw:
+                    try:
+                        flags = json.loads(flags_raw)
+                        sig = bool(flags.get("sig"))
+                    except (json.JSONDecodeError, TypeError):
+                        sig = False
+                severity = "significant" if sig else "general"
+
+            judgment = (by_id.get(f"B22C-{key}-def-{n}-judgment") or (None, None))[1] or ""
+            block_name = _B22C_BLOCK_NAMES[key]
+
+            grouped[severity].append(
+                DeficiencyItem(
+                    id=f"b22c-{key}-{n}",
+                    description=desc,
+                    impact=judgment,
+                    recommendation="",
+                    index_ref=block_name,
+                    source="b22c",
+                    severity=severity,
+                )
+            )
+
+    return grouped
+
+
+async def _load_b22b_deficiencies(project_id, db) -> dict:
+    """加载内控缺陷（Wave3 repoint）：优先 B22C 单一真源，向后兼容回退旧 B22B.
+
+    🔴 函数名 / 返回结构（{"deficiencies": {major,significant,general}, "warning"}）保持不变，
+       避免破坏 A9-1 / A9-2 调用点。
+
+    加载顺序：
+    1. **优先** 从同项目 B22C 底稿读缺陷 + severity 并分组（B22C 为缺陷严重程度单一真源）。
+    2. **向后兼容双读**：回退读旧 B22B（B22B-def-* / b22b-deficiency-*）。
+    3. **去重**：B22B 缺陷若 description 已存在于 B22C（任一分组）则不重复计入。
+    4. **P5 分组等价**：severity 中文→英文映射（_SEVERITY_MAP）在 B22B/B22C 一致；
+       当 B22C 无数据时，结果与"纯读 B22B"完全等价（旧 fixture 测试保持绿，P6 兼容）。
+    """
+    # ── 1. 优先读 B22C ──────────────────────────────────────────────────────
+    b22c_grouped = await _load_b22c_deficiencies(project_id, db)
+    b22c_has_data = any(b22c_grouped.get(s) for s in ("major", "significant", "general"))
+
+    # ── 2. 回退/补充读旧 B22B ───────────────────────────────────────────────
+    b22b_result = await _load_legacy_b22b_deficiencies(project_id, db)
+    b22b_grouped: dict[str, list[DeficiencyItem]] = b22b_result["deficiencies"]
+
+    # ── 3. 合并（B22C 优先）+ 去重（按 description）────────────────────────────
+    b22c_descs: set[str] = set()
+    for grp in b22c_grouped.values():
+        for it in grp:
+            d = (it.description or "").strip()
+            if d:
+                b22c_descs.add(d)
+
+    merged: dict[str, list[DeficiencyItem]] = {"major": [], "significant": [], "general": []}
+    for sev in ("major", "significant", "general"):
+        merged[sev].extend(b22c_grouped.get(sev, []))
+    for sev in ("major", "significant", "general"):
+        for it in b22b_grouped.get(sev, []):
+            d = (it.description or "").strip()
+            if d and d in b22c_descs:
+                continue  # 与 B22C 同一缺陷去重，不重复计入
+            merged[sev].append(it)
+
+    # ── 4. warning：B22C 有数据即视为源已找到（None）；否则沿用 B22B 的 warning ──
+    warning = None if b22c_has_data else b22b_result["warning"]
+
+    return {"deficiencies": merged, "warning": warning}
+
+
+async def _load_legacy_b22b_deficiencies(project_id, db) -> dict:
+    """从 B22B 底稿的 checklist_responses 中提取已评价缺陷（旧数据源，向后兼容）.
+
+    1. 通过 wp_index JOIN working_paper 找到同项目的 B22B 底稿
+    2. 从 checklist_responses (item_id LIKE 'B22B-def-%') 按条目重建缺陷
+       （兼容旧格式 b22b-deficiency-% 单条 JSON blob）
+    3. 按严重程度（重大/重要/一般→major/significant/general）分组
     4. 返回 {"deficiencies": {...}, "warning": str | None}
     """
     deficiencies: dict[str, list[DeficiencyItem]] = {
@@ -240,7 +400,7 @@ async def _load_b22b_deficiencies(project_id, db) -> dict:
             sa.text(
                 "SELECT wp.id AS wp_id "
                 "FROM wp_index wi "
-                "JOIN working_papers wp ON wp.wp_index_id = wi.id "
+                "JOIN working_paper wp ON wp.wp_index_id = wi.id "
                 "WHERE wi.wp_code = 'B22B' AND wp.project_id = :project_id "
                 "LIMIT 1"
             ),
@@ -254,38 +414,104 @@ async def _load_b22b_deficiencies(project_id, db) -> dict:
     if not b22b_row:
         return {"deficiencies": deficiencies, "warning": "未找到B22B内控缺陷评价表"}
 
-    # Load deficiency data from B22B checklist_responses
+    # Load deficiency data from B22B checklist_responses.
+    # 🔴 B22B 实际持久化结构为分字段（前端 useB22BDeficiency.persistAll）：
+    #   B22B-def-{n}-source (remark=JSON {tab,subPanel,index,controlPoint,deficiencyType,elementName})
+    #   B22B-def-{n}-severity (conclusion=重大缺陷/重要缺陷/一般缺陷)
+    #   B22B-def-{n}-corrective (conclusion=Y/N, remark=纠正措施描述)
+    #   B22B-def-{n}-eliminated (conclusion=Y 表示已消除，跳过)
+    #   B22B-def-count (remark=条目总数)
+    #   （_SEVERITY_MAP 已提升为模块级，B22B/B22C 共用同一映射保证 P5 分组等价）
     try:
         cr_result = await db.execute(
             sa.text(
                 "SELECT item_id, conclusion, remark "
                 "FROM checklist_responses WHERE wp_id = :wp_id "
-                "AND item_id LIKE 'b22b-deficiency-%'"
+                "AND (item_id LIKE 'B22B-def-%' OR item_id LIKE 'b22b-deficiency-%')"
             ),
             {"wp_id": str(b22b_row.wp_id)},
         )
+        by_id: dict[str, tuple] = {}
+        legacy_rows: list = []
         for row in cr_result.fetchall():
+            if row.item_id.startswith("B22B-def-"):
+                by_id[row.item_id] = (row.conclusion, row.remark)
+            elif row.item_id.startswith("b22b-deficiency-"):
+                legacy_rows.append(row)
+
+        # ── 兼容旧格式：单条 JSON blob（item_id LIKE 'b22b-deficiency-%'）──
+        for row in legacy_rows:
             if not row.remark:
                 continue
             try:
                 data = json.loads(row.remark)
-                if isinstance(data, dict):
-                    severity = data.get("severity", "general")
-                    if severity not in ("major", "significant", "general"):
-                        severity = "general"
-                    deficiencies[severity].append(
-                        DeficiencyItem(
-                            id=data.get("id", row.item_id),
-                            description=data.get("description", ""),
-                            impact=data.get("impact", ""),
-                            recommendation=data.get("recommendation", ""),
-                            index_ref=data.get("index_ref"),
-                            source="b22b",
-                            severity=severity,
-                        )
-                    )
             except (json.JSONDecodeError, TypeError):
                 logger.warning("B22B deficiency JSON 解析失败 item_id=%s", row.item_id)
+                continue
+            if not isinstance(data, dict):
+                continue
+            severity = data.get("severity", "general")
+            if severity not in ("major", "significant", "general"):
+                severity = "general"
+            deficiencies[severity].append(
+                DeficiencyItem(
+                    id=data.get("id", row.item_id),
+                    description=data.get("description", ""),
+                    impact=data.get("impact", ""),
+                    recommendation=data.get("recommendation", ""),
+                    index_ref=data.get("index_ref"),
+                    source="b22b",
+                    severity=severity,
+                )
+            )
+
+        count_raw = (by_id.get("B22B-def-count") or (None, "0"))[1] or "0"
+        try:
+            count = int(count_raw)
+        except (TypeError, ValueError):
+            count = 0
+
+        for n in range(1, count + 1):
+            # 已消除的缺陷跳过
+            elim = by_id.get(f"B22B-def-{n}-eliminated")
+            if elim and elim[0] == "Y":
+                continue
+            sev_item = by_id.get(f"B22B-def-{n}-severity")
+            severity_cn = sev_item[0] if sev_item else None
+            severity = _SEVERITY_MAP.get(severity_cn or "", None)
+            if severity is None:
+                continue  # 未评定严重程度的不进入缺陷沟通函
+
+            source_raw = (by_id.get(f"B22B-def-{n}-source") or (None, None))[1]
+            control_point = ""
+            element_name = ""
+            deficiency_type = ""
+            if source_raw:
+                try:
+                    src = json.loads(source_raw)
+                    control_point = src.get("controlPoint", "") or ""
+                    element_name = src.get("elementName", "") or ""
+                    deficiency_type = src.get("deficiencyType", "") or ""
+                except (json.JSONDecodeError, TypeError):
+                    logger.warning("B22B-def-%s-source JSON 解析失败", n)
+
+            corrective = by_id.get(f"B22B-def-{n}-corrective")
+            recommendation = corrective[1] if (corrective and corrective[0] == "Y") else ""
+
+            description = control_point or element_name or f"控制缺陷 {n}"
+            impact = f"{element_name}（{deficiency_type}）" if deficiency_type else element_name
+
+            deficiencies[severity].append(
+                DeficiencyItem(
+                    id=f"b22b-{n}",
+                    description=description,
+                    impact=impact,
+                    recommendation=recommendation,
+                    index_ref=element_name or None,
+                    source="b22b",
+                    severity=severity,
+                )
+            )
     except Exception as e:  # noqa: BLE001
         logger.warning("A9-1 B22B checklist_responses 查询失败: %s", e)
         return {"deficiencies": deficiencies, "warning": "B22B缺陷数据读取失败"}

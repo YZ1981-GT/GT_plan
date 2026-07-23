@@ -141,6 +141,7 @@
         <div class="rec-card-actions">
           <el-tag v-if="bsVarianceCount > 0" size="small" type="danger">{{ bsVarianceCount }} 行差异</el-tag>
           <el-tag v-else-if="bsSheet.rows.value.length" size="small" type="success">核对一致</el-tag>
+          <el-button size="small" :disabled="isReadonly" @click="handleFillFromSample">从抽盘带入实盘数</el-button>
           <el-button size="small" type="primary" :disabled="isReadonly" @click="bsSheet.addRow()">+ 明细行</el-button>
         </div>
       </header>
@@ -641,6 +642,20 @@ onMounted(() => {
   if (c?.remark) auditConclusion.value = c.remark
   seedFromPlan({ silent: true })
 })
+
+function handleFillFromSample(): void {
+  if (props.isReadonly) return
+  const result = bsSheet.fillActualFromSample('F2-25-rows')
+  if (result.matched === 0 && result.unmatched === 0) {
+    ElMessage.info('F2-25 抽盘结果为空，无法带入')
+  } else if (result.matched === 0) {
+    ElMessage.warning(`F2-25 共 ${result.unmatched} 项未匹配到账面核对行`)
+  } else if (result.unmatched > 0) {
+    ElMessage.success(`已匹配填入 ${result.matched} 项，${result.unmatched} 项未匹配`)
+  } else {
+    ElMessage.success(`已从抽盘带入 ${result.matched} 项实盘数`)
+  }
+}
 
 function seedFromPlan(opts?: { silent?: boolean }): void {
   if (props.isReadonly) return

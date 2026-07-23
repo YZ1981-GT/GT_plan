@@ -19,6 +19,7 @@ import {
   type H6ClearingRow,
   type H6DisclosureState,
 } from './h6DisclosureModel'
+import type { ColumnDef } from './disclosureColumnDefs'
 
 export interface H6SyncFromWorkpaperPayload {
   wp_id: string
@@ -26,7 +27,23 @@ export interface H6SyncFromWorkpaperPayload {
   section_id: string
   current_standard: string
   sub_table_data: Record<string, Record<string, unknown>[]>
+  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 H6TabDisclosure el-table-column（清理表） */
+  columns?: Record<string, ColumnDef[]>
 }
+
+// 固定资产清理表列头（英文键 → 源对齐；listed 期末/上年年末余额、soe 期末/期初账面价值）
+const H6_LISTED_CLEARING_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '项目', is_label: true },
+  { key: 'end_balance', label: '期末余额', format: 'amount' },
+  { key: 'prior_balance', label: '上年年末余额', format: 'amount' },
+  { key: 'reason', label: '转入清理的原因' },
+]
+const H6_SOE_CLEARING_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '项目', is_label: true },
+  { key: 'end_carrying', label: '期末账面价值', format: 'amount' },
+  { key: 'begin_carrying', label: '期初账面价值', format: 'amount' },
+  { key: 'reason', label: '转入清理的原因' },
+]
 
 function amt(v: number): number {
   return Math.round(n(v) * 100) / 100
@@ -199,6 +216,7 @@ export function buildH6ListedSyncPayloads(
       section_id: H6_NOTE_SECTION.listed,
       current_standard: resolveH6CurrentStandard('listed', applicableStandards),
       sub_table_data: buildH6ListedSubTableData(state, opts),
+      columns: { [H6_CLEARING_SUBTABLE]: H6_LISTED_CLEARING_COLUMNS },
     },
   ]
 }
@@ -217,6 +235,7 @@ export function buildH6SoeSyncPayloads(
       section_id: H6_NOTE_SECTION.soe,
       current_standard: resolveH6CurrentStandard('soe', applicableStandards),
       sub_table_data: buildH6SoeSubTableData(state, opts),
+      columns: { [H6_CLEARING_SUBTABLE]: H6_SOE_CLEARING_COLUMNS },
     },
   ]
 }

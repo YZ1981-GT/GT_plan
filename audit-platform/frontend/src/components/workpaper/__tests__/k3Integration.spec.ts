@@ -155,10 +155,11 @@ describe('K3 Integration — Task 6.3: 抽凭 + OCR + GtIndexChip + 双模式', 
       'utf-8',
     )
 
-    // Has GtVoucherSamplingEngine import + dialog
-    expect(rpSource).toContain("import GtVoucherSamplingEngine from")
+    // Has GtVoucherSamplingEngine（defineAsyncComponent 懒加载，或静态 import）+ dialog
+    expect(rpSource).toContain('GtVoucherSamplingEngine')
     expect(rpSource).toContain('showSamplingDialog')
     expect(rpSource).toContain('account-code="2241"')
+    expect(rpSource).toContain('phase="final"')
     // Has OCR with /d4/contract-ocr endpoint
     expect(rpSource).toContain("'/api/d4/contract-ocr'")
     expect(rpSource).toContain('handleOcrUpload')
@@ -176,10 +177,13 @@ describe('K3 Integration — Task 6.3: 抽凭 + OCR + GtIndexChip + 双模式', 
       'utf-8',
     )
 
-    expect(loSource).toContain("import GtVoucherSamplingEngine from")
+    // 抽凭引擎已接入（defineAsyncComponent 懒加载，或静态 import）
+    expect(loSource).toContain('GtVoucherSamplingEngine')
     expect(loSource).toContain('showSamplingDialog')
     expect(loSource).toContain('account-code="2241"')
     expect(loSource).toContain('onSampleFilled')
+    // 抽凭引擎必填 props（phase/year/workpaper-id）已补全
+    expect(loSource).toContain('phase="final"')
     // No console.log stub
     expect(loSource).not.toContain("console.log('[K3-5] Voucher sampling")
   })

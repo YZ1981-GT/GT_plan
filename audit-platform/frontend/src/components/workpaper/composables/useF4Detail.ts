@@ -9,6 +9,7 @@
  * N:Q 未审账龄合计应等于 M；U:X 审定账龄合计应等于 T。
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ElMessage } from 'element-plus'
 import {
   parseNum,
   calcCreditBalance,
@@ -436,6 +437,110 @@ export function useF4Detail(options: UseF4DetailOptions) {
     persistRows()
   }
 
+  // ─── 期后付款一键取数（从次年序时账 2202 借方按供应商归集） ──────────────
+
+  async function importPostPaymentFromLedger(
+    bsDate?: string,
+    monthsAfter = 6,
+  ): Promise<{ matched: number; filledAmount: number; unmatchedCount: number; unmatchedAmount: number }> {
+    const empty = { matched: 0, filledAmount: 0, unmatchedCount: 0, unmatchedAmount: 0 }
+    if (readonly.value) return empty
+    if (storedData.value.length === 0) {
+      ElMessage.info('请先录入或导入明细供应商后再取期后付款')
+      return empty
+    }
+    const pid = options.projectId.value
+    if (!pid) {
+      ElMessage.warning('缺少项目信息，无法取数')
+      return empty
+    }
+
+    const bs = (bsDate || '').trim()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(bs)) {
+      ElMessage.warning('资产负债表日无效，无法确定期后付款窗口')
+      return empty
+    }
+    const start = new Date(`${bs}T00:00:00`)
+    start.setDate(start.getDate() + 1)
+    const end = new Date(start)
+    end.setMonth(end.getMonth() + monthsAfter)
+    const fmt = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    const dateFrom = fmt(start)
+    const dateTo = fmt(end)
+    const postYear = start.getFullYear()
+
+    try {
+      const token = sessionStorage.getItem('token') || ''
+      const authHeaders = { Authorization: `Bearer ${token}` }
+      // 2202借方发生=付款(减少应付)
+      const url = `/api/projects/${pid}/ledger/entries/2202?year=${postYear}`
+        + `&date_from=${encodeURIComponent(dateFrom)}&date_to=${encodeURIComponent(dateTo)}&limit=2000`
+      const resp = await fetch(url, { headers: authHeaders })
+      if (!resp.ok) {
+        ElMessage.info(`期后（${postYear}年）序时账无数据或未导入`)
+        return empty
+      }
+      const result = await resp.json()
+      const payload = result?.data ?? result
+      const items: any[] = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.items)
+          ? payload.items
+          : Array.isArray(payload?.ledger?.items)
+            ? payload.ledger.items
+            : []
+
+      if (items.length === 0) {
+        ElMessage.info(`期后（${dateFrom} 至 ${dateTo}）无 2202 付款分录`)
+        return empty
+      }
+
+      // 借方发生额 = 付款；按供应商名归集
+      const normalizeName = (s: string) => s.replace(/\s+/g, '').toLowerCase()
+      const rowSums = new Map<string, number>()
+      let unmatchedCount = 0
+      let unmatchedAmount = 0
+
+      for (const it of items) {
+        const debit = Number(it.debit_amount) || 0
+        if (debit <= 0) continue
+        const text = normalizeName(`${it.summary ?? ''} ${it.counterpart_account ?? ''} ${it.aux_name ?? ''}`)
+        let hit: StoredAPDetailRow | null = null
+        for (const row of storedData.value) {
+          const name = normalizeName(row.creditor)
+          if (name.length >= 2 && text.includes(name)) {
+            hit = row
+            break
+          }
+        }
+        if (hit) {
+          rowSums.set(hit.rowId, (rowSums.get(hit.rowId) || 0) + debit)
+        } else {
+          unmatchedCount++
+          unmatchedAmount += debit
+        }
+      }
+
+      const matched = rowSums.size
+      const filledAmount = Array.from(rowSums.values()).reduce((s, v) => s + v, 0)
+
+      // 回填(仅填空值)
+      for (const [rowId, amount] of rowSums) {
+        const row = storedData.value.find((r) => r.rowId === rowId)
+        if (row && row.subsequentPayment === 0) {
+          row.subsequentPayment = Math.round(amount * 100) / 100
+        }
+      }
+
+      if (matched > 0) persistRows()
+      return { matched, filledAmount: Math.round(filledAmount * 100) / 100, unmatchedCount, unmatchedAmount: Math.round(unmatchedAmount * 100) / 100 }
+    } catch {
+      ElMessage.warning('期后付款取数失败')
+      return empty
+    }
+  }
+
   // ─── 持久化 ───────────────────────────────────────────────────────────────
 
   function persistRows(): void {
@@ -487,6 +592,7 @@ export function useF4Detail(options: UseF4DetailOptions) {
     removeRow,
     updateCell,
     allocateAging,
+    importPostPaymentFromLedger,
     rowClassName,
     basicColumns: F4_DETAIL_BASIC_COLUMNS,
     agingColumns: F4_DETAIL_AGING_COLUMNS,

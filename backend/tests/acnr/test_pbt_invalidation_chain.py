@@ -47,6 +47,18 @@ _REV_TARGET = "app.services.formula_reverse_index.invalidate_reverse_index"
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture(autouse=True)
+def _stub_durable_epoch():
+    """Step 5 Durable_Epoch（DB-first）与本测试的 4 步缓存链正交 —— 打桩避免在
+    asyncio.run per-example loop 中开真实 DB 连接（跨 loop asyncpg 清理 RuntimeWarning）。
+    """
+    with patch(
+        "app.services.acnr.cache_epoch.increment_epoch",
+        new=AsyncMock(return_value=0),
+    ):
+        yield
+
+
 class TestInvalidationChainCompleteness:
     """Property 14: 4 步失效链完整性 — 任意异常组合下全步必达。"""
 

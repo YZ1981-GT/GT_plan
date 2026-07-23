@@ -1,37 +1,22 @@
 /**
- * useB23ProcessControl — B23 业务流程与控制了解表 主 composable
+ * useB23ProcessControl — B23 业务层面控制主 composable（14 循环重做）
  *
- * Spec: .kiro/specs/b23-process-control/
- * Task: 2.2
+ * Spec: .kiro/specs/b23-business-control-rework/ | Task: 2.1
  *
  * 职责：
- * - 8 流程卡片管理（展开/收起/适用性）
- * - 控制点 CRUD（per process）
- * - 穿行测试记录管理
- * - Process_Conclusion 自动建议（30% 阈值算法）
- * - 仪表盘统计（dashboardStats）
- * - Entity_Level_Context（B22A 上下文接收）
- * - Linkage_Panel 联动信息
- * - EventBus 事件发布
+ * - 14 循环卡片管理（展开/收起/适用性）
+ * - 21 列控制矩阵 CRUD（per cycle）
+ * - 穿行测试（验设计）/ 控制测试（验运行）分层 CRUD（wt-* 与 ct-* 独立命名空间）
+ * - 缺陷 CRUD（A14-4 分级）
+ * - 循环级结论自动建议
+ * - 仪表盘统计 / 联动信息 / EventBus / Entity_Level_Context
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
-import type { ChecklistItem, ChecklistResponse, ProcessNumber } from './useB23FormData'
+import type { ChecklistItem, ChecklistResponse } from './useB23FormData'
+import { B23_CYCLES, type B23CycleDef } from './b23CycleConfig'
 
-// ─── Constants (exported for testing) ────────────────────────────────────────
+// ─── 常量（导出供测试/组件） ──────────────────────────────────────────────
 
-/** 8 标准流程配置 */
-export const STANDARD_PROCESSES: readonly { num: ProcessNumber; name: string; code: string; targetCycle: string }[] = [
-  { num: 1, name: '采购与付款循环', code: 'P1', targetCycle: 'DA' },
-  { num: 2, name: '销售与收款循环', code: 'P2', targetCycle: 'EA' },
-  { num: 3, name: '资金管理循环', code: 'P3', targetCycle: 'FA' },
-  { num: 4, name: '生产与存货循环', code: 'P4', targetCycle: 'GA' },
-  { num: 5, name: '薪酬与人力循环', code: 'P5', targetCycle: 'HA' },
-  { num: 6, name: '固定资产循环', code: 'P6', targetCycle: 'IA' },
-  { num: 7, name: '投资循环', code: 'P7', targetCycle: 'JA' },
-  { num: 8, name: '其他流程', code: 'P8', targetCycle: 'KA' },
-]
-
-/** 流程结论→颜色映射 */
 export const PROCESS_CONCLUSION_COLOR_MAP: Record<string, { color: string; bg: string; label: string }> = {
   '设计有效且已实施':     { color: '#52c41a', bg: '#f6ffed', label: '有效' },
   '设计有效但未有效实施': { color: '#faad14', bg: '#fffbe6', label: '部分有效' },
@@ -40,7 +25,6 @@ export const PROCESS_CONCLUSION_COLOR_MAP: Record<string, { color: string; bg: s
   '待测试':              { color: '#1890ff', bg: '#e6f7ff', label: '待测试' },
 }
 
-/** 流程结论→B50 控制风险影响 */
 export const CONCLUSION_TO_B50_IMPACT: Record<string, string> = {
   '设计有效且已实施':     '控制风险=低',
   '设计有效但未有效实施': '控制风险=中',
@@ -48,105 +32,125 @@ export const CONCLUSION_TO_B50_IMPACT: Record<string, string> = {
   '不适用':              '不影响控制风险评估',
 }
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+/** 枚举选项（供组件下拉/多选） */
+export const ASSERTION_OPTIONS = ['存在', '发生', '完整性', '准确性', '计价分摊', '权利义务', '列报'] as const
+export const FREQUENCY_OPTIONS = ['每笔', '每日', '每周', '每月', '每季', '每年', '不定期', '定期'] as const
+export const PREVENT_DETECT_OPTIONS = ['预防性', '检查性'] as const
+export const CTRL_TYPE_L1_OPTIONS = ['授权和审批', '监督控制', '信息处理', '实物控制', '职责分离', '绩效评价复核'] as const
+export const YES_NO_OPTIONS = ['是', '否'] as const
+export const WT_AS_DESIGNED_OPTIONS = ['是', '否'] as const
+export const CONTROL_TEST_RESULT_OPTIONS = ['有效', '无效'] as const
+export const DEFICIENCY_TYPE_OPTIONS = ['缺乏控制', '设计不合理', '未执行'] as const
+export const DEFICIENCY_SEVERITY_OPTIONS = ['重大缺陷', '重要缺陷', '一般缺陷'] as const
+export const CYCLE_CONCLUSION_OPTIONS = ['设计有效且已实施', '设计有效但未有效实施', '设计无效', '不适用'] as const
 
-/** 流程结论 */
-export type ProcessConclusion = '设计有效且已实施' | '设计有效但未有效实施' | '设计无效' | '不适用'
+// ─── 类型 ────────────────────────────────────────────────────────────────────
 
-/** 穿行测试结论（控制点级） */
-export type WalkthroughConclusion = '控制有效运行' | '控制未有效运行' | '未执行穿行' | '不适用'
+export type CycleConclusion = '设计有效且已实施' | '设计有效但未有效实施' | '设计无效' | '不适用'
+export type ControlFrequency = typeof FREQUENCY_OPTIONS[number]
+export type YesNo = '是' | '否'
 
-/** 了解方法（多选） */
-export type UnderstandingMethod = '询问' | '观察' | '检查文件' | '穿行测试' | '重新执行'
-
-/** 控制频率 */
-export type ControlFrequency = '每笔' | '每日' | '每周' | '每月' | '每季' | '每年' | '不定期'
-
-/** 控制点字段 */
-export type ControlPointField = 'objective' | 'description' | 'frequency' | 'executor' | 'methods' | 'conclusion' | 'remark'
-
-/** 穿行测试字段 */
-export type WalkthroughField = 'sample' | 'path' | 'finding' | 'reference'
-
-/** 控制点 */
-export interface ControlPoint {
+/** 21 列控制点 */
+export interface B23ControlPoint {
   index: number
-  objective: string
-  description: string
+  subProcess: string
+  ctrlNo: string
+  ctrlName: string
+  ctrlDesc: string
+  affectedItems: string
+  assertion: string[]           // 多选
+  wcgwRef: string
+  wcgwDetail: string
+  ctrlAttr: string
   frequency: ControlFrequency | null
+  itApp: string
+  preventDetect: '预防性' | '检查性' | null
+  designEffective: YesNo | null
+  ctrlTypeL1: string | null
+  ctrlTypeL2: string | null
   executor: string
-  methods: UnderstandingMethod[]
-  conclusion: WalkthroughConclusion | null
-  remark: string
-  isPreset: boolean
+  executorOrg: string
+  hasDoc: YesNo | null
+  isKeyControl: YesNo | null
+  doControlTest: YesNo | null
 }
 
-/** 穿行测试记录（单笔样本） */
-export interface WalkthroughRecord {
-  sampleIndex: number
-  sample: string
-  path: string
-  finding: string
-  reference: string
+/** 穿行测试记录（验设计） */
+export interface B23WalkthroughTest {
+  ctrlIndex: number
+  method: string[]              // 多选
+  interviewee: string
+  procedure: string
+  evidence: string
+  result: string
+  asDesigned: YesNo | null
+  deficiencyFound: string
 }
 
-/** 穿行测试摘要 */
-export interface WalkthroughSummary {
-  testedCount: number
-  totalCount: number
-  completionRate: number
+/** 控制测试记录（验运行） */
+export interface B23ControlTest {
+  ctrlIndex: number
+  riskJudgment: string
+  testNature: string
+  testTiming: string
+  testScope: string
+  operatingEffective: '有效' | '无效' | null
+  deviation: string
+  substantiveImpact: string
 }
 
-/** 流程卡片 */
-export interface ProcessCard {
-  num: ProcessNumber
+/** 缺陷记录（A14-4 分级） */
+export interface B23Deficiency {
+  index: number
+  subProcess: string
+  description: string
+  deficiencyType: '缺乏控制' | '设计不合理' | '未执行' | null
+  severity: '重大缺陷' | '重要缺陷' | '一般缺陷' | null
+  impact: string
+}
+
+/** 循环卡片 */
+export interface B23CycleCard {
+  code: string
+  wpCode: string
   name: string
+  subjectCycle: string
+  isSpecial: boolean
   applicable: boolean
-  conclusion: ProcessConclusion | null
-  suggestedConclusion: ProcessConclusion | null
+  conclusion: CycleConclusion | null
+  suggestedConclusion: CycleConclusion | null
   conclusionOverridden: boolean
   overrideReason: string
-  controlPoints: ControlPoint[]
+  controlPoints: B23ControlPoint[]
+  walkthroughs: B23WalkthroughTest[]
+  controlTests: B23ControlTest[]
+  deficiencies: B23Deficiency[]
+  keyControlCount: number
   walkthroughComplete: boolean
+  controlTestComplete: boolean
+  deficiencyCount: number
   completionRatio: string
 }
 
-/** 状态仪表盘统计 */
+/** 仪表盘统计 */
 export interface DashboardStats {
-  completionDistribution: {
-    completed: number
-    inProgress: number
-    notStarted: number
-    notApplicable: number
-  }
-  effectivenessDistribution: {
-    effective: number
-    partiallyEffective: number
-    ineffective: number
-    notApplicable: number
-  }
+  applicableCount: number
+  completedCount: number
+  totalControlPoints: number
+  totalKeyControls: number
   pendingWalkthroughCount: number
+  pendingControlTestCount: number
+  totalDeficiencies: number
+  effectivenessDistribution: { effective: number; partiallyEffective: number; ineffective: number; notApplicable: number }
 }
 
-/** B22A 实体层面上下文（只读） */
+/** Entity_Level_Context（B22A 只读） */
 export interface EntityLevelContext {
   elementScores: Record<number, string | null>
   overallConclusion: string | null
   completed: boolean
 }
 
-/** 联动信息 */
-export interface LinkageInfo {
-  processNum: ProcessNumber
-  processName: string
-  conclusion: ProcessConclusion | null
-  b50Impact: string
-  targetCycle: string
-  targetCycleName: string
-  needsExtendedProcedures: boolean
-}
-
-/** EventBus: control:conclusion-changed 载荷（来自 B22A） */
 export interface ControlConclusionPayload {
   elementScores: Record<number, string | null>
   itDependency: string
@@ -154,503 +158,484 @@ export interface ControlConclusionPayload {
   overallConclusion: string | null
 }
 
+/** 联动信息 */
+export interface LinkageInfo {
+  code: string
+  name: string
+  conclusion: CycleConclusion | null
+  b50Impact: string
+  cTests: string[]
+  substantiveCycles: string[]
+  needsExtendedProcedures: boolean
+}
+
 export type SaveFn = (items: ChecklistItem[]) => Promise<void>
 
-// ─── Pure Functions (exported for testing) ───────────────────────────────────
+type IdType =
+  | 'applicability' | 'cycle-conclusion' | 'conclusion-override'
+  | 'ctrl-count' | 'ctrl'
+  | 'wt' | 'ct'
+  | 'def-count' | 'def'
+  | 'subproc'
+
+// ─── 纯函数（导出供 PBT） ─────────────────────────────────────────────────────
 
 /**
- * 自动建议流程级结论（30% 阈值算法）
- * - 排除 conclusion=null 和"不适用"后：
- *   (a) 全部为"控制有效运行" → "设计有效且已实施"
- *   (b) 存在"控制未有效运行"且占比≤30% → "设计有效但未有效实施"
- *   (c) 占比>30% → "设计无效"
- *   (d) 无已评估控制点 → null
+ * 生成 item_id（cycle-keyed，前缀 B23-{code}-）
  */
-export function suggestProcessConclusion(controlPoints: ControlPoint[]): ProcessConclusion | null {
-  const evaluated = controlPoints.filter(
-    cp => cp.conclusion !== null && cp.conclusion !== '不适用'
-  )
-  if (evaluated.length === 0) return null
-
-  const ineffective = evaluated.filter(cp => cp.conclusion === '控制未有效运行')
-  if (ineffective.length === 0) {
-    return '设计有效且已实施'
+export function generateItemId(
+  cycleCode: string,
+  type: IdType,
+  a?: number,
+  b?: number,
+  field?: string,
+): string {
+  const p = `B23-${cycleCode}`
+  switch (type) {
+    case 'applicability':        return `${p}-applicability`
+    case 'cycle-conclusion':     return `${p}-cycle-conclusion`
+    case 'conclusion-override':  return `${p}-conclusion-override`
+    case 'ctrl-count':           return `${p}-ctrl-count`
+    case 'ctrl':                 return `${p}-ctrl-${a}-${field}`
+    case 'wt':                   return `${p}-wt-${a}-${field}`
+    case 'ct':                   return `${p}-ct-${a}-${field}`
+    case 'def-count':            return `${p}-def-count`
+    case 'def':                  return `${p}-def-${a}-${field}`
+    case 'subproc':              return `${p}-subproc-${a}-name`
   }
+}
 
-  const ineffectiveRatio = ineffective.length / evaluated.length
-  if (ineffectiveRatio <= 0.3) {
-    return '设计有效但未有效实施'
+/** 循环级结论自动建议（基于控制测试运行有效性 + 缺陷分布，30% 阈值） */
+export function suggestCycleConclusion(
+  controlTests: B23ControlTest[],
+  deficiencies: B23Deficiency[],
+): CycleConclusion | null {
+  const evaluated = controlTests.filter((ct) => ct.operatingEffective !== null)
+  if (evaluated.length === 0) {
+    // 无控制测试结论时，看是否已识别重大/重要缺陷
+    if (deficiencies.some((d) => d.severity === '重大缺陷' || d.severity === '重要缺陷')) return '设计无效'
+    return null
   }
+  const ineffective = evaluated.filter((ct) => ct.operatingEffective === '无效')
+  if (ineffective.length === 0) return '设计有效且已实施'
+  const ratio = ineffective.length / evaluated.length
+  if (ratio <= 0.3) return '设计有效但未有效实施'
   return '设计无效'
 }
 
-/**
- * 生成 item_id
- * - 流程适用性: B23-P{n}-applicability
- * - 控制点字段: B23-P{n}-ctrl-{m}-{field}
- * - 穿行测试: B23-P{n}-wt-{m}-{s}-{field}
- * - 控制点数量: B23-P{n}-ctrl-count
- * - 穿行样本数量: B23-P{n}-wt-{m}-count
- * - 流程结论: B23-P{n}-process-conclusion
- * - 手动覆盖标记: B23-P{n}-conclusion-override
- */
-export function generateItemId(
-  processNum: ProcessNumber,
-  type: 'applicability' | 'ctrl' | 'wt' | 'ctrl-count' | 'wt-count' | 'process-conclusion' | 'conclusion-override',
-  ctrlIndex?: number,
-  sampleIndex?: number,
-  field?: string
-): string {
-  const prefix = `B23-P${processNum}`
-  switch (type) {
-    case 'applicability':
-      return `${prefix}-applicability`
-    case 'ctrl':
-      return `${prefix}-ctrl-${ctrlIndex}-${field}`
-    case 'wt':
-      return `${prefix}-wt-${ctrlIndex}-${sampleIndex}-${field}`
-    case 'ctrl-count':
-      return `${prefix}-ctrl-count`
-    case 'wt-count':
-      return `${prefix}-wt-${ctrlIndex}-count`
-    case 'process-conclusion':
-      return `${prefix}-process-conclusion`
-    case 'conclusion-override':
-      return `${prefix}-conclusion-override`
-  }
+/** 控制点是否可进入测试对象集合（仅关键控制点） */
+export function eligibleForTest(cp: B23ControlPoint): boolean {
+  return cp.isKeyControl === '是'
 }
 
-// ─── Main Composable ─────────────────────────────────────────────────────────
+/** 是否建议执行控制测试（关键控制 ∧ 穿行按设计执行） */
+export function suggestControlTest(cp: B23ControlPoint, wt: B23WalkthroughTest | undefined): boolean {
+  return eligibleForTest(cp) && wt?.asDesigned === '是'
+}
+
+/** 缺陷提示（设计无效 或 穿行未按设计执行 → 必有提示） */
+export function deficiencyHints(cp: B23ControlPoint, wt: B23WalkthroughTest | undefined): string[] {
+  const hints: string[] = []
+  if (cp.designEffective === '否') {
+    hints.push(`控制点 ${cp.ctrlNo || cp.index}（${cp.ctrlName || ''}）：控制设计无效，需识别缺陷`)
+  }
+  if (wt?.asDesigned === '否') {
+    hints.push(`控制点 ${cp.ctrlNo || cp.index}（${cp.ctrlName || ''}）：穿行测试未按设计执行，需识别缺陷并评估对实质性程序范围的影响`)
+  }
+  return hints
+}
+
+/** 适用性过滤（幂等）：返回适用循环子集 */
+export function applicableCycles<T extends { applicable: boolean }>(cycles: T[]): T[] {
+  return cycles.filter((c) => c.applicable)
+}
+
+// ─── 主 composable ─────────────────────────────────────────────────────────
 
 export function useB23ProcessControl(
   allResponses: Ref<Map<string, ChecklistResponse>>,
-  saveImmediate: SaveFn
+  saveImmediate: SaveFn,
 ) {
-  // ─── Expand/Collapse Management ──────────────────────────────────────────
+  // ─── 展开/收起 ───────────────────────────────────────────────────────────
+  const expandedCycles = ref<Set<string>>(new Set())
+  const selectedCycle = ref<string>('')
 
-  const expandedProcesses = ref<Set<ProcessNumber>>(new Set([1, 2, 3, 4, 5, 6, 7, 8]))
-
-  function toggleProcess(num: ProcessNumber): void {
-    const s = new Set(expandedProcesses.value)
-    if (s.has(num)) s.delete(num)
-    else s.add(num)
-    expandedProcesses.value = s
+  function selectCycle(code: string): void {
+    selectedCycle.value = code
+    const s = new Set(expandedCycles.value)
+    s.add(code)
+    expandedCycles.value = s
   }
-
-  function expandAll(): void {
-    expandedProcesses.value = new Set([1, 2, 3, 4, 5, 6, 7, 8])
+  function toggleCycle(code: string): void {
+    const s = new Set(expandedCycles.value)
+    if (s.has(code)) s.delete(code)
+    else s.add(code)
+    expandedCycles.value = s
   }
+  function expandAll(): void { expandedCycles.value = new Set(B23_CYCLES.map((c) => c.code)) }
+  function collapseAll(): void { expandedCycles.value = new Set(); selectedCycle.value = '' }
 
-  function collapseAll(): void {
-    expandedProcesses.value = new Set()
-  }
-
-  // ─── Helper: read/write response fields ──────────────────────────────────
-
-  function getResponseValue(itemId: string): ChecklistResponse {
+  // ─── 读写辅助 ─────────────────────────────────────────────────────────────
+  function getResp(itemId: string): ChecklistResponse {
     return allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null, wp_ref: null }
   }
-
-  function setResponseLocal(itemId: string, conclusion: string | null, remark: string | null = null, wpRef: string | null = null): ChecklistItem {
+  function setLocal(itemId: string, conclusion: string | null, remark: string | null = null, wpRef: string | null = null): ChecklistItem {
     const item: ChecklistItem = { item_id: itemId, conclusion, remark, wp_ref: wpRef }
     allResponses.value.set(itemId, item)
     return item
   }
 
-  // ─── Applicability ───────────────────────────────────────────────────────
-
-  function getApplicability(num: ProcessNumber): ComputedRef<boolean> {
-    return computed(() => {
-      const id = generateItemId(num, 'applicability')
-      const r = getResponseValue(id)
-      return r.conclusion !== 'N'
-    })
+  // ─── 适用性 ───────────────────────────────────────────────────────────────
+  function getApplicability(code: string): boolean {
+    return getResp(generateItemId(code, 'applicability')).conclusion !== 'N'
   }
-
-  function setApplicability(num: ProcessNumber, applicable: boolean): void {
-    const applicabilityId = generateItemId(num, 'applicability')
-    const conclusionId = generateItemId(num, 'process-conclusion')
-    const overrideId = generateItemId(num, 'conclusion-override')
-
-    const items: ChecklistItem[] = []
-
+  function setApplicability(code: string, applicable: boolean): void {
+    const items: ChecklistItem[] = [setLocal(generateItemId(code, 'applicability'), applicable ? 'Y' : 'N')]
     if (!applicable) {
-      // Mark not applicable → auto-set conclusion to "不适用"
-      items.push(setResponseLocal(applicabilityId, 'N'))
-      items.push(setResponseLocal(conclusionId, '不适用'))
-      items.push(setResponseLocal(overrideId, null, null))
-      // Collapse the card
-      const s = new Set(expandedProcesses.value)
-      s.delete(num)
-      expandedProcesses.value = s
+      items.push(setLocal(generateItemId(code, 'cycle-conclusion'), '不适用'))
+      const s = new Set(expandedCycles.value); s.delete(code); expandedCycles.value = s
     } else {
-      // Restore applicable → clear auto conclusion
-      items.push(setResponseLocal(applicabilityId, 'Y'))
-      items.push(setResponseLocal(conclusionId, null))
-      items.push(setResponseLocal(overrideId, null, null))
-      // Expand the card
-      const s = new Set(expandedProcesses.value)
-      s.add(num)
-      expandedProcesses.value = s
+      // 恢复适用 → 清除自动"不适用"结论
+      if (getResp(generateItemId(code, 'cycle-conclusion')).conclusion === '不适用') {
+        items.push(setLocal(generateItemId(code, 'cycle-conclusion'), null))
+      }
     }
-
     saveImmediate(items)
   }
 
-  // ─── Control Points ──────────────────────────────────────────────────────
+  // ─── 控制点 CRUD ──────────────────────────────────────────────────────────
+  const CTRL_TEXT_FIELDS = ['subProcess', 'ctrlNo', 'ctrlName', 'ctrlDesc', 'affectedItems', 'wcgwRef', 'wcgwDetail', 'ctrlAttr', 'itApp', 'executor', 'executorOrg'] as const
+  const CTRL_ENUM_FIELDS = ['frequency', 'preventDetect', 'designEffective', 'ctrlTypeL1', 'ctrlTypeL2', 'hasDoc', 'isKeyControl', 'doControlTest'] as const
 
-  function getControlPointCount(num: ProcessNumber): number {
-    const id = generateItemId(num, 'ctrl-count')
-    const r = getResponseValue(id)
-    const count = parseInt(r.remark || '0', 10)
-    return isNaN(count) ? 0 : count
+  function getCtrlCount(code: string): number {
+    const n = parseInt(getResp(generateItemId(code, 'ctrl-count')).remark || '0', 10)
+    return isNaN(n) ? 0 : n
   }
-
-  function getControlPoints(num: ProcessNumber): ComputedRef<ControlPoint[]> {
-    return computed(() => {
-      const count = getControlPointCount(num)
-      const points: ControlPoint[] = []
-      for (let m = 1; m <= count; m++) {
-        points.push(readControlPoint(num, m))
-      }
-      return points
-    })
-  }
-
-  function readControlPoint(num: ProcessNumber, m: number): ControlPoint {
-    const objective = getResponseValue(generateItemId(num, 'ctrl', m, undefined, 'objective')).remark || ''
-    const description = getResponseValue(generateItemId(num, 'ctrl', m, undefined, 'description')).remark || ''
-    const frequencyVal = getResponseValue(generateItemId(num, 'ctrl', m, undefined, 'frequency')).conclusion
-    const executor = getResponseValue(generateItemId(num, 'ctrl', m, undefined, 'executor')).remark || ''
-    const methodsRaw = getResponseValue(generateItemId(num, 'ctrl', m, undefined, 'methods')).remark || ''
-    const conclusion = getResponseValue(generateItemId(num, 'ctrl', m, undefined, 'conclusion')).conclusion as WalkthroughConclusion | null
-    const remark = getResponseValue(generateItemId(num, 'ctrl', m, undefined, 'remark')).remark || ''
-
-    const methods: UnderstandingMethod[] = methodsRaw
-      ? (methodsRaw.split(',').filter(Boolean) as UnderstandingMethod[])
-      : []
-
+  function readControlPoint(code: string, m: number): B23ControlPoint {
+    const t = (f: string) => getResp(generateItemId(code, 'ctrl', m, undefined, f)).remark || ''
+    const e = (f: string) => getResp(generateItemId(code, 'ctrl', m, undefined, f)).conclusion
+    const assertRaw = t('assertion')
     return {
       index: m,
-      objective,
-      description,
-      frequency: frequencyVal as ControlFrequency | null,
-      executor,
-      methods,
-      conclusion,
-      remark,
-      isPreset: m <= 3, // First 3 are preset by convention
+      subProcess: t('subProcess'), ctrlNo: t('ctrlNo'), ctrlName: t('ctrlName'), ctrlDesc: t('ctrlDesc'),
+      affectedItems: t('affectedItems'),
+      assertion: assertRaw ? assertRaw.split(',').filter(Boolean) : [],
+      wcgwRef: t('wcgwRef'), wcgwDetail: t('wcgwDetail'), ctrlAttr: t('ctrlAttr'), itApp: t('itApp'),
+      executor: t('executor'), executorOrg: t('executorOrg'),
+      frequency: e('frequency') as ControlFrequency | null,
+      preventDetect: e('preventDetect') as '预防性' | '检查性' | null,
+      designEffective: e('designEffective') as YesNo | null,
+      ctrlTypeL1: e('ctrlTypeL1'), ctrlTypeL2: e('ctrlTypeL2'),
+      hasDoc: e('hasDoc') as YesNo | null,
+      isKeyControl: e('isKeyControl') as YesNo | null,
+      doControlTest: e('doControlTest') as YesNo | null,
     }
   }
-
-  function addControlPoint(num: ProcessNumber): void {
-    const currentCount = getControlPointCount(num)
-    if (currentCount >= 20) return // Max 20 per process
-
-    const newCount = currentCount + 1
-    const countId = generateItemId(num, 'ctrl-count')
-    const items: ChecklistItem[] = [
-      setResponseLocal(countId, null, String(newCount)),
-    ]
-    saveImmediate(items)
+  function getControlPoints(code: string): B23ControlPoint[] {
+    const count = getCtrlCount(code)
+    const arr: B23ControlPoint[] = []
+    for (let m = 1; m <= count; m++) arr.push(readControlPoint(code, m))
+    return arr
   }
-
-  function removeControlPoint(num: ProcessNumber, index: number): void {
-    const currentCount = getControlPointCount(num)
-    if (index < 1 || index > currentCount) return
-
-    // Shift all items after the removed index down by 1
+  function addControlPoint(code: string): void {
+    const c = getCtrlCount(code)
+    if (c >= 30) return
+    saveImmediate([setLocal(generateItemId(code, 'ctrl-count'), null, String(c + 1))])
+  }
+  function removeControlPoint(code: string, index: number): void {
+    const count = getCtrlCount(code)
+    if (index < 1 || index > count) return
     const items: ChecklistItem[] = []
-    const fields: string[] = ['objective', 'description', 'frequency', 'executor', 'methods', 'conclusion', 'remark']
-
-    for (let m = index; m < currentCount; m++) {
-      // Copy from m+1 to m
-      for (const field of fields) {
-        const sourceId = generateItemId(num, 'ctrl', m + 1, undefined, field)
-        const targetId = generateItemId(num, 'ctrl', m, undefined, field)
-        const source = getResponseValue(sourceId)
-        items.push(setResponseLocal(targetId, source.conclusion, source.remark, source.wp_ref))
+    const allFields = [...CTRL_TEXT_FIELDS, 'assertion', ...CTRL_ENUM_FIELDS]
+    for (let m = index; m < count; m++) {
+      for (const f of allFields) {
+        const src = getResp(generateItemId(code, 'ctrl', m + 1, undefined, f))
+        items.push(setLocal(generateItemId(code, 'ctrl', m, undefined, f), src.conclusion, src.remark))
       }
-      // Also shift walkthrough records
-      const wtCountId = generateItemId(num, 'wt-count', m + 1)
-      const wtCount = parseInt(getResponseValue(wtCountId).remark || '0', 10) || 0
-      const wtTargetCountId = generateItemId(num, 'wt-count', m)
-      items.push(setResponseLocal(wtTargetCountId, null, String(wtCount)))
-
-      for (let s = 1; s <= wtCount; s++) {
-        const wtFields: WalkthroughField[] = ['sample', 'path', 'finding', 'reference']
-        for (const wf of wtFields) {
-          const sId = generateItemId(num, 'wt', m + 1, s, wf)
-          const tId = generateItemId(num, 'wt', m, s, wf)
-          const sv = getResponseValue(sId)
-          items.push(setResponseLocal(tId, sv.conclusion, sv.remark, sv.wp_ref))
-        }
+      // 同步 wt/ct 记录下移
+      for (const f of WT_FIELDS) {
+        const src = getResp(generateItemId(code, 'wt', m + 1, undefined, f))
+        items.push(setLocal(generateItemId(code, 'wt', m, undefined, f), src.conclusion, src.remark))
+      }
+      for (const f of CT_FIELDS) {
+        const src = getResp(generateItemId(code, 'ct', m + 1, undefined, f))
+        items.push(setLocal(generateItemId(code, 'ct', m, undefined, f), src.conclusion, src.remark))
       }
     }
-
-    // Clear the last slot
-    for (const field of fields) {
-      const lastId = generateItemId(num, 'ctrl', currentCount, undefined, field)
-      items.push(setResponseLocal(lastId, null, null))
+    for (const f of allFields) items.push(setLocal(generateItemId(code, 'ctrl', count, undefined, f), null, null))
+    for (const f of WT_FIELDS) items.push(setLocal(generateItemId(code, 'wt', count, undefined, f), null, null))
+    for (const f of CT_FIELDS) items.push(setLocal(generateItemId(code, 'ct', count, undefined, f), null, null))
+    items.push(setLocal(generateItemId(code, 'ctrl-count'), null, String(count - 1)))
+    saveImmediate(items)
+  }
+  function buildCtrlFieldItem(code: string, index: number, field: string, value: any): ChecklistItem {
+    const itemId = generateItemId(code, 'ctrl', index, undefined, field)
+    if ((CTRL_ENUM_FIELDS as readonly string[]).includes(field)) {
+      return setLocal(itemId, value as string | null)
+    } else if (field === 'assertion') {
+      return setLocal(itemId, null, (Array.isArray(value) ? value : []).join(','))
     }
-    const lastWtCountId = generateItemId(num, 'wt-count', currentCount)
-    items.push(setResponseLocal(lastWtCountId, null, '0'))
+    return setLocal(itemId, null, value == null ? '' : String(value))
+  }
+  function setControlPointField(code: string, index: number, field: string, value: any): void {
+    saveImmediate([buildCtrlFieldItem(code, index, field, value)])
+  }
 
-    // Update count
-    const countId = generateItemId(num, 'ctrl-count')
-    items.push(setResponseLocal(countId, null, String(currentCount - 1)))
+  /** 批量写单个控制点的多个字段（引导式弹窗一次性提交，避免逐字段多次 PUT） */
+  function setControlPointFields(code: string, index: number, partial: Partial<B23ControlPoint>): void {
+    const items: ChecklistItem[] = []
+    for (const [field, value] of Object.entries(partial)) {
+      if (field === 'index') continue
+      items.push(buildCtrlFieldItem(code, index, field, value))
+    }
+    if (items.length) saveImmediate(items)
+  }
 
+  /** 批量导入控制点（供 useB23ImportExport 回写；mode=skip 时仅填空锚点） */
+  function importControlPoints(code: string, points: B23ControlPoint[], mode: 'overwrite' | 'skip'): void {
+    const items: ChecklistItem[] = []
+    const existing = mode === 'skip' ? getControlPoints(code) : []
+    const newCount = mode === 'skip' ? Math.max(getCtrlCount(code), points.length) : points.length
+    const writeField = (m: number, field: string, isEnum: boolean, value: string) => {
+      if (mode === 'skip') {
+        const cur = existing[m - 1] as any
+        const curVal = cur ? (field === 'assertion' ? (cur.assertion || []).join(',') : (cur[field] ?? '')) : ''
+        if (curVal) return // 已有值 → 跳过
+      }
+      const itemId = generateItemId(code, 'ctrl', m, undefined, field)
+      items.push(isEnum ? setLocal(itemId, value || null) : setLocal(itemId, null, value))
+    }
+    points.forEach((cp, i) => {
+      const m = i + 1
+      for (const f of CTRL_TEXT_FIELDS) writeField(m, f, false, (cp as any)[f] ?? '')
+      writeField(m, 'assertion', false, cp.assertion.join(','))
+      for (const f of CTRL_ENUM_FIELDS) writeField(m, f, true, ((cp as any)[f] ?? '') as string)
+    })
+    items.push(setLocal(generateItemId(code, 'ctrl-count'), null, String(newCount)))
     saveImmediate(items)
   }
 
-  function setControlPointField(num: ProcessNumber, index: number, field: ControlPointField, value: any): void {
-    const itemId = generateItemId(num, 'ctrl', index, undefined, field)
-    let item: ChecklistItem
+  // ─── 穿行测试（验设计） ──────────────────────────────────────────────────
+  const WT_TEXT_FIELDS = ['interviewee', 'procedure', 'evidence', 'result', 'deficiencyFound'] as const
+  const WT_FIELDS = ['method', ...WT_TEXT_FIELDS, 'asDesigned'] as const
 
-    if (field === 'frequency' || field === 'conclusion') {
-      // Store in conclusion column
-      item = setResponseLocal(itemId, value as string | null)
-    } else if (field === 'methods') {
-      // Store as comma-separated in remark
-      const methods = value as UnderstandingMethod[]
-      item = setResponseLocal(itemId, null, methods.join(','))
-    } else {
-      // Text fields: objective, description, executor, remark → store in remark
-      item = setResponseLocal(itemId, null, value as string)
-    }
-
-    saveImmediate([item])
-  }
-
-  // ─── Walkthrough Records ─────────────────────────────────────────────────
-
-  function getWalkthroughSampleCount(num: ProcessNumber, ctrlIndex: number): number {
-    const id = generateItemId(num, 'wt-count', ctrlIndex)
-    const r = getResponseValue(id)
-    const count = parseInt(r.remark || '0', 10)
-    return isNaN(count) ? 0 : count
-  }
-
-  function getWalkthroughRecords(num: ProcessNumber, ctrlIndex: number): ComputedRef<WalkthroughRecord[]> {
-    return computed(() => {
-      const count = getWalkthroughSampleCount(num, ctrlIndex)
-      const records: WalkthroughRecord[] = []
-      for (let s = 1; s <= count; s++) {
-        records.push({
-          sampleIndex: s,
-          sample: getResponseValue(generateItemId(num, 'wt', ctrlIndex, s, 'sample')).remark || '',
-          path: getResponseValue(generateItemId(num, 'wt', ctrlIndex, s, 'path')).remark || '',
-          finding: getResponseValue(generateItemId(num, 'wt', ctrlIndex, s, 'finding')).remark || '',
-          reference: getResponseValue(generateItemId(num, 'wt', ctrlIndex, s, 'reference')).remark || '',
-        })
-      }
-      return records
-    })
-  }
-
-  function addWalkthroughSample(num: ProcessNumber, ctrlIndex: number): void {
-    const currentCount = getWalkthroughSampleCount(num, ctrlIndex)
-    if (currentCount >= 5) return // Max 5 samples per control point
-
-    const newCount = currentCount + 1
-    const countId = generateItemId(num, 'wt-count', ctrlIndex)
-    const items: ChecklistItem[] = [
-      setResponseLocal(countId, null, String(newCount)),
-    ]
-    saveImmediate(items)
-  }
-
-  function setWalkthroughField(num: ProcessNumber, ctrlIndex: number, sampleIndex: number, field: WalkthroughField, value: string): void {
-    const itemId = generateItemId(num, 'wt', ctrlIndex, sampleIndex, field)
-    const item = setResponseLocal(itemId, null, value)
-    saveImmediate([item])
-  }
-
-  // ─── Walkthrough Completion ──────────────────────────────────────────────
-
-  function isWalkthroughComplete(num: ProcessNumber): ComputedRef<boolean> {
-    return computed(() => {
-      const points = getControlPoints(num).value
-      // Only consider control points that have "穿行测试" in methods
-      const needsWalkthrough = points.filter(cp => cp.methods.includes('穿行测试'))
-      if (needsWalkthrough.length === 0) return true
-      return needsWalkthrough.every(cp => cp.conclusion !== null)
-    })
-  }
-
-  function walkthroughSummary(num: ProcessNumber): ComputedRef<WalkthroughSummary> {
-    return computed(() => {
-      const points = getControlPoints(num).value
-      const needsWalkthrough = points.filter(cp => cp.methods.includes('穿行测试'))
-      const totalCount = needsWalkthrough.length
-      const testedCount = needsWalkthrough.filter(cp => cp.conclusion !== null).length
-      const completionRate = totalCount === 0 ? 1 : testedCount / totalCount
-      return { testedCount, totalCount, completionRate }
-    })
-  }
-
-  // ─── Process Conclusion ──────────────────────────────────────────────────
-
-  function suggestConclusion(num: ProcessNumber): ComputedRef<ProcessConclusion | null> {
-    return computed(() => {
-      const points = getControlPoints(num).value
-      return suggestProcessConclusion(points)
-    })
-  }
-
-  function getConclusion(num: ProcessNumber): ComputedRef<ProcessConclusion | null> {
-    return computed(() => {
-      const id = generateItemId(num, 'process-conclusion')
-      const r = getResponseValue(id)
-      return (r.conclusion as ProcessConclusion | null) || null
-    })
-  }
-
-  function setConclusion(num: ProcessNumber, conclusion: ProcessConclusion, overrideReason?: string): void {
-    const conclusionId = generateItemId(num, 'process-conclusion')
-    const overrideId = generateItemId(num, 'conclusion-override')
-
-    const oldConclusion = getConclusion(num).value
-    const suggested = suggestConclusion(num).value
-    const isOverride = suggested !== null && conclusion !== suggested
-
-    const items: ChecklistItem[] = [
-      setResponseLocal(conclusionId, conclusion),
-    ]
-
-    if (isOverride && overrideReason) {
-      items.push(setResponseLocal(overrideId, 'Y', overrideReason))
-    } else if (!isOverride) {
-      items.push(setResponseLocal(overrideId, null, null))
-    }
-
-    saveImmediate(items)
-
-    // Publish EventBus event if conclusion changed
-    if (oldConclusion !== conclusion) {
-      publishProcessConcluded(num, oldConclusion, conclusion)
-    }
-  }
-
-  function isConclusionOverridden(num: ProcessNumber): ComputedRef<boolean> {
-    return computed(() => {
-      const id = generateItemId(num, 'conclusion-override')
-      const r = getResponseValue(id)
-      return r.conclusion === 'Y'
-    })
-  }
-
-  function getOverrideReason(num: ProcessNumber): ComputedRef<string> {
-    return computed(() => {
-      const id = generateItemId(num, 'conclusion-override')
-      const r = getResponseValue(id)
-      return r.remark || ''
-    })
-  }
-
-  // ─── Processes (computed card list) ──────────────────────────────────────
-
-  const processes: ComputedRef<ProcessCard[]> = computed(() => {
-    return STANDARD_PROCESSES.map((sp) => {
-      const num = sp.num
-      const applicable = getApplicability(num).value
-      const conclusion = getConclusion(num).value
-      const suggested = suggestConclusion(num).value
-      const overridden = isConclusionOverridden(num).value
-      const overrideReason = getOverrideReason(num).value
-      const points = getControlPoints(num).value
-      const wtComplete = isWalkthroughComplete(num).value
-
-      // Completion ratio: control points with conclusion / total
-      const withConclusion = points.filter(cp => cp.conclusion !== null).length
-      const completionRatio = `${withConclusion}/${points.length}`
-
-      return {
-        num,
-        name: sp.name,
-        applicable,
-        conclusion,
-        suggestedConclusion: suggested,
-        conclusionOverridden: overridden,
-        overrideReason,
-        controlPoints: points,
-        walkthroughComplete: wtComplete,
-        completionRatio,
-      }
-    })
-  })
-
-  // ─── Dashboard Stats ─────────────────────────────────────────────────────
-
-  const dashboardStats: ComputedRef<DashboardStats> = computed(() => {
-    const cards = processes.value
-    let completed = 0
-    let inProgress = 0
-    let notStarted = 0
-    let notApplicable = 0
-
-    let effective = 0
-    let partiallyEffective = 0
-    let ineffective = 0
-    let effectNA = 0
-
-    let pendingWalkthroughCount = 0
-
-    for (const card of cards) {
-      if (!card.applicable) {
-        notApplicable++
-        effectNA++
-        continue
-      }
-
-      // Completion
-      if (card.conclusion) {
-        completed++
-      } else if (card.controlPoints.length > 0) {
-        inProgress++
-      } else {
-        notStarted++
-      }
-
-      // Effectiveness
-      switch (card.conclusion) {
-        case '设计有效且已实施':
-          effective++
-          break
-        case '设计有效但未有效实施':
-          partiallyEffective++
-          break
-        case '设计无效':
-          ineffective++
-          break
-        default:
-          break
-      }
-
-      // Pending walkthrough: control points with "穿行测试" method but no conclusion
-      for (const cp of card.controlPoints) {
-        if (cp.methods.includes('穿行测试') && cp.conclusion === null) {
-          pendingWalkthroughCount++
-        }
-      }
-    }
-
+  function readWalkthrough(code: string, m: number): B23WalkthroughTest {
+    const t = (f: string) => getResp(generateItemId(code, 'wt', m, undefined, f)).remark || ''
+    const methodRaw = t('method')
     return {
-      completionDistribution: { completed, inProgress, notStarted, notApplicable },
-      effectivenessDistribution: {
-        effective,
-        partiallyEffective,
-        ineffective,
-        notApplicable: effectNA,
-      },
-      pendingWalkthroughCount,
+      ctrlIndex: m,
+      method: methodRaw ? methodRaw.split(',').filter(Boolean) : [],
+      interviewee: t('interviewee'), procedure: t('procedure'), evidence: t('evidence'),
+      result: t('result'), deficiencyFound: t('deficiencyFound'),
+      asDesigned: getResp(generateItemId(code, 'wt', m, undefined, 'asDesigned')).conclusion as YesNo | null,
+    }
+  }
+  function getWalkthroughs(code: string): B23WalkthroughTest[] {
+    return getControlPoints(code).map((cp) => readWalkthrough(code, cp.index))
+  }
+  function setWalkthroughField(code: string, ctrlIndex: number, field: string, value: any): void {
+    const itemId = generateItemId(code, 'wt', ctrlIndex, undefined, field)
+    let item: ChecklistItem
+    if (field === 'asDesigned') item = setLocal(itemId, value as string | null)
+    else if (field === 'method') item = setLocal(itemId, null, (value as string[]).join(','))
+    else item = setLocal(itemId, null, value as string)
+    saveImmediate([item])
+  }
+
+  // ─── 控制测试（验运行） ──────────────────────────────────────────────────
+  const CT_TEXT_FIELDS = ['riskJudgment', 'testNature', 'testTiming', 'testScope', 'deviation', 'substantiveImpact'] as const
+  const CT_FIELDS = [...CT_TEXT_FIELDS, 'operatingEffective'] as const
+
+  function readControlTest(code: string, m: number): B23ControlTest {
+    const t = (f: string) => getResp(generateItemId(code, 'ct', m, undefined, f)).remark || ''
+    return {
+      ctrlIndex: m,
+      riskJudgment: t('riskJudgment'), testNature: t('testNature'), testTiming: t('testTiming'),
+      testScope: t('testScope'), deviation: t('deviation'), substantiveImpact: t('substantiveImpact'),
+      operatingEffective: getResp(generateItemId(code, 'ct', m, undefined, 'operatingEffective')).conclusion as '有效' | '无效' | null,
+    }
+  }
+  function getControlTests(code: string): B23ControlTest[] {
+    return getControlPoints(code).map((cp) => readControlTest(code, cp.index))
+  }
+  function setControlTestField(code: string, ctrlIndex: number, field: string, value: any): void {
+    const itemId = generateItemId(code, 'ct', ctrlIndex, undefined, field)
+    const item = field === 'operatingEffective'
+      ? setLocal(itemId, value as string | null)
+      : setLocal(itemId, null, value as string)
+    saveImmediate([item])
+    // 控制测试结论变化 → 发布控制风险事件供 B50
+    if (field === 'operatingEffective') publishControlRiskChanged(code)
+  }
+
+  // ─── 缺陷 CRUD ────────────────────────────────────────────────────────────
+  const DEF_TEXT_FIELDS = ['subProcess', 'description', 'impact'] as const
+  const DEF_ENUM_FIELDS = ['deficiencyType', 'severity'] as const
+
+  function getDefCount(code: string): number {
+    const n = parseInt(getResp(generateItemId(code, 'def-count')).remark || '0', 10)
+    return isNaN(n) ? 0 : n
+  }
+  function readDeficiency(code: string, d: number): B23Deficiency {
+    const t = (f: string) => getResp(generateItemId(code, 'def', d, undefined, f)).remark || ''
+    const e = (f: string) => getResp(generateItemId(code, 'def', d, undefined, f)).conclusion
+    return {
+      index: d, subProcess: t('subProcess'), description: t('description'), impact: t('impact'),
+      deficiencyType: e('deficiencyType') as B23Deficiency['deficiencyType'],
+      severity: e('severity') as B23Deficiency['severity'],
+    }
+  }
+  function getDeficiencies(code: string): B23Deficiency[] {
+    const count = getDefCount(code)
+    const arr: B23Deficiency[] = []
+    for (let d = 1; d <= count; d++) arr.push(readDeficiency(code, d))
+    return arr
+  }
+  function addDeficiency(code: string): void {
+    const c = getDefCount(code)
+    if (c >= 50) return
+    saveImmediate([setLocal(generateItemId(code, 'def-count'), null, String(c + 1))])
+  }
+  function removeDeficiency(code: string, index: number): void {
+    const count = getDefCount(code)
+    if (index < 1 || index > count) return
+    const items: ChecklistItem[] = []
+    const fields = [...DEF_TEXT_FIELDS, ...DEF_ENUM_FIELDS]
+    for (let d = index; d < count; d++) {
+      for (const f of fields) {
+        const src = getResp(generateItemId(code, 'def', d + 1, undefined, f))
+        items.push(setLocal(generateItemId(code, 'def', d, undefined, f), src.conclusion, src.remark))
+      }
+    }
+    for (const f of fields) items.push(setLocal(generateItemId(code, 'def', count, undefined, f), null, null))
+    items.push(setLocal(generateItemId(code, 'def-count'), null, String(count - 1)))
+    saveImmediate(items)
+  }
+  function setDeficiencyField(code: string, index: number, field: string, value: any): void {
+    const itemId = generateItemId(code, 'def', index, undefined, field)
+    const item = (DEF_ENUM_FIELDS as readonly string[]).includes(field)
+      ? setLocal(itemId, value as string | null)
+      : setLocal(itemId, null, value as string)
+    saveImmediate([item])
+  }
+
+  // ─── 循环结论 ─────────────────────────────────────────────────────────────
+  function getConclusion(code: string): CycleConclusion | null {
+    return (getResp(generateItemId(code, 'cycle-conclusion')).conclusion as CycleConclusion | null) || null
+  }
+  function suggestConclusion(code: string): CycleConclusion | null {
+    return suggestCycleConclusion(getControlTests(code), getDeficiencies(code))
+  }
+  function isConclusionOverridden(code: string): boolean {
+    return getResp(generateItemId(code, 'conclusion-override')).conclusion === 'Y'
+  }
+  function getOverrideReason(code: string): string {
+    return getResp(generateItemId(code, 'conclusion-override')).remark || ''
+  }
+  function setConclusion(code: string, conclusion: CycleConclusion, overrideReason?: string): void {
+    const oldC = getConclusion(code)
+    const suggested = suggestConclusion(code)
+    const isOverride = suggested !== null && conclusion !== suggested
+    const items: ChecklistItem[] = [setLocal(generateItemId(code, 'cycle-conclusion'), conclusion)]
+    if (isOverride && overrideReason) items.push(setLocal(generateItemId(code, 'conclusion-override'), 'Y', overrideReason))
+    else if (!isOverride) items.push(setLocal(generateItemId(code, 'conclusion-override'), null, null))
+    saveImmediate(items)
+    if (oldC !== conclusion) publishProcessConcluded(code, oldC, conclusion)
+  }
+
+  // ─── 子流程骨架 ───────────────────────────────────────────────────────────
+  function getSubProcesses(code: string): string[] {
+    const def = B23_CYCLES.find((c) => c.code === code)
+    const stored: string[] = []
+    let i = 1
+    while (true) {
+      const v = getResp(generateItemId(code, 'subproc', i)).remark
+      if (v === null || v === undefined) break
+      stored.push(v)
+      i++
+      if (i > 30) break
+    }
+    return stored.length > 0 ? stored : (def?.defaultSubProcesses ?? [])
+  }
+
+  // ─── 卡片列表 ─────────────────────────────────────────────────────────────
+  const cycles: ComputedRef<B23CycleCard[]> = computed(() => {
+    return B23_CYCLES.map((def: B23CycleDef): B23CycleCard => {
+      const code = def.code
+      const applicable = getApplicability(code)
+      const controlPoints = getControlPoints(code)
+      const walkthroughs = getWalkthroughs(code)
+      const controlTests = getControlTests(code)
+      const deficiencies = getDeficiencies(code)
+      const keyControls = controlPoints.filter((cp) => cp.isKeyControl === '是')
+      // 穿行完成：所有关键控制点均有 asDesigned 结论
+      const wtNeeded = keyControls
+      const walkthroughComplete = wtNeeded.length === 0 || wtNeeded.every((cp) => walkthroughs[cp.index - 1]?.asDesigned !== null)
+      // 控制测试完成：doControlTest='是' 的控制点均有 operatingEffective
+      const ctNeeded = controlPoints.filter((cp) => cp.doControlTest === '是')
+      const controlTestComplete = ctNeeded.length === 0 || ctNeeded.every((cp) => controlTests[cp.index - 1]?.operatingEffective !== null)
+      const withConc = controlTests.filter((ct) => ct.operatingEffective !== null).length
+      return {
+        code, wpCode: def.wpCode, name: def.name, subjectCycle: def.subjectCycle, isSpecial: !!def.isSpecial,
+        applicable,
+        conclusion: getConclusion(code),
+        suggestedConclusion: suggestConclusion(code),
+        conclusionOverridden: isConclusionOverridden(code),
+        overrideReason: getOverrideReason(code),
+        controlPoints, walkthroughs, controlTests, deficiencies,
+        keyControlCount: keyControls.length,
+        walkthroughComplete, controlTestComplete,
+        deficiencyCount: deficiencies.length,
+        completionRatio: `${withConc}/${ctNeeded.length || controlPoints.length}`,
+      }
+    })
+  })
+
+  // ─── 仪表盘 ───────────────────────────────────────────────────────────────
+  const dashboardStats: ComputedRef<DashboardStats> = computed(() => {
+    const cards = cycles.value
+    let applicableCount = 0, completedCount = 0, totalControlPoints = 0, totalKeyControls = 0
+    let pendingWalkthroughCount = 0, pendingControlTestCount = 0, totalDeficiencies = 0
+    let effective = 0, partiallyEffective = 0, ineffective = 0, notApplicable = 0
+    for (const c of cards) {
+      totalControlPoints += c.controlPoints.length
+      totalKeyControls += c.keyControlCount
+      totalDeficiencies += c.deficiencyCount
+      if (!c.applicable) { notApplicable++; continue }
+      applicableCount++
+      if (c.conclusion) completedCount++
+      switch (c.conclusion) {
+        case '设计有效且已实施': effective++; break
+        case '设计有效但未有效实施': partiallyEffective++; break
+        case '设计无效': ineffective++; break
+      }
+      c.controlPoints.forEach((cp) => {
+        if (cp.isKeyControl === '是' && c.walkthroughs[cp.index - 1]?.asDesigned === null) pendingWalkthroughCount++
+        if (cp.doControlTest === '是' && c.controlTests[cp.index - 1]?.operatingEffective === null) pendingControlTestCount++
+      })
+    }
+    return {
+      applicableCount, completedCount, totalControlPoints, totalKeyControls,
+      pendingWalkthroughCount, pendingControlTestCount, totalDeficiencies,
+      effectivenessDistribution: { effective, partiallyEffective, ineffective, notApplicable },
     }
   })
 
-  // ─── Entity Level Context (B22A reference, readonly) ─────────────────────
+  // ─── 联动 ─────────────────────────────────────────────────────────────────
+  const linkageInfo: ComputedRef<LinkageInfo[]> = computed(() => {
+    return B23_CYCLES.map((def) => {
+      const conclusion = getConclusion(def.code)
+      return {
+        code: def.code, name: def.name, conclusion,
+        b50Impact: conclusion ? (CONCLUSION_TO_B50_IMPACT[conclusion] || '') : '',
+        cTests: def.cTests, substantiveCycles: def.substantiveCycles,
+        needsExtendedProcedures: conclusion === '设计无效' || conclusion === '设计有效但未有效实施',
+      }
+    })
+  })
 
+  // ─── Entity_Level_Context ────────────────────────────────────────────────
   const entityLevelContext = ref<EntityLevelContext | null>(null)
-
   function onControlConclusionChanged(payload: ControlConclusionPayload): void {
     entityLevelContext.value = {
       elementScores: { ...payload.elementScores },
@@ -659,110 +644,56 @@ export function useB23ProcessControl(
     }
   }
 
-  // ─── Linkage Info ────────────────────────────────────────────────────────
-
-  const linkageInfo: ComputedRef<LinkageInfo[]> = computed(() => {
-    return STANDARD_PROCESSES.map((sp) => {
-      const conclusion = getConclusion(sp.num).value
-      const b50Impact = conclusion ? (CONCLUSION_TO_B50_IMPACT[conclusion] || '') : ''
-      const needsExtendedProcedures = conclusion === '设计无效'
-
-      return {
-        processNum: sp.num,
-        processName: sp.name,
-        conclusion,
-        b50Impact,
-        targetCycle: sp.targetCycle,
-        targetCycleName: `${sp.targetCycle} 循环程序表`,
-        needsExtendedProcedures,
-      }
-    })
-  })
-
-  // ─── EventBus Publish ────────────────────────────────────────────────────
-
-  function publishProcessConcluded(num: ProcessNumber, oldConclusion: ProcessConclusion | null, newConclusion: ProcessConclusion): void {
-    if (oldConclusion === newConclusion) return
-    const processInfo = STANDARD_PROCESSES.find(p => p.num === num)
-    if (!processInfo) return
-
+  // ─── EventBus ─────────────────────────────────────────────────────────────
+  function publishProcessConcluded(code: string, oldC: CycleConclusion | null, newC: CycleConclusion): void {
+    if (oldC === newC) return
+    const def = B23_CYCLES.find((c) => c.code === code)
     try {
-      // EventBus publish — fire and forget, do not block save
       window.dispatchEvent(new CustomEvent('process:control-concluded', {
-        detail: {
-          processNum: num,
-          processName: processInfo.name,
-          oldConclusion,
-          newConclusion,
-        },
+        detail: { cycleCode: code, cycleName: def?.name, oldConclusion: oldC, newConclusion: newC },
       }))
-    } catch {
-      // EventBus publish failure is non-critical
-      console.warn('[B23] EventBus publish process:control-concluded failed')
-    }
+    } catch { console.warn('[B23] publish process:control-concluded failed') }
   }
-
-  function publishWalkthroughCompleted(num: ProcessNumber): void {
-    const processInfo = STANDARD_PROCESSES.find(p => p.num === num)
-    if (!processInfo) return
-
-    const points = getControlPoints(num).value
-    const needsWalkthrough = points.filter(cp => cp.methods.includes('穿行测试'))
-    const effectiveCount = needsWalkthrough.filter(cp => cp.conclusion === '控制有效运行').length
-    const effectiveRate = needsWalkthrough.length === 0 ? 1 : effectiveCount / needsWalkthrough.length
-
+  function publishWalkthroughCompleted(code: string): void {
+    const def = B23_CYCLES.find((c) => c.code === code)
+    const wts = getWalkthroughs(code).filter((w) => w.asDesigned !== null)
+    const effective = wts.filter((w) => w.asDesigned === '是').length
     try {
       window.dispatchEvent(new CustomEvent('process:walkthrough-completed', {
-        detail: {
-          processNum: num,
-          controlPointCount: needsWalkthrough.length,
-          effectiveRate,
-        },
+        detail: { cycleCode: code, cycleName: def?.name, controlPointCount: wts.length, effectiveRate: wts.length ? effective / wts.length : 1 },
       }))
-    } catch {
-      console.warn('[B23] EventBus publish process:walkthrough-completed failed')
-    }
+    } catch { console.warn('[B23] publish process:walkthrough-completed failed') }
+  }
+  function publishControlRiskChanged(code: string): void {
+    const def = B23_CYCLES.find((c) => c.code === code)
+    try {
+      window.dispatchEvent(new CustomEvent('process:control-risk-changed', {
+        detail: { cycleCode: code, cycleName: def?.name, conclusion: getConclusion(code) },
+      }))
+    } catch { console.warn('[B23] publish process:control-risk-changed failed') }
   }
 
-  // ─── Return ──────────────────────────────────────────────────────────────
-
   return {
-    // 流程卡片管理
-    processes,
-    expandedProcesses,
-    toggleProcess,
-    expandAll,
-    collapseAll,
+    // 展开/选择
+    expandedCycles, selectedCycle, selectCycle, toggleCycle, expandAll, collapseAll,
     // 适用性
-    setApplicability,
-    getApplicability,
-    // 控制点管理
-    getControlPoints,
-    addControlPoint,
-    removeControlPoint,
-    setControlPointField,
-    // 穿行测试
-    getWalkthroughRecords,
-    addWalkthroughSample,
-    setWalkthroughField,
-    isWalkthroughComplete,
-    walkthroughSummary,
-    // Process_Conclusion
-    suggestConclusion,
-    getConclusion,
-    setConclusion,
-    isConclusionOverridden,
-    getOverrideReason,
-    // Status Dashboard
-    dashboardStats,
-    // Entity Level Context
-    entityLevelContext,
-    onControlConclusionChanged,
-    // Linkage Panel
-    linkageInfo,
-    // EventBus 发布
-    publishProcessConcluded,
-    publishWalkthroughCompleted,
+    getApplicability, setApplicability,
+    // 控制点
+    getControlPoints, addControlPoint, removeControlPoint, setControlPointField, setControlPointFields, importControlPoints,
+    // 穿行/控制测试
+    getWalkthroughs, setWalkthroughField, getControlTests, setControlTestField,
+    // 缺陷
+    getDeficiencies, addDeficiency, removeDeficiency, setDeficiencyField,
+    // 结论
+    getConclusion, suggestConclusion, setConclusion, isConclusionOverridden, getOverrideReason,
+    // 子流程
+    getSubProcesses,
+    // 视图
+    cycles, dashboardStats, linkageInfo,
+    // Entity context
+    entityLevelContext, onControlConclusionChanged,
+    // EventBus
+    publishProcessConcluded, publishWalkthroughCompleted, publishControlRiskChanged,
   }
 }
 

@@ -78,6 +78,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
@@ -89,6 +90,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
@@ -100,6 +102,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :applicable-standards="applicableStandards"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
@@ -111,6 +114,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :applicable-standards="applicableStandards"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
@@ -144,7 +148,8 @@
  * Requirements: 1.1-1.10
  */
 import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
-import http from '@/utils/http'
+import { useI5FormData } from './composables/useI5FormData'
+import { useI5CrossSheet } from './composables/useI5CrossSheet'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useI5DualMode } from './composables/useI5DualMode'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
@@ -171,18 +176,39 @@ const props = defineProps<{
   year?: number
   htmlData?: any
   readonly?: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navigate-sheet', sheetName: string): void }>()
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
-const isLoading = ref(true)
-const allResponses = ref<Map<string, any>>(new Map())
-const tbData = ref({
-  unadjusted1911: 0,
-  audited1911: 0,
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+const applicableStandards = computed<string[]>(() => {
+  const fromProp = props.applicableStandards
+  if (Array.isArray(fromProp) && fromProp.length) return fromProp.map(String)
+  const fromRuntime = (runtime as any)?.applicableStandards?.value
+  if (Array.isArray(fromRuntime) && fromRuntime.length) return fromRuntime.map(String)
+  const fromHtml = props.htmlData?.applicableStandards
+  if (Array.isArray(fromHtml) && fromHtml.length) return fromHtml.map(String)
+  return []
 })
+
+const wpIdRef = toRef(props, 'wpId')
+const projectIdRef = toRef(props, 'projectId')
+const htmlDataRef = toRef(props, 'htmlData')
+
+const {
+  isLoading,
+  allResponses,
+  tbData,
+  selfLoad,
+  saveImmediate,
+} = useI5FormData(wpIdRef, projectIdRef, { htmlData: htmlDataRef })
+
+const crossSheet = useI5CrossSheet(allResponses)
+provide('i5CrossSheet', crossSheet)
+provide('i5AllResponses', allResponses)
 
 // ─── 双模式 useI5DualMode (OO 健康检查 + el-segmented) ──────────────────────
 const dualMode = useI5DualMode({
@@ -214,82 +240,14 @@ const currentSheet = computed(() => {
 
 // ─── 子组件 save 回调（持久化 checklist_responses） ────────────────────────────
 async function handleChildSave(itemId: string, value: any): Promise<void> {
-  if (!props.wpId) return
-  const strVal = value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null
-  // 乐观更新本地 Map
-  allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: strVal })
-  try {
-    await http.put(`/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion: null, remark: strVal }],
-    })
-  } catch {
-    // 静默失败，数据保留在本地
-  }
+  await saveImmediate(itemId, value)
 }
 
-// ─── TB自动取数（1911其他非流动资产） ─────────────────────────────────────────
-async function _loadTbData(): Promise<void> {
-  if (!props.projectId) return
-  try {
-    const res = await http.get(`/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '1911' },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
-    let u1911 = 0, a1911 = 0
-    for (const item of list) {
-      const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (code.startsWith('1911')) { u1911 += Number(item.unadjusted_amount ?? 0); a1911 += Number(item.audited_amount ?? 0) }
-    }
-    tbData.value = { unadjusted1911: u1911, audited1911: a1911 }
-  } catch {
-    // TB取数失败静默处理
-  }
-}
-
-// ─── selfLoad ────────────────────────────────────────────────────────────────
-async function selfLoad(): Promise<void> {
-  try {
-    if (props.htmlData) {
-      // 从父级透传的 htmlData 中提取 responses
-      if (props.htmlData.allResponses) {
-        const map = new Map<string, any>()
-        for (const [k, v] of Object.entries(props.htmlData.allResponses)) {
-          map.set(k, v)
-        }
-        allResponses.value = map
-      }
-    } else {
-      // selfLoad: 自行调用 render-config
-      const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
-        params: { force_component_type: 'i5-other-noncurrent-assets' },
-        _silent: true,
-      } as any)
-      const data = res.data?.data || res.data
-      if (data?.sheets && Array.isArray(data.sheets)) {
-        const map = new Map<string, any>()
-        for (const sheet of data.sheets) {
-          if (sheet.html_data?.allResponses) {
-            for (const [k, v] of Object.entries(sheet.html_data.allResponses)) {
-              map.set(k, v)
-            }
-          }
-        }
-        allResponses.value = map
-      }
-    }
-  } catch (err) {
-    console.warn('[GtI5OtherNoncurrentAssets] selfLoad failed:', err)
-  } finally {
-    isLoading.value = false
-  }
-}
+// ─── selfLoad（由 useI5FormData 提供） ────────────────────────────────────────
 
 // openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide（真实复核对话）
 
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
-const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
@@ -299,7 +257,6 @@ provide('i5OpenVersionHistory', openVersionHistory)
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
   void selfLoad()
-  void _loadTbData()
 })
 </script>
 

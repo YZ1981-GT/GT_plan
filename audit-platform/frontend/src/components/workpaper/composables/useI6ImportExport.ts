@@ -6,7 +6,8 @@
  *
  * - el-dropdown 三级 UI（导出模板 / 导出数据 / 导入数据）
  * - axios 请求（NOT fetch）— 自动带 Authorization header
- * - 动态行表格需要导入导出：I6-2 明细表 / I6-3 调整分录
+ * - POST /api/workpapers/{wpId}/i6/export-template
+ * - POST /api/workpapers/{wpId}/i6/export-data
  * - StreamingResponse + RFC5987 编码中文文件名
  * - Follow useI5ImportExport pattern
  */
@@ -18,8 +19,10 @@ import http from '@/utils/http'
 
 /** I6 支持导入导出的 sheet 编码 */
 export type I6ImportableSheet =
-  | 'I6-2'      // 明细表（月度12列横向65列，动态行）
-  | 'I6-3'      // 调整分录（动态行）
+  | 'I6-2'
+  | 'I6-3'
+  | 'I6-5'
+  | 'I6-6'
 
 export interface I6ImportResult {
   success: boolean
@@ -37,6 +40,8 @@ export interface UseI6ImportExportOptions {
 export const I6_IMPORTABLE_SHEETS: { code: I6ImportableSheet; label: string }[] = [
   { code: 'I6-2', label: 'I6-2 明细表(月度12列横向65列)' },
   { code: 'I6-3', label: 'I6-3 调整分录' },
+  { code: 'I6-5', label: 'I6-5 截止测试(账→单据)' },
+  { code: 'I6-6', label: 'I6-6 截止测试(单据→账)' },
 ]
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -57,8 +62,9 @@ export function useI6ImportExport(options: UseI6ImportExportOptions) {
     lastError.value = null
     isExporting.value = true
     try {
-      const response = await http.get(
+      const response = await http.post(
         `/api/workpapers/${wpId.value}/i6/export-template`,
+        null,
         { params: { sheet: targetSheet }, responseType: 'blob' },
       )
       _downloadBlob(response, `I6_${targetSheet}_模板.xlsx`)
@@ -81,8 +87,9 @@ export function useI6ImportExport(options: UseI6ImportExportOptions) {
     lastError.value = null
     isExporting.value = true
     try {
-      const response = await http.get(
+      const response = await http.post(
         `/api/workpapers/${wpId.value}/i6/export-data`,
+        null,
         { params: { sheet: targetSheet }, responseType: 'blob' },
       )
       _downloadBlob(response, `I6_${targetSheet}_数据.xlsx`)

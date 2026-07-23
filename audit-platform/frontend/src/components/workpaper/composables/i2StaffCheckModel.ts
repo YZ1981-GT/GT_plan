@@ -1,7 +1,15 @@
 /**
  * I2-9 研发人员认定检查表 — 纯模型
  * 对齐致同源表：审计目标 → 人员明细核查 → 编制说明（认定规则）→ 说明/结论
+ *
+ * 持久化字段位于 I2TabStaffCheck.vue（未抽取独立 composable，逻辑量较小）：
+ * load/save/normalize 直接内联；此处集中导出 STORAGE_KEY 供该 Vue 及跨sheet引用（如 I2-10 取数）共用，避免字符串硬编码分裂。
  */
+
+/** checklist_responses item_id：行数据 / 审计说明 / 审计结论（供 I2TabStaffCheck.vue 及跨sheet引用共用） */
+export const I2_STAFF_STORAGE_KEY = 'I2-9-rows'
+export const I2_STAFF_AUDIT_NOTE_KEY = 'I2-9-audit-note'
+export const I2_STAFF_AUDIT_CONCLUSION_KEY = 'I2-9-audit-conclusion'
 
 /** 编制说明（源表底部规则） */
 export const I2_STAFF_PREP_NOTES = [

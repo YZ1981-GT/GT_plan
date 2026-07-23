@@ -60,9 +60,8 @@ def test_k1_wp_code_override_count():
     )
 
 
-@pytest.mark.xfail(reason="RENDERER_DISPATCH 将在 Task 5.1 注册")
 def test_k1_renderer_dispatch_registered():
-    """RENDERER_DISPATCH 包含 k1-other-receivables (Task 5.1 后通过)."""
+    """RENDERER_DISPATCH 包含 k1-other-receivables."""
     from app.routers.wp_render_strategies import RENDERER_DISPATCH
 
     assert COMPONENT_TYPE in RENDERER_DISPATCH

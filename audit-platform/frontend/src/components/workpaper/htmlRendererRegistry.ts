@@ -127,12 +127,16 @@ export type HtmlComponentType =
   | 'b50-risk-assessment'
   | 'b22a-control-matrix'
   | 'b22b-deficiency-evaluation'
+  | 'b22b-control-matrix'
+  | 'b22c-design-effectiveness'
   | 'b23-process-control'
   | 'b30-group-audit'
   | 'b2-bundle'
   | 'b13-bundle'
   | 'b19-bundle'
   | 'b51-bundle'
+  | 'b60-strategy'
+  | 'b2-12-evaluation'
   | 'f2-stocktake-bundle'
   | 'c-control-test'
   | 'd1-notes-receivable'
@@ -159,6 +163,9 @@ export type HtmlComponentType =
   | 'a5-1-cashflow-audit'
   | 'a3-8-goodwill-impairment'
   | 'b1-4-due-diligence-report'
+  | 'b1-risk-assessment'
+  | 'b1-3-business-evaluation'
+  | 'b1-5-kaa-check'
   | 'd4-operating-revenue'
   | 'd3-prepaid-accounts'
   | 'd5-receivables-financing'
@@ -324,6 +331,8 @@ const GtConfirmationReliability = defineAsyncComponent(() => import('./confirmat
 const GtB50RiskAssessment = defineAsyncComponent(() => import('./GtB50RiskAssessment.vue'))
 const GtB22AControlMatrix = defineAsyncComponent(() => import('./GtB22AControlMatrix.vue'))
 const GtB22BDeficiencyEvaluation = defineAsyncComponent(() => import('./GtB22BDeficiencyEvaluation.vue'))
+const GtB22BControlMatrix = defineAsyncComponent(() => import('./GtB22BControlMatrix.vue'))
+const GtB22CDesignEffectiveness = defineAsyncComponent(() => import('./GtB22CDesignEffectiveness.vue'))
 const GtCControlTest = defineAsyncComponent(() => import('./GtCControlTest.vue'))
 const GtB23ProcessControl = defineAsyncComponent(() => import('./GtB23ProcessControl.vue'))
 const GtB30GroupAudit = defineAsyncComponent(() => import('./GtB30GroupAudit.vue'))
@@ -331,6 +340,8 @@ const GtB2Bundle = defineAsyncComponent(() => import('./GtB2Bundle.vue'))
 const GtB13Bundle = defineAsyncComponent(() => import('./GtB13Bundle.vue'))
 const GtB19Bundle = defineAsyncComponent(() => import('./GtB19Bundle.vue'))
 const GtB51Bundle = defineAsyncComponent(() => import('./GtB51Bundle.vue'))
+const GtB60Bundle = defineAsyncComponent(() => import('./b60/GtB60Bundle.vue'))
+const GtB212Evaluation = defineAsyncComponent(() => import('./GtB212Evaluation.vue'))
 const GtF2StocktakeBundle = defineAsyncComponent(() => import('./GtF2StocktakeBundle.vue'))
 const GtReviewBundle = defineAsyncComponent(() => import('./GtReviewBundle.vue'))
 const GtD1NotesReceivable = defineAsyncComponent(() => import('./GtD1NotesReceivable.vue'))
@@ -816,6 +827,22 @@ contextProps: 'form-type' as const,
     contextProps: 'standard',
   },
 {
+    componentType: 'b22b-control-matrix',
+    component: GtB22BControlMatrix,
+    icon: '🗂️',
+    label: 'B22B 企业层面控制矩阵登记册',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'b22c-design-effectiveness',
+    component: GtB22CDesignEffectiveness,
+    icon: '📋',
+    label: 'B22C 企业层面控制设计有效性评价',
+    emits: ['save', 'completed'],
+    contextProps: 'standard',
+  },
+{
     componentType: 'b23-process-control',
     component: GtB23ProcessControl,
     icon: '🔄',
@@ -860,6 +887,22 @@ contextProps: 'form-type' as const,
     component: GtB51Bundle,
     icon: '📋',
     label: 'B51 舞弊风险识别',
+    emits: [],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'b60-strategy',
+    component: GtB60Bundle,
+    icon: '📋',
+    label: 'B60 总体审计策略',
+    emits: ['save', 'navigate-sheet'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'b2-12-evaluation',
+    component: GtB212Evaluation,
+    icon: '🧾',
+    label: 'B2-12 对前任注册会计师的评价',
     emits: [],
     contextProps: 'standard',
   },
@@ -1036,6 +1079,30 @@ contextProps: 'form-type' as const,
     component: defineAsyncComponent(() => import('./GtB14DueDiligenceReport.vue')),
     icon: '📋',
     label: 'B1-4 尽职调查报告',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'b1-risk-assessment',
+    component: defineAsyncComponent(() => import('./GtB1RiskAssessment.vue')),
+    icon: '📊',
+    label: 'B1-1/B1-2 风险评估表',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'b1-3-business-evaluation',
+    component: defineAsyncComponent(() => import('./GtB1Evaluation.vue')),
+    icon: '📝',
+    label: 'B1-3 业务评价表',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'b1-5-kaa-check',
+    component: defineAsyncComponent(() => import('./GtB1KaaCheck.vue')),
+    icon: '✅',
+    label: 'B1-5 KAA检查表',
     emits: ['save'],
     contextProps: 'standard',
   },

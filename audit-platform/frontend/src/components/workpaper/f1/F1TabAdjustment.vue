@@ -23,7 +23,7 @@
   <div class="tab-toolbar">
     <div class="toolbar-left">
       <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 新增调整分录</el-button>
-      <el-button size="small" :disabled="isReadonly || selectedRowIds.length === 0" @click="pushToA13">
+      <el-button size="small" :disabled="isReadonly || selectedRowIds.length === 0" @click="doPushToA13">
         推送至A13（{{ selectedRowIds.length }}条）
       </el-button>
     </div>
@@ -158,6 +158,7 @@
  * 10列表 + 借贷平衡 + 推送A13
  */
 import { computed, onMounted, ref, toRef, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useF1Adjustment } from '../composables/useF1Adjustment'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
@@ -199,6 +200,12 @@ const {
 
 function onSelectionChange(selection: any[]) {
   selectedRowIds.value = selection.map((r: any) => r.rowId)
+}
+
+function doPushToA13() {
+  if (selectedRowIds.value.length === 0) return
+  pushToA13(selectedRowIds.value)
+  ElMessage.success(`已推送 ${selectedRowIds.value.length} 笔调整分录至 A13 错报汇总`)
 }
 
 // ─── 审计说明 / 审计结论 ───────────────────────────────────────────────────────

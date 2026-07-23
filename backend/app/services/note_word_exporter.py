@@ -899,12 +899,37 @@ class NoteWordExporter:
                 else:
                     self._render_table_at(doc, para, tbl)
 
+    def _effective_table_data(self, note: DisclosureNote) -> dict | None:
+        """返回投影后的 table_data：workpaper 来源记录把 sub_table_data + _sub_table_columns
+        投影为 _tables 后与模块渲染一致（spec disclosure-table-sync-convergence Req1.2/Property12）。
+
+        非 workpaper 来源 / 投影为空 → 原样返回 table_data（Req6.2，导出行为不变）。
+        投影失败降级不阻断导出（Error Handling）。
+        """
+        td = getattr(note, "table_data", None)
+        if not isinstance(td, dict):
+            return td
+        try:
+            from app.services.note_sub_table_projector import project_sub_tables
+
+            projected = project_sub_tables(td)
+            if projected:
+                return {**td, "_tables": projected}
+        except Exception:  # pragma: no cover - 投影失败回退既有 _tables/rows
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                "note_word_exporter: sub_table projection failed, fallback to existing tables",
+                exc_info=True,
+            )
+        return td
+
     def _note_tables(self, note: DisclosureNote) -> list[dict]:
         """返回 note 的表列表（多表 _tables 数组优先，降级单表）.
         
         过滤掉 export_enabled=false 的表格（用户可在前端选择哪些表导出）。
+        workpaper 来源记录先经投影得到 _tables（与模块渲染一致）。
         """
-        td = getattr(note, "table_data", None)
+        td = self._effective_table_data(note)
         if not isinstance(td, dict):
             return []
         tables = td.get("_tables") or [td]
@@ -997,8 +1022,8 @@ class NoteWordExporter:
                 if note.table_data:
                     # Sprint 0 / Task 0.3 P0 修复：HTML 预览也支持多表
                     # 过滤 export_enabled=false（用户选择不导出的表格）
-                    tables_to_render = note.table_data.get("_tables") or [note.table_data]
-                    tables_to_render = [t for t in tables_to_render if isinstance(t, dict) and t.get("export_enabled", True)]
+                    # workpaper 来源经投影（与模块渲染一致）
+                    tables_to_render = self._note_tables(note)
                     for tbl in tables_to_render:
                         if not isinstance(tbl, dict):
                             continue
@@ -1063,8 +1088,9 @@ class NoteWordExporter:
         if not note.table_data or not isinstance(note.table_data, dict):
             return False
 
-        # 收集所有要检查的表（多表 _tables 数组 + 单表降级）
-        tables_to_check = note.table_data.get("_tables") or [note.table_data]
+        # 收集所有要检查的表（多表 _tables 数组 + 单表降级）；workpaper 来源先投影
+        etd = self._effective_table_data(note) or {}
+        tables_to_check = etd.get("_tables") or [etd]
 
         for tbl in tables_to_check:
             if not isinstance(tbl, dict):
@@ -1201,8 +1227,8 @@ class NoteWordExporter:
 
         # 优先取 _tables 数组（多表章节）；老结构降级到单表
         # 过滤 export_enabled=false 的表格（用户可选择不导出特定表格）
-        tables_to_render = note.table_data.get("_tables") or [note.table_data]
-        tables_to_render = [t for t in tables_to_render if isinstance(t, dict) and t.get("export_enabled", True)]
+        # workpaper 来源经投影得到 _tables（与模块渲染一致，Property12）
+        tables_to_render = self._note_tables(note)
 
         for tbl in tables_to_render:
             if not isinstance(tbl, dict):

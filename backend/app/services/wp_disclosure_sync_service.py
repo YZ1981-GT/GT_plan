@@ -137,6 +137,7 @@ async def sync_from_workpaper(
     current_standard: str,
     user: User,
     year: int | None = None,
+    sub_table_columns: dict[str, list[dict]] | None = None,
     propagation_origin: Literal["user_edit", "system_recompute"] = "user_edit",
     commit: bool = True,
 ) -> dict[str, Any]:
@@ -195,13 +196,35 @@ async def sync_from_workpaper(
     #     并保留 _source / _current_standard / _last_sync_wp / _last_sync_sheet 元数据
     new_table_data: dict[str, Any] = dict(note.table_data) if note and note.table_data else {}
     existing_sub = new_table_data.get("sub_table_data")
-    if isinstance(existing_sub, dict) and clean_sub_table_data:
+    existing_sub = existing_sub if isinstance(existing_sub, dict) else {}
+    if clean_sub_table_data:
+        # 浅合并：保留未推送的既有子表，同名 key 覆盖。
+        # 显式推送 ``{table_key: []}`` 表示该表"空行"有效状态（区别于删除），照常覆盖。
         merged_sub = dict(existing_sub)
         for key, rows in clean_sub_table_data.items():
             merged_sub[key] = rows
         new_table_data["sub_table_data"] = merged_sub
     else:
-        new_table_data["sub_table_data"] = dict(clean_sub_table_data or {})
+        # 空载荷 no-op：绝不清空既有子表（表格丢失主因修复）。
+        # 改版底稿仅同步叙述、item_id/字段漂移读不出表格、或传入空 {} 时，
+        # 保留附注已有全部表格，仅更新叙述/元数据。若需删除表格须显式经删除语义
+        # （当前契约不支持删除，避免误删）。
+        new_table_data["sub_table_data"] = existing_sub
+
+    # ── 列头元数据 _sub_table_columns：与 sub_table_data 同款浅合并 + 空 no-op ──
+    #   （spec disclosure-table-sync-convergence Req2/D3/Property13）
+    #   投影器据此把 sub_table_data 渲染成源模板表样；空载荷不清空既有列头。
+    clean_columns = sub_table_columns if isinstance(sub_table_columns, dict) else {}
+    existing_cols = new_table_data.get("_sub_table_columns")
+    existing_cols = existing_cols if isinstance(existing_cols, dict) else {}
+    if clean_columns:
+        merged_cols = dict(existing_cols)
+        for key, defs in clean_columns.items():
+            merged_cols[key] = defs
+        new_table_data["_sub_table_columns"] = merged_cols
+    elif existing_cols:
+        new_table_data["_sub_table_columns"] = existing_cols
+
     new_table_data["_source"] = "workpaper"
     new_table_data["_current_standard"] = current_standard
     new_table_data["_last_sync_wp_id"] = str(wp_id)
@@ -353,6 +376,9 @@ async def sync_batch_from_workpaper(
             sub_table_data = item.get("sub_table_data") or {}
             if not isinstance(sub_table_data, dict):
                 raise ValueError(f"section {section_id} 的 sub_table_data 必须为对象")
+            sub_table_columns = item.get("columns")
+            if sub_table_columns is not None and not isinstance(sub_table_columns, dict):
+                raise ValueError(f"section {section_id} 的 columns 必须为对象")
             result = await sync_from_workpaper(
                 db,
                 project_id,
@@ -363,6 +389,7 @@ async def sync_batch_from_workpaper(
                 current_standard=current_standard,
                 user=user,
                 year=year,
+                sub_table_columns=sub_table_columns,
                 propagation_origin=propagation_origin,
                 commit=False,
             )
@@ -400,6 +427,7 @@ class WpDisclosureSyncService:
         *,
         project_id: UUID,
         user: User,
+        sub_table_columns: dict | None = None,
         force: bool = False,
     ) -> dict[str, Any]:
         """从 HTML 渲染器的 C 类底稿同步到 disclosure_notes。
@@ -456,7 +484,11 @@ class WpDisclosureSyncService:
                 note_section=section_id,
                 section_title=_derive_section_title(section_id),
                 content_type=ContentType.table,
-                table_data={"sub_table_data": sub_table_data},
+                table_data=(
+                    {"sub_table_data": sub_table_data, "_sub_table_columns": sub_table_columns}
+                    if isinstance(sub_table_columns, dict) and sub_table_columns
+                    else {"sub_table_data": sub_table_data}
+                ),
                 status=NoteStatus.draft,
                 is_stale=False,
                 last_sync_source="workpaper_html",
@@ -492,7 +524,23 @@ class WpDisclosureSyncService:
 
         # 4. 写入（原子操作）
         existing_table_data = dict(note.table_data) if note.table_data else {}
-        existing_table_data["sub_table_data"] = sub_table_data
+        incoming_sub = sub_table_data if isinstance(sub_table_data, dict) else {}
+        if incoming_sub:
+            existing_table_data["sub_table_data"] = incoming_sub
+        else:
+            # 空载荷 no-op：绝不清空既有子表（与 sync_from_workpaper 同款防护）。
+            prev_sub = existing_table_data.get("sub_table_data")
+            existing_table_data["sub_table_data"] = prev_sub if isinstance(prev_sub, dict) else {}
+        # 列头元数据同款浅合并 + 空 no-op
+        incoming_cols = sub_table_columns if isinstance(sub_table_columns, dict) else {}
+        prev_cols = existing_table_data.get("_sub_table_columns")
+        prev_cols = prev_cols if isinstance(prev_cols, dict) else {}
+        if incoming_cols:
+            merged_cols = dict(prev_cols)
+            merged_cols.update(incoming_cols)
+            existing_table_data["_sub_table_columns"] = merged_cols
+        elif prev_cols:
+            existing_table_data["_sub_table_columns"] = prev_cols
         existing_table_data["_source"] = "workpaper_html"
         existing_table_data["_last_sync_wp_id"] = str(wp_id)
         existing_table_data["_last_sync_sheet"] = sheet_name

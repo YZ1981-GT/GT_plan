@@ -80,6 +80,20 @@
       </el-collapse-item>
     </el-collapse>
 
+    <!-- 存货净额行（Req 5 — 净额 = 余额 − 跌价准备1471，跌价变动自动重算） -->
+    <div class="inventory-net-row">
+      <span class="net-label">存货净额 = 存货余额合计 − 跌价准备(1471)</span>
+      <div class="net-values">
+        <span class="net-item">余额合计：<strong>{{ inventoryNetRow.totalBalance.toLocaleString() }}</strong></span>
+        <span class="net-sep">−</span>
+        <span class="net-item">跌价准备：<strong>{{ inventoryNetRow.impairmentProvision.toLocaleString() }}</strong></span>
+        <span class="net-sep">=</span>
+        <el-tag type="primary" size="default" effect="dark">
+          净额：{{ inventoryNetRow.netAmount.toLocaleString() }}
+        </el-tag>
+      </div>
+    </div>
+
     <!-- 核对行 -->
     <div class="tb-check-row">
       <span class="tb-label">与试算平衡表核对（存货科目）：</span>
@@ -158,6 +172,7 @@ const {
   grossSubtotal,
   impairmentSubtotal,
   netSubtotal,
+  inventoryNetRow,
   trialBalanceAmount,
   trialBalanceDiff,
   detailCrossValidation,
@@ -239,4 +254,19 @@ async function generateConclusion() {
 .opinion-section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
 .opinion-section-label { font-size: 14px; font-weight: 500; color: #303133; }
 .opinion-actions { display: flex; gap: 6px; align-items: center; }
+.inventory-net-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  margin: 14px 0;
+  background: linear-gradient(135deg, #ecf5ff 0%, #f0f9ff 100%);
+  border: 1px solid #b3d8ff;
+  border-radius: 6px;
+  font-size: var(--wp-font-size, 13px);
+}
+.net-label { color: #606266; font-weight: 500; }
+.net-values { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.net-item { color: #303133; }
+.net-sep { color: #909399; font-weight: 600; }
 </style>

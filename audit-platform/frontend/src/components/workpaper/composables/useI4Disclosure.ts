@@ -1,468 +1,360 @@
 /**
  * useI4Disclosure — I4 长期待摊费用附注披露 composable
  *
- * Variant 双版本（上市公司14×13 / 国有企业16×12），根据 projectContext.business_category 自动选择。
- * - 从审定表自动取数（subscribe 'substantive:adjudicated' event）(Req 7.2)
- * - AI 辅助生成文字描述 (Req 7.2)
- * - EventBus: subscribe 'substantive:adjudicated' 刷新 + publish 'disclosure:note-text-updated' (Req 7.2)
- * - Persistence: "I4-disc-listed-*" / "I4-disc-soe-*" item_ids
- *
- * 长期待摊费用附注特殊：摊销变动矩阵（期初+增加-摊销-减少=期末）
- * 上市: 14行×13列 (42公式)
- * 国企: 16行×12列 (47公式)
+ * 对齐源表：单表账面余额滚动（期初+增加−摊销−其他减少=期末），无累计摊销备抵。
+ * - 从 I4-2 按类别聚合自动取数
+ * - 订阅 substantive:adjudicated 刷新
+ * - sync-from-workpaper → 附注模块（上市五、29 / 国企八、30）
+ * - EventBus disclosure:note-text-updated
  *
  * Spec: .kiro/specs/i4-long-term-prepaid/
- * Task: 3.5
- * Requirements: 7.1-7.2
  */
 import { ref, computed, watch, onMounted, onUnmounted, type Ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { calcSubtotal } from './useI4FormulaEngine'
+import { eventBus } from '@/utils/eventBus'
+import {
+  I4_DISC_KEYS,
+  aggregateI4DetailForDisclosure,
+  calcI4CurrentPortion,
+  calcI4DisclosureEnd,
+  defaultI4DisclosureRows,
+  emptyI4DisclosureRow,
+  mergeAutoFillPreserveManual,
+  normalizeI4DisclosureRow,
+  summarizeI4Disclosure,
+  type I4DisclosureRow,
+} from './i4DisclosureModel'
+import {
+  resolveI4NoteSectionTarget,
+  type I4DisclosureVariant,
+} from './i4NoteSectionMap'
+import {
+  buildI4ListedFootnote,
+  buildI4ListedSyncPayloads,
+  buildI4SoeSyncPayloads,
+} from './i4DisclosureSyncPayload'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+export type { I4DisclosureVariant, I4DisclosureRow }
 
-export type I4DisclosureVariant = 'listed' | 'soe'
-
-export interface ChecklistItem {
-  item_id: string
-  conclusion: string | null
-  remark: string | null
+function safeParseRows(jsonStr: string | null | undefined): any[] {
+  if (!jsonStr) return []
+  try {
+    const parsed = JSON.parse(jsonStr)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
 }
-
-/** 附注子节定义 */
-export interface I4DisclosureSection {
-  key: string
-  title: string
-  hasTable: boolean
-  hasDynamicRows: boolean
-  hasNoteText: boolean
-}
-
-/** 附注长期待摊费用变动矩阵行 */
-export interface I4DisclosureMatrixRow {
-  rowId: string
-  item: string                  // 费用项目
-  beginBalance: number          // 期初余额
-  increase: number              // 本期增加
-  amortization: number          // 本期摊销
-  decrease: number              // 本期减少(其他)
-  endBalance: number            // 期末余额
-  isAutoFilled: boolean         // 是否跨sheet自动取数
-}
-
-/** 附注动态行（通用） */
-export interface I4DisclosureDynamicRow {
-  rowId: string
-  name: string
-  amount: number
-  description: string
-  remark: string
-}
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const ITEM_PREFIX_LISTED = 'I4-disc-listed'
-const ITEM_PREFIX_SOE = 'I4-disc-soe'
-
-/** 上市公司版本子节（14×13，42公式） */
-export const LISTED_SECTIONS: I4DisclosureSection[] = [
-  { key: 'prepaid_original', title: '(1) 长期待摊费用原值变动', hasTable: true, hasDynamicRows: false, hasNoteText: false },
-  { key: 'prepaid_amortization', title: '(2) 长期待摊费用累计摊销变动', hasTable: true, hasDynamicRows: false, hasNoteText: false },
-  { key: 'prepaid_net_value', title: '(3) 长期待摊费用净值', hasTable: true, hasDynamicRows: false, hasNoteText: false },
-  { key: 'amortization_method', title: '(4) 摊销方法说明', hasTable: false, hasDynamicRows: false, hasNoteText: true },
-  { key: 'major_items', title: '(5) 重大长期待摊费用明细', hasTable: true, hasDynamicRows: true, hasNoteText: true },
-  { key: 'other_disclosure', title: '(6) 其他说明', hasTable: false, hasDynamicRows: false, hasNoteText: true },
-]
-
-/** 国企版本子节（16×12，47公式） */
-export const SOE_SECTIONS: I4DisclosureSection[] = [
-  { key: 'prepaid_original', title: '(一) 长期待摊费用原值变动', hasTable: true, hasDynamicRows: false, hasNoteText: false },
-  { key: 'prepaid_amortization', title: '(二) 长期待摊费用累计摊销变动', hasTable: true, hasDynamicRows: false, hasNoteText: false },
-  { key: 'prepaid_net_value', title: '(三) 长期待摊费用净值', hasTable: true, hasDynamicRows: false, hasNoteText: false },
-  { key: 'amortization_policy', title: '(四) 摊销政策', hasTable: false, hasDynamicRows: false, hasNoteText: true },
-  { key: 'major_items', title: '(五) 重大长期待摊费用明细', hasTable: true, hasDynamicRows: true, hasNoteText: true },
-  { key: 'benefit_period', title: '(六) 受益期间说明', hasTable: false, hasDynamicRows: false, hasNoteText: true },
-  { key: 'other_disclosure', title: '(七) 其他说明', hasTable: false, hasDynamicRows: false, hasNoteText: true },
-]
-
-// ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useI4Disclosure(
   wpId: Ref<string>,
   projectId: Ref<string>,
-  allResponses: Ref<Map<string, ChecklistItem>>,
-  options?: {
-    variant?: Ref<I4DisclosureVariant>
-    crossSheetAutoFill?: Ref<Record<string, number>>
+  allResponses: Ref<Map<string, any>>,
+  options: {
+    variant: Ref<I4DisclosureVariant> | I4DisclosureVariant
     onSave?: (itemId: string, value: any) => void
+    applicableStandards?: Ref<readonly string[] | null | undefined> | (() => readonly string[] | null | undefined)
   },
 ) {
-  // ─── State ─────────────────────────────────────────────────────────────────
-
-  const variant = computed<I4DisclosureVariant>(() => options?.variant?.value ?? 'listed')
-  const itemPrefix = computed(() => variant.value === 'listed' ? ITEM_PREFIX_LISTED : ITEM_PREFIX_SOE)
+  const variant = computed<I4DisclosureVariant>(() =>
+    typeof options.variant === 'string' ? options.variant : options.variant.value,
+  )
+  const isListed = computed(() => variant.value === 'listed')
+  const noteTarget = computed(() => resolveI4NoteSectionTarget(variant.value))
+  const isSyncing = ref(false)
   const isAiGenerating = ref(false)
 
-  /** 子节1: 长期待摊费用原值变动矩阵 */
-  const originalRows = ref<I4DisclosureMatrixRow[]>([])
+  const rows = ref<I4DisclosureRow[]>(defaultI4DisclosureRows())
+  const currentPortion = ref(0)
+  const otherNote = ref('')
+  const auditNote = ref('')
+  const auditConclusion = ref('')
 
-  /** 子节2: 长期待摊费用累计摊销变动矩阵 */
-  const amortizationRows = ref<I4DisclosureMatrixRow[]>([])
+  const totals = computed(() => summarizeI4Disclosure(rows.value))
+  const footnote = computed(() =>
+    isListed.value ? buildI4ListedFootnote(currentPortion.value) : '',
+  )
 
-  /** 动态行子节（重大长期待摊费用明细） */
-  const sectionRows = ref<Record<string, I4DisclosureDynamicRow[]>>({
-    major_items: [],
+  const reconcileDiff = computed(() => {
+    const detail = _readDetailRows()
+    if (!detail.length) return null
+    const auto = aggregateI4DetailForDisclosure(detail)
+    const autoTotal = summarizeI4Disclosure(auto).endBalance
+    return Math.round((totals.value.endBalance - autoTotal) * 100) / 100
   })
 
-  /** 各子节说明文本（AI生成/手工填写） */
-  const sectionNotes = ref<Record<string, string>>({})
+  /** 附注期末 vs I4-1 审定合计 */
+  const reconcileVsAdj = computed(() => {
+    const adjItem = allResponses.value.get('I4-adj-rows') || allResponses.value.get('I4-1-rows')
+    const adjRows = safeParseRows(adjItem?.remark)
+    if (!adjRows.length) return null
+    const adjTotal = adjRows.reduce((s: number, r: any) => s + Number(r.audited ?? r.审定 ?? 0), 0)
+    if (!(Math.abs(adjTotal) > 0.005) && !(Math.abs(totals.value.endBalance) > 0.005)) return null
+    return Math.round((totals.value.endBalance - adjTotal) * 100) / 100
+  })
 
-  // ─── Computed: 子节列表 ────────────────────────────────────────────────────
-
-  const sections = computed(() =>
-    variant.value === 'listed' ? LISTED_SECTIONS : SOE_SECTIONS,
-  )
-
-  // ─── Computed: 跨sheet自动取数 (Req 7.2) ──────────────────────────────────
-
-  const autoFilledData = computed(() => options?.crossSheetAutoFill?.value ?? {})
-
-  // ─── Computed: 合计行 ──────────────────────────────────────────────────────
-
-  const originalTotal = computed(() => ({
-    beginBalance: calcSubtotal(originalRows.value.map((r) => r.beginBalance)),
-    increase: calcSubtotal(originalRows.value.map((r) => r.increase)),
-    amortization: calcSubtotal(originalRows.value.map((r) => r.amortization)),
-    decrease: calcSubtotal(originalRows.value.map((r) => r.decrease)),
-    endBalance: calcSubtotal(originalRows.value.map((r) => r.endBalance)),
-  }))
-
-  const amortizationTotal = computed(() => ({
-    beginBalance: calcSubtotal(amortizationRows.value.map((r) => r.beginBalance)),
-    increase: calcSubtotal(amortizationRows.value.map((r) => r.increase)),
-    amortization: calcSubtotal(amortizationRows.value.map((r) => r.amortization)),
-    decrease: calcSubtotal(amortizationRows.value.map((r) => r.decrease)),
-    endBalance: calcSubtotal(amortizationRows.value.map((r) => r.endBalance)),
-  }))
-
-  /** 净值合计 = 原值期末 - 累计摊销期末 */
-  const netValueTotal = computed(() =>
-    originalTotal.value.endBalance - amortizationTotal.value.endBalance,
-  )
-
-  // ─── Load ──────────────────────────────────────────────────────────────────
-
-  function _loadData(): void {
-    const prefix = itemPrefix.value
-
-    // 矩阵行
-    originalRows.value = _loadMatrixRows(`${prefix}-original-matrix`)
-    amortizationRows.value = _loadMatrixRows(`${prefix}-amortization-matrix`)
-
-    // 动态行
-    for (const key of Object.keys(sectionRows.value)) {
-      const item = allResponses.value.get(`${prefix}-${key}-rows`)
-      if (item?.remark) {
-        try {
-          const parsed = JSON.parse(item.remark)
-          sectionRows.value[key] = Array.isArray(parsed) ? parsed : []
-        } catch { sectionRows.value[key] = [] }
-      } else {
-        sectionRows.value[key] = []
-      }
-    }
-
-    // 说明文本
-    for (const sect of sections.value) {
-      if (sect.hasNoteText) {
-        const noteItem = allResponses.value.get(`${prefix}-${sect.key}-note`)
-        sectionNotes.value[sect.key] = (noteItem?.remark ?? '') as string
-      }
-    }
+  function _standards(): readonly string[] | null | undefined {
+    const s = options.applicableStandards
+    if (!s) return undefined
+    return typeof s === 'function' ? s() : s.value
   }
 
-  function _loadMatrixRows(itemId: string): I4DisclosureMatrixRow[] {
-    const item = allResponses.value.get(itemId)
-    if (!item?.remark) return []
+  function _keys() {
+    return isListed.value
+      ? {
+          rows: I4_DISC_KEYS.listedRows,
+          portion: I4_DISC_KEYS.listedCurrentPortion,
+          note: I4_DISC_KEYS.listedNote,
+          auditNote: I4_DISC_KEYS.listedAuditNote,
+          auditConclusion: I4_DISC_KEYS.listedAuditConclusion,
+        }
+      : {
+          rows: I4_DISC_KEYS.soeRows,
+          portion: '',
+          note: I4_DISC_KEYS.soeNote,
+          auditNote: I4_DISC_KEYS.soeAuditNote,
+          auditConclusion: I4_DISC_KEYS.soeAuditConclusion,
+        }
+  }
+
+  function _readDetailRows(): any[] {
+    const item = allResponses.value.get('I4-2-rows')
+    return safeParseRows(item?.remark)
+  }
+
+  function _load(): void {
+    const keys = _keys()
+    const raw = allResponses.value.get(keys.rows)
+    const parsed = safeParseRows(raw?.remark).map(normalizeI4DisclosureRow)
+    rows.value = parsed.length ? parsed : defaultI4DisclosureRows()
+
+    if (keys.portion) {
+      const p = allResponses.value.get(keys.portion)
+      currentPortion.value = Number(p?.remark) || 0
+    }
+    otherNote.value = String(allResponses.value.get(keys.note)?.remark ?? '')
+    auditNote.value = String(allResponses.value.get(keys.auditNote)?.remark ?? '')
+    auditConclusion.value = String(allResponses.value.get(keys.auditConclusion)?.remark ?? '')
+  }
+
+  function _persistRows(): void {
+    const keys = _keys()
+    options.onSave?.(keys.rows, JSON.stringify(rows.value))
+  }
+
+  function _persistField(key: string, val: string | number): void {
+    if (!key) return
+    options.onSave?.(key, String(val))
+  }
+
+  /** 从 I4-2 同步类别滚动数 */
+  function syncFromDetail(force = false): void {
+    const detail = _readDetailRows()
+    if (!detail.length) {
+      ElMessage.warning('I4-2 明细表暂无数据，请先编制明细')
+      return
+    }
+    const autoRows = aggregateI4DetailForDisclosure(detail)
+    rows.value = force
+      ? autoRows
+      : mergeAutoFillPreserveManual(rows.value, autoRows)
+    currentPortion.value = calcI4CurrentPortion(detail)
+    _persistRows()
+    const keys = _keys()
+    if (keys.portion) _persistField(keys.portion, currentPortion.value)
+    ElMessage.success(`已从 I4-2 同步 ${rows.value.length} 个披露项目`)
+  }
+
+  function addRow(itemName?: string): void {
+    rows.value.push(emptyI4DisclosureRow({ item: itemName || '' }))
+    _persistRows()
+  }
+
+  function removeRow(rowId: string): void {
+    const idx = rows.value.findIndex((r) => r.rowId === rowId)
+    if (idx < 0) return
+    rows.value.splice(idx, 1)
+    if (!rows.value.length) rows.value = defaultI4DisclosureRows()
+    _persistRows()
+  }
+
+  function updateCell(rowId: string, field: keyof I4DisclosureRow, value: unknown): void {
+    const row = rows.value.find((r) => r.rowId === rowId)
+    if (!row) return
+    ;(row as any)[field] = value
+    row.isAutoFilled = false
+    if (['beginBalance', 'increase', 'amortization', 'otherDecrease'].includes(field)) {
+      row.endBalance = calcI4DisclosureEnd(row)
+    }
+    _persistRows()
+  }
+
+  function saveOtherNote(val: string): void {
+    otherNote.value = val
+    _persistField(_keys().note, val)
+  }
+
+  function saveAuditNote(val: string): void {
+    auditNote.value = val
+    _persistField(_keys().auditNote, val)
+  }
+
+  function saveAuditConclusion(val: string): void {
+    auditConclusion.value = val
+    _persistField(_keys().auditConclusion, val)
+  }
+
+  function saveCurrentPortion(val: number): void {
+    currentPortion.value = val
+    const keys = _keys()
+    if (keys.portion) _persistField(keys.portion, val)
+  }
+
+  /** 同步到附注模块 */
+  async function syncToNotes(): Promise<void> {
+    if (isSyncing.value || !projectId.value || !wpId.value) return
+    const diff = reconcileDiff.value
+    if (diff != null && Math.abs(diff) > 0.01) {
+      try {
+        await ElMessageBox.confirm(
+          `披露期末合计与 I4-2 明细差额 ${diff.toLocaleString('zh-CN')}，是否仍同步到附注？`,
+          '同步确认',
+          { type: 'warning', confirmButtonText: '仍要同步', cancelButtonText: '取消' },
+        )
+      } catch {
+        return
+      }
+    }
+
+    const state = {
+      rows: rows.value,
+      currentPortion: currentPortion.value,
+      otherNote: otherNote.value,
+      footnote: footnote.value,
+    }
+    const payloads = isListed.value
+      ? buildI4ListedSyncPayloads(wpId.value, _standards(), state)
+      : buildI4SoeSyncPayloads(wpId.value, _standards(), state)
+
+    if (!payloads.length) {
+      ElMessage.warning('当前报告准则不适用本披露版本同步')
+      return
+    }
+
+    isSyncing.value = true
     try {
-      const parsed = JSON.parse(item.remark)
-      return Array.isArray(parsed) ? parsed : []
-    } catch { return [] }
-  }
-
-  // ─── Auto-fill from cross-sheet (Req 7.2) ─────────────────────────────────
-
-  /**
-   * 从审定表自动取数填入附注对应位置。
-   * 长期待摊费用: 期末 = 期初 + 增加 - 摊销 - 减少
-   * 用户可手工覆盖自动值。
-   */
-  function applyAutoFill(): void {
-    const data = autoFilledData.value
-    if (!data || Object.keys(data).length === 0) return
-
-    // 如果原值矩阵为空，根据审定表数据初始化
-    if (originalRows.value.length === 0 && data['disc_prepaid_begin'] != null) {
-      originalRows.value = [{
-        rowId: 'auto-original-total',
-        item: '合计',
-        beginBalance: data['disc_prepaid_begin'] ?? 0,
-        increase: data['disc_prepaid_increase'] ?? 0,
-        amortization: data['disc_prepaid_amortization'] ?? 0,
-        decrease: data['disc_prepaid_decrease'] ?? 0,
-        endBalance: data['disc_prepaid_end'] ?? 0,
-        isAutoFilled: true,
-      }]
-    }
-
-    // 如果累计摊销矩阵为空，根据审定表数据初始化
-    if (amortizationRows.value.length === 0 && data['disc_amort_begin'] != null) {
-      amortizationRows.value = [{
-        rowId: 'auto-amort-total',
-        item: '合计',
-        beginBalance: data['disc_amort_begin'] ?? 0,
-        increase: data['disc_amort_increase'] ?? 0,
-        amortization: 0,
-        decrease: data['disc_amort_decrease'] ?? 0,
-        endBalance: data['disc_amort_end'] ?? 0,
-        isAutoFilled: true,
-      }]
+      let synced = 0
+      for (const payload of payloads) {
+        const result: any = await api.post(
+          `/api/projects/${projectId.value}/disclosure-notes/sync-from-workpaper`,
+          payload,
+        )
+        const data = result?.data ?? result
+        synced += Number(data?.rows_synced ?? 0)
+      }
+      eventBus.emit('disclosure:note-text-updated' as any, {
+        projectId: projectId.value,
+        sectionIds: [noteTarget.value.sectionId],
+        wpId: wpId.value,
+        sheet: isListed.value ? '附注披露（上市公司）' : '附注披露（国有企业）',
+        wpCode: 'I4',
+      })
+      window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
+        detail: {
+          wpCode: 'I4',
+          variant: variant.value,
+          sectionId: noteTarget.value.sectionId,
+        },
+      }))
+      ElMessage.success(`已同步至附注 ${noteTarget.value.sectionId}（${synced} 行）`)
+    } catch (e: any) {
+      ElMessage.error(e?.response?.data?.message || e?.message || '同步失败')
+    } finally {
+      isSyncing.value = false
     }
   }
 
-  // ─── CRUD: 动态行 ─────────────────────────────────────────────────────────
-
-  function addDynamicRow(sectionKey: string, name: string): void {
-    const rows = sectionRows.value[sectionKey]
-    if (!rows) return
-    rows.push({
-      rowId: `i4disc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      name,
-      amount: 0,
-      description: '',
-      remark: '',
-    })
-    _persistSection(sectionKey)
-  }
-
-  function removeDynamicRow(sectionKey: string, rowId: string): void {
-    const rows = sectionRows.value[sectionKey]
-    if (!rows) return
-    const idx = rows.findIndex((r) => r.rowId === rowId)
-    if (idx >= 0) {
-      rows.splice(idx, 1)
-      _persistSection(sectionKey)
-    }
-  }
-
-  function updateDynamicRow(sectionKey: string, rowId: string, field: keyof I4DisclosureDynamicRow, value: any): void {
-    const rows = sectionRows.value[sectionKey]
-    if (!rows) return
-    const row = rows.find((r) => r.rowId === rowId)
-    if (!row) return
-    ;(row as any)[field] = value
-    _persistSection(sectionKey)
-  }
-
-  // ─── Update: 矩阵行 ───────────────────────────────────────────────────────
-
-  function updateMatrixCell(
-    layer: 'original' | 'amortization',
-    rowId: string,
-    field: keyof I4DisclosureMatrixRow,
-    value: any,
-  ): void {
-    const target = layer === 'original' ? originalRows : amortizationRows
-    const row = target.value.find((r) => r.rowId === rowId)
-    if (!row) return
-    ;(row as any)[field] = value
-    row.isAutoFilled = false // 手工修改后取消自动标记
-    _persistMatrix(layer)
-  }
-
-  // ─── Section Note (手工编辑) ───────────────────────────────────────────────
-
-  function saveSectionNote(sectionKey: string, note: string): void {
-    sectionNotes.value[sectionKey] = note
-    const prefix = itemPrefix.value
-    options?.onSave?.(`${prefix}-${sectionKey}-note`, note)
-
-    // EventBus发布 'disclosure:note-text-updated' (Req 7.2)
-    _publishNoteEvent(sectionKey, note)
-  }
-
-  // ─── AI辅助生成文字描述 (Req 7.2) ─────────────────────────────────────────
-
-  /**
-   * 调用AI端点生成附注文字描述。
-   * 后端 POST /api/workpapers/{wp_id}/ai/generate-text
-   */
-  async function generateNoteText(sectionKey: string, existingContent?: string): Promise<string | null> {
+  async function generateNoteText(): Promise<string | null> {
     if (!wpId.value) return null
     isAiGenerating.value = true
     try {
-      const context = _buildAiContext(sectionKey)
+      const t = totals.value
       const res = await api.post(`/api/workpapers/${wpId.value}/ai/generate-text`, {
-        section: `i4-disclosure-${variant.value}-${sectionKey}`,
-        prompt: `请为长期待摊费用附注"${_getSectionTitle(sectionKey)}"生成披露文字描述`,
-        context,
-        existingContent: existingContent || sectionNotes.value[sectionKey] || '',
+        section: `i4-disclosure-${variant.value}`,
+        prompt: '请为长期待摊费用附注生成简要披露说明（含主要构成、摊销方法）',
+        context: [
+          `科目1801长期待摊费用`,
+          `版本:${isListed.value ? '上市公司' : '国有企业'}`,
+          `期初:${t.beginBalance}`,
+          `增加:${t.increase}`,
+          `摊销:${t.amortization}`,
+          `其他减少:${t.otherDecrease}`,
+          `期末:${t.endBalance}`,
+          isListed.value ? `一年内到期信息性金额:${currentPortion.value}` : '',
+          `项目:${rows.value.map((r) => r.item).filter(Boolean).join('、')}`,
+        ].filter(Boolean).join('; '),
+        existingContent: otherNote.value || '',
       })
-
       const data = res?.data ?? res
-      const generated = data?.content ?? data?.text ?? ''
-      if (generated) {
-        return generated
-      }
-      ElMessage.warning('AI未返回内容，请手工编写')
-      return null
+      return data?.content ?? data?.text ?? null
     } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'AI生成失败'
-      ElMessage.error(msg)
+      ElMessage.error(err?.response?.data?.message || err?.message || 'AI生成失败')
       return null
     } finally {
       isAiGenerating.value = false
     }
   }
 
-  /**
-   * AI生成并确认后写入
-   */
-  async function applyAiGeneratedNote(sectionKey: string, text: string): Promise<void> {
-    sectionNotes.value[sectionKey] = text
-    const prefix = itemPrefix.value
-    options?.onSave?.(`${prefix}-${sectionKey}-note`, text)
-    _publishNoteEvent(sectionKey, text)
-  }
-
-  // ─── EventBus 订阅 + 发布 (Req 7.2) ──────────────────────────────────────
-
-  /** 已变更的section集合（用于批量事件通知） */
-  const changedSections = ref<Set<string>>(new Set())
-  let publishTimer: ReturnType<typeof setTimeout> | null = null
-
-  function _publishNoteEvent(sectionKey: string, _text: string): void {
-    changedSections.value.add(sectionKey)
-
-    // 防抖：300ms内的多次变更合并为一次事件
-    if (publishTimer) clearTimeout(publishTimer)
-    publishTimer = setTimeout(() => {
-      const sectionsArr = Array.from(changedSections.value)
-      changedSections.value.clear()
-
-      const payload = {
-        wpCode: 'I4',
-        variant: variant.value,
-        sections: sectionsArr,
-      }
-
-      // 全局 CustomEvent（标准D~N附注EventBus模式）
-      window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-        detail: payload,
-      }))
-    }, 300)
-  }
-
-  /**
-   * 订阅 'substantive:adjudicated' 事件，审定表确认后刷新附注数据
-   */
   function _onSubstantiveAdjudicated(event: Event): void {
     const detail = (event as CustomEvent).detail
-    // 仅响应 I4 相关事件（科目1801长期待摊费用）
     if (detail?.wpCode === 'I4' || detail?.accountCode === '1801') {
-      applyAutoFill()
+      const detailRows = _readDetailRows()
+      if (!detailRows.length) return
+      const autoRows = aggregateI4DetailForDisclosure(detailRows)
+      rows.value = mergeAutoFillPreserveManual(rows.value, autoRows)
+      currentPortion.value = calcI4CurrentPortion(detailRows)
+      _persistRows()
+      const keys = _keys()
+      if (keys.portion) _persistField(keys.portion, currentPortion.value)
     }
   }
+
+  watch(allResponses, () => _load(), { immediate: true })
+  watch(variant, () => _load())
 
   onMounted(() => {
     window.addEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
   })
-
   onUnmounted(() => {
     window.removeEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
   })
 
-  // ─── Helpers ───────────────────────────────────────────────────────────────
-
-  function _buildAiContext(sectionKey: string): string {
-    const data = autoFilledData.value
-    const parts: string[] = [
-      `科目: 长期待摊费用(1801)，资产类借方，期末=期初+增加-摊销-减少`,
-      `版本: ${variant.value === 'listed' ? '上市公司' : '国有企业'}`,
-      `摊销方法: 直线法(按月平均摊销) 或 工作量法`,
-    ]
-    if (data['disc_prepaid_begin'] != null) parts.push(`期初余额: ${data['disc_prepaid_begin']}`)
-    if (data['disc_prepaid_end'] != null) parts.push(`期末余额: ${data['disc_prepaid_end']}`)
-    if (data['disc_prepaid_increase'] != null) parts.push(`本期增加: ${data['disc_prepaid_increase']}`)
-    if (data['disc_prepaid_amortization'] != null) parts.push(`本期摊销: ${data['disc_prepaid_amortization']}`)
-    if (data['disc_prepaid_decrease'] != null) parts.push(`本期减少(其他): ${data['disc_prepaid_decrease']}`)
-    if (data['disc_prepaid_audited'] != null) parts.push(`审定数: ${data['disc_prepaid_audited']}`)
-    if (data['disc_item_count'] != null) parts.push(`费用项目数: ${data['disc_item_count']}`)
-    return parts.join('; ')
-  }
-
-  function _getSectionTitle(sectionKey: string): string {
-    const sect = sections.value.find((s) => s.key === sectionKey)
-    return sect?.title ?? sectionKey
-  }
-
-  // ─── Persist ───────────────────────────────────────────────────────────────
-
-  function _persistSection(sectionKey: string): void {
-    const prefix = itemPrefix.value
-    options?.onSave?.(`${prefix}-${sectionKey}-rows`, sectionRows.value[sectionKey])
-  }
-
-  function _persistMatrix(layer: string): void {
-    const prefix = itemPrefix.value
-    const target = layer === 'original' ? originalRows : amortizationRows
-    options?.onSave?.(`${prefix}-${layer}-matrix`, target.value)
-  }
-
-  // ─── Init ──────────────────────────────────────────────────────────────────
-
-  watch(allResponses, () => _loadData(), { immediate: true })
-  watch(variant, () => _loadData())
-
-  // ─── Cleanup ───────────────────────────────────────────────────────────────
-
-  function dispose(): void {
-    if (publishTimer) {
-      clearTimeout(publishTimer)
-      publishTimer = null
-    }
-    changedSections.value.clear()
-  }
-
-  // ─── Return ────────────────────────────────────────────────────────────────
-
   return {
-    // State
     variant,
+    isListed,
+    noteTarget,
+    isSyncing,
     isAiGenerating,
-    originalRows,
-    amortizationRows,
-    sectionRows,
-    sectionNotes,
-    // Computed
-    sections,
-    autoFilledData,
-    originalTotal,
-    amortizationTotal,
-    netValueTotal,
-    // Actions
-    applyAutoFill,
-    addDynamicRow,
-    removeDynamicRow,
-    updateDynamicRow,
-    updateMatrixCell,
-    saveSectionNote,
-    // AI
+    rows,
+    totals,
+    currentPortion,
+    footnote,
+    otherNote,
+    auditNote,
+    auditConclusion,
+    reconcileDiff,
+    reconcileVsAdj,
+    syncFromDetail,
+    addRow,
+    removeRow,
+    updateCell,
+    saveOtherNote,
+    saveAuditNote,
+    saveAuditConclusion,
+    saveCurrentPortion,
+    syncToNotes,
     generateNoteText,
-    applyAiGeneratedNote,
-    // Lifecycle
-    dispose,
   }
 }
 

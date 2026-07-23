@@ -609,11 +609,21 @@ def main() -> int:
     )
 
     # ─── Req-16: 生成新版本后自动清理过期快照 ─────────────────────────────
+    # ⚠️ fail-closed（Req-16.3）：本离线脚本无 DB 会话，无法验证哪些历史版本
+    # 被项目锁定引用；传 referenced_versions=None → GC 判定为「不可验证」→
+    # 不删除任何快照。绝不传空集 set()（空集=断言无引用→会误删项目锁定版本）。
+    # 真正的过期清理应由能查询 projects.registry_version 的 DB-aware GC 作业执行
+    # （查得引用集合后经 referenced_versions= 传入）。
     try:
         from app.services.acnr.catalog_snapshot_gc import cleanup_stale_snapshots
 
-        gc_result = cleanup_stale_snapshots(keep_recent=10, referenced_versions=set())
-        if gc_result["deleted"]:
+        gc_result = cleanup_stale_snapshots(keep_recent=10, referenced_versions=None)
+        if gc_result.get("reference_status") == "unverifiable":
+            print(
+                "  Snapshot GC: skipped (引用集合不可验证 → fail-closed，未删除任何快照；"
+                "如需清理请运行 DB-aware GC 作业)"
+            )
+        elif gc_result["deleted"]:
             print(f"  Snapshot GC: deleted {len(gc_result['deleted'])} stale snapshot(s)")
         else:
             print(f"  Snapshot GC: no stale snapshots to clean")

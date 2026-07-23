@@ -27,6 +27,11 @@
       </p>
     </div>
 
+    <details class="excel-fidelity-note">
+      <summary>关于本表与原 Excel 底稿的差异</summary>
+      <p>原 Excel I2-2 明细表共 61 列（4 区段：基础信息/本期投入/资本化/期末汇总）；当前 HTML 结构化视图为对齐审计逻辑的分段简化子集，暂未逐列还原全部 61 列。可通过「导入导出」下载模板/数据以核对完整列。</p>
+    </details>
+
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleAddRow">+ 新增项目</el-button>
@@ -53,6 +58,17 @@
         <el-button size="small" type="success" :disabled="isReadonly" @click="handleSave">保存</el-button>
         <el-button size="small" @click="emit('navigate-sheet', 'I2-1')">← 审定表</el-button>
         <el-button size="small" @click="emit('navigate-sheet', 'I2-3')">I2-3 调整 →</el-button>
+        <el-dropdown v-if="!isReadonly" size="small" :disabled="ieBusy" @command="handleIeCommand">
+          <el-button size="small" :loading="ieBusy">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="export-template">导出模板</el-dropdown-item>
+              <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
+              <el-dropdown-item command="import-data" divided>导入数据</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onFileSelected" />
       </div>
       <div class="toolbar-right">
         <GtIndexChip value="wp:I2-2" :context-project-id="props.projectId" />
@@ -212,6 +228,7 @@
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI2Detail } from '../../composables/useI2Detail'
+import { useI2ImportExport } from '../../composables/useI2ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -223,7 +240,7 @@ const props = defineProps<{
   isReadonly?: boolean
 }>()
 
-const emit = defineEmits<{ save: []; 'navigate-sheet': [sheetName: string] }>()
+const emit = defineEmits<{ save: []; 'navigate-sheet': [sheetName: string]; imported: [] }>()
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
 
 const allResponsesRef = computed(() => props.allResponses)
@@ -354,6 +371,27 @@ function handleReview() {
   openReviewDialog('I2-2-开发支出明细')
 }
 
+// ─── 导入导出（I2-2 明细表） ────────────────────────────────────────────────
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const { isImporting, isExporting, exportTemplate, exportData, importData } = useI2ImportExport({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+  onImported: () => emit('imported'),
+})
+const ieBusy = computed(() => isImporting.value || isExporting.value)
+
+async function handleIeCommand(cmd: string) {
+  if (cmd === 'export-template') await exportTemplate('I2-2')
+  else if (cmd === 'export-data') await exportData('I2-2')
+  else if (cmd === 'import-data') fileInputRef.value?.click()
+}
+
+async function onFileSelected(e: Event) {
+  const file = (e.target as HTMLInputElement).files?.[0]
+  ;(e.target as HTMLInputElement).value = ''
+  if (file) await importData(file, 'I2-2')
+}
+
 function fmtAmount(value: number | null | undefined): string {
   if (value == null || Math.abs(Number(value)) < 0.005) return '—'
   return Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -374,6 +412,12 @@ function fmtAmount(value: number | null | undefined): string {
 .tab-toolbar { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
 .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .link-alert { margin-bottom: 10px; }
+.excel-fidelity-note {
+  margin-bottom: 10px; font-size: 12px; color: var(--el-text-color-secondary);
+  background: #f9fafb; border: 1px solid #ebeef5; border-radius: 4px; padding: 6px 12px;
+}
+.excel-fidelity-note summary { cursor: pointer; font-weight: 500; }
+.excel-fidelity-note p { margin: 6px 0 0; line-height: 1.6; }
 .block-card { margin-bottom: 14px; }
 .block-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-weight: 600; }
 .block-title-text { font-weight: 600; }

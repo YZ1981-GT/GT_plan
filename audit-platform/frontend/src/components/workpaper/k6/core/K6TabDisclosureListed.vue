@@ -136,12 +136,57 @@
       </el-table>
     </el-card>
 
-    <!-- Section 3: 处置安排及损益 -->
+    <!-- Section 3: CAS42(3)(4) 减值损失 + 处置组损益 -->
     <el-card shadow="never" class="disclosure-section">
       <template #header>
         <div class="section-card-header">
-          <span>三、处置安排与已确认损益</span>
-          <el-button size="small" type="primary" plain @click="handleAiGenerate">
+          <span>三、已确认减值损失及处置组损益（CAS42第30条）</span>
+          <el-tag v-if="impairmentAutoFilled" type="primary" size="small" effect="light">减值自动取数</el-tag>
+        </div>
+      </template>
+      <div class="cas42-fields">
+        <div class="cas42-field">
+          <span class="cas42-label">(3) 本期已确认减值损失金额</span>
+          <el-input-number
+            v-model="impairmentLoss"
+            :controls="false"
+            :precision="2"
+            :disabled="isReadonly"
+            size="small"
+            class="cas42-input"
+            @change="persistCas42"
+          />
+          <span class="cas42-hint">（来自K6-5减值测试/K6-1减值合计）</span>
+        </div>
+        <div class="cas42-field">
+          <span class="cas42-label">(4) 报告期间处置组营业利润/亏损</span>
+          <el-input-number
+            v-model="disposalGroupProfit"
+            :controls="false"
+            :precision="2"
+            :disabled="isReadonly"
+            size="small"
+            class="cas42-input"
+            @change="persistCas42"
+          />
+          <span class="cas42-hint">（正=利润，负=亏损，计入终止经营损益）</span>
+        </div>
+        <div class="cas42-field">
+          <span class="cas42-label">列报为终止经营</span>
+          <el-select v-model="isDiscontinuedOp" :disabled="isReadonly" size="small" class="cas42-select" @change="persistCas42">
+            <el-option label="是" value="yes" />
+            <el-option label="否" value="no" />
+          </el-select>
+        </div>
+      </div>
+    </el-card>
+
+    <!-- Section 4: 处置安排及说明 -->
+    <el-card shadow="never" class="disclosure-section">
+      <template #header>
+        <div class="section-card-header">
+          <span>四、非流动资产或处置组描述、处置方式和时间安排</span>
+          <el-button size="small" type="primary" plain :loading="aiLoading" @click="handleAiGenerate">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -151,7 +196,7 @@
         :disabled="isReadonly"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="描述处置方式/时间安排/已确认损益金额（可AI辅助生成）"
+        placeholder="描述非流动资产/处置组、预计处置方式和时间安排（CAS42第30条(1)(2)，可AI辅助生成）"
         @blur="handleNarrativeSave"
       />
     </el-card>
@@ -184,7 +229,9 @@
  * - 审计说明 + 结论 el-card
  */
 import { ref, computed, onMounted, onBeforeUnmount, inject } from 'vue'
+import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
+import http from '@/utils/http'
 
 const K6_ACCOUNT_CODE = '1481'
 
@@ -238,6 +285,13 @@ const assetTable = ref<AssetDisclosureRow[]>([])
 const liabilityTable = ref<LiabilityDisclosureRow[]>([])
 const disposalNarrative = ref('')
 const hasAutoData = ref(false)
+
+// CAS42 第30条(3)(4) 减值损失 + 处置组损益
+const impairmentLoss = ref(0)
+const disposalGroupProfit = ref(0)
+const isDiscontinuedOp = ref('')
+const impairmentAutoFilled = ref(false)
+const aiLoading = ref(false)
 
 // ─── Init ────────────────────────────────────────────────────────────────────
 
@@ -329,33 +383,55 @@ function loadSavedData(): void {
   const savedNarrative = props.allResponses.get('K6-disclosure-listed-narrative')
   if (savedNarrative?.remark) disposalNarrative.value = savedNarrative.remark
 
-  const savedConclusion = props.allResponses.get('K6-disclosure-listed-conclusion')
+  _loadCas42()
 }
 
 function applyAutoFill(): void {
-  // 从K6-1审定数据自动填充
-  const adjTotal = props.allResponses.get('K6-1-audited-total')
-  if (adjTotal?.remark) {
-    hasAutoData.value = true
+  // 从K6-2明细表按类别聚合自动填充（K6-2 useK6Detail 持久化键为 K6-2-rows）
+  const k6_2 = props.allResponses.get('K6-2-rows')
+  const raw = k6_2?.remark ?? (typeof k6_2 === 'string' ? k6_2 : null)
+  if (raw) {
     try {
-      const data = JSON.parse(adjTotal.remark)
-      if (data && typeof data === 'object') {
-        // Apply asset data
+      const rows = JSON.parse(raw)
+      if (Array.isArray(rows) && rows.length > 0) {
+        hasAutoData.value = true
+        // 先清零非合计行的自动填充字段
         for (const row of assetTable.value) {
-          if (!row.isTotal && data.assets?.[row.category]) {
-            const d = data.assets[row.category]
-            row.originalCost = Number(d.originalCost ?? 0)
-            row.accumulatedDep = Number(d.accumulatedDep ?? 0)
-            row.impairment = Number(d.impairment ?? 0)
-            row.bookValue = row.originalCost - row.accumulatedDep - row.impairment
-            row.openingBalance = Number(d.openingBalance ?? 0)
-            row.closingBalance = Number(d.closingBalance ?? 0)
-            row.isAutoFill = true
-          }
+          if (row.isTotal) continue
+          row.originalCost = 0; row.accumulatedDep = 0; row.impairment = 0
+          row.bookValue = 0; row.fairValue = 0; row.sellingCost = 0; row.fairValueNet = 0
+          row.closingBalance = 0; row.isAutoFill = false
+        }
+        // 按类别聚合K6-2明细
+        for (const r of rows) {
+          const cat = r.category || '其他非流动资产'
+          let target = assetTable.value.find(x => !x.isTotal && x.category === cat)
+          if (!target) target = assetTable.value.find(x => !x.isTotal && x.category === '其他非流动资产')
+          if (!target) continue
+          target.originalCost += Number(r.costValue) || 0
+          target.accumulatedDep += Number(r.accumulatedDep) || 0
+          target.impairment += Number(r.impairmentProvision) || 0
+          target.bookValue += Number(r.bookValue) || 0
+          target.fairValue += Number(r.fairValue) || 0
+          target.sellingCost += Number(r.sellingCost) || 0
+          target.fairValueNet += Number(r.fairValueNet) || 0
+          target.closingBalance += Number(r.bookValue) || 0
+          target.isAutoFill = true
         }
         recalcAssetTotals()
       }
     } catch { /* silent */ }
+  }
+
+  // 减值损失从K6-1减值合计 或 K6-5减值合计 自动带入（仅在未手工录入时）
+  if (impairmentLoss.value === 0) {
+    const k6_1_imp = props.allResponses.get('K6-1-impairment-total')
+    const k6_5_imp = props.allResponses.get('K6-5-impairment-total')
+    const impVal = Number(k6_1_imp?.remark ?? 0) || Number(k6_5_imp?.remark ?? 0) || 0
+    if (impVal > 0) {
+      impairmentLoss.value = impVal
+      impairmentAutoFilled.value = true
+    }
   }
 }
 
@@ -402,11 +478,62 @@ function handleNarrativeSave(): void {
   })
 }
 
-function handleConclusionSave(): void {
+// ─── CAS42(3)(4) 持久化 ──────────────────────────────────────────────────────
+
+function persistCas42(): void {
+  impairmentAutoFilled.value = false // 手工修改后取消自动标记
+  emit('save', 'K6-disclosure-listed-cas42', {
+    remark: JSON.stringify({
+      impairmentLoss: impairmentLoss.value,
+      disposalGroupProfit: disposalGroupProfit.value,
+      isDiscontinuedOp: isDiscontinuedOp.value,
+    }),
+  })
 }
 
-function handleAiGenerate(): void {
-  emit('save', 'K6-disclosure-listed-ai-trigger', { remark: 'overall-opinion' })
+function _loadCas42(): void {
+  const saved = props.allResponses.get('K6-disclosure-listed-cas42')
+  if (saved?.remark) {
+    try {
+      const d = JSON.parse(saved.remark)
+      impairmentLoss.value = Number(d.impairmentLoss) || 0
+      disposalGroupProfit.value = Number(d.disposalGroupProfit) || 0
+      isDiscontinuedOp.value = d.isDiscontinuedOp || ''
+    } catch { /* ignore */ }
+  }
+}
+
+// ─── AI辅助（真实接入/ai/generate-text） ─────────────────────────────────────
+
+async function handleAiGenerate(): Promise<void> {
+  if (props.isReadonly || aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const totalRow = assetTable.value.find(r => r.isTotal)
+    const context: Record<string, string> = {
+      '持有待售资产账面合计': String(totalRow?.bookValue ?? 0),
+      '公允净额合计': String(totalRow?.fairValueNet ?? 0),
+      '本期已确认减值损失': String(impairmentLoss.value),
+      '处置组营业利润/亏损': String(disposalGroupProfit.value),
+      '是否列报终止经营': isDiscontinuedOp.value === 'yes' ? '是' : isDiscontinuedOp.value === 'no' ? '否' : '未确定',
+    }
+    const resp = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'k6-disclosure-listed',
+      context,
+      prompt: '根据持有待售资产/负债披露数据，生成上市公司附注披露说明（CAS42第30条：非流动资产或处置组描述、预计处置方式和时间安排、已确认减值损失金额、报告期间处置组营业利润或亏损）',
+      existingContent: disposalNarrative.value,
+    })
+    const text = resp?.data?.content || resp?.data?.text || resp?.content || ''
+    if (text) {
+      disposalNarrative.value = text
+      handleNarrativeSave()
+      ElMessage.success('AI披露说明已生成')
+    }
+  } catch (e: any) {
+    ElMessage.error('AI生成失败: ' + (e?.message || '未知错误'))
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 // ─── Persist ─────────────────────────────────────────────────────────────────
@@ -469,6 +596,15 @@ function fmtAmt(v: number | null | undefined): string {
 .disclosure-section { margin-bottom: 12px; }
 .conclusion-card { margin-bottom: 12px; }
 .section-card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
+
+/* CAS42(3)(4) 字段 */
+.cas42-fields { display: flex; flex-direction: column; gap: 12px; }
+.cas42-field { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.cas42-label { min-width: 220px; font-size: var(--wp-font-size, 13px); color: #303133; }
+.cas42-input { width: 180px; }
+.cas42-input :deep(.el-input__inner) { text-align: right; }
+.cas42-select { width: 100px; }
+.cas42-hint { font-size: 12px; color: #909399; }
 
 .formula-col :deep(.cell) { border-bottom: 1px dashed #409eff; cursor: help; }
 .formula-value { color: #409eff; font-weight: 500; }

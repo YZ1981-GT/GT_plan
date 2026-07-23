@@ -393,6 +393,48 @@ export function useG1DerivativeCheck(opts: {
     opts.debouncedSave(KEY_B, { remark: JSON.stringify(bQuestions.value) })
   }
 
+  /**
+   * 从合同 OCR 结果自动勾选 B 问卷。
+   * ocrFields 的键对齐后端 _g1_contract_ocr.py 的 _B_VARIABLE_FIELDS。
+   * 仅将识别为 true 的变量置「是」（不覆盖已答项为否，避免误清人工判断），
+   * 返回本次自动置「是」的数量。
+   */
+  function applyContractOcrToB(ocrFields: Record<string, unknown>): number {
+    if (opts.isReadonly.value) return 0
+    const map: Record<string, string> = {
+      b1_interestRate: 'b1',
+      b2_financialPrice: 'b2',
+      b3_commodityPrice: 'b3',
+      b4_exchangeRate: 'b4',
+      b5_priceIndex: 'b5',
+      b6_creditRating: 'b6',
+      b7_otherFinancial: 'b7',
+      b8_otherNonFinancial: 'b8',
+    }
+    let applied = 0
+    const next = bQuestions.value.map((q) => ({ ...q }))
+    for (const [ocrKey, bId] of Object.entries(map)) {
+      if (ocrFields[ocrKey] === true) {
+        const row = next.find((q) => q.id === bId)
+        if (row && row.answer !== true) {
+          row.answer = true
+          if (!row.remark) row.remark = '合同OCR识别'
+          applied += 1
+        }
+      }
+    }
+    if (applied > 0) {
+      bQuestions.value = next
+      opts.debouncedSave(KEY_B, { remark: JSON.stringify(bQuestions.value) })
+    }
+    // OCR 识别的工具名称回填（仅当本地为空）
+    const nm = ocrFields.instrumentName
+    if (typeof nm === 'string' && nm.trim() && !instrumentName.value) {
+      setInstrumentName(nm.trim())
+    }
+    return applied
+  }
+
   function setCAnswer(id: string, value: boolean | null) {
     if (opts.isReadonly.value) return
     cQuestions.value = cQuestions.value.map((q) =>
@@ -568,6 +610,7 @@ export function useG1DerivativeCheck(opts: {
     setCas22HybridNoted,
     setBAnswer,
     setBRemark,
+    applyContractOcrToB,
     setCAnswer,
     setCExplanation,
     addVoucher,

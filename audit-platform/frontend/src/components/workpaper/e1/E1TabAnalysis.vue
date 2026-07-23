@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { inject, onMounted, ref, toRef, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useE1Analysis, type AnalysisRow, type AnalysisPeriod } from '../composables/useE1Analysis'
 import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
@@ -71,6 +72,15 @@ async function aiLongText(kind: 'note' | 'conclusion'): Promise<void> {
   })
   if (text) saveText(isNote ? NOTE_KEY : CONCLUSION_KEY, isNote ? auditNote : auditConclusion, text)
 }
+
+function handleFillFromAdj(): void {
+  const filled = analysis.fillFromAdjudication()
+  if (filled > 0) {
+    ElMessage.success(`已从E1-1带入 ${filled} 项上期金额`)
+  } else {
+    ElMessage.info('上期金额已有值或E1-1尚无数据，未覆盖')
+  }
+}
 </script>
 
 <template>
@@ -78,7 +88,7 @@ async function aiLongText(kind: 'note' | 'conclusion'): Promise<void> {
     <div class="method-context"><strong>源模板方法论：</strong>先做三年构成和七类其他货币资金分析，再计算八项比例，结合月度变动、银行类型、资金质量和异常事项形成结论。“存贷双高”必须同时满足货币资金和贷款总额的可见阈值；银行存款占比高仅提示集中度关注。</div>
     <el-alert type="info" :closable="false" title="审计目标：通过分析程序识别货币资金余额和变动异常，评估重大错报风险。" class="objective-alert" />
     <div class="tab-toolbar">
-      <div><el-tag type="info">E1-14 七区段分析</el-tag></div>
+      <div><el-tag type="info">E1-14 七区段分析</el-tag><el-button size="small" type="success" plain :disabled="isReadonly" style="margin-left:8px" @click="handleFillFromAdj">从E1-1带入上期</el-button></div>
       <div class="toolbar-right"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /><el-tag size="small">货币资金 {{ displayPrefs.fmtAmount(analysis.totalEnding.value) }}</el-tag></div>
     </div>
     <el-tabs v-model="activeSection" type="border-card">

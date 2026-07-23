@@ -215,6 +215,7 @@ import { useF1LongTerm } from '../composables/useF1LongTerm'
 import { useF1AiGenerate } from '../composables/useF1AiGenerate'
 import { useF1ImportExport, type F1ImportSheet } from '../composables/useWorkpaperImportExport'
 import { useAgingConfig } from '@/composables/useAgingConfig'
+import { ADJUDICATION_LABEL_BY_SEGMENT_KEY } from '../composables/agingPresets'
 import type { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
@@ -238,10 +239,12 @@ const projectIdRef = toRef(props, 'projectId') as Ref<string>
 
 const { bands } = useAgingConfig(projectIdRef, 'F1')
 
-/** 超1年账龄选项（排除 1年以内） */
+/** 超1年账龄选项（排除 1年以内）；标签与 F1-1 审定表枚举一致 */
 const agingOptions = computed(() => {
-  const labels = bands.value.filter(b => b.key !== 'within1').map(b => b.label)
-  return labels.length ? labels : ['1-2年', '2-3年', '3年以上']
+  const labels = bands.value
+    .filter((b) => b.key !== 'within1')
+    .map((b) => ADJUDICATION_LABEL_BY_SEGMENT_KEY[b.key] || b.label)
+  return labels.length ? labels : ['1至2年(含2年)', '2至3年(含3年)', '3年以上']
 })
 
 const {

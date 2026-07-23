@@ -50,7 +50,7 @@ export interface RelatedPartyRow {
   remark: string                // M: 备注
 }
 
-/** D1-12 质押行（16列） */
+/** D1-12 质押行（16列 + OCR附件） */
 export interface PledgeRow {
   id: string
   noteType: string              // A: 票据类型
@@ -69,6 +69,9 @@ export interface PledgeRow {
   pledgePeriod: string          // N: 质押期限 (日期范围)
   pledgeAgreement: string       // O: 质押协议
   indexRef: string              // P: 索引号
+  attachmentId: string          // 附件ID
+  attachmentName: string        // 附件名称
+  ocrStatus: 'none' | 'processing' | 'done' // OCR状态
 }
 
 /** D1-13 凭证核对明细行（13列） */

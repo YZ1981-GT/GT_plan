@@ -1,75 +1,43 @@
 /**
- * useI3Adjudication — I3 商誉审定表 composable（商誉不摊销！）
+ * useI3Adjudication — I3-1 商誉审定表
  *
- * 列结构（13列）：
- *   被投资单位 | 初始确认 | 期初余额 | 本期增加(新并购) | 本期减少(减值)
- *   | 期末余额 | 未审数 | AJE | RJE | 审定数 | 减值准备 | 净额
- *
- * 核心公式：
- *   - 期末 = 期初 + 新并购(通常0) - 减值  (商誉不摊销！)
- *   - 审定 = 未审 + AJE + RJE
- *   - 净额 = 商誉原值(初始确认) - 累计减值
- *   - 商誉减值不可转回！
- *   - "本期增加"仅来自新并购（正常为0），非零时黄色提示
- *
- * TB回写：科目1711商誉（借方/资产类）
- *
- * Spec: .kiro/specs/i3-goodwill/
- * Task: 3.3
- * Requirements: 2.1-2.8
+ * 对齐 Excel：未审 → 账项调整 → 审定；行自 I3-2 带入；AJE/RJE 自 I3-3；
+ * 本期减值可自 I3-6；与 TB 1711 / I3-2 勾稽。
  */
 import { ref, computed, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { useI3CrossSheet } from './useI3CrossSheet'
 import {
-  calcAuditedAmount,
-  calcGoodwillEndBalance,
-  calcGoodwillNetValue,
-  calcSubtotal,
-} from './useI3FormulaEngine'
+  type I3AdjudicationRowModel,
+  type I3AdjudicationCrossCheck,
+  emptyI3AdjudicationRow,
+  normalizeI3AdjudicationRow,
+  summarizeI3Adjudication,
+  seedI3AdjudicationFromDetail,
+  allocateI3Adjustments,
+  applyAjeFromI33,
+  applyI3ImpairmentFromTest,
+  buildI3AdjudicationCrossCheck,
+  buildI3AdjudicationConclusionDraft,
+  buildI3LayerSummary,
+  validateI3AdjudicationSave,
+  recalcI3AdjudicationRow,
+  I3_ADJ_ROWS_KEY,
+  I3_ADJ_ROWS_CANDIDATES,
+  I3_ADJ_NOTE_KEY,
+  I3_ADJ_CONCLUSION_KEY,
+} from './i3AdjudicationModel'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+export type I3AdjudicationRow = I3AdjudicationRowModel
 
-/** 审定表行（每行对应一个被投资单位） */
-export interface I3AdjudicationRow {
-  rowId: string
-  /** 被投资单位名称 */
-  investee: string
-  /** 初始确认金额（商誉原值） */
-  initialRecognition: number
-  /** 期初余额 */
-  beginBalance: number
-  /** 本期增加（仅新并购） */
-  newAcquisition: number
-  /** 本期减少（仅减值，不可转回） */
-  impairment: number
-  /** 期末余额（公式列：期初 + 新并购 - 减值） */
-  endBalance: number
-  /** 未审数 */
-  unadjusted: number
-  /** AJE调整 */
-  aje: number
-  /** RJE重分类 */
-  rje: number
-  /** 审定数（公式列：未审 + AJE + RJE） */
-  audited: number
-  /** 累计减值准备 */
-  accImpairment: number
-  /** 净额（公式列：初始确认 - 累计减值） */
-  netValue: number
-  /** 可编辑标记 */
-  isEditable?: boolean
-}
-
-/** 警告消息 */
 export interface I3Warning {
   rowId: string
   investee: string
-  type: 'newAcquisition' | 'impairmentReversal'
+  type: 'newAcquisition' | 'impairmentReversal' | 'endVsNet'
   message: string
 }
 
-/** TB差异行 */
 export interface I3DifferenceRow {
   label: string
   accountCode: string
@@ -78,55 +46,57 @@ export interface I3DifferenceRow {
   difference: number
 }
 
-/** ChecklistItem 类型（与 useI3FormData 对齐） */
 export interface I3ChecklistItem {
   item_id: string
   conclusion: string | null
   remark: string | null
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
 const ITEM_PREFIX = 'I3-adj'
 const ACCOUNT_CODE_1711 = '1711'
-
-// ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useI3Adjudication(
   wpId: Ref<string>,
   projectId: Ref<string>,
   allResponses: Ref<Map<string, I3ChecklistItem>>,
   options?: {
-    /** TB未审数据 */
     tbUnadjusted1711?: Ref<number>
-    /** TB审定数据 */
     tbAudited1711?: Ref<number>
-    /** 跨sheet减值联动（来自I3-6） */
     crossSheetImpairment?: Ref<number>
-    /** 保存回调 */
+    asOfYear?: Ref<number> | (() => number)
     onSave?: (itemId: string, value: any) => void
   },
 ) {
-  // ─── State ─────────────────────────────────────────────────────────────────
-
-  /** 审定表数据行（动态，每个被投资单位一行） */
   const rows = ref<I3AdjudicationRow[]>([])
-  /** 审计说明 */
   const auditNote = ref('')
-  /** 审计结论 */
   const auditConclusion = ref('')
 
-  // ─── Load from allResponses ────────────────────────────────────────────────
+  const {
+    detailTotals,
+    impairmentResult,
+    adjustmentSync,
+  } = useI3CrossSheet(allResponses as Ref<Map<string, any>>)
+
+  function getYear(): number {
+    if (!options?.asOfYear) return new Date().getFullYear()
+    return typeof options.asOfYear === 'function'
+      ? options.asOfYear()
+      : options.asOfYear.value
+  }
 
   function _loadRows(): void {
-    const data = _getJson(`${ITEM_PREFIX}-rows`)
+    let data: any = null
+    for (const key of I3_ADJ_ROWS_CANDIDATES) {
+      data = _getJson(key)
+      if (Array.isArray(data) && data.length > 0) break
+    }
     if (Array.isArray(data) && data.length > 0) {
-      rows.value = data.map(_normalizeRow)
+      rows.value = data.map(normalizeI3AdjudicationRow)
     } else {
       rows.value = []
     }
-    auditNote.value = _getString(`${ITEM_PREFIX}-audit-note`)
-    auditConclusion.value = _getString(`${ITEM_PREFIX}-audit-conclusion`)
+    auditNote.value = _getString(I3_ADJ_NOTE_KEY) || _getString(`${ITEM_PREFIX}-audit-note`)
+    auditConclusion.value = _getString(I3_ADJ_CONCLUSION_KEY) || _getString(`${ITEM_PREFIX}-audit-conclusion`)
   }
 
   function _getJson(itemId: string): any {
@@ -134,6 +104,7 @@ export function useI3Adjudication(
     if (!item) return null
     const raw = item.remark ?? item.conclusion
     if (!raw) return null
+    if (typeof raw !== 'string') return raw
     try { return JSON.parse(raw) } catch { return null }
   }
 
@@ -142,63 +113,12 @@ export function useI3Adjudication(
     return (item?.remark ?? item?.conclusion ?? '') as string
   }
 
-  function _normalizeRow(raw: any): I3AdjudicationRow {
-    const beginBalance = Number(raw.beginBalance) || 0
-    const newAcquisition = Number(raw.newAcquisition) || 0
-    const impairment = Number(raw.impairment) || 0
-    const initialRecognition = Number(raw.initialRecognition) || 0
-    const accImpairment = Number(raw.accImpairment) || 0
-    const unadjusted = Number(raw.unadjusted) || 0
-    const aje = Number(raw.aje) || 0
-    const rje = Number(raw.rje) || 0
+  const subtotals = computed(() => summarizeI3Adjudication(rows.value))
 
-    return {
-      rowId: raw.rowId ?? `row-${Math.random().toString(36).slice(2, 10)}`,
-      investee: raw.investee ?? '',
-      initialRecognition,
-      beginBalance,
-      newAcquisition,
-      impairment,
-      endBalance: calcGoodwillEndBalance(beginBalance, newAcquisition, impairment),
-      unadjusted,
-      aje,
-      rje,
-      audited: calcAuditedAmount(unadjusted, aje, rje),
-      accImpairment,
-      netValue: calcGoodwillNetValue(initialRecognition, accImpairment),
-      isEditable: raw.isEditable ?? true,
-    }
-  }
+  const crossCheck = computed<I3AdjudicationCrossCheck>(() =>
+    buildI3AdjudicationCrossCheck(rows.value, detailTotals.value),
+  )
 
-  // ─── Computed: 合计行 ──────────────────────────────────────────────────────
-
-  const subtotals = computed<I3AdjudicationRow>(() => {
-    const detail = rows.value
-    return {
-      rowId: 'row-subtotal',
-      investee: '合计',
-      initialRecognition: calcSubtotal(detail.map(r => r.initialRecognition)),
-      beginBalance: calcSubtotal(detail.map(r => r.beginBalance)),
-      newAcquisition: calcSubtotal(detail.map(r => r.newAcquisition)),
-      impairment: calcSubtotal(detail.map(r => r.impairment)),
-      endBalance: calcSubtotal(detail.map(r => r.endBalance)),
-      unadjusted: calcSubtotal(detail.map(r => r.unadjusted)),
-      aje: calcSubtotal(detail.map(r => r.aje)),
-      rje: calcSubtotal(detail.map(r => r.rje)),
-      audited: calcSubtotal(detail.map(r => r.audited)),
-      accImpairment: calcSubtotal(detail.map(r => r.accImpairment)),
-      netValue: calcSubtotal(detail.map(r => r.netValue)),
-      isEditable: false,
-    }
-  })
-
-  // ─── Computed: 警告 ────────────────────────────────────────────────────────
-
-  /**
-   * 获取警告列表：
-   * - "本期增加"非零 → 黄色提示（正常年份商誉无新增，除非新并购）
-   * - "本期减少"为负（尝试转回） → 红色阻止
-   */
   const warnings = computed<I3Warning[]>(() => {
     const result: I3Warning[] = []
     for (const row of rows.value) {
@@ -218,16 +138,21 @@ export function useI3Adjudication(
           message: `${row.investee || '未命名'}：商誉减值不可转回！本期减少不能为负数`,
         })
       }
+      if (Math.abs(row.endBalance - row.netValue) > 0.01) {
+        result.push({
+          rowId: row.rowId,
+          investee: row.investee,
+          type: 'endVsNet',
+          message: `${row.investee || '未命名'}：期末余额(${row.endBalance})与净额(${row.netValue})不一致，请核对期初/原值/累计减值`,
+        })
+      }
     }
     return result
   })
 
-  /** 便捷方法：获取警告消息数组（兼容模板直接使用） */
   function getWarnings(): I3Warning[] {
     return warnings.value
   }
-
-  // ─── Computed: TB差异 ──────────────────────────────────────────────────────
 
   const tbRow = computed(() => ({
     unadjusted: options?.tbUnadjusted1711?.value ?? 0,
@@ -243,17 +168,13 @@ export function useI3Adjudication(
         accountCode: ACCOUNT_CODE_1711,
         audited: auditedTotal,
         tbAmount: tbUnadj,
-        difference: auditedTotal - tbUnadj,
+        difference: Math.round((auditedTotal - tbUnadj) * 100) / 100,
       },
     ]
   })
 
-  // ─── Actions: 动态行 ──────────────────────────────────────────────────────
+  const tbDiff = computed(() => differenceRows.value[0]?.difference ?? 0)
 
-  /**
-   * 新增行：弹 ElMessageBox 输入被投资单位名称后创建
-   * 商誉审定表是动态行（按被投资单位维度）
-   */
   async function addRow(): Promise<void> {
     try {
       const { value: investeeName } = await ElMessageBox.prompt(
@@ -267,36 +188,16 @@ export function useI3Adjudication(
         },
       )
       if (!investeeName) return
-
-      const newRow: I3AdjudicationRow = {
-        rowId: `row-${Date.now().toString(36)}`,
-        investee: investeeName.trim(),
-        initialRecognition: 0,
-        beginBalance: 0,
-        newAcquisition: 0,
-        impairment: 0,
-        endBalance: 0,
-        unadjusted: 0,
-        aje: 0,
-        rje: 0,
-        audited: 0,
-        accImpairment: 0,
-        netValue: 0,
-        isEditable: true,
-      }
-      rows.value.push(newRow)
+      rows.value.push(emptyI3AdjudicationRow({ investee: investeeName.trim() }))
       _persist()
       ElMessage.success(`已添加：${investeeName}`)
     } catch {
-      // 用户取消
+      /* cancel */
     }
   }
 
-  /**
-   * 删除行（按rowId移除）
-   */
   function removeRow(rowId: string): void {
-    const idx = rows.value.findIndex(r => r.rowId === rowId)
+    const idx = rows.value.findIndex((r) => r.rowId === rowId)
     if (idx >= 0) {
       const removed = rows.value.splice(idx, 1)[0]
       _persist()
@@ -304,102 +205,160 @@ export function useI3Adjudication(
     }
   }
 
-  // ─── Actions: 更新单元格 ──────────────────────────────────────────────────
-
-  /**
-   * 更新审定表某行某列值，自动重算公式列。
-   * 公式列自动计算：endBalance / audited / netValue
-   */
   function updateCell(
     rowId: string,
     field: keyof I3AdjudicationRow,
-    value: number,
+    value: number | string,
   ): void {
-    const row = rows.value.find(r => r.rowId === rowId)
-    if (!row || !row.isEditable) return
+    const row = rows.value.find((r) => r.rowId === rowId)
+    if (!row || row.isEditable === false) return
 
-    // 商誉减值不可转回：阻止负数减值
-    if (field === 'impairment' && value < 0) {
+    if (field === 'impairment' && typeof value === 'number' && value < 0) {
       ElMessage.error('商誉减值不可转回！本期减少不能为负数')
       return
     }
 
     ;(row as any)[field] = value
-
-    // 自动重算公式列
-    row.endBalance = calcGoodwillEndBalance(row.beginBalance, row.newAcquisition, row.impairment)
-    row.audited = calcAuditedAmount(row.unadjusted, row.aje, row.rje)
-    row.netValue = calcGoodwillNetValue(row.initialRecognition, row.accImpairment)
-
+    // 手工改调整后清除近似标记
+    if (field === 'aje' || field === 'rje') {
+      row.ajeApprox = false
+    }
+    const idx = rows.value.findIndex((r) => r.rowId === rowId)
+    if (idx >= 0) rows.value[idx] = recalcI3AdjudicationRow(row)
     _persist()
   }
 
-  // ─── Actions: TB取数接入 ──────────────────────────────────────────────────
-
-  /**
-   * 接收TB未审数据，写入行的 unadjusted 字段
-   * 通常由 useI3FormData 在 selfLoad 后调用
-   */
   function applyTbData(tbUnadjustedTotal: number): void {
-    // TB未审总额写入合计行逻辑：
-    // 如果只有1行，直接写入该行
-    // 如果多行，按期末余额比例分配（或用户手动分配）
     if (rows.value.length === 1) {
-      rows.value[0].unadjusted = tbUnadjustedTotal
-      rows.value[0].audited = calcAuditedAmount(
-        rows.value[0].unadjusted,
-        rows.value[0].aje,
-        rows.value[0].rje,
-      )
+      rows.value[0] = recalcI3AdjudicationRow({
+        ...rows.value[0],
+        unadjusted: tbUnadjustedTotal,
+      })
     } else if (rows.value.length > 1) {
-      // 多行时按期初余额比例分配
-      const totalBegin = calcSubtotal(rows.value.map(r => r.beginBalance))
+      const totalBegin = rows.value.reduce((s, r) => s + r.beginBalance, 0)
       if (totalBegin > 0) {
-        for (const row of rows.value) {
-          const ratio = row.beginBalance / totalBegin
-          row.unadjusted = Math.round(ratio * tbUnadjustedTotal * 100) / 100
-          row.audited = calcAuditedAmount(row.unadjusted, row.aje, row.rje)
-        }
+        rows.value = rows.value.map((row) => recalcI3AdjudicationRow({
+          ...row,
+          unadjusted: Math.round((row.beginBalance / totalBegin) * tbUnadjustedTotal * 100) / 100,
+        }))
       }
     }
     _persist()
   }
 
-  /**
-   * 接收 AJE/RJE 调整（来自 I3-3 调整分录表）
-   * 按被投资单位匹配写入对应行
-   */
   function applyAdjustments(adjustments: { investee: string; aje: number; rje: number }[]): void {
     for (const adj of adjustments) {
-      const row = rows.value.find(r => r.investee === adj.investee)
+      const row = rows.value.find((r) => r.investee === adj.investee)
       if (row) {
-        row.aje = adj.aje
-        row.rje = adj.rje
-        row.audited = calcAuditedAmount(row.unadjusted, row.aje, row.rje)
+        Object.assign(row, recalcI3AdjudicationRow({ ...row, aje: adj.aje, rje: adj.rje }))
       }
     }
     _persist()
   }
 
-  // ─── Actions: 保存审定 + TB回写 + EventBus ─────────────────────────────────
-
-  /**
-   * 保存审定表并回写TB（Req 2.7）：
-   * 1. 持久化行数据到 checklist_responses
-   * 2. 持久化审定合计到独立 item_id（render策略回读seed）
-   * 3. writebackTrialBalance（科目1711）
-   * 4. 发布 'substantive:adjudicated' EventBus事件
-   */
-  async function saveAdjudication(): Promise<void> {
+  /** 从 I3-2 带入/更新行（保留已有 AJE/RJE） */
+  function seedFromI32(): { ok: boolean; message: string; count: number } {
+    const raw = allResponses.value.get('I3-2-rows')
+    const seeded = seedI3AdjudicationFromDetail(raw, getYear(), rows.value)
+    if (!seeded.length) {
+      return { ok: false, count: 0, message: 'I3-2 无明细可带入，请先完成明细表' }
+    }
+    rows.value = seeded
     _persist()
+    return { ok: true, count: seeded.length, message: `已从 I3-2 带入/更新 ${seeded.length} 个被投资单位` }
+  }
 
+  /** 从 I3-3 同步 AJE/RJE：优先按被投资单位精确匹配，剩余比例分摊并标近似 */
+  function syncFromI33(): { ok: boolean; message: string; approx?: boolean } {
+    if (!rows.value.length) return { ok: false, message: '请先带入或新增审定行' }
+    const adjRows = (() => {
+      const raw = allResponses.value.get('I3-3-rows')
+      if (!raw) return []
+      const remark = (raw as any).remark ?? (raw as any).conclusion ?? raw
+      if (Array.isArray(remark)) return remark
+      if (typeof remark === 'string') {
+        try {
+          const p = JSON.parse(remark)
+          return Array.isArray(p) ? p : []
+        } catch { return [] }
+      }
+      return []
+    })()
+    const result = applyAjeFromI33(rows.value, adjRows)
+    if (Math.abs(result.totalAje) < 0.005 && Math.abs(result.totalRje) < 0.005) {
+      // 回退：无行级明细时用 crossSheet 合计分摊
+      const { totalAje, totalRje } = adjustmentSync.value
+      if (Math.abs(totalAje) < 0.005 && Math.abs(totalRje) < 0.005) {
+        return { ok: false, message: 'I3-3 无 1711 相关 AJE/RJE 可同步' }
+      }
+      rows.value = allocateI3Adjustments(rows.value, totalAje, totalRje, true)
+      _persist()
+      return {
+        ok: true,
+        approx: rows.value.length > 1,
+        message: `已按合计分摊 AJE ${totalAje.toFixed(2)} / RJE ${totalRje.toFixed(2)}${rows.value.length > 1 ? '（近似，请复核）' : ''}`,
+      }
+    }
+    rows.value = result.rows
+    _persist()
+    const parts = [
+      `AJE ${result.totalAje.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`,
+      `RJE ${result.totalRje.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`,
+      result.matchedByName ? `精确匹配 ${result.matchedByName}` : '',
+      result.approx ? '含近似分摊须复核' : '',
+    ].filter(Boolean)
+    return { ok: true, approx: result.approx, message: `已同步 ${parts.join(' / ')}` }
+  }
+
+  /** 从 I3-6 同步本期商誉减值 */
+  function syncImpairmentFromI36(): { ok: boolean; message: string } {
+    if (!rows.value.length) return { ok: false, message: '请先带入或新增审定行' }
+    const byName: Record<string, number> = {}
+    for (const [cgu, v] of Object.entries(impairmentResult.value.byCgu)) {
+      byName[cgu] = v.goodwillImpairment
+    }
+    const total = impairmentResult.value.totalImpairment
+    if (!(total > 0) && !Object.keys(byName).length) {
+      return { ok: false, message: 'I3-6 无商誉减值可同步' }
+    }
+    rows.value = applyI3ImpairmentFromTest(rows.value, byName, total)
+    _persist()
+    return {
+      ok: true,
+      message: `已同步本期商誉减值 ${total.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`,
+    }
+  }
+
+  function fillConclusionDraft(): void {
+    auditConclusion.value = buildI3AdjudicationConclusionDraft({
+      rowCount: rows.value.length,
+      auditedTotal: subtotals.value.audited,
+      netTotal: subtotals.value.netValue,
+      newAcquisitionTotal: subtotals.value.newAcquisition,
+      impairmentTotal: subtotals.value.impairment,
+      tbDiff: tbDiff.value,
+      crossCheck: crossCheck.value,
+    })
+  }
+
+  const layerSummary = computed(() => buildI3LayerSummary(rows.value))
+
+  const hasAjeApprox = computed(() => rows.value.some((r) => r.ajeApprox))
+
+  async function saveAdjudication(opts?: { force?: boolean }): Promise<{ ok: boolean; message: string }> {
+    const gate = validateI3AdjudicationSave({
+      rows: rows.value,
+      tbDiff: tbDiff.value,
+      force: opts?.force,
+    })
+    if (!gate.ok) {
+      return { ok: false, message: gate.blockers.join('；') }
+    }
+    _persist()
     const auditedTotal = subtotals.value.audited
-
-    // 持久化审定合计（独立item_id，供render策略回读seed + 跨session持久化）
     options?.onSave?.(`${ITEM_PREFIX}-audited-total`, auditedTotal)
     options?.onSave?.(`${ITEM_PREFIX}-audited-net`, subtotals.value.netValue)
 
-    // TB回写（科目1711）
     if (projectId.value) {
       try {
         await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
@@ -411,7 +370,6 @@ export function useI3Adjudication(
       }
     }
 
-    // 发布 'substantive:adjudicated' EventBus 事件
     window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
       detail: {
         wpCode: 'I3',
@@ -420,57 +378,62 @@ export function useI3Adjudication(
         netValue: subtotals.value.netValue,
       },
     }))
-
-    ElMessage.success('审定表已保存')
+    return {
+      ok: true,
+      message: gate.warnings.length
+        ? `已保存（注意：${gate.warnings.slice(0, 2).join('；')}）`
+        : '审定表已保存',
+    }
   }
-
-  // ─── Persist ───────────────────────────────────────────────────────────────
 
   function _persist(): void {
     const save = options?.onSave
     if (!save) return
-    save(`${ITEM_PREFIX}-rows`, rows.value)
+    save(I3_ADJ_ROWS_KEY, rows.value)
+    save(`${ITEM_PREFIX}-rows`, rows.value) // 兼容旧 key
   }
 
   function saveNote(note: string): void {
     auditNote.value = note
+    options?.onSave?.(I3_ADJ_NOTE_KEY, note)
     options?.onSave?.(`${ITEM_PREFIX}-audit-note`, note)
   }
 
   function saveConclusion(conclusion: string): void {
     auditConclusion.value = conclusion
+    options?.onSave?.(I3_ADJ_CONCLUSION_KEY, conclusion)
     options?.onSave?.(`${ITEM_PREFIX}-audit-conclusion`, conclusion)
   }
 
-  // ─── Init ──────────────────────────────────────────────────────────────────
-
   watch(allResponses, () => _loadRows(), { immediate: true })
 
-  // ─── Return ────────────────────────────────────────────────────────────────
-
   return {
-    // State
     rows,
     auditNote,
     auditConclusion,
-    // Computed
     subtotals,
     warnings,
-    // Computed — TB差异
+    crossCheck,
+    detailTotals,
+    adjustmentSync,
+    impairmentResult,
+    layerSummary,
+    hasAjeApprox,
     tbRow,
+    tbDiff,
     differenceRows,
-    // Actions — 动态行
     addRow,
     removeRow,
-    // Actions — 数据接入
     updateCell,
     applyTbData,
     applyAdjustments,
-    // Actions — 保存
+    seedFromI32,
+    syncFromI33,
+    syncImpairmentFromI36,
+    fillConclusionDraft,
     saveAdjudication,
     saveNote,
     saveConclusion,
-    // Convenience
     getWarnings,
   }
 }

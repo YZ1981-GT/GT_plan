@@ -92,6 +92,11 @@ describe('H10 disclosure sync payload', () => {
     })
     expect(payloads).toHaveLength(1)
     expect(payloads[0].section_id).toBe(H10_NOTE_SECTION.listed)
+    // disclosure-table-sync-convergence: 携带源对齐 columns（项目/本期发生额/上期发生额）
+    expect(payloads[0].columns).toBeDefined()
+    const mainCols = payloads[0].columns!['项  目']
+    expect(mainCols[0]).toMatchObject({ key: 'label', label: '项目', is_label: true })
+    expect(mainCols.find((c) => c.key === 'current_amount')?.label).toBe('本期发生额')
     expect(payloads[0].sub_table_data._note_texts).toEqual([
       { section: 'disclosure-note', text: '说明' },
     ])

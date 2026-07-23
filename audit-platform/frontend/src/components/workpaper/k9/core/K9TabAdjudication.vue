@@ -16,7 +16,10 @@
     <div class="section-header">
       <h3>K9-1 管理费用审定表</h3>
       <div class="header-actions">
-        <el-button size="small" type="primary" plain @click="handleAiGenerate">
+        <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handleFillFromDetail">
+          从 K9-2 带入
+        </el-button>
+        <el-button size="small" type="primary" plain :loading="aiLoading" @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI审计说明
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -35,6 +38,17 @@
       <el-alert type="warning" :closable="false" show-icon>
         <template #title>
           审定表合计 {{ fmtNum(totalRow.audited) }} vs K9-2明细合计差异 {{ fmtNum(detailCrossValidation.diff) }}
+        </template>
+      </el-alert>
+    </div>
+
+    <!-- ═══ K9-3调整分录勾稽（逐行AJE/RJE合计 vs K9-3汇总） ═══ -->
+    <div v-if="adjustmentReconcile.hasK93 && !adjustmentReconcile.isBalanced" class="reconciliation-alert">
+      <el-alert type="warning" :closable="false" show-icon>
+        <template #title>
+          K9-1逐行 AJE {{ fmtNum(adjustmentReconcile.rowAje) }}/RJE {{ fmtNum(adjustmentReconcile.rowRje) }}
+          与 K9-3调整分录汇总 AJE {{ fmtNum(adjustmentReconcile.k93Aje) }}/RJE {{ fmtNum(adjustmentReconcile.k93Rje) }} 不一致，
+          请核对（AJE差 {{ fmtNum(adjustmentReconcile.ajeDiff) }} / RJE差 {{ fmtNum(adjustmentReconcile.rjeDiff) }}）
         </template>
       </el-alert>
     </div>
@@ -207,7 +221,7 @@
       <template #header>
         <div class="section-header compact">
           <span>审计说明与结论</span>
-          <el-button size="small" type="primary" plain @click="handleAiGenerate">
+          <el-button size="small" type="primary" plain :loading="aiLoading" @click="handleAiGenerate">
             <el-icon><MagicStick /></el-icon> AI生成
           </el-button>
         </div>
@@ -259,15 +273,19 @@
  * Spec: .kiro/specs/k9-admin-expenses/ | Task: 4.2
  * Requirements: 2.1-2.7
  */
-import { computed, inject, toRef, type Ref } from 'vue'
+import { computed, inject, toRef, ref, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { MagicStick, CircleCheckFilled, WarningFilled, ChatDotSquare } from '@element-plus/icons-vue'
 import { useK9Adjudication, type K9AdjRow } from '../../composables/useK9Adjudication'
+import { generateK9AiText } from '../../composables/useK9AiText'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   tbData: { unadjusted6602: number; audited6602: number }
+  /** tb_balance 6602 明细子科目预填（来自后端 render adjudication_prefill） */
+  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>
   isReadonly: boolean
 }>()
 
@@ -290,7 +308,9 @@ const {
   auditNote,
   auditConclusion,
   detailCrossValidation,
+  adjustmentReconcile,
   updateCell,
+  fillFromDetail,
   writeback,
   saveNote,
   saveConclusion,
@@ -299,6 +319,7 @@ const {
   projectId: toRef(props, 'projectId') as Ref<string>,
   wpId: toRef(props, 'wpId') as Ref<string>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+  prefill: computed(() => props.prefill ?? []) as Ref<Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>>,
   onSave: (itemId: string, value: any) => {
     emit('save', itemId, value)
   },
@@ -326,6 +347,12 @@ function handleTbWriteback(): void {
   writeback()
 }
 
+function handleFillFromDetail(): void {
+  const r = fillFromDetail()
+  if (r.ok) ElMessage.success(r.message)
+  else ElMessage.warning(r.message)
+}
+
 function handleSaveNote(): void {
   saveNote(auditNote.value)
 }
@@ -334,8 +361,34 @@ function handleSaveConclusion(): void {
   saveConclusion(auditConclusion.value)
 }
 
-function handleAiGenerate(): void {
-  emit('save', 'K9-1-ai-trigger', { remark: 'generate' })
+const aiLoading = ref(false)
+async function handleAiGenerate(): Promise<void> {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const abnormal = tableData.value
+      .filter(r => r.yoyChangeRate != null && Math.abs(r.yoyChangeRate) > CHANGE_RATE_THRESHOLD)
+      .map(r => `${r.projectName}同比${((r.yoyChangeRate ?? 0) * 100).toFixed(0)}%`)
+    const content = await generateK9AiText(props.wpId, {
+      prompt: '请根据K9-1管理费用审定表数据，生成审计说明：概述审定发生额、同比变动主要项目及原因、执行的审计程序与结论建议。',
+      section: 'K9-1-audit-note',
+      context: {
+        科目: '6602 管理费用（损益类，取发生额）',
+        审定合计: totalRow.value.audited,
+        上期合计: totalRow.value.priorAmount,
+        整体变动率: totalRow.value.yoyChangeRate != null ? `${(totalRow.value.yoyChangeRate * 100).toFixed(1)}%` : '—',
+        异常波动项: abnormal.join('；') || '无显著异常波动',
+        明细勾稽: detailCrossValidation.value.isBalanced ? '与K9-2一致' : `与K9-2差异${detailCrossValidation.value.diff}`,
+      },
+      existingContent: auditNote.value || '',
+    })
+    if (content) {
+      auditNote.value = auditNote.value ? `${auditNote.value}\n\n${content}` : content
+      saveNote(auditNote.value)
+    }
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 function handleReview(): void {

@@ -324,6 +324,7 @@ async def full_resolve(
     addr_id: str | None = None,
     index_ref: str | None = None,
     project_id: str | None = None,
+    explicit_wp_id: str | None = None,
     db: AsyncSession | None = None,
     _instance_memo: dict | None = None,
 ) -> ResolveResult:
@@ -338,6 +339,9 @@ async def full_resolve(
         addr_id: 裸 addr_id（如 D2/D2-2/E100）
         index_ref: 索引命名空间引用（如 cell:D2-2!E100）
         project_id: 项目 ID（有值时触发 L2 overlay 和 wp_id 附加）
+        explicit_wp_id: 显式指定的 wp_id（多实例消歧，Req-1.3）。有值且带 project_id 时，
+            按该实例解析 wp_id/jump_route，而非在多实例场景返回 disambiguation 或选到
+            另一实例。调用方（router）须已校验 binding 三元组后再传入。
         db: 数据库会话（resolve_instance 需要，project_id 时必传）
         _instance_memo: 请求级 resolve_instance 缓存（Req-17），
             key = "project_id:parent_wp_code:sheet_code"，命中则跳过 DB。
@@ -378,14 +382,13 @@ async def full_resolve(
                         locked_version,
                         f"Catalog snapshot missing for version={locked_version}",
                     )
-                    # Req-12.2: 记录 fallback 到当前版本
-                    _metrics.record_fallback(
-                        f"snapshot fallback: version={locked_version} not found, using current",
-                        domain="wp",
-                    )
-                    # Req-9.3: 版本缺失返回明确治理错误
+                    # Req-9.3: 版本缺失 → fail-closed 拒绝解析（绝不静默回退当前 catalog，
+                    # 否则会用错误版本的地址映射解析归档项目）。不记 fallback 指标
+                    # （未发生 fallback），仅上抛明确治理错误 VersionNotFoundError。
                     logger.warning(
-                        "ACNR version-locked resolve fallback: project=%s locked=%s current=%s — using current catalog",
+                        "ACNR version-locked resolve: project=%s locked=%s current=%s — "
+                        "锁定版本快照缺失，fail-closed 拒绝解析（raise VersionNotFoundError），"
+                        "不回退当前 catalog",
                         project_id, locked_version, current_version,
                     )
                     raise
@@ -403,11 +406,12 @@ async def full_resolve(
             result=_result_str,
             latency_ms=_latency,
         )
-        # Req-12.2: 记录 fallback 事件
+        # Req-12.2: 记录 fallback 事件（V1 委托为设计内路径，不打 WARNING 日志）
         if result.found:
             _metrics.record_fallback(
                 f"非wp域委托V1: domain={non_wp_domain}",
                 domain=non_wp_domain,
+                silent=True,
             )
         return result
 
@@ -439,12 +443,45 @@ async def full_resolve(
 
     # ─── Canonical normalization (Req-6): 内部使用 CanonicalAddress 比较 ───
     # 通过 CanonicalAddress round-trip 确保 addr_id 格式规范
+    # Req-1.6: 若用户「显式传入 addr_id」且无法规范化 → 记标记，全程 miss 时
+    # 返回明确 invalid_addr_id（而非笼统 miss）。legacy alias 仍可经模糊匹配命中，
+    # 命中则在 Step 8 之前返回 found=True，不受此标记影响。
+    _explicit_addr_invalid = False
     from app.services.acnr.canonical import CanonicalAddress as _CA
     try:
         _canonical = _CA.from_addr_id(resolved_addr_id)
         resolved_addr_id = _canonical.addr_id
     except (ValueError, IndexError):
-        pass  # 非标准格式，保持原值继续
+        if addr_id:
+            _explicit_addr_invalid = True
+        pass  # 非标准格式，保持原值继续（legacy alias 宽松兼容）
+
+    # ─── Req-1.3: explicit_wp_id 预置 instance memo（多实例消歧）──────────
+    # 单点插入：预先按 explicit_wp_id 解析一次 instance 并塞入请求级 memo，
+    # 使下游所有 _attach_wp_id 命中该实例，无需改动各命中分支调用点。
+    if project_id and db and explicit_wp_id:
+        _seed_parts = resolved_addr_id.split("/")
+        if len(_seed_parts) >= 2:
+            if _instance_memo is None:
+                _instance_memo = {}
+            _seed_key = f"{project_id}:{_seed_parts[0]}:{_seed_parts[1]}"
+            if _seed_key not in _instance_memo:
+                try:
+                    _seed_inst = await resolve_instance(
+                        db=db,
+                        project_id=UUID(project_id),
+                        parent_wp_code=_seed_parts[0],
+                        sheet_code=_seed_parts[1],
+                        explicit_wp_id=UUID(explicit_wp_id),
+                    )
+                    # 仅缓存确定性结果（非 disambiguation）供 _attach_wp_id 复用
+                    if _seed_inst.error != "disambiguation":
+                        _instance_memo[_seed_key] = _seed_inst
+                except Exception as _seed_exc:
+                    logger.debug(
+                        "explicit_wp_id seed failed: project=%s wp_id=%s addr=%s error=%s",
+                        project_id, explicit_wp_id, resolved_addr_id, _seed_exc,
+                    )
 
     # ─── Step 2: 若带 project_id → 先应用 L2 overlay（R5.2, R5.8）────
     # overlay 修改的是 catalog 的 sheet 条目（sheet_name_aliases 等），
@@ -670,11 +707,28 @@ async def full_resolve(
 
     # ─── Step 8: miss → metrics + 相近项推荐（≤5）（R5.6）─────────────────
     _resolve_metrics["miss"] += 1
+    _latency = (_time.perf_counter() - _t0) * 1000
+
+    # Req-1.6: 显式 addr_id 规范化失败且全程未命中 → 明确 invalid_addr_id
+    # （区别于「合法但不存在」的通用 miss，便于调用方精确报错而非吞掉非法输入）
+    if _explicit_addr_invalid:
+        _metrics.record_resolve(
+            domain="wp",
+            layer_hit=None,
+            result="miss",
+            latency_ms=_latency,
+        )
+        return ResolveResult(
+            found=False,
+            error="invalid_addr_id",
+            candidates=[],
+            source_layer=None,
+        )
+
     candidates = _find_candidates(resolved_addr_id, max_results=5)
     _result = ResolveResult(found=False, candidates=candidates, source_layer=None)
 
     # Req-12.1: 记录 miss 指标
-    _latency = (_time.perf_counter() - _t0) * 1000
     _metrics.record_resolve(
         domain="wp",
         layer_hit=None,

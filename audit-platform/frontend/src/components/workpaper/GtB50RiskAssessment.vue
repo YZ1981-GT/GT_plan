@@ -11,12 +11,24 @@
  * Spec: .kiro/specs/b50-risk-assessment/
  * Tasks: 3.1 ~ 3.12, 4.1
  */
-import { ref, computed, watch, toRef, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, toRef, onMounted, onUnmounted, nextTick, defineAsyncComponent } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useB50FormData, type ChecklistItem } from './composables/useB50FormData'
-import { useB50RiskMatrix, RISK_COLOR_MAP, ASSERTIONS, type RiskLevel, type Assertion, type RiskLayer } from './composables/useB50RiskMatrix'
+import { useB50RiskMatrix, RISK_COLOR_MAP, ASSERTIONS, CYCLE_OPTIONS, CONTROL_RELIANCE_OPTIONS, APPROACH_OPTIONS, CATEGORY_OPTIONS, type RiskLevel, type Assertion, type RiskLayer } from './composables/useB50RiskMatrix'
+import { useB50DetailColumnPrefs } from './composables/useB50DetailColumnPrefs'
 import { useB50Approval } from './composables/useB50Approval'
+import { useB50OoSheetMap } from './composables/useB50OoSheetMap'
+import { useWorkpaperEntryDualMode, type WorkpaperRenderMode } from './composables/useWorkpaperEntryDualMode'
 import { eventBus } from '@/utils/eventBus'
+import { api } from '@/services/apiProxy'
+import { useWorkpaperVersionToolbar } from './composables/useWorkpaperVersionToolbar'
+import { useWorkpaperReviewProvide } from './composables/useWorkpaperReviewProvide'
+
+const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
+const GtWpReviewDialogHost = defineAsyncComponent(() => import('./GtWpReviewDialogHost.vue'))
+const GtAProgramConsole = defineAsyncComponent(() => import('./GtAProgramConsole.vue'))
+const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+const B50AccountRiskDialog = defineAsyncComponent(() => import('./B50AccountRiskDialog.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -58,9 +70,16 @@ const {
 const {
   accounts,
   addAccount,
+  importAccounts,
   removeAccount,
   setCellRisk,
   toggleSpecialRisk,
+  setCycle,
+  setPlanField,
+  setScopeField,
+  suggestedApproach,
+  applyAccountPatch,
+  ensurePresetCycleDefaults,
   matrixStats,
   incompleteAccounts,
   specialRiskCells,
@@ -68,6 +87,40 @@ const {
   isFraudPresumptionActive,
   filterLevel,
 } = useB50RiskMatrix(tab3Data, saveImmediate)
+
+// Tab3 元列显隐偏好（余额/类别/会计估计/循环/应对方案）
+const columnPrefs = useB50DetailColumnPrefs()
+const columnPopoverVisible = ref(false)
+
+const CATEGORY_LABELS: Record<string, string> = {
+  scot: 'SCOT+',
+  amount_only: '仅金额重大',
+  other: '其他',
+  '': '—',
+}
+const APPROACH_LABEL: Record<string, string> = {
+  substantive: '实质性方案',
+  combined: '综合性方案',
+}
+
+function handleSetScopeField(account: string, field: 'balance' | 'category' | 'estimate', value: string | number | null) {
+  if (isReadonly.value) return
+  setScopeField(account, field, value)
+  emit('save')
+}
+
+// 引导式录入弹窗
+const guideDialogVisible = ref(false)
+const guideRow = ref<any>(null)
+function openGuideDialog(row: any) {
+  if (isReadonly.value) return
+  guideRow.value = row
+  guideDialogVisible.value = true
+}
+function onGuideApply(account: string, patch: any) {
+  applyAccountPatch(account, patch)
+  emit('save')
+}
 
 const {
   isApproved,
@@ -86,9 +139,54 @@ const {
   saveImmediate
 )
 
+// ─── 版本链 + 复核对话（对齐 B60/B212 范式）───────────────────────────────────
+
+const { versionTrailRef, scheduleAutoSnapshot, openVersionHistory } = useWorkpaperVersionToolbar({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId') as any,
+})
+const { openReview } = useWorkpaperReviewProvide({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId') as any,
+})
+
 // ─── Tab 状态 ────────────────────────────────────────────────────────────────
 
 const activeTab = ref('tab3')
+
+// ─── 双模式 HTML ↔ OnlyOffice（对齐 D4 范式，健康检查 gate）──────────────────
+
+const dualMode = useWorkpaperEntryDualMode({
+  reloadAllResponses: async () => { await loadAll() },
+  resolveOoSheetName: () => ooSheetName.value,
+})
+const { ooSheetName, ooSourceWpId, refreshSourceWpId } = useB50OoSheetMap({
+  projectId: toRef(props, 'projectId') as any,
+  activeTab,
+  selfWpId: toRef(props, 'wpId') as any,
+})
+const renderMode = computed<WorkpaperRenderMode>({
+  get: () => dualMode.mode.value,
+  set: (v) => { void dualMode.switchMode(v) },
+})
+const renderModeOptions = computed(() => [
+  { label: '结构化', value: 'html' as const },
+  { label: '在线编辑', value: 'onlyoffice' as const, disabled: !dualMode.ooAvailable.value },
+])
+// 切到 OnlyOffice 或切 Tab 时解析当前 Tab 对应源子底稿 wp_id
+watch([() => dualMode.mode.value, activeTab], ([mode]) => {
+  if (mode === 'onlyoffice') void refreshSourceWpId()
+})
+
+// 程序表索引跳转：B50-1→tab1 … B50-4→tab4
+const PROGRAM_INDEX_TAB_MAP: Record<string, string> = {
+  'B50-1': 'tab1', 'B50-2': 'tab2', 'B50-3': 'tab3', 'B50-4': 'tab4',
+}
+function onProgramIndexJump(indexRef: string) {
+  const base = (indexRef || '').trim().toUpperCase()
+  const target = PROGRAM_INDEX_TAB_MAP[base]
+  if (target) activeTab.value = target
+}
 
 // Tab 完成状态
 type TabStatus = 'empty' | 'partial' | 'complete'
@@ -166,7 +264,22 @@ const SOURCE_OPTIONS = [
   { value: 'discussion', label: '项目组讨论' },
   { value: 'prior_audit', label: '前期审计经验' },
   { value: 'management_interview', label: '管理层访谈' },
+  { value: 'b2_predecessor', label: 'B2 前任沟通' },
   { value: 'other', label: '其他' },
+] as const
+
+// 风险因素类型（源模板 B50-1：舞弊/错误/持续经营）
+const FACTOR_TYPE_OPTIONS = [
+  { value: 'fraud', label: '舞弊' },
+  { value: 'error', label: '错误' },
+  { value: 'going_concern', label: '持续经营' },
+] as const
+
+// 影响层次（源模板 B50-1：财务报表层次/认定层次）
+const IMPACT_LAYER_OPTIONS = [
+  { value: 'fs', label: '财务报表层次' },
+  { value: 'assertion', label: '认定层次' },
+  { value: 'both', label: '两者' },
 ] as const
 
 function addFactorRow() {
@@ -184,8 +297,9 @@ async function deleteFactorRow(index: number) {
   } catch { return }
   // Shift rows down
   const count = tab1Count.value
+  const T1_SUFFIXES = ['desc', 'type', 'is_inherent', 'impact_layer', 'source', 'accounts', 'assertions', 'risk', 'transferred']
   for (let i = index; i < count - 1; i++) {
-    for (const suffix of ['desc', 'source', 'accounts', 'assertions', 'risk', 'transferred']) {
+    for (const suffix of T1_SUFFIXES) {
       const nextItem = allResponses.value.get(`B50-T1-factor-${i + 1}-${suffix}`)
       const currentId = `B50-T1-factor-${i}-${suffix}`
       if (nextItem) {
@@ -197,7 +311,7 @@ async function deleteFactorRow(index: number) {
     }
   }
   // Remove last row
-  for (const suffix of ['desc', 'source', 'accounts', 'assertions', 'risk', 'transferred']) {
+  for (const suffix of T1_SUFFIXES) {
     allResponses.value.delete(`B50-T1-factor-${count - 1}-${suffix}`)
   }
   const newCount: ChecklistItem = { item_id: 'B50-T1-count', conclusion: null, remark: String(count - 1), wp_ref: null }
@@ -220,6 +334,44 @@ function updateFactorField(index: number, suffix: string, value: string, isConcl
   } else {
     saveDebouncedText(item)
   }
+}
+
+// 风险因素一键分流：按影响层次转入报表层次(Tab2)/认定矩阵(Tab3)
+function transferFactor(idx: number) {
+  if (isReadonly.value) return
+  const desc = allResponses.value.get(`B50-T1-factor-${idx}-desc`)?.remark?.trim() || ''
+  const layer = allResponses.value.get(`B50-T1-factor-${idx}-impact_layer`)?.conclusion || ''
+  const ftype = allResponses.value.get(`B50-T1-factor-${idx}-type`)?.conclusion || ''
+  const accountsStr = allResponses.value.get(`B50-T1-factor-${idx}-accounts`)?.remark?.trim() || ''
+  if (!desc) { ElMessage.warning('请先填写风险因素描述'); return }
+  if (!layer) { ElMessage.warning('请先选择"影响层次"'); return }
+
+  const msgs: string[] = []
+  // 财务报表层次 → Tab2
+  if (layer === 'fs' || layer === 'both') {
+    const n = tab2Count.value
+    const batch: ChecklistItem[] = [
+      { item_id: `B50-T2-fs-${n}-desc`, conclusion: null, remark: desc, wp_ref: null },
+      { item_id: `B50-T2-fs-${n}-special`, conclusion: ftype === 'fraud' ? 'Y' : 'N', remark: null, wp_ref: null },
+      { item_id: `B50-T2-fs-${n}-refindex`, conclusion: null, remark: 'B50-1', wp_ref: null },
+      { item_id: 'B50-T2-count', conclusion: null, remark: String(n + 1), wp_ref: null },
+    ]
+    for (const it of batch) allResponses.value.set(it.item_id, it)
+    saveImmediate(batch)
+    msgs.push('已转入报表层次风险(Tab2)')
+  }
+  // 认定层次 → Tab3 矩阵科目
+  if (layer === 'assertion' || layer === 'both') {
+    if (accountsStr) {
+      const names = accountsStr.split(/[,，、;；\s]+/).filter(Boolean)
+      const added = importAccounts(names.map(name => ({ name })))
+      msgs.push(added ? `认定矩阵新增 ${added} 个科目(Tab3)` : '认定矩阵科目已存在')
+    } else {
+      msgs.push('未填写"影响科目/认定"，请手动在矩阵中添加')
+    }
+  }
+  updateFactorField(idx, 'transferred', 'Y', true)
+  ElMessage.success(msgs.join('；'))
 }
 
 // ─── Tab 2: 报表层面风险 ─────────────────────────────────────────────────────
@@ -262,8 +414,9 @@ async function deleteFsRiskRow(index: number) {
     await ElMessageBox.confirm(`确认删除第 ${index + 1} 行报表层面风险？`, '删除确认', { type: 'warning' })
   } catch { return }
   const count = tab2Count.value
+  const T2_SUFFIXES = ['desc', 'category', 'level', 'special', 'refindex', 'entity_response', 'response', 'b60ref']
   for (let i = index; i < count - 1; i++) {
-    for (const suffix of ['desc', 'category', 'level', 'response']) {
+    for (const suffix of T2_SUFFIXES) {
       const nextItem = allResponses.value.get(`B50-T2-fs-${i + 1}-${suffix}`)
       const currentId = `B50-T2-fs-${i}-${suffix}`
       if (nextItem) {
@@ -273,7 +426,7 @@ async function deleteFsRiskRow(index: number) {
       }
     }
   }
-  for (const suffix of ['desc', 'category', 'level', 'response']) {
+  for (const suffix of T2_SUFFIXES) {
     allResponses.value.delete(`B50-T2-fs-${count - 1}-${suffix}`)
   }
   const newCount: ChecklistItem = { item_id: 'B50-T2-count', conclusion: null, remark: String(count - 1), wp_ref: null }
@@ -372,6 +525,68 @@ function handleAddAccount() {
   newAccountName.value = ''
 }
 
+// 从试算表一键导入重要科目（B50-3 确定审计范围）
+const importingScope = ref(false)
+
+// ─── P3-8: B50×B15 重要性联动 ─────────────────────────────────────────────────
+// 从 /api/materiality 读取三级重要性，展示在 Tab3 + 提供风险×重要性→TE建议
+interface MaterialityInfo { pm: number; te: number; sat: number; perfRatio: number }
+const materialityInfo = ref<MaterialityInfo | null>(null)
+
+async function loadMateriality() {
+  try {
+    const res: any = await api.get('/api/materiality', { params: { project_id: props.projectId, year: props.year } })
+    const d = res?.data ?? res
+    if (d && d.overall_materiality) {
+      materialityInfo.value = {
+        pm: Number(d.overall_materiality) || 0,
+        te: Number(d.performance_materiality) || 0,
+        sat: Number(d.trivial_threshold) || 0,
+        perfRatio: Number(d.performance_ratio) || 50,
+      }
+    }
+  } catch { /* B15 尚未设置 */ }
+}
+
+// 风险×重要性→建议 TE 比例（CAS：高风险→降低 TE 加大测试范围）
+function suggestedTeRatio(maxRisk: string | null): { ratio: string; hint: string } {
+  if (!materialityInfo.value) return { ratio: '—', hint: '请先在 B15 设置重要性水平' }
+  switch (maxRisk) {
+    case 'H': return { ratio: '45-50%', hint: '高风险→较低执行重要性→扩大测试范围' }
+    case 'M': return { ratio: '50-65%', hint: '中风险→适中执行重要性' }
+    case 'L': return { ratio: '65-75%', hint: '低风险→较高执行重要性→可缩小范围' }
+    default: return { ratio: '—', hint: '未评估风险等级' }
+  }
+}
+
+async function handleImportScopeAccounts() {
+  if (isReadonly.value) return
+  importingScope.value = true
+  try {
+    const res: any = await api.get('/api/b50/scope-accounts', {
+      params: { project_id: props.projectId, year: props.year },
+    })
+    const data = res?.data ?? res
+    const list: { name: string; cycle?: string }[] = Array.isArray(data?.accounts) ? data.accounts : []
+    if (!list.length) {
+      ElMessage.info(data?.summary || '试算表暂无重要科目可导入')
+      return
+    }
+    const added = importAccounts(list)
+    if (added) {
+      ElMessage.success(`已从试算表导入 ${added} 个重要报表项目（业务循环已按科目名预映射，请复核）`)
+      // 触发下游循环缓存失效
+      try { (eventBus as any).emit('risk:cycle-changed', { wpId: props.wpId }) } catch { /* noop */ }
+    } else {
+      ElMessage.info('试算表科目已全部在矩阵中，无需重复导入')
+    }
+  } catch (e: any) {
+    ElMessage.error('导入失败：' + (e?.message || '请稍后重试'))
+  } finally {
+    importingScope.value = false
+  }
+}
+
 function handleRemoveAccount(index: number) {
   if (isReadonly.value) return
   const row = accounts.value[index]
@@ -398,6 +613,23 @@ function handleToggleSpecialRisk(account: string, assertion: Assertion) {
   } catch (e) {
     console.warn('[B50] EventBus emit failed:', e)
   }
+}
+
+// 业务循环 / 应对方案（行级，驱动 B50→D~N 路由）
+function handleSetCycle(account: string, cycleCode: string) {
+  if (isReadonly.value) return
+  setCycle(account, cycleCode || null)
+  // 通知下游循环程序表 auto_data_source 缓存失效
+  try {
+    (eventBus as any).emit('risk:cycle-changed', { wpId: props.wpId, account, cycle: cycleCode })
+  } catch { /* noop */ }
+  emit('save')
+}
+
+function handleSetPlanField(account: string, field: 'reliance' | 'subonly' | 'approach', value: string) {
+  if (isReadonly.value) return
+  setPlanField(account, field, value || null)
+  emit('save')
 }
 
 // 筛选
@@ -440,6 +672,23 @@ function getCellTooltip(account: string, assertion: Assertion): string {
   return tip
 }
 
+// 行最高综合风险（应对方案表用）
+function rowMaxRisk(row: { cells: Record<Assertion, { combinedRisk: RiskLevel | null }> }): RiskLevel | null {
+  const order: RiskLevel[] = ['H', 'M', 'L']
+  for (const lvl of order) {
+    if (ASSERTIONS.some(a => row.cells[a].combinedRisk === lvl)) return lvl
+  }
+  return null
+}
+function rowMaxRiskLabel(row: any): string {
+  const r = rowMaxRisk(row)
+  return r ? RISK_COLOR_MAP[r].label : '未评'
+}
+function rowMaxRiskColor(row: any): string {
+  const r = rowMaxRisk(row)
+  return r ? RISK_COLOR_MAP[r].text : '#9CA3AF'
+}
+
 // 是否被筛选隐藏
 function isCellHidden(account: string, assertion: Assertion): boolean {
   if (!filterLevel.value) return false
@@ -479,6 +728,31 @@ function updateRefText(account: string, assertion: Assertion, value: string) {
   const item: ChecklistItem = { item_id: id, conclusion: null, remark: value, wp_ref: null }
   allResponses.value.set(id, item)
   saveDebouncedText(item)
+}
+
+// 源模板 B50-4 补充列：是否舞弊导致 / 管理层应对或控制 / 向被审计单位报告事项
+function getSrConclusion(account: string, assertion: Assertion, suffix: string): string {
+  return allResponses.value.get(`B50-T4-sr-${account}-${assertion}-${suffix}`)?.conclusion || ''
+}
+function getSrRemark(account: string, assertion: Assertion, suffix: string): string {
+  return allResponses.value.get(`B50-T4-sr-${account}-${assertion}-${suffix}`)?.remark || ''
+}
+function updateSrField(account: string, assertion: Assertion, suffix: string, value: string, isConclusion = false) {
+  if (isReadonly.value) return
+  const id = `B50-T4-sr-${account}-${assertion}-${suffix}`
+  const item: ChecklistItem = {
+    item_id: id,
+    conclusion: isConclusion ? value : null,
+    remark: isConclusion ? null : value,
+    wp_ref: null,
+  }
+  allResponses.value.set(id, item)
+  if (isConclusion) saveImmediate([item])
+  else saveDebouncedText(item)
+}
+// 舞弊推定：收入确认/管理层凌驾控制默认由舞弊导致
+function fraudPresumed(account: string): boolean {
+  return account === '收入确认' || account === '管理层凌驾控制'
 }
 
 // 应对程序 soft validation (CAS: 不得仅含分析程序)
@@ -583,10 +857,100 @@ function emitFsRiskChange() {
   }
 }
 
+// ─── B2 前任沟通发现 → 风险因素（Task 9 / R6.1） ───────────────────────────
+// 监听 b2_predecessor 推送，向 Tab1 追加风险因素行（source=b2_predecessor）。
+// 按描述去重，避免重复推送生成重复行。
+function existingFactorDescs(): Set<string> {
+  const set = new Set<string>()
+  const count = tab1Count.value
+  for (let i = 0; i < count; i++) {
+    const d = allResponses.value.get(`B50-T1-factor-${i}-desc`)?.remark?.trim()
+    if (d) set.add(d)
+  }
+  return set
+}
+
+/** 共享：把一批风险因素描述追加到 B50-T1 风险因素清单（按描述去重） */
+function _appendFactorDescs(descs: string[], source: string): number {
+  const clean = descs.map((d) => String(d || '').trim()).filter(Boolean)
+  if (!clean.length) return 0
+  const existing = existingFactorDescs()
+  let idx = tab1Count.value
+  const batch: ChecklistItem[] = []
+  let added = 0
+  for (const desc of clean) {
+    if (existing.has(desc)) continue
+    batch.push({ item_id: `B50-T1-factor-${idx}-desc`, conclusion: null, remark: desc, wp_ref: null })
+    batch.push({ item_id: `B50-T1-factor-${idx}-source`, conclusion: source, remark: null, wp_ref: null })
+    existing.add(desc)
+    idx += 1
+    added += 1
+  }
+  if (!added) return 0
+  batch.push({ item_id: 'B50-T1-count', conclusion: null, remark: String(idx), wp_ref: null })
+  for (const it of batch) allResponses.value.set(it.item_id, it)
+  saveImmediate(batch)
+  return added
+}
+
+function appendRiskFactorsFromB2(payload: any) {
+  if (isReadonly.value) return
+  const factors: string[] = Array.isArray(payload?.factors) ? payload.factors : []
+  // 来源尊重推送方（B2 前任沟通默认 b2_predecessor；B23 业务层面控制传 'B23'，两者均在白名单）
+  const rawSource = String(payload?.source || 'b2_predecessor')
+  const source = SOURCE_OPTIONS.some((o) => o.value === rawSource) ? rawSource : 'b2_predecessor'
+  const srcLabel = SOURCE_OPTIONS.find((o) => o.value === source)?.label || '关联底稿'
+  const added = _appendFactorDescs(factors, source)
+  if (added) ElMessage.success(`已从 ${srcLabel} 新增 ${added} 项风险因素`)
+  else if (factors.length) ElMessage.info('该来源发现已在风险因素中，无需重复添加')
+}
+
+const B22A_ELEMENT_NAMES: Record<number, string> = {
+  1: '控制环境', 2: '风险评估过程', 3: '信息系统与沟通', 4: '控制活动', 5: '监督',
+}
+
+/** B22A 企业层面控制结论变更 → 薄弱要素自动进入 B50 风险因素（控制风险输入） */
+function onControlConclusionChanged(payload: any) {
+  if (isReadonly.value) return
+  const descs: string[] = []
+  const scores = payload?.elementScores || {}
+  for (const [tab, score] of Object.entries(scores)) {
+    if (score === '无效' || score === '部分有效') {
+      const name = B22A_ELEMENT_NAMES[Number(tab)] || `要素${tab}`
+      descs.push(`企业层面控制薄弱：${name}设计有效性评价为「${score}」（来自 B22A）`)
+    }
+  }
+  if (payload?.itgcConclusion === '无效' && payload?.itDependency === '高') {
+    descs.push('IT 通用控制(ITGC)无效且 IT 依赖程度高，自动化控制与系统生成报告可靠性受影响（来自 B22A）')
+  }
+  const added = _appendFactorDescs(descs, 'b22a_control')
+  if (added) ElMessage.success(`已从 B22A 内控了解新增 ${added} 项控制风险因素`)
+}
+
+/** B22A 控制环境薄弱事件 → B50 风险因素 */
+function onControlEnvironmentWeak(payload: any) {
+  if (isReadonly.value || !payload?.weak) return
+  _appendFactorDescs(
+    [`控制环境薄弱（管理层诚信/治理层独立性相关控制存在缺陷），建议提高整体重大错报风险评估（来自 B22A）`],
+    'b22a_control',
+  )
+}
+
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 onMounted(async () => {
   await loadAll()
+  ensurePresetCycleDefaults()
+  loadMateriality()
+  eventBus.on('b50:push-risk-factor' as any, appendRiskFactorsFromB2)
+  eventBus.on('control:conclusion-changed' as any, onControlConclusionChanged)
+  eventBus.on('control:environment-weak' as any, onControlEnvironmentWeak)
+})
+
+onUnmounted(() => {
+  eventBus.off('b50:push-risk-factor' as any, appendRiskFactorsFromB2)
+  eventBus.off('control:conclusion-changed' as any, onControlConclusionChanged)
+  eventBus.off('control:environment-weak' as any, onControlEnvironmentWeak)
 })
 
 // Watch isApproved → emit completed
@@ -594,10 +958,11 @@ watch(isApproved, (val) => {
   if (val) emit('completed')
 })
 
-// Watch saving → emit save on successful saves
+// Watch saving → emit save on successful saves + 触发版本自动快照（debounced）
 watch(saving, (isSaving, wasSaving) => {
   if (wasSaving && !isSaving) {
     emit('save')
+    try { scheduleAutoSnapshot?.() } catch { /* noop */ }
   }
 })
 </script>
@@ -616,11 +981,61 @@ watch(saving, (isSaving, wasSaving) => {
     <!-- Loading -->
     <div v-if="loading" class="loading-mask">加载中...</div>
 
+    <!-- 顶部工具栏：版本历史 + 复核对话 + 双模式切换 -->
+    <div class="b50-top-toolbar">
+      <el-button size="small" @click="openVersionHistory">📜 版本历史</el-button>
+      <el-button size="small" type="primary" plain @click="openReview({ sectionId: 'B50-risk-assessment', sectionLabel: 'B50 风险评估复核' })">
+        💬 复核
+      </el-button>
+      <div class="b50-mode-toolbar">
+        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
+        <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
+      </div>
+    </div>
+
+    <!-- 审计目标（CAS 1211/1231） -->
+    <el-alert
+      class="b50-audit-objective"
+      type="info"
+      :closable="false"
+      show-icon
+      title="审计目标：识别、评估财务报表层次与认定层次的重大错报风险（含特别风险），并据此确定进一步审计程序的性质、时间与范围（CAS 1211 / 1231）。"
+    />
+
     <!-- 进度指示 -->
     <div class="tab-progress">完成进度: {{ overallProgress }}</div>
 
+    <!-- OnlyOffice 在线编辑模式：按当前 Tab 打开对应源子底稿 -->
+    <template v-if="renderMode === 'onlyoffice'">
+      <GtOnlyOfficeSheet
+        v-if="ooSourceWpId"
+        :key="`${ooSourceWpId}-${ooSheetName}`"
+        :wp-id="ooSourceWpId"
+        :sheet-name="ooSheetName"
+        :project-id="props.projectId"
+        :readonly="isReadonly"
+        @fallback="() => dualMode.switchMode('html')"
+      />
+      <div v-else class="oo-not-instantiated">
+        <el-empty description="该子表在本项目未实例化，请使用结构化模式编辑" />
+      </div>
+    </template>
+
     <!-- Tab 容器 (Task 3.2) -->
-    <el-tabs v-model="activeTab" type="border-card" class="b50-tabs">
+    <el-tabs v-else v-model="activeTab" type="border-card" class="b50-tabs">
+      <!-- ═══ Tab 0: 汇总程序表 ═══ -->
+      <el-tab-pane label="📋 汇总程序表" name="program">
+        <div class="tab-content">
+          <GtAProgramConsole
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :html-data="{}"
+            :is-readonly="isReadonly"
+            @jump-to-workpaper="onProgramIndexJump"
+          />
+        </div>
+      </el-tab-pane>
+
       <!-- ═══ Tab 1: 风险因素识别 ═══ -->
       <el-tab-pane :label="`${tabStatusIcon(tab1Status)} 风险因素识别`" name="tab1">
         <div class="tab-content">
@@ -645,6 +1060,43 @@ watch(saving, (isSaving, wasSaving) => {
                   placeholder="描述风险因素..."
                   @update:model-value="(v: string) => updateFactorField(idx, 'desc', v)"
                 />
+              </template>
+            </el-table-column>
+            <el-table-column label="类型" width="110">
+              <template #default="{ row: idx }">
+                <el-select
+                  :model-value="allResponses.get(`B50-T1-factor-${idx}-type`)?.conclusion || ''"
+                  :disabled="isReadonly"
+                  placeholder="类型"
+                  @update:model-value="(v: string) => updateFactorField(idx, 'type', v, true)"
+                >
+                  <el-option v-for="opt in FACTOR_TYPE_OPTIONS" :key="opt.value" :label="opt.label" :value="opt.value" />
+                </el-select>
+              </template>
+            </el-table-column>
+            <el-table-column label="是否固有风险因素" width="120" align="center">
+              <template #default="{ row: idx }">
+                <el-select
+                  :model-value="allResponses.get(`B50-T1-factor-${idx}-is_inherent`)?.conclusion || ''"
+                  :disabled="isReadonly"
+                  placeholder="是/否"
+                  @update:model-value="(v: string) => updateFactorField(idx, 'is_inherent', v, true)"
+                >
+                  <el-option label="是" value="Y" />
+                  <el-option label="否" value="N" />
+                </el-select>
+              </template>
+            </el-table-column>
+            <el-table-column label="影响层次" width="130">
+              <template #default="{ row: idx }">
+                <el-select
+                  :model-value="allResponses.get(`B50-T1-factor-${idx}-impact_layer`)?.conclusion || ''"
+                  :disabled="isReadonly"
+                  placeholder="层次"
+                  @update:model-value="(v: string) => updateFactorField(idx, 'impact_layer', v, true)"
+                >
+                  <el-option v-for="opt in IMPACT_LAYER_OPTIONS" :key="opt.value" :label="opt.label" :value="opt.value" />
+                </el-select>
               </template>
             </el-table-column>
             <el-table-column label="来源类型" width="160">
@@ -699,14 +1151,25 @@ watch(saving, (isSaving, wasSaving) => {
                 />
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="60" align="center">
+            <el-table-column label="操作" width="120" align="center">
               <template #default="{ row: idx }">
+                <el-button
+                  v-if="!isReadonly"
+                  type="primary"
+                  size="small"
+                  link
+                  title="按影响层次转入报表层次风险(Tab2)/认定矩阵(Tab3)"
+                  @click="transferFactor(idx)"
+                >
+                  分流
+                </el-button>
                 <el-button v-if="!isReadonly" type="danger" size="small" link @click="deleteFactorRow(idx)">
                   删除
                 </el-button>
               </template>
             </el-table-column>
           </el-table>
+          <p class="tab1-hint">💡 填写"影响层次"与"影响科目/认定"后，点"分流"可自动转入报表层次风险(Tab2)或认定层次矩阵(Tab3)。舞弊类因素分流时自动标记为特别风险。</p>
         </div>
       </el-tab-pane>
 
@@ -748,6 +1211,29 @@ watch(saving, (isSaving, wasSaving) => {
                 </el-select>
               </template>
             </el-table-column>
+            <el-table-column label="是否特别风险" width="110" align="center">
+              <template #default="{ row: idx }">
+                <el-select
+                  :model-value="allResponses.get(`B50-T2-fs-${idx}-special`)?.conclusion || ''"
+                  :disabled="isReadonly"
+                  placeholder="是/否"
+                  @update:model-value="(v: string) => updateFsField(idx, 'special', v, true)"
+                >
+                  <el-option label="是" value="Y" />
+                  <el-option label="否" value="N" />
+                </el-select>
+              </template>
+            </el-table-column>
+            <el-table-column label="相关索引号" width="120">
+              <template #default="{ row: idx }">
+                <el-input
+                  :model-value="allResponses.get(`B50-T2-fs-${idx}-refindex`)?.remark || ''"
+                  :disabled="isReadonly"
+                  placeholder="如 B22C/B19"
+                  @update:model-value="(v: string) => updateFsField(idx, 'refindex', v)"
+                />
+              </template>
+            </el-table-column>
             <el-table-column label="风险等级" width="110">
               <template #default="{ row: idx }">
                 <el-select
@@ -768,15 +1254,37 @@ watch(saving, (isSaving, wasSaving) => {
                 </el-select>
               </template>
             </el-table-column>
-            <el-table-column label="总体应对措施" min-width="200">
+            <el-table-column label="被审计单位应对措施" min-width="160">
+              <template #default="{ row: idx }">
+                <el-input
+                  :model-value="allResponses.get(`B50-T2-fs-${idx}-entity_response`)?.remark || ''"
+                  :disabled="isReadonly"
+                  type="textarea"
+                  :autosize="{ minRows: 1, maxRows: 3 }"
+                  placeholder="被审计单位的控制/应对..."
+                  @update:model-value="(v: string) => updateFsField(idx, 'entity_response', v)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="审计项目组应对措施" min-width="200">
               <template #default="{ row: idx }">
                 <el-input
                   :model-value="allResponses.get(`B50-T2-fs-${idx}-response`)?.remark || ''"
                   :disabled="isReadonly"
                   type="textarea"
                   :autosize="{ minRows: 1, maxRows: 3 }"
-                  placeholder="应对措施..."
+                  placeholder="总体应对策略（CAS 1231）..."
                   @update:model-value="(v: string) => updateFsField(idx, 'response', v)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="应对记录索引号" width="130">
+              <template #default="{ row: idx }">
+                <el-input
+                  :model-value="allResponses.get(`B50-T2-fs-${idx}-b60ref`)?.remark || 'B60'"
+                  :disabled="isReadonly"
+                  placeholder="如 B60"
+                  @update:model-value="(v: string) => updateFsField(idx, 'b60ref', v)"
                 />
               </template>
             </el-table-column>
@@ -818,6 +1326,17 @@ watch(saving, (isSaving, wasSaving) => {
               >
                 <el-option v-for="opt in FILTER_OPTIONS" :key="opt.value" :label="opt.label" :value="opt.value" />
               </el-select>
+              <!-- 从试算表导入重要科目（确定审计范围）-->
+              <el-button
+                v-if="!isReadonly"
+                size="small"
+                type="success"
+                plain
+                :loading="importingScope"
+                @click="handleImportScopeAccounts"
+              >
+                从试算表导入重要科目
+              </el-button>
               <!-- 添加科目 -->
               <div v-if="!isReadonly" class="add-account-row">
                 <el-input v-model="newAccountName" size="small" placeholder="新增科目名称" style="width: 160px" />
@@ -825,6 +1344,16 @@ watch(saving, (isSaving, wasSaving) => {
               </div>
             </div>
           </div>
+
+          <!-- 方法论上下文（源 B50-3 编制逻辑）-->
+          <details class="b50-methodology">
+            <summary>编制方法（源 B50-3：确定审计范围 → 认定层次风险评估 → 风险应对）</summary>
+            <div class="b50-methodology-body">
+              <p>1. <strong>确定审计范围</strong>：从试算表带入重要报表项目，标注类别（SCOT+ 关键流程 / 仅金额重大 / 其他）与是否涉及会计估计。</p>
+              <p>2. <strong>认定层次风险评估</strong>：逐科目在存在/完整性/准确性/截止/分类/列报各认定评估固有风险(IR)、控制风险(CR) 与综合重大错报风险(RMM)；固有风险达最高级或收入确认/管理层凌驾按 CAS 推定为特别风险。</p>
+              <p>3. <strong>风险应对</strong>：确定业务循环（路由 D~N 循环程序表）、对控制的拟信赖程度、"仅实质性程序是否足够"及应对方案（实质性 / 综合性）；综合性方案须在 C 类实施控制测试。</p>
+            </div>
+          </details>
 
           <!-- 统计面板 (Task 3.5/3.6) -->
           <div class="matrix-stats-bar">
@@ -848,9 +1377,21 @@ watch(saving, (isSaving, wasSaving) => {
               <!-- 数据行 -->
               <template v-for="(row, rowIdx) in accounts" :key="row.name">
                 <div class="matrix-row-header" :class="{ 'incomplete-row': incompleteAccounts.includes(row.name) }">
-                  {{ row.name }}
-                  <span v-if="row.isPreset" class="preset-badge">预置</span>
-                  <span v-if="incompleteAccounts.includes(row.name)" class="incomplete-badge">未完成</span>
+                  <div class="row-header-name">
+                    {{ row.name }}
+                    <span v-if="row.isPreset" class="preset-badge">预置</span>
+                    <span v-if="incompleteAccounts.includes(row.name)" class="incomplete-badge">未完成</span>
+                  </div>
+                  <el-select
+                    :model-value="row.cycle || ''"
+                    :disabled="isReadonly || row.name === '管理层凌驾控制'"
+                    placeholder="业务循环"
+                    size="small"
+                    class="row-cycle-select"
+                    @update:model-value="(v: string) => handleSetCycle(row.name, v)"
+                  >
+                    <el-option v-for="opt in CYCLE_OPTIONS" :key="opt.value" :label="opt.label" :value="opt.value" />
+                  </el-select>
                 </div>
                 <div
                   v-for="a in ASSERTIONS"
@@ -881,6 +1422,211 @@ watch(saving, (isSaving, wasSaving) => {
               </template>
             </div>
           </div>
+
+          <!-- B15 重要性水平联动面板 (P3-8) -->
+          <div class="materiality-linkage-panel" v-if="materialityInfo">
+            <div class="mat-panel-header">
+              <h4>B15 重要性水平（联动）</h4>
+              <el-button size="small" link @click="loadMateriality">🔄 刷新</el-button>
+            </div>
+            <div class="mat-panel-cards">
+              <div class="mat-card mat-card--pm">
+                <span class="mat-label">整体重要性(PM)</span>
+                <span class="mat-value">¥{{ materialityInfo.pm.toLocaleString('zh-CN', { maximumFractionDigits: 0 }) }}</span>
+              </div>
+              <div class="mat-card">
+                <span class="mat-label">实际执行重要性(TE)</span>
+                <span class="mat-value">¥{{ materialityInfo.te.toLocaleString('zh-CN', { maximumFractionDigits: 0 }) }}</span>
+                <span class="mat-sub">({{ materialityInfo.perfRatio }}% × PM)</span>
+              </div>
+              <div class="mat-card">
+                <span class="mat-label">明显微小错报(SAT)</span>
+                <span class="mat-value">¥{{ materialityInfo.sat.toLocaleString('zh-CN', { maximumFractionDigits: 0 }) }}</span>
+              </div>
+            </div>
+            <div class="mat-panel-hint">
+              CAS: 风险等级越高 → 实际执行重要性(TE)比例应越低 → 测试范围越广。
+              下方计划矩阵的"建议TE比例"列依据各科目最高综合风险自动推荐。
+            </div>
+          </div>
+          <div class="materiality-linkage-panel materiality-linkage-panel--empty" v-else>
+            <span>B15 重要性水平尚未设置，</span>
+            <el-button type="primary" link size="small" @click="$router.push({ path: '/materiality', query: { project_id: props.projectId, year: props.year } })">
+              前往设置 →
+            </el-button>
+          </div>
+
+          <!-- 认定层次应对方案（对齐源模板 B50-3 风险应对列，驱动 B50→D~N/C 类） -->
+          <div class="response-plan-section">
+            <div class="plan-section-header">
+              <h4>认定层次风险应对方案（计划矩阵）</h4>
+              <el-popover v-model:visible="columnPopoverVisible" placement="bottom-end" :width="300" trigger="click">
+                <template #reference>
+                  <el-button size="small" plain>⚙ 列设置（{{ columnPrefs.visibleCount.value }}/{{ columnPrefs.totalCount }}）</el-button>
+                </template>
+                <div class="col-prefs">
+                  <div class="col-prefs-presets">
+                    <el-button
+                      v-for="p in columnPrefs.B50_T3_COLUMN_PRESETS"
+                      :key="p.key" size="small" plain
+                      @click="columnPrefs.applyPreset(p.key)"
+                    >{{ p.label }}</el-button>
+                    <el-button size="small" link @click="columnPrefs.resetToDefault()">重置</el-button>
+                  </div>
+                  <div v-for="grp in columnPrefs.B50_T3_COLUMN_GROUPS" :key="grp.label" class="col-prefs-group">
+                    <div class="col-prefs-grp-label">{{ grp.label }}</div>
+                    <el-checkbox
+                      v-for="c in grp.columns" :key="c.key"
+                      :model-value="columnPrefs.isVisible(c.key)"
+                      size="small"
+                      @update:model-value="() => columnPrefs.toggleColumn(c.key)"
+                    >{{ c.label }}</el-checkbox>
+                  </div>
+                </div>
+              </el-popover>
+            </div>
+            <p class="plan-hint">每个科目须指定业务循环（路由到对应 D~N 循环程序表）、对控制的拟信赖程度与应对方案（实质性/综合性）。综合性方案须在 C 类实施控制测试。类别与最高综合风险自动建议应对方案。</p>
+            <el-table :data="accounts" border size="small" class="plan-table">
+              <el-table-column label="科目" min-width="140">
+                <template #default="{ row }">
+                  {{ row.name }}
+                  <span v-if="row.isPreset" class="preset-badge">预置</span>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="columnPrefs.isVisible('balance')" label="余额/金额" width="150" align="right">
+                <template #default="{ row }">
+                  <el-input-number
+                    :model-value="row.balance"
+                    :disabled="isReadonly"
+                    :controls="false"
+                    size="small"
+                    placeholder="—"
+                    style="width: 130px"
+                    @update:model-value="(v: number | undefined) => handleSetScopeField(row.name, 'balance', v ?? null)"
+                  />
+                </template>
+              </el-table-column>
+              <el-table-column v-if="columnPrefs.isVisible('category')" label="类别" width="140">
+                <template #default="{ row }">
+                  <el-select
+                    :model-value="row.category || ''"
+                    :disabled="isReadonly"
+                    placeholder="类别"
+                    size="small"
+                    @update:model-value="(v: string) => handleSetScopeField(row.name, 'category', v)"
+                  >
+                    <el-option v-for="opt in CATEGORY_OPTIONS" :key="opt.value" :label="opt.label" :value="opt.value" />
+                  </el-select>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="columnPrefs.isVisible('estimate')" label="会计估计" width="90" align="center">
+                <template #default="{ row }">
+                  <el-select
+                    :model-value="row.isEstimate || ''"
+                    :disabled="isReadonly"
+                    placeholder="是/否"
+                    size="small"
+                    @update:model-value="(v: string) => handleSetScopeField(row.name, 'estimate', v)"
+                  >
+                    <el-option label="是" value="Y" />
+                    <el-option label="否" value="N" />
+                  </el-select>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="columnPrefs.isVisible('cycle')" label="业务循环" width="200">
+                <template #default="{ row }">
+                  <el-select
+                    :model-value="row.cycle || ''"
+                    :disabled="isReadonly || row.name === '管理层凌驾控制'"
+                    placeholder="选择循环"
+                    size="small"
+                    @update:model-value="(v: string) => handleSetCycle(row.name, v)"
+                  >
+                    <el-option v-for="opt in CYCLE_OPTIONS" :key="opt.value" :label="opt.label" :value="opt.value" />
+                  </el-select>
+                </template>
+              </el-table-column>
+              <el-table-column label="最高综合风险" width="110" align="center">
+                <template #default="{ row }">
+                  <span :style="{ color: rowMaxRiskColor(row) }">{{ rowMaxRiskLabel(row) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="含特别风险" width="90" align="center">
+                <template #default="{ row }">
+                  <span v-if="ASSERTIONS.some((a: Assertion) => row.cells[a].isSpecialRisk)" style="color:#DC2626">⚠️ 是</span>
+                  <span v-else style="color:#9CA3AF">否</span>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="columnPrefs.isVisible('reliance')" label="对控制的拟信赖程度" width="150">
+                <template #default="{ row }">
+                  <el-select
+                    :model-value="row.plannedReliance || ''"
+                    :disabled="isReadonly"
+                    placeholder="选择"
+                    size="small"
+                    @update:model-value="(v: string) => handleSetPlanField(row.name, 'reliance', v)"
+                  >
+                    <el-option v-for="opt in CONTROL_RELIANCE_OPTIONS" :key="opt.value" :label="opt.label" :value="opt.value" />
+                  </el-select>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="columnPrefs.isVisible('subonly')" label="仅实质性程序是否足够" width="140" align="center">
+                <template #default="{ row }">
+                  <el-select
+                    :model-value="row.substantiveOnlySufficient || ''"
+                    :disabled="isReadonly"
+                    placeholder="是/否"
+                    size="small"
+                    @update:model-value="(v: string) => handleSetPlanField(row.name, 'subonly', v)"
+                  >
+                    <el-option label="是" value="Y" />
+                    <el-option label="否" value="N" />
+                  </el-select>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="columnPrefs.isVisible('approach')" label="应对方案" width="160">
+                <template #default="{ row }">
+                  <el-select
+                    :model-value="row.approach || ''"
+                    :disabled="isReadonly"
+                    placeholder="选择方案"
+                    size="small"
+                    @update:model-value="(v: string) => handleSetPlanField(row.name, 'approach', v)"
+                  >
+                    <el-option v-for="opt in APPROACH_OPTIONS" :key="opt.value" :label="opt.label" :value="opt.value" />
+                  </el-select>
+                  <span v-if="row.approach === 'combined'" class="combined-hint" title="综合性方案须在 C 类实施控制测试">→C</span>
+                  <span
+                    v-if="suggestedApproach(row.name) && row.approach !== suggestedApproach(row.name)"
+                    class="approach-suggest"
+                    :title="`按类别与最高综合风险，建议：${APPROACH_LABEL[suggestedApproach(row.name)]}`"
+                  >建议：{{ APPROACH_LABEL[suggestedApproach(row.name)] }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="建议TE比例" width="130" v-if="materialityInfo">
+                <template #default="{ row }">
+                  <span class="te-suggestion" :title="suggestedTeRatio(rowMaxRisk(row)).hint">
+                    {{ suggestedTeRatio(rowMaxRisk(row)).ratio }}
+                  </span>
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="90" align="center" fixed="right">
+                <template #default="{ row }">
+                  <el-button v-if="!isReadonly" type="primary" size="small" link @click="openGuideDialog(row)">
+                    引导录入
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+
+          <!-- 引导式科目风险录入弹窗 -->
+          <B50AccountRiskDialog
+            v-model:visible="guideDialogVisible"
+            :row="guideRow"
+            :readonly="isReadonly"
+            @apply="onGuideApply"
+          />
 
           <!-- Popover 编辑面板 (Task 3.5) -->
           <el-dialog
@@ -980,8 +1726,34 @@ watch(saving, (isSaving, wasSaving) => {
                 </span>
               </div>
               <div class="sr-body">
+                <div class="sr-field sr-field-inline">
+                  <label>是否由舞弊导致:</label>
+                  <el-select
+                    :model-value="getSrConclusion(sr.account, sr.assertion, 'fraud') || (fraudPresumed(sr.account) ? 'Y' : '')"
+                    :disabled="isReadonly"
+                    placeholder="是/否"
+                    size="small"
+                    style="width: 120px"
+                    @update:model-value="(v: string) => updateSrField(sr.account, sr.assertion, 'fraud', v, true)"
+                  >
+                    <el-option label="是（舞弊）" value="Y" />
+                    <el-option label="否（非舞弊）" value="N" />
+                  </el-select>
+                  <span v-if="fraudPresumed(sr.account)" class="fraud-presume-hint">CAS 推定舞弊</span>
+                </div>
                 <div class="sr-field">
-                  <label>应对程序:</label>
+                  <label>管理层应对或控制措施:</label>
+                  <el-input
+                    :model-value="getSrRemark(sr.account, sr.assertion, 'mgmt_response')"
+                    :disabled="isReadonly"
+                    type="textarea"
+                    :autosize="{ minRows: 1, maxRows: 4 }"
+                    placeholder="管理层针对该特别风险的控制或应对，及项目组对其的评价..."
+                    @update:model-value="(v: string) => updateSrField(sr.account, sr.assertion, 'mgmt_response', v)"
+                  />
+                </div>
+                <div class="sr-field">
+                  <label>审计措施（应对程序）:</label>
                   <el-input
                     :model-value="getResponseText(sr.account, sr.assertion)"
                     :disabled="isReadonly"
@@ -990,7 +1762,6 @@ watch(saving, (isSaving, wasSaving) => {
                     placeholder="描述应对程序（须包含细节测试）..."
                     @update:model-value="(v: string) => updateResponseText(sr.account, sr.assertion, v)"
                   />
-                  <!-- soft validation warning -->
                   <span v-if="!getResponseText(sr.account, sr.assertion).trim()" class="validation-warning">
                     ⚠️ 待补充应对
                   </span>
@@ -998,17 +1769,27 @@ watch(saving, (isSaving, wasSaving) => {
                     ⚠️ 应对程序不得仅含分析程序，须包含细节测试
                   </span>
                 </div>
-                <div class="sr-field">
+                <div class="sr-field sr-field-inline">
                   <label>底稿引用:</label>
                   <el-input
                     :model-value="getRefText(sr.account, sr.assertion)"
                     :disabled="isReadonly"
                     placeholder="如: D2A-步骤5, F3-步骤3"
+                    style="width: 220px"
                     @update:model-value="(v: string) => updateRefText(sr.account, sr.assertion, v)"
                   />
                   <span v-if="getRefText(sr.account, sr.assertion)" class="ref-chip">
                     📎 {{ getRefText(sr.account, sr.assertion) }}
                   </span>
+                </div>
+                <div class="sr-field">
+                  <label>向被审计单位报告的事项:</label>
+                  <el-input
+                    :model-value="getSrRemark(sr.account, sr.assertion, 'report_item')"
+                    :disabled="isReadonly"
+                    placeholder="如与治理层沟通事项，或 [无]"
+                    @update:model-value="(v: string) => updateSrField(sr.account, sr.assertion, 'report_item', v)"
+                  />
                 </div>
               </div>
             </div>
@@ -1081,6 +1862,10 @@ watch(saving, (isSaving, wasSaving) => {
 
     <!-- Saving indicator -->
     <div v-if="saving" class="saving-indicator">保存中...</div>
+
+    <!-- 版本历史抽屉 + 复核对话 Host（对齐 B60/B212 范式）-->
+    <GtWpVersionTrail ref="versionTrailRef" :workpaper-id="props.wpId" :project-id="props.projectId" />
+    <GtWpReviewDialogHost />
   </div>
 </template>
 
@@ -1137,8 +1922,94 @@ watch(saving, (isSaving, wasSaving) => {
   color: #6B7280;
 }
 
+.b50-top-toolbar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+
+.b50-mode-toolbar {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.oo-not-instantiated {
+  padding: 32px 0;
+  text-align: center;
+}
+
+.plan-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.col-prefs-presets {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.col-prefs-group {
+  margin-bottom: 8px;
+}
+
+.col-prefs-grp-label {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-bottom: 4px;
+}
+
+.approach-suggest {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--el-color-warning);
+  cursor: help;
+}
+
 .tab-content {
   padding: 12px 0;
+}
+
+/* 表格统一 13px */
+.gt-b50-risk-assessment :deep(.el-table) {
+  font-size: 13px;
+}
+
+.b50-audit-objective {
+  margin-bottom: 10px;
+}
+
+.b50-methodology {
+  margin: 8px 0 12px;
+  border-left: 3px solid var(--el-color-warning);
+  background: var(--el-color-warning-light-9);
+  border-radius: 4px;
+  padding: 6px 10px;
+}
+
+.b50-methodology > summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--el-color-warning-dark-2);
+  font-weight: 500;
+}
+
+.b50-methodology-body {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--el-text-color-regular);
+}
+
+.b50-methodology-body p {
+  margin: 4px 0;
 }
 
 .tab-header {
@@ -1184,6 +2055,17 @@ watch(saving, (isSaving, wasSaving) => {
   color: #DC2626;
   font-weight: 700;
   font-size: var(--wp-font-size, 13px);
+}
+
+.tab1-hint {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #6B7280;
+  line-height: 1.5;
+  background: #F0F9FF;
+  border-left: 3px solid #3B82F6;
+  padding: 6px 10px;
+  border-radius: 3px;
 }
 
 /* ═══ Tab 3 矩阵 (Task 3.5/3.6) ═══ */
@@ -1268,6 +2150,126 @@ watch(saving, (isSaving, wasSaving) => {
 
 .matrix-row-header.incomplete-row {
   background: #FEF3C7;
+}
+
+.row-header-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.row-cycle-select {
+  width: 100%;
+  margin-top: 4px;
+}
+
+.response-plan-section {
+  margin-top: 20px;
+  padding: 12px;
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+}
+
+.response-plan-section h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.plan-hint {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #6B7280;
+  line-height: 1.5;
+}
+
+.plan-table {
+  font-size: var(--wp-font-size, 13px);
+}
+
+.combined-hint {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 10px;
+  color: #1D4ED8;
+  font-weight: 700;
+}
+
+/* ═══ B15 重要性联动面板 (P3-8) ═══ */
+.materiality-linkage-panel {
+  margin-top: 16px;
+  margin-bottom: 12px;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #EDE9FE 0%, #F5F3FF 100%);
+  border: 1px solid #C4B5FD;
+  border-radius: 8px;
+}
+.materiality-linkage-panel--empty {
+  background: #F9FAFB;
+  border-color: #E5E7EB;
+  font-size: 13px;
+  color: #6B7280;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.mat-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.mat-panel-header h4 {
+  margin: 0;
+  font-size: 13px;
+  color: #5B21B6;
+}
+.mat-panel-cards {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.mat-card {
+  background: white;
+  border-radius: 6px;
+  padding: 8px 14px;
+  min-width: 140px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  text-align: center;
+}
+.mat-card--pm {
+  border-left: 3px solid #7C3AED;
+}
+.mat-label {
+  display: block;
+  font-size: 11px;
+  color: #6B7280;
+  margin-bottom: 2px;
+}
+.mat-value {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1F2937;
+}
+.mat-sub {
+  display: block;
+  font-size: 10px;
+  color: #9CA3AF;
+}
+.mat-panel-hint {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #6B21A8;
+  line-height: 1.5;
+}
+.te-suggestion {
+  font-size: 12px;
+  font-weight: 600;
+  color: #5B21B6;
+  cursor: help;
+  border-bottom: 1px dashed #C4B5FD;
 }
 
 .preset-badge {
@@ -1467,6 +2469,21 @@ watch(saving, (isSaving, wasSaving) => {
   font-size: 12px;
   font-weight: 600;
   color: #374151;
+}
+
+.sr-field-inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.fraud-presume-hint {
+  font-size: 11px;
+  color: #DC2626;
+  background: #FEE2E2;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 600;
 }
 
 .validation-warning {

@@ -67,6 +67,21 @@
       title="逻辑说明：若 B 项全部为「否」，则未识别衍生特征，无需继续回答 C 及后续抽查（可仍填写专家区）。任一为「是」则继续 C。"
     />
 
+    <!-- 合同 OCR 智能识别 -->
+    <div v-if="!isReadonly && wpId" class="ocr-row">
+      <el-upload
+        :show-file-list="false"
+        :before-upload="onContractOcrUpload"
+        accept=".pdf,.png,.jpg,.jpeg"
+        :disabled="ocrLoading"
+      >
+        <el-button size="small" type="primary" plain :loading="ocrLoading">
+          📎 上传合同智能识别变量
+        </el-button>
+      </el-upload>
+      <span class="ocr-hint">上传贷款/投资/存款协议，自动识别利率/汇率/商品价格等挂钩条款并勾选 B 问卷（需人工复核）</span>
+    </div>
+
     <div class="questionnaire-list">
       <div v-for="item in dc.bQuestions.value" :key="item.id" class="questionnaire-item">
         <div class="question-row">
@@ -398,7 +413,8 @@
 
 <script setup lang="ts">
 import { ref, toRef, computed, inject, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { api } from '@/services/apiProxy'
 import { useG1DerivativeCheck } from '../../composables/useG1DerivativeCheck'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import type { SampledVoucher, FillMode } from '../../composables/useSamplingAlgorithms'
@@ -463,6 +479,44 @@ function onSyncFromG113() {
   if (n > 0) ElMessage.success(`已从 G1-13 带入 ${n} 行凭证`)
   else ElMessage.info('G1-13 暂无可带入的凭证行')
 }
+
+const ocrLoading = ref(false)
+
+async function onContractOcrUpload(file: File): Promise<boolean> {
+  if (!wpId.value) return false
+  ocrLoading.value = true
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    const res: any = await api.post(
+      `/api/workpapers/${wpId.value}/g1/contract-ocr`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } } as any,
+    )
+    const data = res?.data ?? res
+    const fields = data?.extracted_fields ?? {}
+    const hitKeys = Object.keys(fields).filter(
+      (k) => k.startsWith('b') && fields[k] === true,
+    )
+    if (!hitKeys.length) {
+      ElMessage.info('未识别到影响合同价值的变量条款，请人工核对')
+      return false
+    }
+    await ElMessageBox.confirm(
+      `识别到 ${hitKeys.length} 项影响变量，是否自动勾选 B 问卷对应项为「是」？（仍需人工复核）`,
+      '合同 OCR 识别结果',
+      { confirmButtonText: '应用', cancelButtonText: '取消', type: 'info' },
+    )
+    const applied = dc.applyContractOcrToB(fields)
+    if (applied > 0) ElMessage.success(`已自动勾选 ${applied} 项 B 变量，请人工复核`)
+    else ElMessage.info('识别项已勾选，无新增变更')
+  } catch (e: any) {
+    if (e !== 'cancel') ElMessage.warning('OCR 识别失败或已取消')
+  } finally {
+    ocrLoading.value = false
+  }
+  return false
+}
 </script>
 
 <style scoped>
@@ -481,6 +535,8 @@ function onSyncFromG113() {
 .guidance-content { margin-top: 8px; }
 .guidance-content p { margin: 4px 0; }
 .objective-alert, .logic-alert, .gate-alert { margin-bottom: 10px; }
+.ocr-row { display: flex; align-items: center; gap: 12px; margin: 8px 0 12px; flex-wrap: wrap; }
+.ocr-hint { font-size: 12px; color: #909399; }
 .divider-title { font-weight: 600; color: #303133; }
 .meta-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .field-label { font-weight: 600; color: #606266; font-size: 13px; margin-bottom: 4px; display: block; }

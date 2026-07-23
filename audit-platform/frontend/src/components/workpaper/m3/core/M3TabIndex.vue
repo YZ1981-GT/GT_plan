@@ -144,8 +144,9 @@
  *
  * Requirements: 1.2
  */
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { InfoFilled, WarningFilled } from '@element-plus/icons-vue'
+import { useM3FormData } from '../../composables/useM3FormData'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -159,6 +160,14 @@ const emit = defineEmits<{
   (e: 'navigate', sheetName: string): void
 }>()
 
+// ─── FormData (for progress calculation) ─────────────────────────────────────
+
+const formData = useM3FormData({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+
+const dataLoaded = ref(false)
 // ─── Sheet 目录行定义 ────────────────────────────────────────────────────────
 
 interface SheetRow {
@@ -173,7 +182,7 @@ interface SheetRow {
 
 /**
  * 8 行 sheet 目录（对应源模板 M3 底稿目录）。
- * 进度条默认 0%，后续集成时根据 checklist_responses 数据填充。
+ * 进度根据 allResponses 中对应 item_id 前缀的数据有无计算。
  */
 const sheetRows = computed<SheetRow[]>(() => [
   {
@@ -182,7 +191,7 @@ const sheetRows = computed<SheetRow[]>(() => [
     indexCode: 'M3A',
     remark: '程序表（复用）',
     sheetKey: '库存股实质性程序表 M3A',
-    progress: 0,
+    progress: _calcSheetProgress('M3A'),
   },
   {
     seq: 2,
@@ -190,7 +199,7 @@ const sheetRows = computed<SheetRow[]>(() => [
     indexCode: 'M3-1',
     remark: '权益备抵借方',
     sheetKey: '审定表M3-1',
-    progress: 0,
+    progress: _calcSheetProgress('M3-1'),
   },
   {
     seq: 3,
@@ -198,7 +207,7 @@ const sheetRows = computed<SheetRow[]>(() => [
     indexCode: 'M3-1',
     remark: '',
     sheetKey: '附注披露信息（上市公司）',
-    progress: 0,
+    progress: _calcSheetProgress('disclosure-listed'),
   },
   {
     seq: 4,
@@ -206,7 +215,7 @@ const sheetRows = computed<SheetRow[]>(() => [
     indexCode: 'M3-2',
     remark: '按回购批次列示',
     sheetKey: '明细表M3-2',
-    progress: 0,
+    progress: _calcSheetProgress('M3-2'),
   },
   {
     seq: 5,
@@ -214,7 +223,7 @@ const sheetRows = computed<SheetRow[]>(() => [
     indexCode: 'M3-3',
     remark: '借贷平衡',
     sheetKey: '调整分录汇总M3-3',
-    progress: 0,
+    progress: _calcSheetProgress('M3-3'),
   },
   {
     seq: 6,
@@ -222,7 +231,7 @@ const sheetRows = computed<SheetRow[]>(() => [
     indexCode: 'M3-4',
     remark: '外币回购折算',
     sheetKey: '外币投资汇率测算表M3-4',
-    progress: 0,
+    progress: _calcSheetProgress('M3-4'),
   },
   {
     seq: 7,
@@ -230,9 +239,42 @@ const sheetRows = computed<SheetRow[]>(() => [
     indexCode: 'M3-5',
     remark: '回购/注销核对',
     sheetKey: '库存股检查表M3-5',
-    progress: 0,
+    progress: _calcSheetProgress('M3-5'),
   },
 ])
+
+/**
+ * 根据 allResponses 中对应 sheet 前缀的 item 数量判断进度。
+ * 简单策略：有数据item≥1=50%；有审计说明/结论=100%；无=0%
+ */
+function _calcSheetProgress(sheetKey: string): number {
+  if (!dataLoaded.value) return 0
+  const responses = formData.allResponses.value
+  let hasData = false
+  let hasConclusion = false
+  const prefix = `M3-${sheetKey}`
+
+  for (const [key, resp] of responses) {
+    if (key.startsWith(prefix) || key.startsWith(`M3-M3-${sheetKey.replace('M3-', '')}`)) {
+      if (resp.remark || resp.conclusion) {
+        hasData = true
+        if (key.includes('conclusion') || key.includes('Conclusion') || key.includes('auditNote')) {
+          hasConclusion = true
+        }
+      }
+    }
+  }
+
+  // 特殊: M3-2 full-data
+  if (sheetKey === 'M3-2') {
+    const fullData = responses.get('M3-M3-2-full-data')
+    if (fullData?.remark) hasData = true
+  }
+
+  if (hasConclusion) return 100
+  if (hasData) return 50
+  return 0
+}
 
 // ─── 进度计算 ─────────────────────────────────────────────────────────────────
 
@@ -248,14 +290,19 @@ const progressPercent = computed(() => {
   return Math.round(avgProgress)
 })
 
-// ─── 项目信息（简单版：默认占位，后续集成时从 render-config 填充） ──────────
+// ─── 项目信息（从 allResponses 或 render-config htmlData 读取） ──────────
 
-const projectInfo = computed(() => ({
-  clientName: '',
-  cutoffDate: '',
-  preparer: '',
-  prepareDate: '',
-}))
+const projectInfo = computed(() => {
+  // 尝试从已知的 render-config 种子数据获取
+  const clientResp = formData.allResponses.value.get('M3-project-client-name')
+  const yearResp = formData.allResponses.value.get('M3-project-audit-year')
+  return {
+    clientName: clientResp?.remark || '',
+    cutoffDate: yearResp?.remark ? `${yearResp.remark}-12-31` : '',
+    preparer: '',
+    prepareDate: '',
+  }
+})
 
 // ─── 交互 ────────────────────────────────────────────────────────────────────
 
@@ -277,6 +324,13 @@ function getProgressColor(percent: number): string {
   if (percent >= 50) return '#409eff'
   return '#e6e8eb'
 }
+
+// ─── Lifecycle ───────────────────────────────────────────────────────────────
+
+onMounted(async () => {
+  await formData.loadData()
+  dataLoaded.value = true
+})
 </script>
 
 <style scoped>

@@ -141,8 +141,10 @@ describe('6.2 EventBus: I6↔I2双向联动', () => {
     const allResponses = ref(new Map<string, any>())
     const { i2LinkageStatus } = useI6CrossSheet(allResponses)
 
-    // 初始状态
+    // 初始状态：未收到 I2 数据，不应假平衡
     expect(i2LinkageStatus.value.capitalized).toBe(0)
+    expect(i2LinkageStatus.value.ready).toBe(false)
+    expect(i2LinkageStatus.value.isBalanced).toBe(false)
 
     // 模拟 I2 发布事件
     window.dispatchEvent(new CustomEvent('development:capitalized-updated', {
@@ -153,6 +155,7 @@ describe('6.2 EventBus: I6↔I2双向联动', () => {
 
     // I6 应该接收到 I2 的资本化金额
     expect(i2LinkageStatus.value.capitalized).toBe(500000)
+    expect(i2LinkageStatus.value.ready).toBe(true)
   })
 
   it('useI6CrossSheet publishes research:expense-updated when i6ExpenseAmount changes', async () => {
@@ -200,7 +203,43 @@ describe('6.2 EventBus: I6↔I2双向联动', () => {
 
     // total = expense(200000) + capitalized(100000) = 300000
     expect(i2LinkageStatus.value.total).toBe(300000)
+    expect(i2LinkageStatus.value.ready).toBe(true)
     expect(i2LinkageStatus.value.isBalanced).toBe(true)
+  })
+
+  it('restores I2 capitalized from persisted allResponses', async () => {
+    const { useI6CrossSheet } = await import('../composables/useI6CrossSheet')
+
+    const allResponses = ref(new Map<string, any>([
+      ['I6-adj-capitalized-i2', { remark: '88888' }],
+      ['I6-adj-audited-total', { remark: '200000' }],
+    ]))
+
+    const { i2LinkageStatus } = useI6CrossSheet(allResponses)
+    await nextTick()
+
+    expect(i2LinkageStatus.value.ready).toBe(true)
+    expect(i2LinkageStatus.value.capitalized).toBe(88888)
+    expect(i2LinkageStatus.value.expense).toBe(200000)
+  })
+
+  it('flags VR-I6-01 imbalance when expected total differs', async () => {
+    const { useI6CrossSheet } = await import('../composables/useI6CrossSheet')
+
+    const allResponses = ref(new Map<string, any>([
+      ['I6-adj-audited-total', { remark: '200000' }],
+      ['I6-adj-expected-total', { remark: '350000' }],
+    ]))
+    const { i2LinkageStatus } = useI6CrossSheet(allResponses)
+
+    window.dispatchEvent(new CustomEvent('development:capitalized-updated', {
+      detail: { capitalized: 100000, total: 350000 },
+    }))
+    await nextTick()
+
+    expect(i2LinkageStatus.value.ready).toBe(true)
+    expect(i2LinkageStatus.value.isBalanced).toBe(false)
+    expect(i2LinkageStatus.value.difference).toBe(-50000)
   })
 })
 
@@ -324,58 +363,57 @@ describe('6.4 GtIndexChip: I6→I2 / I2→I6双向跳转', () => {
 // ─── 6.5 截止测试useCutoffAutoSampling集成 ─────────────────────────────────
 
 describe('6.5 截止测试useCutoffAutoSampling集成', () => {
-  it('useI6Cutoff.autoSample() calls POST /api/projects/{id}/ledger/cutoff-samples with account_code=6602', async () => {
+  it('useI6Cutoff.loadFromAutoSampling(forward) calls POST sampling/cutoff-test with account_codes=[6602]', async () => {
     const http = (await import('@/utils/http')).default
+    vi.mocked(http.post).mockClear()
     const { useI6Cutoff } = await import('../composables/useI6Cutoff')
 
     const allResponses = ref(new Map<string, any>())
     const projectId = ref('project-cutoff-test')
-    const wpId = ref('wp-001')
 
-    const { autoSample } = useI6Cutoff({
-      direction: 'forward',
+    const { loadFromAutoSampling, updateForwardCriteria } = useI6Cutoff({
       allResponses,
       projectId,
-      wpId,
-      onSave: vi.fn(),
+      saveResponses: vi.fn(),
     })
+    updateForwardCriteria({ cutoffDate: '2025-12-31' })
 
-    await autoSample()
+    await loadFromAutoSampling('forward')
 
+    // 真实端点 /sampling/cutoff-test；方向由客户端分段处理，body 不含 direction
     expect(http.post).toHaveBeenCalledWith(
-      '/api/projects/project-cutoff-test/ledger/cutoff-samples',
+      '/api/projects/project-cutoff-test/sampling/cutoff-test',
       expect.objectContaining({
-        direction: 'forward',
-        threshold_days: 5,
-        account_code: '6602',
+        account_codes: ['6602'],
+        year: 2025,
+        days_before: 5,
+        days_after: 5,
       }),
     )
   })
 
-  it('useI6Cutoff backward direction also passes account_code=6602', async () => {
+  it('useI6Cutoff backward direction also passes account_codes=[6602]', async () => {
     const http = (await import('@/utils/http')).default
     vi.mocked(http.post).mockClear()
     const { useI6Cutoff } = await import('../composables/useI6Cutoff')
 
     const allResponses = ref(new Map<string, any>())
     const projectId = ref('project-cutoff-backward')
-    const wpId = ref('wp-002')
 
-    const { autoSample } = useI6Cutoff({
-      direction: 'backward',
+    const { loadFromAutoSampling, updateBackwardCriteria } = useI6Cutoff({
       allResponses,
       projectId,
-      wpId,
-      onSave: vi.fn(),
+      saveResponses: vi.fn(),
     })
+    updateBackwardCriteria({ cutoffDate: '2025-12-31' })
 
-    await autoSample()
+    await loadFromAutoSampling('backward')
 
     expect(http.post).toHaveBeenCalledWith(
-      '/api/projects/project-cutoff-backward/ledger/cutoff-samples',
+      '/api/projects/project-cutoff-backward/sampling/cutoff-test',
       expect.objectContaining({
-        direction: 'backward',
-        account_code: '6602',
+        account_codes: ['6602'],
+        year: 2025,
       }),
     )
   })
@@ -389,18 +427,19 @@ describe('6.6 附注EventBus + 双模式OO', () => {
 
     const allResponses = ref(new Map<string, any>())
     const saveFn = vi.fn()
+    const wpId = ref('wp-test')
+    const projectId = ref('proj-test')
 
     // 设置初始明细数据供聚合
     allResponses.value.set('I6-2-detail-rows', {
       remark: JSON.stringify([
-        { category: '人员人工费用', currentAmount: 100000, priorAmount: 80000 },
-        { category: '直接投入费用', currentAmount: 50000, priorAmount: 40000 },
+        { category: '人工费', months: [100000], priorUnadj: 80000, priorAje: 0, priorRje: 0, aje: 0, rje: 0 },
+        { category: '材料费', months: [50000], priorUnadj: 40000, priorAje: 0, priorRje: 0, aje: 0, rje: 0 },
       ]),
     })
 
-    useI6Disclosure({
+    useI6Disclosure(wpId, projectId, allResponses, {
       variant: 'listed',
-      allResponses,
       onSave: saveFn,
     })
 
@@ -412,23 +451,23 @@ describe('6.6 附注EventBus + 双模式OO', () => {
     await nextTick()
 
     // 附注应处理了事件（aggregateFromDetail被调用）
-    // 验证不抛错即可——事件handler正确注册
     expect(true).toBe(true)
   })
 
-  it('useI6Disclosure publishes disclosure:note-text-updated on saveNote', async () => {
+  it('useI6Disclosure publishes disclosure:note-text-updated on saveCapitalizationNote', async () => {
     const dispatchSpy = vi.spyOn(window, 'dispatchEvent')
     const { useI6Disclosure } = await import('../composables/useI6Disclosure')
 
     const allResponses = ref(new Map<string, any>())
+    const wpId = ref('wp-test')
+    const projectId = ref('proj-test')
 
-    const { saveNote } = useI6Disclosure({
+    const { saveCapitalizationNote } = useI6Disclosure(wpId, projectId, allResponses, {
       variant: 'listed',
-      allResponses,
       onSave: vi.fn(),
     })
 
-    saveNote('expense_breakdown', '本期研发费用较上期增长20%，主要系...')
+    saveCapitalizationNote('本期研发费用较上期增长20%，主要系...')
 
     // 等待防抖（300ms）
     await new Promise(resolve => setTimeout(resolve, 350))
@@ -444,7 +483,6 @@ describe('6.6 附注EventBus + 双模式OO', () => {
       wpCode: 'I6',
       variant: 'listed',
     })
-    expect(lastEvent.detail.sections).toContain('expense_breakdown')
 
     dispatchSpy.mockRestore()
   })

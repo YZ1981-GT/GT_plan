@@ -1,11 +1,13 @@
 /**
- * useI4FormData — I4 长期待摊费用底稿数据加载/保存/selfLoad/writebackTB
+ * @deprecated 壳层 GtI4LongTermPrepaid 已自管 selfLoad / handleChildSave / TB 取数；
+ * I4-1 审定回写使用 useI4Adjudication.writeback。本模块保留 writebackTrialBalance 供脚本/测试复用，
+ * 请勿在新 UI 中挂载 useI4FormData（会与壳层双轨）。
  *
- * Spec: .kiro/specs/i4-long-term-prepaid/
+ * Spec（归档）: .kiro/specs/_archive/05-business-features/i4-long-term-prepaid/
  * Task: 3.1
  * Requirements: 1.9, 1.10, 2.5
  *
- * 职责：
+ * 职责（历史）：
  * - allResponses Map 加载 + saveImmediate + debouncedSave(2s) + saveBatch
  * - writebackTrialBalance（科目1801长期待摊费用，借方/资产类）
  * - selfLoad逻辑（render-config?force_component_type=i4-long-term-prepaid）

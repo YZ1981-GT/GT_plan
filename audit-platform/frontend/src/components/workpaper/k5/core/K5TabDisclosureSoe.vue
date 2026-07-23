@@ -118,6 +118,71 @@
       </el-table>
     </el-card>
 
+    <!-- Section 2.1: 诉讼明细（自动从K5-6筛选） -->
+    <el-card shadow="never" class="disclosure-section">
+      <template #header>
+        <div class="section-card-header">
+          <span>（1）未决诉讼/仲裁明细</span>
+          <el-tag v-if="litigationDisclosureItems.length > 0" type="danger" size="small">{{ litigationDisclosureItems.length }} 项</el-tag>
+        </div>
+      </template>
+      <el-empty v-if="litigationDisclosureItems.length === 0" description="暂无（K5-6中诉讼事项将自动出现）" />
+      <el-table v-else :data="litigationDisclosureItems" border size="small" style="width: 100%">
+        <el-table-column type="index" label="序" width="42" align="center" />
+        <el-table-column prop="caseName" label="案件名称" min-width="120" />
+        <el-table-column label="涉案金额" width="110" align="right">
+          <template #default="{ row }">{{ fmtAmt(row.amount) }}</template>
+        </el-table-column>
+        <el-table-column prop="stage" label="阶段" width="80" />
+        <el-table-column label="败诉可能性" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.likelihood === 'very_likely' ? 'danger' : 'warning'" size="small">{{ row.likelihood === 'very_likely' ? '很可能' : '可能' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="确认/预计金额" width="120" align="right">
+          <template #default="{ row }">{{ fmtAmt(row.estimatedLoss) }}</template>
+        </el-table-column>
+        <el-table-column label="风险等级" width="90">
+          <template #default="{ row }">
+            <el-select :model-value="row.riskLevel || ''" :disabled="isReadonly" size="small" placeholder="—" @change="(v: string) => handleLitigationRisk(row.id, v)">
+              <el-option label="高" value="high" /><el-option label="中" value="medium" /><el-option label="低" value="low" />
+            </el-select>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- Section 2.2: 环保/弃置义务明细（自动从K5-5筛选） -->
+    <el-card shadow="never" class="disclosure-section">
+      <template #header>
+        <div class="section-card-header">
+          <span>（2）环保/弃置义务明细</span>
+          <el-tag v-if="decommissionDisclosureItems.length > 0" type="success" size="small">{{ decommissionDisclosureItems.length }} 项</el-tag>
+        </div>
+      </template>
+      <el-empty v-if="decommissionDisclosureItems.length === 0" description="暂无（K5-5中弃置费用数据将自动出现）" />
+      <el-table v-else :data="decommissionDisclosureItems" border size="small" style="width: 100%">
+        <el-table-column type="index" label="序" width="42" align="center" />
+        <el-table-column prop="assetName" label="资产名称" min-width="130" />
+        <el-table-column label="预计弃置支出" width="120" align="right">
+          <template #default="{ row }">{{ fmtAmt(row.futureExpense) }}</template>
+        </el-table-column>
+        <el-table-column label="折现率" width="80" align="right">
+          <template #default="{ row }">{{ row.discountRate ? (row.discountRate * 100).toFixed(2) + '%' : '-' }}</template>
+        </el-table-column>
+        <el-table-column label="期末现值" width="110" align="right">
+          <template #default="{ row }"><strong>{{ fmtAmt(row.endBalance) }}</strong></template>
+        </el-table-column>
+        <el-table-column label="风险等级" width="90">
+          <template #default="{ row }">
+            <el-select :model-value="row.riskLevel || ''" :disabled="isReadonly" size="small" placeholder="—" @change="(v: string) => handleDecommissionRisk(row.id, v)">
+              <el-option label="高" value="high" /><el-option label="中" value="medium" /><el-option label="低" value="low" />
+            </el-select>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
     <!-- Section 3: 叙述式结论 -->
     <el-card shadow="never" class="disclosure-section">
       <template #header>
@@ -354,6 +419,81 @@ function persistContingent(): void {
   emit('save', 'K5-disclosure-soe-contingent', { remark: JSON.stringify(contingentItems.value) })
 }
 
+// ─── 分项明细（诉讼/弃置，自动从K5-6/K5-5筛选） ─────────────────────────────
+
+interface LitigationDisclosureItem {
+  id: string
+  caseName: string
+  amount: number
+  stage: string
+  likelihood: string
+  estimatedLoss: number
+  riskLevel: string
+}
+
+interface DecommissionDisclosureItem {
+  id: string
+  assetName: string
+  futureExpense: number
+  discountRate: number
+  endBalance: number
+  riskLevel: string
+}
+
+const litigationDisclosureItems = ref<LitigationDisclosureItem[]>([])
+const decommissionDisclosureItems = ref<DecommissionDisclosureItem[]>([])
+
+function loadSubCategoryItems(): void {
+  // 从 K5-6 诉讼表筛选
+  const litigationData = props.allResponses.get('K5-6-litigation-rows')
+  if (litigationData?.remark) {
+    try {
+      const rows: any[] = JSON.parse(litigationData.remark)
+      litigationDisclosureItems.value = rows
+        .filter(r => r.lossLikelihood === 'very_likely' || r.lossLikelihood === 'possible')
+        .map((r, idx) => ({
+          id: `lit-${idx}`,
+          caseName: r.caseName || `案件${idx + 1}`,
+          amount: Number(r.amount || 0),
+          stage: r.stage || '',
+          likelihood: r.lossLikelihood || 'possible',
+          estimatedLoss: Number(r.estimatedLoss || r.bookProvision || 0),
+          riskLevel: r.riskLevel || '',
+        }))
+    } catch { litigationDisclosureItems.value = [] }
+  }
+
+  // 从 K5-5 弃置表筛选
+  const decommissionData = props.allResponses.get('K5-5-decommission-rows')
+  if (decommissionData?.remark) {
+    try {
+      const rows: any[] = JSON.parse(decommissionData.remark)
+      decommissionDisclosureItems.value = rows
+        .filter(r => Number(r.endBalance || 0) > 0)
+        .map((r, idx) => ({
+          id: `dec-${idx}`,
+          assetName: r.assetName || `资产${idx + 1}`,
+          futureExpense: Number(r.futureExpense || 0),
+          discountRate: Number(r.discountRate || 0),
+          endBalance: Number(r.endBalance || 0),
+          riskLevel: r.riskLevel || '',
+        }))
+    } catch { decommissionDisclosureItems.value = [] }
+  }
+}
+
+function handleLitigationRisk(id: string, value: string): void {
+  const item = litigationDisclosureItems.value.find(r => r.id === id)
+  if (item) { item.riskLevel = value }
+  emit('save', 'K5-disclosure-soe-litigation-risk', { remark: JSON.stringify(litigationDisclosureItems.value) })
+}
+
+function handleDecommissionRisk(id: string, value: string): void {
+  const item = decommissionDisclosureItems.value.find(r => r.id === id)
+  if (item) { item.riskLevel = value }
+  emit('save', 'K5-disclosure-soe-decommission-risk', { remark: JSON.stringify(decommissionDisclosureItems.value) })
+}
+
 // ─── EventBus: subscribe 'substantive:adjudicated' + 'adjustment:created' ═══
 
 function handleAdjudicated(payload: any): void {
@@ -373,6 +513,7 @@ onMounted(() => {
   eventBus.on('adjustment:created', handleAdjustmentCreated)
   loadSavedData()
   applyAutoFill()
+  loadSubCategoryItems()
 })
 
 onBeforeUnmount(() => {

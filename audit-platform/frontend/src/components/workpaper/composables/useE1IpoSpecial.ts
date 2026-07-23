@@ -38,12 +38,23 @@ export type IpoRow = Record<string, unknown> & { id: string }
 // ─── Column Configurations ───────────────────────────────────────────────────
 
 export const COLUMN_CONFIG: Record<IpoSheetCode, ColumnDef[]> = {
+  // E1-23 货币资金收支检查情况表（源模板：凭证级收支明细，借方/贷方检查合并为方向列）
   'E1-23': [
-    { key: 'sampleMethod', label: '抽样方式', type: 'text' },
-    { key: 'sampleSize', label: '样本量', type: 'number' },
-    { key: 'checkItem', label: '检查项目', type: 'text' },
-    { key: 'checkResult', label: '检查结果', type: 'text' },
-    { key: 'issue', label: '发现问题', type: 'text' },
+    { key: 'direction', label: '方向(收/支)', type: 'text', width: 100 },
+    { key: 'accountName', label: '所属科目', type: 'text', width: 110 },
+    { key: 'date', label: '日期', type: 'date', width: 140 },
+    { key: 'voucherNo', label: '凭证编号', type: 'text', width: 120 },
+    { key: 'content', label: '业务内容', type: 'text', width: 180 },
+    { key: 'counterAccount', label: '对方科目', type: 'text', width: 130 },
+    { key: 'counterSubAccount', label: '对方明细科目', type: 'text', width: 140 },
+    { key: 'amount', label: '金额', type: 'number', width: 130 },
+    { key: 'bankReceiptDate', label: '银行回单日期', type: 'date', width: 140 },
+    { key: 'bankReceiptParty', label: '银行回单对方(收/付款方)', type: 'text', width: 170 },
+    { key: 'bankReceiptAmount', label: '银行回单金额', type: 'number', width: 130 },
+    { key: 'otherDoc', label: '其他支持性文件', type: 'text', width: 150 },
+    { key: 'indexNo', label: '索引号', type: 'text', width: 100 },
+    { key: 'isAbnormal', label: '是否异常', type: 'boolean', width: 90 },
+    { key: 'issue', label: '异常说明/备注', type: 'text', width: 180 },
   ],
   'E1-26': [
     { key: 'month', label: '月份', type: 'number' },

@@ -20,15 +20,15 @@
       <div class="k10-guide-steps">
         <div class="step-item">
           <span class="step-num">①</span>
-          <span class="step-text">TB自动取数：6117发生额（损益类贷方科目）→ 未审列自动填入</span>
+          <span class="step-text">先在 K10-2 明细表逐笔录入其他收益 → 点"从K10-2带入"按来源建行（源模板 ='明细表K10-2'! 联动）</span>
         </div>
         <div class="step-item">
           <span class="step-num">②</span>
-          <span class="step-text">录入AJE/RJE调整 → 审定数自动计算</span>
+          <span class="step-text">带入的未审/AJE/重分类 → 审定数自动计算（=未审+AJE+RJE）</span>
         </div>
         <div class="step-item">
           <span class="step-num">③</span>
-          <span class="step-text">确认审定数后点击"回写TB" → 发生额回写trial_balance</span>
+          <span class="step-text">确认审定数后点击"回写TB" → 6117发生额回写trial_balance</span>
         </div>
         <div class="step-item">
           <span class="step-num">④</span>
@@ -55,7 +55,7 @@
         <el-button size="small" type="primary" text @click="handleAiAssist">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
-        <el-button size="small" text @click="openReviewDialog?.('K10-1-adjudication', '其他收益审定表')">💬 复核</el-button>
+        <GtReviewTrigger section-id="K10-1-adjudication" label="💬 复核" />
       </div>
     </div>
 
@@ -234,6 +234,9 @@
 
     <!-- ═══ 操作栏 ═══ -->
     <div class="table-actions">
+      <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handlePullFromDetail">
+        从K10-2带入
+      </el-button>
       <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleAddRow">+ 新增来源行</el-button>
       <el-button size="small" type="success" :disabled="isReadonly" @click="handleWritebackTB">
         回写TB（6117发生额）
@@ -249,6 +252,15 @@
       >
         <template #title>
           K10-1审定合计与K10-2明细合计不一致，差额：{{ fmtAmt(adjudication.detailCrossValidation.value.diff) }}
+        </template>
+      </el-alert>
+    </div>
+
+    <!-- ═══ 与 TB(6117发生额) 勾稽 ═══ -->
+    <div v-if="tbTieOut && !tbTieOut.isBalanced" class="cross-validation-alert">
+      <el-alert type="warning" :closable="false" show-icon>
+        <template #title>
+          审定合计 {{ fmtAmt(adjudication.totalRow.value.audited) }} 与 TB(6117)审定发生额 {{ fmtAmt(props.tbData?.audited6117) }} 不一致，差额：{{ fmtAmt(tbTieOut.diff) }}
         </template>
       </el-alert>
     </div>
@@ -284,7 +296,7 @@
             <el-button size="small" type="primary" text @click="handleAiConclusion">
               <el-icon><MagicStick /></el-icon> AI
             </el-button>
-            <el-button size="small" text @click="openReviewDialog?.('K10-1-conclusion', '审定表结论')">💬 复核</el-button>
+            <GtReviewTrigger section-id="K10-1-conclusion" label="💬 复核" />
           </div>
         </div>
       </template>
@@ -303,10 +315,11 @@
       <summary>📋 编制提示</summary>
       <ul>
         <li>K10-1为损益类审定表（6117其他收益），取贷方发生额（贷方=收益增加）</li>
-        <li>按收益来源分行：政府补助-即征即退/财政贴息/研发补助/稳岗补贴/其他</li>
+        <li><b>编制主脉：K10-2明细逐笔录入 → 「从K10-2带入」逐行建审定表</b>（源模板 ='明细表K10-2'!A11/D11/E11/F11 联动）</li>
+        <li>按收益来源分行：总额法政府补助/增值税进项加计抵减/增值税直接减免/个税手续费返还/债务重组损益等</li>
         <li>审定数 = 未审数 + AJE + RJE（公式自动计算）</li>
         <li>审定完成后点击"回写TB"将发生额回写trial_balance（6117）</li>
-        <li>合计行应与K10-2明细表合计一致（差额为零）</li>
+        <li>合计行应与K10-2明细表合计一致（差额为零）；下方并列显示与试算平衡表(6117)勾稽差额</li>
         <li>与日常活动相关→其他收益(6117)；与日常活动无关→营业外收入(6301,K12)</li>
       </ul>
     </details>
@@ -333,7 +346,9 @@
 import { computed, inject, toRef, defineAsyncComponent } from 'vue'
 import { InfoFilled, MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { api } from '@/services/apiProxy'
 import { useK10Adjudication, type K10AdjRow } from '../../composables/useK10Adjudication'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
@@ -396,6 +411,14 @@ const tableData = computed<TableRow[]>(() => {
 
 const isReadonly = computed(() => props.isReadonly)
 
+/** 审定合计 vs TB(6117)审定发生额 勾稽（仅当 TB 有审定值时校验） */
+const tbTieOut = computed<{ diff: number; isBalanced: boolean } | null>(() => {
+  const tbAudited = props.tbData?.audited6117
+  if (tbAudited == null || tbAudited === 0) return null
+  const diff = adjudication.totalRow.value.audited - tbAudited
+  return { diff, isBalanced: Math.abs(diff) < 0.01 }
+})
+
 function fmtAmt(v: number | null | undefined): string {
   if (v == null || v === 0) return '—'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -433,16 +456,75 @@ async function handleWritebackTB(): Promise<void> {
   } catch { /* cancelled */ }
 }
 
-function handleAiAssist(): void {
-  ElMessage.info('AI辅助审定分析...')
+/** 从 K10-2 明细表带入（复现源模板 ='明细表K10-2'! SUMIF 联动，覆盖当前来源行） */
+async function handlePullFromDetail(): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      '将按 K10-2 明细表逐行重建审定表来源行（项目/未审/AJE/重分类/上期数），会覆盖当前手工来源行。是否继续？',
+      '从K10-2带入',
+      { confirmButtonText: '确认带入', cancelButtonText: '取消', type: 'warning' },
+    )
+    const n = adjudication.pullFromDetail()
+    if (n > 0) ElMessage.success(`已从K10-2带入 ${n} 个来源行`)
+    else ElMessage.warning('K10-2明细表暂无可带入的项目行，请先编制明细表')
+  } catch { /* cancelled */ }
 }
 
-function handleAiNote(): void {
-  ElMessage.info('AI生成审计说明...')
+// ─── AI 辅助（统一 /ai/generate-text，context 全转字符串避 422） ─────────────
+
+/** context 必须是 dict[str,str]（后端 422 校验），值全部转字符串 */
+function buildAiContext(): Record<string, string> {
+  const t = adjudication.totalRow.value
+  return {
+    科目: '6117 其他收益（损益类·贷方发生额）',
+    审定合计: String(t.audited),
+    未审合计: String(t.unadjusted),
+    AJE合计: String(t.aje),
+    RJE合计: String(t.rje),
+    上期审定合计: String(t.priorAudited),
+    与明细差额: String(adjudication.detailCrossValidation.value.diff),
+    来源行: adjudication.rows.value.map(r => `${r.name}:审定${r.audited}`).join('；'),
+  }
 }
 
-function handleAiConclusion(): void {
-  ElMessage.info('AI生成审计结论...')
+async function callAi(section: string, prompt: string, existingContent = ''): Promise<string> {
+  const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+    section,
+    prompt,
+    existingContent,
+    context: buildAiContext(),
+  })
+  return (res?.data?.content ?? res?.content ?? '') as string
+}
+
+async function handleAiAssist(): Promise<void> {
+  await handleAiNote()
+}
+
+async function handleAiNote(): Promise<void> {
+  if (!props.wpId) return
+  try {
+    const content = await callAi(
+      'K10-1-audit-note',
+      '为K10其他收益(6117)审定表生成审计说明：概述本期其他收益构成（政府补助分类）、发生额与上期对比、审定调整情况及与明细表勾稽结论。',
+      adjudication.auditNote.value,
+    )
+    if (content) { adjudication.saveNote(content); ElMessage.success('AI生成完成') }
+    else ElMessage.warning('AI未返回内容，请手动填写')
+  } catch { ElMessage.warning('AI生成失败，请手动填写') }
+}
+
+async function handleAiConclusion(): Promise<void> {
+  if (!props.wpId) return
+  try {
+    const content = await callAi(
+      'K10-1-audit-conclusion',
+      '为K10其他收益(6117)审定表生成审计结论：其他收益发生、完整性、准确性、分类列报认定是否恰当，审定金额是否公允。',
+      adjudication.auditConclusion.value,
+    )
+    if (content) { adjudication.saveConclusion(content); ElMessage.success('AI生成完成') }
+    else ElMessage.warning('AI未返回内容，请手动填写')
+  } catch { ElMessage.warning('AI生成失败，请手动填写') }
 }
 </script>
 

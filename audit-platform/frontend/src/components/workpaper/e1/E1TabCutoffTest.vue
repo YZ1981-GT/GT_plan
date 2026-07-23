@@ -18,10 +18,12 @@ import {
   useE1CutoffTest,
   type CutoffVariant,
   type CutoffTestRow,
+  determineCutoff,
 } from '../composables/useE1CutoffTest'
 import { useE1ImportExport } from '../composables/useE1ImportExport'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
+import GtCutoffAutoSampling from '../cutoff/GtCutoffAutoSampling.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
@@ -100,6 +102,54 @@ function getRowClass({ row }: { row: CutoffTestRow }): string {
   return ''
 }
 
+// ─── 截止自动取数 (GtCutoffAutoSampling) ─────────────────────────────────────
+
+const cutoffSamplingVisible = ref(false)
+const cutoffAccountCode = computed(() => variant.value === 'other' ? '1012' : '1002')
+const samplingYear = computed(() => {
+  const bs = props.bsDate || ''
+  const match = bs.match(/^(\d{4})/)
+  return match ? Number(match[1]) : new Date().getFullYear() - 1
+})
+
+function onCutoffFilled(payload: any): void {
+  const samples = payload?.samples || payload
+  if (!Array.isArray(samples) || samples.length === 0) return
+  const bsVal = balanceSheetDate.value || props.bsDate || ''
+  for (const s of samples) {
+    const date = s.voucherDate || s.date || ''
+    const isCross = determineCutoff(date, bsVal)
+    const newRow: Partial<CutoffTestRow> = {
+      voucherNo: s.voucherNo || '',
+      date,
+      amount: s.debitAmount || s.creditAmount || s.amount || 0,
+      counterparty: s.counterpartAccount || s.counterparty || s.summary || '',
+      isCrossover: isCross,
+      note: isCross ? '跨期(自动标记)' : '',
+    }
+    // Avoid duplicates by voucherNo
+    if (newRow.voucherNo && rows.value.some(r => r.voucherNo === newRow.voucherNo)) continue
+    addRow()
+    const lastRow = rows.value[rows.value.length - 1]
+    if (lastRow) {
+      updateCell(lastRow.id, 'voucherNo', newRow.voucherNo || '')
+      updateCell(lastRow.id, 'date', newRow.date || '')
+      updateCell(lastRow.id, 'amount', String(newRow.amount || 0))
+      updateCell(lastRow.id, 'counterparty', newRow.counterparty || '')
+      if (newRow.note) updateCell(lastRow.id, 'note', newRow.note)
+    }
+  }
+  cutoffSamplingVisible.value = false
+  ElMessage.success(`已导入 ${samples.length} 笔截止凭证`)
+}
+
+/** AI 复核意见经用户确认后追加到审计说明（GtCutoffAutoSampling @applied） */
+function onCutoffApplied(text: string): void {
+  if (!text || props.isReadonly) return
+  const merged = auditNote.value ? `${auditNote.value}\n${text}` : text
+  saveAuditNote(merged)
+}
+
 // ─── 审计说明 / 审计结论 ─────────────────────────────────────────────────────
 
 const NOTE_KEY = computed(() => `E1-cutoff-audit-note-${variant.value}`)
@@ -163,6 +213,7 @@ function saveAuditConclusion(val: string): void {
         </el-tag>
         <el-tag v-if="balanceSheetDate" size="small" type="info">资产负债表日：{{ balanceSheetDate }}</el-tag>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加行</el-button>
+        <el-button size="small" type="warning" :disabled="isReadonly" @click="cutoffSamplingVisible = true">🎲 截止取数</el-button>
       </div>
       <div class="toolbar-right">
         <el-dropdown size="small" trigger="click" :disabled="isReadonly">
@@ -273,6 +324,27 @@ function saveAuditConclusion(val: string): void {
         </el-card>
       </template>
     </el-skeleton>
+
+    <!-- 截止自动取数弹窗 -->
+    <el-dialog
+      v-model="cutoffSamplingVisible"
+      title="截止自动取数"
+      width="880px"
+      append-to-body
+      destroy-on-close
+    >
+      <GtCutoffAutoSampling
+        :account-code="cutoffAccountCode"
+        :workpaper-id="wpId"
+        :project-id="projectId"
+        :year="samplingYear"
+        cutoff-direction="window"
+        :default-conditions="{ cutoffDate: balanceSheetDate || bsDate || '' }"
+        :readonly="isReadonly"
+        @filled="onCutoffFilled"
+        @applied="onCutoffApplied"
+      />
+    </el-dialog>
   </div>
 </template>
 

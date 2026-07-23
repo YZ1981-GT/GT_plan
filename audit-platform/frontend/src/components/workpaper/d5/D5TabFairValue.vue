@@ -39,10 +39,50 @@
       style="margin-bottom: 12px"
     />
 
+    <!-- 贴现利率合理性预警 -->
+    <el-alert
+      v-if="rateReasonabilityWarnings.length > 0"
+      type="warning"
+      :closable="false"
+      show-icon
+      style="margin-bottom: 12px"
+    >
+      <template #title>
+        贴现利率异常：{{ rateReasonabilityWarnings.length }}笔偏离加权平均利率超200bp
+      </template>
+      <div v-for="w in rateReasonabilityWarnings" :key="w.rowId" style="font-size:12px">
+        {{ w.itemName }}：利率{{ (w.rate * 100).toFixed(2) }}%，偏离{{ (w.deviation * 100).toFixed(0) }}bp
+      </div>
+    </el-alert>
+
+    <!-- 到期日预警 -->
+    <el-alert
+      v-if="maturityWarnings.overdue.length > 0"
+      type="error"
+      :closable="false"
+      show-icon
+      style="margin-bottom: 8px"
+    >
+      <template #title>
+        已逾期未兑付：{{ maturityWarnings.overdue.length }}笔，金额{{ fmtAmount(maturityWarnings.overdueTotal) }}
+      </template>
+      <span style="font-size:12px">逾期票据信用风险显著增加，应评估ECL阶段升级(阶段二/三)</span>
+    </el-alert>
+    <el-alert
+      v-if="maturityWarnings.nearMaturity.length > 0"
+      type="warning"
+      :closable="false"
+      show-icon
+      style="margin-bottom: 12px"
+    >
+      即将到期(30天内)：{{ maturityWarnings.nearMaturity.length }}笔，金额{{ fmtAmount(maturityWarnings.nearMaturityTotal) }}
+    </el-alert>
+
     <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加测算行</el-button>
+        <el-button size="small" plain :disabled="isReadonly" @click="importFromDetail">从明细表带入</el-button>
         <div class="default-rate-config">
           <span class="rate-label">全表默认贴现利率：</span>
           <el-input-number
@@ -521,6 +561,9 @@ const {
   updateCell,
   setDefaultRate,
   auditNotes,
+  rateReasonabilityWarnings,
+  maturityWarnings,
+  importFromDetail,
 } = useD5FairValue({
   allResponses: allResponsesRef,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,

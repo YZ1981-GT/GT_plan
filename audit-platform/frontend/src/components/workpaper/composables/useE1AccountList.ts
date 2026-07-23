@@ -224,6 +224,43 @@ export function useE1AccountList(options: UseE1BaseOptions) {
     }
   })
 
+  // ─── P1-7: 账户清单 vs E1-3 银行明细完整性差集 ─────────────────────────────
+
+  /** 清单有而明细无 = 漏列（完整性认定风险） */
+  const missingFromBankDetail = computed<string[]>(() => {
+    const bankDetailRaw = allResponses.value.get('E1-bank-detail-rows')?.remark
+    if (!bankDetailRaw) return []
+    try {
+      const bankRows = JSON.parse(bankDetailRaw)
+      if (!Array.isArray(bankRows)) return []
+      const bankAccountNos = new Set(
+        bankRows.map((r: any) => String(r.accountNo || '').trim()).filter(Boolean)
+      )
+      const accountListNos = rows.value
+        .filter(r => r.accountNo.trim() && r.accountStatus !== '已注销')
+        .map(r => r.accountNo.trim())
+      return accountListNos.filter(no => !bankAccountNos.has(no))
+    } catch { return [] }
+  })
+
+  /** 明细有而清单无 = 未报告开户（监管风险） */
+  const missingFromAccountList = computed<string[]>(() => {
+    const bankDetailRaw = allResponses.value.get('E1-bank-detail-rows')?.remark
+    if (!bankDetailRaw) return []
+    try {
+      const bankRows = JSON.parse(bankDetailRaw)
+      if (!Array.isArray(bankRows)) return []
+      const accountListNos = new Set(
+        rows.value.map(r => r.accountNo.trim()).filter(Boolean)
+      )
+      const bankAccountNos = bankRows
+        .map((r: any) => String(r.accountNo || '').trim())
+        .filter(Boolean) as string[]
+      const uniqueBankNos = [...new Set(bankAccountNos)]
+      return uniqueBankNos.filter(no => !accountListNos.has(no))
+    } catch { return [] }
+  })
+
   // ─── Row CRUD ──────────────────────────────────────────────────────────
 
   function addRow(bank = ''): AccountListRow | null {
@@ -288,6 +325,8 @@ export function useE1AccountList(options: UseE1BaseOptions) {
     rows,
     isLoading,
     summary,
+    missingFromBankDetail,
+    missingFromAccountList,
     isInconsistent,
     isMissingReason,
     isSuspectedOffBook,

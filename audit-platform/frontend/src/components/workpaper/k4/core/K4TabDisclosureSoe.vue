@@ -98,6 +98,7 @@
         <li>编辑后发布 disclosure:note-text-updated 联动附注模块</li>
         <li>与上市公司版区别：使用中文编号（一、二...）；无到期期限分析；无占比列</li>
         <li>负债类科目关注完整性认定：确保所有应入账的其他流动负债已完整披露</li>
+        <li>政府补助：受益期≤1年→其他流动负债(K4)，&gt;1年→递延收益(K7)，两者按同一补助项目合计=总授予金额</li>
       </ul>
     </details>
   </div>
@@ -124,6 +125,8 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
+import type { WorkpaperRuntimeContext } from '../../composables/useWorkpaperScaffold'
+import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 
 const K4_ACCOUNT_CODE = '2245'
 
@@ -139,6 +142,7 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 
 // ═══ 数据模型 ═══
 interface DisclosureRow {
@@ -182,7 +186,8 @@ function buildSections(): DisclosureSection[] {
   return [
     { id: 'nature', title: '一、按项目性质分类', rows: natureRows, hasTextArea: true, textContent: '' },
     { id: 'change', title: '二、增减变动说明', rows: changeRows, hasTextArea: true, textContent: '' },
-    { id: 'other', title: '三、其他披露事项', rows: [], hasTextArea: true, textContent: '' },
+    { id: 'k7-reconcile', title: '三、政府补助与K7递延收益勾稽', rows: [], hasTextArea: true, textContent: '' },
+    { id: 'other', title: '四、其他披露事项', rows: [], hasTextArea: true, textContent: '' },
   ]
 }
 
@@ -275,7 +280,14 @@ async function handleAiGenerate(sIdx: number): Promise<void> {
   try {
     const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       prompt: `请生成其他流动负债附注（国企格式）中"${section.title}"的披露文字说明`,
-      context: `科目:其他流动负债(2245) 负债类 期末余额来自K4-1审定表 国有企业报表附注格式 关注完整性认定`,
+      context: {
+        科目: '2245 其他流动负债（负债类）',
+        格式: '国有企业报表附注',
+        当前节: section.title,
+        行数: String(section.rows.length),
+        关注认定: '完整性（负债易少计）',
+        K7提示: '政府补助受益期>1年部分在递延收益K7列报',
+      },
       existingContent: section.textContent || '',
       section: section.id,
     })
@@ -301,6 +313,11 @@ function persistSection(sIdx: number): void {
     rows: section.rows,
     textContent: section.textContent,
   }))
+  scheduleAutoSnapshot()
+}
+
+function scheduleAutoSnapshot(): void {
+  try { runtime?.version?.scheduleAutoSnapshot?.() } catch { /* silent */ }
 }
 
 function loadSavedData(): void {

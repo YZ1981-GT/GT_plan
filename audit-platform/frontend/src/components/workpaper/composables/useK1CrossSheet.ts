@@ -18,11 +18,20 @@
  * Requirements: 2.9, 3.3, 4.4-4.5, 6.5
  */
 import { computed, type ComputedRef, type Ref } from 'vue'
+import { readK14AdjustmentNets } from './useK1Adjustment'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface CrossSheetCheckResult {
   diff: number
+  isMatch: boolean
+}
+
+export interface K14CrossCheckResult {
+  receivableAjeDiff: number
+  receivableRjeDiff: number
+  badDebtAjeDiff: number
+  badDebtRjeDiff: number
   isMatch: boolean
 }
 
@@ -47,6 +56,7 @@ export function useK1CrossSheet(allResponses: Ref<Map<string, any>>): {
   adjudicationVsDetail: ComputedRef<CrossSheetCheckResult>
   badDebtVsCalc: ComputedRef<CrossSheetCheckResult>
   agingVsBalance: ComputedRef<CrossSheetCheckResult>
+  adjudicationVsK14: ComputedRef<K14CrossCheckResult>
 } {
   // 辅助：从 allResponses 提取数值
   function getNum(key: string): number {
@@ -100,12 +110,43 @@ export function useK1CrossSheet(allResponses: Ref<Map<string, any>>): {
     return { diff, isMatch: Math.abs(diff) < 0.01 }
   })
 
+  // ═══ adjudicationVsK14: K1-1 AJE/RJE 合计 vs K1-4 1221/1231 净额 ═══
+
+  const adjudicationVsK14: ComputedRef<K14CrossCheckResult> = computed(() => {
+    const k14 = readK14AdjustmentNets(allResponses.value)
+    let recAje = 0
+    let recRje = 0
+    let bdAje = 0
+    let bdRje = 0
+    const recCount = getNum('K1-1-receivable-count') || 5
+    const bdCount = getNum('K1-1-baddebt-count') || 5
+    for (let i = 0; i < recCount; i++) {
+      recAje += getNum(`K1-1-receivable-r${i}-aje`)
+      recRje += getNum(`K1-1-receivable-r${i}-rje`)
+    }
+    for (let i = 0; i < bdCount; i++) {
+      bdAje += getNum(`K1-1-baddebt-r${i}-aje`)
+      bdRje += getNum(`K1-1-baddebt-r${i}-rje`)
+    }
+    const receivableAjeDiff = recAje - k14.receivableAjeNet
+    const receivableRjeDiff = recRje - k14.receivableRjeNet
+    const badDebtAjeDiff = bdAje - k14.badDebtAjeNet
+    const badDebtRjeDiff = bdRje - k14.badDebtRjeNet
+    const isMatch =
+      Math.abs(receivableAjeDiff) < 0.01 &&
+      Math.abs(receivableRjeDiff) < 0.01 &&
+      Math.abs(badDebtAjeDiff) < 0.01 &&
+      Math.abs(badDebtRjeDiff) < 0.01
+    return { receivableAjeDiff, receivableRjeDiff, badDebtAjeDiff, badDebtRjeDiff, isMatch }
+  })
+
   // ─── Return ────────────────────────────────────────────────────────────────
 
   return {
     adjudicationVsDetail,
     badDebtVsCalc,
     agingVsBalance,
+    adjudicationVsK14,
   }
 }
 

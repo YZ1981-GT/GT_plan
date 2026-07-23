@@ -1803,9 +1803,15 @@ def register_event_handlers() -> None:
     # B50-3 是认定层次风险评估表，保存后广播给 D~N 循环读取
     # ------------------------------------------------------------------
     async def _on_b50_saved(payload: EventPayload) -> None:
-        """B50-3 风险评估数据保存 → 写入 risk_assessment scope 供 D~N 循环读取。"""
+        """B50 风险评估保存 → 失效 D~N 循环程序表 auto_data_source 缓存。
+
+        B50 认定层次风险的单一真源是 checklist_responses（B50-T3-*），下游
+        risk_for_cycle / b50_risk_summary 经 b50_risk_reader 直接读取，无需再向
+        field_override 同步。此处仅负责在 B50 保存后失效 auto_data 缓存，使 D~N
+        循环程序表立即反映最新风险评估（否则最长 30s TTL 内显示旧值）。
+        """
         wp_code = payload.extra.get("wp_code", "") if payload.extra else ""
-        if wp_code != "B50-3":
+        if wp_code != "B50":
             return
 
         project_id = payload.project_id
@@ -1813,49 +1819,15 @@ def register_event_handlers() -> None:
         if not project_id or not year:
             return
 
-        # 从保存的数据中提取风险条目
-        parsed_data = payload.extra.get("parsed_data") or {} if payload.extra else {}
-        rows = parsed_data.get("rows", [])
-        if not rows:
-            return
-
-        async with async_session_factory() as session:
-            try:
-                from app.services.field_override_service import FieldOverrideService
-                svc = FieldOverrideService(session)
-                for idx, row in enumerate(rows):
-                    item_key = row.get("risk_id") or f"risk_{idx}"
-                    cycle_code = row.get("cycle_code", "")
-                    if not cycle_code:
-                        continue
-                    # 逐字段写入（cycle_code, description, assertion, risk_level, is_special_risk）
-                    for field_name in ("cycle_code", "description", "assertion", "risk_level", "is_special_risk"):
-                        val = row.get(field_name)
-                        if val is not None:
-                            await svc.set(
-                                project_id=project_id,
-                                year=year,
-                                scope="risk_assessment",
-                                item_key=item_key,
-                                field=field_name,
-                                value=str(val),
-                            )
-                await session.commit()
-                logger.info(
-                    "[B50→D~N] Risk assessment saved: %d items for project=%s",
-                    len(rows), project_id,
-                )
-                # 广播 RISK_ASSESSMENT_UPDATED 供 D~N 循环 auto_data_source 缓存失效
-                invalidate_auto_cache(project_id, year)
-            except Exception:
-                await session.rollback()
-                logger.warning(
-                    "[B50→D~N] Failed to save risk assessment for project=%s",
-                    project_id, exc_info=True,
-                )
+        # 失效本项目全部 auto_data 缓存（risk_for_cycle 等按 project:year 键缓存）
+        cleared = invalidate_auto_cache(project_id, year)
+        logger.info(
+            "[B50→D~N] B50 saved, invalidated %d auto_data cache entries for project=%s",
+            cleared, project_id,
+        )
 
     event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_b50_saved)
-    logger.debug("B-linkage: B50-3 WORKPAPER_SAVED → risk_assessment override handler registered")
+    logger.debug("B-linkage: B50 WORKPAPER_SAVED → auto_data cache invalidation handler registered")
 
     # ------------------------------------------------------------------
     # B2 完成 → B1A seq2 自动标完成

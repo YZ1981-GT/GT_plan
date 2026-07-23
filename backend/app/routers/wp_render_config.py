@@ -197,6 +197,27 @@ _ONLYOFFICE_HTML_WHITELIST: set[str] = {
     "k13-non-operating-expense",
     # H7 生产性生物资产（RENDERER_DISPATCH 在 Phase 5 创建，暂保留白名单）
     "h7-biological-assets",
+    # B22 企业层面控制（多 sheet 整册专属，纯前端自加载无 RENDERER_DISPATCH）
+    "b22a-control-matrix",
+    "b22b-deficiency-evaluation",
+    "b22b-control-matrix",
+    "b22c-design-effectiveness",
+    # B23 业务层面控制（14 循环整册专属，纯前端自加载无 RENDERER_DISPATCH）
+    "b23-process-control",
+}
+
+# 自包含整册专属组件：组件内部不按 sheetName 分发（自身 6-Tab/卡片式自加载全部内容），
+# render-config 只输出单一 sheet，避免前端显示 N 个渲染同一组件的冗余页签。
+# （对比 J1/H1/C22 等 sheetName-aware 整册组件，它们依赖多 sheet 切换子视图，不在此集）
+_SELF_CONTAINED_DEDICATED: set[str] = {
+    "b22a-control-matrix",
+    "b22b-deficiency-evaluation",
+    "b22b-control-matrix",
+    "b22c-design-effectiveness",
+    # B23 业务层面控制：14 循环聚合组件内部按循环卡片/目录自加载分发（非 sheetName 切换），
+    # 必须折叠为单一 sheet 并清空 html_data.cells，否则职责分离模板 grid cells 触发前端
+    # noRendererGridFallback → 误走 GtGridSheet 遮蔽 b23-process-control 聚合组件。
+    "b23-process-control",
 }
 
 # ─── Response schemas ────────────────────────────────────────────────────────
@@ -833,6 +854,15 @@ async def _get_render_config_impl(
                        "cross_refs": [i.model_dump() for i in cross_ref_items],
                        "sheet_type": _resolve_sheet_type(sheet_schema, schema_data, cls.sheet_name),
                        "field_sources": _extract_field_sources(sheet_schema, schema_data, cls.sheet_name)})
+
+    # 自包含整册专属组件（组件内部不按 sheetName 分发，自身 6-Tab/卡片式自加载）：
+    # 折叠为单一 sheet，避免前端显示 N 个渲染同一组件的冗余页签（B22A/B22B/B22C）。
+    # 同时清空 html_data：这些组件经 checklist-responses 自加载，不消费 grid cells；
+    # 若代表 sheet 残留模板 grid cells，前端 noRendererGridFallback 会误走 GtGridSheet 而非专属组件。
+    if ovr in _SELF_CONTAINED_DEDICATED and sheets:
+        _rep = next((s for s in sheets if s["componentType"] == ovr), sheets[0])
+        _rep = {**_rep, "html_data": {}}
+        sheets = [_rep]
 
     # Step 7: auto-fill + Step 8: response
     fill_results: dict = {}

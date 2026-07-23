@@ -6,12 +6,13 @@
  * Requirements: 2.1-2.7, 7.1-7.4
  *
  * 职责：
- * - 双区块：按性质分类(保证金/往来款/代收代付/其他) + 按账龄分类(1年内/1-2年/2-3年/3年以上)
+ * - 双区块：按性质分类(保证金/往来款/代收代付/其他) + 按账龄分类(**动态段**from useAgingConfig)
  * - 每行：审定=未审+AJE+RJE, 期末=期初+贷方-借方(负债类！), 变动率
  * - 合计行=Σ各行
  * - 三角勾稽差额校验
  * - TB回写(2241) + EventBus 'substantive:adjudicated'
  * - 底部审计说明+结论（含完整性认定说明）
+ * - TB预填：无持久化数据时从tbData.unadjusted2241 seed未审数到性质合计行
  *
  * 科目：2241 其他应付款（**贷方/负债类**）
  * ⚠️ 负债类！期末=期初+贷方-借方（与资产类相反）
@@ -25,6 +26,7 @@ import {
   calcSubtotal,
 } from './useK3FormulaEngine'
 import type { K3TbData } from './useK3FormData'
+import type { AgingSegment } from '@/composables/useAgingConfig'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -52,6 +54,8 @@ export interface UseK3AdjudicationParams {
   allResponses: Ref<Map<string, any>>
   tbData: Ref<K3TbData>
   saveResponse: Function
+  /** 动态账龄段（from useAgingConfig） */
+  agingSegments?: Ref<AgingSegment[]>
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -69,12 +73,27 @@ function num(map: Map<string, any>, itemId: string): number {
 // ─── 性质分类预设标签 ─────────────────────────────────────────────────────────
 
 const NATURE_ROW_LABELS = ['保证金及押金', '往来款', '代收代付', '其他']
-const AGING_ROW_LABELS = ['1年以内', '1-2年', '2-3年', '3年以上']
+/** 旧硬编码兜底（仅当 agingSegments 未传入时使用） */
+const DEFAULT_AGING_ROW_LABELS = ['1年以内', '1-2年', '2-3年', '3年以上']
+
+/**
+ * 旧 item_id rowKey 映射表（保留对旧持久化数据的兼容）
+ * 旧数据 item_id: K3-1-aging-r0-begin ... K3-1-aging-r3-begin
+ * 新动态段 item_id: K3-1-aging-{seg.key}-begin
+ * 读取时两套 key 都尝试
+ */
+const LEGACY_AGING_ROWKEY: Record<string, string> = {
+  within1: 'r0',
+  y1to2: 'r1',
+  y2to3: 'r2',
+  over3: 'r3',
+  y3to4: 'r3',  // FIVE_YEAR 的 3-4年 复用旧 r3 slot（兜底）
+}
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useK3Adjudication(params: UseK3AdjudicationParams) {
-  const { allResponses, tbData, saveResponse } = params
+  const { allResponses, tbData, saveResponse, agingSegments } = params
 
   // ─── State ─────────────────────────────────────────────────────────────────
 
@@ -128,14 +147,35 @@ export function useK3Adjudication(params: UseK3AdjudicationParams) {
     return rows
   })
 
-  // ─── 按账龄分类区块 (Req 2.1: 1年内/1-2年/2-3年/3年以上) ──────────────────
+  // ─── 按账龄分类区块（**动态段**，from useAgingConfig → agingSegments） ────
 
   const byAgingRows: ComputedRef<K3AdjRow[]> = computed(() => {
     const rows: K3AdjRow[] = []
-    const count = num(allResponses.value, 'K3-1-aging-count') || AGING_ROW_LABELS.length
-    for (let i = 0; i < count; i++) {
-      const label = getVal(allResponses.value, `K3-1-aging-r${i}-label`) || AGING_ROW_LABELS[i] || `账龄${i + 1}`
-      rows.push(buildRow('aging', `r${i}`, label))
+    const segs = agingSegments?.value
+
+    if (segs && segs.length > 0) {
+      // 动态段模式：按项目账龄配置生成行
+      for (const seg of segs) {
+        // 优先用 seg.key 作为 item_id rowKey；兼容旧持久化数据用 LEGACY_AGING_ROWKEY 回退
+        const legacyKey = LEGACY_AGING_ROWKEY[seg.key]
+        // 尝试新 key：K3-1-aging-{seg.key}-begin
+        const newId = `K3-1-aging-${seg.key}`
+        const hasNewData = allResponses.value.has(`${newId}-begin`) || allResponses.value.has(`${newId}-unadj`)
+        // 尝试旧 key：K3-1-aging-r{N}-begin
+        const legacyId = legacyKey ? `K3-1-aging-${legacyKey}` : null
+        const hasLegacyData = legacyId ? (allResponses.value.has(`${legacyId}-begin`) || allResponses.value.has(`${legacyId}-unadj`)) : false
+
+        // 优先新key，回退旧key
+        const effectiveRowKey = hasNewData ? seg.key : (hasLegacyData && legacyKey ? legacyKey : seg.key)
+        rows.push(buildRow('aging', effectiveRowKey, seg.label))
+      }
+    } else {
+      // 兜底：无动态段时使用旧硬编码（向后兼容）
+      const count = num(allResponses.value, 'K3-1-aging-count') || DEFAULT_AGING_ROW_LABELS.length
+      for (let i = 0; i < count; i++) {
+        const label = getVal(allResponses.value, `K3-1-aging-r${i}-label`) || DEFAULT_AGING_ROW_LABELS[i] || `账龄${i + 1}`
+        rows.push(buildRow('aging', `r${i}`, label))
+      }
     }
     return rows
   })
@@ -169,11 +209,38 @@ export function useK3Adjudication(params: UseK3AdjudicationParams) {
     return { diff, isBalanced: Math.abs(diff) < 0.01 }
   })
 
-  // ─── 从 allResponses 初始化审计说明 ────────────────────────────────────────
+  // ─── 从 allResponses 初始化审计说明 + TB预填seed ─────────────────────────
 
   function initFromResponses(): void {
     auditConclusion.value = getVal(allResponses.value, 'K3-1-audit-conclusion')
     completenessNote.value = getVal(allResponses.value, 'K3-1-completeness-note')
+  }
+
+  /**
+   * TB预填：仅在性质行全部未审数为0且无持久化数据时，
+   * 将tbData.unadjusted2241 seed到性质合计的"其他"行未审数（兜底预填）。
+   * 持久化优先——已编辑过的不覆盖。
+   */
+  function seedFromTbIfEmpty(): void {
+    const tbUnadj = tbData.value?.unadjusted2241 ?? 0
+    if (tbUnadj === 0) return
+    // 检查是否所有性质行未审数都为0（无人录入）
+    const hasAnyUnadj = byNatureRows.value.some(r => r.unadjusted !== 0)
+    if (hasAnyUnadj) return
+    // 检查是否有持久化的审定数合计（说明已编辑过）
+    const savedTotal = num(allResponses.value, 'K3-1-audited-total')
+    if (savedTotal !== 0) return
+    // seed: 将TB未审数写入最后一行("其他")的未审数字段
+    // 注：真正审定表应从tb_balance子科目分行预填，此处为兜底总额seed
+    const lastIdx = byNatureRows.value.length - 1
+    if (lastIdx >= 0) {
+      const rowKey = `r${lastIdx}`
+      const itemId = `K3-1-nature-${rowKey}-unadj`
+      if (!allResponses.value.has(itemId)) {
+        // 写入本地Map供computed链即时消费（不持久化，避免覆盖）
+        allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: String(tbUnadj) })
+      }
+    }
   }
 
   // ─── 保存全部 ──────────────────────────────────────────────────────────────
@@ -196,6 +263,8 @@ export function useK3Adjudication(params: UseK3AdjudicationParams) {
   // ─── Watch init ────────────────────────────────────────────────────────────
 
   watch(allResponses, () => initFromResponses(), { immediate: true })
+  // TB数据到达后尝试seed
+  watch(tbData, () => seedFromTbIfEmpty(), { immediate: true })
 
   // ─── Return ────────────────────────────────────────────────────────────────
 
@@ -208,6 +277,7 @@ export function useK3Adjudication(params: UseK3AdjudicationParams) {
     completenessNote,
     reconciliation,
     initFromResponses,
+    seedFromTbIfEmpty,
     saveAll,
     getAuditedTotal,
   }

@@ -38,8 +38,10 @@ export interface K10ReceivableCheckRow {
   expectedRecoverable: CheckStatus
   /** 确认时点合理性 */
   recognitionTiming: CheckStatus
-  /** 金额 */
+  /** 金额（期末应收补助） */
   amount: number
+  /** 期后实际收款金额（核对银行回单/收款凭证，佐证收款权利确凿性） */
+  postCollectionAmount: number
   /** 备注 */
   remark: string
   /** 可编辑标记 */
@@ -87,6 +89,43 @@ export interface UseK10ChecksParams {
   onSave?: (itemId: string, value: any) => void
 }
 
+// ─── 纯函数：总体结论派生 ─────────────────────────────────────────────────────
+
+/**
+ * 由分类正确性 + 确认条件派生总体结论：
+ * - 任一"不合规" → 不合规
+ * - 两项均"不适用" → 不适用
+ * - 否则 → 合规
+ */
+export function deriveOverallStatus(classificationCorrect: CheckStatus, conditionMet: CheckStatus): CheckStatus {
+  if (classificationCorrect === '不合规' || conditionMet === '不合规') return '不合规'
+  if (classificationCorrect === '不适用' && conditionMet === '不适用') return '不适用'
+  return '合规'
+}
+
+/**
+ * K10-5 应收补助综合结论：由 收款权利/预期可收回/确认时点 三项派生
+ * - 任一"不合规" → 不合规
+ * - 三项均"不适用" → 不适用
+ * - 否则 → 合规
+ */
+export function deriveReceivableStatus(
+  receivableRight: CheckStatus, expectedRecoverable: CheckStatus, recognitionTiming: CheckStatus,
+): CheckStatus {
+  const statuses = [receivableRight, expectedRecoverable, recognitionTiming]
+  if (statuses.includes('不合规')) return '不合规'
+  if (statuses.every(s => s === '不适用')) return '不适用'
+  return '合规'
+}
+
+/** 期后收款状态（核对实际收款佐证应收补助可收回性） */
+export type CollectionStatus = '已收回' | '部分收回' | '未收回'
+export function deriveCollectionStatus(amount: number, postCollectionAmount: number): CollectionStatus {
+  if (amount > 0 && postCollectionAmount >= amount) return '已收回'
+  if (postCollectionAmount > 0) return '部分收回'
+  return '未收回'
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useK10Checks(params: UseK10ChecksParams) {
@@ -128,6 +167,7 @@ export function useK10Checks(params: UseK10ChecksParams) {
       expectedRecoverable: _toCheckStatus(raw.expectedRecoverable),
       recognitionTiming: _toCheckStatus(raw.recognitionTiming),
       amount: parseNum(raw.amount),
+      postCollectionAmount: parseNum(raw.postCollectionAmount),
       remark: raw.remark ?? '',
       isEditable: raw.isEditable ?? true,
     }
@@ -243,6 +283,7 @@ export function useK10Checks(params: UseK10ChecksParams) {
       expectedRecoverable: '不适用',
       recognitionTiming: '不适用',
       amount: 0,
+      postCollectionAmount: 0,
       remark: '',
       isEditable: true,
     })
@@ -252,20 +293,59 @@ export function useK10Checks(params: UseK10ChecksParams) {
 
   function addIncomeCheckRow(checkItem: string): void {
     if (isReadonly?.value) return
-    incomeCheckRows.value.push({
-      rowKey: `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      checkItem,
-      checkAmount: 0,
-      classification: '',
-      classificationCorrect: '不适用',
-      conditionMet: '不适用',
-      overallStatus: '不适用',
-      remark: '',
-      isEditable: true,
-    })
+    incomeCheckRows.value.push(_blankIncomeRow(checkItem))
     isChanged.value = true
     _persist()
   }
+
+  function _blankIncomeRow(checkItem: string, partial: Partial<K10IncomeCheckRow> = {}): K10IncomeCheckRow {
+    return {
+      rowKey: `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      checkItem,
+      checkAmount: parseNum(partial.checkAmount),
+      classification: partial.classification ?? '',
+      classificationCorrect: _toCheckStatus(partial.classificationCorrect),
+      conditionMet: _toCheckStatus(partial.conditionMet),
+      overallStatus: _toCheckStatus(partial.overallStatus),
+      remark: partial.remark ?? '',
+      isEditable: true,
+    }
+  }
+
+  /** 带金额/分类的检查行（供抽凭生成检查行使用） */
+  function addIncomeCheckRowFull(partial: Partial<K10IncomeCheckRow> & { checkItem: string }): void {
+    if (isReadonly?.value) return
+    incomeCheckRows.value.push(_blankIncomeRow(partial.checkItem, partial))
+    isChanged.value = true
+    _persist()
+  }
+
+  /**
+   * 从 K10-2 明细带入检查项（checkItem=补助项目，checkAmount=审定数，默认分类其他收益）。
+   * 仅新增未存在的检查项（按 checkItem 去重），返回新增行数。
+   */
+  function importIncomeChecksFromDetail(): number {
+    if (isReadonly?.value) return 0
+    const raw = _getJson('K10-2-detail-rows')
+    if (!Array.isArray(raw) || raw.length === 0) return 0
+    const existing = new Set(incomeCheckRows.value.map(r => r.checkItem.trim()).filter(Boolean))
+    let added = 0
+    for (const d of raw) {
+      const name = String(d?.projectName ?? '').trim()
+      if (!name || existing.has(name)) continue
+      const audited = parseNum(d?.audited) || (parseNum(d?.unadjusted) + parseNum(d?.aje) + parseNum(d?.rje))
+      incomeCheckRows.value.push(_blankIncomeRow(name, { checkAmount: audited, classification: '其他收益' }))
+      existing.add(name)
+      added++
+    }
+    if (added > 0) { isChanged.value = true; _persist() }
+    return added
+  }
+
+  /** 分类为"营业外收入"的检查行（应重分类至 6301/K12） */
+  const misclassifiedRows: ComputedRef<K10IncomeCheckRow[]> = computed(() =>
+    incomeCheckRows.value.filter(r => r.classification === '营业外收入'),
+  )
 
   function removeRow(rowKey: string): void {
     if (isReadonly?.value) return
@@ -307,12 +387,15 @@ export function useK10Checks(params: UseK10ChecksParams) {
     incomeCheckRows,
     incomeCheckSummary,
     coverageRate,
+    misclassifiedRows,
     // common
     isChanged,
     updateReceivableCell,
     updateIncomeCheckCell,
     addReceivableRow,
     addIncomeCheckRow,
+    addIncomeCheckRowFull,
+    importIncomeChecksFromDetail,
     removeRow,
     initFromResponses,
   }

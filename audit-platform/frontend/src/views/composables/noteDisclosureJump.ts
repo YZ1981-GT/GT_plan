@@ -30,6 +30,15 @@ export const H10_DISCLOSURE_SHEET_SOE = '附注披露信息（国有企业）'
 export const I1_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
 export const I1_DISCLOSURE_SHEET_SOE = '附注披露信息（国有企业）'
 
+export const I5_DISCLOSURE_SHEET_LISTED = '附注披露（上市公司）'
+export const I5_DISCLOSURE_SHEET_SOE = '附注披露（国有企业）'
+
+export const K11_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
+export const K11_DISCLOSURE_SHEET_SOE = '附注披露信息（国有企业）'
+
+export const K13_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
+export const K13_DISCLOSURE_SHEET_SOE = '附注披露信息（国有企业）'
+
 export interface NoteDisclosureJumpTarget {
   /** 底稿 sheet 名（传给 ?sheet=） */
   sheet: string
@@ -40,7 +49,7 @@ export interface NoteDisclosureJumpTarget {
   /** 推断依据说明 */
   reason: string
   /** 底稿族代码（ACNR 回退解析） */
-  wpCode?: 'G7' | 'G10' | 'G13' | 'G14' | 'H1' | 'H8' | 'H9' | 'H10' | 'I1'
+  wpCode?: 'G7' | 'G10' | 'G13' | 'G14' | 'H1' | 'H8' | 'H9' | 'H10' | 'I1' | 'I5' | 'K11'
 }
 
 function asRecord(raw: unknown): Record<string, unknown> | null {
@@ -139,6 +148,43 @@ export function isI1IntangibleNoteSection(noteSection: string): boolean {
   if (s === '四、无形资产' || s.startsWith('四、无形资产')) return true
   // 避免误伤「研发支出」等：仅精确/强匹配
   if (s === '无形资产') return true
+  return false
+}
+
+/**
+ * 是否像 K11 资产减值损失相关附注节（6701）。
+ * 关键词"资产减值损失"（区别于 G14"信用减值损失"6702）+ 合并附注 五、73(上市)/五、75(国企)。
+ */
+export function isK11AssetImpairmentNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  // 标题关键词（"资产减值损失（损失以…）" / "加：资产减值损失" 等，不含"信用减值损失"）
+  if (s.includes('资产减值损失')) return true
+  if (s === '五、73' || s.startsWith('五、73')) return true
+  if (s === '五、75' || s.startsWith('五、75')) return true
+  return false
+}
+
+/**
+ * 是否像 K13 营业外支出相关附注节（6711）。
+ * 关键词"营业外支出"（区别于 K12"营业外收入"6301）。
+ */
+export function isK13NonOperatingExpenseNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  // 精确排除"营业外收入"（K12），仅匹配"营业外支出"
+  if (s.includes('营业外收入')) return false
+  if (s.includes('营业外支出')) return true
+  return false
+}
+
+/** 是否像 I5 其他非流动资产相关附注节 */
+export function isI5OtherNoncurrentNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、31' || s.startsWith('五、31')) return true
+  if (s === '八、32' || s.startsWith('八、32')) return true
+  if (s === '其他非流动资产' || s.includes('其他非流动资产')) return true
   return false
 }
 
@@ -242,6 +288,42 @@ export function resolveNoteDisclosureJumpTarget(note: unknown): NoteDisclosureJu
       variant,
       reason: `章节 ${section}`,
       wpCode: 'I1',
+    }
+  }
+
+  // I5 其他非流动资产（五、31 / 八、32）
+  if (isI5OtherNoncurrentNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? I5_DISCLOSURE_SHEET_LISTED : I5_DISCLOSURE_SHEET_SOE,
+      wpId,
+      variant,
+      reason: `章节 ${section}`,
+      wpCode: 'I5',
+    }
+  }
+
+  // K11 资产减值损失（关键词 / 五、73上市 / 五、75国企）——须在通用「附注披露信息」sheet 回退之前
+  if (isK11AssetImpairmentNoteSection(section)) {
+    const variant = section.startsWith('五、75') || section === '五、75' || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? K11_DISCLOSURE_SHEET_LISTED : K11_DISCLOSURE_SHEET_SOE,
+      wpId,
+      variant,
+      reason: `章节 ${section || '资产减值损失'}`,
+      wpCode: 'K11',
+    }
+  }
+
+  // K13 营业外支出（关键词"营业外支出"，区别于 K12 营业外收入）——须在通用「附注披露信息」sheet 回退之前
+  if (isK13NonOperatingExpenseNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? K13_DISCLOSURE_SHEET_LISTED : K13_DISCLOSURE_SHEET_SOE,
+      wpId,
+      variant,
+      reason: `章节 ${section || '营业外支出'}`,
+      wpCode: 'K13',
     }
   }
 

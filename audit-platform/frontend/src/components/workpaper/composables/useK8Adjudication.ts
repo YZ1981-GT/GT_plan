@@ -282,6 +282,44 @@ export function useK8Adjudication(params: UseK8AdjudicationParams) {
     }
   }
 
+  // ─── 从 K8-2 明细带入（复现源模板 SUMIF：审定表各行取自明细表）───────────────
+  /**
+   * 源模板 K8-1 各行 = 明细表 K8-2 的 SUMIF（本期审定 Q / 上期审定 W）。
+   * 一键按明细科目重建审定表行，填未审(=月度合计)/账项调整/重分类/上期审定。
+   */
+  function pullFromDetail(): { ok: boolean; message: string } {
+    if (isReadonly?.value) return { ok: false, message: '只读模式' }
+    const item = allResponses.value.get('K8-2-detail-rows')
+    const raw = item?.remark ?? item?.conclusion
+    let detail: any[] = []
+    try {
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+      if (Array.isArray(parsed)) detail = parsed
+    } catch { /* ignore */ }
+    if (!detail.length) return { ok: false, message: 'K8-2 明细表暂无数据，请先填写明细表' }
+
+    rows.value = detail
+      .filter((d: any) => (d.accountName || '').trim())
+      .map((d: any) => {
+        const months = Array.isArray(d.months) ? d.months.map((v: any) => parseNum(v)) : []
+        const unadj = months.length ? calcSubtotal(months) : parseNum(d.unadjTotal)
+        return _normalizeRow({
+          rowKey: `row-${d.accountName}`,
+          projectName: d.accountName,
+          unadjustedDebit: unadj,
+          unadjustedCredit: 0,
+          aje: parseNum(d.aje),
+          rje: parseNum(d.rje),
+          priorAmount: parseNum(d.priorAmount),
+          remark: d.crossRefIndex ? `勾稽：${d.crossRefIndex}` : '',
+          isEditable: true,
+        })
+      })
+    isChanged.value = true
+    _persist()
+    return { ok: true, message: `已从 K8-2 明细带入 ${rows.value.length} 个费用项目` }
+  }
+
   // ─── TB回写 + EventBus（损益类发生额！）────────────────────────────────────
 
   async function writeback(): Promise<void> {
@@ -322,6 +360,23 @@ export function useK8Adjudication(params: UseK8AdjudicationParams) {
   function _persist(): void {
     if (!onSave) return
     onSave(ROWS_KEY, rows.value)
+    _persistAuditedByItem()
+  }
+
+  /**
+   * 写 K8-1-audited-by-item（供附注上市/国企 applyAutoFill 消费）
+   * 格式：{ [费用项目名]: { audited, prior } }
+   * 修复此前"附注读 K8-1-audited-by-item 但审定表从不写→自动取数恒空"的死链。
+   */
+  function _persistAuditedByItem(): void {
+    if (!onSave) return
+    const byItem: Record<string, { audited: number; prior: number }> = {}
+    for (const row of computedRows.value) {
+      const name = (row.projectName || '').trim()
+      if (!name) continue
+      byItem[name] = { audited: row.audited, prior: row.priorAmount }
+    }
+    onSave(`${ITEM_PREFIX}-audited-by-item`, byItem)
   }
 
   function saveNote(note: string): void {
@@ -362,6 +417,7 @@ export function useK8Adjudication(params: UseK8AdjudicationParams) {
     updateCell,
     addRow,
     removeRow,
+    pullFromDetail,
     writeback,
     computeAll,
     saveNote,

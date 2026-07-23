@@ -12,7 +12,7 @@
  *
  * 科目方向：
  * - 1911 其他非流动资产（借方/资产类）：期末=期初+增加-减少
- * - 最简单标准资产类，无摊销/减值等特殊逻辑
+ * - 明细对齐 Excel：原值/减值/净值；合计取净值审定（legacy beginBalance/endBalance）
  *
  * Spec: .kiro/specs/i5-other-noncurrent-assets/
  * Task: 3.2
@@ -29,36 +29,39 @@ export interface ChecklistItem {
   remark: string | null
 }
 
-/** I5-2 明细行原始 JSON 结构（26列3区段） */
+/** I5-2 明细行原始 JSON（新：gross/impairment；旧：扁平 beginBalance…） */
 export interface I5DetailRowRaw {
   rowId?: string
-  name?: string               // 项目名称
-  category?: string           // 资产类型
-  incurredDate?: string       // 发生日期
-  maturityDate?: string       // 到期日期
-
-  // 金额区段
-  beginBalance?: number       // 期初余额
-  increase?: number           // 本期增加
-  decrease?: number           // 本期减少
-  endBalance?: number         // 期末余额
-
-  // 检查区段
-  voucherRef?: string         // 凭证号
-  remark?: string             // 备注
-  conclusion?: string         // 结论
+  projectName?: string
+  name?: string
+  category?: string
+  layer?: string
+  beginBalance?: number
+  increase?: number
+  decrease?: number
+  endBalance?: number
+  unadjusted?: number
+  gross?: { auditedOpening?: number; auditedIncrease?: number; auditedDecrease?: number; auditedEnding?: number }
+  impairment?: { auditedEnding?: number }
+  remark?: string
 }
 
-/** I5-3 调整分录行原始 JSON 结构 */
+/** I5-3 调整分录行原始 JSON 结构（对齐 Excel 10 列 + 明细项目） */
 export interface I5AdjustmentRowRaw {
   rowId?: string
-  description?: string        // 调整事项
+  description?: string        // 调整事项说明
+  category?: string           // 账项调整 / 报表调整 / 其他
   entryType?: string          // AJE / RJE
+  reportItem?: string         // 报表项目
   accountCode?: string        // 科目代码
   accountName?: string        // 科目名称
-  summary?: string            // 摘要
+  noteItem?: string           // 附注项目
+  projectName?: string        // 明细项目（精确匹配 I5-1/I5-2）
+  summary?: string            // 摘要（兼容旧字段）
   debitAmount?: number        // 借方
   creditAmount?: number       // 贷方
+  debit?: number              // 兼容旧字段
+  credit?: number             // 兼容旧字段
   indexRef?: string           // 索引
   remark?: string
 }
@@ -106,48 +109,44 @@ function _getNum(val: any): number {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useI5CrossSheet(allResponses: Ref<Map<string, any>>): {
-  detailTotals: ComputedRef<{ total: number }>
+  detailTotals: ComputedRef<I5DetailTotals>
   adjudicationFromDetail: ComputedRef<{ audited: number }>
+  detailRowsRaw: ComputedRef<any[]>
+  adjustmentRowsRaw: ComputedRef<I5AdjustmentRowRaw[]>
 } {
-  // ─── 解析 I5-2 明细行数据 ──────────────────────────────────────────────
-
-  const detailRows = computed<I5DetailRowRaw[]>(() => {
+  const detailRowsRaw = computed<any[]>(() => {
     const resp = allResponses.value.get('I5-2-rows')
-    return safeParseRows<I5DetailRowRaw>(resp?.remark)
+    return safeParseRows<any>(resp?.remark)
   })
 
-  // ─── 解析 I5-3 调整分录行数据 ──────────────────────────────────────────
-
-  const adjustmentRows = computed<I5AdjustmentRowRaw[]>(() => {
+  const adjustmentRowsRaw = computed<I5AdjustmentRowRaw[]>(() => {
     const resp = allResponses.value.get('I5-3-rows')
     return safeParseRows<I5AdjustmentRowRaw>(resp?.remark)
   })
 
-  // ═══ detailTotals: I5-2 明细聚合 → I5-1 审定表（Req 2.2-2.5, 3.1-3.2）══
-
-  /**
-   * 从 I5-2 明细行聚合其他非流动资产合计：
-   * - total: 期末余额合计（主合计字段）
-   * - beginBalance: 所有行期初余额之和
-   * - increase: 所有行本期增加之和
-   * - decrease: 所有行本期减少之和
-   * - endBalance: 所有行期末余额之和
-   *
-   * 使用 calcSubtotal 聚合。
-   * 用于与 I5-1 审定表小计行交叉验证。
-   * 其他非流动资产特征：期末=期初+增加-减少（标准资产类）
-   */
-  const detailTotals: ComputedRef<{ total: number }> = computed(() => {
+  const detailTotals: ComputedRef<I5DetailTotals> = computed(() => {
     const beginBalances: number[] = []
     const increases: number[] = []
     const decreases: number[] = []
     const endBalances: number[] = []
 
-    for (const row of detailRows.value) {
-      beginBalances.push(_getNum(row.beginBalance))
-      increases.push(_getNum(row.increase))
-      decreases.push(_getNum(row.decrease))
-      endBalances.push(_getNum(row.endBalance))
+    for (const row of detailRowsRaw.value) {
+      const name = String(row?.projectName || row?.name || '').trim()
+      if (!name || name === '合计' || row?.layer === 'impairment' || row?.layer === 'net') continue
+      // 优先净值审定别名；否则原值−减值；再回退旧扁平字段
+      const gEnd = _getNum(row.gross?.auditedEnding)
+      const iEnd = _getNum(row.impairment?.auditedEnding)
+      const gOpen = _getNum(row.gross?.auditedOpening)
+      const iOpen = _getNum(row.impairment?.auditedOpening)
+      const gInc = _getNum(row.gross?.auditedIncrease)
+      const iInc = _getNum(row.impairment?.auditedIncrease)
+      const gDec = _getNum(row.gross?.auditedDecrease)
+      const iDec = _getNum(row.impairment?.auditedDecrease)
+      const hasNested = row.gross != null
+      beginBalances.push(hasNested ? gOpen - iOpen : _getNum(row.beginBalance))
+      increases.push(hasNested ? gInc - iInc : _getNum(row.increase))
+      decreases.push(hasNested ? gDec - iDec : _getNum(row.decrease))
+      endBalances.push(hasNested ? gEnd - iEnd : _getNum(row.endBalance))
     }
 
     const beginBalance = calcSubtotal(beginBalances)
@@ -155,62 +154,27 @@ export function useI5CrossSheet(allResponses: Ref<Map<string, any>>): {
     const decrease = calcSubtotal(decreases)
     const endBalance = calcSubtotal(endBalances)
 
-    return {
-      total: endBalance,
-      beginBalance,
-      increase,
-      decrease,
-      endBalance,
-    } as I5DetailTotals
+    return { total: endBalance, beginBalance, increase, decrease, endBalance }
   })
 
-  // ═══ adjudicationFromDetail: I5-2 合计 → I5-1 审定表（Req 2.2-2.5）═══
+  const adjudicationFromDetail: ComputedRef<{ audited: number }> = computed(() => ({
+    audited: detailTotals.value.endBalance,
+  }))
 
-  /**
-   * 从 I5-2 明细期末余额合计推导 I5-1 审定数参考值：
-   * - audited: 期末余额合计（= I5-1 审定表 "审定数" 交叉验证来源）
-   *
-   * 当 I5-1 审定数 ≠ 此值时可能存在未记录调整或分类差异。
-   *
-   * 审定数最终公式：未审数 + AJE + RJE
-   * 此处提供的是从明细侧推导的参考值（应与公式结果一致）。
-   */
-  const adjudicationFromDetail: ComputedRef<{ audited: number }> = computed(() => {
-    const totals = detailTotals.value as I5DetailTotals
-    return { audited: totals.endBalance }
-  })
-
-  // ─── EventBus: Subscribe 'substantive:adjudicated' for cross-sheet updates ─
-
-  /**
-   * 监听 substantive:adjudicated 事件，当其他 sheet 审定完成时
-   * 触发跨 sheet 的 computed 重新计算（通过 allResponses Map 自动联动）。
-   *
-   * I5 最简逻辑：接收事件后无需额外处理，allResponses 的 Map 更新
-   * 由 useI5FormData 处理，本 composable 的 computed 自动响应变化。
-   */
   function _onSubstantiveAdjudicated(event: Event): void {
-    // I5 最简底稿：无需处理特殊逻辑
-    // allResponses Map 响应式变化自动驱动 detailTotals / adjudicationFromDetail 重算
-    // 此处仅为事件通道占位，供未来扩展（如刷新附注披露数据）
     void event
   }
 
   window.addEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
-
-  // ─── Cleanup on scope dispose ─────────────────────────────────────────────
-
   onScopeDispose(() => {
     window.removeEventListener('substantive:adjudicated', _onSubstantiveAdjudicated)
   })
 
-  // ─── Return ────────────────────────────────────────────────────────────────
-
   return {
-    // I5-2 → I5-1 明细合计（期末余额 = 主合计）
     detailTotals,
-    // I5-2 合计 → I5-1 审定表审定数参考（期末余额）
     adjudicationFromDetail,
+    detailRowsRaw,
+    adjustmentRowsRaw,
   }
 }
 

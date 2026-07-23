@@ -55,16 +55,20 @@ export interface B14ProjectContext {
 }
 
 export interface B14RenderData {
+  source_sheet?: string
   chapters: Record<string, B14ChapterData>
   variant: 'standard' | 'simplified'
   signature: B14Signature
   project_context: B14ProjectContext
+  financial_indicators?: Record<string, number>
+  related_parties?: { name: string; relation_type: string; detail?: any }[]
 }
 
 export interface UseB14Options {
   wpId: Ref<string>
   projectId: Ref<string>
   htmlData: Ref<B14RenderData | null>
+  onAfterSave?: () => void
 }
 
 export interface UseB14Return {
@@ -72,6 +76,7 @@ export interface UseB14Return {
   variant: Ref<'standard' | 'simplified'>
   signature: Ref<B14Signature>
   projectContext: Ref<B14ProjectContext>
+  sourceSheet: Ref<string>
   saveStatus: Ref<'saved' | 'saving' | 'unsaved'>
   loading: Ref<boolean>
   // Actions
@@ -142,11 +147,12 @@ function chapterIdToNum(chapterId: string): number {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useB14DueDiligence(opts: UseB14Options): UseB14Return {
-  const { wpId, htmlData } = opts
+  const { wpId, htmlData, onAfterSave } = opts
 
   const loading = ref(false)
   const saveStatus = ref<'saved' | 'saving' | 'unsaved'>('saved')
   const variant = ref<'standard' | 'simplified'>('standard')
+  const sourceSheet = ref('')
 
   const chapters = ref<Record<string, B14ChapterData>>({})
 
@@ -165,6 +171,9 @@ export function useB14DueDiligence(opts: UseB14Options): UseB14Return {
     firm_name: '致同会计师事务所（特殊普通合伙）',
   })
 
+  const financialIndicators = ref<Record<string, number>>({})
+  const relatedParties = ref<{ name: string; relation_type: string; detail?: any }[]>([])
+
   // ─── Pending saves ───
   const pendingItems = new Map<string, { item_id: string; conclusion: string | null; remark: string | null }>()
   let saveTimer: ReturnType<typeof setTimeout> | null = null
@@ -172,6 +181,8 @@ export function useB14DueDiligence(opts: UseB14Options): UseB14Return {
   // ─── Hydrate from render data ───
   function hydrateFromRenderData(data: B14RenderData | null) {
     if (!data) return
+
+    if (data.source_sheet) sourceSheet.value = data.source_sheet
 
     // Variant
     if (data.variant === 'standard' || data.variant === 'simplified') {
@@ -191,6 +202,16 @@ export function useB14DueDiligence(opts: UseB14Options): UseB14Return {
     // Project context
     if (data.project_context) {
       Object.assign(projectContext.value, data.project_context)
+    }
+
+    // Financial indicators (ch6 prefill)
+    if (data.financial_indicators) {
+      financialIndicators.value = { ...data.financial_indicators }
+    }
+
+    // Related parties (ch10 prefill)
+    if (Array.isArray(data.related_parties)) {
+      relatedParties.value = data.related_parties
     }
   }
 
@@ -361,6 +382,7 @@ export function useB14DueDiligence(opts: UseB14Options): UseB14Return {
     try {
       await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, { items })
       saveStatus.value = 'saved'
+      try { onAfterSave?.() } catch { /* 版本快照失败不影响保存 */ }
     } catch {
       if (retryCount < 3) {
         for (const item of items) pendingItems.set(item.item_id, item)
@@ -386,6 +408,7 @@ export function useB14DueDiligence(opts: UseB14Options): UseB14Return {
     variant,
     signature,
     projectContext,
+    sourceSheet,
     saveStatus,
     loading,
     updateTextarea,
@@ -396,5 +419,7 @@ export function useB14DueDiligence(opts: UseB14Options): UseB14Return {
     updateSignature,
     flushPendingSaves,
     loadData,
+    financialIndicators,
+    relatedParties,
   }
 }

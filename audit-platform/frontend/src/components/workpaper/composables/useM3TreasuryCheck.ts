@@ -73,6 +73,24 @@ export interface M3ChecklistItem {
   note: string
 }
 
+/** 建议AJE分录（注销冲减差额>0时自动生成） */
+export interface M3SuggestedAjeEntry {
+  /** 说明 */
+  description: string
+  /** 类别 */
+  category: '账项调整'
+  /** 科目名称 */
+  accountName: string
+  /** 科目编码 */
+  accountCode: string
+  /** 借方金额（>0=借记） */
+  debit: number
+  /** 贷方金额（>0=贷记） */
+  credit: number
+  /** 来源批次 */
+  batchName: string
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 /**
@@ -293,6 +311,94 @@ export function useM3TreasuryCheck(formData: ReturnType<typeof useM3FormData>) {
     })
   }
 
+  // ─── 9. 注销冲减差额>0 → 建议AJE分录（自动生成，M5/M6冲减） ────────
+
+  /**
+   * 当注销冲减差额>0时自动建议AJE分录:
+   * - 差额优先冲减盈余公积(M5/3101)
+   * - 盈余公积不足部分冲减未分配利润(M6/3104)
+   *
+   * CAS准则：注销库存股冲减顺序=实收资本(面值)→资本公积→盈余公积→未分配利润
+   * 此处差额=注销金额−冲减M2−冲减M4，即M2/M4已冲减完的剩余部分
+   */
+  const suggestedAjeEntries: ComputedRef<M3SuggestedAjeEntry[]> = computed(() => {
+    const entries: M3SuggestedAjeEntry[] = []
+    for (const row of computedCancelRows.value) {
+      const diff = row.diff
+      if (Math.abs(diff) <= 0.01) continue
+      if (diff > 0) {
+        // 差额>0：库存股成本高于冲减M2+M4，需继续冲减M5→M6
+        // 建议分录：借:盈余公积/未分配利润  贷:库存股
+        // 这里全额建议冲减盈余公积，审计师可手动调整分配到M6
+        entries.push({
+          description: `注销库存股"${row.batchName}"冲减差额${diff.toFixed(2)}元，建议冲减盈余公积`,
+          category: '账项调整',
+          accountName: '盈余公积',
+          accountCode: '3101',
+          debit: diff,
+          credit: 0,
+          batchName: row.batchName,
+        })
+        entries.push({
+          description: `注销库存股"${row.batchName}"冲减差额对应贷记库存股`,
+          category: '账项调整',
+          accountName: '库存股',
+          accountCode: '4002',
+          debit: 0,
+          credit: diff,
+          batchName: row.batchName,
+        })
+      } else {
+        // 差额<0：注销金额低于冲减M2+M4（极端罕见），增加资本公积
+        const absDiff = Math.abs(diff)
+        entries.push({
+          description: `注销库存股"${row.batchName}"低于冲减合计${absDiff.toFixed(2)}元，建议增加资本公积`,
+          category: '账项调整',
+          accountName: '资本公积',
+          accountCode: '3002',
+          debit: 0,
+          credit: absDiff,
+          batchName: row.batchName,
+        })
+        entries.push({
+          description: `注销库存股"${row.batchName}"差额对应借记库存股`,
+          category: '账项调整',
+          accountName: '库存股',
+          accountCode: '4002',
+          debit: absDiff,
+          credit: 0,
+          batchName: row.batchName,
+        })
+      }
+    }
+    return entries
+  })
+
+  /** 是否有建议AJE */
+  const hasSuggestedAje: ComputedRef<boolean> = computed(() => suggestedAjeEntries.value.length > 0)
+
+  /**
+   * 推送建议AJE到调整分录模块（EventBus 'adjustment:created'）
+   * 审计师确认后一键推送，M3-3调整分录订阅此事件自动新增
+   */
+  function pushSuggestedAje(): void {
+    if (!hasSuggestedAje.value) return
+    const entries = suggestedAjeEntries.value
+    eventBus.emit('adjustment:created', {
+      wpCode: 'M3',
+      source: 'M3-5-cancel-diff',
+      entries: entries.map(e => ({
+        description: e.description,
+        category: e.category,
+        accountName: e.accountName,
+        accountCode: e.accountCode,
+        debit: e.debit,
+        credit: e.credit,
+      })),
+      timestamp: Date.now(),
+    } as any)
+  }
+
   // ─── Return ────────────────────────────────────────────────────────────
 
   return {
@@ -308,6 +414,11 @@ export function useM3TreasuryCheck(formData: ReturnType<typeof useM3FormData>) {
     computedCancelRows,
     hasUnresolvedDiff,
     cancelTotal,
+
+    // 建议AJE（注销冲减差额>0）
+    suggestedAjeEntries,
+    hasSuggestedAje,
+    pushSuggestedAje,
 
     // 回购核对操作
     addRepurchaseRow,

@@ -11,6 +11,7 @@
 import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { calcAdjustedAmount, calcCreditBalance, calcSubtotal, parseNum } from './useF4AccPayFormulaEngine'
 import type { ChecklistResponse } from './useF4FormData'
+import { eventBus } from '@/utils/eventBus'
 
 export type F4AdjudicationSection = 'nature' | 'aging'
 
@@ -517,9 +518,18 @@ export function useF4Adjudication(options: UseF4AdjudicationOptions) {
 
   function publishAdjudicated(): void {
     const auditedAmount = totalRow.value.closingAdjusted
-    window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-      detail: { wpCode: 'F4', accountCode: '2202', auditedAmount },
-    }))
+    // 统一走 eventBus（crossWpEventBridge 带再入守卫转发到 window，旧 window 监听者不受影响）
+    try {
+      eventBus.emit('substantive:adjudicated', {
+        wpCode: 'F4',
+        accountCode: '2202',
+        auditedAmount,
+        adjudicatedAmount: auditedAmount,
+        timestamp: Date.now(),
+      } as any)
+    } catch {
+      console.warn('[useF4Adjudication] EventBus publish substantive:adjudicated failed')
+    }
     if (projectId.value) {
       window.dispatchEvent(new CustomEvent('f4:writeback-trial-balance', {
         detail: { projectId: projectId.value, accountCode: '2202', auditedAmount },

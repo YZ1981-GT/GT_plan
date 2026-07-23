@@ -18,7 +18,8 @@
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { parseNum } from './useK9FormulaEngine'
-import { isCrossPeriod, autoSampleCutoff, type LedgerEntry, type CutoffSample } from './useK9CutoffEngine'
+import { isCrossPeriod } from './useK9CutoffEngine'
+import { deriveConclusion as canonicalDeriveConclusion } from './cutoffCanonical'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -57,7 +58,10 @@ export interface K9CutoffRow {
 export interface K9CutoffSummary {
   totalSamples: number
   crossPeriodCount: number
+  /** 正常项数量（双侧证据齐全且同期；不含证据不完整） */
   normalCount: number
+  /** 证据不完整项数量（缺记账侧或原始凭证侧独立证据，不得判正常/完成） */
+  incompleteCount: number
   crossPeriodItems: Array<{ voucherNo: string; amount: number }>
 }
 
@@ -125,6 +129,18 @@ export function useK9Cutoff(params: UseK9CutoffParams) {
     return (item?.remark ?? item?.conclusion ?? '') as string
   }
 
+  /**
+   * 默认结论派生：截止测试须记账侧(bookDate)与原始单据侧(sourceDate)两份独立证据齐全
+   * 才可下"正常/跨期"结论；任一侧缺失（自动提取仅得记账侧、原始凭证未取得）→ "证据不完整"，
+   * 不得假绿为"正常"。审计师手工录入的 conclusion 优先。
+   */
+  function _defaultConclusion(bookDate: string, sourceDate: string, _isCross: boolean): string {
+    // 委托 cutoffCanonical.deriveConclusion（natural-month 单一真源）：
+    // 缺任一侧日期→证据不完整；双侧齐全按自然月跨期→跨期/正常。行为等价（非法日期边界更严格）。
+    const end = periodEnd?.value ?? '2025-12-31'
+    return canonicalDeriveConclusion({ bookDate, documentDate: sourceDate }, end, 'natural-month')
+  }
+
   function _normalizeSample(raw: any, idx: number): K9CutoffRow {
     const bookDate = raw.bookDate ?? ''
     const sourceDate = raw.sourceDate ?? ''
@@ -141,7 +157,7 @@ export function useK9Cutoff(params: UseK9CutoffParams) {
       accountCode: raw.accountCode ?? ACCOUNT_CODE_6602,
       accountName: raw.accountName ?? '',
       isCross, isTimely: raw.isTimely ?? !isCross,
-      conclusion: raw.conclusion ?? (isCross ? '跨期' : '正常'),
+      conclusion: raw.conclusion ?? _defaultConclusion(bookDate, sourceDate, isCross),
       remark: raw.remark ?? '',
     }
   }
@@ -157,7 +173,7 @@ export function useK9Cutoff(params: UseK9CutoffParams) {
         index: idx + 1,
         isCross,
         isTimely: direction === 'S2V' ? !isCross : row.isTimely,
-        conclusion: row.conclusion || (isCross ? '跨期' : '正常'),
+        conclusion: row.conclusion || _defaultConclusion(row.bookDate, row.sourceDate, isCross),
       }
     })
   })
@@ -167,10 +183,13 @@ export function useK9Cutoff(params: UseK9CutoffParams) {
   const summary: ComputedRef<K9CutoffSummary> = computed(() => {
     const all = computedSamples.value
     const crossItems = all.filter(r => r.isCross)
+    // 证据不完整单列，不计入 normalCount，与统一状态机+完成门禁一致
+    const incompleteItems = all.filter(r => r.conclusion === '证据不完整')
     return {
       totalSamples: all.length,
       crossPeriodCount: crossItems.length,
-      normalCount: all.length - crossItems.length,
+      incompleteCount: incompleteItems.length,
+      normalCount: all.length - crossItems.length - incompleteItems.length,
       crossPeriodItems: crossItems.map(r => ({ voucherNo: r.voucherNo, amount: r.amount })),
     }
   })
@@ -183,27 +202,32 @@ export function useK9Cutoff(params: UseK9CutoffParams) {
     try {
       const { default: http } = await import('@/utils/http')
       const end = periodEnd?.value ?? '2025-12-31'
-      const { data } = await http.get(`/api/projects/${projectId.value}/ledger/cutoff-samples`, {
-        params: {
-          period_end: end,
-          days: DEFAULT_THRESHOLD_DAYS,
-          account_code: ACCOUNT_CODE_6602,
-        },
+      const yr = Number(String(end).slice(0, 4)) || new Date().getFullYear()
+      // 真实端点：POST /sampling/cutoff-test（提取期末±N天序时账交易）
+      // 旧代码调 GET ledger/cutoff-samples 为不存在端点，导致「自动提取」恒失败。
+      const res = await http.post(`/api/projects/${projectId.value}/sampling/cutoff-test`, {
+        account_codes: [ACCOUNT_CODE_6602],
+        year: yr,
+        days_before: DEFAULT_THRESHOLD_DAYS,
+        days_after: DEFAULT_THRESHOLD_DAYS,
+        amount_threshold: 0, // 阈值0=窗口内全部非零凭证（管理费用逐笔）
+        cutoff_date: end, // 显式截止基准日 = 资产负债表日，后端据此取窗口
       })
-      const ledgerEntries: LedgerEntry[] = data?.data ?? data ?? []
-      const cutoffSamples = autoSampleCutoff(ledgerEntries, end, DEFAULT_THRESHOLD_DAYS)
+      const payload = (res as any).data?.data ?? (res as any).data ?? {}
+      const entries: any[] = Array.isArray(payload.entries) ? payload.entries : []
 
-      samples.value = cutoffSamples.map((s, idx) => ({
+      samples.value = entries.map((e, idx) => ({
         rowKey: `row-${idx}-${Date.now()}`,
         index: idx + 1,
-        voucherNo: s.entry.voucherNo ?? '',
-        bookDate: s.entry.voucherDate,
-        summary: s.entry.summary ?? '',
-        amount: parseNum(s.entry.debitAmount ?? s.entry.creditAmount),
-        sourceDate: s.entry.sourceDocDate ?? '',
-        accountCode: s.entry.accountCode ?? ACCOUNT_CODE_6602,
-        accountName: '',
-        isCross: isCrossPeriod(s.entry.sourceDocDate ?? '', s.entry.voucherDate, end),
+        voucherNo: e.voucher_no ?? '',
+        bookDate: e.voucher_date ?? '',
+        summary: e.summary ?? '',
+        amount: parseNum(e.debit_amount) || parseNum(e.credit_amount),
+        // 端点仅返回记账凭证（无原始凭证日期）→ 由审计师追查补录 sourceDate 后判定跨期
+        sourceDate: '',
+        accountCode: e.account_code ?? ACCOUNT_CODE_6602,
+        accountName: e.account_name ?? '',
+        isCross: false,
         isTimely: true,
         conclusion: '',
         remark: '',
@@ -211,7 +235,11 @@ export function useK9Cutoff(params: UseK9CutoffParams) {
 
       isChanged.value = true
       _persist()
-      ElMessage.success(`已从序时账自动提取 ${samples.value.length} 条截止样本`)
+      if (samples.value.length > 0) {
+        ElMessage.success(`已从序时账提取 ${samples.value.length} 条截止样本（期末±${DEFAULT_THRESHOLD_DAYS}天），请补充原始凭证日期后判定跨期`)
+      } else {
+        ElMessage.info('期末±5天窗口内未提取到管理费用凭证')
+      }
     } catch {
       ElMessage.warning('截止样本自动提取失败，请手动录入')
     } finally {
@@ -264,7 +292,7 @@ export function useK9Cutoff(params: UseK9CutoffParams) {
       const end = periodEnd?.value ?? '2025-12-31'
       row.isCross = isCrossPeriod(row.sourceDate, row.bookDate, end)
       row.isTimely = !row.isCross
-      if (!row.conclusion) row.conclusion = row.isCross ? '跨期' : '正常'
+      if (!row.conclusion) row.conclusion = _defaultConclusion(row.bookDate, row.sourceDate, row.isCross)
     }
 
     isChanged.value = true

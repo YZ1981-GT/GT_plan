@@ -16,6 +16,19 @@
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
+      <!-- 全局勾稽告警（排除当前tab特定告警，避免重复） -->
+      <el-alert
+        v-if="g1TbDiff !== 0 && currentSheet !== 'G1-1'"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="g1-global-alert"
+      >
+        <template #title>
+          G1-1审定合计 与 试算表1501 差异 {{ g1TbDiffFmt }}（审定{{ g1AdjudicatedFmt }} vs TB{{ g1TbClosingFmt }}）
+        </template>
+      </el-alert>
+
       <GtOnlyOfficeSheet
         v-if="isHtmlSheet && currentSheet !== '底稿目录' && renderMode === 'onlyoffice'"
         :key="ooSheetName"
@@ -162,6 +175,7 @@
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         @imported="onSheetImported"
       />
 
@@ -191,6 +205,7 @@
         :debounced-save="formData.debouncedSave"
         :wp-id="props.wpId"
         :project-id="props.projectId"
+        :bs-date="g1BsDate"
         @imported="onSheetImported"
       />
 
@@ -257,6 +272,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
+import { eventBus } from '@/utils/eventBus'
 import { useG1TraFinFormData } from './composables/useG1TraFinFormData'
 import { useG1DualMode, type G1RenderMode } from './composables/useG1DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -320,6 +336,13 @@ const auditYear = computed(() =>
   ?? null,
 )
 
+/** 资产负债表日：供 G1-13 凭证检查/G1-4 结存/G1-12 盘点倒轧 */
+const g1BsDate = computed(() =>
+  props.htmlData?.project_context?.bs_date
+  ?? props.htmlData?.projectContext?.bs_date
+  ?? (auditYear.value ? `${auditYear.value}-12-31` : ''),
+)
+
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
@@ -352,6 +375,26 @@ const applicableStandards = computed<string[]>(() => {
   }
   return []
 })
+
+// ─── 全局勾稽告警 computed ────────────────────────────────────────────────────
+const g1Adjudicated = computed(() => {
+  const raw = formData.allResponses.value.get('G1-1-adjudicated-amount')?.conclusion
+  return raw ? parseFloat(raw) : 0
+})
+const g1TbClosing = computed(() => {
+  const tb = props.htmlData?.tb_values ?? resolvedHtmlData.value?.tb_values
+  return tb?.closing ?? 0
+})
+const g1TbDiff = computed(() => {
+  const adj = g1Adjudicated.value
+  const tb = g1TbClosing.value
+  if (!adj && !tb) return 0
+  return Math.abs(adj - tb) < 1 ? 0 : adj - tb
+})
+const fmtNum = (v: number) => v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const g1TbDiffFmt = computed(() => fmtNum(g1TbDiff.value))
+const g1AdjudicatedFmt = computed(() => fmtNum(g1Adjudicated.value))
+const g1TbClosingFmt = computed(() => fmtNum(g1TbClosing.value))
 
 const currentSheet = computed(() => extractG1SheetCode(props.sheetName || props.wpCode || ''))
 
@@ -426,22 +469,32 @@ function onSheetImported() {
   void formData.loadAll()
 }
 
-function handleG1Writeback(e: Event): void {
-  const d = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number }>).detail
-  if (!d || d.accountCode !== '1501') return
-  if (typeof d.auditedAmount !== 'number' || !Number.isFinite(d.auditedAmount)) return
-  void formData.writebackTrialBalance(d.auditedAmount)
+function handleG1Writeback(payload: any): void {
+  if (!payload || payload.accountCode !== '1501') return
+  if (typeof payload.auditedAmount !== 'number' || !Number.isFinite(payload.auditedAmount)) return
+  void formData.writebackTrialBalance(payload.auditedAmount)
 }
 
-function handleAdjudicated(e: Event): void {
-  const d = (e as CustomEvent<{ accountCode: string; auditedAmount: number }>).detail
-  if (d?.accountCode !== '1501') return
-  if (typeof d.auditedAmount !== 'number' || !Number.isFinite(d.auditedAmount)) return
+function handleAdjudicated(payload: any): void {
+  const code = payload?.accountCode ?? payload?.account_codes?.[0]
+  if (code !== '1501') return
+  const amount = payload?.auditedAmount ?? payload?.audited_amount
+  if (typeof amount !== 'number' || !Number.isFinite(amount)) return
   void formData.saveImmediate('G1-1-adjudicated-amount', {
     item_id: 'G1-1-adjudicated-amount',
-    conclusion: String(d.auditedAmount),
+    conclusion: String(amount),
     remark: null,
   })
+}
+
+/** window兼容监听器（供crossWpEventBridge旧生产者） */
+function handleG1WritebackWindow(e: Event): void {
+  const d = (e as CustomEvent).detail
+  handleG1Writeback(d)
+}
+function handleAdjudicatedWindow(e: Event): void {
+  const d = (e as CustomEvent).detail
+  handleAdjudicated(d)
 }
 
 const ie = useG1ImportExport({ wpId: wpIdRef })
@@ -485,14 +538,18 @@ defineExpose({
 })
 
 onMounted(() => {
-  window.addEventListener('g1:writeback-trial-balance', handleG1Writeback)
-  window.addEventListener('substantive:adjudicated', handleAdjudicated)
+  // eventBus 订阅（crossWpEventBridge已双向桥接，优先mitt）
+  eventBus.on('substantive:adjudicated', handleAdjudicated)
+  // window 兼容（旧生产者仍走CustomEvent，桥接覆盖）
+  window.addEventListener('g1:writeback-trial-balance', handleG1WritebackWindow)
+  window.addEventListener('substantive:adjudicated', handleAdjudicatedWindow)
   void selfLoad()
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('g1:writeback-trial-balance', handleG1Writeback)
-  window.removeEventListener('substantive:adjudicated', handleAdjudicated)
+  eventBus.off('substantive:adjudicated', handleAdjudicated)
+  window.removeEventListener('g1:writeback-trial-balance', handleG1WritebackWindow)
+  window.removeEventListener('substantive:adjudicated', handleAdjudicatedWindow)
   formData.flushPending()
 })
 </script>
@@ -504,4 +561,5 @@ onBeforeUnmount(() => {
 .g1-index-toolbar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
 .g1a-handbook-tip { flex: 1; min-width: 220px; margin-right: 4px; }
 .g-cycle-tab-index-page { padding: 0; }
+.g1-global-alert { margin-bottom: 8px; }
 </style>

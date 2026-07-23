@@ -598,7 +598,7 @@ async def _prefill_word_template(db: AsyncSession, wp, project_id: UUID, *, user
                 for para in cell.paragraphs:
                     all_text_parts.append(para.text)
     full_text = "\n".join(all_text_parts)
-    if "{{" not in full_text:
+    if "{{" not in full_text and "【" not in full_text:
         return False  # 无占位符或已替换
 
     # ─── 取项目信息 ─────────────────────────────────────────────────────────
@@ -674,8 +674,60 @@ async def _prefill_word_template(db: AsyncSession, wp, project_id: UUID, *, user
         "{{date}}": today.isoformat(),  # 向后兼容
     }
 
-    # 过滤掉值为 None 的 token（保留原始 {{token}} 不替换）
-    replacements: dict[str, str] = {k: v for k, v in token_values.items() if v is not None}
+    # ─── B2 前任沟通系列：中文【】占位符 ───────────────────────────────────
+    # B2-1/3/6/8/11/12 等信函使用中文方括号占位符（【被审计单位名称】/【前任会计
+    # 师事务所的名称】/【20××】等），需与 {{token}} 走同一套替换逻辑。前任所名称
+    # 及项目组联系方式从项目级 checklist_responses(item_id=B2-predecessor-info) 读取。
+    cn_values: dict[str, str | None] = {}
+    contact_fills: dict[str, str | None] = {}
+    if "【" in full_text:
+        # 审计年度（从期末日期取年份）
+        audit_year_str: str | None = audit_period_iso[:4] if audit_period_iso else None
+
+        # 前任沟通基础信息（前任所名称 + 项目组联系方式），仅 B2 系列查询
+        predecessor_info: dict = {}
+        if wp_code and wp_code.startswith("B2"):
+            try:
+                pinfo_row = (await db.execute(sa.text(
+                    "SELECT remark FROM checklist_responses "
+                    "WHERE project_id = :pid AND item_id = 'B2-predecessor-info' LIMIT 1"
+                ), {"pid": str(project_id)})).first()
+                if pinfo_row and pinfo_row[0]:
+                    import json as _json
+                    try:
+                        parsed = _json.loads(pinfo_row[0])
+                        if isinstance(parsed, dict):
+                            predecessor_info = parsed
+                    except Exception:
+                        predecessor_info = {}
+            except Exception:
+                predecessor_info = {}
+
+        def _pv(key: str) -> str | None:
+            v = predecessor_info.get(key)
+            v = str(v).strip() if v is not None else ""
+            return v or None
+
+        firm_name = _pv("firmName")
+        cn_values = {
+            "【被审计单位名称】": entity_name,
+            "【20××】": audit_year_str,
+            "【前任会计师事务所的名称】": firm_name,
+            "【前任会计师事务所名称】": firm_name,
+        }
+        # 项目组联系方式（信函尾部"标签："区，仅在录入后填充）
+        contact_fills = {
+            "联系人：": _pv("contactPerson"),
+            "联系电话：": _pv("contactPhone"),
+            "传真：": _pv("fax"),
+            "地址：": _pv("address"),
+            "邮编：": _pv("zipCode"),
+        }
+
+    # 过滤掉值为 None 的 token（保留原始占位符不替换）
+    replacements: dict[str, str] = {
+        k: v for k, v in {**token_values, **cn_values}.items() if v is not None
+    }
 
     if not replacements:
         return False
@@ -701,6 +753,41 @@ async def _prefill_word_template(db: AsyncSession, wp, project_id: UUID, *, user
         for row in table.rows:
             for cell in row.cells:
                 _replace_in_paragraphs(cell.paragraphs)
+
+    # ─── 联系方式区填充：仅对"标签："独占整段的情况追加值 ─────────────────
+    # 保守策略：段落文本 strip 后精确等于标签（如 "联系人："）时才在末尾 run 追加
+    # 值，避免破坏"联系电话：<tab>传真："等合并行布局。
+    _active_contacts = {lbl: v for lbl, v in contact_fills.items() if v}
+    if _active_contacts:
+        def _fill_contacts(paragraphs) -> None:
+            # 段落内按标签定位追加值：兼容"联系人："独占段 与
+            # "联系电话：<tab>传真："合并行两种布局。每个标签在段落内首次出现处
+            # 追加对应值，改写回首个 run（保留首 run 格式，清空其余 run）。
+            for para in paragraphs:
+                text = para.text
+                if not text or "：" not in text:
+                    continue
+                new_text = text
+                hit: list[str] = []
+                for lbl, val in _active_contacts.items():
+                    if lbl in new_text:
+                        new_text = new_text.replace(lbl, f"{lbl}{val}", 1)
+                        hit.append(lbl)
+                if hit and new_text != text:
+                    if para.runs:
+                        para.runs[0].text = new_text
+                        for r in para.runs[1:]:
+                            r.text = ""
+                    else:
+                        para.add_run(new_text)
+                    for lbl in hit:
+                        if lbl not in replaced_fields:
+                            replaced_fields.append(lbl)
+        _fill_contacts(doc.paragraphs)
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    _fill_contacts(cell.paragraphs)
 
     if replaced_fields:
         doc.save(str(snapshot_path))
@@ -779,6 +866,138 @@ async def export_workpaper_pdf(
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
+        headers={"Content-Disposition": disposition},
+    )
+
+
+# B2-12 结构化评价数据 → docx（准则 1153 号，与前端 GtB212Evaluation 静态定义对齐）
+_B2_12_STEP_TEXTS: list[str] = [
+    "了解并记录前任注册会计师的姓名、执业年限。",
+    "了解被审计单位所处行业，以及项目合伙人、项目经理（即联合签字注册会计师）、审计项目组现场负责人在对该行业客户的执业经验。",
+    "询问项目合伙人、项目经理在执业过程中是否曾经受到行政处罚，或者接受非行政处罚性监管措施。",
+    "询问并记录前任审计项目组的人员配备、人员构成和投入的工时情况。",
+    "了解前任注册会计师的独立性管理流程，并询问该被审计单位的审计项目中是否存在独立性威胁。",
+    "了解并记录前任注册会计师及会计师事务所的专业标准体系和质量控制制度的建立及运行情况。",
+    "获取前任注册会计师出具的审计报告，从形式、内容和要素等方面判断是否存在不符合审计准则规定之处。",
+    "获取前任注册会计师的审计工作底稿，从工作底稿专业标准执行、系统化方法、是否存在重大缺失、是否与直接获取的证据存在重大不一致、编制/复核签名与项目执行是否吻合等方面进行审阅。",
+    "综合对比审计报告、审计工作底稿及其他方面获取的信息，判断前任注册会计师获取的审计证据和所执行程序是否能够支持所发表的审计意见或鉴证结论。",
+]
+_B2_12_CONCLUSION_TEXTS: list[str] = [
+    "对前任注册会计师的独立性存在威胁的事项；",
+    "对前任注册会计师专业素质、胜任能力产生不利影响的因素；",
+    "前任注册会计师所在的会计师事务所未建立统一的专业标准体系或质量控制制度，或者其质量控制制度的设计和运行存在重大缺陷；",
+    "前任注册会计师的工作底稿存在重大缺失（含与重大错报风险、特别风险、关键审计事项应对程序相关底稿记录不完整）；",
+    "前任注册会计师的工作底稿记录与直接从被审计单位获取的信息或审计证据存在重大不一致、实质性矛盾；",
+    "前任注册会计师及审计项目组投入的审计成本严重不足；",
+    "前任注册会计师出具的审计报告意见类型或者审计报告的其他内容、要素不恰当。",
+]
+
+
+@router.get("/working-papers/{wp_id}/b2-12/export-docx")
+async def export_b2_12_docx(
+    project_id: UUID,
+    wp_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """B2-12 对前任注册会计师的评价底稿 → docx 导出（供打印签字归档）。
+
+    从 checklist_responses 读取结构化数据（B2-12-steps/conclusions/note），
+    用 python-docx 生成含 9 步了解程序表 + 7 点结论判断矩阵 + 综合说明的文档。
+    """
+    import json as _json
+    from urllib.parse import quote
+    from fastapi import Response
+
+    try:
+        from docx import Document
+        from docx.shared import Pt
+    except ImportError:
+        raise HTTPException(status_code=500, detail="python-docx 不可用，无法导出")
+
+    # ─── 读取结构化数据 ───
+    snapshot: dict = {}
+    rows = (await db.execute(sa.text(
+        "SELECT item_id, remark FROM checklist_responses "
+        "WHERE wp_id = :wp AND item_id LIKE 'B2-12-%'"
+    ), {"wp": str(wp_id)})).fetchall()
+    for r in rows:
+        snapshot[r[0]] = r[1]
+
+    def _parse(item_id: str, default):
+        raw = snapshot.get(item_id)
+        if not raw:
+            return default
+        try:
+            return _json.loads(raw)
+        except Exception:
+            return default
+
+    steps = _parse("B2-12-steps", [])
+    conclusions = _parse("B2-12-conclusions", [])
+    note_text = snapshot.get("B2-12-note") or ""
+
+    # ─── 项目抬头 ───
+    proj = (await db.execute(sa.text(
+        "SELECT client_name, audit_year FROM projects WHERE id = :pid"
+    ), {"pid": str(project_id)})).first()
+    client_name = (proj[0] if proj else "") or ""
+    audit_year = str(proj[1] if proj else "") or ""
+
+    # ─── 构建 docx ───
+    doc = Document()
+    doc.add_heading("对前任注册会计师的评价底稿", level=1)
+    head = doc.add_paragraph()
+    head.add_run(f"客户名称：{client_name}    会计期间：{audit_year}    索引号：B2-12").font.size = Pt(10)
+
+    doc.add_heading("一、所执行的程序及了解到情况的记录", level=2)
+    t1 = doc.add_table(rows=1, cols=3)
+    t1.style = "Table Grid"
+    hdr = t1.rows[0].cells
+    hdr[0].text, hdr[1].text, hdr[2].text = "序号", "所执行的程序", "了解到情况的记录"
+    for i, text in enumerate(_B2_12_STEP_TEXTS):
+        rec = ""
+        if isinstance(steps, list) and i < len(steps) and isinstance(steps[i], dict):
+            rec = str(steps[i].get("record", "") or "")
+        cells = t1.add_row().cells
+        cells[0].text = str(i + 1)
+        cells[1].text = text
+        cells[2].text = rec
+
+    doc.add_heading("二、执行程序的结论及对审计计划、审计程序的影响", level=2)
+    t2 = doc.add_table(rows=1, cols=4)
+    t2.style = "Table Grid"
+    h2 = t2.rows[0].cells
+    h2[0].text, h2[1].text, h2[2].text, h2[3].text = "判断事项", "是否存在", "应对措施", "对审计计划及程序的影响"
+    for i, text in enumerate(_B2_12_CONCLUSION_TEXTS):
+        exists, measure, impact = "否", "", ""
+        if isinstance(conclusions, list) and i < len(conclusions) and isinstance(conclusions[i], dict):
+            c = conclusions[i]
+            exists = str(c.get("exists", "否") or "否")
+            measure = str(c.get("measure", "") or "")
+            impact = str(c.get("impact", "") or "")
+        cells = t2.add_row().cells
+        cells[0].text = text
+        cells[1].text = exists
+        cells[2].text = measure
+        cells[3].text = impact
+
+    doc.add_heading("三、综合评价说明", level=2)
+    doc.add_paragraph(note_text)
+
+    import io
+    buf = io.BytesIO()
+    doc.save(buf)
+    buf.seek(0)
+
+    display_name = f"B2-12_对前任注册会计师的评价_{client_name}.docx"
+    ascii_name = display_name.encode("ascii", "ignore").decode() or "B2-12.docx"
+    utf8_name = quote(display_name, safe="")
+    disposition = f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{utf8_name}"
+
+    return Response(
+        content=buf.read(),
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": disposition},
     )
 

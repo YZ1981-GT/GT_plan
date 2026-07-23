@@ -23,14 +23,20 @@
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
+import {
+  buildI6AdjudicationAuditNoteDraft,
+  pickI6HighChangeRateRows,
+} from './i6AdjudicationNoteDraft'
 import { api } from '@/services/apiProxy'
 import {
   parseNum,
   calcAuditedAmount,
   calcSubtotal,
+  calcMonthlyTotal,
   calcResearchTotal,
   validateVRI601,
 } from './useI6FormulaEngine'
+import { applyAjeFromI63 } from './i6AdjustmentModel'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -101,6 +107,7 @@ export interface I6CrossSheetData {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
+const ITEM_ROWS = 'I6-1-rows'
 const ITEM_PREFIX = 'I6-adj'
 const ACCOUNT_CODE_6602 = '6602'
 /** 变动率超阈值(±30%)高亮 */
@@ -167,14 +174,14 @@ export function useI6Adjudication(options: {
   // ─── Load from allResponses ────────────────────────────────────────────────
 
   function _loadRows(): void {
-    const data = _getJson(`${ITEM_PREFIX}-rows`)
+    const data = _getJson(ITEM_ROWS) ?? _getJson(`${ITEM_PREFIX}-rows`)
     if (Array.isArray(data) && data.length > 0) {
       rows.value = data.map(_normalizeRow)
     } else {
       rows.value = _buildDefaultRows()
     }
-    auditNote.value = _getString(`${ITEM_PREFIX}-audit-note`)
-    auditConclusion.value = _getString(`${ITEM_PREFIX}-audit-conclusion`)
+    auditNote.value = _getString('I6-1-note') || _getString(`${ITEM_PREFIX}-audit-note`)
+    auditConclusion.value = _getString('I6-1-conclusion') || _getString(`${ITEM_PREFIX}-audit-conclusion`)
     // I2资本化
     const i2Val = _getJson(`${ITEM_PREFIX}-capitalized-i2`)
     if (i2Val != null) {
@@ -200,7 +207,7 @@ export function useI6Adjudication(options: {
   }
 
   function _normalizeRow(raw: any): I6AdjudicationRow {
-    const 上期未审 = parseNum(raw.上期未审)
+    const 上期未审 = parseNum(raw.上期未审 ?? raw.priorUnadj)
     const 上期AJE = parseNum(raw.上期AJE)
     const 上期RJE = parseNum(raw.上期RJE)
     const 上期审定 = calcAuditedAmount(上期未审, 上期AJE, 上期RJE)
@@ -213,7 +220,7 @@ export function useI6Adjudication(options: {
 
     return {
       rowId: raw.rowId ?? `row-${Math.random().toString(36).slice(2, 10)}`,
-      类别: raw.类别 ?? '',
+      类别: raw.类别 ?? raw.项目 ?? raw.category ?? '',
       上期未审,
       上期AJE,
       上期RJE,
@@ -336,6 +343,26 @@ export function useI6Adjudication(options: {
     return totalRow.value.本期审定 - tbUnadjusted.value
   })
 
+  const highChangeRateRows = computed(() =>
+    pickI6HighChangeRateRows(computedRows.value.filter((r) => r.isEditable !== false && !r.isTotal)),
+  )
+
+  const needsAuditNoteDraft = computed(() => highChangeRateRows.value.length > 0)
+
+  function buildAuditNoteDraft(): string {
+    return buildI6AdjudicationAuditNoteDraft(
+      computedRows.value.filter((r) => !r.isTotal),
+      { existingNote: auditNote.value },
+    )
+  }
+
+  function applyAuditNoteDraft(): boolean {
+    const draft = buildAuditNoteDraft()
+    if (!draft) return false
+    saveNote(draft)
+    return true
+  }
+
   /** 与明细表月度合计的交叉校验 */
   const detailCrossValidation: ComputedRef<string | null> = computed(() => {
     if (!options.crossSheet) return null
@@ -374,6 +401,74 @@ export function useI6Adjudication(options: {
 
     isChanged.value = true
     _persist()
+  }
+
+  function _readDetailRows(): any[] {
+    const raw = _getJson('I6-2-detail-rows')
+    return Array.isArray(raw) ? raw : []
+  }
+
+  /** 从 I6-2 明细表按类别聚合写入审定行（对齐 Excel 引用明细表） */
+  function syncFromDetail(force = false): void {
+    if (options.isReadonly?.value) return
+    const detailRows = _readDetailRows()
+    if (!detailRows.length) {
+      ElMessage.warning('I6-2 明细表暂无数据，请先编制明细')
+      return
+    }
+
+    const categoryMap = new Map<string, {
+      上期未审: number; 上期AJE: number; 上期RJE: number
+      本期未审: number; 本期AJE: number; 本期RJE: number
+    }>()
+
+    for (const raw of detailRows) {
+      const cat = String(raw?.category ?? raw?.项目 ?? '').trim()
+      if (!cat || cat === '合计') continue
+
+      const months = Array.isArray(raw?.months) ? raw.months : []
+      const unadj = months.length ? calcMonthlyTotal(months) : parseNum(raw?.unadjTotal)
+      const existing = categoryMap.get(cat) || {
+        上期未审: 0, 上期AJE: 0, 上期RJE: 0,
+        本期未审: 0, 本期AJE: 0, 本期RJE: 0,
+      }
+      existing.上期未审 += parseNum(raw?.priorUnadj)
+      existing.上期AJE += parseNum(raw?.priorAje)
+      existing.上期RJE += parseNum(raw?.priorRje)
+      existing.本期未审 += unadj
+      existing.本期AJE += parseNum(raw?.aje)
+      existing.本期RJE += parseNum(raw?.rje)
+      categoryMap.set(cat, existing)
+    }
+
+    const aggregated = Array.from(categoryMap.entries()).map(([类别, vals]) => ({
+      rowId: `row-${类别}`,
+      类别,
+      ...vals,
+      上期审定: 0, 本期审定: 0, 变动额: 0, 变动率: null as number | null,
+      备注: '', changeRateHighlight: false, isEditable: true, isTotal: false,
+    }))
+
+    if (force || !rows.value.some((r) => r.isEditable && (r.本期未审 || r.上期未审))) {
+      rows.value = aggregated.map(_normalizeRow)
+    } else {
+      for (const agg of aggregated) {
+        const row = rows.value.find((r) => r.类别 === agg.类别)
+        if (row) {
+          Object.assign(row, {
+            上期未审: agg.上期未审, 上期AJE: agg.上期AJE, 上期RJE: agg.上期RJE,
+            本期未审: agg.本期未审, 本期AJE: agg.本期AJE, 本期RJE: agg.本期RJE,
+          })
+          _recalcRow(row)
+        } else {
+          rows.value.push(_normalizeRow(agg))
+        }
+      }
+    }
+
+    isChanged.value = true
+    _persist()
+    ElMessage.success(`已从 I6-2 同步 ${categoryMap.size} 个类别`)
   }
 
   // ─── Actions: TB取数接入 ──────────────────────────────────────────────────
@@ -522,17 +617,17 @@ export function useI6Adjudication(options: {
   function _persist(): void {
     const save = options.onSave
     if (!save) return
-    save(`${ITEM_PREFIX}-rows`, rows.value.filter((r) => !r.isTotal))
+    save(ITEM_ROWS, rows.value.filter((r) => !r.isTotal))
   }
 
   function saveNote(note: string): void {
     auditNote.value = note
-    options.onSave?.(`${ITEM_PREFIX}-audit-note`, note)
+    options.onSave?.('I6-1-note', note)
   }
 
   function saveConclusion(conclusion: string): void {
     auditConclusion.value = conclusion
-    options.onSave?.(`${ITEM_PREFIX}-audit-conclusion`, conclusion)
+    options.onSave?.('I6-1-conclusion', conclusion)
   }
 
   function setExpectedTotal(total: number): void {
@@ -557,9 +652,51 @@ export function useI6Adjudication(options: {
   /** 处理I6-3调整分录回写事件 */
   function onAdjustmentWriteback(e: Event): void {
     const detail = (e as CustomEvent).detail
-    if (detail?.adjustments) {
+    if (!detail) return
+    if (Array.isArray(detail.adjustments)) {
       applyAdjustments(detail.adjustments)
+      return
     }
+    const entries = detail.entries ?? detail.rows
+    if (Array.isArray(entries) && entries.length) {
+      syncFromI63(entries)
+    }
+  }
+
+  /** 从 I6-3 分录汇总 6602 净额并写入审定行 AJE/RJE */
+  function syncFromI63(adjRows?: any[]): void {
+    if (options.isReadonly?.value) return
+    const source = adjRows?.length
+      ? adjRows
+      : (() => {
+          const raw = _getJson('I6-3-rows')
+          return Array.isArray(raw) ? raw : []
+        })()
+    if (!source.length) {
+      ElMessage.info('I6-3 无 6602 相关调整可同步')
+      return
+    }
+    const dataRows = rows.value.filter((r) => r.类别 !== '合  计')
+    const result = applyAjeFromI63(dataRows, source)
+    for (const updated of result.rows) {
+      const row = rows.value.find((r) => r.类别 === updated.类别)
+      if (row) {
+        row.本期AJE = updated.本期AJE
+        row.本期RJE = updated.本期RJE
+        _recalcRow(row)
+      }
+    }
+    isChanged.value = true
+    _persist()
+    if (!result.applied && Math.abs(result.totalAje) < 0.005 && Math.abs(result.totalRje) < 0.005) {
+      ElMessage.info('I6-3 无 6602 相关调整可同步')
+      return
+    }
+    ElMessage.success(
+      result.approx
+        ? `已同步 AJE ${result.totalAje} / RJE ${result.totalRje}（含按未审占比近似分摊，请复核）`
+        : `已同步 AJE ${result.totalAje} / RJE ${result.totalRje}`,
+    )
   }
 
   // ─── Init ──────────────────────────────────────────────────────────────────
@@ -583,10 +720,16 @@ export function useI6Adjudication(options: {
     tbDifference,
     // Computed — 交叉校验
     detailCrossValidation,
+    highChangeRateRows,
+    needsAuditNoteDraft,
+    buildAuditNoteDraft,
+    applyAuditNoteDraft,
     // Actions — 数据接入
     updateCell,
     applyTbData,
     applyAdjustments,
+    syncFromI63,
+    syncFromDetail,
     // Actions — 全量重算
     computeAll,
     // Actions — TB回写+EventBus

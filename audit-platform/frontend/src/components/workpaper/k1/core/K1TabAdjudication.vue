@@ -1,8 +1,104 @@
 <template>
   <div class="k1-tab-adjudication">
-    <!-- 方法论上下文 -->
+    <!-- 方法论上下文 + K1-4 联动 -->
     <div class="methodology-context">
-      <p>K1-1审定表审定其他应收款(1221借方/资产类)与坏账准备(备抵类)，计算账面净值。资产类期末=期初+借方-贷方；备抵类期末=期初+贷方-借方；净值=应收-坏账。</p>
+      <p>K1-1 审定表汇总其他应收款（不含应收利息、应收股利）原值、坏账准备与净值，按组合/账龄/性质三维度列示，并与 TB、K1-2 明细、K1-4 调整勾稽。</p>
+      <div class="sync-toolbar">
+        <el-button v-if="!isReadonly" size="small" type="primary" plain @click="handleSyncK12">从 K1-2 同步未审数</el-button>
+        <el-button size="small" @click="onExportTemplate">导出模板</el-button>
+        <el-button size="small" @click="onExportData">导出数据</el-button>
+        <el-upload
+          v-if="!isReadonly"
+          :show-file-list="false"
+          accept=".xlsx,.xls"
+          :auto-upload="false"
+          :on-change="onImportChange"
+        >
+          <el-button size="small" :loading="importing">导入 Excel</el-button>
+        </el-upload>
+        <el-button size="small" link type="primary" @click="emit('navigate-sheet', 'K1-2')">K1-2 明细 →</el-button>
+        <el-button size="small" link type="primary" @click="emit('navigate-sheet', 'K1-6')">K1-6 政策 →</el-button>
+        <el-button size="small" link type="primary" @click="emit('navigate-sheet', 'K1-8')">K1-8 测算 →</el-button>
+      </div>
+      <div v-if="hasK14Data" class="k14-sync-banner">
+        <el-tag type="info" size="small">
+          K1-4：1221 AJE {{ fmtAmt(k14Sync.receivableAjeNet) }} / RJE {{ fmtAmt(k14Sync.receivableRjeNet) }}；
+          1231 AJE {{ fmtAmt(k14Sync.badDebtAjeNet) }}
+        </el-tag>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="warning"
+          plain
+          @click="handleSyncK14('all')"
+        >
+          从 K1-4 回写全部
+        </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="warning"
+          link
+          @click="handleSyncK14('receivable')"
+        >
+          仅回写 1221
+        </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="warning"
+          link
+          @click="handleSyncK14('baddebt')"
+        >
+          仅回写 1231
+        </el-button>
+        <el-button size="small" link type="primary" @click="emit('navigate-sheet', 'K1-4')">
+          打开 K1-4
+        </el-button>
+      </div>
+      <el-alert
+        v-if="adjVsK14Warning"
+        type="warning"
+        :closable="false"
+        class="cross-alert"
+        :title="adjVsK14Warning"
+      />
+      <el-alert
+        v-if="detailCrossWarning"
+        type="warning"
+        :closable="false"
+        class="cross-alert"
+        :title="detailCrossWarning"
+      />
+      <el-alert
+        v-if="comboCrossCheck.hasK18Data && !comboCrossCheck.isConsistent"
+        type="warning"
+        :closable="false"
+        class="cross-alert"
+      >
+        <template #title>K1-6/K1-8 组合名称不一致</template>
+        <div class="combo-alert-body">
+          <span v-if="comboCrossCheck.onlyInK16.length">仅 K1-6：{{ comboCrossCheck.onlyInK16.join('、') }}</span>
+          <span v-if="comboCrossCheck.onlyInK18.length">仅 K1-8：{{ comboCrossCheck.onlyInK18.join('、') }}</span>
+        </div>
+      </el-alert>
+      <el-alert
+        v-if="varianceAlerts.length"
+        type="warning"
+        :closable="false"
+        class="cross-alert"
+      >
+        <template #title>变动超 30% 须说明原因（{{ varianceAlerts.filter(a => !a.hasReason).length }} 项待填）</template>
+        <div class="variance-alert-list">
+          <span v-for="a in varianceAlerts" :key="a.prefix + a.rowKey">
+            {{ a.label }} {{ (a.changeRate * 100).toFixed(1) }}%
+            <el-tag v-if="a.hasReason" type="success" size="small">已填</el-tag>
+          </span>
+        </div>
+        <el-button v-if="!isReadonly" size="small" type="warning" plain class="variance-draft-btn" @click="handleVarianceDrafts">
+          生成变动原因草稿
+        </el-button>
+      </el-alert>
     </div>
 
     <!-- 审计目标（认定） -->
@@ -17,208 +113,153 @@
       </ol>
     </el-alert>
 
-    <!-- 一、其他应收款（1221） -->
-    <el-card shadow="never" class="block-card">
+    <!-- 一、其他应收款（组合划分） -->
+    <el-card shadow="never" class="block-card section-i-card">
       <template #header>
         <div class="section-title">
-          <span>一、其他应收款（1221）</span>
+          <span>一、其他应收款（不含应收利息、应收股利）</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('adj-receivable')">
-              <el-icon><MagicStick /></el-icon> AI说明
-            </el-button>
-            <el-button size="small" type="default" link @click="handleReview('K1-1-receivable')">
-              💬 复核
-            </el-button>
+            <el-button size="small" type="default" link @click="handleReview('K1-1-receivable')">💬 复核</el-button>
           </div>
         </div>
       </template>
-      <el-table
-        :data="receivableDisplayRows"
-        border stripe size="small" class="adj-table"
-        :max-height="tableMaxHeight"
+      <p class="table-hint">{{ receivableSection?.sectionLabel }} — 期初/期末八列宽表</p>
+      <el-alert
+        v-if="portfolioDeeplinkHint"
+        type="info"
+        :closable="true"
+        class="deeplink-bar"
+        @close="portfolioDeeplinkHint = ''"
       >
-        <el-table-column prop="label" label="项目" min-width="130" fixed />
-        <el-table-column label="期初" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="amount-cell">{{ fmtAmt(row.begin) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="本期借方" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="amount-cell">{{ fmtAmt(row.debit) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="本期贷方" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="amount-cell">{{ fmtAmt(row.credit) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="期末" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="资产类: 期末=期初+借方-贷方">{{ fmtAmt(row.end) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="未审数" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="amount-cell tb-auto">{{ fmtAmt(row.unadjusted) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="AJE" min-width="100" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="row.rowKey !== 'subtotal' && !isReadonly"
-              :model-value="row.aje" :controls="false" size="small" class="amount-input"
-              @change="onAjeChange('receivable', row.rowKey, $event)" />
-            <span v-else class="amount-cell">{{ fmtAmt(row.aje) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="RJE" min-width="100" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="row.rowKey !== 'subtotal' && !isReadonly"
-              :model-value="row.rje" :controls="false" size="small" class="amount-input"
-              @change="onRjeChange('receivable', row.rowKey, $event)" />
-            <span v-else class="amount-cell">{{ fmtAmt(row.rje) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="审定数" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="审定=未审+AJE+RJE">{{ fmtAmt(row.audited) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="变动率" min-width="90" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="变动率=(审定-上期审定)/上期审定">
-              {{ row.changeRate != null ? (row.changeRate * 100).toFixed(1) + '%' : '-' }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="备注" min-width="120">
-          <template #default="{ row }">
-            <span class="amount-cell">{{ row.remark || '' }}</span>
-          </template>
-        </el-table-column>
-      </el-table>
+        <template #title><span>{{ portfolioDeeplinkHint }}</span></template>
+      </el-alert>
+      <K1AdjWideTable
+        ref="receivableTableRef"
+        :rows="receivableDisplayRows"
+        prefix="receivable"
+        :is-readonly="isReadonly"
+        :max-height="tableMaxHeight"
+        :highlight-row-key="portfolioHighlightRowKey"
+        @field-change="onWideFieldChange"
+      />
+      <div v-for="row in receivableSection?.rows ?? []" :key="row.rowKey" class="link-hint-row">
+        <template v-if="portfolioLinkDef(row.label)?.linkSheet === 'K1-8'">
+          <el-button
+            size="small"
+            type="primary"
+            link
+            @click="navigateToK18(row.label)"
+          >
+            {{ row.label }} → K1-8
+          </el-button>
+          <span v-if="portfolioLinkDef(row.label)?.linkHint" class="muted">{{ portfolioLinkDef(row.label)?.linkHint }}</span>
+        </template>
+        <span v-else-if="portfolioLinkHint(row.label)">{{ row.label }}：{{ portfolioLinkHint(row.label) }}</span>
+      </div>
     </el-card>
 
-    <!-- 二、坏账准备 -->
-    <el-card shadow="never" class="block-card">
+    <!-- 原值区块（续）：坏账准备 -->
+    <el-card shadow="never" class="block-card inner-section-card">
       <template #header>
         <div class="section-title">
-          <span>二、坏账准备</span>
+          <span>{{ badDebtSection?.sectionLabel }}</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link @click="handleAiGenerate('adj-baddebt')">
-              <el-icon><MagicStick /></el-icon> AI说明
-            </el-button>
-            <el-button size="small" type="default" link @click="handleReview('K1-1-baddebt')">
-              💬 复核
-            </el-button>
+            <el-button size="small" type="default" link @click="handleReview('K1-1-baddebt')">💬 复核</el-button>
           </div>
         </div>
       </template>
-      <el-table
-        :data="badDebtDisplayRows"
-        border stripe size="small" class="adj-table"
+      <K1AdjWideTable
+        :rows="badDebtDisplayRows"
+        prefix="baddebt"
+        :is-readonly="isReadonly"
         :max-height="tableMaxHeight"
-      >
-        <el-table-column prop="label" label="项目" min-width="130" fixed />
-        <el-table-column label="期初" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="amount-cell">{{ fmtAmt(row.begin) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="本期借方" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="amount-cell">{{ fmtAmt(row.debit) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="本期贷方" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="amount-cell">{{ fmtAmt(row.credit) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="期末" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="备抵类: 期末=期初+贷方-借方">{{ fmtAmt(row.end) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="未审数" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="amount-cell tb-auto">{{ fmtAmt(row.unadjusted) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="AJE" min-width="100" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="row.rowKey !== 'subtotal' && !isReadonly"
-              :model-value="row.aje" :controls="false" size="small" class="amount-input"
-              @change="onAjeChange('baddebt', row.rowKey, $event)" />
-            <span v-else class="amount-cell">{{ fmtAmt(row.aje) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="RJE" min-width="100" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="row.rowKey !== 'subtotal' && !isReadonly"
-              :model-value="row.rje" :controls="false" size="small" class="amount-input"
-              @change="onRjeChange('baddebt', row.rowKey, $event)" />
-            <span v-else class="amount-cell">{{ fmtAmt(row.rje) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="审定数" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="审定=未审+AJE+RJE">{{ fmtAmt(row.audited) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="变动率" min-width="90" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="变动率=(审定-上期审定)/上期审定">
-              {{ row.changeRate != null ? (row.changeRate * 100).toFixed(1) + '%' : '-' }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column label="备注" min-width="120">
-          <template #default="{ row }">
-            <span class="amount-cell">{{ row.remark || '' }}</span>
-          </template>
-        </el-table-column>
-      </el-table>
+        @field-change="onWideFieldChange"
+      />
     </el-card>
 
-    <!-- 三、账面净值 + 三角勾稽 -->
+    <!-- 净值 + 勾稽 -->
     <el-card shadow="never" class="block-card reconciliation-card">
       <template #header>
         <div class="section-title">
-          <span>三、账面净值</span>
+          <span>{{ netValueSection?.sectionLabel }}</span>
         </div>
       </template>
-      <el-table :data="netValueDisplayRows" border stripe size="small" class="adj-table" :max-height="280">
-        <el-table-column prop="label" label="项目" min-width="130" fixed />
-        <el-table-column label="期初" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="净值=应收-坏账">{{ fmtAmt(row.begin) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="期末" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="净值=应收期末-坏账期末">{{ fmtAmt(row.end) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="未审数" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="净值=应收未审-坏账未审">{{ fmtAmt(row.unadjusted) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="审定数" min-width="110" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="净值=应收审定-坏账审定">{{ fmtAmt(row.audited) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="变动率" min-width="90" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="变动率">
-              {{ row.changeRate != null ? (row.changeRate * 100).toFixed(1) + '%' : '-' }}
-            </span>
-          </template>
-        </el-table-column>
-      </el-table>
-      <!-- 三角勾稽校验 -->
+      <K1AdjWideTable
+        :rows="netValueDisplayRows"
+        prefix="net"
+        :is-readonly="true"
+        :max-height="280"
+      />
+      <el-divider content-position="left">报表核对（其他应收款合计 vs K1-1 净值）</el-divider>
+      <div class="fs-reconcile">
+        <div class="fs-row">
+          <span>应收利息</span>
+          <el-input-number
+            v-if="!isReadonly"
+            :model-value="fsReconciliation.interestReceivable"
+            :controls="false"
+            size="small"
+            class="fs-input"
+            @change="onFsField('interest', $event)"
+          />
+          <span v-else>{{ fmtAmt(fsReconciliation.interestReceivable) }}</span>
+        </div>
+        <div class="fs-row">
+          <span>应收股利</span>
+          <el-input-number
+            v-if="!isReadonly"
+            :model-value="fsReconciliation.dividendReceivable"
+            :controls="false"
+            size="small"
+            class="fs-input"
+            @change="onFsField('dividend', $event)"
+          />
+          <span v-else>{{ fmtAmt(fsReconciliation.dividendReceivable) }}</span>
+        </div>
+        <div class="fs-row">
+          <span>其他应收款合计（报表）</span>
+          <el-input-number
+            v-if="!isReadonly"
+            :model-value="fsReconciliation.fsOtherTotal"
+            :controls="false"
+            size="small"
+            class="fs-input"
+            @change="onFsField('other-total', $event)"
+          />
+          <span v-else>{{ fmtAmt(fsReconciliation.fsOtherTotal) }}</span>
+        </div>
+        <div class="fs-row">
+          <span>K1-1 净值审定合计</span>
+          <span>{{ fmtAmt(fsReconciliation.k11NetAudited) }}</span>
+        </div>
+        <div class="fs-row">
+          <span>差异</span>
+          <el-tag :type="fsReconciliation.isBalanced ? 'success' : 'danger'" size="small">
+            {{ fmtAmt(fsReconciliation.fsDiff) }}
+          </el-tag>
+        </div>
+      </div>
+      <el-divider content-position="left">TB 数据核对</el-divider>
+      <div class="tb-reconcile">
+        <div class="tb-row">
+          <span>1221 审定合计</span>
+          <span>{{ fmtAmt(tbReconciliation.auditedReceivable) }}</span>
+          <span class="muted">TB</span>
+          <span>{{ fmtAmt(tbReconciliation.tbReceivable) }}</span>
+          <el-tag :type="Math.abs(tbReconciliation.receivableDiff) < 0.01 ? 'success' : 'danger'" size="small">
+            差异 {{ fmtAmt(tbReconciliation.receivableDiff) }}
+          </el-tag>
+        </div>
+        <div class="tb-row">
+          <span>1231 审定合计</span>
+          <span>{{ fmtAmt(tbReconciliation.auditedBadDebt) }}</span>
+          <span class="muted">TB</span>
+          <span>{{ fmtAmt(tbReconciliation.tbBadDebt) }}</span>
+          <el-tag :type="Math.abs(tbReconciliation.badDebtDiff) < 0.01 ? 'success' : 'danger'" size="small">
+            差异 {{ fmtAmt(tbReconciliation.badDebtDiff) }}
+          </el-tag>
+        </div>
+      </div>
       <el-divider content-position="left">三角勾稽校验</el-divider>
       <div class="reconciliation-result">
         <el-tag :type="reconciliation.isBalanced ? 'success' : 'danger'" size="large">
@@ -228,6 +269,36 @@
           差额: {{ fmtAmt(reconciliation.diff) }}
         </span>
       </div>
+    </el-card>
+
+    <!-- 二、账龄分布 -->
+    <el-card shadow="never" class="block-card">
+      <template #header>
+        <span class="section-title-text">{{ agingDistribution.blockLabel }}</span>
+      </template>
+      <DistributionTripleTable
+        :block="agingDistribution"
+        :is-readonly="isReadonly"
+        gross-prefix="aging-gross"
+        prov-prefix="aging-prov"
+        sub-title="（一）账龄原值 / （二）账龄坏账准备 / （三）账龄净值"
+        @field-change="onDistFieldChange"
+      />
+    </el-card>
+
+    <!-- 三、款项性质分布 -->
+    <el-card shadow="never" class="block-card">
+      <template #header>
+        <span class="section-title-text">{{ natureDistribution.blockLabel }}</span>
+      </template>
+      <DistributionTripleTable
+        :block="natureDistribution"
+        :is-readonly="isReadonly"
+        gross-prefix="nature-gross"
+        prov-prefix="nature-prov"
+        sub-title="（一）性质原值 / （二）性质坏账准备 / （三）性质净值"
+        @field-change="onDistFieldChange"
+      />
     </el-card>
 
     <!-- 审计说明 -->
@@ -269,11 +340,13 @@
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>其他应收款(1221)：资产类，期末=期初+借方-贷方</li>
+        <li>结构对齐致同 K1-1：组合划分 → 账龄分布 → 款项性质分布 → 合计/TB核对</li>
+        <li>账龄组合/客户类型组合须与 K1-6/K1-8 一致；可从 K1-2 一键同步未审数</li>
         <li>坏账准备：备抵类，期末=期初+贷方-借方</li>
         <li>账面净值=其他应收款-坏账准备</li>
         <li>三角勾稽：期末=期初+增加-减少，差额须为0</li>
         <li>审定数=未审数+AJE+RJE，未审数从TB自动取入(只读)</li>
+        <li>K1-4 保存后可「从 K1-4 回写 AJE/RJE」，1221/1231 净额按未审数权重分摊至各行</li>
         <li>"确认审定"将回写trial_balance(1221+坏账准备)并发布EventBus事件</li>
       </ul>
     </details>
@@ -287,17 +360,32 @@
  * Requirements: 2.1-2.10
  * 双区块(1221+坏账准备)+净值+47公式+三角勾稽+TB回写+89行虚拟滚动
  */
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { useK1Adjudication, type K1AdjRow } from '../../composables/useK1Adjudication'
+import type { UploadFile } from 'element-plus'
+import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
+import { useK1Adjudication, type K1AdjRow, type K14WritebackScope, type K1AdjudicationPrefill } from '../../composables/useK1Adjudication'
 import { useK1FormData } from '../../composables/useK1FormData'
+import { useK1CrossSheet } from '../../composables/useK1CrossSheet'
+import { useK1ImportExport } from '../../composables/useK1ImportExport'
+import { useK1AiGenerate } from '../../composables/useK1AiGenerate'
+import DistributionTripleTable from './K1DistributionTripleTable.vue'
+import K1AdjWideTable from './K1AdjWideTable.vue'
+import {
+  K1RowNavigationKey,
+  buildK1PortfolioDeeplinkHint,
+  resolveK11PortfolioRowKey,
+} from '../../composables/useK1RowNavigation'
+import type { K1AdjRowDef } from '../../composables/k1AdjudicationModel'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   tbData: { unadjusted1221: number; audited1221: number; unadjustedBadDebt: number; auditedBadDebt: number }
+  adjudicationPrefill?: K1AdjudicationPrefill | null
   isReadonly: boolean
 }>()
 
@@ -307,18 +395,129 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const k1Nav = inject(K1RowNavigationKey, null)
 const allResponsesRef = computed(() => props.allResponses)
+const portfolioDeeplinkHint = ref('')
+const portfolioHighlightRowKey = ref('')
+const receivableTableRef = ref<InstanceType<typeof K1AdjWideTable>>()
 
 const {
   adjudicationSections,
+  agingDistribution,
+  natureDistribution,
+  portfolioRowDefs,
   reconciliation,
+  tbReconciliation,
+  fsReconciliation,
+  comboCrossCheck,
+  varianceAlerts,
   auditNote,
   auditConclusion,
+  k14AdjustmentSync,
+  syncEndAdjFromK14,
+  syncUnadjFromK12,
+  applyAdjudicationPrefill,
+  ensurePortfolioLabels,
+  persistAuditedTotals,
+  writeRowField,
+  writeFsField,
+  generateVarianceReasonDrafts,
 } = useK1Adjudication({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   allResponses: allResponsesRef as any,
+  tbData: computed(() => props.tbData),
+  onSave: (itemId, value) => emit('save', itemId, value),
 })
+
+const { adjudicationVsK14, adjudicationVsDetail } = useK1CrossSheet(allResponsesRef as any)
+
+const { isImporting: importing, exportTemplate, exportData, importData } = useK1ImportExport({
+  wpId: toRef(props, 'wpId'),
+})
+
+const { generateAndConfirm } = useK1AiGenerate(toRef(props, 'wpId'))
+
+const k14Sync = computed(() => k14AdjustmentSync.value)
+const hasK14Data = computed(() =>
+  k14Sync.value.rowCount > 0 ||
+  Math.abs(k14Sync.value.receivableAjeNet) >= 0.005 ||
+  Math.abs(k14Sync.value.receivableRjeNet) >= 0.005 ||
+  Math.abs(k14Sync.value.badDebtAjeNet) >= 0.005,
+)
+const adjVsK14Warning = computed(() => {
+  const chk = adjudicationVsK14.value
+  if (chk.isMatch || !hasK14Data.value) return ''
+  const parts: string[] = []
+  if (Math.abs(chk.receivableAjeDiff) >= 0.01) {
+    parts.push(`1221 AJE 差额 ${chk.receivableAjeDiff.toLocaleString('zh-CN')}`)
+  }
+  if (Math.abs(chk.badDebtAjeDiff) >= 0.01) {
+    parts.push(`1231 AJE 差额 ${chk.badDebtAjeDiff.toLocaleString('zh-CN')}`)
+  }
+  return parts.length ? `K1-1 与 K1-4 未完全勾稽：${parts.join('；')}。可点击「从 K1-4 回写」同步。` : ''
+})
+const detailCrossWarning = computed(() => {
+  const chk = adjudicationVsDetail.value
+  if (chk.isMatch) return ''
+  return `K1-1 审定合计与 K1-2 明细小计差异 ${chk.diff.toLocaleString('zh-CN')}，请核对或从 K1-2 同步。`
+})
+
+onMounted(() => {
+  ensurePortfolioLabels()
+  if (props.adjudicationPrefill) {
+    applyAdjudicationPrefill(props.adjudicationPrefill)
+  }
+  applyIncomingPortfolioFocus()
+  eventBus.on('adjustment:created', onAdjustmentCreated)
+})
+
+onBeforeUnmount(() => {
+  eventBus.off('adjustment:created', onAdjustmentCreated)
+})
+
+/** K1-4 保存调整后自动回写 1221/1231 净额至审定表 */
+function onAdjustmentCreated(payload: any): void {
+  if (props.isReadonly) return
+  const code = String(payload?.accountCode ?? payload?.account_code ?? '')
+  const wp = String(payload?.wpCode ?? payload?.wp_code ?? '')
+  if (wp && wp !== 'K1' && !wp.startsWith('K1')) return
+  if (code && !/^1221|^1231/.test(code) && wp !== 'K1') return
+  const r = syncEndAdjFromK14('all')
+  if (r?.applied) {
+    persistAuditedTotals()
+    ElMessage.success(r.message || '已从 K1-4 自动回写审定表调整列')
+  }
+}
+
+function applyIncomingPortfolioFocus(): void {
+  const focus = k1Nav?.consumeFocus('K1-1')
+  if (!focus?.portfolioLabel) return
+  const rowKey = resolveK11PortfolioRowKey(focus.portfolioLabel)
+  if (!rowKey) return
+  portfolioHighlightRowKey.value = rowKey
+  portfolioDeeplinkHint.value = buildK1PortfolioDeeplinkHint(focus)
+  k1Nav?.focusRow(rowKey)
+  nextTick(() => scrollToPortfolioRow(rowKey))
+}
+
+function scrollToPortfolioRow(rowKey: string): void {
+  const root = receivableTableRef.value?.$el as HTMLElement | undefined
+  const rowEl = root?.querySelector(`tr[data-row-key="${rowKey}"]`) as HTMLElement | null
+  rowEl?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+}
+
+function navigateToK18(label: string): void {
+  if (k1Nav) {
+    k1Nav.navigateToRow({ sheet: 'K1-8', portfolioLabel: label, sourceSheet: 'K1-1' })
+    return
+  }
+  emit('navigate-sheet', '坏账准备测算K1-8')
+}
+
+function portfolioLinkDef(label: string): K1AdjRowDef | undefined {
+  return portfolioRowDefs.find((d) => d.label === label)
+}
 
 const { writebackTB, debouncedSave } = useK1FormData({
   wpId: toRef(props, 'wpId'),
@@ -348,18 +547,33 @@ const netValueDisplayRows = computed((): K1AdjRow[] => {
   return [...sec.rows, { ...sec.subtotalRow, label: '合计' }]
 })
 
-function onAjeChange(block: 'receivable' | 'baddebt', rowKey: string, value: number | undefined) {
-  const v = value ?? 0
-  const itemId = `K1-1-${block}-${rowKey}-aje`
-  props.allResponses.set(itemId, { item_id: itemId, conclusion: null, remark: String(v) })
-  emit('save', itemId, { remark: String(v) })
+function onWideFieldChange(payload: { prefix: string; rowKey: string; field: string; value: string | number }) {
+  writeRowField(payload.prefix, payload.rowKey, payload.field, payload.value)
+  persistAuditedTotals()
 }
-function onRjeChange(block: 'receivable' | 'baddebt', rowKey: string, value: number | undefined) {
-  const v = value ?? 0
-  const itemId = `K1-1-${block}-${rowKey}-rje`
-  props.allResponses.set(itemId, { item_id: itemId, conclusion: null, remark: String(v) })
-  emit('save', itemId, { remark: String(v) })
+
+function onFsField(field: 'interest' | 'dividend' | 'other-total', value: number | undefined) {
+  writeFsField(field, value ?? 0)
 }
+
+function handleVarianceDrafts() {
+  const res = generateVarianceReasonDrafts()
+  if (res.filled) ElMessage.success(`已生成 ${res.filled} 条变动原因草稿${res.skipped ? `，跳过 ${res.skipped} 条已有说明` : ''}`)
+  else ElMessage.info(res.skipped ? '所有变动行均已填写原因' : '暂无超 30% 变动行')
+}
+
+function onDistFieldChange(payload: { prefix: string; rowKey: string; field: 'aje' | 'rje' | string; value: number | string }) {
+  if (payload.field === 'aje' || payload.field === 'rje') {
+    const itemId = `K1-1-${payload.prefix}-${payload.rowKey}-${payload.field}`
+    props.allResponses.set(itemId, { item_id: itemId, conclusion: null, remark: String(payload.value) })
+    emit('save', itemId, { remark: String(payload.value) })
+    persistAuditedTotals()
+    return
+  }
+  writeRowField(payload.prefix, payload.rowKey, payload.field, payload.value)
+  persistAuditedTotals()
+}
+
 function saveNote() {
   const itemId = 'K1-1-audit-note'
   props.allResponses.set(itemId, { item_id: itemId, conclusion: null, remark: auditNote.value })
@@ -370,6 +584,53 @@ function saveConclusion() {
   props.allResponses.set(itemId, { item_id: itemId, conclusion: null, remark: auditConclusion.value })
   debouncedSave(itemId, { remark: auditConclusion.value })
 }
+
+function portfolioLinkHint(label: string): string {
+  const def = portfolioRowDefs.find((d) => d.label === label)
+  return def?.linkHint || ''
+}
+
+function handleSyncK12() {
+  const res = syncUnadjFromK12()
+  if (res.applied) ElMessage.success(res.message)
+  else ElMessage.info(res.message)
+}
+
+async function reloadFromServer() {
+  try {
+    const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`, { _silent: true } as any)
+    const items: any[] = Array.isArray(res?.data?.data) ? res.data.data : Array.isArray(res?.data) ? res.data : []
+    for (const item of items) {
+      const id = item.item_id || item.itemId
+      if (!id || !String(id).startsWith('K1-1')) continue
+      props.allResponses.set(id, {
+        item_id: id,
+        remark: item.remark ?? null,
+        conclusion: item.conclusion ?? null,
+      })
+    }
+    ensurePortfolioLabels()
+    persistAuditedTotals()
+  } catch {
+    /* keep local state */
+  }
+}
+
+function onExportTemplate() {
+  exportTemplate('K1-1')
+}
+
+function onExportData() {
+  exportData('K1-1')
+}
+
+async function onImportChange(uploadFile: UploadFile) {
+  const raw = uploadFile.raw
+  if (!raw) return
+  const result = await importData('K1-1', raw)
+  if (result) await reloadFromServer()
+}
+
 async function handleWritebackTB() {
   publishing.value = true
   try {
@@ -377,11 +638,39 @@ async function handleWritebackTB() {
     const bdSec = badDebtSection.value
     if (!recSec || !bdSec) return
     await writebackTB(recSec.subtotalRow.audited, bdSec.subtotalRow.audited)
+    persistAuditedTotals()
     ElMessage.success('审定数已回写TB（1221+坏账准备）')
   } catch { ElMessage.error('TB回写失败') }
   finally { publishing.value = false }
 }
-function handleAiGenerate(section: string) { console.log('AI generate:', section) }
+function handleSyncK14(scope: K14WritebackScope = 'all') {
+  const res = syncEndAdjFromK14(undefined, undefined, undefined, undefined, scope)
+  if (res.applied) ElMessage.success(res.message)
+  else ElMessage.info(res.message)
+}
+async function handleAiGenerate(section: 'adj-note' | 'adj-conclusion') {
+  const recSec = receivableSection.value
+  const bdSec = badDebtSection.value
+  const ctx = {
+    receivableAudited: recSec?.subtotalRow.audited ?? 0,
+    badDebtAudited: bdSec?.subtotalRow.audited ?? 0,
+    netAudited: netValueSection.value?.subtotalRow.audited ?? 0,
+    varianceCount: varianceAlerts.value.length,
+    comboConsistent: comboCrossCheck.value.isConsistent,
+    tbBalanced: tbReconciliation.value.isBalanced,
+  }
+  const existing = section === 'adj-note' ? auditNote.value : auditConclusion.value
+  const title = section === 'adj-note' ? 'AI 生成 K1-1 审计说明' : 'AI 生成 K1-1 审计结论'
+  const content = await generateAndConfirm('overall-opinion', existing, ctx, title)
+  if (!content) return
+  if (section === 'adj-note') {
+    auditNote.value = content
+    saveNote()
+  } else {
+    auditConclusion.value = content
+    saveConclusion()
+  }
+}
 function handleReview(id: string) { openReviewDialog(id) }
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'
@@ -396,6 +685,27 @@ function fmtAmt(val: number | null | undefined): string {
   background: #fffbeb;
   padding: 10px 14px;
   margin-bottom: 12px;
+  border-radius: 4px;
+}
+.sync-toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.section-title-text { font-weight: 600; }
+.section-i-card { margin-bottom: 8px; }
+.inner-section-card { margin-top: -4px; }
+.link-hint-row { font-size: 11px; color: var(--el-color-primary); margin-top: 4px; }
+.deeplink-bar { margin-bottom: 8px; }
+.table-hint { font-size: 12px; color: var(--el-text-color-secondary); margin: 0 0 8px; }
+.combo-alert-body, .variance-alert-list { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; margin-top: 4px; }
+.variance-draft-btn { margin-top: 8px; }
+.fs-reconcile { display: flex; flex-direction: column; gap: 8px; font-size: 12px; margin-bottom: 12px; }
+.fs-row { display: grid; grid-template-columns: 180px 1fr; gap: 8px; align-items: center; }
+.fs-input { width: 160px; }
+.tb-reconcile { display: flex; flex-direction: column; gap: 8px; font-size: 12px; margin-bottom: 8px; }
+.tb-row { display: grid; grid-template-columns: 120px 1fr 40px 1fr auto; gap: 8px; align-items: center; }
+.muted { color: var(--el-text-color-secondary); }
+.k14-sync-banner { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+.cross-alert { margin-top: 8px; }
+.methodology-context p {
+  margin: 0;
   font-size: 12px;
   color: var(--el-text-color-regular);
   line-height: 1.6;

@@ -18,7 +18,13 @@ import http from '@/utils/http'
 
 /** I5 支持导入导出的 sheet 编码 */
 export type I5ImportableSheet =
-  | 'I5-2'      // 明细表（26列3区段，63行，动态行）
+  | 'I5-2'      // 明细表（原值|减值|净值滚动）
+  | 'I5-3'      // 调整分录汇总
+
+export const I5_ADJUSTMENT_COLUMNS = [
+  'description', 'category', 'reportItem', 'accountCode', 'accountName',
+  'noteItem', 'projectName', 'debitAmount', 'creditAmount', 'indexRef', 'remark',
+] as const
 
 export interface I5ImportResult {
   success: boolean
@@ -33,15 +39,17 @@ export interface UseI5ImportExportOptions {
   onImported?: () => void | Promise<void>
 }
 
-/** I5-2 的 3 区段定义 */
+/** I5-2 的区段定义（对齐 Excel 原值|减值|净值） */
 export const I5_DETAIL_SEGMENTS = [
-  { key: 'basic', label: '基础信息(名称/类型/发生日/到期日)' },
-  { key: 'amount', label: '金额信息(期初/增加/减少/期末)' },
-  { key: 'check', label: '检查信息(凭证号/备注/结论)' },
+  { key: 'gross-unadj', label: '原值未审(期初/增/减/期末)' },
+  { key: 'gross-adj', label: '原值调整与审定' },
+  { key: 'impairment', label: '减值准备' },
+  { key: 'net', label: '净值与索引' },
 ] as const
 
 export const I5_IMPORTABLE_SHEETS: { code: I5ImportableSheet; label: string }[] = [
-  { code: 'I5-2', label: 'I5-2 明细表(26列3区段)' },
+  { code: 'I5-2', label: 'I5-2 明细表(原值/减值/净值)' },
+  { code: 'I5-3', label: 'I5-3 调整分录汇总' },
 ]
 
 // ─── Composable ──────────────────────────────────────────────────────────────

@@ -214,6 +214,34 @@ export function useK13Adjudication(params: UseK13AdjudicationParams) {
     return { diff, isBalanced: Math.abs(diff) < 0.01 }
   })
 
+  // ─── 与K13-3调整分录AJE/RJE汇总勾稽 ────────────────────────────────────────
+  // K13-3 保存时写 K13-1-aje-total / K13-1-rje-total（净影响=借-贷）。
+  // 此处比对：K13-3 净影响 vs 本审定表各行 AJE/RJE 列合计。
+  // 不一致 = 审计师尚未把 K13-3 的调整反映到 K13-1 各行 → 告警提示。
+
+  const adjustmentReconcile: ComputedRef<{
+    k13_3AjeTotal: number
+    k13_3RjeTotal: number
+    tableAjeTotal: number
+    tableRjeTotal: number
+    ajeDiff: number
+    rjeDiff: number
+    hasK13_3: boolean
+    isBalanced: boolean
+  }> = computed(() => {
+    const ajeItem = allResponses.value.get('K13-1-aje-total')
+    const rjeItem = allResponses.value.get('K13-1-rje-total')
+    const hasK13_3 = ajeItem != null || rjeItem != null
+    const k13_3AjeTotal = parseNum(ajeItem?.remark ?? ajeItem?.conclusion ?? 0)
+    const k13_3RjeTotal = parseNum(rjeItem?.remark ?? rjeItem?.conclusion ?? 0)
+    const tableAjeTotal = totalRow.value.aje
+    const tableRjeTotal = totalRow.value.rje
+    const ajeDiff = parseFloat((k13_3AjeTotal - tableAjeTotal).toFixed(2))
+    const rjeDiff = parseFloat((k13_3RjeTotal - tableRjeTotal).toFixed(2))
+    const isBalanced = Math.abs(ajeDiff) < 0.01 && Math.abs(rjeDiff) < 0.01
+    return { k13_3AjeTotal, k13_3RjeTotal, tableAjeTotal, tableRjeTotal, ajeDiff, rjeDiff, hasK13_3, isBalanced }
+  })
+
   // ─── Cell Update ───────────────────────────────────────────────────────────
 
   function updateCell(rowKey: string, field: keyof K13AdjRow, value: number | string): void {
@@ -316,6 +344,7 @@ export function useK13Adjudication(params: UseK13AdjudicationParams) {
     auditConclusion,
     isChanged,
     detailCrossValidation,
+    adjustmentReconcile,
     updateCell,
     addRow,
     removeRow,

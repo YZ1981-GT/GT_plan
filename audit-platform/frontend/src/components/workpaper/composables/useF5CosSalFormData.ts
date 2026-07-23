@@ -11,6 +11,8 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
   const rollforwardTb = ref<Record<string, number>>({})
   /** F5-7 校验区审定营业成本回退值（来自 render 策略持久化读取） */
   const adjudicatedCogs = ref<number>(0)
+  /** 后端 render 提供的 project_context（含 tb_amount/bs_date/related_parties 等） */
+  const projectContext = ref<Record<string, any>>({})
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const itemPrefix = 'F5-'
 
@@ -52,6 +54,9 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
               if (hd.adjudicated_cogs != null && hd.adjudicated_cogs !== '') {
                 const n = Number(hd.adjudicated_cogs)
                 if (Number.isFinite(n)) adjudicatedCogs.value = n
+              }
+              if (hd.project_context && typeof hd.project_context === 'object') {
+                projectContext.value = hd.project_context
               }
             }
           }
@@ -121,6 +126,7 @@ export function useF5CosSalFormData(opts: { wpId: Ref<string>; projectId: Ref<st
     allResponses,
     rollforwardTb,
     adjudicatedCogs,
+    projectContext,
     loadAll,
     getSheet,
     saveImmediate,

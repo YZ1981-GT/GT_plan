@@ -184,7 +184,26 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
         || current.startsWith('八、72')
         || current === '八、72'
       )
-    if (!matched && !isG7Lte && !isG10Tfl && !isG13Fvc) return
+    // 1911 其他非流动资产：五、31 / 八、32
+    const isI5Ona = String(payload.accountCode || '') === '1911'
+      && (
+        current.includes('其他非流动资产')
+        || current.startsWith('五、31')
+        || current.startsWith('八、32')
+        || current === '五、31'
+        || current === '八、32'
+      )
+    // 6701 资产减值损失（K11）：关键词 / 五、73(上市) / 五、75(国企)
+    const isK11Impair = String(payload.accountCode || '') === '6701'
+      && (
+        current.includes('资产减值损失')
+        || current.startsWith('五、73')
+        || current.startsWith('五、75')
+      )
+    // 6711 营业外支出（K13）：关键词（区别于营业外收入 6301）
+    const isK13NonOpExp = String(payload.accountCode || '') === '6711'
+      && current.includes('营业外支出')
+    if (!matched && !isG7Lte && !isG10Tfl && !isG13Fvc && !isI5Ona && !isK11Impair && !isK13NonOpExp) return
 
     if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
     syncDebounceTimer = setTimeout(async () => {

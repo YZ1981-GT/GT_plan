@@ -17,13 +17,16 @@
         <el-button size="small" :disabled="isReadonly" @click="handleAddRow">
           <el-icon><Plus /></el-icon> 新增行
         </el-button>
+        <el-button size="small" :disabled="isReadonly" @click="seedFromK5Adjudication">
+          📥 从K5-1带入
+        </el-button>
         <el-dropdown size="small" :disabled="isReadonly">
           <el-button size="small">导入导出 <el-icon><ArrowDown /></el-icon></el-button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item @click="$emit('save', 'K5-2-export-template', {})">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="$emit('save', 'K5-2-export-data', {})">导出数据</el-dropdown-item>
-              <el-dropdown-item @click="$emit('save', 'K5-2-import-data', {})">导入数据</el-dropdown-item>
+              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
+              <el-dropdown-item @click="handleImportData">导入数据</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
@@ -34,6 +37,24 @@
       </div>
     </div>
 
+    <!-- ═══ 跨底稿引用 ═══ -->
+    <div class="cross-refs">
+      <span class="cross-refs-label">关联底稿：</span>
+      <GtIndexChip value="wp:K5-1" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K5-4" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K5-5" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K5-6" :context-project-id="props.projectId" />
+    </div>
+
+    <!-- ═══ K5-1↔K5-2勾稽告警 ═══ -->
+    <el-alert v-if="adjVsDetailDiff !== 0" :type="Math.abs(adjVsDetailDiff) > 0.01 ? 'warning' : 'success'" :closable="false" show-icon style="margin-bottom:10px">
+      <template #title>
+        K5-1审定合计 {{ fmtNum(adjTotal) }} vs K5-2明细期末合计 {{ fmtNum(subtotals.auditedEnd || subtotals.endBalance) }}
+        <span v-if="Math.abs(adjVsDetailDiff) > 0.01" style="color:#e6a23c;font-weight:600">  差异 {{ fmtNum(adjVsDetailDiff) }}</span>
+        <span v-else style="color:#67c23a">  ✓ 一致</span>
+      </template>
+    </el-alert>
+
     <!-- ═══ 三区段Tab切换 ═══ -->
     <el-segmented v-model="activeSection" :options="sectionOptions" class="section-segmented" />
 
@@ -42,6 +63,33 @@
       <span class="legend-item"><span class="dot dot-red" /> 很可能（>50%）→ 确认</span>
       <span class="legend-item"><span class="dot dot-orange" /> 可能（≤50%）→ 披露</span>
       <span class="legend-item"><span class="dot dot-gray" /> 极小可能 → 不处理</span>
+    </div>
+
+    <!-- ═══ CAS13 或有事项确认决策树引导（判断区段显示）═══ -->
+    <div v-if="activeSection === 1" class="cas13-decision-tree">
+      <div class="dt-title">CAS13 或有事项确认三条件决策树</div>
+      <div class="dt-flow">
+        <div class="dt-step">
+          <div class="dt-node dt-q">① 是否存在<b>现时义务</b>？<br/><span class="dt-hint">（过去事项导致的法定/推定义务）</span></div>
+          <div class="dt-arrow">是 ↓</div>
+        </div>
+        <div class="dt-step">
+          <div class="dt-node dt-q">② 履行该义务<b>很可能</b>导致经济利益流出？<br/><span class="dt-hint">（可能性>50%,结合律师意见/判决/经验）</span></div>
+          <div class="dt-arrow">是 ↓</div>
+        </div>
+        <div class="dt-step">
+          <div class="dt-node dt-q">③ 金额<b>能够可靠计量</b>？<br/><span class="dt-hint">（最佳估计数/区间中值/期望值加权）</span></div>
+          <div class="dt-arrow">是 ↓</div>
+        </div>
+        <div class="dt-step">
+          <div class="dt-node dt-a">✓ <b>确认预计负债</b>（三条件同时满足）</div>
+        </div>
+      </div>
+      <div class="dt-alt">
+        <span>任一条件不满足：</span>
+        <span class="dt-tag dt-orange">②不满足(≤50%)→ 附注披露或有负债</span>
+        <span class="dt-tag dt-gray">极小可能→ 不处理不披露</span>
+      </div>
     </div>
 
     <!-- ═══ 区段0: 基础信息 ═══ -->
@@ -261,6 +309,30 @@
       <span>最佳估计合计: <strong>{{ fmtNum(subtotals.bestEstimate) }}</strong></span>
     </div>
 
+    <!-- ═══ 审计说明与结论 ═══ -->
+    <el-card shadow="never" class="conclusion-card" style="margin-top:12px">
+      <template #header>
+        <div class="card-header-row">
+          <span class="card-title">审计说明与结论</span>
+          <el-button size="small" type="primary" plain @click="handleAiGenerate">
+            <el-icon><MagicStick /></el-icon> AI
+          </el-button>
+        </div>
+      </template>
+      <div style="margin-bottom:10px">
+        <label style="font-size:12px;color:#909399;display:block;margin-bottom:4px">审计说明</label>
+        <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly"
+          placeholder="概述明细表编制情况：或有事项识别/可能性判断/最佳估计数计量方法/完整性核查/与K5-1勾稽情况等"
+          @change="persistNote" />
+      </div>
+      <div>
+        <label style="font-size:12px;color:#909399;display:block;margin-bottom:4px">审计结论</label>
+        <el-input v-model="auditConclusion" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly"
+          placeholder="基于上述明细检查，对预计负债明细的完整性、计量和分类形成结论..."
+          @change="persistNote" />
+      </div>
+    </el-card>
+
     <!-- ═══ 编制提示（折叠） ═══ -->
     <details class="k5-details-tip">
       <summary>编制提示</summary>
@@ -282,9 +354,12 @@
  * Spec: .kiro/specs/k5-provisions/ | Task: 4.3
  * Requirements: 3.1-3.6, 4.3-4.4, 5.5
  */
-import { toRef } from 'vue'
+import { ref, toRef, computed, onMounted } from 'vue'
 import { Plus, Delete, ArrowDown, MagicStick } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useK5Detail, LIKELIHOOD_COLOR_MAP } from '../../composables/useK5Detail'
+import GtIndexChip from '../../shared/GtIndexChip.vue'
+import http from '@/utils/http'
 import type { Ref } from 'vue'
 
 const props = defineProps<{
@@ -339,6 +414,128 @@ function handleUpdate(rowId: string, field: string, value: any) {
 function handleAddRow() { addRow() }
 function handleRemoveRow(idx: number) { removeRow(idx) }
 function handleAiGenerate() { emit('save', 'K5-2-ai-trigger', { remark: 'generate' }) }
+
+// ─── K5-1↔K5-2勾稽 ─────────────────────────────────────────────────────────
+
+const adjTotal = computed(() => {
+  const item = props.allResponses.get('K5-1-audited-total')
+  return Number(item?.remark ?? 0) || 0
+})
+
+const adjVsDetailDiff = computed(() => {
+  const detailTotal = subtotals.value.auditedEnd || subtotals.value.endBalance || 0
+  return adjTotal.value - detailTotal
+})
+
+// ─── 从K5-1带入明细种子 ─────────────────────────────────────────────────────
+
+const K5_TYPE_LABELS = ['产品质量保证', '未决诉讼', '亏损合同', '重组义务', '弃置义务', '其他']
+
+async function seedFromK5Adjudication(): Promise<void> {
+  // 读K5-1各类型行的期初/期末
+  const seeds: Array<{ name: string; begin: number; end: number }> = []
+  for (let i = 0; i < K5_TYPE_LABELS.length; i++) {
+    const beginItem = props.allResponses.get(`K5-1-r${i}-begin`)
+    const endItem = props.allResponses.get(`K5-1-r${i}-unadj`)
+    const begin = Number(beginItem?.remark ?? 0) || 0
+    const end = Number(endItem?.remark ?? 0) || 0
+    if (begin > 0 || end > 0) {
+      seeds.push({ name: K5_TYPE_LABELS[i], begin, end })
+    }
+  }
+
+  if (seeds.length === 0) {
+    ElMessage.warning('K5-1审定表暂无数据，请先填写审定表')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `从K5-1审定表带入 ${seeds.length} 个类型行作为明细种子：\n${seeds.map(s => `• ${s.name}：期初${fmtNum(s.begin)}/未审${fmtNum(s.end)}`).join('\n')}\n\n仅新增不存在的类型行（已有同名不覆盖）`,
+      '从K5-1带入',
+      { confirmButtonText: '带入', cancelButtonText: '取消', type: 'info' }
+    )
+
+    let added = 0
+    const existingNames = new Set(detailRows.value.map((r: any) => r.projectName))
+    for (const s of seeds) {
+      if (!existingNames.has(s.name)) {
+        addRow(s.name)
+        // 找到刚加的行，填入期初和期末
+        const newRow = detailRows.value[detailRows.value.length - 1]
+        if (newRow) {
+          updateCell(newRow.rowId, 'provisionType', s.name)
+          updateCell(newRow.rowId, 'beginBalance', s.begin)
+          // endBalance 由公式算出，填期初+计提(=end-begin)
+          if (s.end > s.begin) {
+            updateCell(newRow.rowId, 'provision', s.end - s.begin)
+          }
+        }
+        added++
+      }
+    }
+
+    if (added > 0) {
+      ElMessage.success(`已新增 ${added} 行明细种子`)
+    } else {
+      ElMessage.info('所有类型行已存在，未新增')
+    }
+  } catch { /* 用户取消 */ }
+}
+
+// ─── 审计说明与结论 ──────────────────────────────────────────────────────────
+
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+function loadNote(): void {
+  const noteItem = props.allResponses.get('K5-2-audit-note')
+  if (noteItem?.remark) auditNote.value = noteItem.remark
+  const conclItem = props.allResponses.get('K5-2-audit-conclusion')
+  if (conclItem?.remark) auditConclusion.value = conclItem.remark
+}
+
+function persistNote(): void {
+  emit('save', 'K5-2-audit-note', { remark: auditNote.value })
+  emit('save', 'K5-2-audit-conclusion', { remark: auditConclusion.value })
+}
+
+// ─── 导入导出 ────────────────────────────────────────────────────────────────
+
+async function handleExportTemplate(): Promise<void> {
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/k5/export-template`, null, { params: { sheet: 'K5-2' }, responseType: 'blob', _silent: true } as any)
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'K5-2_明细表_模板.xlsx'; a.click(); URL.revokeObjectURL(url)
+    ElMessage.success('模板已下载')
+  } catch { ElMessage.error('导出模板失败') }
+}
+
+async function handleExportData(): Promise<void> {
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/k5/export-data`, null, { params: { sheet: 'K5-2' }, responseType: 'blob', _silent: true } as any)
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'K5-2_明细表_数据.xlsx'; a.click(); URL.revokeObjectURL(url)
+    ElMessage.success('数据已导出')
+  } catch { ElMessage.error('导出数据失败') }
+}
+
+async function handleImportData(): Promise<void> {
+  const input = document.createElement('input'); input.type = 'file'; input.accept = '.xlsx,.xls'
+  input.onchange = async () => {
+    const file = input.files?.[0]; if (!file) return
+    const formData = new FormData(); formData.append('file', file)
+    try {
+      const res = await http.post(`/api/workpapers/${props.wpId}/k5/import-data`, formData, { params: { sheet: 'K5-2' }, headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any)
+      ElMessage.success(`导入成功，共 ${res?.data?.imported_count ?? res?.data?.data?.rowCount ?? 0} 条`)
+    } catch (err: any) { ElMessage.error('导入失败：' + (err?.response?.data?.message || err?.response?.data?.detail || '文件格式错误')) }
+  }
+  input.click()
+}
+
+// ─── Lifecycle ───────────────────────────────────────────────────────────────
+
+onMounted(() => { loadNote() })
 
 // ─── 判断列辅助 ──────────────────────────────────────────────────────────────
 
@@ -406,9 +603,15 @@ function fmtNum(v: number): string {
 
 <style scoped>
 .k5-tab-detail { padding: 12px; font-size: var(--wp-font-size, 13px); }
-.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
 .section-header h3 { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
-.header-actions { display: flex; gap: 8px; }
+.header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.cross-refs { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 12px; flex-wrap: wrap; }
+.cross-refs-label { color: #909399; }
+.card-header-row { display: flex; align-items: center; justify-content: space-between; }
+.card-title { font-weight: 600; }
+.conclusion-card :deep(.el-card__header) { padding: 8px 14px; }
+.conclusion-card :deep(.el-card__body) { padding: 12px 14px; }
 .section-segmented { margin-bottom: 12px; }
 .color-legend { display: flex; gap: 16px; margin-bottom: 10px; font-size: 12px; color: #606266; }
 .legend-item { display: flex; align-items: center; gap: 4px; }
@@ -425,4 +628,18 @@ function fmtNum(v: number): string {
 .k5-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .k5-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .k5-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
+/* CAS13 决策树 */
+.cas13-decision-tree { margin-bottom: 12px; padding: 10px 14px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; font-size: 12px; }
+.dt-title { font-weight: 600; color: #0369a1; margin-bottom: 8px; }
+.dt-flow { display: flex; flex-direction: column; gap: 2px; }
+.dt-step { display: flex; flex-direction: column; align-items: flex-start; }
+.dt-node { padding: 4px 10px; border-radius: 4px; line-height: 1.5; }
+.dt-q { background: #e0f2fe; border: 1px solid #7dd3fc; }
+.dt-a { background: #dcfce7; border: 1px solid #86efac; font-weight: 600; color: #166534; }
+.dt-arrow { padding-left: 16px; color: #0369a1; font-size: 11px; line-height: 1.2; }
+.dt-hint { font-size: 11px; color: #64748b; }
+.dt-alt { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 11px; color: #475569; }
+.dt-tag { padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+.dt-orange { background: #fef3c7; color: #92400e; }
+.dt-gray { background: #f1f5f9; color: #475569; }
 </style>

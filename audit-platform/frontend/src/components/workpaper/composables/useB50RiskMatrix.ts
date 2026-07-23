@@ -32,12 +32,96 @@ export interface MatrixCell {
   remark: string
 }
 
+/** 认定层次应对方案（对控制的拟信赖程度） */
+export type ControlReliance = 'high' | 'medium' | 'low' | 'none'
+/** 应对方案：实质性方案 / 综合性方案 */
+export type AuditApproach = 'substantive' | 'combined'
+
+/** 源 B50-3 类别：SCOT+（关键流程）/ 仅金额重大 / 其他 */
+export type ScopeCategory = '' | 'scot' | 'amount_only' | 'other'
+
 export interface AccountRow {
   index: number
   name: string
   cells: Record<Assertion, MatrixCell>
   isPreset: boolean
+  /** 相关业务循环（D~N 字母代号，用于路由到对应循环程序表） */
+  cycle: string | null
+  /** 对控制的拟信赖程度 */
+  plannedReliance: ControlReliance | null
+  /** 仅实施实质性程序是否足够（Y/N） */
+  substantiveOnlySufficient: string | null
+  /** 应对方案（实质性/综合性） */
+  approach: AuditApproach | null
+  /** 科目余额/金额（源 B50-3 来自财务报表列，从试算表带入） */
+  balance: number | null
+  /** 类别（SCOT+/仅金额重大/其他，源 B50-3 类别列） */
+  category: ScopeCategory
+  /** 是否涉及会计估计（Y/N，源 B50-3 列） */
+  isEstimate: string
 }
+
+/** 引导弹窗一次性应用的科目变更补丁 */
+export interface AccountPatch {
+  balance?: number | null
+  category?: ScopeCategory
+  estimate?: string
+  cycle?: string | null
+  reliance?: ControlReliance | null
+  subonly?: string | null
+  approach?: AuditApproach | null
+  cells?: Partial<Record<Assertion, { ir?: RiskLevel | null; cr?: RiskLevel | null; rmm?: RiskLevel | null; special?: boolean }>>
+}
+
+/** 源 B50-3 类别下拉 */
+export const CATEGORY_OPTIONS: { value: Exclude<ScopeCategory, ''>; label: string }[] = [
+  { value: 'scot', label: 'SCOT+（关键业务流程）' },
+  { value: 'amount_only', label: '仅金额重大' },
+  { value: 'other', label: '其他' },
+]
+
+/**
+ * 纯函数：按类别 + 是否存在高综合风险认定 → 建议应对方案。
+ * - 仅金额重大 ∧ 无高综合风险 → 实质性方案
+ * - SCOT+ ∨ 有高综合风险 → 综合性方案
+ * - 否则 ''（不建议）
+ */
+export function computeSuggestedApproach(
+  category: ScopeCategory,
+  hasHighCombined: boolean,
+): '' | AuditApproach {
+  if (category === 'scot' || hasHighCombined) return 'combined'
+  if (category === 'amount_only') return 'substantive'
+  return ''
+}
+
+/** B50-3 相关业务循环选项（value=D~N 字母代号，与 wp_code 前缀对齐用于路由） */
+export const CYCLE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'D', label: '收入与应收循环' },
+  { value: 'E', label: '货币资金循环' },
+  { value: 'F', label: '采购、存货与应付循环' },
+  { value: 'G', label: '投资循环' },
+  { value: 'H', label: '固定资产与在建工程循环' },
+  { value: 'I', label: '无形资产及其他长期资产循环' },
+  { value: 'J', label: '职工薪酬循环' },
+  { value: 'K', label: '其他往来与损益循环' },
+  { value: 'L', label: '借款与债务循环' },
+  { value: 'M', label: '所有者权益循环' },
+  { value: 'N', label: '税金循环' },
+  { value: 'pervasive', label: '财务报表层次（无特定循环）' },
+]
+
+export const CONTROL_RELIANCE_OPTIONS: { value: ControlReliance; label: string }[] = [
+  { value: 'high', label: '高度信赖' },
+  { value: 'medium', label: '中度信赖' },
+  { value: 'low', label: '低度信赖' },
+  { value: 'none', label: '不信赖控制' },
+]
+
+export const APPROACH_OPTIONS: { value: AuditApproach; label: string }[] = [
+  { value: 'substantive', label: '实质性方案' },
+  { value: 'combined', label: '综合性方案' },
+]
 
 export interface MatrixStats {
   totalAccounts: number
@@ -94,7 +178,11 @@ function createAccountRow(index: number, name: string, isPreset: boolean): Accou
   for (const assertion of ASSERTIONS) {
     cells[assertion] = createEmptyCell(name, assertion)
   }
-  return { index, name, cells, isPreset }
+  return {
+    index, name, cells, isPreset,
+    cycle: null, plannedReliance: null, substantiveOnlySufficient: null, approach: null,
+    balance: null, category: '', isEstimate: '',
+  }
 }
 
 function layerToSuffix(layer: RiskLayer): string {
@@ -183,6 +271,27 @@ export function useB50RiskMatrix(tab3Data: Ref<Tab3State>, saveImmediate: SaveFn
         }
       }
 
+      // 业务循环 + 应对方案（行级）
+      const cycleItem = items.get(`B50-T3-cycle-${name}`)
+      if (cycleItem?.conclusion) row.cycle = cycleItem.conclusion
+      const relianceItem = items.get(`B50-T3-plan-${name}-reliance`)
+      if (relianceItem?.conclusion) row.plannedReliance = relianceItem.conclusion as ControlReliance
+      const subOnlyItem = items.get(`B50-T3-plan-${name}-subonly`)
+      if (subOnlyItem?.conclusion) row.substantiveOnlySufficient = subOnlyItem.conclusion
+      const approachItem = items.get(`B50-T3-plan-${name}-approach`)
+      if (approachItem?.conclusion) row.approach = approachItem.conclusion as AuditApproach
+
+      // 审计范围列（余额/类别/会计估计，源 B50-3）
+      const balItem = items.get(`B50-T3-balance-${name}`)
+      if (balItem?.remark != null && balItem.remark !== '') {
+        const n = Number(balItem.remark)
+        if (!Number.isNaN(n)) row.balance = n
+      }
+      const catItem = items.get(`B50-T3-category-${name}`)
+      if (catItem?.conclusion) row.category = catItem.conclusion as ScopeCategory
+      const estItem = items.get(`B50-T3-estimate-${name}`)
+      if (estItem?.conclusion) row.isEstimate = estItem.conclusion
+
       return row
     })
 
@@ -212,6 +321,39 @@ export function useB50RiskMatrix(tab3Data: Ref<Tab3State>, saveImmediate: SaveFn
     persistAccountList()
   }
 
+  /** 批量导入科目（B50-3 从试算表预填），跳过已存在，单次持久化。返回新增数。 */
+  function importAccounts(items: { name: string; cycle?: string | null; balance?: number | null }[]): number {
+    const batch: ChecklistItem[] = []
+    let added = 0
+    for (const it of items) {
+      const name = (it.name || '').trim()
+      if (!name || accounts.value.some(a => a.name === name)) continue
+      const row = createAccountRow(accounts.value.length, name, false)
+      if (it.cycle) row.cycle = it.cycle
+      // 余额仅在提供且为有效数字时带入（新行本就空，等同"空值才填"）
+      if (it.balance != null && !Number.isNaN(Number(it.balance))) {
+        row.balance = Number(it.balance)
+        batch.push({ item_id: `B50-T3-balance-${name}`, conclusion: null, remark: String(row.balance), wp_ref: null })
+      }
+      accounts.value.push(row)
+      if (it.cycle) {
+        batch.push({ item_id: `B50-T3-cycle-${name}`, conclusion: it.cycle, remark: null, wp_ref: null })
+      }
+      added += 1
+    }
+    if (added) {
+      accounts.value.forEach((r, i) => { r.index = i })
+      batch.push({
+        item_id: 'B50-T3-accounts',
+        conclusion: null,
+        remark: JSON.stringify(accounts.value.map(a => a.name)),
+        wp_ref: null,
+      })
+      saveImmediate(batch)
+    }
+    return added
+  }
+
   function removeAccount(index: number): void {
     const row = accounts.value[index]
     if (!row) return
@@ -235,6 +377,167 @@ export function useB50RiskMatrix(tab3Data: Ref<Tab3State>, saveImmediate: SaveFn
       wp_ref: null,
     }
     saveImmediate([item])
+  }
+
+  // ─── Cycle / 应对方案 (行级) ────────────────────────────────────────────
+
+  /** 为预置科目补默认业务循环（收入确认→D 收入循环 / 管理层凌驾→财报层次），仅当未设置时。 */
+  function ensurePresetCycleDefaults(): void {
+    const batch: ChecklistItem[] = []
+    for (const row of accounts.value) {
+      if (row.cycle) continue
+      let def: string | null = null
+      if (row.name === '收入确认') def = 'D'
+      else if (row.name === '管理层凌驾控制') def = 'pervasive'
+      if (def) {
+        row.cycle = def
+        batch.push({ item_id: `B50-T3-cycle-${row.name}`, conclusion: def, remark: null, wp_ref: null })
+      }
+    }
+    if (batch.length) saveImmediate(batch)
+  }
+
+  function setCycle(account: string, cycleCode: string | null): void {
+    const row = accounts.value.find(a => a.name === account)
+    if (!row) return
+    row.cycle = cycleCode
+    saveImmediate([{
+      item_id: `B50-T3-cycle-${account}`,
+      conclusion: cycleCode || null,
+      remark: null,
+      wp_ref: null,
+    }])
+  }
+
+  function setPlanField(
+    account: string,
+    field: 'reliance' | 'subonly' | 'approach',
+    value: string | null,
+  ): void {
+    const row = accounts.value.find(a => a.name === account)
+    if (!row) return
+    if (field === 'reliance') row.plannedReliance = (value as ControlReliance) || null
+    else if (field === 'subonly') row.substantiveOnlySufficient = value || null
+    else if (field === 'approach') row.approach = (value as AuditApproach) || null
+    saveImmediate([{
+      item_id: `B50-T3-plan-${account}-${field}`,
+      conclusion: value || null,
+      remark: null,
+      wp_ref: null,
+    }])
+  }
+
+  // ─── 审计范围列 (余额/类别/会计估计, 源 B50-3) ─────────────────────────
+
+  function setScopeField(
+    account: string,
+    field: 'balance' | 'category' | 'estimate',
+    value: string | number | null,
+  ): void {
+    const row = accounts.value.find(a => a.name === account)
+    if (!row) return
+    if (field === 'balance') {
+      const n = value === '' || value == null ? null : Number(value)
+      row.balance = n != null && !Number.isNaN(n) ? n : null
+      saveImmediate([{
+        item_id: `B50-T3-balance-${account}`,
+        conclusion: null,
+        remark: row.balance != null ? String(row.balance) : null,
+        wp_ref: null,
+      }])
+    } else if (field === 'category') {
+      row.category = (value as ScopeCategory) || ''
+      saveImmediate([{
+        item_id: `B50-T3-category-${account}`,
+        conclusion: (value as string) || null,
+        remark: null,
+        wp_ref: null,
+      }])
+    } else if (field === 'estimate') {
+      row.isEstimate = (value as string) || ''
+      saveImmediate([{
+        item_id: `B50-T3-estimate-${account}`,
+        conclusion: (value as string) || null,
+        remark: null,
+        wp_ref: null,
+      }])
+    }
+  }
+
+  /** 行是否存在高综合风险认定 */
+  function rowHasHighCombined(row: AccountRow): boolean {
+    return ASSERTIONS.some(a => row.cells[a].combinedRisk === 'H')
+  }
+
+  /** 行建议应对方案（纯 computeSuggestedApproach 包装，仅建议不覆盖手选） */
+  function suggestedApproach(account: string): '' | AuditApproach {
+    const row = accounts.value.find(a => a.name === account)
+    if (!row) return ''
+    return computeSuggestedApproach(row.category, rowHasHighCombined(row))
+  }
+
+  /** 引导弹窗批量应用一个科目的全部字段变更，单次 saveImmediate（不混用 debounce）。 */
+  function applyAccountPatch(account: string, patch: AccountPatch): void {
+    const row = accounts.value.find(a => a.name === account)
+    if (!row) return
+    const batch: ChecklistItem[] = []
+
+    if (patch.balance !== undefined) {
+      const n = patch.balance == null || Number.isNaN(Number(patch.balance)) ? null : Number(patch.balance)
+      row.balance = n
+      batch.push({ item_id: `B50-T3-balance-${account}`, conclusion: null, remark: n != null ? String(n) : null, wp_ref: null })
+    }
+    if (patch.category !== undefined) {
+      row.category = patch.category
+      batch.push({ item_id: `B50-T3-category-${account}`, conclusion: patch.category || null, remark: null, wp_ref: null })
+    }
+    if (patch.estimate !== undefined) {
+      row.isEstimate = patch.estimate
+      batch.push({ item_id: `B50-T3-estimate-${account}`, conclusion: patch.estimate || null, remark: null, wp_ref: null })
+    }
+    if (patch.cycle !== undefined) {
+      row.cycle = patch.cycle
+      batch.push({ item_id: `B50-T3-cycle-${account}`, conclusion: patch.cycle || null, remark: null, wp_ref: null })
+    }
+    if (patch.reliance !== undefined) {
+      row.plannedReliance = patch.reliance
+      batch.push({ item_id: `B50-T3-plan-${account}-reliance`, conclusion: patch.reliance || null, remark: null, wp_ref: null })
+    }
+    if (patch.subonly !== undefined) {
+      row.substantiveOnlySufficient = patch.subonly
+      batch.push({ item_id: `B50-T3-plan-${account}-subonly`, conclusion: patch.subonly || null, remark: null, wp_ref: null })
+    }
+    if (patch.approach !== undefined) {
+      row.approach = patch.approach
+      batch.push({ item_id: `B50-T3-plan-${account}-approach`, conclusion: patch.approach || null, remark: null, wp_ref: null })
+    }
+    if (patch.cells) {
+      for (const a of ASSERTIONS) {
+        const cp = patch.cells[a]
+        if (!cp) continue
+        const cell = row.cells[a]
+        if (cp.ir !== undefined) {
+          cell.inherentRisk = cp.ir
+          batch.push({ item_id: cellItemId(account, a, 'IR'), conclusion: cp.ir, remark: null, wp_ref: null })
+        }
+        if (cp.cr !== undefined) {
+          cell.controlRisk = cp.cr
+          batch.push({ item_id: cellItemId(account, a, 'CR'), conclusion: cp.cr, remark: null, wp_ref: null })
+        }
+        if (cp.rmm !== undefined) {
+          cell.combinedRisk = cp.rmm
+          batch.push({ item_id: cellItemId(account, a, 'RMM'), conclusion: cp.rmm, remark: cell.remark || null, wp_ref: null })
+        }
+        if (cp.special !== undefined) {
+          // 管理层凌驾控制不允许取消
+          if (!(account === '管理层凌驾控制' && cell.isSpecialRisk && !cp.special)) {
+            cell.isSpecialRisk = cp.special
+            batch.push({ item_id: cellItemId(account, a, 'SR'), conclusion: cp.special ? 'Y' : null, remark: null, wp_ref: null })
+          }
+        }
+      }
+    }
+    if (batch.length) saveImmediate(batch)
   }
 
   // ─── Cell Risk Operations ──────────────────────────────────────────────
@@ -467,9 +770,16 @@ export function useB50RiskMatrix(tab3Data: Ref<Tab3State>, saveImmediate: SaveFn
     // Matrix state
     accounts,
     addAccount,
+    importAccounts,
     removeAccount,
     setCellRisk,
     toggleSpecialRisk,
+    setCycle,
+    setPlanField,
+    setScopeField,
+    suggestedApproach,
+    applyAccountPatch,
+    ensurePresetCycleDefaults,
     // Computed
     matrixStats,
     incompleteAccounts,

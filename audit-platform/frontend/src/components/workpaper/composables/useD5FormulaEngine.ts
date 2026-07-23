@@ -176,3 +176,18 @@ export function calcImpairmentEnd(
 ): number {
   return priorEnd + provision - reversal - writeOff
 }
+
+// ─── ECL 阶段辅助 ──────────────────────────────────────────────────────
+
+/** ECL阶段选项 */
+export const ECL_STAGE_OPTIONS = ['阶段一', '阶段二', '阶段三'] as const
+
+/**
+ * 判断信用风险是否显著增加(简化规则)
+ * 逾期>30天 或 明确违约标志 → 阶段二/三
+ */
+export function suggestEclStage(overdueDays: number, isDefault = false): string {
+  if (isDefault || overdueDays > 90) return '阶段三'
+  if (overdueDays > 30) return '阶段二'
+  return '阶段一'
+}

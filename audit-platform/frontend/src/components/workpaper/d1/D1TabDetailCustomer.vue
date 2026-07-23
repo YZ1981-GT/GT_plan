@@ -33,6 +33,7 @@ const props = defineProps<{
   isReadonly: boolean
   sheetName?: string
   relatedParties?: string[]
+  bsDate?: string
 }>()
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
@@ -97,6 +98,7 @@ const {
   addRow,
   removeRow,
   updateCell,
+  importPostSettlementFromLedger,
   saveAuditProcedures,
   saveAuditNote,
   saveAuditConclusion,
@@ -111,7 +113,19 @@ const {
   },
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
   relatedParties: relatedParties as Ref<string[]>,
+  bsDate: toRef(props, 'bsDate') as unknown as Ref<string>,
 })
+
+const loadingPostSettlement = ref(false)
+async function onImportPostSettlement() {
+  if (loadingPostSettlement.value) return
+  loadingPostSettlement.value = true
+  try {
+    await importPostSettlementFromLedger()
+  } finally {
+    loadingPostSettlement.value = false
+  }
+}
 
 const rowCount = computed(() => rows.value.length)
 const { useLargeTable, tableMaxHeight } = useD1VirtualBrowse(rowCount)
@@ -306,6 +320,18 @@ function onReview(sectionId: string) {
             <el-button size="small">导入数据</el-button>
           </el-upload>
         </el-button-group>
+        <el-tooltip content="从次年序时账提取资产负债表日后科目1121贷方（票据承兑收款），按客户归集填入期后兑付列" placement="top">
+          <el-button
+            type="warning"
+            plain
+            size="small"
+            :loading="loadingPostSettlement"
+            :disabled="isReadonly"
+            @click="onImportPostSettlement"
+          >
+            取期后兑付
+          </el-button>
+        </el-tooltip>
         <el-button
           type="primary"
           size="small"
@@ -539,6 +565,26 @@ function onReview(sectionId: string) {
         <el-table-column label="期末审定" min-width="110" align="right">
           <template #default="{ row }">
             <span style="font-weight: 600" v-html="fmtAmount(row.currentAudited)" />
+          </template>
+        </el-table-column>
+
+        <el-table-column min-width="120" align="right">
+          <template #header>
+            <el-tooltip content="资产负债表日后票据承兑收款（存在性/可回收性证据；可点「取期后兑付」按客户自动归集）" placement="top">
+              <span>期后兑付 ⓘ</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.rowId !== 'subtotal' && !isReadonly"
+              class="cell-amount-input"
+              :model-value="row.postSettlement"
+              size="small"
+              :controls="false"
+              :precision="2"
+              @change="(v: number) => updateCell(row.rowId, 'postSettlement', v || 0)"
+            />
+            <span v-else v-html="fmtAmount(row.postSettlement)" />
           </template>
         </el-table-column>
       </el-table>

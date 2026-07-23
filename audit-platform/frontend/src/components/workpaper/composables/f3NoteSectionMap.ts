@@ -45,13 +45,24 @@ export interface F3NoteClassRow {
   priorAmount: number
 }
 
+import type { ColumnDef } from './disclosureColumnDefs'
+
 export interface F3SyncFromWorkpaperPayload {
   wp_id: string
   sheet_name: string
   section_id: string
   current_standard: string
   sub_table_data: Record<string, Record<string, unknown>[]>
+  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 F3 披露组件既有 el-table-column */
+  columns?: Record<string, ColumnDef[]>
 }
+
+// 应付票据子表列头：逐字取自 F3TabDisclosureListed/SOE el-table-column（种类/期末余额/上年年末余额）
+const F3_YFPJ_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '种类', is_label: true },
+  { key: 'end_amount', label: '期末余额', format: 'amount' },
+  { key: 'prior_amount', label: '上年年末余额', format: 'amount' },
+]
 
 /**
  * 按附注模板行序（商业承兑汇票 → 银行承兑汇票）排序分类行；
@@ -61,9 +72,11 @@ export function orderF3ClassRows(rows: readonly F3NoteClassRow[]): F3NoteClassRo
   const order = (label: string): number => {
     if (label.includes('商业承兑')) return 0
     if (label.includes('银行承兑')) return 1
-    return 2
+    if (label.includes('供应链')) return 2
+    return 3
   }
   const merged: F3NoteClassRow[] = [...rows]
+  // 银行/商业承兑始终列示；供应链/其他仅在来源已提供时保留（不强制补零行）
   for (const label of ['商业承兑汇票', '银行承兑汇票']) {
     if (!merged.some((r) => r.label.includes(label.slice(0, 4)))) {
       merged.push({ label, endAmount: 0, priorAmount: 0 })
@@ -103,5 +116,6 @@ export function buildF3SyncPayload(
         { section: `${variant}-note`, text: noteText },
       ],
     },
+    columns: { 应付票据: F3_YFPJ_COLUMNS },
   }
 }

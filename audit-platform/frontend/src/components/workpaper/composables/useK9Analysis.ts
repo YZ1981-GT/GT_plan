@@ -202,6 +202,8 @@ export function useK9Analysis(params: UseK9AnalysisParams) {
   function _persist(): void {
     if (!onSave) return
     onSave(ROWS_KEY, rows.value)
+    // 写本期发生额合计供 useK9CrossSheet.analysisVsDetail 交叉验证（原死键）
+    onSave(`${ITEM_PREFIX}-analysis-total`, summary.value.totalAmount)
   }
 
   function saveOverallConclusion(conclusion: string): void {

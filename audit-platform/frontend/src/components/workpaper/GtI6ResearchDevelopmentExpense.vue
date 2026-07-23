@@ -35,6 +35,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :applicable-standards="applicableStandards"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
@@ -56,6 +57,7 @@
           :all-responses="allResponses"
           :tb-data="tbData"
           :is-readonly="isReadonly"
+          :applicable-standards="applicableStandards"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
@@ -66,8 +68,10 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :tb-data="tbData"
           :is-readonly="isReadonly"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I6-3 调整分录 -->
@@ -88,7 +92,9 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I6-5 截止测试（账→单据） -->
@@ -96,9 +102,12 @@
           v-else-if="currentSheet === 'I6-5'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
+          :year="props.year"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
-          @save="handleChildSave"
+          @save="emit('save')"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- I6-6 截止测试（单据→账） -->
@@ -106,28 +115,33 @@
           v-else-if="currentSheet === 'I6-6'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
+          :year="props.year"
           :all-responses="allResponses"
+          :save-response="saveResponse"
           :is-readonly="isReadonly"
-          @save="handleChildSave"
+          @save="emit('save')"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- 附注披露（上市） -->
         <I6TabDisclosureListed
-          v-else-if="currentSheet === '附注上市'"
+          v-else-if="currentSheet === '附注上市' && disclosureVis.listed"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :applicable-standards="applicableStandards"
           @save="handleChildSave"
         />
 
         <!-- 附注披露（国企） -->
         <I6TabDisclosureSoe
-          v-else-if="currentSheet === '附注国企'"
+          v-else-if="currentSheet === '附注国企' && disclosureVis.soe"
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :applicable-standards="applicableStandards"
           @save="handleChildSave"
         />
 
@@ -166,6 +180,8 @@ import { ref, computed, onMounted, provide, toRef, defineAsyncComponent, inject}
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useI6DualMode } from './composables/useI6DualMode'
+import { useI6CrossSheet } from './composables/useI6CrossSheet'
+import { resolveI6DisclosureVisibility } from './composables/i6ApplicableSheets'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
@@ -194,12 +210,24 @@ const props = defineProps<{
   year?: number
   htmlData?: any
   readonly?: boolean
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navigate-sheet', sheetName: string): void }>()
 
+const runtime = inject(WorkpaperRuntimeContextKey, null)
+
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
+const applicableStandards = computed<string[]>(() => {
+  const fromProp = props.applicableStandards
+  if (fromProp?.length) return fromProp
+  const fromRuntime = (runtime as any)?.applicableStandards?.value
+  if (Array.isArray(fromRuntime) && fromRuntime.length) return fromRuntime
+  const fromHtml = props.htmlData?.applicableStandards
+  return Array.isArray(fromHtml) ? fromHtml : []
+})
+const disclosureVis = computed(() => resolveI6DisclosureVisibility(applicableStandards.value))
 const isLoading = ref(true)
 const allResponses = ref<Map<string, any>>(new Map())
 const tbData = ref({
@@ -216,6 +244,9 @@ const dualMode = useI6DualMode({
   reloadAll: async () => { await selfLoad() },
 })
 
+const crossSheet = useI6CrossSheet(allResponses)
+provide('i6CrossSheet', crossSheet)
+
 /** 当前 sheet 是否为 HTML 可渲染（有匹配子组件） */
 const isHtmlSheet = computed(() => currentSheet.value !== '')
 
@@ -227,9 +258,9 @@ const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''
   // 底稿目录
   if (/底稿目录/.test(name)) return 'I6'
-  // 附注匹配
-  if (/附注.*上市/.test(name)) return '附注上市'
-  if (/附注.*国/.test(name)) return '附注国企'
+  // 附注匹配（不可见时回退目录）
+  if (/附注.*上市/.test(name)) return disclosureVis.value.listed ? '附注上市' : 'I6'
+  if (/附注.*国/.test(name)) return disclosureVis.value.soe ? '附注国企' : 'I6'
   // 程序表 I6A
   if (/I6A/.test(name)) return 'I6A'
   // I6-N 编码（I6-1 到 I6-6）
@@ -256,6 +287,25 @@ async function handleChildSave(itemId: string, value: any): Promise<void> {
   }
 }
 
+/** 批量 save（I6-5/I6-6 截止测试等子组件契约） */
+async function saveResponse(_sheetCode: string, data: Record<string, any>): Promise<void> {
+  if (!props.wpId) return
+  const items = Object.entries(data).map(([item_id, value]) => ({
+    item_id,
+    conclusion: null,
+    remark: value != null ? (typeof value === 'string' ? value : JSON.stringify(value)) : null,
+  }))
+  for (const it of items) allResponses.value.set(it.item_id, it)
+  try {
+    await http.put(`/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items,
+    })
+  } catch {
+    // 静默失败，数据保留在本地
+  }
+}
+
 // ─── TB自动取数（6602研发费用 — 损益类取发生额！） ──────────────────────────────
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
@@ -269,7 +319,12 @@ async function _loadTbData(): Promise<void> {
     for (const item of list) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')
       if (code.startsWith('6602')) {
-        u6602 += Number(item.unadjusted_amount ?? 0)
+        const debit = Number(item.borrowing_amount ?? item.period_debit ?? item.debit_amount ?? 0)
+        const credit = Number(item.lending_amount ?? item.period_credit ?? item.credit_amount ?? 0)
+        const net = item.unadjusted_amount != null && item.unadjusted_amount !== ''
+          ? Number(item.unadjusted_amount)
+          : (debit - credit)
+        u6602 += Number.isFinite(net) ? net : 0
         a6602 += Number(item.audited_amount ?? 0)
       }
     }
@@ -320,7 +375,6 @@ async function selfLoad(): Promise<void> {
 // openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide（真实复核对话）
 
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
-const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)

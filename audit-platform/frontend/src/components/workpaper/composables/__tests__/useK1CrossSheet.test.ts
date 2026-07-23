@@ -111,6 +111,33 @@ describe('useK1CrossSheet', () => {
     })
   })
 
+  describe('adjudicationVsK14', () => {
+    it('matches when K1-1 AJE/RJE totals equal K1-4 nets', () => {
+      const map = new Map<string, any>()
+      map.set('K1-1-receivable-count', { remark: '1' })
+      map.set('K1-1-baddebt-count', { remark: '1' })
+      map.set('K1-1-receivable-r0-aje', { remark: '3000' })
+      map.set('K1-1-receivable-r0-rje', { remark: '0' })
+      map.set('K1-1-baddebt-r0-aje', { remark: '-500' })
+      map.set('K1-1-baddebt-r0-rje', { remark: '0' })
+      map.set('K1-4-aje-net', { remark: '3000' })
+      map.set('K1-4-bd-aje-net', { remark: '-500' })
+      const { adjudicationVsK14 } = useK1CrossSheet(ref(map))
+      expect(adjudicationVsK14.value.isMatch).toBe(true)
+    })
+
+    it('detects diff when K1-1 not synced from K1-4', () => {
+      const map = new Map<string, any>()
+      map.set('K1-1-receivable-count', { remark: '1' })
+      map.set('K1-1-baddebt-count', { remark: '1' })
+      map.set('K1-1-receivable-r0-aje', { remark: '0' })
+      map.set('K1-4-aje-net', { remark: '3000' })
+      const { adjudicationVsK14 } = useK1CrossSheet(ref(map))
+      expect(adjudicationVsK14.value.receivableAjeDiff).toBe(-3000)
+      expect(adjudicationVsK14.value.isMatch).toBe(false)
+    })
+  })
+
   describe('reactivity', () => {
     it('should reactively update when allResponses changes', () => {
       const map = new Map<string, any>()

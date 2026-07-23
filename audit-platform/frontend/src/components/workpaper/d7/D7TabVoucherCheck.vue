@@ -27,7 +27,9 @@
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <el-button v-if="!isReadonly" size="small" type="primary" @click="samplingVisible = true">🎲 抽凭引擎</el-button>
+      </div>
       <div class="toolbar-right">
         <el-dropdown v-if="!isReadonly" size="small" trigger="click">
           <el-button size="small">导入导出 ▾</el-button>
@@ -292,6 +294,19 @@
         />
       </div>
     </el-card>
+
+    <!-- 抽凭引擎弹窗 -->
+    <el-dialog v-model="samplingVisible" title="抽凭引擎 — 合同负债(2205)" width="90%" top="5vh" destroy-on-close>
+      <GtVoucherSamplingEngine
+        v-if="samplingVisible"
+        account-code="2205"
+        phase="final"
+        :workpaper-id="props.wpId"
+        :project-id="props.projectId"
+        :year="samplingYear"
+        @filled="onSamplesFilled"
+      />
+    </el-dialog>
 </div>
 </template>
 
@@ -302,7 +317,7 @@
  * Task: 22.1
  * Requirements: 12.1-12.9, 18.5, 19.4, 20.1, 21.1-21.3
  */
-import { computed, inject, toRef, type Ref } from 'vue'
+import { computed, inject, ref, toRef, defineAsyncComponent, type Ref } from 'vue'
 import { useD7VoucherCheck } from '../composables/useD7VoucherCheck'
 import { useD7ImportExport } from '../composables/useD7ImportExport'
 import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
@@ -313,6 +328,8 @@ import type { ChecklistResponse } from '../composables/useD7FormData'
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
 
+const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../voucher-sampling/GtVoucherSamplingEngine.vue'))
+
 const props = defineProps<{
   wpId: string
   projectId: string
@@ -321,6 +338,7 @@ const props = defineProps<{
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   crossSheet: any
+  year?: number
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
@@ -360,6 +378,28 @@ const CONCLUSION_TEMPLATES = [
   { value: 'cutoff-issue', label: '发现收入确认时点不当，期后结转存在截止差异，建议调整。' },
   { value: 'other', label: '其他（请手动编写结论）。' },
 ]
+
+// ─── 抽凭引擎 ──────────────────────────────────────────────────────
+const samplingVisible = ref(false)
+const samplingYear = computed(() => props.year || new Date().getFullYear() - 1)
+
+function onSamplesFilled(payload: any): void {
+  const samples = payload?.samples
+  if (!Array.isArray(samples) || samples.length === 0) return
+  // Map SampledVoucher → period change rows
+  for (const s of samples) {
+    addSample('period')
+    const newRow = periodChangeRows.value[periodChangeRows.value.length - 1]
+    if (newRow) {
+      updateCell('period', newRow.rowId, 'customerName', s.counterpartAccount || '')
+      updateCell('period', newRow.rowId, 'voucherNo', s.voucherNo || '')
+      updateCell('period', newRow.rowId, 'date', s.voucherDate || '')
+      updateCell('period', newRow.rowId, 'debitAmount', s.debitAmount || 0)
+      updateCell('period', newRow.rowId, 'creditAmount', s.creditAmount || 0)
+    }
+  }
+  samplingVisible.value = false
+}
 
 function onConclusionTemplateSelect(val: string) {
   if (val) auditNotes.value.conclusion = val

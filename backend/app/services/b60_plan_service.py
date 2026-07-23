@@ -115,12 +115,16 @@ class PlanUpdateResponse(BaseModel):
 
 
 class ScotRow(BaseModel):
-    scot_id: str = ""
-    name: str = ""
-    cycle_code: str = ""
-    risk_id: str = ""
-    procedure_wp_index: str = ""
-    rely_on_controls: str = ""  # 是/否/待测
+    scot_id: str = ""            # 识别出的底稿索引号
+    name: str = ""               # 相关交易类别、账户余额和披露名称
+    detail: str = ""             # 所包括的具体交易、账户和披露（T26）
+    approach: str = ""           # 拟采取的方案：综合性/实质性/综合性与实质性结合
+    cycle_code: str = ""         # 循环代码 D~N
+    risk_id: str = ""            # 风险ID / B50 行号
+    procedure_wp_index: str = ""  # 拟用程序底稿索引
+    rely_on_controls: str = ""   # 是否拟依赖控制：是/否/待测（T26）
+    control_test: str = ""       # 整合审计是否做业务层控制测试（T27）
+    row_type: str = "scot"       # scot（SCOT+）/ amount（仅金额重大）
 
 
 class ScotRowsPayload(BaseModel):

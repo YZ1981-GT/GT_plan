@@ -55,6 +55,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :tb-data="tbData"
+          :adjudication-prefill="adjudicationPrefill"
           :is-readonly="isReadonly"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
@@ -67,6 +68,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :related-parties="k1RelatedParties"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
@@ -88,6 +90,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :year="props.year"
           :is-readonly="isReadonly"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
@@ -100,6 +103,9 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :related-parties="k1RelatedParties"
+          :bs-date="k1BsDate"
+          :year="props.year"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
@@ -112,6 +118,7 @@
           :all-responses="allResponses"
           :is-readonly="isReadonly"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- K1-7 三阶段划分 -->
@@ -144,6 +151,7 @@
           :all-responses="allResponses"
           :is-readonly="isReadonly"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- K1-10 长期未收回检查 -->
@@ -153,7 +161,10 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :bs-date="k1BsDate"
+          :year="props.year"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- K1-11 关联方检查 -->
@@ -163,7 +174,11 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :related-parties="k1RelatedParties"
+          :bs-date="k1BsDate"
+          :year="props.year"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- K1-12 其他应收款检查 -->
@@ -175,6 +190,7 @@
           :is-readonly="isReadonly"
           :year="props.year"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- 附注披露（上市） -->
@@ -185,6 +201,7 @@
           :all-responses="allResponses"
           :is-readonly="isReadonly"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- 附注披露（国企） -->
@@ -195,6 +212,7 @@
           :all-responses="allResponses"
           :is-readonly="isReadonly"
           @save="handleChildSave"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
         <!-- 未匹配 → OnlyOffice fallback -->
@@ -226,7 +244,7 @@
  * Spec: .kiro/specs/k1-other-receivables/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent, provide } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
@@ -235,6 +253,9 @@ import {
   WorkpaperRuntimeContextKey,
   type WorkpaperRuntimeContext,
 } from './composables/useWorkpaperScaffold'
+import { createK1RowNavigation, K1RowNavigationKey } from './composables/useK1RowNavigation'
+import { resolveK1BsDate } from './composables/k1PostPaymentFromLedger'
+import type { K1AdjudicationPrefill } from './composables/useK1Adjudication'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
@@ -278,9 +299,43 @@ const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
 }>()
 
+const k1RowNav = createK1RowNavigation((sheetName) => emit('navigate-sheet', sheetName))
+provide(K1RowNavigationKey, k1RowNav)
+
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
 const isLoading = ref(true)
+
+/** B19 关联方清单：后端 render 注入，供 K1-2/K1-11 完整性校验 */
+const k1RelatedParties = computed<string[]>(() => {
+  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
+  const raw = ctx.related_parties
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((p: unknown) => {
+      if (typeof p === 'string') return p
+      if (p && typeof p === 'object') {
+        const o = p as Record<string, unknown>
+        return String(o.name ?? o.party_name ?? o.partyName ?? '')
+      }
+      return ''
+    })
+    .filter(Boolean)
+})
+
+/** 资产负债表日：供期后回款窗口 */
+const k1BsDate = computed(() => {
+  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
+  return resolveK1BsDate(ctx.bs_date ?? ctx.bsDate, props.year ?? ctx.audit_year)
+})
+
+/** 审定表 tb_balance 预填（仅无持久化未审数时由后端返回） */
+const adjudicationPrefill = computed<K1AdjudicationPrefill | null>(() => {
+  const raw = props.htmlData?.adjudication_prefill ?? props.htmlData?.adjudicationPrefill
+  if (!raw || typeof raw !== 'object') return null
+  return raw as K1AdjudicationPrefill
+})
+
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed<string | undefined>(() => props.projectId || undefined)
 const persistence = useChecklistPersistence({ wpId: wpIdRef, projectId: projectIdRef })
@@ -368,6 +423,23 @@ async function handleChildSave(itemId: string, value: unknown): Promise<void> {
 
 // ─── TB自动取数（1221其他应收款 + 坏账准备） ──────────────────────────────────
 async function _loadTbData(): Promise<void> {
+  // 优先用 render 注入的 tb_values，避免重复请求
+  const seeded = props.htmlData?.tb_values ?? props.htmlData?.tbValues
+  if (seeded && typeof seeded === 'object') {
+    const u1221 = Number(seeded.receivable_unadjusted ?? seeded.receivableUnadjusted ?? 0)
+    const a1221 = Number(seeded.receivable_audited ?? seeded.receivableAudited ?? 0)
+    const uBd = Number(seeded.bad_debt_unadjusted ?? seeded.badDebtUnadjusted ?? 0)
+    const aBd = Number(seeded.bad_debt_audited ?? seeded.badDebtAudited ?? 0)
+    // closing 兜底：无 trial_balance 未审时用 tb_balance 期末
+    tbData.value = {
+      unadjusted1221: u1221 || Number(seeded.receivable_unadjusted_closing ?? 0),
+      audited1221: a1221 || Number(seeded.receivable_unadjusted_closing ?? 0),
+      unadjustedBadDebt: Math.abs(uBd || Number(seeded.bad_debt_unadjusted_closing ?? 0)),
+      auditedBadDebt: Math.abs(aBd || Number(seeded.bad_debt_unadjusted_closing ?? 0)),
+    }
+    if (tbData.value.unadjusted1221 || tbData.value.unadjustedBadDebt) return
+  }
+
   if (!props.projectId) return
   try {
     const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {

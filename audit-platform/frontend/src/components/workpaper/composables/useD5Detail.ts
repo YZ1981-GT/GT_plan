@@ -50,6 +50,8 @@ export interface DetailRow {
   endRje: number              // N: 期末重分类调整
   endAudited: number          // O: =L+M+N（自动）
   endOciImpairment: number    // P: 期末OCI减值
+  postRealized: number        // R: 期后兑现金额(验证完整性)
+  eclStage: string            // S: ECL信用风险阶段(阶段一/阶段二/阶段三)
   remark: string              // Q: 备注
 }
 
@@ -109,6 +111,8 @@ function normalizeRow(raw: any): DetailRow {
     endRje: parseNum(raw.endRje),
     endAudited: parseNum(raw.endAudited),
     endOciImpairment: parseNum(raw.endOciImpairment),
+    postRealized: parseNum(raw.postRealized),
+    eclStage: raw.eclStage || '',
     remark: raw.remark || '',
   }
 }
@@ -155,6 +159,8 @@ export function createEmptyRow(): DetailRow {
     endRje: 0,
     endAudited: 0,
     endOciImpairment: 0,
+    postRealized: 0,
+    eclStage: '',
     remark: '',
   }
 }
@@ -181,6 +187,8 @@ function sumRows(rows: DetailRow[], label: string): DetailRow {
     endRje: calcSubtotal(rows.map(r => r.endRje)),
     endAudited: calcSubtotal(rows.map(r => r.endAudited)),
     endOciImpairment: calcSubtotal(rows.map(r => r.endOciImpairment)),
+    postRealized: calcSubtotal(rows.map(r => r.postRealized)),
+    eclStage: '',
     remark: '',
   }
 }
@@ -271,7 +279,7 @@ export function useD5Detail(options: UseD5DetailOptions) {
       'priorUnadjusted', 'priorAje', 'priorRje',
       'ociImpairment', 'periodIncrease', 'periodDecrease',
       'entityReclass', 'endAje', 'endRje',
-      'endOciImpairment',
+      'endOciImpairment', 'postRealized',
     ]
 
     if (numericFields.includes(field)) {
@@ -463,6 +471,83 @@ export function useD5Detail(options: UseD5DetailOptions) {
     }
   }
 
+  // ─── importPostRealizedFromLedger（从次年序时账取期后兑现）──────────
+
+  /**
+   * 从次年序时账1124贷方（兑付/贴现/背书=贷方减少）按明细名归集期后兑现金额
+   * 仅填入空值行(postRealized===0)，不覆盖已手工填入的数据
+   */
+  async function importPostRealizedFromLedger(bsDate: string): Promise<void> {
+    if (isReadonly.value || !projectId.value) return
+
+    const bsYear = bsDate ? parseInt(bsDate.substring(0, 4)) : new Date().getFullYear()
+    const nextYear = bsYear + 1
+    const dateFrom = `${nextYear}-01-01`
+    const dateTo = `${nextYear}-06-30` // 默认期后窗口6个月
+
+    try {
+      const res = await api.get(
+        `/api/projects/${projectId.value}/ledger/entries`,
+        {
+          params: {
+            account_code: '1124',
+            year: nextYear,
+            date_from: dateFrom,
+            date_to: dateTo,
+          },
+        },
+      )
+      const entries: any[] = Array.isArray(res) ? res : (res?.data ?? res?.items ?? [])
+
+      if (entries.length === 0) {
+        ElMessage.info('未找到期后序时账1124贷方数据')
+        return
+      }
+
+      // 按摘要/对方科目名归集贷方金额(1124贷方=减少=兑现)
+      const realizedMap = new Map<string, number>()
+      for (const entry of entries) {
+        const credit = parseNum(entry.credit_amount ?? entry.credit)
+        if (credit <= 0) continue
+        const name = entry.summary || entry.counterpart_name || entry.item_name || '未命名'
+        realizedMap.set(name, (realizedMap.get(name) || 0) + credit)
+      }
+
+      if (realizedMap.size === 0) {
+        ElMessage.info('期后无1124贷方发生额(无兑现)')
+        return
+      }
+
+      // 按名称模糊匹配回填
+      let fillCount = 0
+      const newRows = rows.value.map(row => {
+        if (row.postRealized !== 0) return row // 已有值不覆盖
+        // 精确匹配优先,再模糊
+        let matched = realizedMap.get(row.itemName)
+        if (matched === undefined) {
+          // 双向包含
+          for (const [name, amount] of realizedMap) {
+            if (row.itemName && (name.includes(row.itemName) || row.itemName.includes(name))) {
+              matched = amount
+              break
+            }
+          }
+        }
+        if (matched !== undefined && matched > 0) {
+          fillCount++
+          return { ...row, postRealized: matched }
+        }
+        return row
+      })
+
+      rows.value = newRows
+      persistRows()
+      ElMessage.success(`期后兑现取数完成：匹配${fillCount}笔，序时账共${realizedMap.size}个对方`)
+    } catch {
+      ElMessage.error('从序时账取数失败，请稍后重试')
+    }
+  }
+
   // ─── Cleanup EventBus listeners ─────────────────────────────────────
 
   onBeforeUnmount(() => {
@@ -485,6 +570,7 @@ export function useD5Detail(options: UseD5DetailOptions) {
     importFromD1,
     importFromD2,
     importFromAuxBalance,
+    importPostRealizedFromLedger,
   }
 }
 

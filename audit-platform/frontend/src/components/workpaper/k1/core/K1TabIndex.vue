@@ -40,6 +40,33 @@
       </div>
     </div>
 
+    <!-- ═══ 跨表勾稽仪表盘 ═══ -->
+    <el-card v-if="crossAlerts.length" shadow="never" class="k1-cross-dashboard">
+      <template #header>
+        <div class="cross-dash-header">
+          <span class="group-title">跨表勾稽</span>
+          <el-tag :type="crossOpenCount ? 'warning' : 'success'" size="small">
+            {{ crossOpenCount ? `${crossOpenCount} 项待处理` : '全部平衡' }}
+          </el-tag>
+        </div>
+      </template>
+      <div class="cross-alert-list">
+        <el-alert
+          v-for="a in crossAlerts"
+          :key="a.id"
+          :type="a.severity === 'error' ? 'error' : a.severity === 'warning' ? 'warning' : 'info'"
+          :closable="false"
+          class="cross-item"
+        >
+          <template #title>{{ a.title }}</template>
+          <div class="cross-item-body">
+            <span>{{ a.detail }}</span>
+            <el-button size="small" link type="primary" @click="emit('navigate-sheet', a.targetSheet)">前往 →</el-button>
+          </div>
+        </el-alert>
+      </div>
+    </el-card>
+
     <!-- ═══ 底稿目录表格（分组） ═══ -->
     <!-- 核心组 core: K1A ~ K1-4 -->
     <el-card shadow="never" class="k1-group-card group-core">
@@ -218,8 +245,10 @@
  *
  * Requirements: 1.2
  */
-import { computed } from 'vue'
+import { computed, toRef } from 'vue'
 import { InfoFilled } from '@element-plus/icons-vue'
+import { calcK1SheetProgress } from '../../composables/k1SheetProgress'
+import { useK1IndexCrossCheck } from '../../composables/k1IndexCrossCheck'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -234,6 +263,9 @@ const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
 }>()
 
+const allResponsesRef = toRef(props, 'allResponses')
+const { alerts: crossAlerts, openCount: crossOpenCount } = useK1IndexCrossCheck(allResponsesRef)
+
 // ─── Sheet 行定义 ─────────────────────────────────────────────────────────────
 
 interface SheetRow {
@@ -247,19 +279,10 @@ interface SheetRow {
 }
 
 /**
- * 根据 allResponses 中以指定前缀存储的字段数计算完成度。
- * 简单策略：有任何以 K1-{sheet} 前缀的响应即视为进行中(50%)，
- * 字段数 >= expectedFields 即完成(100%)。
+ * 根据实际 storage key 前缀计算各 sheet 完成度。
  */
-function calcSheetProgress(prefix: string, expectedFields: number): number {
-  if (!props.allResponses || props.allResponses.size === 0) return 0
-  let count = 0
-  for (const key of props.allResponses.keys()) {
-    if (key.startsWith(prefix)) count++
-  }
-  if (count === 0) return 0
-  if (count >= expectedFields) return 100
-  return Math.min(Math.round((count / expectedFields) * 100), 99)
+function sheetProgress(code: string): number {
+  return calcK1SheetProgress(props.allResponses, code)
 }
 
 /** 16 个 sheet 的完整列表 */
@@ -272,7 +295,7 @@ const allSheets = computed<SheetRow[]>(() => [
     sheetKey: '其他应收款实质性程序表K1A',
     description: '实质性程序清单与执行情况',
     group: 'core',
-    progress: calcSheetProgress('K1-K1A-', 5),
+    progress: sheetProgress('K1A'),
   },
   {
     seq: 2,
@@ -281,7 +304,7 @@ const allSheets = computed<SheetRow[]>(() => [
     sheetKey: '审定表K1-1',
     description: '双区块审定（其他应收款+坏账准备），47公式',
     group: 'core',
-    progress: calcSheetProgress('K1-K1-1-', 10),
+    progress: sheetProgress('K1-1'),
   },
   {
     seq: 3,
@@ -290,7 +313,7 @@ const allSheets = computed<SheetRow[]>(() => [
     sheetKey: '明细表K1-2',
     description: '按对象+账龄列示（36列3区段Tab）',
     group: 'core',
-    progress: calcSheetProgress('K1-K1-2-', 8),
+    progress: sheetProgress('K1-2'),
   },
   {
     seq: 4,
@@ -299,7 +322,7 @@ const allSheets = computed<SheetRow[]>(() => [
     sheetKey: '坏账准备明细表K1-3',
     description: '计提/转回/核销管理，21公式',
     group: 'core',
-    progress: calcSheetProgress('K1-K1-3-', 6),
+    progress: sheetProgress('K1-3'),
   },
   {
     seq: 5,
@@ -308,7 +331,7 @@ const allSheets = computed<SheetRow[]>(() => [
     sheetKey: '调整分录汇总K1-4',
     description: 'AJE/RJE管理（借贷平衡校验）',
     group: 'core',
-    progress: calcSheetProgress('K1-K1-4-', 4),
+    progress: sheetProgress('K1-4'),
   },
   // ─── 减值 impairment ───
   {
@@ -318,7 +341,7 @@ const allSheets = computed<SheetRow[]>(() => [
     sheetKey: '信用减值损失会计政策检查K1-6',
     description: 'ECL模型选择/账龄组合/预期损失率依据',
     group: 'impairment',
-    progress: calcSheetProgress('K1-K1-6-', 4),
+    progress: sheetProgress('K1-6'),
   },
   {
     seq: 7,
@@ -327,7 +350,7 @@ const allSheets = computed<SheetRow[]>(() => [
     sheetKey: '三阶段划分检查表K1-7',
     description: 'ECL Stage1/2/3 划分（63行）',
     group: 'impairment',
-    progress: calcSheetProgress('K1-K1-7-', 6),
+    progress: sheetProgress('K1-7'),
   },
   {
     seq: 8,
@@ -336,7 +359,7 @@ const allSheets = computed<SheetRow[]>(() => [
     sheetKey: '坏账准备测算K1-8',
     description: '账龄+迁徙率+ECL测算（62行，11公式）',
     group: 'impairment',
-    progress: calcSheetProgress('K1-K1-8-', 8),
+    progress: sheetProgress('K1-8'),
   },
   // ─── 检查 inspection ───
   {
@@ -346,7 +369,7 @@ const allSheets = computed<SheetRow[]>(() => [
     sheetKey: '大额其他应收款情况分析表K1-5',
     description: '重点款项分析（9公式），金额降序',
     group: 'inspection',
-    progress: calcSheetProgress('K1-K1-5-', 5),
+    progress: sheetProgress('K1-5'),
   },
   {
     seq: 10,
@@ -355,7 +378,7 @@ const allSheets = computed<SheetRow[]>(() => [
     sheetKey: '坏账准备转回(收回)核销检查表K1-9',
     description: '审批依据+凭证+合规判断',
     group: 'inspection',
-    progress: calcSheetProgress('K1-K1-9-', 4),
+    progress: sheetProgress('K1-9'),
   },
   {
     seq: 11,
@@ -364,7 +387,7 @@ const allSheets = computed<SheetRow[]>(() => [
     sheetKey: '长期未收回款项检查表K1-10',
     description: '账龄+收回措施+可回收性评估',
     group: 'inspection',
-    progress: calcSheetProgress('K1-K1-10-', 4),
+    progress: sheetProgress('K1-10'),
   },
   {
     seq: 12,
@@ -373,7 +396,7 @@ const allSheets = computed<SheetRow[]>(() => [
     sheetKey: '关联方及交易检查表K1-11',
     description: '关联交易公允性+披露充分性',
     group: 'inspection',
-    progress: calcSheetProgress('K1-K1-11-', 4),
+    progress: sheetProgress('K1-11'),
   },
   {
     seq: 13,
@@ -382,7 +405,7 @@ const allSheets = computed<SheetRow[]>(() => [
     sheetKey: '其他应收款检查表K1-12',
     description: '综合检查（合规/不合规/不适用）',
     group: 'inspection',
-    progress: calcSheetProgress('K1-K1-12-', 6),
+    progress: sheetProgress('K1-12'),
   },
   // ─── 附注 disclosure ───
   {
@@ -392,7 +415,7 @@ const allSheets = computed<SheetRow[]>(() => [
     sheetKey: '附注披露信息（上市公司）',
     description: '上市公司其他应收款附注（166行12列）',
     group: 'disclosure',
-    progress: calcSheetProgress('K1-disclosure-listed-', 5),
+    progress: sheetProgress('附注上市'),
   },
   {
     seq: 15,
@@ -401,7 +424,7 @@ const allSheets = computed<SheetRow[]>(() => [
     sheetKey: '附注披露信息（国企）',
     description: '国有企业其他应收款附注（130行10列）',
     group: 'disclosure',
-    progress: calcSheetProgress('K1-disclosure-soe-', 5),
+    progress: sheetProgress('附注国企'),
   },
   {
     seq: 16,
@@ -476,6 +499,12 @@ function getProgressColor(percent: number): string {
   padding: 12px;
   font-size: var(--wp-font-size, 13px);
 }
+
+.k1-cross-dashboard { margin-bottom: 14px; }
+.cross-dash-header { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.cross-alert-list { display: flex; flex-direction: column; gap: 8px; }
+.cross-item-body { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; }
+.cross-item { margin: 0; }
 
 /* ─── 进度统计区 ─── */
 .k1-progress-section {

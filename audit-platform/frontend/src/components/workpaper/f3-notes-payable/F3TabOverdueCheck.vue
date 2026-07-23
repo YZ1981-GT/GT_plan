@@ -35,6 +35,7 @@ function fmt(v: number): string {
 const {
   rows, summary, filledCount, auditConclusion, addRow, removeRow, updateCell,
   mergeOcrFields, rowClassName,
+  pendingReclassRows, reclassPreview, pushReclassToAdjustment,
 } = useF3OverdueCheck({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
@@ -155,6 +156,29 @@ async function uploadAndRecognize(file: File) {
   }
 }
 
+async function handleGenerateReclass() {
+  if (props.isReadonly) return
+  const targets = reclassPreview.value
+  if (targets.length === 0) {
+    ElMessage.info('无逾期未调整票据，或金额为0，无需生成重分类分录')
+    return
+  }
+  const preview = targets
+    .map((t) => `· ${t.noteType || '票据'}${t.ticketNo ? `(${t.ticketNo})` : ''} ${fmt(t.amount)} → ${t.targetName}(${t.targetCode})`)
+    .join('\n')
+  try {
+    await ElMessageBox.confirm(
+      `将按源模板规则生成重分类分录（RJE，幂等替换本表历史生成项）：\n逾期银行承兑汇票→短期借款(2001)，逾期商业承兑汇票→应付账款(2202)。\n\n${preview}\n\n借：应付票据(2201) / 贷：目标科目。是否写入 F3-3 调整分录汇总？`,
+      '生成逾期重分类分录',
+      { confirmButtonText: '生成并写入 F3-3', cancelButtonText: '取消', type: 'warning' },
+    )
+    const { count, total } = pushReclassToAdjustment()
+    ElMessage.success(`已生成 ${count} 笔重分类（合计 ${fmt(total)}）并写入 F3-3`)
+  } catch (e: any) {
+    if (e !== 'cancel' && e?.message !== 'cancel') ElMessage.warning('生成失败')
+  }
+}
+
 function summaryMethod({ columns }: { columns: any[] }) {
   return columns.map((column, index) => {
     if (index === 0) return '合计'
@@ -189,10 +213,18 @@ function summaryMethod({ columns }: { columns: any[] }) {
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加逾期票据</el-button>
+        <el-button
+          size="small"
+          type="warning"
+          plain
+          :disabled="isReadonly || pendingReclassRows.length === 0"
+          @click="handleGenerateReclass"
+        >⇄ 生成逾期重分类分录（{{ pendingReclassRows.length }}）</el-button>
       </div>
       <div class="toolbar-right">
         <F3ImportExportToolbar :wp-id="wpId" :project-id="projectId" sheet="F3-5" :disabled="isReadonly" @imported="onImported" />
         <span class="chip-wrap"><GtIndexChip value="wp:F3-5" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:F3-3" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">已填 {{ filledCount }} 笔</el-tag>
         <el-tag v-if="summary.highRisk" size="small" type="danger">高风险 {{ summary.highRisk }} 笔</el-tag>
       </div>

@@ -475,8 +475,10 @@
       <GtVoucherSamplingEngine
         v-if="showSampling && wpId && projectId"
         :project-id="projectId"
-        :account-codes="['1605']"
-        dialog-mode
+        :workpaper-id="wpId"
+        account-code="1605"
+        phase="final"
+        :year="year ?? new Date().getFullYear()"
         @filled="onSampleFilled"
       />
     </el-dialog>
@@ -507,6 +509,7 @@ import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEng
 const props = defineProps<{
   wpId: string
   projectId: string
+  year?: number
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()

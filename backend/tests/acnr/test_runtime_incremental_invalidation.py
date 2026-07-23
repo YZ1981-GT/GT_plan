@@ -28,6 +28,18 @@ from app.services.acnr.runtime import (
 from app.services.acnr.events import invalidate
 
 
+@pytest.fixture(autouse=True)
+def _stub_durable_epoch():
+    """Step 5 Durable_Epoch（DB-first）与本测试的 L3 增量失效正交 —— 打桩避免在
+    asyncio.run per-example loop 中开真实 DB 连接（跨 loop asyncpg 清理 RuntimeWarning）。
+    """
+    with patch(
+        "app.services.acnr.cache_epoch.increment_epoch",
+        new=AsyncMock(return_value=0),
+    ):
+        yield
+
+
 # ─── Strategies ──────────────────────────────────────────────────────────────
 
 _wp_code_st = st.from_regex(r"[A-N][1-9][0-9]?", fullmatch=True)

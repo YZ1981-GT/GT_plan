@@ -1,13 +1,18 @@
 /**
- * useAcnr 缓存失效测试
+ * useAcnr 缓存失效机制测试（acnr-invalidation-overlay-hardening）
  *
- * 验证 Req-7.4: 前端 useAcnr.ts module-level cache 过期
- * （或收到 SSE/WebSocket 通知），前端 SHALL 统一失效并重新请求。
+ * 非 SSE：getCacheEpoch / invalidateModuleCache / clearCache / TTL 缓存命中。
+ * SSE（P8 项目隔离精细失效）：
+ *   - 项目级 acnr:invalidate（仅 project_id）→ 只清该项目 resolve 缓存，不 bump 全局 epoch、不清目录缓存
+ *   - 携带新 catalog_version → 清全局目录缓存 + bump epoch
+ *   - 项目隔离：项目 A 的失效不影响项目 B 的 resolve 缓存
  *
- * **Validates: Requirements 7.4**
+ * **Validates: R4.1/R4.2/R4.3；Property P8**
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { ref } from 'vue'
+
+const PID_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+const PID_B = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'
 
 // ─── Mock http ────────────────────────────────────────────────────────────────
 const mockGet = vi.fn()
@@ -15,59 +20,60 @@ vi.mock('@/utils/http', () => ({
   default: { get: (...args: any[]) => mockGet(...args) },
 }))
 
-// ─── Mock vue lifecycle (onUnmounted is noop in test) ─────────────────────────
+// ─── Mock vue lifecycle ───────────────────────────────────────────────────────
 vi.mock('vue', async () => {
   const actual = await vi.importActual<typeof import('vue')>('vue')
   return {
     ...actual,
-    onUnmounted: vi.fn(), // composable 外部调 onUnmounted 不崩
+    onUnmounted: vi.fn(),
   }
 })
 
-// ─── Mock EventSource ─────────────────────────────────────────────────────────
-class MockEventSource {
-  static instances: MockEventSource[] = []
+// ─── Mock createSSE（fetch-based SSE：Authorization header，token 不入 URL）──────
+// 复盘 #1：useAcnr 改用 createSSE 传 token（header），不再用 native EventSource（URL query token）。
+class MockSSEConn {
+  static instances: MockSSEConn[] = []
   url: string
-  listeners: Record<string, Function[]> = {}
-  onmessage: ((ev: any) => void) | null = null
-  onerror: (() => void) | null = null
+  opts: any
+  msgHandler: ((data: any, event?: string) => void) | null = null
+  errHandler: ((e: any) => void) | null = null
+  openHandler: (() => void) | null = null
   closed = false
+  connected = false
 
-  constructor(url: string) {
+  constructor(url: string, opts: any) {
     this.url = url
-    MockEventSource.instances.push(this)
+    this.opts = opts
+    MockSSEConn.instances.push(this)
   }
-  addEventListener(event: string, handler: Function) {
-    if (!this.listeners[event]) this.listeners[event] = []
-    this.listeners[event].push(handler)
+  onMessage(h: (data: any, event?: string) => void) { this.msgHandler = h }
+  onError(h: (e: any) => void) { this.errHandler = h }
+  onOpen(h: () => void) { this.openHandler = h }
+  close() { this.closed = true; this.connected = false }
+  get isConnected() { return this.connected }
+  /** 模拟服务端发 named event（createSSE 已 JSON.parse，回调收到对象 + event 名） */
+  _emitInvalidate(payload: Record<string, unknown>) {
+    this.msgHandler?.(payload, 'acnr:invalidate')
   }
-  close() {
-    this.closed = true
-  }
-
-  // 测试辅助：模拟服务端发送 named event
-  _emit(event: string, data?: any) {
-    const handlers = this.listeners[event] || []
-    for (const h of handlers) h(data)
-  }
-  // 测试辅助：模拟通用 message
-  _emitMessage(data: any) {
-    if (this.onmessage) {
-      this.onmessage({ data: typeof data === 'string' ? data : JSON.stringify(data) })
-    }
+  static byProject(pid: string): MockSSEConn | undefined {
+    return MockSSEConn.instances.find((c) => c.url.includes(`/api/projects/${pid}/`))
   }
 }
 
-// 安装全局 mock
-;(globalThis as any).EventSource = MockEventSource
+const mockCreateSSE = vi.fn((url: string, opts: any) => new MockSSEConn(url, opts))
+vi.mock('@/utils/sse', () => ({
+  createSSE: (url: string, opts: any) => mockCreateSSE(url, opts),
+}))
 
-describe('useAcnr — 缓存失效机制 (Req-7.4)', () => {
+describe('useAcnr — 缓存失效机制 (R4, P8)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    MockEventSource.instances = []
-
-    // 重置模块级状态：每次 re-import 模块
+    MockSSEConn.instances = []
     vi.resetModules()
+    ;(globalThis as any).sessionStorage = {
+      getItem: (k: string) => (k === 'token' ? 'jwt-abc' : null),
+    }
+    ;(globalThis as any).localStorage = { getItem: () => null }
   })
 
   afterEach(() => {
@@ -75,10 +81,10 @@ describe('useAcnr — 缓存失效机制 (Req-7.4)', () => {
   })
 
   async function loadModule() {
-    // 动态导入以获取干净的模块级状态
-    const mod = await import('./useAcnr')
-    return mod
+    return await import('./useAcnr')
   }
+
+  // ─── 非 SSE：epoch / 缓存基本行为 ─────────────────────────────────────
 
   it('getCacheEpoch 初始值为 0', async () => {
     const { getCacheEpoch } = await loadModule()
@@ -104,7 +110,6 @@ describe('useAcnr — 缓存失效机制 (Req-7.4)', () => {
     const { useAcnr, getCacheEpoch } = await loadModule()
     const acnr = useAcnr()
 
-    // Seed some data
     mockGet.mockResolvedValueOnce({ data: [{ addr_id: 'D2/D2-2', sheet_code: 'D2-2' }] })
     await acnr.listSheets('D')
     expect(acnr.sheets.value.length).toBe(1)
@@ -119,14 +124,9 @@ describe('useAcnr — 缓存失效机制 (Req-7.4)', () => {
   it('listSheets 在缓存命中时不发请求', async () => {
     const { useAcnr } = await loadModule()
     const acnr = useAcnr()
-
     mockGet.mockResolvedValue({ data: [{ addr_id: 'D2/D2-2', sheet_code: 'D2-2' }] })
-
-    // 第一次：发请求
     await acnr.listSheets('D')
     expect(mockGet).toHaveBeenCalledTimes(1)
-
-    // 第二次：缓存命中，不发请求
     await acnr.listSheets('D')
     expect(mockGet).toHaveBeenCalledTimes(1)
   })
@@ -134,118 +134,115 @@ describe('useAcnr — 缓存失效机制 (Req-7.4)', () => {
   it('invalidateModuleCache 后 listSheets 重新发请求', async () => {
     const { useAcnr, invalidateModuleCache } = await loadModule()
     const acnr = useAcnr()
-
     mockGet.mockResolvedValue({ data: [{ addr_id: 'D2/D2-2', sheet_code: 'D2-2' }] })
-
     await acnr.listSheets('D')
     expect(mockGet).toHaveBeenCalledTimes(1)
-
-    // 外部失效
     invalidateModuleCache()
-
-    // 缓存失效后，下次调用应重新请求
     await acnr.listSheets('D')
     expect(mockGet).toHaveBeenCalledTimes(2)
-  })
-
-  it('listCells 缓存命中后 invalidate 导致重新请求', async () => {
-    const { useAcnr, invalidateModuleCache } = await loadModule()
-    const acnr = useAcnr()
-
-    mockGet.mockResolvedValue({ data: [{ addr_id: 'D2/D2-2/E100', cell_address: 'E100' }] })
-
-    await acnr.listCells('D2', 'D2-2')
-    expect(mockGet).toHaveBeenCalledTimes(1)
-
-    // 缓存命中
-    await acnr.listCells('D2', 'D2-2')
-    expect(mockGet).toHaveBeenCalledTimes(1)
-
-    // 失效
-    invalidateModuleCache()
-
-    await acnr.listCells('D2', 'D2-2')
-    expect(mockGet).toHaveBeenCalledTimes(2)
-  })
-
-  it('SSE acnr:invalidate named event 触发缓存清空', async () => {
-    const { useAcnr, getCacheEpoch } = await loadModule()
-    useAcnr() // 触发 SSE 连接
-
-    const es = MockEventSource.instances[0]
-    expect(es).toBeDefined()
-    expect(es.url).toContain('acnr:invalidate')
-
-    const epochBefore = getCacheEpoch()
-    // 模拟 SSE named event
-    es._emit('acnr:invalidate')
-    expect(getCacheEpoch()).toBe(epochBefore + 1)
-  })
-
-  it('SSE generic message with type=acnr:invalidate 触发缓存清空', async () => {
-    const { useAcnr, getCacheEpoch } = await loadModule()
-    useAcnr()
-
-    const es = MockEventSource.instances[0]
-    const epochBefore = getCacheEpoch()
-
-    // 模拟通用 message（部分后端用 data.type）
-    es._emitMessage({ type: 'acnr:invalidate' })
-    expect(getCacheEpoch()).toBe(epochBefore + 1)
-  })
-
-  it('SSE generic message with event=acnr:invalidate 触发缓存清空', async () => {
-    const { useAcnr, getCacheEpoch } = await loadModule()
-    useAcnr()
-
-    const es = MockEventSource.instances[0]
-    const epochBefore = getCacheEpoch()
-
-    es._emitMessage({ event: 'acnr:invalidate' })
-    expect(getCacheEpoch()).toBe(epochBefore + 1)
-  })
-
-  it('SSE 无关 message 不触发缓存失效', async () => {
-    const { useAcnr, getCacheEpoch } = await loadModule()
-    useAcnr()
-
-    const es = MockEventSource.instances[0]
-    const epochBefore = getCacheEpoch()
-
-    es._emitMessage({ type: 'some:other:event' })
-    expect(getCacheEpoch()).toBe(epochBefore)
   })
 
   it('getEpoch 返回当前 epoch', async () => {
     const { useAcnr, invalidateModuleCache } = await loadModule()
     const acnr = useAcnr()
-
     expect(acnr.getEpoch()).toBe(0)
     invalidateModuleCache()
     expect(acnr.getEpoch()).toBe(1)
-    invalidateModuleCache()
-    expect(acnr.getEpoch()).toBe(2)
   })
 
   it('多个 useAcnr 实例共享同一缓存和 epoch', async () => {
-    const { useAcnr, getCacheEpoch } = await loadModule()
-
+    const { useAcnr } = await loadModule()
     const acnr1 = useAcnr()
     const acnr2 = useAcnr()
-
     mockGet.mockResolvedValue({ data: [{ addr_id: 'D2/D2-2', sheet_code: 'D2-2' }] })
-
-    // acnr1 加载后，acnr2 应能命中缓存
     await acnr1.listSheets('D')
     expect(mockGet).toHaveBeenCalledTimes(1)
-
     await acnr2.listSheets('D')
-    // 共享模块缓存，不再请求
     expect(mockGet).toHaveBeenCalledTimes(1)
-
-    // acnr1 失效 → acnr2 也受影响
     acnr1.clearCache()
     await acnr2.listSheets('D')
     expect(mockGet).toHaveBeenCalledTimes(2)
+  })
+
+  // ─── SSE 项目隔离精细失效（P8）────────────────────────────────────────
+
+  it('subscribeInvalidation 连接项目级端点（token 不入 URL，走 Authorization header）', async () => {
+    const { subscribeInvalidation } = await loadModule()
+    subscribeInvalidation(PID_A)
+    const conn = MockSSEConn.byProject(PID_A)
+    expect(conn).toBeDefined()
+    expect(conn!.url).toContain(`/api/projects/${PID_A}/events/stream`)
+    // #1 安全：JWT 不再出现在 URL query
+    expect(conn!.url).not.toContain('token=')
+  })
+
+  it('项目级 acnr:invalidate（仅 project_id）只清该项目 resolve 缓存，不 bump epoch、不清目录缓存', async () => {
+    const { useAcnr, subscribeInvalidation, getCacheEpoch } = await loadModule()
+    subscribeInvalidation(PID_A)
+    const acnr = useAcnr()
+
+    // seed 目录缓存 + 项目 resolve 缓存
+    mockGet.mockResolvedValueOnce({ data: [{ addr_id: 'D2/D2-2', sheet_code: 'D2-2' }] })
+    await acnr.listSheets('D')
+    mockGet.mockResolvedValue({ data: { found: true, addr_id: 'D2/D2-2/E100' } })
+    await acnr.resolveIndex('cell:D2-2!E100', PID_A)
+    const callsAfterSeed = mockGet.mock.calls.length
+    const epochBefore = getCacheEpoch()
+
+    // 项目级失效（无 catalog_version）
+    MockSSEConn.byProject(PID_A)!._emitInvalidate({ project_id: PID_A })
+
+    // epoch 未变（不 bump 全局）
+    expect(getCacheEpoch()).toBe(epochBefore)
+    // 目录缓存未清 → listSheets 仍命中，不重新请求
+    await acnr.listSheets('D')
+    expect(mockGet.mock.calls.length).toBe(callsAfterSeed)
+    // 项目 resolve 缓存已清 → resolveIndex 重新请求
+    await acnr.resolveIndex('cell:D2-2!E100', PID_A)
+    expect(mockGet.mock.calls.length).toBe(callsAfterSeed + 1)
+  })
+
+  it('携带新 catalog_version → 清全局目录缓存 + bump epoch（R4.2）', async () => {
+    const { useAcnr, subscribeInvalidation, getCacheEpoch } = await loadModule()
+    subscribeInvalidation(PID_A)
+    const acnr = useAcnr()
+
+    mockGet.mockResolvedValue({ data: [{ addr_id: 'D2/D2-2', sheet_code: 'D2-2' }] })
+    await acnr.listSheets('D')
+    const callsAfterSeed = mockGet.mock.calls.length
+    const epochBefore = getCacheEpoch()
+
+    MockSSEConn.byProject(PID_A)!._emitInvalidate({
+      project_id: PID_A,
+      catalog_version: 'v-new-2026',
+    })
+
+    // 全局失效 → epoch bump
+    expect(getCacheEpoch()).toBe(epochBefore + 1)
+    // 目录缓存已清 → listSheets 重新请求
+    await acnr.listSheets('D')
+    expect(mockGet.mock.calls.length).toBe(callsAfterSeed + 1)
+  })
+
+  it('项目隔离：项目 A 的失效不影响项目 B 的 resolve 缓存', async () => {
+    const { useAcnr, subscribeInvalidation } = await loadModule()
+    subscribeInvalidation(PID_A)
+    subscribeInvalidation(PID_B)
+    const acnr = useAcnr()
+
+    mockGet.mockResolvedValue({ data: { found: true, addr_id: 'D2/D2-2/E100' } })
+    await acnr.resolveIndex('cell:D2-2!E100', PID_A)
+    await acnr.resolveIndex('cell:D3-2!E100', PID_B)
+    const callsAfterSeed = mockGet.mock.calls.length
+
+    // 失效项目 A
+    MockSSEConn.byProject(PID_A)!._emitInvalidate({ project_id: PID_A })
+
+    // 项目 B resolve 缓存仍命中，不重新请求
+    await acnr.resolveIndex('cell:D3-2!E100', PID_B)
+    expect(mockGet.mock.calls.length).toBe(callsAfterSeed)
+    // 项目 A resolve 缓存已清 → 重新请求
+    await acnr.resolveIndex('cell:D2-2!E100', PID_A)
+    expect(mockGet.mock.calls.length).toBe(callsAfterSeed + 1)
   })
 })

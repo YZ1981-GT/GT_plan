@@ -385,6 +385,9 @@ import {
   I2_STAFF_FULLTIME_OPTIONS,
   I2_STAFF_OBJECTIVES,
   I2_STAFF_PREP_NOTES,
+  I2_STAFF_STORAGE_KEY,
+  I2_STAFF_AUDIT_NOTE_KEY,
+  I2_STAFF_AUDIT_CONCLUSION_KEY,
   emptyI2StaffRow,
   normalizeI2StaffRow,
   persistI2StaffRow,
@@ -416,9 +419,10 @@ const props = defineProps<{
 const emit = defineEmits<{ save: []; 'navigate-sheet': [sheetName: string] }>()
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
 
-const STORAGE_KEY = 'I2-9-rows'
-const AUDIT_NOTE_KEY = 'I2-9-audit-note'
-const AUDIT_CONCLUSION_KEY = 'I2-9-audit-conclusion'
+// STORAGE_KEY 等常量集中定义于 i2StaffCheckModel.ts（跨sheet引用共用，避免硬编码分裂）
+const STORAGE_KEY = I2_STAFF_STORAGE_KEY
+const AUDIT_NOTE_KEY = I2_STAFF_AUDIT_NOTE_KEY
+const AUDIT_CONCLUSION_KEY = I2_STAFF_AUDIT_CONCLUSION_KEY
 
 const rows = ref<I2StaffCheckRow[]>([])
 const auditNote = ref('')

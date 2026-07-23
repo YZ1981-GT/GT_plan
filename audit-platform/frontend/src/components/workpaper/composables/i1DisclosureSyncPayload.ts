@@ -27,6 +27,7 @@ import {
   buildDataResourceSubTableRows,
   formatAmortAllocNote,
 } from './i1DisclosureEnhance'
+import type { ColumnDef } from './disclosureColumnDefs'
 
 export interface I1SyncFromWorkpaperPayload {
   wp_id: string
@@ -34,6 +35,62 @@ export interface I1SyncFromWorkpaperPayload {
   section_id: string
   current_standard: string
   sub_table_data: Record<string, Record<string, unknown>[]>
+  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 note_template §五、26/§八、27 无形资产表 */
+  columns?: Record<string, ColumnDef[]>
+}
+
+/**
+ * 上市变动表列头随类别动态（key=类别 label + 合计），逐字对齐 buildI1ListedSubTableData 行键。
+ * 附属子表列头静态源对齐。
+ */
+export function buildI1ListedColumns(state: I1ListedSyncSnapshot): Record<string, ColumnDef[]> {
+  const cats = state.categories || []
+  const movement: ColumnDef[] = [
+    { key: 'label', label: '项目', is_label: true },
+    ...cats.map((c) => ({ key: c.label, label: c.label, format: 'amount' as const })),
+    { key: '合计', label: '合计', format: 'amount' },
+  ]
+  return {
+    [I1_LISTED_SUBTABLE.movement]: movement,
+    '⑥重要单项无形资产': [
+      { key: 'label', label: '项目', is_label: true },
+      { key: '账面价值', label: '账面价值', format: 'amount' },
+      { key: '剩余摊销期限', label: '剩余摊销期限' },
+    ],
+    '未办妥权属证书的土地使用权': [
+      { key: 'label', label: '项目', is_label: true },
+      { key: '账面价值', label: '账面价值', format: 'amount' },
+      { key: '未办妥产权证书原因', label: '未办妥产权证书原因' },
+    ],
+    '确认为无形资产的数据资源': [
+      { key: 'label', label: '项目', is_label: true },
+      { key: '外购的数据资源无形资产', label: '外购的数据资源无形资产', format: 'amount' },
+      { key: '自行开发的数据资源无形资产', label: '自行开发的数据资源无形资产', format: 'amount' },
+      { key: '其他方式取得的数据资源无形资产', label: '其他方式取得的数据资源无形资产', format: 'amount' },
+      { key: '合计', label: '合计', format: 'amount' },
+    ],
+    '本期摊销费用归属': [
+      { key: 'label', label: '项目', is_label: true },
+      { key: '生产成本', label: '生产成本', format: 'amount' },
+      { key: '制造费用', label: '制造费用', format: 'amount' },
+      { key: '销售费用', label: '销售费用', format: 'amount' },
+      { key: '管理费用', label: '管理费用', format: 'amount' },
+      { key: '研发费用', label: '研发费用', format: 'amount' },
+      { key: '其他', label: '其他', format: 'amount' },
+      { key: '合计', label: '合计', format: 'amount' },
+    ],
+  }
+}
+
+/** 国企变动表列头（项目/期初余额/本期增加/本期减少/期末余额），键对齐 flattenI1SoeMovement 输出 */
+const I1_SOE_COLUMNS: Record<string, ColumnDef[]> = {
+  [I1_SOE_SUBTABLE.movement]: [
+    { key: 'label', label: '项目', is_label: true },
+    { key: 'begin', label: '期初余额', format: 'amount' },
+    { key: 'increase', label: '本期增加', format: 'amount' },
+    { key: 'decrease', label: '本期减少', format: 'amount' },
+    { key: 'end', label: '期末余额', format: 'amount' },
+  ],
 }
 
 export function buildI1ListedSubTableData(state: I1ListedSyncSnapshot): Record<string, Record<string, unknown>[]> {
@@ -157,6 +214,7 @@ export function buildI1ListedSyncPayloads(
     section_id: I1_NOTE_SECTION.listed,
     current_standard: resolveI1CurrentStandard(variant, applicableStandards),
     sub_table_data: buildI1ListedSubTableData(state),
+    columns: buildI1ListedColumns(state),
   }]
 }
 
@@ -173,5 +231,6 @@ export function buildI1SoeSyncPayloads(
     section_id: I1_NOTE_SECTION.soe,
     current_standard: resolveI1CurrentStandard(variant, applicableStandards),
     sub_table_data: buildI1SoeSubTableData(state),
+    columns: I1_SOE_COLUMNS,
   }]
 }

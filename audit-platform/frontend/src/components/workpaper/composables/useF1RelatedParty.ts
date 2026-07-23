@@ -36,6 +36,33 @@ export interface UseF1RelatedPartyOptions {
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   isReadonly: Ref<boolean>
+  /** 项目关联方清单（来自登记表），用于完整性校验防漏列 */
+  relatedParties?: Ref<string[]>
+}
+
+/** 关联方名称模糊匹配（双向包含，忽略大小写/空白） */
+export function relatedPartyNameMatches(a: string, b: string): boolean {
+  const na = String(a || '').trim().toLowerCase().replace(/\s+/g, '')
+  const nb = String(b || '').trim().toLowerCase().replace(/\s+/g, '')
+  if (!na || !nb) return false
+  return na === nb || na.includes(nb) || nb.includes(na)
+}
+
+/** 清单中未在 F1-6 行内识别到的关联方（纯函数，便于测试） */
+export function computeMissingRelatedParties(
+  registry: string[],
+  rows: Array<{ partyName: string }>,
+): string[] {
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const name of registry) {
+    const key = String(name || '').trim()
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    const matched = rows.some((r) => relatedPartyNameMatches(r.partyName, key))
+    if (!matched) out.push(key)
+  }
+  return out
 }
 
 /** Excel 模板「关联关系」枚举 */
@@ -169,7 +196,7 @@ export function mergeRelatedPartyFromImport(
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useF1RelatedParty(options: UseF1RelatedPartyOptions) {
-  const { allResponses, debouncedSave, isReadonly } = options
+  const { allResponses, debouncedSave, isReadonly, relatedParties } = options
 
   const rows = ref<RelatedPartyRow[]>([])
 
@@ -198,6 +225,25 @@ export function useF1RelatedParty(options: UseF1RelatedPartyOptions) {
     if (relatedPartyRows.length === 0) return
     rows.value = mergeRelatedPartyFromImport(rows.value, relatedPartyRows)
     persistRows()
+  }
+
+  /** 完整性校验：登记表关联方清单中未在本表识别到的名单（可能漏列） */
+  const missingRelatedParties: ComputedRef<string[]> = computed(() =>
+    computeMissingRelatedParties(relatedParties?.value ?? [], rows.value),
+  )
+
+  /** 一键补充漏列关联方（为每个缺失名单追加空行，仅填名称） */
+  function addMissingRelatedParties(): number {
+    if (isReadonly.value) return 0
+    const missing = missingRelatedParties.value
+    if (!missing.length) return 0
+    const added = missing.map((name) => ({
+      ...createEmptyRelatedPartyRow(),
+      partyName: name,
+    }))
+    rows.value = [...rows.value, ...added]
+    persistRows()
+    return added.length
   }
 
   function addRow(): void {
@@ -255,6 +301,8 @@ export function useF1RelatedParty(options: UseF1RelatedPartyOptions) {
     subtotalRow,
     auditNote,
     conclusion,
+    missingRelatedParties,
+    addMissingRelatedParties,
     addRow,
     removeRow,
     updateCell,

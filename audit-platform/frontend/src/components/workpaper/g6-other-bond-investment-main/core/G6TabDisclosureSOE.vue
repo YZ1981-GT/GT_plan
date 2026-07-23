@@ -302,6 +302,7 @@ import {
 } from '../../composables/g4ListedStageDisclosure'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { dispatchG6SaveItems } from '../../composables/g6CrossHelpers'
+import type { ColumnDef } from '../../composables/disclosureColumnDefs'
 
 interface BalanceRow {
   item: string
@@ -669,6 +670,37 @@ function patchStageRow(
   persistStages()
 }
 
+// 列头元数据（disclosure-table-sync-convergence）：label 取自本组件 el-table-column
+const G6_SOE_COLUMNS: Record<string, ColumnDef[]> = {
+  其他债权投资情况: [
+    { key: 'label', label: '项目', is_label: true },
+    { key: 'end_balance', label: '期末余额', format: 'amount' },
+    { key: 'prior_balance', label: '期初余额', format: 'amount' },
+  ],
+  期末重要的其他债权投资: [
+    { key: 'label', label: '其他债权投资项目', is_label: true },
+    { key: 'face_value', label: '面值', format: 'amount' },
+    { key: 'amortized_cost', label: '摊余成本', format: 'amount' },
+    { key: 'fair_value', label: '公允价值', format: 'amount' },
+    { key: 'oci_cumulative', label: '累计计入 OCI 的公允价值变动', format: 'amount' },
+    { key: 'impairment', label: '减值准备', format: 'amount' },
+  ],
+  减值准备计提情况: [
+    { key: 'label', label: '类别', is_label: true },
+    { key: 'book_balance', label: '账面余额', format: 'amount' },
+    { key: 'impairment', label: '减值准备', format: 'amount' },
+    { key: 'book_value', label: '账面价值（分析口径）', format: 'amount' },
+    { key: 'reason', label: '理由' },
+  ],
+  减值准备变动: [
+    { key: 'label', label: '减值准备', is_label: true },
+    { key: 'stage1', label: '第一阶段', format: 'amount' },
+    { key: 'stage2', label: '第二阶段', format: 'amount' },
+    { key: 'stage3', label: '第三阶段', format: 'amount' },
+    { key: 'total', label: '合计', format: 'amount' },
+  ],
+}
+
 function buildSyncData(): Record<string, Record<string, unknown>[]> {
   return {
     其他债权投资情况: [
@@ -744,6 +776,7 @@ async function syncToDisclosureNotes(): Promise<void> {
         section_id: noteSection.value,
         current_standard: currentStandard.value,
         sub_table_data: buildSyncData(),
+        columns: G6_SOE_COLUMNS,
       },
     )
     const data = result?.data ?? result

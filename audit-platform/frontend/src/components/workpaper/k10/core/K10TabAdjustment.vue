@@ -18,21 +18,7 @@
         <el-button size="small" @click="handleAI">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
-        <el-button size="small" @click="handleReview">
-          <el-icon><Check /></el-icon> 复核
-        </el-button>
-        <el-dropdown v-if="!props.isReadonly" trigger="click" @command="handleImportExport">
-          <el-button size="small">
-            导入导出 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
-          </el-button>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item command="export-template">导出模板</el-dropdown-item>
-              <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
-              <el-dropdown-item command="import-data">导入数据</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
+        <GtReviewTrigger section-id="K10-3-adjustment" label="💬 复核" />
         <el-button
           type="primary"
           size="small"
@@ -48,8 +34,10 @@
     <!-- ═══ 跨底稿引用 ═══ -->
     <div class="cross-ref-bar">
       <span class="cross-refs-label">关联底稿：</span>
-      <GtIndexChip value="K10-1" :context-project-id="props.projectId" />
-      <GtIndexChip value="A13" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K10-1" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K10-6" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K12" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:A13" :context-project-id="props.projectId" />
     </div>
 
     <!-- ═══ 方法论上下文 ═══ -->
@@ -278,13 +266,12 @@
  * - 导入导出
  * - 科目6117 其他收益: 贷方增加=调增, 借方减少=冲减
  */
-import { computed, defineAsyncComponent, inject, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick, Check, ArrowDown } from '@element-plus/icons-vue'
-import { useK10FormData } from '../../composables/useK10FormData'
-import { useK10ImportExport } from '../../composables/useK10ImportExport'
+import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
@@ -301,9 +288,6 @@ const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'navigate-sheet', sheetName: string): void
 }>()
-
-// ─── Inject复核对话 ──────────────────────────────────────────────────────────
-const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -331,20 +315,6 @@ const typeOptions = [
   { label: 'AJE 审计调整', value: 'AJE' },
   { label: 'RJE 重分类', value: 'RJE' },
 ]
-
-// ─── Composables ─────────────────────────────────────────────────────────────
-
-const formData = useK10FormData({
-  wpId: computed(() => props.wpId),
-  projectId: computed(() => props.projectId),
-  sheetName: ref('调整分录汇总K10-3'),
-})
-
-const importExport = useK10ImportExport({
-  wpId: computed(() => props.wpId),
-  projectId: computed(() => props.projectId),
-  sheetCode: 'K10-4',
-})
 
 // ─── Computed ────────────────────────────────────────────────────────────────
 
@@ -479,6 +449,24 @@ async function handleSave(): Promise<void> {
       rjeAmount: rjeNet6117.value,
       timestamp: Date.now(),
     })
+    // 显式推送错报至 A13（对齐平台 a13:push-misstatement 约定事件，crossWpEventBridge 白名单）
+    eventBus.emit('a13:push-misstatement' as any, {
+      wpCode: 'K10',
+      accountCode: '6117',
+      accountName: '其他收益',
+      entryType: activeType.value,
+      entries: filteredEntries.value.map(e => ({
+        description: e.description,
+        reportItem: e.reportItem,
+        accountName: e.accountName,
+        debitAmount: e.debitAmount,
+        creditAmount: e.creditAmount,
+        refIndex: e.refIndex,
+      })),
+      ajeAmount: ajeNet6117.value,
+      rjeAmount: rjeNet6117.value,
+      timestamp: Date.now(),
+    })
     ElMessage.success('调整分录已保存并发布')
     emit('save', 'K10-3-published', { timestamp: Date.now() })
   } finally {
@@ -486,35 +474,36 @@ async function handleSave(): Promise<void> {
   }
 }
 
-function handleImportExport(command: string): void {
-  if (command === 'export-template') importExport.exportTemplate()
-  else if (command === 'export-data') importExport.exportData()
-  else if (command === 'import-data') {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.xlsx,.xls'
-    input.onchange = async (e: Event) => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (file) await importExport.importData(file)
+/** AI 辅助：基于当前分录给出调整分录建议（顾问式，弹窗展示供参考） */
+async function handleAI(): Promise<void> {
+  if (!props.wpId) return
+  try {
+    const ctx = {
+      科目: '6117 其他收益（损益类·贷方增加=调增）',
+      当前类型: activeType.value,
+      借方合计: String(currentBalance.value.totalDebit),
+      贷方合计: String(currentBalance.value.totalCredit),
+      分录: entries.value.map(e => `${e.type} ${e.description} 借${e.debitAmount}/贷${e.creditAmount}`).join('；') || '（暂无）',
     }
-    input.click()
-  }
-}
-
-function handleAI(): void {
-  // AI辅助钩子
-}
-
-function handleReview(): void {
-  openReviewDialog?.('K10-3-adjustment', '其他收益调整分录汇总')
+    const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'K10-3-adjustment',
+      prompt: '为K10其他收益(6117)调整分录提供审计建议：常见调整场景（政府补助分类纠正6117↔6301、递延分摊转入、多确认冲回）、借贷方向与平衡校验要点。',
+      context: ctx,
+    })
+    const content = (res?.data?.content ?? res?.content ?? '') as string
+    if (content) {
+      await ElMessageBox.alert(content, 'AI 调整分录建议', { confirmButtonText: '知道了', dangerouslyUseHTMLString: false })
+    } else {
+      ElMessage.warning('AI未返回内容')
+    }
+  } catch { ElMessage.warning('AI生成失败，请稍后重试') }
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
-
-onMounted(async () => {
-  await formData.selfLoad()
-  loadEntries()
-})
+// 数据来源 props.allResponses（父 GtK10OtherIncome 已 selfLoad populate）；
+// 组件随 sheet 切换 v-if 重新挂载 → onMounted 载入；父级 reload 时 watch 兜底刷新。
+onMounted(() => { loadEntries() })
+watch(() => props.allResponses, () => loadEntries())
 </script>
 
 <style scoped>

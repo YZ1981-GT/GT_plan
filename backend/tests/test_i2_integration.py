@@ -257,3 +257,71 @@ class TestAiGenerateModule:
             assert True
         except ImportError:
             pytest.skip("Import/export module not yet created")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 6. I2-13 / I2-14 截止测试导入导出
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestI2CutoffImportExport:
+    """I2 截止性测试 sheet 导入导出规格与路由."""
+
+    def test_i2_specs_include_cutoff_sheets(self):
+        from app.routers.wp_render_strategies._i2_import_export import _I2_SPECS
+
+        assert {"I2-13", "I2-14"}.issubset(_I2_SPECS.keys())
+        assert _I2_SPECS["I2-13"]["item_id"] == "I2-13-rows"
+        assert _I2_SPECS["I2-14"]["item_id"] == "I2-14-rows"
+        assert _I2_SPECS["I2-13"]["storage_field"] == "remark"
+        assert _I2_SPECS["I2-14"]["dual_write"] is True
+
+    def test_i2_cutoff_headers_align_with_field_keys(self):
+        from app.routers.wp_render_strategies._i2_import_export import _I2_SPECS
+
+        for code in ("I2-13", "I2-14"):
+            spec = _I2_SPECS[code]
+            assert len(spec["headers"]) == len(spec["field_keys"]), code
+            assert "recordDate" in spec["field_keys"]
+            assert "documentDate" in spec["field_keys"]
+
+    @pytest.mark.asyncio
+    async def test_i2_cutoff_export_template_routes(self):
+        from unittest.mock import AsyncMock
+
+        from httpx import ASGITransport, AsyncClient
+
+        from app.deps import get_current_user
+        from app.main import app
+        from app.models.base import UserRole
+        from app.core.database import get_db
+
+        class _FakeUser:
+            id = "test-user-id"
+            name = "Test User"
+            email = "test@example.com"
+            role = UserRole.admin
+
+        mock_db = AsyncMock()
+        mock_db.commit = AsyncMock()
+        mock_db.execute = AsyncMock()
+
+        async def _override_db():
+            yield mock_db
+
+        app.dependency_overrides[get_current_user] = lambda: _FakeUser()
+        app.dependency_overrides[get_db] = _override_db
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                for sheet in ("I2-13", "I2-14"):
+                    resp = await client.post(
+                        f"/api/workpapers/test-wp/i2/export-template?sheet={sheet}",
+                    )
+                    assert resp.status_code == 200, f"{sheet} export-template failed: {resp.status_code}"
+                    assert resp.headers.get("content-type", "").startswith(
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    ), sheet
+                    assert len(resp.content) > 500, sheet
+        finally:
+            app.dependency_overrides.clear()

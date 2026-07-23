@@ -11,11 +11,13 @@ import {
   type G10DisclosureVariant,
 } from './g10NoteSectionMap'
 import {
+  G10_DISCLOSURE_COL_LABELS,
   G10_DISCLOSURE_TOTAL_LABEL,
   G10_LISTED_MOVEMENT_ROWS,
   G10_SOE_BALANCE_ROWS,
 } from './g10SchemaRows'
 import { calcSubtotal } from './useG10FormulaEngine'
+import type { ColumnDef } from './disclosureColumnDefs'
 
 export interface G10SyncFromWorkpaperPayload {
   wp_id: string
@@ -23,6 +25,64 @@ export interface G10SyncFromWorkpaperPayload {
   section_id: string
   current_standard: string
   sub_table_data: Record<string, Record<string, unknown>[]>
+  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 G10_DISCLOSURE_COL_LABELS（源对齐） */
+  columns?: Record<string, ColumnDef[]>
+}
+
+// ── G10 各子表列头：label 取自 G10_DISCLOSURE_COL_LABELS，键与子表名（含动态年份）一致 ──
+function buildG10ListedColumns(year: number | null): Record<string, ColumnDef[]> {
+  const L = G10_DISCLOSURE_COL_LABELS.listed
+  const fv = L.fvCredit(year)
+  return {
+    交易性金融负债: [
+      { key: 'label', label: L.movement.item, is_label: true },
+      { key: 'opening_balance', label: L.movement.opening, format: 'amount' },
+      { key: 'current_increase', label: L.movement.increase, format: 'amount' },
+      { key: 'current_decrease', label: L.movement.decrease, format: 'amount' },
+      { key: 'end_balance', label: L.movement.closing, format: 'amount' },
+    ],
+    [LISTED_DESIGNATED_TABLE]: [
+      { key: 'label', label: L.designated.item, is_label: true },
+      { key: 'opening_balance', label: L.designated.opening, format: 'amount' },
+      { key: 'end_balance', label: L.designated.closing, format: 'amount' },
+      { key: 'designation_reason', label: L.designated.reason },
+    ],
+    [listedFvCreditTableName(year)]: [
+      { key: 'label', label: fv.item, is_label: true },
+      { key: 'fv_change_amount', label: fv.fvChange, format: 'amount' },
+      { key: 'credit_risk_current', label: fv.creditCurrent, format: 'amount' },
+      { key: 'credit_risk_cumulative', label: fv.creditCumulative, format: 'amount' },
+    ],
+  }
+}
+
+function buildG10ListedDerivativeColumns(): Record<string, ColumnDef[]> {
+  const D = G10_DISCLOSURE_COL_LABELS.listed.derivative
+  return {
+    衍生金融负债: [
+      { key: 'label', label: D.item, is_label: true },
+      { key: 'end_balance', label: D.current, format: 'amount' },
+      { key: 'prior_balance', label: D.prior, format: 'amount' },
+    ],
+  }
+}
+
+function buildG10SoeColumns(year: number | null): Record<string, ColumnDef[]> {
+  const B = G10_DISCLOSURE_COL_LABELS.soe.balance
+  const fv = G10_DISCLOSURE_COL_LABELS.soe.fvCredit(year)
+  return {
+    交易性金融负债: [
+      { key: 'label', label: B.item, is_label: true },
+      { key: 'end_fair_value', label: B.current, format: 'amount' },
+      { key: 'prior_fair_value', label: B.prior, format: 'amount' },
+    ],
+    [soeFvCreditTableName(year)]: [
+      { key: 'label', label: fv.item, is_label: true },
+      { key: 'fv_change_amount', label: fv.fvChange, format: 'amount' },
+      { key: 'credit_risk_current', label: fv.creditCurrent, format: 'amount' },
+      { key: 'credit_risk_cumulative', label: fv.creditCumulative, format: 'amount' },
+    ],
+  }
 }
 
 export interface G10ListedSyncSnapshot {
@@ -227,6 +287,7 @@ export function buildG10ListedSyncPayloads(
       section_id: G10_NOTE_SECTION.listed.trading,
       current_standard: standard,
       sub_table_data: buildG10ListedSubTableData(snap),
+      columns: buildG10ListedColumns(snap.auditYear),
     },
   ]
   if (hasDerivativeListedData(snap.store)) {
@@ -236,6 +297,7 @@ export function buildG10ListedSyncPayloads(
       section_id: G10_NOTE_SECTION.listed.derivative,
       current_standard: standard,
       sub_table_data: buildG10ListedDerivativeSubTableData(snap),
+      columns: buildG10ListedDerivativeColumns(),
     })
   }
   return payloads
@@ -255,6 +317,7 @@ export function buildG10SoeSyncPayloads(
       section_id: G10_NOTE_SECTION.soe.trading,
       current_standard: resolveG10CurrentStandard(variant, applicableStandards),
       sub_table_data: buildG10SoeSubTableData(snap),
+      columns: buildG10SoeColumns(snap.auditYear),
     },
   ]
 }

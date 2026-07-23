@@ -116,10 +116,12 @@ class AcnrMetricsCollector:
         reason: str,
         severity: str = ALERT_WARNING,
         metadata: Optional[dict] = None,
+        silent: bool = False,
     ) -> None:
         """记录告警事件（fallback/auth_reject/alias_conflict/version_mismatch 等）。
 
         主动告警 = logger.warning + 记录到 metrics（不只 logger）。
+        ``silent=True`` 时仅写入 metrics、不打日志（用于设计内路径如非 wp 域 V1 委托）。
         """
         event = AlertEvent(
             event_type=event_type,
@@ -130,6 +132,9 @@ class AcnrMetricsCollector:
         with self._lock:
             self._recent_alerts.append(event)
             self._alert_type_counts[event_type] += 1
+
+        if silent:
+            return
 
         # Req-12.5: 主动告警（非仅 logger.warning）
         if severity == ALERT_ERROR:
@@ -145,12 +150,15 @@ class AcnrMetricsCollector:
 
     # ─── Convenience shortcuts ───────────────────────────────────────────
 
-    def record_fallback(self, reason: str, *, domain: str = "unknown") -> None:
+    def record_fallback(
+        self, reason: str, *, domain: str = "unknown", silent: bool = False,
+    ) -> None:
         """Req-12.2: 记录 fallback 事件。"""
         self.record_alert(
             event_type="fallback",
             reason=reason,
             metadata={"domain": domain},
+            silent=silent,
         )
 
     def record_auth_reject(self, *, project_id: Optional[str] = None) -> None:

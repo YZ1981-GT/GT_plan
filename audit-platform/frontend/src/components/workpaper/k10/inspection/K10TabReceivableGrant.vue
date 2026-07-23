@@ -18,13 +18,17 @@
         </el-tag>
       </div>
       <div class="section-header-right">
-        <el-button size="small" @click="handleAI">
-          <el-icon><MagicStick /></el-icon> AI辅助
-        </el-button>
-        <el-button size="small" @click="handleReview">
-          <el-icon><Check /></el-icon> 复核
-        </el-button>
+        <GtReviewTrigger section-id="K10-5-receivable-grant" label="💬 复核" />
       </div>
+    </div>
+
+    <!-- ═══ 跨底稿引用（期后收款核对至货币资金/银行） ═══ -->
+    <div class="cross-ref-bar">
+      <span class="cross-refs-label">关联引用：</span>
+      <GtIndexChip value="wp:K10-1" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K10-4" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:E1" :context-project-id="props.projectId" />
+      <span class="cross-ref-hint">期后收款可核对至 E1 货币资金/银行回单</span>
     </div>
 
     <!-- ═══ 方法论上下文 ═══ -->
@@ -33,7 +37,8 @@
         <strong>应收政府补助确认检查：</strong>
         对于期末确认的应收政府补助，需逐项核查：①批文依据是否充分 ②收款权利是否确凿（有文件证明）
         ③预期可收回性判断 ④确认时点是否合理（以批文日/条件满足日为准，而非收款日）。
-        存在"不合规"项需关注是否应调整。
+        <strong>并核对期后银行回单/收款凭证</strong>验证实际收款情况（可追溯至 E1 货币资金），
+        期后已收回可佐证收款权利确凿；长期未收回需关注可收回性。存在"不合规"项需关注是否应调整。
       </div>
     </div>
 
@@ -124,7 +129,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="金额" width="120" align="right">
+      <el-table-column label="应收金额" width="120" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!props.isReadonly && row.isEditable"
@@ -135,6 +140,41 @@
             @change="(val: number | undefined) => checks.updateReceivableCell(row.rowKey, 'amount', val ?? 0)"
           />
           <span v-else>{{ fmtAmount(row.amount) }}</span>
+        </template>
+      </el-table-column>
+
+      <!-- 期后收款（核对银行回单/收款凭证，佐证可收回性） -->
+      <el-table-column label="期后收款" width="120" align="right">
+        <template #header>
+          <span title="核对期后银行回单/收款凭证的实际收款金额（可追溯至 E1）">期后收款</span>
+        </template>
+        <template #default="{ row }">
+          <el-input-number
+            v-if="!props.isReadonly && row.isEditable"
+            :model-value="row.postCollectionAmount"
+            :controls="false"
+            size="small"
+            style="width: 100%"
+            @change="(val: number | undefined) => checks.updateReceivableCell(row.rowKey, 'postCollectionAmount', val ?? 0)"
+          />
+          <span v-else>{{ fmtAmount(row.postCollectionAmount) }}</span>
+        </template>
+      </el-table-column>
+
+      <!-- 期后收款状态（派生） -->
+      <el-table-column label="收款状态" width="100" align="center">
+        <template #default="{ row }">
+          <el-tag :type="collectionTagType(collectionStatus(row))" size="small" effect="plain">{{ collectionStatus(row) }}</el-tag>
+        </template>
+      </el-table-column>
+
+      <!-- 综合结论（派生） -->
+      <el-table-column label="综合结论" width="100" align="center">
+        <template #header>
+          <span title="由 收款权利/预期可收回/确认时点 三项派生">综合结论</span>
+        </template>
+        <template #default="{ row }">
+          <el-tag :type="statusTagType(overallStatus(row))" size="small">{{ overallStatus(row) }}</el-tag>
         </template>
       </el-table-column>
 
@@ -199,6 +239,26 @@
       </el-tag>
     </div>
 
+    <!-- ═══ 检查说明与结论（AI辅助） ═══ -->
+    <el-card shadow="never" class="note-card">
+      <template #header>
+        <div class="note-card-header">
+          <span>检查说明与结论</span>
+          <el-button size="small" type="primary" text :loading="aiLoading" @click="handleAI">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="noteText"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="props.isReadonly"
+        placeholder="填写应收政府补助检查说明与结论（批文依据、收款权利、可收回性、确认时点合理性）..."
+        @change="handleNoteSave"
+      />
+    </el-card>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="k10-details-tip">
       <summary>编制提示</summary>
@@ -206,8 +266,10 @@
         <li>应收政府补助确认三要素：收款权利确凿性 + 预期可收回 + 确认时点合理</li>
         <li>批文依据：政府批文/拨款通知/奖补公示等文件编号</li>
         <li>收款权利：以政府发文日为准，非收到款项日</li>
+        <li>期后收款：填入期后实际收到金额（核对银行回单/收款凭证，可追溯 E1），系统据此派生"收款状态"（已收回/部分收回/未收回）佐证可收回性</li>
+        <li>综合结论由 收款权利/预期可收回/确认时点 三项自动派生（任一不合规→不合规）</li>
         <li>📎列可上传批文扫描件，OCR自动识别填入批文依据</li>
-        <li>存在"不合规"项应关注是否需要审计调整</li>
+        <li>存在"不合规"项或"未收回"应关注是否需要审计调整</li>
       </ul>
     </details>
   </div>
@@ -229,11 +291,16 @@
  * - 📎附件列（行级OCR识别批文）
  * - 底部统计摘要（合规/不合规/不适用计数）
  */
-import { computed, inject, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick, Check } from '@element-plus/icons-vue'
-import { useK10Checks, type CheckStatus } from '../../composables/useK10Checks'
+import { MagicStick } from '@element-plus/icons-vue'
+import {
+  useK10Checks, deriveReceivableStatus, deriveCollectionStatus,
+  type CheckStatus, type CollectionStatus,
+} from '../../composables/useK10Checks'
 import { api } from '@/services/apiProxy'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -247,9 +314,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
 }>()
-
-// ─── Inject复核对话 ──────────────────────────────────────────────────────────
-const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 
@@ -276,6 +340,21 @@ function fmtAmount(val: number | undefined | null): string {
 function statusTagType(status: CheckStatus): 'success' | 'danger' | 'info' {
   if (status === '合规') return 'success'
   if (status === '不合规') return 'danger'
+  return 'info'
+}
+
+/** 综合结论（由三项子判断派生） */
+function overallStatus(row: any): CheckStatus {
+  return deriveReceivableStatus(row.receivableRight, row.expectedRecoverable, row.recognitionTiming)
+}
+
+/** 期后收款状态 + tag 颜色 */
+function collectionStatus(row: any): CollectionStatus {
+  return deriveCollectionStatus(Number(row.amount || 0), Number(row.postCollectionAmount || 0))
+}
+function collectionTagType(s: CollectionStatus): 'success' | 'warning' | 'info' {
+  if (s === '已收回') return 'success'
+  if (s === '部分收回') return 'warning'
   return 'info'
 }
 
@@ -334,18 +413,48 @@ async function handleOCR(row: any, file: any): Promise<void> {
   }
 }
 
-function handleAI(): void {
-  // AI辅助钩子
+// ─── 检查说明 + AI ───────────────────────────────────────────────────────────
+const noteText = ref('')
+const aiLoading = ref(false)
+
+function loadNote(): void {
+  const saved = props.allResponses.get('K10-5-note')
+  if (saved) noteText.value = (saved.remark ?? saved.conclusion ?? '') as string
 }
 
-function handleReview(): void {
-  openReviewDialog?.('K10-5-receivable-grant', '应收政府补助检查')
+function handleNoteSave(): void {
+  emit('save', 'K10-5-note', { remark: noteText.value })
+}
+
+async function handleAI(): Promise<void> {
+  if (!props.wpId) return
+  aiLoading.value = true
+  try {
+    const s = checks.receivableSummary.value
+    const ctx = {
+      合规项: String(s.compliant),
+      不合规项: String(s.nonCompliant),
+      不适用项: String(s.notApplicable),
+      合计项: String(s.total),
+      不合规明细: (s.nonCompliantItems || []).join('、') || '无',
+    }
+    const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'K10-5-note',
+      prompt: '为K10应收政府补助检查表生成检查说明与结论：批文依据充分性、收款权利确凿性、预期可收回性、确认时点合理性，以及不合规项是否需审计调整。',
+      existingContent: noteText.value,
+      context: ctx,
+    })
+    const content = (res?.data?.content ?? res?.content ?? '') as string
+    if (content) { noteText.value = content; handleNoteSave(); ElMessage.success('AI生成完成') }
+    else ElMessage.warning('AI未返回内容，请手动填写')
+  } catch { ElMessage.warning('AI生成失败，请手动填写') } finally { aiLoading.value = false }
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 onMounted(() => {
   checks.initFromResponses()
+  loadNote()
 })
 </script>
 
@@ -360,6 +469,14 @@ onMounted(() => {
 .section-header-right { display: flex; align-items: center; gap: 8px; }
 .section-title { margin: 0; font-size: 15px; font-weight: 600; }
 .account-badge { font-size: 11px; }
+
+.cross-ref-bar {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-bottom: 12px; padding: 6px 12px;
+  background: #f5f7fa; border-radius: 6px;
+}
+.cross-refs-label { color: #909399; font-size: 12px; white-space: nowrap; }
+.cross-ref-hint { color: #909399; font-size: 12px; }
 
 .methodology-context {
   background: linear-gradient(135deg, #fffbe6 0%, #fff8e1 100%);
@@ -389,4 +506,8 @@ onMounted(() => {
 .k10-details-tip summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .k10-details-tip ul { margin: 8px 0 0 0; padding-left: 20px; }
 .k10-details-tip li { margin-bottom: 4px; }
+
+.note-card { margin-top: 16px; }
+.note-card-header { display: flex; justify-content: space-between; align-items: center; }
+.note-card-header span { font-weight: 600; font-size: 14px; }
 </style>

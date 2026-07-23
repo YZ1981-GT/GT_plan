@@ -74,3 +74,27 @@ export function parseCustomAgingRows(text: string): AgingRowDef[] {
     .filter(Boolean)
     .map((label, i) => ({ rowKey: `custom-${i}`, label }))
 }
+
+/** 段 key → 展示标签（审定表口径优先，否则用配置 label） */
+export function resolveAgingLabel(
+  key: string,
+  segments?: Array<{ key: string; label: string }>,
+): string {
+  if (ADJUDICATION_LABEL_BY_SEGMENT_KEY[key]) return ADJUDICATION_LABEL_BY_SEGMENT_KEY[key]
+  const hit = segments?.find(s => s.key === key)
+  return hit?.label || key
+}
+
+/** 将 nested 账龄金额拼成「标签:金额」提示（F1-4/F1-6 导入用） */
+export function formatAgingAmountHint(
+  aging: Record<string, number> | undefined | null,
+  segments?: Array<{ key: string; label: string }>,
+): string {
+  if (!aging || typeof aging !== 'object') return ''
+  const parts: string[] = []
+  for (const [k, v] of Object.entries(aging)) {
+    const n = Number(v) || 0
+    if (n !== 0) parts.push(`${resolveAgingLabel(k, segments)}:${n}`)
+  }
+  return parts.join('; ')
+}

@@ -163,12 +163,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 import { InfoFilled, Document, Right } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import type { LinkageContract, TargetType } from '@/types/linkageContract'
 import { useDeliverableLineage, sectionCodeFromAnchor } from '@/composables/useDeliverableLineage'
-import { useSSEReconnect } from '@/composables/useSSEReconnect'
+import { subscribeProjectEvent } from '@/services/sse/projectEventStream'
 import { api } from '@/services/apiProxy'
 
 /** 终态状态列表（signed/confirmed/archived）— 需求 11.4 */
@@ -356,26 +356,27 @@ async function onRefreshAllStale(): Promise<void> {
 
 /**
  * SSE LINKAGE_STALE_CHANGED 实时监听（需求 4.5）
- * 当上游数据变更级联标记章节 stale 时，后端推 SSE 事件，前端实时更新徽标
+ * 当上游数据变更级联标记章节 stale 时，后端推 SSE 事件，前端实时更新徽标。
  *
- * 复用 useSSEReconnect（断线重连 + 退避），连到项目级事件流 /events/stream
- * （EventSource 无法携带自定义 header，与 ImportProgress.vue 同一 /stream 模式，
- *  项目 SSE 端点经现有设置工作，URL 不带 token）
+ * 迁移到项目事件流单例总线（frontend-sse-connection-consolidation）：订阅共享的、经
+ * Authorization header 鉴权的连接（每项目一条），断线重连/退避由总线统一负责。
+ * 🔴 附带修复：原 `useSSEReconnect` 用 native EventSource 无 token → 端点鉴权后恒 401 降级，
+ * 实时徽标其实从未生效；迁移后 LINKAGE_STALE_CHANGED 首次真正送达。
  */
-const { close: closeSSE } = useSSEReconnect({
-  url: () => `/api/projects/${props.projectId}/events/stream`,
-  onMessage: (data: any) => {
-    // 只处理 LINKAGE_STALE_CHANGED 相关事件
-    if (data?.event_type === 'LINKAGE_STALE_CHANGED' || data?.extra) {
-      // 当前章节变 stale，刷新溯源
-      if (currentSectionCode.value) {
-        traceSection(currentSectionCode.value)
-      }
+const _lineageSub = subscribeProjectEvent(
+  props.projectId,
+  'LINKAGE_STALE_CHANGED',
+  () => {
+    // 当前章节可能变 stale → 刷新溯源徽标
+    if (currentSectionCode.value) {
+      traceSection(currentSectionCode.value)
     }
   },
-  pollFallback: async () => 'running', // SSE 用于实时更新，无终态概念，始终 running
-  maxAttempts: 10,
-})
+)
+function closeSSE(): void {
+  _lineageSub.close()
+}
+onUnmounted(closeSSE)
 
 /**
  * 供父组件调用：从 OnlyOffice 获取的书签名触发溯源

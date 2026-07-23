@@ -43,36 +43,33 @@ async def _resolve_b23_for_cycle(db: AsyncSession, project_id: UUID, year: int, 
 async def _resolve_risk_for_cycle(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """B50-3 认定层次风险 → D~N 循环程序表引用。
 
-    数据来源: field_override_service（scope='risk_assessment'，按 cycle_code 过滤）
-    返回结构: {"summary": str, "risks": list[dict]}（每项含 risk_id/description/assertion/risk_level/is_special_risk）
-    参数: kw['cycle'] = 循环代号（如 'D'→销售收入, 'E'→货币资金）。
+    数据来源: checklist_responses（B50 底稿 B50-T3-* 单一真源，经 b50_risk_reader）
+    返回结构: {"summary": str, "risks": list[dict]}
+        每项含 risk_id/account/description/assertion/risk_level/is_special_risk/cycle。
+    参数: kw['cycle'] = 循环代号（如 'D'→收入, 'E'→货币资金）或完整 table_code（如 'D2A'）。
+        - 若提供：按业务循环首字母过滤本循环风险。
+        - 若为空：返回全部认定层次风险（避免因模板未传 cycle 而恒空）。
     """
-    from app.services.field_override_service import FieldOverrideService
-    cycle = kw.get("cycle", "")
-    if not cycle:
-        return {"summary": "未指定循环", "risks": []}
-    svc = FieldOverrideService(db)
-    data = await svc.get_batch(project_id, year, scope="risk_assessment")
-    if not data:
+    from app.services.b50_risk_reader import load_b50_risks, cycle_matches
+
+    cycle = kw.get("cycle") or ""
+    all_risks = await load_b50_risks(db, project_id)
+    if not all_risks:
         return {"summary": "风险评估未完成", "risks": []}
-    # 过滤属于指定循环的风险
-    cycle_risks = []
-    for item_key, fields in data.items():
-        target_cycle = fields.get("cycle_code", "")
-        if target_cycle == cycle:
-            cycle_risks.append({
-                "risk_id": item_key,
-                "description": fields.get("description", ""),
-                "assertion": fields.get("assertion", ""),
-                "risk_level": fields.get("risk_level", ""),
-                "is_special_risk": fields.get("is_special_risk") == "true",
-            })
-    if not cycle_risks:
-        return {"summary": f"循环{cycle}暂无已识别风险", "risks": []}
+
+    if cycle:
+        cycle_risks = [r for r in all_risks if cycle_matches(r.get("cycle"), cycle)]
+        if not cycle_risks:
+            return {"summary": f"本循环暂无已识别的认定层次风险", "risks": []}
+        scope_label = "本循环"
+    else:
+        cycle_risks = all_risks
+        scope_label = "全部"
+
     special = sum(1 for r in cycle_risks if r["is_special_risk"])
-    summary = f"已识别{len(cycle_risks)}项风险"
+    summary = f"{scope_label}已识别{len(cycle_risks)}项认定层次风险"
     if special:
-        summary += f"（含{special}项特别风险）"
+        summary += f"（含{special}项特别风险，须细节测试应对）"
     return {"summary": summary, "risks": cycle_risks}
 
 

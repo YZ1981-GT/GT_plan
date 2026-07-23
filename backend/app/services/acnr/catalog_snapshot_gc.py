@@ -54,57 +54,63 @@ def get_referenced_versions(
     *,
     session: Any | None = None,
     referenced_versions_override: set[str] | None = None,
-) -> set[str]:
+) -> set[str] | None:
     """获取被项目锁定引用的版本集合。
 
-    如果提供 referenced_versions_override（测试用），直接返回该集合。
+    如果提供 referenced_versions_override（测试/调用方查得），直接返回该集合。
     否则查询 PG: SELECT DISTINCT registry_version FROM projects
     WHERE registry_version IS NOT NULL。
 
     Args:
         session: SQLAlchemy async session（生产环境使用）
-        referenced_versions_override: 直接提供的引用集合（测试用）
+        referenced_versions_override: 直接提供的引用集合（调用方查询后传入）
 
     Returns:
-        被引用的 registry_version 集合
+        被引用的 registry_version 集合；**无法验证引用时返回 None**（fail-closed）。
+
+    ⚠️ fail-closed 语义（Req-16.3）：
+        返回空集 set() 表示「已确认无任何版本被引用」→ keep_recent 之外全可删。
+        返回 None 表示「无法验证引用关系」→ 调用方必须 fail-closed 不删除任何快照，
+        避免误删被项目锁定的历史版本。此处同步函数无法执行 async DB 查询，
+        故除非调用方传入 override，一律返回 None。
     """
     if referenced_versions_override is not None:
         return referenced_versions_override
 
-    # 生产路径: 使用 sqlalchemy session 查询
-    if session is not None:
-        # 此处使用同步接口（调用方需确保 session 可用）
-        # 实际集成时由调用方传入查询结果
-        pass
-
-    # fallback: 返回空集（无法查询 DB 时保守不删任何版本）
+    # 生产路径需 async DB 查询（本同步函数无法执行）；由调用方查询后经 override 传入。
+    # 无 override 且无法验证 → 返回 None（fail-closed），绝不返回空集当作「无引用」。
     logger.warning(
-        "catalog_snapshot_gc: 无法获取被引用版本集合（无 session），"
-        "保守策略不删除任何快照"
+        "catalog_snapshot_gc: 无法验证被引用版本集合（未提供 override，同步路径不查 DB），"
+        "返回 None → fail-closed（本次不删除任何快照）"
     )
-    return set()
+    return None
 
 
 def compute_versions_to_delete(
     all_versions: list[str],
-    referenced_versions: set[str],
+    referenced_versions: set[str] | None,
     keep_recent: int = 10,
 ) -> list[str]:
     """计算应被删除的版本列表。
 
-    策略（Req-16.1, Req-16.2）：
+    策略（Req-16.1, Req-16.2, Req-16.3 fail-closed）：
+    - 引用集合不可验证（None）→ 返回空列表，不删除任何版本
     - 保留最近 keep_recent 个版本（按字典序降序排列）
     - 保留所有被项目引用的版本
     - 其余版本可安全删除
 
     Args:
         all_versions: 全部版本列表（降序排列）
-        referenced_versions: 被项目锁定引用的版本集合
+        referenced_versions: 被项目锁定引用的版本集合；None 表示不可验证 → fail-closed
         keep_recent: 保留最近版本数（默认 10）
 
     Returns:
-        可删除的版本列表
+        可删除的版本列表（引用不可验证时恒为空）
     """
+    # fail-closed：无法验证引用关系时绝不删除任何快照（Req-16.3）
+    if referenced_versions is None:
+        return []
+
     if keep_recent < 0:
         keep_recent = 0
 
@@ -158,10 +164,11 @@ def cleanup_stale_snapshots(
     sd = snapshots_dir or _get_snapshots_dir()
     all_versions = list_snapshot_versions(sd)
 
-    # 获取被引用版本
+    # 获取被引用版本；None 表示不可验证 → fail-closed（compute_versions_to_delete 返回 []）
     refs = referenced_versions if referenced_versions is not None else get_referenced_versions()
+    reference_status = "unverifiable" if refs is None else "verified"
 
-    # 计算应删除的版本
+    # 计算应删除的版本（refs 为 None 时恒为空，不删除任何快照）
     to_delete = compute_versions_to_delete(all_versions, refs, keep_recent)
 
     # 安全校验：再次确认不删除被引用版本（Req-16.3 防御层）
@@ -169,7 +176,7 @@ def cleanup_stale_snapshots(
     skipped_referenced: list[str] = []
 
     for version in to_delete:
-        if version in refs:
+        if refs is not None and version in refs:
             # 不应发生（compute_versions_to_delete 已排除），但作为安全守卫
             logger.warning(
                 "catalog_snapshot_gc: 拒绝删除仍被引用的快照 version=%s",
@@ -187,20 +194,28 @@ def cleanup_stale_snapshots(
         else:
             actually_deleted.append(version)
 
+    if reference_status == "unverifiable":
+        logger.warning(
+            "catalog_snapshot_gc: 引用集合不可验证 → fail-closed，本次不删除任何快照 "
+            "(total=%d, keep_recent=%d)",
+            len(all_versions), keep_recent,
+        )
+
     report = {
         "total_snapshots": len(all_versions),
         "keep_recent": keep_recent,
-        "referenced_count": len(refs),
+        "referenced_count": len(refs) if refs is not None else 0,
+        "reference_status": reference_status,
         "deleted": actually_deleted,
         "skipped_referenced": skipped_referenced,
         "dry_run": dry_run,
     }
 
     logger.info(
-        "catalog_snapshot_gc: total=%d keep_recent=%d referenced=%d deleted=%d skipped=%d dry_run=%s",
+        "catalog_snapshot_gc: total=%d keep_recent=%d referenced=%s deleted=%d skipped=%d dry_run=%s",
         len(all_versions),
         keep_recent,
-        len(refs),
+        len(refs) if refs is not None else "unverifiable",
         len(actually_deleted),
         len(skipped_referenced),
         dry_run,

@@ -149,11 +149,6 @@ export function useK6Adjudication(params: UseK6AdjudicationParams) {
 
   function buildSubtotal(label: string, rows: K6AdjRow[]): K6AdjRow {
     const s = (fn: (r: K6AdjRow) => number) => calcSubtotal(rows.map(fn))
-    const audited = s(r => r.audited)
-    const priorTotal = s(r => {
-      const prior = calcVariationRate(0, 0) // placeholder: re-sum from data
-      return 0
-    })
     return {
       rowKey: 'subtotal',
       label,
@@ -165,7 +160,7 @@ export function useK6Adjudication(params: UseK6AdjudicationParams) {
       unadjusted: s(r => r.unadjusted),
       aje: s(r => r.aje),
       rje: s(r => r.rje),
-      audited,
+      audited: s(r => r.audited),
       variationRate: null, // 合计行不算变动率
       remark: '',
     }
@@ -214,14 +209,21 @@ export function useK6Adjudication(params: UseK6AdjudicationParams) {
 
   const assetReconciliation: ComputedRef<K6ReconciliationResult> = computed(() => {
     const sub = assetSubtotal.value
-    // 资产类勾稽：期末(公式) vs 审定数（二者应一致或差异可解释）
+    // 资产类勾稽：期末(公式,变动路径) vs 审定数(未审+AJE+RJE路径)
+    // 仅当两条录入路径都有数据时才校验；若某路径全为0(未启用)则视为平衡避免虚假告警
     const diff = sub.end - sub.audited
+    if (sub.end === 0 || sub.audited === 0) {
+      return { diff, isBalanced: true }
+    }
     return { diff, isBalanced: Math.abs(diff) < 0.01 }
   })
 
   const liabilityReconciliation: ComputedRef<K6ReconciliationResult> = computed(() => {
     const sub = liabilitySubtotal.value
     const diff = sub.end - sub.audited
+    if (sub.end === 0 || sub.audited === 0) {
+      return { diff, isBalanced: true }
+    }
     return { diff, isBalanced: Math.abs(diff) < 0.01 }
   })
 

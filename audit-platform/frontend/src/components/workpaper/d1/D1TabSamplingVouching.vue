@@ -25,7 +25,7 @@
  *
  * Requirements: 10.1-10.4, 11.1-11.4, 12.1-12.6, 13.1-13.5, 14.1-14.5, 18.1-18.4, 18.7
  */
-import { ref, inject, toRef, computed, type Ref } from 'vue'
+import { ref, inject, toRef, computed, defineAsyncComponent, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -59,7 +59,12 @@ const props = defineProps<{
   isReadonly: boolean
   displayPrefs: any
   sheetName?: string
+  year?: number
 }>()
+
+const GtVoucherSamplingEngine = defineAsyncComponent(
+  () => import('../voucher-sampling/GtVoucherSamplingEngine.vue'),
+)
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
@@ -81,6 +86,7 @@ const {
   addVouchingRow,
   removeVouchingRow,
   updateVouchingRow,
+  fillFromSampledVouchers,
   checkedCount,
   checkedAmountTotal,
   vouchingAmountTotal,
@@ -123,6 +129,24 @@ const aiLoadingNote = ref(false)
 const aiLoadingConclusion = ref(false)
 const aiLoadingSamplingBasis = ref(false)
 const ocrExtracted = ref<Map<string, Record<string, any>>>(new Map())
+
+// ─── 抽凭引擎（P0-4 联动）───────────────────────────────────────────────────
+const samplingYear = computed(() => props.year ?? new Date().getFullYear())
+const samplingVisible = ref(false)
+function openSampling(): void {
+  if (props.isReadonly) return
+  samplingVisible.value = true
+}
+function onSamplesFilled(payload: { samples?: any[] }): void {
+  const samples = payload?.samples ?? []
+  const added = fillFromSampledVouchers(samples)
+  samplingVisible.value = false
+  if (added > 0) {
+    ElMessage.success(`已从抽凭引擎回填 ${added} 笔样本到凭证核对明细`)
+  } else {
+    ElMessage.info('未新增样本（可能已存在或未选取）')
+  }
+}
 
 const virtualColumns = computed<VirtualColumn[]>(() => [
   virtualTextCol('noteType', '票据类型', 130),
@@ -651,10 +675,33 @@ const SAMPLING_METHOD_TEXTS = [
             <el-button size="small">导入数据</el-button>
           </el-upload>
         </el-button-group>
+        <el-button size="small" type="warning" plain :disabled="isReadonly" @click="openSampling">
+          ⚡ 抽凭引擎
+        </el-button>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addVouchingRow">
           + 添加核查项
         </el-button>
       </div>
+
+      <!-- ═══ 抽凭引擎 Dialog（P0-4 联动，科目 1121 应收票据）═══ -->
+      <el-dialog
+        v-model="samplingVisible"
+        title="⚡ 抽凭引擎（科目 1121 应收票据）"
+        width="90%"
+        top="5vh"
+        :close-on-click-modal="false"
+        destroy-on-close
+      >
+        <GtVoucherSamplingEngine
+          v-if="samplingVisible && wpId && projectId"
+          account-code="1121"
+          phase="final"
+          :workpaper-id="wpId"
+          :project-id="projectId"
+          :year="samplingYear"
+          @filled="onSamplesFilled"
+        />
+      </el-dialog>
 
       <!-- 凭证核对明细 el-table 12列 -->
       <div v-if="useVirtualScroll" class="virtual-toolbar">

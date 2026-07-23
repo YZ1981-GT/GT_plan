@@ -22,6 +22,8 @@ export {
   getCacheEpoch,
   invalidateModuleCache,
   isSSEDegraded,
+  subscribeInvalidation,
+  MAX_AGE,
   MAX_RESOLVE_CACHE_SIZE,
   type AcnrSheetEntry,
   type AcnrCellEntry,

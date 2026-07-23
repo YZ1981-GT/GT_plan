@@ -26,6 +26,7 @@
         <el-button size="small" type="primary" link @click="handleAiGenerate('related-party-eval')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
+        <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handleImportFromDetail">从K3-2带入</el-button>
         <el-button size="small" :disabled="isReadonly" @click="handleAddRow">＋ 新增</el-button>
         <el-button size="small" @click="handleReview('K3-6-related')">💬 复核</el-button>
       </div>
@@ -228,6 +229,26 @@
       </template>
     </el-alert>
 
+    <!-- 审计说明+结论 -->
+    <el-card shadow="never" class="note-card" style="margin-top:12px">
+      <template #header>
+        <div class="section-head" style="margin-bottom:0">
+          <span style="font-weight:600">审计说明</span>
+          <el-button size="small" type="primary" link @click="handleAiGenerate('related-party-note')">
+            <el-icon><MagicStick /></el-icon> AI生成
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 10 }"
+        :disabled="isReadonly"
+        placeholder="请填写关联方及交易检查审计说明：关联方识别是否完整、交易公允性判断依据、资金占用评估、CAS36披露充分性结论..."
+        @change="persistNote"
+      />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -241,12 +262,14 @@
     </details>
 
     <!-- 抽凭引擎 dialog -->
-    <el-dialog v-model="showSamplingDialog" title="⚡ 抽凭引擎（科目 2241 其他应付款）" width="720px" :close-on-click-modal="false" destroy-on-close>
+    <el-dialog v-model="showSamplingDialog" title="⚡ 抽几引擎（科目 2241 其他应付款）" width="720px" :close-on-click-modal="false" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="showSamplingDialog && props.wpId && props.projectId"
         :project-id="props.projectId"
-        :wp-id="props.wpId"
+        :workpaper-id="props.wpId"
         account-code="2241"
+        phase="final"
+        :year="year"
         @filled="onSampleFilled"
       />
     </el-dialog>
@@ -259,11 +282,12 @@
  * Spec: .kiro/specs/k3-other-payables/ | Task: 4.5
  * Requirements: 6.1-6.3, 6.5
  */
-import { computed, inject, onMounted, ref } from 'vue'
+import { computed, inject, onMounted, ref, defineAsyncComponent } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useK3Checks, type K3RelatedPartyRow, type ComplianceState } from '../../composables/useK3Checks'
-import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+
+const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 import http from '@/utils/http'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -273,6 +297,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  year?: number
 }>()
 
 const emit = defineEmits<{
@@ -283,6 +308,10 @@ const emit = defineEmits<{
 // ─── Injections ──────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+
+// ─── Year ────────────────────────────────────────────────────────────────────
+
+const year = computed(() => props.year ?? new Date().getFullYear())
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 
@@ -296,8 +325,45 @@ function saveResponseFn(itemId: string, payload: any) {
 const {
   relatedPartyRows,
   updateRelatedPartyConclusion,
+  initRelatedPartyFromDetail,
   saveAll,
 } = useK3Checks({ allResponses: allResponsesRef as any, saveResponse: saveResponseFn })
+
+// ─── 审计说明 ────────────────────────────────────────────────────────────────
+
+const auditNote = ref('')
+const ITEM_NOTE = 'K3-6-note'
+
+function loadNote() {
+  const item = props.allResponses.get(ITEM_NOTE)
+  auditNote.value = item?.remark ?? ''
+}
+
+function persistNote() {
+  saveResponseFn(ITEM_NOTE, { remark: auditNote.value })
+}
+
+onMounted(() => loadNote())
+
+// ─── 从K3-2明细带入关联方行 ──────────────────────────────────────────────────
+
+function handleImportFromDetail() {
+  // 从 allResponses 读取K3-2-rows解析明细
+  const item = props.allResponses.get('K3-2-rows')
+  const raw = item?.remark ?? null
+  if (!raw) { ElMessage.warning('K3-2明细表无数据，请先编制明细表'); return }
+  try {
+    const rows = JSON.parse(raw)
+    if (!Array.isArray(rows) || rows.length === 0) { ElMessage.warning('K3-2明细表无数据'); return }
+    const added = initRelatedPartyFromDetail(rows)
+    if (added > 0) {
+      persistRows()
+      ElMessage.success(`已从K3-2带入 ${added} 个关联方`)
+    } else {
+      ElMessage.info('K3-2中无新增关联方（已有的不重复带入）')
+    }
+  } catch { ElMessage.warning('K3-2明细数据解析失败') }
+}
 
 // ─── Computed ────────────────────────────────────────────────────────────────
 
@@ -332,6 +398,7 @@ async function handleAddRow() {
       isDisclosed: '不适用',
       capitalOccupation: '否',
       conclusion: null,
+      indexNo: '',
       remark: '',
     })
     persistRows()
@@ -439,7 +506,25 @@ function fmtAmt(val: number | null | undefined): string {
 }
 
 function handleAiGenerate(section: string) {
-  console.log('[K3-6] AI generate:', section)
+  http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+    prompt: '请生成其他应付款(2241)关联方及交易检查表审计说明，包含：关联方识别完整性评估、交易公允性判断、资金占用风险评估、CAS36披露充分性',
+    context: JSON.stringify({
+      科目: '2241其他应付款',
+      方向: '贷方/负债类',
+      审计重点: '关联方完整性+交易公允性+资金占用',
+      关联方笔数: String(relatedPartyRows.value.length),
+      不合规笔数: String(nonComplianceCount.value),
+      资金占用笔数: String(relatedPartyRows.value.filter(r => r.capitalOccupation === '是').length),
+    }),
+    existingContent: auditNote.value || '',
+    section: 'K3-6-related-party',
+  }).then((res: any) => {
+    const content = res?.data?.data?.content || res?.data?.content || ''
+    if (content) {
+      auditNote.value = auditNote.value ? `${auditNote.value}\n${content}` : content
+      persistNote()
+    }
+  }).catch(() => { /* AI不可用静默降级 */ })
 }
 
 function handleReview(id: string) { openReviewDialog(id) }

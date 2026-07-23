@@ -1,94 +1,123 @@
 <template>
   <div class="i3-tab-disclosure-soe">
-    <!-- 蓝色渐变引导区 -->
+    <div class="section-header">
+      <span class="section-title">商誉附注披露（国有企业）</span>
+      <div class="section-actions">
+        <GtIndexChip v-if="noteTarget" :value="noteTarget.chipValue" :context-project-id="projectId" />
+        <el-button size="small" type="info" plain :disabled="isReadonly" @click="handlePull(true)">
+          从 I3-2 取数
+        </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="isSyncing"
+          :disabled="isReadonly || !projectId"
+          @click="syncToNotes"
+        >同步到附注</el-button>
+        <el-button size="small" type="default" text @click="handleReview('disc-soe')">💬复核</el-button>
+      </div>
+    </div>
+
     <div class="guide-area">
       <div class="guide-grid">
-        <div class="guide-step"><span class="step-num">①</span> 商誉原值/减值准备变动矩阵（跨sheet自动取数I3-1/I3-6）</div>
-        <div class="guide-step"><span class="step-num">②</span> 净值=原值期末-减值期末（商誉无摊销！）</div>
-        <div class="guide-step"><span class="step-num">③</span> CGU分摊+关键假设+结论 文字说明+AI辅助</div>
-        <div class="guide-step"><span class="step-num">④</span> 国企版中文编号(一)~(七)，7子节精简格式</div>
+        <div class="guide-step"><span class="step-num">①</span> （1）（2）原值/减值准备滚动</div>
+        <div class="guide-step"><span class="step-num">②</span> 净值=原值期末−减值期末</div>
+        <div class="guide-step"><span class="step-num">③</span> 减值测试方法与参数说明</div>
+        <div class="guide-step"><span class="step-num">④</span> 同步至附注模块 §八、29</div>
       </div>
     </div>
 
-    <!-- 琥珀色方法论块 CAS8 -->
     <div class="methodology-block">
-      <div class="methodology-title">CAS8 资产减值 商誉披露要求（国有企业适用）</div>
+      <div class="methodology-title">CAS8 商誉披露（国有企业附注格式）</div>
       <div class="methodology-content">
-        按《企业会计准则第8号——资产减值》及国有企业报表附注格式，应披露：商誉账面原值及变动；累计减值准备及变动；商誉分摊至各资产组(组合)的情况；减值测试过程及关键假设（含敏感性）；减值测试结论。国企版使用中文编号"(一)~(七)"，敏感性与关键假设合并为一节。商誉不摊销，仅年度减值测试，减值不可转回。
+        国企附注披露（1）商誉账面原值、（2）商誉减值准备的期初/本期增/本期减/期末，
+        并说明减值测试方法、减值原因及金额确认依据。商誉不摊销，减值不可转回。
       </div>
     </div>
 
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
       show-icon
       class="objective-alert"
-      title="审计目标：核实国有企业商誉附注披露的完整性与准确性——原值/减值准备变动矩阵与 I3-1、I3-6 勾稽一致；CGU 分摊、减值测试过程、关键假设及敏感性、减值结论按国企报表附注格式（中文编号一~七）充分披露，符合 CAS8。"
+      title="审计目标：核实国有企业商誉附注完整性与准确性；矩阵与 I3-2 勾稽；同步至附注模块「八、29 商誉」。"
+    />
+    <el-alert
+      v-if="needsDetailSplitWarning"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="当前为合计占位行（无明细分项），期初可能未填。请点「从 I3-2 取数」按被投资单位展开。"
     />
 
-    <!-- 7子节卡片 -->
     <template v-for="section in sections" :key="section.key">
       <el-card shadow="never" class="disclosure-card">
         <template #header>
-          <div class="section-title">
+          <div class="card-title-row">
             <span>{{ section.title }}</span>
             <div class="title-actions">
+              <el-button
+                v-if="isEditableMatrix(section.key) && !isReadonly"
+                size="small"
+                @click="handleAddMatrix(section.key)"
+              >+ 行</el-button>
               <el-button size="small" type="default" link @click="handleReview(`disc-soe-${section.key}`)">💬</el-button>
             </div>
           </div>
         </template>
 
-        <!-- 矩阵表子节 -->
         <template v-if="section.hasTable">
-          <el-table
-            :data="getMatrixRows(section.key)"
-            border
-            stripe
-            size="small"
-            class="matrix-table"
-          >
-            <el-table-column prop="investee" label="被投资单位(CGU)" min-width="150" fixed />
+          <el-table :data="getMatrixRows(section.key)" border stripe size="small" class="matrix-table">
+            <el-table-column prop="investee" label="被投资单位名称或形成商誉的事项" min-width="180" fixed>
+              <template #default="{ row }">
+                <el-input
+                  v-if="!isReadonly && isEditableMatrix(section.key)"
+                  v-model="row.investee"
+                  size="small"
+                  @change="() => handleInvesteeChange(section.key, row)"
+                />
+                <span v-else>{{ row.investee }}</span>
+              </template>
+            </el-table-column>
             <el-table-column label="期初余额" width="120" align="right">
               <template #default="{ row }">
-                <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number
-                    :model-value="row.beginBalance"
-                    :controls="false"
-                    size="small"
-                    @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'beginBalance', v)"
-                  />
-                </template>
-                <span v-else :class="['amount-cell', { 'auto-fill': row.isAutoFilled }]">
-                  {{ fmtAmt(row.beginBalance) }}
-                  <el-tag v-if="row.isAutoFilled" size="small" type="info" class="auto-badge">自动取数</el-tag>
-                </span>
+                <el-input-number
+                  v-if="!isReadonly && isEditableMatrix(section.key)"
+                  :model-value="row.beginBalance"
+                  :controls="false"
+                  size="small"
+                  style="width:100%"
+                  @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'beginBalance', v)"
+                />
+                <span v-else class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="本期增加" width="120" align="right">
               <template #default="{ row }">
-                <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number
-                    :model-value="row.increase"
-                    :controls="false"
-                    size="small"
-                    @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'increase', v)"
-                  />
-                </template>
-                <span v-else :class="['amount-cell', { 'auto-fill': row.isAutoFilled }]">{{ fmtAmt(row.increase) }}</span>
+                <el-input-number
+                  v-if="!isReadonly && isEditableMatrix(section.key)"
+                  :model-value="row.increase"
+                  :controls="false"
+                  size="small"
+                  style="width:100%"
+                  @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'increase', v)"
+                />
+                <span v-else class="amount-cell">{{ fmtAmt(row.increase) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="本期减少" width="120" align="right">
               <template #default="{ row }">
-                <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number
-                    :model-value="row.decrease"
-                    :controls="false"
-                    size="small"
-                    @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'decrease', v)"
-                  />
-                </template>
-                <span v-else :class="['amount-cell', { 'auto-fill': row.isAutoFilled }]">{{ fmtAmt(row.decrease) }}</span>
+                <el-input-number
+                  v-if="!isReadonly && isEditableMatrix(section.key)"
+                  :model-value="row.decrease"
+                  :controls="false"
+                  size="small"
+                  style="width:100%"
+                  @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'decrease', v)"
+                />
+                <span v-else class="amount-cell">{{ fmtAmt(row.decrease) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="期末余额" width="120" align="right">
@@ -96,34 +125,30 @@
                 <span class="formula-cell" title="期末=期初+增加-减少">{{ fmtAmt(row.endBalance) }}</span>
               </template>
             </el-table-column>
+            <el-table-column v-if="!isReadonly && isEditableMatrix(section.key)" label="操作" width="60" align="center">
+              <template #default="{ row }">
+                <el-button type="danger" link size="small" @click="handleRemoveMatrix(section.key, row.rowId)">删</el-button>
+              </template>
+            </el-table-column>
           </el-table>
 
-          <!-- 合计行 -->
-          <div class="matrix-subtotal" v-if="section.key === 'goodwill_book_value'">
-            合计: 期初 <span class="amount-cell">{{ fmtAmt(bookValueTotal.beginBalance) }}</span>
-            | 增加(新并购) <span class="amount-cell">{{ fmtAmt(bookValueTotal.increase) }}</span>
-            | 减少(减值) <span class="amount-cell">{{ fmtAmt(bookValueTotal.decrease) }}</span>
-            | 期末 <span class="amount-cell formula-cell">{{ fmtAmt(bookValueTotal.endBalance) }}</span>
+          <div v-if="section.key === 'goodwill_book_value'" class="matrix-subtotal">
+            合计：期初 {{ fmtAmt(bookValueTotal.beginBalance) }}
+            ｜ 增加 {{ fmtAmt(bookValueTotal.increase) }}
+            ｜ 减少 {{ fmtAmt(bookValueTotal.decrease) }}
+            ｜ 期末 {{ fmtAmt(bookValueTotal.endBalance) }}
           </div>
-          <div class="matrix-subtotal" v-else-if="section.key === 'goodwill_impairment'">
-            合计: 期初 <span class="amount-cell">{{ fmtAmt(impairmentTotal.beginBalance) }}</span>
-            | 计提 <span class="amount-cell">{{ fmtAmt(impairmentTotal.increase) }}</span>
-            | 转出 <span class="amount-cell">{{ fmtAmt(impairmentTotal.decrease) }}</span>
-            | 期末 <span class="amount-cell formula-cell">{{ fmtAmt(impairmentTotal.endBalance) }}</span>
-            <div class="impairment-warning">⚠️ 商誉减值不可转回，"本期减少"仅限处置/注销</div>
-          </div>
-          <div class="matrix-subtotal" v-else-if="section.key === 'impairment_result'">
-            合计减值: <span class="amount-cell formula-cell">{{ fmtAmt(impairmentTotal.increase) }}</span>
-          </div>
-
-          <div class="auto-fill-hint" v-if="['goodwill_book_value','goodwill_impairment'].includes(section.key)">
-            💡 数据自动从审定表I3-1/减值测试I3-6取入（浅蓝色=跨sheet自动取数）
+          <div v-else-if="section.key === 'goodwill_impairment'" class="matrix-subtotal">
+            合计：期初 {{ fmtAmt(impairmentTotal.beginBalance) }}
+            ｜ 增加 {{ fmtAmt(impairmentTotal.increase) }}
+            ｜ 减少 {{ fmtAmt(impairmentTotal.decrease) }}
+            ｜ 期末 {{ fmtAmt(impairmentTotal.endBalance) }}
+            <div class="impairment-warning">⚠️ 商誉减值不可转回，「本期减少」仅限处置/注销</div>
           </div>
         </template>
 
-        <!-- 动态行子节（CGU分摊） -->
         <template v-if="section.hasDynamicRows">
-          <el-divider v-if="section.hasTable" content-position="left">CGU分摊明细</el-divider>
+          <el-divider v-if="section.hasTable" content-position="left">CGU分摊</el-divider>
           <el-table :data="getDynamicRows(section.key)" border stripe size="small">
             <el-table-column type="index" width="40" />
             <el-table-column prop="name" label="资产组(CGU)名称" min-width="150">
@@ -144,88 +169,59 @@
                 <span v-else>{{ row.description }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="60" align="center" v-if="!isReadonly">
+            <el-table-column v-if="!isReadonly" label="操作" width="60" align="center">
               <template #default="{ row }">
                 <el-button type="danger" link size="small" @click="handleRemoveDynamic(section.key, row.rowId)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
-          <div class="dynamic-actions" v-if="!isReadonly">
+          <div v-if="!isReadonly" class="dynamic-actions">
             <el-button size="small" @click="handleAddDynamic(section.key)">+ 新增CGU</el-button>
           </div>
         </template>
 
-        <!-- 文字说明区（AI可生成） -->
         <template v-if="section.hasNoteText">
           <el-divider v-if="section.hasTable || section.hasDynamicRows" content-position="left">文字说明</el-divider>
           <el-input
             v-model="sectionNotes[section.key]"
             type="textarea"
-            :autosize="{ minRows: 3, maxRows: 10 }"
+            :autosize="{ minRows: 3, maxRows: 12 }"
             :disabled="isReadonly"
             :placeholder="getPlaceholder(section.key)"
             @change="handleNoteChange(section.key)"
           />
+          <div v-if="!isReadonly && !sectionNotes[section.key]" class="template-actions">
+            <el-button size="small" text type="primary" @click="applyTemplate(section.key)">插入模板段落</el-button>
+          </div>
         </template>
       </el-card>
     </template>
 
-    <!-- 净值合计汇总 -->
     <el-card shadow="never" class="summary-card">
       <template #header><span class="summary-title">商誉账面净值合计</span></template>
-      <div class="summary-content">
-        <div class="summary-formula">
-          净值 = 商誉原值期末 <span class="amount-cell">{{ fmtAmt(bookValueTotal.endBalance) }}</span>
-          − 减值准备期末 <span class="amount-cell">{{ fmtAmt(impairmentTotal.endBalance) }}</span>
-          = <span class="amount-cell net-value">{{ fmtAmt(netValueTotal) }}</span>
-        </div>
-        <div class="summary-note">商誉不摊销，净值=原值−累计减值</div>
+      <div class="summary-formula">
+        净值 = 原值期末 {{ fmtAmt(bookValueTotal.endBalance) }}
+        − 减值期末 {{ fmtAmt(impairmentTotal.endBalance) }}
+        = <span class="net-value">{{ fmtAmt(netValueTotal) }}</span>
       </div>
+      <div class="summary-note">同步目标附注「{{ noteTarget.sectionId }}」</div>
     </el-card>
-
-    <!-- 编制提示 -->
-    <details class="compile-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>(一) 商誉账面价值变动矩阵：期初/增加(新并购)/减少(减值)/期末</li>
-        <li>(二) 减值准备变动矩阵：期初/计提/转出(处置)/期末，商誉减值不可转回！</li>
-        <li>(三) 减值测试过程：说明可收回金额确定方式</li>
-        <li>(四) CGU分摊：逐CGU列示分摊商誉额及依据</li>
-        <li>(五) 关键假设及敏感性：折现率/增长率/预测期+关键参数变动对可收回金额的影响</li>
-        <li>(六) 结论：是否需计提减值、金额及会计处理</li>
-        <li>(七) 其他：如有并购、处置等特殊事项说明</li>
-        <li>适用国有企业报表附注披露格式（CAS8）</li>
-      </ul>
-    </details>
   </div>
 </template>
 
 <script setup lang="ts">
-/**
- * I3TabDisclosureSoe.vue — I3 商誉附注披露信息（国有企业版）
- * 31行×7列，31公式 (Req 9.1-9.3)
- *
- * 7 sections (Chinese numbering: 一/二/三...七):
- *   goodwill_book_value / goodwill_impairment / impairment_test_process / cgu_allocation
- *   key_assumptions / impairment_result / other_disclosure
- *
- * 商誉特殊：无摊销！仅原值+减值+净额+减值测试过程
- * 国企版与上市公司版区别：敏感性与关键假设合并为一节(五)，少1节共7节
- *
- * - 从审定表I3-1+减值测试I3-6自动取数 (Req 9.2)
- * - AI辅助生成文字描述 (Req 9.3)
- * - EventBus: subscribe 'substantive:adjudicated' 刷新 + publish 'disclosure:note-text-updated'
- *
- * Spec: .kiro/specs/i3-goodwill/
- * Task: 4.10
- */
 import { ref, computed, inject, toRef, onMounted, onUnmounted } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
+import GtIndexChip from '../../GtIndexChip.vue'
 import {
   useI3Disclosure,
   SOE_SECTIONS,
   type I3DisclosureMatrixRow,
 } from '../../composables/useI3Disclosure'
+import { resolveI3NoteSectionTarget } from '../../composables/i3NoteSectionMap'
+import { buildI3SoeSyncPayloads } from '../../composables/i3DisclosureSyncPayload'
 
 const props = defineProps<{
   wpId: string
@@ -233,6 +229,7 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
   crossSheetAutoFill?: Record<string, number>
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -242,10 +239,9 @@ const emit = defineEmits<{
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const allResponsesRef = computed(() => props.allResponses)
-
+const noteTarget = resolveI3NoteSectionTarget('soe')
+const isSyncing = ref(false)
 const sections = SOE_SECTIONS
-
-// ─── Composable ──────────────────────────────────────────────────────────────
 
 const {
   bookValueRows,
@@ -256,11 +252,16 @@ const {
   impairmentTotal,
   netValueTotal,
   applyAutoFill,
+  needsDetailSplitWarning,
+  pullFromDetailRows,
   addDynamicRow,
   removeDynamicRow,
   updateDynamicRow,
   updateMatrixCell,
+  addMatrixRow,
+  removeMatrixRow,
   saveSectionNote,
+  getSyncSnapshot,
   dispose: disposeDisclosure,
 } = useI3Disclosure(
   toRef(props, 'wpId'),
@@ -275,14 +276,9 @@ const {
   },
 )
 
-// ─── EventBus: subscribe 'substantive:adjudicated' → auto-refresh (Req 9.2) ─
-
 function handleAdjudicated(e: Event): void {
   const detail = (e as CustomEvent).detail
-  // 仅响应I3相关科目(1711)或无过滤条件的全局广播
-  if (!detail || detail.wpCode === 'I3' || detail.accountCode === '1711') {
-    applyAutoFill()
-  }
+  if (!detail || detail.wpCode === 'I3' || detail.accountCode === '1711') applyAutoFill()
 }
 
 onMounted(() => {
@@ -294,32 +290,26 @@ onUnmounted(() => {
   disposeDisclosure()
 })
 
-// ─── Matrix rows by section ──────────────────────────────────────────────────
+function isEditableMatrix(key: string) {
+  return key === 'goodwill_book_value' || key === 'goodwill_impairment'
+}
 
 function getMatrixRows(sectionKey: string): I3DisclosureMatrixRow[] {
-  switch (sectionKey) {
-    case 'goodwill_book_value': return bookValueRows.value
-    case 'goodwill_impairment': return impairmentRows.value
-    case 'impairment_result': return _buildResultRows()
-    default: return []
+  if (sectionKey === 'goodwill_book_value') return bookValueRows.value
+  if (sectionKey === 'goodwill_impairment') return impairmentRows.value
+  if (sectionKey === 'impairment_result') {
+    return (sectionRows.value.cgu_allocation ?? []).map((cgu) => ({
+      rowId: `result-${cgu.rowId}`,
+      investee: cgu.name || '未命名CGU',
+      beginBalance: cgu.amount ?? 0,
+      increase: 0,
+      decrease: 0,
+      endBalance: cgu.amount ?? 0,
+      isAutoFilled: false,
+    }))
   }
+  return []
 }
-
-/** 减值结果矩阵 — 按CGU汇总 */
-function _buildResultRows(): I3DisclosureMatrixRow[] {
-  const cguRows = sectionRows.value['cgu_allocation'] ?? []
-  return cguRows.map((cgu) => ({
-    rowId: `result-${cgu.rowId}`,
-    investee: cgu.name || '未命名CGU',
-    beginBalance: cgu.amount ?? 0,       // 商誉分摊额
-    increase: 0,                          // 可收回金额(待填)
-    decrease: 0,                          // 减值金额(待填)
-    endBalance: (cgu.amount ?? 0),        // 减值后净额
-    isAutoFilled: false,
-  }))
-}
-
-// ─── Dynamic rows ────────────────────────────────────────────────────────────
 
 function getDynamicRows(key: string) {
   return sectionRows.value[key] ?? []
@@ -330,12 +320,9 @@ async function handleAddDynamic(sectionKey: string) {
     const { value } = await ElMessageBox.prompt('请输入资产组(CGU)名称', '新增CGU行', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
-      inputPlaceholder: '如：XX子公司/XX事业部',
     })
-    if (value?.trim()) {
-      addDynamicRow(sectionKey, value.trim())
-    }
-  } catch { /* cancelled */ }
+    if (value?.trim()) addDynamicRow(sectionKey, value.trim())
+  } catch { /* cancel */ }
 }
 
 function handleRemoveDynamic(sectionKey: string, rowId: string) {
@@ -346,90 +333,147 @@ function handleDynamicChange(sectionKey: string, rowId: string, field: string, v
   updateDynamicRow(sectionKey, rowId, field as any, value)
 }
 
-// ─── Matrix edit ─────────────────────────────────────────────────────────────
-
 function handleMatrixEdit(sectionKey: string, rowId: string, field: string, value: number) {
-  const layer = sectionKey === 'goodwill_book_value' ? 'bookValue' : 'impairment'
-  updateMatrixCell(layer, rowId, field as keyof I3DisclosureMatrixRow, value ?? 0)
+  updateMatrixCell(
+    sectionKey === 'goodwill_book_value' ? 'bookValue' : 'impairment',
+    rowId,
+    field as keyof I3DisclosureMatrixRow,
+    value ?? 0,
+  )
 }
 
-// ─── Note text ───────────────────────────────────────────────────────────────
+function handleAddMatrix(sectionKey: string) {
+  addMatrixRow(sectionKey === 'goodwill_book_value' ? 'bookValue' : 'impairment')
+}
+
+function handleRemoveMatrix(sectionKey: string, rowId: string) {
+  removeMatrixRow(sectionKey === 'goodwill_book_value' ? 'bookValue' : 'impairment', rowId)
+}
+
+function handleInvesteeChange(sectionKey: string, row: I3DisclosureMatrixRow) {
+  updateMatrixCell(
+    sectionKey === 'goodwill_book_value' ? 'bookValue' : 'impairment',
+    row.rowId,
+    'investee',
+    row.investee,
+  )
+}
 
 function handleNoteChange(sectionKey: string) {
   saveSectionNote(sectionKey, sectionNotes.value[sectionKey] ?? '')
 }
 
-// ─── Review dialog ───────────────────────────────────────────────────────────
+function handlePull(overwrite: boolean) {
+  const res = pullFromDetailRows({ overwrite })
+  ElMessage({ type: res.count ? 'success' : 'warning', message: res.message })
+}
+
+const SOE_PROCESS_TEMPLATE =
+  '本公司采用预计未来现金流现值的方法计算资产组的可收回金额。本公司根据管理层批准的财务预算预计未来5年内现金流量，'
+  + '其后年度采用的现金流量增长率预计为XX%（上期：XX%），不会超过资产组经营业务的长期平均增长率。'
+  + '管理层根据过往表现及其对市场发展的预期编制上述财务预算。计算未来现金流现值所采用的税前折现率为XX%（上期：XX%），'
+  + '已反映了相对于有关分部的风险。根据减值测试的结果，本期期末商誉未发生减值（上期期末：无）。'
+  + '【或：本期期末对商誉计提减值准备XX元（上期期末：XX元）。】'
+
+const TEMPLATES: Record<string, string> = {
+  impairment_test_process: SOE_PROCESS_TEMPLATE,
+  key_assumptions: '关键假设（增长率、利润率、折现率）及其确定依据；与上期差异原因：',
+  impairment_result: '本期减值结论及金额确认依据：',
+  cgu_allocation: '商誉分摊至资产组的构成及依据：',
+  other_disclosure: '其他说明：',
+}
+
+function applyTemplate(sectionKey: string) {
+  const t = TEMPLATES[sectionKey]
+  if (!t) return
+  sectionNotes.value[sectionKey] = t
+  saveSectionNote(sectionKey, t)
+}
+
+function getPlaceholder(key: string): string {
+  return TEMPLATES[key] || '请填写披露文字…'
+}
+
+function fmtAmt(v: number): string {
+  return (Number(v) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
 
 function handleReview(id: string) {
   openReviewDialog(id)
 }
 
-// ─── Placeholders ────────────────────────────────────────────────────────────
-
-function getPlaceholder(sectionKey: string): string {
-  const map: Record<string, string> = {
-    impairment_test_process: '请描述减值测试过程：可收回金额确定方式（公允价值减处置费用/使用价值DCF）、测试时点...',
-    cgu_allocation: '请说明商誉分摊至各资产组(组合)的依据...',
-    key_assumptions: '请说明减值测试关键假设及敏感性分析：折现率(WACC)/增长率/预测期/关键参数变动影响...',
-    impairment_result: '请说明减值测试结论：是否需计提减值、金额及会计处理...',
-    other_disclosure: '如有并购、处置等特殊事项请在此说明...',
+async function syncToNotes() {
+  if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return
+  const snap = getSyncSnapshot()
+  if (!snap.bookValueRows.length && !snap.impairmentRows.length) {
+    ElMessage.warning('请先从 I3-2 取数或手工填写变动矩阵')
+    return
   }
-  return map[sectionKey] ?? `请填写${sectionKey}的文字说明...`
-}
-
-// ─── Format ──────────────────────────────────────────────────────────────────
-
-function fmtAmt(val: number | null | undefined): string {
-  if (val == null) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const payloads = buildI3SoeSyncPayloads(props.wpId, props.applicableStandards || [], snap)
+  if (!payloads.length) {
+    ElMessage.warning('当前不适用国企附注同步')
+    return
+  }
+  isSyncing.value = true
+  try {
+    let rows = 0
+    for (const payload of payloads) {
+      const result: any = await api.post(
+        `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+        payload,
+      )
+      rows += Number((result?.data ?? result)?.rows_synced ?? 0)
+    }
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      projectId: props.projectId,
+      sectionIds: [noteTarget.sectionId],
+      wpId: props.wpId,
+      sheet: '附注披露（国有企业）',
+    })
+    ElMessage.success(`已同步至附注 ${noteTarget.sectionId}（${rows} 行）`)
+  } catch (e: any) {
+    ElMessage.error(e?.message || '同步失败')
+  } finally {
+    isSyncing.value = false
+  }
 }
 </script>
 
 <style scoped>
 .i3-tab-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
-
-/* 蓝色渐变引导区 */
-.guide-area { background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
-.guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.guide-step { display: flex; align-items: center; gap: 6px; font-size: 12px; }
-.step-num { font-weight: 700; color: var(--el-color-primary); }
-
-/* 琥珀色方法论 */
-.methodology-block { border-left: 4px solid #f59e0b; background: #fffbeb; border-radius: 4px; padding: 12px 16px; margin-bottom: 12px; }
-.methodology-title { font-weight: 600; color: #92400e; margin-bottom: 4px; font-size: 12px; }
-.methodology-content { font-size: 12px; color: #78350f; line-height: 1.6; }
-
-/* 卡片 */
+.section-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; gap: 12px; flex-wrap: wrap;
+}
+.section-title { font-size: 15px; font-weight: 600; color: #1f2937; }
+.section-actions, .title-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.card-title-row {
+  display: flex; justify-content: space-between; align-items: center; width: 100%;
+  font-size: 14px; font-weight: 600;
+}
+.guide-area {
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border: 1px solid #93c5fd; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px;
+}
+.guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; font-size: 12px; color: #1e3a5f; }
+.guide-step { display: flex; gap: 6px; }
+.step-num { color: #2563eb; font-weight: 700; }
+.methodology-block {
+  border-left: 4px solid #f59e0b; background: #fffbeb; padding: 10px 14px;
+  border-radius: 0 6px 6px 0; margin-bottom: 12px; font-size: 12px; line-height: 1.7; color: #78350f;
+}
+.methodology-title { font-weight: 600; margin-bottom: 4px; }
+.objective-alert { margin-bottom: 12px; }
 .disclosure-card { margin-bottom: 12px; }
-.section-title { display: flex; align-items: center; justify-content: space-between; }
-.title-actions { display: flex; gap: 8px; align-items: center; }
-
-/* 金额 */
-.amount-cell { text-align: right; font-variant-numeric: tabular-nums; }
-.auto-fill { color: var(--el-color-primary); }
-.auto-badge { margin-left: 4px; vertical-align: middle; }
-.formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
-.auto-fill-hint { font-size: 11px; color: var(--el-text-color-secondary); margin-top: 8px; }
-
-/* 合计 */
-.matrix-subtotal { margin-top: 8px; font-weight: 500; text-align: right; padding-right: 12px; font-size: 12px; }
-.impairment-warning { color: var(--el-color-danger); font-size: 11px; margin-top: 4px; font-weight: 400; }
-.dynamic-actions { margin-top: 8px; }
-
-/* 净值汇总 */
-.summary-card { margin-bottom: 12px; border: 2px solid var(--el-color-primary-light-5); }
-.summary-title { font-weight: 600; color: var(--el-color-primary); }
-.summary-content { padding: 8px 0; }
-.summary-formula { font-size: 14px; line-height: 2; }
-.summary-note { font-size: 11px; color: var(--el-text-color-secondary); margin-top: 4px; }
-.net-value { font-weight: 700; font-size: 16px; color: var(--el-color-primary); }
-
-/* 矩阵表 */
-.matrix-table { font-size: var(--wp-font-size, 13px); }
-
-/* 编制提示 */
-.compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
-.compile-hint summary { cursor: pointer; font-weight: 500; }
-.compile-hint ul { padding-left: 20px; margin-top: 8px; line-height: 1.8; }
+.matrix-table { width: 100%; margin-bottom: 8px; }
+.amount-cell { font-variant-numeric: tabular-nums; }
+.formula-cell { font-weight: 600; border-bottom: 1px dashed #94a3b8; cursor: help; }
+.matrix-subtotal { font-size: 12px; color: #475569; margin-top: 6px; }
+.impairment-warning { color: #b45309; margin-top: 4px; }
+.dynamic-actions, .template-actions { margin-top: 8px; }
+.summary-card { margin-top: 8px; }
+.summary-title { font-weight: 600; }
+.summary-formula { font-size: 13px; line-height: 1.8; }
+.net-value { color: #92400e; font-weight: 700; font-size: 15px; }
+.summary-note { font-size: 12px; color: #6b7280; margin-top: 4px; }
 </style>

@@ -1,5 +1,5 @@
 /**
- * useD7Detail — D7-2 明细表27列核心逻辑 composable
+ * useD7Detail — D7-2 明细表核心逻辑 composable（动态账龄段，2-period）
  *
  * 贷方科目公式链（4步）：
  *   期初审定 = 期初未审 + AJE + RJE
@@ -7,11 +7,14 @@
  *   期末未审 = 期末余额 + 被审计单位重分类调整
  *   期末审定 = 期末未审 + AJE + RJE
  *
- * Spec: .kiro/specs/d7-contract-liabilities/
- * Task: 7.1
- * Requirements: 5.1-5.12, 6.1-6.7, 7.1-7.5, 18.4, 24.1-24.3
+ * 账龄：nested keyed（agingPrior / agingAudited，key 由项目账龄配置决定，2-period），
+ * 复用 useAgingConfig(subject='D7') + migrateD7FlatToNested + migrateD3F1Keys + remapRowAgingData。
+ *
+ * Spec: .kiro/specs/d7-contract-liabilities-enhancement/
+ * Task: 3
+ * Requirements: 2.1, 2.2, 2.3, 8.1-8.4
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   parseNum,
@@ -19,8 +22,11 @@ import {
   calcCreditEndBalance,
   calcSubtotal,
 } from './useD7FormulaEngine'
+import { eventBus } from '@/utils/eventBus'
 import { matchRelatedPartyPure } from './useD3Detail'
 import type { ChecklistResponse } from './useD7FormData'
+import { useAgingConfig, type AgingSegment } from '@/composables/useAgingConfig'
+import { migrateD7FlatToNested, migrateD3F1Keys, remapRowAgingData, type AgingData } from '@/composables/useAgingMigration'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -35,10 +41,7 @@ export interface DetailRow {
   priorAje: number             // 账项调整
   priorRje: number             // 重分类调整
   priorAudited: number         // 期初审定数（自动）
-  priorAging1: number          // 审定账龄-1年以下
-  priorAging2: number          // 审定账龄-1~2年
-  priorAging3: number          // 审定账龄-2~3年
-  priorAging4: number          // 审定账龄-3年以上
+  agingPrior: AgingData        // 期初审定账龄（nested keyed）
   debitAmount: number          // 借方发生
   creditAmount: number         // 贷方发生
   endBalance: number           // 期末余额（自动）
@@ -47,10 +50,7 @@ export interface DetailRow {
   endAje: number               // 账项调整
   endRje: number               // 重分类调整
   endAudited: number           // 期末审定数（自动）
-  endAging1: number            // 审定账龄-1年以下
-  endAging2: number            // 审定账龄-1~2年
-  endAging3: number            // 审定账龄-2~3年
-  endAging4: number            // 审定账龄-3年以上
+  agingAudited: AgingData      // 期末审定账龄（nested keyed）
   isConfirmed: string          // 是否发函
   postTransfer: number         // 期后结转
 }
@@ -62,6 +62,7 @@ export interface UseD7DetailOptions {
   wpId: Ref<string>
   projectId: Ref<string>
   relatedParties?: Ref<string[]>
+  isReadonly?: Ref<boolean>
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -88,17 +89,21 @@ function generateRowId(): string {
   return `row-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
 }
 
-function safeParseRows(jsonStr: string | null | undefined): DetailRow[] {
+/** 安全解析 JSON 数组（使用动态 segments 迁移账龄至当前配置段） */
+function safeParseRows(jsonStr: string | null | undefined, segments: AgingSegment[]): DetailRow[] {
   if (!jsonStr) return []
   try {
     const parsed = JSON.parse(jsonStr)
-    return Array.isArray(parsed) ? parsed.map(normalizeRow) : []
+    return Array.isArray(parsed) ? parsed.map(raw => normalizeRow(raw, segments)) : []
   } catch {
     return []
   }
 }
 
-function normalizeRow(raw: any): DetailRow {
+/** 规范化行：扁平→nested 迁移 + 对齐当前项目账龄段（Task 2 迁移链） */
+export function normalizeRow(raw: any, segments: AgingSegment[] = []): DetailRow {
+  // 1) 扁平字段 → nested keyed（nested 优先，忽略扁平）；2) 对齐当前段（2-period）
+  const migrated = migrateD3F1Keys(migrateD7FlatToNested(raw), segments)
   return {
     rowId: raw.rowId || generateRowId(),
     contractName: raw.contractName || '',
@@ -110,10 +115,7 @@ function normalizeRow(raw: any): DetailRow {
     priorAje: parseNum(raw.priorAje),
     priorRje: parseNum(raw.priorRje),
     priorAudited: parseNum(raw.priorAudited),
-    priorAging1: parseNum(raw.priorAging1),
-    priorAging2: parseNum(raw.priorAging2),
-    priorAging3: parseNum(raw.priorAging3),
-    priorAging4: parseNum(raw.priorAging4),
+    agingPrior: migrated.agingPrior,
     debitAmount: parseNum(raw.debitAmount),
     creditAmount: parseNum(raw.creditAmount),
     endBalance: parseNum(raw.endBalance),
@@ -122,10 +124,7 @@ function normalizeRow(raw: any): DetailRow {
     endAje: parseNum(raw.endAje),
     endRje: parseNum(raw.endRje),
     endAudited: parseNum(raw.endAudited),
-    endAging1: parseNum(raw.endAging1),
-    endAging2: parseNum(raw.endAging2),
-    endAging3: parseNum(raw.endAging3),
-    endAging4: parseNum(raw.endAging4),
+    agingAudited: migrated.agingAudited,
     isConfirmed: raw.isConfirmed || '',
     postTransfer: parseNum(raw.postTransfer),
   }
@@ -146,21 +145,30 @@ export function recalcRow(row: DetailRow): DetailRow {
   return { ...row, priorAudited, endBalance, endUnadjusted, endAudited }
 }
 
-export function createEmptyRow(): DetailRow {
+/** 创建空行（账龄段按当前项目配置动态零初始化） */
+export function createEmptyRow(segments: AgingSegment[] = []): DetailRow {
+  const emptyAging: AgingData = {}
+  for (const seg of segments) emptyAging[seg.key] = 0
   return {
     rowId: generateRowId(),
     contractName: '', companyName: '', companyCode: '',
     relatedPartyType: '', natureType: '',
     priorUnadjusted: 0, priorAje: 0, priorRje: 0, priorAudited: 0,
-    priorAging1: 0, priorAging2: 0, priorAging3: 0, priorAging4: 0,
+    agingPrior: { ...emptyAging },
     debitAmount: 0, creditAmount: 0, endBalance: 0,
     entityReclass: 0, endUnadjusted: 0, endAje: 0, endRje: 0, endAudited: 0,
-    endAging1: 0, endAging2: 0, endAging3: 0, endAging4: 0,
+    agingAudited: { ...emptyAging },
     isConfirmed: '', postTransfer: 0,
   }
 }
 
-function sumRows(rows: DetailRow[], label: string): DetailRow {
+function sumRows(rows: DetailRow[], label: string, segments: AgingSegment[]): DetailRow {
+  const agingPriorSub: AgingData = {}
+  const agingAuditedSub: AgingData = {}
+  for (const seg of segments) {
+    agingPriorSub[seg.key] = calcSubtotal(rows.map(r => r.agingPrior?.[seg.key] ?? 0))
+    agingAuditedSub[seg.key] = calcSubtotal(rows.map(r => r.agingAudited?.[seg.key] ?? 0))
+  }
   return {
     rowId: `__${label}__`,
     contractName: label, companyName: '', companyCode: '',
@@ -169,10 +177,7 @@ function sumRows(rows: DetailRow[], label: string): DetailRow {
     priorAje: calcSubtotal(rows.map(r => r.priorAje)),
     priorRje: calcSubtotal(rows.map(r => r.priorRje)),
     priorAudited: calcSubtotal(rows.map(r => r.priorAudited)),
-    priorAging1: calcSubtotal(rows.map(r => r.priorAging1)),
-    priorAging2: calcSubtotal(rows.map(r => r.priorAging2)),
-    priorAging3: calcSubtotal(rows.map(r => r.priorAging3)),
-    priorAging4: calcSubtotal(rows.map(r => r.priorAging4)),
+    agingPrior: agingPriorSub,
     debitAmount: calcSubtotal(rows.map(r => r.debitAmount)),
     creditAmount: calcSubtotal(rows.map(r => r.creditAmount)),
     endBalance: calcSubtotal(rows.map(r => r.endBalance)),
@@ -181,10 +186,7 @@ function sumRows(rows: DetailRow[], label: string): DetailRow {
     endAje: calcSubtotal(rows.map(r => r.endAje)),
     endRje: calcSubtotal(rows.map(r => r.endRje)),
     endAudited: calcSubtotal(rows.map(r => r.endAudited)),
-    endAging1: calcSubtotal(rows.map(r => r.endAging1)),
-    endAging2: calcSubtotal(rows.map(r => r.endAging2)),
-    endAging3: calcSubtotal(rows.map(r => r.endAging3)),
-    endAging4: calcSubtotal(rows.map(r => r.endAging4)),
+    agingAudited: agingAuditedSub,
     isConfirmed: '',
     postTransfer: calcSubtotal(rows.map(r => r.postTransfer)),
   }
@@ -195,6 +197,11 @@ function sumRows(rows: DetailRow[], label: string): DetailRow {
 export function useD7Detail(options: UseD7DetailOptions) {
   const { allResponses, debouncedSave, wpId, projectId } = options
   const relatedParties = options.relatedParties ?? ref<string[]>([])
+  const isReadonly = options.isReadonly ?? ref(false)
+
+  // ─── Aging Config Integration (subject='D7', 2-period) ──────────────
+
+  const { segments, bands } = useAgingConfig(projectId, 'D7')
 
   function resolveRelatedPartyType(companyName: string): string {
     const matched = matchRelatedPartyPure(companyName, relatedParties.value)
@@ -212,9 +219,10 @@ export function useD7Detail(options: UseD7DetailOptions) {
   const rows = ref<DetailRow[]>([])
 
   watch(
-    () => allResponses.value.get(ITEM_ID_ROWS)?.remark,
-    (jsonStr) => {
-      rows.value = safeParseRows(jsonStr).map(recalcRow)
+    [() => allResponses.value.get(ITEM_ID_ROWS)?.remark, segments],
+    ([jsonStr]) => {
+      if (!segments.value.length) return  // 等待 segments 加载完成，避免用空段迁移丢数据
+      rows.value = safeParseRows(jsonStr as string | undefined, segments.value).map(recalcRow)
     },
     { immediate: true },
   )
@@ -240,7 +248,7 @@ export function useD7Detail(options: UseD7DetailOptions) {
 
   // ─── totalRow ────────────────────────────────────────────────────────
 
-  const totalRow: ComputedRef<DetailRow> = computed(() => sumRows(rows.value, '合计'))
+  const totalRow: ComputedRef<DetailRow> = computed(() => sumRows(rows.value, '合计', segments.value))
 
   // ─── verificationRow (核对行 = 合计 - TB数) ─────────────────────────
 
@@ -260,30 +268,37 @@ export function useD7Detail(options: UseD7DetailOptions) {
   // ─── addRow / removeRow / updateCell ─────────────────────────────────
 
   function addRow(): void {
-    rows.value = [...rows.value, createEmptyRow()]
+    if (isReadonly.value) return
+    rows.value = [...rows.value, createEmptyRow(segments.value)]
     persistRows()
   }
 
   function removeRow(rowId: string): void {
+    if (isReadonly.value) return
     rows.value = rows.value.filter(r => r.rowId !== rowId)
     persistRows()
   }
 
   const NUMERIC_EDITABLE_FIELDS = [
     'priorUnadjusted', 'priorAje', 'priorRje',
-    'priorAging1', 'priorAging2', 'priorAging3', 'priorAging4',
     'debitAmount', 'creditAmount', 'entityReclass',
     'endAje', 'endRje',
-    'endAging1', 'endAging2', 'endAging3', 'endAging4',
     'postTransfer',
   ]
 
   function updateCell(rowId: string, field: string, value: any): void {
+    if (isReadonly.value) return
     const idx = rows.value.findIndex(r => r.rowId === rowId)
     if (idx === -1) return
 
     const row = { ...rows.value[idx] }
-    if (NUMERIC_EDITABLE_FIELDS.includes(field)) {
+    if (field.startsWith('agingPrior.')) {
+      const subField = field.slice('agingPrior.'.length)
+      row.agingPrior = { ...row.agingPrior, [subField]: parseNum(value) }
+    } else if (field.startsWith('agingAudited.')) {
+      const subField = field.slice('agingAudited.'.length)
+      row.agingAudited = { ...row.agingAudited, [subField]: parseNum(value) }
+    } else if (NUMERIC_EDITABLE_FIELDS.includes(field)) {
       ;(row as any)[field] = parseNum(value)
     } else {
       ;(row as any)[field] = value
@@ -333,8 +348,10 @@ export function useD7Detail(options: UseD7DetailOptions) {
             priorUnadjusted: item.priorUnadjusted ?? item.prior_unadjusted ?? item.begin_balance ?? 0,
             debitAmount: item.debitAmount ?? item.debit_amount ?? 0,
             creditAmount: item.creditAmount ?? item.credit_amount ?? 0,
+            agingPrior: item.agingPrior,
+            agingAudited: item.agingAudited,
             relatedPartyType: resolveRelatedPartyType(companyName),
-          }))
+          }, segments.value))
           existingMap.set(key, newRow)
           newCount++
         }
@@ -348,16 +365,11 @@ export function useD7Detail(options: UseD7DetailOptions) {
     }
   }
 
-  // ─── 关联方自动匹配 ──────────────────────────────────────────────────
-
-  // 编辑单位名称时通过 relatedParties 列表模糊匹配关联关系
-
   // ─── onConfirmationCompleted ─────────────────────────────────────────
 
-  function _handleConfirmationCompleted(event: Event): void {
-    const detail = (event as CustomEvent).detail
-    if (!detail || detail.wpCode !== 'D7') return
-    const customerName = detail.customerName
+  function _handleConfirmationCompleted(payload: any): void {
+    if (!payload || payload.wpCode !== 'D7') return
+    const customerName = payload.customerName
     if (!customerName) return
 
     rows.value = rows.value.map(r => {
@@ -369,14 +381,29 @@ export function useD7Detail(options: UseD7DetailOptions) {
     persistRows()
   }
 
-  // Setup listener
-  if (typeof window !== 'undefined') {
-    window.addEventListener('confirmation:completed', _handleConfirmationCompleted)
+  // Setup listener via eventBus (bridged from window by crossWpEventBridge)
+  eventBus.on('confirmation:completed', _handleConfirmationCompleted)
+
+  // ─── aging-config:changed 刷新（保留共有段/新增段零初始化/旧段丢弃） ──
+
+  const _onAgingConfigChanged = (): void => {
+    if (!segments.value.length) return
+    rows.value = rows.value.map(row =>
+      recalcRow(remapRowAgingData(row, segments.value, false) as DetailRow),
+    )
+    persistRows()
   }
+  onMounted(() => {
+    window.addEventListener('aging-config:changed', _onAgingConfigChanged)
+  })
+
+  onBeforeUnmount(() => {
+    eventBus.off('confirmation:completed', _handleConfirmationCompleted)
+    window.removeEventListener('aging-config:changed', _onAgingConfigChanged)
+  })
 
   // ─── 期后结转联动 (D7-7 → D7-2) ────────────────────────────────────
 
-  // Computed from D7-7-post-rows: match by customer name
   watch(
     () => allResponses.value.get('D7-7-post-rows')?.remark,
     (jsonStr) => {
@@ -385,7 +412,6 @@ export function useD7Detail(options: UseD7DetailOptions) {
       try { postRows = JSON.parse(jsonStr) } catch { return }
       if (!Array.isArray(postRows) || postRows.length === 0) return
 
-      // Aggregate post transfer credits by customer name
       const transferMap = new Map<string, number>()
       for (const pr of postRows) {
         const name = pr.customerName || ''
@@ -393,7 +419,6 @@ export function useD7Detail(options: UseD7DetailOptions) {
         transferMap.set(name, (transferMap.get(name) || 0) + parseNum(pr.creditAmount))
       }
 
-      // Update rows
       let changed = false
       rows.value = rows.value.map(r => {
         const transfer = transferMap.get(r.companyName) ?? 0
@@ -414,6 +439,8 @@ export function useD7Detail(options: UseD7DetailOptions) {
     rows,
     totalRow,
     verificationRow,
+    segments,
+    bands,
     addRow,
     removeRow,
     updateCell,

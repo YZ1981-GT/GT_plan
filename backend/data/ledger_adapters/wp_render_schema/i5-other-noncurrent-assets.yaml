@@ -121,14 +121,14 @@ sheets:
   审定表I5-1:
     code: I5-1
     group: core
-    dimensions: "89×11"
+    dimensions: "47×12"
     component: I5TabAdjudication
     class_code: F-审定表
     account_codes: ['1911']
     formula_count: 61
-    virtual_scroll: true
+    # 镜像 I4-1：未审滚动 → 调整 → 审定；上期比较；无摊销列
     columns:
-      - { field: item_name, label: 项目, type: text, width: 150, readonly: true }
+      - { field: project_name, label: 项目, type: text, width: 150 }
       - { field: opening_balance, label: 期初, type: number, width: 100 }
       - { field: current_increase, label: 本期增加, type: number, width: 100 }
       - { field: current_decrease, label: 本期减少, type: number, width: 100 }
@@ -137,30 +137,36 @@ sheets:
       - { field: aje_amount, label: AJE, type: number, width: 80 }
       - { field: rje_amount, label: RJE, type: number, width: 80 }
       - { field: audited_amount, label: 审定数, type: number, formula: "unadjusted + aje + rje" }
-      - { field: change_rate, label: 变动率, type: percent, width: 80, formula: "(audited - prior) / prior" }
-      - { field: remark, label: 备注, type: text, width: 120, editable: true }
+      - { field: prior_audited, label: 上期审定, type: number, width: 100 }
+      - { field: variance_amount, label: 变动额, type: number, formula: "audited - prior_audited" }
+      - { field: variance_rate, label: 变动率, type: percent, formula: "IF(prior!=0, variance/ABS(prior), N/A)" }
     formulas:
       - { name: calcAssetEndBalance, target: closing_balance, expr: "opening + increase - decrease" }
       - { name: calcAuditedAmount, target: audited_amount, expr: "unadjusted + aje + rje" }
-      - { name: calcChangeRate, target: change_rate, expr: "(audited - prior) / prior" }
-      - { name: calcTriangleReconciliation, target: triangle_check, expr: "closing - (opening + increase - decrease) === 0" }
+      - { name: calcVariance, target: variance_amount, expr: "audited - prior_audited" }
     highlights:
       - { condition: "triangle_mismatch", style: red, tooltip: "三角勾稽不平" }
       - { condition: "tb_variance != 0", style: red }
-      - { condition: "abs(change_rate) > 0.5", style: yellow, tooltip: "变动率超50%" }
+      - { condition: "aje_approx", style: amber, tooltip: "AJE/RJE近似分摊" }
+    cross_refs:
+      - { ref_id: CW-I5-1-001, target_wp: I5-2, description: '明细带入 ← I5-2', direction: inbound }
+      - { ref_id: CW-I5-1-002, target_wp: I5-3, description: 'AJE/RJE ← I5-3', direction: inbound }
     writeback:
       target: trial_balance.audited_amount
       trigger: WORKPAPER_SAVED
       key_field: account_code
       value_field: audited_amount
       accounts: ['1911']
+      gate: { tb_diff_must_be_zero: true, triangle_must_balance: true }
     event_bus:
       publish:
         - { event: "substantive:adjudicated", payload: "{accountCode:'1911', adjudicatedAmount}" }
     footer:
+      - { type: excel_lead_matrix, label: 期初期末审定矩阵 }
       - { type: tb_comparison, accounts: ['1911'] }
       - { type: audit_note, label: 审计说明 }
-      - { type: audit_conclusion }
+      - { type: significant_matters, label: 重大事项说明 }
+      - { type: audit_conclusion, templates: [A, B, C] }
       - { type: review_dialog }
 
   # ─────────────────────────────────────────────────────────────────────────
@@ -264,20 +270,51 @@ sheets:
   针对性检查表I5-4:
     code: I5-4
     group: core
-    dimensions: "30×10"
+    dimensions: "28×17"
     component: I5TabTargetedCheck
-    class_code: D-段落检查
-    layout_type: paragraph
+    class_code: C-抽凭检查
+    layout_type: voucher_matrix
     standards_ref: [CAS30]
-    check_items:
-      - { id: classification_correct, label: 分类正确性（应否归入其他科目）, type: conclusion, options: [正确, 需调整, 不适用] }
-      - { id: term_appropriate, label: 期限适当性（是否仍为非流动）, type: conclusion, options: [适当, 应转流动, 不适用] }
-      - { id: recoverability_assessment, label: 可回收性评估, type: conclusion, options: [可回收, 部分可回收, 无法回收, 不适用] }
-      - { id: existence_check, label: 真实性核查（合同/协议/付款凭证）, type: conclusion_with_evidence }
-      - { id: valuation_check, label: 计量准确性核查, type: conclusion_with_evidence }
+    # 对齐致同 Excel：凭证抽查主路径；分类/期限/可回收性段落为可选补充
+    test_objectives:
+      - 通过针对性测试，验证其他非流动资产的存在/发生、分类、计价
+    test_reasons: [大额, 关联方, 分类变更, 期限临近到期, 其他]
+    test_content:
+      - 原始凭证是否齐全
+      - 记账凭证与原始凭证是否相符
+      - 账务处理是否正确（分类科目是否恰当）
+      - 是否记录于恰当的会计期间
+      - 分类、期限与可回收性判断与 I5-2 一致
+    columns:
+      - { field: projectName, label: 项目明细, type: text }
+      - { field: voucherDate, label: 日期, type: date }
+      - { field: voucherNo, label: 凭证编号, type: text }
+      - { field: businessDesc, label: 业务内容, type: text }
+      - { field: counterpartAccount, label: 对方科目, type: text }
+      - { field: counterpartDetail, label: 对方明细科目, type: text }
+      - { field: debitAmount, label: 借方金额, type: number }
+      - { field: creditAmount, label: 贷方金额, type: number }
+      - { field: supportingDocs, label: 支持性文件, type: text }
+      - { field: check1, label: 核对1, type: select, options: [√, ×, N/A] }
+      - { field: check2, label: 核对2, type: select, options: [√, ×, N/A] }
+      - { field: check3, label: 核对3, type: select, options: [√, ×, N/A] }
+      - { field: check4, label: 核对4, type: select, options: [√, ×, N/A] }
+      - { field: check5, label: 核对5, type: select, options: [√, ×, N/A] }
+      - { field: indexRef, label: 索引号, type: text }
+      - { field: isAbnormal, label: 是否异常, type: select }
+      - { field: remark, label: 备注说明, type: text }
+    formulas:
+      - { name: sumDebit, target: checkedDebitTotal, expr: "SUM(debitAmount)" }
+      - { name: sumCredit, target: checkedCreditTotal, expr: "SUM(creditAmount)" }
+      - { name: coverageRate, target: coverageRate, expr: "IF(periodDebit>0, checkedDebit/periodDebit, N/A)" }
+    cross_refs:
+      - { ref_id: CW-I5-4-001, target_wp: I5-2, description: '本期发生额 ← I5-2', direction: inbound }
     guidance:
-      top_area: blue_gradient_steps
       methodology_context: amber_left_border
+      optional_risk_focus: [分类正确性, 期限适当性, 可回收性评估]
+    sampling:
+      account_code: "1911"
+      engine: GtVoucherSamplingEngine
 
   # ─────────────────────────────────────────────────────────────────────────
   # Sheet 7: 附注披露信息（上市公司）（20行×7列，41公式）

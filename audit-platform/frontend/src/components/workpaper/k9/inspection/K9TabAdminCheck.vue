@@ -8,7 +8,7 @@
     四、审计说明（检查比例：仅"本期借方发生额"一行 — 损益科目特点）
     五、审计结论
 
-  复用 useK1VoucherCheck。科目 6601 销售费用（借方/损益类/发生额）。
+  复用 useK1VoucherCheck。科目 6602 管理费用（借方/损益类/发生额）。
   参照 D4 收入底稿规格：引导区+方法论+样本选取+凭证表+检查比例+结论+列设置。
 -->
 <template>
@@ -36,7 +36,7 @@
             <el-button size="small" link @click="resetColumnPrefs">重置默认</el-button>
           </div>
         </el-popover>
-        <el-button size="small" type="primary" link @click="handleAiGenerate">
+        <el-button size="small" type="primary" link :loading="aiLoading" @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">💬 复核</el-button>
@@ -47,9 +47,9 @@
     <el-alert type="info" :closable="false" class="audit-objective">
       <template #title><span class="ao-title">一、测试目标（认定）</span></template>
       <ol class="ao-list">
-        <li><b>发生：</b>利润表中记录的销售费用已发生且与被审计单位有关；</li>
-        <li><b>完整性与准确性：</b>所有应记录的销售费用均已记录，金额恰当；</li>
-        <li><b>截止：</b>销售费用已记录于正确的会计期间。</li>
+        <li><b>发生：</b>利润表中记录的管理费用已发生且与被审计单位有关；</li>
+        <li><b>完整性与准确性：</b>所有应记录的管理费用均已记录，金额恰当；</li>
+        <li><b>截止：</b>管理费用已记录于正确的会计期间。</li>
       </ol>
     </el-alert>
 
@@ -60,7 +60,12 @@
 
     <!-- 二、样本选取 -->
     <el-card shadow="never" class="section-card">
-      <template #header><span class="card-title">二、样本选取标准与规模</span></template>
+      <template #header>
+        <div class="card-header-row">
+          <span class="card-title">二、样本选取标准与规模</span>
+          <el-button v-if="!isReadonly" size="small" type="warning" plain @click="pullBookAmount">从 K9-1 带入发生额</el-button>
+        </div>
+      </template>
       <el-alert type="warning" :closable="false" style="margin-bottom:10px;font-size:12px" show-icon>
         <template #title>测试总体一般不包括：结转损益、职工薪酬/折旧计提、无形资产及长期费用摊销、各项税费计提等凭证</template>
       </el-alert>
@@ -146,6 +151,23 @@
         <el-table-column v-if="isColVisible('debitAmount')" label="借方金额" min-width="110" align="right">
           <template #default="{ row }"><el-input-number v-if="!isReadonly" v-model="row.debitAmount" :controls="false" size="small" class="amount-input" @change="persist" /><span v-else class="amount-cell">{{ fmtAmt(row.debitAmount) }}</span></template>
         </el-table-column>
+        <el-table-column v-if="isColVisible('supportingDoc')" label="支持性文件" min-width="140">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" v-model="row.supportingDoc" size="small" placeholder="付款审批单/报销单/银行回单/合同等" @change="persist" />
+            <span v-else>{{ row.supportingDoc || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="附件OCR" width="72" align="center">
+          <template #default="{ row }">
+            <el-upload
+              :show-file-list="false"
+              :before-upload="(f: File) => handleVoucherOcr(row, f)"
+              accept=".pdf,.jpg,.jpeg,.png"
+            >
+              <el-button link size="small" type="primary" :loading="ocrLoadingId === row.id">📎</el-button>
+            </el-upload>
+          </template>
+        </el-table-column>
         <el-table-column v-if="isColVisible('checks')" label="核对内容" width="180" align="center">
           <template #header>
             <el-tooltip placement="top">
@@ -199,7 +221,10 @@
     </el-card>
 
     <div v-if="abnormalRows.length > 0" class="abnormal-summary">
-      <div class="as-header">⚠️ 异常凭证摘要（{{ abnormalRows.length }} 笔）</div>
+      <div class="as-header">
+        <span>⚠️ 异常凭证摘要（{{ abnormalRows.length }} 笔）</span>
+        <el-button v-if="!isReadonly" size="small" type="danger" plain @click="pushAbnormalToA13">推送异常至 A13 错报</el-button>
+      </div>
       <ul class="as-list">
         <li v-for="r in abnormalRows" :key="r.id"><b>{{ r.debtorName || '（未填）' }}</b> — 凭证 {{ r.voucherNo || '-' }}：{{ r.remark || '未说明' }}</li>
       </ul>
@@ -223,12 +248,12 @@
         <li>核对内容：①原始凭证齐全 ②与记账凭证相符 ③账务处理正确 ④会计期间正确 ⑤费用分类正确</li>
         <li>重点关注：咨询费/中介机构费/差旅费等易虚列项目+关联方代付费用+期末突击入账</li>
         <li>支持性文件：付款审批单、费用报销单、支出凭单、银行回单、合同等</li>
-        <li>抽凭引擎：科目 6601 销售费用（借方/损益类/发生额）</li>
+        <li>抽凭引擎：科目 6602 管理费用（借方/损益类/发生额）</li>
       </ul>
     </details>
 
     <el-dialog v-model="samplingVisible" title="抽凭引擎 — 管理费用(6602)" width="90%" top="5vh" destroy-on-close>
-      <GtVoucherSamplingEngine v-if="samplingVisible" account-code="6602" phase="current" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
+      <GtVoucherSamplingEngine v-if="samplingVisible" account-code="6602" phase="final" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
     </el-dialog>
   </div>
 </template>
@@ -236,12 +261,25 @@
 <script setup lang="ts">
 /**
  * K9TabAdminCheck.vue — K9-8 管理费用检查表（凭证级测试 + 列设置）
- * 科目 6601 销售费用（借方/损益类/发生额）。仅借方检查比例。
+ * 科目 6602 管理费用（借方/损益类/发生额）。仅借方检查比例。
  * 参照 D4 收入底稿规格。
  */
 import { ref, reactive, computed, inject, onMounted, defineAsyncComponent } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
+import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
+import { generateK9AiText } from '../../composables/useK9AiText'
+
+/** K9 管理费用凭证检查 5 项核对（第⑤项为「费用分类正确」，非 K1「债务人核对」） */
+const K9_CHECK_LABELS = [
+  '原始凭证内容完整（付款审批单/报销单/银行回单/合同等）',
+  '记账凭证与原始凭证相符',
+  '账务处理正确',
+  '记录于恰当会计期间',
+  '费用分类正确',
+] as const
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
@@ -268,7 +306,7 @@ const {
   occurrenceDebitChecked,
   load, addOccurrenceRow, removeOccurrenceRow,
   fillFromSamples, serialize,
-} = useK1VoucherCheck({ allResponses: allResponsesRef as any, itemId: 'K9-8-voucher-check' })
+} = useK1VoucherCheck({ allResponses: allResponsesRef as any, itemId: 'K9-8-voucher-check', checkLabels: K9_CHECK_LABELS })
 
 // K9-8 检查比例仅借方（损益科目发生额=借方）
 const k8CheckRatios = computed(() => checkRatios.value.filter(r => r.direction === '本期借方'))
@@ -286,6 +324,7 @@ const columnDefs = reactive<ColDef[]>([
   { key: 'offsetAccount', label: '对方科目', visible: true },
   { key: 'offsetSubAccount', label: '对方明细科目', visible: false },
   { key: 'debitAmount', label: '借方金额', visible: true },
+  { key: 'supportingDoc', label: '支持性文件', visible: true },
   { key: 'checks', label: '核对内容', visible: true },
   { key: 'abnormal', label: '是否异常', visible: true },
   { key: 'indexNo', label: '索引号', visible: true },
@@ -345,8 +384,113 @@ function fmtAmt(val: number | null | undefined): string {
   return Number(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 function abnormalRowClass({ row }: { row: K1VoucherRow }): string { return row.abnormal ? 'abnormal-row' : '' }
-function handleAiGenerate() { emit('save', 'K9-8-ai-trigger', { remark: 'admin-voucher-check' }) }
+
+const aiLoading = ref(false)
+async function handleAiGenerate() {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const ratio = k8CheckRatios.value[0]
+    const content = await generateK9AiText(props.wpId, {
+      prompt: '请根据管理费用凭证检查表的测试结果，生成审计说明：概述测试总体与样本选取、凭证核对情况、异常事项及检查比例是否充分的结论建议。',
+      section: 'K9-8-audit-note',
+      context: {
+        科目: '6602 管理费用（借方/损益类/发生额）',
+        抽样方法: criteria.samplingMethod || '未填',
+        样本量: criteria.sampleSize ?? 0,
+        检查比例: ratio && ratio.ratio != null ? `${(ratio.ratio * 100).toFixed(1)}%` : '未计算',
+        异常笔数: abnormalRows.value.length,
+      },
+      existingContent: auditNote.value || '',
+    })
+    if (content) {
+      auditNote.value = auditNote.value ? `${auditNote.value}\n\n${content}` : content
+      persist()
+    }
+  } finally {
+    aiLoading.value = false
+  }
+}
 function handleReview() { openReviewDialog('K9-8-check') }
+
+// ─── A. 从 K9-1 带入本期借方发生额（检查比例分母，原全手填） ───────────────────
+function pullBookAmount(): void {
+  if (props.isReadonly) return
+  const item = props.allResponses.get('K9-1-audited-total')
+  const v = Number(item?.remark ?? item?.conclusion ?? 0)
+  if (v > 0) {
+    criteria.bookDebitOccurrence = v
+    if (!criteria.populationDebitAmount) criteria.populationDebitAmount = v
+    persist()
+    ElMessage.success(`已带入本期发生额 ${fmtAmt(v)}（来自 K9-1 审定合计）`)
+  } else {
+    ElMessage.warning('未取到 K9-1 审定发生额，请先在 K9-1 完成审定并回写')
+  }
+}
+
+// ─── B. 异常凭证 → A13 错报汇总（风险导向：测试发现流转错报） ──────────────────
+function pushAbnormalToA13(): void {
+  const items = abnormalRows.value
+  if (items.length === 0) { ElMessage.info('无异常凭证'); return }
+  const payload = {
+    wpCode: 'K9',
+    accountCode: '6602',
+    projectId: props.projectId,
+    source: 'K9-8',
+    items: items.map((r: K1VoucherRow) => ({
+      voucherNo: r.voucherNo || '',
+      amount: Number(r.debitAmount || 0),
+      description: `${r.debtorName || ''} ${r.businessContent || ''} ${r.remark || ''}`.trim() || '管理费用凭证异常',
+      indexRef: r.indexNo || 'K9-8',
+    })),
+    timestamp: Date.now(),
+  }
+  try {
+    eventBus.emit('a13:push-misstatement' as any, payload)
+    ElMessage.success(`已推送 ${items.length} 笔异常凭证至 A13 错报汇总`)
+  } catch {
+    ElMessage.warning('推送失败，请稍后重试')
+  }
+}
+
+// ─── C. 行级合同/单据 OCR（复用 /d4/contract-ocr，仅填空字段） ────────────────
+const ocrLoadingId = ref<string | null>(null)
+async function handleVoucherOcr(row: K1VoucherRow, file: File): Promise<boolean> {
+  if (props.isReadonly) return false
+  ocrLoadingId.value = row.id
+  try {
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await http.post(`/api/workpapers/${props.wpId}/d4/contract-ocr`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' }, _silent: true,
+    } as any)
+    const data = res.data?.data ?? res.data
+    const fields: Record<string, any> = data?.extracted_fields || {}
+    const doc = String(fields.serviceContent ?? fields.full_text ?? '').trim()
+    const amount = Number(fields.contractAmount ?? fields.amount ?? 0)
+    const dateStr = String(fields.date ?? fields.signDate ?? '').trim()
+    const preview = [
+      doc && `内容：${doc.slice(0, 60)}`,
+      amount ? `金额：${amount}` : '',
+      dateStr && `日期：${dateStr}`,
+    ].filter(Boolean).join('\n') || '未识别到结构化字段'
+    await ElMessageBox.confirm(`OCR 识别结果（仅回填空字段，请人工复核）：\n${preview}`, '确认回填', {
+      confirmButtonText: '回填', cancelButtonText: '取消',
+    })
+    if (doc && !row.supportingDoc) row.supportingDoc = doc.slice(0, 200)
+    if (doc && !row.businessContent) row.businessContent = doc.slice(0, 60)
+    if (amount && !row.debitAmount) row.debitAmount = amount
+    if (dateStr && !row.date) row.date = dateStr
+    row.ocrAttachment = file.name
+    persist()
+    ElMessage.success('已回填（请人工复核）')
+  } catch {
+    // 用户取消或识别失败，静默
+  } finally {
+    ocrLoadingId.value = null
+  }
+  return false // 阻止 el-upload 默认上传
+}
 </script>
 
 <style scoped>
@@ -392,7 +536,7 @@ function handleReview() { openReviewDialog('K9-8-check') }
 .note-block { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; }
 .note-block label { font-size: 12px; color: var(--el-text-color-secondary); }
 .abnormal-summary { margin-bottom: 10px; padding: 10px 12px; border-radius: 6px; background: #fef2f2; border: 1px solid #fecaca; }
-.as-header { font-weight: 600; color: var(--el-color-danger); margin-bottom: 6px; }
+.as-header { display: flex; align-items: center; justify-content: space-between; font-weight: 600; color: var(--el-color-danger); margin-bottom: 6px; }
 .as-list { padding-left: 18px; margin: 0; line-height: 1.7; color: var(--el-color-danger-dark-2); }
 .conclusion-card { margin-bottom: 10px; }
 .conclusion-card :deep(.el-card__header) { padding: 8px 14px; }

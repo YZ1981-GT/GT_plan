@@ -177,7 +177,7 @@
         </div>
       </template>
 
-      <!-- 注销差额警告 -->
+      <!-- 注销差额警告 + 建议AJE -->
       <el-alert
         v-if="check.hasUnresolvedDiff.value"
         type="warning"
@@ -185,7 +185,34 @@
         show-icon
         style="margin-bottom: 12px"
       >
-        存在注销冲减差额≠0的行，需进一步冲减盈余公积(M5)/未分配利润(M6)
+        <template #title>
+          存在注销冲减差额≠0的行，需进一步冲减盈余公积(M5)/未分配利润(M6)
+        </template>
+        <template #default>
+          <div v-if="check.hasSuggestedAje.value" class="aje-suggestion-area">
+            <div class="aje-suggestion-title">建议调整分录（CAS准则冲减顺序：M5盈余公积→M6未分配利润）：</div>
+            <el-table :data="check.suggestedAjeEntries.value" size="small" border style="margin:8px 0">
+              <el-table-column prop="accountName" label="科目" min-width="100" />
+              <el-table-column prop="accountCode" label="科目编码" width="80" />
+              <el-table-column label="借方" width="110" align="right">
+                <template #default="{ row }">{{ row.debit > 0 ? fmtAmount(row.debit) : '' }}</template>
+              </el-table-column>
+              <el-table-column label="贷方" width="110" align="right">
+                <template #default="{ row }">{{ row.credit > 0 ? fmtAmount(row.credit) : '' }}</template>
+              </el-table-column>
+              <el-table-column prop="batchName" label="来源批次" min-width="120" />
+            </el-table>
+            <el-button
+              v-if="!isReadonly"
+              type="warning"
+              size="small"
+              @click="handlePushSuggestedAje"
+            >
+              一键推送至M3-3调整分录
+            </el-button>
+            <span class="aje-hint">（推送后可在M3-3查看/编辑，审计师确认后生效）</span>
+          </div>
+        </template>
       </el-alert>
 
       <el-table :data="check.computedCancelRows.value" border size="small" style="width: 100%">
@@ -439,6 +466,12 @@ function handlePublishCancellation() {
   ElMessage.success('已发布注销冲减联动通知至M2/M4')
 }
 
+/** 一键推送建议AJE至M3-3调整分录 */
+function handlePushSuggestedAje() {
+  check.pushSuggestedAje()
+  ElMessage.success('建议AJE已推送至M3-3调整分录（冲减盈余公积/未分配利润）')
+}
+
 function handleImportExport(command: string) {
   const sheet: M3ImportableSheet = 'M3-5'
   switch (command) {
@@ -549,4 +582,7 @@ onMounted(async () => {
 .m3-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .m3-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .m3-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
+.aje-suggestion-area { margin-top: 8px; }
+.aje-suggestion-title { font-weight: 500; color: #e6a23c; margin-bottom: 4px; font-size: 12px; }
+.aje-hint { font-size: 12px; color: #909399; margin-left: 8px; }
 </style>

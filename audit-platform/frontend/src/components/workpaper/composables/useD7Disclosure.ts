@@ -14,8 +14,9 @@
  * Task: 13.1
  * Requirements: 13.1-13.8, 14.1-14.6, 15.1-15.6
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal } from './useD7FormulaEngine'
+import { eventBus } from '@/utils/eventBus'
 import type { ChecklistResponse } from './useD7FormData'
 import type useD7CrossSheet from './useD7CrossSheet'
 
@@ -325,27 +326,28 @@ export function useD7Disclosure(options: UseD7DisclosureOptions) {
         debouncedSave(key, { remark: newTexts[key] })
         // Emit EventBus for disclosure note text update
         try {
-          window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-            detail: { wpCode: 'D7', section: key, text: newTexts[key] },
-          }))
+          eventBus.emit('disclosure:note-text-updated', {
+            wpCode: 'D7', section: key, text: newTexts[key], timestamp: Date.now(),
+          })
         } catch { /* non-blocking */ }
       }
     }
   }, { deep: true })
 
   // Listen for external note updates (last-write-wins)
-  function _handleNoteSectionUpdated(event: Event): void {
-    const detail = (event as CustomEvent).detail
-    if (!detail || detail.wpCode !== 'D7') return
-    const key = detail.section
-    if (NOTE_TEXT_KEYS.includes(key) && detail.text != null) {
-      noteTexts.value = { ...noteTexts.value, [key]: detail.text }
+  function _handleNoteSectionUpdated(payload: any): void {
+    if (!payload || payload.wpCode !== 'D7') return
+    const key = payload.section
+    if (NOTE_TEXT_KEYS.includes(key) && payload.text != null) {
+      noteTexts.value = { ...noteTexts.value, [key]: payload.text }
     }
   }
 
-  if (typeof window !== 'undefined') {
-    window.addEventListener('note:section-updated', _handleNoteSectionUpdated)
-  }
+  eventBus.on('disclosure:note-text-updated', _handleNoteSectionUpdated)
+
+  onBeforeUnmount(() => {
+    eventBus.off('disclosure:note-text-updated', _handleNoteSectionUpdated)
+  })
 
   // ─── Return ──────────────────────────────────────────────────────────
 

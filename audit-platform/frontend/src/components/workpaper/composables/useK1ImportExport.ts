@@ -9,9 +9,11 @@
  *   GET  /api/workpapers/{wpId}/k1/export-data?sheet={code}
  *   POST /api/workpapers/{wpId}/k1/import-data  (multipart/form-data, sheet={code})
  *
- * sheet codes: K1-2 / K1-5 / K1-7 / K1-8
+ * sheet codes: K1-1 / K1-2 / K1-5 / K1-6 / K1-7 / K1-8
+ *   K1-1 审定表（多 sheet 宽表）
  *   K1-2 明细表（36列3区段）
  *   K1-5 大额其他应收款
+ *   K1-6 会计政策检查（多 sheet）
  *   K1-7 三阶段划分（63行）
  *   K1-8 坏账准备测算（2区段Tab）
  *
@@ -26,8 +28,8 @@ import http from '@/utils/http'
 
 // ═══ 类型定义 ═══
 
-/** K1 支持导入导出的 sheet 编码（4张动态行表格） */
-export type K1ImportableSheet = 'K1-2' | 'K1-5' | 'K1-7' | 'K1-8'
+/** K1 支持导入导出的 sheet 编码（5张动态行表格） */
+export type K1ImportableSheet = 'K1-1' | 'K1-2' | 'K1-3' | 'K1-4' | 'K1-5' | 'K1-6' | 'K1-7' | 'K1-8' | 'K1-9' | 'K1-11'
 
 /** 导入结果 */
 export interface K1ImportResult {
@@ -49,12 +51,18 @@ export interface K1SheetMeta {
 
 export const K1_API_PREFIX = 'k1'
 
-/** 4张可导入导出 sheet 的中文标签 */
+/** 5张可导入导出 sheet 的中文标签 */
 export const K1_IMPORT_EXPORT_SHEETS: K1SheetMeta[] = [
+  { code: 'K1-1', label: 'K1-1 审定表', multiSheet: true },
   { code: 'K1-2', label: 'K1-2 明细表', multiSheet: true },
+  { code: 'K1-3', label: 'K1-3 坏账准备明细', multiSheet: true },
+  { code: 'K1-4', label: 'K1-4 调整分录汇总' },
   { code: 'K1-5', label: 'K1-5 大额其他应收款' },
+  { code: 'K1-6', label: 'K1-6 会计政策检查', multiSheet: true },
   { code: 'K1-7', label: 'K1-7 三阶段划分' },
   { code: 'K1-8', label: 'K1-8 坏账准备测算', multiSheet: true },
+  { code: 'K1-9', label: 'K1-9 转回核销检查' },
+  { code: 'K1-11', label: 'K1-11 关联方及交易检查' },
 ]
 
 // ═══ 工具函数 ═══
@@ -155,7 +163,7 @@ export function useK1ImportExport(options: UseK1ImportExportOptions): UseK1Impor
     lastError.value = null
     isExporting.value = true
     try {
-      const response = await http.get(`${apiBase()}/export-template`, {
+      const response = await http.post(`${apiBase()}/export-template`, null, {
         params: { sheet },
         responseType: 'blob',
       })
@@ -183,7 +191,7 @@ export function useK1ImportExport(options: UseK1ImportExportOptions): UseK1Impor
     lastError.value = null
     isExporting.value = true
     try {
-      const response = await http.get(`${apiBase()}/export-data`, {
+      const response = await http.post(`${apiBase()}/export-data`, null, {
         params: { sheet },
         responseType: 'blob',
       })

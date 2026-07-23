@@ -7,7 +7,7 @@
  *
  * 职责：
  * - 管理审定表行数据（按资产类别分行，37行）
- * - 每行: { projectName, currentOccurrence, priorOccurrence, unadjusted, aje, rje, audited, yoyChange, sourceWp, remark }
+ * - 每行（对齐源模板12列）: { projectName, 上期数[priorUnadjusted/priorAdjustment/priorAudited], 本期数[currentOccurrence/aje/rje/audited], yoyChange/yoyChangeRate, sourceWp, remark(原因分析) }
  * - 使用 calcAuditedAmount / calcIncomeStatementOccurrence / calcSubtotal
  * - 合计行计算 + 与K11-2明细交叉验证
  * - TB回写（6701发生额！）+ 发布 'substantive:adjudicated' EventBus事件
@@ -34,25 +34,32 @@ export interface K11AdjRow {
   rowKey: string
   /** 资产类别/减值项目名称 */
   projectName: string
-  /** 本期发生额（借方发生-贷方发生，从tb_ledger） */
+  // ── 上期数（源模板：未审数/账项调整/审定数） ──
+  /** 上期未审数 */
+  priorUnadjusted: number
+  /** 上期账项调整 */
+  priorAdjustment: number
+  /** 上期审定数（公式：上期未审+上期账项调整） */
+  priorAudited: number
+  // ── 本期数（源模板：未审数/账项调整/审定数；本平台账项调整细分为AJE+RJE） ──
+  /** 本期未审数（=本期发生额，借方发生-贷方发生，从tb_ledger） */
   currentOccurrence: number
-  /** 上期发生额 */
-  priorOccurrence: number
-  /** 未审数（=本期发生额，公式列） */
+  /** 未审数（=本期发生额，公式列别名） */
   unadjusted: number
-  /** AJE调整 */
+  /** 本期账项调整 AJE */
   aje: number
-  /** RJE重分类 */
+  /** 本期重分类 RJE */
   rje: number
-  /** 审定数（公式：未审+AJE+RJE） */
+  /** 本期审定数（公式：未审+AJE+RJE） */
   audited: number
-  /** 同比变动额（公式：审定-上期） */
+  // ── 本期审定数与上期审定数的比较 ──
+  /** 变动额（公式：本期审定-上期审定） */
   yoyChange: number
-  /** 同比变动率（公式：变动额/|上期|） */
+  /** 变动率（公式：变动额/|上期审定|） */
   yoyChangeRate: number | null
   /** 来源底稿编码（如 F2/H1/I1/I3 等） */
   sourceWp: string
-  /** 备注 */
+  /** 原因分析（源模板末列，字段名保持 remark 向后兼容） */
   remark: string
   /** 可编辑标记 */
   isEditable: boolean
@@ -62,8 +69,10 @@ export interface K11AdjRow {
 
 export interface K11AdjSubtotalRow {
   label: string
+  priorUnadjusted: number
+  priorAdjustment: number
+  priorAudited: number
   currentOccurrence: number
-  priorOccurrence: number
   unadjusted: number
   aje: number
   rje: number
@@ -89,19 +98,32 @@ const ACCOUNT_CODE_6701 = '6701'
 /** 来源底稿映射（sourceWp codes） */
 export const SOURCE_WP_CODES = ['F2', 'H1', 'I1', 'I2', 'I3', 'H2', 'G7', 'H4', 'H8', 'H3'] as const
 
-/** 默认审定表资产类别行（37行典型分类） */
+/**
+ * 默认审定表资产类别行 —— P1 对齐源模板 K11-1 canonical 18 项
+ * （合同资产/存货跌价/合同取得成本/合同履约成本/持有待售/其他权益工具投资/
+ *  其他非流动金融资产/长期股权投资/投资性房地产/固定资产/工程物资/在建工程/
+ *  生产性生物资产/油气资产/使用权资产/无形资产/商誉/其他），项目名用"损失"后缀对齐源模板。
+ * sourceWp 仅对有清晰单一减值源底稿的项目设置，其余留空。
+ */
 const DEFAULT_PROJECTS: Array<{ name: string; sourceWp: string }> = [
-  { name: '存货跌价准备', sourceWp: 'F2' },
-  { name: '固定资产减值准备', sourceWp: 'H1' },
-  { name: '无形资产减值准备', sourceWp: 'I1' },
-  { name: '开发支出减值准备', sourceWp: 'I2' },
-  { name: '商誉减值准备', sourceWp: 'I3' },
-  { name: '在建工程减值准备', sourceWp: 'H2' },
-  { name: '长期股权投资减值准备', sourceWp: 'G7' },
-  { name: '工程物资减值准备', sourceWp: 'H4' },
-  { name: '使用权资产减值准备', sourceWp: 'H8' },
-  { name: '投资性房地产减值准备', sourceWp: 'H3' },
-  { name: '其他资产减值损失', sourceWp: '' },
+  { name: '合同资产减值损失', sourceWp: 'D6' },
+  { name: '存货跌价损失', sourceWp: 'F2' },
+  { name: '合同取得成本减值损失', sourceWp: '' },
+  { name: '合同履约成本减值损失', sourceWp: '' },
+  { name: '持有待售资产减值损失', sourceWp: 'K6' },
+  { name: '其他权益工具投资减值损失', sourceWp: '' },
+  { name: '其他非流动金融资产减值损失', sourceWp: '' },
+  { name: '长期股权投资减值损失', sourceWp: 'G7' },
+  { name: '投资性房地产减值损失', sourceWp: 'H3' },
+  { name: '固定资产减值损失', sourceWp: 'H1' },
+  { name: '工程物资减值损失', sourceWp: 'H4' },
+  { name: '在建工程减值损失', sourceWp: 'H2' },
+  { name: '生产性生物资产减值损失', sourceWp: 'H5' },
+  { name: '油气资产减值损失', sourceWp: 'H7' },
+  { name: '使用权资产减值损失', sourceWp: 'H8' },
+  { name: '无形资产减值损失', sourceWp: 'I1' },
+  { name: '商誉减值损失', sourceWp: 'I3' },
+  { name: '其他', sourceWp: '' },
 ]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -110,6 +132,23 @@ function calcChangeRate(current: number, prior: number): number | null {
   const pri = parseNum(prior)
   if (pri === 0) return null
   return (parseNum(current) - pri) / Math.abs(pri)
+}
+
+/**
+ * 归一化减值资产类别名（审定表↔附注披露跨表匹配用）。
+ * 去掉"减值/准备/损失/资产"及空白 → 共同资产词干。
+ * 例："存货跌价准备"/"存货跌价损失"→"存货跌价"；
+ *     "固定资产减值准备"/"固定资产减值损失"→"固定"；
+ *     "商誉减值准备"/"商誉减值损失"→"商誉"。
+ */
+export function normalizeImpairmentCategory(name: string): string {
+  return String(name || '')
+    .replace(/减值/g, '')
+    .replace(/准备/g, '')
+    .replace(/损失/g, '')
+    .replace(/资产/g, '')
+    .replace(/\s/g, '')
+    .trim()
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -151,20 +190,27 @@ export function useK11Adjudication(params: UseK11AdjudicationParams) {
   }
 
   function _normalizeRow(raw: any): K11AdjRow {
+    // 上期数：迁移旧字段 priorOccurrence → priorUnadjusted（旧数据无上期账项调整）
+    const priorUnadjusted = parseNum(raw.priorUnadjusted ?? raw.priorOccurrence)
+    const priorAdjustment = parseNum(raw.priorAdjustment)
+    const priorAudited = priorUnadjusted + priorAdjustment
+    // 本期数
     const currentOccurrence = parseNum(raw.currentOccurrence)
-    const priorOccurrence = parseNum(raw.priorOccurrence)
     const unadjusted = currentOccurrence
     const aje = parseNum(raw.aje)
     const rje = parseNum(raw.rje)
     const audited = calcAuditedAmount(unadjusted, aje, rje)
-    const yoyChange = audited - priorOccurrence
-    const yoyChangeRate = calcChangeRate(audited, priorOccurrence)
+    // 比较：本期审定 vs 上期审定
+    const yoyChange = audited - priorAudited
+    const yoyChangeRate = calcChangeRate(audited, priorAudited)
 
     return {
       rowKey: raw.rowKey ?? `row-${Math.random().toString(36).slice(2, 10)}`,
       projectName: raw.projectName ?? '',
+      priorUnadjusted,
+      priorAdjustment,
+      priorAudited,
       currentOccurrence,
-      priorOccurrence,
       unadjusted,
       aje,
       rje,
@@ -182,8 +228,10 @@ export function useK11Adjudication(params: UseK11AdjudicationParams) {
     return DEFAULT_PROJECTS.map((item) => ({
       rowKey: `row-${item.name}`,
       projectName: item.name,
+      priorUnadjusted: 0,
+      priorAdjustment: 0,
+      priorAudited: 0,
       currentOccurrence: 0,
-      priorOccurrence: 0,
       unadjusted: 0,
       aje: 0,
       rje: 0,
@@ -201,11 +249,12 @@ export function useK11Adjudication(params: UseK11AdjudicationParams) {
 
   const computedRows: ComputedRef<K11AdjRow[]> = computed(() => {
     return rows.value.map((row) => {
+      const priorAudited = row.priorUnadjusted + row.priorAdjustment
       const unadjusted = row.currentOccurrence
       const audited = calcAuditedAmount(unadjusted, row.aje, row.rje)
-      const yoyChange = audited - row.priorOccurrence
-      const yoyChangeRate = calcChangeRate(audited, row.priorOccurrence)
-      return { ...row, unadjusted, audited, yoyChange, yoyChangeRate }
+      const yoyChange = audited - priorAudited
+      const yoyChangeRate = calcChangeRate(audited, priorAudited)
+      return { ...row, priorAudited, unadjusted, audited, yoyChange, yoyChangeRate }
     })
   })
 
@@ -213,15 +262,17 @@ export function useK11Adjudication(params: UseK11AdjudicationParams) {
 
   const totalRow: ComputedRef<K11AdjSubtotalRow> = computed(() => {
     const detail = computedRows.value
+    const priorUnadjusted = calcSubtotal(detail.map(r => r.priorUnadjusted))
+    const priorAdjustment = calcSubtotal(detail.map(r => r.priorAdjustment))
+    const priorAudited = priorUnadjusted + priorAdjustment
     const currentOccurrence = calcSubtotal(detail.map(r => r.currentOccurrence))
-    const priorOccurrence = calcSubtotal(detail.map(r => r.priorOccurrence))
     const unadjusted = currentOccurrence
     const aje = calcSubtotal(detail.map(r => r.aje))
     const rje = calcSubtotal(detail.map(r => r.rje))
     const audited = calcAuditedAmount(unadjusted, aje, rje)
-    const yoyChange = audited - priorOccurrence
-    const yoyChangeRate = calcChangeRate(audited, priorOccurrence)
-    return { label: '合  计', currentOccurrence, priorOccurrence, unadjusted, aje, rje, audited, yoyChange, yoyChangeRate }
+    const yoyChange = audited - priorAudited
+    const yoyChangeRate = calcChangeRate(audited, priorAudited)
+    return { label: '合  计', priorUnadjusted, priorAdjustment, priorAudited, currentOccurrence, unadjusted, aje, rje, audited, yoyChange, yoyChangeRate }
   })
 
   // ─── 与K11-2明细合计交叉验证 ────────────────────────────────────────────────
@@ -232,6 +283,39 @@ export function useK11Adjudication(params: UseK11AdjudicationParams) {
     const detailTotal = parseNum(detailTotalRaw?.remark ?? detailTotalRaw?.conclusion ?? 0)
     const diff = adjTotal - detailTotal
     return { diff, isBalanced: Math.abs(diff) < 0.01 }
+  })
+
+  // ─── 与K11-3调整分录合计勾稽（K11-3→K11-1 联动可见，不双重累加）────────────
+
+  const adjustmentReconcile: ComputedRef<{
+    ajeFromEntries: number
+    rjeFromEntries: number
+    ajeInTable: number
+    rjeInTable: number
+    ajeDiff: number
+    rjeDiff: number
+    hasK113: boolean
+    isMatch: boolean
+  }> = computed(() => {
+    const ajeItem = allResponses.value.get('K11-1-aje-total')
+    const rjeItem = allResponses.value.get('K11-1-rje-total')
+    const ajeFromEntries = parseNum(ajeItem?.remark ?? ajeItem?.conclusion ?? 0)
+    const rjeFromEntries = parseNum(rjeItem?.remark ?? rjeItem?.conclusion ?? 0)
+    const ajeInTable = totalRow.value.aje
+    const rjeInTable = totalRow.value.rje
+    const ajeDiff = ajeInTable - ajeFromEntries
+    const rjeDiff = rjeInTable - rjeFromEntries
+    const hasK113 = !!ajeItem || !!rjeItem
+    return {
+      ajeFromEntries,
+      rjeFromEntries,
+      ajeInTable,
+      rjeInTable,
+      ajeDiff,
+      rjeDiff,
+      hasK113,
+      isMatch: Math.abs(ajeDiff) < 0.01 && Math.abs(rjeDiff) < 0.01,
+    }
   })
 
   // ─── GtIndexChip数据（源底稿跳转） ────────────────────────────────────────
@@ -259,10 +343,11 @@ export function useK11Adjudication(params: UseK11AdjudicationParams) {
   }
 
   function _recalcRow(row: K11AdjRow): void {
+    row.priorAudited = row.priorUnadjusted + row.priorAdjustment
     row.unadjusted = row.currentOccurrence
     row.audited = calcAuditedAmount(row.unadjusted, row.aje, row.rje)
-    row.yoyChange = row.audited - row.priorOccurrence
-    row.yoyChangeRate = calcChangeRate(row.audited, row.priorOccurrence)
+    row.yoyChange = row.audited - row.priorAudited
+    row.yoyChangeRate = calcChangeRate(row.audited, row.priorAudited)
   }
 
   // ─── 动态行操作 ────────────────────────────────────────────────────────────
@@ -272,8 +357,10 @@ export function useK11Adjudication(params: UseK11AdjudicationParams) {
     rows.value.push({
       rowKey: `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       projectName,
+      priorUnadjusted: 0,
+      priorAdjustment: 0,
+      priorAudited: 0,
       currentOccurrence: 0,
-      priorOccurrence: 0,
       unadjusted: 0,
       aje: 0,
       rje: 0,
@@ -339,6 +426,38 @@ export function useK11Adjudication(params: UseK11AdjudicationParams) {
   function _persist(): void {
     if (!onSave) return
     onSave(ROWS_KEY, rows.value)
+    // 供附注披露自动取数（按归一化资产类别键写 audited-by-category，修复死链）
+    onSave('K11-1-audited-by-category', _buildAuditedByCategory())
+  }
+
+  /**
+   * 构建 audited-by-category（附注披露 applyAutoFill 消费）。
+   * 键=归一化资产类别；值含本期审定发生额(currentProvision)/上期(priorAmount)。
+   * K11-1 只有净发生额，故 currentReversal=0（本期发生额=净额，与源模板"附注引用审定数"一致）。
+   */
+  function _buildAuditedByCategory(): Record<string, {
+    currentProvision: number
+    currentReversal: number
+    priorAmount: number
+    occurrence: number
+  }> {
+    const out: Record<string, { currentProvision: number; currentReversal: number; priorAmount: number; occurrence: number }> = {}
+    // 直接从 raw rows.value 计算（_persist 同步调用，rows 已被 _recalcRow 更新）；
+    // 不依赖 computedRows 的惰性求值时序，保证 persist 时取到最新值。
+    for (const row of rows.value) {
+      if (!row.projectName) continue
+      const key = normalizeImpairmentCategory(row.projectName)
+      if (!key) continue
+      const audited = calcAuditedAmount(row.currentOccurrence, row.aje, row.rje)
+      const priorAudited = parseNum(row.priorUnadjusted) + parseNum(row.priorAdjustment)
+      out[key] = {
+        currentProvision: audited,
+        currentReversal: 0,
+        priorAmount: priorAudited,
+        occurrence: audited,
+      }
+    }
+    return out
   }
 
   function saveNote(note: string): void {
@@ -368,6 +487,7 @@ export function useK11Adjudication(params: UseK11AdjudicationParams) {
     auditConclusion,
     isChanged,
     detailCrossValidation,
+    adjustmentReconcile,
     sourceChipData,
     updateCell,
     addRow,

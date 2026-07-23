@@ -104,10 +104,12 @@ describe('B22B 内部控制缺陷评价表 — 注册契约 (6.1)', () => {
     expect(entry!.contextProps).toBe('standard')
   })
 
-  it('wp_code_overrides.json 映射 B22B → b22b-deficiency-evaluation', () => {
+  it('wp_code_overrides.json 映射 B22B → b22b-control-matrix（方案 A：B22B 恢复为控制矩阵登记册）', () => {
+    // 方案 A：B22B wp_code 改指向控制矩阵登记册（致同源模板 B22B 真实结构）；
+    // 缺陷评价组件 b22b-deficiency-evaluation 文件保留（兼容期），但 B22B 不再路由它。
     const overridesPath = resolve(process.cwd(), '../../backend/app/data/wp_code_overrides.json')
     const overrides: Record<string, string> = JSON.parse(readFileSync(overridesPath, 'utf-8'))
-    expect(overrides['B22B']).toBe('b22b-deficiency-evaluation')
+    expect(overrides['B22B']).toBe('b22b-control-matrix')
   })
 })
 
@@ -135,6 +137,35 @@ describe('B22B 内部控制缺陷评价表 — 缺陷列表渲染 (6.2)', () => 
       expect(deficiency.deficiencyItems.value).toHaveLength(2)
       expect(deficiency.deficiencyItems.value[0].source.controlPoint).toBe('要点1')
       expect(deficiency.deficiencyItems.value[1].source.deficiencyType).toBe('未实施')
+    })
+    scope.stop()
+  })
+
+  it('syncFromFullList reconciles from B22A full snapshot { deficiencies }', () => {
+    const scope = effectScope()
+    scope.run(() => {
+      const allResponses = ref(new Map<string, ChecklistResponse>())
+      const materialityLevel = ref<number | null>(null)
+      const deficiency = useB22BDeficiency(allResponses, materialityLevel, noopSave)
+
+      // 首次全量快照：2 项
+      deficiency.syncFromFullList([
+        { tab: 1, subPanel: null, index: 1, controlPoint: '要点1', deficiencyType: '设计无效', elementName: '控制环境' },
+        { tab: 2, subPanel: null, index: 1, controlPoint: '要点2', deficiencyType: '未实施', elementName: '风险评估' },
+      ])
+      expect(deficiency.deficiencyItems.value).toHaveLength(2)
+
+      // 更新快照：要点2 消失（改为有效）、新增要点3 → 计算 added/removed
+      deficiency.syncFromFullList([
+        { tab: 1, subPanel: null, index: 1, controlPoint: '要点1', deficiencyType: '设计无效', elementName: '控制环境' },
+        { tab: 5, subPanel: null, index: 1, controlPoint: '要点3', deficiencyType: '设计无效', elementName: '监督' },
+      ])
+      expect(deficiency.deficiencyItems.value).toHaveLength(2)
+      const points = deficiency.deficiencyItems.value.map((i) => i.source.controlPoint)
+      expect(points).toContain('要点1')
+      expect(points).toContain('要点3')
+      expect(points).not.toContain('要点2')
+      expect(deficiency.eliminatedItems.value.some((i) => i.source.controlPoint === '要点2')).toBe(true)
     })
     scope.stop()
   })

@@ -4,11 +4,18 @@
   忠实反映致同源模板 K5-7（预计负债版，镜像 K1-12）：
     一、审计目标（存在/偿还义务/计价分摊 三认定）
     二、样本选取标准与规模（测试总体/特定样本/抽样总体/样本量/抽样方法/抽样过程）
-    三、测试（1.本期发生额检查 2.期后检查，凭证级明细 + 抽凭引擎 + 核对内容勾选）
-    四、审计说明（检查比例表：本期借方/本期贷方/期末余额 → 账面/检查/比例）
+    三、测试（1.本期发生额检查 2.期后实际支付/判决检查，凭证级明细 + 抽凭引擎 + 核对内容勾选）
+    四、审计说明（检查比例表：本期借方/本期贷方 → 账面/检查/比例）
     五、审计结论
 
-  复用 useK1VoucherCheck（通用凭证检查状态）。科目 2701 预计负债（贷方/负债类）。
+  复用 useK1VoucherCheck（通用凭证检查状态）+ 预计负债专属核对标签覆盖。
+  科目 2701 预计负债（贷方/负债类）。
+
+  🔴 与 K1-12 的关键差异（预计负债特异性）：
+  - 核对内容5项对齐预计负债审计要点（非应收款通用）
+  - 期后检查=期后实际支付/判决/转销（验证期末计量合理性），非"期后收款"
+  - 检查比例仅计算本期借方/贷方（期末余额通过K5-4/5/6专项检查验证，不靠期后凭证比例）
+  - 方法论上下文内嵌预计负债凭证审计关注要点
 -->
 <template>
   <div class="k5-tab-provision-check">
@@ -28,6 +35,11 @@
         <el-button size="small" @click="handleReview">💬 复核</el-button>
         <el-button size="small" @click="$emit('navigate-sheet', '审定表K5-1')">复核底稿</el-button>
       </div>
+    </div>
+
+    <!-- 方法论上下文（预计负债凭证检查关注要点） -->
+    <div class="methodology-context">
+      <p><b>预计负债凭证检查关注要点：</b>①计提凭证是否有充分依据（律师函/合同/评估报告）且金额=最佳估计数；②转销/冲回凭证是否基于义务解除的客观证据（判决/和解/保修完成）；③期后实际支付/判决结果与期末计提金额的差异是否合理；④是否存在应确认而未确认的预计负债（完整性）；⑤对方科目是否恰当（计提→营业外支出6711/管理费用6602；转销→银行存款1002/营业外收入6301）。</p>
     </div>
 
     <!-- 一、审计目标 -->
@@ -170,17 +182,21 @@
       </el-table>
     </el-card>
 
-    <!-- 三、测试 2. 期后检查 -->
+    <!-- 三、测试 2. 期后实际支付/判决检查 -->
     <el-card shadow="never" class="section-card">
       <template #header>
         <div class="card-header-row">
-          <span class="card-title">三、测试 — 2. 期后检查</span>
+          <span class="card-title">三、测试 — 2. 期后实际支付/判决检查</span>
           <div>
             <el-button v-if="!isReadonly" size="small" type="primary" plain @click="openSampling('post')"><el-icon><MagicStick /></el-icon> 抽凭</el-button>
             <el-button v-if="!isReadonly" size="small" @click="addPostCollectionRow(); persist()">＋ 手工新增</el-button>
           </div>
         </div>
       </template>
+      <div class="post-check-hint">
+        <el-icon color="#e6a23c" style="margin-right:4px"><WarningFilled /></el-icon>
+        <span>期后检查目的：验证期末预计负债金额合理性。关注期后实际支付/判决/和解金额与期末计提的差异。差异较大应评估是否需追溯调整。</span>
+      </div>
       <el-table :data="postCollectionRows" border size="small" :max-height="300" class="voucher-table" :row-class-name="abnormalRowClass">
         <el-table-column label="#" type="index" width="42" align="center" />
         <el-table-column label="明细项目/对方单位" min-width="140">
@@ -198,8 +214,17 @@
         <el-table-column label="对方科目" min-width="110">
           <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.offsetAccount" size="small" @change="persist" /><span v-else>{{ row.offsetAccount || '-' }}</span></template>
         </el-table-column>
-        <el-table-column label="发生金额" min-width="110" align="right">
+        <el-table-column label="实际支付/判决金额" min-width="110" align="right">
           <template #default="{ row }"><el-input-number v-if="!isReadonly" v-model="row.creditAmount" :controls="false" size="small" class="amount-input" @change="persist" /><span v-else class="amount-cell">{{ fmtAmt(row.creditAmount) }}</span></template>
+        </el-table-column>
+        <el-table-column label="vs期末计提差异" width="110" align="right">
+          <template #default="{ row }">
+            <el-tooltip content="正数=实际支付>期末计提（少提）；负数=实际支付<期末计提（多提）" placement="top">
+              <span class="formula-cell formula-underline" :class="{ 'diff-warn': row.creditAmount && Math.abs(row.creditAmount - (row.debitAmount || 0)) > 0.01 }">
+                {{ row.debitAmount ? fmtAmt(row.creditAmount - row.debitAmount) : '-' }}
+              </span>
+            </el-tooltip>
+          </template>
         </el-table-column>
         <el-table-column label="是否异常" width="80" align="center">
           <template #default="{ row }"><el-switch v-model="row.abnormal" :disabled="isReadonly" size="small" @change="persist" /></template>
@@ -220,7 +245,7 @@
     <!-- 四、审计说明（检查比例表）-->
     <el-card shadow="never" class="section-card">
       <template #header><span class="card-title">四、审计说明 — 检查比例</span></template>
-      <el-table :data="checkRatios" border size="small" class="ratio-table">
+      <el-table :data="k5CheckRatios" border size="small" class="ratio-table">
         <el-table-column label="方向" prop="direction" width="120" />
         <el-table-column label="账面金额" align="right"><template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.bookAmount) }}</span></template></el-table-column>
         <el-table-column label="检查金额" align="right"><template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.checkedAmount) }}</span></template></el-table-column>
@@ -231,8 +256,12 @@
           </template>
         </el-table-column>
       </el-table>
-      <el-alert v-if="lowRatioWarnings.length > 0" type="warning" :closable="false" show-icon class="ratio-warn">
-        <template #title>检查比例偏低（&lt;30%）：{{ lowRatioWarnings.map(r => r.direction).join('、') }}，应扩大检查样本量或说明原因</template>
+      <div class="ratio-note">
+        <el-icon color="#909399"><InfoFilled /></el-icon>
+        <span>预计负债期末余额的验证通过 K5-4(质保)/K5-5(弃置)/K5-6(诉讼) 专项检查完成，不纳入本表检查比例计算。</span>
+      </div>
+      <el-alert v-if="k5LowRatioWarnings.length > 0" type="warning" :closable="false" show-icon class="ratio-warn">
+        <template #title>检查比例偏低（&lt;30%）：{{ k5LowRatioWarnings.map(r => r.direction).join('、') }}，应扩大检查样本量或说明原因</template>
       </el-alert>
       <div class="note-block">
         <label>审计说明</label>
@@ -258,19 +287,25 @@
     </el-card>
 
     <details class="compile-hint">
-      <summary>编制提示（CAS 1314）</summary>
+      <summary>编制提示（CAS13 + CAS1314）</summary>
       <ul>
         <li>审计目标对应三项认定：存在、义务、计价和分摊</li>
-        <li>样本选取：测试总体扣除特定样本得抽样总体；大额、关联方、异常款项应全部测试</li>
-        <li>本期发生额检查：逐笔核对记账凭证与原始凭证，检查会计处理与披露是否正确</li>
-        <li>期后检查：截止日后相关支付/转销与期末余额比对，验证期末余额真实性</li>
+        <li>样本选取：测试总体扣除特定样本得抽样总体；大额计提/转销、诉讼相关、异常款项应全部测试</li>
+        <li><b>本期发生额检查（核心）：</b>
+          <ul style="padding-left:16px;margin:2px 0">
+            <li>计提凭证(贷方2701)：核对是否有充分计提依据(律师函/合同/评估)+金额是否=最佳估计数+对方科目恰当(6711/6602)</li>
+            <li>转销凭证(借方2701)：核对是否基于义务解除客观证据(判决/和解/保修到期)+对方科目恰当(1002/6301)</li>
+          </ul>
+        </li>
+        <li><b>期后检查：</b>截止日后实际支付/判决金额 vs 期末计提金额对比，差异较大评估是否需追溯调整（CAS13§16期后事项考虑）</li>
         <li>检查比例 = 检查金额 / 账面金额；比例偏低（&lt;30%）须扩样或说明</li>
-        <li>抽凭引擎复用序时账，科目 2701 预计负债（贷方/负债类）</li>
+        <li>期末余额合理性通过 K5-4(质保测算)/K5-5(弃置现值)/K5-6(诉讼评估) 专项底稿验证</li>
+        <li>科目 2701 预计负债（贷方/负债类）：贷方=计提增加，借方=转销减少</li>
       </ul>
     </details>
 
     <el-dialog v-model="samplingVisible" title="抽凭引擎 — 预计负债(2701)" width="90%" top="5vh" destroy-on-close>
-      <GtVoucherSamplingEngine v-if="samplingVisible" account-code="2701" :phase="samplingTarget === 'occurrence' ? 'current' : 'post'" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
+      <GtVoucherSamplingEngine v-if="samplingVisible" account-code="2701" phase="final" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
     </el-dialog>
   </div>
 </template>
@@ -283,7 +318,7 @@
  * 科目 2701 预计负债（贷方/负债类）。
  */
 import { ref, computed, inject, onMounted, defineAsyncComponent } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
+import { MagicStick, WarningFilled, InfoFilled } from '@element-plus/icons-vue'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
@@ -305,13 +340,37 @@ const year = computed(() => props.year ?? new Date().getFullYear())
 const allResponsesRef = computed(() => props.allResponses)
 
 const {
-  itemId, checkLabels,
+  itemId, checkLabels: _originalCheckLabels,
   criteria, occurrenceRows, postCollectionRows, auditNote, conclusion, conclusionOption,
   checkRatios, lowRatioWarnings, abnormalRows,
   occurrenceDebitChecked, occurrenceCreditChecked, postCollectionChecked,
   load, addOccurrenceRow, addPostCollectionRow, removeOccurrenceRow, removePostCollectionRow,
   fillFromSamples, serialize,
 } = useK1VoucherCheck({ allResponses: allResponsesRef as any, itemId: 'K5-7-voucher-check' })
+
+/**
+ * 预计负债专属核对内容5项（覆盖 K1-12 的通用标签）
+ * 对齐预计负债审计特异关注点：
+ * 1. 计提/转销依据充分性（律师函/合同/判决/评估报告）
+ * 2. 金额与最佳估计数/实际支付一致
+ * 3. 对方科目恰当（计提→6711/6602；转销→1002/6301）
+ * 4. 会计期间正确（计提时点=义务确认时点；转销时点=义务解除时点）
+ * 5. 与专项检查表（K5-4/5/6）结论一致
+ */
+const checkLabels = [
+  '计提/转销依据充分（律师函/合同/判决）',
+  '金额与最佳估计数或实际支付一致',
+  '对方科目恰当（6711/6602/1002/6301）',
+  '会计期间正确（义务确认/解除时点）',
+  '与专项检查表（K5-4/5/6）结论一致',
+]
+
+/**
+ * K5 检查比例表：仅计算本期借方/贷方发生额的检查比例。
+ * 期末余额不参与本表比例计算（通过K5-4/5/6专项检查验证）。
+ */
+const k5CheckRatios = computed(() => checkRatios.value.filter(r => r.direction !== '期末余额'))
+const k5LowRatioWarnings = computed(() => k5CheckRatios.value.filter(r => r.ratio != null && r.ratio < 0.3 && r.bookAmount > 0))
 
 onMounted(() => load())
 
@@ -357,6 +416,12 @@ function handleReview() { openReviewDialog('K5-7-check') }
 
 <style scoped>
 .k5-tab-provision-check { padding: 12px 14px; font-size: var(--wp-font-size, 13px); }
+.methodology-context { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 10px 14px; margin-bottom: 10px; border-radius: 4px; font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6; }
+.post-check-hint { display: flex; align-items: flex-start; gap: 4px; margin-bottom: 8px; padding: 6px 10px; background: #fef3c7; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.5; }
+.ratio-note { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12px; color: #909399; }
+.formula-cell { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #303133; }
+.formula-underline { border-bottom: 1px dashed #909399; cursor: help; }
+.diff-warn { color: #e6a23c; font-weight: 600; }
 .guide-banner { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; background: linear-gradient(135deg, #eef4ff 0%, #e0ecff 100%); border: 1px solid #c6dbff; border-radius: 6px; padding: 7px 12px; margin-bottom: 10px; }
 .guide-step { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #1e40af; }
 .gs-no { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #2563eb; color: #fff; font-size: 11px; font-weight: 600; flex-shrink: 0; }

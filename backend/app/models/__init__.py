@@ -138,6 +138,11 @@ from app.models.wp_visibility_models import (  # noqa: F401
     WpVisibilityInvalidationOutbox,
     WpVisibilityPolicyEpoch,
 )
+from app.models.acnr_overlay_model import AcnrProjectOverlay  # noqa: F401
+from app.models.acnr_invalidation_model import (  # noqa: F401
+    AcnrInvalidationEpoch,
+    AcnrInvalidationOutbox,
+)
 
 __all__ = [
     # --- base ---
@@ -284,4 +289,8 @@ __all__ = [
     "WpAccessSecurityOutbox",
     "WpVisibilityPolicyEpoch",
     "WpVisibilityInvalidationOutbox",
+    # --- ACNR Overlay + 失效 durable (acnr-invalidation-overlay-hardening / V122) ---
+    "AcnrProjectOverlay",
+    "AcnrInvalidationEpoch",
+    "AcnrInvalidationOutbox",
 ]

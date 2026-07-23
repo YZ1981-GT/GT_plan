@@ -59,6 +59,8 @@ const {
   isInconsistent,
   isMissingReason,
   isSuspectedOffBook,
+  missingFromBankDetail,
+  missingFromAccountList,
   addRow,
   removeRow,
   updateRow,
@@ -256,6 +258,24 @@ function getRowClass({ row }: { row: AccountListRow }): string {
       <el-tag v-if="summary.restrictedCount > 0" size="small" type="warning">受限账户 {{ summary.restrictedCount }}</el-tag>
       <el-tag v-if="summary.companyInconsistentCount > 0" size="small" type="danger">企业信息不一致 {{ summary.companyInconsistentCount }}</el-tag>
     </div>
+
+    <!-- 与 E1-3 银行明细交叉核对差集 -->
+    <el-alert
+      v-if="missingFromBankDetail.length"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="crosscheck-alert"
+      :title="`账户清单有、E1-3 银行明细无（疑漏列 ${missingFromBankDetail.length} 户）：${missingFromBankDetail.join('、')}`"
+    />
+    <el-alert
+      v-if="missingFromAccountList.length"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="crosscheck-alert"
+      :title="`E1-3 银行明细有、账户清单无（疑未报告开户 ${missingFromAccountList.length} 户）：${missingFromAccountList.join('、')}`"
+    />
 
     <el-skeleton :loading="isLoading" :rows="8" animated>
       <template #default>
@@ -515,6 +535,10 @@ function getRowClass({ row }: { row: AccountListRow }): string {
   align-items: center;
 }
 .chip-wrap { display: inline-flex; align-items: center; }
+
+.crosscheck-alert {
+  margin-bottom: 8px;
+}
 
 /* 完整性核对小结 */
 .completeness-bar {

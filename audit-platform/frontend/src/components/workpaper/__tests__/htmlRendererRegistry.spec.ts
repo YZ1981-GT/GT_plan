@@ -113,6 +113,7 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'b50-risk-assessment',
       'b22a-control-matrix',
       'b22b-deficiency-evaluation',
+      'b22c-design-effectiveness',
       'b23-process-control',
       'b30-group-audit',
       'b2-bundle',

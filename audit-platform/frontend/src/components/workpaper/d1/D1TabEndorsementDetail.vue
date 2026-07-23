@@ -27,6 +27,8 @@ import {
 } from '../composables/useD1EndorsementDetail'
 import type { ChecklistItem, ChecklistResponse } from '../composables/useD1FormData'
 import type { MemoRow } from '../composables/useD1MemoReconciliation'
+import { pullD5FinancingForD1, buildD1D5Reconcile, type D5FinancingPullResult, type D1D5Reconcile } from '../composables/d1D5FinancingPull'
+import { parseNum } from '../composables/useD1FormulaEngine'
 import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
@@ -262,6 +264,37 @@ function onCellContextMenu(row: EndorsementRow, _column: any, _cell: any, event:
   if (openReviewDialog) openReviewDialog({ sectionId: 'D1-endorse-cell', rowId: row.rowId })
 }
 
+// ─── D5 应收款项融资勾稽 ──────────────────────────────────────────────────────
+
+const d5Loading = ref(false)
+const d5Result = ref<D5FinancingPullResult | null>(null)
+const d5Reconcile = ref<D1D5Reconcile | null>(null)
+
+/** D1 侧：已贴现未终止确认的汇票金额合计 */
+const d1NotDerecognizedTotal = computed(() => {
+  return discountRows.value
+    .filter(r => r.rowType !== 'summary' && r.isDerecognized !== '是')
+    .reduce((s, r) => s + parseNum(r.billAmount), 0)
+})
+
+async function handlePullD5() {
+  d5Loading.value = true
+  try {
+    const result = await pullD5FinancingForD1(props.projectId)
+    d5Result.value = result
+    if (result.status === 'ok') {
+      d5Reconcile.value = buildD1D5Reconcile(d1NotDerecognizedTotal.value, result.d5AuditedBalance)
+    } else {
+      d5Reconcile.value = null
+    }
+  } catch (e: any) {
+    d5Result.value = { status: 'error', message: e?.message || '拉取失败', d5WpId: null, d5AuditedBalance: 0 }
+    d5Reconcile.value = null
+  } finally {
+    d5Loading.value = false
+  }
+}
+
 // ─── 编制提示 ────────────────────────────────────────────────────────────────────
 
 const GUIDANCE_TEXTS = [
@@ -479,6 +512,44 @@ const GUIDANCE_TEXTS = [
         </div>
       </div>
 
+      <!-- D1-8 ↔ D5 应收款项融资勾稽 -->
+      <div class="section-title">D1-8 ↔ D5 应收款项融资勾稽</div>
+      <el-card shadow="never" class="reconcile-card">
+        <div class="reconcile-toolbar">
+          <el-button size="small" type="primary" :loading="d5Loading" @click="handlePullD5">
+            勾稽 D5 应收款项融资
+          </el-button>
+          <span v-if="d5Result && d5Result.status !== 'ok'" class="reconcile-msg warn">{{ d5Result.message }}</span>
+        </div>
+        <template v-if="d5Reconcile">
+          <table class="reconcile-table">
+            <thead>
+              <tr>
+                <th>D1-8 未终止确认合计</th>
+                <th>D5-1 审定 FV 合计</th>
+                <th>差异</th>
+                <th>勾稽结果</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="reconcile-num" v-html="fmtAmount(d5Reconcile.d1NotDerecognizedTotal)" />
+                <td class="reconcile-num" v-html="fmtAmount(d5Reconcile.d5AuditedBalance)" />
+                <td class="reconcile-num" :class="{ 'diff-warn': !d5Reconcile.matched }" v-html="fmtAmount(d5Reconcile.diff)" />
+                <td>
+                  <el-tag :type="d5Reconcile.matched ? 'success' : 'warning'" size="small">
+                    {{ d5Reconcile.matched ? '勾稽一致' : '存在差异' }}
+                  </el-tag>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <p v-if="!d5Reconcile.matched" class="reconcile-hint">
+            差异 {{ d5Reconcile.diff.toLocaleString('zh-CN') }} 元，请核查 D1-8 未终止确认票据与 D5-1 应收款项融资分类是否一致。
+          </p>
+        </template>
+      </el-card>
+
       <!-- 编制提示 -->
       <details class="guidance-fold">
         <summary>📋 编制提示</summary>
@@ -620,5 +691,52 @@ const GUIDANCE_TEXTS = [
 .guidance-fold p {
   margin: 6px 0;
   line-height: 1.6;
+}
+
+/* D5 勾稽区 */
+.reconcile-card {
+  margin-bottom: 16px;
+}
+.reconcile-card :deep(.el-card__body) {
+  padding: 12px 16px;
+}
+.reconcile-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.reconcile-msg.warn {
+  font-size: 12px;
+  color: #e6a23c;
+}
+.reconcile-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--wp-font-size, 13px);
+  margin-bottom: 8px;
+}
+.reconcile-table th,
+.reconcile-table td {
+  border: 1px solid #ebeef5;
+  padding: 8px 10px;
+  text-align: center;
+}
+.reconcile-table th {
+  background: #f5f7fa;
+  font-weight: 600;
+}
+.reconcile-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.diff-warn {
+  color: #e6a23c !important;
+  font-weight: 600;
+}
+.reconcile-hint {
+  font-size: 12px;
+  color: #e6a23c;
+  margin: 4px 0 0;
 }
 </style>

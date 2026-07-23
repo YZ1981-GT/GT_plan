@@ -15,10 +15,19 @@
       </ol>
     </el-alert>
 
+    <!-- K4-2 ↔ K4-1 交叉验证 -->
+    <el-alert v-if="k41VsK42Diff > 1" type="warning" :closable="false" show-icon style="margin-bottom:10px">
+      <template #title>K4-2 明细审定合计（{{ fmtAmt(detail.subtotals.value.auditedEnd) }}）与 K4-1 审定合计（{{ fmtAmt(k41AuditedTotal) }}）差异 {{ fmtAmt(k41VsK42Diff) }} 元</template>
+    </el-alert>
+    <el-alert v-else-if="k41AuditedTotal > 0 && detail.detailRows.value.length > 0" type="success" :closable="false" show-icon style="margin-bottom:10px">
+      <template #title>✓ K4-2 明细审定合计与 K4-1 审定合计核对一致</template>
+    </el-alert>
+
     <!-- 标题栏 + 操作 -->
     <div class="section-head">
       <h3 class="sheet-title">K4-2 其他流动负债明细表</h3>
       <div class="head-actions">
+        <el-button v-if="!isReadonly && k41HasData" size="small" type="warning" plain @click="seedFromK41">从K4-1带入</el-button>
         <el-button size="small" type="primary" link @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -37,13 +46,51 @@
       </div>
     </div>
 
-    <!-- 2区段 el-segmented -->
-    <el-segmented
-      v-model="activeSegmentIdx"
-      :options="segmentOptions"
-      size="default"
-      class="segment-bar"
-    />
+    <!-- 2区段 el-segmented + 列设置 -->
+    <div class="segment-toolbar">
+      <el-segmented
+        v-model="activeSegmentIdx"
+        :options="segmentOptions"
+        size="default"
+        class="segment-bar"
+      />
+      <el-popover trigger="click" :width="280" placement="bottom-end">
+        <template #reference>
+          <el-button size="small" circle title="列设置">⚙</el-button>
+        </template>
+        <div class="col-prefs-popover">
+          <div class="cp-header">
+            <span class="cp-title">列显隐设置</span>
+            <el-button size="small" link @click="colPrefs.resetAll()">重置</el-button>
+          </div>
+          <div class="cp-presets">
+            <el-tag
+              v-for="p in colPrefs.presets"
+              :key="p.name"
+              :type="colPrefs.activePreset.value === p.name ? 'primary' : 'info'"
+              size="small"
+              effect="plain"
+              style="cursor:pointer;margin-right:4px"
+              @click="colPrefs.applyPreset(p.name)"
+            >{{ p.name }}</el-tag>
+          </div>
+          <el-divider style="margin:8px 0" />
+          <div v-for="(cols, group) in colPrefs.columnsByGroup.value" :key="group" class="cp-group">
+            <div class="cp-group-label">{{ { basic: '基础', check: '检查', adjust: '调整' }[group] }}</div>
+            <div v-for="col in cols" :key="col.key" class="cp-item">
+              <el-checkbox
+                :model-value="col.visible"
+                :disabled="col.alwaysShow"
+                size="small"
+                @change="colPrefs.toggleColumn(col.key)"
+              >{{ col.label }}</el-checkbox>
+            </div>
+          </div>
+          <el-divider style="margin:8px 0" />
+          <el-button size="small" @click="colPrefs.hideEmptyColumns(detail.detailRows.value)">隐藏空列</el-button>
+        </div>
+      </el-popover>
+    </div>
 
     <!-- 表格 -->
     <el-table
@@ -129,58 +176,51 @@
 
       <!-- ═══ 区段1 检查 ═══ -->
       <template v-if="activeSegmentIdx === 1">
-        <el-table-column label="项目" min-width="200">
+        <el-table-column label="项目" min-width="180">
           <template #default="{ row }">
             <span>{{ row.projectName }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="增减原因" min-width="220">
+        <el-table-column label="增减原因" min-width="180">
           <template #default="{ row }">
-            <el-input
-              v-if="!isReadonly"
-              :model-value="row.increaseReason"
-              size="small"
-              placeholder="增减原因"
-              @change="(v: string) => detail.updateCell(row.rowId, 'increaseReason', v)"
-            />
+            <el-input v-if="!isReadonly" :model-value="row.increaseReason" size="small" placeholder="增减原因" @change="(v: string) => detail.updateCell(row.rowId, 'increaseReason', v)" />
             <span v-else>{{ row.increaseReason || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="凭证号" min-width="120">
+        <el-table-column label="凭证号" min-width="100">
           <template #default="{ row }">
-            <el-input
-              v-if="!isReadonly"
-              :model-value="row.voucherRef"
-              size="small"
-              placeholder="凭证号"
-              @change="(v: string) => detail.updateCell(row.rowId, 'voucherRef', v)"
-            />
+            <el-input v-if="!isReadonly" :model-value="row.voucherRef" size="small" placeholder="凭证号" @change="(v: string) => detail.updateCell(row.rowId, 'voucherRef', v)" />
             <span v-else>{{ row.voucherRef || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="核查结论" min-width="120">
+        <el-table-column label="期后偿付金额" min-width="130" align="right">
+          <template #header>
+            <el-tooltip content="次年序时账2245借方按项目归集（验证完整性核心证据）" placement="top">
+              <span style="border-bottom:1px dashed;cursor:help">期后偿付 ⓘ</span>
+            </el-tooltip>
+          </template>
           <template #default="{ row }">
-            <el-select
-              v-if="!isReadonly"
-              :model-value="row.checkConclusion"
-              size="small"
-              placeholder="结论"
-              @change="(v: string) => detail.updateCell(row.rowId, 'checkConclusion', v)"
-            >
+            <el-input-number v-if="!isReadonly" :model-value="row.postPayment" size="small" :controls="false" class="amount-input" @change="(v: number) => detail.updateCell(row.rowId, 'postPayment', v ?? 0)" />
+            <span v-else class="amount-cell">{{ fmtAmt(row.postPayment) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="偿付日期" min-width="110">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.postPaymentDate" size="small" placeholder="YYYY-MM-DD" @change="(v: string) => detail.updateCell(row.rowId, 'postPaymentDate', v)" />
+            <span v-else>{{ row.postPaymentDate || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="核查结论" min-width="140">
+          <template #default="{ row }">
+            <el-select v-if="!isReadonly" :model-value="row.checkConclusion" size="small" placeholder="结论" @change="(v: string) => detail.updateCell(row.rowId, 'checkConclusion', v)">
               <el-option v-for="opt in conclusionOptions" :key="opt" :label="opt" :value="opt" />
             </el-select>
             <span v-else>{{ row.checkConclusion || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="备注" min-width="200">
+        <el-table-column label="备注" min-width="160">
           <template #default="{ row }">
-            <el-input
-              v-if="!isReadonly"
-              :model-value="row.remark"
-              size="small"
-              placeholder="备注"
-              @change="(v: string) => detail.updateCell(row.rowId, 'remark', v)"
-            />
+            <el-input v-if="!isReadonly" :model-value="row.remark" size="small" placeholder="备注" @change="(v: string) => detail.updateCell(row.rowId, 'remark', v)" />
             <span v-else>{{ row.remark || '-' }}</span>
           </template>
         </el-table-column>
@@ -293,6 +333,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useK4Detail } from '../../composables/useK4Detail'
 import { useK4ImportExport } from '../../composables/useK4ImportExport'
+import { useK4DetailColumnPrefs } from '../../composables/useK4DetailColumnPrefs'
+import http from '@/utils/http'
+import type { WorkpaperRuntimeContext } from '../../composables/useWorkpaperScaffold'
+import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -311,11 +355,12 @@ const emit = defineEmits<{
 // ─── Injections ──────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const natureOptions = ['预提费用', '待转销项税额', '代扣代缴', '短期融资', '其他']
-const conclusionOptions = ['正常', '异常', '需关注', '待确认']
+const conclusionOptions = ['正常', '异常', '需关注', '待确认', '确认属流动负债', '已跨期应重分类', '计提依据不充分']
 
 const segmentOptions = [
   { label: '基础', value: 0 },
@@ -333,6 +378,9 @@ const detail = useK4Detail({
     emit('save', itemId, value)
   },
 })
+
+// 列设置 composable
+const colPrefs = useK4DetailColumnPrefs()
 
 const {
   exportTemplate,
@@ -409,14 +457,101 @@ function handleImportData() {
   input.click()
 }
 
-// ─── AI / 复核 ───────────────────────────────────────────────────────────────
+// ─── AI / 复核 / 版本快照 ────────────────────────────────────────────────────
 
-function handleAiGenerate() {
-  console.log('[K4-2] AI generate: detail')
+async function handleAiGenerate(): Promise<void> {
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      prompt: '请根据K4-2其他流动负债明细表数据，分析各项目增减变动原因并生成审计核查建议',
+      context: {
+        科目: '2245 其他流动负债（负债类，完整性为核心认定）',
+        项目数: String(detail.detailRows.value.length),
+        期末合计: String(detail.subtotals.value.endBalance),
+        审定合计: String(detail.subtotals.value.auditedEnd),
+        性质分布: detail.detailRows.value.map(r => r.nature || '未分类').join('、'),
+      },
+      existingContent: '',
+      section: 'K4-2-detail-analysis',
+    })
+    const content = res?.data?.data?.content || res?.data?.content || ''
+    if (content) {
+      ElMessage.success('AI 分析已生成，请查看控制台')
+      console.log('[K4-2 AI]', content)
+    } else {
+      ElMessage.warning('AI 未返回内容')
+    }
+  } catch {
+    ElMessage.warning('AI 生成失败')
+  }
 }
 
 function handleReview() {
   openReviewDialog('K4-2-detail')
+}
+
+function scheduleAutoSnapshot(): void {
+  try { runtime?.version?.scheduleAutoSnapshot?.() } catch { /* silent */ }
+}
+
+// ─── K4-1 ↔ K4-2 交叉验证 ───────────────────────────────────────────────────
+
+const k41AuditedTotal = computed(() => {
+  const item = props.allResponses.get('K4-1-audited-total')
+  const v = item?.remark ?? item?.value ?? item
+  return Number(v) || 0
+})
+
+const k41VsK42Diff = computed(() => {
+  if (k41AuditedTotal.value === 0 || detail.detailRows.value.length === 0) return 0
+  return Math.abs(k41AuditedTotal.value - detail.subtotals.value.auditedEnd)
+})
+
+// ─── 从 K4-1 审定表带入项目种子 ──────────────────────────────────────────────
+
+const k41HasData = computed(() => {
+  // 检查 K4-1 是否有已填写的行数据
+  const rowCount = Number(props.allResponses.get('K4-1-row-count')?.remark ?? props.allResponses.get('K4-1-row-count')?.value ?? 0)
+  return rowCount > 0 || k41AuditedTotal.value > 0
+})
+
+async function seedFromK41(): Promise<void> {
+  if (detail.detailRows.value.length > 0) {
+    try {
+      await ElMessageBox.confirm(
+        '明细表已有数据，从K4-1带入将追加新项目（不覆盖已有行）。是否继续？',
+        '从K4-1审定表带入',
+        { confirmButtonText: '继续', cancelButtonText: '取消', type: 'info' },
+      )
+    } catch { return }
+  }
+
+  const ROW_LABELS = ['短期应付债券', '政府补助', '待转销项税额', '应付退货款', '其他']
+  const existingNames = new Set(detail.detailRows.value.map(r => r.projectName))
+  let added = 0
+
+  for (let i = 0; i < ROW_LABELS.length; i++) {
+    const label = ROW_LABELS[i]
+    if (existingNames.has(label)) continue
+    // 从 K4-1 读取该行的期初和期末
+    const begin = Number(props.allResponses.get(`K4-1-r${i}-begin`)?.remark ?? 0) || 0
+    const end = Number(props.allResponses.get(`K4-1-r${i}-unadj`)?.remark ?? 0) || 0
+    if (begin === 0 && end === 0) continue // 跳过无数据行
+    await detail.addRow(label)
+    // 回填期初余额
+    const newRow = detail.detailRows.value[detail.detailRows.value.length - 1]
+    if (newRow) {
+      detail.updateCell(newRow.rowId, 'beginBalance', begin)
+      detail.updateCell(newRow.rowId, 'nature', label === '其他' ? '其他' : label)
+    }
+    added++
+  }
+
+  if (added > 0) {
+    ElMessage.success(`已从K4-1带入 ${added} 个项目`)
+    scheduleAutoSnapshot()
+  } else {
+    ElMessage.info('K4-1无可带入的新项目（已存在或无数据）')
+  }
 }
 
 // ─── 格式化 ──────────────────────────────────────────────────────────────────
@@ -464,10 +599,26 @@ function fmtAmt(val: number | null | undefined): string {
   align-items: center;
 }
 
-/* el-segmented 区段栏 */
-.segment-bar {
+/* el-segmented 区段栏 + 列设置 */
+.segment-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin-bottom: 12px;
 }
+
+.segment-bar {
+  flex: 1;
+}
+
+/* 列设置 popover */
+.col-prefs-popover { font-size: 12px; }
+.cp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.cp-title { font-weight: 600; }
+.cp-presets { margin-bottom: 4px; }
+.cp-group { margin-bottom: 6px; }
+.cp-group-label { font-size: 11px; color: var(--el-text-color-secondary); margin-bottom: 2px; font-weight: 500; }
+.cp-item { padding: 1px 0; }
 
 /* 表格 */
 .detail-table {

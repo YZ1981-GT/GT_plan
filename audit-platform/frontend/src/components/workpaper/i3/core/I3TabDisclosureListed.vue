@@ -1,46 +1,225 @@
 <template>
   <div class="i3-tab-disclosure-listed">
-    <!-- 蓝色渐变引导区 -->
+    <div class="section-header">
+      <span class="section-title">商誉附注披露（上市公司）</span>
+      <div class="section-actions">
+        <GtIndexChip v-if="noteTarget" :value="noteTarget.chipValue" :context-project-id="projectId" />
+        <el-button size="small" type="info" plain :disabled="isReadonly" @click="handlePull(true)">
+          从 I3-2 取数
+        </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="isSyncing"
+          :disabled="isReadonly || !projectId"
+          @click="syncToNotes"
+        >同步到附注</el-button>
+        <el-button size="small" type="default" text @click="handleReview('disc-listed')">💬复核</el-button>
+      </div>
+    </div>
+
     <div class="guide-area">
       <div class="guide-grid">
-        <div class="guide-step"><span class="step-num">①</span> 商誉原值/减值准备变动矩阵（跨sheet自动取数I3-1/I3-6）</div>
-        <div class="guide-step"><span class="step-num">②</span> 净值=原值期末-减值期末（商誉无摊销！）</div>
-        <div class="guide-step"><span class="step-num">③</span> CGU分摊情况 动态行+可收回金额</div>
-        <div class="guide-step"><span class="step-num">④</span> 关键假设/敏感性/结论 文字说明+AI辅助</div>
+        <div class="guide-step"><span class="step-num">①</span> 原值/减值准备滚动（对齐附注五、28）</div>
+        <div class="guide-step"><span class="step-num">②</span> 净值=原值期末−减值期末（商誉不摊销）</div>
+        <div class="guide-step"><span class="step-num">③</span> CGU/关键假设/敏感性/业绩承诺子表</div>
+        <div class="guide-step"><span class="step-num">④</span> 「同步到附注」写入附注模块 §五、28</div>
       </div>
     </div>
 
-    <!-- 琥珀色方法论块 CAS8 -->
     <div class="methodology-block">
-      <div class="methodology-title">CAS8 资产减值 + 企业会计准则解释第5号 商誉披露要求</div>
+      <div class="methodology-title">CAS8 + 15号文第十九条（二十）+ 会计监管风险提示第8号</div>
       <div class="methodology-content">
-        按《企业会计准则第8号——资产减值》及应用指南，上市公司应披露：商誉账面原值及变动；累计减值准备及变动；商誉分摊至各资产组(组合)的情况；减值测试过程及方法（含可收回金额确定方式）；关键假设及其确定依据；敏感性分析；减值测试结论。商誉不摊销，仅年度减值测试，减值不可转回。
+        上市公司应披露：商誉账面原值及变动；累计减值准备及变动；资产组构成及是否与以前年度一致；
+        可收回金额确定方法及关键参数（增长率、利润率、折现率）及与以前年度/实际情况差异原因；
+        业绩承诺完成情况。即使未计提减值，亦须按上述要求披露。商誉减值不可转回。
       </div>
     </div>
 
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
       show-icon
       class="objective-alert"
-      title="审计目标：核实上市公司商誉附注披露的完整性与准确性——原值/减值准备变动矩阵与 I3-1、I3-6 勾稽一致；CGU 分摊、减值测试过程、关键假设、敏感性分析及减值结论披露充分符合 CAS8 及企业会计准则解释第 5 号。"
+      title="审计目标：核实上市公司商誉附注完整性与准确性；矩阵与 I3-2/I3-1/I3-6 勾稽；同步至附注模块「五、28 商誉」。"
+    />
+    <el-alert
+      v-if="needsDetailSplitWarning"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="objective-alert"
+      title="当前为合计占位行（无明细分项），期初可能未填。请点「从 I3-2 取数」按被投资单位展开。"
     />
 
-    <!-- 8子节卡片 -->
+    <div class="reg-tip">
+      <strong>监管提示：</strong>其他增减变动原因包括境外子公司汇率变化等；资产组变化须披露变化前后构成及客观依据；
+      关键假设与以前年度或外部信息不一致时须披露差异原因。
+    </div>
+
     <template v-for="section in sections" :key="section.key">
       <el-card shadow="never" class="disclosure-card">
         <template #header>
-          <div class="section-title">
+          <div class="card-title-row">
             <span>{{ section.title }}</span>
             <div class="title-actions">
+              <el-button
+                v-if="section.hasTable && isEditableMatrix(section.key) && !isReadonly"
+                size="small"
+                @click="handleAddMatrix(section.key)"
+              >+ 行</el-button>
               <el-button size="small" type="default" link @click="handleReview(`disc-listed-${section.key}`)">💬</el-button>
             </div>
           </div>
         </template>
 
-        <!-- 矩阵表子节 -->
-        <template v-if="section.hasTable">
+        <template v-if="section.hasTable && isEditableMatrix(section.key)">
+          <!-- 原值：Excel 细列 -->
+          <el-table
+            v-if="section.key === 'goodwill_book_value'"
+            :data="bookValueRows"
+            border
+            stripe
+            size="small"
+            class="matrix-table"
+          >
+            <el-table-column prop="investee" label="被投资单位名称或形成商誉的事项" min-width="160" fixed>
+              <template #default="{ row }">
+                <el-input v-if="!isReadonly" v-model="row.investee" size="small" @change="() => handleInvesteeChange(section.key, row)" />
+                <span v-else>{{ row.investee }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="期初余额" width="100" align="right">
+              <template #default="{ row }">
+                <el-input-number v-if="!isReadonly" :model-value="row.beginBalance" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'beginBalance', v)" />
+                <span v-else class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="本期增加" align="center">
+              <el-table-column label="企业合并形成的" width="110" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-if="!isReadonly" :model-value="row.incBusinessCombination ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'incBusinessCombination', v)" />
+                  <span v-else class="amount-cell">{{ fmtAmt(row.incBusinessCombination ?? 0) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="合营取得" width="100" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-if="!isReadonly" :model-value="row.incJoint ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'incJoint', v)" />
+                  <span v-else class="amount-cell">{{ fmtAmt(row.incJoint ?? 0) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="其他" width="90" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-if="!isReadonly" :model-value="row.incOther ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'incOther', v)" />
+                  <span v-else class="amount-cell">{{ fmtAmt(row.incOther ?? 0) }}</span>
+                </template>
+              </el-table-column>
+            </el-table-column>
+            <el-table-column label="本期减少" align="center">
+              <el-table-column label="处置" width="90" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-if="!isReadonly" :model-value="row.decDisposal ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'decDisposal', v)" />
+                  <span v-else class="amount-cell">{{ fmtAmt(row.decDisposal ?? 0) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="其他" width="90" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-if="!isReadonly" :model-value="row.decOther ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'decOther', v)" />
+                  <span v-else class="amount-cell">{{ fmtAmt(row.decOther ?? 0) }}</span>
+                </template>
+              </el-table-column>
+            </el-table-column>
+            <el-table-column label="期末余额" width="110" align="right">
+              <template #default="{ row }">
+                <span class="formula-cell" title="期末=期初+增加分项−减少分项">{{ fmtAmt(row.endBalance) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column v-if="!isReadonly" label="操作" width="56" align="center">
+              <template #default="{ row }">
+                <el-button type="danger" link size="small" @click="handleRemoveMatrix(section.key, row.rowId)">删</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <!-- 减值：Excel 细列 -->
+          <el-table
+            v-else
+            :data="impairmentRows"
+            border
+            stripe
+            size="small"
+            class="matrix-table"
+          >
+            <el-table-column prop="investee" label="被投资单位名称或形成商誉的事项" min-width="160" fixed>
+              <template #default="{ row }">
+                <el-input v-if="!isReadonly" v-model="row.investee" size="small" @change="() => handleInvesteeChange(section.key, row)" />
+                <span v-else>{{ row.investee }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="期初余额" width="100" align="right">
+              <template #default="{ row }">
+                <el-input-number v-if="!isReadonly" :model-value="row.beginBalance" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'beginBalance', v)" />
+                <span v-else class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="本期增加" align="center">
+              <el-table-column label="计提" width="100" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-if="!isReadonly" :model-value="row.increase" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'increase', v)" />
+                  <span v-else class="amount-cell">{{ fmtAmt(row.increase) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="其他" width="90" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-if="!isReadonly" :model-value="row.impIncOther ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'impIncOther', v)" />
+                  <span v-else class="amount-cell">{{ fmtAmt(row.impIncOther ?? 0) }}</span>
+                </template>
+              </el-table-column>
+            </el-table-column>
+            <el-table-column label="本期减少" align="center">
+              <el-table-column label="处置" width="90" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-if="!isReadonly" :model-value="row.impDecDisposal ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'impDecDisposal', v)" />
+                  <span v-else class="amount-cell">{{ fmtAmt(row.impDecDisposal ?? 0) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="其他" width="90" align="right">
+                <template #default="{ row }">
+                  <el-input-number v-if="!isReadonly" :model-value="row.impDecOther ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'impDecOther', v)" />
+                  <span v-else class="amount-cell">{{ fmtAmt(row.impDecOther ?? 0) }}</span>
+                </template>
+              </el-table-column>
+            </el-table-column>
+            <el-table-column label="期末余额" width="110" align="right">
+              <template #default="{ row }">
+                <span class="formula-cell" title="期末=期初+计提+其他增加−处置−其他减少">{{ fmtAmt(row.endBalance) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column v-if="!isReadonly" label="操作" width="56" align="center">
+              <template #default="{ row }">
+                <el-button type="danger" link size="small" @click="handleRemoveMatrix(section.key, row.rowId)">删</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <div v-if="section.key === 'goodwill_book_value'" class="matrix-subtotal">
+            合计：期初 {{ fmtAmt(bookValueTotal.beginBalance) }}
+            ｜ 增加 {{ fmtAmt(bookValueTotal.increase) }}
+            ｜ 减少 {{ fmtAmt(bookValueTotal.decrease) }}
+            ｜ 期末 {{ fmtAmt(bookValueTotal.endBalance) }}
+            <div class="auto-fill-hint">其他增减可含境外子公司汇率变动等；同步附注时按「本期增加/减少」汇总写入</div>
+          </div>
+          <div v-else class="matrix-subtotal">
+            合计：期初 {{ fmtAmt(impairmentTotal.beginBalance) }}
+            ｜ 增加 {{ fmtAmt(impairmentTotal.increase) }}
+            ｜ 转出 {{ fmtAmt(impairmentTotal.decrease) }}
+            ｜ 期末 {{ fmtAmt(impairmentTotal.endBalance) }}
+            <div class="impairment-warning">⚠️ 商誉减值不可转回，「本期减少」仅限处置/注销转出</div>
+          </div>
+        </template>
+
+        <template v-else-if="section.hasTable">
           <el-table
             :data="getMatrixRows(section.key)"
             border
@@ -48,83 +227,16 @@
             size="small"
             class="matrix-table"
           >
-            <el-table-column prop="investee" label="被投资单位(CGU)" min-width="160" fixed />
-            <el-table-column label="期初余额" width="130" align="right">
-              <template #default="{ row }">
-                <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number
-                    :model-value="row.beginBalance"
-                    :controls="false"
-                    size="small"
-                    @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'beginBalance', v)"
-                  />
-                </template>
-                <span v-else :class="['amount-cell', { 'auto-fill': row.isAutoFilled }]">
-                  {{ fmtAmt(row.beginBalance) }}
-                  <el-tag v-if="row.isAutoFilled" size="small" type="info" class="auto-badge">自动取数</el-tag>
-                </span>
-              </template>
+            <el-table-column prop="investee" label="被投资单位/CGU" min-width="160" />
+            <el-table-column label="参考值1" width="120" align="right">
+              <template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span></template>
             </el-table-column>
-            <el-table-column label="本期增加" width="130" align="right">
-              <template #default="{ row }">
-                <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number
-                    :model-value="row.increase"
-                    :controls="false"
-                    size="small"
-                    @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'increase', v)"
-                  />
-                </template>
-                <span v-else :class="['amount-cell', { 'auto-fill': row.isAutoFilled }]">{{ fmtAmt(row.increase) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="本期减少" width="130" align="right">
-              <template #default="{ row }">
-                <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number
-                    :model-value="row.decrease"
-                    :controls="false"
-                    size="small"
-                    @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'decrease', v)"
-                  />
-                </template>
-                <span v-else :class="['amount-cell', { 'auto-fill': row.isAutoFilled }]">{{ fmtAmt(row.decrease) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="期末余额" width="130" align="right">
-              <template #default="{ row }">
-                <span class="formula-cell" title="期末=期初+增加-减少">{{ fmtAmt(row.endBalance) }}</span>
-              </template>
+            <el-table-column label="参考值2" width="120" align="right">
+              <template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.endBalance) }}</span></template>
             </el-table-column>
           </el-table>
-
-          <!-- 合计行 -->
-          <div class="matrix-subtotal" v-if="section.key === 'goodwill_book_value'">
-            合计: 期初 <span class="amount-cell">{{ fmtAmt(bookValueTotal.beginBalance) }}</span>
-            | 增加(新并购) <span class="amount-cell">{{ fmtAmt(bookValueTotal.increase) }}</span>
-            | 减少(减值) <span class="amount-cell">{{ fmtAmt(bookValueTotal.decrease) }}</span>
-            | 期末 <span class="amount-cell formula-cell">{{ fmtAmt(bookValueTotal.endBalance) }}</span>
-          </div>
-          <div class="matrix-subtotal" v-else-if="section.key === 'goodwill_impairment'">
-            合计: 期初 <span class="amount-cell">{{ fmtAmt(impairmentTotal.beginBalance) }}</span>
-            | 计提 <span class="amount-cell">{{ fmtAmt(impairmentTotal.increase) }}</span>
-            | 转出 <span class="amount-cell">{{ fmtAmt(impairmentTotal.decrease) }}</span>
-            | 期末 <span class="amount-cell formula-cell">{{ fmtAmt(impairmentTotal.endBalance) }}</span>
-            <div class="impairment-warning">⚠️ 商誉减值不可转回，"本期减少"仅限处置/注销</div>
-          </div>
-          <div class="matrix-subtotal" v-else-if="section.key === 'sensitivity_analysis'">
-            敏感性矩阵（WACC±1% / 增长率±0.5%）
-          </div>
-          <div class="matrix-subtotal" v-else-if="section.key === 'impairment_result'">
-            合计减值: <span class="amount-cell formula-cell">{{ fmtAmt(impairmentTotal.increase) }}</span>
-          </div>
-
-          <div class="auto-fill-hint" v-if="['goodwill_book_value','goodwill_impairment'].includes(section.key)">
-            💡 数据自动从审定表I3-1/减值测试I3-6取入（浅蓝色=跨sheet自动取数）
-          </div>
         </template>
 
-        <!-- 动态行子节（CGU分摊） -->
         <template v-if="section.hasDynamicRows">
           <el-divider v-if="section.hasTable" content-position="left">CGU分摊明细</el-divider>
           <el-table :data="getDynamicRows(section.key)" border stripe size="small">
@@ -147,88 +259,246 @@
                 <span v-else>{{ row.description }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="60" align="center" v-if="!isReadonly">
+            <el-table-column v-if="!isReadonly" label="操作" width="60" align="center">
               <template #default="{ row }">
                 <el-button type="danger" link size="small" @click="handleRemoveDynamic(section.key, row.rowId)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
-          <div class="dynamic-actions" v-if="!isReadonly">
+          <div v-if="!isReadonly" class="dynamic-actions">
             <el-button size="small" @click="handleAddDynamic(section.key)">+ 新增CGU</el-button>
           </div>
         </template>
 
-        <!-- 文字说明区（AI可生成） -->
+        <!-- (5) 关键假设参数子表（对齐附注毛利率/增长率/折现率） -->
+        <template v-if="section.key === 'key_assumptions'">
+          <div class="card-title-row assume-toolbar">
+            <span class="assume-label">关键假设参数</span>
+            <div class="title-actions">
+              <el-button
+                v-if="!isReadonly"
+                size="small"
+                type="info"
+                plain
+                @click="handleSeedAssumption"
+              >从 CGU 预填</el-button>
+              <el-button v-if="!isReadonly" size="small" @click="addAssumptionParamRow()">+ 行</el-button>
+            </div>
+          </div>
+          <div class="perf-hint">
+            披露各资产组预测期毛利率、收入/利润增长率、税前折现率等；与以前年度或外部信息不一致时须在文字说明中披露差异原因。
+            同步写入附注「关键假设」参数子表（毛利率/增长率/折现率）。
+          </div>
+          <el-table :data="assumptionParamRows" border stripe size="small" class="matrix-table">
+            <el-table-column type="index" width="42" align="center" />
+            <el-table-column label="资产组/业务" min-width="140">
+              <template #default="{ row }">
+                <el-input
+                  v-if="!isReadonly"
+                  v-model="row.label"
+                  size="small"
+                  placeholder="资产组名称"
+                  @change="() => updateAssumptionParamRow(row.rowId, 'label', row.label)"
+                />
+                <span v-else>{{ row.label }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="毛利率" width="110">
+              <template #default="{ row }">
+                <el-input
+                  v-if="!isReadonly"
+                  v-model="row.grossMargin"
+                  size="small"
+                  placeholder="如 28%"
+                  @change="() => updateAssumptionParamRow(row.rowId, 'grossMargin', row.grossMargin)"
+                />
+                <span v-else>{{ row.grossMargin }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="增长率" width="110">
+              <template #default="{ row }">
+                <el-input
+                  v-if="!isReadonly"
+                  v-model="row.growthRate"
+                  size="small"
+                  placeholder="如 5%"
+                  @change="() => updateAssumptionParamRow(row.rowId, 'growthRate', row.growthRate)"
+                />
+                <span v-else>{{ row.growthRate }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="折现率" width="110">
+              <template #default="{ row }">
+                <el-input
+                  v-if="!isReadonly"
+                  v-model="row.discountRate"
+                  size="small"
+                  placeholder="如 12%"
+                  @change="() => updateAssumptionParamRow(row.rowId, 'discountRate', row.discountRate)"
+                />
+                <span v-else>{{ row.discountRate }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="备注" min-width="120">
+              <template #default="{ row }">
+                <el-input
+                  v-if="!isReadonly"
+                  v-model="row.remark"
+                  size="small"
+                  placeholder="预测期/稳定期等"
+                  @change="() => updateAssumptionParamRow(row.rowId, 'remark', row.remark)"
+                />
+                <span v-else>{{ row.remark }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column v-if="!isReadonly" label="操作" width="56" align="center">
+              <template #default="{ row }">
+                <el-button type="danger" link size="small" @click="removeAssumptionParamRow(row.rowId)">删</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div v-if="!assumptionParamRows.length" class="auto-fill-hint">可从（4）CGU 预填行，再填入参数后同步附注</div>
+        </template>
+
         <template v-if="section.hasNoteText">
-          <el-divider v-if="section.hasTable || section.hasDynamicRows" content-position="left">文字说明</el-divider>
+          <el-divider
+            v-if="section.hasTable || section.hasDynamicRows || section.key === 'key_assumptions'"
+            content-position="left"
+          >文字说明</el-divider>
           <el-input
             v-model="sectionNotes[section.key]"
             type="textarea"
-            :autosize="{ minRows: 3, maxRows: 10 }"
+            :autosize="{ minRows: 3, maxRows: 12 }"
             :disabled="isReadonly"
             :placeholder="getPlaceholder(section.key)"
             @change="handleNoteChange(section.key)"
           />
+          <div v-if="!isReadonly && !sectionNotes[section.key]" class="template-actions">
+            <el-button size="small" text type="primary" @click="applyTemplate(section.key)">插入模板段落</el-button>
+          </div>
         </template>
       </el-card>
     </template>
 
-    <!-- 净值合计汇总 -->
-    <el-card shadow="never" class="summary-card">
-      <template #header><span class="summary-title">商誉账面净值合计</span></template>
-      <div class="summary-content">
-        <div class="summary-formula">
-          净值 = 商誉原值期末 <span class="amount-cell">{{ fmtAmt(bookValueTotal.endBalance) }}</span>
-          − 减值准备期末 <span class="amount-cell">{{ fmtAmt(impairmentTotal.endBalance) }}</span>
-          = <span class="amount-cell net-value">{{ fmtAmt(netValueTotal) }}</span>
+    <!-- 业绩承诺完成及对应商誉减值（上市附注子表） -->
+    <el-card shadow="never" class="disclosure-card">
+      <template #header>
+        <div class="card-title-row">
+          <span>（9）业绩承诺完成及对应商誉减值情况</span>
+          <div class="title-actions">
+            <el-button
+              v-if="!isReadonly"
+              size="small"
+              type="info"
+              plain
+              @click="handleSeedPerformance"
+            >从原值预填</el-button>
+            <el-button v-if="!isReadonly" size="small" @click="addPerformanceRow()">+ 行</el-button>
+            <el-button size="small" type="default" link @click="handleReview('disc-listed-performance')">💬</el-button>
+          </div>
         </div>
-        <div class="summary-note">商誉不摊销，净值=原值−累计减值</div>
+      </template>
+      <div class="perf-hint">
+        形成商誉时存在业绩承诺，且报告期或上一期间处于承诺期内的，应披露完成情况及对应商誉减值（15号文第十九条（二十））。
+        同步写入附注子表「业绩承诺完成及对应商誉减值情况如下：」。
+      </div>
+      <el-table :data="performanceRows" border stripe size="small" class="matrix-table">
+        <el-table-column type="index" width="42" align="center" />
+        <el-table-column label="项目" min-width="160">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.name"
+              size="small"
+              placeholder="被投资单位/项目"
+              @change="() => updatePerformanceRow(row.rowId, 'name', row.name)"
+            />
+            <span v-else>{{ row.name }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="业绩承诺完成情况" min-width="200">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.commitmentStatus"
+              size="small"
+              placeholder="如：已完成 / 未完成（完成率XX%）/ 不适用"
+              @change="() => updatePerformanceRow(row.rowId, 'commitmentStatus', row.commitmentStatus)"
+            />
+            <span v-else>{{ row.commitmentStatus }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="商誉减值金额" width="140" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              v-model="row.impairmentAmount"
+              :controls="false"
+              size="small"
+              style="width:100%"
+              @change="(v: number) => updatePerformanceRow(row.rowId, 'impairmentAmount', v ?? 0)"
+            />
+            <span v-else class="amount-cell">{{ fmtAmt(row.impairmentAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="备注" min-width="140">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              v-model="row.remark"
+              size="small"
+              placeholder="承诺期/补偿安排等"
+              @change="() => updatePerformanceRow(row.rowId, 'remark', row.remark)"
+            />
+            <span v-else>{{ row.remark }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="操作" width="60" align="center">
+          <template #default="{ row }">
+            <el-button type="danger" link size="small" @click="removePerformanceRow(row.rowId)">删</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="matrix-subtotal">
+        减值金额合计 {{ fmtAmt(performanceImpairmentTotal) }}
+        <span v-if="!performanceRows.length" class="auto-fill-hint"> — 无业绩承诺可留空；有则须填报并同步</span>
       </div>
     </el-card>
 
-    <!-- 编制提示 -->
+    <el-card shadow="never" class="summary-card">
+      <template #header><span class="summary-title">商誉账面净值合计</span></template>
+      <div class="summary-formula">
+        净值 = 商誉原值期末 <span class="amount-cell">{{ fmtAmt(bookValueTotal.endBalance) }}</span>
+        − 减值准备期末 <span class="amount-cell">{{ fmtAmt(impairmentTotal.endBalance) }}</span>
+        = <span class="amount-cell net-value">{{ fmtAmt(netValueTotal) }}</span>
+      </div>
+      <div class="summary-note">商誉不摊销；同步目标附注「{{ noteTarget.sectionId }}」</div>
+    </el-card>
+
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>（1）商誉账面价值变动矩阵：期初/增加(新并购)/减少(减值)/期末</li>
-        <li>（2）减值准备变动矩阵：期初/计提/转出(处置)/期末，商誉减值不可转回！</li>
-        <li>（3）减值测试过程：说明可收回金额确定方式（公允-处置费 or 使用价值DCF）</li>
-        <li>（4）CGU分摊：逐CGU列示分摊商誉额及可收回金额确定依据</li>
-        <li>（5）关键假设：折现率/增长率/预测期/终值假设及确定依据</li>
-        <li>（6）敏感性分析：关键参数变动对可收回金额的影响</li>
-        <li>（7）结论：是否需计提减值、金额及会计处理</li>
-        <li>（8）其他：如有并购、处置等特殊事项说明</li>
-        <li>适用上市公司年报附注披露要求（CAS8/企业会计准则解释第5号）</li>
+        <li>（1）~（2）变动矩阵与附注五、28 子表一致，可从 I3-2 取数</li>
+        <li>（3）~（8）文字按 15 号文及风险提示第 8 号，即使未减值也须披露测试过程与参数</li>
+        <li>点「同步到附注」将原值/减值细列汇总 + 关键假设参数 + 业绩承诺 + 文字写入附注模块</li>
       </ul>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
-/**
- * I3TabDisclosureListed.vue — I3 商誉附注披露信息（上市公司版）
- * 41行×8列，38公式 (Req 9.1-9.3)
- *
- * 8 sections:
- *   goodwill_book_value / goodwill_impairment / impairment_test_process / cgu_allocation
- *   key_assumptions / sensitivity_analysis / impairment_result / other_disclosure
- *
- * 商誉特殊：无摊销！仅原值+减值+净额+减值测试过程
- *
- * - 从审定表I3-1+减值测试I3-6自动取数 (Req 9.2)
- * - AI辅助生成文字描述 (Req 9.3)
- * - EventBus: subscribe 'substantive:adjudicated' 刷新 + publish 'disclosure:note-text-updated'
- *
- * Spec: .kiro/specs/i3-goodwill/
- * Task: 4.10
- */
 import { ref, computed, inject, toRef, onMounted, onUnmounted } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
+import GtIndexChip from '../../GtIndexChip.vue'
 import {
   useI3Disclosure,
   LISTED_SECTIONS,
   type I3DisclosureMatrixRow,
 } from '../../composables/useI3Disclosure'
+import { resolveI3NoteSectionTarget } from '../../composables/i3NoteSectionMap'
+import { buildI3ListedSyncPayloads } from '../../composables/i3DisclosureSyncPayload'
 
 const props = defineProps<{
   wpId: string
@@ -236,6 +506,7 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
   crossSheetAutoFill?: Record<string, number>
+  applicableStandards?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -245,25 +516,39 @@ const emit = defineEmits<{
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const allResponsesRef = computed(() => props.allResponses)
-
+const noteTarget = resolveI3NoteSectionTarget('listed')
+const isSyncing = ref(false)
 const sections = LISTED_SECTIONS
-
-// ─── Composable ──────────────────────────────────────────────────────────────
 
 const {
   bookValueRows,
   impairmentRows,
   sectionRows,
   sectionNotes,
+  performanceRows,
+  assumptionParamRows,
   bookValueTotal,
   impairmentTotal,
   netValueTotal,
   applyAutoFill,
+  needsDetailSplitWarning,
+  pullFromDetailRows,
   addDynamicRow,
   removeDynamicRow,
   updateDynamicRow,
   updateMatrixCell,
+  addMatrixRow,
+  removeMatrixRow,
+  addPerformanceRow,
+  removePerformanceRow,
+  updatePerformanceRow,
+  seedPerformanceFromBookValue,
+  addAssumptionParamRow,
+  removeAssumptionParamRow,
+  updateAssumptionParamRow,
+  seedAssumptionFromCgu,
   saveSectionNote,
+  getSyncSnapshot,
   dispose: disposeDisclosure,
 } = useI3Disclosure(
   toRef(props, 'wpId'),
@@ -278,14 +563,23 @@ const {
   },
 )
 
-// ─── EventBus: subscribe 'substantive:adjudicated' → auto-refresh (Req 9.2) ─
+const performanceImpairmentTotal = computed(() =>
+  performanceRows.value.reduce((s, r) => s + (Number(r.impairmentAmount) || 0), 0),
+)
+
+function handleSeedPerformance() {
+  const res = seedPerformanceFromBookValue()
+  ElMessage({ type: res.count ? 'success' : 'info', message: res.message })
+}
+
+function handleSeedAssumption() {
+  const res = seedAssumptionFromCgu()
+  ElMessage({ type: res.count ? 'success' : 'info', message: res.message })
+}
 
 function handleAdjudicated(e: Event): void {
   const detail = (e as CustomEvent).detail
-  // 仅响应I3相关科目(1711)或无过滤条件的全局广播
-  if (!detail || detail.wpCode === 'I3' || detail.accountCode === '1711') {
-    applyAutoFill()
-  }
+  if (!detail || detail.wpCode === 'I3' || detail.accountCode === '1711') applyAutoFill()
 }
 
 onMounted(() => {
@@ -297,47 +591,37 @@ onUnmounted(() => {
   disposeDisclosure()
 })
 
-// ─── Matrix rows by section ──────────────────────────────────────────────────
+function isEditableMatrix(key: string) {
+  return key === 'goodwill_book_value' || key === 'goodwill_impairment'
+}
 
 function getMatrixRows(sectionKey: string): I3DisclosureMatrixRow[] {
   switch (sectionKey) {
     case 'goodwill_book_value': return bookValueRows.value
     case 'goodwill_impairment': return impairmentRows.value
-    case 'sensitivity_analysis': return _buildSensitivityRows()
-    case 'impairment_result': return _buildResultRows()
+    case 'sensitivity_analysis':
+      return (sectionRows.value.cgu_allocation ?? []).map((cgu) => ({
+        rowId: `sens-${cgu.rowId}`,
+        investee: cgu.name || '未命名CGU',
+        beginBalance: cgu.amount ?? 0,
+        increase: 0,
+        decrease: 0,
+        endBalance: cgu.amount ?? 0,
+        isAutoFilled: false,
+      }))
+    case 'impairment_result':
+      return (sectionRows.value.cgu_allocation ?? []).map((cgu) => ({
+        rowId: `result-${cgu.rowId}`,
+        investee: cgu.name || '未命名CGU',
+        beginBalance: cgu.amount ?? 0,
+        increase: 0,
+        decrease: 0,
+        endBalance: cgu.amount ?? 0,
+        isAutoFilled: false,
+      }))
     default: return []
   }
 }
-
-/** 敏感性分析矩阵 — 根据CGU分摊构造 */
-function _buildSensitivityRows(): I3DisclosureMatrixRow[] {
-  const cguRows = sectionRows.value['cgu_allocation'] ?? []
-  return cguRows.map((cgu) => ({
-    rowId: `sens-${cgu.rowId}`,
-    investee: cgu.name || '未命名CGU',
-    beginBalance: cgu.amount ?? 0,       // 商誉分摊额
-    increase: 0,                          // WACC+1%时差异(待填)
-    decrease: 0,                          // WACC-1%时差异(待填)
-    endBalance: cgu.amount ?? 0,          // 可收回金额(待填)
-    isAutoFilled: false,
-  }))
-}
-
-/** 减值结果矩阵 — 按CGU汇总 */
-function _buildResultRows(): I3DisclosureMatrixRow[] {
-  const cguRows = sectionRows.value['cgu_allocation'] ?? []
-  return cguRows.map((cgu) => ({
-    rowId: `result-${cgu.rowId}`,
-    investee: cgu.name || '未命名CGU',
-    beginBalance: cgu.amount ?? 0,       // 商誉分摊额
-    increase: 0,                          // 可收回金额(待填)
-    decrease: 0,                          // 减值金额(待填)
-    endBalance: (cgu.amount ?? 0),        // 减值后净额
-    isAutoFilled: false,
-  }))
-}
-
-// ─── Dynamic rows ────────────────────────────────────────────────────────────
 
 function getDynamicRows(key: string) {
   return sectionRows.value[key] ?? []
@@ -350,10 +634,8 @@ async function handleAddDynamic(sectionKey: string) {
       cancelButtonText: '取消',
       inputPlaceholder: '如：XX子公司/XX事业部',
     })
-    if (value?.trim()) {
-      addDynamicRow(sectionKey, value.trim())
-    }
-  } catch { /* cancelled */ }
+    if (value?.trim()) addDynamicRow(sectionKey, value.trim())
+  } catch { /* cancel */ }
 }
 
 function handleRemoveDynamic(sectionKey: string, rowId: string) {
@@ -364,94 +646,174 @@ function handleDynamicChange(sectionKey: string, rowId: string, field: string, v
   updateDynamicRow(sectionKey, rowId, field as any, value)
 }
 
-// ─── Matrix edit ─────────────────────────────────────────────────────────────
-
 function handleMatrixEdit(sectionKey: string, rowId: string, field: string, value: number) {
-  const layer = sectionKey === 'goodwill_book_value' ? 'bookValue' : 'impairment'
-  updateMatrixCell(layer, rowId, field as keyof I3DisclosureMatrixRow, value ?? 0)
+  updateMatrixCell(
+    sectionKey === 'goodwill_book_value' ? 'bookValue' : 'impairment',
+    rowId,
+    field as keyof I3DisclosureMatrixRow,
+    value ?? 0,
+  )
 }
 
-// ─── Note text ───────────────────────────────────────────────────────────────
+function handleAddMatrix(sectionKey: string) {
+  addMatrixRow(sectionKey === 'goodwill_book_value' ? 'bookValue' : 'impairment')
+}
+
+function handleRemoveMatrix(sectionKey: string, rowId: string) {
+  removeMatrixRow(sectionKey === 'goodwill_book_value' ? 'bookValue' : 'impairment', rowId)
+}
+
+function handleInvesteeChange(sectionKey: string, row: I3DisclosureMatrixRow) {
+  updateMatrixCell(
+    sectionKey === 'goodwill_book_value' ? 'bookValue' : 'impairment',
+    row.rowId,
+    'investee',
+    row.investee,
+  )
+}
 
 function handleNoteChange(sectionKey: string) {
   saveSectionNote(sectionKey, sectionNotes.value[sectionKey] ?? '')
 }
 
-// ─── Review dialog ───────────────────────────────────────────────────────────
+function handlePull(overwrite: boolean) {
+  const res = pullFromDetailRows({ overwrite })
+  ElMessage({ type: res.count ? 'success' : 'warning', message: res.message })
+}
+
+const TEMPLATES: Record<string, string> = {
+  impairment_test_process:
+    '商誉所属资产组构成及与以前年度一致性：\n'
+    + '可收回金额确定方法（公允价值减处置费用净额 / 预计未来现金流量现值）：\n'
+    + '若采用现值法：预测期年限、预测期收入增长率/利润率、稳定期增长率/利润率、税前折现率及其确定依据：\n'
+    + '与以前年度减值测试信息或外部信息不一致的，差异原因：\n'
+    + '以前年度减值测试信息与本年实际情况是否一致：',
+  key_assumptions:
+    '本公司采用预计未来现金流量现值计算资产组可收回金额。根据管理层批准的财务预算预计未来5年内现金流量，'
+    + '其后年度现金流量增长率预计为XX%（上期：XX%），不超过长期平均增长率；税前折现率为XX%（上期：XX%）。'
+    + '管理层根据历史经验及对市场发展的预测确定预算毛利率及增长率。',
+  sensitivity_analysis:
+    '若未来现金流量计算中采用的预算增长率低于管理层目前采用的增长率的10%，本公司仍无需对商誉计提减值准备。\n'
+    + '若预计折现率高于管理层目前采用的折现率的10%，本公司亦无需对商誉计提减值准备。',
+  impairment_result:
+    '经过评估，管理层认为本公司无需对该等资产组计提减值准备。【或：本期期末对商誉计提减值准备XX元（上期：XX元）。】',
+  cgu_allocation:
+    '商誉已分摊至预期受益于企业合并协同效应的资产组/组合，分摊层级代表内部监控商誉的最低水平，且不大于报告分部。资产组构成变化（若有）及依据：',
+  other_disclosure:
+    '其他需说明事项（汇率变动、处置、无业绩承诺说明等）：',
+}
+
+function applyTemplate(sectionKey: string) {
+  const t = TEMPLATES[sectionKey]
+  if (!t) return
+  sectionNotes.value[sectionKey] = t
+  saveSectionNote(sectionKey, t)
+}
+
+function getPlaceholder(key: string): string {
+  return TEMPLATES[key] || '请填写披露文字…'
+}
+
+function fmtAmt(v: number): string {
+  return (Number(v) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
 
 function handleReview(id: string) {
   openReviewDialog(id)
 }
 
-// ─── Placeholders ────────────────────────────────────────────────────────────
-
-function getPlaceholder(sectionKey: string): string {
-  const map: Record<string, string> = {
-    impairment_test_process: '请描述减值测试过程：可收回金额确定方式（公允价值减处置费用/使用价值DCF）、评估机构、测试时点...',
-    cgu_allocation: '请说明商誉分摊至各资产组(组合)的依据，是否与内部管理报告层级一致...',
-    key_assumptions: '请说明减值测试关键假设：折现率(WACC)确定方法、收入增长率预测依据、预测期及终值假设...',
-    sensitivity_analysis: '请描述敏感性分析结果：关键参数(折现率/增长率/收入)变动±X%对可收回金额的影响...',
-    impairment_result: '请说明减值测试结论：是否需计提减值、各CGU减值金额及会计处理...',
-    other_disclosure: '如有并购、处置、业绩对赌等特殊事项请在此说明...',
+async function syncToNotes() {
+  if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return
+  const snap = getSyncSnapshot()
+  if (!snap.bookValueRows.length && !snap.impairmentRows.length) {
+    ElMessage.warning('请先从 I3-2 取数或手工填写变动矩阵')
+    return
   }
-  return map[sectionKey] ?? `请填写${sectionKey}的文字说明...`
-}
-
-// ─── Format ──────────────────────────────────────────────────────────────────
-
-function fmtAmt(val: number | null | undefined): string {
-  if (val == null) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const payloads = buildI3ListedSyncPayloads(props.wpId, props.applicableStandards || [], snap)
+  if (!payloads.length) {
+    ElMessage.warning('当前不适用上市附注同步')
+    return
+  }
+  isSyncing.value = true
+  try {
+    let rows = 0
+    for (const payload of payloads) {
+      const result: any = await api.post(
+        `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+        payload,
+      )
+      rows += Number((result?.data ?? result)?.rows_synced ?? 0)
+    }
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      projectId: props.projectId,
+      sectionIds: [noteTarget.sectionId],
+      wpId: props.wpId,
+      sheet: '附注披露（上市公司）',
+    })
+    ElMessage.success(`已同步至附注 ${noteTarget.sectionId}（${rows} 行）`)
+  } catch (e: any) {
+    ElMessage.error(e?.message || '同步失败')
+  } finally {
+    isSyncing.value = false
+  }
 }
 </script>
 
 <style scoped>
 .i3-tab-disclosure-listed { padding: 16px; font-size: var(--wp-font-size, 13px); }
-
-/* 蓝色渐变引导区 */
-.guide-area { background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
-.guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.guide-step { display: flex; align-items: center; gap: 6px; font-size: 12px; }
-.step-num { font-weight: 700; color: var(--el-color-primary); }
-
-/* 琥珀色方法论 */
-.methodology-block { border-left: 4px solid #f59e0b; background: #fffbeb; border-radius: 4px; padding: 12px 16px; margin-bottom: 12px; }
-.methodology-title { font-weight: 600; color: #92400e; margin-bottom: 4px; font-size: 12px; }
-.methodology-content { font-size: 12px; color: #78350f; line-height: 1.6; }
-
-/* 卡片 */
-.disclosure-card { margin-bottom: 12px; }
-.section-title { display: flex; align-items: center; justify-content: space-between; }
-.title-actions { display: flex; gap: 8px; align-items: center; }
-
-/* 审计目标 alert */
+.section-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px; gap: 12px; flex-wrap: wrap;
+}
+.section-title { font-size: 15px; font-weight: 600; color: #1f2937; }
+.section-actions, .title-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.card-title-row {
+  display: flex; justify-content: space-between; align-items: center; width: 100%;
+  font-size: 14px; font-weight: 600;
+}
+.guide-area {
+  background: linear-gradient(135deg, #eff6ff, #dbeafe);
+  border: 1px solid #93c5fd; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px;
+}
+.guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; font-size: 12px; color: #1e3a5f; }
+.guide-step { display: flex; gap: 6px; }
+.step-num { color: #2563eb; font-weight: 700; }
+.methodology-block {
+  border-left: 4px solid #f59e0b; background: #fffbeb; padding: 10px 14px;
+  border-radius: 0 6px 6px 0; margin-bottom: 12px; font-size: 12px; line-height: 1.7; color: #78350f;
+}
+.methodology-title { font-weight: 600; margin-bottom: 4px; }
 .objective-alert { margin-bottom: 12px; }
-
-/* 金额 */
-.amount-cell { text-align: right; font-variant-numeric: tabular-nums; }
-.auto-fill { color: var(--el-color-primary); }
-.auto-badge { margin-left: 4px; vertical-align: middle; }
-.formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
-.auto-fill-hint { font-size: 11px; color: var(--el-text-color-secondary); margin-top: 8px; }
-
-/* 合计 */
-.matrix-subtotal { margin-top: 8px; font-weight: 500; text-align: right; padding-right: 12px; font-size: 12px; }
-.impairment-warning { color: var(--el-color-danger); font-size: 11px; margin-top: 4px; font-weight: 400; }
-.dynamic-actions { margin-top: 8px; }
-
-/* 净值汇总 */
-.summary-card { margin-bottom: 12px; border: 2px solid var(--el-color-primary-light-5); }
-.summary-title { font-weight: 600; color: var(--el-color-primary); }
-.summary-content { padding: 8px 0; }
-.summary-formula { font-size: 14px; line-height: 2; }
-.summary-note { font-size: 11px; color: var(--el-text-color-secondary); margin-top: 4px; }
-.net-value { font-weight: 700; font-size: 16px; color: var(--el-color-primary); }
-
-/* 矩阵表 */
-.matrix-table { font-size: var(--wp-font-size, 13px); }
-
-/* 编制提示 */
-.compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
+.reg-tip {
+  background: #ecfdf5; border: 1px solid #6ee7b7; border-radius: 6px;
+  padding: 8px 12px; margin-bottom: 12px; font-size: 12px; color: #065f46; line-height: 1.6;
+}
+.disclosure-card { margin-bottom: 12px; }
+.matrix-table { width: 100%; margin-bottom: 8px; }
+.amount-cell { font-variant-numeric: tabular-nums; }
+.formula-cell { font-weight: 600; border-bottom: 1px dashed #94a3b8; cursor: help; }
+.matrix-subtotal { font-size: 12px; color: #475569; margin-top: 6px; }
+.impairment-warning { color: #b45309; margin-top: 4px; }
+.auto-fill-hint { font-size: 12px; color: #64748b; margin-top: 6px; }
+.perf-hint {
+  font-size: 12px;
+  color: #065f46;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+.dynamic-actions, .template-actions { margin-top: 8px; }
+.assume-toolbar { margin-bottom: 8px; }
+.assume-label { font-size: 13px; font-weight: 600; color: #334155; }
+.summary-card { margin-top: 8px; }
+.summary-title { font-weight: 600; }
+.summary-formula { font-size: 13px; line-height: 1.8; }
+.net-value { color: #92400e; font-weight: 700; font-size: 15px; }
+.summary-note { font-size: 12px; color: #6b7280; margin-top: 4px; }
+.compile-hint { margin-top: 12px; font-size: 12px; color: #6b7280; }
 .compile-hint summary { cursor: pointer; font-weight: 500; }
-.compile-hint ul { padding-left: 20px; margin-top: 8px; line-height: 1.8; }
+.compile-hint ul { margin: 8px 0 0; padding-left: 18px; line-height: 1.8; }
 </style>

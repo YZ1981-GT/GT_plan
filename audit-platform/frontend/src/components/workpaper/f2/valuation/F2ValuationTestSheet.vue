@@ -51,7 +51,6 @@
         :account-code="valuationAccountCodes.join(',')"
         :year="new Date().getFullYear()"
         phase="final"
-        dialog-mode
         @filled="handleSamplingFilled"
       />
       <el-button size="small" type="primary" :disabled="isReadonly" @click="$emit('addRow')">+ 新增样本</el-button>

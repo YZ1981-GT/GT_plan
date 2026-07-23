@@ -329,8 +329,7 @@ import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
 import ShortcutHelpDialog from '@/components/common/ShortcutHelpDialog.vue'
 import { eventBus, type SyncEventPayload } from '@/utils/eventBus'
 import { operationHistory } from '@/utils/operationHistory'
-import { createSSE, type SSEConnection } from '@/utils/sse'
-import { events as eventPaths } from '@/services/apiPaths'
+import { subscribeProjectEvent, WILDCARD_EVENT, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import DegradedBanner from '@/components/DegradedBanner.vue'
 
 const route = useRoute()
@@ -777,36 +776,36 @@ async function handleLogout() {
 }
 
 // ── SSE 全局连接 ──
-let sseConnection: SSEConnection | null = null
+let sseSub: ProjectEventSubscription | null = null
 
 function connectSSE(projectId: string) {
-  // 关闭旧连接
-  if (sseConnection) {
-    sseConnection.close()
-    sseConnection = null
+  // 切项目先退订旧的（避免连接泄漏）
+  if (sseSub) {
+    sseSub.close()
+    sseSub = null
   }
   if (!projectId) return
 
-  const url = eventPaths.stream(projectId)
-  sseConnection = createSSE(url, { maxRetries: 5, retryInterval: 3000 })
-
-  sseConnection.onOpen(() => {
-    eventBus.emit('sse:connected')
-  })
-
-  sseConnection.onMessage((data, _event) => {
-    if (!data || !data.event_type) return
-    const payload = data as SyncEventPayload
-    if (payload.event_type === 'sync.failed') {
-      eventBus.emit('sse:sync-failed', payload)
-    } else {
-      eventBus.emit('sse:sync-event', payload)
-    }
-  })
-
-  sseConnection.onError(() => {
-    eventBus.emit('sse:disconnected')
-  })
+  // 迁移到项目事件流单例总线（frontend-sse-connection-consolidation）：
+  // 订阅通配 '*' 保持原 typed 事件 catch-all 语义（按 data.event_type 分流到 mitt sse:*）；
+  // 共享连接去重（每项目一条 SSE），断线重连/退避由总线（createSSE）统一负责。
+  sseSub = subscribeProjectEvent(
+    projectId,
+    WILDCARD_EVENT,
+    (data) => {
+      const d = data as SyncEventPayload | null
+      if (!d || !d.event_type) return
+      if (d.event_type === 'sync.failed') {
+        eventBus.emit('sse:sync-failed', d)
+      } else {
+        eventBus.emit('sse:sync-event', d)
+      }
+    },
+    {
+      onReconnect: () => eventBus.emit('sse:connected'),
+      onDegraded: () => eventBus.emit('sse:disconnected'),
+    },
+  )
 }
 
 // 监听项目切换，自动重连 SSE
@@ -883,8 +882,8 @@ onUnmounted(() => {
   eventBus.off('shortcut:undo', onShortcutUndo)
   document.removeEventListener('touchend', onTouchEnd)
   if (importPollTimer) { clearInterval(importPollTimer); importPollTimer = null }
-  // 关闭 SSE 连接
-  if (sseConnection) { sseConnection.close(); sseConnection = null }
+  // 关闭 SSE 订阅
+  if (sseSub) { sseSub.close(); sseSub = null }
 })
 </script>
 

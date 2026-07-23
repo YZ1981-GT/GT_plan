@@ -57,6 +57,8 @@
           :all-responses="allResponses"
           :save-immediate="saveImmediate"
           :debounced-save="debouncedSave"
+          :year="props.year"
+          :bs-date="periodEnd"
         />
 
         <D5TabAdjustment
@@ -261,6 +263,16 @@ const defaultDiscountRate = computed(() => {
   const resp = allResponses.value.get('D5-4-default-rate')
   return parseNum(resp?.remark)
 })
+
+const d5TbAmount = computed(() => {
+  const resp = allResponses.value.get('D5-1-tb-amount')
+  if (resp?.remark) return parseNum(resp.remark)
+  // 从 htmlData project_context 回退
+  return parseNum(props.htmlData?.project_context?.tb_amount)
+})
+
+provide('d5TbAmount', d5TbAmount)
+provide('d5BsDate', periodEnd)
 
 onMounted(async () => {
   await loadAll()

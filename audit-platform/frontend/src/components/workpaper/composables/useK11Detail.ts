@@ -57,10 +57,19 @@ export interface K11DetailRow {
   isNonReversible: boolean
   /** 可编辑标记 */
   isEditable: boolean
+  // ── 减值准备变动（对齐源模板K11-2"对应科目-减值准备发生额"分组） ──
+  /** 对应科目（减值准备科目名，如"存货跌价准备"） */
+  correspondingAccount: string
+  /** 期初金额（减值准备期初余额） */
+  allowanceOpening: number
+  /** 本期转销（核销） */
+  allowanceWriteoff: number
+  /** 期末金额（公式：期初+本期计提-本期转回） */
+  allowanceEnding: number
 }
 
 /** 区段Tab标识 */
-export type K11DetailTabKey = 'basic' | 'reconcile'
+export type K11DetailTabKey = 'basic' | 'reconcile' | 'allowance'
 
 export interface K11DetailSubtotal {
   currentProvision: number
@@ -68,6 +77,9 @@ export interface K11DetailSubtotal {
   currentOccurrence: number
   sourceAmount: number
   variance: number
+  allowanceOpening: number
+  allowanceWriteoff: number
+  allowanceEnding: number
 }
 
 export interface UseK11DetailParams {
@@ -89,32 +101,71 @@ const GOODWILL_CATEGORIES = ['商誉', '商誉减值', '商誉减值损失', '�
 /** 2区段Tab配置 */
 export const DETAIL_TABS: Array<{ key: K11DetailTabKey; label: string }> = [
   { key: 'basic', label: '基础信息' },
+  { key: 'allowance', label: '减值准备变动' },
   { key: 'reconcile', label: '核对' },
 ]
 
-/** 减值来源底稿映射 */
+/**
+ * 减值来源底稿映射
+ * 覆盖 K11-1 的 18 项 canonical 分类三种命名形态：减值 / 减值准备 / 减值损失。
+ */
 export const IMPAIRMENT_SOURCE_MAP: Record<string, string> = {
+  // 合同资产（D6）
+  '合同资产减值': 'D6',
+  '合同资产减值准备': 'D6',
+  '合同资产减值损失': 'D6',
+  // 存货跌价（F2）
   '存货跌价': 'F2',
   '存货跌价准备': 'F2',
-  '固定资产减值': 'H1',
-  '固定资产减值准备': 'H1',
-  '无形资产减值': 'I1',
-  '无形资产减值准备': 'I1',
-  '开发支出减值': 'I2',
-  '开发支出减值准备': 'I2',
-  '商誉减值': 'I3',
-  '商誉减值损失': 'I3',
-  '商誉减值准备': 'I3',
-  '在建工程减值': 'H2',
-  '在建工程减值准备': 'H2',
+  '存货跌价损失': 'F2',
+  // 持有待售（K6）
+  '持有待售资产减值': 'K6',
+  '持有待售资产减值准备': 'K6',
+  '持有待售资产减值损失': 'K6',
+  // 长期股权投资（G7）
   '长期股权投资减值': 'G7',
   '长期股权投资减值准备': 'G7',
-  '工程物资减值': 'H4',
-  '工程物资减值准备': 'H4',
-  '使用权资产减值': 'H8',
-  '使用权资产减值准备': 'H8',
+  '长期股权投资减值损失': 'G7',
+  // 投资性房地产（H3）
   '投资性房地产减值': 'H3',
   '投资性房地产减值准备': 'H3',
+  '投资性房地产减值损失': 'H3',
+  // 固定资产（H1）
+  '固定资产减值': 'H1',
+  '固定资产减值准备': 'H1',
+  '固定资产减值损失': 'H1',
+  // 工程物资（H4）
+  '工程物资减值': 'H4',
+  '工程物资减值准备': 'H4',
+  '工程物资减值损失': 'H4',
+  // 在建工程（H2）
+  '在建工程减值': 'H2',
+  '在建工程减值准备': 'H2',
+  '在建工程减值损失': 'H2',
+  // 生产性生物资产（H5）
+  '生产性生物资产减值': 'H5',
+  '生产性生物资产减值准备': 'H5',
+  '生产性生物资产减值损失': 'H5',
+  // 油气资产（H7）
+  '油气资产减值': 'H7',
+  '油气资产减值准备': 'H7',
+  '油气资产减值损失': 'H7',
+  // 使用权资产（H8）
+  '使用权资产减值': 'H8',
+  '使用权资产减值准备': 'H8',
+  '使用权资产减值损失': 'H8',
+  // 无形资产（I1）
+  '无形资产减值': 'I1',
+  '无形资产减值准备': 'I1',
+  '无形资产减值损失': 'I1',
+  // 开发支出（I2）
+  '开发支出减值': 'I2',
+  '开发支出减值准备': 'I2',
+  '开发支出减值损失': 'I2',
+  // 商誉（I3）
+  '商誉减值': 'I3',
+  '商誉减值准备': 'I3',
+  '商誉减值损失': 'I3',
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -164,6 +215,9 @@ export function useK11Detail(params: UseK11DetailParams) {
     const currentOccurrence = currentProvision - currentReversal
     const sourceAmount = parseNum(raw.sourceAmount)
     const variance = calcSourceVariance(currentOccurrence, sourceAmount)
+    const allowanceOpening = parseNum(raw.allowanceOpening)
+    const allowanceWriteoff = parseNum(raw.allowanceWriteoff)
+    const allowanceEnding = allowanceOpening + currentProvision - currentReversal
 
     return {
       rowKey: raw.rowKey ?? `row-${Math.random().toString(36).slice(2, 10)}`,
@@ -181,6 +235,10 @@ export function useK11Detail(params: UseK11DetailParams) {
       remark: raw.remark ?? '',
       isNonReversible,
       isEditable: raw.isEditable ?? true,
+      correspondingAccount: raw.correspondingAccount ?? '',
+      allowanceOpening,
+      allowanceWriteoff,
+      allowanceEnding,
     }
   }
 
@@ -191,7 +249,8 @@ export function useK11Detail(params: UseK11DetailParams) {
       const currentReversal = row.isNonReversible ? 0 : row.currentReversal
       const currentOccurrence = row.currentProvision - currentReversal
       const variance = calcSourceVariance(currentOccurrence, row.sourceAmount)
-      return { ...row, seq: idx + 1, currentReversal, currentOccurrence, variance }
+      const allowanceEnding = row.allowanceOpening + row.currentProvision - currentReversal
+      return { ...row, seq: idx + 1, currentReversal, currentOccurrence, variance, allowanceEnding }
     })
   })
 
@@ -204,7 +263,10 @@ export function useK11Detail(params: UseK11DetailParams) {
     const currentOccurrence = calcSubtotal(detail.map(r => r.currentOccurrence))
     const sourceAmount = calcSubtotal(detail.map(r => r.sourceAmount))
     const variance = calcSourceVariance(currentOccurrence, sourceAmount)
-    return { currentProvision, currentReversal, currentOccurrence, sourceAmount, variance }
+    const allowanceOpening = calcSubtotal(detail.map(r => r.allowanceOpening))
+    const allowanceWriteoff = calcSubtotal(detail.map(r => r.allowanceWriteoff))
+    const allowanceEnding = calcSubtotal(detail.map(r => r.allowanceEnding))
+    return { currentProvision, currentReversal, currentOccurrence, sourceAmount, variance, allowanceOpening, allowanceWriteoff, allowanceEnding }
   })
 
   // ─── 差异非零行判断（红色标记） ───────────────────────────────────────────
@@ -243,6 +305,26 @@ export function useK11Detail(params: UseK11DetailParams) {
     const currentReversal = row.isNonReversible ? 0 : row.currentReversal
     row.currentOccurrence = row.currentProvision - currentReversal
     row.variance = calcSourceVariance(row.currentOccurrence, row.sourceAmount)
+    row.allowanceEnding = row.allowanceOpening + row.currentProvision - currentReversal
+  }
+
+  /** 批量更新一行多个字段（引导弹窗保存用，只持久化一次） */
+  function updateRowFields(rowKey: string, patch: Partial<K11DetailRow>): void {
+    if (isReadonly?.value) return
+    const row = rows.value.find(r => r.rowKey === rowKey)
+    if (!row || !row.isEditable) return
+    for (const [k, v] of Object.entries(patch)) {
+      if (k === 'currentReversal' && row.isNonReversible) continue
+      ;(row as any)[k] = v
+    }
+    if (typeof patch.assetCategory === 'string') {
+      row.isNonReversible = isGoodwillCategory(patch.assetCategory)
+      if (row.isNonReversible) row.currentReversal = 0
+      row.sourceWp = IMPAIRMENT_SOURCE_MAP[patch.assetCategory] ?? row.sourceWp
+    }
+    _recalcRow(row)
+    isChanged.value = true
+    _persist()
   }
 
   // ─── 动态行操作 ────────────────────────────────────────────────────────────
@@ -267,6 +349,10 @@ export function useK11Detail(params: UseK11DetailParams) {
       remark: '',
       isNonReversible,
       isEditable: true,
+      correspondingAccount: '',
+      allowanceOpening: 0,
+      allowanceWriteoff: 0,
+      allowanceEnding: 0,
     })
     isChanged.value = true
     _persist()
@@ -389,6 +475,7 @@ export function useK11Detail(params: UseK11DetailParams) {
     isChanged,
     varianceRows,
     updateCell,
+    updateRowFields,
     addRow,
     removeRow,
     setActiveTab,

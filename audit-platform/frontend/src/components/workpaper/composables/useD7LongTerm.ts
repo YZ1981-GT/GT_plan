@@ -10,6 +10,10 @@ import { ElMessage } from 'element-plus'
 import { parseNum, calcSubtotal } from './useD7FormulaEngine'
 import type { ChecklistResponse } from './useD7FormData'
 import type { DetailRow } from './useD7Detail'
+import { useAgingConfig } from '@/composables/useAgingConfig'
+
+/** ">1年" 段判定阈值（天）：dayFrom ≥ 366 视为账龄超过 1 年 */
+const OVER_ONE_YEAR_DAY_FROM = 366
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -22,8 +26,18 @@ export interface LongTermRow {
   reason: string             // 未结转或未偿还的原因
   auditDateTransfer: number  // 至审计日结转或偿还金额
   plan: string               // 处理计划
+  disposalConclusion: string // 处置结论
   remark: string             // 备注
 }
+
+/** 处置结论枚举 */
+export const D7_DISPOSAL_CONCLUSIONS = [
+  '应确认收入',
+  '应退回',
+  '正常挂账',
+  '应转营业外收入',
+  '待确定',
+] as const
 
 export interface UseD7LongTermOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
@@ -63,6 +77,7 @@ function normalizeRow(raw: any): LongTermRow {
     reason: raw.reason || '',
     auditDateTransfer: parseNum(raw.auditDateTransfer),
     plan: raw.plan || '',
+    disposalConclusion: raw.disposalConclusion || '',
     remark: raw.remark || '',
   }
 }
@@ -72,14 +87,28 @@ function createEmptyRow(): LongTermRow {
     rowId: generateRowId(),
     customerName: '', endBalance: 0, aging: '',
     businessDescription: '', reason: '',
-    auditDateTransfer: 0, plan: '', remark: '',
+    auditDateTransfer: 0, plan: '', disposalConclusion: '', remark: '',
   }
+}
+
+/** 单行"超过1年"段之和（期末审定账龄 nested keyed），按传入 overKeys 动态求和 */
+function sumOverOneYear(row: any, overKeys: string[]): number {
+  const audited = (row?.agingAudited ?? {}) as Record<string, number>
+  return overKeys.reduce((sum, k) => sum + parseNum(audited[k]), 0)
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD7LongTerm(options: UseD7LongTermOptions) {
-  const { allResponses, debouncedSave } = options
+  const { allResponses, debouncedSave, projectId } = options
+
+  // ─── Aging Config Integration (subject='D7', 2-period) ──────────────
+  const { segments } = useAgingConfig(projectId, 'D7')
+
+  /** 账龄超 1 年的段 key（dayFrom ≥ 366，按项目配置动态判定，不硬编码 4 段）Req 5.1/5.4 */
+  const overOneYearKeys = computed<string[]>(() =>
+    segments.value.filter(s => s.dayFrom >= OVER_ONE_YEAR_DAY_FROM).map(s => s.key),
+  )
 
   // ─── Reactive rows ───────────────────────────────────────────────────
 
@@ -142,13 +171,12 @@ export function useD7LongTerm(options: UseD7LongTermOptions) {
     let detailRows: DetailRow[] = []
     try { detailRows = JSON.parse(d7DetailJson) } catch { return }
 
-    // Filter rows where aging > 1 year (endAging2 + endAging3 + endAging4 > 0)
-    const longTermRows = detailRows.filter((r: any) => {
-      const aging2 = parseNum(r.endAging2)
-      const aging3 = parseNum(r.endAging3)
-      const aging4 = parseNum(r.endAging4)
-      return aging2 + aging3 + aging4 > 0
-    })
+    // 超过1年段：账龄配置中 dayFrom >= 366 的段（不硬编码 4 段，Req 5.1/5.4）
+    const overKeys = overOneYearKeys.value
+    const segLabelByKey = new Map(segments.value.map(s => [s.key, s.label]))
+
+    // 筛选期末审定账龄中"超过1年"段之和 > 0 的明细行（Req 5.2）
+    const longTermRows = detailRows.filter((r: any) => sumOverOneYear(r, overKeys) > 0)
 
     if (longTermRows.length === 0) {
       ElMessage.info('未找到账龄超过1年的客户')
@@ -160,13 +188,15 @@ export function useD7LongTerm(options: UseD7LongTermOptions) {
     const newRows: LongTermRow[] = longTermRows
       .filter((r: any) => !existingNames.has(r.companyName || r.contractName))
       .map((r: any) => {
-        // Determine primary aging band
-        const aging2 = parseNum(r.endAging2)
-        const aging3 = parseNum(r.endAging3)
-        const aging4 = parseNum(r.endAging4)
-        let aging = '1~2年'
-        if (aging4 > 0) aging = '3年以上'
-        else if (aging3 > 0) aging = '2~3年'
+        // 账龄 label 取占比最大的"超过1年"段 label（Req 5.3）
+        const audited = (r.agingAudited ?? {}) as Record<string, number>
+        let topKey = overKeys[0] || ''
+        let topAmt = -Infinity
+        for (const k of overKeys) {
+          const amt = parseNum(audited[k])
+          if (amt > topAmt) { topAmt = amt; topKey = k }
+        }
+        const aging = segLabelByKey.get(topKey) || topKey || '1年以上'
 
         return normalizeRow({
           rowId: generateRowId(),
@@ -184,6 +214,35 @@ export function useD7LongTerm(options: UseD7LongTermOptions) {
       ElMessage.info('所有超1年客户已存在')
     }
   }
+
+  // ─── D7-2 账龄>1年合计（供 D7-5↔D7-2 勾稽，按 segment 动态判定） ─────
+  // 单一动态来源，供消费组件勾稽校验复用，避免在 .vue 中硬编码 endAging2+3+4。
+
+  const d72LongTermTotal = computed<number>(() => {
+    const jsonStr = allResponses.value.get('D7-2-rows')?.remark
+    if (!jsonStr) return 0
+    let detailRows: any[] = []
+    try {
+      const parsed = JSON.parse(jsonStr)
+      detailRows = Array.isArray(parsed) ? parsed : []
+    } catch {
+      return 0
+    }
+    const overKeys = overOneYearKeys.value
+    return detailRows.reduce((sum, r) => sum + sumOverOneYear(r, overKeys), 0)
+  })
+
+  // ─── Disposal Summary (处置结论统计) ───────────────────────────────
+
+  const disposalSummary = computed(() => {
+    const counts: Record<string, number> = {}
+    for (const row of rows.value) {
+      if (row.disposalConclusion) {
+        counts[row.disposalConclusion] = (counts[row.disposalConclusion] || 0) + 1
+      }
+    }
+    return counts
+  })
 
   // ─── Audit Notes ─────────────────────────────────────────────────────
 
@@ -205,6 +264,9 @@ export function useD7LongTerm(options: UseD7LongTermOptions) {
   return {
     rows,
     totalRow,
+    disposalSummary,
+    overOneYearKeys,
+    d72LongTermTotal,
     addRow,
     removeRow,
     updateCell,

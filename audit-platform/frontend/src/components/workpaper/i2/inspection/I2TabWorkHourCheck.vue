@@ -366,6 +366,9 @@ import {
   I2_WORKHOUR_CONCLUSION_OPTIONS,
   I2_WORKHOUR_OBJECTIVES,
   I2_WORKHOUR_PREP_NOTES,
+  I2_WORKHOUR_STORAGE_KEY,
+  I2_WORKHOUR_AUDIT_NOTE_KEY,
+  I2_WORKHOUR_AUDIT_CONCLUSION_KEY,
   buildWorkHourConclusionDraft,
   emptyI2WorkHourRow,
   normalizeI2WorkHourRow,
@@ -381,6 +384,7 @@ import {
   workHourRowRiskClass,
   type I2WorkHourCheckRow,
 } from '../../composables/i2WorkHourModel'
+import { I2_STAFF_STORAGE_KEY } from '../../composables/i2StaffCheckModel'
 import {
   pickOcrField,
   runWorkpaperOcr,
@@ -404,10 +408,11 @@ const props = defineProps<{
 const emit = defineEmits<{ save: []; 'navigate-sheet': [sheetName: string] }>()
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
 
-const STORAGE_KEY = 'I2-10-rows'
-const AUDIT_NOTE_KEY = 'I2-10-audit-note'
-const AUDIT_CONCLUSION_KEY = 'I2-10-audit-conclusion'
-const STAFF_KEY = 'I2-9-rows'
+// STORAGE_KEY 等常量集中定义于 i2WorkHourModel.ts / i2StaffCheckModel.ts（跨sheet引用共用，避免硬编码分裂）
+const STORAGE_KEY = I2_WORKHOUR_STORAGE_KEY
+const AUDIT_NOTE_KEY = I2_WORKHOUR_AUDIT_NOTE_KEY
+const AUDIT_CONCLUSION_KEY = I2_WORKHOUR_AUDIT_CONCLUSION_KEY
+const STAFF_KEY = I2_STAFF_STORAGE_KEY
 const DETAIL_KEY = 'I2-2-rows'
 const ANALYSIS_BUNDLE_KEY = 'I2-5-analysis-bundle'
 

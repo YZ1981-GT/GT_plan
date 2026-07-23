@@ -72,12 +72,10 @@
             </el-tag>
           </div>
           <div class="section-actions">
-            <el-button size="small" @click="handleAI('adjudication')">
+            <el-button size="small" :loading="aiLoading" @click="handleAI('adjudication')">
               <el-icon><MagicStick /></el-icon> AI辅助
             </el-button>
-            <el-button size="small" @click="handleReview">
-              <el-icon><ChatDotSquare /></el-icon> 复核
-            </el-button>
+            <GtReviewTrigger section-id="K12-1-adjudication" label="💬 复核" />
           </div>
         </div>
       </template>
@@ -239,6 +237,20 @@
           </template>
         </el-table-column>
 
+        <!-- 索引号（源模板列） -->
+        <el-table-column prop="refIndex" label="索引号" min-width="100">
+          <template #default="{ row }">
+            <el-input
+              v-if="!props.isReadonly && row.isEditable"
+              v-model="row.refIndex"
+              size="small"
+              placeholder="如 K12-2"
+              @change="adjudication.updateCell(row.rowKey, 'refIndex', row.refIndex)"
+            />
+            <span v-else class="cell-value">{{ row.refIndex || '—' }}</span>
+          </template>
+        </el-table-column>
+
         <!-- 备注 -->
         <el-table-column prop="remark" label="备注" min-width="140">
           <template #default="{ row }">
@@ -263,6 +275,27 @@
 
       <div v-if="!props.isReadonly" class="table-actions">
         <el-button size="small" type="primary" plain @click="handleAddRow">+ 新增来源行</el-button>
+      </div>
+    </el-card>
+
+    <!-- ═══ 试算平衡表核对行（源模板：试算平衡表数 / 差异数） ═══ -->
+    <el-card shadow="never" class="k12-section-card k12-tb-recon-card">
+      <template #header><span class="section-title">与试算平衡表核对</span></template>
+      <div class="tb-recon-grid">
+        <div class="tb-recon-item">
+          <span class="tb-recon-label">审定合计（本表）</span>
+          <span class="tb-recon-value">{{ fmtAmt(adjudication.totalRow.value.audited) }}</span>
+        </div>
+        <div class="tb-recon-item">
+          <span class="tb-recon-label">试算平衡表数（6301审定发生额）</span>
+          <span class="tb-recon-value">{{ fmtAmt(props.tbData?.audited6301) }}</span>
+        </div>
+        <div class="tb-recon-item">
+          <span class="tb-recon-label">差异数</span>
+          <span :class="['tb-recon-value', { 'diff-warn': tbDiffAbnormal }]">{{ fmtAmt(tbDiff) }}</span>
+        </div>
+        <el-tag v-if="tbDiffAbnormal" type="danger" size="small" effect="dark">⚠ 审定合计与试算表存在差异，请核对</el-tag>
+        <el-tag v-else type="success" size="small">✓ 与试算平衡表一致</el-tag>
       </div>
     </el-card>
 
@@ -352,13 +385,16 @@
  * Spec: .kiro/specs/k12-non-operating-income/ Task 4.2
  * Requirements: 2.1-2.7
  */
-import { ref, inject, defineAsyncComponent, watch, toRef, computed } from 'vue'
+import { ref, defineAsyncComponent, watch, toRef, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick, ChatDotSquare } from '@element-plus/icons-vue'
+import { MagicStick } from '@element-plus/icons-vue'
+import http from '@/utils/http'
 import { useK12Adjudication } from '../../composables/useK12Adjudication'
+import { generateK12AiText } from '../../composables/useK12AiText'
 import { eventBus } from '@/utils/eventBus'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
+const GtReviewTrigger = defineAsyncComponent(() => import('../../GtReviewTrigger.vue'))
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 
@@ -374,10 +410,6 @@ const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'navigate-sheet', sheetName: string): void
 }>()
-
-// ─── Inject 复核对话 ─────────────────────────────────────────────────────────
-
-const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -397,6 +429,14 @@ const adjudication = useK12Adjudication({
 // ─── State ───────────────────────────────────────────────────────────────────
 
 const writebackLoading = ref(false)
+
+// ─── 试算平衡表核对（审定合计 vs TB 6301 审定发生额） ─────────────────────────
+const tbDiff = computed(() => {
+  const audited = adjudication.totalRow.value.audited || 0
+  const tbAudited = Number(props.tbData?.audited6301 ?? 0)
+  return audited - tbAudited
+})
+const tbDiffAbnormal = computed(() => Math.abs(tbDiff.value) > 1)
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -458,6 +498,13 @@ async function handleAddRow(): Promise<void> {
 // ─── TB回写 ──────────────────────────────────────────────────────────────────
 
 async function handleWritebackTBInternal(auditedAmount: number): Promise<void> {
+  // P1-8：真实 HTTP 回写 trial_balance.audited_amount（原仅 emit 事件不落库）
+  if (props.projectId) {
+    await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
+      account_code: '6301',
+      audited_amount: auditedAmount,
+    })
+  }
   // 发布 EventBus 'substantive:adjudicated'（附注刷新 + 联动）
   eventBus.emit('substantive:adjudicated' as any, {
     accountCode: '6301',
@@ -490,17 +537,50 @@ function handleConclusionSave(): void {
   adjudication.saveConclusion(adjudication.auditConclusion.value)
 }
 
-// ─── AI辅助 ──────────────────────────────────────────────────────────────────
+// ─── AI辅助（接真实 /ai/generate-text，context 为 dict[str,str]） ─────────────
 
-function handleAI(section: string): void {
-  ElMessage.info(`AI辅助分析营业外收入${section}数据...`)
+const aiLoading = ref(false)
+
+async function handleAI(section: string): Promise<void> {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const t = adjudication.totalRow.value
+    const context: Record<string, unknown> = {
+      科目: '6301 营业外收入（损益类·贷方·发生额）',
+      本期审定合计: fmtAmt(t.audited),
+      上期审定合计: fmtAmt(t.priorAudited),
+      同比变动: fmtPercent(t.yoyChange),
+      各来源审定: adjudication.rows.value
+        .map(r => `${r.name}=${fmtAmt(r.audited)}`)
+        .join('；'),
+      与K12_2差异: fmtAmt(adjudication.detailCrossValidation.value.diff),
+    }
+    const promptMap: Record<string, string> = {
+      adjudication: '你是资深审计师。请基于营业外收入审定表数据，分析各来源本期发生额、同比变动及分类合理性，重点关注非经常性损益列报正确性，输出审计说明草稿。',
+      note: '你是资深审计师。请为营业外收入审定表撰写审计说明（变动原因分析、特殊事项、非经常性损益列报），供人工确认。',
+      conclusion: '你是资深审计师。请为营业外收入审定表撰写审计结论，说明发生额真实完整、分类列报是否恰当。',
+    }
+    const existing = section === 'conclusion' ? adjudication.auditConclusion.value : adjudication.auditNote.value
+    const content = await generateK12AiText(props.wpId, {
+      prompt: promptMap[section] || promptMap.adjudication,
+      section: `K12-1-${section}`,
+      context,
+      existingContent: existing,
+    })
+    if (!content) return
+    if (section === 'conclusion') {
+      adjudication.auditConclusion.value = content
+      adjudication.saveConclusion(content)
+    } else {
+      adjudication.auditNote.value = content
+      adjudication.saveNote(content)
+    }
+  } finally {
+    aiLoading.value = false
+  }
 }
 
-// ─── 复核 ────────────────────────────────────────────────────────────────────
-
-function handleReview(): void {
-  openReviewDialog?.('K12-1-adjudication', '营业外收入审定表')
-}
 </script>
 
 <style scoped>
@@ -649,6 +729,23 @@ function handleReview(): void {
 }
 
 .table-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+/* ─── 试算平衡表核对 ─── */
+.k12-tb-recon-card :deep(.el-card__body) { padding: 10px 16px; }
+.tb-recon-grid {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.tb-recon-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.tb-recon-label { font-size: 12px; color: #909399; }
+.tb-recon-value { font-size: var(--wp-font-size, 13px); font-weight: 600; color: #303133; }
+.tb-recon-value.diff-warn { color: #f56c6c; }
 
 /* ─── 操作栏 ─── */
 .k12-action-bar {

@@ -23,16 +23,48 @@
       <!-- 左侧：配置表单 -->
       <div class="gt-mat-form-section">
         <el-form :model="form" label-width="130px" label-position="right">
+          <!-- §1 是否公开交易实体（决定百分比区间） -->
+          <el-form-item label="是否公开交易实体">
+            <el-radio-group v-model="form.is_public_entity" @change="onParamChange">
+              <el-radio value="yes">是（IPO/上市/新三板）</el-radio>
+              <el-radio value="no">否</el-radio>
+            </el-radio-group>
+            <div class="field-hint" v-if="form.is_public_entity === 'yes'">百分比参考区间：税前利润 3-5%/收入 0.25-1%/净资产 0.25-2%</div>
+            <div class="field-hint" v-else-if="form.is_public_entity === 'no'">百分比参考区间：税前利润 3-10%/收入 0.25-3%/净资产 0.25-2%</div>
+          </el-form-item>
+
           <el-form-item label="基准类型">
             <el-select v-model="form.benchmark_type" placeholder="请选择" style="width: 100%"
               @change="onBenchmarkTypeChange">
-              <el-option label="利润总额" value="pre_tax_profit" />
+              <el-option label="经常性业务的税前利润" value="pre_tax_profit" />
               <el-option label="营业收入" value="revenue" />
               <el-option label="总资产" value="total_assets" />
               <el-option label="净资产" value="net_assets" />
+              <el-option label="费用总额" value="total_expense" />
               <el-option label="自定义" value="custom" />
             </el-select>
           </el-form-item>
+
+          <!-- §2.1 计算基础（三年趋势） -->
+          <el-form-item label="计算基础">
+            <el-radio-group v-model="form.calc_basis" @change="onParamChange">
+              <el-radio value="forecast">本年预测数</el-radio>
+              <el-radio value="unadjusted">年末未审数</el-radio>
+              <el-radio value="average_3y">三年平均数</el-radio>
+            </el-radio-group>
+          </el-form-item>
+
+          <!-- 三年趋势对比（源§2.1） -->
+          <div v-if="form.benchmark_type && form.benchmark_type !== 'custom'" class="three-year-trend">
+            <span class="trend-title">三年趋势对比（万元）：</span>
+            <div class="trend-values">
+              <span>本年: {{ formatAmt(benchmarkNum) }}</span>
+              <span>上年: {{ formatAmt(priorYear1) }}</span>
+              <span>前年: {{ formatAmt(priorYear2) }}</span>
+            </div>
+            <div v-if="trendWarning" class="trend-warning">⚠️ {{ trendWarning }}</div>
+          </div>
+
           <el-form-item label="基准金额">
             <div style="display: flex; gap: 8px; width: 100%">
               <el-input-number v-model="benchmarkNum" :precision="2" :controls="false"
@@ -44,14 +76,38 @@
           <el-form-item label="整体百分比(%)">
             <el-input-number v-model="overallPct" :min="0" :max="100" :precision="2" :step="0.5"
               style="width: 100%" @change="onParamChange" />
+            <div class="field-hint">{{ suggestedPctRange }}</div>
           </el-form-item>
           <el-form-item label="执行比例(%)">
-            <el-slider v-model="perfRatio" :min="0" :max="100" :step="5" show-input @change="onParamChange" />
+            <el-slider v-model="perfRatio" :min="45" :max="75" :step="5" show-input @change="onParamChange" />
+            <div class="field-hint">CAS: 45%~75%。{{ perfRatioHint }}</div>
           </el-form-item>
           <el-form-item label="微小比例(%)">
-            <el-input-number v-model="trivialRatio" :min="0" :max="100" :precision="2" :step="1"
+            <el-input-number v-model="trivialRatio" :min="0" :max="5" :precision="2" :step="0.5"
               style="width: 100%" @change="onParamChange" />
+            <div class="field-hint">CAS: ≤5% 整体重要性（GTI 统一要求）</div>
           </el-form-item>
+
+          <!-- §3.4 特定类别重要性（如适用） -->
+          <el-divider content-position="left">特定类别重要性（如适用）</el-divider>
+          <div class="specific-mat-section">
+            <div class="field-hint" style="margin-bottom:8px">
+              如存在特定交易/余额/披露需单独确定重要性水平（如关联方交易、特定科目），请在此记录。
+              无需时留空。
+            </div>
+            <el-form-item label="特定类别名称">
+              <el-input v-model="specificForm.name" placeholder="如：关联方交易" style="width:100%" />
+            </el-form-item>
+            <el-form-item label="确定原因">
+              <el-input v-model="specificForm.reason" type="textarea" :autosize="{minRows:1,maxRows:3}" placeholder="确定为特定类别的原因..." />
+            </el-form-item>
+            <el-form-item label="特定类别PM">
+              <el-input-number v-model="specificForm.amount" :precision="2" :controls="false" placeholder="金额" style="width:100%" />
+            </el-form-item>
+            <el-form-item label="特定类别TE比例(%)">
+              <el-input-number v-model="specificForm.te_ratio" :min="45" :max="75" :precision="0" style="width:100%" />
+            </el-form-item>
+          </div>
         </el-form>
       </div>
 
@@ -100,6 +156,26 @@
           </el-collapse-item>
         </el-collapse>
       </div>
+    </div>
+
+    <!-- §4 重要性修订（CAS1221 第十二条：审计过程中获知新信息时修订） -->
+    <div class="gt-mat-revision-section" v-if="result">
+      <h3 class="gt-section-title">§4 重要性修订（审计过程中）</h3>
+      <div class="revision-hint">
+        CAS1221 第十二条：如果在审计过程中获知了某项信息，而该信息可能导致注册会计师确定与原来不同的重要性水平，
+        应当修订。常见原因：被审计单位实际经营成果与预测偏差较大/发现新的风险因素/汇总错报接近重要性水平。
+      </div>
+      <el-form v-if="isEditing" label-width="100px" style="margin-top:12px">
+        <el-form-item label="修订原因">
+          <el-input v-model="revisionReason" type="textarea" :autosize="{minRows:2,maxRows:4}" placeholder="说明修订依据（如：年末实际利润较预测大幅偏离/发现新的舞弊风险）..." />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="warning" :disabled="!revisionReason.trim()" @click="submitRevision">
+            修订重要性（基于上方最新参数）
+          </el-button>
+        </el-form-item>
+      </el-form>
+      <div v-else class="revision-readonly">上方参数修改后点"编辑"模式可修订重要性，修订原因将记入变更历史。</div>
     </div>
 
     <!-- 变更历史 -->
@@ -162,11 +238,54 @@ const history = ref<any[]>([])
 const form = reactive({
   benchmark_type: '',
   benchmark_amount: '',
+  is_public_entity: '' as '' | 'yes' | 'no',
+  calc_basis: 'unadjusted' as 'forecast' | 'unadjusted' | 'average_3y',
 })
 const benchmarkNum = ref<number | undefined>(undefined)
+const priorYear1 = ref<number | undefined>(undefined)
+const priorYear2 = ref<number | undefined>(undefined)
 const overallPct = ref(5)
 const perfRatio = ref(50)
 const trivialRatio = ref(5)
+
+// 特定类别重要性
+const specificForm = reactive({
+  name: '',
+  reason: '',
+  amount: undefined as number | undefined,
+  te_ratio: 60,
+})
+
+// 百分比参考区间提示（按基准类型+是否公开交易）
+const suggestedPctRange = computed(() => {
+  const isPublic = form.is_public_entity === 'yes'
+  switch (form.benchmark_type) {
+    case 'pre_tax_profit': return isPublic ? '公开交易：3-5%' : '其他公司：3-10%'
+    case 'revenue': return isPublic ? '公开交易：0.25-1%' : '其他公司：0.25-3%'
+    case 'total_assets': return isPublic ? '公开交易：0.25-1%' : '其他公司：0.25-2%'
+    case 'net_assets': return isPublic ? '公开交易：0.25-2%' : '其他公司：0.25-2%'
+    case 'total_expense': return '非营利组织参考：0.25-3%'
+    default: return ''
+  }
+})
+
+// 执行比例提示（参考舞弊风险因素）
+const perfRatioHint = computed(() => {
+  if (perfRatio.value <= 50) return '较低 — 适用于：前期发现较多错报/舞弊风险较高/经营变化大'
+  if (perfRatio.value >= 70) return '较高 — 适用于：前期较少错报/经营平稳/会计系统无变化'
+  return ''
+})
+
+// 三年趋势预警
+const trendWarning = computed(() => {
+  if (benchmarkNum.value == null || !priorYear1.value) return ''
+  const curr = benchmarkNum.value
+  const prior = priorYear1.value
+  if (prior === 0) return '上年基准为 0，请确认基准选择是否恰当'
+  const changeRate = Math.abs((curr - prior) / prior)
+  if (changeRate > 0.5) return `本年较上年变动 ${(changeRate * 100).toFixed(0)}%（超 50%），考虑使用三年平均数或更换基准`
+  return ''
+})
 
 const overrideForm = reactive({
   overall_materiality: undefined as number | undefined,
@@ -177,6 +296,27 @@ const overrideForm = reactive({
 const overrideFormRef = ref<FormInstance>()
 const overrideRules: FormRules = {
   reason: [{ required: true, message: '请说明覆盖原因', trigger: 'blur' }],
+}
+
+// §4 修订
+const revisionReason = ref('')
+
+async function submitRevision() {
+  if (!revisionReason.value.trim()) return
+  // 修订 = 用当前参数重新计算 + 记录修订原因（与覆盖不同：覆盖是手动改金额，修订是重新跑公式）
+  await onParamChange()
+  if (result.value) {
+    // 把修订原因追加到 override 接口（利用 notes 机制记录）
+    try {
+      await overrideMateriality(projectId.value, year.value, {
+        override_reason: `[修订] ${revisionReason.value.trim()}`,
+      } as any)
+      ElMessage.success('重要性已修订，原因已记入变更历史')
+      eventBus.emit('materiality:changed', { projectId: projectId.value, year: year.value } as MaterialityChangedPayload)
+      revisionReason.value = ''
+      fetchHistory()
+    } catch { ElMessage.error('修订失败') }
+  }
 }
 
 const formatAmt = fmtAmount
@@ -354,4 +494,47 @@ onMounted(async () => {
 }
 .gt-mat-no-result { text-align: center; color: var(--gt-color-text-tertiary); padding: var(--gt-space-10); }
 .gt-mat-history-section { margin-top: var(--gt-space-8); }
+
+/* ── 增强：字段提示 / 三年趋势 / 特定类别 / 修订 ── */
+.field-hint {
+  font-size: 11px;
+  color: var(--gt-color-text-tertiary, #6B7280);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+.three-year-trend {
+  background: #F0F9FF;
+  border-left: 3px solid #3B82F6;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+.trend-title { font-weight: 600; color: #1E40AF; }
+.trend-values { display: flex; gap: 16px; margin-top: 4px; }
+.trend-warning { color: #D97706; font-weight: 600; margin-top: 4px; }
+.specific-mat-section {
+  background: #FAFAFA;
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 4px;
+}
+.gt-mat-revision-section {
+  margin-top: var(--gt-space-6);
+  padding: 16px;
+  background: #FFFBEB;
+  border: 1px solid #F59E0B;
+  border-radius: 8px;
+}
+.revision-hint {
+  font-size: 12px;
+  color: #92400E;
+  line-height: 1.6;
+}
+.revision-readonly {
+  font-size: 12px;
+  color: #6B7280;
+  font-style: italic;
+}
 </style>

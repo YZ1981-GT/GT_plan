@@ -30,14 +30,51 @@
         class="disclosure-table"
       >
         <el-table-column prop="category" label="项目（来源分类）" min-width="160" />
-        <el-table-column prop="currentAmount" label="本期发生额" min-width="120" align="right">
+        <el-table-column prop="currentAmount" label="本期发生额" min-width="130" align="right">
           <template #default="{ row }">
-            <span :class="{ 'amount-zero': !row.currentAmount }">{{ fmtAmt(row.currentAmount) }}</span>
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.currentAmount"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width: 100%"
+              @change="(v: number | undefined) => { row.currentAmount = v ?? 0; handleRowChange(row) }"
+            />
+            <span v-else :class="{ 'amount-zero': !row.currentAmount }">{{ fmtAmt(row.currentAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="priorAmount" label="上期发生额" min-width="120" align="right">
+        <el-table-column prop="priorAmount" label="上期发生额" min-width="130" align="right">
           <template #default="{ row }">
-            <span>{{ fmtAmt(row.priorAmount) }}</span>
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.priorAmount"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width: 100%"
+              @change="(v: number | undefined) => { row.priorAmount = v ?? 0; handleRowChange(row) }"
+            />
+            <span v-else>{{ fmtAmt(row.priorAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="nonRecurringAmount" label="计入当期非经常性损益的金额" min-width="150" align="right">
+          <template #header>
+            <el-tooltip content="源模板必填列：与日常活动无关的利得多列为非经常性损益" placement="top">
+              <span style="border-bottom:1px dashed #909399;cursor:help">计入非经常性损益</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.nonRecurringAmount"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width: 100%"
+              @change="(v: number | undefined) => { row.nonRecurringAmount = v ?? 0; handleRowChange(row) }"
+            />
+            <span v-else>{{ fmtAmt(row.nonRecurringAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="同比变动" min-width="100" align="right">
@@ -59,6 +96,45 @@
           </template>
         </el-table-column>
       </el-table>
+    </el-card>
+
+    <!-- ═══ 与企业日常活动无关的政府补助明细（源模板国企版子表） ═══ -->
+    <el-card shadow="never" class="disclosure-card">
+      <template #header>
+        <div class="section-header">
+          <span class="section-title">与企业日常活动无关的政府补助明细</span>
+          <el-button v-if="!isReadonly" size="small" type="primary" plain @click="addGovGrantRow">+ 新增明细</el-button>
+        </div>
+      </template>
+      <el-table :data="govGrantRows" border size="small" class="disclosure-table" empty-text="暂无政府补助明细">
+        <el-table-column type="index" label="#" width="42" align="center" />
+        <el-table-column prop="item" label="项目" min-width="200">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.item" size="small" placeholder="政府补助项目名称" @change="(v: string) => updateGovGrant(row.rowKey, 'item', v)" />
+            <span v-else>{{ row.item || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="currentAmount" label="本期发生额" min-width="130" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.currentAmount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateGovGrant(row.rowKey, 'currentAmount', v ?? 0)" />
+            <span v-else>{{ fmtAmt(row.currentAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="priorAmount" label="上期发生额" min-width="130" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.priorAmount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateGovGrant(row.rowKey, 'priorAmount', v ?? 0)" />
+            <span v-else>{{ fmtAmt(row.priorAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="" width="50" align="center">
+          <template #default="{ row }">
+            <el-button link size="small" type="danger" @click="removeGovGrantRow(row.rowKey)">删</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="govgrant-total">
+        合计　本期：{{ fmtAmt(govGrantTotalCurrent) }}　|　上期：{{ fmtAmt(govGrantTotalPrior) }}
+      </div>
     </el-card>
 
     <!-- ═══ 审计说明（AI辅助文本区域） ═══ -->
@@ -118,7 +194,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
-import { api } from '@/services/apiProxy'
+import { generateK12AiText } from '../../composables/useK12AiText'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 
@@ -138,15 +214,16 @@ const emit = defineEmits<{
 const ACCOUNT_CODE = '6301'
 const ABNORMAL_THRESHOLD = 0.5
 
-/** 营业外收入标准来源分类（国企版，含国企特有项目） */
+/**
+ * 营业外收入标准来源分类（国企版）
+ * P0-6 修复：删除臆造的「国有资产处置收益」—— 源模板国企版分类与上市版相同，
+ * 无此项目（违「禁止自造披露内容」铁律）。
+ */
 const CATEGORIES = [
-  '政府补助',
-  '债务重组利得',
-  '资产盘盈利得',
-  '罚款收入',
+  '与日常活动无关的政府补助',
   '捐赠利得',
-  '无法支付款项转入',
-  '国有资产处置收益',
+  '盘盈利得（不包括存货盘盈及固定资产盘盈）',
+  '碳排放配额出售利得',
   '其他',
 ]
 
@@ -156,14 +233,25 @@ interface DisclosureRow {
   category: string
   currentAmount: number
   priorAmount: number
+  /** 计入当期非经常性损益的金额（源模板必填列） */
+  nonRecurringAmount: number
   remark: string
+}
+
+/** 与企业日常活动无关的政府补助明细行（源模板国企版子表） */
+interface GovGrantRow {
+  rowKey: string
+  item: string
+  currentAmount: number
+  priorAmount: number
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
 const disclosureRows = ref<DisclosureRow[]>(
-  CATEGORIES.map(c => ({ category: c, currentAmount: 0, priorAmount: 0, remark: '' }))
+  CATEGORIES.map(c => ({ category: c, currentAmount: 0, priorAmount: 0, nonRecurringAmount: 0, remark: '' }))
 )
+const govGrantRows = ref<GovGrantRow[]>([])
 const narrativeText = ref('')
 const totalAdjudicated = ref(0)
 
@@ -181,6 +269,7 @@ function loadSavedData(): void {
             category: CATEGORIES[i],
             currentAmount: Number(parsed.currentAmount || 0),
             priorAmount: Number(parsed.priorAmount || 0),
+            nonRecurringAmount: Number(parsed.nonRecurringAmount || 0),
             remark: parsed.remark || '',
           }
         }
@@ -192,27 +281,61 @@ function loadSavedData(): void {
   if (narrativeSaved) {
     narrativeText.value = narrativeSaved.remark || narrativeSaved.conclusion || ''
   }
+
+  // 政府补助明细子表
+  const ggSaved = props.allResponses.get('K12-disc-soe-govgrant-rows')
+  if (ggSaved) {
+    try {
+      const raw = ggSaved.remark ?? ggSaved.conclusion ?? ggSaved
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+      if (Array.isArray(parsed)) govGrantRows.value = parsed
+    } catch { /* ignore */ }
+  }
 }
 
 // ─── Auto-fill from K12-1 adjudicated data ───────────────────────────────────
 
-function applyAutoFill(): void {
-  for (let i = 0; i < CATEGORIES.length; i++) {
-    const adjKey = `K12-1-row-${i}-audited`
-    const adjSaved = props.allResponses.get(adjKey)
-    if (adjSaved) {
-      const val = Number(adjSaved.remark ?? adjSaved.conclusion ?? 0)
-      if (val !== 0) {
-        disclosureRows.value[i].currentAmount = val
-      }
-    }
+/**
+ * 从 K12-1 审定表取数（P0 修复：原读 `K12-1-row-${i}-audited` 死键，
+ * useK12Adjudication 从不写 → 恒 no-op；改读 `K12-1-rows` 按 name 匹配）。
+ * @param silent true 时不弹提示（EventBus 自动刷新用）
+ */
+function applyAutoFill(silent = false): void {
+  const saved = props.allResponses.get('K12-1-rows')
+  if (!saved) {
+    if (!silent) ElMessage.warning('未找到 K12-1 审定表数据，请先编制审定表')
+    return
+  }
+  let k12Rows: any[] = []
+  try {
+    const raw = saved.remark ?? saved.conclusion ?? saved
+    k12Rows = typeof raw === 'string' ? JSON.parse(raw) : raw
+  } catch { return }
+  if (!Array.isArray(k12Rows)) return
+
+  const byName = new Map<string, { audited: number; prior: number }>()
+  for (const r of k12Rows) {
+    const audited = Number(
+      r.audited ?? (Number(r.unadjusted || 0) + Number(r.aje || 0) + Number(r.rje || 0)),
+    )
+    const prior = Number(
+      r.priorAudited ?? (Number(r.priorUnadj || 0) + Number(r.priorAje || 0) + Number(r.priorRje || 0)),
+    )
+    byName.set(String(r.name || '').trim(), { audited, prior })
   }
 
-  const totalKey = 'K12-1-adjudicated-amount'
-  const totalSaved = props.allResponses.get(totalKey)
-  if (totalSaved) {
-    totalAdjudicated.value = Number(totalSaved.remark ?? totalSaved.conclusion ?? 0)
+  let matched = 0
+  for (const row of disclosureRows.value) {
+    const hit = byName.get(row.category.trim())
+    if (hit) {
+      row.currentAmount = hit.audited
+      row.priorAmount = hit.prior
+      handleRowChange(row)
+      matched++
+    }
   }
+  totalAdjudicated.value = k12Rows.reduce((s, r) => s + Number(r.audited ?? 0), 0)
+  if (!silent) ElMessage.success(`已从 K12-1 审定表带入 ${matched} 项`)
 }
 
 // ─── EventBus: subscribe 'substantive:adjudicated' ───────────────────────────
@@ -223,7 +346,7 @@ function handleAdjudicated(payload: any): void {
     if (payload.auditedAmount != null) {
       totalAdjudicated.value = Number(payload.auditedAmount)
     }
-    applyAutoFill()
+    applyAutoFill(true)
   }
 }
 
@@ -235,10 +358,37 @@ function handleRowChange(row: DisclosureRow): void {
     emit('save', `K12-disc-soe-row-${idx}`, {
       currentAmount: row.currentAmount,
       priorAmount: row.priorAmount,
+      nonRecurringAmount: row.nonRecurringAmount,
       remark: row.remark,
     })
   }
 }
+
+// ─── 政府补助明细子表 CRUD ────────────────────────────────────────────────────
+
+let ggIdCounter = Date.now()
+
+function persistGovGrant(): void {
+  emit('save', 'K12-disc-soe-govgrant-rows', JSON.stringify(govGrantRows.value))
+}
+
+function addGovGrantRow(): void {
+  govGrantRows.value.push({ rowKey: `gg-${++ggIdCounter}`, item: '', currentAmount: 0, priorAmount: 0 })
+  persistGovGrant()
+}
+
+function removeGovGrantRow(rowKey: string): void {
+  govGrantRows.value = govGrantRows.value.filter(r => r.rowKey !== rowKey)
+  persistGovGrant()
+}
+
+function updateGovGrant(rowKey: string, field: keyof GovGrantRow, value: any): void {
+  const r = govGrantRows.value.find(x => x.rowKey === rowKey)
+  if (r) { (r as any)[field] = value; persistGovGrant() }
+}
+
+const govGrantTotalCurrent = computed(() => govGrantRows.value.reduce((s, r) => s + (r.currentAmount || 0), 0))
+const govGrantTotalPrior = computed(() => govGrantRows.value.reduce((s, r) => s + (r.priorAmount || 0), 0))
 
 function handleNarrativeSave(): void {
   emit('save', 'K12-disclosure-soe-narrative', { remark: narrativeText.value })
@@ -254,20 +404,23 @@ function handleNarrativeSave(): void {
 
 async function generateAI(section: string): Promise<void> {
   if (!props.wpId) return
-  try {
-    const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section,
-      prompt: `为K12营业外收入底稿生成国有企业附注披露文本。来源分类：${CATEGORIES.join('/')}。审定发生额：${totalAdjudicated.value}。`,
-      context: JSON.stringify(disclosureRows.value),
-    })
-    const content = res?.data?.content || res?.content || ''
-    if (content && section === 'narrative') {
-      narrativeText.value = content
-      handleNarrativeSave()
-    }
-    ElMessage.success('AI生成完成')
-  } catch {
-    ElMessage.warning('AI生成失败，请手动填写')
+  // P0 修复：context 必须是 dict[str,str]（原传 JSON.stringify 字符串 → 后端 422）
+  const context: Record<string, unknown> = {
+    来源分类: CATEGORIES.join('/'),
+    审定发生额合计: totalAdjudicated.value,
+    各来源本期发生额: disclosureRows.value
+      .map(r => `${r.category}=${fmtAmt(r.currentAmount)}`)
+      .join('；'),
+  }
+  const content = await generateK12AiText(props.wpId, {
+    prompt: '你是资深审计师。请为营业外收入生成国有企业附注披露文本，按来源分类说明本期发生额、同比变动及非经常性损益列报（国企格式，关注与日常活动无关的政府补助明细）。',
+    section: section === 'narrative' ? 'K12-disclosure-soe-narrative' : section,
+    context,
+    existingContent: narrativeText.value,
+  })
+  if (content) {
+    narrativeText.value = content
+    handleNarrativeSave()
   }
 }
 
@@ -283,6 +436,9 @@ function summaryMethod({ columns }: { columns: any[]; data: DisclosureRow[] }): 
     if (col.property === 'currentAmount') return fmtAmt(totalCurrentAmount.value)
     if (col.property === 'priorAmount') {
       return fmtAmt(disclosureRows.value.reduce((s, r) => s + (r.priorAmount || 0), 0))
+    }
+    if (col.property === 'nonRecurringAmount') {
+      return fmtAmt(disclosureRows.value.reduce((s, r) => s + (r.nonRecurringAmount || 0), 0))
     }
     return ''
   })
@@ -309,7 +465,7 @@ function fmtAmt(val: number | null | undefined): string {
 
 onMounted(() => {
   loadSavedData()
-  applyAutoFill()
+  applyAutoFill(true)
   eventBus.on('substantive:adjudicated' as any, handleAdjudicated)
 })
 
@@ -367,6 +523,14 @@ onUnmounted(() => {
 .abnormal-rate {
   color: var(--el-color-danger);
   font-weight: 600;
+}
+
+.govgrant-total {
+  margin-top: 8px;
+  text-align: right;
+  font-size: var(--wp-font-size, 13px);
+  font-weight: 600;
+  color: #303133;
 }
 
 .compile-tips {

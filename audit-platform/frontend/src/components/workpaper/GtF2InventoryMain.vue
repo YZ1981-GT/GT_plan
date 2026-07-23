@@ -122,6 +122,7 @@
           :config="detailConfig"
           :wp-id="props.wpId"
           :project-id="props.projectId"
+          :year="auditYearNum"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
         />

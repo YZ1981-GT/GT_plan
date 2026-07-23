@@ -1,20 +1,19 @@
 <!--
   I3TabReviewProcess.vue — I3-8 复核公司减值测试过程及结论
-  153行12列超大段落型检查（虚拟滚动 max-height=600 overflow-y auto）
-  5 collapsible sections (el-collapse): 假设审阅/模型检查/参数合理性/计算验证/结论评价
-  Each section ~30 check items: check title + textarea + conclusion select + evidence
-  Section progress indicators + AI button per section
-  蓝色渐变引导区(5步复核流程) + 琥珀色方法论
-  结论汇总区(bottom: 总评价+是否存在重大偏差)
-  Table font 13px
+
+  对齐致同 Excel「复核公司减值测试过程及结论I3-8」审计程序结构：
+  一、过程复核（1~11，含使用价值/收益法/市场法/FVLCD/资产组分摊/管理层工作）
+  二、结果或结论评价
+  改进：补回缺号「4」、结论+证据栏、若适用开关、右侧指引折叠、进度汇总
+
   Spec: .kiro/specs/i3-goodwill/ Task 4.9
   Requirements: 7.1~7.4
 -->
 <template>
   <div class="i3-review-process">
-    <!-- 蓝色渐变引导区：5步复核流程 -->
+    <!-- 引导：对齐模板编制逻辑 -->
     <div class="guide-banner">
-      <div class="guide-title">复核公司减值测试过程（5步复核流程）</div>
+      <div class="guide-title">复核公司减值测试过程（I3-8 程序逻辑）</div>
       <div class="guide-steps">
         <div class="guide-step" v-for="(step, idx) in guideSteps" :key="idx">
           <span class="step-number">{{ idx + 1 }}</span>
@@ -23,41 +22,54 @@
       </div>
     </div>
 
-    <!-- 琥珀色方法论上下文 -->
     <div class="methodology-block">
-      <p><strong>CAS8第十七条~第二十条 商誉减值测试复核要点：</strong>
-      含商誉的资产组减值测试应在资产负债表日进行。审计师需复核被审计单位的减值测试过程，
-      包括：①关键假设（收入增长/毛利率/折现率/永续增长率）是否有充分依据；
-      ②DCF模型逻辑是否正确（现金流预测/折现计算/终值处理）；
-      ③关键参数是否在合理区间（与可比交易/行业数据对比）；
-      ④数学计算是否准确无误；⑤最终减值结论是否恰当。
-      商誉减值一经确认不得转回（CAS8第十七条）。</p>
+      <p>
+        <strong>适用前提：</strong>本表适用于管理层与注册会计师均未利用专家工作的情形。
+        若管理层利用专家 → 由 S13-3-1 / S13-3-2 替代；若项目组利用专家 → 由 S12-3-1 / S12-3-2 替代。
+        编制逻辑：迹象判断 → 资产组/分摊 → 方法模型 → 可收回路径 → 参数复核 → 减值分配与管理层工作 → 结果结论。
+        参照 CAS8 第十七~二十条及《会计提示第73号—商誉减值测试》。
+      </p>
     </div>
 
-    <!-- 审计目标 -->
     <el-alert
       type="info"
       :closable="false"
       show-icon
       class="objective-alert"
-      title="审计目标：复核被审计单位商誉减值测试的过程与结论——评价关键假设、DCF 模型逻辑、参数合理性、计算准确性及减值结论恰当性；独立复核是否得出与管理层一致的结论（CAS8 第十七~二十条）。"
+      title="审计目标：在未利用专家时，系统复核被审计单位商誉减值测试过程（迹象、资产组、方法、使用价值/公允价值参数、可收回金额选择、分摊与两步法）并评价测试结果或结论是否恰当（CAS8 / 会计提示第73号）。"
     />
 
-    <!-- 编制提示 -->
+    <el-alert
+      type="warning"
+      :closable="false"
+      show-icon
+      class="expert-alert"
+      title="专家替代提示：管理层利用专家 → S13-3-1/S13-3-2；项目组利用专家 → S12-3-1/S12-3-2。本表不与专家工作复核底稿并行重复编制。"
+    />
+
+    <el-alert
+      v-for="(w, idx) in crossSheetWarnings"
+      :key="'x-' + idx"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="expert-alert"
+      :title="w"
+    />
+
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
         <ul>
-          <li>按"假设审阅→模型检查→参数合理性→计算验证→结论评价"五步复核公司减值测试过程。</li>
-          <li>关键假设（收入增长/毛利率/折现率WACC/永续增长率）须有充分依据并与行业/历史对比。</li>
-          <li>DCF 模型逻辑须正确：现金流预测、折现计算、终值处理（TV=FCFn×(1+g)/(WACC−g)）。</li>
-          <li>逐项给出结论（合理/不合理/需调整/待确认），综合形成复核结论与是否存在重大偏差。</li>
-          <li>商誉减值一经确认不得转回（CAS8 第十七条）。</li>
+          <li>按「1~11 过程复核 → 二、结果结论」顺序填写；第 6、7 项仅在采用收益法/市场法确定公允价值时适用，可标「不适用」。</li>
+          <li>第 3 项重点防错：勿将「原标的公司股东权益」当作商誉减值测试对象，测试范围是分摊商誉的资产组/组合。</li>
+          <li>使用价值现金流与资产组账面价值口径须一致（尤其营运资金是否双向包含）。</li>
+          <li>可收回金额取使用价值与公允价值减处置费用后净额孰高；无法可靠估计公允净额时，以预计未来现金流量现值作为可收回金额。</li>
+          <li>与 I3-5（迹象/分摊）、I3-6（减值测算）、I3-7（可收回金额）交叉索引，结论栏填「合理/不合理/需调整/待确认/不适用」。</li>
         </ul>
       </div>
     </details>
 
-    <!-- Section Header -->
     <div class="section-header">
       <span class="section-title">I3-8 复核公司减值测试过程及结论</span>
       <div class="section-actions">
@@ -70,131 +82,84 @@
       </div>
     </div>
 
-    <!-- 工具栏：索引 chip -->
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <el-button size="small" text type="primary" @click="emit('navigate-sheet', '针对性检查表I3-5')">→ I3-5</el-button>
+        <el-button size="small" text type="primary" @click="emit('navigate-sheet', '商誉减值测试I3-6')">→ I3-6</el-button>
+        <el-button size="small" text type="primary" @click="emit('navigate-sheet', '可收回金额测试I3-7')">→ I3-7</el-button>
+      </div>
       <div class="toolbar-right">
         <GtIndexChip value="wp:I3-8" :context-project-id="projectId" />
       </div>
     </div>
 
-    <!-- 主内容区：虚拟滚动 -->
     <div class="review-scroll-area">
       <el-collapse v-model="activeNames">
-        <!-- Section 1: 假设审阅 -->
-        <el-collapse-item name="assumptions">
+        <el-collapse-item
+          v-for="section in sectionDefs"
+          :key="section.key"
+          :name="section.key"
+        >
           <template #title>
             <div class="collapse-title">
-              <span>一、假设审阅</span>
+              <span>
+                {{ section.title }}
+                <el-tag
+                  v-if="section.optional"
+                  size="small"
+                  type="info"
+                  effect="plain"
+                  style="margin-left:8px"
+                >若适用</el-tag>
+              </span>
               <div class="collapse-title-right">
+                <el-switch
+                  v-if="section.optional"
+                  v-model="sectionApplicable[section.key]"
+                  :disabled="isReadonly"
+                  size="small"
+                  inline-prompt
+                  active-text="适用"
+                  inactive-text="不适用"
+                  @change="markDirty"
+                  @click.stop
+                />
                 <el-progress
-                  :percentage="sectionProgress.assumptions"
-                  :stroke-width="6" :show-text="false"
+                  :percentage="sectionProgress[section.key] || 0"
+                  :stroke-width="6"
+                  :show-text="false"
                   style="width:80px;margin-right:8px"
                 />
-                <el-tag size="small" :type="sectionTagType('assumptions')">
-                  {{ sectionCompletedCount('assumptions') }}/{{ checkItems.assumptions.length }}
+                <el-tag size="small" :type="sectionTagType(section.key)">
+                  {{ sectionCompletedCount(section.key) }}/{{ visibleItemCount(section.key) }}
                 </el-tag>
               </div>
             </div>
           </template>
-          <div class="check-items-container">
-            <div class="check-item" v-for="(item, idx) in checkItems.assumptions" :key="idx">
-              <div class="check-item-header">
-                <span class="check-item-number">1.{{ idx + 1 }}</span>
-                <span class="check-item-title">{{ item.title }}</span>
-              </div>
-              <el-input
-                v-model="item.content"
-                type="textarea"
-                :autosize="{ minRows: 2, maxRows: 8 }"
-                :disabled="isReadonly"
-                :placeholder="item.placeholder"
-                @blur="markDirty"
-              />
-              <div class="check-item-footer">
-                <el-select v-model="item.conclusion" size="small" :disabled="isReadonly"
-                  placeholder="结论" style="width:140px" @change="markDirty">
-                  <el-option label="合理" value="合理" />
-                  <el-option label="不合理" value="不合理" />
-                  <el-option label="需调整" value="需调整" />
-                  <el-option label="待确认" value="待确认" />
-                </el-select>
-                <el-input v-model="item.evidence" size="small" :disabled="isReadonly"
-                  placeholder="审计证据/依据" style="flex:1;margin-left:8px" @blur="markDirty" />
-              </div>
-            </div>
-          </div>
-        </el-collapse-item>
 
-        <!-- Section 2: 模型检查 -->
-        <el-collapse-item name="model">
-          <template #title>
-            <div class="collapse-title">
-              <span>二、模型检查</span>
-              <div class="collapse-title-right">
-                <el-progress
-                  :percentage="sectionProgress.model"
-                  :stroke-width="6" :show-text="false"
-                  style="width:80px;margin-right:8px"
-                />
-                <el-tag size="small" :type="sectionTagType('model')">
-                  {{ sectionCompletedCount('model') }}/{{ checkItems.model.length }}
-                </el-tag>
-              </div>
-            </div>
-          </template>
-          <div class="check-items-container">
-            <div class="check-item" v-for="(item, idx) in checkItems.model" :key="idx">
-              <div class="check-item-header">
-                <span class="check-item-number">2.{{ idx + 1 }}</span>
-                <span class="check-item-title">{{ item.title }}</span>
-              </div>
-              <el-input
-                v-model="item.content"
-                type="textarea"
-                :autosize="{ minRows: 2, maxRows: 8 }"
-                :disabled="isReadonly"
-                :placeholder="item.placeholder"
-                @blur="markDirty"
-              />
-              <div class="check-item-footer">
-                <el-select v-model="item.conclusion" size="small" :disabled="isReadonly"
-                  placeholder="结论" style="width:140px" @change="markDirty">
-                  <el-option label="合理" value="合理" />
-                  <el-option label="不合理" value="不合理" />
-                  <el-option label="需调整" value="需调整" />
-                  <el-option label="待确认" value="待确认" />
-                </el-select>
-                <el-input v-model="item.evidence" size="small" :disabled="isReadonly"
-                  placeholder="审计证据/依据" style="flex:1;margin-left:8px" @blur="markDirty" />
-              </div>
-            </div>
+          <div
+            v-if="section.optional && !sectionApplicable[section.key]"
+            class="na-hint"
+          >
+            已标为不适用。若公司未采用本方法确定公允价值，可跳过本段；如后续改用该方法，请切换为「适用」后补填。
           </div>
-        </el-collapse-item>
 
-        <!-- Section 3: 参数合理性 -->
-        <el-collapse-item name="parameters">
-          <template #title>
-            <div class="collapse-title">
-              <span>三、参数合理性</span>
-              <div class="collapse-title-right">
-                <el-progress
-                  :percentage="sectionProgress.parameters"
-                  :stroke-width="6" :show-text="false"
-                  style="width:80px;margin-right:8px"
-                />
-                <el-tag size="small" :type="sectionTagType('parameters')">
-                  {{ sectionCompletedCount('parameters') }}/{{ checkItems.parameters.length }}
-                </el-tag>
-              </div>
-            </div>
-          </template>
-          <div class="check-items-container">
-            <div class="check-item" v-for="(item, idx) in checkItems.parameters" :key="idx">
+          <div v-else class="check-items-container">
+            <p v-if="section.intro" class="section-intro">{{ section.intro }}</p>
+            <div
+              class="check-item"
+              v-for="item in checkItems[section.key]"
+              :key="item.id"
+            >
               <div class="check-item-header">
-                <span class="check-item-number">3.{{ idx + 1 }}</span>
+                <span class="check-item-number">{{ item.no }}</span>
                 <span class="check-item-title">{{ item.title }}</span>
+              </div>
+              <div v-if="item.guidance" class="check-guidance">
+                <details>
+                  <summary>编制指引</summary>
+                  <pre class="guidance-pre">{{ item.guidance }}</pre>
+                </details>
               </div>
               <el-input
                 v-model="item.content"
@@ -205,107 +170,28 @@
                 @blur="markDirty"
               />
               <div class="check-item-footer">
-                <el-select v-model="item.conclusion" size="small" :disabled="isReadonly"
-                  placeholder="结论" style="width:140px" @change="markDirty">
+                <el-select
+                  v-model="item.conclusion"
+                  size="small"
+                  :disabled="isReadonly"
+                  placeholder="结论"
+                  style="width:140px"
+                  @change="markDirty"
+                >
                   <el-option label="合理" value="合理" />
                   <el-option label="不合理" value="不合理" />
                   <el-option label="需调整" value="需调整" />
                   <el-option label="待确认" value="待确认" />
+                  <el-option label="不适用" value="不适用" />
                 </el-select>
-                <el-input v-model="item.evidence" size="small" :disabled="isReadonly"
-                  placeholder="审计证据/依据" style="flex:1;margin-left:8px" @blur="markDirty" />
-              </div>
-            </div>
-          </div>
-        </el-collapse-item>
-
-        <!-- Section 4: 计算验证 -->
-        <el-collapse-item name="calculation">
-          <template #title>
-            <div class="collapse-title">
-              <span>四、计算验证</span>
-              <div class="collapse-title-right">
-                <el-progress
-                  :percentage="sectionProgress.calculation"
-                  :stroke-width="6" :show-text="false"
-                  style="width:80px;margin-right:8px"
+                <el-input
+                  v-model="item.evidence"
+                  size="small"
+                  :disabled="isReadonly"
+                  placeholder="审计证据 / 底稿索引（如 I3-5、I3-6、I3-7）"
+                  style="flex:1;margin-left:8px"
+                  @blur="markDirty"
                 />
-                <el-tag size="small" :type="sectionTagType('calculation')">
-                  {{ sectionCompletedCount('calculation') }}/{{ checkItems.calculation.length }}
-                </el-tag>
-              </div>
-            </div>
-          </template>
-          <div class="check-items-container">
-            <div class="check-item" v-for="(item, idx) in checkItems.calculation" :key="idx">
-              <div class="check-item-header">
-                <span class="check-item-number">4.{{ idx + 1 }}</span>
-                <span class="check-item-title">{{ item.title }}</span>
-              </div>
-              <el-input
-                v-model="item.content"
-                type="textarea"
-                :autosize="{ minRows: 2, maxRows: 8 }"
-                :disabled="isReadonly"
-                :placeholder="item.placeholder"
-                @blur="markDirty"
-              />
-              <div class="check-item-footer">
-                <el-select v-model="item.conclusion" size="small" :disabled="isReadonly"
-                  placeholder="结论" style="width:140px" @change="markDirty">
-                  <el-option label="合理" value="合理" />
-                  <el-option label="不合理" value="不合理" />
-                  <el-option label="需调整" value="需调整" />
-                  <el-option label="待确认" value="待确认" />
-                </el-select>
-                <el-input v-model="item.evidence" size="small" :disabled="isReadonly"
-                  placeholder="审计证据/依据" style="flex:1;margin-left:8px" @blur="markDirty" />
-              </div>
-            </div>
-          </div>
-        </el-collapse-item>
-
-        <!-- Section 5: 结论评价 -->
-        <el-collapse-item name="conclusion">
-          <template #title>
-            <div class="collapse-title">
-              <span>五、结论评价</span>
-              <div class="collapse-title-right">
-                <el-progress
-                  :percentage="sectionProgress.conclusion"
-                  :stroke-width="6" :show-text="false"
-                  style="width:80px;margin-right:8px"
-                />
-                <el-tag size="small" :type="sectionTagType('conclusion')">
-                  {{ sectionCompletedCount('conclusion') }}/{{ checkItems.conclusion.length }}
-                </el-tag>
-              </div>
-            </div>
-          </template>
-          <div class="check-items-container">
-            <div class="check-item" v-for="(item, idx) in checkItems.conclusion" :key="idx">
-              <div class="check-item-header">
-                <span class="check-item-number">5.{{ idx + 1 }}</span>
-                <span class="check-item-title">{{ item.title }}</span>
-              </div>
-              <el-input
-                v-model="item.content"
-                type="textarea"
-                :autosize="{ minRows: 2, maxRows: 8 }"
-                :disabled="isReadonly"
-                :placeholder="item.placeholder"
-                @blur="markDirty"
-              />
-              <div class="check-item-footer">
-                <el-select v-model="item.conclusion" size="small" :disabled="isReadonly"
-                  placeholder="结论" style="width:140px" @change="markDirty">
-                  <el-option label="合理" value="合理" />
-                  <el-option label="不合理" value="不合理" />
-                  <el-option label="需调整" value="需调整" />
-                  <el-option label="待确认" value="待确认" />
-                </el-select>
-                <el-input v-model="item.evidence" size="small" :disabled="isReadonly"
-                  placeholder="审计证据/依据" style="flex:1;margin-left:8px" @blur="markDirty" />
               </div>
             </div>
           </div>
@@ -313,11 +199,11 @@
       </el-collapse>
     </div>
 
-    <!-- 结论汇总区 -->
+    <!-- 二、评价结果或结论 -->
     <el-card class="summary-card" shadow="never">
       <template #header>
         <div class="summary-header">
-          <span class="summary-title">复核结论汇总</span>
+          <span class="summary-title">二、评价公司商誉减值测试的结果或结论</span>
           <el-tag :type="hasMajorDeviation ? 'danger' : 'success'" size="small">
             {{ hasMajorDeviation ? '存在重大偏差' : '未发现重大偏差' }}
           </el-tag>
@@ -326,8 +212,14 @@
       <div class="summary-body">
         <div class="summary-row">
           <span class="summary-label">总评价：</span>
-          <el-select v-model="overallAssessment" :disabled="isReadonly"
-            size="small" placeholder="选择总评价" style="width:220px">
+          <el-select
+            v-model="overallAssessment"
+            :disabled="isReadonly"
+            size="small"
+            placeholder="选择总评价"
+            style="width:280px"
+            @change="markDirty"
+          >
             <el-option label="公司减值测试过程及结论合理" value="合理" />
             <el-option label="公司减值测试过程基本合理，存在瑕疵" value="基本合理" />
             <el-option label="公司减值测试过程存在重大缺陷" value="存在重大缺陷" />
@@ -336,27 +228,38 @@
         </div>
         <div class="summary-row">
           <span class="summary-label">是否存在重大偏差：</span>
-          <el-radio-group v-model="hasMajorDeviation" :disabled="isReadonly">
+          <el-radio-group v-model="hasMajorDeviation" :disabled="isReadonly" @change="markDirty">
             <el-radio :value="false">否</el-radio>
             <el-radio :value="true">是</el-radio>
           </el-radio-group>
         </div>
         <div class="summary-row" v-if="hasMajorDeviation">
           <span class="summary-label">偏差说明：</span>
-          <el-input v-model="deviationDescription" type="textarea"
-            :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly"
-            placeholder="描述重大偏差的具体内容、影响金额及建议调整" style="flex:1" />
+          <el-input
+            v-model="deviationDescription"
+            type="textarea"
+            :autosize="{ minRows: 2, maxRows: 6 }"
+            :disabled="isReadonly"
+            placeholder="描述重大偏差的具体内容、影响金额、建议调整及与 I3-6/I3-7 差异"
+            style="flex:1"
+            @blur="markDirty"
+          />
         </div>
         <div class="summary-row">
-          <span class="summary-label">综合结论：</span>
-          <el-input v-model="overallConclusionText" type="textarea"
-            :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly"
-            placeholder="综合五项复核结果，得出最终结论：&#10;1. 公司减值测试假设/模型/参数/计算/结论的合理性评价&#10;2. 审计师独立复核是否得出一致结论&#10;3. 后续跟进事项（若有）" style="flex:1" />
+          <span class="summary-label">结果或结论评价：</span>
+          <el-input
+            v-model="overallConclusionText"
+            type="textarea"
+            :autosize="{ minRows: 3, maxRows: 8 }"
+            :disabled="isReadonly"
+            placeholder="综合一、1~11 复核结果：&#10;1. 公司减值测试过程是否恰当&#10;2. 减值金额/是否减值结论是否可接受&#10;3. 审计师独立复核是否与管理层结论一致&#10;4. 后续跟进事项（若有）"
+            style="flex:1"
+            @blur="markDirty"
+          />
         </div>
       </div>
     </el-card>
 
-    <!-- 审计说明 -->
     <el-card class="audit-note-card" shadow="never">
       <template #header><span style="font-weight:600">审计说明</span></template>
       <el-input
@@ -364,12 +267,11 @@
         type="textarea"
         :autosize="{ minRows: 5 }"
         :disabled="isReadonly"
-        placeholder="记录复核公司减值测试过程的审计说明（复核范围、获取的资料、执行的复核程序等）..."
+        placeholder="记录复核范围、获取资料（减值测试模型/预算/评估报告）、执行程序、与 I3-5/I3-6/I3-7 勾稽情况等…"
         @blur="markDirty"
       />
     </el-card>
 
-    <!-- 审计结论 -->
     <el-card class="audit-note-card" shadow="never">
       <template #header><span style="font-weight:600">审计结论</span></template>
       <el-input
@@ -377,12 +279,11 @@
         type="textarea"
         :autosize="{ minRows: 3 }"
         :disabled="isReadonly"
-        placeholder="复核过程的审计结论（如：公司减值测试过程及结论合理，独立复核未发现重大偏差）..."
+        placeholder="如：公司减值测试过程及结论合理，独立复核未发现重大偏差；或：存在需调整事项，详见偏差说明…"
         @blur="markDirty"
       />
     </el-card>
 
-    <!-- 保存按钮 -->
     <div class="table-actions" v-if="!isReadonly">
       <el-button type="success" size="small" @click="handleSave" :loading="saving">
         保存
@@ -395,11 +296,12 @@
 import { ref, reactive, computed, watch, inject } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { useI3CrossSheet } from '../../composables/useI3CrossSheet'
+import { toRef } from 'vue'
 
 /**
- * I3TabReviewProcess.vue — I3-8 复核公司减值测试过程及结论
- * 153行12列超大段落型检查
- * 5 sections × ~30 items = ~150 check items (maps to 153 rows)
+ * I3-8 复核公司减值测试过程及结论
+ * 对齐致同 Excel 程序结构（补回缺号 4），非原 153 行微粒化检查清单。
  */
 
 const props = defineProps<{
@@ -418,222 +320,298 @@ const openReviewDialog = inject<(section: string) => void>('openReviewDialog', (
 
 const STORAGE_KEY = 'I3-8-review-process'
 
-// --- Guide Steps ---
+const injectedCross = inject<ReturnType<typeof useI3CrossSheet> | null>('i3CrossSheet', null)
+const localCross = injectedCross || useI3CrossSheet(toRef(props, 'allResponses') as any)
+
+/** I3-8 ↔ I3-6/I3-7 硬勾稽提示 */
+const crossSheetWarnings = computed(() => {
+  const list: string[] = []
+  const byCgu = localCross.impairmentResult.value.byCgu
+  const i36Count = Object.keys(byCgu).length
+  const rec = localCross.recoverableDetailByCgu.value
+  const i37Count = Object.keys(rec).length
+
+  if (i36Count === 0) {
+    list.push('尚未编制 I3-6 减值测试：本表过程复核缺少测算对象，请先完成 I3-6。')
+  }
+  if (i36Count > 0 && i37Count === 0) {
+    list.push('I3-6 已有 CGU，但 I3-7 无可收回金额明细：请确认使用价值/公允净额是否已测并回写。')
+  }
+  for (const [cgu, d] of Object.entries(rec)) {
+    const i6 = byCgu[cgu]
+    if (!i6) {
+      list.push(`I3-7 资产组「${cgu}」在 I3-6 无对应行，名称须一致。`)
+      continue
+    }
+    if (d.recoverableAmount > 0 && i6.recoverableAmount > 0
+      && Math.abs(d.recoverableAmount - i6.recoverableAmount) > 0.01) {
+      list.push(
+        `「${cgu}」可收回金额 I3-7=${d.recoverableAmount.toLocaleString('zh-CN')} ≠ I3-6=${i6.recoverableAmount.toLocaleString('zh-CN')}，请回写或核对。`,
+      )
+    }
+  }
+  const totalImp = localCross.impairmentResult.value.totalImpairment
+  if (totalImp > 0.01) {
+    list.push(`I3-6 合并确认商誉减值合计 ${totalImp.toLocaleString('zh-CN')}：请在结论中评价是否与公司结论一致，并索引 I3-6。`)
+  }
+  return list
+})
+const SCHEMA_VERSION = 2
+
 const guideSteps = [
-  '审阅关键假设（收入增长/毛利率/折现率/永续增长率）',
-  '检查DCF模型逻辑（现金流预测/折现/终值处理）',
-  '验证参数合理性（与行业/可比交易/历史对比）',
-  '复核数学计算正确性（PV/TV/WACC公式）',
-  '评价最终结论恰当性（减值金额/是否需调整）',
+  '迹象与资产组（1~2）— 是否测、测哪里',
+  '方法与可收回路径（3~4）— 测什么、怎么取数',
+  '使用价值参数（5）— 现金流/折现/终值/敏感度',
+  '公允价值路径（6~8，若适用）— 收益法/市场法/FVLCD',
+  '分摊、管理层工作与结论（9~11 + 二）',
 ]
 
-// --- Check Item Type ---
 interface CheckItem {
+  id: string
+  no: string
   title: string
   placeholder: string
+  guidance: string
   content: string
   conclusion: string
   evidence: string
 }
 
-// --- Active collapse panels ---
-const activeNames = ref<string[]>(['assumptions'])
+interface SectionDef {
+  key: string
+  title: string
+  optional?: boolean
+  intro?: string
+}
+
+const sectionDefs: SectionDef[] = [
+  { key: 's1', title: '1、商誉减值迹象判断' },
+  { key: 's2', title: '2、资产组划分与商誉分摊（概要）' },
+  { key: 's3', title: '3、减值测试方法与模型' },
+  {
+    key: 's4',
+    title: '4、可收回金额确定路径',
+    intro: '（补回原模板缺号）评价公司如何在使用价值与公允价值减处置费用后净额之间确定可收回金额。',
+  },
+  { key: 's5', title: '5、使用价值（预计未来现金流量现值）参数' },
+  {
+    key: 's6',
+    title: '6、收益法确定公允价值的参数',
+    optional: true,
+    intro: '仅当以收益法估计公允价值（进而确定公允净额）时填写。',
+  },
+  {
+    key: 's7',
+    title: '7、市场法确定公允价值的参数',
+    optional: true,
+    intro: '仅当以市场法（价值乘数等）估计公允价值时填写。',
+  },
+  { key: 's8', title: '8、公允价值减去处置费用后的净额' },
+  { key: 's9', title: '9、最终选择可收回金额计算方法的理由' },
+  { key: 's10', title: '10、资产组确定及商誉分摊（详细）' },
+  { key: 's11', title: '11、评价管理层的工作' },
+]
+
+type SectionKey = typeof sectionDefs[number]['key']
+
+function item(
+  id: string,
+  no: string,
+  title: string,
+  placeholder: string,
+  guidance = '',
+): CheckItem {
+  return { id, no, title, placeholder, guidance, content: '', conclusion: '', evidence: '' }
+}
+
+const GUIDANCE = {
+  assetGroupValue:
+    '资产组价值=企业自由现金流评估值（经营性资产价值）－期初营运资金\n' +
+    '其中，企业自由现金流评估值（经营性资产价值）＝EBIT +折旧及摊销－营运资本增加额－资本性支出\n' +
+    'EBIT=营业收入－营业成本－税金及附加－销售费用－管理费用\n' +
+    '（可将营运资金纳入现金流预测模型不予扣除，则对比用的含商誉资产组账面价值中也应包含营运资金）',
+  workingCapital:
+    '若在确定可收回金额的未来现金流量时考虑了期初营运资金的影响，则资产组的账面价值中也应包括营运资金，即资产组也不得扣除与经营相关的流动资产和流动负债。',
+  capex: '资本性支出=资产更新投资+新增长期资产投资（新增固定资产或其他长期资产）',
+  forecastPeriod:
+    '在确定未来现金净流量的预测期时，应建立在经管理层批准的最近财务预算或预测数据基础上，原则上最多涵盖5年。',
+  discountRate:
+    '对折现率预测时，是否与相应的宏观、行业、地域、特定市场、特定市场主体的风险因素相匹配，是否与未来现金净流量均一致采用税前口径。',
+  terminalValue:
+    '假设使用后续现金流量永续增长模型，根据销售增长率估计现金流量增长率。绝大多数可以持续生存的企业，其销售增长率可以按宏观经济增长率估计。',
+  incomeFv:
+    '对未来现金净流量预测时，应以资产的当前状况为基础，以税前口径为预测依据，并充分关注关键参数（销量、价格、成本、费用、预测期/稳定期增长率）是否有可靠数据来源，是否与历史、计划、行业及宏观相符；重大假设与内外部信息不符时是否有合理理由。',
+  marketBestInfo:
+    '在不存在销售协议和资产活跃市场的情况下，应当以可获取的最佳信息为基础，估计资产的公允价值减去处置费用后的净额，可参考同行业类似资产的最近交易价格或结果。',
+  fvHierarchy:
+    '公允价值减处置费用后的净额：有销售协议的，按协议价减处置费用；无协议但有活跃市场的，按市价（通常买方出价）减处置费用；均无则按最佳信息估计。仍无法可靠估计的，以预计未来现金流量现值作为可收回金额。',
+  fairValueDef:
+    '资产组的公允价值是指市场参与者在计量日发生的有序交易中，出售一项资产所能收到或者转移一项负债所需支付的价格。',
+  disposalCost:
+    '处置费用是指可以直接归属于资产组处置的增量费用，包括与资产组处置有关的法律费用、相关税费、搬运费以及为使资产组达到可销售状态所发生的直接费用等。',
+  cguLevel:
+    '分摊商誉的资产组应当代表企业基于内部管理目的对商誉进行监控的最低水平，并且不应大于按《企业会计准则第35号——分部报告》所确定的报告分部。',
+  allocationMethod:
+    '公司应在充分考虑能够受益于企业合并的协同效应的资产组或资产组组合基础上，将商誉账面价值按各资产组或资产组组合的公允价值所占比例进行分摊。详见《会计提示第73号》附录2。',
+  basisConsistency:
+    '资产组或资产组组合的可收回金额与其账面价值的确定基础应保持一致，即二者应包括相同的资产和负债，且应按与资产组内资产和负债一致的基础预测未来现金流量。',
+  nciGoodwill:
+    '将商誉分摊至相关资产组时，应关注归属于少数股东的商誉：先将归属于母公司股东的商誉账面价值调整为全部商誉账面价值，再合理分摊至相关资产组或资产组组合。',
+  realloc:
+    '因重组等原因经营组成部分变化、影响已分摊商誉所在资产组构成的，应将商誉账面价值重新分摊至受影响的资产组或资产组组合，并充分披露理由及依据。',
+  impairAlloc:
+    '减值损失应先抵减分摊至资产组中商誉的账面价值，再按除商誉外其他资产账面价值比重抵减其他资产；并合理确定归属于母公司与少数股东的商誉减值金额。合并报表只反映归属于母公司的商誉减值。详见会计提示第73号附录3、4。',
+  twoStep:
+    '如与商誉相关的资产组存在减值迹象：①先对不含商誉的资产组测试并确认减值；②再对含商誉的资产组测试，比较账面价值（含分摊商誉、已扣除上一步减值）与可收回金额。',
+  subsequent:
+    '重大期后事项包括但不限于内外部环境重大变化、重大诉讼与仲裁的最新进展等。',
+  priorMethod:
+    '若以前期间减值测试有关预测参数与期后实际情况存在重大偏差，应关注管理层会计估计中的判断与决策，识别是否存在管理层偏向。',
+  equityMistake:
+    '将原收购标的公司“全部资产和全部负债组成的资产组（股东权益）”界定为评估对象、采用股东权益价值方法，不符合准则要求。商誉减值测试范围不是原标的公司股权，而是被分摊商誉的资产组或资产组组合。',
+}
+
+function createAllItems(): Record<string, CheckItem[]> {
+  return {
+    s1: [
+      item('s1-1', '1', '公司对商誉减值迹象的判断是否合理',
+        '说明外部/内部迹象核查结论；存在迹象时应随时测试。可与 I3-5 交叉索引。',
+        '当存在减值迹象时，应随时进行减值测试。因企业合并形成的商誉，无论是否存在减值迹象，每年均应进行减值测试（CAS8第十八条）。'),
+    ],
+    s2: [
+      item('s2-1', '2', '资产组或资产组组合划分是否合理，商誉账面价值是否恰当分摊',
+        '说明 CGU 划分依据、协同效应受益对象、分摊方法；详见第10项展开复核。',
+        GUIDANCE.allocationMethod),
+    ],
+    s3: [
+      item('s3-1', '3', '公司确定的减值测试方法与模型是否恰当',
+        '说明采用 VIU / FVLCD / 孰高；是否误用「股东权益价值」评估原标的股权。',
+        GUIDANCE.equityMistake),
+    ],
+    s4: [
+      item('s4-1', '4', '可收回金额确定路径是否合理（使用价值与公允净额孰高）',
+        '说明公司最终采用的可收回金额来源、孰高比较过程，及无法可靠估计公允净额时的处理。',
+        GUIDANCE.fvHierarchy),
+    ],
+    s5: [
+      item('s5-1', '5.(1)', '盈利预测数据来源是否可靠，是否与历史/计划/行业/宏观相符',
+        '复核销量、价格、成本、费用、增长率等关键假设依据。',
+        GUIDANCE.assetGroupValue),
+      item('s5-2', '5.(2)', '营运资金口径是否与非经营性资产负债一致',
+        '说明营运资金是否纳入现金流与账面价值双侧口径。',
+        GUIDANCE.workingCapital),
+      item('s5-3', '5.(3)', '资本性支出预测是否与预算、运营计划一致',
+        '区分更新投资与新增长期资产投资，核对预算/计划。',
+        GUIDANCE.capex),
+      item('s5-4', '5.(4)', '折旧摊销费用预测是否合理',
+        '与资产规模、CAPEX、会计政策是否匹配。'),
+      item('s5-5', '5.(5)', '收益期（增长期及永续期）选择是否合理',
+        '是否基于管理层批准的预算/预测，原则上不超过5年。',
+        GUIDANCE.forecastPeriod),
+      item('s5-6', '5.(6)', '可比公司或可比交易的选择是否合理',
+        '行业、规模、业务构成、交易时点是否可比。'),
+      item('s5-7', '5.(7)', '折现率计算是否合理',
+        '风险匹配、税前口径与现金流一致；与 I3-7 WACC 勾稽。',
+        GUIDANCE.discountRate),
+      item('s5-8', '5.(8)', '终值的处理是否合理',
+        '永续增长/退出倍数选择、g 与宏观增长率关系、g 须小于折现率。',
+        GUIDANCE.terminalValue),
+      item('s5-9', '5.(9)', '关键假设敏感性分析结果',
+        '增长率、毛利率、折现率等变动对可收回金额/减值结论的影响。'),
+    ],
+    s6: [
+      item('s6-1', '6.(1)', '盈利预测数据来源是否可靠（收益法公允价值）',
+        '同使用价值关注点，但服务于公允价值估计。',
+        GUIDANCE.incomeFv),
+      item('s6-2', '6.(2)', '营运资金口径是否与非经营性资产负债一致',
+        '与账面价值口径双向一致。',
+        GUIDANCE.workingCapital),
+      item('s6-3', '6.(3)', '资本性支出预测是否与预算、运营计划一致',
+        '', GUIDANCE.capex),
+      item('s6-4', '6.(4)', '折旧摊销费用预测是否合理',
+        '与资产与 CAPEX 假设匹配。'),
+      item('s6-5', '6.(5)', '收益期（增长期及永续期）选择是否合理',
+        '', GUIDANCE.forecastPeriod),
+      item('s6-6', '6.(6)', '可比公司或可比交易的选择是否合理',
+        '与收益法其他假设是否协调。'),
+      item('s6-7', '6.(7)', '折现率计算是否合理',
+        '', GUIDANCE.discountRate),
+      item('s6-8', '6.(8)', '终值的处理是否合理',
+        '', GUIDANCE.terminalValue),
+      item('s6-9', '6.(9)', '关键假设敏感性分析结果',
+        '增长率、毛利率、折现率等。'),
+    ],
+    s7: [
+      item('s7-1', '7.(1)', '价值乘数的选择是否合理',
+        'EV/EBITDA、P/E 等乘数选取依据。',
+        GUIDANCE.marketBestInfo),
+      item('s7-2', '7.(2)', '可比公司/交易选择是否与收益法一致且合理',
+        '与收益法可比口径交叉核对。',
+        GUIDANCE.fvHierarchy),
+      item('s7-3', '7.(3)', '价值乘数的计算时间是否合理',
+        '时点是否接近计量日、是否存在异常波动。'),
+      item('s7-4', '7.(4)', '对价值乘数的调整是否合理',
+        '规模、流动性、控制权、非经常性损益等调整。'),
+      item('s7-5', '7.(5)', '关键假设敏感性分析结果',
+        '乘数±变动对公允价值的影响。'),
+    ],
+    s8: [
+      item('s8-1', '8.(1)', '公允价值的确定是否合理',
+        '协议价 / 活跃市价 / 最佳信息估计的层级运用。',
+        GUIDANCE.fairValueDef),
+      item('s8-2', '8.(2)', '处置费用预测是否合理，证据是否充分适当',
+        '法律费用、税费、搬运费、达可售状态直接费用等。',
+        GUIDANCE.disposalCost),
+    ],
+    s9: [
+      item('s9-1', '9', '最终选择可收回金额计算方法的理由是否合理',
+        '说明为何取 VIU、FVLCD 或孰高；无法可靠估计公允净额时是否改用现值。',
+        GUIDANCE.fvHierarchy),
+    ],
+    s10: [
+      item('s10-1', '10.(1)', '商誉所在资产组或资产组组合的划分是否合理',
+        '内部监控最低水平、不大于报告分部。',
+        GUIDANCE.cguLevel),
+      item('s10-2', '10.(2)', '将商誉分摊至相关资产组的方法是否合理',
+        '协同效应、相对公允价值比例。',
+        GUIDANCE.allocationMethod),
+      item('s10-3', '10.(3)', '可收回金额与账面价值的确定基础是否一致',
+        '相同资产/负债范围与现金流口径。',
+        GUIDANCE.basisConsistency),
+      item('s10-4', '10.(4)', '是否将归属于少数股东的商誉调整计入相关资产组账面价值',
+        '全部商誉口径调整后再分摊。',
+        GUIDANCE.nciGoodwill),
+      item('s10-5', '10.(5)', '资产组构成改变时是否重新合理分摊商誉',
+        '重组等情形下的重分配与披露。',
+        GUIDANCE.realloc),
+      item('s10-6', '10.(6)', '商誉减值的分配是否合理',
+        '先冲商誉再按比例分摊；母公司与少数股东分摊。',
+        GUIDANCE.impairAlloc),
+    ],
+    s11: [
+      item('s11-1', '11.(1)', '是否分两步进行商誉减值测试',
+        '不含商誉资产组 → 含商誉资产组。',
+        GUIDANCE.twoStep),
+      item('s11-2', '11.(2)', '是否考虑期后事项的影响',
+        '内外部环境重大变化、重大诉讼仲裁进展等。',
+        GUIDANCE.subsequent),
+      item('s11-3', '11.(3)', '与以前期间方法是否一致',
+        '方法变更理由；回溯测试识别管理层偏向。',
+        GUIDANCE.priorMethod),
+    ],
+  }
+}
+
+const checkItems = reactive(createAllItems())
+const sectionApplicable = reactive<Record<string, boolean>>({
+  s6: false,
+  s7: false,
+})
+
+const activeNames = ref<string[]>(['s1', 's2', 's3', 's4', 's5'])
 const saving = ref(false)
 const dirty = ref(false)
 
-// --- Section 1: 假设审阅 (31 items) ---
-function createAssumptionItems(): CheckItem[] {
-  return [
-    { title: '收入预测假设——历史增长趋势分析', placeholder: '复核公司收入预测是否基于合理的历史增长趋势，是否考虑了市场容量变化', content: '', conclusion: '', evidence: '' },
-    { title: '收入预测假设——行业增长率对比', placeholder: '对比行业整体增长率（Wind/同花顺数据），评估公司收入增长假设的合理性', content: '', conclusion: '', evidence: '' },
-    { title: '收入预测假设——客户集中度影响', placeholder: '前五大客户占比/客户流失风险是否在预测中反映', content: '', conclusion: '', evidence: '' },
-    { title: '收入预测假设——新业务/新产品贡献', placeholder: '新业务收入假设是否有订单/合同支撑，是否过于乐观', content: '', conclusion: '', evidence: '' },
-    { title: '收入预测假设——市场份额变动', placeholder: '市场份额假设是否合理，是否考虑竞争格局变化', content: '', conclusion: '', evidence: '' },
-    { title: '收入预测假设——价格变动因素', placeholder: '产品/服务价格调整假设是否有市场依据', content: '', conclusion: '', evidence: '' },
-    { title: '毛利率假设——历史毛利率趋势', placeholder: '复核毛利率假设是否符合历史趋势，异常波动是否有合理解释', content: '', conclusion: '', evidence: '' },
-    { title: '毛利率假设——成本结构变化', placeholder: '原材料/人工/制造费用变化假设是否合理', content: '', conclusion: '', evidence: '' },
-    { title: '毛利率假设——规模效应考虑', placeholder: '收入增长带来的规模效应在毛利率中的体现是否合理', content: '', conclusion: '', evidence: '' },
-    { title: '毛利率假设——与同行业对比', placeholder: '毛利率假设与同行业上市公司对比是否处于合理区间', content: '', conclusion: '', evidence: '' },
-    { title: '费用率假设——销售费用率', placeholder: '销售费用率假设是否考虑渠道拓展/品牌投入等因素', content: '', conclusion: '', evidence: '' },
-    { title: '费用率假设——管理费用率', placeholder: '管理费用率假设是否考虑组织扩张/系统建设等因素', content: '', conclusion: '', evidence: '' },
-    { title: '费用率假设——研发费用率', placeholder: '研发费用投入假设是否与技术迭代需求匹配', content: '', conclusion: '', evidence: '' },
-    { title: '折现率假设——WACC计算方法', placeholder: '复核WACC计算方法是否正确（CAPM/APM/多因子模型选择）', content: '', conclusion: '', evidence: '' },
-    { title: '折现率假设——无风险利率选取', placeholder: '无风险利率选取是否合理（国债收益率期限/到期日匹配）', content: '', conclusion: '', evidence: '' },
-    { title: '折现率假设——Beta系数选取', placeholder: 'Beta系数选取是否合理（可比公司/时间窗口/调整方法）', content: '', conclusion: '', evidence: '' },
-    { title: '折现率假设——市场风险溢价', placeholder: '市场风险溢价(ERP)选取是否有权威数据支持', content: '', conclusion: '', evidence: '' },
-    { title: '折现率假设——特定风险溢价', placeholder: '公司特定风险溢价/规模溢价/非流动性折价是否合理', content: '', conclusion: '', evidence: '' },
-    { title: '折现率假设——资本结构假设', placeholder: '目标资本结构(D/E)假设是否合理（行业均值/公司实际）', content: '', conclusion: '', evidence: '' },
-    { title: '折现率假设——债务成本', placeholder: '债务成本是否反映当前市场利率和公司信用等级', content: '', conclusion: '', evidence: '' },
-    { title: '永续增长率假设——与GDP/CPI对比', placeholder: '永续增长率是否不超过宏观经济长期增长率', content: '', conclusion: '', evidence: '' },
-    { title: '永续增长率假设——行业成熟度', placeholder: '永续增长率是否考虑行业生命周期阶段（成长/成熟/衰退）', content: '', conclusion: '', evidence: '' },
-    { title: '永续增长率假设——与折现率关系', placeholder: '永续增长率是否小于折现率（g<WACC否则终值公式无意义）', content: '', conclusion: '', evidence: '' },
-    { title: '营运资本假设——应收款周转', placeholder: '应收账款周转天数假设是否与历史及行业水平匹配', content: '', conclusion: '', evidence: '' },
-    { title: '营运资本假设——存货周转', placeholder: '存货周转天数假设是否合理', content: '', conclusion: '', evidence: '' },
-    { title: '营运资本假设——应付款周转', placeholder: '应付账款周转天数假设是否合理', content: '', conclusion: '', evidence: '' },
-    { title: '资本支出假设——维持性CAPEX', placeholder: '维持性资本支出假设是否与折旧摊销匹配', content: '', conclusion: '', evidence: '' },
-    { title: '资本支出假设——扩张性CAPEX', placeholder: '扩张性资本支出假设是否与收入增长预期匹配', content: '', conclusion: '', evidence: '' },
-    { title: '预测期假设——预测期限合理性', placeholder: '预测期限（通常5年）是否足够覆盖到稳定状态', content: '', conclusion: '', evidence: '' },
-    { title: '税率假设——有效税率', placeholder: '有效税率假设是否考虑了税收优惠/高新认定/地区政策', content: '', conclusion: '', evidence: '' },
-    { title: '假设一致性——各假设间内部协调', placeholder: '各项假设之间是否保持内部逻辑一致（如高增长→高CAPEX）', content: '', conclusion: '', evidence: '' },
-  ]
-}
-
-// --- Section 2: 模型检查 (30 items) ---
-function createModelItems(): CheckItem[] {
-  return [
-    { title: 'DCF模型结构——现金流定义', placeholder: '复核FCF定义：EBIT×(1-t)+折旧摊销-CAPEX-ΔWC 是否完整', content: '', conclusion: '', evidence: '' },
-    { title: 'DCF模型结构——折现方法', placeholder: '折现采用年中折现/年末折现，是否与现金流产生时点匹配', content: '', conclusion: '', evidence: '' },
-    { title: 'DCF模型结构——终值模型选择', placeholder: '终值采用永续增长/退出倍数，选择是否合理', content: '', conclusion: '', evidence: '' },
-    { title: 'DCF模型结构——终值公式正确性', placeholder: 'TV=FCF_n×(1+g)/(WACC-g) 公式是否正确应用', content: '', conclusion: '', evidence: '' },
-    { title: 'DCF模型结构——折现期数', placeholder: '折现期数(n)是否与预测年数一致，终值折现期是否正确', content: '', conclusion: '', evidence: '' },
-    { title: '现金流预测——收入到EBIT推导', placeholder: '从收入→毛利→EBIT的推导逻辑是否清晰正确', content: '', conclusion: '', evidence: '' },
-    { title: '现金流预测——非经营项目排除', placeholder: '是否正确排除了非经营性项目（一次性收益/非核心资产）', content: '', conclusion: '', evidence: '' },
-    { title: '现金流预测——折旧摊销一致性', placeholder: '折旧摊销金额是否与CAPEX假设和资产规模匹配', content: '', conclusion: '', evidence: '' },
-    { title: '现金流预测——营运资本变动', placeholder: '营运资本变动计算是否正确（增量法vs绝对值法）', content: '', conclusion: '', evidence: '' },
-    { title: '现金流预测——资本支出分类', placeholder: '维持性/扩张性CAPEX区分是否清晰合理', content: '', conclusion: '', evidence: '' },
-    { title: '现金流预测——现金流平衡检验', placeholder: 'FCF各年数据是否通过利润表+资产负债表交叉验证', content: '', conclusion: '', evidence: '' },
-    { title: '终值处理——终值占比合理性', placeholder: '终值占总价值比重是否在合理范围（通常50-80%）', content: '', conclusion: '', evidence: '' },
-    { title: '终值处理——永续年现金流', placeholder: '永续年FCF是否为正常化水平（非预测期末年异常值）', content: '', conclusion: '', evidence: '' },
-    { title: '终值处理——永续增长vs退出倍数交叉验证', placeholder: '两种终值方法计算结果是否相互印证', content: '', conclusion: '', evidence: '' },
-    { title: 'WACC应用——一致性检查', placeholder: 'WACC应用于税后FCF（FCFF→WACC）还是税后权益CF（FCFE→Ke）是否一致', content: '', conclusion: '', evidence: '' },
-    { title: 'WACC应用——名义vs实际利率', placeholder: '折现率与现金流预测的通胀基准是否一致（同为名义或同为实际）', content: '', conclusion: '', evidence: '' },
-    { title: 'WACC应用——币种一致性', placeholder: '多币种情况下折现率与现金流币种是否匹配', content: '', conclusion: '', evidence: '' },
-    { title: '模型完整性——少数股东利益', placeholder: '是否正确处理了少数股东权益对应的现金流', content: '', conclusion: '', evidence: '' },
-    { title: '模型完整性——非经营资产', placeholder: '非经营资产（现金/投资等）是否单独加回', content: '', conclusion: '', evidence: '' },
-    { title: '模型完整性——有息负债', placeholder: '从企业价值(EV)到权益价值时有息负债是否正确扣减', content: '', conclusion: '', evidence: '' },
-    { title: '模型完整性——或有负债/表外项目', placeholder: '或有负债/表外承诺是否在模型中反映', content: '', conclusion: '', evidence: '' },
-    { title: '模型逻辑——循环引用检查', placeholder: '模型中是否存在循环引用（WACC↔D/E↔EV）', content: '', conclusion: '', evidence: '' },
-    { title: '模型逻辑——正负号一致性', placeholder: '现金流入/流出正负号是否全模型一致', content: '', conclusion: '', evidence: '' },
-    { title: '模型逻辑——时间轴对齐', placeholder: '基准日/预测起始日/报告日时间轴是否正确对齐', content: '', conclusion: '', evidence: '' },
-    { title: '模型适用性——被评估资产界定', placeholder: '模型评估的资产范围是否与CGU账面资产范围一致', content: '', conclusion: '', evidence: '' },
-    { title: '模型适用性——评估对象价值类型', placeholder: '使用价值(VIU)的限制条件是否满足（无处置费用扣除/税前折现率）', content: '', conclusion: '', evidence: '' },
-    { title: '模型适用性——估值方法选择', placeholder: '选用DCF（而非市场法/资产基础法）的理由是否充分', content: '', conclusion: '', evidence: '' },
-    { title: '可比验证——EV/EBITDA交叉检验', placeholder: '隐含的EV/EBITDA倍数是否在可比公司范围内', content: '', conclusion: '', evidence: '' },
-    { title: '可比验证——P/E交叉检验', placeholder: '隐含PE是否与行业/公司历史PE一致', content: '', conclusion: '', evidence: '' },
-    { title: '模型版本——与上年模型对比', placeholder: '模型结构是否与上年一致，变更是否有合理说明', content: '', conclusion: '', evidence: '' },
-  ]
-}
-
-// --- Section 3: 参数合理性 (31 items) ---
-function createParameterItems(): CheckItem[] {
-  return [
-    { title: 'WACC——无风险利率来源验证', placeholder: '验证无风险利率数据来源（中债/国债收益率曲线），期限是否匹配', content: '', conclusion: '', evidence: '' },
-    { title: 'WACC——Beta系数来源验证', placeholder: '验证Beta来源（Wind/Bloomberg），时间窗口（2-5年）/频率（周/月）', content: '', conclusion: '', evidence: '' },
-    { title: 'WACC——可比公司选取', placeholder: '可比公司选取标准是否适当（行业/规模/业务构成）', content: '', conclusion: '', evidence: '' },
-    { title: 'WACC——去杠杆/再杠杆过程', placeholder: 'Unlevered Beta→Relevered Beta转换公式及参数是否正确', content: '', conclusion: '', evidence: '' },
-    { title: 'WACC——市场风险溢价(ERP)数据源', placeholder: 'ERP取值来源（Damodaran/CSMAR/历史均值法/隐含法）是否合理', content: '', conclusion: '', evidence: '' },
-    { title: 'WACC——规模溢价', placeholder: '规模溢价选取是否有依据（Duff & Phelps/市值排序）', content: '', conclusion: '', evidence: '' },
-    { title: 'WACC——特定风险溢价', placeholder: '公司特定风险溢价的加点依据是否充分且一致', content: '', conclusion: '', evidence: '' },
-    { title: 'WACC——债务成本', placeholder: '债务成本取值是否反映当前融资环境和公司信用水平', content: '', conclusion: '', evidence: '' },
-    { title: 'WACC——目标资本结构', placeholder: '目标D/E比率是否合理（行业均值/公司目标/可比公司）', content: '', conclusion: '', evidence: '' },
-    { title: 'WACC——最终计算结果', placeholder: '最终WACC值是否在行业合理范围内（8-15%通常区间）', content: '', conclusion: '', evidence: '' },
-    { title: '永续增长率——经济依据', placeholder: '永续增长率g与长期GDP增长率/CPI对比是否合理', content: '', conclusion: '', evidence: '' },
-    { title: '永续增长率——行业特征', placeholder: '永续增长率是否反映行业长期发展趋势（衰退行业应<GDP）', content: '', conclusion: '', evidence: '' },
-    { title: '永续增长率——与上年对比', placeholder: '永续增长率较上年变化是否有合理解释', content: '', conclusion: '', evidence: '' },
-    { title: '收入参数——增长率合理性', placeholder: '各年收入增长率是否合理（高增→逐年递减→稳态）', content: '', conclusion: '', evidence: '' },
-    { title: '收入参数——与在手订单/合同匹配', placeholder: '近1-2年收入预测是否有订单/合同支撑', content: '', conclusion: '', evidence: '' },
-    { title: '收入参数——与管理层预算对比', placeholder: '收入预测是否与管理层年度预算/五年规划一致', content: '', conclusion: '', evidence: '' },
-    { title: '收入参数——与分析师预期对比', placeholder: '收入预测是否与市场分析师一致预期在合理偏差内', content: '', conclusion: '', evidence: '' },
-    { title: '利润率参数——毛利率趋势', placeholder: '毛利率假设是否体现了从当前水平到稳态水平的合理过渡', content: '', conclusion: '', evidence: '' },
-    { title: '利润率参数——EBITDA利润率', placeholder: 'EBITDA利润率是否在可比公司范围内', content: '', conclusion: '', evidence: '' },
-    { title: '利润率参数——净利率合理性', placeholder: '最终净利率是否在合理区间，是否存在利润率"虚高"', content: '', conclusion: '', evidence: '' },
-    { title: '营运资本参数——周转率数据源', placeholder: '周转率取值是否基于历史数据+合理调整', content: '', conclusion: '', evidence: '' },
-    { title: '营运资本参数——与行业对比', placeholder: '营运资本占收入比与行业水平对比是否合理', content: '', conclusion: '', evidence: '' },
-    { title: '资本支出参数——折旧覆盖率', placeholder: 'CAPEX/折旧比率是否合理（成长期>1/稳态期≈1）', content: '', conclusion: '', evidence: '' },
-    { title: '资本支出参数——固定资产周转率', placeholder: '隐含的固定资产周转率与历史及行业是否匹配', content: '', conclusion: '', evidence: '' },
-    { title: '税率参数——实际有效税率', placeholder: '税率假设是否考虑了优惠到期/地区差异/递延税', content: '', conclusion: '', evidence: '' },
-    { title: '参数敏感性——WACC±1%影响', placeholder: 'WACC变动±1%对可收回金额的影响金额和幅度', content: '', conclusion: '', evidence: '' },
-    { title: '参数敏感性——增长率±0.5%影响', placeholder: '永续增长率变动±0.5%对可收回金额的影响', content: '', conclusion: '', evidence: '' },
-    { title: '参数敏感性——收入±10%影响', placeholder: '收入假设变动±10%对可收回金额的影响', content: '', conclusion: '', evidence: '' },
-    { title: '参数敏感性——综合敏感性分析', placeholder: '多参数同时变动（最悲观/最乐观情景）的影响', content: '', conclusion: '', evidence: '' },
-    { title: '参数一致性——评估机构参数采信', placeholder: '若引用评估报告，评估机构参数选取依据是否充分', content: '', conclusion: '', evidence: '' },
-    { title: '参数一致性——与其他CGU参数对比', placeholder: '多个CGU的参数选取是否保持内部一致（折现率/增长率差异合理性）', content: '', conclusion: '', evidence: '' },
-  ]
-}
-
-// --- Section 4: 计算验证 (31 items) ---
-function createCalculationItems(): CheckItem[] {
-  return [
-    { title: 'PV计算——各年折现因子', placeholder: '验证各年折现因子 1/(1+WACC)^i 计算是否正确', content: '', conclusion: '', evidence: '' },
-    { title: 'PV计算——各年现值', placeholder: '验证各年FCF×折现因子=各年现值 计算是否正确', content: '', conclusion: '', evidence: '' },
-    { title: 'PV计算——现值合计', placeholder: '验证各年现值加总是否正确（含终值现值）', content: '', conclusion: '', evidence: '' },
-    { title: '终值计算——永续公式应用', placeholder: '验证TV=FCF_n×(1+g)/(WACC-g) 代入数值是否正确', content: '', conclusion: '', evidence: '' },
-    { title: '终值计算——终值折现', placeholder: '验证终值折现到基准日的计算是否正确', content: '', conclusion: '', evidence: '' },
-    { title: '终值计算——终值占比', placeholder: '终值占总企业价值的比例是否在50-80%合理范围', content: '', conclusion: '', evidence: '' },
-    { title: 'WACC计算——权益成本Ke', placeholder: '验证Ke=Rf+β×ERP+Rs 计算过程及结果', content: '', conclusion: '', evidence: '' },
-    { title: 'WACC计算——加权平均过程', placeholder: '验证WACC=Ke×E/(E+D)+Kd×(1-t)×D/(E+D) 计算是否正确', content: '', conclusion: '', evidence: '' },
-    { title: '现金流计算——EBIT计算', placeholder: '验证收入-成本-费用=EBIT推导过程', content: '', conclusion: '', evidence: '' },
-    { title: '现金流计算——税后NOPAT', placeholder: '验证NOPAT=EBIT×(1-t) 计算是否正确', content: '', conclusion: '', evidence: '' },
-    { title: '现金流计算——FCF推导', placeholder: '验证FCF=NOPAT+D&A-CAPEX-ΔWC 各项是否完整', content: '', conclusion: '', evidence: '' },
-    { title: '现金流计算——营运资本变动', placeholder: '验证ΔWC=本年WC-上年WC 计算是否正确', content: '', conclusion: '', evidence: '' },
-    { title: '现金流计算——各年加总校验', placeholder: '验证各年FCF加总与分项计算一致', content: '', conclusion: '', evidence: '' },
-    { title: '减值计算——账面价值确定', placeholder: '验证CGU账面价值（含商誉）加总是否正确', content: '', conclusion: '', evidence: '' },
-    { title: '减值计算——可收回金额确定', placeholder: '验证可收回金额=MAX(FVLCD, VIU) 选择是否正确', content: '', conclusion: '', evidence: '' },
-    { title: '减值计算——减值金额', placeholder: '验证减值=MAX(账面-可收回, 0) 计算是否正确', content: '', conclusion: '', evidence: '' },
-    { title: '减值分摊——先冲商誉', placeholder: '验证减值先冲商誉（至零为止）的分摊金额', content: '', conclusion: '', evidence: '' },
-    { title: '减值分摊——其他资产按比例', placeholder: '验证剩余减值按资产组其他资产账面比例分摊计算', content: '', conclusion: '', evidence: '' },
-    { title: '减值分摊——下限约束', placeholder: '各资产分摊后不低于：公允-处置费/使用价值/零 三者孰高', content: '', conclusion: '', evidence: '' },
-    { title: '四则运算——加减法复核', placeholder: '对模型中的加减法运算进行抽样复核', content: '', conclusion: '', evidence: '' },
-    { title: '四则运算——乘除法复核', placeholder: '对模型中的乘除法/幂运算进行抽样复核', content: '', conclusion: '', evidence: '' },
-    { title: '引用链接——数据来源追溯', placeholder: '模型中引用的外部数据是否均可追溯到原始来源', content: '', conclusion: '', evidence: '' },
-    { title: '引用链接——内部勾稽', placeholder: '模型各sheet/区域之间的数据引用是否一致无断裂', content: '', conclusion: '', evidence: '' },
-    { title: '单位一致性——金额单位', placeholder: '全模型金额单位（元/万元/百万）是否统一', content: '', conclusion: '', evidence: '' },
-    { title: '单位一致性——百分比格式', placeholder: '增长率/利润率/折现率百分比表示是否一致（小数vs百分数）', content: '', conclusion: '', evidence: '' },
-    { title: '期间对齐——基准日', placeholder: '评估基准日是否与报告日一致（若不一致如何调整）', content: '', conclusion: '', evidence: '' },
-    { title: '期间对齐——预测起始年', placeholder: '预测第一年是否从基准日后开始（非基准日当年）', content: '', conclusion: '', evidence: '' },
-    { title: '合计校验——分部vs合计', placeholder: '多CGU情况下分部合计是否等于总表合计', content: '', conclusion: '', evidence: '' },
-    { title: '合计校验——减值总额vs审定表', placeholder: '减值测试得出的总减值金额是否与I3-1审定表一致', content: '', conclusion: '', evidence: '' },
-    { title: '独立估算——审计师独立PV计算', placeholder: '审计师独立重新计算的现值与公司模型差异分析', content: '', conclusion: '', evidence: '' },
-    { title: '独立估算——合理偏差范围判断', placeholder: '审计师独立估算与公司结论的差异是否在可接受范围内（<5%）', content: '', conclusion: '', evidence: '' },
-  ]
-}
-
-// --- Section 5: 结论评价 (30 items) ---
-function createConclusionItems(): CheckItem[] {
-  return [
-    { title: '减值结论——金额判断', placeholder: '公司得出的减值金额结论是否合理，与审计师独立估算差异', content: '', conclusion: '', evidence: '' },
-    { title: '减值结论——是否需要减值', placeholder: '公司"需要/不需要减值"的结论判断是否有充分依据', content: '', conclusion: '', evidence: '' },
-    { title: '减值结论——减值充分性', placeholder: '减值是否充分计提（是否存在隐瞒减值/少提减值风险）', content: '', conclusion: '', evidence: '' },
-    { title: '减值结论——不可转回确认', placeholder: '确认公司未对以前年度商誉减值进行转回', content: '', conclusion: '', evidence: '' },
-    { title: '对比分析——与上年对比', placeholder: '本年减值结论与上年对比，变化原因是否充分', content: '', conclusion: '', evidence: '' },
-    { title: '对比分析——各CGU减值分布', placeholder: '各CGU减值分布是否与业务实况一致（业绩差的CGU减值多）', content: '', conclusion: '', evidence: '' },
-    { title: '对比分析——与行业可比公司对比', placeholder: '减值幅度与同行业公司商誉减值情况对比是否合理', content: '', conclusion: '', evidence: '' },
-    { title: '对比分析——与过往年度趋势对比', placeholder: '减值趋势是否与公司/行业经营趋势一致', content: '', conclusion: '', evidence: '' },
-    { title: '管理层判断——乐观偏差', placeholder: '管理层是否存在系统性乐观偏差（假设偏高/不愿减值）', content: '', conclusion: '', evidence: '' },
-    { title: '管理层判断——盈余管理迹象', placeholder: '是否存在利用减值测试进行盈余管理的迹象（大洗澡/平滑利润）', content: '', conclusion: '', evidence: '' },
-    { title: '管理层判断——后续期间验证', placeholder: '上年假设是否被本年实际结果验证（回溯测试）', content: '', conclusion: '', evidence: '' },
-    { title: '管理层判断——管理层书面声明', placeholder: '是否需要管理层对减值测试关键假设做出书面声明', content: '', conclusion: '', evidence: '' },
-    { title: '第三方——评估报告质量', placeholder: '若引用第三方评估报告，报告质量/资质/独立性是否充分', content: '', conclusion: '', evidence: '' },
-    { title: '第三方——评估师胜任能力', placeholder: '评估师是否具备相关行业经验和资质（ISA620）', content: '', conclusion: '', evidence: '' },
-    { title: '第三方——评估范围充分性', placeholder: '评估报告覆盖的资产范围是否与减值测试需求一致', content: '', conclusion: '', evidence: '' },
-    { title: '披露要求——减值损失披露', placeholder: '减值损失是否在利润表和附注中充分披露', content: '', conclusion: '', evidence: '' },
-    { title: '披露要求——CGU信息披露', placeholder: 'CGU的可收回金额/关键假设/敏感性分析是否充分披露', content: '', conclusion: '', evidence: '' },
-    { title: '披露要求——减值测试方法披露', placeholder: '减值测试采用的方法（DCF/市场法）是否在附注中说明', content: '', conclusion: '', evidence: '' },
-    { title: '披露要求——关键假设披露', placeholder: '关键假设（折现率/增长率/预测期）是否在附注中量化披露', content: '', conclusion: '', evidence: '' },
-    { title: '披露要求——敏感性分析披露', placeholder: '敏感性分析结果是否在附注中披露', content: '', conclusion: '', evidence: '' },
-    { title: '审计程序——充分性评价', placeholder: '本次复核程序是否充分覆盖了减值测试的所有重要方面', content: '', conclusion: '', evidence: '' },
-    { title: '审计程序——重要性水平考虑', placeholder: '减值金额相对重要性水平的比例，是否影响审计意见', content: '', conclusion: '', evidence: '' },
-    { title: '审计程序——关键审计事项考虑', placeholder: '商誉减值是否构成关键审计事项（KAM），沟通内容是否充分', content: '', conclusion: '', evidence: '' },
-    { title: '审计程序——专家参与', placeholder: '是否需要估值专家参与（ISA620），专家工作是否充分', content: '', conclusion: '', evidence: '' },
-    { title: '后续事项——资产负债表日后事项', placeholder: '资产负债表日后是否有影响减值结论的新事项', content: '', conclusion: '', evidence: '' },
-    { title: '后续事项——持续经营假设', placeholder: '减值测试假设是否与持续经营评估结论一致', content: '', conclusion: '', evidence: '' },
-    { title: '后续事项——对其他科目影响', placeholder: '减值结论对递延税项/少数股东权益等其他科目的影响', content: '', conclusion: '', evidence: '' },
-    { title: '后续事项——对审计报告影响', placeholder: '减值结论是否影响审计报告类型的判断', content: '', conclusion: '', evidence: '' },
-    { title: '综合判断——证据充分性', placeholder: '所获取的审计证据是否足以支持减值结论的判断', content: '', conclusion: '', evidence: '' },
-    { title: '综合判断——审计师最终意见', placeholder: '审计师对公司减值测试过程及结论的最终评价意见', content: '', conclusion: '', evidence: '' },
-  ]
-}
-
-// --- Reactive check items ---
-const checkItems = reactive<Record<string, CheckItem[]>>({
-  assumptions: createAssumptionItems(),
-  model: createModelItems(),
-  parameters: createParameterItems(),
-  calculation: createCalculationItems(),
-  conclusion: createConclusionItems(),
-})
-
-// --- Summary / Conclusion area ---
 const overallAssessment = ref('')
 const hasMajorDeviation = ref(false)
 const deviationDescription = ref('')
@@ -641,32 +619,38 @@ const overallConclusionText = ref('')
 const auditNote = ref('')
 const auditConclusion = ref('')
 
-// --- Progress computed ---
-type SectionKey = 'assumptions' | 'model' | 'parameters' | 'calculation' | 'conclusion'
+function isSectionActive(key: string): boolean {
+  const def = sectionDefs.find((s) => s.key === key)
+  if (def?.optional) return !!sectionApplicable[key]
+  return true
+}
+
+function visibleItemCount(section: string): number {
+  if (!isSectionActive(section)) return 0
+  return (checkItems[section] || []).length
+}
 
 function sectionCompletedCount(section: string): number {
-  return (checkItems[section] || []).filter((it: CheckItem) => !!it.conclusion).length
+  if (!isSectionActive(section)) return 0
+  return (checkItems[section] || []).filter((it) => !!it.conclusion).length
 }
 
 const sectionProgress = computed(() => {
-  const sections: SectionKey[] = ['assumptions', 'model', 'parameters', 'calculation', 'conclusion']
   const result: Record<string, number> = {}
-  for (const s of sections) {
-    const items = checkItems[s] || []
-    result[s] = items.length ? Math.round((sectionCompletedCount(s) / items.length) * 100) : 0
+  for (const s of sectionDefs) {
+    const total = visibleItemCount(s.key)
+    result[s.key] = total ? Math.round((sectionCompletedCount(s.key) / total) * 100) : 0
   }
   return result
 })
 
-const totalItems = computed(() => {
-  return Object.values(checkItems).reduce((sum, arr) => sum + arr.length, 0)
-})
+const totalItems = computed(() =>
+  sectionDefs.reduce((sum, s) => sum + visibleItemCount(s.key), 0),
+)
 
-const completedCount = computed(() => {
-  return Object.values(checkItems).reduce(
-    (sum, arr) => sum + arr.filter((it: CheckItem) => !!it.conclusion).length, 0
-  )
-})
+const completedCount = computed(() =>
+  sectionDefs.reduce((sum, s) => sum + sectionCompletedCount(s.key), 0),
+)
 
 const overallProgressType = computed(() => {
   const pct = totalItems.value ? completedCount.value / totalItems.value : 0
@@ -676,6 +660,7 @@ const overallProgressType = computed(() => {
 })
 
 function sectionTagType(section: string): 'success' | 'warning' | 'info' {
+  if (!isSectionActive(section)) return 'info'
   const pct = sectionProgress.value[section] || 0
   if (pct >= 100) return 'success'
   if (pct >= 50) return 'warning'
@@ -686,44 +671,56 @@ function markDirty() {
   dirty.value = true
 }
 
-// --- Load data from allResponses ---
 function loadData() {
   const raw = props.allResponses.get(STORAGE_KEY)
   if (!raw) return
   try {
-    const parsed = typeof raw === 'string' ? JSON.parse(raw) : (raw.remark ? JSON.parse(raw.remark) : raw)
+    const parsed = typeof raw === 'string'
+      ? JSON.parse(raw)
+      : (raw.remark ? JSON.parse(raw.remark) : raw)
     if (!parsed) return
-    // Restore check items per section
-    const sections: SectionKey[] = ['assumptions', 'model', 'parameters', 'calculation', 'conclusion']
-    for (const s of sections) {
-      if (parsed.checkItems?.[s]) {
-        const saved = parsed.checkItems[s] as Partial<CheckItem>[]
-        for (let i = 0; i < Math.min(saved.length, checkItems[s].length); i++) {
-          if (saved[i]?.content) checkItems[s][i].content = saved[i].content!
-          if (saved[i]?.conclusion) checkItems[s][i].conclusion = saved[i].conclusion!
-          if (saved[i]?.evidence) checkItems[s][i].evidence = saved[i].evidence!
+
+    // v2：按 id 恢复；兼容旧版五段微粒结构时仅恢复汇总字段
+    if (parsed.schemaVersion === SCHEMA_VERSION && parsed.checkItems) {
+      for (const s of sectionDefs) {
+        const saved = parsed.checkItems[s.key] as Array<Partial<CheckItem>> | undefined
+        if (!saved?.length) continue
+        const byId = new Map(saved.map((x) => [x.id, x]))
+        for (const it of checkItems[s.key] || []) {
+          const row = byId.get(it.id)
+          if (!row) continue
+          if (row.content != null) it.content = String(row.content)
+          if (row.conclusion != null) it.conclusion = String(row.conclusion)
+          if (row.evidence != null) it.evidence = String(row.evidence)
         }
       }
+      if (parsed.sectionApplicable) {
+        sectionApplicable.s6 = !!parsed.sectionApplicable.s6
+        sectionApplicable.s7 = !!parsed.sectionApplicable.s7
+      }
     }
-    // Restore summary
+
     overallAssessment.value = parsed.overallAssessment || ''
-    hasMajorDeviation.value = parsed.hasMajorDeviation || false
+    hasMajorDeviation.value = !!parsed.hasMajorDeviation
     deviationDescription.value = parsed.deviationDescription || ''
     overallConclusionText.value = parsed.overallConclusionText || ''
     auditNote.value = parsed.auditNote || ''
     auditConclusion.value = parsed.auditConclusion || ''
-  } catch { /* ignore parse errors */ }
+  } catch { /* ignore */ }
 }
 
 watch(() => props.allResponses, () => loadData(), { immediate: true })
 
-// --- Save ---
 async function handleSave() {
   saving.value = true
   try {
-    const sections: SectionKey[] = ['assumptions', 'model', 'parameters', 'calculation', 'conclusion']
     const payload: Record<string, any> = {
-      checkItems: {} as Record<string, Array<{ content: string; conclusion: string; evidence: string }>>,
+      schemaVersion: SCHEMA_VERSION,
+      checkItems: {} as Record<string, Array<{ id: string; content: string; conclusion: string; evidence: string }>>,
+      sectionApplicable: {
+        s6: sectionApplicable.s6,
+        s7: sectionApplicable.s7,
+      },
       overallAssessment: overallAssessment.value,
       hasMajorDeviation: hasMajorDeviation.value,
       deviationDescription: deviationDescription.value,
@@ -731,8 +728,9 @@ async function handleSave() {
       auditNote: auditNote.value,
       auditConclusion: auditConclusion.value,
     }
-    for (const s of sections) {
-      payload.checkItems[s] = checkItems[s].map((it: CheckItem) => ({
+    for (const s of sectionDefs) {
+      payload.checkItems[s.key] = (checkItems[s.key] || []).map((it) => ({
+        id: it.id,
         content: it.content,
         conclusion: it.conclusion,
         evidence: it.evidence,
@@ -746,7 +744,6 @@ async function handleSave() {
   }
 }
 
-// --- 复核对话 ---
 function handleReview() {
   openReviewDialog('I3-8-复核过程')
 }
@@ -758,7 +755,6 @@ function handleReview() {
   padding: 16px;
 }
 
-/* 蓝色渐变引导区 */
 .guide-banner {
   background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 50%, #93c5fd 100%);
   border-radius: 8px;
@@ -805,12 +801,11 @@ function handleReview() {
   line-height: 1.4;
 }
 
-/* 琥珀色方法论 */
 .methodology-block {
   background: #fffbeb;
   border-left: 4px solid #f59e0b;
   padding: 10px 14px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   border-radius: 4px;
   font-size: 12px;
   color: #92400e;
@@ -821,7 +816,28 @@ function handleReview() {
   margin: 0;
 }
 
-/* Section Header */
+.objective-alert,
+.expert-alert {
+  margin-bottom: 12px;
+}
+
+.guidance-details {
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.guidance-details summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.guidance-details .guidance-content ul {
+  padding-left: 20px;
+  margin-top: 8px;
+  line-height: 1.8;
+}
+
 .section-header {
   display: flex;
   align-items: center;
@@ -835,54 +851,28 @@ function handleReview() {
   color: #1f2937;
 }
 
-/* 审计目标 alert */
-.objective-alert {
-  margin-bottom: 12px;
-}
-
-/* 编制提示 details */
-.guidance-details {
-  margin-bottom: 12px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-.guidance-details summary {
-  cursor: pointer;
-  font-weight: 500;
-}
-.guidance-details .guidance-content ul {
-  padding-left: 20px;
-  margin-top: 8px;
-  line-height: 1.8;
-}
-
-/* 工具栏 */
-.tab-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.tab-toolbar .toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* 审计说明/结论卡片 */
-.audit-note-card {
-  margin-top: 12px;
-}
-
 .section-actions {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-/* Virtual scroll container */
+.tab-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.tab-toolbar .toolbar-left,
+.tab-toolbar .toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .review-scroll-area {
-  max-height: 600px;
+  max-height: 640px;
   overflow-y: auto;
   border: 1px solid #e5e7eb;
   border-radius: 6px;
@@ -890,22 +880,37 @@ function handleReview() {
   margin-bottom: 16px;
 }
 
-/* Collapse title */
 .collapse-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
   padding-right: 8px;
+  gap: 12px;
 }
 
 .collapse-title-right {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 
-/* Check items container */
+.section-intro {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.6;
+}
+
+.na-hint {
+  padding: 12px;
+  font-size: 12px;
+  color: #6b7280;
+  background: #f9fafb;
+  border-radius: 6px;
+}
+
 .check-items-container {
   display: flex;
   flex-direction: column;
@@ -913,7 +918,6 @@ function handleReview() {
   padding: 4px 0;
 }
 
-/* Individual check item */
 .check-item {
   border: 1px solid #f0f0f0;
   border-radius: 6px;
@@ -924,21 +928,47 @@ function handleReview() {
 .check-item-header {
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 6px;
 }
 
 .check-item-number {
   font-weight: 600;
-  color: #6366f1;
+  color: #2563eb;
   font-size: 12px;
-  min-width: 28px;
+  min-width: 42px;
+  flex-shrink: 0;
 }
 
 .check-item-title {
   font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #374151;
+  line-height: 1.5;
+}
+
+.check-guidance {
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.check-guidance summary {
+  cursor: pointer;
+  color: #2563eb;
+  font-weight: 500;
+}
+
+.guidance-pre {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  background: #eff6ff;
+  border-radius: 4px;
+  color: #1e40af;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.65;
 }
 
 .check-item-footer {
@@ -948,9 +978,9 @@ function handleReview() {
   gap: 8px;
 }
 
-/* Summary card */
-.summary-card {
-  margin-bottom: 16px;
+.summary-card,
+.audit-note-card {
+  margin-bottom: 12px;
 }
 
 .summary-header {
@@ -981,22 +1011,23 @@ function handleReview() {
   font-weight: 500;
   color: #374151;
   white-space: nowrap;
-  min-width: 140px;
+  min-width: 150px;
   line-height: 32px;
 }
 
-/* Actions */
 .table-actions {
   display: flex;
   gap: 8px;
 }
 
-/* El-collapse overrides for tighter look */
 :deep(.el-collapse-item__header) {
   font-size: 14px;
   font-weight: 600;
   color: #1f2937;
-  height: 44px;
+  height: auto;
+  min-height: 44px;
+  line-height: 1.4;
+  padding: 8px 0;
 }
 
 :deep(.el-collapse-item__content) {

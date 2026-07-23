@@ -1,68 +1,126 @@
 <template>
   <div class="i6-disclosure-soe">
-    <div class="guide-area">
-      <div class="guide-grid">
-        <div class="guide-step"><span class="step-num">①</span> 研发费用按类型汇总（国企版16行×6列）</div>
-        <div class="guide-step"><span class="step-num">②</span> 费用化/资本化总额说明</div>
-        <div class="guide-step"><span class="step-num">③</span> AI辅助生成文字描述</div>
-      </div>
-    </div>
-    <div class="methodology-block">
-      <div class="methodology-title">附注披露（国有企业版）</div>
-      <div class="methodology-content">
-        国有企业应披露研发费用的分类明细及发生额变动情况。本表16行×6列。
-        科目6602研发费用（损益类/借方），取发生额非余额。
+    <div class="section-header">
+      <span class="section-title">研发费用附注披露（国有企业）</span>
+      <div class="section-actions">
+        <GtIndexChip :value="disc.noteTarget.value.chipValue" :context-project-id="projectId" />
+        <el-button size="small" type="primary" plain :disabled="isReadonly" @click="disc.syncAllFromWorkpaper(false)">
+          一键 SUMIF
+        </el-button>
+        <el-button size="small" type="primary" plain :disabled="isReadonly" @click="disc.syncFromDetail(false)">
+          从 I6-2 取数
+        </el-button>
+        <el-button size="small" :disabled="isReadonly" @click="disc.syncFromAdjudication(false)">
+          从 I6-1 取数
+        </el-button>
+        <el-button size="small" :disabled="isReadonly" @click="disc.syncFromDetail(true)">强制覆盖</el-button>
+        <el-button
+          size="small"
+          type="success"
+          :loading="disc.isSyncing.value"
+          :disabled="isReadonly || !projectId"
+          @click="disc.syncToNotes()"
+        >同步到附注 {{ disc.noteTarget.value.sectionId }}</el-button>
       </div>
     </div>
 
-    <!-- 审计目标 -->
+    <div class="guide-area">
+      <div class="guide-grid">
+        <div class="guide-step"><span class="step-num">①</span> 按费用性质汇总本期/上期发生额</div>
+        <div class="guide-step"><span class="step-num">②</span> 与 I6-1 审定合计勾稽</div>
+        <div class="guide-step"><span class="step-num">③</span> 补充费用化/资本化及重大项目说明</div>
+        <div class="guide-step"><span class="step-num">④</span> 「同步到附注」写入 §八、67</div>
+      </div>
+    </div>
+
+    <div class="methodology-block">
+      <div class="methodology-title">附注披露（国有企业版）</div>
+      <div class="methodology-content">
+        国有企业应披露研发费用按费用性质分类的本期与上期发生额。科目6602（损益类/借方）取发生额非余额。
+      </div>
+    </div>
+
     <el-alert
       type="info"
       :closable="false"
-      title="审计目标：核实研发费用附注披露（国有企业版）分类明细完整、本期与上期发生额勾稽一致，费用化与资本化划分及重大项目说明披露充分、恰当。"
+      title="审计目标：核实附注披露分类明细完整、发生额与 I6-1/I6-2 勾稽一致，并同步至附注模块「八、67 研发费用」。"
       class="objective-alert"
     />
+
+    <el-alert
+      v-if="disc.reconcileSummary.value.severity !== 'ok'"
+      :type="disc.reconcileSummary.value.severity === 'error' ? 'error' : 'warning'"
+      :closable="false"
+      show-icon
+      class="reconcile-alert"
+      :title="disc.reconcileSummary.value.headline"
+    >
+      <template v-if="disc.reconcileSummary.value.itemDiffs.length" #default>
+        <ul class="reconcile-item-list">
+          <li v-for="d in disc.reconcileSummary.value.itemDiffs" :key="d.item">
+            {{ d.item }}：披露 {{ fmtAmt(d.disclosureAmount) }} vs I6-2 {{ fmtAmt(d.referenceAmount) }}，差 {{ fmtAmt(d.diff) }}
+          </li>
+        </ul>
+      </template>
+    </el-alert>
+
+    <div v-else-if="disc.reconcileSummary.value.vsAdj.hasBoth" class="reconcile-bar reconcile-ok">
+      勾稽一致：披露 {{ fmtAmt(disc.reconcileSummary.value.vsAdj.disclosureTotal) }} = I6-1 审定 {{ fmtAmt(disc.reconcileSummary.value.vsAdj.adjudicatedTotal) }}
+    </div>
 
     <el-card shadow="never" class="disclosure-card">
       <template #header>
         <div class="section-title-row">
-          <span class="section-title">研发费用分类明细（国企版）</span>
-          <div class="title-actions">
-            <el-button size="small" type="default" link @click="handleReview('category')">💬</el-button>
-          </div>
+          <span class="section-title">研发费用（按费用性质列示）</span>
+          <el-button v-if="!isReadonly" size="small" @click="handleAdd">+ 行</el-button>
         </div>
       </template>
-      <el-table :data="categoryRows" border stripe size="small" class="matrix-table">
-        <el-table-column prop="item" label="费用类别" min-width="140" fixed />
-        <el-table-column prop="currentAmount" label="本期发生额" min-width="120" align="right">
+      <el-table :data="disc.rows.value" border stripe size="small" class="matrix-table">
+        <el-table-column prop="item" label="项目" min-width="140" fixed>
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.currentAmount" :controls="false" size="small" @change="(v: number) => onEdit(row.rowId, 'currentAmount', v)" />
+            <el-input v-if="!isReadonly" :model-value="row.item" size="small" @change="(v: string) => disc.updateCell(row.rowId, 'item', v)" />
+            <span v-else>{{ row.item }}</span>
+            <el-tag v-if="row.isAutoFilled" size="small" type="info" class="auto-badge">自动</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期发生额" min-width="120" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="!isReadonly" :model-value="row.currentAmount" :controls="false" size="small" @change="(v: number) => disc.updateCell(row.rowId, 'currentAmount', v)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.currentAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="priorAmount" label="上期发生额" min-width="120" align="right">
+        <el-table-column label="上期发生额" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.priorAmount" :controls="false" size="small" @change="(v: number) => onEdit(row.rowId, 'priorAmount', v)" />
+            <el-input-number v-if="!isReadonly" :model-value="row.priorAmount" :controls="false" size="small" @change="(v: number) => disc.updateCell(row.rowId, 'priorAmount', v)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.priorAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="变动额" min-width="110" align="right">
-          <template #default="{ row }"><span class="formula-cell" title="= 本期 - 上期">{{ fmtAmt(row.currentAmount - row.priorAmount) }}</span></template>
+          <template #default="{ row }">
+            <span class="formula-cell">{{ fmtAmt(row.currentAmount - row.priorAmount) }}</span>
+          </template>
         </el-table-column>
         <el-table-column label="变动率" min-width="90" align="right">
-          <template #default="{ row }"><span class="formula-cell" :class="{ 'rate-warn': isHighRate(row) }">{{ fmtPct(row.currentAmount, row.priorAmount) }}</span></template>
-        </el-table-column>
-        <el-table-column prop="remark" label="说明" min-width="140">
           <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.remark" size="small" @blur="(e: FocusEvent) => onEdit(row.rowId, 'remark', (e.target as HTMLInputElement).value)" />
+            <span class="formula-cell" :class="{ 'rate-warn': isHighRate(row) }">{{ fmtPct(row) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="说明" min-width="140">
+          <template #default="{ row }">
+            <el-input v-if="!isReadonly" :model-value="row.remark" size="small" @change="(v: string) => disc.updateCell(row.rowId, 'remark', v)" />
             <span v-else>{{ row.remark || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="操作" width="56" align="center">
+          <template #default="{ row }">
+            <el-button type="danger" link size="small" @click="disc.removeRow(row.rowId)">删</el-button>
           </template>
         </el-table-column>
       </el-table>
       <div class="totals-row">
         <span class="totals-label">合计</span>
-        <span class="totals-value">本期: {{ fmtAmt(totalCurrent) }}</span>
-        <span class="totals-value">上期: {{ fmtAmt(totalPrior) }}</span>
+        <span class="totals-value">本期: {{ fmtAmt(disc.totals.value.currentAmount) }}</span>
+        <span class="totals-value">上期: {{ fmtAmt(disc.totals.value.priorAmount) }}</span>
       </div>
     </el-card>
 
@@ -70,84 +128,121 @@
       <template #header>
         <div class="section-title-row">
           <span class="section-title">补充说明</span>
-          <div class="title-actions">
-            <el-button size="small" type="default" link @click="handleReview('supplement')">💬</el-button>
-          </div>
+          <el-button size="small" type="primary" link :loading="disc.isAiGenerating.value" :disabled="isReadonly" @click="handleAi">AI</el-button>
         </div>
       </template>
-      <el-input v-model="supplementNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="费用化与资本化划分说明、重大项目概况..." @blur="onNoteBlur" />
+      <el-input
+        :model-value="disc.supplementNote.value"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="费用化与资本化划分说明、重大项目概况、增减变动因素…"
+        @change="disc.saveSupplementNote"
+      />
     </el-card>
 
-    <details class="guidance-details compile-hint"><summary>编制提示</summary><ul>
-      <li>国企版：16行×6列（费用类别/本期/上期/变动额/变动率/说明）</li>
-      <li>EventBus: publish 'disclosure:note-text-updated'</li>
-    </ul></details>
+    <details class="compile-hint" open>
+      <summary>编制说明</summary>
+      <ol>
+        <li>对齐源表「附注披露（国有企业）」：项目 | 本期发生额 | 上期发生额。</li>
+        <li>数据自 I6-2 SUMIF 或 I6-1 审定引用，合计须与审定表一致。</li>
+        <li>同步附注写入 note_template §八、67「研发费用」。</li>
+      </ol>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, inject } from 'vue'
+import { computed, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import GtIndexChip from '../../GtIndexChip.vue'
+import { useI6Disclosure, type I6DisclosureRow } from '../../composables/useI6Disclosure'
 
-const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
+const props = defineProps<{
+  wpId: string
+  projectId: string
+  allResponses: Map<string, any>
+  isReadonly: boolean
+  applicableStandards?: string[]
+}>()
+
 const emit = defineEmits<{ 'save': [itemId: string, value: any] }>()
-const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', () => {})
 
-interface CategoryRow { rowId: string; item: string; currentAmount: number; priorAmount: number; remark: string }
+const variant = ref<'soe'>('soe')
+const disc = useI6Disclosure(
+  computed(() => props.wpId),
+  computed(() => props.projectId),
+  computed(() => props.allResponses),
+  {
+    variant,
+    applicableStandards: () => props.applicableStandards,
+    onSave: (itemId, value) => emit('save', itemId, typeof value === 'string' ? value : JSON.stringify(value)),
+  },
+)
 
-const ITEM_ID = 'I6-disc-S-categories'
-const DEFAULT_CATEGORIES = ['人工费', '材料费', '折旧费', '无形资产摊销', '设计费', '装备调试费', '委外研发费', '其他费用']
-
-const categoryRows = ref<CategoryRow[]>([])
-const supplementNote = ref('')
-
-const totalCurrent = computed(() => categoryRows.value.reduce((s, r) => s + (r.currentAmount || 0), 0))
-const totalPrior = computed(() => categoryRows.value.reduce((s, r) => s + (r.priorAmount || 0), 0))
-
-function _load(): void {
-  const item = props.allResponses.get(ITEM_ID)
-  const raw = item?.remark ?? (typeof item === 'string' ? item : null)
-  if (raw) { try { const p = JSON.parse(raw); if (Array.isArray(p)) { categoryRows.value = p; _loadNote(); return } } catch { /* */ } }
-  categoryRows.value = DEFAULT_CATEGORIES.map((name) => ({ rowId: `row-${Math.random().toString(36).slice(2, 10)}`, item: name, currentAmount: 0, priorAmount: 0, remark: '' }))
-  _loadNote()
+async function handleAdd(): Promise<void> {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入费用性质/项目名称', '新增行', {
+      inputPattern: /\S+/,
+      inputErrorMessage: '名称不能为空',
+    })
+    disc.addRow(value)
+  } catch { /* cancel */ }
 }
-function _loadNote(): void {
-  supplementNote.value = _str('I6-disc-S-supplement')
+
+async function handleAi(): Promise<void> {
+  const text = await disc.generateNoteText('supplement')
+  if (text) {
+    disc.saveSupplementNote(text)
+    ElMessage.success('已生成补充说明')
+  }
 }
-function _str(id: string): string { const item = props.allResponses.get(id); return (item?.remark ?? (typeof item === 'string' ? item : '')) as string }
-watch(() => props.allResponses, () => _load(), { immediate: true })
 
-function _persist(): void { emit('save', ITEM_ID, JSON.stringify(categoryRows.value)) }
-function onEdit(rowId: string, field: string, value: any): void { const row = categoryRows.value.find((r) => r.rowId === rowId); if (row) { (row as any)[field] = value; _persist() } }
-function onNoteBlur(): void { emit('save', 'I6-disc-S-supplement', supplementNote.value); window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', { detail: { wpCode: 'I6-附注国企' } })) }
+function isHighRate(row: I6DisclosureRow): boolean {
+  if (!row.priorAmount) return false
+  return Math.abs((row.currentAmount - row.priorAmount) / row.priorAmount) > 0.3
+}
 
-function handleReview(section: string): void { openReviewDialog(`I6 附注国企-${section}`) }
-function isHighRate(row: CategoryRow): boolean { if (!row.priorAmount) return false; return Math.abs((row.currentAmount - row.priorAmount) / row.priorAmount) > 0.3 }
-function fmtAmt(v: number | null | undefined): string { if (v == null || Math.abs(v) < 0.005) return '-'; return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
-function fmtPct(current: number, prior: number): string { if (!prior) return '-'; return ((current - prior) / Math.abs(prior) * 100).toFixed(1) + '%' }
+function fmtAmt(v: number | null | undefined): string {
+  if (v == null || Math.abs(v) < 0.005) return '-'
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function fmtPct(row: I6DisclosureRow): string {
+  if (!row.priorAmount) return '-'
+  return ((row.currentAmount - row.priorAmount) / Math.abs(row.priorAmount) * 100).toFixed(1) + '%'
+}
 </script>
 
 <style scoped>
 .i6-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
-.objective-alert { margin-bottom: 12px; }
-.guide-area { background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+.section-header { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.section-title { font-size: 15px; font-weight: 600; }
+.section-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.guide-area { background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%); border-radius: 8px; padding: 16px; margin-bottom: 12px; }
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .guide-step { display: flex; align-items: flex-start; gap: 6px; font-size: var(--wp-font-size, 13px); }
 .step-num { font-weight: 700; color: var(--el-color-primary); min-width: 20px; }
-.methodology-block { border-left: 4px solid #d97706; background: #fffbeb; padding: 12px 16px; margin-bottom: 16px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.7; }
+.methodology-block { border-left: 4px solid #d97706; background: #fffbeb; padding: 12px 16px; margin-bottom: 12px; border-radius: 4px; font-size: 12px; color: #92400e; line-height: 1.7; }
 .methodology-title { font-weight: 600; color: #78350f; margin-bottom: 4px; }
+.objective-alert { margin-bottom: 12px; }
+.reconcile-bar { font-size: 12px; margin-bottom: 12px; color: var(--el-text-color-secondary); }
+.reconcile-bar.reconcile-ok { color: var(--el-color-success); }
+.reconcile-alert { margin-bottom: 12px; }
+.reconcile-item-list { margin: 4px 0 0; padding-left: 18px; font-size: 12px; }
+.text-danger { color: var(--el-color-danger); }
 .disclosure-card { margin-bottom: 16px; }
 .section-title-row { display: flex; align-items: center; justify-content: space-between; }
-.section-title { font-size: 14px; font-weight: 600; }
-.title-actions { display: flex; align-items: center; gap: 4px; }
 .matrix-table { margin-bottom: 8px; }
 .formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
 .amount-cell { font-variant-numeric: tabular-nums; }
+.auto-badge { margin-left: 4px; }
 .rate-warn { color: #d97706; font-weight: 600; background: #fefce8; padding: 1px 4px; border-radius: 2px; }
-.totals-row { display: flex; align-items: center; gap: 16px; padding: 8px 12px; background: var(--el-fill-color-lighter); border-radius: 4px; font-size: 12px; margin-top: 4px; }
-.totals-label { font-weight: 600; min-width: 40px; }
+.totals-row { display: flex; align-items: center; gap: 16px; padding: 8px 12px; background: var(--el-fill-color-lighter); border-radius: 4px; font-size: 12px; }
+.totals-label { font-weight: 600; }
 .totals-value { font-variant-numeric: tabular-nums; }
 .compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
-.compile-hint summary { cursor: pointer; font-weight: 500; }
-.compile-hint ul { padding-left: 20px; margin-top: 8px; }
-.compile-hint li { margin-bottom: 4px; }
+.compile-hint summary { cursor: pointer; font-weight: 500; color: var(--el-text-color-primary); }
+.compile-hint ol { padding-left: 20px; margin: 8px 0 0; }
+.compile-hint li { margin-bottom: 4px; line-height: 1.5; }
 </style>

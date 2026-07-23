@@ -11,7 +11,7 @@
  *
  * Requirements: 10.6
  */
-import { ref, inject, toRef, onMounted, type Ref } from 'vue'
+import { ref, inject, toRef, onMounted, computed, type Ref } from 'vue'
 import {
   useE1IpoSpecial,
   type IpoSheetCode,
@@ -19,8 +19,10 @@ import {
 } from '../composables/useE1IpoSpecial'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
+import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { ElMessage } from 'element-plus'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -32,6 +34,7 @@ const props = defineProps<{
   debouncedSave: (items: any[]) => Promise<void>
   isReadonly: boolean
   sheetName?: string
+  bsDate?: string
 }>()
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
@@ -77,6 +80,57 @@ function formatCellValue(row: any, col: ColumnDef): string {
 }
 
 // ─── 审计说明 / 审计结论 ─────────────────────────────────────────────────────
+
+// ─── 抽凭引擎 ─────────────────────────────────────────────────────────────────
+
+const samplingVisible = ref(false)
+const samplingYear = computed(() => {
+  const bs = props.bsDate || ''
+  const match = bs.match(/^(\d{4})/)
+  return match ? Number(match[1]) : new Date().getFullYear() - 1
+})
+
+/** 科目编码 → 所属科目名称（1001 现金 / 1002 银行存款 / 1012 其他货币资金） */
+function accountNameOf(code: string): string {
+  const c = String(code || '')
+  if (c.startsWith('1001')) return '现金'
+  if (c.startsWith('1002')) return '银行存款'
+  if (c.startsWith('1012')) return '其他货币资金'
+  return c
+}
+
+function onSampleFilled(payload: any): void {
+  const samples = payload?.samples || []
+  if (!Array.isArray(samples) || samples.length === 0) return
+  let added = 0
+  for (const s of samples) {
+    const debit = Number(s.debitAmount) || 0
+    const credit = Number(s.creditAmount) || 0
+    // 货币资金借方=收入(现金流入)，贷方=支出(现金流出)
+    const direction = debit > 0 ? '收' : credit > 0 ? '支' : ''
+    // 按凭证号去重
+    const voucherNo = s.voucherNo || ''
+    if (voucherNo && rows.value.some(r => r.voucherNo === voucherNo)) continue
+    addRow()
+    const lastRow = rows.value[rows.value.length - 1]
+    if (lastRow) {
+      updateCell(lastRow.id, 'direction', direction)
+      updateCell(lastRow.id, 'accountName', accountNameOf(s.accountCode))
+      updateCell(lastRow.id, 'date', s.voucherDate || '')
+      updateCell(lastRow.id, 'voucherNo', voucherNo)
+      updateCell(lastRow.id, 'content', s.summary || '')
+      updateCell(lastRow.id, 'counterAccount', s.counterpartAccount || '')
+      updateCell(lastRow.id, 'amount', String(debit || credit || 0))
+      if (s.abnormal) {
+        updateCell(lastRow.id, 'isAbnormal', true)
+        updateCell(lastRow.id, 'issue', '抽凭引擎标记异常，待核查')
+      }
+    }
+    added++
+  }
+  samplingVisible.value = false
+  ElMessage.success(added > 0 ? `已导入 ${added} 笔凭证` : '未新增（凭证号重复已跳过）')
+}
 
 const NOTE_KEY = 'E1-largecheck-audit-note'
 const CONCLUSION_KEY = 'E1-largecheck-audit-conclusion'
@@ -133,6 +187,7 @@ function saveAuditConclusion(val: string): void {
       <div class="toolbar-left">
         <el-tag size="small" type="success">收支检查 (E1-23)</el-tag>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加行</el-button>
+        <el-button size="small" type="warning" :disabled="isReadonly" @click="samplingVisible = true">🎲 抽凭引擎</el-button>
       </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
@@ -233,6 +288,26 @@ function saveAuditConclusion(val: string): void {
         </el-card>
       </template>
     </el-skeleton>
+
+    <!-- 抽凭引擎弹窗 -->
+    <el-dialog
+      v-model="samplingVisible"
+      title="抽凭引擎 — 货币资金收支检查"
+      width="1080px"
+      append-to-body
+      destroy-on-close
+    >
+      <GtVoucherSamplingEngine
+        account-code="1002"
+        phase="final"
+        :workpaper-id="wpId"
+        :project-id="projectId"
+        :year="samplingYear"
+        :initial-config-patch="{ accountCodes: ['1001', '1002', '1012'] }"
+        config-hint="货币资金收支检查：默认总体含库存现金(1001)/银行存款(1002)/其他货币资金(1012)，可在抽样配置中调整科目范围。"
+        @filled="onSampleFilled"
+      />
+    </el-dialog>
   </div>
 </template>
 

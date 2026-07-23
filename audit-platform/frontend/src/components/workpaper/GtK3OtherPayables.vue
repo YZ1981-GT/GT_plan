@@ -28,6 +28,18 @@
 
       <!-- HTML 结构化视图 -->
       <template v-else-if="dualMode.currentMode.value === 'html'">
+        <!-- 全局跨sheet勾稽告警 -->
+        <div v-if="globalAlerts.length > 0" class="k3-global-alerts">
+          <el-alert
+            v-for="(a, i) in globalAlerts"
+            :key="i"
+            :type="a.type"
+            :closable="false"
+            show-icon
+            :title="a.text"
+          />
+        </div>
+
         <!-- 底稿目录 -->
         <K3TabIndex
           v-if="currentSheet === 'K3'"
@@ -100,6 +112,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
@@ -111,6 +124,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
@@ -187,6 +201,7 @@ import {
   type WorkpaperRuntimeContext,
 } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
+import { useK3CrossSheet } from './composables/useK3CrossSheet'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -234,6 +249,35 @@ const tbData = ref({
   unadjusted2241: 0,
   audited2241: 0,
 })
+
+// ─── 跨sheet勾稽引擎（全局告警banner消费） ────────────────────────────────────
+const { adjudicationVsDetail, longOutstandingVsDetail, largeAmountVsDetail } = useK3CrossSheet(allResponses)
+
+/** 全局勾稽告警（在非当前编辑源sheet显示，避免与sheet内告警重复） */
+const globalAlerts = computed(() => {
+  const alerts: Array<{ type: 'warning' | 'info'; text: string }> = []
+  const sheet = currentSheet.value
+  // ① K3-1审定 vs K3-2明细（在K3-1/K3-2页内已有各自告警，此处排除避免重复）
+  if (sheet !== 'K3-1' && sheet !== 'K3-2') {
+    const av = adjudicationVsDetail.value
+    if (!av.isMatch && (Math.abs(av.diff) > 0.01)) {
+      alerts.push({ type: 'warning', text: `K3-1审定合计与K3-2明细合计差异 ${fmtCny(av.diff)}，请核对` })
+    }
+  }
+  // ② 3年以上长期挂账（在K3-5页内已有告警，此处排除）
+  if (sheet !== 'K3-5' && longOutstandingVsDetail.value.count > 0) {
+    alerts.push({ type: 'info', text: `K3-2明细中3年以上长期挂账 ${longOutstandingVsDetail.value.count} 笔，合计 ${fmtCny(longOutstandingVsDetail.value.total)}，请确认K3-5已覆盖评估` })
+  }
+  // ③ 大额款项（在K3-4页内已有阈值提示，此处排除）
+  if (sheet !== 'K3-4' && largeAmountVsDetail.value.count > 0) {
+    alerts.push({ type: 'info', text: `K3-2明细中大额款项 ${largeAmountVsDetail.value.count} 笔，合计 ${fmtCny(largeAmountVsDetail.value.total)}，请确认K3-4已覆盖分析` })
+  }
+  return alerts
+})
+
+function fmtCny(v: number): string {
+  return (v || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
 
 // ─── 双模式 (OO 健康检查 + el-segmented) ────────────────────────────────────
 const dualMode = (() => {
@@ -380,5 +424,11 @@ onMounted(() => {
   gap: 12px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.k3-global-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 16px 0;
 }
 </style>

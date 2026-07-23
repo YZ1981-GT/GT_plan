@@ -1,6 +1,13 @@
 /**
  * useK4Check — K4-4 其他流动负债检查表
  *
+ * ⚠️ DEPRECATED: 此 composable 是旧版 4 项 radio 合规性检查清单。
+ * K4TabCheck.vue 已按源模板重建为凭证级测试（复用 useK1VoucherCheck），
+ * 本文件中的 4 项检查不再被任何 .vue 文件渲染消费。
+ * 保留仅为向后兼容旧持久化数据（K4-4-check-items），新功能请勿使用。
+ *
+ * @deprecated 使用 K4TabCheck.vue + useK1VoucherCheck 替代
+ *
  * Spec: .kiro/specs/k4-other-current-liabilities/
  * Task: 3.4
  * Requirements: 4.1-4.3

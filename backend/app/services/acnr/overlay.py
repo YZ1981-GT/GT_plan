@@ -40,6 +40,7 @@ class OverlayPatch:
     expires_at: str | None = None  # ISO "YYYY-MM-DD"
     overlay_type: str = "cust"  # alias | cust | binding
     wp_id: str | None = None
+    revision: int = 1  # V122: 乐观并发版本号（CAS 用）
 
     def is_expired(self) -> bool:
         if not self.expires_at:
@@ -153,12 +154,21 @@ async def load_project_overlays_from_pg(
     patches: dict[str, OverlayPatch] = {}
     for row in rows:
         addr_id = f"{row.parent_wp_code}/{row.sheet_code}"
+        # R7.3: 读回治理字段，使 is_expired() 重启后按持久化 expires_at 判定
         patch = OverlayPatch(
             project_id=project_id,
             addr_id=addr_id,
             overrides=row.payload or {},
             overlay_type=row.overlay_type,
             wp_id=str(row.wp_id) if row.wp_id else None,
+            reason=getattr(row, "reason", None) or "",
+            owner=getattr(row, "owner", None) or "",
+            expires_at=(
+                row.expires_at.isoformat()
+                if getattr(row, "expires_at", None) is not None
+                else None
+            ),
+            revision=getattr(row, "revision", 1) or 1,
         )
         patches[addr_id] = patch
 
@@ -403,11 +413,16 @@ async def write_overlay(
     expires_at: str | None = None,
     overlay_type: str = "cust",
     wp_id: str | None = None,
+    expected_revision: int | None = None,
 ) -> OverlayPatch:
-    """Write overlay to PG + update cache (with ownership validation).
+    """Write overlay to PG（含治理字段 + 可选 CAS）+ 清项目缓存（read-through 重载）。
 
     Req-4.1: 权威数据持久化到 PostgreSQL
     Req-4.3: 写入时校验 wp_id 属于 project 且经 WpIndex 确认全链归属
+    R7.2: 治理字段 reason/owner/expires_at 持久化到 PG
+    R8: expected_revision 提供时 CAS（冲突抛 OverlayRevisionConflict）
+    R9: **清项目缓存**而非写缓存 —— read-through 从已提交 PG 重载，
+        外层事务回滚不留脏缓存（flush ≠ commit）。
     """
     from app.services.acnr.overlay_repository import upsert_overlay
 
@@ -425,8 +440,9 @@ async def write_overlay(
         # Non-UUID project_id: skip PG persistence (legacy/test path)
         pg_project_id = None
 
+    persisted_revision = 1
     if pg_project_id is not None:
-        await upsert_overlay(
+        row = await upsert_overlay(
             db,
             project_id=pg_project_id,
             wp_id=UUID(wp_id) if wp_id else None,
@@ -434,10 +450,22 @@ async def write_overlay(
             sheet_code=sheet_code,
             overlay_type=overlay_type,
             payload=overrides,
+            reason=reason or None,
+            owner=owner or None,
+            expires_at=expires_at,
+            expected_revision=expected_revision,
         )
+        persisted_revision = getattr(row, "revision", 1) or 1
 
-    # Update cache
-    patch = OverlayPatch(
+    # R9: 清项目缓存（不写缓存）→ 下次读经 read-through 从已提交 PG 重载。
+    # 外层事务回滚 → PG 无新行 → 重载得旧状态，天然不留脏缓存。
+    clear_project_overlays(project_id)
+
+    logger.info(
+        "overlay written (cache cleared): project=%s addr_id=%s type=%s owner=%s rev=%d",
+        project_id, addr_id, overlay_type, owner, persisted_revision,
+    )
+    return OverlayPatch(
         project_id=project_id,
         addr_id=addr_id,
         overrides=overrides,
@@ -446,14 +474,124 @@ async def write_overlay(
         expires_at=expires_at,
         overlay_type=overlay_type,
         wp_id=wp_id,
+        revision=persisted_revision,
     )
-    set_overlay_in_cache(patch)
 
-    logger.info(
-        "overlay written: project=%s addr_id=%s type=%s owner=%s",
-        project_id, addr_id, overlay_type, owner,
+
+# ─── 受控变更入口（R10）───────────────────────────────────────────────────
+# 当前平台无 overlay 编辑 UI；这些服务层入口使加固后的写路径可达、可测、可审计。
+# UI 接线为 spec 外后续项。
+
+_OVERLAY_MUTATE_ROLES = frozenset({"admin", "partner", "signing_partner", "manager"})
+
+
+def _actor_role(actor: Any) -> str:
+    role = getattr(actor, "role", None)
+    return role.value if hasattr(role, "value") else str(role or "")
+
+
+async def apply_project_overlay(
+    db: AsyncSession,
+    project_id: str,
+    addr_id: str,
+    overrides: dict[str, Any],
+    *,
+    actor: Any,
+    wp_id: str | None = None,
+    reason: str = "",
+    owner: str = "",
+    expires_at: str | None = None,
+    overlay_type: str = "cust",
+    expected_revision: int | None = None,
+) -> OverlayPatch:
+    """受控 overlay 变更入口（R10）。
+
+    1. capability 校验（manager/partner/signing_partner/admin）；不足 → HTTPException 403
+    2. `write_overlay`（含 validate_ownership + 原子 upsert + 治理字段 + CAS + 清缓存）
+    3. **同事务**写 Invalidation_Outbox（R11.2）—— overlay 写与失效信号原子提交
+       （调用方 commit db）；dispatcher 后续至少一次投递（递增 epoch + 广播）。
+
+    调用方负责 `await db.commit()`（overlay upsert / outbox enqueue 均 flush-only）。
+    """
+    from fastapi import HTTPException
+
+    if _actor_role(actor) not in _OVERLAY_MUTATE_ROLES:
+        raise HTTPException(status_code=403, detail="无权变更 overlay")
+
+    patch = await write_overlay(
+        db,
+        project_id=project_id,
+        addr_id=addr_id,
+        overrides=overrides,
+        reason=reason,
+        owner=owner,
+        expires_at=expires_at,
+        overlay_type=overlay_type,
+        wp_id=wp_id,
+        expected_revision=expected_revision,
     )
+
+    # R11.2: 同事务写 outbox（与 overlay 写原子提交）
+    try:
+        pg_project_id = UUID(project_id)
+        from app.services.acnr.invalidation_outbox import enqueue as _outbox_enqueue
+
+        await _outbox_enqueue(
+            db, str(pg_project_id), wp_id=wp_id, domain="overlay"
+        )
+    except (ValueError, AttributeError):
+        # 非 UUID project_id（测试/legacy 路径）跳过 outbox
+        pass
+
     return patch
+
+
+async def remove_project_overlay(
+    db: AsyncSession,
+    project_id: str,
+    addr_id: str,
+    *,
+    actor: Any,
+    overlay_type: str = "cust",
+) -> bool:
+    """受控 overlay 删除入口（R10）。capability + 删除 PG + 清缓存 + 同事务 outbox。"""
+    from fastapi import HTTPException
+
+    if _actor_role(actor) not in _OVERLAY_MUTATE_ROLES:
+        raise HTTPException(status_code=403, detail="无权变更 overlay")
+
+    parts = addr_id.split("/")
+    parent_wp_code = parts[0] if len(parts) >= 1 else ""
+    sheet_code = parts[1] if len(parts) >= 2 else parts[0]
+
+    deleted = False
+    try:
+        pg_project_id = UUID(project_id)
+    except (ValueError, AttributeError):
+        pg_project_id = None
+
+    if pg_project_id is not None:
+        from app.services.acnr.overlay_repository import delete_overlay_by_identity
+
+        deleted = await delete_overlay_by_identity(
+            db,
+            project_id=pg_project_id,
+            parent_wp_code=parent_wp_code,
+            sheet_code=sheet_code,
+            overlay_type=overlay_type,
+        )
+        # R11.2: 同事务写 outbox
+        from app.services.acnr.invalidation_outbox import enqueue as _outbox_enqueue
+
+        await _outbox_enqueue(db, str(pg_project_id), domain="overlay")
+
+    # R9: 清缓存 → read-through 重载已提交状态
+    clear_project_overlays(project_id)
+    logger.info(
+        "overlay removed (cache cleared): project=%s addr_id=%s type=%s deleted=%s",
+        project_id, addr_id, overlay_type, deleted,
+    )
+    return deleted
 
 
 # ─── 模块级单例 ──────────────────────────────────────────────────────────────

@@ -3,6 +3,10 @@
 除返回 checklist 快照外，为 F5-7 成本倒轧表自动取数：
 - 1401 原材料 / 1404 在产品 / 1405 产成品 的期初/期末余额（tb_balance）
 供前端 F5-7 校验区只读字段 seed。
+
+P0 改进(2026-07-22)：
+- 补 project_context（client_name/audit_year/bs_date/related_parties）
+- 补 tb_amount_6401（trial_balance 6401 发生额，供 F5-1 TB预填）
 """
 from __future__ import annotations
 
@@ -74,10 +78,81 @@ async def render(ctx: RenderContext) -> dict | None:
 
     rollforward_tb = await _fetch_rollforward_tb(ctx)
 
+    # ─── project_context（client_name / audit_year / bs_date / related_parties） ─
+    project_context: dict = {
+        "client_name": "",
+        "audit_year": "",
+        "bs_date": "",
+        "related_parties": [],
+        "tb_amount": 0,
+        "tb_amount_unadjusted": 0,
+        "tb_amount_audited": 0,
+    }
+    try:
+        proj_row = (
+            await ctx.db.execute(
+                sa.text(
+                    "SELECT client_name, audit_year "
+                    "FROM projects WHERE id = :pid"
+                ),
+                {"pid": str(ctx.project_id)},
+            )
+        ).fetchone()
+        if proj_row:
+            project_context["client_name"] = proj_row.client_name or ""
+            project_context["audit_year"] = str(proj_row.audit_year or "")
+            if proj_row.audit_year:
+                project_context["bs_date"] = f"{proj_row.audit_year}-12-31"
+    except Exception as e:  # noqa: BLE001
+        logger.warning("F5 render: project context failed: %s", e)
+
+    # ─── 关联方清单 ──────────────────────────────────────────────────────
+    try:
+        rp_rows = (
+            await ctx.db.execute(
+                sa.text(
+                    "SELECT name FROM related_party_registry "
+                    "WHERE project_id = :pid AND is_deleted = false "
+                    "AND name IS NOT NULL AND name <> ''"
+                ),
+                {"pid": str(ctx.project_id)},
+            )
+        ).fetchall()
+        project_context["related_parties"] = [r.name for r in rp_rows if r.name]
+    except Exception as e:  # noqa: BLE001
+        logger.warning("F5 render: related_parties failed: %s", e)
+
+    # ─── 试算平衡表 6401 营业成本（借方/损益类，发生额=unadjusted/audited） ──
+    year = project_context.get("audit_year")
+    if year:
+        try:
+            tb_row = (
+                await ctx.db.execute(
+                    sa.text(
+                        "SELECT COALESCE(SUM(unadjusted_amount), 0) AS unadjusted, "
+                        "COALESCE(SUM(audited_amount), 0) AS audited "
+                        "FROM trial_balance "
+                        "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                        "AND standard_account_code LIKE '6401%'"
+                    ),
+                    {"pid": str(ctx.project_id), "year": int(year)},
+                )
+            ).fetchone()
+            if tb_row:
+                unadjusted = float(tb_row.unadjusted or 0)
+                audited = float(tb_row.audited or 0)
+                # 损益借方科目：正数=发生额，无需取绝对值
+                project_context["tb_amount"] = audited if audited else unadjusted
+                project_context["tb_amount_unadjusted"] = unadjusted
+                project_context["tb_amount_audited"] = audited
+        except Exception as e:  # noqa: BLE001
+            logger.warning("F5 render: trial_balance(6401) failed: %s", e)
+
     return {
         "account_code": "6401",
         "responses_snapshot": responses_snapshot,
         "prefix": "F5",
         "rollforward_tb": rollforward_tb,
         "adjudicated_cogs": adjudicated_cogs,
+        "project_context": project_context,
     }

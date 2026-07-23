@@ -23,9 +23,11 @@ import http from '@/utils/http'
 
 /** I2 支持导入导出的 sheet 编码 */
 export type I2ImportableSheet =
-  | 'I2-1'      // 审定表
-  | 'I2-2'      // 明细表（61列4区段分sheet导出）
-  | 'I2-7'      // 项目构成明细表（滚动阶段+费用性质）
+  | 'I2-1'
+  | 'I2-2'
+  | 'I2-7'
+  | 'I2-13'
+  | 'I2-14'
 
 export interface I2ImportResult {
   success: boolean
@@ -63,6 +65,8 @@ export const I2_IMPORTABLE_SHEETS: { code: I2ImportableSheet; label: string }[] 
   { code: 'I2-1', label: 'I2-1 审定表' },
   { code: 'I2-2', label: 'I2-2 明细表(61列4区段)' },
   { code: 'I2-7', label: 'I2-7 项目构成(滚动+费用性质)' },
+  { code: 'I2-13', label: 'I2-13 截止测试(账→单据)' },
+  { code: 'I2-14', label: 'I2-14 截止测试(单据→账)' },
 ]
 
 // ─── Composable ──────────────────────────────────────────────────────────────

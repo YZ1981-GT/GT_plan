@@ -16,10 +16,10 @@
         <el-tag size="small" type="info" effect="plain">{{ detailRows.length }} 行</el-tag>
       </div>
       <div class="header-actions">
-        <el-button size="small" type="primary" text @click="handleAiAssist">
+        <el-button size="small" type="primary" text :loading="aiLoading" @click="handleAiAssist">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
-        <el-button size="small" text @click="openReviewDialog?.('K12-2-detail', '营业外收入明细')">💬 复核</el-button>
+        <GtReviewTrigger section-id="K12-2-detail" label="💬 复核" />
       </div>
     </div>
 
@@ -68,12 +68,13 @@
         </el-table-column>
         <el-table-column prop="incomeType" label="收入类型" width="120">
           <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.incomeType" size="small" placeholder="—" @change="(v: string) => updateCell(row.rowKey, 'incomeType', v)">
-              <el-option value="政府补助" label="政府补助" />
-              <el-option value="债务重组利得" label="债务重组利得" />
-              <el-option value="资产盘盈" label="资产盘盈" />
-              <el-option value="罚款收入" label="罚款收入" />
+            <el-select v-if="!isReadonly" :model-value="row.incomeType" size="small" placeholder="—" filterable allow-create @change="(v: string) => updateCell(row.rowKey, 'incomeType', v)">
+              <el-option value="与日常活动无关的政府补助" label="与日常活动无关的政府补助" />
               <el-option value="捐赠利得" label="捐赠利得" />
+              <el-option value="盘盈利得（不包括存货盘盈及固定资产盘盈）" label="盘盈利得（不含存货及固定资产盘盈）" />
+              <el-option value="碳排放配额出售利得" label="碳排放配额出售利得" />
+              <el-option value="债务重组利得" label="债务重组利得" />
+              <el-option value="罚款收入" label="罚款收入" />
               <el-option value="确实无法支付" label="确实无法支付" />
               <el-option value="其他" label="其他" />
             </el-select>
@@ -218,12 +219,14 @@
  * - GtIndexChip跨底稿引用（K12-1 / K12-4）
  * - 合计行（show-summary）
  */
-import { ref, computed, inject, defineAsyncComponent, watch } from 'vue'
+import { ref, computed, defineAsyncComponent, watch } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
+import { generateK12AiText } from '../../composables/useK12AiText'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
+const GtReviewTrigger = defineAsyncComponent(() => import('../../GtReviewTrigger.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -237,8 +240,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
 }>()
-
-const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
 
 // ─── Detail Row 数据 ─────────────────────────────────────────────────────────
 
@@ -341,6 +342,8 @@ async function handleAddRow(): Promise<void> {
 
 function persistRows(): void {
   emit('save', STORAGE_KEY, JSON.stringify(detailRows.value))
+  // P0-5: 写 K12-2-subtotal 供 K12-1 审定表交叉验证读取（此前从不写→K12-1 恒显假差异）
+  emit('save', 'K12-2-subtotal', String(totalAmount.value))
 }
 
 // ─── 合计 ────────────────────────────────────────────────────────────────────
@@ -362,8 +365,32 @@ function fmtAmt(v: number | null | undefined): string {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function handleAiAssist(): void {
-  ElMessage.info('AI辅助明细分析...')
+const aiLoading = ref(false)
+
+async function handleAiAssist(): Promise<void> {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const context: Record<string, unknown> = {
+      科目: '6301 营业外收入明细',
+      明细笔数: detailRows.value.length,
+      合计金额: fmtAmt(totalAmount.value),
+      来源分布: detailRows.value
+        .map(r => `${r.incomeSource || '未命名'}(${r.incomeType || '—'})=${fmtAmt(r.amount)}`)
+        .slice(0, 30)
+        .join('；'),
+    }
+    const content = await generateK12AiText(props.wpId, {
+      prompt: '你是资深审计师。请基于营业外收入明细数据，分析各来源占比、异常波动及分类合理性（与日常活动无关计入营业外收入，相关计入其他收益），并提示非经常性损益列报关注点。',
+      section: 'K12-2-analysis',
+      context,
+    })
+    if (!content) return
+    // 无独立说明字段：以 ElMessageBox 呈现供参考
+    await ElMessageBox.alert(content, 'AI 明细分析建议', { confirmButtonText: '知道了' })
+  } catch { /* cancelled */ } finally {
+    aiLoading.value = false
+  }
 }
 
 // ─── 行级OCR（📎附件列 → POST /d4/contract-ocr → ElMessageBox确认 → merge） ─

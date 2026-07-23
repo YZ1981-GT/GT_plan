@@ -25,6 +25,7 @@
     <div class="toolbar-left">
       <el-button v-if="!isReadonly" size="small" type="primary" @click="addSample(1)">+ 添加本期样本</el-button>
       <el-button v-if="!isReadonly" size="small" @click="addSample(2)">+ 添加期后样本</el-button>
+      <el-button v-if="!isReadonly" size="small" type="warning" @click="showSamplingDialog = true">🎲 抽凭引擎</el-button>
     </div>
     <div class="toolbar-right">
       <el-dropdown size="small" trigger="click">
@@ -371,6 +372,18 @@
       <el-input v-model="auditNotes.conclusion" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="检查结论..." />
     </div>
   </el-card>
+
+  <!-- 抽凭引擎 -->
+  <GtVoucherSamplingEngine
+    v-if="showSamplingDialog"
+    account-code="1402"
+    phase="final"
+    :workpaper-id="props.wpId"
+    :project-id="props.projectId"
+    :year="samplingYear"
+    @filled="onSampleFilled"
+    @close="showSamplingDialog = false"
+  />
 </div>
 </template>
 
@@ -381,12 +394,13 @@
  * 凭证级检查表：双区块(本期+期后) + 5项核对结果(点选色块) + 检查比例汇总
  * 对齐源模板结构：客户/日期/凭证/对方科目/明细/金额/核实文件 + ①②③④⑤核对 + 索引/异常/备注
  */
-import { computed, inject, toRef, type Ref } from 'vue'
+import { computed, ref, inject, toRef, type Ref } from 'vue'
 import { useD6Inspection } from '../composables/useD6Inspection'
 import { useD6ImportExport } from '../composables/useD6ImportExport'
 import type { ChecklistResponse } from '../composables/useD6FormData'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import GtIndexChip from '../GtIndexChip.vue'
+import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 
 const props = defineProps<{
   wpId: string
@@ -395,6 +409,7 @@ const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  year?: number
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
@@ -436,6 +451,40 @@ const {
 })
 
 const sampleCount = computed(() => block1Rows.value.length + block2Rows.value.length)
+
+// ─── 抽凭引擎 ─────────────────────────────────────────────────────────
+const samplingYear = computed(() => props.year || new Date().getFullYear())
+const showSamplingDialog = ref(false)
+
+function onSampleFilled(payload: any) {
+  const samples: any[] = payload?.samples || []
+  if (samples.length === 0) return
+  const existingNos = new Set(block1Rows.value.map(r => r.voucherNo).filter(Boolean))
+  const mapped = samples
+    .filter((s: any) => s.voucherNo && !existingNos.has(s.voucherNo))
+    .map((s: any) => ({
+      rowId: `row-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+      customerName: s.counterpartAccount || '',
+      date: s.voucherDate || '',
+      voucherNo: s.voucherNo || '',
+      businessContent: s.summary || '',
+      counterAccount: '',
+      counterDetail: '',
+      debitAmount: s.debitAmount || 0,
+      creditAmount: s.creditAmount || 0,
+      supportDoc: '',
+      check1: '', check2: '', check3: '', check4: '', check5: '',
+      indexRef: '',
+      isAbnormal: '否',
+      remark: '',
+    }))
+  if (mapped.length > 0) {
+    block1Rows.value = [...block1Rows.value, ...mapped]
+    // Persist block1 rows
+    props.debouncedSave('D6-6-block1-rows', { remark: JSON.stringify(block1Rows.value) })
+  }
+  showSamplingDialog.value = false
+}
 
 // ─── 核对结果切换(点选色块) ───────────────────────────────────────────
 function toggleCheck(block: 1 | 2, rowId: string, field: string): void {

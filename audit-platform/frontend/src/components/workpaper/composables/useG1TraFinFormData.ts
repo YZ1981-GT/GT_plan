@@ -1,6 +1,7 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
 import type { ChecklistResponse } from './useF1FormData'
 import { G1_ACCOUNT_CODE } from './g1AdjudicationItems'
 import { useWorkpaperAuditYear } from './workpaperAuditYear'
@@ -50,6 +51,21 @@ export function useG1TraFinFormData(opts: {
           const sheets = data?.sheets ?? data?.data?.sheets ?? []
           for (const s of sheets) {
             sheetCache.value[s.sheet_name || s.name || 'default'] = s.html_data ?? s
+          }
+          // 合并 responses_snapshot（bundle内嵌场景防御性处理）
+          const snapshot = data?.html_data?.responses_snapshot ?? data?.responses_snapshot
+          if (snapshot && typeof snapshot === 'object' && !Array.isArray(snapshot)) {
+            for (const [k, v] of Object.entries(snapshot)) {
+              if (!k.startsWith('G1-')) continue
+              if (!allResponses.value.has(k)) {
+                const val = v as any
+                allResponses.value.set(k, {
+                  item_id: k,
+                  conclusion: val?.conclusion ?? null,
+                  remark: val?.remark ?? null,
+                })
+              }
+            }
           }
         })(),
       ])
@@ -105,6 +121,13 @@ export function useG1TraFinFormData(opts: {
         item_id: 'G1-1-adjudicated-amount',
         conclusion: String(auditedAmount),
         remark: null,
+      })
+      // 发布审定数变更事件（经 crossWpEventBridge 双向桥接 → G11/G13/附注消费）
+      eventBus.emit('substantive:adjudicated', {
+        accountCode: G1_ACCOUNT_CODE,
+        auditedAmount,
+        wpCode: 'G1',
+        timestamp: Date.now(),
       })
     } catch {
       ElMessage.warning('审定数回写试算失败，请手动确认试算表 1501')

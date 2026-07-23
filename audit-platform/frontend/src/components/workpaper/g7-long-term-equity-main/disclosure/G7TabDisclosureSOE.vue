@@ -332,6 +332,7 @@ import {
 } from '../../composables/g7DisclosureCrossSheet'
 import {
   G7_SOE_DISCLOSURE_SECTIONS,
+  buildG7SoeColumns,
   buildG7SoeSyncPayloads,
   createG7SoeDisclosureState,
   g7SoeChapterSections,
@@ -348,6 +349,8 @@ const ACCOUNT_CODE = '1511'
 const RESPONSE_KEY = 'G7-main-disclosure-soe-v2'
 const SHEET_NAME = '附注披露信息（国企）'
 const CURRENT_STANDARD = 'soe'
+// 列头元数据（disclosure-table-sync-convergence）：全部 SOE 子表键 → ColumnDef
+const soeColumns = buildG7SoeColumns()
 
 function resolveAuditYear(htmlData: Record<string, any> | null | undefined): number | undefined {
   const raw = htmlData?.project_context?.audit_year
@@ -785,6 +788,7 @@ async function syncToDisclosureNotes(): Promise<void> {
           sheet_name: SHEET_NAME,
           section_id: payload.noteSectionId,
           sub_table_data: payload.subTableData,
+          columns: soeColumns,
         })),
       },
     )

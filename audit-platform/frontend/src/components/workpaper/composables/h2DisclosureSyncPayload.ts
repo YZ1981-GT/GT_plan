@@ -44,12 +44,16 @@ import {
   type SoeSummaryRow,
 } from './h2SoeDisclosureModel'
 
+import type { ColumnDef } from './disclosureColumnDefs'
+
 export interface H2SyncFromWorkpaperPayload {
   wp_id: string
   sheet_name: string
   section_id: string
   current_standard: string
   sub_table_data: Record<string, Record<string, unknown>[]>
+  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 H2TabDisclosure el-table-column（两级表头扁平合并） */
+  columns?: Record<string, ColumnDef[]>
 }
 
 export interface H2ListedSyncSnapshot {
@@ -345,6 +349,96 @@ export function buildH2SoeSubTableData(state: H2SoeSyncSnapshot): Record<string,
   }
 }
 
+// ─── 列头定义（label 取自 H2TabDisclosure el-table-column，两级表头扁平合并）───
+
+const H2_LISTED_COLUMNS: Record<string, ColumnDef[]> = {
+  [H2_LISTED_SUBTABLE.summary]: [
+    { key: 'label', label: '项目', is_label: true },
+    { key: 'end_balance', label: '期末余额', format: 'amount' },
+    { key: 'prior_balance', label: '上年年末余额', format: 'amount' },
+  ],
+  [H2_LISTED_SUBTABLE.detail]: [
+    { key: 'label', label: '项目', is_label: true },
+    { key: 'end_book', label: '期末余额-账面余额', format: 'amount' },
+    { key: 'end_impairment', label: '期末余额-减值准备', format: 'amount' },
+    { key: 'end_net', label: '期末余额-账面净值', format: 'amount' },
+    { key: 'prior_book', label: '上年年末余额-账面余额', format: 'amount' },
+    { key: 'prior_impairment', label: '上年年末余额-减值准备', format: 'amount' },
+    { key: 'prior_net', label: '上年年末余额-账面净值', format: 'amount' },
+  ],
+  [H2_LISTED_SUBTABLE.projectMovement]: [
+    { key: 'label', label: '工程名称', is_label: true },
+    { key: 'begin_balance', label: '期初余额', format: 'amount' },
+    { key: 'increase', label: '本期增加', format: 'amount' },
+    { key: 'transfer_to_fa', label: '转入固定资产', format: 'amount' },
+    { key: 'other_decrease', label: '其他减少', format: 'amount' },
+    { key: 'interest_cap_accum', label: '利息资本化累计金额', format: 'amount' },
+    { key: 'interest_cap_current', label: '其中：本期利息资本化金额', format: 'amount' },
+    { key: 'interest_cap_rate', label: '本期利息资本化率%' },
+    { key: 'end_balance', label: '期末余额', format: 'amount' },
+  ],
+  [H2_LISTED_SUBTABLE.projectCont]: [
+    { key: 'label', label: '工程名称', is_label: true },
+    { key: 'budget', label: '预算数', format: 'amount' },
+    { key: 'cum_input_pct', label: '工程累计投入占预算比例%' },
+    { key: 'progress', label: '工程进度' },
+    { key: 'fund_source', label: '资金来源' },
+  ],
+  [H2_LISTED_SUBTABLE.impairment]: [
+    { key: 'label', label: '项目', is_label: true },
+    { key: 'begin_balance', label: '期初余额', format: 'amount' },
+    { key: 'provision', label: '本期计提', format: 'amount' },
+    { key: 'decrease', label: '本期减少', format: 'amount' },
+    { key: 'end_balance', label: '期末余额', format: 'amount' },
+  ],
+  [H2_LISTED_SUBTABLE.materials]: [
+    { key: 'label', label: '项目', is_label: true },
+    { key: 'end_balance', label: '期末余额', format: 'amount' },
+    { key: 'prior_balance', label: '上年年末余额', format: 'amount' },
+  ],
+  [H2_LISTED_SUBTABLE.restricted]: [
+    { key: 'label', label: '项目', is_label: true },
+    { key: 'amount', label: '金额', format: 'amount' },
+    { key: 'description', label: '说明' },
+    { key: 'remark', label: '备注' },
+  ],
+}
+
+const H2_SOE_TWO_LEVEL: ColumnDef[] = [
+  { key: 'label', label: '项目', is_label: true },
+  { key: 'end_book', label: '期末余额-账面余额', format: 'amount' },
+  { key: 'end_impairment', label: '期末余额-减值准备', format: 'amount' },
+  { key: 'end_carrying', label: '期末余额-账面价值', format: 'amount' },
+  { key: 'begin_book', label: '期初余额-账面余额', format: 'amount' },
+  { key: 'begin_impairment', label: '期初余额-减值准备', format: 'amount' },
+  { key: 'begin_carrying', label: '期初余额-账面价值', format: 'amount' },
+]
+
+const H2_SOE_COLUMNS: Record<string, ColumnDef[]> = {
+  [H2_SOE_SUBTABLE.summary]: H2_SOE_TWO_LEVEL,
+  [H2_SOE_SUBTABLE.detail]: H2_SOE_TWO_LEVEL,
+  [H2_SOE_SUBTABLE.projectMovement]: [
+    { key: 'label', label: '项目名称', is_label: true },
+    { key: 'budget', label: '预算数', format: 'amount' },
+    { key: 'begin_balance', label: '期初余额', format: 'amount' },
+    { key: 'increase', label: '本期增加', format: 'amount' },
+    { key: 'transfer_to_fa', label: '本期转入固定资产金额', format: 'amount' },
+    { key: 'other_decrease', label: '本期其他减少金额', format: 'amount' },
+    { key: 'end_balance', label: '期末余额', format: 'amount' },
+    { key: 'cum_input_pct', label: '工程累计投入占预算比例(%)' },
+    { key: 'progress', label: '工程进度' },
+    { key: 'interest_cap_accum', label: '利息资本化累计金额', format: 'amount' },
+    { key: 'interest_cap_current', label: '其中：本期利息资本化金额', format: 'amount' },
+    { key: 'interest_cap_rate', label: '本期利息资本化率(%)' },
+    { key: 'fund_source', label: '资金来源' },
+  ],
+  [H2_SOE_SUBTABLE.impairment]: [
+    { key: 'label', label: '项目', is_label: true },
+    { key: 'provision_amount', label: '计提金额', format: 'amount' },
+    { key: 'reason', label: '原因' },
+  ],
+}
+
 export function buildH2ListedSyncPayloads(
   wpId: string,
   applicableStandards: readonly string[] | null | undefined,
@@ -358,6 +452,7 @@ export function buildH2ListedSyncPayloads(
     section_id: H2_NOTE_SECTION.listed,
     current_standard: resolveH2CurrentStandard(variant, applicableStandards),
     sub_table_data: buildH2ListedSubTableData(state),
+    columns: H2_LISTED_COLUMNS,
   }]
 }
 
@@ -374,5 +469,6 @@ export function buildH2SoeSyncPayloads(
     section_id: H2_NOTE_SECTION.soe,
     current_standard: resolveH2CurrentStandard(variant, applicableStandards),
     sub_table_data: buildH2SoeSubTableData(state),
+    columns: H2_SOE_COLUMNS,
   }]
 }

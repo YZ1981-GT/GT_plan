@@ -1,14 +1,18 @@
 /**
- * useD7DetailColumnPrefs — D7 合同负债明细表列显示偏好
+ * useD7DetailColumnPrefs — D7 合同负债明细表列显示偏好（动态账龄段）
  *
  * 功能：
  * - 按分组管理列的显隐（核心组始终显示）
+ * - 账龄组按当前项目账龄段（segments）动态生成显隐项（agingPrior.{key}/agingAudited.{key}）
  * - 偏好持久化到 localStorage（key: 'd7-detail-column-prefs'）
  * - 切换单列显隐 / 重置为默认隐藏方案
  *
  * 套 K7-5 / K8-8 范式：轻量 localStorage 方案
+ * Spec: d7-contract-liabilities-enhancement Task 8
+ * Requirements: 2.4, 2.5
  */
-import { ref } from 'vue'
+import { ref, computed, type Ref, type ComputedRef } from 'vue'
+import type { AgingSegment } from '@/composables/useAgingConfig'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -22,12 +26,12 @@ export interface ColumnGroup {
 
 const STORAGE_KEY = 'd7-detail-column-prefs'
 
-export const COLUMN_GROUPS: ColumnGroup[] = [
+/** 非账龄基础列组（账龄组按 segments 动态生成） */
+const BASE_COLUMN_GROUPS: ColumnGroup[] = [
   { label: '核心', keys: ['customerName', 'contractName', 'natureType', 'endAudited', 'remark'], alwaysShow: true },
   { label: '期初', keys: ['priorUnadjusted', 'priorAje', 'priorRje', 'priorAudited'] },
   { label: '本期变动', keys: ['creditAmount', 'debitAmount', 'endUnadjusted'] },
   { label: '期末调整', keys: ['endAje', 'endRje'] },
-  { label: '账龄', keys: ['endAging1', 'endAging2', 'endAging3', 'endAging4'] },
   { label: '关联方', keys: ['relatedPartyType'] },
 ]
 
@@ -35,29 +39,42 @@ export const DEFAULT_HIDDEN: string[] = ['priorAje', 'priorRje', 'endAje', 'endR
 
 // Keys that are always visible (from alwaysShow group)
 const ALWAYS_VISIBLE_KEYS = new Set(
-  COLUMN_GROUPS.filter(g => g.alwaysShow).flatMap(g => g.keys)
+  BASE_COLUMN_GROUPS.filter(g => g.alwaysShow).flatMap(g => g.keys)
 )
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-export function useD7DetailColumnPrefs() {
+export function useD7DetailColumnPrefs(segments?: Ref<AgingSegment[]>) {
   const hiddenKeys = ref<Set<string>>(loadFromStorage())
 
-  /**
-   * Returns true if the column should be visible:
-   * - alwaysShow group keys are always visible regardless of hiddenKeys
-   * - Other keys are visible only if NOT in hiddenKeys
-   */
+  const segs = segments ?? ref<AgingSegment[]>([])
+
+  /** 账龄列组按当前 segments 动态生成（期初审定账龄 + 期末审定账龄各段） */
+  const columnGroups: ComputedRef<ColumnGroup[]> = computed(() => {
+    const priorKeys = segs.value.map(s => `agingPrior.${s.key}`)
+    const auditedKeys = segs.value.map(s => `agingAudited.${s.key}`)
+    return [
+      ...BASE_COLUMN_GROUPS,
+      { label: '期初账龄', keys: priorKeys },
+      { label: '期末账龄', keys: auditedKeys },
+    ]
+  })
+
+  /** 段列 label 映射（供组件展示） */
+  const colLabel = (key: string): string => {
+    if (key.startsWith('agingPrior.') || key.startsWith('agingAudited.')) {
+      const segKey = key.split('.')[1]
+      return segs.value.find(s => s.key === segKey)?.label || segKey
+    }
+    return key
+  }
+
   function isColVisible(key: string): boolean {
     if (ALWAYS_VISIBLE_KEYS.has(key)) return true
     return !hiddenKeys.value.has(key)
   }
 
-  /**
-   * Toggle a column's visibility (add/remove from hiddenKeys), then persist.
-   */
   function toggleCol(key: string): void {
-    // Don't allow toggling always-visible columns
     if (ALWAYS_VISIBLE_KEYS.has(key)) return
     const next = new Set(hiddenKeys.value)
     if (next.has(key)) {
@@ -69,9 +86,6 @@ export function useD7DetailColumnPrefs() {
     persistToStorage(next)
   }
 
-  /**
-   * Reset hiddenKeys to DEFAULT_HIDDEN, persist.
-   */
   function resetDefaults(): void {
     const defaults = new Set(DEFAULT_HIDDEN)
     hiddenKeys.value = defaults
@@ -79,11 +93,12 @@ export function useD7DetailColumnPrefs() {
   }
 
   return {
-    columnGroups: COLUMN_GROUPS,
+    columnGroups,
     hiddenKeys,
     isColVisible,
     toggleCol,
     resetDefaults,
+    colLabel,
   }
 }
 

@@ -46,6 +46,28 @@
 
       <template v-else>
 
+      <!-- 全局勾稽告警（跨 sheet 聚合，ECL/坏账/贴现披露口径）-->
+
+      <div v-if="globalAlerts.length" class="d1-global-alerts">
+
+        <el-alert
+
+          v-for="(a, i) in globalAlerts"
+
+          :key="`d1-galert-${i}`"
+
+          :type="a.type"
+
+          :closable="false"
+
+          show-icon
+
+          :title="a.text"
+
+        />
+
+      </div>
+
       <!-- 底稿目录 / D1 主入口 -->
 
       <D1TabIndex
@@ -98,6 +120,8 @@
 
         :sheet-name="props.sheetName"
 
+        :tb-seed-amount="tbNotesReceivableAmount"
+
       />
 
       <D1TabDetailCategory
@@ -131,6 +155,8 @@
         :sheet-name="props.sheetName"
 
         :related-parties="relatedParties"
+
+        :bs-date="bsDate"
 
       />
 
@@ -335,6 +361,8 @@
         :is-readonly="props.readonly ?? false"
 
         :sheet-name="props.sheetName"
+
+        :year="props.year"
 
       />
 
@@ -597,6 +625,19 @@ const relatedParties = computed<string[]>(() => {
 
 const d1ReviewSection = computed(() => resolveD1ReviewSection(currentSheet.value))
 
+// 试算平衡表应收票据(1121)数：由 render 提供，供 D1-1 审定表 TB 差异行预填
+const tbNotesReceivableAmount = computed<number>(() => {
+  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext
+  const v = Number(ctx?.tb_amount)
+  return Number.isFinite(v) ? v : 0
+})
+
+// 资产负债表日（render 提供）：供 D1-3 期后兑付取数窗口
+const bsDate = computed<string>(() => {
+  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext
+  return String(ctx?.bs_date ?? '')
+})
+
 
 
 const availableSheets = computed(() =>
@@ -712,6 +753,37 @@ const crossSheet = useD1CrossSheet({ allResponses })
 useD1EventBus(allResponses, saveDebouncedText)
 
 
+
+// ─── 全局勾稽告警（跨 sheet 聚合）─────────────────────────────────────────
+function fmtYuan(v: number): string {
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+const globalAlerts = computed<Array<{ type: 'warning' | 'info' | 'success'; text: string }>>(() => {
+  const alerts: Array<{ type: 'warning' | 'info' | 'success'; text: string }> = []
+  const sheet = currentSheet.value
+  // ① ECL 模型应计提 vs D1-4 坏账准备审定：差异>1 元提示（ECL/坏账 tab 内已自处理，排除避重复）
+  if (sheet !== 'D1-15' && sheet !== 'D1-4') {
+    const should = crossSheet.eclShouldProvision.value
+    const diff = crossSheet.eclVsBadDebtDiff.value
+    if (should > 0 && Math.abs(diff) > 1) {
+      alerts.push({
+        type: 'warning',
+        text: `ECL 勾稽差异：D1-15 模型应计提减值 ${fmtYuan(should)} 元 与 D1-4 坏账准备审定合计 ${fmtYuan(crossSheet.badDebtTotalAudited.value)} 元 相差 ${fmtYuan(diff)} 元，请核对减值计提口径。`,
+      })
+    }
+  }
+  // ② D1-8 已贴现未终止确认票据：需表外披露 / 与 D5 应收款项融资勾稽（D1-8 tab 内已自处理，排除）
+  if (sheet !== 'D1-8') {
+    const disc = crossSheet.discountNotDerecognizedTotal.value
+    if (disc > 0) {
+      alerts.push({
+        type: 'info',
+        text: `D1-8 已贴现尚未终止确认票据 ${fmtYuan(disc)} 元：仍应列示应收票据并作表外披露，请与 D5 应收款项融资／附注质押担保勾稽。`,
+      })
+    }
+  }
+  return alerts
+})
 
 const wpIdRef = toRef(props, 'wpId')
 
@@ -846,6 +918,18 @@ onBeforeUnmount(() => {
   align-items: center;
 
   gap: 12px;
+
+  margin-bottom: 12px;
+
+}
+
+.d1-global-alerts {
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 8px;
 
   margin-bottom: 12px;
 

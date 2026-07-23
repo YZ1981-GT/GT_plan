@@ -7,6 +7,8 @@ import {
   normalizeRelatedPartyRow,
   mergeRelatedPartyFromImport,
   createEmptyRelatedPartyRow,
+  relatedPartyNameMatches,
+  computeMissingRelatedParties,
   F1_RELATED_PARTY_RELATIONSHIP_OPTIONS,
 } from '../useF1RelatedParty'
 
@@ -97,5 +99,41 @@ describe('useF1RelatedParty helpers', () => {
     const b = merged.find(r => r.partyName === '乙')!
     expect(b.relationship).toBe('联营企业')
     expect(b.endBalance).toBe(50)
+  })
+})
+
+describe('F1-6 关联方完整性校验', () => {
+  it('relatedPartyNameMatches: 双向包含/忽略空白大小写', () => {
+    expect(relatedPartyNameMatches('甲公司', '甲公司')).toBe(true)
+    expect(relatedPartyNameMatches('甲公司 ', ' 甲公司')).toBe(true)
+    expect(relatedPartyNameMatches('北京甲科技有限公司', '甲科技')).toBe(true)
+    expect(relatedPartyNameMatches('ABC Co', 'abc')).toBe(true)
+    expect(relatedPartyNameMatches('甲公司', '乙公司')).toBe(false)
+    expect(relatedPartyNameMatches('', '甲')).toBe(false)
+    expect(relatedPartyNameMatches('甲', '')).toBe(false)
+  })
+
+  it('computeMissingRelatedParties: 返回清单中未在本表识别的关联方', () => {
+    const registry = ['甲科技有限公司', '乙贸易', '丙集团', '']
+    const rows = [
+      { partyName: '北京甲科技有限公司' }, // 模糊匹配甲科技有限公司
+      { partyName: '乙贸易' },
+    ]
+    const missing = computeMissingRelatedParties(registry, rows)
+    expect(missing).toEqual(['丙集团'])
+  })
+
+  it('computeMissingRelatedParties: 空清单返回空数组', () => {
+    expect(computeMissingRelatedParties([], [{ partyName: '甲' }])).toEqual([])
+  })
+
+  it('computeMissingRelatedParties: 去重清单中的重复名', () => {
+    const missing = computeMissingRelatedParties(['甲', '甲', '乙'], [])
+    expect(missing).toEqual(['甲', '乙'])
+  })
+
+  it('computeMissingRelatedParties: 全部已识别时返回空', () => {
+    const missing = computeMissingRelatedParties(['甲', '乙'], [{ partyName: '甲' }, { partyName: '乙' }])
+    expect(missing).toEqual([])
   })
 })

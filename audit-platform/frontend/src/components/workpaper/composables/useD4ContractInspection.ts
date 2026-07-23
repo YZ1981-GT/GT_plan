@@ -288,10 +288,41 @@ export function useD4ContractInspection(options: UseD4ContractInspectionOptions)
     contracts.value.reduce((sum, c) => sum + parseNum(c.contractAmount), 0),
   )
 
+  /** 营业收入审定合计：从 D4-2(主营) + D4-3(其他) 聚合（与 crossSheet 口径一致） */
+  const totalRevenueAudited = computed(() => {
+    let total = 0
+    // D4-2 主营：SUM(months) + auditAdjustment
+    const d2resp = allResponses.value.get('D4-2-rows')
+    if (d2resp?.remark) {
+      try {
+        const rows = JSON.parse(d2resp.remark)
+        if (Array.isArray(rows)) {
+          for (const r of rows) {
+            const months = Array.isArray(r.months) ? r.months.map(parseNum) : []
+            total += months.reduce((s: number, v: number) => s + v, 0) + parseNum(r.auditAdjustment)
+          }
+        }
+      } catch { /* silent */ }
+    }
+    // D4-3 其他：currentAudited 优先，否则 currentUnadjusted + currentAdjustment
+    const d3resp = allResponses.value.get('D4-3-rows')
+    if (d3resp?.remark) {
+      try {
+        const rows = JSON.parse(d3resp.remark)
+        if (Array.isArray(rows)) {
+          for (const r of rows) {
+            total += r.currentAudited != null
+              ? parseNum(r.currentAudited)
+              : parseNum(r.currentUnadjusted) + parseNum(r.currentAdjustment)
+          }
+        }
+      } catch { /* silent */ }
+    }
+    return total
+  })
+
   const coverageRate = computed(() => {
-    // 从allResponses读D4-1审定表的总收入
-    const totalRevenueResp = allResponses.value.get('D4-adj-revenue-total')
-    const totalRevenue = parseNum(totalRevenueResp?.remark)
+    const totalRevenue = totalRevenueAudited.value
     if (totalRevenue <= 0) return 0
     return Math.min((totalContractAmount.value / totalRevenue) * 100, 100)
   })

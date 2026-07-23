@@ -26,6 +26,7 @@
  * Requirements: 7.1-7.6, 8.1-8.6, 9.1-9.5, 15.3, 15.6, 15.9
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ElMessage } from 'element-plus'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import { sumColumn, computePledgeRatio, type PledgeRow } from './d1InspectionFormulas'
 import { useD1ImportExport, type ImportResult } from './useD1ImportExport'
@@ -73,6 +74,9 @@ const STRING_FIELDS: Array<keyof PledgeRow> = [
   'pledgePeriod',
   'pledgeAgreement',
   'indexRef',
+  'attachmentId',
+  'attachmentName',
+  'ocrStatus',
 ]
 
 /** select类字段（立即保存） */
@@ -112,6 +116,9 @@ export function emptyPledgeRow(): PledgeRow {
     pledgePeriod: '',
     pledgeAgreement: '',
     indexRef: '',
+    attachmentId: '',
+    attachmentName: '',
+    ocrStatus: 'none',
   }
 }
 
@@ -472,6 +479,94 @@ export function useD1PledgeCheck(options: UseD1PledgeCheckOptions) {
     return result.count
   }
 
+  // ─── 行级 OCR ─────────────────────────────────────────────────────────────────
+
+  /**
+   * 行级 OCR 上传：上传附件 → 调 /api/d4/contract-ocr → 确认后填入空字段
+   * 映射: counterparty → pledgee, amount → pledgeAmount, date → pledgePeriod
+   */
+  async function handleOcrUpload(rowId: string, file: File): Promise<void> {
+    if (isReadonly.value) return
+    const idx = rows.value.findIndex((r) => r.id === rowId)
+    if (idx === -1) return
+
+    // 标记 processing
+    const updatedRows = [...rows.value]
+    updatedRows[idx] = { ...updatedRows[idx], ocrStatus: 'processing', attachmentName: file.name }
+    rows.value = updatedRows
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await http.post('/api/d4/contract-ocr', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      const ocrData = res.data?.data ?? res.data ?? {}
+
+      // 映射 OCR 字段
+      const mappedFields: Array<{ label: string; field: keyof PledgeRow; value: string }> = []
+      if (ocrData.counterparty) mappedFields.push({ label: '质权人', field: 'pledgee', value: String(ocrData.counterparty) })
+      if (ocrData.amount) mappedFields.push({ label: '质押金额', field: 'pledgeAmount', value: String(ocrData.amount) })
+      if (ocrData.date) mappedFields.push({ label: '质押期限', field: 'pledgePeriod', value: String(ocrData.date) })
+
+      if (mappedFields.length === 0) {
+        ElMessage.info('OCR 未识别到可用字段')
+        const doneRows = [...rows.value]
+        doneRows[idx] = { ...doneRows[idx], ocrStatus: 'done' }
+        rows.value = doneRows
+        persistRowsImmediate()
+        return
+      }
+
+      // 确认弹窗
+      const msgHtml = mappedFields.map(f => `<li><b>${f.label}</b>：${f.value}</li>`).join('')
+      const { default: ElMessageBox } = await import('element-plus')
+      await ElMessageBox.confirm(
+        `<p>OCR 识别结果（仅填入空字段）：</p><ul>${msgHtml}</ul>`,
+        'OCR 识别确认',
+        { dangerouslyUseHTMLString: true, confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' },
+      )
+
+      // 只填入空字段
+      const row = { ...rows.value[idx] }
+      for (const mf of mappedFields) {
+        const currentVal = (row as any)[mf.field]
+        if (mf.field === 'pledgeAmount') {
+          if (currentVal === 0 || currentVal === '') {
+            ;(row as any)[mf.field] = parseNum(mf.value)
+          }
+        } else {
+          if (!currentVal) {
+            ;(row as any)[mf.field] = mf.value
+          }
+        }
+      }
+      row.ocrStatus = 'done'
+      const finalRows = [...rows.value]
+      finalRows[idx] = row
+      rows.value = finalRows
+      persistRowsImmediate()
+      ElMessage.success('OCR 结果已填入')
+    } catch (err: any) {
+      if (err !== 'cancel' && err?.toString?.() !== 'cancel') {
+        // 非用户取消的错误
+        const errRows = [...rows.value]
+        errRows[idx] = { ...errRows[idx], ocrStatus: 'none' }
+        rows.value = errRows
+        if (err?.response || err?.message) {
+          ElMessage.warning('OCR 识别失败，请重试')
+        }
+      } else {
+        // 用户取消
+        const cancelRows = [...rows.value]
+        cancelRows[idx] = { ...cancelRows[idx], ocrStatus: 'done' }
+        rows.value = cancelRows
+      }
+      persistRowsImmediate()
+    }
+  }
+
   // ─── Cleanup ─────────────────────────────────────────────────────────────
 
   onBeforeUnmount(() => {
@@ -517,6 +612,9 @@ export function useD1PledgeCheck(options: UseD1PledgeCheckOptions) {
     // 从备查簿D1-7导入已质押票据
     importFromMemo,
     appendFromMemo,
+
+    // 行级 OCR
+    handleOcrUpload,
   }
 }
 

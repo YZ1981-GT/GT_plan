@@ -5,6 +5,7 @@
  * 比照 useD4Adjudication
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { eventBus } from '@/utils/eventBus'
 import {
   parseNum,
   calcAuditedAmount,
@@ -12,7 +13,7 @@ import {
   calcSubtotal,
 } from './useF3FormulaEngine'
 import type { ChecklistResponse } from './useF3FormData'
-import { rowClosingAdjusted } from './useF3CrossSheet'
+import { rowClosingAdjusted, F3_CATEGORY_META, type F3CategoryKey } from './useF3CrossSheet'
 
 export interface UseF3BaseOptions {
   wpId: Ref<string>
@@ -58,35 +59,32 @@ interface StoredF3AdjRow {
 const ADJ_STORAGE_KEY = 'F3-1-adj-rows'
 const BALANCE_TOLERANCE = 0.005
 
+function categoryDefaultStored(rowKey: F3CategoryKey, label: string): StoredF3AdjRow {
+  return {
+    rowKey,
+    label,
+    isFixed: true,
+    openingUnadjusted: 0,
+    openingAje: 0,
+    openingRje: 0,
+    periodCredit: 0,
+    periodDebit: 0,
+    closingAje: 0,
+    closingRje: 0,
+    indexRef: '',
+    isFromCrossSheet: false,
+  }
+}
+
+/** 各票据类别默认存储行（单一真源，供审定表按需补行） */
+const CATEGORY_DEFAULT: Record<F3CategoryKey, StoredF3AdjRow> = Object.fromEntries(
+  F3_CATEGORY_META.map((m) => [m.rowKey, categoryDefaultStored(m.rowKey, m.label)]),
+) as Record<F3CategoryKey, StoredF3AdjRow>
+
+/** 银行/商业承兑默认始终展示；供应链/其他按明细存在时动态补入 */
 const DEFAULT_STORED: StoredF3AdjRow[] = [
-  {
-    rowKey: 'bank',
-    label: '银行承兑汇票',
-    isFixed: true,
-    openingUnadjusted: 0,
-    openingAje: 0,
-    openingRje: 0,
-    periodCredit: 0,
-    periodDebit: 0,
-    closingAje: 0,
-    closingRje: 0,
-    indexRef: '',
-    isFromCrossSheet: false,
-  },
-  {
-    rowKey: 'commercial',
-    label: '商业承兑汇票',
-    isFixed: true,
-    openingUnadjusted: 0,
-    openingAje: 0,
-    openingRje: 0,
-    periodCredit: 0,
-    periodDebit: 0,
-    closingAje: 0,
-    closingRje: 0,
-    indexRef: '',
-    isFromCrossSheet: false,
-  },
+  { ...CATEGORY_DEFAULT.bank },
+  { ...CATEGORY_DEFAULT.commercial },
 ]
 
 function safeParseRows<T>(jsonStr: string | null | undefined): T[] {
@@ -142,26 +140,31 @@ export function useF3Adjudication(options: UseF3BaseOptions & { crossSheet?: Ret
   const auditNote = ref('')
   const auditConclusion = ref('')
 
+  const CATEGORY_KEYS = new Set<string>(F3_CATEGORY_META.map((m) => m.rowKey))
+
   const storedRows = computed<StoredF3AdjRow[]>(() => {
     const resp = allResponses.value.get(ADJ_STORAGE_KEY)
-    return ensureDefaultRows(safeParseRows<StoredF3AdjRow>(resp?.remark))
+    const base = ensureDefaultRows(safeParseRows<StoredF3AdjRow>(resp?.remark))
+    // P0-1：明细存在供应链/其他票据时，动态补入对应审定行（避免金额被丢弃）
+    if (crossSheet) {
+      const keys = new Set(base.map((r) => r.rowKey))
+      for (const key of ['supplychain', 'other'] as F3CategoryKey[]) {
+        if (!keys.has(key) && crossSheet.hasCategory(key)) {
+          base.push({ ...CATEGORY_DEFAULT[key] })
+        }
+      }
+    }
+    return base
   })
 
 function mergeCrossSheet(stored: StoredF3AdjRow): StoredF3AdjRow {
   if (!crossSheet?.hasDetailData.value) return stored
-  if (stored.rowKey === 'bank') {
+  if (CATEGORY_KEYS.has(stored.rowKey)) {
+    const key = stored.rowKey as F3CategoryKey
     return {
       ...stored,
-      periodCredit: crossSheet.bankPeriodCredit.value,
-      periodDebit: crossSheet.bankPeriodDebit.value,
-      isFromCrossSheet: true,
-    }
-  }
-  if (stored.rowKey === 'commercial') {
-    return {
-      ...stored,
-      periodCredit: crossSheet.commercialPeriodCredit.value,
-      periodDebit: crossSheet.commercialPeriodDebit.value,
+      periodCredit: crossSheet.periodCreditByKey(key),
+      periodDebit: crossSheet.periodDebitByKey(key),
       isFromCrossSheet: true,
     }
   }
@@ -231,7 +234,12 @@ function mergeCrossSheet(stored: StoredF3AdjRow): StoredF3AdjRow {
   function updateCell(rowKey: string, field: string, value: number | string): void {
     if (readonly.value) return
     const stored = ensureDefaultRows(safeParseRows<StoredF3AdjRow>(allResponses.value.get(ADJ_STORAGE_KEY)?.remark))
-    const idx = stored.findIndex((r) => r.rowKey === rowKey)
+    let idx = stored.findIndex((r) => r.rowKey === rowKey)
+    // P0-1：首次编辑动态类别行（供应链/其他）时落库，保证可持久化
+    if (idx === -1 && CATEGORY_KEYS.has(rowKey)) {
+      stored.push({ ...CATEGORY_DEFAULT[rowKey as F3CategoryKey] })
+      idx = stored.length - 1
+    }
     if (idx === -1) return
     if (field === 'indexRef') {
       stored[idx].indexRef = String(value ?? '')
@@ -278,8 +286,9 @@ function mergeCrossSheet(stored: StoredF3AdjRow): StoredF3AdjRow {
       accountCode: '2201',
       auditedAmount: amount,
     }
+    // P1-8：统一走 eventBus（crossWpEventBridge 会镜像到 window，旧监听者不受影响）
     try {
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
+      eventBus.emit('substantive:adjudicated', payload)
     } catch { /* silent */ }
 
     if (projectId.value) {

@@ -53,8 +53,10 @@
                 <div class="gt-b14__chapter-header">
                   <span class="gt-b14__chapter-title">{{ ch.title }}</span>
                   <GtIndexChip v-if="ch.id === 'ch6' && crossRefs.b15" :wp-id="crossRefs.b15" label="B15" />
+                  <el-button v-if="ch.id === 'ch6'" size="small" text type="primary" @click.stop="prefillCh6">📊 从试算表预填</el-button>
                   <GtIndexChip v-if="ch.id === 'ch9' && crossRefs.b22a" :wp-id="crossRefs.b22a" label="B22A" />
                   <GtIndexChip v-if="ch.id === 'ch13' && crossRefs.b50" :wp-id="crossRefs.b50" label="B50" />
+                  <el-button v-if="ch.id === 'ch10'" size="small" text type="primary" @click.stop="prefillCh10">🔗 从 B19 预填关联方</el-button>
                 </div>
               </template>
 
@@ -172,7 +174,12 @@
 
         <!-- Signature Card -->
         <el-card shadow="never" class="gt-b14__signature-card">
-          <template #header><span class="gt-b14__card-title">签字区</span></template>
+          <template #header>
+            <div class="gt-b14__card-header">
+              <span class="gt-b14__card-title">签字区</span>
+              <GtReviewTrigger section-id="b14-conclusion" label="💬 复核" />
+            </div>
+          </template>
           <div class="gt-b14__sig-grid">
             <div class="gt-b14__sig-row">
               <span class="gt-b14__sig-label">项目合伙人</span>
@@ -194,7 +201,7 @@
     </div>
 
     <!-- Online Edit Mode -->
-    <GtOnlyOfficeSheet v-else-if="mode === '在线编辑'" :wp-id="props.wpId" sheet-name="B1-4" class="gt-b14__oo" />
+    <GtOnlyOfficeSheet v-else-if="mode === '在线编辑'" :wp-id="props.wpId" :sheet-name="sourceSheet || '尽职调查报告B1-4'" :project-id="props.projectId" class="gt-b14__oo" />
 
     <!-- AI 建议稿弹窗 -->
     <el-dialog v-model="aiDialogVisible" title="AI 建议稿" width="600px" :close-on-click-modal="false">
@@ -214,15 +221,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent, inject, provide } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { toRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useB14DueDiligence, type B14RenderData, type B14ChapterData } from './composables/useB14DueDiligence'
 import { useB14Navigation } from './composables/useB14Navigation'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
+import GtReviewTrigger from './GtReviewTrigger.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GtIndexChip = defineAsyncComponent(() => import('./GtIndexChip.vue'))
+
+// 版本快照由 Runtime Boundary(GtWpRenderer) 提供；复核对话由 GtReviewTrigger 自行 inject
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
+const scheduleAutoSnapshot = () => runtime?.version?.scheduleAutoSnapshot?.()
 
 defineOptions({ name: 'GtB14DueDiligenceReport' })
 
@@ -240,14 +254,21 @@ const variantLabel = ref('标准版')
 
 // ─── Composable ───
 const {
-  chapters, variant, signature, projectContext, saveStatus, loading,
+  chapters, variant, signature, projectContext, sourceSheet, saveStatus, loading,
   updateTextarea, updateTableRows, addTableRow, removeTableRow,
   setVariant, updateSignature, flushPendingSaves, loadData,
+  financialIndicators, relatedParties,
 } = useB14DueDiligence({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   htmlData: toRef(props, 'htmlData'),
+  onAfterSave: () => scheduleAutoSnapshot?.(),
 })
+
+// 复核线程蓝/红点（供后代 GtReviewTrigger/GtReviewDot inject）
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId') as any)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 // ─── Navigation ───
 const { activeChapter, scrollToChapter, completionStatus, overallProgress } = useB14Navigation({
@@ -256,7 +277,7 @@ const { activeChapter, scrollToChapter, completionStatus, overallProgress } = us
 })
 
 // ─── AI Assist State ───
-const aiEnabled = ref(false)
+const aiEnabled = ref(true) // AI 默认可用，调用时按实际响应降级
 const aiLoading = ref(false)
 const aiDialogVisible = ref(false)
 const aiDraft = ref('')
@@ -364,14 +385,6 @@ function handleTableCellEdit(chapterId: string, tableId: string, rowIndex: numbe
 }
 
 // ─── AI Assist ───
-async function checkAiEnabled() {
-  try {
-    const { api } = await import('@/services/apiProxy')
-    const resp = await api.get('/api/feature-flags', { _silent: true } as any) as any
-    const flags = resp?.flags || resp || {}
-    aiEnabled.value = !!flags.WP_AI_SERVICE_ENABLED
-  } catch { aiEnabled.value = false }
-}
 
 function handleAiClick(chapterId: string, field: string, mode: string) {
   aiTargetChapterId.value = chapterId
@@ -402,12 +415,22 @@ async function doAiGenerate(chapterId: string, field: string, mode: 'generate' |
   aiError.value = ''
   try {
     const { api } = await import('@/services/apiProxy')
-    const result = await api.post(
-      `/api/projects/${props.projectId}/b14/chapters/${chapterId}/ai-generate`,
-      { mode, user_hint: '', current_content: currentContent },
-    ) as { draft?: string; error?: string }
-    if (result?.error) { aiError.value = result.error }
-    else if (result?.draft) { aiDraft.value = result.draft }
+    const chMeta = allChapterMeta.find(c => c.id === chapterId)
+    const prompt = mode === 'polish'
+      ? `请润色以下"${chMeta?.title || chapterId}"章节内容，保持专业审计报告语调，优化语句但不改变事实`
+      : `请为尽职调查（预备调查）报告的"${chMeta?.title || chapterId}"章节撰写初稿草案，内容应专业、简洁`
+    const ctx: Record<string, string> = {
+      被审计单位: projectContext.value?.client_name || '',
+      所属行业: projectContext.value?.industry || '',
+      章节: chMeta?.title || chapterId,
+      版本: variant.value === 'standard' ? '标准版' : '简化版',
+    }
+    const result = await api.post<any>(
+      `/api/workpapers/${props.wpId}/ai/generate-text`,
+      { section: `b14-${chapterId}-${field}`, prompt, existingContent: currentContent || '', context: ctx },
+    )
+    const text = result?.content || result?.data?.content || result?.text || ''
+    if (text) { aiDraft.value = text }
     else { aiError.value = '未获取到生成内容' }
   } catch (err: any) {
     aiError.value = err?.message || 'AI 服务请求失败'
@@ -430,7 +453,12 @@ async function checkOOHealth() {
   try {
     const { api } = await import('@/services/apiProxy')
     const res = await api.get<any>('/api/workpapers/onlyoffice/health', { _silent: true } as any)
-    if (!res?.healthy) modeOptions.value = ['结构化视图']
+    // 信封双层兼容：{code,message,data:{healthy}} 或直接 {healthy}
+    const healthy = res?.data?.healthy ?? res?.healthy ?? false
+    if (!healthy) {
+      modeOptions.value = ['结构化视图']
+      if (mode.value === '在线编辑') mode.value = '结构化视图'
+    }
   } catch {
     modeOptions.value = ['结构化视图']
   }
@@ -459,11 +487,75 @@ watch(mode, async (newMode, oldMode) => {
   }
 })
 
+// ─── ch6 一键预填（从 trial_balance 指标） ───
+function prefillCh6() {
+  const fi = financialIndicators.value
+  if (!fi || !fi.total_assets) {
+    ElMessage.info('暂无试算表数据可预填')
+    return
+  }
+  const fmt = (v: number) => v ? v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—'
+  const text = [
+    `【资产负债概况】`,
+    `资产总计：${fmt(fi.total_assets)} 元`,
+    `负债总计：${fmt(fi.total_liabilities)} 元`,
+    `所有者权益：${fmt(fi.equity)} 元`,
+    `货币资金：${fmt(fi.cash)} 元`,
+    `应收账款：${fmt(fi.receivables)} 元`,
+    `存货：${fmt(fi.inventory)} 元`,
+    `固定资产：${fmt(fi.fixed_assets)} 元`,
+    ``,
+    `【经营成果概况】`,
+    `营业收入：${fmt(fi.revenue)} 元`,
+    `营业成本：${fmt(fi.cost_of_sales)} 元`,
+    `净利润（近似）：${fmt(fi.net_profit)} 元`,
+    ``,
+    `资产负债率：${fi.total_assets > 0 ? ((fi.total_liabilities / fi.total_assets) * 100).toFixed(1) : '—'}%`,
+    `毛利率：${fi.revenue > 0 ? (((fi.revenue - fi.cost_of_sales) / fi.revenue) * 100).toFixed(1) : '—'}%`,
+  ].join('\n')
+  // 仅在 ch6.balance_sheet 为空时预填（不覆盖已有内容）
+  const ch6 = chapters.value['ch6']
+  if (ch6?.type === 'mixed' && ch6.sections) {
+    const bsSec = ch6.sections.find(s => s.id === 'balance_sheet')
+    if (bsSec && !bsSec.content) {
+      updateTextarea('ch6', 'balance_sheet', text)
+      ElMessage.success('已从试算表预填财务分析基础数据')
+    } else {
+      ElMessage.info('财务分析区已有内容，未覆盖')
+    }
+  }
+}
+
+// ─── ch10 一键预填（从 B19 关联方） ───
+function prefillCh10() {
+  const parties = relatedParties.value
+  if (!parties || parties.length === 0) {
+    ElMessage.info('暂无 B19 关联方数据可预填')
+    return
+  }
+  // 预填 related_parties table
+  const ch10 = chapters.value['ch10']
+  if (ch10?.type === 'mixed' && ch10.sections) {
+    const rpSec = ch10.sections.find(s => s.table_id === 'related_parties')
+    if (rpSec && (!rpSec.rows || rpSec.rows.length === 0)) {
+      const rows = parties.map(p => ({
+        name: p.name,
+        relationship: p.relation_type || '',
+        transaction_type: '',
+        amount: '',
+      }))
+      updateTableRows('ch10', 'related_parties', rows)
+      ElMessage.success(`已从 B19 预填 ${rows.length} 条关联方`)
+    } else {
+      ElMessage.info('关联方清单已有数据，未覆盖')
+    }
+  }
+}
+
 // ─── Self-load (bundle embed scenario) ───
 onMounted(async () => {
   checkOOHealth()
   loadCrossRefs()
-  checkAiEnabled()
   if (!props.htmlData) {
     await loadData()
   }
@@ -474,10 +566,14 @@ defineExpose({ reload: () => flushPendingSaves() })
 </script>
 
 <style scoped>
-.gt-b14 { padding: 16px; }
-.gt-b14__toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+/* ── 统一字号 13px + CSS 变量配色 ── */
+.gt-b14 { padding: 16px; font-size: 13px; color: var(--el-text-color-primary); }
+.gt-b14 :deep(.el-input__inner),
+.gt-b14 :deep(.el-textarea__inner),
+.gt-b14 :deep(.el-table) { font-size: 13px; }
+.gt-b14__toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; padding: 8px 12px; background: var(--el-fill-color-lighter); border-radius: 6px; }
 .gt-b14__variant { margin-left: 4px; }
-.gt-b14__save-status { font-size: 12px; color: #909399; display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.gt-b14__save-status { font-size: 12px; color: var(--el-text-color-secondary); display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
 
 .gt-b14__layout { display: flex; gap: 16px; }
 
@@ -485,41 +581,45 @@ defineExpose({ reload: () => flushPendingSaves() })
 .gt-b14__nav {
   position: sticky;
   top: 80px;
-  width: 180px;
-  min-width: 180px;
+  width: 184px;
+  min-width: 184px;
   max-height: calc(100vh - 120px);
   overflow-y: auto;
-  border-right: 1px solid #ebeef5;
-  padding-right: 8px;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  padding: 6px;
 }
 .gt-b14__nav-list { list-style: none; margin: 0; padding: 0; }
 .gt-b14__nav-item {
   display: flex; align-items: center; gap: 6px;
-  padding: 6px 8px; font-size: 12px; color: #606266;
-  cursor: pointer; border-radius: 4px; transition: background 0.2s;
+  padding: 7px 10px; font-size: 13px; color: var(--el-text-color-regular);
+  cursor: pointer; border-radius: 6px; transition: background 0.18s, color 0.18s;
 }
-.gt-b14__nav-item:hover { background: #f5f7fa; }
-.gt-b14__nav-item.is-active { background: #ecf5ff; color: #409eff; font-weight: 500; }
-.gt-b14__nav-dot { width: 6px; height: 6px; border-radius: 50%; background: #dcdfe6; flex-shrink: 0; }
-.gt-b14__nav-dot.is-complete { background: #67c23a; }
+.gt-b14__nav-item:hover { background: var(--el-fill-color-light); }
+.gt-b14__nav-item.is-active { background: var(--el-color-primary-light-9); color: var(--el-color-primary); font-weight: 600; }
+.gt-b14__nav-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--el-border-color); flex-shrink: 0; }
+.gt-b14__nav-dot.is-complete { background: var(--el-color-success); }
 .gt-b14__nav-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .gt-b14__progress { margin-top: 12px; padding: 0 8px; }
 
 /* Right content */
 .gt-b14__content { flex: 1; max-width: 1000px; display: flex; flex-direction: column; gap: 12px; }
 .gt-b14__chapters { border: none; }
-.gt-b14__chapter-item { margin-bottom: 8px; }
+.gt-b14__chapter-item { margin-bottom: 8px; border: 1px solid var(--el-border-color-lighter); border-radius: 8px; overflow: hidden; }
+.gt-b14__chapter-item :deep(.el-collapse-item__header) { padding: 0 12px; background: linear-gradient(90deg, var(--el-color-primary-light-9), transparent 70%); border-left: 3px solid var(--el-color-primary); font-size: 13px; }
+.gt-b14__chapter-item :deep(.el-collapse-item__content) { padding: 14px; }
 .gt-b14__chapter-header { display: flex; align-items: center; gap: 8px; width: 100%; }
-.gt-b14__chapter-title { font-size: 14px; font-weight: 600; color: #303133; }
+.gt-b14__chapter-title { font-size: 13px; font-weight: 600; color: var(--el-text-color-primary); }
 
 /* Textarea */
 .gt-b14__textarea-wrap { position: relative; margin-bottom: 8px; }
-.gt-b14__ai-btn { position: absolute; top: 4px; right: 4px; opacity: 0.6; }
+.gt-b14__ai-btn { position: absolute; top: 4px; right: 4px; opacity: 0.65; }
 .gt-b14__ai-btn:hover { opacity: 1; }
 
 /* AI dialog */
-.gt-b14__ai-loading { display: flex; align-items: center; gap: 8px; padding: 24px 0; justify-content: center; color: #409eff; }
-.gt-b14__ai-error { color: #f56c6c; padding: 12px 0; }
+.gt-b14__ai-loading { display: flex; align-items: center; gap: 8px; padding: 24px 0; justify-content: center; color: var(--el-color-primary); }
+.gt-b14__ai-error { color: var(--el-color-danger); padding: 12px 0; }
 
 /* Table */
 .gt-b14__table-wrap { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
@@ -529,10 +629,12 @@ defineExpose({ reload: () => flushPendingSaves() })
 
 /* Signature card */
 .gt-b14__signature-card { border-radius: 8px; margin-top: 8px; }
-.gt-b14__card-title { font-size: 15px; font-weight: 600; color: #303133; }
+.gt-b14__signature-card :deep(.el-card__header) { padding: 9px 14px; background: linear-gradient(90deg, var(--el-color-primary-light-9), transparent 70%); border-left: 3px solid var(--el-color-primary); }
+.gt-b14__card-header { display: flex; align-items: center; justify-content: space-between; }
+.gt-b14__card-title { font-size: 13px; font-weight: 600; color: var(--el-text-color-primary); }
 .gt-b14__sig-grid { display: flex; flex-direction: column; gap: 12px; }
 .gt-b14__sig-row { display: flex; align-items: center; gap: 12px; }
-.gt-b14__sig-label { width: 80px; font-size: var(--wp-font-size, 13px); color: #606266; flex-shrink: 0; }
+.gt-b14__sig-label { width: 80px; font-size: 13px; color: var(--el-text-color-regular); flex-shrink: 0; }
 
 /* OO */
 .gt-b14__oo { height: calc(100vh - 200px); min-height: 500px; }

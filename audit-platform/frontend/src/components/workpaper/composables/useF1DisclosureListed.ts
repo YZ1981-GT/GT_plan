@@ -10,6 +10,7 @@ import { computeTop5 } from './useF1Analysis'
 import { PRESET_SEGMENTS, type AgingSegment } from '@/composables/useAgingConfig'
 import { isF1DisclosureApplicable } from './f1NoteSectionMap'
 import type { F1ListedSyncSnapshot } from './f1DisclosureSyncPayload'
+import { ADJUDICATION_LABEL_BY_SEGMENT_KEY } from './agingPresets'
 
 export interface F1AgingDisclosureRow {
   rowId: string
@@ -55,12 +56,15 @@ const ITEM_OVER1_REASON_MAP = `${PREFIX}over1-reasons`
 const ITEM_IMPAIRMENT = `${PREFIX}impairment-provision`
 const ITEM_TOP5_SUMMARY = `${PREFIX}top5-summary`
 
-/** 附注模板账龄标签（1至2年）；与 PRESET 的 1-2年 对齐 */
+/** 附注简写标签；缺省时回退审定表口径 / segment.label */
 const NOTE_AGING_LABEL: Record<string, string> = {
   within1: '1年以内',
   y1to2: '1至2年',
   y2to3: '2至3年',
   over3: '3年以上',
+  y3to4: '3至4年',
+  y4to5: '4至5年',
+  over5: '5年以上',
 }
 
 function generateRowId(): string {
@@ -85,35 +89,35 @@ function fmtPctPlain(v: number): string {
   return `${v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
 }
 
+function disclosureAgingLabel(seg: AgingSegment): string {
+  return NOTE_AGING_LABEL[seg.key]
+    || ADJUDICATION_LABEL_BY_SEGMENT_KEY[seg.key]
+    || seg.label
+}
+
 /**
- * 将任意账龄聚合折叠为披露四档（1年以内 / 1至2 / 2至3 / 3年以上）
+ * 按项目账龄枚举段生成附注账龄行（3年段/5年段/自定义，不再强制折四档）
  */
-export function collapseAgingForListedDisclosure(
+export function buildAgingDisclosureRows(
   agingAgg: Record<string, number> | null | undefined,
   segments: AgingSegment[] = PRESET_SEGMENTS.THREE_YEAR,
 ): Array<{ key: string; label: string; endAmount: number; priorAmount: number }> {
   const src = agingAgg ?? {}
-  const keys = segments.map((s) => s.key)
-  const get = (k: string) => parseNum(src[k])
-  const getPrior = (k: string) => parseNum(src[`prior_${k}`])
+  const segs = segments.length ? segments : PRESET_SEGMENTS.THREE_YEAR
+  return segs.map((seg) => ({
+    key: seg.key,
+    label: disclosureAgingLabel(seg),
+    endAmount: parseNum(src[seg.key]),
+    priorAmount: parseNum(src[`prior_${seg.key}`]),
+  }))
+}
 
-  const within1 = keys.includes('within1') ? 'within1' : keys[0]
-  const y1to2 = keys.find((k) => k === 'y1to2') || keys[1]
-  const y2to3 = keys.find((k) => k === 'y2to3') || keys[2]
-  const restKeys = keys.filter((k) => k !== within1 && k !== y1to2 && k !== y2to3)
-
-  const buckets = [
-    { key: 'within1', label: NOTE_AGING_LABEL.within1, endAmount: get(within1), priorAmount: getPrior(within1) },
-    { key: 'y1to2', label: NOTE_AGING_LABEL.y1to2, endAmount: get(y1to2), priorAmount: getPrior(y1to2) },
-    { key: 'y2to3', label: NOTE_AGING_LABEL.y2to3, endAmount: get(y2to3), priorAmount: getPrior(y2to3) },
-    {
-      key: 'over3',
-      label: NOTE_AGING_LABEL.over3,
-      endAmount: calcSubtotal(restKeys.map(get)),
-      priorAmount: calcSubtotal(restKeys.map(getPrior)),
-    },
-  ]
-  return buckets
+/** @deprecated 使用 buildAgingDisclosureRows；保留别名兼容旧测试名 */
+export function collapseAgingForListedDisclosure(
+  agingAgg: Record<string, number> | null | undefined,
+  segments: AgingSegment[] = PRESET_SEGMENTS.THREE_YEAR,
+): Array<{ key: string; label: string; endAmount: number; priorAmount: number }> {
+  return buildAgingDisclosureRows(agingAgg, segments)
 }
 
 export function useF1DisclosureListed(options: UseF1DisclosureListedOptions) {
@@ -135,7 +139,10 @@ export function useF1DisclosureListed(options: UseF1DisclosureListedOptions) {
 
   const agingRows: ComputedRef<F1AgingDisclosureRow[]> = computed(() => {
     const agg = crossSheet.agingAggregation?.value ?? {}
-    const buckets = collapseAgingForListedDisclosure(agg)
+    const segs = crossSheet.agingSegments?.value?.length
+      ? crossSheet.agingSegments.value
+      : PRESET_SEGMENTS.THREE_YEAR
+    const buckets = buildAgingDisclosureRows(agg, segs)
     const endTotal = calcSubtotal(buckets.map((b) => b.endAmount))
     const priorTotal = calcSubtotal(buckets.map((b) => b.priorAmount))
     return buckets.map((b) => ({

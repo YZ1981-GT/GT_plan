@@ -49,6 +49,8 @@ export interface K12AdjRow {
   priorAudited: number
   /** 同比变动率（公式：(本期审定-上期审定)/|上期审定|）*/
   yoyChange: number | null
+  /** 索引号（源模板列，指向支持性底稿/程序） */
+  refIndex: string
   /** 备注 */
   remark: string
   /** 可编辑标记 */
@@ -83,14 +85,16 @@ export interface UseK12AdjudicationParams {
 const ITEM_PREFIX = 'K12-1'
 const ROWS_KEY = `${ITEM_PREFIX}-rows`
 
-/** 默认审定表收入来源行（营业外收入7大类） */
+/**
+ * 默认审定表收入来源行 —— P1 对齐源模板 K12-1 canonical 行
+ * （与日常活动无关的政府补助/捐赠利得/盘盈利得(不含存货及固定资产盘盈)/碳排放配额出售利得/其他）
+ * 其余项目（债务重组利得/罚款收入等）由用户按需动态新增。
+ */
 const DEFAULT_INCOME_SOURCES: Array<{ name: string }> = [
-  { name: '政府补助' },
-  { name: '债务重组利得' },
-  { name: '资产盘盈利得' },
-  { name: '罚款收入' },
+  { name: '与日常活动无关的政府补助' },
   { name: '捐赠利得' },
-  { name: '无法支付款项转入' },
+  { name: '盘盈利得（不包括存货盘盈及固定资产盘盈）' },
+  { name: '碳排放配额出售利得' },
   { name: '其他' },
 ]
 
@@ -155,6 +159,7 @@ export function useK12Adjudication(params: UseK12AdjudicationParams) {
       priorRje,
       priorAudited,
       yoyChange,
+      refIndex: raw.refIndex ?? '',
       remark: raw.remark ?? '',
       isEditable: raw.isEditable ?? true,
     }
@@ -173,6 +178,7 @@ export function useK12Adjudication(params: UseK12AdjudicationParams) {
       priorRje: 0,
       priorAudited: 0,
       yoyChange: null,
+      refIndex: '',
       remark: '',
       isEditable: true,
     }))
@@ -249,6 +255,7 @@ export function useK12Adjudication(params: UseK12AdjudicationParams) {
       priorRje: 0,
       priorAudited: 0,
       yoyChange: null,
+      refIndex: '',
       remark: '',
       isEditable: true,
     })

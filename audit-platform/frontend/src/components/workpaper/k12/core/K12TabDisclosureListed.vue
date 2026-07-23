@@ -30,14 +30,51 @@
         class="disclosure-table"
       >
         <el-table-column prop="category" label="项目（来源分类）" min-width="160" />
-        <el-table-column prop="currentAmount" label="本期发生额" min-width="120" align="right">
+        <el-table-column prop="currentAmount" label="本期发生额" min-width="130" align="right">
           <template #default="{ row }">
-            <span :class="{ 'amount-zero': !row.currentAmount }">{{ fmtAmt(row.currentAmount) }}</span>
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.currentAmount"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width: 100%"
+              @change="(v: number | undefined) => { row.currentAmount = v ?? 0; handleRowChange(row) }"
+            />
+            <span v-else :class="{ 'amount-zero': !row.currentAmount }">{{ fmtAmt(row.currentAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="priorAmount" label="上期发生额" min-width="120" align="right">
+        <el-table-column prop="priorAmount" label="上期发生额" min-width="130" align="right">
           <template #default="{ row }">
-            <span>{{ fmtAmt(row.priorAmount) }}</span>
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.priorAmount"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width: 100%"
+              @change="(v: number | undefined) => { row.priorAmount = v ?? 0; handleRowChange(row) }"
+            />
+            <span v-else>{{ fmtAmt(row.priorAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="nonRecurringAmount" label="计入当期非经常性损益的金额" min-width="150" align="right">
+          <template #header>
+            <el-tooltip content="源模板必填列：营业外收入通常与自然灾害/搬迁/捐赠等相关，多列为非经常性损益" placement="top">
+              <span style="border-bottom:1px dashed #909399;cursor:help">计入非经常性损益</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.nonRecurringAmount"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width: 100%"
+              @change="(v: number | undefined) => { row.nonRecurringAmount = v ?? 0; handleRowChange(row) }"
+            />
+            <span v-else>{{ fmtAmt(row.nonRecurringAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="同比变动" min-width="100" align="right">
@@ -123,7 +160,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
-import { api } from '@/services/apiProxy'
+import { generateK12AiText } from '../../composables/useK12AiText'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 
@@ -143,14 +180,12 @@ const emit = defineEmits<{
 const ACCOUNT_CODE = '6301'
 const ABNORMAL_THRESHOLD = 0.5 // 同比变动超50%标异常
 
-/** 营业外收入标准来源分类（与K12-1审定表行对应） */
+/** 营业外收入标准来源分类（P1 对齐源模板 K12-1 canonical 行，与审定表按 name 匹配） */
 const CATEGORIES = [
-  '政府补助',
-  '债务重组利得',
-  '资产盘盈利得',
-  '罚款收入',
+  '与日常活动无关的政府补助',
   '捐赠利得',
-  '无法支付款项转入',
+  '盘盈利得（不包括存货盘盈及固定资产盘盈）',
+  '碳排放配额出售利得',
   '其他',
 ]
 
@@ -160,13 +195,15 @@ interface DisclosureRow {
   category: string
   currentAmount: number
   priorAmount: number
+  /** 计入当期非经常性损益的金额（源模板必填列） */
+  nonRecurringAmount: number
   remark: string
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
 const disclosureRows = ref<DisclosureRow[]>(
-  CATEGORIES.map(c => ({ category: c, currentAmount: 0, priorAmount: 0, remark: '' }))
+  CATEGORIES.map(c => ({ category: c, currentAmount: 0, priorAmount: 0, nonRecurringAmount: 0, remark: '' }))
 )
 const narrativeText = ref('')
 const totalAdjudicated = ref(0)
@@ -186,6 +223,7 @@ function loadSavedData(): void {
             category: CATEGORIES[i],
             currentAmount: Number(parsed.currentAmount || 0),
             priorAmount: Number(parsed.priorAmount || 0),
+            nonRecurringAmount: Number(parsed.nonRecurringAmount || 0),
             remark: parsed.remark || '',
           }
         }
@@ -202,25 +240,47 @@ function loadSavedData(): void {
 
 // ─── Auto-fill from K12-1 adjudicated data ───────────────────────────────────
 
-function applyAutoFill(): void {
-  // 从 allResponses 中读取 K12-1 审定表各来源行的审定金额
-  for (let i = 0; i < CATEGORIES.length; i++) {
-    const adjKey = `K12-1-row-${i}-audited`
-    const adjSaved = props.allResponses.get(adjKey)
-    if (adjSaved) {
-      const val = Number(adjSaved.remark ?? adjSaved.conclusion ?? 0)
-      if (val !== 0) {
-        disclosureRows.value[i].currentAmount = val
-      }
-    }
+/**
+ * 从 K12-1 审定表取数（P0 修复：原读 `K12-1-row-${i}-audited` 死键，
+ * useK12Adjudication 从不写 → 恒 no-op；改读 `K12-1-rows` 按 name 匹配）。
+ * @param silent true 时不弹提示（EventBus 自动刷新用）
+ */
+function applyAutoFill(silent = false): void {
+  const saved = props.allResponses.get('K12-1-rows')
+  if (!saved) {
+    if (!silent) ElMessage.warning('未找到 K12-1 审定表数据，请先编制审定表')
+    return
+  }
+  let k12Rows: any[] = []
+  try {
+    const raw = saved.remark ?? saved.conclusion ?? saved
+    k12Rows = typeof raw === 'string' ? JSON.parse(raw) : raw
+  } catch { return }
+  if (!Array.isArray(k12Rows)) return
+
+  const byName = new Map<string, { audited: number; prior: number }>()
+  for (const r of k12Rows) {
+    const audited = Number(
+      r.audited ?? (Number(r.unadjusted || 0) + Number(r.aje || 0) + Number(r.rje || 0)),
+    )
+    const prior = Number(
+      r.priorAudited ?? (Number(r.priorUnadj || 0) + Number(r.priorAje || 0) + Number(r.priorRje || 0)),
+    )
+    byName.set(String(r.name || '').trim(), { audited, prior })
   }
 
-  // 从 K12-1 审定合计取值
-  const totalKey = 'K12-1-adjudicated-amount'
-  const totalSaved = props.allResponses.get(totalKey)
-  if (totalSaved) {
-    totalAdjudicated.value = Number(totalSaved.remark ?? totalSaved.conclusion ?? 0)
+  let matched = 0
+  for (const row of disclosureRows.value) {
+    const hit = byName.get(row.category.trim())
+    if (hit) {
+      row.currentAmount = hit.audited
+      row.priorAmount = hit.prior
+      handleRowChange(row)
+      matched++
+    }
   }
+  totalAdjudicated.value = k12Rows.reduce((s, r) => s + Number(r.audited ?? 0), 0)
+  if (!silent) ElMessage.success(`已从 K12-1 审定表带入 ${matched} 项`)
 }
 
 // ─── EventBus: subscribe 'substantive:adjudicated' ───────────────────────────
@@ -234,7 +294,7 @@ function handleAdjudicated(payload: any): void {
       totalAdjudicated.value = Number(payload.auditedAmount)
     }
     // 重新从 allResponses 拉取最新数据
-    applyAutoFill()
+    applyAutoFill(true)
   }
 }
 
@@ -246,6 +306,7 @@ function handleRowChange(row: DisclosureRow): void {
     emit('save', `K12-disc-listed-row-${idx}`, {
       currentAmount: row.currentAmount,
       priorAmount: row.priorAmount,
+      nonRecurringAmount: row.nonRecurringAmount,
       remark: row.remark,
     })
   }
@@ -266,20 +327,23 @@ function handleNarrativeSave(): void {
 
 async function generateAI(section: string): Promise<void> {
   if (!props.wpId) return
-  try {
-    const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section,
-      prompt: `为K12营业外收入底稿生成上市公司附注披露文本。来源分类：${CATEGORIES.join('/')}。审定发生额：${totalAdjudicated.value}。`,
-      context: JSON.stringify(disclosureRows.value),
-    })
-    const content = res?.data?.content || res?.content || ''
-    if (content && section === 'narrative') {
-      narrativeText.value = content
-      handleNarrativeSave()
-    }
-    ElMessage.success('AI生成完成')
-  } catch {
-    ElMessage.warning('AI生成失败，请手动填写')
+  // P0 修复：context 必须是 dict[str,str]（原传 JSON.stringify 字符串 → 后端 422）
+  const context: Record<string, unknown> = {
+    来源分类: CATEGORIES.join('/'),
+    审定发生额合计: totalAdjudicated.value,
+    各来源本期发生额: disclosureRows.value
+      .map(r => `${r.category}=${fmtAmt(r.currentAmount)}`)
+      .join('；'),
+  }
+  const content = await generateK12AiText(props.wpId, {
+    prompt: '你是资深审计师。请为营业外收入生成上市公司附注披露文本，按来源分类说明本期发生额、同比变动及非经常性损益列报，符合企业会计准则第16号（政府补助）等。',
+    section: section === 'narrative' ? 'K12-disclosure-listed-narrative' : section,
+    context,
+    existingContent: narrativeText.value,
+  })
+  if (content) {
+    narrativeText.value = content
+    handleNarrativeSave()
   }
 }
 
@@ -295,6 +359,9 @@ function summaryMethod({ columns }: { columns: any[]; data: DisclosureRow[] }): 
     if (col.property === 'currentAmount') return fmtAmt(totalCurrentAmount.value)
     if (col.property === 'priorAmount') {
       return fmtAmt(disclosureRows.value.reduce((s, r) => s + (r.priorAmount || 0), 0))
+    }
+    if (col.property === 'nonRecurringAmount') {
+      return fmtAmt(disclosureRows.value.reduce((s, r) => s + (r.nonRecurringAmount || 0), 0))
     }
     return ''
   })
@@ -327,7 +394,7 @@ function fmtAmt(val: number | null | undefined): string {
 
 onMounted(() => {
   loadSavedData()
-  applyAutoFill()
+  applyAutoFill(true)
   eventBus.on('substantive:adjudicated' as any, handleAdjudicated)
 })
 

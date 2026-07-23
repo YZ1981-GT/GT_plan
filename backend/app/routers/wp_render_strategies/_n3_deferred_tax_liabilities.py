@@ -17,6 +17,7 @@ Requirements: 1.6
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -31,6 +32,8 @@ logger = logging.getLogger(__name__)
 
 _N3_ACCOUNT_CODE = "2901"
 _ADJUDICATED_ITEM_ID = "N3-1-adjudicated-amount"
+_ADJ_ROWS_ITEM_ID = "N3-1-adjudication-rows"
+_TB_PREFILL_ITEM_ID = "N3-1-tb-prefill"
 
 N3_SHEETS = [
     {"sheet_name": "底稿目录", "component_type": "n3-deferred-tax-liabilities"},
@@ -71,27 +74,26 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
         "end_balance": 0,
     }
     try:
-        active_filter = get_active_filter(ctx.project_id)
+        active_filter = await get_active_filter(ctx.db, TbBalance.__table__, ctx.project_id, ctx.year)
         stmt = (
             sa.select(
-                TbBalance.begin_balance,
+                TbBalance.opening_balance,
                 TbBalance.debit_amount,
                 TbBalance.credit_amount,
-                TbBalance.end_balance,
+                TbBalance.closing_balance,
             )
             .where(
-                TbBalance.project_id == str(ctx.project_id),
-                TbBalance.standard_account_code == _N3_ACCOUNT_CODE,
+                TbBalance.account_code == _N3_ACCOUNT_CODE,
                 active_filter,
             )
             .limit(1)
         )
         row = (await ctx.db.execute(stmt)).fetchone()
         if row:
-            result["begin_balance"] = _parse_num(row.begin_balance)
+            result["begin_balance"] = abs(_parse_num(row.opening_balance))
             result["debit_amount"] = _parse_num(row.debit_amount)
             result["credit_amount"] = _parse_num(row.credit_amount)
-            result["end_balance"] = _parse_num(row.end_balance)
+            result["end_balance"] = abs(_parse_num(row.closing_balance))
     except Exception as e:  # noqa: BLE001
         logger.warning("N3 render: TB 取数失败: %s", e)
     return result
@@ -161,6 +163,21 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
 
     # ─── TB 取数（科目2901递延所得税负债，贷方/负债类）────────────────────
     tb = await _fetch_tb_data(ctx)
+
+    # ─── 审定表 TB 预填种子（仅当无持久化审定表行时注入）──────────────────
+    if _ADJ_ROWS_ITEM_ID not in responses_snapshot:
+        responses_snapshot[_TB_PREFILL_ITEM_ID] = {
+            "item_id": _TB_PREFILL_ITEM_ID,
+            "conclusion": json.dumps(
+                {
+                    "beginning": tb.get("begin_balance", 0) or 0,
+                    "creditAmount": tb.get("credit_amount", 0) or 0,
+                    "debitAmount": tb.get("debit_amount", 0) or 0,
+                    "unadjusted": tb.get("end_balance", 0) or 0,
+                }
+            ),
+            "remark": None,
+        }
 
     return {
         "account_code": _N3_ACCOUNT_CODE,

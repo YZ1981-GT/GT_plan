@@ -10,6 +10,8 @@ import { computeTop5 } from './useF1Analysis'
 import { collapseAgingForListedDisclosure } from './useF1DisclosureListed'
 import { isF1DisclosureApplicable } from './f1NoteSectionMap'
 import type { F1SoeSyncSnapshot } from './f1DisclosureSyncPayload'
+import { PRESET_SEGMENTS } from '@/composables/useAgingConfig'
+import { ADJUDICATION_LABEL_BY_SEGMENT_KEY } from './agingPresets'
 
 export interface F1SoeAgingRow {
   rowId: string
@@ -63,6 +65,9 @@ const SOE_AGING_LABEL: Record<string, string> = {
   y1to2: '1至2年',
   y2to3: '2至3年',
   over3: '3年以上',
+  y3to4: '3至4年',
+  y4to5: '4至5年',
+  over5: '5年以上',
 }
 
 type BadDebtPair = { end: number; prior: number }
@@ -101,7 +106,10 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
 
   const agingRows: ComputedRef<F1SoeAgingRow[]> = computed(() => {
     const agg = crossSheet.agingAggregation?.value ?? {}
-    const buckets = collapseAgingForListedDisclosure(agg)
+    const segs = crossSheet.agingSegments?.value?.length
+      ? crossSheet.agingSegments.value
+      : PRESET_SEGMENTS.THREE_YEAR
+    const buckets = collapseAgingForListedDisclosure(agg, segs)
     const endTotal = calcSubtotal(buckets.map((b) => b.endAmount))
     const priorTotal = calcSubtotal(buckets.map((b) => b.priorAmount))
     return buckets.map((b) => {
@@ -109,7 +117,7 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
       return {
         rowId: `aging-${b.key}`,
         key: b.key,
-        label: SOE_AGING_LABEL[b.key] || b.label,
+        label: SOE_AGING_LABEL[b.key] || ADJUDICATION_LABEL_BY_SEGMENT_KEY[b.key] || b.label,
         endAmount: b.endAmount,
         endPct: calcPercentage(b.endAmount, endTotal),
         endBadDebt: parseNum(bd.end),

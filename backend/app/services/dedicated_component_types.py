@@ -109,5 +109,21 @@ DEDICATED_COMPONENT_TYPES: frozenset[str] = frozenset(
         # G 投资循环（整册多 sheet）
         "g1-trading-financial-assets",
         "g5-long-term-receivable",
+        # B 企业层面控制（B22A 多 sheet：COSO 五要素 + IT + 管理层凌驾 + 控制矩阵汇总，
+        # 整册路由到 b22a-control-matrix 由前端 6-Tab 组件内部分发。B22B/B22C 同样含辅助
+        # sheet（示例/说明/指引）→ 多 sheet，须整册路由到各自专属组件，否则按 class_code 拆成
+        # h-static-doc/d-form-table 而非专属组件）
+        "b22a-control-matrix",
+        "b22b-deficiency-evaluation",
+        "b22b-control-matrix",
+        "b22c-design-effectiveness",
+        # B 业务层面控制（B23 整册多 sheet：14 循环 + 信息处理控制 + 职责分离，整册路由到
+        # b23-process-control，由前端聚合组件按循环内部分发；纯前端自加载无 RENDERER_DISPATCH，
+        # 子底稿 B23-1~B23-15/XX-5 在 wp_code_overrides 全 skip）
+        "b23-process-control",
+        # B 风险评估枢纽（B50 汇总程序表单 sheet + B50-1~4 子表 skip，整册路由到
+        # b50-risk-assessment 由前端 5-Tab 组件自加载分发；WHOLE 注册防程序表 cells 触发
+        # noRendererGridFallback shadow 掉专属组件）
+        "b50-risk-assessment",
     }
 )

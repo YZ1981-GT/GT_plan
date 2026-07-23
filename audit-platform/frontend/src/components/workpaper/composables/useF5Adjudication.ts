@@ -15,6 +15,7 @@ import {
   calcChangeRate,
   calcSubtotal,
 } from './useF5CosOfFormulaEngine'
+import { eventBus } from '@/utils/eventBus'
 import type { ChecklistResponse } from './useF1FormData'
 
 export interface UseF5AdjudicationOptions {
@@ -531,10 +532,19 @@ export function useF5Adjudication(options: UseF5AdjudicationOptions) {
 
   function publishAdjudicated(): void {
     const amount = grandTotal.value.currentAdjusted
-    const payload = { wpCode: 'F5', accountCode: '6401', auditedAmount: amount }
+    const payload = {
+      wpCode: 'F5',
+      accountCode: '6401',
+      auditedAmount: amount,
+      adjudicatedAmount: amount,
+      timestamp: Date.now(),
+    }
+    // 统一走 eventBus（crossWpEventBridge 带再入守卫转发到 window，旧 window 监听者不受影响）
     try {
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
-    } catch { /* silent */ }
+      eventBus.emit('substantive:adjudicated', payload as any)
+    } catch {
+      console.warn('[useF5Adjudication] EventBus publish substantive:adjudicated failed')
+    }
     if (projectId.value) {
       try {
         window.dispatchEvent(new CustomEvent('f5:writeback-trial-balance', {

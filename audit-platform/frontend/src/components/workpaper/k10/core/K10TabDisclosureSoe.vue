@@ -17,9 +17,7 @@
             <el-button size="small" type="primary" link @click="generateAI('disclosure-soe')">
               <el-icon><MagicStick /></el-icon>AI辅助
             </el-button>
-            <el-button size="small" link @click="handleReview">
-              <el-icon><Check /></el-icon>复核
-            </el-button>
+            <GtReviewTrigger section-id="K10-disclosure-soe" label="💬 复核" />
           </div>
         </div>
       </template>
@@ -131,9 +129,10 @@
  */
 import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Refresh, MagicStick, Check } from '@element-plus/icons-vue'
+import { Refresh, MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 
@@ -202,24 +201,106 @@ function loadSavedData(): void {
       } catch { /* ignore */ }
     }
   }
+  loadDynamicRows()
   const narrativeSaved = props.allResponses.get('K10-disclosure-soe-narrative')
   if (narrativeSaved) {
     narrativeText.value = narrativeSaved.remark || narrativeSaved.conclusion || ''
   }
 }
 
-// ─── Auto-fill from K10-1 ────────────────────────────────────────────────────
+const DYN_PREFIX = 'K10-disc-soe-dyn-'
+
+/** 加载动态追加行（K10-1 中不在固定 CATEGORIES 的来源） */
+function loadDynamicRows(): void {
+  disclosureRows.value = disclosureRows.value.slice(0, CATEGORIES.length)
+  for (const [key, saved] of props.allResponses) {
+    if (!key.startsWith(DYN_PREFIX)) continue
+    try {
+      const parsed = typeof saved.remark === 'string' ? JSON.parse(saved.remark) : saved.remark
+      if (parsed && parsed.category) {
+        disclosureRows.value.push({
+          category: parsed.category,
+          currentAmount: Number(parsed.currentAmount || 0),
+          priorAmount: Number(parsed.priorAmount || 0),
+          remark: parsed.remark || '',
+        })
+      }
+    } catch { /* ignore */ }
+  }
+}
+
+// ─── Auto-fill from K10-1（读 K10-1-rows JSON，按来源名称匹配） ───────────────
+
+/** 从审定表 K10-1-rows 构建 名称→审定数 映射 */
+function buildAdjAuditedMap(): Map<string, number> {
+  const map = new Map<string, number>()
+  const raw = props.allResponses.get('K10-1-rows')
+  if (!raw) return map
+  try {
+    const parsed = typeof raw.remark === 'string' ? JSON.parse(raw.remark) : raw.remark
+    if (Array.isArray(parsed)) {
+      for (const r of parsed) {
+        const name = String(r?.name ?? '').trim()
+        if (!name) continue
+        const audited = Number(r?.audited ?? 0)
+          || (Number(r?.unadjusted ?? 0) + Number(r?.aje ?? 0) + Number(r?.rje ?? 0))
+        map.set(name, audited)
+      }
+    }
+  } catch { /* ignore */ }
+  return map
+}
 
 function applyAutoFill(): void {
+  const adjMap = buildAdjAuditedMap()
+  if (adjMap.size === 0) {
+    ElMessage.warning('未找到 K10-1 审定表数据，请先编制审定表')
+    return
+  }
+  const matchedNames = new Set<string>()
+  let matched = 0
   for (let i = 0; i < CATEGORIES.length; i++) {
-    const adjKey = `K10-1-row-${i}-audited`
-    const adjSaved = props.allResponses.get(adjKey)
-    if (adjSaved) {
-      const val = Number(adjSaved.remark ?? adjSaved.conclusion ?? 0)
-      if (val !== 0) disclosureRows.value[i].currentAmount = val
+    let val = adjMap.get(CATEGORIES[i])
+    let hitName = CATEGORIES[i]
+    if (val == null) {
+      for (const [name, amt] of adjMap) {
+        if (CATEGORIES[i].includes(name) || name.includes(CATEGORIES[i])) { val = amt; hitName = name; break }
+      }
+    }
+    if (val != null && val !== 0) {
+      disclosureRows.value[i].currentAmount = val
+      handleRowChange(disclosureRows.value[i])
+      matchedNames.add(hitName)
+      matched++
     }
   }
-  ElMessage.success('已从审定表取数')
+  // 追加：K10-1 中未匹配任何固定分类的来源 → 动态披露行
+  loadDynamicRows()
+  for (const [name, amt] of adjMap) {
+    if (matchedNames.has(name) || amt === 0) continue
+    const existing = disclosureRows.value.find(r => r.category === name)
+    if (existing) {
+      existing.currentAmount = amt
+      persistDynamicRow(existing)
+    } else {
+      const row: DisclosureRow = { category: name, currentAmount: amt, priorAmount: 0, remark: '' }
+      disclosureRows.value.push(row)
+      persistDynamicRow(row)
+    }
+    matched++
+  }
+  ElMessage.success(matched > 0 ? `已从审定表取数（匹配 ${matched} 项）` : '审定表暂无可匹配来源金额')
+}
+
+/** 持久化动态追加行（name-keyed） */
+function persistDynamicRow(row: DisclosureRow): void {
+  const safeKey = DYN_PREFIX + row.category.replace(/[^\w\u4e00-\u9fa5]/g, '_')
+  emit('save', safeKey, {
+    category: row.category,
+    currentAmount: row.currentAmount,
+    priorAmount: row.priorAmount,
+    remark: row.remark,
+  })
 }
 
 // ─── EventBus subscribe ──────────────────────────────────────────────────────
@@ -235,13 +316,16 @@ function handleAdjudicated(payload: any): void {
 
 function handleRowChange(row: DisclosureRow): void {
   const idx = disclosureRows.value.indexOf(row)
-  if (idx >= 0) {
-    emit('save', `K10-disc-soe-row-${idx}`, {
-      currentAmount: row.currentAmount,
-      priorAmount: row.priorAmount,
-      remark: row.remark,
-    })
+  if (idx < 0) return
+  if (idx >= CATEGORIES.length) {
+    persistDynamicRow(row)
+    return
   }
+  emit('save', `K10-disc-soe-row-${idx}`, {
+    currentAmount: row.currentAmount,
+    priorAmount: row.priorAmount,
+    remark: row.remark,
+  })
 }
 
 function handleNarrativeSave(): void {
@@ -262,7 +346,11 @@ async function generateAI(section: string): Promise<void> {
     const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       section,
       prompt: `为K10其他收益底稿生成国企附注披露文本。来源分类：${CATEGORIES.join('/')}。`,
-      context: JSON.stringify(disclosureRows.value),
+      context: {
+        来源分类: CATEGORIES.join('/'),
+        本期合计: String(totalCurrentAmount.value),
+        明细: disclosureRows.value.map(r => `${r.category}:本期${r.currentAmount}`).join('；'),
+      },
     })
     const content = res?.data?.content || res?.content || ''
     if (content && section === 'narrative') {

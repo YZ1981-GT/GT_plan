@@ -109,6 +109,7 @@
           :save-immediate="saveImmediateWithSnapshot"
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
+          :year="d7Year"
         />
 
         <D7TabDisclosure
@@ -163,6 +164,7 @@ import { useD7CrossSheet } from './composables/useD7CrossSheet'
 import { useD7EntryDualMode, type D7RenderMode } from './composables/useD7EntryDualMode'
 import { resolveD7SheetCode } from './composables/useD7SheetRouting'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
+import { useAgingConfig } from '@/composables/useAgingConfig'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -211,7 +213,23 @@ const {
   htmlData: toRef(props, 'htmlData'),
 })
 
-const crossSheet = useD7CrossSheet({ allResponses })
+// 项目账龄配置段（subject='D7', 2-period）供跨表账龄聚合按段进行
+const { segments: d7AgingSegments } = useAgingConfig(toRef(props, 'projectId'), 'D7')
+const crossSheet = useD7CrossSheet({ allResponses, segments: d7AgingSegments })
+
+// ─── Project Context (from render-config) ────────────────────────────
+const projectContext = computed(() => {
+  const hd = props.htmlData
+  return hd?.project_context || hd?.render_config?.project_context || {}
+})
+
+const relatedParties = computed<string[]>(() => projectContext.value.related_parties || [])
+const d7BsDate = computed<string>(() => projectContext.value.bs_date || '')
+const d7TbAmount = computed<number>(() => projectContext.value.tb_amount || 0)
+
+provide('d7RelatedParties', relatedParties)
+provide('d7BsDate', d7BsDate)
+provide('d7TbAmount', d7TbAmount)
 
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
@@ -226,6 +244,7 @@ async function saveImmediateWithSnapshot(...args: Parameters<typeof saveImmediat
 
 const currentSheet = computed(() => resolveD7SheetCode(props.sheetName || 'D7'))
 const d7ReviewSection = computed(() => resolveCycleReviewSection('D7', currentSheet.value))
+const d7Year = computed(() => props.year || parseInt(projectContext.value.audit_year || '0') || new Date().getFullYear() - 1)
 
 const availableSheets = computed(() =>
   props.htmlData?.sheets ?? props.htmlData?.render_config?.sheets ?? [],

@@ -298,7 +298,7 @@
  * Task: 16.1
  * Requirements: 2.1-2.9, 3.4, 3.6, 4.1-4.7, 17.1-17.3, 19.1, 20.1, 21.1-21.5, 22.1-22.4
  */
-import { computed, inject, toRef, type Ref } from 'vue'
+import { computed, inject, toRef, ref, type Ref } from 'vue'
 import { InfoFilled } from '@element-plus/icons-vue'
 import { useD7Adjudication, type AdjudicationRow } from '../composables/useD7Adjudication'
 import { useD7ImportExport } from '../composables/useD7ImportExport'
@@ -324,6 +324,8 @@ const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<strin
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+// TB 预填种子（科目2205期末审定，来自主入口 project_context.tb_amount）
+const d7TbAmount = inject<Ref<number>>('d7TbAmount', ref(0))
 const wpIdRef = computed(() => props.wpId) as unknown as Ref<string>
 const { importing, exportTemplate, exportData, importData } = useD7ImportExport({
   wpId: wpIdRef,
@@ -351,6 +353,7 @@ const {
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   crossSheet: props.crossSheet,
+  tbSeedAmount: d7TbAmount,
 })
 
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD7AiGenerate(toRef(props, 'wpId'))

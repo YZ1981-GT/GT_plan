@@ -1,109 +1,119 @@
 /**
- * useD6DetailColumnPrefs — D6 合同资产明细表列显示偏好
+ * useD6DetailColumnPrefs — D6-2 明细表30列显隐偏好
  *
  * 功能：
- * - 按分组管理列的显隐（核心组始终显示）
- * - 偏好持久化到 localStorage（key: 'd6-detail-column-prefs'）
- * - 切换单列显隐 / 重置为默认隐藏方案
- *
- * 套 K7-5 / K8-8 范式：轻量 localStorage 方案
+ * - 列分组(基础信息/期初/期初账龄/本期发生/期末/期末账龄/收款权/其他)
+ * - 预设方案(全部/核心/审定+账龄)
+ * - localStorage 持久化 D6-detail-column-prefs
+ * - 隐藏空列
+ * - 重置默认
  */
-import { ref } from 'vue'
+import { ref, computed, watch } from 'vue'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+const STORAGE_KEY = 'D6-detail-column-prefs'
 
 export interface ColumnGroup {
   label: string
-  keys: string[]
-  alwaysShow?: boolean
+  columns: string[]
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const STORAGE_KEY = 'd6-detail-column-prefs'
-
-export const COLUMN_GROUPS: ColumnGroup[] = [
-  { label: '核心', keys: ['seqNo', 'contractType', 'customerName', 'contractName', 'endAudited', 'remark'], alwaysShow: true },
-  { label: '期初', keys: ['priorUnadjusted', 'priorAje', 'priorRje', 'priorAudited'] },
-  { label: '本期变动', keys: ['debitAmount', 'creditAmount', 'endUnadjusted'] },
-  { label: '期末调整', keys: ['endAje', 'endRje'] },
-  { label: '账龄', keys: ['aging1y', 'aging1to2', 'aging2to3', 'aging3plus'] },
-  { label: '期后', keys: ['postPeriodSettlement', 'postPeriodDate'] },
+export const D6_COLUMN_GROUPS: ColumnGroup[] = [
+  { label: '基础信息', columns: ['seqNo', 'contractName', 'contractType', 'customerName', 'companyCode', 'relatedPartyType'] },
+  { label: '期初', columns: ['priorUnadjusted', 'priorAje', 'priorRje', 'priorAudited'] },
+  { label: '期初账龄', columns: ['agePrior1y', 'agePrior1to2y', 'agePrior2to3y', 'agePrior3yAbove'] },
+  { label: '本期发生', columns: ['debitAmount', 'creditAmount'] },
+  { label: '期末', columns: ['endUnadjusted', 'endAje', 'endRje', 'endAudited'] },
+  { label: '期末账龄', columns: ['ageEnd1y', 'ageEnd1to2y', 'ageEnd2to3y', 'ageEnd3yAbove'] },
+  { label: '收款权', columns: ['receivableWithin1y', 'receivableAbove1y'] },
+  { label: '其他', columns: ['isInConstructionPeriod', 'creditRiskGroup', 'isConfirmed', 'postPeriodSettlement'] },
 ]
 
-export const DEFAULT_HIDDEN: string[] = ['priorAje', 'priorRje', 'endAje', 'endRje', 'postPeriodDate']
+export const ALL_COLUMNS = D6_COLUMN_GROUPS.flatMap(g => g.columns)
 
-// Keys that are always visible (from alwaysShow group)
-const ALWAYS_VISIBLE_KEYS = new Set(
-  COLUMN_GROUPS.filter(g => g.alwaysShow).flatMap(g => g.keys)
-)
+export interface ColumnPreset {
+  key: string
+  label: string
+  columns: string[]
+}
 
-// ─── Composable ──────────────────────────────────────────────────────────────
+export const D6_COLUMN_PRESETS: ColumnPreset[] = [
+  { key: 'all', label: '全部', columns: ALL_COLUMNS },
+  { key: 'core', label: '核心', columns: ['seqNo', 'contractName', 'contractType', 'customerName', 'priorAudited', 'debitAmount', 'creditAmount', 'endAudited', 'postPeriodSettlement'] },
+  { key: 'audit-aging', label: '审定+账龄', columns: ['seqNo', 'contractName', 'customerName', 'priorAudited', 'endAudited', 'ageEnd1y', 'ageEnd1to2y', 'ageEnd2to3y', 'ageEnd3yAbove', 'receivableWithin1y', 'receivableAbove1y'] },
+]
 
 export function useD6DetailColumnPrefs() {
-  const hiddenKeys = ref<Set<string>>(loadFromStorage())
+  const visibleColumns = ref<Set<string>>(new Set(ALL_COLUMNS))
 
-  /**
-   * Returns true if the column should be visible:
-   * - alwaysShow group keys are always visible regardless of hiddenKeys
-   * - Other keys are visible only if NOT in hiddenKeys
-   */
-  function isColVisible(key: string): boolean {
-    if (ALWAYS_VISIBLE_KEYS.has(key)) return true
-    return !hiddenKeys.value.has(key)
+  // Load from localStorage
+  function loadPrefs(): void {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed)) {
+          visibleColumns.value = new Set(parsed)
+          return
+        }
+      }
+    } catch { /* ignore */ }
+    visibleColumns.value = new Set(ALL_COLUMNS)
   }
 
-  /**
-   * Toggle a column's visibility (add/remove from hiddenKeys), then persist.
-   */
-  function toggleCol(key: string): void {
-    // Don't allow toggling always-visible columns
-    if (ALWAYS_VISIBLE_KEYS.has(key)) return
-    const next = new Set(hiddenKeys.value)
-    if (next.has(key)) {
-      next.delete(key)
+  // Save to localStorage
+  function savePrefs(): void {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(visibleColumns.value)))
+  }
+
+  // Toggle column
+  function toggleColumn(col: string): void {
+    const s = new Set(visibleColumns.value)
+    if (s.has(col)) {
+      s.delete(col)
     } else {
-      next.add(key)
+      s.add(col)
     }
-    hiddenKeys.value = next
-    persistToStorage(next)
+    visibleColumns.value = s
+    savePrefs()
   }
 
-  /**
-   * Reset hiddenKeys to DEFAULT_HIDDEN, persist.
-   */
-  function resetDefaults(): void {
-    const defaults = new Set(DEFAULT_HIDDEN)
-    hiddenKeys.value = defaults
-    persistToStorage(defaults)
+  // Apply preset
+  function applyPreset(presetKey: string): void {
+    const preset = D6_COLUMN_PRESETS.find(p => p.key === presetKey)
+    if (preset) {
+      visibleColumns.value = new Set(preset.columns)
+      savePrefs()
+    }
   }
+
+  // Reset to all
+  function resetToAll(): void {
+    visibleColumns.value = new Set(ALL_COLUMNS)
+    savePrefs()
+  }
+
+  // Check if a column is visible
+  function isVisible(col: string): boolean {
+    return visibleColumns.value.has(col)
+  }
+
+  // Visible count
+  const visibleCount = computed(() => visibleColumns.value.size)
+  const totalCount = ALL_COLUMNS.length
+
+  loadPrefs()
 
   return {
-    columnGroups: COLUMN_GROUPS,
-    hiddenKeys,
-    isColVisible,
-    toggleCol,
-    resetDefaults,
+    visibleColumns,
+    toggleColumn,
+    applyPreset,
+    resetToAll,
+    isVisible,
+    visibleCount,
+    totalCount,
+    D6_COLUMN_GROUPS,
+    D6_COLUMN_PRESETS,
   }
-}
-
-// ─── Persistence Helpers ─────────────────────────────────────────────────────
-
-function loadFromStorage(): Set<string> {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      const arr: string[] = JSON.parse(raw)
-      if (Array.isArray(arr)) return new Set(arr)
-    }
-  } catch { /* ignore corrupt data */ }
-  return new Set(DEFAULT_HIDDEN)
-}
-
-function persistToStorage(keys: Set<string>): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(keys)))
-  } catch { /* ignore quota errors */ }
 }
 
 export default useD6DetailColumnPrefs

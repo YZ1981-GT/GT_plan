@@ -44,6 +44,9 @@ class RelatedPartyRegistry(Base, SoftDeleteMixin, TimestampMixin):
     is_controlled_by_same_party: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    # 源模板 B19-1 描述性字段（企业类型/注册地/法人代表/业务性质/注册资本/持股比例%）
+    # 不参与各循环关联方核对（核对仅用 name），仅供披露与台账展示。
+    detail: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
         Index(

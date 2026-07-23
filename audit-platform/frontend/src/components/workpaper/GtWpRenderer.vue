@@ -285,6 +285,7 @@ import GtWpPreparationHeader from '@/components/workpaper/GtWpPreparationHeader.
 import GtWorkpaperRuntimeHosts from '@/components/workpaper/GtWorkpaperRuntimeHosts.vue'
 import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
 import { useProjectStore } from '@/stores/project'
+import { subscribeInvalidation } from '@/services/acnr'
 import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
 import { useWorkpaperScaffold } from '@/components/workpaper/composables/useWorkpaperScaffold'
 
@@ -771,9 +772,22 @@ onMounted(() => {
   eventBus.on('workpaper:locate-cell', onLocateCell)
 })
 
+// ACNR 项目级 SSE 实时失效订阅（acnr-invalidation-overlay-hardening R1）：
+// 单点订阅（workpaper 渲染外壳，每项目一连接，引用计数复用），项目切换时重订阅。
+let _acnrUnsub: (() => void) | null = null
+
 watch(
   () => renderConfig.value?.project_id,
   (pid) => {
+    // ACNR SSE 订阅生命周期管理（项目变化 → 释放旧连接 + 建新连接）
+    if (_acnrUnsub) {
+      _acnrUnsub()
+      _acnrUnsub = null
+    }
+    if (pid) {
+      _acnrUnsub = subscribeInvalidation(pid)
+    }
+
     if (!pid) return
     try {
       const store = useProjectStore()
@@ -787,6 +801,10 @@ watch(
 
 onUnmounted(() => {
   eventBus.off('workpaper:locate-cell', onLocateCell)
+  if (_acnrUnsub) {
+    _acnrUnsub()
+    _acnrUnsub = null
+  }
 })
 
 const errorTitle = computed(() => {

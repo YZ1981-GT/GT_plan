@@ -282,8 +282,11 @@ export function useI2CrossSheet(allResponses: Ref<Map<string, any>>): {
    * I6 订阅此事件后更新自身的联动校验面板。
    */
   watch(i2Capitalized, (newVal) => {
+    const total = _i6Total.value > 0
+      ? _i6Total.value
+      : newVal + _i6Expense.value
     window.dispatchEvent(new CustomEvent('development:capitalized-updated', {
-      detail: { capitalized: newVal },
+      detail: { capitalized: newVal, total },
     }))
   })
 

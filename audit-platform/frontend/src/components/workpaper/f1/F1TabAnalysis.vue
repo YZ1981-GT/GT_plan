@@ -36,8 +36,17 @@
   />
 
   <div class="analysis-card linkage-card">
-    <h4 class="card-title">跨科目联动锚点（F2 / F4）</h4>
-    <p class="guide-tip">手工填入 F2 存货余额/采购、F4 应付期末余额后，上方将给出周转与并存勾稽提示。</p>
+    <div class="card-title-row">
+      <h4 class="card-title">跨科目联动锚点（F2 / F4）</h4>
+      <el-button
+        size="small"
+        type="primary"
+        plain
+        :disabled="isReadonly || !hasTbContext"
+        @click="doFillFromTb"
+      >从试算表带入余额（存货/应付）</el-button>
+    </div>
+    <p class="guide-tip">可「从试算表带入」存货余额(1401)与应付账款期末余额(2202)；存货采购金额需手工/从 F2 录入。填入后上方将给出周转与并存勾稽提示。</p>
     <el-table :data="linkageAnchorRows" size="small" border>
       <el-table-column label="项目" min-width="220" prop="label" />
       <el-table-column label="本期" width="140" align="right">
@@ -283,10 +292,21 @@
       <el-table-column label="账面价值" width="110" align="right" class-name="auto-calc-col">
         <template #default="{ row }"><span class="amt auto">{{ fmtAmount(row.bookValue) }}</span></template>
       </el-table-column>
-      <el-table-column label="发生时间及账龄" width="140">
+      <el-table-column label="发生时间及账龄" width="160">
         <template #default="{ row }">
-          <el-input v-if="!row._subtotal" :model-value="row.aging" size="small" :disabled="isReadonly"
-            @change="(v: string) => updateSupplierCell(row.rowId, 'aging', v)" />
+          <el-select
+            v-if="!row._subtotal"
+            :model-value="row.aging"
+            size="small"
+            :disabled="isReadonly"
+            filterable
+            allow-create
+            clearable
+            placeholder="选择账龄"
+            @change="(v: string) => updateSupplierCell(row.rowId, 'aging', v ?? '')"
+          >
+            <el-option v-for="opt in agingOptions" :key="opt" :label="opt" :value="opt" />
+          </el-select>
         </template>
       </el-table-column>
       <el-table-column label="发生原因" min-width="120">
@@ -346,6 +366,7 @@
  * F1TabAnalysis.vue — F1-4 实质性分析表（对齐 Excel）
  */
 import { computed, reactive, toRef, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { isChangeRateExceeding } from '../composables/useF1FormulaEngine'
 import {
   useF1Analysis,
@@ -356,6 +377,8 @@ import {
 import { useF1AiGenerate } from '../composables/useF1AiGenerate'
 import type { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import type { ChecklistResponse } from '../composables/useF1FormData'
+import { useAgingConfig } from '@/composables/useAgingConfig'
+import { ADJUDICATION_LABEL_BY_SEGMENT_KEY } from '../composables/agingPresets'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
@@ -369,10 +392,19 @@ const props = defineProps<{
   crossSheet: ReturnType<typeof useF1CrossSheet>
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  /** 后端 render 提供的试算表锚点余额（存货 1401 / 应付 2202，本期期末） */
+  tbContext?: { inventoryBalance?: number; payableBalance?: number }
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 const wpIdRef = toRef(props, 'wpId') as Ref<string>
+const projectIdRef = toRef(props, 'projectId') as Ref<string>
+
+const { bands } = useAgingConfig(projectIdRef, 'F1')
+const agingOptions = computed(() => {
+  const labels = bands.value.map((b) => ADJUDICATION_LABEL_BY_SEGMENT_KEY[b.key] || b.label)
+  return labels.length ? labels : ['1年以内(含1年)', '1至2年(含2年)', '2至3年(含3年)', '3年以上']
+})
 
 const {
   balanceRows,
@@ -398,6 +430,7 @@ const {
     updateSupplierCell,
     fillFromDetail,
     fillMajorSuppliersFromDetail,
+    fillCrossCycleFromTb,
   } = useF1Analysis({
   allResponses: allResponsesRef,
   wpId: wpIdRef,
@@ -409,6 +442,26 @@ const {
 })
 
 const projectId = computed(() => props.projectId)
+
+const hasTbContext = computed(() => {
+  const c = props.tbContext
+  return !!c && ((c.inventoryBalance ?? 0) !== 0 || (c.payableBalance ?? 0) !== 0)
+})
+
+function doFillFromTb() {
+  const r = fillCrossCycleFromTb({
+    inventoryBalance: props.tbContext?.inventoryBalance ?? 0,
+    payableBalance: props.tbContext?.payableBalance ?? 0,
+  })
+  if (r.inventoryFilled || r.payableFilled) {
+    const parts: string[] = []
+    if (r.inventoryFilled) parts.push('存货余额')
+    if (r.payableFilled) parts.push('应付余额')
+    ElMessage.success(`已从试算表带入：${parts.join('、')}`)
+  } else {
+    ElMessage.info('锚点已有数值或试算表无数据，未覆盖已录入值')
+  }
+}
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(wpIdRef)
 

@@ -14,6 +14,33 @@
 
 <template>
   <div class="gt-b-arch">
+    <!-- B1 承接决策看板 -->
+    <div v-if="decisionDashboard" class="gt-b-arch__dashboard">
+      <div class="gt-b-arch__dashboard-title">📋 承接决策看板</div>
+      <div class="gt-b-arch__dashboard-grid">
+        <div class="gt-b-arch__dash-item">
+          <span class="gt-b-arch__dash-label">风险评估（B1-1/B1-2）</span>
+          <el-tag :type="dashRiskType" effect="dark" size="small">{{ decisionDashboard.risk_label }}</el-tag>
+        </div>
+        <div class="gt-b-arch__dash-item">
+          <span class="gt-b-arch__dash-label">客户综合风险（B1-3）</span>
+          <el-tag :type="dashClientRiskType" effect="dark" size="small">{{ decisionDashboard.client_risk_label }}风险</el-tag>
+        </div>
+        <div class="gt-b-arch__dash-item">
+          <span class="gt-b-arch__dash-label">承接意见（B1-3）</span>
+          <el-tag :type="dashOpinionType" effect="dark" size="small">{{ decisionDashboard.opinion_label }}</el-tag>
+        </div>
+        <div class="gt-b-arch__dash-item">
+          <span class="gt-b-arch__dash-label">KAA 标准（B1-5）</span>
+          <el-tag :type="decisionDashboard.kaa_conclusion === 'reached' ? 'warning' : 'success'" effect="dark" size="small">{{ decisionDashboard.kaa_label }}</el-tag>
+        </div>
+        <div class="gt-b-arch__dash-item">
+          <span class="gt-b-arch__dash-label">尽调报告（B1-4）</span>
+          <el-tag :type="decisionDashboard.b14_status === '已编制' ? 'success' : 'info'" effect="plain" size="small">{{ decisionDashboard.b14_status }}</el-tag>
+        </div>
+      </div>
+    </div>
+
     <template v-if="stages.length > 0">
       <div
         v-for="(stage, sIdx) in stages"
@@ -239,11 +266,54 @@ function onNodeClick(node: ArchNode) {
     emit('navigate', node.sheetName)
   }
 }
+
+// ─── B1 承接决策看板 ───
+const decisionDashboard = computed(() => props.htmlData?.decision_dashboard || null)
+const dashRiskType = computed(() => {
+  const r = decisionDashboard.value?.risk_conclusion
+  return r === 'high_risk' ? 'danger' : r === 'medium_risk' ? 'warning' : r === 'low_risk' ? 'success' : 'info'
+})
+const dashClientRiskType = computed(() => {
+  const r = decisionDashboard.value?.client_risk
+  return r === 'high' ? 'danger' : r === 'medium' ? 'warning' : r === 'low' ? 'success' : 'info'
+})
+const dashOpinionType = computed(() => {
+  const o = decisionDashboard.value?.opinion
+  return o === 'reject' ? 'danger' : o === 'accept' || o === 'retain' ? 'success' : 'info'
+})
 </script>
 
 <style scoped>
 .gt-b-arch {
   padding: 8px 4px;
+}
+/* ── 承接决策看板 ── */
+.gt-b-arch__dashboard {
+  background: linear-gradient(135deg, var(--el-color-primary-light-9), var(--el-fill-color-lighter));
+  border: 1px solid var(--el-color-primary-light-7);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+.gt-b-arch__dashboard-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-color-primary);
+  margin-bottom: 10px;
+}
+.gt-b-arch__dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px 16px;
+}
+.gt-b-arch__dash-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gt-b-arch__dash-label {
+  font-size: 13px;
+  color: var(--el-text-color-regular);
 }
 
 /* ─── 阶段泳道 ─── */

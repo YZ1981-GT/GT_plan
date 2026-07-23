@@ -43,7 +43,7 @@ async def _load_cross_reference(project_id, db) -> dict:
             sa.text(
                 "SELECT wi.wp_code, wp.id AS wp_id "
                 "FROM wp_index wi "
-                "JOIN working_papers wp ON wp.wp_index_id = wi.id "
+                "JOIN working_paper wp ON wp.wp_index_id = wi.id "
                 "WHERE wi.wp_code = :code AND wp.project_id = :project_id"
             ),
             {"code": CROSS_REF_WP_CODE, "project_id": str(project_id)},

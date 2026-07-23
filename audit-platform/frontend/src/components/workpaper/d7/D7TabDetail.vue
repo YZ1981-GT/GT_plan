@@ -157,29 +157,17 @@
         <template #default="{ row }"><span class="auto-calc">{{ fmtAmt(row.priorAudited) }}</span></template>
       </el-table-column>
 
-      <!-- 期初账龄 -->
-      <el-table-column label="1年以内" width="100" align="right">
+      <!-- 期初账龄（按项目账龄段动态生成） -->
+      <el-table-column
+        v-for="band in visiblePriorBands"
+        :key="`prior-${band.key}`"
+        :label="`期初·${band.label}`"
+        width="100"
+        align="right"
+      >
         <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.priorAging1" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorAging1', v ?? 0)" />
-          <span v-else>{{ fmtAmt(row.priorAging1) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="1~2年" width="90" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.priorAging2" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorAging2', v ?? 0)" />
-          <span v-else>{{ fmtAmt(row.priorAging2) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="2~3年" width="90" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.priorAging3" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorAging3', v ?? 0)" />
-          <span v-else>{{ fmtAmt(row.priorAging3) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="3年以上" width="90" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.priorAging4" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorAging4', v ?? 0)" />
-          <span v-else>{{ fmtAmt(row.priorAging4) }}</span>
+          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.agingPrior?.[band.key] ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, band.priorField, v ?? 0)" />
+          <span v-else>{{ fmtAmt(row.agingPrior?.[band.key]) }}</span>
         </template>
       </el-table-column>
 
@@ -226,29 +214,17 @@
         <template #default="{ row }"><span class="auto-calc">{{ fmtAmt(row.endAudited) }}</span></template>
       </el-table-column>
 
-      <!-- 期末账龄 -->
-      <el-table-column v-if="isColVisible('endAging1')" label="1年以内" width="100" align="right">
+      <!-- 期末账龄（按项目账龄段动态生成） -->
+      <el-table-column
+        v-for="band in visibleAuditedBands"
+        :key="`audited-${band.key}`"
+        :label="`期末·${band.label}`"
+        width="100"
+        align="right"
+      >
         <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.endAging1" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'endAging1', v ?? 0)" />
-          <span v-else>{{ fmtAmt(row.endAging1) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column v-if="isColVisible('endAging2')" label="1~2年" width="90" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.endAging2" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'endAging2', v ?? 0)" />
-          <span v-else>{{ fmtAmt(row.endAging2) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column v-if="isColVisible('endAging3')" label="2~3年" width="90" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.endAging3" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'endAging3', v ?? 0)" />
-          <span v-else>{{ fmtAmt(row.endAging3) }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column v-if="isColVisible('endAging4')" label="3年以上" width="90" align="right">
-        <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.endAging4" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'endAging4', v ?? 0)" />
-          <span v-else>{{ fmtAmt(row.endAging4) }}</span>
+          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.agingAudited?.[band.key] ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, band.auditedField, v ?? 0)" />
+          <span v-else>{{ fmtAmt(row.agingAudited?.[band.key]) }}</span>
         </template>
       </el-table-column>
 
@@ -372,19 +348,13 @@ import type { VirtualColumn } from '@/composables/useVirtualTable'
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
 
-// ─── Column Preferences ──────────────────────────────────────────────────────
-
-const { columnGroups, isColVisible, toggleCol, resetDefaults } = useD7DetailColumnPrefs()
-
 const COL_LABELS: Record<string, string> = {
   customerName: '单位名称', contractName: '合同名称', natureType: '类型(款项性质)',
   priorUnadjusted: '期初未审', priorAje: '期初AJE', priorRje: '期初RJE', priorAudited: '期初审定',
   creditAmount: '贷方发生', debitAmount: '借方发生', endUnadjusted: '期末未审',
   endAje: '期末AJE', endRje: '期末RJE', endAudited: '期末审定',
-  endAging1: '1年以内', endAging2: '1~2年', endAging3: '2~3年', endAging4: '3年以上',
   relatedPartyType: '关联关系', remark: '备注',
 }
-function getColLabel(key: string): string { return COL_LABELS[key] || key }
 
 const props = defineProps<{
   wpId: string
@@ -428,6 +398,7 @@ const relatedParties = computed(() => {
 
 const {
   rows, totalRow, addRow, removeRow, updateCell, importFromAuxBalance, searchFilter, filteredRows,
+  segments, bands,
 } = useD7Detail({
   allResponses: allResponsesRef,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,
@@ -435,7 +406,16 @@ const {
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   relatedParties,
+  isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
 })
+
+// ─── Column Preferences（账龄组按当前 segments 动态生成）──────────────────────
+const { columnGroups, isColVisible, toggleCol, resetDefaults, colLabel } = useD7DetailColumnPrefs(segments)
+function getColLabel(key: string): string { return COL_LABELS[key] || colLabel(key) }
+
+// 账龄列显隐过滤（避免 v-if + v-for 同元素坑）
+const visiblePriorBands = computed(() => bands.value.filter(b => isColVisible(b.priorField)))
+const visibleAuditedBands = computed(() => bands.value.filter(b => isColVisible(b.auditedField)))
 
 // Display rows: filtered data + total row
 const displayRows = computed(() => [...filteredRows.value, totalRow.value])

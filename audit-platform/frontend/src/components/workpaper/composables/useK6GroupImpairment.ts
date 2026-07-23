@@ -52,6 +52,8 @@ export interface K6GroupImpairmentRow {
   allocationRatio: number    // 分摊比例（公式）
   allocatedImpairment: number // 分摊减值金额（公式）
   bookAfterImpairment: number // 分摊后账面价值
+  impairmentFloor: number    // 减值下限 = MAX(公允净额, 使用价值, 0)（CAS42：分摊后账面不得低于此）
+  belowFloor: boolean        // 是否低于下限（公式：分摊后账面 < 下限，商誉行豁免）
   conclusion: string
   remark: string
 }
@@ -181,6 +183,8 @@ export function useK6GroupImpairment(params: UseK6GroupImpairmentParams) {
       allocationRatio: Number(raw.allocationRatio) || 0,
       allocatedImpairment: Number(raw.allocatedImpairment) || 0,
       bookAfterImpairment: Number(raw.bookAfterImpairment) || 0,
+      impairmentFloor: Number(raw.impairmentFloor) || 0,
+      belowFloor: false,
       conclusion: raw.conclusion ?? '',
       remark: raw.remark ?? '',
     }
@@ -222,11 +226,15 @@ export function useK6GroupImpairment(params: UseK6GroupImpairmentParams) {
         row.allocationRatio = 0
         row.allocatedImpairment = summary.goodwillDeduction
         row.bookAfterImpairment = row.bookValue - row.allocatedImpairment
+        row.belowFloor = false // 商誉可减至零，无下限约束
       } else {
         // 非流动资产行：按比例分摊
         row.allocationRatio = calcAllocationRatio(row.bookValue, summary.groupBookExGoodwill)
         row.allocatedImpairment = summary.remainingAllocation * row.allocationRatio
         row.bookAfterImpairment = row.bookValue - row.allocatedImpairment
+        // CAS42下限校验：分摊后账面不得低于 MAX(公允净额, 使用价值, 0)
+        // impairmentFloor 由用户录入(公允净额/使用价值孰高)；仅当已录入(>0)时校验
+        row.belowFloor = row.impairmentFloor > 0 && row.bookAfterImpairment < row.impairmentFloor - 0.005
       }
     }
   }

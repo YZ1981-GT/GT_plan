@@ -31,9 +31,10 @@
         <span class="toolbar-hint">科目 6401 · 重大调整核查</span>
         <GtVoucherSamplingEngine
           :project-id="projectId"
-          :account-codes="['6401']"
-          dialog-mode
-          :phase="'final'"
+          :workpaper-id="wpId"
+          account-code="6401"
+          phase="final"
+          :year="year ?? new Date().getFullYear()"
           @filled="handleSamplingFilled"
         />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="adj.addRow">+ 新增行</el-button>
@@ -269,8 +270,11 @@ const props = withDefaults(defineProps<{
   projectId: string
   isReadonly: boolean
   materiality?: number
+  /** 审计年度（供抽凭引擎按年度查询序时账），由父入口从 project_context 派生 */
+  year?: number
 }>(), {
   materiality: 0,
+  year: undefined,
 })
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>

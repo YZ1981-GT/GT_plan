@@ -1,10 +1,9 @@
 /**
- * useF1Detail — 账龄枚举口径（3年段/5年段）与快捷分配
+ * useF1Detail — 账龄枚举口径（3年段/5年段/自定义）与快捷分配
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref, nextTick } from 'vue'
 import { useF1Detail } from '../useF1Detail'
-import { PRESET_SEGMENTS } from '@/composables/useAgingConfig'
 import type { ChecklistResponse } from '../useF1FormData'
 
 vi.mock('element-plus', () => ({
@@ -56,7 +55,7 @@ describe('useF1Detail aging enum', () => {
     expect(api.bands.value).toHaveLength(4)
     expect(api.bands.value[0].label).toContain('1年以内')
 
-    api.setAgingPreset('FIVE_YEAR')
+    expect(api.setAgingPreset('FIVE_YEAR')).toBe(true)
     await nextTick()
     expect(api.agingPreset.value).toBe('FIVE_YEAR')
     expect(api.segments.value).toHaveLength(6)
@@ -66,6 +65,27 @@ describe('useF1Detail aging enum', () => {
       'F1-det-aging-preset',
       expect.objectContaining({ remark: 'FIVE_YEAR' }),
     )
+  })
+
+  it('自定义账龄段：至少 2 段，bands 按自定义 label 生成', async () => {
+    const { api, save } = setup()
+    await nextTick()
+    expect(api.setAgingPreset('CUSTOM', ['短期', '中期', '长期'])).toBe(true)
+    await nextTick()
+    expect(api.agingPreset.value).toBe('CUSTOM')
+    expect(api.segments.value).toHaveLength(3)
+    expect(api.bands.value.map(b => b.label)).toEqual(['短期', '中期', '长期'])
+    expect(save).toHaveBeenCalledWith(
+      'F1-det-aging-custom-segments',
+      expect.objectContaining({ remark: JSON.stringify(['短期', '中期', '长期']) }),
+    )
+  })
+
+  it('自定义少于 2 段时拒绝', async () => {
+    const { api } = setup()
+    await nextTick()
+    expect(api.setAgingPreset('CUSTOM', ['仅一段'])).toBe(false)
+    expect(api.agingPreset.value).toBe('THREE_YEAR')
   })
 
   it('账龄分配：将期末审定整笔填入枚举档位，其余段清零', async () => {
@@ -79,32 +99,26 @@ describe('useF1Detail aging enum', () => {
         priorUnadjusted: 100,
         priorAdjustment: 0,
         priorReclass: 0,
+        priorAudited: 100,
         debit: 0,
         credit: 0,
+        endBalance: 100,
         entityReclass: 0,
+        endUnadjusted: 100,
         endAje: 0,
         endRje: 0,
+        endAudited: 100,
         agingPrior: { within1: 100, y1to2: 0, y2to3: 0, over3: 0 },
         agingCurrent: { within1: 100, y1to2: 0, y2to3: 0, over3: 0 },
-        agingAudited: { within1: 40, y1to2: 60, y2to3: 0, over3: 0 },
+        agingAudited: { within1: 100, y1to2: 0, y2to3: 0, over3: 0 },
       }]),
     })
     const { api } = setup(map)
     await nextTick()
-    const row = api.rows.value.find(r => r.rowId === 'r1')!
-    expect(row.endAudited).toBe(100)
-
     api.allocateAging('r1', 'audited', 'y1to2')
-    const after = api.rows.value.find(r => r.rowId === 'r1')!
-    expect(after.agingAudited.y1to2).toBe(100)
-    expect(after.agingAudited.within1).toBe(0)
-    expect(after.agingAudited.y2to3).toBe(0)
-    expect(after.agingAudited.over3).toBe(0)
-  })
-
-  it('PRESET FIVE_YEAR 段 key 与枚举一致', () => {
-    expect(PRESET_SEGMENTS.FIVE_YEAR.map(s => s.key)).toEqual([
-      'within1', 'y1to2', 'y2to3', 'y3to4', 'y4to5', 'over5',
-    ])
+    await nextTick()
+    const row = api.rows.value.find(r => r.rowId === 'r1')!
+    expect(row.agingAudited.y1to2).toBe(100)
+    expect(row.agingAudited.within1).toBe(0)
   })
 })

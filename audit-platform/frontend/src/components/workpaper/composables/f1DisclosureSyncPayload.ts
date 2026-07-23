@@ -10,12 +10,63 @@ import {
   resolveF1CurrentStandard,
 } from './f1NoteSectionMap'
 
+import type { ColumnDef } from './disclosureColumnDefs'
+
 export interface F1SyncFromWorkpaperPayload {
   wp_id: string
   sheet_name: string
   section_id: string
   current_standard: string
   sub_table_data: Record<string, Record<string, unknown>[]>
+  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 F1TabDisclosure el-table-column（多级表头扁平合并） */
+  columns?: Record<string, ColumnDef[]>
+}
+
+// F1 子表英文键 → 源对齐中文列头（键与 buildF1*SubTableData 行键逐字一致）
+const F1_LISTED_COLUMNS: Record<string, ColumnDef[]> = {
+  预付款项按账龄披露: [
+    { key: 'label', label: '账龄', is_label: true },
+    { key: 'end_amount', label: '期末数-金额', format: 'amount' },
+    { key: 'end_pct', label: '期末数-比例%' },
+    { key: 'prior_amount', label: '上年年末数-金额', format: 'amount' },
+    { key: 'prior_pct', label: '上年年末数-比例%' },
+  ],
+  账龄超过1年的重要预付款项: [
+    { key: 'label', label: '债务人名称', is_label: true },
+    { key: 'balance', label: '期末余额', format: 'amount' },
+    { key: 'proportion_pct', label: '占预付款项合计的比例(%)' },
+    { key: 'reason', label: '未偿还原因' },
+  ],
+  单位名称: [
+    { key: 'label', label: '单位名称', is_label: true },
+    { key: 'end_amount', label: '预付款项期末余额', format: 'amount' },
+    { key: 'proportion_pct', label: '占预付款项期末余额合计数的比例%' },
+  ],
+}
+
+const F1_SOE_COLUMNS: Record<string, ColumnDef[]> = {
+  预付款项按账龄列示: [
+    { key: 'label', label: '账龄', is_label: true },
+    { key: 'end_amount', label: '期末数-账面余额金额', format: 'amount' },
+    { key: 'end_pct', label: '期末数-账面余额比例%' },
+    { key: 'end_bad_debt', label: '期末数-坏账准备', format: 'amount' },
+    { key: 'prior_amount', label: '期初数-账面余额金额', format: 'amount' },
+    { key: 'prior_pct', label: '期初数-账面余额比例%' },
+    { key: 'prior_bad_debt', label: '期初数-坏账准备', format: 'amount' },
+  ],
+  账龄超过1年的大额预付款项: [
+    { key: 'creditor_unit', label: '债权单位', is_label: true },
+    { key: 'debtor_unit', label: '债务单位' },
+    { key: 'end_balance', label: '期末余额', format: 'amount' },
+    { key: 'aging', label: '账龄' },
+    { key: 'reason', label: '未结算的原因' },
+  ],
+  按欠款方归集的期末余额前五名的预付款项: [
+    { key: 'label', label: '债务人名称', is_label: true },
+    { key: 'end_amount', label: '账面余额', format: 'amount' },
+    { key: 'proportion_pct', label: '占预付款项合计的比例(%)' },
+    { key: 'bad_debt', label: '坏账准备', format: 'amount' },
+  ],
 }
 
 export interface F1ListedSyncSnapshot {
@@ -254,5 +305,6 @@ export function buildF1SyncPayload(
     section_id: F1_NOTE_SECTION[variant],
     current_standard: resolveF1CurrentStandard(variant, applicableStandards),
     sub_table_data: subTableData,
+    columns: variant === 'listed' ? F1_LISTED_COLUMNS : F1_SOE_COLUMNS,
   }
 }

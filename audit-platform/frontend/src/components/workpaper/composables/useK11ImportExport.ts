@@ -143,18 +143,18 @@ export function useK11ImportExport(params: UseK11ImportExportOptions): UseK11Imp
   const lastError = ref<string | null>(null)
 
   function apiBase(): string {
-    return `/api/workpapers/${wpId.value}`
+    return `/api/workpapers/${wpId.value}/${K11_API_PREFIX}`
   }
 
   /**
-   * 导出模板 — GET /api/workpapers/{wpId}/k11-export-template?sheet_code={code}
+   * 导出模板 — GET /api/workpapers/{wpId}/k11/export-template?sheet={code}
    */
   async function exportTemplate(): Promise<void> {
     lastError.value = null
     isExporting.value = true
     try {
-      const response = await http.get(`${apiBase()}/k11-export-template`, {
-        params: { sheet_code: sheetCode },
+      const response = await http.get(`${apiBase()}/export-template`, {
+        params: { sheet: sheetCode },
         responseType: 'blob',
       })
       const contentDisposition = response.headers?.['content-disposition']
@@ -174,14 +174,14 @@ export function useK11ImportExport(params: UseK11ImportExportOptions): UseK11Imp
   }
 
   /**
-   * 导出数据 — GET /api/workpapers/{wpId}/k11-export-data?sheet_code={code}
+   * 导出数据 — GET /api/workpapers/{wpId}/k11/export-data?sheet={code}
    */
   async function exportData(): Promise<void> {
     lastError.value = null
     isExporting.value = true
     try {
-      const response = await http.get(`${apiBase()}/k11-export-data`, {
-        params: { sheet_code: sheetCode },
+      const response = await http.get(`${apiBase()}/export-data`, {
+        params: { sheet: sheetCode },
         responseType: 'blob',
       })
       const contentDisposition = response.headers?.['content-disposition']
@@ -201,8 +201,8 @@ export function useK11ImportExport(params: UseK11ImportExportOptions): UseK11Imp
   }
 
   /**
-   * 导入数据 — POST /api/workpapers/{wpId}/k11-import-data
-   * multipart/form-data 上传 xlsx 文件, query param sheet_code={code}
+   * 导入数据 — POST /api/workpapers/{wpId}/k11/import-data
+   * multipart/form-data 上传 xlsx 文件, query param sheet={code}
    */
   async function importData(file: File): Promise<K11ImportResult | null> {
     lastError.value = null
@@ -211,8 +211,8 @@ export function useK11ImportExport(params: UseK11ImportExportOptions): UseK11Imp
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await http.post(`${apiBase()}/k11-import-data`, formData, {
-        params: { sheet_code: sheetCode },
+      const response = await http.post(`${apiBase()}/import-data`, formData, {
+        params: { sheet: sheetCode },
         headers: { 'Content-Type': 'multipart/form-data' },
       })
 

@@ -15,12 +15,10 @@
     <div class="section-header">
       <h3>K11-1 资产减值损失审定表</h3>
       <div class="header-actions">
-        <el-button size="small" type="primary" plain @click="handleAiGenerate">
-          <el-icon><MagicStick /></el-icon> AI审计说明
+        <el-button size="small" type="primary" plain :loading="aiGenerating" @click="handleAiGenerate">
+          <el-icon v-if="!aiGenerating"><MagicStick /></el-icon> AI审计说明
         </el-button>
-        <el-button size="small" @click="handleReview">
-          <el-icon><ChatDotSquare /></el-icon> 复核
-        </el-button>
+        <GtReviewTrigger section-id="K11-1" label="💬 复核" />
       </div>
     </div>
 
@@ -42,7 +40,35 @@
       </template>
     </el-alert>
 
-    <!-- ═══ 审定表主表（37行） ═══ -->
+    <!-- ═══ K11-3调整分录勾稽（K11-3→K11-1 联动可见） ═══ -->
+    <el-alert
+      v-if="adjustmentReconcile.hasK113 && !adjustmentReconcile.isMatch"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="reconciliation-alert"
+    >
+      <template #title>
+        K11-3调整分录合计（AJE {{ fmtNum(adjustmentReconcile.ajeFromEntries) }} / RJE {{ fmtNum(adjustmentReconcile.rjeFromEntries) }}）
+        与审定表逐行合计（AJE {{ fmtNum(adjustmentReconcile.ajeInTable) }} / RJE {{ fmtNum(adjustmentReconcile.rjeInTable) }}）不一致，
+        请核对差异（AJE {{ fmtNum(adjustmentReconcile.ajeDiff) }} / RJE {{ fmtNum(adjustmentReconcile.rjeDiff) }}）。
+      </template>
+    </el-alert>
+
+    <!-- ═══ TB(6701)全局勾稽 ═══ -->
+    <el-alert
+      v-if="tbReconcile.hasTb && !tbReconcile.isMatch"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="reconciliation-alert"
+    >
+      <template #title>
+        审定合计 {{ fmtNum(tbReconcile.adjAudited) }} 与试算表 6701 审定发生额 {{ fmtNum(tbReconcile.tbAudited) }} 差异 {{ fmtNum(tbReconcile.diff) }}，请核对（回写试算表后应一致）。
+      </template>
+    </el-alert>
+
+    <!-- ═══ 审定表主表（对齐源模板12列：上期数/本期数/比较/原因分析） ═══ -->
     <el-table
       :data="tableData"
       border
@@ -51,148 +77,162 @@
       :row-class-name="adjRowClass"
       max-height="600"
     >
-      <!-- 1. 项目 -->
-      <el-table-column prop="projectName" label="项目" min-width="160" fixed>
+      <!-- 项目 -->
+      <el-table-column prop="projectName" label="项目" min-width="150" fixed>
         <template #default="{ row }">
           <span :class="{ 'subtotal-label': row.isTotalRow }">{{ row.projectName }}</span>
         </template>
       </el-table-column>
 
-      <!-- 2. 本期发生额（从tb_ledger取，只读） -->
-      <el-table-column label="本期发生额" min-width="120" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable"
-            :model-value="row.currentOccurrence"
-            :disabled="isReadonly"
-            size="small"
-            :controls="false"
-            :precision="2"
-            style="width: 100px"
-            @change="(v: number) => handleCellChange(row.rowKey, 'currentOccurrence', v ?? 0)"
-          />
-          <span v-else class="formula-cell">{{ fmtNum(row.currentOccurrence) }}</span>
-        </template>
+      <!-- ── 上期数 ── -->
+      <el-table-column label="上期数" align="center">
+        <el-table-column label="未审数" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.isEditable"
+              :model-value="row.priorUnadjusted"
+              :disabled="isReadonly"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width: 95px"
+              @change="(v: number) => handleCellChange(row.rowKey, 'priorUnadjusted', v ?? 0)"
+            />
+            <span v-else class="formula-cell">{{ fmtNum(row.priorUnadjusted) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账项调整" min-width="105" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.isEditable"
+              :model-value="row.priorAdjustment"
+              :disabled="isReadonly"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width: 90px"
+              @change="(v: number) => handleCellChange(row.rowKey, 'priorAdjustment', v ?? 0)"
+            />
+            <span v-else class="formula-cell">{{ fmtNum(row.priorAdjustment) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="审定数" min-width="110" align="right">
+          <template #header>
+            <el-tooltip content="上期审定数 = 上期未审 + 上期账项调整" placement="top">
+              <span class="formula-col-header">审定数</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <span class="formula-cell formula-underline">{{ fmtNum(row.priorAudited) }}</span>
+          </template>
+        </el-table-column>
       </el-table-column>
 
-      <!-- 3. 上期发生额 -->
-      <el-table-column label="上期发生额" min-width="120" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable"
-            :model-value="row.priorOccurrence"
-            :disabled="isReadonly"
-            size="small"
-            :controls="false"
-            :precision="2"
-            style="width: 100px"
-            @change="(v: number) => handleCellChange(row.rowKey, 'priorOccurrence', v ?? 0)"
-          />
-          <span v-else class="formula-cell">{{ fmtNum(row.priorOccurrence) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 4. 未审（=本期发生额，公式列） -->
-      <el-table-column label="未审" min-width="110" align="right">
-        <template #header>
-          <el-tooltip content="未审数 = 本期发生额（从tb_ledger取）" placement="top">
-            <span class="formula-col-header">未审</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <el-tooltip content="公式：本期借方发生 − 贷方发生" placement="top">
-            <span class="formula-cell formula-underline">{{ fmtNum(row.unadjusted) }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-
-      <!-- 5. AJE -->
-      <el-table-column label="AJE" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable"
-            :model-value="row.aje"
-            :disabled="isReadonly"
-            size="small"
-            :controls="false"
-            :precision="2"
-            style="width: 85px"
-            @change="(v: number) => handleCellChange(row.rowKey, 'aje', v ?? 0)"
-          />
-          <span v-else class="formula-cell">{{ fmtNum(row.aje) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 6. RJE -->
-      <el-table-column label="RJE" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="row.isEditable"
-            :model-value="row.rje"
-            :disabled="isReadonly"
-            size="small"
-            :controls="false"
-            :precision="2"
-            style="width: 85px"
-            @change="(v: number) => handleCellChange(row.rowKey, 'rje', v ?? 0)"
-          />
-          <span v-else class="formula-cell">{{ fmtNum(row.rje) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 7. 审定数（公式列：未审+AJE+RJE） -->
-      <el-table-column label="审定数" min-width="120" align="right">
-        <template #header>
-          <el-tooltip content="审定数 = 未审 + AJE + RJE" placement="top">
-            <span class="formula-col-header">审定数</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <el-tooltip content="公式：未审 + AJE + RJE" placement="top">
+      <!-- ── 本期数 ── -->
+      <el-table-column label="本期数" align="center">
+        <el-table-column label="未审数" min-width="110" align="right">
+          <template #header>
+            <el-tooltip content="本期未审数 = 本期发生额（借方发生 − 贷方发生，从tb_ledger）" placement="top">
+              <span class="formula-col-header">未审数</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.isEditable"
+              :model-value="row.currentOccurrence"
+              :disabled="isReadonly"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width: 95px"
+              @change="(v: number) => handleCellChange(row.rowKey, 'currentOccurrence', v ?? 0)"
+            />
+            <span v-else class="formula-cell">{{ fmtNum(row.currentOccurrence) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账项调整(AJE)" min-width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.isEditable"
+              :model-value="row.aje"
+              :disabled="isReadonly"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width: 90px"
+              @change="(v: number) => handleCellChange(row.rowKey, 'aje', v ?? 0)"
+            />
+            <span v-else class="formula-cell">{{ fmtNum(row.aje) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="重分类(RJE)" min-width="105" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.isEditable"
+              :model-value="row.rje"
+              :disabled="isReadonly"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width: 85px"
+              @change="(v: number) => handleCellChange(row.rowKey, 'rje', v ?? 0)"
+            />
+            <span v-else class="formula-cell">{{ fmtNum(row.rje) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="审定数" min-width="115" align="right">
+          <template #header>
+            <el-tooltip content="本期审定数 = 未审 + AJE + RJE" placement="top">
+              <span class="formula-col-header">审定数</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
             <span class="formula-cell formula-underline">{{ fmtNum(row.audited) }}</span>
-          </el-tooltip>
-        </template>
+          </template>
+        </el-table-column>
       </el-table-column>
 
-      <!-- 8. 同比变动（公式列：(审定−上期)/|上期|） -->
-      <el-table-column label="同比变动" min-width="100" align="right">
-        <template #header>
-          <el-tooltip content="同比变动率 = (审定数 − 上期) / |上期|" placement="top">
-            <span class="formula-col-header">同比变动</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <el-tooltip content="公式：(审定 − 上期) / |上期|" placement="top">
+      <!-- ── 本期审定数与上期审定数的比较 ── -->
+      <el-table-column label="本期审定数与上期审定数的比较" align="center">
+        <el-table-column label="变动额" min-width="105" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell formula-underline">{{ fmtNum(row.yoyChange) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="变动率" min-width="95" align="right">
+          <template #header>
+            <el-tooltip content="变动率 = (本期审定 − 上期审定) / |上期审定|" placement="top">
+              <span class="formula-col-header">变动率</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
             <span
               class="formula-cell formula-underline"
               :class="{ 'abnormal-highlight': isAbnormal(row.yoyChangeRate) }"
             >
               {{ fmtRate(row.yoyChangeRate) }}
             </span>
-          </el-tooltip>
-        </template>
+          </template>
+        </el-table-column>
       </el-table-column>
 
-      <!-- 9. 来源底稿（GtIndexChip跳转） -->
-      <el-table-column label="来源底稿" min-width="100" align="center">
+      <!-- 来源底稿（GtIndexChip跳转，平台增强列） -->
+      <el-table-column label="来源底稿" min-width="90" align="center">
         <template #default="{ row }">
-          <GtIndexChip
-            v-if="row.sourceWp"
-            :value="row.sourceWp"
-          />
+          <GtIndexChip v-if="row.sourceWp" :value="row.sourceWp" />
           <span v-else class="no-source">—</span>
         </template>
       </el-table-column>
 
-      <!-- 10. 备注 -->
-      <el-table-column label="备注" min-width="140">
+      <!-- 原因分析 -->
+      <el-table-column label="原因分析" min-width="150">
         <template #default="{ row }">
           <el-input
             v-if="row.isEditable"
             :model-value="row.remark"
             :disabled="isReadonly"
             size="small"
-            placeholder="备注"
+            placeholder="变动原因分析"
             @blur="(e: FocusEvent) => handleCellChange(row.rowKey, 'remark', (e.target as HTMLInputElement)?.value ?? '')"
           />
         </template>
@@ -202,12 +242,12 @@
     <!-- ═══ 合计行固定底部 ═══ -->
     <div class="total-row-bar">
       <span class="total-label">合  计</span>
-      <span class="total-item">本期发生: <strong>{{ fmtNum(totalRow.currentOccurrence) }}</strong></span>
-      <span class="total-item">上期发生: <strong>{{ fmtNum(totalRow.priorOccurrence) }}</strong></span>
-      <span class="total-item">未审: <strong>{{ fmtNum(totalRow.unadjusted) }}</strong></span>
+      <span class="total-item">上期审定: <strong>{{ fmtNum(totalRow.priorAudited) }}</strong></span>
+      <span class="total-item">本期未审: <strong>{{ fmtNum(totalRow.currentOccurrence) }}</strong></span>
       <span class="total-item">AJE: <strong>{{ fmtNum(totalRow.aje) }}</strong></span>
       <span class="total-item">RJE: <strong>{{ fmtNum(totalRow.rje) }}</strong></span>
-      <span class="total-item">审定数: <strong>{{ fmtNum(totalRow.audited) }}</strong></span>
+      <span class="total-item">本期审定: <strong>{{ fmtNum(totalRow.audited) }}</strong></span>
+      <span class="total-item">变动额: <strong>{{ fmtNum(totalRow.yoyChange) }}</strong></span>
       <span class="total-item" :class="{ 'abnormal-highlight': isAbnormal(totalRow.yoyChangeRate) }">
         变动率: <strong>{{ fmtRate(totalRow.yoyChangeRate) }}</strong>
       </span>
@@ -255,8 +295,8 @@
       <template #header>
         <div class="section-header compact">
           <span>审计说明与结论</span>
-          <el-button size="small" type="primary" plain @click="handleAiGenerate">
-            <el-icon><MagicStick /></el-icon> AI生成
+          <el-button size="small" type="primary" plain :loading="aiGenerating" @click="handleAiGenerate">
+            <el-icon v-if="!aiGenerating"><MagicStick /></el-icon> AI生成
           </el-button>
         </div>
       </template>
@@ -285,8 +325,9 @@
       <ul>
         <li>损益类科目(6701)：取<strong>发生额</strong>（借方发生累计 − 贷方红冲），非期末余额！</li>
         <li>减值损失借方增加，贷方为转回/红冲。商誉减值不可转回（CAS8）。</li>
-        <li>审定数 = 未审 + AJE + RJE</li>
-        <li>同比变动率 = (审定 − 上期) / |上期|，变动率 > ±30% 红色预警需说明原因</li>
+        <li>对齐源模板12列：上期数(未审/账项调整/审定) + 本期数(未审/账项调整AJE/重分类RJE/审定) + 变动额率 + 原因分析</li>
+        <li>上期审定数 = 上期未审 + 上期账项调整；本期审定数 = 本期未审 + AJE + RJE</li>
+        <li>变动率 = (本期审定 − 上期审定) / |上期审定|，变动率 > ±30% 红色预警需在原因分析说明</li>
         <li>各来源行GtIndexChip可跳转对应减值源底稿（F2/H1/I1/I3/H2/G7/H4/H8/H3）</li>
         <li>审定合计应与K11-2明细表各项目发生额合计一致（交叉勾稽）</li>
         <li>完成后TB回写6701发生额，发布 substantive:adjudicated 事件通知附注</li>
@@ -310,10 +351,12 @@
  * Spec: .kiro/specs/k11-asset-impairment-loss/ | Task: 4.2
  * Requirements: 2.1-2.8
  */
-import { computed, inject, toRef, type Ref } from 'vue'
-import { MagicStick, CircleCheckFilled, WarningFilled, ChatDotSquare } from '@element-plus/icons-vue'
+import { computed, toRef, type Ref } from 'vue'
+import { MagicStick, CircleCheckFilled, WarningFilled } from '@element-plus/icons-vue'
 import { useK11Adjudication, type K11AdjRow } from '../../composables/useK11Adjudication'
+import { useK11AiGenerate } from '../../composables/useK11AiGenerate'
 import GtIndexChip from '../../GtIndexChip.vue'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const props = defineProps<{
   wpId: string
@@ -331,9 +374,6 @@ const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
 }>()
 
-// ─── 复核对话 inject ─────────────────────────────────────────────────────────
-const openReviewDialog = inject<(sectionId: string, label?: string) => void>('openReviewDialog', () => {})
-
 // ─── Composable wiring ───────────────────────────────────────────────────────
 
 const {
@@ -342,6 +382,7 @@ const {
   auditNote,
   auditConclusion,
   detailCrossValidation,
+  adjustmentReconcile,
   updateCell,
   writeback,
   saveNote,
@@ -359,6 +400,20 @@ const {
 // ─── 表格数据 ────────────────────────────────────────────────────────────────
 
 const tableData = computed(() => rows.value)
+
+// ─── TB(6701)全局勾稽：审定合计 ↔ 试算表审定发生额 ─────────────────────────────
+const tbReconcile = computed(() => {
+  const tbAudited = Number(props.tbData?.audited6701 ?? 0)
+  const adjAudited = totalRow.value.audited
+  const diff = adjAudited - tbAudited
+  return {
+    tbAudited,
+    adjAudited,
+    diff,
+    hasTb: Math.abs(tbAudited) > 0.01,
+    isMatch: Math.abs(diff) < 0.01,
+  }
+})
 
 /** 变动率>±30%异常判定 */
 const CHANGE_RATE_THRESHOLD = 0.3
@@ -386,18 +441,31 @@ function handleSaveConclusion(): void {
   saveConclusion(auditConclusion.value)
 }
 
-function handleAiGenerate(): void {
-  emit('save', 'K11-1-ai-trigger', { remark: 'generate' })
+const { generating: aiGenerating, generate: aiGenerate } = useK11AiGenerate({ wpId: () => props.wpId })
+
+async function handleAiGenerate(): Promise<void> {
+  const t = totalRow.value
+  const text = await aiGenerate({
+    section: 'impairment-summary-conclusion',
+    prompt: '为K11资产减值损失审定表生成审计说明，汇总各类资产减值损失本期发生情况、与源底稿核对结果、变动合理性分析。',
+    context: {
+      本期审定数: fmtNum(t.audited),
+      上期审定数: fmtNum(t.priorAudited),
+      变动额: fmtNum(t.yoyChange),
+      变动率: fmtRate(t.yoyChangeRate),
+      本期未审: fmtNum(t.currentOccurrence),
+      AJE: fmtNum(t.aje),
+      RJE: fmtNum(t.rje),
+    },
+    existingContent: auditNote.value,
+  })
+  if (text) {
+    auditNote.value = text
+    saveNote(text)
+  }
 }
 
-function handleReview(): void {
-  openReviewDialog('K11-1', '资产减值损失审定表复核')
-}
 
-/** Navigate to another sheet within this workpaper (intra-workpaper navigation) */
-function navigateTo(code: string): void {
-  emit('navigate-sheet', code)
-}
 
 // ─── Row class ───────────────────────────────────────────────────────────────
 

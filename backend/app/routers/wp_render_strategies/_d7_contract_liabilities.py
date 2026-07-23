@@ -108,6 +108,9 @@ async def render(ctx: RenderContext) -> dict | None:
         "audit_year": "",
         "business_category": "",
         "applicable_standards": "",
+        "bs_date": "",
+        "related_parties": [],
+        "tb_amount": 0,
     }
 
     try:
@@ -129,12 +132,53 @@ async def render(ctx: RenderContext) -> dict | None:
                 project_context["applicable_standards"] = raw_standards.get("type", "")
             else:
                 project_context["applicable_standards"] = str(raw_standards or "")
+            # bs_date 供期后窗口判断
+            audit_year = proj_row.audit_year or ""
+            project_context["bs_date"] = f"{audit_year}-12-31" if audit_year else ""
     except Exception as e:  # noqa: BLE001
         logger.warning("D7 render: project context 查询失败: %s", e)
         try:
             await db.rollback()
         except Exception:
             pass
+
+    # ─── related_parties（关联方清单） ────────────────────────────────────
+    try:
+        rp_result = await db.execute(
+            sa.text(
+                "SELECT name FROM related_party_registry "
+                "WHERE project_id = :pid AND is_deleted = false"
+            ),
+            {"pid": str(ctx.project_id)},
+        )
+        project_context["related_parties"] = [
+            row.name for row in rp_result.fetchall() if row.name
+        ]
+    except Exception as e:  # noqa: BLE001
+        logger.warning("D7 render: related_parties 查询失败: %s", e)
+        project_context["related_parties"] = []
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+
+    # ─── tb_amount（科目2205期末审定数，供TB自动预填） ─────────────────────
+    try:
+        tb_result = await db.execute(
+            sa.text(
+                "SELECT COALESCE(SUM(COALESCE(audited_amount, unadjusted_amount)), 0) AS amt "
+                "FROM trial_balance "
+                "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                "AND standard_account_code LIKE '2205%'"
+            ),
+            {"pid": str(ctx.project_id), "year": int(project_context["audit_year"] or 0)},
+        )
+        tb_row = tb_result.fetchone()
+        if tb_row:
+            project_context["tb_amount"] = float(tb_row.amt)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("D7 render: tb_amount 查询失败: %s", e)
+        project_context["tb_amount"] = 0
 
     # 附注适用性
     standards = str(project_context.get("applicable_standards", "")).lower()

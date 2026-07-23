@@ -14,6 +14,31 @@
   },
   "packages": [
     {
+      "account_package_id": "B1_engagement_acceptance",
+      "cycle": "B",
+      "account_code": null,
+      "account_name": "业务承接和保持",
+      "report_row": null,
+      "note_section": null,
+      "mapping_status": "pending_inventory_reconciliation",
+      "industry": ["通用"],
+      "primary_wp_code": "B1",
+      "control_panel_sheet": "B1A",
+      "source_wp_codes": ["B1-1", "B1-2", "B1-3", "B1-4", "B1-5", "B1-7", "B1A", "B1B"],
+      "schema_refs": [],
+      "generated_inventory_refs": [],
+      "sheets": [
+        { "sheet_name": "B1A 业务承接", "sheet_type": "procedure", "source_wp_code": "B1A" },
+        { "sheet_name": "B1B业务保持", "sheet_type": "procedure", "source_wp_code": "B1B" },
+        { "sheet_name": "风险评估表-承接", "sheet_type": "detail_table", "source_wp_code": "B1-1" },
+        { "sheet_name": "风险评估表-保持", "sheet_type": "detail_table", "source_wp_code": "B1-2" },
+        { "sheet_name": "业务评价表B1-3", "sheet_type": "detail_table", "source_wp_code": "B1-3" },
+        { "sheet_name": "尽职调查报告B1-4", "sheet_type": "detail_table", "source_wp_code": "B1-4" },
+        { "sheet_name": " B1-5 KAA检查表-业务承接", "sheet_type": "detail_table", "source_wp_code": "B1-5" },
+        { "sheet_name": "质量控制委员会会议记录B1-7", "sheet_type": "document", "source_wp_code": "B1-7" }
+      ]
+    },
+    {
       "account_package_id": "D1_notes_receivable",
       "cycle": "D",
       "account_code": "1121",

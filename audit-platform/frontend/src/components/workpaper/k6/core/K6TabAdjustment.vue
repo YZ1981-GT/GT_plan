@@ -28,6 +28,20 @@
       </div>
     </div>
 
+    <!-- 上游建议AJE提示（来自K6-5减值/K6-7不再满足） -->
+    <el-alert
+      v-if="pendingSuggestions.length > 0"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="suggestion-alert"
+    >
+      <template #title>
+        检测到 {{ pendingSuggestions.length }} 项来自 {{ pendingSuggestions.map(s => s.source).join('、') }} 的建议调整分录
+        <el-button size="small" type="primary" link @click="importSuggestions">一键导入建议AJE</el-button>
+      </template>
+    </el-alert>
+
     <!-- 借贷平衡状态 -->
     <div class="balance-bar">
       <span>借方合计：<strong>{{ fmtAmt(totalDebits) }}</strong></span>
@@ -208,7 +222,7 @@ import { eventBus } from '@/utils/eventBus'
 import { useK6ImportExport } from '@/components/workpaper/composables/useK6ImportExport'
 
 const K6_ACCOUNT_CODE_ASSET = '1481'  // 持有待售资产
-const K6_ACCOUNT_CODE_LIAB = '2245'   // 持有待售负债
+const K6_ACCOUNT_CODE_LIAB = '2605'   // 持有待售负债
 const ITEM_PREFIX = 'K6-3-adj'
 
 const props = defineProps<{
@@ -256,6 +270,56 @@ const totalDebits = computed(() => entries.value.reduce((sum, e) => sum + (e.deb
 const totalCredits = computed(() => entries.value.reduce((sum, e) => sum + (e.creditAmount || 0), 0))
 const balanceDiff = computed(() => totalDebits.value - totalCredits.value)
 const isBalanced = computed(() => Math.abs(balanceDiff.value) < 0.005)
+
+// ═══ 上游建议AJE（来自K6-5减值/K6-7不再满足） ═══
+interface SuggestedAje {
+  source: string
+  type: string
+  summary: string
+  entries: Array<{ accountCode: string; accountName: string; debit: number; credit: number }>
+  amount: number
+}
+
+const pendingSuggestions = computed<SuggestedAje[]>(() => {
+  const result: SuggestedAje[] = []
+  for (const key of ['K6-5-suggested-aje', 'K6-7-suggested-aje']) {
+    const item = props.allResponses.get(key)
+    const raw = item?.remark ?? (typeof item === 'string' ? item : null)
+    if (!raw) continue
+    try {
+      const parsed = JSON.parse(raw)
+      if (parsed && Array.isArray(parsed.entries) && parsed.entries.length > 0) {
+        result.push(parsed as SuggestedAje)
+      }
+    } catch { /* ignore */ }
+  }
+  return result
+})
+
+function importSuggestions(): void {
+  let added = 0
+  for (const sug of pendingSuggestions.value) {
+    for (const e of sug.entries) {
+      const entry: AdjustmentEntry = {
+        id: `entry-${++nextId}`,
+        seq: entries.value.length + 1,
+        entryType: (sug.type === 'RJE' ? 'RJE' : 'AJE') as 'AJE' | 'RJE',
+        accountCode: e.accountCode || '',
+        accountName: e.accountName || '',
+        debitAmount: Number(e.debit) || 0,
+        creditAmount: Number(e.credit) || 0,
+        summary: sug.summary || `${sug.source}建议调整`,
+        preparedBy: '',
+        remark: `来源:${sug.source}`,
+      }
+      entries.value.push(entry)
+      added++
+    }
+  }
+  reSequence()
+  persistEntries()
+  ElMessage.success(`已导入 ${added} 条来自上游底稿的建议分录，请核对借贷金额后保存回写`)
+}
 
 // ═══ 初始化加载 ═══
 onMounted(() => {
@@ -361,10 +425,10 @@ function handleSaveWriteback(): void {
 
   // 持有待售负债(贷方/负债类): AJE净调整 = 贷方-借方(贷方增负债)
   const ajeLiab = entries.value
-    .filter(e => e.entryType === 'AJE' && (e.accountCode === K6_ACCOUNT_CODE_LIAB || e.accountCode.startsWith('224')))
+    .filter(e => e.entryType === 'AJE' && (e.accountCode === K6_ACCOUNT_CODE_LIAB || e.accountCode.startsWith('2605')))
     .reduce((sum, e) => sum + (e.creditAmount - e.debitAmount), 0)
   const rjeLiab = entries.value
-    .filter(e => e.entryType === 'RJE' && (e.accountCode === K6_ACCOUNT_CODE_LIAB || e.accountCode.startsWith('224')))
+    .filter(e => e.entryType === 'RJE' && (e.accountCode === K6_ACCOUNT_CODE_LIAB || e.accountCode.startsWith('2605')))
     .reduce((sum, e) => sum + (e.creditAmount - e.debitAmount), 0)
 
   // 汇总AJE/RJE总额（简化：合并资产+负债）
@@ -463,6 +527,8 @@ function tableRowClassName({ row }: { row: AdjustmentEntry }): string {
 .guidance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .guidance-step { display: flex; align-items: flex-start; gap: 6px; font-size: 12px; color: #1a5276; }
 .step-num { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; background: #2980b9; color: #fff; font-size: 10px; flex-shrink: 0; }
+
+.suggestion-alert { margin-bottom: 12px; }
 
 .balance-bar {
   display: flex; gap: 16px; align-items: center; padding: 8px 12px;

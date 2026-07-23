@@ -57,6 +57,107 @@ async def _resolve_b3_indep(db: AsyncSession, project_id: UUID, year: int, **kw)
     return {"summary": f"已确认{confirmed}/{total}项（{pct}%）", "progress": pct}
 
 
+@auto_resolver("b1_risk_assessment_conclusion")
+async def _resolve_b1_risk_conclusion(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """B1-1/B1-2 风险评估综合结论（B1A/B1B 程序表步骤 5.1/5.3 自动推进）。
+
+    数据来源: checklist_responses 表（item_id='b1risk-overall-conclusion'，
+    经 working_paper→wp_index 关联到 wp_code B1-1/B1-2）。
+    返回结构: {"summary": str, "conclusion": str|None}
+    """
+    row = (await db.execute(sa.text("""
+        SELECT cr.conclusion
+        FROM checklist_responses cr
+        JOIN working_paper wp ON wp.id = cr.wp_id
+        JOIN wp_index wi ON wi.id = wp.wp_index_id
+        WHERE cr.project_id = :pid
+          AND cr.item_id = 'b1risk-overall-conclusion'
+          AND wi.wp_code IN ('B1-1', 'B1-2')
+        ORDER BY cr.updated_at DESC NULLS LAST
+        LIMIT 1
+    """), {"pid": str(project_id)})).first()
+    conclusion = row.conclusion if row else None
+    label_map = {
+        "low_risk": "✓ 已完成风险评估—低风险",
+        "medium_risk": "⚠️ 已完成风险评估—中风险（需进一步评估审批）",
+        "high_risk": "⚠️ 已完成风险评估—高风险（建议拒绝/解除）",
+    }
+    if not conclusion:
+        return {"summary": "风险评估未完成", "conclusion": None}
+    return {"summary": label_map.get(conclusion, f"风险评估结论: {conclusion}"), "conclusion": conclusion}
+
+
+@auto_resolver("b1_3_evaluation_conclusion")
+async def _resolve_b1_3_eval(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """B1-3 业务评价表 承接承做意见 + 独立性判断（B1A/B1B 程序表步骤 4 自动推进）。
+
+    数据来源: checklist_responses（item_id b1eval-opinion / b1eval-indep-has_independence_issue，
+    经 working_paper→wp_index 关联 wp_code B1-3 或父码 B1）。
+    返回结构: {"summary": str, "opinion": str|None, "independence_issue": bool}
+    """
+    rows = (await db.execute(sa.text("""
+        SELECT cr.item_id, cr.conclusion
+        FROM checklist_responses cr
+        JOIN working_paper wp ON wp.id = cr.wp_id
+        JOIN wp_index wi ON wi.id = wp.wp_index_id
+        WHERE cr.project_id = :pid
+          AND wi.wp_code IN ('B1-3', 'B1')
+          AND cr.item_id IN ('b1eval-opinion', 'b1eval-indep-has_independence_issue')
+    """), {"pid": str(project_id)})).fetchall()
+    opinion = None
+    indep_issue = False
+    for r in rows:
+        if r.item_id == "b1eval-opinion":
+            opinion = r.conclusion
+        elif r.item_id == "b1eval-indep-has_independence_issue" and r.conclusion == "是":
+            indep_issue = True
+    opinion_label = {"accept": "可以承接", "retain": "可以保持", "reject": "不予承接/保持"}
+    if not opinion:
+        return {"summary": "业务评价未完成", "opinion": None, "independence_issue": indep_issue}
+    tail = "（⚠️独立性存在问题）" if indep_issue else ""
+    return {
+        "summary": f"✓ 业务评价：{opinion_label.get(opinion, opinion)}{tail}",
+        "opinion": opinion,
+        "independence_issue": indep_issue,
+    }
+
+
+@auto_resolver("b1_5_kaa_status")
+async def _resolve_b1_5_kaa(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
+    """B1-5 KAA 检查结论（B1A/B1B 程序表步骤 5.4 自动推进）。
+
+    数据来源: checklist_responses（item_id b1kaa-overall-conclusion 手工覆盖优先；
+    否则按 b1kaa-standard-% 任一"是" 判定达到）。
+    返回结构: {"summary": str, "reached": bool}
+    """
+    rows = (await db.execute(sa.text("""
+        SELECT cr.item_id, cr.conclusion
+        FROM checklist_responses cr
+        JOIN working_paper wp ON wp.id = cr.wp_id
+        JOIN wp_index wi ON wi.id = wp.wp_index_id
+        WHERE cr.project_id = :pid
+          AND wi.wp_code IN ('B1-5', 'B1')
+          AND (cr.item_id = 'b1kaa-overall-conclusion' OR cr.item_id LIKE 'b1kaa-standard-%')
+    """), {"pid": str(project_id)})).fetchall()
+    manual = None
+    reached = False
+    has_any = False
+    for r in rows:
+        has_any = True
+        if r.item_id == "b1kaa-overall-conclusion":
+            manual = r.conclusion
+        elif r.conclusion == "是":
+            reached = True
+    if manual:
+        reached = manual == "reached"
+    if not has_any:
+        return {"summary": "KAA 检查未开始", "reached": False}
+    return {
+        "summary": "⚠️ 已达到 KAA 标准（需审批/报备）" if reached else "未达到 KAA 标准",
+        "reached": reached,
+    }
+
+
 @auto_resolver("b19_related_party_count")
 async def _resolve_b19_rp(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
     """B19 关联方识别数。
@@ -166,26 +267,20 @@ async def _resolve_b23_progress(db: AsyncSession, project_id: UUID, year: int, *
 
 @auto_resolver("b50_risk_summary")
 async def _resolve_b50_risk(db: AsyncSession, project_id: UUID, year: int, **kw) -> dict:
-    """B50 风险汇总统计（已识别风险因素数 + 特别风险数）。
+    """B50 风险汇总统计（认定层次已评估风险数 + 特别风险数）。
 
-    数据来源: field_override_service（scope='risk_assessment'）
+    数据来源: checklist_responses（B50 底稿 B50-T3-* 单一真源，经 b50_risk_reader）
     返回结构: {"summary": str, "risk_factors": int, "special_risks": int}
     """
-    from app.services.field_override_service import FieldOverrideService
-    svc = FieldOverrideService(db)
-    data = await svc.get_batch(project_id, year, scope="risk_assessment")
-    if not data:
-        return {"summary": "风险评估未完成", "risk_factors": 0}
-    # data is {item_key: {field: value}}
-    risk_count = 0
-    special_count = 0
-    for _item_key, fields in data.items():
-        risk_count += 1
-        if fields.get("is_special_risk") == "true":
-            special_count += 1
+    from app.services.b50_risk_reader import load_b50_risks
+
+    risks = await load_b50_risks(db, project_id)
+    if not risks:
+        return {"summary": "风险评估未完成", "risk_factors": 0, "special_risks": 0}
+    special_count = sum(1 for r in risks if r["is_special_risk"])
     return {
-        "summary": f"已识别{risk_count}项风险因素，其中{special_count}项特别风险",
-        "risk_factors": risk_count,
+        "summary": f"已识别{len(risks)}项认定层次风险，其中{special_count}项特别风险",
+        "risk_factors": len(risks),
         "special_risks": special_count,
     }
 

@@ -78,8 +78,9 @@ export function useB23FormData(wpId: Ref<string>) {
     if (!wpId.value || items.length === 0) return
     saving.value = true
     try {
+      // 注：不传 project_id（wpId≠projectId，误传 wp_id 作 project_id 会致后端项目查找 404）；
+      // 后端从 wp_id 反查 project_id。
       await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
-        project_id: wpId.value,
         items: items.map((item) => ({
           item_id: item.item_id,
           conclusion: item.conclusion || null,

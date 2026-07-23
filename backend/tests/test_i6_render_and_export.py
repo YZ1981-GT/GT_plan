@@ -90,6 +90,31 @@ async def test_i6_import_export_router_registered():
     assert resp.status_code != 404, "I6 import_export router not registered"
 
 
+@pytest.mark.asyncio
+async def test_i6_cutoff_export_template_sheets():
+    """I6-5 / I6-6 截止测试导出模板可下载."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        for sheet in ("I6-5", "I6-6"):
+            resp = await client.post(f"/api/workpapers/test-wp/i6/export-template?sheet={sheet}")
+            assert resp.status_code == 200, f"{sheet} export-template: {resp.status_code}"
+            assert resp.headers.get("content-type", "").startswith(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            assert len(resp.content) > 500
+
+
+def test_i6_import_export_includes_cutoff_specs():
+    from app.routers.wp_render_strategies._i6_import_export import _I6_SPECS
+
+    assert {"I6-5", "I6-6"}.issubset(_I6_SPECS.keys())
+    for code in ("I6-5", "I6-6"):
+        spec = _I6_SPECS[code]
+        assert spec["item_id"] == f"{code}-rows"
+        assert len(spec["headers"]) == len(spec["field_keys"])
+        assert spec["storage_field"] == "remark"
+
+
 # ─── test_i6_ai_generate_router_registered ─────────────────────────────────
 
 @pytest.mark.asyncio

@@ -475,14 +475,29 @@ function fmtNumber(val: number): string {
 // ─── Restore from responses ──────────────────────────────────────────────────
 
 function _restoreRows() {
+  // 优先从整包 full-data 恢复
   const fullData = formData.allResponses.value.get('M3-M3-2-full-data')
   if (fullData?.remark) {
     try {
       const parsed = JSON.parse(fullData.remark)
       if (Array.isArray(parsed) && parsed.length > 0) {
         detailRows.value = parsed
+        return
       }
-    } catch { /* keep empty */ }
+    } catch { /* fall through to per-row */ }
+  }
+  // 降级：从逐行 per-row keys 恢复（兼容旧数据/composable单独写的情况）
+  const restored: any[] = []
+  for (const [key, resp] of formData.allResponses.value) {
+    if (key.startsWith('M3-M3-2-row-') && key.endsWith('-data') && resp.remark) {
+      try {
+        const row = JSON.parse(resp.remark)
+        restored.push(row)
+      } catch { /* skip */ }
+    }
+  }
+  if (restored.length > 0) {
+    detailRows.value = restored
   }
 }
 

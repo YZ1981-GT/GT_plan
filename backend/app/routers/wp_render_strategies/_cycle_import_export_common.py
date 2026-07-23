@@ -67,6 +67,16 @@ def is_numeric_field_key(key: str) -> bool:
         "amount", "adjustAmount", "noteAmount", "discountAmount", "openingBalance", "sharePct",
         "currentIssued", "currentAccepted", "closingUnadjusted", "closingAdjusted",
         "depositRate", "depositAmount",
+        # I3 商誉明细/减值滚动数值字段
+        "costOpening", "costIncrease", "costEnding", "costUnadj", "costAje", "costAudited",
+        "impOpening", "impIncrease", "impEnding", "impUnadj", "impAje", "impAudited",
+        "goodwillNetValue", "goodwillOriginal", "goodwillB1", "minorityB2",
+        "assetGroupCarrying", "cguBookValue", "fairValueLessCost", "valueInUse",
+        "impairmentAmount", "goodwillImpairment", "consolidatedGwImpairment",
+        "otherAssetImpairment", "entryGoodwillCalc", "mergerCost", "netAssetFairValue",
+        "shareholding", "accImpairmentBegin", "accImpairmentEnd", "currentImpairment",
+        "consideration", "counterpartyNetAsset", "minorityInterest",
+        "goodwillAmount", "identifiableNetAssetFV",
         # F4-2 应付账款明细（源表A:AA）
         "openingUnadjusted", "openingAje", "openingRje", "currentDebit", "currentCredit",
         "entityReclassification", "unadjustedAgingLt1", "unadjustedAging1to2",
@@ -120,6 +130,11 @@ def is_numeric_field_key(key: str) -> bool:
         "allocationBase",
         # F2-47/F2-48 数量与库龄四档
         "qty", "within1y", "y1to2", "y2to3", "over3y",
+        # K5 预计负债（K5-4 质保测算 / K5-5 弃置现值 / K5-6 诉讼）
+        "revenue", "estimatedExpense", "bookProvision", "periodProvision", "periodUsed",
+        "futureExpense", "expectedYears", "periodIncrease", "interestAdjustment", "estimatedLoss",
+        # K11-2 减值准备变动
+        "allowanceOpening", "allowanceWriteoff", "allowanceEnding",
     }
 
 

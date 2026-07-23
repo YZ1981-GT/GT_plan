@@ -207,6 +207,14 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.b60_plan import router as b60_plan_router
     app.include_router(b60_plan_router, tags=["b60-plan"])
 
+    # ═══ §53d. B60 章节定义 API ═══
+    from app.routers.b60_chapters import router as b60_chapters_router
+    app.include_router(b60_chapters_router, tags=["b60-chapters"])
+
+    # ═══ §53e. B50-3 确定审计范围：试算表重要科目预填 ═══
+    from app.routers.b50_scope import router as b50_scope_router
+    app.include_router(b50_scope_router, tags=["b50-scope"])
+
     # ═══ §54. template-library-coordination：模板库管理 ═══
     from app.routers.template_library_mgmt import router as template_library_mgmt_router
     app.include_router(template_library_mgmt_router, tags=["template-library-mgmt"])

@@ -6,13 +6,16 @@
  * 双模式：表格视图 / 在线编辑
  * 自动跨期判断、统计仪表板、AI辅助审计意见
  */
-import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, watch, onBeforeUnmount, defineAsyncComponent, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
+import type { ExtractedVoucher, FillMode } from '../../composables/useCutoffAutoSampling'
+
+const GtCutoffAutoSampling = defineAsyncComponent(() => import('../../cutoff/GtCutoffAutoSampling.vue'))
 
 // ─── Props ───────────────────────────────────────────────────────────
 const props = defineProps<{
@@ -23,6 +26,10 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+
+// 审计年度（主入口 provide('d4AuditYear')），回退"当前年-1"
+const auditYear = inject<Ref<number> | null>('d4AuditYear', null)
+const samplingYear = computed<number>(() => auditYear?.value ?? new Date().getFullYear() - 1)
 
 // ─── Types ───────────────────────────────────────────────────────────
 interface CutoffBackwardRow {
@@ -126,6 +133,51 @@ function confirmOcrFill() {
   ocrDialogVisible.value = false
   persistAll()
   ElMessage.success('OCR结果已填入')
+}
+
+// ─── Cutoff auto-sampling（useCutoffAutoSampling / GtCutoffAutoSampling，科目6001）─
+const showCutoffPanel = ref(false)
+// 面板默认条件：绑定本表截止日期（v-if 切换重挂时读取最新值）
+const cutoffPanelDefaults = computed(() => ({ cutoffDate: cutoffDate.value }))
+
+/** ExtractedVoucher → D4-18 行（单据到账：序时账凭证映射到记账凭证侧，发货单侧留待审计师追查） */
+function extractedToRow(v: ExtractedVoucher): CutoffBackwardRow {
+  const amt = v.creditAmount ? parseFloat(v.creditAmount) : (v.debitAmount ? parseFloat(v.debitAmount) : 0)
+  return {
+    id: `r-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    deliveryDate: '', deliveryNo: '', deliveryProduct: '', deliveryQty: '', deliveryAmount: 0,
+    voucherDate: v.voucherDate || '',
+    voucherNo: v.voucherNo || '',
+    voucherProduct: v.summary || '',
+    voucherQty: '',
+    voucherAmount: Number.isFinite(amt) ? amt : 0,
+    isCutoff: null,
+    remark: v.cutoffStatus === '可能跨期' ? '跨期疑点' : (v.remark || ''),
+  }
+}
+
+/** 一键取数回写：按 fillMode 合并到 rows 并持久化（复用组件既有 persistAll） */
+function handleCutoffFilled(payload: { samples: ExtractedVoucher[]; fillMode: FillMode }) {
+  if (props.isReadonly) return
+  const mapped = payload.samples.map(extractedToRow)
+  if (payload.fillMode === 'replace') {
+    rows.value = mapped
+  } else if (payload.fillMode === 'merge') {
+    const existingNos = new Set(rows.value.map(r => r.voucherNo).filter(Boolean))
+    rows.value = [...rows.value, ...mapped.filter(r => !r.voucherNo || !existingNos.has(r.voucherNo))]
+  } else {
+    rows.value = [...rows.value, ...mapped]
+  }
+  recalcAll()
+  showCutoffPanel.value = false
+  persistAll()
+  ElMessage.success(`已填入 ${mapped.length} 笔凭证`)
+}
+
+/** AI 复核意见回填审计说明 */
+function onCutoffReviewApplied(text: string) {
+  if (props.isReadonly || !text) return
+  updateAuditNote(auditNote.value ? `${auditNote.value}\n${text}` : text)
 }
 
 // ─── Stats ───────────────────────────────────────────────────────────
@@ -258,7 +310,25 @@ function rowClassName({ row }: { row: any }) { return row.isCutoff === false ? '
       <div class="cutoff-date-bar">
         <label>截止日期：</label>
         <el-input v-model="cutoffDate" size="small" style="width:160px;" placeholder="YYYY-MM-DD" :disabled="isReadonly" @change="recalcAll(); persistAll()" />
+        <el-button size="small" type="success" plain :disabled="isReadonly" @click="showCutoffPanel = !showCutoffPanel">
+          {{ showCutoffPanel ? '收起取数面板' : '从序时账一键取数' }}
+        </el-button>
       </div>
+
+      <!-- 自动取数面板（科目6001，基准日±N天窗口一键取凭证并标注跨期） -->
+      <GtCutoffAutoSampling
+        v-if="showCutoffPanel"
+        :key="`d4-18-${cutoffDate}`"
+        account-code="6001"
+        cutoff-direction="window"
+        :default-conditions="cutoffPanelDefaults"
+        :workpaper-id="wpId"
+        :project-id="projectId"
+        :year="samplingYear"
+        :readonly="isReadonly"
+        @filled="handleCutoffFilled"
+        @applied="onCutoffReviewApplied"
+      />
 
       <!-- 主表格 -->
       <el-table :data="rows" border stripe class="cutoff-table" :row-class-name="rowClassName">

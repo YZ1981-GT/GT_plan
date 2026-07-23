@@ -194,8 +194,8 @@ export function useAgingConfig(
   }
 
   function _applyDefault(): void {
-    // 默认：D3/F1 使用 THREE_YEAR，其他使用 FIVE_YEAR
-    const defaultPreset: AgingPreset = (subject === 'D3' || subject === 'F1')
+    // 默认：D3/F1/D7 使用 THREE_YEAR，其他使用 FIVE_YEAR
+    const defaultPreset: AgingPreset = (subject === 'D3' || subject === 'F1' || subject === 'D7')
       ? 'THREE_YEAR'
       : 'FIVE_YEAR'
     preset.value = defaultPreset

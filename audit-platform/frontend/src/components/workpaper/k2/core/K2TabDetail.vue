@@ -37,6 +37,7 @@
         <el-button size="small" type="primary" link @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
+        <el-button size="small" :disabled="isReadonly" @click="handleImportFromLedger" type="warning" plain>从序时账导入</el-button>
         <el-button size="small" :disabled="isReadonly" @click="handleAddRow">＋ 新增</el-button>
         <el-dropdown trigger="click" size="small">
           <el-button size="small">导入导出 ▾</el-button>
@@ -213,6 +214,28 @@
       <el-tag type="primary" effect="plain">期末合计: {{ fmtAmt(detail.subtotals.value.endBalance) }}</el-tag>
     </div>
 
+    <!-- 审计说明 -->
+    <el-card shadow="never" style="margin:12px 0">
+      <template #header>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-weight:600">审计说明</span>
+          <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleAiGenerate">🤖 AI生成</el-button>
+        </div>
+      </template>
+      <el-input v-model="detailAuditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="概述其他流动资产明细变动情况、主要增减原因..." @blur="persistDetailNote" />
+    </el-card>
+
+    <!-- 审计结论 -->
+    <el-card shadow="never" style="margin-bottom:12px">
+      <template #header>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-weight:600">审计结论</span>
+          <el-button size="small" type="default" link @click="handleReview">💬 复核</el-button>
+        </div>
+      </template>
+      <el-input v-model="detailAuditConclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="基于明细核对，形成审计结论..." @blur="persistDetailConclusion" />
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示</summary>
@@ -222,6 +245,7 @@
         <li>性质列选项：预付款项/待摊费用/合同取得成本/待抵扣税额/押金保证金/其他</li>
         <li>新增行需弹窗输入项目名称后创建</li>
         <li>明细合计应与K2-1审定表其他流动资产总额一致</li>
+        <li>"从序时账导入"从TB查1231子科目余额按名称归集，仅填空值不覆盖</li>
         <li>导入导出支持按模板批量录入明细</li>
       </ul>
     </details>
@@ -238,6 +262,7 @@
 import { ref, computed, inject, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
+import http from '@/utils/http'
 import { useK2Detail } from '../../composables/useK2Detail'
 import { useK2ImportExport } from '../../composables/useK2ImportExport'
 
@@ -319,10 +344,100 @@ function handleImportData() {
   input.click()
 }
 
-// ─── AI / 复核 ───────────────────────────────────────────────────────────────
+// ─── 从序时账导入 ─────────────────────────────────────────────────────────────
 
-function handleAiGenerate() {
-  console.log('[K2-2] AI generate: detail')
+async function handleImportFromLedger() {
+  try {
+    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
+      params: { account_prefix: '1231', year: undefined },
+      _silent: true,
+    } as any)
+    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
+    if (list.length === 0) {
+      ElMessage.warning('未找到1231子科目余额数据')
+      return
+    }
+    const items = list
+      .filter((item: any) => {
+        const code = String(item.standard_account_code ?? item.account_code ?? '')
+        return code.startsWith('1231') && code.length > 4
+      })
+      .map((item: any) => ({
+        name: String(item.account_name ?? item.standard_account_name ?? '未知'),
+        beginBalance: Number(item.opening_balance ?? 0),
+        increase: Math.max(0, Number(item.closing_balance ?? item.unadjusted_amount ?? 0) - Number(item.opening_balance ?? 0)),
+      }))
+    if (items.length === 0) {
+      ElMessage.warning('未找到1231明细子科目')
+      return
+    }
+    await ElMessageBox.confirm(
+      `从试算表导入 ${items.length} 个子科目明细？\n（仅填入空值行，不覆盖已有数据）`,
+      '从序时账导入',
+      { confirmButtonText: '确认导入', cancelButtonText: '取消', type: 'info' },
+    )
+    let importedCount = 0
+    for (const item of items) {
+      const existing = detail.rows.value.find((r: any) => r.name === item.name)
+      if (!existing) {
+        detail.addRowDirect({ name: item.name, beginBalance: item.beginBalance, increase: item.increase })
+        importedCount++
+      }
+    }
+    if (importedCount > 0) {
+      ElMessage.success(`已导入 ${importedCount} 个新项目`)
+    } else {
+      ElMessage.info('所有项目已存在，无需导入')
+    }
+  } catch {
+    // 用户取消或请求失败
+  }
+}
+
+// ─── AI / 复核 / 审计说明结论 ────────────────────────────────────────────────
+
+const detailAuditNote = ref('')
+const detailAuditConclusion = ref('')
+
+// 加载已保存的审计说明/结论
+const savedNote = computed(() => props.allResponses.get('K2-2-audit-note'))
+const savedConclusion = computed(() => props.allResponses.get('K2-2-audit-conclusion'))
+if (savedNote.value?.remark) detailAuditNote.value = savedNote.value.remark
+if (savedConclusion.value?.remark) detailAuditConclusion.value = savedConclusion.value.remark
+
+function persistDetailNote(): void {
+  emit('save', 'K2-2-audit-note', { remark: detailAuditNote.value })
+}
+function persistDetailConclusion(): void {
+  emit('save', 'K2-2-audit-conclusion', { remark: detailAuditConclusion.value })
+}
+
+async function handleAiGenerate() {
+  try {
+    const context: Record<string, string> = {
+      accountCode: '1231',
+      accountName: '其他流动资产',
+      sheet: 'K2-2',
+      rowCount: String(detail.rows.value.length),
+      endBalanceTotal: String(detail.subtotals.value.endBalance ?? 0),
+    }
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      prompt: '请根据其他流动资产(1231)明细表数据，生成审计说明，概述主要项目、变动原因及审计关注点',
+      context,
+      existingContent: detailAuditNote.value,
+      section: 'K2-2-detail',
+    })
+    const generated = res?.data?.data?.content || res?.data?.content || ''
+    if (generated) {
+      detailAuditNote.value = generated
+      persistDetailNote()
+      ElMessage.success('AI审计说明已生成')
+    } else {
+      ElMessage.warning('AI未生成内容')
+    }
+  } catch {
+    ElMessage.warning('AI生成失败')
+  }
 }
 function handleReview() { openReviewDialog('K2-2-detail') }
 

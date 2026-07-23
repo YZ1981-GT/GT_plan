@@ -16,12 +16,10 @@
           size="small"
           @change="(val: any) => adjustment.switchType(val)"
         />
-        <el-button size="small" @click="handleAI('adjustment')">
+        <el-button size="small" :loading="aiLoading" @click="handleAI('adjustment')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
-        <el-button size="small" @click="handleReview">
-          <el-icon><Check /></el-icon> 复核
-        </el-button>
+        <GtReviewTrigger section-id="K12-3-adjustment" label="💬 复核" />
         <el-button
           type="primary"
           size="small"
@@ -240,14 +238,16 @@
  *   Backend: _on_adjustment_created handler picks up K12-3 entries (regex ^[D-N]\d+-3$ matches K12-3)
  *   Disclosure refresh: INDIRECT via K12-1 recalc → writebackTB → substantive:adjudicated
  */
-import { computed, inject, onMounted, onUnmounted, ref, defineAsyncComponent } from 'vue'
+import { computed, onMounted, ref, defineAsyncComponent } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick, Check } from '@element-plus/icons-vue'
+import { MagicStick } from '@element-plus/icons-vue'
 import { useK12FormData } from '../../composables/useK12FormData'
 import { useK12Adjustment } from '../../composables/useK12Adjustment'
+import { generateK12AiText } from '../../composables/useK12AiText'
 import { eventBus } from '@/utils/eventBus'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
+const GtReviewTrigger = defineAsyncComponent(() => import('../../GtReviewTrigger.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -262,9 +262,6 @@ const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'navigate-sheet', sheetName: string): void
 }>()
-
-// ─── Inject复核对话 ──────────────────────────────────────────────────────────
-const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 
@@ -350,13 +347,37 @@ async function handleSave(): Promise<void> {
   }
 }
 
-function handleAI(_section: string): void {
-  // AI辅助钩子（通用端点 /api/workpapers/{wp_id}/ai/generate-text）
+const aiLoading = ref(false)
+
+async function handleAI(_section: string): Promise<void> {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const entries = adjustment.filteredEntries.value
+    const context: Record<string, unknown> = {
+      科目: '6301 营业外收入（贷方增加=调增，借方减少=冲减）',
+      调整类别: adjustment.activeType.value,
+      分录数: entries.length,
+      借方合计: fmtAmount(adjustment.currentBalance.value.totalDebit),
+      贷方合计: fmtAmount(adjustment.currentBalance.value.totalCredit),
+      是否平衡: adjustment.currentBalance.value.isBalanced ? '平衡' : '不平衡',
+      分录明细: entries
+        .map(e => `${e.description || '—'}: 借${fmtAmount(e.debitAmount)}/贷${fmtAmount(e.creditAmount)}`)
+        .slice(0, 20)
+        .join('；'),
+    }
+    const content = await generateK12AiText(props.wpId, {
+      prompt: '你是资深审计师。请基于营业外收入调整分录，评价调整事项的合理性与借贷平衡，并就是否影响非经常性损益列报给出复核意见，供人工确认。',
+      section: 'K12-3-adjustment',
+      context,
+    })
+    if (!content) return
+    await ElMessageBox.alert(content, 'AI 调整分录复核建议', { confirmButtonText: '知道了' })
+  } catch { /* cancelled */ } finally {
+    aiLoading.value = false
+  }
 }
 
-function handleReview(): void {
-  openReviewDialog?.('K12-3-adjustment', '营业外收入调整分录汇总')
-}
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
 

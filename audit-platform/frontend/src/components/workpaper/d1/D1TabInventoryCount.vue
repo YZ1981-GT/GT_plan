@@ -165,6 +165,80 @@ async function generateAuditConclusionWithAI() {
   }
 }
 
+// ─── 从票据实物清单带入 ──────────────────────────────────────────────────────
+
+/** 从 D1-2 按类别行 或 D1-3 客户行 预填盘点候选 */
+function importFromBillList() {
+  if (props.isReadonly) return
+  if (rows.value.length > 0) {
+    ElMessage.info('已有盘点行，请先清空再带入')
+    return
+  }
+
+  // 尝试从 D1-2 类别行
+  const catRaw = props.allResponses.get('D1-cat-rows')?.remark
+  let candidates: any[] = []
+  if (catRaw) {
+    try {
+      const parsed = JSON.parse(catRaw)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        candidates = parsed.filter((r: any) => r && (r.noteType || r.category))
+      }
+    } catch { /* ignore */ }
+  }
+
+  // 如果 D1-2 无数据，尝试 D1-3 客户行
+  if (candidates.length === 0) {
+    const custRaw = props.allResponses.get('D1-cust-rows')?.remark
+    if (custRaw) {
+      try {
+        const parsed = JSON.parse(custRaw)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          candidates = parsed.filter((r: any) => r && (r.customerName || r.drawer))
+        }
+      } catch { /* ignore */ }
+    }
+  }
+
+  if (candidates.length === 0) {
+    ElMessage.info('D1-2/D1-3 暂无数据，请先编制明细')
+    return
+  }
+
+  // 映射为监盘行
+  for (const c of candidates) {
+    addRow()
+    const newRow = rows.value[rows.value.length - 1]
+    if (newRow) {
+      if (c.noteType || c.category) updateRow(newRow.id, 'noteType', c.noteType || c.category || '')
+      if (c.drawer || c.customerName) updateRow(newRow.id, 'drawer', c.drawer || c.customerName || '')
+      if (c.noteNo) updateRow(newRow.id, 'noteNo', c.noteNo || '')
+      if (c.amount || c.currentUnadjusted) updateRow(newRow.id, 'amount', c.amount || c.currentUnadjusted || 0)
+      if (c.maturityDate) updateRow(newRow.id, 'maturityDate', c.maturityDate || '')
+      if (c.issueDate) updateRow(newRow.id, 'issueDate', c.issueDate || '')
+      if (c.acceptor) updateRow(newRow.id, 'acceptor', c.acceptor || '')
+    }
+  }
+  ElMessage.success(`已从票据清单带入 ${candidates.length} 行`)
+}
+
+// ─── 盘点差异列 computed ─────────────────────────────────────────────────────
+
+/** 每行盘点差异 = 票面金额 - 实盘确认金额（hasDifference === '是' 的行） */
+function getRowDiff(row: InventoryCountRow): number {
+  if (!row.amount) return 0
+  // 如果标记了差异，显示票面金额（预期 vs 实盘=0）；否则0
+  if (row.hasDifference === '是') return row.amount
+  return 0
+}
+
+// ─── Row Class 增强：差异行高亮 ─────────────────────────────────────────────
+
+function getRowClassEnhanced({ row }: { row: InventoryCountRow }): string {
+  if (row.hasDifference === '是') return 'difference-row'
+  return ''
+}
+
 // ─── Formatters ──────────────────────────────────────────────────────────────
 
 function fmtAmount(val: number): string {
@@ -234,6 +308,9 @@ const GUIDANCE_TEXTS = [
         </el-button-group>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">
           + 添加票据
+        </el-button>
+        <el-button size="small" :disabled="isReadonly || rows.length > 0" @click="importFromBillList">
+          从票据实物清单带入
         </el-button>
       </div>
 

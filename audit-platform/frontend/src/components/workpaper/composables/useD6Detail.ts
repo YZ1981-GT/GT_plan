@@ -542,6 +542,67 @@ export function useD6Detail(options: UseD6DetailOptions) {
     }
   }
 
+  /**
+   * 从次年序时账导入期后结转金额
+   * (1402贷方=合同资产转为应收，按客户名归集)
+   */
+  async function importPostSettlementFromLedger(bsDate?: string): Promise<void> {
+    if (!wpId.value || !projectId.value) return
+
+    const year = bsDate ? parseInt(bsDate.slice(0, 4)) : new Date().getFullYear() - 1
+    const nextYear = year + 1
+    const dateFrom = `${nextYear}-01-01`
+    const dateTo = `${nextYear}-06-30`
+
+    try {
+      const res = await api.get(
+        `/api/workpapers/${wpId.value}/ledger/entries`,
+        { params: { account_code: '1402', year: nextYear, date_from: dateFrom, date_to: dateTo, direction: 'credit' } },
+      )
+      const entries: any[] = Array.isArray(res) ? res : (res?.data ?? res?.entries ?? [])
+
+      if (entries.length === 0) {
+        ElMessage.info('未找到科目1402的期后贷方发生数据')
+        return
+      }
+
+      // 按客户名归集贷方金额
+      const grouped = new Map<string, number>()
+      for (const entry of entries) {
+        const name = entry.counterpart_name || entry.customer_name || entry.aux_name || ''
+        if (!name) continue
+        grouped.set(name, (grouped.get(name) || 0) + parseNum(entry.credit_amount || entry.amount || 0))
+      }
+
+      // 匹配D6-2明细行回填(仅填空值)
+      let filled = 0
+      const normalizedGrouped = new Map<string, number>()
+      for (const [k, v] of grouped) {
+        normalizedGrouped.set(k.trim().toLowerCase(), v)
+      }
+
+      rows.value = rows.value.map(row => {
+        if (row.postPeriodSettlement > 0) return row // 已有值不覆盖
+        const matchKey = (row.customerName || row.contractName || '').trim().toLowerCase()
+        const amount = normalizedGrouped.get(matchKey)
+        if (amount && amount > 0) {
+          filled++
+          return { ...row, postPeriodSettlement: amount }
+        }
+        return row
+      })
+
+      if (filled > 0) {
+        persistRows()
+        ElMessage.success(`期后结转金额已填入${filled}行（${dateFrom}至${dateTo}，科目1402贷方）`)
+      } else {
+        ElMessage.warning(`序时账有${grouped.size}个客户的期后数据，但未匹配到D6-2明细行（按客户名称/合同名称匹配）`)
+      }
+    } catch {
+      ElMessage.error('从序时账获取期后结转数据失败')
+    }
+  }
+
   // ─── Return ──────────────────────────────────────────────────────────
 
   return {
@@ -555,6 +616,7 @@ export function useD6Detail(options: UseD6DetailOptions) {
     removeRow,
     updateCell,
     importFromAuxBalance,
+    importPostSettlementFromLedger,
     searchFilter,
     filteredRows,
   }

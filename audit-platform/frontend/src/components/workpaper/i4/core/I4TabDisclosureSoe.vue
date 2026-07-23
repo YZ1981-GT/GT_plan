@@ -1,473 +1,309 @@
 <template>
   <div class="i4-tab-disclosure-soe">
-    <!-- 审计目标 -->
-    <el-alert type="info" :closable="false" title="审计目标：检查长期待摊费用附注披露信息（国有企业版）的完整性与准确性，确认原值变动、累计摊销变动、净值、摊销政策及受益期间披露符合国有企业审计要求。" class="objective-alert" />
+    <el-alert
+      type="info"
+      :closable="false"
+      class="objective-alert"
+      title="审计目标：核实长期待摊费用附注披露（国有企业）完整准确——账面余额滚动与 I4-2/I4-1 勾稽，并同步至附注八、30。"
+    />
 
-    <!-- 蓝色渐变引导区 -->
     <div class="guide-area">
       <div class="guide-grid">
-        <div class="guide-step"><span class="step-num">①</span> 原值变动矩阵（期初+增加-摊销-减少=期末）自动从审定表取数</div>
-        <div class="guide-step"><span class="step-num">②</span> 累计摊销变动矩阵（与上市版列定义相同）</div>
-        <div class="guide-step"><span class="step-num">③</span> 净值 = 原值期末 - 累计摊销期末</div>
-        <div class="guide-step"><span class="step-num">④</span> 摊销政策/受益期间/重大明细/其他说明（国企格式，7子节）</div>
+        <div class="guide-step"><span class="step-num">①</span> 从 I4-2 按类别聚合期初/增加/摊销/其他减少</div>
+        <div class="guide-step"><span class="step-num">②</span> 期末 = 期初 + 增加 − 摊销 − 其他减少</div>
+        <div class="guide-step"><span class="step-num">③</span> 其他减少须填写原因（国企格式特有列）</div>
+        <div class="guide-step"><span class="step-num">④</span> 「同步到附注」写入附注模块 §八、30</div>
       </div>
     </div>
 
-    <!-- 琥珀色方法论块 -->
     <div class="methodology-block">
-      <div class="methodology-title">国有企业附注披露要求</div>
+      <div class="methodology-title">编制要点（国有企业）</div>
       <div class="methodology-content">
-        按财政部《企业会计准则——应用指南》及国有企业审计要求：应披露长期待摊费用的原值变动、累计摊销变动、净值及摊销政策；重大项目应单独列示并说明受益期间、预计剩余摊销期等。国企版增加"受益期间说明"独立子节。本表16行×12列，47个公式。
+        国企附注分列「本期摊销额」「其他减少额」，并要求披露其他减少原因。
+        摊销直接冲减账面余额，不做原值/累计摊销双层披露。
       </div>
     </div>
 
-    <!-- 子节卡片 -->
-    <template v-for="section in disclosureState.sections.value" :key="section.key">
-      <el-card shadow="never" class="disclosure-card">
-        <template #header>
-          <div class="section-title-row">
-            <span class="section-title">{{ section.title }}</span>
-            <div class="title-actions">
-              <el-button
-                v-if="section.hasNoteText"
-                size="small"
-                type="primary"
-                link
-                :loading="disclosureState.isAiGenerating.value"
-                @click="handleAiGenerate(section.key)"
-              >
-                <el-icon><MagicStick /></el-icon> AI生成
-              </el-button>
-              <el-button size="small" type="default" link @click="handleReview(section.key)">💬</el-button>
-            </div>
-          </div>
-        </template>
+    <div class="toolbar-row">
+      <el-button size="small" type="primary" plain :disabled="isReadonly" @click="disc.syncFromDetail(false)">
+        从 I4-2 同步
+      </el-button>
+      <el-button size="small" :disabled="isReadonly" @click="disc.syncFromDetail(true)">强制覆盖同步</el-button>
+      <el-button size="small" type="success" :loading="disc.isSyncing.value" :disabled="isReadonly" @click="disc.syncToNotes()">
+        同步到附注 {{ disc.noteTarget.value.sectionId }}
+      </el-button>
+      <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAdd">+ 新增项目</el-button>
+      <el-tag size="small" type="info">目标章节 {{ disc.noteTarget.value.chipValue }}</el-tag>
+      <span v-if="disc.reconcileDiff.value != null" class="reconcile">
+        与明细期末差
+        <b :class="{ 'text-danger': Math.abs(disc.reconcileDiff.value) > 0.01 }">{{ fmtAmt(disc.reconcileDiff.value) }}</b>
+      </span>
+      <span v-if="disc.reconcileVsAdj.value != null" class="reconcile">
+        与审定合计差
+        <b :class="{ 'text-danger': Math.abs(disc.reconcileVsAdj.value) > 0.01 }">{{ fmtAmt(disc.reconcileVsAdj.value) }}</b>
+      </span>
+    </div>
 
-        <!-- 矩阵表子节 -->
-        <template v-if="section.hasTable && (section.key === 'prepaid_original' || section.key === 'prepaid_amortization')">
-          <el-table
-            :data="getMatrixData(section.key)"
-            border
-            stripe
+    <el-card shadow="never" class="disc-card">
+      <template #header>
+        <div class="card-header">
+          <span>长期待摊费用附注披露（国有企业）</span>
+          <span class="hint">期末自动计算</span>
+        </div>
+      </template>
+
+      <el-table :data="disc.rows.value" border stripe size="small" show-summary :summary-method="getSummary">
+        <el-table-column type="index" label="#" width="40" />
+        <el-table-column prop="item" label="项目" min-width="150">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.item"
+              size="small"
+              placeholder="如：使用权资产改良及维护"
+              @update:model-value="(v: string) => disc.updateCell(row.rowId, 'item', v)"
+            />
+            <span v-else>{{ row.item }}</span>
+            <el-tag v-if="row.isAutoFilled" size="small" type="info" class="auto-badge">自动</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="期初余额" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.beginBalance"
+              :controls="false"
+              size="small"
+              :precision="2"
+              @change="(v: number) => disc.updateCell(row.rowId, 'beginBalance', v ?? 0)"
+            />
+            <span v-else class="amt">{{ fmtAmt(row.beginBalance) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期增加额" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.increase"
+              :controls="false"
+              size="small"
+              :precision="2"
+              @change="(v: number) => disc.updateCell(row.rowId, 'increase', v ?? 0)"
+            />
+            <span v-else class="amt">{{ fmtAmt(row.increase) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期摊销额" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.amortization"
+              :controls="false"
+              size="small"
+              :precision="2"
+              @change="(v: number) => disc.updateCell(row.rowId, 'amortization', v ?? 0)"
+            />
+            <span v-else class="amt">{{ fmtAmt(row.amortization) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="其他减少额" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.otherDecrease"
+              :controls="false"
+              size="small"
+              :precision="2"
+              @change="(v: number) => disc.updateCell(row.rowId, 'otherDecrease', v ?? 0)"
+            />
+            <span v-else class="amt">{{ fmtAmt(row.otherDecrease) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末余额" width="110" align="right">
+          <template #default="{ row }">
+            <span class="formula-cell" title="= 期初 + 增加 − 摊销 − 其他减少">{{ fmtAmt(row.endBalance) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="其他减少的原因" min-width="140">
+          <template #default="{ row }">
+            <el-input
+              v-if="!isReadonly"
+              :model-value="row.otherDecreaseReason"
+              size="small"
+              :placeholder="row.otherDecrease ? '必填原因' : '无则空'"
+              @update:model-value="(v: string) => disc.updateCell(row.rowId, 'otherDecreaseReason', v)"
+            />
+            <span v-else>{{ row.otherDecreaseReason || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="操作" width="56" align="center">
+          <template #default="{ row }">
+            <el-button type="danger" link size="small" @click="disc.removeRow(row.rowId)">删</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-card shadow="never" class="disc-card">
+      <template #header>
+        <div class="card-header">
+          <span>其他说明</span>
+          <el-button
             size="small"
-            class="matrix-table"
-          >
-            <el-table-column prop="item" label="费用项目" min-width="140" fixed />
-            <el-table-column label="期初余额" width="120" align="right">
-              <template #default="{ row }">
-                <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number
-                    :model-value="row.beginBalance"
-                    :controls="false"
-                    size="small"
-                    @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'beginBalance', v)"
-                  />
-                </template>
-                <span v-else :class="['amount-cell', { 'auto-fill': row.isAutoFilled }]">
-                  {{ fmtAmt(row.beginBalance) }}
-                  <el-tag v-if="row.isAutoFilled" size="small" type="info" class="auto-badge">自动</el-tag>
-                </span>
-              </template>
-            </el-table-column>
-            <el-table-column label="本期增加" width="120" align="right">
-              <template #default="{ row }">
-                <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number
-                    :model-value="row.increase"
-                    :controls="false"
-                    size="small"
-                    @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'increase', v)"
-                  />
-                </template>
-                <span v-else class="amount-cell">{{ fmtAmt(row.increase) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="本期摊销" width="120" align="right">
-              <template #default="{ row }">
-                <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number
-                    :model-value="row.amortization"
-                    :controls="false"
-                    size="small"
-                    @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'amortization', v)"
-                  />
-                </template>
-                <span v-else class="amount-cell">{{ fmtAmt(row.amortization) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="本期减少(其他)" width="130" align="right">
-              <template #default="{ row }">
-                <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number
-                    :model-value="row.decrease"
-                    :controls="false"
-                    size="small"
-                    @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'decrease', v)"
-                  />
-                </template>
-                <span v-else class="amount-cell">{{ fmtAmt(row.decrease) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="期末余额" width="120" align="right">
-              <template #default="{ row }">
-                <span class="formula-cell" title="= 期初 + 增加 - 摊销 - 减少">
-                  {{ fmtAmt(row.endBalance) }}
-                </span>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <!-- 合计行 -->
-          <div class="totals-row">
-            <span class="totals-label">合计</span>
-            <span class="totals-value">期初: {{ fmtAmt(getSectionTotal(section.key, 'beginBalance')) }}</span>
-            <span class="totals-value">增加: {{ fmtAmt(getSectionTotal(section.key, 'increase')) }}</span>
-            <span class="totals-value">摊销: {{ fmtAmt(getSectionTotal(section.key, 'amortization')) }}</span>
-            <span class="totals-value">减少: {{ fmtAmt(getSectionTotal(section.key, 'decrease')) }}</span>
-            <span class="totals-value totals-end">期末: {{ fmtAmt(getSectionTotal(section.key, 'endBalance')) }}</span>
-          </div>
-        </template>
-
-        <!-- 净值子节 -->
-        <template v-if="section.key === 'prepaid_net_value'">
-          <div class="net-value-summary">
-            <div class="net-item">
-              <span class="net-label">原值期末余额：</span>
-              <span class="net-amount">{{ fmtAmt(disclosureState.originalTotal.value.endBalance) }}</span>
-            </div>
-            <div class="net-item">
-              <span class="net-label">累计摊销期末：</span>
-              <span class="net-amount">{{ fmtAmt(disclosureState.amortizationTotal.value.endBalance) }}</span>
-            </div>
-            <div class="net-item net-result">
-              <span class="net-label">净值（原值 - 累计摊销）：</span>
-              <span class="net-amount formula-cell" title="= 原值期末 - 累计摊销期末">
-                {{ fmtAmt(disclosureState.netValueTotal.value) }}
-              </span>
-            </div>
-          </div>
-        </template>
-
-        <!-- 动态行子节（重大明细） -->
-        <template v-if="section.hasDynamicRows">
-          <el-table :data="disclosureState.sectionRows.value[section.key] ?? []" border size="small" class="dynamic-table">
-            <el-table-column prop="name" label="项目名称" min-width="150">
-              <template #default="{ row }">
-                <template v-if="!isReadonly">
-                  <el-input v-model="row.name" size="small" @blur="handleDynamicRowChange(section.key, row.rowId, 'name', row.name)" />
-                </template>
-                <span v-else>{{ row.name }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="amount" label="金额" width="130" align="right">
-              <template #default="{ row }">
-                <template v-if="!isReadonly">
-                  <el-input-number v-model="row.amount" :controls="false" size="small" @change="handleDynamicRowChange(section.key, row.rowId, 'amount', row.amount)" />
-                </template>
-                <span v-else class="amount-cell">{{ fmtAmt(row.amount) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="description" label="说明" min-width="200">
-              <template #default="{ row }">
-                <template v-if="!isReadonly">
-                  <el-input v-model="row.description" size="small" @blur="handleDynamicRowChange(section.key, row.rowId, 'description', row.description)" />
-                </template>
-                <span v-else>{{ row.description }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column v-if="!isReadonly" label="操作" width="60" align="center">
-              <template #default="{ row }">
-                <el-button type="danger" link size="small" @click="disclosureState.removeDynamicRow(section.key, row.rowId)">删</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <el-button v-if="!isReadonly" size="small" type="primary" text class="add-row-btn" @click="handleAddDynamicRow(section.key)">
-            + 新增重大明细
-          </el-button>
-        </template>
-
-        <!-- 说明文本子节 -->
-        <template v-if="section.hasNoteText">
-          <el-input
-            :model-value="disclosureState.sectionNotes.value[section.key] ?? ''"
-            type="textarea"
-            :autosize="{ minRows: 3, maxRows: 10 }"
+            type="primary"
+            link
+            :loading="disc.isAiGenerating.value"
             :disabled="isReadonly"
-            :placeholder="`请填写${section.title}相关披露文字`"
-            @blur="(e: FocusEvent) => disclosureState.saveSectionNote(section.key, (e.target as HTMLTextAreaElement).value)"
-          />
-        </template>
-      </el-card>
-    </template>
+            @click="handleAi"
+          >AI生成</el-button>
+        </div>
+      </template>
+      <el-input
+        type="textarea"
+        :model-value="disc.otherNote.value"
+        :disabled="isReadonly"
+        :autosize="{ minRows: 3 }"
+        placeholder="摊销政策、受益期间、重大变动等…"
+        @change="disc.saveOtherNote"
+      />
+    </el-card>
 
-    <!-- 审计说明 -->
-    <el-card shadow="never" class="audit-note-card">
+    <el-card shadow="never" class="disc-card">
       <template #header><div class="card-header"><span>审计说明</span></div></template>
       <el-input
         type="textarea"
-        :model-value="auditNote"
+        :model-value="disc.auditNote.value"
         :disabled="isReadonly"
-        :autosize="{ minRows: 5 }"
-        placeholder="请填写审计说明（国企版附注披露核对情况等）..."
-        @change="saveAuditNote"
+        :autosize="{ minRows: 3 }"
+        placeholder="披露与明细/审定勾稽、其他减少原因核查…"
+        @change="disc.saveAuditNote"
       />
     </el-card>
 
-    <!-- 审计结论 -->
-    <el-card shadow="never" class="audit-note-card">
+    <el-card shadow="never" class="disc-card">
       <template #header><div class="card-header"><span>审计结论</span></div></template>
       <el-input
         type="textarea"
-        :model-value="auditConclusion"
+        :model-value="disc.auditConclusion.value"
         :disabled="isReadonly"
-        :autosize="{ minRows: 3 }"
-        placeholder="请填写审计结论..."
-        @change="saveAuditConclusion"
+        :autosize="{ minRows: 2 }"
+        placeholder="A、附注披露完整准确，已同步八、30。B、除下列事项外未见异常。C、存在重大披露差异，不可确认。"
+        @change="disc.saveAuditConclusion"
       />
     </el-card>
 
-    <!-- 编制提示 -->
-    <details class="compile-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>国有企业版附注：16行×12列，47个公式</li>
-        <li>与上市版区别：增加"受益期间说明"独立子节；序号用中文(一)(二)…</li>
-        <li>原值变动 + 累计摊销变动 → 净值自动计算</li>
-        <li>数据优先从审定表I4-1自动取数</li>
-        <li>说明文字可使用AI辅助生成初稿</li>
-      </ul>
+    <details class="compile-hint" open>
+      <summary>编制说明</summary>
+      <ol>
+        <li>本表对齐源底稿「附注披露（国有企业）」：分列摊销额与其他减少额，并披露减少原因。</li>
+        <li>数据优先自 I4-2 聚合；同步写入 note_template §八、30「长期待摊费用」子表。</li>
+        <li>其他减少额非零时，原因列应填写（处置、转销、重分类等）。</li>
+      </ol>
     </details>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * I4TabDisclosureSoe.vue — 附注披露（国有企业版）
- *
- * 16行×12列，47公式
- * - 原值变动矩阵 + 累计摊销变动矩阵
- * - 净值 = 原值期末 - 累计摊销期末
- * - 动态行（重大明细）
- * - AI辅助文字描述
- * - EventBus: subscribe 'substantive:adjudicated', publish 'disclosure:note-text-updated'
- * - Uses useI4Disclosure composable (variant='soe')
- *
- * Spec: .kiro/specs/i4-long-term-prepaid/
- * Task: 4.9
- * Requirements: 7.1-7.2
+ * I4TabDisclosureSoe — 附注披露（国有企业）
+ * 对齐源表 + 同步附注八、30
  */
-import { ref, computed, inject, onMounted } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
-import { useI4Disclosure, type I4DisclosureMatrixRow } from '../../composables/useI4Disclosure'
-
-// ─── Props ───────────────────────────────────────────────────────────────────
+import { computed, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { useI4Disclosure } from '../../composables/useI4Disclosure'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
-
-// ─── Emits ───────────────────────────────────────────────────────────────────
 
 const emit = defineEmits<{
   'navigate-sheet': [sheetName: string]
   'save': [itemId: string, value: any]
 }>()
 
-// ─── Inject ──────────────────────────────────────────────────────────────────
-
-const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', () => {})
-
-// ─── Composable ──────────────────────────────────────────────────────────────
-
-const disclosureState = useI4Disclosure(
+const variant = ref<'soe'>('soe')
+const disc = useI4Disclosure(
   computed(() => props.wpId),
   computed(() => props.projectId),
   computed(() => props.allResponses),
   {
-    variant: ref('soe'),
-    onSave: (itemId: string, value: any) => {
-      const serialized = typeof value === 'string' ? value : JSON.stringify(value)
-      emit('save', itemId, serialized)
-    },
+    variant,
+    applicableStandards: () => props.applicableStandards,
+    onSave: (itemId, value) => emit('save', itemId, typeof value === 'string' ? value : JSON.stringify(value)),
   },
 )
 
-// ─── Matrix Data Access ──────────────────────────────────────────────────────
-
-function getMatrixData(sectionKey: string): I4DisclosureMatrixRow[] {
-  if (sectionKey === 'prepaid_original') return disclosureState.originalRows.value
-  if (sectionKey === 'prepaid_amortization') return disclosureState.amortizationRows.value
-  return []
-}
-
-function getSectionTotal(sectionKey: string, field: keyof I4DisclosureMatrixRow): number {
-  if (sectionKey === 'prepaid_original') {
-    return (disclosureState.originalTotal.value as any)[field] ?? 0
-  }
-  if (sectionKey === 'prepaid_amortization') {
-    return (disclosureState.amortizationTotal.value as any)[field] ?? 0
-  }
-  return 0
-}
-
-// ─── Matrix Edit ─────────────────────────────────────────────────────────────
-
-function handleMatrixEdit(sectionKey: string, rowId: string, field: keyof I4DisclosureMatrixRow, val: number): void {
-  const layer = sectionKey === 'prepaid_original' ? 'original' : 'amortization'
-  disclosureState.updateMatrixCell(layer, rowId, field, val)
-}
-
-// ─── Dynamic Rows ────────────────────────────────────────────────────────────
-
-async function handleAddDynamicRow(sectionKey: string): Promise<void> {
+async function handleAdd(): Promise<void> {
   try {
-    const { value: name } = await ElMessageBox.prompt('请输入重大明细项目名称', '新增明细', {
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
+    const { value } = await ElMessageBox.prompt('请输入披露项目名称', '新增项目', {
       inputPattern: /\S+/,
       inputErrorMessage: '名称不能为空',
     })
-    disclosureState.addDynamicRow(sectionKey, name)
+    disc.addRow(value)
   } catch { /* cancel */ }
 }
 
-function handleDynamicRowChange(sectionKey: string, rowId: string, field: string, value: any): void {
-  disclosureState.updateDynamicRow(sectionKey, rowId, field as any, value)
-}
-
-// ─── AI ──────────────────────────────────────────────────────────────────────
-
-async function handleAiGenerate(sectionKey: string): Promise<void> {
-  const text = await disclosureState.generateNoteText(sectionKey)
+async function handleAi(): Promise<void> {
+  const text = await disc.generateNoteText()
   if (text) {
-    await disclosureState.applyAiGeneratedNote(sectionKey, text)
+    disc.saveOtherNote(text)
+    ElMessage.success('已生成其他说明')
   }
 }
 
-// ─── Review ──────────────────────────────────────────────────────────────────
-
-function handleReview(sectionKey: string): void {
-  openReviewDialog(`I4 附注国企-${sectionKey}`)
+function getSummary({ columns }: { columns: any[] }): string[] {
+  const t = disc.totals.value
+  return columns.map((col: any, i: number) => {
+    if (i === 0) return '合计'
+    if (col.label === '期初余额') return fmtAmt(t.beginBalance)
+    if (col.label === '本期增加额') return fmtAmt(t.increase)
+    if (col.label === '本期摊销额') return fmtAmt(t.amortization)
+    if (col.label === '其他减少额') return fmtAmt(t.otherDecrease)
+    if (col.label === '期末余额') return fmtAmt(t.endBalance)
+    return ''
+  })
 }
-
-// ─── Audit Note / Conclusion (AN + AC) ───────────────────────────────────────
-
-const NOTE_KEY = 'I4-disclosure-soe-audit-note'
-const CONCLUSION_KEY = 'I4-disclosure-soe-audit-conclusion'
-const auditNote = ref('')
-const auditConclusion = ref('')
-
-function saveAuditNote(val: string): void {
-  if (props.isReadonly) return
-  auditNote.value = val
-  const item = { item_id: NOTE_KEY, conclusion: null, remark: val }
-  props.allResponses.set(NOTE_KEY, item)
-  emit('save', NOTE_KEY, val)
-}
-
-function saveAuditConclusion(val: string): void {
-  if (props.isReadonly) return
-  auditConclusion.value = val
-  const item = { item_id: CONCLUSION_KEY, conclusion: null, remark: val }
-  props.allResponses.set(CONCLUSION_KEY, item)
-  emit('save', CONCLUSION_KEY, val)
-}
-
-onMounted(() => {
-  const n = props.allResponses.get(NOTE_KEY)
-  if (n?.remark) auditNote.value = n.remark
-  const c = props.allResponses.get(CONCLUSION_KEY)
-  if (c?.remark) auditConclusion.value = c.remark
-})
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function fmtAmt(val: number | null | undefined): string {
-  if (val == null || val === 0) return '-'
+  if (val == null || Math.abs(val) < 1e-9) return '-'
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 </script>
 
 <style scoped>
 .i4-tab-disclosure-soe { padding: 16px; font-size: var(--wp-font-size, 13px); }
-
-/* 审计目标 */
-.objective-alert { margin-bottom: 14px; }
-.i4-tab-disclosure-soe :deep(.objective-alert .el-alert__content) { padding: 2px 0; }
-
-/* 审计说明/结论 */
-.audit-note-card { margin-bottom: 16px; }
-.audit-note-card :deep(.el-card__header) { padding: 12px 16px; background: #fafafa; }
-.card-header { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 500; }
-
-/* 蓝色渐变引导区 */
+.objective-alert { margin-bottom: 12px; }
 .guide-area {
   background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%);
-  border-radius: 8px; padding: 16px; margin-bottom: 16px;
+  border-radius: 8px; padding: 12px 16px; margin-bottom: 12px;
 }
 .guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.guide-step { display: flex; align-items: flex-start; gap: 6px; font-size: var(--wp-font-size, 13px); }
-.step-num { font-weight: 700; color: var(--el-color-primary); min-width: 20px; }
-
-/* 琥珀色方法论块 */
+.guide-step { display: flex; gap: 6px; font-size: 13px; }
+.step-num { font-weight: 700; color: var(--el-color-primary); }
 .methodology-block {
-  border-left: 4px solid #d97706;
-  background: #fffbeb;
-  padding: 12px 16px;
-  margin-bottom: 16px;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #92400e;
-  line-height: 1.7;
+  border-left: 4px solid #d97706; background: #fffbeb;
+  padding: 10px 14px; margin-bottom: 12px; border-radius: 4px;
+  font-size: 12px; color: #92400e; line-height: 1.7;
 }
-.methodology-title { font-weight: 600; color: #78350f; margin-bottom: 4px; }
-
-/* 子节卡片 */
-.disclosure-card { margin-bottom: 16px; }
-.section-title-row { display: flex; align-items: center; justify-content: space-between; }
-.section-title { font-size: 14px; font-weight: 600; }
-.title-actions { display: flex; align-items: center; gap: 4px; }
-
-/* 矩阵表 */
-.matrix-table { margin-bottom: 8px; }
-.formula-cell {
-  border-bottom: 1px dashed var(--el-border-color);
-  cursor: help;
-  font-variant-numeric: tabular-nums;
+.methodology-title { font-weight: 600; margin-bottom: 4px; }
+.toolbar-row {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px;
 }
-.amount-cell { font-variant-numeric: tabular-nums; }
-.auto-fill { color: var(--el-color-info); }
-.auto-badge { margin-left: 4px; }
-
-/* 合计行 */
-.totals-row {
-  display: flex; align-items: center; gap: 16px;
-  padding: 8px 12px; background: var(--el-fill-color-lighter);
-  border-radius: 4px; font-size: 12px; margin-top: 4px;
-}
-.totals-label { font-weight: 600; min-width: 40px; }
-.totals-value { font-variant-numeric: tabular-nums; }
-.totals-end { font-weight: 600; color: var(--el-color-primary); }
-
-/* 净值摘要 */
-.net-value-summary { padding: 12px; }
-.net-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.net-label { font-size: var(--wp-font-size, 13px); color: var(--el-text-color-regular); }
-.net-amount { font-weight: 600; font-variant-numeric: tabular-nums; }
-.net-result { padding-top: 8px; border-top: 1px solid var(--el-border-color-lighter); }
-.net-result .net-amount { color: var(--el-color-primary); font-size: 16px; }
-
-/* 动态行 */
-.dynamic-table { margin-bottom: 8px; }
-.add-row-btn { margin-top: 4px; }
-
-/* 编制提示 */
-.compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
-.compile-hint summary { cursor: pointer; font-weight: 500; }
-.compile-hint ul { padding-left: 20px; margin-top: 8px; }
-.compile-hint li { margin-bottom: 4px; }
+.reconcile { margin-left: auto; font-size: 12px; color: var(--el-text-color-secondary); }
+.disc-card { margin-bottom: 12px; }
+.disc-card :deep(.el-card__header) { padding: 8px 16px; background: #fafafa; }
+.card-header { display: flex; justify-content: space-between; align-items: center; font-weight: 500; }
+.hint { font-size: 12px; color: var(--el-text-color-secondary); font-weight: 400; }
+.formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
+.amt { font-variant-numeric: tabular-nums; }
+.auto-badge { margin-left: 6px; }
+.text-danger { color: var(--el-color-danger); }
+.compile-hint { font-size: 12px; color: var(--el-text-color-secondary); }
+.compile-hint summary { cursor: pointer; font-weight: 500; color: var(--el-text-color-primary); }
+.compile-hint ol { padding-left: 20px; margin: 8px 0 0; }
+.compile-hint li { margin-bottom: 4px; line-height: 1.5; }
 </style>

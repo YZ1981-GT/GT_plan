@@ -264,6 +264,30 @@ export function useE1Analysis(options: UseE1BaseOptions) {
   }
   function removeAnomaly(rowId: string): void { if (mutable()) { structured.value.anomalies = structured.value.anomalies.filter(row => row.id !== rowId); scheduleSave() } }
   function updateThreshold(field: 'cashThreshold' | 'loanThreshold' | 'concentrationThreshold', value: number): void { if (mutable()) { structured.value[field] = parseNum(value); scheduleSave() } }
+
+  // ─── P2-12: 从E1-1审定表带入上期审定数（期初审定 = 期初未审 + 期初账项调整） ────
+  // E1-1 未持久化单一"期初审定"键，故按源口径重算：
+  //   期初审定 = 期初未审(E1-{x}-opening-unaudited) + 期初账项调整(E1-adjustment-by-item-{itemKey}-opening)
+  function fillFromAdjudication(): number {
+    if (!mutable()) return 0
+    const mapping: Array<{ itemKey: string; openKey: string; adjKey: string }> = [
+      { itemKey: 'cash', openKey: 'E1-cash-detail-opening-unaudited', adjKey: 'E1-adjustment-by-item-cash-opening' },
+      { itemKey: 'bank', openKey: 'E1-bank-detail-principal-opening-unaudited', adjKey: 'E1-adjustment-by-item-bank_principal-opening' },
+      { itemKey: 'other', openKey: 'E1-bank-detail-other-opening-unaudited', adjKey: 'E1-adjustment-by-item-other_mf-opening' },
+    ]
+    let filled = 0
+    for (const m of mapping) {
+      const unaudited = parseNum(allResponses.value.get(m.openKey)?.remark)
+      const adjustment = parseNum(allResponses.value.get(m.adjKey)?.remark)
+      const openingAudited = unaudited + adjustment
+      if (openingAudited && !(storedMap.value[m.itemKey]?.openingAmount)) {
+        updateCell(m.itemKey, 'openingAmount', openingAudited)
+        filled++
+      }
+    }
+    return filled
+  }
+
   function hydrate(): void { isLoading.value = true; try { loadFromResponses() } finally { isLoading.value = false } }
   onBeforeUnmount(() => { if (timer) { clearTimeout(timer); persist() } })
 
@@ -274,6 +298,6 @@ export function useE1Analysis(options: UseE1BaseOptions) {
     concentrationThreshold: computed(() => structured.value.concentrationThreshold), isLoading,
     isRateExceeding: (row: AnalysisRow) => exceedsThreshold(row.changeRate, CHANGE_RATE_THRESHOLD),
     updateCell, updateMetric, updateOtherFund, updateRatioReason, updateMonthly, updateBank, updateQuality,
-    addAnomaly, updateAnomaly, removeAnomaly, updateThreshold, hydrate,
+    addAnomaly, updateAnomaly, removeAnomaly, updateThreshold, fillFromAdjudication, hydrate,
   }
 }

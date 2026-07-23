@@ -1,6 +1,8 @@
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
 import { parseNum, calcCashBalance, calcFxConvert, sumField } from './useE1FormulaEngine'
+import { eventBus } from '@/utils/eventBus'
+import { api } from '@/services/apiProxy'
 
 export type BankDetailVariant = 'rmb' | 'multi'
 export type BankDetailSection = 'principal' | 'accrued'
@@ -293,8 +295,54 @@ export function useE1BankDetail(options: UseE1BaseOptions & { variant: Ref<BankD
     isLoading.value = true
     try { loadFromResponses() } finally { isLoading.value = false }
   }
+
+  // ─── P1-5: 函证回写 — confirmation:received 拉取回函详情后按对象名匹配 confirmAmount ──
+  //
+  // 函证中心(ConfirmationHub)的 confirmation:received 载荷仅含 {projectId, confirmationId,
+  // accountCode}，不含回函金额/账号。故此处拉取函证清单取回函金额(confirmed_amount)与函证
+  // 对象(counterparty=开户行)，仅对 confirm_type='bank' 的银行函证按开户行名称做规范化匹配
+  // 回写到 E1-3 对应行（银行账号在函证记录中不可得，故以开户行名匹配，最贴近可得数据）。
+  async function onConfirmationReceived(payload: any): Promise<void> {
+    if (!payload?.confirmationId || !payload?.projectId) return
+    try {
+      const res = await api.get(`/api/projects/${payload.projectId}/confirmations`)
+      const items = ((res as any)?.items ?? []) as any[]
+      const conf = items.find(c => c.id === payload.confirmationId)
+      if (!conf) return
+      // 仅银行函证回写货币资金明细
+      if (conf.confirm_type && conf.confirm_type !== 'bank') return
+      const replyAmount = parseNum(conf.confirmed_amount)
+      const counterparty = String(conf.counterparty || '').trim()
+      if (!counterparty || replyAmount === 0) return
+
+      const norm = (s: string) => s.replace(/\s+/g, '').toLowerCase()
+      const target = norm(counterparty)
+      let matched = false
+      const next = rows.value.map(row => {
+        const rowName = norm(`${row.bankName || ''}${row.totalLedgerBank || ''}`)
+        const bankOnly = norm(String(row.bankName || ''))
+        if (rowName && (rowName.includes(target) || (bankOnly && target.includes(bankOnly)))) {
+          matched = true
+          return recalcRow({
+            ...row,
+            confirmAmount: replyAmount,
+            confirmIndexNo: row.confirmIndexNo || `函证#${String(conf.id || '').slice(0, 8)}`,
+          }, variant.value)
+        }
+        return row
+      })
+      if (matched) {
+        rows.value = next
+        scheduleSave()
+      }
+    } catch { /* silent：函证拉取失败不阻断 */ }
+  }
+
+  eventBus.on('confirmation:received', onConfirmationReceived)
+
   onBeforeUnmount(() => {
     if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; persistToResponses() }
+    eventBus.off('confirmation:received', onConfirmationReceived)
   })
 
   return {

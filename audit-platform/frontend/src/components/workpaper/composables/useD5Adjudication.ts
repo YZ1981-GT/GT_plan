@@ -25,6 +25,7 @@ import {
   calcSubtotal,
   calcFvTotal,
 } from './useD5FormulaEngine'
+import { eventBus } from '@/utils/eventBus'
 import type { ChecklistResponse } from './useD5FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -97,8 +98,6 @@ function getResponseNum(allResponses: Map<string, ChecklistResponse>, itemId: st
 
 export function useD5Adjudication(options: UseD5AdjudicationOptions) {
   const { allResponses, saveImmediate, debouncedSave, crossSheet, isReadonly } = options
-
-  const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
 
   // EventBus accumulated AJE/RJE (session-level, from adjustment:created events)
   const eventAjeAccum = ref(0)
@@ -395,14 +394,15 @@ export function useD5Adjudication(options: UseD5AdjudicationOptions) {
       wpCode: 'D5',
       accountCode: '1124',
       auditedAmount,
+      adjudicatedAmount: auditedAmount, // 别名兼容
+      timestamp: Date.now(),
     }
 
     // Persist the adjudicated amount
     saveImmediate('D5-1-tb-amount', { remark: String(auditedAmount) })
 
-    try {
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
-    } catch { /* EventBus publish 失败不阻塞 */ }
+    // 统一 eventBus (crossWpEventBridge 双向桥接 window)
+    eventBus.emit('substantive:adjudicated', payload)
   }
 
   // ─── onAdjustmentCreated ─────────────────────────────────────────────
@@ -418,17 +418,13 @@ export function useD5Adjudication(options: UseD5AdjudicationOptions) {
 
   // ─── EventBus Registration ───────────────────────────────────────────
 
-  const adjustmentHandler = (e: Event) => {
-    const detail = (e as CustomEvent).detail
-    if (detail) onAdjustmentCreated(detail)
-  }
-  window.addEventListener('adjustment:created', adjustmentHandler)
-  eventListeners.push({ event: 'adjustment:created', handler: adjustmentHandler })
+  // 统一 eventBus
+  eventBus.on('adjustment:created', (payload: any) => {
+    if (payload) onAdjustmentCreated(payload)
+  })
 
   onBeforeUnmount(() => {
-    for (const { event, handler } of eventListeners) {
-      window.removeEventListener(event, handler)
-    }
+    eventBus.off('adjustment:created')
   })
 
   // ─── Return ──────────────────────────────────────────────────────────

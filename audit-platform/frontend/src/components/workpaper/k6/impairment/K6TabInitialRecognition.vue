@@ -43,6 +43,16 @@
         <div class="section-header">
           <span class="section-title">K6-4 持有待售资产和负债初始确认估值表</span>
           <div class="section-header-actions">
+            <el-dropdown size="small" trigger="click" :disabled="isReadonly" @command="handleIECommand">
+              <el-button size="small">导入导出 ▾</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="template">导出模板</el-dropdown-item>
+                  <el-dropdown-item command="export">导出数据</el-dropdown-item>
+                  <el-dropdown-item command="import">导入数据</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
             <el-button size="small" circle @click="openReview('K6-4-valuation')">💬</el-button>
           </div>
         </div>
@@ -299,8 +309,55 @@
         <el-button size="small" @click="addValuationRow('asset_noncurrent')">+ 持有待售非流动资产</el-button>
         <el-button size="small" @click="addValuationRow('asset_group')">+ 处置组资产</el-button>
         <el-button size="small" @click="addValuationRow('liability_group')">+ 处置组负债</el-button>
+        <el-button size="small" type="success" plain @click="importFromK6_2">从K6-2明细表带入</el-button>
+        <el-button
+          size="small"
+          type="warning"
+          plain
+          :disabled="valuationRows.length === 0"
+          @click="pushValuationToDownstream"
+        >
+          推送估值至K6-5/K6-6
+        </el-button>
       </div>
+
+      <!-- ═══ 估值表↔K6-1交叉验证 ═══ -->
+      <el-alert
+        v-if="crossK6_1Diff !== 0"
+        :type="Math.abs(crossK6_1Diff) > 1 ? 'warning' : 'info'"
+        :closable="false"
+        show-icon
+        class="cross-alert"
+      >
+        <template #title>
+          估值表资产账面合计 {{ fmtAmt(valuationSubtotals.assetBook) }} 与 K6-1审定表差异 {{ fmtAmt(crossK6_1Diff) }} 元，请核对
+        </template>
+      </el-alert>
     </el-card>
+
+    <!-- ═══ 五条件分类门禁提示 ═══ -->
+    <el-alert
+      v-if="isFullyEvaluated && classificationResult !== 'classified'"
+      type="error"
+      :closable="false"
+      show-icon
+      class="gate-alert"
+    >
+      <template #title>
+        ⚠ CAS42五条件未全部满足，<strong>不应划分为持有待售</strong>。请核实各条件判断；如确认不满足，无需继续K6-5/K6-6减值测试，应终止分类。
+      </template>
+    </el-alert>
+    <el-alert
+      v-else-if="isFullyEvaluated && classificationResult === 'classified'"
+      type="success"
+      :closable="false"
+      show-icon
+      class="gate-alert"
+    >
+      <template #title>
+        ✓ CAS42五条件全部满足，可分类为持有待售。请继续编制K6-5减值测试（孰低法计量）。
+      </template>
+    </el-alert>
 
     <!-- ═══ CAS42 五条件辅助判断区 ═══ -->
     <el-card shadow="never" class="block-card aux-card">
@@ -418,8 +475,19 @@
         <li>条件④"一年内完成"有例外情形：非企业自身原因导致延期且企业已取得足够证据表明仍承诺出售</li>
         <li>划分为持有待售后应停止计提折旧/折耗/摊销，并跳转 K6-5 减值测试按孰低计量</li>
         <li>决议索引/协议索引应指向董事会决议、不可撤销转让协议等支持性证据底稿</li>
+        <li>"推送估值至K6-5/K6-6"：将估值表数据写入标准键，K6-5/K6-6点"从K6-4带入"可读取</li>
+        <li>五条件不满足时系统显示门禁提示，不应继续K6-5减值测试</li>
       </ul>
     </details>
+
+    <!-- 隐藏的文件上传input -->
+    <input
+      ref="fileInputRef"
+      type="file"
+      accept=".xlsx,.xls"
+      style="display: none"
+      @change="handleFileSelected"
+    />
   </div>
 </template>
 
@@ -434,10 +502,11 @@
  *
  * Spec: .kiro/specs/k6-held-for-sale/ Task 4.4 · Requirements 4.1-4.5
  */
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, toRef } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useK6InitialRecognition } from '../../composables/useK6InitialRecognition'
+import { useK6ImportExport } from '../../composables/useK6ImportExport'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -512,6 +581,103 @@ async function handleAiGenerate() {
     ElMessage.error('AI生成失败: ' + (e?.message || '未知错误'))
   } finally {
     aiLoading.value = false
+  }
+}
+
+// ─── 导入导出 ────────────────────────────────────────────────────────────────
+
+const { exportTemplate, exportData, importData } = useK6ImportExport({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetCode: 'K6-4',
+})
+
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+function handleIECommand(cmd: string): void {
+  if (cmd === 'template') exportTemplate()
+  else if (cmd === 'export') exportData()
+  else if (cmd === 'import') fileInputRef.value?.click()
+}
+
+async function handleFileSelected(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  input.value = ''
+  const result = await importData(file)
+  if (result && result.rowCount > 0) {
+    ElMessage.success(`导入完成，${result.rowCount} 行`)
+  }
+}
+
+// ─── K6-4↔K6-1 交叉验证 ─────────────────────────────────────────────────────
+
+const crossK6_1Diff = computed(() => {
+  const k6_1_asset = allResponsesRef.value.get('K6-1-audited-asset')
+  const assetAudited = Number(k6_1_asset?.remark ?? k6_1_asset?.value ?? 0) || 0
+  if (assetAudited === 0) return 0
+  return valuationSubtotals.value.assetBook - assetAudited
+})
+
+// ─── 推送估值至K6-5/K6-6（主动写标准键） ─────────────────────────────────────
+
+function pushValuationToDownstream(): void {
+  if (valuationRows.value.length === 0) {
+    ElMessage.info('估值表无数据可推送')
+    return
+  }
+  // 将估值表行写入标准键（K6-5/K6-6的importFromK6_4读取此键）
+  saveResponse('K6-4-valuation-rows', { remark: JSON.stringify(valuationRows.value) })
+  // 写入公允净额合计供K6-5交叉验证
+  saveResponse('K6-4-asset-fairnet-total', { remark: String(valuationSubtotals.value.assetFairNet) })
+  ElMessage.success(`已推送 ${valuationRows.value.length} 项估值数据，K6-5/K6-6可点"从K6-4带入"获取`)
+}
+
+// ─── 从K6-2明细表带入 ─────────────────────────────────────────────────────
+
+function importFromK6_2() {
+  // 读取K6-2明细行（K6-2 useK6Detail 持久化键为 K6-2-rows）
+  const k6_2_item = allResponsesRef.value.get('K6-2-rows')
+  const raw = k6_2_item?.remark ?? k6_2_item?.conclusion ?? (typeof k6_2_item === 'string' ? k6_2_item : null)
+  if (!raw) {
+    ElMessage.info('K6-2明细表暂无数据，请先编制K6-2明细表')
+    return
+  }
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      ElMessage.info('K6-2明细表暂无行数据')
+      return
+    }
+    // 映射为估值表行：名称/账面/公允/出售费用/分类
+    let importCount = 0
+    for (const r of parsed) {
+      const name = r.assetName || ''
+      if (!name) continue
+      // 检查是否已存在（按名称去重）
+      const exists = valuationRows.value.some((v: any) => v.itemName === name)
+      if (exists) continue
+      const category = r.category === '处置组负债' ? 'liability_group'
+        : r.category === '处置组资产' ? 'asset_group'
+        : 'asset_noncurrent'
+      addValuationRow(category)
+      const newRow = valuationRows.value[valuationRows.value.length - 1]
+      if (newRow) {
+        updateValuationCell(newRow.rowId, 'itemName', name)
+        updateValuationCell(newRow.rowId, 'bookValue', Number(r.bookValue) || 0)
+        if (r.fairValue) updateValuationCell(newRow.rowId, 'salesPrice', Number(r.fairValue))
+        if (r.sellingCost) updateValuationCell(newRow.rowId, 'sellingCost', Number(r.sellingCost))
+      }
+      importCount++
+    }
+    if (importCount > 0) {
+      ElMessage.success(`已从K6-2带入 ${importCount} 项（按名称去重）`)
+    } else {
+      ElMessage.info('所有K6-2项目已存在于估值表中')
+    }
+  } catch {
+    ElMessage.error('K6-2数据解析失败')
   }
 }
 
@@ -675,6 +841,10 @@ function fmtAmt(val: number | null | undefined): string {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* 交叉验证 + 门禁提示 */
+.cross-alert { margin-top: 12px; }
+.gate-alert { margin-bottom: 16px; }
 
 /* 不满足条件提示 */
 .unmet-alert { margin-bottom: 12px; }

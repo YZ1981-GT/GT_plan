@@ -8,7 +8,7 @@
    projects as P_proj, trialBalance as P_tb, adjustments as P_adj,
    materiality as P_mat, misstatements as P_mis, reports as P_rpt,
    cfsWorksheet as P_cfs, disclosureNotes as P_dn, auditReport as P_ar,
-   exportTask as P_exp, workpaperSummary as P_ws, events as P_evt,
+   exportTask as P_exp, workpaperSummary as P_ws,
  } from '@/services/apiPaths'
 
  export interface ProjectListItem {
@@ -270,12 +270,9 @@ export async function getMaterialityBenchmark(projectId: string, year: number, b
 }
 
 // ─── Events SSE ───
-// createSSE（fetch+ReadableStream）在 ThreeColumnLayout.vue 中直接使用，token 通过 Authorization header 传输
-// createEventSource 保留为兼容接口（当前无调用方）
-
-export function createEventSource(projectId: string) {
-  return import('@/utils/sse').then(({ createSSE }) => createSSE(P_evt.stream(projectId)))
-}
+// 项目事件流统一走单例总线 `services/sse/projectEventStream`（每项目一条共享连接）。
+// 旧 createEventSource 兼容包装（无调用方）已移除以避免绕过总线直连 /events/stream
+// （frontend-sse-connection-consolidation R6.3）。
 
 
 // ─── Misstatements (未更正错报) ───

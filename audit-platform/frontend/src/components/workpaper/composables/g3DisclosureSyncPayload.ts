@@ -10,13 +10,34 @@ import {
   resolveG3CurrentStandard,
 } from './g3NoteSectionMap'
 
+import type { ColumnDef } from './disclosureColumnDefs'
+
 export interface G3SyncFromWorkpaperPayload {
   wp_id: string
   sheet_name: string
   section_id: string
   current_standard: string
   sub_table_data: Record<string, Record<string, unknown>[]>
+  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 G3TabDisclosure el-table-column */
+  columns?: Record<string, ColumnDef[]>
 }
+
+// 应收股利列头：逐字取自 G3TabDisclosureListed/SOE（两变体列不同）
+const G3_LISTED_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '被投资方', is_label: true },
+  { key: 'prior_balance', label: '上年年末余额', format: 'amount' },
+  { key: 'current_increase', label: '本期增加', format: 'amount' },
+  { key: 'current_decrease', label: '本期减少', format: 'amount' },
+  { key: 'end_balance', label: '期末余额', format: 'amount' },
+  { key: 'remark', label: '备注' },
+]
+const G3_SOE_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '被投资方', is_label: true },
+  { key: 'prior_balance', label: '期初余额', format: 'amount' },
+  { key: 'current_change', label: '本期变动', format: 'amount' },
+  { key: 'end_balance', label: '期末余额', format: 'amount' },
+  { key: 'remark', label: '备注' },
+]
 
 export interface G3ListedRowSnap {
   investeeName: string
@@ -119,6 +140,7 @@ export function buildG3ListedSyncPayloads(
       section_id: G3_NOTE_SECTION.listed,
       current_standard: resolveG3CurrentStandard(variant, applicableStandards),
       sub_table_data: buildG3ListedSubTableData(rows, auditNote),
+      columns: { 应收股利: G3_LISTED_COLUMNS },
     },
   ]
 }
@@ -138,6 +160,7 @@ export function buildG3SoeSyncPayloads(
       section_id: G3_NOTE_SECTION.soe,
       current_standard: resolveG3CurrentStandard(variant, applicableStandards),
       sub_table_data: buildG3SoeSubTableData(rows, auditNote),
+      columns: { 应收股利: G3_SOE_COLUMNS },
     },
   ]
 }

@@ -140,6 +140,18 @@ describe('f2DisclosureSyncPayload', () => {
     expect(payload.current_standard).toBe('listed_standalone')
     expect(payload.wp_id).toBe('wp-1')
     expect(payload.section_id).not.toBe('八、10')
+    // disclosure-table-sync-convergence Task 7: 载荷携带源对齐 _columns
+    expect(payload.columns).toBeDefined()
+    const lc = payload.columns!['存货分类']
+    expect(lc).toBeDefined()
+    expect(lc[0]).toMatchObject({ key: 'label', label: '存货种类', is_label: true })
+    // 中文列头（非英文字段键）
+    expect(lc.find((c) => c.key === 'end_gross')?.label).toBe('期末账面余额')
+    // 每个 sub_table_data 键都有对应列头
+    for (const k of Object.keys(payload.sub_table_data)) {
+      if (k.startsWith('_')) continue
+      expect(payload.columns![k], `缺列头: ${k}`).toBeDefined()
+    }
   })
 
   it('国企 sync payload 只指向 八、10', () => {
@@ -201,6 +213,12 @@ describe('f2DisclosureSyncPayload', () => {
     expect(payload.current_standard).toBe('soe_standalone')
     expect(payload.sub_table_data['存货分类'][0].end_gross).toBe(50)
     expect(payload.section_id).not.toBe('五、9')
+    // Task 7: 国企版 _columns 源对齐（含转销列）
+    expect(payload.columns).toBeDefined()
+    const sc = payload.columns!['存货分类']
+    expect(sc[0]).toMatchObject({ key: 'label', label: '项目', is_label: true })
+    const s2 = payload.columns!['存货跌价准备及合同履约成本减值准备']
+    expect(s2.find((c) => c.key === 'decrease_writeoff')?.label).toBe('本期减少-转销')
   })
 
   it('不适用准则时 buildF2SyncPayload 返回 null', () => {

@@ -1136,6 +1136,29 @@ export function buildG7SoeSectionSyncData(
   return result
 }
 
+/**
+ * 列头元数据（disclosure-table-sync-convergence）：全部子表键 → ColumnDef 扁平映射，
+ * 键与 syncTableKey 一致；投影器仅按各 payload 实含键查找，多余键自动忽略。
+ * label 逐字取自各表 columns 配置，标签列承载 row.label → '项目'。
+ */
+export function buildG7SoeColumns(): Record<string, import('../../composables/disclosureColumnDefs').ColumnDef[]> {
+  const result: Record<string, import('../../composables/disclosureColumnDefs').ColumnDef[]> = {}
+  for (const section of G7_SOE_DISCLOSURE_SECTIONS) {
+    for (const table of section.tables ?? []) {
+      result[syncTableKey(table)] = [
+        { key: '项目', label: '项目', is_label: true },
+        ...table.columns.map((c) => ({
+          key: c.key,
+          label: c.label,
+          format: (c.type === 'number' ? 'amount' : c.type === 'percent' ? 'percent' : 'text') as
+            'amount' | 'percent' | 'text',
+        })),
+      ]
+    }
+  }
+  return result
+}
+
 /** 按附注目标章节聚合；七章各子节分别同步，八、18 合并为一份。 */
 export function buildG7SoeSyncPayloads(state: G7SoeDisclosureState): G7SoeSyncPayload[] {
   const byNote = new Map<string, G7SoeSyncPayload>()

@@ -23,6 +23,8 @@ import {
   calcChangeRate,
   exceedsThreshold,
 } from './useE1FormulaEngine'
+import { eventBus } from '@/utils/eventBus'
+import { api } from '@/services/apiProxy'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -120,7 +122,6 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
   const { projectId, allResponses, debouncedSave, isReadonly } = options
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
-  const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
   const crossSheetStatus = ref<'loaded' | 'loading' | 'error'>('loaded')
   const isLoading = ref(false)
 
@@ -463,18 +464,20 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
     const digitalRow = detailRows.value.find(r => r.itemKey === 'digital')
     byCode['1012'] = (otherRow?.endingAudited ?? 0) + (digitalRow?.endingAudited ?? 0)
 
-    // Write to allResponses for cross-spec consumption
+    // Write to allResponses for cross-spec consumption (E1-14 分析表/全局告警读取)
     for (const [code, amount] of Object.entries(byCode)) {
       setLocal(`E1-adj-total-${code}`, String(amount))
     }
 
-    // Dispatch TB writeback events
+    // 真实 TB 回写：走平台统一端点（对齐 F3/F4/F5/G 循环 writebackTrialBalance）。
+    // 按 1001/1002/1012 三科目分别 upsert 审定数到 trial_balance。
     for (const [code, amount] of Object.entries(byCode)) {
-      try {
-        window.dispatchEvent(new CustomEvent('e1:writeback-trial-balance', {
-          detail: { projectId: projectId.value, accountCode: code, auditedAmount: amount },
-        }))
-      } catch { /* silent */ }
+      api
+        .put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
+          account_code: code,
+          audited_amount: amount,
+        })
+        .catch(() => { /* silent：回写失败不阻断本地保存 */ })
     }
   }
 
@@ -504,32 +507,45 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
 
   // ─── EventBus: adjustment:created ────────────────────────────────────
 
-  function onAdjustmentCreated(e: Event): void {
-    const detail = (e as CustomEvent).detail
-    if (!detail || (detail.wpCode && detail.wpCode !== 'E1')) return
+  function onAdjustmentCreated(payload: any): void {
+    if (!payload || (payload.wpCode && payload.wpCode !== 'E1')) return
     // E1-5 adjustments update allResponses keys directly;
     // this handler ensures we debounce-save the adjudication state
     scheduleSave()
   }
 
-  // ─── EventBus: publish substantive:adjudicated ───────────────────────
+  // ─── Event Registration ──────────────────────────────────────────────
+
+  eventBus.on('adjustment:created', onAdjustmentCreated)
+
+  // ─── Cleanup ─────────────────────────────────────────────────────────
+
+  onBeforeUnmount(() => {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      debounceTimer = null
+      flushSave()
+    }
+    eventBus.off('adjustment:created', onAdjustmentCreated)
+  })
 
   function publishAdjudicated(): void {
     const total = totalRow.value
     const payload = {
       wpCode: 'E1',
       accountCode: '1001,1002,1012',
-      auditedAmount: {
-        total: total.endingAudited,
+      auditedAmount: total.endingAudited,
+      adjudicatedAmount: total.endingAudited,
+      auditedTotal: total.endingAudited,
+      detail: {
         '1001': detailRows.value.find(r => r.itemKey === 'cash')?.endingAudited ?? 0,
         '1002': detailRows.value.find(r => r.itemKey === 'bank_principal')?.endingAudited ?? 0,
         '1012': (detailRows.value.find(r => r.itemKey === 'other_mf')?.endingAudited ?? 0) +
                 (detailRows.value.find(r => r.itemKey === 'digital')?.endingAudited ?? 0),
       },
+      timestamp: Date.now(),
     }
-    try {
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
-    } catch { /* silent */ }
+    eventBus.emit('substantive:adjudicated', payload)
   }
 
   // Watch total audited → auto publish + writeback
@@ -560,29 +576,6 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
       isLoading.value = false
     }
   }
-
-  // ─── Event Registration ──────────────────────────────────────────────
-
-  function registerHandler(event: string, handler: (e: Event) => void): void {
-    window.addEventListener(event, handler)
-    eventListeners.push({ event, handler })
-  }
-
-  registerHandler('adjustment:created', onAdjustmentCreated)
-
-  // ─── Cleanup ─────────────────────────────────────────────────────────
-
-  onBeforeUnmount(() => {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer)
-      debounceTimer = null
-      flushSave()
-    }
-    for (const { event, handler } of eventListeners) {
-      window.removeEventListener(event, handler)
-    }
-    eventListeners.length = 0
-  })
 
   // ─── Return ──────────────────────────────────────────────────────────
 

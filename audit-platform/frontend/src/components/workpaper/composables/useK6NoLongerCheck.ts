@@ -40,7 +40,10 @@ export interface K6NoLongerCheckItem {
   assumedImpairment: number     // ③ 假设未划归原应确认的减值准备
   netValue: number              // ④ 净额 = ① - ② - ③（公式）
   recoverableAmount: number     // 决定不再出售之日的可收回金额（CAS42 第22条(b)）
+  recoverableMethod: string     // 可收回金额确定方法（CAS8：公允净额/使用价值/评估报告）
   adjustedBookValue: number     // 调整后账面价值（公式：min(④净额, 可收回金额)，孰低）
+  currentBookValue: number      // 当前持有待售账面（从K6-2或手工录入）
+  adjustmentDiff: number        // 调整差额（公式：调整后账面 - 现账面，计入当期损益）
   noLongerReason: string        // 不再满足原因
   reclassificationDate: string  // 重分类日期
   decisionRef: string           // 不再处置决议（索引）
@@ -97,6 +100,8 @@ export function useK6NoLongerCheck(params: UseK6NoLongerCheckParams) {
     const recoverableAmount = Number(raw.recoverableAmount) || 0
     // 调整后账面 = min(④净额, 可收回金额)（孰低，Req 7.2）
     const adjustedBookValue = _calcAdjusted(netValue, recoverableAmount)
+    const currentBookValue = Number(raw.currentBookValue) || 0
+    const adjustmentDiff = adjustedBookValue - currentBookValue
     const category: NoLongerCategory =
       raw.category === 'asset_group' || raw.category === 'liability_group'
         ? raw.category
@@ -113,7 +118,10 @@ export function useK6NoLongerCheck(params: UseK6NoLongerCheckParams) {
       assumedImpairment,
       netValue,
       recoverableAmount,
+      recoverableMethod: raw.recoverableMethod ?? '',
       adjustedBookValue,
+      currentBookValue,
+      adjustmentDiff,
       noLongerReason: raw.noLongerReason ?? '',
       reclassificationDate: raw.reclassificationDate ?? '',
       decisionRef: raw.decisionRef ?? '',
@@ -138,6 +146,7 @@ export function useK6NoLongerCheck(params: UseK6NoLongerCheckParams) {
   function _recalcItem(item: K6NoLongerCheckItem): void {
     item.netValue = item.preClassBookValue - item.assumedDepreciation - item.assumedImpairment
     item.adjustedBookValue = _calcAdjusted(item.netValue, item.recoverableAmount)
+    item.adjustmentDiff = item.adjustedBookValue - item.currentBookValue
   }
 
   function recalcAll(): void {

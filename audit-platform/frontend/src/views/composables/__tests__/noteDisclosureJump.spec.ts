@@ -4,9 +4,18 @@ import {
   G7_DISCLOSURE_SHEET_SOE,
   G10_DISCLOSURE_SHEET_LISTED,
   G10_DISCLOSURE_SHEET_SOE,
+  I5_DISCLOSURE_SHEET_LISTED,
+  I5_DISCLOSURE_SHEET_SOE,
+  K11_DISCLOSURE_SHEET_LISTED,
+  K11_DISCLOSURE_SHEET_SOE,
+  K13_DISCLOSURE_SHEET_LISTED,
+  K13_DISCLOSURE_SHEET_SOE,
   isG7EquityNoteSection,
   isG10TradingLiabilityNoteSection,
   isG14CreditImpairmentNoteSection,
+  isI5OtherNoncurrentNoteSection,
+  isK11AssetImpairmentNoteSection,
+  isK13NonOperatingExpenseNoteSection,
   resolveNoteDisclosureJumpTarget,
 } from '../noteDisclosureJump'
 
@@ -111,6 +120,97 @@ describe('noteDisclosureJump', () => {
     expect(target?.wpCode).toBe('H10')
     expect(target?.variant).toBe('soe')
     expect(target?.sheet).toBe('附注披露信息（国有企业）')
+  })
+
+  it('detects I5 other noncurrent note sections', () => {
+    expect(isI5OtherNoncurrentNoteSection('五、31')).toBe(true)
+    expect(isI5OtherNoncurrentNoteSection('八、32')).toBe(true)
+    expect(isI5OtherNoncurrentNoteSection('五、29')).toBe(false)
+  })
+
+  it('infers I5 listed disclosure from 五、31', () => {
+    const target = resolveNoteDisclosureJumpTarget({
+      note_section: '五、31',
+      last_sync_wp_id: 'wp-i5',
+    })
+    expect(target?.wpCode).toBe('I5')
+    expect(target?.variant).toBe('listed')
+    expect(target?.sheet).toBe(I5_DISCLOSURE_SHEET_LISTED)
+  })
+
+  it('infers I5 SOE disclosure from 八、32', () => {
+    expect(resolveNoteDisclosureJumpTarget({
+      note_section: '八、32',
+      source_template: 'soe',
+    })?.sheet).toBe(I5_DISCLOSURE_SHEET_SOE)
+  })
+
+  it('detects K11 asset impairment note sections (区别于信用减值损失)', () => {
+    expect(isK11AssetImpairmentNoteSection('资产减值损失（损失以“—”号填列）')).toBe(true)
+    expect(isK11AssetImpairmentNoteSection('五、73')).toBe(true)
+    expect(isK11AssetImpairmentNoteSection('五、75')).toBe(true)
+    // 不得误伤 G14 信用减值损失
+    expect(isK11AssetImpairmentNoteSection('三、信用减值损失')).toBe(false)
+  })
+
+  it('infers K11 listed disclosure from 资产减值损失 keyword', () => {
+    const target = resolveNoteDisclosureJumpTarget({
+      note_section: '资产减值损失（损失以“—”号填列）',
+      last_sync_wp_id: 'wp-k11',
+    })
+    expect(target?.wpCode).toBe('K11')
+    expect(target?.variant).toBe('listed')
+    expect(target?.sheet).toBe(K11_DISCLOSURE_SHEET_LISTED)
+  })
+
+  it('infers K11 SOE disclosure from 五、75 / soe 准则', () => {
+    const target = resolveNoteDisclosureJumpTarget({
+      note_section: '五、75',
+      source_template: 'soe',
+    })
+    expect(target?.wpCode).toBe('K11')
+    expect(target?.variant).toBe('soe')
+    expect(target?.sheet).toBe(K11_DISCLOSURE_SHEET_SOE)
+  })
+
+  it('K11 资产减值损失 不与 G14 信用减值损失 冲突', () => {
+    // G14 信用减值损失仍解析为 G14，不被 K11 抢占
+    expect(resolveNoteDisclosureJumpTarget({
+      note_section: '三、信用减值损失',
+    })?.wpCode).toBe('G14')
+  })
+
+  it('detects K13 营业外支出 note sections (区别于营业外收入)', () => {
+    expect(isK13NonOperatingExpenseNoteSection('营业外支出')).toBe(true)
+    expect(isK13NonOperatingExpenseNoteSection('五、营业外支出')).toBe(true)
+    // 不得误伤 K12 营业外收入
+    expect(isK13NonOperatingExpenseNoteSection('营业外收入')).toBe(false)
+  })
+
+  it('infers K13 listed disclosure from 营业外支出 keyword', () => {
+    const target = resolveNoteDisclosureJumpTarget({
+      note_section: '营业外支出',
+      last_sync_wp_id: 'wp-k13',
+    })
+    expect(target?.wpCode).toBe('K13')
+    expect(target?.variant).toBe('listed')
+    expect(target?.sheet).toBe(K13_DISCLOSURE_SHEET_LISTED)
+  })
+
+  it('infers K13 SOE disclosure from 八 章节 / soe 准则', () => {
+    const target = resolveNoteDisclosureJumpTarget({
+      note_section: '八、营业外支出',
+      source_template: 'soe',
+    })
+    expect(target?.wpCode).toBe('K13')
+    expect(target?.variant).toBe('soe')
+    expect(target?.sheet).toBe(K13_DISCLOSURE_SHEET_SOE)
+  })
+
+  it('K13 营业外支出 不误伤 营业外收入(K12)', () => {
+    expect(resolveNoteDisclosureJumpTarget({
+      note_section: '营业外收入',
+    })?.wpCode).not.toBe('K13')
   })
 
   it('returns null for unrelated notes', () => {

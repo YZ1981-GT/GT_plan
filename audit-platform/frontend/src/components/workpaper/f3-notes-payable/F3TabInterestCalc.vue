@@ -30,6 +30,7 @@ function fmt(v: number): string {
 const {
   rows, totals, filledCount, abnormalCount, auditConclusion,
   addRow, removeRow, updateCell, rowClassName, mergeOcrFields,
+  pendingAccrualRows, pushInterestAccrualToAdjustment,
 } = useF3InterestCalc({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
@@ -75,6 +76,29 @@ async function generateAiConclusion() {
   if (props.isReadonly) return
   const text = await generateAndConfirm('interest-conclusion', auditConclusion.value, aiContext(), 'AI 生成 · 利息测算审计结论')
   if (text) auditConclusion.value = text
+}
+
+async function handleGenerateAccrual() {
+  if (props.isReadonly) return
+  const targets = pendingAccrualRows.value
+  if (targets.length === 0) {
+    ElMessage.info('无差异超阈值的带息票据，无需补提/冲回')
+    return
+  }
+  const preview = targets
+    .map((r) => `· ${r.noteType || '带息票据'}${r.ticketNo ? `(${r.ticketNo})` : ''} 差异 ${fmt(r.variance)}（${r.variance > 0 ? '补提' : '冲回'}）`)
+    .join('\n')
+  try {
+    await ElMessageBox.confirm(
+      `将对差异超阈值的带息应付票据生成补提/冲回利息分录（AJE，幂等替换本表历史生成项）：\n补提 借 财务费用(6603) / 贷 应付利息(2231)；冲回反向。\n\n${preview}\n\n是否写入 F3-3 调整分录汇总？`,
+      '生成补提利息分录',
+      { confirmButtonText: '生成并写入 F3-3', cancelButtonText: '取消', type: 'warning' },
+    )
+    const { count, total } = pushInterestAccrualToAdjustment()
+    ElMessage.success(`已生成 ${count} 笔利息调整（差异合计 ${fmt(total)}）并写入 F3-3`)
+  } catch (e: any) {
+    if (e !== 'cancel' && e?.message !== 'cancel') ElMessage.warning('生成失败')
+  }
 }
 
 const ocrLoadingId = ref<string | null>(null)
@@ -157,10 +181,18 @@ function summaryMethod({ columns }: { columns: any[]; data: F3InterestCalcRow[] 
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加票据</el-button>
+        <el-button
+          size="small"
+          type="warning"
+          plain
+          :disabled="isReadonly || pendingAccrualRows.length === 0"
+          @click="handleGenerateAccrual"
+        >⇄ 生成补提利息分录（{{ pendingAccrualRows.length }}）</el-button>
       </div>
       <div class="toolbar-right">
         <F3ImportExportToolbar :wp-id="wpId" :project-id="projectId" sheet="F3-4" :disabled="isReadonly" @imported="onImported" />
         <span class="chip-wrap"><GtIndexChip value="wp:F3-4" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip value="wp:F3-3" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">已填 {{ filledCount }} 笔</el-tag>
         <el-tag v-if="abnormalCount > 0" size="small" type="warning">差异 {{ abnormalCount }} 笔</el-tag>
       </div>

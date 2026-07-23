@@ -91,6 +91,7 @@ DEFAULT_SUBJECT_PRESETS: dict[str, AgingPreset] = {
     "D3": AgingPreset.THREE_YEAR,
     "F1": AgingPreset.THREE_YEAR,
     "G2": AgingPreset.THREE_YEAR,
+    "D7": AgingPreset.THREE_YEAR,  # 合同负债：2-period，默认 THREE_YEAR
 }
 
 

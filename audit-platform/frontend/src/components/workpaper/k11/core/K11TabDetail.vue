@@ -25,12 +25,10 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" type="primary" plain @click="handleAiGenerate">
-          <el-icon><MagicStick /></el-icon> AI辅助
+        <el-button size="small" type="primary" plain :loading="aiGenerating" @click="handleAiGenerate">
+          <el-icon v-if="!aiGenerating"><MagicStick /></el-icon> AI辅助
         </el-button>
-        <el-button size="small" @click="handleReview">
-          <el-icon><ChatDotSquare /></el-icon> 复核
-        </el-button>
+        <GtReviewTrigger section-id="K11-2" label="💬 复核" />
       </div>
     </div>
 
@@ -48,6 +46,39 @@
       />
       <div class="tab-right">
         <span class="row-count">共 {{ rows.length }} 行</span>
+        <!-- ⚙ 列设置 -->
+        <el-popover placement="bottom-end" :width="260" trigger="click">
+          <template #reference>
+            <el-button size="small" plain>
+              <el-icon><Setting /></el-icon> 列设置（{{ visibleCount }}/{{ totalCount }}）
+            </el-button>
+          </template>
+          <div class="col-prefs">
+            <div class="col-prefs-presets">
+              <span class="col-prefs-label">预设：</span>
+              <el-button
+                v-for="p in K11_DETAIL_PRESETS"
+                :key="p.key"
+                size="small"
+                link
+                type="primary"
+                @click="applyPreset(p.key)"
+              >{{ p.label }}</el-button>
+              <el-button size="small" link @click="resetToAll">重置</el-button>
+            </div>
+            <el-divider style="margin:6px 0" />
+            <div v-for="g in K11_DETAIL_COLUMN_GROUPS" :key="g.label" class="col-prefs-group">
+              <div class="col-prefs-group-title">{{ g.label }}</div>
+              <el-checkbox
+                v-for="col in g.columns"
+                :key="col"
+                :model-value="isColVisible(col)"
+                size="small"
+                @change="() => toggleColumn(col)"
+              >{{ K11_DETAIL_COLUMN_LABELS[col] || col }}</el-checkbox>
+            </div>
+          </div>
+        </el-popover>
         <el-button size="small" plain :disabled="isReadonly" @click="handlePullH1">
           自 H1-14 引入本期补提
         </el-button>
@@ -77,7 +108,7 @@
             <el-tag v-if="row.isNonReversible" size="small" type="warning" class="no-reversal-tag">不可转回</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="impairmentItem" label="减值项目" min-width="140">
+        <el-table-column v-if="isColVisible('impairmentItem')" prop="impairmentItem" label="减值项目" min-width="140">
           <template #default="{ row }">
             <el-input
               v-if="row.isEditable && !isReadonly"
@@ -103,7 +134,7 @@
             <span v-else class="formula-cell">{{ fmtNum(row.currentProvision) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期转回" width="120" align="right">
+        <el-table-column v-if="isColVisible('currentReversal')" label="本期转回" width="120" align="right">
           <template #header>
             <el-tooltip content="商誉减值不可转回（CAS8）" placement="top">
               <span>本期转回</span>
@@ -135,6 +166,120 @@
             </el-tooltip>
           </template>
         </el-table-column>
+        <el-table-column label="操作" width="96" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              v-if="row.isEditable && !isReadonly"
+              type="primary"
+              link
+              size="small"
+              @click="openRowDialog(row)"
+            >编辑</el-button>
+            <el-button
+              v-if="row.isEditable && !isReadonly"
+              type="danger"
+              link
+              size="small"
+              @click="handleRemoveRow(row.rowKey)"
+            >
+              <el-icon><Delete /></el-icon>
+            </el-button>
+          </template>
+        </el-table-column>
+      </template>
+
+      <!-- ═══ 减值准备变动区段（对齐源模板"对应科目-减值准备发生额"） ═══ -->
+      <template v-if="activeTab === 'allowance'">
+        <el-table-column prop="assetCategory" label="资产类别" min-width="130" fixed />
+        <el-table-column label="对应科目" min-width="140">
+          <template #default="{ row }">
+            <el-input
+              v-if="row.isEditable && !isReadonly"
+              :model-value="row.correspondingAccount"
+              size="small"
+              placeholder="减值准备科目名"
+              @blur="(e: FocusEvent) => handleCellChange(row.rowKey, 'correspondingAccount', (e.target as HTMLInputElement)?.value ?? '')"
+            />
+            <span v-else>{{ row.correspondingAccount || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期初金额" width="115" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.isEditable && !isReadonly"
+              :model-value="row.allowanceOpening"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width: 100px"
+              @change="(v: number | undefined) => handleCellChange(row.rowKey, 'allowanceOpening', v ?? 0)"
+            />
+            <span v-else class="formula-cell">{{ fmtNum(row.allowanceOpening) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期计提" width="115" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.isEditable && !isReadonly"
+              :model-value="row.currentProvision"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width: 100px"
+              @change="(v: number | undefined) => handleCellChange(row.rowKey, 'currentProvision', v ?? 0)"
+            />
+            <span v-else class="formula-cell">{{ fmtNum(row.currentProvision) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期转回" width="115" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.isEditable && !isReadonly && !row.isNonReversible"
+              :model-value="row.currentReversal"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width: 100px"
+              @change="(v: number | undefined) => handleCellChange(row.rowKey, 'currentReversal', v ?? 0)"
+            />
+            <span v-else-if="row.isNonReversible" class="disabled-cell">—</span>
+            <span v-else class="formula-cell">{{ fmtNum(row.currentReversal) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期转销" width="115" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="row.isEditable && !isReadonly"
+              :model-value="row.allowanceWriteoff"
+              size="small"
+              :controls="false"
+              :precision="2"
+              style="width: 100px"
+              @change="(v: number | undefined) => handleCellChange(row.rowKey, 'allowanceWriteoff', v ?? 0)"
+            />
+            <span v-else class="formula-cell">{{ fmtNum(row.allowanceWriteoff) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末金额" width="120" align="right">
+          <template #header>
+            <el-tooltip content="期末金额 = 期初 + 本期计提 − 本期转回" placement="top">
+              <span class="formula-header">期末金额</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <span class="formula-cell formula-underline">{{ fmtNum(row.allowanceEnding) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期计入损失" width="120" align="right">
+          <template #header>
+            <el-tooltip content="本期计入资产减值损失 = 本期计提 − 本期转回（应与本期发生额一致）" placement="top">
+              <span class="formula-header">本期计入损失</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <span class="formula-cell formula-underline">{{ fmtNum(row.currentOccurrence) }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="55" align="center" fixed="right">
           <template #default="{ row }">
             <el-button
@@ -158,13 +303,13 @@
             <span class="formula-cell">{{ fmtNum(row.currentOccurrence) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="sourceWp" label="来源底稿" width="90" align="center">
+        <el-table-column v-if="isColVisible('sourceWp')" prop="sourceWp" label="来源底稿" width="90" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.sourceWp" size="small" type="info" class="source-tag">{{ row.sourceWp }}</el-tag>
             <span v-else class="empty-cell">—</span>
           </template>
         </el-table-column>
-        <el-table-column label="源底稿计提金额" width="130" align="right">
+        <el-table-column v-if="isColVisible('sourceAmount')" label="源底稿计提金额" width="130" align="right">
           <template #default="{ row }">
             <el-input-number
               v-if="row.isEditable && !isReadonly"
@@ -178,7 +323,7 @@
             <span v-else class="formula-cell">{{ fmtNum(row.sourceAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="差异" width="110" align="right">
+        <el-table-column v-if="isColVisible('variance')" label="差异" width="110" align="right">
           <template #header>
             <el-tooltip content="公式：本期发生额 − 源底稿计提金额" placement="top">
               <span class="formula-header">差异</span>
@@ -195,7 +340,7 @@
             </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column label="凭证" min-width="130">
+        <el-table-column v-if="isColVisible('voucherRef')" label="凭证" min-width="130">
           <template #default="{ row }">
             <el-input
               v-if="row.isEditable && !isReadonly"
@@ -207,7 +352,7 @@
             <span v-else>{{ row.voucherRef || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="结论" min-width="130">
+        <el-table-column v-if="isColVisible('conclusion')" label="结论" min-width="130">
           <template #default="{ row }">
             <el-input
               v-if="row.isEditable && !isReadonly"
@@ -238,13 +383,23 @@
     <!-- ═══ 合计行（底部固定加粗） ═══ -->
     <div class="subtotal-bar">
       <span class="total-label">合  计</span>
-      <span class="total-item">本期计提: <strong>{{ fmtNum(subtotal.currentProvision) }}</strong></span>
-      <span class="total-item">本期转回: <strong>{{ fmtNum(subtotal.currentReversal) }}</strong></span>
-      <span class="total-item">本期发生额: <strong>{{ fmtNum(subtotal.currentOccurrence) }}</strong></span>
-      <span class="total-item">源底稿合计: <strong>{{ fmtNum(subtotal.sourceAmount) }}</strong></span>
-      <span class="total-item" :class="{ 'variance-highlight': Math.abs(subtotal.variance) >= 0.01 }">
-        差异合计: <strong>{{ fmtNum(subtotal.variance) }}</strong>
-      </span>
+      <template v-if="activeTab === 'allowance'">
+        <span class="total-item">期初: <strong>{{ fmtNum(subtotal.allowanceOpening) }}</strong></span>
+        <span class="total-item">本期计提: <strong>{{ fmtNum(subtotal.currentProvision) }}</strong></span>
+        <span class="total-item">本期转回: <strong>{{ fmtNum(subtotal.currentReversal) }}</strong></span>
+        <span class="total-item">本期转销: <strong>{{ fmtNum(subtotal.allowanceWriteoff) }}</strong></span>
+        <span class="total-item">期末: <strong>{{ fmtNum(subtotal.allowanceEnding) }}</strong></span>
+        <span class="total-item">本期计入损失: <strong>{{ fmtNum(subtotal.currentOccurrence) }}</strong></span>
+      </template>
+      <template v-else>
+        <span class="total-item">本期计提: <strong>{{ fmtNum(subtotal.currentProvision) }}</strong></span>
+        <span class="total-item">本期转回: <strong>{{ fmtNum(subtotal.currentReversal) }}</strong></span>
+        <span class="total-item">本期发生额: <strong>{{ fmtNum(subtotal.currentOccurrence) }}</strong></span>
+        <span class="total-item">源底稿合计: <strong>{{ fmtNum(subtotal.sourceAmount) }}</strong></span>
+        <span class="total-item" :class="{ 'variance-highlight': Math.abs(subtotal.variance) >= 0.01 }">
+          差异合计: <strong>{{ fmtNum(subtotal.variance) }}</strong>
+        </span>
+      </template>
       <span class="total-item">共 <strong>{{ rows.length }}</strong> 行</span>
     </div>
 
@@ -262,6 +417,13 @@
         <li>合计行应与K11-1审定表合计保持一致（交叉勾稽）</li>
       </ul>
     </details>
+
+    <!-- ═══ 逐项引导式录入弹窗 ═══ -->
+    <K11DetailRowDialog
+      v-model:visible="rowDialogVisible"
+      :row="rowDialogTarget"
+      @save="handleRowDialogSave"
+    />
   </div>
 </template>
 
@@ -282,11 +444,15 @@
  * Spec: .kiro/specs/k11-asset-impairment-loss/ | Task: 4.3
  * Requirements: 3.1-3.5, 4.5
  */
-import { inject, ref, toRef, type Ref } from 'vue'
+import { ref, toRef, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick, ChatDotSquare, ArrowDown, Plus, Delete } from '@element-plus/icons-vue'
+import { MagicStick, ArrowDown, Plus, Delete, Setting } from '@element-plus/icons-vue'
 import { useK11Detail, DETAIL_TABS, type K11DetailTabKey } from '../../composables/useK11Detail'
 import { useK11ImportExport } from '../../composables/useK11ImportExport'
+import { useK11AiGenerate } from '../../composables/useK11AiGenerate'
+import { useK11DetailColumnPrefs } from '../../composables/useK11DetailColumnPrefs'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import K11DetailRowDialog from './K11DetailRowDialog.vue'
 
 const props = defineProps<{
   wpId: string
@@ -299,9 +465,6 @@ const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
 }>()
 
-// ─── 复核对话 inject ─────────────────────────────────────────────────────────
-const openReviewDialog = inject<(sectionId: string, label?: string) => void>('openReviewDialog', () => {})
-
 // ─── Tab state ───────────────────────────────────────────────────────────────
 const activeTab = ref<K11DetailTabKey>('basic')
 const tabOptions = DETAIL_TABS.map(t => ({ label: t.label, value: t.key }))
@@ -313,6 +476,7 @@ const {
   rows,
   subtotal,
   updateCell,
+  updateRowFields,
   addRow,
   removeRow,
   pullH1SupplementAsSource,
@@ -332,6 +496,19 @@ const { exportTemplate, exportData, importData } = useK11ImportExport({
   projectId: toRef(props, 'projectId') as Ref<string>,
   sheetCode: 'K11-2',
 })
+
+// ─── 列显隐偏好（⚙列设置） ───────────────────────────────────────────────────
+const {
+  toggleColumn,
+  applyPreset,
+  resetToAll,
+  isVisible: isColVisible,
+  visibleCount,
+  totalCount,
+  K11_DETAIL_COLUMN_GROUPS,
+  K11_DETAIL_COLUMN_LABELS,
+  K11_DETAIL_PRESETS,
+} = useK11DetailColumnPrefs()
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
@@ -388,12 +565,41 @@ function triggerImport(): void {
   input.click()
 }
 
-function handleAiGenerate(): void {
-  emit('save', 'K11-2-ai-trigger', { remark: 'generate' })
+const { generating: aiGenerating, generate: aiGenerate } = useK11AiGenerate({ wpId: () => props.wpId })
+
+async function handleAiGenerate(): Promise<void> {
+  const s = subtotal.value
+  const text = await aiGenerate({
+    section: 'impairment-detail-analysis',
+    prompt: '为K11资产减值损失明细表生成分析说明，评价各类资产减值计提/转回的完整性、与源底稿核对差异及原因。',
+    context: {
+      本期计提合计: fmtNum(s.currentProvision),
+      本期转回合计: fmtNum(s.currentReversal),
+      本期发生额合计: fmtNum(s.currentOccurrence),
+      源底稿合计: fmtNum(s.sourceAmount),
+      差异合计: fmtNum(s.variance),
+      明细行数: String(rows.value.length),
+    },
+  })
+  if (text) {
+    await ElMessageBox.alert(text, 'K11-2 减值明细分析（AI 辅助）', {
+      confirmButtonText: '知道了',
+      customClass: 'k11-ai-advisory-box',
+    })
+  }
 }
 
-function handleReview(): void {
-  openReviewDialog('K11-2', '资产减值损失明细表复核')
+// ─── 逐项引导式录入弹窗 ───────────────────────────────────────────────────────
+const rowDialogVisible = ref(false)
+const rowDialogTarget = ref<any>(null)
+
+function openRowDialog(row: any): void {
+  rowDialogTarget.value = { ...row }
+  rowDialogVisible.value = true
+}
+
+function handleRowDialogSave(rowKey: string, patch: Record<string, any>): void {
+  updateRowFields(rowKey, patch)
 }
 
 // ─── Row class binding：差异非零行红色标记 ───────────────────────────────────
@@ -425,6 +631,13 @@ function fmtNum(v: number | null | undefined): string {
 .tab-bar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .tab-right { display: flex; align-items: center; gap: 10px; }
 .row-count { font-size: 12px; color: #909399; }
+
+/* ─── ⚙列设置 popover ─── */
+.col-prefs-presets { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
+.col-prefs-label { font-size: 12px; color: #909399; }
+.col-prefs-group { margin-bottom: 6px; }
+.col-prefs-group-title { font-size: 12px; color: #606266; font-weight: 600; margin: 4px 0 2px; }
+.col-prefs-group :deep(.el-checkbox) { display: block; margin: 0 0 2px; }
 
 /* ─── 表格 ─── */
 :deep(.el-table) { font-size: var(--wp-font-size, 13px); }

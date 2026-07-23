@@ -472,10 +472,10 @@ class TestWriteOverlay:
         assert patch.owner == "zhangsan"
         assert patch.expires_at == "2026-12-31"
 
-        # 验证 store 中可查到
-        stored = get_overlay("proj-1", "D2/D2-2")
-        assert stored is not None
-        assert stored.overrides == {"sheet_name_alias_add": ["新叫法"]}
+        # R9 (acnr-invalidation-overlay-hardening)：write_overlay 写 PG 后**清缓存**
+        # （不再 set_overlay_in_cache 未提交状态）→ get_overlay 返回 None，
+        # 下次读经 read-through 从已提交 PG 重载。外层回滚不留脏缓存。
+        assert get_overlay("proj-1", "D2/D2-2") is None
 
     @pytest.mark.asyncio
     async def test_write_rejects_bad_project(self):

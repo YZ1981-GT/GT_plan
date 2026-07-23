@@ -71,9 +71,30 @@ export interface UseF1DetailOptions {
 
 const ITEM_ID_ROWS = 'F1-det-rows'
 const ITEM_ID_TB_AMOUNT = 'F1-adj-trial-balance-amount'
-/** 明细表账龄口径覆盖（THREE_YEAR / FIVE_YEAR）；空则跟随项目 aging 配置 */
+/** 明细表账龄口径覆盖（THREE_YEAR / FIVE_YEAR / CUSTOM）；空则跟随项目 aging 配置 */
 const ITEM_ID_AGING_PRESET = 'F1-det-aging-preset'
+const ITEM_ID_AGING_CUSTOM = 'F1-det-aging-custom-segments'
 const AGING_TOLERANCE = 0.01
+
+function labelsToCustomSegments(labels: string[]): AgingSegment[] {
+  return labels.map((label, i) => ({
+    key: `custom-${i}`,
+    label,
+    dayFrom: 0,
+    dayTo: null,
+  }))
+}
+
+function parseCustomLabels(raw: string | null | undefined): string[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.map((x) => String(x || '').trim()).filter(Boolean)
+  } catch {
+    return []
+  }
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -252,13 +273,24 @@ export function useF1Detail(options: UseF1DetailOptions) {
   const { segments: projectSegments, preset: projectPreset } = useAgingConfig(projectId, 'F1')
 
   /** 表级账龄枚举覆盖；空字符串表示跟随项目配置 */
-  const sheetAgingPreset = ref<'' | 'THREE_YEAR' | 'FIVE_YEAR'>('')
+  const sheetAgingPreset = ref<'' | AgingPreset>('')
+  const customSegments = ref<AgingSegment[]>([])
 
   watch(
     () => allResponses.value.get(ITEM_ID_AGING_PRESET)?.remark,
     (v) => {
       const raw = String(v || '').trim().toUpperCase()
-      sheetAgingPreset.value = raw === 'THREE_YEAR' || raw === 'FIVE_YEAR' ? raw : ''
+      sheetAgingPreset.value =
+        raw === 'THREE_YEAR' || raw === 'FIVE_YEAR' || raw === 'CUSTOM' ? (raw as AgingPreset) : ''
+    },
+    { immediate: true },
+  )
+
+  watch(
+    () => allResponses.value.get(ITEM_ID_AGING_CUSTOM)?.remark,
+    (v) => {
+      const labels = parseCustomLabels(v)
+      customSegments.value = labels.length >= 2 ? labelsToCustomSegments(labels) : []
     },
     { immediate: true },
   )
@@ -266,17 +298,24 @@ export function useF1Detail(options: UseF1DetailOptions) {
   const agingPreset: ComputedRef<AgingPreset> = computed(() => {
     if (sheetAgingPreset.value) return sheetAgingPreset.value
     const p = projectPreset.value
-    if (p === 'THREE_YEAR' || p === 'FIVE_YEAR') return p
+    if (p === 'THREE_YEAR' || p === 'FIVE_YEAR' || p === 'CUSTOM') return p
     return 'THREE_YEAR'
   })
 
   /** 有效账龄段：表级枚举优先，否则项目配置，兜底 3 年段 */
   const segments: ComputedRef<AgingSegment[]> = computed(() => {
-    if (sheetAgingPreset.value) {
-      return PRESET_SEGMENTS[sheetAgingPreset.value] || PRESET_SEGMENTS.THREE_YEAR
+    if (sheetAgingPreset.value === 'CUSTOM') {
+      if (customSegments.value.length >= 2) return customSegments.value
+      if (projectPreset.value === 'CUSTOM' && projectSegments.value.length >= 2) {
+        return projectSegments.value
+      }
+      return PRESET_SEGMENTS.THREE_YEAR
+    }
+    if (sheetAgingPreset.value === 'THREE_YEAR' || sheetAgingPreset.value === 'FIVE_YEAR') {
+      return PRESET_SEGMENTS[sheetAgingPreset.value]
     }
     if (projectSegments.value.length) return projectSegments.value
-    return PRESET_SEGMENTS[agingPreset.value] || PRESET_SEGMENTS.THREE_YEAR
+    return PRESET_SEGMENTS.THREE_YEAR
   })
 
   /** 列定义：使用审定表同口径枚举标签（含N年） */
@@ -510,18 +549,34 @@ export function useF1Detail(options: UseF1DetailOptions) {
   }
 
   /**
-   * 切换账龄枚举口径（3年段 / 5年段）。
-   * 写入表级覆盖并 remap 已有行的账龄字段。
+   * 切换账龄枚举口径（3年段 / 5年段 / 自定义）。
+   * 写入表级覆盖并 remap 已有行的账龄字段。CUSTOM 需传入 ≥2 段标签。
    */
-  function setAgingPreset(preset: 'THREE_YEAR' | 'FIVE_YEAR'): void {
-    if (isReadonly.value) return
-    sheetAgingPreset.value = preset
-    debouncedSave(ITEM_ID_AGING_PRESET, { remark: preset })
-    const segs = PRESET_SEGMENTS[preset] || PRESET_SEGMENTS.THREE_YEAR
+  function setAgingPreset(preset: AgingPreset, customLabels?: string[]): boolean {
+    if (isReadonly.value) return false
+    let segs: AgingSegment[]
+    if (preset === 'CUSTOM') {
+      const labels = (customLabels || customSegments.value.map((s) => s.label))
+        .map((x) => String(x || '').trim())
+        .filter(Boolean)
+      if (labels.length < 2) return false
+      segs = labelsToCustomSegments(labels.slice(0, 10))
+      sheetAgingPreset.value = 'CUSTOM'
+      customSegments.value = segs
+      debouncedSave(ITEM_ID_AGING_PRESET, { remark: 'CUSTOM' })
+      debouncedSave(ITEM_ID_AGING_CUSTOM, { remark: JSON.stringify(labels.slice(0, 10)) })
+    } else {
+      segs = PRESET_SEGMENTS[preset] || PRESET_SEGMENTS.THREE_YEAR
+      sheetAgingPreset.value = preset
+      customSegments.value = []
+      debouncedSave(ITEM_ID_AGING_PRESET, { remark: preset })
+      debouncedSave(ITEM_ID_AGING_CUSTOM, { remark: '[]' })
+    }
     rows.value = rows.value.map(row =>
       recalcRowFormulas(remapRowAgingData(row, segs, true) as DetailRow),
     )
     persistRows()
+    return true
   }
 
   /**
@@ -591,6 +646,7 @@ export function useF1Detail(options: UseF1DetailOptions) {
     segments,
     bands,
     agingPreset,
+    customSegments,
     setAgingPreset,
     allocateAging,
     addRow,

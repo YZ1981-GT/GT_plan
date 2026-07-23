@@ -36,6 +36,7 @@ export function useD1FormData(wpId: Ref<string>, projectId?: Ref<string>) {
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null
   let pendingSave = false
+  const pendingItems = new Set<string>()
 
   // ─── Load ────────────────────────────────────────────────────────────────
 
@@ -70,7 +71,9 @@ export function useD1FormData(wpId: Ref<string>, projectId?: Ref<string>) {
     saving.value = true
     try {
       await api.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
-        project_id: wpId.value,
+        // project_id 传真实 projectId（若未传则 undefined，由后端从 wp_id 推导）；
+        // 历史误传 wpId.value 会命中 checklist_responses.project_id 外键校验风险。
+        project_id: projectId?.value || undefined,
         items: items.map((item) => ({
           item_id: item.item_id,
           conclusion: item.conclusion || null,
@@ -97,16 +100,22 @@ export function useD1FormData(wpId: Ref<string>, projectId?: Ref<string>) {
     await doSave(items)
   }
 
-  /** debounce 2000ms 文本字段保存 */
+  /** debounce 2000ms 文本字段保存（增量：仅保存变更的 item） */
   function saveDebouncedText(item: ChecklistItem): void {
     allResponses.value.set(item.item_id, { ...item })
+    pendingItems.add(item.item_id)
     pendingSave = true
 
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(() => {
       saveTimer = null
       pendingSave = false
-      const items = Array.from(allResponses.value.values())
+      const items: ChecklistItem[] = []
+      for (const itemId of pendingItems) {
+        const resp = allResponses.value.get(itemId)
+        if (resp) items.push(resp)
+      }
+      pendingItems.clear()
       doSave(items)
     }, 2000)
   }
@@ -119,8 +128,13 @@ export function useD1FormData(wpId: Ref<string>, projectId?: Ref<string>) {
     }
     if (pendingSave) {
       pendingSave = false
-      const items = Array.from(allResponses.value.values())
-      doSave(items)
+      const items: ChecklistItem[] = []
+      for (const itemId of pendingItems) {
+        const resp = allResponses.value.get(itemId)
+        if (resp) items.push(resp)
+      }
+      pendingItems.clear()
+      if (items.length > 0) doSave(items)
     }
   }
 

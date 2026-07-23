@@ -12,7 +12,7 @@
  * 跨sheet读取：从allResponses map读D4-1/D4-2审定数
  * EventBus: disclosure:note-text-updated 双向同步附注模块
  */
-import { ref, computed, watch, onBeforeUnmount, onMounted, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, onMounted, inject, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal } from './useD4FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -131,6 +131,13 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
   const prefix = `D4-disc-${variant}-`
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
 
+  // 审计年度（由主入口 provide('d4AuditYear')），回退"当前年-1"
+  const injectedAuditYear = inject<Ref<number> | null>('d4AuditYear', null)
+  function resolveAuditYear(): number {
+    const y = injectedAuditYear?.value
+    return y && y > 0 ? y : new Date().getFullYear() - 1
+  }
+
   // ─── Persistence helpers ─────────────────────────────────────────────
   function getResp(key: string): string | null {
     const resp = allResponses.value.get(prefix + key)
@@ -196,7 +203,7 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
     isRefreshing.value = true
     try {
       const { default: http } = await import('@/utils/http')
-      const projectYear = new Date().getFullYear() - 1
+      const projectYear = resolveAuditYear()
 
       // 1. 从TB取收入/成本审定数
       const res = await http.get(`/api/projects/${projectId.value}/auto-data/d4_analysis_indicators`, {

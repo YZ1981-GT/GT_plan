@@ -27,9 +27,48 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
 
+from ._cycle_import_export_common import (
+    aging_export_values,
+    build_aging_headers,
+    match_import_aging,
+    resolve_aging_segments,
+    subject_aging_periods,
+)
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["d7-import-export"])
+
+# D7-2 明细表非账龄基础列（账龄列由项目账龄配置动态派生，2-period：期初/期末审定）
+_D7_2_BASE_HEADERS: list[str] = [
+    "序号", "合同名称", "单位名称", "公司代码", "关联关系", "类型(款项性质)",
+    "期初未审数", "期初AJE", "期初RJE", "期初审定数",
+    "借方发生", "贷方发生", "期末余额", "重分类调整",
+    "期末未审余额", "期末AJE", "期末RJE", "期末审定数",
+    "是否发函", "期后结转",
+]
+
+
+def _d7_2_dynamic_headers(segments: list[Any]) -> list[str]:
+    """D7-2 动态列头：基础列 + 2N 账龄列（期初/期末审定）。"""
+    return _D7_2_BASE_HEADERS + build_aging_headers(segments, subject_aging_periods("D7"))
+
+
+def _export_d7_2_row_dynamic(data: dict, segments: list[Any]) -> list:
+    """D7-2 动态导出行：基础值 + 嵌套账龄值（按 segments 顺序）。"""
+    base = [
+        data.get("seqNo", ""), _safe_str(data.get("contractName")),
+        _safe_str(data.get("companyName")), _safe_str(data.get("companyCode")),
+        _safe_str(data.get("relatedPartyType")), _safe_str(data.get("natureType")),
+        _safe_float(data.get("priorUnadjusted")), _safe_float(data.get("priorAje")),
+        _safe_float(data.get("priorRje")), _safe_float(data.get("priorAudited")),
+        _safe_float(data.get("debitAmount")), _safe_float(data.get("creditAmount")),
+        _safe_float(data.get("endBalance")), _safe_float(data.get("entityReclass")),
+        _safe_float(data.get("endUnadjusted")), _safe_float(data.get("endAje")),
+        _safe_float(data.get("endRje")), _safe_float(data.get("endAudited")),
+        _safe_str(data.get("isConfirmed")), _safe_float(data.get("postTransfer")),
+    ]
+    return base + aging_export_values(data, segments, subject_aging_periods("D7"))
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Sheet 配置
@@ -79,11 +118,11 @@ _SHEET_HEADERS: dict[str, list[str]] = {
     ],
     "D7-5": [
         "客户名称", "期末余额", "账龄", "经济业务说明",
-        "未结转原因", "至审计日结转金额", "处理计划", "备注",
+        "未结转原因", "至审计日结转金额", "处理计划", "处置结论", "备注",
     ],
     "D7-3": [
         "调整事项说明", "类别", "报表项目", "科目名称", "附注项目", "占位/对应项",
-        "借方调整金额", "贷方调整金额", "索引", "备注",
+        "借方调整金额", "贷方调整金额", "索引", "备注", "款项性质", "账龄段",
     ],
     "D7-4": [
         "记录类型", "项目", "金额", "数据来源", "备注",
@@ -142,17 +181,31 @@ async def _fetch_d7_response_map(wp_id: str, db: AsyncSession, prefix: str) -> d
     return {row.item_id: (row.remark or "") for row in result.fetchall()}
 
 
-async def _upsert_d7_cell(db: AsyncSession, wp_id: str, item_id: str, remark: str) -> None:
+async def _fetch_project_id(db: AsyncSession, wp_id: str) -> str:
+    """从 working_paper 反查 project_id（checklist_responses.project_id 为 NOT NULL）。"""
+    import sqlalchemy as sa
+
+    result = await db.execute(
+        sa.text("SELECT project_id FROM working_paper WHERE id = :wp_id"),
+        {"wp_id": wp_id},
+    )
+    row = result.fetchone()
+    if not row:
+        raise HTTPException(404, "底稿不存在")
+    return str(row.project_id)
+
+
+async def _upsert_d7_cell(db: AsyncSession, wp_id: str, item_id: str, remark: str, project_id: str) -> None:
     import sqlalchemy as sa
 
     await db.execute(
         sa.text("""
-            INSERT INTO checklist_responses (id, wp_id, item_id, remark, updated_at)
-            VALUES (:id, :wp_id, :item_id, :remark, NOW())
+            INSERT INTO checklist_responses (id, project_id, wp_id, item_id, remark, updated_at)
+            VALUES (:id, :project_id, :wp_id, :item_id, :remark, NOW())
             ON CONFLICT (wp_id, item_id)
             DO UPDATE SET remark = :remark, updated_at = NOW()
         """),
-        {"id": str(uuid4()), "wp_id": wp_id, "item_id": item_id, "remark": remark},
+        {"id": str(uuid4()), "project_id": project_id, "wp_id": wp_id, "item_id": item_id, "remark": remark},
     )
 
 
@@ -192,7 +245,7 @@ async def _export_d7_1_data(wp_id: str, db: AsyncSession) -> StreamingResponse:
     )
 
 
-async def _import_d7_1_data(wp_id: str, ws: Any, actual_headers: list[str], db: AsyncSession) -> dict[str, Any]:
+async def _import_d7_1_data(wp_id: str, ws: Any, actual_headers: list[str], db: AsyncSession, project_id: str) -> dict[str, Any]:
     rows_data: list[dict[str, Any]] = []
     row_count = 0
     truncated = False
@@ -222,8 +275,8 @@ async def _import_d7_1_data(wp_id: str, ws: Any, actual_headers: list[str], db: 
         if row_key == "trial-balance":
             prior = _safe_float(row_data.get("priorUnadjusted"))
             current = _safe_float(row_data.get("currentUnadjusted"))
-            await _upsert_d7_cell(db, wp_id, "D7-1-adj-aging-trial-balance-priorAudited", str(prior))
-            await _upsert_d7_cell(db, wp_id, "D7-1-adj-aging-trial-balance-currentAudited", str(current))
+            await _upsert_d7_cell(db, wp_id, "D7-1-adj-aging-trial-balance-priorAudited", str(prior), project_id)
+            await _upsert_d7_cell(db, wp_id, "D7-1-adj-aging-trial-balance-currentAudited", str(current), project_id)
             field_count += 2
             continue
         for field_key, _header, is_text in _D7_1_FIELDS:
@@ -232,7 +285,7 @@ async def _import_d7_1_data(wp_id: str, ws: Any, actual_headers: list[str], db: 
                 continue
             item_id = f"D7-1-adj-{block}-{row_key}-{field_key}"
             remark = str(val) if is_text else str(_safe_float(val))
-            await _upsert_d7_cell(db, wp_id, item_id, remark)
+            await _upsert_d7_cell(db, wp_id, item_id, remark, project_id)
             field_count += 1
 
     await db.commit()
@@ -253,11 +306,17 @@ async def d7_export_template(
     wp_id: str,
     sheet: str = Query(..., description="Sheet编码如D7-2"),
     include_guidance: bool = Query(True, description="是否包含编制说明"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """导出空白模板xlsx（含表头+格式+编制说明，无数据行）"""
     _validate_sheet(sheet)
-    headers = _get_headers(sheet)
+    # D7-2 明细表：账龄列头按项目账龄配置动态生成
+    if sheet == "D7-2":
+        segments = await resolve_aging_segments(db, wp_id, "D7")
+        headers = _d7_2_dynamic_headers(segments)
+    else:
+        headers = _get_headers(sheet)
 
     wb = Workbook()
     ws = wb.active
@@ -302,9 +361,16 @@ async def d7_export_data(
 ) -> StreamingResponse:
     """导出当前数据xlsx"""
     _validate_sheet(sheet)
-    headers = _get_headers(sheet)
 
     import sqlalchemy as sa
+
+    # D7-2 明细表：账龄列头按项目账龄配置动态生成
+    d7_2_segments: list[Any] = []
+    if sheet == "D7-2":
+        d7_2_segments = await resolve_aging_segments(db, wp_id, "D7")
+        headers = _d7_2_dynamic_headers(d7_2_segments)
+    else:
+        headers = _get_headers(sheet)
 
     if sheet == "D7-1":
         return await _export_d7_1_data(wp_id, db)
@@ -351,7 +417,10 @@ async def d7_export_data(
     ws.freeze_panes = "A2"
 
     for data_row in rows_data:
-        row_values = _export_row(sheet, data_row, headers)
+        if sheet == "D7-2":
+            row_values = _export_d7_2_row_dynamic(data_row, d7_2_segments)
+        else:
+            row_values = _export_row(sheet, data_row, headers)
         ws.append(row_values)
 
     buffer = io.BytesIO()
@@ -394,12 +463,24 @@ async def d7_import_data(
     if ws is None:
         raise HTTPException(400, "xlsx文件中无活动工作表")
 
-    # 验证列头
-    expected_headers = _get_headers(sheet)
+    project_id = await _fetch_project_id(db, wp_id)
+
     actual_headers = [
         str(cell.value).strip() if cell.value else ""
         for cell in next(ws.iter_rows(min_row=1, max_row=1))
     ]
+
+    # D7-2：账龄列按 label 动态匹配当前项目配置，验证仅校验基础列
+    d7_2_segments: list[Any] = []
+    skipped_columns: list[str] = []
+    if sheet == "D7-2":
+        expected_headers = _D7_2_BASE_HEADERS
+        d7_2_segments = await resolve_aging_segments(db, wp_id, "D7")
+        _, skipped_columns = match_import_aging(
+            lambda _h: None, actual_headers, d7_2_segments, subject_aging_periods("D7"),
+        )
+    else:
+        expected_headers = _get_headers(sheet)
 
     errors: list[str] = []
     missing_cols = [h for h in expected_headers if h not in actual_headers]
@@ -410,7 +491,7 @@ async def d7_import_data(
         raise HTTPException(400, detail=errors)
 
     if sheet == "D7-1":
-        result = await _import_d7_1_data(wp_id, ws, actual_headers, db)
+        result = await _import_d7_1_data(wp_id, ws, actual_headers, db, project_id)
         wb.close()
         return result
 
@@ -426,7 +507,7 @@ async def d7_import_data(
         if row_count > _ROW_LIMIT:
             truncated = True
             break
-        rows_data.append(_parse_row(sheet, row, actual_headers))
+        rows_data.append(_parse_row(sheet, row, actual_headers, d7_2_segments if sheet == "D7-2" else None))
 
     wb.close()
 
@@ -440,24 +521,24 @@ async def d7_import_data(
             remark_json = json.dumps(payload, ensure_ascii=False)
             await db.execute(
                 sa.text("""
-                    INSERT INTO checklist_responses (id, wp_id, item_id, remark, updated_at)
-                    VALUES (:id, :wp_id, :item_id, :remark, NOW())
+                    INSERT INTO checklist_responses (id, project_id, wp_id, item_id, remark, updated_at)
+                    VALUES (:id, :project_id, :wp_id, :item_id, :remark, NOW())
                     ON CONFLICT (wp_id, item_id)
                     DO UPDATE SET remark = :remark, updated_at = NOW()
                 """),
-                {"id": str(uuid4()), "wp_id": wp_id, "item_id": item_id, "remark": remark_json},
+                {"id": str(uuid4()), "project_id": project_id, "wp_id": wp_id, "item_id": item_id, "remark": remark_json},
             )
     else:
         item_id = _SHEET_ITEM_ID[sheet]
         remark_json = json.dumps(rows_data, ensure_ascii=False)
         await db.execute(
             sa.text("""
-                INSERT INTO checklist_responses (id, wp_id, item_id, remark, updated_at)
-                VALUES (:id, :wp_id, :item_id, :remark, NOW())
+                INSERT INTO checklist_responses (id, project_id, wp_id, item_id, remark, updated_at)
+                VALUES (:id, :project_id, :wp_id, :item_id, :remark, NOW())
                 ON CONFLICT (wp_id, item_id)
                 DO UPDATE SET remark = :remark, updated_at = NOW()
             """),
-            {"id": str(uuid4()), "wp_id": wp_id, "item_id": item_id, "remark": remark_json},
+            {"id": str(uuid4()), "project_id": project_id, "wp_id": wp_id, "item_id": item_id, "remark": remark_json},
         )
     await db.commit()
 
@@ -465,6 +546,11 @@ async def d7_import_data(
     if truncated:
         result_data["warning"] = f"数据行数超过{_ROW_LIMIT}行限制，已截断"
         result_data["truncated"] = True
+    if skipped_columns:
+        result_data["skipped_columns"] = skipped_columns
+        result_data["warnings"] = [
+            f"以下账龄列未匹配当前账龄配置，已跳过: {', '.join(skipped_columns)}"
+        ]
 
     return result_data
 
@@ -507,6 +593,15 @@ async def d7_import_aux_balance(
     if not aux_rows:
         return {"ok": True, "imported_count": 0, "message": "未找到科目2205的辅助余额数据"}
 
+    # 解析当前项目账龄段（nested keyed 账龄，仅首段填余额，其余 0）
+    segments = await resolve_aging_segments(db, wp_id, "D7")
+    seg_keys = [s.key for s in segments] or ["within1"]
+
+    def _aging_first_seg(balance: float) -> dict[str, float]:
+        aging = {k: 0.0 for k in seg_keys}
+        aging[seg_keys[0]] = balance
+        return aging
+
     # 构建 D7-2 行数据（贷方科目）
     rows_data: list[dict] = []
     for idx, aux_row in enumerate(aux_rows[:_ROW_LIMIT], 1):
@@ -523,14 +618,14 @@ async def d7_import_aux_balance(
             "priorUnadjusted": prior_bal,
             "priorAje": 0, "priorRje": 0,
             "priorAudited": prior_bal,
-            "priorAging1": prior_bal, "priorAging2": 0, "priorAging3": 0, "priorAging4": 0,
+            "agingPrior": _aging_first_seg(prior_bal),
             "debitAmount": 0, "creditAmount": 0,
             "endBalance": current_bal,
             "entityReclass": 0,
             "endUnadjusted": current_bal,
             "endAje": 0, "endRje": 0,
             "endAudited": current_bal,
-            "endAging1": current_bal, "endAging2": 0, "endAging3": 0, "endAging4": 0,
+            "agingAudited": _aging_first_seg(current_bal),
             "isConfirmed": "否",
             "postTransfer": 0,
         })
@@ -556,12 +651,12 @@ async def d7_import_aux_balance(
     remark_json = json.dumps(merged, ensure_ascii=False)
     await db.execute(
         sa.text("""
-            INSERT INTO checklist_responses (id, wp_id, item_id, remark, updated_at)
-            VALUES (:id, :wp_id, :item_id, :remark, NOW())
+            INSERT INTO checklist_responses (id, project_id, wp_id, item_id, remark, updated_at)
+            VALUES (:id, :project_id, :wp_id, :item_id, :remark, NOW())
             ON CONFLICT (wp_id, item_id)
             DO UPDATE SET remark = :remark, updated_at = NOW()
         """),
-        {"id": str(uuid4()), "wp_id": wp_id, "item_id": item_id, "remark": remark_json},
+        {"id": str(uuid4()), "project_id": project_id, "wp_id": wp_id, "item_id": item_id, "remark": remark_json},
     )
     await db.commit()
 
@@ -625,7 +720,8 @@ def _export_row(sheet: str, data: dict, headers: list[str]) -> list:
             _safe_str(data.get("customerName")), _safe_float(data.get("endBalance")),
             _safe_str(data.get("aging")), _safe_str(data.get("businessDescription")),
             _safe_str(data.get("reason")), _safe_float(data.get("auditDateTransfer")),
-            _safe_str(data.get("plan")), _safe_str(data.get("remark")),
+            _safe_str(data.get("plan")), _safe_str(data.get("disposalConclusion")),
+            _safe_str(data.get("remark")),
         ]
     elif sheet == "D7-3":
         return [
@@ -634,6 +730,7 @@ def _export_row(sheet: str, data: dict, headers: list[str]) -> list:
             _safe_str(data.get("noteItem")), _safe_str(data.get("placeholder")),
             _safe_float(data.get("debitAmount")), _safe_float(data.get("creditAmount")),
             _safe_str(data.get("indexRef")), _safe_str(data.get("remark")),
+            _safe_str(data.get("natureType")), _safe_str(data.get("agingBand")),
         ]
     elif sheet == "D7-4":
         return [
@@ -677,8 +774,11 @@ def _export_row(sheet: str, data: dict, headers: list[str]) -> list:
         ]
 
 
-def _parse_row(sheet: str, row: tuple, actual_headers: list[str]) -> dict:
-    """按sheet类型解析导入行"""
+def _parse_row(sheet: str, row: tuple, actual_headers: list[str], segments: list[Any] | None = None) -> dict:
+    """按sheet类型解析导入行。
+
+    D7-2：segments 提供时账龄列按 label 动态匹配当前项目配置（nested keyed agingPrior/agingAudited）。
+    """
     if sheet == "D7-2":
         prior_unadj = _safe_float(_col_val(row, actual_headers, "期初未审数"))
         prior_aje = _safe_float(_col_val(row, actual_headers, "期初AJE"))
@@ -693,7 +793,7 @@ def _parse_row(sheet: str, row: tuple, actual_headers: list[str]) -> dict:
         end_aje = _safe_float(_col_val(row, actual_headers, "期末AJE"))
         end_rje = _safe_float(_col_val(row, actual_headers, "期末RJE"))
         end_audited = end_unadjusted + end_aje + end_rje
-        return {
+        parsed = {
             "rowId": str(uuid4()),
             "seqNo": _safe_float(_col_val(row, actual_headers, "序号")) or 0,
             "contractName": _safe_str(_col_val(row, actual_headers, "合同名称")),
@@ -703,23 +803,37 @@ def _parse_row(sheet: str, row: tuple, actual_headers: list[str]) -> dict:
             "natureType": _safe_str(_col_val(row, actual_headers, "类型(款项性质)")) or "预收货款",
             "priorUnadjusted": prior_unadj, "priorAje": prior_aje, "priorRje": prior_rje,
             "priorAudited": prior_audited,
-            "priorAging1": _safe_float(_col_val(row, actual_headers, "期初账龄1年以下")),
-            "priorAging2": _safe_float(_col_val(row, actual_headers, "期初账龄1~2年")),
-            "priorAging3": _safe_float(_col_val(row, actual_headers, "期初账龄2~3年")),
-            "priorAging4": _safe_float(_col_val(row, actual_headers, "期初账龄3年以上")),
             "debitAmount": debit, "creditAmount": credit,
             "endBalance": end_balance,
             "entityReclass": entity_reclass,
             "endUnadjusted": end_unadjusted,
             "endAje": end_aje, "endRje": end_rje,
             "endAudited": end_audited,
-            "endAging1": _safe_float(_col_val(row, actual_headers, "期末账龄1年以下")),
-            "endAging2": _safe_float(_col_val(row, actual_headers, "期末账龄1~2年")),
-            "endAging3": _safe_float(_col_val(row, actual_headers, "期末账龄2~3年")),
-            "endAging4": _safe_float(_col_val(row, actual_headers, "期末账龄3年以上")),
             "isConfirmed": _safe_str(_col_val(row, actual_headers, "是否发函")) or "否",
             "postTransfer": _safe_float(_col_val(row, actual_headers, "期后结转")),
         }
+        if segments:
+            # 账龄列按 label 动态匹配当前项目配置 → nested keyed（2-period）
+            aging_nested, _unmatched = match_import_aging(
+                lambda h: _col_val(row, actual_headers, h),
+                actual_headers,
+                segments,
+                subject_aging_periods("D7"),
+            )
+            parsed.update(aging_nested)
+        else:
+            # legacy 纯函数/round-trip 测试：读取旧固定账龄列头 → 扁平字段
+            parsed.update({
+                "priorAging1": _safe_float(_col_val(row, actual_headers, "期初账龄1年以下")),
+                "priorAging2": _safe_float(_col_val(row, actual_headers, "期初账龄1~2年")),
+                "priorAging3": _safe_float(_col_val(row, actual_headers, "期初账龄2~3年")),
+                "priorAging4": _safe_float(_col_val(row, actual_headers, "期初账龄3年以上")),
+                "endAging1": _safe_float(_col_val(row, actual_headers, "期末账龄1年以下")),
+                "endAging2": _safe_float(_col_val(row, actual_headers, "期末账龄1~2年")),
+                "endAging3": _safe_float(_col_val(row, actual_headers, "期末账龄2~3年")),
+                "endAging4": _safe_float(_col_val(row, actual_headers, "期末账龄3年以上")),
+            })
+        return parsed
     elif sheet == "D7-5":
         return {
             "rowId": str(uuid4()),
@@ -730,6 +844,7 @@ def _parse_row(sheet: str, row: tuple, actual_headers: list[str]) -> dict:
             "reason": _safe_str(_col_val(row, actual_headers, "未结转原因")),
             "auditDateTransfer": _safe_float(_col_val(row, actual_headers, "至审计日结转金额")),
             "plan": _safe_str(_col_val(row, actual_headers, "处理计划")),
+            "disposalConclusion": _safe_str(_col_val(row, actual_headers, "处置结论")),
             "remark": _safe_str(_col_val(row, actual_headers, "备注")),
         }
     elif sheet == "D7-3":
@@ -745,6 +860,8 @@ def _parse_row(sheet: str, row: tuple, actual_headers: list[str]) -> dict:
             "creditAmount": _safe_float(_col_val(row, actual_headers, "贷方调整金额")),
             "indexRef": _safe_str(_col_val(row, actual_headers, "索引")),
             "remark": _safe_str(_col_val(row, actual_headers, "备注")),
+            "natureType": _safe_str(_col_val(row, actual_headers, "款项性质")) or "其他",
+            "agingBand": _safe_str(_col_val(row, actual_headers, "账龄段")),
         }
     elif sheet == "D7-4":
         return {

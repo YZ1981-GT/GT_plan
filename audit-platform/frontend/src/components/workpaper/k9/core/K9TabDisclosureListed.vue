@@ -4,7 +4,7 @@
     <div class="section-header">
       <h3>附注披露信息（上市公司）</h3>
       <div class="header-actions">
-        <el-button size="small" type="primary" plain @click="handleAiGenerate"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
+        <el-button size="small" type="primary" plain :loading="aiLoading" @click="handleAiGenerate"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
         <el-button size="small" @click="openReviewDialog?.('K9-disclosure-listed')">💬 复核</el-button>
       </div>
     </div>
@@ -64,7 +64,7 @@
       <template #header>
         <div class="card-head">
           <span class="card-title">附注说明</span>
-          <el-button size="small" type="primary" plain @click="handleAiNarrative"><el-icon><MagicStick /></el-icon> AI生成</el-button>
+          <el-button size="small" type="primary" plain :loading="aiLoading" @click="handleAiNarrative"><el-icon><MagicStick /></el-icon> AI生成</el-button>
         </div>
       </template>
       <el-input v-model="narrativeText" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :disabled="isReadonly" placeholder="附注说明文本（可AI辅助生成）" @blur="handleNarrativeSave" />
@@ -99,8 +99,9 @@
  */
 import { ref, onMounted, onUnmounted, inject } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
+import { generateK9AiText } from '../../composables/useK9AiText'
+import { K9_FEE_NATURES } from '../../composables/k9FeeNatures'
 
 const K9_ACCOUNT_CODE = '6602'
 const ABNORMAL_THRESHOLD = 0.3
@@ -132,16 +133,7 @@ const hasAutoData = ref(false)
 
 // ─── 默认行（上市公司费用性质分类） ──────────────────────────────────────────
 
-const DEFAULT_PROJECTS = [
-  '职工薪酬', '办公费', '折旧费', '摊销费', '修理费',
-  '中介机构费', '咨询费', '研发费', '税金', '差旅费',
-  '业务招待费', '物料消耗', '租赁费', '水电费', '通讯费',
-  '运输费', '保险费', '劳动保护费', '物业管理费', '低值易耗品摊销',
-  '无形资产摊销', '长期待摊费用摊销', '董事会经费', '聘请审计费',
-  '诉讼费', '绿化费', '排污费', '房产税', '土地使用税',
-  '车船使用税', '印花税', '技术转让费', '技术开发费',
-  '存货盘亏（减盘盈）', '坏账损失', '其他',
-]
+const DEFAULT_PROJECTS = K9_FEE_NATURES
 
 function initDefaultRows(): void {
   disclosureRows.value = DEFAULT_PROJECTS.map((name, idx) => ({
@@ -173,23 +165,31 @@ function loadSavedData(): void {
 
 // ─── 自动取数（从K9-1审定表） ────────────────────────────────────────────────
 
+/** 归一化费用项目名以提升 K9-1 ↔ 附注名称匹配率（去尾差：费用/费/摊销/空格） */
+function normName(s: string): string {
+  return String(s || '').replace(/\s+/g, '').replace(/(费用|摊销)$/, '').replace(/费$/, '')
+}
+
 function applyAutoFill(): void {
   const adjData = props.allResponses.get('K9-1-audited-by-item')
-  if (adjData?.remark) {
-    hasAutoData.value = true
-    try {
-      const data = JSON.parse(adjData.remark)
-      if (data && typeof data === 'object') {
-        for (const row of disclosureRows.value) {
-          const src = data[row.project]
-          if (src) {
-            row.currentAmount = Number(src.currentAmount ?? src.audited ?? 0)
-            row.priorAmount = Number(src.priorAmount ?? src.prior ?? 0)
-          }
-        }
+  if (!adjData?.remark) return
+  try {
+    const data = JSON.parse(adjData.remark)
+    if (!data || typeof data !== 'object') return
+    // 建归一化索引，兼容 K9-1 与附注费用性质命名差异
+    const normIndex: Record<string, any> = {}
+    for (const [k, v] of Object.entries(data)) normIndex[normName(k)] = v
+    let matched = 0
+    for (const row of disclosureRows.value) {
+      const src = data[row.project] ?? normIndex[normName(row.project)]
+      if (src) {
+        row.currentAmount = Number(src.currentAmount ?? src.audited ?? 0)
+        row.priorAmount = Number(src.priorAmount ?? src.prior ?? 0)
+        matched++
       }
-    } catch { /* silent */ }
-  }
+    }
+    hasAutoData.value = matched > 0
+  } catch { /* silent */ }
 }
 
 // ─── 字段更新 + 持久化 ──────────────────────────────────────────────────────
@@ -265,8 +265,38 @@ function fmtAmt(val: number | null | undefined): string {
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function handleAiGenerate(): void { ElMessage.info('AI辅助生成附注披露...') }
-function handleAiNarrative(): void { ElMessage.info('AI生成附注说明文本...') }
+const aiLoading = ref(false)
+async function generateNarrative(): Promise<void> {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const totalCur = disclosureRows.value.reduce((s, r) => s + (r.currentAmount || 0), 0)
+    const totalPri = disclosureRows.value.reduce((s, r) => s + (r.priorAmount || 0), 0)
+    const topItems = [...disclosureRows.value]
+      .filter(r => r.currentAmount)
+      .sort((a, b) => b.currentAmount - a.currentAmount)
+      .slice(0, 5)
+      .map(r => `${r.project} ${r.currentAmount.toFixed(0)}`)
+    const content = await generateK9AiText(props.wpId, {
+      prompt: '请根据上市公司管理费用按费用性质分类的披露数据，生成附注说明文本（概述本期管理费用总额、同比变动及主要构成项目原因）。',
+      section: 'K9-disclosure-listed-narrative',
+      context: {
+        本期合计: totalCur,
+        上期合计: totalPri,
+        主要项目: topItems.join('；') || '无',
+      },
+      existingContent: narrativeText.value || '',
+    })
+    if (content) {
+      narrativeText.value = narrativeText.value ? `${narrativeText.value}\n\n${content}` : content
+      handleNarrativeSave()
+    }
+  } finally {
+    aiLoading.value = false
+  }
+}
+function handleAiGenerate(): void { void generateNarrative() }
+function handleAiNarrative(): void { void generateNarrative() }
 </script>
 
 <style scoped>

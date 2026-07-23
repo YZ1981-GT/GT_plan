@@ -62,38 +62,20 @@
               <span v-else :class="{ 'auto-fill': row.isAutoFilled }">{{ fmtAmt(row.beginBalance) }}</span>
             </template>
           </el-table-column>
-          <!-- 按账龄section显示账龄列 -->
+          <!-- 按账龄section显示动态账龄列（from useAgingConfig） -->
           <template v-if="section.hasAgingColumns">
-            <el-table-column label="1年以内" width="100" align="right">
+            <el-table-column
+              v-for="band in agingBands"
+              :key="band.key"
+              :label="band.label"
+              width="100"
+              align="right"
+            >
               <template #default="{ row }">
                 <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number :model-value="row.within1y" :controls="false" size="small" @change="(v: number) => handleCellEdit(sIdx, row.rowIdx, 'within1y', v)" />
+                  <el-input-number :model-value="row.agingData?.[band.key] ?? 0" :controls="false" size="small" @change="(v: number) => handleAgingCellEdit(sIdx, row.rowIdx, band.key, v)" />
                 </template>
-                <span v-else>{{ fmtAmt(row.within1y) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="1-2年" width="100" align="right">
-              <template #default="{ row }">
-                <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number :model-value="row.y1to2" :controls="false" size="small" @change="(v: number) => handleCellEdit(sIdx, row.rowIdx, 'y1to2', v)" />
-                </template>
-                <span v-else>{{ fmtAmt(row.y1to2) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="2-3年" width="100" align="right">
-              <template #default="{ row }">
-                <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number :model-value="row.y2to3" :controls="false" size="small" @change="(v: number) => handleCellEdit(sIdx, row.rowIdx, 'y2to3', v)" />
-                </template>
-                <span v-else>{{ fmtAmt(row.y2to3) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="3年以上" width="100" align="right">
-              <template #default="{ row }">
-                <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number :model-value="row.over3y" :controls="false" size="small" @change="(v: number) => handleCellEdit(sIdx, row.rowIdx, 'over3y', v)" />
-                </template>
-                <span v-else :class="{ 'over3y-highlight': (row.over3y || 0) > 0 }">{{ fmtAmt(row.over3y) }}</span>
+                <span v-else :class="{ 'over3y-highlight': band.key !== 'within1' && band.key !== 'y1to2' && band.key !== 'y2to3' && (row.agingData?.[band.key] || 0) > 0 }">{{ fmtAmt(row.agingData?.[band.key]) }}</span>
               </template>
             </el-table-column>
           </template>
@@ -156,11 +138,12 @@
  * EventBus: subscribe 'substantive:adjudicated' → auto-refresh
  *           publish 'disclosure:note-text-updated' on text change
  */
-import { reactive, inject, onMounted, onBeforeUnmount } from 'vue'
+import { reactive, ref, computed, inject, onMounted, onBeforeUnmount, toRef } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
+import { useAgingConfig, type AgingBand } from '@/composables/useAgingConfig'
 
 const K3_ACCOUNT_CODE = '2241'
 
@@ -177,16 +160,17 @@ const emit = defineEmits<{
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 
+// 动态账龄段（与K3-1/K3-2共享同一项目配置）
+const { segments: agingSegments, bands: agingBands } = useAgingConfig(toRef(props, 'projectId'), 'K3')
+
 // ═══ 数据模型 ═══
 interface DisclosureRow {
   rowIdx: number
   item: string
   endBalance: number
   beginBalance: number
-  within1y: number
-  y1to2: number
-  y2to3: number
-  over3y: number
+  /** 动态账龄数据 keyed by segment key (e.g. within1/y1to2/y2to3/over3/y3to4/y4to5/over5) */
+  agingData: Record<string, number>
   proportion: number | null
   remark: string
   isFormula?: boolean
@@ -207,7 +191,7 @@ interface DisclosureSection {
 function makeRow(item: string, idx: number, opts?: Partial<DisclosureRow>): DisclosureRow {
   return {
     rowIdx: idx, item, endBalance: 0, beginBalance: 0,
-    within1y: 0, y1to2: 0, y2to3: 0, over3y: 0,
+    agingData: {},
     proportion: null, remark: '',
     ...opts,
   }
@@ -321,6 +305,17 @@ function handleCellEdit(sIdx: number, rowIdx: number, field: string, value: any)
   persistSection(sIdx)
 }
 
+/** 动态账龄单元格编辑（agingData keyed） */
+function handleAgingCellEdit(sIdx: number, rowIdx: number, segKey: string, value: number): void {
+  const section = sections[sIdx]
+  if (!section) return
+  const row = section.rows[rowIdx]
+  if (!row) return
+  if (!row.agingData) row.agingData = {}
+  row.agingData[segKey] = value ?? 0
+  persistSection(sIdx)
+}
+
 // ═══ 文本变化 → publish EventBus ═══
 function handleNoteTextChange(sIdx: number): void {
   persistSection(sIdx)
@@ -371,19 +366,19 @@ async function handleAiGenerate(sIdx: number): Promise<void> {
 function persistSection(sIdx: number): void {
   const section = sections[sIdx]
   if (!section) return
-  emit('save', `K3-disc-listed-${section.id}`, JSON.stringify({
-    rows: section.rows,
-    textContent: section.textContent,
-  }))
+  const data = JSON.stringify({ rows: section.rows, textContent: section.textContent })
+  emit('save', `K3-disc-listed-${section.id}`, { remark: data })
 }
 
 function loadSavedData(): void {
   for (let i = 0; i < sections.length; i++) {
     const section = sections[i]
     const saved = props.allResponses.get(`K3-disc-listed-${section.id}`)
-    if (saved?.value) {
+    // checklist_responses 格式: {item_id, conclusion, remark}
+    const raw = saved?.remark ?? saved?.value ?? null
+    if (raw) {
       try {
-        const parsed = typeof saved.value === 'string' ? JSON.parse(saved.value) : saved.value
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
         if (parsed.rows?.length) section.rows = parsed.rows
         if (parsed.textContent) section.textContent = parsed.textContent
       } catch { /* ignore */ }

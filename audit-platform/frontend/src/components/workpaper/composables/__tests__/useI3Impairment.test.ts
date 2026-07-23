@@ -435,4 +435,74 @@ describe('useI3Impairment', () => {
       expect(cguRows.value[0].impairmentAmount).toBe(300000)
     })
   })
+
+  describe('A/B1/B2 粗化与合并确认', () => {
+    it('账面价值 = A + B1 + B2', () => {
+      const { addCguRow } = useI3Impairment(wpId, allResponses, { onSave })
+      const row = addCguRow({
+        cguName: 'CGU-NCI',
+        assetGroupCarrying: 8000000,
+        goodwillB1: 1000000,
+        minorityB2: 250000,
+        recoverableAmount: 8500000,
+      })
+      expect(row.cguBookValue).toBe(9250000)
+      expect(row.impairmentAmount).toBe(750000)
+      expect(row.goodwillImpairment).toBe(750000)
+      expect(row.consolidatedGwImpairment).toBeCloseTo(600000, 2)
+    })
+
+    it('B2=0 时合并确认等于商誉分摊（兼容旧行为）', () => {
+      const { addCguRow, totalGoodwillImpairment } = useI3Impairment(wpId, allResponses, { onSave })
+      addCguRow({
+        cguName: 'CGU-W',
+        goodwillAmount: 500000,
+        otherAssets: [{ name: '固定资产', bookValue: 1500000 }],
+        recoverableAmount: 1800000,
+      })
+      expect(totalGoodwillImpairment.value).toBe(200000)
+    })
+
+    it('可收回金额取①②孰高', () => {
+      const { addCguRow } = useI3Impairment(wpId, allResponses, { onSave })
+      const row = addCguRow({
+        cguName: 'CGU-R',
+        assetGroupCarrying: 1000000,
+        goodwillB1: 500000,
+        fairValueLessCost: 1200000,
+        valueInUse: 1400000,
+      })
+      expect(row.recoverableAmount).toBe(1400000)
+      expect(row.impairmentAmount).toBe(100000)
+    })
+
+    it('审定表引用 totalGoodwillImpairment 使用合并确认金额', () => {
+      const { totalGoodwillImpairment, addCguRow } = useI3Impairment(wpId, allResponses, { onSave })
+      addCguRow({
+        cguName: 'CGU-C',
+        assetGroupCarrying: 4000000,
+        goodwillB1: 800000,
+        minorityB2: 200000,
+        recoverableAmount: 4500000,
+      })
+      expect(totalGoodwillImpairment.value).toBeCloseTo(400000, 2)
+    })
+
+    it('第二分摊不得低于可收回金额', () => {
+      const { addCguRow } = useI3Impairment(wpId, allResponses, { onSave })
+      // 商誉 100，其他资产账面 1000、可收回 900 → 最多分摊 100
+      // 总减值 500 → 先冲商誉 100，剩余 400，但 cap=100，故其他仅分摊 100
+      const row = addCguRow({
+        cguName: 'CGU-FLOOR',
+        goodwillB1: 100,
+        minorityB2: 0,
+        assetGroupCarrying: 1000,
+        otherAssets: [{ name: '固定资产', bookValue: 1000, recoverableAmount: 900 }],
+        recoverableAmount: 600,
+      })
+      expect(row.impairmentAmount).toBe(500) // 1100-600
+      expect(row.goodwillImpairment).toBe(100)
+      expect(row.otherAllocations[0].amount).toBeCloseTo(100, 2)
+    })
+  })
 })

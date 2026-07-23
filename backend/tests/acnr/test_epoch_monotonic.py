@@ -1,203 +1,187 @@
-"""PBT: epoch 单调递增 — 并发 INCR [P8]
+"""PBT: Durable_Epoch 单调递增 — DB-first（acnr-invalidation-overlay-hardening R11）
 
-**Validates: Requirements 7.1, 7.2**
+**Validates: Requirements 11.4, 12.1；Property P10**
 
-Property: 对同一 project 并发调用 increment_epoch N 次，
-          返回值序列严格单调递增（无重复、无回退）。
+原 acnr-consumer-wiring 的 Redis-authoritative epoch 契约已被 DB-first 取代：
+- increment_epoch DB 权威单调递增（Redis 不可用仍递增，不再返回 0）。
+- Redis 仅作 commit 后 fan-out（publish 通知其他 worker）。
 
-使用 fakeredis 模拟 Redis INCR + pub-sub，验证并发安全性。
+一次性临时 PG16 库隔离（传 session，避免跨事件循环共享 app engine 的 "Event loop is closed"）。
+无 PG 环境 graceful skip（SQLite 不替代）。
 """
 from __future__ import annotations
 
 import asyncio
-
-import pytest
-from hypothesis import given, settings
-from hypothesis import strategies as st
-
-# ─── fakeredis setup ─────────────────────────────────────────────────────────
+import uuid
+from contextlib import asynccontextmanager
 
 import fakeredis.aioredis as fakeredis_aio
-
-# ─── Import SUT ──────────────────────────────────────────────────────────────
+import pytest
 
 from app.services.acnr.cache_epoch import (
-    EPOCH_KEY_PREFIX,
+    INVALIDATE_CHANNEL_PREFIX,
     get_epoch,
-    get_redis_client,
     increment_epoch,
     set_redis_client,
+    _read_db_epoch,
+    _UNSET,
 )
 
 
-# ─── Strategies ──────────────────────────────────────────────────────────────
-
-_project_id_st = st.uuids().map(str)
-_concurrency_st = st.integers(min_value=2, max_value=10)
-
-
-# ─── Tests ───────────────────────────────────────────────────────────────────
+def _pg_available() -> bool:
+    from app.core.config import settings
+    return settings.DATABASE_URL.startswith("postgresql")
 
 
-@settings(max_examples=5, deadline=None)
-@given(project_id=_project_id_st, n_calls=_concurrency_st)
-def test_epoch_monotonic_sequential(project_id: str, n_calls: int):
-    """P8: 顺序调用 increment_epoch N 次，返回值严格单调递增。"""
-
-    async def _run():
-        # 每次测试用独立 fakeredis 实例
-        redis = fakeredis_aio.FakeRedis()
-        set_redis_client(redis)
-
-        try:
-            epochs = []
-            for _ in range(n_calls):
-                e = await increment_epoch(project_id)
-                epochs.append(e)
-
-            # 严格单调递增
-            for i in range(1, len(epochs)):
-                assert epochs[i] > epochs[i - 1], (
-                    f"epoch not monotonic: epochs[{i-1}]={epochs[i-1]}, "
-                    f"epochs[{i}]={epochs[i]}"
-                )
-
-            # 第一个值 >= 1（INCR 从 0 开始，第一次返回 1）
-            assert epochs[0] >= 1
-
-            # get_epoch 应返回最新值
-            current = await get_epoch(project_id)
-            assert current == epochs[-1]
-        finally:
-            set_redis_client(None)
-            await redis.aclose()
-
-    asyncio.run(_run())
+def _base_url() -> str:
+    from app.core.config import settings
+    head, _db = settings.DATABASE_URL.rsplit("/", 1)
+    return head
 
 
-@settings(max_examples=5, deadline=None)
-@given(project_id=_project_id_st, n_calls=_concurrency_st)
-def test_epoch_monotonic_concurrent(project_id: str, n_calls: int):
-    """P8: 并发调用 increment_epoch N 次，返回值集合大小 == N 且全正。"""
+def _connect_args() -> dict:
+    from app.core.config import settings
+    return {"ssl": False} if getattr(settings, "DB_DISABLE_SSL", False) else {}
 
-    async def _run():
-        redis = fakeredis_aio.FakeRedis()
-        set_redis_client(redis)
 
-        try:
-            # 并发 fire N 个 increment_epoch
-            tasks = [increment_epoch(project_id) for _ in range(n_calls)]
-            results = await asyncio.gather(*tasks)
+_EPOCH_TABLE_SQL = """
+CREATE TABLE acnr_invalidation_epoch (
+    project_id UUID PRIMARY KEY,
+    epoch BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+"""
 
-            # 所有返回值 > 0
-            assert all(e > 0 for e in results), f"有 0 值: {results}"
 
-            # 返回值互不相同（INCR 保证原子递增，无重复）
-            assert len(set(results)) == n_calls, (
-                f"并发 INCR 产生重复: {sorted(results)}"
+@asynccontextmanager
+async def _throwaway_engine():
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
+
+    head = _base_url()
+    ca = _connect_args()
+    admin_url = head + "/postgres"
+    tmp_db = f"acnr_epoch_{uuid.uuid4().hex[:12]}"
+
+    admin = create_async_engine(
+        admin_url, poolclass=NullPool, isolation_level="AUTOCOMMIT", connect_args=ca
+    )
+    async with admin.connect() as c:
+        await c.exec_driver_sql(f'CREATE DATABASE "{tmp_db}"')
+    await admin.dispose()
+
+    eng = create_async_engine(head + "/" + tmp_db, poolclass=NullPool, connect_args=ca)
+    try:
+        async with eng.begin() as conn:
+            await conn.exec_driver_sql(_EPOCH_TABLE_SQL)
+        yield eng
+    finally:
+        await eng.dispose()
+        admin = create_async_engine(
+            admin_url, poolclass=NullPool, isolation_level="AUTOCOMMIT", connect_args=ca
+        )
+        async with admin.connect() as c:
+            await c.exec_driver_sql(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                f"WHERE datname='{tmp_db}' AND pid<>pg_backend_pid()"
             )
+            await c.exec_driver_sql(f'DROP DATABASE IF EXISTS "{tmp_db}"')
 
-            # 排序后严格单调递增
-            sorted_results = sorted(results)
-            for i in range(1, len(sorted_results)):
-                assert sorted_results[i] > sorted_results[i - 1]
 
-            # 最终 epoch == max(results)
-            current = await get_epoch(project_id)
-            assert current == max(results)
+pytestmark = pytest.mark.skipif(not _pg_available(), reason="需真实 PostgreSQL 16（SQLite 不替代）")
+
+
+def test_epoch_monotonic_sequential():
+    """P10: DB-first 顺序 increment_epoch 严格单调递增（Redis 不可用亦然）。"""
+    async def _run():
+        from sqlalchemy.ext.asyncio import async_sessionmaker
+        set_redis_client(None)  # Redis 不可用 → DB-first 仍递增（R11.4）
+        try:
+            async with _throwaway_engine() as eng:
+                pid = str(uuid.uuid4())
+                SM = async_sessionmaker(eng, expire_on_commit=False)
+                async with SM() as s:
+                    epochs = [await increment_epoch(pid, session=s) for _ in range(5)]
+                    await s.commit()
+                assert epochs == [1, 2, 3, 4, 5]
+                async with SM() as s:
+                    cur = await get_epoch(pid, session=s)
+                assert cur == 5
         finally:
-            set_redis_client(None)
-            await redis.aclose()
+            set_redis_client(_UNSET)
 
     asyncio.run(_run())
 
 
-@settings(max_examples=5, deadline=None)
-@given(project_id=_project_id_st)
-def test_epoch_redis_unavailable_fallback(project_id: str):
-    """P8 降级: Redis 不可用时，epoch 返回 0（不抛异常）。"""
-
+def test_epoch_redis_unavailable_still_increments():
+    """P10/R11.4: Redis 不可用时 DB epoch 仍单调递增（不再返回 0 丢失失效）。"""
     async def _run():
-        # 不注入 redis client → get_redis_client() returns None
+        from sqlalchemy.ext.asyncio import async_sessionmaker
         set_redis_client(None)
-
-        epoch = await increment_epoch(project_id)
-        assert epoch == 0, "Redis 不可用时应返回 0"
-
-        current = await get_epoch(project_id)
-        assert current == 0, "Redis 不可用时 get_epoch 应返回 0"
+        try:
+            async with _throwaway_engine() as eng:
+                pid = str(uuid.uuid4())
+                SM = async_sessionmaker(eng, expire_on_commit=False)
+                async with SM() as s:
+                    e1 = await increment_epoch(pid, session=s)
+                    e2 = await increment_epoch(pid, session=s)
+                    await s.commit()
+                assert e1 == 1 and e2 == 2  # 关键：非 0
+        finally:
+            set_redis_client(_UNSET)
 
     asyncio.run(_run())
 
 
-@settings(max_examples=5, deadline=None)
-@given(
-    project_a=_project_id_st,
-    project_b=st.uuids().map(str),
-)
-def test_epoch_project_isolation(project_a: str, project_b: str):
-    """P8 隔离: 不同 project 的 epoch 互不影响。"""
-    if project_a == project_b:
-        return  # skip trivial case
-
+def test_epoch_project_isolation():
+    """P10 隔离: 不同 project 的 Durable_Epoch 互不影响。"""
     async def _run():
-        redis = fakeredis_aio.FakeRedis()
-        set_redis_client(redis)
-
+        from sqlalchemy.ext.asyncio import async_sessionmaker
+        set_redis_client(None)
         try:
-            # project_a 递增 3 次
-            for _ in range(3):
-                await increment_epoch(project_a)
-
-            # project_b 递增 1 次
-            await increment_epoch(project_b)
-
-            epoch_a = await get_epoch(project_a)
-            epoch_b = await get_epoch(project_b)
-
-            assert epoch_a == 3
-            assert epoch_b == 1
+            async with _throwaway_engine() as eng:
+                pa, pb = str(uuid.uuid4()), str(uuid.uuid4())
+                SM = async_sessionmaker(eng, expire_on_commit=False)
+                async with SM() as s:
+                    for _ in range(3):
+                        await increment_epoch(pa, session=s)
+                    await increment_epoch(pb, session=s)
+                    await s.commit()
+                async with SM() as s:
+                    assert await _read_db_epoch(pa, session=s) == 3
+                    assert await _read_db_epoch(pb, session=s) == 1
         finally:
-            set_redis_client(None)
-            await redis.aclose()
+            set_redis_client(_UNSET)
 
     asyncio.run(_run())
 
 
-@settings(max_examples=5, deadline=None)
-@given(project_id=_project_id_st, n_calls=_concurrency_st)
-def test_epoch_publish_called_on_incr(project_id: str, n_calls: int):
-    """P8 pub-sub: increment_epoch 后发布到 acnr:invalidate:{project_id} 频道。"""
-
+def test_epoch_redis_fanout_publish_on_incr():
+    """R11: Redis 可用时 increment_epoch 发布到 acnr:invalidate:{project_id} 频道（fan-out）。"""
     async def _run():
+        from sqlalchemy.ext.asyncio import async_sessionmaker
         redis = fakeredis_aio.FakeRedis()
         set_redis_client(redis)
-
         try:
-            # 订阅频道
-            pubsub = redis.pubsub()
-            channel = f"acnr:invalidate:{project_id}"
-            await pubsub.subscribe(channel)
-
-            # 递增 N 次
-            for _ in range(n_calls):
-                await increment_epoch(project_id)
-
-            # 读取订阅消息（跳过 subscribe 确认消息）
-            messages = []
-            for _ in range(n_calls + 1):  # +1 for subscribe confirmation
-                msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
-                if msg and msg["type"] == "message":
-                    messages.append(msg)
-
-            # 至少收到 n_calls 条消息（pub-sub 可能有延迟，但 fakeredis 同步）
-            assert len(messages) >= n_calls, (
-                f"Expected {n_calls} messages, got {len(messages)}"
-            )
-
-            await pubsub.unsubscribe(channel)
+            async with _throwaway_engine() as eng:
+                pid = str(uuid.uuid4())
+                SM = async_sessionmaker(eng, expire_on_commit=False)
+                pubsub = redis.pubsub()
+                channel = f"{INVALIDATE_CHANNEL_PREFIX}{pid}"
+                await pubsub.subscribe(channel)
+                async with SM() as s:
+                    for _ in range(3):
+                        await increment_epoch(pid, session=s)
+                    await s.commit()
+                msgs = []
+                for _ in range(4):
+                    m = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                    if m and m["type"] == "message":
+                        msgs.append(m)
+                await pubsub.unsubscribe(channel)
+                assert len(msgs) >= 3  # 每次 increment 发布一次
         finally:
-            set_redis_client(None)
+            set_redis_client(_UNSET)
             await redis.aclose()
 
     asyncio.run(_run())

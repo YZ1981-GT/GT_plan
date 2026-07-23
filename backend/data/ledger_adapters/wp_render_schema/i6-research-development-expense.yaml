@@ -287,20 +287,58 @@ sheets:
   针对性检查表I6-4:
     code: I6-4
     group: core
-    dimensions: "30×10"
+    dimensions: "37×18"
     component: I6TabTargetedCheck
-    class_code: D-段落检查
-    layout_type: paragraph
+    class_code: C-抽凭检查
+    layout_type: voucher_matrix
     standards_ref: [CAS6]
-    check_items:
-      - { id: expense_completeness, label: 费用归集完整性（研发活动支出是否全部归集到6602）, type: conclusion, options: [完整, 需补充, 不适用] }
-      - { id: personnel_allocation, label: 人员费用分摊合理性（研发人员工时分配）, type: conclusion, options: [合理, 需调整, 不适用] }
-      - { id: i2_consistency, label: 与I2(开发支出)划分一致性, type: conclusion, options: [一致, 存在差异, 不适用] }
-      - { id: expense_authenticity, label: 费用真实性（大额支出合同/发票/验收单）, type: conclusion_with_evidence }
-      - { id: rd_deduction_compliance, label: 研发加计扣除合规性, type: conclusion, options: [合规, 存在风险, 不适用] }
+    # 对齐致同 Excel：凭证抽查主路径；费用归集/人员分摊/I2划分段落为可选补充
+    test_objectives:
+      - 确认利润表中记录的研发费用已发生，与被审计单位有关，且已记录于恰当的账户（发生、权利和义务、分类）
+      - 确认与研发费用有关的金额及其他数据已恰当记录，相关披露已得到恰当计量和描述（准确性、计价和分摊、列报）
+    test_reasons: [大额, 关联方, 委外研发, 资本化相关, 异常, 其他]
+    test_content:
+      - 原始凭证是否齐全
+      - 记账凭证与原始凭证是否相符
+      - 账务处理是否正确（费用化/资本化判断、归集科目恰当）
+      - 是否记录于恰当的会计期间
+      - 研发项目归集与 I6-2 明细一致，费用化与 I2 资本化划分恰当
+    columns:
+      - { field: projectName, label: 研发项目明细, type: text }
+      - { field: voucherDate, label: 日期, type: date }
+      - { field: voucherNo, label: 凭证编号, type: text }
+      - { field: businessDesc, label: 业务内容, type: text }
+      - { field: counterpartAccount, label: 对方科目, type: text }
+      - { field: counterpartDetail, label: 对方明细科目, type: text }
+      - { field: debitAmount, label: 借方金额, type: number }
+      - { field: creditAmount, label: 贷方金额, type: number }
+      - { field: supportingDocs, label: 支持性文件, type: text }
+      - { field: check1, label: 核对1, type: select, options: [√, ×, N/A] }
+      - { field: check2, label: 核对2, type: select, options: [√, ×, N/A] }
+      - { field: check3, label: 核对3, type: select, options: [√, ×, N/A] }
+      - { field: check4, label: 核对4, type: select, options: [√, ×, N/A] }
+      - { field: check5, label: 核对5, type: select, options: [√, ×, N/A] }
+      - { field: indexRef, label: 索引号, type: text }
+      - { field: isAbnormal, label: 是否异常, type: select, options: [否, 是, 归集差异, 资本化不当, 跨期, 项目不一致, 其他] }
+      - { field: remark, label: 备注说明, type: text }
+    formulas:
+      - { name: sumDebit, target: checkedDebitTotal, expr: "SUM(debitAmount)" }
+      - { name: periodTotal, target: periodDebitTotal, expr: "I6-2!Q19" }
+      - { name: coverageRate, target: coverageRate, expr: "IF(periodDebit>0, checkedDebit/periodDebit, N/A)" }
+      - { name: layeredCoverage, target: layeredCoverageLabel, expr: "specific% + sampling%" }
+    persist_keys: [I6-4-rows, I6-4-sample-meta, I6-4-risk-focus, I6-4-audit-note, I6-4-audit-conclusion]
+    cross_refs:
+      - { ref_id: CW-I6-4-001, target_wp: I6-2, description: '本期发生额 ← I6-2 审定合计', direction: inbound }
+      - { ref_id: CW-I6-4-002, target_wp: I2, description: '费用化/资本化划分交叉', direction: outbound }
+      - { ref_id: CW-I6-4-003, target_wp: I6-3, description: '核对×调整草稿 →', direction: outbound }
+      - { ref_id: CW-I6-4-004, target_wp: N5-6-1, description: '加计扣除见税务底稿', direction: outbound }
     guidance:
-      top_area: blue_gradient_steps
       methodology_context: amber_left_border
+      coverage_zero_guard: show_NA_not_DIV0
+      optional_risk_focus: [费用归集完整性, 人员费用分摊, I2划分一致性]
+    sampling:
+      account_code: "6602"
+      engine: GtVoucherSamplingEngine
 
   # ─────────────────────────────────────────────────────────────────────────
   # Sheet 7: 截止性测试（账到单据）I6-5

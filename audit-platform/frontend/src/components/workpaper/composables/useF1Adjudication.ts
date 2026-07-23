@@ -75,6 +75,8 @@ export interface UseF1AdjudicationOptions {
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   crossSheet: ReturnType<typeof useF1CrossSheet>
   isReadonly: Ref<boolean>
+  /** 后端 render 提供的 1123 试算数（审定/未审），无持久化时作只读回退 seed */
+  tbAmountSeed?: Ref<number>
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -120,19 +122,18 @@ function buildRow(
   allResponses: Map<string, ChecklistResponse>,
   crossSheetCurrent: number,
   crossSheetPrior: number,
-  eventAje: number,
-  eventRje: number,
 ): AdjudicationRow {
   const manualPrior = getResponseNum(allResponses, makeItemId(section, rowKey, 'priorUnadjusted'))
   const priorUnadjusted = crossSheetPrior !== 0 ? crossSheetPrior : manualPrior
   const priorAje = getResponseNum(allResponses, makeItemId(section, rowKey, 'priorAje'))
   const priorRje = getResponseNum(allResponses, makeItemId(section, rowKey, 'priorRje'))
 
-  // Current: crossSheet fills currentUnadjusted (from F1-2), or manual edit
+  // Current: crossSheet fills currentUnadjusted (from F1-2), or manual edit.
+  // 审定 AJE/RJE 为 F1-1 逐行手填；与 F1-3 调整分录的一致性由 adjustmentReconcile 校验。
   const manualCurrent = getResponseNum(allResponses, makeItemId(section, rowKey, 'currentUnadjusted'))
   const currentUnadjusted = crossSheetCurrent !== 0 ? crossSheetCurrent : manualCurrent
-  const currentAje = getResponseNum(allResponses, makeItemId(section, rowKey, 'currentAje')) + eventAje
-  const currentRje = getResponseNum(allResponses, makeItemId(section, rowKey, 'currentRje')) + eventRje
+  const currentAje = getResponseNum(allResponses, makeItemId(section, rowKey, 'currentAje'))
+  const currentRje = getResponseNum(allResponses, makeItemId(section, rowKey, 'currentRje'))
 
   const priorAudited = calcAuditedAmount(priorUnadjusted, priorAje, priorRje)
   const currentAudited = calcAuditedAmount(currentUnadjusted, currentAje, currentRje)
@@ -195,14 +196,9 @@ function buildSubtotalRow(rows: AdjudicationRow[], label: string): AdjudicationR
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useF1Adjudication(options: UseF1AdjudicationOptions) {
-  const { allResponses, wpId, projectId, saveImmediate, debouncedSave, crossSheet, isReadonly } = options
+  const { allResponses, wpId, projectId, saveImmediate, debouncedSave, crossSheet, isReadonly, tbAmountSeed } = options
 
   let _debounceTimer: ReturnType<typeof setTimeout> | null = null
-  const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
-
-  // EventBus accumulated AJE/RJE (session-level, from adjustment:created events)
-  const eventAjeAccum = ref(0)
-  const eventRjeAccum = ref(0)
 
   // 项目级账龄配置（F1 默认 THREE_YEAR；可切换 FIVE_YEAR / CUSTOM）
   const { segments } = useAgingConfig(projectId, 'F1')
@@ -222,7 +218,7 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
     // === 区块一：按性质分类 ===
     const natureRows: AdjudicationRow[] = NATURE_ROWS.map(({ rowKey, label }) => {
       const aggData = natureAgg[label] || { current: 0, prior: 0 }
-      return buildRow('nature', rowKey, label, responses, aggData.current, aggData.prior, 0, 0)
+      return buildRow('nature', rowKey, label, responses, aggData.current, aggData.prior)
     })
 
     const natureSubtotal = buildSubtotalRow(natureRows, '合计')
@@ -231,16 +227,7 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
     const agingRows: AdjudicationRow[] = agingRowDefs.value.map(({ rowKey, label }) => {
       const crossCurrent = parseNum(agingAgg[rowKey])
       const crossPrior = parseNum(agingAgg[`prior_${rowKey}`])
-      return buildRow(
-        'aging',
-        rowKey,
-        label,
-        responses,
-        crossCurrent,
-        crossPrior,
-        eventAjeAccum.value,
-        eventRjeAccum.value,
-      )
+      return buildRow('aging', rowKey, label, responses, crossCurrent, crossPrior)
     })
 
     const agingSubtotal = buildSubtotalRow(agingRows, '合计')
@@ -265,10 +252,18 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
 
   const trialBalanceAmount: Ref<number> = ref(0)
 
-  // Load from allResponses or auto_data
+  // Load from allResponses（持久化优先）；无持久化时回退后端 render 提供的 1123 试算数
   watch(
-    () => allResponses.value.get('F1-adj-trial-balance-amount')?.remark,
-    (val) => { trialBalanceAmount.value = parseNum(val) },
+    [
+      () => allResponses.value.get('F1-adj-trial-balance-amount')?.remark,
+      () => tbAmountSeed?.value ?? 0,
+    ],
+    ([val, seed]) => {
+      const persisted = allResponses.value.get('F1-adj-trial-balance-amount')?.remark
+      trialBalanceAmount.value = (persisted !== undefined && persisted !== null && persisted !== '')
+        ? parseNum(val)
+        : parseNum(seed)
+    },
     { immediate: true },
   )
 
@@ -295,6 +290,41 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
     if (diff === 0) return null
     const sign = diff > 0 ? '+' : ''
     return `性质分类合计≠账龄分类合计，差额：${sign}${diff}元`
+  })
+
+  // ─── F1-3 调整分录 ↔ F1-1 审定 AJE/RJE 勾稽 ──────────────────────────
+
+  /**
+   * adjustmentReconcile：把 F1-1 审定表的账项/重分类调整合计（逐行手填）与
+   * F1-3 调整分录汇总（crossSheet.adjustmentTotals，按 debitAmount 归集）核对。
+   * 二者不一致时给出告警，提示审计师在 F1-1 落实 F1-3 的调整或说明差异。
+   */
+  const adjustmentReconcile: ComputedRef<{
+    f1Aje: number
+    f1Rje: number
+    f3Aje: number
+    f3Rje: number
+    ajeDiff: number
+    rjeDiff: number
+    warning: string | null
+  }> = computed(() => {
+    const agingSub = sections.value[1]?.subtotalRow
+    const f1Aje = agingSub?.currentAje ?? 0
+    const f1Rje = agingSub?.currentRje ?? 0
+    const { ajeTotal, rjeTotal } = crossSheet.adjustmentTotals.value
+    const ajeDiff = f1Aje - ajeTotal
+    const rjeDiff = f1Rje - rjeTotal
+    const hasF3 = ajeTotal !== 0 || rjeTotal !== 0
+    const ajeMismatch = Math.abs(ajeDiff) > 0.01
+    const rjeMismatch = Math.abs(rjeDiff) > 0.01
+    let warning: string | null = null
+    if (hasF3 && (ajeMismatch || rjeMismatch)) {
+      const parts: string[] = []
+      if (ajeMismatch) parts.push(`账项调整 F1-1 审定 ${f1Aje} vs F1-3 汇总 ${ajeTotal}`)
+      if (rjeMismatch) parts.push(`重分类调整 F1-1 审定 ${f1Rje} vs F1-3 汇总 ${rjeTotal}`)
+      warning = `F1-1 审定调整与 F1-3 调整分录不一致：${parts.join('；')}。请在 F1-1 落实 F1-3 调整或说明差异。`
+    }
+    return { f1Aje, f1Rje, f3Aje: ajeTotal, f3Rje: rjeTotal, ajeDiff, rjeDiff, warning }
   })
 
   // ─── Audit Notes ─────────────────────────────────────────────────────
@@ -382,33 +412,10 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
     }
   }
 
-  // ─── onAdjustmentCreated ─────────────────────────────────────────────
-
-  function onAdjustmentCreated(payload: AdjustmentPayload): void {
-    if (payload.wpCode !== 'F1') return
-    if (payload.entryType === 'AJE') {
-      eventAjeAccum.value += payload.amount
-    } else if (payload.entryType === 'RJE') {
-      eventRjeAccum.value += payload.amount
-    }
-  }
-
-  // ─── EventBus Registration ───────────────────────────────────────────
-
-  const adjustmentHandler = (e: Event) => {
-    const detail = (e as CustomEvent).detail
-    if (detail) onAdjustmentCreated(detail)
-  }
-  window.addEventListener('adjustment:created', adjustmentHandler)
-  eventListeners.push({ event: 'adjustment:created', handler: adjustmentHandler })
-
   onBeforeUnmount(() => {
     if (_debounceTimer) {
       clearTimeout(_debounceTimer)
       _debounceTimer = null
-    }
-    for (const { event, handler } of eventListeners) {
-      window.removeEventListener(event, handler)
     }
   })
 
@@ -424,16 +431,14 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
     // 交叉验证
     crossValidationDiff,
     crossValidationWarning,
+    // F1-3 调整分录勾稽
+    adjustmentReconcile,
     // 审计说明
     auditNotes,
     // 操作
     updateCell,
     publishAdjudicated,
-    // EventBus
-    onAdjustmentCreated,
     // Internal (for testing)
-    _eventAjeAccum: eventAjeAccum,
-    _eventRjeAccum: eventRjeAccum,
     _NATURE_LABEL_TO_KEY: NATURE_LABEL_TO_KEY,
   }
 }

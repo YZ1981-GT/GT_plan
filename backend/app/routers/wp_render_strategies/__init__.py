@@ -31,6 +31,11 @@ from ._a271_it_audit_memo import render as render_a271_it_audit_memo
 from ._a51_cashflow import render as render_a51_cashflow
 from ._a3_8_goodwill import render as render_a3_8_goodwill
 from ._b14_due_diligence import render as render_b14_due_diligence
+from ._b1_risk_assessment import render as render_b1_risk_assessment
+from ._b1_3_evaluation import render as render_b1_3_evaluation
+from ._b1_5_kaa import render as render_b1_5_kaa
+from ._b19_related_party import render as render_b19_related_party
+from ._b50_risk_assessment import render as render_b50_risk_assessment
 from ._word_template import render as render_word_template
 from ._analytical_review import render as render_analytical_review
 from ._audit_sheet import render as render_audit_sheet
@@ -151,6 +156,8 @@ from ._k11_asset_impairment_loss import render as render_k11_asset_impairment_lo
 from ._k10_other_income import render as render_k10_other_income
 from ._k12_non_operating_income import render as render_k12_non_operating_income
 from ._k13_non_operating_expense import render as render_k13_non_operating_expense
+from ._b60_overall_strategy import render as render_b60_overall_strategy
+from ._b2_12_evaluation import render as render_b2_12_evaluation
 
 # 策略函数签名: async def render(ctx: RenderContext) -> dict | None
 # 各策略文件在后续 task 中逐一实现后注册到此 dict
@@ -180,6 +187,11 @@ RENDERER_DISPATCH: dict[str, Callable] = {
     "a5-1-cashflow-audit": render_a51_cashflow,
     "a3-8-goodwill-impairment": render_a3_8_goodwill,
     "b1-4-due-diligence-report": render_b14_due_diligence,
+    "b1-risk-assessment": render_b1_risk_assessment,
+    "b1-3-business-evaluation": render_b1_3_evaluation,
+    "b1-5-kaa-check": render_b1_5_kaa,
+    "b19-bundle": render_b19_related_party,
+    "b50-risk-assessment": render_b50_risk_assessment,
     "a2-adjustment-console": render_a_program,
     "a3-consolidation-console": render_a_program,
     "audit-sheet": render_audit_sheet,
@@ -303,4 +315,6 @@ RENDERER_DISPATCH: dict[str, Callable] = {
     "k10-other-income": render_k10_other_income,
     "k12-non-operating-income": render_k12_non_operating_income,
     "k13-non-operating-expense": render_k13_non_operating_expense,
+    "b60-strategy": render_b60_overall_strategy,
+    "b2-12-evaluation": render_b2_12_evaluation,
 }

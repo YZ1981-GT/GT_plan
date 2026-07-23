@@ -6,14 +6,23 @@
 
     <template v-else>
       <div v-if="isHtmlSheet" class="k13-header-toolbar">
+        <!-- 一律绑定 :model-value（非 v-model）：切 OO 前必须 config 拉取成功，switchMode 内才置 currentMode -->
         <el-segmented
           v-if="dualMode.isOoAvailable.value"
-          v-model="dualMode.currentMode.value"
+          :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions"
           size="small"
           @change="dualMode.onModeChange"
         />
-        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value && !dualMode.checking.value" size="small" type="info">仅结构化视图</el-tag>
+        <!-- OnlyOffice 状态：检测中 / 拉取成功（就绪）/ 仅结构化（对齐 D4「拉取成功才可以」） -->
+        <el-tag v-if="dualMode.checking.value" size="small" type="warning">OnlyOffice 检测中…</el-tag>
+        <el-tag
+          v-else-if="dualMode.isOoAvailable.value && dualMode.currentMode.value === 'onlyoffice' && dualMode.ooConfig.value"
+          size="small"
+          type="success"
+        >OnlyOffice 拉取成功 ✓</el-tag>
+        <el-tag v-else-if="dualMode.isOoAvailable.value" size="small" type="success" effect="plain">OnlyOffice 就绪</el-tag>
+        <el-tag v-else size="small" type="info">仅结构化视图</el-tag>
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -56,6 +65,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :year="props.year"
           :is-readonly="isReadonly"
           @save="handleChildSave"
         />
@@ -77,6 +87,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :year="props.year"
           :is-readonly="isReadonly"
           @save="handleChildSave"
         />
@@ -130,7 +141,7 @@
  * Spec: .kiro/specs/k13-non-operating-expense/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, inject, provide, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
@@ -139,6 +150,7 @@ import {
   WorkpaperRuntimeContextKey,
   type WorkpaperRuntimeContext,
 } from './composables/useWorkpaperScaffold'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useK13DualMode } from './composables/useK13DualMode'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
@@ -178,6 +190,12 @@ const projectIdRef = computed<string | undefined>(() => props.projectId || undef
 const persistence = useChecklistPersistence({ wpId: wpIdRef, projectId: projectIdRef })
 const allResponses = persistence.responses
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
+
+// ─── 复核圆点（openReviewDialog 由 GtWpRenderer 运行时边界提供；此处仅补 dots） ──
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
+
 const tbData = ref({
   /** 6711 未审发生额 */
   unadjusted6711: 0,
@@ -188,6 +206,7 @@ const tbData = ref({
 // ─── 双模式 (OO 健康检查 + el-segmented) ─────────────────────────────────────
 const dualMode = useK13DualMode({
   wpId: computed(() => props.wpId) as any,
+  projectId: computed(() => props.projectId || '') as any,
   sheetName: computed(() => props.sheetName || '') as any,
   reloadAll: async () => { await selfLoad() },
 })

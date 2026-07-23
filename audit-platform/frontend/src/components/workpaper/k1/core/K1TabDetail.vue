@@ -27,7 +27,35 @@
         <el-button size="small" type="primary" link @click="handleAiGenerate('K1-2-detail')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
+        <el-popover placement="bottom-end" :width="280" trigger="click">
+          <template #reference>
+            <el-button size="small">⚙ 列设置</el-button>
+          </template>
+          <div class="col-prefs">
+            <div class="col-prefs-presets">
+              <el-button
+                v-for="p in presetOptions"
+                :key="p.name"
+                size="small"
+                :type="activePreset === p.name ? 'primary' : 'default'"
+                @click="applyPreset(p.name)"
+              >{{ p.label }}</el-button>
+            </div>
+            <el-divider style="margin: 8px 0" />
+            <div class="col-prefs-list">
+              <el-checkbox
+                v-for="col in colsBySegment[activeSegment as 'basic' | 'aging' | 'impairment']"
+                :key="col"
+                :model-value="isColVisible(col)"
+                @change="(v: boolean | string | number) => toggleCol(col, !!v)"
+              >{{ colLabels[col] }}</el-checkbox>
+            </div>
+          </div>
+        </el-popover>
         <el-button size="small" :disabled="isReadonly" @click="handleAddRow">＋ 新增</el-button>
+        <el-button v-if="!isReadonly && registryParties.length" size="small" type="primary" plain @click="handleBatchMatchB19">
+          批量匹配 B19 清单
+        </el-button>
         <el-dropdown trigger="click" size="small">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -49,9 +77,37 @@
       <el-tab-pane label="减值区段" name="impairment" />
     </el-tabs>
 
+    <el-alert
+      v-if="deeplinkHint"
+      type="info"
+      :closable="false"
+      show-icon
+      class="deeplink-bar"
+    >
+      <template #title>
+        <span>{{ deeplinkHint }}</span>
+        <el-button size="small" link type="primary" style="margin-left: 8px" @click="clearDeeplink">清除筛选</el-button>
+      </template>
+    </el-alert>
+
+    <div class="filter-bar">
+      <el-input
+        v-model="searchFilter"
+        placeholder="搜索往来对象..."
+        size="small"
+        clearable
+        class="search-input"
+      />
+      <span v-if="searchFilter.trim()" class="filter-hint">
+        显示 {{ filteredRows.length }} / {{ rows.length }} 笔
+      </span>
+    </div>
+
     <!-- 表格 -->
     <el-table
-      :data="rows"
+      ref="tableRef"
+      :data="filteredRows"
+      row-key="id"
       border
       size="small"
       :max-height="520"
@@ -62,15 +118,33 @@
       <el-table-column label="序号" width="55" align="center" fixed>
         <template #default="{ row }">{{ row.seq }}</template>
       </el-table-column>
-      <el-table-column label="往来对象" min-width="140" fixed>
+      <el-table-column label="往来对象" min-width="168" fixed>
         <template #default="{ row }">
-          <span>{{ row.counterparty }}</span>
+          <div class="counterparty-cell">
+            <span>{{ row.counterparty }}</span>
+            <el-dropdown
+              v-if="row.counterparty.trim()"
+              trigger="click"
+              @command="(cmd: K1NavSheet) => navigateFromDetail(row, cmd)"
+            >
+              <el-button link type="primary" size="small" class="jump-btn">→</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="K1-5">K1-5 大额分析</el-dropdown-item>
+                  <el-dropdown-item command="K1-7">K1-7 三阶段</el-dropdown-item>
+                  <el-dropdown-item command="K1-10">K1-10 长期未收</el-dropdown-item>
+                  <el-dropdown-item v-if="isRelatedPartyRow(row)" command="K1-11">K1-11 关联方</el-dropdown-item>
+                  <el-dropdown-item command="K1-12">K1-12 凭证检查</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
         </template>
       </el-table-column>
 
       <!-- ═══ 基础区段列 ═══ -->
       <template v-if="activeSegment === 'basic'">
-        <el-table-column label="性质" min-width="100">
+        <el-table-column v-if="isColVisible('nature')" label="性质" min-width="100">
           <template #default="{ row }">
             <el-select v-if="!isReadonly" :model-value="row.nature" size="small" placeholder="选择"
               @change="(v: string) => updateField(row.id, 'nature', v)">
@@ -84,17 +158,16 @@
             <span v-else>{{ row.nature || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="关联关系" min-width="90">
+        <el-table-column v-if="isColVisible('relatedParty')" label="关联关系" min-width="160">
           <template #default="{ row }">
-            <el-select v-if="!isReadonly" :model-value="row.relatedParty" size="small"
+            <el-select v-if="!isReadonly" :model-value="row.relatedParty" size="small" filterable
               @change="(v: string) => updateField(row.id, 'relatedParty', v)">
-              <el-option label="否" value="否" />
-              <el-option label="是" value="是" />
+              <el-option v-for="opt in relatedPartyOptions" :key="opt" :label="opt" :value="opt" />
             </el-select>
-            <span v-else>{{ row.relatedParty }}</span>
+            <span v-else>{{ row.relatedParty || '否' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期初余额" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('beginBalance')" label="期初余额" min-width="120" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.beginBalance" size="small"
               :controls="false" class="amount-input"
@@ -102,7 +175,7 @@
             <span v-else class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末余额" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('endBalance')" label="期末余额" min-width="120" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.endBalance" size="small"
               :controls="false" class="amount-input"
@@ -114,6 +187,7 @@
 
       <!-- ═══ 账龄区段列（动态，基于 bands from useAgingConfig） ═══ -->
       <template v-if="activeSegment === 'aging'">
+        <template v-if="isColVisible('agingBands')">
         <el-table-column
           v-for="band in bands"
           :key="band.key"
@@ -133,14 +207,15 @@
             <span v-else class="amount-cell">{{ fmtAmt(row.agingAudited[band.key]) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="账龄合计" min-width="120" align="right">
+        </template>
+        <el-table-column v-if="isColVisible('agingTotal')" label="账龄合计" min-width="120" align="right">
           <template #default="{ row }">
             <span class="formula-cell" title="账龄合计=各账龄段之和">
               {{ fmtAmt(row.agingTotal) }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="勾稽" width="60" align="center">
+        <el-table-column v-if="isColVisible('agingTotal')" label="勾稽" width="60" align="center">
           <template #default="{ row }">
             <el-icon v-if="Math.abs(row.agingTotal - row.endBalance) > 0.01" color="var(--el-color-danger)">
               <WarningFilled />
@@ -154,7 +229,7 @@
 
       <!-- ═══ 减值区段列 ═══ -->
       <template v-if="activeSegment === 'impairment'">
-        <el-table-column label="阶段" min-width="80" align="center">
+        <el-table-column v-if="isColVisible('stage')" label="阶段" min-width="80" align="center">
           <template #default="{ row }">
             <el-select v-if="!isReadonly" :model-value="row.stage" size="small"
               @change="(v: number) => updateField(row.id, 'stage', v)">
@@ -167,7 +242,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="坏账准备" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('provision')" label="坏账准备" min-width="120" align="right">
           <template #default="{ row }">
             <el-input-number v-if="!isReadonly" :model-value="row.badDebtProvision" size="small"
               :controls="false" class="amount-input"
@@ -175,19 +250,19 @@
             <span v-else class="amount-cell">{{ fmtAmt(row.badDebtProvision) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="净值" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('netValue')" label="净值" min-width="120" align="right">
           <template #default="{ row }">
             <span class="formula-cell" title="净值=期末余额-坏账准备">{{ fmtAmt(row.netValue) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="凭证号" min-width="100">
+        <el-table-column v-if="isColVisible('voucherNo')" label="凭证号" min-width="100">
           <template #default="{ row }">
             <el-input v-if="!isReadonly" :model-value="row.voucherNo" size="small" placeholder="凭证号"
               @change="(v: string) => updateField(row.id, 'voucherNo', v)" />
             <span v-else>{{ row.voucherNo || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="结论" min-width="100">
+        <el-table-column v-if="isColVisible('conclusion')" label="结论" min-width="100">
           <template #default="{ row }">
             <el-select v-if="!isReadonly" :model-value="row.conclusion" size="small" placeholder="选择"
               @change="(v: string) => updateField(row.id, 'conclusion', v)">
@@ -198,7 +273,7 @@
             <span v-else>{{ row.conclusion || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="备注" min-width="140">
+        <el-table-column v-if="isColVisible('remark')" label="备注" min-width="140">
           <template #default="{ row }">
             <el-input v-if="!isReadonly" :model-value="row.remark" size="small" placeholder="备注"
               @change="(v: string) => updateField(row.id, 'remark', v)" />
@@ -227,6 +302,20 @@
         </ul>
       </el-alert>
     </div>
+
+    <!-- 审计说明 -->
+    <el-card shadow="never" class="note-card">
+      <template #header>
+        <div class="section-title">
+          <span>审计说明</span>
+          <el-button v-if="!isReadonly" size="small" type="primary" link @click="handleAiGenerate('K1-2-detail')">
+            <el-icon><MagicStick /></el-icon> AI生成
+          </el-button>
+        </div>
+      </template>
+      <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }"
+        placeholder="明细表审计说明..." :disabled="isReadonly" @blur="saveAuditNote" />
+    </el-card>
 
     <!-- 底部统计 -->
     <div class="stats-bar">
@@ -260,11 +349,26 @@
  * Requirements: 3.1-3.6
  * 36列3区段Tab + 账龄 + 动态行 + 统计 + 导入导出 + 3年以上高亮
  */
-import { ref, computed, inject, toRef, onMounted } from 'vue'
+import { ref, computed, inject, toRef, onMounted, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, WarningFilled, CircleCheckFilled } from '@element-plus/icons-vue'
+import type { ElTable } from 'element-plus'
 import { useK1Detail, type K1DetailRow } from '../../composables/useK1Detail'
+import { useK1DetailColumnPrefs } from '../../composables/useK1DetailColumnPrefs'
 import { useK1ImportExport } from '../../composables/useK1ImportExport'
+import { useK1AiGenerate } from '../../composables/useK1AiGenerate'
+import {
+  K1_DETAIL_RELATED_PARTY_OPTIONS,
+  batchMatchK1DetailRelatedParty,
+  isK1RelatedPartyMarked,
+  matchK1RelatedPartyFromRegistry,
+} from '../../composables/useK1RelatedParty'
+import {
+  K1RowNavigationKey,
+  resolveK1DetailFocusRow,
+  buildK1DeeplinkHint,
+  type K1NavSheet,
+} from '../../composables/useK1RowNavigation'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -273,6 +377,8 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  /** B19 关联方清单，用于新增行时自动建议关联关系 */
+  relatedParties?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -283,6 +389,7 @@ const emit = defineEmits<{
 // ─── Injections ──────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const k1Nav = inject(K1RowNavigationKey, null)
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 
@@ -311,15 +418,96 @@ const {
   importData,
 } = useK1ImportExport({ wpId: toRef(props, 'wpId') })
 
-// ─── 区段状态 ────────────────────────────────────────────────────────────────
+const { generateAndConfirm } = useK1AiGenerate(toRef(props, 'wpId'))
+const auditNote = ref('')
+
+watch(() => props.allResponses.get('K1-2-audit-note')?.remark, (v) => {
+  auditNote.value = v || ''
+}, { immediate: true })
+
+const relatedPartyOptions = K1_DETAIL_RELATED_PARTY_OPTIONS
+const registryParties = computed(() => props.relatedParties ?? [])
 
 const activeSegment = ref<'basic' | 'aging' | 'impairment'>('basic')
+
+const {
+  activePreset,
+  presetOptions,
+  colLabels,
+  colsBySegment,
+  isColVisible,
+  toggleCol,
+  applyPreset,
+} = useK1DetailColumnPrefs()
+const searchFilter = ref('')
+const deeplinkHint = ref('')
+const tableRef = ref<InstanceType<typeof ElTable>>()
+
+const filteredRows = computed(() => {
+  const keyword = searchFilter.value.trim().toLowerCase()
+  if (!keyword) return rows.value
+  return rows.value.filter((r) =>
+    String(r.counterparty ?? '').toLowerCase().includes(keyword),
+  )
+})
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 onMounted(() => {
   loadRows()
+  applyIncomingFocus()
 })
+
+function applyIncomingFocus(): void {
+  const focus = k1Nav?.consumeFocus('K1-2')
+  if (!focus) return
+  const resolved = resolveK1DetailFocusRow(rows.value, focus)
+  if (!resolved) return
+  searchFilter.value = resolved.counterparty
+  deeplinkHint.value = buildK1DeeplinkHint(focus, resolved.counterparty)
+  activeSegment.value = 'basic'
+  if (resolved.rowId) {
+    k1Nav?.focusRow(resolved.rowId)
+    scrollToRow(resolved.rowId)
+  }
+}
+
+function scrollToRow(rowId: string): void {
+  if (!rowId) return
+  nextTick(() => {
+    const root = tableRef.value?.$el as HTMLElement | undefined
+    const rowEl = root?.querySelector(`tr[data-row-key="${rowId}"]`) as HTMLElement | null
+    rowEl?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  })
+}
+
+function clearDeeplink(): void {
+  searchFilter.value = ''
+  deeplinkHint.value = ''
+}
+
+function isRelatedPartyRow(row: K1DetailRow): boolean {
+  return isK1RelatedPartyMarked(row.relatedParty)
+}
+
+function navigateFromDetail(row: K1DetailRow, sheet: K1NavSheet) {
+  const name = row.counterparty.trim()
+  if (!name) {
+    ElMessage.warning('往来对象名称为空')
+    return
+  }
+  if (k1Nav) {
+    k1Nav.navigateToRow({
+      sheet,
+      rowId: row.id,
+      counterparty: name,
+      sourceSheet: 'K1-2',
+      section: sheet === 'K1-12' ? 'occurrence' : undefined,
+    })
+    return
+  }
+  emit('navigate-sheet', sheet === 'K1-2' ? 'K1-2 明细表' : sheet)
+}
 
 // ─── 行操作 ──────────────────────────────────────────────────────────────────
 
@@ -334,9 +522,14 @@ async function handleAddRow() {
       ElMessage.warning('往来对象名称不能为空')
       return
     }
-    addRow(value.trim())
+    const name = value.trim()
+    const row = addRow(name)
+    const suggested = matchK1RelatedPartyFromRegistry(name, registryParties.value)
+    if (suggested !== '否') {
+      updateRow(row.id, 'relatedParty', suggested)
+    }
     persistRows()
-    ElMessage.success(`已新增：${value.trim()}`)
+    ElMessage.success(`已新增：${name}${suggested !== '否' ? `（已匹配 B19 清单 → ${suggested}）` : ''}`)
   } catch {
     // 用户取消
   }
@@ -362,6 +555,20 @@ function persistRows() {
 
 // ─── 导入导出 ─────────────────────────────────────────────────────────────────
 
+function handleBatchMatchB19() {
+  if (!registryParties.value.length) {
+    ElMessage.warning('B19 关联方清单为空，请先在 B19-1 维护')
+    return
+  }
+  const count = batchMatchK1DetailRelatedParty(rows.value, registryParties.value)
+  if (!count) {
+    ElMessage.info('未发现可匹配的未标记关联方行')
+    return
+  }
+  persistRows()
+  ElMessage.success(`已批量匹配 ${count} 笔关联方（关联关系 → 其他关联方）`)
+}
+
 function handleExportTemplate() { exportTemplate('K1-2') }
 function handleExportData() { exportData('K1-2') }
 
@@ -384,13 +591,30 @@ function handleImportData() {
 // ─── 行样式（3年以上高亮） ────────────────────────────────────────────────────
 
 function rowClassName({ row }: { row: K1DetailRow }): string {
-  return isOver3Years(row) ? 'over-3-years-row' : ''
+  const parts: string[] = []
+  if (isOver3Years(row)) parts.push('over-3-years-row')
+  const hl = k1Nav?.rowHighlightClass(row.id)
+  if (hl) parts.push(hl)
+  return parts.join(' ')
 }
 
 // ─── AI / 复核 ───────────────────────────────────────────────────────────────
 
-function handleAiGenerate(section: string) {
-  console.log('[K1-2] AI generate:', section)
+async function handleAiGenerate(_section: string) {
+  const content = await generateAndConfirm('overall-opinion', auditNote.value, {
+    rowCount: stats.value.totalCount,
+    endBalanceTotal: stats.value.totalEndBalance,
+    over3YearRatio: stats.value.over3YearRatio,
+  }, 'AI 生成 K1-2 审计说明')
+  if (content) {
+    auditNote.value = content
+    saveAuditNote()
+  }
+}
+function saveAuditNote() {
+  const itemId = 'K1-2-audit-note'
+  props.allResponses.set(itemId, { item_id: itemId, conclusion: null, remark: auditNote.value })
+  emit('save', itemId, { remark: auditNote.value })
 }
 function handleReview(id: string) { openReviewDialog(id) }
 
@@ -450,6 +674,25 @@ function fmtAmt(val: number | null | undefined): string {
   font-size: var(--wp-font-size, 13px);
   margin-top: -1px;
 }
+.detail-table :deep(.k1-row-deeplink-hl > td) {
+  background-color: #ecf5ff !important;
+  animation: k1-row-flash 1.2s ease-in-out 0s 2;
+}
+@keyframes k1-row-flash {
+  0%, 100% { background-color: #ecf5ff; }
+  50% { background-color: #d9ecff; }
+}
+.deeplink-bar { margin: 8px 0; }
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 10px;
+}
+.search-input { width: 220px; }
+.filter-hint { font-size: 12px; color: var(--el-text-color-secondary); }
+.counterparty-cell { display: flex; align-items: center; gap: 4px; }
+.jump-btn { flex-shrink: 0; padding: 0 2px; font-weight: 600; }
 .amount-cell {
   font-variant-numeric: tabular-nums;
 }
@@ -503,4 +746,6 @@ function fmtAmt(val: number | null | undefined): string {
   margin-top: 8px;
   line-height: 1.8;
 }
+.col-prefs-presets { display: flex; flex-wrap: wrap; gap: 6px; }
+.col-prefs-list { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow: auto; }
 </style>

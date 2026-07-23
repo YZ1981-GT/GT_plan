@@ -11,6 +11,13 @@ import { readRowJson, type ChecklistResponse } from './useF4FormData'
 
 export const F4_LONG_AGING_OPTIONS = ['1～2年', '2～3年', '3年以上'] as const
 export const F4_YES_NO_OPTIONS = ['是', '否', '不适用'] as const
+export const F4_DISPOSAL_CONCLUSIONS = [
+  '应确认收入',
+  '应退回',
+  '正常挂账',
+  '应转营业外收入',
+  '待确定',
+] as const
 
 export interface F4LongOutstandingOcrFields {
   creditor?: string
@@ -42,6 +49,7 @@ export interface LongOutstandingRow {
   paymentPlan: string
   auditedAmount: number
   supportingEvidence: string
+  disposalConclusion: string
   remark: string
   linked: boolean
   adjustmentAmount: number
@@ -64,6 +72,7 @@ interface StoredLongOutstandingRow {
   paymentPlan: string
   auditedAmount: number
   supportingEvidence: string
+  disposalConclusion: string
   remark: string
 }
 
@@ -114,6 +123,7 @@ export function emptyLongOutstandingRow(seq: number, attSlot = seq): StoredLongO
     paymentPlan: '',
     auditedAmount: 0,
     supportingEvidence: '',
+    disposalConclusion: '',
     remark: '',
   }
 }
@@ -154,6 +164,7 @@ function migrateRow(raw: any, index: number): StoredLongOutstandingRow {
     paymentPlan: String(raw?.paymentPlan ?? ''),
     auditedAmount: raw?.auditedAmount == null ? closingBalance : parseNum(raw.auditedAmount),
     supportingEvidence: String(raw?.supportingEvidence ?? ''),
+    disposalConclusion: String(raw?.disposalConclusion ?? ''),
     remark: legacyRemark(raw),
   }
 }

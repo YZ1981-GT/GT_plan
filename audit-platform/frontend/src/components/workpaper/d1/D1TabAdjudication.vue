@@ -33,6 +33,7 @@ const props = defineProps<{
   projectId: string
   isReadonly: boolean
   sheetName?: string
+  tbSeedAmount?: number
 }>()
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
@@ -69,6 +70,7 @@ const {
   loadSubWorkpaperData: async () => ({}),
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
   openReviewDialog: openReviewDialog ?? undefined,
+  tbSeedAmount: computed(() => props.tbSeedAmount ?? 0) as Ref<number>,
 })
 
 // ─── Loading & Active Threads ────────────────────────────────────────────────

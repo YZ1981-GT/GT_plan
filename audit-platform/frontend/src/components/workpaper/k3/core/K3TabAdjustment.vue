@@ -210,9 +210,11 @@ onMounted(() => {
 
 function loadFromResponses(): void {
   const saved = props.allResponses.get(`${ITEM_PREFIX}-entries`)
-  if (saved?.value) {
+  // checklist_responses格式: {item_id, conclusion, remark}
+  const raw = saved?.remark ?? saved?.value ?? null
+  if (raw) {
     try {
-      const parsed = typeof saved.value === 'string' ? JSON.parse(saved.value) : saved.value
+      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
       if (Array.isArray(parsed)) {
         entries.value = parsed.map((e: any, idx: number) => ({
           id: e.id || `entry-${++nextId}`,
@@ -286,7 +288,10 @@ function reSequence(): void {
 
 // ═══ 持久化 ═══
 function persistEntries(): void {
-  emit('save', `${ITEM_PREFIX}-entries`, JSON.stringify(entries.value))
+  const data = JSON.stringify(entries.value)
+  // 以 {remark: json} 格式存储（对齐 checklist_responses 持久化契约）
+  props.allResponses.set(`${ITEM_PREFIX}-entries`, { item_id: `${ITEM_PREFIX}-entries`, conclusion: null, remark: data })
+  emit('save', `${ITEM_PREFIX}-entries`, { remark: data })
 }
 
 // ═══ 保存回写K3-1 + EventBus ═══
@@ -305,12 +310,12 @@ function handleSaveWriteback(): void {
     .reduce((sum, e) => sum + (e.creditAmount - e.debitAmount), 0)
 
   // 同步到allResponses供K3-1审定表读取
-  props.allResponses.set('K3-1-aje-total', { item_id: 'K3-1-aje-total', value: ajeTotal })
-  props.allResponses.set('K3-1-rje-total', { item_id: 'K3-1-rje-total', value: rjeTotal })
+  props.allResponses.set('K3-1-aje-total', { item_id: 'K3-1-aje-total', conclusion: null, remark: String(ajeTotal) })
+  props.allResponses.set('K3-1-rje-total', { item_id: 'K3-1-rje-total', conclusion: null, remark: String(rjeTotal) })
 
-  // 持久化
-  emit('save', 'K3-1-aje-total', ajeTotal)
-  emit('save', 'K3-1-rje-total', rjeTotal)
+  // 持久化（以 {remark} 格式对齐 checklist_responses）
+  emit('save', 'K3-1-aje-total', { remark: String(ajeTotal) })
+  emit('save', 'K3-1-rje-total', { remark: String(rjeTotal) })
   persistEntries()
 
   // EventBus publish adjustment:created → A13

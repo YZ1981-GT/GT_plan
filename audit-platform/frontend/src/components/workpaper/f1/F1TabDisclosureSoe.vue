@@ -186,15 +186,21 @@
             </template>
           </template>
         </el-table-column>
-        <el-table-column label="账龄" width="120">
+        <el-table-column label="账龄" width="140">
           <template #default="{ row }">
-            <el-input
+            <el-select
               v-if="row.rowId !== '__total__'"
               :model-value="row.agingLabel"
               size="small"
               :disabled="isReadonly"
-              @change="(v: string) => updateOver1Field(row.rowId, 'agingLabel', v)"
-            />
+              filterable
+              allow-create
+              clearable
+              placeholder="选择账龄"
+              @change="(v: string) => updateOver1Field(row.rowId, 'agingLabel', v ?? '')"
+            >
+              <el-option v-for="opt in over1AgingOptions" :key="opt" :label="opt" :value="opt" />
+            </el-select>
           </template>
         </el-table-column>
         <el-table-column label="未结算的原因" min-width="160">
@@ -306,6 +312,7 @@ import {
 import { F1_NOTE_SECTION } from '../composables/f1NoteSectionMap'
 import type { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import type { ChecklistResponse } from '../composables/useF1FormData'
+import { ADJUDICATION_LABEL_BY_SEGMENT_KEY } from '../composables/agingPresets'
 import GtIndexChip from '../GtIndexChip.vue'
 import F1DisclosureUsageGuide from './F1DisclosureUsageGuide.vue'
 
@@ -326,6 +333,18 @@ const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<strin
 const noteSectionId = F1_NOTE_SECTION.soe
 const showGuide = ref(false)
 const isSyncing = ref(false)
+
+/** 超1年行账龄下拉：跟项目/明细枚举（排除 1年以内） */
+const over1AgingOptions = computed(() => {
+  const segs = props.crossSheet.agingSegments?.value || []
+  const labels = segs
+    .filter((s) => s.key !== 'within1' && s.dayFrom >= 366)
+    .map((s) => ADJUDICATION_LABEL_BY_SEGMENT_KEY[s.key] || s.label)
+  if (labels.length) return labels
+  return segs
+    .filter((s) => s.key !== 'within1')
+    .map((s) => ADJUDICATION_LABEL_BY_SEGMENT_KEY[s.key] || s.label)
+})
 
 const {
   isApplicable,

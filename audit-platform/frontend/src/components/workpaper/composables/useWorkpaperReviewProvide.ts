@@ -64,7 +64,9 @@ export function useWorkpaperReviewProvide(options: {
 
   provide('openReviewDialog', openReview)
 
-  return ctx
+  // 返回 ctx（含 openReviewDialog）+ openReview（供"既是 provider 又是 consumer"的
+  // 单一组件在同一 setup 内直接触发复核，无需再 inject）。
+  return Object.assign(ctx, { openReview })
 }
 
 export default useWorkpaperReviewProvide

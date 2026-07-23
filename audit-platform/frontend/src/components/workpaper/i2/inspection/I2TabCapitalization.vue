@@ -201,15 +201,20 @@
         <div class="block-title">
           <span>五条件明细 — {{ activeRow.projectName || '未命名项目' }}</span>
           <div class="title-actions">
-            <el-button
-              v-if="!isReadonly"
-              size="small"
-              type="primary"
-              plain
-              @click="handleAiSuggest"
+            <el-tooltip
+              content="基于项目文本关键词匹配的启发式建议（非 LLM/AI 判断），仅供参考，须人工复核证据后确认"
+              placement="top"
             >
-              AI 建议条件
-            </el-button>
+              <el-button
+                v-if="!isReadonly"
+                size="small"
+                type="primary"
+                plain
+                @click="handleAiSuggest"
+              >
+                规则建议条件
+              </el-button>
+            </el-tooltip>
             <el-tag v-if="activeResult" :type="activeResult.isMet ? 'success' : 'danger'" size="small">
               {{ activeResult.conclusion }}
             </el-tag>

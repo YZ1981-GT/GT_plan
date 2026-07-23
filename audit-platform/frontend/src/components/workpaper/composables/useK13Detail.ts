@@ -335,6 +335,59 @@ export function useK13Detail(params: UseK13DetailParams) {
     return computedRows.value
   }
 
+  // ─── 从序时账按月取数回填（K8/K9 范式） ─────────────────────────────────────
+  //  同名明细科目覆盖 12 月发生额；缺失则新增行。保留 AJE/RJE/上期/备注等人工列。
+
+  function applyMonthlyRows(monthlyRows: Array<{ accountName: string; months: number[] }>): number {
+    if (isReadonly?.value) return 0
+    let affected = 0
+    for (const mr of monthlyRows) {
+      const name = String(mr.accountName ?? '').trim()
+      if (!name) continue
+      const months = Array.isArray(mr.months) && mr.months.length === 12
+        ? mr.months.map(parseNum)
+        : Array(12).fill(0)
+      const existing = rows.value.find(r => (r.project ?? '').trim() === name)
+      if (existing) {
+        existing.monthAmounts = months
+        _recalcRow(existing)
+        affected++
+      } else {
+        rows.value.push({
+          rowKey: `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          seq: rows.value.length + 1,
+          project: name,
+          expenseType: '',
+          counterparty: '',
+          amount: 0,
+          occurDate: '',
+          monthAmounts: months,
+          monthTotal: calcSubtotal(months),
+          aje: 0,
+          rje: 0,
+          audited: calcAuditedAmount(calcSubtotal(months), 0, 0),
+          nonRecurring: false,
+          crossRef: '',
+          proportion: null,
+          priorAmount: 0,
+          priorAje: 0,
+          priorRje: 0,
+          priorAudited: 0,
+          priorProportion: null,
+          yoyChange: null,
+          remark: '序时账导入',
+          isEditable: true,
+        })
+        affected++
+      }
+    }
+    if (affected > 0) {
+      isChanged.value = true
+      _persist()
+    }
+    return affected
+  }
+
   // ─── Persist ───────────────────────────────────────────────────────────────
 
   function _persist(): void {
@@ -372,6 +425,7 @@ export function useK13Detail(params: UseK13DetailParams) {
     removeRow,
     importRows,
     exportRows,
+    applyMonthlyRows,
     setActiveTab,
     computeAll,
     initFromResponses,

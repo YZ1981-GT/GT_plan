@@ -480,4 +480,48 @@ export function useI2FormData(params: {
   }
 }
 
+// ─── fetchI2TbData / persistI2TbData（独立轻量版，供 I2TabAdjudication / GtI2 selfLoad 复用） ──
+// 与 _loadTbData 同一 API 模式；不依赖完整 composable 实例，兼容 http(axios) 与 api(已解包) 两种客户端。
+
+/** 从 trial-balance 端点取科目 1717 未审/审定/AJE/RJE（纯函数，便于测试） */
+export async function fetchI2TbData(
+  httpClient: { get: (url: string, config?: any) => Promise<any> },
+  projectId: string,
+): Promise<I2TbData> {
+  const empty: I2TbData = { unadjusted1717: 0, audited1717: 0, aje1717: 0, rje1717: 0 }
+  if (!projectId) return empty
+  try {
+    const res = await httpClient.get(`/projects/${projectId}/trial-balance`, {
+      params: { account_prefix: ACCOUNT_CODE_1717 },
+      _silent: true,
+    } as any)
+    const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
+
+    let unadjusted1717 = 0
+    let audited1717 = 0
+    let aje1717 = 0
+    let rje1717 = 0
+    for (const item of list) {
+      const code = String(item.standard_account_code ?? item.account_code ?? '')
+      if (code.startsWith(ACCOUNT_CODE_1717)) {
+        unadjusted1717 += Number(item.unadjusted_amount ?? 0)
+        audited1717 += Number(item.audited_amount ?? 0)
+        aje1717 += Number(item.aje_adjustment ?? 0)
+        rje1717 += Number(item.rje_adjustment ?? 0)
+      }
+    }
+    return { unadjusted1717, audited1717, aje1717, rje1717 }
+  } catch {
+    return empty
+  }
+}
+
+/** 将取得的 TB 数据写入 'I2-tb-data'（I2-1 审定表消费），saveResponse 的乐观更新会同步刷新 UI */
+export function persistI2TbData(
+  saveResponse: (sheetCode: string, data: Record<string, any>) => Promise<void>,
+  tb: I2TbData,
+): Promise<void> {
+  return saveResponse('I2-1', { 'I2-tb-data': JSON.stringify(tb) })
+}
+
 export default useI2FormData

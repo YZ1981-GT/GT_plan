@@ -364,12 +364,30 @@ const CATEGORIES = [
   '其他',
 ]
 
+/** 适用税率快速选项 */
+const TAX_RATE_OPTIONS = [
+  { label: '25%（一般企业）', value: '0.25' },
+  { label: '15%（高新技术）', value: '0.15' },
+  { label: '20%（小型微利）', value: '0.20' },
+  { label: '10%（优惠税率）', value: '0.10' },
+  { label: '12.5%（减半征收）', value: '0.125' },
+  { label: '0%（免税）', value: '0' },
+]
+
+/** 报表项目选项 */
+const REPORT_ITEM_OPTIONS = [
+  '递延所得税负债',
+  '一年内到期的递延所得税负债',
+]
+
 // ─── Inject 复核对话 ─────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<((section: string) => void) | undefined>(
   'openReviewDialog',
   undefined,
 )
+
+const scheduleAutoSnapshot = inject<(() => void) | undefined>('scheduleAutoSnapshot', undefined)
 
 // ─── FormData ────────────────────────────────────────────────────────────────
 
@@ -522,14 +540,24 @@ async function handleFileSelected(event: Event) {
 
 // ─── AI辅助 / 复核 ──────────────────────────────────────────────────────────
 
-function handleAiAssist() {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+const aiLoading = ref(false)
+
+async function handleAiAssist() {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const { default: http } = await import('@/utils/http')
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       section: 'n3-detail',
-      prompt: '请基于递延所得税负债底稿数据，给出审计分析建议',
-      context: { wpId: props.wpId },
-    }).catch(() => {})
-  })
+      prompt: '请基于递延所得税负债明细表数据，给出审计分析建议',
+      context: { wpId: String(props.wpId) },
+    })
+    const text = res?.data?.content || res?.data?.data?.content || ''
+    if (text) {
+      ElMessage.success('AI分析完成')
+    }
+  } catch { /* 降级静默 */ }
+  finally { aiLoading.value = false }
 }
 
 function handleReview() {

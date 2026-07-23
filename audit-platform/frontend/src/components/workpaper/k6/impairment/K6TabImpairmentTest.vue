@@ -55,6 +55,16 @@
         <div class="section-header">
           <span class="section-title">K6-5 减值准备测试表（孰低法）</span>
           <div class="section-header-actions">
+            <el-dropdown size="small" trigger="click" :disabled="isReadonly" @command="handleIECommand">
+              <el-button size="small">导入导出 ▾</el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="template">导出模板</el-dropdown-item>
+                  <el-dropdown-item command="export">导出数据</el-dropdown-item>
+                  <el-dropdown-item command="import">导入数据</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
             <el-button size="small" type="primary" plain :loading="aiLoading" @click="handleAiGenerate">
               <el-icon><MagicStick /></el-icon> AI辅助
             </el-button>
@@ -253,9 +263,41 @@
         <span class="summary-item">{{ subtotals.count }} 项</span>
       </div>
 
+      <!-- 转回上限校验告警 -->
+      <el-alert
+        v-if="hasReversalOverLimit"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="reversal-alert"
+      >
+        <template #title>
+          ⚠ {{ reversalOverLimitItems.length }} 项减值转回可能超限（CAS42：转回不超过假设未划分持有待售时正常折旧/摊销调整后的账面价值），请核查：
+          {{ reversalOverLimitItems.map(r => r.assetName).join('、') }}
+        </template>
+      </el-alert>
+
       <!-- 新增按钮 -->
       <div v-if="!isReadonly" class="add-row-bar">
         <el-button size="small" @click="addRow()">+ 新增</el-button>
+        <el-button size="small" type="success" plain @click="importFromK6_4">从K6-4估值表带入</el-button>
+        <el-button
+          size="small"
+          type="warning"
+          plain
+          :disabled="subtotals.additionalProvision === 0"
+          @click="pushToK6_3"
+        >
+          应补提→K6-3建议AJE
+        </el-button>
+        <el-button
+          size="small"
+          plain
+          :disabled="subtotals.impairmentAmount === 0"
+          @click="pushToK6_6"
+        >
+          减值合计→K6-6处置组
+        </el-button>
       </div>
     </el-card>
 
@@ -286,11 +328,22 @@
         <li>公允价值净额 = 公允价值 - 预计出售费用（可为负，此时减值=全部账面价值）</li>
         <li>减值金额 = MAX(0, 账面价值 - 公允价值净额)，即孰低法</li>
         <li>应补提 = 减值金额 - 已计提减值准备（正数=需补提，负数=可转回但有上限）</li>
-        <li>CAS42转回上限：不超过假设未划分持有待售时确认的折旧/摊销调整后的账面价值</li>
+        <li>CAS42转回上限：不超过假设未划分持有待售时确认的折旧/摊销调整后的账面价值（转回项标⚠告警）</li>
         <li>与K6-1审定表"减值准备"列交叉验证，差异应核对说明</li>
-        <li>处置组减值请跳转K6-6进行分摊计算</li>
+        <li>处置组减值请跳转K6-6进行分摊计算（"减值合计→K6-6处置组"按钮自动传递）</li>
+        <li>"应补提→K6-3建议AJE"：自动汇总应补提金额生成减值调整分录建议</li>
+        <li>"从K6-4估值表带入"：自动带入资产名/账面/公允/出售费用（按名称去重）</li>
       </ul>
     </details>
+
+    <!-- 隐藏的文件上传input -->
+    <input
+      ref="fileInputRef"
+      type="file"
+      accept=".xlsx,.xls"
+      style="display: none"
+      @change="handleFileSelected"
+    />
   </div>
 </template>
 
@@ -305,10 +358,12 @@
  * Spec: .kiro/specs/k6-held-for-sale/ Task 4.5
  * Requirements: 5.1-5.6
  */
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, toRef } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useK6Impairment } from '../../composables/useK6Impairment'
+import { useK6ImportExport } from '../../composables/useK6ImportExport'
+import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -387,6 +442,176 @@ async function handleAiConclusion() {
   await handleAiGenerate()
 }
 
+// ─── 从K6-4估值表带入 ─────────────────────────────────────────────────────
+
+function importFromK6_4() {
+  // 读取K6-4估值表行数据
+  const k6_4_item = props.allResponses.get('K6-4-valuation-rows')
+  const raw = k6_4_item?.remark ?? k6_4_item?.conclusion ?? (typeof k6_4_item === 'string' ? k6_4_item : null)
+  if (!raw) {
+    ElMessage.info('K6-4估值表暂无数据，请先编制K6-4初始确认检查表')
+    return
+  }
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      ElMessage.info('K6-4估值表暂无行数据')
+      return
+    }
+    // 只带入资产类行（非负债），映射为减值测试行
+    const assetRows = parsed.filter((r: any) => r.category !== 'liability_group')
+    if (assetRows.length === 0) {
+      ElMessage.info('K6-4无资产类行可带入')
+      return
+    }
+    // 按名称去重
+    const existingNames = new Set(impairmentRows.value.map((r: any) => r.assetName))
+    const candidates = assetRows.filter((r: any) => {
+      const name = r.itemName || r.assetName || ''
+      return name && !existingNames.has(name)
+    })
+    if (candidates.length === 0) {
+      ElMessage.info('K6-4中所有资产项目已在减值测试表中')
+      return
+    }
+    // 构造完整行数据（含金额）直接注入
+    const newRows = candidates.map((r: any, i: number) => ({
+      rowId: `row-${Date.now()}-${i}`,
+      seqNo: impairmentRows.value.length + i + 1,
+      assetName: r.itemName || r.assetName || '',
+      bookValue: Number(r.bookValue) || 0,
+      fairValue: Number(r.fairValue) || 0,
+      fairValueBasis: r.salesBasis || r.marketBasis || r.estimateBasis || '',
+      sellingCost: Number(r.sellingCost) || 0,
+      fairValueNet: 0,
+      impairmentAmount: 0,
+      existingProvision: 0,
+      additionalProvision: 0,
+      conclusion: '',
+      remark: '从K6-4带入',
+    }))
+    // 追加到现有行
+    for (const row of newRows) {
+      impairmentRows.value.push(row as any)
+    }
+    // 触发重算（通过更新第一个新行的bookValue）
+    for (const row of newRows) {
+      updateCell(row.rowId, 'bookValue', row.bookValue)
+    }
+    ElMessage.success(`已从K6-4带入 ${newRows.length} 项资产（按名称去重，含账面/公允/出售费用）`)
+  } catch {
+    ElMessage.error('K6-4数据解析失败')
+  }
+}
+
+// ─── 导入导出 ────────────────────────────────────────────────────────────────
+
+const { exportTemplate, exportData, importData } = useK6ImportExport({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetCode: 'K6-5',
+})
+
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+function handleIECommand(cmd: string): void {
+  if (cmd === 'template') exportTemplate()
+  else if (cmd === 'export') exportData()
+  else if (cmd === 'import') fileInputRef.value?.click()
+}
+
+async function handleFileSelected(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  input.value = ''
+  const result = await importData(file)
+  if (result && result.rowCount > 0) {
+    ElMessage.success(`导入完成，${result.rowCount} 行`)
+  }
+}
+
+// ─── 转回上限校验（CAS42：转回金额不超过假设正常折旧后的账面） ────────────────
+
+const reversalOverLimitItems = computed(() => {
+  // 应补提 < 0 意味着转回；如果转回金额的绝对值 > 已计提的一定比例（简化判断：转回>已计提×50%），告警
+  // 严格校验需要"假设未划分时正常折旧调整后的账面"，当前无该字段→用简化规则
+  return impairmentRows.value.filter((row: any) => {
+    if (row.additionalProvision >= 0) return false // 补提或零不告警
+    // 转回金额（绝对值）
+    const reversalAmt = Math.abs(row.additionalProvision)
+    // 简化上限 = 已计提减值准备（不能转回超过已计提的）
+    return reversalAmt > row.existingProvision && row.existingProvision > 0
+  })
+})
+
+const hasReversalOverLimit = computed(() => reversalOverLimitItems.value.length > 0)
+
+// ─── 应补提→K6-3建议AJE ─────────────────────────────────────────────────────
+
+function pushToK6_3(): void {
+  const totalAdditional = subtotals.value.additionalProvision
+  if (Math.abs(totalAdditional) < 0.005) {
+    ElMessage.info('当前应补提为0，无需调整')
+    return
+  }
+
+  // 正=补提减值(借:资产减值损失/贷:持有待售减值准备)
+  // 负=转回(借:持有待售减值准备/贷:资产减值损失)
+  const isProvision = totalAdditional > 0
+  const suggestion = {
+    source: 'K6-5',
+    type: 'AJE',
+    summary: isProvision
+      ? `持有待售资产减值 - 补提减值准备 ${fmtAmt(totalAdditional)} 元`
+      : `持有待售资产减值 - 转回减值准备 ${fmtAmt(Math.abs(totalAdditional))} 元`,
+    entries: isProvision
+      ? [
+          { accountCode: '6701', accountName: '资产减值损失', debit: totalAdditional, credit: 0 },
+          { accountCode: '1481', accountName: '持有待售资产减值准备', debit: 0, credit: totalAdditional },
+        ]
+      : [
+          { accountCode: '1481', accountName: '持有待售资产减值准备', debit: Math.abs(totalAdditional), credit: 0 },
+          { accountCode: '6701', accountName: '资产减值损失', debit: 0, credit: Math.abs(totalAdditional) },
+        ],
+    amount: Math.abs(totalAdditional),
+  }
+
+  props.allResponses.set('K6-5-suggested-aje', {
+    item_id: 'K6-5-suggested-aje',
+    remark: JSON.stringify(suggestion),
+  })
+  emit('save', 'K6-5-suggested-aje', { remark: JSON.stringify(suggestion) })
+
+  eventBus.emit('adjustment:created', {
+    wpCode: 'K6',
+    source: 'K6-5-impairment',
+    accountCode: '1481',
+    ajeTotal: totalAdditional,
+    rjeTotal: 0,
+    projectId: props.projectId,
+  })
+
+  ElMessage.success(`已生成建议AJE（${isProvision ? '补提' : '转回'} ${fmtAmt(Math.abs(totalAdditional))} 元）并通知K6-3`)
+}
+
+// ─── 减值合计→K6-6处置组 ─────────────────────────────────────────────────────
+
+function pushToK6_6(): void {
+  const total = subtotals.value.impairmentAmount
+  if (total <= 0) {
+    ElMessage.info('当前减值合计为0，无需推送')
+    return
+  }
+  // 写入标准键供K6-6 syncFromK6_5 读取
+  props.allResponses.set('K6-5-impairment-total', {
+    item_id: 'K6-5-impairment-total',
+    remark: String(total),
+  })
+  emit('save', 'K6-5-impairment-total', { remark: String(total) })
+  ElMessage.success(`减值合计 ${fmtAmt(total)} 元已推送，请到K6-6点击"← 从K6-5联动"获取`)
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function openReview(id: string) {
@@ -455,6 +680,10 @@ function fmtAmt(val: number | null | undefined): string {
 /* 交叉验证提示 */
 .cross-alert {
   margin-bottom: 16px;
+}
+.reversal-alert {
+  margin-top: 12px;
+  margin-bottom: 4px;
 }
 
 /* 块卡片 */

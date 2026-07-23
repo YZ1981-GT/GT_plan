@@ -8,9 +8,9 @@
     <div class="guide-area">
       <div class="guide-grid">
         <div class="guide-step"><span class="step-num">①</span> 审定表(I5-1)确认TB取数→期末=期初+增加-减少→审定回写(1911)</div>
-        <div class="guide-step"><span class="step-num">②</span> 明细表(I5-2)逐项追踪→26列3区段Tab(基础|金额|检查)</div>
+        <div class="guide-step"><span class="step-num">②</span> 明细表(I5-2)类别滚动→原值|减值|净值（未审→调整→审定）</div>
         <div class="guide-step"><span class="step-num">③</span> 调整分录(I5-3)AJE/RJE录入→借贷平衡→推送A13</div>
-        <div class="guide-step"><span class="step-num">④</span> 针对性检查(I5-4)分类正确性/期限适当性/可回收性评估</div>
+        <div class="guide-step"><span class="step-num">④</span> 针对性检查(I5-4)抽凭核对 + 分类/期限/可回收性专项评估</div>
       </div>
     </div>
 
@@ -33,6 +33,38 @@
         <span class="stat-label">总进度</span>
       </div>
     </div>
+
+    <!-- 编制校验汇总 -->
+    <el-card v-if="prepIssues.length" shadow="never" class="prep-card">
+      <template #header>
+        <div class="section-title">
+          <span>编制校验汇总</span>
+          <el-tag size="small" :type="prepErrorCount ? 'danger' : 'warning'">
+            {{ prepIssues.length }} 项待处理
+          </el-tag>
+        </div>
+      </template>
+      <p class="prep-order">建议顺序：I5-2 → I5-1 带入 → I5-3 → I5-4 → 附注</p>
+      <ul class="prep-list">
+        <li v-for="(issue, idx) in prepIssues" :key="idx">
+          <el-tag
+            size="small"
+            :type="issue.level === 'error' ? 'danger' : 'warning'"
+            class="prep-code"
+            @click="handleNavigateByCode(issue.code)"
+          >{{ issue.code }}</el-tag>
+          {{ issue.message }}
+        </li>
+      </ul>
+    </el-card>
+    <el-alert
+      v-else
+      type="success"
+      :closable="false"
+      show-icon
+      title="编制校验：暂无跨表阻断/告警项"
+      class="prep-ok"
+    />
 
     <!-- 底稿目录表 -->
     <el-card shadow="never" class="index-card">
@@ -87,8 +119,10 @@
         <li>建议按序号顺序编制：程序表→审定表→明细表→调整分录→针对性检查→附注</li>
         <li>科目1911其他非流动资产（借方/资产类）：期末=期初+增加-减少</li>
         <li>审定数=未审数+AJE+RJE，审定表完成后自动回写TB科目1911</li>
-        <li>针对性检查：分类正确性(应否归入其他科目)/期限适当性(是否仍为非流动)/可回收性评估</li>
+        <li>针对性检查：抽凭核对(存在/发生、账证相符) + 分类正确性/期限适当性/可回收性专项评估</li>
         <li>附注有上市版/国企版，根据projectContext.business_category自动判断</li>
+        <li><strong>与 I4 长摊差异：</strong>I4 侧重摊销引擎与受益期；I5 侧重原值/减值/净值滚动、分类重分类（预付土地/工程款、合同资产非流动部分等），无直线摊销表。</li>
+        <li>I5-2 为四层滚动（原值未审→调整→减值→净值），比 spec 三 Tab 更贴近 Excel 原稿结构。</li>
       </ul>
     </details>
   </div>
@@ -107,6 +141,7 @@
  */
 import { computed } from 'vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import { buildI5ConsistencyDashboard } from '../../composables/i5ConsistencyModel'
 
 const props = defineProps<{
   wpId: string
@@ -131,53 +166,117 @@ interface SheetEntry {
   crossRef?: string
 }
 
+interface SheetDef {
+  seq: number
+  code: string
+  name: string
+  sheetName: string
+  fields: string[]
+  crossRef?: string
+  /** 加权进度：字段键 → 权重（合计 100） */
+  progressWeights?: Record<string, number>
+}
+
 /** 9 sheets from the I5 其他非流动资产 workpaper */
-const SHEET_DEFS: { seq: number; code: string; name: string; sheetName: string; fields: string[]; crossRef?: string }[] = [
+const SHEET_DEFS: SheetDef[] = [
   { seq: 1, code: '目录', name: '其他非流动资产（底稿目录）', sheetName: 'Tab_Index 底稿目录', fields: [] },
   { seq: 2, code: 'I5A', name: '其他非流动资产实质性程序表', sheetName: 'Procedure_Table_I5A 其他非流动资产实质性程序表', fields: ['I5A-'] },
-  { seq: 3, code: 'I5-1', name: '其他非流动资产审定表', sheetName: 'Adjudication_I5_1 审定表', fields: ['I5-adj-'] },
-  { seq: 4, code: 'I5-2', name: '其他非流动资产明细表', sheetName: 'Detail_I5_2 明细表', fields: ['I5-2-'] },
-  { seq: 5, code: 'I5-3', name: '其他非流动资产调整分录', sheetName: 'Adjustment_I5_3 调整分录汇总', fields: ['I5-3-'], crossRef: 'A13' },
-  { seq: 6, code: 'I5-4', name: '其他非流动资产针对性检查', sheetName: 'Targeted_Check_I5_4 针对性检查表', fields: ['I5-4-'] },
-  { seq: 7, code: '附注(上市)', name: '附注-上市公司', sheetName: 'Disclosure_Listed 附注上市', fields: ['I5-disc-L-'] },
-  { seq: 8, code: '附注(国企)', name: '附注-国有企业', sheetName: 'Disclosure_SOE 附注国企', fields: ['I5-disc-S-'] },
+  {
+    seq: 3, code: 'I5-1', name: '其他非流动资产审定表', sheetName: 'Adjudication_I5_1 审定表',
+    fields: ['I5-adj-rows', 'I5-adj-audit-note', 'I5-adj-audit-conclusion', 'I5-adj-significant-matters', 'I5-adj-ownership-pledge'],
+    progressWeights: { 'I5-adj-rows': 50, 'I5-adj-audit-note': 20, 'I5-adj-audit-conclusion': 30 },
+  },
+  { seq: 4, code: 'I5-2', name: '其他非流动资产明细表', sheetName: 'Detail_I5_2 明细表', fields: ['I5-2-rows'] },
+  {
+    seq: 5, code: 'I5-3', name: '其他非流动资产调整分录', sheetName: 'Adjustment_I5_3 调整分录汇总',
+    fields: ['I5-3-rows', 'I5-3-audit-note', 'I5-3-audit-conclusion'],
+    crossRef: 'A13',
+    progressWeights: { 'I5-3-rows': 60, 'I5-3-audit-note': 20, 'I5-3-audit-conclusion': 20 },
+  },
+  {
+    seq: 6, code: 'I5-4', name: '其他非流动资产针对性检查', sheetName: 'Targeted_Check_I5_4 针对性检查表',
+    fields: ['I5-4-rows', 'I5-4-sample-meta', 'I5-4-audit-note', 'I5-4-audit-conclusion'],
+    progressWeights: { 'I5-4-rows': 40, 'I5-4-sample-meta': 20, 'I5-4-audit-note': 20, 'I5-4-audit-conclusion': 20 },
+  },
+  { seq: 7, code: '附注(上市)', name: '附注-上市公司', sheetName: 'Disclosure_Listed 附注上市', fields: ['I5-disc-L-', 'I5-disc-listed-', 'I5-disclosure-listed-', 'I5-disc-movement-'] },
+  { seq: 8, code: '附注(国企)', name: '附注-国有企业', sheetName: 'Disclosure_SOE 附注国企', fields: ['I5-disc-S-', 'I5-disc-soe-', 'I5-disclosure-soe-'] },
   { seq: 9, code: 'I5-全', name: '底稿全览(OO)', sheetName: 'Full_Workbook', fields: [] },
 ]
 
+const consistency = computed(() => buildI5ConsistencyDashboard(props.allResponses))
+const prepIssues = computed(() => consistency.value.issues)
+const prepErrorCount = computed(() => consistency.value.errorCount)
+
 /** Determine per-sheet status from checklist_responses */
-function _getSheetStatus(fields: string[]): { status: SheetStatus; progress: number } {
+function _fieldFilled(value: unknown): boolean {
+  if (value == null || value === '') return false
+  if (typeof value === 'object') {
+    const remark = (value as any).remark ?? (value as any).conclusion
+    if (remark == null || remark === '') return false
+    if (typeof remark === 'string') {
+      const t = remark.trim()
+      if (!t || t === '[]' || t === '{}') return false
+    }
+    return true
+  }
+  return true
+}
+
+function _getSheetStatus(def: SheetDef): { status: SheetStatus; progress: number } {
+  const fields = def.fields
   if (fields.length === 0) return { status: '未编制', progress: 0 }
 
-  let totalFields = 0
+  if (def.progressWeights) {
+    let progress = 0
+    let hasAny = false
+    for (const [key, weight] of Object.entries(def.progressWeights)) {
+      if (_fieldFilled(props.allResponses.get(key))) {
+        progress += weight
+        hasAny = true
+      }
+    }
+    if (!hasAny) return { status: '未编制', progress: 0 }
+    const conclusionKey = fields.find((f) => f.includes('conclusion'))
+    const hasConclusion = conclusionKey ? _fieldFilled(props.allResponses.get(conclusionKey)) : false
+    if (hasConclusion && progress >= 90) return { status: '已复核', progress: 100 }
+    return { status: '编制中', progress: Math.min(progress, 99) }
+  }
+
+  let totalFields = fields.length
   let filledFields = 0
   let hasReview = false
 
-  for (const [key, value] of props.allResponses) {
-    for (const prefix of fields) {
-      if (key.startsWith(prefix)) {
-        totalFields++
-        if (value !== null && value !== undefined && value !== '') {
+  for (const key of fields) {
+    const value = props.allResponses.get(key)
+    if (_fieldFilled(value)) filledFields++
+    if (key.includes('-review') && _fieldFilled(value)) hasReview = true
+  }
+
+  // 兼容旧前缀键（如 I5-adj-note 等）
+  if (filledFields === 0) {
+    for (const [key, value] of props.allResponses) {
+      for (const field of fields) {
+        const prefix = field.replace(/-rows$/, '-').replace(/-(note|conclusion|meta)$/, '-')
+        if (key.startsWith(prefix) && key !== field && _fieldFilled(value)) {
           filledFields++
-        }
-        if (key.includes('-review') && value) {
-          hasReview = true
+          break
         }
       }
     }
   }
 
-  if (totalFields === 0) return { status: '未编制', progress: 0 }
+  if (filledFields === 0) return { status: '未编制', progress: 0 }
 
   const progress = Math.round((filledFields / totalFields) * 100)
 
   if (hasReview && progress >= 90) return { status: '已复核', progress: 100 }
-  if (filledFields > 0) return { status: '编制中', progress }
+  if (filledFields > 0) return { status: '编制中', progress: Math.min(progress, 99) }
   return { status: '未编制', progress: 0 }
 }
 
 const sheets = computed<SheetEntry[]>(() => {
   return SHEET_DEFS.map((def) => {
-    const { status, progress } = _getSheetStatus(def.fields)
+    const { status, progress } = _getSheetStatus(def)
     return {
       seq: def.seq,
       code: def.code,
@@ -223,6 +322,13 @@ function progressColor(pct: number): string {
 function handleNavigate(row: SheetEntry) {
   emit('navigate-sheet', row.sheetName)
 }
+
+function handleNavigateByCode(code: string) {
+  const found = sheets.value.find((s) => s.code === code || s.code.startsWith(code) || s.name.includes(code))
+  if (found) emit('navigate-sheet', found.sheetName)
+  else if (code.includes('附注')) emit('navigate-sheet', 'Disclosure_Listed 附注上市')
+  else emit('navigate-sheet', code)
+}
 </script>
 
 <style scoped>
@@ -255,6 +361,13 @@ function handleNavigate(row: SheetEntry) {
 .stat-inprogress .stat-value { color: #e6a23c; }
 .stat-pending .stat-value { color: #909399; }
 .stat-total .stat-value { color: var(--el-color-primary); }
+
+/* 编制校验 */
+.prep-card { margin-bottom: 16px; }
+.prep-ok { margin-bottom: 16px; }
+.prep-order { margin: 0 0 8px; font-size: 12px; color: var(--el-text-color-secondary); }
+.prep-list { margin: 0; padding-left: 4px; list-style: none; line-height: 1.9; }
+.prep-code { margin-right: 8px; cursor: pointer; }
 
 /* 目录卡片 */
 .section-title { display: flex; align-items: center; justify-content: space-between; }

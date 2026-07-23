@@ -284,6 +284,32 @@ export function useD6RelatedParty(options: UseD6RelatedPartyOptions) {
     (v) => debouncedSave('D6-5-note-conclusion', { remark: v }),
   )
 
+  /**
+   * 关联方完整性检查：related_party_registry中已登记但D6-2未识别的关联方
+   */
+  const missingRelatedParties: ComputedRef<Array<{ name: string; type: string }>> = computed(() => {
+    // 从render-config project_context获取已登记关联方
+    const registryRaw = allResponses.value.get('project_context_related_parties')?.remark
+    let registry: Array<{ name: string; type: string }> = []
+    if (registryRaw) {
+      try { registry = JSON.parse(registryRaw) } catch { /* ignore */ }
+    }
+    if (registry.length === 0) return []
+
+    // D6-2已识别的关联方名称集合
+    const identified = new Set(
+      rows.value
+        .filter(r => r.partyName)
+        .map(r => r.partyName.trim().toLowerCase()),
+    )
+
+    // 差集
+    return registry.filter(rp => {
+      const normalized = (rp.name || '').trim().toLowerCase()
+      return normalized && !identified.has(normalized)
+    })
+  })
+
   // ─── Return ──────────────────────────────────────────────────────────
 
   return {
@@ -294,6 +320,7 @@ export function useD6RelatedParty(options: UseD6RelatedPartyOptions) {
     updateCell,
     importFromDetail,
     auditNotes,
+    missingRelatedParties,
   }
 }
 

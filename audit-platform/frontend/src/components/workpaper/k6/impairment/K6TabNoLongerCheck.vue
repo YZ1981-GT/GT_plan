@@ -14,7 +14,17 @@
     <div class="section-head">
       <h3 class="sheet-title">K6-7 检查表（不再满足持有待售条件）</h3>
       <div class="head-actions">
-        <el-button size="small" type="primary" plain @click="handleAiGenerate">
+        <el-dropdown size="small" trigger="click" :disabled="isReadonly" @command="handleIECommand">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="template">导出模板</el-dropdown-item>
+              <el-dropdown-item command="export">导出数据</el-dropdown-item>
+              <el-dropdown-item command="import">导入数据</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <el-button size="small" type="primary" plain :loading="aiLoading" @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="openReview('K6-7-no-longer-check')">💬复核</el-button>
@@ -202,6 +212,57 @@
             </el-tooltip>
           </template>
         </el-table-column>
+        <el-table-column label="现账面" width="120" align="right">
+          <template #header>
+            <el-tooltip content="当前持有待售资产账面价值（从K6-2或手工录入）" placement="top">
+              <span class="hint-header">现账面</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <el-input-number
+              :model-value="row.currentBookValue"
+              :disabled="isReadonly"
+              :controls="false"
+              :precision="2"
+              size="small"
+              style="width: 100%"
+              @change="(v: number | undefined) => updateCell(row.rowId, 'currentBookValue', v ?? 0)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="调整差额" width="120" align="right">
+          <template #header>
+            <span class="formula-header" title="= 调整后账面 - 现账面（正=转回/负=追加减值，计入当期损益）">调整差额</span>
+          </template>
+          <template #default="{ row }">
+            <el-tooltip content="= 调整后账面 - 现账面（计入当期损益）" placement="top">
+              <span :class="['formula-value', { 'diff-positive': (row.adjustmentDiff || 0) > 0, 'diff-negative': (row.adjustmentDiff || 0) < 0 }]">
+                {{ fmtAmt(row.adjustmentDiff) }}
+              </span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column label="可收回确定方法" width="130">
+          <template #header>
+            <el-tooltip content="CAS8：可收回金额=MAX(公允价值减处置费用后的净额, 预计未来现金流量现值)" placement="top">
+              <span class="hint-header">可收回确定方法</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <el-select
+              :model-value="row.recoverableMethod"
+              :disabled="isReadonly"
+              size="small"
+              placeholder="选择"
+              clearable
+              @change="(v: string) => updateCell(row.rowId, 'recoverableMethod', v || '')"
+            >
+              <el-option label="公允净额" value="fair_value_net" />
+              <el-option label="使用价值(DCF)" value="value_in_use" />
+              <el-option label="评估报告" value="appraisal" />
+            </el-select>
+          </template>
+        </el-table-column>
         <el-table-column label="不再满足原因" min-width="140">
           <template #default="{ row }">
             <el-input
@@ -310,6 +371,11 @@
       <div v-if="checkItems.length > 0" class="valuation-summary">
         <span class="summary-item">资产合计（{{ subtotals.assetCount }} 项）— ④净额: <strong>{{ fmtAmt(subtotals.assetNet) }}</strong> ｜ 调整后账面: <strong>{{ fmtAmt(subtotals.assetAdjusted) }}</strong></span>
         <span class="summary-item">负债合计（{{ subtotals.liabilityCount }} 项）— ④净额: <strong>{{ fmtAmt(subtotals.liabilityNet) }}</strong> ｜ 调整后账面: <strong>{{ fmtAmt(subtotals.liabilityAdjusted) }}</strong></span>
+        <span class="summary-item" :class="{ 'diff-positive': totalAdjustmentDiff > 0, 'diff-negative': totalAdjustmentDiff < 0 }">
+          调整差额合计: <strong>{{ fmtAmt(totalAdjustmentDiff) }}</strong>
+          <span v-if="totalAdjustmentDiff > 0">（转回，贷记资产减值损失）</span>
+          <span v-else-if="totalAdjustmentDiff < 0">（追加减值，借记资产减值损失）</span>
+        </span>
       </div>
 
       <!-- 分类新增按钮 -->
@@ -317,6 +383,8 @@
         <el-button size="small" @click="handleAddItem('asset_noncurrent')">+ 不再满足的非流动资产</el-button>
         <el-button size="small" @click="handleAddItem('asset_group')">+ 处置组资产</el-button>
         <el-button size="small" @click="handleAddItem('liability_group')">+ 处置组负债</el-button>
+        <el-button size="small" type="success" plain @click="importFromK6_2">从K6-2明细带入</el-button>
+        <el-button size="small" type="warning" plain :disabled="!hasAdjustmentDiff" @click="pushDiffToK6_3">调整差额→K6-3建议AJE</el-button>
       </div>
     </el-card>
 
@@ -325,7 +393,7 @@
       <template #header>
         <div class="section-card-header">
           <span>审计说明与结论</span>
-          <el-button size="small" type="primary" plain @click="handleAiGenerate">
+          <el-button size="small" type="primary" plain :loading="aiLoading" @click="handleAiGenerate">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -358,12 +426,24 @@
       <ul>
         <li>④净额 = ①被划归前账面 − ②假设折旧摊销 − ③假设减值（系统自动计算）</li>
         <li>调整后账面价值 = min(④净额, 可收回金额)，即 CAS42 第22条孰低计量</li>
+        <li>调整差额 = 调整后账面 − 现账面（正值=转回贷记损益，负值=追加减值借记损益）</li>
+        <li>可收回金额确定方法：CAS8 取 MAX(公允价值减处置费用后的净额, 使用价值/DCF)</li>
         <li>按"非流动资产 / 处置组资产 / 处置组负债"分类录入，可用"处置组/主体"列标注子公司A、分公司B</li>
         <li>逐项判定合规性：合规 / 不合规 / 不适用；"不合规"项将触发顶部红色摘要提示</li>
         <li>决议索引/协议索引应指向不再处置的决议、协议等支持性证据底稿；📎列记录抽凭编号</li>
-        <li>调整差额（调整后账面 − 现账面）计入当期损益，需与资产减值损失/资产处置损益勾稽</li>
+        <li>"调整差额→K6-3建议AJE"按钮：自动汇总差额生成建议调整分录推入K6-3</li>
+        <li>"从K6-2明细带入"：从K6-2已登记的资产中筛选尚未出现在K6-7的项目带入</li>
       </ul>
     </details>
+
+    <!-- 隐藏的文件上传input -->
+    <input
+      ref="fileInputRef"
+      type="file"
+      accept=".xlsx,.xls"
+      style="display: none"
+      @change="handleFileSelected"
+    />
   </div>
 </template>
 
@@ -374,15 +454,20 @@
  * 对照源模板重建：
  * - ①②③④ 净额分解：④净额 = ①被划归前账面 − ②假设折旧摊销 − ③假设减值
  * - 调整后账面 = min(④净额, 可收回金额)（CAS42 第22条孰低）
+ * - 新增：现账面/调整差额/可收回确定方法/从K6-2带入/差额→K6-3建议AJE/导入导出
  * - 分类（非流动资产/处置组资产/处置组负债）+ 处置组主体 + 决议/协议索引
  * - 分区小计 + 逐项合规判定 + 不合规红色摘要 + 行级抽凭
  * - 内嵌"持有待售会计政策"编制说明（源模板 R50-R57）
  *
  * Spec: .kiro/specs/k6-held-for-sale/ Task 4.6 · Requirements 7.1-7.4
  */
-import { inject, toRef, type Ref } from 'vue'
+import { ref, computed, inject, toRef, type Ref } from 'vue'
 import { MagicStick, Delete } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useK6NoLongerCheck, type NoLongerCategory } from '@/components/workpaper/composables/useK6NoLongerCheck'
+import { useK6ImportExport } from '@/components/workpaper/composables/useK6ImportExport'
+import { eventBus } from '@/utils/eventBus'
+import http from '@/utils/http'
 
 const props = defineProps<{
   wpId: string
@@ -400,6 +485,7 @@ const emit = defineEmits<{
 }>()
 
 const openReview = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const fileInputRef = ref<HTMLInputElement | null>(null)
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -423,6 +509,32 @@ const {
   saveResponse,
 })
 
+// ─── 导入导出 ────────────────────────────────────────────────────────────────
+
+const { exportTemplate, exportData, importData } = useK6ImportExport({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetCode: 'K6-7',
+})
+
+// ─── 调整差额计算（adjustmentDiff = adjustedBookValue - currentBookValue）───
+
+const totalAdjustmentDiff = computed(() => {
+  return checkItems.value.reduce((sum, item) => {
+    const current = (item as any).currentBookValue || 0
+    const adjusted = item.adjustedBookValue || 0
+    return sum + (adjusted - current)
+  }, 0)
+})
+
+const hasAdjustmentDiff = computed(() => {
+  return checkItems.value.some((item) => {
+    const current = (item as any).currentBookValue || 0
+    const adjusted = item.adjustedBookValue || 0
+    return Math.abs(adjusted - current) > 0.005
+  })
+})
+
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
 function handleAddItem(category: NoLongerCategory): void {
@@ -437,8 +549,187 @@ function handleConclusionSave(): void {
   saveConclusion()
 }
 
-function handleAiGenerate(): void {
-  emit('save', 'K6-7-ai-trigger', { remark: 'no-longer-eval' })
+// ─── AI辅助（真实接入/ai/generate-text） ─────────────────────────────────────
+
+const aiLoading = ref(false)
+
+async function handleAiGenerate(): Promise<void> {
+  if (props.isReadonly || aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const nonCompliantNames = nonCompliantItems.value.map((i: any) => i.assetName || '未命名').join('、')
+    const context: Record<string, string> = {
+      '检查项数': String(checkItems.value.length),
+      '不合规项数': String(nonCompliantItems.value.length),
+      '不合规项': nonCompliantNames || '无',
+      '资产净额合计': String(subtotals.value.assetNet || 0),
+      '资产调整后账面合计': String(subtotals.value.assetAdjusted || 0),
+      '负债净额合计': String(subtotals.value.liabilityNet || 0),
+      '负债调整后账面合计': String(subtotals.value.liabilityAdjusted || 0),
+      '调整差额合计': String(totalAdjustmentDiff.value),
+    }
+    const resp = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'k6-no-longer-conclusion',
+      context,
+      prompt: '根据CAS42第22条不再满足持有待售条件检查结果，生成审计结论（包括：是否及时终止分类、孰低计量是否恰当、调整差额是否正确计入当期损益、可收回金额确定方法是否合理）',
+      existingContent: auditConclusion.value,
+    })
+    const text = resp?.data?.content || resp?.data?.text || resp?.content || ''
+    if (text) {
+      auditConclusion.value = text
+      saveConclusion()
+      ElMessage.success('AI结论已生成')
+    }
+  } catch (e: any) {
+    ElMessage.error('AI生成失败: ' + (e?.message || '未知错误'))
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+// ─── 从K6-2明细表带入 ────────────────────────────────────────────────────────
+
+function importFromK6_2(): void {
+  // K6-2 useK6Detail 持久化键为 K6-2-rows
+  const k6_2_item = props.allResponses.get('K6-2-rows')
+  const raw = k6_2_item?.remark ?? k6_2_item?.conclusion ?? (typeof k6_2_item === 'string' ? k6_2_item : null)
+  if (!raw) {
+    ElMessage.info('K6-2明细表暂无数据，请先编制K6-2明细表')
+    return
+  }
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      ElMessage.info('K6-2明细表暂无行数据')
+      return
+    }
+    // 按名称去重（已在K6-7中的不再带入）
+    const existingNames = new Set(checkItems.value.map(i => i.assetName))
+    const candidates = parsed.filter((r: any) => r.assetName && !existingNames.has(r.assetName))
+    if (candidates.length === 0) {
+      ElMessage.info('K6-2中所有项目已在K6-7检查表中')
+      return
+    }
+    // 带入：填①被划归前账面=K6-2的bookValue，现账面=K6-2的bookValue
+    let importCount = 0
+    for (const r of candidates) {
+      const category: NoLongerCategory = r.category === '处置组负债' ? 'liability_group'
+        : r.category === '处置组资产' ? 'asset_group'
+        : 'asset_noncurrent'
+      // 直接构造行（不走ElMessageBox弹窗，批量带入）
+      const newItem = {
+        category,
+        assetName: r.assetName,
+        preClassBookValue: Number(r.costValue) || Number(r.bookValue) || 0,
+        currentBookValue: Number(r.bookValue) || 0,
+        recoverableAmount: 0,
+        assumedDepreciation: 0,
+        assumedImpairment: 0,
+      }
+      checkItems.value.push({
+        rowId: `row-${Date.now()}-${importCount}`,
+        seqNo: checkItems.value.length + 1,
+        groupName: '',
+        netValue: newItem.preClassBookValue,
+        adjustedBookValue: 0,
+        noLongerReason: '',
+        reclassificationDate: '',
+        decisionRef: '',
+        agreementRef: '',
+        status: '' as any,
+        voucherRef: '',
+        conclusion: '',
+        remark: '从K6-2带入',
+        ...newItem,
+      } as any)
+      importCount++
+    }
+    // 重新编号 + 重算 + 持久化
+    checkItems.value.forEach((r, i) => { r.seqNo = i + 1 })
+    saveResponse('K6-7-rows', { remark: JSON.stringify(checkItems.value) })
+    ElMessage.success(`已从K6-2带入 ${importCount} 项（按名称去重）`)
+  } catch {
+    ElMessage.error('K6-2数据解析失败')
+  }
+}
+
+// ─── 调整差额→K6-3建议AJE ───────────────────────────────────────────────────
+
+function pushDiffToK6_3(): void {
+  if (!hasAdjustmentDiff.value) {
+    ElMessage.info('当前无调整差额')
+    return
+  }
+  // 汇总所有有差额的行
+  const itemsWithDiff = checkItems.value.filter((item) => {
+    const current = (item as any).currentBookValue || 0
+    const adjusted = item.adjustedBookValue || 0
+    return Math.abs(adjusted - current) > 0.005
+  })
+  const totalDiff = totalAdjustmentDiff.value
+
+  // 构造建议AJE分录（借/贷由差额方向决定）
+  // 差额>0 = 转回（调整后>现账面，减少减值准备）：借:持有待售资产减值准备 / 贷:资产减值损失
+  // 差额<0 = 追加减值（调整后<现账面）：借:资产减值损失 / 贷:持有待售资产减值准备
+  const suggestion = {
+    source: 'K6-7',
+    type: 'AJE',
+    summary: `不再满足持有待售条件 - ${itemsWithDiff.map(i => i.assetName).join('、')} - 调整差额`,
+    entries: totalDiff > 0
+      ? [
+          { accountCode: '1481', accountName: '持有待售资产减值准备', debit: Math.abs(totalDiff), credit: 0 },
+          { accountCode: '6701', accountName: '资产减值损失', debit: 0, credit: Math.abs(totalDiff) },
+        ]
+      : [
+          { accountCode: '6701', accountName: '资产减值损失', debit: Math.abs(totalDiff), credit: 0 },
+          { accountCode: '1481', accountName: '持有待售资产减值准备', debit: 0, credit: Math.abs(totalDiff) },
+        ],
+    amount: Math.abs(totalDiff),
+    items: itemsWithDiff.map(i => ({
+      assetName: i.assetName,
+      adjustedBookValue: i.adjustedBookValue,
+      currentBookValue: (i as any).currentBookValue || 0,
+      diff: i.adjustedBookValue - ((i as any).currentBookValue || 0),
+    })),
+  }
+
+  // 写入allResponses供K6-3读取
+  props.allResponses.set('K6-7-suggested-aje', {
+    item_id: 'K6-7-suggested-aje',
+    remark: JSON.stringify(suggestion),
+  })
+  emit('save', 'K6-7-suggested-aje', { remark: JSON.stringify(suggestion) })
+
+  // 发eventBus通知K6-3（如果在同一会话打开）
+  eventBus.emit('adjustment:created', {
+    wpCode: 'K6',
+    source: 'K6-7-no-longer',
+    accountCode: '1481',
+    ajeTotal: totalDiff,
+    rjeTotal: 0,
+    projectId: props.projectId,
+  })
+
+  ElMessage.success(`已生成建议AJE（差额 ${fmtAmt(totalDiff)} 元）并通知K6-3，请在K6-3确认`)
+}
+
+// ─── 导入导出 ────────────────────────────────────────────────────────────────
+
+function handleIECommand(cmd: string): void {
+  if (cmd === 'template') exportTemplate()
+  else if (cmd === 'export') exportData()
+  else if (cmd === 'import') fileInputRef.value?.click()
+}
+
+async function handleFileSelected(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  input.value = ''
+  const result = await importData(file)
+  if (result && result.rowCount > 0) {
+    ElMessage.success(`导入完成，${result.rowCount} 行`)
+  }
 }
 
 // ─── Table row class ─────────────────────────────────────────────────────────
@@ -494,6 +785,8 @@ function fmtAmt(v: number | null | undefined): string {
 .hint-header { border-bottom: 1px dotted #c0c4cc; cursor: help; }
 .formula-header { border-bottom: 1px dashed #409eff; cursor: help; }
 .formula-value { color: #409eff; font-weight: 500; font-variant-numeric: tabular-nums; }
+.diff-positive { color: #059669; font-weight: 500; }
+.diff-negative { color: #dc2626; font-weight: 500; }
 
 :deep(.non-compliant-row) { background-color: #fef0f0 !important; }
 :deep(.liability-row) { background-color: #fef6f6; }

@@ -2,7 +2,15 @@
  * I2-10 研发人员工时检查表 — 纯模型
  * 对齐致同源表：项目→人员→工时→分配依据→薪酬计提→附件索引
  * 数字增强：同期总工时/占比（对应编制说明中兼职分功能工时统计）
+ *
+ * 持久化字段位于 I2TabWorkHourCheck.vue（未抽取独立 composable，逻辑量较小）：
+ * load/save/normalize 直接内联；此处集中导出 STORAGE_KEY 供该 Vue 及跨sheet引用共用，避免字符串硬编码分裂。
  */
+
+/** checklist_responses item_id：行数据 / 审计说明 / 审计结论（供 I2TabWorkHourCheck.vue 共用） */
+export const I2_WORKHOUR_STORAGE_KEY = 'I2-10-rows'
+export const I2_WORKHOUR_AUDIT_NOTE_KEY = 'I2-10-audit-note'
+export const I2_WORKHOUR_AUDIT_CONCLUSION_KEY = 'I2-10-audit-conclusion'
 
 export const I2_WORKHOUR_OBJECTIVES = [
   '确认利润表中记录的研发费用已发生，与被审计单位有关，且已记录于恰当的账户（发生、权利和义务、分类）。',

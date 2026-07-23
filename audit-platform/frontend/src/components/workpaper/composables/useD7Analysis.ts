@@ -13,6 +13,7 @@ import {
   calcChangeRate,
   topNByField,
 } from './useD7FormulaEngine'
+import { eventBus } from '@/utils/eventBus'
 import type { ChecklistResponse } from './useD7FormData'
 import type { DetailRow } from './useD7Detail'
 
@@ -175,13 +176,12 @@ export function useD7Analysis(options: UseD7AnalysisOptions) {
     for (const row of top10Rows.value) {
       if (typeof row.changeRate === 'number' && Math.abs(row.changeRate) > 0.3) {
         try {
-          window.dispatchEvent(new CustomEvent('analytical:significant-change', {
-            detail: {
-              wpCode: 'D7',
-              changeRate: row.changeRate,
-              item: row.customerName,
-            },
-          }))
+          eventBus.emit('analytical:significant-change', {
+            wpCode: 'D7',
+            changeRate: row.changeRate,
+            item: row.customerName,
+            timestamp: Date.now(),
+          })
         } catch { /* non-blocking */ }
         break
       }
@@ -255,6 +255,60 @@ export function useD7Analysis(options: UseD7AnalysisOptions) {
     persistCreditRows()
   }
 
+  // ─── 从序时账导入（调用后端 d7_ledger_analysis resolver） ──────────
+
+  async function importFromLedger(): Promise<void> {
+    try {
+      const http = (await import('@/utils/http')).default
+      const year = parseInt(allResponses.value.get('D7-4-audit-year')?.remark || '0') ||
+        new Date().getFullYear() - 1
+      const res = await http.get('/api/auto-data/d7_ledger_analysis', {
+        params: { project_id: options.projectId.value, year },
+      })
+      const data = res.data?.data || res.data || {}
+
+      // Fill debit rows
+      const debitByCounter: Array<{ counter_account: string; amount: number }> = data.debit_by_counter || []
+      if (debitByCounter.length > 0) {
+        debitRows.value = debitByCounter.map((r: any) => ({
+          rowId: generateRowId(),
+          item: r.counter_account || '未知',
+          amount: r.amount || 0,
+          dataSource: '序时账导入',
+          remark: '',
+        }))
+        persistDebitRows()
+      }
+
+      // Fill credit rows
+      const creditByCounter: Array<{ counter_account: string; amount: number }> = data.credit_by_counter || []
+      if (creditByCounter.length > 0) {
+        creditRows.value = creditByCounter.map((r: any) => ({
+          rowId: generateRowId(),
+          item: r.counter_account || '未知',
+          amount: r.amount || 0,
+          dataSource: '序时账导入',
+          remark: '',
+        }))
+        persistCreditRows()
+      }
+
+      // Update TB totals for cross-check
+      if (data.debit_total) {
+        debouncedSave('D7-4-debit-total', { remark: String(data.debit_total) })
+      }
+      if (data.credit_total) {
+        debouncedSave('D7-4-credit-total', { remark: String(data.credit_total) })
+      }
+
+      const { ElMessage } = await import('element-plus')
+      ElMessage.success(`已从序时账导入：借方${debitByCounter.length}项，贷方${creditByCounter.length}项`)
+    } catch {
+      const { ElMessage } = await import('element-plus')
+      ElMessage.error('从序时账导入失败，请稍后重试')
+    }
+  }
+
   // ─── Return ──────────────────────────────────────────────────────────
 
   return {
@@ -269,6 +323,7 @@ export function useD7Analysis(options: UseD7AnalysisOptions) {
     isHighConcentration,
     auditNotes,
     publishSignificantChange,
+    importFromLedger,
     addDebitRow,
     addCreditRow,
     removeDebitRow,

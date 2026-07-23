@@ -268,6 +268,17 @@ export function useD5CrossSheet(options: UseD5CrossSheetOptions) {
     }
   })
 
+  // ─── D5 vs D1 跨底稿勾稽提示 ────────────────────────────────────────
+
+  /**
+   * D5审定合计 + D1应收票据审定 应≈ TB(1121+1124)
+   * 本 computed 仅提供 D5 侧数据，D1 侧需主入口从外部注入
+   */
+  const d5AuditedTotal: ComputedRef<number> = computed(() => {
+    const agg = categoryAggregation.value
+    return agg.notesReceivable.current + agg.accountsReceivable.current
+  })
+
   // ─── Return ────────────────────────────────────────────────────────────
 
   return {
@@ -281,6 +292,8 @@ export function useD5CrossSheet(options: UseD5CrossSheetOptions) {
     adjudicationForDisclosure,
     // D5-4 公允价值合计
     fairValueTotal,
+    // D5 vs D1 跨底稿勾稽
+    d5AuditedTotal,
     // 状态
     crossSheetStatus,
   }

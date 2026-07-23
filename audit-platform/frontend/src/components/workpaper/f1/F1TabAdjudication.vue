@@ -48,6 +48,23 @@
         style="margin-bottom: 12px"
       />
 
+      <!-- F1-3 调整分录勾稽告警 -->
+      <el-alert
+        v-if="adjustmentReconcile.warning"
+        type="warning"
+        :title="adjustmentReconcile.warning"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 12px"
+      >
+        <template #default>
+          <div>{{ adjustmentReconcile.warning }}</div>
+          <span class="chip-wrap" style="margin-top: 4px; display: inline-block">
+            <GtIndexChip value="wp:F1-3" :context-project-id="projectId" />
+          </span>
+        </template>
+      </el-alert>
+
       <!-- 双区块表格 -->
       <div v-for="section in sections" :key="section.sectionKey" class="adj-section">
         <h4 class="section-title">{{ section.sectionLabel }}</h4>
@@ -252,6 +269,8 @@ const props = defineProps<{
   crossSheet: ReturnType<typeof useF1CrossSheet>
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  /** 后端 render 提供的 1123 试算数（只读回退 seed） */
+  tbAmountSeed?: number
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
@@ -264,6 +283,7 @@ const {
   trialBalanceAmount,
   trialBalanceDiff,
   crossValidationWarning,
+  adjustmentReconcile,
   auditNotes,
   updateCell,
   publishAdjudicated,
@@ -275,6 +295,7 @@ const {
   debouncedSave: props.debouncedSave,
   crossSheet: props.crossSheet,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
+  tbAmountSeed: computed(() => props.tbAmountSeed ?? 0) as unknown as Ref<number>,
 })
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(wpIdRef)

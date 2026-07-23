@@ -29,6 +29,9 @@ class CutoffTestRequest(BaseModel):
     days_before: int = 5
     days_after: int = 5
     amount_threshold: float = 10000
+    # 显式截止基准日（YYYY-MM-DD）；缺省时服务端回退 year-12-31，
+    # 支持期中/短期/非自然年度项目围绕正确日期抽样。
+    cutoff_date: str | None = None
 
 
 class AgingBracket(BaseModel):
@@ -63,6 +66,7 @@ async def cutoff_test(
     return await svc.run_cutoff_test(
         db, project_id, req.year, req.account_codes,
         req.days_before, req.days_after, req.amount_threshold,
+        cutoff_date=req.cutoff_date,
     )
 
 

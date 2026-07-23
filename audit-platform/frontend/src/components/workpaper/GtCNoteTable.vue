@@ -783,9 +783,36 @@ async function onStandardSwitch(newSub: string | number | boolean | undefined) {
   debounceSave()
 }
 function onJumpToReference(refCode: string) { if (refCode) emit('jump-to-reference', refCode) }
+
+/**
+ * 派生 _columns 列头元数据（spec disclosure-table-sync-convergence Task 8）：
+ * 直接取 schema 的 sub_tables[].columns[]（label 即对照源模板编制的中文列头，天然复用零杜撰）。
+ * key=field（与行对象键一致），is_label 由 labelColumnField 判定，format 由 render/format 映射。
+ */
+function buildSyncColumns(): Record<string, Array<{ key: string; label: string; is_label?: boolean; format?: string }>> {
+  const out: Record<string, Array<{ key: string; label: string; is_label?: boolean; format?: string }>> = {}
+  for (const st of allSubTables.value) {
+    if (!(st.id in subTableData.value)) continue
+    const vcols = visibleColumns(st)
+    if (!vcols.length) continue
+    const labelField = labelColumnField(st, vcols)
+    out[st.id] = vcols.map((c) => {
+      const render = String(c.render ?? '')
+      const fmt = /amount/.test(render) ? 'amount' : /percent/.test(render) ? 'percent' : undefined
+      return {
+        key: c.field,
+        label: c.label,
+        ...(c.field === labelField ? { is_label: true } : {}),
+        ...(fmt ? { format: fmt } : {}),
+      }
+    })
+  }
+  return out
+}
+
 async function onSyncToDisclosureNotes() {
   if (!sectionId.value) { ElMessage.warning('未配置附注章节号（section_id），无法同步'); return }
-  const payload: SyncPayload = { wp_id: props.wpId, sheet_name: props.sheetName, section_id: sectionId.value, sub_table_data: { ...subTableData.value }, current_standard: deriveStandardFromSubClass(currentStandardSubClass.value, contextData.value._current_standard as string) }
+  const payload: SyncPayload = { wp_id: props.wpId, sheet_name: props.sheetName, section_id: sectionId.value, sub_table_data: { ...subTableData.value }, columns: buildSyncColumns(), current_standard: deriveStandardFromSubClass(currentStandardSubClass.value, contextData.value._current_standard as string) }
   emit('sync-to-disclosure-notes', payload)
   const projectId = route.params?.projectId as string | undefined
   if (!projectId) return

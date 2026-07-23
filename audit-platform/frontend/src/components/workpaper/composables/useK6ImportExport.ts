@@ -10,10 +10,13 @@
  *   GET  /api/workpapers/{wpId}/k6/export-data?sheet={code}
  *   POST /api/workpapers/{wpId}/k6/import-data  (multipart/form-data, sheet={code})
  *
- * sheet codes: K6-2 / K6-3 / K6-6
+ * sheet codes: K6-2 / K6-3 / K6-4 / K6-5 / K6-6 / K6-7
  *   K6-2 明细表（15列12公式，40行动态行）
  *   K6-3 调整分录
+ *   K6-4 初始确认估值表（19列）
+ *   K6-5 减值测试
  *   K6-6 处置组减值测试表（55行动态行）
+ *   K6-7 不再满足持有待售检查表
  *
  * UI 铁律：el-dropdown「导入导出 ▾」（导出模板/导出数据/导入数据）
  * 使用 http (axios from @/utils/http) 非原生 fetch — for Authorization header（401 issue）
@@ -28,7 +31,7 @@ import http from '@/utils/http'
 // ═══ 类型定义 ═══
 
 /** K6 支持导入导出的 sheet 编码（动态行表格） */
-export type K6ImportableSheet = 'K6-2' | 'K6-3' | 'K6-6'
+export type K6ImportableSheet = 'K6-2' | 'K6-3' | 'K6-4' | 'K6-5' | 'K6-6' | 'K6-7'
 
 /** 导入结果 */
 export interface K6ImportResult {
@@ -54,7 +57,10 @@ export const K6_API_PREFIX = 'k6'
 export const K6_IMPORT_EXPORT_SHEETS: K6SheetMeta[] = [
   { code: 'K6-2', label: 'K6-2 明细表', multiSheet: true },
   { code: 'K6-3', label: 'K6-3 调整分录' },
+  { code: 'K6-4', label: 'K6-4 初始确认估值表' },
+  { code: 'K6-5', label: 'K6-5 减值测试' },
   { code: 'K6-6', label: 'K6-6 处置组减值', multiSheet: true },
+  { code: 'K6-7', label: 'K6-7 不再满足检查' },
 ]
 
 // ═══ 工具函数 ═══

@@ -15,7 +15,11 @@
  *
  * Spec: .kiro/specs/k8-selling-expenses/
  * Validates: Requirements 5.3-5.4, 9.7
+ *
+ * 收敛（cutoff-test-architecture-convergence Wave1）：isCrossPeriod 委托 cutoffCanonical
+ * 单一真源（natural-month 模式），行为等价（P8 已锁定）。
  */
+import { crossesByNaturalMonth } from './cutoffCanonical'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -85,43 +89,22 @@ function safeParseDate(dateStr: string | null | undefined): Date | null {
   return d
 }
 
-/**
- * 获取日期所属的会计期间 (year, month)
- * 使用自然月作为会计期间（绝大多数企业为12月31日年终）
- */
-function getAccountingPeriod(date: Date): { year: number; month: number } {
-  return { year: date.getFullYear(), month: date.getMonth() + 1 }
-}
-
 // ─── Core Functions ──────────────────────────────────────────────────────────
 
 /**
- * 跨期判断：判断原始凭证日期(sourceDate)与记账日期(bookDate)是否分属不同会计期间
+ * 跨期判断：判断原始凭证日期(sourceDate)与记账日期(bookDate)是否分属不同会计期间。
  *
- * 逻辑：
- * - 解析 sourceDate 和 bookDate 为日期
- * - 以 periodEnd (如 "2025-12-31") 确定会计年度边界
- * - 比较两个日期的 year+month，若不同则为跨期
- * - 任一日期无效时返回 false（无法判断视为不跨期）
+ * 薄封装：委托 cutoffCanonical.crossesByNaturalMonth（natural-month 模式单一真源，
+ * 年+月不同即跨期，与截止日相对位置无关；任一日期非法 → false）。行为等价（P8 已锁定）。
  *
  * Validates: Requirements 5.4, 9.7
  *
  * @param sourceDate 原始凭证日期 YYYY-MM-DD
  * @param bookDate 记账日期 YYYY-MM-DD
- * @param _periodEnd 会计期间截止日 YYYY-MM-DD（预留，当前以自然月比较）
- * @returns true=跨期（两日期分属不同会计期间），false=同期或无法判断
+ * @param _periodEnd 会计期间截止日 YYYY-MM-DD（预留，natural-month 语义下不参与判定）
  */
 export function isCrossPeriod(sourceDate: string, bookDate: string, _periodEnd: string): boolean {
-  const src = safeParseDate(sourceDate)
-  const book = safeParseDate(bookDate)
-  // 任一日期无效，无法判断，视为不跨期
-  if (!src || !book) return false
-
-  const srcPeriod = getAccountingPeriod(src)
-  const bookPeriod = getAccountingPeriod(book)
-
-  // 年+月不同即为跨期
-  return srcPeriod.year !== bookPeriod.year || srcPeriod.month !== bookPeriod.month
+  return crossesByNaturalMonth(sourceDate, bookDate)
 }
 
 /**

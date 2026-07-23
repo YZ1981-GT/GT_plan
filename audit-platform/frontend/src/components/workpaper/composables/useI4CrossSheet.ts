@@ -16,9 +16,9 @@
  * - 1801 长期待摊费用（借方/资产类）：期末=期初+增加-摊销-减少
  * - 无备抵科目（摊销直接减少原值，不设累计摊销备抵）
  *
- * 摊销分支互斥：I4-6（直线法）与 I4-7（工作量法）取有数据的一方。
+ * 摊销分支互斥：I4-6（直线法）与 I4-7（工作量法）取有数据的一方（优先 I4-6）。
  *
- * Spec: .kiro/specs/i4-long-term-prepaid/
+ * Spec（归档）: .kiro/specs/_archive/05-business-features/i4-long-term-prepaid/
  * Task: 3.2
  * Requirements: 2.2-2.5, 3.1-3.2, 6.4-6.6, 7.1-7.2, 8.1
  */
@@ -32,7 +32,7 @@ export interface ChecklistItem {
   remark: string | null
 }
 
-/** I4-2 明细行原始 JSON 结构（25列3区段） */
+/** I4-2 明细行原始 JSON（滚转字段 + 旧别名） */
 export interface I4DetailRowRaw {
   rowId?: string
   name?: string               // 项目名称
@@ -55,29 +55,41 @@ export interface I4DetailRowRaw {
   remainingMonths?: number    // 剩余月数
 }
 
-/** I4-3 调整分录行原始 JSON 结构 */
+/** I4-3 调整分录行原始 JSON 结构（对齐 Excel 列 + 兼容旧 AJE/RJE 字段） */
 export interface I4AdjustmentRowRaw {
   rowId?: string
-  description?: string        // 调整事项
-  entryType?: string          // AJE / RJE
+  description?: string        // 调整事项说明
+  category?: string           // 账项调整 / 报表调整 / 其他
+  entryType?: string          // AJE / RJE（由类别推导，兼容旧数据）
+  reportItem?: string         // 报表项目
   accountCode?: string        // 科目代码
   accountName?: string        // 科目名称
-  summary?: string            // 摘要
-  debitAmount?: number        // 借方
-  creditAmount?: number       // 贷方
+  noteItem?: string           // 附注项目
+  summary?: string            // 摘要（旧字段，等同 description）
+  debitAmount?: number        // 借方调整金额
+  creditAmount?: number       // 贷方调整金额
+  debit?: number              // 旧字段兼容
+  credit?: number             // 旧字段兼容
   indexRef?: string           // 索引
   remark?: string
+  projectName?: string        // 明细项目（匹配 I4-2 / I4-1）
 }
 
-/** I4-6/I4-7 摊销测算行原始 JSON 结构（12月矩阵） */
+/** I4-6/I4-7 摊销测算行原始 JSON 结构（源表测算/账面/差异 或旧12月矩阵） */
 export interface I4AmortizationRowRaw {
   rowId?: string
-  name?: string               // 项目名称
-  originalAmount?: number     // 原始金额
-  totalMonths?: number        // 摊销总月数（直线法）
-  totalUnits?: number         // 总预计工作量（工作量法）
-  monthlyAmorts?: number[]    // 12个月摊销额数组 [m1, m2, ..., m12]
-  annualTotal?: number        // 年度摊销合计
+  name?: string
+  itemName?: string
+  originalAmount?: number
+  totalMonths?: number
+  totalUnits?: number
+  workStandard?: number
+  monthlyAmorts?: number[]
+  monthlyAmort?: number[]
+  yearTotal?: number
+  calcPeriodAmort?: number
+  periodAmortization?: number
+  annualTotal?: number
 }
 
 // ─── Return Types ────────────────────────────────────────────────────────────
@@ -124,27 +136,30 @@ function _getNum(val: any): number {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useI4CrossSheet(allResponses: Ref<Map<string, any>>): {
-  detailTotals: ComputedRef<{ total: number; amortization: number }>
+  detailTotals: ComputedRef<I4DetailTotals>
   adjudicationFromDetail: ComputedRef<{ audited: number }>
   amortizationMatrix: ComputedRef<number[][]>
+  detailRowsRaw: ComputedRef<any[]>
+  adjustmentRowsRaw: ComputedRef<I4AdjustmentRowRaw[]>
+  amortizationRowsRaw: ComputedRef<I4AmortizationRowRaw[]>
 } {
   // ─── 解析 I4-2 明细行数据 ──────────────────────────────────────────────
 
-  const detailRows = computed<I4DetailRowRaw[]>(() => {
+  const detailRowsRaw = computed<any[]>(() => {
     const resp = allResponses.value.get('I4-2-rows')
-    return safeParseRows<I4DetailRowRaw>(resp?.remark)
+    return safeParseRows<any>(resp?.remark)
   })
 
   // ─── 解析 I4-3 调整分录行数据 ──────────────────────────────────────────
 
-  const adjustmentRows = computed<I4AdjustmentRowRaw[]>(() => {
+  const adjustmentRowsRaw = computed<I4AdjustmentRowRaw[]>(() => {
     const resp = allResponses.value.get('I4-3-rows')
     return safeParseRows<I4AdjustmentRowRaw>(resp?.remark)
   })
 
   // ─── 解析 I4-6/I4-7 摊销测算行数据（互斥分支，优先取有数据的一方）───
 
-  const amortizationRows = computed<I4AmortizationRowRaw[]>(() => {
+  const amortizationRowsRaw = computed<I4AmortizationRowRaw[]>(() => {
     // 优先取 I4-6（直线法），若无则取 I4-7（工作量法）——两者互斥
     const resp6 = allResponses.value.get('I4-6-rows')
     const rows6 = safeParseRows<I4AmortizationRowRaw>(resp6?.remark)
@@ -160,15 +175,11 @@ export function useI4CrossSheet(allResponses: Ref<Map<string, any>>): {
    * 从 I4-2 明细行聚合长期待摊费用合计：
    * - total: 所有行原始金额之和
    * - amortization: 所有行本期摊销之和
-   * - beginBalance: 所有行期初余额之和
-   * - increase: 所有行本期增加之和
-   * - decrease: 所有行本期减少之和
-   * - endBalance: 所有行期末余额之和
+   * - beginBalance / increase / decrease / endBalance
    *
-   * 用于与 I4-1 审定表小计行交叉验证。
-   * 长期待摊费用特征：期末=期初+增加-摊销-减少
+   * 兼容新旧字段：projectName|name、currentIncrease|increase 等。
    */
-  const detailTotals: ComputedRef<{ total: number; amortization: number }> = computed(() => {
+  const detailTotals: ComputedRef<I4DetailTotals> = computed(() => {
     let total = 0
     let amortization = 0
     let beginBalance = 0
@@ -176,13 +187,17 @@ export function useI4CrossSheet(allResponses: Ref<Map<string, any>>): {
     let decrease = 0
     let endBalance = 0
 
-    for (const row of detailRows.value) {
+    for (const row of detailRowsRaw.value) {
+      const name = String(row?.projectName || row?.name || '').trim()
+      if (name === '合计') continue
       total += _getNum(row.originalAmount)
-      amortization += _getNum(row.currentAmortization)
-      beginBalance += _getNum(row.beginBalance)
-      increase += _getNum(row.increase)
-      decrease += _getNum(row.decrease)
-      endBalance += _getNum(row.endBalance)
+      amortization += _getNum(
+        row.auditedAmortization ?? row.currentAmortization ?? row.unadjAmortization ?? row.amortization,
+      )
+      beginBalance += _getNum(row.auditedOpening ?? row.beginBalance ?? row.unadjOpening)
+      increase += _getNum(row.auditedIncrease ?? row.currentIncrease ?? row.unadjIncrease ?? row.increase)
+      decrease += _getNum(row.auditedOtherDecrease ?? row.currentDecrease ?? row.unadjOtherDecrease ?? row.decrease)
+      endBalance += _getNum(row.auditedEnding ?? row.endBalance ?? row.unadjEnding)
     }
 
     return { total, amortization, beginBalance, increase, decrease, endBalance }
@@ -201,7 +216,7 @@ export function useI4CrossSheet(allResponses: Ref<Map<string, any>>): {
    */
   const adjudicationFromDetail: ComputedRef<{ audited: number }> = computed(() => {
     // 明细侧推导：期末余额合计即为审定后的科目余额
-    const totals = detailTotals.value as I4DetailTotals
+    const totals = detailTotals.value
     return { audited: totals.endBalance }
   })
 
@@ -227,18 +242,25 @@ export function useI4CrossSheet(allResponses: Ref<Map<string, any>>): {
   const amortizationMatrix: ComputedRef<number[][]> = computed(() => {
     const matrix: number[][] = []
 
-    for (const row of amortizationRows.value) {
-      if (row.monthlyAmorts && Array.isArray(row.monthlyAmorts) && row.monthlyAmorts.length > 0) {
+    for (const row of amortizationRowsRaw.value) {
+      const monthlySrc = row.monthlyAmorts ?? row.monthlyAmort
+      if (monthlySrc && Array.isArray(monthlySrc) && monthlySrc.length > 0) {
         // 直接使用月度数组（补齐12位）
-        const months = row.monthlyAmorts.slice(0, 12).map(v => _getNum(v))
+        const months = monthlySrc.slice(0, 12).map(v => _getNum(v))
         while (months.length < 12) {
           months.push(0)
         }
         matrix.push(months)
-      } else if (_getNum(row.annualTotal) > 0) {
-        // 降级：从年度合计平均分摊12个月
-        const monthly = _getNum(row.annualTotal) / 12
-        matrix.push(Array(12).fill(monthly))
+      } else {
+        // 降级：I4-7 源表测算本年 / 年度合计 / 年合计 → 均分12月（供跨表汇总）
+        const annual = _getNum(row.periodAmortization)
+          || _getNum(row.calcPeriodAmort)
+          || _getNum(row.yearTotal)
+          || _getNum(row.annualTotal)
+        if (annual > 0) {
+          const monthly = annual / 12
+          matrix.push(Array(12).fill(monthly))
+        }
       }
       // 无数据行跳过（不占位）
     }
@@ -255,6 +277,9 @@ export function useI4CrossSheet(allResponses: Ref<Map<string, any>>): {
     adjudicationFromDetail,
     // I4-6/I4-7 → 12月摊销矩阵（每行一个项目×12月）
     amortizationMatrix,
+    detailRowsRaw,
+    adjustmentRowsRaw,
+    amortizationRowsRaw,
   }
 }
 

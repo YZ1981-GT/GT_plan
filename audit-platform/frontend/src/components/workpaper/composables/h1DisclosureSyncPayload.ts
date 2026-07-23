@@ -45,12 +45,92 @@ import {
   H1_LISTED_MOVEMENT_ROWS,
 } from './h1ListedDisclosureModel'
 
+import type { ColumnDef } from './disclosureColumnDefs'
+
 export interface H1SyncFromWorkpaperPayload {
   wp_id: string
   sheet_name: string
   section_id: string
   current_standard: string
   sub_table_data: Record<string, Record<string, unknown>[]>
+  /** 列头元数据（disclosure-table-sync-convergence）：label 取自 H1TabDisclosure el-table-column */
+  columns?: Record<string, ColumnDef[]>
+}
+
+// SOE 子表英文键 → 源对齐列头（取自 H1TabDisclosureSoe）
+const H1_SOE_COLUMNS: Record<string, ColumnDef[]> = {
+  固定资产: [
+    { key: 'label', label: '项目', is_label: true },
+    { key: 'end_carrying', label: '期末账面价值', format: 'amount' },
+    { key: 'begin_carrying', label: '期初账面价值', format: 'amount' },
+  ],
+  固定资产情况: [
+    { key: 'label', label: '项目', is_label: true },
+    { key: 'begin', label: '期初余额', format: 'amount' },
+    { key: 'increase', label: '本期增加', format: 'amount' },
+    { key: 'decrease', label: '本期减少', format: 'amount' },
+    { key: 'end', label: '期末余额', format: 'amount' },
+  ],
+  暂时闲置的固定资产情况: [
+    { key: 'label', label: '项目', is_label: true },
+    { key: 'original_cost', label: '账面原值', format: 'amount' },
+    { key: 'accum_dep', label: '累计折旧', format: 'amount' },
+    { key: 'impairment', label: '减值准备', format: 'amount' },
+    { key: 'carrying', label: '账面价值', format: 'amount' },
+    { key: 'remark', label: '备注' },
+  ],
+  未办妥产权证书的固定资产情况: [
+    { key: 'label', label: '项目', is_label: true },
+    { key: 'carrying', label: '账面价值', format: 'amount' },
+    { key: 'reason', label: '未办妥产权证书原因' },
+  ],
+  固定资产清理: [
+    { key: 'label', label: '项目', is_label: true },
+    { key: 'end_carrying', label: '期末账面价值', format: 'amount' },
+    { key: 'begin_carrying', label: '期初账面价值', format: 'amount' },
+    { key: 'reason', label: '转入清理的原因' },
+  ],
+}
+
+/** 上市子表列头：变动表随类别动态，其余静态源对齐（取自 H1TabDisclosureListed） */
+export function buildH1ListedColumns(snap: H1ListedSyncSnapshot): Record<string, ColumnDef[]> {
+  const cats = snap.categories || []
+  const movement: ColumnDef[] = [
+    { key: 'label', label: '项目', is_label: true },
+    ...cats.map((c) => ({ key: c.label, label: c.label, format: 'amount' as const })),
+    { key: '合计', label: '合计', format: 'amount' },
+  ]
+  return {
+    [H1_LISTED_SUBTABLE.summary]: [
+      { key: 'label', label: '项目', is_label: true },
+      { key: 'end_balance', label: '期末余额', format: 'amount' },
+      { key: 'prior_balance', label: '上年年末余额', format: 'amount' },
+    ],
+    [H1_LISTED_SUBTABLE.movement]: movement,
+    [H1_LISTED_SUBTABLE.idle]: [
+      { key: 'label', label: '项目', is_label: true },
+      { key: 'cost', label: '账面原值', format: 'amount' },
+      { key: 'dep', label: '累计折旧', format: 'amount' },
+      { key: 'impairment', label: '减值准备', format: 'amount' },
+      { key: 'book_value', label: '账面价值', format: 'amount' },
+      { key: 'remark', label: '备注' },
+    ],
+    [H1_LISTED_SUBTABLE.leaseOut]: [
+      { key: 'label', label: '项目', is_label: true },
+      { key: 'book_value', label: '账面价值', format: 'amount' },
+    ],
+    [H1_LISTED_SUBTABLE.titleCert]: [
+      { key: 'label', label: '项目', is_label: true },
+      { key: 'book_value', label: '账面价值', format: 'amount' },
+      { key: 'reason', label: '未办妥产权证书原因' },
+    ],
+    [H1_LISTED_SUBTABLE.clearing]: [
+      { key: 'label', label: '项目', is_label: true },
+      { key: 'end_balance', label: '期末余额', format: 'amount' },
+      { key: 'prior_balance', label: '上年年末余额', format: 'amount' },
+      { key: 'reason', label: '转入清理的原因' },
+    ],
+  }
 }
 
 export function buildH1SoeSubTableData(state: H1SoeDisclosureState): Record<string, Record<string, unknown>[]> {
@@ -163,6 +243,7 @@ export function buildH1SoeSyncPayload(
     section_id: target.sectionId,
     current_standard: target.currentStandard,
     sub_table_data: buildH1SoeSubTableData(state),
+    columns: H1_SOE_COLUMNS,
   }
 }
 
@@ -366,5 +447,7 @@ export function buildH1ListedSyncPayloads(
   snap: H1ListedSyncSnapshot,
 ): H1SyncFromWorkpaperPayload[] {
   const payload = buildH1SyncPayload('listed', wpId, applicableStandards, buildH1ListedSubTableData(snap))
-  return payload ? [payload] : []
+  if (!payload) return []
+  payload.columns = buildH1ListedColumns(snap)
+  return [payload]
 }

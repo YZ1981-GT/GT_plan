@@ -82,80 +82,18 @@
       <GtIndexChip value="A13" :context-project-id="props.projectId" />
     </div>
 
-    <!-- ═══ 核心底稿 ═══ -->
-    <el-card shadow="never" class="k11-group-card group-core">
+    <!-- ═══ 底稿架构与编制流程（4阶段泳道，对齐D4范式） ═══ -->
+    <el-card shadow="never" class="k11-arch-card">
       <template #header>
-        <span class="group-title">核心底稿</span>
-        <el-tag size="small" type="success" effect="light">{{ groupProgress('core') }}</el-tag>
+        <span class="group-title">底稿架构与编制流程</span>
+        <el-tag size="small" type="primary" effect="light">{{ completedCount }}/{{ totalCount }}</el-tag>
       </template>
-      <el-table
-        :data="coreSheets"
-        border
-        size="small"
-        highlight-current-row
-        style="width: 100%"
-        :row-class-name="getRowClassName"
-        @row-click="handleRowClick"
-      >
-        <el-table-column prop="seq" label="序号" width="56" align="center" />
-        <el-table-column prop="name" label="底稿名称" min-width="200">
-          <template #default="{ row }">
-            <span class="sheet-name-link">{{ row.name }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="code" label="索引号" width="80" align="center" />
-        <el-table-column prop="description" label="简要说明" min-width="280" />
-        <el-table-column label="完成进度" width="150" align="center">
-          <template #default="{ row }">
-            <el-progress
-              :percentage="row.progress"
-              :stroke-width="6"
-              :show-text="false"
-              :color="getProgressColor(row.progress)"
-              style="width: 80px; display: inline-block"
-            />
-            <span class="progress-label">{{ row.progress }}%</span>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- ═══ 附注组 ═══ -->
-    <el-card shadow="never" class="k11-group-card group-disclosure">
-      <template #header>
-        <span class="group-title">附注披露</span>
-        <el-tag size="small" type="warning" effect="light">{{ groupProgress('disclosure') }}</el-tag>
-      </template>
-      <el-table
-        :data="disclosureSheets"
-        border
-        size="small"
-        highlight-current-row
-        style="width: 100%"
-        :row-class-name="getRowClassName"
-        @row-click="handleRowClick"
-      >
-        <el-table-column prop="seq" label="序号" width="56" align="center" />
-        <el-table-column prop="name" label="底稿名称" min-width="200">
-          <template #default="{ row }">
-            <span class="sheet-name-link">{{ row.name }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="code" label="索引号" width="80" align="center" />
-        <el-table-column prop="description" label="简要说明" min-width="280" />
-        <el-table-column label="完成进度" width="150" align="center">
-          <template #default="{ row }">
-            <el-progress
-              :percentage="row.progress"
-              :stroke-width="6"
-              :show-text="false"
-              :color="getProgressColor(row.progress)"
-              style="width: 80px; display: inline-block"
-            />
-            <span class="progress-label">{{ row.progress }}%</span>
-          </template>
-        </el-table-column>
-      </el-table>
+      <GtBArchitectureTree
+        :html-data="{ navigation_rows: navigationRows }"
+        :active-sheet="''"
+        :project-id="props.projectId"
+        @navigate="(s: string) => emit('navigate-sheet', s)"
+      />
     </el-card>
 
     <!-- ═══ 编制提示 ═══ -->
@@ -191,6 +129,7 @@ import { defineAsyncComponent } from 'vue'
 import { InfoFilled } from '@element-plus/icons-vue'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
+const GtBArchitectureTree = defineAsyncComponent(() => import('../../GtBArchitectureTree.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -242,13 +181,30 @@ const allSheets = computed<SheetRow[]>(() => [
   { seq: 3, name: '明细表', code: 'K11-2', sheetKey: '明细表K11-2', description: '18列2区段+按资产类别减值明细+50行', group: 'core', progress: calcSheetProgress('K11-2-', 8) },
   { seq: 4, name: '调整分录汇总', code: 'K11-3', sheetKey: '调整分录汇总K11-3', description: 'AJE/RJE管理（借贷平衡）→联动A13', group: 'core', progress: calcSheetProgress('K11-3-', 4) },
   // ─── 附注组 ───
-  { seq: 5, name: '附注披露信息（上市公司）', code: '附注上市', sheetKey: '附注披露信息（上市公司）', description: '按资产类别披露减值损失（30行×27列）', group: 'disclosure', progress: calcSheetProgress('K11-disclosure-listed-', 5) },
-  { seq: 6, name: '附注披露信息（国企）', code: '附注国企', sheetKey: '附注披露信息（国企）', description: '国企版减值损失附注披露（29行×27列）', group: 'disclosure', progress: calcSheetProgress('K11-disclosure-soe-', 5) },
+  { seq: 5, name: '附注披露信息（上市公司）', code: '附注上市', sheetKey: '附注披露信息（上市公司）', description: '按资产类别披露减值损失（项目/本期/上期发生额，18项 canonical）', group: 'disclosure', progress: calcSheetProgress('K11-disclosure-listed-', 5) },
+  { seq: 6, name: '附注披露信息（国企）', code: '附注国企', sheetKey: '附注披露信息（国企）', description: '国企版减值损失附注披露（项目/本期/上期发生额，18项 canonical）', group: 'disclosure', progress: calcSheetProgress('K11-disclosure-soe-', 5) },
   { seq: 7, name: '底稿目录', code: 'K11', sheetKey: '底稿目录', description: '当前页面（底稿目录+减值来源汇总）', group: 'core', progress: 100 },
 ])
 
-const coreSheets = computed(() => allSheets.value.filter(s => s.group === 'core'))
-const disclosureSheets = computed(() => allSheets.value.filter(s => s.group === 'disclosure'))
+// ─── GtBArchitectureTree navigation_rows（4阶段泳道数据源） ───────────────────
+const CT_BY_CODE: Record<string, string> = {
+  'K11A': 'a-program-console',
+  'K11-1': 'd-form-table',
+  'K11-2': 'd-form-table',
+  'K11-3': 'd-form-table',
+  '附注上市': 'c-note-table',
+  '附注国企': 'c-note-table',
+}
+const navigationRows = computed(() =>
+  allSheets.value
+    .filter(s => s.code !== 'K11') // 排除底稿目录（当前页）
+    .map(s => ({
+      content: s.sheetKey,
+      index_ref: s.code,
+      component_type: CT_BY_CODE[s.code] || 'd-form-table',
+      status: s.progress >= 100 ? 'completed' : s.progress > 0 ? 'in_progress' : 'pending',
+    })),
+)
 
 // ─── 进度计算 ────────────────────────────────────────────────────────────────
 
@@ -261,11 +217,6 @@ const progressPercent = computed(() => {
   return Math.round(allSheets.value.reduce((s, r) => s + r.progress, 0) / totalCount.value)
 })
 
-function groupProgress(group: string): string {
-  const sheets = allSheets.value.filter(s => s.group === group)
-  return `${sheets.filter(s => s.progress >= 100).length}/${sheets.length}`
-}
-
 // ─── 减值来源汇总仪表板 ─────────────────────────────────────────────────────
 
 interface ImpairmentSource {
@@ -276,16 +227,49 @@ interface ImpairmentSource {
   diff: number
 }
 
+/** 兜底硬编码来源（K11-1 尚无数据时展示） */
+const FALLBACK_SOURCES: Array<{ wpCode: string; label: string; category: string }> = [
+  { wpCode: 'F2', label: '存货跌价准备', category: '存货' },
+  { wpCode: 'H1', label: '固定资产减值', category: '固定资产' },
+  { wpCode: 'I1', label: '无形资产减值', category: '无形资产' },
+  { wpCode: 'I3', label: '商誉减值', category: '商誉' },
+  { wpCode: 'H2', label: '在建工程减值', category: '在建工程' },
+  { wpCode: 'G7', label: '长期股权投资减值', category: '长期股权投资' },
+]
+
+/**
+ * 减值来源仪表板 —— 优先从 K11-1 审定表行动态派生（对齐 18 类 canonical）。
+ * 取有 sourceWp 的行，按 sourceWp 去重（同一来源底稿汇总一行）；
+ * K11-1 尚无数据时回退硬编码 6 源。
+ */
 const impairmentSources = computed<ImpairmentSource[]>(() => {
   const responses = getResponses()
-  return [
-    { wpCode: 'F2', label: '存货跌价准备', category: '存货', status: getSourceStatus(responses, 'F2'), diff: getSourceDiff(responses, 'F2') },
-    { wpCode: 'H1', label: '固定资产减值', category: '固定资产', status: getSourceStatus(responses, 'H1'), diff: getSourceDiff(responses, 'H1') },
-    { wpCode: 'I1', label: '无形资产减值', category: '无形资产', status: getSourceStatus(responses, 'I1'), diff: getSourceDiff(responses, 'I1') },
-    { wpCode: 'I3', label: '商誉减值', category: '商誉', status: getSourceStatus(responses, 'I3'), diff: getSourceDiff(responses, 'I3') },
-    { wpCode: 'H2', label: '在建工程减值', category: '在建工程', status: getSourceStatus(responses, 'H2'), diff: getSourceDiff(responses, 'H2') },
-    { wpCode: 'G7', label: '长期股权投资减值', category: '长期股权投资', status: getSourceStatus(responses, 'G7'), diff: getSourceDiff(responses, 'G7') },
-  ]
+  const item = responses.get('K11-1-rows')
+  const raw = item?.remark ?? item?.conclusion
+  let derived: Array<{ wpCode: string; label: string; category: string }> = []
+  if (raw) {
+    try {
+      const arr = typeof raw === 'string' ? JSON.parse(raw) : raw
+      if (Array.isArray(arr)) {
+        const seen = new Set<string>()
+        for (const r of arr) {
+          const code = String(r?.sourceWp || '').trim()
+          if (!code || seen.has(code)) continue
+          seen.add(code)
+          const name = String(r?.projectName || code)
+          derived.push({ wpCode: code, label: name, category: name.replace(/减值损失$/, '') })
+        }
+      }
+    } catch { /* fallthrough to fallback */ }
+  }
+  const list = derived.length > 0 ? derived : FALLBACK_SOURCES
+  return list.map(s => ({
+    wpCode: s.wpCode,
+    label: s.label,
+    category: s.category,
+    status: getSourceStatus(responses, s.wpCode),
+    diff: getSourceDiff(responses, s.wpCode),
+  }))
 })
 
 const reconciledCount = computed(() => impairmentSources.value.filter(s => s.status === 'done' && s.diff === 0).length)
@@ -303,30 +287,29 @@ function getSourceStatus(responses: Map<string, any>, code: string): 'done' | 'p
 }
 
 function getSourceDiff(responses: Map<string, any>, code: string): number {
-  const key = `K11-source-${code}-diff`
-  const val = responses.get(key)?.remark ?? responses.get(key)?.value
-  return Number(val) || 0
+  // P2 修复：原读从不写入的 `K11-source-{code}-diff` 键 → 核对差异恒 0。
+  // 改从 K11-2 明细行按来源底稿计算：Σ(本期发生额 − 源底稿计提金额)。
+  const item = responses.get('K11-2-detail-rows')
+  const raw = item?.remark ?? item?.conclusion
+  if (!raw) return 0
+  try {
+    const detailRows = typeof raw === 'string' ? JSON.parse(raw) : raw
+    if (!Array.isArray(detailRows)) return 0
+    let diff = 0
+    for (const r of detailRows) {
+      if (String(r?.sourceWp || '') !== code) continue
+      const occ = Number(
+        r?.currentOccurrence ?? ((Number(r?.currentProvision) || 0) - (Number(r?.currentReversal) || 0)),
+      )
+      diff += occ - (Number(r?.sourceAmount) || 0)
+    }
+    return diff
+  } catch {
+    return 0
+  }
 }
 
 // ─── 交互 ────────────────────────────────────────────────────────────────────
-
-function handleRowClick(row: SheetRow): void {
-  if (row.code === 'K11') return
-  emit('navigate-sheet', row.sheetKey)
-}
-
-function getRowClassName({ row }: { row: SheetRow }): string {
-  if (row.progress >= 100) return 'completed-row'
-  if (row.progress > 0) return 'in-progress-row'
-  return ''
-}
-
-function getProgressColor(p: number): string {
-  if (p >= 100) return '#67c23a'
-  if (p >= 50) return '#409eff'
-  if (p > 0) return '#e6a23c'
-  return '#e6e8eb'
-}
 
 function fmtAmt(v: number | null | undefined): string {
   if (v == null || v === 0) return '-'

@@ -162,6 +162,11 @@
       </el-table>
     </el-card>
 
+    <!-- ═══ K4-2 明细合计 vs K4-1 审定合计 交叉验证 ═══ -->
+    <el-alert v-if="k42VsK41Diff > 1" type="warning" :closable="false" show-icon style="margin-bottom:8px">
+      <template #title>K4-2 明细审定合计（{{ fmtAmt(k42AuditedTotal) }}）与本表审定合计（{{ fmtAmt(subtotalRow.audited) }}）差异 {{ fmtAmt(k42VsK41Diff) }} 元</template>
+    </el-alert>
+
     <!-- ═══ 三角勾稽校验 ═══ -->
     <el-card shadow="never" class="block-card reconciliation-card">
       <template #header>
@@ -248,8 +253,12 @@
 import { ref, computed, inject, toRef } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { eventBus } from '@/utils/eventBus'
+import http from '@/utils/http'
 import { useK4Adjudication, type K4AdjRow } from '../../composables/useK4Adjudication'
 import { useK4FormData } from '../../composables/useK4FormData'
+import type { WorkpaperRuntimeContext } from '../../composables/useWorkpaperScaffold'
+import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{
   wpId: string
@@ -265,6 +274,7 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 const allResponsesRef = computed(() => props.allResponses)
 const tbDataRef = computed(() => props.tbData)
 
@@ -334,14 +344,29 @@ function saveConclusion() {
   debouncedSave(itemId, { remark: auditConclusion.value })
 }
 
-// ─── TB回写 ─────────────────────────────────────────────────────────────────
+// ─── TB回写 + saveAll + EventBus ─────────────────────────────────────────────
 
 async function handleWritebackTB() {
   publishing.value = true
   try {
     const auditedTotal = getAuditedTotal()
+    // 先调 composable saveAll 持久化 subtotal-debit/credit/audited-total
+    await saveAllComposable()
+    // 回写 trial_balance
     await writebackTB(auditedTotal)
-    ElMessage.success('审定数已回写TB（2245其他流动负债）')
+    // 发布 substantive:adjudicated → 附注/A13 消费
+    try {
+      eventBus.emit('substantive:adjudicated', {
+        wpCode: 'K4',
+        accountCode: '2245',
+        projectId: props.projectId,
+        auditedAmount: auditedTotal,
+        adjudicatedAmount: auditedTotal,
+      })
+    } catch { /* silent */ }
+    // 版本快照
+    scheduleAutoSnapshot()
+    ElMessage.success('审定数已回写TB（2245其他流动负债），已通知附注刷新')
   } catch {
     ElMessage.error('TB回写失败')
   } finally {
@@ -349,14 +374,81 @@ async function handleWritebackTB() {
   }
 }
 
-// ─── AI / 复核 ──────────────────────────────────────────────────────────────
+function scheduleAutoSnapshot(): void {
+  try { runtime?.version?.scheduleAutoSnapshot?.() } catch { /* silent */ }
+}
 
-function handleAiGenerate(section: string) {
-  console.log('[K4-1] AI generate:', section)
+// ─── AI 辅助（真实 /ai/generate-text）──────────────────────────────────────
+
+async function handleAiGenerate(section: string): Promise<void> {
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      prompt: section === 'adj-conclusion'
+        ? '请根据K4-1审定表数据，生成其他流动负债审定结论（概述审定数变动/三角勾稽/主要增减项目及原因）'
+        : '请根据K4-1审定表数据，分析各项目变动原因并生成审计说明',
+      context: {
+        科目: '2245 其他流动负债（负债类，完整性为核心认定）',
+        审定合计: String(subtotalRow.value.audited),
+        三角勾稽: reconciliation.value.isBalanced ? '平衡' : `不平，差额${reconciliation.value.diff}`,
+        行数: String(rows.value.length),
+        变动率: rows.value.filter(r => r.changeRate != null && Math.abs(r.changeRate) > 0.3).map(r => `${r.label}变动${((r.changeRate ?? 0) * 100).toFixed(0)}%`).join('；') || '无显著变动',
+      },
+      existingContent: auditConclusion.value || '',
+      section: `K4-1-${section}`,
+    })
+    const content = res?.data?.data?.content || res?.data?.content || ''
+    if (content) {
+      auditConclusion.value = auditConclusion.value ? `${auditConclusion.value}\n\n${content}` : content
+      saveConclusion()
+      ElMessage.success('AI 已生成')
+    } else { ElMessage.warning('AI 未返回内容') }
+  } catch { ElMessage.warning('AI 生成失败') }
 }
 
 function handleReview(id: string) {
   openReviewDialog(id)
+}
+
+// ─── K4-2 ↔ K4-1 交叉验证 ───────────────────────────────────────────────────
+
+const k42AuditedTotal = computed(() => {
+  const item = props.allResponses.get('K4-2-detail-total')
+  const v = item?.remark ?? item?.value ?? item
+  return Number(v) || 0
+})
+
+const k42VsK41Diff = computed(() => {
+  if (k42AuditedTotal.value === 0 || subtotalRow.value.audited === 0) return 0
+  return Math.abs(subtotalRow.value.audited - k42AuditedTotal.value)
+})
+
+// ─── composable saveAll（持久化 subtotal-debit/credit 供 K4-4 联动）───────────
+
+async function saveAllComposable(): Promise<void> {
+  // 调 useK4Adjudication 的 saveAll 方法（持久化审定合计+借方/贷方合计）
+  const { saveAll } = useK4Adjudication({
+    allResponses: allResponsesRef as any,
+    tbData: tbDataRef as any,
+    saveResponse: handleSaveItem,
+  })
+  await saveAll()
+}
+
+// ─── TB 预填种子（从 props.tbData 自动填未审数，仅首次无数据时）──────────────
+
+function seedUnadjustedFromTB(): void {
+  // 如果已有手工数据则不覆盖
+  const hasExisting = rows.value.some(r => r.unadjusted !== 0)
+  if (hasExisting) return
+  // tbData.unadjusted2245 是 2245 科目未审总额
+  if (props.tbData.unadjusted2245 > 0 && rows.value.length > 0) {
+    // 无法按子科目拆分时，仅填到第一个"其他"行作为参考
+    // 实际应从后端 render project_context 按子科目映射（铁律），此处做最低限度 seed
+    const firstRow = rows.value[0]
+    if (firstRow && firstRow.unadjusted === 0) {
+      onFieldChange(firstRow.rowKey, 'unadj', props.tbData.unadjusted2245)
+    }
+  }
 }
 
 // ─── 金额格式化 ─────────────────────────────────────────────────────────────

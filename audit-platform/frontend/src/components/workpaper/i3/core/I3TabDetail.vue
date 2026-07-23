@@ -1,38 +1,30 @@
 <template>
   <div class="i3-tab-detail">
-    <!-- 方法论上下文（琥珀色左边线） -->
-    <div class="methodology-context">
-      <p><strong>I3-2 商誉明细表 — 3区段Tab使用说明：</strong></p>
-      <p>本表30列按功能拆分为3个区段Tab切换查看，切换Tab时当前选中行保持同步高亮。</p>
-      <p>① 基础：被投资单位/并购日期/对价/被购方净资产/持股比例/控制类型/合并方式/股权层级/行业</p>
-      <p>② 入账：合并成本/可辨认净资产公允/商誉原值(公式)/少数股东权益/成本明细/评估方法</p>
-      <p>③ 减值：累计减值期初/本期减值/累计减值期末(公式)/商誉净值(公式)/所属CGU/可收回金额/测试方法</p>
+    <div class="guidance-block">
+      <div class="guidance-grid">
+        <div class="guidance-step"><span class="step-num">①</span><span>原值滚动：期初→增加→减少→期末，再未审+调整→审定</span></div>
+        <div class="guidance-step"><span class="step-num">②</span><span>减值滚动：同期结构；本期计提对接 I3-6，处置转出走减少</span></div>
+        <div class="guidance-step"><span class="step-num">③</span><span>净值=原值审定−减值审定（商誉不摊销、减值不可转回）</span></div>
+        <div class="guidance-step"><span class="step-num">④</span><span>合计勾稽 I3-1；新增商誉核对入账测算 / I3-4</span></div>
+      </div>
     </div>
 
-    <!-- 审计目标 -->
+    <div class="methodology-context">
+      <p>
+        <strong>I3-2 编制逻辑（对齐 Excel 双表）：</strong>
+        左表记录商誉<strong>原值</strong>滚动，右表记录<strong>减值准备</strong>滚动；
+        同一被投资单位两表并行。存在性/完整性看增减变动及支持证据，计价看减值测试（I3-6/I3-7）与账项调整。
+      </p>
+    </div>
+
     <el-alert
       type="info"
       :closable="false"
       show-icon
       class="objective-alert"
-      title="审计目标：逐被投资单位核实商誉的初始确认（合并成本−可辨认净资产公允价值份额）、累计减值及净值的真实性与准确性；核对商誉分摊至资产组(CGU)的合理性；明细合计与 I3-1 审定表勾稽一致（CAS8、CAS20）。"
+      title="审计目标：存在性、完整性、计价和分摊——逐项核实商誉原值与减值准备的期初、本期增减及期末审定数；明细合计与 I3-1 审定表勾稽一致（CAS8、CAS20）。"
     />
 
-    <!-- 编制提示 -->
-    <details class="guidance-details">
-      <summary>📋 编制提示</summary>
-      <div class="guidance-content">
-        <ul>
-          <li>商誉原值 = 合并成本 − 可辨认净资产公允价值份额（CAS20 非同一控制下企业合并）。</li>
-          <li>商誉不摊销，累计减值期末 = 累计减值期初 + 本期减值；商誉净值 = 原值 − 累计减值。</li>
-          <li>每项商誉须分摊至预期受益的资产组(CGU)，分摊层级不高于经营分部（CAS8 第十八条）。</li>
-          <li>本表 30 列按"基础 / 入账 / 减值"三区段切换查看，行选中在各区段间保持同步。</li>
-          <li>明细合计须与 I3-1 审定表商誉原值 / 累计减值 / 净值一致，差异需查明。</li>
-        </ul>
-      </div>
-    </details>
-
-    <!-- 交叉验证警告（黄色alert） -->
     <el-alert
       v-if="crossValidation.hasAnyWarning"
       type="warning"
@@ -41,12 +33,12 @@
     >
       <template #default>
         <div class="cross-validation-content">
-          <span>明细表合计与I3-1审定表不一致：</span>
+          <span>明细合计与 I3-1 审定表不一致：</span>
           <span v-if="crossValidation.hasOriginalWarning" class="warning-item">
-            商誉原值差异 {{ fmtAmount(crossValidation.goodwillOriginalDiff) }}
+            原值审定差异 {{ fmtAmount(crossValidation.goodwillOriginalDiff) }}
           </span>
           <span v-if="crossValidation.hasImpairmentWarning" class="warning-item">
-            累计减值差异 {{ fmtAmount(crossValidation.accImpairmentDiff) }}
+            减值审定差异 {{ fmtAmount(crossValidation.accImpairmentDiff) }}
           </span>
           <span v-if="crossValidation.hasNetValueWarning" class="warning-item">
             净值差异 {{ fmtAmount(crossValidation.netValueDiff) }}
@@ -55,42 +47,195 @@
       </template>
     </el-alert>
 
-    <!-- 区段Tab切换（el-segmented） -->
-    <div class="toolbar-row tab-toolbar">
+    <el-alert
+      v-if="hasRollForwardWarning"
+      type="error"
+      :closable="false"
+      class="cross-validation-alert"
+      title="滚动勾稽异常：存在期末≠期初+增加−减少，或审定≠未审+调整的行，请检查录入。"
+    />
+
+    <el-alert
+      v-if="entryVarianceWarnings.length"
+      type="warning"
+      :closable="false"
+      class="cross-validation-alert"
+    >
+      <template #default>
+        <div class="cross-validation-content">
+          <span>入账测算与原值滚动差异（I3-4）：</span>
+          <span v-for="v in entryVarianceWarnings" :key="v.investee" class="warning-item">
+            {{ v.investee }} 测算{{ fmtAmount(v.entryCalc) }} vs 本期增加{{ fmtAmount(v.costIncrease) }}
+            （差 {{ fmtAmount(v.diffVsIncrease) }}）
+          </span>
+        </div>
+      </template>
+    </el-alert>
+
+    <el-alert
+      v-if="ajeVarianceWarnings.length"
+      type="warning"
+      :closable="false"
+      class="cross-validation-alert"
+    >
+      <template #default>
+        <div class="cross-validation-content">
+          <span>I3-3 账项调整与明细列不一致（可点「从 I3-3 回写调整」）：</span>
+          <span v-for="v in ajeVarianceWarnings" :key="v.investee" class="warning-item">
+            <template v-if="v.investee === '未指定'">有分录未填被投资单位</template>
+            <template v-else-if="v.missingOnDetail">
+              {{ v.investee }} 在 I3-3 有调整但明细无此行
+            </template>
+            <template v-else>
+              {{ v.investee }} 原值AJE差 {{ fmtAmount(v.costDiff) }} / 减值AJE差 {{ fmtAmount(v.impDiff) }}
+            </template>
+          </span>
+        </div>
+      </template>
+    </el-alert>
+
+    <div class="xref-bar">
+      <span class="xref-label">交叉索引：</span>
+      <GtIndexChip value="I3-1" label="审定表" @click="navigate('I3-1')" />
+      <GtIndexChip value="I3-3" label="调整分录" @click="navigate('I3-3')" />
+      <GtIndexChip value="I3-4" label="入账测算" @click="navigate('I3-4')" />
+      <GtIndexChip value="I3-6" label="减值测试" @click="navigate('I3-6')" />
+      <GtIndexChip value="wp:I3-2" :context-project-id="projectId" />
+      <template v-if="!isReadonly">
+        <el-button size="small" type="primary" plain @click="handleSyncFromI36">从 I3-6 带入本期计提</el-button>
+        <el-button size="small" plain @click="handleSyncFromI33">从 I3-3 回写调整</el-button>
+        <el-button size="small" plain @click="handleSyncFromI34">从 I3-4 带入新增</el-button>
+      </template>
+      <el-button size="small" :type="dualView ? 'success' : 'default'" @click="dualView = !dualView">
+        {{ dualView ? '退出并排' : '原值|减值并排' }}
+      </el-button>
+    </div>
+
+    <div class="toolbar-row tab-toolbar" v-if="!dualView">
       <el-segmented
         v-model="activeSectionKey"
         :options="segmentOptions"
         class="segment-bar"
       />
-
       <div class="toolbar-right">
-        <GtIndexChip value="wp:I3-2" :context-project-id="projectId" />
-        <el-button
-          v-if="!isReadonly"
-          type="primary"
-          size="small"
-          @click="handleAddRow"
-        >
-          + 新增
-        </el-button>
-        <el-dropdown v-if="!isReadonly" trigger="click" class="import-export-dropdown">
+        <el-button v-if="!isReadonly" type="primary" size="small" @click="handleAddRow">+ 新增</el-button>
+        <el-dropdown v-if="!isReadonly" trigger="click">
           <el-button size="small">
             导入导出 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
           </el-button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
-              <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
-              <el-dropdown-item @click="handleImportData">导入数据</el-dropdown-item>
+              <el-dropdown-item @click="() => void exportTemplate('I3-2')">导出模板</el-dropdown-item>
+              <el-dropdown-item @click="() => void exportData('I3-2')">导出数据</el-dropdown-item>
+              <el-dropdown-item @click="triggerImport">导入数据</el-dropdown-item>
             </el-dropdown-menu>
           </template>
         </el-dropdown>
+        <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onImportFileSelected" />
         <span class="row-count">共 {{ rows.length }} 行</span>
+        <span class="net-chip">净值合计 <strong>{{ fmtAmount(summaryRow.goodwillNetValue) }}</strong></span>
+        <span class="mov-chip">本期借方 <strong>{{ fmtAmount(summaryRow.periodDebit) }}</strong></span>
+        <span class="mov-chip">本期贷方 <strong>{{ fmtAmount(summaryRow.periodCredit) }}</strong></span>
       </div>
     </div>
 
-    <!-- 数据表格（根据 activeSection 列渲染） -->
+    <!-- 宽屏并排：原值 | 减值 -->
+    <div v-if="dualView" class="dual-view">
+      <div class="dual-pane">
+        <div class="dual-title">商誉明细表（原值）</div>
+        <el-table :data="rows" border size="small" max-height="420" row-key="rowId">
+          <el-table-column type="index" width="40" />
+          <el-table-column
+            v-for="col in costColumns"
+            :key="'d-c-' + col.key"
+            :prop="col.key"
+            :label="col.label"
+            :min-width="col.width"
+            :align="col.type === 'number' || col.type === 'formula' ? 'right' : 'left'"
+          >
+            <template #default="{ row, $index }">
+              <span v-if="col.type === 'formula'" class="formula-value">{{ fmtAmount((row as any)[col.key]) }}</span>
+              <el-input-number
+                v-else-if="col.type === 'number' && col.editable && !isReadonly"
+                :model-value="(row as any)[col.key]"
+                size="small"
+                :controls="false"
+                class="cell-input-number"
+                @change="(val: number | undefined) => handleCellChange($index, col.key, val ?? 0)"
+              />
+              <el-input
+                v-else-if="col.type === 'text' && col.editable && !isReadonly"
+                :model-value="(row as any)[col.key]"
+                size="small"
+                @change="(val: string) => handleCellChange($index, col.key, val)"
+              />
+              <el-select
+                v-else-if="col.type === 'select' && col.editable && !isReadonly"
+                :model-value="(row as any)[col.key]"
+                size="small"
+                clearable
+                @change="(val: string) => handleCellChange($index, col.key, val ?? '')"
+              >
+                <el-option v-for="opt in col.options" :key="opt" :label="opt || '（空）'" :value="opt" />
+              </el-select>
+              <span v-else>{{ col.type === 'number' ? fmtAmount((row as any)[col.key]) : ((row as any)[col.key] || '-') }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <div class="dual-pane">
+        <div class="dual-title">商誉明细表（减值准备）</div>
+        <el-table :data="rows" border size="small" max-height="420" row-key="rowId">
+          <el-table-column type="index" width="40" />
+          <el-table-column
+            v-for="col in impairmentColumns"
+            :key="'d-i-' + col.key"
+            :prop="col.key"
+            :label="col.label"
+            :min-width="col.width"
+            :align="col.type === 'number' || col.type === 'formula' ? 'right' : 'left'"
+          >
+            <template #default="{ row, $index }">
+              <span v-if="col.type === 'formula'" class="formula-value">{{ fmtAmount((row as any)[col.key]) }}</span>
+              <el-input-number
+                v-else-if="col.type === 'number' && col.editable && !isReadonly"
+                :model-value="(row as any)[col.key]"
+                size="small"
+                :controls="false"
+                class="cell-input-number"
+                @change="(val: number | undefined) => handleCellChange($index, col.key, val ?? 0)"
+              />
+              <el-select
+                v-else-if="col.key === 'cguName' && !isReadonly"
+                :model-value="row.cguName"
+                size="small"
+                filterable
+                allow-create
+                clearable
+                style="width:100%"
+                @change="(v: string) => handleCellChange($index, 'cguName', v ?? '')"
+              >
+                <el-option v-for="n in cguNameOptions" :key="n" :label="n" :value="n" />
+              </el-select>
+              <el-select
+                v-else-if="col.type === 'select' && col.editable && !isReadonly"
+                :model-value="(row as any)[col.key]"
+                size="small"
+                clearable
+                @change="(val: string) => handleCellChange($index, col.key, val ?? '')"
+              >
+                <el-option v-for="opt in col.options" :key="opt" :label="opt || '（空）'" :value="opt" />
+              </el-select>
+              <span v-else>{{ col.type === 'number' ? fmtAmount((row as any)[col.key]) : ((row as any)[col.key] || '-') }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </div>
+
+    <!-- 单表区段模式 -->
     <el-table
+      v-else
       :data="rows"
       border
       size="small"
@@ -102,10 +247,8 @@
       max-height="480"
       @current-change="onCurrentRowChange"
     >
-      <!-- 序号列 -->
       <el-table-column type="index" label="#" width="45" align="center" fixed="left" />
 
-      <!-- 动态列 -->
       <el-table-column
         v-for="col in activeColumns"
         :key="col.key"
@@ -114,23 +257,19 @@
         :min-width="col.width"
         :align="col.type === 'number' || col.type === 'formula' ? 'right' : 'left'"
       >
-        <!-- 公式列表头带tooltip -->
         <template v-if="col.type === 'formula'" #header>
           <el-tooltip :content="col.tooltip" placement="top">
             <span class="formula-col-header">{{ col.label }}</span>
           </el-tooltip>
         </template>
 
-        <!-- 单元格渲染 -->
         <template #default="{ row, $index }">
-          <!-- 公式列：虚线下划线 + 只读 -->
           <span v-if="col.type === 'formula'" class="formula-value">
             <el-tooltip :content="col.tooltip" placement="top">
               <span>{{ fmtAmount((row as any)[col.key]) }}</span>
             </el-tooltip>
           </span>
 
-          <!-- 数字可编辑列 -->
           <el-input-number
             v-else-if="col.type === 'number' && col.editable && !isReadonly"
             :model-value="(row as any)[col.key]"
@@ -141,7 +280,19 @@
             @change="(val: number | undefined) => handleCellChange($index, col.key, val ?? 0)"
           />
 
-          <!-- 文本可编辑列 -->
+          <el-select
+            v-else-if="col.key === 'cguName' && !isReadonly"
+            :model-value="(row as any)[col.key]"
+            size="small"
+            class="cell-select"
+            filterable
+            allow-create
+            clearable
+            @change="(val: string) => handleCellChange($index, col.key, val ?? '')"
+          >
+            <el-option v-for="n in cguNameOptions" :key="n" :label="n" :value="n" />
+          </el-select>
+
           <el-input
             v-else-if="col.type === 'text' && col.editable && !isReadonly"
             :model-value="(row as any)[col.key]"
@@ -150,7 +301,6 @@
             @change="(val: string) => handleCellChange($index, col.key, val)"
           />
 
-          <!-- 日期可编辑列 -->
           <el-date-picker
             v-else-if="col.type === 'date' && col.editable && !isReadonly"
             :model-value="(row as any)[col.key]"
@@ -162,51 +312,34 @@
             @change="(val: string) => handleCellChange($index, col.key, val)"
           />
 
-          <!-- 下拉选择可编辑列 -->
           <el-select
             v-else-if="col.type === 'select' && col.editable && !isReadonly"
             :model-value="(row as any)[col.key]"
             size="small"
             class="cell-select"
-            @change="(val: string) => handleCellChange($index, col.key, val)"
+            clearable
+            @change="(val: string) => handleCellChange($index, col.key, val ?? '')"
           >
-            <el-option
-              v-for="opt in col.options"
-              :key="opt"
-              :label="opt"
-              :value="opt"
-            />
+            <el-option v-for="opt in col.options" :key="opt" :label="opt || '（空）'" :value="opt" />
           </el-select>
 
-          <!-- 只读列（非公式） -->
           <span v-else class="cell-readonly">
-            {{ col.type === 'number' ? fmtAmount((row as any)[col.key]) : (row as any)[col.key] || '-' }}
+            {{ col.type === 'number' ? fmtAmount((row as any)[col.key]) : ((row as any)[col.key] || '-') }}
           </span>
         </template>
       </el-table-column>
 
-      <!-- 操作列 -->
       <el-table-column v-if="!isReadonly" label="操作" width="80" align="center" fixed="right">
         <template #default="{ $index }">
-          <el-button size="small" type="danger" text @click="handleRemoveRow($index)">
-            删除
-          </el-button>
+          <el-button size="small" type="danger" text @click="handleRemoveRow($index)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
 
-    <!-- 合计行（sticky高亮） -->
-    <div class="summary-section">
-      <el-table
-        :data="[summaryDisplayRow]"
-        border
-        size="small"
-        class="summary-table"
-      >
+    <div class="summary-section" v-if="!dualView">
+      <el-table :data="[summaryDisplayRow]" border size="small" class="summary-table">
         <el-table-column label="#" width="45" align="center">
-          <template #default>
-            <span class="summary-label">合计</span>
-          </template>
+          <template #default><span class="summary-label">合计</span></template>
         </el-table-column>
         <el-table-column
           v-for="col in activeColumns"
@@ -217,56 +350,81 @@
           :align="col.type === 'number' || col.type === 'formula' ? 'right' : 'left'"
         >
           <template #default="{ row }">
-            <span class="summary-value">
-              {{ getSummaryValue(row, col) }}
-            </span>
+            <span class="summary-value">{{ getSummaryValue(row, col) }}</span>
           </template>
         </el-table-column>
         <el-table-column v-if="!isReadonly" label="" width="80" />
       </el-table>
     </div>
+    <div v-else class="summary-section dual-summary">
+      <span>原值审定合计 <strong>{{ fmtAmount(summaryRow.costAudited) }}</strong></span>
+      <span>减值审定合计 <strong>{{ fmtAmount(summaryRow.impAudited) }}</strong></span>
+      <span class="net-chip">净值合计 <strong>{{ fmtAmount(summaryRow.goodwillNetValue) }}</strong></span>
+      <span>本期借方发生额 <strong>{{ fmtAmount(summaryRow.periodDebit) }}</strong></span>
+      <span>本期贷方发生额 <strong>{{ fmtAmount(summaryRow.periodCredit) }}</strong></span>
+    </div>
 
-    <!-- 审计说明 -->
     <el-card shadow="never" class="audit-note-card">
-      <template #header><span>审计说明</span></template>
+      <template #header><span>三、审计说明</span></template>
       <el-input
         v-model="auditNote"
         type="textarea"
-        :autosize="{ minRows: 5 }"
+        :autosize="{ minRows: 4 }"
         :disabled="isReadonly"
-        placeholder="记录商誉明细的审计说明（如各被投资单位商誉来源、分摊至CGU的依据、评估方法等）..."
+        placeholder="记录增减变动核查、同一控制/非同一控制区分、与 I3-4/I3-6 勾稽情况等…"
         @change="saveAuditNote"
       />
     </el-card>
 
-    <!-- 审计结论 -->
     <el-card shadow="never" class="audit-note-card">
-      <template #header><span>审计结论</span></template>
+      <template #header>
+        <div class="section-header">
+          <span>四、审计结论</span>
+          <el-select
+            v-if="!isReadonly"
+            size="small"
+            placeholder="插入结论模板"
+            style="width: 220px"
+            @change="applyConclusionTemplate"
+          >
+            <el-option v-for="t in CONCLUSION_TEMPLATES" :key="t.key" :label="t.label" :value="t.key" />
+          </el-select>
+        </div>
+      </template>
       <el-input
         v-model="auditConclusion"
         type="textarea"
         :autosize="{ minRows: 3 }"
         :disabled="isReadonly"
-        placeholder="记录商誉明细的审计结论（如：商誉明细列示完整、初始确认与减值计价准确，与审定表勾稽一致）..."
+        placeholder="商誉明细的审计结论…"
         @change="saveAuditConclusion"
       />
     </el-card>
+
+    <details class="guidance-details" open>
+      <summary>编制说明</summary>
+      <div class="guidance-content">
+        <ol>
+          <li>原值与减值准备分表滚动：期末 = 期初 + 本期增加 − 本期减少；审定 = 未审 + 账项调整。</li>
+          <li>商誉不摊销；减值准备一经确认不得转回——本期减少仅用于处置子公司等转出，不得填「转回」。</li>
+          <li>非同一控制下企业合并形成的商誉，入账测算（合并成本−可辨认净资产公允份额）应与原值本期增加/审定勾稽，详见 I3-4。</li>
+          <li>同一控制下企业合并不确认新商誉；账面商誉来自被合并方原已确认金额，需在备注说明。</li>
+          <li>本期减值计提应与 I3-6 合并确认商誉减值勾稽；处置减少应有股权处置底稿索引。</li>
+          <li>明细原值审定合计、减值审定合计、净值合计须与 I3-1 审定表一致。</li>
+          <li>本期借方发生额＝原值本期增加；本期贷方发生额＝原值本期减少＋减值本期计提——合计供 I3-5 检查比例勾稽（对齐 Excel N/O 列）。</li>
+        </ol>
+      </div>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * I3TabDetail.vue — I3-2 商誉明细表（30列3区段Tab）
- *
- * 30列拆为3区段Tab：基础 | 入账 | 减值
- * el-segmented切换 + 行同步 + 公式列虚线tooltip + 合计行sticky + 交叉验证
- *
- * Spec: .kiro/specs/i3-goodwill/
- * Task: 4.3
- * Requirements: 3.1-3.4
+ * I3TabDetail.vue — I3-2 商誉明细表（原值/减值双表滚动）
  */
-import { computed, toRef, watch, ref, type Ref } from 'vue'
+import { computed, toRef, watch, ref, inject, type Ref } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { fmtAmount } from '@/utils/formatters'
 import {
   useI3Detail,
@@ -274,31 +432,24 @@ import {
   type I3DetailSection,
   I3_DETAIL_SECTION_LABELS,
 } from '../../composables/useI3Detail'
+import { useI3CrossSheet } from '../../composables/useI3CrossSheet'
+import { useI3ImportExport } from '../../composables/useI3ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
-
-// ─── Props ───────────────────────────────────────────────────────────────────
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
-  /** 审定表商誉原值小计（交叉验证用） */
   adjGoodwillOriginalSubtotal?: number
-  /** 审定表累计减值小计（交叉验证用） */
   adjAccImpairmentSubtotal?: number
-  /** 审定表净值小计（交叉验证用） */
   adjNetValueSubtotal?: number
 }>()
-
-// ─── Emits ───────────────────────────────────────────────────────────────────
 
 const emit = defineEmits<{
   'navigate-sheet': [sheetName: string]
   'save': [itemId: string, value: any]
 }>()
-
-// ─── Composable ──────────────────────────────────────────────────────────────
 
 const {
   rows,
@@ -306,13 +457,18 @@ const {
   activeRowIndex,
   summaryRow,
   crossValidation,
+  hasRollForwardWarning,
   activeColumns,
-  sections,
+  costColumns,
+  impairmentColumns,
   switchSection,
   setActiveRow,
   updateCell,
   addRow,
   removeRow,
+  syncImpIncreaseFromI3_6,
+  syncAjeFromI3_3,
+  syncFromI3_4,
 } = useI3Detail(
   toRef(props, 'wpId') as Ref<string>,
   toRef(props, 'allResponses') as Ref<Map<string, any>>,
@@ -324,127 +480,200 @@ const {
   },
 )
 
-// ─── el-segmented 选项 ───────────────────────────────────────────────────────
+const injectedCross = inject<ReturnType<typeof useI3CrossSheet> | null>('i3CrossSheet', null)
+const allResponsesRef = computed(() => props.allResponses)
+const localCross = injectedCross || useI3CrossSheet(allResponsesRef as any)
+const {
+  impairmentByCgu,
+  adjustmentSync,
+  initialValueRows,
+  entryVariances,
+  ajeVariances,
+  cguNameOptions,
+} = localCross
 
-/** el-segmented选项配置 */
+const dualView = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+const {
+  exportTemplate,
+  exportData,
+  importData,
+} = useI3ImportExport({
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  projectId: toRef(props, 'projectId') as Ref<string>,
+})
+
+const entryVarianceWarnings = computed(() =>
+  entryVariances.value.filter((v) => Math.abs(v.diffVsIncrease) > 0.01 && v.entryCalc > 0),
+)
+
+const ajeVarianceWarnings = computed(() => ajeVariances.value)
+
 const segmentOptions = I3_DETAIL_SECTION_LABELS.map((label, idx) => ({
   label,
   value: idx as I3DetailSection,
 }))
 
-/** el-segmented绑定的v-model值 */
 const activeSectionKey = computed({
   get: () => activeSection.value,
   set: (val: I3DetailSection) => switchSection(val),
 })
 
-// ─── Computed ────────────────────────────────────────────────────────────────
-
-/** 当前选中行的rowKey（供el-table current-row-key） */
 const activeRowKey = computed(() => {
   if (activeRowIndex.value < 0 || activeRowIndex.value >= rows.value.length) return ''
   return rows.value[activeRowIndex.value]?.rowId ?? ''
 })
 
-/** 合计行展示数据（根据当前Section） */
+const CONCLUSION_TEMPLATES = [
+  {
+    key: 'ok',
+    label: '勾稽一致、列示恰当',
+    text: '经核查，商誉原值及减值准备明细滚动勾稽正确，增减变动有适当支持，明细合计与 I3-1 审定表一致。商誉明细在所有重大方面列示恰当。',
+  },
+  {
+    key: 'aje',
+    label: '已提账项调整',
+    text: '商誉明细经审计后已提出账项调整（见 I3-3）。调整后原值/减值准备审定数与 I3-1 勾稽一致，我们认为相关认定在所有重大方面公允反映。',
+  },
+  {
+    key: 'impairment',
+    label: '本期计提减值',
+    text: '本期商誉减值准备增加已与 I3-6 减值测试结论勾稽。商誉减值一经确认不得转回。除上述事项外，明细滚动及审定数列示恰当。',
+  },
+]
+
 const summaryDisplayRow = computed(() => {
   const s = summaryRow.value
   const sec = activeSection.value
-  switch (sec) {
-    case 0: // 基础
-      return {
-        investee: '合计',
-        acquisitionDate: '',
-        consideration: s.consideration,
-        counterpartyNetAsset: s.counterpartyNetAsset,
-        shareholding: '',
-        controlType: '',
-        mergerType: '',
-        equityLevel: '',
-        industry: '',
-        basicRemark: '',
-      }
-    case 1: // 入账
-      return {
-        investee: '合计',
-        mergerCost: s.mergerCost,
-        netAssetFairValue: s.netAssetFairValue,
-        goodwillOriginal: s.goodwillOriginal,
-        minorityInterest: s.minorityInterest,
-        costConsideration: s.costConsideration,
-        costContingent: s.costContingent,
-        costTransactionFee: s.costTransactionFee,
-        mergerDate: '',
-        valuationBaseDate: '',
-        valuationMethod: '',
-        valuationAppreciation: '',
-      }
-    case 2: // 减值
-      return {
-        investee: '合计',
-        accImpairmentBegin: s.accImpairmentBegin,
-        currentImpairment: s.currentImpairment,
-        accImpairmentEnd: s.accImpairmentEnd,
-        goodwillNetValue: s.goodwillNetValue,
-        cguName: '',
-        recoverableAmount: s.recoverableAmount,
-        impairmentTestDate: '',
-        impairmentTestMethod: '',
-        impairmentIndicator: '',
-      }
-    default:
-      return {}
+  if (sec === 0) {
+    return {
+      investee: '合计',
+      costOpening: s.costOpening,
+      costIncrease: s.costIncrease,
+      costIncreaseMethod: '',
+      costDecrease: s.costDecrease,
+      costDecreaseReason: '',
+      costEnding: s.costEnding,
+      costUnadj: s.costUnadj,
+      costAje: s.costAje,
+      costAudited: s.costAudited,
+    }
+  }
+  if (sec === 1) {
+    return {
+      investee: '合计',
+      impOpening: s.impOpening,
+      impIncrease: s.impIncrease,
+      impIncreaseMethod: '',
+      impDecrease: s.impDecrease,
+      impDecreaseReason: '',
+      impEnding: s.impEnding,
+      impUnadj: s.impUnadj,
+      impAje: s.impAje,
+      impAudited: s.impAudited,
+      goodwillNetValue: s.goodwillNetValue,
+      cguName: '',
+    }
+  }
+  if (sec === 2) {
+    return {
+      investee: '合计',
+      mergerCost: s.mergerCost,
+      netAssetFairValue: s.netAssetFairValue,
+      entryGoodwillCalc: s.entryGoodwillCalc,
+      costAudited: s.costAudited,
+      minorityInterest: s.minorityInterest,
+      costConsideration: s.costConsideration,
+      costContingent: s.costContingent,
+      costTransactionFee: s.costTransactionFee,
+      mergerDate: '',
+      valuationMethod: '',
+      entryRemark: '',
+    }
+  }
+  return {
+    investee: '合计',
+    acquisitionDate: '',
+    consideration: s.consideration,
+    counterpartyNetAsset: s.counterpartyNetAsset,
+    shareholding: '',
+    controlType: '',
+    mergerType: '',
+    equityLevel: '',
+    industry: '',
+    impairmentTestMethod: '',
+    impairmentIndicator: '',
+    basicRemark: '',
   }
 })
 
-// ─── Event Handlers ──────────────────────────────────────────────────────────
-
-/** 行点击同步（跨Tab高亮保持） */
 function onCurrentRowChange(row: I3DetailRow | null): void {
   if (!row) return
   const idx = rows.value.findIndex((r) => r.rowId === row.rowId)
   if (idx >= 0) setActiveRow(idx)
 }
 
-/** 单元格值变化 → 自动重算公式列 + 持久化 */
 function handleCellChange(rowIndex: number, field: string, value: string | number): void {
   updateCell(rowIndex, field as keyof I3DetailRow, value)
 }
 
-/** 新增行：弹ElMessageBox.prompt输入被投资单位名称 */
 async function handleAddRow(): Promise<void> {
   await addRow()
 }
 
-/** 删除行 */
 function handleRemoveRow(index: number): void {
   removeRow(index)
 }
 
-/** 导出模板（委托useI3ImportExport） */
-function handleExportTemplate(): void {
-  console.log('[I3-Detail] Export template — 委托 useI3ImportExport')
+function handleSyncFromI36() {
+  const n = syncImpIncreaseFromI3_6(impairmentByCgu.value)
+  ElMessage[n > 0 ? 'success' : 'info'](n > 0 ? `已从 I3-6 更新 ${n} 行本期计提` : '无匹配 CGU 可更新（请先填写所属CGU）')
 }
 
-/** 导出数据 */
-function handleExportData(): void {
-  console.log('[I3-Detail] Export data — 委托 useI3ImportExport')
+function handleSyncFromI33() {
+  const result = syncAjeFromI3_3(adjustmentSync.value.byInvestee)
+  const tips: string[] = []
+  if (result.updated > 0) tips.push(`已回写 ${result.updated} 行`)
+  if (result.unmatched.length) tips.push(`未匹配明细：${result.unmatched.slice(0, 3).join('、')}${result.unmatched.length > 3 ? '…' : ''}`)
+  if (result.unspecified) tips.push('部分分录未填被投资单位')
+  if (!tips.length) {
+    ElMessage.info('无差异可回写（或无可匹配被投资单位）')
+    return
+  }
+  ElMessage[result.updated > 0 ? (result.unmatched.length || result.unspecified ? 'warning' : 'success') : 'warning'](
+    tips.join('；'),
+  )
 }
 
-/** 导入数据 */
-function handleImportData(): void {
-  console.log('[I3-Detail] Import data — 委托 useI3ImportExport')
+function handleSyncFromI34() {
+  const n = syncFromI3_4(initialValueRows.value)
+  ElMessage[n > 0 ? 'success' : 'info'](n > 0 ? `已从 I3-4 更新 ${n} 行` : '无匹配入账测算可带入')
 }
 
-// ─── Row Class ───────────────────────────────────────────────────────────────
-
-function getRowClassName({ rowIndex }: { row: I3DetailRow; rowIndex: number }): string {
-  return rowIndex === activeRowIndex.value ? 'active-synced-row' : ''
+function triggerImport() {
+  fileInputRef.value?.click()
 }
 
-// ─── Summary Value Helper ────────────────────────────────────────────────────
+async function onImportFileSelected(ev: Event) {
+  const input = ev.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  await importData('I3-2', file)
+}
 
-/** 获取合计行单元格显示值 */
+function navigate(code: string): void {
+  emit('navigate-sheet', code)
+}
+
+function getRowClassName({ row, rowIndex }: { row: I3DetailRow; rowIndex: number }): string {
+  const classes: string[] = []
+  if (rowIndex === activeRowIndex.value) classes.push('active-synced-row')
+  if (row.impIncrease > 0) classes.push('row-impaired')
+  return classes.join(' ')
+}
+
 function getSummaryValue(row: Record<string, any>, col: { key: string; type: string }): string {
   const val = row[col.key]
   if (val == null || val === '') return '-'
@@ -452,7 +681,6 @@ function getSummaryValue(row: Record<string, any>, col: { key: string; type: str
   return String(val)
 }
 
-// ─── 审计说明 / 审计结论（纯文本，无AI） ─────────────────────────────────────
 const NOTE_KEY = 'I3-2-audit-note'
 const CONCLUSION_KEY = 'I3-2-audit-conclusion'
 const auditNote = ref('')
@@ -463,10 +691,18 @@ function saveAuditNote(val: string): void {
   auditNote.value = val
   emit('save', NOTE_KEY, val)
 }
+
 function saveAuditConclusion(val: string): void {
   if (props.isReadonly) return
   auditConclusion.value = val
   emit('save', CONCLUSION_KEY, val)
+}
+
+function applyConclusionTemplate(key: string): void {
+  const t = CONCLUSION_TEMPLATES.find((x) => x.key === key)
+  if (!t) return
+  auditConclusion.value = t.text
+  saveAuditConclusion(t.text)
 }
 
 watch(
@@ -487,28 +723,54 @@ watch(
   padding: 16px;
 }
 
-/* 方法论上下文（琥珀色） */
+.guidance-block {
+  background: linear-gradient(135deg, #e8f4fd 0%, #d6ecfa 100%);
+  border: 1px solid #b3d8f0;
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
+}
+.guidance-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 20px;
+}
+.guidance-step {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 12px;
+  color: #1a5276;
+  line-height: 1.5;
+}
+.step-num {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #2980b9;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 .methodology-context {
   border-left: 4px solid #d97706;
   background: #fffbeb;
-  padding: 12px 16px;
-  margin-bottom: 16px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
   border-radius: 4px;
   font-size: 12px;
   color: #92400e;
-  line-height: 1.8;
+  line-height: 1.7;
 }
-.methodology-context p {
-  margin: 0;
-}
-.methodology-context strong {
-  color: #78350f;
-}
+.methodology-context p { margin: 0; }
 
-/* 交叉验证警告 */
-.cross-validation-alert {
-  margin-bottom: 12px;
-}
+.objective-alert { margin-bottom: 12px; }
+.cross-validation-alert { margin-bottom: 10px; }
 .cross-validation-content {
   display: flex;
   align-items: center;
@@ -523,7 +785,39 @@ watch(
   font-weight: 500;
 }
 
-/* 工具栏行：segmented左 + 按钮右 */
+.xref-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+.xref-label { color: var(--el-text-color-secondary); }
+
+.dual-view {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+@media (max-width: 1100px) {
+  .dual-view { grid-template-columns: 1fr; }
+}
+.dual-pane {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  padding: 8px;
+  background: #fff;
+  overflow: auto;
+}
+.dual-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 8px;
+  color: #1a5276;
+}
+
 .toolbar-row {
   display: flex;
   align-items: center;
@@ -532,122 +826,97 @@ watch(
   gap: 16px;
   flex-wrap: wrap;
 }
-.segment-bar {
-  flex-shrink: 0;
-}
 .toolbar-right {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
-.import-export-dropdown {
-  margin-left: 0;
-}
-.row-count {
-  color: var(--el-text-color-secondary);
+.row-count { color: var(--el-text-color-secondary); font-size: 12px; }
+.net-chip {
   font-size: 12px;
+  padding: 2px 10px;
+  background: #f0fdf4;
+  border-radius: 4px;
+  color: #166534;
+}
+.mov-chip {
+  font-size: 12px;
+  padding: 2px 10px;
+  background: #eff6ff;
+  border-radius: 4px;
+  color: #1e40af;
 }
 
-/* 明细表格 */
-.detail-table {
-  font-size: var(--wp-font-size, 13px);
-}
+.detail-table { font-size: var(--wp-font-size, 13px); }
 .detail-table :deep(.el-table__header th) {
   font-size: 12px;
   font-weight: 600;
   background: #f8fafc;
 }
-.detail-table :deep(.active-synced-row) {
-  background: #eff6ff !important;
-}
-.detail-table :deep(.el-table__body tr:hover > td) {
-  background: #f0f9ff;
-}
+.detail-table :deep(.active-synced-row) { background: #eff6ff !important; }
+.detail-table :deep(.row-impaired) { background: #fef0f0 !important; }
 
-/* 公式列表头：虚线下划线 + cursor:help */
 .formula-col-header {
   border-bottom: 1px dashed #6b7280;
   cursor: help;
-  padding-bottom: 1px;
 }
-
-/* 公式值：虚线下划线 + cursor:help + tooltip来源 */
 .formula-value {
   border-bottom: 1px dashed #9ca3af;
   cursor: help;
-  color: #374151;
   font-weight: 500;
 }
 
-/* 输入控件 */
-.cell-input-number {
-  width: 100%;
-}
-.cell-input-number :deep(.el-input__inner) {
-  text-align: right;
-}
-.cell-input-text {
-  width: 100%;
-}
-.cell-date-picker {
-  width: 100%;
-}
-.cell-select {
-  width: 100%;
-}
-.cell-readonly {
-  color: var(--el-text-color-regular);
-}
+.cell-input-number { width: 100%; }
+.cell-input-number :deep(.el-input__inner) { text-align: right; }
+.cell-input-text, .cell-date-picker, .cell-select { width: 100%; }
+.cell-readonly { color: var(--el-text-color-regular); }
 
-/* 合计行区域（sticky高亮） */
 .summary-section {
   margin-top: 8px;
   position: sticky;
   bottom: 0;
   z-index: 5;
 }
-.summary-table {
-  font-size: var(--wp-font-size, 13px);
+.dual-summary {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  background: #f0fdf4;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #166534;
 }
-.summary-table :deep(.el-table__header) {
-  display: none;
-}
+.summary-table :deep(.el-table__header) { display: none; }
 .summary-table :deep(tr td) {
   background: #f0fdf4 !important;
   font-weight: 600;
 }
-.summary-label {
-  font-weight: 700;
-  color: #166534;
-}
-.summary-value {
-  font-weight: 600;
-  color: #166534;
+.summary-label, .summary-value { color: #166534; font-weight: 700; }
+
+.audit-note-card { margin-top: 12px; }
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-/* 审计目标 alert */
-.objective-alert {
-  margin-bottom: 12px;
-}
-
-/* 编制提示 details */
 .guidance-details {
-  margin-bottom: 12px;
+  margin-top: 14px;
   font-size: 12px;
-  color: var(--el-text-color-secondary);
+  color: #1a5276;
+  background: #f5f8fb;
+  border: 1px solid #d6e4f0;
+  border-radius: 6px;
+  padding: 10px 14px;
 }
-.guidance-details summary {
-  cursor: pointer;
-  font-weight: 500;
-}
-.guidance-details .guidance-content ul {
+.guidance-details summary { cursor: pointer; font-weight: 600; }
+.guidance-content ol {
   padding-left: 20px;
-  margin-top: 8px;
-  line-height: 1.8;
-}
-
-/* 审计说明/结论卡片 */
-.audit-note-card {
-  margin-top: 12px;
+  margin: 8px 0 0;
+  line-height: 1.85;
+  color: #2c5282;
 }
 </style>

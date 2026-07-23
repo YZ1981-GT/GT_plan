@@ -102,6 +102,8 @@ export function useK10GrantReconcile(params: UseK10GrantReconcileParams) {
 
   const rows = ref<K10GrantRow[]>([])
   const isChanged = ref(false)
+  /** K7 递延收益(2401)本期分摊金额 —— 审计师从 K7-4 分摊测算读取后手工填入（跨底稿一致性核对锚点） */
+  const k7AmortManual = ref<number>(0)
 
   // ─── Load ──────────────────────────────────────────────────────────────────
 
@@ -112,6 +114,9 @@ export function useK10GrantReconcile(params: UseK10GrantReconcileParams) {
     } else {
       rows.value = []
     }
+    // 载入手工填入的 K7 本期分摊
+    const k7Item = allResponses.value.get(`${ITEM_PREFIX}-k7-amort`)
+    if (k7Item) k7AmortManual.value = parseNum(k7Item.remark ?? k7Item.conclusion ?? 0)
   }
 
   function _getJson(itemId: string): any {
@@ -209,13 +214,21 @@ export function useK10GrantReconcile(params: UseK10GrantReconcileParams) {
   const k7Consistency: ComputedRef<K10K7Consistency> = computed(() => {
     // K10-4中递延分摊合计（摊销转其他收益合计）
     const deferredAmortInK10 = totals.value.amortToOtherIncome
-    // K7递延收益本期分摊（从allResponses中读取K7已存数据）
+    // K7递延收益本期分摊：优先手工填入值；回退跨底稿键（EventBus/pull 预留，当前未写入）
     const k7Raw = allResponses.value.get('K7-deferred-amort-total')
-    const amortInK7 = parseNum(k7Raw?.remark ?? k7Raw?.conclusion ?? 0)
+    const amortInK7 = k7AmortManual.value || parseNum(k7Raw?.remark ?? k7Raw?.conclusion ?? 0)
     const diff = deferredAmortInK10 - amortInK7
     const isConsistent = isConsistentWithK7(deferredAmortInK10, amortInK7)
     return { deferredAmortInK10, amortInK7, diff, isConsistent }
   })
+
+  /** 手工设置 K7 本期分摊金额（持久化，供一致性核对） */
+  function setK7Amort(val: number): void {
+    if (isReadonly?.value) return
+    k7AmortManual.value = parseNum(val)
+    onSave?.(`${ITEM_PREFIX}-k7-amort`, k7AmortManual.value)
+    isChanged.value = true
+  }
 
   // ─── Cell Update ───────────────────────────────────────────────────────────
 
@@ -291,6 +304,8 @@ export function useK10GrantReconcile(params: UseK10GrantReconcileParams) {
     rows: computedRows,
     totals,
     k7Consistency,
+    k7AmortManual,
+    setK7Amort,
     isChanged,
     updateCell,
     addRow,

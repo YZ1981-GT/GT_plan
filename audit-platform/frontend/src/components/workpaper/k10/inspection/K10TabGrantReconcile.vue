@@ -18,12 +18,31 @@
         </el-tag>
       </div>
       <div class="section-header-right">
-        <el-button size="small" @click="handleAI">
-          <el-icon><MagicStick /></el-icon> AI辅助
-        </el-button>
-        <el-button size="small" @click="handleReview">
-          <el-icon><Check /></el-icon> 复核
-        </el-button>
+        <GtReviewTrigger section-id="K10-4-grant-reconcile" label="💬 复核" />
+        <el-popover placement="bottom-end" trigger="click" :width="260">
+          <template #reference>
+            <el-button size="small">⚙ 列设置</el-button>
+          </template>
+          <div class="col-prefs">
+            <div class="col-prefs-presets">
+              <el-button size="small" text @click="colPrefs.applyPreset('full')">全部</el-button>
+              <el-button size="small" text @click="colPrefs.applyPreset('core')">核心</el-button>
+              <el-button size="small" text @click="colPrefs.applyPreset('deferred')">递延</el-button>
+              <el-button size="small" text @click="colPrefs.hideEmptyColumns()">隐藏空列</el-button>
+              <el-button size="small" text @click="colPrefs.resetDefault()">重置</el-button>
+            </div>
+            <el-divider style="margin:8px 0" />
+            <div class="col-prefs-list">
+              <el-checkbox
+                v-for="c in colPrefs.columns"
+                :key="c.key"
+                :model-value="colPrefs.isVisible(c.key)"
+                size="small"
+                @change="(v: any) => (colPrefs.visible.value[c.key] = !!v)"
+              >{{ c.label }}</el-checkbox>
+            </div>
+          </div>
+        </el-popover>
         <el-dropdown v-if="!props.isReadonly" trigger="click" @command="handleImportExport">
           <el-button size="small">
             导入导出 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
@@ -42,8 +61,10 @@
     <!-- ═══ 跨底稿引用 ═══ -->
     <div class="cross-ref-bar">
       <span class="cross-refs-label">关联底稿：</span>
-      <GtIndexChip value="K7-1" :context-project-id="props.projectId" />
-      <GtIndexChip value="K10-1" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K7-1" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K10-1" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K10-6" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K12" :context-project-id="props.projectId" />
     </div>
 
     <!-- ═══ 方法论上下文 ═══ -->
@@ -69,9 +90,21 @@
         </el-tag>
       </div>
       <div class="consistency-detail">
-        <span>K10递延分摊: {{ fmtAmount(reconcile.k7Consistency.value.deferredAmortInK10) }}</span>
+        <span>K10递延分摊转其他收益: {{ fmtAmount(reconcile.k7Consistency.value.deferredAmortInK10) }}</span>
         <span class="divider">|</span>
-        <span>K7本期分摊: {{ fmtAmount(reconcile.k7Consistency.value.amortInK7) }}</span>
+        <span class="k7-input-wrap">
+          K7本期分摊(2401)：
+          <el-input-number
+            v-if="!props.isReadonly"
+            :model-value="reconcile.k7AmortManual.value"
+            :controls="false"
+            size="small"
+            style="width: 130px"
+            placeholder="从K7-4填入"
+            @change="(val: number | undefined) => reconcile.setK7Amort(val ?? 0)"
+          />
+          <span v-else>{{ fmtAmount(reconcile.k7Consistency.value.amortInK7) }}</span>
+        </span>
         <span v-if="!reconcile.k7Consistency.value.isConsistent" class="diff-warning">
           差额: {{ fmtAmount(reconcile.k7Consistency.value.diff) }}
         </span>
@@ -95,7 +128,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column prop="period" label="期间" width="100">
+      <el-table-column v-if="colPrefs.isVisible('period')" prop="period" label="期间" width="100">
         <template #default="{ row }">
           <el-input
             v-if="!props.isReadonly && row.isEditable"
@@ -108,7 +141,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="直接冲减成本" width="120" align="right">
+      <el-table-column v-if="colPrefs.isVisible('directReduceCost')" prop="directReduceCost" label="直接冲减成本" width="120" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!props.isReadonly && row.isEditable"
@@ -122,7 +155,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="直接计入其他收益" width="140" align="right">
+      <el-table-column v-if="colPrefs.isVisible('directToOtherIncome')" prop="directToOtherIncome" label="直接计入其他收益" width="140" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!props.isReadonly && row.isEditable"
@@ -136,7 +169,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="直接计入营业外" width="130" align="right">
+      <el-table-column v-if="colPrefs.isVisible('directToNonOpIncome')" prop="directToNonOpIncome" label="直接计入营业外" width="130" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!props.isReadonly && row.isEditable"
@@ -150,7 +183,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="新增递延" width="110" align="right">
+      <el-table-column v-if="colPrefs.isVisible('newDeferred')" prop="newDeferred" label="新增递延" width="110" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!props.isReadonly && row.isEditable"
@@ -164,7 +197,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="期初递延余额" width="120" align="right">
+      <el-table-column v-if="colPrefs.isVisible('openingDeferred')" prop="openingDeferred" label="期初递延余额" width="120" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!props.isReadonly && row.isEditable"
@@ -178,7 +211,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="摊销冲减成本" width="120" align="right">
+      <el-table-column v-if="colPrefs.isVisible('amortReduceCost')" prop="amortReduceCost" label="摊销冲减成本" width="120" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!props.isReadonly && row.isEditable"
@@ -192,7 +225,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="摊销转其他收益" width="130" align="right">
+      <el-table-column v-if="colPrefs.isVisible('amortToOtherIncome')" prop="amortToOtherIncome" label="摊销转其他收益" width="130" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!props.isReadonly && row.isEditable"
@@ -206,7 +239,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="摊销转营业外" width="120" align="right">
+      <el-table-column v-if="colPrefs.isVisible('amortToNonOpIncome')" prop="amortToNonOpIncome" label="摊销转营业外" width="120" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!props.isReadonly && row.isEditable"
@@ -220,7 +253,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="返还" width="100" align="right">
+      <el-table-column v-if="colPrefs.isVisible('refund')" prop="refund" label="返还" width="100" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!props.isReadonly && row.isEditable"
@@ -234,7 +267,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="其他转出" width="100" align="right">
+      <el-table-column v-if="colPrefs.isVisible('otherTransferOut')" prop="otherTransferOut" label="其他转出" width="100" align="right">
         <template #default="{ row }">
           <el-input-number
             v-if="!props.isReadonly && row.isEditable"
@@ -248,7 +281,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="期末递延余额" width="130" align="right" class-name="formula-col">
+      <el-table-column prop="closingDeferred" label="期末递延余额" width="130" align="right" class-name="formula-col">
         <template #default="{ row }">
           <span class="formula-value" title="公式：期初+新增-摊销成本-摊销其他收益-摊销营业外-返还-其他转出">
             {{ fmtAmount(row.closingDeferred) }}
@@ -257,14 +290,21 @@
       </el-table-column>
 
       <!-- 操作列 -->
-      <el-table-column v-if="!props.isReadonly" label="" width="60" align="center" fixed="right">
+      <el-table-column v-if="!props.isReadonly" label="操作" width="110" align="center" fixed="right">
         <template #default="{ row }">
-          <el-button v-if="row.isEditable" type="danger" size="small" link @click="reconcile.removeRow(row.rowKey)">
-            删除
-          </el-button>
+          <el-button v-if="row.isEditable" size="small" link type="primary" @click="openDialog(row)">编辑</el-button>
+          <el-button v-if="row.isEditable" type="danger" size="small" link @click="reconcile.removeRow(row.rowKey)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- 引导式录入弹窗 -->
+    <K10GrantReconcileDialog
+      v-model:visible="dialogVisible"
+      :row="dialogRow"
+      :readonly="props.isReadonly"
+      @save="handleDialogSave"
+    />
 
     <!-- ═══ 新增 + 合计计入其他收益 ═══ -->
     <div class="bottom-bar">
@@ -277,6 +317,26 @@
         </el-tag>
       </div>
     </div>
+
+    <!-- ═══ 核对说明（AI辅助） ═══ -->
+    <el-card shadow="never" class="note-card">
+      <template #header>
+        <div class="note-card-header">
+          <span>核对说明与结论</span>
+          <el-button size="small" type="primary" text :loading="aiLoading" @click="handleAI">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="noteText"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="props.isReadonly"
+        placeholder="填写政府补助核对说明（含直接计入/递延分摊口径、与K7递延收益一致性核对结论）..."
+        @change="handleNoteSave"
+      />
+    </el-card>
 
     <!-- ═══ 编制提示 ═══ -->
     <details class="k10-details-tip">
@@ -309,12 +369,15 @@
  * - Total行：显示各列合计 + 合计计入其他收益
  * - 导入导出（el-dropdown三级）
  */
-import { computed, defineAsyncComponent, inject, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick, Check, ArrowDown } from '@element-plus/icons-vue'
+import { MagicStick, ArrowDown } from '@element-plus/icons-vue'
 import { useK10GrantReconcile } from '../../composables/useK10GrantReconcile'
 import { useK10ImportExport } from '../../composables/useK10ImportExport'
+import { useK10GrantColumnPrefs } from '../../composables/useK10GrantColumnPrefs'
 import { api } from '@/services/apiProxy'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import K10GrantReconcileDialog from './K10GrantReconcileDialog.vue'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
@@ -332,9 +395,6 @@ const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
 }>()
 
-// ─── Inject复核对话 ──────────────────────────────────────────────────────────
-const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
-
 // ─── Composables ─────────────────────────────────────────────────────────────
 
 const reconcile = useK10GrantReconcile({
@@ -350,6 +410,68 @@ const importExport = useK10ImportExport({
   projectId: computed(() => props.projectId),
   sheetCode: 'K10-4',
 })
+
+// ─── 列显隐偏好（⚙列设置，13 列宽表） ─────────────────────────────────────────
+const colPrefs = useK10GrantColumnPrefs(computed(() => reconcile.rows.value))
+
+// ─── 引导式录入弹窗 ────────────────────────────────────────────────────────────
+const dialogVisible = ref(false)
+const dialogRow = ref<Record<string, any> | null>(null)
+
+function openDialog(row: Record<string, any>): void {
+  dialogRow.value = { ...row }
+  dialogVisible.value = true
+}
+
+const _GRANT_FIELDS = [
+  'projectName', 'period', 'directReduceCost', 'directToOtherIncome', 'directToNonOpIncome',
+  'newDeferred', 'openingDeferred', 'amortReduceCost', 'amortToOtherIncome', 'amortToNonOpIncome',
+  'refund', 'otherTransferOut',
+] as const
+
+function handleDialogSave(patch: Record<string, any>): void {
+  if (!patch.rowKey) return
+  for (const f of _GRANT_FIELDS) {
+    reconcile.updateCell(patch.rowKey, f, patch[f])
+  }
+}
+
+// ─── 核对说明 + AI ───────────────────────────────────────────────────────────
+const noteText = ref('')
+const aiLoading = ref(false)
+
+function loadNote(): void {
+  const saved = props.allResponses.get('K10-4-note')
+  if (saved) noteText.value = (saved.remark ?? saved.conclusion ?? '') as string
+}
+
+function handleNoteSave(): void {
+  emit('save', 'K10-4-note', { remark: noteText.value })
+}
+
+async function handleAI(): Promise<void> {
+  if (!props.wpId) return
+  aiLoading.value = true
+  try {
+    const t = reconcile.totals.value
+    const ctx = {
+      合计计入其他收益: String(t.totalRecognizedOtherIncome),
+      直接计入其他收益: String(t.directToOtherIncome),
+      递延摊销转其他收益: String(t.amortToOtherIncome),
+      期末递延余额: String(t.closingDeferred),
+      K7一致性: reconcile.k7Consistency.value.isConsistent ? '一致' : `不一致(差额${reconcile.k7Consistency.value.diff})`,
+    }
+    const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'K10-4-note',
+      prompt: '为K10政府补助核对表生成核对说明与结论：政府补助直接计入/递延分摊口径、期末递延余额勾稽、与K7递延收益(2401)本期分摊一致性核对结果。',
+      existingContent: noteText.value,
+      context: ctx,
+    })
+    const content = (res?.data?.content ?? res?.content ?? '') as string
+    if (content) { noteText.value = content; handleNoteSave(); ElMessage.success('AI生成完成') }
+    else ElMessage.warning('AI未返回内容，请手动填写')
+  } catch { ElMessage.warning('AI生成失败，请手动填写') } finally { aiLoading.value = false }
+}
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
@@ -395,26 +517,17 @@ function handleImportExport(command: string): void {
   }
 }
 
-function handleAI(): void {
-  // AI辅助钩子
-}
-
-function handleReview(): void {
-  openReviewDialog?.('K10-4-grant-reconcile', '政府补助核对表')
-}
-
-/** 合计行方法 */
+/**
+ * 合计行方法 — 各金额列已设 prop（= totals 键），按 col.property 映射，
+ * 对隐藏列（⚙列设置）稳健：隐藏列不出现在 columns 中，索引无关。
+ */
 function summaryMethod({ columns }: { columns: any[] }): string[] {
-  const t = reconcile.totals.value
+  const t = reconcile.totals.value as Record<string, number>
   return columns.map((col: any, idx: number) => {
     if (idx === 0) return '合计'
-    const prop = col.property
-    if (prop === 'period') return ''
-    if (prop in t) return fmtAmount((t as any)[prop])
-    // 手动映射无property列（按列顺序）
-    const colMap: Record<number, number> = {}
-    // 由于el-table-column没有prop，用label匹配
-    return ''
+    const prop = col.property as string | undefined
+    if (!prop || prop === 'period' || prop === 'projectName') return ''
+    return prop in t ? fmtAmount(t[prop]) : ''
   })
 }
 
@@ -422,6 +535,7 @@ function summaryMethod({ columns }: { columns: any[] }): string[] {
 
 onMounted(() => {
   reconcile.initFromResponses()
+  loadNote()
 })
 </script>
 
@@ -462,8 +576,9 @@ onMounted(() => {
 .k7-consistency-bar.inconsistent { background: #fef0f0; border: 1px solid #f5c4c4; }
 .consistency-left { display: flex; align-items: center; gap: 8px; }
 .consistency-label { font-size: 12px; color: #606266; }
-.consistency-detail { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #606266; }
+.consistency-detail { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #606266; flex-wrap: wrap; }
 .consistency-detail .divider { color: #dcdfe6; }
+.k7-input-wrap { display: flex; align-items: center; gap: 4px; }
 .diff-warning { color: #f56c6c; font-weight: 600; }
 
 /* 表格 */
@@ -493,4 +608,11 @@ onMounted(() => {
 .k10-details-tip summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .k10-details-tip ul { margin: 8px 0 0 0; padding-left: 20px; }
 .k10-details-tip li { margin-bottom: 4px; }
+
+.note-card { margin-top: 16px; }
+.note-card-header { display: flex; justify-content: space-between; align-items: center; }
+.note-card-header span { font-weight: 600; font-size: 14px; }
+
+.col-prefs-presets { display: flex; flex-wrap: wrap; gap: 4px; }
+.col-prefs-list { display: flex; flex-direction: column; gap: 4px; max-height: 260px; overflow-y: auto; }
 </style>

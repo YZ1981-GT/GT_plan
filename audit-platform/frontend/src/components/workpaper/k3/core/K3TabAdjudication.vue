@@ -331,11 +331,13 @@
  * 科目：2241 其他应付款（**贷方/负债类**）
  * ⚠️ 负债类！期末=期初+贷方-借方（与资产类相反）
  */
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, watch } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useK3Adjudication, type K3AdjRow } from '../../composables/useK3Adjudication'
 import { useK3FormData } from '../../composables/useK3FormData'
+import { useAgingConfig } from '@/composables/useAgingConfig'
+import http from '@/utils/http'
 
 const props = defineProps<{
   wpId: string
@@ -354,6 +356,9 @@ const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => 
 const allResponsesRef = computed(() => props.allResponses)
 const tbDataRef = computed(() => props.tbData)
 
+// 动态账龄段（与K3-2明细表共享同一项目配置）
+const { segments: agingSegments } = useAgingConfig(toRef(props, 'projectId'), 'K3')
+
 const {
   byNatureRows,
   byAgingRows,
@@ -367,6 +372,7 @@ const {
   allResponses: allResponsesRef as any,
   tbData: tbDataRef as any,
   saveResponse: handleSaveItem,
+  agingSegments,
 })
 
 const { writebackTB, debouncedSave } = useK3FormData({
@@ -394,6 +400,19 @@ const agingDisplayRows = computed((): K3AdjRow[] => {
 const crossDiff = computed(() => {
   return Math.round((natureSubtotal.value.audited - agingSubtotal.value.audited) * 100) / 100
 })
+
+// ─── 审定合计持久化（供跨sheet: K3-2勾稽告警/useK3CrossSheet消费） ──────────
+// 🔴 修复整合缺口：审定合计变化时debounce持久化 K3-1-audited-total，
+// 否则 K3-2 明细勾稽告警和 useK3CrossSheet.adjudicationVsDetail 永远读到0
+watch(
+  () => natureSubtotal.value.audited,
+  (total) => {
+    const itemId = 'K3-1-audited-total'
+    props.allResponses.set(itemId, { item_id: itemId, conclusion: null, remark: String(total) })
+    debouncedSave(itemId, { remark: String(total) })
+  },
+  { immediate: false },
+)
 
 // ─── 字段变化处理 ────────────────────────────────────────────────────────────
 
@@ -440,6 +459,10 @@ async function handleWritebackTB() {
   publishing.value = true
   try {
     const auditedTotal = getAuditedTotal()
+    // 立即持久化审定合计供跨sheet消费（K3-2勾稽/useK3CrossSheet）
+    const totalId = 'K3-1-audited-total'
+    props.allResponses.set(totalId, { item_id: totalId, conclusion: null, remark: String(auditedTotal) })
+    emit('save', totalId, { remark: String(auditedTotal) })
     await writebackTB(auditedTotal)
     ElMessage.success('审定数已回写TB（2241其他应付款）')
   } catch {
@@ -452,7 +475,38 @@ async function handleWritebackTB() {
 // ─── AI / 复核 ──────────────────────────────────────────────────────────────
 
 function handleAiGenerate(section: string) {
-  console.log('AI generate:', section)
+  const sectionPrompts: Record<string, string> = {
+    'adj-nature': '请分析其他应付款按性质分类审定数据，评估各类别余额变动合理性',
+    'adj-aging': '请分析其他应付款按账龄分类情况，重点关注3年以上长期挂账及完整性风险',
+    'adj-conclusion': '请生成其他应付款审定表审计结论，基于性质/账龄分析和三角勾稽结果',
+    'adj-completeness': '请生成负债完整性认定说明，描述已执行的反向截止测试程序及结论',
+  }
+  const prompt = sectionPrompts[section] || '请生成其他应付款审定表相关审计说明'
+
+  http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+    prompt,
+    context: JSON.stringify({
+      科目: '2241其他应付款',
+      方向: '贷方/负债类',
+      审计重点: '完整性认定(负债易少计)',
+      性质合计审定: String(natureSubtotal.value.audited),
+      账龄合计审定: String(agingSubtotal.value.audited),
+      三角勾稽: reconciliation.value.isBalanced ? '平衡' : `不平衡(差额${reconciliation.value.diff})`,
+      交叉验证差额: String(crossDiff.value),
+    }),
+    existingContent: section.includes('conclusion') ? auditConclusion.value : (section.includes('completeness') ? completenessNote.value : ''),
+    section: `K3-1-${section}`,
+  }).then((res: any) => {
+    const content = res?.data?.data?.content || res?.data?.content || ''
+    if (!content) return
+    if (section === 'adj-conclusion') {
+      auditConclusion.value = auditConclusion.value ? `${auditConclusion.value}\n${content}` : content
+      saveConclusion()
+    } else if (section === 'adj-completeness') {
+      completenessNote.value = completenessNote.value ? `${completenessNote.value}\n${content}` : content
+      saveCompleteness()
+    }
+  }).catch(() => { /* AI不可用静默降级 */ })
 }
 
 function handleReview(id: string) {

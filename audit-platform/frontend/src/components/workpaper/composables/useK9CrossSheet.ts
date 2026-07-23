@@ -70,7 +70,8 @@ export function useK9CrossSheet(allResponses: Ref<Map<string, any>>): {
    */
   const adjudicationVsDetail: ComputedRef<CrossSheetCheckResult> = computed(() => {
     const adjTotal = getNum('K9-1-audited-total')
-    const detailTotal = getNum('K9-2-total-audited')
+    // 真实键为 K9-2-detail-audited-total（useK9Detail 写入）；兼容旧 K9-2-total-audited
+    const detailTotal = getNum('K9-2-detail-audited-total') || getNum('K9-2-total-audited')
     const diff = adjTotal - detailTotal
     return { diff, isMatch: Math.abs(diff) < 0.01 }
   })
@@ -87,7 +88,7 @@ export function useK9CrossSheet(allResponses: Ref<Map<string, any>>): {
    */
   const analysisVsDetail: ComputedRef<{ isMatch: boolean }> = computed(() => {
     const analysisTotal = getNum('K9-4-analysis-total')
-    const detailTotal = getNum('K9-2-total-audited')
+    const detailTotal = getNum('K9-2-detail-audited-total') || getNum('K9-2-total-audited')
     const diff = analysisTotal - detailTotal
     return { isMatch: Math.abs(diff) < 0.01 }
   })

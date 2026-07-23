@@ -18,6 +18,7 @@ import {
 } from './useF1FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import type { useF1CrossSheet } from './useF1CrossSheet'
+import { formatAgingAmountHint } from './agingPresets'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -253,12 +254,7 @@ export function computeTop5(
 }
 
 function fmtAgingHint(agingAudited: Record<string, number> | undefined): string {
-  if (!agingAudited || typeof agingAudited !== 'object') return ''
-  const parts: string[] = []
-  for (const [k, v] of Object.entries(agingAudited)) {
-    if (parseNum(v) !== 0) parts.push(`${k}:${parseNum(v)}`)
-  }
-  return parts.join('; ')
+  return formatAgingAmountHint(agingAudited)
 }
 
 /** F1-4 与 F2 存货采购 / F4 应付轻量联动提示（纯函数，便于单测） */
@@ -775,6 +771,37 @@ export function useF1Analysis(options: UseF1AnalysisOptions) {
     persist()
   }
 
+  /**
+   * 从试算表带入跨循环锚点余额（本期）：
+   * - 存货余额 1401（对照 F2）
+   * - 应付账款期末余额 2202（对照 F4，后端已取绝对值正数）
+   * 仅在锚点当前为空时填入，不覆盖已录入值；采购额仍需手工/从 F2 录入。
+   */
+  function fillCrossCycleFromTb(ctx: { inventoryBalance?: number; payableBalance?: number }): {
+    inventoryFilled: boolean
+    payableFilled: boolean
+  } {
+    if (isReadonly.value) return { inventoryFilled: false, payableFilled: false }
+    const inv = parseNum(ctx.inventoryBalance)
+    const pay = parseNum(ctx.payableBalance)
+    let inventoryFilled = false
+    let payableFilled = false
+    const next = { ...pack.value }
+    if (inv !== 0 && pack.value.inventoryBalance.current === 0) {
+      next.inventoryBalance = { ...next.inventoryBalance, current: inv }
+      inventoryFilled = true
+    }
+    if (pay !== 0 && pack.value.payableBalance.current === 0) {
+      next.payableBalance = { ...next.payableBalance, current: pay }
+      payableFilled = true
+    }
+    if (inventoryFilled || payableFilled) {
+      pack.value = next
+      persist()
+    }
+    return { inventoryFilled, payableFilled }
+  }
+
   /** 从 F1-2 取期末余额前 N 名填入大额供应商表（覆盖） */
   function fillMajorSuppliersFromDetail(limit = 10): void {
     if (isReadonly.value) return
@@ -823,6 +850,7 @@ export function useF1Analysis(options: UseF1AnalysisOptions) {
     updateSupplierCell,
     fillFromDetail,
     fillMajorSuppliersFromDetail,
+    fillCrossCycleFromTb,
     publishSignificantChange,
     // 兼容旧测试/调用
     top5Debtors: computed(() => top5Result.value.top5),

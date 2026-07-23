@@ -47,9 +47,12 @@ G1_MEASURE_TYPES = [
 async def _fetch_tb_values(ctx: RenderContext) -> dict:
     """取 1501 交易性金融资产 期初/期末余额，按父科目前缀聚合。
 
-    返回 {"opening": float, "closing": float}，取数失败降级为空 dict，前端允许手填。
+    返回 {"opening": float, "closing": float, "by_category": [...]}，
+    by_category 按子科目分类映射到投资品种（stock/fund/bond/derivative/other），
+    供前端 G1-1 审定表分行预填 seed。
+    取数失败降级为空 dict，前端允许手填。
     """
-    tb: dict[str, float] = {}
+    tb: dict = {}
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
@@ -57,24 +60,62 @@ async def _fetch_tb_values(ctx: RenderContext) -> dict:
         result = await ctx.db.execute(
             sa.select(
                 TbBalance.account_code,
+                TbBalance.account_name,
                 TbBalance.opening_balance,
                 TbBalance.closing_balance,
+                TbBalance.level,
             ).where(active_filter)
         )
         opening = 0.0
         closing = 0.0
         matched = False
+        by_category: list[dict] = []
         for row in result.fetchall():
             code = (row.account_code or "").strip()
             if code == _G1_ACCOUNT_PREFIX or code.startswith(_G1_ACCOUNT_PREFIX):
                 opening += float(row.opening_balance or 0)
                 closing += float(row.closing_balance or 0)
                 matched = True
+                # 子科目分类映射（非汇总行）
+                if code != _G1_ACCOUNT_PREFIX and (row.level or 0) >= 2:
+                    name = (row.account_name or "").lower()
+                    category = _classify_g1_sub_account(name, code)
+                    by_category.append({
+                        "account_code": code,
+                        "account_name": row.account_name or "",
+                        "category": category,
+                        "opening": float(row.opening_balance or 0),
+                        "closing": float(row.closing_balance or 0),
+                    })
         if matched:
-            tb = {"opening": opening, "closing": closing}
+            tb = {"opening": opening, "closing": closing, "by_category": by_category}
     except Exception as e:  # noqa: BLE001 — 取数失败降级为空，前端允许手填
         logger.warning("G1 TB fetch failed: %s", e)
     return tb
+
+
+def _classify_g1_sub_account(name: str, code: str) -> str:
+    """根据科目名称/编码将子科目映射到G1投资品种分类。"""
+    # 按名称关键词优先
+    if any(kw in name for kw in ("股票", "股权", "股份")):
+        return "stock"
+    if any(kw in name for kw in ("基金", "理财", "信托")):
+        return "fund"
+    if any(kw in name for kw in ("债券", "债", "票据")):
+        return "bond"
+    if any(kw in name for kw in ("衍生", "期权", "期货", "远期", "互换", "掉期")):
+        return "derivative"
+    # 按科目编码后缀（致同惯例：01股票02基金03债券04衍生）
+    suffix = code[len(_G1_ACCOUNT_PREFIX):]
+    if suffix.startswith("01"):
+        return "stock"
+    if suffix.startswith("02"):
+        return "fund"
+    if suffix.startswith("03"):
+        return "bond"
+    if suffix.startswith("04"):
+        return "derivative"
+    return "other"
 
 
 async def render(ctx: RenderContext) -> dict | None:
@@ -109,11 +150,14 @@ async def render(ctx: RenderContext) -> dict | None:
         "client_name": "",
         "audit_year": "",
         "account_code": _G1_ACCOUNT_PREFIX,
+        "bs_date": "",
+        "related_parties": [],
+        "applicable_standards": [],
     }
     try:
         proj_result = await db.execute(
             sa.text(
-                "SELECT client_name, audit_year "
+                "SELECT client_name, audit_year, applicable_standard_v2 "
                 "FROM projects WHERE id = :pid"
             ),
             {"pid": str(ctx.project_id)},
@@ -121,9 +165,36 @@ async def render(ctx: RenderContext) -> dict | None:
         proj_row = proj_result.fetchone()
         if proj_row:
             project_context["client_name"] = proj_row.client_name or ""
-            project_context["audit_year"] = str(proj_row.audit_year or "")
+            audit_year = str(proj_row.audit_year or "")
+            project_context["audit_year"] = audit_year
+            if audit_year:
+                project_context["bs_date"] = f"{audit_year}-12-31"
+            # applicable_standards — 可能是 JSONB dict 或 string
+            raw_std = proj_row.applicable_standard_v2
+            if raw_std:
+                if isinstance(raw_std, dict):
+                    std_type = raw_std.get("type", "")
+                    if std_type:
+                        project_context["applicable_standards"] = [std_type]
+                elif isinstance(raw_std, str):
+                    project_context["applicable_standards"] = [raw_std]
     except Exception as e:  # noqa: BLE001
         logger.warning("G1 render: project context 失败: %s", e)
+
+    # 关联方名单（供G1-13凭证检查识别关联方交易）
+    try:
+        rp_result = await db.execute(
+            sa.text(
+                "SELECT name FROM related_party_registry "
+                "WHERE project_id = :pid AND is_deleted = false"
+            ),
+            {"pid": str(ctx.project_id)},
+        )
+        project_context["related_parties"] = [
+            r.name for r in rp_result.fetchall() if r.name
+        ]
+    except Exception:  # noqa: BLE001 — 表可能不存在
+        pass
 
     tb_values = await _fetch_tb_values(ctx)
 

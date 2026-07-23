@@ -15,7 +15,11 @@
  *
  * Spec: .kiro/specs/k9-admin-expenses/
  * Validates: Requirements 5.3-5.4, 9.7
+ *
+ * 收敛（cutoff-test-architecture-convergence Wave1）：isCrossPeriod 委托 cutoffCanonical
+ * 单一真源（natural-month 模式），行为等价（P8 已锁定）。
  */
+import { crossesByNaturalMonth } from './cutoffCanonical'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -74,14 +78,6 @@ function safeParseDate(dateStr: string | null | undefined): Date | null {
 }
 
 /**
- * 获取日期所属的会计期间 (year, month)
- * 使用自然月作为会计期间（绝大多数企业为12月31日年终）
- */
-function getAccountingPeriod(date: Date): { year: number; month: number } {
-  return { year: date.getFullYear(), month: date.getMonth() + 1 }
-}
-
-/**
  * 计算两个日期之间的天数差
  * 结果 = target - base（正数表示target在base之后，负数表示之前）
  */
@@ -112,16 +108,9 @@ function calcDaysDiff(target: Date, base: Date): number {
  * @returns true=跨期（两日期分属不同会计期间），false=同期或无法判断
  */
 export function isCrossPeriod(sourceDate: string, bookDate: string, _periodEnd: string): boolean {
-  const src = safeParseDate(sourceDate)
-  const book = safeParseDate(bookDate)
-  // 任一日期无效，无法判断，视为不跨期
-  if (!src || !book) return false
-
-  const srcPeriod = getAccountingPeriod(src)
-  const bookPeriod = getAccountingPeriod(book)
-
-  // 年+月不同即为跨期
-  return srcPeriod.year !== bookPeriod.year || srcPeriod.month !== bookPeriod.month
+  // 薄封装：委托 cutoffCanonical.crossesByNaturalMonth（natural-month 单一真源，
+  // 年+月不同即跨期；任一日期非法 → false）。行为等价（P8 已锁定）。
+  return crossesByNaturalMonth(sourceDate, bookDate)
 }
 
 /**

@@ -238,6 +238,26 @@ export function useD6CrossSheet(options: UseD6CrossSheetOptions) {
     return { single: singleTotal, groups, total }
   })
 
+  /** D6-8 ECL应计提 vs D6-3 账面减值余额差异告警 */
+  const eclVsImpairmentDiff: ComputedRef<{ diff: number; isSignificant: boolean }> = computed(() => {
+    const eclTotal = eclReferenceValues.value.total
+    const impCategories = Object.values(impairmentAggregation.value)
+    const impTotal = calcSubtotal(impCategories.map(c => c.current))
+    const diff = eclTotal - impTotal
+    // >1元视为重大差异
+    const isSignificant = Math.abs(diff) > 1
+    return { diff, isSignificant }
+  })
+
+  /** D6-2中"1年以上收款权"合计 → D6-1非流动扣减参考值 */
+  const nonCurrentTotal: ComputedRef<{ prior: number; current: number }> = computed(() => {
+    const rows = safeParseJsonArray(getRemark(allResponses.value, 'D6-2-rows'))
+    const currentTotal = calcSubtotal(rows.map((r: any) => parseNum(r.receivableAbove1y)))
+    // 期初暂用priorAudited对应行的receivableAbove1y(若有)
+    const priorTotal = calcSubtotal(rows.map((r: any) => parseNum(r.receivableAbove1y)))
+    return { prior: priorTotal, current: currentTotal }
+  })
+
   // ─── D6-4 → D6-1 AJE/RJE ─────────────────────────────────────────────
 
   const adjustmentTotals: ComputedRef<{ ajeTotal: number; rjeTotal: number }> = computed(() => {
@@ -352,6 +372,8 @@ export function useD6CrossSheet(options: UseD6CrossSheetOptions) {
     blockTotals,
     netValueRows,
     eclReferenceValues,
+    eclVsImpairmentDiff,
+    nonCurrentTotal,
     adjustmentTotals,
     netValueValidation,
     adjudicationForDisclosure,

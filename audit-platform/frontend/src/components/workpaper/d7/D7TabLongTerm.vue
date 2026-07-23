@@ -129,6 +129,14 @@
           <span v-else>{{ row.plan }}</span>
         </template>
       </el-table-column>
+      <el-table-column label="处置结论" width="140">
+        <template #default="{ row }">
+          <el-select v-if="!isReadonly" :model-value="row.disposalConclusion" size="small" clearable placeholder="选择" style="width:100%" @change="(v: string) => updateCell(row.rowId, 'disposalConclusion', v ?? '')">
+            <el-option v-for="c in DISPOSAL_CONCLUSIONS" :key="c" :label="c" :value="c" />
+          </el-select>
+          <span v-else>{{ row.disposalConclusion }}</span>
+        </template>
+      </el-table-column>
       <el-table-column v-if="!isReadonly" label="操作" width="60" align="center">
         <template #default="{ row }">
           <el-popconfirm title="确认删除？" @confirm="removeRow(row.rowId)">
@@ -144,6 +152,29 @@
     <div class="total-section">
       <span>期末余额合计：<strong>{{ fmtAmt(totalRow.endBalance) }}</strong></span>
       <span>至审计日结转合计：<strong>{{ fmtAmt(totalRow.auditDateTransfer) }}</strong></span>
+    </div>
+
+    <!-- 处置结论汇总 + 跨底稿联动提示 -->
+    <div v-if="disposalSummaryList.length" class="disposal-summary">
+      <div class="disposal-summary-title">处置结论汇总</div>
+      <div class="disposal-summary-tags">
+        <el-tag v-for="s in disposalSummaryList" :key="s.label" size="small" :type="s.tagType" effect="plain">
+          {{ s.label }}：{{ s.count }} 笔
+        </el-tag>
+      </div>
+      <el-alert
+        v-for="hint in disposalHints"
+        :key="hint.key"
+        :type="hint.type"
+        :closable="false"
+        show-icon
+        style="margin-top:8px"
+      >
+        <template #title>
+          <span>{{ hint.message }}</span>
+          <GtIndexChip v-if="hint.chip" :value="hint.chip" :context-project-id="projectId" style="margin-left:6px" />
+        </template>
+      </el-alert>
     </div>
 
     <!-- 审计意见区（卡片式） -->
@@ -199,7 +230,7 @@
  * Requirements: 10.1-10.8, 19.3, 20.1
  */
 import { computed, inject, toRef, type Ref } from 'vue'
-import { useD7LongTerm } from '../composables/useD7LongTerm'
+import { useD7LongTerm, D7_DISPOSAL_CONCLUSIONS } from '../composables/useD7LongTerm'
 import { useD7ImportExport } from '../composables/useD7ImportExport'
 import { useD7AiGenerate } from '../composables/useD7AiGenerate'
 import { useWorkpaperBrowseMode } from '../composables/useWorkpaperBrowseMode'
@@ -235,14 +266,48 @@ async function onImportFile(file: File) {
   return false
 }
 
+const DISPOSAL_CONCLUSIONS = D7_DISPOSAL_CONCLUSIONS
+
 const {
-  rows, totalRow, addRow, removeRow, updateCell, importFromD72, auditNotes,
+  rows, totalRow, disposalSummary, d72LongTermTotal, addRow, removeRow, updateCell, importFromD72, auditNotes,
 } = useD7LongTerm({
   allResponses: allResponsesRef,
   wpId: computed(() => props.wpId) as unknown as Ref<string>,
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
+})
+
+// 处置结论汇总（供 UI 展示 tag）
+const _DISPOSAL_TAG_TYPE: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'primary'> = {
+  应确认收入: 'danger',
+  应转营业外收入: 'warning',
+  应退回: 'warning',
+  正常挂账: 'success',
+  待确定: 'info',
+}
+const disposalSummaryList = computed(() =>
+  Object.entries(disposalSummary.value).map(([label, count]) => ({
+    label,
+    count,
+    tagType: _DISPOSAL_TAG_TYPE[label] || 'info',
+  })),
+)
+
+// 跨底稿联动提示（按处置结论指向下游底稿）
+const disposalHints = computed<Array<{ key: string; type: 'warning' | 'info'; message: string; chip?: string }>>(() => {
+  const counts = disposalSummary.value
+  const hints: Array<{ key: string; type: 'warning' | 'info'; message: string; chip?: string }> = []
+  if (counts['应确认收入']) {
+    hints.push({ key: 'revenue', type: 'warning', message: `${counts['应确认收入']} 笔应确认收入，关注收入截止与 D4 营业收入勾稽`, chip: 'wp:D4' })
+  }
+  if (counts['应转营业外收入']) {
+    hints.push({ key: 'nonop', type: 'warning', message: `${counts['应转营业外收入']} 笔应转营业外收入，关注 K12 营业外收入`, chip: 'wp:K12' })
+  }
+  if (counts['应退回']) {
+    hints.push({ key: 'refund', type: 'info', message: `${counts['应退回']} 笔应退回，关注其他应付款重分类` })
+  }
+  return hints
 })
 
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD7AiGenerate(toRef(props, 'wpId'))
@@ -280,33 +345,22 @@ const longTermCrossCheck = computed<{ type: 'info' | 'success' | 'warning'; mess
   const responses = allResponsesRef.value
   if (!responses || responses.size === 0) return null
 
-  // Read D7-2 rows and sum aging > 1 year
-  const d72RowsRaw = responses.get('D7-2-rows')?.remark
-  if (!d72RowsRaw) {
+  // D7-2 明细表尚未填写则无法核对
+  if (!responses.get('D7-2-rows')?.remark) {
     return { type: 'info', message: '勾稽校验：D7-2 明细表数据尚未填写，无法核对' }
   }
 
-  let d72LongTermTotal = 0
-  try {
-    const d72Rows = JSON.parse(d72RowsRaw)
-    if (Array.isArray(d72Rows)) {
-      for (const row of d72Rows) {
-        // Sum aging columns > 1 year (aging2 + aging3 + aging4 or endAging2 + endAging3 + endAging4)
-        d72LongTermTotal += (parseFloat(row.endAging2 || row.aging1to2 || 0) || 0)
-          + (parseFloat(row.endAging3 || row.aging2to3 || 0) || 0)
-          + (parseFloat(row.endAging4 || row.aging3plus || 0) || 0)
-      }
-    }
-  } catch { /* ignore parse errors */ }
+  // D7-2 账龄>1年合计：来自 composable 的动态 segment 判定（dayFrom≥366），不硬编码 4 段
+  const d72Total = d72LongTermTotal.value
 
   // D7-5 local rows total
   const d75Total = rows.value.reduce((s, r) => s + (r.endBalance || 0), 0)
 
-  const diff = Math.abs(d75Total - d72LongTermTotal)
+  const diff = Math.abs(d75Total - d72Total)
   if (diff < 0.01) {
-    return { type: 'success', message: `勾稽校验通过：D7-5 长期挂账 ${fmtAmt(d75Total)} = D7-2 账龄>1年 ${fmtAmt(d72LongTermTotal)}` }
+    return { type: 'success', message: `勾稽校验通过：D7-5 长期挂账 ${fmtAmt(d75Total)} = D7-2 账龄>1年 ${fmtAmt(d72Total)}` }
   }
-  return { type: 'warning', message: `勾稽校验：D7-5 长期挂账 ${fmtAmt(d75Total)} vs D7-2 账龄>1年 ${fmtAmt(d72LongTermTotal)}，差异 ${fmtAmt(d75Total - d72LongTermTotal)}` }
+  return { type: 'warning', message: `勾稽校验：D7-5 长期挂账 ${fmtAmt(d75Total)} vs D7-2 账龄>1年 ${fmtAmt(d72Total)}，差异 ${fmtAmt(d75Total - d72Total)}` }
 })
 
 const browseRows = computed(() => rows.value)
@@ -396,6 +450,21 @@ const {
   gap: 24px;
   font-size: var(--wp-font-size, 13px);
 }
+
+.disposal-summary {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #fcfcfc;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+}
+.disposal-summary-title {
+  font-size: var(--wp-font-size, 13px);
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+}
+.disposal-summary-tags { display: flex; gap: 8px; flex-wrap: wrap; }
 
 /* 审计意见卡片 */
 .opinion-card { margin-top: 16px; border-radius: 8px; }

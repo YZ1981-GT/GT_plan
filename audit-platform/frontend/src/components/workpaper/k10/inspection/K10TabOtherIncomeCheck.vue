@@ -19,15 +19,13 @@
         </el-tag>
       </div>
       <div class="section-header-right">
+        <el-button size="small" type="primary" plain @click="handleImportFromDetail">
+          <el-icon><Download /></el-icon> 从K10-2带入
+        </el-button>
         <el-button size="small" @click="handleVoucherSampling">
           <el-icon><Tickets /></el-icon> 抽凭引擎
         </el-button>
-        <el-button size="small" @click="handleAI">
-          <el-icon><MagicStick /></el-icon> AI辅助
-        </el-button>
-        <el-button size="small" @click="handleReview">
-          <el-icon><Check /></el-icon> 复核
-        </el-button>
+        <GtReviewTrigger section-id="K10-6-other-income-check" label="💬 复核" />
       </div>
     </div>
 
@@ -39,6 +37,30 @@
         核查要点：①分类正确性（是否与日常活动相关） ②确认条件是否满足（已收到/权利确定）
         ③金额准确性。检查覆盖率 = 检查金额合计 / K10-2明细合计。
       </div>
+    </div>
+
+    <!-- ═══ 跨底稿引用 ═══ -->
+    <div class="cross-ref-bar">
+      <span class="cross-refs-label">关联引用：</span>
+      <GtIndexChip value="wp:K10-1" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K10-2" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K10-4" :context-project-id="props.projectId" />
+      <GtIndexChip value="wp:K12" :context-project-id="props.projectId" />
+    </div>
+
+    <!-- ④ 分类错配提示（分类为营业外收入 → 应重分类至 6301/K12） -->
+    <div v-if="checks.misclassifiedRows.value.length > 0" class="non-compliant-alert">
+      <el-alert type="warning" :closable="false" show-icon>
+        <template #title>
+          {{ checks.misclassifiedRows.value.length }} 项分类为「营业外收入」，与日常活动无关，应重分类至营业外收入(6301) → K12，请在 K10-3 编制重分类调整（RJE）
+        </template>
+      </el-alert>
+    </div>
+
+    <!-- ⑤ 覆盖率不足告警 -->
+    <div v-if="detailTotal > 0 && coveragePercent < 80" class="non-compliant-alert">
+      <el-alert type="warning" :closable="false" show-icon
+        :title="`检查覆盖率 ${coveragePercent}% 低于建议阈值 80%，建议扩大检查范围或从 K10-2 带入更多检查项`" />
     </div>
 
     <!-- ═══ 不合规红色提示 ═══ -->
@@ -146,7 +168,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="总体结论" width="120" align="center">
+      <el-table-column label="总体结论" width="140" align="center">
         <template #default="{ row }">
           <el-select
             v-if="!props.isReadonly && row.isEditable"
@@ -158,6 +180,12 @@
             <el-option v-for="opt in checkOptions" :key="opt" :label="opt" :value="opt" />
           </el-select>
           <el-tag v-else :type="statusTagType(row.overallStatus)" size="small">{{ row.overallStatus }}</el-tag>
+          <!-- ③ 建议（与当前不一致时可一键采纳） -->
+          <div v-if="!props.isReadonly && row.isEditable && statusDiffers(row)" class="suggest-row">
+            <span class="suggest-label">建议:</span>
+            <el-tag :type="statusTagType(suggestedStatus(row))" size="small" effect="plain">{{ suggestedStatus(row) }}</el-tag>
+            <el-button size="small" link type="primary" @click="adoptSuggestion(row)">采纳</el-button>
+          </div>
         </template>
       </el-table-column>
 
@@ -204,6 +232,9 @@
       <el-button size="small" type="primary" plain @click="handleAddRow">
         + 新增检查项目
       </el-button>
+      <el-button size="small" plain :disabled="checks.incomeCheckRows.value.length === 0" @click="applyAllSuggestions">
+        按判断填充总体结论
+      </el-button>
     </div>
 
     <!-- ═══ 统计摘要 ═══ -->
@@ -221,6 +252,26 @@
         合计: {{ checks.incomeCheckSummary.value.total }} 项
       </el-tag>
     </div>
+
+    <!-- ═══ 检查说明与结论（AI辅助） ═══ -->
+    <el-card shadow="never" class="note-card">
+      <template #header>
+        <div class="note-card-header">
+          <span>检查说明与结论</span>
+          <el-button size="small" type="primary" text :loading="aiLoading" @click="handleAI">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="noteText"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="props.isReadonly"
+        placeholder="填写其他收益检查说明与结论（分类正确性6117 vs 6301、确认条件、覆盖率及总体结论）..."
+        @change="handleNoteSave"
+      />
+    </el-card>
 
     <!-- ═══ 编制提示 ═══ -->
     <details class="k10-details-tip">
@@ -248,7 +299,7 @@
         :project-id="props.projectId"
         :workpaper-id="props.wpId"
         account-code="6117"
-        phase="substantive"
+        phase="final"
         :year="currentYear"
         @filled="handleSampleFilled"
       />
@@ -273,16 +324,18 @@
  * - 抽凭引擎(GtVoucherSamplingEngine dialog，科目 6117，@filled 回填至检查行备注)
  * - Dropdown选项：合规/不合规/不适用
  */
-import { computed, defineAsyncComponent, inject, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick, Check, Tickets } from '@element-plus/icons-vue'
-import { useK10Checks, type CheckStatus } from '../../composables/useK10Checks'
+import { MagicStick, Tickets, Download } from '@element-plus/icons-vue'
+import { useK10Checks, deriveOverallStatus, type CheckStatus } from '../../composables/useK10Checks'
 import { parseNum, calcSubtotal } from '../../composables/useK10FormulaEngine'
 import { api } from '@/services/apiProxy'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue')
 )
+const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -290,15 +343,13 @@ const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
+  year?: number
   isReadonly: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
 }>()
-
-// ─── Inject复核对话 ──────────────────────────────────────────────────────────
-const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 
@@ -318,7 +369,7 @@ const checkOptions: CheckStatus[] = ['合规', '不合规', '不适用']
 // ─── UI State ────────────────────────────────────────────────────────────────
 
 const voucherDialogVisible = ref(false)
-const currentYear = new Date().getFullYear()
+const currentYear = computed<number>(() => props.year && props.year > 0 ? props.year : new Date().getFullYear())
 
 // ─── Computed: 覆盖率 ────────────────────────────────────────────────────────
 
@@ -353,6 +404,32 @@ function statusTagType(status: CheckStatus): 'success' | 'danger' | 'info' {
 function incomeCheckRowClass({ row }: { row: any }): string {
   if (row.overallStatus === '不合规') return 'non-compliant-row'
   return ''
+}
+
+/** ① 从 K10-2 明细带入检查项 */
+function handleImportFromDetail(): void {
+  const added = checks.importIncomeChecksFromDetail()
+  if (added > 0) ElMessage.success(`已从 K10-2 明细带入 ${added} 项检查项目`)
+  else ElMessage.info('无可带入项（K10-2 无明细或检查项已存在）')
+}
+
+/** ③ 总体结论建议（由分类正确性+确认条件派生） */
+function suggestedStatus(row: any): CheckStatus {
+  return deriveOverallStatus(row.classificationCorrect, row.conditionMet)
+}
+function statusDiffers(row: any): boolean {
+  return row.overallStatus !== suggestedStatus(row)
+}
+function adoptSuggestion(row: any): void {
+  checks.updateIncomeCheckCell(row.rowKey, 'overallStatus', suggestedStatus(row))
+}
+/** 一键按判断填充所有行的总体结论 */
+function applyAllSuggestions(): void {
+  for (const row of checks.incomeCheckRows.value) {
+    const s = suggestedStatus(row)
+    if (row.overallStatus !== s) checks.updateIncomeCheckCell(row.rowKey, 'overallStatus', s)
+  }
+  ElMessage.success('已按分类正确性/确认条件填充总体结论')
 }
 
 /** 新增行 */
@@ -416,35 +493,67 @@ function handleSampleFilled(payload: { samples?: any[] } | any): void {
   voucherDialogVisible.value = false
   const samples: any[] = payload?.samples ?? []
   if (samples.length === 0) return
-  const refs = samples
-    .map((s) => s.voucherNo || s.voucher_no || s.ref || '')
-    .filter((r: string) => !!r)
-  if (refs.length === 0) return
-
-  const rows = checks.incomeCheckRows.value
-  if (rows.length === 0) {
-    ElMessage.warning(`已选取 ${refs.length} 笔凭证，请先新增检查项目后再回填`)
-    return
+  // ② 每笔抽样凭证生成一条检查行（贡献覆盖率），checkItem=业务内容/对方，checkAmount=贷方(收益增加)
+  let created = 0
+  for (const s of samples) {
+    const ref = s.voucherNo || s.voucher_no || s.ref || ''
+    const summary = s.summary || s.business || s.abstract || s.counterpartAccount || s.counterparty || ''
+    const amount = Number(s.creditAmount ?? s.credit_amount ?? s.amount ?? s.debitAmount ?? 0)
+    const checkItem = summary || (ref ? `凭证 ${ref}` : `抽样凭证`)
+    checks.addIncomeCheckRowFull({
+      checkItem,
+      checkAmount: Math.abs(amount),
+      classification: '其他收益',
+      remark: ref ? `抽凭：${ref}` : '',
+    })
+    created++
   }
-  // 回填到第一（最近新增在末尾，此处取第一检查行）检查行的备注
-  const targetRow = rows[0]
-  const existing = targetRow.remark ? `${targetRow.remark}；` : ''
-  checks.updateIncomeCheckCell(targetRow.rowKey, 'remark', `${existing}抽凭：${refs.join('、')}`)
-  ElMessage.success(`已选取 ${refs.length} 笔凭证并回填至检查项「${targetRow.checkItem || '第一项'}」备注`)
+  ElMessage.success(`已选取 ${created} 笔凭证并生成检查行（计入覆盖率）`)
 }
 
-function handleAI(): void {
-  // AI辅助钩子
+// ─── 检查说明 + AI ───────────────────────────────────────────────────────────
+const noteText = ref('')
+const aiLoading = ref(false)
+
+function loadNote(): void {
+  const saved = props.allResponses.get('K10-6-note')
+  if (saved) noteText.value = (saved.remark ?? saved.conclusion ?? '') as string
 }
 
-function handleReview(): void {
-  openReviewDialog?.('K10-6-other-income-check', '其他收益检查表')
+function handleNoteSave(): void {
+  emit('save', 'K10-6-note', { remark: noteText.value })
+}
+
+async function handleAI(): Promise<void> {
+  if (!props.wpId) return
+  aiLoading.value = true
+  try {
+    const s = checks.incomeCheckSummary.value
+    const ctx = {
+      检查覆盖率: `${coveragePercent.value}%`,
+      检查金额合计: String(checkAmountTotal.value),
+      明细合计: String(detailTotal.value),
+      合规项: String(s.compliant),
+      不合规项: String(s.nonCompliant),
+      不合规明细: (s.nonCompliantItems || []).join('、') || '无',
+    }
+    const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'K10-6-note',
+      prompt: '为K10其他收益检查表生成检查说明与结论：分类正确性(6117其他收益 vs 6301营业外收入)、确认条件满足情况、检查覆盖率及总体结论。',
+      existingContent: noteText.value,
+      context: ctx,
+    })
+    const content = (res?.data?.content ?? res?.content ?? '') as string
+    if (content) { noteText.value = content; handleNoteSave(); ElMessage.success('AI生成完成') }
+    else ElMessage.warning('AI未返回内容，请手动填写')
+  } catch { ElMessage.warning('AI生成失败，请手动填写') } finally { aiLoading.value = false }
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 onMounted(() => {
   checks.initFromResponses()
+  loadNote()
 })
 </script>
 
@@ -483,6 +592,16 @@ onMounted(() => {
 .check-table :deep(.non-compliant-row) { background: #fef0f0 !important; }
 .project-name { font-weight: 500; }
 
+.cross-ref-bar {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-bottom: 12px; padding: 6px 12px;
+  background: #f5f7fa; border-radius: 6px;
+}
+.cross-refs-label { color: #909399; font-size: 12px; white-space: nowrap; }
+
+.suggest-row { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 4px; }
+.suggest-label { font-size: 11px; color: #909399; }
+
 .add-row-bar { margin-top: 12px; }
 
 .summary-stats {
@@ -497,4 +616,8 @@ onMounted(() => {
 .k10-details-tip summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .k10-details-tip ul { margin: 8px 0 0 0; padding-left: 20px; }
 .k10-details-tip li { margin-bottom: 4px; }
+
+.note-card { margin-top: 16px; }
+.note-card-header { display: flex; justify-content: space-between; align-items: center; }
+.note-card-header span { font-weight: 600; font-size: 14px; }
 </style>
