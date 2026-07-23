@@ -40,6 +40,14 @@
       </div>
     </div>
 
+    <!-- ═══ 审计目标 ═══ -->
+    <el-alert type="info" :closable="false" show-icon class="audit-objective-alert">
+      <template #title>一、审计目标</template>
+      <div class="ao-text">
+        实收资本以恰当的金额包括在财务报表中，与之相关的<strong>计价或分摊调整已恰当记录</strong>，相关披露已得到恰当计量和描述。
+      </div>
+    </el-alert>
+
     <!-- ═══ 主表（20×7，13公式） ═══ -->
     <el-table :data="computedRows" border size="small" style="width: 100%" highlight-current-row>
       <el-table-column type="index" label="#" width="50" align="center" fixed />
@@ -187,6 +195,43 @@
       <span class="cross-wp-desc">资本公积（折算差异去向）</span>
     </div>
 
+    <!-- ═══ 三、审计说明 ═══ -->
+    <el-card shadow="never" class="opinion-card">
+      <template #header>
+        <div class="opinion-header">
+          <span class="card-title">三、审计说明</span>
+          <el-button size="small" @click="handleAI">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="auditNote"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        :placeholder="auditNotePlaceholder"
+        @change="persistNote"
+      />
+    </el-card>
+
+    <!-- ═══ 四、审计结论 ═══ -->
+    <el-card shadow="never" class="opinion-card">
+      <template #header>
+        <div class="opinion-header">
+          <span class="card-title">四、审计结论</span>
+        </div>
+      </template>
+      <el-input
+        v-model="auditConclusion"
+        type="textarea"
+        :autosize="{ minRows: 2, maxRows: 6 }"
+        :disabled="isReadonly"
+        placeholder="基于上述折算测试情况，形成审计结论..."
+        @change="persistNote"
+      />
+    </el-card>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="m2-details-tip">
       <summary>编制提示</summary>
@@ -267,6 +312,19 @@ const currencyOptions = ['USD', 'EUR', 'GBP', 'JPY', 'HKD', 'SGD', 'AUD', 'CAD',
 
 const fxThreshold = ref(FX_THRESHOLD_DEFAULT)
 const rows = ref<FxRow[]>([])
+const auditNote = ref('')
+const auditConclusion = ref('')
+
+// ─── 审计说明预填提示 ──────────────────────────────────────────────────────────
+
+const auditNotePlaceholder = computed(() => {
+  if (rows.value.length === 0) return '填写外币出资折算测试情况及结果...'
+  const diffTotal = totalFxDiff.value
+  if (Math.abs(diffTotal) > fxThreshold.value) {
+    return `折算差异合计${fmtAmount(diffTotal)}元，超过阈值，差异应计入资本公积——资本（股本）溢价（M4）...`
+  }
+  return '折算差异在合理范围内，未见异常...'
+})
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 
@@ -314,6 +372,16 @@ function _restoreRows(): void {
     } catch { /* use empty */ }
   }
   rows.value = []
+  // 恢复审计说明和结论
+  const noteResp = formData.allResponses.value.get('M2-M2-4-auditNote')
+  if (noteResp?.remark) auditNote.value = noteResp.remark
+  const conclusionResp = formData.allResponses.value.get('M2-M2-4-conclusion')
+  if (conclusionResp?.remark) auditConclusion.value = conclusionResp.remark
+}
+
+function persistNote(): void {
+  formData.debouncedSave('M2-M2-4-auditNote', { remark: auditNote.value || null })
+  formData.debouncedSave('M2-M2-4-conclusion', { remark: auditConclusion.value || null })
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -416,6 +484,11 @@ watch(rows, _persistRows, { deep: true })
 :deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 .summary-bar { display: flex; gap: 24px; padding: 10px 16px; margin-top: 12px; background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; flex-wrap: wrap; }
 .fx-alert { margin-top: 12px; }
+.audit-objective-alert { margin-bottom: 14px; }
+.ao-text { font-size: var(--wp-font-size, 13px); line-height: 1.6; }
+.opinion-card { margin-top: 14px; }
+.opinion-header { display: flex; align-items: center; justify-content: space-between; }
+.card-title { font-size: 13px; font-weight: 600; color: #303133; }
 .cross-wp-links { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 14px; background: #f0f9ff; border: 1px solid #d9ecff; border-radius: 6px; flex-wrap: wrap; }
 .cross-wp-label { font-size: 12px; color: #409eff; font-weight: 500; }
 .cross-wp-desc { font-size: 12px; color: #909399; }
