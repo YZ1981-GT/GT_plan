@@ -1,467 +1,444 @@
+<!--
+  M2TabCapitalCheck.vue — M2-5 实收资本（股本）检查表（凭证级测试）
+
+  忠实反映致同源模板 M2-5（27×18 凭证级检查表）：
+    一、测试目标（存在/权利义务/计价分摊 三认定）
+    二、测试（凭证级明细：日期/凭证编号/业务内容/对方科目/对方明细科目/借方/贷方
+         + 支持性文件 + 核对内容1-5 + 索引号/是否异常/备注）
+    三、审计说明（检查比例：本期增加金额/检查金额/比例）
+    四、审计结论
+
+  复用 useK1VoucherCheck（通用凭证检查状态）。科目 4001 实收资本。
+  M2无期后段——实收资本变动是离散事件（增资/减资），非日常收付。
+  仅展示 occurrenceRows + checkRatios 中本期贷方行（增资额）。
+-->
 <template>
   <div class="m2-tab-capital-check">
-    <!-- ═══ 标题 + 操作栏 ═══ -->
-    <div class="section-header">
-      <div class="section-header-left">
-        <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
-        <h3 class="section-title">M2-5 实收资本（股本）检查表</h3>
-        <el-tag :type="isAllChecked ? 'success' : 'info'" size="small">
-          检查进度 {{ completionRate }}%
-        </el-tag>
-        <el-tag v-if="failedCount > 0" type="danger" size="small">{{ failedCount }}项未通过</el-tag>
-      </div>
-      <div class="section-header-right">
-        <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddVerifyRow">
-          <el-icon><Plus /></el-icon> 新增出资人
-        </el-button>
-        <el-button size="small" @click="handleAI('capital-check')">
+    <!-- ═══ 引导区 ═══ -->
+    <div class="guide-banner">
+      <div class="guide-step"><span class="gs-no">1</span>确认测试目标（三认定）</div>
+      <div class="guide-step"><span class="gs-no">2</span>填写样本选取标准与规模</div>
+      <div class="guide-step"><span class="gs-no">3</span>抽凭执行凭证级测试</div>
+      <div class="guide-step"><span class="gs-no">4</span>核对检查比例，形成结论</div>
+    </div>
+
+    <!-- ═══ 标题行 ═══ -->
+    <div class="section-head">
+      <h3 class="sheet-title">M2-5 实收资本（股本）检查表</h3>
+      <div class="head-actions">
+        <el-button size="small" type="primary" link @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
-        <el-button size="small" @click="handleReview">
-          <el-icon><Check /></el-icon> 复核
-        </el-button>
+        <el-button size="small" @click="handleReview">💬 复核</el-button>
       </div>
     </div>
+
+    <!-- ═══ 一、测试目标 ═══ -->
+    <el-alert type="info" :closable="false" class="audit-objective">
+      <template #title><span class="ao-title">一、测试目标（认定）</span></template>
+      <ol class="ao-list">
+        <li><b>存在：</b>资产负债表中记录的实收资本是存在的，且已经记录在恰当的账户中；</li>
+        <li><b>权利和义务：</b>记录的实收资本由被审计单位拥有或控制；</li>
+        <li><b>准确性、计价和分摊：</b>实收资本以恰当的金额包括在财务报表中，与之相关的计价或分摊调整已恰当记录，相关披露已得到恰当计量和描述。</li>
+      </ol>
+    </el-alert>
 
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
-        <strong>验资核对（实收资本核心程序）：</strong>
-        实收资本的存在与准确性认定依赖验资核对：将账面实缴出资与验资报告金额逐一对比。
-        验资差异 = 实缴出资 − 验资金额；出资到位率 = 实缴出资 / 认缴出资。
-        |差异| > {{ VERIFY_DIFF_THRESHOLD }} 元红色高亮；到位率 &lt; 100% 黄色提示认缴未实缴风险。
+        <strong>检查要点：</strong>
+        审阅公司章程、股东（大）会/董事会会议记录中相关规定。收集与所有者权益账户变动有关的股东（大）会决议、董事会会议纪要、合同、协议、公司章程及营业执照、公司设立批文、验资报告以及政府主管部门/财政部门批复、资产评估报告等文件资料，并更新永久性档案。
+        核对内容：1.原始凭证是否齐全；2.记账凭证与原始凭证是否相符；3.账务处理是否正确；4.是否记录于恰当的会计期间；5.其他。
       </div>
     </div>
 
-    <!-- ═══ Section 1: 验资核对表格 ═══ -->
-    <el-card shadow="never" class="check-card">
+    <!-- ═══ 二、样本选取标准与规模 ═══ -->
+    <el-card shadow="never" class="section-card">
+      <template #header><span class="card-title">二、样本选取标准与规模</span></template>
+      <div class="criteria-grid">
+        <div class="cg-item">
+          <label>测试总体（借方/减资）</label>
+          <div class="cg-inline">
+            <el-input-number v-model="criteria.populationDebitCount" :controls="false" :disabled="isReadonly" size="small" placeholder="笔数" class="num-sm" @change="persist" />
+            <span class="cg-unit">笔</span>
+            <el-input-number v-model="criteria.populationDebitAmount" :controls="false" :disabled="isReadonly" size="small" placeholder="金额" class="num-md" @change="persist" />
+            <span class="cg-unit">元</span>
+          </div>
+        </div>
+        <div class="cg-item">
+          <label>测试总体（贷方/增资）</label>
+          <div class="cg-inline">
+            <el-input-number v-model="criteria.populationCreditCount" :controls="false" :disabled="isReadonly" size="small" placeholder="笔数" class="num-sm" @change="persist" />
+            <span class="cg-unit">笔</span>
+            <el-input-number v-model="criteria.populationCreditAmount" :controls="false" :disabled="isReadonly" size="small" placeholder="金额" class="num-md" @change="persist" />
+            <span class="cg-unit">元</span>
+          </div>
+        </div>
+        <div class="cg-item cg-full">
+          <label>特定样本</label>
+          <el-input v-model="criteria.specificSample" :disabled="isReadonly" size="small"
+            placeholder="大额增减资、非货币资产出资、关联方之间的股权转让等全部测试" @change="persist" />
+        </div>
+        <div class="cg-item">
+          <label>抽样总体</label>
+          <div class="cg-inline">
+            <el-input-number v-model="criteria.samplingPopulationCount" :controls="false" :disabled="isReadonly" size="small" placeholder="笔数" class="num-sm" @change="persist" />
+            <span class="cg-unit">笔</span>
+            <el-input-number v-model="criteria.samplingPopulationAmount" :controls="false" :disabled="isReadonly" size="small" placeholder="金额" class="num-md" @change="persist" />
+            <span class="cg-unit">元</span>
+          </div>
+        </div>
+        <div class="cg-item">
+          <label>抽样样本量</label>
+          <div class="cg-inline">
+            <el-input-number v-model="criteria.sampleSize" :controls="false" :disabled="isReadonly" size="small" placeholder="样本量" class="num-sm" @change="persist" />
+            <span class="cg-unit">笔</span>
+          </div>
+        </div>
+        <div class="cg-item">
+          <label>抽样方法</label>
+          <el-select v-model="criteria.samplingMethod" :disabled="isReadonly" size="small" @change="persist">
+            <el-option label="随机选样" value="随机选样" />
+            <el-option label="系统选样" value="系统选样" />
+            <el-option label="货币单元抽样" value="货币单元抽样" />
+            <el-option label="随意选样（非统计抽样）" value="随意选样" />
+          </el-select>
+        </div>
+        <div class="cg-item">
+          <label>本期增加金额（检查比例基准）</label>
+          <div class="cg-inline">
+            <el-input-number v-model="criteria.endBalance" :controls="false" :disabled="isReadonly" size="small" placeholder="本期增加金额" class="num-md" @change="persist" />
+            <span class="cg-unit">元</span>
+          </div>
+        </div>
+        <div class="cg-item cg-full">
+          <label>抽样过程</label>
+          <el-input v-model="criteria.samplingProcess" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly" size="small"
+            placeholder="本期实收资本增减变动笔数较少，全部纳入检查；或使用XX抽样工具选择XX数量的样本进行测试" @change="persist" />
+        </div>
+      </div>
+    </el-card>
+
+    <!-- ═══ 三、测试 — 凭证检查表 ═══ -->
+    <el-card shadow="never" class="section-card">
       <template #header>
-        <div class="card-header">
-          <span>验资核对表</span>
-          <el-button size="small" @click="handleAI('verify-table')">
-            <el-icon><MagicStick /></el-icon> AI
-          </el-button>
+        <div class="card-header-row">
+          <span class="card-title">三、测试 — 本期实收资本增减变动检查</span>
+          <div>
+            <el-button v-if="!isReadonly" size="small" type="primary" plain @click="openSampling"><el-icon><MagicStick /></el-icon> 抽凭</el-button>
+            <el-button v-if="!isReadonly" size="small" @click="addOccurrenceRow(); persist()">＋ 手工新增</el-button>
+          </div>
         </div>
       </template>
-
-      <el-table :data="computedVerifyRows" border size="small" style="width: 100%" highlight-current-row>
-        <el-table-column type="index" label="#" width="50" align="center" />
-
-        <!-- 出资人 -->
-        <el-table-column prop="investorName" label="出资人" min-width="140">
-          <template #default="{ row }">
-            <span>{{ row.investorName || '—' }}</span>
-          </template>
+      <el-table :data="occurrenceRows" border size="small" :max-height="420" class="voucher-table" :row-class-name="abnormalRowClass">
+        <el-table-column label="#" type="index" width="42" align="center" />
+        <el-table-column label="日期" width="120">
+          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.date" size="small" placeholder="YYYY-MM-DD" @change="persist" /><span v-else>{{ row.date || '-' }}</span></template>
         </el-table-column>
-
-        <!-- 认缴出资 -->
-        <el-table-column label="认缴出资" width="130" align="right">
-          <template #default="{ row, $index }">
-            <el-input-number
-              v-if="!isReadonly"
-              :model-value="row.subscribedAmount"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => updateVerifyRow($index, 'subscribedAmount', val ?? 0)"
-            />
-            <span v-else>{{ fmtAmount(row.subscribedAmount) }}</span>
-          </template>
+        <el-table-column label="凭证编号" width="110">
+          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.voucherNo" size="small" @change="persist" /><span v-else>{{ row.voucherNo || '-' }}</span></template>
         </el-table-column>
-
-        <!-- 实缴出资 -->
-        <el-table-column label="实缴出资" width="130" align="right">
-          <template #default="{ row, $index }">
-            <el-input-number
-              v-if="!isReadonly"
-              :model-value="row.paidAmount"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => updateVerifyRow($index, 'paidAmount', val ?? 0)"
-            />
-            <span v-else>{{ fmtAmount(row.paidAmount) }}</span>
-          </template>
+        <el-table-column label="业务内容" min-width="160">
+          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.businessContent" size="small" placeholder="增资/减资/非货币出资..." @change="persist" /><span v-else>{{ row.businessContent || '-' }}</span></template>
         </el-table-column>
-
-        <!-- 验资金额 -->
-        <el-table-column label="验资金额" width="130" align="right">
-          <template #default="{ row, $index }">
-            <el-input-number
-              v-if="!isReadonly"
-              :model-value="row.verifiedAmount"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => updateVerifyRow($index, 'verifiedAmount', val ?? 0)"
-            />
-            <span v-else>{{ fmtAmount(row.verifiedAmount) }}</span>
-          </template>
+        <el-table-column label="对方科目" min-width="110">
+          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.offsetAccount" size="small" @change="persist" /><span v-else>{{ row.offsetAccount || '-' }}</span></template>
         </el-table-column>
-
-        <!-- 验资差异（公式列） -->
-        <el-table-column label="验资差异" width="120" align="right">
+        <el-table-column label="对方明细科目" min-width="120">
+          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.offsetSubAccount" size="small" @change="persist" /><span v-else>{{ row.offsetSubAccount || '-' }}</span></template>
+        </el-table-column>
+        <el-table-column label="借方金额" min-width="110" align="right">
+          <template #default="{ row }"><el-input-number v-if="!isReadonly" v-model="row.debitAmount" :controls="false" size="small" class="amount-input" @change="persist" /><span v-else class="amount-cell">{{ fmtAmt(row.debitAmount) }}</span></template>
+        </el-table-column>
+        <el-table-column label="贷方金额" min-width="110" align="right">
+          <template #default="{ row }"><el-input-number v-if="!isReadonly" v-model="row.creditAmount" :controls="false" size="small" class="amount-input" @change="persist" /><span v-else class="amount-cell">{{ fmtAmt(row.creditAmount) }}</span></template>
+        </el-table-column>
+        <el-table-column label="核对内容" width="180" align="center">
           <template #header>
-            <el-tooltip content="公式: 实缴出资 − 验资金额" placement="top">
-              <span class="formula-col-header">验资差异</span>
+            <el-tooltip placement="top">
+              <template #content><div v-for="(lbl, i) in checkLabels" :key="i">{{ i + 1 }}. {{ lbl }}</div></template>
+              <span class="col-help">核对内容 ⓘ</span>
             </el-tooltip>
           </template>
           <template #default="{ row }">
-            <span
-              class="formula-value"
-              :class="{ 'diff-alert-red': isDiffOverThreshold(row.verifyDiff) }"
-            >
-              {{ fmtAmount(row.verifyDiff) }}
-            </span>
+            <el-checkbox-group :model-value="checkedValues(row)" :disabled="isReadonly" class="check-group" @update:model-value="(v: any) => setChecks(row, v as number[])">
+              <el-checkbox v-for="(_, i) in checkLabels" :key="i" :value="i" :label="i + 1" />
+            </el-checkbox-group>
           </template>
         </el-table-column>
+        <el-table-column label="索引号" width="90">
+          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.indexNo" size="small" @change="persist" /><span v-else>{{ row.indexNo || '-' }}</span></template>
+        </el-table-column>
+        <el-table-column label="是否异常" width="80" align="center">
+          <template #default="{ row }"><el-switch v-model="row.abnormal" :disabled="isReadonly" size="small" @change="persist" /></template>
+        </el-table-column>
+        <el-table-column label="备注说明" min-width="120">
+          <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.remark" size="small" @change="persist" /><span v-else>{{ row.remark || '-' }}</span></template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="" width="56" align="center" fixed="right">
+          <template #default="{ row }"><el-button size="small" type="danger" link @click="removeOccurrenceRow(row.id); persist()">删除</el-button></template>
+        </el-table-column>
+        <template #append><div class="table-total">合计　借方(减资)：{{ fmtAmt(occurrenceDebitChecked) }}　贷方(增资)：{{ fmtAmt(occurrenceCreditChecked) }}</div></template>
+      </el-table>
+    </el-card>
 
-        <!-- 出资到位率（公式列） -->
-        <el-table-column label="出资到位率" width="110" align="center">
-          <template #header>
-            <el-tooltip content="公式: 实缴出资 / 认缴出资" placement="top">
-              <span class="formula-col-header">到位率</span>
-            </el-tooltip>
-          </template>
+    <!-- ═══ 四、审计说明（检查比例）═══ -->
+    <el-card shadow="never" class="section-card">
+      <template #header><span class="card-title">四、审计说明 — 检查比例</span></template>
+      <el-table :data="m2CheckRatios" border size="small" class="ratio-table">
+        <el-table-column label="方向" prop="direction" width="140" />
+        <el-table-column label="账面金额" align="right"><template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.bookAmount) }}</span></template></el-table-column>
+        <el-table-column label="检查金额" align="right"><template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.checkedAmount) }}</span></template></el-table-column>
+        <el-table-column label="检查比例" width="130" align="center">
           <template #default="{ row }">
-            <span
-              class="formula-value"
-              :class="{
-                'rate-alert-yellow': isPaidInRateBelowFull(row.paidInRate),
-                'rate-ok': row.paidInRate >= 1.0,
-              }"
-            >
-              {{ fmtPercent(row.paidInRate) }}
-            </span>
-          </template>
-        </el-table-column>
-
-        <!-- 验资机构 -->
-        <el-table-column label="验资机构" min-width="140">
-          <template #default="{ row, $index }">
-            <el-input
-              v-if="!isReadonly"
-              :model-value="row.verifyOrg"
-              size="small"
-              placeholder="验资机构名称"
-              @change="(val: string) => updateVerifyRow($index, 'verifyOrg', val)"
-            />
-            <span v-else>{{ row.verifyOrg || '—' }}</span>
-          </template>
-        </el-table-column>
-
-        <!-- 操作列 -->
-        <el-table-column v-if="!isReadonly" label="操作" width="70" align="center">
-          <template #default="{ $index }">
-            <el-popconfirm title="确认删除该出资人？" @confirm="removeVerifyRow($index)">
-              <template #reference>
-                <el-button type="danger" text size="small">删除</el-button>
-              </template>
-            </el-popconfirm>
+            <el-tag v-if="row.ratio != null" :type="row.ratio < 0.3 ? 'danger' : row.ratio < 0.6 ? 'warning' : 'success'" size="small" effect="plain">{{ (row.ratio * 100).toFixed(1) }}%</el-tag>
+            <span v-else class="muted">—</span>
           </template>
         </el-table-column>
       </el-table>
-
-      <!-- 合计行 -->
-      <div class="summary-bar">
-        <span>认缴合计：<strong>{{ fmtAmount(totalSubscribed) }}</strong></span>
-        <span>实缴合计：<strong>{{ fmtAmount(totalPaid) }}</strong></span>
-        <span>验资合计：<strong>{{ fmtAmount(totalVerified) }}</strong></span>
-        <span>差异合计：<strong :class="{ 'diff-alert-red': isDiffOverThreshold(totalVerifyDiff) }">{{ fmtAmount(totalVerifyDiff) }}</strong></span>
-        <span>整体到位率：<strong :class="{ 'rate-alert-yellow': isPaidInRateBelowFull(overallPaidInRate) }">{{ fmtPercent(overallPaidInRate) }}</strong></span>
+      <el-alert v-if="lowRatioWarnings.length > 0" type="warning" :closable="false" show-icon class="ratio-warn">
+        <template #title>检查比例偏低（&lt;30%）：{{ lowRatioWarnings.map(r => r.direction).join('、') }}，应扩大检查样本量或说明原因</template>
+      </el-alert>
+      <div class="note-block">
+        <label>审计说明</label>
+        <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3 }" :disabled="isReadonly" placeholder="概述测试情况、结果；拟调整事项及分录、未调整事项及其影响等" @change="persist" />
       </div>
     </el-card>
 
-    <!-- ═══ Section 2: 核对清单（8项） ═══ -->
-    <el-card shadow="never" class="check-card">
+    <!-- ═══ 异常凭证摘要 ═══ -->
+    <div v-if="abnormalRows.length > 0" class="abnormal-summary">
+      <div class="as-header">⚠️ 异常凭证摘要（{{ abnormalRows.length }} 笔）</div>
+      <ul class="as-list">
+        <li v-for="r in abnormalRows" :key="r.id"><b>{{ r.debtorName || '（未填出资人）' }}</b> — 凭证 {{ r.voucherNo || '-' }}：{{ r.remark || '未说明' }}</li>
+      </ul>
+    </div>
+
+    <!-- ═══ 五、审计结论 ═══ -->
+    <el-card shadow="never" class="conclusion-card">
       <template #header>
-        <div class="card-header">
-          <span>核对清单</span>
-          <el-progress :percentage="completionRate" :stroke-width="6" style="width: 120px" />
-          <el-button size="small" @click="handleAI('checklist')">
-            <el-icon><MagicStick /></el-icon> AI
+        <div class="card-header-row">
+          <span class="card-title">五、审计结论</span>
+          <el-button size="small" @click="handleAiGenerate">
+            <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
       </template>
-
-      <div class="checklist-items">
-        <div
-          v-for="item in checkItems"
-          :key="item.id"
-          class="checklist-row"
-        >
-          <div class="checklist-row-header">
-            <span class="checklist-title">{{ item.title }}</span>
-            <el-radio-group
-              v-model="item.status"
-              size="small"
-              :disabled="isReadonly"
-              @change="updateCheckStatus(item.id, item.status)"
-            >
-              <el-radio-button
-                v-for="opt in CHECK_STATUS_OPTIONS"
-                :key="opt.value"
-                :value="opt.value"
-              >
-                {{ opt.label }}
-              </el-radio-button>
-            </el-radio-group>
-          </div>
-          <el-input
-            v-if="item.status === 'fail' || item.remark"
-            v-model="item.remark"
-            type="textarea"
-            :autosize="{ minRows: 1, maxRows: 3 }"
-            :readonly="isReadonly"
-            placeholder="检查说明/问题描述..."
-            size="small"
-            class="checklist-remark"
-            @change="updateCheckRemark(item.id, item.remark)"
-          />
-        </div>
-      </div>
-    </el-card>
-
-    <!-- ═══ Section 3: 审计结论区 ═══ -->
-    <el-card shadow="never" class="check-card conclusion-card">
-      <template #header>
-        <div class="card-header">
-          <span>审计结论</span>
-          <el-button size="small" @click="handleAI('conclusion')">
-            <el-icon><MagicStick /></el-icon> AI辅助结论
-          </el-button>
-        </div>
-      </template>
-
-      <el-form label-position="top" size="small">
-        <el-form-item label="审计发现摘要">
-          <el-input
-            v-model="conclusion.findings"
-            type="textarea"
-            :autosize="{ minRows: 3, maxRows: 8 }"
-            :readonly="isReadonly"
-            placeholder="汇总审计发现：验资核对结果/异常差异/到位率不足等事项..."
-            @change="updateConclusion('findings', conclusion.findings)"
-          />
-        </el-form-item>
-        <el-form-item label="最终结论">
-          <el-input
-            v-model="conclusion.conclusion"
-            type="textarea"
-            :autosize="{ minRows: 2, maxRows: 6 }"
-            :readonly="isReadonly"
-            placeholder="实收资本（股本）科目审计结论..."
-            @change="updateConclusion('conclusion', conclusion.conclusion)"
-          />
-        </el-form-item>
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="编制人">
-              <el-input
-                v-model="conclusion.preparedBy"
-                :readonly="isReadonly"
-                placeholder="编制人"
-                @change="updateConclusion('preparedBy', conclusion.preparedBy)"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="结论日期">
-              <el-date-picker
-                v-model="conclusion.conclusionDate"
-                type="date"
-                :disabled="isReadonly"
-                placeholder="选择日期"
-                value-format="YYYY-MM-DD"
-                style="width: 100%"
-                @change="updateConclusion('conclusionDate', conclusion.conclusionDate)"
-              />
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-form>
-    </el-card>
-
-    <!-- ═══ AI辅助sections ═══ -->
-    <el-card
-      v-for="section in aiSections"
-      :key="section.sectionId"
-      shadow="never"
-      class="check-card ai-section"
-    >
-      <template #header>
-        <div class="card-header">
-          <span>{{ section.title }}</span>
-          <el-button
-            size="small"
-            :loading="section.isGenerating"
-            @click="handleAI(section.sectionId)"
-          >
-            <el-icon><MagicStick /></el-icon> {{ section.isGenerating ? '生成中...' : 'AI生成' }}
-          </el-button>
-        </div>
-      </template>
-      <el-input
-        v-model="section.content"
-        type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }"
-        :readonly="isReadonly"
-        :placeholder="`${section.title}分析内容...`"
-        @change="updateAiSectionContent(section.sectionId, section.content)"
-      />
+      <el-select v-model="conclusionOption" :disabled="isReadonly" size="small" class="concl-select" placeholder="选择结论模板" @change="onConclusionOption">
+        <el-option label="A、未见异常" value="A" />
+        <el-option label="B、除上述重大不符事项作为调整事项予以调整外，其余未见异常" value="B" />
+        <el-option label="C、由于存在重大未调整事项（或审计范围受限），不可确认" value="C" />
+      </el-select>
+      <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2 }" :disabled="isReadonly" placeholder="基于上述检查情况，形成综合审计结论..." @change="persist" />
     </el-card>
 
     <!-- ═══ 编制提示 ═══ -->
-    <details class="m2-details-tip">
+    <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>验资核对是实收资本审计的核心程序（ISA 505）</li>
-        <li>逐一核对各出资人实缴出资与验资报告金额</li>
-        <li>验资差异 = 实缴出资 − 验资金额（正差异：账面>验资需查明）</li>
-        <li>出资到位率 = 实缴出资 / 认缴出资（&lt;100%关注公司法出资期限）</li>
-        <li>差异超{{ VERIFY_DIFF_THRESHOLD }}元红色高亮，到位率&lt;100%黄色提示</li>
-        <li>核对清单8项：真实性/完整性/准确性/时效性/非货币/减资/工商/披露</li>
-        <li>全部核对完成后填写审计结论</li>
+        <li>测试目标对应三项认定：存在、权利和义务、准确性/计价和分摊</li>
+        <li>样本选取：实收资本本期增减变动笔数通常较少，如≤10笔可全部检查</li>
+        <li>核对内容五项：①原始凭证是否齐全 ②记账凭证与原始凭证是否相符 ③账务处理是否正确 ④是否记录于恰当的会计期间 ⑤其他</li>
+        <li>支持性文件包括：验资报告、股东（大）会决议、董事会决议、公司章程、营业执照变更、评估报告（非货币出资）</li>
+        <li>检查比例 = 检查金额(贷方合计) / 本期增加金额；实收资本变动少通常应100%检查</li>
+        <li>抽凭引擎科目 4001 实收资本/股本（贷方/权益类）</li>
+        <li>关注：非货币资产出资是否经评估确认价值、出资期限是否逾期、外币出资汇率折算（见M2-4）</li>
       </ul>
     </details>
+
+    <!-- ═══ 抽凭引擎 ═══ -->
+    <el-dialog v-model="samplingVisible" title="抽凭引擎 — 实收资本/股本(4001)" width="90%" top="5vh" destroy-on-close>
+      <GtVoucherSamplingEngine
+        v-if="samplingVisible"
+        account-code="4001"
+        phase="current"
+        :workpaper-id="props.wpId"
+        :project-id="props.projectId"
+        :year="year"
+        @filled="onSamplesFilled"
+      />
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * M2TabCapitalCheck — M2-5 实收资本（股本）检查表（含验资核对）
+ * M2TabCapitalCheck.vue — M2-5 实收资本（股本）检查表（凭证级测试）
  *
- * Spec: .kiro/specs/m2-paid-in-capital/
- * Task: 4.5
- * Requirements: 5.1-5.5
+ * 对齐源模板 M2-5（27×18）：凭证级检查表（非验资核对表）
+ * 科目 4001 实收资本/股本（贷方/权益类）
+ * 仅本期发生额检查（无期后段——实收资本变动是离散事件）
+ * 检查比例 = 贷方检查金额 / 本期增加金额
  *
- * 功能：
- * - 验资核对表格: 出资人|认缴|实缴|验资金额|差异[公式]|出资到位率[公式]|验资机构
- * - 公式: calcVerifyDiff(实缴-验资), calcPaidInRate(实缴/认缴)
- * - 红色高亮|差异>阈值, 黄色提示|到位率<100%
- * - 核对清单 (8 check items with status radio: pass/fail/pending/na)
- * - 审计结论区 (el-card包裹)
- * - 5个AI辅助 section buttons
- * - Uses useM2CapitalCheck + useM2VerifyEngine + useM2FormData
+ * 复用 useK1VoucherCheck composable，itemId = M2-5-voucher-check
  */
-import { computed, inject, onMounted } from 'vue'
-import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import { ElMessageBox } from 'element-plus'
+import { ref, computed, inject, onMounted, defineAsyncComponent } from 'vue'
+import { MagicStick } from '@element-plus/icons-vue'
+import { useK1VoucherCheck, type K1VoucherRow, type K1CheckRatioRow } from '../../composables/useK1VoucherCheck'
 import { useM2FormData } from '../../composables/useM2FormData'
-import {
-  useM2CapitalCheck,
-  CHECK_STATUS_OPTIONS,
-  VERIFY_DIFF_THRESHOLD,
-} from '../../composables/useM2CapitalCheck'
 
-// ─── Props / Emits ───────────────────────────────────────────────────────────
+const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
 const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  year?: number
 }>()
+const emit = defineEmits<{ (e: 'navigate', sheetName: string): void }>()
+const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 
-const emit = defineEmits<{
-  (e: 'navigate', sheetName: string): void
-}>()
+const year = computed(() => props.year ?? new Date().getFullYear())
 
-const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
-
-// ─── Composables ─────────────────────────────────────────────────────────────
+// ─── FormData（自包含加载） ──────────────────────────────────────────────────
 
 const formData = useM2FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
 
+const allResponsesRef = computed(() => formData.allResponses.value)
+
+// ─── 复用 useK1VoucherCheck（M2-5-voucher-check） ────────────────────────────
+
 const {
-  computedVerifyRows,
-  totalSubscribed,
-  totalPaid,
-  totalVerified,
-  totalVerifyDiff,
-  overallPaidInRate,
-  isDiffOverThreshold,
-  isPaidInRateBelowFull,
-  addVerifyRow,
-  removeVerifyRow,
-  updateVerifyRow,
-  checkItems,
-  completionRate,
-  isAllChecked,
-  failedCount,
-  updateCheckStatus,
-  updateCheckRemark,
-  aiSections,
-  updateAiSectionContent,
-  conclusion,
-  updateConclusion,
-} = useM2CapitalCheck(formData)
+  itemId, checkLabels,
+  criteria, occurrenceRows, auditNote, conclusion, conclusionOption,
+  checkRatios, lowRatioWarnings, abnormalRows,
+  occurrenceDebitChecked, occurrenceCreditChecked,
+  load, addOccurrenceRow, removeOccurrenceRow,
+  fillFromSamples, serialize,
+} = useK1VoucherCheck({ allResponses: allResponsesRef as any, itemId: 'M2-5-voucher-check' })
 
-// ─── Handlers ────────────────────────────────────────────────────────────────
+// ─── M2特殊：检查比例仅展示"本期贷方（增资额）"一行 ─────────────────────────────
 
-async function handleAddVerifyRow(): Promise<void> {
-  try {
-    const { value: name } = await ElMessageBox.prompt(
-      '请输入出资人名称',
-      '新增出资人',
-      { confirmButtonText: '确定', cancelButtonText: '取消', inputPlaceholder: '如：张三 / ABC公司' },
-    )
-    if (!name?.trim()) return
-    addVerifyRow(name.trim())
-  } catch {
-    // 用户取消
-  }
-}
+const m2CheckRatios = computed<K1CheckRatioRow[]>(() => {
+  // M2源模板：检查比例 = 检查金额(贷方合计) / 本期增加金额
+  // 也展示借方(减资)供参考
+  const mk = (direction: string, book: number, checked: number): K1CheckRatioRow => ({
+    direction, bookAmount: book, checkedAmount: checked,
+    ratio: book > 0 ? checked / book : null,
+  })
+  return [
+    mk('本期贷方（增资）', criteria.value.populationCreditAmount, occurrenceCreditChecked.value),
+    mk('本期借方（减资）', criteria.value.populationDebitAmount, occurrenceDebitChecked.value),
+  ]
+})
 
-function handleAI(_section: string): void { /* AI辅助待集成 */ }
-function handleReview(): void { openReviewDialog?.('M2-5-capital-check', '实收资本检查表') }
-
-// ─── Format ──────────────────────────────────────────────────────────────────
-
-function fmtAmount(val: number): string {
-  if (val === 0 || val === undefined || val === null) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function fmtPercent(val: number): string {
-  if (val === 0 || val === undefined || val === null) return '—'
-  return `${(val * 100).toFixed(1)}%`
-}
-
-// ─── Init ────────────────────────────────────────────────────────────────────
+// ─── Load ────────────────────────────────────────────────────────────────────
 
 onMounted(async () => {
   await formData.loadData()
+  load()
 })
+
+// ─── 核对内容勾选 ────────────────────────────────────────────────────────────
+
+function checkedValues(row: K1VoucherRow): number[] {
+  return row.checks.map((c, i) => (c ? i : -1)).filter(i => i >= 0)
+}
+function setChecks(row: K1VoucherRow, vals: number[]): void {
+  row.checks = checkLabels.map((_, i) => vals.includes(i))
+  persist()
+}
+
+// ─── 抽凭引擎 ───────────────────────────────────────────────────────────────
+
+const samplingVisible = ref(false)
+
+function openSampling() { samplingVisible.value = true }
+function onSamplesFilled(payload: { samples: any[] }) {
+  fillFromSamples('occurrence', payload?.samples ?? [])
+  samplingVisible.value = false
+  persist()
+}
+
+// ─── 持久化 ──────────────────────────────────────────────────────────────────
+
+function persist() {
+  const data = serialize()
+  formData.allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: data })
+  formData.debouncedSave(itemId, { remark: data })
+}
+
+function onConclusionOption(val: string) {
+  const map: Record<string, string> = {
+    A: '未见异常。',
+    B: '除上述重大不符事项应当作为调整事项予以调整外，其余未见异常。',
+    C: '由于存在重大未调整事项（或审计范围受到限制无法获取充分、适当证据），不可确认。',
+  }
+  if (map[val] && !conclusion.value) conclusion.value = map[val]
+  persist()
+}
+
+// ─── 格式化 ──────────────────────────────────────────────────────────────────
+
+function fmtAmt(val: number | null | undefined): string {
+  if (val == null || val === 0) return '-'
+  return Number(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function abnormalRowClass({ row }: { row: K1VoucherRow }): string { return row.abnormal ? 'abnormal-row' : '' }
+
+// ─── AI + 复核 ───────────────────────────────────────────────────────────────
+
+function handleAiGenerate() { /* AI辅助待集成 */ }
+function handleReview() { openReviewDialog?.('M2-5-voucher-check') }
 </script>
 
 <style scoped>
-.m2-tab-capital-check { padding: 12px; font-size: var(--wp-font-size, 13px); }
-.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
-.section-header-left { display: flex; align-items: center; gap: 8px; }
-.section-header-right { display: flex; align-items: center; gap: 8px; }
-.section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
-.methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
-.methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
-.check-card { margin-bottom: 16px; }
-.card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
-.formula-value { color: #409eff; font-weight: 500; }
-.diff-alert-red { color: #f56c6c !important; font-weight: 700; }
-.rate-alert-yellow { color: #e6a23c !important; font-weight: 600; }
-.rate-ok { color: #67c23a; }
+.m2-tab-capital-check { padding: 12px 14px; font-size: var(--wp-font-size, 13px); }
+
+.guide-banner { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; padding: 14px 16px; margin-bottom: 16px; background: linear-gradient(135deg, #e8f4fd 0%, #f0f9ff 100%); border-radius: 8px; border: 1px solid #d9ecff; }
+.guide-step { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #303133; }
+.gs-no { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: #409eff; color: #fff; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+
+.section-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.sheet-title { margin: 0; font-size: 16px; font-weight: 700; color: #303133; }
+.head-actions { display: flex; align-items: center; gap: 8px; }
+
+.audit-objective { margin-bottom: 14px; }
+:deep(.el-alert__content) { padding: 2px 0; }
+.ao-title { font-weight: 600; font-size: 13px; }
+.ao-list { padding-left: 18px; line-height: 1.55; font-size: 12px; margin: 4px 0 0; }
+
+.methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 10px 14px; border-radius: 0 6px 6px 0; margin-bottom: 16px; font-size: 12px; color: #78350f; line-height: 1.6; }
+
+.section-card { margin-bottom: 14px; }
+.section-card :deep(.el-card__header) { padding: 10px 16px; background: #fafafa; }
+.card-title { font-size: 13px; font-weight: 600; color: #303133; }
+.card-header-row { display: flex; align-items: center; justify-content: space-between; }
+
+.criteria-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.cg-item label { display: block; margin-bottom: 4px; font-size: 12px; color: #606266; font-weight: 500; }
+.cg-full { grid-column: span 2; }
+.cg-inline { display: flex; align-items: center; gap: 6px; }
+.cg-unit { font-size: 12px; color: #909399; }
+.num-sm { width: 90px; }
+.num-md { width: 140px; }
+
+.voucher-table { font-size: var(--wp-font-size, 13px); }
 :deep(.el-table) { font-size: var(--wp-font-size, 13px); }
-.summary-bar { display: flex; gap: 20px; padding: 10px 16px; margin-top: 12px; background: #f5f7fa; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; flex-wrap: wrap; }
-.checklist-items { display: flex; flex-direction: column; gap: 12px; }
-.checklist-row { border: 1px solid #ebeef5; border-radius: 6px; padding: 10px 14px; }
-.checklist-row-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.checklist-title { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #303133; }
-.checklist-remark { margin-top: 8px; }
-.conclusion-card :deep(.el-form-item__label) { font-weight: 500; color: #303133; }
-.ai-section { opacity: 0.9; }
-.m2-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
-.m2-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
-.m2-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
+.amount-input { width: 100%; }
+.amount-cell { font-variant-numeric: tabular-nums; }
+.col-help { border-bottom: 1px dashed #909399; cursor: help; font-size: 12px; }
+.check-group { display: flex; gap: 2px; }
+:deep(.abnormal-row) { background: #fef0f0 !important; }
+.table-total { padding: 8px 12px; font-size: 12px; font-weight: 600; color: #303133; background: #f5f7fa; }
+
+.ratio-table { margin-bottom: 12px; }
+.ratio-warn { margin-top: 8px; margin-bottom: 12px; }
+.muted { color: #c0c4cc; }
+
+.note-block { margin-top: 12px; }
+.note-block label { display: block; margin-bottom: 4px; font-size: 12px; color: #606266; font-weight: 500; }
+
+.abnormal-summary { margin-bottom: 14px; padding: 10px 14px; background: #fef0f0; border: 1px solid #fbc4c4; border-radius: 6px; }
+.as-header { font-size: 13px; font-weight: 600; color: #f56c6c; margin-bottom: 6px; }
+.as-list { padding-left: 18px; font-size: 12px; line-height: 1.6; color: #303133; margin: 0; }
+
+.conclusion-card { margin-bottom: 14px; }
+.concl-select { margin-bottom: 8px; width: 100%; }
+
+.compile-hint { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: 12px; color: #606266; }
+.compile-hint summary { cursor: pointer; font-weight: 500; color: #303133; font-size: 13px; }
+.compile-hint ul { padding-left: 18px; margin: 8px 0 0; line-height: 1.8; }
 </style>

@@ -72,12 +72,13 @@
         :is-readonly="isReadonly"
         @navigate="handleNavigate"
       />
-      <!-- M2-5 实收资本（股本）检查表（含验资核对） -->
+      <!-- M2-5 实收资本（股本）检查表（凭证级测试） -->
       <M2TabCapitalCheck
         v-else-if="currentSheet === 'M2-5'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :year="props.year"
         @navigate="handleNavigate"
       />
       <!-- OnlyOffice fallback: 未迁移 sheet -->
