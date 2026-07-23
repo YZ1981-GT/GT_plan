@@ -113,7 +113,7 @@ export interface M2DetailUnlistedRow {
 export type M2DetailBranch = 'listed' | 'unlisted'
 
 /** 区段Tab类型 */
-export type M2DetailSegment = 'info' | 'changes' | 'ratio'
+export type M2DetailSegment = 'info' | 'changes' | 'adjustments' | 'audited'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -121,14 +121,16 @@ export type M2DetailSegment = 'info' | 'changes' | 'ratio'
 export const M2_LISTED_SEGMENTS = [
   { key: 'info' as const, label: '股东信息' },
   { key: 'changes' as const, label: '股数增减变动' },
-  { key: 'ratio' as const, label: '比例与金额' },
+  { key: 'adjustments' as const, label: '调整区域' },
+  { key: 'audited' as const, label: '审定数+验资' },
 ] as const
 
 /** 非上市版区段定义 */
 export const M2_UNLISTED_SEGMENTS = [
   { key: 'info' as const, label: '出资人信息' },
   { key: 'changes' as const, label: '出资增减' },
-  { key: 'ratio' as const, label: '比例' },
+  { key: 'adjustments' as const, label: '调整区域' },
+  { key: 'audited' as const, label: '审定数+验资' },
 ] as const
 
 /** 股份性质选项 */

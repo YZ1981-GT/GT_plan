@@ -119,30 +119,37 @@
             <span v-else>{{ fmtNumber(row.beginShares) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期增加" min-width="130" align="right">
-          <template #header>
-            <el-tooltip content="贷方增资：增发/转增/配股/权证行权等" placement="top">
-              <span class="formula-col-header">本期增加</span>
-            </el-tooltip>
-          </template>
+        <el-table-column label="发行新股" min-width="110" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
-              v-if="!isReadonly"
-              :model-value="row.increaseShares"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => detail.updateListedRow($index, 'increaseShares', val ?? 0)"
-            />
-            <span v-else>{{ fmtNumber(row.increaseShares) }}</span>
+            <el-input-number v-if="!isReadonly" :model-value="row.incNewIssue ?? 0" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => detail.updateListedRow($index, 'incNewIssue', val ?? 0)" />
+            <span v-else>{{ fmtNumber(row.incNewIssue) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期减少" min-width="130" align="right">
-          <template #header>
-            <el-tooltip content="借方减资：回购/注销/转让等" placement="top">
-              <span class="formula-col-header">本期减少</span>
-            </el-tooltip>
+        <el-table-column label="送股" min-width="100" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number v-if="!isReadonly" :model-value="row.incBonus ?? 0" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => detail.updateListedRow($index, 'incBonus', val ?? 0)" />
+            <span v-else>{{ fmtNumber(row.incBonus) }}</span>
           </template>
+        </el-table-column>
+        <el-table-column label="公积金转股" min-width="110" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number v-if="!isReadonly" :model-value="row.incReserveConvert ?? 0" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => detail.updateListedRow($index, 'incReserveConvert', val ?? 0)" />
+            <span v-else>{{ fmtNumber(row.incReserveConvert) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="其他增加" min-width="100" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number v-if="!isReadonly" :model-value="row.incOther ?? 0" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => detail.updateListedRow($index, 'incOther', val ?? 0)" />
+            <span v-else>{{ fmtNumber(row.incOther) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="增加小计" min-width="110" align="right">
+          <template #header><el-tooltip content="公式: 发行新股+送股+公积金转股+其他" placement="top"><span class="formula-col-header">增加小计</span></el-tooltip></template>
+          <template #default="{ row }">
+            <span class="formula-value">{{ fmtNumber(row.increaseShares) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="本期减少" min-width="110" align="right">
           <template #default="{ row, $index }">
             <el-input-number
               v-if="!isReadonly"
@@ -155,118 +162,93 @@
             <span v-else>{{ fmtNumber(row.decreaseShares) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末股数" min-width="130" align="right">
-          <template #header>
-            <el-tooltip content="公式: 期初 + 本期增加 − 本期减少（权益类贷方）" placement="top">
-              <span class="formula-col-header">期末股数</span>
-            </el-tooltip>
-          </template>
+        <el-table-column label="期末股数" min-width="120" align="right">
+          <template #header><el-tooltip content="公式: 期初 + 增加小计 − 本期减少" placement="top"><span class="formula-col-header">期末股数</span></el-tooltip></template>
           <template #default="{ row }">
             <span class="formula-value formula-value--primary">{{ fmtNumber(row.endShares) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="增加原因" min-width="130">
+      </template>
+
+      <!-- ═══ 区段3: 调整区域（期初调整+账项调整+重分类调整） ═══ -->
+      <template v-if="activeSegment === 'adjustments'">
+        <el-table-column label="期初调整(AJE)" min-width="120" align="right">
           <template #default="{ row, $index }">
-            <el-select
-              v-if="!isReadonly"
-              :model-value="row.increaseReason"
-              size="small"
-              style="width:100%"
-              placeholder="选择"
-              clearable
-              @change="(val: string) => detail.updateListedRow($index, 'increaseReason', val)"
-            >
-              <el-option value="增发" label="增发" />
-              <el-option value="转增" label="转增" />
-              <el-option value="配股" label="配股" />
-              <el-option value="权证行权" label="权证行权" />
-              <el-option value="债转股" label="债转股" />
-              <el-option value="其他" label="其他" />
-            </el-select>
-            <span v-else>{{ row.increaseReason || '—' }}</span>
+            <el-input-number v-if="!isReadonly" :model-value="row.beginAje ?? 0" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => detail.updateListedRow($index, 'beginAje', val ?? 0)" />
+            <span v-else>{{ fmtNumber(row.beginAje) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="减少原因" min-width="130">
+        <el-table-column label="期初调整(RJE)" min-width="120" align="right">
           <template #default="{ row, $index }">
-            <el-select
-              v-if="!isReadonly"
-              :model-value="row.decreaseReason"
-              size="small"
-              style="width:100%"
-              placeholder="选择"
-              clearable
-              @change="(val: string) => detail.updateListedRow($index, 'decreaseReason', val)"
-            >
-              <el-option value="回购" label="回购" />
-              <el-option value="注销" label="注销" />
-              <el-option value="转让" label="转让" />
-              <el-option value="减资" label="减资" />
-              <el-option value="其他" label="其他" />
-            </el-select>
-            <span v-else>{{ row.decreaseReason || '—' }}</span>
+            <el-input-number v-if="!isReadonly" :model-value="row.beginRje ?? 0" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => detail.updateListedRow($index, 'beginRje', val ?? 0)" />
+            <span v-else>{{ fmtNumber(row.beginRje) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账项调整(增)" min-width="120" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number v-if="!isReadonly" :model-value="row.ajeIncrease ?? 0" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => detail.updateListedRow($index, 'ajeIncrease', val ?? 0)" />
+            <span v-else>{{ fmtNumber(row.ajeIncrease) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账项调整(减)" min-width="120" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number v-if="!isReadonly" :model-value="row.ajeDecrease ?? 0" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => detail.updateListedRow($index, 'ajeDecrease', val ?? 0)" />
+            <span v-else>{{ fmtNumber(row.ajeDecrease) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="重分类调整(增)" min-width="120" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number v-if="!isReadonly" :model-value="row.rjeIncrease ?? 0" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => detail.updateListedRow($index, 'rjeIncrease', val ?? 0)" />
+            <span v-else>{{ fmtNumber(row.rjeIncrease) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="重分类调整(减)" min-width="120" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number v-if="!isReadonly" :model-value="row.rjeDecrease ?? 0" :controls="false" size="small" style="width:100%" @change="(val: number | undefined) => detail.updateListedRow($index, 'rjeDecrease', val ?? 0)" />
+            <span v-else>{{ fmtNumber(row.rjeDecrease) }}</span>
           </template>
         </el-table-column>
       </template>
 
-      <!-- ═══ 区段3: 比例与金额 ═══ -->
-      <template v-if="activeSegment === 'ratio'">
-        <el-table-column label="持股比例" min-width="110" align="right">
-          <template #header>
-            <el-tooltip content="公式: 个人期末股数 / 合计期末股数" placement="top">
-              <span class="formula-col-header">持股比例</span>
-            </el-tooltip>
+      <!-- ═══ 区段4: 审定数+验资 ═══ -->
+      <template v-if="activeSegment === 'audited'">
+        <el-table-column label="审定期初" min-width="120" align="right">
+          <template #header><el-tooltip content="公式: 期初未审 + 期初AJE + 期初RJE" placement="top"><span class="formula-col-header">审定期初</span></el-tooltip></template>
+          <template #default="{ row }">
+            <span class="formula-value">{{ fmtNumber((row.beginShares ?? 0) + (row.beginAje ?? 0) + (row.beginRje ?? 0)) }}</span>
           </template>
+        </el-table-column>
+        <el-table-column label="审定期末" min-width="120" align="right">
+          <template #header><el-tooltip content="公式: 期末未审 + AJE增减 + RJE增减" placement="top"><span class="formula-col-header">审定期末</span></el-tooltip></template>
+          <template #default="{ row }">
+            <span class="formula-value formula-value--primary">{{ fmtNumber((row.endShares ?? 0) + (row.ajeIncrease ?? 0) - (row.ajeDecrease ?? 0) + (row.rjeIncrease ?? 0) - (row.rjeDecrease ?? 0)) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="审定比例" min-width="100" align="right">
+          <template #header><el-tooltip content="公式: 个人审定期末 / 合计审定期末" placement="top"><span class="formula-col-header">审定比例</span></el-tooltip></template>
           <template #default="{ row }">
             <span class="formula-value">{{ fmtPercent(row.shareRatio) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="面值" min-width="100" align="right">
+        <el-table-column label="是否验资" min-width="90" align="center">
           <template #default="{ row, $index }">
-            <el-input-number
-              v-if="!isReadonly"
-              :model-value="row.parValue"
-              :controls="false"
-              :precision="2"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => detail.updateListedRow($index, 'parValue', val ?? 1)"
-            />
-            <span v-else>{{ fmtAmount(row.parValue) }}</span>
+            <el-select v-if="!isReadonly" :model-value="row.isVerified ?? ''" size="small" style="width:100%" placeholder="选择" @change="(val: string) => detail.updateListedRow($index, 'isVerified', val)">
+              <el-option value="是" label="是" />
+              <el-option value="否" label="否" />
+              <el-option value="N/A" label="N/A" />
+            </el-select>
+            <span v-else>{{ row.isVerified || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期初金额" min-width="130" align="right">
+        <el-table-column label="验资报告索引" min-width="120">
           <template #default="{ row, $index }">
-            <el-input-number
-              v-if="!isReadonly"
-              :model-value="row.beginAmount"
-              :controls="false"
-              :precision="2"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => detail.updateListedRow($index, 'beginAmount', val ?? 0)"
-            />
-            <span v-else>{{ fmtAmount(row.beginAmount) }}</span>
+            <el-input v-if="!isReadonly" :model-value="row.verifyReportRef ?? ''" size="small" placeholder="索引号" @change="(val: string) => detail.updateListedRow($index, 'verifyReportRef', val)" />
+            <span v-else>{{ row.verifyReportRef || '—' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末金额" min-width="130" align="right">
-          <template #header>
-            <el-tooltip content="公式: 期末股数 × 面值" placement="top">
-              <span class="formula-col-header">期末金额</span>
-            </el-tooltip>
-          </template>
-          <template #default="{ row }">
-            <span class="formula-value formula-value--primary">{{ fmtAmount(row.endAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="备注" min-width="160">
+        <el-table-column label="备注" min-width="140">
           <template #default="{ row, $index }">
-            <el-input
-              v-if="!isReadonly"
-              :model-value="row.remark"
-              size="small"
-              placeholder="备注"
-              @change="(val: string) => detail.updateListedRow($index, 'remark', val)"
-            />
+            <el-input v-if="!isReadonly" :model-value="row.remark" size="small" placeholder="备注" @change="(val: string) => detail.updateListedRow($index, 'remark', val)" />
             <span v-else>{{ row.remark || '—' }}</span>
           </template>
         </el-table-column>
