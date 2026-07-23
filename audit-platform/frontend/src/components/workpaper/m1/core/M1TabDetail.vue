@@ -126,6 +126,29 @@
             <span v-else>{{ row.remark || '—' }}</span>
           </template>
         </el-table-column>
+        <el-table-column v-if="isColVisible('endAging')" label="期末账龄" width="120" align="center">
+          <template #default="{ row, $index }">
+            <el-select v-if="!isReadonly" :model-value="row.endAging" size="small" style="width:100%" placeholder="选择" @change="(val: string) => handleUpdate($index, 'endAging', val)">
+              <el-option label="1年以内" value="1年以内" />
+              <el-option label="1-2年" value="1-2年" />
+              <el-option label="2-3年" value="2-3年" />
+              <el-option label="3年以上" value="3年以上" />
+            </el-select>
+            <span v-else>{{ row.endAging || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="isColVisible('overdueReason')" label="超1年未支付原因" min-width="160">
+          <template #default="{ row, $index }">
+            <el-input v-if="!isReadonly" :model-value="row.overdueReason" size="small" placeholder="超过1年未支付的原因" @change="(val: string) => handleUpdate($index, 'overdueReason', val)" />
+            <span v-else>{{ row.overdueReason || '—' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="isColVisible('docIndexRef')" label="相关文件索引" width="130">
+          <template #default="{ row, $index }">
+            <el-input v-if="!isReadonly" :model-value="row.docIndexRef" size="small" placeholder="索引号" @change="(val: string) => handleUpdate($index, 'docIndexRef', val)" />
+            <span v-else>{{ row.docIndexRef || '—' }}</span>
+          </template>
+        </el-table-column>
       </template>
 
       <!-- ═══ 区段2: 宣告金额（贷方增加） ═══ -->
@@ -409,6 +432,9 @@ const ALL_COLS: ColDef[] = [
   { key: 'currency', label: '币种', segment: 'shareholder' },
   { key: 'shareholderType', label: '股东类型', segment: 'shareholder' },
   { key: 'remark', label: '备注', segment: 'shareholder' },
+  { key: 'endAging', label: '期末账龄', segment: 'shareholder' },
+  { key: 'overdueReason', label: '超1年未支付原因', segment: 'shareholder' },
+  { key: 'docIndexRef', label: '相关文件索引', segment: 'shareholder' },
   { key: 'beginBalance', label: '期初应付', segment: 'declared' },
   { key: 'declaredAmount', label: '本期宣告', segment: 'declared' },
   { key: 'declaredDate', label: '宣告日期', segment: 'declared' },

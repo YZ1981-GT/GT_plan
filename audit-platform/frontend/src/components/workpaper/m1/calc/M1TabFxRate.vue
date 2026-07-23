@@ -194,6 +194,21 @@
       <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写外币汇率测算审计说明..." :disabled="isReadonly" @change="saveAuditNote" />
     </el-card>
 
+    <!-- ═══ 审计结论（源模板四、审计结论） ═══ -->
+    <el-card shadow="never" class="conclusion-card">
+      <template #header>
+        <div class="section-header">
+          <span class="card-title">审计结论</span>
+        </div>
+      </template>
+      <el-select v-model="conclusionOption" :disabled="isReadonly" size="small" class="concl-select" placeholder="选择结论模板" @change="onConclusionOption">
+        <el-option label="A、未见异常，可以确认" value="A" />
+        <el-option label="B、经审计调整后可确认" value="B" />
+        <el-option label="C、由于存在重大未调整事项（或审计范围受限），不可确认" value="C" />
+      </el-select>
+      <el-input v-model="conclusionText" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="基于上述汇率测算核对情况，对外币应付股利折算的准确性发表结论..." @change="saveConclusion" />
+    </el-card>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="m1-details-tip">
       <summary>编制提示</summary>
@@ -312,12 +327,26 @@ function _restoreRows(): void {
       const parsed = JSON.parse(saved.remark)
       if (Array.isArray(parsed) && parsed.length > 0) {
         rows.value = parsed
-        return
       }
     } catch { /* use empty */ }
   }
-  // 默认空行
-  rows.value = []
+  if (rows.value.length === 0) rows.value = []
+
+  // 恢复审计说明
+  const savedNote = formData.allResponses.value.get('M1-4-auditNote')
+  if (savedNote?.remark) {
+    auditNote.value = savedNote.remark
+  }
+
+  // 恢复结论
+  const savedConclusion = formData.allResponses.value.get('M1-4-conclusion')
+  if (savedConclusion?.remark) {
+    try {
+      const c = JSON.parse(savedConclusion.remark)
+      conclusionOption.value = c.option || ''
+      conclusionText.value = c.text || ''
+    } catch { /* ignore */ }
+  }
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -385,18 +414,55 @@ function handleImportExport(command: string): void {
 }
 
 function handleAI(section: string = 'general'): void {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: `m1-fx-rate-${section}`,
-      prompt: `请基于应付股利底稿"${section}"区段数据，给出审计分析建议`,
-      context: { section, wpId: props.wpId },
-    }).catch(() => {})
+  import('@/utils/http').then(async ({ default: h }) => {
+    try {
+      const res = await h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+        section: `m1-fx-rate-${section}`,
+        prompt: '请基于外币汇率测算表数据，分析汇兑差异及影响，给出审计建议',
+        context: {
+          section: String(section),
+          wpId: String(props.wpId),
+          totalConverted: String(totalConverted.value),
+          totalBooked: String(totalBooked.value),
+          totalFxDiff: String(totalFxDiff.value),
+          rowCount: String(rows.value.length),
+        },
+      })
+      const content = res?.data?.content || res?.content || ''
+      if (content && !auditNote.value) {
+        auditNote.value = content
+        saveAuditNote()
+      }
+    } catch {
+      // AI生成失败静默
+    }
   })
 }
 function handleReview(): void { openReviewDialog?.('M1-4-fx-rate', '外币汇率测算表') }
 
 function saveAuditNote() {
   formData.debouncedSave('M1-4-auditNote', { remark: auditNote.value || null })
+}
+
+// ─── 审计结论 ────────────────────────────────────────────────────────────────
+
+const conclusionOption = ref('')
+const conclusionText = ref('')
+
+function onConclusionOption(val: string) {
+  const map: Record<string, string> = {
+    A: '未见异常，可以确认。',
+    B: '经审计调整后可确认。',
+    C: '由于存在上述重大未调整事项（或审计范围受到限制无法获取充分、适当证据），不可确认。',
+  }
+  if (map[val] && !conclusionText.value) conclusionText.value = map[val]
+  saveConclusion()
+}
+
+function saveConclusion() {
+  formData.debouncedSave('M1-4-conclusion', {
+    remark: JSON.stringify({ option: conclusionOption.value, text: conclusionText.value }),
+  })
 }
 
 // ─── Format ──────────────────────────────────────────────────────────────────
@@ -426,6 +492,8 @@ onMounted(async () => {
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
 .methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .audit-note-card { margin-top: 16px; }
+.conclusion-card { margin-top: 12px; }
+.concl-select { width: 100%; margin-bottom: 8px; }
 .card-title { font-size: 14px; font-weight: 600; color: #303133; }
 .formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
 .formula-value { color: #409eff; font-weight: 500; }

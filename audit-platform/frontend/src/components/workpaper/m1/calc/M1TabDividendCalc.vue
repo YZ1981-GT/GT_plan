@@ -170,20 +170,31 @@
         </template>
       </el-table-column>
 
-      <!-- 差异说明（当差异超阈值时需填写） -->
-      <el-table-column label="差异说明" min-width="180">
+      <!-- 差异说明（所有行均可填写，源模板无阈值限制） -->
+      <el-table-column label="差异原因" min-width="160">
         <template #default="{ row, $index }">
           <el-input
-            v-if="!isReadonly && Math.abs(row.declareDiff) > declareThreshold"
+            v-if="!isReadonly"
             :model-value="row.diffNote"
-            type="textarea"
-            :autosize="{ minRows: 1, maxRows: 3 }"
             size="small"
-            placeholder="差异超阈值，请填写说明"
+            :placeholder="Math.abs(row.declareDiff) > declareThreshold ? '差异超阈值，必须说明' : '差异原因（选填）'"
             @change="(val: string) => handleUpdate($index, 'diffNote', val)"
           />
-          <span v-else-if="row.diffNote">{{ row.diffNote }}</span>
-          <span v-else class="text-muted">—</span>
+          <span v-else>{{ row.diffNote || '—' }}</span>
+        </template>
+      </el-table-column>
+
+      <!-- 备注列（源模板明确有） -->
+      <el-table-column label="备注" min-width="120">
+        <template #default="{ row, $index }">
+          <el-input
+            v-if="!isReadonly"
+            :model-value="row.remark"
+            size="small"
+            placeholder="备注"
+            @change="(val: string) => handleUpdate($index, 'remark', val)"
+          />
+          <span v-else>{{ row.remark || '—' }}</span>
         </template>
       </el-table-column>
 
@@ -229,6 +240,21 @@
         </div>
       </template>
       <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写股利测算审计说明..." :disabled="isReadonly" @change="saveAuditNote" />
+    </el-card>
+
+    <!-- ═══ 审计结论（源模板五、审计结论 A/B/C） ═══ -->
+    <el-card shadow="never" class="conclusion-card">
+      <template #header>
+        <div class="section-header">
+          <span class="card-title">审计结论</span>
+        </div>
+      </template>
+      <el-select v-model="conclusionOption" :disabled="isReadonly" size="small" class="concl-select" placeholder="选择结论模板" @change="onConclusionOption">
+        <el-option label="A、未见异常，可以确认" value="A" />
+        <el-option label="B、经审计调整后可确认" value="B" />
+        <el-option label="C、由于存在重大未调整事项（或审计范围受限），不可确认" value="C" />
+      </el-select>
+      <el-input v-model="conclusionText" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" :disabled="isReadonly" placeholder="基于上述测算核对情况，对应付股利计提金额的准确性、完整性发表结论..." @change="saveConclusion" />
     </el-card>
 
     <!-- ═══ 编制提示 ═══ -->
@@ -290,6 +316,7 @@ interface DividendRow {
   ratio: number
   booked: number
   diffNote: string
+  remark: string
 }
 
 interface ComputedDividendRow extends DividendRow {
@@ -357,6 +384,19 @@ function _persistRows(): void {
   formData.debouncedSave('M1-M1-5-dividend-rows', {
     remark: JSON.stringify(rows.value),
   })
+  // P2: 通知M1-6检查表——差异超阈值的股东建议纳入特定样本
+  _emitDeclareWarning()
+}
+
+/** 当有差异超阈值的股东时，通知M1-6 */
+function _emitDeclareWarning(): void {
+  const threshold = declareThreshold.value
+  const overThreshold = computedRows.value
+    .filter(r => Math.abs(r.declareDiff) > threshold)
+    .map(r => ({ name: r.shareholderName, diff: r.declareDiff }))
+  if (overThreshold.length > 0) {
+    eventBus.emit('m1:declare-diff-warning' as any, { shareholders: overThreshold })
+  }
 }
 
 function _restoreRows(): void {
@@ -365,7 +405,7 @@ function _restoreRows(): void {
     try {
       const parsed = JSON.parse(saved.remark)
       if (Array.isArray(parsed) && parsed.length > 0) {
-        rows.value = parsed
+        rows.value = parsed.map((r: any) => ({ ...r, remark: r.remark || '' }))
         // 检查是否已有 M6 数据
         if (parsed.some((r: DividendRow) => r.profit > 0)) {
           m6DataReady.value = true
@@ -376,6 +416,22 @@ function _restoreRows(): void {
     } catch { /* use empty */ }
   }
   rows.value = []
+
+  // 恢复结论
+  const savedConclusion = formData.allResponses.value.get('M1-5-conclusion')
+  if (savedConclusion?.remark) {
+    try {
+      const c = JSON.parse(savedConclusion.remark)
+      conclusionOption.value = c.option || ''
+      conclusionText.value = c.text || ''
+    } catch { /* ignore */ }
+  }
+
+  // 恢复审计说明
+  const savedNote = formData.allResponses.value.get('M1-5-auditNote')
+  if (savedNote?.remark) {
+    auditNote.value = savedNote.remark
+  }
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -395,6 +451,7 @@ async function handleAddRow(): Promise<void> {
       ratio: 0,
       booked: 0,
       diffNote: '',
+      remark: '',
     })
     _persistRows()
   } catch {
@@ -443,18 +500,55 @@ function handleImportExport(command: string): void {
 }
 
 function handleAI(section: string = 'general'): void {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: `m1-dividend-calc-${section}`,
-      prompt: `请基于应付股利底稿"${section}"区段数据，给出审计分析建议`,
-      context: { section, wpId: props.wpId },
-    }).catch(() => {})
+  import('@/utils/http').then(async ({ default: h }) => {
+    try {
+      const res = await h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+        section: `m1-dividend-calc-${section}`,
+        prompt: '请基于应付股利测算表数据，分析各股东宣告差异及原因，给出审计建议',
+        context: {
+          section: String(section),
+          wpId: String(props.wpId),
+          totalDeclared: String(totalDeclared.value),
+          totalBooked: String(totalBooked.value),
+          totalDiff: String(totalDeclareDiff.value),
+          shareholderCount: String(rows.value.length),
+        },
+      })
+      const content = res?.data?.content || res?.content || ''
+      if (content && !auditNote.value) {
+        auditNote.value = content
+        saveAuditNote()
+      }
+    } catch {
+      // AI生成失败静默
+    }
   })
 }
 function handleReview(): void { openReviewDialog?.('M1-5-dividend-calc', '股利测算表') }
 
 function saveAuditNote() {
   formData.debouncedSave('M1-5-auditNote', { remark: auditNote.value || null })
+}
+
+// ─── 审计结论 ────────────────────────────────────────────────────────────────
+
+const conclusionOption = ref('')
+const conclusionText = ref('')
+
+function onConclusionOption(val: string) {
+  const map: Record<string, string> = {
+    A: '未见异常，可以确认。',
+    B: '经审计调整后可确认。',
+    C: '由于存在上述重大未调整事项（或审计范围受到限制无法获取充分、适当证据），不可确认。',
+  }
+  if (map[val] && !conclusionText.value) conclusionText.value = map[val]
+  saveConclusion()
+}
+
+function saveConclusion() {
+  formData.debouncedSave('M1-5-conclusion', {
+    remark: JSON.stringify({ option: conclusionOption.value, text: conclusionText.value }),
+  })
 }
 
 // ─── Format ──────────────────────────────────────────────────────────────────
@@ -490,6 +584,8 @@ onUnmounted(() => {
 .m6-pending-alert { margin-bottom: 12px; }
 .m6-ready-alert { margin-bottom: 12px; }
 .audit-note-card { margin-top: 16px; }
+.conclusion-card { margin-top: 12px; }
+.concl-select { width: 100%; margin-bottom: 8px; }
 .card-title { font-size: 14px; font-weight: 600; color: #303133; }
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
 .methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
